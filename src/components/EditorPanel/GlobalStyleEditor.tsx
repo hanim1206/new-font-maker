@@ -5,8 +5,15 @@ import { useLayoutStore } from '../../stores/layoutStore'
 import { useJamoStore } from '../../stores/jamoStore'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { decomposeSyllable, isHangul } from '../../utils/hangulUtils'
-import type { LayoutType } from '../../types'
+import type { LayoutType, Padding } from '../../types'
 import styles from './GlobalStyleEditor.module.css'
+
+const PADDING_SIDES: Array<{ key: keyof Padding; label: string }> = [
+  { key: 'top', label: '상단' },
+  { key: 'bottom', label: '하단' },
+  { key: 'left', label: '좌측' },
+  { key: 'right', label: '우측' },
+]
 
 const LAYOUT_TYPES: Array<{ type: LayoutType; label: string }> = [
   { type: 'choseong-only', label: '초성만' },
@@ -33,7 +40,7 @@ export function GlobalStyleEditor() {
     resetStyle,
   } = useGlobalStyleStore()
   const { inputText, selectedCharIndex } = useUIStore()
-  const { getLayoutSchema, getEffectivePadding } = useLayoutStore()
+  const { getLayoutSchema, getEffectivePadding, globalPadding, updateGlobalPadding } = useLayoutStore()
   const { choseong, jungseong, jongseong } = useJamoStore()
 
   // 선택된 글자 기반 미리보기 음절
@@ -141,6 +148,35 @@ export function GlobalStyleEditor() {
             }
             className={styles.slider}
           />
+        </div>
+      </div>
+
+      {/* 글로벌 여백 */}
+      <div className={styles.section}>
+        <h4 className={styles.sectionTitle}>여백 (Padding)</h4>
+
+        <div className={styles.paddingGrid}>
+          {PADDING_SIDES.map(({ key, label }) => (
+            <div key={key} className={styles.sliderGroup}>
+              <div className={styles.sliderLabel}>
+                <span className={styles.labelText}>{label}</span>
+                <span className={styles.labelValue}>
+                  {(globalPadding[key] * 100).toFixed(0)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={0.3}
+                step={0.01}
+                value={globalPadding[key]}
+                onChange={(e) =>
+                  updateGlobalPadding(key, parseFloat(e.target.value))
+                }
+                className={`${styles.slider} ${styles.paddingSlider}`}
+              />
+            </div>
+          ))}
         </div>
       </div>
 

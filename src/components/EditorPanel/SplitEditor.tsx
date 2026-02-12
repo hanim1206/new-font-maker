@@ -25,7 +25,6 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
     getLayoutSchema,
     updateSplit,
     globalPadding,
-    updateGlobalPadding,
     getEffectivePadding,
     hasPaddingOverride,
     setPaddingOverride,
@@ -40,13 +39,6 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
 
   const handleSplitChange = (index: number, value: number) => {
     updateSplit(layoutType, index, value)
-  }
-
-  const handleGlobalPaddingChange = (
-    side: keyof Padding,
-    value: number
-  ) => {
-    updateGlobalPadding(side, value)
   }
 
   const handleOverridePaddingChange = (
@@ -128,42 +120,6 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
           </p>
         </div>
       )}
-
-      {/* 글로벌 여백 */}
-      <div className={styles.section}>
-        <h4 className={styles.sectionTitle}>
-          <span className={styles.sectionIcon}>↔️</span>
-          글로벌 여백 (전체 레이아웃)
-        </h4>
-
-        <div className={styles.paddingGrid}>
-          {PADDING_SIDES.map(({ key, label }) => (
-            <div key={key} className={styles.sliderGroup}>
-              <div className={styles.sliderLabel}>
-                <span className={styles.labelText}>{label}</span>
-                <span className={styles.labelValue}>
-                  {(globalPadding[key] * 100).toFixed(0)}%
-                </span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={0.3}
-                step={0.01}
-                value={globalPadding[key]}
-                onChange={(e) =>
-                  handleGlobalPaddingChange(key, parseFloat(e.target.value))
-                }
-                className={`${styles.slider} ${styles.paddingSlider}`}
-              />
-            </div>
-          ))}
-        </div>
-
-        <p className={styles.infoText}>
-          글로벌 여백은 모든 레이아웃에 일괄 적용됩니다.
-        </p>
-      </div>
 
       {/* 이 레이아웃 여백 오버라이드 */}
       <div className={styles.section}>

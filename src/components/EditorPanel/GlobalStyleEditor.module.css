@@ -114,6 +114,21 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
+/* 여백 그리드 */
+.paddingGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.paddingSlider::-webkit-slider-thumb {
+  background: #9b59b6;
+}
+
+.paddingSlider::-webkit-slider-thumb:hover {
+  background: #a569c6;
+}
+
 /* 제외 설정 */
 .infoText {
   font-size: 0.8rem;
