@@ -86,7 +86,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
 
   // viewBox를 박스 영역에 맞춰 줌 (마진 포함)
   // 너무 납작해지지 않도록 최소 종횡비(높이/너비) 제한
-  const MIN_HEIGHT_RATIO = 0.5
+  const MIN_HEIGHT_RATIO = 0.75
   let vbX = boxX - VIEW_MARGIN
   let vbY = boxY - VIEW_MARGIN
   const vbW = boxWidth + 2 * VIEW_MARGIN

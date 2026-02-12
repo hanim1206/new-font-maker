@@ -2,7 +2,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .emptyState {
@@ -12,12 +12,11 @@
 }
 
 .threeColumnLayout {
-  flex: 1;
   display: grid;
   grid-template-columns: 200px 1fr 250px;
   gap: 16px;
   padding: 20px;
-  overflow: hidden;
+  min-height: 400px;
 }
 
 .leftPanel,
@@ -48,7 +47,6 @@
 .centerPanel {
   align-items: center;
   justify-content: center;
-  overflow: hidden;
 }
 
 .rightPanel {
