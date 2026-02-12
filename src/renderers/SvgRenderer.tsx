@@ -251,8 +251,10 @@ export function SvgRenderer({
   const svgHeight = size * visualHeightRatio
 
   // slant(기울기) 변환: 캔버스 중심 기준 skewX
+  const centerX = VIEW_BOX_SIZE / 2
+  const centerY = visualHeight / 2
   const slantTransform = slant !== 0
-    ? `skewX(${-slant})`
+    ? `translate(${centerX}, ${centerY}) skewX(${-slant}) translate(${-centerX}, ${-centerY})`
     : undefined
 
   return (

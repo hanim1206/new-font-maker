@@ -315,8 +315,8 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
           />
         )}
 
-        {/* 획들 (박스 영역 내 상대 좌표) - slant 적용 */}
-        <g transform={slant !== 0 ? `skewX(${-slant})` : undefined}>
+        {/* 획들 (박스 영역 내 상대 좌표) - slant 적용 (중심 기준) */}
+        <g transform={slant !== 0 ? `translate(${viewBoxWidth / 2}, ${viewBoxHeight / 2}) skewX(${-slant}) translate(${-viewBoxWidth / 2}, ${-viewBoxHeight / 2})` : undefined}>
         {strokes.map((stroke) => {
           const isSelected = stroke.id === selectedStrokeId
           const { strokeX, strokeY, boundsWidth, boundsHeight } = getStrokeBounds(stroke)
