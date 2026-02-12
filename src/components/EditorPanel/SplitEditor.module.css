@@ -1,0 +1,224 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section {
+  padding: 16px;
+  background: #111;
+  border-radius: 8px;
+  border: 1px solid #1a1a1a;
+}
+
+.sectionTitle {
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin: 0 0 16px 0;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sectionIcon {
+  font-size: 1rem;
+}
+
+.sliderGroup {
+  margin-bottom: 16px;
+}
+
+.sliderGroup:last-child {
+  margin-bottom: 0;
+}
+
+.sliderLabel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.labelText {
+  font-size: 0.9rem;
+  color: #ccc;
+  font-weight: 500;
+}
+
+.labelValue {
+  font-size: 0.85rem;
+  color: #888;
+  font-family: 'SF Mono', 'Consolas', monospace;
+  background: #1a1a1a;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.slider {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: #1a1a1a;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #4a9eff;
+  cursor: pointer;
+  border: 2px solid #222;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  background: #5aafff;
+}
+
+.slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #4a9eff;
+  cursor: pointer;
+  border: 2px solid #222;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Split 유형별 색상 */
+.sliderX::-webkit-slider-thumb {
+  background: #ff6b6b;
+}
+
+.sliderX::-webkit-slider-thumb:hover {
+  background: #ff8585;
+}
+
+.sliderY::-webkit-slider-thumb {
+  background: #4ecdc4;
+}
+
+.sliderY::-webkit-slider-thumb:hover {
+  background: #6de0d8;
+}
+
+/* Padding 슬라이더 */
+.paddingGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.paddingSlider::-webkit-slider-thumb {
+  background: #9b59b6;
+}
+
+.paddingSlider::-webkit-slider-thumb:hover {
+  background: #a569c6;
+}
+
+/* 정보 텍스트 */
+.infoText {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #1a1a1a;
+  line-height: 1.5;
+}
+
+/* 슬롯 정보 */
+.slotsInfo {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.slotBadge {
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.slotCH {
+  background: rgba(255, 107, 107, 0.2);
+  color: #ff6b6b;
+}
+
+.slotJU {
+  background: rgba(78, 205, 196, 0.2);
+  color: #4ecdc4;
+}
+
+.slotJU_H {
+  background: rgba(255, 149, 0, 0.2);
+  color: #ff9500;
+}
+
+.slotJU_V {
+  background: rgba(255, 215, 0, 0.2);
+  color: #ffd700;
+}
+
+.slotJO {
+  background: rgba(65, 105, 225, 0.2);
+  color: #4169e1;
+}
+
+/* 비주얼 프리뷰 */
+.visualPreview {
+  /* width: 100%; */
+  height: 200px;
+  aspect-ratio: 1 / 1.1; /* 논리 좌표 1:1, 시각 캔버스 1:1.1 */
+  margin-top: 16px;
+  background: #0a0a0a;
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.splitLineX {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ff6b6b;
+  z-index: 2;
+}
+
+.splitLineY {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #4ecdc4;
+  z-index: 2;
+}
+
+.slotArea {
+  position: absolute;
+  border: 1px dashed;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+}
+

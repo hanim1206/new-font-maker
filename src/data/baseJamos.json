@@ -1,0 +1,2829 @@
+{
+  "version": "1.0.0",
+  "choseong": {
+    "ㄱ": {
+      "char": "ㄱ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㄱ-1",
+          "x": 0.1,
+          "y": 0.15,
+          "width": 0.7,
+          "height": 0.15,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄱ-2",
+          "x": 0.7,
+          "y": 0.15,
+          "width": 0.15,
+          "height": 0.7,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㄲ": {
+      "char": "ㄲ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㄲ-1",
+          "x": 0.05,
+          "y": 0.15,
+          "width": 0.35,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄲ-2",
+          "x": 0.32,
+          "y": 0.15,
+          "width": 0.12,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄲ-3",
+          "x": 0.5,
+          "y": 0.15,
+          "width": 0.35,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄲ-4",
+          "x": 0.77,
+          "y": 0.15,
+          "width": 0.12,
+          "height": 0.7,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㄴ": {
+      "char": "ㄴ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㄴ-1",
+          "x": 0.15,
+          "y": 0.15,
+          "width": 0.15,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄴ-2",
+          "x": 0.15,
+          "y": 0.7,
+          "width": 0.7,
+          "height": 0.15,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㄷ": {
+      "char": "ㄷ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㄷ-1",
+          "x": 0.15,
+          "y": 0.15,
+          "width": 0.7,
+          "height": 0.15,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄷ-2",
+          "x": 0.15,
+          "y": 0.15,
+          "width": 0.15,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄷ-3",
+          "x": 0.15,
+          "y": 0.7,
+          "width": 0.7,
+          "height": 0.15,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㄸ": {
+      "char": "ㄸ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㄸ-1",
+          "x": 0.05,
+          "y": 0.15,
+          "width": 0.35,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄸ-2",
+          "x": 0.05,
+          "y": 0.15,
+          "width": 0.1,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄸ-3",
+          "x": 0.05,
+          "y": 0.75,
+          "width": 0.35,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄸ-4",
+          "x": 0.55,
+          "y": 0.15,
+          "width": 0.35,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄸ-5",
+          "x": 0.55,
+          "y": 0.15,
+          "width": 0.1,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄸ-6",
+          "x": 0.55,
+          "y": 0.75,
+          "width": 0.35,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㄹ": {
+      "char": "ㄹ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㄹ-1",
+          "x": 0.1,
+          "y": 0.15,
+          "width": 0.75,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄹ-2",
+          "x": 0.73,
+          "y": 0.15,
+          "width": 0.12,
+          "height": 0.3,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄹ-3",
+          "x": 0.1,
+          "y": 0.45,
+          "width": 0.75,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄹ-4",
+          "x": 0.1,
+          "y": 0.45,
+          "width": 0.12,
+          "height": 0.3,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄹ-5",
+          "x": 0.1,
+          "y": 0.73,
+          "width": 0.75,
+          "height": 0.12,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅁ": {
+      "char": "ㅁ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅁ-1",
+          "x": 0.15,
+          "y": 0.15,
+          "width": 0.7,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅁ-2",
+          "x": 0.15,
+          "y": 0.15,
+          "width": 0.12,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅁ-3",
+          "x": 0.73,
+          "y": 0.15,
+          "width": 0.12,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅁ-4",
+          "x": 0.15,
+          "y": 0.73,
+          "width": 0.7,
+          "height": 0.12,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅂ": {
+      "char": "ㅂ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅂ-1",
+          "x": 0.15,
+          "y": 0.1,
+          "width": 0.12,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅂ-2",
+          "x": 0.73,
+          "y": 0.1,
+          "width": 0.12,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅂ-3",
+          "x": 0.15,
+          "y": 0.4,
+          "width": 0.7,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅂ-4",
+          "x": 0.15,
+          "y": 0.78,
+          "width": 0.7,
+          "height": 0.12,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅃ": {
+      "char": "ㅃ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅃ-1",
+          "x": 0.05,
+          "y": 0.1,
+          "width": 0.08,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅃ-2",
+          "x": 0.32,
+          "y": 0.1,
+          "width": 0.08,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅃ-3",
+          "x": 0.05,
+          "y": 0.4,
+          "width": 0.35,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅃ-4",
+          "x": 0.05,
+          "y": 0.8,
+          "width": 0.35,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅃ-5",
+          "x": 0.55,
+          "y": 0.1,
+          "width": 0.08,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅃ-6",
+          "x": 0.82,
+          "y": 0.1,
+          "width": 0.08,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅃ-7",
+          "x": 0.55,
+          "y": 0.4,
+          "width": 0.35,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅃ-8",
+          "x": 0.55,
+          "y": 0.8,
+          "width": 0.35,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅅ": {
+      "char": "ㅅ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅅ-1",
+          "x": 0.25000000000000006,
+          "y": 0.3,
+          "width": 0.09999999999999999,
+          "height": 0.6,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅅ-2",
+          "x": 0.65,
+          "y": 0.3,
+          "width": 0.09999999999999999,
+          "height": 0.6,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅅ-3",
+          "x": 0.35,
+          "y": 0.20000000000000004,
+          "width": 0.3,
+          "height": 0.09999999999999999,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅆ": {
+      "char": "ㅆ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅆ-1",
+          "x": 0.08,
+          "y": 0.35,
+          "width": 0.1,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅆ-2",
+          "x": 0.32,
+          "y": 0.35,
+          "width": 0.1,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅆ-3",
+          "x": 0.15,
+          "y": 0.2,
+          "width": 0.2,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅆ-4",
+          "x": 0.55,
+          "y": 0.35,
+          "width": 0.1,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅆ-5",
+          "x": 0.8,
+          "y": 0.35,
+          "width": 0.1,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅆ-6",
+          "x": 0.62,
+          "y": 0.2,
+          "width": 0.2,
+          "height": 0.12,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅇ": {
+      "char": "ㅇ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅇ-circle",
+          "x": 0.15,
+          "y": 0.15,
+          "width": 0.7,
+          "height": 0.7,
+          "direction": "path",
+          "pathData": {
+            "closed": true,
+            "points": [
+              { "x": 0.5, "y": 0.0, "handleIn": { "x": 0.2239, "y": 0.0 }, "handleOut": { "x": 0.7761, "y": 0.0 } },
+              { "x": 1.0, "y": 0.5, "handleIn": { "x": 1.0, "y": 0.2239 }, "handleOut": { "x": 1.0, "y": 0.7761 } },
+              { "x": 0.5, "y": 1.0, "handleIn": { "x": 0.7761, "y": 1.0 }, "handleOut": { "x": 0.2239, "y": 1.0 } },
+              { "x": 0.0, "y": 0.5, "handleIn": { "x": 0.0, "y": 0.7761 }, "handleOut": { "x": 0.0, "y": 0.2239 } }
+            ]
+          }
+        }
+      ]
+    },
+    "ㅈ": {
+      "char": "ㅈ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅈ-1",
+          "x": 0.1,
+          "y": 0.25,
+          "width": 0.8,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅈ-2",
+          "x": 0.2,
+          "y": 0.35,
+          "width": 0.12,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅈ-3",
+          "x": 0.68,
+          "y": 0.35,
+          "width": 0.12,
+          "height": 0.55,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅉ": {
+      "char": "ㅉ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅉ-1",
+          "x": 0.05,
+          "y": 0.25,
+          "width": 0.4,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅉ-2",
+          "x": 0.1,
+          "y": 0.35,
+          "width": 0.08,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅉ-3",
+          "x": 0.35,
+          "y": 0.35,
+          "width": 0.08,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅉ-4",
+          "x": 0.15,
+          "y": 0.1,
+          "width": 0.2,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅉ-5",
+          "x": 0.55,
+          "y": 0.25,
+          "width": 0.4,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅉ-6",
+          "x": 0.58,
+          "y": 0.35,
+          "width": 0.08,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅉ-7",
+          "x": 0.85,
+          "y": 0.35,
+          "width": 0.08,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅉ-8",
+          "x": 0.65,
+          "y": 0.1,
+          "width": 0.2,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅊ": {
+      "char": "ㅊ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅊ-1",
+          "x": 0.1,
+          "y": 0.35,
+          "width": 0.8,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅊ-2",
+          "x": 0.2,
+          "y": 0.45,
+          "width": 0.12,
+          "height": 0.45,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅊ-3",
+          "x": 0.68,
+          "y": 0.45,
+          "width": 0.12,
+          "height": 0.45,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅊ-4",
+          "x": 0.35,
+          "y": 0.2,
+          "width": 0.3,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅋ": {
+      "char": "ㅋ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅋ-1",
+          "x": 0.1,
+          "y": 0.15,
+          "width": 0.7,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅋ-2",
+          "x": 0.7,
+          "y": 0.15,
+          "width": 0.12,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅋ-3",
+          "x": 0.1,
+          "y": 0.45,
+          "width": 0.6,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅌ": {
+      "char": "ㅌ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅌ-1",
+          "x": 0.15,
+          "y": 0.12,
+          "width": 0.7,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅌ-2",
+          "x": 0.15,
+          "y": 0.12,
+          "width": 0.1,
+          "height": 0.76,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅌ-3",
+          "x": 0.15,
+          "y": 0.78,
+          "width": 0.7,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅌ-4",
+          "x": 0.15,
+          "y": 0.45,
+          "width": 0.7,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅍ": {
+      "char": "ㅍ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅍ-1",
+          "x": 0.1,
+          "y": 0.15,
+          "width": 0.8,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅍ-2",
+          "x": 0.1,
+          "y": 0.75,
+          "width": 0.8,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅍ-3",
+          "x": 0.25,
+          "y": 0.25,
+          "width": 0.1,
+          "height": 0.5,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅍ-4",
+          "x": 0.65,
+          "y": 0.25,
+          "width": 0.1,
+          "height": 0.5,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅎ": {
+      "char": "ㅎ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅎ-1",
+          "x": 0.35,
+          "y": 0.05,
+          "width": 0.3,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅎ-2",
+          "x": 0.15,
+          "y": 0.22,
+          "width": 0.7,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅎ-circle",
+          "x": 0.2,
+          "y": 0.38,
+          "width": 0.6,
+          "height": 0.55,
+          "direction": "path",
+          "pathData": {
+            "closed": true,
+            "points": [
+              { "x": 0.5, "y": 0.0, "handleIn": { "x": 0.2239, "y": 0.0 }, "handleOut": { "x": 0.7761, "y": 0.0 } },
+              { "x": 1.0, "y": 0.5, "handleIn": { "x": 1.0, "y": 0.2239 }, "handleOut": { "x": 1.0, "y": 0.7761 } },
+              { "x": 0.5, "y": 1.0, "handleIn": { "x": 0.7761, "y": 1.0 }, "handleOut": { "x": 0.2239, "y": 1.0 } },
+              { "x": 0.0, "y": 0.5, "handleIn": { "x": 0.0, "y": 0.7761 }, "handleOut": { "x": 0.0, "y": 0.2239 } }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "jungseong": {
+    "ㅏ": {
+      "char": "ㅏ",
+      "type": "jungseong",
+      "strokes": [
+        {
+          "id": "ㅏ-1",
+          "x": 0.3,
+          "y": 0.1,
+          "width": 0.15,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅏ-2",
+          "x": 0.3,
+          "y": 0.4,
+          "width": 0.55,
+          "height": 0.12,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅐ": {
+      "char": "ㅐ",
+      "type": "jungseong",
+      "strokes": [
+        {
+          "id": "ㅐ-1",
+          "x": 0.09999999999999999,
+          "y": 0.1,
+          "width": 0.20000000000000007,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅐ-2",
+          "x": 0.2900000000000001,
+          "y": 0.4,
+          "width": 0.4,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅐ-3",
+          "x": 0.6900000000000001,
+          "y": 0.1,
+          "width": 0.19000000000000006,
+          "height": 0.8,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅑ": {
+      "char": "ㅑ",
+      "type": "jungseong",
+      "strokes": [
+        {
+          "id": "ㅑ-1",
+          "x": 0.25,
+          "y": 0.1,
+          "width": 0.12,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅑ-2",
+          "x": 0.25,
+          "y": 0.3,
+          "width": 0.55,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅑ-3",
+          "x": 0.25,
+          "y": 0.55,
+          "width": 0.55,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅒ": {
+      "char": "ㅒ",
+      "type": "jungseong",
+      "verticalStrokes": [
+        {
+          "id": "ㅒ-1",
+          "x": 0.12,
+          "y": 0.1,
+          "width": 0.1,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅒ-2",
+          "x": 0.12,
+          "y": 0.3,
+          "width": 0.35,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅒ-3",
+          "x": 0.12,
+          "y": 0.55,
+          "width": 0.35,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅒ-4",
+          "x": 0.6,
+          "y": 0.1,
+          "width": 0.1,
+          "height": 0.8,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅓ": {
+      "char": "ㅓ",
+      "type": "jungseong",
+      "strokes": [
+        {
+          "id": "ㅓ-1",
+          "x": 0.55,
+          "y": 0.1,
+          "width": 0.15,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅓ-2",
+          "x": 0.15,
+          "y": 0.4,
+          "width": 0.55,
+          "height": 0.12,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅔ": {
+      "char": "ㅔ",
+      "type": "jungseong",
+      "strokes": [
+        {
+          "id": "ㅔ-1",
+          "x": 0.29000000000000004,
+          "y": 0.1,
+          "width": 0.20000000000000007,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅔ-2",
+          "x": 0,
+          "y": 0.4,
+          "width": 0.37,
+          "height": 0.13,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅔ-3",
+          "x": 0.66,
+          "y": 0.1,
+          "width": 0.19000000000000006,
+          "height": 0.8,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅕ": {
+      "char": "ㅕ",
+      "type": "jungseong",
+      "strokes": [
+        {
+          "id": "ㅕ-1",
+          "x": 0.55,
+          "y": 0.1,
+          "width": 0.12,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅕ-2",
+          "x": 0.15,
+          "y": 0.3,
+          "width": 0.55,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅕ-3",
+          "x": 0.15,
+          "y": 0.55,
+          "width": 0.55,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅖ": {
+      "char": "ㅖ",
+      "type": "jungseong",
+      "verticalStrokes": [
+        {
+          "id": "ㅖ-1",
+          "x": 0.25,
+          "y": 0.1,
+          "width": 0.1,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅖ-2",
+          "x": 0.35,
+          "y": 0.3,
+          "width": 0.3,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅖ-3",
+          "x": 0.35,
+          "y": 0.55,
+          "width": 0.3,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅖ-4",
+          "x": 0.65,
+          "y": 0.1,
+          "width": 0.1,
+          "height": 0.8,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅗ": {
+      "char": "ㅗ",
+      "type": "jungseong",
+      "strokes": [
+        {
+          "id": "ㅗ-1",
+          "x": 0.43,
+          "y": 0.1,
+          "width": 0.14,
+          "height": 0.5,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅗ-2",
+          "x": 0.1,
+          "y": 0.6,
+          "width": 0.8,
+          "height": 0.15,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅘ": {
+      "char": "ㅘ",
+      "type": "jungseong",
+      "horizontalStrokes": [
+        {
+          "id": "ㅘ-1",
+          "x": 0.38,
+          "y": 0.09000000000000001,
+          "width": 0.1,
+          "height": 0.35,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅘ-2",
+          "x": 0.1,
+          "y": 0.45,
+          "width": 0.6200000000000001,
+          "height": 0.19000000000000006,
+          "direction": "horizontal"
+        }
+      ],
+      "verticalStrokes": [
+        {
+          "id": "ㅘ-3",
+          "x": 0.5299999999999999,
+          "y": 0.1,
+          "width": 0.15000000000000002,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅘ-4",
+          "x": 0.65,
+          "y": 0.45,
+          "width": 0.25,
+          "height": 0.08,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅙ": {
+      "char": "ㅙ",
+      "type": "jungseong",
+      "horizontalStrokes": [
+        {
+          "id": "ㅙ-1",
+          "x": 0.3600000000000001,
+          "y": 0.12,
+          "width": 0.10999999999999999,
+          "height": 0.38,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅙ-2",
+          "x": 0.1,
+          "y": 0.46,
+          "width": 0.6000000000000002,
+          "height": 0.18000000000000002,
+          "direction": "horizontal"
+        }
+      ],
+      "verticalStrokes": [
+        {
+          "id": "ㅙ-3",
+          "x": 0.31999999999999984,
+          "y": 0.1,
+          "width": 0.19000000000000003,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅙ-4",
+          "x": 0.5,
+          "y": 0.45,
+          "width": 0.25000000000000006,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅙ-5",
+          "x": 0.74,
+          "y": 0.1,
+          "width": 0.16,
+          "height": 0.8,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅚ": {
+      "char": "ㅚ",
+      "type": "jungseong",
+      "horizontalStrokes": [
+        {
+          "id": "ㅚ-1",
+          "x": 0.35,
+          "y": 0.1,
+          "width": 0.1,
+          "height": 0.4,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅚ-2",
+          "x": 0.1,
+          "y": 0.5,
+          "width": 0.55,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ],
+      "verticalStrokes": [
+        {
+          "id": "ㅚ-3",
+          "x": 0.7,
+          "y": 0.1,
+          "width": 0.1,
+          "height": 0.8,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅛ": {
+      "char": "ㅛ",
+      "type": "jungseong",
+      "strokes": [
+        {
+          "id": "ㅛ-1",
+          "x": 0.25,
+          "y": 0.1,
+          "width": 0.1,
+          "height": 0.5,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅛ-2",
+          "x": 0.55,
+          "y": 0.1,
+          "width": 0.1,
+          "height": 0.5,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅛ-3",
+          "x": 0.1,
+          "y": 0.6,
+          "width": 0.8,
+          "height": 0.15,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅜ": {
+      "char": "ㅜ",
+      "type": "jungseong",
+      "strokes": [
+        {
+          "id": "ㅜ-1",
+          "x": 0.1,
+          "y": 0.25,
+          "width": 0.8,
+          "height": 0.15,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅜ-2",
+          "x": 0.43,
+          "y": 0.4,
+          "width": 0.14,
+          "height": 0.5,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅝ": {
+      "char": "ㅝ",
+      "type": "jungseong",
+      "horizontalStrokes": [
+        {
+          "id": "ㅝ-1",
+          "x": 0.1,
+          "y": 0.35,
+          "width": 0.55,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅝ-2",
+          "x": 0.35,
+          "y": 0.45,
+          "width": 0.1,
+          "height": 0.45,
+          "direction": "vertical"
+        }
+      ],
+      "verticalStrokes": [
+        {
+          "id": "ㅝ-3",
+          "x": 0.65,
+          "y": 0.1,
+          "width": 0.1,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅝ-4",
+          "x": 0.65,
+          "y": 0.45,
+          "width": 0.25,
+          "height": 0.08,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅞ": {
+      "char": "ㅞ",
+      "type": "jungseong",
+      "horizontalStrokes": [
+        {
+          "id": "ㅞ-1",
+          "x": 0.03,
+          "y": 0.0999999999999998,
+          "width": 0.5700000000000002,
+          "height": 0.16,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅞ-2",
+          "x": 0.28,
+          "y": 0.27999999999999986,
+          "width": 0.08,
+          "height": 0.5900000000000001,
+          "direction": "vertical"
+        }
+      ],
+      "verticalStrokes": [
+        {
+          "id": "ㅞ-3",
+          "x": 0.33000000000000007,
+          "y": 0.040000000000000015,
+          "width": 0.17000000000000004,
+          "height": 0.9300000000000002,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅞ-4",
+          "x": 0,
+          "y": 0.7100000000000003,
+          "width": 0.37,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅞ-5",
+          "x": 0.6900000000000001,
+          "y": 0.01000000000000001,
+          "width": 0.17000000000000004,
+          "height": 0.9700000000000002,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅟ": {
+      "char": "ㅟ",
+      "type": "jungseong",
+      "horizontalStrokes": [
+        {
+          "id": "ㅟ-1",
+          "x": 0.1,
+          "y": 0.3,
+          "width": 0.55,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅟ-2",
+          "x": 0.35,
+          "y": 0.4,
+          "width": 0.1,
+          "height": 0.5,
+          "direction": "vertical"
+        }
+      ],
+      "verticalStrokes": [
+        {
+          "id": "ㅟ-3",
+          "x": 0.7,
+          "y": 0.1,
+          "width": 0.1,
+          "height": 0.8,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅠ": {
+      "char": "ㅠ",
+      "type": "jungseong",
+      "strokes": [
+        {
+          "id": "ㅠ-1",
+          "x": 0.1,
+          "y": 0.25,
+          "width": 0.8,
+          "height": 0.15,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅠ-2",
+          "x": 0.25,
+          "y": 0.4,
+          "width": 0.1,
+          "height": 0.5,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅠ-3",
+          "x": 0.55,
+          "y": 0.4,
+          "width": 0.1,
+          "height": 0.5,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅡ": {
+      "char": "ㅡ",
+      "type": "jungseong",
+      "strokes": [
+        {
+          "id": "ㅡ-1",
+          "x": 0.1,
+          "y": 0.43,
+          "width": 0.8,
+          "height": 0.14,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅢ": {
+      "char": "ㅢ",
+      "type": "jungseong",
+      "horizontalStrokes": [
+        {
+          "id": "ㅢ-1",
+          "x": 0.1,
+          "y": 0.35,
+          "width": 0.55,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ],
+      "verticalStrokes": [
+        {
+          "id": "ㅢ-2",
+          "x": 0.7,
+          "y": 0.1,
+          "width": 0.1,
+          "height": 0.8,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅣ": {
+      "char": "ㅣ",
+      "type": "jungseong",
+      "strokes": [
+        {
+          "id": "ㅣ-1",
+          "x": 0.43,
+          "y": 0.1,
+          "width": 0.14,
+          "height": 0.8,
+          "direction": "vertical"
+        }
+      ]
+    }
+  },
+  "jongseong": {
+    "ㄱ": {
+      "char": "ㄱ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄱ종-1",
+          "x": 0.1,
+          "y": 0.15,
+          "width": 0.7,
+          "height": 0.15,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄱ종-2",
+          "x": 0.7,
+          "y": 0.15,
+          "width": 0.15,
+          "height": 0.7,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㄲ": {
+      "char": "ㄲ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄲ종-1",
+          "x": 0.05,
+          "y": 0.15,
+          "width": 0.35,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄲ종-2",
+          "x": 0.32,
+          "y": 0.15,
+          "width": 0.12,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄲ종-3",
+          "x": 0.5,
+          "y": 0.15,
+          "width": 0.35,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄲ종-4",
+          "x": 0.77,
+          "y": 0.15,
+          "width": 0.12,
+          "height": 0.7,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㄳ": {
+      "char": "ㄳ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄳ-1",
+          "x": 0.05,
+          "y": 0.15,
+          "width": 0.3,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄳ-2",
+          "x": 0.28,
+          "y": 0.15,
+          "width": 0.1,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄳ-3",
+          "x": 0.5,
+          "y": 0.3,
+          "width": 0.1,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄳ-4",
+          "x": 0.75,
+          "y": 0.3,
+          "width": 0.1,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄳ-5",
+          "x": 0.55,
+          "y": 0.15,
+          "width": 0.25,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㄴ": {
+      "char": "ㄴ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄴ종-1",
+          "x": 0.15,
+          "y": 0.15,
+          "width": 0.15,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄴ종-2",
+          "x": 0.15,
+          "y": 0.7,
+          "width": 0.7,
+          "height": 0.15,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㄵ": {
+      "char": "ㄵ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄵ-1",
+          "x": 0.1,
+          "y": 0.1,
+          "width": 0.1,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄵ-2",
+          "x": 0.1,
+          "y": 0.8,
+          "width": 0.3,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄵ-3",
+          "x": 0.45,
+          "y": 0.25,
+          "width": 0.45,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄵ-4",
+          "x": 0.5,
+          "y": 0.33,
+          "width": 0.08,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄵ-5",
+          "x": 0.78,
+          "y": 0.33,
+          "width": 0.08,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄵ-6",
+          "x": 0.58,
+          "y": 0.12,
+          "width": 0.2,
+          "height": 0.08,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㄶ": {
+      "char": "ㄶ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄶ-1",
+          "x": 0.1,
+          "y": 0.1,
+          "width": 0.1,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄶ-2",
+          "x": 0.1,
+          "y": 0.8,
+          "width": 0.25,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄶ-3",
+          "x": 0.55,
+          "y": 0.08,
+          "width": 0.2,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄶ-4",
+          "x": 0.45,
+          "y": 0.22,
+          "width": 0.45,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄶ-5",
+          "x": 0.5,
+          "y": 0.5,
+          "width": 0.35,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄶ-6",
+          "x": 0.5,
+          "y": 0.72,
+          "width": 0.35,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄶ-7",
+          "x": 0.45,
+          "y": 0.5,
+          "width": 0.06,
+          "height": 0.3,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄶ-8",
+          "x": 0.84,
+          "y": 0.5,
+          "width": 0.06,
+          "height": 0.3,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㄷ": {
+      "char": "ㄷ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄷ종-1",
+          "x": 0.15,
+          "y": 0.15,
+          "width": 0.7,
+          "height": 0.15,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄷ종-2",
+          "x": 0.15,
+          "y": 0.15,
+          "width": 0.15,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄷ종-3",
+          "x": 0.15,
+          "y": 0.7,
+          "width": 0.7,
+          "height": 0.15,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㄹ": {
+      "char": "ㄹ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄹ종-1",
+          "x": 0.1,
+          "y": 0.15,
+          "width": 0.75,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄹ종-2",
+          "x": 0.73,
+          "y": 0.15,
+          "width": 0.12,
+          "height": 0.3,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄹ종-3",
+          "x": 0.1,
+          "y": 0.45,
+          "width": 0.75,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄹ종-4",
+          "x": 0.1,
+          "y": 0.45,
+          "width": 0.12,
+          "height": 0.3,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄹ종-5",
+          "x": 0.1,
+          "y": 0.73,
+          "width": 0.75,
+          "height": 0.12,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㄺ": {
+      "char": "ㄺ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄺ-1",
+          "x": 0.05,
+          "y": 0.08,
+          "width": 0.35,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄺ-2",
+          "x": 0.33,
+          "y": 0.08,
+          "width": 0.07,
+          "height": 0.18,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄺ-3",
+          "x": 0.05,
+          "y": 0.26,
+          "width": 0.35,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄺ-4",
+          "x": 0.05,
+          "y": 0.26,
+          "width": 0.07,
+          "height": 0.18,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄺ-5",
+          "x": 0.05,
+          "y": 0.44,
+          "width": 0.35,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄺ-6",
+          "x": 0.05,
+          "y": 0.44,
+          "width": 0.07,
+          "height": 0.46,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄺ-7",
+          "x": 0.05,
+          "y": 0.82,
+          "width": 0.35,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄺ-8",
+          "x": 0.5,
+          "y": 0.15,
+          "width": 0.35,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄺ-9",
+          "x": 0.78,
+          "y": 0.15,
+          "width": 0.1,
+          "height": 0.7,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㄻ": {
+      "char": "ㄻ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄻ-1",
+          "x": 0.02,
+          "y": 0.08,
+          "width": 0.3,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄻ-2",
+          "x": 0.26,
+          "y": 0.08,
+          "width": 0.06,
+          "height": 0.15,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄻ-3",
+          "x": 0.02,
+          "y": 0.23,
+          "width": 0.3,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄻ-4",
+          "x": 0.02,
+          "y": 0.23,
+          "width": 0.06,
+          "height": 0.15,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄻ-5",
+          "x": 0.02,
+          "y": 0.38,
+          "width": 0.3,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄻ-6",
+          "x": 0.02,
+          "y": 0.38,
+          "width": 0.06,
+          "height": 0.52,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄻ-7",
+          "x": 0.02,
+          "y": 0.84,
+          "width": 0.3,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄻ-8",
+          "x": 0.45,
+          "y": 0.15,
+          "width": 0.45,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄻ-9",
+          "x": 0.45,
+          "y": 0.15,
+          "width": 0.1,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄻ-10",
+          "x": 0.8,
+          "y": 0.15,
+          "width": 0.1,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄻ-11",
+          "x": 0.45,
+          "y": 0.75,
+          "width": 0.45,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㄼ": {
+      "char": "ㄼ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄼ-1",
+          "x": 0.02,
+          "y": 0.08,
+          "width": 0.28,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄼ-2",
+          "x": 0.24,
+          "y": 0.08,
+          "width": 0.06,
+          "height": 0.15,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄼ-3",
+          "x": 0.02,
+          "y": 0.23,
+          "width": 0.28,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄼ-4",
+          "x": 0.02,
+          "y": 0.23,
+          "width": 0.06,
+          "height": 0.15,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄼ-5",
+          "x": 0.02,
+          "y": 0.38,
+          "width": 0.28,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄼ-6",
+          "x": 0.02,
+          "y": 0.38,
+          "width": 0.06,
+          "height": 0.52,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄼ-7",
+          "x": 0.02,
+          "y": 0.84,
+          "width": 0.28,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄼ-8",
+          "x": 0.4,
+          "y": 0.1,
+          "width": 0.08,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄼ-9",
+          "x": 0.82,
+          "y": 0.1,
+          "width": 0.08,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄼ-10",
+          "x": 0.4,
+          "y": 0.4,
+          "width": 0.5,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄼ-11",
+          "x": 0.4,
+          "y": 0.8,
+          "width": 0.5,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㄽ": {
+      "char": "ㄽ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄽ-1",
+          "x": 0.02,
+          "y": 0.08,
+          "width": 0.28,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄽ-2",
+          "x": 0.24,
+          "y": 0.08,
+          "width": 0.06,
+          "height": 0.15,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄽ-3",
+          "x": 0.02,
+          "y": 0.23,
+          "width": 0.28,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄽ-4",
+          "x": 0.02,
+          "y": 0.23,
+          "width": 0.06,
+          "height": 0.15,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄽ-5",
+          "x": 0.02,
+          "y": 0.38,
+          "width": 0.28,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄽ-6",
+          "x": 0.02,
+          "y": 0.38,
+          "width": 0.06,
+          "height": 0.52,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄽ-7",
+          "x": 0.02,
+          "y": 0.84,
+          "width": 0.28,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄽ-8",
+          "x": 0.45,
+          "y": 0.35,
+          "width": 0.1,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄽ-9",
+          "x": 0.75,
+          "y": 0.35,
+          "width": 0.1,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄽ-10",
+          "x": 0.52,
+          "y": 0.15,
+          "width": 0.2,
+          "height": 0.12,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㄾ": {
+      "char": "ㄾ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄾ-1",
+          "x": 0.02,
+          "y": 0.08,
+          "width": 0.28,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄾ-2",
+          "x": 0.24,
+          "y": 0.08,
+          "width": 0.06,
+          "height": 0.15,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄾ-3",
+          "x": 0.02,
+          "y": 0.23,
+          "width": 0.28,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄾ-4",
+          "x": 0.02,
+          "y": 0.23,
+          "width": 0.06,
+          "height": 0.15,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄾ-5",
+          "x": 0.02,
+          "y": 0.38,
+          "width": 0.28,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄾ-6",
+          "x": 0.02,
+          "y": 0.38,
+          "width": 0.06,
+          "height": 0.52,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄾ-7",
+          "x": 0.02,
+          "y": 0.84,
+          "width": 0.28,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄾ-8",
+          "x": 0.4,
+          "y": 0.15,
+          "width": 0.5,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄾ-9",
+          "x": 0.4,
+          "y": 0.15,
+          "width": 0.08,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄾ-10",
+          "x": 0.4,
+          "y": 0.77,
+          "width": 0.5,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄾ-11",
+          "x": 0.4,
+          "y": 0.45,
+          "width": 0.5,
+          "height": 0.08,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㄿ": {
+      "char": "ㄿ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄿ-1",
+          "x": 0.02,
+          "y": 0.08,
+          "width": 0.28,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄿ-2",
+          "x": 0.24,
+          "y": 0.08,
+          "width": 0.06,
+          "height": 0.15,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄿ-3",
+          "x": 0.02,
+          "y": 0.23,
+          "width": 0.28,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄿ-4",
+          "x": 0.02,
+          "y": 0.23,
+          "width": 0.06,
+          "height": 0.15,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄿ-5",
+          "x": 0.02,
+          "y": 0.38,
+          "width": 0.28,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄿ-6",
+          "x": 0.02,
+          "y": 0.38,
+          "width": 0.06,
+          "height": 0.52,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄿ-7",
+          "x": 0.02,
+          "y": 0.84,
+          "width": 0.28,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄿ-8",
+          "x": 0.4,
+          "y": 0.15,
+          "width": 0.5,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄿ-9",
+          "x": 0.4,
+          "y": 0.77,
+          "width": 0.5,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄿ-10",
+          "x": 0.52,
+          "y": 0.25,
+          "width": 0.08,
+          "height": 0.5,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄿ-11",
+          "x": 0.72,
+          "y": 0.25,
+          "width": 0.08,
+          "height": 0.5,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅀ": {
+      "char": "ㅀ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅀ-1",
+          "x": 0.02,
+          "y": 0.08,
+          "width": 0.26,
+          "height": 0.05,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅀ-2",
+          "x": 0.23,
+          "y": 0.08,
+          "width": 0.05,
+          "height": 0.14,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅀ-3",
+          "x": 0.02,
+          "y": 0.22,
+          "width": 0.26,
+          "height": 0.05,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅀ-4",
+          "x": 0.02,
+          "y": 0.22,
+          "width": 0.05,
+          "height": 0.14,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅀ-5",
+          "x": 0.02,
+          "y": 0.36,
+          "width": 0.26,
+          "height": 0.05,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅀ-6",
+          "x": 0.02,
+          "y": 0.36,
+          "width": 0.05,
+          "height": 0.54,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅀ-7",
+          "x": 0.02,
+          "y": 0.85,
+          "width": 0.26,
+          "height": 0.05,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅀ-8",
+          "x": 0.55,
+          "y": 0.08,
+          "width": 0.15,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅀ-9",
+          "x": 0.4,
+          "y": 0.2,
+          "width": 0.5,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅀ-10",
+          "x": 0.5,
+          "y": 0.48,
+          "width": 0.35,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅀ-11",
+          "x": 0.5,
+          "y": 0.68,
+          "width": 0.35,
+          "height": 0.06,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅀ-12",
+          "x": 0.45,
+          "y": 0.48,
+          "width": 0.05,
+          "height": 0.26,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅀ-13",
+          "x": 0.84,
+          "y": 0.48,
+          "width": 0.05,
+          "height": 0.26,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅁ": {
+      "char": "ㅁ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅁ종-1",
+          "x": 0.15,
+          "y": 0.15,
+          "width": 0.7,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅁ종-2",
+          "x": 0.15,
+          "y": 0.15,
+          "width": 0.12,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅁ종-3",
+          "x": 0.73,
+          "y": 0.15,
+          "width": 0.12,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅁ종-4",
+          "x": 0.15,
+          "y": 0.73,
+          "width": 0.7,
+          "height": 0.12,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅂ": {
+      "char": "ㅂ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅂ종-1",
+          "x": 0.15,
+          "y": 0.1,
+          "width": 0.12,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅂ종-2",
+          "x": 0.73,
+          "y": 0.1,
+          "width": 0.12,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅂ종-3",
+          "x": 0.15,
+          "y": 0.4,
+          "width": 0.7,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅂ종-4",
+          "x": 0.15,
+          "y": 0.78,
+          "width": 0.7,
+          "height": 0.12,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅄ": {
+      "char": "ㅄ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅄ-1",
+          "x": 0.05,
+          "y": 0.1,
+          "width": 0.08,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅄ-2",
+          "x": 0.32,
+          "y": 0.1,
+          "width": 0.08,
+          "height": 0.8,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅄ-3",
+          "x": 0.05,
+          "y": 0.4,
+          "width": 0.35,
+          "height": 0.08,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅄ-4",
+          "x": 0.05,
+          "y": 0.8,
+          "width": 0.35,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅄ-5",
+          "x": 0.52,
+          "y": 0.35,
+          "width": 0.08,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅄ-6",
+          "x": 0.8,
+          "y": 0.35,
+          "width": 0.08,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅄ-7",
+          "x": 0.6,
+          "y": 0.15,
+          "width": 0.18,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅅ": {
+      "char": "ㅅ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅅ종-1",
+          "x": 0.2,
+          "y": 0.3,
+          "width": 0.15,
+          "height": 0.6,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅅ종-2",
+          "x": 0.65,
+          "y": 0.3,
+          "width": 0.15,
+          "height": 0.6,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅅ종-3",
+          "x": 0.35,
+          "y": 0.15,
+          "width": 0.3,
+          "height": 0.15,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅆ": {
+      "char": "ㅆ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅆ종-1",
+          "x": 0.08,
+          "y": 0.35,
+          "width": 0.1,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅆ종-2",
+          "x": 0.32,
+          "y": 0.35,
+          "width": 0.1,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅆ종-3",
+          "x": 0.15,
+          "y": 0.2,
+          "width": 0.2,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅆ종-4",
+          "x": 0.55,
+          "y": 0.35,
+          "width": 0.1,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅆ종-5",
+          "x": 0.8,
+          "y": 0.35,
+          "width": 0.1,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅆ종-6",
+          "x": 0.62,
+          "y": 0.2,
+          "width": 0.2,
+          "height": 0.12,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅇ": {
+      "char": "ㅇ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅇ종-circle",
+          "x": 0.15,
+          "y": 0.15,
+          "width": 0.7,
+          "height": 0.7,
+          "direction": "path",
+          "pathData": {
+            "closed": true,
+            "points": [
+              { "x": 0.5, "y": 0.0, "handleIn": { "x": 0.2239, "y": 0.0 }, "handleOut": { "x": 0.7761, "y": 0.0 } },
+              { "x": 1.0, "y": 0.5, "handleIn": { "x": 1.0, "y": 0.2239 }, "handleOut": { "x": 1.0, "y": 0.7761 } },
+              { "x": 0.5, "y": 1.0, "handleIn": { "x": 0.7761, "y": 1.0 }, "handleOut": { "x": 0.2239, "y": 1.0 } },
+              { "x": 0.0, "y": 0.5, "handleIn": { "x": 0.0, "y": 0.7761 }, "handleOut": { "x": 0.0, "y": 0.2239 } }
+            ]
+          }
+        }
+      ]
+    },
+    "ㅈ": {
+      "char": "ㅈ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅈ종-1",
+          "x": 0.1,
+          "y": 0.25,
+          "width": 0.8,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅈ종-2",
+          "x": 0.2,
+          "y": 0.35,
+          "width": 0.12,
+          "height": 0.55,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅈ종-3",
+          "x": 0.68,
+          "y": 0.35,
+          "width": 0.12,
+          "height": 0.55,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅊ": {
+      "char": "ㅊ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅊ종-1",
+          "x": 0.1,
+          "y": 0.35,
+          "width": 0.8,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅊ종-2",
+          "x": 0.2,
+          "y": 0.45,
+          "width": 0.12,
+          "height": 0.45,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅊ종-3",
+          "x": 0.68,
+          "y": 0.45,
+          "width": 0.12,
+          "height": 0.45,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅊ종-4",
+          "x": 0.35,
+          "y": 0.2,
+          "width": 0.3,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅋ": {
+      "char": "ㅋ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅋ종-1",
+          "x": 0.1,
+          "y": 0.15,
+          "width": 0.7,
+          "height": 0.12,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅋ종-2",
+          "x": 0.7,
+          "y": 0.15,
+          "width": 0.12,
+          "height": 0.7,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅋ종-3",
+          "x": 0.1,
+          "y": 0.45,
+          "width": 0.6,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅌ": {
+      "char": "ㅌ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅌ종-1",
+          "x": 0.15,
+          "y": 0.12,
+          "width": 0.7,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅌ종-2",
+          "x": 0.15,
+          "y": 0.12,
+          "width": 0.1,
+          "height": 0.76,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅌ종-3",
+          "x": 0.15,
+          "y": 0.78,
+          "width": 0.7,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅌ종-4",
+          "x": 0.15,
+          "y": 0.45,
+          "width": 0.7,
+          "height": 0.1,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅍ": {
+      "char": "ㅍ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅍ종-1",
+          "x": 0.1,
+          "y": 0.15,
+          "width": 0.8,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅍ종-2",
+          "x": 0.1,
+          "y": 0.75,
+          "width": 0.8,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅍ종-3",
+          "x": 0.25,
+          "y": 0.25,
+          "width": 0.1,
+          "height": 0.5,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅍ종-4",
+          "x": 0.65,
+          "y": 0.25,
+          "width": 0.1,
+          "height": 0.5,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅎ": {
+      "char": "ㅎ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅎ종-1",
+          "x": 0.35,
+          "y": 0.05,
+          "width": 0.3,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅎ종-2",
+          "x": 0.15,
+          "y": 0.22,
+          "width": 0.7,
+          "height": 0.1,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅎ종-circle",
+          "x": 0.2,
+          "y": 0.38,
+          "width": 0.6,
+          "height": 0.55,
+          "direction": "path",
+          "pathData": {
+            "closed": true,
+            "points": [
+              { "x": 0.5, "y": 0.0, "handleIn": { "x": 0.2239, "y": 0.0 }, "handleOut": { "x": 0.7761, "y": 0.0 } },
+              { "x": 1.0, "y": 0.5, "handleIn": { "x": 1.0, "y": 0.2239 }, "handleOut": { "x": 1.0, "y": 0.7761 } },
+              { "x": 0.5, "y": 1.0, "handleIn": { "x": 0.7761, "y": 1.0 }, "handleOut": { "x": 0.2239, "y": 1.0 } },
+              { "x": 0.0, "y": 0.5, "handleIn": { "x": 0.0, "y": 0.7761 }, "handleOut": { "x": 0.0, "y": 0.2239 } }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

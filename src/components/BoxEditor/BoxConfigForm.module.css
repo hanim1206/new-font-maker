@@ -1,0 +1,64 @@
+.formContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.boxGroup {
+  padding: 16px;
+  background: #0a0a0a;
+  border-radius: 6px;
+  border: 1px solid #2a2a2a;
+}
+
+.boxHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.boxLabel {
+  font-weight: 500;
+  color: #e0e0e0;
+}
+
+.boxPart {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.inputGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inputLabel {
+  font-size: 0.75rem;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.numberInput {
+  padding: 8px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-size: 0.9rem;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.numberInput:focus {
+  outline: none;
+  border-color: #3a6cc8;
+  background: #222;
+}

@@ -1,0 +1,535 @@
+.container {
+  min-height: 100%;
+  padding: 1rem;
+  background: #0f0f0f;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* 헤더 */
+.header {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #f5f5f5;
+  margin: 0 0 0.5rem 0;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.selectedJamo {
+  font-size: 0.85rem;
+  color: #888;
+  margin: 0;
+}
+
+/* 섹션 제목 */
+.sectionTitle {
+  font-size: 0.75rem;
+  color: #888;
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+/* 자모 선택기 */
+.jamoSelector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+  border: 1px solid #2a2a2a;
+}
+
+.tabs button {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  color: #888;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tabs button:hover {
+  background: #222;
+  color: #e5e5e5;
+}
+
+.tabActive {
+  background: #7c3aed !important;
+  color: #fff !important;
+}
+
+.jamoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+  gap: 0.5rem;
+  padding: 1rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+  border: 1px solid #2a2a2a;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.jamoGrid button {
+  padding: 0.75rem;
+  background: #0f0f0f;
+  color: #e5e5e5;
+  border: 1px solid #333;
+  border-radius: 6px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.jamoGrid button:hover {
+  background: #222;
+  border-color: #444;
+}
+
+.jamoActive {
+  background: #7c3aed !important;
+  border-color: #7c3aed !important;
+  color: #fff !important;
+}
+
+/* 미리보기 */
+.previewSection {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+}
+
+.preview svg {
+  background: #fff;
+  border-radius: 4px;
+}
+
+.jamoLabel {
+  font-size: 0.85rem;
+  color: #e5e5e5;
+  margin-top: 0.5rem;
+  text-align: center;
+  display: block;
+}
+
+/* 획 목록 */
+.strokeList {
+  display: flex;
+  flex-direction: column;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+  border: 1px solid #2a2a2a;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.list button {
+  padding: 0.75rem 1rem;
+  background: #0f0f0f;
+  color: #e5e5e5;
+  border: 1px solid #333;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.list button:hover {
+  background: #222;
+  border-color: #444;
+}
+
+.strokeActive {
+  background: #7c3aed !important;
+  border-color: #7c3aed !important;
+  color: #fff !important;
+}
+
+.emptyStrokeList {
+  padding: 2rem;
+  text-align: center;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+/* 획 편집기 */
+.strokeEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: #666;
+  margin: 0;
+  padding: 0.5rem;
+  background: #1a1a1a;
+  border-radius: 4px;
+  border: 1px solid #2a2a2a;
+}
+
+.inputGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  padding: 1rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+  border: 1px solid #2a2a2a;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.inputLabel {
+  font-size: 0.7rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.numberInput {
+  padding: 0.5rem;
+  background: #0f0f0f;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #e5e5e5;
+  font-size: 0.85rem;
+  font-family: monospace;
+  transition: all 0.15s ease;
+}
+
+.numberInput:hover {
+  border-color: #444;
+}
+
+.numberInput:focus {
+  outline: none;
+  border-color: #7c3aed;
+  background: #1a1a1a;
+}
+
+.metaInfo {
+  font-size: 0.75rem;
+  color: #666;
+  padding: 0.5rem 1rem;
+  background: #1a1a1a;
+  border-radius: 4px;
+  border: 1px solid #2a2a2a;
+}
+
+/* 버튼 그룹 */
+.buttonGroup {
+  display: flex;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #2a2a2a;
+}
+
+.buttonGroup button {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+}
+
+.saveButton {
+  background: #7c3aed;
+  color: #fff;
+}
+
+.saveButton:hover {
+  background: #6d28d9;
+}
+
+.resetButton {
+  background: #2a2a2a;
+  color: #e5e5e5;
+}
+
+.resetButton:hover {
+  background: #333;
+}
+
+.cancelButton {
+  background: #1a1a1a;
+  color: #888;
+  border: 1px solid #333;
+}
+
+.cancelButton:hover {
+  background: #222;
+  border-color: #444;
+}
+
+/* 빈 상태 */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  text-align: center;
+  padding: 2rem;
+}
+
+.emptyIcon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.6;
+}
+
+.emptyText {
+  font-size: 0.9rem;
+  color: #666;
+  line-height: 1.6;
+}
+
+/* 3단 레이아웃 */
+.threeColumnLayout {
+  display: grid;
+  grid-template-columns: 25% 50% 25%;
+  gap: 1rem;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 좌측 패널 */
+.leftPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+}
+
+/* 중앙 패널 */
+.centerPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.keyboardHint {
+  font-size: 0.75rem;
+  color: #888;
+  text-align: center;
+  padding: 0.5rem 1rem;
+  background: #1a1a1a;
+  border-radius: 4px;
+  border: 1px solid #2a2a2a;
+  max-width: 400px;
+}
+
+/* 우측 패널 */
+.rightPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+}
+
+/* Stroke Inspector */
+.strokeInspector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.propertyList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+  border: 1px solid #2a2a2a;
+}
+
+.propertyItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.propertyLabel {
+  font-size: 0.7rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.propertyInput {
+  padding: 0.5rem;
+  background: #0f0f0f;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #e5e5e5;
+  font-size: 0.85rem;
+  font-family: monospace;
+  transition: all 0.15s ease;
+}
+
+.propertyInput:hover {
+  border-color: #444;
+}
+
+.propertyInput:focus {
+  outline: none;
+  border-color: #7c3aed;
+  background: #1a1a1a;
+}
+
+.metaInfo {
+  padding: 0.75rem;
+  background: #1a1a1a;
+  border-radius: 4px;
+  border: 1px solid #2a2a2a;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.metaLabel {
+  font-size: 0.7rem;
+  color: #888;
+  text-transform: uppercase;
+}
+
+.metaValue {
+  font-size: 0.85rem;
+  color: #e5e5e5;
+  font-family: monospace;
+}
+
+/* 패스 포인트 목록 */
+.pointList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+  border: 1px solid #2a2a2a;
+}
+
+.pointItem {
+  padding: 0.4rem 0.75rem;
+  background: #0f0f0f;
+  color: #e5e5e5;
+  border: 1px solid #333;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pointItem:hover {
+  background: #222;
+  border-color: #444;
+}
+
+.pointActive {
+  padding: 0.4rem 0.75rem;
+  background: #4ecdc4 !important;
+  border: 1px solid #4ecdc4;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: #000 !important;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* 포인트 속성 */
+.pointProperties {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* 핸들 그룹 */
+.handleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  background: #151515;
+  border-radius: 4px;
+  border: 1px solid #2a2a2a;
+}
+
+/* 모바일 대응 */
+@media (max-width: 1024px) {
+  /* 태블릿: 3단 → 수직 레이아웃 */
+  .threeColumnLayout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+  }
+
+  .centerPanel {
+    order: -1; /* 미리보기를 최상단으로 */
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0.75rem;
+    gap: 1rem;
+  }
+
+  .jamoGrid {
+    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+    max-height: 200px;
+  }
+
+  .buttonGroup {
+    flex-direction: column;
+  }
+
+  .buttonGroup button {
+    flex: none;
+  }
+}

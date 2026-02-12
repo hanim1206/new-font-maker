@@ -1,0 +1,151 @@
+import type { LayoutPreset, LayoutType } from '../types'
+
+// ===== 기본 레이아웃 프리셋 =====
+export const DEFAULT_PRESETS: LayoutPreset[] = [
+  // 단독 자모
+  {
+    id: 'choseong-only-default',
+    name: '초성 단독 기본',
+    layoutType: 'choseong-only',
+    isDefault: true,
+    box: {
+      CH: { x: 0.15, y: 0.15, width: 0.7, height: 0.7 },
+    },
+  },
+  {
+    id: 'jungseong-vertical-only-default',
+    name: '세로중성 단독 기본',
+    layoutType: 'jungseong-vertical-only',
+    isDefault: true,
+    box: {
+      JU: { x: 0.25, y: 0.1, width: 0.5, height: 0.8 },
+    },
+  },
+  {
+    id: 'jungseong-horizontal-only-default',
+    name: '가로중성 단독 기본',
+    layoutType: 'jungseong-horizontal-only',
+    isDefault: true,
+    box: {
+      JU: { x: 0.1, y: 0.3, width: 0.8, height: 0.4 },
+    },
+  },
+  {
+    id: 'jungseong-mixed-only-default',
+    name: '혼합중성 단독 기본',
+    layoutType: 'jungseong-mixed-only',
+    isDefault: true,
+    box: {
+      JU: { x: 0.15, y: 0.15, width: 0.7, height: 0.7 }, // 기존 호환성용
+      JU_H: { x: 0.15, y: 0.5, width: 0.7, height: 0.35 }, // 가로획용 (아래쪽)
+      JU_V: { x: 0.5, y: 0.15, width: 0.35, height: 0.7 }, // 세로획용 (오른쪽)
+    },
+  },
+
+  // 초성 + 중성 (세로)
+  {
+    id: 'choseong-jungseong-vertical-default',
+    name: '초성+세로중성 기본',
+    layoutType: 'choseong-jungseong-vertical',
+    isDefault: true,
+    box: {
+      CH: { x: 0.08, y: 0.1, width: 0.55, height: 0.8 },
+      JU: { x: 0.65, y: 0.1, width: 0.28, height: 0.8 },
+    },
+  },
+  // 커스텀: 초성 넓게
+  {
+    id: 'choseong-jungseong-vertical-wide-ch',
+    name: '초성 넓게',
+    layoutType: 'choseong-jungseong-vertical',
+    isDefault: false,
+    box: {
+      CH: { x: 0.05, y: 0.1, width: 0.65, height: 0.8 },
+      JU: { x: 0.72, y: 0.1, width: 0.22, height: 0.8 },
+    },
+  },
+  // 커스텀: 중성 넓게
+  {
+    id: 'choseong-jungseong-vertical-wide-ju',
+    name: '중성 넓게',
+    layoutType: 'choseong-jungseong-vertical',
+    isDefault: false,
+    box: {
+      CH: { x: 0.05, y: 0.1, width: 0.45, height: 0.8 },
+      JU: { x: 0.52, y: 0.1, width: 0.42, height: 0.8 },
+    },
+  },
+
+  // 초성 + 중성 (가로)
+  {
+    id: 'choseong-jungseong-horizontal-default',
+    name: '초성+가로중성 기본',
+    layoutType: 'choseong-jungseong-horizontal',
+    isDefault: true,
+    box: {
+      CH: { x: 0.1, y: 0.05, width: 0.8, height: 0.5 },
+      JU: { x: 0.1, y: 0.55, width: 0.8, height: 0.4 },
+    },
+  },
+
+  // 초성 + 중성 (혼합)
+  {
+    id: 'choseong-jungseong-mixed-default',
+    name: '초성+혼합중성 기본',
+    layoutType: 'choseong-jungseong-mixed',
+    isDefault: true,
+    box: {
+      CH: { x: 0.08, y: 0.1, width: 0.5, height: 0.45 },
+      JU: { x: 0.58, y: 0.1, width: 0.35, height: 0.8 },
+      JU_H: { x: 0.07, y: 0.55, width: 0.7, height: 0.35 },
+      JU_V: { x: 0.45, y: 0.1, width: 0.41, height: 0.8 },
+    },
+  },
+
+  // 초성 + 세로중성 + 종성
+  {
+    id: 'choseong-jungseong-vertical-jongseong-default',
+    name: '초성+세로중성+종성 기본',
+    layoutType: 'choseong-jungseong-vertical-jongseong',
+    isDefault: true,
+    box: {
+      CH: { x: 0.08, y: 0.05, width: 0.52, height: 0.5 },
+      JU: { x: 0.62, y: 0.05, width: 0.3, height: 0.5 },
+      JO: { x: 0.08, y: 0.57, width: 0.84, height: 0.38 },
+    },
+  },
+
+  // 초성 + 가로중성 + 종성
+  {
+    id: 'choseong-jungseong-horizontal-jongseong-default',
+    name: '초성+가로중성+종성 기본',
+    layoutType: 'choseong-jungseong-horizontal-jongseong',
+    isDefault: true,
+    box: {
+      CH: { x: 0.1, y: 0.02, width: 0.8, height: 0.35 },
+      JU: { x: 0.1, y: 0.38, width: 0.8, height: 0.22 },
+      JO: { x: 0.1, y: 0.62, width: 0.8, height: 0.35 },
+    },
+  },
+
+  // 초성 + 혼합중성 + 종성
+  {
+    id: 'choseong-jungseong-mixed-jongseong-default',
+    name: '초성+혼합중성+종성 기본',
+    layoutType: 'choseong-jungseong-mixed-jongseong',
+    isDefault: true,
+    box: {
+      CH: { x: 0.08, y: 0.05, width: 0.48, height: 0.51 },
+      JU: { x: 0.58, y: 0.05, width: 0.35, height: 0.9 },
+      JU_H: { x: 0.06, y: 0.5, width: 0.69, height: 0.26 },
+      JU_V: { x: 0.49, y: 0.05, width: 0.35, height: 0.9 },
+      JO: { x: 0.09, y: 0.74, width: 0.49, height: 0.21 },
+    },
+  },
+]
+
+// 레이아웃 타입별 기본 프리셋 찾기
+export function getDefaultPresetForLayout(layoutType: LayoutType): LayoutPreset | undefined {
+  return DEFAULT_PRESETS.find((p) => p.layoutType === layoutType && p.isDefault)
+}
+
