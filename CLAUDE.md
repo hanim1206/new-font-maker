@@ -1,113 +1,113 @@
 # CLAUDE.md
 
-This file provides guidance for AI assistants working on the Font Maker (한글 폰트 메이커) codebase.
+이 문서는 AI 어시스턴트가 한글 폰트 메이커 코드베이스에서 작업할 때 참고하는 가이드입니다.
 
-## Project Overview
+## 프로젝트 개요
 
-A web-based Korean Hangul font designer built with React + TypeScript. Users visually design custom Korean fonts by editing individual stroke components of Hangul consonants (choseong/초성), vowels (jungseong/중성), and final consonants (jongseong/종성), and by adjusting layout presets for 10 different Hangul syllable composition patterns. All coordinates use a normalized 0–1 coordinate system for resolution independence.
+React + TypeScript 기반의 웹 한글 폰트 디자인 도구입니다. 사용자가 한글 자모(초성, 중성, 종성)의 획을 개별적으로 편집하고, 10가지 한글 음절 조합 패턴에 대한 레이아웃 프리셋을 조정하여 커스텀 폰트를 제작할 수 있습니다. 모든 좌표는 해상도 독립적인 0–1 정규화 좌표계를 사용합니다.
 
-## Tech Stack
+## 기술 스택
 
-- **Framework:** React 19.1 (functional components, hooks only)
-- **Language:** TypeScript 5.8 (strict mode)
-- **Build:** Vite 5.0 (with `tsc -b` type-checking before bundling)
-- **State:** Zustand 5.0 + Immer 11.1 (immutable updates via `set(state => { state.x = y })`)
-- **Forms:** React Hook Form 7.61
-- **Styling:** CSS Modules (`.module.css` files) + global CSS
-- **PWA:** vite-plugin-pwa + Workbox 7.4 (offline-first, installable)
-- **Linting:** ESLint 9 (flat config) with typescript-eslint, react-hooks, react-refresh plugins
-- **No test framework** is currently configured
+- **프레임워크:** React 19.1 (함수형 컴포넌트, 훅만 사용)
+- **언어:** TypeScript 5.8 (strict 모드)
+- **빌드:** Vite 5.0 (번들링 전 `tsc -b`로 타입 검사)
+- **상태 관리:** Zustand 5.0 + Immer 11.1 (`set(state => { state.x = y })` 패턴으로 불변 업데이트)
+- **폼:** React Hook Form 7.61
+- **스타일링:** CSS Modules (`.module.css`) + 전역 CSS
+- **PWA:** vite-plugin-pwa + Workbox 7.4 (오프라인 우선, 설치 가능)
+- **린팅:** ESLint 9 (flat config) + typescript-eslint, react-hooks, react-refresh 플러그인
+- **테스트 프레임워크:** 현재 미설정
 
-## Commands
+## 개발 명령어
 
 ```bash
-npm run dev       # Start Vite dev server with HMR
-npm run build     # TypeScript type-check + Vite production build
-npm run lint      # ESLint validation
-npm run preview   # Preview production build locally
+npm run dev       # Vite 개발 서버 실행 (HMR)
+npm run build     # TypeScript 타입 검사 + Vite 프로덕션 빌드
+npm run lint      # ESLint 검사
+npm run preview   # 프로덕션 빌드 로컬 미리보기
 ```
 
-## Project Structure
+## 프로젝트 구조
 
 ```
 src/
-├── components/               # React UI components
-│   ├── ControlPanel/         # Left sidebar – layout type / jamo selection
-│   ├── PreviewPanel/         # Top-right – text input & live font preview
-│   ├── EditorPanel/          # Bottom-right – editor dispatcher
-│   │   ├── EditorPanel.tsx   # Routes between layout and jamo editors
-│   │   ├── LayoutEditor.tsx  # Split/Padding slider-based editing
-│   │   ├── JamoEditor.tsx    # Stroke-level jamo editing
-│   │   └── SplitEditor.tsx   # Reusable split/padding slider component
-│   ├── CharacterEditor/      # Stroke editing sub-components
-│   │   ├── CharacterPreview.tsx  # Large SVG preview of a jamo
-│   │   ├── StrokeList.tsx        # Lists strokes for selection
-│   │   ├── StrokeEditor.tsx      # Keyboard-driven stroke adjustments
-│   │   └── StrokeInspector.tsx   # Numeric input fields for precision
-│   └── BoxEditor/            # Legacy (replaced by SplitEditor, safe to remove)
-├── stores/                   # Zustand state stores
-│   ├── uiStore.ts            # UI state: view mode, selections (no persistence)
-│   ├── layoutStore.ts        # Layout schemas (persisted to localStorage)
-│   └── jamoStore.ts          # Jamo stroke data (persisted to localStorage)
-├── data/                     # Static data
-│   ├── Hangul.ts             # Jamo stroke maps: CHOSEONG_MAP, JUNGSEONG_MAP, JONGSEONG_MAP
-│   ├── baseJamos.json        # 67 jamo characters with default stroke data
-│   ├── basePresets.json      # 10 default layout schema definitions
-│   └── layoutConfigs.ts      # Layout config helpers + DEFAULT_LAYOUT_CONFIGS
+├── components/               # React UI 컴포넌트
+│   ├── ControlPanel/         # 좌측 사이드바 – 레이아웃 타입/자모 선택
+│   ├── PreviewPanel/         # 우측 상단 – 텍스트 입력 및 실시간 미리보기
+│   ├── EditorPanel/          # 우측 하단 – 편집기 디스패처
+│   │   ├── EditorPanel.tsx   # 레이아웃/자모 에디터 전환 라우팅
+│   │   ├── LayoutEditor.tsx  # Split/Padding 슬라이더 편집
+│   │   ├── JamoEditor.tsx    # 획 단위 자모 편집
+│   │   └── SplitEditor.tsx   # 재사용 가능한 Split/Padding 슬라이더
+│   ├── CharacterEditor/      # 획 편집 세부 컴포넌트
+│   │   ├── CharacterPreview.tsx  # 자모 대형 SVG 미리보기
+│   │   ├── StrokeList.tsx        # 획 목록 및 선택
+│   │   ├── StrokeEditor.tsx      # 키보드 기반 획 조절
+│   │   └── StrokeInspector.tsx   # 숫자 입력 필드 (정밀 편집)
+│   └── BoxEditor/            # [레거시] SplitEditor로 대체됨, 확장하지 말 것
+├── stores/                   # Zustand 상태 저장소
+│   ├── uiStore.ts            # UI 상태: 뷰 모드, 선택 상태 (비영속)
+│   ├── layoutStore.ts        # 레이아웃 스키마 (localStorage 영속)
+│   └── jamoStore.ts          # 자모 획 데이터 (localStorage 영속)
+├── data/                     # 정적 데이터
+│   ├── Hangul.ts             # 자모별 획 맵: CHOSEONG_MAP, JUNGSEONG_MAP, JONGSEONG_MAP
+│   ├── baseJamos.json        # 67개 자모 기본 획 데이터
+│   ├── basePresets.json      # 10개 기본 레이아웃 스키마 정의
+│   └── layoutConfigs.ts      # 레이아웃 설정 헬퍼 + DEFAULT_LAYOUT_CONFIGS
 ├── renderers/
-│   └── SvgRenderer.tsx       # Core SVG rendering engine
+│   └── SvgRenderer.tsx       # 핵심 SVG 렌더링 엔진
 ├── utils/
 │   ├── hangulUtils.ts        # decomposeSyllable(), classifyLayout(), classifyJungseong()
-│   ├── layoutCalculator.ts   # calculateBoxes() – Split/Padding → BoxConfig
-│   ├── pathUtils.ts          # Bezier curve utilities
-│   └── storage.ts            # LocalStorage helpers
+│   ├── layoutCalculator.ts   # calculateBoxes() – Split/Padding → BoxConfig 변환
+│   ├── pathUtils.ts          # 베지어 곡선 유틸리티
+│   └── storage.ts            # LocalStorage 헬퍼
 ├── types/
-│   └── index.ts              # All core TypeScript interfaces and types
-├── App.tsx                   # Root component (responsive layout)
-├── App.css                   # Main app styles
-├── main.tsx                  # Entry point
-└── index.css                 # Global styles
+│   └── index.ts              # 모든 핵심 TypeScript 인터페이스 및 타입
+├── App.tsx                   # 루트 컴포넌트 (반응형 레이아웃)
+├── App.css                   # 메인 앱 스타일
+├── main.tsx                  # 엔트리 포인트
+└── index.css                 # 전역 스타일
 ```
 
-## Architecture & Data Flow
+## 아키텍처 및 데이터 흐름
 
-The rendering pipeline for a Hangul syllable:
+한글 음절의 렌더링 파이프라인:
 
-1. **Decompose** – `decomposeSyllable("한")` → `{ choseong: 'ㅎ', jungseong: 'ㅏ', jongseong: 'ㄴ' }`
-2. **Classify** – `classifyLayout(decomposed)` → `LayoutType` (one of 10 types)
-3. **Schema lookup** – `layoutStore.getLayoutSchema(type)` → `LayoutSchema` (splits + padding)
-4. **Calculate boxes** – `calculateBoxes(schema)` → `Partial<Record<Part, BoxConfig>>` (0–1 coords)
-5. **Stroke lookup** – `CHOSEONG_MAP['ㅎ'].strokes` → stroke array
-6. **Render** – `SvgRenderer` scales strokes into calculated boxes → SVG output
+1. **분해** – `decomposeSyllable("한")` → `{ choseong: 'ㅎ', jungseong: 'ㅏ', jongseong: 'ㄴ' }`
+2. **분류** – `classifyLayout(분해결과)` → `LayoutType` (10가지 중 하나)
+3. **스키마 조회** – `layoutStore.getLayoutSchema(type)` → `LayoutSchema` (splits + padding)
+4. **박스 계산** – `calculateBoxes(schema)` → `Partial<Record<Part, BoxConfig>>` (0–1 좌표)
+5. **획 데이터 조회** – `CHOSEONG_MAP['ㅎ'].strokes` → 획 배열
+6. **렌더링** – `SvgRenderer`가 획을 계산된 박스에 스케일링 → SVG 출력
 
-### State Management
+### 상태 관리
 
-Three Zustand stores with the pattern:
+Zustand 스토어 3개, 공통 패턴:
 
 ```typescript
 export const useStore = create<State & Actions>()(
-  persist(           // optional – layoutStore and jamoStore use this
+  persist(           // 선택사항 – layoutStore, jamoStore에서 사용
     immer((set, get) => ({
-      // state fields
+      // 상태 필드
       key: value,
-      // actions mutate drafts directly
+      // 액션: Immer 드래프트를 직접 변형
       setKey: (val) => set((state) => { state.key = val }),
     })),
-    { name: 'storage-key', partialize: (state) => ({ /* persisted subset */ }) }
+    { name: '저장소-키', partialize: (state) => ({ /* 영속화할 부분 */ }) }
   )
 )
 ```
 
-| Store | Persisted | Purpose |
-|-------|-----------|---------|
-| `uiStore` | No | View mode, selections, editing context |
-| `layoutStore` | Yes (`font-maker-layout-schemas`) | Layout schemas for 10 layout types |
-| `jamoStore` | Yes (`font-maker-jamo-data`) | Stroke data for all 67 jamo characters |
+| 스토어 | 영속화 | 용도 |
+|--------|--------|------|
+| `uiStore` | 안 함 | 뷰 모드, 선택 상태, 편집 컨텍스트 |
+| `layoutStore` | `font-maker-layout-schemas` | 10가지 레이아웃 타입별 스키마 |
+| `jamoStore` | `font-maker-jamo-data` | 67개 자모의 획 데이터 |
 
-### Layout Types (10)
+### 레이아웃 타입 (10종)
 
-| Type | Parts | Example |
-|------|-------|---------|
+| 타입 | 구성 파트 | 예시 |
+|------|-----------|------|
 | `choseong-only` | CH | ㄱ, ㄴ |
 | `jungseong-vertical-only` | JU | ㅏ, ㅓ |
 | `jungseong-horizontal-only` | JU | ㅗ, ㅜ |
@@ -119,98 +119,98 @@ export const useStore = create<State & Actions>()(
 | `choseong-jungseong-horizontal-jongseong` | CH + JU + JO | 공, 눈 |
 | `choseong-jungseong-mixed-jongseong` | CH + JU_H + JU_V + JO | 광, 권 |
 
-Parts: `CH` = choseong, `JU` = jungseong, `JU_H` = horizontal jungseong, `JU_V` = vertical jungseong, `JO` = jongseong.
+파트 약어: `CH` = 초성, `JU` = 중성, `JU_H` = 혼합중성 가로부, `JU_V` = 혼합중성 세로부, `JO` = 종성
 
-## Key Conventions
+## 주요 컨벤션
 
 ### TypeScript
 
-- **Strict mode** is enabled: `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`
-- Target: ES2022, module: ESNext (bundler resolution)
-- All types are defined in `src/types/index.ts`
-- Use discriminated unions for stroke types: `RectStrokeData` (`direction: 'horizontal' | 'vertical'`) vs `PathStrokeData` (`direction: 'path'`)
-- Use the type guard `isPathStroke(stroke)` when narrowing `StrokeData`
+- **strict 모드** 활성화: `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`
+- Target: ES2022, Module: ESNext (bundler resolution)
+- 모든 타입은 `src/types/index.ts`에 정의
+- 획 타입은 구별된 유니온 사용: `RectStrokeData` (`direction: 'horizontal' | 'vertical'`) vs `PathStrokeData` (`direction: 'path'`)
+- `StrokeData` 타입 좁히기 시 `isPathStroke(stroke)` 타입 가드 사용
 
-### Components
+### 컴포넌트
 
-- Functional components only (no class components)
-- CSS Modules for component-scoped styles
-- Responsive design: desktop (>768px) vs mobile (<=768px) with conditional rendering
-- Event handler prefix: `handle*`
-- State setter prefix: `set*`
+- 함수형 컴포넌트만 사용 (클래스 컴포넌트 금지)
+- CSS Modules로 컴포넌트 스코프 스타일링
+- 반응형: 데스크톱 (>768px) vs 모바일 (<=768px), 조건부 렌더링
+- 이벤트 핸들러 접두사: `handle*`
+- 상태 setter 접두사: `set*`
 
-### Naming
+### 네이밍
 
-- **Code identifiers** are in English
-- **UI labels, comments, and documentation** are in Korean
-- Store files: `*Store.ts` exporting `use*Store`
-- Utility files: `*Utils.ts`
-- Lookup objects: `*_MAP` (e.g., `CHOSEONG_MAP`)
+- **코드 식별자**는 영문으로 작성
+- **UI 레이블, 주석, 문서**는 한글로 작성
+- 스토어 파일: `*Store.ts` → `use*Store` 내보내기
+- 유틸리티 파일: `*Utils.ts`
+- 참조 객체: `*_MAP` (예: `CHOSEONG_MAP`)
 
-### Coordinate System
+### 좌표계
 
-- All positions and sizes use **normalized 0–1 coordinates**
-- `BoxConfig`: `{ x, y, width, height }` each in range 0–1
-- `StrokeData`: `{ x, y, width, height }` in 0–1 within its parent box
-- This makes designs resolution-independent and scalable
+- 모든 위치와 크기는 **0–1 정규화 좌표** 사용
+- `BoxConfig`: `{ x, y, width, height }` 각각 0–1 범위
+- `StrokeData`: `{ x, y, width, height }` 부모 박스 내 0–1 상대 좌표
+- 해상도 독립적이며 어떤 크기로든 스케일링 가능
 
-### Commit Messages
+### 커밋 메시지
 
-Follow **Conventional Commits** as defined in `COMMIT_CONVENTION.md`:
+`COMMIT_CONVENTION.md`에 정의된 **Conventional Commits** 규칙 준수:
 
 ```
-<type>(<scope>): <subject in Korean>
+<type>(<scope>): <한글 제목>
 ```
 
-- Type and scope in English, subject and body in Korean
+- type과 scope는 영문, subject와 body는 한글
 - Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `ci`, `build`
-- Subject in imperative form (e.g., ~추가, ~수정, ~삭제)
-- No period at end of subject
-- Do NOT include AI watermarks or co-author attributions in commits
+- 제목은 명령형 (~추가, ~수정, ~삭제)
+- 제목 끝에 마침표 사용하지 않음
+- AI 워터마크나 Co-Author 어트리뷰션 포함 금지
 
-### What to Preserve
+### 유지해야 할 설계 결정
 
-These architectural decisions are intentional and should be maintained:
+다음 아키텍처 결정은 의도된 것이며 반드시 유지해야 함:
 
-- **Split + Padding layout system** (not raw x/y/width/height)
-- **Normalized 0–1 coordinate space** throughout
-- **Zustand + Immer** pattern for state (draft mutations in `set()`)
-- **Separation of schema vs. computed boxes** (`layoutSchemas` are persisted; `layoutConfigs` are derived)
-- **Keyboard-first stroke editing** with arrow keys and shift modifiers
-- **Type-safe store pattern** with separate State and Actions interfaces
+- **Split + Padding 레이아웃 시스템** (raw x/y/width/height가 아닌 분할선 + 여백 방식)
+- **0–1 정규화 좌표계** 전체 적용
+- **Zustand + Immer 패턴** (`set()` 내에서 드래프트 직접 변형)
+- **스키마와 계산된 박스의 분리** (`layoutSchemas`는 영속화, `layoutConfigs`는 파생값)
+- **키보드 우선 획 편집** (화살표 키 + Shift 수정자)
+- **타입 안전한 스토어 패턴** (State와 Actions 인터페이스 분리)
 
-## Existing Documentation
+## 관련 문서
 
-- `PROJECT_OVERVIEW.md` – Comprehensive project analysis (architecture, data flow, implementation status, roadmap) written in Korean
-- `COMMIT_CONVENTION.md` – Commit message guidelines
+- `PROJECT_OVERVIEW.md` – 상세 프로젝트 분석 (아키텍처, 데이터 흐름, 구현 상태, 로드맵)
+- `COMMIT_CONVENTION.md` – 커밋 메시지 가이드라인
 
-## Common Tasks
+## 주요 작업 가이드
 
-### Adding a new stroke type
-1. Add the type to the `StrokeData` discriminated union in `src/types/index.ts`
-2. Add a type guard function
-3. Update `SvgRenderer.tsx` to handle the new stroke rendering
-4. Update `CharacterEditor/` components for editing support
+### 새로운 획 타입 추가
+1. `src/types/index.ts`의 `StrokeData` 구별된 유니온에 새 타입 추가
+2. 타입 가드 함수 추가
+3. `SvgRenderer.tsx`에서 새 획 렌더링 처리
+4. `CharacterEditor/` 컴포넌트에 편집 지원 추가
 
-### Modifying layout calculation
-1. Edit `src/utils/layoutCalculator.ts` (`calculateBoxes()`)
-2. The layout store automatically syncs `layoutConfigs` from `layoutSchemas` via `syncConfigFromSchema()`
+### 레이아웃 계산 수정
+1. `src/utils/layoutCalculator.ts`의 `calculateBoxes()` 수정
+2. 레이아웃 스토어가 `syncConfigFromSchema()`를 통해 `layoutConfigs`를 자동 동기화함
 
-### Adding a new layout type
-1. Add the literal to the `LayoutType` union in `src/types/index.ts`
-2. Add classification logic in `src/utils/hangulUtils.ts`
-3. Add default schema in `src/data/basePresets.json`
-4. Add calculation logic in `src/utils/layoutCalculator.ts`
+### 새로운 레이아웃 타입 추가
+1. `src/types/index.ts`의 `LayoutType` 유니온에 리터럴 추가
+2. `src/utils/hangulUtils.ts`에 분류 로직 추가
+3. `src/data/basePresets.json`에 기본 스키마 추가
+4. `src/utils/layoutCalculator.ts`에 계산 로직 추가
 
-### Working with stores
-- Read state: `const value = useStore((s) => s.field)`
-- Mutate state: actions use Immer drafts — mutate the draft directly, don't return new objects
-- Layout store persists `layoutSchemas` only; `layoutConfigs` are recomputed on hydration
+### 스토어 사용법
+- 상태 읽기: `const value = useStore((s) => s.field)`
+- 상태 변경: 액션에서 Immer 드래프트를 직접 변형 (새 객체를 반환하지 않음)
+- 레이아웃 스토어는 `layoutSchemas`만 영속화하고, `layoutConfigs`는 hydration 시 재계산됨
 
-## Pitfalls
+## 주의사항
 
-- `BoxEditor/` is legacy code (superseded by `SplitEditor`). Do not extend it.
-- The rule system (`Rule`, `Condition`, `Action` types) is defined in types but has no UI — the types exist for future use.
-- No test framework is installed. If adding tests, Vitest is the recommended choice (already compatible with Vite).
-- `.gitignore` is minimal (only `node_modules`). Be mindful not to commit `dist/`, `.env`, or IDE config files.
-- Mixed jungseong (혼합중성 like ㅘ, ㅢ) use separate `horizontalStrokes` and `verticalStrokes` arrays instead of the normal `strokes` array.
+- `BoxEditor/`는 레거시 코드 (`SplitEditor`로 대체됨). 확장하지 말 것
+- 규칙 시스템 (`Rule`, `Condition`, `Action` 타입)은 타입만 정의되어 있고 UI가 없음 — 향후 구현 예정
+- 테스트 프레임워크 미설치. 테스트 추가 시 Vitest 권장 (Vite와 호환)
+- `.gitignore`가 최소한(`node_modules`만 포함)이므로 `dist/`, `.env`, IDE 설정 파일을 커밋하지 않도록 주의
+- 혼합중성(ㅘ, ㅢ 등)은 일반 `strokes` 배열 대신 `horizontalStrokes`와 `verticalStrokes`를 분리하여 사용
