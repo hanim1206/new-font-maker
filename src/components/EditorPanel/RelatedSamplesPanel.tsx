@@ -57,7 +57,7 @@ export function RelatedSamplesPanel({
                     <SvgRenderer
                       syllable={syllable}
                       schema={schemaWithPadding}
-                      size={48}
+                      size={72}
                       fillColor="#e0e0e0"
                       globalStyle={effectiveStyle}
                     />

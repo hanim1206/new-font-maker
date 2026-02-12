@@ -85,10 +85,18 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
   const boxHeight = boxInfo.height * VIEW_BOX_SIZE
 
   // viewBox를 박스 영역에 맞춰 줌 (마진 포함)
-  const vbX = boxX - VIEW_MARGIN
-  const vbY = boxY - VIEW_MARGIN
+  // 너무 납작해지지 않도록 최소 종횡비(높이/너비) 제한
+  const MIN_HEIGHT_RATIO = 0.5
+  let vbX = boxX - VIEW_MARGIN
+  let vbY = boxY - VIEW_MARGIN
   const vbW = boxWidth + 2 * VIEW_MARGIN
-  const vbH = boxHeight + 2 * VIEW_MARGIN
+  let vbH = boxHeight + 2 * VIEW_MARGIN
+
+  if (vbH / vbW < MIN_HEIGHT_RATIO) {
+    const newH = vbW * MIN_HEIGHT_RATIO
+    vbY -= (newH - vbH) / 2
+    vbH = newH
+  }
 
   // slant 변환 중심 (박스 중심 기준)
   const slantCenterX = boxX + boxWidth / 2
