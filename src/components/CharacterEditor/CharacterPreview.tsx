@@ -23,10 +23,12 @@ interface CharacterPreviewProps {
 }
 
 const VIEW_BOX_SIZE = 100
-const BASE_SIZE = 400
 
 // 획 두께 (VIEW_BOX_SIZE 기준, 고정값)
 const STROKE_THICKNESS = 2
+
+// viewBox 마진 (박스 영역 주변 여백)
+const VIEW_MARGIN = 3
 
 // 박스 타입별 색상
 const BOX_COLORS: Record<string, string> = {
@@ -76,20 +78,21 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
   const slant = globalStyle.slant ?? 0
   const effectiveThickness = STROKE_THICKNESS * weightMultiplier
 
-  // 박스 비율에 맞춰 SVG 크기 계산
-  const aspectRatio = boxInfo.width / boxInfo.height
-  const svgWidth = aspectRatio >= 1 ? BASE_SIZE : BASE_SIZE * aspectRatio
-  const svgHeight = aspectRatio >= 1 ? BASE_SIZE / aspectRatio : BASE_SIZE
-
-  // viewBox도 비율에 맞게 조정 (전체 영역을 보여주되, 박스 영역을 강조)
-  const viewBoxWidth = VIEW_BOX_SIZE
-  const viewBoxHeight = VIEW_BOX_SIZE / aspectRatio
-
   // 박스 영역을 viewBox 좌표로 변환
   const boxX = boxInfo.x * VIEW_BOX_SIZE
   const boxY = boxInfo.y * VIEW_BOX_SIZE
   const boxWidth = boxInfo.width * VIEW_BOX_SIZE
   const boxHeight = boxInfo.height * VIEW_BOX_SIZE
+
+  // viewBox를 박스 영역에 맞춰 줌 (마진 포함)
+  const vbX = boxX - VIEW_MARGIN
+  const vbY = boxY - VIEW_MARGIN
+  const vbW = boxWidth + 2 * VIEW_MARGIN
+  const vbH = boxHeight + 2 * VIEW_MARGIN
+
+  // slant 변환 중심 (박스 중심 기준)
+  const slantCenterX = boxX + boxWidth / 2
+  const slantCenterY = boxY + boxHeight / 2
 
   // 박스 타입에 따른 색상 결정
   const boxColor = currentJamoType === 'choseong' ? BOX_COLORS.CH :
@@ -255,19 +258,18 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
     <div className={styles.preview}>
       <svg
         ref={svgRef}
-        width={svgWidth}
-        height={svgHeight}
-        viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
+        viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
+        preserveAspectRatio="xMidYMid meet"
         onMouseMove={dragState ? handleMouseMove : undefined}
         onMouseUp={dragState ? handleMouseUp : undefined}
         onMouseLeave={dragState ? handleMouseUp : undefined}
       >
         {/* 전체 영역 배경 */}
         <rect
-          x={0}
-          y={0}
-          width={viewBoxWidth}
-          height={viewBoxHeight}
+          x={vbX}
+          y={vbY}
+          width={vbW}
+          height={vbH}
           fill="#2a2a2a"
           opacity={0.3}
         />
@@ -316,7 +318,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
         )}
 
         {/* 획들 (박스 영역 내 상대 좌표) - slant 적용 (중심 기준) */}
-        <g transform={slant !== 0 ? `translate(${viewBoxWidth / 2}, ${viewBoxHeight / 2}) skewX(${-slant}) translate(${-viewBoxWidth / 2}, ${-viewBoxHeight / 2})` : undefined}>
+        <g transform={slant !== 0 ? `translate(${slantCenterX}, ${slantCenterY}) skewX(${-slant}) translate(${-slantCenterX}, ${-slantCenterY})` : undefined}>
         {strokes.map((stroke) => {
           const isSelected = stroke.id === selectedStrokeId
           const { strokeX, strokeY, boundsWidth, boundsHeight } = getStrokeBounds(stroke)

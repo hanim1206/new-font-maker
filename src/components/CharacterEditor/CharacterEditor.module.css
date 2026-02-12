@@ -123,11 +123,15 @@
   padding: 1rem;
   background: #1a1a1a;
   border-radius: 8px;
+  width: 100%;
 }
 
 .preview svg {
   background: #fff;
   border-radius: 4px;
+  width: 100%;
+  height: auto;
+  max-height: 400px;
 }
 
 .jamoLabel {
