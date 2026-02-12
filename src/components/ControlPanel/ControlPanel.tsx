@@ -92,7 +92,7 @@ export function ControlPanel() {
       {!selectedSyllable && !showFullMenu && (
         <div className={styles.emptyState}>
           <p className={styles.emptyText}>
-            우측 상단에서 한글을 입력하고
+            좌측에서 한글을 입력하고
             <br />
             글자를 선택하세요
           </p>

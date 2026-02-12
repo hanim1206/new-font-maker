@@ -14,8 +14,8 @@
 
 .textInput {
   width: 100%;
-  padding: 0.875rem 1rem;
-  font-size: 1.25rem;
+  padding: 0.625rem 0.75rem;
+  font-size: 1rem;
   background: #1a1a1a;
   border: 2px solid #2a2a2a;
   border-radius: 10px;
@@ -36,8 +36,7 @@
 .previewSection {
   display: flex;
   justify-content: center;
-  align-items: center;
-  min-height: 220px;
+  align-items: flex-start;
   flex-shrink: 0;
 }
 
@@ -50,12 +49,13 @@
 
 .previewGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 1rem;
-  padding: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 0.5rem;
+  padding: 0.5rem;
   background: #1a1a1a;
   border-radius: 12px;
   max-width: 100%;
+  width: 100%;
 }
 
 .previewGridItem {
@@ -63,8 +63,8 @@
   justify-content: center;
   align-items: center;
   background: #0f0f0f;
-  border-radius: 8px;
-  padding: 0.5rem;
+  border-radius: 6px;
+  padding: 0.25rem;
   border: 2px solid #2a2a2a;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -85,8 +85,8 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 200px;
-  height: 200px;
+  width: 100%;
+  height: 150px;
   background: #1a1a1a;
   border-radius: 12px;
   border: 2px dashed #2a2a2a;
@@ -153,7 +153,8 @@
 
 .decomposed {
   display: flex;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   padding: 0.5rem 0;
   border-top: 1px solid #222;
   margin-top: 0.25rem;

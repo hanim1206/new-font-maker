@@ -1,21 +1,10 @@
-import { useMemo } from 'react'
-import type { LayoutType, Part, Padding } from '../../types'
+import type { LayoutType, Padding } from '../../types'
 import { useLayoutStore } from '../../stores/layoutStore'
-import { calculateBoxes } from '../../utils/layoutCalculator'
 import { RelatedSamplesPanel } from './RelatedSamplesPanel'
 import styles from './SplitEditor.module.css'
 
 interface SplitEditorProps {
   layoutType: LayoutType
-}
-
-// 슬롯별 한글 이름
-const SLOT_NAMES: Record<Part, string> = {
-  CH: '초성',
-  JU: '중성',
-  JU_H: '중성-가로',
-  JU_V: '중성-세로',
-  JO: '종성',
 }
 
 // Split 축별 한글 설명
@@ -48,12 +37,6 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
   const hasSplits = splits.length > 0
   const hasOverride = hasPaddingOverride(layoutType)
   const effectivePadding = getEffectivePadding(layoutType)
-
-  // 계산된 박스 (미리보기용 - 실효 패딩 적용)
-  const calculatedBoxes = useMemo(() => {
-    const schemaWithPadding = { ...schema, padding: effectivePadding }
-    return calculateBoxes(schemaWithPadding)
-  }, [schema, effectivePadding])
 
   const handleSplitChange = (index: number, value: number) => {
     updateSplit(layoutType, index, value)
@@ -102,78 +85,6 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
 
   return (
     <div className={styles.container}>
-      {/* 비주얼 미리보기 */}
-      <div className={styles.section}>
-        <h4 className={styles.sectionTitle}>
-          <span className={styles.sectionIcon}>👁️</span>
-          레이아웃 미리보기
-        </h4>
-        <div className={styles.visualPreview}>
-          {/* Split 라인 표시 */}
-          {splits.map((split, index) =>
-            split.axis === 'x' ? (
-              <div
-                key={`line-x-${index}`}
-                className={styles.splitLineX}
-                style={{ left: `${split.value * 100}%` }}
-              />
-            ) : (
-              <div
-                key={`line-y-${index}`}
-                className={styles.splitLineY}
-                style={{ top: `${split.value * 100}%` }}
-              />
-            )
-          )}
-
-          {/* 슬롯 영역 표시 */}
-          {Object.entries(calculatedBoxes).map(([part, box]) => {
-            if (!box) return null
-            const colorMap: Record<string, string> = {
-              CH: '#ff6b6b',
-              JU: '#4ecdc4',
-              JU_H: '#ff9500',
-              JU_V: '#ffd700',
-              JO: '#4169e1',
-            }
-            return (
-              <div
-                key={part}
-                className={styles.slotArea}
-                style={{
-                  left: `${box.x * 100}%`,
-                  top: `${box.y * 100}%`,
-                  width: `${box.width * 100}%`,
-                  height: `${box.height * 100}%`,
-                  borderColor: colorMap[part] || '#666',
-                  backgroundColor: `${colorMap[part]}15`,
-                }}
-              >
-                {part}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* 슬롯 정보 */}
-      <div className={styles.section}>
-        <h4 className={styles.sectionTitle}>
-          <span className={styles.sectionIcon}>📦</span>
-          슬롯 구성
-        </h4>
-        <div className={styles.slotsInfo}>
-          {schema.slots.map((slot) => (
-            <span
-              key={slot}
-              className={`${styles.slotBadge} ${styles[`slot${slot.replace('_', '')}`] || styles.slotJU}`}
-            >
-              {SLOT_NAMES[slot]} ({slot})
-            </span>
-          ))}
-        </div>
-      </div>
-
       {/* Split 편집기 */}
       {hasSplits && (
         <div className={styles.section}>

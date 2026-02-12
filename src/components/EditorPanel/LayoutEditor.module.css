@@ -30,6 +30,34 @@
   margin-bottom: 12px;
 }
 
+/* 기준선 오버레이가 있는 프리뷰 래퍼 */
+.previewWithSplitLines {
+  position: relative;
+  display: inline-block;
+}
+
+.splitLineX {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ff6b6b;
+  opacity: 0.7;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.splitLineY {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #4ecdc4;
+  opacity: 0.7;
+  z-index: 2;
+  pointer-events: none;
+}
+
 .testChar {
   text-align: center;
   color: #666;

@@ -148,19 +148,37 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
         </div>
       )}
 
-      {/* 미리보기 영역 */}
+      {/* 미리보기 영역 + 기준선 오버레이 */}
       <div className={styles.previewSection}>
         <h3 className={styles.sectionTitle}>미리보기</h3>
         <div className={styles.previewBox}>
-          <SvgRenderer
-            syllable={testSyllable}
-            schema={schema}
-            size={200}
-            fillColor="#e5e5e5"
-            backgroundColor="#1a1a1a"
-            showDebugBoxes={true}
-            globalStyle={effectiveStyle}
-          />
+          <div className={styles.previewWithSplitLines}>
+            <SvgRenderer
+              syllable={testSyllable}
+              schema={schema}
+              size={200}
+              fillColor="#e5e5e5"
+              backgroundColor="#1a1a1a"
+              showDebugBoxes={true}
+              globalStyle={effectiveStyle}
+            />
+            {/* 기준선 오버레이 */}
+            {(schema.splits || []).map((split, index) =>
+              split.axis === 'x' ? (
+                <div
+                  key={`split-x-${index}`}
+                  className={styles.splitLineX}
+                  style={{ left: `${split.value * 100}%` }}
+                />
+              ) : (
+                <div
+                  key={`split-y-${index}`}
+                  className={styles.splitLineY}
+                  style={{ top: `${(split.value / 1.1) * 100}%` }}
+                />
+              )
+            )}
+          </div>
         </div>
         <p className={styles.testChar}>테스트: {testSyllable.char}</p>
       </div>

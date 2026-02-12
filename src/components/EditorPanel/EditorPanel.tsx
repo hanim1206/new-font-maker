@@ -12,7 +12,7 @@ export function EditorPanel() {
     return (
       <div className={styles.editorPanel}>
         <div className={styles.emptyState}>
-          <p className={styles.emptyText}>좌측 메뉴에서 편집할 항목을 선택하세요</p>
+          <p className={styles.emptyText}>편집 메뉴에서 편집할 항목을 선택하세요</p>
         </div>
       </div>
     )
