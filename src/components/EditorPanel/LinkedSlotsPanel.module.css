@@ -1,0 +1,92 @@
+.container {
+  padding: 16px;
+  background: #111;
+  border-radius: 8px;
+  border: 1px solid #1a1a1a;
+  margin: 0 20px;
+}
+
+.title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin: 0 0 8px 0;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.description {
+  font-size: 0.8rem;
+  color: #666;
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+}
+
+.slotList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.slotItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #0a0a0a;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.slotItem:hover {
+  background: #141414;
+}
+
+.slotItem input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  accent-color: #4a9eff;
+  cursor: pointer;
+}
+
+.slotChar {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e0e0e0;
+  min-width: 20px;
+  text-align: center;
+}
+
+.slotType {
+  font-size: 0.75rem;
+  color: #888;
+  background: #1a1a1a;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.slotReason {
+  font-size: 0.75rem;
+  color: #666;
+  margin-left: auto;
+}
+
+.applyButton {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: #2a5cb8;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: inherit;
+}
+
+.applyButton:hover {
+  background: #3a6cc8;
+}

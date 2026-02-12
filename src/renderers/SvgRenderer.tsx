@@ -3,6 +3,7 @@ import type { DecomposedSyllable, BoxConfig, Part, StrokeData, LayoutType, Layou
 import { isPathStroke } from '../types'
 import { calculateBoxes } from '../utils/layoutCalculator'
 import { pathDataToSvgD } from '../utils/pathUtils'
+import type { GlobalStyle } from '../stores/globalStyleStore'
 
 interface SvgRendererProps {
   syllable: DecomposedSyllable
@@ -16,6 +17,8 @@ interface SvgRendererProps {
   // 시각적 캔버스 비율 (논리 좌표계는 1:1 유지, 시각적으로만 세로 확장)
   // 1.0 = 1:1, 1.1 = 1:1.1, 1.15 = 1:1.15
   visualHeightRatio?: number
+  // 글로벌 스타일 (기울기, 두께 등)
+  globalStyle?: GlobalStyle
 }
 
 // SVG viewBox 기준 크기
@@ -54,6 +57,7 @@ export function SvgRenderer({
   backgroundColor = 'transparent',
   showDebugBoxes = false,
   visualHeightRatio = 1.1, // 기본값: 1:1.1 비율
+  globalStyle,
 }: SvgRendererProps) {
   // schema가 있으면 calculateBoxes 사용, 없으면 boxes prop 사용
   const boxes = useMemo(() => {
@@ -62,6 +66,13 @@ export function SvgRenderer({
     }
     return (boxesProp || {}) as Record<Part, BoxConfig>
   }, [schema, boxesProp])
+
+  // 글로벌 스타일 값 (기본값 적용)
+  const slant = globalStyle?.slant ?? 0
+  const weightMultiplier = globalStyle?.weight ?? 1.0
+
+  // weight 적용된 획 두께
+  const effectiveThickness = STROKE_THICKNESS * weightMultiplier
 
   const renderStrokes = (
     strokes: StrokeData[] | undefined,
@@ -85,7 +96,7 @@ export function SvgRenderer({
             d={d}
             fill="none"
             stroke={color}
-            strokeWidth={STROKE_THICKNESS}
+            strokeWidth={effectiveThickness}
             strokeLinecap="round"
             strokeLinejoin="round"
           />
@@ -100,10 +111,10 @@ export function SvgRenderer({
       if (stroke.direction === 'horizontal') {
         // 가로획: height를 고정값으로, width는 박스 크기에 비례
         width = stroke.width * box.width * VIEW_BOX_SIZE
-        height = STROKE_THICKNESS
+        height = effectiveThickness
       } else {
         // 세로획: width를 고정값으로, height는 박스 크기에 비례
-        width = STROKE_THICKNESS
+        width = effectiveThickness
         height = stroke.height * box.height * VIEW_BOX_SIZE
       }
 
@@ -239,6 +250,11 @@ export function SvgRenderer({
   const visualHeight = VIEW_BOX_SIZE * visualHeightRatio
   const svgHeight = size * visualHeightRatio
 
+  // slant(기울기) 변환: 캔버스 중심 기준 skewX
+  const slantTransform = slant !== 0
+    ? `skewX(${-slant})`
+    : undefined
+
   return (
     <svg
       width={size}
@@ -252,9 +268,11 @@ export function SvgRenderer({
           box ? renderDebugBox(box, color, part) : null
         )}
 
-      {/* 동적 순서로 렌더링 */}
-      {renderOrder.map((part) => renderPart(part))}
+      {/* 글자 전체에 slant 적용 */}
+      <g transform={slantTransform}>
+        {/* 동적 순서로 렌더링 */}
+        {renderOrder.map((part) => renderPart(part))}
+      </g>
     </svg>
   )
 }
-
