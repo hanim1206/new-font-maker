@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useLayoutStore } from '../../stores/layoutStore'
 import { useJamoStore } from '../../stores/jamoStore'
+import { useGlobalStyleStore } from '../../stores/globalStyleStore'
 import { SplitEditor } from './SplitEditor'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { decomposeSyllable } from '../../utils/hangulUtils'
@@ -26,8 +27,10 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     _hydrated,
   } = useLayoutStore()
   const { choseong, jungseong, jongseong } = useJamoStore()
+  const { getEffectiveStyle } = useGlobalStyleStore()
 
   const schema = getLayoutSchema(layoutType)
+  const effectiveStyle = getEffectiveStyle(layoutType)
   const modified = isModified()
   const currentLayoutModified = isLayoutModified(layoutType)
 
@@ -156,6 +159,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
             fillColor="#e5e5e5"
             backgroundColor="#1a1a1a"
             showDebugBoxes={true}
+            globalStyle={effectiveStyle}
           />
         </div>
         <p className={styles.testChar}>테스트: {testSyllable.char}</p>

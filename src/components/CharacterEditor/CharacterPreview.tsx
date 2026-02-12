@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useJamoStore } from '../../stores/jamoStore'
+import { useGlobalStyleStore } from '../../stores/globalStyleStore'
 import type { StrokeData, BoxConfig, PathStrokeData } from '../../types'
 import { isPathStroke } from '../../types'
 import { pathDataToSvgD } from '../../utils/pathUtils'
@@ -50,6 +51,7 @@ interface DragState {
 export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, width: 1, height: 1 }, jamoType, onPathPointChange }: CharacterPreviewProps) {
   const { selectedStrokeId, setSelectedStrokeId, editingJamoType, selectedPointIndex, setSelectedPointIndex } = useUIStore()
   const { jungseong } = useJamoStore()
+  const { style: globalStyle } = useGlobalStyleStore()
   const svgRef = useRef<SVGSVGElement>(null)
   const [dragState, setDragState] = useState<DragState | null>(null)
 
@@ -68,6 +70,11 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
       verticalStrokeIds = new Set(jamo.verticalStrokes.map(s => s.id))
     }
   }
+
+  // 글로벌 스타일 적용
+  const weightMultiplier = globalStyle.weight ?? 1.0
+  const slant = globalStyle.slant ?? 0
+  const effectiveThickness = STROKE_THICKNESS * weightMultiplier
 
   // 박스 비율에 맞춰 SVG 크기 계산
   const aspectRatio = boxInfo.width / boxInfo.height
@@ -308,7 +315,8 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
           />
         )}
 
-        {/* 획들 (박스 영역 내 상대 좌표) */}
+        {/* 획들 (박스 영역 내 상대 좌표) - slant 적용 */}
+        <g transform={slant !== 0 ? `skewX(${-slant})` : undefined}>
         {strokes.map((stroke) => {
           const isSelected = stroke.id === selectedStrokeId
           const { strokeX, strokeY, boundsWidth, boundsHeight } = getStrokeBounds(stroke)
@@ -323,7 +331,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
                   d={d}
                   fill="none"
                   stroke="transparent"
-                  strokeWidth={STROKE_THICKNESS * 4}
+                  strokeWidth={effectiveThickness * 4}
                   onClick={() => setSelectedStrokeId(stroke.id)}
                   style={{ cursor: 'pointer' }}
                 />
@@ -332,7 +340,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
                   d={d}
                   fill="none"
                   stroke={isSelected ? '#ff6b6b' : '#1a1a1a'}
-                  strokeWidth={STROKE_THICKNESS}
+                  strokeWidth={effectiveThickness}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   onClick={() => setSelectedStrokeId(stroke.id)}
@@ -349,9 +357,9 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
           let strokeHeight: number
           if (stroke.direction === 'horizontal') {
             strokeWidth = boundsWidth
-            strokeHeight = STROKE_THICKNESS
+            strokeHeight = effectiveThickness
           } else {
-            strokeWidth = STROKE_THICKNESS
+            strokeWidth = effectiveThickness
             strokeHeight = boundsHeight
           }
 
@@ -372,6 +380,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
             />
           )
         })}
+        </g>
       </svg>
       <span className={styles.jamoLabel}>{jamoChar}</span>
     </div>
