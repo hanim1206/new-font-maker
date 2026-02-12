@@ -1,4 +1,10 @@
+import { useMemo } from 'react'
 import { useGlobalStyleStore } from '../../stores/globalStyleStore'
+import { useUIStore } from '../../stores/uiStore'
+import { useLayoutStore } from '../../stores/layoutStore'
+import { useJamoStore } from '../../stores/jamoStore'
+import { SvgRenderer } from '../../renderers/SvgRenderer'
+import { decomposeSyllable, isHangul } from '../../utils/hangulUtils'
 import type { LayoutType } from '../../types'
 import styles from './GlobalStyleEditor.module.css'
 
@@ -23,8 +29,23 @@ export function GlobalStyleEditor() {
     addExclusion,
     removeExclusion,
     hasExclusion,
+    getEffectiveStyle,
     resetStyle,
   } = useGlobalStyleStore()
+  const { inputText, selectedCharIndex } = useUIStore()
+  const { getLayoutSchema, getEffectivePadding } = useLayoutStore()
+  const { choseong, jungseong, jongseong } = useJamoStore()
+
+  // 선택된 글자 기반 미리보기 음절
+  const previewSyllable = useMemo(() => {
+    const hangulChars = inputText.split('').filter(isHangul)
+    const selectedChar = hangulChars[selectedCharIndex]
+    if (selectedChar) {
+      return decomposeSyllable(selectedChar, choseong, jungseong, jongseong)
+    }
+    // 기본값
+    return decomposeSyllable('한', choseong, jungseong, jongseong)
+  }, [inputText, selectedCharIndex, choseong, jungseong, jongseong])
 
   const handleExclusionToggle = (
     property: 'slant' | 'weight' | 'letterSpacing',
@@ -38,8 +59,27 @@ export function GlobalStyleEditor() {
     }
   }
 
+  const previewSchema = getLayoutSchema(previewSyllable.layoutType)
+  const previewPadding = getEffectivePadding(previewSyllable.layoutType)
+  const previewEffectiveStyle = getEffectiveStyle(previewSyllable.layoutType)
+
   return (
     <div className={styles.container}>
+      {/* 미리보기 */}
+      <div className={styles.previewSection}>
+        <div className={styles.previewBox}>
+          <SvgRenderer
+            syllable={previewSyllable}
+            schema={{ ...previewSchema, padding: previewPadding }}
+            size={160}
+            fillColor="#e5e5e5"
+            backgroundColor="#1a1a1a"
+            globalStyle={previewEffectiveStyle}
+          />
+        </div>
+        <p className={styles.previewChar}>{previewSyllable.char}</p>
+      </div>
+
       {/* 기울기 */}
       <div className={styles.section}>
         <h4 className={styles.sectionTitle}>기울기 (Slant)</h4>
