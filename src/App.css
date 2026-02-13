@@ -36,7 +36,8 @@
 }
 
 .editor-section {
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* 모바일 레이아웃 */
