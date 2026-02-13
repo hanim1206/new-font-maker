@@ -339,21 +339,21 @@
   gap: 1rem;
 }
 
-/* 좌측 패널 (획 목록) */
+/* 좌측 패널 (획 목록 - 최상단) */
 .leftPanel {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  order: 1;
+  order: 0;
 }
 
-/* 중앙 패널 (미리보기 - 최상단) */
+/* 중앙 패널 (미리보기 - 중간) */
 .centerPanel {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1rem;
-  order: 0;
+  order: 1;
 }
 
 .keyboardHint {
