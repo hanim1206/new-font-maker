@@ -351,9 +351,10 @@ export function CharacterEditor() {
                 boxInfo={jamoBoxInfo}
                 jamoType={editingJamoType || undefined}
                 onPathPointChange={handlePathPointChange}
+                onStrokeChange={handleStrokeChange}
               />
               <p className={styles.keyboardHint}>
-                방향키: 위치 이동 | Shift + 방향키: 크기 조절
+                드래그: 획 이동 | 핸들 드래그: 크기 조절 | 방향키: 미세 이동 | Shift + 방향키: 미세 크기 조절
               </p>
             </div>
 
