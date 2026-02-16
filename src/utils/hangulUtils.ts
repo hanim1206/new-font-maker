@@ -132,16 +132,6 @@ function classifyLayout(
   return 'choseong-only'
 }
 
-// ===== 문자열을 음절 단위로 분해 =====
-export function decomposeText(
-  text: string,
-  choseongMap: Record<string, JamoData>,
-  jungseongMap: Record<string, JamoData>,
-  jongseongMap: Record<string, JamoData>
-): DecomposedSyllable[] {
-  return text.split('').map(char => decomposeSyllable(char, choseongMap, jungseongMap, jongseongMap))
-}
-
 // ===== 한글인지 확인 =====
 export function isHangul(char: string): boolean {
   const code = char.charCodeAt(0)

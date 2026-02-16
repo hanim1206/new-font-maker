@@ -16,7 +16,6 @@ export function PreviewPanel() {
     setInputText,
     selectedCharIndex,
     setSelectedCharIndex,
-    setViewMode,
     setControlMode,
     setEditingJamo,
     setSelectedLayoutType
@@ -24,7 +23,7 @@ export function PreviewPanel() {
   const { layoutConfigs, getEffectivePadding, getLayoutSchema } = useLayoutStore()
   const { choseong, jungseong, jongseong } = useJamoStore()
   const { getEffectiveStyle } = useGlobalStyleStore()
-  const [showDebug, setShowDebug] = useState(false)
+  const [showDebug, setShowDebug] = useState(true)
 
   // 모든 한글 글자 분석
   const syllables: DecomposedSyllable[] = useMemo(() => {
@@ -66,20 +65,6 @@ export function PreviewPanel() {
   useEffect(() => {
     setSelectedCharIndex(0)
   }, [inputText, setSelectedCharIndex])
-
-  // 자모 클릭 핸들러
-  const handleJamoClick = (type: 'choseong' | 'jungseong' | 'jongseong', char: string) => {
-    setViewMode('editor')
-    setControlMode('jamo')
-    setEditingJamo(type, char)
-  }
-
-  // 레이아웃 타입 클릭 핸들러
-  const handleLayoutTypeClick = (layoutType: string) => {
-    setViewMode('editor')
-    setControlMode('layout')
-    setSelectedLayoutType(layoutType as any)
-  }
 
   return (
     <div className="min-h-full p-4 bg-background flex flex-col gap-4 max-md:p-3">
@@ -144,58 +129,13 @@ export function PreviewPanel() {
 
       {/* 적용된 정보 (선택된 글자 기준) */}
       {selectedSyllable && selectedCharInfo.boxes && (
-        <div className="bg-surface rounded-lg p-4 flex flex-col gap-2.5 flex-1 overflow-y-auto min-h-0">
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-text-dim-5">선택된 글자</span>
-            <span className="text-sm text-text-dim-2 font-mono flex items-center gap-2">{selectedSyllable.char}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-text-dim-5">레이아웃 타입</span>
-            <span
-              className="text-sm text-text-dim-2 font-mono flex items-center gap-2 cursor-pointer transition-all px-2 py-1 rounded-sm hover:bg-surface-2 hover:text-primary"
-              onClick={() => handleLayoutTypeClick(selectedSyllable.layoutType)}
-            >
-              {selectedSyllable.layoutType}
-            </span>
-          </div>
-
-          {/* 분해 정보 (선택된 글자) */}
-          <div className="flex flex-wrap gap-2 py-2 border-t border-surface-3 mt-1">
-            {selectedSyllable.choseong && (
-              <span
-                className="text-xs text-text-dim-4 px-2 py-1 bg-surface-2 rounded-sm cursor-pointer transition-all hover:bg-surface-4 hover:text-primary hover:-translate-y-px"
-                onClick={() => handleJamoClick('choseong', selectedSyllable.choseong!.char)}
-              >
-                초성: {selectedSyllable.choseong.char}
-              </span>
-            )}
-            {selectedSyllable.jungseong && (
-              <span
-                className="text-xs text-text-dim-4 px-2 py-1 bg-surface-2 rounded-sm cursor-pointer transition-all hover:bg-surface-4 hover:text-primary hover:-translate-y-px"
-                onClick={() => handleJamoClick('jungseong', selectedSyllable.jungseong!.char)}
-              >
-                중성: {selectedSyllable.jungseong.char}
-              </span>
-            )}
-            {selectedSyllable.jongseong && (
-              <span
-                className="text-xs text-text-dim-4 px-2 py-1 bg-surface-2 rounded-sm cursor-pointer transition-all hover:bg-surface-4 hover:text-primary hover:-translate-y-px"
-                onClick={() => handleJamoClick('jongseong', selectedSyllable.jongseong!.char)}
-              >
-                종성: {selectedSyllable.jongseong.char}
-              </span>
-            )}
-          </div>
-
-          {/* 디버그 토글 */}
-          <label className="flex items-center gap-2 cursor-pointer text-xs text-text-dim-5 mt-2 pt-2 border-t border-surface-3">
-            <Checkbox
-              checked={showDebug}
-              onCheckedChange={(checked) => setShowDebug(checked === true)}
-            />
-            <span>박스 영역 표시</span>
-          </label>
-        </div>
+        <label className="flex items-center gap-2 cursor-pointer text-xs text-text-dim-5 mt-2 pt-2 border-t border-surface-3">
+          <Checkbox
+            checked={showDebug}
+            onCheckedChange={(checked) => setShowDebug(checked === true)}
+          />
+          <span>박스 영역 표시</span>
+        </label>
       )}
     </div>
   )

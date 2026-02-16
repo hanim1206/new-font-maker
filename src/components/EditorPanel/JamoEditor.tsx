@@ -8,7 +8,7 @@ import { StrokeEditor } from '../CharacterEditor/StrokeEditor'
 import { StrokeInspector } from '../CharacterEditor/StrokeInspector'
 import { LinkedSlotsPanel } from './LinkedSlotsPanel'
 import { RelatedSamplesPanel } from './RelatedSamplesPanel'
-import { downloadAsJson } from '../../utils/storage'
+import { copyJsonToClipboard } from '../../utils/storage'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { StrokeData, JamoData, BoxConfig } from '../../types'
@@ -267,11 +267,14 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
   }
 
   // JSON 내보내기 핸들러
-  const handleExport = () => {
+  const handleExport = async () => {
     const json = exportJamos()
-    const timestamp = new Date().toISOString().slice(0, 10)
-    downloadAsJson(json, `baseJamos-${timestamp}.json`)
-    alert('JSON 파일이 다운로드되었습니다.\nsrc/data/baseJamos.json에 덮어씌우세요.')
+    const ok = await copyJsonToClipboard(json)
+    if (ok) {
+      alert('JSON이 클립보드에 복사되었습니다.\nsrc/data/baseJamos.json에 붙여넣으세요.')
+    } else {
+      alert('클립보드 복사에 실패했습니다.')
+    }
   }
 
   // 전체 초기화 핸들러

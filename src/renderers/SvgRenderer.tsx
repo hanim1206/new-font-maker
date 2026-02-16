@@ -90,6 +90,8 @@ export function SvgRenderer({
         const pathWidth = stroke.width * box.width * VIEW_BOX_SIZE
         const pathHeight = stroke.height * box.height * VIEW_BOX_SIZE
         const d = pathDataToSvgD(stroke.pathData, baseX, baseY, pathWidth, pathHeight)
+
+        // 닫힌/열린 패스 모두 stroke로 렌더링 (fill 없음)
         return (
           <path
             key={stroke.id}

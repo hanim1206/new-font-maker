@@ -117,8 +117,8 @@ export function ControlPanel() {
                 'w-full py-3.5 px-4 text-sm bg-surface-2 text-text-dim-1 border border-border rounded-md cursor-pointer transition-all text-center',
                 'hover:bg-surface-hover hover:border-border-light hover:text-foreground',
                 controlMode === 'layout' &&
-                  selectedLayoutType === selectedSyllable.layoutType &&
-                  'bg-accent-blue border-accent-blue-hover text-white font-medium'
+                selectedLayoutType === selectedSyllable.layoutType &&
+                'bg-accent-blue border-accent-blue-hover text-white font-medium'
               )}
               onClick={() => handleLayoutSelect(selectedSyllable.layoutType)}
             >
@@ -136,8 +136,8 @@ export function ControlPanel() {
                     'flex items-center gap-3 w-full py-3 px-4 text-sm bg-surface-2 text-text-dim-1 border border-border rounded-md cursor-pointer transition-all text-left',
                     'hover:bg-surface-hover hover:border-border-light hover:text-foreground',
                     editingJamoType === 'choseong' &&
-                      editingJamoChar === selectedSyllable.choseong.char &&
-                      'bg-accent-blue border-accent-blue-hover text-white font-medium'
+                    editingJamoChar === selectedSyllable.choseong.char &&
+                    'bg-accent-blue border-accent-blue-hover text-white font-medium'
                   )}
                   onClick={() =>
                     handleJamoSelect(
@@ -149,8 +149,8 @@ export function ControlPanel() {
                   <span className={cn(
                     'text-xs text-text-dim-4 min-w-[32px]',
                     editingJamoType === 'choseong' &&
-                      editingJamoChar === selectedSyllable.choseong.char &&
-                      'text-white/70'
+                    editingJamoChar === selectedSyllable.choseong.char &&
+                    'text-white/70'
                   )}>초성</span>
                   <span className="text-2xl font-semibold">
                     {selectedSyllable.choseong.char}
@@ -163,8 +163,8 @@ export function ControlPanel() {
                     'flex items-center gap-3 w-full py-3 px-4 text-sm bg-surface-2 text-text-dim-1 border border-border rounded-md cursor-pointer transition-all text-left',
                     'hover:bg-surface-hover hover:border-border-light hover:text-foreground',
                     editingJamoType === 'jungseong' &&
-                      editingJamoChar === selectedSyllable.jungseong.char &&
-                      'bg-accent-blue border-accent-blue-hover text-white font-medium'
+                    editingJamoChar === selectedSyllable.jungseong.char &&
+                    'bg-accent-blue border-accent-blue-hover text-white font-medium'
                   )}
                   onClick={() =>
                     handleJamoSelect(
@@ -176,8 +176,8 @@ export function ControlPanel() {
                   <span className={cn(
                     'text-xs text-text-dim-4 min-w-[32px]',
                     editingJamoType === 'jungseong' &&
-                      editingJamoChar === selectedSyllable.jungseong.char &&
-                      'text-white/70'
+                    editingJamoChar === selectedSyllable.jungseong.char &&
+                    'text-white/70'
                   )}>중성</span>
                   <span className="text-2xl font-semibold">
                     {selectedSyllable.jungseong.char}
@@ -190,8 +190,8 @@ export function ControlPanel() {
                     'flex items-center gap-3 w-full py-3 px-4 text-sm bg-surface-2 text-text-dim-1 border border-border rounded-md cursor-pointer transition-all text-left',
                     'hover:bg-surface-hover hover:border-border-light hover:text-foreground',
                     editingJamoType === 'jongseong' &&
-                      editingJamoChar === selectedSyllable.jongseong.char &&
-                      'bg-accent-blue border-accent-blue-hover text-white font-medium'
+                    editingJamoChar === selectedSyllable.jongseong.char &&
+                    'bg-accent-blue border-accent-blue-hover text-white font-medium'
                   )}
                   onClick={() =>
                     handleJamoSelect(
@@ -203,8 +203,8 @@ export function ControlPanel() {
                   <span className={cn(
                     'text-xs text-text-dim-4 min-w-[32px]',
                     editingJamoType === 'jongseong' &&
-                      editingJamoChar === selectedSyllable.jongseong.char &&
-                      'text-white/70'
+                    editingJamoChar === selectedSyllable.jongseong.char &&
+                    'text-white/70'
                   )}>종성</span>
                   <span className="text-2xl font-semibold">
                     {selectedSyllable.jongseong.char}
@@ -249,8 +249,8 @@ export function ControlPanel() {
                     'aspect-square text-lg bg-surface-2 text-text-dim-1 border border-border rounded-sm cursor-pointer transition-all flex items-center justify-center',
                     'hover:bg-surface-hover hover:border-border-light hover:text-foreground',
                     editingJamoType === 'choseong' &&
-                      editingJamoChar === char &&
-                      'bg-accent-blue border-accent-blue-hover text-white font-semibold'
+                    editingJamoChar === char &&
+                    'bg-accent-blue border-accent-blue-hover text-white font-semibold'
                   )}
                   onClick={() => handleJamoSelect('choseong', char)}
                 >
@@ -270,8 +270,8 @@ export function ControlPanel() {
                     'aspect-square text-lg bg-surface-2 text-text-dim-1 border border-border rounded-sm cursor-pointer transition-all flex items-center justify-center',
                     'hover:bg-surface-hover hover:border-border-light hover:text-foreground',
                     editingJamoType === 'jungseong' &&
-                      editingJamoChar === char &&
-                      'bg-accent-blue border-accent-blue-hover text-white font-semibold'
+                    editingJamoChar === char &&
+                    'bg-accent-blue border-accent-blue-hover text-white font-semibold'
                   )}
                   onClick={() => handleJamoSelect('jungseong', char)}
                 >
@@ -291,8 +291,8 @@ export function ControlPanel() {
                     'aspect-square text-lg bg-surface-2 text-text-dim-1 border border-border rounded-sm cursor-pointer transition-all flex items-center justify-center',
                     'hover:bg-surface-hover hover:border-border-light hover:text-foreground',
                     editingJamoType === 'jongseong' &&
-                      editingJamoChar === char &&
-                      'bg-accent-blue border-accent-blue-hover text-white font-semibold'
+                    editingJamoChar === char &&
+                    'bg-accent-blue border-accent-blue-hover text-white font-semibold'
                   )}
                   onClick={() => handleJamoSelect('jongseong', char)}
                 >

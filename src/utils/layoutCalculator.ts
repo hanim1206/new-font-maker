@@ -268,7 +268,7 @@ function calculateMixedJungseongWithJongseong(
     JO: {
       x: padding.left,
       y: splitY2 + 0.02,
-      width: splitX - padding.left - 0.02,
+      width: 1 - padding.left - padding.right,
       height: 1 - splitY2 - padding.bottom - 0.02,
     },
   }

@@ -6,7 +6,7 @@ import { useGlobalStyleStore } from '../../stores/globalStyleStore'
 import { SplitEditor } from './SplitEditor'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { decomposeSyllable } from '../../utils/hangulUtils'
-import { downloadAsJson } from '../../utils/storage'
+import { copyJsonToClipboard } from '../../utils/storage'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { LayoutType } from '../../types'
@@ -42,8 +42,8 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       const hangulChars = inputText.split('').filter((char) => {
         const code = char.charCodeAt(0)
         return (code >= 0xac00 && code <= 0xd7a3) || // 완성형
-               (code >= 0x3131 && code <= 0x314e) || // 자음
-               (code >= 0x314f && code <= 0x3163)    // 모음
+          (code >= 0x3131 && code <= 0x314e) || // 자음
+          (code >= 0x314f && code <= 0x3163)    // 모음
       })
       const selectedChar = hangulChars[selectedCharIndex]
       if (selectedChar) {
@@ -102,11 +102,14 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     }
   }
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const json = exportSchemas()
-    const timestamp = new Date().toISOString().slice(0, 10)
-    downloadAsJson(json, `basePresets-${timestamp}.json`)
-    alert('JSON 파일이 다운로드되었습니다.\nsrc/data/basePresets.json에 덮어씌우세요.')
+    const ok = await copyJsonToClipboard(json)
+    if (ok) {
+      alert('JSON이 클립보드에 복사되었습니다.\nsrc/data/basePresets.json에 붙여넣으세요.')
+    } else {
+      alert('클립보드 복사에 실패했습니다.')
+    }
   }
 
   const handleResetAll = () => {
@@ -133,7 +136,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-5">
+    <div className="h-full overflow-y-auto flex flex-col">
       {/* 변경 감지 배지 */}
       {modified && (
         <Badge variant="modified" className="flex items-center gap-2 px-3.5 py-2.5 text-sm mb-4 w-fit">
@@ -148,9 +151,23 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
           현재 레이아웃 수정됨
         </Badge>
       )}
-
+      {/* 버튼 영역 */}
+      <div className="flex gap-3 pb-4 border-b border-border-subtle">
+        <Button variant="blue" className="flex-1" onClick={handleSave}>
+          저장
+        </Button>
+        <Button variant="default" className="flex-1" onClick={handleReset}>
+          되돌리기
+        </Button>
+        <Button variant="green" className="flex-1" onClick={handleExport}>
+          JSON 내보내기
+        </Button>
+        <Button variant="danger" className="flex-1" onClick={handleResetAll}>
+          전체 초기화
+        </Button>
+      </div>
       {/* 미리보기 + 레이아웃 설정 (가로 배치) */}
-      <div className="flex gap-4 mb-4 items-start">
+      <div className="flex gap-4 mt-4 flex-1">
         {/* 미리보기 영역 + 기준선 오버레이 */}
         <div className="shrink-0 p-4 bg-surface rounded-md border border-border-subtle">
           <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">미리보기</h3>
@@ -183,35 +200,17 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
               )}
             </div>
           </div>
-          <p className="text-center text-text-dim-5 text-sm">테스트: {testSyllable.char}</p>
         </div>
 
         {/* Split/Padding 편집기 */}
-        <div className="flex-1 min-w-0 overflow-y-auto max-h-[400px]">
+        <div className="flex-1 min-w-0 overflow-y-auto ">
           <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">레이아웃 설정</h3>
           <SplitEditor layoutType={layoutType} />
         </div>
       </div>
 
-      {/* 버튼 영역 */}
-      <div className="flex gap-3 pt-4 border-t border-border-subtle">
-        <Button variant="blue" className="flex-1" onClick={handleSave}>
-          저장
-        </Button>
-        <Button variant="default" className="flex-1" onClick={handleReset}>
-          되돌리기
-        </Button>
-      </div>
 
-      {/* 내보내기/전체 리셋 영역 */}
-      <div className="flex gap-3 mt-4 pt-4 border-t border-border-subtle">
-        <Button variant="green" className="flex-1" onClick={handleExport}>
-          JSON 내보내기
-        </Button>
-        <Button variant="danger" className="flex-1" onClick={handleResetAll}>
-          전체 초기화
-        </Button>
-      </div>
+
     </div>
   )
 }
