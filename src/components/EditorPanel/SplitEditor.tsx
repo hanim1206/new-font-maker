@@ -1,20 +1,10 @@
-import { useMemo } from 'react'
-import type { LayoutType, Part } from '../../types'
+import type { LayoutType, Padding } from '../../types'
 import { useLayoutStore } from '../../stores/layoutStore'
-import { calculateBoxes } from '../../utils/layoutCalculator'
+import { RelatedSamplesPanel } from './RelatedSamplesPanel'
 import styles from './SplitEditor.module.css'
 
 interface SplitEditorProps {
   layoutType: LayoutType
-}
-
-// 슬롯별 한글 이름
-const SLOT_NAMES: Record<Part, string> = {
-  CH: '초성',
-  JU: '중성',
-  JU_H: '중성-가로',
-  JU_V: '중성-세로',
-  JO: '종성',
 }
 
 // Split 축별 한글 설명
@@ -23,23 +13,39 @@ const AXIS_NAMES = {
   y: 'Y축 (상하 분할)',
 }
 
+const PADDING_SIDES: Array<{ key: keyof Padding; label: string }> = [
+  { key: 'top', label: '상단' },
+  { key: 'bottom', label: '하단' },
+  { key: 'left', label: '좌측' },
+  { key: 'right', label: '우측' },
+]
+
 export function SplitEditor({ layoutType }: SplitEditorProps) {
-  const { getLayoutSchema, updateSplit, updatePadding } = useLayoutStore()
+  const {
+    getLayoutSchema,
+    updateSplit,
+    globalPadding,
+    getEffectivePadding,
+    hasPaddingOverride,
+    setPaddingOverride,
+    removePaddingOverride,
+  } = useLayoutStore()
   const schema = getLayoutSchema(layoutType)
 
   const splits = schema.splits || []
-  const padding = schema.padding || { top: 0.05, bottom: 0.05, left: 0.05, right: 0.05 }
   const hasSplits = splits.length > 0
-
-  // 계산된 박스 (미리보기용)
-  const calculatedBoxes = useMemo(() => calculateBoxes(schema), [schema])
+  const hasOverride = hasPaddingOverride(layoutType)
+  const effectivePadding = getEffectivePadding(layoutType)
 
   const handleSplitChange = (index: number, value: number) => {
     updateSplit(layoutType, index, value)
   }
 
-  const handlePaddingChange = (side: 'top' | 'bottom' | 'left' | 'right', value: number) => {
-    updatePadding(layoutType, side, value)
+  const handleOverridePaddingChange = (
+    side: keyof Padding,
+    value: number
+  ) => {
+    setPaddingOverride(layoutType, side, value)
   }
 
   // Split 슬라이더 범위 결정
@@ -71,77 +77,6 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
 
   return (
     <div className={styles.container}>
-              {/* 비주얼 미리보기 */}
-      <div className={styles.section}>
-        <h4 className={styles.sectionTitle}>
-          <span className={styles.sectionIcon}>👁️</span>
-          레이아웃 미리보기
-        </h4>
-        <div className={styles.visualPreview}>
-          {/* Split 라인 표시 */}
-          {splits.map((split, index) =>
-            split.axis === 'x' ? (
-              <div
-                key={`line-x-${index}`}
-                className={styles.splitLineX}
-                style={{ left: `${split.value * 100}%` }}
-              />
-            ) : (
-              <div
-                key={`line-y-${index}`}
-                className={styles.splitLineY}
-                style={{ top: `${split.value * 100}%` }}
-              />
-            )
-          )}
-
-          {/* 슬롯 영역 표시 */}
-          {Object.entries(calculatedBoxes).map(([part, box]) => {
-            if (!box) return null
-            const colorMap: Record<string, string> = {
-              CH: '#ff6b6b',
-              JU: '#4ecdc4',
-              JU_H: '#ff9500',
-              JU_V: '#ffd700',
-              JO: '#4169e1',
-            }
-            return (
-              <div
-                key={part}
-                className={styles.slotArea}
-                style={{
-                  left: `${box.x * 100}%`,
-                  top: `${box.y * 100}%`,
-                  width: `${box.width * 100}%`,
-                  height: `${box.height * 100}%`,
-                  borderColor: colorMap[part] || '#666',
-                  backgroundColor: `${colorMap[part]}15`,
-                }}
-              >
-                {part}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-      {/* 슬롯 정보 */}
-      <div className={styles.section}>
-        <h4 className={styles.sectionTitle}>
-          <span className={styles.sectionIcon}>📦</span>
-          슬롯 구성
-        </h4>
-        <div className={styles.slotsInfo}>
-          {schema.slots.map((slot) => (
-            <span
-              key={slot}
-              className={`${styles.slotBadge} ${styles[`slot${slot.replace('_', '')}`] || styles.slotJU}`}
-            >
-              {SLOT_NAMES[slot]} ({slot})
-            </span>
-          ))}
-        </div>
-      </div>
-
       {/* Split 편집기 */}
       {hasSplits && (
         <div className={styles.section}>
@@ -152,7 +87,8 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
 
           {splits.map((split, index) => {
             const range = getSplitRange(index, split.axis)
-            const sliderClass = split.axis === 'x' ? styles.sliderX : styles.sliderY
+            const sliderClass =
+              split.axis === 'x' ? styles.sliderX : styles.sliderY
 
             return (
               <div key={`split-${index}`} className={styles.sliderGroup}>
@@ -170,7 +106,9 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
                   max={range.max}
                   step={0.01}
                   value={split.value}
-                  onChange={(e) => handleSplitChange(index, parseFloat(e.target.value))}
+                  onChange={(e) =>
+                    handleSplitChange(index, parseFloat(e.target.value))
+                  }
                   className={`${styles.slider} ${sliderClass}`}
                 />
               </div>
@@ -183,88 +121,81 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
         </div>
       )}
 
-      {/* Padding 편집기 (Split 없거나 고급 옵션) */}
+      {/* 이 레이아웃 여백 오버라이드 */}
       <div className={styles.section}>
         <h4 className={styles.sectionTitle}>
-          <span className={styles.sectionIcon}>↔️</span>
-          여백 (Padding)
+          <span className={styles.sectionIcon}>🔧</span>
+          이 레이아웃만 다르게
+          <label className={styles.overrideToggle}>
+            <input
+              type="checkbox"
+              checked={hasOverride}
+              onChange={() => {
+                if (hasOverride) {
+                  removePaddingOverride(layoutType)
+                } else {
+                  // 현재 글로벌 값으로 오버라이드 초기화
+                  for (const { key } of PADDING_SIDES) {
+                    setPaddingOverride(layoutType, key, globalPadding[key])
+                  }
+                }
+              }}
+            />
+            <span className={styles.overrideToggleLabel}>오버라이드</span>
+          </label>
         </h4>
 
-        <div className={styles.paddingGrid}>
-          <div className={styles.sliderGroup}>
-            <div className={styles.sliderLabel}>
-              <span className={styles.labelText}>상단</span>
-              <span className={styles.labelValue}>{(padding.top * 100).toFixed(0)}%</span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={0.3}
-              step={0.01}
-              value={padding.top}
-              onChange={(e) => handlePaddingChange('top', parseFloat(e.target.value))}
-              className={`${styles.slider} ${styles.paddingSlider}`}
-            />
+        {hasOverride && (
+          <div className={styles.paddingGrid}>
+            {PADDING_SIDES.map(({ key, label }) => {
+              const isOverridden =
+                effectivePadding[key] !== globalPadding[key]
+              return (
+                <div key={key} className={styles.sliderGroup}>
+                  <div className={styles.sliderLabel}>
+                    <span
+                      className={`${styles.labelText} ${isOverridden ? styles.overriddenLabel : ''}`}
+                    >
+                      {label}
+                      {isOverridden && ' *'}
+                    </span>
+                    <span className={styles.labelValue}>
+                      {(effectivePadding[key] * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={0.3}
+                    step={0.01}
+                    value={effectivePadding[key]}
+                    onChange={(e) =>
+                      handleOverridePaddingChange(
+                        key,
+                        parseFloat(e.target.value)
+                      )
+                    }
+                    className={`${styles.slider} ${styles.overrideSlider}`}
+                  />
+                </div>
+              )
+            })}
           </div>
+        )}
 
-          <div className={styles.sliderGroup}>
-            <div className={styles.sliderLabel}>
-              <span className={styles.labelText}>하단</span>
-              <span className={styles.labelValue}>{(padding.bottom * 100).toFixed(0)}%</span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={0.3}
-              step={0.01}
-              value={padding.bottom}
-              onChange={(e) => handlePaddingChange('bottom', parseFloat(e.target.value))}
-              className={`${styles.slider} ${styles.paddingSlider}`}
-            />
-          </div>
-
-          <div className={styles.sliderGroup}>
-            <div className={styles.sliderLabel}>
-              <span className={styles.labelText}>좌측</span>
-              <span className={styles.labelValue}>{(padding.left * 100).toFixed(0)}%</span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={0.3}
-              step={0.01}
-              value={padding.left}
-              onChange={(e) => handlePaddingChange('left', parseFloat(e.target.value))}
-              className={`${styles.slider} ${styles.paddingSlider}`}
-            />
-          </div>
-
-          <div className={styles.sliderGroup}>
-            <div className={styles.sliderLabel}>
-              <span className={styles.labelText}>우측</span>
-              <span className={styles.labelValue}>{(padding.right * 100).toFixed(0)}%</span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={0.3}
-              step={0.01}
-              value={padding.right}
-              onChange={(e) => handlePaddingChange('right', parseFloat(e.target.value))}
-              className={`${styles.slider} ${styles.paddingSlider}`}
-            />
-          </div>
-        </div>
-
-        {!hasSplits && (
+        {!hasOverride && (
           <p className={styles.infoText}>
-            Split이 없는 레이아웃은 여백으로 슬롯 위치를 조정합니다.
+            이 레이아웃에만 다른 여백을 적용하려면 오버라이드를 켜세요.
           </p>
         )}
       </div>
 
-
+      {/* 연관 샘플 미리보기 */}
+      <RelatedSamplesPanel
+        editingType="layout"
+        editingChar={null}
+        layoutType={layoutType}
+      />
     </div>
   )
 }
-

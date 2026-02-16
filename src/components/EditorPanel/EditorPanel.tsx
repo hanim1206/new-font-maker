@@ -1,6 +1,7 @@
 import { useUIStore } from '../../stores/uiStore'
 import { LayoutEditor } from './LayoutEditor'
 import { JamoEditor } from './JamoEditor'
+import { GlobalStyleEditor } from './GlobalStyleEditor'
 import styles from './EditorPanel.module.css'
 
 export function EditorPanel() {
@@ -11,7 +12,21 @@ export function EditorPanel() {
     return (
       <div className={styles.editorPanel}>
         <div className={styles.emptyState}>
-          <p className={styles.emptyText}>좌측 메뉴에서 편집할 항목을 선택하세요</p>
+          <p className={styles.emptyText}>편집 메뉴에서 편집할 항목을 선택하세요</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 글로벌 스타일 편집 모드
+  if (controlMode === 'global') {
+    return (
+      <div className={styles.editorPanel}>
+        <div className={styles.header}>
+          <h2 className={styles.title}>글로벌 스타일</h2>
+        </div>
+        <div className={styles.content}>
+          <GlobalStyleEditor />
         </div>
       </div>
     )

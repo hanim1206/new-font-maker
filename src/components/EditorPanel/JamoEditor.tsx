@@ -6,6 +6,8 @@ import { CharacterPreview } from '../CharacterEditor/CharacterPreview'
 import { StrokeList } from '../CharacterEditor/StrokeList'
 import { StrokeEditor } from '../CharacterEditor/StrokeEditor'
 import { StrokeInspector } from '../CharacterEditor/StrokeInspector'
+import { LinkedSlotsPanel } from './LinkedSlotsPanel'
+import { RelatedSamplesPanel } from './RelatedSamplesPanel'
 import { downloadAsJson } from '../../utils/storage'
 import type { StrokeData, JamoData, BoxConfig } from '../../types'
 import styles from './JamoEditor.module.css'
@@ -343,6 +345,38 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
 
       {/* 키보드 컨트롤 (UI 없음) */}
       <StrokeEditor strokes={draftStrokes} onChange={handleStrokeChange} boxInfo={jamoBoxInfo} />
+
+      {/* 연관 슬롯 링크 */}
+      <LinkedSlotsPanel
+        jamoType={jamoType}
+        jamoChar={jamoChar}
+        onApplyToLinked={(linkedSlots) => {
+          // 현재 draft strokes를 연관 슬롯에도 적용
+          for (const slot of linkedSlots) {
+            const targetJamo = slot.type === 'choseong' ? choseong[slot.char]
+              : slot.type === 'jungseong' ? jungseong[slot.char]
+              : jongseong[slot.char]
+            if (!targetJamo) continue
+
+            const updatedJamo: JamoData = { ...targetJamo, strokes: [...draftStrokes] }
+            switch (slot.type) {
+              case 'choseong': updateChoseong(slot.char, updatedJamo); break
+              case 'jungseong': updateJungseong(slot.char, updatedJamo); break
+              case 'jongseong': updateJongseong(slot.char, updatedJamo); break
+            }
+          }
+          alert(`${linkedSlots.length}개 연관 슬롯에 적용되었습니다.`)
+        }}
+      />
+
+      {/* 연관 샘플 미리보기 */}
+      <div style={{ padding: '0 20px' }}>
+        <RelatedSamplesPanel
+          editingType={jamoType}
+          editingChar={jamoChar}
+          layoutType={null}
+        />
+      </div>
 
       {/* 버튼 그룹 */}
       <div className={styles.buttonGroup}>

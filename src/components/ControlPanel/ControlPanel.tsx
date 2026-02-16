@@ -64,15 +64,35 @@ export function ControlPanel() {
     setSelectedLayoutType(null)
   }
 
+  // 글로벌 스타일 선택 핸들러
+  const handleGlobalStyleSelect = () => {
+    setControlMode('global')
+    setSelectedLayoutType(null)
+    setEditingJamo(null, null)
+  }
+
   return (
     <div className={styles.controlPanel}>
       <h2 className={styles.title}>편집 메뉴</h2>
+
+      {/* 글로벌 스타일 버튼 (항상 표시) */}
+      <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>글로벌</h3>
+        <button
+          className={`${styles.contextButton} ${
+            controlMode === 'global' ? styles.selected : ''
+          }`}
+          onClick={handleGlobalStyleSelect}
+        >
+          글로벌 스타일
+        </button>
+      </section>
 
       {/* 빈 상태: 글자 미선택 + 전체목록 OFF */}
       {!selectedSyllable && !showFullMenu && (
         <div className={styles.emptyState}>
           <p className={styles.emptyText}>
-            우측 상단에서 한글을 입력하고
+            좌측에서 한글을 입력하고
             <br />
             글자를 선택하세요
           </p>

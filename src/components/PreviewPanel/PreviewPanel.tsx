@@ -3,6 +3,7 @@ import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { useLayoutStore } from '../../stores/layoutStore'
 import { useJamoStore } from '../../stores/jamoStore'
 import { useUIStore } from '../../stores/uiStore'
+import { useGlobalStyleStore } from '../../stores/globalStyleStore'
 import { decomposeSyllable, isHangul } from '../../utils/hangulUtils'
 import type { DecomposedSyllable } from '../../types'
 import styles from './PreviewPanel.module.css'
@@ -18,8 +19,9 @@ export function PreviewPanel() {
     setEditingJamo,
     setSelectedLayoutType
   } = useUIStore()
-  const { layoutConfigs } = useLayoutStore()
+  const { layoutConfigs, getEffectivePadding, getLayoutSchema } = useLayoutStore()
   const { choseong, jungseong, jongseong } = useJamoStore()
+  const { getEffectiveStyle } = useGlobalStyleStore()
   const [showDebug, setShowDebug] = useState(false)
 
   // 모든 한글 글자 분석
@@ -112,11 +114,16 @@ export function PreviewPanel() {
                 >
                   <SvgRenderer
                     syllable={item.syllable}
-                    boxes={item.boxes}
-                    size={120}
+                    schema={(() => {
+                      const schema = getLayoutSchema(item.syllable.layoutType)
+                      const padding = getEffectivePadding(item.syllable.layoutType)
+                      return { ...schema, padding }
+                    })()}
+                    size={90}
                     fillColor="#e5e5e5"
                     backgroundColor="#1a1a1a"
                     showDebugBoxes={showDebug}
+                    globalStyle={getEffectiveStyle(item.syllable.layoutType)}
                   />
                 </div>
               ) : null

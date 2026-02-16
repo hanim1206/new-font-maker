@@ -1,17 +1,29 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { persist } from 'zustand/middleware'
-import type { LayoutType, BoxConfig, LayoutSchema, Part } from '../types'
+import type { LayoutType, BoxConfig, LayoutSchema, Part, Padding } from '../types'
 import { DEFAULT_LAYOUT_CONFIGS, type LayoutConfig } from '../data/layoutConfigs'
 import { calculateBoxes, DEFAULT_LAYOUT_SCHEMAS as CALC_SCHEMAS, BASE_PRESETS_SCHEMAS } from '../utils/layoutCalculator'
 
 const STORAGE_KEY = 'font-maker-layout-schemas'
+
+// 글로벌 패딩 기본값
+const DEFAULT_GLOBAL_PADDING: Padding = {
+  top: 0.08,
+  bottom: 0.08,
+  left: 0.08,
+  right: 0.08,
+}
 
 interface LayoutState {
   // 레이아웃 타입별 스키마 (Split + Padding 기반)
   layoutSchemas: Record<LayoutType, LayoutSchema>
   // 레이아웃 타입별 설정 (호환성 - 계산된 boxes)
   layoutConfigs: Record<LayoutType, LayoutConfig>
+  // 글로벌 패딩 (전체 레이아웃 기본값)
+  globalPadding: Padding
+  // 레이아웃별 패딩 오버라이드 (글로벌과 다르게 적용할 레이아웃)
+  paddingOverrides: Partial<Record<LayoutType, Partial<Padding>>>
   // hydration 완료 여부
   _hydrated: boolean
 }
@@ -38,6 +50,23 @@ interface LayoutActions {
   // 스키마 리셋
   resetLayoutSchema: (layoutType: LayoutType) => void
   resetAllLayoutSchemas: () => void
+
+  // ===== 글로벌 패딩 API =====
+
+  // 글로벌 패딩 업데이트
+  updateGlobalPadding: (side: keyof Padding, value: number) => void
+
+  // 레이아웃별 패딩 오버라이드 설정
+  setPaddingOverride: (layoutType: LayoutType, side: keyof Padding, value: number) => void
+
+  // 레이아웃별 패딩 오버라이드 제거
+  removePaddingOverride: (layoutType: LayoutType) => void
+
+  // 특정 레이아웃의 실효 패딩 계산 (글로벌 + 오버라이드 머지)
+  getEffectivePadding: (layoutType: LayoutType) => Padding
+
+  // 특정 레이아웃에 오버라이드가 설정되어 있는지
+  hasPaddingOverride: (layoutType: LayoutType) => boolean
 
   // ===== 프리셋 관리 API (신규) =====
 
@@ -72,17 +101,34 @@ interface LayoutActions {
   resetAllLayoutConfigs: () => void
 }
 
-// 스키마에서 계산된 boxes로 config 동기화
+// 실효 패딩 계산 (글로벌 + 오버라이드 머지)
+function computeEffectivePadding(state: LayoutState, layoutType: LayoutType): Padding {
+  const override = state.paddingOverrides[layoutType]
+  if (!override) return { ...state.globalPadding }
+  return { ...state.globalPadding, ...override }
+}
+
+// 스키마에서 계산된 boxes로 config 동기화 (글로벌 패딩 적용)
 function syncConfigFromSchema(
   state: LayoutState,
   layoutType: LayoutType
 ): void {
   const schema = state.layoutSchemas[layoutType]
-  const boxes = calculateBoxes(schema)
+  // 실효 패딩을 스키마에 반영하여 계산
+  const effectivePadding = computeEffectivePadding(state, layoutType)
+  const schemaWithPadding = { ...schema, padding: effectivePadding }
+  const boxes = calculateBoxes(schemaWithPadding)
   state.layoutConfigs[layoutType] = {
     layoutType,
     boxes: boxes as LayoutConfig['boxes'],
   }
+}
+
+// 모든 레이아웃의 config를 재동기화
+function syncAllConfigs(state: LayoutState): void {
+  Object.keys(state.layoutSchemas).forEach((lt) => {
+    syncConfigFromSchema(state, lt as LayoutType)
+  })
 }
 
 // 깊은 복사 헬퍼 (JSON 기반)
@@ -96,6 +142,8 @@ export const useLayoutStore = create<LayoutState & LayoutActions>()(
       // 초기 상태
       layoutSchemas: deepClone(CALC_SCHEMAS),
       layoutConfigs: { ...DEFAULT_LAYOUT_CONFIGS },
+      globalPadding: { ...DEFAULT_GLOBAL_PADDING },
+      paddingOverrides: {},
       _hydrated: false,
 
       // ===== Schema 기반 API =====
@@ -137,10 +185,43 @@ export const useLayoutStore = create<LayoutState & LayoutActions>()(
       resetAllLayoutSchemas: () =>
         set((state) => {
           state.layoutSchemas = deepClone(BASE_PRESETS_SCHEMAS)
-          Object.keys(state.layoutSchemas).forEach((lt) => {
-            syncConfigFromSchema(state, lt as LayoutType)
-          })
+          syncAllConfigs(state)
         }),
+
+      // ===== 글로벌 패딩 API =====
+
+      updateGlobalPadding: (side, value) =>
+        set((state) => {
+          state.globalPadding[side] = value
+          // 모든 레이아웃의 config 재계산
+          syncAllConfigs(state)
+        }),
+
+      setPaddingOverride: (layoutType, side, value) =>
+        set((state) => {
+          if (!state.paddingOverrides[layoutType]) {
+            state.paddingOverrides[layoutType] = {}
+          }
+          state.paddingOverrides[layoutType]![side] = value
+          syncConfigFromSchema(state, layoutType)
+        }),
+
+      removePaddingOverride: (layoutType) =>
+        set((state) => {
+          delete state.paddingOverrides[layoutType]
+          syncConfigFromSchema(state, layoutType)
+        }),
+
+      getEffectivePadding: (layoutType) => {
+        const state = get()
+        const override = state.paddingOverrides[layoutType]
+        if (!override) return { ...state.globalPadding }
+        return { ...state.globalPadding, ...override }
+      },
+
+      hasPaddingOverride: (layoutType) => {
+        return !!get().paddingOverrides[layoutType]
+      },
 
       // ===== 프리셋 관리 API (신규) =====
 
@@ -203,20 +284,36 @@ export const useLayoutStore = create<LayoutState & LayoutActions>()(
     })),
     {
       name: STORAGE_KEY,
-      // layoutSchemas만 저장 (layoutConfigs는 계산값이라 저장 불필요)
-      partialize: (state) => ({ layoutSchemas: state.layoutSchemas }),
+      // layoutSchemas + 패딩 설정 저장 (layoutConfigs는 계산값이라 저장 불필요)
+      partialize: (state) => ({
+        layoutSchemas: state.layoutSchemas,
+        globalPadding: state.globalPadding,
+        paddingOverrides: state.paddingOverrides,
+      }),
       // hydration 완료 시 콜백
       onRehydrateStorage: () => (state, error) => {
         if (error) {
           console.error('Layout store hydration failed:', error)
         }
         if (state) {
-          // hydration 후 layoutConfigs 동기화
+          // hydration 후 layoutConfigs 동기화 (글로벌 패딩 적용)
+          if (!state.globalPadding) {
+            state.globalPadding = { ...DEFAULT_GLOBAL_PADDING }
+          }
+          if (!state.paddingOverrides) {
+            state.paddingOverrides = {}
+          }
           Object.keys(state.layoutSchemas).forEach((lt) => {
-            const schema = state.layoutSchemas[lt as LayoutType]
-            const boxes = calculateBoxes(schema)
-            state.layoutConfigs[lt as LayoutType] = {
-              layoutType: lt as LayoutType,
+            const layoutType = lt as LayoutType
+            const schema = state.layoutSchemas[layoutType]
+            const override = state.paddingOverrides[layoutType]
+            const effectivePadding = override
+              ? { ...state.globalPadding, ...override }
+              : { ...state.globalPadding }
+            const schemaWithPadding = { ...schema, padding: effectivePadding }
+            const boxes = calculateBoxes(schemaWithPadding)
+            state.layoutConfigs[layoutType] = {
+              layoutType,
               boxes: boxes as LayoutConfig['boxes'],
             }
           })

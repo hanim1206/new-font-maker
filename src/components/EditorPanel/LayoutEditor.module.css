@@ -4,12 +4,27 @@
   padding: 20px;
 }
 
+/* 미리보기 + 설정 가로 배치 */
+.mainRow {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: flex-start;
+}
+
 .previewSection {
-  margin-bottom: 24px;
+  flex-shrink: 0;
   padding: 16px;
   background: #111;
   border-radius: 8px;
   border: 1px solid #1a1a1a;
+}
+
+.formSection {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  max-height: 400px;
 }
 
 .sectionTitle {
@@ -24,10 +39,38 @@
 .previewBox {
   display: flex;
   justify-content: center;
-  padding: 20px;
+  padding: 12px;
   background: #0a0a0a;
   border-radius: 6px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+}
+
+/* 기준선 오버레이가 있는 프리뷰 래퍼 */
+.previewWithSplitLines {
+  position: relative;
+  display: inline-block;
+}
+
+.splitLineX {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ff6b6b;
+  opacity: 0.7;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.splitLineY {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #4ecdc4;
+  opacity: 0.7;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .testChar {
@@ -35,10 +78,6 @@
   color: #666;
   font-size: 0.85rem;
   margin: 0;
-}
-
-.formSection {
-  margin-bottom: 24px;
 }
 
 .buttonGroup {

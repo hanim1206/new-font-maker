@@ -18,27 +18,24 @@ export default function App() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [setIsMobile])
 
-  // 데스크톱: 좌측 리모콘 + 우측 상/하단
+  // 데스크톱: 좌측 인풋/프리뷰 | 중앙 편집메뉴 | 우측 편집기
   if (!isMobile) {
     return (
       <div className="app-layout">
-        {/* 좌측 리모콘 */}
-        <aside className="control-panel-container">
-          <ControlPanel />
+        {/* 좌측: 인풋 + 프리뷰 */}
+        <aside className="preview-sidebar">
+          <PreviewPanel />
         </aside>
 
-        {/* 우측 메인 영역 */}
-        <main className="main-container">
-          {/* 우측 상단: 미리보기 */}
-          <section className="preview-section">
-            <PreviewPanel />
-          </section>
+        {/* 중앙: 편집 메뉴 */}
+        <section className="control-section">
+          <ControlPanel />
+        </section>
 
-          {/* 우측 하단: 편집 영역 */}
-          <section className="editor-section">
-            <EditorPanel />
-          </section>
-        </main>
+        {/* 우측: 편집 영역 */}
+        <section className="editor-section">
+          <EditorPanel />
+        </section>
       </div>
     )
   }

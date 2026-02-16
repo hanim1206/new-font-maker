@@ -222,3 +222,41 @@
   color: rgba(255, 255, 255, 0.6);
 }
 
+/* 오버라이드 토글 */
+.overrideToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  cursor: pointer;
+}
+
+.overrideToggle input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  accent-color: #ff9500;
+  cursor: pointer;
+}
+
+.overrideToggleLabel {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #888;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* 오버라이드 슬라이더 */
+.overrideSlider::-webkit-slider-thumb {
+  background: #ff9500;
+}
+
+.overrideSlider::-webkit-slider-thumb:hover {
+  background: #ffaa33;
+}
+
+/* 오버라이드된 라벨 */
+.overriddenLabel {
+  color: #ff9500;
+}
+
