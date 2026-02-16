@@ -5,7 +5,6 @@ import { useGlobalStyleStore } from '../../stores/globalStyleStore'
 import type { StrokeData, BoxConfig, PathStrokeData } from '../../types'
 import { isPathStroke } from '../../types'
 import { pathDataToSvgD } from '../../utils/pathUtils'
-import styles from './CharacterEditor.module.css'
 
 type PathPointChangeHandler = (
   strokeId: string,
@@ -105,7 +104,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
   // viewBox를 박스 영역에 맞춰 줌 (마진 포함)
   // 너무 납작해지지 않도록 최소 종횡비(높이/너비) 제한
   const MIN_HEIGHT_RATIO = 0.75
-  let vbX = boxX - VIEW_MARGIN
+  const vbX = boxX - VIEW_MARGIN
   let vbY = boxY - VIEW_MARGIN
   const vbW = boxWidth + 2 * VIEW_MARGIN
   let vbH = boxHeight + 2 * VIEW_MARGIN
@@ -174,7 +173,6 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
       }
     }
     return { x: boxX, y: boxY, w: boxWidth, h: boxHeight }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMixed, boxInfo, horizontalStrokeIds, verticalStrokeIds, boxX, boxY, boxWidth, boxHeight])
 
   // 패스 포인트/핸들 드래그 시작 (마우스 + 터치)
@@ -585,7 +583,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
   }
 
   return (
-    <div className={styles.preview}>
+    <div className="flex flex-col items-center gap-2 p-4 bg-surface-2 rounded-md w-full">
       <svg
         ref={svgRef}
         viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
@@ -732,7 +730,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
         })}
         </g>
       </svg>
-      <span className={styles.jamoLabel}>{jamoChar}</span>
+      <span className="text-sm text-[#e5e5e5] mt-2 text-center block">{jamoChar}</span>
     </div>
   )
 }

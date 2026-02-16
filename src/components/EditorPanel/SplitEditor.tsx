@@ -1,7 +1,9 @@
 import type { LayoutType, Padding } from '../../types'
 import { useLayoutStore } from '../../stores/layoutStore'
 import { RelatedSamplesPanel } from './RelatedSamplesPanel'
-import styles from './SplitEditor.module.css'
+import { cn } from '@/lib/utils'
+import { Slider } from '@/components/ui/slider'
+import { Checkbox } from '@/components/ui/checkbox'
 
 interface SplitEditorProps {
   layoutType: LayoutType
@@ -76,61 +78,56 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
   }
 
   return (
-    <div className={styles.container}>
+    <div className="flex flex-col gap-4">
       {/* Split 편집기 */}
       {hasSplits && (
-        <div className={styles.section}>
-          <h4 className={styles.sectionTitle}>
-            <span className={styles.sectionIcon}>✂️</span>
+        <div className="p-4 bg-surface rounded-md border border-border-subtle">
+          <h4 className="text-sm font-medium m-0 mb-4 text-text-dim-4 uppercase tracking-wider flex items-center gap-2">
+            <span className="text-lg">✂️</span>
             기준선 (Split)
           </h4>
 
           {splits.map((split, index) => {
             const range = getSplitRange(index, split.axis)
-            const sliderClass =
-              split.axis === 'x' ? styles.sliderX : styles.sliderY
+            const colorScheme = split.axis === 'x' ? 'x' as const : 'y' as const
 
             return (
-              <div key={`split-${index}`} className={styles.sliderGroup}>
-                <div className={styles.sliderLabel}>
-                  <span className={styles.labelText}>
+              <div key={`split-${index}`} className="mb-4 last:mb-0">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-base text-text-dim-1 font-medium">
                     {AXIS_NAMES[split.axis]} #{index + 1}
                   </span>
-                  <span className={styles.labelValue}>
+                  <span className="text-sm text-text-dim-4 font-mono bg-surface-2 px-2 py-0.5 rounded-sm">
                     {(split.value * 100).toFixed(0)}%
                   </span>
                 </div>
-                <input
-                  type="range"
+                <Slider
                   min={range.min}
                   max={range.max}
                   step={0.01}
-                  value={split.value}
-                  onChange={(e) =>
-                    handleSplitChange(index, parseFloat(e.target.value))
-                  }
-                  className={`${styles.slider} ${sliderClass}`}
+                  value={[split.value]}
+                  onValueChange={([val]) => handleSplitChange(index, val)}
+                  colorScheme={colorScheme}
                 />
               </div>
             )
           })}
 
-          <p className={styles.infoText}>
+          <p className="text-[0.8rem] text-text-dim-5 mt-3 pt-3 border-t border-border-subtle leading-relaxed">
             기준선을 이동하면 관련 슬롯의 크기가 자동으로 조정됩니다.
           </p>
         </div>
       )}
 
       {/* 이 레이아웃 여백 오버라이드 */}
-      <div className={styles.section}>
-        <h4 className={styles.sectionTitle}>
-          <span className={styles.sectionIcon}>🔧</span>
+      <div className="p-4 bg-surface rounded-md border border-border-subtle">
+        <h4 className="text-sm font-medium m-0 mb-4 text-text-dim-4 uppercase tracking-wider flex items-center gap-2">
+          <span className="text-lg">🔧</span>
           이 레이아웃만 다르게
-          <label className={styles.overrideToggle}>
-            <input
-              type="checkbox"
+          <label className="flex items-center gap-1.5 ml-auto cursor-pointer">
+            <Checkbox
               checked={hasOverride}
-              onChange={() => {
+              onCheckedChange={() => {
                 if (hasOverride) {
                   removePaddingOverride(layoutType)
                 } else {
@@ -141,41 +138,42 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
                 }
               }}
             />
-            <span className={styles.overrideToggleLabel}>오버라이드</span>
+            <span className="text-xs font-normal text-text-dim-4 normal-case tracking-normal">
+              오버라이드
+            </span>
           </label>
         </h4>
 
         {hasOverride && (
-          <div className={styles.paddingGrid}>
+          <div className="grid grid-cols-2 gap-4">
             {PADDING_SIDES.map(({ key, label }) => {
               const isOverridden =
                 effectivePadding[key] !== globalPadding[key]
               return (
-                <div key={key} className={styles.sliderGroup}>
-                  <div className={styles.sliderLabel}>
+                <div key={key} className="mb-4 last:mb-0">
+                  <div className="flex justify-between items-center mb-2">
                     <span
-                      className={`${styles.labelText} ${isOverridden ? styles.overriddenLabel : ''}`}
+                      className={cn(
+                        'text-base font-medium',
+                        isOverridden ? 'text-accent-orange' : 'text-text-dim-1'
+                      )}
                     >
                       {label}
                       {isOverridden && ' *'}
                     </span>
-                    <span className={styles.labelValue}>
+                    <span className="text-sm text-text-dim-4 font-mono bg-surface-2 px-2 py-0.5 rounded-sm">
                       {(effectivePadding[key] * 100).toFixed(0)}%
                     </span>
                   </div>
-                  <input
-                    type="range"
+                  <Slider
                     min={0}
                     max={0.3}
                     step={0.01}
-                    value={effectivePadding[key]}
-                    onChange={(e) =>
-                      handleOverridePaddingChange(
-                        key,
-                        parseFloat(e.target.value)
-                      )
+                    value={[effectivePadding[key]]}
+                    onValueChange={([val]) =>
+                      handleOverridePaddingChange(key, val)
                     }
-                    className={`${styles.slider} ${styles.overrideSlider}`}
+                    colorScheme="override"
                   />
                 </div>
               )
@@ -184,7 +182,7 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
         )}
 
         {!hasOverride && (
-          <p className={styles.infoText}>
+          <p className="text-[0.8rem] text-text-dim-5 mt-3 pt-3 border-t border-border-subtle leading-relaxed">
             이 레이아웃에만 다른 여백을 적용하려면 오버라이드를 켜세요.
           </p>
         )}

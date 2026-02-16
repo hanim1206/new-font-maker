@@ -1,7 +1,7 @@
 import { useUIStore } from '../../stores/uiStore'
 import type { StrokeData } from '../../types'
 import { isPathStroke } from '../../types'
-import styles from './CharacterEditor.module.css'
+import { cn } from '@/lib/utils'
 
 type PathPointChangeHandler = (
   strokeId: string,
@@ -22,9 +22,9 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
 
   if (!selectedStroke) {
     return (
-      <div className={styles.strokeInspector}>
-        <h3 className={styles.sectionTitle}>Stroke Properties</h3>
-        <div className={styles.emptyState}>획을 선택해주세요</div>
+      <div className="flex flex-col gap-3">
+        <h3 className="text-xs text-muted block mb-3">Stroke Properties</h3>
+        <div className="flex flex-col items-center justify-center min-h-[300px] text-center p-8">획을 선택해주세요</div>
       </div>
     )
   }
@@ -34,14 +34,16 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
     ? selectedStroke.pathData.points[selectedPointIndex]
     : null
 
+  const inputClass = 'p-2 bg-[#0f0f0f] border border-border-lighter rounded text-sm text-[#e5e5e5] font-mono transition-all duration-150 ease-in-out hover:border-[#444] focus:outline-none focus:border-primary focus:bg-surface-2'
+
   return (
-    <div className={styles.strokeInspector}>
-      <h3 className={styles.sectionTitle}>Stroke: {selectedStroke.id}</h3>
+    <div className="flex flex-col gap-3">
+      <h3 className="text-xs text-muted block mb-3">Stroke: {selectedStroke.id}</h3>
 
       {/* 바운딩 박스 속성 입력 */}
-      <div className={styles.propertyList}>
-        <div className={styles.propertyItem}>
-          <label className={styles.propertyLabel}>X</label>
+      <div className="flex flex-col gap-3 p-4 bg-surface-2 rounded-md border border-border">
+        <div className="flex flex-col gap-1">
+          <label className="text-[0.7rem] text-muted uppercase tracking-wider">X</label>
           <input
             type="number"
             min="0"
@@ -49,11 +51,11 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
             step="0.01"
             value={selectedStroke.x.toFixed(2)}
             onChange={(e) => onChange(selectedStroke.id, 'x', parseFloat(e.target.value) || 0)}
-            className={styles.propertyInput}
+            className={inputClass}
           />
         </div>
-        <div className={styles.propertyItem}>
-          <label className={styles.propertyLabel}>Y</label>
+        <div className="flex flex-col gap-1">
+          <label className="text-[0.7rem] text-muted uppercase tracking-wider">Y</label>
           <input
             type="number"
             min="0"
@@ -61,11 +63,11 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
             step="0.01"
             value={selectedStroke.y.toFixed(2)}
             onChange={(e) => onChange(selectedStroke.id, 'y', parseFloat(e.target.value) || 0)}
-            className={styles.propertyInput}
+            className={inputClass}
           />
         </div>
-        <div className={styles.propertyItem}>
-          <label className={styles.propertyLabel}>Width</label>
+        <div className="flex flex-col gap-1">
+          <label className="text-[0.7rem] text-muted uppercase tracking-wider">Width</label>
           <input
             type="number"
             min="0.01"
@@ -73,11 +75,11 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
             step="0.01"
             value={selectedStroke.width.toFixed(2)}
             onChange={(e) => onChange(selectedStroke.id, 'width', parseFloat(e.target.value) || 0.01)}
-            className={styles.propertyInput}
+            className={inputClass}
           />
         </div>
-        <div className={styles.propertyItem}>
-          <label className={styles.propertyLabel}>Height</label>
+        <div className="flex flex-col gap-1">
+          <label className="text-[0.7rem] text-muted uppercase tracking-wider">Height</label>
           <input
             type="number"
             min="0.01"
@@ -85,15 +87,15 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
             step="0.01"
             value={selectedStroke.height.toFixed(2)}
             onChange={(e) => onChange(selectedStroke.id, 'height', parseFloat(e.target.value) || 0.01)}
-            className={styles.propertyInput}
+            className={inputClass}
           />
         </div>
       </div>
 
       {/* 메타 정보 */}
-      <div className={styles.metaInfo}>
-        <span className={styles.metaLabel}>Direction:</span>
-        <span className={styles.metaValue}>
+      <div className="p-3 bg-surface-2 rounded border border-border flex flex-col gap-1">
+        <span className="text-[0.7rem] text-muted uppercase">Direction:</span>
+        <span className="text-sm text-[#e5e5e5] font-mono">
           {selectedStroke.direction === 'horizontal' ? '가로 (Horizontal)' :
            selectedStroke.direction === 'vertical' ? '세로 (Vertical)' :
            '패스 (Path)'}
@@ -104,12 +106,16 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
       {isPath && (
         <>
           {/* 포인트 목록 */}
-          <h3 className={styles.sectionTitle}>Path Points</h3>
-          <div className={styles.pointList}>
+          <h3 className="text-xs text-muted block mb-3">Path Points</h3>
+          <div className="flex flex-wrap gap-1 p-2 bg-surface-2 rounded-md border border-border">
             {selectedStroke.pathData.points.map((_, i) => (
               <button
                 key={i}
-                className={i === selectedPointIndex ? styles.pointActive : styles.pointItem}
+                className={cn(
+                  'py-1.5 px-3 bg-[#0f0f0f] text-[#e5e5e5] border border-border-lighter rounded text-xs cursor-pointer transition-all duration-150 ease-in-out',
+                  'hover:bg-surface-3 hover:border-[#444]',
+                  i === selectedPointIndex && 'bg-accent-cyan border-accent-cyan text-black font-semibold'
+                )}
                 onClick={() => setSelectedPointIndex(i)}
               >
                 Point {i}
@@ -119,11 +125,11 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
 
           {/* 선택된 포인트 속성 */}
           {selectedPoint && onPathPointChange && (
-            <div className={styles.pointProperties}>
-              <h3 className={styles.sectionTitle}>Point {selectedPointIndex}</h3>
-              <div className={styles.propertyList}>
-                <div className={styles.propertyItem}>
-                  <label className={styles.propertyLabel}>Point X</label>
+            <div className="flex flex-col gap-2">
+              <h3 className="text-xs text-muted block mb-3">Point {selectedPointIndex}</h3>
+              <div className="flex flex-col gap-3 p-4 bg-surface-2 rounded-md border border-border">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[0.7rem] text-muted uppercase tracking-wider">Point X</label>
                   <input
                     type="number"
                     min="0"
@@ -131,11 +137,11 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
                     step="0.01"
                     value={selectedPoint.x.toFixed(4)}
                     onChange={(e) => onPathPointChange(selectedStroke.id, selectedPointIndex!, 'x', parseFloat(e.target.value) || 0)}
-                    className={styles.propertyInput}
+                    className={inputClass}
                   />
                 </div>
-                <div className={styles.propertyItem}>
-                  <label className={styles.propertyLabel}>Point Y</label>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[0.7rem] text-muted uppercase tracking-wider">Point Y</label>
                   <input
                     type="number"
                     min="0"
@@ -143,18 +149,18 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
                     step="0.01"
                     value={selectedPoint.y.toFixed(4)}
                     onChange={(e) => onPathPointChange(selectedStroke.id, selectedPointIndex!, 'y', parseFloat(e.target.value) || 0)}
-                    className={styles.propertyInput}
+                    className={inputClass}
                   />
                 </div>
               </div>
 
               {/* Handle In */}
               {selectedPoint.handleIn && (
-                <div className={styles.handleGroup}>
-                  <span className={styles.metaLabel}>Handle In</span>
-                  <div className={styles.propertyList}>
-                    <div className={styles.propertyItem}>
-                      <label className={styles.propertyLabel}>X</label>
+                <div className="flex flex-col gap-1 p-2 bg-[#151515] rounded border border-border">
+                  <span className="text-[0.7rem] text-muted uppercase">Handle In</span>
+                  <div className="flex flex-col gap-3 p-4 bg-surface-2 rounded-md border border-border">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[0.7rem] text-muted uppercase tracking-wider">X</label>
                       <input
                         type="number"
                         step="0.01"
@@ -163,11 +169,11 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
                           selectedStroke.id, selectedPointIndex!, 'handleIn',
                           { x: parseFloat(e.target.value) || 0, y: selectedPoint.handleIn!.y }
                         )}
-                        className={styles.propertyInput}
+                        className={inputClass}
                       />
                     </div>
-                    <div className={styles.propertyItem}>
-                      <label className={styles.propertyLabel}>Y</label>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[0.7rem] text-muted uppercase tracking-wider">Y</label>
                       <input
                         type="number"
                         step="0.01"
@@ -176,7 +182,7 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
                           selectedStroke.id, selectedPointIndex!, 'handleIn',
                           { x: selectedPoint.handleIn!.x, y: parseFloat(e.target.value) || 0 }
                         )}
-                        className={styles.propertyInput}
+                        className={inputClass}
                       />
                     </div>
                   </div>
@@ -185,11 +191,11 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
 
               {/* Handle Out */}
               {selectedPoint.handleOut && (
-                <div className={styles.handleGroup}>
-                  <span className={styles.metaLabel}>Handle Out</span>
-                  <div className={styles.propertyList}>
-                    <div className={styles.propertyItem}>
-                      <label className={styles.propertyLabel}>X</label>
+                <div className="flex flex-col gap-1 p-2 bg-[#151515] rounded border border-border">
+                  <span className="text-[0.7rem] text-muted uppercase">Handle Out</span>
+                  <div className="flex flex-col gap-3 p-4 bg-surface-2 rounded-md border border-border">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[0.7rem] text-muted uppercase tracking-wider">X</label>
                       <input
                         type="number"
                         step="0.01"
@@ -198,11 +204,11 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
                           selectedStroke.id, selectedPointIndex!, 'handleOut',
                           { x: parseFloat(e.target.value) || 0, y: selectedPoint.handleOut!.y }
                         )}
-                        className={styles.propertyInput}
+                        className={inputClass}
                       />
                     </div>
-                    <div className={styles.propertyItem}>
-                      <label className={styles.propertyLabel}>Y</label>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[0.7rem] text-muted uppercase tracking-wider">Y</label>
                       <input
                         type="number"
                         step="0.01"
@@ -211,7 +217,7 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
                           selectedStroke.id, selectedPointIndex!, 'handleOut',
                           { x: selectedPoint.handleOut!.x, y: parseFloat(e.target.value) || 0 }
                         )}
-                        className={styles.propertyInput}
+                        className={inputClass}
                       />
                     </div>
                   </div>

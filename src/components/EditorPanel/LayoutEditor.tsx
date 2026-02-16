@@ -7,8 +7,9 @@ import { SplitEditor } from './SplitEditor'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { decomposeSyllable } from '../../utils/hangulUtils'
 import { downloadAsJson } from '../../utils/storage'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import type { LayoutType } from '../../types'
-import styles from './LayoutEditor.module.css'
 
 interface LayoutEditorProps {
   layoutType: LayoutType
@@ -117,44 +118,44 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   // Hydration 전에는 로딩 표시
   if (!_hydrated) {
     return (
-      <div className={styles.container}>
-        <div className={styles.loading}>로딩 중...</div>
+      <div className="h-full overflow-y-auto p-5">
+        <div className="flex items-center justify-center h-[200px] text-text-dim-5 text-base">로딩 중...</div>
       </div>
     )
   }
 
   if (!schema) {
     return (
-      <div className={styles.container}>
+      <div className="h-full overflow-y-auto p-5">
         <p>레이아웃 스키마를 불러올 수 없습니다.</p>
       </div>
     )
   }
 
   return (
-    <div className={styles.container}>
+    <div className="h-full overflow-y-auto p-5">
       {/* 변경 감지 배지 */}
       {modified && (
-        <div className={styles.modifiedBadge}>
-          <span className={styles.modifiedDot}></span>
+        <Badge variant="modified" className="flex items-center gap-2 px-3.5 py-2.5 text-sm mb-4 w-fit">
+          <span className="w-2 h-2 bg-accent-yellow rounded-full animate-pulse-dot" />
           수정됨 (basePresets.json과 다름)
-        </div>
+        </Badge>
       )}
 
       {/* 현재 레이아웃 변경 표시 */}
       {currentLayoutModified && (
-        <div className={styles.currentLayoutModified}>
+        <Badge variant="info" className="block text-center text-xs py-1.5 px-3 mb-4">
           현재 레이아웃 수정됨
-        </div>
+        </Badge>
       )}
 
       {/* 미리보기 + 레이아웃 설정 (가로 배치) */}
-      <div className={styles.mainRow}>
+      <div className="flex gap-4 mb-4 items-start">
         {/* 미리보기 영역 + 기준선 오버레이 */}
-        <div className={styles.previewSection}>
-          <h3 className={styles.sectionTitle}>미리보기</h3>
-          <div className={styles.previewBox}>
-            <div className={styles.previewWithSplitLines}>
+        <div className="shrink-0 p-4 bg-surface rounded-md border border-border-subtle">
+          <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">미리보기</h3>
+          <div className="flex justify-center p-3 bg-background rounded mb-2">
+            <div className="relative inline-block">
               <SvgRenderer
                 syllable={testSyllable}
                 schema={schema}
@@ -169,47 +170,47 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                 split.axis === 'x' ? (
                   <div
                     key={`split-x-${index}`}
-                    className={styles.splitLineX}
+                    className="absolute top-0 bottom-0 w-0.5 bg-accent-red opacity-70 z-[2] pointer-events-none"
                     style={{ left: `${split.value * 100}%` }}
                   />
                 ) : (
                   <div
                     key={`split-y-${index}`}
-                    className={styles.splitLineY}
+                    className="absolute left-0 right-0 h-0.5 bg-accent-cyan opacity-70 z-[2] pointer-events-none"
                     style={{ top: `${(split.value / 1.1) * 100}%` }}
                   />
                 )
               )}
             </div>
           </div>
-          <p className={styles.testChar}>테스트: {testSyllable.char}</p>
+          <p className="text-center text-text-dim-5 text-sm">테스트: {testSyllable.char}</p>
         </div>
 
         {/* Split/Padding 편집기 */}
-        <div className={styles.formSection}>
-          <h3 className={styles.sectionTitle}>레이아웃 설정</h3>
+        <div className="flex-1 min-w-0 overflow-y-auto max-h-[400px]">
+          <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">레이아웃 설정</h3>
           <SplitEditor layoutType={layoutType} />
         </div>
       </div>
 
       {/* 버튼 영역 */}
-      <div className={styles.buttonGroup}>
-        <button onClick={handleSave} className={styles.saveButton}>
+      <div className="flex gap-3 pt-4 border-t border-border-subtle">
+        <Button variant="blue" className="flex-1" onClick={handleSave}>
           저장
-        </button>
-        <button onClick={handleReset} className={styles.resetButton}>
+        </Button>
+        <Button variant="default" className="flex-1" onClick={handleReset}>
           되돌리기
-        </button>
+        </Button>
       </div>
 
       {/* 내보내기/전체 리셋 영역 */}
-      <div className={styles.exportSection}>
-        <button onClick={handleExport} className={styles.exportButton}>
+      <div className="flex gap-3 mt-4 pt-4 border-t border-border-subtle">
+        <Button variant="green" className="flex-1" onClick={handleExport}>
           JSON 내보내기
-        </button>
-        <button onClick={handleResetAll} className={styles.resetAllButton}>
+        </Button>
+        <Button variant="danger" className="flex-1" onClick={handleResetAll}>
           전체 초기화
-        </button>
+        </Button>
       </div>
     </div>
   )

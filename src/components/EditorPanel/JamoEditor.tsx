@@ -9,8 +9,9 @@ import { StrokeInspector } from '../CharacterEditor/StrokeInspector'
 import { LinkedSlotsPanel } from './LinkedSlotsPanel'
 import { RelatedSamplesPanel } from './RelatedSamplesPanel'
 import { downloadAsJson } from '../../utils/storage'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import type { StrokeData, JamoData, BoxConfig } from '../../types'
-import styles from './JamoEditor.module.css'
 
 interface JamoEditorProps {
   jamoType: 'choseong' | 'jungseong' | 'jongseong'
@@ -73,7 +74,7 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
           'choseong-jungseong-mixed',
           'choseong-jungseong-mixed-jongseong'
         ]
-        
+
         for (const layoutType of mixedLayoutTypes) {
           const layoutConfig = layoutConfigs[layoutType as keyof typeof layoutConfigs]
           if (layoutConfig) {
@@ -86,10 +87,10 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
               const maxY = Math.max(juH.y + juH.height, juV.y + juV.height)
               const combinedWidth = maxX - minX
               const combinedHeight = maxY - minY
-              return { 
-                x: minX, 
-                y: minY, 
-                width: combinedWidth, 
+              return {
+                x: minX,
+                y: minY,
+                width: combinedWidth,
                 height: combinedHeight,
                 juH: juH,
                 juV: juV
@@ -106,7 +107,7 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
           'choseong-jungseong-vertical',
           'choseong-jungseong-vertical-jongseong'
         ]
-        
+
         for (const layoutType of verticalLayoutTypes) {
           const layoutConfig = layoutConfigs[layoutType as keyof typeof layoutConfigs]
           if (layoutConfig) {
@@ -125,7 +126,7 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
           'choseong-jungseong-horizontal',
           'choseong-jungseong-horizontal-jongseong'
         ]
-        
+
         for (const layoutType of horizontalLayoutTypes) {
           const layoutConfig = layoutConfigs[layoutType as keyof typeof layoutConfigs]
           if (layoutConfig) {
@@ -288,57 +289,57 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
   // hydration 대기 중
   if (!_hydrated) {
     return (
-      <div className={styles.container}>
-        <p className={styles.loading}>자모 데이터 로딩 중...</p>
+      <div className="h-full flex flex-col overflow-y-auto">
+        <p className="flex items-center justify-center h-[200px] text-text-dim-5 text-base">자모 데이터 로딩 중...</p>
       </div>
     )
   }
 
   if (draftStrokes.length === 0) {
     return (
-      <div className={styles.container}>
-        <p className={styles.emptyState}>획 데이터를 불러올 수 없습니다.</p>
+      <div className="h-full flex flex-col overflow-y-auto">
+        <p className="py-10 px-5 text-center text-text-dim-5">획 데이터를 불러올 수 없습니다.</p>
       </div>
     )
   }
 
   return (
-    <div className={styles.container}>
+    <div className="h-full flex flex-col overflow-y-auto">
       {/* 변경 감지 배지 (전체 수정됨) */}
       {modified && (
-        <div className={styles.modifiedBadge}>
-          <span className={styles.modifiedDot}></span>
+        <Badge variant="modified" className="flex items-center gap-2 px-3.5 py-2.5 text-sm mx-5 mt-4 w-fit">
+          <span className="w-2 h-2 bg-accent-yellow rounded-full animate-pulse-dot" />
           수정됨 (baseJamos.json과 다름)
-        </div>
+        </Badge>
       )}
 
       {/* 현재 자모 수정됨 표시 */}
       {currentJamoModified && (
-        <div className={styles.currentJamoModified}>
+        <Badge variant="info" className="block text-center text-xs py-1.5 px-3 mx-5 mt-2">
           현재 '{jamoChar}' 자모가 수정되었습니다
-        </div>
+        </Badge>
       )}
 
       {/* 3단 레이아웃 */}
-      <div className={styles.threeColumnLayout}>
+      <div className="grid grid-cols-[200px_1fr_250px] gap-4 p-5 min-h-[400px]">
         {/* 좌측: 획 목록 */}
-        <div className={styles.leftPanel}>
-          <h3 className={styles.panelTitle}>획 목록</h3>
+        <div className="flex flex-col overflow-y-auto bg-surface rounded-md border border-border-subtle p-4">
+          <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">획 목록</h3>
           <StrokeList strokes={draftStrokes} />
         </div>
 
         {/* 중앙: 큰 미리보기 + 키보드 힌트 */}
-        <div className={styles.centerPanel}>
-          <h3 className={styles.panelTitle}>미리보기</h3>
+        <div className="flex flex-col items-center justify-center overflow-hidden bg-surface rounded-md border border-border-subtle p-4">
+          <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">미리보기</h3>
           <CharacterPreview jamoChar={jamoChar} strokes={draftStrokes} boxInfo={jamoBoxInfo} jamoType={jamoType} />
-          <p className={styles.keyboardHint}>
+          <p className="mt-4 text-xs text-text-dim-5 text-center leading-relaxed">
             방향키: 위치 이동 | Shift + 방향키: 크기 조절
           </p>
         </div>
 
         {/* 우측: Stroke Inspector */}
-        <div className={styles.rightPanel}>
-          <h3 className={styles.panelTitle}>속성 편집</h3>
+        <div className="flex flex-col overflow-y-auto bg-surface rounded-md border border-border-subtle p-4">
+          <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">속성 편집</h3>
           <StrokeInspector strokes={draftStrokes} onChange={handleStrokeChange} />
         </div>
       </div>
@@ -379,23 +380,23 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
       </div>
 
       {/* 버튼 그룹 */}
-      <div className={styles.buttonGroup}>
-        <button className={styles.resetButton} onClick={handleReset}>
+      <div className="flex gap-3 px-5 py-4 border-t border-border-subtle bg-background">
+        <Button variant="default" className="flex-1" onClick={handleReset}>
           초기화
-        </button>
-        <button className={styles.saveButton} onClick={handleSave}>
+        </Button>
+        <Button variant="blue" className="flex-1" onClick={handleSave}>
           저장
-        </button>
+        </Button>
       </div>
 
       {/* 내보내기/전체 리셋 영역 */}
-      <div className={styles.exportSection}>
-        <button className={styles.exportButton} onClick={handleExport}>
+      <div className="flex gap-3 px-5 py-4 border-t border-border-subtle bg-background">
+        <Button variant="green" className="flex-1" onClick={handleExport}>
           JSON 내보내기
-        </button>
-        <button className={styles.resetAllButton} onClick={handleResetAll}>
+        </Button>
+        <Button variant="danger" className="flex-1" onClick={handleResetAll}>
           전체 초기화
-        </button>
+        </Button>
       </div>
     </div>
   )

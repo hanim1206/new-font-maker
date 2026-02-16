@@ -5,8 +5,10 @@ import { useJamoStore } from '../../stores/jamoStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useGlobalStyleStore } from '../../stores/globalStyleStore'
 import { decomposeSyllable, isHangul } from '../../utils/hangulUtils'
+import { cn } from '@/lib/utils'
+import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import type { DecomposedSyllable } from '../../types'
-import styles from './PreviewPanel.module.css'
 
 export function PreviewPanel() {
   const {
@@ -80,28 +82,32 @@ export function PreviewPanel() {
   }
 
   return (
-    <div className={styles.container}>
+    <div className="min-h-full p-4 bg-background flex flex-col gap-4 max-md:p-3">
       {/* 입력 영역 */}
-      <div className={styles.inputSection}>
-        <input
+      <div className="w-full shrink-0 max-md:sticky max-md:top-0 max-md:z-10 max-md:bg-background max-md:pt-3 max-md:pb-2 max-md:-mt-3 max-md:mb-2">
+        <Input
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           placeholder="한글 입력 (예: 한글샘플)"
-          className={styles.textInput}
           maxLength={50}
+          className="w-full px-3 py-2.5 text-lg bg-surface-2 border-2 border-border rounded-lg text-foreground font-sans focus:border-primary max-md:text-xl max-md:px-3.5 max-md:py-3"
         />
       </div>
 
       {/* 미리보기 영역 - 그리드로 모든 글자 표시 */}
-      <div className={styles.previewSection}>
+      <div className="flex justify-center items-start shrink-0 max-md:min-h-[180px] max-md:sticky max-md:top-[4.5rem] max-md:z-[9] max-md:bg-background max-md:pb-2 max-md:mb-2">
         {renderedSyllables.length > 0 ? (
-          <div className={styles.previewGrid}>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(90px,1fr))] gap-2 p-2 bg-surface-2 rounded-xl max-w-full w-full max-md:grid-cols-[repeat(auto-fill,minmax(100px,1fr))] max-md:gap-3 max-md:p-3 max-[480px]:grid-cols-[repeat(auto-fill,minmax(80px,1fr))] max-[480px]:gap-2">
             {renderedSyllables.map((item, index) =>
               item.boxes ? (
                 <div
                   key={index}
-                  className={`${styles.previewGridItem} ${index === selectedCharIndex ? styles.active : ''}`}
+                  className={cn(
+                    'flex justify-center items-center bg-[#0f0f0f] rounded p-1 border-2 border-border cursor-pointer transition-all',
+                    'hover:border-[#444] hover:bg-surface',
+                    index === selectedCharIndex && 'border-primary bg-primary/10 shadow-[0_0_0_1px_theme(colors.primary.DEFAULT)]'
+                  )}
                   onClick={() => {
                     setSelectedCharIndex(index)
                     // 해당 음절의 레이아웃 타입으로 자동 포커스
@@ -130,23 +136,23 @@ export function PreviewPanel() {
             )}
           </div>
         ) : (
-          <div className={styles.placeholder}>
-            <span>한글을 입력하세요</span>
+          <div className="flex justify-center items-center w-full h-[150px] bg-surface-2 rounded-xl border-2 border-dashed border-border">
+            <span className="text-text-dim-6 text-base">한글을 입력하세요</span>
           </div>
         )}
       </div>
 
       {/* 적용된 정보 (선택된 글자 기준) */}
       {selectedSyllable && selectedCharInfo.boxes && (
-        <div className={styles.infoSection}>
-          <div className={styles.infoItem}>
-            <span className={styles.infoLabel}>선택된 글자</span>
-            <span className={styles.infoValue}>{selectedSyllable.char}</span>
+        <div className="bg-surface rounded-lg p-4 flex flex-col gap-2.5 flex-1 overflow-y-auto min-h-0">
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-text-dim-5">선택된 글자</span>
+            <span className="text-sm text-text-dim-2 font-mono flex items-center gap-2">{selectedSyllable.char}</span>
           </div>
-          <div className={styles.infoItem}>
-            <span className={styles.infoLabel}>레이아웃 타입</span>
-            <span 
-              className={`${styles.infoValue} ${styles.clickable}`}
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-text-dim-5">레이아웃 타입</span>
+            <span
+              className="text-sm text-text-dim-2 font-mono flex items-center gap-2 cursor-pointer transition-all px-2 py-1 rounded-sm hover:bg-surface-2 hover:text-primary"
               onClick={() => handleLayoutTypeClick(selectedSyllable.layoutType)}
             >
               {selectedSyllable.layoutType}
@@ -154,26 +160,26 @@ export function PreviewPanel() {
           </div>
 
           {/* 분해 정보 (선택된 글자) */}
-          <div className={styles.decomposed}>
+          <div className="flex flex-wrap gap-2 py-2 border-t border-surface-3 mt-1">
             {selectedSyllable.choseong && (
-              <span 
-                className={`${styles.jamo} ${styles.clickable}`}
+              <span
+                className="text-xs text-text-dim-4 px-2 py-1 bg-surface-2 rounded-sm cursor-pointer transition-all hover:bg-surface-4 hover:text-primary hover:-translate-y-px"
                 onClick={() => handleJamoClick('choseong', selectedSyllable.choseong!.char)}
               >
                 초성: {selectedSyllable.choseong.char}
               </span>
             )}
             {selectedSyllable.jungseong && (
-              <span 
-                className={`${styles.jamo} ${styles.clickable}`}
+              <span
+                className="text-xs text-text-dim-4 px-2 py-1 bg-surface-2 rounded-sm cursor-pointer transition-all hover:bg-surface-4 hover:text-primary hover:-translate-y-px"
                 onClick={() => handleJamoClick('jungseong', selectedSyllable.jungseong!.char)}
               >
                 중성: {selectedSyllable.jungseong.char}
               </span>
             )}
             {selectedSyllable.jongseong && (
-              <span 
-                className={`${styles.jamo} ${styles.clickable}`}
+              <span
+                className="text-xs text-text-dim-4 px-2 py-1 bg-surface-2 rounded-sm cursor-pointer transition-all hover:bg-surface-4 hover:text-primary hover:-translate-y-px"
                 onClick={() => handleJamoClick('jongseong', selectedSyllable.jongseong!.char)}
               >
                 종성: {selectedSyllable.jongseong.char}
@@ -182,11 +188,10 @@ export function PreviewPanel() {
           </div>
 
           {/* 디버그 토글 */}
-          <label className={styles.debugToggle}>
-            <input
-              type="checkbox"
+          <label className="flex items-center gap-2 cursor-pointer text-xs text-text-dim-5 mt-2 pt-2 border-t border-surface-3">
+            <Checkbox
               checked={showDebug}
-              onChange={(e) => setShowDebug(e.target.checked)}
+              onCheckedChange={(checked) => setShowDebug(checked === true)}
             />
             <span>박스 영역 표시</span>
           </label>

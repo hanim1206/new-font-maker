@@ -3,7 +3,7 @@ import { ControlPanel } from './components/ControlPanel/ControlPanel'
 import { PreviewPanel } from './components/PreviewPanel'
 import { EditorPanel } from './components/EditorPanel/EditorPanel'
 import { useUIStore } from './stores/uiStore'
-import './App.css'
+import { cn } from '@/lib/utils'
 
 export default function App() {
   const { viewMode, setViewMode, isMobile, setIsMobile } = useUIStore()
@@ -21,19 +21,19 @@ export default function App() {
   // 데스크톱: 좌측 인풋/프리뷰 | 중앙 편집메뉴 | 우측 편집기
   if (!isMobile) {
     return (
-      <div className="app-layout">
+      <div className="grid grid-cols-[300px_280px_1fr] h-screen bg-background text-foreground font-sans">
         {/* 좌측: 인풋 + 프리뷰 */}
-        <aside className="preview-sidebar">
+        <aside className="overflow-y-auto overflow-x-hidden border-r border-border-subtle">
           <PreviewPanel />
         </aside>
 
         {/* 중앙: 편집 메뉴 */}
-        <section className="control-section">
+        <section className="overflow-y-auto overflow-x-hidden border-r border-border-subtle">
           <ControlPanel />
         </section>
 
         {/* 우측: 편집 영역 */}
-        <section className="editor-section">
+        <section className="overflow-y-auto overflow-x-hidden">
           <EditorPanel />
         </section>
       </div>
@@ -42,10 +42,12 @@ export default function App() {
 
   // 모바일: 3개 탭 (리모콘 / 미리보기 / 편집)
   return (
-    <div className="app-container mobile">
-      <header className="mobile-header">
-        <h1 className="app-title">Font Maker</h1>
-        <nav className="tab-nav">
+    <div className="flex flex-col h-screen bg-background text-foreground font-sans">
+      <header className="shrink-0 px-4 py-3 bg-[#0f0f0f] border-b border-border-subtle">
+        <h1 className="text-xl font-bold mb-3 bg-gradient-to-br from-primary-light to-accent-pink bg-clip-text text-transparent">
+          Font Maker
+        </h1>
+        <nav className="flex gap-2">
           <TabButton
             active={viewMode === 'presets'}
             onClick={() => setViewMode('presets')}
@@ -67,7 +69,7 @@ export default function App() {
         </nav>
       </header>
 
-      <main className="mobile-content">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden">
         {viewMode === 'presets' && <ControlPanel />}
         {viewMode === 'preview' && <PreviewPanel />}
         {viewMode === 'editor' && <EditorPanel />}
@@ -85,7 +87,12 @@ interface TabButtonProps {
 function TabButton({ active, onClick, children }: TabButtonProps) {
   return (
     <button
-      className={`tab-button ${active ? 'active' : ''}`}
+      className={cn(
+        'flex-1 py-2.5 px-4 text-sm font-medium rounded-md border cursor-pointer transition-all duration-150 ease-in-out font-sans',
+        active
+          ? 'bg-primary border-primary text-white'
+          : 'bg-surface-2 border-border text-muted hover:bg-surface-3 hover:text-muted-foreground'
+      )}
       onClick={onClick}
     >
       {children}

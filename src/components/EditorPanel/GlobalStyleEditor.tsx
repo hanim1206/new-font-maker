@@ -6,7 +6,10 @@ import { useJamoStore } from '../../stores/jamoStore'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { decomposeSyllable, isHangul } from '../../utils/hangulUtils'
 import type { LayoutType, Padding } from '../../types'
-import styles from './GlobalStyleEditor.module.css'
+import { cn } from '@/lib/utils'
+import { Slider } from '@/components/ui/slider'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Button } from '@/components/ui/button'
 
 const PADDING_SIDES: Array<{ key: keyof Padding; label: string }> = [
   { key: 'top', label: '상단' },
@@ -71,10 +74,10 @@ export function GlobalStyleEditor() {
   const previewEffectiveStyle = getEffectiveStyle(previewSyllable.layoutType)
 
   return (
-    <div className={styles.container}>
+    <div className="flex flex-col gap-4">
       {/* 미리보기 */}
-      <div className={styles.previewSection}>
-        <div className={styles.previewBox}>
+      <div className="p-4 bg-surface rounded-md border border-border-subtle flex items-center gap-4">
+        <div className="flex justify-center p-2 bg-background rounded">
           <SvgRenderer
             syllable={previewSyllable}
             schema={{ ...previewSchema, padding: previewPadding }}
@@ -84,96 +87,97 @@ export function GlobalStyleEditor() {
             globalStyle={previewEffectiveStyle}
           />
         </div>
-        <p className={styles.previewChar}>{previewSyllable.char}</p>
+        <p className="text-sm text-text-dim-5 m-0">{previewSyllable.char}</p>
       </div>
 
       {/* 기울기 */}
-      <div className={styles.section}>
-        <h4 className={styles.sectionTitle}>기울기 (Slant)</h4>
-        <div className={styles.sliderGroup}>
-          <div className={styles.sliderLabel}>
-            <span className={styles.labelText}>각도</span>
-            <span className={styles.labelValue}>{style.slant.toFixed(1)}°</span>
+      <div className="p-4 bg-surface rounded-md border border-border-subtle">
+        <h4 className="text-sm font-medium m-0 mb-4 text-text-dim-4 uppercase tracking-wider">
+          기울기 (Slant)
+        </h4>
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-base text-text-dim-1 font-medium">각도</span>
+            <span className="text-sm text-text-dim-4 font-mono bg-surface-2 px-2 py-0.5 rounded-sm">
+              {style.slant.toFixed(1)}°
+            </span>
           </div>
-          <input
-            type="range"
+          <Slider
             min={-30}
             max={30}
             step={0.5}
-            value={style.slant}
-            onChange={(e) => updateStyle('slant', parseFloat(e.target.value))}
-            className={styles.slider}
+            value={[style.slant]}
+            onValueChange={([val]) => updateStyle('slant', val)}
           />
         </div>
       </div>
 
       {/* 두께 */}
-      <div className={styles.section}>
-        <h4 className={styles.sectionTitle}>두께 (Weight)</h4>
-        <div className={styles.sliderGroup}>
-          <div className={styles.sliderLabel}>
-            <span className={styles.labelText}>배율</span>
-            <span className={styles.labelValue}>{style.weight.toFixed(2)}x</span>
+      <div className="p-4 bg-surface rounded-md border border-border-subtle">
+        <h4 className="text-sm font-medium m-0 mb-4 text-text-dim-4 uppercase tracking-wider">
+          두께 (Weight)
+        </h4>
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-base text-text-dim-1 font-medium">배율</span>
+            <span className="text-sm text-text-dim-4 font-mono bg-surface-2 px-2 py-0.5 rounded-sm">
+              {style.weight.toFixed(2)}x
+            </span>
           </div>
-          <input
-            type="range"
+          <Slider
             min={0.3}
             max={3.0}
             step={0.05}
-            value={style.weight}
-            onChange={(e) => updateStyle('weight', parseFloat(e.target.value))}
-            className={styles.slider}
+            value={[style.weight]}
+            onValueChange={([val]) => updateStyle('weight', val)}
           />
         </div>
       </div>
 
       {/* 자간 */}
-      <div className={styles.section}>
-        <h4 className={styles.sectionTitle}>자간 (Letter Spacing)</h4>
-        <div className={styles.sliderGroup}>
-          <div className={styles.sliderLabel}>
-            <span className={styles.labelText}>간격</span>
-            <span className={styles.labelValue}>
+      <div className="p-4 bg-surface rounded-md border border-border-subtle">
+        <h4 className="text-sm font-medium m-0 mb-4 text-text-dim-4 uppercase tracking-wider">
+          자간 (Letter Spacing)
+        </h4>
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-base text-text-dim-1 font-medium">간격</span>
+            <span className="text-sm text-text-dim-4 font-mono bg-surface-2 px-2 py-0.5 rounded-sm">
               {(style.letterSpacing * 100).toFixed(0)}%
             </span>
           </div>
-          <input
-            type="range"
+          <Slider
             min={0}
             max={0.3}
             step={0.01}
-            value={style.letterSpacing}
-            onChange={(e) =>
-              updateStyle('letterSpacing', parseFloat(e.target.value))
-            }
-            className={styles.slider}
+            value={[style.letterSpacing]}
+            onValueChange={([val]) => updateStyle('letterSpacing', val)}
           />
         </div>
       </div>
 
       {/* 글로벌 여백 */}
-      <div className={styles.section}>
-        <h4 className={styles.sectionTitle}>여백 (Padding)</h4>
+      <div className="p-4 bg-surface rounded-md border border-border-subtle">
+        <h4 className="text-sm font-medium m-0 mb-4 text-text-dim-4 uppercase tracking-wider">
+          여백 (Padding)
+        </h4>
 
-        <div className={styles.paddingGrid}>
+        <div className="grid grid-cols-2 gap-4">
           {PADDING_SIDES.map(({ key, label }) => (
-            <div key={key} className={styles.sliderGroup}>
-              <div className={styles.sliderLabel}>
-                <span className={styles.labelText}>{label}</span>
-                <span className={styles.labelValue}>
+            <div key={key}>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-base text-text-dim-1 font-medium">{label}</span>
+                <span className="text-sm text-text-dim-4 font-mono bg-surface-2 px-2 py-0.5 rounded-sm">
                   {(globalPadding[key] * 100).toFixed(0)}%
                 </span>
               </div>
-              <input
-                type="range"
+              <Slider
                 min={0}
                 max={0.3}
                 step={0.01}
-                value={globalPadding[key]}
-                onChange={(e) =>
-                  updateGlobalPadding(key, parseFloat(e.target.value))
-                }
-                className={`${styles.slider} ${styles.paddingSlider}`}
+                value={[globalPadding[key]]}
+                onValueChange={([val]) => updateGlobalPadding(key, val)}
+                colorScheme="padding"
               />
             </div>
           ))}
@@ -184,13 +188,15 @@ export function GlobalStyleEditor() {
       {(style.slant !== 0 ||
         style.weight !== 1.0 ||
         style.letterSpacing !== 0) && (
-        <div className={styles.section}>
-          <h4 className={styles.sectionTitle}>레이아웃별 제외</h4>
-          <p className={styles.infoText}>
+        <div className="p-4 bg-surface rounded-md border border-border-subtle">
+          <h4 className="text-sm font-medium m-0 mb-4 text-text-dim-4 uppercase tracking-wider">
+            레이아웃별 제외
+          </h4>
+          <p className="text-[0.8rem] text-text-dim-5 m-0 mb-3 leading-relaxed">
             특정 레이아웃에서 글로벌 속성을 적용하지 않으려면 체크하세요.
           </p>
 
-          <div className={styles.exclusionGrid}>
+          <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto">
             {LAYOUT_TYPES.map(({ type, label }) => {
               const hasAnyExclusion =
                 hasExclusion('slant', type) ||
@@ -200,46 +206,48 @@ export function GlobalStyleEditor() {
               return (
                 <div
                   key={type}
-                  className={`${styles.exclusionRow} ${
-                    hasAnyExclusion ? styles.hasExclusion : ''
-                  }`}
+                  className={cn(
+                    'flex justify-between items-center px-3 py-2 rounded transition-colors',
+                    hasAnyExclusion
+                      ? 'bg-[rgba(255,107,107,0.08)] border border-[rgba(255,107,107,0.15)]'
+                      : 'bg-background'
+                  )}
                 >
-                  <span className={styles.exclusionLabel}>{label}</span>
-                  <div className={styles.exclusionCheckboxes}>
+                  <span className="text-[0.8rem] text-text-dim-2 min-w-[100px]">
+                    {label}
+                  </span>
+                  <div className="flex gap-3">
                     {style.slant !== 0 && (
-                      <label className={styles.checkbox}>
-                        <input
-                          type="checkbox"
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <Checkbox
                           checked={hasExclusion('slant', type)}
-                          onChange={() =>
+                          onCheckedChange={() =>
                             handleExclusionToggle('slant', type)
                           }
                         />
-                        <span className={styles.checkboxLabel}>기울기</span>
+                        <span className="text-xs text-text-dim-4">기울기</span>
                       </label>
                     )}
                     {style.weight !== 1.0 && (
-                      <label className={styles.checkbox}>
-                        <input
-                          type="checkbox"
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <Checkbox
                           checked={hasExclusion('weight', type)}
-                          onChange={() =>
+                          onCheckedChange={() =>
                             handleExclusionToggle('weight', type)
                           }
                         />
-                        <span className={styles.checkboxLabel}>두께</span>
+                        <span className="text-xs text-text-dim-4">두께</span>
                       </label>
                     )}
                     {style.letterSpacing !== 0 && (
-                      <label className={styles.checkbox}>
-                        <input
-                          type="checkbox"
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <Checkbox
                           checked={hasExclusion('letterSpacing', type)}
-                          onChange={() =>
+                          onCheckedChange={() =>
                             handleExclusionToggle('letterSpacing', type)
                           }
                         />
-                        <span className={styles.checkboxLabel}>자간</span>
+                        <span className="text-xs text-text-dim-4">자간</span>
                       </label>
                     )}
                   </div>
@@ -249,7 +257,7 @@ export function GlobalStyleEditor() {
           </div>
 
           {exclusions.length > 0 && (
-            <p className={styles.exclusionCount}>
+            <p className="text-xs text-accent-red mt-2 m-0 text-right">
               {exclusions.length}개 제외 규칙 적용 중
             </p>
           )}
@@ -257,10 +265,14 @@ export function GlobalStyleEditor() {
       )}
 
       {/* 리셋 */}
-      <div className={styles.resetSection}>
-        <button className={styles.resetButton} onClick={resetStyle}>
+      <div className="pt-2">
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={resetStyle}
+        >
           전체 초기화
-        </button>
+        </Button>
       </div>
     </div>
   )

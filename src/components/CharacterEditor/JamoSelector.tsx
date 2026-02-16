@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CHOSEONG_LIST, JUNGSEONG_LIST, JONGSEONG_LIST } from '../../data/Hangul'
-import styles from './CharacterEditor.module.css'
+import { cn } from '@/lib/utils'
 
 interface JamoSelectorProps {
   selectedType: 'choseong' | 'jungseong' | 'jongseong' | null
@@ -20,23 +20,35 @@ export function JamoSelector({ selectedType, selectedChar, onSelect }: JamoSelec
   }
 
   return (
-    <div className={styles.jamoSelector}>
+    <div className="flex flex-col gap-3">
       {/* 타입 탭 */}
-      <div className={styles.tabs}>
+      <div className="flex gap-2 p-2 bg-surface-2 rounded-md border border-border">
         <button
-          className={activeTab === 'choseong' ? styles.tabActive : ''}
+          className={cn(
+            'flex-1 py-3 px-4 bg-transparent text-muted border-none rounded text-sm font-medium cursor-pointer transition-all duration-150 ease-in-out',
+            'hover:bg-surface-3 hover:text-[#e5e5e5]',
+            activeTab === 'choseong' && 'bg-primary text-white'
+          )}
           onClick={() => setActiveTab('choseong')}
         >
           초성
         </button>
         <button
-          className={activeTab === 'jungseong' ? styles.tabActive : ''}
+          className={cn(
+            'flex-1 py-3 px-4 bg-transparent text-muted border-none rounded text-sm font-medium cursor-pointer transition-all duration-150 ease-in-out',
+            'hover:bg-surface-3 hover:text-[#e5e5e5]',
+            activeTab === 'jungseong' && 'bg-primary text-white'
+          )}
           onClick={() => setActiveTab('jungseong')}
         >
           중성
         </button>
         <button
-          className={activeTab === 'jongseong' ? styles.tabActive : ''}
+          className={cn(
+            'flex-1 py-3 px-4 bg-transparent text-muted border-none rounded text-sm font-medium cursor-pointer transition-all duration-150 ease-in-out',
+            'hover:bg-surface-3 hover:text-[#e5e5e5]',
+            activeTab === 'jongseong' && 'bg-primary text-white'
+          )}
           onClick={() => setActiveTab('jongseong')}
         >
           종성
@@ -44,11 +56,15 @@ export function JamoSelector({ selectedType, selectedChar, onSelect }: JamoSelec
       </div>
 
       {/* 자모 그리드 */}
-      <div className={styles.jamoGrid}>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(50px,1fr))] gap-2 p-4 bg-surface-2 rounded-md border border-border max-h-[300px] overflow-y-auto">
         {jamoList[activeTab].map((char) => (
           <button
             key={char}
-            className={selectedChar === char && selectedType === activeTab ? styles.jamoActive : ''}
+            className={cn(
+              'py-3 bg-[#0f0f0f] text-[#e5e5e5] border border-border-lighter rounded text-[1.2rem] cursor-pointer transition-all duration-150 ease-in-out',
+              'hover:bg-surface-3 hover:border-[#444]',
+              selectedChar === char && selectedType === activeTab && 'bg-primary border-primary text-white'
+            )}
             onClick={() => onSelect(activeTab, char)}
           >
             {char}

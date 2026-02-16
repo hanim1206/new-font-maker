@@ -9,7 +9,7 @@ import { StrokeEditor } from './StrokeEditor'
 import { StrokeInspector } from './StrokeInspector'
 import type { StrokeData, JamoData, BoxConfig } from '../../types'
 import { isPathStroke } from '../../types'
-import styles from './CharacterEditor.module.css'
+import { Button } from '@/components/ui/button'
 
 function getJamoMap(type: 'choseong' | 'jungseong' | 'jongseong'): Record<string, JamoData> {
   switch (type) {
@@ -40,19 +40,19 @@ function generateStrokeCode(strokes: StrokeData[], char: string, type: string): 
     // 혼합 중성의 경우, 원본 데이터에서 horizontalStrokes와 verticalStrokes에 속하는 획 ID 확인
     const jamoMap = getJamoMap('jungseong')
     const originalJamo = jamoMap[char]
-    
+
     if (originalJamo?.horizontalStrokes && originalJamo?.verticalStrokes) {
       // 원본의 horizontalStrokes와 verticalStrokes에 속하는 획 ID 수집
       const horizontalStrokeIds = new Set(originalJamo.horizontalStrokes.map(s => s.id))
       const verticalStrokeIds = new Set(originalJamo.verticalStrokes.map(s => s.id))
-      
+
       // 편집된 strokes를 horizontalStrokes와 verticalStrokes로 분리
       const horizontalStrokes = strokes.filter(s => horizontalStrokeIds.has(s.id))
       const verticalStrokes = strokes.filter(s => verticalStrokeIds.has(s.id))
-      
+
       const horizontalLines = horizontalStrokes.map(formatStroke).join('\n')
       const verticalLines = verticalStrokes.map(formatStroke).join('\n')
-      
+
       return `  '${char}': {
     char: '${char}',
     type: '${type}',
@@ -113,7 +113,7 @@ export function CharacterEditor() {
           'choseong-jungseong-mixed',
           'choseong-jungseong-mixed-jongseong'
         ]
-        
+
         for (const layoutType of mixedLayoutTypes) {
           const layoutConfig = layoutConfigs[layoutType as keyof typeof layoutConfigs]
           if (layoutConfig) {
@@ -127,10 +127,10 @@ export function CharacterEditor() {
               const maxY = Math.max(juH.y + juH.height, juV.y + juV.height)
               const combinedWidth = maxX - minX
               const combinedHeight = maxY - minY
-              return { 
-                x: minX, 
-                y: minY, 
-                width: combinedWidth, 
+              return {
+                x: minX,
+                y: minY,
+                width: combinedWidth,
                 height: combinedHeight,
                 juH: juH,
                 juV: juV
@@ -149,7 +149,7 @@ export function CharacterEditor() {
           'choseong-jungseong-vertical',
           'choseong-jungseong-vertical-jongseong'
         ]
-        
+
         for (const layoutType of verticalLayoutTypes) {
           const layoutConfig = layoutConfigs[layoutType as keyof typeof layoutConfigs]
           if (layoutConfig) {
@@ -169,7 +169,7 @@ export function CharacterEditor() {
           'choseong-jungseong-horizontal',
           'choseong-jungseong-horizontal-jongseong'
         ]
-        
+
         for (const layoutType of horizontalLayoutTypes) {
           const layoutConfig = layoutConfigs[layoutType as keyof typeof layoutConfigs]
           if (layoutConfig) {
@@ -315,12 +315,12 @@ export function CharacterEditor() {
   }
 
   return (
-    <div className={styles.container}>
+    <div className="min-h-full p-4 bg-[#0f0f0f] flex flex-col gap-6">
       {/* 헤더 */}
-      <div className={styles.header}>
-        <h2 className={styles.title}>문자 편집</h2>
+      <div className="pb-4 border-b border-border">
+        <h2 className="text-xl font-semibold text-foreground mb-2 font-sans">문자 편집</h2>
         {editingJamoChar && (
-          <p className={styles.selectedJamo}>
+          <p className="text-sm text-muted">
             선택된 자모: {editingJamoChar} ({editingJamoType})
           </p>
         )}
@@ -337,14 +337,14 @@ export function CharacterEditor() {
       {editingJamoChar && draftStrokes.length > 0 ? (
         <>
           {/* 3단 레이아웃 */}
-          <div className={styles.threeColumnLayout}>
+          <div className="flex flex-col gap-4">
             {/* 좌측: 획 목록 */}
-            <div className={styles.leftPanel}>
+            <div className="flex flex-col gap-3 order-none">
               <StrokeList strokes={draftStrokes} />
             </div>
 
             {/* 중앙: 큰 미리보기 + 키보드 힌트 */}
-            <div className={styles.centerPanel}>
+            <div className="flex flex-col items-center gap-4 order-1">
               <CharacterPreview
                 jamoChar={editingJamoChar}
                 strokes={draftStrokes}
@@ -353,13 +353,13 @@ export function CharacterEditor() {
                 onPathPointChange={handlePathPointChange}
                 onStrokeChange={handleStrokeChange}
               />
-              <p className={styles.keyboardHint}>
+              <p className="text-xs text-muted text-center py-2 px-4 bg-surface-2 rounded border border-border max-w-[400px]">
                 드래그: 획 이동 | 핸들 드래그: 크기 조절 | 방향키: 미세 이동 | Shift + 방향키: 미세 크기 조절
               </p>
             </div>
 
             {/* 우측: Stroke Inspector */}
-            <div className={styles.rightPanel}>
+            <div className="flex flex-col gap-3 order-2">
               <StrokeInspector strokes={draftStrokes} onChange={handleStrokeChange} onPathPointChange={handlePathPointChange} />
             </div>
           </div>
@@ -368,26 +368,26 @@ export function CharacterEditor() {
           <StrokeEditor strokes={draftStrokes} onChange={handleStrokeChange} onPathPointChange={handlePathPointChange} boxInfo={jamoBoxInfo} />
 
           {/* 버튼 그룹 */}
-          <div className={styles.buttonGroup}>
-            <button className={styles.resetButton} onClick={handleReset}>
+          <div className="flex gap-2 pt-4 border-t border-border">
+            <Button variant="default" className="flex-1" onClick={handleReset}>
               초기화
-            </button>
-            <button className={styles.cancelButton} onClick={handleCancel}>
+            </Button>
+            <Button variant="outline" className="flex-1" onClick={handleCancel}>
               취소
-            </button>
-            <button className={styles.saveButton} onClick={handleSave}>
+            </Button>
+            <Button variant="primary" className="flex-1" onClick={handleSave}>
               저장
-            </button>
+            </Button>
           </div>
         </>
       ) : editingJamoChar ? (
-        <div className={styles.emptyState}>
+        <div className="flex flex-col items-center justify-center min-h-[300px] text-center p-8">
           <p>이 자모에 획 데이터가 없습니다</p>
         </div>
       ) : (
-        <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>✏️</div>
-          <p className={styles.emptyText}>편집할 자모를 선택해주세요</p>
+        <div className="flex flex-col items-center justify-center min-h-[300px] text-center p-8">
+          <div className="text-5xl mb-4 opacity-60">✏️</div>
+          <p className="text-base text-text-dim-5 leading-relaxed">편집할 자모를 선택해주세요</p>
         </div>
       )}
     </div>

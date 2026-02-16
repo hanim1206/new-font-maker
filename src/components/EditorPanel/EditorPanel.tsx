@@ -2,7 +2,6 @@ import { useUIStore } from '../../stores/uiStore'
 import { LayoutEditor } from './LayoutEditor'
 import { JamoEditor } from './JamoEditor'
 import { GlobalStyleEditor } from './GlobalStyleEditor'
-import styles from './EditorPanel.module.css'
 
 export function EditorPanel() {
   const { controlMode, selectedLayoutType, editingJamoType, editingJamoChar } = useUIStore()
@@ -10,9 +9,9 @@ export function EditorPanel() {
   // 아무것도 선택되지 않은 경우
   if (!controlMode) {
     return (
-      <div className={styles.editorPanel}>
-        <div className={styles.emptyState}>
-          <p className={styles.emptyText}>편집 메뉴에서 편집할 항목을 선택하세요</p>
+      <div className="h-full bg-background border-t border-border-subtle overflow-hidden flex flex-col">
+        <div className="h-full flex items-center justify-center">
+          <p className="text-text-dim-5 text-base text-center">편집 메뉴에서 편집할 항목을 선택하세요</p>
         </div>
       </div>
     )
@@ -21,11 +20,11 @@ export function EditorPanel() {
   // 글로벌 스타일 편집 모드
   if (controlMode === 'global') {
     return (
-      <div className={styles.editorPanel}>
-        <div className={styles.header}>
-          <h2 className={styles.title}>글로벌 스타일</h2>
+      <div className="h-full bg-background border-t border-border-subtle overflow-hidden flex flex-col">
+        <div className="px-5 py-4 border-b border-border-subtle bg-[#111]">
+          <h2 className="text-xl font-semibold text-[#e0e0e0]">글로벌 스타일</h2>
         </div>
-        <div className={styles.content}>
+        <div className="flex-1 overflow-y-auto p-5">
           <GlobalStyleEditor />
         </div>
       </div>
@@ -35,11 +34,11 @@ export function EditorPanel() {
   // 레이아웃 편집 모드
   if (controlMode === 'layout' && selectedLayoutType) {
     return (
-      <div className={styles.editorPanel}>
-        <div className={styles.header}>
-          <h2 className={styles.title}>레이아웃 편집: {selectedLayoutType}</h2>
+      <div className="h-full bg-background border-t border-border-subtle overflow-hidden flex flex-col">
+        <div className="px-5 py-4 border-b border-border-subtle bg-[#111]">
+          <h2 className="text-xl font-semibold text-[#e0e0e0]">레이아웃 편집: {selectedLayoutType}</h2>
         </div>
-        <div className={styles.content}>
+        <div className="flex-1 overflow-y-auto p-5">
           <LayoutEditor layoutType={selectedLayoutType} />
         </div>
       </div>
@@ -55,13 +54,13 @@ export function EditorPanel() {
     }[editingJamoType]
 
     return (
-      <div className={styles.editorPanel}>
-        <div className={styles.header}>
-          <h2 className={styles.title}>
+      <div className="h-full bg-background border-t border-border-subtle overflow-hidden flex flex-col">
+        <div className="px-5 py-4 border-b border-border-subtle bg-[#111]">
+          <h2 className="text-xl font-semibold text-[#e0e0e0]">
             {typeLabel} 편집: {editingJamoChar}
           </h2>
         </div>
-        <div className={styles.content}>
+        <div className="flex-1 overflow-y-auto p-5">
           <JamoEditor jamoType={editingJamoType} jamoChar={editingJamoChar} />
         </div>
       </div>
@@ -69,9 +68,9 @@ export function EditorPanel() {
   }
 
   return (
-    <div className={styles.editorPanel}>
-      <div className={styles.emptyState}>
-        <p className={styles.emptyText}>선택된 항목이 없습니다</p>
+    <div className="h-full bg-background border-t border-border-subtle overflow-hidden flex flex-col">
+      <div className="h-full flex items-center justify-center">
+        <p className="text-text-dim-5 text-base text-center">선택된 항목이 없습니다</p>
       </div>
     </div>
   )
