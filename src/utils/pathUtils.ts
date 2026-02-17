@@ -1,4 +1,4 @@
-import type { PathData, PathPoint } from '../types'
+import type { PathData, PathPoint, AnchorPoint, BoxConfig } from '../types'
 
 /**
  * PathData의 상대 좌표(0~1)를 절대 viewBox 좌표로 변환하여
@@ -151,6 +151,130 @@ function appendSegment(
   } else {
     parts.push(`L ${toX} ${toY}`)
   }
+}
+
+// ===== 통합 StrokeData(V2) 렌더링 =====
+
+/**
+ * AnchorPoint[] + BoxConfig → SVG path d 속성 문자열
+ *
+ * 모든 좌표를 박스 기준 0~1에서 절대 SVG viewBox 좌표로 변환합니다.
+ * 닫힌 패스(closed=true)에서 비정방 비율일 때 베지어 핸들 보정도 적용합니다.
+ */
+export function pointsToSvgD(
+  points: AnchorPoint[],
+  closed: boolean,
+  box: BoxConfig,
+  viewBoxSize: number
+): string {
+  if (points.length < 2 && !closed) return ''
+  if (points.length < 1) return ''
+
+  const toAbs = (px: number, py: number): [number, number] => [
+    (box.x + px * box.width) * viewBoxSize,
+    (box.y + py * box.height) * viewBoxSize,
+  ]
+
+  // 닫힌 패스의 비정방 비율 곡률 보정
+  let renderPoints: AnchorPoint[] = points
+  if (closed && box.width > 0 && box.height > 0) {
+    const absWidth = box.width * viewBoxSize
+    const absHeight = box.height * viewBoxSize
+    const ratio = absWidth / absHeight
+    if (Math.abs(ratio - 1) > 0.05) {
+      renderPoints = adjustAnchorHandlesForAspectRatio(points, ratio)
+    }
+  }
+
+  const parts: string[] = []
+
+  // 첫 점으로 이동
+  const [startX, startY] = toAbs(renderPoints[0].x, renderPoints[0].y)
+  parts.push(`M ${startX} ${startY}`)
+
+  // 연속 점 쌍에 대해 세그먼트 생성
+  for (let i = 0; i < renderPoints.length - 1; i++) {
+    appendAnchorSegment(parts, renderPoints[i], renderPoints[i + 1], toAbs)
+  }
+
+  // 닫힌 패스: 마지막→첫 점 구간 후 Z
+  if (closed && renderPoints.length >= 2) {
+    appendAnchorSegment(parts, renderPoints[renderPoints.length - 1], renderPoints[0], toAbs)
+    parts.push('Z')
+  }
+
+  return parts.join(' ')
+}
+
+/**
+ * AnchorPoint 쌍의 세그먼트를 SVG 경로 명령으로 추가합니다.
+ */
+function appendAnchorSegment(
+  parts: string[],
+  from: AnchorPoint,
+  to: AnchorPoint,
+  toAbs: (x: number, y: number) => [number, number]
+): void {
+  const hasOut = from.handleOut !== undefined
+  const hasIn = to.handleIn !== undefined
+  const [toX, toY] = toAbs(to.x, to.y)
+
+  if (hasOut && hasIn) {
+    const [cp1x, cp1y] = toAbs(from.handleOut!.x, from.handleOut!.y)
+    const [cp2x, cp2y] = toAbs(to.handleIn!.x, to.handleIn!.y)
+    parts.push(`C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${toX} ${toY}`)
+  } else if (hasOut) {
+    const [cpx, cpy] = toAbs(from.handleOut!.x, from.handleOut!.y)
+    parts.push(`Q ${cpx} ${cpy} ${toX} ${toY}`)
+  } else if (hasIn) {
+    const [cpx, cpy] = toAbs(to.handleIn!.x, to.handleIn!.y)
+    parts.push(`Q ${cpx} ${cpy} ${toX} ${toY}`)
+  } else {
+    parts.push(`L ${toX} ${toY}`)
+  }
+}
+
+/**
+ * AnchorPoint 배열의 비정방 비율 곡률 보정
+ * (기존 adjustHandlesForAspectRatio와 동일한 로직, AnchorPoint용)
+ */
+function adjustAnchorHandlesForAspectRatio(
+  points: AnchorPoint[],
+  ratio: number
+): AnchorPoint[] {
+  const deviation = Math.abs(ratio - 1)
+  const strength = Math.min(deviation * 0.4, 0.3)
+
+  return points.map((point) => {
+    const adjusted = { ...point }
+
+    if (point.handleIn) {
+      const dx = point.handleIn.x - point.x
+      const dy = point.handleIn.y - point.y
+      let adjustedDx = dx
+      let adjustedDy = dy
+      if (ratio > 1) {
+        if (Math.abs(dy) > 0.001) adjustedDy = dy * (1 + strength)
+      } else {
+        if (Math.abs(dx) > 0.001) adjustedDx = dx * (1 + strength)
+      }
+      adjusted.handleIn = { x: point.x + adjustedDx, y: point.y + adjustedDy }
+    }
+    if (point.handleOut) {
+      const dx = point.handleOut.x - point.x
+      const dy = point.handleOut.y - point.y
+      let adjustedDx = dx
+      let adjustedDy = dy
+      if (ratio > 1) {
+        if (Math.abs(dy) > 0.001) adjustedDy = dy * (1 + strength)
+      } else {
+        if (Math.abs(dx) > 0.001) adjustedDx = dx * (1 + strength)
+      }
+      adjusted.handleOut = { x: point.x + adjustedDx, y: point.y + adjustedDy }
+    }
+
+    return adjusted
+  })
 }
 
 /**

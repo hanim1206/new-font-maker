@@ -107,7 +107,7 @@ export interface Rule {
   enabled: boolean
 }
 
-// ===== 패스 데이터 (곡선 지원) =====
+// ===== 패스 데이터 (곡선 지원) — 레거시, Phase 5에서 제거 예정 =====
 export interface PathPoint {
   x: number // 0~1, 스트로크 바운딩 박스 내 상대 좌표
   y: number
@@ -149,6 +149,25 @@ export function isPathStroke(stroke: StrokeData): stroke is PathStrokeData {
 
 export function isRectStroke(stroke: StrokeData): stroke is RectStrokeData {
   return stroke.direction === 'horizontal' || stroke.direction === 'vertical'
+}
+
+// 레거시 별칭 (마이그레이션 유틸리티에서 사용)
+export type LegacyStrokeData = StrokeData
+
+// ===== 통합 획 데이터 (V2) =====
+export interface AnchorPoint {
+  x: number       // 0~1, 레이아웃 박스 기준
+  y: number       // 0~1, 레이아웃 박스 기준
+  handleIn?: { x: number; y: number }   // 베지어 제어점 (박스 기준)
+  handleOut?: { x: number; y: number }
+}
+
+export interface StrokeDataV2 {
+  id: string
+  points: AnchorPoint[]   // 앵커 포인트 배열 (박스 기준 0~1)
+  closed: boolean         // true = 닫힌 도형 (ㅇ 원형 등)
+  thickness: number       // 획 두께 (절대값, viewBoxSize 기준)
+  label?: string          // 선택적 메타데이터 ('horizontal' | 'vertical' | 'curve' | 'circle')
 }
 
 // ===== 자모 데이터 =====
