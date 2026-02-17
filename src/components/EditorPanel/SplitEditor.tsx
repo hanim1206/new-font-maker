@@ -1,11 +1,13 @@
-import type { LayoutType, Padding } from '../../types'
+import type { LayoutType, Padding, Part, PartOverride } from '../../types'
 import { useLayoutStore } from '../../stores/layoutStore'
 import { cn } from '@/lib/utils'
 import { Slider } from '@/components/ui/slider'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Button } from '@/components/ui/button'
 
 interface SplitEditorProps {
   layoutType: LayoutType
+  selectedPart?: Part | null
 }
 
 // Split 축별 한글 설명
@@ -21,7 +23,14 @@ const PADDING_SIDES: Array<{ key: keyof Padding; label: string }> = [
   { key: 'right', label: '우측' },
 ]
 
-export function SplitEditor({ layoutType }: SplitEditorProps) {
+const OVERRIDE_SIDES: Array<{ key: keyof PartOverride; label: string }> = [
+  { key: 'top', label: '상단' },
+  { key: 'bottom', label: '하단' },
+  { key: 'left', label: '좌측' },
+  { key: 'right', label: '우측' },
+]
+
+export function SplitEditor({ layoutType, selectedPart }: SplitEditorProps) {
   const {
     getLayoutSchema,
     updateSplit,
@@ -30,6 +39,8 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
     hasPaddingOverride,
     setPaddingOverride,
     removePaddingOverride,
+    updatePartOverride,
+    resetPartOverride,
   } = useLayoutStore()
   const schema = getLayoutSchema(layoutType)
 
@@ -159,6 +170,67 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
           </p>
         )}
       </div>
+
+      {/* 파트 박스 오버라이드 */}
+      {selectedPart && (
+        <div className="p-4 bg-surface rounded-md border border-border-subtle">
+          <h4 className="text-sm font-medium m-0 mb-4 text-text-dim-4 uppercase tracking-wider flex items-center gap-2">
+            <span className="text-lg">📐</span>
+            파트 오프셋: {selectedPart}
+            <Button
+              variant="default"
+              size="sm"
+              className="ml-auto text-xs"
+              onClick={() => resetPartOverride(layoutType, selectedPart)}
+            >
+              리셋
+            </Button>
+          </h4>
+
+          <p className="text-[0.75rem] text-text-dim-5 mb-3 leading-relaxed">
+            양수 = 안쪽 축소, 음수 = 바깥 확장 (오버랩)
+          </p>
+
+          <div className="grid grid-cols-2 gap-4">
+            {OVERRIDE_SIDES.map(({ key, label }) => {
+              const currentOverride = schema.partOverrides?.[selectedPart]
+              const value = currentOverride?.[key] ?? 0
+              const isNonZero = value !== 0
+
+              return (
+                <div key={key}>
+                  <div className="flex justify-between items-center mb-2">
+                    <span
+                      className={cn(
+                        'text-base font-medium',
+                        isNonZero
+                          ? value < 0 ? 'text-accent-cyan' : 'text-accent-orange'
+                          : 'text-text-dim-1'
+                      )}
+                    >
+                      {label}
+                      {isNonZero && (value < 0 ? ' ↔' : ' ↤')}
+                    </span>
+                    <span className="text-sm text-text-dim-4 font-mono bg-surface-2 px-2 py-0.5 rounded-sm">
+                      {(value * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                  <Slider
+                    min={-0.2}
+                    max={0.2}
+                    step={0.005}
+                    value={[value]}
+                    onValueChange={([val]) =>
+                      updatePartOverride(layoutType, selectedPart, key, val)
+                    }
+                    colorScheme={value < 0 ? 'x' : 'override'}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 연관 샘플은 LayoutEditor 미리보기 영역 아래에 표시 */}
     </div>

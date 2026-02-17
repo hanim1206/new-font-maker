@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import type { StrokeData, BoxConfig } from '../../types'
-import { isPathStroke } from '../../types'
+import { isPathStroke, isRectStroke } from '../../types'
 
 type PathPointChangeHandler = (
   strokeId: string,
@@ -12,13 +12,14 @@ type PathPointChangeHandler = (
 
 interface StrokeEditorProps {
   strokes: StrokeData[]
-  onChange: (strokeId: string, prop: keyof StrokeData, value: number) => void
+  onChange: (strokeId: string, prop: string, value: number) => void
   onPathPointChange?: PathPointChangeHandler
   boxInfo?: BoxConfig & { juH?: BoxConfig; juV?: BoxConfig }
 }
 
 const MOVE_STEP = 0.01
 const RESIZE_STEP = 0.01
+const ANGLE_STEP = 15
 
 export function StrokeEditor({ strokes, onChange, onPathPointChange, boxInfo: _boxInfo = { x: 0, y: 0, width: 1, height: 1 } }: StrokeEditorProps) {
   // TODO: _boxInfo를 사용하여 박스 영역 내에서만 이동 가능하도록 제한
@@ -95,62 +96,82 @@ export function StrokeEditor({ strokes, onChange, onPathPointChange, boxInfo: _b
         return
       }
 
-      // 기존 바운딩 박스 키보드 컨트롤
+      // rect 스트로크: 중심좌표 기반 이동, Shift+좌우=width, Shift+상하=thickness
+      if (isRectStroke(selectedStroke)) {
+        switch (e.key) {
+          case 'ArrowLeft':
+            e.preventDefault()
+            if (isShift) {
+              onChange(selectedStroke.id, 'width', clampToBox(selectedStroke.width - RESIZE_STEP, 0.01, 1))
+            } else {
+              onChange(selectedStroke.id, 'x', clampToBox(selectedStroke.x - MOVE_STEP, 0, 1))
+            }
+            break
+          case 'ArrowRight':
+            e.preventDefault()
+            if (isShift) {
+              onChange(selectedStroke.id, 'width', clampToBox(selectedStroke.width + RESIZE_STEP, 0.01, 1))
+            } else {
+              onChange(selectedStroke.id, 'x', clampToBox(selectedStroke.x + MOVE_STEP, 0, 1))
+            }
+            break
+          case 'ArrowUp':
+            e.preventDefault()
+            if (isShift) {
+              onChange(selectedStroke.id, 'thickness', clampToBox(selectedStroke.thickness - RESIZE_STEP, 0.01, 0.5))
+            } else {
+              onChange(selectedStroke.id, 'y', clampToBox(selectedStroke.y - MOVE_STEP, 0, 1))
+            }
+            break
+          case 'ArrowDown':
+            e.preventDefault()
+            if (isShift) {
+              onChange(selectedStroke.id, 'thickness', clampToBox(selectedStroke.thickness + RESIZE_STEP, 0.01, 0.5))
+            } else {
+              onChange(selectedStroke.id, 'y', clampToBox(selectedStroke.y + MOVE_STEP, 0, 1))
+            }
+            break
+          case 'r':
+          case 'R':
+            e.preventDefault()
+            onChange(selectedStroke.id, 'angle', ((selectedStroke.angle ?? 0) + (isShift ? -ANGLE_STEP : ANGLE_STEP) + 360) % 360)
+            break
+        }
+        return
+      }
+
+      // path 스트로크: 바운딩 박스 이동 (좌상단 좌표)
       switch (e.key) {
         case 'ArrowLeft':
           e.preventDefault()
           if (isShift) {
-            const newWidth = selectedStroke.width - RESIZE_STEP
-            onChange(
-              selectedStroke.id,
-              'width',
-              clampToBox(newWidth, 0.01, 1 - selectedStroke.x)
-            )
+            onChange(selectedStroke.id, 'width', clampToBox(selectedStroke.width - RESIZE_STEP, 0.01, 1 - selectedStroke.x))
           } else {
-            const newX = selectedStroke.x - MOVE_STEP
-            onChange(selectedStroke.id, 'x', clampToBox(newX, 0, 1 - selectedStroke.width))
+            onChange(selectedStroke.id, 'x', clampToBox(selectedStroke.x - MOVE_STEP, 0, 1 - selectedStroke.width))
           }
           break
         case 'ArrowRight':
           e.preventDefault()
           if (isShift) {
-            const newWidth = selectedStroke.width + RESIZE_STEP
-            onChange(
-              selectedStroke.id,
-              'width',
-              clampToBox(newWidth, 0.01, 1 - selectedStroke.x)
-            )
+            onChange(selectedStroke.id, 'width', clampToBox(selectedStroke.width + RESIZE_STEP, 0.01, 1 - selectedStroke.x))
           } else {
-            const newX = selectedStroke.x + MOVE_STEP
-            onChange(selectedStroke.id, 'x', clampToBox(newX, 0, 1 - selectedStroke.width))
+            onChange(selectedStroke.id, 'x', clampToBox(selectedStroke.x + MOVE_STEP, 0, 1 - selectedStroke.width))
           }
           break
         case 'ArrowUp':
           e.preventDefault()
           if (isShift) {
-            const newHeight = selectedStroke.height - RESIZE_STEP
-            onChange(
-              selectedStroke.id,
-              'height',
-              clampToBox(newHeight, 0.01, 1 - selectedStroke.y)
-            )
+            onChange(selectedStroke.id, 'height', clampToBox(selectedStroke.height - RESIZE_STEP, 0.01, 1 - selectedStroke.y))
           } else {
-            const newY = selectedStroke.y - MOVE_STEP
-            onChange(selectedStroke.id, 'y', clampToBox(newY, 0, 1 - selectedStroke.height))
+            onChange(selectedStroke.id, 'y', clampToBox(selectedStroke.y - MOVE_STEP, 0, 1 - selectedStroke.height))
           }
           break
         case 'ArrowDown':
           e.preventDefault()
           if (isShift) {
-            const newHeight = selectedStroke.height + RESIZE_STEP
-            onChange(
-              selectedStroke.id,
-              'height',
-              clampToBox(newHeight, 0.01, 1 - selectedStroke.y)
-            )
+            onChange(selectedStroke.id, 'height', clampToBox(selectedStroke.height + RESIZE_STEP, 0.01, 1 - selectedStroke.y))
           } else {
-            const newY = selectedStroke.y + MOVE_STEP
-            onChange(selectedStroke.id, 'y', clampToBox(newY, 0, 1 - selectedStroke.height))
+            onChange(selectedStroke.id, 'y', clampToBox(selectedStroke.y + MOVE_STEP, 0, 1 - selectedStroke.height))
           }
           break
       }

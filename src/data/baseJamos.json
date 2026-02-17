@@ -7,18 +7,20 @@
       "strokes": [
         {
           "id": "ㄱ-1",
-          "x": 0.1,
-          "y": 0.15,
+          "x": 0.45,
+          "y": 0.225,
           "width": 0.7,
-          "height": 0.15,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄱ-2",
-          "x": 0.775,
-          "y": 0.15,
-          "width": 0.15,
-          "height": 0.7,
+          "x": 0.85,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -29,34 +31,38 @@
       "strokes": [
         {
           "id": "ㄲ-1",
-          "x": 0.05,
-          "y": 0.15,
+          "x": 0.225,
+          "y": 0.225,
           "width": 0.35,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄲ-2",
-          "x": 0.325,
-          "y": 0.15,
-          "width": 0.125,
-          "height": 0.7,
+          "x": 0.4,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄲ-3",
-          "x": 0.5,
-          "y": 0.15,
+          "x": 0.675,
+          "y": 0.225,
           "width": 0.35,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄲ-4",
-          "x": 0.775,
-          "y": 0.15,
-          "width": 0.125,
-          "height": 0.7,
+          "x": 0.85,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -67,18 +73,20 @@
       "strokes": [
         {
           "id": "ㄴ-1",
-          "x": 0.15,
-          "y": 0.15,
-          "width": 0.15,
-          "height": 0.7,
+          "x": 0.225,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄴ-2",
-          "x": 0.15,
-          "y": 0.8,
+          "x": 0.5,
+          "y": 0.875,
           "width": 0.7,
-          "height": 0.15,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -89,26 +97,29 @@
       "strokes": [
         {
           "id": "ㄷ-1",
-          "x": 0.15,
-          "y": 0.15,
+          "x": 0.5,
+          "y": 0.225,
           "width": 0.7,
-          "height": 0.15,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄷ-2",
-          "x": 0.15,
-          "y": 0.15,
-          "width": 0.15,
-          "height": 0.7,
+          "x": 0.225,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄷ-3",
-          "x": 0.15,
-          "y": 0.825,
+          "x": 0.5,
+          "y": 0.9,
           "width": 0.7,
-          "height": 0.15,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -119,50 +130,56 @@
       "strokes": [
         {
           "id": "ㄸ-1",
-          "x": 0.05,
-          "y": 0.15,
+          "x": 0.225,
+          "y": 0.2,
           "width": 0.35,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄸ-2",
-          "x": 0.05,
-          "y": 0.15,
-          "width": 0.1,
-          "height": 0.7,
+          "x": 0.1,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄸ-3",
-          "x": 0.05,
-          "y": 0.825,
+          "x": 0.225,
+          "y": 0.875,
           "width": 0.35,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄸ-4",
-          "x": 0.55,
-          "y": 0.15,
+          "x": 0.725,
+          "y": 0.2,
           "width": 0.35,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄸ-5",
-          "x": 0.55,
-          "y": 0.15,
-          "width": 0.1,
-          "height": 0.7,
+          "x": 0.6,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄸ-6",
-          "x": 0.55,
-          "y": 0.8,
+          "x": 0.725,
+          "y": 0.85,
           "width": 0.35,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -173,42 +190,47 @@
       "strokes": [
         {
           "id": "ㄹ-1",
-          "x": 0.1,
-          "y": 0.15,
+          "x": 0.475,
+          "y": 0.225,
           "width": 0.75,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄹ-2",
-          "x": 0.825,
-          "y": 0.15,
-          "width": 0.125,
-          "height": 0.3,
+          "x": 0.875,
+          "y": 0.3,
+          "width": 0.3,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄹ-3",
-          "x": 0.1,
-          "y": 0.45,
+          "x": 0.475,
+          "y": 0.5,
           "width": 0.75,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄹ-4",
-          "x": 0.1,
-          "y": 0.45,
-          "width": 0.125,
-          "height": 0.3,
+          "x": 0.175,
+          "y": 0.6,
+          "width": 0.3,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄹ-5",
-          "x": 0.1,
-          "y": 0.725,
+          "x": 0.475,
+          "y": 0.775,
           "width": 0.75,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -219,34 +241,38 @@
       "strokes": [
         {
           "id": "ㅁ-1",
-          "x": 0.15,
-          "y": 0.15,
+          "x": 0.5,
+          "y": 0.225,
           "width": 0.7,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅁ-2",
-          "x": 0.15,
-          "y": 0.15,
-          "width": 0.125,
-          "height": 0.7,
+          "x": 0.225,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅁ-3",
-          "x": 0.825,
-          "y": 0.15,
-          "width": 0.125,
-          "height": 0.7,
+          "x": 0.875,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅁ-4",
-          "x": 0.15,
-          "y": 0.825,
+          "x": 0.5,
+          "y": 0.875,
           "width": 0.7,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -257,34 +283,38 @@
       "strokes": [
         {
           "id": "ㅂ-1",
-          "x": 0.15,
-          "y": 0.1,
-          "width": 0.125,
-          "height": 0.8,
+          "x": 0.225,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅂ-2",
-          "x": 0.8,
-          "y": 0.1,
-          "width": 0.125,
-          "height": 0.8,
+          "x": 0.875,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅂ-3",
-          "x": 0.15,
-          "y": 0.4,
+          "x": 0.5,
+          "y": 0.475,
           "width": 0.7,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅂ-4",
-          "x": 0.15,
-          "y": 0.85,
+          "x": 0.5,
+          "y": 0.925,
           "width": 0.7,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -295,66 +325,74 @@
       "strokes": [
         {
           "id": "ㅃ-1",
-          "x": 0.05,
-          "y": 0.1,
-          "width": 0.075,
-          "height": 0.8,
+          "x": 0.075,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅃ-2",
-          "x": 0.375,
-          "y": 0.1,
-          "width": 0.075,
-          "height": 0.8,
+          "x": 0.4,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅃ-3",
-          "x": 0.05,
-          "y": 0.4,
+          "x": 0.225,
+          "y": 0.45,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅃ-4",
-          "x": 0.05,
-          "y": 0.875,
+          "x": 0.225,
+          "y": 0.925,
           "width": 0.35,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅃ-5",
-          "x": 0.55,
-          "y": 0.1,
-          "width": 0.075,
-          "height": 0.8,
+          "x": 0.6,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅃ-6",
-          "x": 0.875,
-          "y": 0.1,
-          "width": 0.075,
-          "height": 0.8,
+          "x": 0.925,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅃ-7",
-          "x": 0.55,
-          "y": 0.4,
+          "x": 0.725,
+          "y": 0.45,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅃ-8",
-          "x": 0.55,
-          "y": 0.85,
+          "x": 0.725,
+          "y": 0.9,
           "width": 0.35,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -386,7 +424,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㅅ-right",
@@ -411,7 +450,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     },
@@ -442,7 +482,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㅆ-1r",
@@ -467,7 +508,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㅆ-2l",
@@ -492,7 +534,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㅆ-2r",
@@ -517,7 +560,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     },
@@ -584,7 +628,8 @@
                 }
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     },
@@ -594,10 +639,11 @@
       "strokes": [
         {
           "id": "ㅈ-1",
-          "x": 0.1,
-          "y": 0.075,
+          "x": 0.5,
+          "y": 0.15,
           "width": 0.8,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
@@ -623,7 +669,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㅈ-right",
@@ -648,7 +695,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     },
@@ -658,10 +706,11 @@
       "strokes": [
         {
           "id": "ㅉ-1",
-          "x": 0.025,
-          "y": 0.1,
+          "x": 0.25,
+          "y": 0.175,
           "width": 0.45,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
@@ -687,7 +736,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㅉ-1r",
@@ -712,14 +762,16 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㅉ-2",
-          "x": 0.525,
-          "y": 0.1,
+          "x": 0.75,
+          "y": 0.175,
           "width": 0.45,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
@@ -745,7 +797,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㅉ-2r",
@@ -770,7 +823,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     },
@@ -780,18 +834,20 @@
       "strokes": [
         {
           "id": "ㅊ-dot",
-          "x": 0.3,
-          "y": 0.025,
+          "x": 0.5,
+          "y": 0.075,
           "width": 0.4,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅊ-1",
-          "x": 0.1,
-          "y": 0.175,
+          "x": 0.5,
+          "y": 0.225,
           "width": 0.8,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
@@ -817,7 +873,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㅊ-right",
@@ -842,7 +899,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     },
@@ -852,26 +910,29 @@
       "strokes": [
         {
           "id": "ㅋ-1",
-          "x": 0.1,
-          "y": 0.15,
+          "x": 0.45,
+          "y": 0.225,
           "width": 0.7,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅋ-2",
-          "x": 0.75,
-          "y": 0.15,
-          "width": 0.125,
-          "height": 0.7,
+          "x": 0.825,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅋ-3",
-          "x": 0.15,
-          "y": 0.45,
+          "x": 0.45,
+          "y": 0.5,
           "width": 0.6,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -882,34 +943,38 @@
       "strokes": [
         {
           "id": "ㅌ-1",
-          "x": 0.15,
-          "y": 0.125,
+          "x": 0.5,
+          "y": 0.175,
           "width": 0.7,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅌ-2",
-          "x": 0.15,
-          "y": 0.125,
-          "width": 0.1,
-          "height": 0.75,
+          "x": 0.2,
+          "y": 0.5,
+          "width": 0.75,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅌ-3",
-          "x": 0.15,
-          "y": 0.85,
+          "x": 0.5,
+          "y": 0.9,
           "width": 0.7,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅌ-4",
-          "x": 0.15,
-          "y": 0.45,
+          "x": 0.5,
+          "y": 0.5,
           "width": 0.7,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -920,34 +985,38 @@
       "strokes": [
         {
           "id": "ㅍ-1",
-          "x": 0.1,
-          "y": 0.225,
+          "x": 0.5,
+          "y": 0.275,
           "width": 0.8,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅍ-2",
-          "x": 0.1,
-          "y": 0.75,
+          "x": 0.5,
+          "y": 0.8,
           "width": 0.8,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅍ-3",
-          "x": 0.25,
-          "y": 0.25,
-          "width": 0.1,
-          "height": 0.5,
+          "x": 0.3,
+          "y": 0.5,
+          "width": 0.5,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅍ-4",
-          "x": 0.7,
-          "y": 0.25,
-          "width": 0.1,
-          "height": 0.5,
+          "x": 0.75,
+          "y": 0.5,
+          "width": 0.5,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -958,18 +1027,20 @@
       "strokes": [
         {
           "id": "ㅎ-1",
-          "x": 0.35,
-          "y": 0.05,
+          "x": 0.5,
+          "y": 0.1,
           "width": 0.3,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅎ-2",
-          "x": 0.15,
-          "y": 0.225,
+          "x": 0.5,
+          "y": 0.275,
           "width": 0.7,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
@@ -1031,7 +1102,8 @@
                 }
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     }
@@ -1043,18 +1115,20 @@
       "strokes": [
         {
           "id": "ㅏ-1",
-          "x": 0.3,
-          "y": 0.1,
-          "width": 0.15,
-          "height": 0.8,
+          "x": 0.375,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅏ-2",
-          "x": 0.3,
-          "y": 0.4,
+          "x": 0.575,
+          "y": 0.475,
           "width": 0.55,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -1065,26 +1139,29 @@
       "strokes": [
         {
           "id": "ㅐ-1",
-          "x": 0.1,
-          "y": 0.1,
-          "width": 0.2,
-          "height": 0.8,
+          "x": 0.2,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅐ-2",
-          "x": 0.3,
-          "y": 0.4,
+          "x": 0.5,
+          "y": 0.45,
           "width": 0.4,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅐ-3",
-          "x": 0.7,
-          "y": 0.1,
-          "width": 0.2,
-          "height": 0.8,
+          "x": 0.8,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -1095,26 +1172,29 @@
       "strokes": [
         {
           "id": "ㅑ-1",
-          "x": 0.25,
-          "y": 0.1,
-          "width": 0.125,
-          "height": 0.8,
+          "x": 0.325,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅑ-2",
-          "x": 0.25,
-          "y": 0.3,
+          "x": 0.525,
+          "y": 0.35,
           "width": 0.55,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅑ-3",
-          "x": 0.25,
-          "y": 0.55,
+          "x": 0.525,
+          "y": 0.6,
           "width": 0.55,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -1125,34 +1205,38 @@
       "verticalStrokes": [
         {
           "id": "ㅒ-1",
-          "x": 0.125,
-          "y": 0.1,
-          "width": 0.1,
-          "height": 0.8,
+          "x": 0.175,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅒ-2",
-          "x": 0.125,
-          "y": 0.3,
+          "x": 0.3,
+          "y": 0.325,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅒ-3",
-          "x": 0.125,
-          "y": 0.55,
+          "x": 0.3,
+          "y": 0.6,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅒ-4",
-          "x": 0.6,
-          "y": 0.1,
-          "width": 0.1,
-          "height": 0.8,
+          "x": 0.65,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -1163,18 +1247,20 @@
       "strokes": [
         {
           "id": "ㅓ-1",
-          "x": 0.55,
-          "y": 0.1,
-          "width": 0.15,
-          "height": 0.8,
+          "x": 0.625,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅓ-2",
-          "x": 0.15,
-          "y": 0.4,
+          "x": 0.425,
+          "y": 0.475,
           "width": 0.55,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -1185,26 +1271,29 @@
       "strokes": [
         {
           "id": "ㅔ-1",
-          "x": 0.3,
-          "y": 0.1,
-          "width": 0.2,
-          "height": 0.8,
+          "x": 0.4,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅔ-2",
-          "x": 0,
-          "y": 0.4,
+          "x": 0.2,
+          "y": 0.475,
           "width": 0.375,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅔ-3",
-          "x": 0.65,
-          "y": 0.1,
-          "width": 0.2,
-          "height": 0.8,
+          "x": 0.75,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -1215,26 +1304,29 @@
       "strokes": [
         {
           "id": "ㅕ-1",
-          "x": 0.55,
-          "y": 0.1,
-          "width": 0.125,
-          "height": 0.8,
+          "x": 0.625,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅕ-2",
-          "x": 0.15,
-          "y": 0.3,
+          "x": 0.425,
+          "y": 0.35,
           "width": 0.55,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅕ-3",
-          "x": 0.15,
-          "y": 0.55,
+          "x": 0.425,
+          "y": 0.6,
           "width": 0.55,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -1245,34 +1337,38 @@
       "verticalStrokes": [
         {
           "id": "ㅖ-1",
-          "x": 0.25,
-          "y": 0.1,
-          "width": 0.1,
-          "height": 0.8,
+          "x": 0.3,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅖ-2",
-          "x": 0.35,
-          "y": 0.3,
+          "x": 0.5,
+          "y": 0.325,
           "width": 0.3,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅖ-3",
-          "x": 0.35,
-          "y": 0.55,
+          "x": 0.5,
+          "y": 0.6,
           "width": 0.3,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅖ-4",
-          "x": 0.65,
-          "y": 0.1,
-          "width": 0.1,
-          "height": 0.8,
+          "x": 0.7,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -1283,18 +1379,20 @@
       "strokes": [
         {
           "id": "ㅗ-1",
-          "x": 0.45,
-          "y": 0.1,
-          "width": 0.15,
-          "height": 0.5,
+          "x": 0.525,
+          "y": 0.35,
+          "width": 0.5,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅗ-2",
-          "x": 0.1,
-          "y": 0.6,
+          "x": 0.5,
+          "y": 0.675,
           "width": 0.8,
-          "height": 0.15,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -1305,36 +1403,40 @@
       "horizontalStrokes": [
         {
           "id": "ㅘ-1",
-          "x": 0.45,
-          "y": 0,
-          "width": 0.1,
-          "height": 0.475,
+          "x": 0.5,
+          "y": 0.225,
+          "width": 0.475,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅘ-2",
-          "x": 0.1,
-          "y": 0.45,
+          "x": 0.525,
+          "y": 0.55,
           "width": 0.875,
-          "height": 0.2,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ],
       "verticalStrokes": [
         {
           "id": "ㅘ-3",
-          "x": 0.525,
-          "y": 0.1,
-          "width": 0.15,
-          "height": 0.8,
+          "x": 0.6,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅘ-4",
-          "x": 0.65,
-          "y": 0.45,
+          "x": 0.775,
+          "y": 0.5,
           "width": 0.25,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -1345,44 +1447,49 @@
       "horizontalStrokes": [
         {
           "id": "ㅙ-1",
-          "x": 0.45,
-          "y": 0.025,
-          "width": 0.1,
-          "height": 0.45,
+          "x": 0.5,
+          "y": 0.25,
+          "width": 0.45,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅙ-2",
-          "x": 0.05,
-          "y": 0.475,
+          "x": 0.5,
+          "y": 0.575,
           "width": 0.875,
-          "height": 0.175,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ],
       "verticalStrokes": [
         {
           "id": "ㅙ-3",
-          "x": 0.325,
-          "y": 0.1,
-          "width": 0.2,
-          "height": 0.8,
+          "x": 0.425,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅙ-4",
-          "x": 0.375,
-          "y": 0.475,
+          "x": 0.575,
+          "y": 0.5,
           "width": 0.375,
-          "height": 0.05,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅙ-5",
-          "x": 0.75,
-          "y": 0.1,
-          "width": 0.15,
-          "height": 0.8,
+          "x": 0.825,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -1393,28 +1500,31 @@
       "horizontalStrokes": [
         {
           "id": "ㅚ-1",
-          "x": 0.45,
-          "y": 0.1,
-          "width": 0.1,
-          "height": 0.4,
+          "x": 0.5,
+          "y": 0.3,
+          "width": 0.4,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅚ-2",
-          "x": 0,
+          "x": 0.5,
           "y": 0.525,
           "width": 0.975,
-          "height": 0.025,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ],
       "verticalStrokes": [
         {
           "id": "ㅚ-3",
-          "x": 0.475,
-          "y": 0.1,
-          "width": 0.1,
-          "height": 0.8,
+          "x": 0.525,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -1425,26 +1535,29 @@
       "strokes": [
         {
           "id": "ㅛ-1",
-          "x": 0.325,
-          "y": 0.1,
-          "width": 0.1,
-          "height": 0.5,
+          "x": 0.375,
+          "y": 0.35,
+          "width": 0.5,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅛ-2",
-          "x": 0.65,
-          "y": 0.1,
-          "width": 0.1,
-          "height": 0.5,
+          "x": 0.7,
+          "y": 0.35,
+          "width": 0.5,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅛ-3",
-          "x": 0.05,
-          "y": 0.6,
+          "x": 0.5,
+          "y": 0.625,
           "width": 0.875,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -1455,18 +1568,20 @@
       "strokes": [
         {
           "id": "ㅜ-1",
-          "x": 0.125,
-          "y": 0.325,
+          "x": 0.525,
+          "y": 0.4,
           "width": 0.8,
-          "height": 0.15,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅜ-2",
-          "x": 0.5,
-          "y": 0.35,
-          "width": 0.15,
-          "height": 0.55,
+          "x": 0.575,
+          "y": 0.625,
+          "width": 0.55,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -1477,36 +1592,40 @@
       "horizontalStrokes": [
         {
           "id": "ㅝ-1",
-          "x": 0,
-          "y": 0.025,
+          "x": 0.5,
+          "y": 0.075,
           "width": 1,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅝ-2",
-          "x": 0.475,
-          "y": 0.075,
-          "width": 0.1,
-          "height": 0.825,
+          "x": 0.525,
+          "y": 0.5,
+          "width": 0.825,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ],
       "verticalStrokes": [
         {
           "id": "ㅝ-3",
-          "x": 0.525,
-          "y": 0.1,
-          "width": 0.1,
-          "height": 0.8,
+          "x": 0.575,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅝ-4",
-          "x": 0,
-          "y": 0.75,
+          "x": 0.275,
+          "y": 0.775,
           "width": 0.525,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -1517,44 +1636,49 @@
       "horizontalStrokes": [
         {
           "id": "ㅞ-1",
-          "x": 0.025,
-          "y": 0.1,
+          "x": 0.5,
+          "y": 0.175,
           "width": 0.975,
-          "height": 0.15,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅞ-2",
-          "x": 0.525,
-          "y": 0.15,
-          "width": 0.075,
-          "height": 0.8,
+          "x": 0.575,
+          "y": 0.55,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ],
       "verticalStrokes": [
         {
           "id": "ㅞ-3",
-          "x": 0.325,
-          "y": 0.05,
-          "width": 0.175,
-          "height": 0.925,
+          "x": 0.4,
+          "y": 0.525,
+          "width": 0.925,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅞ-4",
-          "x": 0,
-          "y": 0.75,
+          "x": 0.2,
+          "y": 0.8,
           "width": 0.375,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅞ-5",
-          "x": 0.7,
-          "y": 0,
-          "width": 0.175,
-          "height": 0.975,
+          "x": 0.775,
+          "y": 0.5,
+          "width": 0.975,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -1565,28 +1689,31 @@
       "horizontalStrokes": [
         {
           "id": "ㅟ-1",
-          "x": 0.025,
-          "y": 0.025,
+          "x": 0.5,
+          "y": 0.075,
           "width": 0.975,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅟ-2",
-          "x": 0.5,
-          "y": 0.05,
-          "width": 0.1,
-          "height": 0.9,
+          "x": 0.55,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ],
       "verticalStrokes": [
         {
           "id": "ㅟ-3",
-          "x": 0.475,
-          "y": 0.05,
-          "width": 0.1,
-          "height": 0.95,
+          "x": 0.525,
+          "y": 0.525,
+          "width": 0.95,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -1597,26 +1724,29 @@
       "strokes": [
         {
           "id": "ㅠ-1",
-          "x": 0.1,
-          "y": 0.25,
+          "x": 0.5,
+          "y": 0.325,
           "width": 0.8,
-          "height": 0.15,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅠ-2",
-          "x": 0.25,
-          "y": 0.275,
-          "width": 0.1,
-          "height": 0.575,
+          "x": 0.3,
+          "y": 0.575,
+          "width": 0.575,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅠ-3",
-          "x": 0.65,
-          "y": 0.25,
-          "width": 0.1,
-          "height": 0.575,
+          "x": 0.7,
+          "y": 0.525,
+          "width": 0.575,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -1627,10 +1757,11 @@
       "strokes": [
         {
           "id": "ㅡ-1",
-          "x": 0.1,
-          "y": 0.425,
+          "x": 0.5,
+          "y": 0.5,
           "width": 0.8,
-          "height": 0.15,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -1641,20 +1772,22 @@
       "horizontalStrokes": [
         {
           "id": "ㅢ-1",
-          "x": 0.1,
-          "y": 0.35,
+          "x": 0.55,
+          "y": 0.4,
           "width": 0.9,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ],
       "verticalStrokes": [
         {
           "id": "ㅢ-2",
-          "x": 0.5,
-          "y": 0.1,
-          "width": 0.1,
-          "height": 0.8,
+          "x": 0.55,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -1665,10 +1798,11 @@
       "strokes": [
         {
           "id": "ㅣ-1",
-          "x": 0.5,
-          "y": 0.1,
-          "width": 0.15,
-          "height": 0.8,
+          "x": 0.575,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -1681,18 +1815,20 @@
       "strokes": [
         {
           "id": "ㄱ-1",
-          "x": 0.1,
-          "y": 0.15,
+          "x": 0.5,
+          "y": 0.225,
           "width": 0.775,
-          "height": 0.15,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄱ-2",
-          "x": 0.85,
-          "y": 0.15,
-          "width": 0.15,
-          "height": 0.7,
+          "x": 0.925,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -1703,34 +1839,38 @@
       "strokes": [
         {
           "id": "ㄲ-1",
-          "x": 0.05,
-          "y": 0.15,
+          "x": 0.225,
+          "y": 0.225,
           "width": 0.35,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄲ-2",
-          "x": 0.375,
-          "y": 0.15,
-          "width": 0.125,
-          "height": 0.7,
+          "x": 0.45,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄲ-3",
-          "x": 0.5,
-          "y": 0.15,
+          "x": 0.675,
+          "y": 0.225,
           "width": 0.35,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄲ-4",
-          "x": 0.825,
-          "y": 0.15,
-          "width": 0.125,
-          "height": 0.7,
+          "x": 0.875,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -1741,18 +1881,20 @@
       "strokes": [
         {
           "id": "ㄳ-1",
-          "x": 0.05,
-          "y": 0.15,
+          "x": 0.225,
+          "y": 0.2,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄳ-2",
-          "x": 0.325,
-          "y": 0.15,
-          "width": 0.075,
-          "height": 0.725,
+          "x": 0.35,
+          "y": 0.5,
+          "width": 0.725,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
@@ -1778,7 +1920,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㄳ-right",
@@ -1803,7 +1946,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     },
@@ -1813,18 +1957,20 @@
       "strokes": [
         {
           "id": "ㄴ-1",
-          "x": 0.15,
-          "y": 0.15,
-          "width": 0.15,
-          "height": 0.7,
+          "x": 0.225,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄴ-2",
-          "x": 0.15,
-          "y": 0.825,
+          "x": 0.5,
+          "y": 0.9,
           "width": 0.7,
-          "height": 0.15,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -1835,50 +1981,56 @@
       "strokes": [
         {
           "id": "ㄵ-1",
-          "x": 0.1,
-          "y": 0.1,
-          "width": 0.1,
-          "height": 0.8,
+          "x": 0.15,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄵ-2",
-          "x": 0.1,
-          "y": 0.8,
+          "x": 0.25,
+          "y": 0.85,
           "width": 0.3,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄵ-3",
-          "x": 0.45,
-          "y": 0.25,
+          "x": 0.675,
+          "y": 0.275,
           "width": 0.45,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄵ-4",
-          "x": 0.5,
-          "y": 0.325,
-          "width": 0.075,
-          "height": 0.55,
+          "x": 0.525,
+          "y": 0.6,
+          "width": 0.55,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄵ-5",
-          "x": 0.775,
-          "y": 0.325,
-          "width": 0.075,
-          "height": 0.55,
+          "x": 0.825,
+          "y": 0.6,
+          "width": 0.55,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄵ-6",
-          "x": 0.575,
-          "y": 0.125,
+          "x": 0.675,
+          "y": 0.175,
           "width": 0.2,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -1889,66 +2041,74 @@
       "strokes": [
         {
           "id": "ㄶ-1",
-          "x": 0.1,
-          "y": 0.1,
-          "width": 0.1,
-          "height": 0.8,
+          "x": 0.15,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄶ-2",
-          "x": 0.1,
-          "y": 0.8,
+          "x": 0.225,
+          "y": 0.85,
           "width": 0.25,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄶ-3",
-          "x": 0.55,
-          "y": 0.075,
+          "x": 0.65,
+          "y": 0.1,
           "width": 0.2,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄶ-4",
-          "x": 0.45,
-          "y": 0.225,
+          "x": 0.675,
+          "y": 0.275,
           "width": 0.45,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄶ-5",
-          "x": 0.5,
-          "y": 0.5,
+          "x": 0.675,
+          "y": 0.525,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄶ-6",
-          "x": 0.5,
-          "y": 0.725,
+          "x": 0.675,
+          "y": 0.75,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄶ-7",
-          "x": 0.45,
-          "y": 0.5,
-          "width": 0.05,
-          "height": 0.3,
+          "x": 0.475,
+          "y": 0.65,
+          "width": 0.3,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄶ-8",
-          "x": 0.85,
-          "y": 0.5,
-          "width": 0.05,
-          "height": 0.3,
+          "x": 0.875,
+          "y": 0.65,
+          "width": 0.3,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -1959,26 +2119,29 @@
       "strokes": [
         {
           "id": "ㄷ-1",
-          "x": 0.15,
-          "y": 0.15,
+          "x": 0.5,
+          "y": 0.225,
           "width": 0.7,
-          "height": 0.15,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄷ-2",
-          "x": 0.15,
-          "y": 0.15,
-          "width": 0.15,
-          "height": 0.7,
+          "x": 0.225,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄷ-3",
-          "x": 0.15,
-          "y": 0.825,
+          "x": 0.5,
+          "y": 0.9,
           "width": 0.7,
-          "height": 0.15,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -1989,42 +2152,47 @@
       "strokes": [
         {
           "id": "ㄹ-1",
-          "x": 0.1,
-          "y": 0.15,
+          "x": 0.475,
+          "y": 0.225,
           "width": 0.75,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄹ-2",
-          "x": 0.825,
-          "y": 0.15,
-          "width": 0.125,
-          "height": 0.3,
+          "x": 0.875,
+          "y": 0.3,
+          "width": 0.3,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄹ-3",
-          "x": 0.1,
-          "y": 0.45,
+          "x": 0.475,
+          "y": 0.5,
           "width": 0.75,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄹ-4",
-          "x": 0.1,
-          "y": 0.45,
-          "width": 0.125,
-          "height": 0.3,
+          "x": 0.175,
+          "y": 0.6,
+          "width": 0.3,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄹ-5",
-          "x": 0.1,
-          "y": 0.725,
+          "x": 0.475,
+          "y": 0.775,
           "width": 0.75,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -2035,58 +2203,65 @@
       "strokes": [
         {
           "id": "ㄺ-1",
-          "x": 0.025,
-          "y": 0.075,
+          "x": 0.2,
+          "y": 0.1,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄺ-2",
-          "x": 0.3,
-          "y": 0.075,
-          "width": 0.075,
-          "height": 0.375,
+          "x": 0.325,
+          "y": 0.275,
+          "width": 0.375,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄺ-3",
-          "x": 0.025,
-          "y": 0.45,
+          "x": 0.2,
+          "y": 0.5,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄺ-4",
-          "x": 0.025,
-          "y": 0.45,
-          "width": 0.075,
-          "height": 0.45,
+          "x": 0.075,
+          "y": 0.675,
+          "width": 0.45,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄺ-5",
-          "x": 0.025,
-          "y": 0.825,
+          "x": 0.2,
+          "y": 0.85,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄺ-6",
-          "x": 0.5,
-          "y": 0.15,
+          "x": 0.7,
+          "y": 0.2,
           "width": 0.375,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄺ-7",
-          "x": 0.8,
-          "y": 0.15,
-          "width": 0.075,
-          "height": 0.725,
+          "x": 0.85,
+          "y": 0.5,
+          "width": 0.725,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -2097,74 +2272,83 @@
       "strokes": [
         {
           "id": "ㄻ-1",
-          "x": 0.025,
-          "y": 0.075,
+          "x": 0.2,
+          "y": 0.1,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄻ-2",
-          "x": 0.3,
-          "y": 0.075,
-          "width": 0.075,
-          "height": 0.375,
+          "x": 0.325,
+          "y": 0.275,
+          "width": 0.375,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄻ-3",
-          "x": 0.025,
-          "y": 0.45,
+          "x": 0.2,
+          "y": 0.5,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄻ-4",
-          "x": 0.025,
-          "y": 0.45,
-          "width": 0.075,
-          "height": 0.45,
+          "x": 0.075,
+          "y": 0.675,
+          "width": 0.45,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄻ-5",
-          "x": 0.025,
-          "y": 0.825,
+          "x": 0.2,
+          "y": 0.85,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄻ-6",
-          "x": 0.475,
-          "y": 0.15,
+          "x": 0.7,
+          "y": 0.2,
           "width": 0.425,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄻ-7",
-          "x": 0.475,
-          "y": 0.15,
-          "width": 0.075,
-          "height": 0.7,
+          "x": 0.5,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄻ-8",
-          "x": 0.825,
-          "y": 0.15,
-          "width": 0.075,
-          "height": 0.7,
+          "x": 0.85,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄻ-9",
-          "x": 0.475,
-          "y": 0.775,
+          "x": 0.7,
+          "y": 0.825,
           "width": 0.425,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -2175,74 +2359,83 @@
       "strokes": [
         {
           "id": "ㄼ-1",
-          "x": 0.025,
-          "y": 0.075,
+          "x": 0.2,
+          "y": 0.1,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄼ-2",
-          "x": 0.3,
-          "y": 0.075,
-          "width": 0.075,
-          "height": 0.375,
+          "x": 0.325,
+          "y": 0.275,
+          "width": 0.375,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄼ-3",
-          "x": 0.025,
-          "y": 0.45,
+          "x": 0.2,
+          "y": 0.5,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄼ-4",
-          "x": 0.025,
-          "y": 0.45,
-          "width": 0.075,
-          "height": 0.45,
+          "x": 0.075,
+          "y": 0.675,
+          "width": 0.45,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄼ-5",
-          "x": 0.025,
-          "y": 0.825,
+          "x": 0.2,
+          "y": 0.85,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄼ-6",
-          "x": 0.525,
-          "y": 0.1,
-          "width": 0.075,
-          "height": 0.75,
+          "x": 0.575,
+          "y": 0.475,
+          "width": 0.75,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄼ-7",
-          "x": 0.825,
-          "y": 0.1,
-          "width": 0.075,
-          "height": 0.75,
+          "x": 0.85,
+          "y": 0.475,
+          "width": 0.75,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄼ-8",
-          "x": 0.475,
-          "y": 0.45,
+          "x": 0.7,
+          "y": 0.5,
           "width": 0.45,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄼ-9",
-          "x": 0.475,
-          "y": 0.775,
+          "x": 0.7,
+          "y": 0.825,
           "width": 0.45,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -2253,42 +2446,47 @@
       "strokes": [
         {
           "id": "ㄽ-1",
-          "x": 0.025,
-          "y": 0.075,
+          "x": 0.2,
+          "y": 0.1,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄽ-2",
-          "x": 0.35,
-          "y": 0.075,
-          "width": 0.075,
-          "height": 0.375,
+          "x": 0.375,
+          "y": 0.275,
+          "width": 0.375,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄽ-3",
-          "x": 0.025,
-          "y": 0.45,
+          "x": 0.2,
+          "y": 0.5,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄽ-4",
-          "x": 0.025,
-          "y": 0.45,
-          "width": 0.075,
-          "height": 0.45,
+          "x": 0.075,
+          "y": 0.675,
+          "width": 0.45,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄽ-5",
-          "x": 0.025,
-          "y": 0.825,
+          "x": 0.2,
+          "y": 0.85,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
@@ -2314,7 +2512,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㄽ-right",
@@ -2339,7 +2538,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     },
@@ -2349,74 +2549,83 @@
       "strokes": [
         {
           "id": "ㄾ-1",
-          "x": 0.025,
-          "y": 0.075,
+          "x": 0.2,
+          "y": 0.1,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄾ-2",
-          "x": 0.3,
-          "y": 0.075,
-          "width": 0.075,
-          "height": 0.375,
+          "x": 0.325,
+          "y": 0.275,
+          "width": 0.375,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄾ-3",
-          "x": 0.025,
-          "y": 0.45,
+          "x": 0.2,
+          "y": 0.5,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄾ-4",
-          "x": 0.025,
-          "y": 0.45,
-          "width": 0.075,
-          "height": 0.45,
+          "x": 0.075,
+          "y": 0.675,
+          "width": 0.45,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄾ-5",
-          "x": 0.025,
-          "y": 0.825,
+          "x": 0.2,
+          "y": 0.85,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄾ-6",
-          "x": 0.475,
-          "y": 0.15,
+          "x": 0.7,
+          "y": 0.2,
           "width": 0.425,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄾ-7",
-          "x": 0.475,
-          "y": 0.15,
-          "width": 0.075,
-          "height": 0.7,
+          "x": 0.5,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄾ-8",
-          "x": 0.475,
-          "y": 0.45,
+          "x": 0.7,
+          "y": 0.5,
           "width": 0.425,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄾ-9",
-          "x": 0.475,
-          "y": 0.775,
+          "x": 0.7,
+          "y": 0.825,
           "width": 0.425,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -2427,74 +2636,83 @@
       "strokes": [
         {
           "id": "ㄿ-1",
-          "x": 0.025,
-          "y": 0.075,
+          "x": 0.2,
+          "y": 0.1,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄿ-2",
-          "x": 0.3,
-          "y": 0.075,
-          "width": 0.075,
-          "height": 0.375,
+          "x": 0.325,
+          "y": 0.275,
+          "width": 0.375,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄿ-3",
-          "x": 0.025,
-          "y": 0.45,
+          "x": 0.2,
+          "y": 0.5,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄿ-4",
-          "x": 0.025,
-          "y": 0.45,
-          "width": 0.075,
-          "height": 0.45,
+          "x": 0.075,
+          "y": 0.675,
+          "width": 0.45,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄿ-5",
-          "x": 0.025,
-          "y": 0.825,
+          "x": 0.2,
+          "y": 0.85,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄿ-6",
-          "x": 0.475,
-          "y": 0.15,
+          "x": 0.7,
+          "y": 0.2,
           "width": 0.425,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄿ-7",
-          "x": 0.55,
-          "y": 0.225,
-          "width": 0.075,
-          "height": 0.5,
+          "x": 0.6,
+          "y": 0.475,
+          "width": 0.5,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄿ-8",
-          "x": 0.75,
-          "y": 0.225,
-          "width": 0.075,
-          "height": 0.5,
+          "x": 0.775,
+          "y": 0.475,
+          "width": 0.5,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄿ-9",
-          "x": 0.475,
-          "y": 0.775,
+          "x": 0.7,
+          "y": 0.825,
           "width": 0.425,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -2505,58 +2723,65 @@
       "strokes": [
         {
           "id": "ㅀ-1",
-          "x": 0.025,
-          "y": 0.075,
+          "x": 0.2,
+          "y": 0.1,
           "width": 0.325,
-          "height": 0.05,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅀ-2",
-          "x": 0.275,
-          "y": 0.075,
-          "width": 0.075,
-          "height": 0.375,
+          "x": 0.325,
+          "y": 0.275,
+          "width": 0.375,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅀ-3",
-          "x": 0.025,
-          "y": 0.45,
+          "x": 0.2,
+          "y": 0.475,
           "width": 0.325,
-          "height": 0.05,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅀ-4",
-          "x": 0.025,
-          "y": 0.45,
-          "width": 0.075,
-          "height": 0.45,
+          "x": 0.075,
+          "y": 0.675,
+          "width": 0.45,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅀ-5",
-          "x": 0.025,
-          "y": 0.85,
+          "x": 0.2,
+          "y": 0.875,
           "width": 0.325,
-          "height": 0.05,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅀ-6",
-          "x": 0.6,
-          "y": 0.075,
+          "x": 0.675,
+          "y": 0.1,
           "width": 0.15,
-          "height": 0.05,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅀ-7",
-          "x": 0.45,
-          "y": 0.225,
+          "x": 0.65,
+          "y": 0.25,
           "width": 0.425,
-          "height": 0.05,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
@@ -2618,7 +2843,8 @@
                 }
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     },
@@ -2628,34 +2854,38 @@
       "strokes": [
         {
           "id": "ㅁ종-1",
-          "x": 0.15,
-          "y": 0.15,
+          "x": 0.5,
+          "y": 0.225,
           "width": 0.7,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅁ종-2",
-          "x": 0.15,
-          "y": 0.15,
-          "width": 0.125,
-          "height": 0.7,
+          "x": 0.225,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅁ종-3",
-          "x": 0.825,
-          "y": 0.15,
-          "width": 0.125,
-          "height": 0.7,
+          "x": 0.875,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅁ종-4",
-          "x": 0.15,
-          "y": 0.775,
+          "x": 0.5,
+          "y": 0.85,
           "width": 0.7,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -2666,34 +2896,38 @@
       "strokes": [
         {
           "id": "ㅂ종-1",
-          "x": 0.15,
-          "y": 0.1,
-          "width": 0.125,
-          "height": 0.8,
+          "x": 0.225,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅂ종-2",
-          "x": 0.825,
-          "y": 0.1,
-          "width": 0.125,
-          "height": 0.8,
+          "x": 0.875,
+          "y": 0.5,
+          "width": 0.8,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅂ종-3",
-          "x": 0.15,
-          "y": 0.4,
+          "x": 0.5,
+          "y": 0.45,
           "width": 0.7,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅂ종-4",
-          "x": 0.15,
-          "y": 0.775,
+          "x": 0.5,
+          "y": 0.85,
           "width": 0.7,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -2704,34 +2938,38 @@
       "strokes": [
         {
           "id": "ㅄ-1",
-          "x": 0.05,
-          "y": 0.1,
-          "width": 0.075,
-          "height": 0.75,
+          "x": 0.075,
+          "y": 0.475,
+          "width": 0.75,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅄ-2",
-          "x": 0.325,
-          "y": 0.1,
-          "width": 0.075,
-          "height": 0.75,
+          "x": 0.35,
+          "y": 0.475,
+          "width": 0.75,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅄ-3",
-          "x": 0.05,
-          "y": 0.425,
+          "x": 0.225,
+          "y": 0.45,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅄ-4",
-          "x": 0.05,
-          "y": 0.775,
+          "x": 0.225,
+          "y": 0.825,
           "width": 0.35,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
@@ -2757,7 +2995,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㅄ-right",
@@ -2782,7 +3021,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     },
@@ -2813,7 +3053,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㅅ종-right",
@@ -2838,7 +3079,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     },
@@ -2869,7 +3111,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㅆ종-1r",
@@ -2894,7 +3137,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㅆ종-2l",
@@ -2919,7 +3163,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㅆ종-2r",
@@ -2944,7 +3189,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     },
@@ -3011,7 +3257,8 @@
                 }
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     },
@@ -3021,10 +3268,11 @@
       "strokes": [
         {
           "id": "ㅈ종-1",
-          "x": 0.1,
-          "y": 0.1,
+          "x": 0.5,
+          "y": 0.175,
           "width": 0.8,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
@@ -3050,7 +3298,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㅈ종-right",
@@ -3075,7 +3324,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     },
@@ -3085,18 +3335,20 @@
       "strokes": [
         {
           "id": "ㅊ종-dot",
-          "x": 0.3,
-          "y": 0.025,
+          "x": 0.5,
+          "y": 0.075,
           "width": 0.4,
-          "height": 0.075,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅊ종-1",
-          "x": 0.1,
-          "y": 0.175,
+          "x": 0.5,
+          "y": 0.225,
           "width": 0.8,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
@@ -3122,7 +3374,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         },
         {
           "id": "ㅊ종-right",
@@ -3147,7 +3400,8 @@
                 "y": 0.95
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     },
@@ -3157,26 +3411,29 @@
       "strokes": [
         {
           "id": "ㅋ종-1",
-          "x": 0.1,
-          "y": 0.15,
+          "x": 0.45,
+          "y": 0.225,
           "width": 0.7,
-          "height": 0.125,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅋ종-2",
-          "x": 0.7,
-          "y": 0.15,
-          "width": 0.125,
-          "height": 0.7,
+          "x": 0.75,
+          "y": 0.5,
+          "width": 0.7,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅋ종-3",
-          "x": 0.1,
-          "y": 0.45,
+          "x": 0.4,
+          "y": 0.5,
           "width": 0.6,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -3187,34 +3444,38 @@
       "strokes": [
         {
           "id": "ㅌ종-1",
-          "x": 0.15,
-          "y": 0.125,
+          "x": 0.5,
+          "y": 0.175,
           "width": 0.7,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅌ종-2",
-          "x": 0.15,
-          "y": 0.125,
-          "width": 0.1,
-          "height": 0.75,
+          "x": 0.2,
+          "y": 0.5,
+          "width": 0.75,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅌ종-3",
-          "x": 0.15,
-          "y": 0.775,
+          "x": 0.5,
+          "y": 0.825,
           "width": 0.7,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅌ종-4",
-          "x": 0.15,
-          "y": 0.45,
+          "x": 0.5,
+          "y": 0.5,
           "width": 0.7,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         }
       ]
@@ -3225,34 +3486,38 @@
       "strokes": [
         {
           "id": "ㅍ종-1",
-          "x": 0.1,
-          "y": 0.15,
+          "x": 0.5,
+          "y": 0.2,
           "width": 0.8,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅍ종-2",
-          "x": 0.1,
-          "y": 0.75,
+          "x": 0.5,
+          "y": 0.8,
           "width": 0.8,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅍ종-3",
-          "x": 0.25,
-          "y": 0.25,
-          "width": 0.1,
-          "height": 0.5,
+          "x": 0.3,
+          "y": 0.5,
+          "width": 0.5,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅍ종-4",
-          "x": 0.65,
-          "y": 0.25,
-          "width": 0.1,
-          "height": 0.5,
+          "x": 0.7,
+          "y": 0.5,
+          "width": 0.5,
+          "thickness": 0.1,
+          "angle": 90,
           "direction": "vertical"
         }
       ]
@@ -3263,18 +3528,20 @@
       "strokes": [
         {
           "id": "ㅎ종-1",
-          "x": 0.35,
-          "y": 0.05,
+          "x": 0.5,
+          "y": 0.1,
           "width": 0.3,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅎ종-2",
-          "x": 0.15,
-          "y": 0.225,
+          "x": 0.5,
+          "y": 0.275,
           "width": 0.7,
-          "height": 0.1,
+          "thickness": 0.1,
+          "angle": 0,
           "direction": "horizontal"
         },
         {
@@ -3336,7 +3603,8 @@
                 }
               }
             ]
-          }
+          },
+          "thickness": 0.1
         }
       ]
     }

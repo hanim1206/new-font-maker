@@ -1,5 +1,6 @@
 import { useUIStore } from '../../stores/uiStore'
 import type { StrokeData } from '../../types'
+import { isRectStroke } from '../../types'
 import { cn } from '@/lib/utils'
 
 interface StrokeListProps {
@@ -32,7 +33,7 @@ export function StrokeList({ strokes }: StrokeListProps) {
             )}
             onClick={() => setSelectedStrokeId(stroke.id)}
           >
-            {stroke.id} ({stroke.direction === 'horizontal' ? '가로' : stroke.direction === 'vertical' ? '세로' : '패스'})
+            {stroke.id} ({isRectStroke(stroke) ? `${stroke.angle}°` : '패스'})
           </button>
         ))}
       </div>

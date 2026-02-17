@@ -24,11 +24,11 @@ function getJamoMap(type: 'choseong' | 'jungseong' | 'jongseong'): Record<string
 
 function generateStrokeCode(strokes: StrokeData[], char: string, type: string): string {
   const formatStroke = (s: StrokeData) => {
-    if (s.direction === 'path' && 'pathData' in s) {
-      return `      { id: '${s.id}', x: ${s.x}, y: ${s.y}, width: ${s.width}, height: ${s.height}, direction: 'path', pathData: ${JSON.stringify(s.pathData)} },`
+    if (isPathStroke(s)) {
+      return `      { id: '${s.id}', x: ${s.x}, y: ${s.y}, width: ${s.width}, height: ${s.height}, thickness: ${s.thickness}, direction: 'path', pathData: ${JSON.stringify(s.pathData)} },`
     }
-    const fn = s.direction === 'horizontal' ? 'h' : 'v'
-    return `      ${fn}('${s.id}', ${s.x}, ${s.y}, ${s.width}, ${s.height}),`
+    // isRectStroke
+    return `      { id: '${s.id}', x: ${s.x}, y: ${s.y}, width: ${s.width}, thickness: ${s.thickness}, angle: ${s.angle}, direction: '${s.direction}' },`
   }
 
   // 혼합 중성인지 확인
@@ -243,7 +243,7 @@ export function CharacterEditor() {
     }
   }, [editingJamoType, editingJamoChar, setSelectedStrokeId])
 
-  const handleStrokeChange = (strokeId: string, prop: keyof StrokeData, value: number) => {
+  const handleStrokeChange = (strokeId: string, prop: string, value: number) => {
     setDraftStrokes((prev) =>
       prev.map((s) => (s.id === strokeId ? { ...s, [prop]: value } : s))
     )
@@ -354,7 +354,7 @@ export function CharacterEditor() {
                 onStrokeChange={handleStrokeChange}
               />
               <p className="text-xs text-muted text-center py-2 px-4 bg-surface-2 rounded border border-border max-w-[400px]">
-                드래그: 획 이동 | 핸들 드래그: 크기 조절 | 방향키: 미세 이동 | Shift + 방향키: 미세 크기 조절
+                드래그: 획 이동 | 핸들 드래그: 크기 조절 | 방향키: 이동 | Shift+방향키: 크기 | R: 회전
               </p>
             </div>
 

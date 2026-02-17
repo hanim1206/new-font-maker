@@ -38,6 +38,14 @@ export interface Padding {
   right: number
 }
 
+// 파트별 박스 오프셋 (2차 세부 조정)
+export interface PartOverride {
+  top: number    // 양수=안쪽 축소, 음수=바깥 확장 (오버랩)
+  bottom: number
+  left: number
+  right: number
+}
+
 // 레이아웃 스키마 (Split + Padding 기반)
 export interface LayoutSchema {
   id: LayoutType
@@ -49,6 +57,8 @@ export interface LayoutSchema {
     horizontalBox?: { splitY?: number; padding?: Padding }
     verticalBox?: { splitX?: number; padding?: Padding }
   }
+  // 파트별 박스 오프셋 (기준선 기반 박스에서 확장/축소)
+  partOverrides?: Partial<Record<Part, PartOverride>>
 }
 
 // ===== 레이아웃 프리셋 =====
@@ -113,18 +123,20 @@ export interface PathData {
 // ===== 획 데이터 =====
 interface StrokeBase {
   id: string
-  x: number // 0~1 상대 좌표
+  x: number // 0~1 상대 좌표 (rect: 중심, path: 좌상단)
   y: number
-  width: number // 0~1 상대 크기
-  height: number
+  width: number // 0~1 상대 크기 (rect: 주축 길이, path: 바운딩 폭)
+  thickness: number // 획 두께 (0–1, 공통)
 }
 
 export interface RectStrokeData extends StrokeBase {
-  direction: 'horizontal' | 'vertical'
+  direction: 'horizontal' | 'vertical' // 힌트/그룹핑용
+  angle: number // 회전각 (0°=가로, 90°=세로)
 }
 
 export interface PathStrokeData extends StrokeBase {
   direction: 'path'
+  height: number // 바운딩 박스 높이 (0–1)
   pathData: PathData
 }
 
@@ -133,6 +145,10 @@ export type StrokeData = RectStrokeData | PathStrokeData
 // 타입 가드
 export function isPathStroke(stroke: StrokeData): stroke is PathStrokeData {
   return stroke.direction === 'path'
+}
+
+export function isRectStroke(stroke: StrokeData): stroke is RectStrokeData {
+  return stroke.direction === 'horizontal' || stroke.direction === 'vertical'
 }
 
 // ===== 자모 데이터 =====

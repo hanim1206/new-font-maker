@@ -4,7 +4,7 @@ import { JamoEditor } from './JamoEditor'
 import { GlobalStyleEditor } from './GlobalStyleEditor'
 
 export function EditorPanel() {
-  const { controlMode, selectedLayoutType, editingJamoType, editingJamoChar } = useUIStore()
+  const { controlMode, selectedLayoutType, editingJamoType, editingJamoChar, editingPartInLayout } = useUIStore()
 
   // 아무것도 선택되지 않은 경우
   if (!controlMode) {
@@ -33,10 +33,15 @@ export function EditorPanel() {
 
   // 레이아웃 편집 모드
   if (controlMode === 'layout' && selectedLayoutType) {
+    // 자모 편집 서브모드 여부에 따른 헤더 텍스트
+    const layoutHeaderText = editingPartInLayout && editingJamoChar
+      ? `레이아웃: ${selectedLayoutType} > ${editingPartInLayout} (${editingJamoChar})`
+      : `레이아웃 편집: ${selectedLayoutType}`
+
     return (
       <div className="h-full bg-background border-t border-border-subtle overflow-hidden flex flex-col">
         <div className="px-5 py-4 border-b border-border-subtle bg-[#111]">
-          <h2 className="text-xl font-semibold text-[#e0e0e0]">레이아웃 편집: {selectedLayoutType}</h2>
+          <h2 className="text-xl font-semibold text-[#e0e0e0]">{layoutHeaderText}</h2>
         </div>
         <div className="flex-1 overflow-y-auto p-5">
           <LayoutEditor layoutType={selectedLayoutType} />

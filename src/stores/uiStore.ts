@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
-import type { ViewMode, LayoutType } from '../types'
+import type { ViewMode, LayoutType, Part } from '../types'
 
 interface UIState {
   // 현재 뷰 모드 (모바일에서 탭 전환용)
@@ -25,6 +25,10 @@ interface UIState {
   selectedStrokeId: string | null
   // 선택된 패스 포인트 인덱스
   selectedPointIndex: number | null
+  // 자모 편집 시 선택된 레이아웃 컨텍스트
+  selectedLayoutContext: LayoutType | null
+  // 레이아웃 미리보기에서 더블클릭한 파트 (자모 편집 서브모드)
+  editingPartInLayout: Part | null
 }
 
 interface UIActions {
@@ -39,6 +43,8 @@ interface UIActions {
   setEditingJamo: (type: 'choseong' | 'jungseong' | 'jongseong' | null, char: string | null) => void
   setSelectedStrokeId: (id: string | null) => void
   setSelectedPointIndex: (index: number | null) => void
+  setSelectedLayoutContext: (layoutType: LayoutType | null) => void
+  setEditingPartInLayout: (part: Part | null) => void
 }
 
 export const useUIStore = create<UIState & UIActions>()(
@@ -56,6 +62,8 @@ export const useUIStore = create<UIState & UIActions>()(
     editingJamoChar: null,
     selectedStrokeId: null,
     selectedPointIndex: null,
+    selectedLayoutContext: null,
+    editingPartInLayout: null,
 
     // 액션
     setViewMode: (mode) =>
@@ -93,6 +101,7 @@ export const useUIStore = create<UIState & UIActions>()(
       set((state) => {
         state.editingJamoType = type
         state.editingJamoChar = char
+        state.selectedLayoutContext = null
       }),
 
     setSelectedStrokeId: (id) =>
@@ -104,6 +113,23 @@ export const useUIStore = create<UIState & UIActions>()(
     setSelectedPointIndex: (index) =>
       set((state) => {
         state.selectedPointIndex = index
+      }),
+
+    setSelectedLayoutContext: (layoutType) =>
+      set((state) => {
+        state.selectedLayoutContext = layoutType
+      }),
+
+    setEditingPartInLayout: (part) =>
+      set((state) => {
+        state.editingPartInLayout = part
+        if (part === null) {
+          // 자모 편집 종료 시 관련 상태 클리어
+          state.editingJamoType = null
+          state.editingJamoChar = null
+          state.selectedStrokeId = null
+          state.selectedPointIndex = null
+        }
       }),
   }))
 )

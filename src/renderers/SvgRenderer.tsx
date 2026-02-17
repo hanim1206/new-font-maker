@@ -1,9 +1,16 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import type { DecomposedSyllable, BoxConfig, Part, StrokeData, LayoutType, LayoutSchema } from '../types'
 import { isPathStroke } from '../types'
 import { calculateBoxes } from '../utils/layoutCalculator'
 import { pathDataToSvgD } from '../utils/pathUtils'
 import type { GlobalStyle } from '../stores/globalStyleStore'
+
+// 파트별 스타일 (자모 편집 시 비편집 파트 흐리게 표시 등)
+export interface PartStyle {
+  fillColor?: string
+  opacity?: number
+  hidden?: boolean  // true이면 해당 파트 렌더링 스킵 (StrokeOverlay가 대신 렌더링)
+}
 
 interface SvgRendererProps {
   syllable: DecomposedSyllable
@@ -19,13 +26,16 @@ interface SvgRendererProps {
   visualHeightRatio?: number
   // 글로벌 스타일 (기울기, 두께 등)
   globalStyle?: GlobalStyle
+  // 파트별 스타일 오버라이드 (fillColor, opacity)
+  partStyles?: Partial<Record<Part, PartStyle>>
+  // SVG 안에 추가 렌더링할 children (slant transform 그룹 내부에 배치)
+  children?: ReactNode
+  // SVG ref 전달
+  svgRef?: React.RefObject<SVGSVGElement | null>
 }
 
 // SVG viewBox 기준 크기
 const VIEW_BOX_SIZE = 100
-
-// 획 두께 (VIEW_BOX_SIZE 기준, 고정값)
-const STROKE_THICKNESS = 5
 
 // 레이아웃 타입에 따라 렌더링 순서 결정
 function getRenderOrder(layoutType: LayoutType): Array<'CH' | 'JU' | 'JU_H' | 'JU_V' | 'JO'> {
@@ -58,6 +68,9 @@ export function SvgRenderer({
   showDebugBoxes = false,
   visualHeightRatio = 1.0, // 기본값: 1:1 정사각 비율
   globalStyle,
+  partStyles,
+  children,
+  svgRef,
 }: SvgRendererProps) {
   // schema가 있으면 calculateBoxes 사용, 없으면 boxes prop 사용
   const boxes = useMemo(() => {
@@ -70,9 +83,6 @@ export function SvgRenderer({
   // 글로벌 스타일 값 (기본값 적용)
   const slant = globalStyle?.slant ?? 0
   const weightMultiplier = globalStyle?.weight ?? 1.0
-
-  // weight 적용된 획 두께
-  const effectiveThickness = STROKE_THICKNESS * weightMultiplier
 
   const renderStrokes = (
     strokes: StrokeData[] | undefined,
@@ -89,6 +99,7 @@ export function SvgRenderer({
       if (isPathStroke(stroke)) {
         const pathWidth = stroke.width * box.width * VIEW_BOX_SIZE
         const pathHeight = stroke.height * box.height * VIEW_BOX_SIZE
+        const pathThickness = stroke.thickness * weightMultiplier * box.height * VIEW_BOX_SIZE
         const d = pathDataToSvgD(stroke.pathData, baseX, baseY, pathWidth, pathHeight)
 
         // 닫힌/열린 패스 모두 stroke로 렌더링 (fill 없음)
@@ -98,26 +109,29 @@ export function SvgRenderer({
             d={d}
             fill="none"
             stroke={color}
-            strokeWidth={effectiveThickness}
+            strokeWidth={pathThickness}
             strokeLinecap="round"
             strokeLinejoin="round"
           />
         )
       }
 
-      // === RECT 스트로크 (직선) ===
-      // 모든 치수를 박스 크기에 비례하여 렌더링
-      // → 획 간 정렬이 데이터 좌표계 기준으로 정확히 유지됨
-      const width = stroke.width * box.width * VIEW_BOX_SIZE
-      const height = stroke.height * box.height * VIEW_BOX_SIZE
+      // === RECT 스트로크 (중심좌표 + angle 기반) ===
+      // x,y = 중심좌표, width = 길이, thickness = 두께, angle = 회전각
+      const cx = (box.x + stroke.x * box.width) * VIEW_BOX_SIZE
+      const cy = (box.y + stroke.y * box.height) * VIEW_BOX_SIZE
+      const rectWidth = stroke.width * box.width * VIEW_BOX_SIZE
+      const rectHeight = stroke.thickness * weightMultiplier * box.height * VIEW_BOX_SIZE
+      const angle = stroke.angle ?? 0
 
       return (
         <rect
           key={stroke.id}
-          x={baseX}
-          y={baseY}
-          width={width}
-          height={height}
+          x={cx - rectWidth / 2}
+          y={cy - rectHeight / 2}
+          width={rectWidth}
+          height={rectHeight}
+          transform={angle !== 0 ? `rotate(${angle}, ${cx}, ${cy})` : undefined}
           fill={color}
           rx={1}
           ry={1}
@@ -154,6 +168,12 @@ export function SvgRenderer({
 
   // 부분별 렌더링 헬퍼
   const renderPart = (part: 'CH' | 'JU' | 'JU_H' | 'JU_V' | 'JO') => {
+    const ps = partStyles?.[part]
+    // hidden이면 렌더링 스킵 (StrokeOverlay가 대신 렌더링)
+    if (ps?.hidden) return null
+    const partColor = ps?.fillColor ?? fillColor
+    const partOpacity = ps?.opacity ?? 1
+
     // 혼합중성의 경우 JU_H와 JU_V로 분리 렌더링
     if (part === 'JU_H' && syllable.jungseong) {
       const box = boxes.JU_H
@@ -162,8 +182,8 @@ export function SvgRenderer({
       const strokes = syllable.jungseong.horizontalStrokes || syllable.jungseong.strokes
       if (!strokes || strokes.length === 0) return null
       return (
-        <g key={part}>
-          {renderStrokes(strokes, box, fillColor)}
+        <g key={part} opacity={partOpacity}>
+          {renderStrokes(strokes, box, partColor)}
         </g>
       )
     }
@@ -175,8 +195,8 @@ export function SvgRenderer({
       const strokes = syllable.jungseong.verticalStrokes || syllable.jungseong.strokes
       if (!strokes || strokes.length === 0) return null
       return (
-        <g key={part}>
-          {renderStrokes(strokes, box, fillColor)}
+        <g key={part} opacity={partOpacity}>
+          {renderStrokes(strokes, box, partColor)}
         </g>
       )
     }
@@ -201,8 +221,8 @@ export function SvgRenderer({
     if (!strokes || strokes.length === 0) return null
 
     return (
-      <g key={part}>
-        {renderStrokes(strokes, box, fillColor)}
+      <g key={part} opacity={partOpacity}>
+        {renderStrokes(strokes, box, partColor)}
       </g>
     )
   }
@@ -252,6 +272,7 @@ export function SvgRenderer({
 
   return (
     <svg
+      ref={svgRef}
       width={size}
       height={svgHeight}
       viewBox={`0 0 ${VIEW_BOX_SIZE} ${visualHeight}`}
@@ -267,6 +288,8 @@ export function SvgRenderer({
       <g transform={slantTransform}>
         {/* 동적 순서로 렌더링 */}
         {renderOrder.map((part) => renderPart(part))}
+        {/* 추가 오버레이 (StrokeOverlay 등) */}
+        {children}
       </g>
     </svg>
   )

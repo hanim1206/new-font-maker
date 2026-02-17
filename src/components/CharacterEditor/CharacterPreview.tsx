@@ -2,8 +2,8 @@ import { useState, useCallback, useRef } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useJamoStore } from '../../stores/jamoStore'
 import { useGlobalStyleStore } from '../../stores/globalStyleStore'
-import type { StrokeData, BoxConfig, PathStrokeData } from '../../types'
-import { isPathStroke } from '../../types'
+import type { StrokeData, BoxConfig, PathStrokeData, RectStrokeData } from '../../types'
+import { isPathStroke, isRectStroke } from '../../types'
 import { pathDataToSvgD } from '../../utils/pathUtils'
 
 type PathPointChangeHandler = (
@@ -25,9 +25,6 @@ interface CharacterPreviewProps {
 }
 
 const VIEW_BOX_SIZE = 100
-
-// 획 두께 (VIEW_BOX_SIZE 기준, 고정값)
-const STROKE_THICKNESS = 2
 
 // viewBox 마진 (박스 영역 주변 여백)
 const VIEW_MARGIN = 3
@@ -93,7 +90,6 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
   // 글로벌 스타일 적용
   const weightMultiplier = globalStyle.weight ?? 1.0
   const slant = globalStyle.slant ?? 0
-  const effectiveThickness = STROKE_THICKNESS * weightMultiplier
 
   // 박스 영역을 viewBox 좌표로 변환
   const boxX = boxInfo.x * VIEW_BOX_SIZE
@@ -102,17 +98,25 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
   const boxHeight = boxInfo.height * VIEW_BOX_SIZE
 
   // viewBox를 박스 영역에 맞춰 줌 (마진 포함)
-  // 너무 납작해지지 않도록 최소 종횡비(높이/너비) 제한
-  const MIN_HEIGHT_RATIO = 0.75
-  const vbX = boxX - VIEW_MARGIN
+  // 종횡비를 0.75~1.25 범위로 제한하여 레이아웃 컨텍스트 전환 시 크기 변동 최소화
+  const MIN_ASPECT = 0.75  // 높이/너비 최소 (너무 납작 방지)
+  const MAX_ASPECT = 1.25  // 높이/너비 최대 (너무 세로로 긴 것 방지)
+  let vbX = boxX - VIEW_MARGIN
   let vbY = boxY - VIEW_MARGIN
-  const vbW = boxWidth + 2 * VIEW_MARGIN
+  let vbW = boxWidth + 2 * VIEW_MARGIN
   let vbH = boxHeight + 2 * VIEW_MARGIN
 
-  if (vbH / vbW < MIN_HEIGHT_RATIO) {
-    const newH = vbW * MIN_HEIGHT_RATIO
+  const aspect = vbH / vbW
+  if (aspect < MIN_ASPECT) {
+    // 너무 납작 → 높이 확장
+    const newH = vbW * MIN_ASPECT
     vbY -= (newH - vbH) / 2
     vbH = newH
+  } else if (aspect > MAX_ASPECT) {
+    // 너무 세로로 긴 → 너비 확장
+    const newW = vbH / MAX_ASPECT
+    vbX -= (newW - vbW) / 2
+    vbW = newW
   }
 
   // slant 변환 중심 (박스 중심 기준)
@@ -283,7 +287,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
       return
     }
 
-    // Rect 이동 드래그
+    // Rect/Path 이동 드래그
     if (dragState.type === 'rectMove' || dragState.type === 'pathMove') {
       if (!onStrokeChange || dragState.containerBoxAbsW === undefined) return
       const cX = dragState.containerBoxAbsX!
@@ -300,51 +304,64 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
       let newX = cW > 0 ? (newAbsX - cX) / cW : 0
       let newY = cH > 0 ? (newAbsY - cY) / cH : 0
 
-      // 클램핑: 스트로크가 박스를 벗어나지 않도록
-      newX = Math.max(0, Math.min(1 - stroke.width, newX))
-      newY = Math.max(0, Math.min(1 - stroke.height, newY))
+      // 클램핑: rect는 중심좌표, path는 좌상단 좌표
+      if (isRectStroke(stroke)) {
+        // 중심좌표: width/2 ~ 1-width/2, thickness/2 ~ 1-thickness/2
+        newX = Math.max(stroke.width / 2, Math.min(1 - stroke.width / 2, newX))
+        newY = Math.max(stroke.thickness / 2, Math.min(1 - stroke.thickness / 2, newY))
+      } else if (isPathStroke(stroke)) {
+        newX = Math.max(0, Math.min(1 - stroke.width, newX))
+        newY = Math.max(0, Math.min(1 - stroke.height, newY))
+      }
 
       onStrokeChange(dragState.strokeId, 'x', newX)
       onStrokeChange(dragState.strokeId, 'y', newY)
       return
     }
 
-    // Rect 리사이즈 드래그
+    // Rect 리사이즈 드래그 (angle 기반: 주축 방향으로 리사이즈)
     if (dragState.type === 'rectResize') {
       if (!onStrokeChange || !dragState.originalStroke || dragState.containerBoxAbsW === undefined) return
+      if (!isRectStroke(dragState.originalStroke)) return
       const cX = dragState.containerBoxAbsX!
       const cY = dragState.containerBoxAbsY!
       const cW = dragState.containerBoxAbsW
       const cH = dragState.containerBoxAbsH!
-      const orig = dragState.originalStroke
-      const isHorizontal = orig.direction === 'horizontal'
+      const orig = dragState.originalStroke as RectStrokeData
 
-      if (isHorizontal) {
-        // 가로 획: 좌우로 리사이즈
-        const mouseRelX = cW > 0 ? (svgPt.x - cX) / cW : 0
-        if (dragState.resizeEdge === 'start') {
-          // 시작점 이동: x 변경, width = 원래 끝점 - 새 x
-          const origEnd = orig.x + orig.width
-          const newX = Math.max(0, Math.min(origEnd - 0.01, mouseRelX))
-          onStrokeChange(dragState.strokeId, 'x', newX)
-          onStrokeChange(dragState.strokeId, 'width', origEnd - newX)
-        } else {
-          // 끝점 이동: width 변경
-          const newEnd = Math.max(orig.x + 0.01, Math.min(1, mouseRelX))
-          onStrokeChange(dragState.strokeId, 'width', newEnd - orig.x)
-        }
+      // 마우스 이동을 주축 방향에 투영 (dot product)
+      const angleRad = (orig.angle ?? 0) * Math.PI / 180
+      const cosA = Math.cos(angleRad)
+      const sinA = Math.sin(angleRad)
+
+      // 중심에서 마우스까지의 벡터 (0~1 정규화 좌표)
+      const mouseRelX = cW > 0 ? (svgPt.x - cX) / cW : 0
+      const mouseRelY = cH > 0 ? (svgPt.y - cY) / cH : 0
+      const dx = mouseRelX - orig.x
+      const dy = mouseRelY - orig.y
+
+      // 주축 방향에 투영
+      const projected = dx * cosA + dy * sinA
+
+      // 리사이즈: 중심은 고정, width만 변경
+      const halfW = orig.width / 2
+      if (dragState.resizeEdge === 'start') {
+        // start 핸들: 중심에서 start 방향의 거리 변경
+        const newHalfW = Math.max(0.01, halfW - projected)
+        const newWidth = newHalfW + halfW
+        // 중심도 이동
+        const shift = (orig.width - newWidth) / 2
+        onStrokeChange(dragState.strokeId, 'x', orig.x + shift * cosA)
+        onStrokeChange(dragState.strokeId, 'y', orig.y + shift * sinA)
+        onStrokeChange(dragState.strokeId, 'width', newWidth)
       } else {
-        // 세로 획: 상하로 리사이즈
-        const mouseRelY = cH > 0 ? (svgPt.y - cY) / cH : 0
-        if (dragState.resizeEdge === 'start') {
-          const origEnd = orig.y + orig.height
-          const newY = Math.max(0, Math.min(origEnd - 0.01, mouseRelY))
-          onStrokeChange(dragState.strokeId, 'y', newY)
-          onStrokeChange(dragState.strokeId, 'height', origEnd - newY)
-        } else {
-          const newEnd = Math.max(orig.y + 0.01, Math.min(1, mouseRelY))
-          onStrokeChange(dragState.strokeId, 'height', newEnd - orig.y)
-        }
+        // end 핸들: 중심에서 end 방향의 거리 변경
+        const newHalfW = Math.max(0.01, projected)
+        const newWidth = halfW + newHalfW
+        const shift = (newWidth - orig.width) / 2
+        onStrokeChange(dragState.strokeId, 'x', orig.x + shift * cosA)
+        onStrokeChange(dragState.strokeId, 'y', orig.y + shift * sinA)
+        onStrokeChange(dragState.strokeId, 'width', newWidth)
       }
       return
     }
@@ -356,125 +373,57 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
   }, [])
 
   // 획의 절대 좌표를 계산하는 헬퍼
+  // rect: strokeX/strokeY = 중심좌표, boundsHeight = thickness 기반
+  // path: strokeX/strokeY = 좌상단, boundsHeight = height 기반
   const getStrokeBounds = (stroke: StrokeData) => {
-    let strokeX: number
-    let strokeY: number
-    let boundsWidth: number
-    let boundsHeight: number
-
-    if (isMixed && boxInfo.juH && boxInfo.juV && horizontalStrokeIds && verticalStrokeIds) {
-      if (horizontalStrokeIds.has(stroke.id)) {
-        strokeX = boxInfo.juH.x * VIEW_BOX_SIZE + stroke.x * boxInfo.juH.width * VIEW_BOX_SIZE
-        strokeY = boxInfo.juH.y * VIEW_BOX_SIZE + stroke.y * boxInfo.juH.height * VIEW_BOX_SIZE
-        boundsWidth = stroke.width * boxInfo.juH.width * VIEW_BOX_SIZE
-        boundsHeight = stroke.height * boxInfo.juH.height * VIEW_BOX_SIZE
-      } else if (verticalStrokeIds.has(stroke.id)) {
-        strokeX = boxInfo.juV.x * VIEW_BOX_SIZE + stroke.x * boxInfo.juV.width * VIEW_BOX_SIZE
-        strokeY = boxInfo.juV.y * VIEW_BOX_SIZE + stroke.y * boxInfo.juV.height * VIEW_BOX_SIZE
-        boundsWidth = stroke.width * boxInfo.juV.width * VIEW_BOX_SIZE
-        boundsHeight = stroke.height * boxInfo.juV.height * VIEW_BOX_SIZE
-      } else {
-        strokeX = boxX + stroke.x * boxWidth
-        strokeY = boxY + stroke.y * boxHeight
-        boundsWidth = stroke.width * boxWidth
-        boundsHeight = stroke.height * boxHeight
-      }
-    } else {
-      strokeX = boxX + stroke.x * boxWidth
-      strokeY = boxY + stroke.y * boxHeight
-      boundsWidth = stroke.width * boxWidth
-      boundsHeight = stroke.height * boxHeight
-    }
+    const container = getContainerBoxAbs(stroke)
+    const strokeX = container.x + stroke.x * container.w
+    const strokeY = container.y + stroke.y * container.h
+    const boundsWidth = stroke.width * container.w
+    const boundsHeight = isRectStroke(stroke)
+      ? stroke.thickness * container.h
+      : (stroke as PathStrokeData).height * container.h
 
     return { strokeX, strokeY, boundsWidth, boundsHeight }
   }
 
-  // Rect 스트로크의 리사이즈 핸들 렌더링
-  const renderRectHandles = (stroke: StrokeData, strokeX: number, strokeY: number, boundsWidth: number, boundsHeight: number) => {
-    if (isPathStroke(stroke)) return null
-    const isHorizontal = stroke.direction === 'horizontal'
+  // Rect 스트로크의 리사이즈 핸들 렌더링 (angle 기반: 주축 양 끝)
+  const renderRectHandles = (stroke: StrokeData, cx: number, cy: number, boundsWidth: number) => {
+    if (!isRectStroke(stroke)) return null
+    const angle = stroke.angle ?? 0
+    const angleRad = angle * Math.PI / 180
+    const halfW = boundsWidth / 2
+    const cosA = Math.cos(angleRad)
+    const sinA = Math.sin(angleRad)
 
-    let strokeW: number
-    let strokeH: number
-    if (isHorizontal) {
-      strokeW = boundsWidth
-      strokeH = effectiveThickness
-    } else {
-      strokeW = effectiveThickness
-      strokeH = boundsHeight
-    }
+    // 주축 양 끝점
+    const startX = cx - halfW * cosA
+    const startY = cy - halfW * sinA
+    const endX = cx + halfW * cosA
+    const endY = cy + halfW * sinA
 
-    if (isHorizontal) {
-      // 가로 획: 좌측 핸들 (start), 우측 핸들 (end)
-      const cy = strokeY + strokeH / 2
-      return (
-        <g key={`handles-${stroke.id}`}>
-          {/* 좌측 핸들 */}
-          <rect
-            x={strokeX - HANDLE_SIZE / 2}
-            y={cy - HANDLE_SIZE}
-            width={HANDLE_SIZE}
-            height={HANDLE_SIZE * 2}
-            fill="#7c3aed"
-            stroke="#fff"
-            strokeWidth={0.5}
-            rx={0.5}
-            style={{ cursor: 'ew-resize' }}
-            onMouseDown={startRectResize(stroke, 'start')}
-            onTouchStart={startRectResize(stroke, 'start')}
-          />
-          {/* 우측 핸들 */}
-          <rect
-            x={strokeX + strokeW - HANDLE_SIZE / 2}
-            y={cy - HANDLE_SIZE}
-            width={HANDLE_SIZE}
-            height={HANDLE_SIZE * 2}
-            fill="#7c3aed"
-            stroke="#fff"
-            strokeWidth={0.5}
-            rx={0.5}
-            style={{ cursor: 'ew-resize' }}
-            onMouseDown={startRectResize(stroke, 'end')}
-            onTouchStart={startRectResize(stroke, 'end')}
-          />
-        </g>
-      )
-    } else {
-      // 세로 획: 상단 핸들 (start), 하단 핸들 (end)
-      const cx = strokeX + strokeW / 2
-      return (
-        <g key={`handles-${stroke.id}`}>
-          {/* 상단 핸들 */}
-          <rect
-            x={cx - HANDLE_SIZE}
-            y={strokeY - HANDLE_SIZE / 2}
-            width={HANDLE_SIZE * 2}
-            height={HANDLE_SIZE}
-            fill="#7c3aed"
-            stroke="#fff"
-            strokeWidth={0.5}
-            rx={0.5}
-            style={{ cursor: 'ns-resize' }}
-            onMouseDown={startRectResize(stroke, 'start')}
-            onTouchStart={startRectResize(stroke, 'start')}
-          />
-          {/* 하단 핸들 */}
-          <rect
-            x={cx - HANDLE_SIZE}
-            y={strokeY + strokeH - HANDLE_SIZE / 2}
-            width={HANDLE_SIZE * 2}
-            height={HANDLE_SIZE}
-            fill="#7c3aed"
-            stroke="#fff"
-            strokeWidth={0.5}
-            rx={0.5}
-            style={{ cursor: 'ns-resize' }}
-            onMouseDown={startRectResize(stroke, 'end')}
-            onTouchStart={startRectResize(stroke, 'end')}
-          />
-        </g>
-      )
-    }
+    const cursor = angle === 90 ? 'ns-resize' : angle === 0 ? 'ew-resize' : 'move'
+
+    return (
+      <g key={`handles-${stroke.id}`}>
+        {/* start 핸들 */}
+        <circle
+          cx={startX} cy={startY} r={HANDLE_SIZE}
+          fill="#7c3aed" stroke="#fff" strokeWidth={0.5}
+          style={{ cursor }}
+          onMouseDown={startRectResize(stroke, 'start')}
+          onTouchStart={startRectResize(stroke, 'start')}
+        />
+        {/* end 핸들 */}
+        <circle
+          cx={endX} cy={endY} r={HANDLE_SIZE}
+          fill="#7c3aed" stroke="#fff" strokeWidth={0.5}
+          style={{ cursor }}
+          onMouseDown={startRectResize(stroke, 'end')}
+          onTouchStart={startRectResize(stroke, 'end')}
+        />
+      </g>
+    )
   }
 
   // path 스트로크의 바운딩 박스 오버레이 (이동 가능)
@@ -572,9 +521,15 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
       case 'rectMove':
       case 'pathMove':
         return 'move'
-      case 'rectResize':
-        if (dragState.originalStroke?.direction === 'horizontal') return 'ew-resize'
-        return 'ns-resize'
+      case 'rectResize': {
+        const orig = dragState.originalStroke
+        if (orig && isRectStroke(orig)) {
+          const a = orig.angle ?? 0
+          if (a === 0) return 'ew-resize'
+          if (a === 90) return 'ns-resize'
+        }
+        return 'move'
+      }
       case 'point':
       case 'handleIn':
       case 'handleOut':
@@ -658,6 +613,8 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
           // === PATH 스트로크 (곡선) ===
           if (isPathStroke(stroke)) {
             const d = pathDataToSvgD(stroke.pathData, strokeX, strokeY, boundsWidth, boundsHeight)
+            const container = getContainerBoxAbs(stroke)
+            const pathThickness = stroke.thickness * weightMultiplier * container.h
             return (
               <g key={stroke.id}>
                 {/* 넓은 히트 영역 (투명) - 이동용 */}
@@ -665,7 +622,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
                   d={d}
                   fill="none"
                   stroke="transparent"
-                  strokeWidth={effectiveThickness * 4}
+                  strokeWidth={pathThickness * 4}
                   onClick={() => setSelectedStrokeId(stroke.id)}
                   onMouseDown={onStrokeChange ? startPathMove(stroke) : undefined}
                   onTouchStart={onStrokeChange ? startPathMove(stroke) : undefined}
@@ -676,7 +633,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
                   d={d}
                   fill="none"
                   stroke={isSelected ? '#ff6b6b' : '#1a1a1a'}
-                  strokeWidth={effectiveThickness}
+                  strokeWidth={pathThickness}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   onClick={() => setSelectedStrokeId(stroke.id)}
@@ -695,24 +652,21 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
             )
           }
 
-          // === RECT 스트로크 (기존 직선) ===
-          let strokeWidth: number
-          let strokeHeight: number
-          if (stroke.direction === 'horizontal') {
-            strokeWidth = boundsWidth
-            strokeHeight = effectiveThickness
-          } else {
-            strokeWidth = effectiveThickness
-            strokeHeight = boundsHeight
-          }
+          // === RECT 스트로크 (중심좌표 + angle 기반) ===
+          // strokeX/strokeY = 중심좌표 (getStrokeBounds에서 계산)
+          const container = getContainerBoxAbs(stroke)
+          const rectW = stroke.width * container.w
+          const rectH = (stroke as RectStrokeData).thickness * weightMultiplier * container.h
+          const angle = (stroke as RectStrokeData).angle ?? 0
 
           return (
             <g key={stroke.id}>
               <rect
-                x={strokeX}
-                y={strokeY}
-                width={strokeWidth}
-                height={strokeHeight}
+                x={strokeX - rectW / 2}
+                y={strokeY - rectH / 2}
+                width={rectW}
+                height={rectH}
+                transform={angle !== 0 ? `rotate(${angle}, ${strokeX}, ${strokeY})` : undefined}
                 fill={isSelected ? '#ff6b6b' : '#1a1a1a'}
                 stroke={isSelected ? '#ff0000' : 'none'}
                 strokeWidth={isSelected ? 1 : 0}
@@ -724,7 +678,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
                 style={{ cursor: onStrokeChange ? 'move' : 'pointer' }}
               />
               {/* 선택된 rect의 리사이즈 핸들 */}
-              {isSelected && onStrokeChange && renderRectHandles(stroke, strokeX, strokeY, boundsWidth, boundsHeight)}
+              {isSelected && onStrokeChange && renderRectHandles(stroke, strokeX, strokeY, boundsWidth)}
             </g>
           )
         })}

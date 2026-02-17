@@ -6,12 +6,14 @@ import { CharacterPreview } from '../CharacterEditor/CharacterPreview'
 import { StrokeList } from '../CharacterEditor/StrokeList'
 import { StrokeEditor } from '../CharacterEditor/StrokeEditor'
 import { StrokeInspector } from '../CharacterEditor/StrokeInspector'
+import { LayoutContextThumbnails } from '../CharacterEditor/LayoutContextThumbnails'
 import { LinkedSlotsPanel } from './LinkedSlotsPanel'
 import { RelatedSamplesPanel } from './RelatedSamplesPanel'
 import { copyJsonToClipboard } from '../../utils/storage'
+import { classifyJungseong, getLayoutsForJamoType } from '../../utils/hangulUtils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import type { StrokeData, JamoData, BoxConfig } from '../../types'
+import type { StrokeData, JamoData, BoxConfig, LayoutType } from '../../types'
 
 interface JamoEditorProps {
   jamoType: 'choseong' | 'jungseong' | 'jongseong'
@@ -19,7 +21,7 @@ interface JamoEditorProps {
 }
 
 export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
-  const { setSelectedStrokeId } = useUIStore()
+  const { setSelectedStrokeId, selectedLayoutContext, setSelectedLayoutContext } = useUIStore()
   const { layoutConfigs } = useLayoutStore()
   const {
     choseong,
@@ -51,124 +53,59 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
   }, [jamoType, choseong, jungseong, jongseong])
 
   // 편집 중인 자모의 박스 정보 계산 (비율 + 위치)
-  // 혼합 중성의 경우 JU_H와 JU_V 박스 정보도 함께 반환
+  // selectedLayoutContext가 있으면 해당 레이아웃 박스 사용, 없으면 기본 첫 번째 매칭
   const jamoBoxInfo = useMemo(() => {
-    if (!jamoType || !jamoChar) return { x: 0, y: 0, width: 1, height: 1, juH: undefined, juV: undefined }
+    const defaultBox = { x: 0, y: 0, width: 1, height: 1, juH: undefined as BoxConfig | undefined, juV: undefined as BoxConfig | undefined }
+    if (!jamoType || !jamoChar) return defaultBox
 
-    // 중성의 경우, 실제 사용되는 레이아웃 타입을 정확히 찾아야 함
-    if (jamoType === 'jungseong') {
-      const jamo = jamoMap[jamoChar]
-      if (!jamo) return { x: 0, y: 0, width: 1, height: 1, juH: undefined, juV: undefined }
-
-      // 중성 타입 분류
-      const verticalJungseong = ['ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅣ', 'ㅐ', 'ㅒ', 'ㅔ', 'ㅖ']
-      const horizontalJungseong = ['ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ']
-      const isVertical = verticalJungseong.includes(jamoChar)
-      const isHorizontal = horizontalJungseong.includes(jamoChar)
-      const isMixed = !isVertical && !isHorizontal
-
-      // 혼합 중성의 경우
-      if (isMixed) {
-        const mixedLayoutTypes = [
-          'jungseong-mixed-only',
-          'choseong-jungseong-mixed',
-          'choseong-jungseong-mixed-jongseong'
-        ]
-
-        for (const layoutType of mixedLayoutTypes) {
-          const layoutConfig = layoutConfigs[layoutType as keyof typeof layoutConfigs]
-          if (layoutConfig) {
-            if (layoutConfig.boxes.JU_H && layoutConfig.boxes.JU_V) {
-              const juH = layoutConfig.boxes.JU_H
-              const juV = layoutConfig.boxes.JU_V
-              const minX = Math.min(juH.x, juV.x)
-              const minY = Math.min(juH.y, juV.y)
-              const maxX = Math.max(juH.x + juH.width, juV.x + juV.width)
-              const maxY = Math.max(juH.y + juH.height, juV.y + juV.height)
-              const combinedWidth = maxX - minX
-              const combinedHeight = maxY - minY
-              return {
-                x: minX,
-                y: minY,
-                width: combinedWidth,
-                height: combinedHeight,
-                juH: juH,
-                juV: juV
-              }
-            } else if (layoutConfig.boxes.JU) {
-              const ju = layoutConfig.boxes.JU
-              return { x: ju.x, y: ju.y, width: ju.width, height: ju.height, juH: undefined, juV: undefined }
-            }
-          }
-        }
-      } else if (isVertical) {
-        const verticalLayoutTypes = [
-          'jungseong-vertical-only',
-          'choseong-jungseong-vertical',
-          'choseong-jungseong-vertical-jongseong'
-        ]
-
-        for (const layoutType of verticalLayoutTypes) {
-          const layoutConfig = layoutConfigs[layoutType as keyof typeof layoutConfigs]
-          if (layoutConfig) {
-            if (layoutConfig.boxes.JU_V) {
-              const juV = layoutConfig.boxes.JU_V
-              return { x: juV.x, y: juV.y, width: juV.width, height: juV.height, juH: undefined, juV: undefined }
-            } else if (layoutConfig.boxes.JU) {
-              const ju = layoutConfig.boxes.JU
-              return { x: ju.x, y: ju.y, width: ju.width, height: ju.height, juH: undefined, juV: undefined }
-            }
-          }
-        }
-      } else if (isHorizontal) {
-        const horizontalLayoutTypes = [
-          'jungseong-horizontal-only',
-          'choseong-jungseong-horizontal',
-          'choseong-jungseong-horizontal-jongseong'
-        ]
-
-        for (const layoutType of horizontalLayoutTypes) {
-          const layoutConfig = layoutConfigs[layoutType as keyof typeof layoutConfigs]
-          if (layoutConfig) {
-            if (layoutConfig.boxes.JU_H) {
-              const juH = layoutConfig.boxes.JU_H
-              return { x: juH.x, y: juH.y, width: juH.width, height: juH.height, juH: undefined, juV: undefined }
-            } else if (layoutConfig.boxes.JU) {
-              const ju = layoutConfig.boxes.JU
-              return { x: ju.x, y: ju.y, width: ju.width, height: ju.height, juH: undefined, juV: undefined }
-            }
-          }
-        }
-      }
-    }
-
-    // 초성, 종성의 경우
-    const relevantLayoutTypes = Object.keys(layoutConfigs).filter((layoutType) => {
-      if (jamoType === 'choseong') {
-        return layoutType.includes('choseong')
-      } else if (jamoType === 'jongseong') {
-        return layoutType.includes('jongseong')
-      }
-      return false
-    })
-
-    for (const layoutType of relevantLayoutTypes) {
-      const layoutConfig = layoutConfigs[layoutType as keyof typeof layoutConfigs]
-      let box: BoxConfig | undefined
+    // 특정 레이아웃에서 자모 박스 추출하는 헬퍼
+    const extractBoxFromLayout = (lt: LayoutType) => {
+      const layoutConfig = layoutConfigs[lt as keyof typeof layoutConfigs]
+      if (!layoutConfig) return null
 
       if (jamoType === 'choseong') {
-        box = layoutConfig.boxes.CH
+        const box = layoutConfig.boxes.CH
+        if (box) return { x: box.x, y: box.y, width: box.width, height: box.height, juH: undefined, juV: undefined }
       } else if (jamoType === 'jongseong') {
-        box = layoutConfig.boxes.JO
+        const box = layoutConfig.boxes.JO
+        if (box) return { x: box.x, y: box.y, width: box.width, height: box.height, juH: undefined, juV: undefined }
+      } else if (jamoType === 'jungseong') {
+        // 혼합중성: JU_H + JU_V 합산 박스
+        if (layoutConfig.boxes.JU_H && layoutConfig.boxes.JU_V) {
+          const juH = layoutConfig.boxes.JU_H
+          const juV = layoutConfig.boxes.JU_V
+          const minX = Math.min(juH.x, juV.x)
+          const minY = Math.min(juH.y, juV.y)
+          const maxX = Math.max(juH.x + juH.width, juV.x + juV.width)
+          const maxY = Math.max(juH.y + juH.height, juV.y + juV.height)
+          return { x: minX, y: minY, width: maxX - minX, height: maxY - minY, juH, juV }
+        }
+        // 일반 중성
+        if (layoutConfig.boxes.JU) {
+          const ju = layoutConfig.boxes.JU
+          return { x: ju.x, y: ju.y, width: ju.width, height: ju.height, juH: undefined, juV: undefined }
+        }
       }
-
-      if (box) {
-        return { x: box.x, y: box.y, width: box.width, height: box.height, juH: undefined, juV: undefined }
-      }
+      return null
     }
 
-    return { x: 0, y: 0, width: 1, height: 1, juH: undefined, juV: undefined }
-  }, [jamoType, jamoChar, layoutConfigs, jamoMap])
+    // selectedLayoutContext가 있으면 해당 레이아웃 사용
+    if (selectedLayoutContext) {
+      const result = extractBoxFromLayout(selectedLayoutContext)
+      if (result) return result
+    }
+
+    // 기본값: 첫 번째 매칭 레이아웃 사용
+    const subType = jamoType === 'jungseong' ? classifyJungseong(jamoChar) : undefined
+    const layouts = getLayoutsForJamoType(jamoType, subType)
+
+    for (const lt of layouts) {
+      const result = extractBoxFromLayout(lt)
+      if (result) return result
+    }
+
+    return defaultBox
+  }, [jamoType, jamoChar, layoutConfigs, selectedLayoutContext])
 
   // 자모가 변경될 때 획 데이터 로드
   useEffect(() => {
@@ -195,7 +132,7 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
     setSelectedStrokeId(null)
   }, [jamoType, jamoChar, jamoMap, setSelectedStrokeId])
 
-  const handleStrokeChange = (strokeId: string, prop: keyof StrokeData, value: number) => {
+  const handleStrokeChange = (strokeId: string, prop: string, value: number) => {
     setDraftStrokes((prev) =>
       prev.map((s) => (s.id === strokeId ? { ...s, [prop]: value } : s))
     )
@@ -323,6 +260,14 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
         </Badge>
       )}
 
+      {/* 레이아웃 컨텍스트 썸네일 */}
+      <LayoutContextThumbnails
+        jamoType={jamoType}
+        jamoChar={jamoChar}
+        selectedContext={selectedLayoutContext}
+        onSelectContext={setSelectedLayoutContext}
+      />
+
       {/* 3단 레이아웃 */}
       <div className="grid grid-cols-[200px_1fr_250px] gap-4 p-5 min-h-[400px]">
         {/* 좌측: 획 목록 */}
@@ -336,7 +281,7 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
           <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">미리보기</h3>
           <CharacterPreview jamoChar={jamoChar} strokes={draftStrokes} boxInfo={jamoBoxInfo} jamoType={jamoType} />
           <p className="mt-4 text-xs text-text-dim-5 text-center leading-relaxed">
-            방향키: 위치 이동 | Shift + 방향키: 크기 조절
+            방향키: 이동 | Shift+방향키: 크기 | R: 회전
           </p>
         </div>
 

@@ -1,4 +1,4 @@
-import type { LayoutSchema, BoxConfig, Part, Padding, LayoutType } from '../types'
+import type { LayoutSchema, BoxConfig, Part, Padding, LayoutType, PartOverride } from '../types'
 import basePresets from '../data/basePresets.json'
 
 // 기본 패딩 값
@@ -30,9 +30,49 @@ function paddingToBox(padding: Padding): BoxConfig {
 }
 
 /**
+ * partOverrides 적용: 계산된 박스에 오프셋 적용
+ * 양수 = 안쪽 축소, 음수 = 바깥 확장 (오버랩 허용)
+ */
+function applyPartOverrides(
+  boxes: Partial<Record<Part, BoxConfig>>,
+  overrides?: Partial<Record<Part, PartOverride>>
+): Partial<Record<Part, BoxConfig>> {
+  if (!overrides) return boxes
+
+  const result = { ...boxes }
+
+  for (const [part, override] of Object.entries(overrides)) {
+    const box = result[part as Part]
+    if (!box || !override) continue
+
+    const top = override.top ?? 0
+    const bottom = override.bottom ?? 0
+    const left = override.left ?? 0
+    const right = override.right ?? 0
+
+    result[part as Part] = {
+      x: box.x + left,
+      y: box.y + top,
+      width: Math.max(0.01, box.width - left - right),
+      height: Math.max(0.01, box.height - top - bottom),
+    }
+  }
+
+  return result
+}
+
+/**
  * LayoutSchema로부터 각 슬롯의 BoxConfig 계산
  */
 export function calculateBoxes(schema: LayoutSchema): Partial<Record<Part, BoxConfig>> {
+  const rawBoxes = calculateRawBoxes(schema)
+  return applyPartOverrides(rawBoxes, schema.partOverrides)
+}
+
+/**
+ * Split + Padding 기반 박스 계산 (오버라이드 적용 전)
+ */
+function calculateRawBoxes(schema: LayoutSchema): Partial<Record<Part, BoxConfig>> {
   const boxes: Partial<Record<Part, BoxConfig>> = {}
   const padding = schema.padding || DEFAULT_PADDING
   const splits = schema.splits || []
@@ -71,13 +111,14 @@ export function calculateBoxes(schema: LayoutSchema): Partial<Record<Part, BoxCo
     case 'jungseong-mixed-only':
       return calculateMixedJungseongOnly(schema, padding)
 
-    default:
+    default: {
       // 단일 슬롯 (choseong-only, jungseong-*-only)
       const singlePadding = schema.padding || DEFAULT_SINGLE_SLOT_PADDING
       if (schema.slots[0]) {
         boxes[schema.slots[0]] = paddingToBox(singlePadding)
       }
       return boxes
+    }
   }
 }
 

@@ -1,6 +1,6 @@
 import { useUIStore } from '../../stores/uiStore'
 import type { StrokeData } from '../../types'
-import { isPathStroke } from '../../types'
+import { isPathStroke, isRectStroke } from '../../types'
 import { cn } from '@/lib/utils'
 
 type PathPointChangeHandler = (
@@ -12,7 +12,7 @@ type PathPointChangeHandler = (
 
 interface StrokeInspectorProps {
   strokes: StrokeData[]
-  onChange: (strokeId: string, prop: keyof StrokeData, value: number) => void
+  onChange: (strokeId: string, prop: string, value: number) => void
   onPathPointChange?: PathPointChangeHandler
 }
 
@@ -40,67 +40,114 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
     <div className="flex flex-col gap-3">
       <h3 className="text-xs text-muted block mb-3">Stroke: {selectedStroke.id}</h3>
 
-      {/* 바운딩 박스 속성 입력 */}
-      <div className="flex flex-col gap-3 p-4 bg-surface-2 rounded-md border border-border">
-        <div className="flex flex-col gap-1">
-          <label className="text-[0.7rem] text-muted uppercase tracking-wider">X</label>
-          <input
-            type="number"
-            min="0"
-            max="1"
-            step="0.01"
-            value={selectedStroke.x.toFixed(2)}
-            onChange={(e) => onChange(selectedStroke.id, 'x', parseFloat(e.target.value) || 0)}
-            className={inputClass}
-          />
+      {/* 속성 입력 — rect와 path 분리 */}
+      {isRectStroke(selectedStroke) ? (
+        <div className="flex flex-col gap-3 p-4 bg-surface-2 rounded-md border border-border">
+          <div className="flex flex-col gap-1">
+            <label className="text-[0.7rem] text-muted uppercase tracking-wider">X (중심)</label>
+            <input
+              type="number" min="0" max="1" step="0.01"
+              value={selectedStroke.x.toFixed(3)}
+              onChange={(e) => onChange(selectedStroke.id, 'x', parseFloat(e.target.value) || 0)}
+              className={inputClass}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[0.7rem] text-muted uppercase tracking-wider">Y (중심)</label>
+            <input
+              type="number" min="0" max="1" step="0.01"
+              value={selectedStroke.y.toFixed(3)}
+              onChange={(e) => onChange(selectedStroke.id, 'y', parseFloat(e.target.value) || 0)}
+              className={inputClass}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[0.7rem] text-muted uppercase tracking-wider">Width (길이)</label>
+            <input
+              type="number" min="0.01" max="1" step="0.01"
+              value={selectedStroke.width.toFixed(3)}
+              onChange={(e) => onChange(selectedStroke.id, 'width', parseFloat(e.target.value) || 0.01)}
+              className={inputClass}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[0.7rem] text-muted uppercase tracking-wider">Thickness (두께)</label>
+            <input
+              type="number" min="0.01" max="0.5" step="0.005"
+              value={selectedStroke.thickness.toFixed(3)}
+              onChange={(e) => onChange(selectedStroke.id, 'thickness', parseFloat(e.target.value) || 0.01)}
+              className={inputClass}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[0.7rem] text-muted uppercase tracking-wider">Angle (각도)</label>
+            <input
+              type="number" min="0" max="360" step="1"
+              value={selectedStroke.angle}
+              onChange={(e) => onChange(selectedStroke.id, 'angle', parseFloat(e.target.value) || 0)}
+              className={inputClass}
+            />
+          </div>
+          <div className="p-2 bg-[#0f0f0f] rounded border border-border-lighter">
+            <span className="text-[0.65rem] text-muted uppercase">Direction: </span>
+            <span className="text-xs text-[#e5e5e5] font-mono">
+              {selectedStroke.direction === 'horizontal' ? '가로' : '세로'}
+            </span>
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[0.7rem] text-muted uppercase tracking-wider">Y</label>
-          <input
-            type="number"
-            min="0"
-            max="1"
-            step="0.01"
-            value={selectedStroke.y.toFixed(2)}
-            onChange={(e) => onChange(selectedStroke.id, 'y', parseFloat(e.target.value) || 0)}
-            className={inputClass}
-          />
+      ) : (
+        <div className="flex flex-col gap-3 p-4 bg-surface-2 rounded-md border border-border">
+          <div className="flex flex-col gap-1">
+            <label className="text-[0.7rem] text-muted uppercase tracking-wider">X</label>
+            <input
+              type="number" min="0" max="1" step="0.01"
+              value={selectedStroke.x.toFixed(2)}
+              onChange={(e) => onChange(selectedStroke.id, 'x', parseFloat(e.target.value) || 0)}
+              className={inputClass}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[0.7rem] text-muted uppercase tracking-wider">Y</label>
+            <input
+              type="number" min="0" max="1" step="0.01"
+              value={selectedStroke.y.toFixed(2)}
+              onChange={(e) => onChange(selectedStroke.id, 'y', parseFloat(e.target.value) || 0)}
+              className={inputClass}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[0.7rem] text-muted uppercase tracking-wider">Width</label>
+            <input
+              type="number" min="0.01" max="1" step="0.01"
+              value={selectedStroke.width.toFixed(2)}
+              onChange={(e) => onChange(selectedStroke.id, 'width', parseFloat(e.target.value) || 0.01)}
+              className={inputClass}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[0.7rem] text-muted uppercase tracking-wider">Height</label>
+            <input
+              type="number" min="0.01" max="1" step="0.01"
+              value={selectedStroke.height.toFixed(2)}
+              onChange={(e) => onChange(selectedStroke.id, 'height', parseFloat(e.target.value) || 0.01)}
+              className={inputClass}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[0.7rem] text-muted uppercase tracking-wider">Thickness (두께)</label>
+            <input
+              type="number" min="0.01" max="0.5" step="0.005"
+              value={selectedStroke.thickness.toFixed(3)}
+              onChange={(e) => onChange(selectedStroke.id, 'thickness', parseFloat(e.target.value) || 0.01)}
+              className={inputClass}
+            />
+          </div>
+          <div className="p-2 bg-[#0f0f0f] rounded border border-border-lighter">
+            <span className="text-[0.65rem] text-muted uppercase">Type: </span>
+            <span className="text-xs text-[#e5e5e5] font-mono">패스 (Path)</span>
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[0.7rem] text-muted uppercase tracking-wider">Width</label>
-          <input
-            type="number"
-            min="0.01"
-            max="1"
-            step="0.01"
-            value={selectedStroke.width.toFixed(2)}
-            onChange={(e) => onChange(selectedStroke.id, 'width', parseFloat(e.target.value) || 0.01)}
-            className={inputClass}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[0.7rem] text-muted uppercase tracking-wider">Height</label>
-          <input
-            type="number"
-            min="0.01"
-            max="1"
-            step="0.01"
-            value={selectedStroke.height.toFixed(2)}
-            onChange={(e) => onChange(selectedStroke.id, 'height', parseFloat(e.target.value) || 0.01)}
-            className={inputClass}
-          />
-        </div>
-      </div>
-
-      {/* 메타 정보 */}
-      <div className="p-3 bg-surface-2 rounded border border-border flex flex-col gap-1">
-        <span className="text-[0.7rem] text-muted uppercase">Direction:</span>
-        <span className="text-sm text-[#e5e5e5] font-mono">
-          {selectedStroke.direction === 'horizontal' ? '가로 (Horizontal)' :
-           selectedStroke.direction === 'vertical' ? '세로 (Vertical)' :
-           '패스 (Path)'}
-        </span>
-      </div>
+      )}
 
       {/* 패스 포인트 편집 UI */}
       {isPath && (

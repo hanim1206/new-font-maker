@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useJamoStore } from '../../stores/jamoStore'
 import { CHOSEONG_LIST, JUNGSEONG_LIST, JONGSEONG_LIST } from '../../data/Hangul'
-import { decomposeSyllable, isHangul } from '../../utils/hangulUtils'
+import { decomposeSyllable, isHangul, getLayoutsForJamoType, classifyJungseong } from '../../utils/hangulUtils'
 import { cn } from '@/lib/utils'
-import type { LayoutType } from '../../types'
+import type { LayoutType, Part } from '../../types'
 
 // 레이아웃 타입 한글 이름
 const LAYOUT_LABELS: Record<LayoutType, string> = {
@@ -24,17 +24,27 @@ const ALL_LAYOUT_TYPES: Array<{ type: LayoutType; label: string }> = Object.entr
   LAYOUT_LABELS
 ).map(([type, label]) => ({ type: type as LayoutType, label }))
 
+// 자모 타입 → 파트 매핑
+function jamoTypeToPart(jamoType: 'choseong' | 'jungseong' | 'jongseong', jamoChar: string): Part {
+  if (jamoType === 'choseong') return 'CH'
+  if (jamoType === 'jongseong') return 'JO'
+  // 중성은 subType에 따라 JU / JU_H
+  const subType = classifyJungseong(jamoChar)
+  if (subType === 'mixed') return 'JU_H' // 혼합중성 → JU_H로 진입 (JU_V도 같이 표시됨)
+  return 'JU'
+}
+
 export function ControlPanel() {
   const {
     inputText,
     selectedCharIndex,
     controlMode,
     selectedLayoutType,
-    editingJamoType,
-    editingJamoChar,
+    editingPartInLayout,
     setControlMode,
     setSelectedLayoutType,
     setEditingJamo,
+    setEditingPartInLayout,
   } = useUIStore()
   const { choseong, jungseong, jongseong } = useJamoStore()
   const [showFullMenu, setShowFullMenu] = useState(false)
@@ -52,16 +62,25 @@ export function ControlPanel() {
     setSelectedLayoutType(layoutType)
     setControlMode('layout')
     setEditingJamo(null, null)
+    setEditingPartInLayout(null)
   }
 
-  // 자소 선택 핸들러
-  const handleJamoSelect = (
+  // 전체 메뉴에서 자모 클릭 → 레이아웃 경유 자모 편집 진입
+  const handleJamoFromFullMenu = (
     type: 'choseong' | 'jungseong' | 'jongseong',
     char: string
   ) => {
+    // 첫 번째 매칭 레이아웃 찾기
+    const subType = type === 'jungseong' ? classifyJungseong(char) : undefined
+    const layouts = getLayoutsForJamoType(type, subType)
+    const firstLayout = layouts[0]
+    if (!firstLayout) return
+
+    // 레이아웃 선택 → 자모 편집 서브모드 진입
+    setSelectedLayoutType(firstLayout)
+    setControlMode('layout')
     setEditingJamo(type, char)
-    setControlMode('jamo')
-    setSelectedLayoutType(null)
+    setEditingPartInLayout(jamoTypeToPart(type, char))
   }
 
   // 글로벌 스타일 선택 핸들러
@@ -69,6 +88,7 @@ export function ControlPanel() {
     setControlMode('global')
     setSelectedLayoutType(null)
     setEditingJamo(null, null)
+    setEditingPartInLayout(null)
   }
 
   return (
@@ -101,7 +121,7 @@ export function ControlPanel() {
         </div>
       )}
 
-      {/* 컨텍스트 메뉴: 선택된 글자 기반 */}
+      {/* 컨텍스트 메뉴: 선택된 글자 기반 (자모 버튼 제거, 레이아웃만) */}
       {selectedSyllable && !showFullMenu && (
         <>
           <div className="flex items-center justify-between p-4 mb-6 bg-surface border border-border rounded-md">
@@ -126,90 +146,21 @@ export function ControlPanel() {
             </button>
           </section>
 
-          {/* 자모 편집 */}
+          {/* 자모 편집 안내 */}
           <section className="mb-6">
             <h3 className="text-base font-medium mb-3 text-text-dim-3 uppercase tracking-wide">자모</h3>
-            <div className="flex flex-col gap-2">
-              {selectedSyllable.choseong && (
-                <button
-                  className={cn(
-                    'flex items-center gap-3 w-full py-3 px-4 text-sm bg-surface-2 text-text-dim-1 border border-border rounded-md cursor-pointer transition-all text-left',
-                    'hover:bg-surface-hover hover:border-border-light hover:text-foreground',
-                    editingJamoType === 'choseong' &&
-                    editingJamoChar === selectedSyllable.choseong.char &&
-                    'bg-accent-blue border-accent-blue-hover text-white font-medium'
-                  )}
-                  onClick={() =>
-                    handleJamoSelect(
-                      'choseong',
-                      selectedSyllable.choseong!.char
-                    )
-                  }
-                >
-                  <span className={cn(
-                    'text-xs text-text-dim-4 min-w-[32px]',
-                    editingJamoType === 'choseong' &&
-                    editingJamoChar === selectedSyllable.choseong.char &&
-                    'text-white/70'
-                  )}>초성</span>
-                  <span className="text-2xl font-semibold">
-                    {selectedSyllable.choseong.char}
+            <div className="p-4 bg-surface border border-border-subtle rounded-md">
+              <p className="text-sm text-text-dim-4 leading-relaxed">
+                레이아웃 편집기에서 파트를 <span className="text-text-dim-2 font-medium">더블클릭</span>하면
+                해당 자모 편집 모드로 진입합니다.
+              </p>
+              {/* 현재 자모 편집 중 표시 */}
+              {editingPartInLayout && (
+                <div className="mt-3 pt-3 border-t border-border-subtle">
+                  <span className="text-xs text-accent-blue font-medium">
+                    현재 편집 중: {editingPartInLayout}
                   </span>
-                </button>
-              )}
-              {selectedSyllable.jungseong && (
-                <button
-                  className={cn(
-                    'flex items-center gap-3 w-full py-3 px-4 text-sm bg-surface-2 text-text-dim-1 border border-border rounded-md cursor-pointer transition-all text-left',
-                    'hover:bg-surface-hover hover:border-border-light hover:text-foreground',
-                    editingJamoType === 'jungseong' &&
-                    editingJamoChar === selectedSyllable.jungseong.char &&
-                    'bg-accent-blue border-accent-blue-hover text-white font-medium'
-                  )}
-                  onClick={() =>
-                    handleJamoSelect(
-                      'jungseong',
-                      selectedSyllable.jungseong!.char
-                    )
-                  }
-                >
-                  <span className={cn(
-                    'text-xs text-text-dim-4 min-w-[32px]',
-                    editingJamoType === 'jungseong' &&
-                    editingJamoChar === selectedSyllable.jungseong.char &&
-                    'text-white/70'
-                  )}>중성</span>
-                  <span className="text-2xl font-semibold">
-                    {selectedSyllable.jungseong.char}
-                  </span>
-                </button>
-              )}
-              {selectedSyllable.jongseong && (
-                <button
-                  className={cn(
-                    'flex items-center gap-3 w-full py-3 px-4 text-sm bg-surface-2 text-text-dim-1 border border-border rounded-md cursor-pointer transition-all text-left',
-                    'hover:bg-surface-hover hover:border-border-light hover:text-foreground',
-                    editingJamoType === 'jongseong' &&
-                    editingJamoChar === selectedSyllable.jongseong.char &&
-                    'bg-accent-blue border-accent-blue-hover text-white font-medium'
-                  )}
-                  onClick={() =>
-                    handleJamoSelect(
-                      'jongseong',
-                      selectedSyllable.jongseong!.char
-                    )
-                  }
-                >
-                  <span className={cn(
-                    'text-xs text-text-dim-4 min-w-[32px]',
-                    editingJamoType === 'jongseong' &&
-                    editingJamoChar === selectedSyllable.jongseong.char &&
-                    'text-white/70'
-                  )}>종성</span>
-                  <span className="text-2xl font-semibold">
-                    {selectedSyllable.jongseong.char}
-                  </span>
-                </button>
+                </div>
               )}
             </div>
           </section>
@@ -239,8 +190,12 @@ export function ControlPanel() {
             </div>
           </section>
 
+          {/* 자모 그리드: 클릭 시 레이아웃 경유 자모 편집 진입 */}
           <section className="mb-6">
-            <h3 className="text-base font-medium mb-3 text-text-dim-3 uppercase tracking-wide">초성 편집</h3>
+            <h3 className="text-base font-medium mb-3 text-text-dim-3 uppercase tracking-wide">
+              초성 편집
+              <span className="text-xs text-text-dim-5 ml-2 normal-case font-normal">클릭 → 레이아웃 내 편집</span>
+            </h3>
             <div className="grid grid-cols-5 gap-1.5">
               {CHOSEONG_LIST.map((char) => (
                 <button
@@ -248,11 +203,11 @@ export function ControlPanel() {
                   className={cn(
                     'aspect-square text-lg bg-surface-2 text-text-dim-1 border border-border rounded-sm cursor-pointer transition-all flex items-center justify-center',
                     'hover:bg-surface-hover hover:border-border-light hover:text-foreground',
-                    editingJamoType === 'choseong' &&
-                    editingJamoChar === char &&
+                    editingPartInLayout === 'CH' &&
+                    controlMode === 'layout' &&
                     'bg-accent-blue border-accent-blue-hover text-white font-semibold'
                   )}
-                  onClick={() => handleJamoSelect('choseong', char)}
+                  onClick={() => handleJamoFromFullMenu('choseong', char)}
                 >
                   {char}
                 </button>
@@ -261,7 +216,10 @@ export function ControlPanel() {
           </section>
 
           <section className="mb-6">
-            <h3 className="text-base font-medium mb-3 text-text-dim-3 uppercase tracking-wide">중성 편집</h3>
+            <h3 className="text-base font-medium mb-3 text-text-dim-3 uppercase tracking-wide">
+              중성 편집
+              <span className="text-xs text-text-dim-5 ml-2 normal-case font-normal">클릭 → 레이아웃 내 편집</span>
+            </h3>
             <div className="grid grid-cols-5 gap-1.5">
               {JUNGSEONG_LIST.map((char) => (
                 <button
@@ -269,11 +227,12 @@ export function ControlPanel() {
                   className={cn(
                     'aspect-square text-lg bg-surface-2 text-text-dim-1 border border-border rounded-sm cursor-pointer transition-all flex items-center justify-center',
                     'hover:bg-surface-hover hover:border-border-light hover:text-foreground',
-                    editingJamoType === 'jungseong' &&
-                    editingJamoChar === char &&
+                    editingPartInLayout &&
+                    (editingPartInLayout === 'JU' || editingPartInLayout === 'JU_H' || editingPartInLayout === 'JU_V') &&
+                    controlMode === 'layout' &&
                     'bg-accent-blue border-accent-blue-hover text-white font-semibold'
                   )}
-                  onClick={() => handleJamoSelect('jungseong', char)}
+                  onClick={() => handleJamoFromFullMenu('jungseong', char)}
                 >
                   {char}
                 </button>
@@ -282,7 +241,10 @@ export function ControlPanel() {
           </section>
 
           <section className="mb-6">
-            <h3 className="text-base font-medium mb-3 text-text-dim-3 uppercase tracking-wide">종성 편집</h3>
+            <h3 className="text-base font-medium mb-3 text-text-dim-3 uppercase tracking-wide">
+              종성 편집
+              <span className="text-xs text-text-dim-5 ml-2 normal-case font-normal">클릭 → 레이아웃 내 편집</span>
+            </h3>
             <div className="grid grid-cols-5 gap-1.5">
               {JONGSEONG_LIST.filter((c) => c !== '').map((char) => (
                 <button
@@ -290,11 +252,11 @@ export function ControlPanel() {
                   className={cn(
                     'aspect-square text-lg bg-surface-2 text-text-dim-1 border border-border rounded-sm cursor-pointer transition-all flex items-center justify-center',
                     'hover:bg-surface-hover hover:border-border-light hover:text-foreground',
-                    editingJamoType === 'jongseong' &&
-                    editingJamoChar === char &&
+                    editingPartInLayout === 'JO' &&
+                    controlMode === 'layout' &&
                     'bg-accent-blue border-accent-blue-hover text-white font-semibold'
                   )}
-                  onClick={() => handleJamoSelect('jongseong', char)}
+                  onClick={() => handleJamoFromFullMenu('jongseong', char)}
                 >
                   {char}
                 </button>

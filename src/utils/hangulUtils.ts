@@ -132,6 +132,71 @@ function classifyLayout(
   return 'choseong-only'
 }
 
+// ===== 자모 타입별 적용 가능한 레이아웃 목록 =====
+export function getLayoutsForJamoType(
+  jamoType: 'choseong' | 'jungseong' | 'jongseong',
+  jungseongSubType?: 'vertical' | 'horizontal' | 'mixed'
+): LayoutType[] {
+  if (jamoType === 'choseong') {
+    return [
+      'choseong-only',
+      'choseong-jungseong-vertical',
+      'choseong-jungseong-horizontal',
+      'choseong-jungseong-mixed',
+      'choseong-jungseong-vertical-jongseong',
+      'choseong-jungseong-horizontal-jongseong',
+      'choseong-jungseong-mixed-jongseong',
+    ]
+  }
+
+  if (jamoType === 'jongseong') {
+    return [
+      'choseong-jungseong-vertical-jongseong',
+      'choseong-jungseong-horizontal-jongseong',
+      'choseong-jungseong-mixed-jongseong',
+    ]
+  }
+
+  // jungseong: 서브 타입에 따라 분기
+  if (jungseongSubType === 'vertical') {
+    return [
+      'jungseong-vertical-only',
+      'choseong-jungseong-vertical',
+      'choseong-jungseong-vertical-jongseong',
+    ]
+  }
+  if (jungseongSubType === 'horizontal') {
+    return [
+      'jungseong-horizontal-only',
+      'choseong-jungseong-horizontal',
+      'choseong-jungseong-horizontal-jongseong',
+    ]
+  }
+  // mixed
+  return [
+    'jungseong-mixed-only',
+    'choseong-jungseong-mixed',
+    'choseong-jungseong-mixed-jongseong',
+  ]
+}
+
+// ===== 레이아웃 타입별 대표 음절 =====
+export function getSampleSyllableForLayout(layoutType: LayoutType): string {
+  const samples: Record<LayoutType, string> = {
+    'choseong-only': 'ㄱ',
+    'jungseong-vertical-only': 'ㅏ',
+    'jungseong-horizontal-only': 'ㅗ',
+    'jungseong-mixed-only': 'ㅘ',
+    'choseong-jungseong-vertical': '가',
+    'choseong-jungseong-horizontal': '고',
+    'choseong-jungseong-mixed': '과',
+    'choseong-jungseong-vertical-jongseong': '한',
+    'choseong-jungseong-horizontal-jongseong': '공',
+    'choseong-jungseong-mixed-jongseong': '광',
+  }
+  return samples[layoutType]
+}
+
 // ===== 한글인지 확인 =====
 export function isHangul(char: string): boolean {
   const code = char.charCodeAt(0)

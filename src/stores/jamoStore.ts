@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { persist } from 'zustand/middleware'
 import type { JamoData } from '../types'
+import { migrateJamoData, needsMigration } from '../utils/strokeMigration'
 import baseJamos from '../data/baseJamos.json'
 
 const STORAGE_KEY = 'font-maker-jamo-data'
@@ -62,6 +63,28 @@ interface JamoActions {
 // 깊은 복사 헬퍼 (JSON 기반)
 function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj))
+}
+
+// 자모 맵에 구형 스트로크가 있는지 확인
+function mapNeedsMigration(jamoMap: Record<string, JamoData>): boolean {
+  for (const jamo of Object.values(jamoMap)) {
+    const allStrokes = [
+      ...(jamo.strokes || []),
+      ...(jamo.horizontalStrokes || []),
+      ...(jamo.verticalStrokes || []),
+    ]
+    if (allStrokes.some(needsMigration)) return true
+  }
+  return false
+}
+
+// 자모 맵 전체 마이그레이션
+function migrateMap(jamoMap: Record<string, JamoData>): Record<string, JamoData> {
+  const result: Record<string, JamoData> = {}
+  for (const [key, jamo] of Object.entries(jamoMap)) {
+    result[key] = migrateJamoData(jamo)
+  }
+  return result
 }
 
 // baseJamos.json에서 초기 데이터 로드
@@ -165,12 +188,24 @@ export const useJamoStore = create<JamoState & JamoActions>()(
         jungseong: state.jungseong,
         jongseong: state.jongseong,
       }),
-      // hydration 완료 시 콜백
+      // hydration 완료 시 콜백: 구형 스트로크 자동 마이그레이션
       onRehydrateStorage: () => (state, error) => {
         if (error) {
           console.error('Jamo store hydration failed:', error)
         }
         if (state) {
+          // localStorage에서 불러온 데이터에 구형 스트로크가 있으면 마이그레이션
+          const needsCh = mapNeedsMigration(state.choseong)
+          const needsJu = mapNeedsMigration(state.jungseong)
+          const needsJo = mapNeedsMigration(state.jongseong)
+
+          if (needsCh || needsJu || needsJo) {
+            console.log('[jamoStore] 구형 스트로크 감지 — 자동 마이그레이션 실행')
+            if (needsCh) state.choseong = migrateMap(state.choseong) as typeof state.choseong
+            if (needsJu) state.jungseong = migrateMap(state.jungseong) as typeof state.jungseong
+            if (needsJo) state.jongseong = migrateMap(state.jongseong) as typeof state.jongseong
+          }
+
           state.setHydrated()
         }
       },

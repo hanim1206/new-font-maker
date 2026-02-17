@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { persist } from 'zustand/middleware'
-import type { LayoutType, BoxConfig, LayoutSchema, Part, Padding } from '../types'
+import type { LayoutType, BoxConfig, LayoutSchema, Part, Padding, PartOverride } from '../types'
 import { DEFAULT_LAYOUT_CONFIGS, type LayoutConfig } from '../data/layoutConfigs'
 import { calculateBoxes, DEFAULT_LAYOUT_SCHEMAS as CALC_SCHEMAS, BASE_PRESETS_SCHEMAS } from '../utils/layoutCalculator'
 
@@ -67,6 +67,22 @@ interface LayoutActions {
 
   // 특정 레이아웃에 오버라이드가 설정되어 있는지
   hasPaddingOverride: (layoutType: LayoutType) => boolean
+
+  // ===== 파트 오버라이드 API =====
+
+  // 파트별 박스 오프셋 업데이트
+  updatePartOverride: (
+    layoutType: LayoutType,
+    part: Part,
+    side: keyof PartOverride,
+    value: number
+  ) => void
+
+  // 특정 파트 오버라이드 제거
+  resetPartOverride: (layoutType: LayoutType, part: Part) => void
+
+  // 전체 파트 오버라이드 제거
+  resetAllPartOverrides: (layoutType: LayoutType) => void
 
   // ===== 프리셋 관리 API (신규) =====
 
@@ -222,6 +238,40 @@ export const useLayoutStore = create<LayoutState & LayoutActions>()(
       hasPaddingOverride: (layoutType) => {
         return !!get().paddingOverrides[layoutType]
       },
+
+      // ===== 파트 오버라이드 API =====
+
+      updatePartOverride: (layoutType, part, side, value) =>
+        set((state) => {
+          const schema = state.layoutSchemas[layoutType]
+          if (!schema.partOverrides) {
+            schema.partOverrides = {}
+          }
+          if (!schema.partOverrides[part]) {
+            schema.partOverrides[part] = { top: 0, bottom: 0, left: 0, right: 0 }
+          }
+          schema.partOverrides[part]![side] = value
+          syncConfigFromSchema(state, layoutType)
+        }),
+
+      resetPartOverride: (layoutType, part) =>
+        set((state) => {
+          const schema = state.layoutSchemas[layoutType]
+          if (schema.partOverrides) {
+            delete schema.partOverrides[part]
+            if (Object.keys(schema.partOverrides).length === 0) {
+              delete schema.partOverrides
+            }
+            syncConfigFromSchema(state, layoutType)
+          }
+        }),
+
+      resetAllPartOverrides: (layoutType) =>
+        set((state) => {
+          const schema = state.layoutSchemas[layoutType]
+          delete schema.partOverrides
+          syncConfigFromSchema(state, layoutType)
+        }),
 
       // ===== 프리셋 관리 API (신규) =====
 
