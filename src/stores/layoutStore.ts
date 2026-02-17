@@ -9,10 +9,10 @@ const STORAGE_KEY = 'font-maker-layout-schemas'
 
 // 글로벌 패딩 기본값
 const DEFAULT_GLOBAL_PADDING: Padding = {
-  top: 0.08,
-  bottom: 0.08,
-  left: 0.08,
-  right: 0.08,
+  top: 0.075,
+  bottom: 0.075,
+  left: 0.075,
+  right: 0.075,
 }
 
 interface LayoutState {

@@ -56,7 +56,7 @@ export function SvgRenderer({
   fillColor = '#1a1a1a',
   backgroundColor = 'transparent',
   showDebugBoxes = false,
-  visualHeightRatio = 1.1, // 기본값: 1:1.1 비율
+  visualHeightRatio = 1.0, // 기본값: 1:1 정사각 비율
   globalStyle,
 }: SvgRendererProps) {
   // schema가 있으면 calculateBoxes 사용, 없으면 boxes prop 사용
@@ -105,20 +105,11 @@ export function SvgRenderer({
         )
       }
 
-      // === RECT 스트로크 (기존 직선) ===
-      // 방향에 따라 두께 고정: 가로획은 height 고정, 세로획은 width 고정
-      let width: number
-      let height: number
-
-      if (stroke.direction === 'horizontal') {
-        // 가로획: height를 고정값으로, width는 박스 크기에 비례
-        width = stroke.width * box.width * VIEW_BOX_SIZE
-        height = effectiveThickness
-      } else {
-        // 세로획: width를 고정값으로, height는 박스 크기에 비례
-        width = effectiveThickness
-        height = stroke.height * box.height * VIEW_BOX_SIZE
-      }
+      // === RECT 스트로크 (직선) ===
+      // 모든 치수를 박스 크기에 비례하여 렌더링
+      // → 획 간 정렬이 데이터 좌표계 기준으로 정확히 유지됨
+      const width = stroke.width * box.width * VIEW_BOX_SIZE
+      const height = stroke.height * box.height * VIEW_BOX_SIZE
 
       return (
         <rect

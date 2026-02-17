@@ -95,13 +95,13 @@ function calculateVerticalSplit(
     CH: {
       x: padding.left,
       y: padding.top,
-      width: splitX - padding.left - padding.right * 0.5,
+      width: splitX - padding.left,
       height: 1 - padding.top - padding.bottom,
     },
     JU: {
-      x: splitX + padding.left * 0.5,
+      x: splitX,
       y: padding.top,
-      width: 1 - splitX - padding.right - padding.left * 0.5,
+      width: 1 - splitX - padding.right,
       height: 1 - padding.top - padding.bottom,
     },
   }
@@ -122,13 +122,13 @@ function calculateHorizontalSplit(
       x: padding.left,
       y: padding.top,
       width: 1 - padding.left - padding.right,
-      height: splitY - padding.top - padding.bottom * 0.5,
+      height: splitY - padding.top,
     },
     JU: {
       x: padding.left,
-      y: splitY + padding.top * 0.5,
+      y: splitY,
       width: 1 - padding.left - padding.right,
-      height: 1 - splitY - padding.bottom - padding.top * 0.5,
+      height: 1 - splitY - padding.bottom,
     },
   }
 }
@@ -148,20 +148,20 @@ function calculateVerticalWithJongseong(
     CH: {
       x: padding.left,
       y: padding.top,
-      width: splitX - padding.left - 0.02,
-      height: splitY - padding.top - 0.02,
+      width: splitX - padding.left,
+      height: splitY - padding.top,
     },
     JU: {
-      x: splitX + 0.02,
+      x: splitX,
       y: padding.top,
-      width: 1 - splitX - padding.right - 0.02,
-      height: splitY - padding.top - 0.02,
+      width: 1 - splitX - padding.right,
+      height: splitY - padding.top,
     },
     JO: {
       x: padding.left,
-      y: splitY + 0.02,
+      y: splitY,
       width: 1 - padding.left - padding.right,
-      height: 1 - splitY - padding.bottom - 0.02,
+      height: 1 - splitY - padding.bottom,
     },
   }
 }
@@ -176,27 +176,27 @@ function calculateHorizontalWithJongseong(
 ): Partial<Record<Part, BoxConfig>> {
   // Y축 splits를 순서대로 사용
   const ySplits = schema.splits?.filter((s) => s.axis === 'y') ?? []
-  const splitY1 = ySplits[0]?.value ?? 0.37
-  const splitY2 = ySplits[1]?.value ?? 0.60
+  const splitY1 = ySplits[0]?.value ?? 0.375
+  const splitY2 = ySplits[1]?.value ?? 0.6
 
   return {
     CH: {
       x: padding.left,
       y: padding.top,
       width: 1 - padding.left - padding.right,
-      height: splitY1 - padding.top - 0.01,
+      height: splitY1 - padding.top,
     },
     JU: {
       x: padding.left,
-      y: splitY1 + 0.01,
+      y: splitY1,
       width: 1 - padding.left - padding.right,
-      height: splitY2 - splitY1 - 0.02,
+      height: splitY2 - splitY1,
     },
     JO: {
       x: padding.left,
-      y: splitY2 + 0.01,
+      y: splitY2,
       width: 1 - padding.left - padding.right,
-      height: 1 - splitY2 - padding.bottom - 0.01,
+      height: 1 - splitY2 - padding.bottom,
     },
   }
 }
@@ -215,19 +215,19 @@ function calculateMixedJungseong(
     CH: {
       x: padding.left,
       y: padding.top,
-      width: splitX - padding.left - 0.02,
-      height: splitY - padding.top - 0.02,
+      width: splitX - padding.left,
+      height: splitY - padding.top,
     },
     JU_H: {
       x: padding.left,
-      y: splitY + 0.02,
-      width: splitX - padding.left - 0.02,
-      height: 1 - splitY - padding.bottom - 0.02,
+      y: splitY,
+      width: splitX - padding.left,
+      height: 1 - splitY - padding.bottom,
     },
     JU_V: {
-      x: splitX + 0.02,
+      x: splitX,
       y: padding.top,
-      width: 1 - splitX - padding.right - 0.02,
+      width: 1 - splitX - padding.right,
       height: 1 - padding.top - padding.bottom,
     },
   }
@@ -250,26 +250,26 @@ function calculateMixedJungseongWithJongseong(
     CH: {
       x: padding.left,
       y: padding.top,
-      width: splitX - padding.left - 0.02,
-      height: splitY1 - padding.top - 0.02,
+      width: splitX - padding.left,
+      height: splitY1 - padding.top,
     },
     JU_H: {
       x: padding.left,
-      y: splitY1 + 0.02,
-      width: splitX - padding.left - 0.02,
-      height: splitY2 - splitY1 - 0.04,
+      y: splitY1,
+      width: splitX - padding.left,
+      height: splitY2 - splitY1,
     },
     JU_V: {
-      x: splitX + 0.02,
+      x: splitX,
       y: padding.top,
-      width: 1 - splitX - padding.right - 0.02,
-      height: splitY2 - padding.top - 0.02,
+      width: 1 - splitX - padding.right,
+      height: splitY2 - padding.top,
     },
     JO: {
       x: padding.left,
-      y: splitY2 + 0.02,
+      y: splitY2,
       width: 1 - padding.left - padding.right,
-      height: 1 - splitY2 - padding.bottom - 0.02,
+      height: 1 - splitY2 - padding.bottom,
     },
   }
 }
@@ -287,14 +287,14 @@ function calculateMixedJungseongOnly(
   return {
     JU_H: {
       x: padding.left,
-      y: splitY + 0.02,
-      width: splitX - padding.left - 0.02,
-      height: 1 - splitY - padding.bottom - 0.02,
+      y: splitY,
+      width: splitX - padding.left,
+      height: 1 - splitY - padding.bottom,
     },
     JU_V: {
-      x: splitX + 0.02,
+      x: splitX,
       y: padding.top,
-      width: 1 - splitX - padding.right - 0.02,
+      width: 1 - splitX - padding.right,
       height: 1 - padding.top - padding.bottom,
     },
   }

@@ -4,11 +4,11 @@ import { useLayoutStore } from '../../stores/layoutStore'
 import { useJamoStore } from '../../stores/jamoStore'
 import { useGlobalStyleStore } from '../../stores/globalStyleStore'
 import { SplitEditor } from './SplitEditor'
+import { RelatedSamplesPanel } from './RelatedSamplesPanel'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { decomposeSyllable } from '../../utils/hangulUtils'
 import { copyJsonToClipboard } from '../../utils/storage'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import type { LayoutType } from '../../types'
 
 interface LayoutEditorProps {
@@ -19,10 +19,10 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   const { inputText, selectedCharIndex } = useUIStore()
   const {
     getLayoutSchema,
+    getEffectivePadding,
+    hasPaddingOverride,
     resetLayoutSchema,
     getCalculatedBoxes,
-    isModified,
-    isLayoutModified,
     exportSchemas,
     resetToBasePresets,
     _hydrated,
@@ -31,9 +31,12 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   const { getEffectiveStyle } = useGlobalStyleStore()
 
   const schema = getLayoutSchema(layoutType)
+  const effectivePadding = getEffectivePadding(layoutType)
+  const schemaWithPadding = useMemo(
+    () => ({ ...schema, padding: effectivePadding }),
+    [schema, effectivePadding]
+  )
   const effectiveStyle = getEffectiveStyle(layoutType)
-  const modified = isModified()
-  const currentLayoutModified = isLayoutModified(layoutType)
 
   // 테스트용 음절 (선택한 음절 우선, 없으면 입력 텍스트의 첫 번째 음절 또는 기본값)
   const testSyllable = useMemo(() => {
@@ -138,19 +141,14 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   return (
     <div className="h-full overflow-y-auto flex flex-col">
       {/* 변경 감지 배지 */}
-      {modified && (
-        <Badge variant="modified" className="flex items-center gap-2 px-3.5 py-2.5 text-sm mb-4 w-fit">
+      {/* {modified && (
+        <Badge variant="modified" className="flex items-center gap-2 px-3.5 py-2.5 text-sm mb-4 w-fit ">
           <span className="w-2 h-2 bg-accent-yellow rounded-full animate-pulse-dot" />
           수정됨 (basePresets.json과 다름)
         </Badge>
-      )}
+      )} */}
 
-      {/* 현재 레이아웃 변경 표시 */}
-      {currentLayoutModified && (
-        <Badge variant="info" className="block text-center text-xs py-1.5 px-3 mb-4">
-          현재 레이아웃 수정됨
-        </Badge>
-      )}
+
       {/* 버튼 영역 */}
       <div className="flex gap-3 pb-4 border-b border-border-subtle">
         <Button variant="blue" className="flex-1" onClick={handleSave}>
@@ -172,16 +170,72 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
         <div className="shrink-0 p-4 bg-surface rounded-md border border-border-subtle">
           <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">미리보기</h3>
           <div className="flex justify-center p-3 bg-background rounded mb-2">
-            <div className="relative inline-block">
+            <div className="relative inline-block" style={{ backgroundColor: '#1a1a1a' }}>
+              {/* 0.025 스냅 그리드 */}
+              <svg
+                className="absolute inset-0 pointer-events-none z-0"
+                width={200}
+                height={200}
+                viewBox="0 0 100 100"
+              >
+                {Array.from({ length: 39 }, (_, i) => {
+                  const v = (i + 1) * 2.5 // 0.025 * 100
+                  return (
+                    <g key={`grid-${i}`}>
+                      <line x1={v} y1={0} x2={v} y2={100} stroke="#333" strokeWidth={0.2} />
+                      <line x1={0} y1={v} x2={100} y2={v} stroke="#333" strokeWidth={0.2} />
+                    </g>
+                  )
+                })}
+                {/* 10% 단위 강조선 */}
+                {Array.from({ length: 9 }, (_, i) => {
+                  const v = (i + 1) * 10
+                  return (
+                    <g key={`grid-major-${i}`}>
+                      <line x1={v} y1={0} x2={v} y2={100} stroke="#444" strokeWidth={0.4} />
+                      <line x1={0} y1={v} x2={100} y2={v} stroke="#444" strokeWidth={0.4} />
+                    </g>
+                  )
+                })}
+              </svg>
               <SvgRenderer
                 syllable={testSyllable}
-                schema={schema}
+                schema={schemaWithPadding}
                 size={200}
                 fillColor="#e5e5e5"
-                backgroundColor="#1a1a1a"
+                backgroundColor="transparent"
                 showDebugBoxes={true}
                 globalStyle={effectiveStyle}
               />
+              {/* 패딩 오버라이드 시각화 */}
+              {hasPaddingOverride(layoutType) && (() => {
+                const p = effectivePadding
+                const hr = 1.0 // visualHeightRatio
+                return (
+                  <>
+                    {/* 상단 패딩 */}
+                    <div
+                      className="absolute left-0 right-0 bg-accent-orange/20 pointer-events-none z-[1]"
+                      style={{ top: 0, height: `${(p.top / hr) * 100}%` }}
+                    />
+                    {/* 하단 패딩 */}
+                    <div
+                      className="absolute left-0 right-0 bottom-0 bg-accent-orange/20 pointer-events-none z-[1]"
+                      style={{ height: `${(p.bottom / hr) * 100}%` }}
+                    />
+                    {/* 좌측 패딩 */}
+                    <div
+                      className="absolute top-0 bottom-0 bg-accent-orange/20 pointer-events-none z-[1]"
+                      style={{ left: 0, width: `${p.left * 100}%` }}
+                    />
+                    {/* 우측 패딩 */}
+                    <div
+                      className="absolute top-0 bottom-0 right-0 bg-accent-orange/20 pointer-events-none z-[1]"
+                      style={{ width: `${p.right * 100}%` }}
+                    />
+                  </>
+                )
+              })()}
               {/* 기준선 오버레이 */}
               {(schema.splits || []).map((split, index) =>
                 split.axis === 'x' ? (
@@ -194,12 +248,19 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                   <div
                     key={`split-y-${index}`}
                     className="absolute left-0 right-0 h-0.5 bg-accent-cyan opacity-70 z-[2] pointer-events-none"
-                    style={{ top: `${(split.value / 1.1) * 100}%` }}
+                    style={{ top: `${split.value * 100}%` }}
                   />
                 )
               )}
             </div>
           </div>
+          {/* 연관 샘플 (미리보기 아래) */}
+          <RelatedSamplesPanel
+            editingType="layout"
+            editingChar={null}
+            layoutType={layoutType}
+            compact
+          />
         </div>
 
         {/* Split/Padding 편집기 */}

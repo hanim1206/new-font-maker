@@ -69,14 +69,14 @@
       "splits": [
         {
           "axis": "x",
-          "value": 0.63
+          "value": 0.625
         }
       ],
       "padding": {
         "top": 0.1,
         "bottom": 0.1,
-        "left": 0.08,
-        "right": 0.08
+        "left": 0.075,
+        "right": 0.075
       }
     },
     "choseong-jungseong-horizontal": {
@@ -88,7 +88,7 @@
       "splits": [
         {
           "axis": "y",
-          "value": 0.55
+          "value": 0.5
         }
       ],
       "padding": {
@@ -108,7 +108,7 @@
       "splits": [
         {
           "axis": "x",
-          "value": 0.58
+          "value": 0.575
         },
         {
           "axis": "y",
@@ -118,8 +118,8 @@
       "padding": {
         "top": 0.1,
         "bottom": 0.1,
-        "left": 0.08,
-        "right": 0.07
+        "left": 0.075,
+        "right": 0.075
       }
     },
     "choseong-jungseong-vertical-jongseong": {
@@ -132,7 +132,7 @@
       "splits": [
         {
           "axis": "x",
-          "value": 0.62
+          "value": 0.625
         },
         {
           "axis": "y",
@@ -142,8 +142,8 @@
       "padding": {
         "top": 0.05,
         "bottom": 0.05,
-        "left": 0.08,
-        "right": 0.08
+        "left": 0.075,
+        "right": 0.075
       }
     },
     "choseong-jungseong-horizontal-jongseong": {
@@ -156,7 +156,7 @@
       "splits": [
         {
           "axis": "y",
-          "value": 0.37
+          "value": 0.375
         },
         {
           "axis": "y",
@@ -164,8 +164,8 @@
         }
       ],
       "padding": {
-        "top": 0.02,
-        "bottom": 0.03,
+        "top": 0.025,
+        "bottom": 0.025,
         "left": 0.1,
         "right": 0.1
       }
@@ -181,24 +181,24 @@
       "splits": [
         {
           "axis": "x",
-          "value": 0.62
+          "value": 0.625
         },
         {
           "axis": "y",
-          "value": 0.38
+          "value": 0.375
         },
         {
           "axis": "y",
-          "value": 0.62
+          "value": 0.625
         }
       ],
       "padding": {
         "top": 0.05,
         "bottom": 0.05,
-        "left": 0.08,
-        "right": 0.06
+        "left": 0.075,
+        "right": 0.05
       }
     }
   },
-  "exportedAt": "2026-02-16T07:49:44.433Z"
+  "exportedAt": "2026-02-16T10:19:10.179Z"
 }

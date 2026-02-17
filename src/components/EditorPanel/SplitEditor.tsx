@@ -1,6 +1,5 @@
 import type { LayoutType, Padding } from '../../types'
 import { useLayoutStore } from '../../stores/layoutStore'
-import { RelatedSamplesPanel } from './RelatedSamplesPanel'
 import { cn } from '@/lib/utils'
 import { Slider } from '@/components/ui/slider'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -40,6 +39,7 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
   const effectivePadding = getEffectivePadding(layoutType)
 
   const handleSplitChange = (index: number, value: number) => {
+    if (splits[index] && splits[index].value === value) return
     updateSplit(layoutType, index, value)
   }
 
@@ -48,33 +48,6 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
     value: number
   ) => {
     setPaddingOverride(layoutType, side, value)
-  }
-
-  // Split 슬라이더 범위 결정
-  const getSplitRange = (index: number, axis: 'x' | 'y') => {
-    // 기본 범위: 0.2 ~ 0.8
-    let min = 0.2
-    let max = 0.8
-
-    // 같은 축의 다른 split이 있으면 범위 조정
-    const samAxisSplits = splits.filter((s) => s.axis === axis)
-    const currentIndex = samAxisSplits.findIndex((_, i) => {
-      let count = 0
-      for (let j = 0; j <= index; j++) {
-        if (splits[j].axis === axis) count++
-      }
-      return i === count - 1
-    })
-
-    if (samAxisSplits.length > 1) {
-      if (currentIndex === 0) {
-        max = (samAxisSplits[1]?.value ?? 0.8) - 0.05
-      } else if (currentIndex === samAxisSplits.length - 1) {
-        min = (samAxisSplits[currentIndex - 1]?.value ?? 0.2) + 0.05
-      }
-    }
-
-    return { min, max }
   }
 
   return (
@@ -88,7 +61,6 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
           </h4>
 
           {splits.map((split, index) => {
-            const range = getSplitRange(index, split.axis)
             const colorScheme = split.axis === 'x' ? 'x' as const : 'y' as const
 
             return (
@@ -98,13 +70,13 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
                     {AXIS_NAMES[split.axis]} #{index + 1}
                   </span>
                   <span className="text-sm text-text-dim-4 font-mono bg-surface-2 px-2 py-0.5 rounded-sm">
-                    {(split.value * 100).toFixed(0)}%
+                    {(split.value * 100).toFixed(1)}%
                   </span>
                 </div>
                 <Slider
-                  min={range.min}
-                  max={range.max}
-                  step={0.01}
+                  min={0.1}
+                  max={0.9}
+                  step={0.025}
                   value={[split.value]}
                   onValueChange={([val]) => handleSplitChange(index, val)}
                   colorScheme={colorScheme}
@@ -162,13 +134,13 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
                       {isOverridden && ' *'}
                     </span>
                     <span className="text-sm text-text-dim-4 font-mono bg-surface-2 px-2 py-0.5 rounded-sm">
-                      {(effectivePadding[key] * 100).toFixed(0)}%
+                      {(effectivePadding[key] * 100).toFixed(1)}%
                     </span>
                   </div>
                   <Slider
                     min={0}
                     max={0.3}
-                    step={0.01}
+                    step={0.025}
                     value={[effectivePadding[key]]}
                     onValueChange={([val]) =>
                       handleOverridePaddingChange(key, val)
@@ -188,12 +160,7 @@ export function SplitEditor({ layoutType }: SplitEditorProps) {
         )}
       </div>
 
-      {/* 연관 샘플 미리보기 */}
-      <RelatedSamplesPanel
-        editingType="layout"
-        editingChar={null}
-        layoutType={layoutType}
-      />
+      {/* 연관 샘플은 LayoutEditor 미리보기 영역 아래에 표시 */}
     </div>
   )
 }
