@@ -42,7 +42,7 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
 
       {/* 속성 입력 — rect와 path 분리 */}
       {isRectStroke(selectedStroke) ? (
-        <div className="flex flex-col gap-3 p-4 bg-surface-2 rounded-md border border-border">
+        <div className="grid grid-cols-2 gap-3 p-4 bg-surface-2 rounded-md border border-border">
           <div className="flex flex-col gap-1">
             <label className="text-[0.7rem] text-muted uppercase tracking-wider">X (중심)</label>
             <input
@@ -96,7 +96,7 @@ export function StrokeInspector({ strokes, onChange, onPathPointChange }: Stroke
           </div>
         </div>
       ) : (
-        <div className="flex flex-col gap-3 p-4 bg-surface-2 rounded-md border border-border">
+        <div className="grid grid-cols-2 gap-3 p-4 bg-surface-2 rounded-md border border-border">
           <div className="flex flex-col gap-1">
             <label className="text-[0.7rem] text-muted uppercase tracking-wider">X</label>
             <input

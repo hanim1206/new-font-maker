@@ -3,10 +3,11 @@ import { ControlPanel } from './components/ControlPanel/ControlPanel'
 import { PreviewPanel } from './components/PreviewPanel'
 import { EditorPanel } from './components/EditorPanel/EditorPanel'
 import { useUIStore } from './stores/uiStore'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
 export default function App() {
-  const { viewMode, setViewMode, isMobile, setIsMobile } = useUIStore()
+  const { viewMode, setViewMode, isMobile, setIsMobile, inputText, setInputText } = useUIStore()
 
   // 반응형 감지
   useEffect(() => {
@@ -18,24 +19,29 @@ export default function App() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [setIsMobile])
 
-  // 데스크톱: 좌측 인풋/프리뷰 | 중앙 편집메뉴 | 우측 편집기
+  // 데스크톱: 상단 (인풋 + 가로 프리뷰) → 하단 편집기
   if (!isMobile) {
     return (
-      <div className="grid grid-cols-[300px_280px_1fr] h-screen bg-background text-foreground font-sans">
-        {/* 좌측: 인풋 + 프리뷰 */}
-        <aside className="overflow-y-auto overflow-x-hidden border-r border-border-subtle">
-          <PreviewPanel />
-        </aside>
+      <div className="flex flex-col h-screen bg-background text-foreground font-sans">
+        {/* 최상단: 텍스트 입력 + 가로 글자 프리뷰 */}
+        <div className="shrink-0 border-b border-border-subtle bg-[#0f0f0f]">
+          <div className="flex items-center gap-3 px-4 py-2">
+            <Input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="한글 입력 (예: 한글샘플)"
+              maxLength={50}
+              className="w-[240px] shrink-0 px-3 py-2 text-base bg-surface-2 border border-border rounded-lg text-foreground font-sans focus:border-primary"
+            />
+            <PreviewPanel horizontal />
+          </div>
+        </div>
 
-        {/* 중앙: 편집 메뉴 */}
-        <section className="overflow-y-auto overflow-x-hidden border-r border-border-subtle">
-          <ControlPanel />
-        </section>
-
-        {/* 우측: 편집 영역 */}
-        <section className="overflow-y-auto overflow-x-hidden">
+        {/* 메인: 편집기 전체 폭 */}
+        <div className="flex-1 min-h-0 overflow-hidden">
           <EditorPanel />
-        </section>
+        </div>
       </div>
     )
   }

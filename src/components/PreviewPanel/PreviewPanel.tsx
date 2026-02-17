@@ -8,9 +8,13 @@ import { decomposeSyllable, isHangul } from '../../utils/hangulUtils'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import type { DecomposedSyllable } from '../../types'
+import type { DecomposedSyllable, LayoutType } from '../../types'
 
-export function PreviewPanel() {
+interface PreviewPanelProps {
+  horizontal?: boolean
+}
+
+export function PreviewPanel({ horizontal = false }: PreviewPanelProps) {
   const {
     inputText,
     setInputText,
@@ -18,7 +22,8 @@ export function PreviewPanel() {
     setSelectedCharIndex,
     setControlMode,
     setEditingJamo,
-    setSelectedLayoutType
+    setSelectedLayoutType,
+    isMobile,
   } = useUIStore()
   const { layoutConfigs, getEffectivePadding, getLayoutSchema } = useLayoutStore()
   const { choseong, jungseong, jongseong } = useJamoStore()
@@ -33,7 +38,7 @@ export function PreviewPanel() {
       .map(char => decomposeSyllable(char, choseong, jungseong, jongseong))
   }, [inputText, choseong, jungseong, jongseong])
 
-  // 각 글자에 대한 렌더링 정보 (규칙 적용 제거, 직접 레이아웃 설정 사용)
+  // 각 글자에 대한 렌더링 정보
   const renderedSyllables = useMemo(() => {
     return syllables.map((syllable) => {
       const layoutConfig = layoutConfigs[syllable.layoutType]
@@ -42,7 +47,6 @@ export function PreviewPanel() {
         return { syllable, boxes: null }
       }
 
-      // 옵셔널 필드를 필터링하여 Record<Part, BoxConfig> 타입으로 변환
       const boxes: Record<string, any> = {}
       Object.entries(layoutConfig.boxes).forEach(([key, value]) => {
         if (value) {
@@ -66,19 +70,70 @@ export function PreviewPanel() {
     setSelectedCharIndex(0)
   }, [inputText, setSelectedCharIndex])
 
+  const handleCharClick = (index: number, layoutType: LayoutType) => {
+    setSelectedCharIndex(index)
+    setSelectedLayoutType(layoutType)
+    setControlMode('layout')
+    setEditingJamo(null, null)
+  }
+
+  // === 가로 모드 (데스크톱 상단 바) ===
+  if (horizontal) {
+    return (
+      <div className="flex-1 min-w-0 flex items-center gap-2 overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border">
+        {renderedSyllables.length > 0 ? (
+          renderedSyllables.map((item, index) =>
+            item.boxes ? (
+              <div
+                key={index}
+                className={cn(
+                  'shrink-0 flex justify-center items-center bg-[#0f0f0f] rounded p-0.5 border-2 cursor-pointer transition-all',
+                  'hover:border-[#444] hover:bg-surface',
+                  index === selectedCharIndex
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border'
+                )}
+                onClick={() => handleCharClick(index, item.syllable.layoutType)}
+              >
+                <SvgRenderer
+                  syllable={item.syllable}
+                  schema={(() => {
+                    const schema = getLayoutSchema(item.syllable.layoutType)
+                    const padding = getEffectivePadding(item.syllable.layoutType)
+                    return { ...schema, padding }
+                  })()}
+                  size={48}
+                  fillColor="#e5e5e5"
+                  backgroundColor="#1a1a1a"
+                  showDebugBoxes={false}
+                  globalStyle={getEffectiveStyle(item.syllable.layoutType)}
+                />
+              </div>
+            ) : null
+          )
+        ) : (
+          <span className="text-text-dim-6 text-sm whitespace-nowrap">한글을 입력하세요</span>
+        )}
+      </div>
+    )
+  }
+
+  // === 세로 모드 (모바일 / 기본) ===
   return (
     <div className="min-h-full p-4 bg-background flex flex-col gap-4 max-md:p-3">
-      {/* 입력 영역 */}
-      <div className="w-full shrink-0 max-md:sticky max-md:top-0 max-md:z-10 max-md:bg-background max-md:pt-3 max-md:pb-2 max-md:-mt-3 max-md:mb-2">
-        <Input
-          type="text"
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          placeholder="한글 입력 (예: 한글샘플)"
-          maxLength={50}
-          className="w-full px-3 py-2.5 text-lg bg-surface-2 border-2 border-border rounded-lg text-foreground font-sans focus:border-primary max-md:text-xl max-md:px-3.5 max-md:py-3"
-        />
-      </div>
+      {/* 입력 영역 — 모바일에서만 표시 */}
+      {isMobile && (
+        <div className="w-full shrink-0 sticky top-0 z-10 bg-background pt-3 pb-2 -mt-3 mb-2">
+          <Input
+            type="text"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder="한글 입력 (예: 한글샘플)"
+            maxLength={50}
+            className="w-full px-3.5 py-3 text-xl bg-surface-2 border-2 border-border rounded-lg text-foreground font-sans focus:border-primary"
+          />
+        </div>
+      )}
 
       {/* 미리보기 영역 - 그리드로 모든 글자 표시 */}
       <div className="flex justify-center items-start shrink-0 max-md:min-h-[180px] max-md:sticky max-md:top-[4.5rem] max-md:z-[9] max-md:bg-background max-md:pb-2 max-md:mb-2">
@@ -93,15 +148,7 @@ export function PreviewPanel() {
                     'hover:border-[#444] hover:bg-surface',
                     index === selectedCharIndex && 'border-primary bg-primary/10 shadow-[0_0_0_1px_theme(colors.primary.DEFAULT)]'
                   )}
-                  onClick={() => {
-                    setSelectedCharIndex(index)
-                    // 해당 음절의 레이아웃 타입으로 자동 포커스
-                    setSelectedLayoutType(item.syllable.layoutType)
-                    // 편집 모드를 레이아웃 편집 모드로 변경
-                    setControlMode('layout')
-                    // 자모 편집 모드 해제
-                    setEditingJamo(null, null)
-                  }}
+                  onClick={() => handleCharClick(index, item.syllable.layoutType)}
                 >
                   <SvgRenderer
                     syllable={item.syllable}
@@ -127,7 +174,7 @@ export function PreviewPanel() {
         )}
       </div>
 
-      {/* 적용된 정보 (선택된 글자 기준) */}
+      {/* 박스 영역 표시 체크박스 */}
       {selectedSyllable && selectedCharInfo.boxes && (
         <label className="flex items-center gap-2 cursor-pointer text-xs text-text-dim-5 mt-2 pt-2 border-t border-surface-3">
           <Checkbox

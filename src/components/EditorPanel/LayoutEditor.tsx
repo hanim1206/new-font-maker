@@ -61,6 +61,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     updateJongseong,
     updateJamoPadding,
     resetJamoPadding,
+    exportJamos,
   } = useJamoStore()
   const { getEffectiveStyle, style: globalStyleRaw } = useGlobalStyleStore()
 
@@ -351,11 +352,21 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     }
   }
 
-  const handleExport = async () => {
+  const handleExportPresets = async () => {
     const json = exportSchemas()
     const ok = await copyJsonToClipboard(json)
     if (ok) {
       alert('JSON이 클립보드에 복사되었습니다.\n이 데이터를 basePresets.json 파일 전체에 붙여넣으세요.\n\n⚠️ localStorage에서 직접 복사하면 포맷이 달라 에러납니다.\n반드시 이 버튼으로 추출한 데이터를 사용하세요.\n\n경로: /Users/hanim/Documents/GitHub/new-font-maker/src/data/basePresets.json')
+    } else {
+      alert('클립보드 복사에 실패했습니다.')
+    }
+  }
+
+  const handleExportJamos = async () => {
+    const json = exportJamos()
+    const ok = await copyJsonToClipboard(json)
+    if (ok) {
+      alert('JSON이 클립보드에 복사되었습니다.\n이 데이터를 baseJamos.json 파일 전체에 붙여넣으세요.\n\n⚠️ localStorage에서 직접 복사하면 포맷이 달라 에러납니다.\n반드시 이 버튼으로 추출한 데이터를 사용하세요.\n\n경로: /Users/hanim/Documents/GitHub/new-font-maker/src/data/baseJamos.json')
     } else {
       alert('클립보드 복사에 실패했습니다.')
     }
@@ -412,23 +423,6 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
         </div>
       )}
 
-      {/* 레이아웃 편집 모드 버튼 영역 */}
-      {!isJamoEditing && (
-        <div className="flex gap-3 pb-4 border-b border-border-subtle">
-          <Button variant="blue" className="flex-1" onClick={handleSave}>
-            저장
-          </Button>
-          <Button variant="default" className="flex-1" onClick={handleReset}>
-            되돌리기
-          </Button>
-          <Button variant="green" className="flex-1" onClick={handleExport}>
-            JSON 내보내기
-          </Button>
-          <Button variant="danger" className="flex-1" onClick={handleResetAll}>
-            전체 초기화
-          </Button>
-        </div>
-      )}
 
       {/* 미리보기 + 편집 패널 (가로 배치) */}
       <div className="flex gap-4 mt-4 flex-1">
@@ -762,7 +756,25 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
           ) : (
             /* 레이아웃 편집 도구 */
             <>
-              <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">레이아웃 설정</h3>
+              {/* 도구 아이콘 바 */}
+              <div className="flex items-center gap-1 mb-3">
+                <h3 className="text-sm font-medium text-text-dim-3 uppercase tracking-wider mr-auto">레이아웃 설정</h3>
+                <Button variant="blue" size="icon" onClick={handleSave} title="저장">
+                  💾
+                </Button>
+                <Button variant="default" size="icon" onClick={handleReset} title="되돌리기">
+                  ↩️
+                </Button>
+                <Button variant="green" size="icon" onClick={handleExportPresets} title="레이아웃 JSON 내보내기 (basePresets)">
+                  📤
+                </Button>
+                <Button variant="green" size="icon" onClick={handleExportJamos} title="자모 JSON 내보내기 (baseJamos)">
+                  🔤
+                </Button>
+                <Button variant="danger" size="icon" onClick={handleResetAll} title="전체 초기화">
+                  🗑️
+                </Button>
+              </div>
               <SplitEditor layoutType={layoutType} selectedPart={selectedPart} />
               <p className="text-xs text-text-dim-5 mt-4 text-center leading-relaxed">
                 파트 더블클릭으로 자모 편집 진입

@@ -22,7 +22,7 @@ export function StrokeList({ strokes }: StrokeListProps) {
   return (
     <div className="flex flex-col">
       <h3 className="text-xs text-muted block mb-3">획 목록</h3>
-      <div className="flex flex-col gap-2 p-4 bg-surface-2 rounded-md border border-border max-h-[200px] overflow-y-auto">
+      <div className="grid grid-cols-4 gap-2 p-4 bg-surface-2 rounded-md border border-border max-h-[200px] overflow-y-auto">
         {strokes.map((stroke) => (
           <button
             key={stroke.id}
