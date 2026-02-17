@@ -17,7 +17,7 @@ import { calculateBoxes } from '../../utils/layoutCalculator'
 import { copyJsonToClipboard } from '../../utils/storage'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
-import type { LayoutType, Part, StrokeData, DecomposedSyllable, BoxConfig, JamoData, Padding } from '../../types'
+import type { LayoutType, Part, StrokeDataV2, DecomposedSyllable, BoxConfig, JamoData, Padding } from '../../types'
 
 interface LayoutEditorProps {
   layoutType: LayoutType
@@ -72,7 +72,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   const [selectedPart, setSelectedPart] = useState<Part | null>(null)
 
   // 자모 편집용 draft strokes
-  const [draftStrokes, setDraftStrokes] = useState<StrokeData[]>([])
+  const [draftStrokes, setDraftStrokes] = useState<StrokeDataV2[]>([])
 
   const schema = getLayoutSchema(layoutType)
   const effectivePadding = getEffectivePadding(layoutType)

@@ -1,9 +1,8 @@
 import { useEffect } from 'react'
 import { useUIStore } from '../../stores/uiStore'
-import type { StrokeData, BoxConfig } from '../../types'
-import { isPathStroke, isRectStroke } from '../../types'
+import type { StrokeDataV2, BoxConfig } from '../../types'
 
-type PathPointChangeHandler = (
+type PointChangeHandler = (
   strokeId: string,
   pointIndex: number,
   field: 'x' | 'y' | 'handleIn' | 'handleOut',
@@ -11,26 +10,19 @@ type PathPointChangeHandler = (
 ) => void
 
 interface StrokeEditorProps {
-  strokes: StrokeData[]
+  strokes: StrokeDataV2[]
   onChange: (strokeId: string, prop: string, value: number) => void
-  onPathPointChange?: PathPointChangeHandler
+  onPointChange?: PointChangeHandler
   boxInfo?: BoxConfig & { juH?: BoxConfig; juV?: BoxConfig }
 }
 
 const MOVE_STEP = 0.025
-const RESIZE_STEP = 0.025
-const ANGLE_STEP = 15
+const THICKNESS_STEP = 0.005
 
-export function StrokeEditor({ strokes, onChange, onPathPointChange, boxInfo: _boxInfo = { x: 0, y: 0, width: 1, height: 1 } }: StrokeEditorProps) {
-  // TODO: _boxInfo를 사용하여 박스 영역 내에서만 이동 가능하도록 제한
+export function StrokeEditor({ strokes, onChange, onPointChange, boxInfo: _boxInfo = { x: 0, y: 0, width: 1, height: 1 } }: StrokeEditorProps) {
   void _boxInfo
   const { selectedStrokeId, selectedPointIndex } = useUIStore()
   const selectedStroke = strokes.find((s) => s.id === selectedStrokeId)
-
-  // 박스 영역 내에서만 이동 가능하도록 제한하는 헬퍼 함수
-  const clampToBox = (value: number, min: number, max: number) => {
-    return Math.max(min, Math.min(max, value))
-  }
 
   // 키보드 컨트롤
   useEffect(() => {
@@ -42,144 +34,106 @@ export function StrokeEditor({ strokes, onChange, onPathPointChange, boxInfo: _b
 
       const isShift = e.shiftKey
 
-      // path 스트로크 + 포인트 선택 시: 포인트 이동
-      if (isPathStroke(selectedStroke) && selectedPointIndex !== null && onPathPointChange) {
-        const point = selectedStroke.pathData.points[selectedPointIndex]
+      // 포인트가 선택된 경우: 해당 포인트 이동, Shift+방향키는 handleOut 이동
+      if (selectedPointIndex !== null && onPointChange) {
+        const point = selectedStroke.points[selectedPointIndex]
         if (!point) return
 
         switch (e.key) {
           case 'ArrowLeft':
             e.preventDefault()
             if (isShift && point.handleOut) {
-              onPathPointChange(selectedStroke.id, selectedPointIndex, 'handleOut', {
+              onPointChange(selectedStroke.id, selectedPointIndex, 'handleOut', {
                 x: point.handleOut.x - MOVE_STEP,
                 y: point.handleOut.y,
               })
             } else {
-              onPathPointChange(selectedStroke.id, selectedPointIndex, 'x', point.x - MOVE_STEP)
+              onPointChange(selectedStroke.id, selectedPointIndex, 'x', point.x - MOVE_STEP)
             }
             break
           case 'ArrowRight':
             e.preventDefault()
             if (isShift && point.handleOut) {
-              onPathPointChange(selectedStroke.id, selectedPointIndex, 'handleOut', {
+              onPointChange(selectedStroke.id, selectedPointIndex, 'handleOut', {
                 x: point.handleOut.x + MOVE_STEP,
                 y: point.handleOut.y,
               })
             } else {
-              onPathPointChange(selectedStroke.id, selectedPointIndex, 'x', point.x + MOVE_STEP)
+              onPointChange(selectedStroke.id, selectedPointIndex, 'x', point.x + MOVE_STEP)
             }
             break
           case 'ArrowUp':
             e.preventDefault()
             if (isShift && point.handleOut) {
-              onPathPointChange(selectedStroke.id, selectedPointIndex, 'handleOut', {
+              onPointChange(selectedStroke.id, selectedPointIndex, 'handleOut', {
                 x: point.handleOut.x,
                 y: point.handleOut.y - MOVE_STEP,
               })
             } else {
-              onPathPointChange(selectedStroke.id, selectedPointIndex, 'y', point.y - MOVE_STEP)
+              onPointChange(selectedStroke.id, selectedPointIndex, 'y', point.y - MOVE_STEP)
             }
             break
           case 'ArrowDown':
             e.preventDefault()
             if (isShift && point.handleOut) {
-              onPathPointChange(selectedStroke.id, selectedPointIndex, 'handleOut', {
+              onPointChange(selectedStroke.id, selectedPointIndex, 'handleOut', {
                 x: point.handleOut.x,
                 y: point.handleOut.y + MOVE_STEP,
               })
             } else {
-              onPathPointChange(selectedStroke.id, selectedPointIndex, 'y', point.y + MOVE_STEP)
+              onPointChange(selectedStroke.id, selectedPointIndex, 'y', point.y + MOVE_STEP)
             }
             break
         }
         return
       }
 
-      // rect 스트로크: 중심좌표 기반 이동, Shift+좌우=width, Shift+상하=thickness
-      if (isRectStroke(selectedStroke)) {
+      // 포인트 미선택 시: 모든 포인트를 동시에 이동 (획 전체 이동)
+      // Shift+상하 = 두께 변경
+      if (onPointChange) {
         switch (e.key) {
           case 'ArrowLeft':
             e.preventDefault()
-            if (isShift) {
-              onChange(selectedStroke.id, 'width', clampToBox(selectedStroke.width - RESIZE_STEP, 0.01, 1))
-            } else {
-              onChange(selectedStroke.id, 'x', clampToBox(selectedStroke.x - MOVE_STEP, 0, 1))
-            }
+            // 모든 포인트를 왼쪽으로
+            selectedStroke.points.forEach((pt, i) => {
+              onPointChange(selectedStroke.id, i, 'x', pt.x - MOVE_STEP)
+            })
             break
           case 'ArrowRight':
             e.preventDefault()
-            if (isShift) {
-              onChange(selectedStroke.id, 'width', clampToBox(selectedStroke.width + RESIZE_STEP, 0.01, 1))
-            } else {
-              onChange(selectedStroke.id, 'x', clampToBox(selectedStroke.x + MOVE_STEP, 0, 1))
-            }
+            selectedStroke.points.forEach((pt, i) => {
+              onPointChange(selectedStroke.id, i, 'x', pt.x + MOVE_STEP)
+            })
             break
           case 'ArrowUp':
             e.preventDefault()
             if (isShift) {
-              onChange(selectedStroke.id, 'thickness', clampToBox(selectedStroke.thickness - RESIZE_STEP, 0.01, 0.5))
+              // 두께 감소
+              onChange(selectedStroke.id, 'thickness', Math.max(0.01, selectedStroke.thickness - THICKNESS_STEP))
             } else {
-              onChange(selectedStroke.id, 'y', clampToBox(selectedStroke.y - MOVE_STEP, 0, 1))
+              selectedStroke.points.forEach((pt, i) => {
+                onPointChange(selectedStroke.id, i, 'y', pt.y - MOVE_STEP)
+              })
             }
             break
           case 'ArrowDown':
             e.preventDefault()
             if (isShift) {
-              onChange(selectedStroke.id, 'thickness', clampToBox(selectedStroke.thickness + RESIZE_STEP, 0.01, 0.5))
+              // 두께 증가
+              onChange(selectedStroke.id, 'thickness', Math.min(0.5, selectedStroke.thickness + THICKNESS_STEP))
             } else {
-              onChange(selectedStroke.id, 'y', clampToBox(selectedStroke.y + MOVE_STEP, 0, 1))
+              selectedStroke.points.forEach((pt, i) => {
+                onPointChange(selectedStroke.id, i, 'y', pt.y + MOVE_STEP)
+              })
             }
             break
-          case 'r':
-          case 'R':
-            e.preventDefault()
-            onChange(selectedStroke.id, 'angle', ((selectedStroke.angle ?? 0) + (isShift ? -ANGLE_STEP : ANGLE_STEP) + 360) % 360)
-            break
         }
-        return
-      }
-
-      // path 스트로크: 바운딩 박스 이동 (좌상단 좌표)
-      switch (e.key) {
-        case 'ArrowLeft':
-          e.preventDefault()
-          if (isShift) {
-            onChange(selectedStroke.id, 'width', clampToBox(selectedStroke.width - RESIZE_STEP, 0.01, 1 - selectedStroke.x))
-          } else {
-            onChange(selectedStroke.id, 'x', clampToBox(selectedStroke.x - MOVE_STEP, 0, 1 - selectedStroke.width))
-          }
-          break
-        case 'ArrowRight':
-          e.preventDefault()
-          if (isShift) {
-            onChange(selectedStroke.id, 'width', clampToBox(selectedStroke.width + RESIZE_STEP, 0.01, 1 - selectedStroke.x))
-          } else {
-            onChange(selectedStroke.id, 'x', clampToBox(selectedStroke.x + MOVE_STEP, 0, 1 - selectedStroke.width))
-          }
-          break
-        case 'ArrowUp':
-          e.preventDefault()
-          if (isShift) {
-            onChange(selectedStroke.id, 'height', clampToBox(selectedStroke.height - RESIZE_STEP, 0.01, 1 - selectedStroke.y))
-          } else {
-            onChange(selectedStroke.id, 'y', clampToBox(selectedStroke.y - MOVE_STEP, 0, 1 - selectedStroke.height))
-          }
-          break
-        case 'ArrowDown':
-          e.preventDefault()
-          if (isShift) {
-            onChange(selectedStroke.id, 'height', clampToBox(selectedStroke.height + RESIZE_STEP, 0.01, 1 - selectedStroke.y))
-          } else {
-            onChange(selectedStroke.id, 'y', clampToBox(selectedStroke.y + MOVE_STEP, 0, 1 - selectedStroke.height))
-          }
-          break
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedStroke, selectedPointIndex, onChange, onPathPointChange])
+  }, [selectedStroke, selectedPointIndex, onChange, onPointChange])
 
   // UI 렌더링 없음 - 키보드 컨트롤만 담당
   return null

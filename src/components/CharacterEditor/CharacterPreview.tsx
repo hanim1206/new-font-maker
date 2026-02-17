@@ -2,25 +2,24 @@ import { useState, useCallback, useRef } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useJamoStore } from '../../stores/jamoStore'
 import { useGlobalStyleStore } from '../../stores/globalStyleStore'
-import type { StrokeData, BoxConfig, PathStrokeData, RectStrokeData, Padding } from '../../types'
-import { isPathStroke, isRectStroke } from '../../types'
-import { pathDataToSvgD } from '../../utils/pathUtils'
+import type { StrokeDataV2, BoxConfig, Padding } from '../../types'
+import { pointsToSvgD } from '../../utils/pathUtils'
 
-type PathPointChangeHandler = (
+type PointChangeHandler = (
   strokeId: string,
   pointIndex: number,
   field: 'x' | 'y' | 'handleIn' | 'handleOut',
   value: { x: number; y: number } | number
 ) => void
 
-type StrokeChangeHandler = (strokeId: string, prop: keyof StrokeData, value: number) => void
+type StrokeChangeHandler = (strokeId: string, prop: string, value: number) => void
 
 interface CharacterPreviewProps {
   jamoChar: string
-  strokes: StrokeData[]
+  strokes: StrokeDataV2[]
   boxInfo?: BoxConfig & { juH?: BoxConfig; juV?: BoxConfig }
   jamoType?: 'choseong' | 'jungseong' | 'jongseong'
-  onPathPointChange?: PathPointChangeHandler
+  onPointChange?: PointChangeHandler
   onStrokeChange?: StrokeChangeHandler
   jamoPadding?: Padding
 }
@@ -29,9 +28,6 @@ const VIEW_BOX_SIZE = 100
 
 // viewBox 마진 (박스 영역 주변 여백)
 const VIEW_MARGIN = 3
-
-// 리사이즈 핸들 크기
-const HANDLE_SIZE = 2.5
 
 // 박스 타입별 색상
 const BOX_COLORS: Record<string, string> = {
@@ -44,25 +40,18 @@ const BOX_COLORS: Record<string, string> = {
 
 // 드래그 상태 타입
 interface DragState {
-  type: 'point' | 'handleIn' | 'handleOut' | 'rectMove' | 'rectResize' | 'pathMove'
+  type: 'point' | 'handleIn' | 'handleOut' | 'strokeMove'
   strokeId: string
   pointIndex: number
-  strokeX: number
-  strokeY: number
-  boundsWidth: number
-  boundsHeight: number
-  // rectMove/pathMove: 마우스 시작 위치에서 스트로크 원점까지의 오프셋 (SVG abs 좌표)
-  grabOffsetX?: number
-  grabOffsetY?: number
-  // rectResize: 리사이즈 방향
-  resizeEdge?: 'start' | 'end'
-  // 컨테이너 박스 (0~1 좌표 변환용)
-  containerBoxAbsX?: number
-  containerBoxAbsY?: number
-  containerBoxAbsW?: number
-  containerBoxAbsH?: number
-  // 원본 스트로크 데이터 (리사이즈 시 사용)
-  originalStroke?: StrokeData
+  // strokeMove 시: 원래 points 스냅샷 + 그랩 오프셋
+  originalPoints?: { x: number; y: number }[]
+  grabRelX?: number
+  grabRelY?: number
+  // 컨테이너 박스 절대 좌표
+  containerX: number
+  containerY: number
+  containerW: number
+  containerH: number
 }
 
 // 자모 패딩 적용: 박스를 패딩만큼 축소
@@ -76,7 +65,7 @@ function applyJamoPaddingToBox(box: { x: number; y: number; width: number; heigh
   }
 }
 
-export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, width: 1, height: 1 }, jamoType, onPathPointChange, onStrokeChange, jamoPadding }: CharacterPreviewProps) {
+export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, width: 1, height: 1 }, jamoType, onPointChange, onStrokeChange, jamoPadding }: CharacterPreviewProps) {
   const { selectedStrokeId, setSelectedStrokeId, editingJamoType, selectedPointIndex, setSelectedPointIndex } = useUIStore()
   const { jungseong } = useJamoStore()
   const { style: globalStyle } = useGlobalStyleStore()
@@ -110,9 +99,8 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
   const boxHeight = boxInfo.height * VIEW_BOX_SIZE
 
   // viewBox를 박스 영역에 맞춰 줌 (마진 포함)
-  // 종횡비를 0.75~1.25 범위로 제한하여 레이아웃 컨텍스트 전환 시 크기 변동 최소화
-  const MIN_ASPECT = 0.75  // 높이/너비 최소 (너무 납작 방지)
-  const MAX_ASPECT = 1.25  // 높이/너비 최대 (너무 세로로 긴 것 방지)
+  const MIN_ASPECT = 0.75
+  const MAX_ASPECT = 1.25
   let vbX = boxX - VIEW_MARGIN
   let vbY = boxY - VIEW_MARGIN
   let vbW = boxWidth + 2 * VIEW_MARGIN
@@ -120,12 +108,10 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
 
   const aspect = vbH / vbW
   if (aspect < MIN_ASPECT) {
-    // 너무 납작 → 높이 확장
     const newH = vbW * MIN_ASPECT
     vbY -= (newH - vbH) / 2
     vbH = newH
   } else if (aspect > MAX_ASPECT) {
-    // 너무 세로로 긴 → 너비 확장
     const newW = vbH / MAX_ASPECT
     vbX -= (newW - vbW) / 2
     vbW = newW
@@ -161,429 +147,112 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
     return { x: svgPt.x, y: svgPt.y }
   }, [])
 
-  // 절대 SVG 좌표 → PathPoint 상대 좌표 (0~1)
-  const absToRelative = useCallback((absX: number, absY: number, sX: number, sY: number, bW: number, bH: number) => {
-    return {
-      x: bW > 0 ? Math.max(0, Math.min(1, (absX - sX) / bW)) : 0,
-      y: bH > 0 ? Math.max(0, Math.min(1, (absY - sY) / bH)) : 0,
-    }
-  }, [])
-
-  // 스트로크의 컨테이너 박스 절대 좌표 가져오기 (자모 패딩 적용됨)
-  const getContainerBoxAbs = useCallback((stroke: StrokeData) => {
+  // 스트로크의 컨테이너 박스 정보 가져오기 (자모 패딩 적용됨, BoxConfig 형식)
+  const getContainerBox = useCallback((stroke: StrokeDataV2): BoxConfig => {
     if (isMixed && boxInfo.juH && boxInfo.juV && horizontalStrokeIds && verticalStrokeIds) {
       if (horizontalStrokeIds.has(stroke.id)) {
-        const padded = applyJamoPaddingToBox(boxInfo.juH, jamoPadding)
-        return {
-          x: padded.x * VIEW_BOX_SIZE,
-          y: padded.y * VIEW_BOX_SIZE,
-          w: padded.width * VIEW_BOX_SIZE,
-          h: padded.height * VIEW_BOX_SIZE,
-        }
+        return applyJamoPaddingToBox(boxInfo.juH, jamoPadding)
       } else if (verticalStrokeIds.has(stroke.id)) {
-        const padded = applyJamoPaddingToBox(boxInfo.juV, jamoPadding)
-        return {
-          x: padded.x * VIEW_BOX_SIZE,
-          y: padded.y * VIEW_BOX_SIZE,
-          w: padded.width * VIEW_BOX_SIZE,
-          h: padded.height * VIEW_BOX_SIZE,
-        }
+        return applyJamoPaddingToBox(boxInfo.juV, jamoPadding)
       }
     }
-    // 일반 박스에 패딩 적용
-    const padded = applyJamoPaddingToBox(boxInfo, jamoPadding)
-    return {
-      x: padded.x * VIEW_BOX_SIZE,
-      y: padded.y * VIEW_BOX_SIZE,
-      w: padded.width * VIEW_BOX_SIZE,
-      h: padded.height * VIEW_BOX_SIZE,
-    }
+    return applyJamoPaddingToBox(boxInfo, jamoPadding)
   }, [isMixed, boxInfo, horizontalStrokeIds, verticalStrokeIds, jamoPadding])
 
-  // 패스 포인트/핸들 드래그 시작 (마우스 + 터치)
-  const startPathDrag = useCallback((type: 'point' | 'handleIn' | 'handleOut', strokeId: string, pointIndex: number, strokeX: number, strokeY: number, boundsWidth: number, boundsHeight: number) => {
+  // 포인트/핸들 드래그 시작
+  const startPointDrag = useCallback((type: 'point' | 'handleIn' | 'handleOut', strokeId: string, pointIndex: number, container: BoxConfig) => {
     return (e: React.MouseEvent | React.TouchEvent) => {
       e.stopPropagation()
       e.preventDefault()
       setSelectedPointIndex(pointIndex)
-      setDragState({ type, strokeId, pointIndex, strokeX, strokeY, boundsWidth, boundsHeight })
+      setDragState({
+        type,
+        strokeId,
+        pointIndex,
+        containerX: container.x * VIEW_BOX_SIZE,
+        containerY: container.y * VIEW_BOX_SIZE,
+        containerW: container.width * VIEW_BOX_SIZE,
+        containerH: container.height * VIEW_BOX_SIZE,
+      })
     }
   }, [setSelectedPointIndex])
 
-  // Rect 스트로크 이동 드래그 시작 (마우스 + 터치)
-  const startRectMove = useCallback((stroke: StrokeData) => {
+  // 획 전체 이동 드래그 시작
+  const startStrokeMove = useCallback((stroke: StrokeDataV2) => {
     return (e: React.MouseEvent | React.TouchEvent) => {
       e.stopPropagation()
       e.preventDefault()
       setSelectedStrokeId(stroke.id)
       const svgPt = svgPointFromEvent(e)
-      const { strokeX, strokeY, boundsWidth, boundsHeight } = getStrokeBounds(stroke)
-      const container = getContainerBoxAbs(stroke)
+      const container = getContainerBox(stroke)
+      const cX = container.x * VIEW_BOX_SIZE
+      const cY = container.y * VIEW_BOX_SIZE
+      const cW = container.width * VIEW_BOX_SIZE
+      const cH = container.height * VIEW_BOX_SIZE
+      // 마우스의 박스 내 상대 좌표
+      const grabRelX = cW > 0 ? (svgPt.x - cX) / cW : 0
+      const grabRelY = cH > 0 ? (svgPt.y - cY) / cH : 0
       setDragState({
-        type: 'rectMove',
+        type: 'strokeMove',
         strokeId: stroke.id,
         pointIndex: 0,
-        strokeX, strokeY, boundsWidth, boundsHeight,
-        grabOffsetX: svgPt.x - strokeX,
-        grabOffsetY: svgPt.y - strokeY,
-        containerBoxAbsX: container.x,
-        containerBoxAbsY: container.y,
-        containerBoxAbsW: container.w,
-        containerBoxAbsH: container.h,
-        originalStroke: { ...stroke },
+        originalPoints: stroke.points.map(p => ({ x: p.x, y: p.y })),
+        grabRelX,
+        grabRelY,
+        containerX: cX,
+        containerY: cY,
+        containerW: cW,
+        containerH: cH,
       })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [strokes, setSelectedStrokeId, svgPointFromEvent, getContainerBoxAbs])
+  }, [strokes, setSelectedStrokeId, svgPointFromEvent, getContainerBox])
 
-  // Rect 스트로크 리사이즈 드래그 시작 (마우스 + 터치)
-  const startRectResize = useCallback((stroke: StrokeData, edge: 'start' | 'end') => {
-    return (e: React.MouseEvent | React.TouchEvent) => {
-      e.stopPropagation()
-      e.preventDefault()
-      const { strokeX, strokeY, boundsWidth, boundsHeight } = getStrokeBounds(stroke)
-      const container = getContainerBoxAbs(stroke)
-      setDragState({
-        type: 'rectResize',
-        strokeId: stroke.id,
-        pointIndex: 0,
-        strokeX, strokeY, boundsWidth, boundsHeight,
-        resizeEdge: edge,
-        containerBoxAbsX: container.x,
-        containerBoxAbsY: container.y,
-        containerBoxAbsW: container.w,
-        containerBoxAbsH: container.h,
-        originalStroke: { ...stroke },
-      })
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [strokes, getContainerBoxAbs])
-
-  // Path 스트로크 바운딩 박스 이동 드래그 시작 (마우스 + 터치)
-  const startPathMove = useCallback((stroke: StrokeData) => {
-    return (e: React.MouseEvent | React.TouchEvent) => {
-      e.stopPropagation()
-      e.preventDefault()
-      setSelectedStrokeId(stroke.id)
-      const svgPt = svgPointFromEvent(e)
-      const { strokeX, strokeY, boundsWidth, boundsHeight } = getStrokeBounds(stroke)
-      const container = getContainerBoxAbs(stroke)
-      setDragState({
-        type: 'pathMove',
-        strokeId: stroke.id,
-        pointIndex: 0,
-        strokeX, strokeY, boundsWidth, boundsHeight,
-        grabOffsetX: svgPt.x - strokeX,
-        grabOffsetY: svgPt.y - strokeY,
-        containerBoxAbsX: container.x,
-        containerBoxAbsY: container.y,
-        containerBoxAbsW: container.w,
-        containerBoxAbsH: container.h,
-        originalStroke: { ...stroke },
-      })
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [strokes, setSelectedStrokeId, svgPointFromEvent, getContainerBoxAbs])
-
-  // 통합 드래그 이동 핸들러 (마우스 + 터치)
+  // 통합 드래그 이동 핸들러
   const handlePointerMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (!dragState) return
     const svgPt = svgPointFromEvent(e)
+    const cX = dragState.containerX
+    const cY = dragState.containerY
+    const cW = dragState.containerW
+    const cH = dragState.containerH
 
-    // 패스 포인트/핸들 드래그
+    // 포인트/핸들 드래그
     if (dragState.type === 'point' || dragState.type === 'handleIn' || dragState.type === 'handleOut') {
-      if (!onPathPointChange) return
-      const rel = absToRelative(svgPt.x, svgPt.y, dragState.strokeX, dragState.strokeY, dragState.boundsWidth, dragState.boundsHeight)
+      if (!onPointChange) return
+      const relX = cW > 0 ? (svgPt.x - cX) / cW : 0
+      const relY = cH > 0 ? (svgPt.y - cY) / cH : 0
 
       if (dragState.type === 'point') {
-        onPathPointChange(dragState.strokeId, dragState.pointIndex, 'x', rel.x)
-        onPathPointChange(dragState.strokeId, dragState.pointIndex, 'y', rel.y)
+        onPointChange(dragState.strokeId, dragState.pointIndex, 'x', Math.max(0, Math.min(1, relX)))
+        onPointChange(dragState.strokeId, dragState.pointIndex, 'y', Math.max(0, Math.min(1, relY)))
       } else {
-        const unclampedRel = {
-          x: dragState.boundsWidth > 0 ? (svgPt.x - dragState.strokeX) / dragState.boundsWidth : 0,
-          y: dragState.boundsHeight > 0 ? (svgPt.y - dragState.strokeY) / dragState.boundsHeight : 0,
-        }
-        onPathPointChange(dragState.strokeId, dragState.pointIndex, dragState.type, unclampedRel)
+        // 핸들은 0~1 범위를 벗어날 수 있음
+        onPointChange(dragState.strokeId, dragState.pointIndex, dragState.type, { x: relX, y: relY })
       }
       return
     }
 
-    // Rect/Path 이동 드래그
-    if (dragState.type === 'rectMove' || dragState.type === 'pathMove') {
-      if (!onStrokeChange || dragState.containerBoxAbsW === undefined) return
-      const cX = dragState.containerBoxAbsX!
-      const cY = dragState.containerBoxAbsY!
-      const cW = dragState.containerBoxAbsW
-      const cH = dragState.containerBoxAbsH!
-      const stroke = dragState.originalStroke!
-
-      // 마우스 위치 - 그랩 오프셋 = 새 스트로크 절대 좌표
-      const newAbsX = svgPt.x - (dragState.grabOffsetX ?? 0)
-      const newAbsY = svgPt.y - (dragState.grabOffsetY ?? 0)
-
-      // 절대 좌표 → 0~1 정규화 (컨테이너 박스 기준)
-      let newX = cW > 0 ? (newAbsX - cX) / cW : 0
-      let newY = cH > 0 ? (newAbsY - cY) / cH : 0
-
-      // 클램핑: rect는 중심좌표, path는 좌상단 좌표
-      if (isRectStroke(stroke)) {
-        const angle = stroke.angle ?? 0
-        const isVertical = angle === 90
-        const wm = weightMultiplier
-
-        let halfExtentX: number
-        let halfExtentY: number
-
-        if (isVertical) {
-          // 세로획: 시각적 가로폭 = thickness*wm*VIEW_BOX_SIZE, 세로높이 = width*cH
-          halfExtentX = cW > 0 ? (stroke.thickness * wm * VIEW_BOX_SIZE) / (2 * cW) : 0
-          halfExtentY = stroke.width / 2
-        } else {
-          // 가로획: 시각적 가로폭 = width*cW, 세로높이 = thickness*wm*VIEW_BOX_SIZE
-          halfExtentX = stroke.width / 2
-          halfExtentY = cH > 0 ? (stroke.thickness * wm * VIEW_BOX_SIZE) / (2 * cH) : 0
-        }
-
-        halfExtentX = Math.min(halfExtentX, 0.5)
-        halfExtentY = Math.min(halfExtentY, 0.5)
-
-        newX = Math.max(halfExtentX, Math.min(1 - halfExtentX, newX))
-        newY = Math.max(halfExtentY, Math.min(1 - halfExtentY, newY))
-      } else if (isPathStroke(stroke)) {
-        newX = Math.max(0, Math.min(1 - stroke.width, newX))
-        newY = Math.max(0, Math.min(1 - stroke.height, newY))
-      }
-
-      onStrokeChange(dragState.strokeId, 'x', newX)
-      onStrokeChange(dragState.strokeId, 'y', newY)
-      return
-    }
-
-    // Rect 리사이즈 드래그 (angle 기반: 주축 방향으로 리사이즈)
-    if (dragState.type === 'rectResize') {
-      if (!onStrokeChange || !dragState.originalStroke || dragState.containerBoxAbsW === undefined) return
-      if (!isRectStroke(dragState.originalStroke)) return
-      const cX = dragState.containerBoxAbsX!
-      const cY = dragState.containerBoxAbsY!
-      const cW = dragState.containerBoxAbsW
-      const cH = dragState.containerBoxAbsH!
-      const orig = dragState.originalStroke as RectStrokeData
-
-      // 마우스 이동을 주축 방향에 투영 (dot product)
-      const angleRad = (orig.angle ?? 0) * Math.PI / 180
-      const cosA = Math.cos(angleRad)
-      const sinA = Math.sin(angleRad)
-
-      // 중심에서 마우스까지의 벡터 (0~1 정규화 좌표)
+    // 획 전체 이동
+    if (dragState.type === 'strokeMove') {
+      if (!onPointChange || !dragState.originalPoints) return
       const mouseRelX = cW > 0 ? (svgPt.x - cX) / cW : 0
       const mouseRelY = cH > 0 ? (svgPt.y - cY) / cH : 0
-      const dx = mouseRelX - orig.x
-      const dy = mouseRelY - orig.y
+      const deltaX = mouseRelX - (dragState.grabRelX ?? 0)
+      const deltaY = mouseRelY - (dragState.grabRelY ?? 0)
 
-      // 주축 방향에 투영
-      const projected = dx * cosA + dy * sinA
-
-      // 리사이즈: 중심은 고정, width만 변경
-      const halfW = orig.width / 2
-      if (dragState.resizeEdge === 'start') {
-        // start 핸들: 중심에서 start 방향의 거리 변경
-        const newHalfW = Math.max(0.01, halfW - projected)
-        const newWidth = newHalfW + halfW
-        // 중심도 이동
-        const shift = (orig.width - newWidth) / 2
-        onStrokeChange(dragState.strokeId, 'x', orig.x + shift * cosA)
-        onStrokeChange(dragState.strokeId, 'y', orig.y + shift * sinA)
-        onStrokeChange(dragState.strokeId, 'width', newWidth)
-      } else {
-        // end 핸들: 중심에서 end 방향의 거리 변경
-        const newHalfW = Math.max(0.01, projected)
-        const newWidth = halfW + newHalfW
-        const shift = (newWidth - orig.width) / 2
-        onStrokeChange(dragState.strokeId, 'x', orig.x + shift * cosA)
-        onStrokeChange(dragState.strokeId, 'y', orig.y + shift * sinA)
-        onStrokeChange(dragState.strokeId, 'width', newWidth)
-      }
+      dragState.originalPoints.forEach((origPt, i) => {
+        onPointChange(dragState.strokeId, i, 'x', origPt.x + deltaX)
+        onPointChange(dragState.strokeId, i, 'y', origPt.y + deltaY)
+      })
       return
     }
-  }, [dragState, onPathPointChange, onStrokeChange, svgPointFromEvent, absToRelative, weightMultiplier])
+  }, [dragState, onPointChange, svgPointFromEvent])
 
-  // 드래그 종료 (마우스 + 터치)
+  // 드래그 종료
   const handlePointerUp = useCallback(() => {
     setDragState(null)
   }, [])
-
-  // 획의 절대 좌표를 계산하는 헬퍼
-  // rect: strokeX/strokeY = 중심좌표, boundsHeight = thickness 기반
-  // path: strokeX/strokeY = 좌상단, boundsHeight = height 기반
-  const getStrokeBounds = (stroke: StrokeData) => {
-    const container = getContainerBoxAbs(stroke)
-    const strokeX = container.x + stroke.x * container.w
-    const strokeY = container.y + stroke.y * container.h
-
-    // 세로획(90°)은 container.h 기준으로 width 스케일
-    const angle = isRectStroke(stroke) ? (stroke.angle ?? 0) : 0
-    const isVertical = angle === 90
-    const boundsWidth = isRectStroke(stroke)
-      ? stroke.width * (isVertical ? container.h : container.w)
-      : stroke.width * container.w
-
-    // rect thickness는 절대값 (VIEW_BOX_SIZE 기준), path height는 container 상대값
-    const boundsHeight = isRectStroke(stroke)
-      ? stroke.thickness * weightMultiplier * VIEW_BOX_SIZE
-      : (stroke as PathStrokeData).height * container.h
-
-    return { strokeX, strokeY, boundsWidth, boundsHeight }
-  }
-
-  // Rect 스트로크의 리사이즈 핸들 렌더링 (angle 기반: 주축 양 끝)
-  const renderRectHandles = (stroke: StrokeData, cx: number, cy: number, boundsWidth: number) => {
-    if (!isRectStroke(stroke)) return null
-    const angle = stroke.angle ?? 0
-    const angleRad = angle * Math.PI / 180
-    const halfW = boundsWidth / 2
-    const cosA = Math.cos(angleRad)
-    const sinA = Math.sin(angleRad)
-
-    // 주축 양 끝점
-    const startX = cx - halfW * cosA
-    const startY = cy - halfW * sinA
-    const endX = cx + halfW * cosA
-    const endY = cy + halfW * sinA
-
-    const cursor = angle === 90 ? 'ns-resize' : angle === 0 ? 'ew-resize' : 'move'
-
-    return (
-      <g key={`handles-${stroke.id}`}>
-        {/* start 핸들 */}
-        <circle
-          cx={startX} cy={startY} r={HANDLE_SIZE}
-          fill="#7c3aed" stroke="#fff" strokeWidth={0.5}
-          style={{ cursor }}
-          onMouseDown={startRectResize(stroke, 'start')}
-          onTouchStart={startRectResize(stroke, 'start')}
-        />
-        {/* end 핸들 */}
-        <circle
-          cx={endX} cy={endY} r={HANDLE_SIZE}
-          fill="#7c3aed" stroke="#fff" strokeWidth={0.5}
-          style={{ cursor }}
-          onMouseDown={startRectResize(stroke, 'end')}
-          onTouchStart={startRectResize(stroke, 'end')}
-        />
-      </g>
-    )
-  }
-
-  // path 스트로크의 바운딩 박스 오버레이 (이동 가능)
-  const renderPathBoundsOverlay = (stroke: PathStrokeData, strokeX: number, strokeY: number, boundsWidth: number, boundsHeight: number) => {
-    return (
-      <rect
-        key={`pathbounds-${stroke.id}`}
-        x={strokeX}
-        y={strokeY}
-        width={boundsWidth}
-        height={boundsHeight}
-        fill="transparent"
-        stroke="#7c3aed"
-        strokeWidth={0.8}
-        strokeDasharray="2,2"
-        opacity={0.6}
-        style={{ cursor: 'move' }}
-        onMouseDown={startPathMove(stroke)}
-        onTouchStart={startPathMove(stroke)}
-      />
-    )
-  }
-
-  // path 스트로크의 포인트/핸들 오버레이 렌더링
-  const renderPathOverlay = (stroke: PathStrokeData, strokeX: number, strokeY: number, boundsWidth: number, boundsHeight: number) => {
-    const { points } = stroke.pathData
-
-    const toAbs = (px: number, py: number): [number, number] => [
-      strokeX + px * boundsWidth,
-      strokeY + py * boundsHeight,
-    ]
-
-    return (
-      <g key={`overlay-${stroke.id}`}>
-        {/* 선택된 포인트의 핸들 표시 */}
-        {selectedPointIndex !== null && selectedPointIndex < points.length && (() => {
-          const point = points[selectedPointIndex]
-          const [ptX, ptY] = toAbs(point.x, point.y)
-
-          return (
-            <>
-              {point.handleIn && (() => {
-                const [hx, hy] = toAbs(point.handleIn.x, point.handleIn.y)
-                return (
-                  <>
-                    <line x1={ptX} y1={ptY} x2={hx} y2={hy}
-                      stroke="#ff6b6b" strokeWidth={0.5} opacity={0.6} />
-                    <circle cx={hx} cy={hy} r={1.8}
-                      fill="#ff6b6b" stroke="#fff" strokeWidth={0.3}
-                      style={{ cursor: 'grab' }}
-                      onMouseDown={startPathDrag('handleIn', stroke.id, selectedPointIndex, strokeX, strokeY, boundsWidth, boundsHeight)}
-                      onTouchStart={startPathDrag('handleIn', stroke.id, selectedPointIndex, strokeX, strokeY, boundsWidth, boundsHeight)} />
-                  </>
-                )
-              })()}
-              {point.handleOut && (() => {
-                const [hx, hy] = toAbs(point.handleOut.x, point.handleOut.y)
-                return (
-                  <>
-                    <line x1={ptX} y1={ptY} x2={hx} y2={hy}
-                      stroke="#4ecdc4" strokeWidth={0.5} opacity={0.6} />
-                    <circle cx={hx} cy={hy} r={1.8}
-                      fill="#4ecdc4" stroke="#fff" strokeWidth={0.3}
-                      style={{ cursor: 'grab' }}
-                      onMouseDown={startPathDrag('handleOut', stroke.id, selectedPointIndex, strokeX, strokeY, boundsWidth, boundsHeight)}
-                      onTouchStart={startPathDrag('handleOut', stroke.id, selectedPointIndex, strokeX, strokeY, boundsWidth, boundsHeight)} />
-                  </>
-                )
-              })()}
-            </>
-          )
-        })()}
-
-        {/* 모든 앵커 포인트 */}
-        {points.map((pt, i) => {
-          const [ptX, ptY] = toAbs(pt.x, pt.y)
-          const isActive = i === selectedPointIndex
-          return (
-            <circle key={i} cx={ptX} cy={ptY} r={2.5}
-              fill={isActive ? '#ff6b6b' : '#4ecdc4'}
-              stroke="#fff" strokeWidth={0.5}
-              style={{ cursor: 'grab' }}
-              onMouseDown={startPathDrag('point', stroke.id, i, strokeX, strokeY, boundsWidth, boundsHeight)}
-              onTouchStart={startPathDrag('point', stroke.id, i, strokeX, strokeY, boundsWidth, boundsHeight)} />
-          )
-        })}
-      </g>
-    )
-  }
-
-  // 드래그 중 커서 결정
-  const getDragCursor = () => {
-    if (!dragState) return undefined
-    switch (dragState.type) {
-      case 'rectMove':
-      case 'pathMove':
-        return 'move'
-      case 'rectResize': {
-        const orig = dragState.originalStroke
-        if (orig && isRectStroke(orig)) {
-          const a = orig.angle ?? 0
-          if (a === 0) return 'ew-resize'
-          if (a === 90) return 'ns-resize'
-        }
-        return 'move'
-      }
-      case 'point':
-      case 'handleIn':
-      case 'handleOut':
-        return 'grabbing'
-    }
-  }
 
   return (
     <div className="flex flex-col items-center gap-2 p-4 bg-surface-2 rounded-md w-full">
@@ -597,7 +266,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
         onTouchMove={dragState ? handlePointerMove : undefined}
         onTouchEnd={dragState ? handlePointerUp : undefined}
         onTouchCancel={dragState ? handlePointerUp : undefined}
-        style={{ touchAction: 'none', ...(dragState ? { cursor: getDragCursor() } : {}) }}
+        style={{ touchAction: 'none', ...(dragState ? { cursor: dragState.type === 'strokeMove' ? 'move' : 'grabbing' } : {}) }}
       >
         {/* 전체 영역 배경 */}
         <rect
@@ -654,7 +323,6 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
 
         {/* 자모 패딩 오버레이 (반투명 오렌지) */}
         {jamoPadding && (jamoPadding.top > 0 || jamoPadding.bottom > 0 || jamoPadding.left > 0 || jamoPadding.right > 0) && (() => {
-          // 패딩 영역을 4개 rect로 표시 (각 변마다)
           const renderPaddingOverlay = (bx: number, by: number, bw: number, bh: number) => {
             const pTop = jamoPadding.top * bh
             const pBottom = jamoPadding.bottom * bh
@@ -662,13 +330,9 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
             const pRight = jamoPadding.right * bw
             return (
               <g opacity={0.15}>
-                {/* 상단 */}
                 {pTop > 0 && <rect x={bx} y={by} width={bw} height={pTop} fill="#ff9500" />}
-                {/* 하단 */}
                 {pBottom > 0 && <rect x={bx} y={by + bh - pBottom} width={bw} height={pBottom} fill="#ff9500" />}
-                {/* 좌측 (상하 제외) */}
                 {pLeft > 0 && <rect x={bx} y={by + pTop} width={pLeft} height={bh - pTop - pBottom} fill="#ff9500" />}
-                {/* 우측 (상하 제외) */}
                 {pRight > 0 && <rect x={bx + bw - pRight} y={by + pTop} width={pRight} height={bh - pTop - pBottom} fill="#ff9500" />}
               </g>
             )
@@ -712,84 +376,111 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
           return renderPaddedBorder(boxX, boxY, boxWidth, boxHeight)
         })()}
 
-        {/* 획들 (박스 영역 내 상대 좌표) - slant 적용 (중심 기준) */}
+        {/* 획들 - slant 적용 */}
         <g transform={slant !== 0 ? `translate(${slantCenterX}, ${slantCenterY}) skewX(${-slant}) translate(${-slantCenterX}, ${-slantCenterY})` : undefined}>
         {strokes.map((stroke) => {
           const isSelected = stroke.id === selectedStrokeId
-          const { strokeX, strokeY, boundsWidth, boundsHeight } = getStrokeBounds(stroke)
+          const container = getContainerBox(stroke)
+          const d = pointsToSvgD(stroke.points, stroke.closed, container, VIEW_BOX_SIZE)
+          if (!d) return null
+          const strokeWidth = stroke.thickness * weightMultiplier * VIEW_BOX_SIZE
 
-          // === PATH 스트로크 (곡선) ===
-          if (isPathStroke(stroke)) {
-            const d = pathDataToSvgD(stroke.pathData, strokeX, strokeY, boundsWidth, boundsHeight)
-            // 두께는 박스 비율에 영향받지 않는 절대값
-            const pathThickness = stroke.thickness * weightMultiplier * VIEW_BOX_SIZE
-            return (
-              <g key={stroke.id}>
-                {/* 넓은 히트 영역 (투명) - 이동용 */}
-                <path
-                  d={d}
-                  fill="none"
-                  stroke="transparent"
-                  strokeWidth={pathThickness * 4}
-                  onClick={() => setSelectedStrokeId(stroke.id)}
-                  onMouseDown={onStrokeChange ? startPathMove(stroke) : undefined}
-                  onTouchStart={onStrokeChange ? startPathMove(stroke) : undefined}
-                  style={{ cursor: onStrokeChange ? 'move' : 'pointer' }}
-                />
-                {/* 실제 렌더링 */}
-                <path
-                  d={d}
-                  fill="none"
-                  stroke={isSelected ? '#ff6b6b' : '#1a1a1a'}
-                  strokeWidth={pathThickness}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  onClick={() => setSelectedStrokeId(stroke.id)}
-                  onMouseDown={onStrokeChange ? startPathMove(stroke) : undefined}
-                  onTouchStart={onStrokeChange ? startPathMove(stroke) : undefined}
-                  style={{ cursor: onStrokeChange ? 'move' : 'pointer' }}
-                />
-                {/* 선택된 path의 바운딩 박스 + 포인트/핸들 오버레이 */}
-                {isSelected && (
-                  <>
-                    {onStrokeChange && renderPathBoundsOverlay(stroke, strokeX, strokeY, boundsWidth, boundsHeight)}
-                    {onPathPointChange && renderPathOverlay(stroke, strokeX, strokeY, boundsWidth, boundsHeight)}
-                  </>
-                )}
-              </g>
-            )
-          }
+          // 컨테이너의 절대 좌표 (포인트 오버레이용)
+          const cAbsX = container.x * VIEW_BOX_SIZE
+          const cAbsY = container.y * VIEW_BOX_SIZE
+          const cAbsW = container.width * VIEW_BOX_SIZE
+          const cAbsH = container.height * VIEW_BOX_SIZE
 
-          // === RECT 스트로크 (중심좌표 + angle 기반) ===
-          // strokeX/strokeY = 중심좌표 (getStrokeBounds에서 계산)
-          const container = getContainerBoxAbs(stroke)
-          const angle = (stroke as RectStrokeData).angle ?? 0
-          // 세로획(90°)은 회전 후 rectW가 시각적 높이가 되므로 container.h 기준으로 스케일
-          const isVertical = angle === 90
-          const rectW = stroke.width * (isVertical ? container.h : container.w)
-          // 두께는 박스 비율에 영향받지 않는 절대값
-          const rectH = (stroke as RectStrokeData).thickness * weightMultiplier * VIEW_BOX_SIZE
+          // 포인트를 절대 좌표로 변환
+          const toAbs = (px: number, py: number): [number, number] => [
+            cAbsX + px * cAbsW,
+            cAbsY + py * cAbsH,
+          ]
 
           return (
             <g key={stroke.id}>
-              <rect
-                x={strokeX - rectW / 2}
-                y={strokeY - rectH / 2}
-                width={rectW}
-                height={rectH}
-                transform={angle !== 0 ? `rotate(${angle}, ${strokeX}, ${strokeY})` : undefined}
-                fill={isSelected ? '#ff6b6b' : '#1a1a1a'}
-                stroke={isSelected ? '#ff0000' : 'none'}
-                strokeWidth={isSelected ? 1 : 0}
-                rx={1}
-                ry={1}
+              {/* 넓은 히트 영역 (투명) - 이동용 */}
+              <path
+                d={d}
+                fill={stroke.closed ? 'transparent' : 'none'}
+                stroke="transparent"
+                strokeWidth={strokeWidth * 4}
                 onClick={() => setSelectedStrokeId(stroke.id)}
-                onMouseDown={onStrokeChange ? startRectMove(stroke) : undefined}
-                onTouchStart={onStrokeChange ? startRectMove(stroke) : undefined}
+                onMouseDown={onStrokeChange ? startStrokeMove(stroke) : undefined}
+                onTouchStart={onStrokeChange ? startStrokeMove(stroke) : undefined}
                 style={{ cursor: onStrokeChange ? 'move' : 'pointer' }}
               />
-              {/* 선택된 rect의 리사이즈 핸들 */}
-              {isSelected && onStrokeChange && renderRectHandles(stroke, strokeX, strokeY, boundsWidth)}
+              {/* 실제 렌더링 */}
+              <path
+                d={d}
+                fill={stroke.closed ? (isSelected ? '#ff6b6b' : '#1a1a1a') : 'none'}
+                stroke={isSelected ? '#ff6b6b' : '#1a1a1a'}
+                strokeWidth={stroke.closed ? 0 : strokeWidth}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                onClick={() => setSelectedStrokeId(stroke.id)}
+                onMouseDown={onStrokeChange ? startStrokeMove(stroke) : undefined}
+                onTouchStart={onStrokeChange ? startStrokeMove(stroke) : undefined}
+                style={{ cursor: onStrokeChange ? 'move' : 'pointer' }}
+              />
+
+              {/* 선택된 획의 포인트/핸들 오버레이 */}
+              {isSelected && onPointChange && (
+                <g>
+                  {/* 선택된 포인트의 핸들 표시 */}
+                  {selectedPointIndex !== null && selectedPointIndex < stroke.points.length && (() => {
+                    const point = stroke.points[selectedPointIndex]
+                    const [ptX, ptY] = toAbs(point.x, point.y)
+
+                    return (
+                      <>
+                        {point.handleIn && (() => {
+                          const [hx, hy] = toAbs(point.handleIn.x, point.handleIn.y)
+                          return (
+                            <>
+                              <line x1={ptX} y1={ptY} x2={hx} y2={hy}
+                                stroke="#ff6b6b" strokeWidth={0.5} opacity={0.6} />
+                              <circle cx={hx} cy={hy} r={1.8}
+                                fill="#ff6b6b" stroke="#fff" strokeWidth={0.3}
+                                style={{ cursor: 'grab' }}
+                                onMouseDown={startPointDrag('handleIn', stroke.id, selectedPointIndex, container)}
+                                onTouchStart={startPointDrag('handleIn', stroke.id, selectedPointIndex, container)} />
+                            </>
+                          )
+                        })()}
+                        {point.handleOut && (() => {
+                          const [hx, hy] = toAbs(point.handleOut.x, point.handleOut.y)
+                          return (
+                            <>
+                              <line x1={ptX} y1={ptY} x2={hx} y2={hy}
+                                stroke="#4ecdc4" strokeWidth={0.5} opacity={0.6} />
+                              <circle cx={hx} cy={hy} r={1.8}
+                                fill="#4ecdc4" stroke="#fff" strokeWidth={0.3}
+                                style={{ cursor: 'grab' }}
+                                onMouseDown={startPointDrag('handleOut', stroke.id, selectedPointIndex, container)}
+                                onTouchStart={startPointDrag('handleOut', stroke.id, selectedPointIndex, container)} />
+                            </>
+                          )
+                        })()}
+                      </>
+                    )
+                  })()}
+
+                  {/* 모든 앵커 포인트 */}
+                  {stroke.points.map((pt, i) => {
+                    const [ptX, ptY] = toAbs(pt.x, pt.y)
+                    const isActive = i === selectedPointIndex
+                    return (
+                      <circle key={i} cx={ptX} cy={ptY} r={2.5}
+                        fill={isActive ? '#ff6b6b' : '#4ecdc4'}
+                        stroke="#fff" strokeWidth={0.5}
+                        style={{ cursor: 'grab' }}
+                        onMouseDown={startPointDrag('point', stroke.id, i, container)}
+                        onTouchStart={startPointDrag('point', stroke.id, i, container)} />
+                    )
+                  })}
+                </g>
+              )}
             </g>
           )
         })}

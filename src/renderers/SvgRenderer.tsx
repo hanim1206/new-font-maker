@@ -1,8 +1,7 @@
 import { useMemo, type ReactNode } from 'react'
-import type { DecomposedSyllable, BoxConfig, Part, StrokeData, LayoutType, LayoutSchema, Padding } from '../types'
-import { isPathStroke } from '../types'
+import type { DecomposedSyllable, BoxConfig, Part, StrokeDataV2, LayoutType, LayoutSchema, Padding } from '../types'
 import { calculateBoxes } from '../utils/layoutCalculator'
-import { pathDataToSvgD } from '../utils/pathUtils'
+import { pointsToSvgD } from '../utils/pathUtils'
 import type { GlobalStyle } from '../stores/globalStyleStore'
 
 // 파트별 스타일 (자모 편집 시 비편집 파트 흐리게 표시 등)
@@ -96,60 +95,26 @@ export function SvgRenderer({
   const weightMultiplier = globalStyle?.weight ?? 1.0
 
   const renderStrokes = (
-    strokes: StrokeData[] | undefined,
+    strokes: StrokeDataV2[] | undefined,
     box: BoxConfig,
     color: string
   ) => {
     if (!strokes || strokes.length === 0) return null
     return strokes.map((stroke) => {
-      // 박스 내 상대 좌표를 절대 좌표로 변환
-      const baseX = (box.x + stroke.x * box.width) * VIEW_BOX_SIZE
-      const baseY = (box.y + stroke.y * box.height) * VIEW_BOX_SIZE
-
-      // === PATH 스트로크 (곡선) ===
-      if (isPathStroke(stroke)) {
-        const pathWidth = stroke.width * box.width * VIEW_BOX_SIZE
-        const pathHeight = stroke.height * box.height * VIEW_BOX_SIZE
-        // 두께는 박스 비율에 영향받지 않는 절대값
-        const pathThickness = stroke.thickness * weightMultiplier * VIEW_BOX_SIZE
-        const d = pathDataToSvgD(stroke.pathData, baseX, baseY, pathWidth, pathHeight)
-
-        // 닫힌/열린 패스 모두 stroke로 렌더링 (fill 없음)
-        return (
-          <path
-            key={stroke.id}
-            d={d}
-            fill="none"
-            stroke={color}
-            strokeWidth={pathThickness}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        )
-      }
-
-      // === RECT 스트로크 (중심좌표 + angle 기반) ===
-      // x,y = 중심좌표, width = 길이, thickness = 두께, angle = 회전각
-      const cx = (box.x + stroke.x * box.width) * VIEW_BOX_SIZE
-      const cy = (box.y + stroke.y * box.height) * VIEW_BOX_SIZE
-      const angle = stroke.angle ?? 0
-      // 세로획(90°)은 회전 후 rectWidth가 시각적 높이가 되므로 box.height 기준으로 스케일
-      const isVertical = angle === 90
-      const rectWidth = stroke.width * (isVertical ? box.height : box.width) * VIEW_BOX_SIZE
-      // 두께는 박스 비율에 영향받지 않는 절대값
-      const rectHeight = stroke.thickness * weightMultiplier * VIEW_BOX_SIZE
+      // V2 통합 렌더링: 모든 획을 path로 렌더링
+      const d = pointsToSvgD(stroke.points, stroke.closed, box, VIEW_BOX_SIZE)
+      if (!d) return null
+      const strokeWidth = stroke.thickness * weightMultiplier * VIEW_BOX_SIZE
 
       return (
-        <rect
+        <path
           key={stroke.id}
-          x={cx - rectWidth / 2}
-          y={cy - rectHeight / 2}
-          width={rectWidth}
-          height={rectHeight}
-          transform={angle !== 0 ? `rotate(${angle}, ${cx}, ${cy})` : undefined}
-          fill={color}
-          rx={1}
-          ry={1}
+          d={d}
+          fill="none"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeLinejoin="round"
         />
       )
     })

@@ -1,10 +1,9 @@
 import { useUIStore } from '../../stores/uiStore'
-import type { StrokeData } from '../../types'
-import { isRectStroke } from '../../types'
+import type { StrokeDataV2 } from '../../types'
 import { cn } from '@/lib/utils'
 
 interface StrokeListProps {
-  strokes: StrokeData[]
+  strokes: StrokeDataV2[]
 }
 
 export function StrokeList({ strokes }: StrokeListProps) {
@@ -21,7 +20,6 @@ export function StrokeList({ strokes }: StrokeListProps) {
 
   return (
     <div className="flex flex-col">
-      <h3 className="text-xs text-muted block mb-3">획 목록</h3>
       <div className="grid grid-cols-4 gap-2 p-4 bg-surface-2 rounded-md border border-border max-h-[200px] overflow-y-auto">
         {strokes.map((stroke) => (
           <button
@@ -33,7 +31,7 @@ export function StrokeList({ strokes }: StrokeListProps) {
             )}
             onClick={() => setSelectedStrokeId(stroke.id)}
           >
-            {stroke.id} ({isRectStroke(stroke) ? `${stroke.angle}°` : '패스'})
+            {stroke.id} ({stroke.label || (stroke.closed ? '도형' : `${stroke.points.length}pt`)})
           </button>
         ))}
       </div>

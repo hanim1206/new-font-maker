@@ -175,10 +175,10 @@ export interface JamoData {
   char: string
   type: 'choseong' | 'jungseong' | 'jongseong'
   // 일반 자모는 strokes 사용, 혼합중성은 horizontalStrokes + verticalStrokes만 사용
-  strokes?: StrokeData[]
+  strokes?: StrokeDataV2[]
   // 혼합중성의 경우 가로획과 세로획 분리
-  horizontalStrokes?: StrokeData[]
-  verticalStrokes?: StrokeData[]
+  horizontalStrokes?: StrokeDataV2[]
+  verticalStrokes?: StrokeDataV2[]
   // 자모별 내부 패딩 (0~1, 박스 기준 비율)
   padding?: Padding
 }

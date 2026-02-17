@@ -82,7 +82,8 @@ function deepClone<T>(obj: T): T {
 }
 
 // 자모 맵에 구형 스트로크가 있는지 확인
-function mapNeedsMigration(jamoMap: Record<string, JamoData>): boolean {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapNeedsMigration(jamoMap: Record<string, any>): boolean {
   for (const jamo of Object.values(jamoMap)) {
     const allStrokes = [
       ...(jamo.strokes || []),
@@ -171,7 +172,7 @@ export const useJamoStore = create<JamoState & JamoActions>()(
         const current = get()
         return JSON.stringify(
           {
-            version: '1.0.0',
+            version: '2.0.0',
             choseong: current.choseong,
             jungseong: current.jungseong,
             jongseong: current.jongseong,

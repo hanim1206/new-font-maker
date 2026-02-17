@@ -14,7 +14,7 @@ import { classifyJungseong, getLayoutsForJamoType } from '../../utils/hangulUtil
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
-import type { StrokeData, JamoData, BoxConfig, LayoutType, Padding } from '../../types'
+import type { StrokeDataV2, JamoData, BoxConfig, LayoutType, Padding } from '../../types'
 
 interface JamoEditorProps {
   jamoType: 'choseong' | 'jungseong' | 'jongseong'
@@ -41,7 +41,7 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
   } = useJamoStore()
 
   // Draft state for stroke edits
-  const [draftStrokes, setDraftStrokes] = useState<StrokeData[]>([])
+  const [draftStrokes, setDraftStrokes] = useState<StrokeDataV2[]>([])
 
   // 자모 맵 가져오기 (jamoStore에서)
   const jamoMap = useMemo(() => {

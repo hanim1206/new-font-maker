@@ -7,8 +7,7 @@ import { CharacterPreview } from './CharacterPreview'
 import { StrokeList } from './StrokeList'
 import { StrokeEditor } from './StrokeEditor'
 import { StrokeInspector } from './StrokeInspector'
-import type { StrokeData, JamoData, BoxConfig } from '../../types'
-import { isPathStroke } from '../../types'
+import type { StrokeDataV2, JamoData, BoxConfig } from '../../types'
 import { Button } from '@/components/ui/button'
 
 function getJamoMap(type: 'choseong' | 'jungseong' | 'jongseong'): Record<string, JamoData> {
@@ -22,13 +21,11 @@ function getJamoMap(type: 'choseong' | 'jungseong' | 'jongseong'): Record<string
   }
 }
 
-function generateStrokeCode(strokes: StrokeData[], char: string, type: string): string {
-  const formatStroke = (s: StrokeData) => {
-    if (isPathStroke(s)) {
-      return `      { id: '${s.id}', x: ${s.x}, y: ${s.y}, width: ${s.width}, height: ${s.height}, thickness: ${s.thickness}, direction: 'path', pathData: ${JSON.stringify(s.pathData)} },`
-    }
-    // isRectStroke
-    return `      { id: '${s.id}', x: ${s.x}, y: ${s.y}, width: ${s.width}, thickness: ${s.thickness}, angle: ${s.angle}, direction: '${s.direction}' },`
+function generateStrokeCode(strokes: StrokeDataV2[], char: string, type: string): string {
+  const formatStroke = (s: StrokeDataV2) => {
+    const pointsStr = JSON.stringify(s.points)
+    const labelStr = s.label ? `, label: '${s.label}'` : ''
+    return `      { id: '${s.id}', points: ${pointsStr}, closed: ${s.closed}, thickness: ${s.thickness}${labelStr} },`
   }
 
   // 혼합 중성인지 확인
@@ -84,7 +81,7 @@ export function CharacterEditor() {
   const { layoutConfigs } = useLayoutStore()
 
   // Draft state for stroke edits
-  const [draftStrokes, setDraftStrokes] = useState<StrokeData[]>([])
+  const [draftStrokes, setDraftStrokes] = useState<StrokeDataV2[]>([])
 
   // 편집 중인 자모의 박스 정보 계산 (비율 + 위치)
   // 혼합 중성의 경우 JU_H와 JU_V 박스 정보도 함께 반환
@@ -249,15 +246,15 @@ export function CharacterEditor() {
     )
   }
 
-  const handlePathPointChange = (
+  const handlePointChange = (
     strokeId: string,
     pointIndex: number,
     field: 'x' | 'y' | 'handleIn' | 'handleOut',
     value: { x: number; y: number } | number
   ) => {
     setDraftStrokes(prev => prev.map(s => {
-      if (s.id !== strokeId || !isPathStroke(s)) return s
-      const newPoints = s.pathData.points.map((p, i) => {
+      if (s.id !== strokeId) return s
+      const newPoints = s.points.map((p, i) => {
         if (i !== pointIndex) return p
         const updated = { ...p }
         if (field === 'x' || field === 'y') {
@@ -267,7 +264,7 @@ export function CharacterEditor() {
         }
         return updated
       })
-      return { ...s, pathData: { ...s.pathData, points: newPoints } }
+      return { ...s, points: newPoints }
     }))
   }
 
@@ -350,7 +347,7 @@ export function CharacterEditor() {
                 strokes={draftStrokes}
                 boxInfo={jamoBoxInfo}
                 jamoType={editingJamoType || undefined}
-                onPathPointChange={handlePathPointChange}
+                onPointChange={handlePointChange}
                 onStrokeChange={handleStrokeChange}
               />
               <p className="text-xs text-muted text-center py-2 px-4 bg-surface-2 rounded border border-border max-w-[400px]">
@@ -360,12 +357,13 @@ export function CharacterEditor() {
 
             {/* 우측: Stroke Inspector */}
             <div className="flex flex-col gap-3 order-2">
-              <StrokeInspector strokes={draftStrokes} onChange={handleStrokeChange} onPathPointChange={handlePathPointChange} />
+              <StrokeInspector strokes={draftStrokes} onChange={handleStrokeChange} onPointChange={handlePointChange} />
+
             </div>
           </div>
 
           {/* 키보드 컨트롤 (UI 없음) */}
-          <StrokeEditor strokes={draftStrokes} onChange={handleStrokeChange} onPathPointChange={handlePathPointChange} boxInfo={jamoBoxInfo} />
+          <StrokeEditor strokes={draftStrokes} onChange={handleStrokeChange} onPointChange={handlePointChange} boxInfo={jamoBoxInfo} />
 
           {/* 버튼 그룹 */}
           <div className="flex gap-2 pt-4 border-t border-border">

@@ -1,36 +1,40 @@
-import type { StrokeData, RectStrokeData, JamoData } from '../types'
-import { isPathStroke } from '../types'
+import type { StrokeDataV2, JamoData, LegacyStrokeData } from '../types'
+import { convertLegacyStroke, isLegacyStroke } from './strokeConversion'
 
 /**
- * 구형 rect 스트로크를 신형 포맷으로 마이그레이션합니다.
- *
- * 구형: x,y = 좌상단, width/height = 방향에 따라 길이/두께 혼용
- * 신형: x,y = 중심, width = 길이, thickness = 두께, angle = 회전각
- *
- * 변환 공식:
- * - 가로획: x→x+w/2, y→y+h/2, width 유지, thickness=height, angle=0
- * - 세로획: x→x+w/2, y→y+h/2, width=height(길이), thickness=width(두께), angle=90
+ * 스트로크가 V2 형식인지 확인합니다.
+ * V2: points 배열 + closed + thickness
  */
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type OldRectStroke = any
-
-/**
- * 스트로크가 구형 포맷인지 판단
- * - rect: angle/thickness 없거나 height 잔여필드 있으면 구형
- * - path: thickness 없으면 마이그레이션 필요
- */
-export function needsMigration(stroke: StrokeData): boolean {
-  // path 스트로크: thickness 없으면 마이그레이션 필요
-  if (isPathStroke(stroke)) return !('thickness' in stroke)
-  // rect 스트로크: angle/thickness 없으면 구형, 또는 height 잔여필드가 있으면 정리 필요
-  return !('angle' in stroke) || !('thickness' in stroke) || ('height' in stroke)
+function isV2Stroke(stroke: unknown): stroke is StrokeDataV2 {
+  return (
+    typeof stroke === 'object' &&
+    stroke !== null &&
+    'points' in stroke &&
+    Array.isArray((stroke as Record<string, unknown>).points) &&
+    'closed' in stroke
+  )
 }
 
 /**
- * 구형 rect 스트로크 → 신형 변환
+ * 스트로크가 마이그레이션이 필요한지 판단합니다.
+ * - 레거시 형식 (direction 필드 존재): V2로 변환 필요
+ * - 초기 구형 (angle/thickness 없는 rect): 중간 형식 거쳐 V2로 변환
  */
-export function migrateRectStroke(old: OldRectStroke): RectStrokeData {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function needsMigration(stroke: any): boolean {
+  // 이미 V2 형식이면 마이그레이션 불필요
+  if (isV2Stroke(stroke)) return false
+  // 레거시 형식이면 마이그레이션 필요
+  if (isLegacyStroke(stroke)) return true
+  // 완전 구형 (direction + 좌상단 좌표) → 마이그레이션 필요
+  return 'direction' in stroke || !('points' in stroke)
+}
+
+/**
+ * 초기 구형 rect 스트로크 (x,y = 좌상단) → 중간 형식 (x,y = 중심) 변환
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function migrateOldRectToCenter(old: any) {
   if (old.direction === 'horizontal') {
     return {
       id: old.id,
@@ -42,13 +46,12 @@ export function migrateRectStroke(old: OldRectStroke): RectStrokeData {
       direction: 'horizontal',
     }
   } else {
-    // vertical
     return {
       id: old.id,
       x: round(old.x + old.width / 2),
       y: round(old.y + old.height / 2),
-      width: old.height, // 길이 (세로 방향이었으므로 height가 길이)
-      thickness: old.width, // 두께 (세로획에서 width가 두께)
+      width: old.height,
+      thickness: old.width,
       angle: 90,
       direction: 'vertical',
     }
@@ -56,33 +59,42 @@ export function migrateRectStroke(old: OldRectStroke): RectStrokeData {
 }
 
 /**
- * StrokeData 배열 전체를 마이그레이션
+ * 단일 스트로크를 V2로 마이그레이션합니다.
+ * - 이미 V2이면 그대로 반환
+ * - 레거시 중간 형식 (center + angle): V2로 직접 변환
+ * - 완전 구형 (좌상단 + width/height): 중간 형식 거쳐 V2로 변환
  */
-export function migrateStrokes(strokes: StrokeData[]): StrokeData[] {
-  return strokes.map((stroke) => {
-    // path 스트로크: thickness 없으면 기본값 0.1 추가 (구형 localStorage 데이터 대응)
-    if (isPathStroke(stroke)) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (!(stroke as any).thickness) {
-        return Object.assign({}, stroke, { thickness: 0.1 })
-      }
-      return stroke
-    }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function migrateOneStroke(stroke: any): StrokeDataV2 {
+  // 이미 V2 형식
+  if (isV2Stroke(stroke)) return stroke
 
-    // 완전 구형 (angle/thickness 없음) → 전체 변환
-    if (!('angle' in stroke) || !('thickness' in stroke)) {
-      return migrateRectStroke(stroke)
-    }
+  // 레거시 중간 형식 (angle + thickness 있음)
+  if ('angle' in stroke && 'thickness' in stroke) {
+    return convertLegacyStroke(stroke)
+  }
 
-    // 신형이지만 height 잔여필드 정리
-    if ('height' in stroke) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { height: _, ...rest } = stroke as RectStrokeData & { height: number }
-      return rest as RectStrokeData
+  // 완전 구형 (좌상단 좌표) → 중간 형식 → V2
+  if ('direction' in stroke) {
+    if (stroke.direction === 'path') {
+      // 구형 path → thickness 없으면 기본값 추가 후 변환
+      const patched = { ...stroke, thickness: stroke.thickness ?? 0.1 }
+      return convertLegacyStroke(patched)
     }
+    // 구형 rect (좌상단) → 중간 형식(중심) → V2
+    const centered = migrateOldRectToCenter(stroke) as LegacyStrokeData
+    return convertLegacyStroke(centered)
+  }
 
-    return stroke
-  })
+  // 알 수 없는 형식 — 최선의 추측으로 반환
+  return stroke as StrokeDataV2
+}
+
+/**
+ * StrokeData 배열 전체를 V2로 마이그레이션
+ */
+export function migrateStrokes(strokes: unknown[]): StrokeDataV2[] {
+  return strokes.map(migrateOneStroke)
 }
 
 /**
