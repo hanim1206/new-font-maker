@@ -16,7 +16,8 @@ import { decomposeSyllable } from '../../utils/hangulUtils'
 import { calculateBoxes } from '../../utils/layoutCalculator'
 import { copyJsonToClipboard } from '../../utils/storage'
 import { Button } from '@/components/ui/button'
-import type { LayoutType, Part, StrokeData, DecomposedSyllable, BoxConfig, JamoData } from '../../types'
+import { Slider } from '@/components/ui/slider'
+import type { LayoutType, Part, StrokeData, DecomposedSyllable, BoxConfig, JamoData, Padding } from '../../types'
 
 interface LayoutEditorProps {
   layoutType: LayoutType
@@ -58,6 +59,8 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     updateChoseong,
     updateJungseong,
     updateJongseong,
+    updateJamoPadding,
+    resetJamoPadding,
   } = useJamoStore()
   const { getEffectiveStyle, style: globalStyleRaw } = useGlobalStyleStore()
 
@@ -161,6 +164,15 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       verticalStrokeIds: new Set(jamo.verticalStrokes.map(s => s.id)),
     }
   }, [editingJamoInfo, jungseong, computedBoxes])
+
+  // 편집 중인 자모의 패딩 데이터
+  const editingJamoPadding = useMemo((): Padding | undefined => {
+    if (!editingJamoInfo) return undefined
+    const jamoMap = editingJamoInfo.type === 'choseong' ? choseong
+      : editingJamoInfo.type === 'jungseong' ? jungseong
+      : jongseong
+    return jamoMap[editingJamoInfo.char]?.padding
+  }, [editingJamoInfo, choseong, jungseong, jongseong])
 
   // 자모 편집 진입 시 draft strokes 로드
   useEffect(() => {
@@ -343,7 +355,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     const json = exportSchemas()
     const ok = await copyJsonToClipboard(json)
     if (ok) {
-      alert('JSON이 클립보드에 복사되었습니다.\nsrc/data/basePresets.json에 붙여넣으세요.')
+      alert('JSON이 클립보드에 복사되었습니다.\n이 데이터를 basePresets.json 파일 전체에 붙여넣으세요.\n\n⚠️ localStorage에서 직접 복사하면 포맷이 달라 에러납니다.\n반드시 이 버튼으로 추출한 데이터를 사용하세요.\n\n경로: /Users/hanim/Documents/GitHub/new-font-maker/src/data/basePresets.json')
     } else {
       alert('클립보드 복사에 실패했습니다.')
     }
@@ -479,6 +491,57 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                 globalStyle={effectiveStyle}
                 partStyles={partStyles}
               >
+                {/* 자모 편집 모드: 패딩 오버레이 (오렌지색 반투명) */}
+                {isJamoEditing && editingJamoPadding && (editingJamoPadding.top > 0 || editingJamoPadding.bottom > 0 || editingJamoPadding.left > 0 || editingJamoPadding.right > 0) && (() => {
+                  const pad = editingJamoPadding
+                  const renderPaddingOverlay = (bx: number, by: number, bw: number, bh: number) => {
+                    const pTop = pad.top * bh
+                    const pBottom = pad.bottom * bh
+                    const pLeft = pad.left * bw
+                    const pRight = pad.right * bw
+                    return (
+                      <g opacity={0.15}>
+                        {pTop > 0 && <rect x={bx} y={by} width={bw} height={pTop} fill="#ff9500" />}
+                        {pBottom > 0 && <rect x={bx} y={by + bh - pBottom} width={bw} height={pBottom} fill="#ff9500" />}
+                        {pLeft > 0 && <rect x={bx} y={by + pTop} width={pLeft} height={bh - pTop - pBottom} fill="#ff9500" />}
+                        {pRight > 0 && <rect x={bx + bw - pRight} y={by + pTop} width={pRight} height={bh - pTop - pBottom} fill="#ff9500" />}
+                      </g>
+                    )
+                  }
+                  const renderPaddedBorder = (bx: number, by: number, bw: number, bh: number) => {
+                    const px = bx + pad.left * bw
+                    const py = by + pad.top * bh
+                    const pw = bw * (1 - pad.left - pad.right)
+                    const ph = bh * (1 - pad.top - pad.bottom)
+                    return (
+                      <rect x={px} y={py} width={pw} height={ph} fill="none" stroke="#ff9500" strokeWidth={0.8} strokeDasharray="2,2" opacity={0.5} />
+                    )
+                  }
+
+                  if (mixedJungseongData?.juHBox && mixedJungseongData?.juVBox) {
+                    const hb = mixedJungseongData.juHBox
+                    const vb = mixedJungseongData.juVBox
+                    return (
+                      <>
+                        {renderPaddingOverlay(hb.x * 100, hb.y * 100, hb.width * 100, hb.height * 100)}
+                        {renderPaddingOverlay(vb.x * 100, vb.y * 100, vb.width * 100, vb.height * 100)}
+                        {renderPaddedBorder(hb.x * 100, hb.y * 100, hb.width * 100, hb.height * 100)}
+                        {renderPaddedBorder(vb.x * 100, vb.y * 100, vb.width * 100, vb.height * 100)}
+                      </>
+                    )
+                  }
+
+                  if (editingBox) {
+                    return (
+                      <>
+                        {renderPaddingOverlay(editingBox.x * 100, editingBox.y * 100, editingBox.width * 100, editingBox.height * 100)}
+                        {renderPaddedBorder(editingBox.x * 100, editingBox.y * 100, editingBox.width * 100, editingBox.height * 100)}
+                      </>
+                    )
+                  }
+                  return null
+                })()}
+
                 {/* 자모 편집 모드: StrokeOverlay를 SvgRenderer children으로 전달 */}
                 {isJamoEditing && editingBox && draftStrokes.length > 0 && (
                   <StrokeOverlay
@@ -506,6 +569,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                     horizontalStrokeIds={mixedJungseongData?.horizontalStrokeIds}
                     verticalStrokeIds={mixedJungseongData?.verticalStrokeIds}
                     globalStyle={globalStyleRaw}
+                    jamoPadding={editingJamoPadding}
                   />
                 )}
               </SvgRenderer>
@@ -614,6 +678,65 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                 <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">속성 편집</h3>
                 <StrokeInspector strokes={draftStrokes} onChange={handleStrokeChange} />
               </div>
+
+              {/* 자모 패딩 */}
+              {editingJamoInfo && (() => {
+                const pad = editingJamoPadding
+                const hasPad = pad && (pad.top > 0 || pad.bottom > 0 || pad.left > 0 || pad.right > 0)
+                const sides: Array<{ key: keyof Padding; label: string }> = [
+                  { key: 'top', label: '상단' },
+                  { key: 'bottom', label: '하단' },
+                  { key: 'left', label: '좌측' },
+                  { key: 'right', label: '우측' },
+                ]
+                return (
+                  <div className="bg-surface rounded-md border border-border-subtle p-4">
+                    <h4 className="text-sm font-medium m-0 mb-4 text-text-dim-4 uppercase tracking-wider flex items-center gap-2">
+                      <span className="text-lg">📐</span>
+                      자모 여백 (Padding)
+                      {hasPad && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="ml-auto text-xs"
+                          onClick={() => resetJamoPadding(editingJamoInfo.type, editingJamoInfo.char)}
+                        >
+                          리셋
+                        </Button>
+                      )}
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      {sides.map(({ key, label }) => {
+                        const value = pad?.[key] ?? 0
+                        const isNonZero = value > 0
+                        return (
+                          <div key={key}>
+                            <div className="flex justify-between items-center mb-2">
+                              <span className={`text-base font-medium ${isNonZero ? 'text-accent-orange' : 'text-text-dim-1'}`}>
+                                {label}
+                              </span>
+                              <span className="text-sm text-text-dim-4 font-mono bg-surface-2 px-2 py-0.5 rounded-sm">
+                                {(value * 100).toFixed(1)}%
+                              </span>
+                            </div>
+                            <Slider
+                              min={0}
+                              max={0.3}
+                              step={0.025}
+                              value={[value]}
+                              onValueChange={([val]) => updateJamoPadding(editingJamoInfo.type, editingJamoInfo.char, key, val)}
+                              colorScheme="override"
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <p className="text-[0.75rem] text-text-dim-5 mt-3 pt-3 border-t border-border-subtle leading-relaxed">
+                      자모 획이 박스 가장자리까지 확장되는 것을 방지합니다. 변경 시 즉시 반영됩니다.
+                    </p>
+                  </div>
+                )
+              })()}
 
               {/* 키보드 기반 컨트롤 (UI 없음, 이벤트만 처리) */}
               <StrokeEditor

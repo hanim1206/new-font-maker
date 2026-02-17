@@ -7,19 +7,19 @@
       "strokes": [
         {
           "id": "ㄱ-1",
-          "x": 0.45,
-          "y": 0.225,
-          "width": 0.7,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄱ-2",
-          "x": 0.85,
+          "x": 0.95,
           "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -31,37 +31,37 @@
       "strokes": [
         {
           "id": "ㄲ-1",
-          "x": 0.225,
-          "y": 0.225,
-          "width": 0.35,
-          "thickness": 0.1,
+          "x": 0.25,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄲ-2",
-          "x": 0.4,
+          "x": 0.45,
           "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄲ-3",
-          "x": 0.675,
-          "y": 0.225,
-          "width": 0.35,
-          "thickness": 0.1,
+          "x": 0.75,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄲ-4",
-          "x": 0.85,
+          "x": 0.95,
           "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -73,19 +73,19 @@
       "strokes": [
         {
           "id": "ㄴ-1",
-          "x": 0.225,
+          "x": 0.05,
           "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄴ-2",
           "x": 0.5,
-          "y": 0.875,
-          "width": 0.7,
-          "thickness": 0.1,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -98,27 +98,27 @@
         {
           "id": "ㄷ-1",
           "x": 0.5,
-          "y": 0.225,
-          "width": 0.7,
-          "thickness": 0.1,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄷ-2",
-          "x": 0.225,
+          "x": 0.05,
           "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄷ-3",
           "x": 0.5,
-          "y": 0.9,
-          "width": 0.7,
-          "thickness": 0.1,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -130,55 +130,55 @@
       "strokes": [
         {
           "id": "ㄸ-1",
-          "x": 0.225,
-          "y": 0.2,
-          "width": 0.35,
-          "thickness": 0.1,
+          "x": 0.25,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄸ-2",
-          "x": 0.1,
+          "x": 0.05,
           "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄸ-3",
-          "x": 0.225,
-          "y": 0.875,
-          "width": 0.35,
-          "thickness": 0.1,
+          "x": 0.25,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄸ-4",
-          "x": 0.725,
-          "y": 0.2,
-          "width": 0.35,
-          "thickness": 0.1,
+          "x": 0.75,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄸ-5",
-          "x": 0.6,
+          "x": 0.55,
           "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄸ-6",
-          "x": 0.725,
-          "y": 0.85,
-          "width": 0.35,
-          "thickness": 0.1,
+          "x": 0.75,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -190,46 +190,46 @@
       "strokes": [
         {
           "id": "ㄹ-1",
-          "x": 0.475,
-          "y": 0.225,
-          "width": 0.75,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄹ-2",
-          "x": 0.875,
-          "y": 0.3,
-          "width": 0.3,
-          "thickness": 0.1,
+          "x": 0.95,
+          "y": 0.275,
+          "width": 0.45,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄹ-3",
-          "x": 0.475,
+          "x": 0.5,
           "y": 0.5,
-          "width": 0.75,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㄹ-4",
-          "x": 0.175,
-          "y": 0.6,
-          "width": 0.3,
-          "thickness": 0.1,
+          "x": 0.05,
+          "y": 0.725,
+          "width": 0.45,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㄹ-5",
-          "x": 0.475,
-          "y": 0.775,
-          "width": 0.75,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -242,36 +242,36 @@
         {
           "id": "ㅁ-1",
           "x": 0.5,
-          "y": 0.225,
-          "width": 0.7,
-          "thickness": 0.1,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅁ-2",
-          "x": 0.225,
+          "x": 0.05,
           "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅁ-3",
-          "x": 0.875,
+          "x": 0.95,
           "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅁ-4",
           "x": 0.5,
-          "y": 0.875,
-          "width": 0.7,
-          "thickness": 0.1,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -283,37 +283,37 @@
       "strokes": [
         {
           "id": "ㅂ-1",
-          "x": 0.225,
+          "x": 0.05,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅂ-2",
-          "x": 0.875,
+          "x": 0.95,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅂ-3",
           "x": 0.5,
-          "y": 0.475,
-          "width": 0.7,
-          "thickness": 0.1,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅂ-4",
           "x": 0.5,
-          "y": 0.925,
-          "width": 0.7,
-          "thickness": 0.1,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -325,73 +325,73 @@
       "strokes": [
         {
           "id": "ㅃ-1",
-          "x": 0.075,
+          "x": 0.05,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅃ-2",
-          "x": 0.4,
+          "x": 0.45,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅃ-3",
-          "x": 0.225,
-          "y": 0.45,
-          "width": 0.35,
-          "thickness": 0.1,
+          "x": 0.25,
+          "y": 0.5,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅃ-4",
-          "x": 0.225,
-          "y": 0.925,
-          "width": 0.35,
-          "thickness": 0.1,
+          "x": 0.25,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅃ-5",
-          "x": 0.6,
+          "x": 0.55,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅃ-6",
-          "x": 0.925,
+          "x": 0.95,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅃ-7",
-          "x": 0.725,
-          "y": 0.45,
-          "width": 0.35,
-          "thickness": 0.1,
+          "x": 0.75,
+          "y": 0.5,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅃ-8",
-          "x": 0.725,
-          "y": 0.9,
-          "width": 0.35,
-          "thickness": 0.1,
+          "x": 0.75,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -403,55 +403,55 @@
       "strokes": [
         {
           "id": "ㅅ-left",
-          "x": 0.05,
-          "y": 0.1,
-          "width": 0.95,
-          "height": 0.8,
+          "x": 0,
+          "y": 0,
+          "width": 1,
+          "height": 1,
           "direction": "path",
           "pathData": {
             "closed": false,
             "points": [
               {
                 "x": 0.5,
-                "y": 0.05,
+                "y": 0,
                 "handleOut": {
                   "x": 0.425,
                   "y": 0.35
                 }
               },
               {
-                "x": 0.1,
-                "y": 0.95
+                "x": 0,
+                "y": 1
               }
             ]
           },
-          "thickness": 0.1
+          "thickness": 0.07
         },
         {
           "id": "ㅅ-right",
-          "x": 0.075,
-          "y": 0.325,
-          "width": 0.8,
-          "height": 0.525,
+          "x": 0,
+          "y": 0,
+          "width": 1,
+          "height": 1,
           "direction": "path",
           "pathData": {
             "closed": false,
             "points": [
               {
                 "x": 0.5,
-                "y": 0.05,
+                "y": 0,
                 "handleOut": {
                   "x": 0.575,
                   "y": 0.35
                 }
               },
               {
-                "x": 0.9,
-                "y": 0.95
+                "x": 1,
+                "y": 1
               }
             ]
           },
-          "thickness": 0.1
+          "thickness": 0.07
         }
       ]
     },
@@ -461,107 +461,107 @@
       "strokes": [
         {
           "id": "ㅆ-1l",
-          "x": 0.025,
-          "y": 0.1,
-          "width": 0.45,
-          "height": 0.85,
+          "x": 0,
+          "y": 0,
+          "width": 0.5,
+          "height": 1,
           "direction": "path",
           "pathData": {
             "closed": false,
             "points": [
               {
                 "x": 0.5,
-                "y": 0.05,
+                "y": 0,
                 "handleOut": {
                   "x": 0.425,
                   "y": 0.35
                 }
               },
               {
-                "x": 0.1,
-                "y": 0.95
+                "x": 0,
+                "y": 1
               }
             ]
           },
-          "thickness": 0.1
+          "thickness": 0.07
         },
         {
           "id": "ㅆ-1r",
-          "x": 0.025,
-          "y": 0.1,
-          "width": 0.45,
-          "height": 0.85,
+          "x": 0,
+          "y": 0,
+          "width": 0.5,
+          "height": 1,
           "direction": "path",
           "pathData": {
             "closed": false,
             "points": [
               {
                 "x": 0.5,
-                "y": 0.05,
+                "y": 0,
                 "handleOut": {
                   "x": 0.575,
                   "y": 0.35
                 }
               },
               {
-                "x": 0.9,
-                "y": 0.95
+                "x": 1,
+                "y": 1
               }
             ]
           },
-          "thickness": 0.1
+          "thickness": 0.07
         },
         {
           "id": "ㅆ-2l",
-          "x": 0.525,
-          "y": 0.1,
-          "width": 0.45,
-          "height": 0.85,
+          "x": 0.5,
+          "y": 0,
+          "width": 0.5,
+          "height": 1,
           "direction": "path",
           "pathData": {
             "closed": false,
             "points": [
               {
                 "x": 0.5,
-                "y": 0.05,
+                "y": 0,
                 "handleOut": {
                   "x": 0.425,
                   "y": 0.35
                 }
               },
               {
-                "x": 0.1,
-                "y": 0.95
+                "x": 0,
+                "y": 1
               }
             ]
           },
-          "thickness": 0.1
+          "thickness": 0.07
         },
         {
           "id": "ㅆ-2r",
-          "x": 0.525,
-          "y": 0.1,
-          "width": 0.45,
-          "height": 0.85,
+          "x": 0.5,
+          "y": 0,
+          "width": 0.5,
+          "height": 1,
           "direction": "path",
           "pathData": {
             "closed": false,
             "points": [
               {
                 "x": 0.5,
-                "y": 0.05,
+                "y": 0,
                 "handleOut": {
                   "x": 0.575,
                   "y": 0.35
                 }
               },
               {
-                "x": 0.9,
-                "y": 0.95
+                "x": 1,
+                "y": 1
               }
             ]
           },
-          "thickness": 0.1
+          "thickness": 0.07
         }
       ]
     },
@@ -571,9 +571,483 @@
       "strokes": [
         {
           "id": "ㅇ-circle",
-          "x": 0.15,
-          "y": 0.15,
-          "width": 0.7,
+          "x": 0,
+          "y": 0,
+          "width": 1,
+          "height": 1,
+          "direction": "path",
+          "pathData": {
+            "closed": true,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleIn": {
+                  "x": 0.225,
+                  "y": 0
+                },
+                "handleOut": {
+                  "x": 0.775,
+                  "y": 0
+                }
+              },
+              {
+                "x": 1,
+                "y": 0.5,
+                "handleIn": {
+                  "x": 1,
+                  "y": 0.225
+                },
+                "handleOut": {
+                  "x": 1,
+                  "y": 0.775
+                }
+              },
+              {
+                "x": 0.5,
+                "y": 1,
+                "handleIn": {
+                  "x": 0.775,
+                  "y": 1
+                },
+                "handleOut": {
+                  "x": 0.225,
+                  "y": 1
+                }
+              },
+              {
+                "x": 0,
+                "y": 0.5,
+                "handleIn": {
+                  "x": 0,
+                  "y": 0.775
+                },
+                "handleOut": {
+                  "x": 0,
+                  "y": 0.225
+                }
+              }
+            ]
+          },
+          "thickness": 0.07
+        }
+      ]
+    },
+    "ㅈ": {
+      "char": "ㅈ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅈ-1",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅈ-left",
+          "x": 0,
+          "y": 0.05,
+          "width": 1,
+          "height": 0.95,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.425,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 0,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        },
+        {
+          "id": "ㅈ-right",
+          "x": 0,
+          "y": 0.05,
+          "width": 1,
+          "height": 0.95,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.575,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        }
+      ]
+    },
+    "ㅉ": {
+      "char": "ㅉ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅉ-1",
+          "x": 0.25,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅉ-1l",
+          "x": 0,
+          "y": 0.05,
+          "width": 0.5,
+          "height": 0.95,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.425,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 0,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        },
+        {
+          "id": "ㅉ-1r",
+          "x": 0,
+          "y": 0.05,
+          "width": 0.5,
+          "height": 0.95,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.575,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        },
+        {
+          "id": "ㅉ-2",
+          "x": 0.75,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅉ-2l",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 0.5,
+          "height": 0.95,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.425,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 0,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        },
+        {
+          "id": "ㅉ-2r",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 0.5,
+          "height": 0.95,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.575,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        }
+      ]
+    },
+    "ㅊ": {
+      "char": "ㅊ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅊ-dot",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 0.4,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅊ-1",
+          "x": 0.5,
+          "y": 0.2,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅊ-left",
+          "x": 0,
+          "y": 0.2,
+          "width": 1,
+          "height": 0.8,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.425,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 0,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        },
+        {
+          "id": "ㅊ-right",
+          "x": 0,
+          "y": 0.2,
+          "width": 1,
+          "height": 0.8,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.575,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        }
+      ]
+    },
+    "ㅋ": {
+      "char": "ㅋ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅋ-1",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅋ-2",
+          "x": 0.95,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅋ-3",
+          "x": 0.5,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅌ": {
+      "char": "ㅌ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅌ-1",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅌ-2",
+          "x": 0.05,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅌ-3",
+          "x": 0.5,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅌ-4",
+          "x": 0.5,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅍ": {
+      "char": "ㅍ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅍ-1",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅍ-2",
+          "x": 0.5,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅍ-3",
+          "x": 0.333,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅍ-4",
+          "x": 0.667,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅎ": {
+      "char": "ㅎ",
+      "type": "choseong",
+      "strokes": [
+        {
+          "id": "ㅎ-1",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 0.3,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅎ-2",
+          "x": 0.5,
+          "y": 0.2,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅎ-circle",
+          "x": 0,
+          "y": 0.3,
+          "width": 1,
           "height": 0.7,
           "direction": "path",
           "pathData": {
@@ -629,481 +1103,7 @@
               }
             ]
           },
-          "thickness": 0.1
-        }
-      ]
-    },
-    "ㅈ": {
-      "char": "ㅈ",
-      "type": "choseong",
-      "strokes": [
-        {
-          "id": "ㅈ-1",
-          "x": 0.5,
-          "y": 0.15,
-          "width": 0.8,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅈ-left",
-          "x": 0.1,
-          "y": 0.1,
-          "width": 0.8,
-          "height": 0.85,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.425,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.1,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        },
-        {
-          "id": "ㅈ-right",
-          "x": 0.075,
-          "y": 0.225,
-          "width": 0.8,
-          "height": 0.725,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.575,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.9,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        }
-      ]
-    },
-    "ㅉ": {
-      "char": "ㅉ",
-      "type": "choseong",
-      "strokes": [
-        {
-          "id": "ㅉ-1",
-          "x": 0.25,
-          "y": 0.175,
-          "width": 0.45,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅉ-1l",
-          "x": 0.025,
-          "y": 0.2,
-          "width": 0.45,
-          "height": 0.75,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.425,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.1,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        },
-        {
-          "id": "ㅉ-1r",
-          "x": 0.025,
-          "y": 0.2,
-          "width": 0.45,
-          "height": 0.75,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.575,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.9,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        },
-        {
-          "id": "ㅉ-2",
-          "x": 0.75,
-          "y": 0.175,
-          "width": 0.45,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅉ-2l",
-          "x": 0.525,
-          "y": 0.2,
-          "width": 0.45,
-          "height": 0.75,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.425,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.1,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        },
-        {
-          "id": "ㅉ-2r",
-          "x": 0.525,
-          "y": 0.2,
-          "width": 0.45,
-          "height": 0.75,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.575,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.9,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        }
-      ]
-    },
-    "ㅊ": {
-      "char": "ㅊ",
-      "type": "choseong",
-      "strokes": [
-        {
-          "id": "ㅊ-dot",
-          "x": 0.5,
-          "y": 0.075,
-          "width": 0.4,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅊ-1",
-          "x": 0.5,
-          "y": 0.225,
-          "width": 0.8,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅊ-left",
-          "x": 0.1,
-          "y": 0.275,
-          "width": 0.8,
-          "height": 0.675,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.425,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.1,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        },
-        {
-          "id": "ㅊ-right",
-          "x": 0.1,
-          "y": 0.275,
-          "width": 0.8,
-          "height": 0.675,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.575,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.9,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        }
-      ]
-    },
-    "ㅋ": {
-      "char": "ㅋ",
-      "type": "choseong",
-      "strokes": [
-        {
-          "id": "ㅋ-1",
-          "x": 0.45,
-          "y": 0.225,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅋ-2",
-          "x": 0.825,
-          "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㅋ-3",
-          "x": 0.45,
-          "y": 0.5,
-          "width": 0.6,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        }
-      ]
-    },
-    "ㅌ": {
-      "char": "ㅌ",
-      "type": "choseong",
-      "strokes": [
-        {
-          "id": "ㅌ-1",
-          "x": 0.5,
-          "y": 0.175,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅌ-2",
-          "x": 0.2,
-          "y": 0.5,
-          "width": 0.75,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㅌ-3",
-          "x": 0.5,
-          "y": 0.9,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅌ-4",
-          "x": 0.5,
-          "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        }
-      ]
-    },
-    "ㅍ": {
-      "char": "ㅍ",
-      "type": "choseong",
-      "strokes": [
-        {
-          "id": "ㅍ-1",
-          "x": 0.5,
-          "y": 0.275,
-          "width": 0.8,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅍ-2",
-          "x": 0.5,
-          "y": 0.8,
-          "width": 0.8,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅍ-3",
-          "x": 0.3,
-          "y": 0.5,
-          "width": 0.5,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㅍ-4",
-          "x": 0.75,
-          "y": 0.5,
-          "width": 0.5,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        }
-      ]
-    },
-    "ㅎ": {
-      "char": "ㅎ",
-      "type": "choseong",
-      "strokes": [
-        {
-          "id": "ㅎ-1",
-          "x": 0.5,
-          "y": 0.1,
-          "width": 0.3,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅎ-2",
-          "x": 0.5,
-          "y": 0.275,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅎ-circle",
-          "x": 0.2,
-          "y": 0.375,
-          "width": 0.6,
-          "height": 0.55,
-          "direction": "path",
-          "pathData": {
-            "closed": true,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0,
-                "handleIn": {
-                  "x": 0.225,
-                  "y": 0
-                },
-                "handleOut": {
-                  "x": 0.775,
-                  "y": 0
-                }
-              },
-              {
-                "x": 1,
-                "y": 0.5,
-                "handleIn": {
-                  "x": 1,
-                  "y": 0.225
-                },
-                "handleOut": {
-                  "x": 1,
-                  "y": 0.775
-                }
-              },
-              {
-                "x": 0.5,
-                "y": 1,
-                "handleIn": {
-                  "x": 0.775,
-                  "y": 1
-                },
-                "handleOut": {
-                  "x": 0.225,
-                  "y": 1
-                }
-              },
-              {
-                "x": 0,
-                "y": 0.5,
-                "handleIn": {
-                  "x": 0,
-                  "y": 0.775
-                },
-                "handleOut": {
-                  "x": 0,
-                  "y": 0.225
-                }
-              }
-            ]
-          },
-          "thickness": 0.1
+          "thickness": 0.07
         }
       ]
     }
@@ -1115,19 +1115,19 @@
       "strokes": [
         {
           "id": "ㅏ-1",
-          "x": 0.375,
+          "x": 0.05,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅏ-2",
-          "x": 0.575,
-          "y": 0.475,
-          "width": 0.55,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -1139,28 +1139,28 @@
       "strokes": [
         {
           "id": "ㅐ-1",
-          "x": 0.2,
+          "x": 0.05,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅐ-2",
           "x": 0.5,
-          "y": 0.45,
-          "width": 0.4,
-          "thickness": 0.1,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅐ-3",
-          "x": 0.8,
+          "x": 0.95,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1172,28 +1172,28 @@
       "strokes": [
         {
           "id": "ㅑ-1",
-          "x": 0.325,
+          "x": 0.05,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅑ-2",
-          "x": 0.525,
+          "x": 0.5,
           "y": 0.35,
-          "width": 0.55,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅑ-3",
-          "x": 0.525,
-          "y": 0.6,
-          "width": 0.55,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.65,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -1205,37 +1205,37 @@
       "verticalStrokes": [
         {
           "id": "ㅒ-1",
-          "x": 0.175,
+          "x": 0.05,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅒ-2",
-          "x": 0.3,
-          "y": 0.325,
-          "width": 0.35,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.35,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅒ-3",
-          "x": 0.3,
-          "y": 0.6,
-          "width": 0.35,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.65,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅒ-4",
-          "x": 0.65,
+          "x": 0.95,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1247,19 +1247,19 @@
       "strokes": [
         {
           "id": "ㅓ-1",
-          "x": 0.625,
+          "x": 0.95,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅓ-2",
-          "x": 0.425,
-          "y": 0.475,
-          "width": 0.55,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -1271,28 +1271,28 @@
       "strokes": [
         {
           "id": "ㅔ-1",
-          "x": 0.4,
+          "x": 0.333,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅔ-2",
-          "x": 0.2,
-          "y": 0.475,
-          "width": 0.375,
-          "thickness": 0.1,
+          "x": 0.167,
+          "y": 0.5,
+          "width": 0.333,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅔ-3",
-          "x": 0.75,
+          "x": 0.95,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1304,28 +1304,28 @@
       "strokes": [
         {
           "id": "ㅕ-1",
-          "x": 0.625,
+          "x": 0.95,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅕ-2",
-          "x": 0.425,
+          "x": 0.5,
           "y": 0.35,
-          "width": 0.55,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅕ-3",
-          "x": 0.425,
-          "y": 0.6,
-          "width": 0.55,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.65,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -1337,37 +1337,37 @@
       "verticalStrokes": [
         {
           "id": "ㅖ-1",
-          "x": 0.3,
+          "x": 0.5,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅖ-2",
-          "x": 0.5,
-          "y": 0.325,
-          "width": 0.3,
-          "thickness": 0.1,
+          "x": 0.25,
+          "y": 0.35,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅖ-3",
-          "x": 0.5,
-          "y": 0.6,
-          "width": 0.3,
-          "thickness": 0.1,
+          "x": 0.25,
+          "y": 0.65,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅖ-4",
-          "x": 0.7,
+          "x": 0.95,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1379,19 +1379,19 @@
       "strokes": [
         {
           "id": "ㅗ-1",
-          "x": 0.525,
-          "y": 0.35,
-          "width": 0.5,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅗ-2",
           "x": 0.5,
-          "y": 0.675,
-          "width": 0.8,
-          "thickness": 0.1,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -1404,18 +1404,18 @@
         {
           "id": "ㅘ-1",
           "x": 0.5,
-          "y": 0.225,
-          "width": 0.475,
-          "thickness": 0.1,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅘ-2",
-          "x": 0.525,
-          "y": 0.55,
-          "width": 0.875,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -1423,19 +1423,19 @@
       "verticalStrokes": [
         {
           "id": "ㅘ-3",
-          "x": 0.6,
+          "x": 0.05,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅘ-4",
-          "x": 0.775,
+          "x": 0.5,
           "y": 0.5,
-          "width": 0.25,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -1448,18 +1448,18 @@
         {
           "id": "ㅙ-1",
           "x": 0.5,
-          "y": 0.25,
-          "width": 0.45,
-          "thickness": 0.1,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅙ-2",
           "x": 0.5,
-          "y": 0.575,
-          "width": 0.875,
-          "thickness": 0.1,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -1467,28 +1467,28 @@
       "verticalStrokes": [
         {
           "id": "ㅙ-3",
-          "x": 0.425,
+          "x": 0.05,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅙ-4",
-          "x": 0.575,
+          "x": 0.5,
           "y": 0.5,
-          "width": 0.375,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅙ-5",
-          "x": 0.825,
+          "x": 0.95,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1501,18 +1501,18 @@
         {
           "id": "ㅚ-1",
           "x": 0.5,
-          "y": 0.3,
-          "width": 0.4,
-          "thickness": 0.1,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅚ-2",
           "x": 0.5,
-          "y": 0.525,
-          "width": 0.975,
-          "thickness": 0.1,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -1520,10 +1520,10 @@
       "verticalStrokes": [
         {
           "id": "ㅚ-3",
-          "x": 0.525,
+          "x": 0.5,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1535,28 +1535,28 @@
       "strokes": [
         {
           "id": "ㅛ-1",
-          "x": 0.375,
-          "y": 0.35,
-          "width": 0.5,
-          "thickness": 0.1,
+          "x": 0.35,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅛ-2",
-          "x": 0.7,
-          "y": 0.35,
-          "width": 0.5,
-          "thickness": 0.1,
+          "x": 0.65,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅛ-3",
           "x": 0.5,
-          "y": 0.625,
-          "width": 0.875,
-          "thickness": 0.1,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -1568,19 +1568,19 @@
       "strokes": [
         {
           "id": "ㅜ-1",
-          "x": 0.525,
-          "y": 0.4,
-          "width": 0.8,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅜ-2",
-          "x": 0.575,
-          "y": 0.625,
-          "width": 0.55,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1593,18 +1593,18 @@
         {
           "id": "ㅝ-1",
           "x": 0.5,
-          "y": 0.075,
+          "y": 0.05,
           "width": 1,
-          "thickness": 0.1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅝ-2",
-          "x": 0.525,
+          "x": 0.5,
           "y": 0.5,
-          "width": 0.825,
-          "thickness": 0.1,
+          "width": 0.9,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1612,19 +1612,19 @@
       "verticalStrokes": [
         {
           "id": "ㅝ-3",
-          "x": 0.575,
+          "x": 0.95,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅝ-4",
-          "x": 0.275,
-          "y": 0.775,
-          "width": 0.525,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -1637,18 +1637,18 @@
         {
           "id": "ㅞ-1",
           "x": 0.5,
-          "y": 0.175,
-          "width": 0.975,
-          "thickness": 0.1,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅞ-2",
-          "x": 0.575,
-          "y": 0.55,
-          "width": 0.8,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1656,28 +1656,28 @@
       "verticalStrokes": [
         {
           "id": "ㅞ-3",
-          "x": 0.4,
-          "y": 0.525,
-          "width": 0.925,
-          "thickness": 0.1,
+          "x": 0.333,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅞ-4",
-          "x": 0.2,
-          "y": 0.8,
-          "width": 0.375,
-          "thickness": 0.1,
+          "x": 0.167,
+          "y": 0.5,
+          "width": 0.333,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅞ-5",
-          "x": 0.775,
+          "x": 0.95,
           "y": 0.5,
-          "width": 0.975,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1690,18 +1690,18 @@
         {
           "id": "ㅟ-1",
           "x": 0.5,
-          "y": 0.075,
-          "width": 0.975,
-          "thickness": 0.1,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅟ-2",
-          "x": 0.55,
+          "x": 0.5,
           "y": 0.5,
           "width": 0.9,
-          "thickness": 0.1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1709,10 +1709,10 @@
       "verticalStrokes": [
         {
           "id": "ㅟ-3",
-          "x": 0.525,
-          "y": 0.525,
-          "width": 0.95,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1725,27 +1725,27 @@
         {
           "id": "ㅠ-1",
           "x": 0.5,
-          "y": 0.325,
-          "width": 0.8,
-          "thickness": 0.1,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
           "id": "ㅠ-2",
-          "x": 0.3,
-          "y": 0.575,
-          "width": 0.575,
-          "thickness": 0.1,
+          "x": 0.35,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
           "id": "ㅠ-3",
-          "x": 0.7,
-          "y": 0.525,
-          "width": 0.575,
-          "thickness": 0.1,
+          "x": 0.65,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1759,8 +1759,8 @@
           "id": "ㅡ-1",
           "x": 0.5,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -1772,10 +1772,10 @@
       "horizontalStrokes": [
         {
           "id": "ㅢ-1",
-          "x": 0.55,
-          "y": 0.4,
-          "width": 0.9,
-          "thickness": 0.1,
+          "x": 0.5,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -1783,10 +1783,10 @@
       "verticalStrokes": [
         {
           "id": "ㅢ-2",
-          "x": 0.55,
+          "x": 0.5,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1798,10 +1798,10 @@
       "strokes": [
         {
           "id": "ㅣ-1",
-          "x": 0.575,
+          "x": 0.5,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1814,20 +1814,20 @@
       "type": "jongseong",
       "strokes": [
         {
-          "id": "ㄱ-1",
+          "id": "ㄱ종-1",
           "x": 0.5,
-          "y": 0.225,
-          "width": 0.775,
-          "thickness": 0.1,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
-          "id": "ㄱ-2",
-          "x": 0.925,
+          "id": "ㄱ종-2",
+          "x": 0.95,
           "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1838,38 +1838,38 @@
       "type": "jongseong",
       "strokes": [
         {
-          "id": "ㄲ-1",
-          "x": 0.225,
-          "y": 0.225,
-          "width": 0.35,
-          "thickness": 0.1,
+          "id": "ㄲ종-1",
+          "x": 0.25,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
-          "id": "ㄲ-2",
+          "id": "ㄲ종-2",
           "x": 0.45,
           "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
-          "id": "ㄲ-3",
-          "x": 0.675,
-          "y": 0.225,
-          "width": 0.35,
-          "thickness": 0.1,
+          "id": "ㄲ종-3",
+          "x": 0.75,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
-          "id": "ㄲ-4",
-          "x": 0.875,
+          "id": "ㄲ종-4",
+          "x": 0.95,
           "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         }
@@ -1880,74 +1880,74 @@
       "type": "jongseong",
       "strokes": [
         {
-          "id": "ㄳ-1",
-          "x": 0.225,
-          "y": 0.2,
-          "width": 0.35,
-          "thickness": 0.1,
+          "id": "ㄳ종-1",
+          "x": 0.25,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
-          "id": "ㄳ-2",
-          "x": 0.35,
+          "id": "ㄳ종-2",
+          "x": 0.45,
           "y": 0.5,
-          "width": 0.725,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
-          "id": "ㄳ-left",
-          "x": 0.475,
-          "y": 0.1,
-          "width": 0.45,
-          "height": 0.825,
+          "id": "ㄳ종-left",
+          "x": 0.5,
+          "y": 0,
+          "width": 0.5,
+          "height": 1,
           "direction": "path",
           "pathData": {
             "closed": false,
             "points": [
               {
                 "x": 0.5,
-                "y": 0.05,
+                "y": 0,
                 "handleOut": {
                   "x": 0.425,
                   "y": 0.35
                 }
               },
               {
-                "x": 0.1,
-                "y": 0.95
+                "x": 0,
+                "y": 1
               }
             ]
           },
-          "thickness": 0.1
+          "thickness": 0.07
         },
         {
-          "id": "ㄳ-right",
-          "x": 0.475,
-          "y": 0.1,
-          "width": 0.45,
-          "height": 0.825,
+          "id": "ㄳ종-right",
+          "x": 0.5,
+          "y": 0,
+          "width": 0.5,
+          "height": 1,
           "direction": "path",
           "pathData": {
             "closed": false,
             "points": [
               {
                 "x": 0.5,
-                "y": 0.05,
+                "y": 0,
                 "handleOut": {
                   "x": 0.575,
                   "y": 0.35
                 }
               },
               {
-                "x": 0.9,
-                "y": 0.95
+                "x": 1,
+                "y": 1
               }
             ]
           },
-          "thickness": 0.1
+          "thickness": 0.07
         }
       ]
     },
@@ -1956,20 +1956,20 @@
       "type": "jongseong",
       "strokes": [
         {
-          "id": "ㄴ-1",
-          "x": 0.225,
+          "id": "ㄴ종-1",
+          "x": 0.05,
           "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
-          "id": "ㄴ-2",
+          "id": "ㄴ종-2",
           "x": 0.5,
-          "y": 0.9,
-          "width": 0.7,
-          "thickness": 0.1,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         }
@@ -1980,58 +1980,83 @@
       "type": "jongseong",
       "strokes": [
         {
-          "id": "ㄵ-1",
-          "x": 0.15,
+          "id": "ㄵ종-1",
+          "x": 0.05,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
-          "id": "ㄵ-2",
+          "id": "ㄵ종-2",
           "x": 0.25,
-          "y": 0.85,
-          "width": 0.3,
-          "thickness": 0.1,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
-          "id": "ㄵ-3",
-          "x": 0.675,
-          "y": 0.275,
-          "width": 0.45,
-          "thickness": 0.1,
+          "id": "ㄵ종-3",
+          "x": 0.75,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
-          "id": "ㄵ-4",
-          "x": 0.525,
-          "y": 0.6,
-          "width": 0.55,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
+          "id": "ㄵ종-left",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 0.5,
+          "height": 0.95,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.425,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 0,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
         },
         {
-          "id": "ㄵ-5",
-          "x": 0.825,
-          "y": 0.6,
-          "width": 0.55,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄵ-6",
-          "x": 0.675,
-          "y": 0.175,
-          "width": 0.2,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
+          "id": "ㄵ종-right",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 0.5,
+          "height": 0.95,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.575,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
         }
       ]
     },
@@ -2040,1169 +2065,46 @@
       "type": "jongseong",
       "strokes": [
         {
-          "id": "ㄶ-1",
-          "x": 0.15,
+          "id": "ㄶ종-1",
+          "x": 0.05,
           "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 90,
           "direction": "vertical"
         },
         {
-          "id": "ㄶ-2",
-          "x": 0.225,
-          "y": 0.85,
-          "width": 0.25,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄶ-3",
-          "x": 0.65,
-          "y": 0.1,
-          "width": 0.2,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄶ-4",
-          "x": 0.675,
-          "y": 0.275,
-          "width": 0.45,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄶ-5",
-          "x": 0.675,
-          "y": 0.525,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄶ-6",
-          "x": 0.675,
-          "y": 0.75,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄶ-7",
-          "x": 0.475,
-          "y": 0.65,
-          "width": 0.3,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄶ-8",
-          "x": 0.875,
-          "y": 0.65,
-          "width": 0.3,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        }
-      ]
-    },
-    "ㄷ": {
-      "char": "ㄷ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㄷ-1",
-          "x": 0.5,
-          "y": 0.225,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄷ-2",
-          "x": 0.225,
-          "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄷ-3",
-          "x": 0.5,
-          "y": 0.9,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        }
-      ]
-    },
-    "ㄹ": {
-      "char": "ㄹ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㄹ-1",
-          "x": 0.475,
-          "y": 0.225,
-          "width": 0.75,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄹ-2",
-          "x": 0.875,
-          "y": 0.3,
-          "width": 0.3,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄹ-3",
-          "x": 0.475,
-          "y": 0.5,
-          "width": 0.75,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄹ-4",
-          "x": 0.175,
-          "y": 0.6,
-          "width": 0.3,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄹ-5",
-          "x": 0.475,
-          "y": 0.775,
-          "width": 0.75,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        }
-      ]
-    },
-    "ㄺ": {
-      "char": "ㄺ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㄺ-1",
-          "x": 0.2,
-          "y": 0.1,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄺ-2",
-          "x": 0.325,
-          "y": 0.275,
-          "width": 0.375,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄺ-3",
-          "x": 0.2,
-          "y": 0.5,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄺ-4",
-          "x": 0.075,
-          "y": 0.675,
-          "width": 0.45,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄺ-5",
-          "x": 0.2,
-          "y": 0.85,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄺ-6",
-          "x": 0.7,
-          "y": 0.2,
-          "width": 0.375,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄺ-7",
-          "x": 0.85,
-          "y": 0.5,
-          "width": 0.725,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        }
-      ]
-    },
-    "ㄻ": {
-      "char": "ㄻ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㄻ-1",
-          "x": 0.2,
-          "y": 0.1,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄻ-2",
-          "x": 0.325,
-          "y": 0.275,
-          "width": 0.375,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄻ-3",
-          "x": 0.2,
-          "y": 0.5,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄻ-4",
-          "x": 0.075,
-          "y": 0.675,
-          "width": 0.45,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄻ-5",
-          "x": 0.2,
-          "y": 0.85,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄻ-6",
-          "x": 0.7,
-          "y": 0.2,
-          "width": 0.425,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄻ-7",
-          "x": 0.5,
-          "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄻ-8",
-          "x": 0.85,
-          "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄻ-9",
-          "x": 0.7,
-          "y": 0.825,
-          "width": 0.425,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        }
-      ]
-    },
-    "ㄼ": {
-      "char": "ㄼ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㄼ-1",
-          "x": 0.2,
-          "y": 0.1,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄼ-2",
-          "x": 0.325,
-          "y": 0.275,
-          "width": 0.375,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄼ-3",
-          "x": 0.2,
-          "y": 0.5,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄼ-4",
-          "x": 0.075,
-          "y": 0.675,
-          "width": 0.45,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄼ-5",
-          "x": 0.2,
-          "y": 0.85,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄼ-6",
-          "x": 0.575,
-          "y": 0.475,
-          "width": 0.75,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄼ-7",
-          "x": 0.85,
-          "y": 0.475,
-          "width": 0.75,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄼ-8",
-          "x": 0.7,
-          "y": 0.5,
-          "width": 0.45,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄼ-9",
-          "x": 0.7,
-          "y": 0.825,
-          "width": 0.45,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        }
-      ]
-    },
-    "ㄽ": {
-      "char": "ㄽ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㄽ-1",
-          "x": 0.2,
-          "y": 0.1,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄽ-2",
-          "x": 0.375,
-          "y": 0.275,
-          "width": 0.375,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄽ-3",
-          "x": 0.2,
-          "y": 0.5,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄽ-4",
-          "x": 0.075,
-          "y": 0.675,
-          "width": 0.45,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄽ-5",
-          "x": 0.2,
-          "y": 0.85,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄽ-left",
-          "x": 0.45,
-          "y": 0.075,
+          "id": "ㄶ종-2",
+          "x": 0.25,
+          "y": 0.95,
           "width": 0.5,
-          "height": 0.85,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.425,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.1,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        },
-        {
-          "id": "ㄽ-right",
-          "x": 0.45,
-          "y": 0.225,
-          "width": 0.5,
-          "height": 0.65,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.575,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.9,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        }
-      ]
-    },
-    "ㄾ": {
-      "char": "ㄾ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㄾ-1",
-          "x": 0.2,
-          "y": 0.1,
-          "width": 0.35,
-          "thickness": 0.1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
-          "id": "ㄾ-2",
-          "x": 0.325,
-          "y": 0.275,
-          "width": 0.375,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄾ-3",
-          "x": 0.2,
-          "y": 0.5,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄾ-4",
-          "x": 0.075,
-          "y": 0.675,
-          "width": 0.45,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄾ-5",
-          "x": 0.2,
-          "y": 0.85,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄾ-6",
-          "x": 0.7,
-          "y": 0.2,
-          "width": 0.425,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄾ-7",
-          "x": 0.5,
-          "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄾ-8",
-          "x": 0.7,
-          "y": 0.5,
-          "width": 0.425,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄾ-9",
-          "x": 0.7,
-          "y": 0.825,
-          "width": 0.425,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        }
-      ]
-    },
-    "ㄿ": {
-      "char": "ㄿ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㄿ-1",
-          "x": 0.2,
-          "y": 0.1,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄿ-2",
-          "x": 0.325,
-          "y": 0.275,
-          "width": 0.375,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄿ-3",
-          "x": 0.2,
-          "y": 0.5,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄿ-4",
-          "x": 0.075,
-          "y": 0.675,
-          "width": 0.45,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄿ-5",
-          "x": 0.2,
-          "y": 0.85,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄿ-6",
-          "x": 0.7,
-          "y": 0.2,
-          "width": 0.425,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㄿ-7",
-          "x": 0.6,
-          "y": 0.475,
-          "width": 0.5,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄿ-8",
-          "x": 0.775,
-          "y": 0.475,
-          "width": 0.5,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㄿ-9",
-          "x": 0.7,
-          "y": 0.825,
-          "width": 0.425,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        }
-      ]
-    },
-    "ㅀ": {
-      "char": "ㅀ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㅀ-1",
-          "x": 0.2,
-          "y": 0.1,
-          "width": 0.325,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅀ-2",
-          "x": 0.325,
-          "y": 0.275,
-          "width": 0.375,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㅀ-3",
-          "x": 0.2,
-          "y": 0.475,
-          "width": 0.325,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅀ-4",
-          "x": 0.075,
-          "y": 0.675,
-          "width": 0.45,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㅀ-5",
-          "x": 0.2,
-          "y": 0.875,
-          "width": 0.325,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅀ-6",
-          "x": 0.675,
-          "y": 0.1,
+          "id": "ㄶ종-3",
+          "x": 0.75,
+          "y": 0.05,
           "width": 0.15,
-          "thickness": 0.1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
-          "id": "ㅀ-7",
-          "x": 0.65,
-          "y": 0.25,
-          "width": 0.425,
-          "thickness": 0.1,
+          "id": "ㄶ종-4",
+          "x": 0.75,
+          "y": 0.2,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
-          "id": "ㅀ-circle",
+          "id": "ㄶ종-circle",
           "x": 0.5,
           "y": 0.3,
-          "width": 0.35,
-          "height": 0.6,
-          "direction": "path",
-          "pathData": {
-            "closed": true,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0,
-                "handleIn": {
-                  "x": 0.225,
-                  "y": 0
-                },
-                "handleOut": {
-                  "x": 0.775,
-                  "y": 0
-                }
-              },
-              {
-                "x": 1,
-                "y": 0.5,
-                "handleIn": {
-                  "x": 1,
-                  "y": 0.225
-                },
-                "handleOut": {
-                  "x": 1,
-                  "y": 0.775
-                }
-              },
-              {
-                "x": 0.5,
-                "y": 1,
-                "handleIn": {
-                  "x": 0.775,
-                  "y": 1
-                },
-                "handleOut": {
-                  "x": 0.225,
-                  "y": 1
-                }
-              },
-              {
-                "x": 0,
-                "y": 0.5,
-                "handleIn": {
-                  "x": 0,
-                  "y": 0.775
-                },
-                "handleOut": {
-                  "x": 0,
-                  "y": 0.225
-                }
-              }
-            ]
-          },
-          "thickness": 0.1
-        }
-      ]
-    },
-    "ㅁ": {
-      "char": "ㅁ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㅁ종-1",
-          "x": 0.5,
-          "y": 0.225,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅁ종-2",
-          "x": 0.225,
-          "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㅁ종-3",
-          "x": 0.875,
-          "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㅁ종-4",
-          "x": 0.5,
-          "y": 0.85,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        }
-      ]
-    },
-    "ㅂ": {
-      "char": "ㅂ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㅂ종-1",
-          "x": 0.225,
-          "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㅂ종-2",
-          "x": 0.875,
-          "y": 0.5,
-          "width": 0.8,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㅂ종-3",
-          "x": 0.5,
-          "y": 0.45,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅂ종-4",
-          "x": 0.5,
-          "y": 0.85,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        }
-      ]
-    },
-    "ㅄ": {
-      "char": "ㅄ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㅄ-1",
-          "x": 0.075,
-          "y": 0.475,
-          "width": 0.75,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㅄ-2",
-          "x": 0.35,
-          "y": 0.475,
-          "width": 0.75,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㅄ-3",
-          "x": 0.225,
-          "y": 0.45,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅄ-4",
-          "x": 0.225,
-          "y": 0.825,
-          "width": 0.35,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅄ-left",
-          "x": 0.475,
-          "y": 0.075,
-          "width": 0.45,
-          "height": 0.85,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.425,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.1,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        },
-        {
-          "id": "ㅄ-right",
-          "x": 0.475,
-          "y": 0.075,
-          "width": 0.45,
-          "height": 0.85,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.575,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.9,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        }
-      ]
-    },
-    "ㅅ": {
-      "char": "ㅅ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㅅ종-left",
-          "x": 0.1,
-          "y": 0.1,
-          "width": 0.8,
-          "height": 0.85,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.425,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.1,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        },
-        {
-          "id": "ㅅ종-right",
-          "x": 0.1,
-          "y": 0.1,
-          "width": 0.8,
-          "height": 0.85,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.575,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.9,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        }
-      ]
-    },
-    "ㅆ": {
-      "char": "ㅆ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㅆ종-1l",
-          "x": 0.025,
-          "y": 0.1,
-          "width": 0.45,
-          "height": 0.85,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.425,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.1,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        },
-        {
-          "id": "ㅆ종-1r",
-          "x": 0.025,
-          "y": 0.1,
-          "width": 0.45,
-          "height": 0.85,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.575,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.9,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        },
-        {
-          "id": "ㅆ종-2l",
-          "x": 0.525,
-          "y": 0.1,
-          "width": 0.45,
-          "height": 0.85,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.425,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.1,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        },
-        {
-          "id": "ㅆ종-2r",
-          "x": 0.525,
-          "y": 0.1,
-          "width": 0.45,
-          "height": 0.85,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.575,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.9,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
-        }
-      ]
-    },
-    "ㅇ": {
-      "char": "ㅇ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㅇ종-circle",
-          "x": 0.15,
-          "y": 0.15,
-          "width": 0.7,
+          "width": 0.5,
           "height": 0.7,
           "direction": "path",
           "pathData": {
@@ -3258,298 +2160,687 @@
               }
             ]
           },
-          "thickness": 0.1
+          "thickness": 0.07
         }
       ]
     },
-    "ㅈ": {
-      "char": "ㅈ",
+    "ㄷ": {
+      "char": "ㄷ",
       "type": "jongseong",
       "strokes": [
         {
-          "id": "ㅈ종-1",
+          "id": "ㄷ종-1",
           "x": 0.5,
-          "y": 0.175,
-          "width": 0.8,
-          "thickness": 0.1,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
-          "id": "ㅈ종-left",
-          "x": 0.1,
-          "y": 0.2,
-          "width": 0.8,
-          "height": 0.75,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.425,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.1,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
+          "id": "ㄷ종-2",
+          "x": 0.05,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
         },
         {
-          "id": "ㅈ종-right",
-          "x": 0.1,
-          "y": 0.2,
-          "width": 0.8,
-          "height": 0.75,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.575,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.9,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
+          "id": "ㄷ종-3",
+          "x": 0.5,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
         }
       ]
     },
-    "ㅊ": {
-      "char": "ㅊ",
+    "ㄹ": {
+      "char": "ㄹ",
       "type": "jongseong",
       "strokes": [
         {
-          "id": "ㅊ종-dot",
+          "id": "ㄹ종-1",
           "x": 0.5,
-          "y": 0.075,
-          "width": 0.4,
-          "thickness": 0.1,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
-          "id": "ㅊ종-1",
-          "x": 0.5,
-          "y": 0.225,
-          "width": 0.8,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅊ종-left",
-          "x": 0.1,
+          "id": "ㄹ종-2",
+          "x": 0.95,
           "y": 0.275,
-          "width": 0.8,
-          "height": 0.675,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.425,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.1,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
+          "width": 0.45,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
         },
         {
-          "id": "ㅊ종-right",
-          "x": 0.1,
-          "y": 0.275,
-          "width": 0.8,
-          "height": 0.675,
-          "direction": "path",
-          "pathData": {
-            "closed": false,
-            "points": [
-              {
-                "x": 0.5,
-                "y": 0.05,
-                "handleOut": {
-                  "x": 0.575,
-                  "y": 0.35
-                }
-              },
-              {
-                "x": 0.9,
-                "y": 0.95
-              }
-            ]
-          },
-          "thickness": 0.1
+          "id": "ㄹ종-3",
+          "x": 0.5,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄹ종-4",
+          "x": 0.05,
+          "y": 0.725,
+          "width": 0.45,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄹ종-5",
+          "x": 0.5,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
         }
       ]
     },
-    "ㅋ": {
-      "char": "ㅋ",
+    "ㄺ": {
+      "char": "ㄺ",
       "type": "jongseong",
       "strokes": [
         {
-          "id": "ㅋ종-1",
+          "id": "ㄺ종-1",
+          "x": 0.25,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄺ종-2",
           "x": 0.45,
-          "y": 0.225,
-          "width": 0.7,
-          "thickness": 0.1,
+          "y": 0.275,
+          "width": 0.45,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄺ종-3",
+          "x": 0.25,
+          "y": 0.5,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
-          "id": "ㅋ종-2",
+          "id": "ㄺ종-4",
+          "x": 0.05,
+          "y": 0.725,
+          "width": 0.45,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄺ종-5",
+          "x": 0.25,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄺ종-6",
+          "x": 0.75,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄺ종-7",
+          "x": 0.95,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㄻ": {
+      "char": "ㄻ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄻ종-1",
+          "x": 0.25,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄻ종-2",
+          "x": 0.45,
+          "y": 0.275,
+          "width": 0.45,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄻ종-3",
+          "x": 0.25,
+          "y": 0.5,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄻ종-4",
+          "x": 0.05,
+          "y": 0.725,
+          "width": 0.45,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄻ종-5",
+          "x": 0.25,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄻ종-6",
+          "x": 0.75,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄻ종-7",
+          "x": 0.55,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄻ종-8",
+          "x": 0.95,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄻ종-9",
+          "x": 0.75,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㄼ": {
+      "char": "ㄼ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄼ종-1",
+          "x": 0.25,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄼ종-2",
+          "x": 0.45,
+          "y": 0.275,
+          "width": 0.45,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄼ종-3",
+          "x": 0.25,
+          "y": 0.5,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄼ종-4",
+          "x": 0.05,
+          "y": 0.725,
+          "width": 0.45,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄼ종-5",
+          "x": 0.25,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄼ종-6",
+          "x": 0.55,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄼ종-7",
+          "x": 0.95,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄼ종-8",
           "x": 0.75,
           "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㅋ종-3",
-          "x": 0.4,
-          "y": 0.5,
-          "width": 0.6,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        }
-      ]
-    },
-    "ㅌ": {
-      "char": "ㅌ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㅌ종-1",
-          "x": 0.5,
-          "y": 0.175,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅌ종-2",
-          "x": 0.2,
-          "y": 0.5,
-          "width": 0.75,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㅌ종-3",
-          "x": 0.5,
-          "y": 0.825,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅌ종-4",
-          "x": 0.5,
-          "y": 0.5,
-          "width": 0.7,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        }
-      ]
-    },
-    "ㅍ": {
-      "char": "ㅍ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㅍ종-1",
-          "x": 0.5,
-          "y": 0.2,
-          "width": 0.8,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅍ종-2",
-          "x": 0.5,
-          "y": 0.8,
-          "width": 0.8,
-          "thickness": 0.1,
-          "angle": 0,
-          "direction": "horizontal"
-        },
-        {
-          "id": "ㅍ종-3",
-          "x": 0.3,
-          "y": 0.5,
           "width": 0.5,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        },
-        {
-          "id": "ㅍ종-4",
-          "x": 0.7,
-          "y": 0.5,
-          "width": 0.5,
-          "thickness": 0.1,
-          "angle": 90,
-          "direction": "vertical"
-        }
-      ]
-    },
-    "ㅎ": {
-      "char": "ㅎ",
-      "type": "jongseong",
-      "strokes": [
-        {
-          "id": "ㅎ종-1",
-          "x": 0.5,
-          "y": 0.1,
-          "width": 0.3,
-          "thickness": 0.1,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
-          "id": "ㅎ종-2",
-          "x": 0.5,
+          "id": "ㄼ종-9",
+          "x": 0.75,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㄽ": {
+      "char": "ㄽ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄽ종-1",
+          "x": 0.25,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄽ종-2",
+          "x": 0.45,
           "y": 0.275,
-          "width": 0.7,
-          "thickness": 0.1,
+          "width": 0.45,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄽ종-3",
+          "x": 0.25,
+          "y": 0.5,
+          "width": 0.5,
+          "thickness": 0.07,
           "angle": 0,
           "direction": "horizontal"
         },
         {
-          "id": "ㅎ종-circle",
-          "x": 0.2,
-          "y": 0.375,
-          "width": 0.6,
-          "height": 0.55,
+          "id": "ㄽ종-4",
+          "x": 0.05,
+          "y": 0.725,
+          "width": 0.45,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄽ종-5",
+          "x": 0.25,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄽ종-left",
+          "x": 0.5,
+          "y": 0,
+          "width": 0.5,
+          "height": 1,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.425,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 0,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        },
+        {
+          "id": "ㄽ종-right",
+          "x": 0.5,
+          "y": 0,
+          "width": 0.5,
+          "height": 1,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.575,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        }
+      ]
+    },
+    "ㄾ": {
+      "char": "ㄾ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄾ종-1",
+          "x": 0.25,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄾ종-2",
+          "x": 0.45,
+          "y": 0.275,
+          "width": 0.45,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄾ종-3",
+          "x": 0.25,
+          "y": 0.5,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄾ종-4",
+          "x": 0.05,
+          "y": 0.725,
+          "width": 0.45,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄾ종-5",
+          "x": 0.25,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄾ종-6",
+          "x": 0.75,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄾ종-7",
+          "x": 0.55,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄾ종-8",
+          "x": 0.75,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄾ종-9",
+          "x": 0.75,
+          "y": 0.5,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㄿ": {
+      "char": "ㄿ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㄿ종-1",
+          "x": 0.25,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄿ종-2",
+          "x": 0.45,
+          "y": 0.275,
+          "width": 0.45,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄿ종-3",
+          "x": 0.25,
+          "y": 0.5,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄿ종-4",
+          "x": 0.05,
+          "y": 0.725,
+          "width": 0.45,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄿ종-5",
+          "x": 0.25,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄿ종-6",
+          "x": 0.75,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄿ종-7",
+          "x": 0.75,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㄿ종-8",
+          "x": 0.667,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㄿ종-9",
+          "x": 0.833,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅀ": {
+      "char": "ㅀ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅀ종-1",
+          "x": 0.25,
+          "y": 0.05,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅀ종-2",
+          "x": 0.45,
+          "y": 0.275,
+          "width": 0.45,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅀ종-3",
+          "x": 0.25,
+          "y": 0.5,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅀ종-4",
+          "x": 0.05,
+          "y": 0.725,
+          "width": 0.45,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅀ종-5",
+          "x": 0.25,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅀ종-6",
+          "x": 0.75,
+          "y": 0.05,
+          "width": 0.15,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅀ종-7",
+          "x": 0.75,
+          "y": 0.2,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅀ종-circle",
+          "x": 0.5,
+          "y": 0.3,
+          "width": 0.5,
+          "height": 0.7,
           "direction": "path",
           "pathData": {
             "closed": true,
@@ -3604,7 +2895,767 @@
               }
             ]
           },
-          "thickness": 0.1
+          "thickness": 0.07
+        }
+      ]
+    },
+    "ㅁ": {
+      "char": "ㅁ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅁ종-1",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅁ종-2",
+          "x": 0.05,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅁ종-3",
+          "x": 0.95,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅁ종-4",
+          "x": 0.5,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅂ": {
+      "char": "ㅂ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅂ종-1",
+          "x": 0.05,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅂ종-2",
+          "x": 0.95,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅂ종-3",
+          "x": 0.5,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅂ종-4",
+          "x": 0.5,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅄ": {
+      "char": "ㅄ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅄ종-1",
+          "x": 0.05,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅄ종-2",
+          "x": 0.45,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅄ종-3",
+          "x": 0.25,
+          "y": 0.5,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅄ종-4",
+          "x": 0.25,
+          "y": 0.95,
+          "width": 0.5,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅄ종-left",
+          "x": 0.5,
+          "y": 0,
+          "width": 0.5,
+          "height": 1,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.425,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 0,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        },
+        {
+          "id": "ㅄ종-right",
+          "x": 0.5,
+          "y": 0,
+          "width": 0.5,
+          "height": 1,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.575,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        }
+      ]
+    },
+    "ㅅ": {
+      "char": "ㅅ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅅ종-left",
+          "x": 0,
+          "y": 0,
+          "width": 1,
+          "height": 1,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.425,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 0,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        },
+        {
+          "id": "ㅅ종-right",
+          "x": 0,
+          "y": 0,
+          "width": 1,
+          "height": 1,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.575,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        }
+      ]
+    },
+    "ㅆ": {
+      "char": "ㅆ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅆ종-1l",
+          "x": 0,
+          "y": 0,
+          "width": 0.5,
+          "height": 1,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.425,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 0,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        },
+        {
+          "id": "ㅆ종-1r",
+          "x": 0,
+          "y": 0,
+          "width": 0.5,
+          "height": 1,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.575,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        },
+        {
+          "id": "ㅆ종-2l",
+          "x": 0.5,
+          "y": 0,
+          "width": 0.5,
+          "height": 1,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.425,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 0,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        },
+        {
+          "id": "ㅆ종-2r",
+          "x": 0.5,
+          "y": 0,
+          "width": 0.5,
+          "height": 1,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.575,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        }
+      ]
+    },
+    "ㅇ": {
+      "char": "ㅇ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅇ종-circle",
+          "x": 0,
+          "y": 0,
+          "width": 1,
+          "height": 1,
+          "direction": "path",
+          "pathData": {
+            "closed": true,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleIn": {
+                  "x": 0.225,
+                  "y": 0
+                },
+                "handleOut": {
+                  "x": 0.775,
+                  "y": 0
+                }
+              },
+              {
+                "x": 1,
+                "y": 0.5,
+                "handleIn": {
+                  "x": 1,
+                  "y": 0.225
+                },
+                "handleOut": {
+                  "x": 1,
+                  "y": 0.775
+                }
+              },
+              {
+                "x": 0.5,
+                "y": 1,
+                "handleIn": {
+                  "x": 0.775,
+                  "y": 1
+                },
+                "handleOut": {
+                  "x": 0.225,
+                  "y": 1
+                }
+              },
+              {
+                "x": 0,
+                "y": 0.5,
+                "handleIn": {
+                  "x": 0,
+                  "y": 0.775
+                },
+                "handleOut": {
+                  "x": 0,
+                  "y": 0.225
+                }
+              }
+            ]
+          },
+          "thickness": 0.07
+        }
+      ]
+    },
+    "ㅈ": {
+      "char": "ㅈ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅈ종-1",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅈ종-left",
+          "x": 0,
+          "y": 0.05,
+          "width": 1,
+          "height": 0.95,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.425,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 0,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        },
+        {
+          "id": "ㅈ종-right",
+          "x": 0,
+          "y": 0.05,
+          "width": 1,
+          "height": 0.95,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.575,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        }
+      ]
+    },
+    "ㅊ": {
+      "char": "ㅊ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅊ종-dot",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 0.4,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅊ종-1",
+          "x": 0.5,
+          "y": 0.2,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅊ종-left",
+          "x": 0,
+          "y": 0.2,
+          "width": 1,
+          "height": 0.8,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.425,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 0,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        },
+        {
+          "id": "ㅊ종-right",
+          "x": 0,
+          "y": 0.2,
+          "width": 1,
+          "height": 0.8,
+          "direction": "path",
+          "pathData": {
+            "closed": false,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleOut": {
+                  "x": 0.575,
+                  "y": 0.35
+                }
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ]
+          },
+          "thickness": 0.07
+        }
+      ]
+    },
+    "ㅋ": {
+      "char": "ㅋ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅋ종-1",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅋ종-2",
+          "x": 0.95,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅋ종-3",
+          "x": 0.5,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅌ": {
+      "char": "ㅌ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅌ종-1",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅌ종-2",
+          "x": 0.05,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅌ종-3",
+          "x": 0.5,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅌ종-4",
+          "x": 0.5,
+          "y": 0.5,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        }
+      ]
+    },
+    "ㅍ": {
+      "char": "ㅍ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅍ종-1",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅍ종-2",
+          "x": 0.5,
+          "y": 0.95,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅍ종-3",
+          "x": 0.333,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        },
+        {
+          "id": "ㅍ종-4",
+          "x": 0.667,
+          "y": 0.5,
+          "width": 0.9,
+          "thickness": 0.07,
+          "angle": 90,
+          "direction": "vertical"
+        }
+      ]
+    },
+    "ㅎ": {
+      "char": "ㅎ",
+      "type": "jongseong",
+      "strokes": [
+        {
+          "id": "ㅎ종-1",
+          "x": 0.5,
+          "y": 0.05,
+          "width": 0.3,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅎ종-2",
+          "x": 0.5,
+          "y": 0.2,
+          "width": 1,
+          "thickness": 0.07,
+          "angle": 0,
+          "direction": "horizontal"
+        },
+        {
+          "id": "ㅎ종-circle",
+          "x": 0,
+          "y": 0.3,
+          "width": 1,
+          "height": 0.7,
+          "direction": "path",
+          "pathData": {
+            "closed": true,
+            "points": [
+              {
+                "x": 0.5,
+                "y": 0,
+                "handleIn": {
+                  "x": 0.225,
+                  "y": 0
+                },
+                "handleOut": {
+                  "x": 0.775,
+                  "y": 0
+                }
+              },
+              {
+                "x": 1,
+                "y": 0.5,
+                "handleIn": {
+                  "x": 1,
+                  "y": 0.225
+                },
+                "handleOut": {
+                  "x": 1,
+                  "y": 0.775
+                }
+              },
+              {
+                "x": 0.5,
+                "y": 1,
+                "handleIn": {
+                  "x": 0.775,
+                  "y": 1
+                },
+                "handleOut": {
+                  "x": 0.225,
+                  "y": 1
+                }
+              },
+              {
+                "x": 0,
+                "y": 0.5,
+                "handleIn": {
+                  "x": 0,
+                  "y": 0.775
+                },
+                "handleOut": {
+                  "x": 0,
+                  "y": 0.225
+                }
+              }
+            ]
+          },
+          "thickness": 0.07
         }
       ]
     }

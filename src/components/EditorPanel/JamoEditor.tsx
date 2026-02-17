@@ -13,7 +13,8 @@ import { copyJsonToClipboard } from '../../utils/storage'
 import { classifyJungseong, getLayoutsForJamoType } from '../../utils/hangulUtils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import type { StrokeData, JamoData, BoxConfig, LayoutType } from '../../types'
+import { Slider } from '@/components/ui/slider'
+import type { StrokeData, JamoData, BoxConfig, LayoutType, Padding } from '../../types'
 
 interface JamoEditorProps {
   jamoType: 'choseong' | 'jungseong' | 'jongseong'
@@ -30,6 +31,8 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
     updateChoseong,
     updateJungseong,
     updateJongseong,
+    updateJamoPadding,
+    resetJamoPadding,
     isModified,
     isJamoModified,
     exportJamos,
@@ -208,7 +211,7 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
     const json = exportJamos()
     const ok = await copyJsonToClipboard(json)
     if (ok) {
-      alert('JSON이 클립보드에 복사되었습니다.\nsrc/data/baseJamos.json에 붙여넣으세요.')
+      alert('JSON이 클립보드에 복사되었습니다.\n이 데이터를 baseJamos.json 파일 전체에 붙여넣으세요.\n\n⚠️ localStorage에서 직접 복사하면 포맷이 달라 에러납니다.\n반드시 이 버튼으로 추출한 데이터를 사용하세요.\n\n경로: /Users/hanim/Documents/GitHub/new-font-maker/src/data/baseJamos.json')
     } else {
       alert('클립보드 복사에 실패했습니다.')
     }
@@ -279,7 +282,7 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
         {/* 중앙: 큰 미리보기 + 키보드 힌트 */}
         <div className="flex flex-col items-center justify-center overflow-hidden bg-surface rounded-md border border-border-subtle p-4">
           <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">미리보기</h3>
-          <CharacterPreview jamoChar={jamoChar} strokes={draftStrokes} boxInfo={jamoBoxInfo} jamoType={jamoType} />
+          <CharacterPreview jamoChar={jamoChar} strokes={draftStrokes} boxInfo={jamoBoxInfo} jamoType={jamoType} jamoPadding={jamoMap[jamoChar]?.padding} />
           <p className="mt-4 text-xs text-text-dim-5 text-center leading-relaxed">
             방향키: 이동 | Shift+방향키: 크기 | R: 회전
           </p>
@@ -291,6 +294,15 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
           <StrokeInspector strokes={draftStrokes} onChange={handleStrokeChange} />
         </div>
       </div>
+
+      {/* 자모 패딩 슬라이더 */}
+      <JamoPaddingSection
+        jamoType={jamoType}
+        jamoChar={jamoChar}
+        padding={jamoMap[jamoChar]?.padding}
+        onPaddingChange={(side, value) => updateJamoPadding(jamoType, jamoChar, side, value)}
+        onReset={() => resetJamoPadding(jamoType, jamoChar)}
+      />
 
       {/* 키보드 컨트롤 (UI 없음) */}
       <StrokeEditor strokes={draftStrokes} onChange={handleStrokeChange} boxInfo={jamoBoxInfo} />
@@ -346,6 +358,87 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
           전체 초기화
         </Button>
       </div>
+    </div>
+  )
+}
+
+// 자모 패딩 섹션 컴포넌트
+const JAMO_PADDING_SIDES: Array<{ key: keyof Padding; label: string }> = [
+  { key: 'top', label: '상단' },
+  { key: 'bottom', label: '하단' },
+  { key: 'left', label: '좌측' },
+  { key: 'right', label: '우측' },
+]
+
+function JamoPaddingSection({
+  jamoType: _jamoType,
+  jamoChar: _jamoChar,
+  padding,
+  onPaddingChange,
+  onReset,
+}: {
+  jamoType: string
+  jamoChar: string
+  padding?: Padding
+  onPaddingChange: (side: keyof Padding, value: number) => void
+  onReset: () => void
+}) {
+  // unused vars 무시 (향후 확장용)
+  void _jamoType
+  void _jamoChar
+
+  const hasPadding = padding && (padding.top > 0 || padding.bottom > 0 || padding.left > 0 || padding.right > 0)
+
+  return (
+    <div className="mx-5 mb-4 p-4 bg-surface rounded-md border border-border-subtle">
+      <h4 className="text-sm font-medium m-0 mb-4 text-text-dim-4 uppercase tracking-wider flex items-center gap-2">
+        <span className="text-lg">📐</span>
+        자모 여백 (Padding)
+        {hasPadding && (
+          <Button
+            variant="default"
+            size="sm"
+            className="ml-auto text-xs"
+            onClick={onReset}
+          >
+            리셋
+          </Button>
+        )}
+      </h4>
+
+      <div className="grid grid-cols-2 gap-4">
+        {JAMO_PADDING_SIDES.map(({ key, label }) => {
+          const value = padding?.[key] ?? 0
+          const isNonZero = value > 0
+
+          return (
+            <div key={key}>
+              <div className="flex justify-between items-center mb-2">
+                <span
+                  className={`text-base font-medium ${isNonZero ? 'text-accent-orange' : 'text-text-dim-1'}`}
+                >
+                  {label}
+                </span>
+                <span className="text-sm text-text-dim-4 font-mono bg-surface-2 px-2 py-0.5 rounded-sm">
+                  {(value * 100).toFixed(1)}%
+                </span>
+              </div>
+              <Slider
+                min={0}
+                max={0.3}
+                step={0.025}
+                value={[value]}
+                onValueChange={([val]) => onPaddingChange(key, val)}
+                colorScheme="override"
+              />
+            </div>
+          )
+        })}
+      </div>
+
+      <p className="text-[0.75rem] text-text-dim-5 mt-3 pt-3 border-t border-border-subtle leading-relaxed">
+        자모 획이 박스 가장자리까지 확장되는 것을 방지합니다. 변경 시 즉시 반영됩니다.
+      </p>
     </div>
   )
 }

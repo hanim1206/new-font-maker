@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useUIStore } from '../../stores/uiStore'
-import type { StrokeData, BoxConfig, PathStrokeData, RectStrokeData } from '../../types'
+import type { StrokeData, BoxConfig, PathStrokeData, RectStrokeData, Padding } from '../../types'
 import { isPathStroke, isRectStroke } from '../../types'
 import { pathDataToSvgD } from '../../utils/pathUtils'
 import type { GlobalStyle } from '../../stores/globalStyleStore'
@@ -52,6 +52,19 @@ export interface StrokeOverlayProps {
   globalStyle?: GlobalStyle
   // 획 색상 (기본: #1a1a1a)
   strokeColor?: string
+  // 자모 패딩 (박스를 패딩만큼 축소)
+  jamoPadding?: Padding
+}
+
+// 자모 패딩 적용: 박스를 패딩만큼 축소
+function applyJamoPaddingToBox(bx: number, by: number, bw: number, bh: number, padding?: Padding) {
+  if (!padding) return { x: bx, y: by, w: bw, h: bh }
+  return {
+    x: bx + padding.left * bw,
+    y: by + padding.top * bh,
+    w: bw * (1 - padding.left - padding.right),
+    h: bh * (1 - padding.top - padding.bottom),
+  }
 }
 
 // 리사이즈 핸들 크기
@@ -80,6 +93,7 @@ export function StrokeOverlay({
   verticalStrokeIds,
   globalStyle,
   strokeColor = '#1a1a1a',
+  jamoPadding,
 }: StrokeOverlayProps) {
   const { selectedStrokeId, setSelectedStrokeId, selectedPointIndex, setSelectedPointIndex } = useUIStore()
   const [dragState, setDragState] = useState<DragState | null>(null)
@@ -121,40 +135,46 @@ export function StrokeOverlay({
     }
   }, [])
 
-  // 스트로크의 컨테이너 박스 절대 좌표 가져오기
+  // 스트로크의 컨테이너 박스 절대 좌표 가져오기 (자모 패딩 적용됨)
   const getContainerBoxAbs = useCallback((stroke: StrokeData) => {
     if (isMixed && juHBox && juVBox && horizontalStrokeIds && verticalStrokeIds) {
       if (horizontalStrokeIds.has(stroke.id)) {
-        return {
-          x: juHBox.x * viewBoxSize,
-          y: juHBox.y * viewBoxSize,
-          w: juHBox.width * viewBoxSize,
-          h: juHBox.height * viewBoxSize,
-        }
+        return applyJamoPaddingToBox(
+          juHBox.x * viewBoxSize, juHBox.y * viewBoxSize,
+          juHBox.width * viewBoxSize, juHBox.height * viewBoxSize,
+          jamoPadding
+        )
       } else if (verticalStrokeIds.has(stroke.id)) {
-        return {
-          x: juVBox.x * viewBoxSize,
-          y: juVBox.y * viewBoxSize,
-          w: juVBox.width * viewBoxSize,
-          h: juVBox.height * viewBoxSize,
-        }
+        return applyJamoPaddingToBox(
+          juVBox.x * viewBoxSize, juVBox.y * viewBoxSize,
+          juVBox.width * viewBoxSize, juVBox.height * viewBoxSize,
+          jamoPadding
+        )
       }
     }
-    return { x: boxX, y: boxY, w: boxWidth, h: boxHeight }
-  }, [isMixed, juHBox, juVBox, horizontalStrokeIds, verticalStrokeIds, boxX, boxY, boxWidth, boxHeight, viewBoxSize])
+    return applyJamoPaddingToBox(boxX, boxY, boxWidth, boxHeight, jamoPadding)
+  }, [isMixed, juHBox, juVBox, horizontalStrokeIds, verticalStrokeIds, boxX, boxY, boxWidth, boxHeight, viewBoxSize, jamoPadding])
 
   // 획의 절대 좌표 계산
   const getStrokeBounds = useCallback((stroke: StrokeData) => {
     const container = getContainerBoxAbs(stroke)
     const strokeX = container.x + stroke.x * container.w
     const strokeY = container.y + stroke.y * container.h
-    const boundsWidth = stroke.width * container.w
+
+    // 세로획(90°)은 container.h 기준으로 width 스케일
+    const angle = isRectStroke(stroke) ? (stroke.angle ?? 0) : 0
+    const isVertical = angle === 90
+    const boundsWidth = isRectStroke(stroke)
+      ? stroke.width * (isVertical ? container.h : container.w)
+      : stroke.width * container.w
+
+    // rect thickness는 절대값 (viewBoxSize 기준), path height는 container 상대값
     const boundsHeight = isRectStroke(stroke)
-      ? stroke.thickness * container.h
+      ? stroke.thickness * weightMultiplier * viewBoxSize
       : (stroke as PathStrokeData).height * container.h
 
     return { strokeX, strokeY, boundsWidth, boundsHeight }
-  }, [getContainerBoxAbs])
+  }, [getContainerBoxAbs, weightMultiplier, viewBoxSize])
 
   // 패스 포인트/핸들 드래그 시작
   const startPathDrag = useCallback((type: 'point' | 'handleIn' | 'handleOut', strokeId: string, pointIndex: number, strokeX: number, strokeY: number, boundsWidth: number, boundsHeight: number) => {
@@ -280,8 +300,28 @@ export function StrokeOverlay({
       let newY = cH > 0 ? (newAbsY - cY) / cH : 0
 
       if (isRectStroke(stroke)) {
-        newX = Math.max(stroke.width / 2, Math.min(1 - stroke.width / 2, newX))
-        newY = Math.max(stroke.thickness / 2, Math.min(1 - stroke.thickness / 2, newY))
+        const angle = stroke.angle ?? 0
+        const isVertical = angle === 90
+        const wm = weightMultiplier
+
+        let halfExtentX: number
+        let halfExtentY: number
+
+        if (isVertical) {
+          // 세로획: 시각적 가로폭 = thickness*wm*viewBoxSize, 세로높이 = width*cH
+          halfExtentX = cW > 0 ? (stroke.thickness * wm * viewBoxSize) / (2 * cW) : 0
+          halfExtentY = stroke.width / 2
+        } else {
+          // 가로획: 시각적 가로폭 = width*cW, 세로높이 = thickness*wm*viewBoxSize
+          halfExtentX = stroke.width / 2
+          halfExtentY = cH > 0 ? (stroke.thickness * wm * viewBoxSize) / (2 * cH) : 0
+        }
+
+        halfExtentX = Math.min(halfExtentX, 0.5)
+        halfExtentY = Math.min(halfExtentY, 0.5)
+
+        newX = Math.max(halfExtentX, Math.min(1 - halfExtentX, newX))
+        newY = Math.max(halfExtentY, Math.min(1 - halfExtentY, newY))
       } else if (isPathStroke(stroke)) {
         newX = Math.max(0, Math.min(1 - stroke.width, newX))
         newY = Math.max(0, Math.min(1 - stroke.height, newY))
@@ -331,7 +371,7 @@ export function StrokeOverlay({
       }
       return
     }
-  }, [dragState, onPathPointChange, onStrokeChange, svgPointFromEvent, absToRelative])
+  }, [dragState, onPathPointChange, onStrokeChange, svgPointFromEvent, absToRelative, weightMultiplier, viewBoxSize])
 
   // 드래그 종료
   const handlePointerUp = useCallback(() => {
@@ -507,8 +547,8 @@ export function StrokeOverlay({
         // === PATH 스트로크 ===
         if (isPathStroke(stroke)) {
           const d = pathDataToSvgD(stroke.pathData, strokeX, strokeY, boundsWidth, boundsHeight)
-          const container = getContainerBoxAbs(stroke)
-          const pathThickness = stroke.thickness * weightMultiplier * container.h
+          // 두께는 박스 비율에 영향받지 않는 절대값
+          const pathThickness = stroke.thickness * weightMultiplier * viewBoxSize
           return (
             <g key={stroke.id}>
               {/* 넓은 히트 영역 (투명) - 이동용 */}
@@ -548,9 +588,12 @@ export function StrokeOverlay({
 
         // === RECT 스트로크 ===
         const container = getContainerBoxAbs(stroke)
-        const rectW = stroke.width * container.w
-        const rectH = (stroke as RectStrokeData).thickness * weightMultiplier * container.h
         const angle = (stroke as RectStrokeData).angle ?? 0
+        // 세로획(90°)은 회전 후 rectW가 시각적 높이가 되므로 container.h 기준으로 스케일
+        const isVertical = angle === 90
+        const rectW = stroke.width * (isVertical ? container.h : container.w)
+        // 두께는 박스 비율에 영향받지 않는 절대값
+        const rectH = (stroke as RectStrokeData).thickness * weightMultiplier * viewBoxSize
 
         return (
           <g key={stroke.id}>

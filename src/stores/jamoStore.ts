@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { persist } from 'zustand/middleware'
-import type { JamoData } from '../types'
+import type { JamoData, Padding } from '../types'
 import { migrateJamoData, needsMigration } from '../utils/strokeMigration'
 import baseJamos from '../data/baseJamos.json'
 
@@ -55,6 +55,22 @@ interface JamoActions {
 
   // 특정 타입만 초기화
   resetJamoType: (type: 'choseong' | 'jungseong' | 'jongseong') => void
+
+  // ===== 자모 패딩 =====
+
+  // 자모 패딩 업데이트
+  updateJamoPadding: (
+    type: 'choseong' | 'jungseong' | 'jongseong',
+    char: string,
+    side: keyof Padding,
+    value: number
+  ) => void
+
+  // 자모 패딩 초기화
+  resetJamoPadding: (
+    type: 'choseong' | 'jungseong' | 'jongseong',
+    char: string
+  ) => void
 
   // hydration 완료 표시
   setHydrated: () => void
@@ -176,6 +192,26 @@ export const useJamoStore = create<JamoState & JamoActions>()(
       resetJamoType: (type) =>
         set((state) => {
           state[type] = deepClone(BASE_JAMOS[type])
+        }),
+
+      // ===== 자모 패딩 =====
+
+      updateJamoPadding: (type, char, side, value) =>
+        set((state) => {
+          const jamo = state[type][char]
+          if (!jamo) return
+          if (!jamo.padding) {
+            jamo.padding = { top: 0, bottom: 0, left: 0, right: 0 }
+          }
+          jamo.padding[side] = value
+        }),
+
+      resetJamoPadding: (type, char) =>
+        set((state) => {
+          const jamo = state[type][char]
+          if (jamo) {
+            delete jamo.padding
+          }
         }),
 
       setHydrated: () => set({ _hydrated: true }),

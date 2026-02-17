@@ -160,6 +160,8 @@ export interface JamoData {
   // 혼합중성의 경우 가로획과 세로획 분리
   horizontalStrokes?: StrokeData[]
   verticalStrokes?: StrokeData[]
+  // 자모별 내부 패딩 (0~1, 박스 기준 비율)
+  padding?: Padding
 }
 
 // ===== 음절 분해 결과 =====

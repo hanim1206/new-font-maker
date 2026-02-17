@@ -17,8 +17,8 @@ interface StrokeEditorProps {
   boxInfo?: BoxConfig & { juH?: BoxConfig; juV?: BoxConfig }
 }
 
-const MOVE_STEP = 0.01
-const RESIZE_STEP = 0.01
+const MOVE_STEP = 0.025
+const RESIZE_STEP = 0.025
 const ANGLE_STEP = 15
 
 export function StrokeEditor({ strokes, onChange, onPathPointChange, boxInfo: _boxInfo = { x: 0, y: 0, width: 1, height: 1 } }: StrokeEditorProps) {

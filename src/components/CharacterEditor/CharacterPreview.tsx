@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useJamoStore } from '../../stores/jamoStore'
 import { useGlobalStyleStore } from '../../stores/globalStyleStore'
-import type { StrokeData, BoxConfig, PathStrokeData, RectStrokeData } from '../../types'
+import type { StrokeData, BoxConfig, PathStrokeData, RectStrokeData, Padding } from '../../types'
 import { isPathStroke, isRectStroke } from '../../types'
 import { pathDataToSvgD } from '../../utils/pathUtils'
 
@@ -22,6 +22,7 @@ interface CharacterPreviewProps {
   jamoType?: 'choseong' | 'jungseong' | 'jongseong'
   onPathPointChange?: PathPointChangeHandler
   onStrokeChange?: StrokeChangeHandler
+  jamoPadding?: Padding
 }
 
 const VIEW_BOX_SIZE = 100
@@ -64,7 +65,18 @@ interface DragState {
   originalStroke?: StrokeData
 }
 
-export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, width: 1, height: 1 }, jamoType, onPathPointChange, onStrokeChange }: CharacterPreviewProps) {
+// 자모 패딩 적용: 박스를 패딩만큼 축소
+function applyJamoPaddingToBox(box: { x: number; y: number; width: number; height: number }, padding?: Padding) {
+  if (!padding) return box
+  return {
+    x: box.x + padding.left * box.width,
+    y: box.y + padding.top * box.height,
+    width: box.width * (1 - padding.left - padding.right),
+    height: box.height * (1 - padding.top - padding.bottom),
+  }
+}
+
+export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, width: 1, height: 1 }, jamoType, onPathPointChange, onStrokeChange, jamoPadding }: CharacterPreviewProps) {
   const { selectedStrokeId, setSelectedStrokeId, editingJamoType, selectedPointIndex, setSelectedPointIndex } = useUIStore()
   const { jungseong } = useJamoStore()
   const { style: globalStyle } = useGlobalStyleStore()
@@ -157,27 +169,36 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
     }
   }, [])
 
-  // 스트로크의 컨테이너 박스 절대 좌표 가져오기
+  // 스트로크의 컨테이너 박스 절대 좌표 가져오기 (자모 패딩 적용됨)
   const getContainerBoxAbs = useCallback((stroke: StrokeData) => {
     if (isMixed && boxInfo.juH && boxInfo.juV && horizontalStrokeIds && verticalStrokeIds) {
       if (horizontalStrokeIds.has(stroke.id)) {
+        const padded = applyJamoPaddingToBox(boxInfo.juH, jamoPadding)
         return {
-          x: boxInfo.juH.x * VIEW_BOX_SIZE,
-          y: boxInfo.juH.y * VIEW_BOX_SIZE,
-          w: boxInfo.juH.width * VIEW_BOX_SIZE,
-          h: boxInfo.juH.height * VIEW_BOX_SIZE,
+          x: padded.x * VIEW_BOX_SIZE,
+          y: padded.y * VIEW_BOX_SIZE,
+          w: padded.width * VIEW_BOX_SIZE,
+          h: padded.height * VIEW_BOX_SIZE,
         }
       } else if (verticalStrokeIds.has(stroke.id)) {
+        const padded = applyJamoPaddingToBox(boxInfo.juV, jamoPadding)
         return {
-          x: boxInfo.juV.x * VIEW_BOX_SIZE,
-          y: boxInfo.juV.y * VIEW_BOX_SIZE,
-          w: boxInfo.juV.width * VIEW_BOX_SIZE,
-          h: boxInfo.juV.height * VIEW_BOX_SIZE,
+          x: padded.x * VIEW_BOX_SIZE,
+          y: padded.y * VIEW_BOX_SIZE,
+          w: padded.width * VIEW_BOX_SIZE,
+          h: padded.height * VIEW_BOX_SIZE,
         }
       }
     }
-    return { x: boxX, y: boxY, w: boxWidth, h: boxHeight }
-  }, [isMixed, boxInfo, horizontalStrokeIds, verticalStrokeIds, boxX, boxY, boxWidth, boxHeight])
+    // 일반 박스에 패딩 적용
+    const padded = applyJamoPaddingToBox(boxInfo, jamoPadding)
+    return {
+      x: padded.x * VIEW_BOX_SIZE,
+      y: padded.y * VIEW_BOX_SIZE,
+      w: padded.width * VIEW_BOX_SIZE,
+      h: padded.height * VIEW_BOX_SIZE,
+    }
+  }, [isMixed, boxInfo, horizontalStrokeIds, verticalStrokeIds, jamoPadding])
 
   // 패스 포인트/핸들 드래그 시작 (마우스 + 터치)
   const startPathDrag = useCallback((type: 'point' | 'handleIn' | 'handleOut', strokeId: string, pointIndex: number, strokeX: number, strokeY: number, boundsWidth: number, boundsHeight: number) => {
@@ -306,9 +327,28 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
 
       // 클램핑: rect는 중심좌표, path는 좌상단 좌표
       if (isRectStroke(stroke)) {
-        // 중심좌표: width/2 ~ 1-width/2, thickness/2 ~ 1-thickness/2
-        newX = Math.max(stroke.width / 2, Math.min(1 - stroke.width / 2, newX))
-        newY = Math.max(stroke.thickness / 2, Math.min(1 - stroke.thickness / 2, newY))
+        const angle = stroke.angle ?? 0
+        const isVertical = angle === 90
+        const wm = weightMultiplier
+
+        let halfExtentX: number
+        let halfExtentY: number
+
+        if (isVertical) {
+          // 세로획: 시각적 가로폭 = thickness*wm*VIEW_BOX_SIZE, 세로높이 = width*cH
+          halfExtentX = cW > 0 ? (stroke.thickness * wm * VIEW_BOX_SIZE) / (2 * cW) : 0
+          halfExtentY = stroke.width / 2
+        } else {
+          // 가로획: 시각적 가로폭 = width*cW, 세로높이 = thickness*wm*VIEW_BOX_SIZE
+          halfExtentX = stroke.width / 2
+          halfExtentY = cH > 0 ? (stroke.thickness * wm * VIEW_BOX_SIZE) / (2 * cH) : 0
+        }
+
+        halfExtentX = Math.min(halfExtentX, 0.5)
+        halfExtentY = Math.min(halfExtentY, 0.5)
+
+        newX = Math.max(halfExtentX, Math.min(1 - halfExtentX, newX))
+        newY = Math.max(halfExtentY, Math.min(1 - halfExtentY, newY))
       } else if (isPathStroke(stroke)) {
         newX = Math.max(0, Math.min(1 - stroke.width, newX))
         newY = Math.max(0, Math.min(1 - stroke.height, newY))
@@ -365,7 +405,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
       }
       return
     }
-  }, [dragState, onPathPointChange, onStrokeChange, svgPointFromEvent, absToRelative])
+  }, [dragState, onPathPointChange, onStrokeChange, svgPointFromEvent, absToRelative, weightMultiplier])
 
   // 드래그 종료 (마우스 + 터치)
   const handlePointerUp = useCallback(() => {
@@ -379,9 +419,17 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
     const container = getContainerBoxAbs(stroke)
     const strokeX = container.x + stroke.x * container.w
     const strokeY = container.y + stroke.y * container.h
-    const boundsWidth = stroke.width * container.w
+
+    // 세로획(90°)은 container.h 기준으로 width 스케일
+    const angle = isRectStroke(stroke) ? (stroke.angle ?? 0) : 0
+    const isVertical = angle === 90
+    const boundsWidth = isRectStroke(stroke)
+      ? stroke.width * (isVertical ? container.h : container.w)
+      : stroke.width * container.w
+
+    // rect thickness는 절대값 (VIEW_BOX_SIZE 기준), path height는 container 상대값
     const boundsHeight = isRectStroke(stroke)
-      ? stroke.thickness * container.h
+      ? stroke.thickness * weightMultiplier * VIEW_BOX_SIZE
       : (stroke as PathStrokeData).height * container.h
 
     return { strokeX, strokeY, boundsWidth, boundsHeight }
@@ -604,6 +652,66 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
           />
         )}
 
+        {/* 자모 패딩 오버레이 (반투명 오렌지) */}
+        {jamoPadding && (jamoPadding.top > 0 || jamoPadding.bottom > 0 || jamoPadding.left > 0 || jamoPadding.right > 0) && (() => {
+          // 패딩 영역을 4개 rect로 표시 (각 변마다)
+          const renderPaddingOverlay = (bx: number, by: number, bw: number, bh: number) => {
+            const pTop = jamoPadding.top * bh
+            const pBottom = jamoPadding.bottom * bh
+            const pLeft = jamoPadding.left * bw
+            const pRight = jamoPadding.right * bw
+            return (
+              <g opacity={0.15}>
+                {/* 상단 */}
+                {pTop > 0 && <rect x={bx} y={by} width={bw} height={pTop} fill="#ff9500" />}
+                {/* 하단 */}
+                {pBottom > 0 && <rect x={bx} y={by + bh - pBottom} width={bw} height={pBottom} fill="#ff9500" />}
+                {/* 좌측 (상하 제외) */}
+                {pLeft > 0 && <rect x={bx} y={by + pTop} width={pLeft} height={bh - pTop - pBottom} fill="#ff9500" />}
+                {/* 우측 (상하 제외) */}
+                {pRight > 0 && <rect x={bx + bw - pRight} y={by + pTop} width={pRight} height={bh - pTop - pBottom} fill="#ff9500" />}
+              </g>
+            )
+          }
+
+          if (isMixed && boxInfo.juH && boxInfo.juV) {
+            return (
+              <>
+                {renderPaddingOverlay(boxInfo.juH.x * VIEW_BOX_SIZE, boxInfo.juH.y * VIEW_BOX_SIZE, boxInfo.juH.width * VIEW_BOX_SIZE, boxInfo.juH.height * VIEW_BOX_SIZE)}
+                {renderPaddingOverlay(boxInfo.juV.x * VIEW_BOX_SIZE, boxInfo.juV.y * VIEW_BOX_SIZE, boxInfo.juV.width * VIEW_BOX_SIZE, boxInfo.juV.height * VIEW_BOX_SIZE)}
+              </>
+            )
+          }
+          return renderPaddingOverlay(boxX, boxY, boxWidth, boxHeight)
+        })()}
+
+        {/* 패딩 경계선 (점선) */}
+        {jamoPadding && (jamoPadding.top > 0 || jamoPadding.bottom > 0 || jamoPadding.left > 0 || jamoPadding.right > 0) && (() => {
+          const renderPaddedBorder = (bx: number, by: number, bw: number, bh: number) => {
+            const px = bx + jamoPadding.left * bw
+            const py = by + jamoPadding.top * bh
+            const pw = bw * (1 - jamoPadding.left - jamoPadding.right)
+            const ph = bh * (1 - jamoPadding.top - jamoPadding.bottom)
+            return (
+              <rect
+                x={px} y={py} width={pw} height={ph}
+                fill="none" stroke="#ff9500" strokeWidth={0.8}
+                strokeDasharray="2,2" opacity={0.5}
+              />
+            )
+          }
+
+          if (isMixed && boxInfo.juH && boxInfo.juV) {
+            return (
+              <>
+                {renderPaddedBorder(boxInfo.juH.x * VIEW_BOX_SIZE, boxInfo.juH.y * VIEW_BOX_SIZE, boxInfo.juH.width * VIEW_BOX_SIZE, boxInfo.juH.height * VIEW_BOX_SIZE)}
+                {renderPaddedBorder(boxInfo.juV.x * VIEW_BOX_SIZE, boxInfo.juV.y * VIEW_BOX_SIZE, boxInfo.juV.width * VIEW_BOX_SIZE, boxInfo.juV.height * VIEW_BOX_SIZE)}
+              </>
+            )
+          }
+          return renderPaddedBorder(boxX, boxY, boxWidth, boxHeight)
+        })()}
+
         {/* 획들 (박스 영역 내 상대 좌표) - slant 적용 (중심 기준) */}
         <g transform={slant !== 0 ? `translate(${slantCenterX}, ${slantCenterY}) skewX(${-slant}) translate(${-slantCenterX}, ${-slantCenterY})` : undefined}>
         {strokes.map((stroke) => {
@@ -613,8 +721,8 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
           // === PATH 스트로크 (곡선) ===
           if (isPathStroke(stroke)) {
             const d = pathDataToSvgD(stroke.pathData, strokeX, strokeY, boundsWidth, boundsHeight)
-            const container = getContainerBoxAbs(stroke)
-            const pathThickness = stroke.thickness * weightMultiplier * container.h
+            // 두께는 박스 비율에 영향받지 않는 절대값
+            const pathThickness = stroke.thickness * weightMultiplier * VIEW_BOX_SIZE
             return (
               <g key={stroke.id}>
                 {/* 넓은 히트 영역 (투명) - 이동용 */}
@@ -655,9 +763,12 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
           // === RECT 스트로크 (중심좌표 + angle 기반) ===
           // strokeX/strokeY = 중심좌표 (getStrokeBounds에서 계산)
           const container = getContainerBoxAbs(stroke)
-          const rectW = stroke.width * container.w
-          const rectH = (stroke as RectStrokeData).thickness * weightMultiplier * container.h
           const angle = (stroke as RectStrokeData).angle ?? 0
+          // 세로획(90°)은 회전 후 rectW가 시각적 높이가 되므로 container.h 기준으로 스케일
+          const isVertical = angle === 90
+          const rectW = stroke.width * (isVertical ? container.h : container.w)
+          // 두께는 박스 비율에 영향받지 않는 절대값
+          const rectH = (stroke as RectStrokeData).thickness * weightMultiplier * VIEW_BOX_SIZE
 
           return (
             <g key={stroke.id}>

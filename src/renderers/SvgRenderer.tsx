@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
-import type { DecomposedSyllable, BoxConfig, Part, StrokeData, LayoutType, LayoutSchema } from '../types'
+import type { DecomposedSyllable, BoxConfig, Part, StrokeData, LayoutType, LayoutSchema, Padding } from '../types'
 import { isPathStroke } from '../types'
 import { calculateBoxes } from '../utils/layoutCalculator'
 import { pathDataToSvgD } from '../utils/pathUtils'
@@ -36,6 +36,17 @@ interface SvgRendererProps {
 
 // SVG viewBox 기준 크기
 const VIEW_BOX_SIZE = 100
+
+// 자모 패딩 적용: 박스를 패딩만큼 축소
+function applyJamoPadding(box: BoxConfig, padding?: Padding): BoxConfig {
+  if (!padding) return box
+  return {
+    x: box.x + padding.left * box.width,
+    y: box.y + padding.top * box.height,
+    width: box.width * (1 - padding.left - padding.right),
+    height: box.height * (1 - padding.top - padding.bottom),
+  }
+}
 
 // 레이아웃 타입에 따라 렌더링 순서 결정
 function getRenderOrder(layoutType: LayoutType): Array<'CH' | 'JU' | 'JU_H' | 'JU_V' | 'JO'> {
@@ -99,7 +110,8 @@ export function SvgRenderer({
       if (isPathStroke(stroke)) {
         const pathWidth = stroke.width * box.width * VIEW_BOX_SIZE
         const pathHeight = stroke.height * box.height * VIEW_BOX_SIZE
-        const pathThickness = stroke.thickness * weightMultiplier * box.height * VIEW_BOX_SIZE
+        // 두께는 박스 비율에 영향받지 않는 절대값
+        const pathThickness = stroke.thickness * weightMultiplier * VIEW_BOX_SIZE
         const d = pathDataToSvgD(stroke.pathData, baseX, baseY, pathWidth, pathHeight)
 
         // 닫힌/열린 패스 모두 stroke로 렌더링 (fill 없음)
@@ -120,9 +132,12 @@ export function SvgRenderer({
       // x,y = 중심좌표, width = 길이, thickness = 두께, angle = 회전각
       const cx = (box.x + stroke.x * box.width) * VIEW_BOX_SIZE
       const cy = (box.y + stroke.y * box.height) * VIEW_BOX_SIZE
-      const rectWidth = stroke.width * box.width * VIEW_BOX_SIZE
-      const rectHeight = stroke.thickness * weightMultiplier * box.height * VIEW_BOX_SIZE
       const angle = stroke.angle ?? 0
+      // 세로획(90°)은 회전 후 rectWidth가 시각적 높이가 되므로 box.height 기준으로 스케일
+      const isVertical = angle === 90
+      const rectWidth = stroke.width * (isVertical ? box.height : box.width) * VIEW_BOX_SIZE
+      // 두께는 박스 비율에 영향받지 않는 절대값
+      const rectHeight = stroke.thickness * weightMultiplier * VIEW_BOX_SIZE
 
       return (
         <rect
@@ -174,10 +189,17 @@ export function SvgRenderer({
     const partColor = ps?.fillColor ?? fillColor
     const partOpacity = ps?.opacity ?? 1
 
+    // 파트별 자모 패딩 참조
+    const jamoPadding =
+      part === 'CH' ? syllable.choseong?.padding :
+      part === 'JO' ? syllable.jongseong?.padding :
+      syllable.jungseong?.padding
+
     // 혼합중성의 경우 JU_H와 JU_V로 분리 렌더링
     if (part === 'JU_H' && syllable.jungseong) {
-      const box = boxes.JU_H
-      if (!box) return null
+      const rawBox = boxes.JU_H
+      if (!rawBox) return null
+      const box = applyJamoPadding(rawBox, jamoPadding)
       // horizontalStrokes가 있으면 사용, 없으면 전체 strokes 사용
       const strokes = syllable.jungseong.horizontalStrokes || syllable.jungseong.strokes
       if (!strokes || strokes.length === 0) return null
@@ -189,8 +211,9 @@ export function SvgRenderer({
     }
 
     if (part === 'JU_V' && syllable.jungseong) {
-      const box = boxes.JU_V
-      if (!box) return null
+      const rawBox = boxes.JU_V
+      if (!rawBox) return null
+      const box = applyJamoPadding(rawBox, jamoPadding)
       // verticalStrokes가 있으면 사용, 없으면 전체 strokes 사용
       const strokes = syllable.jungseong.verticalStrokes || syllable.jungseong.strokes
       if (!strokes || strokes.length === 0) return null
@@ -207,8 +230,9 @@ export function SvgRenderer({
       JO: { jamo: syllable.jongseong, box: boxes.JO },
     }
 
-    const { jamo, box } = partMap[part as 'CH' | 'JU' | 'JO']
-    if (!jamo || !box) return null
+    const { jamo, box: rawBox } = partMap[part as 'CH' | 'JU' | 'JO']
+    if (!jamo || !rawBox) return null
+    const box = applyJamoPadding(rawBox, jamoPadding)
 
     // strokes가 없으면 verticalStrokes나 horizontalStrokes 확인
     let strokes = jamo.strokes
