@@ -8,6 +8,7 @@ import { StrokeList } from './StrokeList'
 import { StrokeEditor } from './StrokeEditor'
 import { StrokeInspector } from './StrokeInspector'
 import type { StrokeDataV2, JamoData, BoxConfig } from '../../types'
+import { mergeStrokes, splitStroke, addHandlesToPoint, removeHandlesFromPoint } from '../../utils/strokeEditUtils'
 import { Button } from '@/components/ui/button'
 
 function getJamoMap(type: 'choseong' | 'jungseong' | 'jongseong'): Record<string, JamoData> {
@@ -268,6 +269,50 @@ export function CharacterEditor() {
     }))
   }
 
+  // 두 획 합치기
+  const handleMergeStrokes = (strokeIdA: string, strokeIdB: string) => {
+    setDraftStrokes(prev => {
+      const a = prev.find(s => s.id === strokeIdA)
+      const b = prev.find(s => s.id === strokeIdB)
+      if (!a || !b) return prev
+      const merged = mergeStrokes(a, b)
+      if (!merged) return prev
+      // 합쳐진 stroke로 교체, 두 번째 stroke 제거
+      return prev
+        .map(s => s.id === strokeIdA ? merged : s)
+        .filter(s => s.id !== strokeIdB)
+    })
+  }
+
+  // 획 분리
+  const handleSplitStroke = (strokeId: string, pointIndex: number) => {
+    setDraftStrokes(prev => {
+      const stroke = prev.find(s => s.id === strokeId)
+      if (!stroke) return prev
+      const result = splitStroke(stroke, pointIndex)
+      if (!result) return prev
+      const [first, second] = result
+      const idx = prev.findIndex(s => s.id === strokeId)
+      const newStrokes = [...prev]
+      newStrokes.splice(idx, 1, first, second)
+      return newStrokes
+    })
+  }
+
+  // 포인트 곡선화
+  const handleToggleCurve = (strokeId: string, pointIndex: number) => {
+    setDraftStrokes(prev => prev.map(s => {
+      if (s.id !== strokeId) return s
+      const pt = s.points[pointIndex]
+      if (!pt) return s
+      if (pt.handleIn || pt.handleOut) {
+        return removeHandlesFromPoint(s, pointIndex)
+      } else {
+        return addHandlesToPoint(s, pointIndex)
+      }
+    }))
+  }
+
   const handleSave = () => {
     if (!editingJamoChar || !editingJamoType) return
 
@@ -357,7 +402,14 @@ export function CharacterEditor() {
 
             {/* 우측: Stroke Inspector */}
             <div className="flex flex-col gap-3 order-2">
-              <StrokeInspector strokes={draftStrokes} onChange={handleStrokeChange} onPointChange={handlePointChange} />
+              <StrokeInspector
+                strokes={draftStrokes}
+                onChange={handleStrokeChange}
+                onPointChange={handlePointChange}
+                onMergeStrokes={handleMergeStrokes}
+                onSplitStroke={handleSplitStroke}
+                onToggleCurve={handleToggleCurve}
+              />
 
             </div>
           </div>
