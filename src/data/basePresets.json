@@ -114,12 +114,12 @@
       "partOverrides": {
         "CH": {
           "top": 0,
-          "bottom": 0,
-          "left": 0.1,
+          "bottom": -0.005625,
+          "left": 0.14025,
           "right": 0.1
         },
         "JU": {
-          "top": 0.09,
+          "top": 0,
           "bottom": 0,
           "left": 0,
           "right": 0
@@ -201,9 +201,15 @@
           "right": 0
         },
         "JO": {
-          "top": 0.1,
+          "top": 0.08625,
           "bottom": 0,
           "left": 0.08,
+          "right": 0
+        },
+        "CH": {
+          "top": 0,
+          "bottom": 0.013500000000000002,
+          "left": 0,
           "right": 0
         }
       }
@@ -222,7 +228,7 @@
         },
         {
           "axis": "y",
-          "value": 0.6
+          "value": 0.625
         }
       ],
       "padding": {
@@ -265,7 +271,7 @@
         },
         {
           "axis": "y",
-          "value": 0.65
+          "value": 0.6000000000000001
         }
       ],
       "padding": {
@@ -288,7 +294,7 @@
           "right": 0.065
         },
         "JU_H": {
-          "top": 0.06,
+          "top": 0.00125,
           "bottom": 0.02,
           "left": 0,
           "right": 0
@@ -297,10 +303,10 @@
           "top": 0,
           "bottom": 0,
           "left": 0.06,
-          "right": 0.06
+          "right": 0.021
         }
       }
     }
   },
-  "exportedAt": "2026-02-17T14:07:09.478Z"
+  "exportedAt": "2026-02-18T16:09:58.391Z"
 }

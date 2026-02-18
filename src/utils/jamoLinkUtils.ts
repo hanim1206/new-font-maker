@@ -31,7 +31,7 @@ for (const [ssang, single] of Object.entries(SSANG_JAMO)) {
 }
 
 // ===== 이중받침(겹받침) → 구성 자모 매핑 =====
-const COMPOUND_JONGSEONG: Record<string, [string, string]> = {
+export const COMPOUND_JONGSEONG: Record<string, [string, string]> = {
   'ㄳ': ['ㄱ', 'ㅅ'],
   'ㄵ': ['ㄴ', 'ㅈ'],
   'ㄶ': ['ㄴ', 'ㅎ'],
