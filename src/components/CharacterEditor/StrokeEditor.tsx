@@ -11,7 +11,7 @@ type PointChangeHandler = (
 
 interface StrokeEditorProps {
   strokes: StrokeDataV2[]
-  onChange: (strokeId: string, prop: string, value: number) => void
+  onChange: (strokeId: string, prop: string, value: number | string | undefined) => void
   onPointChange?: PointChangeHandler
   boxInfo?: BoxConfig & { juH?: BoxConfig; juV?: BoxConfig }
 }

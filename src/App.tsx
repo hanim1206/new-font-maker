@@ -1,13 +1,21 @@
-import { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 import { ControlPanel } from './components/ControlPanel/ControlPanel'
 import { PreviewPanel } from './components/PreviewPanel'
 import { EditorPanel } from './components/EditorPanel/EditorPanel'
 import { useUIStore } from './stores/uiStore'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 export default function App() {
   const { viewMode, setViewMode, isMobile, setIsMobile, inputText, setInputText } = useUIStore()
+
+  const handleClearStorage = useCallback(() => {
+    if (confirm('로컬스토리지를 비우면 모든 편집 데이터가 초기화됩니다.\n계속하시겠습니까?')) {
+      localStorage.clear()
+      window.location.reload()
+    }
+  }, [])
 
   // 반응형 감지
   useEffect(() => {
@@ -34,6 +42,15 @@ export default function App() {
               maxLength={50}
               className="w-[240px] shrink-0 px-3 py-2 text-base bg-surface-2 border border-border rounded-lg text-foreground font-sans focus:border-primary"
             />
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleClearStorage}
+              title="로컬스토리지 초기화"
+              className="shrink-0"
+            >
+              Reset
+            </Button>
             <PreviewPanel horizontal />
           </div>
         </div>

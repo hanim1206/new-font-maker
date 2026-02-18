@@ -1,7 +1,22 @@
 import { useUIStore } from '../../stores/uiStore'
-import type { StrokeDataV2 } from '../../types'
+import type { StrokeDataV2, StrokeLinecap } from '../../types'
+import { MERGE_PROXIMITY } from '../../utils/snapUtils'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+
+/** 두 획의 가장 가까운 끝점 간 거리 */
+function minEndpointDistance(a: StrokeDataV2, b: StrokeDataV2): number {
+  const aEnds = [a.points[0], a.points[a.points.length - 1]]
+  const bEnds = [b.points[0], b.points[b.points.length - 1]]
+  let min = Infinity
+  for (const ae of aEnds) {
+    for (const be of bEnds) {
+      const d = Math.sqrt((ae.x - be.x) ** 2 + (ae.y - be.y) ** 2)
+      if (d < min) min = d
+    }
+  }
+  return min
+}
 
 type PointChangeHandler = (
   strokeId: string,
@@ -12,7 +27,7 @@ type PointChangeHandler = (
 
 interface StrokeInspectorProps {
   strokes: StrokeDataV2[]
-  onChange: (strokeId: string, prop: string, value: number) => void
+  onChange: (strokeId: string, prop: string, value: number | string | undefined) => void
   onPointChange?: PointChangeHandler
   onMergeStrokes?: (strokeIdA: string, strokeIdB: string) => void
   onSplitStroke?: (strokeId: string, pointIndex: number) => void
@@ -23,9 +38,13 @@ export function StrokeInspector({ strokes, onChange, onPointChange, onMergeStrok
   const { selectedStrokeId, selectedPointIndex, setSelectedPointIndex, setSelectedStrokeId } = useUIStore()
   const selectedStroke = strokes.find((s) => s.id === selectedStrokeId)
 
-  // 합치기 대상 후보: 선택된 획 외의 다른 열린 획
+  // 합치기 대상 후보: 끝점이 가까운 열린 획만
   const mergeTargets = selectedStroke && !selectedStroke.closed
-    ? strokes.filter(s => s.id !== selectedStrokeId && !s.closed)
+    ? strokes
+        .filter(s => s.id !== selectedStrokeId && !s.closed)
+        .map(s => ({ stroke: s, dist: minEndpointDistance(selectedStroke, s) }))
+        .filter(t => t.dist <= MERGE_PROXIMITY)
+        .sort((a, b) => a.dist - b.dist)
     : []
 
   if (!selectedStroke) {
@@ -48,10 +67,10 @@ export function StrokeInspector({ strokes, onChange, onPointChange, onMergeStrok
 
   return (
     <div className="flex flex-col gap-3">
-      <h3 className="text-xs text-muted block mb-3">Stroke: {selectedStroke.id}</h3>
+      {/* <h3 className="text-xs text-muted block mb-3">Stroke: {selectedStroke.id}</h3> */}
 
-      {/* 공통 속성: 두께 + 라벨 */}
-      <div className="grid grid-cols-2 gap-3 p-4 bg-surface-2 rounded-md border border-border">
+      {/* 공통 속성: 두께 */}
+      <div className="p-4 bg-surface-2 rounded-md border border-border">
         <div className="flex flex-col gap-1">
           <label className="text-[0.7rem] text-muted uppercase tracking-wider">Thickness (두께)</label>
           <input
@@ -61,11 +80,36 @@ export function StrokeInspector({ strokes, onChange, onPointChange, onMergeStrok
             className={inputClass}
           />
         </div>
-        <div className="p-2 bg-[#0f0f0f] rounded border border-border-lighter flex flex-col justify-center">
-          <span className="text-[0.65rem] text-muted uppercase">Type: </span>
-          <span className="text-xs text-[#e5e5e5] font-mono">
-            {selectedStroke.label || (selectedStroke.closed ? '닫힌 도형' : `${selectedStroke.points.length}pt`)}
-          </span>
+      </div>
+
+      {/* 끝 모양 (Linecap) 오버라이드 */}
+      <div className="p-4 bg-surface-2 rounded-md border border-border">
+        <div className="flex flex-col gap-1">
+          <label className="text-[0.7rem] text-muted uppercase tracking-wider">Linecap (끝 모양)</label>
+          <div className="flex gap-1">
+            {([
+              { value: undefined as StrokeLinecap | undefined, label: '기본' },
+              { value: 'round' as StrokeLinecap, label: '둥근' },
+              { value: 'butt' as StrokeLinecap, label: '평평' },
+              { value: 'square' as StrokeLinecap, label: '사각' },
+            ]).map(({ value, label }) => {
+              const isActive = selectedStroke.linecap === value
+              return (
+                <button
+                  key={label}
+                  className={cn(
+                    'flex-1 py-1.5 px-2 rounded border text-xs transition-colors',
+                    isActive
+                      ? 'border-accent-cyan bg-accent-cyan/10 text-accent-cyan font-semibold'
+                      : 'border-border-lighter text-text-dim-4 hover:border-[#444]'
+                  )}
+                  onClick={() => onChange(selectedStroke.id, 'linecap', value)}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
 
@@ -73,13 +117,14 @@ export function StrokeInspector({ strokes, onChange, onPointChange, onMergeStrok
       <div className="flex flex-col gap-2">
         <h3 className="text-xs text-muted block">획 편집</h3>
         <div className="flex flex-wrap gap-2">
-          {/* 합치기: 다른 획과 합침 */}
+          {/* 합치기: 끝점이 가까운 획과 합침 */}
           {onMergeStrokes && mergeTargets.length > 0 && (
-            mergeTargets.map(target => (
+            mergeTargets.map(({ stroke: target }) => (
               <Button
                 key={target.id}
                 variant="outline"
                 size="sm"
+                className="border-green-600 text-green-400 hover:bg-green-900/30"
                 onClick={() => {
                   onMergeStrokes(selectedStroke.id, target.id)
                   setSelectedStrokeId(selectedStroke.id)
@@ -88,6 +133,9 @@ export function StrokeInspector({ strokes, onChange, onPointChange, onMergeStrok
                 + {target.id} 합치기
               </Button>
             ))
+          )}
+          {onMergeStrokes && mergeTargets.length === 0 && !selectedStroke.closed && strokes.filter(s => s.id !== selectedStrokeId && !s.closed).length > 0 && (
+            <span className="text-xs text-text-dim-5 py-1">끝점을 다른 획 끝점 근처로 이동하면 합치기 가능</span>
           )}
         </div>
       </div>

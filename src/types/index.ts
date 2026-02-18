@@ -154,6 +154,9 @@ export function isRectStroke(stroke: StrokeData): stroke is RectStrokeData {
 // 레거시 별칭 (마이그레이션 유틸리티에서 사용)
 export type LegacyStrokeData = StrokeData
 
+// ===== 획 끝 모양 (Linecap) =====
+export type StrokeLinecap = 'round' | 'butt' | 'square'
+
 // ===== 통합 획 데이터 (V2) =====
 export interface AnchorPoint {
   x: number       // 0~1, 레이아웃 박스 기준
@@ -168,6 +171,7 @@ export interface StrokeDataV2 {
   closed: boolean         // true = 닫힌 도형 (ㅇ 원형 등)
   thickness: number       // 획 두께 (절대값, viewBoxSize 기준)
   label?: string          // 선택적 메타데이터 ('horizontal' | 'vertical' | 'curve' | 'circle')
+  linecap?: StrokeLinecap // 획별 끝 모양 오버라이드 (없으면 글로벌 기본값 사용)
 }
 
 // ===== 자모 데이터 =====
@@ -181,6 +185,9 @@ export interface JamoData {
   verticalStrokes?: StrokeDataV2[]
   // 자모별 내부 패딩 (0~1, 박스 기준 비율)
   padding?: Padding
+  // 혼합중성 전용: JU_H / JU_V 파트별 개별 패딩 (없으면 padding으로 폴백)
+  horizontalPadding?: Padding  // JU_H(가로부)용
+  verticalPadding?: Padding    // JU_V(세로부)용
 }
 
 // ===== 음절 분해 결과 =====

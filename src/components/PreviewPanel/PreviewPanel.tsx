@@ -22,6 +22,7 @@ export function PreviewPanel({ horizontal = false }: PreviewPanelProps) {
     setSelectedCharIndex,
     setControlMode,
     setEditingJamo,
+    setEditingPartInLayout,
     setSelectedLayoutType,
     isMobile,
   } = useUIStore()
@@ -75,6 +76,7 @@ export function PreviewPanel({ horizontal = false }: PreviewPanelProps) {
     setSelectedLayoutType(layoutType)
     setControlMode('layout')
     setEditingJamo(null, null)
+    setEditingPartInLayout(null)
   }
 
   // === 가로 모드 (데스크톱 상단 바) ===
