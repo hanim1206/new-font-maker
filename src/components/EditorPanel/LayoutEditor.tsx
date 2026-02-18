@@ -4,7 +4,6 @@ import { useLayoutStore } from '../../stores/layoutStore'
 import { useJamoStore } from '../../stores/jamoStore'
 import { useGlobalStyleStore } from '../../stores/globalStyleStore'
 import { useStrokeHistory } from '../../hooks/useStrokeHistory'
-import { SplitEditor } from './SplitEditor'
 import { RelatedSamplesPanel } from './RelatedSamplesPanel'
 import { StrokeInspector } from '../CharacterEditor/StrokeInspector'
 import { StrokeEditor } from '../CharacterEditor/StrokeEditor'
@@ -49,9 +48,9 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     getLayoutSchema,
     getEffectivePadding,
     hasPaddingOverride,
-    updateGlobalPadding,
     setPaddingOverride,
     updateSplit,
+    updatePartOverride,
     resetLayoutSchema,
     getCalculatedBoxes,
     exportSchemas,
@@ -93,6 +92,40 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     () => calculateBoxes(schemaWithPadding),
     [schemaWithPadding]
   )
+
+  // 오프셋 적용 전 원본 박스 (파트 오프셋 드래그용)
+  const rawBoxes = useMemo(
+    () => calculateBoxes({ ...schemaWithPadding, partOverrides: undefined }),
+    [schemaWithPadding]
+  )
+
+  // 선택된 파트의 오프셋을 PaddingOverlay용 Padding으로 변환
+  const selectedPartOverridePadding = useMemo((): Padding | null => {
+    if (!selectedPart) return null
+    const box = rawBoxes[selectedPart]
+    if (!box) return null
+    const override = schema.partOverrides?.[selectedPart]
+    const top = override?.top ?? 0
+    const bottom = override?.bottom ?? 0
+    const left = override?.left ?? 0
+    const right = override?.right ?? 0
+    return {
+      top: box.height > 0 ? top / box.height : 0,
+      bottom: box.height > 0 ? bottom / box.height : 0,
+      left: box.width > 0 ? left / box.width : 0,
+      right: box.width > 0 ? right / box.width : 0,
+    }
+  }, [selectedPart, rawBoxes, schema.partOverrides])
+
+  // PaddingOverlay 드래그 → PartOverride 값으로 역변환하여 저장
+  const handlePartOverrideChange = useCallback((side: keyof Padding, val: number) => {
+    if (!selectedPart) return
+    const box = rawBoxes[selectedPart]
+    if (!box) return
+    const isVertical = side === 'top' || side === 'bottom'
+    const absoluteVal = val * (isVertical ? box.height : box.width)
+    updatePartOverride(layoutType, selectedPart, side, absoluteVal)
+  }, [selectedPart, rawBoxes, layoutType, updatePartOverride])
 
   // 테스트용 음절
   const testSyllable = useMemo(() => {
@@ -527,7 +560,14 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
             />
           )}
 
-          <div className="flex justify-center p-3 bg-background rounded mb-2">
+          <div
+            className="flex justify-center p-3 bg-background rounded mb-2"
+            onClick={() => {
+              if (!isJamoEditing && selectedPart) {
+                setSelectedPart(null)
+              }
+            }}
+          >
             <div className="relative inline-block" style={{ backgroundColor: '#1a1a1a' }}>
               {/* 0.025 스냅 그리드 */}
               <svg
@@ -642,8 +682,8 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                   />
                 )}
 
-                {/* 레이아웃 편집 모드: 기준선 드래그 오버레이 */}
-                {!isJamoEditing && schema.splits && schema.splits.length > 0 && (
+                {/* 레이아웃 편집 모드: 파트 미선택 → 기준선 + 레이아웃 패딩 */}
+                {!isJamoEditing && !selectedPart && schema.splits && schema.splits.length > 0 && (
                   <SplitOverlay
                     svgRef={svgRef}
                     viewBoxSize={100}
@@ -652,22 +692,31 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                     originValues={BASE_PRESETS_SCHEMAS[layoutType]?.splits?.map(s => s.value)}
                   />
                 )}
-
-                {/* 레이아웃 편집 모드: 패딩 드래그 오버레이 */}
-                {!isJamoEditing && (
+                {!isJamoEditing && !selectedPart && (
                   <PaddingOverlay
                     svgRef={svgRef}
                     viewBoxSize={100}
                     padding={effectivePadding}
                     containerBox={{ x: 0, y: 0, width: 1, height: 1 }}
                     onPaddingChange={(side, val) => {
-                      if (hasPaddingOverride(layoutType)) {
-                        setPaddingOverride(layoutType, side, val)
-                      } else {
-                        updateGlobalPadding(side, val)
-                      }
+                      setPaddingOverride(layoutType, side, val)
                     }}
                     color={hasPaddingOverride(layoutType) ? '#ff9500' : '#a855f7'}
+                  />
+                )}
+
+                {/* 레이아웃 편집 모드: 파트 선택됨 → 파트 오프셋 드래그 */}
+                {!isJamoEditing && selectedPart && rawBoxes[selectedPart] && selectedPartOverridePadding && (
+                  <PaddingOverlay
+                    svgRef={svgRef}
+                    viewBoxSize={100}
+                    padding={selectedPartOverridePadding}
+                    containerBox={rawBoxes[selectedPart]!}
+                    onPaddingChange={handlePartOverrideChange}
+                    color="#facc15"
+                    minPadding={-0.5}
+                    maxPadding={0.5}
+                    snapStep={0.005}
                   />
                 )}
               </SvgRenderer>
@@ -692,7 +741,10 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                           width: `${box.width * 100}%`,
                           height: `${box.height * 100}%`,
                         }}
-                        onClick={() => setSelectedPart(selectedPart === part ? null : part)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedPart(selectedPart === part ? null : part)
+                        }}
                         onDoubleClick={() => handlePartDoubleClick(part)}
                         title={`${part} (더블클릭: 자모 편집)`}
                       >
@@ -850,7 +902,6 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                   🗑️
                 </Button>
               </div>
-              <SplitEditor layoutType={layoutType} selectedPart={selectedPart} />
               <p className="text-xs text-text-dim-5 mt-4 text-center leading-relaxed">
                 파트 더블클릭으로 자모 편집 진입
               </p>

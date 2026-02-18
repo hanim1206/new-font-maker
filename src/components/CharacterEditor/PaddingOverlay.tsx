@@ -12,6 +12,9 @@ interface PaddingOverlayProps {
   containerBox: BoxConfig
   onPaddingChange: (side: PaddingSide, value: number) => void
   color?: string
+  /** 음수 색상 (바깥 확장 시, 기본 '#38bdf8') */
+  negativeColor?: string
+  minPadding?: number
   maxPadding?: number
   snapStep?: number
   disabled?: boolean
@@ -41,6 +44,8 @@ export function PaddingOverlay({
   containerBox,
   onPaddingChange,
   color = '#ff9500',
+  negativeColor = '#38bdf8',
+  minPadding = 0,
   maxPadding = 0.3,
   snapStep = 0.025,
   disabled = false,
@@ -108,11 +113,11 @@ export function PaddingOverlay({
 
       // 대변 충돌 방지 (최소 10% 컨텐츠)
       const oppositeValue = padding[OPPOSITE[side]]
-      const maxAllowed = Math.min(maxPadding, 0.9 - oppositeValue)
+      const maxAllowed = Math.min(maxPadding, 0.9 - Math.max(0, oppositeValue))
 
-      return Math.max(0, Math.min(maxAllowed, raw))
+      return Math.max(minPadding, Math.min(maxAllowed, raw))
     },
-    [bx, by, bw, bh, snapStep, maxPadding, padding]
+    [bx, by, bw, bh, snapStep, minPadding, maxPadding, padding]
   )
 
   // 내부 경계선 위치 계산 (SVG 좌표)
@@ -174,33 +179,49 @@ export function PaddingOverlay({
     const pBottom = p.bottom * bh
     const pLeft = p.left * bw
     const pRight = p.right * bw
-    const hasPadding = pTop > 0 || pBottom > 0 || pLeft > 0 || pRight > 0
-    if (!hasPadding) return null
+    const hasAny = pTop !== 0 || pBottom !== 0 || pLeft !== 0 || pRight !== 0
+    if (!hasAny) return null
 
     return (
-      <g opacity={0.15} pointerEvents="none">
-        {pTop > 0 && <rect x={bx} y={by} width={bw} height={pTop} fill={color} />}
-        {pBottom > 0 && (
-          <rect x={bx} y={by + bh - pBottom} width={bw} height={pBottom} fill={color} />
-        )}
-        {pLeft > 0 && (
-          <rect
-            x={bx}
-            y={by + pTop}
-            width={pLeft}
-            height={bh - pTop - pBottom}
-            fill={color}
-          />
-        )}
-        {pRight > 0 && (
-          <rect
-            x={bx + bw - pRight}
-            y={by + pTop}
-            width={pRight}
-            height={bh - pTop - pBottom}
-            fill={color}
-          />
-        )}
+      <g pointerEvents="none">
+        {/* 양수 패딩 (안쪽 축소) */}
+        <g opacity={0.15}>
+          {pTop > 0 && <rect x={bx} y={by} width={bw} height={pTop} fill={color} />}
+          {pBottom > 0 && (
+            <rect x={bx} y={by + bh - pBottom} width={bw} height={pBottom} fill={color} />
+          )}
+          {pLeft > 0 && (
+            <rect
+              x={bx}
+              y={by + Math.max(0, pTop)}
+              width={pLeft}
+              height={bh - Math.max(0, pTop) - Math.max(0, pBottom)}
+              fill={color}
+            />
+          )}
+          {pRight > 0 && (
+            <rect
+              x={bx + bw - pRight}
+              y={by + Math.max(0, pTop)}
+              width={pRight}
+              height={bh - Math.max(0, pTop) - Math.max(0, pBottom)}
+              fill={color}
+            />
+          )}
+        </g>
+        {/* 음수 패딩 (바깥 확장) */}
+        <g opacity={0.12}>
+          {pTop < 0 && <rect x={bx} y={by + pTop} width={bw} height={-pTop} fill={negativeColor} />}
+          {pBottom < 0 && (
+            <rect x={bx} y={by + bh} width={bw} height={-pBottom} fill={negativeColor} />
+          )}
+          {pLeft < 0 && (
+            <rect x={bx + pLeft} y={by} width={-pLeft} height={bh} fill={negativeColor} />
+          )}
+          {pRight < 0 && (
+            <rect x={bx + bw} y={by} width={-pRight} height={bh} fill={negativeColor} />
+          )}
+        </g>
       </g>
     )
   }
@@ -233,14 +254,16 @@ export function PaddingOverlay({
     const isActive = dragState?.side === side
     const isHovered = hoveredSide === side
     const isAtOrigin = padding[side] === 0 // 기본값(0)에 스냅된 상태
+    const isNegative = padding[side] < 0 // 음수(바깥 확장) 상태
 
     // 핸들 위치 (박스 바깥)
     const { cx, cy } = getHandlePosition(side)
     const handleR = isActive ? 3.5 : isHovered ? 3 : 2.5
     const hitR = 5 // 투명 히트 영역 반지름
 
-    // 기본값 스냅 시 색상 변경
-    const activeColor = isActive && isAtOrigin ? originColor : color
+    // 상태별 색상: 원점 → 흰색, 음수 → 시안, 양수 → 기본색
+    const sideColor = isNegative ? negativeColor : color
+    const activeColor = isActive && isAtOrigin ? originColor : sideColor
 
     return (
       <g key={side}>
@@ -250,7 +273,7 @@ export function PaddingOverlay({
           y1={edge.y1}
           x2={edge.x2}
           y2={edge.y2}
-          stroke={isAtOrigin && isActive ? originColor : color}
+          stroke={isAtOrigin && isActive ? originColor : sideColor}
           strokeWidth={isActive ? 1.5 : isHovered ? 1.2 : 0.8}
           opacity={isActive ? 1 : isHovered ? 0.9 : 0.5}
           strokeDasharray={isActive ? 'none' : '3,2'}
@@ -261,7 +284,7 @@ export function PaddingOverlay({
           cx={cx}
           cy={cy}
           r={handleR}
-          fill={isActive ? activeColor : isHovered ? color : 'rgba(0,0,0,0.6)'}
+          fill={isActive ? activeColor : isHovered ? sideColor : 'rgba(0,0,0,0.6)'}
           stroke={activeColor}
           strokeWidth={isActive ? 1.5 : 1}
           opacity={isActive ? 1 : isHovered ? 0.95 : 0.7}
@@ -325,6 +348,7 @@ export function PaddingOverlay({
     const value = padding[dragState.side]
     const isHorizontal = dragState.side === 'top' || dragState.side === 'bottom'
     const isAtOrigin = value === 0
+    const isNeg = value < 0
     // 핸들 옆에 툴팁 배치
     const offsetX = isHorizontal ? -8 : 0
     const offsetY = isHorizontal ? 0 : -5
@@ -334,7 +358,7 @@ export function PaddingOverlay({
         x={cx + offsetX}
         y={cy + offsetY}
         fontSize={4}
-        fill={isAtOrigin ? originColor : color}
+        fill={isAtOrigin ? originColor : isNeg ? negativeColor : color}
         textAnchor="middle"
         dominantBaseline="middle"
         pointerEvents="none"
@@ -356,7 +380,7 @@ export function PaddingOverlay({
       {/* 패딩 내부 경계 (대시 테두리) */}
       {(() => {
         const p = padding
-        const hasPadding = p.top > 0 || p.bottom > 0 || p.left > 0 || p.right > 0
+        const hasPadding = p.top !== 0 || p.bottom !== 0 || p.left !== 0 || p.right !== 0
         if (!hasPadding) return null
         const px = bx + p.left * bw
         const py = by + p.top * bh
