@@ -209,6 +209,22 @@ export const useStore = create<State & Actions>()(
 
 ## 주의사항
 
+### SVG 이벤트 레이어링 (중요)
+
+- **SvgRenderer의 `{children}`은 단일 `<g>` 안에 순서대로 렌더링됨** — 나중에 렌더된 요소가 이벤트를 먼저 받음
+- **StrokeOverlay는 viewBox 전체를 덮는 투명 배경 rect를 가짐** (`<rect fill="transparent">`) → 이 뒤에 렌더된 오버레이만 이벤트를 받을 수 있음
+- 따라서 **PaddingOverlay는 반드시 StrokeOverlay 뒤에 렌더링**해야 패딩 드래그가 동작함
+- 이벤트가 안 먹히는 SVG 문제를 디버깅할 때: 코드 구조보다 **실제 DOM 렌더 순서**를 먼저 확인할 것
+- 수정 후 반드시 **Playwright 등 자동화 테스트로 검증** 후 사용자에게 확인 요청할 것
+
+### UI 라우팅 구조
+
+- 편집 메뉴에서 자모(ㄱ 등) 클릭 → `controlMode='layout'` + `editingPartInLayout` 설정 → **LayoutEditor의 자모 편집 서브모드** 진입 (JamoEditor가 아님)
+- `JamoEditor` 컴포넌트는 `controlMode='jamo'`일 때만 렌더되며, 현재 UI 플로우에서는 도달하지 않음
+- 자모 편집 관련 수정은 **LayoutEditor 내부**에서 해야 함
+
+### 기타
+
 - `BoxEditor/`는 레거시 코드 (`SplitEditor`로 대체됨). 확장하지 말 것
 - 규칙 시스템 (`Rule`, `Condition`, `Action` 타입)은 타입만 정의되어 있고 UI가 없음 — 향후 구현 예정
 - 테스트 프레임워크 미설치. 테스트 추가 시 Vitest 권장 (Vite와 호환)
