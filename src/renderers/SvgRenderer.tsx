@@ -2,6 +2,7 @@ import { useMemo, type ReactNode } from 'react'
 import type { DecomposedSyllable, BoxConfig, Part, StrokeDataV2, LayoutType, LayoutSchema, Padding } from '../types'
 import { calculateBoxes } from '../utils/layoutCalculator'
 import { pointsToSvgD } from '../utils/pathUtils'
+import { weightToMultiplier } from '../stores/globalStyleStore'
 import type { GlobalStyle } from '../stores/globalStyleStore'
 
 // 파트별 스타일 (자모 편집 시 비편집 파트 흐리게 표시 등)
@@ -92,7 +93,7 @@ export function SvgRenderer({
 
   // 글로벌 스타일 값 (기본값 적용)
   const slant = globalStyle?.slant ?? 0
-  const weightMultiplier = globalStyle?.weight ?? 1.0
+  const weightMultiplier = globalStyle ? weightToMultiplier(globalStyle.weight) : 1.0
 
   const renderStrokes = (
     strokes: StrokeDataV2[] | undefined,

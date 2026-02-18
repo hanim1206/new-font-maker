@@ -55,18 +55,19 @@ export function EditorPanel() {
     setShowMenu(false)
   }, [setSelectedLayoutType, setControlMode, setEditingJamo, setEditingPartInLayout])
 
-  // 헤더 텍스트
-  let headerText = ''
+  // 헤더 텍스트 (향후 UI 표시용)
+  let _headerText = ''
   if (controlMode === 'global') {
-    headerText = '글로벌 스타일'
+    _headerText = '글로벌 스타일'
   } else if (controlMode === 'layout' && selectedLayoutType) {
-    headerText = editingPartInLayout && editingJamoChar
+    _headerText = editingPartInLayout && editingJamoChar
       ? `레이아웃: ${selectedLayoutType} > ${editingPartInLayout} (${editingJamoChar})`
       : `레이아웃 편집: ${selectedLayoutType}`
   } else if (controlMode === 'jamo' && editingJamoType && editingJamoChar) {
     const typeLabel = { choseong: '초성', jungseong: '중성', jongseong: '종성' }[editingJamoType]
-    headerText = `${typeLabel} 편집: ${editingJamoChar}`
+    _headerText = `${typeLabel} 편집: ${editingJamoChar}`
   }
+  void _headerText
 
   // 콘텐츠
   let content: React.ReactNode = null
@@ -116,11 +117,8 @@ export function EditorPanel() {
           >
             <span className="text-xs">{showMenu ? '▲' : '▼'}</span>
             편집 메뉴
-            {controlMode && (
-              <span className="ml-auto text-xs text-text-dim-5 truncate max-w-[60%]">
-                {headerText}
-              </span>
-            )}
+        
+      
           </button>
 
           {/* 펼침: 글로벌 + 자모 버튼 가로 정렬 */}
@@ -209,12 +207,8 @@ export function EditorPanel() {
         </div>
       )}
 
-      {/* 헤더 */}
-      {headerText && (
-        <div className="px-5 py-4 border-b border-border-subtle bg-[#111] shrink-0">
-          <h2 className="text-xl font-semibold text-[#e0e0e0]">{headerText}</h2>
-        </div>
-      )}
+
+
 
       {/* 콘텐츠 */}
       {content}

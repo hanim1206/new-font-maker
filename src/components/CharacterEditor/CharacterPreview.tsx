@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useJamoStore } from '../../stores/jamoStore'
-import { useGlobalStyleStore } from '../../stores/globalStyleStore'
+import { useGlobalStyleStore, weightToMultiplier } from '../../stores/globalStyleStore'
 import type { StrokeDataV2, BoxConfig, Padding } from '../../types'
 import { pointsToSvgD } from '../../utils/pathUtils'
 
@@ -89,7 +89,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
   }
 
   // 글로벌 스타일 적용
-  const weightMultiplier = globalStyle.weight ?? 1.0
+  const weightMultiplier = weightToMultiplier(globalStyle.weight ?? 400)
   const slant = globalStyle.slant ?? 0
 
   // 박스 영역을 viewBox 좌표로 변환

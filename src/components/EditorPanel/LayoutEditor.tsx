@@ -3,9 +3,9 @@ import { useUIStore } from '../../stores/uiStore'
 import { useLayoutStore } from '../../stores/layoutStore'
 import { useJamoStore } from '../../stores/jamoStore'
 import { useGlobalStyleStore } from '../../stores/globalStyleStore'
+import { useStrokeHistory } from '../../hooks/useStrokeHistory'
 import { SplitEditor } from './SplitEditor'
 import { RelatedSamplesPanel } from './RelatedSamplesPanel'
-import { StrokeList } from '../CharacterEditor/StrokeList'
 import { StrokeInspector } from '../CharacterEditor/StrokeInspector'
 import { StrokeEditor } from '../CharacterEditor/StrokeEditor'
 import { StrokeOverlay } from '../CharacterEditor/StrokeOverlay'
@@ -18,7 +18,7 @@ import { copyJsonToClipboard } from '../../utils/storage'
 import { mergeStrokes, splitStroke, addHandlesToPoint, removeHandlesFromPoint } from '../../utils/strokeEditUtils'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
-import type { LayoutType, Part, StrokeDataV2, DecomposedSyllable, BoxConfig, JamoData, Padding } from '../../types'
+import type { LayoutType, Part, DecomposedSyllable, BoxConfig, JamoData, Padding } from '../../types'
 
 interface LayoutEditorProps {
   layoutType: LayoutType
@@ -72,8 +72,8 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   // 파트 선택 상태 (레이아웃 편집 모드)
   const [selectedPart, setSelectedPart] = useState<Part | null>(null)
 
-  // 자모 편집용 draft strokes
-  const [draftStrokes, setDraftStrokes] = useState<StrokeDataV2[]>([])
+  // 자모 편집용 draft strokes (undo/redo 지원)
+  const { strokes: draftStrokes, setStrokes: setDraftStrokes, pushSnapshot, resetStrokes: resetDraftStrokes, undo, redo, canUndo, canRedo } = useStrokeHistory()
 
   const schema = getLayoutSchema(layoutType)
   const effectivePadding = getEffectivePadding(layoutType)
@@ -176,10 +176,10 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     return jamoMap[editingJamoInfo.char]?.padding
   }, [editingJamoInfo, choseong, jungseong, jongseong])
 
-  // 자모 편집 진입 시 draft strokes 로드
+  // 자모 편집 진입 시 draft strokes 로드 (히스토리 초기화)
   useEffect(() => {
     if (!editingJamoInfo) {
-      setDraftStrokes([])
+      resetDraftStrokes([])
       return
     }
 
@@ -190,24 +190,24 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
     if (jamo) {
       if (jamo.horizontalStrokes && jamo.verticalStrokes) {
-        setDraftStrokes([...jamo.horizontalStrokes, ...jamo.verticalStrokes])
+        resetDraftStrokes([...jamo.horizontalStrokes, ...jamo.verticalStrokes])
       } else if (jamo.verticalStrokes) {
-        setDraftStrokes([...jamo.verticalStrokes])
+        resetDraftStrokes([...jamo.verticalStrokes])
       } else if (jamo.horizontalStrokes) {
-        setDraftStrokes([...jamo.horizontalStrokes])
+        resetDraftStrokes([...jamo.horizontalStrokes])
       } else if (jamo.strokes) {
-        setDraftStrokes([...jamo.strokes])
+        resetDraftStrokes([...jamo.strokes])
       } else {
-        setDraftStrokes([])
+        resetDraftStrokes([])
       }
     } else {
-      setDraftStrokes([])
+      resetDraftStrokes([])
     }
 
     setSelectedStrokeId(null)
   }, [editingJamoInfo, choseong, jungseong, jongseong, setSelectedStrokeId])
 
-  // Escape 키로 자모 편집 종료
+  // Escape 키로 자모 편집 종료 + Ctrl+Z/Y로 undo/redo
   useEffect(() => {
     if (!isJamoEditing) return
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -215,10 +215,18 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
         e.preventDefault()
         setEditingPartInLayout(null)
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        undo()
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault()
+        redo()
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isJamoEditing, setEditingPartInLayout])
+  }, [isJamoEditing, setEditingPartInLayout, undo, redo])
 
   // 더블클릭으로 자모 편집 진입
   const handlePartDoubleClick = useCallback((part: Part) => {
@@ -260,6 +268,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
   // 두 획 합치기
   const handleMergeStrokes = useCallback((strokeIdA: string, strokeIdB: string) => {
+    pushSnapshot()
     setDraftStrokes(prev => {
       const a = prev.find(s => s.id === strokeIdA)
       const b = prev.find(s => s.id === strokeIdB)
@@ -274,6 +283,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
   // 획 분리
   const handleSplitStroke = useCallback((strokeId: string, pointIndex: number) => {
+    pushSnapshot()
     setDraftStrokes(prev => {
       const stroke = prev.find(s => s.id === strokeId)
       if (!stroke) return prev
@@ -289,6 +299,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
   // 포인트 곡선화 토글
   const handleToggleCurve = useCallback((strokeId: string, pointIndex: number) => {
+    pushSnapshot()
     setDraftStrokes(prev => prev.map(s => {
       if (s.id !== strokeId) return s
       const pt = s.points[pointIndex]
@@ -333,7 +344,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     }
   }, [editingJamoInfo, draftStrokes, choseong, jungseong, jongseong, updateChoseong, updateJungseong, updateJongseong])
 
-  // 자모 편집 초기화
+  // 자모 편집 초기화 (히스토리 리셋)
   const handleJamoReset = useCallback(() => {
     if (!editingJamoInfo) return
     const jamoMap = editingJamoInfo.type === 'choseong' ? choseong
@@ -343,15 +354,15 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     if (!jamo) return
 
     if (jamo.horizontalStrokes && jamo.verticalStrokes) {
-      setDraftStrokes([...jamo.horizontalStrokes, ...jamo.verticalStrokes])
+      resetDraftStrokes([...jamo.horizontalStrokes, ...jamo.verticalStrokes])
     } else if (jamo.verticalStrokes) {
-      setDraftStrokes([...jamo.verticalStrokes])
+      resetDraftStrokes([...jamo.verticalStrokes])
     } else if (jamo.horizontalStrokes) {
-      setDraftStrokes([...jamo.horizontalStrokes])
+      resetDraftStrokes([...jamo.horizontalStrokes])
     } else if (jamo.strokes) {
-      setDraftStrokes([...jamo.strokes])
+      resetDraftStrokes([...jamo.strokes])
     }
-  }, [editingJamoInfo, choseong, jungseong, jongseong])
+  }, [editingJamoInfo, choseong, jungseong, jongseong, resetDraftStrokes])
 
   // 자모 편집 모드에서 SvgRenderer용 partStyles 계산
   // 편집 중인 파트는 hidden (StrokeOverlay가 대신 렌더링), 나머지는 어둡게
@@ -623,6 +634,8 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                     svgRef={svgRef}
                     viewBoxSize={100}
                     onStrokeChange={handleStrokeChange}
+                    onPointChange={handlePointChange}
+                    onDragStart={pushSnapshot}
                     strokeColor="#e5e5e5"
                     isMixed={!!mixedJungseongData}
                     juHBox={mixedJungseongData?.juHBox}
@@ -728,25 +741,6 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
           {isJamoEditing && editingJamoInfo ? (
             /* 자모 편집 도구 */
             <div className="flex flex-col gap-4">
-              {/* 획 목록 */}
-              <div className="bg-surface rounded-md border border-border-subtle p-4">
-                <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">획 목록</h3>
-                <StrokeList strokes={draftStrokes} />
-              </div>
-
-              {/* 속성 편집 */}
-              <div className="bg-surface rounded-md border border-border-subtle p-4">
-                <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">속성 편집</h3>
-                <StrokeInspector
-                  strokes={draftStrokes}
-                  onChange={handleStrokeChange}
-                  onPointChange={handlePointChange}
-                  onMergeStrokes={handleMergeStrokes}
-                  onSplitStroke={handleSplitStroke}
-                  onToggleCurve={handleToggleCurve}
-                />
-              </div>
-
               {/* 자모 패딩 */}
               {editingJamoInfo && (() => {
                 const pad = editingJamoPadding
@@ -799,26 +793,51 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                         )
                       })}
                     </div>
-                    <p className="text-[0.75rem] text-text-dim-5 mt-3 pt-3 border-t border-border-subtle leading-relaxed">
-                      자모 획이 박스 가장자리까지 확장되는 것을 방지합니다. 변경 시 즉시 반영됩니다.
-                    </p>
+                 
                   </div>
                 )
               })()}
+
+              {/* 획 목록 */}
+              {/* <div className="bg-surface rounded-md border border-border-subtle p-4">
+                <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">획 목록</h3>
+                <StrokeList strokes={draftStrokes} />
+              </div> */}
+
+              {/* 속성 편집 */}
+              <div className="bg-surface rounded-md border border-border-subtle p-4">
+                <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">속성 편집</h3>
+                <StrokeInspector
+                  strokes={draftStrokes}
+                  onChange={handleStrokeChange}
+                  onPointChange={handlePointChange}
+                  onMergeStrokes={handleMergeStrokes}
+                  onSplitStroke={handleSplitStroke}
+                  onToggleCurve={handleToggleCurve}
+                />
+              </div>
 
               {/* 키보드 기반 컨트롤 (UI 없음, 이벤트만 처리) */}
               <StrokeEditor
                 strokes={draftStrokes}
                 onChange={handleStrokeChange}
+                onPointChange={handlePointChange}
                 boxInfo={editingBox ? { ...editingBox } : undefined}
               />
 
-              {/* 저장/초기화 버튼 */}
-              <div className="flex gap-3">
-                <Button variant="default" className="flex-1" onClick={handleJamoReset}>
+              {/* undo/redo + 저장/초기화 버튼 */}
+              <div className="flex gap-2">
+                <Button variant="default" size="sm" onClick={undo} disabled={!canUndo} title="되돌리기 (Ctrl+Z)">
+                  ↩
+                </Button>
+                <Button variant="default" size="sm" onClick={redo} disabled={!canRedo} title="다시 실행 (Ctrl+Y)">
+                  ↪
+                </Button>
+                <div className="flex-1" />
+                <Button variant="default" onClick={handleJamoReset}>
                   초기화
                 </Button>
-                <Button variant="blue" className="flex-1" onClick={handleJamoSave}>
+                <Button variant="blue" onClick={handleJamoSave}>
                   저장
                 </Button>
               </div>

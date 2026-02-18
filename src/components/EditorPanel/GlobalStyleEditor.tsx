@@ -5,11 +5,26 @@ import { useLayoutStore } from '../../stores/layoutStore'
 import { useJamoStore } from '../../stores/jamoStore'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { decomposeSyllable, isHangul } from '../../utils/hangulUtils'
+import { weightToMultiplier } from '../../stores/globalStyleStore'
 import type { LayoutType, Padding } from '../../types'
 import { cn } from '@/lib/utils'
 import { Slider } from '@/components/ui/slider'
+import type { SliderMark } from '@/components/ui/slider'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
+
+/** 두께 100~900 마크 (CSS font-weight 방식) */
+const WEIGHT_MARKS: SliderMark[] = [
+  { value: 100, label: '100' },
+  { value: 200 },
+  { value: 300, label: '300' },
+  { value: 400, label: '400' },
+  { value: 500 },
+  { value: 600, label: '600' },
+  { value: 700, label: '700' },
+  { value: 800 },
+  { value: 900, label: '900' },
+]
 
 const PADDING_SIDES: Array<{ key: keyof Padding; label: string }> = [
   { key: 'top', label: '상단' },
@@ -74,10 +89,10 @@ export function GlobalStyleEditor() {
   const previewEffectiveStyle = getEffectiveStyle(previewSyllable.layoutType)
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex  gap-4">
       {/* 미리보기 */}
-      <div className="p-4 bg-surface rounded-md border border-border-subtle flex items-center gap-4">
-        <div className="flex justify-center p-2 bg-background rounded">
+
+        <div className="flex flex-1 justify-center p-2 bg-background rounded">
           <SvgRenderer
             syllable={previewSyllable}
             schema={{ ...previewSchema, padding: previewPadding }}
@@ -87,8 +102,16 @@ export function GlobalStyleEditor() {
             globalStyle={previewEffectiveStyle}
           />
         </div>
-        <p className="text-sm text-text-dim-5 m-0">{previewSyllable.char}</p>
-      </div>
+        {/* 속성 편집 묶음 */}
+      <div className="flex-1 p-2 flex-col bg-surface rounded-md border border-border-subtle flex gap-4">
+      {/* 리셋 */}
+      <Button
+        variant="outline"
+        className="w-full"
+        onClick={resetStyle}
+      >
+        전체 초기화
+      </Button>
 
       {/* 기울기 */}
       <div className="p-4 bg-surface rounded-md border border-border-subtle">
@@ -108,6 +131,7 @@ export function GlobalStyleEditor() {
             step={0.5}
             value={[style.slant]}
             onValueChange={([val]) => updateStyle('slant', val)}
+            originValue={0}
           />
         </div>
       </div>
@@ -119,17 +143,19 @@ export function GlobalStyleEditor() {
         </h4>
         <div>
           <div className="flex justify-between items-center mb-2">
-            <span className="text-base text-text-dim-1 font-medium">배율</span>
+            <span className="text-base text-text-dim-1 font-medium">{style.weight}</span>
             <span className="text-sm text-text-dim-4 font-mono bg-surface-2 px-2 py-0.5 rounded-sm">
-              {style.weight.toFixed(2)}x
+              {weightToMultiplier(style.weight).toFixed(2)}x
             </span>
           </div>
           <Slider
-            min={0.3}
-            max={3.0}
-            step={0.05}
+            min={100}
+            max={900}
+            step={100}
             value={[style.weight]}
             onValueChange={([val]) => updateStyle('weight', val)}
+            marks={WEIGHT_MARKS}
+            originValue={400}
           />
         </div>
       </div>
@@ -152,6 +178,7 @@ export function GlobalStyleEditor() {
             step={0.01}
             value={[style.letterSpacing]}
             onValueChange={([val]) => updateStyle('letterSpacing', val)}
+            originValue={0}
           />
         </div>
       </div>
@@ -178,6 +205,7 @@ export function GlobalStyleEditor() {
                 value={[globalPadding[key]]}
                 onValueChange={([val]) => updateGlobalPadding(key, val)}
                 colorScheme="padding"
+                originValue={0}
               />
             </div>
           ))}
@@ -186,7 +214,7 @@ export function GlobalStyleEditor() {
 
       {/* 레이아웃별 제외 설정 */}
       {(style.slant !== 0 ||
-        style.weight !== 1.0 ||
+        style.weight !== 400 ||
         style.letterSpacing !== 0) && (
         <div className="p-4 bg-surface rounded-md border border-border-subtle">
           <h4 className="text-sm font-medium m-0 mb-4 text-text-dim-4 uppercase tracking-wider">
@@ -228,7 +256,7 @@ export function GlobalStyleEditor() {
                         <span className="text-xs text-text-dim-4">기울기</span>
                       </label>
                     )}
-                    {style.weight !== 1.0 && (
+                    {style.weight !== 400 && (
                       <label className="flex items-center gap-1 cursor-pointer">
                         <Checkbox
                           checked={hasExclusion('weight', type)}
@@ -263,16 +291,6 @@ export function GlobalStyleEditor() {
           )}
         </div>
       )}
-
-      {/* 리셋 */}
-      <div className="pt-2">
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={resetStyle}
-        >
-          전체 초기화
-        </Button>
       </div>
     </div>
   )

@@ -8,8 +8,20 @@ const STORAGE_KEY = 'font-maker-global-style'
 // ===== 글로벌 스타일 속성 =====
 export interface GlobalStyle {
   slant: number         // 기울기 (도, -30~30, 기본 0)
-  weight: number        // 두께 배율 (0.5~2.0, 기본 1.0)
+  weight: number        // 두께 (100~900, 100단위, 기본 400)
   letterSpacing: number // 자간 (0~0.3, 기본 0)
+}
+
+/**
+ * weight 값(100~900)을 두께 배율(multiplier)로 변환
+ * 100=0.4x, 400=1.0x, 900=2.2x (선형 보간)
+ */
+export function weightToMultiplier(weight: number): number {
+  // 100 → 0.4, 400 → 1.0, 900 → 2.2
+  if (weight <= 400) {
+    return 0.4 + (weight - 100) / 300 * 0.6  // 100→0.4, 400→1.0
+  }
+  return 1.0 + (weight - 400) / 500 * 1.2     // 400→1.0, 900→2.2
 }
 
 // ===== 레이아웃별 속성 제외 =====
@@ -46,7 +58,7 @@ interface GlobalStyleActions {
 
 const DEFAULT_STYLE: GlobalStyle = {
   slant: 0,
-  weight: 1.0,
+  weight: 400,
   letterSpacing: 0,
 }
 

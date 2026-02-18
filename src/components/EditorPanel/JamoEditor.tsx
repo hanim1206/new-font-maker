@@ -435,10 +435,7 @@ function JamoPaddingSection({
           )
         })}
       </div>
-
-      <p className="text-[0.75rem] text-text-dim-5 mt-3 pt-3 border-t border-border-subtle leading-relaxed">
-        자모 획이 박스 가장자리까지 확장되는 것을 방지합니다. 변경 시 즉시 반영됩니다.
-      </p>
+\
     </div>
   )
 }
