@@ -15,6 +15,7 @@ import type { PartStyle } from '../../renderers/SvgRenderer'
 import { decomposeSyllable } from '../../utils/hangulUtils'
 import { calculateBoxes } from '../../utils/layoutCalculator'
 import { copyJsonToClipboard } from '../../utils/storage'
+import { mergeStrokes, splitStroke, addHandlesToPoint, removeHandlesFromPoint } from '../../utils/strokeEditUtils'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import type { LayoutType, Part, StrokeDataV2, DecomposedSyllable, BoxConfig, JamoData, Padding } from '../../types'
@@ -232,6 +233,72 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     setDraftStrokes((prev) =>
       prev.map((s) => (s.id === strokeId ? { ...s, [prop]: value } : s))
     )
+  }, [])
+
+  // 포인트 변경 핸들러
+  const handlePointChange = useCallback((
+    strokeId: string,
+    pointIndex: number,
+    field: 'x' | 'y' | 'handleIn' | 'handleOut',
+    value: { x: number; y: number } | number
+  ) => {
+    setDraftStrokes(prev => prev.map(s => {
+      if (s.id !== strokeId) return s
+      const newPoints = s.points.map((p, i) => {
+        if (i !== pointIndex) return p
+        const updated = { ...p }
+        if (field === 'x' || field === 'y') {
+          updated[field] = value as number
+        } else {
+          updated[field] = value as { x: number; y: number }
+        }
+        return updated
+      })
+      return { ...s, points: newPoints }
+    }))
+  }, [])
+
+  // 두 획 합치기
+  const handleMergeStrokes = useCallback((strokeIdA: string, strokeIdB: string) => {
+    setDraftStrokes(prev => {
+      const a = prev.find(s => s.id === strokeIdA)
+      const b = prev.find(s => s.id === strokeIdB)
+      if (!a || !b) return prev
+      const merged = mergeStrokes(a, b)
+      if (!merged) return prev
+      return prev
+        .map(s => s.id === strokeIdA ? merged : s)
+        .filter(s => s.id !== strokeIdB)
+    })
+  }, [])
+
+  // 획 분리
+  const handleSplitStroke = useCallback((strokeId: string, pointIndex: number) => {
+    setDraftStrokes(prev => {
+      const stroke = prev.find(s => s.id === strokeId)
+      if (!stroke) return prev
+      const result = splitStroke(stroke, pointIndex)
+      if (!result) return prev
+      const [first, second] = result
+      const idx = prev.findIndex(s => s.id === strokeId)
+      const newStrokes = [...prev]
+      newStrokes.splice(idx, 1, first, second)
+      return newStrokes
+    })
+  }, [])
+
+  // 포인트 곡선화 토글
+  const handleToggleCurve = useCallback((strokeId: string, pointIndex: number) => {
+    setDraftStrokes(prev => prev.map(s => {
+      if (s.id !== strokeId) return s
+      const pt = s.points[pointIndex]
+      if (!pt) return s
+      if (pt.handleIn || pt.handleOut) {
+        return removeHandlesFromPoint(s, pointIndex)
+      } else {
+        return addHandlesToPoint(s, pointIndex)
+      }
+    }))
   }, [])
 
   // 자모 편집 저장
@@ -670,7 +737,14 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
               {/* 속성 편집 */}
               <div className="bg-surface rounded-md border border-border-subtle p-4">
                 <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">속성 편집</h3>
-                <StrokeInspector strokes={draftStrokes} onChange={handleStrokeChange} />
+                <StrokeInspector
+                  strokes={draftStrokes}
+                  onChange={handleStrokeChange}
+                  onPointChange={handlePointChange}
+                  onMergeStrokes={handleMergeStrokes}
+                  onSplitStroke={handleSplitStroke}
+                  onToggleCurve={handleToggleCurve}
+                />
               </div>
 
               {/* 자모 패딩 */}
