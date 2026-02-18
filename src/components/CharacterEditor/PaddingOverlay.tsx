@@ -226,48 +226,43 @@ export function PaddingOverlay({
     )
   }
 
-  // 핸들 위치 계산 (컨테이너 박스 바깥)
-  const HANDLE_OFFSET = 6 // 박스 가장자리에서 바깥으로의 거리
+  // 핸들 위치 계산 — 박스 바깥 꼭짓점 영역으로 이동
+  const HANDLE_OFFSET = 10 // 박스 가장자리에서 바깥으로의 거리
   const getHandlePosition = (side: PaddingSide) => {
     const edge = getEdgePosition(side)
     switch (side) {
       case 'top':
-        // 경계선 y좌표, 박스 왼쪽 바깥
         return { cx: bx - HANDLE_OFFSET, cy: edge.y1 }
       case 'bottom':
-        // 경계선 y좌표, 박스 왼쪽 바깥
         return { cx: bx - HANDLE_OFFSET, cy: edge.y1 }
       case 'left':
-        // 경계선 x좌표, 박스 위쪽 바깥
         return { cx: edge.x1, cy: by - HANDLE_OFFSET }
       case 'right':
-        // 경계선 x좌표, 박스 위쪽 바깥
         return { cx: edge.x1, cy: by - HANDLE_OFFSET }
     }
   }
 
-  // 경계선 + 원형 핸들 렌더링
+  // 경계선 + 핸들 원 렌더링 (히트 영역은 핸들 원만)
   const renderEdgeHandle = (side: PaddingSide) => {
     const edge = getEdgePosition(side)
     const isHorizontal = side === 'top' || side === 'bottom'
     const cursor = isHorizontal ? 'ns-resize' : 'ew-resize'
     const isActive = dragState?.side === side
     const isHovered = hoveredSide === side
-    const isAtOrigin = padding[side] === 0 // 기본값(0)에 스냅된 상태
-    const isNegative = padding[side] < 0 // 음수(바깥 확장) 상태
+    const isAtOrigin = padding[side] === 0
+    const isNegative = padding[side] < 0
 
-    // 핸들 위치 (박스 바깥)
+    // 핸들 마커 위치 (박스 바깥)
     const { cx, cy } = getHandlePosition(side)
-    const handleR = isActive ? 3.5 : isHovered ? 3 : 2.5
-    const hitR = 5 // 투명 히트 영역 반지름
+    const handleR = isActive ? 4 : isHovered ? 3.5 : 3
 
-    // 상태별 색상: 원점 → 흰색, 음수 → 시안, 양수 → 기본색
+    // 상태별 색상
     const sideColor = isNegative ? negativeColor : color
     const activeColor = isActive && isAtOrigin ? originColor : sideColor
 
     return (
       <g key={side}>
-        {/* 가시적 경계선 */}
+        {/* 가시적 경계선 (클릭 불가) */}
         <line
           x1={edge.x1}
           y1={edge.y1}
@@ -279,7 +274,7 @@ export function PaddingOverlay({
           strokeDasharray={isActive ? 'none' : '3,2'}
           pointerEvents="none"
         />
-        {/* 가시적 원형 핸들 */}
+        {/* 가시적 원형 핸들 마커 (바깥) */}
         <circle
           cx={cx}
           cy={cy}
@@ -291,45 +286,14 @@ export function PaddingOverlay({
           pointerEvents="none"
           style={{ transition: 'r 0.1s, opacity 0.1s' }}
         />
-        {/* 핸들 내부 방향 표시 (가로/세로 화살표 힌트) */}
-        {(isHovered || isActive) && (
-          <g pointerEvents="none" opacity={0.9}>
-            {isHorizontal ? (
-              <>
-                <line x1={cx} y1={cy - 1.2} x2={cx} y2={cy + 1.2}
-                  stroke="#fff" strokeWidth={0.8} strokeLinecap="round" />
-                <line x1={cx - 0.6} y1={cy - 0.6} x2={cx} y2={cy - 1.2}
-                  stroke="#fff" strokeWidth={0.6} strokeLinecap="round" />
-                <line x1={cx + 0.6} y1={cy - 0.6} x2={cx} y2={cy - 1.2}
-                  stroke="#fff" strokeWidth={0.6} strokeLinecap="round" />
-                <line x1={cx - 0.6} y1={cy + 0.6} x2={cx} y2={cy + 1.2}
-                  stroke="#fff" strokeWidth={0.6} strokeLinecap="round" />
-                <line x1={cx + 0.6} y1={cy + 0.6} x2={cx} y2={cy + 1.2}
-                  stroke="#fff" strokeWidth={0.6} strokeLinecap="round" />
-              </>
-            ) : (
-              <>
-                <line x1={cx - 1.2} y1={cy} x2={cx + 1.2} y2={cy}
-                  stroke="#fff" strokeWidth={0.8} strokeLinecap="round" />
-                <line x1={cx - 0.6} y1={cy - 0.6} x2={cx - 1.2} y2={cy}
-                  stroke="#fff" strokeWidth={0.6} strokeLinecap="round" />
-                <line x1={cx - 0.6} y1={cy + 0.6} x2={cx - 1.2} y2={cy}
-                  stroke="#fff" strokeWidth={0.6} strokeLinecap="round" />
-                <line x1={cx + 0.6} y1={cy - 0.6} x2={cx + 1.2} y2={cy}
-                  stroke="#fff" strokeWidth={0.6} strokeLinecap="round" />
-                <line x1={cx + 0.6} y1={cy + 0.6} x2={cx + 1.2} y2={cy}
-                  stroke="#fff" strokeWidth={0.6} strokeLinecap="round" />
-              </>
-            )}
-          </g>
-        )}
-        {/* 투명 히트 영역 (원형) */}
+        {/* 히트 영역: 핸들 원 주변만 (획과 충돌 없음) */}
         {!dragState && (
           <circle
             cx={cx}
             cy={cy}
-            r={hitR}
+            r={6}
             fill="transparent"
+            pointerEvents="all"
             style={{ cursor: disabled ? 'default' : cursor }}
             onMouseEnter={() => !disabled && setHoveredSide(side)}
             onMouseLeave={() => setHoveredSide(null)}
@@ -371,7 +335,7 @@ export function PaddingOverlay({
   }
 
   return (
-    <g style={dragState ? {
+    <g pointerEvents="none" style={dragState ? {
       cursor: dragState.side === 'top' || dragState.side === 'bottom' ? 'ns-resize' : 'ew-resize',
     } : undefined}>
       {/* 패딩 영역 채우기 */}
@@ -402,7 +366,7 @@ export function PaddingOverlay({
         )
       })()}
 
-      {/* 4개 내부 경계선 + 히트 영역 */}
+      {/* 4개 경계선 + 핸들 원 */}
       {SIDES.map((side) => renderEdgeHandle(side))}
 
       {/* 드래그 중 값 툴팁 */}

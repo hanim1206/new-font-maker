@@ -22,12 +22,13 @@ interface CharacterPreviewProps {
   onPointChange?: PointChangeHandler
   onStrokeChange?: StrokeChangeHandler
   jamoPadding?: Padding
+  onPaddingChange?: (side: keyof Padding, value: number) => void
 }
 
 const VIEW_BOX_SIZE = 100
 
-// viewBox 마진 (박스 영역 주변 여백)
-const VIEW_MARGIN = 3
+// viewBox 마진 (박스 영역 주변 여백, PaddingOverlay 핸들 HANDLE_OFFSET=6 + hitR=5 고려)
+const VIEW_MARGIN = 12
 
 // 박스 타입별 색상
 const BOX_COLORS: Record<string, string> = {
@@ -65,7 +66,7 @@ function applyJamoPaddingToBox(box: { x: number; y: number; width: number; heigh
   }
 }
 
-export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, width: 1, height: 1 }, jamoType, onPointChange, onStrokeChange, jamoPadding }: CharacterPreviewProps) {
+export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, width: 1, height: 1 }, jamoType, onPointChange, onStrokeChange, jamoPadding, onPaddingChange }: CharacterPreviewProps) {
   const { selectedStrokeId, setSelectedStrokeId, editingJamoType, selectedPointIndex, setSelectedPointIndex } = useUIStore()
   const { jungseong } = useJamoStore()
   const { style: globalStyle } = useGlobalStyleStore()
@@ -256,236 +257,238 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
 
   return (
     <div className="flex flex-col items-center gap-2 p-4 bg-surface-2 rounded-md w-full">
-      <svg
-        ref={svgRef}
-        viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
-        preserveAspectRatio="xMidYMid meet"
-        onMouseMove={dragState ? handlePointerMove : undefined}
-        onMouseUp={dragState ? handlePointerUp : undefined}
-        onMouseLeave={dragState ? handlePointerUp : undefined}
-        onTouchMove={dragState ? handlePointerMove : undefined}
-        onTouchEnd={dragState ? handlePointerUp : undefined}
-        onTouchCancel={dragState ? handlePointerUp : undefined}
-        style={{ touchAction: 'none', ...(dragState ? { cursor: dragState.type === 'strokeMove' ? 'move' : 'grabbing' } : {}) }}
-      >
-        {/* 전체 영역 배경 */}
-        <rect
-          x={vbX}
-          y={vbY}
-          width={vbW}
-          height={vbH}
-          fill="#2a2a2a"
-          opacity={0.3}
-        />
-
-        {/* 혼합 중성인 경우 JU_H와 JU_V 박스를 각각 표시 */}
-        {isMixed && boxInfo.juH && boxInfo.juV ? (
-          <>
-            {/* JU_H 박스 */}
-            <rect
-              x={boxInfo.juH.x * VIEW_BOX_SIZE}
-              y={boxInfo.juH.y * VIEW_BOX_SIZE}
-              width={boxInfo.juH.width * VIEW_BOX_SIZE}
-              height={boxInfo.juH.height * VIEW_BOX_SIZE}
-              fill={BOX_COLORS.JU_H}
-              opacity={0.2}
-              stroke={BOX_COLORS.JU_H}
-              strokeWidth={2}
-              strokeDasharray="4,4"
-            />
-            {/* JU_V 박스 */}
-            <rect
-              x={boxInfo.juV.x * VIEW_BOX_SIZE}
-              y={boxInfo.juV.y * VIEW_BOX_SIZE}
-              width={boxInfo.juV.width * VIEW_BOX_SIZE}
-              height={boxInfo.juV.height * VIEW_BOX_SIZE}
-              fill={BOX_COLORS.JU_V}
-              opacity={0.2}
-              stroke={BOX_COLORS.JU_V}
-              strokeWidth={2}
-              strokeDasharray="4,4"
-            />
-          </>
-        ) : (
-          /* 일반 박스 영역 */
+      {/* 획 SVG + 패딩 오버레이 SVG를 겹쳐 배치 */}
+      <div className="relative w-full" style={{ aspectRatio: `${vbW} / ${vbH}` }}>
+        {/* 메인 SVG: 획 렌더링 + 드래그 */}
+        <svg
+          ref={svgRef}
+          viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
+          preserveAspectRatio="xMidYMid meet"
+          className="absolute inset-0 w-full h-full"
+          onMouseMove={dragState ? handlePointerMove : undefined}
+          onMouseUp={dragState ? handlePointerUp : undefined}
+          onMouseLeave={dragState ? handlePointerUp : undefined}
+          onTouchMove={dragState ? handlePointerMove : undefined}
+          onTouchEnd={dragState ? handlePointerUp : undefined}
+          onTouchCancel={dragState ? handlePointerUp : undefined}
+          style={{ touchAction: 'none', ...(dragState ? { cursor: dragState.type === 'strokeMove' ? 'move' : 'grabbing' } : {}) }}
+        >
+          {/* 전체 영역 배경 */}
           <rect
-            x={boxX}
-            y={boxY}
-            width={boxWidth}
-            height={boxHeight}
-            fill={boxColor}
-            opacity={0.2}
-            stroke={boxColor}
-            strokeWidth={2}
-            strokeDasharray="4,4"
+            x={vbX}
+            y={vbY}
+            width={vbW}
+            height={vbH}
+            fill="#2a2a2a"
+            opacity={0.3}
           />
-        )}
 
-        {/* 자모 패딩 오버레이 (반투명 오렌지) */}
-        {jamoPadding && (jamoPadding.top > 0 || jamoPadding.bottom > 0 || jamoPadding.left > 0 || jamoPadding.right > 0) && (() => {
-          const renderPaddingOverlay = (bx: number, by: number, bw: number, bh: number) => {
-            const pTop = jamoPadding.top * bh
-            const pBottom = jamoPadding.bottom * bh
-            const pLeft = jamoPadding.left * bw
-            const pRight = jamoPadding.right * bw
+          {/* 혼합 중성인 경우 JU_H와 JU_V 박스를 각각 표시 */}
+          {isMixed && boxInfo.juH && boxInfo.juV ? (
+            <>
+              {/* JU_H 박스 */}
+              <rect
+                x={boxInfo.juH.x * VIEW_BOX_SIZE}
+                y={boxInfo.juH.y * VIEW_BOX_SIZE}
+                width={boxInfo.juH.width * VIEW_BOX_SIZE}
+                height={boxInfo.juH.height * VIEW_BOX_SIZE}
+                fill={BOX_COLORS.JU_H}
+                opacity={0.2}
+                stroke={BOX_COLORS.JU_H}
+                strokeWidth={2}
+                strokeDasharray="4,4"
+              />
+              {/* JU_V 박스 */}
+              <rect
+                x={boxInfo.juV.x * VIEW_BOX_SIZE}
+                y={boxInfo.juV.y * VIEW_BOX_SIZE}
+                width={boxInfo.juV.width * VIEW_BOX_SIZE}
+                height={boxInfo.juV.height * VIEW_BOX_SIZE}
+                fill={BOX_COLORS.JU_V}
+                opacity={0.2}
+                stroke={BOX_COLORS.JU_V}
+                strokeWidth={2}
+                strokeDasharray="4,4"
+              />
+            </>
+          ) : (
+            /* 일반 박스 영역 */
+            <rect
+              x={boxX}
+              y={boxY}
+              width={boxWidth}
+              height={boxHeight}
+              fill={boxColor}
+              opacity={0.2}
+              stroke={boxColor}
+              strokeWidth={2}
+              strokeDasharray="4,4"
+            />
+          )}
+
+          {/* 획들 - slant 적용 */}
+          <g transform={slant !== 0 ? `translate(${slantCenterX}, ${slantCenterY}) skewX(${-slant}) translate(${-slantCenterX}, ${-slantCenterY})` : undefined}>
+          {strokes.map((stroke) => {
+            const isSelected = stroke.id === selectedStrokeId
+            const container = getContainerBox(stroke)
+            const d = pointsToSvgD(stroke.points, stroke.closed, container, VIEW_BOX_SIZE)
+            if (!d) return null
+            const strokeWidth = stroke.thickness * weightMultiplier * VIEW_BOX_SIZE
+
+            // 컨테이너의 절대 좌표 (포인트 오버레이용)
+            const cAbsX = container.x * VIEW_BOX_SIZE
+            const cAbsY = container.y * VIEW_BOX_SIZE
+            const cAbsW = container.width * VIEW_BOX_SIZE
+            const cAbsH = container.height * VIEW_BOX_SIZE
+
+            // 포인트를 절대 좌표로 변환
+            const toAbs = (px: number, py: number): [number, number] => [
+              cAbsX + px * cAbsW,
+              cAbsY + py * cAbsH,
+            ]
+
             return (
-              <g opacity={0.15}>
-                {pTop > 0 && <rect x={bx} y={by} width={bw} height={pTop} fill="#ff9500" />}
-                {pBottom > 0 && <rect x={bx} y={by + bh - pBottom} width={bw} height={pBottom} fill="#ff9500" />}
-                {pLeft > 0 && <rect x={bx} y={by + pTop} width={pLeft} height={bh - pTop - pBottom} fill="#ff9500" />}
-                {pRight > 0 && <rect x={bx + bw - pRight} y={by + pTop} width={pRight} height={bh - pTop - pBottom} fill="#ff9500" />}
+              <g key={stroke.id}>
+                {/* 넓은 히트 영역 (투명) - 이동용 */}
+                <path
+                  d={d}
+                  fill={stroke.closed ? 'transparent' : 'none'}
+                  stroke="transparent"
+                  strokeWidth={strokeWidth * 4}
+                  onClick={() => setSelectedStrokeId(stroke.id)}
+                  onMouseDown={onStrokeChange ? startStrokeMove(stroke) : undefined}
+                  onTouchStart={onStrokeChange ? startStrokeMove(stroke) : undefined}
+                  style={{ cursor: onStrokeChange ? 'move' : 'pointer' }}
+                />
+                {/* 실제 렌더링 */}
+                <path
+                  d={d}
+                  fill={stroke.closed ? (isSelected ? '#ff6b6b' : '#1a1a1a') : 'none'}
+                  stroke={isSelected ? '#ff6b6b' : '#1a1a1a'}
+                  strokeWidth={stroke.closed ? 0 : strokeWidth}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  onClick={() => setSelectedStrokeId(stroke.id)}
+                  onMouseDown={onStrokeChange ? startStrokeMove(stroke) : undefined}
+                  onTouchStart={onStrokeChange ? startStrokeMove(stroke) : undefined}
+                  style={{ cursor: onStrokeChange ? 'move' : 'pointer' }}
+                />
+
+                {/* 선택된 획의 포인트/핸들 오버레이 */}
+                {isSelected && onPointChange && (
+                  <g>
+                    {/* 선택된 포인트의 핸들 표시 */}
+                    {selectedPointIndex !== null && selectedPointIndex < stroke.points.length && (() => {
+                      const point = stroke.points[selectedPointIndex]
+                      const [ptX, ptY] = toAbs(point.x, point.y)
+
+                      return (
+                        <>
+                          {point.handleIn && (() => {
+                            const [hx, hy] = toAbs(point.handleIn.x, point.handleIn.y)
+                            return (
+                              <>
+                                <line x1={ptX} y1={ptY} x2={hx} y2={hy}
+                                  stroke="#ff6b6b" strokeWidth={0.5} opacity={0.6} />
+                                <circle cx={hx} cy={hy} r={1.8}
+                                  fill="#ff6b6b" stroke="#fff" strokeWidth={0.3}
+                                  style={{ cursor: 'grab' }}
+                                  onMouseDown={startPointDrag('handleIn', stroke.id, selectedPointIndex, container)}
+                                  onTouchStart={startPointDrag('handleIn', stroke.id, selectedPointIndex, container)} />
+                              </>
+                            )
+                          })()}
+                          {point.handleOut && (() => {
+                            const [hx, hy] = toAbs(point.handleOut.x, point.handleOut.y)
+                            return (
+                              <>
+                                <line x1={ptX} y1={ptY} x2={hx} y2={hy}
+                                  stroke="#4ecdc4" strokeWidth={0.5} opacity={0.6} />
+                                <circle cx={hx} cy={hy} r={1.8}
+                                  fill="#4ecdc4" stroke="#fff" strokeWidth={0.3}
+                                  style={{ cursor: 'grab' }}
+                                  onMouseDown={startPointDrag('handleOut', stroke.id, selectedPointIndex, container)}
+                                  onTouchStart={startPointDrag('handleOut', stroke.id, selectedPointIndex, container)} />
+                              </>
+                            )
+                          })()}
+                        </>
+                      )
+                    })()}
+
+                    {/* 모든 앵커 포인트 */}
+                    {stroke.points.map((pt, i) => {
+                      const [ptX, ptY] = toAbs(pt.x, pt.y)
+                      const isActive = i === selectedPointIndex
+                      return (
+                        <circle key={i} cx={ptX} cy={ptY} r={2.5}
+                          fill={isActive ? '#ff6b6b' : '#4ecdc4'}
+                          stroke="#fff" strokeWidth={0.5}
+                          style={{ cursor: 'grab' }}
+                          onMouseDown={startPointDrag('point', stroke.id, i, container)}
+                          onTouchStart={startPointDrag('point', stroke.id, i, container)} />
+                      )
+                    })}
+                  </g>
+                )}
               </g>
             )
-          }
+          })}
+          </g>
+        </svg>
 
-          if (isMixed && boxInfo.juH && boxInfo.juV) {
-            return (
-              <>
-                {renderPaddingOverlay(boxInfo.juH.x * VIEW_BOX_SIZE, boxInfo.juH.y * VIEW_BOX_SIZE, boxInfo.juH.width * VIEW_BOX_SIZE, boxInfo.juH.height * VIEW_BOX_SIZE)}
-                {renderPaddingOverlay(boxInfo.juV.x * VIEW_BOX_SIZE, boxInfo.juV.y * VIEW_BOX_SIZE, boxInfo.juV.width * VIEW_BOX_SIZE, boxInfo.juV.height * VIEW_BOX_SIZE)}
-              </>
-            )
-          }
-          return renderPaddingOverlay(boxX, boxY, boxWidth, boxHeight)
-        })()}
-
-        {/* 패딩 경계선 (점선) */}
-        {jamoPadding && (jamoPadding.top > 0 || jamoPadding.bottom > 0 || jamoPadding.left > 0 || jamoPadding.right > 0) && (() => {
-          const renderPaddedBorder = (bx: number, by: number, bw: number, bh: number) => {
-            const px = bx + jamoPadding.left * bw
-            const py = by + jamoPadding.top * bh
-            const pw = bw * (1 - jamoPadding.left - jamoPadding.right)
-            const ph = bh * (1 - jamoPadding.top - jamoPadding.bottom)
-            return (
-              <rect
-                x={px} y={py} width={pw} height={ph}
-                fill="none" stroke="#ff9500" strokeWidth={0.8}
-                strokeDasharray="2,2" opacity={0.5}
-              />
-            )
-          }
-
-          if (isMixed && boxInfo.juH && boxInfo.juV) {
-            return (
-              <>
-                {renderPaddedBorder(boxInfo.juH.x * VIEW_BOX_SIZE, boxInfo.juH.y * VIEW_BOX_SIZE, boxInfo.juH.width * VIEW_BOX_SIZE, boxInfo.juH.height * VIEW_BOX_SIZE)}
-                {renderPaddedBorder(boxInfo.juV.x * VIEW_BOX_SIZE, boxInfo.juV.y * VIEW_BOX_SIZE, boxInfo.juV.width * VIEW_BOX_SIZE, boxInfo.juV.height * VIEW_BOX_SIZE)}
-              </>
-            )
-          }
-          return renderPaddedBorder(boxX, boxY, boxWidth, boxHeight)
-        })()}
-
-        {/* 획들 - slant 적용 */}
-        <g transform={slant !== 0 ? `translate(${slantCenterX}, ${slantCenterY}) skewX(${-slant}) translate(${-slantCenterX}, ${-slantCenterY})` : undefined}>
-        {strokes.map((stroke) => {
-          const isSelected = stroke.id === selectedStrokeId
-          const container = getContainerBox(stroke)
-          const d = pointsToSvgD(stroke.points, stroke.closed, container, VIEW_BOX_SIZE)
-          if (!d) return null
-          const strokeWidth = stroke.thickness * weightMultiplier * VIEW_BOX_SIZE
-
-          // 컨테이너의 절대 좌표 (포인트 오버레이용)
-          const cAbsX = container.x * VIEW_BOX_SIZE
-          const cAbsY = container.y * VIEW_BOX_SIZE
-          const cAbsW = container.width * VIEW_BOX_SIZE
-          const cAbsH = container.height * VIEW_BOX_SIZE
-
-          // 포인트를 절대 좌표로 변환
-          const toAbs = (px: number, py: number): [number, number] => [
-            cAbsX + px * cAbsW,
-            cAbsY + py * cAbsH,
+        {/* 패딩 조절: 4면 HTML 버튼 오버레이 (SVG 이벤트 충돌 없음) */}
+        {onPaddingChange && (() => {
+          const effectivePadding = jamoPadding ?? { top: 0, bottom: 0, left: 0, right: 0 }
+          const EDGE_THICKNESS = 14 // px
+          const sides: Array<{ side: keyof typeof effectivePadding; style: React.CSSProperties; cursor: string }> = [
+            { side: 'top', cursor: 'ns-resize', style: { top: 0, left: EDGE_THICKNESS, right: EDGE_THICKNESS, height: EDGE_THICKNESS } },
+            { side: 'bottom', cursor: 'ns-resize', style: { bottom: 0, left: EDGE_THICKNESS, right: EDGE_THICKNESS, height: EDGE_THICKNESS } },
+            { side: 'left', cursor: 'ew-resize', style: { top: 0, left: 0, bottom: 0, width: EDGE_THICKNESS } },
+            { side: 'right', cursor: 'ew-resize', style: { top: 0, right: 0, bottom: 0, width: EDGE_THICKNESS } },
           ]
+          return sides.map(({ side, cursor, style }) => (
+            <div
+              key={side}
+              className="absolute"
+              style={{
+                ...style,
+                cursor,
+                zIndex: 10,
+              }}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                const startY = e.clientY
+                const startX = e.clientX
+                const startVal = effectivePadding[side]
+                const rect = e.currentTarget.parentElement!.getBoundingClientRect()
+                const isH = side === 'top' || side === 'bottom'
+                const size = isH ? rect.height : rect.width
 
-          return (
-            <g key={stroke.id}>
-              {/* 넓은 히트 영역 (투명) - 이동용 */}
-              <path
-                d={d}
-                fill={stroke.closed ? 'transparent' : 'none'}
-                stroke="transparent"
-                strokeWidth={strokeWidth * 4}
-                onClick={() => setSelectedStrokeId(stroke.id)}
-                onMouseDown={onStrokeChange ? startStrokeMove(stroke) : undefined}
-                onTouchStart={onStrokeChange ? startStrokeMove(stroke) : undefined}
-                style={{ cursor: onStrokeChange ? 'move' : 'pointer' }}
-              />
-              {/* 실제 렌더링 */}
-              <path
-                d={d}
-                fill={stroke.closed ? (isSelected ? '#ff6b6b' : '#1a1a1a') : 'none'}
-                stroke={isSelected ? '#ff6b6b' : '#1a1a1a'}
-                strokeWidth={stroke.closed ? 0 : strokeWidth}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                onClick={() => setSelectedStrokeId(stroke.id)}
-                onMouseDown={onStrokeChange ? startStrokeMove(stroke) : undefined}
-                onTouchStart={onStrokeChange ? startStrokeMove(stroke) : undefined}
-                style={{ cursor: onStrokeChange ? 'move' : 'pointer' }}
-              />
-
-              {/* 선택된 획의 포인트/핸들 오버레이 */}
-              {isSelected && onPointChange && (
-                <g>
-                  {/* 선택된 포인트의 핸들 표시 */}
-                  {selectedPointIndex !== null && selectedPointIndex < stroke.points.length && (() => {
-                    const point = stroke.points[selectedPointIndex]
-                    const [ptX, ptY] = toAbs(point.x, point.y)
-
-                    return (
-                      <>
-                        {point.handleIn && (() => {
-                          const [hx, hy] = toAbs(point.handleIn.x, point.handleIn.y)
-                          return (
-                            <>
-                              <line x1={ptX} y1={ptY} x2={hx} y2={hy}
-                                stroke="#ff6b6b" strokeWidth={0.5} opacity={0.6} />
-                              <circle cx={hx} cy={hy} r={1.8}
-                                fill="#ff6b6b" stroke="#fff" strokeWidth={0.3}
-                                style={{ cursor: 'grab' }}
-                                onMouseDown={startPointDrag('handleIn', stroke.id, selectedPointIndex, container)}
-                                onTouchStart={startPointDrag('handleIn', stroke.id, selectedPointIndex, container)} />
-                            </>
-                          )
-                        })()}
-                        {point.handleOut && (() => {
-                          const [hx, hy] = toAbs(point.handleOut.x, point.handleOut.y)
-                          return (
-                            <>
-                              <line x1={ptX} y1={ptY} x2={hx} y2={hy}
-                                stroke="#4ecdc4" strokeWidth={0.5} opacity={0.6} />
-                              <circle cx={hx} cy={hy} r={1.8}
-                                fill="#4ecdc4" stroke="#fff" strokeWidth={0.3}
-                                style={{ cursor: 'grab' }}
-                                onMouseDown={startPointDrag('handleOut', stroke.id, selectedPointIndex, container)}
-                                onTouchStart={startPointDrag('handleOut', stroke.id, selectedPointIndex, container)} />
-                            </>
-                          )
-                        })()}
-                      </>
-                    )
-                  })()}
-
-                  {/* 모든 앵커 포인트 */}
-                  {stroke.points.map((pt, i) => {
-                    const [ptX, ptY] = toAbs(pt.x, pt.y)
-                    const isActive = i === selectedPointIndex
-                    return (
-                      <circle key={i} cx={ptX} cy={ptY} r={2.5}
-                        fill={isActive ? '#ff6b6b' : '#4ecdc4'}
-                        stroke="#fff" strokeWidth={0.5}
-                        style={{ cursor: 'grab' }}
-                        onMouseDown={startPointDrag('point', stroke.id, i, container)}
-                        onTouchStart={startPointDrag('point', stroke.id, i, container)} />
-                    )
-                  })}
-                </g>
-              )}
-            </g>
-          )
-        })}
-        </g>
-      </svg>
+                const handleMove = (me: MouseEvent) => {
+                  const delta = isH
+                    ? (side === 'top' ? me.clientY - startY : startY - me.clientY)
+                    : (side === 'left' ? me.clientX - startX : startX - me.clientX)
+                  const raw = startVal + delta / size
+                  // 스냅 + 클램프
+                  const step = 0.025
+                  let snapped = Math.round(raw / step) * step
+                  if (Math.abs(snapped) < step * 0.8) snapped = 0
+                  snapped = Math.max(0, Math.min(0.3, snapped))
+                  onPaddingChange(side, snapped)
+                }
+                const handleUp = () => {
+                  window.removeEventListener('mousemove', handleMove)
+                  window.removeEventListener('mouseup', handleUp)
+                }
+                window.addEventListener('mousemove', handleMove)
+                window.addEventListener('mouseup', handleUp)
+              }}
+            />
+          ))
+        })()}
+      </div>
       <span className="text-sm text-[#e5e5e5] mt-2 text-center block">{jamoChar}</span>
     </div>
   )

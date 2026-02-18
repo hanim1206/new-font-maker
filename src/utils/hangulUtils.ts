@@ -181,20 +181,59 @@ export function getLayoutsForJamoType(
 }
 
 // ===== 레이아웃 타입별 대표 음절 =====
-export function getSampleSyllableForLayout(layoutType: LayoutType): string {
-  const samples: Record<LayoutType, string> = {
-    'choseong-only': 'ㄱ',
-    'jungseong-vertical-only': 'ㅏ',
-    'jungseong-horizontal-only': 'ㅗ',
-    'jungseong-mixed-only': 'ㅘ',
-    'choseong-jungseong-vertical': '가',
-    'choseong-jungseong-horizontal': '고',
-    'choseong-jungseong-mixed': '과',
-    'choseong-jungseong-vertical-jongseong': '한',
-    'choseong-jungseong-horizontal-jongseong': '공',
-    'choseong-jungseong-mixed-jongseong': '광',
+
+// 레이아웃별 기본 구성 (초성인덱스, 중성, 종성)
+const LAYOUT_DEFAULTS: Record<LayoutType, { cho: number; jung: string; jong: string | null }> = {
+  'choseong-only': { cho: 0, jung: '', jong: null },
+  'jungseong-vertical-only': { cho: -1, jung: 'ㅏ', jong: null },
+  'jungseong-horizontal-only': { cho: -1, jung: 'ㅗ', jong: null },
+  'jungseong-mixed-only': { cho: -1, jung: 'ㅘ', jong: null },
+  'choseong-jungseong-vertical': { cho: 0, jung: 'ㅏ', jong: null },
+  'choseong-jungseong-horizontal': { cho: 0, jung: 'ㅗ', jong: null },
+  'choseong-jungseong-mixed': { cho: 0, jung: 'ㅘ', jong: null },
+  'choseong-jungseong-vertical-jongseong': { cho: 0, jung: 'ㅏ', jong: 'ㄴ' },
+  'choseong-jungseong-horizontal-jongseong': { cho: 0, jung: 'ㅗ', jong: 'ㄴ' },
+  'choseong-jungseong-mixed-jongseong': { cho: 0, jung: 'ㅘ', jong: 'ㄴ' },
+}
+
+/** 편집 중인 자모를 반영한 샘플 음절 생성 */
+export function getSampleSyllableForLayout(
+  layoutType: LayoutType,
+  jamoType?: 'choseong' | 'jungseong' | 'jongseong',
+  jamoChar?: string
+): string {
+  const defaults = LAYOUT_DEFAULTS[layoutType]
+
+  // 자모 전용 레이아웃
+  if (layoutType === 'choseong-only') {
+    return jamoType === 'choseong' && jamoChar ? jamoChar : 'ㄱ'
   }
-  return samples[layoutType]
+  if (layoutType.endsWith('-only')) {
+    return jamoType === 'jungseong' && jamoChar ? jamoChar : defaults.jung
+  }
+
+  // 초성/중성/종성 인덱스 결정
+  let choIdx = defaults.cho
+  let jung = defaults.jung
+  let jong = defaults.jong
+
+  if (jamoType === 'choseong' && jamoChar) {
+    choIdx = (CHOSEONG_LIST as readonly string[]).indexOf(jamoChar)
+    if (choIdx < 0) choIdx = 0
+  }
+  if (jamoType === 'jungseong' && jamoChar) {
+    jung = jamoChar
+  }
+  if (jamoType === 'jongseong' && jamoChar) {
+    jong = jamoChar
+  }
+
+  const jungIdx = (JUNGSEONG_LIST as readonly string[]).indexOf(jung)
+  const jongIdx = jong ? (JONGSEONG_LIST as readonly string[]).indexOf(jong) : 0
+
+  if (jungIdx < 0) return 'ㄱ' // fallback
+  const code = 0xac00 + (choIdx * 21 + jungIdx) * 28 + Math.max(0, jongIdx)
+  return String.fromCharCode(code)
 }
 
 // ===== 한글인지 확인 =====

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useJamoStore } from '../../stores/jamoStore'
 import { useLayoutStore } from '../../stores/layoutStore'
 import { useGlobalStyleStore } from '../../stores/globalStyleStore'
@@ -32,6 +32,15 @@ export function LayoutContextThumbnails({
     return getLayoutsForJamoType(jamoType)
   }, [jamoType, jamoChar])
 
+  // selectedContext가 null이면 첫 번째 레이아웃을 기본 선택
+  const effectiveContext = selectedContext ?? applicableLayouts[0] ?? null
+
+  useEffect(() => {
+    if (!selectedContext && applicableLayouts.length > 0) {
+      onSelectContext(applicableLayouts[0])
+    }
+  }, [selectedContext, applicableLayouts, onSelectContext])
+
   if (applicableLayouts.length === 0) return null
 
   return (
@@ -41,7 +50,7 @@ export function LayoutContextThumbnails({
       </h4>
       <div className="flex flex-wrap gap-1.5 ">
         {applicableLayouts.map((layoutType) => {
-          const sampleChar = getSampleSyllableForLayout(layoutType)
+          const sampleChar = getSampleSyllableForLayout(layoutType, jamoType, jamoChar)
           const schema = getLayoutSchema(layoutType)
           const effectivePadding = getEffectivePadding(layoutType)
           const schemaWithPadding = { ...schema, padding: effectivePadding }
@@ -54,7 +63,7 @@ export function LayoutContextThumbnails({
             jongseong
           )
 
-          const isSelected = selectedContext === layoutType
+          const isSelected = effectiveContext === layoutType
 
           return (
             <button
