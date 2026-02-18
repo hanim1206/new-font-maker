@@ -5,8 +5,8 @@ import { useLayoutStore } from '../../stores/layoutStore'
 import { useJamoStore } from '../../stores/jamoStore'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { decomposeSyllable, isHangul } from '../../utils/hangulUtils'
-import { weightToMultiplier } from '../../stores/globalStyleStore'
-import type { LayoutType, Padding } from '../../types'
+import { weightToMultiplier, type GlobalStyle } from '../../stores/globalStyleStore'
+import type { LayoutType, Padding, StrokeLinecap } from '../../types'
 import { cn } from '@/lib/utils'
 import { Slider } from '@/components/ui/slider'
 import type { SliderMark } from '@/components/ui/slider'
@@ -46,11 +46,33 @@ const LAYOUT_TYPES: Array<{ type: LayoutType; label: string }> = [
   { type: 'choseong-jungseong-mixed-jongseong', label: '초+혼합중+종' },
 ]
 
+const LINECAP_OPTIONS: Array<{ value: StrokeLinecap; label: string }> = [
+  { value: 'round', label: '둥근' },
+  { value: 'butt', label: '평평' },
+  { value: 'square', label: '사각' },
+]
+
+/** linecap 미리보기 아이콘 */
+function LinecapIcon({ cap, active }: { cap: StrokeLinecap; active: boolean }) {
+  const color = active ? '#e5e5e5' : '#888'
+  return (
+    <svg width="40" height="24" viewBox="0 0 40 24">
+      <line
+        x1="8" y1="12" x2="32" y2="12"
+        stroke={color}
+        strokeWidth={6}
+        strokeLinecap={cap}
+      />
+    </svg>
+  )
+}
+
 export function GlobalStyleEditor() {
   const {
     style,
     exclusions,
     updateStyle,
+    updateLinecap,
     addExclusion,
     removeExclusion,
     hasExclusion,
@@ -73,7 +95,7 @@ export function GlobalStyleEditor() {
   }, [inputText, selectedCharIndex, choseong, jungseong, jongseong])
 
   const handleExclusionToggle = (
-    property: 'slant' | 'weight' | 'letterSpacing',
+    property: keyof GlobalStyle,
     layoutType: LayoutType
   ) => {
     const id = `${property}-${layoutType}`
@@ -183,6 +205,30 @@ export function GlobalStyleEditor() {
         </div>
       </div>
 
+      {/* 획 끝 모양 */}
+      <div className="p-4 bg-surface rounded-md border border-border-subtle">
+        <h4 className="text-sm font-medium m-0 mb-4 text-text-dim-4 uppercase tracking-wider">
+          획 끝 모양 (Linecap)
+        </h4>
+        <div className="flex gap-2">
+          {LINECAP_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              className={cn(
+                'flex-1 flex flex-col items-center gap-1 p-2 rounded border text-sm transition-colors',
+                style.linecap === value
+                  ? 'border-primary bg-primary/10 text-text-dim-1'
+                  : 'border-border-lighter text-text-dim-4 hover:border-[#444]'
+              )}
+              onClick={() => updateLinecap(value)}
+            >
+              <LinecapIcon cap={value} active={style.linecap === value} />
+              <span className="text-xs">{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* 글로벌 여백 */}
       <div className="p-4 bg-surface rounded-md border border-border-subtle">
         <h4 className="text-sm font-medium m-0 mb-4 text-text-dim-4 uppercase tracking-wider">
@@ -215,7 +261,8 @@ export function GlobalStyleEditor() {
       {/* 레이아웃별 제외 설정 */}
       {(style.slant !== 0 ||
         style.weight !== 400 ||
-        style.letterSpacing !== 0) && (
+        style.letterSpacing !== 0 ||
+        style.linecap !== 'round') && (
         <div className="p-4 bg-surface rounded-md border border-border-subtle">
           <h4 className="text-sm font-medium m-0 mb-4 text-text-dim-4 uppercase tracking-wider">
             레이아웃별 제외
@@ -229,7 +276,8 @@ export function GlobalStyleEditor() {
               const hasAnyExclusion =
                 hasExclusion('slant', type) ||
                 hasExclusion('weight', type) ||
-                hasExclusion('letterSpacing', type)
+                hasExclusion('letterSpacing', type) ||
+                hasExclusion('linecap', type)
 
               return (
                 <div
@@ -276,6 +324,17 @@ export function GlobalStyleEditor() {
                           }
                         />
                         <span className="text-xs text-text-dim-4">자간</span>
+                      </label>
+                    )}
+                    {style.linecap !== 'round' && (
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <Checkbox
+                          checked={hasExclusion('linecap', type)}
+                          onCheckedChange={() =>
+                            handleExclusionToggle('linecap', type)
+                          }
+                        />
+                        <span className="text-xs text-text-dim-4">끝모양</span>
                       </label>
                     )}
                   </div>

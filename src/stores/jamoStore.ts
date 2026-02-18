@@ -72,6 +72,20 @@ interface JamoActions {
     char: string
   ) => void
 
+  // 혼합중성 파트별 패딩 업데이트 (jungseong 전용)
+  updateMixedJamoPadding: (
+    char: string,
+    part: 'horizontal' | 'vertical',
+    side: keyof Padding,
+    value: number
+  ) => void
+
+  // 혼합중성 파트별 패딩 초기화
+  resetMixedJamoPadding: (
+    char: string,
+    part: 'horizontal' | 'vertical'
+  ) => void
+
   // hydration 완료 표시
   setHydrated: () => void
 }
@@ -212,6 +226,28 @@ export const useJamoStore = create<JamoState & JamoActions>()(
           const jamo = state[type][char]
           if (jamo) {
             delete jamo.padding
+          }
+        }),
+
+      // ===== 혼합중성 파트별 패딩 =====
+
+      updateMixedJamoPadding: (char, part, side, value) =>
+        set((state) => {
+          const jamo = state.jungseong[char]
+          if (!jamo) return
+          const key = part === 'horizontal' ? 'horizontalPadding' as const : 'verticalPadding' as const
+          if (!jamo[key]) {
+            jamo[key] = { top: 0, bottom: 0, left: 0, right: 0 }
+          }
+          jamo[key]![side] = value
+        }),
+
+      resetMixedJamoPadding: (char, part) =>
+        set((state) => {
+          const jamo = state.jungseong[char]
+          if (jamo) {
+            const key = part === 'horizontal' ? 'horizontalPadding' as const : 'verticalPadding' as const
+            delete jamo[key]
           }
         }),
 

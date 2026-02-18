@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useJamoStore } from '../../stores/jamoStore'
-import { useGlobalStyleStore, weightToMultiplier } from '../../stores/globalStyleStore'
+import { useGlobalStyleStore, weightToMultiplier, resolveLinecap } from '../../stores/globalStyleStore'
 import type { StrokeDataV2, BoxConfig, Padding } from '../../types'
 import { pointsToSvgD } from '../../utils/pathUtils'
 
@@ -366,7 +366,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
                   fill={stroke.closed ? (isSelected ? '#ff6b6b' : '#1a1a1a') : 'none'}
                   stroke={isSelected ? '#ff6b6b' : '#1a1a1a'}
                   strokeWidth={stroke.closed ? 0 : strokeWidth}
-                  strokeLinecap="round"
+                  strokeLinecap={resolveLinecap(stroke.linecap, globalStyle.linecap)}
                   strokeLinejoin="round"
                   onClick={() => setSelectedStrokeId(stroke.id)}
                   onMouseDown={onStrokeChange ? startStrokeMove(stroke) : undefined}

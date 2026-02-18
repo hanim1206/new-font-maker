@@ -133,9 +133,17 @@ export function JamoEditor({ jamoType, jamoChar }: JamoEditorProps) {
     setSelectedStrokeId(null)
   }, [jamoType, jamoChar, jamoMap, setSelectedStrokeId])
 
-  const handleStrokeChange = (strokeId: string, prop: string, value: number) => {
+  const handleStrokeChange = (strokeId: string, prop: string, value: number | string | undefined) => {
     setDraftStrokes((prev) =>
-      prev.map((s) => (s.id === strokeId ? { ...s, [prop]: value } : s))
+      prev.map((s) => {
+        if (s.id !== strokeId) return s
+        if (value === undefined) {
+          const updated = { ...s }
+          delete (updated as Record<string, unknown>)[prop]
+          return updated
+        }
+        return { ...s, [prop]: value }
+      })
     )
   }
 

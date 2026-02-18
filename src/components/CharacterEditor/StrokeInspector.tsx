@@ -1,5 +1,5 @@
 import { useUIStore } from '../../stores/uiStore'
-import type { StrokeDataV2 } from '../../types'
+import type { StrokeDataV2, StrokeLinecap } from '../../types'
 import { MERGE_PROXIMITY } from '../../utils/snapUtils'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -27,7 +27,7 @@ type PointChangeHandler = (
 
 interface StrokeInspectorProps {
   strokes: StrokeDataV2[]
-  onChange: (strokeId: string, prop: string, value: number) => void
+  onChange: (strokeId: string, prop: string, value: number | string | undefined) => void
   onPointChange?: PointChangeHandler
   onMergeStrokes?: (strokeIdA: string, strokeIdB: string) => void
   onSplitStroke?: (strokeId: string, pointIndex: number) => void
@@ -79,6 +79,37 @@ export function StrokeInspector({ strokes, onChange, onPointChange, onMergeStrok
             onChange={(e) => onChange(selectedStroke.id, 'thickness', parseFloat(e.target.value) || 0.01)}
             className={inputClass}
           />
+        </div>
+      </div>
+
+      {/* 끝 모양 (Linecap) 오버라이드 */}
+      <div className="p-4 bg-surface-2 rounded-md border border-border">
+        <div className="flex flex-col gap-1">
+          <label className="text-[0.7rem] text-muted uppercase tracking-wider">Linecap (끝 모양)</label>
+          <div className="flex gap-1">
+            {([
+              { value: undefined as StrokeLinecap | undefined, label: '기본' },
+              { value: 'round' as StrokeLinecap, label: '둥근' },
+              { value: 'butt' as StrokeLinecap, label: '평평' },
+              { value: 'square' as StrokeLinecap, label: '사각' },
+            ]).map(({ value, label }) => {
+              const isActive = selectedStroke.linecap === value
+              return (
+                <button
+                  key={label}
+                  className={cn(
+                    'flex-1 py-1.5 px-2 rounded border text-xs transition-colors',
+                    isActive
+                      ? 'border-accent-cyan bg-accent-cyan/10 text-accent-cyan font-semibold'
+                      : 'border-border-lighter text-text-dim-4 hover:border-[#444]'
+                  )}
+                  onClick={() => onChange(selectedStroke.id, 'linecap', value)}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
 

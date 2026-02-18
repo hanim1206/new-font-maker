@@ -2,7 +2,7 @@ import { useMemo, type ReactNode } from 'react'
 import type { DecomposedSyllable, BoxConfig, Part, StrokeDataV2, LayoutType, LayoutSchema, Padding } from '../types'
 import { calculateBoxes } from '../utils/layoutCalculator'
 import { pointsToSvgD } from '../utils/pathUtils'
-import { weightToMultiplier } from '../stores/globalStyleStore'
+import { weightToMultiplier, resolveLinecap } from '../stores/globalStyleStore'
 import type { GlobalStyle } from '../stores/globalStyleStore'
 
 // 파트별 스타일 (자모 편집 시 비편집 파트 흐리게 표시 등)
@@ -114,7 +114,7 @@ export function SvgRenderer({
           fill="none"
           stroke={color}
           strokeWidth={strokeWidth}
-          strokeLinecap="round"
+          strokeLinecap={resolveLinecap(stroke.linecap, globalStyle?.linecap)}
           strokeLinejoin="round"
         />
       )
@@ -155,10 +155,12 @@ export function SvgRenderer({
     const partColor = ps?.fillColor ?? fillColor
     const partOpacity = ps?.opacity ?? 1
 
-    // 파트별 자모 패딩 참조
+    // 파트별 자모 패딩 참조 (혼합중성은 파트별 개별 패딩 지원)
     const jamoPadding =
       part === 'CH' ? syllable.choseong?.padding :
       part === 'JO' ? syllable.jongseong?.padding :
+      part === 'JU_H' ? (syllable.jungseong?.horizontalPadding ?? syllable.jungseong?.padding) :
+      part === 'JU_V' ? (syllable.jungseong?.verticalPadding ?? syllable.jungseong?.padding) :
       syllable.jungseong?.padding
 
     // 혼합중성의 경우 JU_H와 JU_V로 분리 렌더링

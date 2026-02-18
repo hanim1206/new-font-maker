@@ -4,7 +4,7 @@ import type { StrokeDataV2, BoxConfig, Padding } from '../../types'
 import { pointsToSvgD } from '../../utils/pathUtils'
 import { collectSnapTargets, snapPoint, detectMergeHint } from '../../utils/snapUtils'
 import type { SnapResult, MergeHint } from '../../utils/snapUtils'
-import { weightToMultiplier } from '../../stores/globalStyleStore'
+import { weightToMultiplier, resolveLinecap } from '../../stores/globalStyleStore'
 import type { GlobalStyle } from '../../stores/globalStyleStore'
 
 // === 타입 정의 ===
@@ -16,7 +16,7 @@ export type PointChangeHandler = (
   value: { x: number; y: number } | number
 ) => void
 
-export type StrokeChangeHandler = (strokeId: string, prop: string, value: number) => void
+export type StrokeChangeHandler = (strokeId: string, prop: string, value: number | string | undefined) => void
 
 interface DragState {
   type: 'point' | 'handleIn' | 'handleOut' | 'strokeMove'
@@ -54,6 +54,9 @@ export interface StrokeOverlayProps {
   strokeColor?: string
   // 자모 패딩 (박스를 패딩만큼 축소)
   jamoPadding?: Padding
+  // 혼합중성 파트별 개별 패딩
+  horizontalPadding?: Padding
+  verticalPadding?: Padding
 }
 
 // 자모 패딩 적용
@@ -92,6 +95,8 @@ export function StrokeOverlay({
   globalStyle,
   strokeColor = '#1a1a1a',
   jamoPadding,
+  horizontalPadding,
+  verticalPadding,
 }: StrokeOverlayProps) {
   const { selectedStrokeId, setSelectedStrokeId, selectedPointIndex, setSelectedPointIndex } = useUIStore()
   const [dragState, setDragState] = useState<DragState | null>(null)
@@ -134,33 +139,30 @@ export function StrokeOverlay({
         return applyJamoPaddingToBox(
           juHBox.x * viewBoxSize, juHBox.y * viewBoxSize,
           juHBox.width * viewBoxSize, juHBox.height * viewBoxSize,
-          jamoPadding
+          horizontalPadding ?? jamoPadding
         )
       } else if (verticalStrokeIds.has(stroke.id)) {
         return applyJamoPaddingToBox(
           juVBox.x * viewBoxSize, juVBox.y * viewBoxSize,
           juVBox.width * viewBoxSize, juVBox.height * viewBoxSize,
-          jamoPadding
+          verticalPadding ?? jamoPadding
         )
       }
     }
     return applyJamoPaddingToBox(boxX, boxY, boxWidth, boxHeight, jamoPadding)
-  }, [isMixed, juHBox, juVBox, horizontalStrokeIds, verticalStrokeIds, boxX, boxY, boxWidth, boxHeight, viewBoxSize, jamoPadding])
+  }, [isMixed, juHBox, juVBox, horizontalStrokeIds, verticalStrokeIds, boxX, boxY, boxWidth, boxHeight, viewBoxSize, jamoPadding, horizontalPadding, verticalPadding])
 
   // 스트로크의 컨테이너 박스 (패딩 적용됨, 0~1 좌표, pointsToSvgD용)
   const getContainerBoxNormalized = useCallback((stroke: StrokeDataV2): BoxConfig => {
     if (isMixed && juHBox && juVBox && horizontalStrokeIds && verticalStrokeIds) {
       if (horizontalStrokeIds.has(stroke.id)) {
-        const padded = applyJamoPaddingToBox(juHBox.x, juHBox.y, juHBox.width, juHBox.height, jamoPadding)
-        return padded
+        return applyJamoPaddingToBox(juHBox.x, juHBox.y, juHBox.width, juHBox.height, horizontalPadding ?? jamoPadding)
       } else if (verticalStrokeIds.has(stroke.id)) {
-        const padded = applyJamoPaddingToBox(juVBox.x, juVBox.y, juVBox.width, juVBox.height, jamoPadding)
-        return padded
+        return applyJamoPaddingToBox(juVBox.x, juVBox.y, juVBox.width, juVBox.height, verticalPadding ?? jamoPadding)
       }
     }
-    const padded = applyJamoPaddingToBox(box.x, box.y, box.width, box.height, jamoPadding)
-    return padded
-  }, [isMixed, juHBox, juVBox, horizontalStrokeIds, verticalStrokeIds, box, jamoPadding])
+    return applyJamoPaddingToBox(box.x, box.y, box.width, box.height, jamoPadding)
+  }, [isMixed, juHBox, juVBox, horizontalStrokeIds, verticalStrokeIds, box, jamoPadding, horizontalPadding, verticalPadding])
 
   // 스냅 타겟 캐시 (드래그 중인 획 제외)
   const snapTargets = useMemo(() => {
@@ -352,10 +354,10 @@ export function StrokeOverlay({
     <g
       style={dragState ? { cursor: getDragCursor() } : undefined}
     >
-      {/* 배경: 빈 영역 클릭 시 선택 해제 + 드래그 캡처 */}
+      {/* 배경: 빈 영역 클릭 시 선택 해제 (viewBox 범위 내로 제한) */}
       <rect
-        x={-50} y={-50}
-        width={viewBoxSize + 100} height={viewBoxSize + 100}
+        x={0} y={0}
+        width={viewBoxSize} height={viewBoxSize}
         fill="transparent"
         onClick={handleBackgroundClick}
       />
@@ -393,7 +395,7 @@ export function StrokeOverlay({
               fill={stroke.closed ? (isSelected ? '#ff6b6b' : strokeColor) : 'none'}
               stroke={isSelected ? '#ff6b6b' : strokeColor}
               strokeWidth={stroke.closed ? 0 : pathThickness}
-              strokeLinecap="round"
+              strokeLinecap={resolveLinecap(stroke.linecap, globalStyle?.linecap)}
               strokeLinejoin="round"
               onClick={(e) => { e.stopPropagation(); setSelectedStrokeId(stroke.id) }}
               onMouseDown={onStrokeChange ? startStrokeMove(stroke) : undefined}

@@ -17,6 +17,7 @@ import { decomposeSyllable, getSampleSyllableForLayout } from '../../utils/hangu
 import { calculateBoxes, BASE_PRESETS_SCHEMAS } from '../../utils/layoutCalculator'
 import { copyJsonToClipboard } from '../../utils/storage'
 import { mergeStrokes, splitStroke, addHandlesToPoint, removeHandlesFromPoint } from '../../utils/strokeEditUtils'
+import { COMPOUND_JONGSEONG } from '../../utils/jamoLinkUtils'
 import { Button } from '@/components/ui/button'
 import type { LayoutType, Part, DecomposedSyllable, BoxConfig, JamoData, Padding } from '../../types'
 
@@ -65,6 +66,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     updateJungseong,
     updateJongseong,
     updateJamoPadding,
+    updateMixedJamoPadding,
     exportJamos,
   } = useJamoStore()
   const { getEffectiveStyle, style: globalStyleRaw } = useGlobalStyleStore()
@@ -77,6 +79,17 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
   // 자모 편집 시 미리보기 레이아웃 전환
   const [previewLayoutType, setPreviewLayoutType] = useState<LayoutType | null>(null)
+
+  // layoutType prop 변경 또는 자모 편집 종료 시 previewLayoutType 초기화
+  useEffect(() => {
+    setPreviewLayoutType(null)
+  }, [layoutType])
+
+  useEffect(() => {
+    if (!editingPartInLayout) {
+      setPreviewLayoutType(null)
+    }
+  }, [editingPartInLayout])
 
   // 자모 편집용 draft strokes (undo/redo 지원)
   const { strokes: draftStrokes, setStrokes: setDraftStrokes, pushSnapshot, resetStrokes: resetDraftStrokes, undo, redo, canUndo, canRedo } = useStrokeHistory()
@@ -212,6 +225,17 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     return jamoMap[editingJamoInfo.char]?.padding
   }, [editingJamoInfo, choseong, jungseong, jongseong])
 
+  // 혼합중성 파트별 개별 패딩
+  const editingHorizontalPadding = useMemo((): Padding | undefined => {
+    if (!editingJamoInfo || editingJamoInfo.type !== 'jungseong') return undefined
+    return jungseong[editingJamoInfo.char]?.horizontalPadding
+  }, [editingJamoInfo, jungseong])
+
+  const editingVerticalPadding = useMemo((): Padding | undefined => {
+    if (!editingJamoInfo || editingJamoInfo.type !== 'jungseong') return undefined
+    return jungseong[editingJamoInfo.char]?.verticalPadding
+  }, [editingJamoInfo, jungseong])
+
   // 자모 편집 진입 시 draft strokes 로드 (히스토리 초기화)
   useEffect(() => {
     if (!editingJamoInfo) {
@@ -266,17 +290,47 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   }, [isJamoEditing, setEditingPartInLayout, undo, redo])
 
   // 더블클릭으로 자모 편집 진입
+  // 파트 클릭/더블클릭 구분 (onClick → 싱글클릭 시 선택, onDoubleClick → 자모 편집 진입)
+  const partClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handlePartClick = useCallback((part: Part) => {
+    if (partClickTimer.current) {
+      clearTimeout(partClickTimer.current)
+      partClickTimer.current = null
+    }
+    partClickTimer.current = setTimeout(() => {
+      partClickTimer.current = null
+      setSelectedPart(prev => prev === part ? null : part)
+    }, 250)
+  }, [])
+
   const handlePartDoubleClick = useCallback((part: Part) => {
+    if (partClickTimer.current) {
+      clearTimeout(partClickTimer.current)
+      partClickTimer.current = null
+    }
     const jamoInfo = partToJamoInfo(part, testSyllable)
     if (!jamoInfo) return
+    // 자모 편집 진입 시 현재 layoutType을 previewLayoutType으로 설정
+    // (LayoutContextThumbnails가 자동으로 첫 번째 레이아웃을 선택하는 것 방지)
+    setPreviewLayoutType(layoutType)
     setEditingPartInLayout(part)
     setEditingJamo(jamoInfo.type, jamoInfo.char)
-  }, [testSyllable, setEditingPartInLayout, setEditingJamo])
+  }, [testSyllable, layoutType, setEditingPartInLayout, setEditingJamo])
 
   // 자모 편집 변경 핸들러
-  const handleStrokeChange = useCallback((strokeId: string, prop: string, value: number) => {
+  const handleStrokeChange = useCallback((strokeId: string, prop: string, value: number | string | undefined) => {
     setDraftStrokes((prev) =>
-      prev.map((s) => (s.id === strokeId ? { ...s, [prop]: value } : s))
+      prev.map((s) => {
+        if (s.id !== strokeId) return s
+        if (value === undefined) {
+          // undefined → 해당 프로퍼티 제거 (linecap 오버라이드 해제 등)
+          const updated = { ...s }
+          delete (updated as Record<string, unknown>)[prop]
+          return updated
+        }
+        return { ...s, [prop]: value }
+      })
     )
   }, [])
 
@@ -348,6 +402,87 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       }
     }))
   }, [])
+
+  // 종성 편집 시 초성 스타일 복사 정보
+  // - 단일 종성: 동일 초성 1개
+  // - 겹받침: 구성 자모 초성 2개
+  const choseongStyleInfo = useMemo(() => {
+    if (!editingJamoInfo || editingJamoInfo.type !== 'jongseong') return null
+    const char = editingJamoInfo.char
+
+    // 겹받침 확인
+    const compoundParts = COMPOUND_JONGSEONG[char]
+    if (compoundParts) {
+      const [first, second] = compoundParts
+      const firstJamo = choseong[first]
+      const secondJamo = choseong[second]
+      if (firstJamo && secondJamo) {
+        return { type: 'compound' as const, parts: compoundParts, jamos: [firstJamo, secondJamo] as const }
+      }
+      return null
+    }
+
+    // 단일 종성 → 동일 초성
+    const singleJamo = choseong[char]
+    if (singleJamo) {
+      return { type: 'single' as const, jamo: singleJamo }
+    }
+
+    return null
+  }, [editingJamoInfo, choseong])
+
+  const handleApplyChoseongStyle = useCallback(() => {
+    if (!choseongStyleInfo || !editingJamoInfo) return
+    pushSnapshot()
+
+    let newStrokes: typeof draftStrokes
+    if (choseongStyleInfo.type === 'single') {
+      // 단일 종성: 초성 획/패딩 그대로 복사
+      const src = choseongStyleInfo.jamo
+      newStrokes = src.strokes ? src.strokes.map(s => ({ ...s })) : []
+      if (src.padding) {
+        const pad = src.padding
+        for (const side of ['top', 'bottom', 'left', 'right'] as const) {
+          updateJamoPadding('jongseong', editingJamoInfo.char, side, pad[side])
+        }
+      }
+    } else {
+      // 겹받침: 두 구성 자모의 초성 획을 왼쪽/오른쪽에 배치
+      // 첫 번째 자모 → 왼쪽 절반 (x: 0~0.5), 두 번째 → 오른쪽 (x: 0.5~1.0)
+      const [firstJamo, secondJamo] = choseongStyleInfo.jamos
+      const scaleStrokes = (strokes: typeof draftStrokes, xOffset: number, xScale: number) =>
+        strokes.map(s => ({
+          ...s,
+          points: s.points.map(p => ({
+            ...p,
+            x: p.x * xScale + xOffset,
+            ...(p.handleIn ? { handleIn: { x: p.handleIn.x * xScale + xOffset, y: p.handleIn.y } } : {}),
+            ...(p.handleOut ? { handleOut: { x: p.handleOut.x * xScale + xOffset, y: p.handleOut.y } } : {}),
+          })),
+        }))
+      const leftStrokes = scaleStrokes(
+        firstJamo.strokes ? firstJamo.strokes.map(s => ({ ...s })) : [],
+        0, 0.5
+      )
+      const rightStrokes = scaleStrokes(
+        secondJamo.strokes ? secondJamo.strokes.map(s => ({ ...s })) : [],
+        0.5, 0.5
+      )
+      newStrokes = [...leftStrokes, ...rightStrokes]
+      // 패딩 초기화 (겹받침은 좌우 배치가 중요하므로 좌우 패딩 0)
+      for (const side of ['top', 'bottom', 'left', 'right'] as const) {
+        updateJamoPadding('jongseong', editingJamoInfo.char, side, 0)
+      }
+    }
+
+    // draft 업데이트 + 스토어에 즉시 저장 (연관 샘플·프리뷰 반영)
+    resetDraftStrokes(newStrokes)
+    const jamoMap = jongseong
+    const jamo = jamoMap[editingJamoInfo.char]
+    if (jamo) {
+      updateJongseong(editingJamoInfo.char, { ...jamo, strokes: newStrokes })
+    }
+  }, [choseongStyleInfo, editingJamoInfo, pushSnapshot, resetDraftStrokes, updateJamoPadding, jongseong, updateJongseong])
 
   // 자모 편집 저장
   const handleJamoSave = useCallback(() => {
@@ -524,7 +659,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
           <Button
             variant="default"
             size="sm"
-            onClick={() => setEditingPartInLayout(null)}
+            onClick={() => { setEditingPartInLayout(null); setPreviewLayoutType(null) }}
           >
             ← 레이아웃
           </Button>
@@ -535,6 +670,23 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
             {' '}
             <span className="text-text-dim-4">({editingPartInLayout})</span>
           </span>
+          {choseongStyleInfo && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleApplyChoseongStyle}
+              className="ml-auto text-xs"
+              title={choseongStyleInfo.type === 'compound'
+                ? `초성 ${choseongStyleInfo.parts[0]}+${choseongStyleInfo.parts[1]}의 획을 종성에 적용`
+                : `초성 ${editingJamoInfo.char}의 획/패딩을 종성에 적용`
+              }
+            >
+              {choseongStyleInfo.type === 'compound'
+                ? `초성 ${choseongStyleInfo.parts[0]}+${choseongStyleInfo.parts[1]} 적용`
+                : '초성 스타일 적용'
+              }
+            </Button>
+          )}
         </div>
       )}
 
@@ -635,6 +787,8 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                     verticalStrokeIds={mixedJungseongData?.verticalStrokeIds}
                     globalStyle={globalStyleRaw}
                     jamoPadding={editingJamoPadding}
+                    horizontalPadding={editingHorizontalPadding}
+                    verticalPadding={editingVerticalPadding}
                   />
                 )}
 
@@ -648,24 +802,31 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                   const isStrokeSelected = !!selectedStrokeId
 
                   if (mixedJungseongData?.juHBox && mixedJungseongData?.juVBox) {
+                    // 혼합중성: 파트별 개별 패딩 사용
+                    const hPad = editingHorizontalPadding ?? jamoPad
+                    const vPad = editingVerticalPadding ?? jamoPad
                     return (
                       <>
                         <PaddingOverlay
                           svgRef={svgRef}
                           viewBoxSize={100}
-                          padding={jamoPad}
+                          padding={hPad}
                           containerBox={mixedJungseongData.juHBox}
-                          onPaddingChange={handleJamoPaddingChange}
+                          onPaddingChange={(side, val) =>
+                            updateMixedJamoPadding(editingJamoInfo.char, 'horizontal', side, val)
+                          }
                           color="#ff9500"
                           disabled={isStrokeSelected}
                         />
                         <PaddingOverlay
                           svgRef={svgRef}
                           viewBoxSize={100}
-                          padding={jamoPad}
+                          padding={vPad}
                           containerBox={mixedJungseongData.juVBox}
-                          onPaddingChange={handleJamoPaddingChange}
-                          color="#ff9500"
+                          onPaddingChange={(side, val) =>
+                            updateMixedJamoPadding(editingJamoInfo.char, 'vertical', side, val)
+                          }
+                          color="#ffd700"
                           disabled={isStrokeSelected}
                         />
                       </>
@@ -746,7 +907,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                         }}
                         onClick={(e) => {
                           e.stopPropagation()
-                          setSelectedPart(selectedPart === part ? null : part)
+                          handlePartClick(part)
                         }}
                         onDoubleClick={() => handlePartDoubleClick(part)}
                         title={`${part} (더블클릭: 자모 편집)`}
