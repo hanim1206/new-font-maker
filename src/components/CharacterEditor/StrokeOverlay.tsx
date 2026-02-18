@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import type { StrokeDataV2, BoxConfig, Padding } from '../../types'
 import { pointsToSvgD } from '../../utils/pathUtils'
@@ -215,7 +215,7 @@ export function StrokeOverlay({
   }, [strokes, setSelectedStrokeId, svgPointFromEvent, getContainerBoxAbs, onDragStart])
 
   // 통합 드래그 이동 핸들러
-  const handlePointerMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+  const handlePointerMove = useCallback((e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent) => {
     if (!dragState) return
     const svgPt = svgPointFromEvent(e)
     const cX = dragState.containerX
@@ -313,6 +313,33 @@ export function StrokeOverlay({
     return getContainerBoxAbs(stroke)
   }, [dragState, strokes, getContainerBoxAbs])
 
+  // window 레벨 드래그 이벤트 (범위 밖에서도 드래그 유지)
+  useEffect(() => {
+    if (!dragState) return
+
+    const handleWindowMove = (e: MouseEvent | TouchEvent) => {
+      handlePointerMove(e)
+    }
+
+    const handleWindowUp = () => {
+      handlePointerUp()
+    }
+
+    window.addEventListener('mousemove', handleWindowMove)
+    window.addEventListener('mouseup', handleWindowUp)
+    window.addEventListener('touchmove', handleWindowMove)
+    window.addEventListener('touchend', handleWindowUp)
+    window.addEventListener('touchcancel', handleWindowUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMove)
+      window.removeEventListener('mouseup', handleWindowUp)
+      window.removeEventListener('touchmove', handleWindowMove)
+      window.removeEventListener('touchend', handleWindowUp)
+      window.removeEventListener('touchcancel', handleWindowUp)
+    }
+  }, [dragState, handlePointerMove, handlePointerUp])
+
   // 빈 영역 클릭 시 선택 해제
   const handleBackgroundClick = useCallback(() => {
     if (!dragState) {
@@ -324,12 +351,6 @@ export function StrokeOverlay({
   return (
     <g
       style={dragState ? { cursor: getDragCursor() } : undefined}
-      onMouseMove={dragState ? handlePointerMove : undefined}
-      onMouseUp={dragState ? handlePointerUp : undefined}
-      onMouseLeave={dragState ? handlePointerUp : undefined}
-      onTouchMove={dragState ? handlePointerMove : undefined}
-      onTouchEnd={dragState ? handlePointerUp : undefined}
-      onTouchCancel={dragState ? handlePointerUp : undefined}
     >
       {/* 배경: 빈 영역 클릭 시 선택 해제 + 드래그 캡처 */}
       <rect

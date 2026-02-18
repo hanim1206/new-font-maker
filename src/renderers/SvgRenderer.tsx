@@ -266,7 +266,7 @@ export function SvgRenderer({
       width={size}
       height={svgHeight}
       viewBox={`0 0 ${VIEW_BOX_SIZE} ${visualHeight}`}
-      style={{ backgroundColor }}
+      style={{ backgroundColor, overflow: 'visible' }}
     >
       {/* 디버그 박스 - 실제 사용되는 박스만 표시 */}
       {showDebugBoxes &&

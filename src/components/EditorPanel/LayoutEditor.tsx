@@ -9,11 +9,13 @@ import { RelatedSamplesPanel } from './RelatedSamplesPanel'
 import { StrokeInspector } from '../CharacterEditor/StrokeInspector'
 import { StrokeEditor } from '../CharacterEditor/StrokeEditor'
 import { StrokeOverlay } from '../CharacterEditor/StrokeOverlay'
+import { PaddingOverlay } from '../CharacterEditor/PaddingOverlay'
+import { SplitOverlay } from '../CharacterEditor/SplitOverlay'
 import { LayoutContextThumbnails } from '../CharacterEditor/LayoutContextThumbnails'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import type { PartStyle } from '../../renderers/SvgRenderer'
 import { decomposeSyllable } from '../../utils/hangulUtils'
-import { calculateBoxes } from '../../utils/layoutCalculator'
+import { calculateBoxes, BASE_PRESETS_SCHEMAS } from '../../utils/layoutCalculator'
 import { copyJsonToClipboard } from '../../utils/storage'
 import { mergeStrokes, splitStroke, addHandlesToPoint, removeHandlesFromPoint } from '../../utils/strokeEditUtils'
 import { Button } from '@/components/ui/button'
@@ -47,6 +49,9 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     getLayoutSchema,
     getEffectivePadding,
     hasPaddingOverride,
+    updateGlobalPadding,
+    setPaddingOverride,
+    updateSplit,
     resetLayoutSchema,
     getCalculatedBoxes,
     exportSchemas,
@@ -563,55 +568,45 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                 globalStyle={effectiveStyle}
                 partStyles={partStyles}
               >
-                {/* 자모 편집 모드: 패딩 오버레이 (오렌지색 반투명) */}
-                {isJamoEditing && editingJamoPadding && (editingJamoPadding.top > 0 || editingJamoPadding.bottom > 0 || editingJamoPadding.left > 0 || editingJamoPadding.right > 0) && (() => {
-                  const pad = editingJamoPadding
-                  const renderPaddingOverlay = (bx: number, by: number, bw: number, bh: number) => {
-                    const pTop = pad.top * bh
-                    const pBottom = pad.bottom * bh
-                    const pLeft = pad.left * bw
-                    const pRight = pad.right * bw
-                    return (
-                      <g opacity={0.15}>
-                        {pTop > 0 && <rect x={bx} y={by} width={bw} height={pTop} fill="#ff9500" />}
-                        {pBottom > 0 && <rect x={bx} y={by + bh - pBottom} width={bw} height={pBottom} fill="#ff9500" />}
-                        {pLeft > 0 && <rect x={bx} y={by + pTop} width={pLeft} height={bh - pTop - pBottom} fill="#ff9500" />}
-                        {pRight > 0 && <rect x={bx + bw - pRight} y={by + pTop} width={pRight} height={bh - pTop - pBottom} fill="#ff9500" />}
-                      </g>
-                    )
-                  }
-                  const renderPaddedBorder = (bx: number, by: number, bw: number, bh: number) => {
-                    const px = bx + pad.left * bw
-                    const py = by + pad.top * bh
-                    const pw = bw * (1 - pad.left - pad.right)
-                    const ph = bh * (1 - pad.top - pad.bottom)
-                    return (
-                      <rect x={px} y={py} width={pw} height={ph} fill="none" stroke="#ff9500" strokeWidth={0.8} strokeDasharray="2,2" opacity={0.5} />
-                    )
-                  }
+                {/* 자모 편집 모드: 패딩 드래그 오버레이 */}
+                {isJamoEditing && editingJamoInfo && editingBox && (() => {
+                  const jamoPad = editingJamoPadding ?? { top: 0, bottom: 0, left: 0, right: 0 }
+                  const handleJamoPaddingChange = (side: keyof Padding, val: number) =>
+                    updateJamoPadding(editingJamoInfo.type, editingJamoInfo.char, side, val)
 
                   if (mixedJungseongData?.juHBox && mixedJungseongData?.juVBox) {
-                    const hb = mixedJungseongData.juHBox
-                    const vb = mixedJungseongData.juVBox
                     return (
                       <>
-                        {renderPaddingOverlay(hb.x * 100, hb.y * 100, hb.width * 100, hb.height * 100)}
-                        {renderPaddingOverlay(vb.x * 100, vb.y * 100, vb.width * 100, vb.height * 100)}
-                        {renderPaddedBorder(hb.x * 100, hb.y * 100, hb.width * 100, hb.height * 100)}
-                        {renderPaddedBorder(vb.x * 100, vb.y * 100, vb.width * 100, vb.height * 100)}
+                        <PaddingOverlay
+                          svgRef={svgRef}
+                          viewBoxSize={100}
+                          padding={jamoPad}
+                          containerBox={mixedJungseongData.juHBox}
+                          onPaddingChange={handleJamoPaddingChange}
+                          color="#ff9500"
+                        />
+                        <PaddingOverlay
+                          svgRef={svgRef}
+                          viewBoxSize={100}
+                          padding={jamoPad}
+                          containerBox={mixedJungseongData.juVBox}
+                          onPaddingChange={handleJamoPaddingChange}
+                          color="#ff9500"
+                        />
                       </>
                     )
                   }
 
-                  if (editingBox) {
-                    return (
-                      <>
-                        {renderPaddingOverlay(editingBox.x * 100, editingBox.y * 100, editingBox.width * 100, editingBox.height * 100)}
-                        {renderPaddedBorder(editingBox.x * 100, editingBox.y * 100, editingBox.width * 100, editingBox.height * 100)}
-                      </>
-                    )
-                  }
-                  return null
+                  return (
+                    <PaddingOverlay
+                      svgRef={svgRef}
+                      viewBoxSize={100}
+                      padding={jamoPad}
+                      containerBox={editingBox}
+                      onPaddingChange={handleJamoPaddingChange}
+                      color="#ff9500"
+                    />
+                  )
                 })()}
 
                 {/* 자모 편집 모드: StrokeOverlay를 SvgRenderer children으로 전달 */}
@@ -646,53 +641,40 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                     jamoPadding={editingJamoPadding}
                   />
                 )}
+
+                {/* 레이아웃 편집 모드: 기준선 드래그 오버레이 */}
+                {!isJamoEditing && schema.splits && schema.splits.length > 0 && (
+                  <SplitOverlay
+                    svgRef={svgRef}
+                    viewBoxSize={100}
+                    splits={schema.splits}
+                    onSplitChange={(index, value) => updateSplit(layoutType, index, value)}
+                    originValues={BASE_PRESETS_SCHEMAS[layoutType]?.splits?.map(s => s.value)}
+                  />
+                )}
+
+                {/* 레이아웃 편집 모드: 패딩 드래그 오버레이 */}
+                {!isJamoEditing && (
+                  <PaddingOverlay
+                    svgRef={svgRef}
+                    viewBoxSize={100}
+                    padding={effectivePadding}
+                    containerBox={{ x: 0, y: 0, width: 1, height: 1 }}
+                    onPaddingChange={(side, val) => {
+                      if (hasPaddingOverride(layoutType)) {
+                        setPaddingOverride(layoutType, side, val)
+                      } else {
+                        updateGlobalPadding(side, val)
+                      }
+                    }}
+                    color={hasPaddingOverride(layoutType) ? '#ff9500' : '#a855f7'}
+                  />
+                )}
               </SvgRenderer>
 
-              {/* 레이아웃 편집 모드: 패딩/기준선/파트 오버레이 */}
+              {/* 레이아웃 편집 모드: 기준선/파트 오버레이 */}
               {!isJamoEditing && (
                 <>
-                  {/* 패딩 오버라이드 시각화 */}
-                  {hasPaddingOverride(layoutType) && (() => {
-                    const p = effectivePadding
-                    const hr = 1.0
-                    return (
-                      <>
-                        <div
-                          className="absolute left-0 right-0 bg-accent-orange/20 pointer-events-none z-[1]"
-                          style={{ top: 0, height: `${(p.top / hr) * 100}%` }}
-                        />
-                        <div
-                          className="absolute left-0 right-0 bottom-0 bg-accent-orange/20 pointer-events-none z-[1]"
-                          style={{ height: `${(p.bottom / hr) * 100}%` }}
-                        />
-                        <div
-                          className="absolute top-0 bottom-0 bg-accent-orange/20 pointer-events-none z-[1]"
-                          style={{ left: 0, width: `${p.left * 100}%` }}
-                        />
-                        <div
-                          className="absolute top-0 bottom-0 right-0 bg-accent-orange/20 pointer-events-none z-[1]"
-                          style={{ width: `${p.right * 100}%` }}
-                        />
-                      </>
-                    )
-                  })()}
-
-                  {/* 기준선 오버레이 */}
-                  {(schema.splits || []).map((split, index) =>
-                    split.axis === 'x' ? (
-                      <div
-                        key={`split-x-${index}`}
-                        className="absolute top-0 bottom-0 w-0.5 bg-accent-red opacity-70 z-[2] pointer-events-none"
-                        style={{ left: `${split.value * 100}%` }}
-                      />
-                    ) : (
-                      <div
-                        key={`split-y-${index}`}
-                        className="absolute left-0 right-0 h-0.5 bg-accent-cyan opacity-70 z-[2] pointer-events-none"
-                        style={{ top: `${split.value * 100}%` }}
-                      />
-                    )
-                  )}
 
                   {/* 파트 클릭/더블클릭 오버레이 */}
                   {(Object.entries(computedBoxes) as [Part, { x: number; y: number; width: number; height: number }][]).map(
