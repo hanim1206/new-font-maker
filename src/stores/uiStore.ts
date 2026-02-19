@@ -14,7 +14,7 @@ interface UIState {
 
   // === 리모콘 상태 ===
   // 컨트롤 모드: 레이아웃 편집 또는 자소 편집
-  controlMode: 'global' | 'layout' | 'jamo' | null
+  controlMode: 'layout' | 'jamo' | null
   // 선택된 레이아웃 타입 (레이아웃 편집 모드용)
   selectedLayoutType: LayoutType | null
   // 편집 중인 자모 타입
@@ -27,7 +27,7 @@ interface UIState {
   selectedPointIndex: number | null
   // 자모 편집 시 선택된 레이아웃 컨텍스트
   selectedLayoutContext: LayoutType | null
-  // 레이아웃 미리보기에서 더블클릭한 파트 (자모 편집 서브모드)
+  // 레이아웃 미리보기에서 클릭한 파트 (자모 편집 서브모드)
   editingPartInLayout: Part | null
 }
 
@@ -38,7 +38,7 @@ interface UIActions {
   setIsMobile: (isMobile: boolean) => void
 
   // === 리모콘 액션 ===
-  setControlMode: (mode: 'global' | 'layout' | 'jamo' | null) => void
+  setControlMode: (mode: 'layout' | 'jamo' | null) => void
   setSelectedLayoutType: (layoutType: LayoutType | null) => void
   setEditingJamo: (type: 'choseong' | 'jungseong' | 'jongseong' | null, char: string | null) => void
   setSelectedStrokeId: (id: string | null) => void

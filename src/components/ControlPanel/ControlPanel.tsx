@@ -2,23 +2,9 @@ import { useMemo, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useJamoStore } from '../../stores/jamoStore'
 import { CHOSEONG_LIST, JUNGSEONG_LIST, JONGSEONG_LIST } from '../../data/Hangul'
-import { decomposeSyllable, isHangul, getLayoutsForJamoType, classifyJungseong } from '../../utils/hangulUtils'
+import { decomposeSyllable, isHangul, getLayoutsForJamoType, classifyJungseong, LAYOUT_LABELS } from '../../utils/hangulUtils'
 import { cn } from '@/lib/utils'
 import type { LayoutType, Part } from '../../types'
-
-// 레이아웃 타입 한글 이름
-const LAYOUT_LABELS: Record<LayoutType, string> = {
-  'choseong-only': '초성만',
-  'jungseong-vertical-only': '세로중성만',
-  'jungseong-horizontal-only': '가로중성만',
-  'jungseong-mixed-only': '혼합중성만',
-  'choseong-jungseong-vertical': '초+세로중',
-  'choseong-jungseong-horizontal': '초+가로중',
-  'choseong-jungseong-mixed': '초+혼합중',
-  'choseong-jungseong-vertical-jongseong': '초+세로중+종',
-  'choseong-jungseong-horizontal-jongseong': '초+가로중+종',
-  'choseong-jungseong-mixed-jongseong': '초+혼합중+종',
-}
 
 const ALL_LAYOUT_TYPES: Array<{ type: LayoutType; label: string }> = Object.entries(
   LAYOUT_LABELS
@@ -83,32 +69,9 @@ export function ControlPanel() {
     setEditingPartInLayout(jamoTypeToPart(type, char))
   }
 
-  // 글로벌 스타일 선택 핸들러
-  const handleGlobalStyleSelect = () => {
-    setControlMode('global')
-    setSelectedLayoutType(null)
-    setEditingJamo(null, null)
-    setEditingPartInLayout(null)
-  }
-
   return (
     <div className="h-full overflow-y-auto p-5 bg-background flex flex-col scrollbar-thin scrollbar-track-background scrollbar-thumb-border">
       <h2 className="text-3xl font-semibold mb-6 text-foreground">편집 메뉴</h2>
-
-      {/* 글로벌 스타일 버튼 (항상 표시) */}
-      <section className="mb-6">
-        <h3 className="text-base font-medium mb-3 text-text-dim-3 uppercase tracking-wide">글로벌</h3>
-        <button
-          className={cn(
-            'w-full py-3.5 px-4 text-sm bg-surface-2 text-text-dim-1 border border-border rounded-md cursor-pointer transition-all text-center',
-            'hover:bg-surface-hover hover:border-border-light hover:text-foreground',
-            controlMode === 'global' && 'bg-accent-blue border-accent-blue-hover text-white font-medium'
-          )}
-          onClick={handleGlobalStyleSelect}
-        >
-          글로벌 스타일
-        </button>
-      </section>
 
       {/* 빈 상태: 글자 미선택 + 전체목록 OFF */}
       {!selectedSyllable && !showFullMenu && (
@@ -151,7 +114,7 @@ export function ControlPanel() {
             <h3 className="text-base font-medium mb-3 text-text-dim-3 uppercase tracking-wide">자모</h3>
             <div className="p-4 bg-surface border border-border-subtle rounded-md">
               <p className="text-sm text-text-dim-4 leading-relaxed">
-                레이아웃 편집기에서 파트를 <span className="text-text-dim-2 font-medium">더블클릭</span>하면
+                레이아웃 편집기에서 파트를 <span className="text-text-dim-2 font-medium">클릭</span>하면
                 해당 자모 편집 모드로 진입합니다.
               </p>
               {/* 현재 자모 편집 중 표시 */}

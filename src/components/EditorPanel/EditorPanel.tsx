@@ -2,7 +2,8 @@ import { useState, useCallback } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { LayoutEditor } from './LayoutEditor'
 import { JamoEditor } from './JamoEditor'
-import { GlobalStyleEditor } from './GlobalStyleEditor'
+import { GlobalQuickControls } from './GlobalQuickControls'
+import { EditorBreadcrumb } from './EditorBreadcrumb'
 import { CHOSEONG_LIST, JUNGSEONG_LIST, JONGSEONG_LIST } from '../../data/Hangul'
 import { getLayoutsForJamoType, classifyJungseong } from '../../utils/hangulUtils'
 import { cn } from '@/lib/utils'
@@ -32,15 +33,6 @@ export function EditorPanel() {
   } = useUIStore()
   const [showMenu, setShowMenu] = useState(false)
 
-  // 글로벌 스타일 선택
-  const handleGlobalStyle = useCallback(() => {
-    setControlMode('global')
-    setSelectedLayoutType(null)
-    setEditingJamo(null, null)
-    setEditingPartInLayout(null)
-    setShowMenu(false)
-  }, [setControlMode, setSelectedLayoutType, setEditingJamo, setEditingPartInLayout])
-
   // 자모 클릭 → 레이아웃 경유 자모 편집 진입
   const handleJamo = useCallback((type: 'choseong' | 'jungseong' | 'jongseong', char: string) => {
     const subType = type === 'jungseong' ? classifyJungseong(char) : undefined
@@ -55,20 +47,6 @@ export function EditorPanel() {
     setShowMenu(false)
   }, [setSelectedLayoutType, setControlMode, setEditingJamo, setEditingPartInLayout])
 
-  // 헤더 텍스트 (향후 UI 표시용)
-  let _headerText = ''
-  if (controlMode === 'global') {
-    _headerText = '글로벌 스타일'
-  } else if (controlMode === 'layout' && selectedLayoutType) {
-    _headerText = editingPartInLayout && editingJamoChar
-      ? `레이아웃: ${selectedLayoutType} > ${editingPartInLayout} (${editingJamoChar})`
-      : `레이아웃 편집: ${selectedLayoutType}`
-  } else if (controlMode === 'jamo' && editingJamoType && editingJamoChar) {
-    const typeLabel = { choseong: '초성', jungseong: '중성', jongseong: '종성' }[editingJamoType]
-    _headerText = `${typeLabel} 편집: ${editingJamoChar}`
-  }
-  void _headerText
-
   // 콘텐츠
   let content: React.ReactNode = null
   if (!controlMode) {
@@ -79,18 +57,8 @@ export function EditorPanel() {
         </p>
       </div>
     )
-  } else if (controlMode === 'global') {
-    content = (
-      <div className="flex-1 overflow-y-auto p-5">
-        <GlobalStyleEditor />
-      </div>
-    )
   } else if (controlMode === 'layout' && selectedLayoutType) {
-    content = (
-      <div className="flex-1 overflow-y-auto p-5">
-        <LayoutEditor layoutType={selectedLayoutType} />
-      </div>
-    )
+    content = <LayoutEditor layoutType={selectedLayoutType} />
   } else if (controlMode === 'jamo' && editingJamoType && editingJamoChar) {
     content = (
       <div className="flex-1 overflow-y-auto p-5">
@@ -109,37 +77,19 @@ export function EditorPanel() {
     <div className="h-full bg-background border-t border-border-subtle overflow-hidden flex flex-col">
       {/* 편집 메뉴 토글 바 (데스크톱만) */}
       {!isMobile && (
-        <div className="shrink-0">
+        <div className="shrink-0 hidden">
           {/* 토글 버튼 */}
           <button
             className="w-full px-4 py-2 flex items-center gap-2 text-sm font-medium text-text-dim-3 bg-[#111] border-b border-border-subtle cursor-pointer hover:bg-surface-2 hover:text-text-dim-1 transition-colors"
             onClick={() => setShowMenu(!showMenu)}
           >
-            <span className="text-xs">{showMenu ? '▲' : '▼'}</span>
-            편집 메뉴
-        
-      
+            <span className="text-xs">{showMenu ? '▼' : '▲'}</span>
+            전체 자모     
           </button>
 
-          {/* 펼침: 글로벌 + 자모 버튼 가로 정렬 */}
+          {/* 펼침: 자모 버튼 가로 정렬 */}
           {showMenu && (
-            <div className="px-4 py-3 border-b border-border-subtle bg-[#0d0d0d] flex gap-4 overflow-x-auto">
-              {/* 글로벌 스타일 */}
-              <button
-                className={cn(
-                  'shrink-0 px-3 py-2 text-xs rounded border cursor-pointer transition-all',
-                  controlMode === 'global'
-                    ? 'bg-accent-blue border-accent-blue-hover text-white font-medium'
-                    : 'bg-surface-2 text-text-dim-1 border-border hover:bg-surface-hover hover:text-foreground'
-                )}
-                onClick={handleGlobalStyle}
-              >
-                글로벌
-              </button>
-
-              {/* 구분선 */}
-              <div className="shrink-0 w-px bg-border-subtle" />
-
+            <div className="px-4 py-3 border-b border-border-subtle bg-[#0d0d0d] flex flex-col gap-4 overflow-x-auto">
               {/* 초성 */}
               <div className="flex gap-1 shrink-0">
                 {CHOSEONG_LIST.map((char) => (
@@ -207,8 +157,11 @@ export function EditorPanel() {
         </div>
       )}
 
+      {/* 글로벌 스타일 퀵 컨트롤 (항상 표시) */}
+      <GlobalQuickControls />
 
-
+      {/* 브레드크럼 네비게이션 */}
+      <EditorBreadcrumb />
 
       {/* 콘텐츠 */}
       {content}

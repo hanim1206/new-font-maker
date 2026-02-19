@@ -1,24 +1,18 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useLayoutStore } from '../../stores/layoutStore'
 import { useJamoStore } from '../../stores/jamoStore'
 import { useGlobalStyleStore } from '../../stores/globalStyleStore'
 import { useStrokeHistory } from '../../hooks/useStrokeHistory'
-import { RelatedSamplesPanel } from './RelatedSamplesPanel'
-import { StrokeInspector } from '../CharacterEditor/StrokeInspector'
-import { StrokeEditor } from '../CharacterEditor/StrokeEditor'
-import { StrokeOverlay } from '../CharacterEditor/StrokeOverlay'
-import { PaddingOverlay } from '../CharacterEditor/PaddingOverlay'
-import { SplitOverlay } from '../CharacterEditor/SplitOverlay'
-import { LayoutContextThumbnails } from '../CharacterEditor/LayoutContextThumbnails'
-import { SvgRenderer } from '../../renderers/SvgRenderer'
+import { LayoutCanvasColumn } from './LayoutCanvasColumn'
+import { JamoCanvasColumn } from './JamoCanvasColumn'
+import { JamoControlsColumn } from './JamoControlsColumn'
 import type { PartStyle } from '../../renderers/SvgRenderer'
 import { decomposeSyllable, getSampleSyllableForLayout } from '../../utils/hangulUtils'
-import { calculateBoxes, BASE_PRESETS_SCHEMAS } from '../../utils/layoutCalculator'
+import { calculateBoxes } from '../../utils/layoutCalculator'
 import { copyJsonToClipboard } from '../../utils/storage'
 import { mergeStrokes, splitStroke, addHandlesToPoint, removeHandlesFromPoint } from '../../utils/strokeEditUtils'
 import { COMPOUND_JONGSEONG } from '../../utils/jamoLinkUtils'
-import { Button } from '@/components/ui/button'
 import type { LayoutType, Part, DecomposedSyllable, BoxConfig, JamoData, Padding } from '../../types'
 
 interface LayoutEditorProps {
@@ -51,7 +45,6 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     hasPaddingOverride,
     setPaddingOverride,
     updateSplit,
-    updatePartOverride,
     resetLayoutSchema,
     getCalculatedBoxes,
     exportSchemas,
@@ -70,12 +63,6 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     exportJamos,
   } = useJamoStore()
   const { getEffectiveStyle, style: globalStyleRaw } = useGlobalStyleStore()
-
-  // SVG ref (StrokeOverlay에서 사용)
-  const svgRef = useRef<SVGSVGElement>(null)
-
-  // 파트 선택 상태 (레이아웃 편집 모드)
-  const [selectedPart, setSelectedPart] = useState<Part | null>(null)
 
   // 자모 편집 시 미리보기 레이아웃 전환
   const [previewLayoutType, setPreviewLayoutType] = useState<LayoutType | null>(null)
@@ -110,40 +97,6 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     () => calculateBoxes(schemaWithPadding),
     [schemaWithPadding]
   )
-
-  // 오프셋 적용 전 원본 박스 (파트 오프셋 드래그용)
-  const rawBoxes = useMemo(
-    () => calculateBoxes({ ...schemaWithPadding, partOverrides: undefined }),
-    [schemaWithPadding]
-  )
-
-  // 선택된 파트의 오프셋을 PaddingOverlay용 Padding으로 변환
-  const selectedPartOverridePadding = useMemo((): Padding | null => {
-    if (!selectedPart) return null
-    const box = rawBoxes[selectedPart]
-    if (!box) return null
-    const override = schema.partOverrides?.[selectedPart]
-    const top = override?.top ?? 0
-    const bottom = override?.bottom ?? 0
-    const left = override?.left ?? 0
-    const right = override?.right ?? 0
-    return {
-      top: box.height > 0 ? top / box.height : 0,
-      bottom: box.height > 0 ? bottom / box.height : 0,
-      left: box.width > 0 ? left / box.width : 0,
-      right: box.width > 0 ? right / box.width : 0,
-    }
-  }, [selectedPart, rawBoxes, schema.partOverrides])
-
-  // PaddingOverlay 드래그 → PartOverride 값으로 역변환하여 저장
-  const handlePartOverrideChange = useCallback((side: keyof Padding, val: number) => {
-    if (!selectedPart) return
-    const box = rawBoxes[selectedPart]
-    if (!box) return
-    const isVertical = side === 'top' || side === 'bottom'
-    const absoluteVal = val * (isVertical ? box.height : box.width)
-    updatePartOverride(layoutType, selectedPart, side, absoluteVal)
-  }, [selectedPart, rawBoxes, layoutType, updatePartOverride])
 
   // 테스트용 음절
   const testSyllable = useMemo(() => {
@@ -289,30 +242,10 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isJamoEditing, setEditingPartInLayout, undo, redo])
 
-  // 더블클릭으로 자모 편집 진입
-  // 파트 클릭/더블클릭 구분 (onClick → 싱글클릭 시 선택, onDoubleClick → 자모 편집 진입)
-  const partClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
+  // 파트 싱글클릭 → 즉시 자모 편집 진입
   const handlePartClick = useCallback((part: Part) => {
-    if (partClickTimer.current) {
-      clearTimeout(partClickTimer.current)
-      partClickTimer.current = null
-    }
-    partClickTimer.current = setTimeout(() => {
-      partClickTimer.current = null
-      setSelectedPart(prev => prev === part ? null : part)
-    }, 250)
-  }, [])
-
-  const handlePartDoubleClick = useCallback((part: Part) => {
-    if (partClickTimer.current) {
-      clearTimeout(partClickTimer.current)
-      partClickTimer.current = null
-    }
     const jamoInfo = partToJamoInfo(part, testSyllable)
     if (!jamoInfo) return
-    // 자모 편집 진입 시 현재 layoutType을 previewLayoutType으로 설정
-    // (LayoutContextThumbnails가 자동으로 첫 번째 레이아웃을 선택하는 것 방지)
     setPreviewLayoutType(layoutType)
     setEditingPartInLayout(part)
     setEditingJamo(jamoInfo.type, jamoInfo.char)
@@ -648,373 +581,90 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   // 미리보기에 사용할 음절 (자모 편집 시 draft 반영, 아니면 testSyllable)
   const displaySyllable = editingSyllable || testSyllable
 
-  // 미리보기 크기 (자모 편집 시 확대)
-  const previewSize = isJamoEditing ? 300 : 200
+  // 패딩 오버라이드 핸들러
+  const handlePaddingOverrideChange = useCallback((side: keyof Padding, val: number) => {
+    setPaddingOverride(layoutType, side, val)
+  }, [layoutType, setPaddingOverride])
 
+  // 3컬럼 데스크톱 레이아웃
   return (
-    <div className="h-full overflow-y-auto flex flex-col">
-      {/* 자모 편집 서브모드 헤더 */}
-      {isJamoEditing && editingJamoInfo && (
-        <div className="flex items-center gap-3 pb-3 border-b border-border-subtle">
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => { setEditingPartInLayout(null); setPreviewLayoutType(null) }}
-          >
-            ← 레이아웃
-          </Button>
-          <span className="text-sm text-text-dim-2 font-medium">
-            {editingJamoInfo.type === 'choseong' ? '초성' : editingJamoInfo.type === 'jungseong' ? '중성' : '종성'}
-            {' '}
-            <span className="text-lg font-bold text-text-primary">{editingJamoInfo.char}</span>
-            {' '}
-            <span className="text-text-dim-4">({editingPartInLayout})</span>
-          </span>
-          {choseongStyleInfo && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleApplyChoseongStyle}
-              className="ml-auto text-xs"
-              title={choseongStyleInfo.type === 'compound'
-                ? `초성 ${choseongStyleInfo.parts[0]}+${choseongStyleInfo.parts[1]}의 획을 종성에 적용`
-                : `초성 ${editingJamoInfo.char}의 획/패딩을 종성에 적용`
-              }
-            >
-              {choseongStyleInfo.type === 'compound'
-                ? `초성 ${choseongStyleInfo.parts[0]}+${choseongStyleInfo.parts[1]} 적용`
-                : '초성 스타일 적용'
-              }
-            </Button>
-          )}
-        </div>
-      )}
+    <div className="h-full overflow-hidden flex">
+      {/* 좌측: 레이아웃 캔버스 */}
+      <div className="flex-[2] min-w-0 overflow-y-auto border-r border-border-subtle">
+        <LayoutCanvasColumn
+          layoutType={layoutType}
+          displaySyllable={displaySyllable}
+          schemaWithPadding={schemaWithPadding}
+          effectiveStyle={effectiveStyle}
+          computedBoxes={computedBoxes}
+          schema={schema}
+          effectivePadding={effectivePadding}
+          hasPaddingOverride={hasPaddingOverride(layoutType)}
+          isJamoEditing={isJamoEditing}
+          editingPartInLayout={editingPartInLayout}
+          editingJamoInfo={editingJamoInfo}
+          previewLayoutType={previewLayoutType}
+          activeLayoutType={activeLayoutType}
+          editingJamoType={editingJamoType}
+          editingJamoChar={editingJamoChar}
+          onPartClick={handlePartClick}
+          onSplitChange={(index, value) => updateSplit(layoutType, index, value)}
+          onPaddingOverrideChange={handlePaddingOverrideChange}
+          onPreviewLayoutTypeChange={(lt) => setPreviewLayoutType(lt)}
+        />
+      </div>
 
+      {/* 중앙: 자모 획 캔버스 */}
+      <div className="flex-[3] min-w-0 overflow-y-auto border-r border-border-subtle">
+        <JamoCanvasColumn
+          displaySyllable={displaySyllable}
+          schemaWithPadding={schemaWithPadding}
+          effectiveStyle={effectiveStyle}
+          partStyles={partStyles}
+          isJamoEditing={isJamoEditing}
+          draftStrokes={draftStrokes}
+          editingBox={editingBox}
+          editingJamoInfo={editingJamoInfo}
+          mixedJungseongData={mixedJungseongData}
+          editingJamoPadding={editingJamoPadding}
+          editingHorizontalPadding={editingHorizontalPadding}
+          editingVerticalPadding={editingVerticalPadding}
+          selectedStrokeId={selectedStrokeId}
+          globalStyleRaw={globalStyleRaw}
+          onStrokeChange={handleStrokeChange}
+          onPointChange={handlePointChange}
+          onDragStart={pushSnapshot}
+          onJamoPaddingChange={(type, char, side, val) => updateJamoPadding(type, char, side, val)}
+          onMixedJamoPaddingChange={(char, part, side, val) => updateMixedJamoPadding(char, part, side, val)}
+        />
+      </div>
 
-      {/* 미리보기 + 편집 패널 (가로 배치) */}
-      <div className="flex gap-4 mt-4 flex-1">
-        {/* 미리보기 영역 */}
-        <div className="shrink-0 p-4 bg-surface rounded-md border border-border-subtle">
-          <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">
-            미리보기
-          </h3>
-
-          {/* 자모 편집 시 LayoutContextThumbnails 표시 */}
-          {isJamoEditing && editingJamoInfo && (
-            <LayoutContextThumbnails
-              jamoType={editingJamoInfo.type}
-              jamoChar={editingJamoInfo.char}
-              selectedContext={previewLayoutType}
-              onSelectContext={(lt) => setPreviewLayoutType(lt)}
-            />
-          )}
-
-          <div
-            className="flex justify-center p-3 bg-background rounded mb-2"
-            onClick={() => {
-              if (!isJamoEditing && selectedPart) {
-                setSelectedPart(null)
-              }
-            }}
-          >
-            <div className="relative inline-block" style={{ backgroundColor: '#1a1a1a' }}>
-              {/* 0.025 스냅 그리드 */}
-              <svg
-                className="absolute inset-0 pointer-events-none z-0"
-                width={previewSize}
-                height={previewSize}
-                viewBox="0 0 100 100"
-              >
-                {Array.from({ length: 39 }, (_, i) => {
-                  const v = (i + 1) * 2.5
-                  return (
-                    <g key={`grid-${i}`}>
-                      <line x1={v} y1={0} x2={v} y2={100} stroke="#333" strokeWidth={0.2} />
-                      <line x1={0} y1={v} x2={100} y2={v} stroke="#333" strokeWidth={0.2} />
-                    </g>
-                  )
-                })}
-                {Array.from({ length: 9 }, (_, i) => {
-                  const v = (i + 1) * 10
-                  return (
-                    <g key={`grid-major-${i}`}>
-                      <line x1={v} y1={0} x2={v} y2={100} stroke="#444" strokeWidth={0.4} />
-                      <line x1={0} y1={v} x2={100} y2={v} stroke="#444" strokeWidth={0.4} />
-                    </g>
-                  )
-                })}
-              </svg>
-
-              {/* SvgRenderer (partStyles로 자모 편집 시 비편집 파트 어둡게) */}
-              <SvgRenderer
-                svgRef={svgRef}
-                syllable={displaySyllable}
-                schema={schemaWithPadding}
-                size={previewSize}
-                fillColor="#e5e5e5"
-                backgroundColor="transparent"
-                showDebugBoxes
-                globalStyle={effectiveStyle}
-                partStyles={partStyles}
-              >
-                {/* 자모 편집 모드: StrokeOverlay를 SvgRenderer children으로 전달 */}
-                {isJamoEditing && editingBox && draftStrokes.length > 0 && (
-                  <StrokeOverlay
-                    strokes={draftStrokes}
-                    box={mixedJungseongData?.juHBox || mixedJungseongData?.juVBox ? {
-                      // 혼합중성: JU_H + JU_V 합산 박스
-                      x: Math.min(mixedJungseongData.juHBox?.x ?? 1, mixedJungseongData.juVBox?.x ?? 1),
-                      y: Math.min(mixedJungseongData.juHBox?.y ?? 1, mixedJungseongData.juVBox?.y ?? 1),
-                      width: Math.max(
-                        (mixedJungseongData.juHBox?.x ?? 0) + (mixedJungseongData.juHBox?.width ?? 0),
-                        (mixedJungseongData.juVBox?.x ?? 0) + (mixedJungseongData.juVBox?.width ?? 0)
-                      ) - Math.min(mixedJungseongData.juHBox?.x ?? 1, mixedJungseongData.juVBox?.x ?? 1),
-                      height: Math.max(
-                        (mixedJungseongData.juHBox?.y ?? 0) + (mixedJungseongData.juHBox?.height ?? 0),
-                        (mixedJungseongData.juVBox?.y ?? 0) + (mixedJungseongData.juVBox?.height ?? 0)
-                      ) - Math.min(mixedJungseongData.juHBox?.y ?? 1, mixedJungseongData.juVBox?.y ?? 1),
-                    } : editingBox}
-                    svgRef={svgRef}
-                    viewBoxSize={100}
-                    onStrokeChange={handleStrokeChange}
-                    onPointChange={handlePointChange}
-                    onDragStart={pushSnapshot}
-                    strokeColor="#e5e5e5"
-                    isMixed={!!mixedJungseongData}
-                    juHBox={mixedJungseongData?.juHBox}
-                    juVBox={mixedJungseongData?.juVBox}
-                    horizontalStrokeIds={mixedJungseongData?.horizontalStrokeIds}
-                    verticalStrokeIds={mixedJungseongData?.verticalStrokeIds}
-                    globalStyle={globalStyleRaw}
-                    jamoPadding={editingJamoPadding}
-                    horizontalPadding={editingHorizontalPadding}
-                    verticalPadding={editingVerticalPadding}
-                  />
-                )}
-
-                {/* 자모 편집 모드: 패딩 드래그 오버레이 (StrokeOverlay 위에 렌더링하여 이벤트 우선) */}
-                {isJamoEditing && editingJamoInfo && editingBox && (() => {
-                  const jamoPad = editingJamoPadding ?? { top: 0, bottom: 0, left: 0, right: 0 }
-                  const handleJamoPaddingChange = (side: keyof Padding, val: number) =>
-                    updateJamoPadding(editingJamoInfo.type, editingJamoInfo.char, side, val)
-
-                  // 획이 선택된 상태면 패딩 핸들 비활성화 (획 편집과 충돌 방지)
-                  const isStrokeSelected = !!selectedStrokeId
-
-                  if (mixedJungseongData?.juHBox && mixedJungseongData?.juVBox) {
-                    // 혼합중성: 파트별 개별 패딩 사용
-                    const hPad = editingHorizontalPadding ?? jamoPad
-                    const vPad = editingVerticalPadding ?? jamoPad
-                    return (
-                      <>
-                        <PaddingOverlay
-                          svgRef={svgRef}
-                          viewBoxSize={100}
-                          padding={hPad}
-                          containerBox={mixedJungseongData.juHBox}
-                          onPaddingChange={(side, val) =>
-                            updateMixedJamoPadding(editingJamoInfo.char, 'horizontal', side, val)
-                          }
-                          color="#ff9500"
-                          disabled={isStrokeSelected}
-                        />
-                        <PaddingOverlay
-                          svgRef={svgRef}
-                          viewBoxSize={100}
-                          padding={vPad}
-                          containerBox={mixedJungseongData.juVBox}
-                          onPaddingChange={(side, val) =>
-                            updateMixedJamoPadding(editingJamoInfo.char, 'vertical', side, val)
-                          }
-                          color="#ffd700"
-                          disabled={isStrokeSelected}
-                        />
-                      </>
-                    )
-                  }
-
-                  return (
-                    <PaddingOverlay
-                      svgRef={svgRef}
-                      viewBoxSize={100}
-                      padding={jamoPad}
-                      containerBox={editingBox}
-                      onPaddingChange={handleJamoPaddingChange}
-                      color="#ff9500"
-                      disabled={isStrokeSelected}
-                    />
-                  )
-                })()}
-
-                {/* 레이아웃 편집 모드: 파트 미선택 → 기준선 + 레이아웃 패딩 */}
-                {!isJamoEditing && !selectedPart && schema.splits && schema.splits.length > 0 && (
-                  <SplitOverlay
-                    svgRef={svgRef}
-                    viewBoxSize={100}
-                    splits={schema.splits}
-                    onSplitChange={(index, value) => updateSplit(layoutType, index, value)}
-                    originValues={BASE_PRESETS_SCHEMAS[layoutType]?.splits?.map(s => s.value)}
-                  />
-                )}
-                {!isJamoEditing && !selectedPart && (
-                  <PaddingOverlay
-                    svgRef={svgRef}
-                    viewBoxSize={100}
-                    padding={effectivePadding}
-                    containerBox={{ x: 0, y: 0, width: 1, height: 1 }}
-                    onPaddingChange={(side, val) => {
-                      setPaddingOverride(layoutType, side, val)
-                    }}
-                    color={hasPaddingOverride(layoutType) ? '#ff9500' : '#a855f7'}
-                  />
-                )}
-
-                {/* 레이아웃 편집 모드: 파트 선택됨 → 파트 오프셋 드래그 */}
-                {!isJamoEditing && selectedPart && rawBoxes[selectedPart] && selectedPartOverridePadding && (
-                  <PaddingOverlay
-                    svgRef={svgRef}
-                    viewBoxSize={100}
-                    padding={selectedPartOverridePadding}
-                    containerBox={rawBoxes[selectedPart]!}
-                    onPaddingChange={handlePartOverrideChange}
-                    color="#facc15"
-                    minPadding={-0.5}
-                    maxPadding={0.5}
-                    snapStep={0.005}
-                  />
-                )}
-              </SvgRenderer>
-
-              {/* 레이아웃 편집 모드: 기준선/파트 오버레이 */}
-              {!isJamoEditing && (
-                <>
-
-                  {/* 파트 클릭/더블클릭 오버레이 */}
-                  {(Object.entries(computedBoxes) as [Part, { x: number; y: number; width: number; height: number }][]).map(
-                    ([part, box]) => (
-                      <button
-                        key={`part-overlay-${part}`}
-                        className={`absolute z-[3] border-2 transition-colors cursor-pointer rounded-sm ${
-                          selectedPart === part
-                            ? 'border-accent-yellow bg-accent-yellow/15'
-                            : 'border-transparent hover:border-accent-yellow/50 hover:bg-accent-yellow/5'
-                        }`}
-                        style={{
-                          left: `${box.x * 100}%`,
-                          top: `${box.y * 100}%`,
-                          width: `${box.width * 100}%`,
-                          height: `${box.height * 100}%`,
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handlePartClick(part)
-                        }}
-                        onDoubleClick={() => handlePartDoubleClick(part)}
-                        title={`${part} (더블클릭: 자모 편집)`}
-                      >
-                        {selectedPart === part && (
-                          <span className="absolute top-0.5 left-1 text-[0.55rem] font-bold text-accent-yellow drop-shadow-[0_0_2px_rgba(0,0,0,0.8)]">
-                            {part}
-                          </span>
-                        )}
-                      </button>
-                    )
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* 연관 샘플 (미리보기 아래) */}
-          <RelatedSamplesPanel
-            editingType={isJamoEditing && editingJamoType ? editingJamoType : 'layout'}
-            editingChar={isJamoEditing && editingJamoChar ? editingJamoChar : null}
-            layoutType={activeLayoutType}
-            compact
-          />
-        </div>
-
-        {/* 우측 패널: 레이아웃 설정 또는 자모 편집 도구 */}
-        <div className="flex-1 min-w-0 overflow-y-auto">
-          {isJamoEditing && editingJamoInfo ? (
-            /* 자모 편집 도구 */
-            <div className="flex flex-col gap-4">
-              {/* 획 목록 */}
-              {/* <div className="bg-surface rounded-md border border-border-subtle p-4">
-                <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">획 목록</h3>
-                <StrokeList strokes={draftStrokes} />
-              </div> */}
-
-              {/* 속성 편집 */}
-              <div className="bg-surface rounded-md border border-border-subtle p-4">
-                <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">속성 편집</h3>
-                <StrokeInspector
-                  strokes={draftStrokes}
-                  onChange={handleStrokeChange}
-                  onPointChange={handlePointChange}
-                  onMergeStrokes={handleMergeStrokes}
-                  onSplitStroke={handleSplitStroke}
-                  onToggleCurve={handleToggleCurve}
-                />
-              </div>
-
-              {/* 키보드 기반 컨트롤 (UI 없음, 이벤트만 처리) */}
-              <StrokeEditor
-                strokes={draftStrokes}
-                onChange={handleStrokeChange}
-                onPointChange={handlePointChange}
-                boxInfo={editingBox ? { ...editingBox } : undefined}
-              />
-
-              {/* undo/redo + 저장/초기화 버튼 */}
-              <div className="flex gap-2">
-                <Button variant="default" size="sm" onClick={undo} disabled={!canUndo} title="되돌리기 (Ctrl+Z)">
-                  ↩
-                </Button>
-                <Button variant="default" size="sm" onClick={redo} disabled={!canRedo} title="다시 실행 (Ctrl+Y)">
-                  ↪
-                </Button>
-                <div className="flex-1" />
-                <Button variant="default" onClick={handleJamoReset}>
-                  초기화
-                </Button>
-                <Button variant="blue" onClick={handleJamoSave}>
-                  저장
-                </Button>
-              </div>
-
-              <p className="text-xs text-text-dim-5 text-center leading-relaxed">
-                방향키: 이동 | Shift+방향키: 크기 | R: 회전 | Esc: 레이아웃으로 돌아가기
-              </p>
-            </div>
-          ) : (
-            /* 레이아웃 편집 도구 */
-            <>
-              {/* 도구 아이콘 바 */}
-              <div className="flex items-center gap-1 mb-3">
-                <h3 className="text-sm font-medium text-text-dim-3 uppercase tracking-wider mr-auto">레이아웃 설정</h3>
-                <Button variant="blue" size="icon" onClick={handleSave} title="저장">
-                  💾
-                </Button>
-                <Button variant="default" size="icon" onClick={handleReset} title="되돌리기">
-                  ↩️
-                </Button>
-                <Button variant="green" size="icon" onClick={handleExportPresets} title="레이아웃 JSON 내보내기 (basePresets)">
-                  📤
-                </Button>
-                <Button variant="green" size="icon" onClick={handleExportJamos} title="자모 JSON 내보내기 (baseJamos)">
-                  🔤
-                </Button>
-                <Button variant="danger" size="icon" onClick={handleResetAll} title="전체 초기화">
-                  🗑️
-                </Button>
-              </div>
-              <p className="text-xs text-text-dim-5 mt-4 text-center leading-relaxed">
-                파트 더블클릭으로 자모 편집 진입
-              </p>
-            </>
-          )}
-        </div>
+      {/* 우측: 컨트롤러 */}
+      <div className="w-[280px] shrink-0 overflow-y-auto">
+        <JamoControlsColumn
+          isJamoEditing={isJamoEditing}
+          editingJamoInfo={editingJamoInfo}
+          draftStrokes={draftStrokes}
+          editingBox={editingBox}
+          choseongStyleInfo={choseongStyleInfo}
+          onStrokeChange={handleStrokeChange}
+          onPointChange={handlePointChange}
+          onMergeStrokes={handleMergeStrokes}
+          onSplitStroke={handleSplitStroke}
+          onToggleCurve={handleToggleCurve}
+          onUndo={undo}
+          onRedo={redo}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onJamoSave={handleJamoSave}
+          onJamoReset={handleJamoReset}
+          onApplyChoseongStyle={handleApplyChoseongStyle}
+          onLayoutSave={handleSave}
+          onLayoutReset={handleReset}
+          onExportPresets={handleExportPresets}
+          onExportJamos={handleExportJamos}
+          onResetAll={handleResetAll}
+        />
       </div>
     </div>
   )

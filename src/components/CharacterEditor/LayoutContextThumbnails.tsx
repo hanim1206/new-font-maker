@@ -44,7 +44,7 @@ export function LayoutContextThumbnails({
   if (applicableLayouts.length === 0) return null
 
   return (
-    <div className="px-5 pt-3">
+    <div className="px-5 pt-3 ">
       <h4 className="text-xs font-medium mb-2 text-text-dim-4 uppercase tracking-wider">
         레이아웃 컨텍스트
       </h4>

@@ -237,6 +237,20 @@ export function getSampleSyllableForLayout(
 }
 
 // ===== 한글인지 확인 =====
+// ===== 레이아웃 타입 한글 이름 =====
+export const LAYOUT_LABELS: Record<LayoutType, string> = {
+  'choseong-only': '초성만',
+  'jungseong-vertical-only': '세로중성만',
+  'jungseong-horizontal-only': '가로중성만',
+  'jungseong-mixed-only': '혼합중성만',
+  'choseong-jungseong-vertical': '초+세로중',
+  'choseong-jungseong-horizontal': '초+가로중',
+  'choseong-jungseong-mixed': '초+혼합중',
+  'choseong-jungseong-vertical-jongseong': '초+세로중+종',
+  'choseong-jungseong-horizontal-jongseong': '초+가로중+종',
+  'choseong-jungseong-mixed-jongseong': '초+혼합중+종',
+}
+
 export function isHangul(char: string): boolean {
   const code = char.charCodeAt(0)
   return (
