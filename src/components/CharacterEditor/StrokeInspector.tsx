@@ -3,6 +3,40 @@ import type { StrokeDataV2, StrokeLinecap } from '../../types'
 import { MERGE_PROXIMITY } from '../../utils/snapUtils'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Slider } from '@/components/ui/slider'
+import type { SliderMark } from '@/components/ui/slider'
+import { weightToMultiplier } from '../../stores/globalStyleStore'
+
+/** 기본 획 두께 (baseJamos.json 기본값) */
+const BASE_THICKNESS = 0.07
+
+/** thickness → weight(100~900) 변환 (weightToMultiplier의 역함수, BASE_THICKNESS 기준) */
+function thicknessToWeight(thickness: number): number {
+  const multiplier = thickness / BASE_THICKNESS
+  // weightToMultiplier 역변환: 0.4→100, 1.0→400, 2.2→900
+  if (multiplier <= 1.0) {
+    return 100 + ((multiplier - 0.4) / 0.6) * 300
+  }
+  return 400 + ((multiplier - 1.0) / 1.2) * 500
+}
+
+/** weight(100~900) → thickness 변환 (weightToMultiplier × BASE_THICKNESS) */
+function weightToThickness(weight: number): number {
+  return weightToMultiplier(weight) * BASE_THICKNESS
+}
+
+/** 두께 슬라이더 마크 */
+const WEIGHT_MARKS: SliderMark[] = [
+  { value: 100, label: '100' },
+  { value: 200 },
+  { value: 300, label: '300' },
+  { value: 400, label: '400' },
+  { value: 500 },
+  { value: 600, label: '600' },
+  { value: 700, label: '700' },
+  { value: 800 },
+  { value: 900, label: '900' },
+]
 
 /** 두 획의 가장 가까운 끝점 간 거리 */
 function minEndpointDistance(a: StrokeDataV2, b: StrokeDataV2): number {
@@ -71,14 +105,22 @@ export function StrokeInspector({ strokes, onChange, onPointChange, onMergeStrok
 
       {/* 공통 속성: 두께 */}
       <div className="p-4 bg-surface-2 rounded-md border border-border">
-        <div className="flex flex-col gap-1">
-          <label className="text-[0.7rem] text-muted uppercase tracking-wider">Thickness (두께)</label>
-          <input
-            type="number" min="0.01" max="0.5" step="0.005"
-            value={selectedStroke.thickness.toFixed(3)}
-            onChange={(e) => onChange(selectedStroke.id, 'thickness', parseFloat(e.target.value) || 0.01)}
-            className={inputClass}
-          />
+        <label className="text-[0.7rem] text-muted uppercase tracking-wider block mb-2">두께</label>
+        <div className="flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <Slider
+              min={100}
+              max={900}
+              step={100}
+              value={[Math.round(thicknessToWeight(selectedStroke.thickness) / 100) * 100]}
+              onValueChange={([val]) => onChange(selectedStroke.id, 'thickness', weightToThickness(val))}
+              marks={WEIGHT_MARKS}
+              originValue={400}
+            />
+          </div>
+          <span className="text-xs text-text-dim-5 font-mono shrink-0 w-12 text-right">
+            {selectedStroke.thickness.toFixed(3)}
+          </span>
         </div>
       </div>
 

@@ -381,7 +381,7 @@ export function StrokeOverlay({
             {/* 넓은 히트 영역 (투명) - 이동용 */}
             <path
               d={d}
-              fill={stroke.closed ? 'transparent' : 'none'}
+              fill="none"
               stroke="transparent"
               strokeWidth={pathThickness * 4}
               onClick={(e) => { e.stopPropagation(); setSelectedStrokeId(stroke.id) }}
@@ -392,9 +392,9 @@ export function StrokeOverlay({
             {/* 실제 렌더링 */}
             <path
               d={d}
-              fill={stroke.closed ? (isSelected ? '#ff6b6b' : strokeColor) : 'none'}
+              fill="none"
               stroke={isSelected ? '#ff6b6b' : strokeColor}
-              strokeWidth={stroke.closed ? 0 : pathThickness}
+              strokeWidth={pathThickness}
               strokeLinecap={resolveLinecap(stroke.linecap, globalStyle?.linecap)}
               strokeLinejoin="round"
               onClick={(e) => { e.stopPropagation(); setSelectedStrokeId(stroke.id) }}

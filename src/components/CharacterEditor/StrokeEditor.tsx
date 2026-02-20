@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useUIStore } from '../../stores/uiStore'
+import { weightToMultiplier } from '../../stores/globalStyleStore'
 import type { StrokeDataV2, BoxConfig } from '../../types'
 
 type PointChangeHandler = (
@@ -17,7 +18,8 @@ interface StrokeEditorProps {
 }
 
 const MOVE_STEP = 0.025
-const THICKNESS_STEP = 0.005
+const BASE_THICKNESS = 0.07
+const WEIGHT_STEP = 100
 
 export function StrokeEditor({ strokes, onChange, onPointChange, boxInfo: _boxInfo = { x: 0, y: 0, width: 1, height: 1 } }: StrokeEditorProps) {
   void _boxInfo
@@ -108,8 +110,14 @@ export function StrokeEditor({ strokes, onChange, onPointChange, boxInfo: _boxIn
           case 'ArrowUp':
             e.preventDefault()
             if (isShift) {
-              // 두께 감소
-              onChange(selectedStroke.id, 'thickness', Math.max(0.01, selectedStroke.thickness - THICKNESS_STEP))
+              // 두께 감소 (weight 100 단위)
+              const currentMultiplier = selectedStroke.thickness / BASE_THICKNESS
+              // 현재 multiplier → weight 역변환
+              const currentWeight = currentMultiplier <= 1.0
+                ? 100 + ((currentMultiplier - 0.4) / 0.6) * 300
+                : 400 + ((currentMultiplier - 1.0) / 1.2) * 500
+              const newWeight = Math.max(100, Math.round(currentWeight / WEIGHT_STEP) * WEIGHT_STEP - WEIGHT_STEP)
+              onChange(selectedStroke.id, 'thickness', weightToMultiplier(newWeight) * BASE_THICKNESS)
             } else {
               selectedStroke.points.forEach((pt, i) => {
                 onPointChange(selectedStroke.id, i, 'y', pt.y - MOVE_STEP)
@@ -119,8 +127,13 @@ export function StrokeEditor({ strokes, onChange, onPointChange, boxInfo: _boxIn
           case 'ArrowDown':
             e.preventDefault()
             if (isShift) {
-              // 두께 증가
-              onChange(selectedStroke.id, 'thickness', Math.min(0.5, selectedStroke.thickness + THICKNESS_STEP))
+              // 두께 증가 (weight 100 단위)
+              const currentMultiplier = selectedStroke.thickness / BASE_THICKNESS
+              const currentWeight = currentMultiplier <= 1.0
+                ? 100 + ((currentMultiplier - 0.4) / 0.6) * 300
+                : 400 + ((currentMultiplier - 1.0) / 1.2) * 500
+              const newWeight = Math.min(900, Math.round(currentWeight / WEIGHT_STEP) * WEIGHT_STEP + WEIGHT_STEP)
+              onChange(selectedStroke.id, 'thickness', weightToMultiplier(newWeight) * BASE_THICKNESS)
             } else {
               selectedStroke.points.forEach((pt, i) => {
                 onPointChange(selectedStroke.id, i, 'y', pt.y + MOVE_STEP)

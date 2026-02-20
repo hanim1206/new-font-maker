@@ -352,7 +352,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
                 {/* 넓은 히트 영역 (투명) - 이동용 */}
                 <path
                   d={d}
-                  fill={stroke.closed ? 'transparent' : 'none'}
+                  fill="none"
                   stroke="transparent"
                   strokeWidth={strokeWidth * 4}
                   onClick={() => setSelectedStrokeId(stroke.id)}
@@ -363,9 +363,9 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
                 {/* 실제 렌더링 */}
                 <path
                   d={d}
-                  fill={stroke.closed ? (isSelected ? '#ff6b6b' : '#1a1a1a') : 'none'}
+                  fill="none"
                   stroke={isSelected ? '#ff6b6b' : '#1a1a1a'}
-                  strokeWidth={stroke.closed ? 0 : strokeWidth}
+                  strokeWidth={strokeWidth}
                   strokeLinecap={resolveLinecap(stroke.linecap, globalStyle.linecap)}
                   strokeLinejoin="round"
                   onClick={() => setSelectedStrokeId(stroke.id)}
