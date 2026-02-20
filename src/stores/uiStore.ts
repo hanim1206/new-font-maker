@@ -29,6 +29,8 @@ interface UIState {
   selectedLayoutContext: LayoutType | null
   // 레이아웃 미리보기에서 클릭한 파트 (자모 편집 서브모드)
   editingPartInLayout: Part | null
+  // 현재 편집 중인 오버라이드 ID (null = 기본값 편집)
+  editingOverrideId: string | null
 }
 
 interface UIActions {
@@ -45,6 +47,7 @@ interface UIActions {
   setSelectedPointIndex: (index: number | null) => void
   setSelectedLayoutContext: (layoutType: LayoutType | null) => void
   setEditingPartInLayout: (part: Part | null) => void
+  setEditingOverrideId: (id: string | null) => void
 }
 
 export const useUIStore = create<UIState & UIActions>()(
@@ -64,6 +67,7 @@ export const useUIStore = create<UIState & UIActions>()(
     selectedPointIndex: null,
     selectedLayoutContext: null,
     editingPartInLayout: null,
+    editingOverrideId: null,
 
     // 액션
     setViewMode: (mode) =>
@@ -129,7 +133,16 @@ export const useUIStore = create<UIState & UIActions>()(
           state.editingJamoChar = null
           state.selectedStrokeId = null
           state.selectedPointIndex = null
+          state.editingOverrideId = null
         }
+      }),
+
+    setEditingOverrideId: (id) =>
+      set((state) => {
+        state.editingOverrideId = id
+        // 오버라이드 전환 시 선택 상태 클리어
+        state.selectedStrokeId = null
+        state.selectedPointIndex = null
       }),
   }))
 )

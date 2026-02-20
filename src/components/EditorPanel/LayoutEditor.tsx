@@ -8,12 +8,12 @@ import { LayoutCanvasColumn } from './LayoutCanvasColumn'
 import { JamoCanvasColumn } from './JamoCanvasColumn'
 import { JamoControlsColumn } from './JamoControlsColumn'
 import type { PartStyle } from '../../renderers/SvgRenderer'
-import { decomposeSyllable, getSampleSyllableForLayout } from '../../utils/hangulUtils'
+import { decomposeSyllableWithOverrides, getSampleSyllableForLayout } from '../../utils/hangulUtils'
 import { calculateBoxes } from '../../utils/layoutCalculator'
 import { copyJsonToClipboard } from '../../utils/storage'
 import { mergeStrokes, splitStroke, addHandlesToPoint, removeHandlesFromPoint } from '../../utils/strokeEditUtils'
 import { COMPOUND_JONGSEONG } from '../../utils/jamoLinkUtils'
-import type { LayoutType, Part, DecomposedSyllable, BoxConfig, JamoData, Padding } from '../../types'
+import type { LayoutType, Part, DecomposedSyllable, BoxConfig, JamoData, JamoOverrideVariant, Padding } from '../../types'
 
 interface LayoutEditorProps {
   layoutType: LayoutType
@@ -38,6 +38,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     setEditingJamo,
     selectedStrokeId,
     setSelectedStrokeId,
+    editingOverrideId,
   } = useUIStore()
   const {
     getLayoutSchema,
@@ -61,6 +62,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     updateJamoPadding,
     updateMixedJamoPadding,
     exportJamos,
+    updateOverride,
   } = useJamoStore()
   const { getEffectiveStyle, style: globalStyleRaw } = useGlobalStyleStore()
 
@@ -109,7 +111,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       })
       const selectedChar = hangulChars[selectedCharIndex]
       if (selectedChar) {
-        const syllable = decomposeSyllable(selectedChar, choseong, jungseong, jongseong)
+        const syllable = decomposeSyllableWithOverrides(selectedChar, choseong, jungseong, jongseong)
         if (syllable.layoutType === activeLayoutType) {
           return syllable
         }
@@ -118,7 +120,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
     const firstChar = inputText.trim()[0]
     if (firstChar) {
-      const syllable = decomposeSyllable(firstChar, choseong, jungseong, jongseong)
+      const syllable = decomposeSyllableWithOverrides(firstChar, choseong, jungseong, jongseong)
       if (syllable.layoutType === activeLayoutType) {
         return syllable
       }
@@ -130,7 +132,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       editingJamoType ?? undefined,
       editingJamoChar ?? undefined
     )
-    return decomposeSyllable(fallbackChar, choseong, jungseong, jongseong)
+    return decomposeSyllableWithOverrides(fallbackChar, choseong, jungseong, jongseong)
   }, [inputText, selectedCharIndex, activeLayoutType, editingJamoType, editingJamoChar, choseong, jungseong, jongseong])
 
   // === 자모 편집 서브모드 ===
@@ -169,27 +171,46 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     }
   }, [editingJamoInfo, jungseong, computedBoxes])
 
-  // 편집 중인 자모의 패딩 데이터
+  // 편집 중인 자모의 패딩 데이터 (오버라이드 편집 중이면 variant padding 우선)
   const editingJamoPadding = useMemo((): Padding | undefined => {
     if (!editingJamoInfo) return undefined
     const jamoMap = editingJamoInfo.type === 'choseong' ? choseong
       : editingJamoInfo.type === 'jungseong' ? jungseong
       : jongseong
-    return jamoMap[editingJamoInfo.char]?.padding
-  }, [editingJamoInfo, choseong, jungseong, jongseong])
+    const jamo = jamoMap[editingJamoInfo.char]
+    if (!jamo) return undefined
+    if (editingOverrideId) {
+      const override = jamo.overrides?.find(o => o.id === editingOverrideId)
+      if (override?.variant.padding) return override.variant.padding
+    }
+    return jamo.padding
+  }, [editingJamoInfo, editingOverrideId, choseong, jungseong, jongseong])
 
-  // 혼합중성 파트별 개별 패딩
+  // 혼합중성 파트별 개별 패딩 (오버라이드 variant 우선)
   const editingHorizontalPadding = useMemo((): Padding | undefined => {
     if (!editingJamoInfo || editingJamoInfo.type !== 'jungseong') return undefined
-    return jungseong[editingJamoInfo.char]?.horizontalPadding
-  }, [editingJamoInfo, jungseong])
+    const jamo = jungseong[editingJamoInfo.char]
+    if (!jamo) return undefined
+    if (editingOverrideId) {
+      const override = jamo.overrides?.find(o => o.id === editingOverrideId)
+      if (override?.variant.horizontalPadding) return override.variant.horizontalPadding
+    }
+    return jamo.horizontalPadding
+  }, [editingJamoInfo, editingOverrideId, jungseong])
 
   const editingVerticalPadding = useMemo((): Padding | undefined => {
     if (!editingJamoInfo || editingJamoInfo.type !== 'jungseong') return undefined
-    return jungseong[editingJamoInfo.char]?.verticalPadding
-  }, [editingJamoInfo, jungseong])
+    const jamo = jungseong[editingJamoInfo.char]
+    if (!jamo) return undefined
+    if (editingOverrideId) {
+      const override = jamo.overrides?.find(o => o.id === editingOverrideId)
+      if (override?.variant.verticalPadding) return override.variant.verticalPadding
+    }
+    return jamo.verticalPadding
+  }, [editingJamoInfo, editingOverrideId, jungseong])
 
   // 자모 편집 진입 시 draft strokes 로드 (히스토리 초기화)
+  // editingOverrideId가 있으면 variant strokes, 없으면 기본 strokes 로드
   useEffect(() => {
     if (!editingJamoInfo) {
       resetDraftStrokes([])
@@ -200,25 +221,50 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       : editingJamoInfo.type === 'jungseong' ? jungseong
       : jongseong
     const jamo = jamoMap[editingJamoInfo.char]
+    if (!jamo) {
+      resetDraftStrokes([])
+      return
+    }
 
-    if (jamo) {
-      if (jamo.horizontalStrokes && jamo.verticalStrokes) {
-        resetDraftStrokes([...jamo.horizontalStrokes, ...jamo.verticalStrokes])
-      } else if (jamo.verticalStrokes) {
-        resetDraftStrokes([...jamo.verticalStrokes])
-      } else if (jamo.horizontalStrokes) {
-        resetDraftStrokes([...jamo.horizontalStrokes])
-      } else if (jamo.strokes) {
-        resetDraftStrokes([...jamo.strokes])
-      } else {
-        resetDraftStrokes([])
+    // 오버라이드 편집 중이면 variant strokes 로드
+    if (editingOverrideId) {
+      const override = jamo.overrides?.find(o => o.id === editingOverrideId)
+      if (override) {
+        const v = override.variant
+        if (v.horizontalStrokes && v.verticalStrokes) {
+          resetDraftStrokes([...v.horizontalStrokes, ...v.verticalStrokes])
+        } else if (v.strokes) {
+          resetDraftStrokes([...v.strokes])
+        } else {
+          // variant가 비어있으면 기본값 복사
+          if (jamo.horizontalStrokes && jamo.verticalStrokes) {
+            resetDraftStrokes([...jamo.horizontalStrokes, ...jamo.verticalStrokes])
+          } else if (jamo.strokes) {
+            resetDraftStrokes([...jamo.strokes])
+          } else {
+            resetDraftStrokes([])
+          }
+        }
+        setSelectedStrokeId(null)
+        return
       }
+    }
+
+    // 기본 탭: 기본 strokes 로드
+    if (jamo.horizontalStrokes && jamo.verticalStrokes) {
+      resetDraftStrokes([...jamo.horizontalStrokes, ...jamo.verticalStrokes])
+    } else if (jamo.verticalStrokes) {
+      resetDraftStrokes([...jamo.verticalStrokes])
+    } else if (jamo.horizontalStrokes) {
+      resetDraftStrokes([...jamo.horizontalStrokes])
+    } else if (jamo.strokes) {
+      resetDraftStrokes([...jamo.strokes])
     } else {
       resetDraftStrokes([])
     }
 
     setSelectedStrokeId(null)
-  }, [editingJamoInfo, choseong, jungseong, jongseong, setSelectedStrokeId])
+  }, [editingJamoInfo, editingOverrideId, choseong, jungseong, jongseong, setSelectedStrokeId])
 
   // Escape 키로 자모 편집 종료 + Ctrl+Z/Y로 undo/redo
   useEffect(() => {
@@ -417,6 +463,53 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     }
   }, [choseongStyleInfo, editingJamoInfo, pushSnapshot, resetDraftStrokes, updateJamoPadding, jongseong, updateJongseong])
 
+  // 오버라이드 탭 전환 시 드래프트 strokes 교체
+  const handleOverrideSwitch = useCallback((overrideId: string | null) => {
+    if (!editingJamoInfo) return
+    const jamoMap = editingJamoInfo.type === 'choseong' ? choseong
+      : editingJamoInfo.type === 'jungseong' ? jungseong
+      : jongseong
+    const jamo = jamoMap[editingJamoInfo.char]
+    if (!jamo) return
+
+    if (overrideId === null) {
+      // 기본 탭: 원본 strokes 로드
+      if (jamo.horizontalStrokes && jamo.verticalStrokes) {
+        resetDraftStrokes([...jamo.horizontalStrokes, ...jamo.verticalStrokes])
+      } else if (jamo.strokes) {
+        resetDraftStrokes([...jamo.strokes])
+      } else {
+        resetDraftStrokes([])
+      }
+    } else {
+      // 오버라이드 탭: variant strokes 로드 (없으면 기본값 복사)
+      const override = jamo.overrides?.find(o => o.id === overrideId)
+      if (!override) return
+      const variant = override.variant
+      if (variant.horizontalStrokes && variant.verticalStrokes) {
+        resetDraftStrokes([...variant.horizontalStrokes, ...variant.verticalStrokes])
+      } else if (variant.strokes) {
+        resetDraftStrokes([...variant.strokes])
+      } else {
+        // variant가 비어있으면 기본값 복사
+        if (jamo.horizontalStrokes && jamo.verticalStrokes) {
+          resetDraftStrokes([...jamo.horizontalStrokes, ...jamo.verticalStrokes])
+        } else if (jamo.strokes) {
+          resetDraftStrokes([...jamo.strokes])
+        } else {
+          resetDraftStrokes([])
+        }
+      }
+    }
+  }, [editingJamoInfo, choseong, jungseong, jongseong, resetDraftStrokes])
+
+  // 혼합중성 판별 헬퍼
+  const isMixedJungseong = useCallback((char: string) => {
+    const verticalJungseong = ['ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅣ', 'ㅐ', 'ㅒ', 'ㅔ', 'ㅖ']
+    const horizontalJungseong = ['ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ']
+    return !verticalJungseong.includes(char) && !horizontalJungseong.includes(char)
+  }, [])
+
   // 자모 편집 저장
   const handleJamoSave = useCallback(() => {
     if (!editingJamoInfo) return
@@ -426,12 +519,28 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     const jamo = jamoMap[editingJamoInfo.char]
     if (!jamo) return
 
-    const verticalJungseong = ['ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅣ', 'ㅐ', 'ㅒ', 'ㅔ', 'ㅖ']
-    const horizontalJungseong = ['ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ']
-    const isMixed = editingJamoInfo.type === 'jungseong'
-      && !verticalJungseong.includes(editingJamoInfo.char)
-      && !horizontalJungseong.includes(editingJamoInfo.char)
+    const isMixed = editingJamoInfo.type === 'jungseong' && isMixedJungseong(editingJamoInfo.char)
 
+    // 오버라이드 편집 중이면 variant에 저장 (기존 패딩 유지)
+    if (editingOverrideId) {
+      const existingOverride = jamo.overrides?.find(o => o.id === editingOverrideId)
+      const existingVariant = existingOverride?.variant ?? {}
+      let variantUpdate: JamoOverrideVariant
+      if (isMixed && jamo.horizontalStrokes && jamo.verticalStrokes) {
+        const horizontalStrokeIds = new Set(jamo.horizontalStrokes.map(s => s.id))
+        const horizontalStrokes = draftStrokes.filter(s => horizontalStrokeIds.has(s.id))
+        const verticalStrokes = draftStrokes.filter(s => !horizontalStrokeIds.has(s.id))
+        variantUpdate = { ...existingVariant, horizontalStrokes, verticalStrokes }
+      } else {
+        variantUpdate = { ...existingVariant, strokes: draftStrokes }
+      }
+      updateOverride(editingJamoInfo.type, editingJamoInfo.char, editingOverrideId, {
+        variant: variantUpdate,
+      })
+      return
+    }
+
+    // 기본 저장
     let updatedJamo: JamoData
     if (isMixed && jamo.horizontalStrokes && jamo.verticalStrokes) {
       const horizontalStrokeIds = new Set(jamo.horizontalStrokes.map(s => s.id))
@@ -447,7 +556,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       case 'jungseong': updateJungseong(editingJamoInfo.char, updatedJamo); break
       case 'jongseong': updateJongseong(editingJamoInfo.char, updatedJamo); break
     }
-  }, [editingJamoInfo, draftStrokes, choseong, jungseong, jongseong, updateChoseong, updateJungseong, updateJongseong])
+  }, [editingJamoInfo, editingOverrideId, draftStrokes, choseong, jungseong, jongseong, isMixedJungseong, updateChoseong, updateJungseong, updateJongseong, updateOverride])
 
   // 자모 편집 초기화 (히스토리 리셋)
   const handleJamoReset = useCallback(() => {
@@ -561,6 +670,11 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     }
   }
 
+  // 패딩 오버라이드 핸들러 (훅은 early return 전에 호출해야 함)
+  const handlePaddingOverrideChange = useCallback((side: keyof Padding, val: number) => {
+    setPaddingOverride(layoutType, side, val)
+  }, [layoutType, setPaddingOverride])
+
   // Hydration 전에는 로딩 표시
   if (!_hydrated) {
     return (
@@ -580,11 +694,6 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
   // 미리보기에 사용할 음절 (자모 편집 시 draft 반영, 아니면 testSyllable)
   const displaySyllable = editingSyllable || testSyllable
-
-  // 패딩 오버라이드 핸들러
-  const handlePaddingOverrideChange = useCallback((side: keyof Padding, val: number) => {
-    setPaddingOverride(layoutType, side, val)
-  }, [layoutType, setPaddingOverride])
 
   // 3컬럼 데스크톱 레이아웃
   return (
@@ -634,8 +743,34 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
           onStrokeChange={handleStrokeChange}
           onPointChange={handlePointChange}
           onDragStart={pushSnapshot}
-          onJamoPaddingChange={(type, char, side, val) => updateJamoPadding(type, char, side, val)}
-          onMixedJamoPaddingChange={(char, part, side, val) => updateMixedJamoPadding(char, part, side, val)}
+          onJamoPaddingChange={(type, char, side, val) => {
+            if (editingOverrideId) {
+              // 오버라이드 편집 중이면 variant.padding에 저장
+              const jamoMap = type === 'choseong' ? choseong : type === 'jungseong' ? jungseong : jongseong
+              const jamo = jamoMap[char]
+              const override = jamo?.overrides?.find(o => o.id === editingOverrideId)
+              const currentPadding = override?.variant.padding ?? jamo?.padding ?? { top: 0, bottom: 0, left: 0, right: 0 }
+              updateOverride(type, char, editingOverrideId, {
+                variant: { ...override?.variant, padding: { ...currentPadding, [side]: val } },
+              })
+            } else {
+              updateJamoPadding(type, char, side, val)
+            }
+          }}
+          onMixedJamoPaddingChange={(char, part, side, val) => {
+            if (editingOverrideId) {
+              // 오버라이드 편집 중이면 variant의 혼합중성 패딩에 저장
+              const jamo = jungseong[char]
+              const override = jamo?.overrides?.find(o => o.id === editingOverrideId)
+              const paddingKey = part === 'horizontal' ? 'horizontalPadding' as const : 'verticalPadding' as const
+              const currentPadding = override?.variant[paddingKey] ?? jamo?.[paddingKey] ?? { top: 0, bottom: 0, left: 0, right: 0 }
+              updateOverride('jungseong', char, editingOverrideId, {
+                variant: { ...override?.variant, [paddingKey]: { ...currentPadding, [side]: val } },
+              })
+            } else {
+              updateMixedJamoPadding(char, part, side, val)
+            }
+          }}
         />
       </div>
 
@@ -664,6 +799,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
           onExportPresets={handleExportPresets}
           onExportJamos={handleExportJamos}
           onResetAll={handleResetAll}
+          onOverrideSwitch={handleOverrideSwitch}
         />
       </div>
     </div>

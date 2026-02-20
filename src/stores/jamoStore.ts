@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { persist } from 'zustand/middleware'
-import type { JamoData, Padding } from '../types'
+import type { JamoData, JamoOverride, Padding } from '../types'
 import { migrateJamoData, needsMigration } from '../utils/strokeMigration'
 import baseJamos from '../data/baseJamos.json'
 
@@ -85,6 +85,36 @@ interface JamoActions {
     char: string,
     part: 'horizontal' | 'vertical'
   ) => void
+
+  // ===== 조건부 오버라이드 =====
+
+  // 오버라이드 추가
+  addOverride: (
+    type: 'choseong' | 'jungseong' | 'jongseong',
+    char: string,
+    override: JamoOverride
+  ) => void
+
+  // 오버라이드 업데이트
+  updateOverride: (
+    type: 'choseong' | 'jungseong' | 'jongseong',
+    char: string,
+    overrideId: string,
+    updates: Partial<JamoOverride>
+  ) => void
+
+  // 오버라이드 삭제
+  removeOverride: (
+    type: 'choseong' | 'jungseong' | 'jongseong',
+    char: string,
+    overrideId: string
+  ) => void
+
+  // 오버라이드 목록 조회
+  getOverrides: (
+    type: 'choseong' | 'jungseong' | 'jongseong',
+    char: string
+  ) => JamoOverride[]
 
   // hydration 완료 표시
   setHydrated: () => void
@@ -250,6 +280,43 @@ export const useJamoStore = create<JamoState & JamoActions>()(
             delete jamo[key]
           }
         }),
+
+      // ===== 조건부 오버라이드 =====
+
+      addOverride: (type, char, override) =>
+        set((state) => {
+          const jamo = state[type][char]
+          if (!jamo) return
+          if (!jamo.overrides) {
+            jamo.overrides = []
+          }
+          jamo.overrides.push(override)
+        }),
+
+      updateOverride: (type, char, overrideId, updates) =>
+        set((state) => {
+          const jamo = state[type][char]
+          if (!jamo?.overrides) return
+          const idx = jamo.overrides.findIndex(o => o.id === overrideId)
+          if (idx < 0) return
+          // 새 객체로 교체하여 Immer가 확실히 변경을 감지하도록 함
+          jamo.overrides[idx] = { ...jamo.overrides[idx], ...updates }
+        }),
+
+      removeOverride: (type, char, overrideId) =>
+        set((state) => {
+          const jamo = state[type][char]
+          if (!jamo?.overrides) return
+          jamo.overrides = jamo.overrides.filter(o => o.id !== overrideId)
+          if (jamo.overrides.length === 0) {
+            delete jamo.overrides
+          }
+        }),
+
+      getOverrides: (type, char) => {
+        const jamo = get()[type][char]
+        return jamo?.overrides ?? []
+      },
 
       setHydrated: () => set({ _hydrated: true }),
     })),

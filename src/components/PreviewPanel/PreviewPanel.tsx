@@ -4,7 +4,7 @@ import { useLayoutStore } from '../../stores/layoutStore'
 import { useJamoStore } from '../../stores/jamoStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useGlobalStyleStore } from '../../stores/globalStyleStore'
-import { decomposeSyllable, isHangul } from '../../utils/hangulUtils'
+import { decomposeSyllableWithOverrides, isHangul } from '../../utils/hangulUtils'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -36,7 +36,7 @@ export function PreviewPanel({ horizontal = false }: PreviewPanelProps) {
     return inputText
       .split('')
       .filter(isHangul)
-      .map(char => decomposeSyllable(char, choseong, jungseong, jongseong))
+      .map(char => decomposeSyllableWithOverrides(char, choseong, jungseong, jongseong))
   }, [inputText, choseong, jungseong, jongseong])
 
   // 각 글자에 대한 렌더링 정보

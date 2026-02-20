@@ -76,34 +76,35 @@ export interface LayoutPreset {
   isDefault?: boolean
 }
 
-// ===== 규칙 시스템 (조건/액션 DSL) =====
+// ===== 조건부 자모 오버라이드 =====
 export type Jamo = string // 'ㄱ', 'ㅏ', 'ㅁ' 등
 
-// 조건 타입
-export type Condition =
-  | { type: 'layoutIs'; layout: LayoutType }
+// 오버라이드 단일 조건
+export type OverrideCondition =
   | { type: 'choseongIs'; jamo: Jamo }
   | { type: 'jungseongIs'; jamo: Jamo }
   | { type: 'jongseongIs'; jamo: Jamo }
+  | { type: 'layoutIs'; layout: LayoutType }
 
-// 액션 타입
-export type BoxProp = 'x' | 'y' | 'width' | 'height'
-
-export type Action = {
-  type: 'setBox'
-  part: Part
-  prop: BoxProp
-  value: number
+// 오버라이드 변형 데이터 (기본 JamoData를 대체하는 부분)
+export interface JamoOverrideVariant {
+  strokes?: StrokeDataV2[]
+  horizontalStrokes?: StrokeDataV2[]
+  verticalStrokes?: StrokeDataV2[]
+  padding?: Padding
+  horizontalPadding?: Padding
+  verticalPadding?: Padding
 }
 
-// 규칙
-export interface Rule {
+// 자모 오버라이드 (JamoData.overrides[]에 저장)
+// conditionGroups: 외부 배열 = OR 결합, 내부 배열 = AND 결합
+// 예: [[ㄱ초성, ㅏ중성], [ㄴ초성]] = (ㄱ초성 AND ㅏ중성) OR (ㄴ초성)
+export interface JamoOverride {
   id: string
-  name: string
-  presetId: string // 어느 프리셋에 속하는지
-  priority: number // 숫자 클수록 우선
-  when: Condition[]
-  then: Action[]
+  conditionGroups: OverrideCondition[][]  // OR(AND) 결합
+  conditions?: OverrideCondition[]        // 레거시 (마이그레이션용, 단일 AND 그룹)
+  variant: JamoOverrideVariant
+  priority: number                        // 높을수록 우선
   enabled: boolean
 }
 
@@ -188,6 +189,8 @@ export interface JamoData {
   // 혼합중성 전용: JU_H / JU_V 파트별 개별 패딩 (없으면 padding으로 폴백)
   horizontalPadding?: Padding  // JU_H(가로부)용
   verticalPadding?: Padding    // JU_V(세로부)용
+  // 조건부 변형 목록 (특정 음절 문맥에서 다른 획/패딩 사용)
+  overrides?: JamoOverride[]
 }
 
 // ===== 음절 분해 결과 =====

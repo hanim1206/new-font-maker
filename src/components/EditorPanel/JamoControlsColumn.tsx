@@ -1,5 +1,6 @@
 import { StrokeInspector } from '../CharacterEditor/StrokeInspector'
 import { StrokeEditor } from '../CharacterEditor/StrokeEditor'
+import { OverridePanel } from '../CharacterEditor/OverridePanel'
 import { Button } from '@/components/ui/button'
 import type { StrokeDataV2, BoxConfig } from '../../types'
 
@@ -36,6 +37,8 @@ interface JamoControlsColumnProps {
   onExportPresets: () => void
   onExportJamos: () => void
   onResetAll: () => void
+  // 오버라이드 탭 전환 시 호출
+  onOverrideSwitch: (overrideId: string | null) => void
 }
 
 /** 우측 컨트롤러 패널 (280px 고정) */
@@ -62,6 +65,7 @@ export function JamoControlsColumn({
   onExportPresets,
   onExportJamos,
   onResetAll,
+  onOverrideSwitch,
 }: JamoControlsColumnProps) {
   if (isJamoEditing && editingJamoInfo) {
     return (
@@ -84,6 +88,9 @@ export function JamoControlsColumn({
             }
           </Button>
         )}
+
+        {/* 적용 범위 (조건부 오버라이드) */}
+        <OverridePanel onOverrideSwitch={onOverrideSwitch} />
 
         {/* 속성 편집 */}
         <div className="bg-surface rounded-md border border-border-subtle p-4">

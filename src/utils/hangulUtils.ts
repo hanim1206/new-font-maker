@@ -6,6 +6,7 @@ import {
   VERTICAL_JUNGSEONG,
   HORIZONTAL_JUNGSEONG,
 } from '../data/Hangul'
+import { extractContext, resolveJamoData } from './overrideResolver'
 
 // ===== 중성 분류 =====
 export function classifyJungseong(char: string): 'vertical' | 'horizontal' | 'mixed' {
@@ -258,5 +259,24 @@ export function isHangul(char: string): boolean {
     (code >= 0x3131 && code <= 0x314e) || // 자음
     (code >= 0x314f && code <= 0x3163) // 모음
   )
+}
+
+// ===== 오버라이드 적용 래퍼 =====
+
+/** decomposeSyllable 후 조건부 오버라이드를 자동 적용하는 래퍼 */
+export function decomposeSyllableWithOverrides(
+  char: string,
+  choseongMap: Record<string, JamoData>,
+  jungseongMap: Record<string, JamoData>,
+  jongseongMap: Record<string, JamoData>
+): DecomposedSyllable {
+  const base = decomposeSyllable(char, choseongMap, jungseongMap, jongseongMap)
+  const ctx = extractContext(base)
+  return {
+    ...base,
+    choseong: base.choseong ? resolveJamoData(base.choseong, ctx) : null,
+    jungseong: base.jungseong ? resolveJamoData(base.jungseong, ctx) : null,
+    jongseong: base.jongseong ? resolveJamoData(base.jongseong, ctx) : null,
+  }
 }
 
