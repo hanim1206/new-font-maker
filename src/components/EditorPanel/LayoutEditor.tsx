@@ -11,7 +11,6 @@ import { JamoControlsColumn } from './JamoControlsColumn'
 import type { PartStyle } from '../../renderers/SvgRenderer'
 import { decomposeSyllableWithOverrides, getSampleSyllableForLayout } from '../../utils/hangulUtils'
 import { calculateBoxes } from '../../utils/layoutCalculator'
-import { copyJsonToClipboard } from '../../utils/storage'
 import { mergeStrokes, splitStroke, addHandlesToPoint, removeHandlesFromPoint } from '../../utils/strokeEditUtils'
 import { COMPOUND_JONGSEONG } from '../../utils/jamoLinkUtils'
 import type { LayoutType, Part, DecomposedSyllable, BoxConfig, JamoData, JamoOverrideVariant, Padding, PartOverride } from '../../types'
@@ -51,8 +50,6 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     setPaddingOverride,
     updateSplit,
     updatePartOverride,
-    exportSchemas,
-    resetToBasePresets,
     _hydrated,
   } = useLayoutStore()
   const {
@@ -64,7 +61,6 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     updateJongseong,
     updateJamoPadding,
     updateMixedJamoPadding,
-    exportJamos,
     updateOverride,
   } = useJamoStore()
   const { getEffectiveStyle, style: globalStyleRaw } = useGlobalStyleStore()
@@ -102,6 +98,11 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     setDraftPaddingSide,
     setDraftPartOverride,
     resetDraft: resetLayoutDraft,
+    pushSnapshot: pushLayoutSnapshot,
+    undo: layoutUndo,
+    redo: layoutRedo,
+    canUndo: canLayoutUndo,
+    canRedo: canLayoutRedo,
   } = useLayoutSchemaDraft(schema, effectivePadding)
 
   // 드래프트 기반 스키마+패딩 (캔버스 렌더링용)
@@ -227,16 +228,21 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
   // 자모 편집 진입 시 draft strokes 로드 (히스토리 초기화)
   // editingOverrideId가 있으면 variant strokes, 없으면 기본 strokes 로드
+  // 주의: editingJamoInfo는 testSyllable → choseong/jungseong/jongseong 의존 체인 때문에
+  // 패딩 변경 시 참조가 재생성됨 → type/char 원시값만 deps에 넣어 불필요한 재실행 방지
+  const editingJamoType_ = editingJamoInfo?.type ?? null
+  const editingJamoChar_ = editingJamoInfo?.char ?? null
   useEffect(() => {
-    if (!editingJamoInfo) {
+    if (!editingJamoType_ || !editingJamoChar_) {
       resetDraftStrokes([])
       return
     }
 
-    const jamoMap = editingJamoInfo.type === 'choseong' ? choseong
-      : editingJamoInfo.type === 'jungseong' ? jungseong
-      : jongseong
-    const jamo = jamoMap[editingJamoInfo.char]
+    const { choseong: ch, jungseong: ju, jongseong: jo } = useJamoStore.getState()
+    const jamoMap = editingJamoType_ === 'choseong' ? ch
+      : editingJamoType_ === 'jungseong' ? ju
+      : jo
+    const jamo = jamoMap[editingJamoChar_]
     if (!jamo) {
       resetDraftStrokes([])
       return
@@ -280,9 +286,9 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     }
 
     setSelectedStrokeId(null)
-  }, [editingJamoInfo, editingOverrideId, choseong, jungseong, jongseong, setSelectedStrokeId])
+  }, [editingJamoType_, editingJamoChar_, editingOverrideId, setSelectedStrokeId])
 
-  // Escape 키로 자모 편집 종료 + Ctrl+Z/Y로 undo/redo
+  // Escape 키로 자모 편집 종료 + Ctrl+Z/Y로 undo/redo (자모 편집 모드)
   useEffect(() => {
     if (!isJamoEditing) return
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -304,10 +310,32 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isJamoEditing, setEditingPartInLayout, undo, redo])
 
+  // 레이아웃 편집 모드에서 Ctrl+Z/Y로 undo/redo
+  useEffect(() => {
+    if (isJamoEditing) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        layoutUndo()
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault()
+        layoutRedo()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isJamoEditing, layoutUndo, layoutRedo])
+
   // 파트 싱글클릭 → 파트 선택 (파트 오프셋 조절용)
   const handlePartClick = useCallback((part: Part) => {
     setSelectedPartInLayout(selectedPartInLayout === part ? null : part)
   }, [selectedPartInLayout, setSelectedPartInLayout])
+
+  // 파트 선택 해제 (캔버스 외부 클릭 시)
+  const handlePartDeselect = useCallback(() => {
+    setSelectedPartInLayout(null)
+  }, [setSelectedPartInLayout])
 
   // 파트 더블클릭 → 자모 편집 진입
   const handlePartDoubleClick = useCallback((part: Part) => {
@@ -678,32 +706,6 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     resetLayoutDraft()
   }
 
-  const handleExportPresets = async () => {
-    const json = exportSchemas()
-    const ok = await copyJsonToClipboard(json)
-    if (ok) {
-      alert('JSON이 클립보드에 복사되었습니다.\n이 데이터를 basePresets.json 파일 전체에 붙여넣으세요.\n\n⚠️ localStorage에서 직접 복사하면 포맷이 달라 에러납니다.\n반드시 이 버튼으로 추출한 데이터를 사용하세요.\n\n경로: /Users/hanim/Documents/GitHub/new-font-maker/src/data/basePresets.json')
-    } else {
-      alert('클립보드 복사에 실패했습니다.')
-    }
-  }
-
-  const handleExportJamos = async () => {
-    const json = exportJamos()
-    const ok = await copyJsonToClipboard(json)
-    if (ok) {
-      alert('JSON이 클립보드에 복사되었습니다.\n이 데이터를 baseJamos.json 파일 전체에 붙여넣으세요.\n\n⚠️ localStorage에서 직접 복사하면 포맷이 달라 에러납니다.\n반드시 이 버튼으로 추출한 데이터를 사용하세요.\n\n경로: /Users/hanim/Documents/GitHub/new-font-maker/src/data/baseJamos.json')
-    } else {
-      alert('클립보드 복사에 실패했습니다.')
-    }
-  }
-
-  const handleResetAll = () => {
-    if (confirm('모든 레이아웃을 기본값으로 되돌리시겠습니까?\n저장된 작업이 모두 사라집니다.')) {
-      resetToBasePresets()
-    }
-  }
-
   // 패딩 오버라이드 핸들러 → 드래프트에 반영
   const handlePaddingOverrideChange = useCallback((side: keyof Padding, val: number) => {
     setDraftPaddingSide(side, val)
@@ -750,7 +752,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
   // 3컬럼 데스크톱 레이아웃
   return (
-    <div className="h-full overflow-hidden flex">
+    <div className="h-full overflow-hidden flex" onClick={handlePartDeselect}>
       {/* 좌측: 레이아웃 캔버스 */}
       <div className="flex-[2] min-w-0 overflow-y-auto border-r border-border-subtle">
         <LayoutCanvasColumn
@@ -769,6 +771,11 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
           isLayoutDirty={isLayoutDirty}
           onLayoutSave={handleSave}
           onLayoutReset={handleReset}
+          onDragStart={pushLayoutSnapshot}
+          onUndo={layoutUndo}
+          onRedo={layoutRedo}
+          canUndo={canLayoutUndo}
+          canRedo={canLayoutRedo}
           onPartClick={handlePartClick}
           onPartDoubleClick={handlePartDoubleClick}
           onPartOverrideChange={handlePartOverrideChange}
@@ -849,12 +856,6 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
           onJamoSave={handleJamoSave}
           onJamoReset={handleJamoReset}
           onApplyChoseongStyle={handleApplyChoseongStyle}
-          isLayoutDirty={isLayoutDirty}
-          onLayoutSave={handleSave}
-          onLayoutReset={handleReset}
-          onExportPresets={handleExportPresets}
-          onExportJamos={handleExportJamos}
-          onResetAll={handleResetAll}
           onOverrideSwitch={handleOverrideSwitch}
         />
       </div>

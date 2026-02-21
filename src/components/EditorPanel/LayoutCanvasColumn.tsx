@@ -40,6 +40,12 @@ interface LayoutCanvasColumnProps {
   isLayoutDirty: boolean
   onLayoutSave: () => void
   onLayoutReset: () => void
+  // undo/redo
+  onDragStart: () => void
+  onUndo: () => void
+  onRedo: () => void
+  canUndo: boolean
+  canRedo: boolean
   // 핸들러
   onPartClick: (part: Part) => void
   onPartDoubleClick: (part: Part) => void
@@ -66,6 +72,11 @@ export function LayoutCanvasColumn({
   isLayoutDirty,
   onLayoutSave,
   onLayoutReset,
+  onDragStart: onLayoutDragStart,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
   onPartClick,
   onPartDoubleClick,
   onPartOverrideChange,
@@ -80,7 +91,7 @@ export function LayoutCanvasColumn({
   const [isDragging, setIsDragging] = useState(false)
   const [draggingSide, setDraggingSide] = useState<PaddingSide | null>(null)
   const [hoveredSide, setHoveredSide] = useState<PaddingSide | null>(null)
-  const handleDragStart = useCallback(() => setIsDragging(true), [])
+  const handleDragStart = useCallback(() => { onLayoutDragStart(); setIsDragging(true) }, [onLayoutDragStart])
   const handleDragEnd = useCallback(() => setIsDragging(false), [])
 
   // ref로 최신 콜백 참조 (드래그 중 클로저 캡처 문제 방지)
@@ -112,6 +123,7 @@ export function LayoutCanvasColumn({
       if (!selectedPartInLayout) return
       e.preventDefault()
       e.stopPropagation()
+      onLayoutDragStart()
 
       const startX = e.clientX
       const startY = e.clientY
@@ -165,7 +177,7 @@ export function LayoutCanvasColumn({
       window.addEventListener('mousemove', handleMove)
       window.addEventListener('mouseup', handleUp)
     },
-    [selectedPartInLayout, schema.partOverrides, computedBoxes, previewSize]
+    [selectedPartInLayout, schema.partOverrides, computedBoxes, previewSize, onLayoutDragStart]
   )
 
   // 경계선의 캔버스 내 위치 (px) — 원본 박스 기준
@@ -185,13 +197,14 @@ export function LayoutCanvasColumn({
       </h3>
 
       {/* 캔버스 — 핸들 공간 확보를 위한 외부 여백 */}
-      <div className="flex justify-center p-3 bg-background rounded mb-2">
+      {/* 캔버스 래퍼 내부 클릭은 상위 deselect로 전파되지 않도록 차단 */}
+      <div className="flex justify-center p-3 bg-background rounded mb-2" onClick={(e) => e.stopPropagation()}>
         <div
           className="relative"
           style={{
-            // 핸들이 캔버스 바깥에 위치하므로 여유 공간 확보
-            width: previewSize + (selectedPartInLayout ? HANDLE_MARGIN * 2 : 0),
-            height: previewSize + (selectedPartInLayout ? HANDLE_MARGIN * 2 : 0),
+            // 핸들 공간을 항상 확보하여 모드 전환 시 레이아웃 시프트 방지
+            width: previewSize + HANDLE_MARGIN * 2,
+            height: previewSize + HANDLE_MARGIN * 2,
           }}
         >
           {/* 캔버스 본체 (핸들 여백 안쪽) */}
@@ -200,14 +213,14 @@ export function LayoutCanvasColumn({
           <div
             className="absolute"
             style={{
-              left: selectedPartInLayout ? HANDLE_MARGIN : 0,
-              top: selectedPartInLayout ? HANDLE_MARGIN : 0,
+              left: HANDLE_MARGIN,
+              top: HANDLE_MARGIN,
               width: previewSize,
               height: previewSize,
               backgroundColor: '#1a1a1a',
             }}
-            onClick={() => {
-              if (selectedPartInLayout) onPartClick(selectedPartInLayout)
+            onClick={(e) => {
+              e.stopPropagation()
             }}
           >
             {/* 0.025 스냅 그리드 */}
@@ -296,10 +309,16 @@ export function LayoutCanvasColumn({
                       top: `${box.y * 100}%`,
                       width: `${box.width * 100}%`,
                       height: `${box.height * 100}%`,
-                      pointerEvents: (isDragging || selectedPartInLayout) ? 'none' : undefined,
+                      // 드래그 중이면 전부 비활성, 파트 선택 중이면 다른 파트만 비활성 (선택된 파트는 더블클릭 가능)
+                      pointerEvents: isDragging ? 'none'
+                        : (selectedPartInLayout && selectedPartInLayout !== part) ? 'none'
+                        : undefined,
                     }}
                     onClick={(e) => {
                       e.stopPropagation()
+                      // 이미 선택된 파트를 싱글클릭하면 아무 동작 없음 (더블클릭 대기)
+                      // 선택 해제는 캔버스 배경 또는 외부 클릭으로
+                      if (selectedPartInLayout === part) return
                       onPartClick(part)
                     }}
                     onDoubleClick={(e) => {
@@ -440,7 +459,7 @@ export function LayoutCanvasColumn({
           {selectedPartInLayout && originalPartBox && (() => {
             const sides: PaddingSide[] = ['top', 'bottom', 'left', 'right']
             const ob = originalPartBox
-            const margin = selectedPartInLayout ? HANDLE_MARGIN : 0
+            const margin = HANDLE_MARGIN
             const padding = selectedPartPadding ?? { top: 0, bottom: 0, left: 0, right: 0 }
 
             return sides.map(side => {
@@ -521,24 +540,32 @@ export function LayoutCanvasColumn({
         </div>
       </div>
 
-      {/* 레이아웃 저장/초기화 버튼 */}
+      {/* undo/redo + 저장/초기화 버튼 */}
       <div className="flex gap-2 px-1 mb-2">
+        <Button variant="default" size="sm" onClick={onUndo} disabled={!canUndo} title="되돌리기 (Ctrl+Z)">
+          ↩
+        </Button>
+        <Button variant="default" size="sm" onClick={onRedo} disabled={!canRedo} title="다시 실행 (Ctrl+Y)">
+          ↪
+        </Button>
+        <div className="flex-1" />
         <Button variant="default" size="sm" onClick={onLayoutReset} disabled={!isLayoutDirty}>
           초기화
         </Button>
-        <div className="flex-1" />
         <Button variant={isLayoutDirty ? 'blue' : 'default'} size="sm" onClick={onLayoutSave} disabled={!isLayoutDirty}>
           저장
         </Button>
       </div>
 
       {/* 레이아웃 컨텍스트 썸네일 (항상 7개 고정 노출) */}
-      <LayoutContextThumbnails
-        jamoType={editingJamoInfo?.type}
-        jamoChar={editingJamoInfo?.char}
-        selectedContext={previewLayoutType}
-        onSelectContext={onPreviewLayoutTypeChange}
-      />
+      <div>
+        <LayoutContextThumbnails
+          jamoType={editingJamoInfo?.type}
+          jamoChar={editingJamoInfo?.char}
+          selectedContext={previewLayoutType}
+          onSelectContext={onPreviewLayoutTypeChange}
+        />
+      </div>
     </div>
   )
 }

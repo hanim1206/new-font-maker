@@ -31,13 +31,6 @@ interface JamoControlsColumnProps {
   onJamoSave: () => void
   onJamoReset: () => void
   onApplyChoseongStyle: () => void
-  // 레이아웃 모드 액션
-  isLayoutDirty?: boolean
-  onLayoutSave: () => void
-  onLayoutReset: () => void
-  onExportPresets: () => void
-  onExportJamos: () => void
-  onResetAll: () => void
   // 오버라이드 탭 전환 시 호출
   onOverrideSwitch: (overrideId: string | null) => void
 }
@@ -61,12 +54,6 @@ export function JamoControlsColumn({
   onJamoSave,
   onJamoReset,
   onApplyChoseongStyle,
-  isLayoutDirty,
-  onLayoutSave,
-  onLayoutReset,
-  onExportPresets,
-  onExportJamos,
-  onResetAll,
   onOverrideSwitch,
 }: JamoControlsColumnProps) {
   if (isJamoEditing && editingJamoInfo) {
@@ -143,24 +130,6 @@ export function JamoControlsColumn({
   return (
     <div className="h-full overflow-y-auto p-4 flex flex-col gap-3">
       <h3 className="text-sm font-medium text-text-dim-3 uppercase tracking-wider">레이아웃 설정</h3>
-      {/* 도구 아이콘 바 */}
-      <div className="flex items-center gap-1">
-        <Button variant={isLayoutDirty ? 'blue' : 'default'} size="icon" onClick={onLayoutSave} title="저장" disabled={!isLayoutDirty}>
-          💾
-        </Button>
-        <Button variant="default" size="icon" onClick={onLayoutReset} title="되돌리기" disabled={!isLayoutDirty}>
-          ↩️
-        </Button>
-        <Button variant="green" size="icon" onClick={onExportPresets} title="레이아웃 JSON 내보내기 (basePresets)">
-          📤
-        </Button>
-        <Button variant="green" size="icon" onClick={onExportJamos} title="자모 JSON 내보내기 (baseJamos)">
-          🔤
-        </Button>
-        <Button variant="danger" size="icon" onClick={onResetAll} title="전체 초기화">
-          🗑️
-        </Button>
-      </div>
       <p className="text-xs text-text-dim-5 mt-4 text-center leading-relaxed">
         좌측 캔버스에서 파트를 클릭하면
         <br />
