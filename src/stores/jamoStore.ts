@@ -116,6 +116,13 @@ interface JamoActions {
     char: string
   ) => JamoOverride[]
 
+  // 외부 데이터(Supabase 등)에서 일괄 로드
+  loadFontData: (data: {
+    choseong: Record<string, JamoData>
+    jungseong: Record<string, JamoData>
+    jongseong: Record<string, JamoData>
+  }) => void
+
   // hydration 완료 표시
   setHydrated: () => void
 }
@@ -317,6 +324,22 @@ export const useJamoStore = create<JamoState & JamoActions>()(
         const jamo = get()[type][char]
         return jamo?.overrides ?? []
       },
+
+      loadFontData: (data) =>
+        set((state) => {
+          // 구형 스트로크 마이그레이션 체크
+          let ch = deepClone(data.choseong)
+          let ju = deepClone(data.jungseong)
+          let jo = deepClone(data.jongseong)
+
+          if (mapNeedsMigration(ch)) ch = migrateMap(ch)
+          if (mapNeedsMigration(ju)) ju = migrateMap(ju)
+          if (mapNeedsMigration(jo)) jo = migrateMap(jo)
+
+          state.choseong = ch as typeof state.choseong
+          state.jungseong = ju as typeof state.jungseong
+          state.jongseong = jo as typeof state.jongseong
+        }),
 
       setHydrated: () => set({ _hydrated: true }),
     })),

@@ -1,7 +1,8 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import { ControlPanel } from './components/ControlPanel/ControlPanel'
 import { PreviewPanel } from './components/PreviewPanel'
 import { EditorPanel } from './components/EditorPanel/EditorPanel'
+import { ProjectManager } from './components/ProjectManager'
 import { useUIStore } from './stores/uiStore'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -9,6 +10,7 @@ import { cn } from '@/lib/utils'
 
 export default function App() {
   const { viewMode, setViewMode, isMobile, setIsMobile, inputText, setInputText } = useUIStore()
+  const [projectManagerOpen, setProjectManagerOpen] = useState(false)
 
   const handleClearStorage = useCallback(() => {
     if (confirm('로컬스토리지를 비우면 모든 편집 데이터가 초기화됩니다.\n계속하시겠습니까?')) {
@@ -42,6 +44,20 @@ export default function App() {
               maxLength={50}
               className="w-[240px] shrink-0 px-3 py-2 text-base bg-surface-2 border border-border rounded-lg text-foreground font-sans focus:border-primary"
             />
+            <div className="relative shrink-0">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setProjectManagerOpen(!projectManagerOpen)}
+                title="프로젝트 저장/불러오기"
+              >
+                프로젝트
+              </Button>
+              <ProjectManager
+                open={projectManagerOpen}
+                onClose={() => setProjectManagerOpen(false)}
+              />
+            </div>
             <Button
               variant="danger"
               size="sm"

@@ -98,6 +98,13 @@ interface LayoutActions {
   // basePresets.json 기본값으로 초기화
   resetToBasePresets: () => void
 
+  // 외부 데이터(Supabase 등)에서 일괄 로드
+  loadFontData: (data: {
+    layoutSchemas: Record<LayoutType, LayoutSchema>
+    globalPadding: Padding
+    paddingOverrides: Partial<Record<LayoutType, Partial<Padding>>>
+  }) => void
+
   // hydration 완료 표시
   setHydrated: () => void
 
@@ -300,6 +307,14 @@ export const useLayoutStore = create<LayoutState & LayoutActions>()(
           Object.keys(state.layoutSchemas).forEach((lt) => {
             syncConfigFromSchema(state, lt as LayoutType)
           })
+        }),
+
+      loadFontData: (data) =>
+        set((state) => {
+          state.layoutSchemas = deepClone(data.layoutSchemas)
+          state.globalPadding = { ...data.globalPadding }
+          state.paddingOverrides = deepClone(data.paddingOverrides)
+          syncAllConfigs(state)
         }),
 
       setHydrated: () => set({ _hydrated: true }),

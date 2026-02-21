@@ -58,6 +58,12 @@ interface GlobalStyleActions {
   // 리셋
   resetStyle: () => void
 
+  // 외부 데이터(Supabase 등)에서 일괄 로드
+  loadFontData: (data: {
+    style: GlobalStyle
+    exclusions: GlobalStyleExclusion[]
+  }) => void
+
   // hydration
   setHydrated: () => void
 }
@@ -132,6 +138,16 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
         set((state) => {
           state.style = { ...DEFAULT_STYLE }
           state.exclusions = []
+        }),
+
+      loadFontData: (data) =>
+        set((state) => {
+          state.style = { ...data.style }
+          // linecap 백필 (구형 데이터 호환)
+          if (!state.style.linecap) {
+            state.style.linecap = 'round'
+          }
+          state.exclusions = [...data.exclusions]
         }),
 
       setHydrated: () => set({ _hydrated: true }),
