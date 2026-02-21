@@ -105,9 +105,15 @@ export default {
           '0%, 100%': { opacity: '1', transform: 'scale(1)' },
           '50%': { opacity: '0.5', transform: 'scale(0.9)' },
         },
+        'glyph-fade-in': {
+          '0%': { opacity: '0', transform: 'scale(0.5)' },
+          '60%': { opacity: '1', transform: 'scale(1.05)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
       },
       animation: {
         'pulse-dot': 'pulse-dot 1.5s ease-in-out infinite',
+        'glyph-fade-in': 'glyph-fade-in 1.2s cubic-bezier(0.22, 1, 0.36, 1)',
       },
     },
   },

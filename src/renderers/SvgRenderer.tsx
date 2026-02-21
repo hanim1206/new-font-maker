@@ -30,6 +30,10 @@ interface SvgRendererProps {
   partStyles?: Partial<Record<Part, PartStyle>>
   // SVG 안에 추가 렌더링할 children (slant transform 그룹 내부에 배치)
   children?: ReactNode
+  // SVG overflow 제어 (기본: 'visible')
+  overflow?: 'visible' | 'hidden'
+  // path에 CSS transition 적용 여부 (기본: false)
+  enableTransition?: boolean
   // SVG ref 전달
   svgRef?: React.RefObject<SVGSVGElement | null>
 }
@@ -80,6 +84,8 @@ export function SvgRenderer({
   visualHeightRatio = 1.0, // 기본값: 1:1 정사각 비율
   globalStyle,
   partStyles,
+  overflow = 'visible',
+  enableTransition = false,
   children,
   svgRef,
 }: SvgRendererProps) {
@@ -116,6 +122,7 @@ export function SvgRenderer({
           strokeWidth={strokeWidth}
           strokeLinecap={resolveLinecap(stroke.linecap, globalStyle?.linecap)}
           strokeLinejoin="round"
+          style={enableTransition ? { transition: 'd 0.15s ease, stroke-width 0.15s ease' } : undefined}
         />
       )
     })
@@ -276,11 +283,22 @@ export function SvgRenderer({
           box ? renderDebugBox(box, color, part) : null
         )}
 
+      {/* 글리프 클리핑용 (overflow='hidden' 시 viewBox 영역 내로 제한) */}
+      {overflow === 'hidden' && (
+        <defs>
+          <clipPath id="glyph-clip">
+            <rect x={0} y={0} width={VIEW_BOX_SIZE} height={visualHeight} />
+          </clipPath>
+        </defs>
+      )}
+
       {/* 글자 전체에 slant 적용 */}
       <g transform={slantTransform}>
-        {/* 동적 순서로 렌더링 */}
-        {renderOrder.map((part) => renderPart(part))}
-        {/* 추가 오버레이 (StrokeOverlay 등) */}
+        {/* 글리프 렌더링 — overflow='hidden'이면 clipPath로 제한 */}
+        <g clipPath={overflow === 'hidden' ? 'url(#glyph-clip)' : undefined}>
+          {renderOrder.map((part) => renderPart(part))}
+        </g>
+        {/* 추가 오버레이 (StrokeOverlay 등) — 클리핑 밖에서 렌더 */}
         {children}
       </g>
     </svg>

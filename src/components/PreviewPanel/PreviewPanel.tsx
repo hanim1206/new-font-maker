@@ -89,7 +89,7 @@ export function PreviewPanel({ horizontal = false }: PreviewPanelProps) {
               <div
                 key={index}
                 className={cn(
-                  'shrink-0 flex justify-center items-center bg-[#0f0f0f] rounded p-0.5 border-2 cursor-pointer transition-all',
+                  'shrink-0 flex justify-center items-center bg-[#0f0f0f] rounded p-0.5 border-2 cursor-pointer transition-colors',
                   'hover:border-[#444] hover:bg-surface',
                   index === selectedCharIndex
                     ? 'border-primary bg-primary/10'
@@ -100,14 +100,15 @@ export function PreviewPanel({ horizontal = false }: PreviewPanelProps) {
                 <SvgRenderer
                   syllable={item.syllable}
                   schema={(() => {
-                    const schema = getLayoutSchema(item.syllable.layoutType)
+                    const baseSchema = getLayoutSchema(item.syllable.layoutType)
                     const padding = getEffectivePadding(item.syllable.layoutType)
-                    return { ...schema, padding }
+                    return { ...baseSchema, padding }
                   })()}
                   size={48}
                   fillColor="#e5e5e5"
                   backgroundColor="#1a1a1a"
                   showDebugBoxes={false}
+                  enableTransition
                   globalStyle={getEffectiveStyle(item.syllable.layoutType)}
                 />
               </div>
@@ -146,7 +147,7 @@ export function PreviewPanel({ horizontal = false }: PreviewPanelProps) {
                 <div
                   key={index}
                   className={cn(
-                    'flex justify-center items-center bg-[#0f0f0f] rounded p-1 border-2 border-border cursor-pointer transition-all',
+                    'flex justify-center items-center bg-[#0f0f0f] rounded p-1 border-2 border-border cursor-pointer transition-colors',
                     'hover:border-[#444] hover:bg-surface',
                     index === selectedCharIndex && 'border-primary bg-primary/10 shadow-[0_0_0_1px_theme(colors.primary.DEFAULT)]'
                   )}
@@ -155,14 +156,15 @@ export function PreviewPanel({ horizontal = false }: PreviewPanelProps) {
                   <SvgRenderer
                     syllable={item.syllable}
                     schema={(() => {
-                      const schema = getLayoutSchema(item.syllable.layoutType)
+                      const baseSchema = getLayoutSchema(item.syllable.layoutType)
                       const padding = getEffectivePadding(item.syllable.layoutType)
-                      return { ...schema, padding }
+                      return { ...baseSchema, padding }
                     })()}
                     size={90}
                     fillColor="#e5e5e5"
                     backgroundColor="#1a1a1a"
                     showDebugBoxes={showDebug}
+                    enableTransition
                     globalStyle={getEffectiveStyle(item.syllable.layoutType)}
                   />
                 </div>
