@@ -27,10 +27,14 @@ interface UIState {
   selectedPointIndex: number | null
   // 자모 편집 시 선택된 레이아웃 컨텍스트
   selectedLayoutContext: LayoutType | null
-  // 레이아웃 미리보기에서 클릭한 파트 (자모 편집 서브모드)
+  // 레이아웃에서 선택된 파트 (단일클릭 → 파트 오프셋 조절)
+  selectedPartInLayout: Part | null
+  // 레이아웃 미리보기에서 클릭한 파트 (더블클릭 → 자모 편집 서브모드)
   editingPartInLayout: Part | null
   // 현재 편집 중인 오버라이드 ID (null = 기본값 편집)
   editingOverrideId: string | null
+  // 현재 편집 중인 레이아웃 오버라이드 ID (null = 기본값 편집)
+  editingLayoutOverrideId: string | null
 }
 
 interface UIActions {
@@ -46,8 +50,10 @@ interface UIActions {
   setSelectedStrokeId: (id: string | null) => void
   setSelectedPointIndex: (index: number | null) => void
   setSelectedLayoutContext: (layoutType: LayoutType | null) => void
+  setSelectedPartInLayout: (part: Part | null) => void
   setEditingPartInLayout: (part: Part | null) => void
   setEditingOverrideId: (id: string | null) => void
+  setEditingLayoutOverrideId: (id: string | null) => void
 }
 
 export const useUIStore = create<UIState & UIActions>()(
@@ -66,8 +72,10 @@ export const useUIStore = create<UIState & UIActions>()(
     selectedStrokeId: null,
     selectedPointIndex: null,
     selectedLayoutContext: null,
+    selectedPartInLayout: null,
     editingPartInLayout: null,
     editingOverrideId: null,
+    editingLayoutOverrideId: null,
 
     // 액션
     setViewMode: (mode) =>
@@ -124,9 +132,16 @@ export const useUIStore = create<UIState & UIActions>()(
         state.selectedLayoutContext = layoutType
       }),
 
+    setSelectedPartInLayout: (part) =>
+      set((state) => {
+        state.selectedPartInLayout = part
+      }),
+
     setEditingPartInLayout: (part) =>
       set((state) => {
         state.editingPartInLayout = part
+        // 자모 편집 진입 시 파트 선택 해제
+        state.selectedPartInLayout = null
         if (part === null) {
           // 자모 편집 종료 시 관련 상태 클리어
           state.editingJamoType = null
@@ -143,6 +158,11 @@ export const useUIStore = create<UIState & UIActions>()(
         // 오버라이드 전환 시 선택 상태 클리어
         state.selectedStrokeId = null
         state.selectedPointIndex = null
+      }),
+
+    setEditingLayoutOverrideId: (id) =>
+      set((state) => {
+        state.editingLayoutOverrideId = id
       }),
   }))
 )

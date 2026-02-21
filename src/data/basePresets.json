@@ -114,7 +114,7 @@
       "partOverrides": {
         "CH": {
           "top": 0,
-          "bottom": -0.005625,
+          "bottom": 0,
           "left": 0.14025,
           "right": 0.1
         },
@@ -196,7 +196,7 @@
       "partOverrides": {
         "JU": {
           "top": 0,
-          "bottom": -0.08,
+          "bottom": 0,
           "left": 0.09,
           "right": 0
         },
@@ -283,7 +283,7 @@
       "partOverrides": {
         "JU_V": {
           "top": 0,
-          "bottom": -0.04,
+          "bottom": 0,
           "left": 0.09,
           "right": 0
         },

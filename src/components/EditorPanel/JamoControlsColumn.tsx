@@ -32,6 +32,7 @@ interface JamoControlsColumnProps {
   onJamoReset: () => void
   onApplyChoseongStyle: () => void
   // 레이아웃 모드 액션
+  isLayoutDirty?: boolean
   onLayoutSave: () => void
   onLayoutReset: () => void
   onExportPresets: () => void
@@ -60,6 +61,7 @@ export function JamoControlsColumn({
   onJamoSave,
   onJamoReset,
   onApplyChoseongStyle,
+  isLayoutDirty,
   onLayoutSave,
   onLayoutReset,
   onExportPresets,
@@ -143,10 +145,10 @@ export function JamoControlsColumn({
       <h3 className="text-sm font-medium text-text-dim-3 uppercase tracking-wider">레이아웃 설정</h3>
       {/* 도구 아이콘 바 */}
       <div className="flex items-center gap-1">
-        <Button variant="blue" size="icon" onClick={onLayoutSave} title="저장">
+        <Button variant={isLayoutDirty ? 'blue' : 'default'} size="icon" onClick={onLayoutSave} title="저장" disabled={!isLayoutDirty}>
           💾
         </Button>
-        <Button variant="default" size="icon" onClick={onLayoutReset} title="되돌리기">
+        <Button variant="default" size="icon" onClick={onLayoutReset} title="되돌리기" disabled={!isLayoutDirty}>
           ↩️
         </Button>
         <Button variant="green" size="icon" onClick={onExportPresets} title="레이아웃 JSON 내보내기 (basePresets)">

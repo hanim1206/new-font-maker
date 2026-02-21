@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import type { Split } from '../../types'
 
 // === 타입 정의 ===
@@ -16,6 +16,9 @@ interface SplitOverlayProps {
   originValues?: number[]
   /** 기본값에 스냅됐을 때 표시할 색상 (기본 '#ffffff') */
   originColor?: string
+  /** 드래그 시작/종료 콜백 */
+  onDragStart?: () => void
+  onDragEnd?: () => void
 }
 
 interface DragState {
@@ -42,9 +45,22 @@ export function SplitOverlay({
   disabled = false,
   originValues,
   originColor = '#ffffff',
+  onDragStart,
+  onDragEnd,
 }: SplitOverlayProps) {
   const [dragState, setDragState] = useState<DragState | null>(null)
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+
+  // 외부에 드래그 상태 전파
+  const prevDragRef = useRef(false)
+  useEffect(() => {
+    const isDragging = dragState !== null
+    if (isDragging !== prevDragRef.current) {
+      prevDragRef.current = isDragging
+      if (isDragging) onDragStart?.()
+      else onDragEnd?.()
+    }
+  }, [dragState, onDragStart, onDragEnd])
 
   const V = viewBoxSize
 

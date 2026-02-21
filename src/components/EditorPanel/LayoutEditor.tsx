@@ -4,6 +4,7 @@ import { useLayoutStore } from '../../stores/layoutStore'
 import { useJamoStore } from '../../stores/jamoStore'
 import { useGlobalStyleStore } from '../../stores/globalStyleStore'
 import { useStrokeHistory } from '../../hooks/useStrokeHistory'
+import { useLayoutSchemaDraft } from '../../hooks/useLayoutSchemaDraft'
 import { LayoutCanvasColumn } from './LayoutCanvasColumn'
 import { JamoCanvasColumn } from './JamoCanvasColumn'
 import { JamoControlsColumn } from './JamoControlsColumn'
@@ -13,7 +14,7 @@ import { calculateBoxes } from '../../utils/layoutCalculator'
 import { copyJsonToClipboard } from '../../utils/storage'
 import { mergeStrokes, splitStroke, addHandlesToPoint, removeHandlesFromPoint } from '../../utils/strokeEditUtils'
 import { COMPOUND_JONGSEONG } from '../../utils/jamoLinkUtils'
-import type { LayoutType, Part, DecomposedSyllable, BoxConfig, JamoData, JamoOverrideVariant, Padding } from '../../types'
+import type { LayoutType, Part, DecomposedSyllable, BoxConfig, JamoData, JamoOverrideVariant, Padding, PartOverride } from '../../types'
 
 interface LayoutEditorProps {
   layoutType: LayoutType
@@ -31,6 +32,8 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   const {
     inputText,
     selectedCharIndex,
+    selectedPartInLayout,
+    setSelectedPartInLayout,
     editingPartInLayout,
     setEditingPartInLayout,
     editingJamoType,
@@ -39,6 +42,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     selectedStrokeId,
     setSelectedStrokeId,
     editingOverrideId,
+    setSelectedLayoutType,
   } = useUIStore()
   const {
     getLayoutSchema,
@@ -46,8 +50,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     hasPaddingOverride,
     setPaddingOverride,
     updateSplit,
-    resetLayoutSchema,
-    getCalculatedBoxes,
+    updatePartOverride,
     exportSchemas,
     resetToBasePresets,
     _hydrated,
@@ -88,13 +91,26 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
   const schema = getLayoutSchema(activeLayoutType)
   const effectivePadding = getEffectivePadding(activeLayoutType)
-  const schemaWithPadding = useMemo(
-    () => ({ ...schema, padding: effectivePadding }),
-    [schema, effectivePadding]
-  )
   const effectiveStyle = getEffectiveStyle(activeLayoutType)
 
-  // 계산된 박스 (파트 오버레이용)
+  // 레이아웃 드래프트 (저장 버튼 전까지 로컬에서만 관리)
+  const {
+    draftSchema,
+    draftPadding,
+    isDirty: isLayoutDirty,
+    setDraftSplit,
+    setDraftPaddingSide,
+    setDraftPartOverride,
+    resetDraft: resetLayoutDraft,
+  } = useLayoutSchemaDraft(schema, effectivePadding)
+
+  // 드래프트 기반 스키마+패딩 (캔버스 렌더링용)
+  const schemaWithPadding = useMemo(
+    () => ({ ...draftSchema, padding: draftPadding }),
+    [draftSchema, draftPadding]
+  )
+
+  // 계산된 박스 (파트 오버레이용) — partOverrides 포함
   const computedBoxes = useMemo(
     () => calculateBoxes(schemaWithPadding),
     [schemaWithPadding]
@@ -288,8 +304,13 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isJamoEditing, setEditingPartInLayout, undo, redo])
 
-  // 파트 싱글클릭 → 즉시 자모 편집 진입
+  // 파트 싱글클릭 → 파트 선택 (파트 오프셋 조절용)
   const handlePartClick = useCallback((part: Part) => {
+    setSelectedPartInLayout(selectedPartInLayout === part ? null : part)
+  }, [selectedPartInLayout, setSelectedPartInLayout])
+
+  // 파트 더블클릭 → 자모 편집 진입
+  const handlePartDoubleClick = useCallback((part: Part) => {
     const jamoInfo = partToJamoInfo(part, testSyllable)
     if (!jamoInfo) return
     setPreviewLayoutType(layoutType)
@@ -630,18 +651,31 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
   // === 레이아웃 편집 모드 핸들러 ===
   const handleSave = () => {
-    console.log('\n현재 LayoutSchema:\n')
-    console.log(JSON.stringify(schema, null, 2))
-    const boxes = getCalculatedBoxes(layoutType)
-    console.log('\n계산된 BoxConfig:\n')
-    console.log(JSON.stringify(boxes, null, 2))
-    alert('레이아웃 설정이 저장되었습니다!\n(LocalStorage에 자동 저장됨)')
+    // 드래프트의 splits를 스토어에 반영
+    if (draftSchema.splits) {
+      draftSchema.splits.forEach((split, index) => {
+        updateSplit(activeLayoutType, index, split.value)
+      })
+    }
+    // 드래프트의 패딩을 스토어에 반영
+    const paddingSides: (keyof Padding)[] = ['top', 'bottom', 'left', 'right']
+    paddingSides.forEach(side => {
+      setPaddingOverride(activeLayoutType, side, draftPadding[side])
+    })
+    // 드래프트의 partOverrides를 스토어에 반영
+    if (draftSchema.partOverrides) {
+      for (const [part, override] of Object.entries(draftSchema.partOverrides)) {
+        if (!override) continue
+        paddingSides.forEach(side => {
+          updatePartOverride(activeLayoutType, part as Part, side, override[side])
+        })
+      }
+    }
+    resetLayoutDraft()
   }
 
   const handleReset = () => {
-    if (confirm(`'${layoutType}' 레이아웃을 기본값으로 되돌리시겠습니까?`)) {
-      resetLayoutSchema(layoutType)
-    }
+    resetLayoutDraft()
   }
 
   const handleExportPresets = async () => {
@@ -670,10 +704,29 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     }
   }
 
-  // 패딩 오버라이드 핸들러 (훅은 early return 전에 호출해야 함)
+  // 패딩 오버라이드 핸들러 → 드래프트에 반영
   const handlePaddingOverrideChange = useCallback((side: keyof Padding, val: number) => {
-    setPaddingOverride(layoutType, side, val)
-  }, [layoutType, setPaddingOverride])
+    setDraftPaddingSide(side, val)
+  }, [setDraftPaddingSide])
+
+  // 파트 오프셋 드래프트 핸들러
+  const handlePartOverrideChange = useCallback((part: Part, side: keyof PartOverride, value: number) => {
+    setDraftPartOverride(part, side, value)
+  }, [setDraftPartOverride])
+
+  // 기준선 드래프트 핸들러
+  const handleSplitChange = useCallback((index: number, value: number) => {
+    setDraftSplit(index, value)
+  }, [setDraftSplit])
+
+  // 레이아웃 컨텍스트 전환 핸들러
+  const handlePreviewLayoutTypeChange = useCallback((lt: LayoutType) => {
+    if (isJamoEditing) {
+      setPreviewLayoutType(lt)
+    } else {
+      setSelectedLayoutType(lt)
+    }
+  }, [isJamoEditing, setPreviewLayoutType, setSelectedLayoutType])
 
   // Hydration 전에는 로딩 표시
   if (!_hydrated) {
@@ -706,20 +759,22 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
           schemaWithPadding={schemaWithPadding}
           effectiveStyle={effectiveStyle}
           computedBoxes={computedBoxes}
-          schema={schema}
-          effectivePadding={effectivePadding}
-          hasPaddingOverride={hasPaddingOverride(layoutType)}
-          isJamoEditing={isJamoEditing}
+          schema={draftSchema}
+          effectivePadding={draftPadding}
+          hasPaddingOverride={isLayoutDirty || hasPaddingOverride(layoutType)}
+          selectedPartInLayout={selectedPartInLayout}
           editingPartInLayout={editingPartInLayout}
           editingJamoInfo={editingJamoInfo}
-          previewLayoutType={previewLayoutType}
-          activeLayoutType={activeLayoutType}
-          editingJamoType={editingJamoType}
-          editingJamoChar={editingJamoChar}
+          previewLayoutType={isJamoEditing ? previewLayoutType : layoutType}
+          isLayoutDirty={isLayoutDirty}
+          onLayoutSave={handleSave}
+          onLayoutReset={handleReset}
           onPartClick={handlePartClick}
-          onSplitChange={(index, value) => updateSplit(layoutType, index, value)}
+          onPartDoubleClick={handlePartDoubleClick}
+          onPartOverrideChange={handlePartOverrideChange}
+          onSplitChange={handleSplitChange}
           onPaddingOverrideChange={handlePaddingOverrideChange}
-          onPreviewLayoutTypeChange={(lt) => setPreviewLayoutType(lt)}
+          onPreviewLayoutTypeChange={handlePreviewLayoutTypeChange}
         />
       </div>
 
@@ -794,6 +849,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
           onJamoSave={handleJamoSave}
           onJamoReset={handleJamoReset}
           onApplyChoseongStyle={handleApplyChoseongStyle}
+          isLayoutDirty={isLayoutDirty}
           onLayoutSave={handleSave}
           onLayoutReset={handleReset}
           onExportPresets={handleExportPresets}

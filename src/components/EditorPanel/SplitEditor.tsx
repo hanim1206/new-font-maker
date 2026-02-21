@@ -71,14 +71,14 @@ export function SplitEditor({ layoutType, selectedPart }: SplitEditorProps) {
                     </span>
                   </div>
                   <Slider
-                    min={-0.2}
-                    max={0.2}
+                    min={0}
+                    max={0.3}
                     step={0.005}
                     value={[value]}
                     onValueChange={([val]) =>
                       updatePartOverride(layoutType, selectedPart, key, val)
                     }
-                    colorScheme={value < 0 ? 'x' : 'override'}
+                    colorScheme="override"
                   />
                 </div>
               )

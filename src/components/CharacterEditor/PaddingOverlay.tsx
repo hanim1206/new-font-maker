@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import type { Padding, BoxConfig } from '../../types'
 
 // === 타입 정의 ===
@@ -20,6 +20,9 @@ interface PaddingOverlayProps {
   disabled?: boolean
   /** 기본값에 스냅됐을 때 표시할 색상 (기본 '#ffffff') */
   originColor?: string
+  /** 드래그 시작/종료 콜백 */
+  onDragStart?: () => void
+  onDragEnd?: () => void
 }
 
 interface DragState {
@@ -50,17 +53,39 @@ export function PaddingOverlay({
   snapStep = 0.025,
   disabled = false,
   originColor = '#ffffff',
+  onDragStart,
+  onDragEnd,
 }: PaddingOverlayProps) {
   const [dragState, setDragState] = useState<DragState | null>(null)
   const [hoveredSide, setHoveredSide] = useState<PaddingSide | null>(null)
 
+  // 콜백/값 ref 안정화 (useEffect deps에서 제거하여 드래그 중 리스너 재등록 방지)
+  const onPaddingChangeRef = useRef(onPaddingChange)
+  onPaddingChangeRef.current = onPaddingChange
+  const paddingRef = useRef(padding)
+  paddingRef.current = padding
+  const containerBoxRef = useRef(containerBox)
+  containerBoxRef.current = containerBox
+
+  // 외부에 드래그 상태 전파
+  const prevDragRef = useRef(false)
+  useEffect(() => {
+    const isDragging = dragState !== null
+    if (isDragging !== prevDragRef.current) {
+      prevDragRef.current = isDragging
+      if (isDragging) onDragStart?.()
+      else onDragEnd?.()
+    }
+  }, [dragState, onDragStart, onDragEnd])
+
+  // 렌더링용 파생값 (SVG 좌표)
   const V = viewBoxSize
   const bx = containerBox.x * V
   const by = containerBox.y * V
   const bw = containerBox.width * V
   const bh = containerBox.height * V
 
-  // SVG 이벤트에서 viewBox 좌표 추출
+  // SVG 이벤트에서 viewBox 좌표 추출 (svgRef는 안정적이므로 useCallback OK)
   const svgPointFromEvent = useCallback(
     (e: React.MouseEvent | MouseEvent | React.TouchEvent | TouchEvent) => {
       const svg = svgRef.current
@@ -85,40 +110,48 @@ export function PaddingOverlay({
   )
 
   // SVG 좌표 → 패딩값 변환 + 스냅 + 클램프
-  const svgToPaddingValue = useCallback(
-    (svgPt: { x: number; y: number }, side: PaddingSide): number => {
-      let raw: number
-      switch (side) {
-        case 'top':
-          raw = bh > 0 ? (svgPt.y - by) / bh : 0
-          break
-        case 'bottom':
-          raw = bh > 0 ? (by + bh - svgPt.y) / bh : 0
-          break
-        case 'left':
-          raw = bw > 0 ? (svgPt.x - bx) / bw : 0
-          break
-        case 'right':
-          raw = bw > 0 ? (bx + bw - svgPt.x) / bw : 0
-          break
-      }
-
-      // 원점(0) 강한 흡착: 1스텝 이내면 0으로 스냅
-      if (Math.abs(raw) < snapStep * 0.8) {
-        raw = 0
-      } else {
-        // 그리드 스냅
-        raw = Math.round(raw / snapStep) * snapStep
-      }
-
-      // 대변 충돌 방지 (최소 10% 컨텐츠)
-      const oppositeValue = padding[OPPOSITE[side]]
-      const maxAllowed = Math.min(maxPadding, 0.9 - Math.max(0, oppositeValue))
-
-      return Math.max(minPadding, Math.min(maxAllowed, raw))
-    },
-    [bx, by, bw, bh, snapStep, minPadding, maxPadding, padding]
+  // 모든 변동 값을 ref로 참조하여 드래그 중 리스너 재등록 완전 방지
+  const svgToPaddingValueRef = useRef(
+    (_svgPt: { x: number; y: number }, _side: PaddingSide): number => 0
   )
+  svgToPaddingValueRef.current = (svgPt: { x: number; y: number }, side: PaddingSide): number => {
+    const cb = containerBoxRef.current
+    const _V = viewBoxSize
+    const _bx = cb.x * _V
+    const _by = cb.y * _V
+    const _bw = cb.width * _V
+    const _bh = cb.height * _V
+
+    let raw: number
+    switch (side) {
+      case 'top':
+        raw = _bh > 0 ? (svgPt.y - _by) / _bh : 0
+        break
+      case 'bottom':
+        raw = _bh > 0 ? (_by + _bh - svgPt.y) / _bh : 0
+        break
+      case 'left':
+        raw = _bw > 0 ? (svgPt.x - _bx) / _bw : 0
+        break
+      case 'right':
+        raw = _bw > 0 ? (_bx + _bw - svgPt.x) / _bw : 0
+        break
+    }
+
+    // 원점(0) 강한 흡착: 1스텝 이내면 0으로 스냅
+    if (Math.abs(raw) < snapStep * 0.8) {
+      raw = 0
+    } else {
+      // 그리드 스냅
+      raw = Math.round(raw / snapStep) * snapStep
+    }
+
+    // 대변 충돌 방지 (최소 10% 컨텐츠) — ref로 최신 padding 참조
+    const oppositeValue = paddingRef.current[OPPOSITE[side]]
+    const maxAllowed = Math.min(maxPadding, 0.9 - Math.max(0, oppositeValue))
+
+    return Math.max(minPadding, Math.min(maxAllowed, raw))
+  }
 
   // 내부 경계선 위치 계산 (SVG 좌표)
   const getEdgePosition = (side: PaddingSide) => {
@@ -144,13 +177,14 @@ export function PaddingOverlay({
   }
 
   // window 레벨 드래그 이벤트 (범위 밖에서도 드래그 유지)
+  // 모든 변동 값을 ref로 참조하여 dragState만 의존 → 드래그 중 리스너 재등록 완전 방지
   useEffect(() => {
     if (!dragState) return
 
     const handleWindowMove = (e: MouseEvent | TouchEvent) => {
       const svgPt = svgPointFromEvent(e)
-      const newValue = svgToPaddingValue(svgPt, dragState.side)
-      onPaddingChange(dragState.side, newValue)
+      const newValue = svgToPaddingValueRef.current(svgPt, dragState.side)
+      onPaddingChangeRef.current(dragState.side, newValue)
     }
 
     const handleWindowUp = () => {
@@ -170,7 +204,7 @@ export function PaddingOverlay({
       window.removeEventListener('touchend', handleWindowUp)
       window.removeEventListener('touchcancel', handleWindowUp)
     }
-  }, [dragState, svgPointFromEvent, svgToPaddingValue, onPaddingChange])
+  }, [dragState, svgPointFromEvent])
 
   // 패딩 영역 채우기 렌더링
   const renderPaddingFills = () => {
