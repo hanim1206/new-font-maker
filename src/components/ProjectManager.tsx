@@ -22,6 +22,8 @@ export function ProjectManager({ open, onClose }: ProjectManagerProps) {
     fetchProjects,
     saveAsNew,
     saveCurrent,
+    saveToProject,
+    renameProject,
     loadProject,
     deleteProject,
     clearError,
@@ -29,6 +31,9 @@ export function ProjectManager({ open, onClose }: ProjectManagerProps) {
 
   const [newName, setNewName] = useState('')
   const [showNameInput, setShowNameInput] = useState(false)
+  // 이름 수정 중인 프로젝트 ID
+  const [editingNameId, setEditingNameId] = useState<string | null>(null)
+  const [editingNameValue, setEditingNameValue] = useState('')
   const panelRef = useRef<HTMLDivElement>(null)
 
   // 열릴 때 목록 조회
@@ -68,9 +73,33 @@ export function ProjectManager({ open, onClose }: ProjectManagerProps) {
     await loadProject(id)
   }
 
+  const handleOverwrite = async (id: string, name: string) => {
+    if (!confirm(`'${name}'에 현재 데이터를 덮어쓰시겠습니까?`)) return
+    await saveToProject(id)
+  }
+
   const handleDelete = async (id: string) => {
     if (!confirm('이 프로젝트를 삭제하시겠습니까?')) return
     await deleteProject(id)
+  }
+
+  const handleStartRename = (id: string, currentName: string) => {
+    setEditingNameId(id)
+    setEditingNameValue(currentName)
+  }
+
+  const handleRenameConfirm = async () => {
+    if (!editingNameId) return
+    const trimmed = editingNameValue.trim()
+    if (!trimmed) return
+    await renameProject(editingNameId, trimmed)
+    setEditingNameId(null)
+    setEditingNameValue('')
+  }
+
+  const handleRenameCancel = () => {
+    setEditingNameId(null)
+    setEditingNameValue('')
   }
 
   if (!open) return null
@@ -152,46 +181,93 @@ export function ProjectManager({ open, onClose }: ProjectManagerProps) {
             저장된 프로젝트가 없습니다
           </div>
         ) : (
-          projects.map((project) => (
-            <div
-              key={project.id}
-              className={`flex items-center gap-2 px-4 py-2.5 border-b border-border-subtle hover:bg-surface-3 transition-colors ${
-                project.id === currentProjectId ? 'bg-primary/10 border-l-2 border-l-primary' : ''
-              }`}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-foreground truncate">
-                  {project.name}
+          projects.map((project) => {
+            const isCurrent = project.id === currentProjectId
+            const isRenaming = editingNameId === project.id
+
+            return (
+              <div
+                key={project.id}
+                className={`px-4 py-2.5 border-b border-border-subtle hover:bg-surface-3 transition-colors ${
+                  isCurrent ? 'bg-primary/10 border-l-2 border-l-primary' : ''
+                }`}
+              >
+                {/* 이름 + 날짜 */}
+                <div className="flex items-center gap-2 mb-1.5">
+                  {isRenaming ? (
+                    <div className="flex-1 flex gap-1">
+                      <Input
+                        type="text"
+                        value={editingNameValue}
+                        onChange={(e) => setEditingNameValue(e.target.value)}
+                        className="flex-1 text-sm h-7"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleRenameConfirm()
+                          if (e.key === 'Escape') handleRenameCancel()
+                        }}
+                        autoFocus
+                      />
+                      <Button size="sm" onClick={handleRenameConfirm} disabled={loading}>
+                        ✓
+                      </Button>
+                      <Button size="sm" variant="default" onClick={handleRenameCancel}>
+                        ✕
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className="text-sm font-medium text-foreground truncate cursor-pointer hover:text-primary"
+                        onClick={() => handleStartRename(project.id, project.name)}
+                        title="클릭하여 이름 변경"
+                      >
+                        {project.name}
+                        {isCurrent && <span className="ml-1 text-xs text-primary">(현재)</span>}
+                      </div>
+                      <div className="text-xs text-muted">
+                        {new Date(project.updated_at).toLocaleDateString('ko-KR', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="text-xs text-muted">
-                  {new Date(project.updated_at).toLocaleDateString('ko-KR', {
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </div>
+
+                {/* 액션 버튼 */}
+                {!isRenaming && (
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => handleLoad(project.id)}
+                      disabled={loading}
+                    >
+                      불러오기
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => handleOverwrite(project.id, project.name)}
+                      disabled={loading}
+                    >
+                      덮어쓰기
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      onClick={() => handleDelete(project.id)}
+                      disabled={loading}
+                    >
+                      삭제
+                    </Button>
+                  </div>
+                )}
               </div>
-              <div className="flex gap-1 shrink-0">
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={() => handleLoad(project.id)}
-                  disabled={loading}
-                >
-                  불러오기
-                </Button>
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={() => handleDelete(project.id)}
-                  disabled={loading}
-                >
-                  삭제
-                </Button>
-              </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
     </div>

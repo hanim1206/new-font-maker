@@ -304,7 +304,7 @@ export function PaddingOverlay({
           y2={edge.y2}
           stroke={isAtOrigin && isActive ? originColor : sideColor}
           strokeWidth={isActive ? 1.5 : isHovered ? 1.2 : 0.8}
-          opacity={isActive ? 1 : isHovered ? 0.9 : 0.5}
+          opacity={disabled ? 0 : isActive ? 1 : isHovered ? 0.9 : 0.5}
           strokeDasharray={isActive ? 'none' : '3,2'}
           pointerEvents="none"
         />
@@ -316,20 +316,20 @@ export function PaddingOverlay({
           fill={isActive ? activeColor : isHovered ? sideColor : 'rgba(0,0,0,0.6)'}
           stroke={activeColor}
           strokeWidth={isActive ? 1.5 : 1}
-          opacity={isActive ? 1 : isHovered ? 0.95 : 0.7}
+          opacity={disabled ? 0 : isActive ? 1 : isHovered ? 0.95 : 0.7}
           pointerEvents="none"
           style={{ transition: 'r 0.1s, opacity 0.1s' }}
         />
         {/* 히트 영역: 핸들 원 주변만 (획과 충돌 없음) */}
-        {!dragState && (
+        {!dragState && !disabled && (
           <circle
             cx={cx}
             cy={cy}
             r={6}
             fill="transparent"
             pointerEvents="all"
-            style={{ cursor: disabled ? 'default' : cursor }}
-            onMouseEnter={() => !disabled && setHoveredSide(side)}
+            style={{ cursor }}
+            onMouseEnter={() => setHoveredSide(side)}
             onMouseLeave={() => setHoveredSide(null)}
             onMouseDown={handlePointerDown(side)}
             onTouchStart={handlePointerDown(side)}

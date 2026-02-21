@@ -19,6 +19,8 @@ interface UseFontProjectReturn {
   fetchProjects: () => Promise<void>
   saveAsNew: (name: string) => Promise<FontProject>
   saveCurrent: () => Promise<void>
+  saveToProject: (id: string) => Promise<void>
+  renameProject: (id: string, name: string) => Promise<void>
   loadProject: (id: string) => Promise<void>
   deleteProject: (id: string) => Promise<void>
   clearError: () => void
@@ -93,6 +95,40 @@ export function useFontProject(): UseFontProjectReturn {
     }
   }, [currentProjectId])
 
+  // 특정 프로젝트에 현재 데이터를 덮어쓰기 저장
+  const saveToProject = useCallback(async (id: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const fontData = collectFontData()
+      const updated = await fontProjectService.update(id, { font_data: fontData })
+      setCurrentProjectId(id)
+      setProjects((prev) =>
+        prev.map((p) => (p.id === updated.id ? updated : p))
+      )
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '덮어쓰기 실패')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // 프로젝트 이름 변경
+  const renameProject = useCallback(async (id: string, name: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const updated = await fontProjectService.update(id, { name })
+      setProjects((prev) =>
+        prev.map((p) => (p.id === updated.id ? updated : p))
+      )
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '이름 변경 실패')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   // 프로젝트 불러오기
   const loadProject = useCallback(async (id: string) => {
     setLoading(true)
@@ -146,6 +182,8 @@ export function useFontProject(): UseFontProjectReturn {
     fetchProjects,
     saveAsNew,
     saveCurrent,
+    saveToProject,
+    renameProject,
     loadProject,
     deleteProject,
     clearError,
