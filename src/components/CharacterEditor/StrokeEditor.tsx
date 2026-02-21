@@ -12,7 +12,7 @@ type PointChangeHandler = (
 
 interface StrokeEditorProps {
   strokes: StrokeDataV2[]
-  onChange: (strokeId: string, prop: string, value: number | string | undefined) => void
+  onChange: (strokeId: string, prop: string, value: number | string | boolean | undefined) => void
   onPointChange?: PointChangeHandler
   boxInfo?: BoxConfig & { juH?: BoxConfig; juV?: BoxConfig }
 }
@@ -96,15 +96,19 @@ export function StrokeEditor({ strokes, onChange, onPointChange, boxInfo: _boxIn
         switch (e.key) {
           case 'ArrowLeft':
             e.preventDefault()
-            // 모든 포인트를 왼쪽으로
+            // 모든 포인트 + 핸들을 왼쪽으로
             selectedStroke.points.forEach((pt, i) => {
               onPointChange(selectedStroke.id, i, 'x', pt.x - MOVE_STEP)
+              if (pt.handleIn) onPointChange(selectedStroke.id, i, 'handleIn', { x: pt.handleIn.x - MOVE_STEP, y: pt.handleIn.y })
+              if (pt.handleOut) onPointChange(selectedStroke.id, i, 'handleOut', { x: pt.handleOut.x - MOVE_STEP, y: pt.handleOut.y })
             })
             break
           case 'ArrowRight':
             e.preventDefault()
             selectedStroke.points.forEach((pt, i) => {
               onPointChange(selectedStroke.id, i, 'x', pt.x + MOVE_STEP)
+              if (pt.handleIn) onPointChange(selectedStroke.id, i, 'handleIn', { x: pt.handleIn.x + MOVE_STEP, y: pt.handleIn.y })
+              if (pt.handleOut) onPointChange(selectedStroke.id, i, 'handleOut', { x: pt.handleOut.x + MOVE_STEP, y: pt.handleOut.y })
             })
             break
           case 'ArrowUp':
@@ -121,6 +125,8 @@ export function StrokeEditor({ strokes, onChange, onPointChange, boxInfo: _boxIn
             } else {
               selectedStroke.points.forEach((pt, i) => {
                 onPointChange(selectedStroke.id, i, 'y', pt.y - MOVE_STEP)
+                if (pt.handleIn) onPointChange(selectedStroke.id, i, 'handleIn', { x: pt.handleIn.x, y: pt.handleIn.y - MOVE_STEP })
+                if (pt.handleOut) onPointChange(selectedStroke.id, i, 'handleOut', { x: pt.handleOut.x, y: pt.handleOut.y - MOVE_STEP })
               })
             }
             break
@@ -137,6 +143,8 @@ export function StrokeEditor({ strokes, onChange, onPointChange, boxInfo: _boxIn
             } else {
               selectedStroke.points.forEach((pt, i) => {
                 onPointChange(selectedStroke.id, i, 'y', pt.y + MOVE_STEP)
+                if (pt.handleIn) onPointChange(selectedStroke.id, i, 'handleIn', { x: pt.handleIn.x, y: pt.handleIn.y + MOVE_STEP })
+                if (pt.handleOut) onPointChange(selectedStroke.id, i, 'handleOut', { x: pt.handleOut.x, y: pt.handleOut.y + MOVE_STEP })
               })
             }
             break

@@ -241,7 +241,7 @@ export function CharacterEditor() {
     }
   }, [editingJamoType, editingJamoChar, setSelectedStrokeId])
 
-  const handleStrokeChange = (strokeId: string, prop: string, value: number | string | undefined) => {
+  const handleStrokeChange = (strokeId: string, prop: string, value: number | string | boolean | undefined) => {
     setDraftStrokes((prev) =>
       prev.map((s) => {
         if (s.id !== strokeId) return s
@@ -305,6 +305,47 @@ export function CharacterEditor() {
       newStrokes.splice(idx, 1, first, second)
       return newStrokes
     })
+  }
+
+  // 닫힌 경로를 선택한 점에서 끊기 (열기)
+  const handleOpenAtPoint = (strokeId: string, pointIndex: number) => {
+    setDraftStrokes(prev => prev.map(s => {
+      if (s.id !== strokeId || !s.closed) return s
+      // 선택한 점이 시작점이 되도록 배열 회전
+      const rotated = [...s.points.slice(pointIndex), ...s.points.slice(0, pointIndex)]
+      return { ...s, points: rotated, closed: false }
+    }))
+  }
+
+  // 포인트 삭제 (최소 2점 유지)
+  const handleDeletePoint = (strokeId: string, pointIndex: number) => {
+    setDraftStrokes(prev => prev.map(s => {
+      if (s.id !== strokeId || s.points.length <= 2) return s
+      const newPoints = [...s.points]
+      newPoints.splice(pointIndex, 1)
+      return { ...s, points: newPoints }
+    }))
+  }
+
+  // 획 삭제
+  const handleDeleteStroke = (strokeId: string) => {
+    setDraftStrokes(prev => prev.filter(s => s.id !== strokeId))
+  }
+
+  // 획 추가 (기본 2점 직선)
+  const handleAddStroke = () => {
+    const newId = `stroke-${Date.now()}`
+    const newStroke: StrokeDataV2 = {
+      id: newId,
+      points: [
+        { x: 0.2, y: 0.5 },
+        { x: 0.8, y: 0.5 },
+      ],
+      closed: false,
+      thickness: 0.07,
+    }
+    setDraftStrokes(prev => [...prev, newStroke])
+    setSelectedStrokeId(newId)
   }
 
   // 포인트 곡선화
@@ -417,6 +458,10 @@ export function CharacterEditor() {
                 onMergeStrokes={handleMergeStrokes}
                 onSplitStroke={handleSplitStroke}
                 onToggleCurve={handleToggleCurve}
+                onOpenAtPoint={handleOpenAtPoint}
+                onDeletePoint={handleDeletePoint}
+                onDeleteStroke={handleDeleteStroke}
+                onAddStroke={handleAddStroke}
               />
 
             </div>

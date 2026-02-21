@@ -61,14 +61,18 @@ type PointChangeHandler = (
 
 interface StrokeInspectorProps {
   strokes: StrokeDataV2[]
-  onChange: (strokeId: string, prop: string, value: number | string | undefined) => void
+  onChange: (strokeId: string, prop: string, value: number | string | boolean | undefined) => void
   onPointChange?: PointChangeHandler
   onMergeStrokes?: (strokeIdA: string, strokeIdB: string) => void
   onSplitStroke?: (strokeId: string, pointIndex: number) => void
   onToggleCurve?: (strokeId: string, pointIndex: number) => void
+  onOpenAtPoint?: (strokeId: string, pointIndex: number) => void
+  onDeletePoint?: (strokeId: string, pointIndex: number) => void
+  onDeleteStroke?: (strokeId: string) => void
+  onAddStroke?: () => void
 }
 
-export function StrokeInspector({ strokes, onChange, onPointChange, onMergeStrokes, onSplitStroke, onToggleCurve }: StrokeInspectorProps) {
+export function StrokeInspector({ strokes, onChange, onPointChange, onMergeStrokes, onSplitStroke, onToggleCurve, onOpenAtPoint, onDeletePoint, onDeleteStroke, onAddStroke }: StrokeInspectorProps) {
   const { selectedStrokeId, selectedPointIndex, setSelectedPointIndex, setSelectedStrokeId } = useUIStore()
   const selectedStroke = strokes.find((s) => s.id === selectedStrokeId)
 
@@ -179,6 +183,31 @@ export function StrokeInspector({ strokes, onChange, onPointChange, onMergeStrok
           {onMergeStrokes && mergeTargets.length === 0 && !selectedStroke.closed && strokes.filter(s => s.id !== selectedStrokeId && !s.closed).length > 0 && (
             <span className="text-xs text-text-dim-5 py-1">끝점을 다른 획 끝점 근처로 이동하면 합치기 가능</span>
           )}
+          {onDeleteStroke && strokes.length > 1 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-red-600 text-red-400 hover:bg-red-900/30"
+              onClick={() => {
+                onDeleteStroke(selectedStroke.id)
+                // 삭제 후 다른 획 선택
+                const remaining = strokes.filter(s => s.id !== selectedStroke.id)
+                if (remaining.length > 0) setSelectedStrokeId(remaining[0].id)
+              }}
+            >
+              획 삭제
+            </Button>
+          )}
+          {onAddStroke && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-blue-600 text-blue-400 hover:bg-blue-900/30"
+              onClick={onAddStroke}
+            >
+              + 획 추가
+            </Button>
+          )}
         </div>
       </div>
 
@@ -220,6 +249,31 @@ export function StrokeInspector({ strokes, onChange, onPointChange, onMergeStrok
               onClick={() => onSplitStroke(selectedStroke.id, selectedPointIndex!)}
             >
               여기서 분리
+            </Button>
+          )}
+          {onOpenAtPoint && selectedStroke.closed && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-orange-600 text-orange-400 hover:bg-orange-900/30"
+              onClick={() => onOpenAtPoint(selectedStroke.id, selectedPointIndex!)}
+            >
+              여기서 끊기
+            </Button>
+          )}
+          {onDeletePoint && selectedStroke.points.length > 2 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-red-600 text-red-400 hover:bg-red-900/30"
+              onClick={() => {
+                onDeletePoint(selectedStroke.id, selectedPointIndex!)
+                // 삭제 후 인덱스 보정
+                const newLen = selectedStroke.points.length - 1
+                if (selectedPointIndex! >= newLen) setSelectedPointIndex(newLen - 1)
+              }}
+            >
+              점 삭제
             </Button>
           )}
         </div>
