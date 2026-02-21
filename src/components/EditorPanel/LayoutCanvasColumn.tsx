@@ -131,17 +131,11 @@ export function LayoutCanvasColumn({
       const startVal = currentPadding[side]
       const part = selectedPartInLayout
 
-      // 원본 파트 박스의 실제 픽셀 크기 계산 (override 적용 전)
-      const shrunkBox = computedBoxes[part]
-      if (!shrunkBox) return
-      const ovr = currentPadding
-      const origW = shrunkBox.width + ovr.left + ovr.right
-      const origH = shrunkBox.height + ovr.top + ovr.bottom
-      const boxPixelW = origW * previewSize
-      const boxPixelH = origH * previewSize
-
+      // partOverrides는 0-1 정규화 좌표에 직접 가산되므로
+      // 드래그 계산은 전체 캔버스 크기 기준으로 해야 함
+      if (!computedBoxes[part]) return
       const isHorizontal = side === 'top' || side === 'bottom'
-      const size = isHorizontal ? boxPixelH : boxPixelW
+      const size = previewSize
 
       setIsDragging(true)
       setDraggingSide(side)
@@ -181,20 +175,41 @@ export function LayoutCanvasColumn({
   )
 
   // 경계선의 캔버스 내 위치 (px) — 원본 박스 기준
+  // partOverrides는 0-1 정규화 좌표에 직접 가산되므로 val * previewSize (캔버스 절대)
   const getEdgePx = (side: PaddingSide, origBox: BoxConfig) => {
     const p = selectedPartPadding ?? { top: 0, bottom: 0, left: 0, right: 0 }
     const val = p[side]
-    if (side === 'top') return origBox.y * previewSize + val * origBox.height * previewSize
-    if (side === 'bottom') return origBox.y * previewSize + origBox.height * previewSize - val * origBox.height * previewSize
-    if (side === 'left') return origBox.x * previewSize + val * origBox.width * previewSize
-    /* right */ return origBox.x * previewSize + origBox.width * previewSize - val * origBox.width * previewSize
+    if (side === 'top') return origBox.y * previewSize + val * previewSize
+    if (side === 'bottom') return (origBox.y + origBox.height) * previewSize - val * previewSize
+    if (side === 'left') return origBox.x * previewSize + val * previewSize
+    /* right */ return (origBox.x + origBox.width) * previewSize - val * previewSize
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4">
-      <h3 className="text-sm font-medium mb-3 text-text-dim-3 uppercase tracking-wider">
-        레이아웃
-      </h3>
+    <div className="h-full overflow-y-auto">
+      {/* undo/redo + 저장/초기화 — 상단 고정 */}
+      <div className="sticky top-0 z-10 bg-surface-2 px-4 pt-3 pb-2 border-b border-border-subtle">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-text-dim-3 uppercase tracking-wider">
+            레이아웃
+          </h3>
+          <div className="flex-1" />
+          <Button variant="default" size="sm" onClick={onUndo} disabled={!canUndo} title="되돌리기 (Ctrl+Z)">
+            ↩
+          </Button>
+          <Button variant="default" size="sm" onClick={onRedo} disabled={!canRedo} title="다시 실행 (Ctrl+Y)">
+            ↪
+          </Button>
+          <Button variant="default" size="sm" onClick={onLayoutReset} disabled={!isLayoutDirty}>
+            초기화
+          </Button>
+          <Button variant={isLayoutDirty ? 'blue' : 'default'} size="sm" onClick={onLayoutSave} disabled={!isLayoutDirty}>
+            저장
+          </Button>
+        </div>
+      </div>
+
+      <div className="p-4 pt-3">
 
       {/* 캔버스 — 핸들 공간 확보를 위한 외부 여백 */}
       {/* 캔버스 래퍼 내부 클릭은 상위 deselect로 전파되지 않도록 차단 */}
@@ -358,10 +373,11 @@ export function LayoutCanvasColumn({
                   {/* 양수: 안쪽 축소 / 음수: 바깥 확장 — 모두 올바르게 처리 */}
                   {hasAny && (() => {
                     // 각 면의 경계선 위치 (px)
-                    const edgeTop = obyPx + p.top * obhPx
-                    const edgeBottom = obyPx + obhPx - p.bottom * obhPx
-                    const edgeLeft = obxPx + p.left * obwPx
-                    const edgeRight = obxPx + obwPx - p.right * obwPx
+                    // partOverrides는 0-1 캔버스 절대 좌표이므로 val * previewSize
+                    const edgeTop = obyPx + p.top * previewSize
+                    const edgeBottom = obyPx + obhPx - p.bottom * previewSize
+                    const edgeLeft = obxPx + p.left * previewSize
+                    const edgeRight = obxPx + obwPx - p.right * previewSize
 
                     // fill 영역: 원본 박스 경계 ~ 경계선 사이 (min/max로 방향 무관하게 처리)
                     const topFillY = Math.min(obyPx, edgeTop)
@@ -374,8 +390,8 @@ export function LayoutCanvasColumn({
                     const rightFillW = Math.abs(obxPx + obwPx - edgeRight)
 
                     // 좌우 fill의 수직 범위 (top/bottom fill과 겹치지 않게)
-                    const midTop = Math.min(edgeTop, obyPx + obhPx - p.bottom * obhPx)
-                    const midBottom = Math.max(edgeBottom, obyPx + p.top * obhPx)
+                    const midTop = Math.min(edgeTop, obyPx + obhPx - p.bottom * previewSize)
+                    const midBottom = Math.max(edgeBottom, obyPx + p.top * previewSize)
                     const midY = Math.min(midTop, midBottom)
                     const midH = Math.max(0, Math.max(midTop, midBottom) - midY)
 
@@ -540,23 +556,6 @@ export function LayoutCanvasColumn({
         </div>
       </div>
 
-      {/* undo/redo + 저장/초기화 버튼 */}
-      <div className="flex gap-2 px-1 mb-2">
-        <Button variant="default" size="sm" onClick={onUndo} disabled={!canUndo} title="되돌리기 (Ctrl+Z)">
-          ↩
-        </Button>
-        <Button variant="default" size="sm" onClick={onRedo} disabled={!canRedo} title="다시 실행 (Ctrl+Y)">
-          ↪
-        </Button>
-        <div className="flex-1" />
-        <Button variant="default" size="sm" onClick={onLayoutReset} disabled={!isLayoutDirty}>
-          초기화
-        </Button>
-        <Button variant={isLayoutDirty ? 'blue' : 'default'} size="sm" onClick={onLayoutSave} disabled={!isLayoutDirty}>
-          저장
-        </Button>
-      </div>
-
       {/* 레이아웃 컨텍스트 썸네일 (항상 7개 고정 노출) */}
       <div>
         <LayoutContextThumbnails
@@ -565,6 +564,7 @@ export function LayoutCanvasColumn({
           selectedContext={previewLayoutType}
           onSelectContext={onPreviewLayoutTypeChange}
         />
+      </div>
       </div>
     </div>
   )

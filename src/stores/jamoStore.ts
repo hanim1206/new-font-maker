@@ -56,6 +56,9 @@ interface JamoActions {
   // 특정 타입만 초기화
   resetJamoType: (type: 'choseong' | 'jungseong' | 'jongseong') => void
 
+  // 특정 자모 1개만 baseJamos 기본값으로 초기화
+  resetJamoChar: (type: 'choseong' | 'jungseong' | 'jongseong', char: string) => void
+
   // ===== 자모 패딩 =====
 
   // 자모 패딩 업데이트
@@ -244,6 +247,14 @@ export const useJamoStore = create<JamoState & JamoActions>()(
       resetJamoType: (type) =>
         set((state) => {
           state[type] = deepClone(BASE_JAMOS[type])
+        }),
+
+      resetJamoChar: (type, char) =>
+        set((state) => {
+          const base = BASE_JAMOS[type][char]
+          if (base) {
+            state[type][char] = deepClone(base)
+          }
         }),
 
       // ===== 자모 패딩 =====

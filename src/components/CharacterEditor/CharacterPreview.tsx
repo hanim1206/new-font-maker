@@ -40,12 +40,18 @@ const BOX_COLORS: Record<string, string> = {
 }
 
 // 드래그 상태 타입
+interface OriginalPointSnapshot {
+  x: number; y: number
+  handleIn?: { x: number; y: number }
+  handleOut?: { x: number; y: number }
+}
+
 interface DragState {
   type: 'point' | 'handleIn' | 'handleOut' | 'strokeMove'
   strokeId: string
   pointIndex: number
-  // strokeMove 시: 원래 points 스냅샷 + 그랩 오프셋
-  originalPoints?: { x: number; y: number }[]
+  // strokeMove 시: 원래 points 스냅샷 (핸들 포함) + 그랩 오프셋
+  originalPoints?: OriginalPointSnapshot[]
   grabRelX?: number
   grabRelY?: number
   // 컨테이너 박스 절대 좌표
@@ -197,7 +203,11 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
         type: 'strokeMove',
         strokeId: stroke.id,
         pointIndex: 0,
-        originalPoints: stroke.points.map(p => ({ x: p.x, y: p.y })),
+        originalPoints: stroke.points.map(p => ({
+          x: p.x, y: p.y,
+          handleIn: p.handleIn ? { x: p.handleIn.x, y: p.handleIn.y } : undefined,
+          handleOut: p.handleOut ? { x: p.handleOut.x, y: p.handleOut.y } : undefined,
+        })),
         grabRelX,
         grabRelY,
         containerX: cX,
@@ -245,6 +255,19 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
       dragState.originalPoints.forEach((origPt, i) => {
         onPointChange(dragState.strokeId, i, 'x', origPt.x + deltaX)
         onPointChange(dragState.strokeId, i, 'y', origPt.y + deltaY)
+        // 곡률 유지: 핸들도 동일한 delta만큼 이동
+        if (origPt.handleIn) {
+          onPointChange(dragState.strokeId, i, 'handleIn', {
+            x: origPt.handleIn.x + deltaX,
+            y: origPt.handleIn.y + deltaY,
+          })
+        }
+        if (origPt.handleOut) {
+          onPointChange(dragState.strokeId, i, 'handleOut', {
+            x: origPt.handleOut.x + deltaX,
+            y: origPt.handleOut.y + deltaY,
+          })
+        }
       })
       return
     }
