@@ -925,19 +925,6 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
                 }
                 setIsPaddingDirty(true)
               }}
-            />
-          </div>
-
-          {/* 우측: 컨트롤러 */}
-          <div className="flex-1 shrink-0 overflow-y-auto">
-            <JamoControlsColumn
-              isJamoEditing={isJamoEditing}
-              editingJamoInfo={editingJamoInfo}
-              draftStrokes={draftStrokes}
-              editingBox={editingBox}
-              choseongStyleInfo={choseongStyleInfo}
-              onStrokeChange={handleStrokeChange}
-              onPointChange={handlePointChange}
               onMergeStrokes={handleMergeStrokes}
               onSplitStroke={handleSplitStroke}
               onToggleCurve={handleToggleCurve}
@@ -945,6 +932,15 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
               onDeletePoint={handleDeletePoint}
               onDeleteStroke={handleDeleteStroke}
               onAddStroke={handleAddStroke}
+            />
+          </div>
+
+          {/* 우측: 컨트롤러 (슬림) */}
+          <div className="w-[220px] shrink-0 overflow-y-auto">
+            <JamoControlsColumn
+              isJamoEditing={isJamoEditing}
+              editingJamoInfo={editingJamoInfo}
+              choseongStyleInfo={choseongStyleInfo}
               onApplyChoseongStyle={handleApplyChoseongStyle}
               onOverrideSwitch={handleOverrideSwitch}
             />

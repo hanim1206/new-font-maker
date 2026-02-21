@@ -49,6 +49,7 @@ export interface StrokeOverlayProps {
   onStrokeChange?: StrokeChangeHandler
   onPointChange?: PointChangeHandler
   onDragStart?: () => void // 드래그 시작 시 호출 (undo 스냅샷 저장용)
+  onDragEnd?: () => void   // 드래그 종료 시 호출 (팝업 재표시용)
   // 혼합중성 지원
   isMixed?: boolean
   juHBox?: BoxConfig
@@ -65,16 +66,7 @@ export interface StrokeOverlayProps {
   verticalPadding?: Padding
 }
 
-// 자모 패딩 적용
-function applyJamoPaddingToBox(bx: number, by: number, bw: number, bh: number, padding?: Padding): BoxConfig {
-  if (!padding) return { x: bx, y: by, width: bw, height: bh }
-  return {
-    x: bx + padding.left * bw,
-    y: by + padding.top * bh,
-    width: bw * (1 - padding.left - padding.right),
-    height: bh * (1 - padding.top - padding.bottom),
-  }
-}
+import { applyJamoPaddingToBox } from '../../utils/containerBoxUtils'
 
 /**
  * StrokeOverlay: 획 드래그/리사이즈 상호작용을 SVG `<g>` 프래그먼트로 제공
@@ -93,6 +85,7 @@ export function StrokeOverlay({
   onStrokeChange,
   onPointChange,
   onDragStart,
+  onDragEnd,
   isMixed = false,
   juHBox,
   juVBox,
@@ -315,7 +308,8 @@ export function StrokeOverlay({
     setDragState(null)
     setSnapFeedback(null)
     setMergeHintState(null)
-  }, [])
+    onDragEnd?.()
+  }, [onDragEnd])
 
   // 드래그 중 커서
   const getDragCursor = () => {

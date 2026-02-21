@@ -454,7 +454,6 @@ export function CharacterEditor() {
               <StrokeInspector
                 strokes={draftStrokes}
                 onChange={handleStrokeChange}
-                onPointChange={handlePointChange}
                 onMergeStrokes={handleMergeStrokes}
                 onSplitStroke={handleSplitStroke}
                 onToggleCurve={handleToggleCurve}

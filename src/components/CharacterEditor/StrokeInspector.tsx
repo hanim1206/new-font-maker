@@ -52,17 +52,9 @@ function minEndpointDistance(a: StrokeDataV2, b: StrokeDataV2): number {
   return min
 }
 
-type PointChangeHandler = (
-  strokeId: string,
-  pointIndex: number,
-  field: 'x' | 'y' | 'handleIn' | 'handleOut',
-  value: { x: number; y: number } | number
-) => void
-
 interface StrokeInspectorProps {
   strokes: StrokeDataV2[]
   onChange: (strokeId: string, prop: string, value: number | string | boolean | undefined) => void
-  onPointChange?: PointChangeHandler
   onMergeStrokes?: (strokeIdA: string, strokeIdB: string) => void
   onSplitStroke?: (strokeId: string, pointIndex: number) => void
   onToggleCurve?: (strokeId: string, pointIndex: number) => void
@@ -72,7 +64,7 @@ interface StrokeInspectorProps {
   onAddStroke?: () => void
 }
 
-export function StrokeInspector({ strokes, onChange, onPointChange, onMergeStrokes, onSplitStroke, onToggleCurve, onOpenAtPoint, onDeletePoint, onDeleteStroke, onAddStroke }: StrokeInspectorProps) {
+export function StrokeInspector({ strokes, onChange, onMergeStrokes, onSplitStroke, onToggleCurve, onOpenAtPoint, onDeletePoint, onDeleteStroke, onAddStroke }: StrokeInspectorProps) {
   const { selectedStrokeId, selectedPointIndex, setSelectedPointIndex, setSelectedStrokeId } = useUIStore()
   const selectedStroke = strokes.find((s) => s.id === selectedStrokeId)
 
@@ -100,8 +92,6 @@ export function StrokeInspector({ strokes, onChange, onPointChange, onMergeStrok
 
   const hasCurve = selectedPoint ? !!(selectedPoint.handleIn || selectedPoint.handleOut) : false
   const canSplit = selectedPointIndex !== null && selectedPointIndex > 0 && selectedPointIndex < selectedStroke.points.length - 1 && !selectedStroke.closed
-
-  const inputClass = 'p-2 bg-[#0f0f0f] border border-border-lighter rounded text-sm text-[#e5e5e5] font-mono transition-all duration-150 ease-in-out hover:border-[#444] focus:outline-none focus:border-primary focus:bg-surface-2'
 
   return (
     <div className="flex flex-col gap-3">
@@ -279,108 +269,6 @@ export function StrokeInspector({ strokes, onChange, onPointChange, onMergeStrok
         </div>
       )}
 
-      {/* 선택된 포인트 속성 */}
-      {selectedPoint && onPointChange && (
-        <div className="flex flex-col gap-2">
-          <h3 className="text-xs text-muted block mb-3">Point {selectedPointIndex}</h3>
-          <div className="flex flex-col gap-3 p-4 bg-surface-2 rounded-md border border-border">
-            <div className="flex flex-col gap-1">
-              <label className="text-[0.7rem] text-muted uppercase tracking-wider">Point X</label>
-              <input
-                type="number"
-                min="0"
-                max="1"
-                step="0.01"
-                value={selectedPoint.x.toFixed(4)}
-                onChange={(e) => onPointChange(selectedStroke.id, selectedPointIndex!, 'x', parseFloat(e.target.value) || 0)}
-                className={inputClass}
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[0.7rem] text-muted uppercase tracking-wider">Point Y</label>
-              <input
-                type="number"
-                min="0"
-                max="1"
-                step="0.01"
-                value={selectedPoint.y.toFixed(4)}
-                onChange={(e) => onPointChange(selectedStroke.id, selectedPointIndex!, 'y', parseFloat(e.target.value) || 0)}
-                className={inputClass}
-              />
-            </div>
-          </div>
-
-          {/* Handle In */}
-          {selectedPoint.handleIn && (
-            <div className="flex flex-col gap-1 p-2 bg-[#151515] rounded border border-border">
-              <span className="text-[0.7rem] text-muted uppercase">Handle In</span>
-              <div className="flex flex-col gap-3 p-4 bg-surface-2 rounded-md border border-border">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[0.7rem] text-muted uppercase tracking-wider">X</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={selectedPoint.handleIn.x.toFixed(4)}
-                    onChange={(e) => onPointChange(
-                      selectedStroke.id, selectedPointIndex!, 'handleIn',
-                      { x: parseFloat(e.target.value) || 0, y: selectedPoint.handleIn!.y }
-                    )}
-                    className={inputClass}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[0.7rem] text-muted uppercase tracking-wider">Y</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={selectedPoint.handleIn.y.toFixed(4)}
-                    onChange={(e) => onPointChange(
-                      selectedStroke.id, selectedPointIndex!, 'handleIn',
-                      { x: selectedPoint.handleIn!.x, y: parseFloat(e.target.value) || 0 }
-                    )}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Handle Out */}
-          {selectedPoint.handleOut && (
-            <div className="flex flex-col gap-1 p-2 bg-[#151515] rounded border border-border">
-              <span className="text-[0.7rem] text-muted uppercase">Handle Out</span>
-              <div className="flex flex-col gap-3 p-4 bg-surface-2 rounded-md border border-border">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[0.7rem] text-muted uppercase tracking-wider">X</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={selectedPoint.handleOut.x.toFixed(4)}
-                    onChange={(e) => onPointChange(
-                      selectedStroke.id, selectedPointIndex!, 'handleOut',
-                      { x: parseFloat(e.target.value) || 0, y: selectedPoint.handleOut!.y }
-                    )}
-                    className={inputClass}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[0.7rem] text-muted uppercase tracking-wider">Y</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={selectedPoint.handleOut.y.toFixed(4)}
-                    onChange={(e) => onPointChange(
-                      selectedStroke.id, selectedPointIndex!, 'handleOut',
-                      { x: selectedPoint.handleOut!.x, y: parseFloat(e.target.value) || 0 }
-                    )}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
