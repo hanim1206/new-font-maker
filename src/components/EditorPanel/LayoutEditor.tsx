@@ -5,10 +5,8 @@ import { useJamoStore } from '../../stores/jamoStore'
 import { useGlobalStyleStore } from '../../stores/globalStyleStore'
 import { useStrokeHistory } from '../../hooks/useStrokeHistory'
 import { useLayoutSchemaDraft } from '../../hooks/useLayoutSchemaDraft'
-import { LayoutCanvasColumn } from './LayoutCanvasColumn'
-import { JamoCanvasColumn } from './JamoCanvasColumn'
-import { JamoControlsColumn } from './JamoControlsColumn'
-import { Button } from '@/components/ui/button'
+import { LayoutEditorDesktop } from './LayoutEditorDesktop'
+import { LayoutEditorMobile } from './LayoutEditorMobile'
 import type { PartStyle } from '../../renderers/SvgRenderer'
 import { decomposeSyllableWithOverrides, getSampleSyllableForLayout } from '../../utils/hangulUtils'
 import { calculateBoxes } from '../../utils/layoutCalculator'
@@ -43,6 +41,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     setSelectedStrokeId,
     editingOverrideId,
     setSelectedLayoutType,
+    isMobile,
   } = useUIStore()
   const {
     getLayoutSchema,
@@ -832,121 +831,121 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   // 미리보기에 사용할 음절 (자모 편집 시 draft 반영, 아니면 testSyllable)
   const displaySyllable = editingSyllable || testSyllable
 
+  // 공통 캔버스 컬럼 props
+  const layoutCanvasProps = {
+    layoutType,
+    displaySyllable,
+    schemaWithPadding,
+    effectiveStyle,
+    computedBoxes,
+    schema: draftSchema,
+    effectivePadding: draftPadding,
+    hasPaddingOverride: isLayoutDirty || hasPaddingOverride(layoutType),
+    selectedPartInLayout,
+    editingPartInLayout,
+    editingJamoInfo,
+    previewLayoutType: isJamoEditing ? previewLayoutType : layoutType,
+    isLayoutDirty,
+    onLayoutSave: handleSave,
+    onLayoutReset: handleReset,
+    onDragStart: pushLayoutSnapshot,
+    onUndo: layoutUndo,
+    onRedo: layoutRedo,
+    canUndo: canLayoutUndo,
+    canRedo: canLayoutRedo,
+    onPartClick: handlePartClick,
+    onPartDoubleClick: handlePartDoubleClick,
+    onPartOverrideChange: handlePartOverrideChange,
+    onSplitChange: handleSplitChange,
+    onPaddingOverrideChange: handlePaddingOverrideChange,
+    onPreviewLayoutTypeChange: handlePreviewLayoutTypeChange,
+  } as const
+
+  const jamoCanvasProps = {
+    displaySyllable,
+    schemaWithPadding,
+    effectiveStyle,
+    partStyles,
+    isJamoEditing,
+    draftStrokes,
+    editingBox,
+    editingJamoInfo,
+    mixedJungseongData,
+    editingJamoPadding: draftJamoPadding,
+    editingHorizontalPadding: draftHorizontalPadding,
+    editingVerticalPadding: draftVerticalPadding,
+    isPaddingDirty,
+    selectedStrokeId,
+    globalStyleRaw,
+    onStrokeChange: handleStrokeChange,
+    onPointChange: handlePointChange,
+    onDragStart: pushSnapshot,
+    onJamoPaddingChange: (_type: 'choseong' | 'jungseong' | 'jongseong', _char: string, side: keyof import('../../types').Padding, val: number) => {
+      setDraftJamoPadding(prev => ({ ...(prev ?? { top: 0, bottom: 0, left: 0, right: 0 }), [side]: val }))
+      setIsPaddingDirty(true)
+    },
+    onMixedJamoPaddingChange: (_char: string, part: 'horizontal' | 'vertical', side: keyof import('../../types').Padding, val: number) => {
+      if (part === 'horizontal') {
+        setDraftHorizontalPadding(prev => ({ ...(prev ?? { top: 0, bottom: 0, left: 0, right: 0 }), [side]: val }))
+      } else {
+        setDraftVerticalPadding(prev => ({ ...(prev ?? { top: 0, bottom: 0, left: 0, right: 0 }), [side]: val }))
+      }
+      setIsPaddingDirty(true)
+    },
+    onMergeStrokes: handleMergeStrokes,
+    onSplitStroke: handleSplitStroke,
+    onToggleCurve: handleToggleCurve,
+    onOpenAtPoint: handleOpenAtPoint,
+    onDeletePoint: handleDeletePoint,
+    onDeleteStroke: handleDeleteStroke,
+    onAddStroke: handleAddStroke,
+  } as const
+
+  const jamoControlsProps = {
+    isJamoEditing,
+    editingJamoInfo,
+    choseongStyleInfo,
+    onApplyChoseongStyle: handleApplyChoseongStyle,
+    onOverrideSwitch: handleOverrideSwitch,
+  } as const
+
+  // 모바일: 단일 컬럼 레이아웃
+  if (isMobile) {
+    return (
+      <LayoutEditorMobile
+        layoutCanvasProps={layoutCanvasProps}
+        jamoCanvasProps={jamoCanvasProps}
+        jamoControlsProps={jamoControlsProps}
+        isJamoEditing={isJamoEditing}
+        editingJamoInfo={editingJamoInfo}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        isJamoDirty={isJamoDirty}
+        onPartDeselect={handlePartDeselect}
+        onJamoSave={handleJamoSave}
+        onJamoReset={handleJamoReset}
+        onUndo={undo}
+        onRedo={redo}
+      />
+    )
+  }
+
   // 3컬럼 데스크톱 레이아웃
   return (
-    <div className="h-full overflow-hidden flex gap-[10px]" onClick={handlePartDeselect}>
-      {/* 좌측: 레이아웃 캔버스 */}
-      <div className="flex-[1] min-w-0 overflow-y-auto border-r border-border-subtle">
-        <LayoutCanvasColumn
-          layoutType={layoutType}
-          displaySyllable={displaySyllable}
-          schemaWithPadding={schemaWithPadding}
-          effectiveStyle={effectiveStyle}
-          computedBoxes={computedBoxes}
-          schema={draftSchema}
-          effectivePadding={draftPadding}
-          hasPaddingOverride={isLayoutDirty || hasPaddingOverride(layoutType)}
-          selectedPartInLayout={selectedPartInLayout}
-          editingPartInLayout={editingPartInLayout}
-          editingJamoInfo={editingJamoInfo}
-          previewLayoutType={isJamoEditing ? previewLayoutType : layoutType}
-          isLayoutDirty={isLayoutDirty}
-          onLayoutSave={handleSave}
-          onLayoutReset={handleReset}
-          onDragStart={pushLayoutSnapshot}
-          onUndo={layoutUndo}
-          onRedo={layoutRedo}
-          canUndo={canLayoutUndo}
-          canRedo={canLayoutRedo}
-          onPartClick={handlePartClick}
-          onPartDoubleClick={handlePartDoubleClick}
-          onPartOverrideChange={handlePartOverrideChange}
-          onSplitChange={handleSplitChange}
-          onPaddingOverrideChange={handlePaddingOverrideChange}
-          onPreviewLayoutTypeChange={handlePreviewLayoutTypeChange}
-        />
-      </div>
-
-      {/* 중앙+우측: 자모 영역 (버튼 바가 2·3열 전체를 덮도록 묶음) */}
-      <div className="flex-[2] min-w-0 flex flex-col">
-        {/* 자모 편집 시 2·3열 공통 상단 버튼 바 */}
-        {isJamoEditing && editingJamoInfo && (
-          <div className="shrink-0 bg-surface-2 px-4 pt-3 pb-2 border-b border-border-subtle flex items-center gap-2">
-            <h3 className="text-sm font-medium text-text-dim-3 uppercase tracking-wider">
-              자모 편집 — {editingJamoInfo.char}
-            </h3>
-            <div className="flex-1" />
-            <Button variant="default" size="sm" onClick={undo} disabled={!canUndo} title="되돌리기 (Ctrl+Z)">
-              ↩
-            </Button>
-            <Button variant="default" size="sm" onClick={redo} disabled={!canRedo} title="다시 실행 (Ctrl+Y)">
-              ↪
-            </Button>
-            <Button variant="default" size="sm" onClick={handleJamoReset} disabled={!isJamoDirty}>
-              초기화
-            </Button>
-            <Button variant={isJamoDirty ? 'blue' : 'default'} size="sm" onClick={handleJamoSave}>
-              저장
-            </Button>
-          </div>
-        )}
-
-        <div className="flex-1 min-h-0 flex">
-          {/* 중앙: 자모 획 캔버스 */}
-          <div className="flex-1 min-w-0 overflow-y-auto border-r border-border-subtle">
-            <JamoCanvasColumn
-              displaySyllable={displaySyllable}
-              schemaWithPadding={schemaWithPadding}
-              effectiveStyle={effectiveStyle}
-              partStyles={partStyles}
-              isJamoEditing={isJamoEditing}
-              draftStrokes={draftStrokes}
-              editingBox={editingBox}
-              editingJamoInfo={editingJamoInfo}
-              mixedJungseongData={mixedJungseongData}
-              editingJamoPadding={draftJamoPadding}
-              editingHorizontalPadding={draftHorizontalPadding}
-              editingVerticalPadding={draftVerticalPadding}
-              isPaddingDirty={isPaddingDirty}
-              selectedStrokeId={selectedStrokeId}
-              globalStyleRaw={globalStyleRaw}
-              onStrokeChange={handleStrokeChange}
-              onPointChange={handlePointChange}
-              onDragStart={pushSnapshot}
-              onJamoPaddingChange={(_type, _char, side, val) => {
-                setDraftJamoPadding(prev => ({ ...(prev ?? { top: 0, bottom: 0, left: 0, right: 0 }), [side]: val }))
-                setIsPaddingDirty(true)
-              }}
-              onMixedJamoPaddingChange={(_char, part, side, val) => {
-                if (part === 'horizontal') {
-                  setDraftHorizontalPadding(prev => ({ ...(prev ?? { top: 0, bottom: 0, left: 0, right: 0 }), [side]: val }))
-                } else {
-                  setDraftVerticalPadding(prev => ({ ...(prev ?? { top: 0, bottom: 0, left: 0, right: 0 }), [side]: val }))
-                }
-                setIsPaddingDirty(true)
-              }}
-              onMergeStrokes={handleMergeStrokes}
-              onSplitStroke={handleSplitStroke}
-              onToggleCurve={handleToggleCurve}
-              onOpenAtPoint={handleOpenAtPoint}
-              onDeletePoint={handleDeletePoint}
-              onDeleteStroke={handleDeleteStroke}
-              onAddStroke={handleAddStroke}
-            />
-          </div>
-
-          {/* 우측: 컨트롤러 (슬림) */}
-          <div className="w-[220px] shrink-0 overflow-y-auto">
-            <JamoControlsColumn
-              isJamoEditing={isJamoEditing}
-              editingJamoInfo={editingJamoInfo}
-              choseongStyleInfo={choseongStyleInfo}
-              onApplyChoseongStyle={handleApplyChoseongStyle}
-              onOverrideSwitch={handleOverrideSwitch}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
+    <LayoutEditorDesktop
+      layoutCanvasProps={layoutCanvasProps}
+      jamoCanvasProps={jamoCanvasProps}
+      jamoControlsProps={jamoControlsProps}
+      isJamoEditing={isJamoEditing}
+      editingJamoInfo={editingJamoInfo}
+      canUndo={canUndo}
+      canRedo={canRedo}
+      isJamoDirty={isJamoDirty}
+      onPartDeselect={handlePartDeselect}
+      onJamoSave={handleJamoSave}
+      onJamoReset={handleJamoReset}
+      onUndo={undo}
+      onRedo={redo}
+    />
   )
 }

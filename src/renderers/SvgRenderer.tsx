@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useId, type ReactNode } from 'react'
 import type { DecomposedSyllable, BoxConfig, Part, StrokeDataV2, LayoutType, LayoutSchema, Padding } from '../types'
 import { calculateBoxes } from '../utils/layoutCalculator'
 import { pointsToSvgD } from '../utils/pathUtils'
@@ -32,10 +32,15 @@ interface SvgRendererProps {
   children?: ReactNode
   // SVG overflow 제어 (기본: 'visible')
   overflow?: 'visible' | 'hidden'
+  // 글리프를 viewBox 영역 내로 클리핑 (overflow와 독립적으로 설정 가능)
+  // 기본: overflow='hidden'이면 true
+  clipGlyphs?: boolean
   // path에 CSS transition 적용 여부 (기본: false)
   enableTransition?: boolean
   // SVG ref 전달
   svgRef?: React.RefObject<SVGSVGElement | null>
+  // 추가 className (반응형 크기 조절 등)
+  className?: string
 }
 
 // SVG viewBox 기준 크기
@@ -85,10 +90,17 @@ export function SvgRenderer({
   globalStyle,
   partStyles,
   overflow = 'visible',
+  clipGlyphs,
   enableTransition = false,
   children,
   svgRef,
+  className,
 }: SvgRendererProps) {
+  // 글리프 클리핑 여부 (명시적 prop 우선, 없으면 overflow='hidden'과 동일)
+  const shouldClipGlyphs = clipGlyphs ?? (overflow === 'hidden')
+  const clipRawId = useId()
+  const clipId = `glyph-clip${clipRawId.replace(/:/g, '')}`
+
   // schema가 있으면 calculateBoxes 사용, 없으면 boxes prop 사용
   const boxes = useMemo(() => {
     if (schema) {
@@ -275,7 +287,8 @@ export function SvgRenderer({
       width={size}
       height={svgHeight}
       viewBox={`0 0 ${VIEW_BOX_SIZE} ${visualHeight}`}
-      style={{ backgroundColor, overflow: 'visible' }}
+      className={className}
+      style={{ backgroundColor, overflow, touchAction: 'none' }}
     >
       {/* 디버그 박스 - 실제 사용되는 박스만 표시 */}
       {showDebugBoxes &&
@@ -283,10 +296,10 @@ export function SvgRenderer({
           box ? renderDebugBox(box, color, part) : null
         )}
 
-      {/* 글리프 클리핑용 (overflow='hidden' 시 viewBox 영역 내로 제한) */}
-      {overflow === 'hidden' && (
+      {/* 글리프 클리핑용 (clipGlyphs 또는 overflow='hidden' 시 viewBox 영역 내로 제한) */}
+      {shouldClipGlyphs && (
         <defs>
-          <clipPath id="glyph-clip">
+          <clipPath id={clipId}>
             <rect x={0} y={0} width={VIEW_BOX_SIZE} height={visualHeight} />
           </clipPath>
         </defs>
@@ -294,8 +307,8 @@ export function SvgRenderer({
 
       {/* 글자 전체에 slant 적용 */}
       <g transform={slantTransform}>
-        {/* 글리프 렌더링 — overflow='hidden'이면 clipPath로 제한 */}
-        <g clipPath={overflow === 'hidden' ? 'url(#glyph-clip)' : undefined}>
+        {/* 글리프 렌더링 — clipGlyphs이면 clipPath로 제한 */}
+        <g clipPath={shouldClipGlyphs ? `url(#${clipId})` : undefined}>
           {renderOrder.map((part) => renderPart(part))}
         </g>
         {/* 추가 오버레이 (StrokeOverlay 등) — 클리핑 밖에서 렌더 */}

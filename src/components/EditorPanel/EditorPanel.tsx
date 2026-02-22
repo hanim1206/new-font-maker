@@ -157,8 +157,8 @@ export function EditorPanel() {
         </div>
       )}
 
-      {/* 글로벌 스타일 퀵 컨트롤 (항상 표시) */}
-      <GlobalQuickControls />
+      {/* 글로벌 스타일 퀵 컨트롤 (데스크톱만 — 모바일은 인스펙터 드로어에서 표시) */}
+      {!isMobile && <GlobalQuickControls />}
 
       {/* 브레드크럼 네비게이션 */}
       <EditorBreadcrumb />

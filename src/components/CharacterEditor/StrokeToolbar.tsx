@@ -4,13 +4,13 @@ import { MERGE_PROXIMITY } from '../../utils/snapUtils'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
+import { Separator } from '@/components/ui/separator'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { SliderMark } from '@/components/ui/slider'
 import { weightToMultiplier } from '../../stores/globalStyleStore'
 
-/** 기본 획 두께 (baseJamos.json 기본값) */
 const BASE_THICKNESS = 0.07
 
-/** thickness → weight(100~900) 변환 */
 function thicknessToWeight(thickness: number): number {
   const multiplier = thickness / BASE_THICKNESS
   if (multiplier <= 1.0) {
@@ -19,7 +19,6 @@ function thicknessToWeight(thickness: number): number {
   return 400 + ((multiplier - 1.0) / 1.2) * 500
 }
 
-/** weight(100~900) → thickness 변환 */
 function weightToThickness(weight: number): number {
   return weightToMultiplier(weight) * BASE_THICKNESS
 }
@@ -36,7 +35,6 @@ const WEIGHT_MARKS: SliderMark[] = [
   { value: 900, label: '900' },
 ]
 
-/** 두 획의 가장 가까운 끝점 간 거리 */
 function minEndpointDistance(a: StrokeDataV2, b: StrokeDataV2): number {
   const aEnds = [a.points[0], a.points[a.points.length - 1]]
   const bEnds = [b.points[0], b.points[b.points.length - 1]]
@@ -50,6 +48,13 @@ function minEndpointDistance(a: StrokeDataV2, b: StrokeDataV2): number {
   return min
 }
 
+const LINECAP_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'default', label: '기본' },
+  { value: 'round', label: '둥근' },
+  { value: 'butt', label: '평평' },
+  { value: 'square', label: '사각' },
+]
+
 interface StrokeToolbarProps {
   strokes: StrokeDataV2[]
   onChange: (strokeId: string, prop: string, value: number | string | boolean | undefined) => void
@@ -58,14 +63,12 @@ interface StrokeToolbarProps {
   onAddStroke?: () => void
 }
 
-/** 캔버스 하단 인라인 툴바: 두께, Linecap, 포인트 목록, 획 액션 */
 export function StrokeToolbar({ strokes, onChange, onMergeStrokes, onDeleteStroke, onAddStroke }: StrokeToolbarProps) {
   const { selectedStrokeId, selectedPointIndex, setSelectedPointIndex, setSelectedStrokeId } = useUIStore()
   const selectedStroke = strokes.find((s) => s.id === selectedStrokeId)
 
   if (!selectedStroke) return null
 
-  // 합치기 대상 후보
   const mergeTargets = selectedStroke && !selectedStroke.closed
     ? strokes
         .filter(s => s.id !== selectedStrokeId && !s.closed)
@@ -74,9 +77,11 @@ export function StrokeToolbar({ strokes, onChange, onMergeStrokes, onDeleteStrok
         .sort((a, b) => a.dist - b.dist)
     : []
 
+  const currentLinecap = selectedStroke.linecap ?? 'default'
+
   return (
     <div className="flex flex-col gap-2 p-3 bg-surface-2 border-b border-border-subtle">
-      {/* 두께 + Linecap 한 줄 */}
+      {/* 두께 */}
       <div className="flex items-center gap-3">
         <label className="text-[0.65rem] text-muted uppercase tracking-wider shrink-0">두께</label>
         <div className="flex-1 min-w-0">
@@ -98,31 +103,30 @@ export function StrokeToolbar({ strokes, onChange, onMergeStrokes, onDeleteStrok
       {/* Linecap */}
       <div className="flex items-center gap-2">
         <label className="text-[0.65rem] text-muted uppercase tracking-wider shrink-0">끝</label>
-        <div className="flex gap-1 flex-1">
-          {([
-            { value: undefined as StrokeLinecap | undefined, label: '기본' },
-            { value: 'round' as StrokeLinecap, label: '둥근' },
-            { value: 'butt' as StrokeLinecap, label: '평평' },
-            { value: 'square' as StrokeLinecap, label: '사각' },
-          ]).map(({ value, label }) => {
-            const isActive = selectedStroke.linecap === value
-            return (
-              <button
-                key={label}
-                className={cn(
-                  'flex-1 py-1 px-1.5 rounded border text-[0.65rem] transition-colors',
-                  isActive
-                    ? 'border-accent-cyan bg-accent-cyan/10 text-accent-cyan font-semibold'
-                    : 'border-border-lighter text-text-dim-4 hover:border-[#444]'
-                )}
-                onClick={() => onChange(selectedStroke.id, 'linecap', value)}
-              >
-                {label}
-              </button>
-            )
-          })}
-        </div>
+        <ToggleGroup
+          type="single"
+          value={currentLinecap}
+          onValueChange={(val) => {
+            if (!val) return
+            onChange(selectedStroke.id, 'linecap', val === 'default' ? undefined : val as StrokeLinecap)
+          }}
+          className="flex-1"
+        >
+          {LINECAP_OPTIONS.map(({ value, label }) => (
+            <ToggleGroupItem
+              key={value}
+              value={value}
+              variant="outline"
+              size="sm"
+              className="flex-1 text-[0.65rem]"
+            >
+              {label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
       </div>
+
+      <Separator />
 
       {/* 포인트 목록 + 획 액션 */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -145,7 +149,6 @@ export function StrokeToolbar({ strokes, onChange, onMergeStrokes, onDeleteStrok
         </div>
 
         <div className="flex gap-1 ml-auto">
-          {/* 합치기 */}
           {onMergeStrokes && mergeTargets.length > 0 && (
             mergeTargets.map(({ stroke: target }) => (
               <Button

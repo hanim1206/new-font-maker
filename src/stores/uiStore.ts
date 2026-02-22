@@ -3,6 +3,8 @@ import { immer } from 'zustand/middleware/immer'
 import type { ViewMode, LayoutType, Part } from '../types'
 
 interface UIState {
+  // 현재 페이지 (에디터 또는 프로젝트 목록)
+  currentPage: 'editor' | 'projects'
   // 현재 뷰 모드 (모바일에서 탭 전환용)
   viewMode: ViewMode
   // 입력된 텍스트
@@ -39,9 +41,17 @@ interface UIState {
   currentProjectId: string | null
   // 현재 불러온 프로젝트 이름
   currentProjectName: string | null
+
+  // === 모바일 드로어 상태 ===
+  activeMobileDrawer: 'control' | 'inspector' | 'preview' | null
+
+  // === 캔버스 줌/패닝 상태 ===
+  canvasZoom: number
+  canvasPan: { x: number; y: number }
 }
 
 interface UIActions {
+  setCurrentPage: (page: 'editor' | 'projects') => void
   setViewMode: (mode: ViewMode) => void
   setInputText: (text: string) => void
   setSelectedCharIndex: (index: number) => void
@@ -59,11 +69,21 @@ interface UIActions {
   setEditingOverrideId: (id: string | null) => void
   setEditingLayoutOverrideId: (id: string | null) => void
   setCurrentProject: (id: string | null, name: string | null) => void
+
+  // === 모바일 드로어 액션 ===
+  setActiveMobileDrawer: (drawer: 'control' | 'inspector' | 'preview' | null) => void
+  toggleMobileDrawer: (drawer: 'control' | 'inspector' | 'preview') => void
+
+  // === 캔버스 줌/패닝 액션 ===
+  setCanvasZoom: (zoom: number) => void
+  setCanvasPan: (pan: { x: number; y: number }) => void
+  resetCanvasView: () => void
 }
 
 export const useUIStore = create<UIState & UIActions>()(
   immer((set) => ({
     // 초기 상태
+    currentPage: 'editor',
     viewMode: 'preview',
     inputText: '',
     selectedCharIndex: 0,
@@ -84,7 +104,19 @@ export const useUIStore = create<UIState & UIActions>()(
     currentProjectId: null,
     currentProjectName: null,
 
+    // 모바일 드로어
+    activeMobileDrawer: null,
+
+    // 캔버스 줌/패닝
+    canvasZoom: 1,
+    canvasPan: { x: 0, y: 0 },
+
     // 액션
+    setCurrentPage: (page) =>
+      set((state) => {
+        state.currentPage = page
+      }),
+
     setViewMode: (mode) =>
       set((state) => {
         state.viewMode = mode
@@ -176,6 +208,31 @@ export const useUIStore = create<UIState & UIActions>()(
       set((state) => {
         state.currentProjectId = id
         state.currentProjectName = name
+      }),
+
+    // 모바일 드로어
+    setActiveMobileDrawer: (drawer) =>
+      set((state) => {
+        state.activeMobileDrawer = drawer
+      }),
+    toggleMobileDrawer: (drawer) =>
+      set((state) => {
+        state.activeMobileDrawer = state.activeMobileDrawer === drawer ? null : drawer
+      }),
+
+    // 캔버스 줌/패닝
+    setCanvasZoom: (zoom) =>
+      set((state) => {
+        state.canvasZoom = Math.max(0.5, Math.min(5, zoom))
+      }),
+    setCanvasPan: (pan) =>
+      set((state) => {
+        state.canvasPan = pan
+      }),
+    resetCanvasView: () =>
+      set((state) => {
+        state.canvasZoom = 1
+        state.canvasPan = { x: 0, y: 0 }
       }),
   }))
 )

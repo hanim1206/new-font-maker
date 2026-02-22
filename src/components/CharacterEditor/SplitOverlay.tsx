@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { useDeviceCapability } from '../../hooks/useDeviceCapability'
 import type { Split } from '../../types'
 
 // === 타입 정의 ===
@@ -48,8 +49,10 @@ export function SplitOverlay({
   onDragStart,
   onDragEnd,
 }: SplitOverlayProps) {
+  const { isTouch } = useDeviceCapability()
   const [dragState, setDragState] = useState<DragState | null>(null)
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const touchHitRadius = isTouch ? 12 : 6
 
   // 외부에 드래그 상태 전파
   const prevDragRef = useRef(false)
@@ -170,7 +173,7 @@ export function SplitOverlay({
 
     const cursor = split.axis === 'x' ? 'ew-resize' : 'ns-resize'
     const handleS = isActive ? HANDLE_SIZE + 1 : isHovered ? HANDLE_SIZE + 0.5 : HANDLE_SIZE
-    const hitR = 6 // 히트 영역
+    const hitR = touchHitRadius // 히트 영역 (터치: 12, 마우스: 6)
 
     return (
       <g key={index}>
@@ -223,6 +226,8 @@ export function SplitOverlay({
             cy={handleY}
             r={hitR}
             fill="transparent"
+            role="button"
+            aria-label={`분할선 ${index + 1} (${split.axis === 'x' ? '수직' : '수평'})`}
             style={{ cursor: disabled ? 'default' : cursor }}
             onMouseEnter={() => !disabled && setHoveredIndex(index)}
             onMouseLeave={() => setHoveredIndex(null)}

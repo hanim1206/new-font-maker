@@ -100,6 +100,18 @@ export default {
         '2xl': '1.3rem',
         '3xl': '1.5rem',
       },
+      spacing: {
+        'safe-t': 'env(safe-area-inset-top)',
+        'safe-b': 'env(safe-area-inset-bottom)',
+        'safe-l': 'env(safe-area-inset-left)',
+        'safe-r': 'env(safe-area-inset-right)',
+      },
+      minWidth: {
+        'touch': '44px',
+      },
+      minHeight: {
+        'touch': '44px',
+      },
       keyframes: {
         'pulse-dot': {
           '0%, 100%': { opacity: '1', transform: 'scale(1)' },
@@ -110,12 +122,22 @@ export default {
           '60%': { opacity: '1', transform: 'scale(1.05)' },
           '100%': { opacity: '1', transform: 'scale(1)' },
         },
+        'accordion-down': {
+          from: { height: '0' },
+          to: { height: 'var(--radix-accordion-content-height)' },
+        },
+        'accordion-up': {
+          from: { height: 'var(--radix-accordion-content-height)' },
+          to: { height: '0' },
+        },
       },
       animation: {
         'pulse-dot': 'pulse-dot 1.5s ease-in-out infinite',
         'glyph-fade-in': 'glyph-fade-in 1.2s cubic-bezier(0.22, 1, 0.36, 1)',
+        'accordion-down': 'accordion-down 0.2s ease-out',
+        'accordion-up': 'accordion-up 0.2s ease-out',
       },
     },
   },
-  plugins: [],
+  plugins: [require('tailwindcss-animate')],
 }

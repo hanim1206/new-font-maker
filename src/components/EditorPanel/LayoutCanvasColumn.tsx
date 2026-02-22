@@ -1,10 +1,13 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { PaddingOverlay } from '../CharacterEditor/PaddingOverlay'
 import { SplitOverlay } from '../CharacterEditor/SplitOverlay'
 import { LayoutContextThumbnails } from '../CharacterEditor/LayoutContextThumbnails'
 import { Button } from '@/components/ui/button'
 import { BASE_PRESETS_SCHEMAS } from '../../utils/layoutCalculator'
+import { useUIStore } from '../../stores/uiStore'
+import { useDeviceCapability } from '../../hooks/useDeviceCapability'
+import { usePinchZoom } from '../../hooks/usePinchZoom'
 import type { DecomposedSyllable, BoxConfig, LayoutSchema, Part, Padding, LayoutType, PartOverride } from '../../types'
 import type { GlobalStyle } from '../../stores/globalStyleStore'
 
@@ -16,6 +19,34 @@ const MAX_PADDING = 0.3
 // 핸들이 캔버스 바깥에 위치하는 오프셋 (px)
 const HANDLE_MARGIN = 14
 const HANDLE_RADIUS = 5
+// 파트 버튼 가장자리 근접 감지 임계값 (px) — 이 범위 내 터치 시 즉시 오프셋 드래그 시작
+const EDGE_DRAG_THRESHOLD = 14
+
+// 포인터 위치가 버튼의 어느 가장자리에 가까운지 감지
+function detectNearEdge(
+  clientX: number,
+  clientY: number,
+  buttonRect: DOMRect,
+  threshold: number
+): PaddingSide | null {
+  const relX = clientX - buttonRect.left
+  const relY = clientY - buttonRect.top
+  const w = buttonRect.width
+  const h = buttonRect.height
+
+  const distTop = relY
+  const distBottom = h - relY
+  const distLeft = relX
+  const distRight = w - relX
+
+  const minDist = Math.min(distTop, distBottom, distLeft, distRight)
+  if (minDist > threshold) return null
+
+  if (minDist === distTop) return 'top'
+  if (minDist === distBottom) return 'bottom'
+  if (minDist === distLeft) return 'left'
+  return 'right'
+}
 
 interface LayoutCanvasColumnProps {
   layoutType: LayoutType
@@ -85,7 +116,24 @@ export function LayoutCanvasColumn({
   onPreviewLayoutTypeChange,
 }: LayoutCanvasColumnProps) {
   const svgRef = useRef<SVGSVGElement>(null)
-  const previewSize = 200
+  const canvasContainerRef = useRef<HTMLDivElement>(null)
+  const [canvasSize, setCanvasSize] = useState(200)
+
+  const { canvasZoom, canvasPan, resetCanvasView, isMobile } = useUIStore()
+
+  // ResizeObserver: 캔버스 래퍼 너비 기준으로 정사각형 캔버스 크기 동적 계산
+  useEffect(() => {
+    if (!canvasContainerRef.current) return
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const { width } = entry.contentRect
+        const base = Math.max(150, Math.floor(width - HANDLE_MARGIN * 2))
+        setCanvasSize(isMobile ? Math.floor(base * 0.8) : base)
+      }
+    })
+    observer.observe(canvasContainerRef.current)
+    return () => observer.disconnect()
+  }, [isMobile])
 
   // 오버레이 드래그 중 여부 (드래그 중 파트 버튼 pointer-events 차단)
   const [isDragging, setIsDragging] = useState(false)
@@ -93,6 +141,13 @@ export function LayoutCanvasColumn({
   const [hoveredSide, setHoveredSide] = useState<PaddingSide | null>(null)
   const handleDragStart = useCallback(() => { onLayoutDragStart(); setIsDragging(true) }, [onLayoutDragStart])
   const handleDragEnd = useCallback(() => setIsDragging(false), [])
+  const { isTouch } = useDeviceCapability()
+  usePinchZoom(svgRef, { enabled: false })
+
+  // 레이아웃 타입 변경 시 줌/패닝 초기화
+  useEffect(() => {
+    resetCanvasView()
+  }, [layoutType]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ref로 최신 콜백 참조 (드래그 중 클로저 캡처 문제 방지)
   const onPartOverrideChangeRef = useRef(onPartOverrideChange)
@@ -116,34 +171,27 @@ export function LayoutCanvasColumn({
     }
   })()
 
-  // === HTML 기반 파트 오프셋 드래그 핸들러 ===
-  // mousedown → startVal/rect 캡처 → window 이벤트 (React state 없이 드래그)
-  const handlePartEdgeMouseDown = useCallback(
-    (side: PaddingSide, e: React.MouseEvent) => {
-      if (!selectedPartInLayout) return
-      e.preventDefault()
-      e.stopPropagation()
+  // === HTML 기반 파트 오프셋 드래그 핸들러 (마우스 + 터치 공통) ===
+  const startPartEdgeDrag = useCallback(
+    (side: PaddingSide, startX: number, startY: number, overridePart?: Part) => {
+      const part = overridePart ?? selectedPartInLayout
+      if (!part) return
       onLayoutDragStart()
 
-      const startX = e.clientX
-      const startY = e.clientY
-      const currentPadding = schema.partOverrides?.[selectedPartInLayout] ?? { top: 0, bottom: 0, left: 0, right: 0 }
+      const currentPadding = schema.partOverrides?.[part] ?? { top: 0, bottom: 0, left: 0, right: 0 }
       const startVal = currentPadding[side]
-      const part = selectedPartInLayout
 
-      // partOverrides는 0-1 정규화 좌표에 직접 가산되므로
-      // 드래그 계산은 전체 캔버스 크기 기준으로 해야 함
       if (!computedBoxes[part]) return
       const isHorizontal = side === 'top' || side === 'bottom'
-      const size = previewSize
+      const size = canvasSize
 
       setIsDragging(true)
       setDraggingSide(side)
 
-      const handleMove = (me: MouseEvent) => {
+      const applyMove = (clientX: number, clientY: number) => {
         const deltaPixel = isHorizontal
-          ? (side === 'top' ? me.clientY - startY : startY - me.clientY)
-          : (side === 'left' ? me.clientX - startX : startX - me.clientX)
+          ? (side === 'top' ? clientY - startY : startY - clientY)
+          : (side === 'left' ? clientX - startX : startX - clientX)
 
         let raw = startVal + deltaPixel / size
 
@@ -157,36 +205,67 @@ export function LayoutCanvasColumn({
 
         // 클램프
         raw = Math.max(-MAX_PADDING, Math.min(MAX_PADDING, raw))
-
         onPartOverrideChangeRef.current(part, side, raw)
+      }
+
+      const onMouseMove = (me: MouseEvent) => applyMove(me.clientX, me.clientY)
+      const onTouchMove = (te: TouchEvent) => {
+        if (te.touches.length > 0) {
+          te.preventDefault()
+          applyMove(te.touches[0].clientX, te.touches[0].clientY)
+        }
       }
 
       const handleUp = () => {
         setIsDragging(false)
         setDraggingSide(null)
-        window.removeEventListener('mousemove', handleMove)
+        window.removeEventListener('mousemove', onMouseMove)
         window.removeEventListener('mouseup', handleUp)
+        window.removeEventListener('touchmove', onTouchMove)
+        window.removeEventListener('touchend', handleUp)
       }
 
-      window.addEventListener('mousemove', handleMove)
+      window.addEventListener('mousemove', onMouseMove)
       window.addEventListener('mouseup', handleUp)
+      window.addEventListener('touchmove', onTouchMove, { passive: false })
+      window.addEventListener('touchend', handleUp)
     },
-    [selectedPartInLayout, schema.partOverrides, computedBoxes, previewSize, onLayoutDragStart]
+    [selectedPartInLayout, schema.partOverrides, computedBoxes, canvasSize, onLayoutDragStart]
+  )
+
+  const handlePartEdgeMouseDown = useCallback(
+    (side: PaddingSide, e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      startPartEdgeDrag(side, e.clientX, e.clientY)
+    },
+    [startPartEdgeDrag]
+  )
+
+  const handlePartEdgeTouchStart = useCallback(
+    (side: PaddingSide, e: React.TouchEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.touches.length > 0) {
+        startPartEdgeDrag(side, e.touches[0].clientX, e.touches[0].clientY)
+      }
+    },
+    [startPartEdgeDrag]
   )
 
   // 경계선의 캔버스 내 위치 (px) — 원본 박스 기준
-  // partOverrides는 0-1 정규화 좌표에 직접 가산되므로 val * previewSize (캔버스 절대)
+  // partOverrides는 0-1 정규화 좌표에 직접 가산되므로 val * canvasSize (캔버스 절대)
   const getEdgePx = (side: PaddingSide, origBox: BoxConfig) => {
     const p = selectedPartPadding ?? { top: 0, bottom: 0, left: 0, right: 0 }
     const val = p[side]
-    if (side === 'top') return origBox.y * previewSize + val * previewSize
-    if (side === 'bottom') return (origBox.y + origBox.height) * previewSize - val * previewSize
-    if (side === 'left') return origBox.x * previewSize + val * previewSize
-    /* right */ return (origBox.x + origBox.width) * previewSize - val * previewSize
+    if (side === 'top') return origBox.y * canvasSize + val * canvasSize
+    if (side === 'bottom') return (origBox.y + origBox.height) * canvasSize - val * canvasSize
+    if (side === 'left') return origBox.x * canvasSize + val * canvasSize
+    /* right */ return (origBox.x + origBox.width) * canvasSize - val * canvasSize
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className={isTouch ? 'h-full overflow-hidden' : 'h-full overflow-y-auto'}>
       {/* undo/redo + 저장/초기화 — 상단 고정 */}
       <div className="sticky top-0 z-10 bg-surface-2 px-4 pt-3 pb-2 border-b border-border-subtle">
         <div className="flex items-center gap-2">
@@ -213,13 +292,16 @@ export function LayoutCanvasColumn({
 
       {/* 캔버스 — 핸들 공간 확보를 위한 외부 여백 */}
       {/* 캔버스 래퍼 내부 클릭은 상위 deselect로 전파되지 않도록 차단 */}
-      <div className="flex justify-center p-3 bg-background rounded mb-2" onClick={(e) => e.stopPropagation()}>
+      <div ref={canvasContainerRef} className="flex justify-center p-3 bg-background rounded mb-2" onClick={(e) => e.stopPropagation()}>
         <div
           className="relative"
           style={{
             // 핸들 공간을 항상 확보하여 모드 전환 시 레이아웃 시프트 방지
-            width: previewSize + HANDLE_MARGIN * 2,
-            height: previewSize + HANDLE_MARGIN * 2,
+            width: canvasSize + HANDLE_MARGIN * 2,
+            height: canvasSize + HANDLE_MARGIN * 2,
+            transform: isTouch ? `translate(${canvasPan.x}px, ${canvasPan.y}px) scale(${canvasZoom})` : undefined,
+            transformOrigin: 'center center',
+            willChange: isTouch ? 'transform' : undefined,
           }}
         >
           {/* 캔버스 본체 (핸들 여백 안쪽) */}
@@ -230,8 +312,8 @@ export function LayoutCanvasColumn({
             style={{
               left: HANDLE_MARGIN,
               top: HANDLE_MARGIN,
-              width: previewSize,
-              height: previewSize,
+              width: canvasSize,
+              height: canvasSize,
               backgroundColor: '#1a1a1a',
             }}
             onClick={(e) => {
@@ -241,8 +323,8 @@ export function LayoutCanvasColumn({
             {/* 0.025 스냅 그리드 */}
             <svg
               className="absolute inset-0 pointer-events-none z-0"
-              width={previewSize}
-              height={previewSize}
+              width={canvasSize}
+              height={canvasSize}
               viewBox="0 0 100 100"
             >
               {Array.from({ length: 39 }, (_, i) => {
@@ -269,15 +351,15 @@ export function LayoutCanvasColumn({
               svgRef={svgRef}
               syllable={displaySyllable}
               schema={schemaWithPadding}
-              size={previewSize}
+              size={canvasSize}
               fillColor="#e5e5e5"
               backgroundColor="transparent"
               showDebugBoxes
-              overflow="hidden"
+              clipGlyphs
               globalStyle={effectiveStyle}
             >
-              {/* Split/Padding 오버레이 (파트 선택 시 비활성화) */}
-              {!selectedPartInLayout && schema.splits && schema.splits.length > 0 && (
+              {/* Split/Padding 오버레이 — 항상 표시, 파트 선택 시 비활성 */}
+              {schema.splits && schema.splits.length > 0 && (
                 <SplitOverlay
                   svgRef={svgRef}
                   viewBoxSize={100}
@@ -286,21 +368,21 @@ export function LayoutCanvasColumn({
                   originValues={BASE_PRESETS_SCHEMAS[layoutType]?.splits?.map(s => s.value)}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
+                  disabled={!!selectedPartInLayout}
                 />
               )}
-              {!selectedPartInLayout && (
-                <PaddingOverlay
-                  svgRef={svgRef}
-                  viewBoxSize={100}
-                  padding={effectivePadding}
-                  containerBox={{ x: 0, y: 0, width: 1, height: 1 }}
-                  onPaddingChange={onPaddingOverrideChange}
-                  color={hasPaddingOverride ? '#ff9500' : '#a855f7'}
-                  snapStep={0.005}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                />
-              )}
+              <PaddingOverlay
+                svgRef={svgRef}
+                viewBoxSize={100}
+                padding={effectivePadding}
+                containerBox={{ x: 0, y: 0, width: 1, height: 1 }}
+                onPaddingChange={onPaddingOverrideChange}
+                color={hasPaddingOverride ? '#ff9500' : '#a855f7'}
+                snapStep={0.005}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                disabled={!!selectedPartInLayout}
+              />
             </SvgRenderer>
 
             {/* 파트 클릭 오버레이 (HTML 버튼) */}
@@ -329,6 +411,27 @@ export function LayoutCanvasColumn({
                         : (selectedPartInLayout && selectedPartInLayout !== part) ? 'none'
                         : undefined,
                     }}
+                    onMouseDown={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect()
+                      const nearSide = detectNearEdge(e.clientX, e.clientY, rect, EDGE_DRAG_THRESHOLD)
+                      if (nearSide) {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        onPartClick(part)
+                        startPartEdgeDrag(nearSide, e.clientX, e.clientY, part)
+                      }
+                    }}
+                    onTouchStart={(e) => {
+                      if (e.touches.length === 0) return
+                      const rect = e.currentTarget.getBoundingClientRect()
+                      const nearSide = detectNearEdge(e.touches[0].clientX, e.touches[0].clientY, rect, EDGE_DRAG_THRESHOLD)
+                      if (nearSide) {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        onPartClick(part)
+                        startPartEdgeDrag(nearSide, e.touches[0].clientX, e.touches[0].clientY, part)
+                      }
+                    }}
                     onClick={(e) => {
                       e.stopPropagation()
                       // 이미 선택된 파트를 싱글클릭하면 아무 동작 없음 (더블클릭 대기)
@@ -356,10 +459,10 @@ export function LayoutCanvasColumn({
             {selectedPartInLayout && originalPartBox && (() => {
               const p = selectedPartPadding ?? { top: 0, bottom: 0, left: 0, right: 0 }
               const ob = originalPartBox // 원본 박스 (override 전)
-              const obxPx = ob.x * previewSize
-              const obyPx = ob.y * previewSize
-              const obwPx = ob.width * previewSize
-              const obhPx = ob.height * previewSize
+              const obxPx = ob.x * canvasSize
+              const obyPx = ob.y * canvasSize
+              const obwPx = ob.width * canvasSize
+              const obhPx = ob.height * canvasSize
 
               const sides: PaddingSide[] = ['top', 'bottom', 'left', 'right']
               const hasAny = p.top !== 0 || p.bottom !== 0 || p.left !== 0 || p.right !== 0
@@ -373,11 +476,11 @@ export function LayoutCanvasColumn({
                   {/* 양수: 안쪽 축소 / 음수: 바깥 확장 — 모두 올바르게 처리 */}
                   {hasAny && (() => {
                     // 각 면의 경계선 위치 (px)
-                    // partOverrides는 0-1 캔버스 절대 좌표이므로 val * previewSize
-                    const edgeTop = obyPx + p.top * previewSize
-                    const edgeBottom = obyPx + obhPx - p.bottom * previewSize
-                    const edgeLeft = obxPx + p.left * previewSize
-                    const edgeRight = obxPx + obwPx - p.right * previewSize
+                    // partOverrides는 0-1 캔버스 절대 좌표이므로 val * canvasSize
+                    const edgeTop = obyPx + p.top * canvasSize
+                    const edgeBottom = obyPx + obhPx - p.bottom * canvasSize
+                    const edgeLeft = obxPx + p.left * canvasSize
+                    const edgeRight = obxPx + obwPx - p.right * canvasSize
 
                     // fill 영역: 원본 박스 경계 ~ 경계선 사이 (min/max로 방향 무관하게 처리)
                     const topFillY = Math.min(obyPx, edgeTop)
@@ -390,8 +493,8 @@ export function LayoutCanvasColumn({
                     const rightFillW = Math.abs(obxPx + obwPx - edgeRight)
 
                     // 좌우 fill의 수직 범위 (top/bottom fill과 겹치지 않게)
-                    const midTop = Math.min(edgeTop, obyPx + obhPx - p.bottom * previewSize)
-                    const midBottom = Math.max(edgeBottom, obyPx + p.top * previewSize)
+                    const midTop = Math.min(edgeTop, obyPx + obhPx - p.bottom * canvasSize)
+                    const midBottom = Math.max(edgeBottom, obyPx + p.top * canvasSize)
                     const midY = Math.min(midTop, midBottom)
                     const midH = Math.max(0, Math.max(midTop, midBottom) - midY)
 
@@ -542,11 +645,13 @@ export function LayoutCanvasColumn({
                         width: 16,
                         height: 16,
                         cursor: isH ? 'ns-resize' : 'ew-resize',
+                        touchAction: 'none',
                         zIndex: 13,
                       }}
                       onMouseEnter={() => setHoveredSide(side)}
                       onMouseLeave={() => setHoveredSide(null)}
                       onMouseDown={(e) => handlePartEdgeMouseDown(side, e)}
+                      onTouchStart={(e) => handlePartEdgeTouchStart(side, e)}
                     />
                   )}
                 </div>

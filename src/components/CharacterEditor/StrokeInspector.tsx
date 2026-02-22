@@ -4,28 +4,26 @@ import { MERGE_PROXIMITY } from '../../utils/snapUtils'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
+import { Card, CardContent } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { SliderMark } from '@/components/ui/slider'
 import { weightToMultiplier } from '../../stores/globalStyleStore'
 
-/** 기본 획 두께 (baseJamos.json 기본값) */
 const BASE_THICKNESS = 0.07
 
-/** thickness → weight(100~900) 변환 (weightToMultiplier의 역함수, BASE_THICKNESS 기준) */
 function thicknessToWeight(thickness: number): number {
   const multiplier = thickness / BASE_THICKNESS
-  // weightToMultiplier 역변환: 0.4→100, 1.0→400, 2.2→900
   if (multiplier <= 1.0) {
     return 100 + ((multiplier - 0.4) / 0.6) * 300
   }
   return 400 + ((multiplier - 1.0) / 1.2) * 500
 }
 
-/** weight(100~900) → thickness 변환 (weightToMultiplier × BASE_THICKNESS) */
 function weightToThickness(weight: number): number {
   return weightToMultiplier(weight) * BASE_THICKNESS
 }
 
-/** 두께 슬라이더 마크 */
 const WEIGHT_MARKS: SliderMark[] = [
   { value: 100, label: '100' },
   { value: 200 },
@@ -38,7 +36,6 @@ const WEIGHT_MARKS: SliderMark[] = [
   { value: 900, label: '900' },
 ]
 
-/** 두 획의 가장 가까운 끝점 간 거리 */
 function minEndpointDistance(a: StrokeDataV2, b: StrokeDataV2): number {
   const aEnds = [a.points[0], a.points[a.points.length - 1]]
   const bEnds = [b.points[0], b.points[b.points.length - 1]]
@@ -51,6 +48,13 @@ function minEndpointDistance(a: StrokeDataV2, b: StrokeDataV2): number {
   }
   return min
 }
+
+const LINECAP_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'default', label: '기본' },
+  { value: 'round', label: '둥근' },
+  { value: 'butt', label: '평평' },
+  { value: 'square', label: '사각' },
+]
 
 interface StrokeInspectorProps {
   strokes: StrokeDataV2[]
@@ -68,7 +72,6 @@ export function StrokeInspector({ strokes, onChange, onMergeStrokes, onSplitStro
   const { selectedStrokeId, selectedPointIndex, setSelectedPointIndex, setSelectedStrokeId } = useUIStore()
   const selectedStroke = strokes.find((s) => s.id === selectedStrokeId)
 
-  // 합치기 대상 후보: 끝점이 가까운 열린 획만
   const mergeTargets = selectedStroke && !selectedStroke.closed
     ? strokes
         .filter(s => s.id !== selectedStrokeId && !s.closed)
@@ -92,68 +95,66 @@ export function StrokeInspector({ strokes, onChange, onMergeStrokes, onSplitStro
 
   const hasCurve = selectedPoint ? !!(selectedPoint.handleIn || selectedPoint.handleOut) : false
   const canSplit = selectedPointIndex !== null && selectedPointIndex > 0 && selectedPointIndex < selectedStroke.points.length - 1 && !selectedStroke.closed
+  const currentLinecap = selectedStroke.linecap ?? 'default'
 
   return (
     <div className="flex flex-col gap-3">
-      {/* <h3 className="text-xs text-muted block mb-3">Stroke: {selectedStroke.id}</h3> */}
-
-      {/* 공통 속성: 두께 */}
-      <div className="p-4 bg-surface-2 rounded-md border border-border">
-        <label className="text-[0.7rem] text-muted uppercase tracking-wider block mb-2">두께</label>
-        <div className="flex items-center gap-3">
-          <div className="flex-1 min-w-0">
-            <Slider
-              min={100}
-              max={900}
-              step={100}
-              value={[Math.round(thicknessToWeight(selectedStroke.thickness) / 100) * 100]}
-              onValueChange={([val]) => onChange(selectedStroke.id, 'thickness', weightToThickness(val))}
-              marks={WEIGHT_MARKS}
-              originValue={400}
-            />
+      {/* 두께 */}
+      <Card>
+        <CardContent className="p-4">
+          <label className="text-[0.7rem] text-muted uppercase tracking-wider block mb-2">두께</label>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <Slider
+                min={100}
+                max={900}
+                step={100}
+                value={[Math.round(thicknessToWeight(selectedStroke.thickness) / 100) * 100]}
+                onValueChange={([val]) => onChange(selectedStroke.id, 'thickness', weightToThickness(val))}
+                marks={WEIGHT_MARKS}
+                originValue={400}
+              />
+            </div>
+            <span className="text-xs text-text-dim-5 font-mono shrink-0 w-12 text-right">
+              {selectedStroke.thickness.toFixed(3)}
+            </span>
           </div>
-          <span className="text-xs text-text-dim-5 font-mono shrink-0 w-12 text-right">
-            {selectedStroke.thickness.toFixed(3)}
-          </span>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* 끝 모양 (Linecap) 오버라이드 */}
-      <div className="p-4 bg-surface-2 rounded-md border border-border">
-        <div className="flex flex-col gap-1">
-          <label className="text-[0.7rem] text-muted uppercase tracking-wider">Linecap (끝 모양)</label>
-          <div className="flex gap-1">
-            {([
-              { value: undefined as StrokeLinecap | undefined, label: '기본' },
-              { value: 'round' as StrokeLinecap, label: '둥근' },
-              { value: 'butt' as StrokeLinecap, label: '평평' },
-              { value: 'square' as StrokeLinecap, label: '사각' },
-            ]).map(({ value, label }) => {
-              const isActive = selectedStroke.linecap === value
-              return (
-                <button
-                  key={label}
-                  className={cn(
-                    'flex-1 py-1.5 px-2 rounded border text-xs transition-colors',
-                    isActive
-                      ? 'border-accent-cyan bg-accent-cyan/10 text-accent-cyan font-semibold'
-                      : 'border-border-lighter text-text-dim-4 hover:border-[#444]'
-                  )}
-                  onClick={() => onChange(selectedStroke.id, 'linecap', value)}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      </div>
+      {/* Linecap */}
+      <Card>
+        <CardContent className="p-4">
+          <label className="text-[0.7rem] text-muted uppercase tracking-wider block mb-2">Linecap (끝 모양)</label>
+          <ToggleGroup
+            type="single"
+            value={currentLinecap}
+            onValueChange={(val) => {
+              if (!val) return
+              onChange(selectedStroke.id, 'linecap', val === 'default' ? undefined : val as StrokeLinecap)
+            }}
+          >
+            {LINECAP_OPTIONS.map(({ value, label }) => (
+              <ToggleGroupItem
+                key={value}
+                value={value}
+                variant="outline"
+                size="sm"
+                className="flex-1"
+              >
+                {label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </CardContent>
+      </Card>
+
+      <Separator />
 
       {/* 획 편집 액션 버튼 */}
       <div className="flex flex-col gap-2">
         <h3 className="text-xs text-muted block">획 편집</h3>
         <div className="flex flex-wrap gap-2">
-          {/* 합치기: 끝점이 가까운 획과 합침 */}
           {onMergeStrokes && mergeTargets.length > 0 && (
             mergeTargets.map(({ stroke: target }) => (
               <Button
@@ -180,7 +181,6 @@ export function StrokeInspector({ strokes, onChange, onMergeStrokes, onSplitStro
               className="border-red-600 text-red-400 hover:bg-red-900/30"
               onClick={() => {
                 onDeleteStroke(selectedStroke.id)
-                // 삭제 후 다른 획 선택
                 const remaining = strokes.filter(s => s.id !== selectedStroke.id)
                 if (remaining.length > 0) setSelectedStrokeId(remaining[0].id)
               }}
@@ -201,24 +201,30 @@ export function StrokeInspector({ strokes, onChange, onMergeStrokes, onSplitStro
         </div>
       </div>
 
+      <Separator />
+
       {/* 포인트 목록 */}
-      <h3 className="text-xs text-muted block mb-3">Points ({selectedStroke.points.length})</h3>
-      <div className="flex flex-wrap gap-1 p-2 bg-surface-2 rounded-md border border-border">
-        {selectedStroke.points.map((pt, i) => (
-          <button
-            key={i}
-            className={cn(
-              'py-1.5 px-3 bg-[#0f0f0f] text-[#e5e5e5] border border-border-lighter rounded text-xs cursor-pointer transition-all duration-150 ease-in-out',
-              'hover:bg-surface-3 hover:border-[#444]',
-              i === selectedPointIndex && 'bg-accent-cyan border-accent-cyan text-black font-semibold',
-              (pt.handleIn || pt.handleOut) && i !== selectedPointIndex && 'border-[#4ecdc4] text-[#4ecdc4]'
-            )}
-            onClick={() => setSelectedPointIndex(i)}
-          >
-            {(pt.handleIn || pt.handleOut) ? '~' : ''}{i}
-          </button>
-        ))}
-      </div>
+      <h3 className="text-xs text-muted block">Points ({selectedStroke.points.length})</h3>
+      <Card>
+        <CardContent className="p-2">
+          <div className="flex flex-wrap gap-1">
+            {selectedStroke.points.map((pt, i) => (
+              <button
+                key={i}
+                className={cn(
+                  'py-1.5 px-3 bg-[#0f0f0f] text-[#e5e5e5] border border-border-lighter rounded text-xs cursor-pointer transition-all duration-150 ease-in-out',
+                  'hover:bg-surface-3 hover:border-[#444]',
+                  i === selectedPointIndex && 'bg-accent-cyan border-accent-cyan text-black font-semibold',
+                  (pt.handleIn || pt.handleOut) && i !== selectedPointIndex && 'border-[#4ecdc4] text-[#4ecdc4]'
+                )}
+                onClick={() => setSelectedPointIndex(i)}
+              >
+                {(pt.handleIn || pt.handleOut) ? '~' : ''}{i}
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* 선택된 포인트 액션 */}
       {selectedPoint && (
@@ -258,7 +264,6 @@ export function StrokeInspector({ strokes, onChange, onMergeStrokes, onSplitStro
               className="border-red-600 text-red-400 hover:bg-red-900/30"
               onClick={() => {
                 onDeletePoint(selectedStroke.id, selectedPointIndex!)
-                // 삭제 후 인덱스 보정
                 const newLen = selectedStroke.points.length - 1
                 if (selectedPointIndex! >= newLen) setSelectedPointIndex(newLen - 1)
               }}
@@ -268,7 +273,6 @@ export function StrokeInspector({ strokes, onChange, onMergeStrokes, onSplitStro
           )}
         </div>
       )}
-
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import type { PartStyle } from '../../renderers/SvgRenderer'
 import { StrokeOverlay } from '../CharacterEditor/StrokeOverlay'
@@ -6,6 +6,9 @@ import { PaddingOverlay } from '../CharacterEditor/PaddingOverlay'
 import { StrokeToolbar } from '../CharacterEditor/StrokeToolbar'
 import { PointActionPopup } from '../CharacterEditor/PointActionPopup'
 import { StrokeEditor } from '../CharacterEditor/StrokeEditor'
+import { useUIStore } from '../../stores/uiStore'
+import { useDeviceCapability } from '../../hooks/useDeviceCapability'
+import { usePinchZoom } from '../../hooks/usePinchZoom'
 import type { DecomposedSyllable, BoxConfig, LayoutSchema, Part, Padding, StrokeDataV2 } from '../../types'
 import type { GlobalStyle } from '../../stores/globalStyleStore'
 
@@ -84,8 +87,42 @@ export function JamoCanvasColumn({
   onAddStroke,
 }: JamoCanvasColumnProps) {
   const svgRef = useRef<SVGSVGElement>(null)
-  const previewSize = 300
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [canvasSize, setCanvasSize] = useState(300)
   const [isDragging, setIsDragging] = useState(false)
+
+  const { canvasZoom, canvasPan, resetCanvasView, selectedPointIndex, isMobile } = useUIStore()
+
+  // ResizeObserver: 컨테이너 크기에 맞게 캔버스 크기 동적 계산
+  useEffect(() => {
+    if (!containerRef.current) return
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect
+        const base = Math.max(150, Math.floor(Math.min(width, height) - 32))
+        setCanvasSize(isMobile ? Math.floor(base * 0.8) : base)
+      }
+    })
+    observer.observe(containerRef.current)
+    return () => observer.disconnect()
+  }, [isMobile])
+  const { isTouch } = useDeviceCapability()
+  usePinchZoom(svgRef, { enabled: false })
+
+  // 자모 편집 대상이 변경될 때 줌/패닝 초기화
+  useEffect(() => {
+    resetCanvasView()
+  }, [editingJamoInfo?.char, editingJamoInfo?.type]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 롱프레스로 PointActionPopup 활성화 (모바일 전용)
+  const [longPressActive, setLongPressActive] = useState(false)
+  useEffect(() => {
+    setLongPressActive(false)
+  }, [selectedPointIndex])
+
+  const handlePointLongPress = useCallback(() => {
+    setLongPressActive(true)
+  }, [])
 
   const handleDragStart = useCallback(() => {
     setIsDragging(true)
@@ -140,14 +177,24 @@ export function JamoCanvasColumn({
       )}
 
       {/* 캔버스 영역 */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div ref={containerRef} className="flex-1 overflow-hidden p-4">
         <div className="flex justify-center p-3 bg-background rounded mb-2">
-          <div className="relative inline-block" style={{ backgroundColor: '#1a1a1a' }}>
+          <div
+            className="relative"
+            style={{
+              width: canvasSize,
+              height: canvasSize,
+              backgroundColor: '#1a1a1a',
+              transform: isTouch ? `translate(${canvasPan.x}px, ${canvasPan.y}px) scale(${canvasZoom})` : undefined,
+              transformOrigin: 'center center',
+              willChange: isTouch ? 'transform' : undefined,
+            }}
+          >
             {/* 0.025 스냅 그리드 */}
             <svg
               className="absolute inset-0 pointer-events-none z-0"
-              width={previewSize}
-              height={previewSize}
+              width={canvasSize}
+              height={canvasSize}
               viewBox="0 0 100 100"
             >
               {Array.from({ length: 39 }, (_, i) => {
@@ -174,7 +221,7 @@ export function JamoCanvasColumn({
               svgRef={svgRef}
               syllable={displaySyllable}
               schema={schemaWithPadding}
-              size={previewSize}
+              size={canvasSize}
               fillColor="#e5e5e5"
               backgroundColor="transparent"
               showDebugBoxes
@@ -192,6 +239,7 @@ export function JamoCanvasColumn({
                   onPointChange={onPointChange}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
+                  onPointLongPress={handlePointLongPress}
                   strokeColor="#e5e5e5"
                   isMixed={!!mixedJungseongData}
                   juHBox={mixedJungseongData?.juHBox}
@@ -254,11 +302,11 @@ export function JamoCanvasColumn({
               })()}
             </SvgRenderer>
 
-            {/* PointActionPopup — 캔버스 위에 absolute 팝업 */}
-            {editingBox && !isDragging && (
+            {/* PointActionPopup — 캔버스 위에 absolute 팝업 (터치: 롱프레스 후 표시) */}
+            {editingBox && !isDragging && (!isTouch || longPressActive) && (
               <PointActionPopup
                 strokes={draftStrokes}
-                canvasSize={previewSize}
+                canvasSize={canvasSize}
                 viewBoxSize={100}
                 box={effectiveBox}
                 isMixed={!!mixedJungseongData}

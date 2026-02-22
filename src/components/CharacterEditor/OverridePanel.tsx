@@ -32,9 +32,11 @@ function conditionGroupsToLabel(groups: OverrideCondition[][]): string {
 interface OverridePanelProps {
   /** 오버라이드 탭 전환 시 호출 (드래프트 strokes 재로드용) */
   onOverrideSwitch: (overrideId: string | null) => void
+  /** 모바일용 컴팩트 모드 */
+  compact?: boolean
 }
 
-export function OverridePanel({ onOverrideSwitch }: OverridePanelProps) {
+export function OverridePanel({ onOverrideSwitch, compact = false }: OverridePanelProps) {
   const { editingJamoType, editingJamoChar, editingOverrideId, setEditingOverrideId } = useUIStore()
   const { addOverride, updateOverride, removeOverride } = useJamoStore()
 
@@ -100,6 +102,90 @@ export function OverridePanel({ onOverrideSwitch }: OverridePanelProps) {
     })
   }
 
+  // 모바일 컴팩트 모드
+  if (compact) {
+    return (
+      <div>
+        {/* 탭 바 - 가로 스크롤 pill 스타일 */}
+        <div className="flex items-center gap-1 overflow-x-auto">
+          <span className="text-[0.65rem] text-text-dim-5 shrink-0 mr-0.5">범위</span>
+
+          <button
+            className={cn(
+              'shrink-0 h-6 px-2.5 rounded-full text-[0.7rem] transition-colors',
+              editingOverrideId === null
+                ? 'bg-accent-cyan/15 text-accent-cyan font-medium'
+                : 'text-text-dim-4 active:text-text-dim-2'
+            )}
+            onClick={() => handleSelectOverride(null)}
+          >
+            기본
+          </button>
+
+          {overrides.map(ovr => (
+            <button
+              key={ovr.id}
+              className={cn(
+                'shrink-0 h-6 px-2.5 rounded-full text-[0.7rem] transition-colors',
+                !ovr.enabled && 'opacity-40',
+                editingOverrideId === ovr.id
+                  ? 'bg-accent-orange/15 text-accent-orange font-medium'
+                  : 'text-text-dim-4 active:text-text-dim-2'
+              )}
+              onClick={() => handleSelectOverride(ovr.id)}
+            >
+              {conditionGroupsToLabel(ovr.conditionGroups ?? (ovr.conditions ? [ovr.conditions] : []))}
+            </button>
+          ))}
+
+          <button
+            className="shrink-0 h-6 w-6 rounded-full text-[0.7rem] text-text-dim-5 active:text-text-dim-3 transition-colors"
+            onClick={handleAddOverride}
+          >
+            +
+          </button>
+
+          {selectedOverride && (
+            <>
+              <div className="shrink-0 w-px h-4 bg-border-subtle mx-0.5" />
+              <button
+                className={cn(
+                  'shrink-0 h-6 px-1.5 rounded text-[0.65rem] font-medium',
+                  selectedOverride.enabled ? 'text-green-400' : 'text-text-dim-5'
+                )}
+                onClick={handleToggleEnabled}
+              >
+                {selectedOverride.enabled ? 'ON' : 'OFF'}
+              </button>
+              <button
+                className="shrink-0 h-6 px-1.5 rounded text-[0.65rem] text-red-400/60 active:text-red-400"
+                onClick={() => handleRemoveOverride(selectedOverride.id)}
+              >
+                삭제
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* 선택된 오버라이드 조건 편집 */}
+        {selectedOverride && (
+          <div className="mt-1.5 pt-1.5 border-t border-border-subtle/50">
+            <ConditionBuilder
+              conditionGroups={selectedOverride.conditionGroups ?? (selectedOverride.conditions ? [selectedOverride.conditions] : [[]])}
+              onChange={handleConditionGroupsChange}
+              editingJamoType={editingJamoType}
+            />
+          </div>
+        )}
+
+        {editingOverrideId === null && overrides.length === 0 && (
+          <p className="text-[0.6rem] text-text-dim-5 mt-1">+ 으로 조건부 변형 추가</p>
+        )}
+      </div>
+    )
+  }
+
+  // 데스크톱 기본 모드
   return (
     <div className="p-3 bg-surface-2 rounded-md border border-border">
       <label className="text-[0.7rem] text-muted uppercase tracking-wider block mb-2">적용 범위</label>

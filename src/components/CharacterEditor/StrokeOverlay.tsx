@@ -1,11 +1,15 @@
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useUIStore } from '../../stores/uiStore'
+import { useDeviceCapability } from '../../hooks/useDeviceCapability'
 import type { StrokeDataV2, BoxConfig, Padding } from '../../types'
 import { pointsToSvgD } from '../../utils/pathUtils'
 import { collectSnapTargets, snapPoint, detectMergeHint } from '../../utils/snapUtils'
 import type { SnapResult, MergeHint } from '../../utils/snapUtils'
 import { weightToMultiplier, resolveLinecap } from '../../stores/globalStyleStore'
 import type { GlobalStyle } from '../../stores/globalStyleStore'
+import { SnapFeedback } from './SnapFeedback'
+import type { MergeHintPositions } from './SnapFeedback'
+import { PointOverlay } from './PointOverlay'
 
 // === 타입 정의 ===
 
@@ -64,6 +68,8 @@ export interface StrokeOverlayProps {
   // 혼합중성 파트별 개별 패딩
   horizontalPadding?: Padding
   verticalPadding?: Padding
+  // 롱프레스 시 포인트 액션 팝업 트리거 (모바일)
+  onPointLongPress?: (strokeId: string, pointIndex: number) => void
 }
 
 import { applyJamoPaddingToBox } from '../../utils/containerBoxUtils'
@@ -96,12 +102,22 @@ export function StrokeOverlay({
   jamoPadding,
   horizontalPadding,
   verticalPadding,
+  onPointLongPress,
 }: StrokeOverlayProps) {
   const { selectedStrokeId, setSelectedStrokeId, selectedPointIndex, setSelectedPointIndex } = useUIStore()
+  const { isTouch } = useDeviceCapability()
   const [dragState, setDragState] = useState<DragState | null>(null)
   const [snapFeedback, setSnapFeedback] = useState<SnapResult | null>(null)
   const [mergeHintState, setMergeHintState] = useState<MergeHint | null>(null)
 
+  // 터치 하이라이트 (터치 시작 시 획 일시 강조)
+  const [touchHighlightId, setTouchHighlightId] = useState<string | null>(null)
+  const touchHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 롱프레스 타이머 (앵커 포인트 롱프레스 → 팝업 트리거)
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const pointRadius = isTouch ? 5 : 2.5
   const weightMultiplier = globalStyle ? weightToMultiplier(globalStyle.weight) : 1.0
 
   // 박스 절대 좌표
@@ -109,6 +125,29 @@ export function StrokeOverlay({
   const boxY = box.y * viewBoxSize
   const boxWidth = box.width * viewBoxSize
   const boxHeight = box.height * viewBoxSize
+
+  // 롱프레스 타이머 취소
+  const clearLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }, [])
+
+  // 터치 하이라이트 설정 (300ms 후 자동 해제)
+  const setTouchHighlight = useCallback((id: string) => {
+    if (touchHighlightTimerRef.current) clearTimeout(touchHighlightTimerRef.current)
+    setTouchHighlightId(id)
+    touchHighlightTimerRef.current = setTimeout(() => setTouchHighlightId(null), 300)
+  }, [])
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      clearLongPress()
+      if (touchHighlightTimerRef.current) clearTimeout(touchHighlightTimerRef.current)
+    }
+  }, [clearLongPress])
 
   // SVG 이벤트에서 viewBox 좌표 추출
   const svgPointFromEvent = useCallback((e: React.MouseEvent | MouseEvent | React.TouchEvent | TouchEvent) => {
@@ -245,7 +284,6 @@ export function StrokeOverlay({
         setSnapFeedback(snap.snappedX || snap.snappedY ? snap : null)
 
         // 병합 힌트 감지
-        // strokes에서 현재 드래그 포인트가 snap 적용된 좌표를 기준으로 감지
         const currentStrokes = strokes.map(s => {
           if (s.id !== dragState.strokeId) return s
           const newPoints = s.points.map((p, i) =>
@@ -283,7 +321,6 @@ export function StrokeOverlay({
       dragState.originalPoints.forEach((origPt, i) => {
         onPointChange(dragState.strokeId, i, 'x', origPt.x + snappedDeltaX)
         onPointChange(dragState.strokeId, i, 'y', origPt.y + snappedDeltaY)
-        // 곡률 유지: 핸들도 동일한 delta만큼 이동
         if (origPt.handleIn) {
           onPointChange(dragState.strokeId, i, 'handleIn', {
             x: origPt.handleIn.x + snappedDeltaX,
@@ -315,12 +352,10 @@ export function StrokeOverlay({
   const getDragCursor = () => {
     if (!dragState) return undefined
     switch (dragState.type) {
-      case 'strokeMove':
-        return 'move'
+      case 'strokeMove': return 'move'
       case 'point':
       case 'handleIn':
-      case 'handleOut':
-        return 'grabbing'
+      case 'handleOut': return 'grabbing'
     }
   }
 
@@ -332,11 +367,30 @@ export function StrokeOverlay({
     return getContainerBoxAbs(stroke)
   }, [dragState, strokes, getContainerBoxAbs])
 
+  // 병합 힌트 위치 (사전 계산하여 SnapFeedback에 전달)
+  const mergeHintPositions = useMemo((): MergeHintPositions | null => {
+    if (!mergeHintState || !dragContainerAbs) return null
+    const targetStroke = strokes.find(s => s.id === mergeHintState.targetStrokeId)
+    if (!targetStroke) return null
+    const targetContainer = getContainerBoxAbs(targetStroke)
+    const tX = targetContainer.x + mergeHintState.targetPoint.x * targetContainer.width
+    const tY = targetContainer.y + mergeHintState.targetPoint.y * targetContainer.height
+    const sourceStroke = strokes.find(s => s.id === mergeHintState.sourceStrokeId)
+    if (!sourceStroke) return null
+    const sourceContainer = getContainerBoxAbs(sourceStroke)
+    const srcPt = sourceStroke.points[mergeHintState.sourcePointIndex]
+    if (!srcPt) return null
+    const sX = sourceContainer.x + srcPt.x * sourceContainer.width
+    const sY = sourceContainer.y + srcPt.y * sourceContainer.height
+    return { source: { x: sX, y: sY }, target: { x: tX, y: tY } }
+  }, [mergeHintState, dragContainerAbs, strokes, getContainerBoxAbs])
+
   // window 레벨 드래그 이벤트 (범위 밖에서도 드래그 유지)
   useEffect(() => {
     if (!dragState) return
 
     const handleWindowMove = (e: MouseEvent | TouchEvent) => {
+      clearLongPress() // 이동 시작 시 롱프레스 취소
       handlePointerMove(e)
     }
 
@@ -357,7 +411,7 @@ export function StrokeOverlay({
       window.removeEventListener('touchend', handleWindowUp)
       window.removeEventListener('touchcancel', handleWindowUp)
     }
-  }, [dragState, handlePointerMove, handlePointerUp])
+  }, [dragState, handlePointerMove, handlePointerUp, clearLongPress])
 
   // 빈 영역 클릭 시 선택 해제
   const handleBackgroundClick = useCallback(() => {
@@ -366,6 +420,28 @@ export function StrokeOverlay({
       setSelectedStrokeId(null)
     }
   }, [dragState, setSelectedPointIndex, setSelectedStrokeId])
+
+  // 포인트 근접 감지 — 터치 시 획 선택+포인트 드래그를 한번에 시작하기 위해
+  const POINT_GRAB_THRESHOLD = isTouch ? 8 : 4 // viewBox 단위
+  const findNearestPointIndex = useCallback((
+    stroke: StrokeDataV2,
+    svgPt: { x: number; y: number },
+    cAbs: BoxConfig
+  ): number | null => {
+    let nearIdx: number | null = null
+    let nearDist = POINT_GRAB_THRESHOLD
+    for (let i = 0; i < stroke.points.length; i++) {
+      const pt = stroke.points[i]
+      const absX = cAbs.x + pt.x * cAbs.width
+      const absY = cAbs.y + pt.y * cAbs.height
+      const dist = Math.hypot(svgPt.x - absX, svgPt.y - absY)
+      if (dist < nearDist) {
+        nearDist = dist
+        nearIdx = i
+      }
+    }
+    return nearIdx
+  }, [POINT_GRAB_THRESHOLD])
 
   return (
     <g
@@ -376,13 +452,12 @@ export function StrokeOverlay({
         x={0} y={0}
         width={viewBoxSize} height={viewBoxSize}
         fill="transparent"
+        role="presentation"
         onClick={handleBackgroundClick}
       />
 
-      {/* 선택된 획이 포인트 편집 중이면 다른 획의 히트 영역 비활성화 */}
       {/* 선택된 획을 마지막에 렌더링하여 SVG z-order 최상위로 배치 */}
       {(() => {
-        // 선택된 획을 마지막에 렌더링 (z-order 최상위)
         const sorted = selectedStrokeId
           ? [...strokes.filter(s => s.id !== selectedStrokeId), ...strokes.filter(s => s.id === selectedStrokeId)]
           : strokes
@@ -397,13 +472,8 @@ export function StrokeOverlay({
           const pathThickness = stroke.thickness * weightMultiplier * viewBoxSize
 
           // 포인트를 절대 좌표로 변환 (오버레이용)
-          const toAbs = (px: number, py: number): [number, number] => [
-            containerAbs.x + px * containerAbs.width,
-            containerAbs.y + py * containerAbs.height,
-          ]
-
-          // 선택된 획의 포인트 편집 중일 때 다른 획의 히트 영역 비활성화
           const disableHitArea = !isSelected && isPointEditingActive
+          const isHighlighted = isTouch && touchHighlightId === stroke.id
 
           return (
             <g key={stroke.id}>
@@ -413,155 +483,121 @@ export function StrokeOverlay({
                 fill="none"
                 stroke="transparent"
                 strokeWidth={pathThickness * 4}
+                role={disableHitArea ? undefined : 'button'}
+                aria-label={disableHitArea ? undefined : '획 선택'}
                 onClick={disableHitArea ? undefined : (e) => { e.stopPropagation(); setSelectedStrokeId(stroke.id) }}
-                onMouseDown={disableHitArea ? undefined : (onStrokeChange ? startStrokeMove(stroke) : undefined)}
-                onTouchStart={disableHitArea ? undefined : (onStrokeChange ? startStrokeMove(stroke) : undefined)}
+                onMouseDown={disableHitArea ? undefined : (e: React.MouseEvent) => {
+                  // 포인트 근처 클릭 시 즉시 포인트 드래그 시작 (획 선택 불필요)
+                  if (onPointChange) {
+                    const svgPt = svgPointFromEvent(e)
+                    const nearIdx = findNearestPointIndex(stroke, svgPt, containerAbs)
+                    if (nearIdx !== null) {
+                      e.stopPropagation(); e.preventDefault()
+                      setSelectedStrokeId(stroke.id); onDragStart?.(); setSelectedPointIndex(nearIdx)
+                      setDragState({ type: 'point', strokeId: stroke.id, pointIndex: nearIdx,
+                        containerX: containerAbs.x, containerY: containerAbs.y, containerW: containerAbs.width, containerH: containerAbs.height })
+                      return
+                    }
+                  }
+                  if (onStrokeChange) startStrokeMove(stroke)(e)
+                }}
+                onTouchStart={disableHitArea ? undefined : (e: React.TouchEvent) => {
+                  setTouchHighlight(stroke.id)
+                  // 포인트 근처 터치 시 즉시 포인트 드래그 시작 (획 선택 불필요)
+                  if (onPointChange) {
+                    const svgPt = svgPointFromEvent(e)
+                    const nearIdx = findNearestPointIndex(stroke, svgPt, containerAbs)
+                    if (nearIdx !== null) {
+                      e.stopPropagation(); e.preventDefault()
+                      setSelectedStrokeId(stroke.id); onDragStart?.(); setSelectedPointIndex(nearIdx)
+                      setDragState({ type: 'point', strokeId: stroke.id, pointIndex: nearIdx,
+                        containerX: containerAbs.x, containerY: containerAbs.y, containerW: containerAbs.width, containerH: containerAbs.height })
+                      clearLongPress()
+                      if (onPointLongPress) {
+                        longPressTimerRef.current = setTimeout(() => onPointLongPress(stroke.id, nearIdx), 500)
+                      }
+                      return
+                    }
+                  }
+                  if (onStrokeChange) startStrokeMove(stroke)(e)
+                }}
                 style={{ cursor: disableHitArea ? 'default' : (onStrokeChange ? 'move' : 'pointer'), pointerEvents: disableHitArea ? 'none' : undefined }}
               />
               {/* 실제 렌더링 */}
               <path
                 d={d}
                 fill="none"
-                stroke={isSelected ? '#ff6b6b' : strokeColor}
-                strokeWidth={pathThickness}
+                stroke={isSelected ? '#ff6b6b' : (isHighlighted ? '#c0c0c0' : strokeColor)}
+                strokeWidth={pathThickness * (isHighlighted ? 1.5 : 1)}
                 strokeLinecap={resolveLinecap(stroke.linecap, globalStyle?.linecap)}
                 strokeLinejoin="round"
+                aria-hidden="true"
                 onClick={disableHitArea ? undefined : (e) => { e.stopPropagation(); setSelectedStrokeId(stroke.id) }}
-                onMouseDown={disableHitArea ? undefined : (onStrokeChange ? startStrokeMove(stroke) : undefined)}
-                onTouchStart={disableHitArea ? undefined : (onStrokeChange ? startStrokeMove(stroke) : undefined)}
+                onMouseDown={disableHitArea ? undefined : (e: React.MouseEvent) => {
+                  if (onPointChange) {
+                    const svgPt = svgPointFromEvent(e)
+                    const nearIdx = findNearestPointIndex(stroke, svgPt, containerAbs)
+                    if (nearIdx !== null) {
+                      e.stopPropagation(); e.preventDefault()
+                      setSelectedStrokeId(stroke.id); onDragStart?.(); setSelectedPointIndex(nearIdx)
+                      setDragState({ type: 'point', strokeId: stroke.id, pointIndex: nearIdx,
+                        containerX: containerAbs.x, containerY: containerAbs.y, containerW: containerAbs.width, containerH: containerAbs.height })
+                      return
+                    }
+                  }
+                  if (onStrokeChange) startStrokeMove(stroke)(e)
+                }}
+                onTouchStart={disableHitArea ? undefined : (e: React.TouchEvent) => {
+                  if (onPointChange) {
+                    const svgPt = svgPointFromEvent(e)
+                    const nearIdx = findNearestPointIndex(stroke, svgPt, containerAbs)
+                    if (nearIdx !== null) {
+                      e.stopPropagation(); e.preventDefault()
+                      setSelectedStrokeId(stroke.id); onDragStart?.(); setSelectedPointIndex(nearIdx)
+                      setDragState({ type: 'point', strokeId: stroke.id, pointIndex: nearIdx,
+                        containerX: containerAbs.x, containerY: containerAbs.y, containerW: containerAbs.width, containerH: containerAbs.height })
+                      return
+                    }
+                  }
+                  if (onStrokeChange) startStrokeMove(stroke)(e)
+                }}
                 style={{ cursor: disableHitArea ? 'default' : (onStrokeChange ? 'move' : 'pointer'), pointerEvents: disableHitArea ? 'none' : undefined }}
               />
 
               {/* 선택된 획의 포인트/핸들 오버레이 */}
               {isSelected && onPointChange && (
-                <g>
-                  {/* 선택된 포인트의 핸들 표시 */}
-                  {selectedPointIndex !== null && selectedPointIndex < stroke.points.length && (() => {
-                    const point = stroke.points[selectedPointIndex]
-                    const [ptX, ptY] = toAbs(point.x, point.y)
-
-                    return (
-                      <>
-                        {point.handleIn && (() => {
-                          const [hx, hy] = toAbs(point.handleIn.x, point.handleIn.y)
-                          return (
-                            <>
-                              <line x1={ptX} y1={ptY} x2={hx} y2={hy}
-                                stroke="#ff6b6b" strokeWidth={0.5} opacity={0.6} />
-                              <circle cx={hx} cy={hy} r={1.8}
-                                fill="#ff6b6b" stroke="#fff" strokeWidth={0.3}
-                                style={{ cursor: 'grab' }}
-                                onClick={(e) => e.stopPropagation()}
-                                onMouseDown={startPointDrag('handleIn', stroke.id, selectedPointIndex, containerAbs)}
-                                onTouchStart={startPointDrag('handleIn', stroke.id, selectedPointIndex, containerAbs)} />
-                            </>
-                          )
-                        })()}
-                        {point.handleOut && (() => {
-                          const [hx, hy] = toAbs(point.handleOut.x, point.handleOut.y)
-                          return (
-                            <>
-                              <line x1={ptX} y1={ptY} x2={hx} y2={hy}
-                                stroke="#4ecdc4" strokeWidth={0.5} opacity={0.6} />
-                              <circle cx={hx} cy={hy} r={1.8}
-                                fill="#4ecdc4" stroke="#fff" strokeWidth={0.3}
-                                style={{ cursor: 'grab' }}
-                                onClick={(e) => e.stopPropagation()}
-                                onMouseDown={startPointDrag('handleOut', stroke.id, selectedPointIndex, containerAbs)}
-                                onTouchStart={startPointDrag('handleOut', stroke.id, selectedPointIndex, containerAbs)} />
-                            </>
-                          )
-                        })()}
-                      </>
-                    )
-                  })()}
-
-                  {/* 모든 앵커 포인트 */}
-                  {stroke.points.map((pt, i) => {
-                    const [ptX, ptY] = toAbs(pt.x, pt.y)
-                    const isActive = i === selectedPointIndex
-                    return (
-                      <circle key={i} cx={ptX} cy={ptY} r={2.5}
-                        fill={isActive ? '#ff6b6b' : '#4ecdc4'}
-                        stroke="#fff" strokeWidth={0.5}
-                        style={{ cursor: 'grab' }}
-                        onClick={(e) => e.stopPropagation()}
-                        onMouseDown={startPointDrag('point', stroke.id, i, containerAbs)}
-                        onTouchStart={startPointDrag('point', stroke.id, i, containerAbs)} />
-                    )
-                  })}
-                </g>
+                <PointOverlay
+                  stroke={stroke}
+                  selectedPointIndex={selectedPointIndex}
+                  containerAbs={containerAbs}
+                  pointRadius={pointRadius}
+                  onHandleInDown={startPointDrag('handleIn', stroke.id, selectedPointIndex ?? 0, containerAbs)}
+                  onHandleOutDown={startPointDrag('handleOut', stroke.id, selectedPointIndex ?? 0, containerAbs)}
+                  onAnchorDown={(i) => startPointDrag('point', stroke.id, i, containerAbs)}
+                  onAnchorTouchStart={(i) => (e) => {
+                    startPointDrag('point', stroke.id, i, containerAbs)(e)
+                    // 롱프레스 타이머 시작 (이동 시 window touchmove handler에서 clearLongPress 호출됨)
+                    clearLongPress()
+                    if (onPointLongPress) {
+                      longPressTimerRef.current = setTimeout(() => {
+                        onPointLongPress(stroke.id, i)
+                      }, 500)
+                    }
+                  }}
+                  onAnchorTouchEnd={clearLongPress}
+                />
               )}
             </g>
           )
         })
       })()}
 
-      {/* === 스냅 시각적 피드백 === */}
-      {snapFeedback && dragContainerAbs && (
-        <g pointerEvents="none">
-          {snapFeedback.guideLines.map((guide, i) => {
-            const isGrid = guide.type === 'grid'
-            const color = isGrid ? '#4ecdc4' : '#ff9500'
-            const dashArray = isGrid ? '2,2' : 'none'
-            const opacity = isGrid ? 0.6 : 0.8
-
-            if (guide.axis === 'x') {
-              const absX = dragContainerAbs.x + guide.value * dragContainerAbs.width
-              return (
-                <line key={`guide-${i}`}
-                  x1={absX} y1={dragContainerAbs.y - 5}
-                  x2={absX} y2={dragContainerAbs.y + dragContainerAbs.height + 5}
-                  stroke={color} strokeWidth={0.4} strokeDasharray={dashArray} opacity={opacity}
-                />
-              )
-            } else {
-              const absY = dragContainerAbs.y + guide.value * dragContainerAbs.height
-              return (
-                <line key={`guide-${i}`}
-                  x1={dragContainerAbs.x - 5} y1={absY}
-                  x2={dragContainerAbs.x + dragContainerAbs.width + 5} y2={absY}
-                  stroke={color} strokeWidth={0.4} strokeDasharray={dashArray} opacity={opacity}
-                />
-              )
-            }
-          })}
-        </g>
-      )}
-
-      {/* === 병합 힌트 === */}
-      {mergeHintState && dragContainerAbs && (() => {
-        // 타겟 포인트의 절대 좌표
-        const targetStroke = strokes.find(s => s.id === mergeHintState.targetStrokeId)
-        if (!targetStroke) return null
-        const targetContainer = getContainerBoxAbs(targetStroke)
-        const tX = targetContainer.x + mergeHintState.targetPoint.x * targetContainer.width
-        const tY = targetContainer.y + mergeHintState.targetPoint.y * targetContainer.height
-
-        // 소스 포인트의 절대 좌표
-        const sourceStroke = strokes.find(s => s.id === mergeHintState.sourceStrokeId)
-        if (!sourceStroke) return null
-        const sourceContainer = getContainerBoxAbs(sourceStroke)
-        const srcPt = sourceStroke.points[mergeHintState.sourcePointIndex]
-        if (!srcPt) return null
-        const sX = sourceContainer.x + srcPt.x * sourceContainer.width
-        const sY = sourceContainer.y + srcPt.y * sourceContainer.height
-
-        return (
-          <g pointerEvents="none">
-            {/* 연결 점선 */}
-            <line x1={sX} y1={sY} x2={tX} y2={tY}
-              stroke="#22c55e" strokeWidth={0.5} strokeDasharray="1.5,1.5" opacity={0.8} />
-            {/* 타겟 끝점 펄스 원 */}
-            <circle cx={tX} cy={tY} r={3} fill="none" stroke="#22c55e" strokeWidth={0.8} opacity={0.9}>
-              <animate attributeName="r" values="3;5;3" dur="0.8s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.9;0.4;0.9" dur="0.8s" repeatCount="indefinite" />
-            </circle>
-            {/* 타겟 끝점 내부 원 */}
-            <circle cx={tX} cy={tY} r={2} fill="#22c55e" opacity={0.6} />
-          </g>
-        )
-      })()}
+      {/* 스냅 피드백 + 병합 힌트 */}
+      <SnapFeedback
+        snapFeedback={snapFeedback}
+        dragContainerAbs={dragContainerAbs}
+        mergeHintPositions={mergeHintPositions}
+      />
     </g>
   )
 }

@@ -1,20 +1,21 @@
 /**
  * 폰트 프로젝트 저장/불러오기 패널
  *
- * 상단 바에서 토글되는 드롭다운 형태
+ * Popover 내부 콘텐츠로 렌더링
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
 import { useFontProject } from '../hooks/useFontProject'
 import { generateAndDownloadFont } from '../services/fontGenerator'
 
 interface ProjectManagerProps {
-  open: boolean
   onClose: () => void
 }
 
-export function ProjectManager({ open, onClose }: ProjectManagerProps) {
+export function ProjectManager({ onClose }: ProjectManagerProps) {
   const {
     projects,
     currentProjectId,
@@ -32,38 +33,15 @@ export function ProjectManager({ open, onClose }: ProjectManagerProps) {
 
   const [newName, setNewName] = useState('')
   const [showNameInput, setShowNameInput] = useState(false)
-  // 이름 수정 중인 프로젝트 ID
   const [editingNameId, setEditingNameId] = useState<string | null>(null)
   const [editingNameValue, setEditingNameValue] = useState('')
   const [exportingId, setExportingId] = useState<string | null>(null)
   const [exportProgress, setExportProgress] = useState('')
-  const panelRef = useRef<HTMLDivElement>(null)
   const exportingRef = useRef(false)
 
-  // 열릴 때 목록 조회
   useEffect(() => {
-    if (open) {
-      fetchProjects()
-    }
-  }, [open, fetchProjects])
-
-  // 외부 클릭 감지
-  useEffect(() => {
-    if (!open) return
-    const handleClickOutside = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        onClose()
-      }
-    }
-    // 약간의 딜레이를 줘서 열기 버튼 클릭과 겹치지 않게
-    const timer = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside)
-    }, 100)
-    return () => {
-      clearTimeout(timer)
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [open, onClose])
+    fetchProjects()
+  }, [fetchProjects])
 
   const handleSaveAsNew = async () => {
     const name = newName.trim() || '새 폰트'
@@ -75,6 +53,7 @@ export function ProjectManager({ open, onClose }: ProjectManagerProps) {
   const handleLoad = async (id: string) => {
     if (!confirm('현재 편집 중인 데이터를 덮어씁니다.\n계속하시겠습니까?')) return
     await loadProject(id)
+    onClose()
   }
 
   const handleOverwrite = async (id: string, name: string) => {
@@ -93,7 +72,6 @@ export function ProjectManager({ open, onClose }: ProjectManagerProps) {
     setExportingId(id)
     setExportProgress('준비 중...')
     try {
-      // 먼저 해당 프로젝트를 불러온 후 내보내기
       await loadProject(id)
       const result = await generateAndDownloadFont({
         familyName: name,
@@ -130,25 +108,15 @@ export function ProjectManager({ open, onClose }: ProjectManagerProps) {
     setEditingNameValue('')
   }
 
-  if (!open) return null
-
   return (
-    <div
-      ref={panelRef}
-      className="absolute top-full left-0 mt-1 w-[360px] bg-surface-2 border border-border rounded-lg shadow-lg z-50 overflow-hidden"
-    >
+    <div className="w-[360px]">
       {/* 헤더 */}
-      <div className="px-4 py-3 border-b border-border-subtle bg-surface-3">
+      <div className="px-4 py-3 border-b border-border-subtle">
         <div className="flex items-center justify-between">
           <span className="text-sm font-semibold text-foreground">프로젝트 관리</span>
           <div className="flex gap-2">
             {currentProjectId && (
-              <Button
-                size="sm"
-                variant="default"
-                onClick={saveCurrent}
-                disabled={loading}
-              >
+              <Button size="sm" variant="default" onClick={saveCurrent} disabled={loading}>
                 저장
               </Button>
             )}
@@ -162,7 +130,6 @@ export function ProjectManager({ open, onClose }: ProjectManagerProps) {
           </div>
         </div>
 
-        {/* 새 프로젝트 이름 입력 */}
         {showNameInput && (
           <div className="flex gap-2 mt-2">
             <Input
@@ -198,8 +165,10 @@ export function ProjectManager({ open, onClose }: ProjectManagerProps) {
         </div>
       )}
 
+      <Separator />
+
       {/* 프로젝트 목록 */}
-      <div className="max-h-[300px] overflow-y-auto">
+      <ScrollArea className="max-h-[300px]">
         {loading && projects.length === 0 ? (
           <div className="px-4 py-6 text-center text-sm text-muted">
             불러오는 중...
@@ -220,7 +189,6 @@ export function ProjectManager({ open, onClose }: ProjectManagerProps) {
                   isCurrent ? 'bg-primary/10 border-l-2 border-l-primary' : ''
                 }`}
               >
-                {/* 이름 + 날짜 */}
                 <div className="flex items-center gap-2 mb-1.5">
                   {isRenaming ? (
                     <div className="flex-1 flex gap-1">
@@ -264,39 +232,18 @@ export function ProjectManager({ open, onClose }: ProjectManagerProps) {
                   )}
                 </div>
 
-                {/* 액션 버튼 */}
                 {!isRenaming && (
                   <div className="flex gap-1">
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => handleLoad(project.id)}
-                      disabled={loading}
-                    >
+                    <Button size="sm" variant="default" onClick={() => handleLoad(project.id)} disabled={loading}>
                       불러오기
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => handleOverwrite(project.id, project.name)}
-                      disabled={loading}
-                    >
+                    <Button size="sm" variant="default" onClick={() => handleOverwrite(project.id, project.name)} disabled={loading}>
                       덮어쓰기
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => handleExportTTF(project.id, project.name)}
-                      disabled={loading || exportingId !== null}
-                    >
+                    <Button size="sm" variant="default" onClick={() => handleExportTTF(project.id, project.name)} disabled={loading || exportingId !== null}>
                       {exportingId === project.id ? exportProgress : 'TTF'}
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      onClick={() => handleDelete(project.id)}
-                      disabled={loading}
-                    >
+                    <Button size="sm" variant="danger" onClick={() => handleDelete(project.id)} disabled={loading}>
                       삭제
                     </Button>
                   </div>
@@ -305,7 +252,7 @@ export function ProjectManager({ open, onClose }: ProjectManagerProps) {
             )
           })
         )}
-      </div>
+      </ScrollArea>
     </div>
   )
 }

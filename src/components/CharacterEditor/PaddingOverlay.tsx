@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { useDeviceCapability } from '../../hooks/useDeviceCapability'
 import type { Padding, BoxConfig } from '../../types'
 
 // === 타입 정의 ===
@@ -56,8 +57,10 @@ export function PaddingOverlay({
   onDragStart,
   onDragEnd,
 }: PaddingOverlayProps) {
+  const { isTouch } = useDeviceCapability()
   const [dragState, setDragState] = useState<DragState | null>(null)
   const [hoveredSide, setHoveredSide] = useState<PaddingSide | null>(null)
+  const handleHitRadius = isTouch ? 12 : 6
 
   // 콜백/값 ref 안정화 (useEffect deps에서 제거하여 드래그 중 리스너 재등록 방지)
   const onPaddingChangeRef = useRef(onPaddingChange)
@@ -325,9 +328,11 @@ export function PaddingOverlay({
           <circle
             cx={cx}
             cy={cy}
-            r={6}
+            r={handleHitRadius}
             fill="transparent"
             pointerEvents="all"
+            role="button"
+            aria-label={`${side === 'top' ? '상단' : side === 'bottom' ? '하단' : side === 'left' ? '좌측' : '우측'} 패딩`}
             style={{ cursor }}
             onMouseEnter={() => setHoveredSide(side)}
             onMouseLeave={() => setHoveredSide(null)}

@@ -1,6 +1,7 @@
 import * as React from 'react'
 import * as SliderPrimitive from '@radix-ui/react-slider'
 import { cn } from '@/lib/utils'
+import { useDeviceCapability } from '@/hooks/useDeviceCapability'
 
 const colorSchemes = {
   default: {
@@ -46,6 +47,7 @@ const Slider = React.forwardRef<
   SliderProps
 >(({ className, colorScheme = 'default', marks, originValue, ...props }, ref) => {
   const colors = colorSchemes[colorScheme]
+  const { isTouch } = useDeviceCapability()
   const min = props.min ?? 0
   const max = props.max ?? 100
   const currentValue = (props.value ?? props.defaultValue ?? [min])[0]
@@ -105,15 +107,16 @@ const Slider = React.forwardRef<
 
         <SliderPrimitive.Thumb
           className={cn(
-            'block h-[18px] w-[18px] rounded-full border-2 border-surface-3 shadow-md transition-transform hover:scale-110 focus-visible:outline-none z-10',
+            'block rounded-full border-2 border-surface-3 shadow-md transition-transform hover:scale-110 focus-visible:outline-none z-10',
+            isTouch ? 'h-[28px] w-[28px]' : 'h-[18px] w-[18px]',
             colors.thumb
           )}
         />
       </SliderPrimitive.Root>
 
       {/* 마크 라벨 (슬라이더 아래) */}
-      {marks && marks.some(m => m.label) && (
-        <div className="relative w-full mt-1.5 h-4">
+      {/* {marks && marks.some(m => m.label) && (
+        <div className="relative w-full mt-4 h-4">
           {marks.map((mark) => {
             if (!mark.label) return null
             const pct = ((mark.value - min) / (max - min)) * 100
@@ -135,7 +138,7 @@ const Slider = React.forwardRef<
             )
           })}
         </div>
-      )}
+      )} */}
     </div>
   )
 })
