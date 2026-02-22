@@ -350,7 +350,11 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     setPreviewLayoutType(layoutType)
     setEditingPartInLayout(part)
     setEditingJamo(jamoInfo.type, jamoInfo.char)
-  }, [testSyllable, layoutType, setEditingPartInLayout, setEditingJamo])
+    // 모바일: 자모 편집 진입 시 자모 탭으로 자동 전환
+    if (isMobile) {
+      setMobileEditorTab('jamo')
+    }
+  }, [testSyllable, layoutType, setEditingPartInLayout, setEditingJamo, isMobile])
 
   // 자모 편집 변경 핸들러
   const handleStrokeChange = useCallback((strokeId: string, prop: string, value: number | string | boolean | undefined) => {
