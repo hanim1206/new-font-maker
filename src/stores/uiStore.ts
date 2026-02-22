@@ -35,6 +35,10 @@ interface UIState {
   editingOverrideId: string | null
   // 현재 편집 중인 레이아웃 오버라이드 ID (null = 기본값 편집)
   editingLayoutOverrideId: string | null
+  // 현재 불러온 프로젝트 ID
+  currentProjectId: string | null
+  // 현재 불러온 프로젝트 이름
+  currentProjectName: string | null
 }
 
 interface UIActions {
@@ -54,6 +58,7 @@ interface UIActions {
   setEditingPartInLayout: (part: Part | null) => void
   setEditingOverrideId: (id: string | null) => void
   setEditingLayoutOverrideId: (id: string | null) => void
+  setCurrentProject: (id: string | null, name: string | null) => void
 }
 
 export const useUIStore = create<UIState & UIActions>()(
@@ -76,6 +81,8 @@ export const useUIStore = create<UIState & UIActions>()(
     editingPartInLayout: null,
     editingOverrideId: null,
     editingLayoutOverrideId: null,
+    currentProjectId: null,
+    currentProjectName: null,
 
     // 액션
     setViewMode: (mode) =>
@@ -163,6 +170,12 @@ export const useUIStore = create<UIState & UIActions>()(
     setEditingLayoutOverrideId: (id) =>
       set((state) => {
         state.editingLayoutOverrideId = id
+      }),
+
+    setCurrentProject: (id, name) =>
+      set((state) => {
+        state.currentProjectId = id
+        state.currentProjectName = name
       }),
   }))
 )

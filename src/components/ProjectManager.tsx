@@ -3,10 +3,11 @@
  *
  * 상단 바에서 토글되는 드롭다운 형태
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useFontProject } from '../hooks/useFontProject'
+import { generateAndDownloadFont } from '../services/fontGenerator'
 
 interface ProjectManagerProps {
   open: boolean
@@ -34,7 +35,10 @@ export function ProjectManager({ open, onClose }: ProjectManagerProps) {
   // 이름 수정 중인 프로젝트 ID
   const [editingNameId, setEditingNameId] = useState<string | null>(null)
   const [editingNameValue, setEditingNameValue] = useState('')
+  const [exportingId, setExportingId] = useState<string | null>(null)
+  const [exportProgress, setExportProgress] = useState('')
   const panelRef = useRef<HTMLDivElement>(null)
+  const exportingRef = useRef(false)
 
   // 열릴 때 목록 조회
   useEffect(() => {
@@ -82,6 +86,30 @@ export function ProjectManager({ open, onClose }: ProjectManagerProps) {
     if (!confirm('이 프로젝트를 삭제하시겠습니까?')) return
     await deleteProject(id)
   }
+
+  const handleExportTTF = useCallback(async (id: string, name: string) => {
+    if (exportingRef.current) return
+    exportingRef.current = true
+    setExportingId(id)
+    setExportProgress('준비 중...')
+    try {
+      // 먼저 해당 프로젝트를 불러온 후 내보내기
+      await loadProject(id)
+      const result = await generateAndDownloadFont({
+        familyName: name,
+        onProgress: (_completed, _total, phase) => {
+          setExportProgress(phase)
+        },
+      })
+      if (!result.success) {
+        alert(`내보내기 실패: ${result.error}`)
+      }
+    } finally {
+      setExportingId(null)
+      setExportProgress('')
+      exportingRef.current = false
+    }
+  }, [loadProject])
 
   const handleStartRename = (id: string, currentName: string) => {
     setEditingNameId(id)
@@ -254,6 +282,14 @@ export function ProjectManager({ open, onClose }: ProjectManagerProps) {
                       disabled={loading}
                     >
                       덮어쓰기
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => handleExportTTF(project.id, project.name)}
+                      disabled={loading || exportingId !== null}
+                    >
+                      {exportingId === project.id ? exportProgress : 'TTF'}
                     </Button>
                     <Button
                       size="sm"
