@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useState, useRef } from 'react'
 import { ControlPanel } from './components/ControlPanel/ControlPanel'
 import { PreviewPanel } from './components/PreviewPanel'
 import { EditorPanel } from './components/EditorPanel/EditorPanel'
@@ -9,12 +9,38 @@ import { useAuthStore } from './stores/authStore'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { generateAndDownloadFont } from './services/fontGenerator'
 
 export default function App() {
   const { viewMode, setViewMode, isMobile, setIsMobile, inputText, setInputText } = useUIStore()
   const user = useAuthStore((s) => s.user)
   const [projectManagerOpen, setProjectManagerOpen] = useState(false)
   const [authPanelOpen, setAuthPanelOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportProgress, setExportProgress] = useState('')
+  const exportingRef = useRef(false)
+
+  const handleExportTTF = useCallback(async () => {
+    if (exportingRef.current) return
+    exportingRef.current = true
+    setExporting(true)
+    setExportProgress('준비 중...')
+    try {
+      const result = await generateAndDownloadFont({
+        familyName: 'FontMaker',
+        onProgress: (_completed, _total, phase) => {
+          setExportProgress(phase)
+        },
+      })
+      if (!result.success) {
+        alert(`내보내기 실패: ${result.error}`)
+      }
+    } finally {
+      setExporting(false)
+      setExportProgress('')
+      exportingRef.current = false
+    }
+  }, [])
 
   // 인증 상태 리스너 초기화 (initialize 참조 안정성 무관하게 1회만)
   useEffect(() => {
@@ -85,6 +111,16 @@ export default function App() {
               className="shrink-0"
             >
               Reset
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleExportTTF}
+              disabled={exporting}
+              title={exporting ? exportProgress : 'TTF 폰트 파일 다운로드'}
+              className="shrink-0"
+            >
+              {exporting ? exportProgress : 'TTF 내보내기'}
             </Button>
             <PreviewPanel horizontal />
             {/* 우측 끝: 인증 버튼 */}
