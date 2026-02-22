@@ -6,6 +6,7 @@
 import { useState, useCallback } from 'react'
 import { fontProjectService } from '../services/fontProjectService'
 import { collectFontData, applyFontData, validateFontData } from '../services/fontDataBridge'
+import { useUIStore } from '../stores/uiStore'
 import type { FontProject } from '../types/database'
 
 interface UseFontProjectReturn {
@@ -28,7 +29,8 @@ interface UseFontProjectReturn {
 
 export function useFontProject(): UseFontProjectReturn {
   const [projects, setProjects] = useState<FontProject[]>([])
-  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
+  const currentProjectId = useUIStore((s) => s.currentProjectId)
+  const setCurrentProject = useUIStore((s) => s.setCurrentProject)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -58,7 +60,7 @@ export function useFontProject(): UseFontProjectReturn {
         name,
         font_data: fontData,
       })
-      setCurrentProjectId(project.id)
+      setCurrentProject(project.id, name)
       // 목록 갱신
       setProjects((prev) => [project, ...prev])
       return project
@@ -69,7 +71,7 @@ export function useFontProject(): UseFontProjectReturn {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [setCurrentProject])
 
   // 현재 프로젝트 덮어쓰기 저장
   const saveCurrent = useCallback(async () => {
@@ -102,7 +104,7 @@ export function useFontProject(): UseFontProjectReturn {
     try {
       const fontData = collectFontData()
       const updated = await fontProjectService.update(id, { font_data: fontData })
-      setCurrentProjectId(id)
+      setCurrentProject(id, updated.name)
       setProjects((prev) =>
         prev.map((p) => (p.id === updated.id ? updated : p))
       )
@@ -111,7 +113,7 @@ export function useFontProject(): UseFontProjectReturn {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [setCurrentProject])
 
   // 프로젝트 이름 변경
   const renameProject = useCallback(async (id: string, name: string) => {
@@ -122,12 +124,16 @@ export function useFontProject(): UseFontProjectReturn {
       setProjects((prev) =>
         prev.map((p) => (p.id === updated.id ? updated : p))
       )
+      // 현재 프로젝트 이름 변경 시 uiStore도 갱신
+      if (id === currentProjectId) {
+        setCurrentProject(id, name)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : '이름 변경 실패')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [currentProjectId, setCurrentProject])
 
   // 프로젝트 불러오기
   const loadProject = useCallback(async (id: string) => {
@@ -148,13 +154,13 @@ export function useFontProject(): UseFontProjectReturn {
 
       // 3개 스토어에 적용
       applyFontData(project.font_data)
-      setCurrentProjectId(project.id)
+      setCurrentProject(project.id, project.name)
     } catch (e) {
       setError(e instanceof Error ? e.message : '불러오기 실패')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [setCurrentProject])
 
   // 프로젝트 삭제
   const deleteProject = useCallback(async (id: string) => {
@@ -165,14 +171,14 @@ export function useFontProject(): UseFontProjectReturn {
       setProjects((prev) => prev.filter((p) => p.id !== id))
       // 현재 프로젝트가 삭제되면 초기화
       if (currentProjectId === id) {
-        setCurrentProjectId(null)
+        setCurrentProject(null, null)
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : '삭제 실패')
     } finally {
       setLoading(false)
     }
-  }, [currentProjectId])
+  }, [currentProjectId, setCurrentProject])
 
   return {
     projects,

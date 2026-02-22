@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState, useRef } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import { ControlPanel } from './components/ControlPanel/ControlPanel'
 import { PreviewPanel } from './components/PreviewPanel'
 import { EditorPanel } from './components/EditorPanel/EditorPanel'
@@ -6,41 +6,30 @@ import { ProjectManager } from './components/ProjectManager'
 import { AuthPanel } from './components/AuthPanel'
 import { useUIStore } from './stores/uiStore'
 import { useAuthStore } from './stores/authStore'
+import { useFontProject } from './hooks/useFontProject'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { generateAndDownloadFont } from './services/fontGenerator'
 
 export default function App() {
   const { viewMode, setViewMode, isMobile, setIsMobile, inputText, setInputText } = useUIStore()
+  const currentProjectId = useUIStore((s) => s.currentProjectId)
+  const currentProjectName = useUIStore((s) => s.currentProjectName)
   const user = useAuthStore((s) => s.user)
+  const { saveCurrent, loading: projectLoading } = useFontProject()
   const [projectManagerOpen, setProjectManagerOpen] = useState(false)
   const [authPanelOpen, setAuthPanelOpen] = useState(false)
-  const [exporting, setExporting] = useState(false)
-  const [exportProgress, setExportProgress] = useState('')
-  const exportingRef = useRef(false)
+  const [saving, setSaving] = useState(false)
 
-  const handleExportTTF = useCallback(async () => {
-    if (exportingRef.current) return
-    exportingRef.current = true
-    setExporting(true)
-    setExportProgress('준비 중...')
+  const handleSave = useCallback(async () => {
+    if (!currentProjectId || saving) return
+    setSaving(true)
     try {
-      const result = await generateAndDownloadFont({
-        familyName: 'FontMaker',
-        onProgress: (_completed, _total, phase) => {
-          setExportProgress(phase)
-        },
-      })
-      if (!result.success) {
-        alert(`내보내기 실패: ${result.error}`)
-      }
+      await saveCurrent()
     } finally {
-      setExporting(false)
-      setExportProgress('')
-      exportingRef.current = false
+      setSaving(false)
     }
-  }, [])
+  }, [currentProjectId, saving, saveCurrent])
 
   // 인증 상태 리스너 초기화 (initialize 참조 안정성 무관하게 1회만)
   useEffect(() => {
@@ -103,6 +92,18 @@ export default function App() {
                 onClose={() => setProjectManagerOpen(false)}
               />
             </div>
+            {currentProjectId && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleSave}
+                disabled={saving || projectLoading}
+                title={currentProjectName ? `'${currentProjectName}' 저장` : '현재 프로젝트 저장'}
+                className="shrink-0"
+              >
+                {saving ? '저장 중...' : '저장'}
+              </Button>
+            )}
             <Button
               variant="danger"
               size="sm"
@@ -111,16 +112,6 @@ export default function App() {
               className="shrink-0"
             >
               Reset
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleExportTTF}
-              disabled={exporting}
-              title={exporting ? exportProgress : 'TTF 폰트 파일 다운로드'}
-              className="shrink-0"
-            >
-              {exporting ? exportProgress : 'TTF 내보내기'}
             </Button>
             <PreviewPanel horizontal />
             {/* 우측 끝: 인증 버튼 */}
