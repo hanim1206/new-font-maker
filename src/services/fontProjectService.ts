@@ -3,18 +3,32 @@ import type { FontProject, CreateFontProjectInput, UpdateFontProjectInput } from
 
 const TABLE = 'font_projects'
 
+/** 현재 로그인된 사용자 ID 조회 */
+async function getCurrentUserId(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser()
+  return user?.id ?? null
+}
+
 /**
  * 폰트 프로젝트 CRUD 서비스
  */
 export const fontProjectService = {
   /**
-   * 전체 폰트 프로젝트 목록 조회 (최신순)
+   * 전체 폰트 프로젝트 목록 조회 (최신순, 본인 프로젝트만)
    */
   async list(): Promise<FontProject[]> {
-    const { data, error } = await supabase
+    const userId = await getCurrentUserId()
+    let query = supabase
       .from(TABLE)
       .select('*')
       .order('updated_at', { ascending: false })
+
+    // 로그인 상태면 본인 프로젝트만 조회
+    if (userId) {
+      query = query.eq('user_id', userId)
+    }
+
+    const { data, error } = await query
 
     if (error) throw new Error(`폰트 목록 조회 실패: ${error.message}`)
     return data as FontProject[]
@@ -41,12 +55,13 @@ export const fontProjectService = {
    * 새 폰트 프로젝트 생성
    */
   async create(input: CreateFontProjectInput): Promise<FontProject> {
+    const userId = await getCurrentUserId()
     const { data, error } = await supabase
       .from(TABLE)
       .insert({
         name: input.name,
         font_data: input.font_data,
-        user_id: input.user_id ?? null,
+        user_id: input.user_id ?? userId,
       })
       .select()
       .single()

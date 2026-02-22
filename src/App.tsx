@@ -3,18 +3,37 @@ import { ControlPanel } from './components/ControlPanel/ControlPanel'
 import { PreviewPanel } from './components/PreviewPanel'
 import { EditorPanel } from './components/EditorPanel/EditorPanel'
 import { ProjectManager } from './components/ProjectManager'
+import { AuthPanel } from './components/AuthPanel'
 import { useUIStore } from './stores/uiStore'
+import { useAuthStore } from './stores/authStore'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 export default function App() {
   const { viewMode, setViewMode, isMobile, setIsMobile, inputText, setInputText } = useUIStore()
+  const user = useAuthStore((s) => s.user)
   const [projectManagerOpen, setProjectManagerOpen] = useState(false)
+  const [authPanelOpen, setAuthPanelOpen] = useState(false)
+
+  // 인증 상태 리스너 초기화 (initialize 참조 안정성 무관하게 1회만)
+  useEffect(() => {
+    const unsubscribe = useAuthStore.getState().initialize()
+    return unsubscribe
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleClearStorage = useCallback(() => {
     if (confirm('로컬스토리지를 비우면 모든 편집 데이터가 초기화됩니다.\n계속하시겠습니까?')) {
-      localStorage.clear()
+      // Supabase 세션 토큰은 보존하고 앱 데이터만 삭제
+      const keysToRemove: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && !key.startsWith('sb-')) {
+          keysToRemove.push(key)
+        }
+      }
+      keysToRemove.forEach((key) => localStorage.removeItem(key))
       window.location.reload()
     }
   }, [])
@@ -68,6 +87,20 @@ export default function App() {
               Reset
             </Button>
             <PreviewPanel horizontal />
+            {/* 우측 끝: 인증 버튼 */}
+            <div className="relative shrink-0 ml-auto">
+              <Button
+                variant={user ? 'default' : 'default'}
+                size="sm"
+                onClick={() => setAuthPanelOpen(!authPanelOpen)}
+              >
+                {user ? user.email?.split('@')[0] : '로그인'}
+              </Button>
+              <AuthPanel
+                open={authPanelOpen}
+                onClose={() => setAuthPanelOpen(false)}
+              />
+            </div>
           </div>
         </div>
 
