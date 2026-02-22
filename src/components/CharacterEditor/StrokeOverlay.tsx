@@ -41,6 +41,10 @@ interface DragState {
   containerY: number
   containerW: number
   containerH: number
+  // 핸들 드래그 시: 초기 각도 및 앵커 절대 좌표 (각도 데드존용)
+  initialAngle?: number
+  anchorAbsX?: number
+  anchorAbsY?: number
 }
 
 // === Props ===
@@ -215,6 +219,26 @@ export function StrokeOverlay({
       e.preventDefault()
       onDragStart?.()
       setSelectedPointIndex(pointIndex)
+
+      // 핸들 드래그 시 초기 각도 캡처 (각도 데드존용)
+      let initialAngle: number | undefined
+      let anchorAbsX: number | undefined
+      let anchorAbsY: number | undefined
+      if (type === 'handleIn' || type === 'handleOut') {
+        const stroke = strokes.find(s => s.id === strokeId)
+        if (stroke) {
+          const point = stroke.points[pointIndex]
+          anchorAbsX = container.x + point.x * container.width
+          anchorAbsY = container.y + point.y * container.height
+          const handle = type === 'handleIn' ? point.handleIn : point.handleOut
+          if (handle) {
+            const hAbsX = container.x + handle.x * container.width
+            const hAbsY = container.y + handle.y * container.height
+            initialAngle = Math.atan2(hAbsY - anchorAbsY, hAbsX - anchorAbsX)
+          }
+        }
+      }
+
       setDragState({
         type,
         strokeId,
@@ -223,9 +247,12 @@ export function StrokeOverlay({
         containerY: container.y,
         containerW: container.width,
         containerH: container.height,
+        initialAngle,
+        anchorAbsX,
+        anchorAbsY,
       })
     }
-  }, [setSelectedPointIndex, onDragStart])
+  }, [setSelectedPointIndex, onDragStart, strokes])
 
   // 획 전체 이동 드래그 시작
   const startStrokeMove = useCallback((stroke: StrokeDataV2) => {
@@ -294,8 +321,39 @@ export function StrokeOverlay({
         const hint = detectMergeHint(currentStrokes, dragState.strokeId, dragState.pointIndex)
         setMergeHintState(hint)
       } else {
-        // 핸들은 스냅 없이 자유 이동
-        onPointChange(dragState.strokeId, dragState.pointIndex, dragState.type, { x: relX, y: relY })
+        // 핸들 드래그: 각도 데드존 적용 (15도 이내면 초기 각도 유지)
+        const ANGLE_DEAD_ZONE = 15 * Math.PI / 180
+        const aX = dragState.anchorAbsX
+        const aY = dragState.anchorAbsY
+        const initAngle = dragState.initialAngle
+
+        if (aX !== undefined && aY !== undefined && initAngle !== undefined) {
+          const dx = svgPt.x - aX
+          const dy = svgPt.y - aY
+          const dist = Math.hypot(dx, dy)
+          const newAngle = Math.atan2(dy, dx)
+
+          let angleDiff = newAngle - initAngle
+          // -PI ~ PI 정규화
+          while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI
+          while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI
+
+          let effectiveAngle: number
+          if (Math.abs(angleDiff) < ANGLE_DEAD_ZONE) {
+            effectiveAngle = initAngle
+          } else {
+            // 데드존만큼 빼서 점프 방지
+            effectiveAngle = initAngle + (angleDiff > 0 ? angleDiff - ANGLE_DEAD_ZONE : angleDiff + ANGLE_DEAD_ZONE)
+          }
+
+          const finalX = aX + Math.cos(effectiveAngle) * dist
+          const finalY = aY + Math.sin(effectiveAngle) * dist
+          const handleRelX = cW > 0 ? (finalX - cX) / cW : 0
+          const handleRelY = cH > 0 ? (finalY - cY) / cH : 0
+          onPointChange(dragState.strokeId, dragState.pointIndex, dragState.type, { x: handleRelX, y: handleRelY })
+        } else {
+          onPointChange(dragState.strokeId, dragState.pointIndex, dragState.type, { x: relX, y: relY })
+        }
         setSnapFeedback(null)
         setMergeHintState(null)
       }

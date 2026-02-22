@@ -91,7 +91,7 @@ export function JamoCanvasColumn({
   const [canvasSize, setCanvasSize] = useState(300)
   const [isDragging, setIsDragging] = useState(false)
 
-  const { canvasZoom, canvasPan, resetCanvasView, selectedPointIndex, isMobile } = useUIStore()
+  const { canvasZoom, canvasPan, resetCanvasView, isMobile } = useUIStore()
 
   // ResizeObserver: 컨테이너 크기에 맞게 캔버스 크기 동적 계산
   useEffect(() => {
@@ -113,16 +113,6 @@ export function JamoCanvasColumn({
   useEffect(() => {
     resetCanvasView()
   }, [editingJamoInfo?.char, editingJamoInfo?.type]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 롱프레스로 PointActionPopup 활성화 (모바일 전용)
-  const [longPressActive, setLongPressActive] = useState(false)
-  useEffect(() => {
-    setLongPressActive(false)
-  }, [selectedPointIndex])
-
-  const handlePointLongPress = useCallback(() => {
-    setLongPressActive(true)
-  }, [])
 
   const handleDragStart = useCallback(() => {
     setIsDragging(true)
@@ -164,9 +154,9 @@ export function JamoCanvasColumn({
   } : editingBox!
 
   return (
-    <div className="h-full flex flex-col">
-      {/* StrokeToolbar — 캔버스 상단 인라인 */}
-      {isJamoEditing && selectedStrokeId && (
+    <div className="h-full flex flex-col relative">
+      {/* StrokeToolbar — PC: 캔버스 상단 인라인 */}
+      {!isMobile && isJamoEditing && selectedStrokeId && (
         <StrokeToolbar
           strokes={draftStrokes}
           onChange={onStrokeChange}
@@ -239,7 +229,6 @@ export function JamoCanvasColumn({
                   onPointChange={onPointChange}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
-                  onPointLongPress={handlePointLongPress}
                   strokeColor="#e5e5e5"
                   isMixed={!!mixedJungseongData}
                   juHBox={mixedJungseongData?.juHBox}
@@ -302,8 +291,8 @@ export function JamoCanvasColumn({
               })()}
             </SvgRenderer>
 
-            {/* PointActionPopup — 캔버스 위에 absolute 팝업 (터치: 롱프레스 후 표시) */}
-            {editingBox && !isDragging && (!isTouch || longPressActive) && (
+            {/* PointActionPopup — 캔버스 위에 absolute 팝업 */}
+            {editingBox && !isDragging && (
               <PointActionPopup
                 strokes={draftStrokes}
                 canvasSize={canvasSize}
@@ -324,8 +313,22 @@ export function JamoCanvasColumn({
               />
             )}
           </div>
+
         </div>
       </div>
+
+      {/* StrokeToolbar — 모바일: 하단 absolute (캔버스 크기 영향 없음) */}
+      {isMobile && isJamoEditing && selectedStrokeId && (
+        <div className="absolute bottom-0 left-0 right-0 z-10">
+          <StrokeToolbar
+            strokes={draftStrokes}
+            onChange={onStrokeChange}
+            onMergeStrokes={onMergeStrokes}
+            onDeleteStroke={onDeleteStroke}
+            onAddStroke={onAddStroke}
+          />
+        </div>
+      )}
 
       {/* StrokeEditor — UI 없는 키보드 핸들러 */}
       {editingBox && (
