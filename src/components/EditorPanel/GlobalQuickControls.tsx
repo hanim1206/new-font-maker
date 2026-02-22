@@ -1,7 +1,9 @@
 import { useGlobalStyleStore, weightToMultiplier } from '../../stores/globalStyleStore'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
+import { cn } from '@/lib/utils'
 import type { SliderMark } from '@/components/ui/slider'
+import type { StrokeLinecap } from '../../types'
 
 const WEIGHT_MARKS: SliderMark[] = [
   { value: 100, label: '100' },
@@ -15,12 +17,48 @@ const WEIGHT_MARKS: SliderMark[] = [
   { value: 900, label: '900' },
 ]
 
+const CAP_OPTIONS: Array<{ value: StrokeLinecap; label: string }> = [
+  { value: 'round', label: '둥글게' },
+  { value: 'butt', label: '납작하게' },
+]
+
+function CapIcon({ cap }: { cap: StrokeLinecap }) {
+  return (
+    <svg width="26" height="10" viewBox="0 0 26 10" fill="none">
+      <line x1="3" y1="5" x2="23" y2="5" stroke="currentColor" strokeWidth="7" strokeLinecap={cap} />
+    </svg>
+  )
+}
+
+function CapStylePicker({ linecap, onChange }: { linecap: StrokeLinecap; onChange: (v: StrokeLinecap) => void }) {
+  return (
+    <div className="flex gap-1">
+      {CAP_OPTIONS.map(({ value, label }) => (
+        <button
+          key={value}
+          title={label}
+          onClick={() => onChange(value)}
+          className={cn(
+            'h-7 px-2.5 rounded text-xs flex items-center gap-1.5 border transition-all duration-150 cursor-pointer',
+            linecap === value
+              ? 'bg-accent-blue border-accent-blue text-white'
+              : 'bg-surface-2 border-border text-text-dim-3 hover:bg-surface-hover hover:text-foreground hover:border-border-light'
+          )}
+        >
+          <CapIcon cap={value} />
+          <span>{label}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 interface GlobalQuickControlsProps {
   vertical?: boolean
 }
 
 export function GlobalQuickControls({ vertical = false }: GlobalQuickControlsProps) {
-  const { style, updateStyle } = useGlobalStyleStore()
+  const { style, updateStyle, updateLinecap } = useGlobalStyleStore()
 
   if (vertical) {
     return (
@@ -60,6 +98,12 @@ export function GlobalQuickControls({ vertical = false }: GlobalQuickControlsPro
           <span className="text-xs text-text-dim-5 font-mono shrink-0 w-12 text-right">
             {weightToMultiplier(style.weight).toFixed(2)}x
           </span>
+        </div>
+
+        {/* 캡 스타일 */}
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-text-dim-4 shrink-0 w-10">캡</span>
+          <CapStylePicker linecap={style.linecap} onChange={updateLinecap} />
         </div>
       </div>
     )
@@ -104,6 +148,14 @@ export function GlobalQuickControls({ vertical = false }: GlobalQuickControlsPro
         <span className="text-xs text-text-dim-5 font-mono shrink-0 w-12 text-right">
           {weightToMultiplier(style.weight).toFixed(2)}x
         </span>
+      </div>
+
+      <Separator orientation="vertical" className="h-5" />
+
+      {/* 캡 스타일 */}
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="text-xs text-text-dim-4">캡</span>
+        <CapStylePicker linecap={style.linecap} onChange={updateLinecap} />
       </div>
     </div>
   )
