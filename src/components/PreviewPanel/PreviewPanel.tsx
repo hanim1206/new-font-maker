@@ -24,6 +24,7 @@ export function PreviewPanel({ horizontal = false }: PreviewPanelProps) {
     setEditingJamo,
     setEditingPartInLayout,
     setSelectedLayoutType,
+    setViewMode,
     isMobile,
   } = useUIStore()
   const { layoutConfigs, getEffectivePadding, getLayoutSchema } = useLayoutStore()
@@ -77,6 +78,10 @@ export function PreviewPanel({ horizontal = false }: PreviewPanelProps) {
     setControlMode('layout')
     setEditingJamo(null, null)
     setEditingPartInLayout(null)
+    // 모바일: 글자 선택 시 편집 탭으로 자동 전환
+    if (isMobile) {
+      setViewMode('editor')
+    }
   }
 
   // === 가로 모드 (데스크톱 상단 바) ===

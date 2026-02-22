@@ -1,5 +1,4 @@
 import { useEffect, useCallback, useState } from 'react'
-import { ControlPanel } from './components/ControlPanel/ControlPanel'
 import { PreviewPanel } from './components/PreviewPanel'
 import { EditorPanel } from './components/EditorPanel/EditorPanel'
 import { ProjectManager } from './components/ProjectManager'
@@ -121,12 +120,6 @@ export default function App() {
         </h1>
         <nav className="flex gap-2">
           <TabButton
-            active={viewMode === 'presets'}
-            onClick={() => setViewMode('presets')}
-          >
-            리모콘
-          </TabButton>
-          <TabButton
             active={viewMode === 'preview'}
             onClick={() => setViewMode('preview')}
           >
@@ -142,7 +135,6 @@ export default function App() {
       </header>
 
       <main className="flex-1 overflow-y-auto overflow-x-hidden">
-        {viewMode === 'presets' && <ControlPanel />}
         {viewMode === 'preview' && <PreviewPanel />}
         {viewMode === 'editor' && <EditorPanel />}
       </main>

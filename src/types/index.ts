@@ -203,5 +203,5 @@ export interface DecomposedSyllable {
 }
 
 // ===== UI 상태 =====
-export type ViewMode = 'preview' | 'presets' | 'editor'
+export type ViewMode = 'preview' | 'editor'
 
