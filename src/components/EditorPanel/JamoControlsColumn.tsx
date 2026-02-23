@@ -1,5 +1,7 @@
 import { OverridePanel } from '../CharacterEditor/OverridePanel'
+import { StrokeToolbar } from '../CharacterEditor/StrokeToolbar'
 import { Button } from '@/components/ui/button'
+import type { StrokeDataV2 } from '../../types'
 
 interface ChoseongStyleInfo {
   type: 'single' | 'compound'
@@ -14,6 +16,12 @@ interface JamoControlsColumnProps {
   onApplyChoseongStyle: () => void
   // 오버라이드 탭 전환 시 호출
   onOverrideSwitch: (overrideId: string | null) => void
+  // StrokeToolbar props
+  strokes?: StrokeDataV2[]
+  onStrokeChange?: (strokeId: string, prop: string, value: number | string | boolean | undefined) => void
+  onMergeStrokes?: (strokeIdA: string, strokeIdB: string) => void
+  onDeleteStroke?: (strokeId: string) => void
+  onAddStroke?: () => void
 }
 
 /** 우측 컨트롤러 패널 (슬림 — 오버라이드 + 초성 스타일만) */
@@ -23,11 +31,27 @@ export function JamoControlsColumn({
   choseongStyleInfo,
   onApplyChoseongStyle,
   onOverrideSwitch,
+  strokes,
+  onStrokeChange,
+  onMergeStrokes,
+  onDeleteStroke,
+  onAddStroke,
 }: JamoControlsColumnProps) {
   if (isJamoEditing && editingJamoInfo) {
     return (
       <div className="h-full overflow-y-auto">
         <div className="p-4 flex flex-col gap-4">
+          {/* 획 편집 툴바 */}
+          {strokes && onStrokeChange && (
+            <StrokeToolbar
+              strokes={strokes}
+              onChange={onStrokeChange}
+              onMergeStrokes={onMergeStrokes}
+              onDeleteStroke={onDeleteStroke}
+              onAddStroke={onAddStroke}
+            />
+          )}
+
           {/* 초성 스타일 적용 버튼 (종성 편집 시) */}
           {choseongStyleInfo && (
             <Button

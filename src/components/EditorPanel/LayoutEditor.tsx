@@ -907,6 +907,11 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     choseongStyleInfo,
     onApplyChoseongStyle: handleApplyChoseongStyle,
     onOverrideSwitch: handleOverrideSwitch,
+    strokes: draftStrokes,
+    onStrokeChange: handleStrokeChange,
+    onMergeStrokes: handleMergeStrokes,
+    onDeleteStroke: handleDeleteStroke,
+    onAddStroke: handleAddStroke,
   } as const
 
   // 모바일: 단일 컬럼 레이아웃

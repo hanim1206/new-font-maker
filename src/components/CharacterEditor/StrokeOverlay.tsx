@@ -542,7 +542,8 @@ export function StrokeOverlay({
         width={viewBoxSize} height={viewBoxSize}
         fill="transparent"
         role="presentation"
-        onClick={handleBackgroundClick}
+        onMouseDown={handleBackgroundClick}
+        onTouchStart={handleBackgroundClick}
       />
 
       {/* 선택된 획을 마지막에 렌더링하여 SVG z-order 최상위로 배치 */}
@@ -576,13 +577,19 @@ export function StrokeOverlay({
                 aria-label={disableHitArea ? undefined : '획 선택'}
                 onClick={disableHitArea ? undefined : (e) => { e.stopPropagation(); setSelectedStrokeId(stroke.id) }}
                 onMouseDown={disableHitArea ? undefined : (e: React.MouseEvent) => {
-                  // 포인트 근처 클릭 시 즉시 포인트 드래그 시작 (획 선택 불필요)
+                  // 미선택 획: 먼저 획만 선택 (포인트 선택은 획 선택 후에만 가능)
+                  if (!isSelected) {
+                    e.stopPropagation()
+                    setSelectedStrokeId(stroke.id)
+                    return
+                  }
+                  // 이미 선택된 획: 포인트 근처면 포인트 드래그
                   if (onPointChange) {
                     const svgPt = svgPointFromEvent(e)
                     const nearIdx = findNearestPointIndex(stroke, svgPt, containerAbs)
                     if (nearIdx !== null) {
                       e.stopPropagation(); e.preventDefault()
-                      setSelectedStrokeId(stroke.id); onDragStart?.(); setSelectedPointIndex(nearIdx)
+                      onDragStart?.(); setSelectedPointIndex(nearIdx)
                       setDragState({ type: 'point', strokeId: stroke.id, pointIndex: nearIdx,
                         containerX: containerAbs.x, containerY: containerAbs.y, containerW: containerAbs.width, containerH: containerAbs.height })
                       return
@@ -639,12 +646,19 @@ export function StrokeOverlay({
                 aria-hidden="true"
                 onClick={disableHitArea ? undefined : (e) => { e.stopPropagation(); setSelectedStrokeId(stroke.id) }}
                 onMouseDown={disableHitArea ? undefined : (e: React.MouseEvent) => {
+                  // 미선택 획: 먼저 획만 선택
+                  if (!isSelected) {
+                    e.stopPropagation()
+                    setSelectedStrokeId(stroke.id)
+                    return
+                  }
+                  // 이미 선택된 획: 포인트 근처면 포인트 드래그
                   if (onPointChange) {
                     const svgPt = svgPointFromEvent(e)
                     const nearIdx = findNearestPointIndex(stroke, svgPt, containerAbs)
                     if (nearIdx !== null) {
                       e.stopPropagation(); e.preventDefault()
-                      setSelectedStrokeId(stroke.id); onDragStart?.(); setSelectedPointIndex(nearIdx)
+                      onDragStart?.(); setSelectedPointIndex(nearIdx)
                       setDragState({ type: 'point', strokeId: stroke.id, pointIndex: nearIdx,
                         containerX: containerAbs.x, containerY: containerAbs.y, containerW: containerAbs.width, containerH: containerAbs.height })
                       return

@@ -89,6 +89,7 @@ export function JamoCanvasColumn({
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [canvasSize, setCanvasSize] = useState(300)
+  const HANDLE_MARGIN = 40
   const [isDragging, setIsDragging] = useState(false)
 
   const { canvasZoom, canvasPan, resetCanvasView, isMobile, setSelectedStrokeId, setSelectedPointIndex } = useUIStore()
@@ -99,7 +100,7 @@ export function JamoCanvasColumn({
     const observer = new ResizeObserver(entries => {
       for (const entry of entries) {
         const { width } = entry.contentRect
-        const base = Math.max(150, Math.floor(width - 32))
+        const base = Math.max(150, Math.floor(width - HANDLE_MARGIN * 2))
         setCanvasSize(isMobile ? Math.floor(base * 0.8) : base)
       }
     })
@@ -155,29 +156,27 @@ export function JamoCanvasColumn({
 
   return (
     <div className="relative">
-      {/* StrokeToolbar — PC: 캔버스 상단 인라인 */}
-      {!isMobile && isJamoEditing && selectedStrokeId && (
-        <StrokeToolbar
-          strokes={draftStrokes}
-          onChange={onStrokeChange}
-          onMergeStrokes={onMergeStrokes}
-          onDeleteStroke={onDeleteStroke}
-          onAddStroke={onAddStroke}
-        />
-      )}
-
       {/* 캔버스 영역 */}
-      <div ref={containerRef} className="p-4">
-        <div className="flex justify-center p-3 bg-background rounded mb-2" onClick={() => { setSelectedStrokeId(null); setSelectedPointIndex(null) }}>
+      <div className="p-4 md:p-10 ">
+        <div ref={containerRef} className="flex justify-center p-3 bg-background rounded mb-2" onClick={() => { setSelectedStrokeId(null); setSelectedPointIndex(null) }}>
           <div
             className="relative"
             style={{
-              width: canvasSize,
-              height: canvasSize,
-              backgroundColor: '#1a1a1a',
+              width: canvasSize + HANDLE_MARGIN * 2,
+              height: canvasSize + HANDLE_MARGIN * 2,
               transform: isTouch ? `translate(${canvasPan.x}px, ${canvasPan.y}px) scale(${canvasZoom})` : undefined,
               transformOrigin: 'center center',
               willChange: isTouch ? 'transform' : undefined,
+            }}
+          >
+          <div
+            className="absolute"
+            style={{
+              left: HANDLE_MARGIN,
+              top: HANDLE_MARGIN,
+              width: canvasSize,
+              height: canvasSize,
+              backgroundColor: '#1a1a1a',
             }}
           >
             {/* 0.025 스냅 그리드 */}
@@ -312,6 +311,7 @@ export function JamoCanvasColumn({
                 onDeletePoint={onDeletePoint}
               />
             )}
+          </div>
           </div>
 
         </div>
