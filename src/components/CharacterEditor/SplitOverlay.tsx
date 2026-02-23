@@ -116,6 +116,8 @@ export function SplitOverlay({
   // 드래그 시작
   const handlePointerDown = (index: number, axis: 'x' | 'y') => (e: React.MouseEvent | React.TouchEvent) => {
     if (disabled) return
+    // 멀티터치(핀치줌 중) → 드래그 시작 차단
+    if ('touches' in e && e.touches.length > 1) return
     e.stopPropagation()
     e.preventDefault()
     setDragState({ index, axis })
@@ -126,6 +128,11 @@ export function SplitOverlay({
     if (!dragState) return
 
     const handleWindowMove = (e: MouseEvent | TouchEvent) => {
+      // 멀티터치 감지 → 드래그 취소 (핀치줌 우선)
+      if ('touches' in e && e.touches.length > 1) {
+        setDragState(null)
+        return
+      }
       const svgPt = svgPointFromEvent(e)
       const newValue = svgToSplitValue(svgPt, dragState.axis, dragState.index)
       onSplitChange(dragState.index, newValue)

@@ -209,6 +209,11 @@ export function LayoutCanvasColumn({
 
       const onMouseMove = (me: MouseEvent) => applyMove(me.clientX, me.clientY)
       const onTouchMove = (te: TouchEvent) => {
+        // 멀티터치 감지 → 드래그 취소 (핀치줌 우선)
+        if (te.touches.length > 1) {
+          handleUp()
+          return
+        }
         if (te.touches.length > 0) {
           te.preventDefault()
           applyMove(te.touches[0].clientX, te.touches[0].clientY)
@@ -243,11 +248,11 @@ export function LayoutCanvasColumn({
 
   const handlePartEdgeTouchStart = useCallback(
     (side: PaddingSide, e: React.TouchEvent) => {
+      // 멀티터치(핀치줌 중) → 드래그 시작 차단
+      if (e.touches.length !== 1) return
       e.preventDefault()
       e.stopPropagation()
-      if (e.touches.length > 0) {
-        startPartEdgeDrag(side, e.touches[0].clientX, e.touches[0].clientY)
-      }
+      startPartEdgeDrag(side, e.touches[0].clientX, e.touches[0].clientY)
     },
     [startPartEdgeDrag]
   )
@@ -421,7 +426,8 @@ export function LayoutCanvasColumn({
                       }
                     }}
                     onTouchStart={(e) => {
-                      if (e.touches.length === 0) return
+                      // 멀티터치(핀치줌 중) → 드래그 시작 차단
+                      if (e.touches.length !== 1) return
                       const rect = e.currentTarget.getBoundingClientRect()
                       const nearSide = detectNearEdge(e.touches[0].clientX, e.touches[0].clientY, rect, EDGE_DRAG_THRESHOLD)
                       if (nearSide) {
