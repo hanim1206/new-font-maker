@@ -121,8 +121,14 @@ export function StrokeOverlay({
   // 롱프레스 타이머 (앵커 포인트 롱프레스 → 팝업 트리거)
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // 1-finger pan 후 click 이벤트 억제용 플래그
-  const panOccurredRef = useRef(false)
+  // 터치 선택 딜레이 (핀치줌 시 첫 손가락이 획에 닿아도 즉시 선택하지 않음)
+  const pendingTouchSelectRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cancelPendingTouchSelect = useCallback(() => {
+    if (pendingTouchSelectRef.current) {
+      clearTimeout(pendingTouchSelectRef.current)
+      pendingTouchSelectRef.current = null
+    }
+  }, [])
 
   // 줌 보정: 화면상 일정한 크기 유지
   const zoomScale = 1 / canvasZoom
@@ -154,9 +160,10 @@ export function StrokeOverlay({
   useEffect(() => {
     return () => {
       clearLongPress()
+      cancelPendingTouchSelect()
       if (touchHighlightTimerRef.current) clearTimeout(touchHighlightTimerRef.current)
     }
-  }, [clearLongPress])
+  }, [clearLongPress, cancelPendingTouchSelect])
 
   // SVG 이벤트에서 viewBox 좌표 추출
   const svgPointFromEvent = useCallback((e: React.MouseEvent | MouseEvent | React.TouchEvent | TouchEvent) => {
@@ -454,8 +461,9 @@ export function StrokeOverlay({
 
     const handleWindowMove = (e: MouseEvent | TouchEvent) => {
       clearLongPress() // 이동 시작 시 롱프레스 취소
-      // 멀티터치 감지 → 드래그 취소 (핀치줌 우선)
+      // 멀티터치 감지 → 드래그 취소 + 대기 중 선택 취소 (핀치줌 우선)
       if ('touches' in e && e.touches.length > 1) {
+        cancelPendingTouchSelect()
         handlePointerUp()
         return
       }
@@ -479,66 +487,28 @@ export function StrokeOverlay({
       window.removeEventListener('touchend', handleWindowUp)
       window.removeEventListener('touchcancel', handleWindowUp)
     }
-  }, [dragState, handlePointerMove, handlePointerUp, clearLongPress])
+  }, [dragState, handlePointerMove, handlePointerUp, clearLongPress, cancelPendingTouchSelect])
 
-  // 빈 영역 클릭 시 선택 해제 (pan 직후에는 무시)
-  const handleBackgroundClick = useCallback(() => {
-    if (panOccurredRef.current) {
-      panOccurredRef.current = false
-      return
+  // 멀티터치 감지 → 대기 중 선택 취소 (dragState 없어도 동작)
+  useEffect(() => {
+    const handleGlobalTouch = (e: TouchEvent) => {
+      if (e.touches.length > 1) cancelPendingTouchSelect()
     }
+    window.addEventListener('touchstart', handleGlobalTouch)
+    window.addEventListener('touchmove', handleGlobalTouch)
+    return () => {
+      window.removeEventListener('touchstart', handleGlobalTouch)
+      window.removeEventListener('touchmove', handleGlobalTouch)
+    }
+  }, [cancelPendingTouchSelect])
+
+  // 빈 영역 클릭 시 선택 해제
+  const handleBackgroundClick = useCallback(() => {
     if (!dragState) {
       setSelectedPointIndex(null)
       setSelectedStrokeId(null)
     }
   }, [dragState, setSelectedPointIndex, setSelectedStrokeId])
-
-  // 빈 영역 터치 → 줌 상태에서 1-finger 캔버스 팬
-  const handleBgTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length !== 1 || canvasZoom <= 1) return
-
-    let lastX = e.touches[0].clientX
-    let lastY = e.touches[0].clientY
-    let moved = false
-
-    const onTouchMove = (te: TouchEvent) => {
-      // 멀티터치 → 팬 취소 (핀치줌으로 전환)
-      if (te.touches.length > 1) {
-        cleanup()
-        return
-      }
-      if (te.touches.length === 1) {
-        const dx = te.touches[0].clientX - lastX
-        const dy = te.touches[0].clientY - lastY
-        lastX = te.touches[0].clientX
-        lastY = te.touches[0].clientY
-        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) moved = true
-        const state = useUIStore.getState()
-        state.setCanvasPan({
-          x: state.canvasPan.x + dx,
-          y: state.canvasPan.y + dy,
-        })
-      }
-    }
-
-    const onTouchEnd = () => {
-      cleanup()
-      // 이동이 있었으면 click 이벤트(선택 해제) 억제
-      if (moved) {
-        panOccurredRef.current = true
-      }
-    }
-
-    const cleanup = () => {
-      window.removeEventListener('touchmove', onTouchMove)
-      window.removeEventListener('touchend', onTouchEnd)
-      window.removeEventListener('touchcancel', onTouchEnd)
-    }
-
-    window.addEventListener('touchmove', onTouchMove)
-    window.addEventListener('touchend', onTouchEnd)
-    window.addEventListener('touchcancel', onTouchEnd)
-  }, [canvasZoom])
 
   // 포인트 근접 감지 — 터치 시 획 선택+포인트 드래그를 한번에 시작하기 위해
   const POINT_GRAB_THRESHOLD = (isTouch ? 8 : 4) * zoomScale // viewBox 단위, 줌 보정
@@ -566,14 +536,13 @@ export function StrokeOverlay({
     <g
       style={dragState ? { cursor: getDragCursor() } : undefined}
     >
-      {/* 배경: 빈 영역 클릭 시 선택 해제 / 줌 상태에서 1-finger 팬 */}
+      {/* 배경: 빈 영역 클릭 시 선택 해제 */}
       <rect
         x={0} y={0}
         width={viewBoxSize} height={viewBoxSize}
         fill="transparent"
         role="presentation"
         onClick={handleBackgroundClick}
-        onTouchStart={handleBgTouchStart}
       />
 
       {/* 선택된 획을 마지막에 렌더링하여 SVG z-order 최상위로 배치 */}
@@ -627,10 +596,14 @@ export function StrokeOverlay({
 
                   setTouchHighlight(stroke.id)
 
-                  // 터치: 미선택 획이면 선택만 (드래그 안 함)
+                  // 터치: 미선택 획이면 딜레이 후 선택 (핀치줌 시 취소됨)
                   if (!isSelected) {
                     e.stopPropagation()
-                    setSelectedStrokeId(stroke.id)
+                    cancelPendingTouchSelect()
+                    pendingTouchSelectRef.current = setTimeout(() => {
+                      setSelectedStrokeId(stroke.id)
+                      pendingTouchSelectRef.current = null
+                    }, 80)
                     return
                   }
 
@@ -683,10 +656,14 @@ export function StrokeOverlay({
                   // 멀티터치(핀치줌 중) → 획 이벤트 무시
                   if (e.touches.length > 1) return
 
-                  // 터치: 미선택 획이면 선택만 (드래그 안 함)
+                  // 터치: 미선택 획이면 딜레이 후 선택 (핀치줌 시 취소됨)
                   if (!isSelected) {
                     e.stopPropagation()
-                    setSelectedStrokeId(stroke.id)
+                    cancelPendingTouchSelect()
+                    pendingTouchSelectRef.current = setTimeout(() => {
+                      setSelectedStrokeId(stroke.id)
+                      pendingTouchSelectRef.current = null
+                    }, 80)
                     return
                   }
 

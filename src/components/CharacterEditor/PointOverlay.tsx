@@ -63,13 +63,19 @@ export function PointOverlay({
                 <>
                   <line x1={ptX} y1={ptY} x2={hx} y2={hy}
                     stroke="#ff6b6b" strokeWidth={0.5 * zoomScale} opacity={0.6} aria-hidden="true" />
-                  <circle cx={hx} cy={hy} r={1.8 * zoomScale}
-                    fill="#ff6b6b" stroke="#fff" strokeWidth={0.3 * zoomScale}
+                  {/* 넓은 히트 영역 (투명) */}
+                  <circle cx={hx} cy={hy} r={pointRadius}
+                    fill="transparent"
                     role="button" aria-label="인 핸들"
                     style={{ cursor: 'grab' }}
                     onClick={(e) => e.stopPropagation()}
                     onMouseDown={onHandleInDown}
                     onTouchStart={onHandleInDown}
+                  />
+                  {/* 가시적 핸들 */}
+                  <circle cx={hx} cy={hy} r={1.8 * zoomScale}
+                    fill="#ff6b6b" stroke="#fff" strokeWidth={0.3 * zoomScale}
+                    aria-hidden="true" style={{ pointerEvents: 'none' }}
                   />
                 </>
               )
@@ -80,13 +86,19 @@ export function PointOverlay({
                 <>
                   <line x1={ptX} y1={ptY} x2={hx} y2={hy}
                     stroke="#4ecdc4" strokeWidth={0.5 * zoomScale} opacity={0.6} aria-hidden="true" />
-                  <circle cx={hx} cy={hy} r={1.8 * zoomScale}
-                    fill="#4ecdc4" stroke="#fff" strokeWidth={0.3 * zoomScale}
+                  {/* 넓은 히트 영역 (투명) */}
+                  <circle cx={hx} cy={hy} r={pointRadius}
+                    fill="transparent"
                     role="button" aria-label="아웃 핸들"
                     style={{ cursor: 'grab' }}
                     onClick={(e) => e.stopPropagation()}
                     onMouseDown={onHandleOutDown}
                     onTouchStart={onHandleOutDown}
+                  />
+                  {/* 가시적 핸들 */}
+                  <circle cx={hx} cy={hy} r={1.8 * zoomScale}
+                    fill="#4ecdc4" stroke="#fff" strokeWidth={0.3 * zoomScale}
+                    aria-hidden="true" style={{ pointerEvents: 'none' }}
                   />
                 </>
               )
