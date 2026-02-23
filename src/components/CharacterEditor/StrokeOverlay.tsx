@@ -165,25 +165,26 @@ export function StrokeOverlay({
     }
   }, [clearLongPress, cancelPendingTouchSelect])
 
-  // SVG 이벤트에서 viewBox 좌표 추출
+  // SVG 이벤트에서 viewBox 좌표 추출 (getBoundingClientRect 기반 — CSS transform 안정 처리)
   const svgPointFromEvent = useCallback((e: React.MouseEvent | MouseEvent | React.TouchEvent | TouchEvent) => {
     const svg = svgRef.current
     if (!svg) return { x: 0, y: 0 }
-    const ctm = svg.getScreenCTM()
-    if (!ctm) return { x: 0, y: 0 }
-    const inv = ctm.inverse()
-    const pt = svg.createSVGPoint()
+    const rect = svg.getBoundingClientRect()
+    const vb = svg.viewBox.baseVal
+    let clientX: number, clientY: number
     if ('touches' in e) {
       const touch = e.touches[0] || (e as TouchEvent).changedTouches?.[0]
       if (!touch) return { x: 0, y: 0 }
-      pt.x = touch.clientX
-      pt.y = touch.clientY
+      clientX = touch.clientX
+      clientY = touch.clientY
     } else {
-      pt.x = e.clientX
-      pt.y = e.clientY
+      clientX = (e as MouseEvent).clientX
+      clientY = (e as MouseEvent).clientY
     }
-    const svgPt = pt.matrixTransform(inv)
-    return { x: svgPt.x, y: svgPt.y }
+    return {
+      x: vb.x + ((clientX - rect.left) / rect.width) * vb.width,
+      y: vb.y + ((clientY - rect.top) / rect.height) * vb.height,
+    }
   }, [svgRef])
 
   // 스트로크의 컨테이너 박스 (패딩 적용됨, 절대 좌표)
