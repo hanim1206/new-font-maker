@@ -291,8 +291,8 @@ export function LayoutCanvasColumn({
       <div className="p-4 pt-3">
 
       {/* 캔버스 — 핸들 공간 확보를 위한 외부 여백 */}
-      {/* 캔버스 래퍼 내부 클릭은 상위 deselect로 전파되지 않도록 차단 */}
-      <div ref={canvasContainerRef} className="flex justify-center p-3 bg-background rounded mb-2" onClick={(e) => e.stopPropagation()}>
+      {/* 캔버스 래퍼 배경 클릭은 상위 deselect로 전파되어 선택 해제 */}
+      <div ref={canvasContainerRef} className="flex justify-center p-3 bg-background rounded mb-2">
         <div
           className="relative"
           style={{

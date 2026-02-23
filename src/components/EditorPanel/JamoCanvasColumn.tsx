@@ -91,7 +91,7 @@ export function JamoCanvasColumn({
   const [canvasSize, setCanvasSize] = useState(300)
   const [isDragging, setIsDragging] = useState(false)
 
-  const { canvasZoom, canvasPan, resetCanvasView, isMobile } = useUIStore()
+  const { canvasZoom, canvasPan, resetCanvasView, isMobile, setSelectedStrokeId, setSelectedPointIndex } = useUIStore()
 
   // ResizeObserver: 컨테이너 크기에 맞게 캔버스 크기 동적 계산
   useEffect(() => {
@@ -168,7 +168,7 @@ export function JamoCanvasColumn({
 
       {/* 캔버스 영역 */}
       <div ref={containerRef} className="flex-1 overflow-hidden p-4">
-        <div className="flex justify-center p-3 bg-background rounded mb-2">
+        <div className="flex justify-center p-3 bg-background rounded mb-2" onClick={() => { setSelectedStrokeId(null); setSelectedPointIndex(null) }}>
           <div
             className="relative"
             style={{
