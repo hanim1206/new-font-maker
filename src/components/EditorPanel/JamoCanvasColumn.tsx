@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import type { PartStyle } from '../../renderers/SvgRenderer'
 import { StrokeOverlay } from '../CharacterEditor/StrokeOverlay'
@@ -317,9 +318,12 @@ export function JamoCanvasColumn({
         </div>
       </div>
 
-      {/* StrokeToolbar — 모바일: 하단 absolute (캔버스 크기 영향 없음) */}
-      {isMobile && isJamoEditing && selectedStrokeId && (
-        <div className="absolute bottom-0 left-0 right-0 z-10">
+      {/* StrokeToolbar — 모바일: 푸터 바로 위 fixed (createPortal로 CSS transform 영향 제거) */}
+      {isMobile && isJamoEditing && selectedStrokeId && createPortal(
+        <div
+          className="fixed left-0 right-0 z-40"
+          style={{ bottom: 'calc(50px + env(safe-area-inset-bottom, 0px))' }}
+        >
           <StrokeToolbar
             strokes={draftStrokes}
             onChange={onStrokeChange}
@@ -327,7 +331,8 @@ export function JamoCanvasColumn({
             onDeleteStroke={onDeleteStroke}
             onAddStroke={onAddStroke}
           />
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* StrokeEditor — UI 없는 키보드 핸들러 */}
