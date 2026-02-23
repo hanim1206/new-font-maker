@@ -1,4 +1,4 @@
-import type { LayoutType, LayoutSchema, Padding, JamoData, StrokeLinecap } from './index'
+import type { LayoutType, LayoutSchema, Padding, JamoData, StrokeLinecap, StrokeLinejoin } from './index'
 
 // ===== 글로벌 스타일 (DB 저장용) =====
 export interface FontGlobalStyle {
@@ -6,6 +6,7 @@ export interface FontGlobalStyle {
   weight: number
   letterSpacing: number
   linecap: StrokeLinecap
+  linejoin: StrokeLinejoin
 }
 
 export interface FontGlobalStyleExclusion {

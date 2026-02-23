@@ -158,6 +158,9 @@ export type LegacyStrokeData = StrokeData
 // ===== 획 끝 모양 (Linecap) =====
 export type StrokeLinecap = 'round' | 'butt' | 'square'
 
+// ===== 획 꺾임 모양 (Linejoin) =====
+export type StrokeLinejoin = 'miter' | 'round' | 'bevel'
+
 // ===== 통합 획 데이터 (V2) =====
 export interface AnchorPoint {
   x: number       // 0~1, 레이아웃 박스 기준
@@ -172,7 +175,8 @@ export interface StrokeDataV2 {
   closed: boolean         // true = 닫힌 도형 (ㅇ 원형 등)
   thickness: number       // 획 두께 (절대값, viewBoxSize 기준)
   label?: string          // 선택적 메타데이터 ('horizontal' | 'vertical' | 'curve' | 'circle')
-  linecap?: StrokeLinecap // 획별 끝 모양 오버라이드 (없으면 글로벌 기본값 사용)
+  linecap?: StrokeLinecap  // 획별 끝 모양 오버라이드 (없으면 글로벌 기본값 사용)
+  linejoin?: StrokeLinejoin // 획별 꺾임 모양 오버라이드 (없으면 글로벌 기본값 사용)
 }
 
 // ===== 자모 데이터 =====

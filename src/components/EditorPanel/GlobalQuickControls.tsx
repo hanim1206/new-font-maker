@@ -3,7 +3,7 @@ import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import type { SliderMark } from '@/components/ui/slider'
-import type { StrokeLinecap } from '../../types'
+import type { StrokeLinecap, StrokeLinejoin } from '../../types'
 
 const WEIGHT_MARKS: SliderMark[] = [
   { value: 100, label: '100' },
@@ -53,12 +53,57 @@ function CapStylePicker({ linecap, onChange }: { linecap: StrokeLinecap; onChang
   )
 }
 
+const JOIN_OPTIONS: Array<{ value: StrokeLinejoin; label: string }> = [
+  { value: 'miter', label: '뾰족하게' },
+  { value: 'round', label: '둥글게' },
+  { value: 'bevel', label: '비스듬히' },
+]
+
+function JoinIcon({ join }: { join: StrokeLinejoin }) {
+  // 꺾인 선으로 각 linejoin 스타일 시각화
+  return (
+    <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+      <polyline
+        points="2,12 9,2 16,12"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinejoin={join}
+        fill="none"
+        strokeLinecap="butt"
+      />
+    </svg>
+  )
+}
+
+function JoinStylePicker({ linejoin, onChange }: { linejoin: StrokeLinejoin; onChange: (v: StrokeLinejoin) => void }) {
+  return (
+    <div className="flex gap-1">
+      {JOIN_OPTIONS.map(({ value, label }) => (
+        <button
+          key={value}
+          title={label}
+          onClick={() => onChange(value)}
+          className={cn(
+            'h-7 px-2.5 rounded text-xs flex items-center gap-1.5 border transition-all duration-150 cursor-pointer',
+            linejoin === value
+              ? 'bg-accent-blue border-accent-blue text-white'
+              : 'bg-surface-2 border-border text-text-dim-3 hover:bg-surface-hover hover:text-foreground hover:border-border-light'
+          )}
+        >
+          <JoinIcon join={value} />
+          <span>{label}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 interface GlobalQuickControlsProps {
   vertical?: boolean
 }
 
 export function GlobalQuickControls({ vertical = false }: GlobalQuickControlsProps) {
-  const { style, updateStyle, updateLinecap } = useGlobalStyleStore()
+  const { style, updateStyle, updateLinecap, updateLinejoin } = useGlobalStyleStore()
 
   if (vertical) {
     return (
@@ -104,6 +149,12 @@ export function GlobalQuickControls({ vertical = false }: GlobalQuickControlsPro
         <div className="flex items-center gap-3">
           <span className="text-xs text-text-dim-4 shrink-0 w-10">캡</span>
           <CapStylePicker linecap={style.linecap} onChange={updateLinecap} />
+        </div>
+
+        {/* 꺾임 스타일 */}
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-text-dim-4 shrink-0 w-10">꺾임</span>
+          <JoinStylePicker linejoin={style.linejoin} onChange={updateLinejoin} />
         </div>
       </div>
     )
@@ -156,6 +207,14 @@ export function GlobalQuickControls({ vertical = false }: GlobalQuickControlsPro
       <div className="flex items-center gap-2 shrink-0">
         <span className="text-xs text-text-dim-4">캡</span>
         <CapStylePicker linecap={style.linecap} onChange={updateLinecap} />
+      </div>
+
+      <Separator orientation="vertical" className="h-5" />
+
+      {/* 꺾임 스타일 */}
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="text-xs text-text-dim-4">꺾임</span>
+        <JoinStylePicker linejoin={style.linejoin} onChange={updateLinejoin} />
       </div>
     </div>
   )

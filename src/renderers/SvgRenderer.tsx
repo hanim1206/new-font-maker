@@ -2,7 +2,7 @@ import { useMemo, useId, type ReactNode } from 'react'
 import type { DecomposedSyllable, BoxConfig, Part, StrokeDataV2, LayoutType, LayoutSchema, Padding } from '../types'
 import { calculateBoxes } from '../utils/layoutCalculator'
 import { pointsToSvgD } from '../utils/pathUtils'
-import { weightToMultiplier, resolveLinecap } from '../stores/globalStyleStore'
+import { weightToMultiplier, resolveLinecap, resolveLinejoin } from '../stores/globalStyleStore'
 import type { GlobalStyle } from '../stores/globalStyleStore'
 
 // 파트별 스타일 (자모 편집 시 비편집 파트 흐리게 표시 등)
@@ -133,7 +133,7 @@ export function SvgRenderer({
           stroke={color}
           strokeWidth={strokeWidth}
           strokeLinecap={resolveLinecap(stroke.linecap, globalStyle?.linecap)}
-          strokeLinejoin="round"
+          strokeLinejoin={resolveLinejoin(stroke.linejoin, globalStyle?.linejoin)}
           style={enableTransition ? { transition: 'd 0.15s ease, stroke-width 0.15s ease' } : undefined}
         />
       )

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { persist } from 'zustand/middleware'
-import type { LayoutType, StrokeLinecap } from '../types'
+import type { LayoutType, StrokeLinecap, StrokeLinejoin } from '../types'
 
 const STORAGE_KEY = 'font-maker-global-style'
 
@@ -10,7 +10,8 @@ export interface GlobalStyle {
   slant: number         // 기울기 (도, -30~30, 기본 0)
   weight: number        // 두께 (100~900, 100단위, 기본 400)
   letterSpacing: number // 자간 (0~0.3, 기본 0)
-  linecap: StrokeLinecap // 획 끝 모양 (기본 'round')
+  linecap: StrokeLinecap  // 획 끝 모양 (기본 'round')
+  linejoin: StrokeLinejoin // 획 꺾임 모양 (기본 'round')
 }
 
 // 숫자 속성만 (updateStyle에서 사용)
@@ -46,6 +47,8 @@ interface GlobalStyleActions {
   updateStyle: (prop: NumericGlobalStyleProp, value: number) => void
   // linecap 업데이트
   updateLinecap: (value: StrokeLinecap) => void
+  // linejoin 업데이트
+  updateLinejoin: (value: StrokeLinejoin) => void
 
   // 제외 규칙 관리
   addExclusion: (property: keyof GlobalStyle, layoutType: LayoutType) => void
@@ -73,6 +76,7 @@ const DEFAULT_STYLE: GlobalStyle = {
   weight: 400,
   letterSpacing: 0,
   linecap: 'round',
+  linejoin: 'round',
 }
 
 export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>()(
@@ -90,6 +94,11 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
       updateLinecap: (value) =>
         set((state) => {
           state.style.linecap = value
+        }),
+
+      updateLinejoin: (value) =>
+        set((state) => {
+          state.style.linejoin = value
         }),
 
       addExclusion: (property, layoutType) =>
@@ -147,6 +156,10 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
           if (!state.style.linecap) {
             state.style.linecap = 'round'
           }
+          // linejoin 백필 (구형 데이터 호환)
+          if (!state.style.linejoin) {
+            state.style.linejoin = 'round'
+          }
           state.exclusions = [...data.exclusions]
         }),
 
@@ -167,6 +180,10 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
           if (!state.style.linecap) {
             state.style.linecap = 'round'
           }
+          // linejoin 백필 (기존 데이터 호환)
+          if (!state.style.linejoin) {
+            state.style.linejoin = 'round'
+          }
           state.setHydrated()
         }
       },
@@ -183,4 +200,15 @@ export function resolveLinecap(
   globalLinecap: StrokeLinecap | undefined
 ): StrokeLinecap {
   return strokeLinecap ?? globalLinecap ?? 'round'
+}
+
+/**
+ * 획별 linejoin 오버라이드와 글로벌 기본값을 결합하여 최종 linejoin 결정
+ * strokeLinejoin(획별) > globalLinejoin(글로벌) > 'round'(폴백)
+ */
+export function resolveLinejoin(
+  strokeLinejoin: StrokeLinejoin | undefined,
+  globalLinejoin: StrokeLinejoin | undefined
+): StrokeLinejoin {
+  return strokeLinejoin ?? globalLinejoin ?? 'round'
 }
