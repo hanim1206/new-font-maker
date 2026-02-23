@@ -17,7 +17,7 @@ type PaddingSide = keyof Padding
 const SNAP_STEP = 0.025
 const MAX_PADDING = 0.3
 // 핸들이 캔버스 바깥에 위치하는 오프셋 (px)
-const HANDLE_MARGIN = 20
+const HANDLE_MARGIN = 40
 // 파트 버튼 가장자리 근접 감지 임계값 (px) — 이 범위 내 터치 시 즉시 오프셋 드래그 시작
 const EDGE_DRAG_THRESHOLD = 14
 
@@ -573,93 +573,91 @@ export function LayoutCanvasColumn({
             })()}
           </div>
 
-          {/* 파트 오프셋: 캔버스 외부 핸들 원 */}
+          {/* 파트 오프셋: 캔버스 외부 핸들 원 (SVG) */}
           {selectedPartInLayout && originalPartBox && (() => {
             const sides: PaddingSide[] = ['top', 'bottom', 'left', 'right']
             const ob = originalPartBox
             const margin = HANDLE_MARGIN
             const padding = selectedPartPadding ?? { top: 0, bottom: 0, left: 0, right: 0 }
+            const fullW = canvasSize + margin * 2
+            const fullH = canvasSize + margin * 2
+            const scale = canvasSize / 100
 
-            return sides.map(side => {
-              const isH = side === 'top' || side === 'bottom'
-              const edgePx = getEdgePx(side, ob)
-              const isActive = draggingSide === side
-              const isHov = hoveredSide === side
-              const isAtOrigin = (padding[side] ?? 0) === 0
-              // PaddingOverlay와 동일한 비율 (viewBox 100 기준)
-              const scale = canvasSize / 100
-              const r = (isActive ? 4 : isHov ? 3.5 : 3) * scale
-              const borderW = (isActive ? 1.5 : 1) * scale
-              const hitR = (isTouch ? 12 : 6) * scale
+            return (
+              <svg
+                className="absolute inset-0"
+                width={fullW}
+                height={fullH}
+                style={{ zIndex: 11, pointerEvents: 'none', overflow: 'visible' }}
+              >
+                {sides.map(side => {
+                  const isH = side === 'top' || side === 'bottom'
+                  const edgePx = getEdgePx(side, ob)
+                  const isActive = draggingSide === side
+                  const isHov = hoveredSide === side
+                  const isAtOrigin = (padding[side] ?? 0) === 0
+                  // PaddingOverlay와 동일한 비율 (viewBox 100 기준)
+                  const r = (isActive ? 4 : isHov ? 3.5 : 3) * scale
+                  const strokeW = (isActive ? 1.5 : 1) * scale
+                  const hitR = (isTouch ? 12 : 6) * scale
 
-              // 핸들 위치: 캔버스 외부
-              // top/bottom → 캔버스 왼쪽 바깥 (x = margin 중앙)
-              // left/right → 캔버스 위쪽 바깥 (y = margin 중앙)
-              const cx = isH ? margin / 2 : margin + edgePx
-              const cy = isH ? margin + edgePx : margin / 2
+                  const cx = isH ? margin / 2 : margin + edgePx
+                  const cy = isH ? margin + edgePx : margin / 2
 
-              const fillColor = isActive
-                ? (isAtOrigin ? '#fff' : '#38bdf8')
-                : isHov ? '#38bdf8' : 'rgba(0,0,0,0.6)'
-              const strokeColor = isAtOrigin && isActive ? '#fff' : '#38bdf8'
+                  const sideColor = '#38bdf8'
+                  const activeColor = isAtOrigin && isActive ? '#fff' : sideColor
+                  const fillColor = isActive ? activeColor : isHov ? sideColor : 'rgba(0,0,0,0.6)'
 
-              return (
-                <div key={`handle-${side}`}>
-                  {/* 가시적 핸들 원 */}
-                  <div
-                    className="absolute rounded-full pointer-events-none"
-                    style={{
-                      left: cx - r,
-                      top: cy - r,
-                      width: r * 2,
-                      height: r * 2,
-                      backgroundColor: fillColor,
-                      border: `${borderW}px solid ${strokeColor}`,
-                      opacity: isActive ? 1 : isHov ? 0.95 : 0.7,
-                      transition: 'width 0.1s, height 0.1s, left 0.05s, top 0.05s, opacity 0.1s',
-                      zIndex: 11,
-                    }}
-                  />
-                  {/* 드래그 중 값 표시 */}
-                  {(isActive || isHov) && (
-                    <div
-                      className="absolute pointer-events-none"
-                      style={{
-                        left: isH ? cx - 20 : cx - 12,
-                        top: isH ? cy - 14 : cy - 16,
-                        fontSize: 9,
-                        fontFamily: 'monospace',
-                        fontWeight: 'bold',
-                        color: isAtOrigin ? '#fff' : '#38bdf8',
-                        whiteSpace: 'nowrap',
-                        zIndex: 12,
-                      }}
-                    >
-                      {((padding[side] ?? 0) * 100).toFixed(1)}%
-                    </div>
-                  )}
-                  {/* 투명 히트 영역 (핸들보다 넓게) */}
-                  {!isDragging && (
-                    <div
-                      className="absolute"
-                      style={{
-                        left: cx - hitR,
-                        top: cy - hitR,
-                        width: hitR * 2,
-                        height: hitR * 2,
-                        cursor: isH ? 'ns-resize' : 'ew-resize',
-                        touchAction: 'none',
-                        zIndex: 13,
-                      }}
-                      onMouseEnter={() => setHoveredSide(side)}
-                      onMouseLeave={() => setHoveredSide(null)}
-                      onMouseDown={(e) => handlePartEdgeMouseDown(side, e)}
-                      onTouchStart={(e) => handlePartEdgeTouchStart(side, e)}
-                    />
-                  )}
-                </div>
-              )
-            })
+                  return (
+                    <g key={`handle-${side}`}>
+                      {/* 가시적 핸들 원 */}
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={r}
+                        fill={fillColor}
+                        stroke={activeColor}
+                        strokeWidth={strokeW}
+                        opacity={isActive ? 1 : isHov ? 0.95 : 0.7}
+                        pointerEvents="none"
+                        style={{ transition: 'r 0.1s, opacity 0.1s' }}
+                      />
+                      {/* 드래그 중 값 표시 */}
+                      {(isActive || isHov) && (
+                        <text
+                          x={isH ? cx - 8 * scale : cx}
+                          y={isH ? cy : cy - 5 * scale}
+                          fontSize={4 * scale}
+                          fill={isAtOrigin ? '#fff' : sideColor}
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                          pointerEvents="none"
+                          fontFamily="monospace"
+                          fontWeight="bold"
+                        >
+                          {((padding[side] ?? 0) * 100).toFixed(1)}%
+                        </text>
+                      )}
+                      {/* 투명 히트 영역 */}
+                      {!isDragging && (
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={hitR}
+                          fill="transparent"
+                          pointerEvents="all"
+                          style={{ cursor: isH ? 'ns-resize' : 'ew-resize' }}
+                          onMouseEnter={() => setHoveredSide(side)}
+                          onMouseLeave={() => setHoveredSide(null)}
+                          onMouseDown={(e) => handlePartEdgeMouseDown(side, e)}
+                          onTouchStart={(e) => handlePartEdgeTouchStart(side, e)}
+                        />
+                      )}
+                    </g>
+                  )
+                })}
+              </svg>
+            )
           })()}
         </div>
       </div>
