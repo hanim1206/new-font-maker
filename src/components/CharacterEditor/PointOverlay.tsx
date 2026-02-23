@@ -111,10 +111,11 @@ export function PointOverlay({
       {stroke.points.map((pt, i) => {
         const [ptX, ptY] = toAbs(pt.x, pt.y)
         const isActive = i === selectedPointIndex
+        const isCurve = !!(pt.handleIn || pt.handleOut)
 
         return (
           <circle key={i} cx={ptX} cy={ptY} r={pointRadius}
-            fill={isActive ? '#ff6b6b' : '#4ecdc4'}
+            fill={isActive ? '#ff6b6b' : isCurve ? '#c084fc' : '#4ecdc4'}
             stroke="#fff" strokeWidth={0.5 * zoomScale}
             role="button" aria-label={`기준점 ${i + 1}`}
             style={{ cursor: 'grab' }}
