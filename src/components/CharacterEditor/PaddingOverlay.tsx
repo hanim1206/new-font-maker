@@ -47,7 +47,7 @@ export function PaddingOverlay({
   padding,
   containerBox,
   onPaddingChange,
-  color = '#ff9500',
+  color = '#38bdf8',
   negativeColor = '#38bdf8',
   minPadding = 0,
   maxPadding = 0.3,

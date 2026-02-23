@@ -98,8 +98,8 @@ export function JamoCanvasColumn({
     if (!containerRef.current) return
     const observer = new ResizeObserver(entries => {
       for (const entry of entries) {
-        const { width, height } = entry.contentRect
-        const base = Math.max(150, Math.floor(Math.min(width, height) - 32))
+        const { width } = entry.contentRect
+        const base = Math.max(150, Math.floor(width - 32))
         setCanvasSize(isMobile ? Math.floor(base * 0.8) : base)
       }
     })
@@ -154,7 +154,7 @@ export function JamoCanvasColumn({
   } : editingBox!
 
   return (
-    <div className="h-full flex flex-col relative">
+    <div className="relative">
       {/* StrokeToolbar — PC: 캔버스 상단 인라인 */}
       {!isMobile && isJamoEditing && selectedStrokeId && (
         <StrokeToolbar
@@ -167,7 +167,7 @@ export function JamoCanvasColumn({
       )}
 
       {/* 캔버스 영역 */}
-      <div ref={containerRef} className="flex-1 overflow-hidden p-4">
+      <div ref={containerRef} className="p-4">
         <div className="flex justify-center p-3 bg-background rounded mb-2" onClick={() => { setSelectedStrokeId(null); setSelectedPointIndex(null) }}>
           <div
             className="relative"
@@ -257,7 +257,7 @@ export function JamoCanvasColumn({
                         onPaddingChange={(side, val) =>
                           onMixedJamoPaddingChange(editingJamoInfo.char, 'horizontal', side, val)
                         }
-                        color={isPaddingDirty ? '#ff9500' : '#a855f7'}
+                        color={isPaddingDirty ? '#38bdf8' : '#a855f7'}
                         disabled={isStrokeSelected}
                       />
                       <PaddingOverlay
@@ -268,7 +268,7 @@ export function JamoCanvasColumn({
                         onPaddingChange={(side, val) =>
                           onMixedJamoPaddingChange(editingJamoInfo.char, 'vertical', side, val)
                         }
-                        color={isPaddingDirty ? '#ffd700' : '#c084fc'}
+                        color={isPaddingDirty ? '#38bdf8' : '#c084fc'}
                         disabled={isStrokeSelected}
                       />
                     </>
@@ -284,7 +284,7 @@ export function JamoCanvasColumn({
                     onPaddingChange={(side, val) =>
                       onJamoPaddingChange(editingJamoInfo.type, editingJamoInfo.char, side, val)
                     }
-                    color={isPaddingDirty ? '#ff9500' : '#a855f7'}
+                    color={isPaddingDirty ? '#38bdf8' : '#a855f7'}
                     disabled={isStrokeSelected}
                   />
                 )
