@@ -291,7 +291,7 @@ export function LayoutCanvasColumn({
 
       {/* 캔버스 — 핸들 공간 확보를 위한 외부 여백 */}
       {/* 캔버스 래퍼 배경 클릭은 상위 deselect로 전파되어 선택 해제 */}
-      <div ref={canvasContainerRef} className="flex justify-center p-3 bg-background rounded mb-2">
+      <div ref={canvasContainerRef} className="flex justify-center p-4 md:p-10 bg-background rounded mb-2 ">
         <div
           className="relative"
           style={{
@@ -307,7 +307,7 @@ export function LayoutCanvasColumn({
           {/* 글리프 클리핑은 SvgRenderer의 overflow="hidden" + SVG clipPath로 처리 */}
           {/* 오버레이(Split/Padding 핸들)는 클리핑되지 않음 */}
           <div
-            className="absolute"
+            className="absolute "
             style={{
               left: HANDLE_MARGIN,
               top: HANDLE_MARGIN,
