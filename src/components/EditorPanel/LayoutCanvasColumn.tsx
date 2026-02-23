@@ -17,8 +17,7 @@ type PaddingSide = keyof Padding
 const SNAP_STEP = 0.025
 const MAX_PADDING = 0.3
 // 핸들이 캔버스 바깥에 위치하는 오프셋 (px)
-const HANDLE_MARGIN = 14
-const HANDLE_RADIUS = 5
+const HANDLE_MARGIN = 20
 // 파트 버튼 가장자리 근접 감지 임계값 (px) — 이 범위 내 터치 시 즉시 오프셋 드래그 시작
 const EDGE_DRAG_THRESHOLD = 14
 
@@ -142,7 +141,7 @@ export function LayoutCanvasColumn({
   const handleDragStart = useCallback(() => { onLayoutDragStart(); setIsDragging(true) }, [onLayoutDragStart])
   const handleDragEnd = useCallback(() => setIsDragging(false), [])
   const { isTouch } = useDeviceCapability()
-  usePinchZoom(svgRef, { enabled: false })
+  usePinchZoom(svgRef, { enabled: isTouch })
 
   // 레이아웃 타입 변경 시 줌/패닝 초기화
   useEffect(() => {
@@ -587,7 +586,11 @@ export function LayoutCanvasColumn({
               const isActive = draggingSide === side
               const isHov = hoveredSide === side
               const isAtOrigin = (padding[side] ?? 0) === 0
-              const r = isActive ? HANDLE_RADIUS + 1.5 : isHov ? HANDLE_RADIUS + 0.5 : HANDLE_RADIUS
+              // PaddingOverlay와 동일한 비율 (viewBox 100 기준)
+              const scale = canvasSize / 100
+              const r = (isActive ? 4 : isHov ? 3.5 : 3) * scale
+              const borderW = (isActive ? 1.5 : 1) * scale
+              const hitR = (isTouch ? 12 : 6) * scale
 
               // 핸들 위치: 캔버스 외부
               // top/bottom → 캔버스 왼쪽 바깥 (x = margin 중앙)
@@ -611,7 +614,7 @@ export function LayoutCanvasColumn({
                       width: r * 2,
                       height: r * 2,
                       backgroundColor: fillColor,
-                      border: `${isActive ? 2 : 1}px solid ${strokeColor}`,
+                      border: `${borderW}px solid ${strokeColor}`,
                       opacity: isActive ? 1 : isHov ? 0.95 : 0.7,
                       transition: 'width 0.1s, height 0.1s, left 0.05s, top 0.05s, opacity 0.1s',
                       zIndex: 11,
@@ -640,10 +643,10 @@ export function LayoutCanvasColumn({
                     <div
                       className="absolute"
                       style={{
-                        left: cx - 8,
-                        top: cy - 8,
-                        width: 16,
-                        height: 16,
+                        left: cx - hitR,
+                        top: cy - hitR,
+                        width: hitR * 2,
+                        height: hitR * 2,
                         cursor: isH ? 'ns-resize' : 'ew-resize',
                         touchAction: 'none',
                         zIndex: 13,

@@ -449,6 +449,11 @@ export function StrokeOverlay({
 
     const handleWindowMove = (e: MouseEvent | TouchEvent) => {
       clearLongPress() // 이동 시작 시 롱프레스 취소
+      // 멀티터치 감지 → 드래그 취소 (핀치줌 우선)
+      if ('touches' in e && e.touches.length > 1) {
+        handlePointerUp()
+        return
+      }
       handlePointerMove(e)
     }
 
@@ -561,13 +566,21 @@ export function StrokeOverlay({
                 }}
                 onTouchStart={disableHitArea ? undefined : (e: React.TouchEvent) => {
                   setTouchHighlight(stroke.id)
-                  // 포인트 근처 터치 시 즉시 포인트 드래그 시작 (획 선택 불필요)
+
+                  // 터치: 미선택 획이면 선택만 (드래그 안 함)
+                  if (!isSelected) {
+                    e.stopPropagation()
+                    setSelectedStrokeId(stroke.id)
+                    return
+                  }
+
+                  // 이미 선택된 획: 포인트 근처면 포인트 드래그
                   if (onPointChange) {
                     const svgPt = svgPointFromEvent(e)
                     const nearIdx = findNearestPointIndex(stroke, svgPt, containerAbs)
                     if (nearIdx !== null) {
                       e.stopPropagation(); e.preventDefault()
-                      setSelectedStrokeId(stroke.id); onDragStart?.(); setSelectedPointIndex(nearIdx)
+                      onDragStart?.(); setSelectedPointIndex(nearIdx)
                       setDragState({ type: 'point', strokeId: stroke.id, pointIndex: nearIdx,
                         containerX: containerAbs.x, containerY: containerAbs.y, containerW: containerAbs.width, containerH: containerAbs.height })
                       clearLongPress()
@@ -577,6 +590,7 @@ export function StrokeOverlay({
                       return
                     }
                   }
+                  // 이미 선택된 획: 스트로크 이동 드래그
                   if (onStrokeChange) startStrokeMove(stroke)(e)
                 }}
                 style={{ cursor: disableHitArea ? 'default' : (onStrokeChange ? 'move' : 'pointer'), pointerEvents: disableHitArea ? 'none' : undefined }}
@@ -606,17 +620,26 @@ export function StrokeOverlay({
                   if (onStrokeChange) startStrokeMove(stroke)(e)
                 }}
                 onTouchStart={disableHitArea ? undefined : (e: React.TouchEvent) => {
+                  // 터치: 미선택 획이면 선택만 (드래그 안 함)
+                  if (!isSelected) {
+                    e.stopPropagation()
+                    setSelectedStrokeId(stroke.id)
+                    return
+                  }
+
+                  // 이미 선택된 획: 포인트 근처면 포인트 드래그
                   if (onPointChange) {
                     const svgPt = svgPointFromEvent(e)
                     const nearIdx = findNearestPointIndex(stroke, svgPt, containerAbs)
                     if (nearIdx !== null) {
                       e.stopPropagation(); e.preventDefault()
-                      setSelectedStrokeId(stroke.id); onDragStart?.(); setSelectedPointIndex(nearIdx)
+                      onDragStart?.(); setSelectedPointIndex(nearIdx)
                       setDragState({ type: 'point', strokeId: stroke.id, pointIndex: nearIdx,
                         containerX: containerAbs.x, containerY: containerAbs.y, containerW: containerAbs.width, containerH: containerAbs.height })
                       return
                     }
                   }
+                  // 이미 선택된 획: 스트로크 이동 드래그
                   if (onStrokeChange) startStrokeMove(stroke)(e)
                 }}
                 style={{ cursor: disableHitArea ? 'default' : (onStrokeChange ? 'move' : 'pointer'), pointerEvents: disableHitArea ? 'none' : undefined }}
