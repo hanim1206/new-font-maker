@@ -46,8 +46,17 @@ export function pathDataToSvgD(
   }
 
   // 닫힌 패스: 마지막→첫 점 구간 후 Z
+  // 주의: 직선 구간은 L p0 없이 Z만 사용해야 첫 꼭지점에 linejoin이 올바르게 적용됨.
+  // L p0 + Z는 Z를 길이 0 세그먼트로 만들어 linejoin 대신 linecap이 적용됨.
   if (closed && adjustedPoints.length >= 2) {
-    appendSegment(parts, adjustedPoints[adjustedPoints.length - 1], adjustedPoints[0], toAbs)
+    const last = adjustedPoints[adjustedPoints.length - 1]
+    const first = adjustedPoints[0]
+    const hasCurve = last.handleOut !== undefined || first.handleIn !== undefined
+    if (hasCurve) {
+      // 베지어 곡선이 있으면 명시적으로 그린 후 Z
+      appendSegment(parts, last, first, toAbs)
+    }
+    // 직선이면 Z만으로 닫음 (SVG가 직선 연결 + 올바른 linejoin 적용)
     parts.push('Z')
   }
 
@@ -198,8 +207,17 @@ export function pointsToSvgD(
   }
 
   // 닫힌 패스: 마지막→첫 점 구간 후 Z
+  // 주의: 직선 구간은 L p0 없이 Z만 사용해야 첫 꼭지점에 linejoin이 올바르게 적용됨.
+  // L p0 + Z는 Z를 길이 0 세그먼트로 만들어 linejoin 대신 linecap이 적용됨.
   if (closed && renderPoints.length >= 2) {
-    appendAnchorSegment(parts, renderPoints[renderPoints.length - 1], renderPoints[0], toAbs)
+    const last = renderPoints[renderPoints.length - 1]
+    const first = renderPoints[0]
+    const hasCurve = last.handleOut !== undefined || first.handleIn !== undefined
+    if (hasCurve) {
+      // 베지어 곡선이 있으면 명시적으로 그린 후 Z
+      appendAnchorSegment(parts, last, first, toAbs)
+    }
+    // 직선이면 Z만으로 닫음 (SVG가 직선 연결 + 올바른 linejoin 적용)
     parts.push('Z')
   }
 
