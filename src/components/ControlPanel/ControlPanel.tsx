@@ -81,7 +81,7 @@ export function ControlPanel() {
         <AccordionItem value="choseong">
           <AccordionTrigger>
             초성 편집
-            <span className="text-xs text-text-dim-5 ml-2 normal-case font-normal">클릭 → 레이아웃 내 편집</span>
+           
           </AccordionTrigger>
           <AccordionContent>
             <div className="grid grid-cols-5 gap-1.5">
@@ -108,7 +108,7 @@ export function ControlPanel() {
         <AccordionItem value="jungseong">
           <AccordionTrigger>
             중성 편집
-            <span className="text-xs text-text-dim-5 ml-2 normal-case font-normal">클릭 → 레이아웃 내 편집</span>
+           
           </AccordionTrigger>
           <AccordionContent>
             <div className="grid grid-cols-5 gap-1.5">
@@ -136,7 +136,7 @@ export function ControlPanel() {
         <AccordionItem value="jongseong">
           <AccordionTrigger>
             종성 편집
-            <span className="text-xs text-text-dim-5 ml-2 normal-case font-normal">클릭 → 레이아웃 내 편집</span>
+           
           </AccordionTrigger>
           <AccordionContent>
             <div className="grid grid-cols-5 gap-1.5">

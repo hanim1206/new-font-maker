@@ -14,6 +14,8 @@ export interface PointOverlayProps {
   selectedPointIndex: number | null
   containerAbs: ContainerRect
   pointRadius: number
+  /** 줌 보정 스케일 (1/canvasZoom) — 화면상 일정한 크기 유지 */
+  zoomScale?: number
   onHandleInDown: (e: React.MouseEvent | React.TouchEvent) => void
   onHandleOutDown: (e: React.MouseEvent | React.TouchEvent) => void
   onAnchorDown: (i: number) => (e: React.MouseEvent | React.TouchEvent) => void
@@ -34,6 +36,7 @@ export function PointOverlay({
   selectedPointIndex,
   containerAbs,
   pointRadius,
+  zoomScale = 1,
   onHandleInDown,
   onHandleOutDown,
   onAnchorDown,
@@ -59,9 +62,9 @@ export function PointOverlay({
               return (
                 <>
                   <line x1={ptX} y1={ptY} x2={hx} y2={hy}
-                    stroke="#ff6b6b" strokeWidth={0.5} opacity={0.6} aria-hidden="true" />
-                  <circle cx={hx} cy={hy} r={1.8}
-                    fill="#ff6b6b" stroke="#fff" strokeWidth={0.3}
+                    stroke="#ff6b6b" strokeWidth={0.5 * zoomScale} opacity={0.6} aria-hidden="true" />
+                  <circle cx={hx} cy={hy} r={1.8 * zoomScale}
+                    fill="#ff6b6b" stroke="#fff" strokeWidth={0.3 * zoomScale}
                     role="button" aria-label="인 핸들"
                     style={{ cursor: 'grab' }}
                     onClick={(e) => e.stopPropagation()}
@@ -76,9 +79,9 @@ export function PointOverlay({
               return (
                 <>
                   <line x1={ptX} y1={ptY} x2={hx} y2={hy}
-                    stroke="#4ecdc4" strokeWidth={0.5} opacity={0.6} aria-hidden="true" />
-                  <circle cx={hx} cy={hy} r={1.8}
-                    fill="#4ecdc4" stroke="#fff" strokeWidth={0.3}
+                    stroke="#4ecdc4" strokeWidth={0.5 * zoomScale} opacity={0.6} aria-hidden="true" />
+                  <circle cx={hx} cy={hy} r={1.8 * zoomScale}
+                    fill="#4ecdc4" stroke="#fff" strokeWidth={0.3 * zoomScale}
                     role="button" aria-label="아웃 핸들"
                     style={{ cursor: 'grab' }}
                     onClick={(e) => e.stopPropagation()}
@@ -100,7 +103,7 @@ export function PointOverlay({
         return (
           <circle key={i} cx={ptX} cy={ptY} r={pointRadius}
             fill={isActive ? '#ff6b6b' : '#4ecdc4'}
-            stroke="#fff" strokeWidth={0.5}
+            stroke="#fff" strokeWidth={0.5 * zoomScale}
             role="button" aria-label={`기준점 ${i + 1}`}
             style={{ cursor: 'grab' }}
             onClick={(e) => e.stopPropagation()}

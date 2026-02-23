@@ -43,7 +43,7 @@ export function PointActionPopup({
   onOpenAtPoint,
   onDeletePoint,
 }: PointActionPopupProps) {
-  const { selectedStrokeId, selectedPointIndex, setSelectedPointIndex } = useUIStore()
+  const { selectedStrokeId, selectedPointIndex, setSelectedPointIndex, canvasZoom } = useUIStore()
   const selectedStroke = strokes.find(s => s.id === selectedStrokeId)
 
   if (!selectedStroke || selectedPointIndex === null || selectedPointIndex >= selectedStroke.points.length) {
@@ -71,14 +71,18 @@ export function PointActionPopup({
   const pixelX = (absX / viewBoxSize) * canvasSize
   const pixelY = (absY / viewBoxSize) * canvasSize
 
-  // 팝업 크기 추정
-  const popupHeight = 32
-  const popupWidth = 180
+  // 줌 보정: 팝업이 화면상 동일 크기 유지
+  const invZoom = 1 / canvasZoom
+
+  // 팝업 크기 추정 (줌 보정 후 부모 좌표계 기준)
+  const popupHeight = 32 * invZoom
+  const popupWidth = 180 * invZoom
+  const gap = 12 * invZoom
 
   // 위치: 점 위에 표시, 너무 위면 아래로 flip
-  let top = pixelY - popupHeight - 12
-  if (top < 4) top = pixelY + 16
-  const left = Math.max(4, Math.min(canvasSize - popupWidth - 4, pixelX - popupWidth / 2))
+  let top = pixelY - popupHeight - gap
+  if (top < 4 * invZoom) top = pixelY + 16 * invZoom
+  const left = Math.max(4 * invZoom, Math.min(canvasSize - popupWidth - 4 * invZoom, pixelX - popupWidth / 2))
 
   // 표시할 버튼이 하나도 없으면 렌더링하지 않음
   const hasAnyAction = onToggleCurve || (onSplitStroke && canSplit) || (onOpenAtPoint && selectedStroke.closed) || (onDeletePoint && selectedStroke.points.length > 2)
@@ -87,7 +91,7 @@ export function PointActionPopup({
   return (
     <div
       className="absolute z-10 flex gap-1 bg-surface-2 border border-border rounded-lg shadow-lg px-1.5 py-1"
-      style={{ top, left, pointerEvents: 'auto' }}
+      style={{ top, left, pointerEvents: 'auto', transform: `scale(${invZoom})`, transformOrigin: '0 0' }}
     >
       {onToggleCurve && (
         <Button

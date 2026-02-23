@@ -124,7 +124,9 @@ export function StrokeOverlay({
   // 1-finger pan 후 click 이벤트 억제용 플래그
   const panOccurredRef = useRef(false)
 
-  const pointRadius = isTouch ? 5 : 2.5
+  // 줌 보정: 화면상 일정한 크기 유지
+  const zoomScale = 1 / canvasZoom
+  const pointRadius = (isTouch ? 5 : 2.5) * zoomScale
   const weightMultiplier = globalStyle ? weightToMultiplier(globalStyle.weight) : 1.0
 
   // 박스 절대 좌표
@@ -539,7 +541,7 @@ export function StrokeOverlay({
   }, [canvasZoom])
 
   // 포인트 근접 감지 — 터치 시 획 선택+포인트 드래그를 한번에 시작하기 위해
-  const POINT_GRAB_THRESHOLD = isTouch ? 8 : 4 // viewBox 단위
+  const POINT_GRAB_THRESHOLD = (isTouch ? 8 : 4) * zoomScale // viewBox 단위, 줌 보정
   const findNearestPointIndex = useCallback((
     stroke: StrokeDataV2,
     svgPt: { x: number; y: number },
@@ -713,6 +715,7 @@ export function StrokeOverlay({
                   selectedPointIndex={selectedPointIndex}
                   containerAbs={containerAbs}
                   pointRadius={pointRadius}
+                  zoomScale={zoomScale}
                   onHandleInDown={startPointDrag('handleIn', stroke.id, selectedPointIndex ?? 0, containerAbs)}
                   onHandleOutDown={startPointDrag('handleOut', stroke.id, selectedPointIndex ?? 0, containerAbs)}
                   onAnchorDown={(i) => startPointDrag('point', stroke.id, i, containerAbs)}
