@@ -293,8 +293,8 @@ export function JamoCanvasColumn({
             {/* PointActionPopup — 캔버스 위에 absolute 팝업 */}
             {editingBox && !isDragging && (
               <PointActionPopup
+                svgRef={svgRef}
                 strokes={draftStrokes}
-                canvasSize={canvasSize}
                 viewBoxSize={100}
                 box={effectiveBox}
                 isMixed={!!mixedJungseongData}

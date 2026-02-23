@@ -73,7 +73,7 @@ export function PointOverlay({
                     onTouchStart={onHandleInDown}
                   />
                   {/* 가시적 핸들 */}
-                  <circle cx={hx} cy={hy} r={1.8 * zoomScale}
+                  <circle cx={hx} cy={hy} r={pointRadius}
                     fill="#ff6b6b" stroke="#fff" strokeWidth={0.3 * zoomScale}
                     aria-hidden="true" style={{ pointerEvents: 'none' }}
                   />
@@ -96,7 +96,7 @@ export function PointOverlay({
                     onTouchStart={onHandleOutDown}
                   />
                   {/* 가시적 핸들 */}
-                  <circle cx={hx} cy={hy} r={1.8 * zoomScale}
+                  <circle cx={hx} cy={hy} r={pointRadius}
                     fill="#4ecdc4" stroke="#fff" strokeWidth={0.3 * zoomScale}
                     aria-hidden="true" style={{ pointerEvents: 'none' }}
                   />
