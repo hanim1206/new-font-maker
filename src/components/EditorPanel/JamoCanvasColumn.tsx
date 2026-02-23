@@ -88,7 +88,7 @@ export function JamoCanvasColumn({
 }: JamoCanvasColumnProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [canvasSize, setCanvasSize] = useState(300)
+  const [canvasSize, setCanvasSize] = useState(200)
   const HANDLE_MARGIN = 40
   const [isDragging, setIsDragging] = useState(false)
 
@@ -106,7 +106,7 @@ export function JamoCanvasColumn({
     })
     observer.observe(containerRef.current)
     return () => observer.disconnect()
-  }, [isMobile])
+  }, [isMobile, isJamoEditing])
   const { isTouch } = useDeviceCapability()
   usePinchZoom(svgRef, { enabled: isTouch, doubleTapZoom: false })
 
@@ -157,8 +157,8 @@ export function JamoCanvasColumn({
   return (
     <div className="relative">
       {/* 캔버스 영역 */}
-      <div className="p-4 md:p-10 ">
-        <div ref={containerRef} className="flex justify-center p-3 bg-background rounded mb-2" onClick={() => { setSelectedStrokeId(null); setSelectedPointIndex(null) }}>
+      <div className="p-4 pt-3">
+        <div ref={containerRef} className="flex justify-center p-4 md:p-10 bg-background rounded mb-2" onClick={() => { setSelectedStrokeId(null); setSelectedPointIndex(null) }}>
           <div
             className="relative"
             style={{
