@@ -24,19 +24,8 @@ export function MobileToolbar() {
           onClick={() => toggleMobileDrawer('control')}
           aria-label="리모콘 패널"
         >
-          <Sliders className="h-5 w-5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            'min-w-touch min-h-touch',
-            activeMobileDrawer === 'inspector' && 'bg-primary/20 text-primary'
-          )}
-          onClick={() => toggleMobileDrawer('inspector')}
-          aria-label="인스펙터 패널"
-        >
           <PanelBottom className="h-5 w-5" />
+
         </Button>
         <Button
           variant="ghost"
@@ -49,6 +38,19 @@ export function MobileToolbar() {
           aria-label="미리보기 패널"
         >
           <Eye className="h-5 w-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(
+            'min-w-touch min-h-touch',
+            activeMobileDrawer === 'inspector' && 'bg-primary/20 text-primary'
+          )}
+          onClick={() => toggleMobileDrawer('inspector')}
+          aria-label="인스펙터 패널"
+        >
+          <Sliders className="h-5 w-5" />
+
         </Button>
       </div>
     </div>

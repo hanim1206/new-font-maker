@@ -108,7 +108,7 @@ export function StrokeOverlay({
   verticalPadding,
   onPointLongPress,
 }: StrokeOverlayProps) {
-  const { selectedStrokeId, setSelectedStrokeId, selectedPointIndex, setSelectedPointIndex } = useUIStore()
+  const { selectedStrokeId, setSelectedStrokeId, selectedPointIndex, setSelectedPointIndex, canvasZoom } = useUIStore()
   const { isTouch } = useDeviceCapability()
   const [dragState, setDragState] = useState<DragState | null>(null)
   const [snapFeedback, setSnapFeedback] = useState<SnapResult | null>(null)
@@ -120,6 +120,9 @@ export function StrokeOverlay({
 
   // 롱프레스 타이머 (앵커 포인트 롱프레스 → 팝업 트리거)
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 1-finger pan 후 click 이벤트 억제용 플래그
+  const panOccurredRef = useRef(false)
 
   const pointRadius = isTouch ? 5 : 2.5
   const weightMultiplier = globalStyle ? weightToMultiplier(globalStyle.weight) : 1.0
@@ -476,13 +479,64 @@ export function StrokeOverlay({
     }
   }, [dragState, handlePointerMove, handlePointerUp, clearLongPress])
 
-  // 빈 영역 클릭 시 선택 해제
+  // 빈 영역 클릭 시 선택 해제 (pan 직후에는 무시)
   const handleBackgroundClick = useCallback(() => {
+    if (panOccurredRef.current) {
+      panOccurredRef.current = false
+      return
+    }
     if (!dragState) {
       setSelectedPointIndex(null)
       setSelectedStrokeId(null)
     }
   }, [dragState, setSelectedPointIndex, setSelectedStrokeId])
+
+  // 빈 영역 터치 → 줌 상태에서 1-finger 캔버스 팬
+  const handleBgTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length !== 1 || canvasZoom <= 1) return
+
+    let lastX = e.touches[0].clientX
+    let lastY = e.touches[0].clientY
+    let moved = false
+
+    const onTouchMove = (te: TouchEvent) => {
+      // 멀티터치 → 팬 취소 (핀치줌으로 전환)
+      if (te.touches.length > 1) {
+        cleanup()
+        return
+      }
+      if (te.touches.length === 1) {
+        const dx = te.touches[0].clientX - lastX
+        const dy = te.touches[0].clientY - lastY
+        lastX = te.touches[0].clientX
+        lastY = te.touches[0].clientY
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) moved = true
+        const state = useUIStore.getState()
+        state.setCanvasPan({
+          x: state.canvasPan.x + dx,
+          y: state.canvasPan.y + dy,
+        })
+      }
+    }
+
+    const onTouchEnd = () => {
+      cleanup()
+      // 이동이 있었으면 click 이벤트(선택 해제) 억제
+      if (moved) {
+        panOccurredRef.current = true
+      }
+    }
+
+    const cleanup = () => {
+      window.removeEventListener('touchmove', onTouchMove)
+      window.removeEventListener('touchend', onTouchEnd)
+      window.removeEventListener('touchcancel', onTouchEnd)
+    }
+
+    window.addEventListener('touchmove', onTouchMove)
+    window.addEventListener('touchend', onTouchEnd)
+    window.addEventListener('touchcancel', onTouchEnd)
+  }, [canvasZoom])
 
   // 포인트 근접 감지 — 터치 시 획 선택+포인트 드래그를 한번에 시작하기 위해
   const POINT_GRAB_THRESHOLD = isTouch ? 8 : 4 // viewBox 단위
@@ -510,13 +564,14 @@ export function StrokeOverlay({
     <g
       style={dragState ? { cursor: getDragCursor() } : undefined}
     >
-      {/* 배경: 빈 영역 클릭 시 선택 해제 (viewBox 범위 내로 제한) */}
+      {/* 배경: 빈 영역 클릭 시 선택 해제 / 줌 상태에서 1-finger 팬 */}
       <rect
         x={0} y={0}
         width={viewBoxSize} height={viewBoxSize}
         fill="transparent"
         role="presentation"
         onClick={handleBackgroundClick}
+        onTouchStart={handleBgTouchStart}
       />
 
       {/* 선택된 획을 마지막에 렌더링하여 SVG z-order 최상위로 배치 */}
@@ -565,6 +620,9 @@ export function StrokeOverlay({
                   if (onStrokeChange) startStrokeMove(stroke)(e)
                 }}
                 onTouchStart={disableHitArea ? undefined : (e: React.TouchEvent) => {
+                  // 멀티터치(핀치줌 중) → 획 이벤트 무시
+                  if (e.touches.length > 1) return
+
                   setTouchHighlight(stroke.id)
 
                   // 터치: 미선택 획이면 선택만 (드래그 안 함)
@@ -620,6 +678,9 @@ export function StrokeOverlay({
                   if (onStrokeChange) startStrokeMove(stroke)(e)
                 }}
                 onTouchStart={disableHitArea ? undefined : (e: React.TouchEvent) => {
+                  // 멀티터치(핀치줌 중) → 획 이벤트 무시
+                  if (e.touches.length > 1) return
+
                   // 터치: 미선택 획이면 선택만 (드래그 안 함)
                   if (!isSelected) {
                     e.stopPropagation()

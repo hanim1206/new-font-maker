@@ -141,7 +141,7 @@ export function LayoutCanvasColumn({
   const handleDragStart = useCallback(() => { onLayoutDragStart(); setIsDragging(true) }, [onLayoutDragStart])
   const handleDragEnd = useCallback(() => setIsDragging(false), [])
   const { isTouch } = useDeviceCapability()
-  usePinchZoom(svgRef, { enabled: isTouch })
+  usePinchZoom(svgRef, { enabled: isTouch, doubleTapZoom: false })
 
   // 레이아웃 타입 변경 시 줌/패닝 초기화
   useEffect(() => {

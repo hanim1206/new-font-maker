@@ -5,13 +5,14 @@ interface PinchZoomOptions {
   enabled?: boolean
   minZoom?: number
   maxZoom?: number
+  doubleTapZoom?: boolean
 }
 
 export function usePinchZoom(
   svgRef: React.RefObject<SVGSVGElement | null>,
   options: PinchZoomOptions = {}
 ) {
-  const { enabled = true, minZoom = 0.5, maxZoom = 5 } = options
+  const { enabled = true, minZoom = 0.5, maxZoom = 5, doubleTapZoom = true } = options
   const { canvasZoom, canvasPan, setCanvasZoom, setCanvasPan, resetCanvasView } = useUIStore()
 
   const initialDistance = useRef(0)
@@ -36,9 +37,12 @@ export function usePinchZoom(
     if (!enabled) return
 
     if (e.touches.length === 2) {
-      // 핀치 시작
+      // 핀치 시작 → 획/포인트 선택 해제
       e.preventDefault()
       isPinching.current = true
+      const state = useUIStore.getState()
+      if (state.selectedStrokeId) state.setSelectedStrokeId(null)
+      if (state.selectedPointIndex !== null) state.setSelectedPointIndex(null)
       initialDistance.current = getDistance(e.touches[0], e.touches[1])
       initialZoom.current = canvasZoom
       initialPan.current = { ...canvasPan }
@@ -49,7 +53,21 @@ export function usePinchZoom(
   const handleTouchMove = useCallback((e: TouchEvent) => {
     if (!enabled) return
 
-    if (isPinching.current && e.touches.length === 2) {
+    if (e.touches.length === 2) {
+      // 두 번째 손가락이 캔버스 밖에서 시작된 경우 touchstart를 못 받으므로
+      // touchmove에서 핀치 초기화
+      if (!isPinching.current) {
+        isPinching.current = true
+        // 핀치 시작 → 획/포인트 선택 해제
+        const state = useUIStore.getState()
+        if (state.selectedStrokeId) state.setSelectedStrokeId(null)
+        if (state.selectedPointIndex !== null) state.setSelectedPointIndex(null)
+        initialDistance.current = getDistance(e.touches[0], e.touches[1])
+        initialZoom.current = state.canvasZoom
+        initialPan.current = { ...state.canvasPan }
+        initialMidpoint.current = getMidpoint(e.touches[0], e.touches[1])
+      }
+
       e.preventDefault()
       const dist = getDistance(e.touches[0], e.touches[1])
       const scale = dist / initialDistance.current
@@ -71,7 +89,7 @@ export function usePinchZoom(
     if (e.touches.length < 2) {
       isPinching.current = false
     }
-    if (e.touches.length === 0) {
+    if (e.touches.length === 0 && doubleTapZoom) {
       // 더블탭 감지 → 줌 리셋/줌인
       const now = Date.now()
       if (now - lastDoubleTapTime.current < 300) {
@@ -85,7 +103,7 @@ export function usePinchZoom(
         lastDoubleTapTime.current = now
       }
     }
-  }, [canvasZoom, resetCanvasView, setCanvasZoom])
+  }, [canvasZoom, resetCanvasView, setCanvasZoom, doubleTapZoom])
 
   useEffect(() => {
     const svg = svgRef.current

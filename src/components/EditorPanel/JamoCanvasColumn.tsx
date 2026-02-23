@@ -107,7 +107,7 @@ export function JamoCanvasColumn({
     return () => observer.disconnect()
   }, [isMobile])
   const { isTouch } = useDeviceCapability()
-  usePinchZoom(svgRef, { enabled: isTouch })
+  usePinchZoom(svgRef, { enabled: isTouch, doubleTapZoom: false })
 
   // 자모 편집 대상이 변경될 때 줌/패닝 초기화
   useEffect(() => {
