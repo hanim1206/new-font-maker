@@ -24,7 +24,6 @@ export function ProjectManager({ onClose }: ProjectManagerProps) {
     fetchProjects,
     saveAsNew,
     saveCurrent,
-    saveToProject,
     renameProject,
     loadProject,
     deleteProject,
@@ -54,11 +53,6 @@ export function ProjectManager({ onClose }: ProjectManagerProps) {
     if (!confirm('현재 편집 중인 데이터를 덮어씁니다.\n계속하시겠습니까?')) return
     await loadProject(id)
     onClose()
-  }
-
-  const handleOverwrite = async (id: string, name: string) => {
-    if (!confirm(`'${name}'에 현재 데이터를 덮어쓰시겠습니까?`)) return
-    await saveToProject(id)
   }
 
   const handleDelete = async (id: string) => {
@@ -236,9 +230,6 @@ export function ProjectManager({ onClose }: ProjectManagerProps) {
                   <div className="flex gap-1">
                     <Button size="sm" variant="default" onClick={() => handleLoad(project.id)} disabled={loading}>
                       불러오기
-                    </Button>
-                    <Button size="sm" variant="default" onClick={() => handleOverwrite(project.id, project.name)} disabled={loading}>
-                      덮어쓰기
                     </Button>
                     <Button size="sm" variant="default" onClick={() => handleExportTTF(project.id, project.name)} disabled={loading || exportingId !== null}>
                       {exportingId === project.id ? exportProgress : 'TTF'}

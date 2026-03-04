@@ -1,10 +1,13 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
+import { persist } from 'zustand/middleware'
 import type { ViewMode, LayoutType, Part } from '../types'
 
+type PageType = 'home' | 'editor' | 'projects'
+
 interface UIState {
-  // 현재 페이지 (에디터 또는 프로젝트 목록)
-  currentPage: 'editor' | 'projects'
+  // 현재 페이지 (홈, 에디터, 프로젝트 목록)
+  currentPage: PageType
   // 현재 뷰 모드 (모바일에서 탭 전환용)
   viewMode: ViewMode
   // 입력된 텍스트
@@ -51,7 +54,7 @@ interface UIState {
 }
 
 interface UIActions {
-  setCurrentPage: (page: 'editor' | 'projects') => void
+  setCurrentPage: (page: PageType) => void
   setViewMode: (mode: ViewMode) => void
   setInputText: (text: string) => void
   setSelectedCharIndex: (index: number) => void
@@ -81,9 +84,10 @@ interface UIActions {
 }
 
 export const useUIStore = create<UIState & UIActions>()(
+  persist(
   immer((set) => ({
     // 초기 상태
-    currentPage: 'editor',
+    currentPage: 'home' as PageType,
     viewMode: 'preview',
     inputText: '',
     selectedCharIndex: 0,
@@ -234,5 +238,13 @@ export const useUIStore = create<UIState & UIActions>()(
         state.canvasZoom = 1
         state.canvasPan = { x: 0, y: 0 }
       }),
-  }))
+  })),
+  {
+    name: 'font-maker-ui',
+    partialize: (state) => ({
+      currentProjectId: state.currentProjectId,
+      currentProjectName: state.currentProjectName,
+    }),
+  }
+  )
 )

@@ -7,6 +7,7 @@ import { useState, useCallback } from 'react'
 import { fontProjectService } from '../services/fontProjectService'
 import { collectFontData, applyFontData, validateFontData } from '../services/fontDataBridge'
 import { useUIStore } from '../stores/uiStore'
+import { addRecentProject } from '../utils/recentProjects'
 import type { FontProject } from '../types/database'
 
 interface UseFontProjectReturn {
@@ -19,8 +20,8 @@ interface UseFontProjectReturn {
   // 액션
   fetchProjects: () => Promise<void>
   saveAsNew: (name: string) => Promise<FontProject>
-  saveCurrent: () => Promise<void>
-  saveToProject: (id: string) => Promise<void>
+  saveCurrent: () => Promise<boolean>
+  duplicateProject: (id: string) => Promise<void>
   renameProject: (id: string, name: string) => Promise<void>
   loadProject: (id: string) => Promise<void>
   deleteProject: (id: string) => Promise<void>
@@ -61,6 +62,7 @@ export function useFontProject(): UseFontProjectReturn {
         font_data: fontData,
       })
       setCurrentProject(project.id, name)
+      addRecentProject(project.id, name)
       // 목록 갱신
       setProjects((prev) => [project, ...prev])
       return project
@@ -73,11 +75,11 @@ export function useFontProject(): UseFontProjectReturn {
     }
   }, [setCurrentProject])
 
-  // 현재 프로젝트 덮어쓰기 저장
-  const saveCurrent = useCallback(async () => {
+  // 현재 프로젝트 저장 (성공 여부 반환)
+  const saveCurrent = useCallback(async (): Promise<boolean> => {
     if (!currentProjectId) {
       setError('저장할 프로젝트가 선택되지 않았습니다')
-      return
+      return false
     }
     setLoading(true)
     setError(null)
@@ -90,30 +92,36 @@ export function useFontProject(): UseFontProjectReturn {
       setProjects((prev) =>
         prev.map((p) => (p.id === updated.id ? updated : p))
       )
+      return true
     } catch (e) {
       setError(e instanceof Error ? e.message : '저장 실패')
+      return false
     } finally {
       setLoading(false)
     }
   }, [currentProjectId])
 
-  // 특정 프로젝트에 현재 데이터를 덮어쓰기 저장
-  const saveToProject = useCallback(async (id: string) => {
+  // 프로젝트 복제
+  const duplicateProject = useCallback(async (id: string) => {
     setLoading(true)
     setError(null)
     try {
-      const fontData = collectFontData()
-      const updated = await fontProjectService.update(id, { font_data: fontData })
-      setCurrentProject(id, updated.name)
-      setProjects((prev) =>
-        prev.map((p) => (p.id === updated.id ? updated : p))
-      )
+      const project = await fontProjectService.get(id)
+      if (!project) {
+        setError('프로젝트를 찾을 수 없습니다')
+        return
+      }
+      const newProject = await fontProjectService.create({
+        name: `${project.name} (사본)`,
+        font_data: project.font_data,
+      })
+      setProjects((prev) => [newProject, ...prev])
     } catch (e) {
-      setError(e instanceof Error ? e.message : '덮어쓰기 실패')
+      setError(e instanceof Error ? e.message : '복제 실패')
     } finally {
       setLoading(false)
     }
-  }, [setCurrentProject])
+  }, [])
 
   // 프로젝트 이름 변경
   const renameProject = useCallback(async (id: string, name: string) => {
@@ -155,6 +163,7 @@ export function useFontProject(): UseFontProjectReturn {
       // 3개 스토어에 적용
       applyFontData(project.font_data)
       setCurrentProject(project.id, project.name)
+      addRecentProject(project.id, project.name)
     } catch (e) {
       setError(e instanceof Error ? e.message : '불러오기 실패')
     } finally {
@@ -188,7 +197,7 @@ export function useFontProject(): UseFontProjectReturn {
     fetchProjects,
     saveAsNew,
     saveCurrent,
-    saveToProject,
+    duplicateProject,
     renameProject,
     loadProject,
     deleteProject,

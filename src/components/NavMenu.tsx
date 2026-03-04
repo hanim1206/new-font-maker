@@ -2,10 +2,10 @@
  * 햄버거 네비게이션 메뉴
  *
  * PC/모바일 공용. Sheet(좌측 드로어)로 열리며
- * 유저 정보, 프로젝트 관리, 저장/리셋 등 앱 전역 액션을 포함한다.
+ * 유저 정보, 프로젝트 관리, 저장 등 앱 전역 액션을 포함한다.
  */
 import { useState, useCallback } from 'react'
-import { Menu, FolderOpen, Save, LogIn, LogOut, User } from 'lucide-react'
+import { Menu, Home, FolderOpen, Save, FilePlus, LogIn, LogOut, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -24,6 +24,8 @@ import { useFontProject } from '../hooks/useFontProject'
 export function NavMenu() {
   const [open, setOpen] = useState(false)
   const [showAuth, setShowAuth] = useState(false)
+  const [showSaveAsInput, setShowSaveAsInput] = useState(false)
+  const [saveAsName, setSaveAsName] = useState('')
 
   const currentProjectId = useUIStore((s) => s.currentProjectId)
   const currentProjectName = useUIStore((s) => s.currentProjectName)
@@ -32,7 +34,7 @@ export function NavMenu() {
   const user = useAuthStore((s) => s.user)
   const signOut = useAuthStore((s) => s.signOut)
 
-  const { saveCurrent, loading: projectLoading } = useFontProject()
+  const { saveCurrent, saveAsNew, loading: projectLoading } = useFontProject()
   const [saving, setSaving] = useState(false)
 
   const handleSave = useCallback(async () => {
@@ -44,6 +46,23 @@ export function NavMenu() {
       setSaving(false)
     }
   }, [currentProjectId, saving, saveCurrent])
+
+  const handleSaveAs = useCallback(async () => {
+    const name = saveAsName.trim() || '새 폰트'
+    setSaving(true)
+    try {
+      await saveAsNew(name)
+      setShowSaveAsInput(false)
+      setSaveAsName('')
+    } finally {
+      setSaving(false)
+    }
+  }, [saveAsName, saveAsNew])
+
+  const handleGoHome = () => {
+    setCurrentPage('home')
+    setOpen(false)
+  }
 
   const handleGoToProjects = () => {
     setCurrentPage('projects')
@@ -110,16 +129,31 @@ export function NavMenu() {
             </>
           )}
 
-          {/* 프로젝트 관련 */}
+          {/* 네비게이션 */}
           <div className="py-1">
             <button
               className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-surface-3 transition-colors"
-              onClick={handleGoToProjects}
+              onClick={handleGoHome}
             >
-              <FolderOpen className="h-4 w-4 text-muted shrink-0" />
-              <span>프로젝트 관리</span>
+              <Home className="h-4 w-4 text-muted shrink-0" />
+              <span>홈으로</span>
             </button>
 
+            {user && (
+              <button
+                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-surface-3 transition-colors"
+                onClick={handleGoToProjects}
+              >
+                <FolderOpen className="h-4 w-4 text-muted shrink-0" />
+                <span>내 프로젝트</span>
+              </button>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* 프로젝트 액션 */}
+          <div className="py-1">
             {currentProjectId && (
               <button
                 className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-surface-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -127,13 +161,46 @@ export function NavMenu() {
                 disabled={saving || projectLoading}
               >
                 <Save className="h-4 w-4 text-muted shrink-0" />
-                <span>{saving ? '저장 중...' : '현재 프로젝트 저장'}</span>
+                <span>{saving ? '저장 중...' : '저장'}</span>
                 {currentProjectName && (
                   <span className="ml-auto text-xs text-muted truncate max-w-[100px]">
                     {currentProjectName}
                   </span>
                 )}
               </button>
+            )}
+
+            {user && (
+              <>
+                <button
+                  className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-surface-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => setShowSaveAsInput(!showSaveAsInput)}
+                  disabled={saving || projectLoading}
+                >
+                  <FilePlus className="h-4 w-4 text-muted shrink-0" />
+                  <span>다른 이름으로 저장</span>
+                </button>
+
+                {showSaveAsInput && (
+                  <div className="flex gap-1 px-4 py-2">
+                    <input
+                      type="text"
+                      value={saveAsName}
+                      onChange={(e) => setSaveAsName(e.target.value)}
+                      placeholder="폰트 이름"
+                      className="flex-1 bg-surface-2 border border-border-subtle rounded px-2 py-1 text-sm text-foreground"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveAs()
+                        if (e.key === 'Escape') setShowSaveAsInput(false)
+                      }}
+                      autoFocus
+                    />
+                    <Button size="sm" onClick={handleSaveAs} disabled={saving}>
+                      저장
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

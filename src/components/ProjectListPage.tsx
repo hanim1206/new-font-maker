@@ -1,16 +1,31 @@
 /**
  * 프로젝트 관리 전체 페이지
  *
- * 기존 Popover 내 ProjectManager를 별도 페이지로 분리.
- * 프로젝트 목록, 새로 저장, 불러오기, 내보내기, 삭제 기능 포함.
+ * 프로젝트 목록 탐색 + 관리 중심. 주요 동작 "열기" + 더보기 메뉴.
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Plus, MoreHorizontal, Pencil, Copy, Download, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useUIStore } from '../stores/uiStore'
 import { useFontProject } from '../hooks/useFontProject'
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges'
+import { UnsavedChangesDialog } from './ui/UnsavedChangesDialog'
 import { generateAndDownloadFont } from '../services/fontGenerator'
 
 export function ProjectListPage() {
@@ -24,17 +39,31 @@ export function ProjectListPage() {
     fetchProjects,
     saveAsNew,
     saveCurrent,
-    saveToProject,
+    duplicateProject,
     renameProject,
     loadProject,
     deleteProject,
     clearError,
   } = useFontProject()
 
+  const { isDirty, markAsSaved, markAsClean } = useUnsavedChanges()
+
+  // 새 프로젝트 이름 입력
+  const [showNewInput, setShowNewInput] = useState(false)
   const [newName, setNewName] = useState('')
-  const [showNameInput, setShowNameInput] = useState(false)
+
+  // 이름 편집
   const [editingNameId, setEditingNameId] = useState<string | null>(null)
   const [editingNameValue, setEditingNameValue] = useState('')
+
+  // 삭제 확인 다이얼로그
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+
+  // 미저장 변경 다이얼로그
+  const [unsavedAction, setUnsavedAction] = useState<(() => void) | null>(null)
+  const [unsavedSaving, setUnsavedSaving] = useState(false)
+
+  // 내보내기
   const [exportingId, setExportingId] = useState<string | null>(null)
   const [exportProgress, setExportProgress] = useState('')
   const exportingRef = useRef(false)
@@ -43,29 +72,70 @@ export function ProjectListPage() {
     fetchProjects()
   }, [fetchProjects])
 
+  // === 새 폰트 저장 ===
+  const handleNewFont = () => {
+    setShowNewInput(true)
+    setNewName('')
+  }
+
   const handleSaveAsNew = async () => {
     const name = newName.trim() || '새 폰트'
     await saveAsNew(name)
+    markAsSaved()
     setNewName('')
-    setShowNameInput(false)
+    setShowNewInput(false)
   }
 
-  const handleLoad = async (id: string) => {
-    if (!confirm('현재 편집 중인 데이터를 덮어씁니다.\n계속하시겠습니까?')) return
-    await loadProject(id)
-    setCurrentPage('editor')
+  // === 프로젝트 열기 (미저장 확인 포함) ===
+  const handleOpenProject = (id: string) => {
+    const doOpen = async () => {
+      await loadProject(id)
+      markAsClean()
+      setCurrentPage('editor')
+    }
+
+    if (isDirty) {
+      setUnsavedAction(() => doOpen)
+    } else {
+      doOpen()
+    }
   }
 
-  const handleOverwrite = async (id: string, name: string) => {
-    if (!confirm(`'${name}'에 현재 데이터를 덮어쓰시겠습니까?`)) return
-    await saveToProject(id)
+  const handleUnsavedSaveAndContinue = async () => {
+    setUnsavedSaving(true)
+    const success = await saveCurrent()
+    setUnsavedSaving(false)
+    if (success) {
+      markAsSaved()
+      const action = unsavedAction
+      setUnsavedAction(null)
+      if (action) action()
+    }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('이 프로젝트를 삭제하시겠습니까?')) return
-    await deleteProject(id)
+  const handleUnsavedDiscardAndContinue = () => {
+    const action = unsavedAction
+    setUnsavedAction(null)
+    if (action) action()
   }
 
+  const handleUnsavedCancel = () => {
+    setUnsavedAction(null)
+  }
+
+  // === 삭제 ===
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return
+    await deleteProject(deleteTarget.id)
+    setDeleteTarget(null)
+  }
+
+  // === 복제 ===
+  const handleDuplicate = async (id: string) => {
+    await duplicateProject(id)
+  }
+
+  // === 내보내기 ===
   const handleExportTTF = useCallback(async (id: string, name: string) => {
     if (exportingRef.current) return
     exportingRef.current = true
@@ -89,6 +159,7 @@ export function ProjectListPage() {
     }
   }, [loadProject])
 
+  // === 이름 변경 ===
   const handleStartRename = (id: string, currentName: string) => {
     setEditingNameId(id)
     setEditingNameValue(currentName)
@@ -117,29 +188,21 @@ export function ProjectListPage() {
             variant="ghost"
             size="sm"
             className="shrink-0 p-1.5"
-            onClick={() => setCurrentPage('editor')}
-            aria-label="편집기로 돌아가기"
+            onClick={() => setCurrentPage('home')}
+            aria-label="홈으로 돌아가기"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-base font-semibold">프로젝트 관리</h1>
-          <div className="ml-auto flex gap-2">
-            {currentProjectId && (
-              <Button size="sm" variant="default" onClick={saveCurrent} disabled={loading}>
-                저장
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="default"
-              onClick={() => setShowNameInput(!showNameInput)}
-            >
-              새로 저장
+          <h1 className="text-base font-semibold">내 프로젝트</h1>
+          <div className="ml-auto">
+            <Button size="sm" variant="default" onClick={handleNewFont}>
+              <Plus className="h-4 w-4 mr-1" />
+              새 폰트
             </Button>
           </div>
         </div>
 
-        {showNameInput && (
+        {showNewInput && (
           <div className="flex gap-2 px-4 pb-3">
             <Input
               type="text"
@@ -149,11 +212,15 @@ export function ProjectListPage() {
               className="flex-1 text-sm"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSaveAsNew()
+                if (e.key === 'Escape') setShowNewInput(false)
               }}
               autoFocus
             />
             <Button size="sm" onClick={handleSaveAsNew} disabled={loading}>
-              확인
+              저장
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowNewInput(false)}>
+              취소
             </Button>
           </div>
         )}
@@ -189,6 +256,7 @@ export function ProjectListPage() {
             {projects.map((project) => {
               const isCurrent = project.id === currentProjectId
               const isRenaming = editingNameId === project.id
+              const isExporting = exportingId === project.id
 
               return (
                 <div
@@ -197,6 +265,7 @@ export function ProjectListPage() {
                     isCurrent ? 'bg-primary/10 border-l-2 border-l-primary' : ''
                   }`}
                 >
+                  {/* 프로젝트 정보 */}
                   <div className="flex items-center gap-2 mb-2">
                     {isRenaming ? (
                       <div className="flex-1 flex gap-1">
@@ -214,19 +283,19 @@ export function ProjectListPage() {
                         <Button size="sm" onClick={handleRenameConfirm} disabled={loading}>
                           확인
                         </Button>
-                        <Button size="sm" variant="default" onClick={handleRenameCancel}>
+                        <Button size="sm" variant="ghost" onClick={handleRenameCancel}>
                           취소
                         </Button>
                       </div>
                     ) : (
                       <div className="flex-1 min-w-0">
-                        <div
-                          className="text-sm font-medium text-foreground truncate cursor-pointer hover:text-primary"
-                          onClick={() => handleStartRename(project.id, project.name)}
-                          title="클릭하여 이름 변경"
-                        >
+                        <div className="text-sm font-medium text-foreground truncate">
                           {project.name}
-                          {isCurrent && <span className="ml-1 text-xs text-primary">(현재)</span>}
+                          {isCurrent && (
+                            <span className="ml-1.5 text-xs text-primary font-normal">
+                              (현재 편집 중)
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs text-muted mt-0.5">
                           {new Date(project.updated_at).toLocaleDateString('ko-KR', {
@@ -240,28 +309,58 @@ export function ProjectListPage() {
                     )}
                   </div>
 
+                  {/* 액션 버튼 */}
                   {!isRenaming && (
-                    <div className="flex gap-1.5 flex-wrap">
-                      <Button size="sm" variant="default" onClick={() => handleLoad(project.id)} disabled={loading}>
-                        불러오기
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => handleOpenProject(project.id)}
+                        disabled={loading || isExporting}
+                      >
+                        열기
                       </Button>
-                      <Button size="sm" variant="default" onClick={() => handleOverwrite(project.id, project.name)} disabled={loading}>
-                        덮어쓰기
-                      </Button>
-                      <Button size="sm" variant="default" onClick={() => handleExportTTF(project.id, project.name)} disabled={loading || exportingId !== null}>
-                        {exportingId === project.id ? exportProgress : 'TTF 내보내기'}
-                      </Button>
-                      <Button size="sm" variant="danger" onClick={() => handleDelete(project.id)} disabled={loading}>
-                        삭제
-                      </Button>
-                    </div>
-                  )}
 
-                  {exportingId === project.id && (
-                    <>
-                      <Separator className="my-2" />
-                      <div className="text-xs text-muted">{exportProgress}</div>
-                    </>
+                      {/* 더보기 메뉴 */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="p-1.5"
+                            disabled={loading || isExporting}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem onClick={() => handleStartRename(project.id, project.name)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            이름 변경
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDuplicate(project.id)}>
+                            <Copy className="h-4 w-4 mr-2" />
+                            복제
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleExportTTF(project.id, project.name)}>
+                            <Download className="h-4 w-4 mr-2" />
+                            폰트 파일 내보내기
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-red-400 focus:text-red-400"
+                            onClick={() => setDeleteTarget({ id: project.id, name: project.name })}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            삭제
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {isExporting && (
+                        <span className="text-xs text-muted ml-2">{exportProgress}</span>
+                      )}
+                    </div>
                   )}
                 </div>
               )
@@ -269,6 +368,36 @@ export function ProjectListPage() {
           </div>
         )}
       </div>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>프로젝트 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              '{deleteTarget?.name}'을(를) 삭제하시겠습니까?
+              이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>
+              취소
+            </Button>
+            <Button variant="danger" onClick={handleDeleteConfirm} disabled={loading}>
+              삭제
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 미저장 변경 다이얼로그 */}
+      <UnsavedChangesDialog
+        open={!!unsavedAction}
+        onSaveAndContinue={handleUnsavedSaveAndContinue}
+        onDiscardAndContinue={handleUnsavedDiscardAndContinue}
+        onCancel={handleUnsavedCancel}
+        saving={unsavedSaving}
+      />
     </div>
   )
 }

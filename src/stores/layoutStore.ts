@@ -304,6 +304,8 @@ export const useLayoutStore = create<LayoutState & LayoutActions>()(
       resetToBasePresets: () =>
         set((state) => {
           state.layoutSchemas = deepClone(BASE_PRESETS_SCHEMAS)
+          state.globalPadding = { ...DEFAULT_GLOBAL_PADDING }
+          state.paddingOverrides = {}
           Object.keys(state.layoutSchemas).forEach((lt) => {
             syncConfigFromSchema(state, lt as LayoutType)
           })

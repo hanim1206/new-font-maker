@@ -3,6 +3,7 @@ import { EditorPanel } from './components/EditorPanel/EditorPanel'
 import { MobileLayout } from './components/mobile/MobileLayout'
 import { NavMenu } from './components/NavMenu'
 import { ProjectListPage } from './components/ProjectListPage'
+import { HomePage } from './components/HomePage'
 import { useUIStore } from './stores/uiStore'
 import { useAuthStore } from './stores/authStore'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -11,12 +12,12 @@ import { PreviewPanel } from './components/PreviewPanel/PreviewPanel'
 export default function App() {
   const { isMobile, setIsMobile } = useUIStore()
   const currentPage = useUIStore((s) => s.currentPage)
+  const currentProjectName = useUIStore((s) => s.currentProjectName)
 
   // 인증 상태 리스너 초기화 (initialize 참조 안정성 무관하게 1회만)
   useEffect(() => {
     const unsubscribe = useAuthStore.getState().initialize()
     return unsubscribe
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 반응형 감지
@@ -28,6 +29,15 @@ export default function App() {
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [setIsMobile])
+
+  // 홈 화면
+  if (currentPage === 'home') {
+    return (
+      <div className="h-screen bg-background text-foreground font-sans">
+        <HomePage />
+      </div>
+    )
+  }
 
   // 프로젝트 목록 페이지 (PC/모바일 공용)
   if (currentPage === 'projects') {
@@ -43,10 +53,13 @@ export default function App() {
     return (
       <TooltipProvider delayDuration={300}>
         <div className="flex flex-col h-screen bg-background text-foreground font-sans">
-          {/* 최상단: 햄버거 + 가로 글자 프리뷰 (인풋 포함) */}
+          {/* 최상단: 햄버거 + 프로젝트명 + 가로 글자 프리뷰 (인풋 포함) */}
           <div className="shrink-0 border-b border-border-subtle bg-[#0f0f0f]">
             <div className="flex items-center gap-3 px-4 py-2">
               <NavMenu />
+              <span className="text-xs text-muted truncate max-w-[150px] shrink-0">
+                {currentProjectName || '새 폰트 (미저장)'}
+              </span>
               <PreviewPanel horizontal />
             </div>
           </div>
