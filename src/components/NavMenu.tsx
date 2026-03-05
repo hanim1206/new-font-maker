@@ -16,14 +16,14 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet'
 import { Separator } from '@/components/ui/separator'
-import { AuthPanel } from './AuthPanel'
 import { useUIStore } from '../stores/uiStore'
 import { useAuthStore } from '../stores/authStore'
+import { useAuthDialogStore } from '../stores/authDialogStore'
+import { useAuthGuard } from '../hooks/useAuthGuard'
 import { useFontProject } from '../hooks/useFontProject'
 
 export function NavMenu() {
   const [open, setOpen] = useState(false)
-  const [showAuth, setShowAuth] = useState(false)
   const [showSaveAsInput, setShowSaveAsInput] = useState(false)
   const [saveAsName, setSaveAsName] = useState('')
 
@@ -33,6 +33,9 @@ export function NavMenu() {
 
   const user = useAuthStore((s) => s.user)
   const signOut = useAuthStore((s) => s.signOut)
+
+  const openAuthDialog = useAuthDialogStore((s) => s.openWithAction)
+  const guardedAction = useAuthGuard()
 
   const { saveCurrent, saveAsNew, loading: projectLoading } = useFontProject()
   const [saving, setSaving] = useState(false)
@@ -65,7 +68,20 @@ export function NavMenu() {
   }
 
   const handleGoToProjects = () => {
-    setCurrentPage('projects')
+    guardedAction(() => {
+      setCurrentPage('projects')
+      setOpen(false)
+    }, '프로젝트를 열려면 로그인하세요')
+  }
+
+  const handleSaveAsClick = () => {
+    guardedAction(() => {
+      setShowSaveAsInput(!showSaveAsInput)
+    }, '저장하려면 로그인하세요')
+  }
+
+  const handleLoginClick = () => {
+    openAuthDialog(null)
     setOpen(false)
   }
 
@@ -109,7 +125,7 @@ export function NavMenu() {
             ) : (
               <button
                 className="flex items-center gap-3 w-full text-left hover:bg-surface-3 rounded-lg p-2 -m-2 transition-colors"
-                onClick={() => setShowAuth(true)}
+                onClick={handleLoginClick}
               >
                 <div className="flex items-center justify-center w-8 h-8 rounded-full bg-surface-3 text-muted shrink-0">
                   <LogIn className="h-4 w-4" />
@@ -121,14 +137,6 @@ export function NavMenu() {
 
           <Separator />
 
-          {/* 인증 폼 (비로그인 시 토글) */}
-          {showAuth && !user && (
-            <>
-              <AuthPanel onClose={() => setShowAuth(false)} />
-              <Separator />
-            </>
-          )}
-
           {/* 네비게이션 */}
           <div className="py-1">
             <button
@@ -139,15 +147,13 @@ export function NavMenu() {
               <span>홈으로</span>
             </button>
 
-            {user && (
-              <button
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-surface-3 transition-colors"
-                onClick={handleGoToProjects}
-              >
-                <FolderOpen className="h-4 w-4 text-muted shrink-0" />
-                <span>내 프로젝트</span>
-              </button>
-            )}
+            <button
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-surface-3 transition-colors"
+              onClick={handleGoToProjects}
+            >
+              <FolderOpen className="h-4 w-4 text-muted shrink-0" />
+              <span>내 프로젝트</span>
+            </button>
           </div>
 
           <Separator />
@@ -170,37 +176,33 @@ export function NavMenu() {
               </button>
             )}
 
-            {user && (
-              <>
-                <button
-                  className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-surface-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={() => setShowSaveAsInput(!showSaveAsInput)}
-                  disabled={saving || projectLoading}
-                >
-                  <FilePlus className="h-4 w-4 text-muted shrink-0" />
-                  <span>다른 이름으로 저장</span>
-                </button>
+            <button
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-surface-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleSaveAsClick}
+              disabled={saving || projectLoading}
+            >
+              <FilePlus className="h-4 w-4 text-muted shrink-0" />
+              <span>다른 이름으로 저장</span>
+            </button>
 
-                {showSaveAsInput && (
-                  <div className="flex gap-1 px-4 py-2">
-                    <input
-                      type="text"
-                      value={saveAsName}
-                      onChange={(e) => setSaveAsName(e.target.value)}
-                      placeholder="폰트 이름"
-                      className="flex-1 bg-surface-2 border border-border-subtle rounded px-2 py-1 text-sm text-foreground"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSaveAs()
-                        if (e.key === 'Escape') setShowSaveAsInput(false)
-                      }}
-                      autoFocus
-                    />
-                    <Button size="sm" onClick={handleSaveAs} disabled={saving}>
-                      저장
-                    </Button>
-                  </div>
-                )}
-              </>
+            {showSaveAsInput && (
+              <div className="flex gap-1 px-4 py-2">
+                <input
+                  type="text"
+                  value={saveAsName}
+                  onChange={(e) => setSaveAsName(e.target.value)}
+                  placeholder="폰트 이름"
+                  className="flex-1 bg-surface-2 border border-border-subtle rounded px-2 py-1 text-sm text-foreground"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveAs()
+                    if (e.key === 'Escape') setShowSaveAsInput(false)
+                  }}
+                  autoFocus
+                />
+                <Button size="sm" onClick={handleSaveAs} disabled={saving}>
+                  저장
+                </Button>
+              </div>
             )}
           </div>
 

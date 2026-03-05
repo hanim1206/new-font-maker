@@ -11,6 +11,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useJamoStore } from '../stores/jamoStore'
 import { useLayoutStore } from '../stores/layoutStore'
 import { useGlobalStyleStore } from '../stores/globalStyleStore'
+import { useAuthGuard } from '../hooks/useAuthGuard'
 import { getRecentProjects, type RecentProject } from '../utils/recentProjects'
 import { NavMenu } from './NavMenu'
 
@@ -20,6 +21,7 @@ export function HomePage() {
   const currentProjectName = useUIStore((s) => s.currentProjectName)
   const setCurrentProject = useUIStore((s) => s.setCurrentProject)
   const user = useAuthStore((s) => s.user)
+  const guardedAction = useAuthGuard()
 
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([])
 
@@ -37,7 +39,7 @@ export function HomePage() {
   }
 
   const handleOpenExisting = () => {
-    setCurrentPage('projects')
+    guardedAction(() => setCurrentPage('projects'), '프로젝트를 열려면 로그인하세요')
   }
 
   const handleContinue = () => {
@@ -78,15 +80,12 @@ export function HomePage() {
             </button>
 
             <button
-              className="flex flex-col items-center gap-2 p-5 rounded-lg border border-border-subtle bg-surface-2 hover:bg-surface-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex flex-col items-center gap-2 p-5 rounded-lg border border-border-subtle bg-surface-2 hover:bg-surface-3 transition-colors"
               onClick={handleOpenExisting}
-              disabled={!user}
             >
               <FolderOpen className="h-6 w-6 text-primary" />
               <span className="text-sm font-medium">기존 폰트 열기</span>
-              <span className="text-xs text-muted">
-                {user ? '저장된 프로젝트' : '로그인이 필요합니다'}
-              </span>
+              <span className="text-xs text-muted">저장된 프로젝트</span>
             </button>
           </div>
 

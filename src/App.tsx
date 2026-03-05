@@ -8,6 +8,7 @@ import { useUIStore } from './stores/uiStore'
 import { useAuthStore } from './stores/authStore'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { PreviewPanel } from './components/PreviewPanel/PreviewPanel'
+import { AuthDialog } from './components/AuthDialog'
 
 export default function App() {
   const { isMobile, setIsMobile } = useUIStore()
@@ -35,6 +36,7 @@ export default function App() {
     return (
       <div className="h-screen bg-background text-foreground font-sans">
         <HomePage />
+        <AuthDialog />
       </div>
     )
   }
@@ -44,6 +46,7 @@ export default function App() {
     return (
       <div className="h-screen bg-background text-foreground font-sans">
         <ProjectListPage />
+        <AuthDialog />
       </div>
     )
   }
@@ -69,10 +72,16 @@ export default function App() {
             <EditorPanel />
           </div>
         </div>
+        <AuthDialog />
       </TooltipProvider>
     )
   }
 
   // 모바일: 캔버스 중심 + 드로어 방식
-  return <MobileLayout />
+  return (
+    <>
+      <MobileLayout />
+      <AuthDialog />
+    </>
+  )
 }

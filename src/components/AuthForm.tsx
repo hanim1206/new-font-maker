@@ -1,7 +1,7 @@
 /**
- * 이메일/비밀번호 로그인·회원가입 패널
+ * 이메일/비밀번호 로그인·회원가입 폼
  *
- * Popover 내부 콘텐츠로 렌더링
+ * AuthDialog 내부에서 사용. 로그아웃 UI 없음.
  */
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
@@ -9,12 +9,13 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuthStore } from '../stores/authStore'
 
-interface AuthPanelProps {
-  onClose: () => void
+interface AuthFormProps {
+  onLoginSuccess: () => void
+  onModeChange?: (mode: 'login' | 'signup') => void
 }
 
-export function AuthPanel({ onClose }: AuthPanelProps) {
-  const { user, loading, error, signIn, signUp, signOut, clearError } = useAuthStore()
+export function AuthForm({ onLoginSuccess, onModeChange }: AuthFormProps) {
+  const { loading, error, signIn, signUp, clearError } = useAuthStore()
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -37,43 +38,20 @@ export function AuthPanel({ onClose }: AuthPanelProps) {
       if (success) setSignUpSuccess(true)
     } else {
       const success = await signIn(email, password)
-      if (success) onClose()
+      if (success) onLoginSuccess()
     }
   }
 
-  const handleSignOut = async () => {
-    await signOut()
-    onClose()
-  }
-
-  // 로그인 상태
-  if (user) {
-    return (
-      <div className="w-[300px] p-4">
-        <div className="text-sm text-muted mb-1">로그인됨</div>
-        <div className="text-sm font-medium text-foreground mb-3 truncate">
-          {user.email}
-        </div>
-        <Button
-          size="sm"
-          variant="danger"
-          onClick={handleSignOut}
-          disabled={loading}
-          className="w-full"
-        >
-          로그아웃
-        </Button>
-      </div>
-    )
-  }
-
-  // 비로그인: 로그인/회원가입
   return (
-    <div className="w-[300px] p-4">
+    <div>
       {/* 탭 전환 */}
       <Tabs
         value={mode}
-        onValueChange={(v) => setMode(v as 'login' | 'signup')}
+        onValueChange={(v) => {
+          const m = v as 'login' | 'signup'
+          setMode(m)
+          onModeChange?.(m)
+        }}
         className="mb-4"
       >
         <TabsList className="w-full">
