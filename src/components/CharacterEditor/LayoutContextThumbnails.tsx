@@ -1,10 +1,9 @@
 import { useEffect, useMemo } from 'react'
-import { useJamoStore } from '../../stores/jamoStore'
 import { useLayoutStore } from '../../stores/layoutStore'
 import { useGlobalStyleStore } from '../../stores/globalStyleStore'
-import { SvgRenderer } from '../../renderers/SvgRenderer'
-import { decomposeSyllable, getSampleSyllableForLayout, classifyJungseong } from '../../utils/hangulUtils'
-import type { LayoutType } from '../../types'
+import { calculateRawBoxes } from '../../utils/layoutCalculator'
+import { PART_COLORS } from '../../constants/editorColors'
+import type { LayoutType, Part, BoxConfig } from '../../types'
 
 /** 항상 고정으로 노출되는 7개 레이아웃 (음절 조합 + 초성only) */
 const FIXED_LAYOUTS: LayoutType[] = [
@@ -17,43 +16,12 @@ const FIXED_LAYOUTS: LayoutType[] = [
   'choseong-only',
 ]
 
-/** 레이아웃 타입에 해당하는 중성 서브타입 ('vertical' | 'horizontal' | 'mixed' | null) */
-function getLayoutJungseongSubType(layoutType: LayoutType): 'vertical' | 'horizontal' | 'mixed' | null {
-  if (layoutType.includes('mixed')) return 'mixed'
-  if (layoutType.includes('horizontal')) return 'horizontal'
-  if (layoutType.includes('vertical')) return 'vertical'
-  return null // choseong-only 등
-}
+const V = 100 // viewBox 크기
 
-/** 자모가 해당 레이아웃에 호환되는지 확인 */
-function isJamoCompatible(
-  layoutType: LayoutType,
-  jamoType?: 'choseong' | 'jungseong' | 'jongseong',
-  jamoChar?: string
-): boolean {
-  if (!jamoType || !jamoChar) return false
 
-  // 초성은 모든 레이아웃에 호환
-  if (jamoType === 'choseong') return true
-
-  // 종성은 jongseong 포함 레이아웃에만 호환
-  if (jamoType === 'jongseong') return layoutType.includes('jongseong')
-
-  // 중성: 서브타입이 레이아웃과 일치해야 호환
-  if (jamoType === 'jungseong') {
-    const layoutSubType = getLayoutJungseongSubType(layoutType)
-    if (!layoutSubType) return false // choseong-only 등에는 중성 없음
-    const charSubType = classifyJungseong(jamoChar)
-    return charSubType === layoutSubType
-  }
-
-  return false
-}
 
 interface LayoutContextThumbnailsProps {
-  /** 자모 편집 중일 때 자모 타입 (샘플 글자 선택에 사용) */
   jamoType?: 'choseong' | 'jungseong' | 'jongseong'
-  /** 자모 편집 중일 때 자모 문자 */
   jamoChar?: string
   selectedContext: LayoutType | null
   onSelectContext: (layoutType: LayoutType) => void
@@ -65,11 +33,9 @@ export function LayoutContextThumbnails({
   selectedContext,
   onSelectContext,
 }: LayoutContextThumbnailsProps) {
-  const { choseong, jungseong, jongseong } = useJamoStore()
-  const { getLayoutSchema, getEffectivePadding, layoutSchemas } = useLayoutStore()
-  const { getEffectiveStyle, style: globalStyle, exclusions } = useGlobalStyleStore()
+  const { getLayoutSchema, layoutSchemas } = useLayoutStore()
+  const { style: globalStyle, exclusions } = useGlobalStyleStore()
 
-  // selectedContext가 null이면 첫 번째 레이아웃을 기본 선택
   const effectiveContext = selectedContext ?? FIXED_LAYOUTS[0] ?? null
 
   useEffect(() => {
@@ -78,32 +44,25 @@ export function LayoutContextThumbnails({
     }
   }, [selectedContext, onSelectContext])
 
-  // 각 레이아웃의 샘플 음절 미리 계산
   const thumbnails = useMemo(() => {
     return FIXED_LAYOUTS.map((layoutType) => {
-      // 자모가 이 레이아웃에 호환될 때만 자모 정보 전달, 아니면 기본 샘플 사용
-      const compatible = isJamoCompatible(layoutType, jamoType, jamoChar)
-      const sampleChar = getSampleSyllableForLayout(
-        layoutType,
-        compatible ? jamoType : undefined,
-        compatible ? jamoChar : undefined
-      )
       const schema = getLayoutSchema(layoutType)
-      const effectivePadding = getEffectivePadding(layoutType)
-      const schemaWithPadding = { ...schema, padding: effectivePadding }
-      const effectiveStyle = getEffectiveStyle(layoutType)
 
-      const syllable = decomposeSyllable(
-        sampleChar,
-        choseong,
-        jungseong,
-        jongseong
-      )
+      // 기준선으로만 나눈 박스 (패딩 0, partOverrides 없음)
+      const noPaddingSchema = {
+        ...schema,
+        padding: { top: 0, bottom: 0, left: 0, right: 0 },
+        partOverrides: undefined,
+      }
+      const baseBoxes = calculateRawBoxes(noPaddingSchema)
 
-      return { layoutType, sampleChar, schemaWithPadding, effectiveStyle, syllable }
+      // partOverrides가 있으면 오버라이드 영역 계산
+      const partOverrides = schema.partOverrides
+
+      return { layoutType, schema, baseBoxes, partOverrides }
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jamoType, jamoChar, choseong, jungseong, jongseong, getLayoutSchema, getEffectivePadding, getEffectiveStyle, layoutSchemas, globalStyle, exclusions])
+  }, [getLayoutSchema, layoutSchemas, globalStyle, exclusions, jamoType, jamoChar])
 
   return (
     <div className="px-4 pt-3">
@@ -111,7 +70,7 @@ export function LayoutContextThumbnails({
         레이아웃 컨텍스트
       </h4>
       <div className="flex flex-wrap gap-1.5">
-        {thumbnails.map(({ layoutType, schemaWithPadding, effectiveStyle, syllable }) => {
+        {thumbnails.map(({ layoutType, schema, baseBoxes, partOverrides }) => {
           const isSelected = effectiveContext === layoutType
 
           return (
@@ -121,21 +80,80 @@ export function LayoutContextThumbnails({
               className={`
                 flex flex-col items-center gap-0.5 p-1 rounded border transition-colors cursor-pointer
                 ${isSelected
-                  ? 'border-accent-blue bg-accent-blue/10 ring-1 ring-accent-blue'
+                  ? 'border-text-dim-3'
                   : 'border-border-subtle bg-background hover:border-border-light'
                 }
               `}
               title={layoutType}
             >
-              <SvgRenderer
-                syllable={syllable}
-                schema={schemaWithPadding}
-                size={40}
-                fillColor="transparent"
-                backgroundColor="#ffffff"
-                showDebugBoxes
-                globalStyle={effectiveStyle}
-              />
+              <svg width={40} height={40} viewBox={`0 0 ${V} ${V}`} style={{ backgroundColor: '#ffffff' }}>
+                {/* 파트별 원색 배경 */}
+                {(Object.entries(baseBoxes) as [Part, BoxConfig][]).map(([part, box]) => (
+                  <rect
+                    key={`base-${part}`}
+                    x={box.x * V}
+                    y={box.y * V}
+                    width={box.width * V}
+                    height={box.height * V}
+                    fill={PART_COLORS[part]}
+                    fillOpacity={1}
+                  />
+                ))}
+
+                {/* partOverride 패딩: 흰색 반투명 오버레이 (색이 빠지는 효과) */}
+                {partOverrides && (Object.entries(baseBoxes) as [Part, BoxConfig][]).map(([part, box]) => {
+                  const override = partOverrides[part]
+                  if (!override) return null
+                  const top = override.top ?? 0
+                  const bottom = override.bottom ?? 0
+                  const left = override.left ?? 0
+                  const right = override.right ?? 0
+                  if (top === 0 && bottom === 0 && left === 0 && right === 0) return null
+
+                  const bx = box.x * V
+                  const by = box.y * V
+                  const bw = box.width * V
+                  const bh = box.height * V
+
+                  // 각 면의 패딩 영역을 흰색 오버레이로 (양수: 안쪽 축소 → 흰색으로 탈색)
+                  // 음수: 바깥 확장 → 파트색이 넘침 (기본 배경 위에 이미 그려짐)
+                  const strips = []
+
+                  if (top > 0) {
+                    strips.push({ x: bx, y: by, w: bw, h: top * V, key: `${part}-top` })
+                  }
+                  if (bottom > 0) {
+                    strips.push({ x: bx, y: by + bh - bottom * V, w: bw, h: bottom * V, key: `${part}-bottom` })
+                  }
+                  if (left > 0) {
+                    const stripTop = by + (top > 0 ? top * V : 0)
+                    const stripH = bh - (top > 0 ? top * V : 0) - (bottom > 0 ? bottom * V : 0)
+                    strips.push({ x: bx, y: stripTop, w: left * V, h: stripH, key: `${part}-left` })
+                  }
+                  if (right > 0) {
+                    const stripTop = by + (top > 0 ? top * V : 0)
+                    const stripH = bh - (top > 0 ? top * V : 0) - (bottom > 0 ? bottom * V : 0)
+                    strips.push({ x: bx + bw - right * V, y: stripTop, w: right * V, h: stripH, key: `${part}-right` })
+                  }
+
+                  return strips.map(({ x, y, w, h, key }) => (
+                    <rect
+                      key={key}
+                      x={x} y={y} width={Math.max(0, w)} height={Math.max(0, h)}
+                      fill="#ffffff"
+                      fillOpacity={0.55}
+                    />
+                  ))
+                })}
+
+                {/* 기준선: 검정 굵은 선 */}
+                {schema.splits?.map((split, i) => {
+                  const pos = split.value * V
+                  return split.axis === 'x'
+                    ? <line key={`split-${i}`} x1={pos} y1={0} x2={pos} y2={V} stroke="#000" strokeWidth={2} />
+                    : <line key={`split-${i}`} x1={0} y1={pos} x2={V} y2={pos} stroke="#000" strokeWidth={2} />
+                })}
+              </svg>
             </button>
           )
         })}

@@ -72,7 +72,7 @@ export function calculateBoxes(schema: LayoutSchema): Partial<Record<Part, BoxCo
 /**
  * Split + Padding 기반 박스 계산 (오버라이드 적용 전)
  */
-function calculateRawBoxes(schema: LayoutSchema): Partial<Record<Part, BoxConfig>> {
+export function calculateRawBoxes(schema: LayoutSchema): Partial<Record<Part, BoxConfig>> {
   const boxes: Partial<Record<Part, BoxConfig>> = {}
   const padding = schema.padding || DEFAULT_PADDING
   const splits = schema.splits || []

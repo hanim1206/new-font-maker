@@ -1,10 +1,10 @@
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { PaddingOverlay } from '../CharacterEditor/PaddingOverlay'
 import { SplitOverlay } from '../CharacterEditor/SplitOverlay'
 import { LayoutContextThumbnails } from '../CharacterEditor/LayoutContextThumbnails'
 import { Button } from '@/components/ui/button'
-import { BASE_PRESETS_SCHEMAS } from '../../utils/layoutCalculator'
+import { BASE_PRESETS_SCHEMAS, calculateRawBoxes } from '../../utils/layoutCalculator'
 import { useUIStore } from '../../stores/uiStore'
 import { useDeviceCapability } from '../../hooks/useDeviceCapability'
 import { usePinchZoom } from '../../hooks/usePinchZoom'
@@ -137,6 +137,7 @@ export function LayoutCanvasColumn({
 
   // 호버된 파트 추적
   const [hoveredPart, setHoveredPart] = useState<Part | null>(null)
+  const [showGlyphs, setShowGlyphs] = useState(true)
 
   // 오버레이 드래그 중 여부 (드래그 중 파트 버튼 pointer-events 차단)
   const [isDragging, setIsDragging] = useState(false)
@@ -155,6 +156,12 @@ export function LayoutCanvasColumn({
   // ref로 최신 콜백 참조 (드래그 중 클로저 캡처 문제 방지)
   const onPartOverrideChangeRef = useRef(onPartOverrideChange)
   onPartOverrideChangeRef.current = onPartOverrideChange
+
+  // Raw 박스 (partOverrides 미적용, 레이아웃 패딩은 반영) — 배경색 기준 영역
+  const rawBoxes = useMemo(() => {
+    const noOverrideSchema = { ...schemaWithPadding, partOverrides: undefined }
+    return calculateRawBoxes(noOverrideSchema)
+  }, [schemaWithPadding])
 
   // 선택된 파트의 박스 (partOverrides 적용 후 — 축소된 상태)
   const selectedPartBox = selectedPartInLayout ? computedBoxes[selectedPartInLayout] : undefined
@@ -281,6 +288,24 @@ export function LayoutCanvasColumn({
             레이아웃
           </h3>
           <div className="flex-1" />
+          <button
+            onClick={() => setShowGlyphs(v => !v)}
+            className="p-1.5 rounded hover:bg-surface-3 transition-colors text-text-dim-4 hover:text-text-dim-2"
+            title={showGlyphs ? '글자 숨기기' : '글자 보이기'}
+          >
+            {showGlyphs ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                <line x1="1" y1="1" x2="23" y2="23" />
+              </svg>
+            )}
+          </button>
           <Button variant="default" size="sm" onClick={onUndo} disabled={!canUndo} title="되돌리기 (Ctrl+Z)">
             ↩
           </Button>
@@ -355,14 +380,79 @@ export function LayoutCanvasColumn({
               })}
             </svg>
 
+            {/* 파트별 원색 배경 (raw 박스 기준, partOverrides 미적용) */}
+            {(Object.entries(rawBoxes) as [Part, BoxConfig][]).map(([part, box]) => (
+              <div
+                key={`bg-${part}`}
+                className="absolute pointer-events-none"
+                style={{
+                  left: `${box.x * 100}%`,
+                  top: `${box.y * 100}%`,
+                  width: `${box.width * 100}%`,
+                  height: `${box.height * 100}%`,
+                  backgroundColor: PART_COLORS[part],
+                  opacity: 1,
+                }}
+              />
+            ))}
+
+            {/* partOverride 패딩: 흰색 반투명 오버레이 (색이 빠지는 효과) */}
+            {schema.partOverrides && (Object.entries(rawBoxes) as [Part, BoxConfig][]).map(([part, box]) => {
+              const override = schema.partOverrides?.[part]
+              if (!override) return null
+              const top = override.top ?? 0
+              const bottom = override.bottom ?? 0
+              const left = override.left ?? 0
+              const right = override.right ?? 0
+              if (top === 0 && bottom === 0 && left === 0 && right === 0) return null
+
+              const bx = box.x * 100
+              const by = box.y * 100
+              const bw = box.width * 100
+              const bh = box.height * 100
+
+              const strips: { x: number; y: number; w: number; h: number; key: string }[] = []
+
+              if (top > 0) {
+                strips.push({ x: bx, y: by, w: bw, h: top * 100, key: `${part}-top` })
+              }
+              if (bottom > 0) {
+                strips.push({ x: bx, y: by + bh - bottom * 100, w: bw, h: bottom * 100, key: `${part}-bottom` })
+              }
+              if (left > 0) {
+                const sTop = by + (top > 0 ? top * 100 : 0)
+                const sH = bh - (top > 0 ? top * 100 : 0) - (bottom > 0 ? bottom * 100 : 0)
+                strips.push({ x: bx, y: sTop, w: left * 100, h: sH, key: `${part}-left` })
+              }
+              if (right > 0) {
+                const sTop = by + (top > 0 ? top * 100 : 0)
+                const sH = bh - (top > 0 ? top * 100 : 0) - (bottom > 0 ? bottom * 100 : 0)
+                strips.push({ x: bx + bw - right * 100, y: sTop, w: right * 100, h: sH, key: `${part}-right` })
+              }
+
+              return strips.map(({ x, y, w, h, key }) => (
+                <div
+                  key={key}
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: `${x}%`,
+                    top: `${y}%`,
+                    width: `${Math.max(0, w)}%`,
+                    height: `${Math.max(0, h)}%`,
+                    backgroundColor: '#ffffff',
+                    opacity: 0.55,
+                  }}
+                />
+              ))
+            })}
+
             <SvgRenderer
               svgRef={svgRef}
               syllable={displaySyllable}
               schema={schemaWithPadding}
               size={canvasSize}
-              fillColor="#1a1a1a"
+              fillColor={showGlyphs ? '#1a1a1a' : 'transparent'}
               backgroundColor="transparent"
-              showDebugBoxes
               clipGlyphs
               globalStyle={effectiveStyle}
               className="relative z-[1]"
@@ -688,6 +778,7 @@ export function LayoutCanvasColumn({
           onSelectContext={onPreviewLayoutTypeChange}
         />
       </div>
+
       </div>
     </div>
   )
