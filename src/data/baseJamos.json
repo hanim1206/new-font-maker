@@ -15,18 +15,6 @@
             {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄱ-2",
-          "points": [
-            {
-              "x": 1,
-              "y": 0
             },
             {
               "x": 1,
@@ -34,8 +22,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
+          "thickness": 0.07
         }
       ],
       "padding": {
@@ -59,18 +46,6 @@
             {
               "x": 0.45,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄲ-2",
-          "points": [
-            {
-              "x": 0.45,
-              "y": 0
             },
             {
               "x": 0.45,
@@ -78,8 +53,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
+          "thickness": 0.07
         },
         {
           "id": "ㄲ-3",
@@ -91,18 +65,6 @@
             {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄲ-4",
-          "points": [
-            {
-              "x": 1,
-              "y": 0
             },
             {
               "x": 1,
@@ -110,8 +72,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
+          "thickness": 0.07
         }
       ]
     },
@@ -129,18 +90,6 @@
             {
               "x": 0,
               "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄴ-2",
-          "points": [
-            {
-              "x": 0,
-              "y": 1
             },
             {
               "x": 1,
@@ -148,8 +97,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "thickness": 0.07
         }
       ]
     },
@@ -161,37 +109,13 @@
           "id": "ㄷ-1",
           "points": [
             {
-              "x": 0,
-              "y": 0
-            },
-            {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄷ-2",
-          "points": [
+            },
             {
               "x": 0,
               "y": 0
             },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄷ-3",
-          "points": [
             {
               "x": 0,
               "y": 1
@@ -202,8 +126,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "thickness": 0.07
         }
       ]
     },
@@ -215,37 +138,13 @@
           "id": "ㄸ-1",
           "points": [
             {
-              "x": 0,
-              "y": 0
-            },
-            {
               "x": 0.5,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄸ-2",
-          "points": [
+            },
             {
               "x": 0,
               "y": 0
             },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄸ-3",
-          "points": [
             {
               "x": 0,
               "y": 1
@@ -256,44 +155,19 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "thickness": 0.07
         },
         {
           "id": "ㄸ-4",
           "points": [
             {
-              "x": 0.55,
-              "y": 0
-            },
-            {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄸ-5",
-          "points": [
+            },
             {
               "x": 0.55,
               "y": 0
             },
-            {
-              "x": 0.55,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄸ-6",
-          "points": [
             {
               "x": 0.55,
               "y": 1
@@ -304,8 +178,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "thickness": 0.07
         }
       ]
     },
@@ -323,63 +196,15 @@
             {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄹ-2",
-          "points": [
-            {
-              "x": 1,
-              "y": 0
             },
             {
               "x": 1,
               "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄹ-3",
-          "points": [
+            },
             {
               "x": 0,
               "y": 0.5
             },
-            {
-              "x": 1,
-              "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄹ-4",
-          "points": [
-            {
-              "x": 0,
-              "y": 0.5
-            },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄹ-5",
-          "points": [
             {
               "x": 0,
               "y": 1
@@ -390,8 +215,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "thickness": 0.07
         }
       ]
     },
@@ -409,59 +233,22 @@
             {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㅁ-2",
-          "points": [
+            },
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "x": 0,
+              "y": 1
+            },
             {
               "x": 0,
               "y": 0
-            },
-            {
-              "x": 0,
-              "y": 1
             }
           ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㅁ-3",
-          "points": [
-            {
-              "x": 1,
-              "y": 0
-            },
-            {
-              "x": 1,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㅁ-4",
-          "points": [
-            {
-              "x": 0,
-              "y": 1
-            },
-            {
-              "x": 1,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "closed": true,
+          "thickness": 0.07
         }
       ]
     },
@@ -479,27 +266,18 @@
             {
               "x": 0,
               "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㅂ-2",
-          "points": [
-            {
-              "x": 1,
-              "y": 0
             },
             {
               "x": 1,
               "y": 1
+            },
+            {
+              "x": 1,
+              "y": 0
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
+          "thickness": 0.07
         },
         {
           "id": "ㅂ-3",
@@ -511,22 +289,6 @@
             {
               "x": 1,
               "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㅂ-4",
-          "points": [
-            {
-              "x": 0,
-              "y": 1
-            },
-            {
-              "x": 1,
-              "y": 1
             }
           ],
           "closed": false,
@@ -549,27 +311,18 @@
             {
               "x": 0,
               "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㅃ-2",
-          "points": [
-            {
-              "x": 0.45,
-              "y": 0
             },
             {
               "x": 0.45,
               "y": 1
+            },
+            {
+              "x": 0.45,
+              "y": 0
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
+          "thickness": 0.07
         },
         {
           "id": "ㅃ-3",
@@ -588,22 +341,6 @@
           "label": "horizontal"
         },
         {
-          "id": "ㅃ-4",
-          "points": [
-            {
-              "x": 0,
-              "y": 1
-            },
-            {
-              "x": 0.45,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
           "id": "ㅃ-5",
           "points": [
             {
@@ -613,27 +350,18 @@
             {
               "x": 0.55,
               "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㅃ-6",
-          "points": [
-            {
-              "x": 1,
-              "y": 0
             },
             {
               "x": 1,
               "y": 1
+            },
+            {
+              "x": 1,
+              "y": 0
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
+          "thickness": 0.07
         },
         {
           "id": "ㅃ-7",
@@ -645,22 +373,6 @@
             {
               "x": 1,
               "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㅃ-8",
-          "points": [
-            {
-              "x": 0.55,
-              "y": 1
-            },
-            {
-              "x": 1,
-              "y": 1
             }
           ],
           "closed": false,
@@ -930,22 +642,6 @@
       "type": "choseong",
       "strokes": [
         {
-          "id": "ㅉ-1",
-          "points": [
-            {
-              "x": 0,
-              "y": 0
-            },
-            {
-              "x": 0.5,
-              "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
           "id": "ㅉ-1l",
           "points": [
             {
@@ -986,22 +682,6 @@
           "label": "curve"
         },
         {
-          "id": "ㅉ-2",
-          "points": [
-            {
-              "x": 0.5,
-              "y": 0
-            },
-            {
-              "x": 1,
-              "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
           "id": "ㅉ-2l",
           "points": [
             {
@@ -1040,6 +720,25 @@
           "closed": false,
           "thickness": 0.07,
           "label": "curve"
+        },
+        {
+          "id": "ㅉ-1",
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0.5,
+              "y": 0
+            },
+            {
+              "x": 1,
+              "y": 0
+            }
+          ],
+          "closed": false,
+          "thickness": 0.07
         }
       ]
     },
@@ -1135,18 +834,6 @@
             {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㅋ-2",
-          "points": [
-            {
-              "x": 1,
-              "y": 0
             },
             {
               "x": 1,
@@ -1154,8 +841,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
+          "thickness": 0.07
         },
         {
           "id": "ㅋ-3",
@@ -1183,37 +869,13 @@
           "id": "ㅌ-1",
           "points": [
             {
-              "x": 0,
-              "y": 0
-            },
-            {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㅌ-2",
-          "points": [
+            },
             {
               "x": 0,
               "y": 0
             },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㅌ-3",
-          "points": [
             {
               "x": 0,
               "y": 1
@@ -1224,8 +886,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "thickness": 0.07
         },
         {
           "id": "ㅌ-4",
@@ -1695,7 +1356,7 @@
           "id": "ㅔ-2",
           "points": [
             {
-              "x": -0.5,
+              "x": 0,
               "y": 0.5
             },
             {
@@ -1974,7 +1635,7 @@
           "points": [
             {
               "x": 0.5,
-              "y": -0.25
+              "y": 0
             },
             {
               "x": 0.5,
@@ -2242,7 +1903,7 @@
             },
             {
               "x": 0.5,
-              "y": 1.275
+              "y": 1
             }
           ],
           "closed": false,
@@ -2271,7 +1932,7 @@
           "id": "ㅝ-4",
           "points": [
             {
-              "x": -0.5,
+              "x": 0,
               "y": 0.8
             },
             {
@@ -2314,7 +1975,7 @@
             },
             {
               "x": 0.5,
-              "y": 1.25
+              "y": 1
             }
           ],
           "closed": false,
@@ -2343,7 +2004,7 @@
           "id": "ㅞ-4",
           "points": [
             {
-              "x": -0.575,
+              "x": 0,
               "y": 0.825
             },
             {
@@ -2589,18 +2250,6 @@
             {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄱ종-2",
-          "points": [
-            {
-              "x": 1,
-              "y": 0
             },
             {
               "x": 1,
@@ -2608,8 +2257,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
+          "thickness": 0.07
         }
       ]
     },
@@ -2627,18 +2275,6 @@
             {
               "x": 0.45,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄲ종-2",
-          "points": [
-            {
-              "x": 0.45,
-              "y": 0
             },
             {
               "x": 0.45,
@@ -2646,8 +2282,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
+          "thickness": 0.07
         },
         {
           "id": "ㄲ종-3",
@@ -2659,18 +2294,6 @@
             {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄲ종-4",
-          "points": [
-            {
-              "x": 1,
-              "y": 0
             },
             {
               "x": 1,
@@ -2678,8 +2301,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
+          "thickness": 0.07
         }
       ]
     },
@@ -2687,38 +2309,6 @@
       "char": "ㄳ",
       "type": "jongseong",
       "strokes": [
-        {
-          "id": "ㄳ종-1",
-          "points": [
-            {
-              "x": 0,
-              "y": 0
-            },
-            {
-              "x": 0.45,
-              "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄳ종-2",
-          "points": [
-            {
-              "x": 0.45,
-              "y": 0
-            },
-            {
-              "x": 0.45,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
         {
           "id": "ㄳ종-left",
           "points": [
@@ -2758,6 +2348,25 @@
           "closed": false,
           "thickness": 0.07,
           "label": "curve"
+        },
+        {
+          "id": "ㄳ종-1",
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0.45,
+              "y": 0
+            },
+            {
+              "x": 0.45,
+              "y": 1
+            }
+          ],
+          "closed": false,
+          "thickness": 0.07
         }
       ]
     },
@@ -2775,18 +2384,6 @@
             {
               "x": 0,
               "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄴ종-2",
-          "points": [
-            {
-              "x": 0,
-              "y": 1
             },
             {
               "x": 1,
@@ -2794,8 +2391,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "thickness": 0.07
         }
       ]
     },
@@ -2803,54 +2399,6 @@
       "char": "ㄵ",
       "type": "jongseong",
       "strokes": [
-        {
-          "id": "ㄵ종-1",
-          "points": [
-            {
-              "x": 0,
-              "y": 0
-            },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄵ종-2",
-          "points": [
-            {
-              "x": 0,
-              "y": 1
-            },
-            {
-              "x": 0.5,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄵ종-3",
-          "points": [
-            {
-              "x": 0.5,
-              "y": 0
-            },
-            {
-              "x": 1,
-              "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
         {
           "id": "ㄵ종-left",
           "points": [
@@ -2890,6 +2438,41 @@
           "closed": false,
           "thickness": 0.07,
           "label": "curve"
+        },
+        {
+          "id": "ㄵ종-1",
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0,
+              "y": 1
+            },
+            {
+              "x": 0.5,
+              "y": 1
+            }
+          ],
+          "closed": false,
+          "thickness": 0.07
+        },
+        {
+          "id": "ㄵ종-3",
+          "points": [
+            {
+              "x": 0.5,
+              "y": 0
+            },
+            {
+              "x": 1,
+              "y": 0
+            }
+          ],
+          "closed": false,
+          "thickness": 0.07,
+          "label": "horizontal"
         }
       ]
     },
@@ -2897,70 +2480,6 @@
       "char": "ㄶ",
       "type": "jongseong",
       "strokes": [
-        {
-          "id": "ㄶ종-1",
-          "points": [
-            {
-              "x": 0,
-              "y": 0
-            },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄶ종-2",
-          "points": [
-            {
-              "x": 0,
-              "y": 1
-            },
-            {
-              "x": 0.5,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄶ종-3",
-          "points": [
-            {
-              "x": 0.675,
-              "y": 0
-            },
-            {
-              "x": 0.825,
-              "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄶ종-4",
-          "points": [
-            {
-              "x": 0.5,
-              "y": 0.2
-            },
-            {
-              "x": 1,
-              "y": 0.2
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
         {
           "id": "ㄶ종-circle",
           "points": [
@@ -3016,6 +2535,57 @@
           "closed": true,
           "thickness": 0.07,
           "label": "circle"
+        },
+        {
+          "id": "ㄶ종-1",
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0,
+              "y": 1
+            },
+            {
+              "x": 0.5,
+              "y": 1
+            }
+          ],
+          "closed": false,
+          "thickness": 0.07
+        },
+        {
+          "id": "ㄶ종-3",
+          "points": [
+            {
+              "x": 0.675,
+              "y": 0
+            },
+            {
+              "x": 0.825,
+              "y": 0
+            }
+          ],
+          "closed": false,
+          "thickness": 0.07,
+          "label": "horizontal"
+        },
+        {
+          "id": "ㄶ종-4",
+          "points": [
+            {
+              "x": 0.5,
+              "y": 0.2
+            },
+            {
+              "x": 1,
+              "y": 0.2
+            }
+          ],
+          "closed": false,
+          "thickness": 0.07,
+          "label": "horizontal"
         }
       ]
     },
@@ -3027,37 +2597,13 @@
           "id": "ㄷ종-1",
           "points": [
             {
-              "x": 0,
-              "y": 0
-            },
-            {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄷ종-2",
-          "points": [
+            },
             {
               "x": 0,
               "y": 0
             },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄷ종-3",
-          "points": [
             {
               "x": 0,
               "y": 1
@@ -3068,8 +2614,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "thickness": 0.07
         }
       ]
     },
@@ -3087,63 +2632,15 @@
             {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄹ종-2",
-          "points": [
-            {
-              "x": 1,
-              "y": 0
             },
             {
               "x": 1,
               "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄹ종-3",
-          "points": [
+            },
             {
               "x": 0,
               "y": 0.5
             },
-            {
-              "x": 1,
-              "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄹ종-4",
-          "points": [
-            {
-              "x": 0,
-              "y": 0.5
-            },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄹ종-5",
-          "points": [
             {
               "x": 0,
               "y": 1
@@ -3154,8 +2651,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "thickness": 0.07
         }
       ]
     },
@@ -3173,63 +2669,15 @@
             {
               "x": 0.45,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄺ종-2",
-          "points": [
-            {
-              "x": 0.45,
-              "y": 0
             },
             {
               "x": 0.45,
               "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄺ종-3",
-          "points": [
+            },
             {
               "x": 0,
               "y": 0.5
             },
-            {
-              "x": 0.45,
-              "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄺ종-4",
-          "points": [
-            {
-              "x": 0,
-              "y": 0.5
-            },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄺ종-5",
-          "points": [
             {
               "x": 0,
               "y": 1
@@ -3240,8 +2688,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "thickness": 0.07
         },
         {
           "id": "ㄺ종-6",
@@ -3253,18 +2700,6 @@
             {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄺ종-7",
-          "points": [
-            {
-              "x": 1,
-              "y": 0
             },
             {
               "x": 1,
@@ -3272,8 +2707,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
+          "thickness": 0.07
         }
       ]
     },
@@ -3291,63 +2725,15 @@
             {
               "x": 0.45,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄻ종-2",
-          "points": [
-            {
-              "x": 0.45,
-              "y": 0
             },
             {
               "x": 0.45,
               "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄻ종-3",
-          "points": [
+            },
             {
               "x": 0,
               "y": 0.5
             },
-            {
-              "x": 0.45,
-              "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄻ종-4",
-          "points": [
-            {
-              "x": 0,
-              "y": 0.5
-            },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄻ종-5",
-          "points": [
             {
               "x": 0,
               "y": 1
@@ -3358,8 +2744,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "thickness": 0.07
         },
         {
           "id": "ㄻ종-6",
@@ -3371,59 +2756,22 @@
             {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄻ종-7",
-          "points": [
+            },
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "x": 0.55,
+              "y": 1
+            },
             {
               "x": 0.55,
               "y": 0
-            },
-            {
-              "x": 0.55,
-              "y": 1
             }
           ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄻ종-8",
-          "points": [
-            {
-              "x": 1,
-              "y": 0
-            },
-            {
-              "x": 1,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄻ종-9",
-          "points": [
-            {
-              "x": 0.55,
-              "y": 1
-            },
-            {
-              "x": 1,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "closed": true,
+          "thickness": 0.07
         }
       ]
     },
@@ -3441,63 +2789,15 @@
             {
               "x": 0.45,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄼ종-2",
-          "points": [
-            {
-              "x": 0.45,
-              "y": 0
             },
             {
               "x": 0.45,
               "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄼ종-3",
-          "points": [
+            },
             {
               "x": 0,
               "y": 0.5
             },
-            {
-              "x": 0.45,
-              "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄼ종-4",
-          "points": [
-            {
-              "x": 0,
-              "y": 0.5
-            },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄼ종-5",
-          "points": [
             {
               "x": 0,
               "y": 1
@@ -3508,8 +2808,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "thickness": 0.07
         },
         {
           "id": "ㄼ종-6",
@@ -3521,27 +2820,18 @@
             {
               "x": 0.55,
               "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄼ종-7",
-          "points": [
-            {
-              "x": 1,
-              "y": 0
             },
             {
               "x": 1,
               "y": 1
+            },
+            {
+              "x": 1,
+              "y": 0
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
+          "thickness": 0.07
         },
         {
           "id": "ㄼ종-8",
@@ -3558,22 +2848,6 @@
           "closed": false,
           "thickness": 0.07,
           "label": "horizontal"
-        },
-        {
-          "id": "ㄼ종-9",
-          "points": [
-            {
-              "x": 0.55,
-              "y": 1
-            },
-            {
-              "x": 1,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
         }
       ]
     },
@@ -3581,86 +2855,6 @@
       "char": "ㄽ",
       "type": "jongseong",
       "strokes": [
-        {
-          "id": "ㄽ종-1",
-          "points": [
-            {
-              "x": 0,
-              "y": 0
-            },
-            {
-              "x": 0.45,
-              "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄽ종-2",
-          "points": [
-            {
-              "x": 0.45,
-              "y": 0
-            },
-            {
-              "x": 0.45,
-              "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄽ종-3",
-          "points": [
-            {
-              "x": 0,
-              "y": 0.5
-            },
-            {
-              "x": 0.45,
-              "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄽ종-4",
-          "points": [
-            {
-              "x": 0,
-              "y": 0.5
-            },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄽ종-5",
-          "points": [
-            {
-              "x": 0,
-              "y": 1
-            },
-            {
-              "x": 0.5,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
         {
           "id": "ㄽ종-left",
           "points": [
@@ -3700,6 +2894,37 @@
           "closed": false,
           "thickness": 0.07,
           "label": "curve"
+        },
+        {
+          "id": "ㄽ종-1",
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0.45,
+              "y": 0
+            },
+            {
+              "x": 0.45,
+              "y": 0.5
+            },
+            {
+              "x": 0,
+              "y": 0.5
+            },
+            {
+              "x": 0,
+              "y": 1
+            },
+            {
+              "x": 0.5,
+              "y": 1
+            }
+          ],
+          "closed": false,
+          "thickness": 0.07
         }
       ]
     },
@@ -3717,63 +2942,15 @@
             {
               "x": 0.45,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄾ종-2",
-          "points": [
-            {
-              "x": 0.45,
-              "y": 0
             },
             {
               "x": 0.45,
               "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄾ종-3",
-          "points": [
+            },
             {
               "x": 0,
               "y": 0.5
             },
-            {
-              "x": 0.45,
-              "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄾ종-4",
-          "points": [
-            {
-              "x": 0,
-              "y": 0.5
-            },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄾ종-5",
-          "points": [
             {
               "x": 0,
               "y": 1
@@ -3784,44 +2961,19 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "thickness": 0.07
         },
         {
           "id": "ㄾ종-6",
           "points": [
             {
-              "x": 0.55,
-              "y": 0
-            },
-            {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄾ종-7",
-          "points": [
+            },
             {
               "x": 0.55,
               "y": 0
             },
-            {
-              "x": 0.55,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄾ종-8",
-          "points": [
             {
               "x": 0.55,
               "y": 1
@@ -3832,8 +2984,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "thickness": 0.07
         },
         {
           "id": "ㄾ종-9",
@@ -3867,63 +3018,15 @@
             {
               "x": 0.45,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄿ종-2",
-          "points": [
-            {
-              "x": 0.45,
-              "y": 0
             },
             {
               "x": 0.45,
               "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄿ종-3",
-          "points": [
+            },
             {
               "x": 0,
               "y": 0.5
             },
-            {
-              "x": 0.45,
-              "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄿ종-4",
-          "points": [
-            {
-              "x": 0,
-              "y": 0.5
-            },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㄿ종-5",
-          "points": [
             {
               "x": 0,
               "y": 1
@@ -3931,11 +3034,14 @@
             {
               "x": 0.5,
               "y": 1
+            },
+            {
+              "x": 1,
+              "y": 1
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "thickness": 0.07
         },
         {
           "id": "ㄿ종-6",
@@ -3947,22 +3053,6 @@
             {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㄿ종-7",
-          "points": [
-            {
-              "x": 0.5,
-              "y": 1
-            },
-            {
-              "x": 1,
-              "y": 1
             }
           ],
           "closed": false,
@@ -4007,118 +3097,6 @@
       "char": "ㅀ",
       "type": "jongseong",
       "strokes": [
-        {
-          "id": "ㅀ종-1",
-          "points": [
-            {
-              "x": 0,
-              "y": 0
-            },
-            {
-              "x": 0.45,
-              "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㅀ종-2",
-          "points": [
-            {
-              "x": 0.45,
-              "y": 0
-            },
-            {
-              "x": 0.45,
-              "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㅀ종-3",
-          "points": [
-            {
-              "x": 0,
-              "y": 0.5
-            },
-            {
-              "x": 0.45,
-              "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㅀ종-4",
-          "points": [
-            {
-              "x": 0,
-              "y": 0.5
-            },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㅀ종-5",
-          "points": [
-            {
-              "x": 0,
-              "y": 1
-            },
-            {
-              "x": 0.5,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㅀ종-6",
-          "points": [
-            {
-              "x": 0.675,
-              "y": 0
-            },
-            {
-              "x": 0.825,
-              "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㅀ종-7",
-          "points": [
-            {
-              "x": 0.5,
-              "y": 0.2
-            },
-            {
-              "x": 1,
-              "y": 0.2
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
         {
           "id": "ㅀ종-circle",
           "points": [
@@ -4174,6 +3152,69 @@
           "closed": true,
           "thickness": 0.07,
           "label": "circle"
+        },
+        {
+          "id": "ㅀ종-1",
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0.45,
+              "y": 0
+            },
+            {
+              "x": 0.45,
+              "y": 0.5
+            },
+            {
+              "x": 0,
+              "y": 0.5
+            },
+            {
+              "x": 0,
+              "y": 1
+            },
+            {
+              "x": 0.5,
+              "y": 1
+            }
+          ],
+          "closed": false,
+          "thickness": 0.07
+        },
+        {
+          "id": "ㅀ종-6",
+          "points": [
+            {
+              "x": 0.675,
+              "y": 0
+            },
+            {
+              "x": 0.825,
+              "y": 0
+            }
+          ],
+          "closed": false,
+          "thickness": 0.07,
+          "label": "horizontal"
+        },
+        {
+          "id": "ㅀ종-7",
+          "points": [
+            {
+              "x": 0.5,
+              "y": 0.2
+            },
+            {
+              "x": 1,
+              "y": 0.2
+            }
+          ],
+          "closed": false,
+          "thickness": 0.07,
+          "label": "horizontal"
         }
       ]
     },
@@ -4191,59 +3232,22 @@
             {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㅁ종-2",
-          "points": [
+            },
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "x": 0,
+              "y": 1
+            },
             {
               "x": 0,
               "y": 0
-            },
-            {
-              "x": 0,
-              "y": 1
             }
           ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㅁ종-3",
-          "points": [
-            {
-              "x": 1,
-              "y": 0
-            },
-            {
-              "x": 1,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㅁ종-4",
-          "points": [
-            {
-              "x": 0,
-              "y": 1
-            },
-            {
-              "x": 1,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "closed": true,
+          "thickness": 0.07
         }
       ]
     },
@@ -4261,27 +3265,18 @@
             {
               "x": 0,
               "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㅂ종-2",
-          "points": [
-            {
-              "x": 1,
-              "y": 0
             },
             {
               "x": 1,
               "y": 1
+            },
+            {
+              "x": 1,
+              "y": 0
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
+          "thickness": 0.07
         },
         {
           "id": "ㅂ종-3",
@@ -4298,22 +3293,6 @@
           "closed": false,
           "thickness": 0.07,
           "label": "horizontal"
-        },
-        {
-          "id": "ㅂ종-4",
-          "points": [
-            {
-              "x": 0,
-              "y": 1
-            },
-            {
-              "x": 1,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
         }
       ]
     },
@@ -4321,70 +3300,6 @@
       "char": "ㅄ",
       "type": "jongseong",
       "strokes": [
-        {
-          "id": "ㅄ종-1",
-          "points": [
-            {
-              "x": 0,
-              "y": 0
-            },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㅄ종-2",
-          "points": [
-            {
-              "x": 0.45,
-              "y": 0
-            },
-            {
-              "x": 0.45,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㅄ종-3",
-          "points": [
-            {
-              "x": 0,
-              "y": 0.5
-            },
-            {
-              "x": 0.45,
-              "y": 0.5
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㅄ종-4",
-          "points": [
-            {
-              "x": 0,
-              "y": 1
-            },
-            {
-              "x": 0.45,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
         {
           "id": "ㅄ종-left",
           "points": [
@@ -4424,6 +3339,45 @@
           "closed": false,
           "thickness": 0.07,
           "label": "curve"
+        },
+        {
+          "id": "ㅄ종-1",
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0,
+              "y": 1
+            },
+            {
+              "x": 0.45,
+              "y": 1
+            },
+            {
+              "x": 0.45,
+              "y": 0
+            }
+          ],
+          "closed": false,
+          "thickness": 0.07
+        },
+        {
+          "id": "ㅄ종-3",
+          "points": [
+            {
+              "x": 0,
+              "y": 0.5
+            },
+            {
+              "x": 0.45,
+              "y": 0.5
+            }
+          ],
+          "closed": false,
+          "thickness": 0.07,
+          "label": "horizontal"
         }
       ]
     },
@@ -4775,18 +3729,6 @@
             {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㅋ종-2",
-          "points": [
-            {
-              "x": 1,
-              "y": 0
             },
             {
               "x": 1,
@@ -4794,8 +3736,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
+          "thickness": 0.07
         },
         {
           "id": "ㅋ종-3",
@@ -4823,37 +3764,13 @@
           "id": "ㅌ종-1",
           "points": [
             {
-              "x": 0,
-              "y": 0
-            },
-            {
               "x": 1,
               "y": 0
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
-        },
-        {
-          "id": "ㅌ종-2",
-          "points": [
+            },
             {
               "x": 0,
               "y": 0
             },
-            {
-              "x": 0,
-              "y": 1
-            }
-          ],
-          "closed": false,
-          "thickness": 0.07,
-          "label": "vertical"
-        },
-        {
-          "id": "ㅌ종-3",
-          "points": [
             {
               "x": 0,
               "y": 1
@@ -4864,8 +3781,7 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07,
-          "label": "horizontal"
+          "thickness": 0.07
         },
         {
           "id": "ㅌ종-4",
