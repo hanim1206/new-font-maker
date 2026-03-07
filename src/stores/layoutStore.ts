@@ -1,11 +1,14 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import type { LayoutType, BoxConfig, LayoutSchema, Part, Padding, PartOverride } from '../types'
 import { DEFAULT_LAYOUT_CONFIGS, type LayoutConfig } from '../data/layoutConfigs'
 import { calculateBoxes, DEFAULT_LAYOUT_SCHEMAS as CALC_SCHEMAS, BASE_PRESETS_SCHEMAS } from '../utils/layoutCalculator'
+import { createDebouncedStorage } from '../utils/debouncedStorage'
 
 const STORAGE_KEY = 'font-maker-layout-schemas'
+const rawStorage = createDebouncedStorage(300)
+const debouncedStorage = createJSONStorage(() => rawStorage)
 
 // 글로벌 패딩 기본값
 const DEFAULT_GLOBAL_PADDING: Padding = {
@@ -351,6 +354,7 @@ export const useLayoutStore = create<LayoutState & LayoutActions>()(
     })),
     {
       name: STORAGE_KEY,
+      storage: debouncedStorage,
       // layoutSchemas + 패딩 설정 저장 (layoutConfigs는 계산값이라 저장 불필요)
       partialize: (state) => ({
         layoutSchemas: state.layoutSchemas,

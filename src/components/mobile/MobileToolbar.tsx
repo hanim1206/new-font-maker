@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Sliders, Eye, PanelBottom } from 'lucide-react'
 import { NavMenu } from '../NavMenu'
+import { SaveButton } from '../SaveButton'
 
 export function MobileToolbar() {
   const {
@@ -13,6 +14,7 @@ export function MobileToolbar() {
   return (
     <div className="shrink-0 flex items-center px-2 py-1.5 bg-[#0f0f0f] border-t border-border-subtle pb-safe-b">
       <NavMenu />
+      <SaveButton />
       <div className="flex gap-1">
         <Button
           variant="ghost"

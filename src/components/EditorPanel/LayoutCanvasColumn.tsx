@@ -67,9 +67,6 @@ interface LayoutCanvasColumnProps {
   editingPartInLayout: Part | null
   editingJamoInfo: { type: 'choseong' | 'jungseong' | 'jongseong'; char: string } | null
   previewLayoutType: LayoutType | null
-  // 레이아웃 드래프트 상태
-  isLayoutDirty: boolean
-  onLayoutSave: () => void
   onLayoutReset: () => void
   // undo/redo
   onDragStart: () => void
@@ -100,8 +97,6 @@ export function LayoutCanvasColumn({
   editingPartInLayout,
   editingJamoInfo,
   previewLayoutType,
-  isLayoutDirty,
-  onLayoutSave,
   onLayoutReset,
   onDragStart: onLayoutDragStart,
   onUndo,
@@ -312,11 +307,8 @@ export function LayoutCanvasColumn({
           <Button variant="default" size="sm" onClick={onRedo} disabled={!canRedo} title="다시 실행 (Ctrl+Y)">
             ↪
           </Button>
-          <Button variant="default" size="sm" onClick={onLayoutReset} disabled={!isLayoutDirty}>
+          <Button variant="default" size="sm" onClick={onLayoutReset}>
             초기화
-          </Button>
-          <Button variant={isLayoutDirty ? 'blue' : 'default'} size="sm" onClick={onLayoutSave} disabled={!isLayoutDirty}>
-            저장
           </Button>
         </div>
       </div>

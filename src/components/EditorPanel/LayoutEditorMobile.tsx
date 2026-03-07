@@ -39,9 +39,7 @@ export interface LayoutEditorMobileProps {
   editingJamoInfo: { type: 'choseong' | 'jungseong' | 'jongseong'; char: string } | null
   canUndo: boolean
   canRedo: boolean
-  isJamoDirty: boolean
   onPartDeselect: () => void
-  onJamoSave: () => void
   onJamoReset: () => void
   onUndo: () => void
   onRedo: () => void
@@ -60,9 +58,7 @@ export function LayoutEditorMobile({
   editingJamoInfo,
   canUndo,
   canRedo,
-  isJamoDirty,
   onPartDeselect,
-  onJamoSave,
   onJamoReset,
   onUndo,
   onRedo,
@@ -134,8 +130,7 @@ export function LayoutEditorMobile({
           <div className="flex-1" />
           <Button variant="default" size="sm" onClick={onUndo} disabled={!canUndo} title="되돌리기">↩</Button>
           <Button variant="default" size="sm" onClick={onRedo} disabled={!canRedo} title="다시 실행">↪</Button>
-          <Button variant="default" size="sm" onClick={onJamoReset} disabled={!isJamoDirty}>초기화</Button>
-          <Button variant={isJamoDirty ? 'blue' : 'default'} size="sm" onClick={onJamoSave}>저장</Button>
+          <Button variant="default" size="sm" onClick={onJamoReset}>초기화</Button>
         </div>
       )}
 

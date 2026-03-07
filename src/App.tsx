@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { EditorPanel } from './components/EditorPanel/EditorPanel'
 import { MobileLayout } from './components/mobile/MobileLayout'
 import { NavMenu } from './components/NavMenu'
+import { SaveButton } from './components/SaveButton'
 import { ProjectListPage } from './components/ProjectListPage'
 import { HomePage } from './components/HomePage'
 import { useUIStore } from './stores/uiStore'
@@ -60,6 +61,7 @@ export default function App() {
           <div className="shrink-0 border-b border-border-subtle bg-[#0f0f0f]">
             <div className="flex items-center gap-3 px-4 py-2">
               <NavMenu />
+              <SaveButton />
               <span className="text-xs text-muted truncate max-w-[150px] shrink-0">
                 {currentProjectName || '새 폰트 (미저장)'}
               </span>

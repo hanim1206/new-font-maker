@@ -1,11 +1,14 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import type { JamoData, JamoOverride, Padding } from '../types'
 import { migrateJamoData, needsMigration } from '../utils/strokeMigration'
 import baseJamos from '../data/baseJamos.json'
+import { createDebouncedStorage } from '../utils/debouncedStorage'
 
 const STORAGE_KEY = 'font-maker-jamo-data'
+const rawStorage = createDebouncedStorage(300)
+const debouncedStorage = createJSONStorage(() => rawStorage)
 
 interface JamoState {
   // 자모 데이터
@@ -356,6 +359,7 @@ export const useJamoStore = create<JamoState & JamoActions>()(
     })),
     {
       name: STORAGE_KEY,
+      storage: debouncedStorage,
       // 모든 자모 데이터 저장
       partialize: (state) => ({
         choseong: state.choseong,
