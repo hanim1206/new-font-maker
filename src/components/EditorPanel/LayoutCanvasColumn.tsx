@@ -379,38 +379,46 @@ export function LayoutCanvasColumn({
             </svg>
 
             {/* 파트별 원색 배경 (raw 박스 기준, partOverrides 미적용) */}
-            {(Object.entries(rawBoxes) as [Part, BoxConfig][]).map(([part, box]) => (
-              <div
-                key={`bg-${part}`}
-                className="absolute pointer-events-none"
-                style={{
-                  left: `${box.x * 100}%`,
-                  top: `${box.y * 100}%`,
-                  width: `${box.width * 100}%`,
-                  height: `${box.height * 100}%`,
-                  backgroundColor: PART_COLORS[part],
-                  opacity: selectedPartInLayout && selectedPartInLayout !== part ? 0.35 : 1,
-                  transition: 'opacity 0.15s',
-                }}
-              />
-            ))}
+            {(Object.entries(rawBoxes) as [Part, BoxConfig][]).map(([part, box]) => {
+              const focusedPart = selectedPartInLayout ?? editingPartInLayout
+              const isDimmed = focusedPart != null && focusedPart !== part
+              return (
+                <div
+                  key={`bg-${part}`}
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: `${box.x * 100}%`,
+                    top: `${box.y * 100}%`,
+                    width: `${box.width * 100}%`,
+                    height: `${box.height * 100}%`,
+                    backgroundColor: PART_COLORS[part],
+                    opacity: isDimmed ? 0.35 : 1,
+                    transition: 'opacity 0.15s',
+                  }}
+                />
+              )
+            })}
 
             {/* computed 박스 (partOverrides 적용) — 반투명으로 겹쳐서 확장 영역 색 혼합 */}
-            {(Object.entries(computedBoxes) as [Part, BoxConfig][]).map(([part, box]) => (
-              <div
-                key={`computed-${part}`}
-                className="absolute pointer-events-none"
-                style={{
-                  left: `${box.x * 100}%`,
-                  top: `${box.y * 100}%`,
-                  width: `${box.width * 100}%`,
-                  height: `${box.height * 100}%`,
-                  backgroundColor: PART_COLORS[part],
-                  opacity: selectedPartInLayout && selectedPartInLayout !== part ? 0 : 0.6,
-                  transition: 'opacity 0.15s',
-                }}
-              />
-            ))}
+            {(Object.entries(computedBoxes) as [Part, BoxConfig][]).map(([part, box]) => {
+              const focusedPart = selectedPartInLayout ?? editingPartInLayout
+              const isDimmed = focusedPart != null && focusedPart !== part
+              return (
+                <div
+                  key={`computed-${part}`}
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: `${box.x * 100}%`,
+                    top: `${box.y * 100}%`,
+                    width: `${box.width * 100}%`,
+                    height: `${box.height * 100}%`,
+                    backgroundColor: PART_COLORS[part],
+                    opacity: isDimmed ? 0 : 0.6,
+                    transition: 'opacity 0.15s',
+                  }}
+                />
+              )
+            })}
 
 {/* partOverride 패딩: 선택된 파트만 흰색 반투명 오버레이 (색이 빠지는 효과) */}
             {selectedPartInLayout && schema.partOverrides && (Object.entries(rawBoxes) as [Part, BoxConfig][]).filter(([part]) => part === selectedPartInLayout).map(([part, box]) => {

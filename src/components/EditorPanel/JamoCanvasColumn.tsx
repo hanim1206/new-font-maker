@@ -194,7 +194,7 @@ export function JamoCanvasColumn({
             }}
           >
           <div
-            className="absolute overflow-hidden"
+            className="absolute"
             style={{
               left: HANDLE_MARGIN,
               top: HANDLE_MARGIN,
