@@ -30,3 +30,7 @@ export const SNAP_ORIGIN_COLOR = '#ff9500'
 
 // 파트 오프셋 핸들 색상
 export const PART_OFFSET_COLOR = '#38bdf8'
+
+// 캔버스 그리드 색상
+export const GRID_MINOR_COLOR = '#f0f0f05e'      // 0.025 소그리드
+export const GRID_MAJOR_COLOR = '#f0f0f05e'       // 0.1 대그리드

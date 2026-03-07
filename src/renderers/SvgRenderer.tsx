@@ -301,7 +301,7 @@ export function SvgRenderer({
       {/* 글자 전체에 slant 적용 */}
       <g transform={slantTransform}>
         {/* 글리프 렌더링 — clipGlyphs이면 clipPath로 제한 */}
-        <g clipPath={shouldClipGlyphs ? `url(#${clipId})` : undefined}>
+        <g clipPath={shouldClipGlyphs ? `url(#${clipId})` : undefined} pointerEvents="none">
           {renderOrder.map((part) => renderPart(part))}
         </g>
         {/* 추가 오버레이 (StrokeOverlay 등) — 클리핑 밖에서 렌더 */}

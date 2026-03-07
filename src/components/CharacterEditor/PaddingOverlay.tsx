@@ -308,18 +308,20 @@ export function PaddingOverlay({
 
     return (
       <g key={side}>
-        {/* 가시적 경계선 (클릭 불가) */}
-        <line
-          x1={edge.x1}
-          y1={edge.y1}
-          x2={edge.x2}
-          y2={edge.y2}
-          stroke={isAtOrigin && isActive ? originColor : sideColor}
-          strokeWidth={isActive ? 1.5 : isHovered ? 1.2 : 0.8}
-          opacity={disabled ? 0 : isActive ? 1 : isHovered ? 0.9 : 0.5}
-          strokeDasharray={isActive ? 'none' : '3,2'}
-          pointerEvents="none"
-        />
+        {/* 가시적 경계선 — 드래그/호버 시에만 표시 */}
+        {(isActive || isHovered) && (
+          <line
+            x1={edge.x1}
+            y1={edge.y1}
+            x2={edge.x2}
+            y2={edge.y2}
+            stroke={isAtOrigin && isActive ? originColor : sideColor}
+            strokeWidth={isActive ? 1.5 : 1.2}
+            opacity={disabled ? 0 : isActive ? 1 : 0.9}
+            strokeDasharray={isActive ? 'none' : '3,2'}
+            pointerEvents="none"
+          />
+        )}
         {/* 가시적 원형 핸들 마커 (바깥) */}
         <circle
           cx={cx}
