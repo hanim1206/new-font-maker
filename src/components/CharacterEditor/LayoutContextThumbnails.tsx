@@ -66,8 +66,8 @@ export function LayoutContextThumbnails({
   onSelectContext,
 }: LayoutContextThumbnailsProps) {
   const { choseong, jungseong, jongseong } = useJamoStore()
-  const { getLayoutSchema, getEffectivePadding } = useLayoutStore()
-  const { getEffectiveStyle } = useGlobalStyleStore()
+  const { getLayoutSchema, getEffectivePadding, layoutSchemas } = useLayoutStore()
+  const { getEffectiveStyle, style: globalStyle, exclusions } = useGlobalStyleStore()
 
   // selectedContext가 null이면 첫 번째 레이아웃을 기본 선택
   const effectiveContext = selectedContext ?? FIXED_LAYOUTS[0] ?? null
@@ -102,7 +102,8 @@ export function LayoutContextThumbnails({
 
       return { layoutType, sampleChar, schemaWithPadding, effectiveStyle, syllable }
     })
-  }, [jamoType, jamoChar, choseong, jungseong, jongseong, getLayoutSchema, getEffectivePadding, getEffectiveStyle])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jamoType, jamoChar, choseong, jungseong, jongseong, getLayoutSchema, getEffectivePadding, getEffectiveStyle, layoutSchemas, globalStyle, exclusions])
 
   return (
     <div className="px-4 pt-3">
@@ -110,7 +111,7 @@ export function LayoutContextThumbnails({
         레이아웃 컨텍스트
       </h4>
       <div className="flex flex-wrap gap-1.5">
-        {thumbnails.map(({ layoutType, sampleChar, schemaWithPadding, effectiveStyle, syllable }) => {
+        {thumbnails.map(({ layoutType, schemaWithPadding, effectiveStyle, syllable }) => {
           const isSelected = effectiveContext === layoutType
 
           return (
@@ -130,13 +131,11 @@ export function LayoutContextThumbnails({
                 syllable={syllable}
                 schema={schemaWithPadding}
                 size={40}
-                fillColor={isSelected ? '#60a5fa' : '#a0a0a0'}
+                fillColor="transparent"
+                backgroundColor="#ffffff"
                 showDebugBoxes
                 globalStyle={effectiveStyle}
               />
-              <span className="text-[0.6rem] text-text-dim-5 leading-none">
-                {sampleChar}
-              </span>
             </button>
           )
         })}

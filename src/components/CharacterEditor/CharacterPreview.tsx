@@ -3,6 +3,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useJamoStore } from '../../stores/jamoStore'
 import { useGlobalStyleStore, weightToMultiplier, resolveLinecap } from '../../stores/globalStyleStore'
 import type { StrokeDataV2, BoxConfig, Padding } from '../../types'
+import { PART_COLORS, STROKE_SELECTED_COLOR, POINT_STRAIGHT_COLOR, POINT_ACTIVE_COLOR } from '../../constants/editorColors'
 import { pointsToSvgD } from '../../utils/pathUtils'
 
 type PointChangeHandler = (
@@ -30,14 +31,7 @@ const VIEW_BOX_SIZE = 100
 // viewBox 마진 (박스 영역 주변 여백, PaddingOverlay 핸들 HANDLE_OFFSET=6 + hitR=5 고려)
 const VIEW_MARGIN = 12
 
-// 박스 타입별 색상
-const BOX_COLORS: Record<string, string> = {
-  CH: '#ff6b6b',
-  JU: '#4ecdc4',
-  JU_H: '#ff9500',
-  JU_V: '#ffd700',
-  JO: '#4169e1',
-}
+const BOX_COLORS = PART_COLORS
 
 // 드래그 상태 타입
 interface OriginalPointSnapshot {
@@ -387,7 +381,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
                 <path
                   d={d}
                   fill="none"
-                  stroke={isSelected ? '#ff6b6b' : '#1a1a1a'}
+                  stroke={isSelected ? STROKE_SELECTED_COLOR : '#1a1a1a'}
                   strokeWidth={strokeWidth}
                   strokeLinecap={resolveLinecap(stroke.linecap, globalStyle.linecap)}
                   strokeLinejoin="round"
@@ -412,9 +406,9 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
                             return (
                               <>
                                 <line x1={ptX} y1={ptY} x2={hx} y2={hy}
-                                  stroke="#ff6b6b" strokeWidth={0.5} opacity={0.6} />
+                                  stroke={STROKE_SELECTED_COLOR} strokeWidth={0.5} opacity={0.6} />
                                 <circle cx={hx} cy={hy} r={1.8}
-                                  fill="#ff6b6b" stroke="#fff" strokeWidth={0.3}
+                                  fill={STROKE_SELECTED_COLOR} stroke="#fff" strokeWidth={0.3}
                                   style={{ cursor: 'grab' }}
                                   onMouseDown={startPointDrag('handleIn', stroke.id, selectedPointIndex, container)}
                                   onTouchStart={startPointDrag('handleIn', stroke.id, selectedPointIndex, container)} />
@@ -426,9 +420,9 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
                             return (
                               <>
                                 <line x1={ptX} y1={ptY} x2={hx} y2={hy}
-                                  stroke="#4ecdc4" strokeWidth={0.5} opacity={0.6} />
+                                  stroke={POINT_STRAIGHT_COLOR} strokeWidth={0.5} opacity={0.6} />
                                 <circle cx={hx} cy={hy} r={1.8}
-                                  fill="#4ecdc4" stroke="#fff" strokeWidth={0.3}
+                                  fill={POINT_STRAIGHT_COLOR} stroke="#fff" strokeWidth={0.3}
                                   style={{ cursor: 'grab' }}
                                   onMouseDown={startPointDrag('handleOut', stroke.id, selectedPointIndex, container)}
                                   onTouchStart={startPointDrag('handleOut', stroke.id, selectedPointIndex, container)} />
@@ -445,7 +439,7 @@ export function CharacterPreview({ jamoChar, strokes, boxInfo = { x: 0, y: 0, wi
                       const isActive = i === selectedPointIndex
                       return (
                         <circle key={i} cx={ptX} cy={ptY} r={2.5}
-                          fill={isActive ? '#ff6b6b' : '#4ecdc4'}
+                          fill={isActive ? POINT_ACTIVE_COLOR : POINT_STRAIGHT_COLOR}
                           stroke="#fff" strokeWidth={0.5}
                           style={{ cursor: 'grab' }}
                           onMouseDown={startPointDrag('point', stroke.id, i, container)}

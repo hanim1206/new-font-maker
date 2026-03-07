@@ -1,6 +1,7 @@
 import { useUIStore } from '../../stores/uiStore'
 import type { StrokeDataV2, StrokeLinecap } from '../../types'
 import { MERGE_PROXIMITY } from '../../utils/snapUtils'
+import { POINT_STRAIGHT_COLOR } from '../../constants/editorColors'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
@@ -215,8 +216,11 @@ export function StrokeInspector({ strokes, onChange, onMergeStrokes, onSplitStro
                   'py-1.5 px-3 bg-[#0f0f0f] text-[#e5e5e5] border border-border-lighter rounded text-xs cursor-pointer transition-all duration-150 ease-in-out',
                   'hover:bg-surface-3 hover:border-[#444]',
                   i === selectedPointIndex && 'bg-accent-cyan border-accent-cyan text-black font-semibold',
-                  (pt.handleIn || pt.handleOut) && i !== selectedPointIndex && 'border-[#4ecdc4] text-[#4ecdc4]'
                 )}
+                style={(pt.handleIn || pt.handleOut) && i !== selectedPointIndex ? {
+                  borderColor: POINT_STRAIGHT_COLOR,
+                  color: POINT_STRAIGHT_COLOR,
+                } : undefined}
                 onClick={() => setSelectedPointIndex(i)}
               >
                 {(pt.handleIn || pt.handleOut) ? '~' : ''}{i}

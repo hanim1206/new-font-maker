@@ -9,6 +9,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useDeviceCapability } from '../../hooks/useDeviceCapability'
 import { usePinchZoom } from '../../hooks/usePinchZoom'
 import type { DecomposedSyllable, BoxConfig, LayoutSchema, Part, Padding, LayoutType, PartOverride } from '../../types'
+import { PART_COLORS, PADDING_COLOR, PADDING_OVERRIDE_COLOR, PART_OFFSET_COLOR } from '../../constants/editorColors'
 import type { GlobalStyle } from '../../stores/globalStyleStore'
 
 type PaddingSide = keyof Padding
@@ -133,6 +134,9 @@ export function LayoutCanvasColumn({
     observer.observe(canvasContainerRef.current)
     return () => observer.disconnect()
   }, [isMobile])
+
+  // 호버된 파트 추적
+  const [hoveredPart, setHoveredPart] = useState<Part | null>(null)
 
   // 오버레이 드래그 중 여부 (드래그 중 파트 버튼 pointer-events 차단)
   const [isDragging, setIsDragging] = useState(false)
@@ -318,7 +322,7 @@ export function LayoutCanvasColumn({
               top: HANDLE_MARGIN,
               width: canvasSize,
               height: canvasSize,
-              backgroundColor: '#1a1a1a',
+              backgroundColor: '#ffffff',
             }}
             onClick={(e) => {
               e.stopPropagation()
@@ -335,8 +339,8 @@ export function LayoutCanvasColumn({
                 const v = (i + 1) * 2.5
                 return (
                   <g key={`grid-${i}`}>
-                    <line x1={v} y1={0} x2={v} y2={100} stroke="#333" strokeWidth={0.2} />
-                    <line x1={0} y1={v} x2={100} y2={v} stroke="#333" strokeWidth={0.2} />
+                    <line x1={v} y1={0} x2={v} y2={100} stroke="#f0f0f0" strokeWidth={0.2} />
+                    <line x1={0} y1={v} x2={100} y2={v} stroke="#f0f0f0" strokeWidth={0.2} />
                   </g>
                 )
               })}
@@ -344,8 +348,8 @@ export function LayoutCanvasColumn({
                 const v = (i + 1) * 10
                 return (
                   <g key={`grid-major-${i}`}>
-                    <line x1={v} y1={0} x2={v} y2={100} stroke="#444" strokeWidth={0.4} />
-                    <line x1={0} y1={v} x2={100} y2={v} stroke="#444" strokeWidth={0.4} />
+                    <line x1={v} y1={0} x2={v} y2={100} stroke="#e9e9e9" strokeWidth={0.4} />
+                    <line x1={0} y1={v} x2={100} y2={v} stroke="#e9e9e9" strokeWidth={0.4} />
                   </g>
                 )
               })}
@@ -356,11 +360,12 @@ export function LayoutCanvasColumn({
               syllable={displaySyllable}
               schema={schemaWithPadding}
               size={canvasSize}
-              fillColor="#e5e5e5"
+              fillColor="#1a1a1a"
               backgroundColor="transparent"
               showDebugBoxes
               clipGlyphs
               globalStyle={effectiveStyle}
+              className="relative z-[1]"
             >
               {/* Split/Padding 오버레이 — 항상 표시, 파트 선택 시 비활성 */}
               {schema.splits && schema.splits.length > 0 && (
@@ -381,7 +386,7 @@ export function LayoutCanvasColumn({
                 padding={effectivePadding}
                 containerBox={{ x: 0, y: 0, width: 1, height: 1 }}
                 onPaddingChange={onPaddingOverrideChange}
-                color={hasPaddingOverride ? '#ff9500' : '#a855f7'}
+                color={hasPaddingOverride ? PADDING_OVERRIDE_COLOR : PADDING_COLOR}
                 snapStep={0.005}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
@@ -403,18 +408,24 @@ export function LayoutCanvasColumn({
                         ? 'border-accent-blue bg-accent-blue/15'
                         : isSelected
                           ? 'border-accent-cyan bg-accent-cyan/10'
-                          : 'border-transparent hover:border-accent-yellow/50 hover:bg-accent-yellow/5'
+                          : 'border-transparent'
                     }`}
                     style={{
                       left: `${box.x * 100}%`,
                       top: `${box.y * 100}%`,
                       width: `${box.width * 100}%`,
                       height: `${box.height * 100}%`,
+                      ...(!isEditing && !isSelected && hoveredPart === part ? {
+                        borderColor: `${PART_COLORS[part]}80`,
+                        backgroundColor: `${PART_COLORS[part]}0d`,
+                      } : {}),
                       // 드래그 중이면 전부 비활성, 파트 선택 중이면 다른 파트만 비활성 (선택된 파트는 더블클릭 가능)
                       pointerEvents: isDragging ? 'none'
                         : (selectedPartInLayout && selectedPartInLayout !== part) ? 'none'
                         : undefined,
                     }}
+                    onMouseEnter={() => setHoveredPart(part)}
+                    onMouseLeave={() => setHoveredPart(null)}
                     onMouseDown={(e) => {
                       const rect = e.currentTarget.getBoundingClientRect()
                       const nearSide = detectNearEdge(e.clientX, e.clientY, rect, EDGE_DRAG_THRESHOLD)
@@ -561,14 +572,14 @@ export function LayoutCanvasColumn({
                           top: edgePx,
                           width: obwPx,
                           height: 0,
-                          borderTop: `${isActive ? 2 : isHov ? 1.5 : 1}px ${isActive ? 'solid' : 'dashed'} ${isAtOrigin && isActive ? '#fff' : '#38bdf8'}`,
+                          borderTop: `${isActive ? 2 : isHov ? 1.5 : 1}px ${isActive ? 'solid' : 'dashed'} ${isAtOrigin && isActive ? '#fff' : PART_OFFSET_COLOR}`,
                           opacity: isActive ? 1 : isHov ? 0.9 : 0.5,
                         } : {
                           left: edgePx,
                           top: obyPx,
                           width: 0,
                           height: obhPx,
-                          borderLeft: `${isActive ? 2 : isHov ? 1.5 : 1}px ${isActive ? 'solid' : 'dashed'} ${isAtOrigin && isActive ? '#fff' : '#38bdf8'}`,
+                          borderLeft: `${isActive ? 2 : isHov ? 1.5 : 1}px ${isActive ? 'solid' : 'dashed'} ${isAtOrigin && isActive ? '#fff' : PART_OFFSET_COLOR}`,
                           opacity: isActive ? 1 : isHov ? 0.9 : 0.5,
                         }}
                       />
@@ -610,7 +621,7 @@ export function LayoutCanvasColumn({
                   const cx = isH ? margin / 2 : margin + edgePx
                   const cy = isH ? margin + edgePx : margin / 2
 
-                  const sideColor = '#38bdf8'
+                  const sideColor = PART_OFFSET_COLOR
                   const activeColor = isAtOrigin && isActive ? '#fff' : sideColor
                   const fillColor = isActive ? activeColor : isHov ? sideColor : 'rgba(0,0,0,0.6)'
 

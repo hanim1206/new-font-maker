@@ -1,4 +1,5 @@
 import type { SnapResult } from '../../utils/snapUtils'
+import { SNAP_GRID_COLOR, SNAP_ORIGIN_COLOR } from '../../constants/editorColors'
 
 // === 타입 정의 ===
 
@@ -30,7 +31,7 @@ export function SnapFeedback({ snapFeedback, dragContainerAbs, mergeHintPosition
         <g pointerEvents="none">
           {snapFeedback.guideLines.map((guide, i) => {
             const isGrid = guide.type === 'grid'
-            const color = isGrid ? '#4ecdc4' : '#ff9500'
+            const color = isGrid ? SNAP_GRID_COLOR : SNAP_ORIGIN_COLOR
             const dashArray = isGrid ? '2,2' : 'none'
             const opacity = isGrid ? 0.6 : 0.8
 

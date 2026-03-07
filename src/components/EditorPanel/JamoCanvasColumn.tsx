@@ -11,6 +11,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useDeviceCapability } from '../../hooks/useDeviceCapability'
 import { usePinchZoom } from '../../hooks/usePinchZoom'
 import type { DecomposedSyllable, BoxConfig, LayoutSchema, Part, Padding, StrokeDataV2 } from '../../types'
+import { PADDING_COLOR, PADDING_DIRTY_COLOR, PADDING_MIXED_ALT_COLOR } from '../../constants/editorColors'
 import type { GlobalStyle } from '../../stores/globalStyleStore'
 
 interface MixedJungseongData {
@@ -177,7 +178,7 @@ export function JamoCanvasColumn({
               top: HANDLE_MARGIN,
               width: canvasSize,
               height: canvasSize,
-              backgroundColor: '#1a1a1a',
+              backgroundColor: '#ffffff',
             }}
           >
             {/* 0.025 스냅 그리드 */}
@@ -191,8 +192,8 @@ export function JamoCanvasColumn({
                 const v = (i + 1) * 2.5
                 return (
                   <g key={`grid-${i}`}>
-                    <line x1={v} y1={0} x2={v} y2={100} stroke="#333" strokeWidth={0.2} />
-                    <line x1={0} y1={v} x2={100} y2={v} stroke="#333" strokeWidth={0.2} />
+                    <line x1={v} y1={0} x2={v} y2={100} stroke="#e0e0e0" strokeWidth={0.2} />
+                    <line x1={0} y1={v} x2={100} y2={v} stroke="#e0e0e0" strokeWidth={0.2} />
                   </g>
                 )
               })}
@@ -200,8 +201,8 @@ export function JamoCanvasColumn({
                 const v = (i + 1) * 10
                 return (
                   <g key={`grid-major-${i}`}>
-                    <line x1={v} y1={0} x2={v} y2={100} stroke="#444" strokeWidth={0.4} />
-                    <line x1={0} y1={v} x2={100} y2={v} stroke="#444" strokeWidth={0.4} />
+                    <line x1={v} y1={0} x2={v} y2={100} stroke="#ccc" strokeWidth={0.4} />
+                    <line x1={0} y1={v} x2={100} y2={v} stroke="#ccc" strokeWidth={0.4} />
                   </g>
                 )
               })}
@@ -212,11 +213,11 @@ export function JamoCanvasColumn({
               syllable={displaySyllable}
               schema={schemaWithPadding}
               size={canvasSize}
-              fillColor="#e5e5e5"
+              fillColor="#1a1a1a"
               backgroundColor="transparent"
-              showDebugBoxes
               globalStyle={effectiveStyle}
               partStyles={partStyles}
+              className="relative z-[1]"
             >
               {/* StrokeOverlay (자모 획 편집) — 반드시 PaddingOverlay보다 먼저 렌더링 */}
               {editingBox && draftStrokes.length > 0 && (
@@ -229,7 +230,7 @@ export function JamoCanvasColumn({
                   onPointChange={onPointChange}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
-                  strokeColor="#e5e5e5"
+                  strokeColor="#1a1a1a"
                   isMixed={!!mixedJungseongData}
                   juHBox={mixedJungseongData?.juHBox}
                   juVBox={mixedJungseongData?.juVBox}
@@ -257,7 +258,7 @@ export function JamoCanvasColumn({
                         onPaddingChange={(side, val) =>
                           onMixedJamoPaddingChange(editingJamoInfo.char, 'horizontal', side, val)
                         }
-                        color={isPaddingDirty ? '#38bdf8' : '#a855f7'}
+                        color={isPaddingDirty ? PADDING_DIRTY_COLOR : PADDING_COLOR}
                         disabled={isStrokeSelected}
                       />
                       <PaddingOverlay
@@ -268,7 +269,7 @@ export function JamoCanvasColumn({
                         onPaddingChange={(side, val) =>
                           onMixedJamoPaddingChange(editingJamoInfo.char, 'vertical', side, val)
                         }
-                        color={isPaddingDirty ? '#38bdf8' : '#c084fc'}
+                        color={isPaddingDirty ? PADDING_DIRTY_COLOR : PADDING_MIXED_ALT_COLOR}
                         disabled={isStrokeSelected}
                       />
                     </>
@@ -284,7 +285,7 @@ export function JamoCanvasColumn({
                     onPaddingChange={(side, val) =>
                       onJamoPaddingChange(editingJamoInfo.type, editingJamoInfo.char, side, val)
                     }
-                    color={isPaddingDirty ? '#38bdf8' : '#a855f7'}
+                    color={isPaddingDirty ? PADDING_DIRTY_COLOR : PADDING_COLOR}
                     disabled={isStrokeSelected}
                   />
                 )

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useDeviceCapability } from '../../hooks/useDeviceCapability'
 import type { Split } from '../../types'
+import { SPLIT_COLOR } from '../../constants/editorColors'
 
 // === 타입 정의 ===
 
@@ -29,8 +30,8 @@ interface DragState {
 
 // 축별 색상
 const AXIS_COLOR: Record<'x' | 'y', string> = {
-  x: '#2dd4bf', // 민트 (세로선)
-  y: '#2dd4bf', // 민트 (가로선)
+  x: SPLIT_COLOR,
+  y: SPLIT_COLOR,
 }
 
 // === 컴포넌트 ===

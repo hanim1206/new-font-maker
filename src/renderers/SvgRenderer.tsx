@@ -1,5 +1,6 @@
 import { useMemo, useId, type ReactNode } from 'react'
 import type { DecomposedSyllable, BoxConfig, Part, StrokeDataV2, LayoutType, LayoutSchema, Padding } from '../types'
+import { PART_COLORS } from '../constants/editorColors'
 import { calculateBoxes } from '../utils/layoutCalculator'
 import { pointsToSvgD } from '../utils/pathUtils'
 import { weightToMultiplier, resolveLinecap, resolveLinejoin } from '../stores/globalStyleStore'
@@ -149,16 +150,15 @@ export function SvgRenderer({
           y={box.y * VIEW_BOX_SIZE}
           width={box.width * VIEW_BOX_SIZE}
           height={box.height * VIEW_BOX_SIZE}
-          fill="none"
-          stroke={color}
-          strokeWidth={0.5}
-          strokeDasharray="2,2"
+          fill={color}
+          fillOpacity={1}
         />
         <text
           x={(box.x + 0.02) * VIEW_BOX_SIZE}
           y={(box.y + 0.08) * VIEW_BOX_SIZE}
           fontSize={6}
           fill={color}
+          fillOpacity={0.5}
         >
           {label}
         </text>
@@ -241,14 +241,7 @@ export function SvgRenderer({
   // 렌더링 순서 결정
   const renderOrder = getRenderOrder(syllable.layoutType)
 
-  // 디버그 박스 색상 매핑
-  const debugBoxColors: Record<string, string> = {
-    CH: '#ff6b6b',
-    JU: '#4ecdc4',
-    JU_H: '#ff9500',
-    JU_V: '#ffd700',
-    JO: '#4169e1',
-  }
+  const debugBoxColors = PART_COLORS
 
   // 실제 사용되는 박스만 디버그 박스로 표시
   const getDebugBoxes = () => {

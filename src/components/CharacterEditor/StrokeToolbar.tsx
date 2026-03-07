@@ -1,5 +1,6 @@
 import { useUIStore } from '../../stores/uiStore'
 import type { StrokeDataV2, StrokeLinecap } from '../../types'
+import { POINT_STRAIGHT_COLOR } from '../../constants/editorColors'
 import { MERGE_PROXIMITY } from '../../utils/snapUtils'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -139,8 +140,11 @@ export function StrokeToolbar({ strokes, onChange, onMergeStrokes, onDeleteStrok
                 'py-0.5 px-2 bg-[#0f0f0f] text-[#e5e5e5] border border-border-lighter rounded text-[0.65rem] cursor-pointer transition-all',
                 'hover:bg-surface-3 hover:border-[#444]',
                 i === selectedPointIndex && 'bg-accent-cyan border-accent-cyan text-black font-semibold',
-                (pt.handleIn || pt.handleOut) && i !== selectedPointIndex && 'border-[#4ecdc4] text-[#4ecdc4]'
               )}
+              style={(pt.handleIn || pt.handleOut) && i !== selectedPointIndex ? {
+                borderColor: POINT_STRAIGHT_COLOR,
+                color: POINT_STRAIGHT_COLOR,
+              } : undefined}
               onClick={() => setSelectedPointIndex(i)}
             >
               {(pt.handleIn || pt.handleOut) ? '~' : ''}{i}

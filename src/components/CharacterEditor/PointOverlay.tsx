@@ -1,4 +1,5 @@
 import type { StrokeDataV2 } from '../../types'
+import { STROKE_SELECTED_COLOR, POINT_STRAIGHT_COLOR, POINT_CURVE_COLOR, POINT_ACTIVE_COLOR } from '../../constants/editorColors'
 
 // === 타입 정의 ===
 
@@ -62,7 +63,7 @@ export function PointOverlay({
               return (
                 <>
                   <line x1={ptX} y1={ptY} x2={hx} y2={hy}
-                    stroke="#ff6b6b" strokeWidth={0.5 * zoomScale} opacity={0.6} aria-hidden="true" />
+                    stroke={STROKE_SELECTED_COLOR} strokeWidth={0.5 * zoomScale} opacity={0.6} aria-hidden="true" />
                   {/* 넓은 히트 영역 (투명) */}
                   <circle cx={hx} cy={hy} r={pointRadius}
                     fill="transparent"
@@ -74,7 +75,7 @@ export function PointOverlay({
                   />
                   {/* 가시적 핸들 */}
                   <circle cx={hx} cy={hy} r={pointRadius}
-                    fill="#ff6b6b" stroke="#fff" strokeWidth={0.3 * zoomScale}
+                    fill={STROKE_SELECTED_COLOR} stroke="#fff" strokeWidth={0.3 * zoomScale}
                     aria-hidden="true" style={{ pointerEvents: 'none' }}
                   />
                 </>
@@ -85,7 +86,7 @@ export function PointOverlay({
               return (
                 <>
                   <line x1={ptX} y1={ptY} x2={hx} y2={hy}
-                    stroke="#4ecdc4" strokeWidth={0.5 * zoomScale} opacity={0.6} aria-hidden="true" />
+                    stroke={POINT_STRAIGHT_COLOR} strokeWidth={0.5 * zoomScale} opacity={0.6} aria-hidden="true" />
                   {/* 넓은 히트 영역 (투명) */}
                   <circle cx={hx} cy={hy} r={pointRadius}
                     fill="transparent"
@@ -97,7 +98,7 @@ export function PointOverlay({
                   />
                   {/* 가시적 핸들 */}
                   <circle cx={hx} cy={hy} r={pointRadius}
-                    fill="#4ecdc4" stroke="#fff" strokeWidth={0.3 * zoomScale}
+                    fill={POINT_STRAIGHT_COLOR} stroke="#fff" strokeWidth={0.3 * zoomScale}
                     aria-hidden="true" style={{ pointerEvents: 'none' }}
                   />
                 </>
@@ -115,7 +116,7 @@ export function PointOverlay({
 
         return (
           <circle key={i} cx={ptX} cy={ptY} r={pointRadius}
-            fill={isActive ? '#ff6b6b' : isCurve ? '#c084fc' : '#4ecdc4'}
+            fill={isActive ? POINT_ACTIVE_COLOR : isCurve ? POINT_CURVE_COLOR : POINT_STRAIGHT_COLOR}
             stroke="#fff" strokeWidth={0.5 * zoomScale}
             role="button" aria-label={`기준점 ${i + 1}`}
             style={{ cursor: 'grab' }}

@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useDeviceCapability } from '../../hooks/useDeviceCapability'
 import type { StrokeDataV2, BoxConfig, Padding } from '../../types'
+import { STROKE_SELECTED_COLOR } from '../../constants/editorColors'
 import { pointsToSvgD } from '../../utils/pathUtils'
 import { collectSnapTargets, snapPoint, detectMergeHint } from '../../utils/snapUtils'
 import type { SnapResult, MergeHint } from '../../utils/snapUtils'
@@ -640,7 +641,7 @@ export function StrokeOverlay({
               <path
                 d={d}
                 fill="none"
-                stroke={isSelected ? '#ff6b6b' : (isHighlighted ? '#c0c0c0' : strokeColor)}
+                stroke={isSelected ? STROKE_SELECTED_COLOR : (isHighlighted ? '#c0c0c0' : strokeColor)}
                 strokeWidth={pathThickness * (isHighlighted ? 1.5 : 1)}
                 strokeLinecap={resolveLinecap(stroke.linecap, globalStyle?.linecap)}
                 strokeLinejoin="round"

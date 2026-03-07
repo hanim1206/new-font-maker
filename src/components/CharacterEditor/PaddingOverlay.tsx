@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useDeviceCapability } from '../../hooks/useDeviceCapability'
 import type { Padding, BoxConfig } from '../../types'
+import { PADDING_DIRTY_COLOR } from '../../constants/editorColors'
 
 // === 타입 정의 ===
 
@@ -47,8 +48,8 @@ export function PaddingOverlay({
   padding,
   containerBox,
   onPaddingChange,
-  color = '#38bdf8',
-  negativeColor = '#38bdf8',
+  color = PADDING_DIRTY_COLOR,
+  negativeColor = PADDING_DIRTY_COLOR,
   minPadding = 0,
   maxPadding = 0.3,
   snapStep = 0.025,
