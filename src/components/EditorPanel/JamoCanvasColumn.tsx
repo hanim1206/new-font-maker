@@ -11,7 +11,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useDeviceCapability } from '../../hooks/useDeviceCapability'
 import { usePinchZoom } from '../../hooks/usePinchZoom'
 import type { DecomposedSyllable, BoxConfig, LayoutSchema, Part, Padding, StrokeDataV2 } from '../../types'
-import { PADDING_COLOR, PADDING_DIRTY_COLOR, PADDING_MIXED_ALT_COLOR } from '../../constants/editorColors'
+import { PADDING_COLOR, PADDING_DIRTY_COLOR, PADDING_MIXED_ALT_COLOR, PART_COLORS } from '../../constants/editorColors'
 import type { GlobalStyle } from '../../stores/globalStyleStore'
 
 interface MixedJungseongData {
@@ -94,7 +94,7 @@ export function JamoCanvasColumn({
   const HANDLE_MARGIN = 40
   const [isDragging, setIsDragging] = useState(false)
 
-  const { canvasZoom, canvasPan, resetCanvasView, isMobile, setSelectedStrokeId, setSelectedPointIndex } = useUIStore()
+  const { canvasZoom, canvasPan, resetCanvasView, isMobile, setSelectedStrokeId, setSelectedPointIndex, editingPartInLayout } = useUIStore()
 
   // ResizeObserver: 컨테이너 크기에 맞게 캔버스 크기 동적 계산
   useEffect(() => {
@@ -142,8 +142,19 @@ export function JamoCanvasColumn({
   const isStrokeSelected = !!selectedStrokeId
   const jamoPad = editingJamoPadding ?? { top: 0, bottom: 0, left: 0, right: 0 }
 
-  // StrokeOverlay에 전달할 effective box (혼합중성 고려)
-  const effectiveBox = mixedJungseongData?.juHBox || mixedJungseongData?.juVBox ? {
+  // 꽉 찬 뷰: 전체 캔버스를 사용
+  const fullBox: BoxConfig = { x: 0, y: 0, width: 1, height: 1 }
+
+  // 혼합중성의 sub-box를 전체 캔버스에 맞게 리맵
+  const remapBox = (subBox: BoxConfig, parentBox: BoxConfig): BoxConfig => ({
+    x: (subBox.x - parentBox.x) / parentBox.width,
+    y: (subBox.y - parentBox.y) / parentBox.height,
+    width: subBox.width / parentBox.width,
+    height: subBox.height / parentBox.height,
+  })
+
+  // 원본 effective box (리맵 기준용)
+  const origEffectiveBox = mixedJungseongData?.juHBox || mixedJungseongData?.juVBox ? {
     x: Math.min(mixedJungseongData.juHBox?.x ?? 1, mixedJungseongData.juVBox?.x ?? 1),
     y: Math.min(mixedJungseongData.juHBox?.y ?? 1, mixedJungseongData.juVBox?.y ?? 1),
     width: Math.max(
@@ -155,6 +166,17 @@ export function JamoCanvasColumn({
       (mixedJungseongData.juVBox?.y ?? 0) + (mixedJungseongData.juVBox?.height ?? 0)
     ) - Math.min(mixedJungseongData.juHBox?.y ?? 1, mixedJungseongData.juVBox?.y ?? 1),
   } : editingBox!
+
+  // StrokeOverlay에 전달할 effective box (꽉 찬 뷰)
+  const effectiveBox = fullBox
+
+  // 혼합중성 sub-box를 전체 캔버스에 리맵
+  const remappedJuHBox = mixedJungseongData?.juHBox
+    ? remapBox(mixedJungseongData.juHBox, origEffectiveBox)
+    : undefined
+  const remappedJuVBox = mixedJungseongData?.juVBox
+    ? remapBox(mixedJungseongData.juVBox, origEffectiveBox)
+    : undefined
 
   return (
     <div className="relative">
@@ -172,7 +194,7 @@ export function JamoCanvasColumn({
             }}
           >
           <div
-            className="absolute"
+            className="absolute overflow-hidden"
             style={{
               left: HANDLE_MARGIN,
               top: HANDLE_MARGIN,
@@ -208,6 +230,17 @@ export function JamoCanvasColumn({
               })}
             </svg>
 
+            {/* 편집 중인 파트의 배경색 (꽉 찬 뷰) */}
+            {editingPartInLayout && editingBox && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  backgroundColor: PART_COLORS[editingPartInLayout],
+                  opacity: 0.15,
+                }}
+              />
+            )}
+
             <SvgRenderer
               svgRef={svgRef}
               syllable={displaySyllable}
@@ -232,8 +265,8 @@ export function JamoCanvasColumn({
                   onDragEnd={handleDragEnd}
                   strokeColor="#1a1a1a"
                   isMixed={!!mixedJungseongData}
-                  juHBox={mixedJungseongData?.juHBox}
-                  juVBox={mixedJungseongData?.juVBox}
+                  juHBox={remappedJuHBox}
+                  juVBox={remappedJuVBox}
                   horizontalStrokeIds={mixedJungseongData?.horizontalStrokeIds}
                   verticalStrokeIds={mixedJungseongData?.verticalStrokeIds}
                   globalStyle={globalStyleRaw}
@@ -245,7 +278,7 @@ export function JamoCanvasColumn({
 
               {/* PaddingOverlay — 반드시 StrokeOverlay 뒤에 렌더링 (이벤트 레이어링) */}
               {editingJamoInfo && editingBox && (() => {
-                if (mixedJungseongData?.juHBox && mixedJungseongData?.juVBox) {
+                if (remappedJuHBox && remappedJuVBox) {
                   const hPad = editingHorizontalPadding ?? jamoPad
                   const vPad = editingVerticalPadding ?? jamoPad
                   return (
@@ -254,7 +287,7 @@ export function JamoCanvasColumn({
                         svgRef={svgRef}
                         viewBoxSize={100}
                         padding={hPad}
-                        containerBox={mixedJungseongData.juHBox}
+                        containerBox={remappedJuHBox}
                         onPaddingChange={(side, val) =>
                           onMixedJamoPaddingChange(editingJamoInfo.char, 'horizontal', side, val)
                         }
@@ -265,7 +298,7 @@ export function JamoCanvasColumn({
                         svgRef={svgRef}
                         viewBoxSize={100}
                         padding={vPad}
-                        containerBox={mixedJungseongData.juVBox}
+                        containerBox={remappedJuVBox}
                         onPaddingChange={(side, val) =>
                           onMixedJamoPaddingChange(editingJamoInfo.char, 'vertical', side, val)
                         }
@@ -281,7 +314,7 @@ export function JamoCanvasColumn({
                     svgRef={svgRef}
                     viewBoxSize={100}
                     padding={jamoPad}
-                    containerBox={editingBox}
+                    containerBox={fullBox}
                     onPaddingChange={(side, val) =>
                       onJamoPaddingChange(editingJamoInfo.type, editingJamoInfo.char, side, val)
                     }
@@ -300,8 +333,8 @@ export function JamoCanvasColumn({
                 viewBoxSize={100}
                 box={effectiveBox}
                 isMixed={!!mixedJungseongData}
-                juHBox={mixedJungseongData?.juHBox}
-                juVBox={mixedJungseongData?.juVBox}
+                juHBox={remappedJuHBox}
+                juVBox={remappedJuVBox}
                 horizontalStrokeIds={mixedJungseongData?.horizontalStrokeIds}
                 verticalStrokeIds={mixedJungseongData?.verticalStrokeIds}
                 jamoPadding={editingJamoPadding}
@@ -342,7 +375,7 @@ export function JamoCanvasColumn({
           strokes={draftStrokes}
           onChange={onStrokeChange}
           onPointChange={onPointChange}
-          boxInfo={editingBox}
+          boxInfo={fullBox}
         />
       )}
     </div>

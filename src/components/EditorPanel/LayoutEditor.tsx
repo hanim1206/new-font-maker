@@ -717,8 +717,8 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
         // 편집 중 파트: SvgRenderer에서 숨김 (StrokeOverlay가 렌더링)
         styles[part] = { hidden: true }
       } else {
-        // 비편집 파트: 어둡게
-        styles[part] = { fillColor: '#555', opacity: 0.25 }
+        // 비편집 파트: 숨김
+        styles[part] = { hidden: true }
       }
     }
     return styles
