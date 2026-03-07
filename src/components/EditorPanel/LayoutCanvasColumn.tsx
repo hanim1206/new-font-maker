@@ -396,9 +396,9 @@ export function LayoutCanvasColumn({
               />
             ))}
 
-            {/* partOverride 패딩: 흰색 반투명 오버레이 (색이 빠지는 효과) */}
-            {schema.partOverrides && (Object.entries(rawBoxes) as [Part, BoxConfig][]).map(([part, box]) => {
-              const override = schema.partOverrides?.[part]
+            {/* partOverride 패딩: 선택된 파트만 흰색 반투명 오버레이 (색이 빠지는 효과) */}
+            {selectedPartInLayout && schema.partOverrides && (Object.entries(rawBoxes) as [Part, BoxConfig][]).filter(([part]) => part === selectedPartInLayout).map(([part, box]) => {
+              const override = schema.partOverrides?.[part as Part]
               if (!override) return null
               const top = override.top ?? 0
               const bottom = override.bottom ?? 0
