@@ -605,7 +605,8 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       if (isEditingPart) {
         styles[part] = { hidden: true }
       } else {
-        styles[part] = { fillColor: '#555', opacity: 0.25 }
+        // 비편집 파트: 숨김
+        styles[part] = { hidden: true }
       }
     }
     return styles

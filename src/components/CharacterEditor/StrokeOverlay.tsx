@@ -387,8 +387,21 @@ export function StrokeOverlay({
       const firstNewX = firstOrig.x + rawDeltaX
       const firstNewY = firstOrig.y + rawDeltaY
       const snap = snapPoint(firstNewX, firstNewY, snapTargets)
-      const snappedDeltaX = snap.x - firstOrig.x
-      const snappedDeltaY = snap.y - firstOrig.y
+      let snappedDeltaX = snap.x - firstOrig.x
+      let snappedDeltaY = snap.y - firstOrig.y
+
+      // 캔버스 바운드 클램핑: 모든 포인트가 0~1 범위 안에 유지되도록 delta 제한
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+      for (const pt of dragState.originalPoints) {
+        minX = Math.min(minX, pt.x)
+        maxX = Math.max(maxX, pt.x)
+        minY = Math.min(minY, pt.y)
+        maxY = Math.max(maxY, pt.y)
+      }
+      if (minX + snappedDeltaX < 0) snappedDeltaX = -minX
+      if (maxX + snappedDeltaX > 1) snappedDeltaX = 1 - maxX
+      if (minY + snappedDeltaY < 0) snappedDeltaY = -minY
+      if (maxY + snappedDeltaY > 1) snappedDeltaY = 1 - maxY
 
       dragState.originalPoints.forEach((origPt, i) => {
         onPointChange(dragState.strokeId, i, 'x', origPt.x + snappedDeltaX)
