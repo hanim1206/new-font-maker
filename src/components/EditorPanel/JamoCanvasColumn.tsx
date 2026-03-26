@@ -1,11 +1,10 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
-import { createPortal } from 'react-dom'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import type { PartStyle } from '../../renderers/SvgRenderer'
 import { StrokeOverlay } from '../CharacterEditor/StrokeOverlay'
 import { PaddingOverlay } from '../CharacterEditor/PaddingOverlay'
-import { StrokeToolbar } from '../CharacterEditor/StrokeToolbar'
-import { PointActionPopup } from '../CharacterEditor/PointActionPopup'
+import { FloatingStrokeToolbar } from '../CharacterEditor/FloatingStrokeToolbar'
+import { OverrideChipBar } from '../CharacterEditor/OverrideChipBar'
 import { StrokeEditor } from '../CharacterEditor/StrokeEditor'
 import { useUIStore } from '../../stores/uiStore'
 import { useDeviceCapability } from '../../hooks/useDeviceCapability'
@@ -56,6 +55,8 @@ interface JamoCanvasColumnProps {
   onDeletePoint?: (id: string, idx: number) => void
   onDeleteStroke?: (id: string) => void
   onAddStroke?: () => void
+  // 오버라이드
+  onOverrideSwitch?: (overrideId: string | null) => void
 }
 
 /** 중앙 자모 획 캔버스 컬럼 */
@@ -87,12 +88,12 @@ export function JamoCanvasColumn({
   onDeletePoint,
   onDeleteStroke,
   onAddStroke,
+  onOverrideSwitch,
 }: JamoCanvasColumnProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [canvasSize, setCanvasSize] = useState(200)
   const HANDLE_MARGIN = 40
-  const [isDragging, setIsDragging] = useState(false)
 
   const { canvasZoom, canvasPan, resetCanvasView, isMobile, setSelectedStrokeId, setSelectedPointIndex, editingPartInLayout } = useUIStore()
 
@@ -118,12 +119,11 @@ export function JamoCanvasColumn({
   }, [editingJamoInfo?.char, editingJamoInfo?.type]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDragStart = useCallback(() => {
-    setIsDragging(true)
     onDragStart()
   }, [onDragStart])
 
   const handleDragEnd = useCallback(() => {
-    setIsDragging(false)
+    // drag 종료 (StrokeOverlay에서 호출)
   }, [])
 
   // 빈 상태
@@ -325,48 +325,30 @@ export function JamoCanvasColumn({
               })()}
             </SvgRenderer>
 
-            {/* PointActionPopup — 캔버스 위에 absolute 팝업 */}
-            {editingBox && !isDragging && (
-              <PointActionPopup
-                svgRef={svgRef}
-                strokes={draftStrokes}
-                viewBoxSize={100}
-                box={effectiveBox}
-                isMixed={!!mixedJungseongData}
-                juHBox={remappedJuHBox}
-                juVBox={remappedJuVBox}
-                horizontalStrokeIds={mixedJungseongData?.horizontalStrokeIds}
-                verticalStrokeIds={mixedJungseongData?.verticalStrokeIds}
-                jamoPadding={editingJamoPadding}
-                horizontalPadding={editingHorizontalPadding}
-                verticalPadding={editingVerticalPadding}
-                onToggleCurve={onToggleCurve}
-                onSplitStroke={onSplitStroke}
-                onOpenAtPoint={onOpenAtPoint}
-                onDeletePoint={onDeletePoint}
-              />
-            )}
           </div>
           </div>
 
         </div>
       </div>
 
-      {/* StrokeToolbar — 모바일: 푸터 바로 위 fixed (createPortal로 CSS transform 영향 제거) */}
-      {isMobile && isJamoEditing && selectedStrokeId && createPortal(
-        <div
-          className="fixed left-0 right-0 z-40"
-          style={{ bottom: 'calc(50px + env(safe-area-inset-bottom, 0px))' }}
-        >
-          <StrokeToolbar
-            strokes={draftStrokes}
-            onChange={onStrokeChange}
-            onMergeStrokes={onMergeStrokes}
-            onDeleteStroke={onDeleteStroke}
-            onAddStroke={onAddStroke}
-          />
-        </div>,
-        document.body
+      {/* 오버라이드 칩 바 — 캔버스 상단 상시 표시 */}
+      {onOverrideSwitch && (
+        <OverrideChipBar onOverrideSwitch={onOverrideSwitch} />
+      )}
+
+      {/* 플로팅 획 편집 툴바 — 캔버스 하단 중앙 */}
+      {isJamoEditing && selectedStrokeId && (
+        <FloatingStrokeToolbar
+          strokes={draftStrokes}
+          onChange={onStrokeChange}
+          onMergeStrokes={onMergeStrokes}
+          onDeleteStroke={onDeleteStroke}
+          onAddStroke={onAddStroke}
+          onToggleCurve={onToggleCurve}
+          onSplitStroke={onSplitStroke}
+          onOpenAtPoint={onOpenAtPoint}
+          onDeletePoint={onDeletePoint}
+        />
       )}
 
       {/* StrokeEditor — UI 없는 키보드 핸들러 */}

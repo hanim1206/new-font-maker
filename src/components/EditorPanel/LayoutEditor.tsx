@@ -763,19 +763,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     onDeletePoint: handleDeletePoint,
     onDeleteStroke: handleDeleteStroke,
     onAddStroke: handleAddStroke,
-  } as const
-
-  const jamoControlsProps = {
-    isJamoEditing,
-    editingJamoInfo,
-    choseongStyleInfo,
-    onApplyChoseongStyle: handleApplyChoseongStyle,
     onOverrideSwitch: handleOverrideSwitch,
-    strokes: editingStrokes,
-    onStrokeChange: handleStrokeChange,
-    onMergeStrokes: handleMergeStrokes,
-    onDeleteStroke: handleDeleteStroke,
-    onAddStroke: handleAddStroke,
   } as const
 
   // 모바일: 단일 컬럼 레이아웃
@@ -784,9 +772,10 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       <LayoutEditorMobile
         layoutCanvasProps={layoutCanvasProps}
         jamoCanvasProps={jamoCanvasProps}
-        jamoControlsProps={jamoControlsProps}
         isJamoEditing={isJamoEditing}
         editingJamoInfo={editingJamoInfo}
+        choseongStyleInfo={choseongStyleInfo}
+        onApplyChoseongStyle={handleApplyChoseongStyle}
         canUndo={canUndo}
         canRedo={canRedo}
         onPartDeselect={handlePartDeselect}
@@ -802,9 +791,10 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     <LayoutEditorDesktop
       layoutCanvasProps={layoutCanvasProps}
       jamoCanvasProps={jamoCanvasProps}
-      jamoControlsProps={jamoControlsProps}
       isJamoEditing={isJamoEditing}
       editingJamoInfo={editingJamoInfo}
+      choseongStyleInfo={choseongStyleInfo}
+      onApplyChoseongStyle={handleApplyChoseongStyle}
       canUndo={canUndo}
       canRedo={canRedo}
       onPartDeselect={handlePartDeselect}
