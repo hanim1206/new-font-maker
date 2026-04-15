@@ -318,6 +318,17 @@ export async function generateAndDownloadFont(
       glyphs: glyphs,
     })
 
+    // OS/2 테이블에 한글 Unicode/CodePage range 비트 설정
+    // FontDrop 등 도구가 이 비트를 읽어 언어 지원 여부를 판단함
+    if (font.tables.os2) {
+      // ulUnicodeRange1 bit 28: Hangul Jamo (3130-318F)
+      font.tables.os2.ulUnicodeRange1 = (font.tables.os2.ulUnicodeRange1 || 0) | (1 << 28)
+      // ulUnicodeRange2 bit 17: Hangul Syllables (AC00-D7AF)
+      font.tables.os2.ulUnicodeRange2 = (font.tables.os2.ulUnicodeRange2 || 0) | (1 << 17)
+      // ulCodePageRange1 bit 19: Korean Wansung (949)
+      font.tables.os2.ulCodePageRange1 = (font.tables.os2.ulCodePageRange1 || 0) | (1 << 19)
+    }
+
     // Phase 4: 다운로드
     const arrayBuffer = font.toArrayBuffer() as ArrayBuffer
     const fileSize = arrayBuffer.byteLength
@@ -375,6 +386,13 @@ export async function downloadPrototypeFont(
       descender: DESCENDER,
       glyphs,
     })
+
+    // OS/2 테이블에 한글 Unicode/CodePage range 비트 설정
+    if (font.tables.os2) {
+      font.tables.os2.ulUnicodeRange1 = (font.tables.os2.ulUnicodeRange1 || 0) | (1 << 28)
+      font.tables.os2.ulUnicodeRange2 = (font.tables.os2.ulUnicodeRange2 || 0) | (1 << 17)
+      font.tables.os2.ulCodePageRange1 = (font.tables.os2.ulCodePageRange1 || 0) | (1 << 19)
+    }
 
     const arrayBuffer = font.toArrayBuffer() as ArrayBuffer
     downloadTTF(arrayBuffer, `${familyName}-prototype.ttf`)
