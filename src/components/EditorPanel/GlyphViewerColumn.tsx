@@ -66,6 +66,8 @@ function generateId(): string {
 
 const EMPTY_OVERRIDES: JamoOverride[] = []
 const CELL_PX = 32
+// 2행 기본 노출 높이: paddingTop(2) + row1(32) + gap(1) + row2(32) + paddingBottom(4)
+const TWO_ROW_HEIGHT = 2 + CELL_PX + 1 + CELL_PX + 4
 
 type JongFilter = 'all' | 'none' | 'has'
 type JungFilter = 'all' | 'vertical' | 'horizontal' | 'mixed'
@@ -96,8 +98,18 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
   const [selectedChars, setSelectedChars] = useState<Set<string>>(new Set())
   const [jongFilter, setJongFilter] = useState<JongFilter>('all')
   const [jungFilter, setJungFilter] = useState<JungFilter>('all')
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   const isDragging = useRef(false)
   const isDragAdding = useRef(true)
+
+  const toggleSection = useCallback((key: string) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
 
   const isJamoEditing = !!(editingJamoType && editingJamoChar)
 
@@ -364,51 +376,66 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
 
       {/* === 글리프 그리드 (레이아웃별 섹션) === */}
       <div className="flex-1 overflow-y-auto select-none">
-        {groupedSyllables.map(({ key, syllables }) => (
-          <div key={key}>
-            {/* 섹션 헤더 */}
-            <div className="px-3 py-1 flex items-center gap-2 sticky top-0 bg-[#0d0d0d] z-10">
-              <span className="text-[10px] text-text-dim-5 font-medium uppercase tracking-wide">
-                {(!isJamoEditing && selectedLayoutType) ? key : LAYOUT_LABELS[key as LayoutType] ?? key}
-              </span>
-              <span className="text-[10px] text-text-dim-5 tabular-nums">
-                {syllables.length}
-              </span>
+        {groupedSyllables.map(({ key, syllables }) => {
+          const isExpanded = expandedSections.has(key)
+          const hasMore = syllables.length > 6
+          return (
+            <div key={key}>
+              {/* 섹션 헤더 */}
+              <div className="px-3 py-1 flex items-center gap-2 sticky top-0 bg-[#0d0d0d] z-10">
+                <span className="text-[10px] text-text-dim-5 font-medium uppercase tracking-wide">
+                  {(!isJamoEditing && selectedLayoutType) ? key : LAYOUT_LABELS[key as LayoutType] ?? key}
+                </span>
+                <span className="text-[10px] text-text-dim-5 tabular-nums">
+                  {syllables.length}
+                </span>
+              </div>
+              {/* 섹션 그리드 (2행 클리핑) */}
+              <div style={{ overflow: 'hidden', maxHeight: isExpanded ? undefined : TWO_ROW_HEIGHT }}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(auto-fill, ${CELL_PX}px)`,
+                    gap: 1,
+                    padding: 4,
+                    paddingTop: 2,
+                  }}
+                >
+                  {syllables.map((meta) => {
+                    const isSelected = isJamoEditing && selectedChars.has(meta.char)
+                    return (
+                      <div
+                        key={meta.char}
+                        title={meta.char}
+                        style={{ width: CELL_PX, height: CELL_PX }}
+                        className={`flex items-center justify-center text-[13px] rounded-[2px] transition-colors ${
+                          isJamoEditing ? 'cursor-pointer' : ''
+                        } ${
+                          isSelected
+                            ? 'bg-accent-blue text-white'
+                            : 'text-foreground bg-surface-2'
+                        }`}
+                        onMouseDown={isJamoEditing ? (e) => handleCellMouseDown(meta.char, e) : undefined}
+                        onMouseEnter={isJamoEditing ? () => handleCellMouseEnter(meta.char) : undefined}
+                      >
+                        {meta.char}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              {/* 더보기 토글 */}
+              {hasMore && (
+                <button
+                  onClick={() => toggleSection(key)}
+                  className="w-full py-1 text-[10px] text-text-dim-5 hover:text-text-dim-2 hover:bg-surface-2 transition-colors border-t border-border-subtle"
+                >
+                  {isExpanded ? '접기' : `더보기 (${syllables.length}개)`}
+                </button>
+              )}
             </div>
-            {/* 섹션 그리드 */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(auto-fill, ${CELL_PX}px)`,
-                gap: 1,
-                padding: 4,
-                paddingTop: 2,
-              }}
-            >
-              {syllables.map((meta) => {
-                const isSelected = isJamoEditing && selectedChars.has(meta.char)
-                return (
-                  <div
-                    key={meta.char}
-                    title={meta.char}
-                    style={{ width: CELL_PX, height: CELL_PX }}
-                    className={`flex items-center justify-center text-[13px] rounded-[2px] transition-colors ${
-                      isJamoEditing ? 'cursor-pointer' : ''
-                    } ${
-                      isSelected
-                        ? 'bg-accent-blue text-white'
-                        : 'text-foreground bg-surface-2'
-                    }`}
-                    onMouseDown={isJamoEditing ? (e) => handleCellMouseDown(meta.char, e) : undefined}
-                    onMouseEnter={isJamoEditing ? () => handleCellMouseEnter(meta.char) : undefined}
-                  >
-                    {meta.char}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* === 적용 바 (오버라이드 편집 중에만) === */}
