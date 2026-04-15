@@ -2,7 +2,6 @@ import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { PaddingOverlay } from '../CharacterEditor/PaddingOverlay'
 import { SplitOverlay } from '../CharacterEditor/SplitOverlay'
-import { LayoutContextThumbnails } from '../CharacterEditor/LayoutContextThumbnails'
 import { Button } from '@/components/ui/button'
 import { BASE_PRESETS_SCHEMAS, calculateRawBoxes } from '../../utils/layoutCalculator'
 import { useUIStore } from '../../stores/uiStore'
@@ -65,8 +64,6 @@ interface LayoutCanvasColumnProps {
   selectedPartInLayout: Part | null
   // 자모 편집 상태 (더블클릭)
   editingPartInLayout: Part | null
-  editingJamoInfo: { type: 'choseong' | 'jungseong' | 'jongseong'; char: string } | null
-  previewLayoutType: LayoutType | null
   onLayoutReset: () => void
   // undo/redo
   onDragStart: () => void
@@ -80,7 +77,6 @@ interface LayoutCanvasColumnProps {
   onPartOverrideChange: (part: Part, side: keyof PartOverride, value: number) => void
   onSplitChange: (index: number, value: number) => void
   onPaddingOverrideChange: (side: keyof Padding, val: number) => void
-  onPreviewLayoutTypeChange: (lt: LayoutType) => void
 }
 
 /** 좌측 레이아웃 캔버스 컬럼 */
@@ -95,8 +91,6 @@ export function LayoutCanvasColumn({
   hasPaddingOverride,
   selectedPartInLayout,
   editingPartInLayout,
-  editingJamoInfo,
-  previewLayoutType,
   onLayoutReset,
   onDragStart: onLayoutDragStart,
   onUndo,
@@ -108,7 +102,6 @@ export function LayoutCanvasColumn({
   onPartOverrideChange,
   onSplitChange,
   onPaddingOverrideChange,
-  onPreviewLayoutTypeChange,
 }: LayoutCanvasColumnProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const canvasContainerRef = useRef<HTMLDivElement>(null)
@@ -786,16 +779,6 @@ export function LayoutCanvasColumn({
             )
           })()}
         </div>
-      </div>
-
-      {/* 레이아웃 컨텍스트 썸네일 (항상 7개 고정 노출) */}
-      <div>
-        <LayoutContextThumbnails
-          jamoType={editingJamoInfo?.type}
-          jamoChar={editingJamoInfo?.char}
-          selectedContext={previewLayoutType}
-          onSelectContext={onPreviewLayoutTypeChange}
-        />
       </div>
 
       </div>

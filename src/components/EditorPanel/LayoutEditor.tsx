@@ -6,12 +6,22 @@ import { useGlobalStyleStore } from '../../stores/globalStyleStore'
 import { useHistoryStore } from '../../stores/historyStore'
 import { LayoutEditorDesktop } from './LayoutEditorDesktop'
 import { LayoutEditorMobile } from './LayoutEditorMobile'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import type { PartStyle } from '../../renderers/SvgRenderer'
 import { decomposeSyllableWithOverrides, getSampleSyllableForLayout } from '../../utils/hangulUtils'
 import { calculateBoxes } from '../../utils/layoutCalculator'
 import { mergeStrokes, splitStroke, addHandlesToPoint, removeHandlesFromPoint } from '../../utils/strokeEditUtils'
 import { COMPOUND_JONGSEONG } from '../../utils/jamoLinkUtils'
-import type { LayoutType, Part, DecomposedSyllable, BoxConfig, JamoData, Padding, PartOverride, StrokeDataV2 } from '../../types'
+import type { LayoutType, Part, DecomposedSyllable, BoxConfig, JamoData, Padding, PartOverride, StrokeDataV2, LayoutSchema } from '../../types'
 
 interface LayoutEditorProps {
   layoutType: LayoutType
@@ -125,8 +135,10 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     updatePartOverride,
     resetLayoutSchema,
     resetAllPartOverrides,
+    restoreLayoutSnapshot,
     _hydrated,
   } = useLayoutStore()
+  const paddingOverrides = useLayoutStore(s => s.paddingOverrides)
   const {
     choseong,
     jungseong,
@@ -142,6 +154,22 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
   // 자모 편집 시 미리보기 레이아웃 전환
   const [previewLayoutType, setPreviewLayoutType] = useState<LayoutType | null>(null)
+
+  // 레이아웃 편집 더티 상태 추적
+  const [isLayoutDirty, setIsLayoutDirty] = useState(false)
+  const layoutSnapshotRef = useRef<LayoutSchema | null>(null)
+  const paddingOverrideSnapshotRef = useRef<Partial<Padding> | null>(null)
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
+  const [pendingJamoPart, setPendingJamoPart] = useState<Part | null>(null)
+
+  // layoutType 변경 시 스냅샷 초기화 + 더티 클리어
+  useEffect(() => {
+    layoutSnapshotRef.current = JSON.parse(JSON.stringify(getLayoutSchema(layoutType)))
+    paddingOverrideSnapshotRef.current = paddingOverrides[layoutType]
+      ? JSON.parse(JSON.stringify(paddingOverrides[layoutType]))
+      : null
+    setIsLayoutDirty(false)
+  }, [layoutType]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // layoutType prop 변경 또는 자모 편집 종료 시 previewLayoutType 초기화
   useEffect(() => {
@@ -323,14 +351,48 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     setSelectedPartInLayout(null)
   }, [setSelectedPartInLayout])
 
-  // 파트 더블클릭 → 자모 편집 진입
-  const handlePartDoubleClick = useCallback((part: Part) => {
+  // 자모 편집으로 실제 진입하는 내부 함수
+  const enterJamoEditing = useCallback((part: Part) => {
     const jamoInfo = partToJamoInfo(part, testSyllable)
     if (!jamoInfo) return
     setPreviewLayoutType(layoutType)
     setEditingPartInLayout(part)
     setEditingJamo(jamoInfo.type, jamoInfo.char)
   }, [testSyllable, layoutType, setEditingPartInLayout, setEditingJamo])
+
+  // 파트 더블클릭 → 더티 상태면 저장/폐기 다이얼로그, 아니면 즉시 진입
+  const handlePartDoubleClick = useCallback((part: Part) => {
+    const jamoInfo = partToJamoInfo(part, testSyllable)
+    if (!jamoInfo) return
+    if (isLayoutDirty) {
+      setPendingJamoPart(part)
+      setShowSaveDialog(true)
+      return
+    }
+    enterJamoEditing(part)
+  }, [testSyllable, isLayoutDirty, enterJamoEditing])
+
+  // 저장/폐기 다이얼로그 핸들러
+  const handleSaveDialogSave = useCallback(() => {
+    setIsLayoutDirty(false)
+    setShowSaveDialog(false)
+    if (pendingJamoPart) {
+      enterJamoEditing(pendingJamoPart)
+      setPendingJamoPart(null)
+    }
+  }, [pendingJamoPart, enterJamoEditing])
+
+  const handleSaveDialogDiscard = useCallback(() => {
+    if (layoutSnapshotRef.current) {
+      restoreLayoutSnapshot(layoutType, layoutSnapshotRef.current, paddingOverrideSnapshotRef.current)
+    }
+    setIsLayoutDirty(false)
+    setShowSaveDialog(false)
+    if (pendingJamoPart) {
+      enterJamoEditing(pendingJamoPart)
+      setPendingJamoPart(null)
+    }
+  }, [pendingJamoPart, layoutType, enterJamoEditing, restoreLayoutSnapshot])
 
   // === 자모 획 편집 핸들러 (스토어 직접 조작) ===
 
@@ -620,21 +682,28 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     resetLayoutSchema(layoutType)
     resetAllPartOverrides(layoutType)
     removePaddingOverride(layoutType)
+    setIsLayoutDirty(false)
+    // 리셋 후 스냅샷도 갱신
+    layoutSnapshotRef.current = JSON.parse(JSON.stringify(getLayoutSchema(layoutType)))
+    paddingOverrideSnapshotRef.current = null
   }
 
-  // 패딩 오버라이드 → 스토어 직접
+  // 패딩 오버라이드 → 스토어 직접 + 더티 마킹
   const handlePaddingOverrideChange = useCallback((side: keyof Padding, val: number) => {
     setPaddingOverride(activeLayoutType, side, val)
+    setIsLayoutDirty(true)
   }, [setPaddingOverride, activeLayoutType])
 
-  // 파트 오프셋 → 스토어 직접
+  // 파트 오프셋 → 스토어 직접 + 더티 마킹
   const handlePartOverrideChange = useCallback((part: Part, side: keyof PartOverride, value: number) => {
     updatePartOverride(activeLayoutType, part, side, value)
+    setIsLayoutDirty(true)
   }, [updatePartOverride, activeLayoutType])
 
-  // 기준선 → 스토어 직접
+  // 기준선 → 스토어 직접 + 더티 마킹
   const handleSplitChange = useCallback((index: number, value: number) => {
     updateSplit(activeLayoutType, index, value)
+    setIsLayoutDirty(true)
   }, [updateSplit, activeLayoutType])
 
   // 레이아웃 컨텍스트 전환 핸들러
@@ -719,8 +788,6 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     hasPaddingOverride: hasPaddingOverride(layoutType),
     selectedPartInLayout,
     editingPartInLayout,
-    editingJamoInfo,
-    previewLayoutType: isJamoEditing ? previewLayoutType : layoutType,
     onLayoutReset: handleReset,
     onDragStart: handleDragStart,
     onUndo: globalUndo,
@@ -732,7 +799,6 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     onPartOverrideChange: handlePartOverrideChange,
     onSplitChange: handleSplitChange,
     onPaddingOverrideChange: handlePaddingOverrideChange,
-    onPreviewLayoutTypeChange: handlePreviewLayoutTypeChange,
   } as const
 
   const jamoCanvasProps = {
@@ -788,19 +854,48 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
   // 3컬럼 데스크톱 레이아웃
   return (
-    <LayoutEditorDesktop
-      layoutCanvasProps={layoutCanvasProps}
-      jamoCanvasProps={jamoCanvasProps}
-      isJamoEditing={isJamoEditing}
-      editingJamoInfo={editingJamoInfo}
-      choseongStyleInfo={choseongStyleInfo}
-      onApplyChoseongStyle={handleApplyChoseongStyle}
-      canUndo={canUndo}
-      canRedo={canRedo}
-      onPartDeselect={handlePartDeselect}
-      onJamoReset={handleJamoReset}
-      onUndo={globalUndo}
-      onRedo={globalRedo}
-    />
+    <>
+      <LayoutEditorDesktop
+        layoutCanvasProps={layoutCanvasProps}
+        jamoCanvasProps={jamoCanvasProps}
+        isJamoEditing={isJamoEditing}
+        editingJamoInfo={editingJamoInfo}
+        choseongStyleInfo={choseongStyleInfo}
+        onApplyChoseongStyle={handleApplyChoseongStyle}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onPartDeselect={handlePartDeselect}
+        onJamoReset={handleJamoReset}
+        onUndo={globalUndo}
+        onRedo={globalRedo}
+        selectedLayoutType={layoutType}
+        previewLayoutType={previewLayoutType}
+        onSelectLayout={setSelectedLayoutType}
+        onSelectPreviewLayout={handlePreviewLayoutTypeChange}
+      />
+
+      {/* 레이아웃 저장/폐기 다이얼로그 */}
+      <AlertDialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>레이아웃 변경사항이 있습니다</AlertDialogTitle>
+            <AlertDialogDescription>
+              자모 편집으로 넘어가기 전에 현재 레이아웃 변경사항을 어떻게 처리하시겠습니까?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setShowSaveDialog(false); setPendingJamoPart(null) }}>
+              취소
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleSaveDialogDiscard} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              변경 폐기
+            </AlertDialogAction>
+            <AlertDialogAction onClick={handleSaveDialogSave}>
+              저장 후 계속
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

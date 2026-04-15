@@ -54,6 +54,9 @@ interface LayoutActions {
   resetLayoutSchema: (layoutType: LayoutType) => void
   resetAllLayoutSchemas: () => void
 
+  // 스냅샷 복원 (저장/폐기 다이얼로그의 폐기 시 사용)
+  restoreLayoutSnapshot: (layoutType: LayoutType, schema: LayoutSchema, paddingOverride: Partial<Padding> | null) => void
+
   // ===== 글로벌 패딩 API =====
 
   // 글로벌 패딩 업데이트
@@ -212,6 +215,17 @@ export const useLayoutStore = create<LayoutState & LayoutActions>()(
         set((state) => {
           state.layoutSchemas = deepClone(BASE_PRESETS_SCHEMAS)
           syncAllConfigs(state)
+        }),
+
+      restoreLayoutSnapshot: (layoutType, schema, paddingOverride) =>
+        set((state) => {
+          state.layoutSchemas[layoutType] = deepClone(schema)
+          if (paddingOverride === null) {
+            delete state.paddingOverrides[layoutType]
+          } else {
+            state.paddingOverrides[layoutType] = deepClone(paddingOverride)
+          }
+          syncConfigFromSchema(state, layoutType)
         }),
 
       // ===== 글로벌 패딩 API =====

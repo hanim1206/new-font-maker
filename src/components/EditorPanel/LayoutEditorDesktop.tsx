@@ -1,7 +1,9 @@
 import { LayoutCanvasColumn } from './LayoutCanvasColumn'
 import { JamoCanvasColumn } from './JamoCanvasColumn'
 import { GlyphViewerColumn } from './GlyphViewerColumn'
+import { LayoutContextColumn } from './LayoutContextColumn'
 import { Button } from '@/components/ui/button'
+import type { LayoutType } from '../../types'
 
 // === 타입 정의 ===
 
@@ -26,11 +28,20 @@ export interface LayoutEditorDesktopProps {
   onJamoReset: () => void
   onUndo: () => void
   onRedo: () => void
+  // 레이아웃 컨텍스트 컬럼용
+  selectedLayoutType: LayoutType | null
+  previewLayoutType: LayoutType | null
+  onSelectLayout: (lt: LayoutType) => void
+  onSelectPreviewLayout: (lt: LayoutType) => void
 }
 
 // === 컴포넌트 ===
 
-/** 데스크톱 2컬럼 레이아웃 렌더러 */
+/** 데스크톱 3컬럼 레이아웃 렌더러
+ *  1열: 레이아웃 컨텍스트 내비게이션 (LayoutContextColumn, 고정 너비)
+ *  2열: 레이아웃 캔버스 ↔ 자모 캔버스 (isJamoEditing에 따라 전환)
+ *  3열: 유니코드 글리프 뷰어 / 적용범위 설정 (GlyphViewerColumn)
+ */
 export function LayoutEditorDesktop({
   layoutCanvasProps,
   jamoCanvasProps,
@@ -44,61 +55,75 @@ export function LayoutEditorDesktop({
   onJamoReset,
   onUndo,
   onRedo,
+  selectedLayoutType,
+  previewLayoutType,
+  onSelectLayout,
+  onSelectPreviewLayout,
 }: LayoutEditorDesktopProps) {
   return (
     <div className="h-full overflow-hidden flex" onClick={onPartDeselect}>
-      {/* 0열: 음절 뷰어 */}
-      <GlyphViewerColumn onOverrideSwitch={jamoCanvasProps.onOverrideSwitch} />
 
-      {/* 1열: 레이아웃 캔버스 */}
-      <div className="flex-1 min-w-0 overflow-y-auto border-r border-border-subtle">
-        <LayoutCanvasColumn {...layoutCanvasProps} />
-      </div>
+      {/* 0열: 레이아웃 컨텍스트 내비게이션 */}
+      <LayoutContextColumn
+        selectedLayoutType={selectedLayoutType}
+        isJamoEditing={isJamoEditing}
+        previewLayoutType={previewLayoutType}
+        onSelectLayout={onSelectLayout}
+        onSelectPreviewLayout={onSelectPreviewLayout}
+      />
 
-      {/* 우측: 자모 캔버스 */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        {/* 자모 편집 시 상단 버튼 바 */}
-        {isJamoEditing && editingJamoInfo && (
-          <div className="shrink-0 bg-surface-2 px-4 pt-3 pb-2 border-b border-border-subtle flex items-center gap-2">
-            <h3 className="text-sm font-medium text-text-dim-3 uppercase tracking-wider">
-              자모 편집 — {editingJamoInfo.char}
-            </h3>
+      {/* 1열: 편집 캔버스 (레이아웃 ↔ 자모 전환) */}
+      <div className="flex-1 min-w-0 flex flex-col border-r border-border-subtle overflow-hidden">
+        {isJamoEditing && editingJamoInfo ? (
+          /* ─── 자모 편집 모드 ─── */
+          <>
+            {/* 상단 툴바 */}
+            <div className="shrink-0 bg-surface-2 px-4 pt-3 pb-2 border-b border-border-subtle flex items-center gap-2">
+              <h3 className="text-sm font-medium text-text-dim-3 uppercase tracking-wider">
+                자모 편집 — {editingJamoInfo.char}
+              </h3>
 
-            {/* 종성 편집 시 초성 스타일 적용 */}
-            {choseongStyleInfo && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onApplyChoseongStyle}
-                className="text-xs"
-                title={choseongStyleInfo.type === 'compound'
-                  ? `초성 ${choseongStyleInfo.parts?.[0]}+${choseongStyleInfo.parts?.[1]}의 획을 종성에 적용`
-                  : `초성 ${editingJamoInfo.char}의 획/패딩을 종성에 적용`
-                }
-              >
-                {choseongStyleInfo.type === 'compound'
-                  ? `초성 ${choseongStyleInfo.parts?.[0]}+${choseongStyleInfo.parts?.[1]} 적용`
-                  : '초성 스타일 적용'
-                }
-              </Button>
-            )}
+              {/* 종성 편집 시 초성 스타일 적용 */}
+              {choseongStyleInfo && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onApplyChoseongStyle}
+                  className="text-xs"
+                  title={choseongStyleInfo.type === 'compound'
+                    ? `초성 ${choseongStyleInfo.parts?.[0]}+${choseongStyleInfo.parts?.[1]}의 획을 종성에 적용`
+                    : `초성 ${editingJamoInfo.char}의 획/패딩을 종성에 적용`
+                  }
+                >
+                  {choseongStyleInfo.type === 'compound'
+                    ? `초성 ${choseongStyleInfo.parts?.[0]}+${choseongStyleInfo.parts?.[1]} 적용`
+                    : '초성 스타일 적용'
+                  }
+                </Button>
+              )}
 
-            <div className="flex-1" />
-            <Button variant="default" size="sm" onClick={onUndo} disabled={!canUndo} title="되돌리기 (Ctrl+Z)">
-              ↩
-            </Button>
-            <Button variant="default" size="sm" onClick={onRedo} disabled={!canRedo} title="다시 실행 (Ctrl+Y)">
-              ↪
-            </Button>
-            <Button variant="default" size="sm" onClick={onJamoReset}>
-              초기화
-            </Button>
+              <div className="flex-1" />
+              <Button variant="default" size="sm" onClick={onUndo} disabled={!canUndo} title="되돌리기 (Ctrl+Z)">↩</Button>
+              <Button variant="default" size="sm" onClick={onRedo} disabled={!canRedo} title="다시 실행 (Ctrl+Y)">↪</Button>
+              <Button variant="default" size="sm" onClick={onJamoReset}>초기화</Button>
+            </div>
+
+            {/* 자모 캔버스 */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <JamoCanvasColumn {...jamoCanvasProps} />
+            </div>
+          </>
+        ) : (
+          /* ─── 레이아웃 편집 모드 ─── */
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <LayoutCanvasColumn {...layoutCanvasProps} />
           </div>
         )}
+      </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <JamoCanvasColumn {...jamoCanvasProps} />
-        </div>
+      {/* 2열: 유니코드 글리프 뷰어 / 적용범위 */}
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <GlyphViewerColumn onOverrideSwitch={jamoCanvasProps.onOverrideSwitch} />
       </div>
     </div>
   )
