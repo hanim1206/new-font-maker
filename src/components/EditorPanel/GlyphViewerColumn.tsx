@@ -92,8 +92,29 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
   const setEditingOverrideId = useUIStore((s) => s.setEditingOverrideId)
   const { addOverride, updateOverride, removeOverride } = useJamoStore()
   const { choseong, jungseong, jongseong } = useJamoStore()
-  const { getLayoutSchema, getEffectivePadding } = useLayoutStore()
+  const { getLayoutSchema, getEffectivePadding, layoutSchemas } = useLayoutStore()
   const { getEffectiveStyle } = useGlobalStyleStore()
+
+  // 레이아웃 7종의 schema+style을 사전 계산 (셀 렌더 시 재사용)
+  const cellSchemas = useMemo(() => {
+    const LAYOUT_TYPES: LayoutType[] = [
+      'choseong-jungseong-vertical',
+      'choseong-jungseong-horizontal',
+      'choseong-jungseong-mixed',
+      'choseong-jungseong-vertical-jongseong',
+      'choseong-jungseong-horizontal-jongseong',
+      'choseong-jungseong-mixed-jongseong',
+      'choseong-only',
+    ]
+    const map: Partial<Record<LayoutType, { schema: ReturnType<typeof getLayoutSchema> & { padding: ReturnType<typeof getEffectivePadding> }; style: ReturnType<typeof getEffectiveStyle> }>> = {}
+    for (const lt of LAYOUT_TYPES) {
+      const schema = getLayoutSchema(lt)
+      const padding = getEffectivePadding(lt)
+      map[lt] = { schema: { ...schema, padding }, style: getEffectiveStyle(lt) }
+    }
+    return map
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getLayoutSchema, getEffectivePadding, getEffectiveStyle, layoutSchemas])
 
   const overrides = useJamoStore((s) => {
     if (!editingJamoType || !editingJamoChar) return EMPTY_OVERRIDES
@@ -409,47 +430,40 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
                 >
                   {syllables.map((meta) => {
                     const isSelected = isJamoEditing && selectedChars.has(meta.char)
-
-                    // 선택된 셀: 미니 SvgRenderer로 실시간 스타일 반영
-                    if (isSelected) {
-                      const syllable = decomposeSyllableWithOverrides(meta.char, choseong, jungseong, jongseong)
-                      const schema = getLayoutSchema(syllable.layoutType)
-                      const effectivePadding = getEffectivePadding(syllable.layoutType)
-                      const schemaWithPadding = { ...schema, padding: effectivePadding }
-                      const style = getEffectiveStyle(syllable.layoutType)
-                      return (
-                        <div
-                          key={meta.char}
-                          title={meta.char}
-                          style={{ width: CELL_PX, height: CELL_PX }}
-                          className={`rounded-[2px] overflow-hidden ring-2 ring-accent-blue cursor-pointer transition-all`}
-                          onMouseDown={(e) => handleCellMouseDown(meta.char, e)}
-                          onMouseEnter={() => handleCellMouseEnter(meta.char)}
-                        >
-                          <SvgRenderer
-                            syllable={syllable}
-                            schema={schemaWithPadding}
-                            size={CELL_PX}
-                            fillColor="#1a1a1a"
-                            backgroundColor="#ffffff"
-                            globalStyle={style}
-                          />
-                        </div>
-                      )
-                    }
+                    const syllable = decomposeSyllableWithOverrides(meta.char, choseong, jungseong, jongseong)
+                    const cellSchema = cellSchemas[meta.layoutType]
 
                     return (
                       <div
                         key={meta.char}
                         title={meta.char}
                         style={{ width: CELL_PX, height: CELL_PX }}
-                        className={`flex items-center justify-center text-[13px] rounded-[2px] transition-colors text-foreground bg-surface-2 ${
-                          isJamoEditing ? 'cursor-pointer hover:ring-1 hover:ring-border-light' : ''
+                        className={`rounded-[2px] overflow-hidden transition-all ${
+                          isJamoEditing ? 'cursor-pointer' : ''
+                        } ${
+                          isSelected
+                            ? 'ring-2 ring-accent-blue'
+                            : isJamoEditing
+                              ? 'ring-1 ring-transparent hover:ring-border-light'
+                              : ''
                         }`}
                         onMouseDown={isJamoEditing ? (e) => handleCellMouseDown(meta.char, e) : undefined}
                         onMouseEnter={isJamoEditing ? () => handleCellMouseEnter(meta.char) : undefined}
                       >
-                        {meta.char}
+                        {cellSchema ? (
+                          <SvgRenderer
+                            syllable={syllable}
+                            schema={cellSchema.schema}
+                            size={CELL_PX}
+                            fillColor="#1a1a1a"
+                            backgroundColor="#ffffff"
+                            globalStyle={cellSchema.style}
+                          />
+                        ) : (
+                          <span className="flex items-center justify-center w-full h-full text-[11px] text-foreground bg-surface-2">
+                            {meta.char}
+                          </span>
+                        )}
                       </div>
                     )
                   })}
