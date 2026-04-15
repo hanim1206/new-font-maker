@@ -1,5 +1,6 @@
 import { LayoutCanvasColumn } from './LayoutCanvasColumn'
 import { JamoCanvasColumn } from './JamoCanvasColumn'
+import { GlyphViewerColumn } from './GlyphViewerColumn'
 import { Button } from '@/components/ui/button'
 
 // === 타입 정의 ===
@@ -46,7 +47,10 @@ export function LayoutEditorDesktop({
 }: LayoutEditorDesktopProps) {
   return (
     <div className="h-full overflow-hidden flex" onClick={onPartDeselect}>
-      {/* 좌측: 레이아웃 캔버스 */}
+      {/* 0열: 음절 뷰어 */}
+      <GlyphViewerColumn onOverrideSwitch={jamoCanvasProps.onOverrideSwitch} />
+
+      {/* 1열: 레이아웃 캔버스 */}
       <div className="flex-1 min-w-0 overflow-y-auto border-r border-border-subtle">
         <LayoutCanvasColumn {...layoutCanvasProps} />
       </div>

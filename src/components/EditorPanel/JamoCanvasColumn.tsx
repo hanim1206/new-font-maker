@@ -4,7 +4,6 @@ import type { PartStyle } from '../../renderers/SvgRenderer'
 import { StrokeOverlay } from '../CharacterEditor/StrokeOverlay'
 import { PaddingOverlay } from '../CharacterEditor/PaddingOverlay'
 import { FloatingStrokeToolbar } from '../CharacterEditor/FloatingStrokeToolbar'
-import { OverrideChipBar } from '../CharacterEditor/OverrideChipBar'
 import { StrokeEditor } from '../CharacterEditor/StrokeEditor'
 import { useUIStore } from '../../stores/uiStore'
 import { useDeviceCapability } from '../../hooks/useDeviceCapability'
@@ -88,7 +87,6 @@ export function JamoCanvasColumn({
   onDeletePoint,
   onDeleteStroke,
   onAddStroke,
-  onOverrideSwitch,
 }: JamoCanvasColumnProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -331,12 +329,7 @@ export function JamoCanvasColumn({
         </div>
       </div>
 
-      {/* 오버라이드 칩 바 — 캔버스 상단 상시 표시 */}
-      {onOverrideSwitch && (
-        <OverrideChipBar onOverrideSwitch={onOverrideSwitch} />
-      )}
-
-      {/* 플로팅 획 편집 툴바 — 캔버스 하단 중앙 */}
+{/* 플로팅 획 편집 툴바 — 캔버스 하단 중앙 */}
       {isJamoEditing && selectedStrokeId && (
         <FloatingStrokeToolbar
           strokes={draftStrokes}
