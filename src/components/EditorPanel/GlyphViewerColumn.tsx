@@ -131,6 +131,20 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
   const isDragging = useRef(false)
   const isDragAdding = useRef(true)
 
+  // 컨테이너 너비 기반 열 수 계산 (ResizeObserver)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [colsPerRow, setColsPerRow] = useState(6)
+  useEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    const observer = new ResizeObserver(entries => {
+      const width = entries[0]?.contentRect.width ?? el.clientWidth
+      setColsPerRow(Math.max(1, Math.floor((width - GRID_PAD * 2) / (CELL_PX + CELL_GAP))))
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
   const toggleSection = useCallback((key: string) => {
     setExpandedSections((prev) => {
       const next = new Set(prev)
@@ -404,10 +418,11 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
       </div>
 
       {/* === 글리프 그리드 (레이아웃별 섹션) === */}
-      <div className="flex-1 min-h-0 overflow-y-auto select-none">
+      <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto select-none">
         {groupedSyllables.map(({ key, syllables }) => {
           const isExpanded = expandedSections.has(key)
-          const hasMore = syllables.length > 6
+          // 실제 열 수 기반으로 2행 초과 여부 판단
+          const hasMore = Math.ceil(syllables.length / colsPerRow) > 2
           return (
             <div key={key}>
               {/* 섹션 헤더 */}
