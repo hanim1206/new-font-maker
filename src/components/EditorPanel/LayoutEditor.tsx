@@ -394,6 +394,23 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     }
   }, [pendingJamoPart, layoutType, enterJamoEditing, restoreLayoutSnapshot])
 
+  // 레이아웃 툴바 저장 버튼 — dirty 플래그 클리어 + 스냅샷 갱신
+  const handleLayoutSave = useCallback(() => {
+    layoutSnapshotRef.current = JSON.parse(JSON.stringify(getLayoutSchema(layoutType)))
+    paddingOverrideSnapshotRef.current = paddingOverrides[layoutType]
+      ? JSON.parse(JSON.stringify(paddingOverrides[layoutType]))
+      : null
+    setIsLayoutDirty(false)
+  }, [layoutType, getLayoutSchema, paddingOverrides])
+
+  // 레이아웃 툴바 폐기 버튼 — 스냅샷 복원
+  const handleLayoutDiscard = useCallback(() => {
+    if (layoutSnapshotRef.current) {
+      restoreLayoutSnapshot(layoutType, layoutSnapshotRef.current, paddingOverrideSnapshotRef.current)
+    }
+    setIsLayoutDirty(false)
+  }, [layoutType, restoreLayoutSnapshot])
+
   // === 자모 획 편집 핸들러 (스토어 직접 조작) ===
 
   // 획 속성 변경 (드래그 중 연속 호출 — 스냅샷 없음)
@@ -872,6 +889,9 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
         previewLayoutType={previewLayoutType}
         onSelectLayout={setSelectedLayoutType}
         onSelectPreviewLayout={handlePreviewLayoutTypeChange}
+        isLayoutDirty={isLayoutDirty}
+        onLayoutSave={handleLayoutSave}
+        onLayoutDiscard={handleLayoutDiscard}
       />
 
       {/* 레이아웃 저장/폐기 다이얼로그 */}

@@ -33,6 +33,10 @@ export interface LayoutEditorDesktopProps {
   previewLayoutType: LayoutType | null
   onSelectLayout: (lt: LayoutType) => void
   onSelectPreviewLayout: (lt: LayoutType) => void
+  // 레이아웃 저장/폐기
+  isLayoutDirty: boolean
+  onLayoutSave: () => void
+  onLayoutDiscard: () => void
 }
 
 // === 컴포넌트 ===
@@ -59,6 +63,9 @@ export function LayoutEditorDesktop({
   previewLayoutType,
   onSelectLayout,
   onSelectPreviewLayout,
+  isLayoutDirty,
+  onLayoutSave,
+  onLayoutDiscard,
 }: LayoutEditorDesktopProps) {
   return (
     <div className="h-full overflow-hidden flex" onClick={onPartDeselect}>
@@ -115,9 +122,29 @@ export function LayoutEditorDesktop({
           </>
         ) : (
           /* ─── 레이아웃 편집 모드 ─── */
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <LayoutCanvasColumn {...layoutCanvasProps} />
-          </div>
+          <>
+            {/* 레이아웃 편집 툴바 */}
+            <div className="shrink-0 bg-surface-2 px-4 pt-3 pb-2 border-b border-border-subtle flex items-center gap-2">
+              <h3 className="text-sm font-medium text-text-dim-3 uppercase tracking-wider">
+                레이아웃 편집
+                {isLayoutDirty && <span className="ml-1.5 text-amber-400">●</span>}
+              </h3>
+              <div className="flex-1" />
+              {isLayoutDirty && (
+                <>
+                  <Button variant="outline" size="sm" onClick={onLayoutDiscard}>
+                    폐기
+                  </Button>
+                  <Button size="sm" onClick={onLayoutSave}>
+                    저장
+                  </Button>
+                </>
+              )}
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <LayoutCanvasColumn {...layoutCanvasProps} />
+            </div>
+          </>
         )}
       </div>
 
