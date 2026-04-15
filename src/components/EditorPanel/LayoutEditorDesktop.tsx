@@ -149,7 +149,7 @@ export function LayoutEditorDesktop({
       </div>
 
       {/* 2열: 유니코드 글리프 뷰어 / 적용범위 */}
-      <div className="flex-[3] min-w-0 overflow-hidden">
+      <div className="flex-[3] min-w-0 overflow-hidden flex flex-col">
         <GlyphViewerColumn onOverrideSwitch={jamoCanvasProps.onOverrideSwitch} />
       </div>
     </div>

@@ -301,7 +301,7 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
 
   return (
     <div
-      className="flex-1 min-w-0 flex flex-col border-r border-border-subtle bg-[#080808]"
+      className="flex-1 min-h-0 min-w-0 flex flex-col border-r border-border-subtle bg-[#080808]"
       onMouseLeave={() => { isDragging.current = false }}
     >
 
@@ -404,7 +404,7 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
       </div>
 
       {/* === 글리프 그리드 (레이아웃별 섹션) === */}
-      <div className="flex-1 overflow-y-auto select-none">
+      <div className="flex-1 min-h-0 overflow-y-auto select-none">
         {groupedSyllables.map(({ key, syllables }) => {
           const isExpanded = expandedSections.has(key)
           const hasMore = syllables.length > 6
