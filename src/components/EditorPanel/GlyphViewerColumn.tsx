@@ -442,6 +442,7 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
                     gridTemplateColumns: `repeat(auto-fill, ${CELL_PX}px)`,
                     gap: CELL_GAP,
                     padding: GRID_PAD,
+                    backgroundColor: '#ffffff',
                   }}
                 >
                   {syllables.map((meta) => {
