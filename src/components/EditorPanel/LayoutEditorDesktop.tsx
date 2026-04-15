@@ -80,7 +80,7 @@ export function LayoutEditorDesktop({
       />
 
       {/* 1열: 편집 캔버스 (레이아웃 ↔ 자모 전환) */}
-      <div className="flex-1 min-w-0 flex flex-col border-r border-border-subtle overflow-hidden">
+      <div className="flex-[2] min-w-0 flex flex-col border-r border-border-subtle overflow-hidden">
         {isJamoEditing && editingJamoInfo ? (
           /* ─── 자모 편집 모드 ─── */
           <>
@@ -149,7 +149,7 @@ export function LayoutEditorDesktop({
       </div>
 
       {/* 2열: 유니코드 글리프 뷰어 / 적용범위 */}
-      <div className="flex-1 min-w-0 overflow-hidden">
+      <div className="flex-[3] min-w-0 overflow-hidden">
         <GlyphViewerColumn onOverrideSwitch={jamoCanvasProps.onOverrideSwitch} />
       </div>
     </div>

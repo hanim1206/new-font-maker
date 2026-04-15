@@ -68,9 +68,11 @@ function generateId(): string {
 }
 
 const EMPTY_OVERRIDES: JamoOverride[] = []
-const CELL_PX = 32
-// 2행 기본 노출 높이: paddingTop(2) + row1(32) + gap(1) + row2(32) + paddingBottom(4)
-const TWO_ROW_HEIGHT = 2 + CELL_PX + 1 + CELL_PX + 4
+const CELL_PX = 40
+const CELL_GAP = 4
+const GRID_PAD = 6
+// 2행 기본 노출 높이: paddingTop + row1 + gap + row2 + paddingBottom
+const TWO_ROW_HEIGHT = GRID_PAD + CELL_PX + CELL_GAP + CELL_PX + GRID_PAD
 
 type JongFilter = 'all' | 'none' | 'has'
 type JungFilter = 'all' | 'vertical' | 'horizontal' | 'mixed'
@@ -423,9 +425,8 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
                   style={{
                     display: 'grid',
                     gridTemplateColumns: `repeat(auto-fill, ${CELL_PX}px)`,
-                    gap: 1,
-                    padding: 4,
-                    paddingTop: 2,
+                    gap: CELL_GAP,
+                    padding: GRID_PAD,
                   }}
                 >
                   {syllables.map((meta) => {
