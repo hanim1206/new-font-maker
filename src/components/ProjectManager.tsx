@@ -232,7 +232,7 @@ export function ProjectManager({ onClose }: ProjectManagerProps) {
                       불러오기
                     </Button>
                     <Button size="sm" variant="default" onClick={() => handleExportTTF(project.id, project.name)} disabled={loading || exportingId !== null}>
-                      {exportingId === project.id ? exportProgress : 'TTF'}
+                      {exportingId === project.id ? exportProgress : 'OTF 내보내기'}
                     </Button>
                     <Button size="sm" variant="danger" onClick={() => handleDelete(project.id)} disabled={loading}>
                       삭제

@@ -12,6 +12,7 @@ import opentype from 'opentype.js'
 import { strokeToContours } from './strokeToOutline'
 import type { Contour } from './strokeToOutline'
 import { collectAllGlyphData, UPM, DEFAULT_ADVANCE_WIDTH, ASCENDER, DESCENDER } from './fontExportUtils'
+import { useGlobalStyleStore } from '../stores/globalStyleStore'
 import type { GlyphData } from './fontExportUtils'
 
 // ===== 타입 정의 =====
@@ -207,9 +208,9 @@ function createSpaceGlyph(): InstanceType<typeof opentype.Glyph> {
  */
 function downloadTTF(
   arrayBuffer: ArrayBuffer,
-  fileName: string = 'fontmaker.ttf'
+  fileName: string = 'fontmaker.otf'
 ): void {
-  const blob = new Blob([arrayBuffer], { type: 'font/ttf' })
+  const blob = new Blob([arrayBuffer], { type: 'font/otf' })
   const url = URL.createObjectURL(blob)
 
   const link = document.createElement('a')
@@ -264,7 +265,7 @@ async function processInChunks<T, R>(
  * 1. 스토어에서 전체 글리프 데이터 수집 (11,000+ 글리프)
  * 2. 각 글리프의 획을 윤곽 컨투어로 변환
  * 3. opentype.js 폰트 조립
- * 4. .ttf 파일 다운로드
+ * 4. .otf 파일 다운로드
  *
  * async로 구현하여 UI 블로킹 방지 (100개씩 청크 처리)
  */
@@ -309,32 +310,75 @@ export async function generateAndDownloadFont(
     // Phase 3: 폰트 조립
     onProgress?.(0, 1, '폰트 파일 생성 중...')
 
+    // Windows 호환을 위한 ASCII 전용 폰트 이름 생성
+    const asciiFamilyName = familyName.replace(/[^a-zA-Z0-9\s_-]/g, '').trim() || 'FontMaker'
+
+    // 글로벌 스타일에서 weight 가져오기
+    const styleState = useGlobalStyleStore.getState()
+    const usWeightClass = styleState.style.weight || 400
+
     const font = new opentype.Font({
-      familyName,
+      familyName: asciiFamilyName,
       styleName,
       unitsPerEm: UPM,
       ascender: ASCENDER,
       descender: DESCENDER,
       glyphs: glyphs,
+      weightClass: usWeightClass,
+      widthClass: 5,       // Normal
+      fsSelection: usWeightClass >= 700 ? 0x0020 : 0x0040, // BOLD or REGULAR
+      tables: {
+        os2: {
+          usWeightClass,
+          usWidthClass: 5,
+          // Hangul Syllables (bit 28) + Hangul Jamo (bit 27) + Basic Latin (bit 0) + Latin-1 (bit 1)
+          ulUnicodeRange1: 0x00000003,
+          ulUnicodeRange2: 0x18000000,
+          ulUnicodeRange3: 0x00000000,
+          ulUnicodeRange4: 0x00000000,
+          // CP1252 Latin (bit 0) + CP949 Korean Wansung (bit 19)
+          ulCodePageRange1: (1 << 0) | (1 << 19),
+          ulCodePageRange2: 0,
+          // Windows 클리핑 메트릭 (양수값, macOS는 hhea 사용하므로 영향 없음)
+          usWinAscent: ASCENDER,
+          usWinDescent: Math.abs(DESCENDER),
+          sTypoAscender: ASCENDER,
+          sTypoDescender: DESCENDER,
+          sTypoLineGap: 0,
+          fsSelection: usWeightClass >= 700 ? 0x0020 : 0x0040,
+        },
+      },
     })
 
-    // OS/2 테이블에 한글 Unicode/CodePage range 비트 설정
-    // FontDrop 등 도구가 이 비트를 읽어 언어 지원 여부를 판단함
-    if (font.tables.os2) {
-      // ulUnicodeRange1 bit 28: Hangul Jamo (3130-318F)
-      font.tables.os2.ulUnicodeRange1 = (font.tables.os2.ulUnicodeRange1 || 0) | (1 << 28)
-      // ulUnicodeRange2 bit 17: Hangul Syllables (AC00-D7AF)
-      font.tables.os2.ulUnicodeRange2 = (font.tables.os2.ulUnicodeRange2 || 0) | (1 << 17)
-      // ulCodePageRange1 bit 19: Korean Wansung (949)
-      font.tables.os2.ulCodePageRange1 = (font.tables.os2.ulCodePageRange1 || 0) | (1 << 19)
-    }
+    // name 테이블 설정 (macOS Font Book 유효성 + Windows 호환)
+    const hasKoreanName = familyName !== asciiFamilyName
+    const psName = asciiFamilyName.replace(/[^a-zA-Z0-9-]/g, '') || 'FontMaker'
+    const psFullName = `${psName}-${styleName.replace(/\s+/g, '')}`
+
+    // 필수 name 레코드 (nameID 0~6)
+    font.names.copyright = { en: `Copyright (c) ${new Date().getFullYear()}` }
+    font.names.fontFamily = hasKoreanName
+      ? { en: asciiFamilyName, ko: familyName }
+      : { en: asciiFamilyName }
+    font.names.fontSubfamily = { en: styleName }
+    font.names.uniqueID = { en: `1.000;NONE;${psFullName}` }
+    font.names.fullName = hasKoreanName
+      ? { en: `${asciiFamilyName} ${styleName}`, ko: `${familyName} ${styleName}` }
+      : { en: `${asciiFamilyName} ${styleName}` }
+    font.names.version = { en: 'Version 1.000' }
+    font.names.postScriptName = { en: psFullName }
+    // preferredFamily: Windows 폰트 메뉴 표시용
+    font.names.preferredFamily = hasKoreanName
+      ? { en: asciiFamilyName, ko: familyName }
+      : { en: asciiFamilyName }
+    font.names.preferredSubfamily = { en: styleName }
 
     // Phase 4: 다운로드
     const arrayBuffer = font.toArrayBuffer() as ArrayBuffer
     const fileSize = arrayBuffer.byteLength
 
     const sanitizedName = familyName.replace(/[^a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ\s_-]/g, '').trim() || 'fontmaker'
-    downloadTTF(arrayBuffer, `${sanitizedName}.ttf`)
+    downloadTTF(arrayBuffer, `${sanitizedName}.otf`)
 
     return {
       success: true,
@@ -378,24 +422,37 @@ export async function downloadPrototypeFont(
       createGlyph(glyphData),
     ]
 
+    const asciiFamilyName = familyName.replace(/[^a-zA-Z0-9\s_-]/g, '').trim() || 'FontMaker Prototype'
+
     const font = new opentype.Font({
-      familyName,
+      familyName: asciiFamilyName,
       styleName: 'Regular',
       unitsPerEm: UPM,
       ascender: ASCENDER,
       descender: DESCENDER,
       glyphs,
+      tables: {
+        os2: {
+          ulUnicodeRange1: 0x00000003,
+          ulUnicodeRange2: 0x18000000,
+          ulCodePageRange1: (1 << 0) | (1 << 19),
+          usWinAscent: ASCENDER,
+          usWinDescent: Math.abs(DESCENDER),
+          sTypoAscender: ASCENDER,
+          sTypoDescender: DESCENDER,
+          sTypoLineGap: 0,
+        },
+      },
     })
 
-    // OS/2 테이블에 한글 Unicode/CodePage range 비트 설정
-    if (font.tables.os2) {
-      font.tables.os2.ulUnicodeRange1 = (font.tables.os2.ulUnicodeRange1 || 0) | (1 << 28)
-      font.tables.os2.ulUnicodeRange2 = (font.tables.os2.ulUnicodeRange2 || 0) | (1 << 17)
-      font.tables.os2.ulCodePageRange1 = (font.tables.os2.ulCodePageRange1 || 0) | (1 << 19)
-    }
+    const psName = asciiFamilyName.replace(/[^a-zA-Z0-9-]/g, '') || 'FontMakerPrototype'
+    font.names.copyright = { en: `Copyright (c) ${new Date().getFullYear()}` }
+    font.names.uniqueID = { en: `1.000;NONE;${psName}-Regular` }
+    font.names.version = { en: 'Version 1.000' }
+    font.names.postScriptName = { en: `${psName}-Regular` }
 
     const arrayBuffer = font.toArrayBuffer() as ArrayBuffer
-    downloadTTF(arrayBuffer, `${familyName}-prototype.ttf`)
+    downloadTTF(arrayBuffer, `${familyName}-prototype.otf`)
 
     return {
       success: true,

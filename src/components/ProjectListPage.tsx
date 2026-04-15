@@ -344,7 +344,7 @@ export function ProjectListPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleExportTTF(project.id, project.name)}>
                             <Download className="h-4 w-4 mr-2" />
-                            폰트 파일 내보내기
+                            OTF 내보내기
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
