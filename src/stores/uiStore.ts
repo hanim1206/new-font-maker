@@ -149,6 +149,10 @@ export const useUIStore = create<UIState & UIActions>()(
 
     setSelectedLayoutType: (layoutType) =>
       set((state) => {
+        // 다른 레이아웃 타입으로 변경 시에만 오버라이드 편집 초기화 (같은 타입 재선택 시 유지)
+        if (state.selectedLayoutType !== layoutType) {
+          state.editingLayoutOverrideId = null
+        }
         state.selectedLayoutType = layoutType
       }),
 
@@ -185,7 +189,10 @@ export const useUIStore = create<UIState & UIActions>()(
         state.editingPartInLayout = part
         // 자모 편집 진입 시 파트 선택 해제
         state.selectedPartInLayout = null
-        if (part === null) {
+        if (part !== null) {
+          // 자모 편집 진입 시 레이아웃 오버라이드 편집 종료
+          state.editingLayoutOverrideId = null
+        } else {
           // 자모 편집 종료 시 관련 상태 클리어
           state.editingJamoType = null
           state.editingJamoChar = null

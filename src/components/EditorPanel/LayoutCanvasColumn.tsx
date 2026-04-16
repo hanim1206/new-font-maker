@@ -1,9 +1,9 @@
-import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { PaddingOverlay } from '../CharacterEditor/PaddingOverlay'
 import { SplitOverlay } from '../CharacterEditor/SplitOverlay'
 import { Button } from '@/components/ui/button'
-import { BASE_PRESETS_SCHEMAS, calculateRawBoxes } from '../../utils/layoutCalculator'
+import { BASE_PRESETS_SCHEMAS } from '../../utils/layoutCalculator'
 import { useUIStore } from '../../stores/uiStore'
 import { useDeviceCapability } from '../../hooks/useDeviceCapability'
 import { usePinchZoom } from '../../hooks/usePinchZoom'
@@ -144,12 +144,6 @@ export function LayoutCanvasColumn({
   // ref로 최신 콜백 참조 (드래그 중 클로저 캡처 문제 방지)
   const onPartOverrideChangeRef = useRef(onPartOverrideChange)
   onPartOverrideChangeRef.current = onPartOverrideChange
-
-  // Raw 박스 (partOverrides 미적용, 레이아웃 패딩은 반영) — 배경색 기준 영역
-  const rawBoxes = useMemo(() => {
-    const noOverrideSchema = { ...schemaWithPadding, partOverrides: undefined }
-    return calculateRawBoxes(noOverrideSchema)
-  }, [schemaWithPadding])
 
   // 선택된 파트의 박스 (partOverrides 적용 후 — 축소된 상태)
   const selectedPartBox = selectedPartInLayout ? computedBoxes[selectedPartInLayout] : undefined
@@ -363,8 +357,8 @@ export function LayoutCanvasColumn({
               })}
             </svg>
 
-            {/* 파트별 원색 배경 (raw 박스 기준, partOverrides 미적용) */}
-            {(Object.entries(rawBoxes) as [Part, BoxConfig][]).map(([part, box]) => {
+            {/* 파트별 배경색 (computedBoxes 기준 — partOverrides 포함, 오프셋 조절 시 함께 변경됨) */}
+            {(Object.entries(computedBoxes) as [Part, BoxConfig][]).map(([part, box]) => {
               const focusedPart = selectedPartInLayout ?? editingPartInLayout
               const isDimmed = focusedPart != null && focusedPart !== part
               return (
@@ -378,81 +372,10 @@ export function LayoutCanvasColumn({
                     height: `${box.height * 100}%`,
                     backgroundColor: PART_COLORS[part],
                     opacity: isDimmed ? 0.35 : 1,
-                    transition: 'opacity 0.15s',
+                    transition: 'left 0.05s, top 0.05s, width 0.05s, height 0.05s, opacity 0.15s',
                   }}
                 />
               )
-            })}
-
-            {/* computed 박스 (partOverrides 적용) — 반투명으로 겹쳐서 확장 영역 색 혼합 */}
-            {(Object.entries(computedBoxes) as [Part, BoxConfig][]).map(([part, box]) => {
-              const focusedPart = selectedPartInLayout ?? editingPartInLayout
-              const isDimmed = focusedPart != null && focusedPart !== part
-              return (
-                <div
-                  key={`computed-${part}`}
-                  className="absolute pointer-events-none"
-                  style={{
-                    left: `${box.x * 100}%`,
-                    top: `${box.y * 100}%`,
-                    width: `${box.width * 100}%`,
-                    height: `${box.height * 100}%`,
-                    backgroundColor: PART_COLORS[part],
-                    opacity: isDimmed ? 0 : 0.6,
-                    transition: 'opacity 0.15s',
-                  }}
-                />
-              )
-            })}
-
-{/* partOverride 패딩: 선택된 파트만 흰색 반투명 오버레이 (색이 빠지는 효과) */}
-            {selectedPartInLayout && schema.partOverrides && (Object.entries(rawBoxes) as [Part, BoxConfig][]).filter(([part]) => part === selectedPartInLayout).map(([part, box]) => {
-              const override = schema.partOverrides?.[part as Part]
-              if (!override) return null
-              const top = override.top ?? 0
-              const bottom = override.bottom ?? 0
-              const left = override.left ?? 0
-              const right = override.right ?? 0
-              if (top === 0 && bottom === 0 && left === 0 && right === 0) return null
-
-              const bx = box.x * 100
-              const by = box.y * 100
-              const bw = box.width * 100
-              const bh = box.height * 100
-
-              const strips: { x: number; y: number; w: number; h: number; key: string }[] = []
-
-              if (top > 0) {
-                strips.push({ x: bx, y: by, w: bw, h: top * 100, key: `${part}-top` })
-              }
-              if (bottom > 0) {
-                strips.push({ x: bx, y: by + bh - bottom * 100, w: bw, h: bottom * 100, key: `${part}-bottom` })
-              }
-              if (left > 0) {
-                const sTop = by + (top > 0 ? top * 100 : 0)
-                const sH = bh - (top > 0 ? top * 100 : 0) - (bottom > 0 ? bottom * 100 : 0)
-                strips.push({ x: bx, y: sTop, w: left * 100, h: sH, key: `${part}-left` })
-              }
-              if (right > 0) {
-                const sTop = by + (top > 0 ? top * 100 : 0)
-                const sH = bh - (top > 0 ? top * 100 : 0) - (bottom > 0 ? bottom * 100 : 0)
-                strips.push({ x: bx + bw - right * 100, y: sTop, w: right * 100, h: sH, key: `${part}-right` })
-              }
-
-              return strips.map(({ x, y, w, h, key }) => (
-                <div
-                  key={key}
-                  className="absolute pointer-events-none"
-                  style={{
-                    left: `${x}%`,
-                    top: `${y}%`,
-                    width: `${Math.max(0, w)}%`,
-                    height: `${Math.max(0, h)}%`,
-                    backgroundColor: '#ffffff',
-                    opacity: 0.55,
-                  }}
-                />
-              ))
             })}
 
             <SvgRenderer
@@ -493,8 +416,8 @@ export function LayoutCanvasColumn({
               )}
             </SvgRenderer>
 
-            {/* 파트 클릭 오버레이 (HTML 버튼) — raw 박스 기준으로 패딩 영역 포함 */}
-            {(Object.entries(rawBoxes) as [Part, BoxConfig][]).map(
+            {/* 파트 클릭 오버레이 (HTML 버튼) — computedBoxes 기준 */}
+            {(Object.entries(computedBoxes) as [Part, BoxConfig][]).map(
               ([part, box]) => {
                 const isEditing = editingPartInLayout === part
                 const isSelected = selectedPartInLayout === part

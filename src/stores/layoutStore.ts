@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { LayoutType, BoxConfig, LayoutSchema, Part, Padding, PartOverride } from '../types'
+import type { LayoutType, BoxConfig, LayoutSchema, Part, Padding, PartOverride, LayoutOverride } from '../types'
 import { DEFAULT_LAYOUT_CONFIGS, type LayoutConfig } from '../data/layoutConfigs'
 import { calculateBoxes, DEFAULT_LAYOUT_SCHEMAS as CALC_SCHEMAS, BASE_PRESETS_SCHEMAS } from '../utils/layoutCalculator'
 import { createDebouncedStorage } from '../utils/debouncedStorage'
@@ -89,6 +89,21 @@ interface LayoutActions {
 
   // 전체 파트 오버라이드 제거
   resetAllPartOverrides: (layoutType: LayoutType) => void
+
+  // ===== 레이아웃 오버라이드 API =====
+
+  // 레이아웃 오버라이드 추가
+  addLayoutOverride: (layoutType: LayoutType, override: LayoutOverride) => void
+
+  // 레이아웃 오버라이드 업데이트 (부분 패치)
+  updateLayoutOverride: (
+    layoutType: LayoutType,
+    overrideId: string,
+    patch: Partial<Pick<LayoutOverride, 'conditionGroups' | 'partOverrides' | 'priority' | 'enabled'>>
+  ) => void
+
+  // 레이아웃 오버라이드 제거
+  removeLayoutOverride: (layoutType: LayoutType, overrideId: string) => void
 
   // ===== 프리셋 관리 API (신규) =====
 
@@ -295,6 +310,35 @@ export const useLayoutStore = create<LayoutState & LayoutActions>()(
           const schema = state.layoutSchemas[layoutType]
           delete schema.partOverrides
           syncConfigFromSchema(state, layoutType)
+        }),
+
+      // ===== 레이아웃 오버라이드 API =====
+
+      addLayoutOverride: (layoutType, override) =>
+        set((state) => {
+          const schema = state.layoutSchemas[layoutType]
+          if (!schema.overrides) schema.overrides = []
+          schema.overrides.push(deepClone(override))
+        }),
+
+      updateLayoutOverride: (layoutType, overrideId, patch) =>
+        set((state) => {
+          const schema = state.layoutSchemas[layoutType]
+          const idx = schema.overrides?.findIndex((o) => o.id === overrideId) ?? -1
+          if (idx === -1 || !schema.overrides) return
+          const clonedPatch = deepClone(patch)
+          if (clonedPatch.conditionGroups !== undefined) schema.overrides[idx].conditionGroups = clonedPatch.conditionGroups
+          if (clonedPatch.partOverrides !== undefined) schema.overrides[idx].partOverrides = clonedPatch.partOverrides
+          if (clonedPatch.priority !== undefined) schema.overrides[idx].priority = clonedPatch.priority
+          if (clonedPatch.enabled !== undefined) schema.overrides[idx].enabled = clonedPatch.enabled
+        }),
+
+      removeLayoutOverride: (layoutType, overrideId) =>
+        set((state) => {
+          const schema = state.layoutSchemas[layoutType]
+          if (!schema.overrides) return
+          schema.overrides = schema.overrides.filter((o) => o.id !== overrideId)
+          if (schema.overrides.length === 0) delete schema.overrides
         }),
 
       // ===== 프리셋 관리 API (신규) =====

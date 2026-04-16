@@ -1,4 +1,29 @@
-import type { LayoutSchema, BoxConfig, Part, Padding, LayoutType, PartOverride } from '../types'
+import type { LayoutSchema, BoxConfig, Part, Padding, LayoutType, PartOverride, OverrideCondition } from '../types'
+
+/** 음절 컨텍스트 (calculateBoxes에 전달 시 레이아웃 오버라이드 해석에 사용) */
+export interface SyllableContext {
+  cho: string
+  jung: string
+  jong: string
+}
+
+/** OR(AND) 조건 매칭 — JamoOverride와 동일한 로직 */
+function matchesConditionGroups(
+  conditionGroups: OverrideCondition[][],
+  context: SyllableContext,
+  layoutType: LayoutType,
+): boolean {
+  if (conditionGroups.length === 0) return false
+  return conditionGroups.some((group) =>
+    group.every((cond) => {
+      if (cond.type === 'layoutIs') return cond.layout === layoutType
+      if (cond.type === 'choseongIs') return cond.jamo === context.cho
+      if (cond.type === 'jungseongIs') return cond.jamo === context.jung
+      if (cond.type === 'jongseongIs') return cond.jamo === context.jong
+      return false
+    })
+  )
+}
 import basePresets from '../data/basePresets.json'
 
 // 기본 패딩 값
@@ -63,10 +88,32 @@ function applyPartOverrides(
 
 /**
  * LayoutSchema로부터 각 슬롯의 BoxConfig 계산
+ * context가 주어지면 schema.overrides에서 매칭되는 LayoutOverride의 partOverrides를 병합
  */
-export function calculateBoxes(schema: LayoutSchema): Partial<Record<Part, BoxConfig>> {
+export function calculateBoxes(
+  schema: LayoutSchema,
+  context?: SyllableContext,
+): Partial<Record<Part, BoxConfig>> {
   const rawBoxes = calculateRawBoxes(schema)
-  return applyPartOverrides(rawBoxes, schema.partOverrides)
+
+  let effectivePartOverrides = schema.partOverrides
+
+  if (context && schema.overrides && schema.overrides.length > 0) {
+    // 우선순위 내림차순으로 매칭 오버라이드 검색
+    const matching = schema.overrides
+      .filter((o) => o.enabled && matchesConditionGroups(o.conditionGroups, context, schema.id))
+      .sort((a, b) => b.priority - a.priority)
+
+    if (matching.length > 0) {
+      // 가장 높은 우선순위 오버라이드의 partOverrides를 기본 partOverrides에 병합
+      effectivePartOverrides = {
+        ...schema.partOverrides,
+        ...matching[0].partOverrides,
+      }
+    }
+  }
+
+  return applyPartOverrides(rawBoxes, effectivePartOverrides)
 }
 
 /**

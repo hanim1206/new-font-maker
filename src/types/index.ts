@@ -59,6 +59,8 @@ export interface LayoutSchema {
   }
   // 파트별 박스 오프셋 (기준선 기반 박스에서 확장/축소)
   partOverrides?: Partial<Record<Part, PartOverride>>
+  // 음절 조합별 파트 오프셋 오버라이드 (conditionGroups 매칭 시 partOverrides 위에 병합)
+  overrides?: LayoutOverride[]
 }
 
 // ===== 레이아웃 프리셋 =====
@@ -105,6 +107,16 @@ export interface JamoOverride {
   conditions?: OverrideCondition[]        // 레거시 (마이그레이션용, 단일 AND 그룹)
   variant: JamoOverrideVariant
   priority: number                        // 높을수록 우선
+  enabled: boolean
+}
+
+// 레이아웃 범위 오버라이드 (특정 음절 조합에만 다른 파트 오프셋 적용)
+// LayoutSchema.overrides[]에 저장되며, conditionGroups는 JamoOverride와 동일한 OR(AND) 구조
+export interface LayoutOverride {
+  id: string
+  conditionGroups: OverrideCondition[][]
+  partOverrides: Partial<Record<Part, PartOverride>>
+  priority: number
   enabled: boolean
 }
 

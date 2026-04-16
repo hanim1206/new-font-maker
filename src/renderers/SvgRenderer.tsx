@@ -102,13 +102,18 @@ export function SvgRenderer({
   const clipRawId = useId()
   const clipId = `glyph-clip${clipRawId.replace(/:/g, '')}`
 
-  // schema가 있으면 calculateBoxes 사용, 없으면 boxes prop 사용
+  // schema가 있으면 calculateBoxes 사용 (syllable에서 컨텍스트 자동 추출 → 레이아웃 오버라이드 해석)
   const boxes = useMemo(() => {
     if (schema) {
-      return calculateBoxes(schema) as Record<Part, BoxConfig>
+      const context = {
+        cho: syllable.choseong?.char ?? '',
+        jung: syllable.jungseong?.char ?? '',
+        jong: syllable.jongseong?.char ?? '',
+      }
+      return calculateBoxes(schema, context) as Record<Part, BoxConfig>
     }
     return (boxesProp || {}) as Record<Part, BoxConfig>
-  }, [schema, boxesProp])
+  }, [schema, boxesProp, syllable])
 
   // 글로벌 스타일 값 (기본값 적용)
   const slant = globalStyle?.slant ?? 0

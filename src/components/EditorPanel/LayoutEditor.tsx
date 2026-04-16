@@ -133,12 +133,14 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     removePaddingOverride,
     updateSplit,
     updatePartOverride,
+    updateLayoutOverride,
     resetLayoutSchema,
     resetAllPartOverrides,
     restoreLayoutSnapshot,
     _hydrated,
   } = useLayoutStore()
   const paddingOverrides = useLayoutStore(s => s.paddingOverrides)
+  const editingLayoutOverrideId = useUIStore(s => s.editingLayoutOverrideId)
   const {
     choseong,
     jungseong,
@@ -196,10 +198,21 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     [schema, effectivePadding]
   )
 
+  // 레이아웃 오버라이드 편집 중이면 해당 오버라이드의 partOverrides를 병합하여 캔버스에 표시
+  const displaySchema = useMemo(() => {
+    if (!editingLayoutOverrideId) return schemaWithPadding
+    const override = schema.overrides?.find((o) => o.id === editingLayoutOverrideId)
+    if (!override) return schemaWithPadding
+    return {
+      ...schemaWithPadding,
+      partOverrides: { ...schema.partOverrides, ...override.partOverrides },
+    }
+  }, [editingLayoutOverrideId, schemaWithPadding, schema])
+
   // 계산된 박스 (파트 오버레이용) — partOverrides 포함
   const computedBoxes = useMemo(
-    () => calculateBoxes(schemaWithPadding),
-    [schemaWithPadding]
+    () => calculateBoxes(displaySchema),
+    [displaySchema]
   )
 
   // 테스트용 음절
@@ -711,11 +724,23 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     setIsLayoutDirty(true)
   }, [setPaddingOverride, activeLayoutType])
 
-  // 파트 오프셋 → 스토어 직접 + 더티 마킹
+  // 파트 오프셋 → 레이아웃 오버라이드 편집 중이면 오버라이드에, 아니면 기본 스키마에 저장
   const handlePartOverrideChange = useCallback((part: Part, side: keyof PartOverride, value: number) => {
-    updatePartOverride(activeLayoutType, part, side, value)
-    setIsLayoutDirty(true)
-  }, [updatePartOverride, activeLayoutType])
+    if (editingLayoutOverrideId) {
+      const schema = getLayoutSchema(activeLayoutType)
+      const override = schema.overrides?.find((o) => o.id === editingLayoutOverrideId)
+      const currentPart = override?.partOverrides?.[part] ?? { top: 0, bottom: 0, left: 0, right: 0 }
+      updateLayoutOverride(activeLayoutType, editingLayoutOverrideId, {
+        partOverrides: {
+          ...override?.partOverrides,
+          [part]: { ...currentPart, [side]: value },
+        },
+      })
+    } else {
+      updatePartOverride(activeLayoutType, part, side, value)
+      setIsLayoutDirty(true)
+    }
+  }, [editingLayoutOverrideId, updatePartOverride, updateLayoutOverride, activeLayoutType, getLayoutSchema])
 
   // 기준선 → 스토어 직접 + 더티 마킹
   const handleSplitChange = useCallback((index: number, value: number) => {
@@ -797,7 +822,9 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   const layoutCanvasProps = {
     layoutType,
     displaySyllable: testSyllable,
-    schemaWithPadding,
+    // SvgRenderer에는 실제 schema 전달 — syllable context로 override 해석 (해당 음절이 scope에 포함될 때만 적용)
+    // computedBoxes는 displaySchema 기반이라 드래그 핸들은 항상 override 박스를 표시
+    schemaWithPadding: schemaWithPadding,
     effectiveStyle,
     computedBoxes,
     schema,

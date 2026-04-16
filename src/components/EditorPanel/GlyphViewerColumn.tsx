@@ -13,7 +13,7 @@ import { useGlobalStyleStore } from '../../stores/globalStyleStore'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { classifyJungseong, LAYOUT_LABELS, decomposeSyllableWithOverrides } from '../../utils/hangulUtils'
 import { CHOSEONG_LIST, JUNGSEONG_LIST, JONGSEONG_LIST } from '../../data/Hangul'
-import type { LayoutType, JamoOverride, JamoOverrideVariant, OverrideCondition } from '../../types'
+import type { LayoutType, JamoOverride, JamoOverrideVariant, OverrideCondition, LayoutOverride } from '../../types'
 
 // ===== 모듈 로드 시 1회 계산 =====
 
@@ -92,9 +92,11 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
   const editingJamoType = useUIStore((s) => s.editingJamoType)
   const editingOverrideId = useUIStore((s) => s.editingOverrideId)
   const setEditingOverrideId = useUIStore((s) => s.setEditingOverrideId)
+  const editingLayoutOverrideId = useUIStore((s) => s.editingLayoutOverrideId)
+  const setEditingLayoutOverrideId = useUIStore((s) => s.setEditingLayoutOverrideId)
   const { addOverride, updateOverride, removeOverride } = useJamoStore()
   const { choseong, jungseong, jongseong } = useJamoStore()
-  const { getLayoutSchema, getEffectivePadding, layoutSchemas } = useLayoutStore()
+  const { getLayoutSchema, getEffectivePadding, layoutSchemas, addLayoutOverride, updateLayoutOverride, removeLayoutOverride } = useLayoutStore()
   const { getEffectiveStyle } = useGlobalStyleStore()
 
   // 레이아웃 7종의 schema+style을 사전 계산 (셀 렌더 시 재사용)
@@ -130,6 +132,10 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   const isDragging = useRef(false)
   const isDragAdding = useRef(true)
+  // 드래그 시작 위치 (섹션 키 + 섹션 내 인덱스)
+  const dragStartRef = useRef<{ sectionKey: string; localIndex: number } | null>(null)
+  // 드래그 시작 시점의 선택 스냅샷 (rect 재계산 시 기준점)
+  const preDragSelectionRef = useRef<Set<string>>(new Set())
 
   // 컨테이너 너비 기반 열 수 계산 (ResizeObserver)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -155,52 +161,102 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
   }, [])
 
   const isJamoEditing = !!(editingJamoType && editingJamoChar)
+  // 레이아웃 오버라이드 scope 편집 모드
+  const isLayoutOverrideEditing = !isJamoEditing && !!selectedLayoutType && !!editingLayoutOverrideId
 
-  // 오버라이드 탭 전환 시 scope pre-selection 동기화
-  useEffect(() => {
-    if (!editingOverrideId || !editingJamoType || !editingJamoChar) {
-      setSelectedChars(new Set())
-      return
+  // 레이아웃 오버라이드 편집 중: 선택된 셀에 미리보기 적용할 스키마 (partOverrides 직접 병합)
+  const layoutOverridePreviewSchema = useMemo(() => {
+    if (!isLayoutOverrideEditing || !selectedLayoutType || !editingLayoutOverrideId) return null
+    const schema = getLayoutSchema(selectedLayoutType)
+    const override = schema?.overrides?.find((o) => o.id === editingLayoutOverrideId)
+    if (!override || Object.keys(override.partOverrides).length === 0) return null
+    const style = cellSchemas[selectedLayoutType]?.style
+    const padding = getEffectivePadding(selectedLayoutType)
+    // 오버라이드 partOverrides를 기본에 병합, overrides 배열에서 제거하여 이중 적용 방지
+    const previewSchema = {
+      ...schema,
+      padding,
+      partOverrides: { ...(schema.partOverrides ?? {}), ...override.partOverrides },
+      overrides: (schema.overrides ?? []).filter((o) => o.id !== editingLayoutOverrideId),
     }
-    const state = useJamoStore.getState()
-    const jamoData = state[editingJamoType][editingJamoChar]
-    const override = jamoData?.overrides?.find((o) => o.id === editingOverrideId)
-    if (!override) { setSelectedChars(new Set()); return }
+    return { schema: previewSchema, style }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLayoutOverrideEditing, selectedLayoutType, editingLayoutOverrideId, layoutSchemas, cellSchemas])
 
-    // conditionGroups에서 layoutIs 조건 추출
-    const layoutTypes = new Set<LayoutType>()
-    for (const group of override.conditionGroups ?? []) {
-      for (const cond of group) {
-        if (cond.type === 'layoutIs') layoutTypes.add(cond.layout)
+  // 조건 OR(AND) 매칭 헬퍼
+  function matchConditionGroups(
+    conditionGroups: OverrideCondition[][],
+    meta: SyllableMeta,
+  ): boolean {
+    return conditionGroups.some((group) =>
+      group.every((cond) => {
+        if (cond.type === 'layoutIs') return meta.layoutType === cond.layout
+        if (cond.type === 'choseongIs') return meta.cho === cond.jamo
+        if (cond.type === 'jungseongIs') return meta.jung === cond.jamo
+        if (cond.type === 'jongseongIs') return meta.jong === cond.jamo
+        return false
+      })
+    )
+  }
+
+  // scope pre-selection 통합 effect
+  useEffect(() => {
+    if (isJamoEditing && editingOverrideId && editingJamoType && editingJamoChar) {
+      // 자모 오버라이드: 기존 conditionGroups에서 선택 복원
+      const state = useJamoStore.getState()
+      const jamoData = state[editingJamoType][editingJamoChar]
+      const override = jamoData?.overrides?.find((o) => o.id === editingOverrideId)
+      if (!override || (override.conditionGroups ?? []).length === 0) {
+        setSelectedChars(new Set())
+        return
+      }
+      const groups = override.conditionGroups
+      const newSelected = new Set<string>()
+      ALL_SYLLABLES.forEach((meta) => {
+        if (matchConditionGroups(groups, meta)) newSelected.add(meta.char)
+      })
+      setSelectedChars(newSelected)
+    } else if (!isJamoEditing && selectedLayoutType && editingLayoutOverrideId) {
+      // 레이아웃 오버라이드: conditionGroups에서 선택 복원
+      const schema = useLayoutStore.getState().getLayoutSchema(selectedLayoutType)
+      const override = schema?.overrides?.find((o) => o.id === editingLayoutOverrideId)
+      if (!override || (override.conditionGroups ?? []).length === 0) {
+        setSelectedChars(new Set())
+        return
+      }
+      const groups = override.conditionGroups
+      const newSelected = new Set<string>()
+      ALL_SYLLABLES.forEach((meta) => {
+        if (meta.layoutType === selectedLayoutType && matchConditionGroups(groups, meta)) newSelected.add(meta.char)
+      })
+      setSelectedChars(newSelected)
+    } else {
+      setSelectedChars(new Set())
+      if (!isJamoEditing && !isLayoutOverrideEditing) {
+        setJongFilter('all')
+        setJungFilter('all')
       }
     }
-
-    const newSelected = new Set<string>()
-    ALL_SYLLABLES.forEach((meta) => {
-      if (layoutTypes.has(meta.layoutType)) newSelected.add(meta.char)
-    })
-    setSelectedChars(newSelected)
-  }, [editingOverrideId, editingJamoType, editingJamoChar])
-
-  // 자모 편집 종료 시 초기화
-  useEffect(() => {
-    if (!isJamoEditing) {
-      setSelectedChars(new Set())
-      setJongFilter('all')
-      setJungFilter('all')
-    }
-  }, [isJamoEditing])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isJamoEditing, editingOverrideId, editingJamoType, editingJamoChar, editingLayoutOverrideId, selectedLayoutType])
 
   // --- 필터링 ---
   const visibleSyllables = useMemo<SyllableMeta[]>(() => {
     return ALL_SYLLABLES.filter((meta) => {
       if (!isJamoEditing) {
-        // 기본 모드: 레이아웃 + 자모 필터
+        // 기본 모드 + 레이아웃 오버라이드 모드: 레이아웃 + 자모 필터
         if (selectedLayoutType && meta.layoutType !== selectedLayoutType) return false
         if (editingJamoChar && editingJamoType) {
           if (editingJamoType === 'choseong' && meta.cho !== editingJamoChar) return false
           if (editingJamoType === 'jungseong' && meta.jung !== editingJamoChar) return false
           if (editingJamoType === 'jongseong' && meta.jong !== editingJamoChar) return false
+        }
+        // 레이아웃 오버라이드 모드에서도 그룹핑 필터 적용
+        if (isLayoutOverrideEditing) {
+          if (jongFilter === 'none' && meta.jong !== '') return false
+          if (jongFilter === 'has' && meta.jong === '') return false
+          const jungType = classifyJungseong(meta.jung)
+          if (jungFilter !== 'all' && jungType !== jungFilter) return false
         }
         return true
       }
@@ -215,13 +271,20 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
       if (jungFilter !== 'all' && jungType !== jungFilter) return false
       return true
     })
-  }, [isJamoEditing, selectedLayoutType, editingJamoChar, editingJamoType, jongFilter, jungFilter])
+  }, [isJamoEditing, isLayoutOverrideEditing, selectedLayoutType, editingJamoChar, editingJamoType, jongFilter, jungFilter])
 
   // --- 드래그 선택 ---
-  const handleCellMouseDown = useCallback((char: string, e: React.MouseEvent) => {
+  const handleCellMouseDown = useCallback((
+    char: string,
+    sectionKey: string,
+    localIndex: number,
+    e: React.MouseEvent,
+  ) => {
     e.preventDefault()
     isDragging.current = true
     isDragAdding.current = !selectedChars.has(char)
+    dragStartRef.current = { sectionKey, localIndex }
+    preDragSelectionRef.current = new Set(selectedChars)
     setSelectedChars((prev) => {
       const next = new Set(prev)
       if (isDragAdding.current) next.add(char)
@@ -230,18 +293,56 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
     })
   }, [selectedChars])
 
-  const handleCellMouseEnter = useCallback((char: string) => {
+  const handleCellMouseEnter = useCallback((
+    char: string,
+    sectionKey: string,
+    localIndex: number,
+    sectionSyllables: SyllableMeta[],
+  ) => {
     if (!isDragging.current) return
-    setSelectedChars((prev) => {
-      const next = new Set(prev)
-      if (isDragAdding.current) next.add(char)
-      else next.delete(char)
-      return next
+    const dragStart = dragStartRef.current
+
+    // 섹션이 다른 경우: 단순 토글 (크로스-섹션 드래그)
+    if (!dragStart || dragStart.sectionKey !== sectionKey) {
+      setSelectedChars((prev) => {
+        const next = new Set(prev)
+        if (isDragAdding.current) next.add(char)
+        else next.delete(char)
+        return next
+      })
+      return
+    }
+
+    // 같은 섹션: 드래그 시작~현재 사이의 직사각형 범위를 선택
+    const startIdx = dragStart.localIndex
+    const endIdx = localIndex
+    const startRow = Math.floor(startIdx / colsPerRow)
+    const startCol = startIdx % colsPerRow
+    const endRow = Math.floor(endIdx / colsPerRow)
+    const endCol = endIdx % colsPerRow
+
+    const minRow = Math.min(startRow, endRow)
+    const maxRow = Math.max(startRow, endRow)
+    const minCol = Math.min(startCol, endCol)
+    const maxCol = Math.max(startCol, endCol)
+
+    const next = new Set(preDragSelectionRef.current)
+    sectionSyllables.forEach((meta, i) => {
+      const row = Math.floor(i / colsPerRow)
+      const col = i % colsPerRow
+      if (row >= minRow && row <= maxRow && col >= minCol && col <= maxCol) {
+        if (isDragAdding.current) next.add(meta.char)
+        else next.delete(meta.char)
+      }
     })
-  }, [])
+    setSelectedChars(next)
+  }, [colsPerRow])
 
   useEffect(() => {
-    const stop = () => { isDragging.current = false }
+    const stop = () => {
+      isDragging.current = false
+      dragStartRef.current = null
+    }
     document.addEventListener('mouseup', stop)
     return () => document.removeEventListener('mouseup', stop)
   }, [])
@@ -249,15 +350,97 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
   // --- 적용 ---
   const handleApply = useCallback(() => {
     if (!editingOverrideId || !editingJamoType || !editingJamoChar) return
-    const layoutTypes = new Set<LayoutType>()
+
+    // 선택된 각 음절을 정확히 특정하는 AND 조건 그룹을 생성
+    // 편집 중인 자모 포지션은 고정이므로, 나머지 조건으로 음절 식별
+    const groupMap = new Map<string, OverrideCondition[]>()
+
     ALL_SYLLABLES.forEach((meta) => {
-      if (selectedChars.has(meta.char)) layoutTypes.add(meta.layoutType)
+      if (!selectedChars.has(meta.char)) return
+
+      let group: OverrideCondition[]
+      let key: string
+
+      if (editingJamoType === 'choseong') {
+        // 초성 고정 → jung + jong 으로 식별
+        group = [
+          { type: 'layoutIs', layout: meta.layoutType },
+          { type: 'jungseongIs', jamo: meta.jung },
+          ...(meta.jong !== '' ? [{ type: 'jongseongIs' as const, jamo: meta.jong }] : []),
+        ]
+        key = `${meta.layoutType}|${meta.jung}|${meta.jong}`
+      } else if (editingJamoType === 'jungseong') {
+        // 중성 고정 → cho + jong 으로 식별
+        group = [
+          { type: 'layoutIs', layout: meta.layoutType },
+          { type: 'choseongIs', jamo: meta.cho },
+          ...(meta.jong !== '' ? [{ type: 'jongseongIs' as const, jamo: meta.jong }] : []),
+        ]
+        key = `${meta.layoutType}|${meta.cho}|${meta.jong}`
+      } else {
+        // 종성 고정 → cho + jung 으로 식별
+        group = [
+          { type: 'layoutIs', layout: meta.layoutType },
+          { type: 'choseongIs', jamo: meta.cho },
+          { type: 'jungseongIs', jamo: meta.jung },
+        ]
+        key = `${meta.layoutType}|${meta.cho}|${meta.jung}`
+      }
+
+      if (!groupMap.has(key)) groupMap.set(key, group)
     })
-    const conditionGroups: OverrideCondition[][] = Array.from(layoutTypes).map((lt) => [
-      { type: 'layoutIs' as const, layout: lt },
-    ])
+
+    const conditionGroups = Array.from(groupMap.values())
     updateOverride(editingJamoType, editingJamoChar, editingOverrideId, { conditionGroups })
   }, [editingOverrideId, editingJamoType, editingJamoChar, selectedChars, updateOverride])
+
+  // --- 레이아웃 오버라이드 scope 적용 ---
+  const handleLayoutOverrideApply = useCallback(() => {
+    if (!selectedLayoutType || !editingLayoutOverrideId) return
+
+    // 선택된 각 음절을 정확히 특정하는 AND 조건 그룹 생성 (layoutType은 저장 위치에서 이미 특정되므로 불필요)
+    const groupMap = new Map<string, OverrideCondition[]>()
+    ALL_SYLLABLES.forEach((meta) => {
+      if (meta.layoutType !== selectedLayoutType || !selectedChars.has(meta.char)) return
+      const group: OverrideCondition[] = [
+        { type: 'choseongIs', jamo: meta.cho },
+        { type: 'jungseongIs', jamo: meta.jung },
+        ...(meta.jong !== '' ? [{ type: 'jongseongIs' as const, jamo: meta.jong }] : []),
+      ]
+      const key = `${meta.cho}|${meta.jung}|${meta.jong}`
+      if (!groupMap.has(key)) groupMap.set(key, group)
+    })
+
+    const conditionGroups = Array.from(groupMap.values())
+    updateLayoutOverride(selectedLayoutType, editingLayoutOverrideId, { conditionGroups })
+  }, [selectedLayoutType, editingLayoutOverrideId, selectedChars, updateLayoutOverride])
+
+  // --- 레이아웃 오버라이드 탭 관리 ---
+  const handleAddLayoutOverride = useCallback(() => {
+    if (!selectedLayoutType) return
+    const schema = useLayoutStore.getState().getLayoutSchema(selectedLayoutType)
+    const priority = (schema.overrides?.length ?? 0)
+    const newOverride: LayoutOverride = {
+      id: generateId(),
+      conditionGroups: [],
+      partOverrides: {},
+      priority,
+      enabled: true,
+    }
+    addLayoutOverride(selectedLayoutType, newOverride)
+    setEditingLayoutOverrideId(newOverride.id)
+  }, [selectedLayoutType, addLayoutOverride, setEditingLayoutOverrideId])
+
+  const handleSelectLayoutOverride = useCallback((id: string | null) => {
+    setEditingLayoutOverrideId(id)
+  }, [setEditingLayoutOverrideId])
+
+  const handleRemoveLayoutOverride = useCallback((id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!selectedLayoutType) return
+    removeLayoutOverride(selectedLayoutType, id)
+    if (editingLayoutOverrideId === id) setEditingLayoutOverrideId(null)
+  }, [selectedLayoutType, editingLayoutOverrideId, removeLayoutOverride, setEditingLayoutOverrideId])
 
   // --- 오버라이드 관리 ---
   const handleAddOverride = useCallback(() => {
@@ -370,8 +553,58 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
         </div>
       )}
 
-      {/* === 그룹핑 버튼 (자모 편집 중에만) === */}
-      {isJamoEditing && (
+      {/* === 레이아웃 오버라이드 탭 (레이아웃 편집 중에만) === */}
+      {!isJamoEditing && selectedLayoutType && (() => {
+        const schema = useLayoutStore.getState().getLayoutSchema(selectedLayoutType)
+        const layoutOverrides = schema?.overrides ?? []
+        return (
+          <div className="shrink-0 px-2 pt-2 pb-1.5 border-b border-border-subtle flex items-center gap-1 flex-wrap">
+            <button
+              onClick={() => handleSelectLayoutOverride(null)}
+              className={`h-6 px-2.5 rounded-full text-[11px] font-medium transition-all ${
+                editingLayoutOverrideId === null
+                  ? 'bg-[rgba(78,205,196,0.15)] text-[#4ecdc4]'
+                  : 'text-text-dim-5 hover:text-text-dim-2 hover:bg-surface-2'
+              }`}
+            >
+              기본
+            </button>
+            {layoutOverrides.map((ovr, idx) => (
+              <div key={ovr.id} className="relative group flex items-center">
+                <button
+                  onClick={() => handleSelectLayoutOverride(ovr.id)}
+                  className={`h-6 pl-2.5 pr-1.5 rounded-full text-[11px] font-medium transition-all flex items-center gap-1 ${
+                    !ovr.enabled ? 'opacity-40' : ''
+                  } ${
+                    editingLayoutOverrideId === ovr.id
+                      ? 'bg-[rgba(251,146,60,0.15)] text-[#fb923c]'
+                      : 'text-text-dim-5 hover:text-text-dim-2 hover:bg-surface-2'
+                  }`}
+                >
+                  오버라이드 {idx + 1}
+                  <span
+                    role="button"
+                    onClick={(e) => handleRemoveLayoutOverride(ovr.id, e)}
+                    className="opacity-0 group-hover:opacity-50 hover:!opacity-100 text-[#f87171] leading-none ml-0.5"
+                    title="삭제"
+                  >
+                    ×
+                  </span>
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={handleAddLayoutOverride}
+              className="w-6 h-6 flex items-center justify-center rounded-full border border-dashed border-border text-text-dim-5 text-[13px] hover:border-text-dim-3 hover:text-text-dim-2 transition-all shrink-0"
+            >
+              +
+            </button>
+          </div>
+        )
+      })()}
+
+      {/* === 그룹핑 버튼 (자모 편집 또는 레이아웃 오버라이드 편집 중에만) === */}
+      {(isJamoEditing || isLayoutOverrideEditing) && (
         <div className="shrink-0 px-2 py-1.5 border-b border-border-subtle flex flex-col gap-1">
           <div className="flex gap-1">
             {([['all', '전체'], ['none', '받침없음'], ['has', '받침있음']] as const).map(([val, label]) => (
@@ -424,15 +657,32 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
           // 실제 열 수 기반으로 2행 초과 여부 판단
           const hasMore = Math.ceil(syllables.length / colsPerRow) > 2
           return (
-            <div key={key}>
+            <div key={key} className="border-t border-border-subtle first:border-t-0">
               {/* 섹션 헤더 */}
-              <div className="px-3 py-1 flex items-center gap-2 sticky top-0 bg-[#0d0d0d] z-10">
-                <span className="text-[10px] text-text-dim-5 font-medium uppercase tracking-wide">
+              <div className="px-3 py-2 flex items-center gap-2 sticky top-0 bg-[#111111] z-10 border-b border-border-subtle">
+                <span className="text-[11px] font-semibold text-text-dim-2 tracking-wide">
                   {(!isJamoEditing && selectedLayoutType) ? key : LAYOUT_LABELS[key as LayoutType] ?? key}
                 </span>
-                <span className="text-[10px] text-text-dim-5 tabular-nums">
+                <span className="text-[10px] text-text-dim-4 tabular-nums">
                   {syllables.length}
                 </span>
+                {(isJamoEditing || isLayoutOverrideEditing) && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const allSelected = syllables.every((m) => selectedChars.has(m.char))
+                      setSelectedChars((prev) => {
+                        const next = new Set(prev)
+                        if (allSelected) syllables.forEach((m) => next.delete(m.char))
+                        else syllables.forEach((m) => next.add(m.char))
+                        return next
+                      })
+                    }}
+                    className="ml-auto text-[11px] px-2.5 py-1 rounded border border-border transition-colors text-text-dim-3 hover:text-text-dim-1 hover:border-border-light hover:bg-surface-2"
+                  >
+                    {syllables.every((m) => selectedChars.has(m.char)) ? '전체해제' : '전체선택'}
+                  </button>
+                )}
               </div>
               {/* 섹션 그리드 (2행 클리핑) */}
               <div style={{ overflow: 'hidden', maxHeight: isExpanded ? undefined : TWO_ROW_HEIGHT }}>
@@ -445,41 +695,47 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
                     backgroundColor: '#ffffff',
                   }}
                 >
-                  {syllables.map((meta) => {
-                    const isSelected = isJamoEditing && selectedChars.has(meta.char)
+                  {syllables.map((meta, localIndex) => {
+                    const isSelectable = isJamoEditing || isLayoutOverrideEditing
+                    const isSelected = isSelectable && selectedChars.has(meta.char)
                     const syllable = decomposeSyllableWithOverrides(meta.char, choseong, jungseong, jongseong)
                     const cellSchema = cellSchemas[meta.layoutType]
+                    // 레이아웃 오버라이드 편집 중 선택된 셀: 미리보기 스키마로 오버라이드 효과 미리 표시
+                    const usePreview = isLayoutOverrideEditing && isSelected && !!layoutOverridePreviewSchema
+                    const renderSchema = usePreview ? layoutOverridePreviewSchema! : cellSchema
 
                     return (
                       <div
                         key={meta.char}
                         title={meta.char}
                         style={{ width: CELL_PX, height: CELL_PX }}
-                        className={`rounded-[2px] overflow-hidden transition-all ${
-                          isJamoEditing ? 'cursor-pointer' : ''
-                        } ${
-                          isSelected
-                            ? 'ring-2 ring-accent-blue'
-                            : isJamoEditing
-                              ? 'ring-1 ring-transparent hover:ring-border-light'
-                              : ''
+                        className={`group relative rounded-[2px] overflow-hidden ${
+                          isSelectable ? 'cursor-pointer' : ''
                         }`}
-                        onMouseDown={isJamoEditing ? (e) => handleCellMouseDown(meta.char, e) : undefined}
-                        onMouseEnter={isJamoEditing ? () => handleCellMouseEnter(meta.char) : undefined}
+                        onMouseDown={isSelectable ? (e) => handleCellMouseDown(meta.char, key, localIndex, e) : undefined}
+                        onMouseEnter={isSelectable ? () => handleCellMouseEnter(meta.char, key, localIndex, syllables) : undefined}
                       >
-                        {cellSchema ? (
+                        {renderSchema ? (
                           <SvgRenderer
                             syllable={syllable}
-                            schema={cellSchema.schema}
+                            schema={renderSchema.schema}
                             size={CELL_PX}
                             fillColor="#1a1a1a"
                             backgroundColor="#ffffff"
-                            globalStyle={cellSchema.style}
+                            globalStyle={renderSchema.style}
                           />
                         ) : (
                           <span className="flex items-center justify-center w-full h-full text-[11px] text-foreground bg-surface-2">
                             {meta.char}
                           </span>
+                        )}
+                        {/* 선택 오버레이: 레이아웃 오버라이드=앰버(미저장), 자모 오버라이드=라임그린 */}
+                        {isSelectable && (
+                          <div className={`absolute inset-0 pointer-events-none transition-colors ${
+                            isSelected
+                              ? (isLayoutOverrideEditing ? 'bg-[#f59e0b]/50' : 'bg-[#84cc16]/55')
+                              : 'bg-transparent group-hover:bg-black/8'
+                          }`} />
                         )}
                       </div>
                     )
@@ -500,7 +756,7 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
         })}
       </div>
 
-      {/* === 적용 바 (오버라이드 편집 중에만) === */}
+      {/* === 적용 바 (자모 오버라이드 편집 중) === */}
       {isJamoEditing && editingOverrideId !== null && (
         <div className="shrink-0 px-3 py-2 border-t border-border-subtle flex items-center justify-between bg-[#0c0c0c]">
           <span className="text-[11px] text-text-dim-5">
@@ -511,6 +767,25 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
           </span>
           <button
             onClick={handleApply}
+            disabled={selectedChars.size === 0}
+            className="h-7 px-3 rounded text-[11px] font-medium bg-accent-blue text-white disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+          >
+            적용
+          </button>
+        </div>
+      )}
+
+      {/* === 적용 바 (레이아웃 오버라이드 scope 편집 중) === */}
+      {isLayoutOverrideEditing && (
+        <div className="shrink-0 px-3 py-2 border-t border-border-subtle flex items-center justify-between bg-[#0c0c0c]">
+          <span className="text-[11px] text-text-dim-5">
+            {selectedChars.size > 0
+              ? <><span className="text-foreground font-medium">{selectedChars.size.toLocaleString()}</span>개 선택됨</>
+              : '글자를 드래그하여 적용 범위 선택'
+            }
+          </span>
+          <button
+            onClick={handleLayoutOverrideApply}
             disabled={selectedChars.size === 0}
             className="h-7 px-3 rounded text-[11px] font-medium bg-accent-blue text-white disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
           >
