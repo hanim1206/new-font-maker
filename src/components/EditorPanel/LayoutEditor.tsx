@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import type { PartStyle } from '../../renderers/SvgRenderer'
 import { decomposeSyllableWithOverrides, getSampleSyllableForLayout } from '../../utils/hangulUtils'
-import { calculateBoxes } from '../../utils/layoutCalculator'
+import { calculateBoxes, calculateRawBoxes } from '../../utils/layoutCalculator'
 import { mergeStrokes, splitStroke, addHandlesToPoint, removeHandlesFromPoint } from '../../utils/strokeEditUtils'
 import { COMPOUND_JONGSEONG } from '../../utils/jamoLinkUtils'
 import type { LayoutType, Part, DecomposedSyllable, BoxConfig, JamoData, Padding, PartOverride, StrokeDataV2, LayoutSchema } from '../../types'
@@ -113,6 +113,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     inputText,
     selectedCharIndex,
     focusedSyllable,
+    setFocusedSyllable,
     selectedPartInLayout,
     setSelectedPartInLayout,
     editingPartInLayout,
@@ -167,7 +168,9 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
   // 레이아웃 편집 더티 상태 추적
   const [isLayoutDirty, setIsLayoutDirty] = useState(false)
+  const [isJamoDirty, setIsJamoDirty] = useState(false)
   const layoutSnapshotRef = useRef<LayoutSchema | null>(null)
+  const jamoSnapshotRef = useRef<{ type: 'choseong' | 'jungseong' | 'jongseong'; char: string; data: JamoData } | null>(null)
   const paddingOverrideSnapshotRef = useRef<Partial<Padding> | null>(null)
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [pendingJamoPart, setPendingJamoPart] = useState<Part | null>(null)
@@ -222,12 +225,15 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     () => calculateBoxes(displaySchema),
     [displaySchema]
   )
+  const rawBoxes = useMemo(() => calculateRawBoxes(schemaWithPadding), [schemaWithPadding])
 
   // 테스트용 음절
   const testSyllable = useMemo(() => {
+    let contextSyllable: DecomposedSyllable | null = null
     if (focusedSyllable) {
       const focused = decomposeSyllableWithOverrides(focusedSyllable, choseong, jungseong, jongseong)
       if (focused.layoutType === activeLayoutType) return focused
+      contextSyllable = focused
     }
 
     if (inputText && selectedCharIndex >= 0) {
@@ -243,6 +249,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
         if (syllable.layoutType === activeLayoutType) {
           return syllable
         }
+        contextSyllable ??= syllable
       }
     }
 
@@ -252,13 +259,19 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       if (syllable.layoutType === activeLayoutType) {
         return syllable
       }
+      contextSyllable ??= syllable
     }
 
     // 자모 편집 중이면 편집 중인 자모가 포함된 샘플, 아니면 기본 샘플
     const fallbackChar = getSampleSyllableForLayout(
       activeLayoutType,
       editingJamoType ?? undefined,
-      editingJamoChar ?? undefined
+      editingJamoChar ?? undefined,
+      contextSyllable ? {
+        choseong: contextSyllable.choseong?.char,
+        jungseong: contextSyllable.jungseong?.char,
+        jongseong: contextSyllable.jongseong?.char,
+      } : undefined,
     )
     return decomposeSyllableWithOverrides(fallbackChar, choseong, jungseong, jongseong)
   }, [focusedSyllable, inputText, selectedCharIndex, activeLayoutType, editingJamoType, editingJamoChar, choseong, jungseong, jongseong])
@@ -278,6 +291,50 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   const editingOverrideIdRef = useRef(editingOverrideId)
   editingOverrideIdRef.current = editingOverrideId
 
+  useEffect(() => {
+    if (!editingJamoInfo) {
+      jamoSnapshotRef.current = null
+      setIsJamoDirty(false)
+      return
+    }
+    const current = useJamoStore.getState()[editingJamoInfo.type][editingJamoInfo.char]
+    if (!current) return
+    jamoSnapshotRef.current = {
+      type: editingJamoInfo.type,
+      char: editingJamoInfo.char,
+      data: JSON.parse(JSON.stringify(current)),
+    }
+    setIsJamoDirty(false)
+  }, [editingJamoInfo?.type, editingJamoInfo?.char]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const snapshot = jamoSnapshotRef.current
+    if (!snapshot || !editingJamoInfo) return
+    const current = useJamoStore.getState()[snapshot.type][snapshot.char]
+    setIsJamoDirty(JSON.stringify(current) !== JSON.stringify(snapshot.data))
+  }, [editingJamoInfo, choseong, jungseong, jongseong])
+
+  const handleJamoSave = useCallback(() => {
+    const info = editingJamoInfoRef.current
+    if (!info) return
+    const current = useJamoStore.getState()[info.type][info.char]
+    if (!current) return
+    jamoSnapshotRef.current = { type: info.type, char: info.char, data: JSON.parse(JSON.stringify(current)) }
+    setIsJamoDirty(false)
+  }, [])
+
+  const handleJamoDiscard = useCallback(() => {
+    const snapshot = jamoSnapshotRef.current
+    if (!snapshot) return
+    const restored = JSON.parse(JSON.stringify(snapshot.data)) as JamoData
+    const store = useJamoStore.getState()
+    if (snapshot.type === 'choseong') store.updateChoseong(snapshot.char, restored)
+    else if (snapshot.type === 'jungseong') store.updateJungseong(snapshot.char, restored)
+    else store.updateJongseong(snapshot.char, restored)
+    setIsJamoDirty(false)
+    setSelectedStrokeId(null)
+  }, [setSelectedStrokeId])
+
   // 편집 중인 파트의 박스 정보 (StrokeOverlay용)
   const editingBox = useMemo((): BoxConfig | null => {
     if (!editingPartInLayout) return null
@@ -289,6 +346,11 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     const box = computedBoxes[partKey as keyof typeof computedBoxes]
     return box || null
   }, [editingPartInLayout, computedBoxes])
+
+  const editingBoundaryBox = useMemo((): BoxConfig | null => {
+    if (!editingPartInLayout) return null
+    return rawBoxes[editingPartInLayout] ?? null
+  }, [editingPartInLayout, rawBoxes])
 
   // 편집 중인 자모의 strokes (스토어에서 파생)
   const editingStrokes = useMemo(() => {
@@ -336,8 +398,10 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       juVBox: computedBoxes.JU_V as BoxConfig | undefined,
       horizontalStrokeIds: new Set(jamo.horizontalStrokes.map(s => s.id)),
       verticalStrokeIds: new Set(jamo.verticalStrokes.map(s => s.id)),
+      horizontalBoundaryBox: rawBoxes.JU_H as BoxConfig | undefined,
+      verticalBoundaryBox: rawBoxes.JU_V as BoxConfig | undefined,
     }
-  }, [editingJamoInfo, jungseong, computedBoxes])
+  }, [editingJamoInfo, jungseong, computedBoxes, rawBoxes])
 
   // 자모 편집 진입/전환 시 선택 초기화
   const editingJamoType_ = editingJamoInfo?.type ?? null
@@ -710,8 +774,8 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       if (isEditingPart) {
         styles[part] = { hidden: true }
       } else {
-        // 비편집 파트: 숨김
-        styles[part] = { hidden: true }
+        // 비편집 파트는 레이아웃 문맥을 유지하되 포커스 밖으로 흐리게 표시한다.
+        styles[part] = { opacity: 0.18 }
       }
     }
     return styles
@@ -766,9 +830,21 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     if (isJamoEditing) {
       setPreviewLayoutType(lt)
     } else {
+      const anchoredChoseong = testSyllable.choseong?.char
+      const anchoredSyllable = getSampleSyllableForLayout(
+        lt,
+        undefined,
+        undefined,
+        {
+          choseong: anchoredChoseong,
+          jungseong: testSyllable.jungseong?.char,
+          jongseong: testSyllable.jongseong?.char,
+        },
+      )
       setSelectedLayoutType(lt)
+      setFocusedSyllable(anchoredSyllable)
     }
-  }, [isJamoEditing, setPreviewLayoutType, setSelectedLayoutType])
+  }, [isJamoEditing, testSyllable, setPreviewLayoutType, setSelectedLayoutType, setFocusedSyllable])
 
   // 자모 패딩 변경 → 스토어 직접
   const handleJamoPaddingChange = useCallback((_type: 'choseong' | 'jungseong' | 'jongseong', _char: string, side: keyof Padding, val: number) => {
@@ -866,6 +942,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     isJamoEditing,
     draftStrokes: editingStrokes,
     editingBox,
+    editingBoundaryBox,
     editingJamoInfo,
     mixedJungseongData,
     editingJamoPadding: editingPadding.padding,
@@ -903,6 +980,9 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
         canRedo={canRedo}
         onPartDeselect={handlePartDeselect}
         onJamoReset={handleJamoReset}
+        isJamoDirty={isJamoDirty}
+        onJamoSave={handleJamoSave}
+        onJamoDiscard={handleJamoDiscard}
         onUndo={globalUndo}
         onRedo={globalRedo}
       />
@@ -923,11 +1003,14 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
         canRedo={canRedo}
         onPartDeselect={handlePartDeselect}
         onJamoReset={handleJamoReset}
+        isJamoDirty={isJamoDirty}
+        onJamoSave={handleJamoSave}
+        onJamoDiscard={handleJamoDiscard}
         onUndo={globalUndo}
         onRedo={globalRedo}
         selectedLayoutType={layoutType}
         previewLayoutType={previewLayoutType}
-        onSelectLayout={setSelectedLayoutType}
+        onSelectLayout={handlePreviewLayoutTypeChange}
         onSelectPreviewLayout={handlePreviewLayoutTypeChange}
         isLayoutDirty={isLayoutDirty}
         onLayoutSave={handleLayoutSave}

@@ -201,22 +201,34 @@ const LAYOUT_DEFAULTS: Record<LayoutType, { cho: number; jung: string; jong: str
 export function getSampleSyllableForLayout(
   layoutType: LayoutType,
   jamoType?: 'choseong' | 'jungseong' | 'jongseong',
-  jamoChar?: string
+  jamoChar?: string,
+  context?: { choseong?: string; jungseong?: string; jongseong?: string }
 ): string {
   const defaults = LAYOUT_DEFAULTS[layoutType]
 
   // 자모 전용 레이아웃
   if (layoutType === 'choseong-only') {
-    return jamoType === 'choseong' && jamoChar ? jamoChar : 'ㄱ'
+    return jamoType === 'choseong' && jamoChar ? jamoChar : context?.choseong ?? 'ㄱ'
   }
   if (layoutType.endsWith('-only')) {
-    return jamoType === 'jungseong' && jamoChar ? jamoChar : defaults.jung
+    return jamoType === 'jungseong' && jamoChar ? jamoChar : context?.jungseong ?? defaults.jung
   }
 
   // 초성/중성/종성 인덱스 결정
-  let choIdx = defaults.cho
-  let jung = defaults.jung
-  let jong = defaults.jong
+  let choIdx = context?.choseong
+    ? (CHOSEONG_LIST as readonly string[]).indexOf(context.choseong)
+    : defaults.cho
+  if (choIdx < 0) choIdx = defaults.cho
+
+  const targetJungseongType = layoutType.includes('vertical')
+    ? 'vertical'
+    : layoutType.includes('horizontal') ? 'horizontal' : 'mixed'
+  let jung = context?.jungseong && classifyJungseong(context.jungseong) === targetJungseongType
+    ? context.jungseong
+    : defaults.jung
+  let jong = layoutType.endsWith('-jongseong')
+    ? context?.jongseong ?? defaults.jong
+    : null
 
   if (jamoType === 'choseong' && jamoChar) {
     choIdx = (CHOSEONG_LIST as readonly string[]).indexOf(jamoChar)
@@ -279,4 +291,3 @@ export function decomposeSyllableWithOverrides(
     jongseong: base.jongseong ? resolveJamoData(base.jongseong, ctx) : null,
   }
 }
-

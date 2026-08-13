@@ -23,6 +23,9 @@ export interface LayoutEditorMobileProps {
   canRedo: boolean
   onPartDeselect: () => void
   onJamoReset: () => void
+  isJamoDirty: boolean
+  onJamoSave: () => void
+  onJamoDiscard: () => void
   onUndo: () => void
   onRedo: () => void
 }
@@ -40,6 +43,9 @@ export function LayoutEditorMobile({
   canRedo,
   onPartDeselect,
   onJamoReset,
+  isJamoDirty,
+  onJamoSave,
+  onJamoDiscard,
   onUndo,
   onRedo,
 }: LayoutEditorMobileProps) {
@@ -70,6 +76,12 @@ export function LayoutEditorMobile({
           <Button variant="default" size="sm" onClick={onUndo} disabled={!canUndo} title="되돌리기">↩</Button>
           <Button variant="default" size="sm" onClick={onRedo} disabled={!canRedo} title="다시 실행">↪</Button>
           <Button variant="default" size="sm" onClick={onJamoReset}>초기화</Button>
+          {isJamoDirty && (
+            <>
+              <Button variant="outline" size="sm" onClick={onJamoDiscard}>폐기</Button>
+              <Button size="sm" onClick={onJamoSave}>저장</Button>
+            </>
+          )}
         </div>
       )}
 

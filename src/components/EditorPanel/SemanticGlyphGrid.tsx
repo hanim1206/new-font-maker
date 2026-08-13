@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { buildSyllableGridSheets, formatAxisValue, type SyllableGridMeta } from '../../utils/syllableGridUtils'
 import type { LayoutType } from '../../types'
 
@@ -15,7 +15,7 @@ interface SemanticGlyphGridProps {
   onNavigate: (meta: SyllableGridMeta) => void
 }
 
-const CELL_SIZE = 36
+const CELL_SIZE = 44
 const HEADER_SIZE = 38
 
 export function SemanticGlyphGrid({
@@ -34,24 +34,16 @@ export function SemanticGlyphGrid({
     () => buildSyllableGridSheets(syllables, { editingJamoType, selectedLayoutType }),
     [syllables, editingJamoType, selectedLayoutType],
   )
-  const [activeSheetId, setActiveSheetId] = useState('')
-  const dragStartRef = useRef<{ row: number; column: number } | null>(null)
+  const dragStartRef = useRef<{ sheetId: string; row: number; column: number } | null>(null)
   const selectionBeforeDragRef = useRef<Set<string>>(new Set())
   const dragMovedRef = useRef(false)
   const activePointerIdRef = useRef<number | null>(null)
   const capturedElementRef = useRef<HTMLElement | null>(null)
 
-  useEffect(() => {
-    if (!sheets.some((sheet) => sheet.id === activeSheetId)) {
-      setActiveSheetId(sheets[0]?.id ?? '')
-    }
-  }, [sheets, activeSheetId])
-
-  const activeSheet = sheets.find((sheet) => sheet.id === activeSheetId) ?? sheets[0]
-
-  const selectRectangle = useCallback((endRow: number, endColumn: number) => {
+  const selectRectangle = useCallback((sheetId: string, endRow: number, endColumn: number) => {
     const start = dragStartRef.current
-    if (!start || !activeSheet) return
+    const sheet = sheets.find((candidate) => candidate.id === sheetId)
+    if (!start || start.sheetId !== sheetId || !sheet) return
     if (start.row === endRow && start.column === endColumn) return
     dragMovedRef.current = true
     const minRow = Math.min(start.row, endRow)
@@ -61,7 +53,7 @@ export function SemanticGlyphGrid({
     const chars: string[] = []
     for (let row = minRow; row <= maxRow; row += 1) {
       for (let column = minColumn; column <= maxColumn; column += 1) {
-        const meta = activeSheet.cells[row]?.[column]
+        const meta = sheet.cells[row]?.[column]
         if (meta) chars.push(meta.char)
       }
     }
@@ -72,7 +64,7 @@ export function SemanticGlyphGrid({
       else next.add(char)
     })
     onSetSelection(next)
-  }, [activeSheet, onSetSelection])
+  }, [sheets, onSetSelection])
 
   const endDrag = useCallback(() => {
     const pointerId = activePointerIdRef.current
@@ -99,9 +91,10 @@ export function SemanticGlyphGrid({
       const target = document.elementFromPoint(event.clientX, event.clientY)
       const cell = target?.closest<HTMLElement>('[data-semantic-grid-cell]')
       if (!cell) return
+      const sheetId = cell.dataset.gridSheet
       const row = Number(cell.dataset.gridRow)
       const column = Number(cell.dataset.gridColumn)
-      if (Number.isInteger(row) && Number.isInteger(column)) selectRectangle(row, column)
+      if (sheetId && Number.isInteger(row) && Number.isInteger(column)) selectRectangle(sheetId, row, column)
     }
     const handlePointerEnd = (event: PointerEvent) => {
       if (activePointerIdRef.current === null || activePointerIdRef.current === event.pointerId) endDrag()
@@ -130,34 +123,22 @@ export function SemanticGlyphGrid({
     }
   }, [endDrag, selectRectangle])
 
-  if (!activeSheet) {
+  if (sheets.length === 0) {
     return <div className="p-4 text-xs text-text-dim-5">표시할 음절이 없습니다.</div>
   }
 
-  const allChars = activeSheet.cells.flatMap((row) => row.flatMap((meta) => meta ? [meta.char] : []))
-
   return (
-    <div className="flex-1 min-h-0 flex flex-col">
-      <div className="shrink-0 px-2 py-1.5 border-b border-border-subtle flex items-center gap-1 overflow-x-auto">
-        {sheets.map((sheet) => (
-          <button
-            key={sheet.id}
-            onClick={() => setActiveSheetId(sheet.id)}
-            className={`h-6 px-2.5 rounded whitespace-nowrap text-[10px] transition-colors ${
-              sheet.id === activeSheet.id
-                ? 'bg-accent-blue/20 text-accent-blue font-medium'
-                : 'bg-surface-2 text-text-dim-5 hover:text-text-dim-2'
-            }`}
-          >
+    <div className="flex-1 min-h-0 overflow-auto bg-white select-none">
+      {sheets.map((sheet) => {
+        const allChars = sheet.cells.flatMap((row) => row.flatMap((meta) => meta ? [meta.char] : []))
+        return (
+        <section key={sheet.id} className="w-max min-w-full border-b-4 border-[#080808] last:border-b-0">
+          <div className="sticky left-0 z-20 px-3 py-1.5 bg-[#111111] border-b border-border-subtle text-[11px] font-semibold text-text-dim-2">
             {sheet.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex-1 min-h-0 overflow-auto bg-white select-none">
+          </div>
         <div
           className="grid w-max min-w-full"
-          style={{ gridTemplateColumns: `${HEADER_SIZE}px repeat(${activeSheet.columns.length}, ${CELL_SIZE}px)` }}
+          style={{ gridTemplateColumns: `${HEADER_SIZE}px repeat(${sheet.columns.length}, ${CELL_SIZE}px)` }}
         >
           <button
             type="button"
@@ -169,15 +150,15 @@ export function SemanticGlyphGrid({
           >
             전체
           </button>
-          {activeSheet.columns.map((column, columnIndex) => {
-            const chars = activeSheet.cells.flatMap((row) => row[columnIndex] ? [row[columnIndex]!.char] : [])
+          {sheet.columns.map((column, columnIndex) => {
+            const chars = sheet.cells.flatMap((row) => row[columnIndex] ? [row[columnIndex]!.char] : [])
             return (
               <button
                 key={`column-${column}`}
                 type="button"
                 disabled={!selectable}
                 onClick={() => onToggleRange(chars)}
-                title={`${activeSheet.columnLabel} ${formatAxisValue(column)} 전체 선택/해제`}
+                title={`${sheet.columnLabel} ${formatAxisValue(column)} 전체 선택/해제`}
                 className="sticky top-0 z-20 border-r border-b border-neutral-300 bg-neutral-100 text-[11px] font-medium text-neutral-700 disabled:cursor-default"
                 style={{ width: CELL_SIZE, height: HEADER_SIZE }}
               >
@@ -186,31 +167,32 @@ export function SemanticGlyphGrid({
             )
           })}
 
-          {activeSheet.rows.map((row, rowIndex) => (
+          {sheet.rows.map((row, rowIndex) => (
             <div key={`row-${row}`} className="contents">
               <button
                 type="button"
                 disabled={!selectable}
-                onClick={() => onToggleRange(activeSheet.cells[rowIndex].flatMap((meta) => meta ? [meta.char] : []))}
-                title={`${activeSheet.rowLabel} ${formatAxisValue(row)} 전체 선택/해제`}
+                onClick={() => onToggleRange(sheet.cells[rowIndex].flatMap((meta) => meta ? [meta.char] : []))}
+                title={`${sheet.rowLabel} ${formatAxisValue(row)} 전체 선택/해제`}
                 className="sticky left-0 z-10 border-r border-b border-neutral-300 bg-neutral-100 text-[10px] font-medium text-neutral-700 disabled:cursor-default"
                 style={{ width: HEADER_SIZE, height: CELL_SIZE }}
               >
                 {formatAxisValue(row)}
               </button>
-              {activeSheet.cells[rowIndex].map((meta, columnIndex) => (
+              {sheet.cells[rowIndex].map((meta, columnIndex) => (
                 meta ? (
                   <div
                     key={meta.char}
                     data-semantic-grid-cell
+                    data-grid-sheet={sheet.id}
                     data-grid-row={rowIndex}
                     data-grid-column={columnIndex}
                     title={`${meta.char} · 더블클릭하여 중앙에서 보기`}
-                    className={`relative overflow-hidden border-r border-b border-neutral-200 ${selectable ? 'cursor-pointer' : 'cursor-default'}`}
+                    className={`relative overflow-hidden border-r border-b border-neutral-200 flex items-center justify-center ${selectable ? 'cursor-pointer' : 'cursor-default'}`}
                     style={{ width: CELL_SIZE, height: CELL_SIZE }}
                     onPointerDown={selectable ? (event) => {
                       event.preventDefault()
-                      dragStartRef.current = { row: rowIndex, column: columnIndex }
+                      dragStartRef.current = { sheetId: sheet.id, row: rowIndex, column: columnIndex }
                       selectionBeforeDragRef.current = new Set(selectedChars)
                       dragMovedRef.current = false
                       activePointerIdRef.current = event.pointerId
@@ -237,7 +219,9 @@ export function SemanticGlyphGrid({
             </div>
           ))}
         </div>
-      </div>
+        </section>
+        )
+      })}
     </div>
   )
 }

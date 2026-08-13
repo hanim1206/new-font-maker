@@ -12,6 +12,7 @@ import { useLayoutStore } from '../../stores/layoutStore'
 import { useGlobalStyleStore } from '../../stores/globalStyleStore'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { SemanticGlyphGrid } from './SemanticGlyphGrid'
+import { LayoutFilterChips } from './LayoutFilterChips'
 import { classifyJungseong, decomposeSyllableWithOverrides } from '../../utils/hangulUtils'
 import { CHOSEONG_LIST, JUNGSEONG_LIST, JONGSEONG_LIST } from '../../data/Hangul'
 import type { LayoutType, JamoOverride, JamoOverrideVariant, OverrideCondition, LayoutOverride } from '../../types'
@@ -20,6 +21,12 @@ import type { SyllableGridMeta } from '../../utils/syllableGridUtils'
 // ===== 모듈 로드 시 1회 계산 =====
 
 type SyllableMeta = SyllableGridMeta
+
+function containsJamo(meta: SyllableMeta, type: 'choseong' | 'jungseong' | 'jongseong', char: string): boolean {
+  if (type === 'choseong') return meta.cho === char
+  if (type === 'jungseong') return meta.jung === char
+  return meta.jong === char
+}
 
 function buildAllSyllables(): SyllableMeta[] {
   const result: SyllableMeta[] = []
@@ -66,18 +73,18 @@ function generateId(): string {
 const EMPTY_OVERRIDES: JamoOverride[] = []
 const CELL_PX = 36
 
-type JongFilter = 'all' | 'none' | 'has'
-type JungFilter = 'all' | 'vertical' | 'horizontal' | 'mixed'
-
 // ===== Props =====
 
 interface GlyphViewerColumnProps {
   onOverrideSwitch?: (id: string | null) => void
+  activeLayoutType: LayoutType | null
+  onSelectLayout: (layoutType: LayoutType) => void
+  onJamoScopeStateChange?: (isDirty: boolean, action: ((mode: 'save' | 'discard') => boolean) | null) => void
 }
 
 // ===== 컴포넌트 =====
 
-export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) {
+export function GlyphViewerColumn({ onOverrideSwitch, activeLayoutType, onSelectLayout, onJamoScopeStateChange }: GlyphViewerColumnProps) {
   // --- 스토어 ---
   const selectedLayoutType = useUIStore((s) => s.selectedLayoutType)
   const editingJamoChar = useUIStore((s) => s.editingJamoChar)
@@ -119,13 +126,30 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
 
   // --- 로컬 상태 ---
   const [selectedChars, setSelectedChars] = useState<Set<string>>(new Set())
-  const [jongFilter, setJongFilter] = useState<JongFilter>('all')
-  const [jungFilter, setJungFilter] = useState<JungFilter>('all')
   const setFocusedSyllable = useUIStore((s) => s.setFocusedSyllable)
 
   const isJamoEditing = !!(editingJamoType && editingJamoChar)
   // 레이아웃 오버라이드 scope 편집 모드
   const isLayoutOverrideEditing = !isJamoEditing && !!selectedLayoutType && !!editingLayoutOverrideId
+
+  const storedJamoScopeChars = useMemo(() => {
+    const stored = new Set<string>()
+    if (!isJamoEditing || !editingOverrideId || !editingJamoType || !editingJamoChar) return stored
+    const override = overrides.find((item) => item.id === editingOverrideId)
+    if (!override) return stored
+    ALL_SYLLABLES.forEach((meta) => {
+      if (
+        containsJamo(meta, editingJamoType, editingJamoChar) &&
+        matchConditionGroups(override.conditionGroups ?? [], meta)
+      ) stored.add(meta.char)
+    })
+    return stored
+  }, [isJamoEditing, editingOverrideId, editingJamoType, editingJamoChar, overrides])
+
+  const isJamoScopeDirty = editingOverrideId !== null && (
+    selectedChars.size !== storedJamoScopeChars.size ||
+    Array.from(selectedChars).some((char) => !storedJamoScopeChars.has(char))
+  )
 
   // 레이아웃 오버라이드 편집 중: 선택된 셀에 미리보기 적용할 스키마 (partOverrides 직접 병합)
   const layoutOverridePreviewSchema = useMemo(() => {
@@ -176,7 +200,10 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
       const groups = override.conditionGroups
       const newSelected = new Set<string>()
       ALL_SYLLABLES.forEach((meta) => {
-        if (matchConditionGroups(groups, meta)) newSelected.add(meta.char)
+        if (
+          containsJamo(meta, editingJamoType, editingJamoChar) &&
+          matchConditionGroups(groups, meta)
+        ) newSelected.add(meta.char)
       })
       setSelectedChars(newSelected)
     } else if (!isJamoEditing && selectedLayoutType && editingLayoutOverrideId) {
@@ -195,12 +222,7 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
       setSelectedChars(newSelected)
     } else {
       setSelectedChars(new Set())
-      if (!isJamoEditing && !isLayoutOverrideEditing) {
-        setJongFilter('all')
-        setJungFilter('all')
-      }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isJamoEditing, editingOverrideId, editingJamoType, editingJamoChar, editingLayoutOverrideId, selectedLayoutType])
 
   // --- 필터링 ---
@@ -214,27 +236,16 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
           if (editingJamoType === 'jungseong' && meta.jung !== editingJamoChar) return false
           if (editingJamoType === 'jongseong' && meta.jong !== editingJamoChar) return false
         }
-        // 레이아웃 오버라이드 모드에서도 그룹핑 필터 적용
-        if (isLayoutOverrideEditing) {
-          if (jongFilter === 'none' && meta.jong !== '') return false
-          if (jongFilter === 'has' && meta.jong === '') return false
-          const jungType = classifyJungseong(meta.jung)
-          if (jungFilter !== 'all' && jungType !== jungFilter) return false
-        }
         return true
       }
       // 자모 편집 모드: 편집 중인 자모가 해당 포지션에 있는 것만
+      if (activeLayoutType && meta.layoutType !== activeLayoutType) return false
       if (editingJamoType === 'choseong' && meta.cho !== editingJamoChar) return false
       if (editingJamoType === 'jungseong' && meta.jung !== editingJamoChar) return false
       if (editingJamoType === 'jongseong' && meta.jong !== editingJamoChar) return false
-      // 그룹핑 필터 (추가 좁히기)
-      if (jongFilter === 'none' && meta.jong !== '') return false
-      if (jongFilter === 'has' && meta.jong === '') return false
-      const jungType = classifyJungseong(meta.jung)
-      if (jungFilter !== 'all' && jungType !== jungFilter) return false
       return true
     })
-  }, [isJamoEditing, isLayoutOverrideEditing, selectedLayoutType, editingJamoChar, editingJamoType, jongFilter, jungFilter])
+  }, [isJamoEditing, selectedLayoutType, activeLayoutType, editingJamoChar, editingJamoType])
 
   const handleToggleCell = useCallback((char: string) => {
     setSelectedChars((previous) => {
@@ -276,7 +287,7 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
         group = [
           { type: 'layoutIs', layout: meta.layoutType },
           { type: 'jungseongIs', jamo: meta.jung },
-          ...(meta.jong !== '' ? [{ type: 'jongseongIs' as const, jamo: meta.jong }] : []),
+          { type: 'jongseongIs', jamo: meta.jong },
         ]
         key = `${meta.layoutType}|${meta.jung}|${meta.jong}`
       } else if (editingJamoType === 'jungseong') {
@@ -284,7 +295,7 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
         group = [
           { type: 'layoutIs', layout: meta.layoutType },
           { type: 'choseongIs', jamo: meta.cho },
-          ...(meta.jong !== '' ? [{ type: 'jongseongIs' as const, jamo: meta.jong }] : []),
+          { type: 'jongseongIs', jamo: meta.jong },
         ]
         key = `${meta.layoutType}|${meta.cho}|${meta.jong}`
       } else {
@@ -303,6 +314,23 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
     const conditionGroups = Array.from(groupMap.values())
     updateOverride(editingJamoType, editingJamoChar, editingOverrideId, { conditionGroups })
   }, [editingOverrideId, editingJamoType, editingJamoChar, selectedChars, updateOverride])
+
+  useEffect(() => {
+    if (!isJamoEditing) {
+      onJamoScopeStateChange?.(false, null)
+      return
+    }
+    onJamoScopeStateChange?.(isJamoScopeDirty, (mode) => {
+      if (mode === 'discard') {
+        setSelectedChars(new Set(storedJamoScopeChars))
+        return true
+      }
+      if (editingOverrideId && selectedChars.size === 0) return false
+      if (editingOverrideId) handleApply()
+      return true
+    })
+    return () => onJamoScopeStateChange?.(false, null)
+  }, [isJamoEditing, editingOverrideId, selectedChars, storedJamoScopeChars, isJamoScopeDirty, handleApply, onJamoScopeStateChange])
 
   // --- 레이아웃 오버라이드 scope 적용 ---
   const handleLayoutOverrideApply = useCallback(() => {
@@ -386,6 +414,13 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
 
   return (
     <div className="flex-1 min-h-0 min-w-0 flex flex-col border-r border-border-subtle bg-[#080808]">
+
+      <LayoutFilterChips
+        activeLayoutType={activeLayoutType}
+        onSelect={onSelectLayout}
+        editingJamoType={isJamoEditing ? editingJamoType : null}
+        editingJamoChar={isJamoEditing ? editingJamoChar : null}
+      />
 
       {/* === 오버라이드 탭 (자모 편집 중에만) === */}
       {isJamoEditing && (
@@ -488,42 +523,6 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
         )
       })()}
 
-      {/* === 그룹핑 버튼 (자모 편집 또는 레이아웃 오버라이드 편집 중에만) === */}
-      {(isJamoEditing || isLayoutOverrideEditing) && (
-        <div className="shrink-0 px-2 py-1.5 border-b border-border-subtle flex flex-col gap-1">
-          <div className="flex gap-1">
-            {([['all', '전체'], ['none', '받침없음'], ['has', '받침있음']] as const).map(([val, label]) => (
-              <button
-                key={val}
-                onClick={() => setJongFilter(val)}
-                className={`h-5 px-2 rounded text-[10px] transition-all ${
-                  jongFilter === val
-                    ? 'bg-accent-blue/20 text-accent-blue font-medium'
-                    : 'text-text-dim-5 bg-surface-2 hover:text-text-dim-2'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-1">
-            {([['all', '전체'], ['vertical', '세로'], ['horizontal', '가로'], ['mixed', '복합']] as const).map(([val, label]) => (
-              <button
-                key={val}
-                onClick={() => setJungFilter(val)}
-                className={`h-5 px-2 rounded text-[10px] transition-all ${
-                  jungFilter === val
-                    ? 'bg-accent-blue/20 text-accent-blue font-medium'
-                    : 'text-text-dim-5 bg-surface-2 hover:text-text-dim-2'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* === 헤더 === */}
       <div className="shrink-0 px-3 py-1.5 border-b border-border-subtle flex items-center justify-between">
         <span className="text-[11px] text-text-dim-3 font-medium">음절</span>
@@ -578,7 +577,7 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
         }}
       />
 
-      {/* === 적용 바 (자모 오버라이드 편집 중) === */}
+      {/* === 적용 범위 상태 (저장은 상단 공통 저장 버튼에서 수행) === */}
       {isJamoEditing && editingOverrideId !== null && (
         <div className="shrink-0 px-3 py-2 border-t border-border-subtle flex items-center justify-between bg-[#0c0c0c]">
           <button onClick={() => setSelectedChars(new Set())} className="text-[11px] text-text-dim-3 hover:text-foreground">
@@ -590,13 +589,7 @@ export function GlyphViewerColumn({ onOverrideSwitch }: GlyphViewerColumnProps) 
               : '글자를 드래그하여 적용 범위 선택'
             }
           </span>
-          <button
-            onClick={handleApply}
-            disabled={selectedChars.size === 0}
-            className="h-7 px-3 rounded text-[11px] font-medium bg-accent-blue text-white disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
-          >
-            적용
-          </button>
+          <span className="text-[11px] text-text-dim-4">상단 저장으로 확정</span>
         </div>
       )}
 

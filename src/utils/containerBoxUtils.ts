@@ -1,5 +1,27 @@
 import type { BoxConfig, Padding, StrokeDataV2 } from '../types'
 
+export interface NormalizedBounds {
+  minX: number
+  maxX: number
+  minY: number
+  maxY: number
+}
+
+/** 패딩 기준 좌표계에서 원래 파트 박스가 차지하는 허용 범위 */
+export function getBoxBoundsInNormalizedCoordinates(
+  containerBox: BoxConfig,
+  boundaryBox: BoxConfig,
+): NormalizedBounds {
+  const width = Math.max(0.01, containerBox.width)
+  const height = Math.max(0.01, containerBox.height)
+  return {
+    minX: (boundaryBox.x - containerBox.x) / width,
+    maxX: (boundaryBox.x + boundaryBox.width - containerBox.x) / width,
+    minY: (boundaryBox.y - containerBox.y) / height,
+    maxY: (boundaryBox.y + boundaryBox.height - containerBox.y) / height,
+  }
+}
+
 /**
  * 자모 패딩을 박스에 적용하여 축소된 박스를 반환
  * padding은 박스 상대 비율 (0~1)

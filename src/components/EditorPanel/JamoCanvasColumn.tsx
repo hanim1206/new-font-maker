@@ -11,6 +11,7 @@ import { usePinchZoom } from '../../hooks/usePinchZoom'
 import type { DecomposedSyllable, BoxConfig, LayoutSchema, Part, Padding, StrokeDataV2 } from '../../types'
 import { PADDING_COLOR, PADDING_DIRTY_COLOR, PADDING_MIXED_ALT_COLOR, PART_COLORS } from '../../constants/editorColors'
 import type { GlobalStyle } from '../../stores/globalStyleStore'
+import { applyJamoPaddingToBox } from '../../utils/containerBoxUtils'
 
 interface MixedJungseongData {
   isMixed: boolean
@@ -18,6 +19,8 @@ interface MixedJungseongData {
   juVBox: BoxConfig | undefined
   horizontalStrokeIds: Set<string>
   verticalStrokeIds: Set<string>
+  horizontalBoundaryBox?: BoxConfig
+  verticalBoundaryBox?: BoxConfig
 }
 
 interface JamoCanvasColumnProps {
@@ -30,6 +33,7 @@ interface JamoCanvasColumnProps {
   isJamoEditing: boolean
   draftStrokes: StrokeDataV2[]
   editingBox: BoxConfig | null
+  editingBoundaryBox: BoxConfig | null
   editingJamoInfo: { type: 'choseong' | 'jungseong' | 'jongseong'; char: string } | null
   // 혼합중성
   mixedJungseongData: MixedJungseongData | null
@@ -67,6 +71,7 @@ export function JamoCanvasColumn({
   isJamoEditing,
   draftStrokes,
   editingBox,
+  editingBoundaryBox,
   editingJamoInfo,
   mixedJungseongData,
   editingJamoPadding,
@@ -139,20 +144,33 @@ export function JamoCanvasColumn({
 
   const isStrokeSelected = !!selectedStrokeId
   const jamoPad = editingJamoPadding ?? { top: 0, bottom: 0, left: 0, right: 0 }
+  const editingLimitBox = editingBoundaryBox
+    ? applyJamoPaddingToBox(editingBoundaryBox.x, editingBoundaryBox.y, editingBoundaryBox.width, editingBoundaryBox.height, editingJamoPadding)
+    : undefined
+  const horizontalLimitBox = mixedJungseongData?.horizontalBoundaryBox
+    ? applyJamoPaddingToBox(
+      mixedJungseongData.horizontalBoundaryBox.x,
+      mixedJungseongData.horizontalBoundaryBox.y,
+      mixedJungseongData.horizontalBoundaryBox.width,
+      mixedJungseongData.horizontalBoundaryBox.height,
+      editingHorizontalPadding ?? editingJamoPadding,
+    )
+    : undefined
+  const verticalLimitBox = mixedJungseongData?.verticalBoundaryBox
+    ? applyJamoPaddingToBox(
+      mixedJungseongData.verticalBoundaryBox.x,
+      mixedJungseongData.verticalBoundaryBox.y,
+      mixedJungseongData.verticalBoundaryBox.width,
+      mixedJungseongData.verticalBoundaryBox.height,
+      editingVerticalPadding ?? editingJamoPadding,
+    )
+    : undefined
 
-  // 꽉 찬 뷰: 전체 캔버스를 사용
   const fullBox: BoxConfig = { x: 0, y: 0, width: 1, height: 1 }
 
-  // 혼합중성의 sub-box를 전체 캔버스에 맞게 리맵
-  const remapBox = (subBox: BoxConfig, parentBox: BoxConfig): BoxConfig => ({
-    x: (subBox.x - parentBox.x) / parentBox.width,
-    y: (subBox.y - parentBox.y) / parentBox.height,
-    width: subBox.width / parentBox.width,
-    height: subBox.height / parentBox.height,
-  })
-
-  // 원본 effective box (리맵 기준용)
-  const origEffectiveBox = mixedJungseongData?.juHBox || mixedJungseongData?.juVBox ? {
+  // 선택 레이아웃에서 자모가 실제로 차지하는 영역.
+  // 혼합중성은 JU_H/JU_V의 합집합, 나머지는 calculateBoxes에서 받은 editingBox를 사용한다.
+  const mixedContextBox = mixedJungseongData?.juHBox || mixedJungseongData?.juVBox ? {
     x: Math.min(mixedJungseongData.juHBox?.x ?? 1, mixedJungseongData.juVBox?.x ?? 1),
     y: Math.min(mixedJungseongData.juHBox?.y ?? 1, mixedJungseongData.juVBox?.y ?? 1),
     width: Math.max(
@@ -163,24 +181,15 @@ export function JamoCanvasColumn({
       (mixedJungseongData.juHBox?.y ?? 0) + (mixedJungseongData.juHBox?.height ?? 0),
       (mixedJungseongData.juVBox?.y ?? 0) + (mixedJungseongData.juVBox?.height ?? 0)
     ) - Math.min(mixedJungseongData.juHBox?.y ?? 1, mixedJungseongData.juVBox?.y ?? 1),
-  } : editingBox!
-
-  // StrokeOverlay에 전달할 effective box (꽉 찬 뷰)
-  const effectiveBox = fullBox
-
-  // 혼합중성 sub-box를 전체 캔버스에 리맵
-  const remappedJuHBox = mixedJungseongData?.juHBox
-    ? remapBox(mixedJungseongData.juHBox, origEffectiveBox)
-    : undefined
-  const remappedJuVBox = mixedJungseongData?.juVBox
-    ? remapBox(mixedJungseongData.juVBox, origEffectiveBox)
-    : undefined
+  } : null
+  const contextBox = mixedContextBox ?? editingBox ?? fullBox
+  const hasLayoutArea = mixedContextBox !== null || editingBox !== null
 
   return (
     <div className="relative">
       {/* 캔버스 영역 */}
       <div className="p-4 pt-3">
-        <div ref={containerRef} className="flex justify-center p-4 md:p-10 bg-background rounded mb-2" onClick={() => { setSelectedStrokeId(null); setSelectedPointIndex(null) }}>
+        <div ref={containerRef} className="flex justify-center p-4 md:p-10 bg-[#b8bcc2] rounded mb-2" onClick={() => { setSelectedStrokeId(null); setSelectedPointIndex(null) }}>
           <div
             className="relative"
             style={{
@@ -191,19 +200,19 @@ export function JamoCanvasColumn({
               willChange: isTouch ? 'transform' : undefined,
             }}
           >
+          {/* 레이아웃 캔버스와 같은 전체 좌표계에서 선택 자소만 포커스 편집한다. */}
           <div
-            className="absolute"
+            className="absolute bg-white border border-neutral-500 shadow-sm"
+            data-jamo-layout-canvas
             style={{
               left: HANDLE_MARGIN,
               top: HANDLE_MARGIN,
               width: canvasSize,
               height: canvasSize,
-              backgroundColor: '#ffffff',
             }}
           >
-            {/* 0.025 스냅 그리드 */}
             <svg
-              className="absolute inset-0 pointer-events-none z-0"
+              className="absolute inset-0 pointer-events-none"
               width={canvasSize}
               height={canvasSize}
               viewBox="0 0 100 100"
@@ -221,109 +230,124 @@ export function JamoCanvasColumn({
                 const v = (i + 1) * 10
                 return (
                   <g key={`grid-major-${i}`}>
-                    <line x1={v} y1={0} x2={v} y2={100} stroke="#ccc" strokeWidth={0.4} />
-                    <line x1={0} y1={v} x2={100} y2={v} stroke="#ccc" strokeWidth={0.4} />
+                    <line x1={v} y1={0} x2={v} y2={100} stroke="#b8b8b8" strokeWidth={0.4} />
+                    <line x1={0} y1={v} x2={100} y2={v} stroke="#b8b8b8" strokeWidth={0.4} />
                   </g>
                 )
               })}
             </svg>
 
-            {/* 편집 중인 파트의 배경색 (꽉 찬 뷰) */}
-            {editingPartInLayout && editingBox && (
+            {hasLayoutArea && (
               <div
-                className="absolute inset-0 pointer-events-none"
+                className="absolute z-[1] pointer-events-none"
+                data-jamo-context-box={`${contextBox.x},${contextBox.y},${contextBox.width},${contextBox.height}`}
                 style={{
-                  backgroundColor: PART_COLORS[editingPartInLayout],
-                  opacity: 0.15,
+                  left: `${contextBox.x * 100}%`,
+                  top: `${contextBox.y * 100}%`,
+                  width: `${contextBox.width * 100}%`,
+                  height: `${contextBox.height * 100}%`,
+                  backgroundColor: `${editingPartInLayout ? PART_COLORS[editingPartInLayout] : '#2563eb'}1f`,
+                  outline: `2px solid ${editingPartInLayout ? PART_COLORS[editingPartInLayout] : '#2563eb'}`,
+                  outlineOffset: -1,
                 }}
               />
             )}
 
-            <SvgRenderer
-              svgRef={svgRef}
-              syllable={displaySyllable}
-              schema={schemaWithPadding}
-              size={canvasSize}
-              fillColor="#1a1a1a"
-              backgroundColor="transparent"
-              globalStyle={effectiveStyle}
-              partStyles={partStyles}
-              className="relative z-[1]"
-            >
-              {/* StrokeOverlay (자모 획 편집) — 반드시 PaddingOverlay보다 먼저 렌더링 */}
-              {editingBox && draftStrokes.length > 0 && (
-                <StrokeOverlay
-                  strokes={draftStrokes}
-                  box={effectiveBox}
-                  svgRef={svgRef}
-                  viewBoxSize={100}
-                  onStrokeChange={onStrokeChange}
-                  onPointChange={onPointChange}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                  strokeColor="#1a1a1a"
-                  isMixed={!!mixedJungseongData}
-                  juHBox={remappedJuHBox}
-                  juVBox={remappedJuVBox}
-                  horizontalStrokeIds={mixedJungseongData?.horizontalStrokeIds}
-                  verticalStrokeIds={mixedJungseongData?.verticalStrokeIds}
-                  globalStyle={globalStyleRaw}
-                  jamoPadding={editingJamoPadding}
-                  horizontalPadding={editingHorizontalPadding}
-                  verticalPadding={editingVerticalPadding}
-                />
-              )}
-
-              {/* PaddingOverlay — 반드시 StrokeOverlay 뒤에 렌더링 (이벤트 레이어링) */}
-              {editingJamoInfo && editingBox && (() => {
-                if (remappedJuHBox && remappedJuVBox) {
-                  const hPad = editingHorizontalPadding ?? jamoPad
-                  const vPad = editingVerticalPadding ?? jamoPad
-                  return (
-                    <>
-                      <PaddingOverlay
-                        svgRef={svgRef}
-                        viewBoxSize={100}
-                        padding={hPad}
-                        containerBox={remappedJuHBox}
-                        onPaddingChange={(side, val) =>
-                          onMixedJamoPaddingChange(editingJamoInfo.char, 'horizontal', side, val)
-                        }
-                        color={isPaddingDirty ? PADDING_DIRTY_COLOR : PADDING_COLOR}
-                        disabled={isStrokeSelected}
-                      />
-                      <PaddingOverlay
-                        svgRef={svgRef}
-                        viewBoxSize={100}
-                        padding={vPad}
-                        containerBox={remappedJuVBox}
-                        onPaddingChange={(side, val) =>
-                          onMixedJamoPaddingChange(editingJamoInfo.char, 'vertical', side, val)
-                        }
-                        color={isPaddingDirty ? PADDING_DIRTY_COLOR : PADDING_MIXED_ALT_COLOR}
-                        disabled={isStrokeSelected}
-                      />
-                    </>
-                  )
-                }
-
-                return (
-                  <PaddingOverlay
+            {hasLayoutArea && (
+              <SvgRenderer
+                svgRef={svgRef}
+                syllable={displaySyllable}
+                schema={schemaWithPadding}
+                size={canvasSize}
+                fillColor="#1a1a1a"
+                backgroundColor="transparent"
+                clipGlyphs
+                globalStyle={effectiveStyle}
+                partStyles={partStyles}
+                className="relative z-[2]"
+              >
+                {editingBox && draftStrokes.length > 0 && (
+                  <StrokeOverlay
+                    strokes={draftStrokes}
+                    box={editingBox}
                     svgRef={svgRef}
                     viewBoxSize={100}
-                    padding={jamoPad}
-                    containerBox={fullBox}
-                    onPaddingChange={(side, val) =>
-                      onJamoPaddingChange(editingJamoInfo.type, editingJamoInfo.char, side, val)
-                    }
-                    color={isPaddingDirty ? PADDING_DIRTY_COLOR : PADDING_COLOR}
-                    disabled={isStrokeSelected}
+                    onStrokeChange={onStrokeChange}
+                    onPointChange={onPointChange}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    strokeColor="#1a1a1a"
+                    isMixed={!!mixedJungseongData}
+                    juHBox={mixedJungseongData?.juHBox}
+                    juVBox={mixedJungseongData?.juVBox}
+                    horizontalStrokeIds={mixedJungseongData?.horizontalStrokeIds}
+                    verticalStrokeIds={mixedJungseongData?.verticalStrokeIds}
+                    globalStyle={globalStyleRaw}
+                    jamoPadding={editingJamoPadding}
+                    horizontalPadding={editingHorizontalPadding}
+                    verticalPadding={editingVerticalPadding}
+                    boundaryBox={editingLimitBox}
+                    horizontalBoundaryBox={horizontalLimitBox}
+                    verticalBoundaryBox={verticalLimitBox}
                   />
-                )
-              })()}
-            </SvgRenderer>
+                )}
 
+                {editingJamoInfo && editingBox && (() => {
+                  if (mixedJungseongData?.juHBox && mixedJungseongData.juVBox) {
+                    const hPad = editingHorizontalPadding ?? jamoPad
+                    const vPad = editingVerticalPadding ?? jamoPad
+                    return (
+                      <>
+                        <PaddingOverlay
+                          svgRef={svgRef}
+                          viewBoxSize={100}
+                          padding={hPad}
+                          containerBox={mixedJungseongData.juHBox}
+                          onPaddingChange={(side, val) =>
+                            onMixedJamoPaddingChange(editingJamoInfo.char, 'horizontal', side, val)
+                          }
+                          color={isPaddingDirty ? PADDING_DIRTY_COLOR : PADDING_COLOR}
+                          disabled={isStrokeSelected}
+                        />
+                        <PaddingOverlay
+                          svgRef={svgRef}
+                          viewBoxSize={100}
+                          padding={vPad}
+                          containerBox={mixedJungseongData.juVBox}
+                          onPaddingChange={(side, val) =>
+                            onMixedJamoPaddingChange(editingJamoInfo.char, 'vertical', side, val)
+                          }
+                          color={isPaddingDirty ? PADDING_DIRTY_COLOR : PADDING_MIXED_ALT_COLOR}
+                          disabled={isStrokeSelected}
+                        />
+                      </>
+                    )
+                  }
+
+                  return (
+                    <PaddingOverlay
+                      svgRef={svgRef}
+                      viewBoxSize={100}
+                      padding={jamoPad}
+                      containerBox={editingBox}
+                      onPaddingChange={(side, val) =>
+                        onJamoPaddingChange(editingJamoInfo.type, editingJamoInfo.char, side, val)
+                      }
+                      color={isPaddingDirty ? PADDING_DIRTY_COLOR : PADDING_COLOR}
+                      disabled={isStrokeSelected}
+                    />
+                  )
+                })()}
+              </SvgRenderer>
+            )}
           </div>
+          {!hasLayoutArea ? (
+            <div className="absolute inset-0 flex items-center justify-center text-center text-sm text-neutral-600">
+              선택한 레이아웃에는
+              <br />
+              이 자소의 편집 영역이 없습니다
+            </div>
+          ) : null}
           </div>
 
         </div>
@@ -350,7 +374,17 @@ export function JamoCanvasColumn({
           strokes={draftStrokes}
           onChange={onStrokeChange}
           onPointChange={onPointChange}
-          boxInfo={fullBox}
+          boxInfo={editingBox ?? fullBox}
+          jamoPadding={editingJamoPadding}
+          horizontalPadding={editingHorizontalPadding}
+          verticalPadding={editingVerticalPadding}
+          horizontalStrokeIds={mixedJungseongData?.horizontalStrokeIds}
+          verticalStrokeIds={mixedJungseongData?.verticalStrokeIds}
+          boundaryBox={editingLimitBox}
+          horizontalBox={mixedJungseongData?.juHBox}
+          verticalBox={mixedJungseongData?.juVBox}
+          horizontalBoundaryBox={horizontalLimitBox}
+          verticalBoundaryBox={verticalLimitBox}
         />
       )}
     </div>
