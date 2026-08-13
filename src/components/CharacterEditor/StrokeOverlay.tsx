@@ -73,11 +73,14 @@ export interface StrokeOverlayProps {
   // 혼합중성 파트별 개별 패딩
   horizontalPadding?: Padding
   verticalPadding?: Padding
+  boundaryBox?: BoxConfig
+  horizontalBoundaryBox?: BoxConfig
+  verticalBoundaryBox?: BoxConfig
   // 롱프레스 시 포인트 액션 팝업 트리거 (모바일)
   onPointLongPress?: (strokeId: string, pointIndex: number) => void
 }
 
-import { applyJamoPaddingToBox } from '../../utils/containerBoxUtils'
+import { applyJamoPaddingToBox, getBoxBoundsInNormalizedCoordinates } from '../../utils/containerBoxUtils'
 
 /**
  * StrokeOverlay: 획 드래그/리사이즈 상호작용을 SVG `<g>` 프래그먼트로 제공
@@ -107,6 +110,9 @@ export function StrokeOverlay({
   jamoPadding,
   horizontalPadding,
   verticalPadding,
+  boundaryBox,
+  horizontalBoundaryBox,
+  verticalBoundaryBox,
   onPointLongPress,
 }: StrokeOverlayProps) {
   const { selectedStrokeId, setSelectedStrokeId, selectedPointIndex, setSelectedPointIndex, canvasZoom } = useUIStore()
@@ -220,6 +226,17 @@ export function StrokeOverlay({
     return applyJamoPaddingToBox(box.x, box.y, box.width, box.height, jamoPadding)
   }, [isMixed, juHBox, juVBox, horizontalStrokeIds, verticalStrokeIds, box, jamoPadding, horizontalPadding, verticalPadding])
 
+  const getEditableBounds = useCallback((stroke: StrokeDataV2) => {
+    const container = getContainerBoxNormalized(stroke)
+    if (isMixed && horizontalStrokeIds?.has(stroke.id)) {
+      return getBoxBoundsInNormalizedCoordinates(container, horizontalBoundaryBox ?? container)
+    }
+    if (isMixed && verticalStrokeIds?.has(stroke.id)) {
+      return getBoxBoundsInNormalizedCoordinates(container, verticalBoundaryBox ?? container)
+    }
+    return getBoxBoundsInNormalizedCoordinates(container, boundaryBox ?? container)
+  }, [getContainerBoxNormalized, isMixed, horizontalStrokeIds, verticalStrokeIds, boundaryBox, horizontalBoundaryBox, verticalBoundaryBox])
+
   // 스냅 타겟 캐시 (드래그 중인 획 제외)
   const snapTargets = useMemo(() => {
     if (!dragState) return []
@@ -315,11 +332,19 @@ export function StrokeOverlay({
       const relY = cH > 0 ? (svgPt.y - cY) / cH : 0
 
       if (dragState.type === 'point') {
-        const clampedX = Math.max(0, Math.min(1, relX))
-        const clampedY = Math.max(0, Math.min(1, relY))
+        const stroke = strokes.find((candidate) => candidate.id === dragState.strokeId)
+        if (!stroke) return
+        const bounds = getEditableBounds(stroke)
+        const clampedX = Math.max(bounds.minX, Math.min(bounds.maxX, relX))
+        const clampedY = Math.max(bounds.minY, Math.min(bounds.maxY, relY))
 
         // 스냅 적용
-        const snap = snapPoint(clampedX, clampedY, snapTargets)
+        const snapped = snapPoint(clampedX, clampedY, snapTargets)
+        const snap = {
+          ...snapped,
+          x: Math.max(bounds.minX, Math.min(bounds.maxX, snapped.x)),
+          y: Math.max(bounds.minY, Math.min(bounds.maxY, snapped.y)),
+        }
         onPointChange(dragState.strokeId, dragState.pointIndex, 'x', snap.x)
         onPointChange(dragState.strokeId, dragState.pointIndex, 'y', snap.y)
         setSnapFeedback(snap.snappedX || snap.snappedY ? snap : null)
@@ -377,6 +402,9 @@ export function StrokeOverlay({
     // 획 전체 이동
     if (dragState.type === 'strokeMove') {
       if (!onPointChange || !dragState.originalPoints) return
+      const stroke = strokes.find((candidate) => candidate.id === dragState.strokeId)
+      if (!stroke) return
+      const bounds = getEditableBounds(stroke)
       const mouseRelX = cW > 0 ? (svgPt.x - cX) / cW : 0
       const mouseRelY = cH > 0 ? (svgPt.y - cY) / cH : 0
       const rawDeltaX = mouseRelX - (dragState.grabRelX ?? 0)
@@ -390,7 +418,7 @@ export function StrokeOverlay({
       let snappedDeltaX = snap.x - firstOrig.x
       let snappedDeltaY = snap.y - firstOrig.y
 
-      // 캔버스 바운드 클램핑: 모든 포인트가 0~1 범위 안에 유지되도록 delta 제한
+      // 패딩은 권고선으로만 사용하고, 모든 포인트가 실제 파트 영역 안에 유지되도록 제한
       let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
       for (const pt of dragState.originalPoints) {
         minX = Math.min(minX, pt.x)
@@ -398,10 +426,10 @@ export function StrokeOverlay({
         minY = Math.min(minY, pt.y)
         maxY = Math.max(maxY, pt.y)
       }
-      if (minX + snappedDeltaX < 0) snappedDeltaX = -minX
-      if (maxX + snappedDeltaX > 1) snappedDeltaX = 1 - maxX
-      if (minY + snappedDeltaY < 0) snappedDeltaY = -minY
-      if (maxY + snappedDeltaY > 1) snappedDeltaY = 1 - maxY
+      if (minX + snappedDeltaX < bounds.minX) snappedDeltaX = bounds.minX - minX
+      if (maxX + snappedDeltaX > bounds.maxX) snappedDeltaX = bounds.maxX - maxX
+      if (minY + snappedDeltaY < bounds.minY) snappedDeltaY = bounds.minY - minY
+      if (maxY + snappedDeltaY > bounds.maxY) snappedDeltaY = bounds.maxY - maxY
 
       dragState.originalPoints.forEach((origPt, i) => {
         onPointChange(dragState.strokeId, i, 'x', origPt.x + snappedDeltaX)
@@ -423,7 +451,7 @@ export function StrokeOverlay({
       setMergeHintState(null)
       return
     }
-  }, [dragState, onPointChange, svgPointFromEvent, snapTargets, strokes])
+  }, [dragState, onPointChange, svgPointFromEvent, snapTargets, strokes, getEditableBounds])
 
   // 드래그 종료
   const handlePointerUp = useCallback(() => {

@@ -11,6 +11,14 @@
         "bottom": 0.15,
         "left": 0.15,
         "right": 0.15
+      },
+      "partOverrides": {
+        "CH": {
+          "top": 0.075,
+          "bottom": 0.075,
+          "left": 0.075,
+          "right": 0.075
+        }
       }
     },
     "jungseong-vertical-only": {
@@ -196,15 +204,15 @@
       "partOverrides": {
         "JU": {
           "top": 0,
-          "bottom": 0,
+          "bottom": -0.015,
           "left": 0.09,
           "right": 0
         },
         "JO": {
           "top": 0.08625,
           "bottom": 0,
-          "left": 0.08,
-          "right": 0
+          "left": 0.11,
+          "right": 0.06
         },
         "CH": {
           "top": 0,
@@ -250,6 +258,54 @@
           "left": 0.09,
           "right": 0.09
         }
+      },
+      "partOverridesByJungseong": {
+        "ㅗ": {
+          "JU": {
+            "top": -0.05,
+            "bottom": 0.0775,
+            "left": 0,
+            "right": 0
+          }
+        },
+        "ㅛ": {
+          "JU": {
+            "top": -0.048,
+            "bottom": 0.119,
+            "left": 0,
+            "right": 0
+          }
+        },
+        "ㅜ": {
+          "JU": {
+            "top": 0.0015,
+            "bottom": 0.02,
+            "left": 0,
+            "right": 0
+          }
+        },
+        "ㅠ": {
+          "JU": {
+            "top": 0.07,
+            "bottom": 0.02,
+            "left": 0,
+            "right": 0
+          }
+        },
+        "ㅡ": {
+          "JU": {
+            "top": -0.055,
+            "bottom": 0.055,
+            "left": 0,
+            "right": 0
+          },
+          "JO": {
+            "top": 0.024,
+            "bottom": 0,
+            "left": 0.09,
+            "right": 0.09
+          }
+        }
       }
     },
     "choseong-jungseong-mixed-jongseong": {
@@ -290,11 +346,11 @@
         "JO": {
           "top": 0.07,
           "bottom": 0,
-          "left": 0.05,
-          "right": 0.065
+          "left": 0.065,
+          "right": 0.08
         },
         "JU_H": {
-          "top": 0.00125,
+          "top": -0.01875,
           "bottom": 0.02,
           "left": 0,
           "right": 0

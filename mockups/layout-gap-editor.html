@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>레이아웃 간격 편집 목업</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, Pretendard, system-ui, sans-serif;
+      --bg: #080909;
+      --panel: #101212;
+      --line: #292c2c;
+      --muted: #878c8c;
+      --cyan: #35d4d0;
+      --orange: #ff8a22;
+      --lime: #a6d943;
+      --split: 55%;
+      --gap: 9%;
+      --outer: 7%;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 1080px; min-height: 100vh; overflow: hidden; background: var(--bg); color: #f4f5f5; }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    .app { height: 100vh; display: grid; grid-template-columns: 210px minmax(580px, 1fr) 330px; grid-template-rows: 1fr 102px; }
+    .sidebar, .inspector { background: var(--panel); }
+    .sidebar { border-right: 1px solid var(--line); padding: 22px 16px; }
+    .inspector { border-left: 1px solid var(--line); padding: 24px 22px; overflow-y: auto; }
+    h1 { font-size: 18px; margin: 0 0 22px; }
+    h2 { font-size: 14px; margin: 24px 0 10px; color: #c8cccc; }
+    .layout-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .layout-card { height: 62px; border: 1px solid var(--line); border-radius: 10px; background: #151717; cursor: pointer; font-size: 23px; }
+    .layout-card.active { border-color: var(--orange); background: #21170f; box-shadow: inset 0 0 0 1px #ff8a2250; }
+    .main { position: relative; display: flex; flex-direction: column; min-width: 0; background: #0b0c0c; }
+    .toolbar { height: 68px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .tool { height: 38px; min-width: 90px; padding: 0 18px; border: 1px solid var(--line); background: #151717; cursor: pointer; }
+    .tool:first-child { border-radius: 9px 0 0 9px; }
+    .tool:last-child { border-radius: 0 9px 9px 0; }
+    .tool.active { border-color: var(--orange); background: var(--orange); color: #15100a; font-weight: 750; }
+    .stage { flex: 1; min-height: 0; display: grid; place-items: center; padding: 30px; }
+    .artboard { position: relative; width: min(58vh, 560px); aspect-ratio: 1; background: white; box-shadow: 0 22px 70px #000b; user-select: none; touch-action: none; }
+    .safe { position: absolute; inset: var(--outer); border: 1px dashed #777; pointer-events: none; }
+    .part { position: absolute; display: grid; place-items: center; overflow: hidden; transition: background .15s; }
+    .part span { color: #111; font-family: serif; font-weight: 900; line-height: .8; }
+    .ch { left: var(--outer); top: var(--outer); width: calc(var(--split) - var(--outer) - var(--gap) / 2); height: calc(67% - var(--outer) - var(--gap) / 2); background: #f2f9e5; outline: 1px dashed var(--lime); }
+    .ju { left: calc(var(--split) + var(--gap) / 2); top: var(--outer); right: var(--outer); height: calc(67% - var(--outer) - var(--gap) / 2); background: #e9f8fa; outline: 1px dashed var(--cyan); }
+    .jo { left: var(--outer); right: var(--outer); top: calc(67% + var(--gap) / 2); bottom: var(--outer); background: #f7effd; outline: 1px dashed #a875df; }
+    .ch span { font-size: clamp(100px, 18vh, 170px); transform: scaleX(1.15); }
+    .ju span { font-size: clamp(105px, 19vh, 180px); }
+    .jo span { font-size: clamp(105px, 18vh, 170px); transform: scaleX(1.25); }
+    .tag { position: absolute; top: 7px; left: 7px; z-index: 2; padding: 4px 7px; border-radius: 5px; color: #101212; font-size: 11px; font-weight: 800; }
+    .ch .tag { background: var(--lime); }.ju .tag { background: var(--cyan); }.jo .tag { background: #a875df; color: white; }
+    .handle { position: absolute; z-index: 5; display: grid; place-items: center; border: 0; color: white; cursor: grab; box-shadow: 0 3px 10px #0007; }
+    .handle:active { cursor: grabbing; }
+    .ratio-line { left: var(--split); top: var(--outer); bottom: calc(33% + var(--gap) / 2); width: 2px; background: var(--cyan); transform: translateX(-1px); }
+    .ratio-handle { left: var(--split); top: 30%; width: 34px; height: 34px; border-radius: 9px; background: var(--cyan); transform: translate(-50%, -50%); }
+    .ratio-handle::after { content: '↔'; font-size: 19px; }
+    .gap-line { left: var(--outer); right: var(--outer); top: 67%; height: 2px; background: var(--orange); transform: translateY(-1px); }
+    .gap-handle { left: 50%; top: 67%; width: 34px; height: 34px; border-radius: 9px; background: var(--orange); transform: translate(-50%, -50%); }
+    .gap-handle::after { content: '↕'; font-size: 19px; }
+    .mode-hint { position: absolute; left: 50%; bottom: 15px; transform: translateX(-50%); color: #777; font-size: 11px; white-space: nowrap; }
+    .segmented { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 10px; padding: 3px; background: #0b0c0c; }
+    .segmented button { height: 38px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; }
+    .segmented button.active { color: white; background: #292c2c; }
+    .control { margin-top: 27px; }
+    .control-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px; }
+    .control-name { display: flex; align-items: center; gap: 9px; font-size: 14px; }
+    .dot { width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; color: #111; font-weight: 900; }
+    .value { color: #dfe2e2; font-variant-numeric: tabular-nums; }
+    input[type="range"] { width: 100%; accent-color: var(--cyan); }
+    .orange input { accent-color: var(--orange); }
+    details { margin-top: 28px; border: 1px solid var(--line); border-radius: 10px; background: #151717; }
+    summary { padding: 15px; cursor: pointer; list-style: none; }
+    summary::after { content: '⌄'; float: right; color: var(--muted); }
+    details[open] summary::after { content: '⌃'; }
+    summary small { display: block; margin-top: 4px; color: var(--muted); }
+    .advanced { padding: 0 15px 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .mini { padding: 10px; border-radius: 7px; background: #0d0f0f; color: #aeb2b2; font-size: 12px; }
+    .mini input { width: 100%; margin-top: 6px; }
+    .scope { grid-column: 1 / -1; border-top: 1px solid var(--line); background: #101212; display: flex; align-items: center; padding: 18px 24px; gap: 22px; }
+    .scope-info { flex: 1; }
+    .scope-info strong { display: block; color: var(--orange); margin-bottom: 5px; }
+    .scope-info span { color: var(--muted); font-size: 12px; }
+    .glyphs { display: flex; gap: 8px; }
+    .glyph { width: 48px; height: 48px; border: 1px solid var(--line); border-radius: 8px; background: #171919; font-size: 22px; cursor: pointer; }
+    .glyph.selected { border-color: var(--orange); background: #24180e; box-shadow: inset 0 0 0 1px #ff8a2245; }
+    @media (max-height: 720px) { .inspector { padding-top: 16px; }.control { margin-top: 17px; }.artboard { width: min(54vh, 460px); } }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <aside class="sidebar">
+      <h1>레이아웃</h1>
+      <div class="layout-list">
+        <button class="layout-card">가</button><button class="layout-card">고</button>
+        <button class="layout-card">과</button><button class="layout-card">강</button>
+        <button class="layout-card">공</button><button class="layout-card active">광</button>
+      </div>
+      <h2>편집 중인 음절</h2>
+      <div style="font-size:13px;color:#878c8c;line-height:1.7">초성  ㄱ<br>중성  ㅘ<br>종성  ㅇ</div>
+    </aside>
+
+    <section class="main">
+      <nav class="toolbar" aria-label="편집 도구">
+        <button class="tool">선택</button><button class="tool">비율</button><button class="tool active">간격</button>
+      </nav>
+      <div class="stage">
+        <div class="artboard" id="artboard">
+          <div class="safe"></div>
+          <div class="part ch"><b class="tag">초성</b><span>ㄱ</span></div>
+          <div class="part ju"><b class="tag">중성</b><span>ㅘ</span></div>
+          <div class="part jo"><b class="tag">종성</b><span>ㅇ</span></div>
+          <div class="ratio-line"></div><button class="handle ratio-handle" id="ratioHandle" aria-label="파트 비율 조절"></button>
+          <div class="gap-line"></div><button class="handle gap-handle" id="gapHandle" aria-label="파트 간격 조절"></button>
+          <div class="mode-hint">핸들을 직접 드래그해 보세요</div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="inspector">
+      <h1>레이아웃 조정</h1>
+      <div class="segmented"><button class="active">간단 조정</button><button>고급 조정</button></div>
+      <div class="control">
+        <div class="control-head"><span class="control-name"><i class="dot" style="background:#ddd">□</i>전체 여백</span><span class="value" id="outerValue">7</span></div>
+        <input id="outerRange" type="range" min="2" max="16" value="7" />
+      </div>
+      <div class="control">
+        <div class="control-head"><span class="control-name"><i class="dot" style="background:var(--cyan)">↔</i>파트 비율</span><span class="value" id="ratioValue">55 : 45</span></div>
+        <input id="ratioRange" type="range" min="35" max="70" value="55" />
+      </div>
+      <div class="control orange">
+        <div class="control-head"><span class="control-name"><i class="dot" style="background:var(--orange)">↕</i>파트 간격</span><span class="value" id="gapValue">9</span></div>
+        <input id="gapRange" type="range" min="2" max="20" value="9" />
+      </div>
+      <details>
+        <summary>파트별 세부 여백<small>상·하·좌·우 개별 조정</small></summary>
+        <div class="advanced">
+          <label class="mini">초성 안쪽<input type="range" min="0" max="20" value="4"></label>
+          <label class="mini">중성 안쪽<input type="range" min="0" max="20" value="4"></label>
+          <label class="mini">종성 위쪽<input type="range" min="0" max="20" value="4"></label>
+          <label class="mini">종성 아래쪽<input type="range" min="0" max="20" value="4"></label>
+        </div>
+      </details>
+    </aside>
+
+    <footer class="scope">
+      <div class="scope-info"><strong>오버라이드 적용 범위</strong><span>선택한 글자에만 현재 레이아웃 조정값이 저장됩니다.</span></div>
+      <div class="glyphs" aria-label="적용 글자 선택">
+        <button class="glyph selected">광</button><button class="glyph selected">괭</button><button class="glyph selected">굉</button>
+        <button class="glyph">관</button><button class="glyph">괄</button><button class="glyph selected">괌</button>
+      </div>
+    </footer>
+  </main>
+  <script>
+    const root = document.documentElement;
+    const artboard = document.querySelector('#artboard');
+    const ratioRange = document.querySelector('#ratioRange');
+    const gapRange = document.querySelector('#gapRange');
+    const outerRange = document.querySelector('#outerRange');
+
+    function setRatio(value) {
+      const n = Math.max(35, Math.min(70, Math.round(value)));
+      root.style.setProperty('--split', `${n}%`);
+      ratioRange.value = n;
+      document.querySelector('#ratioValue').textContent = `${n} : ${100 - n}`;
+    }
+    function setGap(value) {
+      const n = Math.max(2, Math.min(20, Math.round(value)));
+      root.style.setProperty('--gap', `${n}%`);
+      gapRange.value = n;
+      document.querySelector('#gapValue').textContent = n;
+    }
+    function setOuter(value) {
+      const n = Math.max(2, Math.min(16, Math.round(value)));
+      root.style.setProperty('--outer', `${n}%`);
+      outerRange.value = n;
+      document.querySelector('#outerValue').textContent = n;
+    }
+    ratioRange.addEventListener('input', e => setRatio(e.target.value));
+    gapRange.addEventListener('input', e => setGap(e.target.value));
+    outerRange.addEventListener('input', e => setOuter(e.target.value));
+
+    function makeDrag(handle, update) {
+      handle.addEventListener('pointerdown', event => {
+        event.preventDefault();
+        handle.setPointerCapture(event.pointerId);
+        const move = e => {
+          const rect = artboard.getBoundingClientRect();
+          update(e, rect);
+        };
+        handle.addEventListener('pointermove', move);
+        handle.addEventListener('pointerup', () => handle.removeEventListener('pointermove', move), { once: true });
+      });
+    }
+    makeDrag(document.querySelector('#ratioHandle'), (e, rect) => setRatio((e.clientX - rect.left) / rect.width * 100));
+    makeDrag(document.querySelector('#gapHandle'), (e, rect) => setGap(Math.abs((e.clientY - rect.top) / rect.height * 100 - 67) * 2 + 2));
+
+    document.querySelectorAll('.tool').forEach(button => button.addEventListener('click', () => {
+      document.querySelectorAll('.tool').forEach(item => item.classList.remove('active'));
+      button.classList.add('active');
+    }));
+    document.querySelectorAll('.segmented button').forEach((button, index) => button.addEventListener('click', () => {
+      document.querySelectorAll('.segmented button').forEach(item => item.classList.remove('active'));
+      button.classList.add('active');
+      document.querySelector('details').open = index === 1;
+    }));
+    document.querySelectorAll('.glyph').forEach(button => button.addEventListener('click', () => button.classList.toggle('selected')));
+    document.querySelectorAll('.layout-card').forEach(button => button.addEventListener('click', () => {
+      document.querySelectorAll('.layout-card').forEach(item => item.classList.remove('active'));
+      button.classList.add('active');
+    }));
+  </script>
+</body>
+</html>

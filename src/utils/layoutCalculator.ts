@@ -96,7 +96,10 @@ export function calculateBoxes(
 ): Partial<Record<Part, BoxConfig>> {
   const rawBoxes = calculateRawBoxes(schema)
 
-  let effectivePartOverrides = schema.partOverrides
+  let effectivePartOverrides = {
+    ...schema.partOverrides,
+    ...(context ? schema.partOverridesByJungseong?.[context.jung] : undefined),
+  }
 
   if (context && schema.overrides && schema.overrides.length > 0) {
     // 우선순위 내림차순으로 매칭 오버라이드 검색
@@ -107,7 +110,7 @@ export function calculateBoxes(
     if (matching.length > 0) {
       // 가장 높은 우선순위 오버라이드의 partOverrides를 기본 partOverrides에 병합
       effectivePartOverrides = {
-        ...schema.partOverrides,
+        ...effectivePartOverrides,
         ...matching[0].partOverrides,
       }
     }
@@ -406,4 +409,3 @@ export const DEFAULT_LAYOUT_SCHEMAS: Record<LayoutType, LayoutSchema> =
  */
 export const BASE_PRESETS_SCHEMAS: Record<LayoutType, LayoutSchema> =
   basePresets.schemas as Record<LayoutType, LayoutSchema>
-
