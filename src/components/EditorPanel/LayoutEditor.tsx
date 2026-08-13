@@ -112,6 +112,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   const {
     inputText,
     selectedCharIndex,
+    focusedSyllable,
     selectedPartInLayout,
     setSelectedPartInLayout,
     editingPartInLayout,
@@ -156,6 +157,13 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
   // 자모 편집 시 미리보기 레이아웃 전환
   const [previewLayoutType, setPreviewLayoutType] = useState<LayoutType | null>(null)
+
+  // 의미 그리드에서 더블클릭한 음절의 레이아웃으로 자모 미리보기 컨텍스트 이동
+  useEffect(() => {
+    if (!focusedSyllable || !editingPartInLayout) return
+    const focused = decomposeSyllableWithOverrides(focusedSyllable, choseong, jungseong, jongseong)
+    setPreviewLayoutType(focused.layoutType)
+  }, [focusedSyllable, editingPartInLayout, choseong, jungseong, jongseong])
 
   // 레이아웃 편집 더티 상태 추적
   const [isLayoutDirty, setIsLayoutDirty] = useState(false)
@@ -217,6 +225,11 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
   // 테스트용 음절
   const testSyllable = useMemo(() => {
+    if (focusedSyllable) {
+      const focused = decomposeSyllableWithOverrides(focusedSyllable, choseong, jungseong, jongseong)
+      if (focused.layoutType === activeLayoutType) return focused
+    }
+
     if (inputText && selectedCharIndex >= 0) {
       const hangulChars = inputText.split('').filter((char) => {
         const code = char.charCodeAt(0)
@@ -248,7 +261,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       editingJamoChar ?? undefined
     )
     return decomposeSyllableWithOverrides(fallbackChar, choseong, jungseong, jongseong)
-  }, [inputText, selectedCharIndex, activeLayoutType, editingJamoType, editingJamoChar, choseong, jungseong, jongseong])
+  }, [focusedSyllable, inputText, selectedCharIndex, activeLayoutType, editingJamoType, editingJamoChar, choseong, jungseong, jongseong])
 
   // === 자모 편집 서브모드 ===
   const isJamoEditing = editingPartInLayout !== null
@@ -672,7 +685,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   }, [choseongStyleInfo, editingJamoInfo, editingOverrideId, pushSnapshot, updateJamoPadding])
 
   // 오버라이드 탭 전환 (strokes는 스토어에서 자동 파생)
-  const handleOverrideSwitch = useCallback((_overrideId: string | null) => {
+  const handleOverrideSwitch = useCallback(() => {
     setSelectedStrokeId(null)
   }, [setSelectedStrokeId])
 

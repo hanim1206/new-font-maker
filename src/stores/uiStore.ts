@@ -14,6 +14,8 @@ interface UIState {
   inputText: string
   // 선택된 글자 인덱스 (PreviewPanel에서)
   selectedCharIndex: number
+  // 우측 의미 그리드에서 중앙 편집 기준으로 선택한 음절 (상단 입력과 독립)
+  focusedSyllable: string | null
   // 모바일 여부
   isMobile: boolean
 
@@ -58,6 +60,7 @@ interface UIActions {
   setViewMode: (mode: ViewMode) => void
   setInputText: (text: string) => void
   setSelectedCharIndex: (index: number) => void
+  setFocusedSyllable: (char: string | null) => void
   setIsMobile: (isMobile: boolean) => void
 
   // === 리모콘 액션 ===
@@ -91,6 +94,7 @@ export const useUIStore = create<UIState & UIActions>()(
     viewMode: 'preview',
     inputText: '',
     selectedCharIndex: 0,
+    focusedSyllable: null,
     isMobile: false,
 
     // 리모콘 상태
@@ -136,6 +140,11 @@ export const useUIStore = create<UIState & UIActions>()(
         state.selectedCharIndex = index
       }),
 
+    setFocusedSyllable: (char) =>
+      set((state) => {
+        state.focusedSyllable = char
+      }),
+
     setIsMobile: (isMobile) =>
       set((state) => {
         state.isMobile = isMobile
@@ -152,12 +161,16 @@ export const useUIStore = create<UIState & UIActions>()(
         // 다른 레이아웃 타입으로 변경 시에만 오버라이드 편집 초기화 (같은 타입 재선택 시 유지)
         if (state.selectedLayoutType !== layoutType) {
           state.editingLayoutOverrideId = null
+          state.focusedSyllable = null
         }
         state.selectedLayoutType = layoutType
       }),
 
     setEditingJamo: (type, char) =>
       set((state) => {
+        if (state.editingJamoType !== type || state.editingJamoChar !== char) {
+          state.focusedSyllable = null
+        }
         state.editingJamoType = type
         state.editingJamoChar = char
         state.selectedLayoutContext = null
