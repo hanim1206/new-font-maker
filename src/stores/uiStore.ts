@@ -12,6 +12,8 @@ interface UIState {
   viewMode: ViewMode
   // 입력된 텍스트
   inputText: string
+  // 새 프로젝트 최초 진입 시 입력과 독립적으로 표시하는 임시 샘플
+  showInitialSample: boolean
   // 선택된 글자 인덱스 (PreviewPanel에서)
   selectedCharIndex: number
   // 우측 의미 그리드에서 중앙 편집 기준으로 선택한 음절 (상단 입력과 독립)
@@ -59,6 +61,7 @@ interface UIActions {
   setCurrentPage: (page: PageType) => void
   setViewMode: (mode: ViewMode) => void
   setInputText: (text: string) => void
+  setShowInitialSample: (visible: boolean) => void
   setSelectedCharIndex: (index: number) => void
   setFocusedSyllable: (char: string | null) => void
   setIsMobile: (isMobile: boolean) => void
@@ -93,6 +96,7 @@ export const useUIStore = create<UIState & UIActions>()(
     currentPage: 'home' as PageType,
     viewMode: 'preview',
     inputText: '',
+    showInitialSample: false,
     selectedCharIndex: 0,
     focusedSyllable: null,
     isMobile: false,
@@ -133,6 +137,12 @@ export const useUIStore = create<UIState & UIActions>()(
     setInputText: (text) =>
       set((state) => {
         state.inputText = text
+        state.showInitialSample = false
+      }),
+
+    setShowInitialSample: (visible) =>
+      set((state) => {
+        state.showInitialSample = visible
       }),
 
     setSelectedCharIndex: (index) =>

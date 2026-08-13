@@ -12,6 +12,8 @@ import type { DecomposedSyllable, BoxConfig, LayoutSchema, Part, Padding, Stroke
 import { PADDING_COLOR, PADDING_DIRTY_COLOR, PADDING_MIXED_ALT_COLOR, PART_COLORS } from '../../constants/editorColors'
 import type { GlobalStyle } from '../../stores/globalStyleStore'
 import { applyJamoPaddingToBox } from '../../utils/containerBoxUtils'
+import { pointsToSvgD } from '../../utils/pathUtils'
+import { resolveLinecap, resolveLinejoin, weightToMultiplier } from '../../stores/globalStyleStore'
 
 interface MixedJungseongData {
   isMixed: boolean
@@ -32,6 +34,7 @@ interface JamoCanvasColumnProps {
   // 자모 편집 상태
   isJamoEditing: boolean
   draftStrokes: StrokeDataV2[]
+  baseGuideStrokes: StrokeDataV2[]
   editingBox: BoxConfig | null
   editingBoundaryBox: BoxConfig | null
   editingJamoInfo: { type: 'choseong' | 'jungseong' | 'jongseong'; char: string } | null
@@ -41,6 +44,9 @@ interface JamoCanvasColumnProps {
   editingJamoPadding: Padding | undefined
   editingHorizontalPadding: Padding | undefined
   editingVerticalPadding: Padding | undefined
+  baseGuidePadding: Padding | undefined
+  baseGuideHorizontalPadding: Padding | undefined
+  baseGuideVerticalPadding: Padding | undefined
   isPaddingDirty: boolean
   selectedStrokeId: string | null
   globalStyleRaw: GlobalStyle
@@ -70,6 +76,7 @@ export function JamoCanvasColumn({
   partStyles,
   isJamoEditing,
   draftStrokes,
+  baseGuideStrokes,
   editingBox,
   editingBoundaryBox,
   editingJamoInfo,
@@ -77,6 +84,9 @@ export function JamoCanvasColumn({
   editingJamoPadding,
   editingHorizontalPadding,
   editingVerticalPadding,
+  baseGuidePadding,
+  baseGuideHorizontalPadding,
+  baseGuideVerticalPadding,
   isPaddingDirty,
   selectedStrokeId,
   globalStyleRaw,
@@ -185,6 +195,43 @@ export function JamoCanvasColumn({
   const contextBox = mixedContextBox ?? editingBox ?? fullBox
   const hasLayoutArea = mixedContextBox !== null || editingBox !== null
 
+  const renderBaseGuide = () => {
+    if (!editingBox || baseGuideStrokes.length === 0) return null
+    const weightMultiplier = weightToMultiplier(effectiveStyle.weight)
+    return (
+      <g pointerEvents="none" opacity={0.24} aria-hidden="true">
+        {baseGuideStrokes.map((stroke) => {
+          const isHorizontal = mixedJungseongData?.horizontalStrokeIds.has(stroke.id)
+          const isVertical = mixedJungseongData?.verticalStrokeIds.has(stroke.id)
+          const partBox = isHorizontal
+            ? mixedJungseongData?.juHBox ?? editingBox
+            : isVertical
+              ? mixedJungseongData?.juVBox ?? editingBox
+              : editingBox
+          const padding = isHorizontal
+            ? baseGuideHorizontalPadding ?? baseGuidePadding
+            : isVertical
+              ? baseGuideVerticalPadding ?? baseGuidePadding
+              : baseGuidePadding
+          const box = applyJamoPaddingToBox(partBox.x, partBox.y, partBox.width, partBox.height, padding)
+          const d = pointsToSvgD(stroke.points, stroke.closed, box, 100)
+          if (!d) return null
+          return (
+            <path
+              key={`base-guide-${stroke.id}`}
+              d={d}
+              fill="none"
+              stroke="#64748b"
+              strokeWidth={stroke.thickness * weightMultiplier * 100}
+              strokeLinecap={resolveLinecap(stroke.linecap, effectiveStyle.linecap)}
+              strokeLinejoin={resolveLinejoin(stroke.linejoin, effectiveStyle.linejoin)}
+            />
+          )
+        })}
+      </g>
+    )
+  }
+
   return (
     <div className="relative">
       {/* 캔버스 영역 */}
@@ -266,6 +313,7 @@ export function JamoCanvasColumn({
                 partStyles={partStyles}
                 className="relative z-[2]"
               >
+                {renderBaseGuide()}
                 {editingBox && draftStrokes.length > 0 && (
                   <StrokeOverlay
                     strokes={draftStrokes}

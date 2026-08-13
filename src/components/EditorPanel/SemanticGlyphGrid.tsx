@@ -8,6 +8,7 @@ interface SemanticGlyphGridProps {
   selectedLayoutType: LayoutType | null
   selectedChars: Set<string>
   selectable: boolean
+  navigateOnSingleClick?: boolean
   renderCell: (meta: SyllableGridMeta, selected: boolean) => React.ReactNode
   onToggleCell: (char: string) => void
   onToggleRange: (chars: string[]) => void
@@ -24,6 +25,7 @@ export function SemanticGlyphGrid({
   selectedLayoutType,
   selectedChars,
   selectable,
+  navigateOnSingleClick = false,
   renderCell,
   onToggleCell,
   onToggleRange,
@@ -133,9 +135,6 @@ export function SemanticGlyphGrid({
         const allChars = sheet.cells.flatMap((row) => row.flatMap((meta) => meta ? [meta.char] : []))
         return (
         <section key={sheet.id} className="w-max min-w-full border-b-4 border-[#080808] last:border-b-0">
-          <div className="sticky left-0 z-20 px-3 py-1.5 bg-[#111111] border-b border-border-subtle text-[11px] font-semibold text-text-dim-2">
-            {sheet.label}
-          </div>
         <div
           className="grid w-max min-w-full"
           style={{ gridTemplateColumns: `${HEADER_SIZE}px repeat(${sheet.columns.length}, ${CELL_SIZE}px)` }}
@@ -187,8 +186,8 @@ export function SemanticGlyphGrid({
                     data-grid-sheet={sheet.id}
                     data-grid-row={rowIndex}
                     data-grid-column={columnIndex}
-                    title={`${meta.char} · 더블클릭하여 중앙에서 보기`}
-                    className={`relative overflow-hidden border-r border-b border-neutral-200 flex items-center justify-center ${selectable ? 'cursor-pointer' : 'cursor-default'}`}
+                    title={`${meta.char} · ${navigateOnSingleClick ? '클릭' : '더블클릭'}하여 중앙에서 보기`}
+                    className={`relative overflow-hidden border-r border-b border-neutral-200 flex items-center justify-center ${selectable || navigateOnSingleClick ? 'cursor-pointer' : 'cursor-default'}`}
                     style={{ width: CELL_SIZE, height: CELL_SIZE }}
                     onPointerDown={selectable ? (event) => {
                       event.preventDefault()
@@ -203,8 +202,8 @@ export function SemanticGlyphGrid({
                     onClick={selectable ? () => {
                       if (!dragMovedRef.current) onToggleCell(meta.char)
                       dragMovedRef.current = false
-                    } : undefined}
-                    onDoubleClick={() => onNavigate(meta)}
+                    } : navigateOnSingleClick ? () => onNavigate(meta) : undefined}
+                    onDoubleClick={navigateOnSingleClick ? undefined : () => onNavigate(meta)}
                   >
                     {renderCell(meta, selectable && selectedChars.has(meta.char))}
                   </div>

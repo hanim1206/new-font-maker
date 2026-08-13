@@ -20,6 +20,7 @@ interface PreviewPanelProps {
 export function PreviewPanel({ horizontal = false }: PreviewPanelProps) {
   const {
     inputText,
+    showInitialSample,
     setInputText,
     setSelectedCharIndex,
     setControlMode,
@@ -31,12 +32,13 @@ export function PreviewPanel({ horizontal = false }: PreviewPanelProps) {
   const { layoutConfigs, getEffectivePadding, getLayoutSchema } = useLayoutStore()
   const { choseong, jungseong, jongseong } = useJamoStore()
   const { getEffectiveStyle } = useGlobalStyleStore()
+  const previewText = showInitialSample && inputText === '' ? '가' : inputText
 
   // 모든 글자 분석 (한글 + 공백)
   const previewItems = useMemo((): PreviewItem[] => {
     const items: PreviewItem[] = []
     let hangulIndex = 0
-    for (const ch of inputText) {
+    for (const ch of previewText) {
       if (isHangul(ch)) {
         const syllable = decomposeSyllableWithOverrides(ch, choseong, jungseong, jongseong)
         const layoutConfig = layoutConfigs[syllable.layoutType]
@@ -55,7 +57,7 @@ export function PreviewPanel({ horizontal = false }: PreviewPanelProps) {
       }
     }
     return items
-  }, [inputText, choseong, jungseong, jongseong, layoutConfigs])
+  }, [previewText, choseong, jungseong, jongseong, layoutConfigs])
 
   const hasSyllables = previewItems.some(item => item.type === 'syllable')
 

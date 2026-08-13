@@ -3,7 +3,7 @@ import { LayoutCanvasColumn } from './LayoutCanvasColumn'
 import { JamoCanvasColumn } from './JamoCanvasColumn'
 import { GlyphViewerColumn } from './GlyphViewerColumn'
 import { Button } from '@/components/ui/button'
-import type { LayoutType } from '../../types'
+import type { JamoData, LayoutType } from '../../types'
 
 // === 타입 정의 ===
 
@@ -40,6 +40,7 @@ export interface LayoutEditorDesktopProps {
   isLayoutDirty: boolean
   onLayoutSave: () => void
   onLayoutDiscard: () => void
+  savedJamoData: JamoData | null
 }
 
 // === 컴포넌트 ===
@@ -71,6 +72,7 @@ export function LayoutEditorDesktop({
   isLayoutDirty,
   onLayoutSave,
   onLayoutDiscard,
+  savedJamoData,
 }: LayoutEditorDesktopProps) {
   const scopeActionRef = useRef<((mode: 'save' | 'discard') => boolean) | null>(null)
   const [isScopeDirty, setIsScopeDirty] = useState(false)
@@ -173,6 +175,7 @@ export function LayoutEditorDesktop({
           activeLayoutType={isJamoEditing ? previewLayoutType ?? selectedLayoutType : selectedLayoutType}
           onSelectLayout={isJamoEditing ? onSelectPreviewLayout : onSelectLayout}
           onJamoScopeStateChange={handleScopeStateChange}
+          savedJamoData={savedJamoData}
         />
       </div>
     </div>

@@ -4,6 +4,7 @@ import { calculateRawBoxes } from '../../utils/layoutCalculator'
 import { classifyJungseong, LAYOUT_LABELS } from '../../utils/hangulUtils'
 import { PART_COLORS } from '../../constants/editorColors'
 import type { BoxConfig, LayoutType, Part } from '../../types'
+import styles from './JamoLayoutPreviewCards.module.css'
 
 const GLYPH_LAYOUT_FILTERS: LayoutType[] = [
   'choseong-only',
@@ -38,10 +39,9 @@ export function LayoutFilterChips({ activeLayoutType, onSelect, editingJamoType,
   }), [getLayoutSchema, layoutSchemas])
 
   return (
-    <div className="shrink-0 px-2 py-2 border-b border-border-subtle bg-[#0c0c0c]">
-      <div className="mb-1.5 text-[9px] font-medium text-text-dim-5 uppercase tracking-wider">레이아웃 필터</div>
-      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-        {chips.map(({ layoutType, schema, baseBoxes }) => {
+    <div className={styles.container}>
+      <div className={styles.matrix}>
+        {chips.map(({ layoutType, schema, baseBoxes }, index) => {
           const isActive = activeLayoutType === layoutType
           const jungseongType = editingJamoType === 'jungseong' && editingJamoChar
             ? classifyJungseong(editingJamoChar)
@@ -60,15 +60,11 @@ export function LayoutFilterChips({ activeLayoutType, onSelect, editingJamoType,
                 : LAYOUT_LABELS[layoutType]}
               aria-pressed={isActive}
               disabled={isUnavailable}
-              className={`shrink-0 w-11 p-1 rounded border-2 transition-colors ${
-                isActive
-                  ? 'border-accent-blue bg-accent-blue/10'
-                  : isUnavailable
-                    ? 'border-border-subtle bg-surface-2 opacity-35 cursor-not-allowed'
-                  : 'border-border-subtle hover:border-border-light bg-surface-2'
-              }`}
+              className={`${styles.card} ${index === 0 ? styles.standalone : ''} ${
+                isActive ? styles.active : ''
+              } ${isUnavailable ? 'opacity-35 cursor-not-allowed' : ''}`}
             >
-              <svg width="100%" viewBox={`0 0 ${V} ${V}`} className="block aspect-square bg-white">
+              <svg width="64" height="64" viewBox={`0 0 ${V} ${V}`} className="block bg-white">
                 {(Object.entries(baseBoxes) as [Part, BoxConfig][]).map(([part, box]) => (
                   <rect
                     key={part}

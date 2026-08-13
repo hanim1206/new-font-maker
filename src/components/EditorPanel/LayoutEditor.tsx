@@ -169,6 +169,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   // 레이아웃 편집 더티 상태 추적
   const [isLayoutDirty, setIsLayoutDirty] = useState(false)
   const [isJamoDirty, setIsJamoDirty] = useState(false)
+  const [savedJamoData, setSavedJamoData] = useState<JamoData | null>(null)
   const layoutSnapshotRef = useRef<LayoutSchema | null>(null)
   const jamoSnapshotRef = useRef<{ type: 'choseong' | 'jungseong' | 'jongseong'; char: string; data: JamoData } | null>(null)
   const paddingOverrideSnapshotRef = useRef<Partial<Padding> | null>(null)
@@ -229,10 +230,17 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
 
   // 테스트용 음절
   const testSyllable = useMemo(() => {
+    const containsEditingJamo = (syllable: DecomposedSyllable) => {
+      if (!editingJamoType || !editingJamoChar) return true
+      if (editingJamoType === 'choseong') return syllable.choseong?.char === editingJamoChar
+      if (editingJamoType === 'jungseong') return syllable.jungseong?.char === editingJamoChar
+      return syllable.jongseong?.char === editingJamoChar
+    }
+
     let contextSyllable: DecomposedSyllable | null = null
     if (focusedSyllable) {
       const focused = decomposeSyllableWithOverrides(focusedSyllable, choseong, jungseong, jongseong)
-      if (focused.layoutType === activeLayoutType) return focused
+      if (focused.layoutType === activeLayoutType && containsEditingJamo(focused)) return focused
       contextSyllable = focused
     }
 
@@ -246,7 +254,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       const selectedChar = hangulChars[selectedCharIndex]
       if (selectedChar) {
         const syllable = decomposeSyllableWithOverrides(selectedChar, choseong, jungseong, jongseong)
-        if (syllable.layoutType === activeLayoutType) {
+        if (syllable.layoutType === activeLayoutType && containsEditingJamo(syllable)) {
           return syllable
         }
         contextSyllable ??= syllable
@@ -256,7 +264,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     const firstChar = inputText.trim()[0]
     if (firstChar) {
       const syllable = decomposeSyllableWithOverrides(firstChar, choseong, jungseong, jongseong)
-      if (syllable.layoutType === activeLayoutType) {
+      if (syllable.layoutType === activeLayoutType && containsEditingJamo(syllable)) {
         return syllable
       }
       contextSyllable ??= syllable
@@ -294,6 +302,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   useEffect(() => {
     if (!editingJamoInfo) {
       jamoSnapshotRef.current = null
+      setSavedJamoData(null)
       setIsJamoDirty(false)
       return
     }
@@ -304,6 +313,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       char: editingJamoInfo.char,
       data: JSON.parse(JSON.stringify(current)),
     }
+    setSavedJamoData(JSON.parse(JSON.stringify(current)))
     setIsJamoDirty(false)
   }, [editingJamoInfo?.type, editingJamoInfo?.char]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -320,6 +330,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     const current = useJamoStore.getState()[info.type][info.char]
     if (!current) return
     jamoSnapshotRef.current = { type: info.type, char: info.char, data: JSON.parse(JSON.stringify(current)) }
+    setSavedJamoData(JSON.parse(JSON.stringify(current)))
     setIsJamoDirty(false)
   }, [])
 
@@ -361,6 +372,14 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     )
   }, [editingJamoInfo, editingOverrideId, choseong, jungseong, jongseong])
 
+  const baseEditingStrokes = useMemo(() => {
+    if (!editingJamoInfo || !editingOverrideId) return [] as StrokeDataV2[]
+    return getEditingStrokes(
+      editingJamoInfo.type, editingJamoInfo.char,
+      null, choseong, jungseong, jongseong
+    )
+  }, [editingJamoInfo, editingOverrideId, choseong, jungseong, jongseong])
+
   // 편집 중인 자모의 패딩 (스토어에서 파생)
   const editingPadding = useMemo(() => {
     if (!editingJamoInfo) return { padding: undefined as Padding | undefined, horizontalPadding: undefined as Padding | undefined, verticalPadding: undefined as Padding | undefined }
@@ -384,6 +403,18 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       padding: jamo.padding,
       horizontalPadding: jamo.horizontalPadding,
       verticalPadding: jamo.verticalPadding,
+    }
+  }, [editingJamoInfo, editingOverrideId, choseong, jungseong, jongseong])
+
+  const baseEditingPadding = useMemo(() => {
+    if (!editingJamoInfo || !editingOverrideId) return { padding: undefined, horizontalPadding: undefined, verticalPadding: undefined }
+    const jamoMap = editingJamoInfo.type === 'choseong' ? choseong
+      : editingJamoInfo.type === 'jungseong' ? jungseong : jongseong
+    const jamo = jamoMap[editingJamoInfo.char]
+    return {
+      padding: jamo?.padding,
+      horizontalPadding: jamo?.horizontalPadding,
+      verticalPadding: jamo?.verticalPadding,
     }
   }, [editingJamoInfo, editingOverrideId, choseong, jungseong, jongseong])
 
@@ -941,6 +972,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     partStyles,
     isJamoEditing,
     draftStrokes: editingStrokes,
+    baseGuideStrokes: baseEditingStrokes,
     editingBox,
     editingBoundaryBox,
     editingJamoInfo,
@@ -948,6 +980,9 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     editingJamoPadding: editingPadding.padding,
     editingHorizontalPadding: editingPadding.horizontalPadding,
     editingVerticalPadding: editingPadding.verticalPadding,
+    baseGuidePadding: baseEditingPadding.padding,
+    baseGuideHorizontalPadding: baseEditingPadding.horizontalPadding,
+    baseGuideVerticalPadding: baseEditingPadding.verticalPadding,
     isPaddingDirty: false,
     selectedStrokeId,
     globalStyleRaw,
@@ -1015,6 +1050,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
         isLayoutDirty={isLayoutDirty}
         onLayoutSave={handleLayoutSave}
         onLayoutDiscard={handleLayoutDiscard}
+        savedJamoData={savedJamoData}
       />
 
       {/* 레이아웃 저장/폐기 다이얼로그 */}
