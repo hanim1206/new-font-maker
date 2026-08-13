@@ -1,8 +1,8 @@
-import { useCallback, useRef, useState } from 'react'
 import { LayoutCanvasColumn } from './LayoutCanvasColumn'
 import { JamoCanvasColumn } from './JamoCanvasColumn'
 import { GlyphViewerColumn } from './GlyphViewerColumn'
 import { Button } from '@/components/ui/button'
+import { ArrowLeft } from 'lucide-react'
 import type { JamoData, LayoutType } from '../../types'
 
 // === 타입 정의 ===
@@ -27,8 +27,11 @@ export interface LayoutEditorDesktopProps {
   onPartDeselect: () => void
   onJamoReset: () => void
   isJamoDirty: boolean
+  isJamoScopeDirty: boolean
   onJamoSave: () => void
   onJamoDiscard: () => void
+  onBackToLayout: () => void
+  onJamoScopeStateChange: (dirty: boolean, action: ((mode: 'save' | 'discard') => boolean) | null) => void
   onUndo: () => void
   onRedo: () => void
   // 레이아웃 컨텍스트 컬럼용
@@ -45,9 +48,10 @@ export interface LayoutEditorDesktopProps {
 
 // === 컴포넌트 ===
 
-/** 데스크톱 2컬럼 레이아웃 렌더러
+/** 데스크톱 3컬럼 레이아웃 렌더러
  *  1열: 레이아웃 캔버스 ↔ 자모 캔버스 (isJamoEditing에 따라 전환)
- *  2열: 레이아웃 필터 + 유니코드 글리프 뷰어 / 적용범위 설정
+ *  2열: 현재 레이아웃 + 오버라이드 컨텍스트
+ *  3열: 유니코드 글리프 뷰어 / 적용 범위 선택
  */
 export function LayoutEditorDesktop({
   layoutCanvasProps,
@@ -61,8 +65,11 @@ export function LayoutEditorDesktop({
   onPartDeselect,
   onJamoReset,
   isJamoDirty,
+  isJamoScopeDirty,
   onJamoSave,
   onJamoDiscard,
+  onBackToLayout,
+  onJamoScopeStateChange,
   onUndo,
   onRedo,
   selectedLayoutType,
@@ -74,21 +81,6 @@ export function LayoutEditorDesktop({
   onLayoutDiscard,
   savedJamoData,
 }: LayoutEditorDesktopProps) {
-  const scopeActionRef = useRef<((mode: 'save' | 'discard') => boolean) | null>(null)
-  const [isScopeDirty, setIsScopeDirty] = useState(false)
-  const handleScopeStateChange = useCallback((dirty: boolean, action: ((mode: 'save' | 'discard') => boolean) | null) => {
-    scopeActionRef.current = action
-    setIsScopeDirty(dirty)
-  }, [])
-  const handleJamoSave = useCallback(() => {
-    if (scopeActionRef.current && !scopeActionRef.current('save')) return
-    onJamoSave()
-  }, [onJamoSave])
-  const handleJamoDiscard = useCallback(() => {
-    scopeActionRef.current?.('discard')
-    onJamoDiscard()
-  }, [onJamoDiscard])
-
   return (
     <div className="h-full overflow-hidden flex" onClick={onPartDeselect}>
 
@@ -99,10 +91,16 @@ export function LayoutEditorDesktop({
           <>
             {/* 상단 툴바 */}
             <div className="shrink-0 bg-surface-2 px-4 pt-3 pb-2 border-b border-border-subtle flex items-center gap-2">
-              <h3 className="text-sm font-medium text-text-dim-3 uppercase tracking-wider">
-                자모 편집 — {editingJamoInfo.char}
-                {(isJamoDirty || isScopeDirty) && <span className="ml-1.5 text-amber-400">●</span>}
-              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onBackToLayout}
+                className="h-8 w-8 text-text-dim-3 hover:text-foreground"
+                title="레이아웃 편집으로 돌아가기"
+                aria-label="레이아웃 편집으로 돌아가기"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
 
               {/* 종성 편집 시 초성 스타일 적용 */}
               {choseongStyleInfo && (
@@ -127,10 +125,10 @@ export function LayoutEditorDesktop({
               <Button variant="default" size="sm" onClick={onUndo} disabled={!canUndo} title="되돌리기 (Ctrl+Z)">↩</Button>
               <Button variant="default" size="sm" onClick={onRedo} disabled={!canRedo} title="다시 실행 (Ctrl+Y)">↪</Button>
               <Button variant="default" size="sm" onClick={onJamoReset}>초기화</Button>
-              {(isJamoDirty || isScopeDirty) && (
+              {(isJamoDirty || isJamoScopeDirty) && (
                 <>
-                  <Button variant="outline" size="sm" onClick={handleJamoDiscard}>폐기</Button>
-                  <Button size="sm" onClick={handleJamoSave}>저장</Button>
+                  <Button variant="outline" size="sm" onClick={onJamoDiscard}>폐기</Button>
+                  <Button size="sm" onClick={onJamoSave}>저장</Button>
                 </>
               )}
             </div>
@@ -143,14 +141,8 @@ export function LayoutEditorDesktop({
         ) : (
           /* ─── 레이아웃 편집 모드 ─── */
           <>
-            {/* 레이아웃 편집 툴바 */}
-            <div className="shrink-0 bg-surface-2 px-4 pt-3 pb-2 border-b border-border-subtle flex items-center gap-2">
-              <h3 className="text-sm font-medium text-text-dim-3 uppercase tracking-wider">
-                레이아웃 편집
-                {isLayoutDirty && <span className="ml-1.5 text-amber-400">●</span>}
-              </h3>
-              <div className="flex-1" />
-              {isLayoutDirty && (
+            {isLayoutDirty && (
+              <div className="shrink-0 bg-surface-2 px-4 py-2 border-b border-border-subtle flex items-center justify-end gap-2">
                 <>
                   <Button variant="outline" size="sm" onClick={onLayoutDiscard}>
                     폐기
@@ -159,8 +151,8 @@ export function LayoutEditorDesktop({
                     저장
                   </Button>
                 </>
-              )}
-            </div>
+              </div>
+            )}
             <div className="flex-1 min-h-0 overflow-y-auto">
               <LayoutCanvasColumn {...layoutCanvasProps} />
             </div>
@@ -168,13 +160,13 @@ export function LayoutEditorDesktop({
         )}
       </div>
 
-      {/* 2열: 유니코드 글리프 뷰어 / 적용범위 */}
+      {/* 2–3열: 컨텍스트 레일 + 유니코드 글리프 뷰어 */}
       <div className="flex-[3] min-w-0 overflow-hidden flex flex-col">
         <GlyphViewerColumn
           onOverrideSwitch={jamoCanvasProps.onOverrideSwitch}
           activeLayoutType={isJamoEditing ? previewLayoutType ?? selectedLayoutType : selectedLayoutType}
           onSelectLayout={isJamoEditing ? onSelectPreviewLayout : onSelectLayout}
-          onJamoScopeStateChange={handleScopeStateChange}
+          onJamoScopeStateChange={onJamoScopeStateChange}
           savedJamoData={savedJamoData}
         />
       </div>

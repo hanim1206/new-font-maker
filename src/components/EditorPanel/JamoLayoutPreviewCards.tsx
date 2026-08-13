@@ -11,10 +11,10 @@ import styles from './JamoLayoutPreviewCards.module.css'
 const CHOSEONG_LAYOUTS: LayoutType[] = [
   'choseong-only',
   'choseong-jungseong-vertical',
-  'choseong-jungseong-horizontal',
-  'choseong-jungseong-mixed',
   'choseong-jungseong-vertical-jongseong',
+  'choseong-jungseong-horizontal',
   'choseong-jungseong-horizontal-jongseong',
+  'choseong-jungseong-mixed',
   'choseong-jungseong-mixed-jongseong',
 ]
 

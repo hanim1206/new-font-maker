@@ -10,11 +10,51 @@ import { useAuthStore } from './stores/authStore'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { PreviewPanel } from './components/PreviewPanel/PreviewPanel'
 import { AuthDialog } from './components/AuthDialog'
+import {
+  APP_ROUTE_POP_EVENT,
+  applyAppRoute,
+  appRouteToPath,
+  getCurrentRouteHistoryState,
+  parseAppRoute,
+  pushAppRoute,
+  type AppRouteHistoryState,
+  type AppRoutePopDetail,
+} from './utils/appRoutes'
 
 export default function App() {
   const { isMobile, setIsMobile } = useUIStore()
   const currentPage = useUIStore((s) => s.currentPage)
   const currentProjectName = useUIStore((s) => s.currentProjectName)
+
+  // 브라우저 뒤로/앞으로 가기는 편집기에서 미저장 분기를 처리한 뒤 적용한다.
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const route = parseAppRoute(window.location.pathname)
+      const state = event.state as AppRouteHistoryState | null
+      if (useUIStore.getState().currentPage === 'editor') {
+        window.dispatchEvent(new CustomEvent<AppRoutePopDetail>(APP_ROUTE_POP_EVENT, {
+          detail: {
+            route,
+            state: state?.fontMakerRoute ? state : null,
+          },
+        }))
+        return
+      }
+      applyAppRoute(route)
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  // 홈과 프로젝트 목록도 편집 URL에서 정상적으로 왕복할 수 있게 히스토리에 기록한다.
+  useEffect(() => {
+    if (currentPage === 'editor') return
+    const route = currentPage === 'projects' ? { page: 'projects' as const } : { page: 'home' as const }
+    if (window.location.pathname === appRouteToPath(route)) return
+    const currentState = getCurrentRouteHistoryState()
+    if (currentState?.route.page === currentPage) return
+    pushAppRoute(route)
+  }, [currentPage])
 
   // 인증 상태 리스너 초기화 (initialize 참조 안정성 무관하게 1회만)
   useEffect(() => {

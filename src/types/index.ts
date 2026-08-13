@@ -59,6 +59,8 @@ export interface LayoutSchema {
   }
   // 파트별 박스 오프셋 (기준선 기반 박스에서 확장/축소)
   partOverrides?: Partial<Record<Part, PartOverride>>
+  // 특정 중성에서만 적용되는 레이아웃 기본 파트 영역 (사용자 오버라이드와 별도)
+  partOverridesByJungseong?: Record<string, Partial<Record<Part, PartOverride>>>
   // 음절 조합별 파트 오프셋 오버라이드 (conditionGroups 매칭 시 partOverrides 위에 병합)
   overrides?: LayoutOverride[]
 }
@@ -220,4 +222,3 @@ export interface DecomposedSyllable {
 
 // ===== UI 상태 =====
 export type ViewMode = 'preview' | 'presets' | 'editor'
-

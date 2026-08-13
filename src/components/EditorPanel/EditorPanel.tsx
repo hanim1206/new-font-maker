@@ -3,7 +3,6 @@ import { useUIStore } from '../../stores/uiStore'
 import { LayoutEditor } from './LayoutEditor'
 import { JamoEditor } from './JamoEditor'
 import { GlobalQuickControls } from './GlobalQuickControls'
-import { EditorBreadcrumb } from './EditorBreadcrumb'
 import { CHOSEONG_LIST, JUNGSEONG_LIST, JONGSEONG_LIST } from '../../data/Hangul'
 import { getLayoutsForJamoType, classifyJungseong } from '../../utils/hangulUtils'
 import { cn } from '@/lib/utils'
@@ -159,9 +158,6 @@ export function EditorPanel() {
 
       {/* 글로벌 스타일 퀵 컨트롤 (데스크톱만 — 모바일은 인스펙터 드로어에서 표시) */}
       {!isMobile && <GlobalQuickControls />}
-
-      {/* 브레드크럼 네비게이션 */}
-      <EditorBreadcrumb />
 
       {/* 콘텐츠 */}
       {content}

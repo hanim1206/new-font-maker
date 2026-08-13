@@ -12,6 +12,7 @@ import { useLayoutStore } from '../../stores/layoutStore'
 import { useGlobalStyleStore } from '../../stores/globalStyleStore'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { SemanticGlyphGrid } from './SemanticGlyphGrid'
+import { ProgressiveJamoSelector } from './ProgressiveJamoSelector'
 import { LayoutFilterChips } from './LayoutFilterChips'
 import { JamoLayoutPreviewCards } from './JamoLayoutPreviewCards'
 import { classifyJungseong, decomposeSyllableWithOverrides } from '../../utils/hangulUtils'
@@ -507,99 +508,50 @@ export function GlyphViewerColumn({ onOverrideSwitch, activeLayoutType, onSelect
   const isFiltered = !isJamoEditing && (selectedLayoutType !== null || editingJamoChar !== null)
 
   return (
-    <div className="flex-1 min-h-0 min-w-0 flex flex-col border-r border-border-subtle bg-[#080808]">
+    <div className="flex-1 min-h-0 min-w-0 flex bg-[#080808]">
 
-      {isJamoEditing && editingJamoType && editingJamoChar ? (
-        <JamoLayoutPreviewCards
-          activeLayoutType={activeLayoutType}
-          highlightedLayoutTypes={overrideLayoutTypes}
-          editingJamoType={editingJamoType}
-          editingJamoChar={editingJamoChar}
-          savedJamoData={savedJamoData}
-          onSelect={onSelectLayout}
-        />
-      ) : (
-        <LayoutFilterChips
-          activeLayoutType={activeLayoutType}
-          onSelect={onSelectLayout}
-        />
-      )}
+      {/* 2열: 현재 레이아웃과 오버라이드 컨텍스트 */}
+      <aside className="w-[208px] shrink-0 min-h-0 overflow-y-auto border-r border-border-subtle bg-[#0c0c0c]">
+        {isJamoEditing && editingJamoType && editingJamoChar ? (
+          <JamoLayoutPreviewCards
+            activeLayoutType={activeLayoutType}
+            highlightedLayoutTypes={overrideLayoutTypes}
+            editingJamoType={editingJamoType}
+            editingJamoChar={editingJamoChar}
+            savedJamoData={savedJamoData}
+            onSelect={onSelectLayout}
+          />
+        ) : (
+          <LayoutFilterChips
+            activeLayoutType={activeLayoutType}
+            onSelect={onSelectLayout}
+          />
+        )}
 
-      {/* === 오버라이드 탭 (자모 편집 중에만) === */}
-      {isJamoEditing && (
-        <div className="shrink-0 px-2 pt-2 pb-1.5 border-b border-border-subtle flex items-center gap-1 flex-wrap">
-          {/* 기본 탭 */}
-          <button
-            onClick={() => handleSelectOverride(null)}
-            className={`h-6 px-2.5 rounded-full text-[11px] font-medium transition-all ${
-              editingOverrideId === null
-                ? 'bg-[rgba(78,205,196,0.15)] text-[#4ecdc4]'
-                : 'text-text-dim-5 hover:text-text-dim-2 hover:bg-surface-2'
-            }`}
-          >
-            기본 · 전체 적용
-          </button>
-
-          {/* 오버라이드 탭들 */}
-          {overrides.map((ovr, idx) => (
-            <div key={ovr.id} className="relative group flex items-center">
-              <button
-                onClick={() => handleSelectOverride(ovr.id)}
-                className={`h-6 pl-2.5 pr-1.5 rounded-full text-[11px] font-medium transition-all flex items-center gap-1 ${
-                  !ovr.enabled ? 'opacity-40' : ''
-                } ${
-                  editingOverrideId === ovr.id
-                    ? 'bg-[rgba(251,146,60,0.15)] text-[#fb923c]'
-                    : 'text-text-dim-5 hover:text-text-dim-2 hover:bg-surface-2'
-                }`}
-              >
-                오버라이드 {idx + 1}
-                <span
-                  role="button"
-                  onClick={(e) => handleRemoveOverride(ovr.id, e)}
-                  className="opacity-0 group-hover:opacity-50 hover:!opacity-100 text-[#f87171] leading-none ml-0.5"
-                  title="삭제"
-                >
-                  ×
-                </span>
-              </button>
-            </div>
-          ))}
-
-          {/* + 버튼 */}
-          <button
-            onClick={handleAddOverride}
-            className="w-6 h-6 flex items-center justify-center rounded-full border border-dashed border-border text-text-dim-5 text-[13px] hover:border-text-dim-3 hover:text-text-dim-2 transition-all shrink-0"
-          >
-            +
-          </button>
-        </div>
-      )}
-
-      {/* === 레이아웃 오버라이드 탭 (레이아웃 편집 중에만) === */}
-      {!isJamoEditing && selectedLayoutType && (() => {
-        const schema = useLayoutStore.getState().getLayoutSchema(selectedLayoutType)
-        const layoutOverrides = schema?.overrides ?? []
-        return (
-          <div className="shrink-0 px-2 pt-2 pb-1.5 border-b border-border-subtle flex items-center gap-1 flex-wrap">
+        {/* === 오버라이드 탭 (자모 편집 중에만) === */}
+        {isJamoEditing && (
+          <div className="mx-3 py-3 border-t border-border-subtle flex items-center gap-1.5 flex-wrap">
+            {/* 기본 탭 */}
             <button
-              onClick={() => handleSelectLayoutOverride(null)}
-              className={`h-6 px-2.5 rounded-full text-[11px] font-medium transition-all ${
-                editingLayoutOverrideId === null
+              onClick={() => handleSelectOverride(null)}
+              className={`h-7 px-2.5 rounded-md text-[11px] font-medium transition-all ${
+                editingOverrideId === null
                   ? 'bg-[rgba(78,205,196,0.15)] text-[#4ecdc4]'
                   : 'text-text-dim-5 hover:text-text-dim-2 hover:bg-surface-2'
               }`}
             >
               기본
             </button>
-            {layoutOverrides.map((ovr, idx) => (
+
+            {/* 오버라이드 탭들 */}
+            {overrides.map((ovr, idx) => (
               <div key={ovr.id} className="relative group flex items-center">
                 <button
-                  onClick={() => handleSelectLayoutOverride(ovr.id)}
-                  className={`h-6 pl-2.5 pr-1.5 rounded-full text-[11px] font-medium transition-all flex items-center gap-1 ${
+                  onClick={() => handleSelectOverride(ovr.id)}
+                  className={`h-7 pl-2.5 pr-1.5 rounded-md text-[11px] font-medium transition-all flex items-center gap-1 ${
                     !ovr.enabled ? 'opacity-40' : ''
                   } ${
-                    editingLayoutOverrideId === ovr.id
+                    editingOverrideId === ovr.id
                       ? 'bg-[rgba(251,146,60,0.15)] text-[#fb923c]'
                       : 'text-text-dim-5 hover:text-text-dim-2 hover:bg-surface-2'
                   }`}
@@ -607,7 +559,7 @@ export function GlyphViewerColumn({ onOverrideSwitch, activeLayoutType, onSelect
                   오버라이드 {idx + 1}
                   <span
                     role="button"
-                    onClick={(e) => handleRemoveLayoutOverride(ovr.id, e)}
+                    onClick={(e) => handleRemoveOverride(ovr.id, e)}
                     className="opacity-0 group-hover:opacity-50 hover:!opacity-100 text-[#f87171] leading-none ml-0.5"
                     title="삭제"
                   >
@@ -616,39 +568,87 @@ export function GlyphViewerColumn({ onOverrideSwitch, activeLayoutType, onSelect
                 </button>
               </div>
             ))}
+
+            {/* + 버튼 */}
             <button
-              onClick={handleAddLayoutOverride}
-              className="w-6 h-6 flex items-center justify-center rounded-full border border-dashed border-border text-text-dim-5 text-[13px] hover:border-text-dim-3 hover:text-text-dim-2 transition-all shrink-0"
+              onClick={handleAddOverride}
+              className="w-7 h-7 flex items-center justify-center rounded-md border border-dashed border-border text-text-dim-5 text-[13px] hover:border-text-dim-3 hover:text-text-dim-2 transition-all shrink-0"
             >
               +
             </button>
           </div>
-        )
-      })()}
+        )}
 
-      {isBaseJamoEditing && (
-        <div className="shrink-0 px-3 py-2 border-b border-border-subtle bg-[#0c0c0c] flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#4ecdc4] shadow-[0_0_0_4px_rgba(78,205,196,0.1)] shrink-0" />
-          <div className="min-w-0">
-            <div className="text-[11px] text-text-dim-2">이 자모를 사용하는 모든 글자에 적용</div>
-            <div className="text-[10px] text-text-dim-5 mt-0.5">기본 편집에서는 적용 범위를 변경할 수 없습니다</div>
-          </div>
-          <span className="ml-auto text-[10px] text-text-dim-5 tabular-nums whitespace-nowrap">
-            {visibleSyllables.length.toLocaleString()}개 전체
+        {/* === 레이아웃 오버라이드 탭 (레이아웃 편집 중에만) === */}
+        {!isJamoEditing && selectedLayoutType && (() => {
+          const schema = useLayoutStore.getState().getLayoutSchema(selectedLayoutType)
+          const layoutOverrides = schema?.overrides ?? []
+          return (
+            <div className="mx-3 py-3 border-t border-border-subtle flex items-center gap-1.5 flex-wrap">
+              <button
+                onClick={() => handleSelectLayoutOverride(null)}
+                className={`h-7 px-2.5 rounded-md text-[11px] font-medium transition-all ${
+                  editingLayoutOverrideId === null
+                    ? 'bg-[rgba(78,205,196,0.15)] text-[#4ecdc4]'
+                    : 'text-text-dim-5 hover:text-text-dim-2 hover:bg-surface-2'
+                }`}
+              >
+                기본
+              </button>
+              {layoutOverrides.map((ovr, idx) => (
+                <div key={ovr.id} className="relative group flex items-center">
+                  <button
+                    onClick={() => handleSelectLayoutOverride(ovr.id)}
+                    className={`h-7 pl-2.5 pr-1.5 rounded-md text-[11px] font-medium transition-all flex items-center gap-1 ${
+                      !ovr.enabled ? 'opacity-40' : ''
+                    } ${
+                      editingLayoutOverrideId === ovr.id
+                        ? 'bg-[rgba(251,146,60,0.15)] text-[#fb923c]'
+                        : 'text-text-dim-5 hover:text-text-dim-2 hover:bg-surface-2'
+                    }`}
+                  >
+                    오버라이드 {idx + 1}
+                    <span
+                      role="button"
+                      onClick={(e) => handleRemoveLayoutOverride(ovr.id, e)}
+                      className="opacity-0 group-hover:opacity-50 hover:!opacity-100 text-[#f87171] leading-none ml-0.5"
+                      title="삭제"
+                    >
+                      ×
+                    </span>
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={handleAddLayoutOverride}
+                className="w-7 h-7 flex items-center justify-center rounded-md border border-dashed border-border text-text-dim-5 text-[13px] hover:border-text-dim-3 hover:text-text-dim-2 transition-all shrink-0"
+              >
+                +
+              </button>
+            </div>
+          )
+        })()}
+      </aside>
+
+      {/* 3열: 글자 버튼과 적용 범위 선택 */}
+      <section className="flex-1 min-h-0 min-w-0 flex flex-col">
+        {/* === 헤더 === */}
+        <div className="shrink-0 px-3 py-1.5 border-b border-border-subtle flex items-center justify-end">
+          <span className="text-[10px] text-text-dim-5 tabular-nums">
+            {isFiltered
+              ? <><span className="text-foreground">{visibleSyllables.length.toLocaleString()}</span> / {ALL_SYLLABLES.length.toLocaleString()}</>
+              : visibleSyllables.length.toLocaleString()
+            }
           </span>
         </div>
-      )}
 
-      {/* === 헤더 === */}
-      <div className="shrink-0 px-3 py-1.5 border-b border-border-subtle flex items-center justify-end">
-        <span className="text-[10px] text-text-dim-5 tabular-nums">
-          {isFiltered
-            ? <><span className="text-foreground">{visibleSyllables.length.toLocaleString()}</span> / {ALL_SYLLABLES.length.toLocaleString()}</>
-            : visibleSyllables.length.toLocaleString()
-          }
-        </span>
-      </div>
-
+      {isBaseLayoutEditing ? (
+        <ProgressiveJamoSelector
+          syllables={visibleSyllables}
+          focusedSyllable={focusedSyllable}
+          onSelect={(meta) => setFocusedSyllable(meta.char)}
+        />
+      ) : (
       <SemanticGlyphGrid
         syllables={visibleSyllables}
         editingJamoType={isJamoEditing ? editingJamoType : null}
@@ -714,6 +714,7 @@ export function GlyphViewerColumn({ onOverrideSwitch, activeLayoutType, onSelect
           )
         }}
       />
+      )}
 
       {/* === 적용 범위 상태 (저장은 상단 공통 저장 버튼에서 수행) === */}
       {isJamoOverrideEditing && (
@@ -753,6 +754,7 @@ export function GlyphViewerColumn({ onOverrideSwitch, activeLayoutType, onSelect
         </div>
       )}
 
+      </section>
     </div>
   )
 }

@@ -9,10 +9,10 @@ import styles from './JamoLayoutPreviewCards.module.css'
 const GLYPH_LAYOUT_FILTERS: LayoutType[] = [
   'choseong-only',
   'choseong-jungseong-vertical',
-  'choseong-jungseong-horizontal',
-  'choseong-jungseong-mixed',
   'choseong-jungseong-vertical-jongseong',
+  'choseong-jungseong-horizontal',
   'choseong-jungseong-horizontal-jongseong',
+  'choseong-jungseong-mixed',
   'choseong-jungseong-mixed-jongseong',
 ]
 

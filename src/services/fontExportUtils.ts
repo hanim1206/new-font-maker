@@ -220,7 +220,11 @@ export function collectGlyphDataForChar(char: string): GlyphData | null {
     layoutType
   )
   const schemaWithPadding = { ...schema, padding: effectivePadding }
-  const boxes = calculateBoxes(schemaWithPadding) as Record<Part, BoxConfig>
+  const boxes = calculateBoxes(schemaWithPadding, {
+    cho: syllable.choseong?.char ?? '',
+    jung: syllable.jungseong?.char ?? '',
+    jong: syllable.jongseong?.char ?? '',
+  }) as Record<Part, BoxConfig>
 
   // 렌더 순서에 따라 모든 파트의 획 수집
   const renderOrder = getRenderOrder(layoutType)

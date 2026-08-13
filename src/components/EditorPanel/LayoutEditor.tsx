@@ -21,11 +21,32 @@ import { decomposeSyllableWithOverrides, getSampleSyllableForLayout } from '../.
 import { calculateBoxes, calculateRawBoxes } from '../../utils/layoutCalculator'
 import { mergeStrokes, splitStroke, addHandlesToPoint, removeHandlesFromPoint } from '../../utils/strokeEditUtils'
 import { COMPOUND_JONGSEONG } from '../../utils/jamoLinkUtils'
+import {
+  APP_ROUTE_POP_EVENT,
+  applyAppRoute,
+  appRouteToPath,
+  getCurrentRouteHistoryState,
+  pushAppRoute,
+  replaceAppRoute,
+  type AppRoute,
+  type AppRouteHistoryState,
+  type AppRoutePopDetail,
+} from '../../utils/appRoutes'
 import type { LayoutType, Part, DecomposedSyllable, BoxConfig, JamoData, Padding, PartOverride, StrokeDataV2, LayoutSchema } from '../../types'
 
 interface LayoutEditorProps {
   layoutType: LayoutType
 }
+
+type PendingJamoNavigation =
+  | { type: 'layout'; layoutType: LayoutType }
+  | { type: 'exit' }
+  | {
+      type: 'history'
+      route: AppRoute
+      state: AppRouteHistoryState
+      delta: number
+    }
 
 // 파트 → 자모 정보 매핑
 function partToJamoInfo(part: Part, syllable: DecomposedSyllable): { type: 'choseong' | 'jungseong' | 'jongseong'; char: string } | null {
@@ -169,12 +190,19 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   // 레이아웃 편집 더티 상태 추적
   const [isLayoutDirty, setIsLayoutDirty] = useState(false)
   const [isJamoDirty, setIsJamoDirty] = useState(false)
+  const [isJamoScopeDirty, setIsJamoScopeDirty] = useState(false)
   const [savedJamoData, setSavedJamoData] = useState<JamoData | null>(null)
   const layoutSnapshotRef = useRef<LayoutSchema | null>(null)
   const jamoSnapshotRef = useRef<{ type: 'choseong' | 'jungseong' | 'jongseong'; char: string; data: JamoData } | null>(null)
   const paddingOverrideSnapshotRef = useRef<Partial<Padding> | null>(null)
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [pendingJamoPart, setPendingJamoPart] = useState<Part | null>(null)
+  const [showJamoSaveDialog, setShowJamoSaveDialog] = useState(false)
+  const [pendingJamoNavigation, setPendingJamoNavigation] = useState<PendingJamoNavigation | null>(null)
+  const jamoScopeActionRef = useRef<((mode: 'save' | 'discard') => boolean) | null>(null)
+  const acceptedHistoryStateRef = useRef<AppRouteHistoryState | null>(getCurrentRouteHistoryState())
+  const restoringHistoryRef = useRef(false)
+  const confirmedHistoryNavigationRef = useRef(false)
 
   // layoutType 변경 시 스냅샷 초기화 + 더티 클리어
   useEffect(() => {
@@ -221,11 +249,6 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     }
   }, [editingLayoutOverrideId, schemaWithPadding, schema])
 
-  // 계산된 박스 (파트 오버레이용) — partOverrides 포함
-  const computedBoxes = useMemo(
-    () => calculateBoxes(displaySchema),
-    [displaySchema]
-  )
   const rawBoxes = useMemo(() => calculateRawBoxes(schemaWithPadding), [schemaWithPadding])
 
   // 테스트용 음절
@@ -284,6 +307,16 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     return decomposeSyllableWithOverrides(fallbackChar, choseong, jungseong, jongseong)
   }, [focusedSyllable, inputText, selectedCharIndex, activeLayoutType, editingJamoType, editingJamoChar, choseong, jungseong, jongseong])
 
+  // 계산된 박스 (파트 오버레이용) — 현재 음절의 레이아웃 기본 영역까지 반영
+  const computedBoxes = useMemo(
+    () => calculateBoxes(displaySchema, {
+      cho: testSyllable.choseong?.char ?? '',
+      jung: testSyllable.jungseong?.char ?? '',
+      jong: testSyllable.jongseong?.char ?? '',
+    }),
+    [displaySchema, testSyllable]
+  )
+
   // === 자모 편집 서브모드 ===
   const isJamoEditing = editingPartInLayout !== null
 
@@ -292,6 +325,47 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     if (!editingPartInLayout) return null
     return partToJamoInfo(editingPartInLayout, testSyllable)
   }, [editingPartInLayout, testSyllable])
+
+  const editorRoute = useMemo<AppRoute>(() => {
+    if (isJamoEditing && editingJamoType && editingJamoChar) {
+      return {
+        page: 'editor',
+        layoutType: activeLayoutType,
+        jamo: { type: editingJamoType, char: editingJamoChar },
+      }
+    }
+    return { page: 'editor', layoutType }
+  }, [isJamoEditing, editingJamoType, editingJamoChar, activeLayoutType, layoutType])
+
+  // UI에서 편집 뎁스가 바뀌면 URL을 동기화한다. 자모 안의 레이아웃 전환은
+  // 히스토리를 쌓지 않고 현재 자모 URL만 교체한다.
+  useEffect(() => {
+    const nextPath = appRouteToPath(editorRoute)
+    if (window.location.pathname === nextPath) {
+      acceptedHistoryStateRef.current = getCurrentRouteHistoryState()
+      return
+    }
+
+    const current = getCurrentRouteHistoryState()
+    if (
+      editorRoute.page === 'editor' && editorRoute.jamo &&
+      current?.route.page === 'editor' && current.route.jamo &&
+      current.route.jamo.type === editorRoute.jamo.type &&
+      current.route.jamo.char === editorRoute.jamo.char
+    ) {
+      acceptedHistoryStateRef.current = replaceAppRoute(editorRoute, {
+        parentPath: current.parentPath,
+      })
+      return
+    }
+
+    const parentPath = editorRoute.page === 'editor' && editorRoute.jamo
+      ? current?.route.page === 'editor' && !current.route.jamo
+        ? appRouteToPath(current.route)
+        : current?.parentPath ?? appRouteToPath({ page: 'editor', layoutType })
+      : undefined
+    acceptedHistoryStateRef.current = pushAppRoute(editorRoute, { parentPath })
+  }, [editorRoute, layoutType])
 
   // Ref로 최신 편집 컨텍스트 참조 (드래그 핸들러에서 클로저 문제 방지)
   const editingJamoInfoRef = useRef(editingJamoInfo)
@@ -302,8 +376,10 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   useEffect(() => {
     if (!editingJamoInfo) {
       jamoSnapshotRef.current = null
+      jamoScopeActionRef.current = null
       setSavedJamoData(null)
       setIsJamoDirty(false)
+      setIsJamoScopeDirty(false)
       return
     }
     const current = useJamoStore.getState()[editingJamoInfo.type][editingJamoInfo.char]
@@ -324,27 +400,147 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     setIsJamoDirty(JSON.stringify(current) !== JSON.stringify(snapshot.data))
   }, [editingJamoInfo, choseong, jungseong, jongseong])
 
-  const handleJamoSave = useCallback(() => {
+  const handleJamoScopeStateChange = useCallback((dirty: boolean, action: ((mode: 'save' | 'discard') => boolean) | null) => {
+    jamoScopeActionRef.current = action
+    setIsJamoScopeDirty(dirty)
+  }, [])
+
+  const handleJamoSave = useCallback((): boolean => {
+    if (jamoScopeActionRef.current && !jamoScopeActionRef.current('save')) return false
     const info = editingJamoInfoRef.current
-    if (!info) return
+    if (!info) return false
     const current = useJamoStore.getState()[info.type][info.char]
-    if (!current) return
+    if (!current) return false
     jamoSnapshotRef.current = { type: info.type, char: info.char, data: JSON.parse(JSON.stringify(current)) }
     setSavedJamoData(JSON.parse(JSON.stringify(current)))
     setIsJamoDirty(false)
+    setIsJamoScopeDirty(false)
+    return true
   }, [])
 
-  const handleJamoDiscard = useCallback(() => {
+  const handleJamoDiscard = useCallback((): boolean => {
+    jamoScopeActionRef.current?.('discard')
     const snapshot = jamoSnapshotRef.current
-    if (!snapshot) return
+    if (!snapshot) return false
     const restored = JSON.parse(JSON.stringify(snapshot.data)) as JamoData
     const store = useJamoStore.getState()
     if (snapshot.type === 'choseong') store.updateChoseong(snapshot.char, restored)
     else if (snapshot.type === 'jungseong') store.updateJungseong(snapshot.char, restored)
     else store.updateJongseong(snapshot.char, restored)
     setIsJamoDirty(false)
+    setIsJamoScopeDirty(false)
     setSelectedStrokeId(null)
+    return true
   }, [setSelectedStrokeId])
+
+  const completeJamoNavigation = useCallback((target: PendingJamoNavigation) => {
+    if (target.type === 'layout') {
+      setPreviewLayoutType(target.layoutType)
+      return
+    }
+    if (target.type === 'history') {
+      if (target.delta === 0) {
+        acceptedHistoryStateRef.current = target.state
+        applyAppRoute(target.route)
+        return
+      }
+      confirmedHistoryNavigationRef.current = true
+      window.history.go(target.delta)
+      return
+    }
+    const layoutRoute: AppRoute = { page: 'editor', layoutType: activeLayoutType }
+    acceptedHistoryStateRef.current = replaceAppRoute(layoutRoute)
+    setPreviewLayoutType(null)
+    setEditingPartInLayout(null)
+  }, [activeLayoutType, setEditingPartInLayout])
+
+  const requestJamoNavigation = useCallback((target: PendingJamoNavigation) => {
+    if (isJamoDirty || isJamoScopeDirty) {
+      setPendingJamoNavigation(target)
+      setShowJamoSaveDialog(true)
+      return
+    }
+    completeJamoNavigation(target)
+  }, [isJamoDirty, isJamoScopeDirty, completeJamoNavigation])
+
+  const handleJamoNavigationSave = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    if (!pendingJamoNavigation || !handleJamoSave()) {
+      event.preventDefault()
+      return
+    }
+    const target = pendingJamoNavigation
+    setShowJamoSaveDialog(false)
+    setPendingJamoNavigation(null)
+    completeJamoNavigation(target)
+  }, [pendingJamoNavigation, handleJamoSave, completeJamoNavigation])
+
+  const handleJamoNavigationDiscard = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    if (!pendingJamoNavigation || !handleJamoDiscard()) {
+      event.preventDefault()
+      return
+    }
+    const target = pendingJamoNavigation
+    setShowJamoSaveDialog(false)
+    setPendingJamoNavigation(null)
+    completeJamoNavigation(target)
+  }, [pendingJamoNavigation, handleJamoDiscard, completeJamoNavigation])
+
+  const handleBackToLayout = useCallback(() => {
+    const current = acceptedHistoryStateRef.current ?? getCurrentRouteHistoryState()
+    if (current?.parentPath && current.index > 0) {
+      window.history.back()
+      return
+    }
+    requestJamoNavigation({ type: 'exit' })
+  }, [requestJamoNavigation])
+
+  // 브라우저 뒤로/앞으로 가기도 자모 카드 이동과 동일한 저장 분기를 거친다.
+  useEffect(() => {
+    const handleRoutePop = (event: Event) => {
+      const { route, state } = (event as CustomEvent<AppRoutePopDetail>).detail
+
+      if (restoringHistoryRef.current) {
+        restoringHistoryRef.current = false
+        acceptedHistoryStateRef.current = state
+        return
+      }
+
+      if (confirmedHistoryNavigationRef.current) {
+        confirmedHistoryNavigationRef.current = false
+        acceptedHistoryStateRef.current = state
+        applyAppRoute(route)
+        return
+      }
+
+      const accepted = acceptedHistoryStateRef.current
+      if (isJamoEditing && (isJamoDirty || isJamoScopeDirty) && accepted && state) {
+        const delta = state.index - accepted.index
+        if (delta !== 0) {
+          setPendingJamoNavigation({ type: 'history', route, state, delta })
+          setShowJamoSaveDialog(true)
+          restoringHistoryRef.current = true
+          window.history.go(-delta)
+          return
+        }
+      }
+
+      acceptedHistoryStateRef.current = state
+      applyAppRoute(route)
+    }
+
+    window.addEventListener(APP_ROUTE_POP_EVENT, handleRoutePop)
+    return () => window.removeEventListener(APP_ROUTE_POP_EVENT, handleRoutePop)
+  }, [isJamoEditing, isJamoDirty, isJamoScopeDirty])
+
+  useEffect(() => {
+    if (!isJamoEditing || (!isJamoDirty && !isJamoScopeDirty)) return
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [isJamoEditing, isJamoDirty, isJamoScopeDirty])
 
   // 편집 중인 파트의 박스 정보 (StrokeOverlay용)
   const editingBox = useMemo((): BoxConfig | null => {
@@ -446,8 +642,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isJamoEditing) {
         e.preventDefault()
-        setPreviewLayoutType(null)
-        setEditingPartInLayout(null)
+        handleBackToLayout()
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault()
@@ -460,7 +655,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isJamoEditing, setEditingPartInLayout, globalUndo, globalRedo])
+  }, [isJamoEditing, handleBackToLayout, globalUndo, globalRedo])
 
   // 파트 싱글클릭 → 파트 선택 (파트 오프셋 조절용)
   const handlePartClick = useCallback((part: Part) => {
@@ -859,7 +1054,8 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
   // 레이아웃 컨텍스트 전환 핸들러
   const handlePreviewLayoutTypeChange = useCallback((lt: LayoutType) => {
     if (isJamoEditing) {
-      setPreviewLayoutType(lt)
+      if (lt === activeLayoutType) return
+      requestJamoNavigation({ type: 'layout', layoutType: lt })
     } else {
       const anchoredChoseong = testSyllable.choseong?.char
       const anchoredSyllable = getSampleSyllableForLayout(
@@ -875,7 +1071,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
       setSelectedLayoutType(lt)
       setFocusedSyllable(anchoredSyllable)
     }
-  }, [isJamoEditing, testSyllable, setPreviewLayoutType, setSelectedLayoutType, setFocusedSyllable])
+  }, [isJamoEditing, activeLayoutType, requestJamoNavigation, testSyllable, setSelectedLayoutType, setFocusedSyllable])
 
   // 자모 패딩 변경 → 스토어 직접
   const handleJamoPaddingChange = useCallback((_type: 'choseong' | 'jungseong' | 'jongseong', _char: string, side: keyof Padding, val: number) => {
@@ -1001,26 +1197,64 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
     onOverrideSwitch: handleOverrideSwitch,
   } as const
 
+  const jamoNavigationDialog = (
+    <AlertDialog
+      open={showJamoSaveDialog}
+      onOpenChange={(open) => {
+        setShowJamoSaveDialog(open)
+        if (!open) setPendingJamoNavigation(null)
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>자모 변경사항이 있습니다</AlertDialogTitle>
+          <AlertDialogDescription>
+            {pendingJamoNavigation?.type === 'layout'
+              ? '다른 레이아웃으로 이동하기 전에 현재 자모 변경사항을 어떻게 처리하시겠습니까?'
+              : pendingJamoNavigation?.type === 'history' && pendingJamoNavigation.route.page !== 'editor'
+                ? '현재 편집 화면을 떠나기 전에 자모 변경사항을 어떻게 처리하시겠습니까?'
+              : '레이아웃 편집으로 돌아가기 전에 현재 자모 변경사항을 어떻게 처리하시겠습니까?'
+            }
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => setPendingJamoNavigation(null)}>
+            취소
+          </AlertDialogCancel>
+          <AlertDialogAction onClick={handleJamoNavigationDiscard} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            변경 폐기
+          </AlertDialogAction>
+          <AlertDialogAction onClick={handleJamoNavigationSave}>
+            저장 후 계속
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+
   // 모바일: 단일 컬럼 레이아웃
   if (isMobile) {
     return (
-      <LayoutEditorMobile
-        layoutCanvasProps={layoutCanvasProps}
-        jamoCanvasProps={jamoCanvasProps}
-        isJamoEditing={isJamoEditing}
-        editingJamoInfo={editingJamoInfo}
-        choseongStyleInfo={choseongStyleInfo}
-        onApplyChoseongStyle={handleApplyChoseongStyle}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        onPartDeselect={handlePartDeselect}
-        onJamoReset={handleJamoReset}
-        isJamoDirty={isJamoDirty}
-        onJamoSave={handleJamoSave}
-        onJamoDiscard={handleJamoDiscard}
-        onUndo={globalUndo}
-        onRedo={globalRedo}
-      />
+      <>
+        <LayoutEditorMobile
+          layoutCanvasProps={layoutCanvasProps}
+          jamoCanvasProps={jamoCanvasProps}
+          isJamoEditing={isJamoEditing}
+          editingJamoInfo={editingJamoInfo}
+          choseongStyleInfo={choseongStyleInfo}
+          onApplyChoseongStyle={handleApplyChoseongStyle}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onPartDeselect={handlePartDeselect}
+          onJamoReset={handleJamoReset}
+          isJamoDirty={isJamoDirty}
+          onJamoSave={handleJamoSave}
+          onJamoDiscard={handleJamoDiscard}
+          onUndo={globalUndo}
+          onRedo={globalRedo}
+        />
+        {jamoNavigationDialog}
+      </>
     )
   }
 
@@ -1039,8 +1273,11 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
         onPartDeselect={handlePartDeselect}
         onJamoReset={handleJamoReset}
         isJamoDirty={isJamoDirty}
+        isJamoScopeDirty={isJamoScopeDirty}
         onJamoSave={handleJamoSave}
         onJamoDiscard={handleJamoDiscard}
+        onBackToLayout={handleBackToLayout}
+        onJamoScopeStateChange={handleJamoScopeStateChange}
         onUndo={globalUndo}
         onRedo={globalRedo}
         selectedLayoutType={layoutType}
@@ -1075,6 +1312,7 @@ export function LayoutEditor({ layoutType }: LayoutEditorProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {jamoNavigationDialog}
     </>
   )
 }
