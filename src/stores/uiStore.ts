@@ -3,7 +3,7 @@ import { immer } from 'zustand/middleware/immer'
 import { persist } from 'zustand/middleware'
 import type { ViewMode, LayoutType, Part } from '../types'
 
-type PageType = 'home' | 'editor' | 'projects'
+type PageType = 'home' | 'editor' | 'editor-v2' | 'projects'
 
 interface UIState {
   // 현재 페이지 (홈, 에디터, 프로젝트 목록)

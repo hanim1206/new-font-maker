@@ -10,6 +10,7 @@ import { useAuthStore } from './stores/authStore'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { PreviewPanel } from './components/PreviewPanel/PreviewPanel'
 import { AuthDialog } from './components/AuthDialog'
+import { MobileEditorV2Page } from './features/mobile-editor/MobileEditorV2Page'
 import {
   APP_ROUTE_POP_EVENT,
   applyAppRoute,
@@ -49,7 +50,11 @@ export default function App() {
   // 홈과 프로젝트 목록도 편집 URL에서 정상적으로 왕복할 수 있게 히스토리에 기록한다.
   useEffect(() => {
     if (currentPage === 'editor') return
-    const route = currentPage === 'projects' ? { page: 'projects' as const } : { page: 'home' as const }
+    const route = currentPage === 'projects'
+      ? { page: 'projects' as const }
+      : currentPage === 'editor-v2'
+        ? { page: 'editor-v2' as const }
+        : { page: 'home' as const }
     if (window.location.pathname === appRouteToPath(route)) return
     const currentState = getCurrentRouteHistoryState()
     if (currentState?.route.page === currentPage) return
@@ -92,13 +97,17 @@ export default function App() {
     )
   }
 
+  if (currentPage === 'editor-v2') {
+    return <MobileEditorV2Page />
+  }
+
   // 데스크톱
   if (!isMobile) {
     return (
       <TooltipProvider delayDuration={300}>
         <div className="flex flex-col h-screen bg-background text-foreground font-sans">
           {/* 최상단: 햄버거 + 프로젝트명 + 가로 글자 프리뷰 (인풋 포함) */}
-          <div className="shrink-0 border-b border-border-subtle bg-[#0f0f0f]">
+          <div className="shrink-0 border-b border-border-subtle bg-surface">
             <div className="flex items-center gap-3 px-4 py-2">
               <NavMenu />
               <SaveButton />

@@ -5,3 +5,5 @@ dist/
 .omc/
 .vercel
 .claude/
+test-results/
+playwright-report/

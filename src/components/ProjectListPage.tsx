@@ -182,7 +182,7 @@ export function ProjectListPage() {
   return (
     <div className="flex flex-col h-full bg-background text-foreground">
       {/* 헤더 */}
-      <header className="shrink-0 border-b border-border-subtle bg-[#0f0f0f]">
+      <header className="shrink-0 border-b border-border-subtle bg-surface">
         <div className="flex items-center gap-3 px-4 py-3">
           <Button
             variant="ghost"

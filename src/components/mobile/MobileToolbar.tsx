@@ -12,7 +12,7 @@ export function MobileToolbar() {
   } = useUIStore()
 
   return (
-    <div className="shrink-0 flex items-center px-2 py-1.5 bg-[#0f0f0f] border-t border-border-subtle pb-safe-b">
+    <div className="shrink-0 flex items-center px-2 py-1.5 bg-surface border-t border-border-subtle pb-safe-b shadow-[0_-1px_12px_rgb(15_23_42_/_0.04)]">
       <NavMenu />
       <SaveButton />
       <div className="flex gap-1">

@@ -3,6 +3,61 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    color-scheme: light;
+
+    /* 2차 개발 기본 테마: 차가운 흰색 바탕 + 선명한 중성색 */
+    --color-background: 247 248 250;
+    --color-foreground: 24 27 31;
+    --color-surface: 255 255 255;
+    --color-surface-2: 248 249 251;
+    --color-surface-3: 240 243 246;
+    --color-surface-4: 231 235 240;
+    --color-surface-hover: 242 245 248;
+
+    --color-border: 218 223 230;
+    --color-border-light: 202 209 218;
+    --color-border-lighter: 211 217 225;
+    --color-border-subtle: 235 238 242;
+
+    --color-primary: 47 111 237;
+    --color-primary-dark: 35 88 201;
+    --color-primary-light: 232 240 255;
+    --color-primary-foreground: 255 255 255;
+    --color-ring: 47 111 237;
+
+    --color-muted: 112 120 131;
+    --color-muted-foreground: 88 97 109;
+    --color-text-1: 43 48 55;
+    --color-text-2: 65 72 82;
+    --color-text-3: 88 97 109;
+    --color-text-4: 112 120 131;
+    --color-text-5: 139 147 157;
+    --color-text-6: 166 173 182;
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 18px;
+
+    --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.05);
+    --shadow-md: 0 8px 24px rgb(15 23 42 / 0.08);
+    --shadow-overlay: 0 20px 60px rgb(15 23 42 / 0.14);
+
+    --motion-fast: 120ms;
+    --motion-normal: 180ms;
+    --motion-slow: 260ms;
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --touch-target: 44px;
+  }
+
   /* 전역 리셋 */
   * {
     margin: 0;
@@ -12,16 +67,29 @@
 
   html {
     font-size: 16px;
+    background: rgb(var(--color-background));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overscroll-behavior: none;
   }
 
   body {
-    background: #0a0a0a;
-    color: #f5f5f5;
+    background: rgb(var(--color-background));
+    color: rgb(var(--color-foreground));
     font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     line-height: 1.5;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--color-ring));
+    outline-offset: 2px;
   }
 
   /* 접근성 */
@@ -36,22 +104,23 @@
   /* 스크롤바 커스텀 */
   ::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #0a0a0a;
+    background: rgb(var(--color-background));
   }
   ::-webkit-scrollbar-thumb {
-    background: #333;
+    background: rgb(var(--color-border-light));
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #444;
+    background: rgb(var(--color-muted));
   }
 
   /* 선택 색상 */
   ::selection {
-    background: rgba(124, 58, 237, 0.4);
-    color: #fff;
+    background: rgb(var(--color-primary) / 0.18);
+    color: rgb(var(--color-foreground));
   }
 }
 

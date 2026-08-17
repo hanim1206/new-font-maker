@@ -220,5 +220,51 @@ export interface DecomposedSyllable {
   layoutType: LayoutType
 }
 
+// ===== 모바일 편집기 v2 =====
+export type MobileEditorSelection =
+  | { kind: 'none' }
+  | { kind: 'part'; part: Part }
+  | { kind: 'stroke'; part: Part; strokeId: string }
+
+export interface StrokeMoveDelta {
+  x: number
+  y: number
+}
+
+export interface GlyphBounds {
+  minX: number
+  centerX: number
+  maxX: number
+  minY: number
+  centerY: number
+  maxY: number
+}
+
+export interface AlignmentReference {
+  label: string
+  bounds: GlyphBounds
+}
+
+export interface SmartGuide {
+  axis: 'x' | 'y'
+  position: number
+  label: string
+}
+
+export interface EditorHistoryEntry {
+  id: string
+  createdAt: string
+  action: 'stroke-move' | 'restore' | 'undo'
+  syllable: string
+  jamoType: 'choseong'
+  jamoChar: string
+  part: 'CH'
+  strokeId: string
+  delta: StrokeMoveDelta
+  before: JamoData
+  after: JamoData
+  summary: string
+}
+
 // ===== UI 상태 =====
 export type ViewMode = 'preview' | 'presets' | 'editor'

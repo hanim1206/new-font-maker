@@ -6,22 +6,22 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: '#0a0a0a',
-        foreground: '#f5f5f5',
-        border: '#2a2a2a',
-        ring: '#7c3aed',
+        background: 'rgb(var(--color-background) / <alpha-value>)',
+        foreground: 'rgb(var(--color-foreground) / <alpha-value>)',
+        border: 'rgb(var(--color-border) / <alpha-value>)',
+        ring: 'rgb(var(--color-ring) / <alpha-value>)',
         surface: {
-          DEFAULT: '#141414',
-          2: '#1a1a1a',
-          3: '#222222',
-          4: '#2a2a2a',
-          hover: '#252525',
+          DEFAULT: 'rgb(var(--color-surface) / <alpha-value>)',
+          2: 'rgb(var(--color-surface-2) / <alpha-value>)',
+          3: 'rgb(var(--color-surface-3) / <alpha-value>)',
+          4: 'rgb(var(--color-surface-4) / <alpha-value>)',
+          hover: 'rgb(var(--color-surface-hover) / <alpha-value>)',
         },
         primary: {
-          DEFAULT: '#7c3aed',
-          dark: '#6d28d9',
-          light: '#a855f7',
-          foreground: '#ffffff',
+          DEFAULT: 'rgb(var(--color-primary) / <alpha-value>)',
+          dark: 'rgb(var(--color-primary-dark) / <alpha-value>)',
+          light: 'rgb(var(--color-primary-light) / <alpha-value>)',
+          foreground: 'rgb(var(--color-primary-foreground) / <alpha-value>)',
         },
         accent: {
           blue: '#2a5cb8',
@@ -45,20 +45,20 @@ export default {
           pink: '#ec4899',
         },
         muted: {
-          DEFAULT: '#888888',
-          foreground: '#aaaaaa',
+          DEFAULT: 'rgb(var(--color-muted) / <alpha-value>)',
+          foreground: 'rgb(var(--color-muted-foreground) / <alpha-value>)',
         },
         'text-dim': {
-          1: '#cccccc',
-          2: '#aaaaaa',
-          3: '#999999',
-          4: '#888888',
-          5: '#666666',
-          6: '#555555',
+          1: 'rgb(var(--color-text-1) / <alpha-value>)',
+          2: 'rgb(var(--color-text-2) / <alpha-value>)',
+          3: 'rgb(var(--color-text-3) / <alpha-value>)',
+          4: 'rgb(var(--color-text-4) / <alpha-value>)',
+          5: 'rgb(var(--color-text-5) / <alpha-value>)',
+          6: 'rgb(var(--color-text-6) / <alpha-value>)',
         },
-        'border-light': '#3a3a3a',
-        'border-lighter': '#333333',
-        'border-subtle': '#1a1a1a',
+        'border-light': 'rgb(var(--color-border-light) / <alpha-value>)',
+        'border-lighter': 'rgb(var(--color-border-lighter) / <alpha-value>)',
+        'border-subtle': 'rgb(var(--color-border-subtle) / <alpha-value>)',
         // 슬롯 색상 (CH, JU, JO 등)
         slot: {
           ch: '#ff6b6b',
@@ -86,11 +86,16 @@ export default {
         mono: ['SF Mono', 'Monaco', 'Menlo', 'Consolas', 'monospace'],
       },
       borderRadius: {
-        sm: '4px',
-        DEFAULT: '6px',
-        md: '8px',
-        lg: '10px',
-        xl: '12px',
+        sm: 'var(--radius-sm)',
+        DEFAULT: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
+        xl: 'var(--radius-xl)',
+      },
+      boxShadow: {
+        sm: 'var(--shadow-sm)',
+        md: 'var(--shadow-md)',
+        overlay: 'var(--shadow-overlay)',
       },
       fontSize: {
         'micro': '0.65rem',
@@ -109,10 +114,18 @@ export default {
         'safe-r': 'env(safe-area-inset-right)',
       },
       minWidth: {
-        'touch': '44px',
+        'touch': 'var(--touch-target)',
       },
       minHeight: {
-        'touch': '44px',
+        'touch': 'var(--touch-target)',
+      },
+      transitionDuration: {
+        fast: 'var(--motion-fast)',
+        normal: 'var(--motion-normal)',
+        slow: 'var(--motion-slow)',
+      },
+      transitionTimingFunction: {
+        standard: 'var(--ease-standard)',
       },
       keyframes: {
         'pulse-dot': {

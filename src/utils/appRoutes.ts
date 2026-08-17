@@ -22,6 +22,7 @@ export type JamoType = 'choseong' | 'jungseong' | 'jongseong'
 export type AppRoute =
   | { page: 'home' }
   | { page: 'projects' }
+  | { page: 'editor-v2' }
   | {
       page: 'editor'
       layoutType: LayoutType
@@ -64,6 +65,7 @@ export function parseAppRoute(pathname: string): AppRoute {
   const segments = decodedSegments as string[]
   if (segments.length === 0) return { page: 'home' }
   if (segments.length === 1 && segments[0] === 'projects') return { page: 'projects' }
+  if (segments.length === 1 && segments[0] === 'editor-v2') return { page: 'editor-v2' }
 
   if (segments[0] === 'editor' && segments[1] === 'layout' && isLayoutType(segments[2] ?? '')) {
     const layoutType = segments[2] as LayoutType
@@ -88,6 +90,7 @@ export function parseAppRoute(pathname: string): AppRoute {
 export function appRouteToPath(route: AppRoute): string {
   if (route.page === 'home') return '/'
   if (route.page === 'projects') return '/projects'
+  if (route.page === 'editor-v2') return '/editor-v2'
   const layoutPath = `/editor/layout/${route.layoutType}`
   if (!route.jamo) return layoutPath
   return `${layoutPath}/jamo/${route.jamo.type}/${encodeURIComponent(route.jamo.char)}`
@@ -131,7 +134,7 @@ export function partForJamo(type: JamoType, char: string): Part {
 
 export function applyAppRoute(route: AppRoute): void {
   const ui = useUIStore.getState()
-  if (route.page === 'home' || route.page === 'projects') {
+  if (route.page === 'home' || route.page === 'projects' || route.page === 'editor-v2') {
     ui.setCurrentPage(route.page)
     return
   }

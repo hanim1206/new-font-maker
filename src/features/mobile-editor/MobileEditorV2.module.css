@@ -1,0 +1,70 @@
+.page {
+  min-height: 100dvh;
+  background: rgb(var(--color-background));
+}
+
+.shell {
+  width: min(100%, 480px);
+  height: 100dvh;
+  margin: 0 auto;
+  background: rgb(var(--color-surface));
+  box-shadow: var(--shadow-md);
+}
+
+.canvasGrid {
+  background-image:
+    linear-gradient(rgb(var(--color-border-subtle) / 0.8) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--color-border-subtle) / 0.8) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.glyphCanvas {
+  width: min(calc(100vw - 32px), 34dvh, 390px);
+}
+
+.trackpad {
+  position: relative;
+  touch-action: none;
+  user-select: none;
+  background:
+    radial-gradient(circle at center, rgb(var(--color-primary) / 0.12), transparent 45%),
+    linear-gradient(rgb(var(--color-border-subtle)) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--color-border-subtle)) 1px, transparent 1px),
+    rgb(var(--color-surface-2));
+  background-size: auto, 24px 24px, 24px 24px, auto;
+}
+
+.trackpad::before,
+.trackpad::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  background: rgb(var(--color-primary) / 0.22);
+}
+
+.trackpad::before {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+}
+
+.trackpad::after {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+}
+
+@media (min-width: 769px) {
+  .page {
+    padding: 24px 0;
+  }
+
+  .shell {
+    height: calc(100dvh - 48px);
+    border: 1px solid rgb(var(--color-border));
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+  }
+}
