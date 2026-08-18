@@ -1,10 +1,42 @@
 import type {
+  AnchorPoint,
   DecomposedSyllable,
   JamoData,
   JamoOverride,
   LayoutType,
   OverrideCondition,
 } from '../types'
+
+function transformPoint(point: AnchorPoint, transform: NonNullable<JamoOverride['variant']['transform']>): AnchorPoint {
+  return {
+    ...point,
+    x: 0.5 + (point.x - 0.5) * transform.scaleX + transform.translateX,
+    y: 0.5 + (point.y - 0.5) * transform.scaleY + transform.translateY,
+    ...(point.handleIn && {
+      handleIn: {
+        x: 0.5 + (point.handleIn.x - 0.5) * transform.scaleX + transform.translateX,
+        y: 0.5 + (point.handleIn.y - 0.5) * transform.scaleY + transform.translateY,
+      },
+    }),
+    ...(point.handleOut && {
+      handleOut: {
+        x: 0.5 + (point.handleOut.x - 0.5) * transform.scaleX + transform.translateX,
+        y: 0.5 + (point.handleOut.y - 0.5) * transform.scaleY + transform.translateY,
+      },
+    }),
+  }
+}
+
+function transformStrokes<T extends JamoData['strokes']>(
+  strokes: T,
+  transform: NonNullable<JamoOverride['variant']['transform']>,
+): T {
+  if (!strokes) return strokes
+  return strokes.map((stroke) => ({
+    ...stroke,
+    points: stroke.points.map((point) => transformPoint(point, transform)),
+  })) as T
+}
 
 // ===== 음절 컨텍스트 (조건 평가에 필요한 정보) =====
 export interface SyllableContext {
@@ -83,11 +115,15 @@ export function resolveJamoData(jamo: JamoData, ctx: SyllableContext): JamoData 
 
   // 최우선 매칭 variant를 base 위에 머지
   const variant = matching[0].variant
+  const strokes = variant.strokes ?? jamo.strokes
+  const horizontalStrokes = variant.horizontalStrokes ?? jamo.horizontalStrokes
+  const verticalStrokes = variant.verticalStrokes ?? jamo.verticalStrokes
+  const transform = variant.transform
   return {
     ...jamo,
-    ...(variant.strokes !== undefined && { strokes: variant.strokes }),
-    ...(variant.horizontalStrokes !== undefined && { horizontalStrokes: variant.horizontalStrokes }),
-    ...(variant.verticalStrokes !== undefined && { verticalStrokes: variant.verticalStrokes }),
+    ...(strokes !== undefined && { strokes: transform ? transformStrokes(strokes, transform) : strokes }),
+    ...(horizontalStrokes !== undefined && { horizontalStrokes: transform ? transformStrokes(horizontalStrokes, transform) : horizontalStrokes }),
+    ...(verticalStrokes !== undefined && { verticalStrokes: transform ? transformStrokes(verticalStrokes, transform) : verticalStrokes }),
     ...(variant.padding !== undefined && { padding: variant.padding }),
     ...(variant.horizontalPadding !== undefined && { horizontalPadding: variant.horizontalPadding }),
     ...(variant.verticalPadding !== undefined && { verticalPadding: variant.verticalPadding }),

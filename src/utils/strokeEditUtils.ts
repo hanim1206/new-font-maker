@@ -58,8 +58,10 @@ export function splitStroke(stroke: StrokeDataV2, pointIndex: number): [StrokeDa
   if (stroke.closed) return null
   if (pointIndex <= 0 || pointIndex >= stroke.points.length - 1) return null
 
-  const firstHalf = stroke.points.slice(0, pointIndex + 1)
-  const secondHalf = stroke.points.slice(pointIndex)
+  // 분리점은 양쪽 획에 포함되지만 같은 객체를 공유하면 안 됩니다.
+  // 공유된 상태에서는 한 획을 이동할 때 다른 획의 끝점도 함께 움직입니다.
+  const firstHalf = structuredClone(stroke.points.slice(0, pointIndex + 1))
+  const secondHalf = structuredClone(stroke.points.slice(pointIndex))
 
   const strokeA: StrokeDataV2 = {
     id: stroke.id,
@@ -140,7 +142,9 @@ export function removeHandlesFromPoint(
 ): StrokeDataV2 {
   const newPoints = stroke.points.map((p, i) => {
     if (i !== pointIndex) return p
-    const { handleIn: _hi, handleOut: _ho, ...rest } = p
+    const rest = { ...p }
+    delete rest.handleIn
+    delete rest.handleOut
     return rest
   })
 

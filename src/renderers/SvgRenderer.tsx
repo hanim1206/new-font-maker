@@ -25,6 +25,8 @@ interface SvgRendererProps {
   // 시각적 캔버스 비율 (논리 좌표계는 1:1 유지, 시각적으로만 세로 확장)
   // 1.0 = 1:1, 1.1 = 1:1.1, 1.15 = 1:1.15
   visualHeightRatio?: number
+  // 정규화 좌표계의 일부 박스만 편집 뷰포트로 표시
+  viewportBox?: BoxConfig
   // 글로벌 스타일 (기울기, 두께 등)
   globalStyle?: GlobalStyle
   // 파트별 스타일 오버라이드 (fillColor, opacity)
@@ -88,6 +90,7 @@ export function SvgRenderer({
   backgroundColor = 'transparent',
   showDebugBoxes = false,
   visualHeightRatio = 1.0, // 기본값: 1:1 정사각 비율
+  viewportBox,
   globalStyle,
   partStyles,
   overflow = 'visible',
@@ -271,6 +274,9 @@ export function SvgRenderer({
   // 시각적 캔버스 크기 계산 (논리 좌표계는 VIEW_BOX_SIZE x VIEW_BOX_SIZE 유지)
   const visualHeight = VIEW_BOX_SIZE * visualHeightRatio
   const svgHeight = size * visualHeightRatio
+  const viewport = viewportBox
+    ? { x: viewportBox.x * VIEW_BOX_SIZE, y: viewportBox.y * VIEW_BOX_SIZE, width: viewportBox.width * VIEW_BOX_SIZE, height: viewportBox.height * VIEW_BOX_SIZE }
+    : { x: 0, y: 0, width: VIEW_BOX_SIZE, height: visualHeight }
 
   // slant(기울기) 변환: 캔버스 중심 기준 skewX
   const centerX = VIEW_BOX_SIZE / 2
@@ -284,7 +290,7 @@ export function SvgRenderer({
       ref={svgRef}
       width={size}
       height={svgHeight}
-      viewBox={`0 0 ${VIEW_BOX_SIZE} ${visualHeight}`}
+      viewBox={`${viewport.x} ${viewport.y} ${viewport.width} ${viewport.height}`}
       className={className}
       style={{ backgroundColor, overflow, touchAction: 'none' }}
     >
@@ -298,7 +304,7 @@ export function SvgRenderer({
       {shouldClipGlyphs && (
         <defs>
           <clipPath id={clipId}>
-            <rect x={0} y={0} width={VIEW_BOX_SIZE} height={visualHeight} />
+            <rect x={viewport.x} y={viewport.y} width={viewport.width} height={viewport.height} />
           </clipPath>
         </defs>
       )}

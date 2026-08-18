@@ -46,12 +46,26 @@ export interface PartOverride {
   right: number
 }
 
+export type GapAnchor = 'before' | 'center' | 'after'
+
+export interface LayoutGap {
+  id: string
+  axis: Axis
+  before: Part[]
+  after: Part[]
+  size: number
+  anchor: GapAnchor
+  beforeInset?: number
+  afterInset?: number
+}
+
 // 레이아웃 스키마 (Split + Padding 기반)
 export interface LayoutSchema {
   id: LayoutType
   slots: Part[]
   splits?: Split[] // 0~N개의 기준선
   padding?: Padding // Split 0개일 때 주로 사용
+  gaps?: LayoutGap[] // 파트 사이에서 비워 둘 공간
   // 혼합중성용 추가 설정
   mixedJungseong?: {
     horizontalBox?: { splitY?: number; padding?: Padding }
@@ -59,6 +73,8 @@ export interface LayoutSchema {
   }
   // 파트별 박스 오프셋 (기준선 기반 박스에서 확장/축소)
   partOverrides?: Partial<Record<Part, PartOverride>>
+  // 사용자가 레이아웃 화면에서 직접 조작한 추가 오프셋 (프리셋·자모별 기본 보정 뒤에 적용)
+  userPartOverrides?: Partial<Record<Part, PartOverride>>
   // 특정 중성에서만 적용되는 레이아웃 기본 파트 영역 (사용자 오버라이드와 별도)
   partOverridesByJungseong?: Record<string, Partial<Record<Part, PartOverride>>>
   // 음절 조합별 파트 오프셋 오버라이드 (conditionGroups 매칭 시 partOverrides 위에 병합)
@@ -83,6 +99,13 @@ export interface LayoutPreset {
 // ===== 조건부 자모 오버라이드 =====
 export type Jamo = string // 'ㄱ', 'ㅏ', 'ㅁ' 등
 
+export interface JamoTransform {
+  translateX: number
+  translateY: number
+  scaleX: number
+  scaleY: number
+}
+
 // 오버라이드 단일 조건
 export type OverrideCondition =
   | { type: 'choseongIs'; jamo: Jamo }
@@ -98,6 +121,8 @@ export interface JamoOverrideVariant {
   padding?: Padding
   horizontalPadding?: Padding
   verticalPadding?: Padding
+  // 기본 자소 형태를 유지한 채 특정 문맥에서만 적용할 위치/비율 보정
+  transform?: JamoTransform
 }
 
 // 자모 오버라이드 (JamoData.overrides[]에 저장)
@@ -221,12 +246,21 @@ export interface DecomposedSyllable {
 }
 
 // ===== 모바일 편집기 v2 =====
+export type MobileEditorPart = 'CH' | 'JU' | 'JO'
+
 export type MobileEditorSelection =
   | { kind: 'none' }
   | { kind: 'part'; part: Part }
   | { kind: 'stroke'; part: Part; strokeId: string }
+  | { kind: 'point'; part: Part; strokeId: string; pointIndex: number }
+  | { kind: 'handle'; part: Part; strokeId: string; pointIndex: number; handle: 'in' | 'out' }
 
 export interface StrokeMoveDelta {
+  x: number
+  y: number
+}
+
+export interface StrokeScale {
   x: number
   y: number
 }
@@ -254,15 +288,22 @@ export interface SmartGuide {
 export interface EditorHistoryEntry {
   id: string
   createdAt: string
-  action: 'stroke-move' | 'restore' | 'undo'
+  action: 'part-move' | 'part-resize' | 'gap-change' | 'split-change' | 'stroke-move' | 'stroke-scale' | 'point-move' | 'restore' | 'undo'
+  targetKind: 'layout' | 'jamo'
+  scope?: 'jamo-base' | 'syllable'
   syllable: string
-  jamoType: 'choseong'
+  jamoType: JamoData['type']
   jamoChar: string
-  part: 'CH'
+  part: MobileEditorPart
+  layoutType: LayoutType
   strokeId: string
+  pointIndex?: number
   delta: StrokeMoveDelta
+  scale?: StrokeScale
   before: JamoData
   after: JamoData
+  layoutBefore?: LayoutSchema
+  layoutAfter?: LayoutSchema
   summary: string
 }
 

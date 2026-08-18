@@ -6,12 +6,38 @@ export interface SmartGuideSnap {
   guides: SmartGuide[]
 }
 
+export function createAlignmentReferenceFromBounds(
+  bounds: GlyphBounds[],
+  label: string
+): AlignmentReference | null {
+  if (bounds.length === 0) return null
+  const minX = Math.min(...bounds.map((value) => value.minX))
+  const maxX = Math.max(...bounds.map((value) => value.maxX))
+  const minY = Math.min(...bounds.map((value) => value.minY))
+  const maxY = Math.max(...bounds.map((value) => value.maxY))
+  return {
+    label,
+    bounds: {
+      minX,
+      centerX: (minX + maxX) / 2,
+      maxX,
+      minY,
+      centerY: (minY + maxY) / 2,
+      maxY,
+    },
+  }
+}
+
 export function getStrokeBoundsInGlyph(
   jamo: JamoData,
   strokeId: string,
   box: BoxConfig
 ): GlyphBounds | null {
-  const stroke = jamo.strokes?.find((item) => item.id === strokeId)
+  const stroke = [
+    ...(jamo.strokes ?? []),
+    ...(jamo.horizontalStrokes ?? []),
+    ...(jamo.verticalStrokes ?? []),
+  ].find((item) => item.id === strokeId)
   if (!stroke || stroke.points.length === 0) return null
   const halfThickness = stroke.thickness / 2
   const xs = stroke.points.map((point) => box.x + point.x * box.width)
@@ -35,26 +61,17 @@ export function createAlignmentReference(
   box: BoxConfig | undefined,
   label: string
 ): AlignmentReference | null {
-  if (!jamo || !box || !jamo.strokes?.length) return null
-  const bounds = jamo.strokes
+  if (!jamo || !box) return null
+  const strokes = [
+    ...(jamo.strokes ?? []),
+    ...(jamo.horizontalStrokes ?? []),
+    ...(jamo.verticalStrokes ?? []),
+  ]
+  if (strokes.length === 0) return null
+  const bounds = strokes
     .map((stroke) => getStrokeBoundsInGlyph(jamo, stroke.id, box))
     .filter((value): value is GlyphBounds => value !== null)
-  if (bounds.length === 0) return null
-  const minX = Math.min(...bounds.map((value) => value.minX))
-  const maxX = Math.max(...bounds.map((value) => value.maxX))
-  const minY = Math.min(...bounds.map((value) => value.minY))
-  const maxY = Math.max(...bounds.map((value) => value.maxY))
-  return {
-    label,
-    bounds: {
-      minX,
-      centerX: (minX + maxX) / 2,
-      maxX,
-      minY,
-      centerY: (minY + maxY) / 2,
-      maxY,
-    },
-  }
+  return createAlignmentReferenceFromBounds(bounds, label)
 }
 
 export function findSmartGuideSnap(

@@ -1,4 +1,5 @@
 import type { LayoutSchema, BoxConfig, Part, Padding, LayoutType, PartOverride, OverrideCondition } from '../types'
+import { resolveGapInsets } from './layoutGapUtils'
 
 /** 음절 컨텍스트 (calculateBoxes에 전달 시 레이아웃 오버라이드 해석에 사용) */
 export interface SyllableContext {
@@ -94,7 +95,7 @@ export function calculateBoxes(
   schema: LayoutSchema,
   context?: SyllableContext,
 ): Partial<Record<Part, BoxConfig>> {
-  const rawBoxes = calculateRawBoxes(schema)
+  const rawBoxes = applyLayoutGaps(calculateRawBoxes(schema), schema)
 
   let effectivePartOverrides = {
     ...schema.partOverrides,
@@ -116,7 +117,35 @@ export function calculateBoxes(
     }
   }
 
-  return applyPartOverrides(rawBoxes, effectivePartOverrides)
+  const presetBoxes = applyPartOverrides(rawBoxes, effectivePartOverrides)
+  return applyPartOverrides(presetBoxes, schema.userPartOverrides)
+}
+
+function applyLayoutGaps(
+  boxes: Partial<Record<Part, BoxConfig>>,
+  schema: LayoutSchema,
+): Partial<Record<Part, BoxConfig>> {
+  if (!schema.gaps?.length) return boxes
+  const result = structuredClone(boxes)
+  const inset = (part: Part, side: 'before' | 'after', axis: 'x' | 'y', amount: number) => {
+    const box = result[part]
+    if (!box || Math.abs(amount) < 0.000001) return
+    if (axis === 'x') {
+      const applied = amount > 0 ? Math.min(amount, Math.max(0, box.width - 0.01)) : amount
+      if (side === 'before') box.width -= applied
+      else { box.x += applied; box.width -= applied }
+    } else {
+      const applied = amount > 0 ? Math.min(amount, Math.max(0, box.height - 0.01)) : amount
+      if (side === 'before') box.height -= applied
+      else { box.y += applied; box.height -= applied }
+    }
+  }
+  schema.gaps.forEach((gap) => {
+    const { beforeInset, afterInset } = resolveGapInsets(gap)
+    gap.before.forEach((part) => inset(part, 'before', gap.axis, beforeInset))
+    gap.after.forEach((part) => inset(part, 'after', gap.axis, afterInset))
+  })
+  return result
 }
 
 /**
