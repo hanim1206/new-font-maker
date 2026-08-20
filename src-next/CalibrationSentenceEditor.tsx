@@ -1167,11 +1167,11 @@ export function CalibrationSentenceEditor() {
     <main className={styles.page}>
       <header className={styles.header}>
         <div><span>FONT CALIBRATION</span><strong>문장에서 글자를 직접 다듬으세요</strong></div>
-        <nav aria-label="폰트 추출, 분석용 복사 및 편집 기록">
+        <nav aria-label="폰트 추출 및 편집 기록">
           <button type="button" className={styles.exportButton} data-export-state={exportState} onClick={exportCurrentFont} disabled={exportState === 'exporting'} aria-label={exportState === 'exporting' ? `OTF 추출 중: ${exportProgress}` : exportState === 'downloaded' ? 'OTF 추출 완료' : exportState === 'failed' ? 'OTF 추출 실패' : '현재 작업을 OTF로 추출'} title={exportState === 'exporting' ? exportProgress : '현재 작업을 OTF로 추출'}>
             {exportState === 'exporting' ? <LoaderCircle className={styles.exportSpinner} size={18} /> : exportState === 'downloaded' ? <Check size={18} /> : exportState === 'failed' ? <X size={18} /> : <Download size={18} />}
           </button>
-          <button type="button" className={styles.copyButton} data-copy-state={copyState} onClick={copyAnalysisValues} aria-label={copyState === 'copied' ? '분석용 값 복사됨' : copyState === 'failed' ? '분석용 값 복사 실패' : '분석용 값 복사'} title="분석용 값 복사">
+          <button hidden type="button" className={styles.copyButton} data-copy-state={copyState} onClick={copyAnalysisValues} aria-label={copyState === 'copied' ? '분석용 값 복사됨' : copyState === 'failed' ? '분석용 값 복사 실패' : '분석용 값 복사'} title="분석용 값 복사">
             {copyState === 'copied' ? <Check size={18} /> : <Copy size={18} />}
           </button>
           <button type="button" data-active={isBodySettingsOpen || undefined} onClick={() => setIsBodySettingsOpen((open) => !open)} aria-label="글자 네모꼴 설정" title="글자 네모꼴 설정"><Settings2 size={18} /></button>

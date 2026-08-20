@@ -5,6 +5,7 @@
 .header strong { font-size: 14px; line-height: 1.18; }
 .header nav { display: flex; gap: 4px; }
 .header button { position: relative; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 10px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); }
+.header button[hidden] { display: none; }
 .header button span { position: absolute; top: 4px; right: 4px; min-width: 15px; height: 15px; border-radius: 999px; background: rgb(var(--color-primary)); color: white; font-size: 9px; line-height: 15px; }
 .header button:disabled { color: rgb(var(--color-text-dim-5)); opacity: .55; }
 .header button[data-active='true'] { color: rgb(var(--color-primary)); background: rgb(var(--color-primary-light) / .65); }
