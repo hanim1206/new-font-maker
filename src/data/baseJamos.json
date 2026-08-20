@@ -24,13 +24,7 @@
           "closed": false,
           "thickness": 0.07
         }
-      ],
-      "padding": {
-        "top": 0,
-        "bottom": 0,
-        "left": 0,
-        "right": 0
-      }
+      ]
     },
     "ㄲ": {
       "char": "ㄲ",
@@ -1108,13 +1102,7 @@
           "thickness": 0.07,
           "label": "horizontal"
         }
-      ],
-      "padding": {
-        "top": 0,
-        "bottom": 0,
-        "left": 0.225,
-        "right": 0
-      }
+      ]
     },
     "ㅐ": {
       "char": "ㅐ",
@@ -1546,13 +1534,7 @@
           "thickness": 0.07,
           "label": "horizontal"
         }
-      ],
-      "padding": {
-        "top": 0,
-        "bottom": 0.2,
-        "left": 0,
-        "right": 0
-      }
+      ]
     },
     "ㅘ": {
       "char": "ㅘ",
@@ -1712,13 +1694,7 @@
           "thickness": 0.07,
           "label": "vertical"
         }
-      ],
-      "padding": {
-        "top": 0,
-        "bottom": 0,
-        "left": 0,
-        "right": 0
-      }
+      ]
     },
     "ㅚ": {
       "char": "ㅚ",
@@ -1866,13 +1842,7 @@
           "thickness": 0.07,
           "label": "vertical"
         }
-      ],
-      "padding": {
-        "top": 0.3,
-        "bottom": 0,
-        "left": 0,
-        "right": 0
-      }
+      ]
     },
     "ㅝ": {
       "char": "ㅝ",
@@ -2032,13 +2002,7 @@
           "thickness": 0.07,
           "label": "vertical"
         }
-      ],
-      "padding": {
-        "top": 0,
-        "bottom": 0,
-        "left": 0,
-        "right": 0
-      }
+      ]
     },
     "ㅟ": {
       "char": "ㅟ",

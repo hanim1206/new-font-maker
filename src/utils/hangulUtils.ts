@@ -52,7 +52,10 @@ export function decomposeSyllable(
 
   // 자음 단독 (ㄱ-ㅎ)
   if (code >= 0x3131 && code <= 0x314e) {
-    const choseong = Object.values(choseongMap).find((j) => j.char === char) || null
+    const initial = Object.values(choseongMap).find((j) => j.char === char)
+    const final = Object.values(jongseongMap).find((j) => j.char === char)
+    // 겹받침은 초성 마스터가 없으므로 종성 마스터의 형태를 독립 자모로 재사용한다.
+    const choseong = initial ?? (final ? { ...final, type: 'choseong' as const } : null)
     return {
       char,
       choseong,

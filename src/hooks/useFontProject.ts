@@ -23,7 +23,7 @@ interface UseFontProjectReturn {
   saveCurrent: () => Promise<boolean>
   duplicateProject: (id: string) => Promise<void>
   renameProject: (id: string, name: string) => Promise<void>
-  loadProject: (id: string) => Promise<void>
+  loadProject: (id: string) => Promise<boolean>
   deleteProject: (id: string) => Promise<void>
   clearError: () => void
 }
@@ -151,21 +151,23 @@ export function useFontProject(): UseFontProjectReturn {
       const project = await fontProjectService.get(id)
       if (!project) {
         setError('프로젝트를 찾을 수 없습니다')
-        return
+        return false
       }
 
       // 데이터 유효성 검사
       if (!validateFontData(project.font_data)) {
         setError('폰트 데이터가 손상되었습니다')
-        return
+        return false
       }
 
       // 3개 스토어에 적용
       applyFontData(project.font_data)
       setCurrentProject(project.id, project.name)
       addRecentProject(project.id, project.name)
+      return true
     } catch (e) {
       setError(e instanceof Error ? e.message : '불러오기 실패')
+      return false
     } finally {
       setLoading(false)
     }

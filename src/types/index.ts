@@ -63,6 +63,9 @@ export interface LayoutGap {
 export interface LayoutSchema {
   id: LayoutType
   slots: Part[]
+  // Font Space 안의 바깥 Design Body. 있으면 기본 850×850 좌표로 계산한
+  // 내부 분할·여백을 이 영역에 비례 변환한다.
+  designBodyPadding?: Padding
   splits?: Split[] // 0~N개의 기준선
   padding?: Padding // Split 0개일 때 주로 사용
   gaps?: LayoutGap[] // 파트 사이에서 비워 둘 공간
@@ -219,19 +222,37 @@ export interface StrokeDataV2 {
 }
 
 // ===== 자모 데이터 =====
+export type JamoGeometryMode = 'slot-normalized' | 'ink-normalized'
+
+export interface JamoInkSafetyOrigin {
+  strokes?: StrokeDataV2[]
+  horizontalStrokes?: StrokeDataV2[]
+  verticalStrokes?: StrokeDataV2[]
+}
+
+export interface JamoContextualInkSafety {
+  origin: JamoInkSafetyOrigin
+  minimumGap: number
+}
+
 export interface JamoData {
   char: string
   type: 'choseong' | 'jungseong' | 'jongseong'
+  // 기존 데이터는 slot-normalized(기본값). 실제 종횡비를 보존해 만든 신규 마스터만 ink-normalized.
+  geometryMode?: JamoGeometryMode
   // 일반 자모는 strokes 사용, 혼합중성은 horizontalStrokes + verticalStrokes만 사용
   strokes?: StrokeDataV2[]
   // 혼합중성의 경우 가로획과 세로획 분리
   horizontalStrokes?: StrokeDataV2[]
   verticalStrokes?: StrokeDataV2[]
-  // 자모별 내부 패딩 (0~1, 박스 기준 비율)
+  // 보정 편집의 공통 목표는 현재 획에 두고, 문맥별 충돌 시 origin→현재 변화량만 줄여 적용한다.
+  contextualInkSafety?: JamoContextualInkSafety
+  /** @deprecated 조합 배치는 레이아웃 프로필이 담당한다. 구형 파일 읽기 전용. */
   padding?: Padding
-  // 혼합중성 전용: JU_H / JU_V 파트별 개별 패딩 (없으면 padding으로 폴백)
-  horizontalPadding?: Padding  // JU_H(가로부)용
-  verticalPadding?: Padding    // JU_V(세로부)용
+  /** @deprecated 조합 배치는 레이아웃 프로필이 담당한다. 구형 파일 읽기 전용. */
+  horizontalPadding?: Padding
+  /** @deprecated 조합 배치는 레이아웃 프로필이 담당한다. 구형 파일 읽기 전용. */
+  verticalPadding?: Padding
   // 조건부 변형 목록 (특정 음절 문맥에서 다른 획/패딩 사용)
   overrides?: JamoOverride[]
 }

@@ -5,6 +5,7 @@ import type { JamoData, JamoOverride, Padding } from '../types'
 import { migrateJamoData, needsMigration } from '../utils/strokeMigration'
 import baseJamos from '../data/baseJamos.json'
 import { createDebouncedStorage } from '../utils/debouncedStorage'
+import { USER_PRESET_01_JAMOS } from '../../src-next/userPreset01'
 
 const STORAGE_KEY = 'font-maker-jamo-data'
 const rawStorage = createDebouncedStorage(300)
@@ -163,9 +164,9 @@ function migrateMap(jamoMap: Record<string, JamoData>): Record<string, JamoData>
 
 // baseJamos.json에서 초기 데이터 로드
 const BASE_JAMOS = {
-  choseong: baseJamos.choseong as Record<string, JamoData>,
-  jungseong: baseJamos.jungseong as Record<string, JamoData>,
-  jongseong: baseJamos.jongseong as Record<string, JamoData>,
+  choseong: { ...(baseJamos.choseong as Record<string, JamoData>), ...USER_PRESET_01_JAMOS.choseong },
+  jungseong: { ...(baseJamos.jungseong as Record<string, JamoData>), ...USER_PRESET_01_JAMOS.jungseong },
+  jongseong: { ...(baseJamos.jongseong as Record<string, JamoData>), ...USER_PRESET_01_JAMOS.jongseong },
 }
 
 export const useJamoStore = create<JamoState & JamoActions>()(

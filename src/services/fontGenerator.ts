@@ -11,9 +11,21 @@
 import opentype from 'opentype.js'
 import { strokeToContours } from './strokeToOutline'
 import type { Contour } from './strokeToOutline'
-import { collectAllGlyphData, UPM, DEFAULT_ADVANCE_WIDTH, ASCENDER, DESCENDER } from './fontExportUtils'
+import {
+  collectAllGlyphData,
+  UPM,
+  DEFAULT_ADVANCE_WIDTH,
+  ASCENDER,
+  DESCENDER,
+  OS2_CODE_PAGE_RANGE_1,
+  OS2_UNICODE_RANGE_1,
+  OS2_UNICODE_RANGE_2,
+  getCurrentSpaceAdvance,
+} from './fontExportUtils'
 import { useGlobalStyleStore } from '../stores/globalStyleStore'
 import type { GlyphData } from './fontExportUtils'
+import type { FontLayoutProfile } from './fontExportUtils'
+import { mergeStrokeContourGroupsForCff } from './contourBoolean'
 
 // ===== 타입 정의 =====
 
@@ -21,6 +33,8 @@ import type { GlyphData } from './fontExportUtils'
 export interface FontGeneratorOptions {
   familyName?: string
   styleName?: string
+  /** 신규 보정 화면에서 확정한 레이아웃 프로필을 현재 출력에 직접 반영 */
+  layoutProfile?: FontLayoutProfile
   onProgress?: (completed: number, total: number, phase: string) => void
 }
 
@@ -30,6 +44,36 @@ export interface FontGeneratorResult {
   glyphCount: number
   fileSize?: number
   error?: string
+}
+
+export interface FontIdentity {
+  asciiFamilyName: string
+  postScriptName: string
+}
+
+function stableNameHash(value: string): string {
+  let hash = 0x811c9dc5
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(16).toUpperCase().padStart(8, '0')
+}
+
+/** 한글 이름을 보존하면서 OS 설치 충돌이 없는 ASCII/PostScript 식별자를 만든다. */
+export function createFontIdentity(familyName: string, styleName: string): FontIdentity {
+  const trimmedFamily = familyName.trim() || 'FontMaker'
+  const asciiBase = trimmedFamily.replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'FontMaker'
+  const lostCharacters = asciiBase !== trimmedFamily
+  const uniqueFamily = lostCharacters
+    ? `${asciiBase}-${stableNameHash(trimmedFamily)}`
+    : asciiBase
+  const safeStyle = styleName.replace(/[^a-zA-Z0-9-]/g, '') || 'Regular'
+  const postScriptFamily = uniqueFamily.replace(/[^a-zA-Z0-9-]/g, '') || 'FontMaker'
+  return {
+    asciiFamilyName: uniqueFamily,
+    postScriptName: `${postScriptFamily}-${safeStyle}`.slice(0, 63),
+  }
 }
 
 // ===== 컨투어 → opentype.js Path 변환 =====
@@ -124,8 +168,8 @@ function contoursToPath(contours: Contour[]): InstanceType<typeof opentype.Path>
 function createGlyph(
   glyphData: GlyphData,
 ): InstanceType<typeof opentype.Glyph> {
-  // 모든 획의 컨투어 수집
-  const allContours: Contour[] = []
+  // CFF 1은 겹친 컨투어를 even-odd로 상쇄하므로 획별 잉크 묶음을 유지한다.
+  const contourGroups: Contour[][] = []
 
   for (const resolved of glyphData.strokes) {
     const contours = strokeToContours(
@@ -136,13 +180,23 @@ function createGlyph(
         weightMultiplier: glyphData.weightMultiplier,
         slant: glyphData.slant,
         globalLinecap: resolved.effectiveLinecap,
+        globalLinejoin: resolved.effectiveLinejoin,
+        ascender: ASCENDER,
       }
     )
-    allContours.push(...contours)
+    if (contours.length > 0) contourGroups.push(contours)
   }
 
-  // 컨투어 → opentype.js Path
-  const path = contoursToPath(allContours)
+  let mergedContours: Contour[]
+  try {
+    mergedContours = mergeStrokeContourGroupsForCff(contourGroups)
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    throw new Error(`${glyphData.char}(U+${glyphData.unicode.toString(16).toUpperCase()}) 컨투어 합치기 실패: ${reason}`)
+  }
+
+  // 겹침이 제거된 컨투어 → opentype.js Path
+  const path = contoursToPath(mergedContours)
 
   // 유니코드 이름 생성
   const unicodeHex = glyphData.unicode.toString(16).toUpperCase().padStart(4, '0')
@@ -192,11 +246,11 @@ function createNotdefGlyph(): InstanceType<typeof opentype.Glyph> {
 /**
  * 스페이스 글리프 생성
  */
-function createSpaceGlyph(): InstanceType<typeof opentype.Glyph> {
+function createSpaceGlyph(advanceWidth: number): InstanceType<typeof opentype.Glyph> {
   return new opentype.Glyph({
     name: 'space',
     unicode: 32,
-    advanceWidth: Math.round(DEFAULT_ADVANCE_WIDTH / 2),
+    advanceWidth,
     path: new opentype.Path(),
   })
 }
@@ -275,6 +329,7 @@ export async function generateAndDownloadFont(
   const {
     familyName = 'FontMaker',
     styleName = 'Regular',
+    layoutProfile,
     onProgress,
   } = options
 
@@ -284,7 +339,7 @@ export async function generateAndDownloadFont(
 
     const glyphDataList = collectAllGlyphData((completed, total) => {
       onProgress?.(completed, total, '글리프 데이터 수집 중...')
-    })
+    }, { layoutProfile })
 
     if (glyphDataList.length === 0) {
       return { success: false, glyphCount: 0, error: '생성할 글리프가 없습니다.' }
@@ -293,7 +348,7 @@ export async function generateAndDownloadFont(
     // Phase 2: 글리프 변환 (획 → 윤곽)
     const glyphs: Array<InstanceType<typeof opentype.Glyph>> = [
       createNotdefGlyph(),
-      createSpaceGlyph(),
+      createSpaceGlyph(getCurrentSpaceAdvance()),
     ]
 
     const hangulGlyphs = await processInChunks(
@@ -310,8 +365,9 @@ export async function generateAndDownloadFont(
     // Phase 3: 폰트 조립
     onProgress?.(0, 1, '폰트 파일 생성 중...')
 
-    // Windows 호환을 위한 ASCII 전용 폰트 이름 생성
-    const asciiFamilyName = familyName.replace(/[^a-zA-Z0-9\s_-]/g, '').trim() || 'FontMaker'
+    // OS 설치 충돌을 피하는 ASCII/PostScript 식별자 생성
+    const identity = createFontIdentity(familyName, styleName)
+    const { asciiFamilyName } = identity
 
     // 글로벌 스타일에서 weight 가져오기
     const styleState = useGlobalStyleStore.getState()
@@ -331,13 +387,13 @@ export async function generateAndDownloadFont(
         os2: {
           usWeightClass,
           usWidthClass: 5,
-          // Hangul Syllables (bit 28) + Hangul Jamo (bit 27) + Basic Latin (bit 0) + Latin-1 (bit 1)
-          ulUnicodeRange1: 0x00000003,
-          ulUnicodeRange2: 0x18000000,
+          // Basic Latin(space) + Hangul Compatibility Jamo(bit 52) + Hangul Syllables(bit 56)
+          ulUnicodeRange1: OS2_UNICODE_RANGE_1,
+          ulUnicodeRange2: OS2_UNICODE_RANGE_2,
           ulUnicodeRange3: 0x00000000,
           ulUnicodeRange4: 0x00000000,
-          // CP1252 Latin (bit 0) + CP949 Korean Wansung (bit 19)
-          ulCodePageRange1: (1 << 0) | (1 << 19),
+          // CP949 Korean Wansung (bit 19)
+          ulCodePageRange1: OS2_CODE_PAGE_RANGE_1,
           ulCodePageRange2: 0,
           // Windows 클리핑 메트릭 (양수값, macOS는 hhea 사용하므로 영향 없음)
           usWinAscent: ASCENDER,
@@ -352,8 +408,7 @@ export async function generateAndDownloadFont(
 
     // name 테이블 설정 (macOS Font Book 유효성 + Windows 호환)
     const hasKoreanName = familyName !== asciiFamilyName
-    const psName = asciiFamilyName.replace(/[^a-zA-Z0-9-]/g, '') || 'FontMaker'
-    const psFullName = `${psName}-${styleName.replace(/\s+/g, '')}`
+    const psFullName = identity.postScriptName
 
     // 필수 name 레코드 (nameID 0~6)
     font.names.copyright = { en: `Copyright (c) ${new Date().getFullYear()}` }
@@ -418,11 +473,12 @@ export async function downloadPrototypeFont(
 
     const glyphs = [
       createNotdefGlyph(),
-      createSpaceGlyph(),
+      createSpaceGlyph(getCurrentSpaceAdvance()),
       createGlyph(glyphData),
     ]
 
-    const asciiFamilyName = familyName.replace(/[^a-zA-Z0-9\s_-]/g, '').trim() || 'FontMaker Prototype'
+    const identity = createFontIdentity(familyName, 'Regular')
+    const { asciiFamilyName } = identity
 
     const font = new opentype.Font({
       familyName: asciiFamilyName,
@@ -433,9 +489,9 @@ export async function downloadPrototypeFont(
       glyphs,
       tables: {
         os2: {
-          ulUnicodeRange1: 0x00000003,
-          ulUnicodeRange2: 0x18000000,
-          ulCodePageRange1: (1 << 0) | (1 << 19),
+          ulUnicodeRange1: OS2_UNICODE_RANGE_1,
+          ulUnicodeRange2: OS2_UNICODE_RANGE_2,
+          ulCodePageRange1: OS2_CODE_PAGE_RANGE_1,
           usWinAscent: ASCENDER,
           usWinDescent: Math.abs(DESCENDER),
           sTypoAscender: ASCENDER,
@@ -445,11 +501,10 @@ export async function downloadPrototypeFont(
       },
     })
 
-    const psName = asciiFamilyName.replace(/[^a-zA-Z0-9-]/g, '') || 'FontMakerPrototype'
     font.names.copyright = { en: `Copyright (c) ${new Date().getFullYear()}` }
-    font.names.uniqueID = { en: `1.000;NONE;${psName}-Regular` }
+    font.names.uniqueID = { en: `1.000;NONE;${identity.postScriptName}` }
     font.names.version = { en: 'Version 1.000' }
-    font.names.postScriptName = { en: `${psName}-Regular` }
+    font.names.postScriptName = { en: identity.postScriptName }
 
     const arrayBuffer = font.toArrayBuffer() as ArrayBuffer
     downloadTTF(arrayBuffer, `${familyName}-prototype.otf`)

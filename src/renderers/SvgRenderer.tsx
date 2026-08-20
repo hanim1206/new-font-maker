@@ -1,10 +1,12 @@
 import { useMemo, useId, type ReactNode } from 'react'
-import type { DecomposedSyllable, BoxConfig, Part, StrokeDataV2, LayoutType, LayoutSchema, Padding } from '../types'
+import type { DecomposedSyllable, BoxConfig, Part, StrokeDataV2, LayoutType, LayoutSchema } from '../types'
 import { PART_COLORS } from '../constants/editorColors'
 import { calculateBoxes } from '../utils/layoutCalculator'
 import { pointsToSvgD } from '../utils/pathUtils'
 import { weightToMultiplier, resolveLinecap, resolveLinejoin } from '../stores/globalStyleStore'
 import type { GlobalStyle } from '../stores/globalStyleStore'
+import { getJamoRenderBox } from '../utils/jamoGeometry'
+import { resolveSyllableContextualInkSafety } from '../utils/contextualInkSafety'
 
 // 파트별 스타일 (자모 편집 시 비편집 파트 흐리게 표시 등)
 export interface PartStyle {
@@ -48,17 +50,6 @@ interface SvgRendererProps {
 
 // SVG viewBox 기준 크기
 const VIEW_BOX_SIZE = 100
-
-// 자모 패딩 적용: 박스를 패딩만큼 축소
-function applyJamoPadding(box: BoxConfig, padding?: Padding): BoxConfig {
-  if (!padding) return box
-  return {
-    x: box.x + padding.left * box.width,
-    y: box.y + padding.top * box.height,
-    width: box.width * (1 - padding.left - padding.right),
-    height: box.height * (1 - padding.top - padding.bottom),
-  }
-}
 
 // 레이아웃 타입에 따라 렌더링 순서 결정
 function getRenderOrder(layoutType: LayoutType): Array<'CH' | 'JU' | 'JU_H' | 'JU_V' | 'JO'> {
@@ -117,10 +108,17 @@ export function SvgRenderer({
     }
     return (boxesProp || {}) as Record<Part, BoxConfig>
   }, [schema, boxesProp, syllable])
+  const renderSyllable = useMemo(
+    () => resolveSyllableContextualInkSafety(syllable, boxes).syllable,
+    [boxes, syllable],
+  )
 
   // 글로벌 스타일 값 (기본값 적용)
   const slant = globalStyle?.slant ?? 0
   const weightMultiplier = globalStyle ? weightToMultiplier(globalStyle.weight) : 1.0
+  // viewportBox는 조판 창의 크기일 뿐 잉크를 다시 맞추는 경계가 아니다.
+  // Design Body보다 돌출된 획도 편집기와 같은 형태로 보여야 한다.
+  const horizontalInkBounds = { min: 0, max: 1 }
 
   const renderStrokes = (
     strokes: StrokeDataV2[] | undefined,
@@ -182,22 +180,14 @@ export function SvgRenderer({
     const partColor = ps?.fillColor ?? fillColor
     const partOpacity = ps?.opacity ?? 1
 
-    // 파트별 자모 패딩 참조 (혼합중성은 파트별 개별 패딩 지원)
-    const jamoPadding =
-      part === 'CH' ? syllable.choseong?.padding :
-      part === 'JO' ? syllable.jongseong?.padding :
-      part === 'JU_H' ? (syllable.jungseong?.horizontalPadding ?? syllable.jungseong?.padding) :
-      part === 'JU_V' ? (syllable.jungseong?.verticalPadding ?? syllable.jungseong?.padding) :
-      syllable.jungseong?.padding
-
     // 혼합중성의 경우 JU_H와 JU_V로 분리 렌더링
-    if (part === 'JU_H' && syllable.jungseong) {
+    if (part === 'JU_H' && renderSyllable.jungseong) {
       const rawBox = boxes.JU_H
       if (!rawBox) return null
-      const box = applyJamoPadding(rawBox, jamoPadding)
       // horizontalStrokes가 있으면 사용, 없으면 전체 strokes 사용
-      const strokes = syllable.jungseong.horizontalStrokes || syllable.jungseong.strokes
+      const strokes = renderSyllable.jungseong.horizontalStrokes || renderSyllable.jungseong.strokes
       if (!strokes || strokes.length === 0) return null
+      const box = getJamoRenderBox(renderSyllable.jungseong, strokes, rawBox, weightMultiplier, horizontalInkBounds)
       return (
         <g key={part} opacity={partOpacity}>
           {renderStrokes(strokes, box, partColor)}
@@ -205,13 +195,13 @@ export function SvgRenderer({
       )
     }
 
-    if (part === 'JU_V' && syllable.jungseong) {
+    if (part === 'JU_V' && renderSyllable.jungseong) {
       const rawBox = boxes.JU_V
       if (!rawBox) return null
-      const box = applyJamoPadding(rawBox, jamoPadding)
       // verticalStrokes가 있으면 사용, 없으면 전체 strokes 사용
-      const strokes = syllable.jungseong.verticalStrokes || syllable.jungseong.strokes
+      const strokes = renderSyllable.jungseong.verticalStrokes || renderSyllable.jungseong.strokes
       if (!strokes || strokes.length === 0) return null
+      const box = getJamoRenderBox(renderSyllable.jungseong, strokes, rawBox, weightMultiplier, horizontalInkBounds)
       return (
         <g key={part} opacity={partOpacity}>
           {renderStrokes(strokes, box, partColor)}
@@ -220,14 +210,13 @@ export function SvgRenderer({
     }
 
     const partMap = {
-      CH: { jamo: syllable.choseong, box: boxes.CH },
-      JU: { jamo: syllable.jungseong, box: boxes.JU },
-      JO: { jamo: syllable.jongseong, box: boxes.JO },
+      CH: { jamo: renderSyllable.choseong, box: boxes.CH },
+      JU: { jamo: renderSyllable.jungseong, box: boxes.JU },
+      JO: { jamo: renderSyllable.jongseong, box: boxes.JO },
     }
 
     const { jamo, box: rawBox } = partMap[part as 'CH' | 'JU' | 'JO']
     if (!jamo || !rawBox) return null
-    const box = applyJamoPadding(rawBox, jamoPadding)
 
     // strokes가 없으면 verticalStrokes나 horizontalStrokes 확인
     let strokes = jamo.strokes
@@ -238,6 +227,7 @@ export function SvgRenderer({
       strokes = [...verticalStrokes, ...horizontalStrokes]
     }
     if (!strokes || strokes.length === 0) return null
+    const box = getJamoRenderBox(jamo, strokes, rawBox, weightMultiplier, horizontalInkBounds)
 
     return (
       <g key={part} opacity={partOpacity}>
@@ -247,7 +237,7 @@ export function SvgRenderer({
   }
 
   // 렌더링 순서 결정
-  const renderOrder = getRenderOrder(syllable.layoutType)
+  const renderOrder = getRenderOrder(renderSyllable.layoutType)
 
   const debugBoxColors = PART_COLORS
 
@@ -257,11 +247,11 @@ export function SvgRenderer({
     return renderOrder
       .filter((part) => {
         // 각 part에 대해 실제로 박스가 있고 사용 가능한지 확인
-        if (part === 'CH') return boxes.CH && syllable.choseong
-        if (part === 'JU') return boxes.JU && syllable.jungseong
-        if (part === 'JU_H') return boxes.JU_H && syllable.jungseong
-        if (part === 'JU_V') return boxes.JU_V && syllable.jungseong
-        if (part === 'JO') return boxes.JO && syllable.jongseong
+        if (part === 'CH') return boxes.CH && renderSyllable.choseong
+        if (part === 'JU') return boxes.JU && renderSyllable.jungseong
+        if (part === 'JU_H') return boxes.JU_H && renderSyllable.jungseong
+        if (part === 'JU_V') return boxes.JU_V && renderSyllable.jungseong
+        if (part === 'JO') return boxes.JO && renderSyllable.jongseong
         return false
       })
       .map((part) => {

@@ -11,11 +11,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: 'Font Maker - 한글 폰트 메이커',
-        short_name: 'Font Maker',
-        description: '한글 폰트를 커스터마이징하고 미리보기할 수 있는 앱',
-        theme_color: '#7c3aed',
-        background_color: '#0a0a0a',
+        name: 'Font Maker Next',
+        short_name: 'Font Maker Next',
+        description: '완성 글자 편집에서 전체 한글 폰트의 규칙을 만드는 실험',
+        theme_color: '#292820',
+        background_color: '#f0eee7',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
@@ -61,7 +61,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@': fileURLToPath(new URL('./src-next', import.meta.url)),
     },
   },
   server: {

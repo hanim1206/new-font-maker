@@ -1,5 +1,6 @@
 import type { LayoutSchema, BoxConfig, Part, Padding, LayoutType, PartOverride, OverrideCondition } from '../types'
 import { resolveGapInsets } from './layoutGapUtils'
+import { applyComponentPlacementProfile } from '../data/componentPlacementProfiles'
 
 /** 음절 컨텍스트 (calculateBoxes에 전달 시 레이아웃 오버라이드 해석에 사용) */
 export interface SyllableContext {
@@ -33,6 +34,13 @@ const DEFAULT_PADDING: Padding = {
   bottom: 0.05,
   left: 0.05,
   right: 0.05,
+}
+
+const DEFAULT_DESIGN_BODY_PADDING: Padding = {
+  top: 0.075,
+  bottom: 0.075,
+  left: 0.075,
+  right: 0.075,
 }
 
 // Split 없을 때 사용하는 기본 패딩 (넓은 여백)
@@ -95,17 +103,21 @@ export function calculateBoxes(
   schema: LayoutSchema,
   context?: SyllableContext,
 ): Partial<Record<Part, BoxConfig>> {
-  const rawBoxes = applyLayoutGaps(calculateRawBoxes(schema), schema)
+  const designBodyPadding = schema.designBodyPadding
+  const calculationSchema = designBodyPadding
+    ? { ...schema, padding: DEFAULT_DESIGN_BODY_PADDING, designBodyPadding: undefined }
+    : schema
+  const rawBoxes = applyLayoutGaps(calculateRawBoxes(calculationSchema), calculationSchema)
 
   let effectivePartOverrides = {
-    ...schema.partOverrides,
-    ...(context ? schema.partOverridesByJungseong?.[context.jung] : undefined),
+    ...calculationSchema.partOverrides,
+    ...(context ? calculationSchema.partOverridesByJungseong?.[context.jung] : undefined),
   }
 
-  if (context && schema.overrides && schema.overrides.length > 0) {
+  if (context && calculationSchema.overrides && calculationSchema.overrides.length > 0) {
     // 우선순위 내림차순으로 매칭 오버라이드 검색
-    const matching = schema.overrides
-      .filter((o) => o.enabled && matchesConditionGroups(o.conditionGroups, context, schema.id))
+    const matching = calculationSchema.overrides
+      .filter((o) => o.enabled && matchesConditionGroups(o.conditionGroups, context, calculationSchema.id))
       .sort((a, b) => b.priority - a.priority)
 
     if (matching.length > 0) {
@@ -118,7 +130,30 @@ export function calculateBoxes(
   }
 
   const presetBoxes = applyPartOverrides(rawBoxes, effectivePartOverrides)
-  return applyPartOverrides(presetBoxes, schema.userPartOverrides)
+  const userBoxes = applyPartOverrides(presetBoxes, calculationSchema.userPartOverrides)
+  const placedBoxes = context ? applyComponentPlacementProfile(userBoxes, context.jung) : userBoxes
+  return designBodyPadding
+    ? mapBoxesToDesignBody(placedBoxes, designBodyPadding)
+    : placedBoxes
+}
+
+function mapBoxesToDesignBody(
+  boxes: Partial<Record<Part, BoxConfig>>,
+  target: Padding,
+): Partial<Record<Part, BoxConfig>> {
+  const sourceWidth = 1 - DEFAULT_DESIGN_BODY_PADDING.left - DEFAULT_DESIGN_BODY_PADDING.right
+  const sourceHeight = 1 - DEFAULT_DESIGN_BODY_PADDING.top - DEFAULT_DESIGN_BODY_PADDING.bottom
+  const targetWidth = 1 - target.left - target.right
+  const targetHeight = 1 - target.top - target.bottom
+  const scaleX = targetWidth / sourceWidth
+  const scaleY = targetHeight / sourceHeight
+
+  return Object.fromEntries(Object.entries(boxes).map(([part, box]) => [part, {
+    x: target.left + (box.x - DEFAULT_DESIGN_BODY_PADDING.left) * scaleX,
+    y: target.top + (box.y - DEFAULT_DESIGN_BODY_PADDING.top) * scaleY,
+    width: box.width * scaleX,
+    height: box.height * scaleY,
+  }])) as Partial<Record<Part, BoxConfig>>
 }
 
 function applyLayoutGaps(

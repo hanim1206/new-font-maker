@@ -11,7 +11,7 @@ const rawStorage = createDebouncedStorage(300)
 const debouncedStorage = createJSONStorage(() => rawStorage)
 
 // 글로벌 패딩 기본값
-const DEFAULT_GLOBAL_PADDING: Padding = {
+export const DEFAULT_GLOBAL_PADDING: Padding = {
   top: 0.075,
   bottom: 0.075,
   left: 0.075,
@@ -62,9 +62,12 @@ interface LayoutActions {
 
   // 글로벌 패딩 업데이트
   updateGlobalPadding: (side: keyof Padding, value: number) => void
+  setGlobalPadding: (padding: Padding) => void
+  resetGlobalPadding: () => void
 
   // 레이아웃별 패딩 오버라이드 설정
   setPaddingOverride: (layoutType: LayoutType, side: keyof Padding, value: number) => void
+  setPaddingOverrides: (layoutType: LayoutType, padding: Padding) => void
 
   // 레이아웃별 패딩 오버라이드 제거
   removePaddingOverride: (layoutType: LayoutType) => void
@@ -259,12 +262,30 @@ export const useLayoutStore = create<LayoutState & LayoutActions>()(
           syncAllConfigs(state)
         }),
 
+      setGlobalPadding: (padding) =>
+        set((state) => {
+          state.globalPadding = deepClone(padding)
+          syncAllConfigs(state)
+        }),
+
+      resetGlobalPadding: () =>
+        set((state) => {
+          state.globalPadding = { ...DEFAULT_GLOBAL_PADDING }
+          syncAllConfigs(state)
+        }),
+
       setPaddingOverride: (layoutType, side, value) =>
         set((state) => {
           if (!state.paddingOverrides[layoutType]) {
             state.paddingOverrides[layoutType] = {}
           }
           state.paddingOverrides[layoutType]![side] = value
+          syncConfigFromSchema(state, layoutType)
+        }),
+
+      setPaddingOverrides: (layoutType, padding) =>
+        set((state) => {
+          state.paddingOverrides[layoutType] = deepClone(padding)
           syncConfigFromSchema(state, layoutType)
         }),
 

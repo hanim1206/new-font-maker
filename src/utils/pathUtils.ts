@@ -1,4 +1,5 @@
 import type { PathData, PathPoint, AnchorPoint, BoxConfig } from '../types'
+import { normalizeClosedStrokePoints } from './strokePathUtils'
 
 /**
  * PathData의 상대 좌표(0~1)를 절대 viewBox 좌표로 변환하여
@@ -184,8 +185,8 @@ export function pointsToSvgD(
     (box.y + py * box.height) * viewBoxSize,
   ]
 
-  // 닫힌 패스의 비정방 비율 곡률 보정
-  let renderPoints: AnchorPoint[] = points
+  // closed가 마지막→첫 점 연결을 담당하므로 레거시 중복 시작점은 먼저 제거한다.
+  let renderPoints: AnchorPoint[] = normalizeClosedStrokePoints(points, closed)
   if (closed && box.width > 0 && box.height > 0) {
     const absWidth = box.width * viewBoxSize
     const absHeight = box.height * viewBoxSize

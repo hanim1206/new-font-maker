@@ -89,7 +89,8 @@ export function ProjectListPage() {
   // === 프로젝트 열기 (미저장 확인 포함) ===
   const handleOpenProject = (id: string) => {
     const doOpen = async () => {
-      await loadProject(id)
+      const loaded = await loadProject(id)
+      if (!loaded) return
       markAsClean()
       setCurrentPage('editor')
     }
@@ -142,7 +143,8 @@ export function ProjectListPage() {
     setExportingId(id)
     setExportProgress('준비 중...')
     try {
-      await loadProject(id)
+      const loaded = await loadProject(id)
+      if (!loaded) return
       const result = await generateAndDownloadFont({
         familyName: name,
         onProgress: (_completed, _total, phase) => {

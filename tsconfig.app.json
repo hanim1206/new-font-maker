@@ -18,7 +18,7 @@
     /* Path aliases */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src-next/*"]
     },
 
     /* Linting */
@@ -29,5 +29,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src"]
+  "include": ["src-next"]
 }

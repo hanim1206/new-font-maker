@@ -8,9 +8,9 @@ import type {
   Part,
   StrokeDataV2,
 } from '../types'
-import { applyJamoPaddingToBox } from '../utils/containerBoxUtils'
 import { classifyJungseong } from '../utils/hangulUtils'
 import { COMPOUND_JONGSEONG } from '../utils/jamoLinkUtils'
+import { getJamoRenderBox } from '../utils/jamoGeometry'
 
 const CHOSEONG_CAROUSEL = [
   'ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ',
@@ -272,15 +272,6 @@ export function getPartLabel(part: MobileEditorPart): string {
   return '종성'
 }
 
-function paddedBox(box: BoxConfig, jamo: JamoData, part: Part): BoxConfig {
-  const padding = part === 'JU_H'
-    ? jamo.horizontalPadding ?? jamo.padding
-    : part === 'JU_V'
-      ? jamo.verticalPadding ?? jamo.padding
-      : jamo.padding
-  return applyJamoPaddingToBox(box.x, box.y, box.width, box.height, padding)
-}
-
 function targets(
   editorPart: MobileEditorPart,
   renderPart: Part,
@@ -289,7 +280,7 @@ function targets(
   box: BoxConfig | undefined
 ): RenderedStrokeTarget[] {
   if (!jamo || !strokes || !box) return []
-  const renderedBox = paddedBox(box, jamo, renderPart)
+  const renderedBox = getJamoRenderBox(jamo, strokes, box)
   return strokes.map((stroke) => ({ editorPart, renderPart, jamo, stroke, box: renderedBox }))
 }
 

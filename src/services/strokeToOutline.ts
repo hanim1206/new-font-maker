@@ -11,13 +11,14 @@
  * - 베지어: 세분화 후 각 마이크로 세그먼트에 수직 오프셋
  * - Douglas-Peucker로 포인트 수 축소
  */
-import type { StrokeDataV2, AnchorPoint, BoxConfig, StrokeLinecap } from '../types'
+import type { StrokeDataV2, AnchorPoint, BoxConfig, StrokeLinecap, StrokeLinejoin } from '../types'
+import { normalizeClosedStrokePoints } from '../utils/strokePathUtils'
 
 // ===== 타입 정의 =====
 
 /** 폰트 컨투어의 단일 점 */
 export interface ContourPoint {
-  x: number       // UPM 좌표 (0-1000)
+  x: number       // UPM 좌표
   y: number       // UPM 좌표, Y-up
   onCurve: boolean // true = on-curve, false = off-curve 제어점
 }
@@ -36,6 +37,8 @@ export interface StrokeStyle {
   weightMultiplier: number
   slant: number               // 기울기 (도)
   globalLinecap: StrokeLinecap
+  globalLinejoin: StrokeLinejoin
+  ascender: number
 }
 
 // ===== 2D 벡터 유틸리티 =====
@@ -75,6 +78,10 @@ function dist(a: Vec2, b: Vec2): number {
   return length(sub(b, a))
 }
 
+function cross(a: Vec2, b: Vec2): number {
+  return a.x * b.y - a.y * b.x
+}
+
 // ===== 좌표 변환 =====
 
 /**
@@ -86,17 +93,18 @@ function dist(a: Vec2, b: Vec2): number {
  */
 function toFontCoord(
   px: number, py: number,
-  box: BoxConfig, upm: number, slant: number
+  box: BoxConfig, upm: number, slant: number, ascender: number
 ): Vec2 {
   // SVG 절대 좌표 (0-1 → 0-upm)
   const svgX = (box.x + px * box.width) * upm
   const svgY = (box.y + py * box.height) * upm
 
   // Y축 뒤집기 (SVG y-down → font y-up)
-  const fontY = upm - svgY
+  const fontY = ascender - svgY
 
   // 슬랜트 (SvgRenderer L268: skewX(-slant), 중심 기준)
-  const fontX = svgX + (fontY - upm / 2) * Math.tan(slant * Math.PI / 180)
+  const verticalCenter = ascender - upm / 2
+  const fontX = svgX + (fontY - verticalCenter) * Math.tan(slant * Math.PI / 180)
 
   return vec(fontX, fontY)
 }
@@ -106,14 +114,14 @@ function toFontCoord(
  */
 function anchorToAbsolute(
   anchor: AnchorPoint,
-  box: BoxConfig, upm: number, slant: number
+  box: BoxConfig, upm: number, slant: number, ascender: number
 ): { point: Vec2; handleIn?: Vec2; handleOut?: Vec2 } {
-  const point = toFontCoord(anchor.x, anchor.y, box, upm, slant)
+  const point = toFontCoord(anchor.x, anchor.y, box, upm, slant, ascender)
   const handleIn = anchor.handleIn
-    ? toFontCoord(anchor.handleIn.x, anchor.handleIn.y, box, upm, slant)
+    ? toFontCoord(anchor.handleIn.x, anchor.handleIn.y, box, upm, slant, ascender)
     : undefined
   const handleOut = anchor.handleOut
-    ? toFontCoord(anchor.handleOut.x, anchor.handleOut.y, box, upm, slant)
+    ? toFontCoord(anchor.handleOut.x, anchor.handleOut.y, box, upm, slant, ascender)
     : undefined
   return { point, handleIn, handleOut }
 }
@@ -214,6 +222,122 @@ interface OffsetSegment {
   right: Vec2[]
 }
 
+type OffsetSide = keyof OffsetSegment
+
+function lineIntersection(pointA: Vec2, directionA: Vec2, pointB: Vec2, directionB: Vec2): Vec2 | null {
+  const denominator = cross(directionA, directionB)
+  if (Math.abs(denominator) < 1e-8) return null
+  const t = cross(sub(pointB, pointA), directionB) / denominator
+  return add(pointA, scale(directionA, t))
+}
+
+function roundJoinPoints(center: Vec2, start: Vec2, end: Vec2, sweepSign: number): Vec2[] {
+  const startAngle = Math.atan2(start.y - center.y, start.x - center.x)
+  const endAngle = Math.atan2(end.y - center.y, end.x - center.x)
+  let sweep = endAngle - startAngle
+  while (sweep <= -Math.PI) sweep += Math.PI * 2
+  while (sweep > Math.PI) sweep -= Math.PI * 2
+  if (Math.abs(Math.abs(sweep) - Math.PI) < 1e-6) {
+    sweep = Math.sign(sweepSign) * Math.PI
+  }
+  const steps = Math.max(1, Math.ceil(Math.abs(sweep) / (Math.PI / 8)))
+  const radius = (dist(center, start) + dist(center, end)) / 2
+  const points = [start]
+  for (let index = 1; index < steps; index += 1) {
+    const angle = startAngle + sweep * (index / steps)
+    points.push(vec(center.x + Math.cos(angle) * radius, center.y + Math.sin(angle) * radius))
+  }
+  points.push(end)
+  return points
+}
+
+function joinOffsetSides(
+  previousEnd: Vec2,
+  nextStart: Vec2,
+  center: Vec2,
+  previousTangent: Vec2,
+  nextTangent: Vec2,
+  side: OffsetSide,
+  halfWidth: number,
+  linejoin: StrokeLinejoin,
+): Vec2[] {
+  const turn = cross(previousTangent, nextTangent)
+  if (Math.abs(turn) < 1e-6) {
+    return [scale(add(previousEnd, nextStart), 0.5)]
+  }
+
+  const outside = side === 'left' ? turn < 0 : turn > 0
+  const intersection = lineIntersection(previousEnd, previousTangent, nextStart, nextTangent)
+  if (!outside) {
+    return intersection && dist(center, intersection) <= halfWidth * 4
+      ? [intersection]
+      : [previousEnd, nextStart]
+  }
+
+  if (linejoin === 'round') {
+    return roundJoinPoints(center, previousEnd, nextStart, Math.sign(turn))
+  }
+  if (linejoin === 'miter' && intersection && dist(center, intersection) <= halfWidth * 4) {
+    return [intersection]
+  }
+  return [previousEnd, nextStart]
+}
+
+function assembleOpenSide(
+  side: OffsetSide,
+  absAnchors: Array<{ point: Vec2 }>,
+  segments: OffsetSegment[],
+  segTangents: Array<{ startTangent: Vec2; endTangent: Vec2 }>,
+  halfWidth: number,
+  linejoin: StrokeLinejoin,
+): Vec2[] {
+  const result = [...segments[0][side]]
+  for (let index = 1; index < segments.length; index += 1) {
+    const next = segments[index][side]
+    result.pop()
+    result.push(...joinOffsetSides(
+      segments[index - 1][side][segments[index - 1][side].length - 1],
+      next[0],
+      absAnchors[index].point,
+      segTangents[index - 1].endTangent,
+      segTangents[index].startTangent,
+      side,
+      halfWidth,
+      linejoin,
+    ))
+    result.push(...next.slice(1))
+  }
+  return result
+}
+
+function assembleClosedSide(
+  side: OffsetSide,
+  absAnchors: Array<{ point: Vec2 }>,
+  segments: OffsetSegment[],
+  segTangents: Array<{ startTangent: Vec2; endTangent: Vec2 }>,
+  halfWidth: number,
+  linejoin: StrokeLinejoin,
+): Vec2[] {
+  const result: Vec2[] = []
+  for (let index = 0; index < segments.length; index += 1) {
+    const previousIndex = (index - 1 + segments.length) % segments.length
+    const previous = segments[previousIndex][side]
+    const next = segments[index][side]
+    result.push(...joinOffsetSides(
+      previous[previous.length - 1],
+      next[0],
+      absAnchors[index].point,
+      segTangents[previousIndex].endTangent,
+      segTangents[index].startTangent,
+      side,
+      halfWidth,
+      linejoin,
+    ))
+    result.push(...next.slice(1, -1))
+  }
+  return result
+}
+
 /**
  * 직선 세그먼트 오프셋
  * 양쪽 수직 방향으로 halfWidth만큼 이동
@@ -272,9 +396,6 @@ function offsetCubicSegment(
 
 // ===== Linecap 생성 =====
 
-/** 베지어 근사 원호 상수 */
-const KAPPA = 0.5522847498
-
 /**
  * 획 끝 모양 생성
  *
@@ -313,26 +434,18 @@ function generateLinecap(
     ]
   }
 
-  // round: 반원 (2개의 quarter-arc cubic bezier)
-  // left → top → right
-  const topPoint = add(center, scale(dir, halfWidth))
-  const kappaOffset = halfWidth * KAPPA
-
-  // 왼쪽 quarter arc: leftPoint → topPoint
-  const cp1 = add(leftPoint, scale(dir, kappaOffset))
-  const cp2 = add(topPoint, scale(n, kappaOffset))
-
-  // 오른쪽 quarter arc: topPoint → rightPoint
-  const cp3 = sub(topPoint, scale(n, kappaOffset))
-  const cp4 = add(rightPoint, scale(dir, kappaOffset))
-
-  return [
-    { x: cp1.x, y: cp1.y, onCurve: false },
-    { x: cp2.x, y: cp2.y, onCurve: false },
-    { x: topPoint.x, y: topPoint.y, onCurve: true },
-    { x: cp3.x, y: cp3.y, onCurve: false },
-    { x: cp4.x, y: cp4.y, onCurve: false },
-  ]
+  // round: left → 바깥쪽 → right 반원을 8개 구간으로 근사한다.
+  // 회전된 베지어 제어점의 축방향 overshoot 없이 실제 반경 안에 머문다.
+  const points: ContourPoint[] = []
+  for (let index = 1; index < 8; index += 1) {
+    const angle = Math.PI / 2 - Math.PI * (index / 8)
+    const point = add(
+      center,
+      add(scale(dir, Math.cos(angle) * halfWidth), scale(n, Math.sin(angle) * halfWidth)),
+    )
+    points.push({ x: point.x, y: point.y, onCurve: true })
+  }
+  return points
 }
 
 
@@ -476,7 +589,7 @@ export function strokeToContours(
   upm: number,
   style: StrokeStyle
 ): Contour[] {
-  const points = stroke.points
+  const points = normalizeClosedStrokePoints(stroke.points, stroke.closed)
   if (points.length < 2 && !stroke.closed) return []
   if (points.length < 1) return []
 
@@ -499,9 +612,10 @@ export function strokeToContours(
 
   // linecap 결정 (globalStyleStore resolveLinecap 로직)
   const capType: StrokeLinecap = stroke.linecap ?? style.globalLinecap ?? 'round'
+  const joinType: StrokeLinejoin = stroke.linejoin ?? style.globalLinejoin ?? 'round'
 
   // 앵커 → 절대 좌표 변환
-  const absAnchors = renderPoints.map(a => anchorToAbsolute(a, box, upm, style.slant))
+  const absAnchors = renderPoints.map(a => anchorToAbsolute(a, box, upm, style.slant, style.ascender))
 
   // 세그먼트 수 결정
   const segCount = stroke.closed ? absAnchors.length : absAnchors.length - 1
@@ -530,9 +644,9 @@ export function strokeToContours(
   }
 
   if (stroke.closed) {
-    return assembleClosedContours(absAnchors, segments, segTangents, effectiveHalfWidth)
+    return assembleClosedContours(absAnchors, segments, segTangents, effectiveHalfWidth, joinType)
   } else {
-    return assembleOpenContours(absAnchors, segments, segTangents, effectiveHalfWidth, capType)
+    return assembleOpenContours(absAnchors, segments, segTangents, effectiveHalfWidth, capType, joinType)
   }
 }
 
@@ -546,23 +660,12 @@ function assembleOpenContours(
   segments: OffsetSegment[],
   segTangents: Array<{ startTangent: Vec2; endTangent: Vec2 }>,
   halfWidth: number,
-  capType: StrokeLinecap
+  capType: StrokeLinecap,
+  linejoin: StrokeLinejoin,
 ): Contour[] {
-  // 왼쪽 전진 포인트 수집
-  let leftPoints: Vec2[] = []
-  let rightPoints: Vec2[] = []
-
-  for (let i = 0; i < segments.length; i++) {
-    if (i === 0) {
-      leftPoints.push(...segments[i].left)
-      rightPoints.push(...segments[i].right)
-    } else {
-      // 조인: 이전 세그먼트 끝 법선 → 현재 세그먼트 시작 법선
-      // 단순 연결 (join point = 각 세그먼트 오프셋 점)
-      leftPoints.push(...segments[i].left)
-      rightPoints.push(...segments[i].right)
-    }
-  }
+  // 각 꺾임에서 SVG와 같은 round/miter/bevel join을 만든다.
+  let leftPoints = assembleOpenSide('left', absAnchors, segments, segTangents, halfWidth, linejoin)
+  let rightPoints = assembleOpenSide('right', absAnchors, segments, segTangents, halfWidth, linejoin)
 
   // Douglas-Peucker 단순화
   leftPoints = douglasPeucker(leftPoints, 0.5)
@@ -607,17 +710,13 @@ function assembleOpenContours(
 function assembleClosedContours(
   absAnchors: Array<{ point: Vec2; handleIn?: Vec2; handleOut?: Vec2 }>,
   segments: OffsetSegment[],
-  _segTangents: Array<{ startTangent: Vec2; endTangent: Vec2 }>,
-  halfWidth: number
+  segTangents: Array<{ startTangent: Vec2; endTangent: Vec2 }>,
+  halfWidth: number,
+  linejoin: StrokeLinejoin,
 ): Contour[] {
   // 왼쪽 = outer, 오른쪽 = inner
-  let outerPoints: Vec2[] = []
-  let innerPoints: Vec2[] = []
-
-  for (const seg of segments) {
-    outerPoints.push(...seg.left)
-    innerPoints.push(...seg.right)
-  }
+  let outerPoints = assembleClosedSide('left', absAnchors, segments, segTangents, halfWidth, linejoin)
+  let innerPoints = assembleClosedSide('right', absAnchors, segments, segTangents, halfWidth, linejoin)
 
   // 단순화
   outerPoints = douglasPeucker(outerPoints, 0.5)

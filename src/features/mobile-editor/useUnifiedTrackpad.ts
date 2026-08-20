@@ -18,6 +18,7 @@ export function detectScaleAxis(deltaX: number, deltaY: number, deadzone: number
 interface UnifiedTrackpadOptions {
   enabled: boolean
   scaleEnabled: boolean
+  commitOnCancel?: boolean
   moveAxisLock?: boolean
   moveDeadzone?: number
   scaleDeadzone?: number
@@ -34,6 +35,7 @@ interface UnifiedTrackpadOptions {
 export function useUnifiedTrackpad({
   enabled,
   scaleEnabled,
+  commitOnCancel = false,
   moveAxisLock = false,
   moveDeadzone = 8,
   scaleDeadzone = 8,
@@ -142,18 +144,22 @@ export function useUnifiedTrackpad({
     const endedMode = mode.current
     pointers.current.delete(event.pointerId)
     if (endedMode === 'move' && event.pointerId === firstPointerId.current) {
+      mode.current = 'finished'
       onMoveCommit()
-      mode.current = 'finished'
     } else if (endedMode === 'scale') {
-      onScaleCommit()
       mode.current = 'finished'
+      onScaleCommit()
     }
     if (pointers.current.size === 0) reset()
     else publish(event.currentTarget)
   }
   const onPointerCancel = (event: ReactPointerEvent<HTMLElement>) => {
     if (!pointers.current.has(event.pointerId)) return
-    if (mode.current === 'move' || mode.current === 'scale') onCancel()
+    const endedMode = mode.current
+    mode.current = 'finished'
+    if (commitOnCancel && endedMode === 'move') onMoveCommit()
+    else if (commitOnCancel && endedMode === 'scale') onScaleCommit()
+    else if (endedMode === 'move' || endedMode === 'scale') onCancel()
     reset()
   }
 

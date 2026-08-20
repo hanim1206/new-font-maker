@@ -51,8 +51,8 @@ export function ProjectManager({ onClose }: ProjectManagerProps) {
 
   const handleLoad = async (id: string) => {
     if (!confirm('현재 편집 중인 데이터를 덮어씁니다.\n계속하시겠습니까?')) return
-    await loadProject(id)
-    onClose()
+    const loaded = await loadProject(id)
+    if (loaded) onClose()
   }
 
   const handleDelete = async (id: string) => {
@@ -66,7 +66,8 @@ export function ProjectManager({ onClose }: ProjectManagerProps) {
     setExportingId(id)
     setExportProgress('준비 중...')
     try {
-      await loadProject(id)
+      const loaded = await loadProject(id)
+      if (!loaded) return
       const result = await generateAndDownloadFont({
         familyName: name,
         onProgress: (_completed, _total, phase) => {

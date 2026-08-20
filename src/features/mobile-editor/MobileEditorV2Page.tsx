@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, ChevronLeft, ChevronRight, Clock3, Grid2X2, History, Link2, LockKeyhole, Plus, RotateCcw, Spline, Trash2, Undo2, Unlink } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Clock3, Grid2X2, History, LockKeyhole, RotateCcw, Undo2 } from 'lucide-react'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { useJamoStore } from '../../stores/jamoStore'
 import { useLayoutStore } from '../../stores/layoutStore'
@@ -24,6 +24,7 @@ import { applyAppRoute, pushAppRoute } from '../../utils/appRoutes'
 import type { AlignmentReference, Axis, BoxConfig, DecomposedSyllable, EditorHistoryEntry, JamoData, JamoTransform, LayoutSchema, LayoutType, MobileEditorPart, MobileEditorSelection, Padding, Part, SmartGuide, StrokeDataV2, StrokeMoveDelta, StrokeScale } from '../../types'
 import styles from './MobileEditorV2.module.css'
 import { useUnifiedTrackpad } from './useUnifiedTrackpad'
+import { StrokeToolRail } from './StrokeToolRail'
 
 const MOVE_GRID_STEP = 0.005
 const LAYOUT_SPLIT_STEP = 0.01
@@ -1228,13 +1229,15 @@ function Trackpad({ target }: { target: ActiveEditTarget }) {
   return (
     <section className="border-t border-border-subtle bg-surface px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
       <div className={`${styles.trackpadWithTools} ${showToolRail ? styles.trackpadWithToolsActive : ''}`}>
-      {showToolRail && <aside className={styles.strokeToolRail} aria-label="획 편집 도구" onPointerDown={(event) => event.stopPropagation()}>
-        <button type="button" onClick={handleAddStroke} aria-label="선 추가"><Plus size={18} aria-hidden="true" /><span>추가</span></button>
-        {(target.mode === 'point' || target.mode === 'handle') && <button type="button" onClick={handleToggleCurve} aria-label={selectedPointHasCurve ? '직선화' : '곡선화'}><Spline size={18} aria-hidden="true" /><span>{selectedPointHasCurve ? '직선' : '곡선'}</span></button>}
-        {mergeTarget && <button type="button" onClick={handleConnect} aria-label="가까운 선 연결"><Link2 size={18} aria-hidden="true" /><span>연결</span></button>}
-        {canDisconnect && <button type="button" onClick={handleDisconnect} aria-label="선 끊기"><Unlink size={18} aria-hidden="true" /><span>끊기</span></button>}
-        {canDelete && <button type="button" onClick={handleDelete} aria-label={target.mode === 'point' || target.mode === 'handle' ? '꼭짓점 삭제' : '획 삭제'}><Trash2 size={18} aria-hidden="true" /><span>삭제</span></button>}
-      </aside>}
+      {showToolRail && <StrokeToolRail
+        onAdd={handleAddStroke}
+        curveMode={target.mode === 'point' || target.mode === 'handle' ? selectedPointHasCurve ? 'line' : 'curve' : undefined}
+        onToggleCurve={target.mode === 'point' || target.mode === 'handle' ? handleToggleCurve : undefined}
+        onConnect={mergeTarget ? handleConnect : undefined}
+        onDisconnect={canDisconnect ? handleDisconnect : undefined}
+        deleteLabel={canDelete ? target.mode === 'point' || target.mode === 'handle' ? '꼭짓점 삭제' : '획 삭제' : undefined}
+        onDelete={canDelete ? handleDelete : undefined}
+      />}
       <div {...trackpad.handlers} className={`${styles.trackpad} ${trackpad.visualState.mode === 'scale' || directionLockArmed ? styles.scaleActive : ''} ${directionLockArmed ? styles.axisLockArmed : ''} ${trackpad.visualState.axis === 'x' ? styles.scaleAxisX : trackpad.visualState.axis === 'y' ? styles.scaleAxisY : ''} h-44 rounded-xl border ${enabled ? 'border-text-dim-5' : 'border-border-subtle opacity-60'}`} role="group" aria-label="한 손가락으로 이동하고 두 손가락으로 획 비율을 조절하는 트랙패드" aria-disabled={!enabled} tabIndex={enabled ? 0 : -1} onKeyDown={commitKeyboardMove}>
         <span className={styles.horizontalLane} aria-hidden="true" /><span className={styles.verticalLane} aria-hidden="true" />
         {trackpad.visualState.points.map((point, index) => <span key={index} className={styles.pinchPoint} style={{ left: point.x, top: point.y }} aria-hidden="true" />)}
