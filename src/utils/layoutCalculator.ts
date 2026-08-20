@@ -1,6 +1,7 @@
 import type { LayoutSchema, BoxConfig, Part, Padding, LayoutType, PartOverride, OverrideCondition } from '../types'
 import { resolveGapInsets } from './layoutGapUtils'
 import { applyComponentPlacementProfile } from '../data/componentPlacementProfiles'
+import { constrainUpwardHorizontalJungseong } from '../data/jamoMorphology'
 
 /** 음절 컨텍스트 (calculateBoxes에 전달 시 레이아웃 오버라이드 해석에 사용) */
 export interface SyllableContext {
@@ -132,9 +133,12 @@ export function calculateBoxes(
   const presetBoxes = applyPartOverrides(rawBoxes, effectivePartOverrides)
   const userBoxes = applyPartOverrides(presetBoxes, calculationSchema.userPartOverrides)
   const placedBoxes = context ? applyComponentPlacementProfile(userBoxes, context.jung) : userBoxes
-  return designBodyPadding
-    ? mapBoxesToDesignBody(placedBoxes, designBodyPadding)
+  const contextualBoxes = context
+    ? constrainUpwardHorizontalJungseong(placedBoxes, context.cho, context.jung)
     : placedBoxes
+  return designBodyPadding
+    ? mapBoxesToDesignBody(contextualBoxes, designBodyPadding)
+    : contextualBoxes
 }
 
 function mapBoxesToDesignBody(
