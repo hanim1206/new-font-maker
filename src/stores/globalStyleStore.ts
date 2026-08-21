@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { persist } from 'zustand/middleware'
-import type { LayoutType, StrokeLinecap, StrokeLinejoin } from '../types'
+import type { BrushStyle, LayoutType, StrokeLinecap, StrokeLinejoin } from '../types'
 
 const STORAGE_KEY = 'font-maker-global-style'
 
@@ -12,6 +12,7 @@ export interface GlobalStyle {
   letterSpacing: number // 자간 (0~0.3, 기본 0)
   linecap: StrokeLinecap  // 획 끝 모양 (기본 'round')
   linejoin: StrokeLinejoin // 획 꺾임 모양 (기본 'round')
+  brush: BrushStyle       // 폰트 전체에 적용하는 붓촉
 }
 
 // 숫자 속성만 (updateStyle에서 사용)
@@ -49,6 +50,7 @@ interface GlobalStyleActions {
   updateLinecap: (value: StrokeLinecap) => void
   // linejoin 업데이트
   updateLinejoin: (value: StrokeLinejoin) => void
+  setBrushStyle: (value: BrushStyle) => void
 
   // 제외 규칙 관리
   addExclusion: (property: keyof GlobalStyle, layoutType: LayoutType) => void
@@ -77,6 +79,14 @@ const DEFAULT_STYLE: GlobalStyle = {
   letterSpacing: 0,
   linecap: 'round',
   linejoin: 'round',
+  brush: { tip: 'round', aspectRatio: 0.5, angle: 0 },
+}
+
+export function normalizeBrushStyle(value: Partial<BrushStyle> | undefined): BrushStyle {
+  const tip = value?.tip === 'ellipse' || value?.tip === 'rectangle' ? value.tip : 'round'
+  const aspectRatio = Math.max(0.2, Math.min(1, Number.isFinite(value?.aspectRatio) ? value!.aspectRatio! : 0.5))
+  const angle = Math.max(-90, Math.min(90, Number.isFinite(value?.angle) ? value!.angle! : 0))
+  return { tip, aspectRatio, angle }
 }
 
 export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>()(
@@ -99,6 +109,11 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
       updateLinejoin: (value) =>
         set((state) => {
           state.style.linejoin = value
+        }),
+
+      setBrushStyle: (value) =>
+        set((state) => {
+          state.style.brush = normalizeBrushStyle(value)
         }),
 
       addExclusion: (property, layoutType) =>
@@ -160,6 +175,7 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
           if (!state.style.linejoin) {
             state.style.linejoin = 'round'
           }
+          state.style.brush = normalizeBrushStyle(state.style.brush)
           state.exclusions = [...data.exclusions]
         }),
 
@@ -184,6 +200,7 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
           if (!state.style.linejoin) {
             state.style.linejoin = 'round'
           }
+          state.style.brush = normalizeBrushStyle(state.style.brush)
           state.setHydrated()
         }
       },

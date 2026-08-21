@@ -7,6 +7,7 @@ import { weightToMultiplier, resolveLinecap, resolveLinejoin } from '../stores/g
 import type { GlobalStyle } from '../stores/globalStyleStore'
 import { getJamoRenderBox } from '../utils/jamoGeometry'
 import { resolveSyllableContextualInkSafety } from '../utils/contextualInkSafety'
+import { brushInkGroupsToSvgPaths, strokeToBrushInkGroups } from '../services/brushGeometry'
 
 // 파트별 스타일 (자모 편집 시 비편집 파트 흐리게 표시 등)
 export interface PartStyle {
@@ -131,6 +132,18 @@ export function SvgRenderer({
       const d = pointsToSvgD(stroke.points, stroke.closed, box, VIEW_BOX_SIZE)
       if (!d) return null
       const strokeWidth = stroke.thickness * weightMultiplier * VIEW_BOX_SIZE
+
+      if (globalStyle?.brush?.tip && globalStyle.brush.tip !== 'round') {
+        const paths = brushInkGroupsToSvgPaths(
+          strokeToBrushInkGroups(stroke, box, weightMultiplier, globalStyle.brush),
+          VIEW_BOX_SIZE,
+        )
+        return (
+          <g key={stroke.id}>
+            {paths.map((path, index) => <path key={`${stroke.id}-brush-${index}`} d={path} fill={color} />)}
+          </g>
+        )
+      }
 
       return (
         <path

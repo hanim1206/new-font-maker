@@ -13,7 +13,7 @@
  * - linecap/linejoin 해석
  */
 import type {
-  BoxConfig, Part, Padding, StrokeDataV2, StrokeLinecap, StrokeLinejoin,
+  BoxConfig, BrushStyle, Part, Padding, StrokeDataV2, StrokeLinecap, StrokeLinejoin,
   LayoutType, LayoutSchema, DecomposedSyllable,
 } from '../types'
 import { useJamoStore } from '../stores/jamoStore'
@@ -55,6 +55,7 @@ export interface GlyphData {
   strokes: ResolvedStroke[]
   weightMultiplier: number
   slant: number
+  brush: BrushStyle
 }
 
 export type FontLayoutProfile = Partial<Record<LayoutType, LayoutSchema['userPartOverrides']>>
@@ -283,6 +284,7 @@ export function collectGlyphDataForChar(
     strokes: outputStrokes,
     weightMultiplier,
     slant: effectiveStyle.slant,
+    brush: effectiveStyle.brush,
   }
 }
 

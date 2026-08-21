@@ -203,6 +203,17 @@ export type StrokeLinecap = 'round' | 'butt' | 'square'
 // ===== 획 꺾임 모양 (Linejoin) =====
 export type StrokeLinejoin = 'miter' | 'round' | 'bevel'
 
+// ===== 전역 붓촉 =====
+export type BrushTip = 'round' | 'ellipse' | 'rectangle'
+
+export interface BrushStyle {
+  tip: BrushTip
+  /** 짧은 축 / 긴 축. 0.2~1.0 */
+  aspectRatio: number
+  /** 화면 가로축 기준 고정 각도. -90~+90 */
+  angle: number
+}
+
 // ===== 통합 획 데이터 (V2) =====
 export interface AnchorPoint {
   x: number       // 0~1, 레이아웃 박스 기준

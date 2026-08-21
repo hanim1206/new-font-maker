@@ -6,8 +6,8 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('폰트 전체와 현재 레이아웃의 네모꼴을 따로 조절한다', async ({ page }) => {
-  await page.getByRole('button', { name: '글자 네모꼴 설정' }).click()
-  const settings = page.getByRole('region', { name: '글자 네모꼴 설정' })
+  await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
+  const settings = page.getByRole('tabpanel', { name: '글자 네모꼴 설정' })
   await expect(settings).toBeVisible()
   await expect(settings.getByText('Font Space 1000은 고정됩니다')).toBeVisible()
 

@@ -15,20 +15,19 @@
 .header .exportButton[data-export-state='failed'] { color: #b24d3d; }
 .exportSpinner { animation: export-spinner 1s linear infinite; }
 @keyframes export-spinner { to { rotate: 1turn; } }
-.bodySettings { position: absolute; z-index: 10; top: 66px; right: 10px; left: 10px; padding: 14px; border: 1px solid rgb(var(--color-border)); border-radius: 16px; background: rgb(var(--color-surface)); box-shadow: var(--shadow-md); }
-.bodySettingsTitle { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.bodySettingsTitle div { display: flex; flex-direction: column; gap: 2px; }
-.bodySettingsTitle strong { font-size: 14px; }
-.bodySettingsTitle span, .bodySettings > p { margin: 0; color: rgb(var(--color-text-dim-4)); font-size: 10px; }
-.bodySettingsTitle button { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 9px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); }
-.bodyScope { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 12px 0 8px; padding: 3px; border-radius: 10px; background: rgb(var(--color-surface-2)); }
+.bodyControls { min-height: 0; display: flex; flex: 1; flex-direction: column; gap: 6px; }
+.bodyControls > p { min-height: 25px; margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: rgb(var(--color-text-dim-3)); font-size: 10px; }
+.bodyControls > p strong { min-width: 0; overflow: hidden; color: rgb(var(--color-foreground)); text-overflow: ellipsis; white-space: nowrap; }
+.bodyControls > p span { flex: 0 0 auto; color: rgb(var(--color-text-dim-4)); }
+.bodyScope { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border-radius: 10px; background: rgb(var(--color-surface)); }
 .bodyScope button { min-height: 34px; border: 0; border-radius: 8px; background: transparent; color: rgb(var(--color-text-dim-3)); font-size: 12px; font-weight: 700; }
-.bodyScope button[aria-selected='true'] { background: rgb(var(--color-surface)); color: rgb(var(--color-primary)); box-shadow: var(--shadow-sm); }
-.bodySettings > label { display: grid; grid-template-columns: 72px 1fr; align-items: center; gap: 10px; margin-top: 12px; font-size: 12px; font-weight: 650; }
-.bodySettings label span { display: flex; justify-content: space-between; }
-.bodySettings output { color: rgb(var(--color-primary)); font-family: ui-monospace, monospace; }
-.bodySettings input[type='range'] { width: 100%; accent-color: rgb(var(--color-primary)); }
-.bodyReset { width: 100%; min-height: 34px; margin-top: 12px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 11px; font-weight: 650; }
+.bodyScope button[aria-selected='true'] { background: rgb(var(--color-primary-light) / .62); color: rgb(var(--color-primary-dark)); box-shadow: var(--shadow-sm); }
+.bodyDimensionGrid { min-height: 70px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.bodyDimensionGrid label { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 8px 10px; border: 1px solid rgb(var(--color-border-subtle)); border-radius: 11px; background: rgb(var(--color-surface)); font-size: 11px; font-weight: 700; }
+.bodyDimensionGrid label span { display: flex; justify-content: space-between; }
+.bodyDimensionGrid output { color: rgb(var(--color-primary-dark)); font-family: ui-monospace, monospace; }
+.bodyDimensionGrid input { width: 100%; accent-color: rgb(var(--color-primary)); }
+.bodyReset { width: 100%; min-height: 32px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-size: 11px; font-weight: 650; }
 .bodyReset:disabled { opacity: .45; }
 .sentence { position: relative; box-sizing: border-box; flex: 0 0 104px; height: 104px; display: flex; align-items: flex-start; padding: 8px 56px 8px 12px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; border-bottom: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
 .sentence::-webkit-scrollbar { display: none; }
@@ -74,4 +73,43 @@
 .trackpadDisabled { opacity: .55; }
 .trackpadLabel { position: absolute; z-index: 2; top: 12px; left: 12px; padding: 5px 8px; border-radius: 7px; background: rgb(var(--color-surface) / .9); color: rgb(var(--color-text-dim-3)); font-size: 10px; font-weight: 650; }
 .trackpadValue { position: absolute; z-index: 2; right: 12px; bottom: 10px; padding: 4px 7px; border-radius: 6px; background: rgb(var(--color-surface) / .9); color: rgb(var(--color-text-dim-3)); font-family: ui-monospace, monospace; font-size: 10px; }
+.brushSection { flex: 0 0 auto; padding: 7px 12px calc(env(safe-area-inset-bottom) + 9px); border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
+.brushDrawer { display: flex; min-height: 252px; max-height: 282px; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid rgb(var(--color-border)); border-radius: 16px; background: rgb(var(--color-surface-2)); }
+.brushHeader { display: flex; min-height: 30px; align-items: center; justify-content: space-between; }
+.brushHeader > div { display: flex; align-items: baseline; gap: 7px; }
+.brushHeader strong { font-size: 13px; }
+.brushHeader span { color: rgb(var(--color-text-dim-4)); font-size: 10px; }
+.brushHeader button { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-2)); }
+.globalStyleTabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.globalStyleTabs button { min-width: 0; min-height: 42px; display: flex; align-items: center; gap: 8px; padding: 6px 9px; border: 1px solid rgb(var(--color-border)); border-radius: 11px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); text-align: left; }
+.globalStyleTabs button[aria-selected='true'] { border-color: rgb(var(--color-primary)); color: rgb(var(--color-primary-dark)); background: rgb(var(--color-primary-light) / .55); }
+.globalStyleTabs button > span { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.globalStyleTabs strong { font-size: 11px; }
+.globalStyleTabs small { overflow: hidden; color: rgb(var(--color-text-dim-4)); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.brushControls { min-height: 0; display: flex; flex: 1; flex-direction: column; gap: 6px; }
+.brushTips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.brushTips button { position: relative; min-width: 0; min-height: 62px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: 1fr auto; align-items: center; gap: 1px 4px; padding: 5px 7px; border: 1px solid rgb(var(--color-border)); border-radius: 11px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); }
+.brushTips button[aria-checked='true'] { border-color: rgb(var(--color-primary)); color: rgb(var(--color-primary-dark)); background: rgb(var(--color-primary-light) / .55); box-shadow: 0 0 0 1px rgb(var(--color-primary) / .14); }
+.brushTips strong { grid-column: 1 / -1; font-size: 10px; }
+.brushTipPreview { min-width: 0; height: 34px; display: grid; place-items: center; overflow: hidden; }
+.brushTipPreview svg { width: 38px; height: 38px; }
+.brushTipIcon { width: 22px; height: 22px; display: block; border-radius: 999px; background: currentColor; rotate: -24deg; opacity: .76; }
+.brushTipIcon_round { border-radius: 999px; }
+.brushTipIcon_ellipse { height: 10px; }
+.brushTipIcon_rectangle { height: 10px; border-radius: 2px; }
+.brushControlGrid { min-height: 104px; display: grid; grid-template-columns: minmax(0, .8fr) minmax(150px, 1.2fr); gap: 8px; }
+.flatnessControl { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 10px; border: 1px solid rgb(var(--color-border-subtle)); border-radius: 12px; background: rgb(var(--color-surface)); }
+.flatnessControl > span { display: flex; justify-content: space-between; color: rgb(var(--color-text-dim-2)); font-size: 11px; font-weight: 700; }
+.flatnessControl output { color: rgb(var(--color-primary-dark)); font-family: ui-monospace, monospace; }
+.flatnessControl input { width: 100%; accent-color: rgb(var(--color-primary)); }
+.brushAnglePad { position: relative; min-height: 104px; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background-color: rgb(var(--color-surface)); background-image: linear-gradient(rgb(var(--color-border-subtle) / .65) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--color-border-subtle) / .65) 1px, transparent 1px); background-size: 20px 20px; touch-action: none; user-select: none; }
+.brushAnglePad::before, .brushAnglePad::after { content: ''; position: absolute; background: rgb(var(--color-primary) / .18); pointer-events: none; }
+.brushAnglePad::before { top: 0; bottom: 0; left: 50%; width: 1px; }
+.brushAnglePad::after { right: 0; bottom: 50%; left: 0; height: 1px; }
+.brushAngleGuide { position: absolute; z-index: 1; top: 50%; left: calc(50% - 46px); width: 92px; height: 1px; border-top: 1px dashed rgb(var(--color-primary) / .5); transform-origin: center; }
+.brushAnglePuck { position: absolute; z-index: 2; top: 50%; left: 50%; translate: -50% -50%; border: 2px solid rgb(var(--color-surface)); border-radius: 999px; background: rgb(var(--color-primary)); box-shadow: var(--shadow-sm); pointer-events: none; }
+.brushAnglePuckRectangle { border-radius: 3px; }
+.brushAnglePad output { position: absolute; z-index: 3; right: 7px; bottom: 6px; padding: 3px 6px; border-radius: 6px; background: rgb(var(--color-surface) / .9); color: rgb(var(--color-text-dim-2)); font-family: ui-monospace, monospace; font-size: 10px; }
+.roundBrushMessage { min-height: 104px; margin: 0; display: grid; place-items: center; border: 1px dashed rgb(var(--color-border)); border-radius: 12px; color: rgb(var(--color-text-dim-4)); font-size: 11px; text-align: center; }
 @media (max-height: 720px) { .focusCanvas { width: min(54dvh, 278px); } }
+@media (max-height: 720px) { .brushSection { padding-top: 4px; padding-bottom: calc(env(safe-area-inset-bottom) + 6px); } .brushDrawer { min-height: 212px; gap: 4px; padding: 6px; } .brushHeader { min-height: 27px; } .brushHeader button { width: 28px; height: 28px; } .globalStyleTabs button { min-height: 34px; padding-block: 4px; } .globalStyleTabs small { display: none; } .brushControls { gap: 4px; } .brushControlGrid, .brushAnglePad, .roundBrushMessage { min-height: 76px; } .brushTips button { min-height: 50px; } .brushTipPreview { height: 27px; } .bodyScope button { min-height: 28px; } .bodyControls { gap: 4px; } .bodyDimensionGrid { min-height: 52px; } .bodyDimensionGrid label { gap: 4px; padding-block: 5px; } .bodyReset { min-height: 28px; } }

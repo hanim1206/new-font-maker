@@ -158,4 +158,34 @@ describe('OTF 출력 계약', () => {
     expect(profiledChoseong?.box.x).toBeGreaterThan(beforeChoseong!.box.x)
     expect(useLayoutStore.getState().layoutSchemas[layoutType]).toEqual(storedSchema)
   })
+
+  it('전역 붓촉을 글리프 출력 데이터와 저장 데이터에 함께 전달한다', async () => {
+    const [{ collectGlyphDataForChar }, { collectFontData }, { useGlobalStyleStore }] = await Promise.all([
+      import('../src/services/fontExportUtils'),
+      import('../src/services/fontDataBridge'),
+      import('../src/stores/globalStyleStore'),
+    ])
+    const before = structuredClone(useGlobalStyleStore.getState().style.brush)
+    const brush = { tip: 'rectangle' as const, aspectRatio: 0.3, angle: -27 }
+    const storageWarning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      useGlobalStyleStore.getState().setBrushStyle(brush)
+      expect(collectGlyphDataForChar('한')?.brush).toEqual(brush)
+      expect(collectFontData().globalStyle.style.brush).toEqual(brush)
+    } finally {
+      useGlobalStyleStore.getState().setBrushStyle(before)
+      storageWarning.mockRestore()
+    }
+  })
+
+  it('구형·범위 밖 붓촉 값을 안전한 기본 범위로 정규화한다', async () => {
+    const { normalizeBrushStyle } = await import('../src/stores/globalStyleStore')
+    expect(normalizeBrushStyle(undefined)).toEqual({ tip: 'round', aspectRatio: 0.5, angle: 0 })
+    expect(normalizeBrushStyle({ tip: 'rectangle', aspectRatio: 4, angle: -130 })).toEqual({
+      tip: 'rectangle',
+      aspectRatio: 1,
+      angle: -90,
+    })
+  })
 })

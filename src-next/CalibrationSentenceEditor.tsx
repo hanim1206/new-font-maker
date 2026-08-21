@@ -14,6 +14,7 @@ import { addHandlesToPoint, mergeStrokes, pointHasHandles, removeHandlesFromPoin
 import { MERGE_PROXIMITY } from '../src/utils/snapUtils'
 import type {
   BoxConfig,
+  BrushStyle,
   DecomposedSyllable,
   JamoData,
   LayoutSchema,
@@ -49,6 +50,9 @@ import {
 import { resolveSyllableContextualInkSafety, withContextualInkSafety } from '../src/utils/contextualInkSafety'
 import { centeredDesignBodyPadding, paddingToDesignBody } from './designBody'
 import { generateAndDownloadFont } from '../src/services/fontGenerator'
+import { useGlobalStyleStore, type GlobalStyle } from '../src/stores/globalStyleStore'
+import { BrushStyleTrackpad } from './BrushStyleTrackpad'
+import { GlobalStyleTrackpad, type GlobalStylePanel } from './GlobalStyleTrackpad'
 
 const SAMPLE_SENTENCES = [
   '별을 노래하는 마음으로',
@@ -90,6 +94,7 @@ type SelectedPoint = { strokeId: string; pointIndex: number }
 type HistoryEntry =
   | { kind: 'layout'; layoutType: LayoutType; before: LayoutSchema; after: LayoutSchema; edit: SampleGlyphEdit }
   | { kind: 'jamo'; jamoType: JamoData['type']; char: string; before: JamoData; after: JamoData; edit: SampleGlyphEdit }
+  | { kind: 'brush'; before: BrushStyle; after: BrushStyle }
 
 function isEditableHangul(char: string): boolean {
   const code = char.codePointAt(0) ?? 0
@@ -253,6 +258,7 @@ function Glyph({
   previewSchema,
   layoutProfile,
   layoutHighlight,
+  globalStyle,
 }: {
   char: string
   size: number
@@ -264,6 +270,7 @@ function Glyph({
   previewSchema: PreviewSchema | null
   layoutProfile: Partial<Record<LayoutType, LayoutSchema['userPartOverrides']>>
   layoutHighlight: { layoutType: LayoutType; parts: Part[]; source: boolean } | null
+  globalStyle: GlobalStyle
 }) {
   const decomposed = withPreviewJamo(decomposeSyllable(char, maps.choseong, maps.jungseong, maps.jongseong), previewJamo)
   const schema = previewSchema?.layoutType === decomposed.layoutType
@@ -284,7 +291,7 @@ function Glyph({
       jong: decomposed.jongseong?.char ?? '',
     })
     : null
-  return <SvgRenderer syllable={decomposed} schema={effectiveSchema} viewportBox={viewportBox} size={size} overflow="visible" clipGlyphs={false}>
+  return <SvgRenderer syllable={decomposed} schema={effectiveSchema} viewportBox={viewportBox} size={size} overflow="visible" clipGlyphs={false} globalStyle={globalStyle}>
     {boxes && layoutHighlight && <LayoutAreaBoxes boxes={boxes} parts={layoutHighlight.parts} emphasis={layoutHighlight.source ? 'source' : 'affected'} />}
   </SvgRenderer>
 }
@@ -300,6 +307,7 @@ function FocusedGlyph({
   fontSpace,
   grid,
   designBody,
+  globalStyle,
 }: {
   char: string
   syllable: DecomposedSyllable
@@ -311,6 +319,7 @@ function FocusedGlyph({
   fontSpace: { unitsPerEm: number }
   grid: { majorDivisions: number; minorInterval: number }
   designBody: { x: number; y: number; width: number; height: number }
+  globalStyle: GlobalStyle
 }) {
   const boxes = useMemo(() => calculateBoxes(schema, {
     cho: syllable.choseong?.char ?? '',
@@ -341,7 +350,7 @@ function FocusedGlyph({
   return (
     <div className={styles.focusCanvas} style={canvasStyle} onPointerDown={() => onSelect({ kind: 'none' })}>
       <span className={styles.designBody} aria-hidden="true" />
-      <SvgRenderer syllable={syllable} schema={schema} size={340} className={styles.focusSvg} partStyles={partStyles}>
+      <SvgRenderer syllable={syllable} schema={schema} size={340} className={styles.focusSvg} partStyles={partStyles} globalStyle={globalStyle}>
         {selection.kind === 'component' && <LayoutAreaBoxes boxes={boxes} parts={selection.renderParts} emphasis="focused" />}
         {targets.map((target) => {
           const path = pointsToSvgD(target.stroke.points, target.stroke.closed, target.box, VIEW_BOX_SIZE)
@@ -354,6 +363,8 @@ function FocusedGlyph({
             stroke={selectedStrokeId === target.stroke.id ? 'rgb(var(--color-primary) / .3)' : 'transparent'}
             strokeWidth={Math.max(12, target.stroke.thickness * VIEW_BOX_SIZE + 8)}
             pointerEvents="stroke"
+            data-editor-hit="stroke"
+            data-selected={selectedStrokeId === target.stroke.id ? 'true' : undefined}
             onPointerDown={(event) => {
               event.stopPropagation()
               if (sameComponent) {
@@ -374,8 +385,8 @@ function FocusedGlyph({
               onPointSelect({ kind: 'point', component, editorPart: target.editorPart, renderPart: target.renderPart, jamo: target.jamo, strokeId: target.stroke.id, pointIndex, box: target.box })
           }
           return <g key={`point-${target.renderPart}-${target.stroke.id}-${pointIndex}`}>
-            <circle cx={x} cy={y} r={7.5} fill="transparent" pointerEvents="all" className={styles.pointHitTarget} onPointerDown={selectPoint} />
-            <circle cx={x} cy={y} r={active ? 2.8 : 2.1} className={active ? styles.activePoint : styles.point} pointerEvents="none" />
+            <circle cx={x} cy={y} r={7.5} fill="transparent" pointerEvents="all" className={styles.pointHitTarget} data-editor-point="hit" onPointerDown={selectPoint} />
+            <circle cx={x} cy={y} r={active ? 2.8 : 2.1} className={active ? styles.activePoint : styles.point} data-editor-point="visible" pointerEvents="none" />
           </g>
         }))}
         {(selection.kind === 'point' || selection.kind === 'handle') && targets.filter((target) => target.stroke.id === selection.strokeId).flatMap((target) => {
@@ -824,14 +835,12 @@ function InferenceTrackpad({
   )
 }
 
-function DesignBodySettings({
+function DesignBodyControls({
   layoutType,
   fontSpace,
-  onClose,
 }: {
   layoutType: LayoutType
   fontSpace: { unitsPerEm: number; width: number; height: number }
-  onClose: () => void
 }) {
   const globalPadding = useLayoutStore((state) => state.globalPadding)
   const layoutOverride = useLayoutStore((state) => state.paddingOverrides[layoutType])
@@ -865,20 +874,18 @@ function DesignBodySettings({
     setScope('layout')
   }
 
-  return <section className={styles.bodySettings} aria-label="글자 네모꼴 설정">
-    <div className={styles.bodySettingsTitle}>
-      <div><strong>글자 네모꼴</strong><span>Font Space {fontSpace.unitsPerEm}은 고정됩니다</span></div>
-      <button type="button" onClick={onClose} aria-label="글자 네모꼴 설정 닫기"><X size={18} /></button>
-    </div>
+  return <div className={styles.bodyControls} role="tabpanel" aria-label="글자 네모꼴 설정">
     <div className={styles.bodyScope} role="tablist" aria-label="네모꼴 적용 범위">
       <button type="button" role="tab" aria-selected={scope === 'font'} onClick={() => setScope('font')}>폰트 전체</button>
       <button type="button" role="tab" aria-selected={scope === 'layout'} onClick={selectLayoutScope}>현재 레이아웃</button>
     </div>
-    <p>{scope === 'font' ? '모든 레이아웃의 기본 네모꼴' : `${LAYOUT_LABELS[layoutType]}만 별도 적용`}</p>
-    <label><span>가로 <output>{Math.round(body.width)}</output></span><input type="range" min="500" max="1000" step="5" value={Math.round(body.width)} onChange={(event) => updateBody('width', Number(event.target.value))} /></label>
-    <label><span>세로 <output>{Math.round(body.height)}</output></span><input type="range" min="500" max="1000" step="5" value={Math.round(body.height)} onChange={(event) => updateBody('height', Number(event.target.value))} /></label>
+    <p><strong>{scope === 'font' ? '모든 레이아웃의 기본 네모꼴' : `${LAYOUT_LABELS[layoutType]}만 별도 적용`}</strong><span>Font Space {fontSpace.unitsPerEm}은 고정됩니다</span></p>
+    <div className={styles.bodyDimensionGrid}>
+      <label><span>가로 <output>{Math.round(body.width)}</output></span><input type="range" min="500" max="1000" step="5" value={Math.round(body.width)} onChange={(event) => updateBody('width', Number(event.target.value))} /></label>
+      <label><span>세로 <output>{Math.round(body.height)}</output></span><input type="range" min="500" max="1000" step="5" value={Math.round(body.height)} onChange={(event) => updateBody('height', Number(event.target.value))} /></label>
+    </div>
     <button type="button" className={styles.bodyReset} disabled={scope === 'layout' ? !layoutOverride : body.width === 850 && body.height === 850} onClick={() => scope === 'layout' ? removePaddingOverride(layoutType) : resetGlobalPadding()}>{scope === 'layout' ? '폰트 전체 설정 따르기' : '기본 850 × 850으로 되돌리기'}</button>
-  </section>
+  </div>
 }
 
 export function CalibrationSentenceEditor() {
@@ -888,6 +895,7 @@ export function CalibrationSentenceEditor() {
   const schemas = useLayoutStore((state) => state.layoutSchemas)
   const globalPadding = useLayoutStore((state) => state.globalPadding)
   const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
+  const globalStyle = useGlobalStyleStore((state) => state.style)
   const fontSpace = useCalibrationProjectStore((state) => state.fontSpace)
   const grid = useCalibrationProjectStore((state) => state.grid)
   const metrics = useCalibrationProjectStore((state) => state.metrics)
@@ -907,9 +915,13 @@ export function CalibrationSentenceEditor() {
   const [inkGapLimiter, setInkGapLimiter] = useState<CalibrationInkGapViolation | null>(null)
   const [isDirectInputActive, setIsDirectInputActive] = useState(false)
   const [isCustomSentence, setIsCustomSentence] = useState(false)
-  const [isBodySettingsOpen, setIsBodySettingsOpen] = useState(false)
+  const [globalStylePanel, setGlobalStylePanel] = useState<GlobalStylePanel | null>(null)
+  const [previewBrush, setPreviewBrush] = useState<BrushStyle | null>(null)
   const directInputRef = useRef<HTMLTextAreaElement>(null)
+  const isGlobalStyleOpen = globalStylePanel !== null
+  const isBrushStyleOpen = globalStylePanel === 'brush'
   const maps = useMemo(() => ({ choseong, jungseong, jongseong }), [choseong, jungseong, jongseong])
+  const previewGlobalStyle = useMemo(() => ({ ...globalStyle, brush: previewBrush ?? globalStyle.brush }), [globalStyle, previewBrush])
   const baseSyllable = useMemo(() => decomposeSyllable(selectedChar, choseong, jungseong, jongseong), [selectedChar, choseong, jungseong, jongseong])
   const previewedSyllable = useMemo(() => withPreviewJamo(baseSyllable, previewJamo), [baseSyllable, previewJamo])
   const baseSchema = withLayoutProfile(schemas[previewedSyllable.layoutType], layoutProfile[previewedSyllable.layoutType])
@@ -1058,14 +1070,29 @@ export function CalibrationSentenceEditor() {
     useCalibrationProjectStore.getState().addSampleGlyphEdit(edit)
     setPreviewSchema(null)
   }
+  const commitBrush = (before: BrushStyle, after: BrushStyle) => {
+    if (JSON.stringify(before) === JSON.stringify(after)) {
+      setPreviewBrush(null)
+      return
+    }
+    setHistory((entries) => [...entries, { kind: 'brush', before, after }])
+    setFuture([])
+    useGlobalStyleStore.getState().setBrushStyle(after)
+    setPreviewBrush(null)
+  }
+  const closeGlobalStyle = () => {
+    setPreviewBrush(null)
+    setGlobalStylePanel(null)
+  }
   const undo = () => {
     const entry = history.at(-1)
     if (!entry) return
     if (entry.kind === 'layout') useCalibrationProjectStore.getState().setLayoutProfile(entry.layoutType, entry.before.userPartOverrides)
+    else if (entry.kind === 'brush') useGlobalStyleStore.getState().setBrushStyle(entry.before)
     else updateJamo(entry.before)
     setHistory((entries) => entries.slice(0, -1))
     setFuture((entries) => [...entries, entry])
-    useCalibrationProjectStore.getState().removeSampleGlyphEdit(entry.edit.id)
+    if (entry.kind !== 'brush') useCalibrationProjectStore.getState().removeSampleGlyphEdit(entry.edit.id)
     setPreviewJamo(null)
     setPreviewSchema(null)
     setSelection({ kind: 'none' })
@@ -1075,10 +1102,11 @@ export function CalibrationSentenceEditor() {
     const entry = future.at(-1)
     if (!entry) return
     if (entry.kind === 'layout') useCalibrationProjectStore.getState().setLayoutProfile(entry.layoutType, entry.after.userPartOverrides)
+    else if (entry.kind === 'brush') useGlobalStyleStore.getState().setBrushStyle(entry.after)
     else updateJamo(entry.after)
     setFuture((entries) => entries.slice(0, -1))
     setHistory((entries) => [...entries, entry])
-    useCalibrationProjectStore.getState().addSampleGlyphEdit(entry.edit)
+    if (entry.kind !== 'brush') useCalibrationProjectStore.getState().addSampleGlyphEdit(entry.edit)
     setPreviewJamo(null)
     setPreviewSchema(null)
     setSelection({ kind: 'none' })
@@ -1140,7 +1168,7 @@ export function CalibrationSentenceEditor() {
     const spaceAdvance = Math.round(metrics.spaceAdvance * globalBodyWidth / .85)
     const advance = advanceForCharacter(char, metrics, hangulAdvance, spaceAdvance)
     const width = `${advance / fontSpace.unitsPerEm}em`
-    const layoutHighlight = selection.kind === 'component'
+    const layoutHighlight = !isBrushStyleOpen && selection.kind === 'component'
       ? { layoutType: syllable.layoutType, parts: selection.renderParts, source: char === selectedChar }
       : null
     const contextId = `sentence-${lineIndex}-${charIndex}`
@@ -1159,7 +1187,7 @@ export function CalibrationSentenceEditor() {
     }
     return isEditableHangul(char)
       ? <button key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width }} type="button" aria-current={char === selectedChar ? 'true' : undefined} data-ink-gap-limiter={inkGapLimiter?.id === contextId ? 'true' : undefined} data-ink-safety-adjusted={isSafetyAdjusted ? 'true' : undefined} aria-label={`${char} 편집${isSafetyAdjusted ? ', 충돌 안전 보정됨' : ''}`} onClick={() => chooseChar(char)}>
-          <Glyph char={char} size={sentenceEm} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={previewJamo} previewSchema={previewSchema} layoutProfile={layoutProfile} layoutHighlight={layoutHighlight} />
+          <Glyph char={char} size={sentenceEm} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={previewJamo} previewSchema={previewSchema} layoutProfile={layoutProfile} layoutHighlight={layoutHighlight} globalStyle={previewGlobalStyle} />
         </button>
       : <span key={`${lineIndex}-${char}-${charIndex}`} className={/\s/u.test(char) ? styles.spaceGlyph : styles.punctuationGlyph} style={{ inlineSize: width }} aria-label={/\s/u.test(char) ? '공백' : char}>{char}</span>
   }
@@ -1174,14 +1202,11 @@ export function CalibrationSentenceEditor() {
           <button hidden type="button" className={styles.copyButton} data-copy-state={copyState} onClick={copyAnalysisValues} aria-label={copyState === 'copied' ? '분석용 값 복사됨' : copyState === 'failed' ? '분석용 값 복사 실패' : '분석용 값 복사'} title="분석용 값 복사">
             {copyState === 'copied' ? <Check size={18} /> : <Copy size={18} />}
           </button>
-          <button type="button" data-active={isBodySettingsOpen || undefined} onClick={() => setIsBodySettingsOpen((open) => !open)} aria-label="글자 네모꼴 설정" title="글자 네모꼴 설정"><Settings2 size={18} /></button>
+          <button type="button" data-active={isGlobalStyleOpen || undefined} onClick={() => isGlobalStyleOpen ? closeGlobalStyle() : setGlobalStylePanel('body')} aria-label="글로벌 스타일 설정" title="글자 네모꼴과 획 스타일"><Settings2 size={18} /></button>
           <button type="button" onClick={undo} disabled={history.length === 0} aria-label="마지막 편집 되돌리기"><Undo2 size={18} />{history.length > 0 && <span>{history.length}</span>}</button>
           <button type="button" onClick={redo} disabled={future.length === 0} aria-label="되돌린 편집 다시 실행"><Redo2 size={18} /></button>
         </nav>
       </header>
-
-
-      {isBodySettingsOpen && <DesignBodySettings layoutType={previewedSyllable.layoutType} fontSpace={fontSpace} onClose={() => setIsBodySettingsOpen(false)} />}
 
       <section className={styles.sentence} aria-label="보정 문장">
         <div className={styles.sentenceActions}>
@@ -1210,10 +1235,23 @@ export function CalibrationSentenceEditor() {
       </section>
 
       <section className={styles.editor} aria-label={`${selectedChar} 완성 글자 편집`}>
-        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={selection} onSelect={selectFromCanvas} selectedPoints={selectedPoints} onPointSelect={selectPointFromCanvas} fontSpace={fontSpace} grid={grid} designBody={designBody} />
+        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={isBrushStyleOpen ? { kind: 'none' } : selection} onSelect={isBrushStyleOpen ? () => {} : selectFromCanvas} selectedPoints={isBrushStyleOpen ? [] : selectedPoints} onPointSelect={isBrushStyleOpen ? () => {} : selectPointFromCanvas} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
       </section>
 
-      <InferenceTrackpad
+      {globalStylePanel ? <GlobalStyleTrackpad
+        panel={globalStylePanel}
+        onPanelChange={(panel) => { setPreviewBrush(null); setGlobalStylePanel(panel) }}
+        onClose={closeGlobalStyle}
+        bodyControls={<DesignBodyControls layoutType={previewedSyllable.layoutType} fontSpace={fontSpace} />}
+        brushControls={<BrushStyleTrackpad
+          committed={globalStyle.brush}
+          draft={previewBrush}
+          onDraftChange={setPreviewBrush}
+          onCommit={commitBrush}
+          renderPreview={(brush) => <Glyph char="한" size={42} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={null} previewSchema={null} layoutProfile={layoutProfile} layoutHighlight={null} globalStyle={{ ...globalStyle, brush }} />}
+          embedded
+        />}
+      /> : <InferenceTrackpad
         glyph={selectedChar}
         syllable={syllable}
         selection={selection}
@@ -1232,7 +1270,7 @@ export function CalibrationSentenceEditor() {
         onSelectionChange={handleTrackpadSelectionChange}
         onInkGapLimitChange={setInkGapLimiter}
         onMultiSelectArmedChange={setMultiSelectArmed}
-      />
+      />}
     </main>
   )
 }

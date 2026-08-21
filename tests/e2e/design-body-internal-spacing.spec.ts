@@ -15,8 +15,8 @@ test('에의 ㅔ 가로점은 네모꼴 축소 비율을 따라 유지된다', a
   }
   const before = await ratio()
 
-  await page.getByRole('button', { name: '글자 네모꼴 설정' }).click()
-  const settings = page.getByRole('region', { name: '글자 네모꼴 설정' })
+  await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
+  const settings = page.getByRole('tabpanel', { name: '글자 네모꼴 설정' })
   await settings.locator('label').filter({ hasText: '가로' }).locator('input').fill('600')
   const after = await ratio()
 
@@ -34,8 +34,8 @@ test('글로벌 가로폭을 줄이면 예시 문장의 띄어쓰기도 함께 �
   const before = await space.boundingBox()
   if (!before) throw new Error('공백의 화면 경계를 찾지 못했습니다.')
 
-  await page.getByRole('button', { name: '글자 네모꼴 설정' }).click()
-  const settings = page.getByRole('region', { name: '글자 네모꼴 설정' })
+  await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
+  const settings = page.getByRole('tabpanel', { name: '글자 네모꼴 설정' })
   await settings.locator('label').filter({ hasText: '가로' }).locator('input').fill('595')
   const after = await space.boundingBox()
   if (!after) throw new Error('변경된 공백의 화면 경계를 찾지 못했습니다.')

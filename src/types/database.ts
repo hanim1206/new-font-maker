@@ -1,4 +1,4 @@
-import type { LayoutType, LayoutSchema, Padding, JamoData, StrokeLinecap, StrokeLinejoin } from './index'
+import type { BrushStyle, LayoutType, LayoutSchema, Padding, JamoData, StrokeLinecap, StrokeLinejoin } from './index'
 
 // ===== 글로벌 스타일 (DB 저장용) =====
 export interface FontGlobalStyle {
@@ -7,6 +7,7 @@ export interface FontGlobalStyle {
   letterSpacing: number
   linecap: StrokeLinecap
   linejoin: StrokeLinejoin
+  brush: BrushStyle
 }
 
 export interface FontGlobalStyleExclusion {
@@ -16,7 +17,7 @@ export interface FontGlobalStyleExclusion {
 }
 
 // ===== 폰트 데이터 (font_data JSONB 컬럼 구조) =====
-export const FONT_DATA_VERSION = '1.0.0'
+export const FONT_DATA_VERSION = '1.1.0'
 
 export interface FontData {
   // 데이터 버전 (마이그레이션용)
