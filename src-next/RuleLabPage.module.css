@@ -1,0 +1,70 @@
+.page { min-height: 100dvh; padding: 28px; background: rgb(var(--color-background)); color: rgb(var(--color-foreground)); }
+.header { width: min(1320px, 100%); margin: 0 auto 18px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
+.header div { display: grid; gap: 3px; }
+.header span { color: rgb(var(--color-primary)); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.header h1 { font-size: clamp(24px, 4vw, 38px); line-height: 1.1; }
+.header p { color: rgb(var(--color-text-3)); font-size: 13px; }
+.header a { flex: 0 0 auto; padding: 9px 12px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-2)); font-size: 12px; font-weight: 700; text-decoration: none; }
+.layout { width: min(1320px, 100%); margin: 0 auto; display: grid; grid-template-columns: 350px minmax(0, 1fr); gap: 12px; align-items: start; }
+.stage, .inspector, .comparison { min-width: 0; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); }
+.stage { padding: 12px; }
+.jamoTabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-bottom: 12px; }
+.jamoTabs button { min-height: 40px; border: 1px solid rgb(var(--color-border)); border-radius: 7px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-size: 19px; font-weight: 750; }
+.jamoTabs button[aria-selected='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary-light)); color: rgb(var(--color-primary-dark)); box-shadow: inset 0 0 0 1px rgb(var(--color-primary) / .12); }
+.canvas { position: relative; aspect-ratio: 1; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 8px; background: rgb(var(--color-surface-2)); }
+.canvas svg { display: block; width: 100%; height: 100%; }
+.gridLine { stroke: rgb(var(--color-border-subtle)); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.designBody { fill: none; stroke: rgb(var(--color-primary) / .22); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.jamoPath { fill: none; stroke: rgb(var(--color-foreground)); stroke-width: 48; stroke-linecap: butt; stroke-linejoin: round; }
+.terminal, .activeTerminal { cursor: pointer; vector-effect: non-scaling-stroke; }
+.terminal { fill: rgb(var(--color-surface)); stroke: rgb(var(--color-primary)); stroke-width: 3; }
+.activeTerminal { fill: rgb(var(--color-editor-point-selected)); stroke: white; stroke-width: 5; filter: drop-shadow(0 2px 5px rgb(15 23 42 / .18)); }
+.legend { position: absolute; right: 12px; bottom: 10px; display: flex; gap: 10px; padding: 6px 8px; border: 1px solid rgb(var(--color-border-subtle)); border-radius: 8px; background: rgb(var(--color-surface) / .92); color: rgb(var(--color-text-3)); font-size: 10px; }
+.legend span { display: flex; align-items: center; gap: 4px; }
+.legend i { width: 9px; height: 9px; border: 1px solid rgb(var(--color-primary)); border-radius: 50%; background: white; }
+.legend .activeDot { border-color: rgb(var(--color-editor-point-selected)); background: rgb(var(--color-editor-point-selected)); }
+.referenceCard { margin-top: 10px; padding: 10px 11px; border-radius: 7px; background: rgb(var(--color-surface-2)); }
+.referenceCard span { font-size: 13px; font-weight: 800; }
+.referenceCard p { margin-top: 3px; color: rgb(var(--color-text-2)); font-size: 12px; }
+.referenceCard small { display: block; margin-top: 7px; color: rgb(var(--color-text-4)); font-size: 10px; }
+.inspector { grid-column: 1 / -1; display: grid; grid-template-columns: 180px 260px minmax(0, 1fr); gap: 12px; padding: 14px; }
+.inspector > header { grid-column: 1 / -1; }
+.inspector > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.inspector > header span { color: rgb(var(--color-primary)); font-size: 10px; font-weight: 800; }
+.inspector h2 { font-size: 20px; }
+.inspector > header button { min-height: 36px; padding: 0 11px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-2)); font-size: 11px; font-weight: 750; }
+.inspector > header button[data-state='copied'] { border-color: rgb(var(--color-primary)); color: rgb(var(--color-primary)); }
+.geometryGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.geometryGrid div { padding: 10px 11px; border: 1px solid rgb(var(--color-border-subtle)); border-radius: 10px; background: rgb(var(--color-surface-2)); }
+.geometryGrid dt { color: rgb(var(--color-text-4)); font-size: 10px; }
+.geometryGrid dd { margin-top: 2px; font-size: 13px; font-weight: 750; }
+.field { display: grid; gap: 6px; color: rgb(var(--color-text-2)); font-size: 11px; font-weight: 750; }
+.field small { color: rgb(var(--color-text-4)); font-size: 10px; font-weight: 500; }
+.field select, .field textarea { width: 100%; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); }
+.field select { min-height: 40px; padding: 0 10px; }
+.field textarea { min-height: 82px; padding: 10px; resize: vertical; font-size: 12px; font-weight: 500; }
+.jsonHeader { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 2px; }
+.jsonHeader strong { font-size: 12px; }
+.jsonHeader span { color: rgb(var(--color-text-4)); font-size: 10px; }
+.jsonPanel { display: grid; gap: 6px; min-width: 0; }
+.inspector pre { min-height: 130px; max-height: 220px; margin: 0; padding: 11px; overflow: auto; border-radius: 7px; background: #171a1f; color: #dce6f4; font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+.comparison { height: 100%; overflow: hidden; }
+.comparison > header { display: flex; align-items: end; justify-content: space-between; gap: 16px; padding: 12px 14px 10px; }
+.comparison > header span { color: rgb(var(--color-primary)); font-size: 10px; font-weight: 800; }
+.comparison > header h2 { margin-top: 2px; font-size: 20px; }
+.comparison > header p { color: rgb(var(--color-text-4)); font-size: 11px; }
+.tableScroll { max-height: 455px; overflow: auto; border-top: 1px solid rgb(var(--color-border-subtle)); }
+.comparison table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 12px; }
+.comparison th, .comparison td { padding: 7px 9px; border-bottom: 1px solid rgb(var(--color-border-subtle)); text-align: left; vertical-align: middle; }
+.comparison thead th { position: sticky; top: 0; z-index: 1; color: rgb(var(--color-text-4)); background: rgb(var(--color-surface-2)); font-size: 10px; font-weight: 750; }
+.comparison tbody tr { cursor: pointer; }
+.comparison tbody tr:hover, .comparison tbody tr[data-selected='true'] { background: rgb(var(--color-primary-light)); }
+.comparison tbody th { width: 52px; font-size: 17px; }
+.rowSelect { border: 0; background: transparent; color: rgb(var(--color-primary)); font-size: 11px; font-weight: 750; }
+.comparison input, .comparison select { width: 100%; min-height: 31px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: rgb(var(--color-foreground)); font-size: 11px; }
+.comparison input:hover, .comparison input:focus, .comparison select:hover, .comparison select:focus { border-color: rgb(var(--color-border)); background: rgb(var(--color-surface)); outline: none; }
+.comparison input { min-width: 230px; padding: 0 9px; }
+.comparison select { min-width: 120px; padding: 0 7px; }
+@media (max-width: 900px) { .page { padding: 16px; } .header { align-items: flex-start; } .header p { max-width: 260px; } .layout { grid-template-columns: 300px minmax(0, 1fr); } .inspector { grid-template-columns: 1fr 1fr; } .jsonPanel { grid-column: 1 / -1; } }
+@media (max-width: 680px) { .layout { grid-template-columns: 1fr; } .comparison, .inspector { grid-column: 1; } .tableScroll { max-height: 390px; } .inspector { grid-template-columns: 1fr; } .jsonPanel { grid-column: 1; } }
+@media (max-width: 480px) { .page { padding: 12px; } .header { margin-bottom: 12px; } .header p { display: none; } .jamoTabs button { min-height: 44px; } .stage, .inspector, .comparison { border-radius: 16px; } .stage { padding: 10px; } .inspector { padding: 14px; } .comparison > header p { display: none; } }

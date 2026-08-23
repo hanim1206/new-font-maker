@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
-import { Check, Copy, Dices, Download, LoaderCircle, Redo2, Settings2, TextCursorInput, Undo2, X } from 'lucide-react'
+import { Check, Copy, Dices, Download, ListTree, LoaderCircle, Redo2, Settings2, TextCursorInput, Undo2, X } from 'lucide-react'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
@@ -14,7 +14,7 @@ import { addHandlesToPoint, mergeStrokes, pointHasHandles, removeHandlesFromPoin
 import { MERGE_PROXIMITY } from '../src/utils/snapUtils'
 import type {
   BoxConfig,
-  BrushStyle,
+  StrokeRenderStyle,
   DecomposedSyllable,
   JamoData,
   LayoutSchema,
@@ -53,6 +53,8 @@ import { generateAndDownloadFont } from '../src/services/fontGenerator'
 import { useGlobalStyleStore, type GlobalStyle } from '../src/stores/globalStyleStore'
 import { BrushStyleTrackpad } from './BrushStyleTrackpad'
 import { GlobalStyleTrackpad, type GlobalStylePanel } from './GlobalStyleTrackpad'
+import { GRID_SYSTEM_2_STROKE_UNITS, GRID_SYSTEM_2_UNIT } from '../src/services/gridSystem2Geometry'
+import { ShapeRulePanel } from './ShapeRulePanel'
 
 const SAMPLE_SENTENCES = [
   '별을 노래하는 마음으로',
@@ -94,7 +96,7 @@ type SelectedPoint = { strokeId: string; pointIndex: number }
 type HistoryEntry =
   | { kind: 'layout'; layoutType: LayoutType; before: LayoutSchema; after: LayoutSchema; edit: SampleGlyphEdit }
   | { kind: 'jamo'; jamoType: JamoData['type']; char: string; before: JamoData; after: JamoData; edit: SampleGlyphEdit }
-  | { kind: 'brush'; before: BrushStyle; after: BrushStyle }
+  | { kind: 'brush'; before: StrokeRenderStyle; after: StrokeRenderStyle }
 
 function isEditableHangul(char: string): boolean {
   const code = char.codePointAt(0) ?? 0
@@ -345,10 +347,12 @@ function FocusedGlyph({
     '--design-body-top': `${designBody.y / fontSpace.unitsPerEm * 100}%`,
     '--design-body-width': `${designBody.width / fontSpace.unitsPerEm * 100}%`,
     '--design-body-height': `${designBody.height / fontSpace.unitsPerEm * 100}%`,
+    '--construction-band-size': `${GRID_SYSTEM_2_UNIT * GRID_SYSTEM_2_STROKE_UNITS * 100}%`,
   } as CSSProperties
 
   return (
     <div className={styles.focusCanvas} style={canvasStyle} onPointerDown={() => onSelect({ kind: 'none' })}>
+      {globalStyle.strokeStyle.mode === 'grid-system-2' && <span className={styles.constructionGrid} aria-hidden="true" data-construction-grid="grid-system-2" />}
       <span className={styles.designBody} aria-hidden="true" />
       <SvgRenderer syllable={syllable} schema={schema} size={340} className={styles.focusSvg} partStyles={partStyles} globalStyle={globalStyle}>
         {selection.kind === 'component' && <LayoutAreaBoxes boxes={boxes} parts={selection.renderParts} emphasis="focused" />}
@@ -916,12 +920,16 @@ export function CalibrationSentenceEditor() {
   const [isDirectInputActive, setIsDirectInputActive] = useState(false)
   const [isCustomSentence, setIsCustomSentence] = useState(false)
   const [globalStylePanel, setGlobalStylePanel] = useState<GlobalStylePanel | null>(null)
-  const [previewBrush, setPreviewBrush] = useState<BrushStyle | null>(null)
+  const [previewBrush, setPreviewBrush] = useState<StrokeRenderStyle | null>(null)
+  const [isShapeRuleOpen, setIsShapeRuleOpen] = useState(false)
   const directInputRef = useRef<HTMLTextAreaElement>(null)
   const isGlobalStyleOpen = globalStylePanel !== null
   const isBrushStyleOpen = globalStylePanel === 'brush'
   const maps = useMemo(() => ({ choseong, jungseong, jongseong }), [choseong, jungseong, jongseong])
-  const previewGlobalStyle = useMemo(() => ({ ...globalStyle, brush: previewBrush ?? globalStyle.brush }), [globalStyle, previewBrush])
+  const previewGlobalStyle = useMemo(() => {
+    const strokeStyle = previewBrush ?? globalStyle.strokeStyle
+    return { ...globalStyle, strokeStyle, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : globalStyle.brush }
+  }, [globalStyle, previewBrush])
   const baseSyllable = useMemo(() => decomposeSyllable(selectedChar, choseong, jungseong, jongseong), [selectedChar, choseong, jungseong, jongseong])
   const previewedSyllable = useMemo(() => withPreviewJamo(baseSyllable, previewJamo), [baseSyllable, previewJamo])
   const baseSchema = withLayoutProfile(schemas[previewedSyllable.layoutType], layoutProfile[previewedSyllable.layoutType])
@@ -1070,14 +1078,14 @@ export function CalibrationSentenceEditor() {
     useCalibrationProjectStore.getState().addSampleGlyphEdit(edit)
     setPreviewSchema(null)
   }
-  const commitBrush = (before: BrushStyle, after: BrushStyle) => {
+  const commitBrush = (before: StrokeRenderStyle, after: StrokeRenderStyle) => {
     if (JSON.stringify(before) === JSON.stringify(after)) {
       setPreviewBrush(null)
       return
     }
     setHistory((entries) => [...entries, { kind: 'brush', before, after }])
     setFuture([])
-    useGlobalStyleStore.getState().setBrushStyle(after)
+    useGlobalStyleStore.getState().setStrokeRenderStyle(after)
     setPreviewBrush(null)
   }
   const closeGlobalStyle = () => {
@@ -1088,7 +1096,7 @@ export function CalibrationSentenceEditor() {
     const entry = history.at(-1)
     if (!entry) return
     if (entry.kind === 'layout') useCalibrationProjectStore.getState().setLayoutProfile(entry.layoutType, entry.before.userPartOverrides)
-    else if (entry.kind === 'brush') useGlobalStyleStore.getState().setBrushStyle(entry.before)
+    else if (entry.kind === 'brush') useGlobalStyleStore.getState().setStrokeRenderStyle(entry.before)
     else updateJamo(entry.before)
     setHistory((entries) => entries.slice(0, -1))
     setFuture((entries) => [...entries, entry])
@@ -1102,7 +1110,7 @@ export function CalibrationSentenceEditor() {
     const entry = future.at(-1)
     if (!entry) return
     if (entry.kind === 'layout') useCalibrationProjectStore.getState().setLayoutProfile(entry.layoutType, entry.after.userPartOverrides)
-    else if (entry.kind === 'brush') useGlobalStyleStore.getState().setBrushStyle(entry.after)
+    else if (entry.kind === 'brush') useGlobalStyleStore.getState().setStrokeRenderStyle(entry.after)
     else updateJamo(entry.after)
     setFuture((entries) => entries.slice(0, -1))
     setHistory((entries) => [...entries, entry])
@@ -1202,6 +1210,7 @@ export function CalibrationSentenceEditor() {
           <button hidden type="button" className={styles.copyButton} data-copy-state={copyState} onClick={copyAnalysisValues} aria-label={copyState === 'copied' ? '분석용 값 복사됨' : copyState === 'failed' ? '분석용 값 복사 실패' : '분석용 값 복사'} title="분석용 값 복사">
             {copyState === 'copied' ? <Check size={18} /> : <Copy size={18} />}
           </button>
+          <button type="button" disabled={selection.kind === 'none'} onClick={() => setIsShapeRuleOpen(true)} aria-label="선택 자모 형태 규칙" title="현재 자모의 획과 형태 예절"><ListTree size={18} /></button>
           <button type="button" data-active={isGlobalStyleOpen || undefined} onClick={() => isGlobalStyleOpen ? closeGlobalStyle() : setGlobalStylePanel('body')} aria-label="글로벌 스타일 설정" title="글자 네모꼴과 획 스타일"><Settings2 size={18} /></button>
           <button type="button" onClick={undo} disabled={history.length === 0} aria-label="마지막 편집 되돌리기"><Undo2 size={18} />{history.length > 0 && <span>{history.length}</span>}</button>
           <button type="button" onClick={redo} disabled={future.length === 0} aria-label="되돌린 편집 다시 실행"><Redo2 size={18} /></button>
@@ -1244,11 +1253,11 @@ export function CalibrationSentenceEditor() {
         onClose={closeGlobalStyle}
         bodyControls={<DesignBodyControls layoutType={previewedSyllable.layoutType} fontSpace={fontSpace} />}
         brushControls={<BrushStyleTrackpad
-          committed={globalStyle.brush}
+          committed={globalStyle.strokeStyle}
           draft={previewBrush}
           onDraftChange={setPreviewBrush}
           onCommit={commitBrush}
-          renderPreview={(brush) => <Glyph char="한" size={42} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={null} previewSchema={null} layoutProfile={layoutProfile} layoutHighlight={null} globalStyle={{ ...globalStyle, brush }} />}
+          renderPreview={(strokeStyle) => <Glyph char="한" size={42} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={null} previewSchema={null} layoutProfile={layoutProfile} layoutHighlight={null} globalStyle={{ ...globalStyle, strokeStyle, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : globalStyle.brush }} />}
           embedded
         />}
       /> : <InferenceTrackpad
@@ -1271,6 +1280,7 @@ export function CalibrationSentenceEditor() {
         onInkGapLimitChange={setInkGapLimiter}
         onMultiSelectArmedChange={setMultiSelectArmed}
       />}
+      {isShapeRuleOpen && selection.kind !== 'none' && <ShapeRulePanel jamo={selection.jamo} selectedStrokeId={selection.kind === 'component' ? null : selection.strokeId} onClose={() => setIsShapeRuleOpen(false)} />}
     </main>
   )
 }

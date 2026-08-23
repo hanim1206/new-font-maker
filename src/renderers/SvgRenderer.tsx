@@ -8,6 +8,7 @@ import type { GlobalStyle } from '../stores/globalStyleStore'
 import { getJamoRenderBox } from '../utils/jamoGeometry'
 import { resolveSyllableContextualInkSafety } from '../utils/contextualInkSafety'
 import { brushInkGroupsToSvgPaths, strokeToBrushInkGroups } from '../services/brushGeometry'
+import { strokeToRenderInkGroups } from '../services/strokeRenderGeometry'
 
 // 파트별 스타일 (자모 편집 시 비편집 파트 흐리게 표시 등)
 export interface PartStyle {
@@ -133,14 +134,17 @@ export function SvgRenderer({
       if (!d) return null
       const strokeWidth = stroke.thickness * weightMultiplier * VIEW_BOX_SIZE
 
-      if (globalStyle?.brush?.tip && globalStyle.brush.tip !== 'round') {
+      const renderStyle = globalStyle?.strokeStyle ?? (globalStyle?.brush ? { mode: 'brush' as const, brush: globalStyle.brush } : undefined)
+      if (renderStyle && (renderStyle.mode !== 'brush' || renderStyle.brush.tip !== 'round')) {
         const paths = brushInkGroupsToSvgPaths(
-          strokeToBrushInkGroups(stroke, box, weightMultiplier, globalStyle.brush),
+          renderStyle.mode === 'brush'
+            ? strokeToBrushInkGroups(stroke, box, weightMultiplier, renderStyle.brush)
+            : strokeToRenderInkGroups(stroke, box, weightMultiplier, renderStyle),
           VIEW_BOX_SIZE,
         )
         return (
           <g key={stroke.id}>
-            {paths.map((path, index) => <path key={`${stroke.id}-brush-${index}`} d={path} fill={color} />)}
+            {paths.map((path, index) => <path key={`${stroke.id}-brush-${index}`} d={path} fill={color} fillRule="evenodd" />)}
           </g>
         )
       }

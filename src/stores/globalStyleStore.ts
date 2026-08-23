@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { persist } from 'zustand/middleware'
-import type { BrushStyle, LayoutType, StrokeLinecap, StrokeLinejoin } from '../types'
+import type { BrushStyle, LayoutType, StrokeLinecap, StrokeLinejoin, StrokeRenderStyle } from '../types'
 
 const STORAGE_KEY = 'font-maker-global-style'
 
@@ -13,6 +13,7 @@ export interface GlobalStyle {
   linecap: StrokeLinecap  // 획 끝 모양 (기본 'round')
   linejoin: StrokeLinejoin // 획 꺾임 모양 (기본 'round')
   brush: BrushStyle       // 폰트 전체에 적용하는 붓촉
+  strokeStyle: StrokeRenderStyle // 중심선을 최종 윤곽으로 바꾸는 공통 규칙
 }
 
 // 숫자 속성만 (updateStyle에서 사용)
@@ -51,6 +52,7 @@ interface GlobalStyleActions {
   // linejoin 업데이트
   updateLinejoin: (value: StrokeLinejoin) => void
   setBrushStyle: (value: BrushStyle) => void
+  setStrokeRenderStyle: (value: StrokeRenderStyle) => void
 
   // 제외 규칙 관리
   addExclusion: (property: keyof GlobalStyle, layoutType: LayoutType) => void
@@ -80,6 +82,7 @@ const DEFAULT_STYLE: GlobalStyle = {
   linecap: 'round',
   linejoin: 'round',
   brush: { tip: 'round', aspectRatio: 0.5, angle: 0 },
+  strokeStyle: { mode: 'brush', brush: { tip: 'round', aspectRatio: 0.5, angle: 0 } },
 }
 
 export function normalizeBrushStyle(value: Partial<BrushStyle> | undefined): BrushStyle {
@@ -87,6 +90,35 @@ export function normalizeBrushStyle(value: Partial<BrushStyle> | undefined): Bru
   const aspectRatio = Math.max(0.2, Math.min(1, Number.isFinite(value?.aspectRatio) ? value!.aspectRatio! : 0.5))
   const angle = Math.max(-90, Math.min(90, Number.isFinite(value?.angle) ? value!.angle! : 0))
   return { tip, aspectRatio, angle }
+}
+
+export function normalizeStrokeRenderStyle(
+  value: Partial<StrokeRenderStyle> | undefined,
+  legacyBrush?: Partial<BrushStyle>,
+): StrokeRenderStyle {
+  if (value?.mode === 'angled-area') {
+    const rawCutAngle = Math.max(-60, Math.min(60, Number.isFinite(value.cutAngle) ? value.cutAngle! : 35))
+    const cutAngle = Math.abs(rawCutAngle) < 15 ? (rawCutAngle < 0 ? -15 : 15) : rawCutAngle
+    const cornerRadius = Math.max(0, Math.min(1, Number.isFinite(value.cornerRadius) ? value.cornerRadius! : 0.2))
+    return { mode: 'angled-area', cutAngle, cornerRadius }
+  }
+  if (value?.mode === 'dot-pattern') {
+    const dotSize = Math.max(0.5, Math.min(1.5, Number.isFinite(value.dotSize) ? value.dotSize! : 1))
+    const gap = Math.max(0, Math.min(2, Number.isFinite(value.gap) ? value.gap! : 0.5))
+    const rows = Math.max(1, Math.min(3, Math.round(Number.isFinite(value.rows) ? value.rows! : 1)))
+    const rawOmitEvery = Math.round(Number.isFinite(value.omitEvery) ? value.omitEvery! : 0)
+    const omitEvery = rawOmitEvery === 0 ? 0 : Math.max(2, Math.min(8, rawOmitEvery))
+    return { mode: 'dot-pattern', dotSize, gap, rows, stagger: value.stagger === true, omitEvery }
+  }
+  if (value?.mode === 'grid-system-2') return { mode: 'grid-system-2' }
+  const candidate = value?.mode === 'brush' ? value.brush : legacyBrush
+  return { mode: 'brush', brush: normalizeBrushStyle(candidate) }
+}
+
+function normalizeGlobalStyle(style: GlobalStyle): GlobalStyle {
+  const brush = normalizeBrushStyle(style.brush)
+  const strokeStyle = normalizeStrokeRenderStyle(style.strokeStyle, brush)
+  return { ...style, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : brush, strokeStyle }
 }
 
 export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>()(
@@ -114,6 +146,13 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
       setBrushStyle: (value) =>
         set((state) => {
           state.style.brush = normalizeBrushStyle(value)
+          state.style.strokeStyle = { mode: 'brush', brush: state.style.brush }
+        }),
+
+      setStrokeRenderStyle: (value) =>
+        set((state) => {
+          state.style.strokeStyle = normalizeStrokeRenderStyle(value, state.style.brush)
+          if (state.style.strokeStyle.mode === 'brush') state.style.brush = state.style.strokeStyle.brush
         }),
 
       addExclusion: (property, layoutType) =>
@@ -175,7 +214,7 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
           if (!state.style.linejoin) {
             state.style.linejoin = 'round'
           }
-          state.style.brush = normalizeBrushStyle(state.style.brush)
+          state.style = normalizeGlobalStyle(state.style)
           state.exclusions = [...data.exclusions]
         }),
 
@@ -200,7 +239,7 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
           if (!state.style.linejoin) {
             state.style.linejoin = 'round'
           }
-          state.style.brush = normalizeBrushStyle(state.style.brush)
+          state.style = normalizeGlobalStyle(state.style)
           state.setHydrated()
         }
       },

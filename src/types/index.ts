@@ -214,6 +214,45 @@ export interface BrushStyle {
   angle: number
 }
 
+// ===== 중심선 → 최종 윤곽 생성 규칙 =====
+export interface BrushStrokeRenderStyle {
+  mode: 'brush'
+  brush: BrushStyle
+}
+
+export interface AngledAreaStrokeRenderStyle {
+  mode: 'angled-area'
+  /** 화면 가로축 기준 공통 절단면 각도. -60~+60 */
+  cutAngle: number
+  /** 꺾임을 둥글리는 비율. 0~1 */
+  cornerRadius: number
+}
+
+export interface DotPatternStrokeRenderStyle {
+  mode: 'dot-pattern'
+  /** 기존 획 굵기에 대한 점 지름 배율. 0.5~1.5 */
+  dotSize: number
+  /** 점 지름에 대한 중심 간 빈 간격 배율. 0~2 */
+  gap: number
+  /** 중심선 양옆으로 반복하는 열 수. 1~3 */
+  rows: number
+  /** 이웃 열을 반 칸 엇갈리게 배치 */
+  stagger: boolean
+  /** 0은 생략 없음, 2~8은 해당 주기마다 한 점 생략 */
+  omitEvery: number
+}
+
+/** 그리드 시스템 2 고정 프로토타입. 세부 값은 검증 전까지 생성기 상수로 둔다. */
+export interface GridSystem2StrokeRenderStyle {
+  mode: 'grid-system-2'
+}
+
+export type StrokeRenderStyle =
+  | BrushStrokeRenderStyle
+  | AngledAreaStrokeRenderStyle
+  | DotPatternStrokeRenderStyle
+  | GridSystem2StrokeRenderStyle
+
 // ===== 통합 획 데이터 (V2) =====
 export interface AnchorPoint {
   x: number       // 0~1, 레이아웃 박스 기준

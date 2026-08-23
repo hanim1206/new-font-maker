@@ -27,6 +27,7 @@ import type { GlyphData } from './fontExportUtils'
 import type { FontLayoutProfile } from './fontExportUtils'
 import { mergeStrokeContourGroupsForCff } from './contourBoolean'
 import { brushInkGroupsToFontContours, strokeToBrushInkGroups } from './brushGeometry'
+import { strokeToRenderInkGroups } from './strokeRenderGeometry'
 
 // ===== 타입 정의 =====
 
@@ -173,9 +174,12 @@ function createGlyph(
   const contourGroups: Contour[][] = []
 
   for (const resolved of glyphData.strokes) {
-    if (glyphData.brush.tip !== 'round') {
+    const renderStyle = glyphData.strokeStyle ?? { mode: 'brush' as const, brush: glyphData.brush }
+    if (renderStyle.mode !== 'brush' || renderStyle.brush.tip !== 'round') {
       const groups = brushInkGroupsToFontContours(
-        strokeToBrushInkGroups(resolved.stroke, resolved.box, glyphData.weightMultiplier, glyphData.brush),
+        renderStyle.mode === 'brush'
+          ? strokeToBrushInkGroups(resolved.stroke, resolved.box, glyphData.weightMultiplier, renderStyle.brush)
+          : strokeToRenderInkGroups(resolved.stroke, resolved.box, glyphData.weightMultiplier, renderStyle),
         UPM,
         ASCENDER,
         glyphData.slant,

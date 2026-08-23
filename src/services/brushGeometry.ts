@@ -197,11 +197,11 @@ export function strokeToBrushInkGroups(
 }
 
 export function brushInkGroupsToSvgPaths(groups: BrushInkGroup[], viewBoxSize: number): string[] {
-  return groups.flatMap((group) => group.map((contour) => {
+  return groups.map((group) => group.map((contour) => {
     if (contour.length < 3) return ''
     const [first, ...rest] = contour
     return `M ${first.x * viewBoxSize} ${first.y * viewBoxSize} ${rest.map((item) => `L ${item.x * viewBoxSize} ${item.y * viewBoxSize}`).join(' ')} Z`
-  })).filter(Boolean)
+  }).filter(Boolean).join(' ')).filter(Boolean)
 }
 
 export function brushInkGroupsToFontContours(

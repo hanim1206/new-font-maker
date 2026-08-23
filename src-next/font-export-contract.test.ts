@@ -188,4 +188,43 @@ describe('OTF 출력 계약', () => {
       angle: -90,
     })
   })
+
+  it('면적형과 점 반복 규칙을 저장·출력 데이터에 같은 값으로 전달한다', async () => {
+    const [{ collectGlyphDataForChar }, { collectFontData }, { useGlobalStyleStore }] = await Promise.all([
+      import('../src/services/fontExportUtils'), import('../src/services/fontDataBridge'), import('../src/stores/globalStyleStore'),
+    ])
+    const before = structuredClone(useGlobalStyleStore.getState().style.strokeStyle)
+    const storageWarning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      const area = { mode: 'angled-area' as const, cutAngle: 35, cornerRadius: 0.2 }
+      useGlobalStyleStore.getState().setStrokeRenderStyle(area)
+      expect(collectGlyphDataForChar('한')?.strokeStyle).toEqual(area)
+      expect(collectFontData().globalStyle.style.strokeStyle).toEqual(area)
+
+      const dots = { mode: 'dot-pattern' as const, dotSize: 1.1, gap: 0.4, rows: 2, stagger: true, omitEvery: 4 }
+      useGlobalStyleStore.getState().setStrokeRenderStyle(dots)
+      expect(collectGlyphDataForChar('공')?.strokeStyle).toEqual(dots)
+      expect(collectFontData().globalStyle.style.strokeStyle).toEqual(dots)
+    } finally {
+      useGlobalStyleStore.getState().setStrokeRenderStyle(before)
+      storageWarning.mockRestore()
+    }
+  })
+
+  it('구형 brush 데이터와 범위 밖 신규 규칙을 안전하게 정규화한다', async () => {
+    const { normalizeStrokeRenderStyle } = await import('../src/stores/globalStyleStore')
+    expect(normalizeStrokeRenderStyle(undefined, { tip: 'rectangle', aspectRatio: 0.4, angle: 12 })).toEqual({
+      mode: 'brush', brush: { tip: 'rectangle', aspectRatio: 0.4, angle: 12 },
+    })
+    expect(normalizeStrokeRenderStyle({ mode: 'angled-area', cutAngle: 100, cornerRadius: -2 })).toEqual({
+      mode: 'angled-area', cutAngle: 60, cornerRadius: 0,
+    })
+    expect(normalizeStrokeRenderStyle({ mode: 'angled-area', cutAngle: 0, cornerRadius: 0.5 })).toEqual({
+      mode: 'angled-area', cutAngle: 15, cornerRadius: 0.5,
+    })
+    expect(normalizeStrokeRenderStyle({ mode: 'dot-pattern', dotSize: 9, gap: -1, rows: 8, stagger: true, omitEvery: 1 })).toEqual({
+      mode: 'dot-pattern', dotSize: 1.5, gap: 0, rows: 3, stagger: true, omitEvery: 2,
+    })
+    expect(normalizeStrokeRenderStyle({ mode: 'grid-system-2' })).toEqual({ mode: 'grid-system-2' })
+  })
 })
