@@ -11,6 +11,10 @@ const STORAGE_KEY = 'font-maker-jamo-data'
 const rawStorage = createDebouncedStorage(300)
 const debouncedStorage = createJSONStorage(() => rawStorage)
 
+export function flushJamoStorePersistence(): void {
+  rawStorage.flush(STORAGE_KEY)
+}
+
 interface JamoState {
   // 자모 데이터
   choseong: Record<string, JamoData>

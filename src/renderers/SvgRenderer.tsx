@@ -1,13 +1,11 @@
 import { useMemo, useId, type ReactNode } from 'react'
-import type { DecomposedSyllable, BoxConfig, Part, StrokeDataV2, LayoutType, LayoutSchema } from '../types'
+import type { DecomposedSyllable, BoxConfig, Part, ResolvedCenterlinePrimitive, StrokeDataV2, LayoutSchema } from '../types'
 import { PART_COLORS } from '../constants/editorColors'
-import { calculateBoxes } from '../utils/layoutCalculator'
 import { pointsToSvgD } from '../utils/pathUtils'
-import { weightToMultiplier, resolveLinecap, resolveLinejoin } from '../stores/globalStyleStore'
+import { weightToMultiplier } from '../stores/globalStyleStore'
 import type { GlobalStyle } from '../stores/globalStyleStore'
-import { getJamoRenderBox } from '../utils/jamoGeometry'
-import { resolveSyllableContextualInkSafety } from '../utils/contextualInkSafety'
 import { brushInkGroupsToSvgPaths, strokeToBrushInkGroups } from '../services/brushGeometry'
+import { resolveGlyphInkPrimitives } from '../services/glyphInkResolver'
 import { strokeToRenderInkGroups } from '../services/strokeRenderGeometry'
 
 // 파트별 스타일 (자모 편집 시 비편집 파트 흐리게 표시 등)
@@ -52,26 +50,11 @@ interface SvgRendererProps {
 
 // SVG viewBox 기준 크기
 const VIEW_BOX_SIZE = 100
+const HORIZONTAL_INK_BOUNDS = { min: 0, max: 1 } as const
 
-// 레이아웃 타입에 따라 렌더링 순서 결정
-function getRenderOrder(layoutType: LayoutType): Array<'CH' | 'JU' | 'JU_H' | 'JU_V' | 'JO'> {
-  // 혼합중성+종성: JU_H(가로획)를 먼저, JO(종성), 그다음 JU_V(세로획)
-  if (layoutType === 'choseong-jungseong-mixed-jongseong') {
-    return ['CH', 'JU_H', 'JO', 'JU_V']
-  }
-
-  // 혼합중성 (종성 없음): JU_H, JU_V 순서
-  if (layoutType === 'choseong-jungseong-mixed') {
-    return ['CH', 'JU_H', 'JU_V']
-  }
-
-  // 혼합중성 단독: JU_H, JU_V 순서
-  if (layoutType === 'jungseong-mixed-only') {
-    return ['JU_H', 'JU_V']
-  }
-
-  // 기본 순서 (JU_H, JU_V가 없으면 무시됨)
-  return ['CH', 'JU', 'JO']
+/** 기존 기하 함수는 획을 읽기만 한다. readonly 경계는 이 어댑터 한 곳에서만 좁힌다. */
+function asLegacyReadonlyStroke(stroke: ResolvedCenterlinePrimitive['stroke']): StrokeDataV2 {
+  return stroke as StrokeDataV2
 }
 
 export function SvgRenderer({
@@ -98,70 +81,67 @@ export function SvgRenderer({
   const clipRawId = useId()
   const clipId = `glyph-clip${clipRawId.replace(/:/g, '')}`
 
-  // schema가 있으면 calculateBoxes 사용 (syllable에서 컨텍스트 자동 추출 → 레이아웃 오버라이드 해석)
-  const boxes = useMemo(() => {
-    if (schema) {
-      const context = {
-        cho: syllable.choseong?.char ?? '',
-        jung: syllable.jungseong?.char ?? '',
-        jong: syllable.jongseong?.char ?? '',
-      }
-      return calculateBoxes(schema, context) as Record<Part, BoxConfig>
-    }
-    return (boxesProp || {}) as Record<Part, BoxConfig>
-  }, [schema, boxesProp, syllable])
-  const renderSyllable = useMemo(
-    () => resolveSyllableContextualInkSafety(syllable, boxes).syllable,
-    [boxes, syllable],
-  )
-
   // 글로벌 스타일 값 (기본값 적용)
   const slant = globalStyle?.slant ?? 0
   const weightMultiplier = globalStyle ? weightToMultiplier(globalStyle.weight) : 1.0
-  // viewportBox는 조판 창의 크기일 뿐 잉크를 다시 맞추는 경계가 아니다.
-  // Design Body보다 돌출된 획도 편집기와 같은 형태로 보여야 한다.
-  const horizontalInkBounds = { min: 0, max: 1 }
+  const resolvedInk = useMemo(() => resolveGlyphInkPrimitives({
+    syllable,
+    placement: schema
+      ? { kind: 'schema', schema }
+      : { kind: 'boxes', boxes: boxesProp ?? {} },
+    weightMultiplier,
+    globalLinecap: globalStyle?.linecap,
+    globalLinejoin: globalStyle?.linejoin,
+    // viewportBox는 조판 창의 크기일 뿐 잉크를 다시 맞추는 경계가 아니다.
+    // Design Body보다 돌출된 획도 편집기와 같은 형태로 보여야 한다.
+    horizontalInkBounds: HORIZONTAL_INK_BOUNDS,
+  }), [boxesProp, globalStyle?.linecap, globalStyle?.linejoin, schema, syllable, weightMultiplier])
+  const centerlines = useMemo(() => resolvedInk.primitives.map((primitive) => {
+    if (primitive.kind !== 'centerline') {
+      throw new Error(`SvgRenderer가 지원하지 않는 잉크 primitive입니다: ${primitive.kind}`)
+    }
+    return primitive
+  }), [resolvedInk.primitives])
+  const boxes = resolvedInk.boxes
+  const renderOrder = resolvedInk.renderOrder
 
-  const renderStrokes = (
-    strokes: StrokeDataV2[] | undefined,
-    box: BoxConfig,
+  const renderPrimitive = (
+    primitive: ResolvedCenterlinePrimitive,
     color: string
   ) => {
-    if (!strokes || strokes.length === 0) return null
-    return strokes.map((stroke) => {
-      // V2 통합 렌더링: 모든 획을 path로 렌더링
-      const d = pointsToSvgD(stroke.points, stroke.closed, box, VIEW_BOX_SIZE)
-      if (!d) return null
-      const strokeWidth = stroke.thickness * weightMultiplier * VIEW_BOX_SIZE
+    const stroke = asLegacyReadonlyStroke(primitive.stroke)
+    // V2 통합 렌더링: 모든 획을 path로 렌더링
+    const d = pointsToSvgD(stroke.points, stroke.closed, primitive.box, VIEW_BOX_SIZE)
+    if (!d) return null
+    const strokeWidth = stroke.thickness * primitive.weightMultiplier * VIEW_BOX_SIZE
 
-      const renderStyle = globalStyle?.strokeStyle ?? (globalStyle?.brush ? { mode: 'brush' as const, brush: globalStyle.brush } : undefined)
-      if (renderStyle && (renderStyle.mode !== 'brush' || renderStyle.brush.tip !== 'round')) {
-        const paths = brushInkGroupsToSvgPaths(
-          renderStyle.mode === 'brush'
-            ? strokeToBrushInkGroups(stroke, box, weightMultiplier, renderStyle.brush)
-            : strokeToRenderInkGroups(stroke, box, weightMultiplier, renderStyle),
-          VIEW_BOX_SIZE,
-        )
-        return (
-          <g key={stroke.id}>
-            {paths.map((path, index) => <path key={`${stroke.id}-brush-${index}`} d={path} fill={color} fillRule="evenodd" />)}
-          </g>
-        )
-      }
-
-      return (
-        <path
-          key={stroke.id}
-          d={d}
-          fill="none"
-          stroke={color}
-          strokeWidth={strokeWidth}
-          strokeLinecap={resolveLinecap(stroke.linecap, globalStyle?.linecap)}
-          strokeLinejoin={resolveLinejoin(stroke.linejoin, globalStyle?.linejoin)}
-          style={enableTransition ? { transition: 'd 0.15s ease, stroke-width 0.15s ease' } : undefined}
-        />
+    const renderStyle = globalStyle?.strokeStyle ?? (globalStyle?.brush ? { mode: 'brush' as const, brush: globalStyle.brush } : undefined)
+    if (renderStyle && (renderStyle.mode !== 'brush' || renderStyle.brush.tip !== 'round')) {
+      const paths = brushInkGroupsToSvgPaths(
+        renderStyle.mode === 'brush'
+          ? strokeToBrushInkGroups(stroke, primitive.box, primitive.weightMultiplier, renderStyle.brush)
+          : strokeToRenderInkGroups(stroke, primitive.box, primitive.weightMultiplier, renderStyle),
+        VIEW_BOX_SIZE,
       )
-    })
+      return (
+        <g key={primitive.id}>
+          {paths.map((path, index) => <path key={`${primitive.id}-brush-${index}`} d={path} fill={color} fillRule="evenodd" />)}
+        </g>
+      )
+    }
+
+    return (
+      <path
+        key={primitive.id}
+        d={d}
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap={primitive.effectiveLinecap}
+        strokeLinejoin={primitive.effectiveLinejoin}
+        style={enableTransition ? { transition: 'd 0.15s ease, stroke-width 0.15s ease' } : undefined}
+      />
+    )
   }
 
   const renderDebugBox = (box: BoxConfig, color: string, label: string) => {
@@ -190,71 +170,21 @@ export function SvgRenderer({
   }
 
   // 부분별 렌더링 헬퍼
-  const renderPart = (part: 'CH' | 'JU' | 'JU_H' | 'JU_V' | 'JO') => {
+  const renderPart = (part: Part) => {
     const ps = partStyles?.[part]
     // hidden이면 렌더링 스킵 (StrokeOverlay가 대신 렌더링)
     if (ps?.hidden) return null
     const partColor = ps?.fillColor ?? fillColor
     const partOpacity = ps?.opacity ?? 1
-
-    // 혼합중성의 경우 JU_H와 JU_V로 분리 렌더링
-    if (part === 'JU_H' && renderSyllable.jungseong) {
-      const rawBox = boxes.JU_H
-      if (!rawBox) return null
-      // horizontalStrokes가 있으면 사용, 없으면 전체 strokes 사용
-      const strokes = renderSyllable.jungseong.horizontalStrokes || renderSyllable.jungseong.strokes
-      if (!strokes || strokes.length === 0) return null
-      const box = getJamoRenderBox(renderSyllable.jungseong, strokes, rawBox, weightMultiplier, horizontalInkBounds)
-      return (
-        <g key={part} opacity={partOpacity}>
-          {renderStrokes(strokes, box, partColor)}
-        </g>
-      )
-    }
-
-    if (part === 'JU_V' && renderSyllable.jungseong) {
-      const rawBox = boxes.JU_V
-      if (!rawBox) return null
-      // verticalStrokes가 있으면 사용, 없으면 전체 strokes 사용
-      const strokes = renderSyllable.jungseong.verticalStrokes || renderSyllable.jungseong.strokes
-      if (!strokes || strokes.length === 0) return null
-      const box = getJamoRenderBox(renderSyllable.jungseong, strokes, rawBox, weightMultiplier, horizontalInkBounds)
-      return (
-        <g key={part} opacity={partOpacity}>
-          {renderStrokes(strokes, box, partColor)}
-        </g>
-      )
-    }
-
-    const partMap = {
-      CH: { jamo: renderSyllable.choseong, box: boxes.CH },
-      JU: { jamo: renderSyllable.jungseong, box: boxes.JU },
-      JO: { jamo: renderSyllable.jongseong, box: boxes.JO },
-    }
-
-    const { jamo, box: rawBox } = partMap[part as 'CH' | 'JU' | 'JO']
-    if (!jamo || !rawBox) return null
-
-    // strokes가 없으면 verticalStrokes나 horizontalStrokes 확인
-    let strokes = jamo.strokes
-    if (!strokes || strokes.length === 0) {
-      // verticalStrokes와 horizontalStrokes를 합쳐서 사용
-      const verticalStrokes = jamo.verticalStrokes || []
-      const horizontalStrokes = jamo.horizontalStrokes || []
-      strokes = [...verticalStrokes, ...horizontalStrokes]
-    }
-    if (!strokes || strokes.length === 0) return null
-    const box = getJamoRenderBox(jamo, strokes, rawBox, weightMultiplier, horizontalInkBounds)
+    const partPrimitives = centerlines.filter((primitive) => primitive.source.part === part)
+    if (partPrimitives.length === 0) return null
 
     return (
       <g key={part} opacity={partOpacity}>
-        {renderStrokes(strokes, box, partColor)}
+        {partPrimitives.map((primitive) => renderPrimitive(primitive, partColor))}
       </g>
     )
   }
-
-  // 렌더링 순서 결정
-  const renderOrder = getRenderOrder(renderSyllable.layoutType)
 
   const debugBoxColors = PART_COLORS
 
@@ -263,16 +193,15 @@ export function SvgRenderer({
     if (!showDebugBoxes) return []
     return renderOrder
       .filter((part) => {
-        // 각 part에 대해 실제로 박스가 있고 사용 가능한지 확인
-        if (part === 'CH') return boxes.CH && renderSyllable.choseong
-        if (part === 'JU') return boxes.JU && renderSyllable.jungseong
-        if (part === 'JU_H') return boxes.JU_H && renderSyllable.jungseong
-        if (part === 'JU_V') return boxes.JU_V && renderSyllable.jungseong
-        if (part === 'JO') return boxes.JO && renderSyllable.jongseong
-        return false
+        if (!boxes[part]) return false
+        if (part === 'CH') return syllable.choseong !== null
+        if (part === 'JU' || part === 'JU_H' || part === 'JU_V') {
+          return syllable.jungseong !== null
+        }
+        return syllable.jongseong !== null
       })
       .map((part) => {
-        const box = boxes[part as keyof typeof boxes]
+        const box = boxes[part]
         const color = debugBoxColors[part]
         return { part, box, color }
       })

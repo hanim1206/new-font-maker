@@ -5,7 +5,8 @@
  */
 import { useState, useCallback } from 'react'
 import { fontProjectService } from '../services/fontProjectService'
-import { collectFontData, applyFontData, validateFontData } from '../services/fontDataBridge'
+import { collectFontData, applyFontData } from '../services/fontDataBridge'
+import { parseAndMigrateFontData } from '../services/fontDataMigration'
 import { useUIStore } from '../stores/uiStore'
 import { addRecentProject } from '../utils/recentProjects'
 import type { FontProject } from '../types/database'
@@ -111,9 +112,14 @@ export function useFontProject(): UseFontProjectReturn {
         setError('프로젝트를 찾을 수 없습니다')
         return
       }
+      const parsed = parseAndMigrateFontData(project.font_data)
+      if (!parsed.ok) {
+        setError('복제할 폰트 데이터가 손상되었거나 지원하지 않는 버전입니다')
+        return
+      }
       const newProject = await fontProjectService.create({
         name: `${project.name} (사본)`,
-        font_data: project.font_data,
+        font_data: parsed.data,
       })
       setProjects((prev) => [newProject, ...prev])
     } catch (e) {
@@ -154,14 +160,11 @@ export function useFontProject(): UseFontProjectReturn {
         return false
       }
 
-      // 데이터 유효성 검사
-      if (!validateFontData(project.font_data)) {
-        setError('폰트 데이터가 손상되었습니다')
+      const applied = applyFontData(project.font_data)
+      if (!applied.ok) {
+        setError(`폰트 데이터를 불러올 수 없습니다: ${applied.error.message}`)
         return false
       }
-
-      // 3개 스토어에 적용
-      applyFontData(project.font_data)
       setCurrentProject(project.id, project.name)
       addRecentProject(project.id, project.name)
       return true

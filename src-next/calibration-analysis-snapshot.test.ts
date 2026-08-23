@@ -25,7 +25,6 @@ describe('분석용 보정값 스냅샷', () => {
       grid: DEFAULT_FONT_GRID,
       designBody: DEFAULT_DESIGN_BODY,
       metrics: DEFAULT_FONT_METRICS,
-      layoutProfile: {},
       sampleGlyphEdits: [],
       maps,
       schemas,
@@ -45,6 +44,10 @@ describe('분석용 보정값 스냅샷', () => {
       'choseong-jungseong-horizontal-jongseong',
       'choseong-jungseong-vertical',
     ])
+    expect(snapshot.fontProject.layoutProfile).toEqual({
+      'choseong-jungseong-horizontal-jongseong': {},
+      'choseong-jungseong-vertical': {},
+    })
     expect(snapshot.changeSummary).toEqual({
       editCount: 0,
       changedJamos: [],
@@ -94,7 +97,6 @@ describe('분석용 보정값 스냅샷', () => {
       grid: DEFAULT_FONT_GRID,
       designBody: DEFAULT_DESIGN_BODY,
       metrics: DEFAULT_FONT_METRICS,
-      layoutProfile: {},
       sampleGlyphEdits,
       maps,
       schemas,
@@ -109,5 +111,48 @@ describe('분석용 보정값 스냅샷', () => {
       'choseong-jungseong-horizontal',
       'choseong-jungseong-vertical',
     ])
+  })
+
+  it('canonical schema 보정을 유효 레이아웃과 version 4 호환 profile에 exact 반영한다', () => {
+    type SnapshotInput = Parameters<typeof createCalibrationAnalysisSnapshot>[0]
+    type HasExternalLayoutProfile = 'layoutProfile' extends keyof SnapshotInput ? true : false
+    const hasExternalLayoutProfile: HasExternalLayoutProfile = false
+    expect(hasExternalLayoutProfile).toBe(false)
+
+    const maps = baseJamos as unknown as {
+      choseong: Record<string, JamoData>
+      jungseong: Record<string, JamoData>
+      jongseong: Record<string, JamoData>
+    }
+    const schemas = structuredClone(basePresets.schemas) as unknown as Record<LayoutType, LayoutSchema>
+    const layoutType: LayoutType = 'choseong-jungseong-vertical'
+    const overrides = {
+      CH: { top: .045, bottom: .035, left: .105, right: .125 },
+      JU: { top: -.01, bottom: .01, left: -.06, right: .06 },
+    }
+    schemas[layoutType].userPartOverrides = structuredClone(overrides)
+
+    const snapshot = createCalibrationAnalysisSnapshot({
+      sentenceLines: ['가 공'],
+      fontSpace: DEFAULT_FONT_SPACE,
+      grid: DEFAULT_FONT_GRID,
+      designBody: DEFAULT_DESIGN_BODY,
+      metrics: DEFAULT_FONT_METRICS,
+      sampleGlyphEdits: [],
+      maps,
+      schemas,
+      globalPadding: { top: .075, bottom: .075, left: .075, right: .075 },
+      paddingOverrides: {},
+    })
+
+    expect(snapshot.effectiveLayouts[layoutType]?.userPartOverrides).toEqual(overrides)
+    expect(snapshot.fontProject.layoutProfile).toEqual({
+      'choseong-jungseong-horizontal-jongseong': {},
+      [layoutType]: overrides,
+    })
+
+    schemas[layoutType].userPartOverrides!.CH!.top = .5
+    expect(snapshot.effectiveLayouts[layoutType]?.userPartOverrides).toEqual(overrides)
+    expect(snapshot.fontProject.layoutProfile[layoutType]).toEqual(overrides)
   })
 })

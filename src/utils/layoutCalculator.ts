@@ -37,7 +37,8 @@ const DEFAULT_PADDING: Padding = {
   right: 0.05,
 }
 
-const DEFAULT_DESIGN_BODY_PADDING: Padding = {
+/** 모든 레이아웃이 해석되는 canonical 850×850 Design Body 경계. */
+export const DESIGN_BODY_BASE_PADDING: Padding = {
   top: 0.075,
   bottom: 0.075,
   left: 0.075,
@@ -106,7 +107,7 @@ export function calculateBoxes(
 ): Partial<Record<Part, BoxConfig>> {
   const designBodyPadding = schema.designBodyPadding
   const calculationSchema = designBodyPadding
-    ? { ...schema, padding: DEFAULT_DESIGN_BODY_PADDING, designBodyPadding: undefined }
+    ? { ...schema, padding: DESIGN_BODY_BASE_PADDING, designBodyPadding: undefined }
     : schema
   const rawBoxes = applyLayoutGaps(calculateRawBoxes(calculationSchema), calculationSchema)
 
@@ -145,16 +146,16 @@ function mapBoxesToDesignBody(
   boxes: Partial<Record<Part, BoxConfig>>,
   target: Padding,
 ): Partial<Record<Part, BoxConfig>> {
-  const sourceWidth = 1 - DEFAULT_DESIGN_BODY_PADDING.left - DEFAULT_DESIGN_BODY_PADDING.right
-  const sourceHeight = 1 - DEFAULT_DESIGN_BODY_PADDING.top - DEFAULT_DESIGN_BODY_PADDING.bottom
+  const sourceWidth = 1 - DESIGN_BODY_BASE_PADDING.left - DESIGN_BODY_BASE_PADDING.right
+  const sourceHeight = 1 - DESIGN_BODY_BASE_PADDING.top - DESIGN_BODY_BASE_PADDING.bottom
   const targetWidth = 1 - target.left - target.right
   const targetHeight = 1 - target.top - target.bottom
   const scaleX = targetWidth / sourceWidth
   const scaleY = targetHeight / sourceHeight
 
   return Object.fromEntries(Object.entries(boxes).map(([part, box]) => [part, {
-    x: target.left + (box.x - DEFAULT_DESIGN_BODY_PADDING.left) * scaleX,
-    y: target.top + (box.y - DEFAULT_DESIGN_BODY_PADDING.top) * scaleY,
+    x: target.left + (box.x - DESIGN_BODY_BASE_PADDING.left) * scaleX,
+    y: target.top + (box.y - DESIGN_BODY_BASE_PADDING.top) * scaleY,
     width: box.width * scaleX,
     height: box.height * scaleY,
   }])) as Partial<Record<Part, BoxConfig>>

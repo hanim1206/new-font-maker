@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { StrokeDataV2 } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { strokeToContours } from '../src/services/strokeToOutline'
+import type { FontGeneratorOptions } from '../src/services/fontGenerator'
 import baseJamos from '../src/data/baseJamos.json'
 
 const UPM = 1000
@@ -138,25 +139,136 @@ describe('OTF 출력 계약', () => {
     expect(createFontIdentity('Font Maker', 'Regular').asciiFamilyName).toBe('Font Maker')
   })
 
-  it('신규 보정 화면의 레이아웃 프로필을 저장 스키마를 바꾸지 않고 출력에 반영한다', async () => {
+  it('OTF는 public override 없이 최신 canonical layoutStore revision만 읽는다', async () => {
+    vi.useFakeTimers()
     const [{ collectGlyphDataForChar }, { useLayoutStore }] = await Promise.all([
       import('../src/services/fontExportUtils'),
       import('../src/stores/layoutStore'),
     ])
     const layoutType = 'choseong-jungseong-vertical'
-    const storedSchema = structuredClone(useLayoutStore.getState().layoutSchemas[layoutType])
-    const before = collectGlyphDataForChar('가')
-    const profiled = collectGlyphDataForChar('가', {
-      layoutProfile: {
-        [layoutType]: {
-          CH: { top: 0, bottom: 0, left: 0.08, right: -0.08 },
-        },
-      },
+    const storedOverrides = structuredClone(useLayoutStore.getState().layoutSchemas[layoutType].userPartOverrides)
+    const revisionA = { CH: { top: 0, bottom: 0, left: 0.02, right: -0.02 } }
+    const revisionB = { CH: { top: 0, bottom: 0, left: 0.08, right: -0.08 } }
+    const hasOnePublicArgument: Parameters<typeof collectGlyphDataForChar>['length'] extends 1 ? true : false = true
+    const hasLayoutProfileOption: 'layoutProfile' extends keyof FontGeneratorOptions ? true : false = false
+
+    try {
+      useLayoutStore.getState().setUserPartOverrides(layoutType, revisionA)
+      const glyphA = collectGlyphDataForChar('가')
+      useLayoutStore.getState().setUserPartOverrides(layoutType, revisionB)
+      const glyphB = collectGlyphDataForChar('가')
+      const choseongA = glyphA?.strokes.find((item) => item.stroke.id.startsWith('ㄱ'))
+      const choseongB = glyphB?.strokes.find((item) => item.stroke.id.startsWith('ㄱ'))
+
+      expect(hasOnePublicArgument).toBe(true)
+      expect(hasLayoutProfileOption).toBe(false)
+      expect(useLayoutStore.getState().layoutSchemas[layoutType].userPartOverrides).toEqual(revisionB)
+      expect(choseongB?.box.x).toBeGreaterThan(choseongA!.box.x)
+    } finally {
+      useLayoutStore.getState().setUserPartOverrides(layoutType, storedOverrides)
+      vi.runAllTimers()
+      vi.useRealTimers()
+    }
+  })
+
+  it('실제 곽의 공통 resolver 중심선을 x 원점만 이동해 OTF facade로 투영한다', async () => {
+    const [
+      { collectGlyphDataForChar },
+      { resolveGlyphInkPrimitives },
+      { useLayoutStore },
+      { useJamoStore },
+      { useGlobalStyleStore, weightToMultiplier },
+      { decomposeSyllableWithOverrides },
+    ] = await Promise.all([
+      import('../src/services/fontExportUtils'),
+      import('../src/services/glyphInkResolver'),
+      import('../src/stores/layoutStore'),
+      import('../src/stores/jamoStore'),
+      import('../src/stores/globalStyleStore'),
+      import('../src/utils/hangulUtils'),
+    ])
+    const layoutState = useLayoutStore.getState()
+    const jamoState = useJamoStore.getState()
+    const styleState = useGlobalStyleStore.getState()
+    const syllable = decomposeSyllableWithOverrides(
+      '곽',
+      jamoState.choseong,
+      jamoState.jungseong,
+      jamoState.jongseong,
+    )
+    const layoutType = syllable.layoutType
+    const effectivePadding = layoutState.getEffectivePadding(layoutType)
+    const effectiveStyle = styleState.getEffectiveStyle(layoutType)
+    const schemaWithPadding = {
+      ...layoutState.layoutSchemas[layoutType],
+      padding: effectivePadding,
+      designBodyPadding: effectivePadding,
+    }
+    const resolverInput = {
+      syllable,
+      placement: { kind: 'schema' as const, schema: schemaWithPadding },
+      weightMultiplier: weightToMultiplier(effectiveStyle.weight),
+      globalLinecap: effectiveStyle.linecap,
+      globalLinejoin: effectiveStyle.linejoin,
+      horizontalInkBounds: { min: 0, max: 1 },
+    }
+    const inputBefore = JSON.stringify(resolverInput)
+    const storeBefore = JSON.stringify({
+      schema: layoutState.layoutSchemas[layoutType],
+      globalPadding: layoutState.globalPadding,
+      paddingOverrides: layoutState.paddingOverrides,
+      choseong: jamoState.choseong['ㄱ'],
+      jungseong: jamoState.jungseong['ㅘ'],
+      jongseong: jamoState.jongseong['ㄱ'],
+      style: styleState.style,
+      exclusions: styleState.exclusions,
     })
-    const beforeChoseong = before?.strokes.find((item) => item.stroke.id.startsWith('ㄱ'))
-    const profiledChoseong = profiled?.strokes.find((item) => item.stroke.id.startsWith('ㄱ'))
-    expect(profiledChoseong?.box.x).toBeGreaterThan(beforeChoseong!.box.x)
-    expect(useLayoutStore.getState().layoutSchemas[layoutType]).toEqual(storedSchema)
+    const resolved = resolveGlyphInkPrimitives(resolverInput)
+    const resolvedBefore = JSON.stringify(resolved)
+    const glyph = collectGlyphDataForChar('곽')
+    const centerlines = resolved.primitives.filter((primitive) => primitive.kind === 'centerline')
+    const hasOnePublicArgument: Parameters<typeof collectGlyphDataForChar>['length'] extends 1 ? true : false = true
+
+    if (!glyph) throw new Error('곽 OTF facade를 만들 수 없습니다.')
+    expect(centerlines.map(({ source }) => [source.part, source.channel, source.strokeId])).toEqual([
+      ['CH', 'strokes', 'ㄱ-1'],
+      ['JU_H', 'horizontalStrokes', 'ㅘ-1'],
+      ['JU_H', 'horizontalStrokes', 'ㅘ-2'],
+      ['JO', 'strokes', 'ㄱ종-1'],
+      ['JU_V', 'verticalStrokes', 'ㅘ-3'],
+      ['JU_V', 'verticalStrokes', 'ㅘ-4'],
+    ])
+    expect(glyph.strokes.map(({ stroke }) => stroke.id)).toEqual(
+      centerlines.map(({ source }) => source.strokeId),
+    )
+    expect(glyph.weightMultiplier).toBe(resolverInput.weightMultiplier)
+    expect(hasOnePublicArgument).toBe(true)
+
+    centerlines.forEach((primitive, index) => {
+      const output = glyph.strokes[index]
+      expect(output.stroke).toBe(primitive.stroke)
+      expect(output.effectiveLinecap).toBe(primitive.effectiveLinecap)
+      expect(output.effectiveLinejoin).toBe(primitive.effectiveLinejoin)
+      expect(primitive.weightMultiplier).toBe(glyph.weightMultiplier)
+      expect(output.box).not.toBe(primitive.box)
+      expect(output.box.x).toBeCloseTo(primitive.box.x - effectivePadding.left)
+      expect(output.box.y).toBe(primitive.box.y)
+      expect(output.box.width).toBe(primitive.box.width)
+      expect(output.box.height).toBe(primitive.box.height)
+    })
+
+    expect(JSON.stringify(resolverInput)).toBe(inputBefore)
+    expect(JSON.stringify(resolved)).toBe(resolvedBefore)
+    expect(JSON.stringify({
+      schema: useLayoutStore.getState().layoutSchemas[layoutType],
+      globalPadding: useLayoutStore.getState().globalPadding,
+      paddingOverrides: useLayoutStore.getState().paddingOverrides,
+      choseong: useJamoStore.getState().choseong['ㄱ'],
+      jungseong: useJamoStore.getState().jungseong['ㅘ'],
+      jongseong: useJamoStore.getState().jongseong['ㄱ'],
+      style: useGlobalStyleStore.getState().style,
+      exclusions: useGlobalStyleStore.getState().exclusions,
+    })).toBe(storeBefore)
   })
 
   it('전역 붓촉을 글리프 출력 데이터와 저장 데이터에 함께 전달한다', async () => {
@@ -225,6 +337,7 @@ describe('OTF 출력 계약', () => {
     expect(normalizeStrokeRenderStyle({ mode: 'dot-pattern', dotSize: 9, gap: -1, rows: 8, stagger: true, omitEvery: 1 })).toEqual({
       mode: 'dot-pattern', dotSize: 1.5, gap: 0, rows: 3, stagger: true, omitEvery: 2,
     })
-    expect(normalizeStrokeRenderStyle({ mode: 'grid-system-2' })).toEqual({ mode: 'grid-system-2' })
+    expect(normalizeStrokeRenderStyle({ mode: 'grid-system-2' })).toEqual({ mode: 'legacy-snapped-centerline' })
+    expect(normalizeStrokeRenderStyle({ mode: 'legacy-snapped-centerline' })).toEqual({ mode: 'legacy-snapped-centerline' })
   })
 })

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
-import { Check, Copy, Dices, Download, ListTree, LoaderCircle, Redo2, Settings2, TextCursorInput, Undo2, X } from 'lucide-react'
+import { Check, Copy, Dices, Download, LayoutDashboard, ListTree, LoaderCircle, Redo2, Settings2, TextCursorInput, Undo2, X } from 'lucide-react'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
@@ -94,7 +94,13 @@ type PreviewJamo = { type: JamoData['type']; char: string; data: JamoData; basel
 type PreviewSchema = { layoutType: LayoutType; schema: LayoutSchema }
 type SelectedPoint = { strokeId: string; pointIndex: number }
 type HistoryEntry =
-  | { kind: 'layout'; layoutType: LayoutType; before: LayoutSchema; after: LayoutSchema; edit: SampleGlyphEdit }
+  | {
+      kind: 'layout'
+      layoutType: LayoutType
+      beforeOverrides: LayoutSchema['userPartOverrides']
+      afterOverrides: LayoutSchema['userPartOverrides']
+      edit: SampleGlyphEdit
+    }
   | { kind: 'jamo'; jamoType: JamoData['type']; char: string; before: JamoData; after: JamoData; edit: SampleGlyphEdit }
   | { kind: 'brush'; before: StrokeRenderStyle; after: StrokeRenderStyle }
 
@@ -193,13 +199,6 @@ function componentFor(glyph: string, part: MobileEditorPart, jamo: JamoData): Gl
   return { id: `${glyph}:${role}:${jamo.char}`, role, jamoId: jamo.char }
 }
 
-function withLayoutProfile(
-  schema: LayoutSchema,
-  overrides: LayoutSchema['userPartOverrides'] | undefined,
-): LayoutSchema {
-  return { ...schema, userPartOverrides: overrides ?? schema.userPartOverrides }
-}
-
 function absolutePoint(point: { x: number; y: number }, box: BoxConfig): { x: number; y: number } {
   return {
     x: (box.x + point.x * box.width) * VIEW_BOX_SIZE,
@@ -258,7 +257,6 @@ function Glyph({
   paddingOverrides,
   previewJamo,
   previewSchema,
-  layoutProfile,
   layoutHighlight,
   globalStyle,
 }: {
@@ -270,14 +268,13 @@ function Glyph({
   paddingOverrides: Partial<Record<LayoutType, Partial<Padding>>>
   previewJamo: PreviewJamo | null
   previewSchema: PreviewSchema | null
-  layoutProfile: Partial<Record<LayoutType, LayoutSchema['userPartOverrides']>>
   layoutHighlight: { layoutType: LayoutType; parts: Part[]; source: boolean } | null
   globalStyle: GlobalStyle
 }) {
   const decomposed = withPreviewJamo(decomposeSyllable(char, maps.choseong, maps.jungseong, maps.jongseong), previewJamo)
   const schema = previewSchema?.layoutType === decomposed.layoutType
     ? previewSchema.schema
-    : withLayoutProfile(schemas[decomposed.layoutType], layoutProfile[decomposed.layoutType])
+    : schemas[decomposed.layoutType]
   const effectivePadding = { ...globalPadding, ...paddingOverrides[decomposed.layoutType] }
   const effectiveSchema = { ...schema, padding: effectivePadding, designBodyPadding: effectivePadding }
   const viewportBox = {
@@ -352,7 +349,7 @@ function FocusedGlyph({
 
   return (
     <div className={styles.focusCanvas} style={canvasStyle} onPointerDown={() => onSelect({ kind: 'none' })}>
-      {globalStyle.strokeStyle.mode === 'grid-system-2' && <span className={styles.constructionGrid} aria-hidden="true" data-construction-grid="grid-system-2" />}
+      {globalStyle.strokeStyle.mode === 'legacy-snapped-centerline' && <span className={styles.constructionGrid} aria-hidden="true" data-construction-grid="legacy-snapped-centerline" />}
       <span className={styles.designBody} aria-hidden="true" />
       <SvgRenderer syllable={syllable} schema={schema} size={340} className={styles.focusSvg} partStyles={partStyles} globalStyle={globalStyle}>
         {selection.kind === 'component' && <LayoutAreaBoxes boxes={boxes} parts={selection.renderParts} emphasis="focused" />}
@@ -781,7 +778,6 @@ function InferenceTrackpad({
   const trackpad = useUnifiedTrackpad({
     enabled: selection.kind !== 'none',
     scaleEnabled: selection.kind === 'component' || selection.kind === 'stroke',
-    commitOnCancel: true,
     onMoveStart: beginMove,
     onMoveChange: changeMove,
     onMoveCommit: commitMove,
@@ -903,7 +899,6 @@ export function CalibrationSentenceEditor() {
   const fontSpace = useCalibrationProjectStore((state) => state.fontSpace)
   const grid = useCalibrationProjectStore((state) => state.grid)
   const metrics = useCalibrationProjectStore((state) => state.metrics)
-  const layoutProfile = useCalibrationProjectStore((state) => state.layoutProfile)
   const [sampleSentence, setSampleSentence] = useState<string>(SAMPLE_SENTENCES[0])
   const [selectedChar, setSelectedChar] = useState('과')
   const [selection, setSelection] = useState<Selection>({ kind: 'none' })
@@ -932,7 +927,7 @@ export function CalibrationSentenceEditor() {
   }, [globalStyle, previewBrush])
   const baseSyllable = useMemo(() => decomposeSyllable(selectedChar, choseong, jungseong, jongseong), [selectedChar, choseong, jungseong, jongseong])
   const previewedSyllable = useMemo(() => withPreviewJamo(baseSyllable, previewJamo), [baseSyllable, previewJamo])
-  const baseSchema = withLayoutProfile(schemas[previewedSyllable.layoutType], layoutProfile[previewedSyllable.layoutType])
+  const baseSchema = schemas[previewedSyllable.layoutType]
   const displayedSchema = previewSchema?.layoutType === previewedSyllable.layoutType ? previewSchema.schema : baseSchema
   const effectiveSchema = useMemo(() => {
     const padding = { ...globalPadding, ...paddingOverrides[previewedSyllable.layoutType] }
@@ -956,7 +951,7 @@ export function CalibrationSentenceEditor() {
     const contexts = calibrationLines.flatMap((line, lineIndex) => [...line].flatMap((char, charIndex) => {
       if (!isEditableHangul(char)) return []
       const decomposed = decomposeSyllable(char, choseong, jungseong, jongseong)
-      const base = withLayoutProfile(schemas[decomposed.layoutType], layoutProfile[decomposed.layoutType])
+      const base = schemas[decomposed.layoutType]
       const padding = { ...globalPadding, ...paddingOverrides[decomposed.layoutType] }
       const schema = { ...base, padding, designBodyPadding: padding }
       const boxes = calculateBoxes(schema, {
@@ -975,7 +970,7 @@ export function CalibrationSentenceEditor() {
       contexts.unshift({ id: 'focused', char: selectedChar, syllable, schema: effectiveSchema })
     }
     return contexts
-  }, [calibrationLines, choseong, effectiveSchema, globalPadding, jungseong, jongseong, layoutProfile, paddingOverrides, schemas, selectedChar, syllable])
+  }, [calibrationLines, choseong, effectiveSchema, globalPadding, jungseong, jongseong, paddingOverrides, schemas, selectedChar, syllable])
 
   const chooseChar = (char: string) => {
     setSelectedChar(char)
@@ -1070,11 +1065,19 @@ export function CalibrationSentenceEditor() {
     setSelection((current) => current.kind === 'none' ? current : { ...current, jamo: safeAfter })
   }
   const commitSchema = (before: LayoutSchema, after: LayoutSchema, raw: RawGlyphEdit) => {
-    if (JSON.stringify(before.userPartOverrides ?? {}) === JSON.stringify(after.userPartOverrides ?? {})) return
+    const layoutType = before.id
+    const storedBefore = useLayoutStore.getState().layoutSchemas[layoutType].userPartOverrides
+    const beforeOverrides = storedBefore && Object.keys(storedBefore).length > 0
+      ? structuredClone(storedBefore)
+      : undefined
+    const afterOverrides = after.userPartOverrides && Object.keys(after.userPartOverrides).length > 0
+      ? structuredClone(after.userPartOverrides)
+      : undefined
+    if (JSON.stringify(beforeOverrides ?? {}) === JSON.stringify(afterOverrides ?? {})) return
     const edit = createSampleGlyphEdit(raw)
-    setHistory((entries) => [...entries, { kind: 'layout', layoutType: before.id, before, after, edit }])
+    useLayoutStore.getState().setUserPartOverrides(layoutType, afterOverrides)
+    setHistory((entries) => [...entries, { kind: 'layout', layoutType, beforeOverrides, afterOverrides, edit }])
     setFuture([])
-    useCalibrationProjectStore.getState().setLayoutProfile(after.id, after.userPartOverrides)
     useCalibrationProjectStore.getState().addSampleGlyphEdit(edit)
     setPreviewSchema(null)
   }
@@ -1095,7 +1098,7 @@ export function CalibrationSentenceEditor() {
   const undo = () => {
     const entry = history.at(-1)
     if (!entry) return
-    if (entry.kind === 'layout') useCalibrationProjectStore.getState().setLayoutProfile(entry.layoutType, entry.before.userPartOverrides)
+    if (entry.kind === 'layout') useLayoutStore.getState().setUserPartOverrides(entry.layoutType, entry.beforeOverrides)
     else if (entry.kind === 'brush') useGlobalStyleStore.getState().setStrokeRenderStyle(entry.before)
     else updateJamo(entry.before)
     setHistory((entries) => entries.slice(0, -1))
@@ -1109,7 +1112,7 @@ export function CalibrationSentenceEditor() {
   const redo = () => {
     const entry = future.at(-1)
     if (!entry) return
-    if (entry.kind === 'layout') useCalibrationProjectStore.getState().setLayoutProfile(entry.layoutType, entry.after.userPartOverrides)
+    if (entry.kind === 'layout') useLayoutStore.getState().setUserPartOverrides(entry.layoutType, entry.afterOverrides)
     else if (entry.kind === 'brush') useGlobalStyleStore.getState().setStrokeRenderStyle(entry.after)
     else updateJamo(entry.after)
     setFuture((entries) => entries.slice(0, -1))
@@ -1130,7 +1133,6 @@ export function CalibrationSentenceEditor() {
       grid: currentProject.grid,
       designBody: paddingToDesignBody(currentLayouts.globalPadding, currentProject.fontSpace),
       metrics: currentProject.metrics,
-      layoutProfile: currentProject.layoutProfile,
       sampleGlyphEdits: currentProject.sampleGlyphEdits,
       maps: {
         choseong: currentJamos.choseong,
@@ -1155,7 +1157,6 @@ export function CalibrationSentenceEditor() {
     setExportProgress('준비 중...')
     const result = await generateAndDownloadFont({
       familyName: 'FontMaker',
-      layoutProfile: useCalibrationProjectStore.getState().layoutProfile,
       onProgress: (_completed, _total, phase) => setExportProgress(phase),
     })
     setExportProgress('')
@@ -1183,7 +1184,7 @@ export function CalibrationSentenceEditor() {
     let isSafetyAdjusted = false
     if (isEditableHangul(char)) {
       const previewed = withPreviewJamo(decomposeSyllable(char, choseong, jungseong, jongseong), previewJamo)
-      const contextBase = withLayoutProfile(schemas[previewed.layoutType], layoutProfile[previewed.layoutType])
+      const contextBase = schemas[previewed.layoutType]
       const padding = { ...globalPadding, ...paddingOverrides[previewed.layoutType] }
       const contextSchema = { ...contextBase, padding, designBodyPadding: padding }
       const contextBoxes = calculateBoxes(contextSchema, {
@@ -1195,7 +1196,7 @@ export function CalibrationSentenceEditor() {
     }
     return isEditableHangul(char)
       ? <button key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width }} type="button" aria-current={char === selectedChar ? 'true' : undefined} data-ink-gap-limiter={inkGapLimiter?.id === contextId ? 'true' : undefined} data-ink-safety-adjusted={isSafetyAdjusted ? 'true' : undefined} aria-label={`${char} 편집${isSafetyAdjusted ? ', 충돌 안전 보정됨' : ''}`} onClick={() => chooseChar(char)}>
-          <Glyph char={char} size={sentenceEm} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={previewJamo} previewSchema={previewSchema} layoutProfile={layoutProfile} layoutHighlight={layoutHighlight} globalStyle={previewGlobalStyle} />
+          <Glyph char={char} size={sentenceEm} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={previewJamo} previewSchema={previewSchema} layoutHighlight={layoutHighlight} globalStyle={previewGlobalStyle} />
         </button>
       : <span key={`${lineIndex}-${char}-${charIndex}`} className={/\s/u.test(char) ? styles.spaceGlyph : styles.punctuationGlyph} style={{ inlineSize: width }} aria-label={/\s/u.test(char) ? '공백' : char}>{char}</span>
   }
@@ -1204,6 +1205,7 @@ export function CalibrationSentenceEditor() {
       <header className={styles.header}>
         <div><span>FONT CALIBRATION</span><strong>문장에서 글자를 직접 다듬으세요</strong></div>
         <nav aria-label="폰트 추출 및 편집 기록">
+          <a href="/workspace/jamo" className={styles.workspaceLink} aria-label="자소 원형 새 화면 검토" title="자소 원형 새 화면 검토"><LayoutDashboard size={18} /></a>
           <button type="button" className={styles.exportButton} data-export-state={exportState} onClick={exportCurrentFont} disabled={exportState === 'exporting'} aria-label={exportState === 'exporting' ? `OTF 추출 중: ${exportProgress}` : exportState === 'downloaded' ? 'OTF 추출 완료' : exportState === 'failed' ? 'OTF 추출 실패' : '현재 작업을 OTF로 추출'} title={exportState === 'exporting' ? exportProgress : '현재 작업을 OTF로 추출'}>
             {exportState === 'exporting' ? <LoaderCircle className={styles.exportSpinner} size={18} /> : exportState === 'downloaded' ? <Check size={18} /> : exportState === 'failed' ? <X size={18} /> : <Download size={18} />}
           </button>
@@ -1257,7 +1259,7 @@ export function CalibrationSentenceEditor() {
           draft={previewBrush}
           onDraftChange={setPreviewBrush}
           onCommit={commitBrush}
-          renderPreview={(strokeStyle) => <Glyph char="한" size={42} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={null} previewSchema={null} layoutProfile={layoutProfile} layoutHighlight={null} globalStyle={{ ...globalStyle, strokeStyle, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : globalStyle.brush }} />}
+          renderPreview={(strokeStyle) => <Glyph char="한" size={42} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={null} previewSchema={null} layoutHighlight={null} globalStyle={{ ...globalStyle, strokeStyle, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : globalStyle.brush }} />}
           embedded
         />}
       /> : <InferenceTrackpad

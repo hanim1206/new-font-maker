@@ -1,9 +1,12 @@
 import { expect, test } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('brush-style-initialized') === 'true') return
+    localStorage.clear()
+    sessionStorage.setItem('brush-style-initialized', 'true')
+  })
   await page.goto('/')
-  await page.evaluate(() => localStorage.clear())
-  await page.reload()
 })
 
 test('원형·납작형·네모형 붓촉을 전역 미리보기와 이력에 적용한다', async ({ page }) => {
@@ -69,6 +72,37 @@ test('작은 모바일 화면에서도 획 스타일 조절판이 페이지를 �
   }))
   expect(overflow.horizontal).toBeLessThanOrEqual(0)
   expect(overflow.vertical).toBeLessThanOrEqual(0)
+})
+
+test('획 스타일 제스처 취소는 미리보기·저장·이력을 시작 상태로 되돌린다', async ({ page }) => {
+  await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
+  await page.getByRole('tab', { name: /획 스타일/ }).click()
+  const drawer = page.getByRole('tabpanel', { name: '획 스타일' })
+  await drawer.getByRole('radio', { name: '납작형', exact: true }).click()
+  await page.waitForTimeout(450)
+
+  const angle = drawer.getByRole('slider', { name: '붓촉 각도' })
+  const beforeValue = await angle.getAttribute('aria-valuenow')
+  const beforeStorage = await page.evaluate(() => localStorage.getItem('font-maker-global-style'))
+  const undo = page.getByRole('button', { name: '마지막 편집 되돌리기' })
+  const beforeHistoryLabel = await undo.textContent()
+  const box = await angle.boundingBox()
+  if (!box) throw new Error('붓촉 각도 조절판 위치를 찾지 못했습니다.')
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width * .75, box.y + box.height / 2, { steps: 4 })
+  await expect(angle).not.toHaveAttribute('aria-valuenow', beforeValue ?? '0')
+  await angle.dispatchEvent('pointercancel', { pointerId: 1, pointerType: 'mouse' })
+  await page.mouse.up()
+
+  await expect(angle).toHaveAttribute('aria-valuenow', beforeValue ?? '0')
+  await page.waitForTimeout(450)
+  expect(await page.evaluate(() => localStorage.getItem('font-maker-global-style'))).toBe(beforeStorage)
+  await expect(undo).toHaveText(beforeHistoryLabel ?? '')
+
+  await undo.click()
+  await expect(drawer.getByRole('radio', { name: '원형', exact: true })).toHaveAttribute('aria-checked', 'true')
 })
 
 test('네모형 붓촉을 적용한 OTF를 끝까지 생성한다', async ({ page }) => {

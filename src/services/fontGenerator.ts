@@ -24,10 +24,12 @@ import {
 } from './fontExportUtils'
 import { useGlobalStyleStore } from '../stores/globalStyleStore'
 import type { GlyphData } from './fontExportUtils'
-import type { FontLayoutProfile } from './fontExportUtils'
 import { mergeStrokeContourGroupsForCff } from './contourBoolean'
 import { brushInkGroupsToFontContours, strokeToBrushInkGroups } from './brushGeometry'
 import { strokeToRenderInkGroups } from './strokeRenderGeometry'
+import type { DeepReadonly } from '../types'
+import type { FinalGlyphInk } from './finalGlyphInk'
+import { projectFinalGlyphInkToFontContours } from './finalGlyphInk'
 
 // ===== 타입 정의 =====
 
@@ -35,8 +37,6 @@ import { strokeToRenderInkGroups } from './strokeRenderGeometry'
 export interface FontGeneratorOptions {
   familyName?: string
   styleName?: string
-  /** 신규 보정 화면에서 확정한 레이아웃 프로필을 현재 출력에 직접 반영 */
-  layoutProfile?: FontLayoutProfile
   onProgress?: (completed: number, total: number, phase: string) => void
 }
 
@@ -51,6 +51,52 @@ export interface FontGeneratorResult {
 export interface FontIdentity {
   asciiFamilyName: string
   postScriptName: string
+}
+
+export interface FinalRegionGlyphData {
+  unicode: number
+  char: string
+  advanceWidth: number
+  finalInk: DeepReadonly<FinalGlyphInk>
+  originX: number
+  slant: number
+}
+
+function ringSignedArea(ring: readonly Readonly<{ x: number; y: number }>[]): number {
+  return ring.reduce((sum, point, index) => {
+    const next = ring[(index + 1) % ring.length]
+    return sum + point.x * next.y - next.x * point.y
+  }, 0) / 2
+}
+
+function hasFiniteRingPoints(ring: readonly Readonly<{ x: number; y: number }>[]): boolean {
+  return ring.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+}
+
+function assertFinalRegionGlyphData(glyphData: FinalRegionGlyphData): void {
+  if ([...glyphData.char].length !== 1 || glyphData.char.codePointAt(0) !== glyphData.unicode
+    || !Number.isInteger(glyphData.unicode) || glyphData.unicode < 0 || glyphData.unicode > 0x10FFFF) {
+    throw new Error('Shape final glyph의 char와 unicode가 일치해야 합니다.')
+  }
+  if (!Number.isFinite(glyphData.advanceWidth) || glyphData.advanceWidth <= 0
+    || !Number.isFinite(glyphData.originX) || !Number.isFinite(glyphData.slant)) {
+    throw new Error('Shape final glyph의 advanceWidth, originX, slant가 유효해야 합니다.')
+  }
+  if (!Array.isArray(glyphData.finalInk.regions) || glyphData.finalInk.regions.length === 0) {
+    throw new Error('Shape final glyph의 regions가 비어 있습니다.')
+  }
+  for (const region of glyphData.finalInk.regions) {
+    if (!Array.isArray(region.outer) || !Array.isArray(region.holes) || region.outer.length < 3 || ringSignedArea(region.outer) >= 0
+      || !hasFiniteRingPoints(region.outer)) {
+      throw new Error('Shape final glyph outer ring이 유효한 시계 방향 윤곽이어야 합니다.')
+    }
+    for (const hole of region.holes) {
+      if (!Array.isArray(hole) || hole.length < 3 || ringSignedArea(hole) <= 0
+        || !hasFiniteRingPoints(hole)) {
+        throw new Error('Shape final glyph hole ring이 유효한 반시계 방향 윤곽이어야 합니다.')
+      }
+    }
+  }
 }
 
 function stableNameHash(value: string): string {
@@ -224,6 +270,54 @@ function createGlyph(
   })
 }
 
+/** Shape final regions에는 출력 좌표 투영만 적용한다. Boolean과 획 확장은 재실행하지 않는다. */
+function createFinalRegionGlyph(
+  glyphData: FinalRegionGlyphData,
+): InstanceType<typeof opentype.Glyph> {
+  const contours = projectFinalGlyphInkToFontContours(glyphData.finalInk, {
+    upm: UPM,
+    ascender: ASCENDER,
+    slant: glyphData.slant,
+    originX: glyphData.originX,
+  })
+  const unicodeHex = glyphData.unicode.toString(16).toUpperCase().padStart(4, '0')
+  return new opentype.Glyph({
+    name: `uni${unicodeHex}`,
+    unicode: glyphData.unicode,
+    advanceWidth: glyphData.advanceWidth,
+    path: contoursToPath(contours),
+  })
+}
+
+/**
+ * 자동 문맥 선택이 연결되기 전, 검증된 Shape request 하나를 실제 OTF로 확인하는 명시적 seam.
+ * 전체 11,223자를 미리 면으로 만들지 않고 전달된 한 글리프만 소비한다.
+ */
+export function buildFinalRegionPrototypeFontBuffer(
+  glyphData: FinalRegionGlyphData,
+  familyName = 'FontMaker Shape Prototype',
+): ArrayBuffer {
+  assertFinalRegionGlyphData(glyphData)
+  const identity = createFontIdentity(familyName, 'Regular')
+  const glyphs = [
+    createNotdefGlyph(),
+    createSpaceGlyph(DEFAULT_ADVANCE_WIDTH / 2),
+    createFinalRegionGlyph(glyphData),
+  ]
+  const font = new opentype.Font({
+    familyName: identity.asciiFamilyName,
+    styleName: 'Regular',
+    unitsPerEm: UPM,
+    ascender: ASCENDER,
+    descender: DESCENDER,
+    glyphs,
+  })
+  font.names.uniqueID = { en: `1.000;NONE;${identity.postScriptName}` }
+  font.names.version = { en: 'Version 1.000' }
+  font.names.postScriptName = { en: identity.postScriptName }
+  return font.toArrayBuffer() as ArrayBuffer
+}
+
 /**
  * .notdef 글리프 생성 (빈 사각형)
  */
@@ -344,7 +438,6 @@ export async function generateAndDownloadFont(
   const {
     familyName = 'FontMaker',
     styleName = 'Regular',
-    layoutProfile,
     onProgress,
   } = options
 
@@ -354,7 +447,7 @@ export async function generateAndDownloadFont(
 
     const glyphDataList = collectAllGlyphData((completed, total) => {
       onProgress?.(completed, total, '글리프 데이터 수집 중...')
-    }, { layoutProfile })
+    })
 
     if (glyphDataList.length === 0) {
       return { success: false, glyphCount: 0, error: '생성할 글리프가 없습니다.' }

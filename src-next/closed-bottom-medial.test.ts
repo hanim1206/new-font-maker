@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import basePresets from '../src/data/basePresets.json'
+import { LEGACY_CALIBRATION_LAYOUT_PROFILE_V1 } from '../src/data/legacyCalibrationLayoutProfileV1'
 import type { LayoutSchema } from '../src/types'
 import { calculateBoxes } from '../src/utils/layoutCalculator'
-import { USER_PRESET_01_LAYOUT_PROFILE } from './userPreset01'
 
 const schemas = basePresets.schemas as unknown as Record<string, LayoutSchema>
 
@@ -10,7 +10,7 @@ function horizontalJongSchema(): LayoutSchema {
   return {
     ...structuredClone(schemas['choseong-jungseong-horizontal-jongseong']),
     userPartOverrides: structuredClone(
-      USER_PRESET_01_LAYOUT_PROFILE['choseong-jungseong-horizontal-jongseong'],
+      LEGACY_CALIBRATION_LAYOUT_PROFILE_V1['choseong-jungseong-horizontal-jongseong'],
     ),
   }
 }

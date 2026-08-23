@@ -35,6 +35,13 @@ function evenOddFilled(target: { x: number; y: number }, contours: Contour[]): b
   return contours.filter((ring) => pointInContour(target, ring)).length % 2 === 1
 }
 
+function contourSignedArea(ring: Contour): number {
+  return ring.reduce((area, point, index) => {
+    const next = ring[(index + 1) % ring.length]
+    return area + point.x * next.y - next.x * point.y
+  }, 0) / 2
+}
+
 function findEvenOverlapPoint(groups: Contour[][]): { x: number; y: number } | null {
   const points = groups.flat(2)
   const bounds = points.reduce((result, point) => ({
@@ -91,6 +98,12 @@ describe('CFF 컨투어 정규화와 겹침 제거', () => {
     expect(merged).toHaveLength(1)
   })
 
+  it('레거시 CFF facade는 중복점으로 퇴화한 선행 링 뒤의 첫 유효 링을 유지한다', () => {
+    const degenerate = contour([[0, 0], [0.0000001, 0], [0, 0.0000001]])
+    const valid = contour([[0, 0], [0, 100], [100, 100], [100, 0]])
+    expect(mergeStrokeContourGroupsForCff([[degenerate, valid]])).toEqual([valid])
+  })
+
   it('실제 ㅂ의 세로·가로 획 교차부를 채운다', async () => {
     const memory = new Map<string, string>()
     vi.stubGlobal('localStorage', {
@@ -118,6 +131,93 @@ describe('CFF 컨투어 정규화와 겹침 제거', () => {
     expect(evenOddFilled(overlap, rawContours)).toBe(false)
     expect(evenOddFilled(overlap, mergeStrokeContourGroupsForCff(groups))).toBe(true)
     vi.unstubAllGlobals()
+  })
+
+  it('실제 ㅇ의 중심 hole과 ring 잉크를 union 뒤에도 유지한다', async () => {
+    const memory = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => memory.get(key) ?? null,
+      setItem: (key: string, value: string) => memory.set(key, value),
+      removeItem: (key: string) => memory.delete(key),
+    })
+
+    try {
+      const { collectGlyphDataForChar } = await import('../src/services/fontExportUtils')
+      const glyph = collectGlyphDataForChar('ㅇ')
+      if (!glyph) throw new Error('ㅇ 출력 데이터를 만들 수 없습니다.')
+      const circle = glyph.strokes.find((resolved) => resolved.stroke.closed)
+      if (!circle) throw new Error('ㅇ 닫힌 원형 획을 찾을 수 없습니다.')
+
+      const groups = glyph.strokes.map((resolved) => strokeToContours(resolved.stroke, resolved.box, UPM, {
+        weightMultiplier: glyph.weightMultiplier,
+        slant: glyph.slant,
+        globalLinecap: resolved.effectiveLinecap,
+        globalLinejoin: resolved.effectiveLinejoin,
+        ascender: ASCENDER,
+      }))
+      const merged = mergeStrokeContourGroupsForCff(groups)
+      const bounds = merged.flat().reduce((result, point) => ({
+        minX: Math.min(result.minX, point.x),
+        minY: Math.min(result.minY, point.y),
+        maxX: Math.max(result.maxX, point.x),
+        maxY: Math.max(result.maxY, point.y),
+      }), { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity })
+      const holeCenter = {
+        x: (bounds.minX + bounds.maxX) / 2,
+        y: (bounds.minY + bounds.maxY) / 2,
+      }
+
+      const anchor = circle.stroke.points[0]
+      const ringY = ASCENDER - (circle.box.y + anchor.y * circle.box.height) * UPM
+      const verticalCenter = ASCENDER - UPM / 2
+      const ringPoint = {
+        x: (circle.box.x + anchor.x * circle.box.width) * UPM
+          + (ringY - verticalCenter) * Math.tan(glyph.slant * Math.PI / 180),
+        y: ringY,
+      }
+
+      expect(evenOddFilled(holeCenter, merged)).toBe(false)
+      expect(evenOddFilled(ringPoint, merged)).toBe(true)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('실제 ㅁ과 ㅎ의 내부 공간을 union 뒤에도 유지한다', async () => {
+    const memory = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => memory.get(key) ?? null,
+      setItem: (key: string, value: string) => memory.set(key, value),
+      removeItem: (key: string) => memory.delete(key),
+    })
+
+    try {
+      const { collectGlyphDataForChar } = await import('../src/services/fontExportUtils')
+      for (const char of ['ㅁ', 'ㅎ']) {
+        const glyph = collectGlyphDataForChar(char)
+        if (!glyph) throw new Error(`${char} 출력 데이터를 만들 수 없습니다.`)
+        const groups = glyph.strokes.map((resolved) => strokeToContours(resolved.stroke, resolved.box, UPM, {
+          weightMultiplier: glyph.weightMultiplier,
+          slant: glyph.slant,
+          globalLinecap: resolved.effectiveLinecap,
+          globalLinejoin: resolved.effectiveLinejoin,
+          ascender: ASCENDER,
+        }))
+        const merged = mergeStrokeContourGroupsForCff(groups)
+        const holes = merged.filter((ring) => contourSignedArea(ring) > 0)
+        expect(holes.length, `${char} hole`).toBeGreaterThan(0)
+        for (const hole of holes) {
+          const center = hole.reduce((point, current) => ({
+            x: point.x + current.x / hole.length,
+            y: point.y + current.y / hole.length,
+          }), { x: 0, y: 0 })
+          expect(evenOddFilled(center, merged), `${char} hole center`).toBe(false)
+        }
+        expect(merged.some((ring) => contourSignedArea(ring) < 0), `${char} outer`).toBe(true)
+      }
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('실제 ㅙ의 복합중성 교차부를 채운다', async () => {

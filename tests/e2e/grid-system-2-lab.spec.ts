@@ -1,6 +1,16 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
+const GRID2_KEY = 'font-maker-grid-system-2-lab-v1'
+
+async function resetGridWriteCount(page: Page) {
+  await page.evaluate(() => { (window as unknown as { __grid2WriteCount: number }).__grid2WriteCount = 0 })
+}
+
+async function gridWriteCount(page: Page) {
+  return page.evaluate(() => (window as unknown as { __grid2WriteCount: number }).__grid2WriteCount)
+}
+
 async function restoreCellTouchingCurve(page: Page, cornerLabel: string | null) {
   const match = cornerLabel?.match(/(\d+)-(\d+)$/)
   if (!match) throw new Error('곡률 모서리 좌표를 읽지 못했습니다.')
@@ -20,9 +30,91 @@ async function restoreCellTouchingCurve(page: Page, cornerLabel: string | null) 
 }
 
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(({ storageKey }) => {
+    if (sessionStorage.getItem('grid-system-2-lab-initialized') !== 'true') {
+      localStorage.clear()
+      sessionStorage.setItem('grid-system-2-lab-initialized', 'true')
+    }
+    const originalSetItem = Storage.prototype.setItem
+    ;(window as unknown as { __grid2WriteCount: number }).__grid2WriteCount = 0
+    Storage.prototype.setItem = function setItem(key: string, value: string) {
+      if (key === storageKey) (window as unknown as { __grid2WriteCount: number }).__grid2WriteCount += 1
+      originalSetItem.call(this, key, value)
+    }
+  }, { storageKey: GRID2_KEY })
   await page.goto('/grid-lab')
-  await page.evaluate(() => localStorage.clear())
+})
+
+test('채우기·레일·곡률 제스처는 놓을 때 한 번 저장하고 취소하면 완전히 롤백한다', async ({ page }) => {
+  const shape = page.locator('[data-grid2-shape="ㄱ"]').first()
+  const initialPath = await shape.getAttribute('d')
+  const initialRaw = await page.evaluate((key) => localStorage.getItem(key), GRID2_KEY)
+  const fillStart = page.getByRole('button', { name: '2행 1열 채우기', exact: true })
+  const fillEnd = page.getByRole('button', { name: '2행 3열 채우기', exact: true })
+  const fillStartCell = page.locator('[data-grid2-cell="1-0"]')
+  const fillStartBox = await fillStart.boundingBox()
+  const fillEndBox = await fillEnd.boundingBox()
+  if (!fillStartBox || !fillEndBox) throw new Error('채우기 드래그 칸을 찾지 못했습니다.')
+
+  await resetGridWriteCount(page)
+  await page.mouse.move(fillStartBox.x + fillStartBox.width / 2, fillStartBox.y + fillStartBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(fillEndBox.x + fillEndBox.width / 2, fillEndBox.y + fillEndBox.height / 2, { steps: 6 })
+  await fillStartCell.dispatchEvent('pointercancel', { pointerId: 1, pointerType: 'mouse' })
+  await page.mouse.up()
+  await expect(shape).toHaveAttribute('d', initialPath ?? '')
+  await expect(page.locator('main')).toHaveAttribute('data-grid2-history-count', '0')
+  expect(await gridWriteCount(page)).toBe(0)
+  expect(await page.evaluate((key) => localStorage.getItem(key), GRID2_KEY)).toBe(initialRaw)
+
+  await page.mouse.move(fillStartBox.x + fillStartBox.width / 2, fillStartBox.y + fillStartBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(fillEndBox.x + fillEndBox.width / 2, fillEndBox.y + fillEndBox.height / 2, { steps: 6 })
+  await page.mouse.up()
+  expect(await gridWriteCount(page)).toBe(1)
+  await expect(page.locator('main')).toHaveAttribute('data-grid2-history-count', '1')
+  await page.getByRole('button', { name: '실행 취소' }).click()
+  await expect(shape).toHaveAttribute('d', initialPath ?? '')
+
+  await page.getByRole('radio', { name: '레일', exact: true }).click()
+  const rail = page.getByRole('slider', { name: '세로 레일 1', exact: true })
+  const railBefore = await rail.getAttribute('aria-valuenow')
+  const railBox = await rail.boundingBox()
+  if (!railBox) throw new Error('레일 위치를 찾지 못했습니다.')
+  const rawBeforeRail = await page.evaluate((key) => localStorage.getItem(key), GRID2_KEY)
+  await resetGridWriteCount(page)
+  await page.mouse.move(railBox.x + railBox.width / 2, railBox.y + railBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(railBox.x + railBox.width / 2 + 30, railBox.y + railBox.height / 2, { steps: 5 })
+  await rail.dispatchEvent('pointercancel', { pointerId: 1, pointerType: 'mouse' })
+  await page.mouse.up()
+  await expect(rail).toHaveAttribute('aria-valuenow', railBefore ?? '')
+  expect(await gridWriteCount(page)).toBe(0)
+  expect(await page.evaluate((key) => localStorage.getItem(key), GRID2_KEY)).toBe(rawBeforeRail)
+
+  await page.getByRole('radio', { name: '곡률', exact: true }).click()
+  await page.getByRole('button', { name: /곡률 모서리/ }).first().click()
+  const curvePlane = page.locator('[data-grid2-curve-plane="active"]')
+  const curvePlaneBox = await curvePlane.boundingBox()
+  if (!curvePlaneBox) throw new Error('곡률 조절 영역을 찾지 못했습니다.')
+  await page.mouse.move(curvePlaneBox.x + 8, curvePlaneBox.y + 8)
+  await page.mouse.down()
+  await page.mouse.move(curvePlaneBox.x + curvePlaneBox.width - 8, curvePlaneBox.y + curvePlaneBox.height - 8, { steps: 4 })
+  await curvePlane.dispatchEvent('pointercancel', { pointerId: 1, pointerType: 'mouse' })
+  await page.mouse.up()
+  await expect(page.locator('[data-grid2-curve-preview="active"]')).toHaveCount(0)
+  expect(await gridWriteCount(page)).toBe(0)
+})
+
+test('손상되거나 미래 버전인 Grid v1 저장값은 화면 진입만으로 덮어쓰지 않는다', async ({ page }) => {
+  const malformed = '{"version":99,"future":true}'
+  await page.evaluate(({ key, raw }) => localStorage.setItem(key, raw), { key: GRID2_KEY, raw: malformed })
+  await resetGridWriteCount(page)
   await page.reload()
+  await expect(page.getByRole('alert')).toContainText('저장 데이터 확인 필요')
+  await page.waitForTimeout(450)
+  expect(await gridWriteCount(page)).toBe(0)
+  expect(await page.evaluate((key) => localStorage.getItem(key), GRID2_KEY)).toBe(malformed)
 })
 
 test('칸 점유·부분 곡률·외곽 사선화를 실행 취소와 함께 편집한다', async ({ page }) => {

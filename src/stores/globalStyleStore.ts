@@ -93,25 +93,30 @@ export function normalizeBrushStyle(value: Partial<BrushStyle> | undefined): Bru
 }
 
 export function normalizeStrokeRenderStyle(
-  value: Partial<StrokeRenderStyle> | undefined,
+  value: unknown,
   legacyBrush?: Partial<BrushStyle>,
 ): StrokeRenderStyle {
-  if (value?.mode === 'angled-area') {
-    const rawCutAngle = Math.max(-60, Math.min(60, Number.isFinite(value.cutAngle) ? value.cutAngle! : 35))
+  const input = value && typeof value === 'object' ? value as Record<string, unknown> : undefined
+  if (input?.mode === 'angled-area') {
+    const rawCutAngle = Math.max(-60, Math.min(60, Number.isFinite(input.cutAngle) ? input.cutAngle as number : 35))
     const cutAngle = Math.abs(rawCutAngle) < 15 ? (rawCutAngle < 0 ? -15 : 15) : rawCutAngle
-    const cornerRadius = Math.max(0, Math.min(1, Number.isFinite(value.cornerRadius) ? value.cornerRadius! : 0.2))
+    const cornerRadius = Math.max(0, Math.min(1, Number.isFinite(input.cornerRadius) ? input.cornerRadius as number : 0.2))
     return { mode: 'angled-area', cutAngle, cornerRadius }
   }
-  if (value?.mode === 'dot-pattern') {
-    const dotSize = Math.max(0.5, Math.min(1.5, Number.isFinite(value.dotSize) ? value.dotSize! : 1))
-    const gap = Math.max(0, Math.min(2, Number.isFinite(value.gap) ? value.gap! : 0.5))
-    const rows = Math.max(1, Math.min(3, Math.round(Number.isFinite(value.rows) ? value.rows! : 1)))
-    const rawOmitEvery = Math.round(Number.isFinite(value.omitEvery) ? value.omitEvery! : 0)
+  if (input?.mode === 'dot-pattern') {
+    const dotSize = Math.max(0.5, Math.min(1.5, Number.isFinite(input.dotSize) ? input.dotSize as number : 1))
+    const gap = Math.max(0, Math.min(2, Number.isFinite(input.gap) ? input.gap as number : 0.5))
+    const rows = Math.max(1, Math.min(3, Math.round(Number.isFinite(input.rows) ? input.rows as number : 1)))
+    const rawOmitEvery = Math.round(Number.isFinite(input.omitEvery) ? input.omitEvery as number : 0)
     const omitEvery = rawOmitEvery === 0 ? 0 : Math.max(2, Math.min(8, rawOmitEvery))
-    return { mode: 'dot-pattern', dotSize, gap, rows, stagger: value.stagger === true, omitEvery }
+    return { mode: 'dot-pattern', dotSize, gap, rows, stagger: input.stagger === true, omitEvery }
   }
-  if (value?.mode === 'grid-system-2') return { mode: 'grid-system-2' }
-  const candidate = value?.mode === 'brush' ? value.brush : legacyBrush
+  if (input?.mode === 'legacy-snapped-centerline' || input?.mode === 'grid-system-2') {
+    return { mode: 'legacy-snapped-centerline' }
+  }
+  const candidate = input?.mode === 'brush' && input.brush && typeof input.brush === 'object'
+    ? input.brush as Partial<BrushStyle>
+    : legacyBrush
   return { mode: 'brush', brush: normalizeBrushStyle(candidate) }
 }
 

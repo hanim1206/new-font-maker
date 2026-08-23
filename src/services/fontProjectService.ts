@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import type { FontProject, CreateFontProjectInput, UpdateFontProjectInput } from '../types/database'
+import { parseAndMigrateFontData } from './fontDataMigration'
 
 const TABLE = 'font_projects'
 
@@ -56,11 +57,13 @@ export const fontProjectService = {
    */
   async create(input: CreateFontProjectInput): Promise<FontProject> {
     const userId = await getCurrentUserId()
+    const parsed = parseAndMigrateFontData(input.font_data)
+    if (!parsed.ok) throw new Error('저장할 폰트 데이터가 1.4 계약을 통과하지 못했습니다.')
     const { data, error } = await supabase
       .from(TABLE)
       .insert({
         name: input.name,
-        font_data: input.font_data,
+        font_data: parsed.data,
         user_id: input.user_id ?? userId,
       })
       .select()
@@ -74,9 +77,15 @@ export const fontProjectService = {
    * 폰트 프로젝트 수정 (이름 또는 데이터)
    */
   async update(id: string, input: UpdateFontProjectInput): Promise<FontProject> {
+    const updateInput = { ...input }
+    if (input.font_data !== undefined) {
+      const parsed = parseAndMigrateFontData(input.font_data)
+      if (!parsed.ok) throw new Error('저장할 폰트 데이터가 1.4 계약을 통과하지 못했습니다.')
+      updateInput.font_data = parsed.data
+    }
     const { data, error } = await supabase
       .from(TABLE)
-      .update(input)
+      .update(updateInput)
       .eq('id', id)
       .select()
       .single()

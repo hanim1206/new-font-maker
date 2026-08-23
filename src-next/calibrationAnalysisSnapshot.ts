@@ -3,7 +3,6 @@ import { decomposeSyllable } from '../src/utils/hangulUtils'
 import type {
   DesignBody,
   FontGrid,
-  FontLayoutProfile,
   FontMetrics,
   FontSpace,
   SampleGlyphEdit,
@@ -16,7 +15,6 @@ interface SnapshotInput {
   grid: FontGrid
   designBody: DesignBody
   metrics: FontMetrics
-  layoutProfile: FontLayoutProfile
   sampleGlyphEdits: SampleGlyphEdit[]
   maps: {
     choseong: Record<string, JamoData>
@@ -99,12 +97,15 @@ export function createCalibrationAnalysisSnapshot(input: SnapshotInput) {
   }
 
   const effectiveLayouts = {} as Partial<Record<LayoutType, LayoutSchema>>
+  const layoutProfile = {} as Partial<Record<LayoutType, LayoutSchema['userPartOverrides']>>
   for (const layoutType of [...used.layouts].sort()) {
     const schema = input.schemas[layoutType]
+    const userPartOverrides = structuredClone(schema.userPartOverrides ?? {})
+    layoutProfile[layoutType] = structuredClone(userPartOverrides)
     effectiveLayouts[layoutType] = {
       ...structuredClone(schema),
       padding: { ...input.globalPadding, ...input.paddingOverrides[layoutType] },
-      userPartOverrides: structuredClone(input.layoutProfile[layoutType] ?? schema.userPartOverrides ?? {}),
+      userPartOverrides,
     }
   }
 
@@ -118,7 +119,8 @@ export function createCalibrationAnalysisSnapshot(input: SnapshotInput) {
       grid: structuredClone(input.grid),
       designBody: structuredClone(input.designBody),
       metrics: structuredClone(input.metrics),
-      layoutProfile: structuredClone(input.layoutProfile),
+      // version 4 출력 호환 필드이며 별도 원본이 아니다.
+      layoutProfile,
     },
     effectiveLayouts,
     jamoMasters: {

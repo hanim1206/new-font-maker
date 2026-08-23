@@ -10,6 +10,10 @@ const STORAGE_KEY = 'font-maker-layout-schemas'
 const rawStorage = createDebouncedStorage(300)
 const debouncedStorage = createJSONStorage(() => rawStorage)
 
+export function flushLayoutStorePersistence(): void {
+  rawStorage.flush(STORAGE_KEY)
+}
+
 // 글로벌 패딩 기본값
 export const DEFAULT_GLOBAL_PADDING: Padding = {
   top: 0.075,
@@ -80,6 +84,12 @@ interface LayoutActions {
 
   // ===== 파트 오버라이드 API =====
 
+  // 사용자 보정 전체 교체 (빈 값은 필드 삭제로 정규화)
+  setUserPartOverrides: (
+    layoutType: LayoutType,
+    overrides: LayoutSchema['userPartOverrides'] | undefined
+  ) => void
+
   // 파트별 박스 오프셋 업데이트
   updatePartOverride: (
     layoutType: LayoutType,
@@ -133,20 +143,10 @@ interface LayoutActions {
   // hydration 완료 표시
   setHydrated: () => void
 
-  // ===== 레거시 API (호환성 유지) =====
+  // ===== 파생 레이아웃 조회 API =====
 
   // 레이아웃 설정 조회
   getLayoutConfig: (layoutType: LayoutType) => LayoutConfig
-
-  // 레이아웃 설정 업데이트
-  updateLayoutConfig: (layoutType: LayoutType, boxes: LayoutConfig['boxes']) => void
-
-  // 특정 박스만 업데이트
-  updateBox: (layoutType: LayoutType, part: keyof LayoutConfig['boxes'], box: BoxConfig) => void
-
-  // 기본값으로 리셋
-  resetLayoutConfig: (layoutType: LayoutType) => void
-  resetAllLayoutConfigs: () => void
 }
 
 // 실효 패딩 계산 (글로벌 + 오버라이드 머지)
@@ -308,6 +308,18 @@ export const useLayoutStore = create<LayoutState & LayoutActions>()(
 
       // ===== 파트 오버라이드 API =====
 
+      setUserPartOverrides: (layoutType, overrides) =>
+        set((state) => {
+          const schema = state.layoutSchemas[layoutType]
+          const cloned = overrides ? deepClone(overrides) : undefined
+          if (!cloned || Object.keys(cloned).length === 0) {
+            delete schema.userPartOverrides
+          } else {
+            schema.userPartOverrides = cloned
+          }
+          syncConfigFromSchema(state, layoutType)
+        }),
+
       updatePartOverride: (layoutType, part, side, value) =>
         set((state) => {
           const schema = state.layoutSchemas[layoutType]
@@ -410,33 +422,11 @@ export const useLayoutStore = create<LayoutState & LayoutActions>()(
 
       setHydrated: () => set({ _hydrated: true }),
 
-      // ===== 레거시 API (호환성) =====
+      // ===== 파생 레이아웃 조회 API =====
 
       getLayoutConfig: (layoutType) => {
         return get().layoutConfigs[layoutType]
       },
-
-      updateLayoutConfig: (layoutType, boxes) =>
-        set((state) => {
-          state.layoutConfigs[layoutType].boxes = boxes
-        }),
-
-      updateBox: (layoutType, part, box) =>
-        set((state) => {
-          if (part && box) {
-            state.layoutConfigs[layoutType].boxes[part] = box
-          }
-        }),
-
-      resetLayoutConfig: (layoutType) =>
-        set((state) => {
-          state.layoutConfigs[layoutType] = { ...DEFAULT_LAYOUT_CONFIGS[layoutType] }
-        }),
-
-      resetAllLayoutConfigs: () =>
-        set((state) => {
-          state.layoutConfigs = { ...DEFAULT_LAYOUT_CONFIGS }
-        }),
     })),
     {
       name: STORAGE_KEY,

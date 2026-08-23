@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { USER_PRESET_01_JAMOS, USER_PRESET_01_LAYOUT_PROFILE } from './userPreset01'
+import { LEGACY_CALIBRATION_LAYOUT_PROFILE_V1 } from '../src/data/legacyCalibrationLayoutProfileV1'
+import { USER_PRESET_01_JAMOS } from './userPreset01'
 
 describe('사용자 프리셋 01', () => {
   it('레이아웃 보정값을 5 unit 그리드에 맞춘다', () => {
-    for (const layout of Object.values(USER_PRESET_01_LAYOUT_PROFILE)) {
+    for (const layout of Object.values(LEGACY_CALIBRATION_LAYOUT_PROFILE_V1)) {
       for (const part of Object.values(layout ?? {})) {
         for (const value of Object.values(part)) {
           expect(Math.round(value * 200)).toBeCloseTo(value * 200)

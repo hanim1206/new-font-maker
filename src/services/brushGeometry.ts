@@ -126,14 +126,19 @@ function rotate(source: BrushPoint, radians: number): BrushPoint {
   return point(source.x * cosine - source.y * sine, source.x * sine + source.y * cosine)
 }
 
-export function createBrushTipPolygon(brush: BrushStyle, diameter: number): BrushContour {
+export function createBrushTipPolygon(
+  brush: BrushStyle,
+  diameter: number,
+  ellipseVertexCount = ELLIPSE_VERTEX_COUNT,
+): BrushContour {
   const aspectRatio = Math.max(0.2, Math.min(1, brush.aspectRatio))
   const radians = Math.max(-90, Math.min(90, brush.angle)) * Math.PI / 180
   if (brush.tip === 'ellipse') {
     const longRadius = diameter / 2
     const shortRadius = longRadius * aspectRatio
-    return Array.from({ length: ELLIPSE_VERTEX_COUNT }, (_, index) => {
-      const theta = index / ELLIPSE_VERTEX_COUNT * Math.PI * 2
+    const vertices = Math.max(8, Math.round(ellipseVertexCount))
+    return Array.from({ length: vertices }, (_, index) => {
+      const theta = index / vertices * Math.PI * 2
       return rotate(point(Math.cos(theta) * longRadius, Math.sin(theta) * shortRadius), radians)
     })
   }
@@ -180,11 +185,12 @@ export function strokeToBrushInkGroups(
   box: BoxConfig,
   weightMultiplier: number,
   brush: BrushStyle,
+  ellipseVertexCount = ELLIPSE_VERTEX_COUNT,
 ): BrushInkGroup[] {
   if (brush.tip === 'round') return []
   const centerline = flattenStrokeCenterline(stroke, box)
   if (centerline.length < 2) return []
-  const tip = createBrushTipPolygon(brush, Math.max(stroke.thickness * weightMultiplier, 0.001))
+  const tip = createBrushTipPolygon(brush, Math.max(stroke.thickness * weightMultiplier, 0.001), ellipseVertexCount)
   const segmentCount = stroke.closed ? centerline.length : centerline.length - 1
   const groups: BrushInkGroup[] = []
   for (let index = 0; index < segmentCount; index += 1) {

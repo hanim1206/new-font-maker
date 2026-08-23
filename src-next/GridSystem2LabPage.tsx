@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { ArrowLeft, Circle, Grid3X3, PaintBucket, Plus, Redo2, RotateCcw, Slash, Trash2, Undo2 } from 'lucide-react'
 import {
   GRID2_JAMOS,
@@ -33,6 +33,9 @@ import styles from './GridSystem2LabPage.module.css'
 interface SelectedRail { axis: Grid2Axis; index: number }
 interface CurveDraft { vertex: Grid2GridPoint; incoming: Grid2GridPoint; outgoing: Grid2GridPoint }
 interface DiagonalDraft { vertex: Grid2GridPoint; from: Grid2GridPoint; to: Grid2GridPoint }
+type LoadedProject =
+  | { status: 'ready'; project: Grid2Project }
+  | { status: 'blocked'; project: Grid2Project; raw: string }
 
 const STORAGE_KEY = 'font-maker-grid-system-2-lab-v1'
 const TOOL_OPTIONS: Array<{ tool: Grid2Tool; label: string; icon: typeof Grid3X3 }> = [
@@ -41,17 +44,21 @@ const TOOL_OPTIONS: Array<{ tool: Grid2Tool; label: string; icon: typeof Grid3X3
   { tool: 'curve', label: '곡률', icon: Circle },
   { tool: 'diagonal', label: '사선', icon: Slash },
 ]
-function loadProject(): Grid2Project {
+function loadProject(): LoadedProject {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return createDefaultGrid2Project()
-    return parseGrid2Project(JSON.parse(raw)) ?? createDefaultGrid2Project()
+    if (!raw) return { status: 'ready', project: createDefaultGrid2Project() }
+    const project = parseGrid2Project(JSON.parse(raw))
+    return project
+      ? { status: 'ready', project }
+      : { status: 'blocked', project: createDefaultGrid2Project(), raw }
   } catch {
-    return createDefaultGrid2Project()
+    const raw = window.localStorage.getItem(STORAGE_KEY) ?? ''
+    return { status: 'blocked', project: createDefaultGrid2Project(), raw }
   }
 }
 
-function Grid2Glyph({ project, jamo, tool, interactive, selectedRail, curveDraft, diagonalDraft, onCellToggle, onCellPaintStart, onCellPaintMove, onCellPaintEnd, onCurveCornerClick, onCurveExtentPreview, onCurveExtentCommit, onCurveCancel, onDiagonalCornerClick, onDiagonalExtentPreview, onDiagonalExtentCommit, onDiagonalCancel, onRailStart, onRailMove, onRailEnd, onRailNudge }: {
+function Grid2Glyph({ project, jamo, tool, interactive, selectedRail, curveDraft, diagonalDraft, onCellToggle, onCellPaintStart, onCellPaintMove, onCellPaintEnd, onCellPaintCancel, onCurveCornerClick, onCurveExtentPreview, onCurveExtentCommit, onCurveCancel, onDiagonalCornerClick, onDiagonalExtentPreview, onDiagonalExtentCommit, onDiagonalCancel, onRailStart, onRailMove, onRailEnd, onRailCancel, onRailNudge }: {
   project: Grid2Project
   jamo: Grid2Jamo
   tool?: Grid2Tool
@@ -63,6 +70,7 @@ function Grid2Glyph({ project, jamo, tool, interactive, selectedRail, curveDraft
   onCellPaintStart?: (event: ReactPointerEvent<SVGRectElement>, row: number, column: number) => void
   onCellPaintMove?: (event: ReactPointerEvent<SVGRectElement>) => void
   onCellPaintEnd?: (event: ReactPointerEvent<SVGRectElement>) => void
+  onCellPaintCancel?: (event: ReactPointerEvent<SVGRectElement>) => void
   onCurveCornerClick?: (point: Grid2GridPoint) => void
   onCurveExtentPreview?: (incoming: Grid2GridPoint, outgoing: Grid2GridPoint) => void
   onCurveExtentCommit?: (incoming: Grid2GridPoint, outgoing: Grid2GridPoint) => void
@@ -74,6 +82,7 @@ function Grid2Glyph({ project, jamo, tool, interactive, selectedRail, curveDraft
   onRailStart?: (event: ReactPointerEvent<SVGLineElement>, axis: Grid2Axis, index: number) => void
   onRailMove?: (event: ReactPointerEvent<SVGLineElement>) => void
   onRailEnd?: (event: ReactPointerEvent<SVGLineElement>) => void
+  onRailCancel?: (event: ReactPointerEvent<SVGLineElement>) => void
   onRailNudge?: (axis: Grid2Axis, index: number, delta: number) => void
 }) {
   const rawId = useId()
@@ -125,19 +134,20 @@ function Grid2Glyph({ project, jamo, tool, interactive, selectedRail, curveDraft
       onPointerDown={(event) => onCellPaintStart?.(event, rowIndex, columnIndex)}
       onPointerMove={onCellPaintMove}
       onPointerUp={onCellPaintEnd}
-      onPointerCancel={onCellPaintEnd}
+      onPointerCancel={onCellPaintCancel}
+      onLostPointerCapture={onCellPaintCancel}
       onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onCellToggle?.(rowIndex, columnIndex) } }}
     />))}
     {interactive && tool === 'rails' && <>
       {project.xRails.slice(1, -1).map((value, offset) => <line key={`x-handle-${offset}`} className={styles.railHit} x1={value} y1={project.yRails[0]} x2={value} y2={project.yRails.at(-1)}
         role="slider" tabIndex={0} aria-label={`세로 레일 ${offset + 1}`} aria-valuemin={project.xRails[offset] + 50} aria-valuemax={project.xRails[offset + 2] - 50} aria-valuenow={value}
         data-axis="x" data-selected={selectedRail?.axis === 'x' && selectedRail.index === offset + 1}
-        onPointerDown={(event) => onRailStart?.(event, 'x', offset + 1)} onPointerMove={onRailMove} onPointerUp={onRailEnd} onPointerCancel={onRailEnd}
+        onPointerDown={(event) => onRailStart?.(event, 'x', offset + 1)} onPointerMove={onRailMove} onPointerUp={onRailEnd} onPointerCancel={onRailCancel} onLostPointerCapture={onRailCancel}
         onKeyDown={(event) => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); onRailNudge?.('x', offset + 1, event.key === 'ArrowRight' ? project.snapUnit : -project.snapUnit) } }} />)}
       {project.yRails.slice(1, -1).map((value, offset) => <line key={`y-handle-${offset}`} className={styles.railHit} x1={project.xRails[0]} y1={value} x2={project.xRails.at(-1)} y2={value}
         role="slider" tabIndex={0} aria-label={`가로 레일 ${offset + 1}`} aria-valuemin={project.yRails[offset] + 50} aria-valuemax={project.yRails[offset + 2] - 50} aria-valuenow={value}
         data-axis="y" data-selected={selectedRail?.axis === 'y' && selectedRail.index === offset + 1}
-        onPointerDown={(event) => onRailStart?.(event, 'y', offset + 1)} onPointerMove={onRailMove} onPointerUp={onRailEnd} onPointerCancel={onRailEnd}
+        onPointerDown={(event) => onRailStart?.(event, 'y', offset + 1)} onPointerMove={onRailMove} onPointerUp={onRailEnd} onPointerCancel={onRailCancel} onLostPointerCapture={onRailCancel}
         onKeyDown={(event) => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); onRailNudge?.('y', offset + 1, event.key === 'ArrowDown' ? project.snapUnit : -project.snapUnit) } }} />)}
     </>}
     {interactive && tool === 'curve' && !activeCurveCandidate && curveCandidates.map((candidate) => {
@@ -222,7 +232,8 @@ function Grid2Glyph({ project, jamo, tool, interactive, selectedRail, curveDraft
           onPointerMove={(event) => { const pair = nearestPair(event); onCurveExtentPreview?.(pair.incoming, pair.outgoing) }}
           onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); const pair = nearestPair(event); onCurveExtentPreview?.(pair.incoming, pair.outgoing) }}
           onPointerUp={(event) => { const pair = nearestPair(event); if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); onCurveExtentCommit?.(pair.incoming, pair.outgoing) }}
-          onPointerCancel={(event) => { const pair = nearestPair(event); onCurveExtentCommit?.(pair.incoming, pair.outgoing) }} />
+          onPointerCancel={() => onCurveCancel?.()}
+          onLostPointerCapture={() => onCurveCancel?.()} />
         <circle className={styles.curveExtentHandle} cx={currentPair.position.x} cy={currentPair.position.y} r="19" data-grid2-curve-handle="active" />
         <circle className={styles.curveExtentKeyboardTarget} cx={currentPair.position.x} cy={currentPair.position.y} r="30" role="button" tabIndex={0}
           aria-label="곡률 범위 핸들" onKeyDown={handleKeyboard} />
@@ -287,6 +298,11 @@ function Grid2Glyph({ project, jamo, tool, interactive, selectedRail, curveDraft
             diagonalCornerGesture.current = null
             onDiagonalCancel?.()
           }}
+          onLostPointerCapture={(event) => {
+            if (diagonalCornerGesture.current?.pointerId !== event.pointerId) return
+            diagonalCornerGesture.current = null
+            onDiagonalCancel?.()
+          }}
           onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onDiagonalCornerClick?.(candidate.vertex) } }} />
       </g>
     })}
@@ -327,7 +343,9 @@ function Grid2Glyph({ project, jamo, tool, interactive, selectedRail, curveDraft
           onPointerEnter={(event) => { const pair = nearestPair(event); onDiagonalExtentPreview?.(pair.from, pair.to) }}
           onPointerMove={(event) => { const pair = nearestPair(event); onDiagonalExtentPreview?.(pair.from, pair.to) }}
           onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); const pair = nearestPair(event); onDiagonalExtentPreview?.(pair.from, pair.to) }}
-          onPointerUp={(event) => { const pair = nearestPair(event); if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); onDiagonalExtentCommit?.(pair.from, pair.to) }} />
+          onPointerUp={(event) => { const pair = nearestPair(event); if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); onDiagonalExtentCommit?.(pair.from, pair.to) }}
+          onPointerCancel={() => onDiagonalCancel?.()}
+          onLostPointerCapture={() => onDiagonalCancel?.()} />
         <circle className={styles.diagonalExtentHandle} cx={currentPair.position.x} cy={currentPair.position.y} r="19" data-grid2-diagonal-handle="active" />
         <circle className={styles.diagonalExtentKeyboardTarget} cx={currentPair.position.x} cy={currentPair.position.y} r="30" role="button" tabIndex={0}
           aria-label="사선 범위 핸들" onKeyDown={(event) => {
@@ -340,7 +358,8 @@ function Grid2Glyph({ project, jamo, tool, interactive, selectedRail, curveDraft
 }
 
 export function GridSystem2LabPage() {
-  const [project, setProject] = useState<Grid2Project>(loadProject)
+  const [loadedProject] = useState<LoadedProject>(loadProject)
+  const [project, setProject] = useState<Grid2Project>(loadedProject.project)
   const [selectedJamo, setSelectedJamo] = useState<Grid2Jamo>('ㄱ')
   const [tool, setTool] = useState<Grid2Tool>('fill')
   const [selectedRail, setSelectedRail] = useState<SelectedRail>({ axis: 'x', index: 1 })
@@ -354,7 +373,9 @@ export function GridSystem2LabPage() {
   const diagonalGestureCommitted = useRef(false)
   projectRef.current = project
 
-  useEffect(() => { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(project)) }, [project])
+  const persist = (next: Grid2Project) => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+  }
 
   const commit = (next: Grid2Project) => {
     if (JSON.stringify(next) === JSON.stringify(projectRef.current)) return
@@ -363,6 +384,7 @@ export function GridSystem2LabPage() {
     setFuture([])
     projectRef.current = next
     setProject(next)
+    persist(next)
   }
   const undo = () => {
     const previous = past.at(-1)
@@ -373,6 +395,7 @@ export function GridSystem2LabPage() {
     const next = cloneGrid2Project(previous)
     projectRef.current = next
     setProject(next)
+    persist(next)
   }
   const redo = () => {
     const nextProject = future[0]
@@ -383,6 +406,7 @@ export function GridSystem2LabPage() {
     const next = cloneGrid2Project(nextProject)
     projectRef.current = next
     setProject(next)
+    persist(next)
   }
   const reset = () => commit(createDefaultGrid2Project())
 
@@ -421,11 +445,21 @@ export function GridSystem2LabPage() {
   const handleCellPaintEnd = (event: ReactPointerEvent<SVGRectElement>) => {
     const gesture = fillGesture.current
     if (!gesture) return
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     fillGesture.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     if (JSON.stringify(gesture.before) === JSON.stringify(projectRef.current)) return
     setPast((history) => [...history.slice(-39), gesture.before])
     setFuture([])
+    persist(projectRef.current)
+  }
+  const handleCellPaintCancel = (event: ReactPointerEvent<SVGRectElement>) => {
+    const gesture = fillGesture.current
+    if (!gesture) return
+    fillGesture.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    const before = cloneGrid2Project(gesture.before)
+    projectRef.current = before
+    setProject(before)
   }
 
   const handleRailStart = (event: ReactPointerEvent<SVGLineElement>, axis: Grid2Axis, index: number) => {
@@ -450,11 +484,21 @@ export function GridSystem2LabPage() {
   const handleRailEnd = (event: ReactPointerEvent<SVGLineElement>) => {
     const gesture = railGesture.current
     if (!gesture) return
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     railGesture.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     if (JSON.stringify(gesture.before) === JSON.stringify(projectRef.current)) return
     setPast((history) => [...history.slice(-39), gesture.before])
     setFuture([])
+    persist(projectRef.current)
+  }
+  const handleRailCancel = (event: ReactPointerEvent<SVGLineElement>) => {
+    const gesture = railGesture.current
+    if (!gesture) return
+    railGesture.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    const before = cloneGrid2Project(gesture.before)
+    projectRef.current = before
+    setProject(before)
   }
 
   const handleAddRail = (axis: Grid2Axis) => {
@@ -530,6 +574,17 @@ export function GridSystem2LabPage() {
     setDiagonalDraft(null)
   }
 
+  if (loadedProject.status === 'blocked') {
+    return <main className={styles.page}>
+      <section className={styles.blockedState} role="alert">
+        <span>Grid System 2 · 저장 데이터 확인 필요</span>
+        <h1>형태 그리드를 열지 않았어요</h1>
+        <p>저장된 실험 데이터의 형식이 다르거나 손상되어 원본을 그대로 보존했습니다. 자동 초기화나 덮어쓰기는 하지 않습니다.</p>
+        <a href="/">보정 화면으로 돌아가기</a>
+      </section>
+    </main>
+  }
+
   const glyph = project.glyphs[selectedJamo]
   const selectedRails = selectedRail.axis === 'x' ? project.xRails : project.yRails
   const selectedRailIndex = Math.max(1, Math.min(selectedRails.length - 2, selectedRail.index))
@@ -563,6 +618,7 @@ export function GridSystem2LabPage() {
             onCellPaintStart={handleCellPaintStart}
             onCellPaintMove={handleCellPaintMove}
             onCellPaintEnd={handleCellPaintEnd}
+            onCellPaintCancel={handleCellPaintCancel}
             onCurveCornerClick={handleCurveCornerClick}
             onCurveExtentPreview={handleCurveExtentPreview}
             onCurveExtentCommit={handleCurveExtentCommit}
@@ -571,7 +627,7 @@ export function GridSystem2LabPage() {
             onDiagonalExtentPreview={handleDiagonalExtentPreview}
             onDiagonalExtentCommit={handleDiagonalExtentCommit}
             onDiagonalCancel={() => setDiagonalDraft(null)}
-            onRailStart={handleRailStart} onRailMove={handleRailMove} onRailEnd={handleRailEnd}
+            onRailStart={handleRailStart} onRailMove={handleRailMove} onRailEnd={handleRailEnd} onRailCancel={handleRailCancel}
             onRailNudge={(axis, index, delta) => commit(moveGrid2Rail(projectRef.current, axis, index, (axis === 'x' ? projectRef.current.xRails : projectRef.current.yRails)[index] + delta))} />
           <span className={styles.canvasBadge}>원본 획 보존 · 별도 형태 데이터</span>
           {tool === 'rails' && <output className={styles.railValueBadge}>{selectedRail.axis === 'x' ? '세로' : '가로'} {selectedRailIndex} · {selectedRailValue}</output>}

@@ -1,7 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import type { LayoutType, Part, PartOverride } from '../src/types'
-import { USER_PRESET_01_LAYOUT_PROFILE } from './userPreset01'
+import { createJSONStorage, persist } from 'zustand/middleware'
+import type { LayoutType, Part } from '../src/types'
 
 export interface FontSpace {
   unitsPerEm: number
@@ -56,8 +55,6 @@ export interface SampleGlyphEdit {
   inferredRule: InferredEditRule
 }
 
-export type FontLayoutProfile = Partial<Record<LayoutType, Partial<Record<Part, PartOverride>>>>
-
 export const DEFAULT_FONT_SPACE: FontSpace = { unitsPerEm: 1000, width: 1000, height: 1000 }
 export const DEFAULT_FONT_GRID: FontGrid = { majorDivisions: 8, minorInterval: 25, snapInterval: 5 }
 export const DEFAULT_DESIGN_BODY: DesignBody = { x: 75, y: 75, width: 850, height: 850 }
@@ -73,11 +70,30 @@ interface CalibrationProjectState {
   grid: FontGrid
   designBody: DesignBody
   metrics: FontMetrics
-  layoutProfile: FontLayoutProfile
   sampleGlyphEdits: SampleGlyphEdit[]
-  setLayoutProfile: (layoutType: LayoutType, overrides: Partial<Record<Part, PartOverride>> | undefined) => void
   addSampleGlyphEdit: (edit: SampleGlyphEdit) => void
   removeSampleGlyphEdit: (id: string) => void
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function mergePersistedProject(
+  persistedState: unknown,
+  currentState: CalibrationProjectState,
+): CalibrationProjectState {
+  const persisted = isRecord(persistedState) ? persistedState : {}
+  return {
+    ...currentState,
+    ...(isRecord(persisted.fontSpace) && { fontSpace: persisted.fontSpace as unknown as FontSpace }),
+    ...(isRecord(persisted.grid) && { grid: persisted.grid as unknown as FontGrid }),
+    ...(isRecord(persisted.designBody) && { designBody: persisted.designBody as unknown as DesignBody }),
+    ...(isRecord(persisted.metrics) && { metrics: persisted.metrics as unknown as FontMetrics }),
+    ...(Array.isArray(persisted.sampleGlyphEdits) && {
+      sampleGlyphEdits: structuredClone(persisted.sampleGlyphEdits) as SampleGlyphEdit[],
+    }),
+  }
 }
 
 export const useCalibrationProjectStore = create<CalibrationProjectState>()(
@@ -87,11 +103,7 @@ export const useCalibrationProjectStore = create<CalibrationProjectState>()(
       grid: DEFAULT_FONT_GRID,
       designBody: DEFAULT_DESIGN_BODY,
       metrics: DEFAULT_FONT_METRICS,
-      layoutProfile: structuredClone(USER_PRESET_01_LAYOUT_PROFILE),
       sampleGlyphEdits: [],
-      setLayoutProfile: (layoutType, overrides) => set((state) => ({
-        layoutProfile: { ...state.layoutProfile, [layoutType]: overrides ? structuredClone(overrides) : undefined },
-      })),
       addSampleGlyphEdit: (edit) => set((state) => ({
         sampleGlyphEdits: [...state.sampleGlyphEdits.filter((item) => item.id !== edit.id), edit].slice(-100),
       })),
@@ -99,7 +111,18 @@ export const useCalibrationProjectStore = create<CalibrationProjectState>()(
         sampleGlyphEdits: state.sampleGlyphEdits.filter((item) => item.id !== id),
       })),
     }),
-    { name: 'font-maker-calibration-project' },
+    {
+      name: 'font-maker-calibration-project',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        fontSpace: state.fontSpace,
+        grid: state.grid,
+        designBody: state.designBody,
+        metrics: state.metrics,
+        sampleGlyphEdits: state.sampleGlyphEdits,
+      }),
+      merge: mergePersistedProject,
+    },
   ),
 )
 

@@ -88,19 +88,20 @@ export function strokeToRenderInkGroups(
   box: BoxConfig,
   weightMultiplier: number,
   style: StrokeRenderStyle,
+  options?: { ellipseVertexCount?: number },
 ): BrushInkGroup[] {
   if (style.mode === 'angled-area') return strokeToAngledAreaInkGroups(stroke, box, weightMultiplier, style)
   if (style.mode === 'dot-pattern') return strokeToDotPatternInkGroups(stroke, box, weightMultiplier, style)
-  if (style.mode === 'grid-system-2') return strokeToGridSystem2InkGroups(stroke, box, weightMultiplier)
+  if (style.mode === 'legacy-snapped-centerline') return strokeToGridSystem2InkGroups(stroke, box, weightMultiplier)
   if (style.brush.tip === 'round') {
     const centerline = flattenStrokeCenterline(stroke, box)
     if (centerline.length < 2) return []
     const tip = { ...style.brush, tip: 'ellipse' as const, aspectRatio: 1 }
-    const groups = strokeToBrushInkGroups(stroke, box, weightMultiplier, tip)
+    const groups = strokeToBrushInkGroups(stroke, box, weightMultiplier, tip, options?.ellipseVertexCount)
     // 기존 원형은 SVG stroke/정밀 OTF 변환을 유지하므로 이 분기는 외부에서 사용하지 않는다.
     return groups
   }
-  return strokeToBrushInkGroups(stroke, box, weightMultiplier, style.brush)
+  return strokeToBrushInkGroups(stroke, box, weightMultiplier, style.brush, options?.ellipseVertexCount)
 }
 
 export function createDotPreviewContour(diameter: number): BrushContour {
