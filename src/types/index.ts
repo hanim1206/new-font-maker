@@ -1178,6 +1178,7 @@ export interface SourceCommandTransaction<T> {
     | 'remove-context-variant-patch'
     | 'set-seven-context-base-core-rail'
     | 'connect-layout-grid'
+    | 'set-layout-grid-rail'
   before: T
   after: T
 }
@@ -1197,6 +1198,13 @@ export interface SetSevenContextBaseCoreRailV2Command {
     STANDALONE: BaseMasterRailTargetV2
     CH: BaseMasterRailTargetV2
   }
+}
+
+/** 공통 layout grid의 안정 Rail ID 하나를 한 transaction으로 이동한다. */
+export interface SetLayoutGridRailV1Command {
+  transactionId: string
+  railId: string
+  position: { kind: 'absolute'; value: number }
 }
 
 export type BaseMasterRailCommandErrorCode =

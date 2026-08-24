@@ -14,6 +14,7 @@ import type {
   ShapeSystemSourceV2,
   ShapeSystemStoreResult,
   SetSevenContextBaseCoreRailV2Command,
+  SetLayoutGridRailV1Command,
   ValidatedRoleConstructionSourceV1,
   ValidatedShapeSystemSourceV2,
 } from '../types'
@@ -31,6 +32,7 @@ import { parseRoleConstructionSourceV1 } from '../services/roleConstructionSourc
 import { createStarterShapeSystemV2 } from '../services/defaultShapeSystemV2'
 import { setSevenContextBaseCoreRailV2 } from '../services/baseMasterRailCommandsV2'
 import { connectLayoutGridFromSchemasV1 } from '../services/layoutGridConnectionV1'
+import { setLayoutGridRailV1 } from '../services/layoutGridRailCommandsV1'
 
 export const SHAPE_SYSTEM_STORAGE_KEY = 'font-maker-shape-system-v1'
 export const SHAPE_SYSTEM_HISTORY_LIMIT = 50
@@ -50,6 +52,7 @@ interface ShapeSystemActions {
     transactionId: string
     schemas: DeepReadonly<Record<LayoutType, LayoutSchema>>
   }) => ShapeSystemStoreResult
+  setLayoutGridRail: (command: DeepReadonly<SetLayoutGridRailV1Command>) => ShapeSystemStoreResult
   setSevenContextBaseCoreRail: (
     command: DeepReadonly<SetSevenContextBaseCoreRailV2Command>,
   ) => ShapeSystemStoreResult
@@ -218,6 +221,26 @@ export const useShapeSystemStore = create<ShapeSystemState & ShapeSystemActions>
           }
           if (!current.source) return failure('not-initialized', 'Shape System이 아직 연결되지 않았습니다.')
           const result = connectLayoutGridFromSchemasV1({ source: current.source, ...input })
+          if (!result.ok) return failure('command-failed', result.error.message)
+          const entry: ShapeSystemHistoryEntry = { transaction: structuredClone(result.transaction) }
+          set((state) => {
+            state.source = result.source as unknown as typeof state.source
+            state.past.push(entry)
+            if (state.past.length > SHAPE_SYSTEM_HISTORY_LIMIT) {
+              state.past.splice(0, state.past.length - SHAPE_SYSTEM_HISTORY_LIMIT)
+            }
+            state.future = []
+          })
+          return success()
+        },
+
+        setLayoutGridRail: (command) => {
+          const current = get()
+          if (current.hydrationStatus === 'blocked') {
+            return failure('hydration-blocked', '손상되거나 지원하지 않는 저장 데이터를 먼저 복구해야 합니다.')
+          }
+          if (!current.source) return failure('not-initialized', 'Shape System이 아직 연결되지 않았습니다.')
+          const result = setLayoutGridRailV1(current.source, command)
           if (!result.ok) return failure('command-failed', result.error.message)
           const entry: ShapeSystemHistoryEntry = { transaction: structuredClone(result.transaction) }
           set((state) => {

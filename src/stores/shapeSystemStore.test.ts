@@ -149,6 +149,29 @@ describe('shapeSystemStore canonical persistence and session history', () => {
     expect(useStore.getState().source).toEqual(after)
   })
 
+  it('공통 layout Rail direct 편집은 한 history 경계와 exact Undo/Redo를 지킨다', async () => {
+    const storeModule = await importStore()
+    const useStore = storeModule.useShapeSystemStore
+    expect(storeModule.initializeStarterShapeSystem()).toEqual({ ok: true })
+    expect(useStore.getState().connectLayoutGrid({
+      transactionId: 'tx:store:connect-layout', schemas: BASE_PRESETS_SCHEMAS,
+    })).toEqual({ ok: true })
+    const before = structuredClone(useStore.getState().source)!
+    const rail = before.layoutGridSystem!.grid.xRails[1]
+    expect(rail.position.kind).toBe('absolute')
+    if (rail.position.kind !== 'absolute') return
+    expect(useStore.getState().setLayoutGridRail({
+      transactionId: 'tx:store:layout-rail', railId: rail.id,
+      position: { kind: 'absolute', value: rail.position.value + 0.005 },
+    })).toEqual({ ok: true })
+    const after = structuredClone(useStore.getState().source)!
+    expect(useStore.getState().past).toHaveLength(2)
+    expect(useStore.getState().undo()).toEqual({ ok: true })
+    expect(useStore.getState().source).toEqual(before)
+    expect(useStore.getState().redo()).toEqual({ ok: true })
+    expect(useStore.getState().source).toEqual(after)
+  })
+
   it('strict source만 로드하고 source 외 history·파생값을 persist하지 않는다', async () => {
     const storeModule = await importStore()
     const source = envelope()
@@ -557,8 +580,8 @@ describe('shapeSystemStore canonical persistence and session history', () => {
     const useStore = (await importStore()).useShapeSystemStore
     expect(Object.keys(useStore.getState()).sort()).toEqual([
       'canRedo', 'canUndo', 'connectLayoutGrid', 'future', 'hydrationIssues', 'hydrationStatus',
-      'past', 'redo', 'removeContextCoreRailOverride',
-      'setContextCoreRailOverride', 'setSevenContextBaseCoreRail', 'source', 'undo',
+      'past', 'redo', 'removeContextCoreRailOverride', 'setContextCoreRailOverride',
+      'setLayoutGridRail', 'setSevenContextBaseCoreRail', 'source', 'undo',
     ])
   })
 })

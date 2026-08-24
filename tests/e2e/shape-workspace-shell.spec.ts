@@ -117,6 +117,46 @@ test('J-02 자소 원형 Rail은 네 방향을 직접 편집하고 한 transacti
   await expectMobileShellContract(page)
 })
 
+test('L-01 공통 layout Rail은 7개 binding 결과를 draft로 미리 보고 한 번 저장·Undo한다', async ({ page }) => {
+  await page.goto('/workspace/skeleton')
+  await expect(page.getByRole('heading', { name: '공통 layout grid', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '추천 기본 구조로 시작' }).click()
+  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await page.getByRole('button', { name: '기존 7개 배치를 공통 기준선으로 연결' }).click()
+  await expect(page.getByRole('region', { name: '공통 layout Rail 편집 캔버스' })).toBeVisible()
+  await expect(page.getByRole('list', { name: '공통 배치가 쓰이는 7개 조합' }).getByRole('listitem')).toHaveCount(7)
+
+  const connectedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
+  const splitRailId = await page.evaluate((key) => {
+    const source = JSON.parse(localStorage.getItem(key)!).state.source
+    return source.layoutGridSystem.bindings['choseong-jungseong-vertical'].splitRailIds['choseong-jungseong-vertical:x:ch-ju']
+  }, SHAPE_KEY)
+  const rail = page.locator(`[data-rail-id="${splitRailId}"]`)
+  const railBox = await rail.boundingBox()
+  if (!railBox) throw new Error('공통 layout split Rail 위치를 찾을 수 없습니다.')
+  const preview = page.getByRole('list', { name: '공통 배치가 쓰이는 7개 조합' }).getByRole('button', { name: '가 세로모음 관찰' }).locator('svg')
+  const beforePreview = await preview.evaluate((element) => element.outerHTML)
+  const beforeValue = await rail.getAttribute('aria-valuenow')
+
+  await page.mouse.move(railBox.x + railBox.width / 2, railBox.y + railBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(railBox.x + railBox.width / 2 + 18, railBox.y + railBox.height / 2, { steps: 3 })
+  await expect(rail).not.toHaveAttribute('aria-valuenow', beforeValue ?? '')
+  expect(await preview.evaluate((element) => element.outerHTML)).not.toBe(beforePreview)
+  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(connectedRaw)
+  await page.mouse.up()
+  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await page.waitForTimeout(350)
+  const movedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
+  expect(movedRaw).not.toBe(connectedRaw)
+
+  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
+  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await page.waitForTimeout(350)
+  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(connectedRaw)
+  await expectMobileShellContract(page)
+})
+
 test('비교 카드 선택과 드로어 열기는 저장 데이터에 영향을 주지 않는다', async ({ page }) => {
   await page.goto('/workspace/jamo')
   await page.waitForTimeout(450)

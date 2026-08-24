@@ -21,3 +21,9 @@
 - 변경 파일: `src/services/layoutGridConnectionV1.ts`, `src/services/layoutGridConnectionV1.test.ts`, `src/services/layoutGridProjection.ts`, `src/stores/shapeSystemStore.ts`, `src/stores/shapeSystemStore.test.ts`, `src/types/index.ts`, `IMPLEMENTATION_STATUS.md`.
 - 검증: 공통 grid 연결·projection·store 표적 Vitest 47개, `npx tsc -b --pretty false`, 대상 ESLint, `git diff --check` 통과.
 - 남은 P1·다음 단계 주의점: 이 조각은 현재 7개 legacy schema를 사용자가 명시적으로 연결할 수 있는 strict 원본과 Undo transaction만 제공한다. 실제 layout Rail 선택·드래그 UI와 파생 schema를 화면 소비 경로에 연결하는 작업은 다음 세션에서 별도 조각으로 진행하며, grid가 없는 기존 프로젝트는 계속 legacy 결과를 사용해야 한다.
+
+## Step 4F-2 · 공통 layout Rail 직접 편집
+
+- 변경 파일: `src/services/layoutGridRailCommandsV1.ts`, `src/services/layoutGridRailCommandsV1.test.ts`, `src/stores/shapeSystemStore.ts`, `src/stores/shapeSystemStore.test.ts`, `src/types/index.ts`, `src-next/ShapeWorkspacePage.tsx`, `src-next/ShapeWorkspacePage.module.css`, `src-next/workspace/WorkspaceChrome.tsx`, `tests/e2e/shape-workspace-shell.spec.ts`, `IMPLEMENTATION_STATUS.md`.
+- 검증: 공통 Rail command·store 표적 Vitest 26개, `npx tsc -b --pretty false`, 대상 ESLint, `npx playwright test tests/e2e/shape-workspace-shell.spec.ts --workers=1`(9개 통과) 실행. draft 중 raw 저장 불변, pointerup 한 번 저장, Undo exact 복원과 390px overflow를 브라우저에서 확인했다.
+- 남은 P1·다음 단계 주의점: 공통 grid는 직접 이동 가능한 absolute Rail만 stable ID로 갱신한다. 이후 자소 캔버스의 선·면·보조 Rail 편집은 이 layout grid transaction과 섞지 말고, 자소 역할 grid의 소유권·topology 검증 경계를 유지해야 한다. Shape 최종 출력과 OTF는 아직 이 화면의 legacy 글자 배치 결과와 별도 검증 단계다.
