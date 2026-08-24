@@ -4,6 +4,7 @@ import type {
   CoreYRailRole,
   JamoPartRole,
   RoleConstructionScope,
+  SetSevenContextBaseAreaCellV1Command,
   SetSevenContextBaseCoreRailV2Command,
   ShapeSystemSourceV2,
   ValidatedShapeSystemSourceV2,
@@ -76,6 +77,29 @@ function sevenContextCommand(
     jamoId: 'ㄱ',
     coreRole: 'inner-left',
     position: { kind: 'absolute', value },
+    targets: { STANDALONE: target('STANDALONE'), CH: target('CH') },
+  }
+}
+
+function sevenContextAreaCommand(
+  source: ValidatedShapeSystemSourceV2,
+  mode: 'create' | 'move',
+  x: number,
+): SetSevenContextBaseAreaCellV1Command {
+  const target = (role: 'STANDALONE' | 'CH') => ({
+    masterId: source.roleSources[role].masters[0].id,
+    elementId: `j02:area:${role}:giyeok:primary`,
+    cell: {
+      leftRailId: source.roleSources[role].grid.xRails[x].id,
+      rightRailId: source.roleSources[role].grid.xRails[x + 1].id,
+      topRailId: source.roleSources[role].grid.yRails[0].id,
+      bottomRailId: source.roleSources[role].grid.yRails[1].id,
+    },
+  })
+  return {
+    transactionId: `tx:store:base-area:${mode}:${x}`,
+    mode,
+    jamoId: 'ㄱ',
     targets: { STANDALONE: target('STANDALONE'), CH: target('CH') },
   }
 }
@@ -264,6 +288,34 @@ describe('shapeSystemStore canonical persistence and session history', () => {
     expect(reloaded.useShapeSystemStore.getState().source).toEqual(committed)
     expect(reloaded.useShapeSystemStore.getState().past).toEqual([])
     expect(reloaded.useShapeSystemStore.getState().future).toEqual([])
+  })
+
+  it('7문맥 원자 셀 면 생성·이동은 각각 한 history 경계이고 Undo가 제스처 전 source를 exact 복원한다', async () => {
+    const storeModule = await importStore()
+    const useStore = storeModule.useShapeSystemStore
+    expect(storeModule.initializeStarterShapeSystem()).toEqual({ ok: true })
+    const beforeCreate = structuredClone(useStore.getState().source)!
+    expect(useStore.getState().setSevenContextBaseAreaCell(
+      sevenContextAreaCommand(beforeCreate, 'create', 0),
+    )).toEqual({ ok: true })
+    const beforeMove = structuredClone(useStore.getState().source)!
+    expect(useStore.getState().past).toHaveLength(1)
+
+    expect(useStore.getState().setSevenContextBaseAreaCell(
+      sevenContextAreaCommand(beforeMove, 'move', 1),
+    )).toEqual({ ok: true })
+    const afterMove = structuredClone(useStore.getState().source)!
+    expect(useStore.getState().past).toHaveLength(2)
+    expect(useStore.getState().past[1].transaction.before).toEqual(beforeMove)
+    expect(useStore.getState().past[1].transaction.after).toEqual(afterMove)
+
+    expect(useStore.getState().undo()).toEqual({ ok: true })
+    expect(useStore.getState().source).toEqual(beforeMove)
+    expect(useStore.getState().redo()).toEqual({ ok: true })
+    expect(useStore.getState().source).toEqual(afterMove)
+    expect(useStore.getState().undo()).toEqual({ ok: true })
+    expect(useStore.getState().undo()).toEqual({ ok: true })
+    expect(useStore.getState().source).toEqual(beforeCreate)
   })
 
   it('7문맥 base Rail no-op/stale/minGap 실패는 source/history/storage를 exact 보존한다', async () => {
@@ -581,7 +633,7 @@ describe('shapeSystemStore canonical persistence and session history', () => {
     expect(Object.keys(useStore.getState()).sort()).toEqual([
       'canRedo', 'canUndo', 'connectLayoutGrid', 'future', 'hydrationIssues', 'hydrationStatus',
       'past', 'redo', 'removeContextCoreRailOverride', 'setContextCoreRailOverride',
-      'setLayoutGridRail', 'setSevenContextBaseCoreRail', 'source', 'undo',
+      'setLayoutGridRail', 'setSevenContextBaseAreaCell', 'setSevenContextBaseCoreRail', 'source', 'undo',
     ])
   })
 })

@@ -45,3 +45,9 @@
 - 변경 파일: `src-next/workspace/WorkspaceChrome.tsx`, `src-next/ShapeWorkspacePage.tsx`, `tests/e2e/shape-workspace-shell.spec.ts`, `IMPLEMENTATION_STATUS.md`.
 - 검증: `npx tsc -b --pretty false`, 대상 ESLint, `npx playwright test tests/e2e/shape-workspace-shell.spec.ts --workers=1`(9개 통과), `git diff --check` 통과.
 - 남은 P1·다음 단계 주의점: L-01의 7개 연결 결과 카드는 클릭해도 바뀌는 가짜 선택 도구가 아니라 읽기 전용 결과다. J-02/J-03의 관찰 카드만 여전히 선택 가능한 상호작용을 유지한다.
+
+## Step 5A-1 · J-02 단일 원자 셀 면 생성·이동
+
+- 변경 파일: `src/types/index.ts`, `src/services/baseMasterAreaCommandsV1.ts`, `src/services/baseMasterAreaCommandsV1.test.ts`, `src/stores/shapeSystemStore.ts`, `src/stores/shapeSystemStore.test.ts`, `src-next/ShapeWorkspacePage.tsx`, `src-next/ShapeWorkspacePage.module.css`, `tests/e2e/shape-workspace-shell.spec.ts`, `IMPLEMENTATION_STATUS.md`.
+- 검증: `npx tsc -b --pretty false`, 대상 ESLint, 관련 Vitest 49개, `tests/e2e/shape-workspace-shell.spec.ts` 10개, `git diff --check` 통과. 생성·이동 draft 중 raw 저장 불변, pointerup 저장 1회, pointercancel·lostpointercapture 무변, 이동 Undo 1회 exact 복원을 확인했다.
+- 남은 P1·다음 단계 주의점: 이번 Step 5 첫 조각은 ㄱ 가로획과 겹치는 상단 중앙 core 원자 셀 두 곳에서 stable element ID를 가진 면 하나만 생성·선택·이동한다. 다중 셀 채우기, 면 삭제, 곡률·사선, 보조 Rail·참조 재연결, 중심선 생성은 아직 추가하지 않는다. 기존 J-02 네 core Rail, J-03 sparse override, L-01 layout grid의 transaction·cancel 경계는 계속 분리한다.

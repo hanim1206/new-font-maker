@@ -13,6 +13,7 @@ import type {
   ShapeSystemHistoryEntry,
   ShapeSystemSourceV2,
   ShapeSystemStoreResult,
+  SetSevenContextBaseAreaCellV1Command,
   SetSevenContextBaseCoreRailV2Command,
   SetLayoutGridRailV1Command,
   ValidatedRoleConstructionSourceV1,
@@ -31,6 +32,7 @@ import {
 import { parseRoleConstructionSourceV1 } from '../services/roleConstructionSourceV1'
 import { createStarterShapeSystemV2 } from '../services/defaultShapeSystemV2'
 import { setSevenContextBaseCoreRailV2 } from '../services/baseMasterRailCommandsV2'
+import { setSevenContextBaseAreaCellV1 } from '../services/baseMasterAreaCommandsV1'
 import { connectLayoutGridFromSchemasV1 } from '../services/layoutGridConnectionV1'
 import { setLayoutGridRailV1 } from '../services/layoutGridRailCommandsV1'
 
@@ -55,6 +57,9 @@ interface ShapeSystemActions {
   setLayoutGridRail: (command: DeepReadonly<SetLayoutGridRailV1Command>) => ShapeSystemStoreResult
   setSevenContextBaseCoreRail: (
     command: DeepReadonly<SetSevenContextBaseCoreRailV2Command>,
+  ) => ShapeSystemStoreResult
+  setSevenContextBaseAreaCell: (
+    command: DeepReadonly<SetSevenContextBaseAreaCellV1Command>,
   ) => ShapeSystemStoreResult
   setContextCoreRailOverride: (
     role: JamoPartRole,
@@ -271,6 +276,28 @@ export const useShapeSystemStore = create<ShapeSystemState & ShapeSystemActions>
           }
           if (!current.source) return failure('not-initialized', 'Shape System이 아직 연결되지 않았습니다.')
           const result = setSevenContextBaseCoreRailV2(current.source, command)
+          if (!result.ok) return failure('command-failed', result.error.message)
+          const entry: ShapeSystemHistoryEntry = {
+            transaction: structuredClone(result.transaction),
+          }
+          set((state) => {
+            state.source = result.source as unknown as typeof state.source
+            state.past.push(entry)
+            if (state.past.length > SHAPE_SYSTEM_HISTORY_LIMIT) {
+              state.past.splice(0, state.past.length - SHAPE_SYSTEM_HISTORY_LIMIT)
+            }
+            state.future = []
+          })
+          return success()
+        },
+
+        setSevenContextBaseAreaCell: (command) => {
+          const current = get()
+          if (current.hydrationStatus === 'blocked') {
+            return failure('hydration-blocked', '손상되거나 지원하지 않는 저장 데이터를 먼저 복구해야 합니다.')
+          }
+          if (!current.source) return failure('not-initialized', 'Shape System이 아직 연결되지 않았습니다.')
+          const result = setSevenContextBaseAreaCellV1(current.source, command)
           if (!result.ok) return failure('command-failed', result.error.message)
           const entry: ShapeSystemHistoryEntry = {
             transaction: structuredClone(result.transaction),

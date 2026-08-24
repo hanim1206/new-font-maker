@@ -117,6 +117,98 @@ test('J-02 자소 원형 Rail은 네 방향을 직접 편집하고 한 transacti
   await expectMobileShellContract(page)
 })
 
+test('J-02 점유 면은 원자 셀에서 생성·선택·draft 이동하고 pointerup 한 번 저장·Undo한다', async ({ page }) => {
+  await page.goto('/workspace/jamo/result?char=ㄱ')
+  await page.getByRole('button', { name: '추천 기본 구조로 시작' }).click()
+  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await page.goto('/workspace/jamo')
+  await page.waitForTimeout(350)
+
+  const initializedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
+  await page.evaluate(() => {
+    const originalSetItem = Storage.prototype.setItem
+    ;(window as unknown as { __shapeAreaWrites: number }).__shapeAreaWrites = 0
+    Storage.prototype.setItem = function setItem(key: string, value: string): void {
+      if (key === 'font-maker-shape-system-v1') (window as unknown as { __shapeAreaWrites: number }).__shapeAreaWrites += 1
+      originalSetItem.call(this, key, value)
+    }
+  })
+
+  await page.getByRole('button', { name: '면 채우기' }).click()
+  const createCell = page.getByRole('button', { name: '면 생성 1행 2열' })
+  await createCell.scrollIntoViewIfNeeded()
+  const createBox = await createCell.boundingBox()
+  if (!createBox) throw new Error('면 생성 원자 셀 위치를 찾을 수 없습니다.')
+  const masterInk = page.getByRole('img', { name: 'Shape 마스터 ㄱ 최종 윤곽' }).locator('path[data-final-ink]')
+  const beforeCreatePath = await masterInk.getAttribute('d')
+
+  await page.mouse.move(createBox.x + createBox.width / 2, createBox.y + createBox.height / 2)
+  await page.mouse.down()
+  await expect(masterInk).not.toHaveAttribute('d', beforeCreatePath ?? '')
+  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
+  await createCell.dispatchEvent('pointercancel', { pointerId: 1, pointerType: 'mouse', isPrimary: true })
+  await page.mouse.up()
+  await expect(masterInk).toHaveAttribute('d', beforeCreatePath ?? '')
+  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
+
+  const resetCreateBox = await createCell.boundingBox()
+  if (!resetCreateBox) throw new Error('취소 뒤 면 생성 셀 위치를 찾을 수 없습니다.')
+  await page.mouse.move(resetCreateBox.x + resetCreateBox.width / 2, resetCreateBox.y + resetCreateBox.height / 2)
+  await page.mouse.down()
+  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
+  await page.mouse.up()
+  await page.waitForTimeout(350)
+  const createdRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
+  expect(createdRaw).not.toBe(initializedRaw)
+  expect(await page.evaluate(() => (window as unknown as { __shapeAreaWrites: number }).__shapeAreaWrites)).toBe(1)
+  await expect(page.getByRole('button', { name: '점유 면 이동' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '정밀 조절' })).toContainText('점유 면')
+  const createdTargets = await page.evaluate((key) => {
+    const source = JSON.parse(localStorage.getItem(key)!).state.source
+    return ['STANDALONE', 'CH'].map((role) => {
+      const elementId = `j02:area:${role}:giyeok:primary`
+      const element = source.roleSources[role].masters[0].construction.channels.main.elements
+        .find((candidate: { id: string }) => candidate.id === elementId)
+      return { elementId: element.id, cellId: element.filledCells[0].id }
+    })
+  }, SHAPE_KEY)
+  expect(createdTargets).toEqual([
+    expect.objectContaining({ elementId: 'j02:area:STANDALONE:giyeok:primary', cellId: expect.stringContaining('grid-cell:') }),
+    expect.objectContaining({ elementId: 'j02:area:CH:giyeok:primary', cellId: expect.stringContaining('grid-cell:') }),
+  ])
+
+  const areaHandle = page.getByRole('button', { name: '점유 면 이동' })
+  await areaHandle.scrollIntoViewIfNeeded()
+  const areaBox = await areaHandle.boundingBox()
+  if (!areaBox) throw new Error('점유 면 위치를 찾을 수 없습니다.')
+  await page.mouse.move(areaBox.x + areaBox.width / 2, areaBox.y + areaBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(areaBox.x + areaBox.width + 34, areaBox.y + areaBox.height / 2, { steps: 4 })
+  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(createdRaw)
+  await areaHandle.dispatchEvent('lostpointercapture', { pointerId: 1, pointerType: 'mouse', isPrimary: true })
+  await page.mouse.up()
+  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(createdRaw)
+
+  await areaHandle.scrollIntoViewIfNeeded()
+  const resetAreaBox = await areaHandle.boundingBox()
+  if (!resetAreaBox) throw new Error('취소 뒤 점유 면 위치를 찾을 수 없습니다.')
+  await page.mouse.move(resetAreaBox.x + resetAreaBox.width / 2, resetAreaBox.y + resetAreaBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(resetAreaBox.x + resetAreaBox.width + 34, resetAreaBox.y + resetAreaBox.height / 2, { steps: 4 })
+  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(createdRaw)
+  await page.mouse.up()
+  await page.waitForTimeout(350)
+  const movedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
+  expect(movedRaw).not.toBe(createdRaw)
+  expect(await page.evaluate(() => (window as unknown as { __shapeAreaWrites: number }).__shapeAreaWrites)).toBe(2)
+
+  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
+  await page.waitForTimeout(350)
+  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(createdRaw)
+  await expect(page.getByRole('slider', { name: /캔버스 안쪽 .* 기준선/ })).toHaveCount(4)
+  await expectMobileShellContract(page)
+})
+
 test('L-01 공통 layout Rail은 7개 binding 결과를 draft로 미리 보고 한 번 저장·Undo한다', async ({ page }) => {
   await page.goto('/workspace/skeleton')
   await expect(page.getByRole('heading', { name: '공통 layout grid', exact: true })).toBeVisible()

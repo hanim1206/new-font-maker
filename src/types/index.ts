@@ -1177,6 +1177,8 @@ export interface SourceCommandTransaction<T> {
     | 'set-context-variant-patch'
     | 'remove-context-variant-patch'
     | 'set-seven-context-base-core-rail'
+    | 'create-seven-context-base-area-cell'
+    | 'move-seven-context-base-area-cell'
     | 'connect-layout-grid'
     | 'set-layout-grid-rail'
   before: T
@@ -1197,6 +1199,23 @@ export interface SetSevenContextBaseCoreRailV2Command {
   targets: {
     STANDALONE: BaseMasterRailTargetV2
     CH: BaseMasterRailTargetV2
+  }
+}
+
+export interface BaseMasterAreaCellTargetV1 {
+  masterId: string
+  elementId: string
+  cell: Omit<GridCellRef, 'id'>
+}
+
+/** J-02의 STANDALONE·CH 원형에 같은 의미의 단일 원자 셀 면을 생성하거나 이동한다. */
+export interface SetSevenContextBaseAreaCellV1Command {
+  transactionId: string
+  mode: 'create' | 'move'
+  jamoId: string
+  targets: {
+    STANDALONE: BaseMasterAreaCellTargetV1
+    CH: BaseMasterAreaCellTargetV1
   }
 }
 
@@ -1229,6 +1248,33 @@ export type BaseMasterRailCommandResult =
       ok: false
       error: {
         code: BaseMasterRailCommandErrorCode
+        message: string
+      }
+    }
+
+export type BaseMasterAreaCommandErrorCode =
+  | 'invalid-transaction-id'
+  | 'invalid-command'
+  | 'invalid-source'
+  | 'missing-master'
+  | 'stale-target'
+  | 'target-exists'
+  | 'unsupported-area-shape'
+  | 'variant-in-use'
+  | 'cell-occupied'
+  | 'no-op'
+  | 'invalid-result'
+
+export type BaseMasterAreaCommandResult =
+  | {
+      ok: true
+      source: ValidatedShapeSystemSourceV2
+      transaction: SourceCommandTransaction<ShapeSystemSourceV2>
+    }
+  | {
+      ok: false
+      error: {
+        code: BaseMasterAreaCommandErrorCode
         message: string
       }
     }

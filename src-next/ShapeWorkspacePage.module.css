@@ -22,6 +22,16 @@
 .canvasSelectButton { position: absolute; z-index: 0; inset: 0; border: 0; background: transparent; cursor: pointer; }
 .canvasGrid { position: absolute; z-index: 0; inset: 7.5%; pointer-events: none; background-image: linear-gradient(rgb(var(--color-border-subtle) / .7) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--color-border-subtle) / .7) 1px, transparent 1px), linear-gradient(rgb(var(--color-border) / .6) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--color-border) / .6) 1px, transparent 1px); background-size: 6.25% 6.25%, 6.25% 6.25%, 25% 25%, 25% 25%; }
 .canvasGlyph { position: relative; z-index: 1; width: 84%; height: 84%; pointer-events: none; }
+.shapeAreaLayer { position: absolute; z-index: 5; inset: 8%; pointer-events: none; }
+.shapeAreaLayer button { position: absolute; min-width: 44px; min-height: 44px; padding: 0; touch-action: none; pointer-events: auto; }
+.areaCreateCell { border: 1px dashed rgb(var(--color-primary) / .42); background: rgb(var(--color-primary-light) / .12); }
+.areaCreateCell:hover,
+.areaCreateCell:focus-visible,
+.areaCreateCell[data-draft='true'] { border-style: solid; background: rgb(var(--color-primary) / .2); outline: none; }
+.areaMoveHandle { display: grid; place-items: center; border: 2px solid rgb(var(--color-primary)); background: rgb(var(--color-primary) / .2); color: rgb(var(--color-primary-dark)); cursor: grab; }
+.areaMoveHandle:active { cursor: grabbing; }
+.areaMoveHandle[data-selected='true'] { box-shadow: 0 0 0 3px rgb(var(--color-primary) / .18); background: rgb(var(--color-primary) / .28); }
+.areaMoveHandle span { padding: 3px 5px; border-radius: 999px; background: rgb(var(--color-surface) / .9); font-size: 9px; font-weight: 800; }
 .shapePreviewError { max-width: 18rem; color: #9f1239; font-size: .84rem; line-height: 1.45; text-align: center; }
 .lockedLayout { position: absolute; z-index: 2; top: 10px; left: 10px; display: flex; align-items: center; gap: 4px; padding: 5px 7px; border-radius: 7px; pointer-events: none; background: rgb(var(--color-surface) / .9); color: rgb(var(--color-text-dim-3)); font-size: 9px; font-weight: 700; }
 .selectionBadge { position: absolute; z-index: 2; right: 10px; bottom: 10px; padding: 5px 7px; border-radius: 7px; background: rgb(var(--color-primary)); color: white; font-size: 9px; font-weight: 750; }
@@ -143,6 +153,8 @@
 .railEditorMeta span { color: rgb(var(--color-text-dim-3)); font-size: 9px; }
 .railEditorMeta button { min-width: 88px; min-height: 44px; padding: 0 10px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-size: 9px; font-weight: 750; }
 .railEditorMeta button:disabled { opacity: .38; }
+.areaEditor { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid rgb(var(--color-primary) / .24); border-radius: 12px; background: rgb(var(--color-primary-light) / .22); }
+.areaEditor p { color: rgb(var(--color-text-dim-3)); font-size: 9px; line-height: 1.5; }
 
 .notFound { min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; text-align: center; }
 .notFound h1 { font-size: 20px; }
