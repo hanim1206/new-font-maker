@@ -1,6 +1,6 @@
 # Step 2 구현 인계
 
-> 기준 문서: `COMMON_GRID_HYBRID_IMPLEMENTATION_PLAN.md`, `KOREAN_FONT_MAKER_UX_SCREEN_SPEC.md`
+> 기준 문서: `COMMON_GRID_HYBRID_IMPLEMENTATION_PLAN.md`, `docs/PRODUCT_PHILOSOPHY.md`
 > 완료 범위: Implementation Plan Step 2 — 공통 잉크 해석 계층
 > 다음 작업: Step 3 안정 ID 기반 생산용 그리드와 코어 레일 계약만 진행한다. Step 4 이후 UI는 시작하지 않는다.
 

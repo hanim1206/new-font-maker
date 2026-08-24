@@ -1,10 +1,12 @@
 # 한글 폰트 메이커 UX·화면 명세
 
-> 상태: `draft for UX review`
+> 상태: `historical UX draft · active reference에서 제외`
 > 작성일: 2026-08-23
 > 개정일: 2026-08-24
 > 관련 문서: `COMMON_GRID_HYBRID_IMPLEMENTATION_PLAN.md`
 > 기준: 모바일에서 전체 제작 가능, 데스크톱·태블릿에서는 정밀 편집 효율 강화
+
+> 주의: 이 문서는 2026-08-24 사용자 검토에서 공통 레이아웃 그리드의 시각적 원본을 충분히 반영하지 못한 것으로 판정했다. 구현·인계의 기준 문서로 사용하지 않는다. 공통 그리드는 Obsidian `이미지 래퍼런스 캔버스.canvas`의 연결된 이미지와 `docs/PRODUCT_PHILOSOPHY.md`, 사용자와 다시 합의한 의미 계약을 우선한다.
 
 ## 0. 문서 목적
 

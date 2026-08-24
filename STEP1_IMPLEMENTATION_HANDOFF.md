@@ -211,7 +211,7 @@ Step 2에서는 승인된 데이터 계약과 resolver 기반만 구현한다. �
 
 ## 6. 다음 모델의 시작 순서
 
-1. 이 문서, `COMMON_GRID_HYBRID_IMPLEMENTATION_PLAN.md`, `KOREAN_FONT_MAKER_UX_SCREEN_SPEC.md`, `docs/PRODUCT_PHILOSOPHY.md`를 다시 읽는다.
+1. 이 문서, `COMMON_GRID_HYBRID_IMPLEMENTATION_PLAN.md`, `docs/PRODUCT_PHILOSOPHY.md`를 다시 읽는다. 공통 그리드의 시각적 의미는 Obsidian `이미지 래퍼런스 캔버스.canvas`의 연결된 이미지를 함께 확인한다.
 2. `git status --short`로 위 변경과 다른 사용자 변경을 구분한다.
 3. `pointercancel`의 승인 목표가 rollback임을 유지하고 Step 2의 정확한 하위 범위를 확인한다.
 4. Step 2 타입·resolver의 첫 수직 조각만 구현한다.

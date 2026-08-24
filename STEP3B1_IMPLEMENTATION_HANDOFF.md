@@ -1,6 +1,6 @@
 # Step 3B-1 구현 인계
 
-> 기준 문서: `COMMON_GRID_HYBRID_IMPLEMENTATION_PLAN.md`, `KOREAN_FONT_MAKER_UX_SCREEN_SPEC.md`
+> 기준 문서: `COMMON_GRID_HYBRID_IMPLEMENTATION_PLAN.md`, `docs/PRODUCT_PHILOSOPHY.md`
 > 완료 범위: 역할별 자소 마스터, 채널별 grid 소유권, 보조 Rail 추가와 채워진 원자 셀 분할
 > 다음 작업: 모든 point·handle·cell edge·boundary treatment의 안정 참조를 추가한 뒤 usage 수집, 참조 재연결, 삭제 잠금을 한 수직 조각으로 구현한다.
 

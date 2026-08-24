@@ -1,6 +1,6 @@
 # Step 3A 구현 인계
 
-> 기준 문서: `COMMON_GRID_HYBRID_IMPLEMENTATION_PLAN.md`, `KOREAN_FONT_MAKER_UX_SCREEN_SPEC.md`
+> 기준 문서: `COMMON_GRID_HYBRID_IMPLEMENTATION_PLAN.md`, `docs/PRODUCT_PHILOSOPHY.md`
 > 완료 범위: 생산용 Part Grid의 코어 Rail 타입과 순수 검증·해석 계약
 > 다음 작업: 안정 참조·자소 construction·순수 편집 command를 구현한다. Store, FontData, Grid v1 이관, UI는 아직 시작하지 않는다.
 
