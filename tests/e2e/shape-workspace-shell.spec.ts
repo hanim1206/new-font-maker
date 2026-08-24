@@ -136,7 +136,9 @@ test('L-01 공통 layout Rail은 7개 binding 결과를 draft로 미리 보고 �
   const railBox = await rail.boundingBox()
   const canvasBox = await rail.locator('xpath=..').boundingBox()
   if (!railBox || !canvasBox) throw new Error('공통 layout split Rail 위치를 찾을 수 없습니다.')
-  const preview = page.getByRole('list', { name: '공통 배치가 쓰이는 7개 조합' }).getByRole('button', { name: '가 세로모음 관찰' }).locator('svg')
+  const resultCards = page.getByRole('list', { name: '공통 배치가 쓰이는 7개 조합' })
+  await expect(resultCards.getByRole('button')).toHaveCount(0)
+  const preview = resultCards.locator('[data-context-id="가"] svg')
   const beforePreview = await preview.evaluate((element) => element.outerHTML)
   const beforeValue = await rail.getAttribute('aria-valuenow')
 

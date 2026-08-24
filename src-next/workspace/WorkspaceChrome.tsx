@@ -105,35 +105,41 @@ export function ContextComparisonStrip({
   observedId,
   onObserve,
   description,
+  interactive = true,
 }: {
   heading: string
   eyebrow?: string
   items: readonly ComparisonItem[]
   observedId: string
-  onObserve: (id: string) => void
+  onObserve?: (id: string) => void
   description?: string
+  interactive?: boolean
 }) {
   const active = items.find((item) => item.id === observedId) ?? items[0]
   return (
     <section className={styles.comparisonSection} aria-labelledby="workspace-context-heading">
       <div className={styles.sectionHeading}>
         <div><span>{eyebrow}</span><h2 id="workspace-context-heading">{heading}</h2></div>
-        {active && <strong>{active.label} · {active.detail}</strong>}
+        {interactive && active && <strong>{active.label} · {active.detail}</strong>}
       </div>
       <ul className={styles.comparisonStrip} aria-label={heading}>
         {items.map((item) => (
-          <li key={item.id}>
-            <button
+          <li key={item.id} data-context-id={item.id}>
+            {interactive ? <button
               type="button"
               className={styles.contextCard}
               aria-current={observedId === item.id ? 'true' : undefined}
-              onClick={() => onObserve(item.id)}
+              onClick={() => onObserve?.(item.id)}
               aria-label={`${item.label} ${item.detail} 관찰`}
             >
               <span className={styles.cardPreview}>{item.preview}</span>
               <strong>{item.label}</strong>
               <span>{item.detail}</span>
-            </button>
+            </button> : <div className={styles.contextCard} aria-label={`${item.label} ${item.detail} 연결 결과`}>
+              <span className={styles.cardPreview}>{item.preview}</span>
+              <strong>{item.label}</strong>
+              <span>{item.detail}</span>
+            </div>}
           </li>
         ))}
       </ul>

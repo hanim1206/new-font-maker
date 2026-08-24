@@ -39,3 +39,9 @@
 - 변경 파일: `src-next/ShapeWorkspacePage.tsx`, `src-next/ShapeWorkspacePage.module.css`, `tests/e2e/shape-workspace-shell.spec.ts`, `IMPLEMENTATION_STATUS.md`.
 - 검증: `npx tsc -b --pretty false`, 대상 ESLint, `npx playwright test tests/e2e/shape-workspace-shell.spec.ts --workers=1`(9개 통과), `git diff --check` 통과.
 - 남은 P1·다음 단계 주의점: L-01에서는 캔버스의 Rail 근처를 hover하면 해당 선만 강조되고, 탭한 Rail은 파란 drag handle을 표시한다. 조작은 캔버스에서 끝나며 정밀 조절 drawer나 layout별 선택 모드를 다시 도입하지 않는다.
+
+## Step 4F-5 · 연결 결과 읽기 전용 표시
+
+- 변경 파일: `src-next/workspace/WorkspaceChrome.tsx`, `src-next/ShapeWorkspacePage.tsx`, `tests/e2e/shape-workspace-shell.spec.ts`, `IMPLEMENTATION_STATUS.md`.
+- 검증: `npx tsc -b --pretty false`, 대상 ESLint, `npx playwright test tests/e2e/shape-workspace-shell.spec.ts --workers=1`(9개 통과), `git diff --check` 통과.
+- 남은 P1·다음 단계 주의점: L-01의 7개 연결 결과 카드는 클릭해도 바뀌는 가짜 선택 도구가 아니라 읽기 전용 결과다. J-02/J-03의 관찰 카드만 여전히 선택 가능한 상호작용을 유지한다.

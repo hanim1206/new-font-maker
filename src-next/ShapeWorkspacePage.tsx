@@ -866,7 +866,6 @@ function resolveLayoutRailModels(source: DeepReadonly<ShapeSystemSourceV2> | nul
 }
 
 function SharedLayoutScreen() {
-  const [observedChar, setObservedChar] = useState<(typeof CONTEXTS)[number]['char']>('가')
   const [selectedRailId, setSelectedRailId] = useState<string | null>(null)
   const [hoveredRailId, setHoveredRailId] = useState<string | null>(null)
   const [draftValue, setDraftValue] = useState<number | null>(null)
@@ -1103,7 +1102,7 @@ function SharedLayoutScreen() {
             </ul>
             <p className={styles.layoutCanvasHelp}>선 가까이 가면 그 Rail이 강조됩니다. 탭하면 핸들이 나타나고, 그대로 끌면 7개 결과를 임시로 보여줘요.</p>
           </section>
-          <ContextComparisonStrip heading="공통 배치가 쓰이는 7개 조합" eyebrow="연결 결과" items={contextItems} observedId={observedChar} onObserve={(id) => setObservedChar(id as typeof observedChar)} description="카드는 공통 layout binding으로 다시 계산한 기존 글자 배치 결과예요." />
+          <ContextComparisonStrip heading="공통 배치가 쓰이는 7개 조합" eyebrow="연결 결과" items={contextItems} observedId="가" interactive={false} description="카드는 공통 layout binding으로 다시 계산한 읽기 전용 결과예요." />
         </> : <section className={styles.layoutSetup} aria-label="공통 layout grid 연결">
           <Grid2X2 size={24} aria-hidden="true" />
           <h2>{hydrationStatus === 'blocked' ? '저장 데이터 확인이 필요해요' : !source ? '형태 시스템을 먼저 시작하세요' : '기존 배치를 공통 기준선으로 연결하세요'}</h2>
