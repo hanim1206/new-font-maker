@@ -15,3 +15,9 @@
 - 변경 파일: `src-next/ShapeWorkspacePage.tsx`, `src-next/ShapeWorkspacePage.module.css`, `tests/e2e/shape-workspace-shell.spec.ts`, `IMPLEMENTATION_STATUS.md`.
 - 검증: `npx tsc -b --pretty false`, 대상 ESLint, `npx playwright test tests/e2e/shape-workspace-shell.spec.ts --workers=1`(8개 통과), `git diff --check` 통과.
 - 남은 P1·다음 단계 주의점: J-02는 STANDALONE·CH의 stable master/Rail 주소와 두 역할 안전 범위의 교집합이 모두 확인될 때만 편집한다. J-03 sparse override의 transaction·cancel 경계는 그대로 유지하며, 이후 Rail 추가·삭제나 전체 Shape 출력 연결은 이 원형 편집 경로에 섞지 않는다.
+
+## Step 4F-1 · 공통 layout grid 명시적 연결
+
+- 변경 파일: `src/services/layoutGridConnectionV1.ts`, `src/services/layoutGridConnectionV1.test.ts`, `src/services/layoutGridProjection.ts`, `src/stores/shapeSystemStore.ts`, `src/stores/shapeSystemStore.test.ts`, `src/types/index.ts`, `IMPLEMENTATION_STATUS.md`.
+- 검증: 공통 grid 연결·projection·store 표적 Vitest 47개, `npx tsc -b --pretty false`, 대상 ESLint, `git diff --check` 통과.
+- 남은 P1·다음 단계 주의점: 이 조각은 현재 7개 legacy schema를 사용자가 명시적으로 연결할 수 있는 strict 원본과 Undo transaction만 제공한다. 실제 layout Rail 선택·드래그 UI와 파생 schema를 화면 소비 경로에 연결하는 작업은 다음 세션에서 별도 조각으로 진행하며, grid가 없는 기존 프로젝트는 계속 legacy 결과를 사용해야 한다.

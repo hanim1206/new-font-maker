@@ -19,6 +19,7 @@ import {
   parseShapeSystemSourceV2,
 } from '../services/shapeSystemSourceV2'
 import { createConnectedShapeSystemV2Fixture } from '../../tests/fixtures/shapeSystemV2'
+import { BASE_PRESETS_SCHEMAS } from '../utils/layoutCalculator'
 
 const STORAGE_KEY = 'font-maker-shape-system-v1'
 const values = new Map<string, string>()
@@ -129,6 +130,23 @@ describe('shapeSystemStore canonical persistence and session history', () => {
     vi.advanceTimersByTime(300)
     const reloaded = await importStore(values.get(STORAGE_KEY))
     expect(reloaded.useShapeSystemStore.getState().source).toEqual(source)
+  })
+
+  it('명시적 공통 layout grid 연결은 한 source transaction으로 저장하고 Undo/Redo한다', async () => {
+    const storeModule = await importStore()
+    const useStore = storeModule.useShapeSystemStore
+    expect(storeModule.initializeStarterShapeSystem()).toEqual({ ok: true })
+    const before = structuredClone(useStore.getState().source)!
+    expect(useStore.getState().connectLayoutGrid({
+      transactionId: 'tx:store:connect-layout', schemas: BASE_PRESETS_SCHEMAS,
+    })).toEqual({ ok: true })
+    const after = structuredClone(useStore.getState().source)!
+    expect(after.layoutGridSystem).not.toBeNull()
+    expect(useStore.getState().past).toHaveLength(1)
+    expect(useStore.getState().undo()).toEqual({ ok: true })
+    expect(useStore.getState().source).toEqual(before)
+    expect(useStore.getState().redo()).toEqual({ ok: true })
+    expect(useStore.getState().source).toEqual(after)
   })
 
   it('strict source만 로드하고 source 외 history·파생값을 persist하지 않는다', async () => {
@@ -538,7 +556,7 @@ describe('shapeSystemStore canonical persistence and session history', () => {
   it('store 공개 API가 raw resolver·retile·generic transaction 적용을 노출하지 않는다', async () => {
     const useStore = (await importStore()).useShapeSystemStore
     expect(Object.keys(useStore.getState()).sort()).toEqual([
-      'canRedo', 'canUndo', 'future', 'hydrationIssues', 'hydrationStatus',
+      'canRedo', 'canUndo', 'connectLayoutGrid', 'future', 'hydrationIssues', 'hydrationStatus',
       'past', 'redo', 'removeContextCoreRailOverride',
       'setContextCoreRailOverride', 'setSevenContextBaseCoreRail', 'source', 'undo',
     ])

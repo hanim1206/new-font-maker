@@ -5,6 +5,8 @@ import type {
   ContextVariantCommandResult,
   DeepReadonly,
   JamoPartRole,
+  LayoutSchema,
+  LayoutType,
   RemoveCoreRailOverrideV1Command,
   RoleConstructionScope,
   SetCoreRailOverrideV1Command,
@@ -28,6 +30,7 @@ import {
 import { parseRoleConstructionSourceV1 } from '../services/roleConstructionSourceV1'
 import { createStarterShapeSystemV2 } from '../services/defaultShapeSystemV2'
 import { setSevenContextBaseCoreRailV2 } from '../services/baseMasterRailCommandsV2'
+import { connectLayoutGridFromSchemasV1 } from '../services/layoutGridConnectionV1'
 
 export const SHAPE_SYSTEM_STORAGE_KEY = 'font-maker-shape-system-v1'
 export const SHAPE_SYSTEM_HISTORY_LIMIT = 50
@@ -43,6 +46,10 @@ interface ShapeSystemState {
 }
 
 interface ShapeSystemActions {
+  connectLayoutGrid: (input: {
+    transactionId: string
+    schemas: DeepReadonly<Record<LayoutType, LayoutSchema>>
+  }) => ShapeSystemStoreResult
   setSevenContextBaseCoreRail: (
     command: DeepReadonly<SetSevenContextBaseCoreRailV2Command>,
   ) => ShapeSystemStoreResult
@@ -203,6 +210,26 @@ export const useShapeSystemStore = create<ShapeSystemState & ShapeSystemActions>
         hydrationIssues: [],
         past: [],
         future: [],
+
+        connectLayoutGrid: (input) => {
+          const current = get()
+          if (current.hydrationStatus === 'blocked') {
+            return failure('hydration-blocked', '손상되거나 지원하지 않는 저장 데이터를 먼저 복구해야 합니다.')
+          }
+          if (!current.source) return failure('not-initialized', 'Shape System이 아직 연결되지 않았습니다.')
+          const result = connectLayoutGridFromSchemasV1({ source: current.source, ...input })
+          if (!result.ok) return failure('command-failed', result.error.message)
+          const entry: ShapeSystemHistoryEntry = { transaction: structuredClone(result.transaction) }
+          set((state) => {
+            state.source = result.source as unknown as typeof state.source
+            state.past.push(entry)
+            if (state.past.length > SHAPE_SYSTEM_HISTORY_LIMIT) {
+              state.past.splice(0, state.past.length - SHAPE_SYSTEM_HISTORY_LIMIT)
+            }
+            state.future = []
+          })
+          return success()
+        },
 
         setContextCoreRailOverride: (role, command) => commitRoleCommand(
           role,

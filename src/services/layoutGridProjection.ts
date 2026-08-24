@@ -266,7 +266,7 @@ export function resolveGridBoundSchema(input: {
   const top = Math.min(...allBoxes.map((box) => box.y))
   const bottom = Math.max(...allBoxes.map((box) => box.y + box.height))
 
-  const result = structuredClone(input.schema)
+  const result = structuredClone(input.schema) as LayoutSchema
   if (splits.length > 0 || hasOwn(input.schema, 'splits')) {
     result.splits = splits.map(({ axis, value }) => ({ axis, value }))
   } else delete result.splits
@@ -305,7 +305,7 @@ export function resolveAllGridBoundSchemas(input: {
     return { ok: false, issues: [{ code: 'invalid-binding', message: '공통 레이아웃 7종 바인딩이 모두 필요합니다.' }] }
   }
 
-  const result = structuredClone(input.schemas)
+  const result = structuredClone(input.schemas) as Record<LayoutType, LayoutSchema>
   const stableSplits = {} as Record<SharedLayoutType, StableLayoutSplit[]>
   const issues: LayoutGridProjectionIssue[] = []
   for (const layoutType of SHARED_LAYOUT_TYPES) {

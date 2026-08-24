@@ -1177,6 +1177,7 @@ export interface SourceCommandTransaction<T> {
     | 'set-context-variant-patch'
     | 'remove-context-variant-patch'
     | 'set-seven-context-base-core-rail'
+    | 'connect-layout-grid'
   before: T
   after: T
 }
