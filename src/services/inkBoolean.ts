@@ -35,7 +35,50 @@ function signedArea(points: ArrayLike<readonly [number, number]>): number {
   return area / 2
 }
 
-function inkRingToPolygonRing(source: readonly InkPoint[], options: InkBooleanOptions): Ring {
+function crossProduct(first: Pair, second: Pair, third: Pair): number {
+  return (second[0] - first[0]) * (third[1] - first[1])
+    - (second[1] - first[1]) * (third[0] - first[0])
+}
+
+function pointOnSegment(point: Pair, start: Pair, end: Pair, epsilon: number): boolean {
+  return Math.abs(crossProduct(start, end, point)) <= epsilon
+    && point[0] >= Math.min(start[0], end[0]) - epsilon
+    && point[0] <= Math.max(start[0], end[0]) + epsilon
+    && point[1] >= Math.min(start[1], end[1]) - epsilon
+    && point[1] <= Math.max(start[1], end[1]) + epsilon
+}
+
+function segmentsIntersect(firstStart: Pair, firstEnd: Pair, secondStart: Pair, secondEnd: Pair, epsilon: number): boolean {
+  const firstStartSide = crossProduct(firstStart, firstEnd, secondStart)
+  const firstEndSide = crossProduct(firstStart, firstEnd, secondEnd)
+  const secondStartSide = crossProduct(secondStart, secondEnd, firstStart)
+  const secondEndSide = crossProduct(secondStart, secondEnd, firstEnd)
+  const crosses = (firstStartSide > epsilon && firstEndSide < -epsilon || firstStartSide < -epsilon && firstEndSide > epsilon)
+    && (secondStartSide > epsilon && secondEndSide < -epsilon || secondStartSide < -epsilon && secondEndSide > epsilon)
+  if (crosses) return true
+  return pointOnSegment(secondStart, firstStart, firstEnd, epsilon)
+    || pointOnSegment(secondEnd, firstStart, firstEnd, epsilon)
+    || pointOnSegment(firstStart, secondStart, secondEnd, epsilon)
+    || pointOnSegment(firstEnd, secondStart, secondEnd, epsilon)
+}
+
+function assertSimpleRing(ring: Ring, options: InkBooleanOptions, label: string): void {
+  if (ring.some(([x, y]) => !Number.isFinite(x) || !Number.isFinite(y))) {
+    throw new Error(`${label}에 유한하지 않은 좌표가 있습니다.`)
+  }
+  for (let first = 0; first < ring.length; first += 1) {
+    const firstNext = (first + 1) % ring.length
+    for (let second = first + 1; second < ring.length; second += 1) {
+      const secondNext = (second + 1) % ring.length
+      if (first === second || firstNext === second || secondNext === first) continue
+      if (segmentsIntersect(ring[first], ring[firstNext], ring[second], ring[secondNext], options.positionEpsilon)) {
+        throw new Error(`${label}에 self-intersection이 있어 Boolean을 수행할 수 없습니다.`)
+      }
+    }
+  }
+}
+
+function inkRingToPolygonRing(source: readonly InkPoint[], options: InkBooleanOptions, label: string): Ring {
   const ring: Ring = []
   for (const point of source) {
     const pair: Pair = [point.x, point.y]
@@ -46,6 +89,7 @@ function inkRingToPolygonRing(source: readonly InkPoint[], options: InkBooleanOp
   if (ring.length > 1 && samePosition(ring[0], ring[ring.length - 1], options.positionEpsilon)) {
     ring.pop()
   }
+  if (ring.length >= 3) assertSimpleRing(ring, options, label)
   return ring
 }
 
@@ -72,11 +116,11 @@ function normalizeRing(
 }
 
 function inkRegionToPolygon(region: Readonly<InkRegion>, options: InkBooleanOptions): Polygon | null {
-  const outer = inkRingToPolygonRing(region.outer, options)
-  if (outer.length < 3) return null
+  const outer = inkRingToPolygonRing(region.outer, options, 'InkRegion outer ring')
+  if (outer.length < 3 || Math.abs(signedArea(outer)) < options.minRingArea) return null
   const holes = region.holes
-    .map((hole) => inkRingToPolygonRing(hole, options))
-    .filter((ring) => ring.length >= 3)
+    .map((hole) => inkRingToPolygonRing(hole, options, 'InkRegion hole ring'))
+    .filter((ring) => ring.length >= 3 && Math.abs(signedArea(ring)) >= options.minRingArea)
   return [outer, ...holes]
 }
 

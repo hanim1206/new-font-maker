@@ -19,6 +19,10 @@ function rectangle(x: number, y: number, width: number, height: number): InkRegi
   }
 }
 
+function ring(outer: InkRing, holes: InkRing[] = []): InkRegion {
+  return { outer, holes }
+}
+
 function signedArea(ring: InkRing): number {
   return ring.reduce((area, point, index) => {
     const next = ring[(index + 1) % ring.length]
@@ -59,6 +63,32 @@ describe('좌표계 독립 InkRegion Boolean', () => {
     expect(filled({ x: 0.5, y: 0.5 }, merged)).toBe(true)
   })
 
+  it('꼭짓점만 닿는 positive 면은 별개의 island로 유지한다', () => {
+    const merged = unionInkRegions([
+      rectangle(0, 0, 1, 1),
+      rectangle(1, 1, 1, 1),
+    ], NORMALIZED)
+
+    expect(topology(merged)).toEqual({ regions: 2, holes: [0, 0] })
+    expect(filled({ x: 0.5, y: 0.5 }, merged)).toBe(true)
+    expect(filled({ x: 1.5, y: 1.5 }, merged)).toBe(true)
+  })
+
+  it('변을 공유하거나 완전히 겹치는 positive 면은 하나의 region으로 합친다', () => {
+    const sharedEdge = unionInkRegions([
+      rectangle(0, 0, 1, 1),
+      rectangle(1, 0, 1, 1),
+    ], NORMALIZED)
+    const fullOverlap = unionInkRegions([
+      rectangle(0, 0, 1, 1),
+      rectangle(0, 0, 1, 1),
+    ], NORMALIZED)
+
+    expect(topology(sharedEdge)).toEqual({ regions: 1, holes: [0] })
+    expect(filled({ x: 1.5, y: 0.5 }, sharedEdge)).toBe(true)
+    expect(topology(fullOverlap)).toEqual({ regions: 1, holes: [0] })
+  })
+
   it('outer와 hole의 위상을 유지하고 방향을 정규화한다', () => {
     const ring: InkRegion = {
       outer: rectangle(0, 0, 1, 1).outer,
@@ -75,6 +105,29 @@ describe('좌표계 독립 InkRegion Boolean', () => {
     expect(signedArea(merged[0].holes[0])).toBeGreaterThan(0)
     expect(filled({ x: 0.5, y: 0.5 }, merged)).toBe(false)
     expect(filled({ x: 0.1, y: 0.5 }, merged)).toBe(true)
+  })
+
+  it('hole 경계에 닿는 positive 잉크는 hole의 해당 부분만 채운다', () => {
+    const merged = unionInkRegions([
+      ring(rectangle(0, 0, 4, 4).outer, [rectangle(1, 1, 2, 2).outer]),
+      rectangle(1, 1.5, 1, 1),
+    ], NORMALIZED)
+
+    expect(topology(merged)).toEqual({ regions: 1, holes: [1] })
+    expect(filled({ x: 1.5, y: 2 }, merged)).toBe(true)
+    expect(filled({ x: 2.5, y: 1.5 }, merged)).toBe(false)
+    expect(filled({ x: 0.5, y: 2 }, merged)).toBe(true)
+  })
+
+  it('hole 안에 분리된 positive island를 hole 밖으로 합치지 않는다', () => {
+    const merged = unionInkRegions([
+      ring(rectangle(0, 0, 4, 4).outer, [rectangle(1, 1, 2, 2).outer]),
+      rectangle(1.25, 1.25, 0.5, 0.5),
+    ], NORMALIZED)
+
+    expect(topology(merged)).toEqual({ regions: 2, holes: [1, 0] })
+    expect(filled({ x: 1.5, y: 1.5 }, merged)).toBe(true)
+    expect(filled({ x: 1.1, y: 1.1 }, merged)).toBe(false)
   })
 
   it('떨어진 면은 union을 건너뛰며 입력 순서를 유지한다', () => {
@@ -107,6 +160,28 @@ describe('좌표계 독립 InkRegion Boolean', () => {
       positionEpsilon: NORMALIZED.positionEpsilon * scale,
       minRingArea: NORMALIZED.minRingArea * scale * scale,
     }))).toEqual(topology(unionInkRegions(source, NORMALIZED)))
+  })
+
+  it('minRingArea보다 작은 outer와 hole은 positive ink로 승격하지 않는다', () => {
+    const tiny = rectangle(0, 0, 0.00001, 0.00001)
+    const withTinyHole = ring(rectangle(0, 0, 1, 1).outer, [
+      rectangle(0.5, 0.5, 0.00001, 0.00001).outer,
+    ])
+
+    expect(unionInkRegions([tiny], NORMALIZED)).toEqual([])
+    expect(topology(unionInkRegions([withTinyHole], NORMALIZED))).toEqual({ regions: 1, holes: [0] })
+    expect(filled({ x: 0.5, y: 0.5 }, unionInkRegions([withTinyHole], NORMALIZED))).toBe(true)
+  })
+
+  it('self-intersection 입력은 일부 윤곽을 만들지 않고 fail-closed한다', () => {
+    const bowTie = ring([
+      { x: 0, y: 0 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 },
+      { x: 1, y: 0 },
+    ])
+
+    expect(() => unionInkRegions([bowTie], NORMALIZED)).toThrow(/self-intersection/)
   })
 
   it('좌표계별 허용치를 필수 유한값으로 검증한다', () => {
