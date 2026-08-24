@@ -29,6 +29,7 @@
 .cardGlyph { width: 68px; height: 68px; margin: auto; pointer-events: none; }
 
 .layoutGridCanvas { touch-action: none; }
+.layoutGridCanvas[data-hovered='true'] { cursor: grab; }
 .layoutGridOverlays { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .layoutGridOverlays g { fill: none; stroke-width: .004; vector-effect: non-scaling-stroke; }
 .layoutGridOverlays g:nth-of-type(1) { stroke: #64748b; stroke-dasharray: .02 .014; }
@@ -38,15 +39,19 @@
 .layoutGridOverlays g:nth-of-type(5) { stroke: #d97706; }
 .layoutGridOverlays g:nth-of-type(6) { stroke: #d1487c; }
 .layoutGridOverlays g:nth-of-type(7) { stroke: #64748b; stroke-dasharray: .008 .012; }
-.layoutCanvasRailHandle { position: absolute; z-index: 3; display: grid; place-items: center; touch-action: none; outline: 0; cursor: grab; }
-.layoutCanvasRailHandle[data-axis='x'] { top: 0; width: 44px; height: 44px; margin-left: -22px; }
-.layoutCanvasRailHandle[data-axis='y'] { left: 0; width: 44px; height: 44px; margin-top: -22px; }
-.layoutCanvasRailHandle span { display: block; background: rgb(var(--color-text-dim-3) / .48); pointer-events: none; }
-.layoutCanvasRailHandle[data-axis='x'] span { position: absolute; top: 0; left: 21px; width: 2px; height: 1000px; }
-.layoutCanvasRailHandle[data-axis='y'] span { position: absolute; top: 21px; left: 0; width: 1000px; height: 2px; }
-.layoutCanvasRailHandle[data-selected='true'] { z-index: 4; cursor: grabbing; }
+.layoutCanvasRailHandle { position: absolute; z-index: 3; pointer-events: none; }
+.layoutCanvasRailHandle[data-axis='x'] { top: 0; bottom: 0; width: 2px; margin-left: -1px; }
+.layoutCanvasRailHandle[data-axis='y'] { right: 0; left: 0; height: 2px; margin-top: -1px; }
+.layoutCanvasRailHandle span { position: absolute; display: block; background: rgb(var(--color-text-dim-3) / .38); }
+.layoutCanvasRailHandle[data-axis='x'] span { inset: 0; }
+.layoutCanvasRailHandle[data-axis='y'] span { inset: 0; }
+.layoutCanvasRailHandle[data-hovered='true'] span { background: rgb(var(--color-primary) / .72); box-shadow: 0 0 0 1px rgb(var(--color-primary-light) / .65); }
+.layoutCanvasRailHandle[data-selected='true'] { z-index: 4; }
 .layoutCanvasRailHandle[data-selected='true'] span { background: rgb(var(--color-primary)); box-shadow: 0 0 0 1px rgb(var(--color-primary-light)); }
-.layoutCanvasRailHandle:focus-visible span { outline: 3px solid rgb(var(--color-primary) / .35); outline-offset: 2px; }
+.layoutCanvasRailHandle::after { position: absolute; width: 18px; height: 18px; border: 3px solid white; border-radius: 50%; content: ''; opacity: 0; background: rgb(var(--color-primary)); box-shadow: 0 1px 5px rgb(15 23 42 / .3); transition: opacity .12s ease; }
+.layoutCanvasRailHandle[data-axis='x']::after { top: 9px; left: -8px; }
+.layoutCanvasRailHandle[data-axis='y']::after { top: -8px; left: 9px; }
+.layoutCanvasRailHandle[data-selected='true']::after { opacity: 1; }
 .layoutCanvasHelp { max-width: 330px; margin: 8px auto 0; color: rgb(var(--color-text-dim-3)); font-size: 10px; line-height: 1.45; text-align: center; }
 .layoutOverlayLegend { max-width: 330px; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 8px; margin: 8px auto 0; padding: 0; list-style: none; }
 .layoutOverlayLegend li { display: inline-flex; align-items: center; gap: 4px; color: rgb(var(--color-text-dim-3)); font-size: 9px; }

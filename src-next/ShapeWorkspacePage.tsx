@@ -868,7 +868,7 @@ function resolveLayoutRailModels(source: DeepReadonly<ShapeSystemSourceV2> | nul
 function SharedLayoutScreen() {
   const [observedChar, setObservedChar] = useState<(typeof CONTEXTS)[number]['char']>('가')
   const [selectedRailId, setSelectedRailId] = useState<string | null>(null)
-  const [drawerState, setDrawerState] = useState<DrawerState>('collapsed')
+  const [hoveredRailId, setHoveredRailId] = useState<string | null>(null)
   const [draftValue, setDraftValue] = useState<number | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [feedback, setFeedback] = useState<string | null>(null)
@@ -932,9 +932,14 @@ function SharedLayoutScreen() {
       preview: <DerivedSchemaGlyphPreview char={context.char} compact schema={projectedSchemas[layoutType]} />,
     }
   }), [choseong, jungseong, jongseong, projectedSchemas])
-  const visibleSelected = visible.kind === 'ready' && selected
-    ? visible.rails.find((rail) => rail.id === selected.id) ?? selected
-    : selected
+  const committedRails = useMemo(() => {
+    const model = resolveLayoutRailModels(source)
+    return model.kind === 'ready' ? model.rails : []
+  }, [source])
+  const visibleRails = useMemo(() => {
+    const model = resolveLayoutRailModels(draftSource)
+    return model.kind === 'ready' ? model.rails : []
+  }, [draftSource])
 
   const clearDraft = useCallback(() => {
     gestureRef.current = null
@@ -972,12 +977,25 @@ function SharedLayoutScreen() {
   }, [clearDraft, persistShapeChange, setLayoutGridRail])
   const beginGesture = (rail: LayoutRailEditModel, event: ReactPointerEvent<HTMLDivElement>) => {
     setSelectedRailId(rail.id)
-    setDrawerState('medium')
+    setHoveredRailId(rail.id)
     gestureRef.current = { railId: rail.id, startValue: rail.value, startClientX: event.clientX, startClientY: event.clientY, moved: false }
     draftValueRef.current = null
     setDraftValue(null)
     event.currentTarget.setPointerCapture(event.pointerId)
   }
+  const railAtPointer = useCallback((clientX: number, clientY: number): LayoutRailEditModel | null => {
+    const bounds = canvasRef.current?.getBoundingClientRect()
+    if (!bounds) return null
+    const closest = committedRails.reduce<{ rail: LayoutRailEditModel; distance: number } | null>((nearest, rail) => {
+      const coordinate = rail.axis === 'x'
+        ? bounds.left + bounds.width * rail.value
+        : bounds.top + bounds.height * rail.value
+      const pointer = rail.axis === 'x' ? clientX : clientY
+      const candidate = { rail, distance: Math.abs(pointer - coordinate) }
+      return !nearest || candidate.distance < nearest.distance ? candidate : nearest
+    }, null)
+    return closest && closest.distance <= 22 ? closest.rail : null
+  }, [committedRails])
   const updateDraft = (rail: LayoutRailEditModel, clientX: number, clientY: number) => {
     const gesture = gestureRef.current
     const bounds = canvasRef.current?.getBoundingClientRect()
@@ -1002,6 +1020,28 @@ function SharedLayoutScreen() {
     if (gesture.moved && committedRail) commit(committedRail, draftValueRef.current ?? gesture.startValue)
     else clearDraft()
   }
+  const handleCanvasPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = gestureRef.current
+    if (gesture) {
+      const rail = committedRails.find((candidate) => candidate.id === gesture.railId)
+      if (rail) updateDraft(rail, event.clientX, event.clientY)
+      return
+    }
+    setHoveredRailId(railAtPointer(event.clientX, event.clientY)?.id ?? null)
+  }
+  const handleCanvasPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const rail = railAtPointer(event.clientX, event.clientY)
+    if (rail) beginGesture(rail, event)
+  }
+  const handleCanvasPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = gestureRef.current
+    const rail = gesture && committedRails.find((candidate) => candidate.id === gesture.railId)
+    if (rail) finishGesture(rail, event)
+  }
+  const cancelCanvasGesture = () => {
+    setHoveredRailId(null)
+    clearDraft()
+  }
   const handleConnect = () => {
     const result = connectLayoutGrid({ transactionId: 'shape-workspace:connect-layout', schemas: effectiveSchemas })
     if (!result.ok) { setSaveState('error'); setFeedback(result.error.message); return }
@@ -1021,7 +1061,6 @@ function SharedLayoutScreen() {
   const saveLabel = saveState === 'saving' ? '저장 중…'
     : saveState === 'saved' ? currentProjectId ? '프로젝트 저장됨' : '기기에 저장됨'
       : saveState === 'error' ? '저장 확인 필요' : selected ? '공통 기준선 편집' : '공통 기준선 관찰'
-  const visibleRails = visible.kind === 'ready' ? visible.rails : []
   const layoutOverlays = useMemo(() => SHARED_LAYOUT_TYPES.map((layoutType) => ({
     layoutType,
     boxes: calculateRawBoxes(projectedSchemas[layoutType]),
@@ -1033,29 +1072,6 @@ function SharedLayoutScreen() {
       projectName={projectName}
       statusLabel={saveLabel}
       history={{ canUndo, canRedo, onUndo: () => handleHistory('undo'), onRedo: () => handleHistory('redo') }}
-      drawer={<PrecisionControlDrawer state={drawerState} onStateChange={setDrawerState} targetLabel={visibleSelected ? `공통 ${visibleSelected.axis.toUpperCase()} Rail` : '공통 기준선 관찰'}>
-        {selected && visibleSelected ? <div className={styles.railEditor}>
-          <div className={styles.railChoices} aria-label="편집할 공통 기준선">
-            {(committed.kind === 'ready' ? committed.rails : []).map((rail) => <button type="button" key={rail.id} aria-pressed={rail.id === selected.id} onClick={() => { clearDraft(); setSelectedRailId(rail.id) }}>{rail.axis.toUpperCase()} · {Math.round(rail.value * 1000)}</button>)}
-          </div>
-          <div className={styles.railEditorHeading}><span>공통 {selected.axis.toUpperCase()} Rail</span><output>{Math.round(visibleSelected.value * 1000)} UPM</output></div>
-          <input type="range" min={selected.min} max={selected.max} step={RAIL_EDIT_STEP} value={visibleSelected.value} aria-label="선택한 공통 기준선" onPointerDown={(event) => {
-            gestureRef.current = { railId: selected.id, startValue: selected.value, startClientX: event.clientX, startClientY: event.clientY, moved: false }
-            event.currentTarget.setPointerCapture(event.pointerId)
-          }} onChange={(event) => {
-            const value = Number(event.currentTarget.value)
-            if (gestureRef.current && Math.abs(value - selected.value) >= 0.000001) gestureRef.current.moved = true
-            draftValueRef.current = value; setDraftValue(value)
-          }} onPointerUp={(event) => {
-            const gesture = gestureRef.current
-            if (!gesture || gesture.railId !== selected.id) return
-            gestureRef.current = null
-            if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-            if (gesture.moved) commit(selected, draftValueRef.current ?? gesture.startValue); else clearDraft()
-          }} onPointerCancel={clearDraft} onLostPointerCapture={clearDraft} />
-          <div className={styles.railEditorMeta}><span>연결된 7개 배치 결과에 함께 적용</span></div>
-        </div> : <DisabledPrecisionControl selected={false} expanded={drawerState === 'expanded'} sourceLabel="공통 grid 연결 후 편집할 수 있어요." />}
-      </PrecisionControlDrawer>}
     >
       <section className={styles.titleSection}>
         <span className={styles.screenId}>L-01 · 공통 배치 기준선</span>
@@ -1067,7 +1083,7 @@ function SharedLayoutScreen() {
       <div className={styles.workspaceScroll}>
         {hydrationStatus === 'ready' && source?.layoutGridSystem && visible.kind === 'ready' ? <>
           <section className={styles.canvasSection} aria-label="공통 layout Rail 편집 캔버스">
-            <div className={`${styles.canvas} ${styles.layoutGridCanvas}`} ref={canvasRef} data-selected={selected ? 'true' : undefined}>
+            <div className={`${styles.canvas} ${styles.layoutGridCanvas}`} ref={canvasRef} data-selected={selected ? 'true' : undefined} data-hovered={hoveredRailId ? 'true' : undefined} onPointerMove={handleCanvasPointerMove} onPointerDown={handleCanvasPointerDown} onPointerUp={handleCanvasPointerUp} onPointerCancel={cancelCanvasGesture} onLostPointerCapture={cancelCanvasGesture} onPointerLeave={() => { if (!gestureRef.current) setHoveredRailId(null) }}>
               <span className={styles.canvasGrid} aria-hidden="true" />
               <svg className={styles.layoutGridOverlays} viewBox="0 0 1 1" aria-label="공통 layout grid의 7개 슬롯 경계">
                 {layoutOverlays.map(({ layoutType, boxes }) => (
@@ -1080,12 +1096,12 @@ function SharedLayoutScreen() {
                   </g>
                 ))}
               </svg>
-              {visibleRails.map((rail) => <div key={rail.id} className={styles.layoutCanvasRailHandle} data-rail-id={rail.id} data-selected={rail.id === selected?.id || undefined} data-axis={rail.axis} style={rail.axis === 'x' ? { left: `${rail.value * 100}%` } : { top: `${rail.value * 100}%` }} role="slider" tabIndex={0} aria-label={`공통 layout ${rail.axis.toUpperCase()} Rail ${Math.round(rail.value * 1000)} UPM`} aria-valuemin={rail.min} aria-valuemax={rail.max} aria-valuenow={rail.value} onPointerDown={(event) => beginGesture(rail, event)} onPointerMove={(event) => updateDraft(rail, event.clientX, event.clientY)} onPointerUp={(event) => finishGesture(rail, event)} onPointerCancel={clearDraft} onLostPointerCapture={clearDraft}><span aria-hidden="true" /></div>)}
+              {visibleRails.map((rail) => <div key={rail.id} className={styles.layoutCanvasRailHandle} data-rail-id={rail.id} data-selected={rail.id === selected?.id || undefined} data-hovered={rail.id === hoveredRailId || undefined} data-axis={rail.axis} style={rail.axis === 'x' ? { left: `${rail.value * 100}%` } : { top: `${rail.value * 100}%` }} aria-hidden="true"><span /></div>)}
             </div>
             <ul className={styles.layoutOverlayLegend} aria-label="겹쳐 보이는 layout 종류">
               {SHARED_LAYOUT_TYPES.map((layoutType) => <li key={layoutType} data-layout={layoutType}>{SHARED_LAYOUT_LABELS[layoutType]}</li>)}
             </ul>
-            <p className={styles.layoutCanvasHelp}>7개 layout의 슬롯 경계를 동시에 보입니다. 기준선을 탭하면 선택하고, 직접 끌면 7개 결과를 임시로 보여줘요.</p>
+            <p className={styles.layoutCanvasHelp}>선 가까이 가면 그 Rail이 강조됩니다. 탭하면 핸들이 나타나고, 그대로 끌면 7개 결과를 임시로 보여줘요.</p>
           </section>
           <ContextComparisonStrip heading="공통 배치가 쓰이는 7개 조합" eyebrow="연결 결과" items={contextItems} observedId={observedChar} onObserve={(id) => setObservedChar(id as typeof observedChar)} description="카드는 공통 layout binding으로 다시 계산한 기존 글자 배치 결과예요." />
         </> : <section className={styles.layoutSetup} aria-label="공통 layout grid 연결">

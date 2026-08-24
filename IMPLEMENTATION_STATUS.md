@@ -33,3 +33,9 @@
 - 변경 파일: `src-next/ShapeWorkspacePage.tsx`, `src-next/ShapeWorkspacePage.module.css`, `tests/e2e/shape-workspace-shell.spec.ts`, `IMPLEMENTATION_STATUS.md`.
 - 검증: `npx tsc -b --pretty false`, 대상 ESLint, `npx playwright test tests/e2e/shape-workspace-shell.spec.ts --workers=1`(9개 통과), `git diff --check` 통과.
 - 남은 P1·다음 단계 주의점: L-01 캔버스는 7개 binding의 슬롯 경계를 같은 좌표에서 항상 함께 보이며 Rail만 선택 상태로 강조한다. layout별 개별 편집 모드나 binding 재연결 UI는 아직 추가하지 않는다.
+
+## Step 4F-4 · 공통 layout Rail 직접 조작
+
+- 변경 파일: `src-next/ShapeWorkspacePage.tsx`, `src-next/ShapeWorkspacePage.module.css`, `tests/e2e/shape-workspace-shell.spec.ts`, `IMPLEMENTATION_STATUS.md`.
+- 검증: `npx tsc -b --pretty false`, 대상 ESLint, `npx playwright test tests/e2e/shape-workspace-shell.spec.ts --workers=1`(9개 통과), `git diff --check` 통과.
+- 남은 P1·다음 단계 주의점: L-01에서는 캔버스의 Rail 근처를 hover하면 해당 선만 강조되고, 탭한 Rail은 파란 drag handle을 표시한다. 조작은 캔버스에서 끝나며 정밀 조절 drawer나 layout별 선택 모드를 다시 도입하지 않는다.
