@@ -57,3 +57,12 @@
 - 변경 파일: `src-next/ShapeWorkspacePage.tsx`, `tests/e2e/shape-workspace-shell.spec.ts`, `IMPLEMENTATION_STATUS.md`.
 - 검증: `npx tsc -b --pretty false`, 대상 ESLint, 관련 Vitest 6개, `tests/e2e/shape-workspace-shell.spec.ts` 10개, `git diff --check` 통과. `면 채우기` 선택 즉시 기준선 조절 대신 `점유 면 만들기` 안내가 열리고, 생성 뒤 기존 면 이동 패널로 전환되는 것을 확인했다.
 - 남은 P1·다음 단계 주의점: 지원 범위는 상단 중앙 두 원자 셀 중 하나에 면 하나를 생성·이동하는 흐름 그대로다. 다중 셀 채우기, 면 삭제, 중심선·보조 Rail 편집은 후속 조각이며 기존 Rail·문맥 override·공통 layout grid의 transaction 경계는 바꾸지 않는다.
+
+## Step 5A-1 사용자 검토 · 전체 그리드 점유 편집으로 교체
+
+- 판정: `상단 두 셀 중 면 하나 생성·이동`은 stable ID와 transaction 안전성을 확인한 기술 조각이지만 제품의 면 채우기 UX로는 부적합하다. 완성 기능이나 확장 기반으로 취급하지 않는다.
+- 다음 구현: 현재 역할 part grid의 모든 원자 셀을 노출하고, 하나의 `GridAreaElement`가 여러 `filledCells`를 소유하도록 연속 채우기·비우기를 구현한다. 첫 셀에서 제스처 방향을 고정하고 draft 중 저장 무변, pointerup 한 transaction, cancel 무변, Undo 한 단계 계약을 기존 Grid 2와 동일하게 유지한다.
+- 선 원칙: 신규 중심선 앵커·꺾임은 Rail 교점에 고정하고 Rail 이동 때 같은 ID 참조로 다시 계산한다. legacy 선은 사용자가 `그리드에 연결`을 명시적으로 실행하기 전까지 바꾸지 않는다.
+- 역할 소유권: 초성 화면은 CH, 단독 화면은 STANDALONE 원형을 독립 편집한다. 현재 두 역할을 함께 바꾸는 임시 bridge는 새 면 명령에 재사용하지 않으며 역할 간 복사·연결은 별도 명시적 액션으로 둔다.
+- 변경 문서: `docs/PRODUCT_PHILOSOPHY.md`, `COMMON_GRID_HYBRID_IMPLEMENTATION_PLAN.md`, `KOREAN_FONT_MAKER_UX_SCREEN_SPEC.md`, `IMPLEMENTATION_STATUS.md`와 Obsidian 대응 플랜·UX 명세.
+- 검증: 핵심 용어·Step 5·J-02·수용 기준의 상호 참조와 저장소/Obsidian 문서 동기화, `git diff --check`를 확인한다.

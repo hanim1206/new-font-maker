@@ -50,6 +50,7 @@
 - 공통 레이아웃 그리드는 자소 형태의 part grid와 다른 좌표·ID 체계로 둔다. 기존 Split 저장값에는 안정 ID를 덧붙이지 않고, 공통 그리드의 Rail ID와 레이아웃 binding을 해석할 때만 의미 기반 split 주소를 파생한다. 숫자 위치가 우연히 같다는 이유로 여러 레이아웃 경계를 자동 공유하지 않으며, 공유 관계는 명시적 binding으로만 만든다. 저장 원본은 `absolute/between` Rail 위치식과 정확히 7개인 binding만 가지며, 해석된 좌표·안정 split·박스는 저장하지 않는다. 저장 파서는 깨진 Rail, 순환·축 교차, split과 part edge의 의미 불일치, ID 충돌을 전체 차단한 뒤에만 원본을 승인한다. Design Body가 있는 배치는 기존 850×850 canonical body에서 해석한 뒤 최종 배치 계산에서 한 번만 Font Space로 투영한다. 이 원본은 Shape System V2의 선택적 `layoutGridSystem`으로 저장하며 FontData 1.4에서만 내보낸다.
 - 문맥 형태 규칙은 `자소 마스터 → 역할 기본값 → 조합 문맥 프리셋 → 자소별 예외` 순서로 상속한다. 같은 기본 문맥에서는 정의된 특징 태그가 많은 규칙을 우선하고, 태그 수가 같으면 `medialClass → finalWidthClass → initialClass` 순서로 fallback을 고정한다. 배열 순서나 ID 문자열로 승자를 정하지 않으며, 자소 variant가 명시한 실제 preset ID는 role과 요청 문맥이 맞을 때만 자동 선택을 대신한다.
 - 역할 part grid는 0–1 로컬 좌표로 유지하고, 최종 레이아웃 slot으로의 affine 투영은 `projectPartGridToSlot()` 한 곳에서만 수행한다. 비정방 slot에서는 x/y 축 비율이 다르므로 투영 결과를 편집용 `ResolvedRailGrid`로 재사용하지 않고 `SlotProjectedPartGrid`로 구분한다. 화면·OTF용 Shape primitive는 이미 glyph 좌표가 된 Rail과 identity box를 소비하며 slot을 다시 곱하지 않는다. Rail·master·provenance 원본은 투영 과정에서 바꾸거나 저장하지 않는다.
+- 자소 형태 그리드는 결과 뒤에 겹쳐 보이는 안내선이 아니라 글자의 선과 면을 만드는 생성 문법이다. 하나의 면 요소가 현재 part grid의 여러 원자 셀 점유 집합을 소유하며, 면 채우기는 셀 하나를 독립 도형처럼 이동하는 기능이 아니라 이 집합을 연속해서 채우고 비우는 기능이다. 신규 중심선의 앵커와 꺾임은 Rail 교점에 고정하고 Rail이 움직이면 같은 참조로 다시 계산한다. 기존 legacy 선은 자동으로 스냅하지 않고 사용자가 명시적으로 `그리드에 연결`할 때만 이 문법으로 변환한다.
 
 ### 검증된 Shape System 구현 상태 — 2026-08-24
 
@@ -58,6 +59,7 @@
 - J-03 조합 화면은 `ㄱ·가·고·과·각·곡·곽`의 정확한 역할·문맥을 해석하고, 현재 자소·현재 문맥의 안쪽 왼쪽·오른쪽·위·아래 코어 Rail override를 실제 Shape 최종 잉크로 미리 본다. 카드 관찰만으로 variant를 만들지 않으며, 편집을 명시적으로 시작한 뒤 `pointerup`에서 command 한 건을 저장한다. `pointercancel`은 원본으로 돌아가고, 기본값 복원은 선택한 sparse override만 제거한다.
 - Shape 편집 Undo/Redo는 before/after 원본 transaction을 사용하며 세션 history만 유지한다. 로컬 저장 완료를 표시하기 전에는 디바운스된 Shape write를 명시적으로 flush한다. 프로젝트 apply는 layout·jamo·style·Shape와 두 history를 먼저 검증하고, 지연 저장 실패가 발생하면 메모리와 저장 원본을 함께 복원한다.
 - 위 J-03 수직 흐름은 390px 화면에서 `starter 생성 → 캔버스 Rail 직접 드래그 → cancel 무변 → pointerup 1회 저장 → Undo → Redo → reload 복원`으로 검증했다. 드래그 중에는 같은 final ink를 다시 해석해 미리보기만 바꾸고 저장하지 않는다. 아직 Rail 추가·삭제, 셀 채우기, 참조 재연결, 곡률·사선, 전체 폰트 Shape 출력은 연결하지 않았다.
+- J-02의 단일 원자 셀 면 생성·이동은 stable element/cell ID, draft, pointerup 1회 저장, cancel 무변, Undo exact 복원을 확인한 기술 조각이다. 2026-08-24 사용자 검토에서 전체 그리드 점유 편집이라는 제품 의도와 다르다고 판정했으므로 완성된 `면 채우기`로 취급하거나 이 흐름을 확장하지 않는다. 다음 조각은 현재 part grid의 모든 원자 셀을 직접 채우고 비우며 하나의 면 요소가 여러 `filledCells`를 소유하는 방식으로 교체한다.
 
 ## 샘플 문장 기반 편집 원칙
 
