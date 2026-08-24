@@ -135,6 +135,9 @@ test('J-02 점유 면은 원자 셀에서 생성·선택·draft 이동하고 poi
   })
 
   await page.getByRole('button', { name: '면 채우기' }).click()
+  const precisionDrawer = page.getByRole('region', { name: '정밀 조절' })
+  await expect(precisionDrawer).toContainText('점유 면 만들기')
+  await expect(precisionDrawer.getByRole('slider', { name: /기준선/ })).toHaveCount(0)
   const createCell = page.getByRole('button', { name: '면 생성 1행 2열' })
   await createCell.scrollIntoViewIfNeeded()
   const createBox = await createCell.boundingBox()

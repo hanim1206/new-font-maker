@@ -51,3 +51,9 @@
 - 변경 파일: `src/types/index.ts`, `src/services/baseMasterAreaCommandsV1.ts`, `src/services/baseMasterAreaCommandsV1.test.ts`, `src/stores/shapeSystemStore.ts`, `src/stores/shapeSystemStore.test.ts`, `src-next/ShapeWorkspacePage.tsx`, `src-next/ShapeWorkspacePage.module.css`, `tests/e2e/shape-workspace-shell.spec.ts`, `IMPLEMENTATION_STATUS.md`.
 - 검증: `npx tsc -b --pretty false`, 대상 ESLint, 관련 Vitest 49개, `tests/e2e/shape-workspace-shell.spec.ts` 10개, `git diff --check` 통과. 생성·이동 draft 중 raw 저장 불변, pointerup 저장 1회, pointercancel·lostpointercapture 무변, 이동 Undo 1회 exact 복원을 확인했다.
 - 남은 P1·다음 단계 주의점: 이번 Step 5 첫 조각은 ㄱ 가로획과 겹치는 상단 중앙 core 원자 셀 두 곳에서 stable element ID를 가진 면 하나만 생성·선택·이동한다. 다중 셀 채우기, 면 삭제, 곡률·사선, 보조 Rail·참조 재연결, 중심선 생성은 아직 추가하지 않는다. 기존 J-02 네 core Rail, J-03 sparse override, L-01 layout grid의 transaction·cancel 경계는 계속 분리한다.
+
+## Step 5A-1 보정 · 면 도구 패널 전환
+
+- 변경 파일: `src-next/ShapeWorkspacePage.tsx`, `tests/e2e/shape-workspace-shell.spec.ts`, `IMPLEMENTATION_STATUS.md`.
+- 검증: `npx tsc -b --pretty false`, 대상 ESLint, 관련 Vitest 6개, `tests/e2e/shape-workspace-shell.spec.ts` 10개, `git diff --check` 통과. `면 채우기` 선택 즉시 기준선 조절 대신 `점유 면 만들기` 안내가 열리고, 생성 뒤 기존 면 이동 패널로 전환되는 것을 확인했다.
+- 남은 P1·다음 단계 주의점: 지원 범위는 상단 중앙 두 원자 셀 중 하나에 면 하나를 생성·이동하는 흐름 그대로다. 다중 셀 채우기, 면 삭제, 중심선·보조 Rail 편집은 후속 조각이며 기존 Rail·문맥 override·공통 layout grid의 transaction 경계는 바꾸지 않는다.

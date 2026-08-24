@@ -955,6 +955,7 @@ function MasterScreen() {
       : committedModel.kind === 'unavailable'
         ? committedModel.message
         : '단독과 초성의 같은 기준선을 한 번에 바꾸고 7개 결과에 반영합니다.'
+  const areaCreateActive = activeTool === 'area' && areaModel.kind === 'ready' && !areaModel.hasArea
   const areaSelectionActive = areaSelected && areaModel.kind === 'ready' && areaModel.hasArea
 
   return (
@@ -967,11 +968,21 @@ function MasterScreen() {
         <PrecisionControlDrawer
           state={drawerState}
           onStateChange={setDrawerState}
-          targetLabel={areaSelectionActive
+          targetLabel={areaCreateActive
+            ? 'ㄱ 원형 · 점유 면 만들기'
+            : areaSelectionActive
             ? 'ㄱ 원형 · 점유 면'
             : committedModel.kind === 'ready' ? `ㄱ 원형 · ${committedModel.railLabel}` : '원형 관찰'}
         >
-          {areaSelectionActive && visibleAreaCell ? (
+          {areaCreateActive ? (
+            <div className={styles.areaEditor}>
+              <div className={styles.railEditorHeading}>
+                <span>점유 면 만들기</span>
+                <output>{visibleAreaCell ? `${visibleAreaCell.row + 1}행 ${visibleAreaCell.column + 1}열` : '2칸 중 선택'}</output>
+              </div>
+              <p>캔버스에 표시된 두 칸 중 하나를 누르세요. 누르는 동안 결과만 미리 보고, 손을 떼면 면 하나로 저장합니다.</p>
+            </div>
+          ) : areaSelectionActive && visibleAreaCell ? (
             <div className={styles.areaEditor}>
               <div className={styles.railEditorHeading}>
                 <span>점유 면</span>
@@ -1161,6 +1172,7 @@ function MasterScreen() {
             clearDraft()
             setAreaSelected(false)
             setActiveTool('area')
+            setDrawerState('medium')
           }}><Grid2X2 size={18} />면 채우기</button>
           <button type="button" disabled><CircleDot size={18} />레일</button>
         </section>
