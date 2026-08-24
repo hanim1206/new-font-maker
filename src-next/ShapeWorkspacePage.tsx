@@ -30,6 +30,7 @@ import {
 import { useUIStore } from '../src/stores/uiStore'
 import { useFontProject } from '../src/hooks/useFontProject'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
+import { calculateRawBoxes } from '../src/utils/layoutCalculator'
 import type {
   ContextGridPresetCatalogV1,
   CoreRailRole,
@@ -39,8 +40,11 @@ import type {
   LayoutSchema,
   LayoutType,
   Padding,
+  Part,
   ShapeSystemSourceV2,
+  SharedLayoutType,
 } from '../src/types'
+import { SHARED_LAYOUT_TYPES } from '../src/types'
 import {
   ContextComparisonStrip,
   EditScopeBar,
@@ -98,6 +102,16 @@ const ROLE_LABELS: Record<JamoPartRole, string> = {
 }
 
 const REPRESENTATIVE_JAMOS = ['ㄱ', 'ㅇ', 'ㅏ', 'ㅂ', 'ㅎ', 'ㅙ'] as const
+const LAYOUT_SLOT_PARTS = ['CH', 'JU', 'JU_H', 'JU_V', 'JO'] as const satisfies readonly Part[]
+const SHARED_LAYOUT_LABELS: Record<SharedLayoutType, string> = {
+  'choseong-only': '단독',
+  'choseong-jungseong-vertical': '세로',
+  'choseong-jungseong-horizontal': '가로',
+  'choseong-jungseong-mixed': '혼합',
+  'choseong-jungseong-vertical-jongseong': '세로+받침',
+  'choseong-jungseong-horizontal-jongseong': '가로+받침',
+  'choseong-jungseong-mixed-jongseong': '혼합+받침',
+}
 
 function withEffectivePadding(
   schema: LayoutSchema,
@@ -1008,7 +1022,10 @@ function SharedLayoutScreen() {
     : saveState === 'saved' ? currentProjectId ? '프로젝트 저장됨' : '기기에 저장됨'
       : saveState === 'error' ? '저장 확인 필요' : selected ? '공통 기준선 편집' : '공통 기준선 관찰'
   const visibleRails = visible.kind === 'ready' ? visible.rails : []
-  const previewSchema = projectedSchemas[decomposeSyllable(observedChar, choseong, jungseong, jongseong).layoutType]
+  const layoutOverlays = useMemo(() => SHARED_LAYOUT_TYPES.map((layoutType) => ({
+    layoutType,
+    boxes: calculateRawBoxes(projectedSchemas[layoutType]),
+  })), [projectedSchemas])
 
   return (
     <MobileWorkspaceShell
@@ -1052,10 +1069,23 @@ function SharedLayoutScreen() {
           <section className={styles.canvasSection} aria-label="공통 layout Rail 편집 캔버스">
             <div className={`${styles.canvas} ${styles.layoutGridCanvas}`} ref={canvasRef} data-selected={selected ? 'true' : undefined}>
               <span className={styles.canvasGrid} aria-hidden="true" />
-              <DerivedSchemaGlyphPreview char={observedChar} schema={previewSchema} />
+              <svg className={styles.layoutGridOverlays} viewBox="0 0 1 1" aria-label="공통 layout grid의 7개 슬롯 경계">
+                {layoutOverlays.map(({ layoutType, boxes }) => (
+                  <g key={layoutType} data-layout-overlay={layoutType}>
+                    <title>{SHARED_LAYOUT_LABELS[layoutType]} layout 슬롯</title>
+                    {LAYOUT_SLOT_PARTS.flatMap((part) => {
+                      const box = boxes[part]
+                      return box ? [<rect key={part} data-part={part} x={box.x} y={box.y} width={box.width} height={box.height} />] : []
+                    })}
+                  </g>
+                ))}
+              </svg>
               {visibleRails.map((rail) => <div key={rail.id} className={styles.layoutCanvasRailHandle} data-rail-id={rail.id} data-selected={rail.id === selected?.id || undefined} data-axis={rail.axis} style={rail.axis === 'x' ? { left: `${rail.value * 100}%` } : { top: `${rail.value * 100}%` }} role="slider" tabIndex={0} aria-label={`공통 layout ${rail.axis.toUpperCase()} Rail ${Math.round(rail.value * 1000)} UPM`} aria-valuemin={rail.min} aria-valuemax={rail.max} aria-valuenow={rail.value} onPointerDown={(event) => beginGesture(rail, event)} onPointerMove={(event) => updateDraft(rail, event.clientX, event.clientY)} onPointerUp={(event) => finishGesture(rail, event)} onPointerCancel={clearDraft} onLostPointerCapture={clearDraft}><span aria-hidden="true" /></div>)}
             </div>
-            <p className={styles.layoutCanvasHelp}>기준선을 탭하면 선택하고, 직접 끌면 7개 결과를 임시로 보여줘요. 놓기 전에는 저장하지 않아요.</p>
+            <ul className={styles.layoutOverlayLegend} aria-label="겹쳐 보이는 layout 종류">
+              {SHARED_LAYOUT_TYPES.map((layoutType) => <li key={layoutType} data-layout={layoutType}>{SHARED_LAYOUT_LABELS[layoutType]}</li>)}
+            </ul>
+            <p className={styles.layoutCanvasHelp}>7개 layout의 슬롯 경계를 동시에 보입니다. 기준선을 탭하면 선택하고, 직접 끌면 7개 결과를 임시로 보여줘요.</p>
           </section>
           <ContextComparisonStrip heading="공통 배치가 쓰이는 7개 조합" eyebrow="연결 결과" items={contextItems} observedId={observedChar} onObserve={(id) => setObservedChar(id as typeof observedChar)} description="카드는 공통 layout binding으로 다시 계산한 기존 글자 배치 결과예요." />
         </> : <section className={styles.layoutSetup} aria-label="공통 layout grid 연결">

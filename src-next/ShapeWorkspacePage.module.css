@@ -29,6 +29,15 @@
 .cardGlyph { width: 68px; height: 68px; margin: auto; pointer-events: none; }
 
 .layoutGridCanvas { touch-action: none; }
+.layoutGridOverlays { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.layoutGridOverlays g { fill: none; stroke-width: .004; vector-effect: non-scaling-stroke; }
+.layoutGridOverlays g:nth-of-type(1) { stroke: #64748b; stroke-dasharray: .02 .014; }
+.layoutGridOverlays g:nth-of-type(2) { stroke: #4f7ee8; }
+.layoutGridOverlays g:nth-of-type(3) { stroke: #0f9e89; }
+.layoutGridOverlays g:nth-of-type(4) { stroke: #9b6ed2; }
+.layoutGridOverlays g:nth-of-type(5) { stroke: #d97706; }
+.layoutGridOverlays g:nth-of-type(6) { stroke: #d1487c; }
+.layoutGridOverlays g:nth-of-type(7) { stroke: #64748b; stroke-dasharray: .008 .012; }
 .layoutCanvasRailHandle { position: absolute; z-index: 3; display: grid; place-items: center; touch-action: none; outline: 0; cursor: grab; }
 .layoutCanvasRailHandle[data-axis='x'] { top: 0; width: 44px; height: 44px; margin-left: -22px; }
 .layoutCanvasRailHandle[data-axis='y'] { left: 0; width: 44px; height: 44px; margin-top: -22px; }
@@ -39,6 +48,14 @@
 .layoutCanvasRailHandle[data-selected='true'] span { background: rgb(var(--color-primary)); box-shadow: 0 0 0 1px rgb(var(--color-primary-light)); }
 .layoutCanvasRailHandle:focus-visible span { outline: 3px solid rgb(var(--color-primary) / .35); outline-offset: 2px; }
 .layoutCanvasHelp { max-width: 330px; margin: 8px auto 0; color: rgb(var(--color-text-dim-3)); font-size: 10px; line-height: 1.45; text-align: center; }
+.layoutOverlayLegend { max-width: 330px; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 8px; margin: 8px auto 0; padding: 0; list-style: none; }
+.layoutOverlayLegend li { display: inline-flex; align-items: center; gap: 4px; color: rgb(var(--color-text-dim-3)); font-size: 9px; }
+.layoutOverlayLegend li::before { width: 8px; height: 2px; content: ''; background: #64748b; }
+.layoutOverlayLegend li[data-layout='choseong-jungseong-vertical']::before { background: #4f7ee8; }
+.layoutOverlayLegend li[data-layout='choseong-jungseong-horizontal']::before { background: #0f9e89; }
+.layoutOverlayLegend li[data-layout='choseong-jungseong-mixed']::before { background: #9b6ed2; }
+.layoutOverlayLegend li[data-layout='choseong-jungseong-vertical-jongseong']::before { background: #d97706; }
+.layoutOverlayLegend li[data-layout='choseong-jungseong-horizontal-jongseong']::before { background: #d1487c; }
 .layoutSetup { min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 28px 24px; text-align: center; }
 .layoutSetup h2 { font-size: 17px; }
 .layoutSetup p { max-width: 280px; color: rgb(var(--color-text-dim-3)); font-size: 11px; line-height: 1.5; }

@@ -124,6 +124,7 @@ test('L-01 공통 layout Rail은 7개 binding 결과를 draft로 미리 보고 �
   await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
   await page.getByRole('button', { name: '기존 7개 배치를 공통 기준선으로 연결' }).click()
   await expect(page.getByRole('region', { name: '공통 layout Rail 편집 캔버스' })).toBeVisible()
+  await expect(page.locator('[data-layout-overlay]')).toHaveCount(7)
   await expect(page.getByRole('list', { name: '공통 배치가 쓰이는 7개 조합' }).getByRole('listitem')).toHaveCount(7)
 
   const connectedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
