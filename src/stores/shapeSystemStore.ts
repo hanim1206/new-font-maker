@@ -13,7 +13,7 @@ import type {
   ShapeSystemHistoryEntry,
   ShapeSystemSourceV2,
   ShapeSystemStoreResult,
-  SetSevenContextBaseAreaCellV1Command,
+  SetBaseMasterAreaCellsV1Command,
   SetSevenContextBaseCoreRailV2Command,
   SetLayoutGridRailV1Command,
   ValidatedRoleConstructionSourceV1,
@@ -32,7 +32,7 @@ import {
 import { parseRoleConstructionSourceV1 } from '../services/roleConstructionSourceV1'
 import { createStarterShapeSystemV2 } from '../services/defaultShapeSystemV2'
 import { setSevenContextBaseCoreRailV2 } from '../services/baseMasterRailCommandsV2'
-import { setSevenContextBaseAreaCellV1 } from '../services/baseMasterAreaCommandsV1'
+import { setBaseMasterAreaCellsV1 } from '../services/baseMasterAreaCommandsV1'
 import { connectLayoutGridFromSchemasV1 } from '../services/layoutGridConnectionV1'
 import { setLayoutGridRailV1 } from '../services/layoutGridRailCommandsV1'
 
@@ -58,8 +58,8 @@ interface ShapeSystemActions {
   setSevenContextBaseCoreRail: (
     command: DeepReadonly<SetSevenContextBaseCoreRailV2Command>,
   ) => ShapeSystemStoreResult
-  setSevenContextBaseAreaCell: (
-    command: DeepReadonly<SetSevenContextBaseAreaCellV1Command>,
+  setBaseMasterAreaCells: (
+    command: DeepReadonly<SetBaseMasterAreaCellsV1Command>,
   ) => ShapeSystemStoreResult
   setContextCoreRailOverride: (
     role: JamoPartRole,
@@ -291,13 +291,13 @@ export const useShapeSystemStore = create<ShapeSystemState & ShapeSystemActions>
           return success()
         },
 
-        setSevenContextBaseAreaCell: (command) => {
+        setBaseMasterAreaCells: (command) => {
           const current = get()
           if (current.hydrationStatus === 'blocked') {
             return failure('hydration-blocked', '손상되거나 지원하지 않는 저장 데이터를 먼저 복구해야 합니다.')
           }
           if (!current.source) return failure('not-initialized', 'Shape System이 아직 연결되지 않았습니다.')
-          const result = setSevenContextBaseAreaCellV1(current.source, command)
+          const result = setBaseMasterAreaCellsV1(current.source, command)
           if (!result.ok) return failure('command-failed', result.error.message)
           const entry: ShapeSystemHistoryEntry = {
             transaction: structuredClone(result.transaction),

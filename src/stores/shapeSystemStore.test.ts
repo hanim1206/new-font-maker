@@ -4,7 +4,7 @@ import type {
   CoreYRailRole,
   JamoPartRole,
   RoleConstructionScope,
-  SetSevenContextBaseAreaCellV1Command,
+  SetBaseMasterAreaCellsV1Command,
   SetSevenContextBaseCoreRailV2Command,
   ShapeSystemSourceV2,
   ValidatedShapeSystemSourceV2,
@@ -81,26 +81,26 @@ function sevenContextCommand(
   }
 }
 
-function sevenContextAreaCommand(
+function baseAreaCommand(
   source: ValidatedShapeSystemSourceV2,
-  mode: 'create' | 'move',
-  x: number,
-): SetSevenContextBaseAreaCellV1Command {
-  const target = (role: 'STANDALONE' | 'CH') => ({
-    masterId: source.roleSources[role].masters[0].id,
-    elementId: `j02:area:${role}:giyeok:primary`,
-    cell: {
-      leftRailId: source.roleSources[role].grid.xRails[x].id,
-      rightRailId: source.roleSources[role].grid.xRails[x + 1].id,
-      topRailId: source.roleSources[role].grid.yRails[0].id,
-      bottomRailId: source.roleSources[role].grid.yRails[1].id,
-    },
-  })
+  mode: 'fill' | 'erase',
+  coordinates: ReadonlyArray<readonly [number, number]>,
+): SetBaseMasterAreaCellsV1Command {
+  const grid = source.roleSources.CH.grid
   return {
-    transactionId: `tx:store:base-area:${mode}:${x}`,
+    transactionId: `tx:store:base-area:${mode}:${coordinates.map((value) => value.join('-')).join(':')}`,
     mode,
     jamoId: 'ㄱ',
-    targets: { STANDALONE: target('STANDALONE'), CH: target('CH') },
+    target: {
+      masterId: source.roleSources.CH.masters[0].id,
+      elementId: 'j02:area:CH:giyeok:primary',
+    },
+    cells: coordinates.map(([x, y]) => ({
+      leftRailId: grid.xRails[x].id,
+      rightRailId: grid.xRails[x + 1].id,
+      topRailId: grid.yRails[y].id,
+      bottomRailId: grid.yRails[y + 1].id,
+    })),
   }
 }
 
@@ -290,29 +290,29 @@ describe('shapeSystemStore canonical persistence and session history', () => {
     expect(reloaded.useShapeSystemStore.getState().future).toEqual([])
   })
 
-  it('7문맥 원자 셀 면 생성·이동은 각각 한 history 경계이고 Undo가 제스처 전 source를 exact 복원한다', async () => {
+  it('CH 다중 셀 채우기·비우기는 각각 한 history 경계이고 Undo가 제스처 전 source를 exact 복원한다', async () => {
     const storeModule = await importStore()
     const useStore = storeModule.useShapeSystemStore
     expect(storeModule.initializeStarterShapeSystem()).toEqual({ ok: true })
     const beforeCreate = structuredClone(useStore.getState().source)!
-    expect(useStore.getState().setSevenContextBaseAreaCell(
-      sevenContextAreaCommand(beforeCreate, 'create', 0),
+    expect(useStore.getState().setBaseMasterAreaCells(
+      baseAreaCommand(beforeCreate, 'fill', [[0, 0], [1, 0], [1, 1]]),
     )).toEqual({ ok: true })
-    const beforeMove = structuredClone(useStore.getState().source)!
+    const beforeErase = structuredClone(useStore.getState().source)!
     expect(useStore.getState().past).toHaveLength(1)
 
-    expect(useStore.getState().setSevenContextBaseAreaCell(
-      sevenContextAreaCommand(beforeMove, 'move', 1),
+    expect(useStore.getState().setBaseMasterAreaCells(
+      baseAreaCommand(beforeErase, 'erase', [[0, 0], [1, 0]]),
     )).toEqual({ ok: true })
-    const afterMove = structuredClone(useStore.getState().source)!
+    const afterErase = structuredClone(useStore.getState().source)!
     expect(useStore.getState().past).toHaveLength(2)
-    expect(useStore.getState().past[1].transaction.before).toEqual(beforeMove)
-    expect(useStore.getState().past[1].transaction.after).toEqual(afterMove)
+    expect(useStore.getState().past[1].transaction.before).toEqual(beforeErase)
+    expect(useStore.getState().past[1].transaction.after).toEqual(afterErase)
 
     expect(useStore.getState().undo()).toEqual({ ok: true })
-    expect(useStore.getState().source).toEqual(beforeMove)
+    expect(useStore.getState().source).toEqual(beforeErase)
     expect(useStore.getState().redo()).toEqual({ ok: true })
-    expect(useStore.getState().source).toEqual(afterMove)
+    expect(useStore.getState().source).toEqual(afterErase)
     expect(useStore.getState().undo()).toEqual({ ok: true })
     expect(useStore.getState().undo()).toEqual({ ok: true })
     expect(useStore.getState().source).toEqual(beforeCreate)
@@ -632,8 +632,8 @@ describe('shapeSystemStore canonical persistence and session history', () => {
     const useStore = (await importStore()).useShapeSystemStore
     expect(Object.keys(useStore.getState()).sort()).toEqual([
       'canRedo', 'canUndo', 'connectLayoutGrid', 'future', 'hydrationIssues', 'hydrationStatus',
-      'past', 'redo', 'removeContextCoreRailOverride', 'setContextCoreRailOverride',
-      'setLayoutGridRail', 'setSevenContextBaseAreaCell', 'setSevenContextBaseCoreRail', 'source', 'undo',
+      'past', 'redo', 'removeContextCoreRailOverride', 'setBaseMasterAreaCells',
+      'setContextCoreRailOverride', 'setLayoutGridRail', 'setSevenContextBaseCoreRail', 'source', 'undo',
     ])
   })
 })

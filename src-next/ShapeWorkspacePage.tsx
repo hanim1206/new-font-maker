@@ -13,7 +13,7 @@ import { resolveContextualPartGrid } from '../src/services/contextPartGridResolv
 import { parseRoleConstructionSourceV1 } from '../src/services/roleConstructionSourceV1'
 import { setCoreRailOverrideV1 } from '../src/services/jamoContextVariantCommandsV1'
 import { setSevenContextBaseCoreRailV2 } from '../src/services/baseMasterRailCommandsV2'
-import { setSevenContextBaseAreaCellV1 } from '../src/services/baseMasterAreaCommandsV1'
+import { setBaseMasterAreaCellsV1 } from '../src/services/baseMasterAreaCommandsV1'
 import { partForJamoRole } from '../src/services/jamoContextRoles'
 import { projectPartGridToSlot } from '../src/services/partGridSlotProjection'
 import { resolveRailGrid } from '../src/services/railGridResolver'
@@ -46,7 +46,7 @@ import type {
   Part,
   ShapeSystemSourceV2,
   SharedLayoutType,
-  SetSevenContextBaseAreaCellV1Command,
+  SetBaseMasterAreaCellsV1Command,
 } from '../src/types'
 import { SHARED_LAYOUT_TYPES } from '../src/types'
 import {
@@ -334,10 +334,7 @@ const PROVENANCE_LABELS = {
 } as const
 
 const RAIL_EDIT_STEP = 0.005
-const BASE_AREA_ELEMENT_IDS = {
-  STANDALONE: 'j02:area:STANDALONE:giyeok:primary',
-  CH: 'j02:area:CH:giyeok:primary',
-} as const
+const BASE_AREA_ELEMENT_ID = 'j02:area:CH:giyeok:primary'
 
 function snapRailDraft(value: number, min: number, max: number): number {
   const clamped = Math.min(max, Math.max(min, value))
@@ -353,29 +350,26 @@ type BaseAreaCellModel = {
   y: number
   width: number
   height: number
-  cells: {
-    STANDALONE: Omit<GridCellRef, 'id'>
-    CH: Omit<GridCellRef, 'id'>
-  }
+  cell: Omit<GridCellRef, 'id'>
 }
 
 type BaseAreaEditModel =
   | { kind: 'unavailable'; message: string }
   | {
     kind: 'ready'
-    masterIds: { STANDALONE: string; CH: string }
+    masterId: string
     cells: BaseAreaCellModel[]
-    currentCellKey: string | null
-    hasArea: boolean
+    occupiedCellKeys: ReadonlySet<string>
   }
 
 type BaseAreaGesture = {
-  mode: 'create' | 'move'
-  startClientX: number
-  startClientY: number
-  startCellKey: string
-  draftCellKey: string
-  moved: boolean
+  mode: 'fill' | 'erase'
+  visited: Set<string>
+}
+
+type BaseAreaDraft = {
+  mode: 'fill' | 'erase'
+  cellKeys: string[]
 }
 
 function sameAreaCell(
@@ -392,124 +386,72 @@ function resolveBaseAreaEditModel(source: DeepReadonly<ShapeSystemSourceV2> | nu
   if (!source) return { kind: 'unavailable', message: '형태 시스템을 먼저 시작해야 합니다.' }
   const parsed = parseShapeSystemSourceV2(source)
   if (!parsed.ok) return { kind: 'unavailable', message: '현재 자소 원본을 안전하게 편집할 수 없습니다.' }
-  const masterIds = {
-    STANDALONE: createJamoRoleMasterId('ㄱ', 'STANDALONE'),
-    CH: createJamoRoleMasterId('ㄱ', 'CH'),
+  const masterId = createJamoRoleMasterId('ㄱ', 'CH')
+  const master = parsed.source.roleSources.CH.masters.find(({ id }) => id === masterId)
+  if (!master) return { kind: 'unavailable', message: '초성 ㄱ 원형을 찾을 수 없습니다.' }
+  const channel = master.construction.channels.main
+  if (!channel || channel.role !== 'CH' || channel.gridId !== parsed.source.roleSources.CH.grid.id) {
+    return { kind: 'unavailable', message: '초성 ㄱ main channel의 소유권을 확인할 수 없습니다.' }
   }
-  const masters = {
-    STANDALONE: parsed.source.roleSources.STANDALONE.masters.find(({ id }) => id === masterIds.STANDALONE),
-    CH: parsed.source.roleSources.CH.masters.find(({ id }) => id === masterIds.CH),
-  }
-  if (!masters.STANDALONE || !masters.CH) {
-    return { kind: 'unavailable', message: '단독·초성 ㄱ 원형을 모두 찾을 수 없습니다.' }
-  }
-  const channels = {
-    STANDALONE: masters.STANDALONE.construction.channels.main,
-    CH: masters.CH.construction.channels.main,
-  }
-  if (!channels.STANDALONE || !channels.CH) {
-    return { kind: 'unavailable', message: '단독·초성 ㄱ의 main channel을 찾을 수 없습니다.' }
-  }
-  const elements = {
-    STANDALONE: channels.STANDALONE.elements.find(({ id }) => id === BASE_AREA_ELEMENT_IDS.STANDALONE),
-    CH: channels.CH.elements.find(({ id }) => id === BASE_AREA_ELEMENT_IDS.CH),
-  }
-  const hasStandalone = Boolean(elements.STANDALONE)
-  const hasCh = Boolean(elements.CH)
-  if (hasStandalone !== hasCh) {
-    return { kind: 'unavailable', message: '단독·초성 면 소유 상태가 달라 안전하게 편집할 수 없습니다.' }
-  }
-  if ((elements.STANDALONE && (elements.STANDALONE.kind !== 'area'
-    || elements.STANDALONE.filledCells.length !== 1 || elements.STANDALONE.boundaryTreatments.length !== 0))
-    || (elements.CH && (elements.CH.kind !== 'area'
-      || elements.CH.filledCells.length !== 1 || elements.CH.boundaryTreatments.length !== 0))) {
-    return { kind: 'unavailable', message: '첫 면 편집 흐름은 곡률·사선이 없는 단일 셀만 지원합니다.' }
+  const element = channel.elements.find(({ id }) => id === BASE_AREA_ELEMENT_ID)
+  if (element && (element.kind !== 'area' || element.boundaryTreatments.length !== 0)) {
+    return { kind: 'unavailable', message: '곡률·사선이 있는 면은 현재 점유 도구로 편집할 수 없습니다.' }
   }
   const resolvedCh = resolveRailGrid(parsed.source.roleSources.CH.grid)
   if (!resolvedCh.ok) return { kind: 'unavailable', message: '초성 기준선 위치를 해석할 수 없습니다.' }
-  const standaloneGrid = parsed.source.roleSources.STANDALONE.grid
-  const standaloneX = new Map(standaloneGrid.xRails.map((rail, index) => [rail.coreRole, { rail, index }]))
-  const standaloneY = new Map(standaloneGrid.yRails.map((rail, index) => [rail.coreRole, { rail, index }]))
   const cells: BaseAreaCellModel[] = []
   for (let row = 0; row < resolvedCh.grid.yRails.length - 1; row += 1) {
     const top = resolvedCh.grid.yRails[row]
     const bottom = resolvedCh.grid.yRails[row + 1]
-    if (!top.coreRole || !bottom.coreRole) continue
-    const standaloneTop = standaloneY.get(top.coreRole)
-    const standaloneBottom = standaloneY.get(bottom.coreRole)
-    if (!standaloneTop || !standaloneBottom || standaloneBottom.index !== standaloneTop.index + 1) continue
     for (let column = 0; column < resolvedCh.grid.xRails.length - 1; column += 1) {
-      // 첫 면 수직 조각은 ㄱ 가로획과 실제로 겹치는 상단 중앙 두 셀만 노출한다.
-      if (row !== 0 || (column !== 1 && column !== 2)) continue
       const left = resolvedCh.grid.xRails[column]
       const right = resolvedCh.grid.xRails[column + 1]
-      if (!left.coreRole || !right.coreRole) continue
-      const standaloneLeft = standaloneX.get(left.coreRole)
-      const standaloneRight = standaloneX.get(right.coreRole)
-      if (!standaloneLeft || !standaloneRight || standaloneRight.index !== standaloneLeft.index + 1) continue
+      const bounds = {
+        leftRailId: left.id,
+        rightRailId: right.id,
+        topRailId: top.id,
+        bottomRailId: bottom.id,
+      }
       cells.push({
-        key: `${left.coreRole}:${right.coreRole}:${top.coreRole}:${bottom.coreRole}`,
+        key: [left.id, right.id, top.id, bottom.id].join(':'),
         column,
         row,
         x: left.value,
         y: top.value,
         width: right.value - left.value,
         height: bottom.value - top.value,
-        cells: {
-          CH: {
-            leftRailId: left.id,
-            rightRailId: right.id,
-            topRailId: top.id,
-            bottomRailId: bottom.id,
-          },
-          STANDALONE: {
-            leftRailId: standaloneLeft.rail.id,
-            rightRailId: standaloneRight.rail.id,
-            topRailId: standaloneTop.rail.id,
-            bottomRailId: standaloneBottom.rail.id,
-          },
-        },
+        cell: bounds,
       })
     }
   }
-  if (cells.length === 0) return { kind: 'unavailable', message: '두 역할이 공유하는 원자 셀을 찾을 수 없습니다.' }
-  let currentCellKey: string | null = null
-  const standaloneArea = elements.STANDALONE?.kind === 'area' ? elements.STANDALONE : null
-  const chArea = elements.CH?.kind === 'area' ? elements.CH : null
-  if (standaloneArea && chArea) {
-    currentCellKey = cells.find((cell) =>
-      sameAreaCell(standaloneArea.filledCells[0], cell.cells.STANDALONE)
-      && sameAreaCell(chArea.filledCells[0], cell.cells.CH),
-    )?.key ?? null
-    if (!currentCellKey) {
-      return { kind: 'unavailable', message: '단독·초성 면이 같은 의미의 원자 셀에 있지 않습니다.' }
+  if (cells.length === 0) return { kind: 'unavailable', message: '초성 원자 셀을 찾을 수 없습니다.' }
+  const occupiedCellKeys = new Set<string>()
+  if (element?.kind === 'area') {
+    for (const filledCell of element.filledCells) {
+      const matched = cells.find(({ cell }) => sameAreaCell(filledCell, cell))
+      if (!matched) return { kind: 'unavailable', message: '저장된 면 셀을 현재 Rail 그리드에서 찾을 수 없습니다.' }
+      occupiedCellKeys.add(matched.key)
     }
   }
-  return { kind: 'ready', masterIds, cells, currentCellKey, hasArea: hasStandalone && hasCh }
+  return { kind: 'ready', masterId, cells, occupiedCellKeys }
 }
 
 function areaCommand(
   model: Extract<BaseAreaEditModel, { kind: 'ready' }>,
-  mode: 'create' | 'move',
-  cell: BaseAreaCellModel,
+  mode: 'fill' | 'erase',
+  cellKeys: readonly string[],
   transactionId: string,
-): SetSevenContextBaseAreaCellV1Command {
+): SetBaseMasterAreaCellsV1Command {
   return {
     transactionId,
     mode,
     jamoId: 'ㄱ',
-    targets: {
-      STANDALONE: {
-        masterId: model.masterIds.STANDALONE,
-        elementId: BASE_AREA_ELEMENT_IDS.STANDALONE,
-        cell: cell.cells.STANDALONE,
-      },
-      CH: {
-        masterId: model.masterIds.CH,
-        elementId: BASE_AREA_ELEMENT_IDS.CH,
-        cell: cell.cells.CH,
-      },
+    target: {
+      masterId: model.masterId,
+      elementId: BASE_AREA_ELEMENT_ID,
     },
+    cells: cellKeys.map((key) => model.cells.find((cell) => cell.key === key)?.cell)
+      .filter((cell): cell is Omit<GridCellRef, 'id'> => Boolean(cell)),
   }
 }
 
@@ -686,10 +628,9 @@ function MasterScreen() {
   const [observedChar, setObservedChar] = useState<(typeof CONTEXTS)[number]['char']>('ㄱ')
   const [drawerState, setDrawerState] = useState<DrawerState>('collapsed')
   const [activeTool, setActiveTool] = useState<'select' | 'area'>('select')
-  const [areaSelected, setAreaSelected] = useState(false)
   const [editedCoreRole, setEditedCoreRole] = useState<EditableCoreRole>('inner-left')
   const [draftValue, setDraftValue] = useState<number | null>(null)
-  const [draftAreaCellKey, setDraftAreaCellKey] = useState<string | null>(null)
+  const [areaDraft, setAreaDraft] = useState<BaseAreaDraft | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [feedback, setFeedback] = useState<string | null>(null)
   const railCanvasRef = useRef<HTMLDivElement | null>(null)
@@ -701,7 +642,7 @@ function MasterScreen() {
   const hydrationStatus = useShapeSystemStore((state) => state.hydrationStatus)
   const source = useShapeSystemStore((state) => state.source)
   const setBaseRail = useShapeSystemStore((state) => state.setSevenContextBaseCoreRail)
-  const setBaseAreaCell = useShapeSystemStore((state) => state.setSevenContextBaseAreaCell)
+  const setBaseAreaCells = useShapeSystemStore((state) => state.setBaseMasterAreaCells)
   const canUndo = useShapeSystemStore((state) => state.past.length > 0)
   const canRedo = useShapeSystemStore((state) => state.future.length > 0)
   const undo = useShapeSystemStore((state) => state.undo)
@@ -727,30 +668,25 @@ function MasterScreen() {
     return result.ok ? result.source : source
   }, [committedModel, draftValue, source])
   const draftSource = useMemo(() => {
-    if (!source || areaModel.kind !== 'ready' || !draftAreaCellKey) return railDraftSource
-    const cell = areaModel.cells.find(({ key }) => key === draftAreaCellKey)
-    if (!cell) return railDraftSource
-    const result = setSevenContextBaseAreaCellV1(source, areaCommand(
+    if (!source || areaModel.kind !== 'ready' || !areaDraft || areaDraft.cellKeys.length === 0) return railDraftSource
+    const result = setBaseMasterAreaCellsV1(source, areaCommand(
       areaModel,
-      areaModel.hasArea ? 'move' : 'create',
-      cell,
+      areaDraft.mode,
+      areaDraft.cellKeys,
       'shape-workspace:area-draft',
     ))
     return result.ok ? result.source : railDraftSource
-  }, [areaModel, draftAreaCellKey, railDraftSource, source])
+  }, [areaDraft, areaModel, railDraftSource, source])
   const preview = useShapeMasterPreview(draftSource)
   const contextItems = useShapeContextItems(draftSource)
   const visibleValue = draftValue ?? (committedModel.kind === 'ready' ? committedModel.value : 0)
-  const visibleAreaCell = areaModel.kind === 'ready'
-    ? areaModel.cells.find(({ key }) => key === (draftAreaCellKey ?? areaModel.currentCellKey)) ?? null
-    : null
 
   useEffect(() => {
     railGestureRef.current = null
     areaGestureRef.current = null
     draftValueRef.current = null
     setDraftValue(null)
-    setDraftAreaCellKey(null)
+    setAreaDraft(null)
   }, [source])
 
   const persistShapeChange = useCallback(async () => {
@@ -777,7 +713,7 @@ function MasterScreen() {
     areaGestureRef.current = null
     draftValueRef.current = null
     setDraftValue(null)
-    setDraftAreaCellKey(null)
+    setAreaDraft(null)
   }, [])
 
   const commitValue = useCallback((model: Extract<BaseEditModel, { kind: 'ready' }>, value: number) => {
@@ -803,16 +739,16 @@ function MasterScreen() {
     void persistShapeChange()
   }, [clearDraft, persistShapeChange, setBaseRail])
 
-  const commitAreaCell = useCallback((
+  const commitAreaCells = useCallback((
     model: Extract<BaseAreaEditModel, { kind: 'ready' }>,
-    mode: 'create' | 'move',
-    cell: BaseAreaCellModel,
+    mode: 'fill' | 'erase',
+    cellKeys: readonly string[],
   ) => {
     transactionSequence.current += 1
-    const result = setBaseAreaCell(areaCommand(
+    const result = setBaseAreaCells(areaCommand(
       model,
       mode,
-      cell,
+      cellKeys,
       `shape-workspace:base-area:${transactionSequence.current}`,
     ))
     if (!result.ok) {
@@ -822,11 +758,9 @@ function MasterScreen() {
       return
     }
     clearDraft()
-    setAreaSelected(true)
-    setActiveTool('select')
     setDrawerState('medium')
     void persistShapeChange()
-  }, [clearDraft, persistShapeChange, setBaseAreaCell])
+  }, [clearDraft, persistShapeChange, setBaseAreaCells])
 
   const handleHistory = (direction: 'undo' | 'redo') => {
     const result = direction === 'undo' ? undo() : redo()
@@ -840,7 +774,6 @@ function MasterScreen() {
   }
 
   const beginCanvasGesture = (model: Extract<BaseEditModel, { kind: 'ready' }>, event: ReactPointerEvent<HTMLDivElement>) => {
-    setAreaSelected(false)
     setActiveTool('select')
     setEditedCoreRole(model.coreRole)
     setDrawerState('medium')
@@ -890,24 +823,16 @@ function MasterScreen() {
       && y >= cell.y && y <= cell.y + cell.height) ?? null
   }, [areaModel])
 
-  const beginAreaGesture = (
-    mode: 'create' | 'move',
-    cell: BaseAreaCellModel,
-    event: ReactPointerEvent<HTMLButtonElement>,
-  ) => {
+  const beginAreaGesture = (cell: BaseAreaCellModel, event: ReactPointerEvent<HTMLButtonElement>) => {
     clearDraft()
-    setAreaSelected(mode === 'move')
     setDrawerState('medium')
+    const mode = areaModel.kind === 'ready' && areaModel.occupiedCellKeys.has(cell.key) ? 'erase' : 'fill'
     const gesture: BaseAreaGesture = {
       mode,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      startCellKey: cell.key,
-      draftCellKey: cell.key,
-      moved: false,
+      visited: new Set([cell.key]),
     }
     areaGestureRef.current = gesture
-    setDraftAreaCellKey(cell.key)
+    setAreaDraft({ mode, cellKeys: [cell.key] })
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
@@ -915,30 +840,19 @@ function MasterScreen() {
     const gesture = areaGestureRef.current
     if (!gesture) return
     const cell = areaCellAtPointer(clientX, clientY)
-    if (!cell) return
-    const distance = Math.hypot(clientX - gesture.startClientX, clientY - gesture.startClientY)
-    if (distance >= 3 && cell.key !== gesture.startCellKey) gesture.moved = true
-    gesture.draftCellKey = cell.key
-    setDraftAreaCellKey(cell.key)
+    if (!cell || gesture.visited.has(cell.key)) return
+    gesture.visited.add(cell.key)
+    setAreaDraft({ mode: gesture.mode, cellKeys: [...gesture.visited] })
   }
 
   const finishAreaGesture = (event: ReactPointerEvent<HTMLButtonElement>) => {
     const gesture = areaGestureRef.current
     if (!gesture || areaModel.kind !== 'ready') return
     updateAreaDraft(event.clientX, event.clientY)
+    const cellKeys = [...gesture.visited]
     areaGestureRef.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-    const cell = areaModel.cells.find(({ key }) => key === gesture.draftCellKey)
-    if (!cell) {
-      clearDraft()
-      return
-    }
-    if (gesture.mode === 'create' || (gesture.moved && gesture.draftCellKey !== gesture.startCellKey)) {
-      commitAreaCell(areaModel, gesture.mode, cell)
-    } else {
-      setAreaSelected(true)
-      clearDraft()
-    }
+    commitAreaCells(areaModel, gesture.mode, cellKeys)
   }
 
   const saveLabel = saveState === 'saving'
@@ -955,8 +869,16 @@ function MasterScreen() {
       : committedModel.kind === 'unavailable'
         ? committedModel.message
         : '단독과 초성의 같은 기준선을 한 번에 바꾸고 7개 결과에 반영합니다.'
-  const areaCreateActive = activeTool === 'area' && areaModel.kind === 'ready' && !areaModel.hasArea
-  const areaSelectionActive = areaSelected && areaModel.kind === 'ready' && areaModel.hasArea
+  const areaToolActive = activeTool === 'area' && areaModel.kind === 'ready'
+  const visibleOccupiedCellKeys = useMemo(() => {
+    if (areaModel.kind !== 'ready') return new Set<string>()
+    const keys = new Set(areaModel.occupiedCellKeys)
+    if (areaDraft) for (const key of areaDraft.cellKeys) {
+      if (areaDraft.mode === 'fill') keys.add(key)
+      else keys.delete(key)
+    }
+    return keys
+  }, [areaDraft, areaModel])
 
   return (
     <MobileWorkspaceShell
@@ -968,27 +890,17 @@ function MasterScreen() {
         <PrecisionControlDrawer
           state={drawerState}
           onStateChange={setDrawerState}
-          targetLabel={areaCreateActive
-            ? 'ㄱ 원형 · 점유 면 만들기'
-            : areaSelectionActive
-            ? 'ㄱ 원형 · 점유 면'
+          targetLabel={areaToolActive
+            ? '초성 ㄱ 원형 · 면 채우기'
             : committedModel.kind === 'ready' ? `ㄱ 원형 · ${committedModel.railLabel}` : '원형 관찰'}
         >
-          {areaCreateActive ? (
+          {areaToolActive ? (
             <div className={styles.areaEditor}>
               <div className={styles.railEditorHeading}>
-                <span>점유 면 만들기</span>
-                <output>{visibleAreaCell ? `${visibleAreaCell.row + 1}행 ${visibleAreaCell.column + 1}열` : '2칸 중 선택'}</output>
+                <span>전체 그리드 면 채우기</span>
+                <output>{visibleOccupiedCellKeys.size}칸 점유</output>
               </div>
-              <p>캔버스에 표시된 두 칸 중 하나를 누르세요. 누르는 동안 결과만 미리 보고, 손을 떼면 면 하나로 저장합니다.</p>
-            </div>
-          ) : areaSelectionActive && visibleAreaCell ? (
-            <div className={styles.areaEditor}>
-              <div className={styles.railEditorHeading}>
-                <span>점유 면</span>
-                <output>{visibleAreaCell.row + 1}행 {visibleAreaCell.column + 1}열</output>
-              </div>
-              <p>선택한 원자 셀 하나를 단독·초성 ㄱ 원형에서 함께 사용합니다. 캔버스의 면을 끌어 인접 셀로 옮길 수 있어요.</p>
+              <p>빈 칸에서 시작하면 지나간 칸을 채우고, 찬 칸에서 시작하면 비웁니다. 손을 떼기 전에는 최종 윤곽만 미리 보여요.</p>
             </div>
           ) : committedModel.kind === 'ready' ? (
             <div className={styles.railEditor}>
@@ -996,7 +908,6 @@ function MasterScreen() {
                 {EDITABLE_CORE_RAILS.map((rail) => (
                   <button type="button" key={rail.coreRole} aria-pressed={editedCoreRole === rail.coreRole} onClick={() => {
                     clearDraft()
-                    setAreaSelected(false)
                     setActiveTool('select')
                     setEditedCoreRole(rail.coreRole)
                   }}>{rail.label.replace('안쪽 ', '').replace(' 기준선', '')}</button>
@@ -1057,7 +968,7 @@ function MasterScreen() {
         <EditScopeBar items={[
           { label: '현재 대상', value: '초성 ㄱ' },
           { label: '수정 범위', value: '이 자소의 원형' },
-          { label: '영향', value: '초성 조합 7개' },
+          { label: '영향', value: activeTool === 'area' ? '초성 조합 6개' : '단독·초성 조합 7개' },
         ]} />
         <ShapeStatus />
         {feedback && <p className={styles.saveFeedback} data-state={saveState} role={saveState === 'error' ? 'alert' : 'status'}>{feedback}</p>}
@@ -1069,7 +980,7 @@ function MasterScreen() {
             <button type="button" aria-pressed="true">결과 윤곽</button>
             <button type="button" aria-pressed="false" disabled>원본 선</button>
             <button type="button" aria-pressed="false" disabled>기준선</button>
-            <button type="button" aria-pressed={areaModel.kind === 'ready' && areaModel.hasArea} disabled>점유 면</button>
+            <button type="button" aria-pressed={areaModel.kind === 'ready' && areaModel.occupiedCellKeys.size > 0} disabled>점유 면</button>
           </div>
           {preview.kind === 'error' ? (
             <div className={styles.canvas} aria-describedby="shape-preview-error">
@@ -1086,45 +997,33 @@ function MasterScreen() {
               ) : <GlyphPreview char="ㄱ" />}
               {areaModel.kind === 'ready' && (
                 <div className={styles.shapeAreaLayer} ref={areaLayerRef} aria-label="점유 면 원자 셀">
-                  {activeTool === 'area' && !areaModel.hasArea && areaModel.cells.map((cell) => (
+                  {areaToolActive && areaModel.cells.map((cell) => {
+                    const occupied = visibleOccupiedCellKeys.has(cell.key)
+                    const drafted = areaDraft?.cellKeys.includes(cell.key) ?? false
+                    return (
                     <button
                       type="button"
                       key={cell.key}
-                      className={styles.areaCreateCell}
-                      data-draft={draftAreaCellKey === cell.key || undefined}
+                      className={styles.areaCell}
+                      data-area-cell={cell.key}
+                      data-occupied={occupied || undefined}
+                      data-draft={drafted || undefined}
                       style={{
                         left: `${cell.x * 100}%`, top: `${cell.y * 100}%`,
                         width: `${cell.width * 100}%`, height: `${cell.height * 100}%`,
                       }}
-                      aria-label={`면 생성 ${cell.row + 1}행 ${cell.column + 1}열`}
-                      onPointerDown={(event) => beginAreaGesture('create', cell, event)}
+                      aria-label={`면 셀 ${cell.row + 1}행 ${cell.column + 1}열, ${occupied ? '찬 셀' : '빈 셀'}`}
+                      onPointerDown={(event) => beginAreaGesture(cell, event)}
                       onPointerMove={(event) => updateAreaDraft(event.clientX, event.clientY)}
                       onPointerUp={finishAreaGesture}
                       onPointerCancel={clearDraft}
                       onLostPointerCapture={clearDraft}
                     />
-                  ))}
-                  {areaModel.hasArea && visibleAreaCell && (
-                    <button
-                      type="button"
-                      className={styles.areaMoveHandle}
-                      data-selected={areaSelectionActive || undefined}
-                      data-element-id={BASE_AREA_ELEMENT_IDS.CH}
-                      style={{
-                        left: `${visibleAreaCell.x * 100}%`, top: `${visibleAreaCell.y * 100}%`,
-                        width: `${visibleAreaCell.width * 100}%`, height: `${visibleAreaCell.height * 100}%`,
-                      }}
-                      aria-label="점유 면 이동"
-                      onPointerDown={(event) => beginAreaGesture('move', visibleAreaCell, event)}
-                      onPointerMove={(event) => updateAreaDraft(event.clientX, event.clientY)}
-                      onPointerUp={finishAreaGesture}
-                      onPointerCancel={clearDraft}
-                      onLostPointerCapture={clearDraft}
-                    ><span>면</span></button>
-                  )}
+                    )
+                  })}
                 </div>
               )}
-              {committedModel.kind === 'ready' && baseModels.map(({ rail, model }) => {
+              {activeTool !== 'area' && committedModel.kind === 'ready' && baseModels.map(({ rail, model }) => {
                 if (model.kind !== 'ready') return null
                 const value = rail.coreRole === editedCoreRole ? visibleValue : model.value
                 return <div
@@ -1168,9 +1067,8 @@ function MasterScreen() {
             setActiveTool('select')
           }}><ScanSearch size={18} />선택</button>
           <button type="button" disabled><Shapes size={18} />중심선</button>
-          <button type="button" aria-pressed={activeTool === 'area'} disabled={areaModel.kind !== 'ready' || areaModel.hasArea} onClick={() => {
+          <button type="button" aria-pressed={activeTool === 'area'} disabled={areaModel.kind !== 'ready'} onClick={() => {
             clearDraft()
-            setAreaSelected(false)
             setActiveTool('area')
             setDrawerState('medium')
           }}><Grid2X2 size={18} />면 채우기</button>

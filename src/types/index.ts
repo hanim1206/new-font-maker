@@ -1177,8 +1177,7 @@ export interface SourceCommandTransaction<T> {
     | 'set-context-variant-patch'
     | 'remove-context-variant-patch'
     | 'set-seven-context-base-core-rail'
-    | 'create-seven-context-base-area-cell'
-    | 'move-seven-context-base-area-cell'
+    | 'set-base-master-area-cells'
     | 'connect-layout-grid'
     | 'set-layout-grid-rail'
   before: T
@@ -1202,21 +1201,18 @@ export interface SetSevenContextBaseCoreRailV2Command {
   }
 }
 
-export interface BaseMasterAreaCellTargetV1 {
+export interface BaseMasterAreaTargetV1 {
   masterId: string
   elementId: string
-  cell: Omit<GridCellRef, 'id'>
 }
 
-/** J-02의 STANDALONE·CH 원형에 같은 의미의 단일 원자 셀 면을 생성하거나 이동한다. */
-export interface SetSevenContextBaseAreaCellV1Command {
+/** J-02의 한 역할 primary area 점유 집합에 원자 셀을 추가하거나 제거한다. */
+export interface SetBaseMasterAreaCellsV1Command {
   transactionId: string
-  mode: 'create' | 'move'
+  mode: 'fill' | 'erase'
   jamoId: string
-  targets: {
-    STANDALONE: BaseMasterAreaCellTargetV1
-    CH: BaseMasterAreaCellTargetV1
-  }
+  target: BaseMasterAreaTargetV1
+  cells: Omit<GridCellRef, 'id'>[]
 }
 
 /** 공통 layout grid의 안정 Rail ID 하나를 한 transaction으로 이동한다. */

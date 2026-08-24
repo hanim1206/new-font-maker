@@ -1,6 +1,6 @@
 # 구현 상태
 
-기준 커밋: `3169a71`
+기준 커밋: `ee92d10`
 
 ## Step 4E-1 · 자소 원형 Rail 편집 경계
 
@@ -66,3 +66,9 @@
 - 역할 소유권: 초성 화면은 CH, 단독 화면은 STANDALONE 원형을 독립 편집한다. 현재 두 역할을 함께 바꾸는 임시 bridge는 새 면 명령에 재사용하지 않으며 역할 간 복사·연결은 별도 명시적 액션으로 둔다.
 - 변경 문서: `docs/PRODUCT_PHILOSOPHY.md`, `COMMON_GRID_HYBRID_IMPLEMENTATION_PLAN.md`, `KOREAN_FONT_MAKER_UX_SCREEN_SPEC.md`, `IMPLEMENTATION_STATUS.md`와 Obsidian 대응 플랜·UX 명세.
 - 검증: 핵심 용어·Step 5·J-02·수용 기준의 상호 참조와 저장소/Obsidian 문서 동기화, `git diff --check`를 확인한다.
+
+## Step 5A-2 · J-02 전체 그리드 점유 면 편집
+
+- 변경 파일: `src/types/index.ts`, `src/services/baseMasterAreaCommandsV1.ts`, `src/services/baseMasterAreaCommandsV1.test.ts`, `src/stores/shapeSystemStore.ts`, `src/stores/shapeSystemStore.test.ts`, `src-next/ShapeWorkspacePage.tsx`, `src-next/ShapeWorkspacePage.module.css`, `tests/e2e/shape-workspace-shell.spec.ts`, `IMPLEMENTATION_STATUS.md`.
+- 검증: `npx tsc -b --pretty false`, 대상 ESLint, 관련 Vitest 112개, `tests/e2e/shape-workspace-shell.spec.ts` 10개, `git diff --check` 통과. 기본 CH part grid의 4×4 전체 셀, 기존 단일 셀 확장, 연속 채우기·비우기, 같은 셀 왕복 중복 방지, draft 중 source·localStorage 불변, pointerup 1회 저장, pointercancel·lostpointercapture 무변, Undo exact 복원, reload 복원, STANDALONE 원본과 기존 중심선·Rail·J-03·L-01 보존을 확인했다.
+- 남은 P1·다음 단계 주의점: 첫 수직 흐름은 초성 ㄱ의 CH stable primary area 하나만 편집한다. 마지막 셀을 비워도 요소는 유지하며 STANDALONE 면은 읽거나 쓰지 않는다. 중심선 생성·교점 편집, 보조 Rail 추가·삭제, 참조 재연결, 곡률·사선, 별도 면 요소 추가·삭제, 67개 자소와 전체 Shape OTF 전환은 아직 지원하지 않는다.

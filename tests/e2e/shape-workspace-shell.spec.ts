@@ -117,7 +117,7 @@ test('J-02 자소 원형 Rail은 네 방향을 직접 편집하고 한 transacti
   await expectMobileShellContract(page)
 })
 
-test('J-02 점유 면은 원자 셀에서 생성·선택·draft 이동하고 pointerup 한 번 저장·Undo한다', async ({ page }) => {
+test('J-02 전체 4×4 점유 면은 연속 채우기·비우기 draft를 한 transaction으로 저장·취소·복원한다', async ({ page }) => {
   await page.goto('/workspace/jamo/result?char=ㄱ')
   await page.getByRole('button', { name: '추천 기본 구조로 시작' }).click()
   await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
@@ -135,79 +135,99 @@ test('J-02 점유 면은 원자 셀에서 생성·선택·draft 이동하고 poi
   })
 
   await page.getByRole('button', { name: '면 채우기' }).click()
+  await expect(page.locator('[aria-label="수정 범위"]')).toContainText('초성 조합 6개')
   const precisionDrawer = page.getByRole('region', { name: '정밀 조절' })
-  await expect(precisionDrawer).toContainText('점유 면 만들기')
+  await expect(precisionDrawer).toContainText('전체 그리드 면 채우기')
   await expect(precisionDrawer.getByRole('slider', { name: /기준선/ })).toHaveCount(0)
-  const createCell = page.getByRole('button', { name: '면 생성 1행 2열' })
-  await createCell.scrollIntoViewIfNeeded()
-  const createBox = await createCell.boundingBox()
-  if (!createBox) throw new Error('면 생성 원자 셀 위치를 찾을 수 없습니다.')
+  const cells = page.locator('[data-area-cell]')
+  await expect(cells).toHaveCount(16)
+  await expect(page.getByRole('button', { name: '면 셀 1행 1열, 빈 셀' })).toBeVisible()
+  const first = cells.nth(0)
+  const second = cells.nth(1)
+  const third = cells.nth(2)
+  await first.scrollIntoViewIfNeeded()
+  const firstBox = await first.boundingBox()
+  const secondBox = await second.boundingBox()
+  const thirdBox = await third.boundingBox()
+  if (!firstBox || !secondBox || !thirdBox) throw new Error('면 원자 셀 위치를 찾을 수 없습니다.')
+  const center = (box: typeof firstBox) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 })
   const masterInk = page.getByRole('img', { name: 'Shape 마스터 ㄱ 최종 윤곽' }).locator('path[data-final-ink]')
-  const beforeCreatePath = await masterInk.getAttribute('d')
+  const beforeFillPath = await masterInk.getAttribute('d')
 
-  await page.mouse.move(createBox.x + createBox.width / 2, createBox.y + createBox.height / 2)
+  await page.mouse.move(center(firstBox).x, center(firstBox).y)
   await page.mouse.down()
-  await expect(masterInk).not.toHaveAttribute('d', beforeCreatePath ?? '')
+  await page.mouse.move(center(secondBox).x, center(secondBox).y, { steps: 4 })
+  await expect(masterInk).not.toHaveAttribute('d', beforeFillPath ?? '')
   expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
-  await createCell.dispatchEvent('pointercancel', { pointerId: 1, pointerType: 'mouse', isPrimary: true })
+  await first.dispatchEvent('pointercancel', { pointerId: 1, pointerType: 'mouse', isPrimary: true })
   await page.mouse.up()
-  await expect(masterInk).toHaveAttribute('d', beforeCreatePath ?? '')
+  await expect(masterInk).toHaveAttribute('d', beforeFillPath ?? '')
   expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
 
-  const resetCreateBox = await createCell.boundingBox()
-  if (!resetCreateBox) throw new Error('취소 뒤 면 생성 셀 위치를 찾을 수 없습니다.')
-  await page.mouse.move(resetCreateBox.x + resetCreateBox.width / 2, resetCreateBox.y + resetCreateBox.height / 2)
+  await page.mouse.move(center(firstBox).x, center(firstBox).y)
   await page.mouse.down()
+  await page.mouse.move(center(secondBox).x, center(secondBox).y, { steps: 3 })
+  await first.dispatchEvent('lostpointercapture', { pointerId: 1, pointerType: 'mouse', isPrimary: true })
+  await page.mouse.up()
+  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
+
+  await page.mouse.move(center(firstBox).x, center(firstBox).y)
+  await page.mouse.down()
+  await page.mouse.move(center(secondBox).x, center(secondBox).y, { steps: 3 })
+  await page.mouse.move(center(firstBox).x, center(firstBox).y, { steps: 3 })
+  await page.mouse.move(center(thirdBox).x, center(thirdBox).y, { steps: 3 })
   expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
   await page.mouse.up()
   await page.waitForTimeout(350)
-  const createdRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
-  expect(createdRaw).not.toBe(initializedRaw)
+  const filledRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
+  expect(filledRaw).not.toBe(initializedRaw)
   expect(await page.evaluate(() => (window as unknown as { __shapeAreaWrites: number }).__shapeAreaWrites)).toBe(1)
-  await expect(page.getByRole('button', { name: '점유 면 이동' })).toBeVisible()
-  await expect(page.getByRole('region', { name: '정밀 조절' })).toContainText('점유 면')
-  const createdTargets = await page.evaluate((key) => {
+  await expect(precisionDrawer).toContainText('3칸 점유')
+  const committed = await page.evaluate((key) => {
     const source = JSON.parse(localStorage.getItem(key)!).state.source
-    return ['STANDALONE', 'CH'].map((role) => {
-      const elementId = `j02:area:${role}:giyeok:primary`
-      const element = source.roleSources[role].masters[0].construction.channels.main.elements
-        .find((candidate: { id: string }) => candidate.id === elementId)
-      return { elementId: element.id, cellId: element.filledCells[0].id }
-    })
+    const chElement = source.roleSources.CH.masters[0].construction.channels.main.elements
+      .find((candidate: { id: string }) => candidate.id === 'j02:area:CH:giyeok:primary')
+    const standaloneElement = source.roleSources.STANDALONE.masters[0].construction.channels.main.elements
+      .find((candidate: { kind: string }) => candidate.kind === 'area')
+    return { chElement, standaloneElement }
   }, SHAPE_KEY)
-  expect(createdTargets).toEqual([
-    expect.objectContaining({ elementId: 'j02:area:STANDALONE:giyeok:primary', cellId: expect.stringContaining('grid-cell:') }),
-    expect.objectContaining({ elementId: 'j02:area:CH:giyeok:primary', cellId: expect.stringContaining('grid-cell:') }),
-  ])
+  expect(committed.chElement).toMatchObject({
+    id: 'j02:area:CH:giyeok:primary',
+    filledCells: [
+      expect.objectContaining({ id: expect.stringContaining('grid-cell:') }),
+      expect.objectContaining({ id: expect.stringContaining('grid-cell:') }),
+      expect.objectContaining({ id: expect.stringContaining('grid-cell:') }),
+    ],
+  })
+  expect(committed.standaloneElement).toBeUndefined()
 
-  const areaHandle = page.getByRole('button', { name: '점유 면 이동' })
-  await areaHandle.scrollIntoViewIfNeeded()
-  const areaBox = await areaHandle.boundingBox()
-  if (!areaBox) throw new Error('점유 면 위치를 찾을 수 없습니다.')
-  await page.mouse.move(areaBox.x + areaBox.width / 2, areaBox.y + areaBox.height / 2)
+  const filledFirst = page.getByRole('button', { name: '면 셀 1행 1열, 찬 셀' })
+  const filledSecond = page.getByRole('button', { name: '면 셀 1행 2열, 찬 셀' })
+  const eraseFirstBox = await cells.nth(0).boundingBox()
+  const eraseSecondBox = await cells.nth(1).boundingBox()
+  if (!eraseFirstBox || !eraseSecondBox) throw new Error('비우기 원자 셀 위치를 찾을 수 없습니다.')
+  await page.mouse.move(center(eraseFirstBox).x, center(eraseFirstBox).y)
   await page.mouse.down()
-  await page.mouse.move(areaBox.x + areaBox.width + 34, areaBox.y + areaBox.height / 2, { steps: 4 })
-  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(createdRaw)
-  await areaHandle.dispatchEvent('lostpointercapture', { pointerId: 1, pointerType: 'mouse', isPrimary: true })
-  await page.mouse.up()
-  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(createdRaw)
-
-  await areaHandle.scrollIntoViewIfNeeded()
-  const resetAreaBox = await areaHandle.boundingBox()
-  if (!resetAreaBox) throw new Error('취소 뒤 점유 면 위치를 찾을 수 없습니다.')
-  await page.mouse.move(resetAreaBox.x + resetAreaBox.width / 2, resetAreaBox.y + resetAreaBox.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(resetAreaBox.x + resetAreaBox.width + 34, resetAreaBox.y + resetAreaBox.height / 2, { steps: 4 })
-  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(createdRaw)
+  await page.mouse.move(center(eraseSecondBox).x, center(eraseSecondBox).y, { steps: 4 })
+  await page.mouse.move(center(eraseFirstBox).x, center(eraseFirstBox).y, { steps: 3 })
+  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(filledRaw)
   await page.mouse.up()
   await page.waitForTimeout(350)
-  const movedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
-  expect(movedRaw).not.toBe(createdRaw)
+  const erasedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
+  expect(erasedRaw).not.toBe(filledRaw)
   expect(await page.evaluate(() => (window as unknown as { __shapeAreaWrites: number }).__shapeAreaWrites)).toBe(2)
+  await expect(precisionDrawer).toContainText('1칸 점유')
+  await expect(filledFirst).toHaveCount(0)
+  await expect(filledSecond).toHaveCount(0)
 
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
   await page.waitForTimeout(350)
-  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(createdRaw)
+  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(filledRaw)
+  await page.reload()
+  await page.getByRole('button', { name: '면 채우기' }).click()
+  await expect(page.locator('[data-area-cell][data-occupied="true"]')).toHaveCount(3)
+  await expect(page.getByRole('region', { name: '정밀 조절' })).toContainText('3칸 점유')
+  await page.getByRole('button', { name: '선택', exact: true }).click()
   await expect(page.getByRole('slider', { name: /캔버스 안쪽 .* 기준선/ })).toHaveCount(4)
   await expectMobileShellContract(page)
 })
