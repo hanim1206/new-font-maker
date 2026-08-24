@@ -79,3 +79,10 @@
 - 변경 파일: `src-next/ShapeWorkspacePage.tsx`, `tests/e2e/shape-workspace-shell.spec.ts`, `IMPLEMENTATION_STATUS.md`.
 - 보정: 면 도구에서는 CH 원형이 실제로 반영되는 6개 조합만 표시하고 STANDALONE ㄱ을 제외한다. pointerdown 직후 드로어에 `채우는 중` 또는 `비우는 중`과 현재 점유 칸 수를 표시하고, 빈 칸에서 시작해야 면을 늘릴 수 있음을 명시한다.
 - 검증: 대상 TypeScript·ESLint, 관련 Vitest 112개, Shape 작업공간 E2E 10개, 프로덕션 빌드, `git diff --check` 통과. 빈 셀에서 시작해 같은 열의 3칸을 세로로 드래그하면 첫 제스처의 draft가 즉시 보이고 pointerup 한 번에 저장되는 것을 확인했다. J-02 Rail, J-03, L-01과 STANDALONE 원본은 유지된다.
+
+## Step 5A-2 사용자 검토 보정 · 빠른 드래그와 면 채우기 패널 제거
+
+- 판정: 빠른 드래그는 포인터 이동 이벤트가 중간 셀을 건너뛰면 임시 면이 누락될 수 있었다. 면 채우기는 셀 경계와 점유 draft가 캔버스에 직접 보이고 별도 수치 입력도 없어 하단 `정밀 조절` 드로어가 같은 정보를 반복하며 작업 영역만 줄였다.
+- 보정: 연속된 포인터 위치 사이의 선분이 지나는 모든 셀을 계산해 빠른 가로·세로 드래그도 한 번에 반영한다. 면 채우기 도구가 활성화된 동안 정밀 조절 드로어를 렌더링하지 않고, 선택·기준선 편집으로 돌아오면 기존 수치 조절 드로어를 유지한다. 실제 pointercancel·lostpointercapture는 기존 계약대로 draft를 버린다.
+- 변경 파일: `src-next/ShapeWorkspacePage.tsx`, `src-next/ShapeWorkspacePage.module.css`, `tests/e2e/shape-workspace-shell.spec.ts`, `KOREAN_FONT_MAKER_UX_SCREEN_SPEC.md`, `IMPLEMENTATION_STATUS.md`.
+- 검증: 프로덕션 빌드, 대상 ESLint, Shape 작업공간 E2E 10개, `git diff --check`를 통과했다. 실제 390px 화면에서 면 채우기 중 드로어 0개·원자 셀 16개, 선택 복귀 후 드로어 1개를 확인했다.

@@ -151,8 +151,6 @@
 .railEditorMeta span { color: rgb(var(--color-text-dim-3)); font-size: 9px; }
 .railEditorMeta button { min-width: 88px; min-height: 44px; padding: 0 10px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-size: 9px; font-weight: 750; }
 .railEditorMeta button:disabled { opacity: .38; }
-.areaEditor { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid rgb(var(--color-primary) / .24); border-radius: 12px; background: rgb(var(--color-primary-light) / .22); }
-.areaEditor p { color: rgb(var(--color-text-dim-3)); font-size: 9px; line-height: 1.5; }
 
 .notFound { min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; text-align: center; }
 .notFound h1 { font-size: 20px; }

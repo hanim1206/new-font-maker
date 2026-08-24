@@ -365,6 +365,8 @@ type BaseAreaEditModel =
 type BaseAreaGesture = {
   mode: 'fill' | 'erase'
   visited: Set<string>
+  lastX: number
+  lastY: number
 }
 
 type BaseAreaDraft = {
@@ -380,6 +382,37 @@ function sameAreaCell(
     && left.rightRailId === right.rightRailId
     && left.topRailId === right.topRailId
     && left.bottomRailId === right.bottomRailId
+}
+
+function segmentIntersectsAreaCell(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+  cell: BaseAreaCellModel,
+): boolean {
+  const deltaX = endX - startX
+  const deltaY = endY - startY
+  let near = 0
+  let far = 1
+  const boundaries = [
+    [-deltaX, startX - cell.x],
+    [deltaX, cell.x + cell.width - startX],
+    [-deltaY, startY - cell.y],
+    [deltaY, cell.y + cell.height - startY],
+  ] as const
+
+  for (const [direction, distance] of boundaries) {
+    if (Math.abs(direction) < Number.EPSILON) {
+      if (distance < 0) return false
+      continue
+    }
+    const ratio = distance / direction
+    if (direction < 0) near = Math.max(near, ratio)
+    else far = Math.min(far, ratio)
+    if (near > far) return false
+  }
+  return true
 }
 
 function resolveBaseAreaEditModel(source: DeepReadonly<ShapeSystemSourceV2> | null): BaseAreaEditModel {
@@ -761,7 +794,6 @@ function MasterScreen() {
       return
     }
     clearDraft()
-    setDrawerState('medium')
     void persistShapeChange()
   }, [clearDraft, persistShapeChange, setBaseAreaCells])
 
@@ -816,23 +848,33 @@ function MasterScreen() {
     else clearDraft()
   }
 
-  const areaCellAtPointer = useCallback((clientX: number, clientY: number): BaseAreaCellModel | null => {
-    if (areaModel.kind !== 'ready') return null
+  const areaPointAtPointer = useCallback((clientX: number, clientY: number) => {
     const bounds = areaLayerRef.current?.getBoundingClientRect()
     if (!bounds || bounds.width <= 0 || bounds.height <= 0) return null
-    const x = (clientX - bounds.left) / bounds.width
-    const y = (clientY - bounds.top) / bounds.height
-    return areaModel.cells.find((cell) => x >= cell.x && x <= cell.x + cell.width
-      && y >= cell.y && y <= cell.y + cell.height) ?? null
-  }, [areaModel])
+    return {
+      x: (clientX - bounds.left) / bounds.width,
+      y: (clientY - bounds.top) / bounds.height,
+    }
+  }, [])
 
-  const beginAreaGesture = (cell: BaseAreaCellModel, event: ReactPointerEvent<HTMLButtonElement>) => {
+  const areaCellAtPointer = useCallback((clientX: number, clientY: number): BaseAreaCellModel | null => {
+    if (areaModel.kind !== 'ready') return null
+    const point = areaPointAtPointer(clientX, clientY)
+    if (!point) return null
+    return areaModel.cells.find((cell) => point.x >= cell.x && point.x <= cell.x + cell.width
+      && point.y >= cell.y && point.y <= cell.y + cell.height) ?? null
+  }, [areaModel, areaPointAtPointer])
+
+  const beginAreaGesture = (fallbackCell: BaseAreaCellModel, event: ReactPointerEvent<HTMLButtonElement>) => {
     clearDraft()
-    setDrawerState('medium')
+    const point = areaPointAtPointer(event.clientX, event.clientY)
+    const cell = areaCellAtPointer(event.clientX, event.clientY) ?? fallbackCell
     const mode = areaModel.kind === 'ready' && areaModel.occupiedCellKeys.has(cell.key) ? 'erase' : 'fill'
     const gesture: BaseAreaGesture = {
       mode,
       visited: new Set([cell.key]),
+      lastX: point?.x ?? cell.x + cell.width / 2,
+      lastY: point?.y ?? cell.y + cell.height / 2,
     }
     areaGestureRef.current = gesture
     setAreaDraft({ mode, cellKeys: [cell.key] })
@@ -841,21 +883,33 @@ function MasterScreen() {
 
   const updateAreaDraft = (clientX: number, clientY: number) => {
     const gesture = areaGestureRef.current
-    if (!gesture) return
-    const cell = areaCellAtPointer(clientX, clientY)
-    if (!cell || gesture.visited.has(cell.key)) return
-    gesture.visited.add(cell.key)
-    setAreaDraft({ mode: gesture.mode, cellKeys: [...gesture.visited] })
+    const point = areaPointAtPointer(clientX, clientY)
+    if (!gesture || !point || areaModel.kind !== 'ready') return
+    let changed = false
+    for (const cell of areaModel.cells) {
+      if (gesture.visited.has(cell.key)
+        || !segmentIntersectsAreaCell(gesture.lastX, gesture.lastY, point.x, point.y, cell)) continue
+      gesture.visited.add(cell.key)
+      changed = true
+    }
+    gesture.lastX = point.x
+    gesture.lastY = point.y
+    if (changed) setAreaDraft({ mode: gesture.mode, cellKeys: [...gesture.visited] })
+  }
+
+  const commitCurrentAreaGesture = () => {
+    const gesture = areaGestureRef.current
+    if (!gesture || areaModel.kind !== 'ready') return
+    const cellKeys = [...gesture.visited]
+    areaGestureRef.current = null
+    commitAreaCells(areaModel, gesture.mode, cellKeys)
   }
 
   const finishAreaGesture = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    const gesture = areaGestureRef.current
-    if (!gesture || areaModel.kind !== 'ready') return
+    if (!areaGestureRef.current) return
     updateAreaDraft(event.clientX, event.clientY)
-    const cellKeys = [...gesture.visited]
-    areaGestureRef.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-    commitAreaCells(areaModel, gesture.mode, cellKeys)
+    commitCurrentAreaGesture()
   }
 
   const saveLabel = saveState === 'saving'
@@ -889,27 +943,13 @@ function MasterScreen() {
       projectName={projectName}
       statusLabel={saveLabel}
       history={{ canUndo, canRedo, onUndo: () => handleHistory('undo'), onRedo: () => handleHistory('redo') }}
-      drawer={(
+      drawer={!areaToolActive ? (
         <PrecisionControlDrawer
           state={drawerState}
           onStateChange={setDrawerState}
-          targetLabel={areaToolActive
-            ? '초성 ㄱ 원형 · 면 채우기'
-            : committedModel.kind === 'ready' ? `ㄱ 원형 · ${committedModel.railLabel}` : '원형 관찰'}
+          targetLabel={committedModel.kind === 'ready' ? `ㄱ 원형 · ${committedModel.railLabel}` : '원형 관찰'}
         >
-          {areaToolActive ? (
-            <div className={styles.areaEditor}>
-              <div className={styles.railEditorHeading}>
-                <span>전체 그리드 면 채우기</span>
-                <output>{areaDraft
-                  ? `${areaDraft.mode === 'fill' ? '채우는 중' : '비우는 중'} · ${visibleOccupiedCellKeys.size}칸`
-                  : `${visibleOccupiedCellKeys.size}칸 점유`}</output>
-              </div>
-              <p>{areaDraft
-                ? `${areaDraft.mode === 'fill' ? '빈 칸에서 시작해 채우고 있습니다.' : '찬 칸에서 시작해 비우고 있습니다.'} 손을 떼면 한 번 저장됩니다.`
-                : '새 면을 늘리려면 빈 칸에서 시작하세요. 찬 칸에서 시작하면 지나간 칸을 비웁니다.'}</p>
-            </div>
-          ) : committedModel.kind === 'ready' ? (
+          {committedModel.kind === 'ready' ? (
             <div className={styles.railEditor}>
               <div className={styles.railChoices} aria-label="편집할 기준선">
                 {EDITABLE_CORE_RAILS.map((rail) => (
@@ -967,7 +1007,7 @@ function MasterScreen() {
             </div>
           ) : <DisabledPrecisionControl selected={false} expanded={drawerState === 'expanded'} sourceLabel={editReason} />}
         </PrecisionControlDrawer>
-      )}
+      ) : undefined}
     >
       <section className={styles.titleSection}>
         <span className={styles.screenId}>J-02 · 자소 원형</span>
@@ -1080,7 +1120,6 @@ function MasterScreen() {
             clearDraft()
             setActiveTool('area')
             if (observedChar === 'ㄱ') setObservedChar('가')
-            setDrawerState('medium')
           }}><Grid2X2 size={18} />면 채우기</button>
           <button type="button" disabled><CircleDot size={18} />레일</button>
         </section>
