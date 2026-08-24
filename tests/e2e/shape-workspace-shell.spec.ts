@@ -31,14 +31,77 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
-test('J-02 모바일 셸이 실제 경로에서 읽기 전용으로 보인다', async ({ page }) => {
+test('J-02 자소 원형 Rail은 네 방향을 직접 편집하고 한 transaction으로 저장·Undo한다', async ({ page }) => {
+  await page.goto('/workspace/jamo/result?char=ㄱ')
+  await page.getByRole('button', { name: '추천 기본 구조로 시작' }).click()
+  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
   await page.goto('/workspace/jamo')
 
   await expect(page.getByRole('heading', { name: '초성 ㄱ 원형', exact: true })).toBeVisible()
-  await expect(page.getByText('형태 시스템 연결 전이에요.')).toBeVisible()
   await expect(page.getByRole('region', { name: '초성 ㄱ 원형 편집 캔버스' })).toBeVisible()
+  await expect(page.getByRole('slider', { name: /캔버스 안쪽 .* 기준선/ })).toHaveCount(4)
   await expect(page.getByRole('list', { name: 'ㄱ이 쓰인 7개 조합 비교' }).getByRole('listitem')).toHaveCount(7)
   await expect(page.getByText('ㄱ · 단독')).toBeVisible()
+
+  const initializedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
+  await page.waitForTimeout(350)
+  await page.evaluate(() => {
+    const originalSetItem = Storage.prototype.setItem
+    ;(window as unknown as { __shapeWrites: number }).__shapeWrites = 0
+    Storage.prototype.setItem = function setItem(key: string, value: string): void {
+      if (key === 'font-maker-shape-system-v1') (window as unknown as { __shapeWrites: number }).__shapeWrites += 1
+      originalSetItem.call(this, key, value)
+    }
+  })
+
+  const canvasRail = page.getByRole('slider', { name: '캔버스 안쪽 오른쪽 기준선' })
+  const precisionSlider = page.getByRole('slider', { name: '안쪽 오른쪽 기준선', exact: true })
+  const handleBox = await canvasRail.boundingBox()
+  if (!handleBox) throw new Error('J-02 Rail 위치를 찾을 수 없습니다.')
+  const comparisonPaths = page.getByRole('list', { name: 'ㄱ이 쓰인 7개 조합 비교' }).locator('path[data-final-ink]')
+  const beforePaths = await comparisonPaths.evaluateAll((paths) => paths.map((path) => path.getAttribute('d')))
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(handleBox.x + handleBox.width / 2 - 32, handleBox.y + handleBox.height / 2, { steps: 4 })
+  await expect(page.getByLabel('편집할 기준선').getByRole('button', { name: '오른쪽', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(precisionSlider).not.toHaveValue('0.8')
+  expect(await comparisonPaths.evaluateAll((paths) => paths.map((path) => path.getAttribute('d')))).not.toEqual(beforePaths)
+  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
+  await page.mouse.up()
+  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await page.waitForTimeout(350)
+  const committedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
+  expect(committedRaw).not.toBe(initializedRaw)
+  expect(await page.evaluate(() => (window as unknown as { __shapeWrites: number }).__shapeWrites)).toBe(1)
+  const changedRails = await page.evaluate((key) => {
+    const source = JSON.parse(localStorage.getItem(key)!).state.source
+    return ['STANDALONE', 'CH'].map((role) => source.roleSources[role].grid.xRails.find((rail: { coreRole?: string }) => rail.coreRole === 'inner-right').position.value)
+  }, SHAPE_KEY)
+  expect(changedRails[0]).toBe(changedRails[1])
+
+  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
+  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
+
+  const cancelRail = page.getByRole('slider', { name: '캔버스 안쪽 아래 기준선' })
+  const cancelBox = await cancelRail.boundingBox()
+  if (!cancelBox) throw new Error('J-02 취소 Rail 위치를 찾을 수 없습니다.')
+  await page.mouse.move(cancelBox.x + cancelBox.width / 2, cancelBox.y + cancelBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(cancelBox.x + cancelBox.width / 2, cancelBox.y + cancelBox.height / 2 - 28, { steps: 3 })
+  await cancelRail.dispatchEvent('pointercancel', { pointerId: 1, pointerType: 'mouse', isPrimary: true })
+  await page.mouse.up()
+  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
+
+  const lostRail = page.getByRole('slider', { name: '캔버스 안쪽 위 기준선' })
+  const lostBox = await lostRail.boundingBox()
+  if (!lostBox) throw new Error('J-02 lost capture Rail 위치를 찾을 수 없습니다.')
+  await page.mouse.move(lostBox.x + lostBox.width / 2, lostBox.y + lostBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(lostBox.x + lostBox.width / 2, lostBox.y + lostBox.height / 2 + 28, { steps: 3 })
+  await lostRail.dispatchEvent('lostpointercapture', { pointerId: 1, pointerType: 'mouse', isPrimary: true })
+  await page.mouse.up()
+  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
 
   const horizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   expect(horizontalOverflow).toBeLessThanOrEqual(0)
@@ -70,7 +133,7 @@ test('비교 카드 선택과 드로어 열기는 저장 데이터에 영향을 
 
   await page.getByRole('button', { name: 'ㄱ 원형 선택' }).click()
   await expect(page.getByRole('button', { name: '정밀 조절' })).toHaveAttribute('aria-expanded', 'true')
-  await expect(page.getByText('형태 편집 연결 전입니다')).toBeVisible()
+  await expect(page.getByText('캔버스에서 대상을 먼저 선택하세요')).toBeVisible()
 
   const after = await page.evaluate(([shapeKey, layoutKey, jamoKey]) => ({
     shape: localStorage.getItem(shapeKey),
@@ -402,8 +465,9 @@ test('연결된 strict 7-role source에서도 관찰은 Shape 저장을 다시 �
   await page.goto('/workspace/jamo')
   await expect(page.getByText('역할별 마스터 1개가 연결되어 있어요.')).toBeVisible()
   await expect(page.getByRole('img', { name: 'Shape 마스터 ㄱ 최종 윤곽' })).toBeVisible()
-  await expect(page.locator('path[data-final-ink="true"]')).toHaveCount(1)
-  await expect(page.locator('path[data-final-ink="true"]')).not.toHaveAttribute('d', '')
+  const masterInk = page.getByRole('img', { name: 'Shape 마스터 ㄱ 최종 윤곽' }).locator('path[data-final-ink="true"]')
+  await expect(masterInk).toHaveCount(1)
+  await expect(masterInk).not.toHaveAttribute('d', '')
   await page.waitForTimeout(450)
   expect(await page.evaluate(() => (window as unknown as { __shapeWrites: number }).__shapeWrites)).toBe(0)
   expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY))

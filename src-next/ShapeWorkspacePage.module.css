@@ -19,10 +19,11 @@
 
 .canvas { position: relative; width: min(100%, 330px); aspect-ratio: 1; margin: 0 auto; display: grid; place-items: center; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 19px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); touch-action: manipulation; }
 .canvas[data-selected='true'] { border-color: rgb(var(--color-primary)); box-shadow: 0 0 0 3px rgb(var(--color-primary) / .11); }
-.canvasGrid { position: absolute; inset: 7.5%; background-image: linear-gradient(rgb(var(--color-border-subtle) / .7) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--color-border-subtle) / .7) 1px, transparent 1px), linear-gradient(rgb(var(--color-border) / .6) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--color-border) / .6) 1px, transparent 1px); background-size: 6.25% 6.25%, 6.25% 6.25%, 25% 25%, 25% 25%; }
+.canvasSelectButton { position: absolute; z-index: 0; inset: 0; border: 0; background: transparent; cursor: pointer; }
+.canvasGrid { position: absolute; z-index: 0; inset: 7.5%; pointer-events: none; background-image: linear-gradient(rgb(var(--color-border-subtle) / .7) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--color-border-subtle) / .7) 1px, transparent 1px), linear-gradient(rgb(var(--color-border) / .6) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--color-border) / .6) 1px, transparent 1px); background-size: 6.25% 6.25%, 6.25% 6.25%, 25% 25%, 25% 25%; }
 .canvasGlyph { position: relative; z-index: 1; width: 84%; height: 84%; pointer-events: none; }
 .shapePreviewError { max-width: 18rem; color: #9f1239; font-size: .84rem; line-height: 1.45; text-align: center; }
-.lockedLayout { position: absolute; z-index: 2; top: 10px; left: 10px; display: flex; align-items: center; gap: 4px; padding: 5px 7px; border-radius: 7px; background: rgb(var(--color-surface) / .9); color: rgb(var(--color-text-dim-3)); font-size: 9px; font-weight: 700; }
+.lockedLayout { position: absolute; z-index: 2; top: 10px; left: 10px; display: flex; align-items: center; gap: 4px; padding: 5px 7px; border-radius: 7px; pointer-events: none; background: rgb(var(--color-surface) / .9); color: rgb(var(--color-text-dim-3)); font-size: 9px; font-weight: 700; }
 .selectionBadge { position: absolute; z-index: 2; right: 10px; bottom: 10px; padding: 5px 7px; border-radius: 7px; background: rgb(var(--color-primary)); color: white; font-size: 9px; font-weight: 750; }
 
 .cardGlyph { width: 68px; height: 68px; margin: auto; pointer-events: none; }

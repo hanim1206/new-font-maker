@@ -12,8 +12,10 @@ import { canonicalVariantContextKey } from '../src/services/jamoContextVariants'
 import { resolveContextualPartGrid } from '../src/services/contextPartGridResolver'
 import { parseRoleConstructionSourceV1 } from '../src/services/roleConstructionSourceV1'
 import { setCoreRailOverrideV1 } from '../src/services/jamoContextVariantCommandsV1'
+import { setSevenContextBaseCoreRailV2 } from '../src/services/baseMasterRailCommandsV2'
 import { partForJamoRole } from '../src/services/jamoContextRoles'
 import { projectPartGridToSlot } from '../src/services/partGridSlotProjection'
+import { resolveRailGrid } from '../src/services/railGridResolver'
 import { useGlobalStyleStore, weightToMultiplier } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
@@ -139,8 +141,7 @@ type ShapeMasterPreviewState =
   | { kind: 'ready'; ink: FinalGlyphInk }
 
 /** J-02에서는 실제 CH ㄱ 마스터가 있을 때만 공통 Shape final regions를 해석한다. */
-function useShapeMasterPreview(): ShapeMasterPreviewState {
-  const source = useShapeSystemStore((state) => state.source)
+function useShapeMasterPreview(source: DeepReadonly<ShapeSystemSourceV2> | null): ShapeMasterPreviewState {
   const globalStyle = useGlobalStyleStore((state) => state.style)
   return useMemo(() => {
     const scope = source?.roleSources.CH
@@ -252,6 +253,32 @@ type RailGesture = {
   startValue: number
 }
 
+type BaseRailTarget = {
+  masterId: string
+  railId: string
+}
+
+type BaseEditModel =
+  | { kind: 'unavailable'; message: string }
+  | {
+    kind: 'ready'
+    coreRole: EditableCoreRole
+    axis: 'x' | 'y'
+    railLabel: string
+    value: number
+    min: number
+    max: number
+    targets: { STANDALONE: BaseRailTarget; CH: BaseRailTarget }
+  }
+
+type BaseRailGesture = {
+  coreRole: EditableCoreRole
+  startValue: number
+  startClientX: number
+  startClientY: number
+  moved: boolean
+}
+
 const PROVENANCE_LABELS = {
   master: '자소 원형에서 가져옴',
   'role-default': '역할 기본값에서 가져옴',
@@ -265,6 +292,76 @@ function snapRailDraft(value: number, min: number, max: number): number {
   const clamped = Math.min(max, Math.max(min, value))
   const snapped = Math.round(clamped / RAIL_EDIT_STEP) * RAIL_EDIT_STEP
   return Number(Math.min(max, Math.max(min, snapped)).toFixed(6))
+}
+
+function resolveBaseEditModel(input: {
+  source: DeepReadonly<ShapeSystemSourceV2> | null
+  coreRole: EditableCoreRole
+}): BaseEditModel {
+  if (!input.source) return { kind: 'unavailable', message: '형태 시스템을 먼저 시작해야 합니다.' }
+  const definition = editableRail(input.coreRole)
+  const targets = {} as { STANDALONE: BaseRailTarget; CH: BaseRailTarget }
+  const values: number[] = []
+  const mins: number[] = []
+  const maxes: number[] = []
+  for (const role of ['STANDALONE', 'CH'] as const) {
+    const scope = input.source.roleSources[role]
+    const masterId = createJamoRoleMasterId('ㄱ', role)
+    const master = scope.masters.find(({ id }) => id === masterId)
+    if (!master || master.jamoId !== 'ㄱ' || master.role !== role) {
+      return { kind: 'unavailable', message: `${ROLE_LABELS[role]} ㄱ 원형을 찾을 수 없습니다.` }
+    }
+    const parsed = parseRoleConstructionSourceV1(scope, {
+      knownPresetIds: new Set(input.source.contextPresetCatalog?.contextPresets.map(({ id }) => id) ?? []),
+    })
+    if (!parsed.ok) return { kind: 'unavailable', message: '현재 자소 원본을 안전하게 편집할 수 없습니다.' }
+    const resolved = resolveRailGrid(parsed.source.grid)
+    if (!resolved.ok) return { kind: 'unavailable', message: '기준선 위치를 안전하게 해석할 수 없습니다.' }
+    const rails = definition.axis === 'x' ? resolved.grid.xRails : resolved.grid.yRails
+    const index = rails.findIndex(({ coreRole }) => coreRole === input.coreRole)
+    const rail = rails[index]
+    const previous = rails[index - 1]
+    const next = rails[index + 1]
+    if (!rail || !previous || !next || rail.kind !== 'core' || rail.coreRole !== input.coreRole) {
+      return { kind: 'unavailable', message: `${ROLE_LABELS[role]}의 ${definition.label}을 찾을 수 없습니다.` }
+    }
+    targets[role] = { masterId, railId: rail.id }
+    values.push(rail.value)
+    mins.push(previous.value + scope.grid.minGap)
+    maxes.push(next.value - scope.grid.minGap)
+  }
+  const min = Math.max(...mins)
+  const max = Math.min(...maxes)
+  if (min > max) return { kind: 'unavailable', message: '두 역할에서 함께 이동할 수 있는 범위가 없습니다.' }
+  if (values.some((value) => Math.abs(value - values[0]) > 0.000001)) {
+    return { kind: 'unavailable', message: '두 역할의 기준선 값이 달라 안전하게 함께 편집할 수 없습니다.' }
+  }
+  return { kind: 'ready', coreRole: input.coreRole, axis: definition.axis, railLabel: definition.label, value: values[0], min, max, targets }
+}
+
+function ShapePartPreview({ context, source }: { context: WorkspaceContext; source: DeepReadonly<ShapeSystemSourceV2> | null }) {
+  const globalStyle = useGlobalStyleStore((state) => state.style)
+  const model = useMemo(() => resolveContextEditModel({
+    source,
+    active: context,
+    coreRole: 'inner-left',
+    weightMultiplier: weightToMultiplier(globalStyle.weight),
+    linecap: globalStyle.linecap,
+    linejoin: globalStyle.linejoin,
+    strokeStyle: globalStyle.strokeStyle,
+  }), [context, globalStyle, source])
+  return model.kind === 'ready'
+    ? <FinalInkRenderer ink={model.ink} size={68} className={styles.cardGlyph} ariaLabel={`${context.char} Shape 초성 파트 결과`} />
+    : <GlyphPreview char={context.char} compact />
+}
+
+function useShapeContextItems(source: DeepReadonly<ShapeSystemSourceV2> | null): ComparisonItem[] {
+  return useMemo(() => CONTEXTS.map((context) => ({
+    id: context.char,
+    label: context.char,
+    detail: context.label,
+    preview: <ShapePartPreview context={context} source={source} />,
+  })), [source])
 }
 
 function resolveContextEditModel(input: {
@@ -369,20 +466,231 @@ function resolveContextEditModel(input: {
 function MasterScreen() {
   const [observedChar, setObservedChar] = useState<(typeof CONTEXTS)[number]['char']>('ㄱ')
   const [drawerState, setDrawerState] = useState<DrawerState>('collapsed')
-  const [isSelected, setIsSelected] = useState(false)
-  const contextItems = useContextItems()
-  const preview = useShapeMasterPreview()
+  const [editedCoreRole, setEditedCoreRole] = useState<EditableCoreRole>('inner-left')
+  const [draftValue, setDraftValue] = useState<number | null>(null)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [feedback, setFeedback] = useState<string | null>(null)
+  const railCanvasRef = useRef<HTMLDivElement | null>(null)
+  const railGestureRef = useRef<BaseRailGesture | null>(null)
+  const draftValueRef = useRef<number | null>(null)
+  const transactionSequence = useRef(0)
+  const hydrationStatus = useShapeSystemStore((state) => state.hydrationStatus)
+  const source = useShapeSystemStore((state) => state.source)
+  const setBaseRail = useShapeSystemStore((state) => state.setSevenContextBaseCoreRail)
+  const canUndo = useShapeSystemStore((state) => state.past.length > 0)
+  const canRedo = useShapeSystemStore((state) => state.future.length > 0)
+  const undo = useShapeSystemStore((state) => state.undo)
+  const redo = useShapeSystemStore((state) => state.redo)
+  const projectName = useUIStore((state) => state.currentProjectName) ?? '새 한글 폰트'
+  const { currentProjectId, saveCurrent } = useFontProject()
+  const baseModels = useMemo(() => EDITABLE_CORE_RAILS.map((rail) => ({
+    rail,
+    model: resolveBaseEditModel({ source, coreRole: rail.coreRole }),
+  })), [source])
+  const committedModel = useMemo(() => baseModels.find(({ rail }) => rail.coreRole === editedCoreRole)?.model
+    ?? { kind: 'unavailable' as const, message: '편집할 기준선을 찾을 수 없습니다.' }, [baseModels, editedCoreRole])
+  const draftSource = useMemo(() => {
+    if (!source || committedModel.kind !== 'ready' || draftValue === null) return source
+    const result = setSevenContextBaseCoreRailV2(source, {
+      transactionId: 'shape-workspace:master-draft',
+      jamoId: 'ㄱ',
+      coreRole: committedModel.coreRole,
+      position: { kind: 'absolute', value: draftValue },
+      targets: committedModel.targets,
+    })
+    return result.ok ? result.source : source
+  }, [committedModel, draftValue, source])
+  const preview = useShapeMasterPreview(draftSource)
+  const contextItems = useShapeContextItems(draftSource)
+  const visibleValue = draftValue ?? (committedModel.kind === 'ready' ? committedModel.value : 0)
+
+  useEffect(() => {
+    railGestureRef.current = null
+    draftValueRef.current = null
+    setDraftValue(null)
+  }, [source])
+
+  const persistShapeChange = useCallback(async () => {
+    setSaveState('saving')
+    setFeedback(null)
+    try {
+      flushShapeSystemStorePersistence()
+      if (currentProjectId) {
+        const saved = await saveCurrent()
+        if (!saved) throw new Error('프로젝트 서버 저장에 실패했습니다.')
+        setFeedback('프로젝트와 기기에 저장했습니다.')
+      } else {
+        setFeedback('이 기기에 저장했습니다.')
+      }
+      setSaveState('saved')
+    } catch (error) {
+      setSaveState('error')
+      setFeedback(error instanceof Error ? error.message : '저장하지 못했습니다.')
+    }
+  }, [currentProjectId, saveCurrent])
+
+  const clearDraft = useCallback(() => {
+    railGestureRef.current = null
+    draftValueRef.current = null
+    setDraftValue(null)
+  }, [])
+
+  const commitValue = useCallback((model: Extract<BaseEditModel, { kind: 'ready' }>, value: number) => {
+    if (Math.abs(value - model.value) < 0.000001) {
+      clearDraft()
+      return
+    }
+    transactionSequence.current += 1
+    const result = setBaseRail({
+      transactionId: `shape-workspace:master:${transactionSequence.current}`,
+      jamoId: 'ㄱ',
+      coreRole: model.coreRole,
+      position: { kind: 'absolute', value },
+      targets: model.targets,
+    })
+    if (!result.ok) {
+      setSaveState('error')
+      setFeedback(result.error.message)
+      clearDraft()
+      return
+    }
+    clearDraft()
+    void persistShapeChange()
+  }, [clearDraft, persistShapeChange, setBaseRail])
+
+  const handleHistory = (direction: 'undo' | 'redo') => {
+    const result = direction === 'undo' ? undo() : redo()
+    if (!result.ok) {
+      setSaveState('error')
+      setFeedback(result.error.message)
+      return
+    }
+    clearDraft()
+    void persistShapeChange()
+  }
+
+  const beginCanvasGesture = (model: Extract<BaseEditModel, { kind: 'ready' }>, event: ReactPointerEvent<HTMLDivElement>) => {
+    setEditedCoreRole(model.coreRole)
+    setDrawerState('medium')
+    railGestureRef.current = {
+      coreRole: model.coreRole,
+      startValue: model.value,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      moved: false,
+    }
+    draftValueRef.current = null
+    setDraftValue(null)
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const updateCanvasDraft = (model: Extract<BaseEditModel, { kind: 'ready' }>, clientX: number, clientY: number) => {
+    const gesture = railGestureRef.current
+    const bounds = railCanvasRef.current?.getBoundingClientRect()
+    if (!gesture || gesture.coreRole !== model.coreRole || !bounds || bounds.width <= 0 || bounds.height <= 0) return
+    const delta = model.axis === 'x'
+      ? (clientX - gesture.startClientX) / bounds.width
+      : (clientY - gesture.startClientY) / bounds.height
+    if (!gesture.moved && Math.abs(delta) * (model.axis === 'x' ? bounds.width : bounds.height) < 3) return
+    gesture.moved = true
+    const value = snapRailDraft(gesture.startValue + delta, model.min, model.max)
+    draftValueRef.current = value
+    setDraftValue(value)
+  }
+
+  const finishCanvasGesture = (model: Extract<BaseEditModel, { kind: 'ready' }>, event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = railGestureRef.current
+    if (!gesture || gesture.coreRole !== model.coreRole) return
+    updateCanvasDraft(model, event.clientX, event.clientY)
+    railGestureRef.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    if (gesture.moved) commitValue(model, draftValueRef.current ?? gesture.startValue)
+    else clearDraft()
+  }
+
+  const saveLabel = saveState === 'saving'
+    ? '저장 중…'
+    : saveState === 'saved'
+      ? currentProjectId ? '프로젝트 저장됨' : '기기에 저장됨'
+      : saveState === 'error'
+        ? '저장 확인 필요'
+        : committedModel.kind === 'ready' ? '원형 편집' : '원형 관찰'
+  const editReason = hydrationStatus === 'blocked'
+    ? '저장 데이터를 확인한 뒤 편집할 수 있어요.'
+    : !source
+      ? '형태 시스템 연결 전에는 기존 안내 상태를 유지합니다.'
+      : committedModel.kind === 'unavailable'
+        ? committedModel.message
+        : '단독과 초성의 같은 기준선을 한 번에 바꾸고 7개 결과에 반영합니다.'
 
   return (
     <MobileWorkspaceShell
       activeArea="jamo"
+      projectName={projectName}
+      statusLabel={saveLabel}
+      history={{ canUndo, canRedo, onUndo: () => handleHistory('undo'), onRedo: () => handleHistory('redo') }}
       drawer={(
         <PrecisionControlDrawer
           state={drawerState}
           onStateChange={setDrawerState}
-          targetLabel={isSelected ? 'ㄱ 원형 · 편집 연결 전' : '선택한 대상 없음'}
+          targetLabel={committedModel.kind === 'ready' ? `ㄱ 원형 · ${committedModel.railLabel}` : '원형 관찰'}
         >
-          <DisabledPrecisionControl selected={isSelected} expanded={drawerState === 'expanded'} sourceLabel={preview.kind === 'ready' ? 'Shape 마스터 원본' : '기존 자소 원본'} />
+          {committedModel.kind === 'ready' ? (
+            <div className={styles.railEditor}>
+              <div className={styles.railChoices} aria-label="편집할 기준선">
+                {EDITABLE_CORE_RAILS.map((rail) => (
+                  <button type="button" key={rail.coreRole} aria-pressed={editedCoreRole === rail.coreRole} onClick={() => {
+                    clearDraft()
+                    setEditedCoreRole(rail.coreRole)
+                  }}>{rail.label.replace('안쪽 ', '').replace(' 기준선', '')}</button>
+                ))}
+              </div>
+              <div className={styles.railEditorHeading}>
+                <span>{committedModel.railLabel}</span>
+                <output>{Math.round(visibleValue * 1000)} UPM</output>
+              </div>
+              <input
+                type="range"
+                min={committedModel.min}
+                max={committedModel.max}
+                step={RAIL_EDIT_STEP}
+                value={visibleValue}
+                aria-label={committedModel.railLabel}
+                onPointerDown={(event) => {
+                  railGestureRef.current = { coreRole: committedModel.coreRole, startValue: committedModel.value, startClientX: event.clientX, startClientY: event.clientY, moved: false }
+                  draftValueRef.current = null
+                  event.currentTarget.setPointerCapture(event.pointerId)
+                }}
+                onChange={(event) => {
+                  const value = Number(event.currentTarget.value)
+                  if (Math.abs(value - committedModel.value) >= 0.000001 && railGestureRef.current) railGestureRef.current.moved = true
+                  draftValueRef.current = value
+                  setDraftValue(value)
+                }}
+                onPointerUp={(event) => {
+                  const gesture = railGestureRef.current
+                  if (!gesture || gesture.coreRole !== committedModel.coreRole) return
+                  railGestureRef.current = null
+                  if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+                  if (gesture.moved) commitValue(committedModel, draftValueRef.current ?? gesture.startValue)
+                  else clearDraft()
+                }}
+                onPointerCancel={clearDraft}
+                onLostPointerCapture={clearDraft}
+                onKeyDown={() => {
+                  if (!railGestureRef.current) railGestureRef.current = { coreRole: committedModel.coreRole, startValue: committedModel.value, startClientX: 0, startClientY: 0, moved: false }
+                }}
+                onKeyUp={() => {
+                  const gesture = railGestureRef.current
+                  if (!gesture || gesture.coreRole !== committedModel.coreRole) return
+                  railGestureRef.current = null
+                  if (gesture.moved) commitValue(committedModel, draftValueRef.current ?? gesture.startValue)
+                  else clearDraft()
+                }}
+              />
+              <div className={styles.railEditorMeta}><span>단독·초성 원형에 함께 적용</span></div>
+            </div>
+          ) : <DisabledPrecisionControl selected={false} expanded={drawerState === 'expanded'} sourceLabel={editReason} />}
         </PrecisionControlDrawer>
       )}
     >
@@ -395,6 +703,7 @@ function MasterScreen() {
           { label: '영향', value: '초성 조합 7개' },
         ]} />
         <ShapeStatus />
+        {feedback && <p className={styles.saveFeedback} data-state={saveState} role={saveState === 'error' ? 'alert' : 'status'}>{feedback}</p>}
       </section>
 
       <div className={styles.workspaceScroll}>
@@ -411,20 +720,37 @@ function MasterScreen() {
               <span id="shape-preview-error" className={styles.shapePreviewError} role="alert">{preview.message}</span>
             </div>
           ) : (
-            <button
-              type="button"
-              className={styles.canvas}
-              data-selected={isSelected || undefined}
-              onClick={() => { setIsSelected(true); setDrawerState('medium') }}
-              aria-label="ㄱ 원형 선택"
-            >
+            <div className={styles.canvas} data-selected={committedModel.kind === 'ready' || undefined} ref={railCanvasRef}>
+              <button type="button" className={styles.canvasSelectButton} onClick={() => setDrawerState('medium')} aria-label="ㄱ 원형 선택" />
               <span className={styles.canvasGrid} aria-hidden="true" />
               <span className={styles.lockedLayout} aria-hidden="true"><LockKeyhole size={14} />레이아웃 영역 잠금</span>
               {preview.kind === 'ready' ? (
                 <FinalInkRenderer ink={preview.ink} size={340} className={styles.canvasGlyph} ariaLabel="Shape 마스터 ㄱ 최종 윤곽" />
               ) : <GlyphPreview char="ㄱ" />}
-              {isSelected && <span className={styles.selectionBadge}>ㄱ 원형 선택됨</span>}
-            </button>
+              {committedModel.kind === 'ready' && baseModels.map(({ rail, model }) => {
+                if (model.kind !== 'ready') return null
+                const value = rail.coreRole === editedCoreRole ? visibleValue : model.value
+                return <div
+                  key={model.coreRole}
+                  className={styles.canvasRailHandle}
+                  data-selected={rail.coreRole === editedCoreRole || undefined}
+                  data-axis={model.axis}
+                  style={model.axis === 'x' ? { left: `${value * 100}%` } : { top: `${value * 100}%` }}
+                  role="slider"
+                  tabIndex={0}
+                  aria-label={`캔버스 ${model.railLabel}`}
+                  aria-valuemin={model.min}
+                  aria-valuemax={model.max}
+                  aria-valuenow={value}
+                  aria-valuetext={`${Math.round(value * 1000)} UPM`}
+                  onPointerDown={(event) => beginCanvasGesture(model, event)}
+                  onPointerMove={(event) => updateCanvasDraft(model, event.clientX, event.clientY)}
+                  onPointerUp={(event) => finishCanvasGesture(model, event)}
+                  onPointerCancel={clearDraft}
+                  onLostPointerCapture={clearDraft}
+                ><span aria-hidden="true" /></div>
+              })}
+            </div>
           )}
         </section>
 
@@ -433,7 +759,7 @@ function MasterScreen() {
           items={contextItems}
           observedId={observedChar}
           onObserve={(id) => setObservedChar(id as typeof observedChar)}
-          description="카드를 눌러도 관찰할 조합만 바뀌고 수정 범위는 그대로예요."
+          description="카드는 Shape 초성 파트 결과만 보여주며, 전체 음절 최종 결과를 뜻하지 않아요."
         />
         <div className={styles.contextActionRow}>
           <a href={`/workspace/jamo/result?char=${encodeURIComponent(observedChar)}`}>조합별 결과 확인</a>
