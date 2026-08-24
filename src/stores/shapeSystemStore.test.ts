@@ -4,7 +4,9 @@ import type {
   CoreYRailRole,
   JamoPartRole,
   RoleConstructionScope,
+  SetSevenContextBaseCoreRailV2Command,
   ShapeSystemSourceV2,
+  ValidatedShapeSystemSourceV2,
 } from '../types'
 import { createEmptyJamoRoleMaster, createRoleConstructionSourceV1 } from '../services/jamoConstruction'
 import { createBasePartGrid } from '../services/railGridResolver'
@@ -58,6 +60,23 @@ function envelope(): ShapeSystemSourceV2 {
 
 function persisted(source: unknown, version = 2): string {
   return JSON.stringify({ state: { source }, version })
+}
+
+function sevenContextCommand(
+  source: NonNullable<ReturnType<typeof createConnectedShapeSystemV2Fixture>>,
+  value = 0.25,
+): SetSevenContextBaseCoreRailV2Command {
+  const target = (role: 'STANDALONE' | 'CH') => ({
+    masterId: source.roleSources[role].masters[0].id,
+    railId: source.roleSources[role].grid.xRails.find(({ coreRole }) => coreRole === 'inner-left')!.id,
+  })
+  return {
+    transactionId: `tx:store:base:${value}`,
+    jamoId: 'ㄱ',
+    coreRole: 'inner-left',
+    position: { kind: 'absolute', value },
+    targets: { STANDALONE: target('STANDALONE'), CH: target('CH') },
+  }
 }
 
 async function importStore(raw?: string) {
@@ -173,6 +192,127 @@ describe('shapeSystemStore canonical persistence and session history', () => {
     expect(useStore.getState().future).toHaveLength(0)
   })
 
+  it('7문맥 base Rail aggregate는 history 한 건, future clear, Undo/Redo exact, source-only reload를 지킨다', async () => {
+    const storeModule = await importStore()
+    const useStore = storeModule.useShapeSystemStore
+    expect(storeModule.initializeStarterShapeSystem()).toEqual({ ok: true })
+    const before = structuredClone(useStore.getState().source)!
+    expect(useStore.getState().setSevenContextBaseCoreRail(sevenContextCommand(before))).toEqual({ ok: true })
+    const after = structuredClone(useStore.getState().source)
+    expect(useStore.getState().past).toHaveLength(1)
+    expect(useStore.getState().future).toHaveLength(0)
+    expect(useStore.getState().past[0].transaction.before).toEqual(before)
+    expect(useStore.getState().past[0].transaction.after).toEqual(after)
+
+    expect(useStore.getState().undo()).toEqual({ ok: true })
+    expect(useStore.getState().source).toEqual(before)
+    expect(useStore.getState().past).toHaveLength(0)
+    expect(useStore.getState().future).toHaveLength(1)
+    expect(useStore.getState().redo()).toEqual({ ok: true })
+    expect(useStore.getState().source).toEqual(after)
+
+    expect(useStore.getState().undo()).toEqual({ ok: true })
+    expect(useStore.getState().setSevenContextBaseCoreRail(sevenContextCommand(before, 0.26))).toEqual({ ok: true })
+    expect(useStore.getState().future).toHaveLength(0)
+    const committed = structuredClone(useStore.getState().source)
+    vi.advanceTimersByTime(300)
+    const raw = values.get(STORAGE_KEY)
+    if (!raw) throw new Error('aggregate source가 저장되지 않았습니다.')
+    expect(Object.keys((JSON.parse(raw) as { state: Record<string, unknown> }).state)).toEqual(['source'])
+    const reloaded = await importStore(raw)
+    expect(reloaded.useShapeSystemStore.getState().source).toEqual(committed)
+    expect(reloaded.useShapeSystemStore.getState().past).toEqual([])
+    expect(reloaded.useShapeSystemStore.getState().future).toEqual([])
+  })
+
+  it('7문맥 base Rail no-op/stale/minGap 실패는 source/history/storage를 exact 보존한다', async () => {
+    const storeModule = await importStore()
+    const useStore = storeModule.useShapeSystemStore
+    expect(storeModule.initializeStarterShapeSystem()).toEqual({ ok: true })
+    vi.advanceTimersByTime(300)
+    const source = useStore.getState().source!
+    const attempts = [
+      sevenContextCommand(source, 0.2),
+      (() => {
+        const value = sevenContextCommand(source)
+        value.targets.CH.railId = 'rail:stale'
+        return value
+      })(),
+      sevenContextCommand(source, 0.49),
+    ]
+    for (const attempt of attempts) {
+      const before = {
+        source: structuredClone(useStore.getState().source),
+        past: structuredClone(useStore.getState().past),
+        future: structuredClone(useStore.getState().future),
+        raw: values.get(STORAGE_KEY),
+      }
+      expect(useStore.getState().setSevenContextBaseCoreRail(attempt)).toEqual(expect.objectContaining({ ok: false }))
+      expect(useStore.getState().source).toEqual(before.source)
+      expect(useStore.getState().past).toEqual(before.past)
+      expect(useStore.getState().future).toEqual(before.future)
+      vi.advanceTimersByTime(300)
+      expect(values.get(STORAGE_KEY)).toBe(before.raw)
+    }
+  })
+
+  it('7문맥 whole-source history의 stale Undo/Redo도 source/history/storage를 exact 보존한다', async () => {
+    const drift = (source: ShapeSystemSourceV2): ValidatedShapeSystemSourceV2 => {
+      const next = structuredClone(source)
+      next.roleSources.JO.grid.xRails.find(({ coreRole }) => coreRole === 'outer-right')!.position = {
+        kind: 'absolute', value: 0.95,
+      }
+      const parsed = parseShapeSystemSourceV2(next)
+      if (!parsed.ok) throw new Error('aggregate stale fixture parse 실패')
+      return parsed.source
+    }
+
+    const undoModule = await importStore()
+    const undoStore = undoModule.useShapeSystemStore
+    undoModule.initializeStarterShapeSystem()
+    const undoStart = undoStore.getState().source!
+    undoStore.getState().setSevenContextBaseCoreRail(sevenContextCommand(undoStart))
+    undoStore.setState({ source: drift(undoStore.getState().source!) })
+    vi.advanceTimersByTime(300)
+    const undoBefore = {
+      source: structuredClone(undoStore.getState().source),
+      past: structuredClone(undoStore.getState().past),
+      future: structuredClone(undoStore.getState().future),
+      raw: values.get(STORAGE_KEY),
+    }
+    expect(undoStore.getState().undo()).toEqual(expect.objectContaining({
+      ok: false, error: expect.objectContaining({ code: 'stale-history' }),
+    }))
+    expect(undoStore.getState().source).toEqual(undoBefore.source)
+    expect(undoStore.getState().past).toEqual(undoBefore.past)
+    expect(undoStore.getState().future).toEqual(undoBefore.future)
+    vi.advanceTimersByTime(300)
+    expect(values.get(STORAGE_KEY)).toBe(undoBefore.raw)
+
+    const redoModule = await importStore()
+    const redoStore = redoModule.useShapeSystemStore
+    redoModule.initializeStarterShapeSystem()
+    const redoStart = redoStore.getState().source!
+    redoStore.getState().setSevenContextBaseCoreRail(sevenContextCommand(redoStart))
+    redoStore.getState().undo()
+    redoStore.setState({ source: drift(redoStore.getState().source!) })
+    vi.advanceTimersByTime(300)
+    const redoBefore = {
+      source: structuredClone(redoStore.getState().source),
+      past: structuredClone(redoStore.getState().past),
+      future: structuredClone(redoStore.getState().future),
+      raw: values.get(STORAGE_KEY),
+    }
+    expect(redoStore.getState().redo()).toEqual(expect.objectContaining({
+      ok: false, error: expect.objectContaining({ code: 'stale-history' }),
+    }))
+    expect(redoStore.getState().source).toEqual(redoBefore.source)
+    expect(redoStore.getState().past).toEqual(redoBefore.past)
+    expect(redoStore.getState().future).toEqual(redoBefore.future)
+    vi.advanceTimersByTime(300)
+    expect(values.get(STORAGE_KEY)).toBe(redoBefore.raw)
+  })
+
   it('catalog preset이 연결된 source도 set/remove/Undo/Redo와 재접속 round-trip을 유지한다', async () => {
     const storeModule = await importStore()
     const useStore = storeModule.useShapeSystemStore
@@ -271,6 +411,16 @@ describe('shapeSystemStore canonical persistence and session history', () => {
       transactionId: 'tx:blocked', masterId: 'missing', context: { baseContext: 'horizontal' },
       coreRole: 'inner-left', position: { kind: 'absolute', value: 0.25 },
     })).toEqual(expect.objectContaining({ ok: false }))
+    expect(useStore.getState().setSevenContextBaseCoreRail({
+      transactionId: 'tx:blocked:base', jamoId: 'ㄱ', coreRole: 'inner-left',
+      position: { kind: 'absolute', value: 0.25 },
+      targets: {
+        STANDALONE: { masterId: 'missing', railId: 'missing' },
+        CH: { masterId: 'missing', railId: 'missing' },
+      },
+    })).toEqual(expect.objectContaining({
+      ok: false, error: expect.objectContaining({ code: 'hydration-blocked' }),
+    }))
     expect(storeModule.loadShapeSystemFromFontData(null)).toEqual(expect.objectContaining({
       ok: false,
       error: expect.objectContaining({ code: 'hydration-blocked' }),
@@ -390,7 +540,7 @@ describe('shapeSystemStore canonical persistence and session history', () => {
     expect(Object.keys(useStore.getState()).sort()).toEqual([
       'canRedo', 'canUndo', 'future', 'hydrationIssues', 'hydrationStatus',
       'past', 'redo', 'removeContextCoreRailOverride',
-      'setContextCoreRailOverride', 'source', 'undo',
+      'setContextCoreRailOverride', 'setSevenContextBaseCoreRail', 'source', 'undo',
     ])
   })
 })

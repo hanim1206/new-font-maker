@@ -11,6 +11,7 @@ import type {
   ShapeSystemHistoryEntry,
   ShapeSystemSourceV2,
   ShapeSystemStoreResult,
+  SetSevenContextBaseCoreRailV2Command,
   ValidatedRoleConstructionSourceV1,
   ValidatedShapeSystemSourceV2,
 } from '../types'
@@ -26,6 +27,7 @@ import {
 } from '../services/shapeSystemSourceV2'
 import { parseRoleConstructionSourceV1 } from '../services/roleConstructionSourceV1'
 import { createStarterShapeSystemV2 } from '../services/defaultShapeSystemV2'
+import { setSevenContextBaseCoreRailV2 } from '../services/baseMasterRailCommandsV2'
 
 export const SHAPE_SYSTEM_STORAGE_KEY = 'font-maker-shape-system-v1'
 export const SHAPE_SYSTEM_HISTORY_LIMIT = 50
@@ -41,6 +43,9 @@ interface ShapeSystemState {
 }
 
 interface ShapeSystemActions {
+  setSevenContextBaseCoreRail: (
+    command: DeepReadonly<SetSevenContextBaseCoreRailV2Command>,
+  ) => ShapeSystemStoreResult
   setContextCoreRailOverride: (
     role: JamoPartRole,
     command: DeepReadonly<SetCoreRailOverrideV1Command>,
@@ -209,16 +214,42 @@ export const useShapeSystemStore = create<ShapeSystemState & ShapeSystemActions>
           (source, knownPresetIds) => removeCoreRailOverrideV1(source, command, { knownPresetIds }),
         ),
 
+        setSevenContextBaseCoreRail: (command) => {
+          const current = get()
+          if (current.hydrationStatus === 'blocked') {
+            return failure('hydration-blocked', '손상되거나 지원하지 않는 저장 데이터를 먼저 복구해야 합니다.')
+          }
+          if (!current.source) return failure('not-initialized', 'Shape System이 아직 연결되지 않았습니다.')
+          const result = setSevenContextBaseCoreRailV2(current.source, command)
+          if (!result.ok) return failure('command-failed', result.error.message)
+          const entry: ShapeSystemHistoryEntry = {
+            transaction: structuredClone(result.transaction),
+          }
+          set((state) => {
+            state.source = result.source as unknown as typeof state.source
+            state.past.push(entry)
+            if (state.past.length > SHAPE_SYSTEM_HISTORY_LIMIT) {
+              state.past.splice(0, state.past.length - SHAPE_SYSTEM_HISTORY_LIMIT)
+            }
+            state.future = []
+          })
+          return success()
+        },
+
         undo: () => {
           const current = get()
           if (current.hydrationStatus === 'blocked') return failure('hydration-blocked', '차단된 저장 상태에서는 Undo할 수 없습니다.')
           if (!current.source || current.past.length === 0) return failure('no-history', 'Undo할 변경이 없습니다.')
           const entry = current.past[current.past.length - 1]
-          const roleSource = current.source.roleSources[entry.role]
-          if (canonicalJson(roleSource) !== canonicalJson(entry.transaction.after)) {
+          const currentTarget = 'role' in entry
+            ? current.source.roleSources[entry.role]
+            : current.source
+          if (canonicalJson(currentTarget) !== canonicalJson(entry.transaction.after)) {
             return failure('stale-history', '현재 source가 Undo transaction의 after와 일치하지 않습니다.')
           }
-          const parsed = replaceRoleSource(current.source, entry.role, entry.transaction.before)
+          const parsed = 'role' in entry
+            ? replaceRoleSource(current.source, entry.role, entry.transaction.before)
+            : parseShapeSystemSourceV2(entry.transaction.before)
           if (!parsed.ok) return failure('invalid-source', 'Undo 결과가 Shape System 계약을 통과하지 못했습니다.')
           set((state) => {
             state.source = parsed.source as unknown as typeof state.source
@@ -233,11 +264,15 @@ export const useShapeSystemStore = create<ShapeSystemState & ShapeSystemActions>
           if (current.hydrationStatus === 'blocked') return failure('hydration-blocked', '차단된 저장 상태에서는 Redo할 수 없습니다.')
           if (!current.source || current.future.length === 0) return failure('no-history', 'Redo할 변경이 없습니다.')
           const entry = current.future[current.future.length - 1]
-          const roleSource = current.source.roleSources[entry.role]
-          if (canonicalJson(roleSource) !== canonicalJson(entry.transaction.before)) {
+          const currentTarget = 'role' in entry
+            ? current.source.roleSources[entry.role]
+            : current.source
+          if (canonicalJson(currentTarget) !== canonicalJson(entry.transaction.before)) {
             return failure('stale-history', '현재 source가 Redo transaction의 before와 일치하지 않습니다.')
           }
-          const parsed = replaceRoleSource(current.source, entry.role, entry.transaction.after)
+          const parsed = 'role' in entry
+            ? replaceRoleSource(current.source, entry.role, entry.transaction.after)
+            : parseShapeSystemSourceV2(entry.transaction.after)
           if (!parsed.ok) return failure('invalid-source', 'Redo 결과가 Shape System 계약을 통과하지 못했습니다.')
           set((state) => {
             state.source = parsed.source as unknown as typeof state.source

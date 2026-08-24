@@ -1066,10 +1066,14 @@ export type ShapeSystemSourceMigrationResult =
   | { ok: true; source: ValidatedShapeSystemSourceV2; migratedFrom?: 1 }
   | { ok: false; issues: ShapeSystemSourceV2ParseIssue[] }
 
-export interface ShapeSystemHistoryEntry {
-  role: JamoPartRole
-  transaction: SourceCommandTransaction<RoleConstructionScope>
-}
+export type ShapeSystemHistoryEntry =
+  | {
+      role: JamoPartRole
+      transaction: SourceCommandTransaction<RoleConstructionScope>
+    }
+  | {
+      transaction: SourceCommandTransaction<ShapeSystemSourceV2>
+    }
 
 export type ShapeSystemStoreErrorCode =
   | 'not-initialized'
@@ -1172,9 +1176,53 @@ export interface SourceCommandTransaction<T> {
     | 'import-grid-v1'
     | 'set-context-variant-patch'
     | 'remove-context-variant-patch'
+    | 'set-seven-context-base-core-rail'
   before: T
   after: T
 }
+
+export interface BaseMasterRailTargetV2 {
+  masterId: string
+  railId: RailId
+}
+
+/** J-02 초성 원형의 ㄱ·가·고·과·각·곡·곽 비교 범위를 한 번에 갱신한다. */
+export interface SetSevenContextBaseCoreRailV2Command {
+  transactionId: string
+  jamoId: string
+  coreRole: CoreXRailRole | CoreYRailRole
+  position: { kind: 'absolute'; value: number }
+  targets: {
+    STANDALONE: BaseMasterRailTargetV2
+    CH: BaseMasterRailTargetV2
+  }
+}
+
+export type BaseMasterRailCommandErrorCode =
+  | 'invalid-transaction-id'
+  | 'invalid-command'
+  | 'invalid-source'
+  | 'missing-master'
+  | 'shared-grid-in-use'
+  | 'stale-target'
+  | 'core-role-mismatch'
+  | 'invalid-position'
+  | 'no-op'
+  | 'invalid-result'
+
+export type BaseMasterRailCommandResult =
+  | {
+      ok: true
+      source: ValidatedShapeSystemSourceV2
+      transaction: SourceCommandTransaction<ShapeSystemSourceV2>
+    }
+  | {
+      ok: false
+      error: {
+        code: BaseMasterRailCommandErrorCode
+        message: string
+      }
+    }
 
 export interface AddAuxiliaryRailCommand {
   transactionId: string
