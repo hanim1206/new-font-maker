@@ -516,13 +516,16 @@ function ShapePartPreview({ context, source }: { context: WorkspaceContext; sour
     : <GlyphPreview char={context.char} compact />
 }
 
-function useShapeContextItems(source: DeepReadonly<ShapeSystemSourceV2> | null): ComparisonItem[] {
-  return useMemo(() => CONTEXTS.map((context) => ({
+function useShapeContextItems(
+  source: DeepReadonly<ShapeSystemSourceV2> | null,
+  includeStandalone: boolean,
+): ComparisonItem[] {
+  return useMemo(() => CONTEXTS.filter((context) => includeStandalone || context.role === 'CH').map((context) => ({
     id: context.char,
     label: context.char,
     detail: context.label,
     preview: <ShapePartPreview context={context} source={source} />,
-  })), [source])
+  })), [includeStandalone, source])
 }
 
 function resolveContextEditModel(input: {
@@ -678,7 +681,7 @@ function MasterScreen() {
     return result.ok ? result.source : railDraftSource
   }, [areaDraft, areaModel, railDraftSource, source])
   const preview = useShapeMasterPreview(draftSource)
-  const contextItems = useShapeContextItems(draftSource)
+  const contextItems = useShapeContextItems(draftSource, activeTool !== 'area')
   const visibleValue = draftValue ?? (committedModel.kind === 'ready' ? committedModel.value : 0)
 
   useEffect(() => {
@@ -898,9 +901,13 @@ function MasterScreen() {
             <div className={styles.areaEditor}>
               <div className={styles.railEditorHeading}>
                 <span>전체 그리드 면 채우기</span>
-                <output>{visibleOccupiedCellKeys.size}칸 점유</output>
+                <output>{areaDraft
+                  ? `${areaDraft.mode === 'fill' ? '채우는 중' : '비우는 중'} · ${visibleOccupiedCellKeys.size}칸`
+                  : `${visibleOccupiedCellKeys.size}칸 점유`}</output>
               </div>
-              <p>빈 칸에서 시작하면 지나간 칸을 채우고, 찬 칸에서 시작하면 비웁니다. 손을 떼기 전에는 최종 윤곽만 미리 보여요.</p>
+              <p>{areaDraft
+                ? `${areaDraft.mode === 'fill' ? '빈 칸에서 시작해 채우고 있습니다.' : '찬 칸에서 시작해 비우고 있습니다.'} 손을 떼면 한 번 저장됩니다.`
+                : '새 면을 늘리려면 빈 칸에서 시작하세요. 찬 칸에서 시작하면 지나간 칸을 비웁니다.'}</p>
             </div>
           ) : committedModel.kind === 'ready' ? (
             <div className={styles.railEditor}>
@@ -1051,11 +1058,13 @@ function MasterScreen() {
         </section>
 
         <ContextComparisonStrip
-          heading="ㄱ이 쓰인 7개 조합 비교"
+          heading={areaToolActive ? '면이 반영되는 초성 조합 6개' : 'ㄱ이 쓰인 7개 조합 비교'}
           items={contextItems}
           observedId={observedChar}
           onObserve={(id) => setObservedChar(id as typeof observedChar)}
-          description="카드는 Shape 초성 파트 결과만 보여주며, 전체 음절 최종 결과를 뜻하지 않아요."
+          description={areaToolActive
+            ? '면은 CH 원형에만 저장됩니다. 단독 ㄱ은 별도 STANDALONE 원형이므로 이 비교에서 제외합니다.'
+            : '카드는 역할별 Shape 파트 결과만 보여주며, 전체 음절 최종 결과를 뜻하지 않아요.'}
         />
         <div className={styles.contextActionRow}>
           <a href={`/workspace/jamo/result?char=${encodeURIComponent(observedChar)}`}>조합별 결과 확인</a>
@@ -1070,6 +1079,7 @@ function MasterScreen() {
           <button type="button" aria-pressed={activeTool === 'area'} disabled={areaModel.kind !== 'ready'} onClick={() => {
             clearDraft()
             setActiveTool('area')
+            if (observedChar === 'ㄱ') setObservedChar('가')
             setDrawerState('medium')
           }}><Grid2X2 size={18} />면 채우기</button>
           <button type="button" disabled><CircleDot size={18} />레일</button>

@@ -1,6 +1,6 @@
 # 구현 상태
 
-기준 커밋: `ee92d10`
+기준 커밋: `4d62c22`
 
 ## Step 4E-1 · 자소 원형 Rail 편집 경계
 
@@ -72,3 +72,10 @@
 - 변경 파일: `src/types/index.ts`, `src/services/baseMasterAreaCommandsV1.ts`, `src/services/baseMasterAreaCommandsV1.test.ts`, `src/stores/shapeSystemStore.ts`, `src/stores/shapeSystemStore.test.ts`, `src-next/ShapeWorkspacePage.tsx`, `src-next/ShapeWorkspacePage.module.css`, `tests/e2e/shape-workspace-shell.spec.ts`, `IMPLEMENTATION_STATUS.md`.
 - 검증: `npx tsc -b --pretty false`, 대상 ESLint, 관련 Vitest 112개, `tests/e2e/shape-workspace-shell.spec.ts` 10개, `git diff --check` 통과. 기본 CH part grid의 4×4 전체 셀, 기존 단일 셀 확장, 연속 채우기·비우기, 같은 셀 왕복 중복 방지, draft 중 source·localStorage 불변, pointerup 1회 저장, pointercancel·lostpointercapture 무변, Undo exact 복원, reload 복원, STANDALONE 원본과 기존 중심선·Rail·J-03·L-01 보존을 확인했다.
 - 남은 P1·다음 단계 주의점: 첫 수직 흐름은 초성 ㄱ의 CH stable primary area 하나만 편집한다. 마지막 셀을 비워도 요소는 유지하며 STANDALONE 면은 읽거나 쓰지 않는다. 중심선 생성·교점 편집, 보조 Rail 추가·삭제, 참조 재연결, 곡률·사선, 별도 면 요소 추가·삭제, 67개 자소와 전체 Shape OTF 전환은 아직 지원하지 않는다.
+
+## Step 5A-2 사용자 검토 보정 · 영향 카드와 제스처 모드
+
+- 증상과 판정: 면 채우기가 `가·고·과·각·곡·곽`에는 반영되지만 첫 `ㄱ` 카드에는 반영되지 않아 전파 누락처럼 보였다. 실제 면 원본은 계약대로 CH만 수정되고 첫 카드는 별도 STANDALONE 원형이므로 데이터 오류가 아니라 비교 UI의 범위 표시 오류였다. 기존 면 끝의 찬 셀에서 바깥으로 드래그하면 첫 셀이 정한 `비우기` 모드가 적용되지만 모드가 즉시 보이지 않아 첫 채우기가 누락된 것처럼 느껴졌다.
+- 변경 파일: `src-next/ShapeWorkspacePage.tsx`, `tests/e2e/shape-workspace-shell.spec.ts`, `IMPLEMENTATION_STATUS.md`.
+- 보정: 면 도구에서는 CH 원형이 실제로 반영되는 6개 조합만 표시하고 STANDALONE ㄱ을 제외한다. pointerdown 직후 드로어에 `채우는 중` 또는 `비우는 중`과 현재 점유 칸 수를 표시하고, 빈 칸에서 시작해야 면을 늘릴 수 있음을 명시한다.
+- 검증: 대상 TypeScript·ESLint, 관련 Vitest 112개, Shape 작업공간 E2E 10개, 프로덕션 빌드, `git diff --check` 통과. 빈 셀에서 시작해 같은 열의 3칸을 세로로 드래그하면 첫 제스처의 draft가 즉시 보이고 pointerup 한 번에 저장되는 것을 확인했다. J-02 Rail, J-03, L-01과 STANDALONE 원본은 유지된다.
