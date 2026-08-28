@@ -8,7 +8,7 @@
  * 4. opentype.Font — 폰트 조립 + ArrayBuffer → 다운로드
  */
 // @ts-expect-error opentype.js에 타입 정의 파일 없음
-import opentype from 'opentype.js'
+import * as opentype from 'opentype.js'
 import { strokeToContours } from './strokeToOutline'
 import type { Contour } from './strokeToOutline'
 import {
@@ -52,6 +52,29 @@ export interface FontIdentity {
   postScriptName: string
 }
 
+export interface CmapMapping {
+  codePoint: number
+  glyphIndex: number
+}
+
+const CMAP_FORMAT_4_MAX_LENGTH = 0xffff
+const CMAP_FORMAT_4_BASE_LENGTH = 16
+const CMAP_FORMAT_4_BYTES_PER_SEGMENT = 8
+const OPTIONAL_FONT_NAME_KEYS = [
+  'trademark',
+  'manufacturer',
+  'designer',
+  'description',
+  'manufacturerURL',
+  'designerURL',
+  'license',
+  'licenseURL',
+] as const
+
+type LocalizedFontName = Record<string, string>
+type PlatformFontNames = Record<string, LocalizedFontName>
+type OpenTypeFontNames = Record<'unicode' | 'macintosh' | 'windows', PlatformFontNames>
+
 function stableNameHash(value: string): string {
   let hash = 0x811c9dc5
   for (let index = 0; index < value.length; index += 1) {
@@ -74,6 +97,88 @@ export function createFontIdentity(familyName: string, styleName: string): FontI
   return {
     asciiFamilyName: uniqueFamily,
     postScriptName: `${postScriptFamily}-${safeStyle}`.slice(0, 63),
+  }
+}
+
+/**
+ * format 4 cmap은 길이 필드가 uint16이라 병합 후 segment가 8,189개를 넘을 수 없다.
+ * opentype.js가 손상된 길이를 기록하기 전에 명시적으로 출력을 중단한다.
+ */
+export function assertCmapFormat4Capacity(mappings: readonly CmapMapping[]): void {
+  for (const mapping of mappings) {
+    if (!Number.isInteger(mapping.codePoint) || !Number.isInteger(mapping.glyphIndex)) {
+      throw new Error('cmap 매핑에는 정수 Unicode와 글리프 인덱스가 필요합니다.')
+    }
+    if (mapping.codePoint < 0 || mapping.codePoint > 0x10ffff || mapping.glyphIndex < 0) {
+      throw new Error('cmap 매핑이 유효한 Unicode 또는 글리프 인덱스 범위를 벗어났습니다.')
+    }
+    if (mapping.codePoint === 0xffff) {
+      throw new Error('U+FFFF는 cmap format 4 terminator로 예약되어 있습니다.')
+    }
+  }
+
+  const bmpMappings = mappings
+    .filter(({ codePoint }) => codePoint >= 0 && codePoint < 0xffff)
+    .slice()
+    .sort((a, b) => a.codePoint - b.codePoint)
+
+  let mergedRunCount = 0
+  let previous: CmapMapping | undefined
+
+  for (const mapping of bmpMappings) {
+    if (previous?.codePoint === mapping.codePoint) {
+      throw new Error(`중복된 Unicode cmap 매핑입니다: U+${mapping.codePoint.toString(16).toUpperCase()}`)
+    }
+
+    const continuesPreviousRun = previous !== undefined
+      && mapping.codePoint === previous.codePoint + 1
+      && mapping.glyphIndex === previous.glyphIndex + 1
+    if (!continuesPreviousRun) mergedRunCount += 1
+    previous = mapping
+  }
+
+  // 마지막 U+FFFF terminator segment까지 format 4 길이에 포함한다.
+  const format4Length = CMAP_FORMAT_4_BASE_LENGTH
+    + CMAP_FORMAT_4_BYTES_PER_SEGMENT * (mergedRunCount + 1)
+  if (format4Length > CMAP_FORMAT_4_MAX_LENGTH) {
+    throw new Error(
+      `Unicode cmap 구간이 format 4 용량을 초과했습니다 (${mergedRunCount.toLocaleString()}개).`,
+    )
+  }
+}
+
+function setFontNameRecords(
+  font: InstanceType<typeof opentype.Font>,
+  familyName: string,
+  styleName: string,
+  identity: FontIdentity,
+): void {
+  const names = font.names as OpenTypeFontNames
+  const hasKoreanName = familyName !== identity.asciiFamilyName
+  const copyright = `Copyright (c) ${new Date().getFullYear()}`
+  const fullEnglishName = `${identity.asciiFamilyName} ${styleName}`
+  const fullKoreanName = `${familyName} ${styleName}`
+
+  for (const platform of ['unicode', 'macintosh', 'windows'] as const) {
+    const platformNames = names[platform]
+    for (const key of OPTIONAL_FONT_NAME_KEYS) delete platformNames[key]
+
+    platformNames.copyright = { en: copyright }
+    platformNames.fontFamily = { en: identity.asciiFamilyName }
+    platformNames.fontSubfamily = { en: styleName }
+    platformNames.uniqueID = { en: `1.000;NONE;${identity.postScriptName}` }
+    platformNames.fullName = { en: fullEnglishName }
+    platformNames.version = { en: 'Version 1.000' }
+    platformNames.postScriptName = { en: identity.postScriptName }
+    platformNames.preferredFamily = { en: identity.asciiFamilyName }
+    platformNames.preferredSubfamily = { en: styleName }
+
+    // Macintosh name 레코드는 MacRoman이라 한글 번역을 넣지 않는다.
+    if (hasKoreanName && platform !== 'macintosh') {
+      platformNames.fontFamily.ko = familyName
+      platformNames.fullName.ko = fullKoreanName
+      platformNames.preferredFamily.ko = familyName
+    }
   }
 }
 
@@ -356,6 +461,14 @@ export async function generateAndDownloadFont(
       return { success: false, glyphCount: 0, error: '생성할 글리프가 없습니다.' }
     }
 
+    assertCmapFormat4Capacity([
+      { codePoint: 0x20, glyphIndex: 1 },
+      ...glyphDataList.map((data, index) => ({
+        codePoint: data.unicode,
+        glyphIndex: index + 2,
+      })),
+    ])
+
     // Phase 2: 글리프 변환 (획 → 윤곽)
     const glyphs: Array<InstanceType<typeof opentype.Glyph>> = [
       createNotdefGlyph(),
@@ -418,26 +531,7 @@ export async function generateAndDownloadFont(
     })
 
     // name 테이블 설정 (macOS Font Book 유효성 + Windows 호환)
-    const hasKoreanName = familyName !== asciiFamilyName
-    const psFullName = identity.postScriptName
-
-    // 필수 name 레코드 (nameID 0~6)
-    font.names.copyright = { en: `Copyright (c) ${new Date().getFullYear()}` }
-    font.names.fontFamily = hasKoreanName
-      ? { en: asciiFamilyName, ko: familyName }
-      : { en: asciiFamilyName }
-    font.names.fontSubfamily = { en: styleName }
-    font.names.uniqueID = { en: `1.000;NONE;${psFullName}` }
-    font.names.fullName = hasKoreanName
-      ? { en: `${asciiFamilyName} ${styleName}`, ko: `${familyName} ${styleName}` }
-      : { en: `${asciiFamilyName} ${styleName}` }
-    font.names.version = { en: 'Version 1.000' }
-    font.names.postScriptName = { en: psFullName }
-    // preferredFamily: Windows 폰트 메뉴 표시용
-    font.names.preferredFamily = hasKoreanName
-      ? { en: asciiFamilyName, ko: familyName }
-      : { en: asciiFamilyName }
-    font.names.preferredSubfamily = { en: styleName }
+    setFontNameRecords(font, familyName, styleName, identity)
 
     // Phase 4: 다운로드
     const arrayBuffer = font.toArrayBuffer() as ArrayBuffer
@@ -482,6 +576,11 @@ export async function downloadPrototypeFont(
       return { success: false, glyphCount: 0, error: `'${char}'의 글리프 데이터를 찾을 수 없습니다.` }
     }
 
+    assertCmapFormat4Capacity([
+      { codePoint: 0x20, glyphIndex: 1 },
+      { codePoint: glyphData.unicode, glyphIndex: 2 },
+    ])
+
     const glyphs = [
       createNotdefGlyph(),
       createSpaceGlyph(getCurrentSpaceAdvance()),
@@ -512,10 +611,7 @@ export async function downloadPrototypeFont(
       },
     })
 
-    font.names.copyright = { en: `Copyright (c) ${new Date().getFullYear()}` }
-    font.names.uniqueID = { en: `1.000;NONE;${identity.postScriptName}` }
-    font.names.version = { en: 'Version 1.000' }
-    font.names.postScriptName = { en: identity.postScriptName }
+    setFontNameRecords(font, familyName, 'Regular', identity)
 
     const arrayBuffer = font.toArrayBuffer() as ArrayBuffer
     downloadTTF(arrayBuffer, `${familyName}-prototype.otf`)
