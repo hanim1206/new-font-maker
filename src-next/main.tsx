@@ -11,6 +11,18 @@ import '../src/index.css'
 const root = createRoot(document.getElementById('root')!)
 
 async function start(): Promise<void> {
+  if (window.location.pathname === '/reference-lab') {
+    const { ReferenceLabPage } = await import('./ReferenceLabPage')
+    root.render(<StrictMode><ReferenceLabPage /></StrictMode>)
+    return
+  }
+
+  if (window.location.pathname === '/five-guide-lab') {
+    const { FiveGuideLabPage } = await import('./FiveGuideLabPage')
+    root.render(<StrictMode><FiveGuideLabPage /></StrictMode>)
+    return
+  }
+
   const migration = runLayoutProfileMigrationBootstrap({
     storage: window.localStorage,
     defaultSchemas: DEFAULT_LAYOUT_SCHEMAS,

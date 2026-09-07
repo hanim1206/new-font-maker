@@ -67,5 +67,11 @@ export default defineConfig({
   server: {
     host: true, // 네트워크에서 접근 가능하도록 설정
     port: 5173, // 기본 포트 (필요시 변경 가능)
+    proxy: {
+      '/api/reference': {
+        target: 'http://127.0.0.1:8765',
+        changeOrigin: false,
+      },
+    },
   },
 })

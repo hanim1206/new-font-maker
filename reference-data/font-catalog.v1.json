@@ -1,0 +1,84 @@
+{
+  "schema": "reference-font-catalog-v1",
+  "version": 1,
+  "display": {
+    "unitsPerEm": 1000,
+    "baselineY": 880,
+    "viewBox": [-120, -120, 1240, 1240],
+    "xOrigin": 0,
+    "projection": "matrix(1000/nativeUPM 0 0 -1000/nativeUPM 0 880)",
+    "inkAutofit": false,
+    "individualCentering": false,
+    "advanceNormalization": false
+  },
+  "fonts": [
+    {
+      "id": "noto-sans-kr",
+      "family": "Noto Sans KR",
+      "fileName": "NotoSansKR.ttf",
+      "fileSha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252",
+      "version": "Version 2.004-H2;hotconv 1.0.118;makeotfexe 2.5.65603",
+      "source": "https://github.com/google/fonts/tree/main/ofl/notosanskr",
+      "license": "SIL Open Font License 1.1",
+      "weight": 400,
+      "axes": {
+        "wght": 400
+      }
+    },
+    {
+      "id": "ibm-plex-sans-kr",
+      "family": "IBM Plex Sans KR",
+      "fileName": "IBMPlexSansKR-Regular.ttf",
+      "fileSha256": "53750379270312368cf7641901f43a98dd892e3d9d5798cf25cdc245c85c71c0",
+      "version": "Version 1.001",
+      "source": "https://github.com/google/fonts/tree/main/ofl/ibmplexsanskr",
+      "license": "SIL Open Font License 1.1",
+      "weight": 400,
+      "axes": {}
+    },
+    {
+      "id": "nanum-gothic",
+      "family": "Nanum Gothic",
+      "fileName": "NanumGothic-Regular.ttf",
+      "fileSha256": "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31",
+      "version": "Version 3.020;PS 1;hotconv 1.0.57;makeotf.lib2.0.21895",
+      "source": "https://github.com/google/fonts/tree/main/ofl/nanumgothic",
+      "license": "SIL Open Font License 1.1",
+      "weight": 400,
+      "axes": {}
+    },
+    {
+      "id": "dotum",
+      "family": "Dotum",
+      "fileName": "Dotum-Regular.ttf",
+      "fileSha256": "12f749ac462e547e3f4073227bb3b2b4c116062fc7546fbdadaa04e5e9f88b12",
+      "version": "Version 2.21",
+      "source": "https://github.com/google/fonts/tree/main/ofl/dotum",
+      "license": "SIL Open Font License 1.1",
+      "weight": 400,
+      "axes": {}
+    },
+    {
+      "id": "gowun-dodum",
+      "family": "Gowun Dodum",
+      "fileName": "GowunDodum-Regular.ttf",
+      "fileSha256": "a6e457933227483a11758fd0947bc74422a106d46f0bf057fdaa5af94a30067d",
+      "version": "Version 2.000",
+      "source": "https://github.com/google/fonts/tree/main/ofl/gowundodum",
+      "license": "SIL Open Font License 1.1",
+      "weight": 400,
+      "axes": {}
+    },
+    {
+      "id": "black-han-sans",
+      "family": "Black Han Sans",
+      "fileName": "BlackHanSans-Regular.ttf",
+      "fileSha256": "31960809284026681774a8e52dc19ebcad26cf69b0ad9d560f288296fbb52739",
+      "version": "Version 1.001",
+      "source": "https://github.com/google/fonts/tree/main/ofl/blackhansans",
+      "license": "SIL Open Font License 1.1",
+      "weight": 400,
+      "axes": {}
+    }
+  ]
+}

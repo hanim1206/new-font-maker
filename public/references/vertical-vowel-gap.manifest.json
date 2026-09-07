@@ -1,0 +1,1289 @@
+{
+  "analysisSha256": "8575b47ae9bc7d24250479e414f53a37b66f40e27e7250e56aa7495e16d53954",
+  "approved": false,
+  "candidates": [
+    {
+      "basis": "현재 레거시 effective X · Noto 굵기로 재측정",
+      "deltaFromCurrent": 0.0,
+      "gap": 0.26781249999999995,
+      "gapFontUnits": 267.81249999999994,
+      "id": "current",
+      "juX": 0.750625,
+      "label": "Current",
+      "strokeRatio": 3.570833333333333
+    },
+    {
+      "basis": "중립 4종 Tukey P25 · 5 units 반올림",
+      "deltaFromCurrent": -0.09781249999999997,
+      "gap": 0.17,
+      "gapFontUnits": 170.0,
+      "id": "a",
+      "juX": 0.6528125,
+      "label": "A",
+      "strokeRatio": 2.266666666666667
+    },
+    {
+      "basis": "중립 4종 중앙값 · 5 units 반올림",
+      "deltaFromCurrent": -0.07781249999999995,
+      "gap": 0.19,
+      "gapFontUnits": 190.0,
+      "id": "b",
+      "juX": 0.6728125,
+      "label": "B",
+      "strokeRatio": 2.5333333333333337
+    },
+    {
+      "basis": "중립 4종 Tukey P75 · 5 units 반올림",
+      "deltaFromCurrent": -0.06281250000000005,
+      "gap": 0.205,
+      "gapFontUnits": 205.0,
+      "id": "c",
+      "juX": 0.6878124999999999,
+      "label": "C",
+      "strokeRatio": 2.7333333333333334
+    }
+  ],
+  "checkpoint": "S0b",
+  "comparisonYCalibration": {
+    "control": {
+      "gapFontUnits": 149.9486083984375,
+      "strokeWidth": 75.0,
+      "xCalibration": "Noto 가의 전폭 X 빈 띠와 exact 일치"
+    },
+    "limitation": "Noto의 외곽 상·하단만 맞춘 비교 표시안이다. ㅏ 가로팔과 ㄱ 내부 획, 5선 위치의 승인이 아니다.",
+    "productionApplied": false,
+    "recommendedVariantId": "noto-envelope",
+    "reference": {
+      "fontId": "noto-sans-kr",
+      "glyph": "가",
+      "inkEnvelope": {
+        "bottom": 957.140380859375,
+        "top": 52.6895751953125
+      },
+      "pathSha256": "5f57f7d31f0d2f3b24cb5acb83abd7684fe1937a44744313c9bfea2c3ffd3f44",
+      "sourceBounds": [
+        0.0552091064453125,
+        -0.077140380859375,
+        0.889460205078125,
+        0.8273104248046875
+      ],
+      "weight": 400
+    },
+    "scope": "display-only",
+    "sourceCenterlines": {
+      "chBottom": 675,
+      "chTop": 300,
+      "juArm": 500,
+      "juBottom": 755,
+      "juTop": 245
+    },
+    "status": "candidate",
+    "variants": [
+      {
+        "affine": {
+          "offsetY": 0.0,
+          "scaleY": 1.0
+        },
+        "basis": "현재 Shape 중심선과 75-unit 획",
+        "bodyOverflow": {
+          "bottom": 0,
+          "top": 0
+        },
+        "id": "current",
+        "label": "Current Y",
+        "mappedCenterlines": {
+          "chBottom": 675.0,
+          "chTop": 300.0,
+          "juArm": 500.0,
+          "juBottom": 755.0,
+          "juTop": 245.0
+        },
+        "targetCenterlineEnvelope": {
+          "bottom": 755.0,
+          "top": 245.0
+        },
+        "targetInkEnvelope": {
+          "bottom": 792.5,
+          "top": 207.5
+        }
+      },
+      {
+        "affine": {
+          "offsetY": -259.80392156862746,
+          "scaleY": 1.5196078431372548
+        },
+        "basis": "Canonical Design Body 75…925에 잉크 상·하단 일치",
+        "bodyOverflow": {
+          "bottom": 0,
+          "top": 0
+        },
+        "id": "body-fit",
+        "label": "Body-fit",
+        "mappedCenterlines": {
+          "chBottom": 765.9313725490197,
+          "chTop": 196.078431372549,
+          "juArm": 499.99999999999994,
+          "juBottom": 887.5,
+          "juTop": 112.5
+        },
+        "targetCenterlineEnvelope": {
+          "bottom": 887.5,
+          "top": 112.5
+        },
+        "targetInkEnvelope": {
+          "bottom": 925,
+          "top": 75
+        }
+      },
+      {
+        "affine": {
+          "offsetY": -308.2720863491881,
+          "scaleY": 1.6263741287530638
+        },
+        "basis": "Noto Sans KR 400 가의 원본 잉크 상·하단 일치",
+        "bodyOverflow": {
+          "bottom": 32.140380859375,
+          "top": 22.3104248046875
+        },
+        "id": "noto-envelope",
+        "label": "Noto envelope",
+        "mappedCenterlines": {
+          "chBottom": 789.5304505591298,
+          "chTop": 179.64015227673104,
+          "juArm": 504.9149780273438,
+          "juBottom": 919.640380859375,
+          "juTop": 90.1895751953125
+        },
+        "targetCenterlineEnvelope": {
+          "bottom": 919.640380859375,
+          "top": 90.1895751953125
+        },
+        "targetInkEnvelope": {
+          "bottom": 957.140380859375,
+          "top": 52.6895751953125
+        }
+      }
+    ]
+  },
+  "corpus": {
+    "candidateCount": 4,
+    "fontCount": 6,
+    "glyphCount": 10,
+    "glyphs": [
+      "가",
+      "거",
+      "나",
+      "너",
+      "다",
+      "더",
+      "마",
+      "머",
+      "아",
+      "어"
+    ],
+    "missingCount": 0,
+    "referenceSampleCount": 60
+  },
+  "decision": {
+    "excluded": [
+      "X 간격 후보 선택",
+      "production Y",
+      "5선 위치",
+      "다른 자소",
+      "OTF 반영"
+    ],
+    "fixed": [
+      "UPM 1000",
+      "baseline 880",
+      "획 75",
+      "Noto 가와 같은 X 빈 띠",
+      "Shape topology"
+    ],
+    "mode": "comparison-only-y-calibration",
+    "question": "다음 X 간격 비교에서 Noto Sans KR 400 `가`의 잉크 상·하단에 맞춘 Y 표시안을 사용할까요?",
+    "scope": "ㄱ+ㅏ 무받침 prototype의 비교 화면 전용 Y 크기·위치",
+    "xGapVerdict": "suspended"
+  },
+  "display": {
+    "coordinateFrame": {
+      "advanceNormalization": false,
+      "ascender": 880,
+      "baselineY": 880,
+      "candidateCoordinates": "font-space-y-down + explicit comparisonYCalibration variant",
+      "descender": -120,
+      "designBodyGuide": [
+        75,
+        75,
+        850,
+        850
+      ],
+      "designBodyGuideRole": "guide-only",
+      "emGuide": [
+        0,
+        0,
+        1000,
+        1000
+      ],
+      "gapBandY": [
+        75,
+        925
+      ],
+      "individualCentering": false,
+      "inkAutofit": false,
+      "method": "shared-baseline",
+      "referenceTransform": "y=880-fontY*1000/nativeUPM",
+      "xOrigin": 0,
+      "yDirection": "down"
+    },
+    "glanceStrip": {
+      "glyph": "가",
+      "order": [
+        "reference:noto-sans-kr",
+        "reference:ibm-plex-sans-kr",
+        "reference:nanum-gothic",
+        "reference:dotum",
+        "reference:gowun-dodum",
+        "reference:black-han-sans",
+        "candidate:current",
+        "candidate:a",
+        "candidate:b",
+        "candidate:c"
+      ]
+    },
+    "rule": "공통 Font Space에서 reference는 원본, candidate는 명시한 comparison-only Y variant로 표시",
+    "unitsPerEm": 1000,
+    "viewBox": [
+      -120,
+      -120,
+      1240,
+      1240
+    ]
+  },
+  "fonts": [
+    {
+      "aggregation": "core",
+      "family": "Noto Sans KR",
+      "fileName": "NotoSansKR.ttf",
+      "fileSha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252",
+      "id": "noto-sans-kr",
+      "license": "SIL Open Font License 1.1",
+      "role": "중립 기준",
+      "source": "https://github.com/google/fonts/tree/main/ofl/notosanskr",
+      "version": "Version 2.004-H2;hotconv 1.0.118;makeotfexe 2.5.65603",
+      "weight": 400
+    },
+    {
+      "aggregation": "core",
+      "family": "IBM Plex Sans KR",
+      "fileName": "IBMPlexSansKR-Regular.ttf",
+      "fileSha256": "53750379270312368cf7641901f43a98dd892e3d9d5798cf25cdc245c85c71c0",
+      "id": "ibm-plex-sans-kr",
+      "license": "SIL Open Font License 1.1",
+      "role": "중립 기준",
+      "source": "https://github.com/google/fonts/tree/main/ofl/ibmplexsanskr",
+      "version": "Version 1.001",
+      "weight": 400
+    },
+    {
+      "aggregation": "core",
+      "family": "Nanum Gothic",
+      "fileName": "NanumGothic-Regular.ttf",
+      "fileSha256": "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31",
+      "id": "nanum-gothic",
+      "license": "SIL Open Font License 1.1",
+      "role": "중립 기준",
+      "source": "https://github.com/google/fonts/tree/main/ofl/nanumgothic",
+      "version": "Version 3.020;PS 1;hotconv 1.0.57;makeotf.lib2.0.21895",
+      "weight": 400
+    },
+    {
+      "aggregation": "core",
+      "family": "Dotum",
+      "fileName": "Dotum-Regular.ttf",
+      "fileSha256": "12f749ac462e547e3f4073227bb3b2b4c116062fc7546fbdadaa04e5e9f88b12",
+      "id": "dotum",
+      "license": "SIL Open Font License 1.1",
+      "role": "중립 기준",
+      "source": "https://github.com/google/fonts/tree/main/ofl/dotum",
+      "version": "Version 2.21",
+      "weight": 400
+    },
+    {
+      "aggregation": "boundary",
+      "family": "Gowun Dodum",
+      "fileName": "GowunDodum-Regular.ttf",
+      "fileSha256": "a6e457933227483a11758fd0947bc74422a106d46f0bf057fdaa5af94a30067d",
+      "id": "gowun-dodum",
+      "license": "SIL Open Font License 1.1",
+      "role": "스타일 경계",
+      "source": "https://github.com/google/fonts/tree/main/ofl/gowundodum",
+      "version": "Version 2.000",
+      "weight": 400
+    },
+    {
+      "aggregation": "stress",
+      "family": "Black Han Sans",
+      "fileName": "BlackHanSans-Regular.ttf",
+      "fileSha256": "31960809284026681774a8e52dc19ebcad26cf69b0ad9d560f288296fbb52739",
+      "id": "black-han-sans",
+      "license": "SIL Open Font License 1.1",
+      "role": "고밀도 스트레스",
+      "source": "https://github.com/google/fonts/tree/main/ofl/blackhansans",
+      "version": "Version 1.001",
+      "weight": 400
+    }
+  ],
+  "htmlSha256": "3f97fee926c82748781f5ff679f9c0b93fcf213b53d8b8808db6f48fd10e42c9",
+  "measurement": {
+    "coreFontIds": [
+      "noto-sans-kr",
+      "ibm-plex-sans-kr",
+      "nanum-gothic",
+      "dotum"
+    ],
+    "excludedFromAggregation": [
+      "gowun-dodum",
+      "black-han-sans"
+    ],
+    "id": "whole-x-empty-band",
+    "label": "전폭 X 빈 띠(참고값)",
+    "limitations": "초성–중성의 광학 최단거리가 아니다. x상 분리된 가의 contour 군집 사이에서 완전히 비는 가장 넓은 세로 띠만 잰다.",
+    "rawTukeyHinges": {
+      "median": 0.19188235294117645,
+      "p25": 0.16997430419921877,
+      "p75": 0.20576907169117642
+    },
+    "roundedFontUnitTargets": {
+      "median": 190.0,
+      "p25": 170.0,
+      "p75": 205.0
+    },
+    "validForNumericAggregation": [
+      "가"
+    ]
+  },
+  "productionValueApplied": false,
+  "recommendation": {
+    "provisional": true,
+    "reason": "X 간격 판단에서 글자 높이·상하 위치 차이를 줄이는 Noto 기준 비교 표시안",
+    "variantId": "noto-envelope"
+  },
+  "references": [
+    {
+      "advance": 0.92,
+      "bounds": [
+        0.0552091064453125,
+        -0.077140380859375,
+        0.889460205078125,
+        0.8273104248046875
+      ],
+      "fontId": "noto-sans-kr",
+      "glyph": "가",
+      "measurement": {
+        "left": 0.51180029296875,
+        "right": 0.6617489013671874,
+        "value": 0.1499486083984375
+      },
+      "pathSha256": "5f57f7d31f0d2f3b24cb5acb83abd7684fe1937a44744313c9bfea2c3ffd3f44",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.92,
+      "bounds": [
+        0.049499267578125,
+        -0.07792041015625,
+        0.7932308349609375,
+        0.8265303955078125
+      ],
+      "fontId": "noto-sans-kr",
+      "glyph": "거",
+      "measurement": null,
+      "pathSha256": "1c7371c881db2f520d6b164a3a51c0e6dd31226c62b67f8b7b177b456fbacea1",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.92,
+      "bounds": [
+        0.08583935546875,
+        -0.077140380859375,
+        0.889460205078125,
+        0.8273104248046875
+      ],
+      "fontId": "noto-sans-kr",
+      "glyph": "나",
+      "measurement": null,
+      "pathSha256": "90ddbfebc0a4d1b15e5ea1bef8f2928d2545ab390cc68cc7e2e107e5d59b0d78",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.92,
+      "bounds": [
+        0.09907958984375,
+        -0.0790904541015625,
+        0.7950108642578125,
+        0.82692041015625
+      ],
+      "fontId": "noto-sans-kr",
+      "glyph": "너",
+      "measurement": null,
+      "pathSha256": "5b125f6fc75fd8aed447cff981bed264334c05abcd211aa920db3f60a2744f14",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.92,
+      "bounds": [
+        0.08851953125,
+        -0.078700439453125,
+        0.893020263671875,
+        0.8273104248046875
+      ],
+      "fontId": "noto-sans-kr",
+      "glyph": "다",
+      "measurement": null,
+      "pathSha256": "e594612b1227ad7801d67830aa3430fe48d22ae109ae6b599848eda19dc524c2",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.92,
+      "bounds": [
+        0.0954696044921875,
+        -0.0790904541015625,
+        0.7950108642578125,
+        0.82692041015625
+      ],
+      "fontId": "noto-sans-kr",
+      "glyph": "더",
+      "measurement": null,
+      "pathSha256": "c1a873af0188ff474e289108e22f6a681ee13e564cac5086afd3d1764153723c",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.92,
+      "bounds": [
+        0.08583935546875,
+        -0.07792041015625,
+        0.893020263671875,
+        0.8265303955078125
+      ],
+      "fontId": "noto-sans-kr",
+      "glyph": "마",
+      "measurement": null,
+      "pathSha256": "c4ea468ff96edaf42d98607ea8cd40f2d2936b24c0caa3d5c0f13457b8652834",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.92,
+      "bounds": [
+        0.086299560546875,
+        -0.078700439453125,
+        0.79440087890625,
+        0.8273104248046875
+      ],
+      "fontId": "noto-sans-kr",
+      "glyph": "머",
+      "measurement": null,
+      "pathSha256": "d72f5e52e32f891f6bc0f3e91f8052860472e31240f91b0a4a02f6e12fefd9ce",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.92,
+      "bounds": [
+        0.063059326171875,
+        -0.07792041015625,
+        0.893020263671875,
+        0.8265303955078125
+      ],
+      "fontId": "noto-sans-kr",
+      "glyph": "아",
+      "measurement": null,
+      "pathSha256": "16e8b9aa2a3e225aa62597ad7b0e04403ed509ccc9c7408bbc5aaf92b63c252b",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.92,
+      "bounds": [
+        0.06607958984375,
+        -0.078700439453125,
+        0.79440087890625,
+        0.8273104248046875
+      ],
+      "fontId": "noto-sans-kr",
+      "glyph": "어",
+      "measurement": null,
+      "pathSha256": "fca865795514cfd28cad2757656281e9e48d9f2ed18750df8d3f8dc26698b8d2",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.892,
+      "bounds": [
+        0.056,
+        -0.101,
+        0.88,
+        0.767
+      ],
+      "fontId": "ibm-plex-sans-kr",
+      "glyph": "가",
+      "measurement": {
+        "left": 0.47,
+        "right": 0.66,
+        "value": 0.19000000000000006
+      },
+      "pathSha256": "29cdb6408fc02e75ba2d9c8c5f2b3f87faed797fed60bbd659801341c248bb8a",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.892,
+      "bounds": [
+        0.072,
+        -0.099,
+        0.783,
+        0.769
+      ],
+      "fontId": "ibm-plex-sans-kr",
+      "glyph": "거",
+      "measurement": null,
+      "pathSha256": "72ab6656313304a50cf600dba74758d25ddf3c982cc6b9cb55a8a675c5d11b47",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.892,
+      "bounds": [
+        0.075,
+        -0.101,
+        0.88,
+        0.767
+      ],
+      "fontId": "ibm-plex-sans-kr",
+      "glyph": "나",
+      "measurement": null,
+      "pathSha256": "494826bb919306f01042b3752b4fb80df79053bf536db57d168a60879cf90a98",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.892,
+      "bounds": [
+        0.093,
+        -0.099,
+        0.783,
+        0.769
+      ],
+      "fontId": "ibm-plex-sans-kr",
+      "glyph": "너",
+      "measurement": null,
+      "pathSha256": "5e395dec5f11c8a35a9bcc23d753bdc0d1a5c60ca1c826d89234f64a6ff6a764",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.892,
+      "bounds": [
+        0.077,
+        -0.101,
+        0.88,
+        0.767
+      ],
+      "fontId": "ibm-plex-sans-kr",
+      "glyph": "다",
+      "measurement": null,
+      "pathSha256": "3a9d432e8b620c41694a5c289e5047cee1d4a05e6424c9b5d9468bbcff74c5fd",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.892,
+      "bounds": [
+        0.096,
+        -0.099,
+        0.783,
+        0.769
+      ],
+      "fontId": "ibm-plex-sans-kr",
+      "glyph": "더",
+      "measurement": null,
+      "pathSha256": "04f05b6e2230a296e7bb72c5acdf6b46a6995595cd050d0ff3842903d0ea709a",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.892,
+      "bounds": [
+        0.068,
+        -0.101,
+        0.88,
+        0.767
+      ],
+      "fontId": "ibm-plex-sans-kr",
+      "glyph": "마",
+      "measurement": null,
+      "pathSha256": "4c1ec2028d853faec9f3e4479383354ddddb615874ee98975204b6400d6cb0fc",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.892,
+      "bounds": [
+        0.086,
+        -0.099,
+        0.783,
+        0.769
+      ],
+      "fontId": "ibm-plex-sans-kr",
+      "glyph": "머",
+      "measurement": null,
+      "pathSha256": "4838efb940c5f45de0d0c20129ecefcc308e22de574c03b8c5941517e3a908f0",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.892,
+      "bounds": [
+        0.043,
+        -0.101,
+        0.88,
+        0.767
+      ],
+      "fontId": "ibm-plex-sans-kr",
+      "glyph": "아",
+      "measurement": null,
+      "pathSha256": "82f05037bbac6c7d31ea72ef2b8d8a003c622892bfa2040c1821a8267ee7817f",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.892,
+      "bounds": [
+        0.061,
+        -0.099,
+        0.783,
+        0.769
+      ],
+      "fontId": "ibm-plex-sans-kr",
+      "glyph": "어",
+      "measurement": null,
+      "pathSha256": "007618b96cad1be08e366205d1f50c5327d1dd24225d2574b566e0c38487c915",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.94,
+      "bounds": [
+        0.06027777777777778,
+        -0.096,
+        0.923,
+        0.826
+      ],
+      "fontId": "nanum-gothic",
+      "glyph": "가",
+      "measurement": {
+        "left": 0.5072352941176471,
+        "right": 0.701,
+        "value": 0.19376470588235284
+      },
+      "pathSha256": "b343dd1a871753055efee5bae15b3b52038b03b3f53402de4bf89ac5d407ed5e",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.94,
+      "bounds": [
+        0.08327777777777777,
+        -0.096,
+        0.805,
+        0.826
+      ],
+      "fontId": "nanum-gothic",
+      "glyph": "거",
+      "measurement": null,
+      "pathSha256": "dbc67812cb7cfb2c351c121c1865cd1e01b7106e7b2c92fba9e0d72be1a85445",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.94,
+      "bounds": [
+        0.112,
+        -0.096,
+        0.923,
+        0.826
+      ],
+      "fontId": "nanum-gothic",
+      "glyph": "나",
+      "measurement": null,
+      "pathSha256": "9a095d5819cf2f09808738a541670bc37886e8246bed3b8a4342f2978853726b",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.94,
+      "bounds": [
+        0.122,
+        -0.096,
+        0.805,
+        0.826
+      ],
+      "fontId": "nanum-gothic",
+      "glyph": "너",
+      "measurement": null,
+      "pathSha256": "7a628b28fa04ce157aff92d9744bbad6dcdaa60028733fae01734567b209769e",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.94,
+      "bounds": [
+        0.095,
+        -0.096,
+        0.923,
+        0.826
+      ],
+      "fontId": "nanum-gothic",
+      "glyph": "다",
+      "measurement": null,
+      "pathSha256": "0391fa6f30c8811a5d378660d5bd4c82ce360be533cd9f199dd98f6b824c5c77",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.94,
+      "bounds": [
+        0.11,
+        -0.096,
+        0.805,
+        0.826
+      ],
+      "fontId": "nanum-gothic",
+      "glyph": "더",
+      "measurement": null,
+      "pathSha256": "05d03ec9e97c171fab460a35036d5b5b3ac452bf547f7cb3cd139a911ea56d6f",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.94,
+      "bounds": [
+        0.095,
+        -0.096,
+        0.923,
+        0.826
+      ],
+      "fontId": "nanum-gothic",
+      "glyph": "마",
+      "measurement": null,
+      "pathSha256": "182cc0149a8affce88c65abdccdadbf298d493ebc67509b261b70866781ceab4",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.94,
+      "bounds": [
+        0.101,
+        -0.096,
+        0.805,
+        0.826
+      ],
+      "fontId": "nanum-gothic",
+      "glyph": "머",
+      "measurement": null,
+      "pathSha256": "1a503d73e80582fcaf8ec018993a8c17013194685a909337c190041d37d742c6",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.94,
+      "bounds": [
+        0.076,
+        -0.096,
+        0.923,
+        0.826
+      ],
+      "fontId": "nanum-gothic",
+      "glyph": "아",
+      "measurement": null,
+      "pathSha256": "1b974abd3c3ad6ec33071116835bf9b180227b2db6c27afae235f6df642bf458",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.94,
+      "bounds": [
+        0.082,
+        -0.096,
+        0.805,
+        0.826
+      ],
+      "fontId": "nanum-gothic",
+      "glyph": "어",
+      "measurement": null,
+      "pathSha256": "f54a4701233f8bd3c915b03bb68ca5cdf164e31f5cccf1ea5a2e614e0cc1a3f1",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 1.0,
+      "bounds": [
+        0.046875,
+        -0.0478515625,
+        0.9736328125,
+        0.8173828125
+      ],
+      "fontId": "dotum",
+      "glyph": "가",
+      "measurement": {
+        "left": 0.5302734375,
+        "right": 0.748046875,
+        "value": 0.2177734375
+      },
+      "pathSha256": "690e9fd5a592474350ef4db3626cbf32a1fefebfa35307faf17b1572aa22fc24",
+      "unitsPerEm": 1024
+    },
+    {
+      "advance": 1.0,
+      "bounds": [
+        0.0400390625,
+        -0.048828125,
+        0.82373046875,
+        0.8154296875
+      ],
+      "fontId": "dotum",
+      "glyph": "거",
+      "measurement": null,
+      "pathSha256": "988cfddec6f964c53015f9dcdf965beede7f16224a9e161675f634c00c70ba28",
+      "unitsPerEm": 1024
+    },
+    {
+      "advance": 1.0,
+      "bounds": [
+        0.10546875,
+        -0.0478515625,
+        0.966796875,
+        0.8173828125
+      ],
+      "fontId": "dotum",
+      "glyph": "나",
+      "measurement": null,
+      "pathSha256": "d902d13e166577abee26d5b77ebd61ed976e5fb28dd816030ea28a7a9801b8bc",
+      "unitsPerEm": 1024
+    },
+    {
+      "advance": 1.0,
+      "bounds": [
+        0.125,
+        -0.0791015625,
+        0.8150111607142857,
+        0.7958984375
+      ],
+      "fontId": "dotum",
+      "glyph": "너",
+      "measurement": null,
+      "pathSha256": "51267658dbd860678e9d89620ee848326e1696b380a447964b18bbeafa5942cc",
+      "unitsPerEm": 1024
+    },
+    {
+      "advance": 1.0,
+      "bounds": [
+        0.1162109375,
+        -0.046875,
+        0.97265625,
+        0.8173828125
+      ],
+      "fontId": "dotum",
+      "glyph": "다",
+      "measurement": null,
+      "pathSha256": "dc1d3989b557b424e2ecb131d32be9de2bb8098ecd1e24d4f85c82e7f17fb313",
+      "unitsPerEm": 1024
+    },
+    {
+      "advance": 1.0,
+      "bounds": [
+        0.11328125,
+        -0.0478515625,
+        0.8238002232142857,
+        0.8134765625
+      ],
+      "fontId": "dotum",
+      "glyph": "더",
+      "measurement": null,
+      "pathSha256": "5a2c01e6b845d858b152b8e868d9316fafc59408d9cac440b32cd3dc5ff67188",
+      "unitsPerEm": 1024
+    },
+    {
+      "advance": 1.0,
+      "bounds": [
+        0.111328125,
+        -0.046875,
+        0.966796875,
+        0.814453125
+      ],
+      "fontId": "dotum",
+      "glyph": "마",
+      "measurement": null,
+      "pathSha256": "dc55985a2c38c4d69fe01c1abad612c3d64f1a5c2abf6e74dffc899fb2642b6b",
+      "unitsPerEm": 1024
+    },
+    {
+      "advance": 1.0,
+      "bounds": [
+        0.09375,
+        -0.0791015625,
+        0.8150111607142857,
+        0.7958984375
+      ],
+      "fontId": "dotum",
+      "glyph": "머",
+      "measurement": null,
+      "pathSha256": "fa890d2134c945b9bad7f86ba8085eb67e1184fe099b0cdc3d20314ad188f044",
+      "unitsPerEm": 1024
+    },
+    {
+      "advance": 1.0,
+      "bounds": [
+        0.103515625,
+        -0.0625,
+        0.978515625,
+        0.8037109375
+      ],
+      "fontId": "dotum",
+      "glyph": "아",
+      "measurement": null,
+      "pathSha256": "9f30e41156691a609399fdb834e48fd6ec722e8b71cfb8f31d7049d9cdf95754",
+      "unitsPerEm": 1024
+    },
+    {
+      "advance": 1.0,
+      "bounds": [
+        0.08203125,
+        -0.056640625,
+        0.8271484375,
+        0.8095703125
+      ],
+      "fontId": "dotum",
+      "glyph": "어",
+      "measurement": null,
+      "pathSha256": "5bd233d4dda702f7315f9aeb6df5491ac95f29c86035d4db42f9921c31408a61",
+      "unitsPerEm": 1024
+    },
+    {
+      "advance": 0.91,
+      "bounds": [
+        0.04554545454545455,
+        -0.01,
+        0.88,
+        0.84
+      ],
+      "fontId": "gowun-dodum",
+      "glyph": "가",
+      "measurement": {
+        "left": 0.5101111111111111,
+        "right": 0.6321111111111111,
+        "value": 0.122
+      },
+      "pathSha256": "ec05ad566d56d514eb20cb772eefd235378c9fda122ba9aebc3bcfd3eda7b8c5",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.86,
+      "bounds": [
+        0.04554545454545455,
+        -0.01,
+        0.74,
+        0.84
+      ],
+      "fontId": "gowun-dodum",
+      "glyph": "거",
+      "measurement": null,
+      "pathSha256": "5ba8e6886ef292c82723c1d1adaa83689f706a26e3c846b998850bbf437d8c8d",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.92,
+      "bounds": [
+        0.10530769230769231,
+        -0.01,
+        0.89,
+        0.84
+      ],
+      "fontId": "gowun-dodum",
+      "glyph": "나",
+      "measurement": null,
+      "pathSha256": "d2aff8bf3dae9faa1e246f14c0a0fcbfa4411e85bf666c91682fdc8f1b93299f",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.87,
+      "bounds": [
+        0.1103076923076923,
+        -0.01,
+        0.75,
+        0.84
+      ],
+      "fontId": "gowun-dodum",
+      "glyph": "너",
+      "measurement": null,
+      "pathSha256": "e6a1a3ef173db2ebd2e0c3ca4341be72de3a221075cd8abf185f1f35e857b918",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.92,
+      "bounds": [
+        0.0995,
+        -0.01,
+        0.89,
+        0.84
+      ],
+      "fontId": "gowun-dodum",
+      "glyph": "다",
+      "measurement": null,
+      "pathSha256": "7de7c067f36640a49dc418aaf191bcc687ce69759deb28b21af2f8ecfd62aad0",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.87,
+      "bounds": [
+        0.1005,
+        -0.01,
+        0.75,
+        0.84
+      ],
+      "fontId": "gowun-dodum",
+      "glyph": "더",
+      "measurement": null,
+      "pathSha256": "75b9a99880bc9669dbbed432c124da0bb47138194b54b3e23b7a753183f95f77",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.92,
+      "bounds": [
+        0.07,
+        -0.01,
+        0.89,
+        0.84
+      ],
+      "fontId": "gowun-dodum",
+      "glyph": "마",
+      "measurement": null,
+      "pathSha256": "b4d23d095bd44ddd469414b4f25424d98972ec40db8a9230e6d9371abd268c0d",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.87,
+      "bounds": [
+        0.07,
+        -0.01,
+        0.75,
+        0.84
+      ],
+      "fontId": "gowun-dodum",
+      "glyph": "머",
+      "measurement": null,
+      "pathSha256": "4ac7751715d8a7f29516cea41467cd0e1a3479483948a368a79e99919e0f2fc0",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.93,
+      "bounds": [
+        0.065,
+        -0.01,
+        0.9,
+        0.84
+      ],
+      "fontId": "gowun-dodum",
+      "glyph": "아",
+      "measurement": null,
+      "pathSha256": "773df410993432188d29b7d8cf20da7020999223b0cd466857fed8dbbbc1f4d5",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.88,
+      "bounds": [
+        0.065,
+        -0.01,
+        0.76,
+        0.84
+      ],
+      "fontId": "gowun-dodum",
+      "glyph": "어",
+      "measurement": null,
+      "pathSha256": "4b7b5c383e52f8e41ad856c400f472c698d3a1602125cf8dcd916fc5b024c719",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.835,
+      "bounds": [
+        0.05,
+        0.0,
+        0.835,
+        0.76
+      ],
+      "fontId": "black-han-sans",
+      "glyph": "가",
+      "measurement": {
+        "left": 0.487,
+        "right": 0.572,
+        "value": 0.08499999999999996
+      },
+      "pathSha256": "d68a5e81b679e9f233ccf00a499fd8bcf2d713a11edd82ba6c15f37dd2f9bbb1",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.82,
+      "bounds": [
+        0.05,
+        0.0,
+        0.76,
+        0.762
+      ],
+      "fontId": "black-han-sans",
+      "glyph": "거",
+      "measurement": null,
+      "pathSha256": "3d3a46bbf56a9d86d68914f370060f39551f9bd0279fe5de22459632232e573d",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.835,
+      "bounds": [
+        0.06,
+        0.0,
+        0.835,
+        0.76
+      ],
+      "fontId": "black-han-sans",
+      "glyph": "나",
+      "measurement": null,
+      "pathSha256": "d1ff0df097a94614c7e7aae0b98ce514888a775001c4b1f80bde037cd2403539",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.83,
+      "bounds": [
+        0.06,
+        0.0,
+        0.77,
+        0.762
+      ],
+      "fontId": "black-han-sans",
+      "glyph": "너",
+      "measurement": null,
+      "pathSha256": "2324b2d7093d5c0ce5dfc3ae6bca857e3d9e9e75546cd5f3da2c6270005c6077",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.835,
+      "bounds": [
+        0.06,
+        0.0,
+        0.835,
+        0.76
+      ],
+      "fontId": "black-han-sans",
+      "glyph": "다",
+      "measurement": null,
+      "pathSha256": "84870d830145bc6a026228a6d9720b1b7c2e788cc858228d1bbe6c2c603d2f0d",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.82,
+      "bounds": [
+        0.06,
+        0.0,
+        0.76,
+        0.76
+      ],
+      "fontId": "black-han-sans",
+      "glyph": "더",
+      "measurement": null,
+      "pathSha256": "6fd1a22dca79d7c3304e6b71d5984556ddf6b7d934be68a93e3c137b561710e5",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.838,
+      "bounds": [
+        0.06,
+        0.0,
+        0.838,
+        0.76
+      ],
+      "fontId": "black-han-sans",
+      "glyph": "마",
+      "measurement": null,
+      "pathSha256": "1f867516f52bc3d82d387235b022140a9db3c3026cc52a713245011e4c9dd133",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.823,
+      "bounds": [
+        0.06,
+        0.0,
+        0.763,
+        0.762
+      ],
+      "fontId": "black-han-sans",
+      "glyph": "머",
+      "measurement": null,
+      "pathSha256": "3712b8bfffb30a2147c420b12842d9e96d2af88a20a60d4456bfe69fef0d64fc",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.835,
+      "bounds": [
+        0.06,
+        0.0,
+        0.835,
+        0.76
+      ],
+      "fontId": "black-han-sans",
+      "glyph": "아",
+      "measurement": null,
+      "pathSha256": "20ee7ce92e58a0a8aee39259e799581e2f5316335a5795d928076a2ec02fc1ac",
+      "unitsPerEm": 1000
+    },
+    {
+      "advance": 0.82,
+      "bounds": [
+        0.06,
+        0.0,
+        0.76,
+        0.76
+      ],
+      "fontId": "black-han-sans",
+      "glyph": "어",
+      "measurement": null,
+      "pathSha256": "2d50dd6c906349eea9e041ec6bf1620608a20edc8f647255436d44427762947d",
+      "unitsPerEm": 1000
+    }
+  ],
+  "schema": "vertical-vowel-gap-evidence-v1",
+  "shapeGeometry": {
+    "chCenterline": [
+      [
+        180,
+        300
+      ],
+      [
+        495,
+        300
+      ],
+      [
+        495,
+        675
+      ]
+    ],
+    "chRightCenter": 495.0,
+    "juArmEndRatio": 0.8,
+    "juCenterOffset": 87.1875,
+    "juY": [
+      245,
+      755
+    ],
+    "linecap": "round",
+    "linejoin": "round",
+    "onlyVariable": "JU X translation",
+    "strokeReference": {
+      "fontId": "noto-sans-kr",
+      "glyph": "가",
+      "horizontalMean": 68.8914794922,
+      "limitation": "Noto의 방향별 채움 윤곽을 복제하지 않고 단일 isotropic round stroke의 굵기만 정규화한다.",
+      "method": "horizontal mean과 vertical stem의 균형값을 5 font units로 반올림",
+      "rawBalancedValue": 76.1016845703,
+      "roundedValue": 75.0,
+      "samples": {
+        "chHorizontal": 68.6114501953,
+        "juHorizontal": 69.1715087891,
+        "juVertical": 83.3118896484
+      },
+      "weight": 400
+    },
+    "strokeWidth": 75.0,
+    "unitsPerEm": 1000
+  },
+  "status": "candidate",
+  "version": 1,
+  "xGapHypothesis": {
+    "candidateId": "b",
+    "provisional": true,
+    "reason": "중립 고딕 4종의 가 전폭 X 빈 띠 중앙값을 5 font units로 반올림한 prototype 후보",
+    "status": "suspended-until-y-calibration"
+  }
+}

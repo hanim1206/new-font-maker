@@ -1,0 +1,234 @@
+{
+  "schema": "five-guide-square-x-baseline",
+  "version": 1,
+  "sourceCommit": "52a5c3f4673009fd0ee6bd721801344bb46a9fb0",
+  "sourceSchemaSha256": "c3abf3a814b47f79d9aa1f414447f7de782f5131865b245e474b7b5f3a86b587",
+  "calculation": {
+    "raw": "createLayoutGridSystemFromSchemas(BASE_PRESETS_SCHEMAS); X rails and left/right bindings only",
+    "effective": "calculateBoxes(schema, context); x/width only for seven shared layouts",
+    "runtimePadding": {
+      "top": 0.075,
+      "right": 0.075,
+      "bottom": 0.075,
+      "left": 0.075
+    },
+    "overrideState": "base schema part overrides only; no context preset, layout override, or user override",
+    "globalStyle": {
+      "weight": 400,
+      "weightMultiplier": 1,
+      "slant": 0,
+      "letterSpacing": 0,
+      "linecap": "round",
+      "linejoin": "round",
+      "brushTip": "round"
+    }
+  },
+  "raw": {
+    "xRails": [
+      { "id": "layout-grid:legacy-connected-v1:x:0", "value": 0.075 },
+      { "id": "layout-grid:legacy-connected-v1:x:1", "value": 0.1 },
+      { "id": "layout-grid:legacy-connected-v1:x:2", "value": 0.15 },
+      { "id": "layout-grid:legacy-connected-v1:x:3", "value": 0.6 },
+      { "id": "layout-grid:legacy-connected-v1:x:4", "value": 0.675 },
+      { "id": "layout-grid:legacy-connected-v1:x:5", "value": 0.85 },
+      { "id": "layout-grid:legacy-connected-v1:x:6", "value": 0.9 },
+      { "id": "layout-grid:legacy-connected-v1:x:7", "value": 0.925 },
+      { "id": "layout-grid:legacy-connected-v1:x:8", "value": 0.95 }
+    ],
+    "bindings": {
+      "choseong-only": {
+        "splitRailIds": {},
+        "partEdges": {
+          "CH": {
+            "left": "layout-grid:legacy-connected-v1:x:2",
+            "right": "layout-grid:legacy-connected-v1:x:5"
+          }
+        }
+      },
+      "choseong-jungseong-vertical": {
+        "splitRailIds": {
+          "choseong-jungseong-vertical:x:ch-ju": "layout-grid:legacy-connected-v1:x:3"
+        },
+        "partEdges": {
+          "CH": {
+            "left": "layout-grid:legacy-connected-v1:x:0",
+            "right": "layout-grid:legacy-connected-v1:x:3"
+          },
+          "JU": {
+            "left": "layout-grid:legacy-connected-v1:x:3",
+            "right": "layout-grid:legacy-connected-v1:x:7"
+          }
+        }
+      },
+      "choseong-jungseong-horizontal": {
+        "splitRailIds": {},
+        "partEdges": {
+          "CH": {
+            "left": "layout-grid:legacy-connected-v1:x:1",
+            "right": "layout-grid:legacy-connected-v1:x:6"
+          },
+          "JU": {
+            "left": "layout-grid:legacy-connected-v1:x:1",
+            "right": "layout-grid:legacy-connected-v1:x:6"
+          }
+        }
+      },
+      "choseong-jungseong-mixed": {
+        "splitRailIds": {
+          "choseong-jungseong-mixed:x:left-column-ju-v": "layout-grid:legacy-connected-v1:x:4"
+        },
+        "partEdges": {
+          "CH": {
+            "left": "layout-grid:legacy-connected-v1:x:0",
+            "right": "layout-grid:legacy-connected-v1:x:4"
+          },
+          "JU_H": {
+            "left": "layout-grid:legacy-connected-v1:x:0",
+            "right": "layout-grid:legacy-connected-v1:x:4"
+          },
+          "JU_V": {
+            "left": "layout-grid:legacy-connected-v1:x:4",
+            "right": "layout-grid:legacy-connected-v1:x:7"
+          }
+        }
+      },
+      "choseong-jungseong-vertical-jongseong": {
+        "splitRailIds": {
+          "choseong-jungseong-vertical-jongseong:x:ch-ju": "layout-grid:legacy-connected-v1:x:3"
+        },
+        "partEdges": {
+          "CH": {
+            "left": "layout-grid:legacy-connected-v1:x:0",
+            "right": "layout-grid:legacy-connected-v1:x:3"
+          },
+          "JU": {
+            "left": "layout-grid:legacy-connected-v1:x:3",
+            "right": "layout-grid:legacy-connected-v1:x:7"
+          },
+          "JO": {
+            "left": "layout-grid:legacy-connected-v1:x:0",
+            "right": "layout-grid:legacy-connected-v1:x:7"
+          }
+        }
+      },
+      "choseong-jungseong-horizontal-jongseong": {
+        "splitRailIds": {},
+        "partEdges": {
+          "CH": {
+            "left": "layout-grid:legacy-connected-v1:x:1",
+            "right": "layout-grid:legacy-connected-v1:x:6"
+          },
+          "JU": {
+            "left": "layout-grid:legacy-connected-v1:x:1",
+            "right": "layout-grid:legacy-connected-v1:x:6"
+          },
+          "JO": {
+            "left": "layout-grid:legacy-connected-v1:x:1",
+            "right": "layout-grid:legacy-connected-v1:x:6"
+          }
+        }
+      },
+      "choseong-jungseong-mixed-jongseong": {
+        "splitRailIds": {
+          "choseong-jungseong-mixed-jongseong:x:left-column-ju-v": "layout-grid:legacy-connected-v1:x:3"
+        },
+        "partEdges": {
+          "CH": {
+            "left": "layout-grid:legacy-connected-v1:x:0",
+            "right": "layout-grid:legacy-connected-v1:x:3"
+          },
+          "JU_H": {
+            "left": "layout-grid:legacy-connected-v1:x:0",
+            "right": "layout-grid:legacy-connected-v1:x:3"
+          },
+          "JU_V": {
+            "left": "layout-grid:legacy-connected-v1:x:3",
+            "right": "layout-grid:legacy-connected-v1:x:8"
+          },
+          "JO": {
+            "left": "layout-grid:legacy-connected-v1:x:0",
+            "right": "layout-grid:legacy-connected-v1:x:8"
+          }
+        }
+      }
+    }
+  },
+  "effective": {
+    "sharedLayouts": {
+      "choseong-only": {
+        "context": { "char": "ㄱ", "cho": "ㄱ", "jung": "", "jong": "" },
+        "parts": {
+          "CH": { "x": 0.15, "width": 0.7000000000000002 }
+        }
+      },
+      "choseong-jungseong-vertical": {
+        "context": { "char": "가", "cho": "ㄱ", "jung": "ㅏ", "jong": "" },
+        "parts": {
+          "CH": { "x": 0.075, "width": 0.525 },
+          "JU": { "x": 0.750625, "width": 0.174375 }
+        }
+      },
+      "choseong-jungseong-horizontal": {
+        "context": { "char": "고", "cho": "ㄱ", "jung": "ㅗ", "jong": "" },
+        "parts": {
+          "CH": { "x": 0.21525, "width": 0.6097500000000001 },
+          "JU": { "x": 0.075, "width": 0.8500000000000001 }
+        }
+      },
+      "choseong-jungseong-mixed": {
+        "context": { "char": "과", "cho": "ㄱ", "jung": "ㅘ", "jong": "" },
+        "parts": {
+          "CH": { "x": 0.125, "width": 0.45000000000000007 },
+          "JU_H": { "x": 0.075, "width": 0.6000000000000001 },
+          "JU_V": { "x": 0.685, "width": 0.23999999999999994 }
+        }
+      },
+      "choseong-jungseong-vertical-jongseong": {
+        "context": { "char": "각", "cho": "ㄱ", "jung": "ㅏ", "jong": "ㄱ" },
+        "parts": {
+          "CH": { "x": 0.075, "width": 0.525 },
+          "JU": { "x": 0.742875, "width": 0.182125 },
+          "JO": { "x": 0.185, "width": 0.6800000000000002 }
+        }
+      },
+      "choseong-jungseong-horizontal-jongseong": {
+        "context": { "char": "곡", "cho": "ㄱ", "jung": "ㅗ", "jong": "ㄱ" },
+        "parts": {
+          "CH": { "x": 0.16499999999999998, "width": 0.6700000000000002 },
+          "JU": { "x": 0.075, "width": 0.8500000000000001 },
+          "JO": { "x": 0.16499999999999998, "width": 0.6700000000000002 }
+        }
+      },
+      "choseong-jungseong-mixed-jongseong": {
+        "context": { "char": "곽", "cho": "ㄱ", "jung": "ㅘ", "jong": "ㄱ" },
+        "parts": {
+          "CH": { "x": 0.135, "width": 0.444 },
+          "JU_H": { "x": 0.075, "width": 0.525 },
+          "JU_V": { "x": 0.69, "width": 0.23500000000000001 },
+          "JO": { "x": 0.14, "width": 0.7050000000000002 }
+        }
+      }
+    },
+    "standaloneLayouts": {
+      "jungseong-vertical-only": {
+        "context": { "char": "ㅏ", "cho": "", "jung": "ㅏ", "jong": "" },
+        "boxes": {
+          "JU": { "x": 0.26625000000000004, "y": 0.075, "width": 0.6587500000000001, "height": 0.8500000000000001 }
+        }
+      },
+      "jungseong-horizontal-only": {
+        "context": { "char": "ㅗ", "cho": "", "jung": "ㅗ", "jong": "" },
+        "boxes": {
+          "JU": { "x": 0.075, "y": 0.075, "width": 0.8500000000000001, "height": 0.6800000000000002 }
+        }
+      },
+      "jungseong-mixed-only": {
+        "context": { "char": "ㅘ", "cho": "", "jung": "ㅘ", "jong": "" },
+        "boxes": {
+          "JU_H": { "x": 0.075, "y": 0.5, "width": 0.425, "height": 0.425 },
+          "JU_V": { "x": 0.5, "y": 0.075, "width": 0.425, "height": 0.8500000000000001 }
+        }
+      }
+    }
+  }
+}

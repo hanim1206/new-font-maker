@@ -1,8 +1,10 @@
 # 공통 그리드 기반 선·면 하이브리드 구현 플랜
 
-> 상태: `in progress · Step 5 interaction correction`
-> 개정일: 2026-08-24
+> 상태: `레이아웃 P0 대체됨 · Shape construction 구현 기록`
+> 개정일: 2026-08-28
 > 이번 개정의 핵심: 전체 자소 그리드의 점유 면과 Rail 교점에 고정된 선을 하나의 생성 문법으로 편집
+
+> **2026-08-28 전환 안내:** 이 문서의 공통 layout grid, `L-01`, `legacy-connected-v1`, X/Y 대칭 5 Rail 및 이를 전제로 한 단계 계획은 더 이상 구현 기준이 아니다. 신규 네모꼴 프로젝트의 레이아웃 P0는 [`FIVE_GUIDE_SQUARE_LAYOUT_P0_SPEC.md`](FIVE_GUIDE_SQUARE_LAYOUT_P0_SPEC.md)만 따른다. 이 문서의 Shape construction·선/면 합성 관련 구현 기록은 배경 자료로 유지하되, 새 명세와 충돌하면 새 명세를 우선한다.
 
 > 참조 우선순위: Obsidian `이미지 래퍼런스 캔버스.canvas`의 연결된 이미지와 `docs/PRODUCT_PHILOSOPHY.md`, 사용자와 합의한 의미 계약을 우선한다. `KOREAN_FONT_MAKER_UX_SCREEN_SPEC.md`는 과거 UX 검토 초안이며 구현 기준으로 사용하지 않는다.
 
