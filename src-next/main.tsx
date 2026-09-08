@@ -23,6 +23,12 @@ async function start(): Promise<void> {
     return
   }
 
+  if (window.location.pathname === '/font-guide-lab') {
+    const { FontGuideLabPage } = await import('./FontGuideLabPage')
+    root.render(<StrictMode><FontGuideLabPage /></StrictMode>)
+    return
+  }
+
   if (window.location.pathname === '/five-guide-lab') {
     const { FiveGuideLabPage } = await import('./FiveGuideLabPage')
     root.render(<StrictMode><FiveGuideLabPage /></StrictMode>)

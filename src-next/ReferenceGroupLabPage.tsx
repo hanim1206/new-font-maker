@@ -18,14 +18,12 @@ const FONT_CATALOG_URL = '/api/reference/v1/fonts'
 const OUTLINE_URL = '/api/reference/v1/outlines'
 const OUTLINE_CHUNK_SIZE = 12
 
-type ContextId = 'initial-horizontal-final' | 'initial-vertical-final' | 'final-horizontal-mixed' | 'final-vertical'
+type ContextId = 'initial-horizontal' | 'initial-vertical' | 'initial-horizontal-final' | 'initial-vertical-final' | 'final-horizontal-mixed' | 'final-vertical'
 type ComparisonSet = Readonly<Partial<Record<ContextId, OutlineResponse>>>
 
 interface ContextEntry { jamo: string; sample: string }
 interface ContextGroup { id: number; jamos: readonly string[] }
 interface Criterion { id: ContextId; title: string; highlight: GlyphHighlight; groups: readonly ContextGroup[]; entries: readonly ContextEntry[] }
-interface JamoFeature { height: string; innerSpace: string }
-
 const CHOSEONG_INDEX: Readonly<Record<string, number>> = {
   'ㄱ': 0, 'ㄲ': 1, 'ㄴ': 2, 'ㄷ': 3, 'ㄸ': 4, 'ㄹ': 5, 'ㅁ': 6, 'ㅂ': 7, 'ㅃ': 8,
   'ㅅ': 9, 'ㅆ': 10, 'ㅇ': 11, 'ㅈ': 12, 'ㅉ': 13, 'ㅊ': 14, 'ㅋ': 15, 'ㅌ': 16, 'ㅍ': 17, 'ㅎ': 18,
@@ -37,30 +35,17 @@ const JONGSEONG_INDEX: Readonly<Record<string, number>> = {
   'ㅄ': 18, 'ㅅ': 19, 'ㅆ': 20, 'ㅇ': 21, 'ㅈ': 22, 'ㅊ': 23, 'ㅋ': 24, 'ㅌ': 25, 'ㅍ': 26, 'ㅎ': 27,
 }
 
-const JAMO_FEATURES: Readonly<Record<string, JamoFeature>> = {
-  'ㄱ': { height: '2칸', innerSpace: '기본형' }, 'ㄴ': { height: '2칸', innerSpace: '기본형' },
-  'ㄷ': { height: '2칸', innerSpace: '기본형' }, 'ㅁ': { height: '2칸', innerSpace: '기본형' },
-  'ㅅ': { height: '2칸', innerSpace: '기본형' }, 'ㅇ': { height: '2칸', innerSpace: '기본형' },
-  'ㅈ': { height: '2칸', innerSpace: 'ㅈ형' }, 'ㅍ': { height: '2칸', innerSpace: 'ㅍ·ㄲ·ㅆ형' },
-  'ㄲ': { height: '2칸', innerSpace: 'ㅍ·ㄲ·ㅆ형' }, 'ㄸ': { height: '2칸', innerSpace: 'ㄹ·ㅂ·ㅌ·ㄸ형' },
-  'ㅆ': { height: '2칸', innerSpace: 'ㅍ·ㄲ·ㅆ형' }, 'ㄹ': { height: '3칸 이상', innerSpace: 'ㄹ·ㅂ·ㅌ·ㄸ형' },
-  'ㅂ': { height: '3칸 이상', innerSpace: 'ㄹ·ㅂ·ㅌ·ㄸ형' }, 'ㅌ': { height: '3칸 이상', innerSpace: 'ㄹ·ㅂ·ㅌ·ㄸ형' },
-  'ㅋ': { height: '3칸 이상', innerSpace: 'ㅋ형' }, 'ㅊ': { height: '3칸 이상', innerSpace: 'ㅊ·ㅎ형' },
-  'ㅎ': { height: '3칸 이상', innerSpace: 'ㅊ·ㅎ형' }, 'ㅃ': { height: '3칸 이상', innerSpace: 'ㅃ·ㅉ형' },
-  'ㅉ': { height: '3칸 이상', innerSpace: 'ㅃ·ㅉ형' },
-}
-
 const MEDIAL_INDEX = { 'ㅏ': 0, 'ㅗ': 8, 'ㅘ': 9, 'ㅡ': 18 } as const
 
-function syllable(initial: string, medial: keyof typeof MEDIAL_INDEX, final: string): string {
+function syllable(initial: string, medial: keyof typeof MEDIAL_INDEX, final: string | null): string {
   const initialIndex = CHOSEONG_INDEX[initial]
-  const finalIndex = JONGSEONG_INDEX[final]
-  if (initialIndex === undefined || finalIndex === undefined) throw new Error(`지원하지 않는 자모: ${initial}${medial}${final}`)
+  const finalIndex = final === null ? 0 : JONGSEONG_INDEX[final]
+  if (initialIndex === undefined || finalIndex === undefined) throw new Error(`지원하지 않는 자모: ${initial}${medial}${final ?? ''}`)
   return String.fromCodePoint(0xac00 + ((initialIndex * 21 + MEDIAL_INDEX[medial]) * 28) + finalIndex)
 }
 
-function initialEntries(jamos: readonly string[], medial: keyof typeof MEDIAL_INDEX): ContextEntry[] {
-  return jamos.map((jamo) => ({ jamo, sample: syllable(jamo, medial, 'ㅁ') }))
+function initialEntries(jamos: readonly string[], medial: keyof typeof MEDIAL_INDEX, final: string | null): ContextEntry[] {
+  return jamos.map((jamo) => ({ jamo, sample: syllable(jamo, medial, final) }))
 }
 
 function finalEntries(jamos: readonly string[], medials: readonly (keyof typeof MEDIAL_INDEX)[]): ContextEntry[] {
@@ -83,6 +68,17 @@ const INITIAL_HORIZONTAL_GROUPS: readonly ContextGroup[] = [
   { id: 6, jamos: ['ㅎ', 'ㅃ', 'ㅉ'] },
 ]
 
+const INITIAL_HORIZONTAL_NO_FINAL_GROUPS: readonly ContextGroup[] = [
+  { id: 1, jamos: ['ㄱ'] },
+  { id: 2, jamos: ['ㄴ', 'ㄷ', 'ㅁ', 'ㅅ', 'ㅇ'] },
+  { id: 3, jamos: ['ㅈ'] },
+  { id: 4, jamos: ['ㅍ', 'ㄲ', 'ㅆ'] },
+  { id: 5, jamos: ['ㅋ'] },
+  { id: 6, jamos: ['ㄹ', 'ㅂ', 'ㅊ', 'ㅌ', 'ㄸ'] },
+  { id: 7, jamos: ['ㅎ'] },
+  { id: 8, jamos: ['ㅃ', 'ㅉ'] },
+]
+
 const INITIAL_VERTICAL_GROUPS: readonly ContextGroup[] = [
   { id: 1, jamos: ['ㄱ', 'ㅅ'] },
   { id: 2, jamos: ['ㄴ'] },
@@ -90,6 +86,17 @@ const INITIAL_VERTICAL_GROUPS: readonly ContextGroup[] = [
   { id: 4, jamos: ['ㅍ', 'ㄲ', 'ㅆ'] },
   { id: 5, jamos: ['ㄹ', 'ㅂ', 'ㅊ', 'ㅌ', 'ㄸ'] },
   { id: 6, jamos: ['ㅎ', 'ㅃ', 'ㅉ'] },
+]
+
+const INITIAL_VERTICAL_NO_FINAL_GROUPS: readonly ContextGroup[] = [
+  { id: 1, jamos: ['ㄱ', 'ㅅ'] },
+  { id: 2, jamos: ['ㄴ'] },
+  { id: 3, jamos: ['ㄷ', 'ㅁ', 'ㅇ', 'ㅈ'] },
+  { id: 4, jamos: ['ㅍ', 'ㄲ', 'ㅆ'] },
+  { id: 5, jamos: ['ㅋ'] },
+  { id: 6, jamos: ['ㄹ', 'ㅂ', 'ㅊ', 'ㅌ', 'ㄸ'] },
+  { id: 7, jamos: ['ㅎ'] },
+  { id: 8, jamos: ['ㅃ', 'ㅉ'] },
 ]
 
 const FINAL_HORIZONTAL_MIXED_GROUPS: readonly ContextGroup[] = [
@@ -112,12 +119,20 @@ const FINAL_VERTICAL_GROUPS: readonly ContextGroup[] = [
 
 const CRITERIA: readonly Criterion[] = [
   {
+    id: 'initial-horizontal', title: '가로모임꼴 · 첫닿자', highlight: 'initial-left',
+    groups: INITIAL_HORIZONTAL_NO_FINAL_GROUPS, entries: initialEntries(groupJamos(INITIAL_HORIZONTAL_NO_FINAL_GROUPS), 'ㅏ', null),
+  },
+  {
+    id: 'initial-vertical', title: '세로모임꼴 · 첫닿자', highlight: 'initial-top',
+    groups: INITIAL_VERTICAL_NO_FINAL_GROUPS, entries: initialEntries(groupJamos(INITIAL_VERTICAL_NO_FINAL_GROUPS), 'ㅗ', null),
+  },
+  {
     id: 'initial-horizontal-final', title: '가로모임꼴 받친글자 · 첫닿자', highlight: 'initial-left',
-    groups: INITIAL_HORIZONTAL_GROUPS, entries: initialEntries(groupJamos(INITIAL_HORIZONTAL_GROUPS), 'ㅏ'),
+    groups: INITIAL_HORIZONTAL_GROUPS, entries: initialEntries(groupJamos(INITIAL_HORIZONTAL_GROUPS), 'ㅏ', 'ㅁ'),
   },
   {
     id: 'initial-vertical-final', title: '세로모임꼴 받친글자 · 첫닿자', highlight: 'initial-top',
-    groups: INITIAL_VERTICAL_GROUPS, entries: initialEntries(groupJamos(INITIAL_VERTICAL_GROUPS), 'ㅗ'),
+    groups: INITIAL_VERTICAL_GROUPS, entries: initialEntries(groupJamos(INITIAL_VERTICAL_GROUPS), 'ㅗ', 'ㅁ'),
   },
   {
     id: 'final-horizontal-mixed', title: '가로·섞임모임꼴 · 받침닿자', highlight: 'final',
@@ -161,58 +176,7 @@ function variantLabel(criterion: Criterion, index: number): string | null {
   return index === 0 ? '가로모임' : '섞임모임'
 }
 
-function groupRationale(criterion: Criterion, group: ContextGroup): Readonly<Record<string, string>> {
-  const features = group.jamos.map((jamo) => ({ jamo, ...(JAMO_FEATURES[jamo] ?? { height: '겹받침', innerSpace: '겹받침형' }) }))
-  const heights = Array.from(new Set(features.map(({ height }) => height)))
-  const innerSpaces = Array.from(new Set(features.map(({ innerSpace }) => innerSpace)))
-  const innerSpaceMembers = innerSpaces.map((innerSpace) => `${innerSpace}(${features.filter((feature) => feature.innerSpace === innerSpace).map(({ jamo }) => jamo).join('·')})`).join(' / ')
-  return {
-    높이: heights.join(' · '),
-    속공간: innerSpaces.length === 1 ? innerSpaces[0] : '단일 기준 아님',
-    ...(innerSpaces.length > 1 ? { 구성: innerSpaceMembers } : {}),
-    예외: criterion.id === 'final-vertical' && group.jamos.includes('ㅅ') ? 'ㅅ·ㅜ/ㅠ 접촉 점검' : '없음',
-    판정: heights.length === 1 && innerSpaces.length === 1 ? '기본 특성 일치' : '문맥 규칙으로 통합',
-  }
-}
-
-const GROUP_DESCRIPTIONS: Readonly<Record<ContextId, Readonly<Record<number, string>>>> = {
-  'initial-horizontal-final': {
-    1: '홀자 쪽 세로획이 바로 서고, 아래·왼쪽 열린 공간이 받침 쪽으로 이어지는 비대칭 L자.',
-    2: '2칸 높이의 기본 속공간 계열. 홀자와 나란한 문맥에서 오른쪽 여백과 받침 위 빈 공간을 같은 규칙으로 맞춘다.',
-    3: 'ㅈ의 아래 열린 끝과 ㅋ의 계단형 가로획은 다르다. 결론표에서 나란한 문맥의 같은 조합 규칙으로 단순화한 묶음.',
-    4: '반복 가로획으로 속공간이 여러 칸으로 나뉘는 계열. 2칸 높이 안에서 시각 밀도가 높다.',
-    5: '3칸 이상을 쓰는 다층 골격 계열. 가로획 층과 안쪽 빈 공간이 커서 2칸 계열과 다른 크기 규칙이 필요하다.',
-    6: '3칸 이상 계열. 원형 또는 겹친 획 때문에 중심부 밀도가 높은 묶음.',
-  },
-  'initial-vertical-final': {
-    1: '홀자와 마주 보는 아래 면이 열린 형태.',
-    2: '아래 가로획이 홀자 위를 수평으로 닫는 형태. 위아래 사이 빈 공간과 무게가 그룹 1과 다르다.',
-    3: 'ㄷ·ㅁ·ㅇ의 닫힌 하단과 ㅈ·ㅋ의 열린·계단형 하단이 섞인다. 결론표에서 홀자 위 문맥의 같은 조합 규칙으로 단순화한 묶음.',
-    4: '반복 가로획으로 속공간이 여러 칸으로 나뉘는 계열. 홀자 위에서 아래 경계의 밀도를 함께 맞춘다.',
-    5: '3칸 이상을 쓰는 다층 골격 계열. 홀자 위에서 아래쪽 끝과 속공간의 크기를 별도로 조절한다.',
-    6: '3칸 이상 계열. 원형 또는 겹친 획 때문에 중심부 밀도가 높은 묶음.',
-  },
-  'final-horizontal-mixed': {
-    1: '홀자와 마주 보는 윗면이 홀자 아래 공간을 비교적 막거나 경계 짓는 형태.',
-    2: '홀자와 마주 보는 윗면이 크게 열린 형태. 홀자 아래 빈 공간이 안쪽까지 이어진다.',
-    3: 'ㅈ·ㅋ·ㅍ·ㄲ은 높이와 속공간이 다르다. 결론표에서 홀자 아래 문맥의 같은 조합 규칙으로 단순화한 묶음.',
-    4: '다층 골격과 겹친 받침이 섞인 고밀도 묶음. 획 수보다 윗면의 시각적 무게와 속공간을 함께 본다.',
-    5: '3칸 이상 계열. 위아래로 벌어진 획과 중심부 공간 때문에 단순 2칸 받침과 분리한다.',
-    6: '두 닿자가 결합한 겹받침 계열. 가로 폭과 중심부 밀도가 커서 홑받침과 다른 규칙이 필요하다.',
-  },
-  'final-vertical': {
-    1: '홀자와 마주 보는 윗면이 홀자 아래 공간을 비교적 막거나 경계 짓는 형태.',
-    2: '홀자와 마주 보는 윗면이 크게 열린 형태. 홀자 아래 빈 공간이 안쪽까지 이어진다.',
-    3: 'ㅅ은 ㅜ·ㅠ의 짧은 기둥과 붙을 위험을 별도 확인한다. 나머지와 함께 결론표에서 단순화한 묶음.',
-    4: '다층 골격과 겹친 받침이 섞인 고밀도 묶음. 획 수보다 윗면의 시각적 무게와 속공간을 함께 본다.',
-    5: '3칸 이상 계열. 위아래로 벌어진 획과 중심부 공간 때문에 단순 2칸 받침과 분리한다.',
-    6: '두 닿자가 결합한 겹받침 계열. 가로 폭과 중심부 밀도가 커서 홑받침과 다른 규칙이 필요하다.',
-  },
-}
-
-function groupDescription(criterion: Criterion, group: ContextGroup): string {
-  return GROUP_DESCRIPTIONS[criterion.id][group.id]
-}
+const GROUP_METHOD_NOTE = '이용제가 닿자의 면적·시각 공간·홀자와의 상대 위치로 단순화한 비교용 그룹이다. 홀자의 세부 형태와 닿자 끝맺음은 이 표만으로 설명되지 않으며, 실제 조합에서 별도 검증이 필요하다.'
 
 async function requestOutline(text: string, catalog: FontCatalogResponse, signal: AbortSignal): Promise<OutlineResponse> {
   const chunks = Array.from(text).reduce<string[]>((result, character, index) => {
@@ -316,6 +280,7 @@ export function ReferenceGroupLabPage() {
         <span>R0 복제본 · 문맥별 윤곽 비교</span>
         <h1>닿자 위치 변형 랩</h1>
         <p>닿자 하나가 첫닿자·받침닿자, 모임꼴 문맥에 따라 만드는 형태 변형을 비교합니다.</p>
+        <a className={styles.guideLabLink} href={`/font-guide-lab${activeFont ? `?font=${encodeURIComponent(activeFont.id)}` : ''}`}>기준선 조율 랩 열기</a>
       </header>
 
       <section className={styles.chipSelector} aria-labelledby="jamo-heading">
@@ -363,15 +328,8 @@ export function ReferenceGroupLabPage() {
                 </header>
                 <div className={styles.criterionBody}>
                   <div className={styles.groupTable} aria-label={`${criterion.title} 전체 닿자 그룹표`}>
-                    {group && (
-                      <dl className={styles.groupRationale} aria-label={`${selectedJamo} 그룹 ${group.id} 분류 근거`}>
-                        <div className={styles.rationaleTitle}><dt>그룹 {group.id}</dt><dd>분류 근거</dd></div>
-                        {Object.entries(groupRationale(criterion, group)).map(([label, value]) => (
-                          <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
-                        ))}
-                      </dl>
-                    )}
                     <table>
+                      <thead><tr><th scope="col">그룹</th><th scope="col">닿자</th></tr></thead>
                       <tbody>{criterion.groups.map(({ id, jamos }) => {
                         const representative = jamos[0]
                         return (
@@ -420,7 +378,7 @@ export function ReferenceGroupLabPage() {
                     </div>
                   )}
                 </div>
-                {group && <footer className={styles.groupDescription}><strong>그룹 설명</strong><p>{groupDescription(criterion, group)}</p></footer>}
+                {group && <footer className={styles.groupDescription}><strong>분류 메모</strong><p>{GROUP_METHOD_NOTE}</p></footer>}
               </section>
             )
           })}
