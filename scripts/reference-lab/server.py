@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
 from fontTools.pens.boundsPen import BoundsPen
+from fontTools.pens.recordingPen import RecordingPen
 from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
@@ -65,6 +66,40 @@ def sha256_file(path: Path) -> str:
 
 def path_sha256(path_commands: str) -> str:
     return hashlib.sha256(path_commands.encode("utf-8")).hexdigest()
+
+
+def contour_paths(glyph: Any, glyph_set: Any) -> List[Dict[str, Any]]:
+    """Extract closed contours without changing original glyph coordinates."""
+    recorder = RecordingPen()
+    glyph.draw(recorder)
+    contours: List[Dict[str, Any]] = []
+    current: List[Tuple[str, Tuple[Any, ...]]] = []
+
+    def flush() -> None:
+        if not current:
+            return
+        path_pen = SVGPathPen(glyph_set)
+        bounds_pen = BoundsPen(glyph_set)
+        for operator, arguments in current:
+            getattr(path_pen, operator)(*arguments)
+            getattr(bounds_pen, operator)(*arguments)
+        path = path_pen.getCommands()
+        if not path or bounds_pen.bounds is None:
+            raise ValueError("empty contour data")
+        contours.append({
+            "path": path,
+            "bounds": [float(value) for value in bounds_pen.bounds],
+        })
+        current.clear()
+
+    for operator, arguments in recorder.value:
+        if operator == "moveTo" and current:
+            flush()
+        current.append((operator, arguments))
+        if operator in {"closePath", "endPath"}:
+            flush()
+    flush()
+    return contours
 
 
 def codepoint_label(character: str) -> str:
@@ -322,6 +357,7 @@ class ReferenceEngine:
                 glyph.draw(path_pen)
                 glyph.draw(bounds_pen)
                 path_commands = path_pen.getCommands()
+                contours = contour_paths(glyph, glyph_set)
                 units_per_em = int(font["head"].unitsPerEm)
                 advance = float(glyph.width) / units_per_em
                 bounds = (
@@ -351,6 +387,7 @@ class ReferenceEngine:
                 "glyphName": glyph_name,
                 "path": path_commands,
                 "pathSha256": path_sha256(path_commands),
+                "contours": contours,
                 "unitsPerEm": units_per_em,
                 "advance": advance,
                 "bounds": bounds,

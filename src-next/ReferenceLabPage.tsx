@@ -7,7 +7,7 @@ const DEFAULT_TEXT = '가거'
 const MAX_CHARACTERS = 12
 const EXPECTED_PROJECTION = 'matrix(1000/nativeUPM 0 0 -1000/nativeUPM 0 880)'
 
-interface DisplayContract {
+export interface DisplayContract {
   unitsPerEm: 1000
   baselineY: 880
   viewBox: readonly [-120, -120, 1240, 1240]
@@ -18,7 +18,7 @@ interface DisplayContract {
   advanceNormalization: false
 }
 
-interface ReferenceFont {
+export interface ReferenceFont {
   id: string
   family: string
   fileName: string
@@ -30,7 +30,7 @@ interface ReferenceFont {
   axes: Readonly<Record<string, number>>
 }
 
-interface FontCatalogResponse {
+export interface FontCatalogResponse {
   schema: 'reference-font-catalog-response-v1'
   apiVersion: 'reference.v1'
   display: DisplayContract
@@ -50,6 +50,7 @@ interface PresentGlyphOutline extends GlyphIdentity {
   unitsPerEm: number
   advance: number
   bounds: readonly [number, number, number, number] | null
+  contours?: readonly GlyphContour[]
 }
 
 interface MissingGlyphOutline extends GlyphIdentity {
@@ -60,14 +61,20 @@ interface MissingGlyphOutline extends GlyphIdentity {
   }
 }
 
-type GlyphOutline = PresentGlyphOutline | MissingGlyphOutline
+export type GlyphOutline = PresentGlyphOutline | MissingGlyphOutline
+export type GlyphHighlight = 'initial-left' | 'initial-top' | 'final'
 
-interface FontOutlineSample {
+interface GlyphContour {
+  path: string
+  bounds: readonly [number, number, number, number]
+}
+
+export interface FontOutlineSample {
   fontId: string
   glyphs: readonly GlyphOutline[]
 }
 
-interface OutlineResponse {
+export interface OutlineResponse {
   schema: 'reference-outline-response-v1'
   apiVersion: 'reference.v1'
   text: string
@@ -163,7 +170,7 @@ function parseFont(value: unknown, index: number): ReferenceFont {
   }
 }
 
-function parseFontCatalogResponse(value: unknown): FontCatalogResponse {
+export function parseFontCatalogResponse(value: unknown): FontCatalogResponse {
   const response = asRecord(value, 'font catalog')
   expectLiteral(response.schema, 'reference-font-catalog-response-v1', 'font catalog.schema')
   expectLiteral(response.apiVersion, 'reference.v1', 'font catalog.apiVersion')
@@ -203,6 +210,19 @@ function parseBounds(value: unknown, location: string): readonly [number, number
   return bounds as unknown as readonly [number, number, number, number]
 }
 
+function parseContours(value: unknown, location: string): readonly GlyphContour[] {
+  if (!Array.isArray(value) || value.length === 0) return contractError(location, '비어 있지 않은 배열이어야 합니다.')
+  return value.map((value, index) => {
+    const contour = asRecord(value, `${location}[${index}]`)
+    const bounds = parseBounds(contour.bounds, `${location}[${index}].bounds`)
+    if (bounds === null) return contractError(`${location}[${index}].bounds`, 'null일 수 없습니다.')
+    return {
+      path: asString(contour.path, `${location}[${index}].path`),
+      bounds,
+    }
+  })
+}
+
 function parseGlyph(value: unknown, location: string): GlyphOutline {
   const glyph = asRecord(value, location)
   const identity = parseGlyphIdentity(glyph, location)
@@ -227,6 +247,7 @@ function parseGlyph(value: unknown, location: string): GlyphOutline {
   if (unitsPerEm <= 0) return contractError(`${location}.unitsPerEm`, '0보다 커야 합니다.')
   const advance = asFiniteNumber(glyph.advance, `${location}.advance`)
   if (advance < 0) return contractError(`${location}.advance`, '0 이상이어야 합니다.')
+  const contours = glyph.contours === undefined ? undefined : parseContours(glyph.contours, `${location}.contours`)
   return {
     ...identity,
     missing: false,
@@ -236,10 +257,11 @@ function parseGlyph(value: unknown, location: string): GlyphOutline {
     unitsPerEm,
     advance,
     bounds: parseBounds(glyph.bounds, `${location}.bounds`),
+    ...(contours ? { contours } : {}),
   }
 }
 
-function parseOutlineResponse(value: unknown): OutlineResponse {
+export function parseOutlineResponse(value: unknown): OutlineResponse {
   const response = asRecord(value, 'outline response')
   expectLiteral(response.schema, 'reference-outline-response-v1', 'outline response.schema')
   expectLiteral(response.apiVersion, 'reference.v1', 'outline response.apiVersion')
@@ -271,12 +293,12 @@ function normalizeCharacters(value: string): readonly string[] {
   return Array.from(value.normalize('NFC')).filter((character) => !/[\s\p{C}]/u.test(character))
 }
 
-function describeError(error: unknown): string {
+export function describeError(error: unknown): string {
   if (error instanceof Error) return error.message
   return '알 수 없는 오류가 발생했습니다.'
 }
 
-function isAbortError(error: unknown): boolean {
+export function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError'
 }
 
@@ -288,7 +310,7 @@ async function responseJson(response: Response): Promise<unknown> {
   }
 }
 
-async function requireSuccessfulJson(response: Response): Promise<unknown> {
+export async function requireSuccessfulJson(response: Response): Promise<unknown> {
   const value = await responseJson(response)
   if (response.ok) return value
   const payload = asRecord(value, `HTTP ${response.status} error`)
@@ -296,7 +318,7 @@ async function requireSuccessfulJson(response: Response): Promise<unknown> {
   throw new Error(`Reference API ${response.status}: ${asString(error.message, 'error.message')}`)
 }
 
-function validateOutlineCoverage(
+export function validateOutlineCoverage(
   response: OutlineResponse,
   requestedText: string,
   fonts: readonly ReferenceFont[],
@@ -345,9 +367,18 @@ interface GlyphSpecimenProps {
   display: DisplayContract
   font: ReferenceFont
   glyph: GlyphOutline
+  highlight?: GlyphHighlight
 }
 
-function GlyphSpecimen({ display, font, glyph }: GlyphSpecimenProps) {
+export function GlyphSpecimen({ display, font, glyph, highlight }: GlyphSpecimenProps) {
+  const highlightSlot = highlight === 'initial-left'
+    ? { x: 0, y: 0, width: 520, height: 610 }
+    : highlight === 'initial-top'
+      ? { x: 0, y: 0, width: 1000, height: 360 }
+      : highlight === 'final'
+        ? { x: 0, y: 610, width: 1000, height: 390 }
+        : null
+  const highlightLabel = highlight === 'final' ? '받침닿자 위치' : '첫닿자 위치'
   const commonSvg = {
     viewBox: display.viewBox.join(' '),
     'data-testid': 'glyph-svg',
@@ -390,6 +421,9 @@ function GlyphSpecimen({ display, font, glyph }: GlyphSpecimenProps) {
             y2="1120"
           />
         )}
+        {!glyph.missing && highlightSlot && highlight && (
+          <rect className={styles.jamoSlot} data-jamo-highlight={highlight} {...highlightSlot} />
+        )}
         {glyph.missing ? (
           <g className={styles.missingMark} data-testid="missing-glyph">
             <text x="500" y="475" textAnchor="middle">글리프 없음</text>
@@ -401,6 +435,11 @@ function GlyphSpecimen({ display, font, glyph }: GlyphSpecimenProps) {
             transform={`matrix(${display.unitsPerEm / glyph.unitsPerEm} 0 0 ${-(display.unitsPerEm / glyph.unitsPerEm)} 0 ${display.baselineY})`}
           >
             <path className={styles.glyphInk} d={glyph.path} />
+          </g>
+        )}
+        {highlightSlot && highlight && (
+          <g>
+            <text className={styles.jamoSlotLabel} x={highlightSlot.x + 24} y={highlightSlot.y + 58}>{highlightLabel}</text>
           </g>
         )}
       </svg>

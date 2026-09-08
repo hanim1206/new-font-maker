@@ -17,6 +17,12 @@ async function start(): Promise<void> {
     return
   }
 
+  if (window.location.pathname === '/reference-group-lab') {
+    const { ReferenceGroupLabPage } = await import('./ReferenceGroupLabPage')
+    root.render(<StrictMode><ReferenceGroupLabPage /></StrictMode>)
+    return
+  }
+
   if (window.location.pathname === '/five-guide-lab') {
     const { FiveGuideLabPage } = await import('./FiveGuideLabPage')
     root.render(<StrictMode><FiveGuideLabPage /></StrictMode>)

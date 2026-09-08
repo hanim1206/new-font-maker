@@ -374,6 +374,8 @@
 }
 
 .glyphInk { fill: #14213b; }
+.jamoSlot { fill: #76adff; fill-opacity: .48; }
+.jamoSlotLabel { fill: white; stroke: #1d4f9b; stroke-width: 12; font-size: 42px; font-weight: 800; paint-order: stroke; stroke-linejoin: round; }
 
 .missingMark text {
   fill: #9a3f35;
