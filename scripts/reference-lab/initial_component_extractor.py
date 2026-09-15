@@ -27,8 +27,9 @@ import medial_guide_extractor as medial
 BASELINE_Y = 880.0
 AXIS_TOLERANCE = 1e-6
 # 확장 받침 문맥에서 첫닿자 클러스터가 홀자 기둥 하단을 넘을 수 있는 여유(1000-unit).
-# 획 끝 라운딩·오버슈트만 허용하고 받침 획 흡수는 거부한다.
-PILLAR_BOTTOM_TOLERANCE = 40.0
+# ㅋ·ㅌ류 다리의 정상 하강(실측 최대 약 57)은 허용하고, 받침 획을 흡수한
+# 위장 클러스터(실측 초과 127 이상)는 거부한다.
+PILLAR_BOTTOM_TOLERANCE = 60.0
 PROBE_OFFSET = 0.25
 P0_VERIFIED_FONT_SHA256 = dict(medial.P0_VERIFIED_FONT_SHA256)
 Point = Tuple[float, float]
@@ -486,6 +487,122 @@ def _upper_cluster_at_largest_gap(
     return selected_ids, gap
 
 
+def _segment_orientation(a: Point, b: Point, c: Point) -> float:
+    return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
+
+def _contact_point_on_segment(point: Point, start: Point, end: Point) -> bool:
+    return (
+        min(start[0], end[0]) - AXIS_TOLERANCE <= point[0] <= max(start[0], end[0]) + AXIS_TOLERANCE
+        and min(start[1], end[1]) - AXIS_TOLERANCE <= point[1] <= max(start[1], end[1]) + AXIS_TOLERANCE
+    )
+
+
+def _segments_touch(a: Point, b: Point, c: Point, d: Point) -> bool:
+    first = _segment_orientation(a, b, c)
+    second = _segment_orientation(a, b, d)
+    third = _segment_orientation(c, d, a)
+    fourth = _segment_orientation(c, d, b)
+    if (
+        ((first > AXIS_TOLERANCE and second < -AXIS_TOLERANCE) or (first < -AXIS_TOLERANCE and second > AXIS_TOLERANCE))
+        and ((third > AXIS_TOLERANCE and fourth < -AXIS_TOLERANCE) or (third < -AXIS_TOLERANCE and fourth > AXIS_TOLERANCE))
+    ):
+        return True
+    return any(
+        abs(orientation) <= AXIS_TOLERANCE and _contact_point_on_segment(point, start, end)
+        for orientation, point, start, end in (
+            (first, c, a, b), (second, d, a, b), (third, a, c, d), (fourth, b, c, d),
+        )
+    )
+
+
+def _polygon_edge_pairs(polygon: Sequence[Point]) -> List[Tuple[Point, Point]]:
+    points = list(polygon)
+    if len(points) < 2:
+        return []
+    if points[0] != points[-1]:
+        points.append(points[0])
+    return list(zip(points, points[1:]))
+
+
+def _records_contact(left: ContourRecord, right: ContourRecord) -> bool:
+    """bbox 중첩은 접촉 증거가 아니다. 실제 윤곽 edge 교차·접점만 인정한다."""
+    contact_tolerance = 1e-3
+    if (
+        left.bounds[2] < right.bounds[0] - contact_tolerance
+        or right.bounds[2] < left.bounds[0] - contact_tolerance
+        or left.bounds[3] < right.bounds[1] - contact_tolerance
+        or right.bounds[3] < left.bounds[1] - contact_tolerance
+    ):
+        return False
+    return any(
+        _segments_touch(left_start, left_end, right_start, right_end)
+        for left_start, left_end in _polygon_edge_pairs(left.polygon)
+        for right_start, right_end in _polygon_edge_pairs(right.polygon)
+    )
+
+
+def _contact_component_fallback(
+    contour_ids: Sequence[int],
+    records_by_id: Dict[int, ContourRecord],
+    parents: Dict[int, int],
+    structure: InitialStructureSpec,
+    selected_bottom_limit: Optional[float],
+) -> Tuple[List[int], float]:
+    """세로 구간이 겹쳐 병합된 경우의 확장 문맥 전용 fallback.
+
+    실제 잉크 접촉으로 연결 성분을 만들고, 위에서부터 기둥 하단 한계 안에서
+    구조가 증명되는 최대 성분 묶음을 첫닿자로 삼는다. 접촉으로 이어진 획은
+    절단하지 않으며, 한계 안 유효 묶음이 없으면 그대로 포기한다.
+    """
+    if selected_bottom_limit is None:
+        return [], 0.0
+    outer_ids = _outer_ids(contour_ids, parents, records_by_id)
+    roots = {value: value for value in outer_ids}
+
+    def find(value: int) -> int:
+        while roots[value] != value:
+            roots[value] = roots[roots[value]]
+            value = roots[value]
+        return value
+
+    for index, left in enumerate(outer_ids):
+        for right in outer_ids[index + 1:]:
+            if _records_contact(records_by_id[left], records_by_id[right]):
+                roots[find(right)] = find(left)
+    components: Dict[int, List[int]] = {}
+    for value in outer_ids:
+        components.setdefault(find(value), []).append(value)
+    ordered = sorted(
+        components.values(),
+        key=lambda ids: min(records_by_id[contour_id].bounds[1] for contour_id in ids),
+    )
+    best: Tuple[List[int], float] = ([], 0.0)
+    for count in range(1, len(ordered)):
+        selected = {contour_id for component in ordered[:count] for contour_id in component}
+        changed = True
+        while changed:
+            changed = False
+            for contour_id in contour_ids:
+                if contour_id not in selected and parents.get(contour_id) in selected:
+                    selected.add(contour_id)
+                    changed = True
+        bottom = max(records_by_id[contour_id].bounds[3] for contour_id in selected)
+        if bottom > selected_bottom_limit + PILLAR_BOTTOM_TOLERANCE:
+            break
+        holes = _hole_ids(sorted(selected), records_by_id, parents)
+        outer = _outer_ids(sorted(selected), parents, records_by_id)
+        if len(outer) < structure.minimum_outer_islands or len(holes) < structure.minimum_holes:
+            continue
+        leftover_top = min(
+            records_by_id[contour_id].bounds[1]
+            for component in ordered[count:]
+            for contour_id in component
+        )
+        best = (sorted(selected), max(0.0, leftover_top - bottom))
+    return best
+
+
 def _select_component_ids(
     records: Sequence[ContourRecord],
     medial_faces: Dict[str, Dict[str, Any]],
@@ -521,7 +638,16 @@ def _select_component_ids(
                 if isinstance(span, dict) and isinstance(span.get("to"), (int, float))
             ]
             selected_bottom_limit = max(endpoints) if endpoints else None
-        return _upper_cluster_at_largest_gap(eligible, records_by_id, parents, structure, selected_bottom_limit)
+        selected_ids, margin = _upper_cluster_at_largest_gap(
+            eligible, records_by_id, parents, structure, selected_bottom_limit
+        )
+        if not selected_ids and selected_bottom_limit is not None:
+            # 세로 구간 겹침으로 병합돼 유효 분할이 없을 때만 실제 잉크 접촉
+            # 성분으로 재시도한다. 성공하던 기존 선택은 바꾸지 않는다.
+            selected_ids, margin = _contact_component_fallback(
+                eligible, records_by_id, parents, structure, selected_bottom_limit
+            )
+        return selected_ids, margin
     if context_id.startswith("bottom"):
         anchor = float(medial_faces["primaryBeam"]["value"])
         eligible = [record.contour_id for record in non_medial if record.center_y < anchor]

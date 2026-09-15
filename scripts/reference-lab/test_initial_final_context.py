@@ -122,15 +122,18 @@ class NotoFinalContextTests(unittest.TestCase):
                 self.assertFalse(set(selection.contour_ids) & medial_contour_ids)
 
     def test_pillar_bottom_rule_rejects_absorbed_final_strokes(self):
-        # 갛: ㅎ받침 위 획이 첫닿자 클러스터와 세로로 융합되어 분리 증명이 없다.
-        # 임의 절단 대신 자동 포기하고, 기둥 하단 안의 유효 분할이 있으면 그 분할을 쓴다.
-        result = self.extract("갛")
-        self.assertEqual(result["componentGroup"]["status"], "abstained")
-        self.assertEqual(result["componentGroup"]["reasonCode"], "final-separation-unproven")
-        for character in ("깧", "핳", "탛", "챃"):
+        # 갛: ㅎ받침 위 획과 첫닿자 다리는 세로 구간이 겹치지만 실제 잉크 접촉이 없다.
+        # 접촉 성분 fallback이 절단 없이 분리하고, 받침 획은 흡수하지 않는다.
+        for character in ("갛", "깧", "핳", "탛", "챃", "칺"):
             with self.subTest(character=character):
-                value = self.extract(character)["componentGroup"]
+                result = self.extract(character)
+                value = result["componentGroup"]
                 self.assertEqual(value["status"], "candidate")
+                case = self.cases[character]
+                _, medial_contour_ids = initial._medial_anchor_data(
+                    self.font, character, case["medialJamo"], case["finalJamo"]
+                )
+                self.assertFalse(set(value["value"]["contourIds"]) & medial_contour_ids)
 
     def test_giyeok_p0_observation_is_byte_identical_to_p0_path(self):
         case = next(case for case in contract.p0_cases() if case["character"] == "각")

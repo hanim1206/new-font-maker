@@ -98,11 +98,16 @@ test.describe('실제 Noto corpus 검수판', () => {
     await expect(initial.getByText('필수값 후보', { exact: true })).toBeVisible()
     await expect(initial.getByText('기준선 맞음', { exact: true })).toBeEnabled()
     await expect(page.getByTestId('corpus-guide-initial')).toBeVisible()
+    // 갛: 접촉 성분 fallback 이후 받침 흡수 없이 후보다.
     await page.getByPlaceholder('예: 가고과너').fill('갛')
     await page.getByTestId('corpus-character').click()
-    await expect(initial.getByText('자동 포기', { exact: true })).toBeVisible()
-    await expect(initial.getByText(/분리 증명이 부족해 자동 포기/)).toBeVisible()
-    await expect(initial.getByText('기준선 맞음', { exact: true })).toBeDisabled()
+    await expect(initial.getByText('필수값 후보', { exact: true })).toBeVisible()
+    // 넖: ㅓ 팔이 탐색 영역 밖이라 홀자가 일부 누락으로 남고 승인이 차단된다.
+    await page.getByPlaceholder('예: 가고과너').fill('넖')
+    await page.getByTestId('corpus-character').click()
+    const medial = page.getByTestId('corpus-review-medial')
+    await expect(medial.getByText('일부 누락', { exact: true })).toBeVisible()
+    await expect(medial.getByText('기준선 맞음', { exact: true })).toBeDisabled()
   })
 
   test('미추출 글자는 레거시 자모로 대신 그리지 않는다', async ({ page }) => {

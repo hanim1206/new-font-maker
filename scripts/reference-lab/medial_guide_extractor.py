@@ -1474,7 +1474,10 @@ def _p1_attached_beam_options(
     return deduped
 
 
-def _p1_main_beam_options(face_hypotheses: Sequence[FaceHypothesis]) -> List[Tuple[float, FaceHypothesis]]:
+def _p1_main_beam_options(
+    face_hypotheses: Sequence[FaceHypothesis],
+    minimum_roi_coverage: float = 0.2,
+) -> List[Tuple[float, FaceHypothesis]]:
     candidates = _dedupe_axis_positions(
         hypothesis
         for hypothesis in face_hypotheses
@@ -1483,7 +1486,7 @@ def _p1_main_beam_options(face_hypotheses: Sequence[FaceHypothesis]) -> List[Tup
         and 250.0 <= hypothesis.position <= BASELINE_Y + 30.0
         and _hypothesis_extent(hypothesis) >= 250.0
         and hypothesis.visible_length >= 100.0
-        and hypothesis.roi_coverage >= 0.2
+        and hypothesis.roi_coverage >= minimum_roi_coverage
     )
     return sorted(
         (
@@ -1504,6 +1507,7 @@ def _p1_twin_stem_options(
     face_hypotheses: Sequence[FaceHypothesis],
     main_beam: FaceHypothesis,
     medial_jamo: str,
+    minimum_roi_coverage: float = 0.15,
 ) -> List[Tuple[float, FaceHypothesis]]:
     scored: List[Tuple[float, FaceHypothesis]] = []
     beam_start, beam_end = _hypothesis_component_bounds(main_beam)
@@ -1525,7 +1529,7 @@ def _p1_twin_stem_options(
             or hypothesis.visible_length < 40.0
             or attachment_distance > maximum_distance
             or not beam_start - 20.0 <= hypothesis.position <= beam_end + 20.0
-            or hypothesis.roi_coverage < 0.15
+            or hypothesis.roi_coverage < minimum_roi_coverage
             or directional_reach < MIN_TWIN_STEM_DIRECTIONAL_REACH
         ):
             continue
@@ -1563,8 +1567,14 @@ def _p1_directional_twin_structures(
     융합되면 정상 구조에도 counter가 생긴다.
     """
     structures: List[Tuple[float, FaceHypothesis, List[Tuple[float, FaceHypothesis]]]] = []
-    for beam_score, beam in _p1_main_beam_options(face_hypotheses):
-        stem_options = _p1_twin_stem_options(face_hypotheses, beam, medial_jamo)
+    # 받침 문맥: 납작한 초성 위 ㅠ처럼 보가 ROI 상단 밖으로 올라간 실제 구조를
+    # 점 판정 ROI로 거르지 않는다. 위장은 줄기 잉크 증명과 점수 정렬이 막는다.
+    minimum_roi_coverage = 0.0 if contour_bounds is not None else 0.2
+    for beam_score, beam in _p1_main_beam_options(face_hypotheses, minimum_roi_coverage):
+        stem_options = _p1_twin_stem_options(
+            face_hypotheses, beam, medial_jamo,
+            0.0 if contour_bounds is not None else 0.15,
+        )
         if contour_bounds is not None:
             beam_box = contour_bounds.get(beam.contour_id)
             filtered: List[Tuple[float, FaceHypothesis]] = []
@@ -2177,7 +2187,11 @@ def extract_medial_character(
     left_beam_pillar: Optional[ContourFeatures] = None
     # 승인 당시 P0의 무받침/ㄱ 계약은 그대로 둔다. 다른 받침 문맥에는
     # 위치 점수만 상속하지 않고 실제 보-줄기 연결을 추가로 증명한다.
-    expanded_upward = medial_jamo in {"ㅗ", "ㅘ", "ㅜ"} and final_jamo not in P0_FINAL_JAMOS
+    # ㅗ·ㅘ의 ㄱ받침은 승인된 P0 관측이라 기존 경로를 유지한다.
+    # ㅜ는 P0 집합에 없으므로 받침이 있으면 항상 하향 접합을 증명한다.
+    expanded_upward = (
+        medial_jamo in {"ㅗ", "ㅘ"} and final_jamo not in P0_FINAL_JAMOS
+    ) or (medial_jamo == "ㅜ" and final_jamo is not None)
     bound_beam, bound_stems, bound_beam_face = _expanded_upward_base(
         recorder.value, features, face_hypotheses, units_per_em, medial_jamo,
     ) if expanded_upward else (None, [], None)
