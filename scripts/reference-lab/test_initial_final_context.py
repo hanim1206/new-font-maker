@@ -15,17 +15,18 @@ FONT_PATH = Path(__file__).resolve().parents[2] / ".reference-fonts/NotoSansKR.t
 
 class FinalContextContractTests(unittest.TestCase):
     def test_78_contexts_cover_26_finals_for_each_p0_medial(self):
-        self.assertEqual(len(contract.FINAL_CONTEXTS), 78)
-        self.assertEqual(len(contract.EXPANDED_FINAL_CONTEXT_IDS), 78)
-        pairs = {(context["medialJamo"], context["finalJamo"]) for context in contract.FINAL_CONTEXTS}
+        legacy = [context for context in contract.FINAL_CONTEXTS if "-medial-" not in context["id"]]
+        self.assertEqual(len(legacy), 78)
+        self.assertEqual(len(contract.EXPANDED_FINAL_CONTEXT_IDS), 564)
+        pairs = {(context["medialJamo"], context["finalJamo"]) for context in legacy}
         expected = {
             (medial_jamo, final_jamo)
-            for medial_jamo in contract.MEDIAL_INDEX
+            for medial_jamo in contract.P0_MEDIALS
             for final_jamo in final_contract.FINAL_JAMOS
             if final_jamo != "ㄱ"
         }
         self.assertEqual(pairs, expected)
-        for context in contract.FINAL_CONTEXTS:
+        for context in legacy:
             family = context["id"].split("-final-")[0]
             self.assertIn(family, ("right", "bottom", "mixed"))
             template = next(
@@ -36,7 +37,7 @@ class FinalContextContractTests(unittest.TestCase):
             self.assertEqual(context["scanDirection"], template["scanDirection"])
 
     def test_1482_cases_do_not_overlap_p0_or_no_final_and_match_g2(self):
-        cases = contract.final_cases()
+        cases = [case for case in contract.final_cases() if case["medialJamo"] in contract.P0_MEDIALS]
         self.assertEqual(len(cases), 1482)
         characters = {case["character"] for case in cases}
         self.assertEqual(len(characters), 1482)
@@ -73,11 +74,12 @@ class FinalContextContractTests(unittest.TestCase):
             with self.subTest(character=character, context=context_id), self.assertRaises(ValueError):
                 initial._validate_identity(character, "ㄱ", "ㅏ", final_jamo, context_id)
 
-    def test_compose_syllable_supports_all_finals_but_not_new_medials(self):
+    def test_compose_syllable_supports_all_medials_and_finals(self):
         self.assertEqual(contract.compose_syllable("ㄱ", "ㅏ", "ㅎ"), "갛")
         self.assertEqual(contract.compose_syllable("ㅎ", "ㅘ", "ㅄ"), "홦")
+        self.assertEqual(contract.compose_syllable("ㄱ", "ㅓ", "ㄴ"), "건")
         with self.assertRaises(ValueError):
-            contract.compose_syllable("ㄱ", "ㅓ", "ㄴ")
+            contract.compose_syllable("ㄱ", "ㅏ", "가")
 
 
 @unittest.skipUnless(FONT_PATH.is_file(), "Noto reference font unavailable")

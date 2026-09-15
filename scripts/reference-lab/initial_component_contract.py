@@ -34,7 +34,9 @@ BOUND_SIDES = tuple(str(value) for value in CONTRACT["boundSides"])
 REASON_CODES = tuple(str(value) for value in CONTRACT["reasonCodes"])
 P0_CONTEXTS = tuple(dict(value) for value in CONTRACT["contexts"])
 
-MEDIAL_INDEX = {"ㅏ": 0, "ㅗ": 8, "ㅘ": 9}
+ALL_MEDIALS = tuple("ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ")
+P0_MEDIALS = ("ㅏ", "ㅗ", "ㅘ")
+MEDIAL_INDEX = {jamo: ALL_MEDIALS.index(jamo) for jamo in ALL_MEDIALS}
 FINAL_JAMOS = _final_contract.FINAL_JAMOS
 FINAL_INDEX: Dict[Optional[str], int] = {None: 0, **{jamo: index + 1 for index, jamo in enumerate(FINAL_JAMOS)}}
 
@@ -70,19 +72,36 @@ FINAL_CONTEXT_CONTRACT_VERSION = "initial-final-context-v1"
 
 
 def _final_contexts() -> tuple:
-    """ㄱ받침 P0 템플릿에서 나머지 26받침 문맥을 파생한다. 기존 P0 문맥 ID는 바꾸지 않는다."""
+    """ㄱ받침 P0 템플릿에서 나머지 받침·홀자 문맥을 파생한다. 기존 P0·ㅏㅗㅘ 확장 문맥 ID는 바꾸지 않는다."""
     templates = {context["medialJamo"]: context for context in P0_CONTEXTS if context["finalJamo"] == "ㄱ"}
+    families = {
+        "ㅏ": templates["ㅏ"], "ㅐ": templates["ㅏ"], "ㅑ": templates["ㅏ"], "ㅒ": templates["ㅏ"],
+        "ㅓ": templates["ㅏ"], "ㅔ": templates["ㅏ"], "ㅕ": templates["ㅏ"], "ㅖ": templates["ㅏ"], "ㅣ": templates["ㅏ"],
+        "ㅗ": templates["ㅗ"], "ㅛ": templates["ㅗ"], "ㅜ": templates["ㅗ"], "ㅠ": templates["ㅗ"], "ㅡ": templates["ㅗ"],
+        "ㅘ": templates["ㅘ"], "ㅙ": templates["ㅘ"], "ㅚ": templates["ㅘ"],
+        "ㅝ": templates["ㅘ"], "ㅞ": templates["ㅘ"], "ㅟ": templates["ㅘ"], "ㅢ": templates["ㅘ"],
+    }
     contexts = []
-    for medial_jamo in MEDIAL_INDEX:
-        template = templates[medial_jamo]
+    for medial_jamo in ALL_MEDIALS:
+        template = families[medial_jamo]
         for final_jamo in FINAL_JAMOS:
-            if final_jamo == "ㄱ":
+            if medial_jamo in P0_MEDIALS and final_jamo == "ㄱ":
                 continue
-            contexts.append({
+            if medial_jamo in P0_MEDIALS:
+                context_id = "{}-{:04x}".format(template["id"], ord(final_jamo))
+                base_beam_role = None
+            else:
+                context_id = "{}-medial-{:04x}-{:04x}".format(template["id"], ord(medial_jamo), ord(final_jamo))
+                base_beam_role = MIXED_BASE_BEAM_ROLES.get(medial_jamo)
+            context = {
                 **template,
-                "id": "{}-{:04x}".format(template["id"], ord(final_jamo)),
+                "id": context_id,
+                "medialJamo": medial_jamo,
                 "finalJamo": final_jamo,
-            })
+            }
+            if base_beam_role is not None:
+                context["baseBeamRole"] = base_beam_role
+            contexts.append(context)
     return tuple(contexts)
 
 

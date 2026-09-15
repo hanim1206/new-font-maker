@@ -213,7 +213,9 @@ class BatchTests(unittest.TestCase):
             args = argparse.Namespace(font=Path("unused.ttf"), output=Path(directory), scope="all", characters="걕꺅", manifest_only=False, retry_incomplete=False, stop_after=1)
             identity = {"id": "fixture", "fileSha256": "fixture", "axes": {"wght": 400}, "unitsPerEm": 1000}
             keys = {stage: stage for stage in corpus.STAGES}
-            with patch.object(corpus, "font_identity", return_value=identity), patch.object(corpus, "stage_versions", return_value=(keys, {})), patch.object(corpus.medial, "load_font", return_value=FakeFont()), patch.object(corpus.medial, "extract_medial_character", side_effect=medial_observation) as extract_medial, patch.object(corpus.initial, "extract_initial_character") as extract_initial:
+            # 전체 계약 확장 후 현대 글자는 모두 문맥이 있으므로,
+            # 미지원 경로는 요청 사전을 비워 시뮬레이션한다. 투영 생성 금지 보장은 동일하다.
+            with patch.object(corpus, "font_identity", return_value=identity), patch.object(corpus, "stage_versions", return_value=(keys, {})), patch.object(corpus.medial, "load_font", return_value=FakeFont()), patch.object(corpus.medial, "extract_medial_character", side_effect=medial_observation) as extract_medial, patch.object(corpus.initial, "extract_initial_character") as extract_initial, patch.dict(corpus.INITIAL_CASES, clear=True), patch.dict(corpus.FINAL_CASES, clear=True):
                 first = corpus.run_batch(args)
                 self.assertEqual(first["status"], "paused")
                 self.assertEqual(first["pendingCount"], 1)

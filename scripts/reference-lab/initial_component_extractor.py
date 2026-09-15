@@ -355,6 +355,11 @@ def _context(context_id: str) -> Dict[str, Any]:
 def _required_anchor_ids(context_id: str) -> Tuple[str, ...]:
     if context_id in contract.EXPANDED_NO_FINAL_CONTEXT_IDS:
         return tuple(spec.element_id for spec in medial.MEDIAL_ROLE_SPECS[_context(context_id)["medialJamo"]])
+    if context_id in contract.EXPANDED_FINAL_CONTEXT_IDS:
+        base_beam_role = _context(context_id).get("baseBeamRole")
+        if base_beam_role is not None:
+            # 혼합 홀자는 홀자별 실제 기준 가로획 역할로 앵커를 정한다. ㅢ는 baseStem이 없다.
+            return (base_beam_role, "outerPillar")
     if context_id.startswith("right"):
         return ("outerPillar",)
     if context_id.startswith("bottom"):
@@ -384,6 +389,11 @@ def _mixed_base_anchor(medial_faces: Dict[str, Dict[str, Any]], context_id: Opti
     if context_id in contract.EXPANDED_NO_FINAL_CONTEXT_IDS:
         face = medial_faces.get(_context(context_id)["baseBeamRole"])
         return float(face["value"]) if face is not None else None
+    if context_id is not None and context_id in contract.EXPANDED_FINAL_CONTEXT_IDS:
+        base_beam_role = _context(context_id).get("baseBeamRole")
+        if base_beam_role is not None:
+            face = medial_faces.get(base_beam_role)
+            return float(face["value"]) if face is not None else None
     lower_beam = medial_faces.get("lowerBeam")
     if lower_beam is not None:
         return float(lower_beam["value"])

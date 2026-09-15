@@ -44,7 +44,10 @@ INITIAL_CASES = {
     **{case["character"]: case for case in initial_contract.no_final_cases()},
     **{case["character"]: case for case in initial_contract.final_cases()},
 }
-FINAL_CASES = {case["character"]: case for case in final_contract.g2_cases()}
+FINAL_CASES = {
+    **{case["character"]: case for case in final_contract.g2_cases()},
+    **{case["character"]: case for case in final_contract.expanded_medial_cases()},
+}
 REVIEW = {"status": "pending", "approved": False, "structuralValidation": "not-run"}
 
 
@@ -172,6 +175,7 @@ def stage_versions(identity: Dict[str, Any]) -> Tuple[Dict[str, str], Dict[str, 
         "initialFinalContract": initial_contract.FINAL_CONTEXT_CONTRACT_VERSION,
         "final": final_contract.EXTRACTOR_VERSION,
         "finalRoleDefinition": final_contract.ROLE_DEFINITION_VERSION,
+        "finalMedialContract": final_contract.MEDIAL_CONTEXT_CONTRACT_VERSION,
     }
 
 
@@ -431,6 +435,8 @@ def extract_case(case: Dict[str, Any], cache: StageCache, get_font: Callable[[],
             result["evaluationScope"] = "expanded-no-final-unreviewed"
         elif stage == "initial" and request["contextId"] in initial_contract.EXPANDED_FINAL_CONTEXT_IDS:
             result["evaluationScope"] = "expanded-final-unreviewed"
+        elif stage == "final" and request["contextId"] in final_contract.EXPANDED_MEDIAL_CONTEXT_IDS:
+            result["evaluationScope"] = "expanded-medial-unreviewed"
         return result
 
     run("initial", lambda: get_component("initial"))

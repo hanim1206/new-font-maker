@@ -36,6 +36,7 @@ test.describe('실제 Noto corpus 검수판', () => {
 
   test('기준선 토글은 Noto 원본 윤곽을 바꾸지 않는다', async ({ page }) => {
     await page.goto('/noto-corpus-lab')
+    await page.getByPlaceholder('예: 가고과너').fill('고')
     await page.getByText('고', { exact: true }).first().click()
     const svg = page.locator(glyphSvg)
     await expect(svg).toHaveAttribute('aria-label', '고 실제 Noto 윤곽과 추출 기준선')
@@ -107,6 +108,24 @@ test.describe('실제 Noto corpus 검수판', () => {
   })
 
   test('미추출 글자는 레거시 자모로 대신 그리지 않는다', async ({ page }) => {
+    // 전수 배치 이후 실제 미추출 글자가 없으므로, 갹을 미추출 상태로 모킹해
+    // 레거시 대체 렌더링 금지 규칙을 계속 검증한다.
+    const target = '갹'.codePointAt(0)!
+    await page.route('**/api/noto-corpus', async (route) => {
+      const response = await route.fetch()
+      const snapshot = await response.json()
+      snapshot.rows = snapshot.rows.filter((row: { identity: { codepoint: number } }) => row.identity.codepoint !== target)
+      await route.fulfill({ json: snapshot })
+    })
+    await page.route(`**/api/noto-corpus/glyph/${target}`, async (route) => {
+      await route.fulfill({ json: {
+        schema: 'noto-corpus-detail-v1',
+        identity: { character: '갹', codepoint: target, initialJamo: 'ㄱ', medialJamo: 'ㅑ', finalJamo: null, contextId: 'right' },
+        font: { id: 'noto-sans-kr', fileSha256: '0'.repeat(64), axes: {}, unitsPerEm: 1000 },
+        row: { identity: { character: '갹', codepoint: target, initialJamo: 'ㄱ', medialJamo: 'ㅑ', finalJamo: null, contextId: 'right' }, stages: Object.fromEntries(['outline', 'medial', 'initial', 'final'].map((stage) => [stage, { status: 'unprocessed', reasonCodes: [] }])) },
+        stages: { outline: null, medial: null, initial: null, final: null },
+      } })
+    })
     await page.goto('/noto-corpus-lab')
     await expect(page.locator(glyphSvg)).toBeVisible()
     await page.getByRole('combobox', { name: '상태', exact: true }).selectOption({ label: '아직 미추출' })

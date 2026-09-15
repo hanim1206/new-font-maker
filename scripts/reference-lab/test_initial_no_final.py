@@ -40,8 +40,12 @@ class NoFinalContractTests(unittest.TestCase):
         ):
             with self.subTest(character=character, context=context_id), self.assertRaises(ValueError):
                 initial._validate_identity(character, "ㄱ", medial_jamo, final_jamo, context_id)
-        with self.assertRaises(ValueError):
-            contract.compose_syllable("ㄱ", "ㅒ", None)
+        # 홀자 21종 확장 이후 compose_syllable도 무받침 조합을 만들 수 있다.
+        # 두 경로의 결과가 같아야 identity 검증이 어긋나지 않는다.
+        self.assertEqual(
+            contract.compose_syllable("ㄱ", "ㅒ", None),
+            contract.compose_no_final_syllable("ㄱ", "ㅒ"),
+        )
 
     def test_mixed_anchor_uses_each_medials_actual_base_beam(self):
         faces = {key: {"value": value} for key, value in {"lowerBeam": 700, "upperBeam": 500, "primaryBeam": 600}.items()}

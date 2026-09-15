@@ -282,6 +282,9 @@ def validated_initial_component_cases(value: Any) -> List[Dict[str, Any]]:
         if final_jamo is not None and not isinstance(final_jamo, str):
             raise APIError(400, "INVALID_INITIAL_COMPONENT_CASE", "finalJamo는 null 또는 문자열이어야 합니다.", {"index": index})
         context = contexts.get(context_id)
+        # 웹 API는 P0 범위만 계산한다. 배치 확장 계약과 별개로 명시적으로 제한한다.
+        if medial_jamo not in initial_component_contract.P0_MEDIALS or final_jamo not in (None, "ㄱ"):
+            raise APIError(422, "P0_SCOPE_UNAVAILABLE", "현재 첫닿 P0는 ㅏ·ㅗ·ㅘ와 받침 없음/ㄱ만 계산합니다.", {"index": index})
         try:
             expected_character = initial_component_contract.compose_syllable(initial_jamo, medial_jamo, final_jamo)
         except ValueError as error:

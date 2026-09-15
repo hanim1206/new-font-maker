@@ -44,8 +44,16 @@ REASON_CODES = tuple(str(value) for value in CONTRACT["reasonCodes"])
 FORBIDDEN_CANDIDATE_KEYS = tuple(str(value) for value in CONTRACT["forbiddenCandidateKeys"])
 INVALIDATION_SCOPE = tuple(str(value) for value in CONTRACT["invalidationScope"])
 
-MEDIAL_INDEX = {"ㅏ": 0, "ㅗ": 8, "ㅘ": 9}
+ALL_MEDIALS = tuple("ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ")
+MEDIAL_INDEX = {jamo: index for index, jamo in enumerate(ALL_MEDIALS)}
 FINAL_INDEX = {jamo: index + 1 for index, jamo in enumerate(FINAL_JAMOS)}
+
+MEDIAL_CONTEXT_CONTRACT_VERSION = "final-medial-context-v1"
+MEDIAL_FAMILY = {
+    **{jamo: "right" for jamo in "ㅏㅐㅑㅒㅓㅔㅕㅖㅣ"},
+    **{jamo: "bottom" for jamo in "ㅗㅛㅜㅠㅡ"},
+    **{jamo: "mixed" for jamo in "ㅘㅙㅚㅝㅞㅟㅢ"},
+}
 
 
 def _validate_contract() -> None:
@@ -99,11 +107,32 @@ def structure_kind_for(final_jamo: str) -> Dict[str, Any]:
     return matches[0]
 
 
+def _medial_contexts() -> tuple:
+    """P0 3가족 템플릿에서 나머지 18홀자 문맥을 파생한다. 기존 P0 문맥 ID는 바꾸지 않는다."""
+    templates = {str(context["medialJamo"]): context for context in P0_CONTEXTS}
+    families = {MEDIAL_FAMILY[jamo]: templates[jamo] for jamo in templates}
+    contexts = []
+    for medial_jamo in ALL_MEDIALS:
+        if medial_jamo in templates:
+            continue
+        template = families[MEDIAL_FAMILY[medial_jamo]]
+        contexts.append({
+            **template,
+            "id": "{}-medial-{:04x}".format(template["id"], ord(medial_jamo)),
+            "medialJamo": medial_jamo,
+        })
+    return tuple(contexts)
+
+
+MEDIAL_CONTEXTS = _medial_contexts()
+EXPANDED_MEDIAL_CONTEXT_IDS = frozenset(context["id"] for context in MEDIAL_CONTEXTS)
+
+
 def compose_syllable(initial_jamo: str, medial_jamo: str, final_jamo: str) -> str:
     if initial_jamo not in INITIAL_JAMOS:
         raise ValueError("지원하지 않는 첫닿자입니다.")
     if medial_jamo not in MEDIAL_INDEX:
-        raise ValueError("P0 대표 홀자가 아닙니다.")
+        raise ValueError("현대 홀자 21종이 아닙니다.")
     if final_jamo not in FINAL_INDEX:
         raise ValueError("현대 받침 27종이 아닙니다.")
     return chr(
@@ -139,6 +168,21 @@ def g2_cases() -> List[Dict[str, str]]:
         }
         for initial_jamo in INITIAL_JAMOS
         for context in P0_CONTEXTS
+        for final_jamo in FINAL_JAMOS
+    ]
+
+
+def expanded_medial_cases() -> List[Dict[str, str]]:
+    return [
+        {
+            "character": compose_syllable(initial_jamo, str(context["medialJamo"]), final_jamo),
+            "initialJamo": initial_jamo,
+            "medialJamo": str(context["medialJamo"]),
+            "finalJamo": final_jamo,
+            "contextId": str(context["id"]),
+        }
+        for initial_jamo in INITIAL_JAMOS
+        for context in MEDIAL_CONTEXTS
         for final_jamo in FINAL_JAMOS
     ]
 

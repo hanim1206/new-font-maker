@@ -20,6 +20,7 @@ from fontTools.pens.recordingPen import DecomposingRecordingPen
 from fontTools.ttLib import TTFont
 
 import final_component_contract as contract
+import initial_component_contract as initial_contract
 import initial_component_extractor as initial
 import medial_guide_extractor as medial
 
@@ -57,10 +58,26 @@ def _rounded(value: float) -> float:
 
 
 def _context(context_id: str) -> Dict[str, Any]:
-    matches = [value for value in contract.P0_CONTEXTS if value["id"] == context_id]
+    matches = [
+        value
+        for value in contract.P0_CONTEXTS + contract.MEDIAL_CONTEXTS
+        if value["id"] == context_id
+    ]
     if len(matches) != 1:
         raise ValueError("지원하지 않는 받침 P0 문맥입니다.")
     return matches[0]
+
+
+def _required_anchor_ids(context_id: str) -> Tuple[str, ...]:
+    """확장 홀자 문맥은 홀자별 실제 역할로 앵커를 정한다. P0 문맥은 기존 규칙을 쓴다."""
+    if context_id not in contract.EXPANDED_MEDIAL_CONTEXT_IDS:
+        return initial._required_anchor_ids(context_id)  # pylint: disable=protected-access
+    medial_jamo = str(_context(context_id)["medialJamo"])
+    if context_id.startswith("right"):
+        return ("outerPillar",)
+    if context_id.startswith("bottom"):
+        return ("primaryBeam",)
+    return (initial_contract.MIXED_BASE_BEAM_ROLES[medial_jamo], "outerPillar")
 
 
 def _validate_identity(
@@ -221,7 +238,7 @@ def _required_medial_contour_ids(
 ) -> set[int]:
     return {
         int(medial_faces[anchor_id]["evidence"]["contourId"])
-        for anchor_id in initial._required_anchor_ids(context_id)  # pylint: disable=protected-access
+        for anchor_id in _required_anchor_ids(context_id)
         if anchor_id in medial_faces
     }
 
@@ -922,7 +939,7 @@ def extract_final_character(
     )
     if any(
         anchor_id not in medial_faces
-        for anchor_id in initial._required_anchor_ids(context_id)  # pylint: disable=protected-access
+        for anchor_id in _required_anchor_ids(context_id)
     ):
         return _abstained_case(identity, "medial-anchor-unavailable")
     medial_contour_ids = _validated_medial_contour_ids(
