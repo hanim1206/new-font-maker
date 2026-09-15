@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { allCorpusRows, CORPUS_TOTAL, corpusCodepoint, corpusIdentity, corpusProgress, corpusRecordingPath, hasRejection, isCompleteCandidate, isReviewed, parseCorpusReviews, PART_STAGES, REVIEW_STORAGE_KEY, reviewFor, STAGE_LABEL, STATUS_LABEL } from './notoCorpus'
-import type { ComponentMeasurement, CorpusDetail, CorpusReviews, CorpusRow, CorpusSnapshot, MedialMeasurement, PartStage, RawCorpusOutline } from './notoCorpus'
+import type { ComponentMeasurement, CorpusDetail, CorpusModelPrediction, CorpusReviews, CorpusRow, CorpusSnapshot, MedialMeasurement, PartStage, RawCorpusOutline } from './notoCorpus'
 import styles from './NotoCorpusLabPage.module.css'
 import { NotoCorpusMatrix } from './NotoCorpusMatrix'
 import { NotoPresetInspector } from './NotoPresetInspector'
 import { notoConflictingParts } from './notoRoleIntegrity'
 
 const PART_COLOR = { initial: '#db6228', medial: '#2472bc', final: '#238370' }
+// 예측 기준선은 실측(주황 실선)과 대비되게 보라 점선으로 그린다.
+const MODEL_COLOR = '#7c3aed'
+// 타깃 → 어느 단계 색·짧은 이름. 단계 B는 첫닿밑선 하나.
+const MODEL_TARGET_LABEL: Record<string, string> = { 'initial.roleFaces.bottom': '첫닿밑선' }
 const REASON_LABEL: Record<string, string> = { 'context-contract-not-expanded': '실제 문맥 추출 계약이 아직 확장되지 않았습니다.', 'no-role-match': '역할에 맞는 외곽면을 찾지 못했습니다.', 'incomplete-required-medial-roles': '필수 홀자 역할이 일부 빠져 있습니다.', 'no-axis-face': '일부 보조 축평행 면이 없습니다. 필수 역할면 상태와 구분합니다.', 'extractor-error': '추출 중 실행 오류가 발생했습니다.', 'medial-anchor-role-conflict': '홀자 후보와 첫닿자 구조의 역할이 충돌합니다. 기준선 맞음 승인을 차단했습니다.', 'final-separation-unproven': '첫닿자와 받침의 분리 증명이 부족해 자동 포기했습니다. 임의 절단으로 채우지 않습니다.' }
 const number = (value: number) => value.toLocaleString('ko-KR')
 const percent = (value: number, total: number) => total ? `${(value / total * 100).toFixed(2)}%` : '해당 없음'
@@ -37,7 +41,7 @@ const faceLine = (orientation: 'vertical' | 'horizontal', face: number) => orien
   ? { x1: face, x2: face, y1: CANVAS_EDGE[0], y2: CANVAS_EDGE[1] }
   : { x1: CANVAS_EDGE[0], x2: CANVAS_EDGE[1], y1: face, y2: face }
 
-function GuideCanvas({ detail, visible, guideStyle }: { detail: CorpusDetail; visible: Record<PartStage, boolean>; guideStyle: GuideStyle }) {
+function GuideCanvas({ detail, visible, guideStyle, model }: { detail: CorpusDetail; visible: Record<PartStage, boolean>; guideStyle: GuideStyle; model: CorpusModelPrediction[] }) {
   const drawing = useMemo(() => {
     try {
       const outline = detail.stages.outline?.observation as RawCorpusOutline | null
@@ -70,6 +74,12 @@ function GuideCanvas({ detail, visible, guideStyle }: { detail: CorpusDetail; vi
       })}
       {visible.medial && <g data-testid="corpus-guide-medial">{Object.entries(medial).map(([id, value]) => <line key={id} {...faceLine(value.orientation, value.face)} stroke={PART_COLOR.medial} strokeWidth="2" strokeOpacity=".9" vectorEffect="non-scaling-stroke"><title>{id} · {value.face.toFixed(5)}</title></line>)}</g>}
     </>}
+    {/* 예측 기준선: 실측과 같은 좌표계에 보라 점선. 실선(실측)과의 간극이 잔차다. */}
+    {model.filter((prediction) => visible.initial && prediction.target === 'initial.roleFaces.bottom').map((prediction) => (
+      <line key={prediction.target} {...faceLine('horizontal', prediction.predicted / 1000)} stroke={MODEL_COLOR} strokeWidth="1.6" strokeDasharray="7 5" vectorEffect="non-scaling-stroke" data-testid="corpus-model-initial-bottom">
+        <title>{MODEL_TARGET_LABEL[prediction.target]} 예측 {(prediction.predicted / 1000).toFixed(5)} · 잔차 {prediction.residual >= 0 ? '+' : ''}{prediction.residual.toFixed(1)}u</title>
+      </line>
+    ))}
   </svg>
 }
 
@@ -190,7 +200,16 @@ export function NotoCorpusLabPage() {
         <section className={styles.inspector} aria-label="선택 글자 검수" data-testid="corpus-inspector"><header><div><span className={styles.eyebrow}>실제 원본과 관측</span><h2>{selectedRow?.identity.character ?? '가'} <small>{selectedRow ? `${selectedRow.identity.initialJamo} + ${selectedRow.identity.medialJamo} · ${selectedRow.identity.finalJamo ?? '무받침'}` : ''}</small></h2></div><button type="button" onClick={() => setShowGuides((value) => !value)} aria-pressed={showGuides}>{showGuides ? '기준선 숨기기' : '기준선 보이기'}</button></header>
           <div className={styles.legend}>{PART_STAGES.map((stage) => <label key={stage} style={{ color: PART_COLOR[stage] }}><input type="checkbox" checked={parts[stage]} onChange={(event) => setParts((current) => ({ ...current, [stage]: event.target.checked }))} />{STAGE_LABEL[stage]}</label>)}<div className={styles.guideStyle} role="group" aria-label="기준선 표시 방식"><button type="button" aria-pressed={guideStyle === 'line'} onClick={() => setGuideStyle('line')}>선</button><button type="button" aria-pressed={guideStyle === 'box'} onClick={() => setGuideStyle('box')}>박스</button></div></div>
           {detailError && <p role="alert" className={styles.alert}>{detailError}</p>}
-          {detail && detail.identity.codepoint === selected ? <><GuideCanvas detail={detail} visible={visible} guideStyle={guideStyle} /><p className={styles.caption}>{guideStyle === 'line' ? '선: 역할 기준면을 캔버스 끝까지 연장' : '박스: 닿자 구조 선택 영역 · 홀자 실제 노출 구간'}<br />검은 윤곽은 Noto 원본입니다. 생성본이나 레거시 자모가 아닙니다.</p><div className={styles.partReviews}>{PART_STAGES.map((stage) => {
+          {detail && detail.identity.codepoint === selected ? <><GuideCanvas detail={detail} visible={visible} guideStyle={guideStyle} model={detail.model} /><p className={styles.caption}>{guideStyle === 'line' ? '선: 역할 기준면을 캔버스 끝까지 연장' : '박스: 닿자 구조 선택 영역 · 홀자 실제 노출 구간'}<br />검은 윤곽은 Noto 원본입니다. 생성본이나 레거시 자모가 아닙니다.</p>
+          {detail.model.length > 0 && <div className={styles.modelPanel} data-testid="corpus-model-panel">
+            <header><strong style={{ color: MODEL_COLOR }}>변화량 모델 예측</strong><span>실측(주황 실선) vs 예측(보라 점선). 대표값 + 첫닿·홀자·받침 효과. 승인이 아니라 확인용입니다.</span></header>
+            {detail.model.map((prediction) => <div key={prediction.target} data-testid={`corpus-model-${prediction.target}`} data-exception={prediction.exception}>
+              <span>{MODEL_TARGET_LABEL[prediction.target] ?? prediction.target}<small> · {prediction.layer}{prediction.confidence === 'low' ? ' · 저신뢰' : ''}</small></span>
+              <span>실측 {(prediction.actual / 1000).toFixed(5)} · 예측 {(prediction.predicted / 1000).toFixed(5)}</span>
+              <strong>잔차 {prediction.residual >= 0 ? '+' : ''}{prediction.residual.toFixed(1)}u {prediction.exception ? `· 예외(임계 ${prediction.threshold}u 초과) 실측 보존` : '· 모델 내'}</strong>
+            </div>)}
+          </div>}
+          <div className={styles.partReviews}>{PART_STAGES.map((stage) => {
             const value = detail.row.stages[stage]
             const review = reviewFor(detail.row, stage, reviewState.entries)
             const canReview = Boolean(value.reviewKey && detail.stages[stage]?.observation && detail.stages.outline?.status === 'candidate' && !reviewState.error)

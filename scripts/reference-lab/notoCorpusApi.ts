@@ -3,16 +3,51 @@ import path from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import { CORPUS_STAGES, corpusIdentity, emptyCorpusRow } from '../../src-next/notoCorpus'
-import type { CorpusDetail, CorpusFont, CorpusPayload, CorpusRow, CorpusSnapshot, CorpusStage } from '../../src-next/notoCorpus'
+import type { CorpusDetail, CorpusFont, CorpusIdentity, CorpusModelPrediction, CorpusPayload, CorpusRow, CorpusSnapshot, CorpusStage } from '../../src-next/notoCorpus'
 
 interface Manifest { schema: string; font: CorpusFont; stageKeys: Record<CorpusStage, string> }
 interface ReportRow extends CorpusRow { stages: Record<CorpusStage, CorpusRow['stages'][CorpusStage] & { artifact: string }> }
 interface Report { stageKeys: Record<CorpusStage, string>; font: CorpusFont; cases: ReportRow[]; medialVariationFromGiyeok?: { character: string; baselineCharacter: string; roleId: string }[] }
+interface VariationLayer { representative: number; effects: Record<'initial' | 'medial' | 'final', Record<string, number>>; defaultThreshold: number; confidence: 'low' | 'normal' }
+interface VariationModel { schema: string; stageKeys: Record<CorpusStage, string>; targets: Record<string, { layers: Record<string, VariationLayer> }> }
 interface Loaded { root: string; manifest: Manifest; snapshot: CorpusSnapshot; rows: Map<number, ReportRow> }
 const API = '/api/noto-corpus'
 const HEX = /^[a-f0-9]{64}$/
 const NOTO_SHA = '194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252'
 const APPROVED_INPUTS_FILE = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../reference-data/preset-candidates/noto-approved-guide-inputs.v1.json')
+// 변화량 모델 v1이 예측하는 역할면 타깃. 값 소스는 각 타깃이 어느 단계 측정에서 실측을 읽는지 알려준다.
+const MODEL_NO_FINAL = '∅'
+const MODELED_TARGETS: { target: string; stage: CorpusStage; read: (measurements: Record<string, unknown>) => number | null }[] = [
+  { target: 'initial.roleFaces.bottom', stage: 'initial', read: (m) => {
+    const bottom = (m.roleFaces as Record<string, number> | undefined)?.bottom
+    return typeof bottom === 'number' && Number.isFinite(bottom) ? bottom : null
+  } },
+]
+
+function predictTarget(model: VariationModel, identity: CorpusIdentity, stages: CorpusDetail['stages']): CorpusModelPrediction[] {
+  const predictions: CorpusModelPrediction[] = []
+  for (const { target, stage, read } of MODELED_TARGETS) {
+    const layer = model.targets[target]?.layers[identity.contextId]
+    const payload = stages[stage]
+    if (!layer || !payload || payload.status !== 'candidate') continue
+    const actualNormalized = read(payload.measurements)
+    if (actualNormalized === null) continue
+    const effects = {
+      initial: layer.effects.initial[identity.initialJamo] ?? 0,
+      medial: layer.effects.medial[identity.medialJamo] ?? 0,
+      final: layer.effects.final[identity.finalJamo ?? MODEL_NO_FINAL] ?? 0,
+    }
+    const predicted = layer.representative + effects.initial + effects.medial + effects.final
+    const actual = actualNormalized * 1000
+    const residual = actual - predicted
+    predictions.push({
+      target, layer: identity.contextId, representative: layer.representative,
+      predicted, actual, residual, threshold: layer.defaultThreshold,
+      exception: Math.abs(residual) > layer.defaultThreshold, confidence: layer.confidence, effects,
+    })
+  }
+  return predictions
+}
 
 async function readApprovedInputCount(): Promise<number | null> {
   try {
@@ -76,6 +111,22 @@ export function createNotoCorpusReader(directory: string) {
     return loaded
   }
 
+  // 3MB 모델은 스냅샷 hot path에서 빼고 글자 상세에서만 지연 로드·메모이즈한다.
+  let modelMemo: { key: string; model: VariationModel | null } | undefined
+  async function loadModel(loaded: Loaded): Promise<VariationModel | null> {
+    const file = path.join(loaded.root, 'analysis', 'variation-model-v1.json')
+    const key = `${loaded.root}:${await stat(file).then((info) => info.mtimeMs).catch(() => 0)}`
+    if (modelMemo?.key === key) return modelMemo.model
+    let model: VariationModel | null = null
+    try {
+      const candidate = await json<VariationModel>(file)
+      // 추출 단계 키가 다르면 모델이 이전 관측 기준이므로 예측을 붙이지 않는다.
+      if (candidate.schema === 'noto-variation-model-v1' && CORPUS_STAGES.every((stage) => candidate.stageKeys[stage] === loaded.manifest.stageKeys[stage])) model = candidate
+    } catch { /* 모델 파일이 없으면 예측 없이 검수만 한다. */ }
+    modelMemo = { key, model }
+    return model
+  }
+
   async function detail(codepoint: number): Promise<CorpusDetail> {
     const identity = corpusIdentity(codepoint)
     const loaded = await load()
@@ -95,7 +146,9 @@ export function createNotoCorpusReader(directory: string) {
         stages[stage] = record.payload
       }))
     }
-    return { schema: 'noto-corpus-detail-v1', identity, font: loaded.manifest.font, row, stages }
+    const variationModel = await loadModel(loaded)
+    const model = variationModel ? predictTarget(variationModel, identity, stages) : []
+    return { schema: 'noto-corpus-detail-v1', identity, font: loaded.manifest.font, row, stages, model }
   }
   return { snapshot: async () => (await load()).snapshot, detail }
 }

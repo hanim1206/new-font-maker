@@ -43,7 +43,20 @@ export interface MedialMeasurement { orientation: 'vertical' | 'horizontal'; fac
 export interface RecordingOperation { operation: string; arguments: ([number, number] | null)[] }
 export interface RawCorpusOutline { unitsPerEm: number; operations: RecordingOperation[] }
 export interface CorpusPayload { status: CorpusStatus; reasonCodes: string[]; observation: unknown; measurements: Record<string, unknown> }
-export interface CorpusDetail { schema: 'noto-corpus-detail-v1'; identity: CorpusIdentity; font: CorpusFont; row: CorpusRow; stages: Record<CorpusStage, CorpusPayload | null> }
+// 변화량 모델 v1의 한 역할면 타깃 예측. 값은 실측과 같은 1000단위, 화면 좌표는 /1000.
+export interface CorpusModelPrediction {
+  target: string
+  layer: string
+  representative: number
+  predicted: number
+  actual: number
+  residual: number
+  threshold: number
+  exception: boolean
+  confidence: 'low' | 'normal'
+  effects: { initial: number; medial: number; final: number }
+}
+export interface CorpusDetail { schema: 'noto-corpus-detail-v1'; identity: CorpusIdentity; font: CorpusFont; row: CorpusRow; stages: Record<CorpusStage, CorpusPayload | null>; model: CorpusModelPrediction[] }
 export interface CorpusReview { verdict: 'approved' | 'rejected'; note: string; reviewedAt: string }
 export type CorpusReviews = Record<string, CorpusReview>
 

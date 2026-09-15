@@ -73,6 +73,15 @@
 .canvas { display: block; width: min(100%, 400px); margin: 0 auto; aspect-ratio: 1; }
 .emptyCanvas { display: grid; place-content: center; min-height: 240px; padding: 28px; margin: 16px 0; border: 1px dashed var(--line); border-radius: 12px; background: #f8fafc; color: var(--muted); font-size: 13px; text-align: center; line-height: 1.9; }
 .caption { text-align: center; color: var(--muted); font-size: 10px; line-height: 1.8; }
+.modelPanel { margin-top: 16px; padding: 13px; border: 1px solid #d9cef2; border-radius: 10px; background: #f8f5ff; }
+.modelPanel header { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+.modelPanel header strong { font-size: 12px; }
+.modelPanel header span { color: var(--muted); font-size: 10px; line-height: 1.6; }
+.modelPanel > div { display: grid; gap: 2px; padding: 8px 0; border-top: 1px solid #eae2fb; font-size: 11px; }
+.modelPanel > div span { color: var(--muted); }
+.modelPanel > div span small { font-size: 10px; }
+.modelPanel > div strong { font-variant-numeric: tabular-nums; }
+.modelPanel > div[data-exception='true'] strong { color: #8a3ffc; }
 .partReviews { display: grid; gap: 10px; margin-top: 20px; }
 .partReviews article { padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: #f9fbfd; }
 .partReviews header { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }

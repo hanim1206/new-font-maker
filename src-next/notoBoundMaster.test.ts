@@ -11,6 +11,7 @@ function detail(input: ApprovedNotoInput): CorpusDetail {
     font: { id: 'noto-sans-kr', fileSha256: '194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252', axes: { wght: 400 }, unitsPerEm: 1000 },
     row: { identity: structuredClone(input.identity), stages: { outline: { status: 'candidate', reasonCodes: [] }, initial: { status: 'candidate', reasonCodes: [] }, medial: { status: 'candidate', reasonCodes: [] }, final: { status: 'not-applicable', reasonCodes: [] } } },
     stages: { ...structuredClone(input.stages), final: null },
+    model: [],
   }
 }
 

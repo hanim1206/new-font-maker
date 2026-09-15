@@ -110,6 +110,28 @@ test.describe('실제 Noto corpus 검수판', () => {
     await expect(medial.getByText('기준선 맞음', { exact: true })).toBeDisabled()
   })
 
+  test('변화량 모델 예측 첫닿밑선을 실측과 겹쳐 보여준다', async ({ page, request }) => {
+    const codepoint = '간'.codePointAt(0)!
+    const detail = await (await request.get(`/api/noto-corpus/glyph/${codepoint}`)).json()
+    const prediction = detail.model.find((item: { target: string }) => item.target === 'initial.roleFaces.bottom')
+    expect(prediction).toBeTruthy()
+
+    await page.goto('/noto-corpus-lab')
+    await page.getByPlaceholder('예: 가고과너').fill('간')
+    await page.getByTestId('corpus-character').click()
+    const panel = page.getByTestId('corpus-model-panel')
+    await expect(panel).toBeVisible()
+    await expect(panel.getByText('첫닿밑선', { exact: false })).toBeVisible()
+    await expect(panel.getByText(/잔차/)).toBeVisible()
+    // 첫닿자(초성) 기준선이 켜져 있으면 예측 점선이 캔버스에 그려진다.
+    await expect(page.getByTestId('corpus-model-initial-bottom')).toHaveCount(1)
+    // 큰 잔차 글자는 예외로 표시하고 실측을 덮지 않는다.
+    await page.getByPlaceholder('예: 가고과너').fill('걫')
+    await page.getByTestId('corpus-character').click()
+    await expect(page.getByTestId('corpus-model-initial.roleFaces.bottom')).toHaveAttribute('data-exception', 'true')
+    await expect(panel.getByText(/실측 보존/)).toBeVisible()
+  })
+
   test('미추출 글자는 레거시 자모로 대신 그리지 않는다', async ({ page }) => {
     // 전수 배치 이후 실제 미추출 글자가 없으므로, 갹을 미추출 상태로 모킹해
     // 레거시 대체 렌더링 금지 규칙을 계속 검증한다.
@@ -127,6 +149,7 @@ test.describe('실제 Noto corpus 검수판', () => {
         font: { id: 'noto-sans-kr', fileSha256: '0'.repeat(64), axes: {}, unitsPerEm: 1000 },
         row: { identity: { character: '갹', codepoint: target, initialJamo: 'ㄱ', medialJamo: 'ㅑ', finalJamo: null, contextId: 'right' }, stages: Object.fromEntries(['outline', 'medial', 'initial', 'final'].map((stage) => [stage, { status: 'unprocessed', reasonCodes: [] }])) },
         stages: { outline: null, medial: null, initial: null, final: null },
+        model: [],
       } })
     })
     await page.goto('/noto-corpus-lab')
