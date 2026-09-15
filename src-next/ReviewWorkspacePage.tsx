@@ -6,6 +6,8 @@ import type { ApprovedNotoInput } from './notoBoundMaster'
 import { allCorpusRows, CORPUS_TOTAL, corpusIdentity, parseCorpusReviews, REVIEW_STORAGE_KEY } from './notoCorpus'
 import type { CorpusReviews, CorpusSnapshot } from './notoCorpus'
 import { NotoCorpusMatrix } from './NotoCorpusMatrix'
+import { fitComponentsForGlyph } from './notoComponentFitView'
+import type { ComponentFitPart } from './notoComponentFitView'
 import { editableRailsOf, fitMedialForGlyph, renderMedialPart, roleLabel } from './notoMedialFitView'
 import type { EditableRail, MedialFitView, RenderedMedialPart } from './notoMedialFitView'
 import type { CoreRailRole } from '../src/services/notoMedialMasterFit'
@@ -103,7 +105,7 @@ function baselineRails(glyph: NotoPresetGlyph): Rail[] {
 
 const VIEW_BOX_SIZE = 1.16
 
-function GhostCanvas({ ghost, measured, editable = [], selectedRail, onSelectRail, onDragRail, label, overlays = [] }: {
+function GhostCanvas({ ghost, measured, editable = [], selectedRail, onSelectRail, onDragRail, label, overlays = [], componentOverlays = [] }: {
   ghost: string
   /** Noto 실측 기준선. 참고용이라 옅은 점선, 조작 없음. */
   measured: Rail[]
@@ -116,6 +118,8 @@ function GhostCanvas({ ghost, measured, editable = [], selectedRail, onSelectRai
   label: string
   /** 내 획 마스터 잉크. 고스트 위에 파랗게 겹친다. */
   overlays?: string[]
+  /** 닿자 박스 fit 잉크(앱 획). 초록으로 구분한다. */
+  componentOverlays?: string[]
 }) {
   const gesture = useRef<{ pointerId: number; id: string; axis: 'x' | 'y'; start: number; startValue: number } | null>(null)
   const startDrag = (rail: EditableRail) => (event: ReactPointerEvent<SVGLineElement>) => {
@@ -154,6 +158,7 @@ function GhostCanvas({ ghost, measured, editable = [], selectedRail, onSelectRai
     {/* Noto 고스트. 잉크가 아니라 비교용이라 반투명으로 깐다. */}
     <path d={ghost} fill="#3a3a36" fillOpacity=".55" fillRule="evenodd" data-testid="review-ghost" />
     {overlays.map((path, index) => <path key={index} d={path} fill="#3b6fd6" fillOpacity=".45" fillRule="evenodd" data-testid="review-fit-ink" />)}
+    {componentOverlays.map((path, index) => <path key={`c${index}`} d={path} fill="#2f9a6a" fillOpacity=".4" fillRule="evenodd" data-testid="review-component-ink" />)}
     {measured.map((rail) => <g key={rail.id} data-rail={rail.id}>
       <line {...geometryOf(rail.axis, rail.value)} stroke="#b8b4a8" strokeWidth=".003" strokeDasharray=".012 .008" />
       <text {...(rail.axis === 'x' ? { x: rail.value + 0.012, y: 1.01 } : { x: 0.96, y: rail.value - 0.008 })} fontSize=".026" fill="#b8b4a8">{rail.label}</text>
@@ -251,6 +256,20 @@ function FitStats({ view, rendered, approved }: { view: MedialFitView; rendered:
   </div>
 }
 
+const SIDE_LABEL: Record<string, string> = { left: '왼', right: '오른', top: '위', bottom: '아래' }
+
+/** 닿자 박스 fit 수치. 앱 획 골격이 Noto와 얼마나 다른지 — 승인 글자는 xor·네 변 오차. */
+function ComponentStats({ parts, approved }: { parts: ComponentFitPart[]; approved: boolean }) {
+  return <div className={styles.fitStats} data-testid="review-component-stats">
+    {parts.map((part) => <div key={part.part} className={`${styles.fitPart} ${styles.componentPart}`}>
+      <div className={styles.fitHead}><span>{part.part === 'CH' ? '첫닿자' : '받침'} {part.jamoId} · 앱 획 · 모델 박스</span>
+        {part.xorRatio !== undefined ? <strong data-testid="review-component-xor">xor {(part.xorRatio * 100).toFixed(1)}%<small> · 잉크 {((part.inkRatio ?? 0) * 100).toFixed(0)}%</small></strong> : <small>{part.message ?? (approved ? '' : '겹쳐 보기만 · 승인 측정 없음')}</small>}
+      </div>
+      {part.faceErrors.length > 0 && <div className={styles.railErrors}>{part.faceErrors.map((face) => <span key={face.side} data-large={Math.abs(face.errorUnits) > 10 || undefined}><i>{SIDE_LABEL[face.side]}</i>{face.errorUnits >= 0 ? '+' : ''}{face.errorUnits.toFixed(1)}u</span>)}</div>}
+    </div>)}
+  </div>
+}
+
 type RailsByPart = (Record<CoreRailRole, number> | undefined)[]
 
 function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
@@ -260,6 +279,8 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
   const measured = useMemo(() => baselineRails(glyph), [glyph])
   const { bundle, error: modelError } = useNotoModel()
   const fitView = useMemo(() => bundle ? fitMedialForGlyph({ identity: glyph.identity, bundle, outline: glyph.outline, approved: approvedInputFor(codepoint) }) : null, [bundle, glyph, codepoint])
+  const componentParts = useMemo(() => bundle ? fitComponentsForGlyph({ identity: glyph.identity, bundle, outline: glyph.outline, approved: approvedInputFor(codepoint) }) : [], [bundle, glyph, codepoint])
+  const componentOverlays = componentParts.flatMap((part) => part.path ? [part.path] : [])
   // rail 편집은 세션 임시. part별 em 값. undefined = 모델 rail 그대로.
   const [railsByPart, setRailsByPart] = useState<RailsByPart>([])
   const [selectedRail, setSelectedRail] = useState<string | undefined>()
@@ -301,15 +322,15 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
   return <MobileWorkspaceShell activeArea="review" statusLabel={approved ? '검수 · 승인 측정' : '검수 · 실측 보기'} drawer={ruler || undefined}>
     <GlyphTitle codepoint={codepoint} approved={approved} />
     <div className={styles.scroll}>
-      <p className={styles.context}>{glyph.identity.initialJamo} + {glyph.identity.medialJamo}{glyph.identity.finalJamo ? ` + ${glyph.identity.finalJamo}` : ''} · <b>{approved ? '승인 측정 있음' : '승인 추출 없음'}</b> · 회색 고스트 위 파랑 = 내 획</p>
+      <p className={styles.context}>{glyph.identity.initialJamo} + {glyph.identity.medialJamo}{glyph.identity.finalJamo ? ` + ${glyph.identity.finalJamo}` : ''} · <b>{approved ? '승인 측정 있음' : '승인 추출 없음'}</b> · 회색 고스트 위 파랑 = 홀자 획, 초록 = 닿자 획</p>
       <section className={styles.canvasSection}>
-        {'path' in ghost ? <GhostCanvas ghost={ghost.path} measured={measured} editable={editable} selectedRail={rail?.id} onSelectRail={(id) => { setSelectedRail(id); setError('') }} onDragRail={changeRail} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
+        {'path' in ghost ? <GhostCanvas ghost={ghost.path} measured={measured} editable={editable} selectedRail={rail?.id} onSelectRail={(id) => { setSelectedRail(id); setError('') }} onDragRail={changeRail} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
         <TierBadge approved={approved} className={styles.canvasBadge} />
       </section>
       {editable.length > 0 && <div className={styles.chips} role="group" aria-label="편집할 기준선">
         {editable.map((item) => <button type="button" key={item.id} aria-pressed={item.id === rail?.id} onClick={() => { setSelectedRail(item.id); setError('') }}>{item.label}</button>)}
       </div>}
-      {modelError ? <p className={styles.status} data-state="error" role="alert">{modelError}</p> : fitView ? <FitStats view={fitView} rendered={rendered} approved={approved} /> : <p className={styles.status} role="status">모델 읽는 중</p>}
+      {modelError ? <p className={styles.status} data-state="error" role="alert">{modelError}</p> : fitView ? <><FitStats view={fitView} rendered={rendered} approved={approved} /><ComponentStats parts={componentParts} approved={approved} /></> : <p className={styles.status} role="status">모델 읽는 중</p>}
       <div className={styles.head}><span>기준선 실측<small>Noto · 1000 u</small></span><span>{measured.length}개</span></div>
       <div className={styles.values} data-testid="review-values">
         {measured.map((item) => <div className={styles.cell} key={item.id}><span><span className={styles.key}>{item.label}</span><span className={styles.value}>{(item.value * 1000).toFixed(1)}<small>u</small></span></span><i className={styles.bar} style={{ '--p': `${Math.round(item.value * 100)}%` } as React.CSSProperties} /></div>)}

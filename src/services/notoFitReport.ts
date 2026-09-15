@@ -41,11 +41,11 @@ export interface MedialFitReport {
   slot?: MedialFitResult['slot']
 }
 
-function regionToPolygon(region: DeepReadonly<InkRegion>): Polygon {
+export function regionToPolygon(region: DeepReadonly<InkRegion>): Polygon {
   return [region.outer, ...region.holes].map((ring) => ring.map((point) => [point.x, point.y] as [number, number]))
 }
 
-function multiPolygonArea(shape: MultiPolygon): number {
+export function multiPolygonArea(shape: MultiPolygon): number {
   let total = 0
   for (const polygon of shape) {
     polygon.forEach((ring, index) => {
@@ -62,7 +62,7 @@ function multiPolygonArea(shape: MultiPolygon): number {
   return total
 }
 
-function unionOf(regions: readonly DeepReadonly<InkRegion>[]): MultiPolygon {
+export function unionOf(regions: readonly DeepReadonly<InkRegion>[]): MultiPolygon {
   const polygons = regions.map(regionToPolygon)
   if (!polygons.length) return []
   return polygonClipping.union(polygons[0], ...polygons.slice(1))

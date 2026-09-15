@@ -77,3 +77,4 @@
 .dialDock { flex: 0 0 auto; display: flex; flex-direction: column; gap: 2px; padding: 8px 14px 4px; border-top: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); box-shadow: 0 -8px 24px rgb(15 23 42 / .06); }
 .railButton { cursor: grab; outline: none; }
 .railButton:active { cursor: grabbing; }
+.componentPart { border-color: rgb(47 154 106 / .4); background: rgb(47 154 106 / .08); }
