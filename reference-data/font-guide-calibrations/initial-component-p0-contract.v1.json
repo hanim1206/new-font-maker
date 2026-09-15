@@ -1,0 +1,73 @@
+{
+  "schema": "initial-component-p0-contract-v1",
+  "version": 1,
+  "responseSchema": "reference-initial-component-candidate-response-v1",
+  "extractorVersion": "initial-component-matcher-v2",
+  "roleDefinitionVersion": "initial-component-role-v1",
+  "medialAnchorExtractorVersion": "geometric-role-matcher-v9",
+  "coordinateFrame": "shared-baseline",
+  "groupingMethod": "medial-anchored-component-grouping-v1",
+  "boundMethod": "bezier-ink-extremum-v1",
+  "selectionAreaMethod": "derived-four-ink-bounds-v1",
+  "selectionRules": [
+    "context-directed-contour-islands",
+    "context-directed-merged-boundary"
+  ],
+  "initialJamos": [
+    "ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ",
+    "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"
+  ],
+  "boundSides": ["top", "bottom", "left", "right"],
+  "reasonCodes": [
+    "glyph-missing",
+    "medial-anchor-unavailable",
+    "ambiguous-component-group",
+    "merged-jamo-boundary",
+    "invalid-component-bounds",
+    "no-axis-face"
+  ],
+  "contexts": [
+    {
+      "id": "right",
+      "medialJamo": "ㅏ",
+      "finalJamo": null,
+      "scanOrigin": "medial-outer-pillar",
+      "scanDirection": "right-to-left"
+    },
+    {
+      "id": "right-final",
+      "medialJamo": "ㅏ",
+      "finalJamo": "ㄱ",
+      "scanOrigin": "medial-outer-pillar",
+      "scanDirection": "right-to-left-and-upper-cluster"
+    },
+    {
+      "id": "bottom",
+      "medialJamo": "ㅗ",
+      "finalJamo": null,
+      "scanOrigin": "medial-primary-beam",
+      "scanDirection": "bottom-to-top"
+    },
+    {
+      "id": "bottom-final",
+      "medialJamo": "ㅗ",
+      "finalJamo": "ㄱ",
+      "scanOrigin": "medial-primary-beam",
+      "scanDirection": "bottom-to-top"
+    },
+    {
+      "id": "mixed",
+      "medialJamo": "ㅘ",
+      "finalJamo": null,
+      "scanOrigin": "medial-base-beam-and-outer-pillar",
+      "scanDirection": "anchor-to-upper-left"
+    },
+    {
+      "id": "mixed-final",
+      "medialJamo": "ㅘ",
+      "finalJamo": "ㄱ",
+      "scanOrigin": "medial-base-beam-and-outer-pillar",
+      "scanDirection": "anchor-to-upper-left"
+    }
+  ]
+}

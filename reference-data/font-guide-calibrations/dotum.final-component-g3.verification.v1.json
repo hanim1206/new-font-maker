@@ -1,0 +1,12 @@
+{
+  "schema": "reference-final-component-verification-v1",
+  "state": "verified",
+  "candidateArtifactSha256": "a417042b35286e45a5d86dca9ba873c747f8d7d73288a28709087896436a8ab0",
+  "candidateIdentitySha256": "405a6c2499434ac99fb017e99fd91e894f19fc6820d3a5abcfe544d1a3826d8a",
+  "review": {
+    "method": "user-visual-review",
+    "reviewedAt": "2026-09-15T00:00:00+09:00",
+    "reviewedBy": "hanim",
+    "note": "v2 돋움 G3 정적 검토표 축척 보정 뒤 사용자 화면 검토 승인. 빨간 자동 포기는 안전 holdout으로 유지."
+  }
+}

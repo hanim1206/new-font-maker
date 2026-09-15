@@ -9,3 +9,7 @@ test-results/
 playwright-report/
 .reference-fonts/
 .reference-cache/
+
+# 대용량 재생성 가능 관측 덤프 (evaluate/build 스크립트로 재생성)
+reference-data/font-guide-calibrations/*.final-component-g2.v1.json
+reference-data/font-guide-calibrations/*.final-component-g3.v1.json

@@ -1,0 +1,141 @@
+{
+  "schema": "medial-guide-p1-g2-v7-report-v1",
+  "version": 1,
+  "status": "invalidated-by-user-review",
+  "reviewedAt": "2026-09-14",
+  "productionEligible": false,
+  "userReviewed": true,
+  "extractorVersion": "geometric-role-matcher-v7",
+  "roleContractVersion": "medial-guide-role-v4",
+  "thresholdPolicy": "p1-v7-context-directed-structure-graph",
+  "scope": {
+    "fontIds": ["noto-sans-kr", "nanum-gothic"],
+    "initialJamoCount": 19,
+    "medialJamos": ["ㅐ", "ㅑ", "ㅒ", "ㅔ", "ㅕ", "ㅖ", "ㅙ", "ㅚ", "ㅛ", "ㅝ", "ㅞ", "ㅟ", "ㅠ", "ㅢ"],
+    "finalJamos": [null, "ㄱ"],
+    "characterCount": 1064,
+    "elementCount": 3648
+  },
+  "fonts": [
+    {
+      "id": "noto-sans-kr",
+      "fileSha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252",
+      "characterCount": 532,
+      "elementCount": 1824,
+      "usableCandidateCount": 1824,
+      "usableHighConfidenceCount": 0,
+      "usableMediumConfidenceCount": 1824,
+      "simpleCandidateRate": 1.0,
+      "mixedCandidateRate": 1.0,
+      "matchingUnits": {
+        "axis-face-segment-group": 1596,
+        "structure-linked-local-tangent": 228
+      },
+      "abstainedReasonCounts": {},
+      "structureFamilyCandidateRates": {
+        "vertical-double-pillar-single-beam": 1.0,
+        "vertical-single-pillar-double-beam": 1.0,
+        "vertical-double-pillar-double-beam": 1.0,
+        "horizontal-twin-stem": 1.0,
+        "mixed-double-pillar": 1.0,
+        "mixed-base-pillar": 1.0,
+        "mixed-no-stem": 1.0
+      }
+    },
+    {
+      "id": "nanum-gothic",
+      "fileSha256": "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31",
+      "characterCount": 532,
+      "elementCount": 1824,
+      "usableCandidateCount": 1824,
+      "usableHighConfidenceCount": 0,
+      "usableMediumConfidenceCount": 1824,
+      "simpleCandidateRate": 1.0,
+      "mixedCandidateRate": 1.0,
+      "matchingUnits": {
+        "axis-face-segment-group": 1596,
+        "structure-linked-local-tangent": 228
+      },
+      "abstainedReasonCounts": {},
+      "structureFamilyCandidateRates": {
+        "vertical-double-pillar-single-beam": 1.0,
+        "vertical-single-pillar-double-beam": 1.0,
+        "vertical-double-pillar-double-beam": 1.0,
+        "horizontal-twin-stem": 1.0,
+        "mixed-double-pillar": 1.0,
+        "mixed-base-pillar": 1.0,
+        "mixed-no-stem": 1.0
+      }
+    }
+  ],
+  "combinedMetrics": {
+    "usableCandidateCount": 3648,
+    "usableHighConfidenceCount": 0,
+    "usableMediumConfidenceCount": 3648,
+    "candidateRate": 1.0,
+    "simpleCandidateRate": 1.0,
+    "mixedCandidateRate": 1.0,
+    "wrongRoleCount": 76,
+    "invalidNumberCount": 0,
+    "roleContractViolationCount": 0,
+    "missingEvidenceCount": 0,
+    "structuralInvariantViolationCount": 0,
+    "unexpectedLocalTangentCount": 0,
+    "directionalTwinStructureViolationCount": 0,
+    "scanPlanViolationCount": 0,
+    "abstainedReasonCounts": {},
+    "structureFamilyCandidateRates": {
+      "vertical-double-pillar-single-beam": 1.0,
+      "vertical-single-pillar-double-beam": 1.0,
+      "vertical-double-pillar-double-beam": 1.0,
+      "horizontal-twin-stem": 1.0,
+      "mixed-double-pillar": 1.0,
+      "mixed-base-pillar": 1.0,
+      "mixed-no-stem": 1.0
+    }
+  },
+  "gateResult": {
+    "crashCount": 0,
+    "glyphMissingCount": 0,
+    "highConfidenceWrongRoleCount": 0,
+    "supportedStructureFamiliesBelowThreshold": [],
+    "result": "fail-user-review"
+  },
+  "visualReview": {
+    "scope": "all-p1-g2-medial-contact-sheets",
+    "reviewedSheetCount": 28,
+    "reviewedCharacterCount": 1064,
+    "reviewedCandidateCount": 3648,
+    "reviewedAbstentionCount": 0,
+    "wrongRoleCount": 76,
+    "result": "invalidated-by-user-review",
+    "score": 0,
+    "method": "one-full-contact-sheet-per-font-and-medial",
+    "reviewer": "codex-screen"
+  },
+  "userReview": {
+    "reviewedAt": "2026-09-14",
+    "scope": "preset-candidate-lab-horizontal-twin-stem-cards",
+    "characters": ["규", "귝"],
+    "wrongRoleCount": 2,
+    "result": "fail",
+    "reviewer": "user"
+  },
+  "findings": [
+    "User review invalidated v7: Noto 규·귝 displayed the main beam end face as rightStem instead of the second ㅠ stem.",
+    "A full Noto audit found the same rightStem contamination in all 76 ㅛ·ㅠ contexts across 19 initials and final none/ㄱ.",
+    "v7 checked stem attachment and pair separation but did not require each candidate to extend beyond the beam in the medial direction.",
+    "v7 uses requested medial and composition context as a directional scan contract instead of searching the whole syllable without direction.",
+    "Vertical medials scan from the glyph right edge through outer and inner pillars, then require side beams with the expected attachment direction.",
+    "Horizontal medials select a wide beam below the initial and require stems above it for ㅗ·ㅛ or below it for ㅜ·ㅠ.",
+    "Mixed medials start at the visible left-side local tangent below the initial, bind a directionally attached base stem, then scan right-side pillars and arms.",
+    "Nanum 궥·뛔·뛕 rounded base beams, 뚀 twin-stem structure, 퓩 twin-stem structure, and 뫠 baseStem now resolve without glyph, initial, font, or coordinate exceptions.",
+    "All v7 observations are blocked from preset input and production use."
+  ],
+  "reproduction": {
+    "notoCommand": "python3 scripts/reference-lab/evaluate_medial_p1.py .reference-fonts/NotoSansKR.ttf --scope p1 --json /private/tmp/noto-p1-g2-v7.json --html-dir /private/tmp/noto-p1-g2-v7-sheets",
+    "nanumCommand": "python3 scripts/reference-lab/evaluate_medial_p1.py .reference-fonts/NanumGothic-Regular.ttf --scope p1 --json /private/tmp/nanum-p1-g2-v7.json --html-dir /private/tmp/nanum-p1-g2-v7-sheets",
+    "notoFullReportSha256": "0019d01c2a66201f3eecc1590bb4f558d71d89143610772fdb61eaf64d16a5c8",
+    "nanumFullReportSha256": "b2823dc132a95434c8ac073df339728302f7067eb0d35f50dc66456d3c5452d0"
+  }
+}

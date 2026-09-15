@@ -1,0 +1,109 @@
+{
+  "schema": "medial-guide-p1-g1-v4-report-v1",
+  "version": 1,
+  "status": "agent-reviewed-diagnostic",
+  "reviewedAt": "2026-09-14",
+  "productionEligible": false,
+  "userReviewed": false,
+  "extractorVersion": "geometric-role-matcher-v4",
+  "roleContractVersion": "medial-guide-role-v4",
+  "thresholdPolicy": "p1-v4-structure-family-selector",
+  "scope": {
+    "fontIds": ["noto-sans-kr", "nanum-gothic"],
+    "initialJamos": ["ㄱ"],
+    "medialJamos": ["ㅐ", "ㅑ", "ㅒ", "ㅔ", "ㅕ", "ㅖ", "ㅙ", "ㅚ", "ㅛ", "ㅝ", "ㅞ", "ㅟ", "ㅠ", "ㅢ"],
+    "finalJamos": [null, "ㄱ"],
+    "characterCount": 56,
+    "elementCount": 192
+  },
+  "fonts": [
+    {
+      "id": "noto-sans-kr",
+      "fileSha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252",
+      "characterCount": 28,
+      "elementCount": 96,
+      "usableCandidateCount": 96,
+      "usableHighConfidenceCount": 0,
+      "usableMediumConfidenceCount": 96,
+      "simpleCandidateRate": 1.0,
+      "mixedCandidateRate": 1.0,
+      "matchingUnits": {
+        "axis-face-segment-group": 84,
+        "structure-linked-local-tangent": 12
+      },
+      "abstainedReasonCounts": {}
+    },
+    {
+      "id": "nanum-gothic",
+      "fileSha256": "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31",
+      "characterCount": 28,
+      "elementCount": 96,
+      "usableCandidateCount": 84,
+      "usableHighConfidenceCount": 0,
+      "usableMediumConfidenceCount": 84,
+      "simpleCandidateRate": 1.0,
+      "mixedCandidateRate": 0.7273,
+      "matchingUnits": {
+        "axis-face-segment-group": 84
+      },
+      "abstainedReasonCounts": {
+        "non-scalar-face": 12
+      }
+    }
+  ],
+  "combinedMetrics": {
+    "usableCandidateCount": 180,
+    "usableHighConfidenceCount": 0,
+    "usableMediumConfidenceCount": 180,
+    "candidateRate": 0.9375,
+    "simpleCandidateRate": 1.0,
+    "mixedCandidateRate": 0.8636,
+    "wrongRoleCount": 0,
+    "invalidNumberCount": 0,
+    "roleContractViolationCount": 0,
+    "missingEvidenceCount": 0,
+    "abstainedReasonCounts": {
+      "non-scalar-face": 12
+    },
+    "structureFamilyCandidateRates": {
+      "vertical-double-pillar-single-beam": 1.0,
+      "vertical-single-pillar-double-beam": 1.0,
+      "vertical-double-pillar-double-beam": 1.0,
+      "horizontal-twin-stem": 1.0,
+      "mixed-double-pillar": 0.9,
+      "mixed-base-pillar": 0.85,
+      "mixed-no-stem": 0.75
+    }
+  },
+  "visualReview": {
+    "scope": "all-p1-g1-anchor-candidates-and-abstentions",
+    "reviewedCharacterCount": 56,
+    "reviewedCandidateCount": 180,
+    "reviewedAbstentionCount": 12,
+    "wrongRoleCount": 0,
+    "result": "agent-pass",
+    "method": "generated-contact-sheets",
+    "reviewer": "codex-screen"
+  },
+  "p0Regression": {
+    "approvedElementCount": 28,
+    "coordinateMismatchCount": 0,
+    "abstentionMismatchCount": 0,
+    "result": "pass"
+  },
+  "findings": [
+    "v4 selects repeated pillars, repeated beams, and paired stems as separate finite structure faces.",
+    "Noto mixed base beams use an explicit left-side local tangent only when structure attachment and visible support agree.",
+    "Nanum mixed base beams keep 12 independent non-scalar-face abstentions because rounded left extremes provide less than 10 units of flat support.",
+    "Runtime rules contain no character-specific contour IDs or per-character coordinate table.",
+    "All emitted values remain external-font observations and are not production design values."
+  ],
+  "reproduction": {
+    "notoCommand": "python3 scripts/reference-lab/evaluate_medial_p1.py .reference-fonts/NotoSansKR.ttf --scope anchor --json /private/tmp/noto-p1-g1.json --html /private/tmp/noto-p1-g1.html",
+    "nanumCommand": "python3 scripts/reference-lab/evaluate_medial_p1.py .reference-fonts/NanumGothic-Regular.ttf --scope anchor --json /private/tmp/nanum-p1-g1.json --html /private/tmp/nanum-p1-g1.html",
+    "notoFullReportSha256": "2c9a2b247beec0bc702b5f73e03c09141f1a6fac364015b75e67951f930a7f14",
+    "nanumFullReportSha256": "b622189fe3f7ca6a5a4e4a5aea44d60cd2eb03eddbee7c86d4e8c33fb36a5020",
+    "notoContactSheetSha256": "6536eaff5bc04f571cfa1492d112e106994676703f8fba48e4f2bdfcd3889ad5",
+    "nanumContactSheetSha256": "5fd3d062d82c6beec37af11f53888de117e9a15c667d3781a60d1695df5efa9e"
+  }
+}

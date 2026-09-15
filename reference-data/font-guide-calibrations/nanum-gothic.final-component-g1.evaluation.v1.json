@@ -1,0 +1,128 @@
+{
+  "schema": "reference-final-component-g1-evaluation-v1",
+  "stage": "G1",
+  "candidateArtifactSchema": "reference-final-component-candidate-response-v1",
+  "candidateLifecycle": "candidate",
+  "supportStatus": "candidate-only",
+  "visualReviewStatus": "pending",
+  "structuralCheckStatus": "pass",
+  "caseCount": 81,
+  "candidateCount": 75,
+  "abstainedCount": 6,
+  "abstainedReasonCounts": {
+    "merged-boundary-unresolved": 3,
+    "medial-anchor-unavailable": 3
+  },
+  "structureCounts": {
+    "single": 42,
+    "doubled": 3,
+    "compound": 30
+  },
+  "relationCounts": {
+    "disjoint": 33,
+    "touching": 0,
+    "overlapping": 0,
+    "merged-boundary": 0
+  },
+  "perInitial": {
+    "ㄱ": {
+      "caseCount": 81,
+      "candidateCount": 75,
+      "abstainedCount": 6
+    },
+    "ㄲ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㄴ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㄷ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㄸ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㄹ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㅁ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㅂ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㅃ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㅅ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㅆ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㅇ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㅈ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㅉ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㅊ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㅋ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㅌ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㅍ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    },
+    "ㅎ": {
+      "caseCount": 0,
+      "candidateCount": 0,
+      "abstainedCount": 0
+    }
+  },
+  "globalIssues": [],
+  "forbiddenPaths": [],
+  "issues": [],
+  "invalidatedFamilies": []
+}

@@ -1,0 +1,12 @@
+{
+  "schema": "reference-final-component-verification-v1",
+  "state": "verified",
+  "candidateArtifactSha256": "d08cd33394dc7108c2b206f088aeee6ed30430f284fd9d43924869794ca86ef1",
+  "candidateIdentitySha256": "dcd38ec9b3ad63669bb1b33dc08c3a5903e99feb8408bd1c6ba972de227ae753",
+  "review": {
+    "method": "user-visual-review",
+    "reviewedAt": "2026-09-15T00:00:00+09:00",
+    "reviewedBy": "hanim",
+    "note": "v2 G1 화면 검토 승인. red abstain은 의도된 안전 보류로 제외 처리 후 후보 확정."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "schema": "reference-final-component-verification-v1",
+  "state": "verified",
+  "candidateArtifactSha256": "429051fab9093b75b9350c83247a08df906b39c8a5965f72ebfe29508a1a8097",
+  "candidateIdentitySha256": "3010201a90d1110ac85811c08a5e0f4ce826d3ef26d12ac880ee76cf0c85bbb4",
+  "review": {
+    "method": "user-visual-review",
+    "reviewedAt": "2026-09-15T00:00:00+09:00",
+    "reviewedBy": "hanim",
+    "note": "v2 G2 Nanum 화면 검토 승인. red abstain은 의도된 안전 보류로 제외 처리 후 후보 확정."
+  }
+}

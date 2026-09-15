@@ -1,0 +1,161 @@
+{
+  "schema": "medial-guide-p1-g2-v9-report-v1",
+  "version": 1,
+  "status": "user-reviewed-diagnostic",
+  "reviewedAt": "2026-09-14",
+  "productionEligible": false,
+  "userReviewed": true,
+  "extractorVersion": "geometric-role-matcher-v9",
+  "roleContractVersion": "medial-guide-role-v4",
+  "thresholdPolicy": "p1-v9-directional-and-interior-stem-attachment",
+  "scope": {
+    "fontIds": ["noto-sans-kr", "nanum-gothic"],
+    "initialJamoCount": 19,
+    "medialJamos": ["ㅐ", "ㅑ", "ㅒ", "ㅔ", "ㅕ", "ㅖ", "ㅙ", "ㅚ", "ㅛ", "ㅝ", "ㅞ", "ㅟ", "ㅠ", "ㅢ"],
+    "finalJamos": [null, "ㄱ"],
+    "characterCount": 1064,
+    "elementCount": 3648
+  },
+  "fonts": [
+    {
+      "id": "noto-sans-kr",
+      "fileSha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252",
+      "characterCount": 532,
+      "elementCount": 1824,
+      "usableCandidateCount": 1824,
+      "usableHighConfidenceCount": 0,
+      "usableMediumConfidenceCount": 1824,
+      "simpleCandidateRate": 1.0,
+      "mixedCandidateRate": 1.0,
+      "matchingUnits": {
+        "axis-face-segment-group": 1596,
+        "structure-linked-local-tangent": 228
+      },
+      "abstainedReasonCounts": {},
+      "structureFamilyCandidateRates": {
+        "vertical-double-pillar-single-beam": 1.0,
+        "vertical-single-pillar-double-beam": 1.0,
+        "vertical-double-pillar-double-beam": 1.0,
+        "horizontal-twin-stem": 1.0,
+        "mixed-double-pillar": 1.0,
+        "mixed-base-pillar": 1.0,
+        "mixed-no-stem": 1.0
+      }
+    },
+    {
+      "id": "nanum-gothic",
+      "fileSha256": "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31",
+      "characterCount": 532,
+      "elementCount": 1824,
+      "usableCandidateCount": 1824,
+      "usableHighConfidenceCount": 0,
+      "usableMediumConfidenceCount": 1824,
+      "simpleCandidateRate": 1.0,
+      "mixedCandidateRate": 1.0,
+      "matchingUnits": {
+        "axis-face-segment-group": 1596,
+        "structure-linked-local-tangent": 228
+      },
+      "abstainedReasonCounts": {},
+      "structureFamilyCandidateRates": {
+        "vertical-double-pillar-single-beam": 1.0,
+        "vertical-single-pillar-double-beam": 1.0,
+        "vertical-double-pillar-double-beam": 1.0,
+        "horizontal-twin-stem": 1.0,
+        "mixed-double-pillar": 1.0,
+        "mixed-base-pillar": 1.0,
+        "mixed-no-stem": 1.0
+      }
+    }
+  ],
+  "combinedMetrics": {
+    "usableCandidateCount": 3648,
+    "usableHighConfidenceCount": 0,
+    "usableMediumConfidenceCount": 3648,
+    "candidateRate": 1.0,
+    "simpleCandidateRate": 1.0,
+    "mixedCandidateRate": 1.0,
+    "wrongRoleCount": 0,
+    "invalidNumberCount": 0,
+    "roleContractViolationCount": 0,
+    "missingEvidenceCount": 0,
+    "structuralInvariantViolationCount": 0,
+    "unexpectedLocalTangentCount": 0,
+    "directionalTwinStructureViolationCount": 0,
+    "scanPlanViolationCount": 0,
+    "abstainedReasonCounts": {},
+    "structureFamilyCandidateRates": {
+      "vertical-double-pillar-single-beam": 1.0,
+      "vertical-single-pillar-double-beam": 1.0,
+      "vertical-double-pillar-double-beam": 1.0,
+      "horizontal-twin-stem": 1.0,
+      "mixed-double-pillar": 1.0,
+      "mixed-base-pillar": 1.0,
+      "mixed-no-stem": 1.0
+    }
+  },
+  "gateResult": {
+    "crashCount": 0,
+    "glyphMissingCount": 0,
+    "highConfidenceWrongRoleCount": 0,
+    "supportedStructureFamiliesBelowThreshold": [],
+    "wrongRoleCount": 0,
+    "result": "pass-user-reviewed-risk-sample"
+  },
+  "visualReview": {
+    "scope": "v9-changed-mixed-family-full-contact-sheets",
+    "reviewedSheetCount": 10,
+    "reviewedCharacterCount": 380,
+    "reviewedCandidateCount": 1520,
+    "reviewedAbstentionCount": 0,
+    "wrongRoleCount": 0,
+    "result": "agent-pass",
+    "score": 100,
+    "method": "Noto and Nanum full ㅙ·ㅚ·ㅝ·ㅞ·ㅟ contact sheets",
+    "reviewer": "codex-screen"
+  },
+  "differentialReview": {
+    "baselineExtractorVersion": "geometric-role-matcher-v8",
+    "notoChangedCaseCount": 11,
+    "notoChangedElementCount": 22,
+    "notoChangedCharacters": ["뒥", "뤄", "뤼", "뤽", "퉈", "튀", "튁", "풔", "풕", "퓌", "퓍"],
+    "nanumChangedCaseCount": 0,
+    "nanumChangedElementCount": 0,
+    "result": "pass"
+  },
+  "userReview": {
+    "reviewedAt": "2026-09-14",
+    "scope": "noto-v9-mixed-base-regression-live-cards",
+    "characters": ["풔", "풕"],
+    "wrongRoleCount": 0,
+    "result": "pass",
+    "reviewer": "user"
+  },
+  "presetAnchorReview": {
+    "reviewedAt": "2026-09-14",
+    "scope": "noto-preset-anchor-28-exact-observation-equivalence",
+    "characterCount": 28,
+    "wrongRoleCount": 0,
+    "observationDigest": "ddbf8478cd0360301c5755175334ba1e8e3f05afd17bb6b723ef9136ea169291",
+    "priorApprovedExtractorVersion": "geometric-role-matcher-v8",
+    "result": "pass",
+    "basis": "v9 face coordinates, reference modes, anchors, and visible spans exactly match the user-reviewed v8 anchor observations",
+    "reviewer": "deterministic-differential"
+  },
+  "findings": [
+    "v9 keeps v8 directional stem reach and additionally requires a mixed base stem to sit at least 8 percent of the selected base beam width inside both beam ends.",
+    "The rule rejects all 11 audited Noto contaminants without a glyph, initial, font, or coordinate exception.",
+    "All 11 rejected structures had zero beam-interior inset; the retained true alternatives had at least 184.529 units of inset.",
+    "Both fixed fonts reproduce 1,824 of 1,824 candidates with zero numeric, role-contract, evidence, structural, directional-twin, or scan-plan violations.",
+    "The v9 change affects 11 Noto cases and 22 elements; Nanum output is numerically unchanged.",
+    "Agent review covered all 380 mixed-family cards and 1,520 visible candidates across both fonts; the user then approved the live Noto 풔·풕 regression cards.",
+    "The 28 Noto preset-anchor observations are byte-stable under the review projection, so their prior user approval transfers only to those unchanged observations."
+  ],
+  "reproduction": {
+    "notoCommand": "python3 scripts/reference-lab/evaluate_medial_p1.py .reference-fonts/NotoSansKR.ttf --scope p1 --json /private/tmp/noto-p1-g2-v9.json --html-dir /private/tmp/noto-p1-g2-v9-sheets",
+    "notoAnchorCommand": "python3 scripts/reference-lab/evaluate_medial_p1.py .reference-fonts/NotoSansKR.ttf --scope anchor --json /private/tmp/noto-p1-v9-anchor.json --html /private/tmp/noto-p1-v9-anchor.html",
+    "nanumCommand": "python3 scripts/reference-lab/evaluate_medial_p1.py .reference-fonts/NanumGothic-Regular.ttf --scope p1 --json /private/tmp/nanum-p1-g2-v9.json --html-dir /private/tmp/nanum-p1-g2-v9-sheets",
+    "notoFullReportSha256": "1d0f813107f0a9d88444f93006359353c3b8a2728e8ef10cade2078876b02305",
+    "nanumFullReportSha256": "aace465fa83ad19820940cc50d7ffe51d424349ec3df6d6191a326e14eed6d82"
+  }
+}

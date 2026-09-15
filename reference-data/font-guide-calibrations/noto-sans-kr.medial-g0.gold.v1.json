@@ -1,0 +1,127 @@
+{
+  "schema": "medial-guide-g0-analysis-gold-v1",
+  "version": 1,
+  "status": "approved-analysis-gold",
+  "approvedAt": "2026-09-14",
+  "approvalBasis": "user-visual-review-and-directed-pair-consistency",
+  "productionEligible": false,
+  "font": {
+    "id": "noto-sans-kr",
+    "fileSha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252",
+    "axes": { "wght": 400 }
+  },
+  "coordinateFrame": {
+    "id": "shared-baseline",
+    "unitsPerEm": 1000,
+    "baselineY": 880
+  },
+  "roleDefinitionVersion": "medial-guide-role-v3",
+  "extractorVersionAtApproval": "annotated-contour-finite-face-v2",
+  "scope": {
+    "initialJamo": "ㄱ",
+    "medials": ["ㅏ", "ㅓ", "ㅣ", "ㅗ", "ㅜ", "ㅡ", "ㅘ"],
+    "finalJamos": [null, "ㄱ"],
+    "characterCount": 14,
+    "elementCount": 28
+  },
+  "cases": [
+    {
+      "character": "가",
+      "elements": [
+        { "elementId": "outerPillar", "orientation": "vertical", "faceSide": "right", "face": { "status": "candidate", "value": 745.061, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 52.69, "to": 419.819 }, { "from": 488.991, "to": 957.14 }] }, "componentSpans": [{ "from": 52.69, "to": 957.14 }], "derived": { "extent": 904.451, "visibleLength": 835.279 } },
+        { "elementId": "primaryBeam", "orientation": "horizontal", "faceSide": "top", "face": { "status": "candidate", "value": 419.819, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 745.061, "to": 889.46 }] }, "componentSpans": [{ "from": 722.97, "to": 889.46 }], "derived": { "extent": 144.399, "visibleLength": 144.399 } }
+      ]
+    },
+    {
+      "character": "각",
+      "elements": [
+        { "elementId": "outerPillar", "orientation": "vertical", "faceSide": "right", "face": { "status": "candidate", "value": 751.551, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 53.08, "to": 281.819 }, { "from": 351.601, "to": 583.49 }] }, "componentSpans": [{ "from": 53.08, "to": 583.49 }], "derived": { "extent": 530.41, "visibleLength": 460.629 } },
+        { "elementId": "primaryBeam", "orientation": "horizontal", "faceSide": "top", "face": { "status": "candidate", "value": 281.819, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 751.551, "to": 885.02 }] }, "componentSpans": [{ "from": 728.9, "to": 885.02 }], "derived": { "extent": 133.47, "visibleLength": 133.47 } }
+      ]
+    },
+    {
+      "character": "거",
+      "elements": [
+        { "elementId": "outerPillar", "orientation": "vertical", "faceSide": "right", "face": { "status": "candidate", "value": 793.231, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 53.47, "to": 957.92 }] }, "componentSpans": [{ "from": 53.47, "to": 957.92 }], "derived": { "extent": 904.451, "visibleLength": 904.451 } },
+        { "elementId": "primaryBeam", "orientation": "horizontal", "faceSide": "top", "face": { "status": "candidate", "value": 415.669, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 499.9, "to": 710.529 }] }, "componentSpans": [{ "from": 499.9, "to": 747.83 }], "derived": { "extent": 210.629, "visibleLength": 210.629 } }
+      ]
+    },
+    {
+      "character": "걱",
+      "elements": [
+        { "elementId": "outerPillar", "orientation": "vertical", "faceSide": "right", "face": { "status": "candidate", "value": 793.841, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 53.69, "to": 584.1 }] }, "componentSpans": [{ "from": 53.69, "to": 584.1 }], "derived": { "extent": 530.41, "visibleLength": 530.41 } },
+        { "elementId": "primaryBeam", "orientation": "horizontal", "faceSide": "top", "face": { "status": "candidate", "value": 290.379, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 517.53, "to": 710.529 }] }, "componentSpans": [{ "from": 517.53, "to": 728.769 }], "derived": { "extent": 192.999, "visibleLength": 192.999 } }
+      ]
+    },
+    {
+      "character": "기",
+      "elements": [
+        { "elementId": "outerPillar", "orientation": "vertical", "faceSide": "right", "face": { "status": "candidate", "value": 791.671, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 53.08, "to": 957.53 }] }, "componentSpans": [{ "from": 53.08, "to": 957.53 }], "derived": { "extent": 904.451, "visibleLength": 904.451 } }
+      ]
+    },
+    {
+      "character": "긱",
+      "elements": [
+        { "elementId": "outerPillar", "orientation": "vertical", "faceSide": "right", "face": { "status": "candidate", "value": 791.111, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 53.69, "to": 584.1 }] }, "componentSpans": [{ "from": 53.69, "to": 584.1 }], "derived": { "extent": 530.41, "visibleLength": 530.41 } }
+      ]
+    },
+    {
+      "character": "고",
+      "elements": [
+        { "elementId": "baseStem", "orientation": "vertical", "faceSide": "right", "face": { "status": "candidate", "value": 450.281, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 439.2, "to": 762.13 }] }, "componentSpans": [{ "from": 439.2, "to": 796.85 }], "derived": { "extent": 322.93, "visibleLength": 322.93 } },
+        { "elementId": "primaryBeam", "orientation": "horizontal", "faceSide": "top", "face": { "status": "candidate", "value": 762.13, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 50.03, "to": 367.579 }, { "from": 450.281, "to": 867.31 }] }, "componentSpans": [{ "from": 50.03, "to": 867.31 }], "derived": { "extent": 817.281, "visibleLength": 734.579 } }
+      ]
+    },
+    {
+      "character": "곡",
+      "elements": [
+        { "elementId": "baseStem", "orientation": "vertical", "faceSide": "right", "face": { "status": "candidate", "value": 467.991, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 299.54, "to": 483.009 }] }, "componentSpans": [{ "from": 299.54, "to": 501.619 }], "derived": { "extent": 183.47, "visibleLength": 183.47 } },
+        { "elementId": "primaryBeam", "orientation": "horizontal", "faceSide": "top", "face": { "status": "candidate", "value": 483.009, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 50.81, "to": 385.679 }, { "from": 467.991, "to": 866.14 }] }, "componentSpans": [{ "from": 50.81, "to": 866.14 }], "derived": { "extent": 815.331, "visibleLength": 733.019 } }
+      ]
+    },
+    {
+      "character": "구",
+      "elements": [
+        { "elementId": "baseStem", "orientation": "vertical", "faceSide": "right", "face": { "status": "candidate", "value": 498.181, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 568.861, "to": 958.53 }] }, "componentSpans": [{ "from": 545.891, "to": 958.53 }], "derived": { "extent": 389.669, "visibleLength": 389.669 } },
+        { "elementId": "primaryBeam", "orientation": "horizontal", "faceSide": "top", "face": { "status": "candidate", "value": 500.25, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 50.03, "to": 650.504 }, { "from": 734.749, "to": 867.31 }] }, "componentSpans": [{ "from": 50.03, "to": 867.31 }], "derived": { "extent": 817.281, "visibleLength": 733.036 } }
+      ]
+    },
+    {
+      "character": "국",
+      "elements": [
+        { "elementId": "baseStem", "orientation": "vertical", "faceSide": "right", "face": { "status": "candidate", "value": 499.741, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 487.281, "to": 651.959 }] }, "componentSpans": [{ "from": 465.53, "to": 678.2 }], "derived": { "extent": 164.679, "visibleLength": 164.679 } },
+        { "elementId": "primaryBeam", "orientation": "horizontal", "faceSide": "top", "face": { "status": "candidate", "value": 419.059, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 50.03, "to": 658.223 }, { "from": 741.06, "to": 869.75 }] }, "componentSpans": [{ "from": 50.03, "to": 869.75 }], "derived": { "extent": 819.721, "visibleLength": 736.884 } }
+      ]
+    },
+    {
+      "character": "그",
+      "elements": [
+        { "elementId": "primaryBeam", "orientation": "horizontal", "faceSide": "top", "face": { "status": "candidate", "value": 756.839, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 50.03, "to": 867.31 }] }, "componentSpans": [{ "from": 50.03, "to": 867.31 }], "derived": { "extent": 817.281, "visibleLength": 817.281 } }
+      ]
+    },
+    {
+      "character": "극",
+      "elements": [
+        { "elementId": "primaryBeam", "orientation": "horizontal", "faceSide": "top", "face": { "status": "candidate", "value": 433.789, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 50.03, "to": 657.633 }, { "from": 740.858, "to": 869.75 }] }, "componentSpans": [{ "from": 50.03, "to": 869.75 }], "derived": { "extent": 819.721, "visibleLength": 736.496 } }
+      ]
+    },
+    {
+      "character": "과",
+      "elements": [
+        { "elementId": "baseStem", "orientation": "vertical", "faceSide": "right", "face": { "status": "candidate", "value": 313.601, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 410.69, "to": 686.0 }] }, "componentSpans": [{ "from": 410.69, "to": 716.88 }], "derived": { "extent": 275.311, "visibleLength": 275.311 } },
+        { "elementId": "outerPillar", "orientation": "vertical", "faceSide": "right", "face": { "status": "candidate", "value": 742.741, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 53.08, "to": 431.229 }, { "from": 501.621, "to": 957.53 }] }, "componentSpans": [{ "from": 53.08, "to": 957.53 }], "derived": { "extent": 904.451, "visibleLength": 834.059 } },
+        { "elementId": "upperBeam", "orientation": "horizontal", "faceSide": "top", "face": { "status": "candidate", "value": 431.229, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 742.741, "to": 887.46 }] }, "componentSpans": [{ "from": 720.36, "to": 887.46 }], "derived": { "extent": 144.719, "visibleLength": 144.719 } },
+        { "elementId": "lowerBeam", "orientation": "horizontal", "faceSide": "top", "face": { "status": "candidate", "value": 690.619, "referenceMode": "start-side-local-tangent", "referenceSide": "left", "anchor": { "x": 40.81, "y": 690.619 }, "maximumDeviation": 0.2 }, "visibleSpans": { "status": "candidate", "value": [{ "from": 40.81, "to": 65.093 }] }, "componentSpans": [{ "from": 40.81, "to": 65.093 }], "derived": { "extent": 24.283, "visibleLength": 24.283 } }
+      ]
+    },
+    {
+      "character": "곽",
+      "elements": [
+        { "elementId": "baseStem", "orientation": "vertical", "faceSide": "right", "face": { "status": "candidate", "value": 316.53, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 308.66, "to": 491.032 }] }, "componentSpans": [{ "from": 308.66, "to": 529.63 }], "derived": { "extent": 182.372, "visibleLength": 182.372 } },
+        { "elementId": "outerPillar", "orientation": "vertical", "faceSide": "right", "face": { "status": "candidate", "value": 753.521, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 53.08, "to": 304.769 }, { "from": 374.161, "to": 612.8 }] }, "componentSpans": [{ "from": 53.08, "to": 612.8 }], "derived": { "extent": 559.721, "visibleLength": 490.329 } },
+        { "elementId": "upperBeam", "orientation": "horizontal", "faceSide": "top", "face": { "status": "candidate", "value": 304.769, "referenceMode": "axis-aligned-face" }, "visibleSpans": { "status": "candidate", "value": [{ "from": 753.521, "to": 882.58 }] }, "componentSpans": [{ "from": 715.48, "to": 882.58 }], "derived": { "extent": 129.059, "visibleLength": 129.059 } },
+        { "elementId": "lowerBeam", "orientation": "horizontal", "faceSide": "top", "face": { "status": "candidate", "value": 495.789, "referenceMode": "start-side-local-tangent", "referenceSide": "left", "anchor": { "x": 43.619, "y": 495.789 }, "maximumDeviation": 0.2 }, "visibleSpans": { "status": "candidate", "value": [{ "from": 43.619, "to": 97.911 }] }, "componentSpans": [{ "from": 43.619, "to": 97.911 }], "derived": { "extent": 54.292, "visibleLength": 54.292 } }
+      ]
+    }
+  ]
+}

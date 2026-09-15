@@ -1,0 +1,105 @@
+{
+  "schema": "medial-guide-p1-g0-baseline-report-v1",
+  "version": 1,
+  "status": "agent-reviewed-diagnostic-baseline",
+  "reviewedAt": "2026-09-14",
+  "productionEligible": false,
+  "userReviewed": false,
+  "extractorVersion": "geometric-role-matcher-v3",
+  "roleContractVersion": "medial-guide-role-v4-draft",
+  "thresholdPolicy": "g1-frozen-contour-plus-g4-segment-fallback",
+  "scope": {
+    "fontIds": ["noto-sans-kr", "nanum-gothic"],
+    "initialJamos": ["ㄱ"],
+    "medialJamos": ["ㅐ", "ㅑ", "ㅒ", "ㅔ", "ㅕ", "ㅖ", "ㅙ", "ㅚ", "ㅛ", "ㅝ", "ㅞ", "ㅟ", "ㅠ", "ㅢ"],
+    "finalJamos": [null, "ㄱ"],
+    "characterCount": 56,
+    "elementCount": 192
+  },
+  "fonts": [
+    {
+      "id": "noto-sans-kr",
+      "fileSha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252",
+      "characterCount": 28,
+      "elementCount": 96,
+      "usableCandidateCount": 40,
+      "usableHighConfidenceCount": 28,
+      "usableMediumConfidenceCount": 12,
+      "simpleCandidateRate": 0.3269,
+      "mixedCandidateRate": 0.5227,
+      "compositeCaseCount": 0,
+      "abstainedReasonCounts": {
+        "no-role-match": 44,
+        "ambiguous-role-match": 6,
+        "non-scalar-face": 6
+      }
+    },
+    {
+      "id": "nanum-gothic",
+      "fileSha256": "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31",
+      "characterCount": 28,
+      "elementCount": 96,
+      "usableCandidateCount": 39,
+      "usableHighConfidenceCount": 12,
+      "usableMediumConfidenceCount": 27,
+      "simpleCandidateRate": 0.3077,
+      "mixedCandidateRate": 0.5227,
+      "compositeCaseCount": 8,
+      "compositeCharacters": ["걕", "겍", "곅", "괙", "굑", "궥", "귝", "긕"],
+      "abstainedReasonCounts": {
+        "no-role-match": 50,
+        "ambiguous-role-match": 7
+      }
+    }
+  ],
+  "combinedMetrics": {
+    "usableCandidateCount": 79,
+    "usableHighConfidenceCount": 40,
+    "usableMediumConfidenceCount": 39,
+    "candidateRate": 0.4115,
+    "simpleCandidateRate": 0.3173,
+    "mixedCandidateRate": 0.5227,
+    "wrongRoleCount": 0,
+    "invalidNumberCount": 0,
+    "roleContractViolationCount": 0,
+    "missingEvidenceCount": 0,
+    "abstainedReasonCounts": {
+      "no-role-match": 94,
+      "ambiguous-role-match": 13,
+      "non-scalar-face": 6
+    },
+    "structureFamilyCandidateRates": {
+      "vertical-double-pillar-single-beam": 0.4583,
+      "vertical-single-pillar-double-beam": 0.3333,
+      "vertical-double-pillar-double-beam": 0.1875,
+      "horizontal-twin-stem": 0.3333,
+      "mixed-double-pillar": 0.45,
+      "mixed-base-pillar": 0.6,
+      "mixed-no-stem": 0.5
+    }
+  },
+  "visualReview": {
+    "scope": "all-p1-g0-anchor-candidates-and-abstentions",
+    "reviewedCharacterCount": 56,
+    "reviewedCandidateCount": 79,
+    "reviewedAbstentionCount": 113,
+    "wrongRoleCount": 0,
+    "result": "agent-reviewed-baseline-below-generation-floor",
+    "method": "generated-contact-sheets",
+    "reviewer": "codex-screen"
+  },
+  "findings": [
+    "v3 candidates that were emitted touched the intended medial structure face in both contact sheets.",
+    "v3 has no role scorer for innerPillar, leftStem, or rightStem.",
+    "v3 beam scoring cannot yet distinguish the additional double-beam and mixed-base-beam structures.",
+    "P1 curved faces remain abstained; the approved ㅘ local-tangent policy was not copied to another medial."
+  ],
+  "reproduction": {
+    "notoCommand": "python3 scripts/reference-lab/evaluate_medial_p1.py .reference-fonts/NotoSansKR.ttf --scope anchor --json /private/tmp/noto-p1-g0.json --html /private/tmp/noto-p1-g0.html",
+    "nanumCommand": "python3 scripts/reference-lab/evaluate_medial_p1.py .reference-fonts/NanumGothic-Regular.ttf --scope anchor --json /private/tmp/nanum-p1-g0.json --html /private/tmp/nanum-p1-g0.html",
+    "notoFullReportSha256": "7c673ae813e32ae7454d744a9931365460f170e52880df12553e9bf8d77b8003",
+    "nanumFullReportSha256": "1edcdba495e924617cd826fd74682e783b289c673148d2b0d8a53a494628c7e4",
+    "notoContactSheetSha256": "2242380c08ffaeee201f5b34b986a0f99e18f954349c7536d2eacb439e4d876d",
+    "nanumContactSheetSha256": "2ec6f648fe73e61dfe8504e8c0e4114db92dc514cbf9c9fb61a0167013e65914"
+  }
+}

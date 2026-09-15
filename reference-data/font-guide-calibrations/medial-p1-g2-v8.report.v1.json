@@ -1,0 +1,162 @@
+{
+  "schema": "medial-guide-p1-g2-v8-report-v1",
+  "version": 1,
+  "status": "invalidated-by-user-review",
+  "reviewedAt": "2026-09-14",
+  "productionEligible": false,
+  "userReviewed": true,
+  "extractorVersion": "geometric-role-matcher-v8",
+  "roleContractVersion": "medial-guide-role-v4",
+  "thresholdPolicy": "p1-v8-directional-stem-reach",
+  "scope": {
+    "fontIds": ["noto-sans-kr", "nanum-gothic"],
+    "initialJamoCount": 19,
+    "medialJamos": ["ㅐ", "ㅑ", "ㅒ", "ㅔ", "ㅕ", "ㅖ", "ㅙ", "ㅚ", "ㅛ", "ㅝ", "ㅞ", "ㅟ", "ㅠ", "ㅢ"],
+    "finalJamos": [null, "ㄱ"],
+    "characterCount": 1064,
+    "elementCount": 3648
+  },
+  "fonts": [
+    {
+      "id": "noto-sans-kr",
+      "fileSha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252",
+      "characterCount": 532,
+      "elementCount": 1824,
+      "usableCandidateCount": 1824,
+      "usableHighConfidenceCount": 0,
+      "usableMediumConfidenceCount": 1824,
+      "simpleCandidateRate": 1.0,
+      "mixedCandidateRate": 1.0,
+      "matchingUnits": {
+        "axis-face-segment-group": 1596,
+        "structure-linked-local-tangent": 228
+      },
+      "abstainedReasonCounts": {},
+      "structureFamilyCandidateRates": {
+        "vertical-double-pillar-single-beam": 1.0,
+        "vertical-single-pillar-double-beam": 1.0,
+        "vertical-double-pillar-double-beam": 1.0,
+        "horizontal-twin-stem": 1.0,
+        "mixed-double-pillar": 1.0,
+        "mixed-base-pillar": 1.0,
+        "mixed-no-stem": 1.0
+      }
+    },
+    {
+      "id": "nanum-gothic",
+      "fileSha256": "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31",
+      "characterCount": 532,
+      "elementCount": 1824,
+      "usableCandidateCount": 1824,
+      "usableHighConfidenceCount": 0,
+      "usableMediumConfidenceCount": 1824,
+      "simpleCandidateRate": 1.0,
+      "mixedCandidateRate": 1.0,
+      "matchingUnits": {
+        "axis-face-segment-group": 1596,
+        "structure-linked-local-tangent": 228
+      },
+      "abstainedReasonCounts": {},
+      "structureFamilyCandidateRates": {
+        "vertical-double-pillar-single-beam": 1.0,
+        "vertical-single-pillar-double-beam": 1.0,
+        "vertical-double-pillar-double-beam": 1.0,
+        "horizontal-twin-stem": 1.0,
+        "mixed-double-pillar": 1.0,
+        "mixed-base-pillar": 1.0,
+        "mixed-no-stem": 1.0
+      }
+    }
+  ],
+  "combinedMetrics": {
+    "usableCandidateCount": 3648,
+    "usableHighConfidenceCount": 0,
+    "usableMediumConfidenceCount": 3648,
+    "candidateRate": 1.0,
+    "simpleCandidateRate": 1.0,
+    "mixedCandidateRate": 1.0,
+    "wrongRoleCount": 11,
+    "invalidNumberCount": 0,
+    "roleContractViolationCount": 0,
+    "missingEvidenceCount": 0,
+    "structuralInvariantViolationCount": 0,
+    "unexpectedLocalTangentCount": 0,
+    "directionalTwinStructureViolationCount": 0,
+    "scanPlanViolationCount": 0,
+    "abstainedReasonCounts": {},
+    "structureFamilyCandidateRates": {
+      "vertical-double-pillar-single-beam": 1.0,
+      "vertical-single-pillar-double-beam": 1.0,
+      "vertical-double-pillar-double-beam": 1.0,
+      "horizontal-twin-stem": 1.0,
+      "mixed-double-pillar": 1.0,
+      "mixed-base-pillar": 1.0,
+      "mixed-no-stem": 1.0
+    }
+  },
+  "gateResult": {
+    "crashCount": 0,
+    "glyphMissingCount": 0,
+    "highConfidenceWrongRoleCount": 0,
+    "supportedStructureFamiliesBelowThreshold": [],
+    "wrongRoleCount": 11,
+    "result": "fail-user-review"
+  },
+  "visualReview": {
+    "scope": "horizontal-twin-stem-regression-contact-sheets-and-live-cards",
+    "reviewedSheetCount": 4,
+    "reviewedCharacterCount": 152,
+    "reviewedCandidateCount": 456,
+    "reviewedAbstentionCount": 0,
+    "wrongRoleCount": 0,
+    "result": "agent-pass",
+    "score": 96,
+    "method": "Noto and Nanum full ㅛ·ㅠ sheets plus Noto 규·귝 and Nanum 횩 cards",
+    "reviewer": "codex-screen"
+  },
+  "userReview": {
+    "reviewedAt": "2026-09-14",
+    "scope": "v8-topology-regression-former-v6-failures-and-noto-anchor-twin-stems",
+    "characters": ["뚀", "퓩", "뫠", "궥", "교", "굑", "규", "귝"],
+    "wrongRoleCount": 0,
+    "result": "pass",
+    "reviewer": "user"
+  },
+  "invalidationReview": {
+    "reviewedAt": "2026-09-14",
+    "scope": "noto-mixed-base-beam-and-base-stem-role-contamination",
+    "userReportedCharacters": ["풔", "풕"],
+    "auditedAffectedCharacters": ["뒥", "뤄", "뤼", "뤽", "퉈", "튀", "튁", "풔", "풕", "퓌", "퓍"],
+    "wrongRoleCount": 11,
+    "result": "fail",
+    "reviewer": "user-plus-geometry-audit"
+  },
+  "presetAnchorReview": {
+    "reviewedAt": "2026-09-14",
+    "scope": "noto-preset-anchor-28",
+    "characterCount": 28,
+    "wrongRoleCount": 0,
+    "result": "pass",
+    "reviewer": "user"
+  },
+  "findings": [
+    "v8 requires each ㅛ·ㅠ stem candidate to extend at least 75 font units beyond the main beam in the requested medial direction.",
+    "The rule rejects all 76 Noto v7 beam-end contaminants; their directional reach was at most 69.611 units.",
+    "The shortest retained compressed true stem is Nanum 횩 at 99 units of directional reach, so the correction does not add a glyph, initial, font, or coordinate exception.",
+    "Noto 규 now selects leftStem x=343.551 and rightStem x=652.251; 귝 selects x=351.741 and x=649.401.",
+    "Both fixed fonts reproduce 1,824 of 1,824 candidates with zero numeric, role-contract, evidence, structural, directional-twin, or scan-plan violations.",
+    "Only the affected ㅛ·ㅠ family received a new agent visual review; the unchanged 12 medial families retain their v7 differential evidence.",
+    "The earlier user confirmation of 뚀·퓩·뫠·궥 and 교·굑·규·귝 covered only those risk samples and did not prove the unchanged mixed-base family.",
+    "Later user review found Noto 풔·풕 selecting the initial ㅍ middle beam and its right end cap as ㅝ upperBeam and baseStem.",
+    "A full mixed-base topology audit found the same zero-interior-margin contamination in 11 Noto contexts: 뒥·뤄·뤼·뤽·퉈·튀·튁·풔·풕·퓌·퓍.",
+    "v8 and its P1 G4 completion are invalidated. It must not feed preset candidates, production values, or browser cache after the replacement extractor is integrated.",
+    "The user reviewed all 28 Noto preset anchor cards and found no wrong medial role. This approves the v8 observations as G2 analysis input, not as production layout or glyph-shape values."
+  ],
+  "reproduction": {
+    "notoCommand": "python3 scripts/reference-lab/evaluate_medial_p1.py .reference-fonts/NotoSansKR.ttf --scope p1 --json /private/tmp/noto-p1-g2-v8.json --html-dir /private/tmp/noto-p1-g2-v8-sheets",
+    "notoAnchorCommand": "python3 scripts/reference-lab/evaluate_medial_p1.py .reference-fonts/NotoSansKR.ttf --scope anchor --json /private/tmp/noto-p1-v8-anchor.json --html /private/tmp/noto-p1-v8-anchor.html",
+    "nanumCommand": "python3 scripts/reference-lab/evaluate_medial_p1.py .reference-fonts/NanumGothic-Regular.ttf --scope p1 --json /private/tmp/nanum-p1-g2-v8.json --html-dir /private/tmp/nanum-p1-g2-v8-sheets",
+    "notoFullReportSha256": "f29c50d9e8121815314339562f59c634c9c7d214fbdfc69cd4a0fdb852f01bdf",
+    "nanumFullReportSha256": "12ece32993d806df144b5bb42b378093ccba17bd8a4461dba77ba480f2ac4a99"
+  }
+}

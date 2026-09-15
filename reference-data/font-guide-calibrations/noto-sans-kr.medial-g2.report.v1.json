@@ -1,0 +1,59 @@
+{
+  "schema": "medial-guide-g2-holdout-report-v1",
+  "version": 1,
+  "status": "agent-reviewed-diagnostic",
+  "reviewedAt": "2026-09-14",
+  "productionEligible": false,
+  "userReviewed": false,
+  "font": {
+    "id": "noto-sans-kr",
+    "fileSha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252"
+  },
+  "extractorVersion": "geometric-role-matcher-v3",
+  "thresholdPolicy": "g1-frozen-contour-plus-g4-segment-fallback",
+  "scope": {
+    "initialJamos": ["ㄷ", "ㅁ", "ㅍ", "ㅎ"],
+    "medialJamos": ["ㅏ", "ㅗ", "ㅘ"],
+    "finalJamos": [null, "ㄱ"],
+    "characterCount": 24,
+    "elementCount": 64,
+    "tuningCharacterOverlap": 0
+  },
+  "metrics": {
+    "usableCandidateCount": 64,
+    "usableHighConfidenceCount": 58,
+    "usableMediumConfidenceCount": 6,
+    "simpleCandidateRate": 1.0,
+    "mixedCandidateRate": 1.0,
+    "highConfidenceWrongRoleCount": 0,
+    "invalidNumberCount": 0,
+    "roleContractViolationCount": 0,
+    "missingEvidenceCount": 0,
+    "abstainedReasonCounts": {}
+  },
+  "visualReview": {
+    "scope": "g4-v3-regression",
+    "representativeCharacters": ["퐉", "혹", "확"],
+    "finiteCandidateCount": 64,
+    "reviewedCandidateCount": 3,
+    "wrongRoleCount": 0,
+    "result": "targeted-pass",
+    "method": "live-font-guide-lab",
+    "reviewer": "codex-screen"
+  },
+  "fullP0Batch": {
+    "characterCount": 266,
+    "elementCount": 532,
+    "usableCandidateCount": 530,
+    "simpleCandidateRate": 0.9947,
+    "mixedCandidateRate": 1.0,
+    "invalidNumberCount": 0,
+    "roleContractViolationCount": 0,
+    "missingEvidenceCount": 0
+  },
+  "reproduction": {
+    "command": "python3 scripts/reference-lab/evaluate_medial_g2.py .reference-fonts/NotoSansKR.ttf --scope g2",
+    "g2FullReportSha256": "90481673dc15b0ac44d18d505e8b99d3fbdfd563f8f2c50f4ab466128062cab1",
+    "p0FullReportSha256": "10ac0d6cbd69851d7209f817e053cb6559c3f66a404767c6cbd34d5648b47842"
+  }
+}

@@ -1,0 +1,147 @@
+{
+  "schema": "medial-guide-p1-g2-v4-report-v1",
+  "version": 1,
+  "status": "invalidated-by-user-review",
+  "reviewedAt": "2026-09-14",
+  "productionEligible": false,
+  "userReviewed": false,
+  "extractorVersion": "geometric-role-matcher-v4",
+  "roleContractVersion": "medial-guide-role-v4",
+  "thresholdPolicy": "p1-v4-structure-family-selector",
+  "scope": {
+    "fontIds": ["noto-sans-kr", "nanum-gothic"],
+    "initialJamoCount": 19,
+    "medialJamos": ["ㅐ", "ㅑ", "ㅒ", "ㅔ", "ㅕ", "ㅖ", "ㅙ", "ㅚ", "ㅛ", "ㅝ", "ㅞ", "ㅟ", "ㅠ", "ㅢ"],
+    "finalJamos": [null, "ㄱ"],
+    "characterCount": 1064,
+    "elementCount": 3648
+  },
+  "fonts": [
+    {
+      "id": "noto-sans-kr",
+      "fileSha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252",
+      "characterCount": 532,
+      "elementCount": 1824,
+      "usableCandidateCount": 1797,
+      "usableHighConfidenceCount": 0,
+      "usableMediumConfidenceCount": 1797,
+      "simpleCandidateRate": 0.9818,
+      "mixedCandidateRate": 0.9892,
+      "matchingUnits": {
+        "axis-face-segment-group": 1569,
+        "structure-linked-local-tangent": 228
+      },
+      "abstainedReasonCounts": {
+        "no-role-match": 19,
+        "ambiguous-role-match": 8
+      },
+      "structureFamilyCandidateRates": {
+        "vertical-double-pillar-single-beam": 1.0,
+        "vertical-single-pillar-double-beam": 0.9825,
+        "vertical-double-pillar-double-beam": 1.0,
+        "horizontal-twin-stem": 0.9386,
+        "mixed-double-pillar": 0.9947,
+        "mixed-base-pillar": 0.9816,
+        "mixed-no-stem": 1.0
+      }
+    },
+    {
+      "id": "nanum-gothic",
+      "fileSha256": "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31",
+      "characterCount": 532,
+      "elementCount": 1824,
+      "usableCandidateCount": 1486,
+      "usableHighConfidenceCount": 0,
+      "usableMediumConfidenceCount": 1486,
+      "simpleCandidateRate": 0.9626,
+      "mixedCandidateRate": 0.64,
+      "matchingUnits": {
+        "axis-face-segment-group": 1486
+      },
+      "abstainedReasonCounts": {
+        "non-scalar-face": 228,
+        "no-role-match": 106,
+        "ambiguous-role-match": 4
+      },
+      "structureFamilyCandidateRates": {
+        "vertical-double-pillar-single-beam": 0.9956,
+        "vertical-single-pillar-double-beam": 0.9912,
+        "vertical-double-pillar-double-beam": 1.0,
+        "horizontal-twin-stem": 0.8509,
+        "mixed-double-pillar": 0.7237,
+        "mixed-base-pillar": 0.5842,
+        "mixed-no-stem": 0.5
+      },
+      "supportedStructureFamilyCandidateRates": {
+        "mixed-double-pillar": 0.9046,
+        "mixed-base-pillar": 0.8346,
+        "mixed-no-stem": 1.0
+      },
+      "unsupportedRolePolicy": {
+        "reasonCode": "non-scalar-face",
+        "role": "rounded mixed base beam",
+        "excludedElementCount": 228,
+        "rule": "No scalar candidate without at least 10 shared-coordinate units of flat local support."
+      }
+    }
+  ],
+  "combinedMetrics": {
+    "usableCandidateCount": 3283,
+    "usableHighConfidenceCount": 0,
+    "usableMediumConfidenceCount": 3283,
+    "candidateRate": 0.8999,
+    "simpleCandidateRate": 0.9722,
+    "mixedCandidateRate": 0.8146,
+    "wrongRoleCount": 1,
+    "invalidNumberCount": 0,
+    "roleContractViolationCount": 0,
+    "missingEvidenceCount": 0,
+    "structuralInvariantViolationCount": 0,
+    "unexpectedLocalTangentCount": 0,
+    "abstainedReasonCounts": {
+      "non-scalar-face": 228,
+      "no-role-match": 125,
+      "ambiguous-role-match": 12
+    },
+    "structureFamilyCandidateRates": {
+      "vertical-double-pillar-single-beam": 0.9978,
+      "vertical-single-pillar-double-beam": 0.9868,
+      "vertical-double-pillar-double-beam": 1.0,
+      "horizontal-twin-stem": 0.8947,
+      "mixed-double-pillar": 0.8592,
+      "mixed-base-pillar": 0.7829,
+      "mixed-no-stem": 0.75
+    }
+  },
+  "gateResult": {
+    "crashCount": 0,
+    "glyphMissingCount": 0,
+    "highConfidenceWrongRoleCount": 0,
+    "supportedStructureFamiliesBelowThreshold": [],
+    "result": "fail-role-contamination"
+  },
+  "visualReview": {
+    "scope": "all-p1-g2-medial-contact-sheets",
+    "reviewedSheetCount": 28,
+    "reviewedCharacterCount": 1064,
+    "reviewedCandidateCount": 3283,
+    "reviewedAbstentionCount": 365,
+    "wrongRoleCount": 1,
+    "result": "invalidated",
+    "method": "one-full-contact-sheet-per-font-and-medial",
+    "reviewer": "codex-screen"
+  },
+  "findings": [
+    "Historical v4 report invalidated after user review found Noto 표 primaryBeam on the initial ㅍ middle bar.",
+    "The previous contact-sheet claim of zero wrong roles is withdrawn; G2 must be rerun with directional attachment checks.",
+    "Nanum's 228 rounded mixed base beams are explicitly unsupported scalar faces, not failed supported-role matches.",
+    "After excluding only those declared curved faces, every structure family meets the 80 percent usable threshold on both fixed font SHAs.",
+    "All emitted values remain external-font observations and are not production design values."
+  ],
+  "reproduction": {
+    "notoCommand": "python3 scripts/reference-lab/evaluate_medial_p1.py .reference-fonts/NotoSansKR.ttf --scope p1 --json /private/tmp/noto-p1-g2.json --html-dir /private/tmp/noto-p1-g2-sheets",
+    "nanumCommand": "python3 scripts/reference-lab/evaluate_medial_p1.py .reference-fonts/NanumGothic-Regular.ttf --scope p1 --json /private/tmp/nanum-p1-g2.json --html-dir /private/tmp/nanum-p1-g2-sheets",
+    "notoFullReportSha256": "9796ba12fc5bc84f1bc6cf27e37dbed662e4bc04c47dcb9fd3c786565fa93971",
+    "nanumFullReportSha256": "63fbdd5ec750f49a91af97b6bf062f01f433782139749329faca87666f3f0844"
+  }
+}

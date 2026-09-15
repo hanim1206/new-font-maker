@@ -19,10 +19,16 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
 from fontTools.pens.boundsPen import BoundsPen
-from fontTools.pens.recordingPen import RecordingPen
+from fontTools.pens.recordingPen import DecomposingRecordingPen, RecordingPen
 from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
+
+import medial_guide_extractor
+import initial_component_contract
+import initial_component_extractor
+import final_component_contract
+import final_component_extractor
 
 
 API_VERSION = "reference.v1"
@@ -30,13 +36,74 @@ ERROR_SCHEMA = "reference-api-error-v1"
 MAX_BODY_BYTES = 64 * 1024
 MAX_CODEPOINTS = 12
 MAX_CATALOG_FONTS = 64
+MAX_MEDIAL_CASES = 12
+MAX_INITIAL_COMPONENT_CASES = 6
+MAX_FINAL_COMPONENT_CASES = 3
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_FONT_DIR = PROJECT_ROOT / ".reference-fonts"
 DEFAULT_CATALOG_PATH = PROJECT_ROOT / "reference-data/font-catalog.v1.json"
+FINAL_COMPONENT_DISPLAY_SCHEMA = "reference-final-component-display-response-v1"
+FINAL_COMPONENT_DISPLAY_INDEX_SCHEMA = "reference-final-component-display-index-v1"
+FINAL_COMPONENT_DISPLAY_SOURCES = {
+    "noto-sans-kr": {
+        "index": PROJECT_ROOT / "reference-data/font-guide-calibrations/noto-sans-kr.final-component-display-index.v1.json",
+        "verification": PROJECT_ROOT / "reference-data/font-guide-calibrations/noto-sans-kr.final-component-g2.verification.v1.json",
+    },
+    "nanum-gothic": {
+        "index": PROJECT_ROOT / "reference-data/font-guide-calibrations/nanum-gothic.final-component-display-index.v1.json",
+        "verification": PROJECT_ROOT / "reference-data/font-guide-calibrations/nanum-gothic.final-component-g2.verification.v1.json",
+    },
+    "dotum": {
+        "index": PROJECT_ROOT / "reference-data/font-guide-calibrations/dotum.final-component-display-index.v1.json",
+        "verification": PROJECT_ROOT / "reference-data/font-guide-calibrations/dotum.final-component-g3.verification.v1.json",
+    },
+}
 ALLOWED_ORIGINS = {
     "http://127.0.0.1:5173",
     "http://localhost:5173",
 }
+INITIAL_JAMOS = (
+    "ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ",
+    "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ",
+)
+MEDIAL_JAMOS = (
+    "ㅏ", "ㅐ", "ㅑ", "ㅒ", "ㅓ", "ㅔ", "ㅕ", "ㅖ", "ㅗ", "ㅘ", "ㅙ",
+    "ㅚ", "ㅛ", "ㅜ", "ㅝ", "ㅞ", "ㅟ", "ㅠ", "ㅡ", "ㅢ", "ㅣ",
+)
+FINAL_JAMOS = (
+    None, "ㄱ", "ㄲ", "ㄳ", "ㄴ", "ㄵ", "ㄶ", "ㄷ", "ㄹ", "ㄺ", "ㄻ",
+    "ㄼ", "ㄽ", "ㄾ", "ㄿ", "ㅀ", "ㅁ", "ㅂ", "ㅄ", "ㅅ", "ㅆ", "ㅇ",
+    "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ",
+)
+
+
+def _final_component_case_key(case: Dict[str, Any]) -> Tuple[str, str, str, str, str]:
+    return (
+        str(case["character"]),
+        str(case["initialJamo"]),
+        str(case["medialJamo"]),
+        str(case["finalJamo"]),
+        str(case["contextId"]),
+    )
+
+
+def _same_number_record(left: Dict[str, Any], right: Dict[str, Any]) -> bool:
+    return set(left) == set(right) and all(
+        isinstance(left[key], (int, float))
+        and isinstance(right[key], (int, float))
+        and float(left[key]) == float(right[key])
+        for key in left
+    )
+
+
+def _sha256_identity_cases(cases: List[Dict[str, Any]]) -> str:
+    canonical = json.dumps(
+        [case["identity"] for case in cases],
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
 
 
 class APIError(Exception):
@@ -132,6 +199,154 @@ def normalized_text(value: Any) -> str:
     return filtered
 
 
+def compose_syllable(initial_jamo: str, medial_jamo: str, final_jamo: Optional[str]) -> str:
+    try:
+        initial_index = INITIAL_JAMOS.index(initial_jamo)
+        medial_index = MEDIAL_JAMOS.index(medial_jamo)
+        final_index = FINAL_JAMOS.index(final_jamo)
+    except ValueError as error:
+        raise APIError(
+            400,
+            "INVALID_JAMO",
+            "현대 한글 초성·중성·종성 조합이어야 합니다.",
+        ) from error
+    return chr(0xAC00 + initial_index * 588 + medial_index * 28 + final_index)
+
+
+def validated_medial_cases(value: Any) -> List[Dict[str, Any]]:
+    if not isinstance(value, list) or not 1 <= len(value) <= MAX_MEDIAL_CASES:
+        raise APIError(
+            400,
+            "INVALID_MEDIAL_CASES",
+            "cases는 1..{}개 배열이어야 합니다.".format(MAX_MEDIAL_CASES),
+        )
+    validated: List[Dict[str, Any]] = []
+    seen = set()
+    required = {"character", "initialJamo", "medialJamo", "finalJamo"}
+    for index, case in enumerate(value):
+        if not isinstance(case, dict) or set(case) != required:
+            raise APIError(
+                400,
+                "INVALID_MEDIAL_CASE",
+                "각 case는 character·initialJamo·medialJamo·finalJamo만 가져야 합니다.",
+                {"index": index},
+            )
+        character = case["character"]
+        initial_jamo = case["initialJamo"]
+        medial_jamo = case["medialJamo"]
+        final_jamo = case["finalJamo"]
+        if not all(isinstance(item, str) for item in (character, initial_jamo, medial_jamo)):
+            raise APIError(400, "INVALID_MEDIAL_CASE", "case의 글자와 자모는 문자열이어야 합니다.", {"index": index})
+        if final_jamo is not None and not isinstance(final_jamo, str):
+            raise APIError(400, "INVALID_MEDIAL_CASE", "finalJamo는 null 또는 문자열이어야 합니다.", {"index": index})
+        if len(character) != 1 or character != compose_syllable(initial_jamo, medial_jamo, final_jamo):
+            raise APIError(
+                400,
+                "INVALID_SYLLABLE_CASE",
+                "character와 초성·중성·종성 조합이 일치하지 않습니다.",
+                {"index": index},
+            )
+        if character in seen:
+            raise APIError(400, "DUPLICATE_MEDIAL_CASE", "같은 완성 글자를 중복 요청할 수 없습니다.", {"index": index})
+        seen.add(character)
+        validated.append(dict(case))
+    return validated
+
+
+def validated_initial_component_cases(value: Any) -> List[Dict[str, Any]]:
+    if not isinstance(value, list) or not 1 <= len(value) <= MAX_INITIAL_COMPONENT_CASES:
+        raise APIError(
+            400,
+            "INVALID_INITIAL_COMPONENT_CASES",
+            "cases는 1..{}개 배열이어야 합니다.".format(MAX_INITIAL_COMPONENT_CASES),
+        )
+    validated: List[Dict[str, Any]] = []
+    seen = set()
+    required = {"character", "initialJamo", "medialJamo", "finalJamo", "contextId"}
+    contexts = {str(context["id"]): context for context in initial_component_contract.P0_CONTEXTS}
+    for index, case in enumerate(value):
+        if not isinstance(case, dict) or set(case) != required:
+            raise APIError(
+                400,
+                "INVALID_INITIAL_COMPONENT_CASE",
+                "각 case는 character·initialJamo·medialJamo·finalJamo·contextId만 가져야 합니다.",
+                {"index": index},
+            )
+        character = case["character"]
+        initial_jamo = case["initialJamo"]
+        medial_jamo = case["medialJamo"]
+        final_jamo = case["finalJamo"]
+        context_id = case["contextId"]
+        if not all(isinstance(item, str) for item in (character, initial_jamo, medial_jamo, context_id)):
+            raise APIError(400, "INVALID_INITIAL_COMPONENT_CASE", "case의 글자·자모·문맥은 문자열이어야 합니다.", {"index": index})
+        if final_jamo is not None and not isinstance(final_jamo, str):
+            raise APIError(400, "INVALID_INITIAL_COMPONENT_CASE", "finalJamo는 null 또는 문자열이어야 합니다.", {"index": index})
+        context = contexts.get(context_id)
+        try:
+            expected_character = initial_component_contract.compose_syllable(initial_jamo, medial_jamo, final_jamo)
+        except ValueError as error:
+            raise APIError(422, "P0_SCOPE_UNAVAILABLE", "현재 첫닿 P0는 ㅏ·ㅗ·ㅘ와 받침 없음/ㄱ만 계산합니다.", {"index": index}) from error
+        if (
+            len(character) != 1
+            or character != expected_character
+            or context is None
+            or context["medialJamo"] != medial_jamo
+            or context["finalJamo"] != final_jamo
+        ):
+            raise APIError(400, "INVALID_INITIAL_COMPONENT_IDENTITY", "character와 첫닿 P0 문맥 identity가 일치하지 않습니다.", {"index": index})
+        if character in seen:
+            raise APIError(400, "DUPLICATE_INITIAL_COMPONENT_CASE", "같은 완성 글자를 중복 요청할 수 없습니다.", {"index": index})
+        seen.add(character)
+        validated.append(dict(case))
+    return validated
+
+
+def validated_final_component_cases(value: Any) -> List[Dict[str, Any]]:
+    if not isinstance(value, list) or not 1 <= len(value) <= MAX_FINAL_COMPONENT_CASES:
+        raise APIError(
+            400,
+            "INVALID_FINAL_COMPONENT_CASES",
+            "cases는 1..{}개 배열이어야 합니다.".format(MAX_FINAL_COMPONENT_CASES),
+        )
+    validated: List[Dict[str, Any]] = []
+    seen = set()
+    required = {"character", "initialJamo", "medialJamo", "finalJamo", "contextId"}
+    contexts = {str(context["id"]): context for context in final_component_contract.P0_CONTEXTS}
+    for index, case in enumerate(value):
+        if not isinstance(case, dict) or set(case) != required:
+            raise APIError(
+                400,
+                "INVALID_FINAL_COMPONENT_CASE",
+                "각 case는 character·initialJamo·medialJamo·finalJamo·contextId만 가져야 합니다.",
+                {"index": index},
+            )
+        character = case["character"]
+        initial_jamo = case["initialJamo"]
+        medial_jamo = case["medialJamo"]
+        final_jamo = case["finalJamo"]
+        context_id = case["contextId"]
+        if not all(isinstance(item, str) for item in (character, initial_jamo, medial_jamo, final_jamo, context_id)):
+            raise APIError(400, "INVALID_FINAL_COMPONENT_CASE", "case의 글자·자모·문맥은 문자열이어야 합니다.", {"index": index})
+        context = contexts.get(context_id)
+        try:
+            expected_character = final_component_contract.compose_syllable(initial_jamo, medial_jamo, final_jamo)
+        except ValueError as error:
+            raise APIError(422, "P1_SCOPE_UNAVAILABLE", "현재 받침 P1은 ㅏ·ㅗ·ㅘ와 현대 받침 27종만 표시합니다.", {"index": index}) from error
+        if (
+            len(character) != 1
+            or character != expected_character
+            or context is None
+            or context["medialJamo"] != medial_jamo
+        ):
+            raise APIError(400, "INVALID_FINAL_COMPONENT_IDENTITY", "character와 받침 P1 identity가 일치하지 않습니다.", {"index": index})
+        key = _final_component_case_key(case)
+        if key in seen:
+            raise APIError(400, "DUPLICATE_FINAL_COMPONENT_CASE", "같은 받침 사례를 중복 요청할 수 없습니다.", {"index": index})
+        seen.add(key)
+        validated.append(dict(case))
+    return validated
+
+
 def load_catalog(path: Path) -> Dict[str, Any]:
     try:
         catalog = json.loads(path.read_text(encoding="utf-8"))
@@ -204,6 +419,10 @@ class ReferenceEngine:
         self._font_cache: Dict[str, Tuple[Tuple[int, int], TTFont]] = {}
         self._hash_cache: Dict[Path, Tuple[Tuple[int, int], str]] = {}
         self._glyph_cache: Dict[Tuple[str, int], Dict[str, Any]] = {}
+        self._medial_candidate_cache: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
+        self._initial_component_candidate_cache: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
+        self._final_component_index_cache: Dict[str, Tuple[Tuple[int, int, int, int], Dict[str, Any]]] = {}
+        self._final_component_display_cache: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
         self._lock = threading.RLock()
 
     @property
@@ -222,6 +441,10 @@ class ReferenceEngine:
         with self._lock:
             font_cache_size = len(self._font_cache)
             glyph_cache_size = len(self._glyph_cache)
+            medial_candidate_cache_size = len(self._medial_candidate_cache)
+            initial_component_candidate_cache_size = len(self._initial_component_candidate_cache)
+            final_component_index_cache_size = len(self._final_component_index_cache)
+            final_component_display_cache_size = len(self._final_component_display_cache)
         return {
             "schema": "reference-lab-health-v1",
             "apiVersion": API_VERSION,
@@ -231,6 +454,10 @@ class ReferenceEngine:
                 "diskWrites": False,
                 "fontCacheEntries": font_cache_size,
                 "glyphCacheEntries": glyph_cache_size,
+                "medialCandidateCacheEntries": medial_candidate_cache_size,
+                "initialComponentCandidateCacheEntries": initial_component_candidate_cache_size,
+                "finalComponentIndexCacheEntries": final_component_index_cache_size,
+                "finalComponentDisplayCacheEntries": final_component_display_cache_size,
             },
         }
 
@@ -320,6 +547,17 @@ class ReferenceEngine:
                 stale_keys = [key for key in self._glyph_cache if key[0] == font_id]
                 for key in stale_keys:
                     del self._glyph_cache[key]
+                stale_candidate_keys = [key for key in self._medial_candidate_cache if key[0] == font_id]
+                for key in stale_candidate_keys:
+                    del self._medial_candidate_cache[key]
+                stale_initial_keys = [key for key in self._initial_component_candidate_cache if key[0] == font_id]
+                for key in stale_initial_keys:
+                    del self._initial_component_candidate_cache[key]
+                self._final_component_display_cache = {
+                    key: value
+                    for key, value in self._final_component_display_cache.items()
+                    if key[0] != font_id
+                }
             self._font_cache[font_id] = (signature, font)
             return font
 
@@ -442,12 +680,361 @@ class ReferenceEngine:
             "samples": samples,
         }
 
+    def medial_guide_candidates_response(self, payload: Any) -> Dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise APIError(400, "INVALID_BODY", "요청 body는 JSON object여야 합니다.")
+        extra_keys = sorted(set(payload) - {"fontId", "cases"})
+        if extra_keys:
+            raise APIError(400, "UNKNOWN_FIELDS", "지원하지 않는 요청 필드가 있습니다.", {"fields": extra_keys})
+        font_id = payload.get("fontId")
+        if not isinstance(font_id, str) or font_id not in self.fonts_by_id:
+            raise APIError(400, "UNKNOWN_FONT_ID", "catalog에 없는 font id입니다.", {"fontId": font_id})
+        font_record = self.fonts_by_id[font_id]
+        if font_record["fileSha256"] != medial_guide_extractor.P0_VERIFIED_FONT_SHA256.get(font_id):
+            raise APIError(
+                422,
+                "P1_SCOPE_UNAVAILABLE",
+                "현재 P1 역할 탐색 범위는 검증된 Noto Sans KR·나눔고딕 파일입니다.",
+                {"fontId": font_id, "fileSha256": font_record["fileSha256"]},
+            )
+        cases = validated_medial_cases(payload.get("cases"))
+        unavailable = [
+            case["character"]
+            for case in cases
+            if case["medialJamo"] not in medial_guide_extractor.SUPPORTED_MEDIAL_JAMOS
+            or case["finalJamo"] not in medial_guide_extractor.P0_FINAL_JAMOS
+        ]
+        if unavailable:
+            raise APIError(
+                422,
+                "P1_SCOPE_UNAVAILABLE",
+                "현재 P1은 현대 홀자 21자와 받침 없음/ㄱ만 계산합니다.",
+                {"characters": unavailable},
+            )
+
+        font = self._verified_font(font_id)
+        results = []
+        for case in cases:
+            glyph = self._glyph(font_id, case["character"])
+            if glyph["missing"]:
+                results.append({**case, "status": "abstained", "reasonCode": "glyph-missing"})
+                continue
+            cache_key = (
+                font_id,
+                font_record["fileSha256"],
+                tuple(sorted(font_record["axes"].items())),
+                ord(case["character"]),
+                glyph["pathSha256"],
+                medial_guide_extractor.API_EXTRACTOR_VERSION,
+                medial_guide_extractor.API_ROLE_CONTRACT_VERSION,
+            )
+            with self._lock:
+                cached = self._medial_candidate_cache.get(cache_key)
+            if cached is None:
+                extracted = medial_guide_extractor.extract_medial_character(
+                    font,
+                    case["character"],
+                    case["medialJamo"],
+                    case["finalJamo"],
+                )
+                cached = {
+                    "status": "candidate",
+                    "glyphName": glyph["glyphName"],
+                    "pathSha256": glyph["pathSha256"],
+                    "elements": extracted["elements"],
+                }
+                with self._lock:
+                    self._medial_candidate_cache[cache_key] = cached
+            results.append({**case, **cached})
+
+        return {
+            "schema": "reference-medial-guide-candidate-response-v1",
+            "apiVersion": API_VERSION,
+            "extractorVersion": medial_guide_extractor.API_EXTRACTOR_VERSION,
+            "roleDefinitionVersion": medial_guide_extractor.API_ROLE_CONTRACT_VERSION,
+            "coordinateFrame": "shared-baseline",
+            "matching": "geometry-role-search",
+            "font": {
+                "id": font_id,
+                "fileSha256": font_record["fileSha256"],
+                "axes": dict(font_record["axes"]),
+            },
+            "cases": results,
+        }
+
+    def initial_component_candidates_response(self, payload: Any) -> Dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise APIError(400, "INVALID_BODY", "요청 body는 JSON object여야 합니다.")
+        extra_keys = sorted(set(payload) - {"fontId", "cases"})
+        if extra_keys:
+            raise APIError(400, "UNKNOWN_FIELDS", "지원하지 않는 요청 필드가 있습니다.", {"fields": extra_keys})
+        font_id = payload.get("fontId")
+        if not isinstance(font_id, str) or font_id not in self.fonts_by_id:
+            raise APIError(400, "UNKNOWN_FONT_ID", "catalog에 없는 font id입니다.", {"fontId": font_id})
+        font_record = self.fonts_by_id[font_id]
+        if font_record["fileSha256"] != initial_component_extractor.P0_VERIFIED_FONT_SHA256.get(font_id):
+            raise APIError(
+                422,
+                "P0_SCOPE_UNAVAILABLE",
+                "현재 첫닿 P0 범위는 검증된 Noto Sans KR·나눔고딕 파일입니다.",
+                {"fontId": font_id, "fileSha256": font_record["fileSha256"]},
+            )
+        cases = validated_initial_component_cases(payload.get("cases"))
+        font = self._verified_font(font_id)
+        results = []
+        for case in cases:
+            glyph = self._glyph(font_id, case["character"])
+            cache_key = (
+                font_id,
+                font_record["fileSha256"],
+                tuple(sorted(font_record["axes"].items())),
+                ord(case["character"]),
+                case["initialJamo"],
+                case["medialJamo"],
+                case["finalJamo"],
+                case["contextId"],
+                glyph.get("pathSha256", "glyph-missing"),
+                initial_component_contract.RESPONSE_SCHEMA,
+                initial_component_contract.EXTRACTOR_VERSION,
+                initial_component_contract.ROLE_DEFINITION_VERSION,
+                initial_component_contract.MEDIAL_ANCHOR_EXTRACTOR_VERSION,
+            )
+            with self._lock:
+                cached = self._initial_component_candidate_cache.get(cache_key)
+            if cached is None:
+                cached = initial_component_extractor.extract_initial_character(
+                    font,
+                    case["character"],
+                    case["initialJamo"],
+                    case["medialJamo"],
+                    case["finalJamo"],
+                    case["contextId"],
+                )
+                with self._lock:
+                    self._initial_component_candidate_cache[cache_key] = cached
+            results.append(dict(cached))
+        return initial_component_extractor.response_envelope(
+            font_id,
+            font_record["fileSha256"],
+            dict(font_record["axes"]),
+            results,
+        )
+
+    def _final_component_display_index(self, font_id: str) -> Dict[str, Any]:
+        source = FINAL_COMPONENT_DISPLAY_SOURCES.get(font_id)
+        if source is None:
+            raise APIError(
+                422,
+                "P1_SCOPE_UNAVAILABLE",
+                "현재 받침 P1 화면 범위는 검증된 Noto Sans KR·나눔고딕·돋움입니다.",
+                {"fontId": font_id},
+            )
+        index_path = source["index"]
+        verification_path = source["verification"]
+        try:
+            index_stat = index_path.stat()
+            verification_stat = verification_path.stat()
+            signature = (
+                index_stat.st_size,
+                index_stat.st_mtime_ns,
+                verification_stat.st_size,
+                verification_stat.st_mtime_ns,
+            )
+        except OSError as error:
+            raise APIError(500, "FINAL_COMPONENT_INDEX_MISSING", "검증된 받침 표시 index를 읽을 수 없습니다.", {"fontId": font_id}) from error
+        with self._lock:
+            cached = self._final_component_index_cache.get(font_id)
+            if cached is not None and cached[0] == signature:
+                return cached[1]
+        try:
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            verification = json.loads(verification_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise APIError(500, "FINAL_COMPONENT_INDEX_INVALID", "검증된 받침 표시 index 형식이 올바르지 않습니다.", {"fontId": font_id}) from error
+        if not isinstance(index, dict) or not isinstance(verification, dict):
+            raise APIError(500, "FINAL_COMPONENT_INDEX_INVALID", "검증된 받침 표시 index 형식이 올바르지 않습니다.", {"fontId": font_id})
+        if (
+            index.get("schema") != FINAL_COMPONENT_DISPLAY_INDEX_SCHEMA
+            or index.get("coordinateFrame") != final_component_contract.COORDINATE_FRAME
+            or index.get("extractorVersion") != final_component_contract.EXTRACTOR_VERSION
+            or index.get("roleDefinitionVersion") != final_component_contract.ROLE_DEFINITION_VERSION
+            or index.get("medialAnchorExtractorVersion") != final_component_contract.MEDIAL_ANCHOR_EXTRACTOR_VERSION
+        ):
+            raise APIError(500, "FINAL_COMPONENT_INDEX_INVALID", "받침 표시 index 계약이 현재 추출 계약과 다릅니다.", {"fontId": font_id})
+        if (
+            verification.get("schema") != final_component_contract.VERIFICATION_SCHEMA
+            or verification.get("state") != "verified"
+            or index.get("candidateArtifactSha256") != verification.get("candidateArtifactSha256")
+            or index.get("candidateIdentitySha256") != verification.get("candidateIdentitySha256")
+        ):
+            raise APIError(500, "FINAL_COMPONENT_VERIFICATION_REQUIRED", "사용자 화면 승인된 받침 fixture가 필요합니다.", {"fontId": font_id})
+        record = self.fonts_by_id[font_id]
+        index_font = index.get("font")
+        if (
+            not isinstance(index_font, dict)
+            or index_font.get("id") != font_id
+            or index_font.get("fileSha256") != record["fileSha256"]
+            or not isinstance(index_font.get("axes"), dict)
+            or not _same_number_record(index_font["axes"], record["axes"])
+        ):
+            raise APIError(500, "FINAL_COMPONENT_INDEX_INVALID", "받침 표시 index 폰트 identity가 catalog와 다릅니다.", {"fontId": font_id})
+        cases = index.get("cases")
+        if not isinstance(cases, list) or not cases:
+            raise APIError(500, "FINAL_COMPONENT_INDEX_INVALID", "받침 표시 index 사례가 필요합니다.", {"fontId": font_id})
+        if index.get("candidateIdentitySha256") != _sha256_identity_cases(cases):
+            raise APIError(500, "FINAL_COMPONENT_INDEX_INVALID", "받침 표시 index identity SHA가 다릅니다.", {"fontId": font_id})
+        cases_by_key: Dict[Tuple[str, str, str, str, str], Dict[str, Any]] = {}
+        for case in cases:
+            if not isinstance(case, dict) or not isinstance(case.get("identity"), dict):
+                raise APIError(500, "FINAL_COMPONENT_INDEX_INVALID", "받침 표시 index 사례 identity가 필요합니다.", {"fontId": font_id})
+            identity = case["identity"]
+            required = {"character", "initialJamo", "medialJamo", "finalJamo", "contextId"}
+            if not required.issubset(identity):
+                raise APIError(500, "FINAL_COMPONENT_INDEX_INVALID", "받침 표시 index 사례 identity가 불완전합니다.", {"fontId": font_id})
+            if identity.get("fontSha256") != record["fileSha256"] or not isinstance(identity.get("axes"), dict) or not _same_number_record(identity["axes"], record["axes"]):
+                raise APIError(500, "FINAL_COMPONENT_INDEX_INVALID", "받침 표시 index 사례 폰트 identity가 다릅니다.", {"fontId": font_id})
+            key = _final_component_case_key(identity)
+            if key in cases_by_key:
+                raise APIError(500, "FINAL_COMPONENT_INDEX_INVALID", "받침 표시 index 사례가 중복됩니다.", {"fontId": font_id})
+            cases_by_key[key] = case
+        value = {
+            "source": {
+                "candidateArtifactSha256": index["candidateArtifactSha256"],
+                "candidateIdentitySha256": index["candidateIdentitySha256"],
+                "verification": dict(index["verification"]),
+            },
+            "font": dict(index_font),
+            "casesByKey": cases_by_key,
+        }
+        with self._lock:
+            self._final_component_index_cache[font_id] = (signature, value)
+        return value
+
+    def _final_component_member_paths(
+        self,
+        font: TTFont,
+        candidate: Dict[str, Any],
+    ) -> List[Dict[str, str]]:
+        identity = candidate["identity"]
+        glyph_name = identity.get("glyphName")
+        if not isinstance(glyph_name, str) or not glyph_name:
+            raise APIError(500, "FINAL_COMPONENT_DISPLAY_INVALID", "받침 표시 후보 glyph identity가 없습니다.")
+        glyph_set = font.getGlyphSet()
+        recorder = DecomposingRecordingPen(glyph_set)
+        glyph_set[glyph_name].draw(recorder)
+        units_per_em = int(font["head"].unitsPerEm)
+        records = initial_component_extractor._contour_records(recorder.value, units_per_em)  # pylint: disable=protected-access
+        group = candidate.get("componentGroup")
+        if not isinstance(group, dict) or not isinstance(group.get("contourIds"), list) or not isinstance(group.get("selectedPathSha256"), str):
+            raise APIError(500, "FINAL_COMPONENT_DISPLAY_INVALID", "받침 표시 후보 contour provenance가 없습니다.")
+        group_ids = [int(contour_id) for contour_id in group["contourIds"]]
+        if not group_ids or len(set(group_ids)) != len(group_ids):
+            raise APIError(500, "FINAL_COMPONENT_DISPLAY_INVALID", "받침 표시 전체 contour provenance가 올바르지 않습니다.")
+        selection = final_component_extractor._selection_for_ids(  # pylint: disable=protected-access
+            group_ids,
+            records,
+            units_per_em,
+        )
+        if initial_component_extractor._selected_path_sha256(selection) != group["selectedPathSha256"]:  # pylint: disable=protected-access
+            raise APIError(422, "FINAL_COMPONENT_PATH_MISMATCH", "현재 글리프 윤곽이 검증된 받침 fixture와 다릅니다.")
+        members = candidate.get("members")
+        if not isinstance(members, list) or not members:
+            raise APIError(500, "FINAL_COMPONENT_DISPLAY_INVALID", "받침 표시 후보 구성원이 없습니다.")
+        member_ids = set()
+        member_contours = set()
+        member_contour_sequence: List[int] = []
+        paths: List[Dict[str, str]] = []
+        for member in members:
+            if not isinstance(member, dict) or not isinstance(member.get("id"), str) or not isinstance(member.get("contourIds"), list):
+                raise APIError(500, "FINAL_COMPONENT_DISPLAY_INVALID", "받침 표시 구성원 provenance가 없습니다.")
+            member_id = member["id"]
+            contour_ids = [int(contour_id) for contour_id in member["contourIds"]]
+            if member_id in member_ids or not contour_ids or len(set(contour_ids)) != len(contour_ids):
+                raise APIError(500, "FINAL_COMPONENT_DISPLAY_INVALID", "받침 표시 구성원 순서가 올바르지 않습니다.")
+            member_ids.add(member_id)
+            member_contours.update(contour_ids)
+            member_contour_sequence.extend(contour_ids)
+            member_selection = final_component_extractor._selection_for_ids(  # pylint: disable=protected-access
+                contour_ids,
+                records,
+                units_per_em,
+            )
+            paths.append({
+                "id": member_id,
+                "path": initial_component_extractor.selection_path_commands(member_selection),
+            })
+        if len(member_contour_sequence) != len(member_contours) or member_contours != set(group_ids):
+            raise APIError(500, "FINAL_COMPONENT_DISPLAY_INVALID", "받침 표시 구성원 contour 분할이 완전하지 않습니다.")
+        return paths
+
+    def final_component_display_response(self, payload: Any) -> Dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise APIError(400, "INVALID_BODY", "요청 body는 JSON object여야 합니다.")
+        extra_keys = sorted(set(payload) - {"fontId", "cases"})
+        if extra_keys:
+            raise APIError(400, "UNKNOWN_FIELDS", "지원하지 않는 요청 필드가 있습니다.", {"fields": extra_keys})
+        font_id = payload.get("fontId")
+        if not isinstance(font_id, str) or font_id not in self.fonts_by_id:
+            raise APIError(400, "UNKNOWN_FONT_ID", "catalog에 없는 font id입니다.", {"fontId": font_id})
+        cases = validated_final_component_cases(payload.get("cases"))
+        display_index = self._final_component_display_index(font_id)
+        font_record = self.fonts_by_id[font_id]
+        font = self._verified_font(font_id)
+        results: List[Dict[str, Any]] = []
+        for request_case in cases:
+            candidate = display_index["casesByKey"].get(_final_component_case_key(request_case))
+            if candidate is None:
+                raise APIError(422, "P1_SCOPE_UNAVAILABLE", "현재 선택은 검증된 받침 fixture 범위에 없습니다.", {"character": request_case["character"]})
+            identity = candidate["identity"]
+            if any(identity[key] != request_case[key] for key in request_case):
+                raise APIError(500, "FINAL_COMPONENT_INDEX_INVALID", "받침 표시 index 사례 identity가 요청과 다릅니다.", {"character": request_case["character"]})
+            glyph = self._glyph(font_id, request_case["character"])
+            if glyph["missing"] or glyph["glyphName"] != identity.get("glyphName") or glyph["pathSha256"] != identity.get("pathSha256"):
+                raise APIError(422, "FINAL_COMPONENT_PATH_MISMATCH", "현재 글리프 윤곽이 검증된 받침 fixture와 다릅니다.", {"character": request_case["character"]})
+            if candidate.get("state") == "abstained":
+                results.append(dict(candidate))
+                continue
+            cache_key = (
+                font_id,
+                font_record["fileSha256"],
+                tuple(sorted(font_record["axes"].items())),
+                request_case["character"],
+                glyph["pathSha256"],
+                display_index["source"]["candidateArtifactSha256"],
+            )
+            with self._lock:
+                cached = self._final_component_display_cache.get(cache_key)
+            if cached is None:
+                cached = {**candidate, "memberPaths": self._final_component_member_paths(font, candidate)}
+                with self._lock:
+                    self._final_component_display_cache[cache_key] = cached
+            results.append(dict(cached))
+        return {
+            "schema": FINAL_COMPONENT_DISPLAY_SCHEMA,
+            "apiVersion": API_VERSION,
+            "coordinateFrame": final_component_contract.COORDINATE_FRAME,
+            "extractorVersion": final_component_contract.EXTRACTOR_VERSION,
+            "roleDefinitionVersion": final_component_contract.ROLE_DEFINITION_VERSION,
+            "medialAnchorExtractorVersion": final_component_contract.MEDIAL_ANCHOR_EXTRACTOR_VERSION,
+            "source": display_index["source"],
+            "font": {
+                "id": font_id,
+                "fileSha256": font_record["fileSha256"],
+                "axes": dict(font_record["axes"]),
+            },
+            "cases": results,
+        }
+
     def close(self) -> None:
         with self._lock:
             for _, font in self._font_cache.values():
                 font.close()
             self._font_cache.clear()
             self._glyph_cache.clear()
+            self._medial_candidate_cache.clear()
+            self._initial_component_candidate_cache.clear()
+            self._final_component_index_cache.clear()
+            self._final_component_display_cache.clear()
 
 
 class ReferenceLabServer(ThreadingHTTPServer):
@@ -543,7 +1130,13 @@ class ReferenceRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         try:
-            if self._path() != "/api/reference/v1/outlines":
+            path = self._path()
+            if path not in {
+                "/api/reference/v1/outlines",
+                "/api/reference/v1/medial-guide-candidates",
+                "/api/reference/v1/initial-component-candidates",
+                "/api/reference/v1/final-component-display",
+            }:
                 raise APIError(404, "NOT_FOUND", "요청한 API endpoint가 없습니다.")
             content_type = self.headers.get("Content-Type", "")
             if content_type.split(";", 1)[0].strip().lower() != "application/json":
@@ -571,7 +1164,15 @@ class ReferenceRequestHandler(BaseHTTPRequestHandler):
                 payload = json.loads(body.decode("utf-8"))
             except (UnicodeDecodeError, json.JSONDecodeError) as error:
                 raise APIError(400, "INVALID_JSON", "올바른 UTF-8 JSON body가 필요합니다.") from error
-            self._send_json(200, self.engine.outlines_response(payload))
+            if path == "/api/reference/v1/outlines":
+                result = self.engine.outlines_response(payload)
+            elif path == "/api/reference/v1/medial-guide-candidates":
+                result = self.engine.medial_guide_candidates_response(payload)
+            elif path == "/api/reference/v1/initial-component-candidates":
+                result = self.engine.initial_component_candidates_response(payload)
+            else:
+                result = self.engine.final_component_display_response(payload)
+            self._send_json(200, result)
         except APIError as error:
             self._send_error(error)
         except Exception:
@@ -582,6 +1183,9 @@ class ReferenceRequestHandler(BaseHTTPRequestHandler):
             "/api/reference/v1/health",
             "/api/reference/v1/fonts",
             "/api/reference/v1/outlines",
+            "/api/reference/v1/medial-guide-candidates",
+            "/api/reference/v1/initial-component-candidates",
+            "/api/reference/v1/final-component-display",
         }:
             self._send_error(APIError(404, "NOT_FOUND", "요청한 API endpoint가 없습니다."))
             return

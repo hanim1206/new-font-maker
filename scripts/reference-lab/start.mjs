@@ -5,6 +5,7 @@ import path from 'node:path'
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const children = []
 let stopping = false
+const apiOnly = process.argv.includes('--api-only')
 
 function startProcess(command, args) {
   const child = spawn(command, args, {
@@ -25,16 +26,16 @@ function stop(exitCode) {
 }
 
 const python = startProcess('python3', ['scripts/reference-lab/server.py'])
-const vite = startProcess(process.execPath, [
-  'node_modules/vite/bin/vite.js',
-  '--host',
-  '127.0.0.1',
-  '--port',
-  '5173',
-  '--strictPort',
-])
+const vite = apiOnly ? null : startProcess(process.execPath, [
+    'node_modules/vite/bin/vite.js',
+    '--host',
+    '127.0.0.1',
+    '--port',
+    '5173',
+    '--strictPort',
+  ])
 
-for (const child of [python, vite]) {
+for (const child of [python, vite].filter(Boolean)) {
   child.on('error', (error) => {
     console.error(error)
     stop(1)

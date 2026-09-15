@@ -1,0 +1,72 @@
+{
+  "schema": "medial-guide-g4-holdout-report-v1",
+  "version": 1,
+  "status": "user-reviewed-diagnostic",
+  "reviewedAt": "2026-09-14",
+  "productionEligible": false,
+  "userReviewed": true,
+  "font": {
+    "id": "nanum-gothic",
+    "fileSha256": "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31"
+  },
+  "extractorVersion": "geometric-role-matcher-v3",
+  "thresholdPolicy": "g1-frozen-contour-plus-g4-segment-fallback",
+  "scope": {
+    "initialJamos": ["ㄷ", "ㅁ", "ㅍ", "ㅎ"],
+    "medialJamos": ["ㅏ", "ㅗ", "ㅘ"],
+    "finalJamos": [null, "ㄱ"],
+    "characterCount": 24,
+    "elementCount": 64,
+    "compositeCharacters": ["돡", "뫅", "퐉"]
+  },
+  "metrics": {
+    "usableCandidateCount": 60,
+    "usableHighConfidenceCount": 0,
+    "usableMediumConfidenceCount": 60,
+    "simpleCandidateRate": 1.0,
+    "mixedCandidateRate": 0.875,
+    "highConfidenceWrongRoleCount": 0,
+    "wrongRoleCount": 0,
+    "invalidNumberCount": 0,
+    "roleContractViolationCount": 0,
+    "missingEvidenceCount": 0,
+    "abstainedReasonCounts": {
+      "no-role-match": 4
+    }
+  },
+  "visualReview": {
+    "scope": "all-g4-risk-candidates",
+    "characters": [
+      "다", "닥", "도", "독", "돠", "돡",
+      "마", "막", "모", "목", "뫄", "뫅",
+      "파", "팍", "포", "폭", "퐈", "퐉",
+      "하", "학", "호", "혹", "화", "확"
+    ],
+    "reviewedCandidateCount": 60,
+    "reviewedAbstentionCount": 4,
+    "wrongRoleCount": 0,
+    "abstainedCharacters": ["돠", "뫄", "퐈", "화"],
+    "result": "agent-and-user-pass",
+    "method": "live-font-guide-lab",
+    "reviewer": "codex-screen+user"
+  },
+  "fullP0Batch": {
+    "characterCount": 266,
+    "elementCount": 532,
+    "compositeCaseCount": 16,
+    "usableCandidateCount": 475,
+    "usableHighConfidenceCount": 70,
+    "usableMediumConfidenceCount": 405,
+    "simpleCandidateRate": 0.9,
+    "mixedCandidateRate": 0.875,
+    "invalidNumberCount": 0,
+    "roleContractViolationCount": 0,
+    "missingEvidenceCount": 0
+  },
+  "reproduction": {
+    "riskCommand": "python3 scripts/reference-lab/evaluate_medial_g4.py .reference-fonts/NanumGothic-Regular.ttf --scope g4",
+    "fullCommand": "python3 scripts/reference-lab/evaluate_medial_g4.py .reference-fonts/NanumGothic-Regular.ttf --scope p0",
+    "riskFullReportSha256": "8f8ff7de1f1474698a045c757593b1bc71e106446fc186b625df19ad4a083d72",
+    "p0FullReportSha256": "fb5ba5d012cde8070181d381bfc64a7d6763ce26daa882d02cb32973ba3ec47a"
+  }
+}

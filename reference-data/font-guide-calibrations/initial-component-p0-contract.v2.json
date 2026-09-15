@@ -1,0 +1,149 @@
+{
+  "schema": "initial-component-p0-contract-v2",
+  "version": 2,
+  "responseSchema": "reference-initial-component-candidate-response-v2",
+  "extractorVersion": "initial-component-matcher-v3",
+  "roleDefinitionVersion": "initial-component-role-v2",
+  "medialAnchorExtractorVersion": "geometric-role-matcher-v9",
+  "coordinateFrame": "shared-baseline",
+  "groupingMethod": "medial-anchored-component-grouping-v1",
+  "boundMethod": "bezier-ink-extremum-v1",
+  "roleFaceMethod": "initial-structure-role-face-v2",
+  "selectionAreaMethod": "derived-four-role-faces-v2",
+  "selectionRules": [
+    "context-directed-contour-islands",
+    "context-directed-merged-boundary"
+  ],
+  "roleFaceSelectionRules": [
+    "component-ink-extremum",
+    "first-main-horizontal-endpoint",
+    "paired-first-main-horizontal-endpoint",
+    "body-main-horizontal-endpoint"
+  ],
+  "roleClasses": [
+    {
+      "id": "full-component",
+      "initialJamos": [
+        "ㄴ",
+        "ㅅ",
+        "ㅆ",
+        "ㅇ"
+      ],
+      "horizontalRule": "component-ink-extremum"
+    },
+    {
+      "id": "first-main-horizontal",
+      "initialJamos": [
+        "ㄱ",
+        "ㄷ",
+        "ㄹ",
+        "ㅁ",
+        "ㅂ",
+        "ㅈ",
+        "ㅋ",
+        "ㅌ",
+        "ㅍ"
+      ],
+      "horizontalRule": "first-main-horizontal-endpoint"
+    },
+    {
+      "id": "paired-first-main-horizontal",
+      "initialJamos": [
+        "ㄲ",
+        "ㄸ",
+        "ㅃ",
+        "ㅉ"
+      ],
+      "horizontalRule": "paired-first-main-horizontal-endpoint"
+    },
+    {
+      "id": "marked-body-horizontal",
+      "initialJamos": [
+        "ㅊ",
+        "ㅎ"
+      ],
+      "horizontalRule": "body-main-horizontal-endpoint"
+    }
+  ],
+  "initialJamos": [
+    "ㄱ",
+    "ㄲ",
+    "ㄴ",
+    "ㄷ",
+    "ㄸ",
+    "ㄹ",
+    "ㅁ",
+    "ㅂ",
+    "ㅃ",
+    "ㅅ",
+    "ㅆ",
+    "ㅇ",
+    "ㅈ",
+    "ㅉ",
+    "ㅊ",
+    "ㅋ",
+    "ㅌ",
+    "ㅍ",
+    "ㅎ"
+  ],
+  "boundSides": [
+    "top",
+    "bottom",
+    "left",
+    "right"
+  ],
+  "reasonCodes": [
+    "glyph-missing",
+    "medial-anchor-unavailable",
+    "ambiguous-component-group",
+    "merged-jamo-boundary",
+    "invalid-component-bounds",
+    "no-axis-face",
+    "role-face-unavailable",
+    "final-separation-unproven"
+  ],
+  "contexts": [
+    {
+      "id": "right",
+      "medialJamo": "ㅏ",
+      "finalJamo": null,
+      "scanOrigin": "medial-outer-pillar",
+      "scanDirection": "right-to-left"
+    },
+    {
+      "id": "right-final",
+      "medialJamo": "ㅏ",
+      "finalJamo": "ㄱ",
+      "scanOrigin": "medial-outer-pillar",
+      "scanDirection": "right-to-left-and-upper-cluster"
+    },
+    {
+      "id": "bottom",
+      "medialJamo": "ㅗ",
+      "finalJamo": null,
+      "scanOrigin": "medial-primary-beam",
+      "scanDirection": "bottom-to-top"
+    },
+    {
+      "id": "bottom-final",
+      "medialJamo": "ㅗ",
+      "finalJamo": "ㄱ",
+      "scanOrigin": "medial-primary-beam",
+      "scanDirection": "bottom-to-top"
+    },
+    {
+      "id": "mixed",
+      "medialJamo": "ㅘ",
+      "finalJamo": null,
+      "scanOrigin": "medial-base-beam-and-outer-pillar",
+      "scanDirection": "anchor-to-upper-left"
+    },
+    {
+      "id": "mixed-final",
+      "medialJamo": "ㅘ",
+      "finalJamo": "ㄱ",
+      "scanOrigin": "medial-base-beam-and-outer-pillar",
+      "scanDirection": "anchor-to-upper-left"
+    }
+  ]
+}
