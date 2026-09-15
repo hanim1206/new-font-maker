@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { allCorpusRows, CORPUS_INITIALS, CORPUS_MEDIALS, CORPUS_FINALS, corpusProgress, corpusRecordingPath, hasRejection, isCompleteCandidate, isReviewed, parseCorpusReviews, PART_STAGES, REVIEW_STORAGE_KEY, reviewFor, STAGE_LABEL, STATUS_LABEL } from './notoCorpus'
+import { allCorpusRows, CORPUS_TOTAL, corpusCodepoint, corpusIdentity, corpusProgress, corpusRecordingPath, hasRejection, isCompleteCandidate, isReviewed, parseCorpusReviews, PART_STAGES, REVIEW_STORAGE_KEY, reviewFor, STAGE_LABEL, STATUS_LABEL } from './notoCorpus'
 import type { ComponentMeasurement, CorpusDetail, CorpusReviews, CorpusRow, CorpusSnapshot, MedialMeasurement, PartStage, RawCorpusOutline } from './notoCorpus'
 import styles from './NotoCorpusLabPage.module.css'
+import { NotoCorpusMatrix } from './NotoCorpusMatrix'
 import { NotoPresetInspector } from './NotoPresetInspector'
 import { notoConflictingParts } from './notoRoleIntegrity'
 
-const PAGE_SIZE = 48
 const PART_COLOR = { initial: '#db6228', medial: '#2472bc', final: '#238370' }
 const REASON_LABEL: Record<string, string> = { 'context-contract-not-expanded': '실제 문맥 추출 계약이 아직 확장되지 않았습니다.', 'no-role-match': '역할에 맞는 외곽면을 찾지 못했습니다.', 'incomplete-required-medial-roles': '필수 홀자 역할이 일부 빠져 있습니다.', 'no-axis-face': '일부 보조 축평행 면이 없습니다. 필수 역할면 상태와 구분합니다.', 'extractor-error': '추출 중 실행 오류가 발생했습니다.', 'medial-anchor-role-conflict': '홀자 후보와 첫닿자 구조의 역할이 충돌합니다. 기준선 맞음 승인을 차단했습니다.', 'final-separation-unproven': '첫닿자와 받침의 분리 증명이 부족해 자동 포기했습니다. 임의 절단으로 채우지 않습니다.' }
 const number = (value: number) => value.toLocaleString('ko-KR')
@@ -54,12 +54,8 @@ export function NotoCorpusLabPage() {
   const [error, setError] = useState('')
   const [refresh, setRefresh] = useState(0)
   const [scope, setScope] = useState('all')
-  const [filter, setFilter] = useState('processed')
-  const [initial, setInitial] = useState('')
-  const [medial, setMedial] = useState('')
-  const [final, setFinal] = useState('')
+  const [filter, setFilter] = useState('all')
   const [query, setQuery] = useState('')
-  const [page, setPage] = useState(0)
   const [selected, setSelected] = useState(0xac00)
   const [detail, setDetail] = useState<CorpusDetail | null>(null)
   const [detailError, setDetailError] = useState('')
@@ -97,9 +93,8 @@ export function NotoCorpusLabPage() {
   const overall = useMemo(() => corpusProgress(allRows, reviewState.entries), [allRows, reviewState.entries])
   const scoped = useMemo(() => scope === 'no-final' ? allRows.filter((row) => row.identity.finalJamo === null) : allRows, [allRows, scope])
   const progress = useMemo(() => corpusProgress(scoped, reviewState.entries), [scoped, reviewState.entries])
-  const filtered = useMemo(() => scoped.filter((row) => {
-    const identity = row.identity
-    if (initial && identity.initialJamo !== initial || medial && identity.medialJamo !== medial || final && (final === 'none' ? identity.finalJamo !== null : identity.finalJamo !== final) || query.trim() && !query.includes(identity.character)) return false
+  // 격자에서는 조건에 맞지 않는 칸을 숨기지 않고 흐리게만 한다.
+  const matchesFilter = (row: CorpusRow) => {
     if (filter === 'processed') return row.stages.outline.status !== 'unprocessed'
     if (filter === 'candidate') return isCompleteCandidate(row) && !isReviewed(row, reviewState.entries)
     if (filter === 'missing') return Object.values(row.stages).some((stage) => ['partial', 'abstained', 'blocked', 'error'].includes(stage.status))
@@ -108,13 +103,19 @@ export function NotoCorpusLabPage() {
     if (filter === 'reviewed') return isReviewed(row, reviewState.entries)
     if (filter === 'rejected') return hasRejection(row, reviewState.entries)
     return true
-  }), [scoped, initial, medial, final, query, filter, reviewState.entries])
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const currentPage = Math.min(page, pageCount - 1)
-  const shown = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE)
+  }
+  const searchHits = useMemo(() => [...new Set(query)].map((character) => character.codePointAt(0) ?? 0).filter((codepoint) => codepoint >= 0xac00 && codepoint < 0xac00 + CORPUS_TOTAL).slice(0, 48), [query])
   const selectedRow = allRows.find((row) => row.identity.codepoint === selected)
   const visible = Object.fromEntries(PART_STAGES.map((stage) => [stage, showGuides && parts[stage]])) as Record<PartStage, boolean>
-  const changeFilter = (setter: (value: string) => void, value: string) => { setter(value); setPage(0) }
+  const selectCharacter = (codepoint: number) => {
+    if (scope === 'no-final' && corpusIdentity(codepoint).finalJamo !== null) setScope('all')
+    setSelected(codepoint)
+  }
+  const showNoFinal = () => {
+    const identity = corpusIdentity(selected)
+    setScope('no-final')
+    setSelected(corpusCodepoint(identity.initialJamo, identity.medialJamo, null))
+  }
 
   const saveReview = (stage: PartStage, verdict: 'approved' | 'rejected' | null) => {
     if (!detail || detail.identity.codepoint !== selected) return
@@ -133,7 +134,7 @@ export function NotoCorpusLabPage() {
     <header className={styles.hero}><div><span className={styles.eyebrow}>NOTO SANS KR · 추출에서 프리셋까지</span><h1>얼마나 뽑았고,<br />어디까지 확인했나.</h1><p>자동 추출 후보와 사람이 확인한 기준선은 다릅니다.<br />글자 상세 아래에서 승인 입력 57자의 마스터와 기준선 편집을 비교할 수 있습니다.</p></div><nav><a href="/font-guide-lab?font=noto-sans-kr">기준선 조율 랩</a><a href="/preset-candidate-lab">기존 프리셋 비교 실험</a><button type="button" onClick={() => setRefresh((value) => value + 1)}>최신 집계 다시 읽기</button></nav></header>
     {error && <p role="alert" className={styles.alert}>{error}</p>}
     {!snapshot ? <p className={styles.notice}>로컬 추출 보고서를 읽는 중입니다.</p> : <>
-      <section className={styles.scopeBar}><div><strong>분모 선택</strong><button type="button" aria-pressed={scope === 'all'} onClick={() => { setScope('all'); setPage(0) }}>현대 한글 전체 11,172자</button><button type="button" aria-pressed={scope === 'no-final'} onClick={() => { setScope('no-final'); setFinal(''); setPage(0) }}>무받침 399자</button></div><small>보고서 시각 {new Date(snapshot.updatedAt).toLocaleString('ko-KR')}</small></section>
+      <section className={styles.scopeBar}><div><strong>분모 선택</strong><button type="button" aria-pressed={scope === 'all'} onClick={() => setScope('all')}>현대 한글 전체 11,172자</button><button type="button" aria-pressed={scope === 'no-final'} onClick={showNoFinal}>무받침 399자</button></div><small>보고서 시각 {new Date(snapshot.updatedAt).toLocaleString('ko-KR')}</small></section>
       <div className={styles.metrics}>
         <Metric title="추출 시도" value={progress.attempted} total={progress.total} description="배치가 처리한 글자" />
         <Metric title="필수 역할 후보" value={progress.complete} total={progress.total} description="모든 자모 필수값 확보 · 정확도 승인 아님" />
@@ -155,17 +156,12 @@ export function NotoCorpusLabPage() {
         </ol>
       </section>
       <div className={styles.workspace}>
-        <section className={styles.browser} aria-label="전체 글자 탐색"><header><h2>글자별 범위</h2><p>실패·누락부터 확인하고, 후보를 검수하세요.</p></header><div className={styles.filters}>
-          <label>상태<select value={filter} onChange={(event) => changeFilter(setFilter, event.target.value)}><option value="processed">추출 시도한 글자</option><option value="candidate">필수값 후보 · 검수 대기</option><option value="missing">누락·자동 포기·오류</option><option value="unsupported">문맥 미지원</option><option value="unprocessed">아직 미추출</option><option value="reviewed">내 검수 완료</option><option value="rejected">문제 표시한 글자</option><option value="all">전체</option></select></label>
-          <label>첫닿자<select value={initial} onChange={(event) => changeFilter(setInitial, event.target.value)}><option value="">전체</option>{CORPUS_INITIALS.map((value) => <option key={value}>{value}</option>)}</select></label>
-          <label>홀자<select value={medial} onChange={(event) => changeFilter(setMedial, event.target.value)}><option value="">전체</option>{CORPUS_MEDIALS.map((value) => <option key={value}>{value}</option>)}</select></label>
-          <label>받침<select value={final} disabled={scope === 'no-final'} onChange={(event) => changeFilter(setFinal, event.target.value)}><option value="">전체</option><option value="none">없음</option>{CORPUS_FINALS.filter((value): value is string => value !== null).map((value) => <option key={value}>{value}</option>)}</select></label>
-          <label className={styles.search}>글자 검색<input placeholder="예: 가고과너" value={query} onChange={(event) => changeFilter(setQuery, event.target.value)} /></label>
-        </div><div className={styles.listCount}><strong>{number(filtered.length)}자</strong><span>한 번에 최대 {PAGE_SIZE}자 · 표시는 탐색용 글자 이름</span></div>
-          <div className={styles.glyphGrid}>{shown.map((row: CorpusRow) => {
-            const label = hasRejection(row, reviewState.entries) ? '문제 표시' : isReviewed(row, reviewState.entries) ? '내 검수 완료' : isCompleteCandidate(row) ? '필수값 후보' : row.stages.outline.status === 'unprocessed' ? '미추출' : '입력 미완료'
-            return <button key={row.identity.codepoint} type="button" aria-label={`${row.identity.character} · ${label}`} aria-pressed={row.identity.codepoint === selected} data-testid="corpus-character" data-complete={isCompleteCandidate(row)} onClick={() => setSelected(row.identity.codepoint)}><strong>{row.identity.character}</strong><small>{label}</small></button>
-          })}</div>{!shown.length && <p className={styles.notice}>이 조건에 해당하는 글자가 없습니다.</p>}<div className={styles.pagination}><button type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>이전</button><span>{currentPage + 1} / {pageCount}</span><button type="button" disabled={currentPage + 1 >= pageCount} onClick={() => setPage(currentPage + 1)}>다음</button></div>
+        <section className={styles.browser} aria-label="전체 글자 탐색"><header><h2>글자 격자</h2><p>시트를 고르고 문제 칸이 몰린 줄부터 확인하세요. 상태 강조는 칸을 숨기지 않고 흐리게만 합니다.</p></header><div className={styles.filters}>
+          <label>상태 강조<select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">전체 보기</option><option value="processed">추출 시도한 글자</option><option value="candidate">필수값 후보 · 검수 대기</option><option value="missing">누락·자동 포기·오류</option><option value="unsupported">문맥 미지원</option><option value="unprocessed">아직 미추출</option><option value="reviewed">내 검수 완료</option><option value="rejected">문제 표시한 글자</option></select></label>
+          <label className={styles.search}>글자 검색<input placeholder="예: 가고과너" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+        </div>
+          {searchHits.length > 0 && <div className={styles.searchHits} aria-label="검색한 글자">{searchHits.map((codepoint) => <button key={codepoint} type="button" data-testid="corpus-character" aria-pressed={codepoint === selected} onClick={() => selectCharacter(codepoint)}>{String.fromCodePoint(codepoint)}</button>)}</div>}
+          <NotoCorpusMatrix rows={allRows} reviews={reviewState.entries} selected={selected} onSelect={selectCharacter} isHighlighted={matchesFilter} noFinal={scope === 'no-final'} />
         </section>
         <section className={styles.inspector} aria-label="선택 글자 검수" data-testid="corpus-inspector"><header><div><span className={styles.eyebrow}>실제 원본과 관측</span><h2>{selectedRow?.identity.character ?? '가'} <small>{selectedRow ? `${selectedRow.identity.initialJamo} + ${selectedRow.identity.medialJamo} · ${selectedRow.identity.finalJamo ?? '무받침'}` : ''}</small></h2></div><button type="button" onClick={() => setShowGuides((value) => !value)} aria-pressed={showGuides}>{showGuides ? '기준선 숨기기' : '기준선 보이기'}</button></header>
           <div className={styles.legend}>{PART_STAGES.map((stage) => <label key={stage} style={{ color: PART_COLOR[stage] }}><input type="checkbox" checked={parts[stage]} onChange={(event) => setParts((current) => ({ ...current, [stage]: event.target.checked }))} />{STAGE_LABEL[stage]}</label>)}</div>

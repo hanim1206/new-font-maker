@@ -56,6 +56,12 @@ export function corpusIdentity(codepoint: number): CorpusIdentity {
   return { codepoint, character: String.fromCodePoint(codepoint), initialJamo: CORPUS_INITIALS[Math.floor(offset / 588)], medialJamo, finalJamo, contextId: family + (finalJamo ? '-final' : '') }
 }
 
+export function corpusCodepoint(initial: string, medial: string, final: string | null): number {
+  const [i, m, f] = [CORPUS_INITIALS.indexOf(initial), CORPUS_MEDIALS.indexOf(medial), CORPUS_FINALS.indexOf(final)]
+  if (i < 0 || m < 0 || f < 0) throw new Error('현대 한글 자모 조합이 아닙니다.')
+  return 0xac00 + (i * 21 + m) * 28 + f
+}
+
 export function emptyCorpusRow(codepoint: number): CorpusRow {
   const identity = corpusIdentity(codepoint)
   const pending: CorpusStageSummary = { status: 'unprocessed', reasonCodes: [] }
@@ -75,6 +81,24 @@ export function reviewFor(row: CorpusRow, stage: PartStage, reviews: CorpusRevie
 }
 export function isReviewed(row: CorpusRow, reviews: CorpusReviews): boolean { return isCompleteCandidate(row) && requiredParts(row).every((stage) => reviewFor(row, stage, reviews)?.verdict === 'approved') }
 export function hasRejection(row: CorpusRow, reviews: CorpusReviews): boolean { return requiredParts(row).some((stage) => reviewFor(row, stage, reviews)?.verdict === 'rejected') }
+
+// 격자 칸 하나의 대표 상태. 검수 판정이 추출 상태보다 우선한다.
+export type CorpusCellStatus = 'reviewed' | 'candidate' | 'missing' | 'unsupported' | 'rejected' | 'unprocessed'
+export const CELL_STATUS_LABEL: Record<CorpusCellStatus, string> = { reviewed: '내 검수 완료', candidate: '필수값 후보', missing: '누락·포기·오류', unsupported: '문맥 미지원', rejected: '문제 표시', unprocessed: '미추출' }
+export function corpusCellStatus(row: CorpusRow, reviews: CorpusReviews): CorpusCellStatus {
+  if (hasRejection(row, reviews)) return 'rejected'
+  if (isReviewed(row, reviews)) return 'reviewed'
+  if (isCompleteCandidate(row)) return 'candidate'
+  if (row.stages.outline.status === 'unprocessed') return 'unprocessed'
+  return requiredParts(row).some((stage) => row.stages[stage].status === 'unsupported') ? 'unsupported' : 'missing'
+}
+export function corpusPartStatus(row: CorpusRow, stage: PartStage, reviews: CorpusReviews): CorpusCellStatus | 'not-applicable' {
+  const status = row.stages[stage].status
+  if (status === 'not-applicable') return status
+  const verdict = reviewFor(row, stage, reviews)?.verdict
+  if (verdict) return verdict === 'approved' ? 'reviewed' : 'rejected'
+  return status === 'candidate' || status === 'unsupported' || status === 'unprocessed' ? status : 'missing'
+}
 
 export function corpusProgress(rows: CorpusRow[], reviews: CorpusReviews) {
   return {
