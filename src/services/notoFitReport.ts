@@ -5,6 +5,7 @@ import { partForJamoRole } from './jamoContextRoles'
 import { fitNotoMedialMaster } from './notoMedialMasterFit'
 import type { MedialFitInput, MedialFitResult } from './notoMedialMasterFit'
 import { notoOutlineToInkRegions } from './notoOutlineInk'
+import { medialRoleGeometry } from './notoVariationModel'
 import type { NotoOutline } from './notoOutlineInk'
 import { resolveShapeGlyphInkPrimitives } from './shapeGlyphInkResolver'
 
@@ -69,38 +70,67 @@ function unionOf(regions: readonly DeepReadonly<InkRegion>[]): MultiPolygon {
 
 /** 측정 face와 fit 중심선을 같은 자리로 되돌려 비교한다. 직접 fit이면 0, 모델 예측 rail이면 예측 오차가 된다. */
 export function railErrorsOf(fit: MedialFitResult, measurements: MedialFitInput['measurements']): RailError[] {
-  return fit.strokes.map((stroke) => {
+  return fit.strokes.flatMap((stroke) => {
     const m = measurements[stroke.roleId]
+    if (!m) return []
     const inward = stroke.orientation === 'vertical' ? (m.faceSide === 'right' ? -1 : 1) : (m.faceSide === 'top' ? 1 : -1)
     const fitted = stroke.center - inward * stroke.thickness / 2
-    return { roleId: stroke.roleId, measured: m.face, fitted, errorUnits: (fitted - m.face) * 1000 }
+    return [{ roleId: stroke.roleId, measured: m.face, fitted, errorUnits: (fitted - m.face) * 1000 }]
   })
 }
 
-export function reportMedialFit(input: MedialFitInput & { ghostOutline: DeepReadonly<NotoOutline>; weightMultiplier?: number }): MedialFitReport {
+/**
+ * 변화량 모델 예측(face·spanFrom·spanTo, 1000u)에서 fit 입력을 만든다.
+ * 역할 기하(방향·면)는 corpus 상수, 두께는 자모별 대표값을 호출자가 준다.
+ */
+export function medialInputFromPrediction(input: {
+  jamoId: string
+  role: MedialFitInput['role']
+  roleIds: readonly string[]
+  predicted: (target: string) => number | null
+  thickness: Readonly<Record<string, number>>
+}): { ok: true; input: MedialFitInput } | { ok: false; message: string } {
+  const measurements: Record<string, MedialFitInput['measurements'][string]> = {}
+  for (const roleId of input.roleIds) {
+    const face = input.predicted(`medial.${roleId}.face`)
+    const from = input.predicted(`medial.${roleId}.spanFrom`)
+    const to = input.predicted(`medial.${roleId}.spanTo`)
+    if (face === null || from === null || to === null) return { ok: false, message: `${roleId}: 이 문맥의 face·span 예측이 없습니다.` }
+    measurements[roleId] = { ...medialRoleGeometry(roleId), face: face / 1000, visibleSpans: [{ from: from / 1000, to: to / 1000 }] }
+  }
+  return { ok: true, input: { jamoId: input.jamoId, role: input.role, measurements, thickness: input.thickness } }
+}
+
+export function reportMedialFit(input: MedialFitInput & {
+  ghostOutline: DeepReadonly<NotoOutline>
+  weightMultiplier?: number
+  /** rail 오차를 잴 기준 측정. 없으면 fit 입력 자신(직접 fit이면 0). 모델 예측으로 fit할 때 실측을 넣는다. */
+  referenceMeasurements?: MedialFitInput['measurements']
+}): MedialFitReport {
   const base = { jamoId: input.jamoId, role: input.role }
   const outcome = fitNotoMedialMaster(input)
   if (!outcome.ok) return { ...base, ok: false, message: outcome.message, railErrors: [] }
   const { fit } = outcome
+  const reference = input.referenceMeasurements ?? input.measurements
   const primitives = resolveShapeGlyphInkPrimitives({
     source: fit.scope, masterId: fit.master.id, glyphId: `fit:${input.jamoId}`,
     part: partForJamoRole(input.role), slot: fit.slot, weightMultiplier: input.weightMultiplier ?? 1,
   })
-  if (!primitives.ok) return { ...base, ok: false, message: primitives.issues[0]?.message ?? '마스터를 해석할 수 없습니다.', railErrors: railErrorsOf(fit, input.measurements), slot: fit.slot }
+  if (!primitives.ok) return { ...base, ok: false, message: primitives.issues[0]?.message ?? '마스터를 해석할 수 없습니다.', railErrors: railErrorsOf(fit, reference), slot: fit.slot }
   const ink = materializeFinalGlyphInk(primitives.primitives, FIT_INK_STYLE, INK_OPTIONS)
-  if (!ink.ok) return { ...base, ok: false, message: ink.message, railErrors: railErrorsOf(fit, input.measurements), slot: fit.slot }
+  if (!ink.ok) return { ...base, ok: false, message: ink.message, railErrors: railErrorsOf(fit, reference), slot: fit.slot }
   const ghost = notoOutlineToInkRegions(input.ghostOutline)
-  if (!ghost.ok) return { ...base, ok: false, message: ghost.message, railErrors: railErrorsOf(fit, input.measurements), slot: fit.slot }
+  if (!ghost.ok) return { ...base, ok: false, message: ghost.message, railErrors: railErrorsOf(fit, reference), slot: fit.slot }
   const mine = unionOf(ink.ink.regions)
   const theirs = unionOf(ghost.regions)
   const ghostArea = multiPolygonArea(theirs)
-  if (ghostArea <= 0) return { ...base, ok: false, message: 'Noto 고스트 면적이 0입니다.', railErrors: railErrorsOf(fit, input.measurements), slot: fit.slot }
+  if (ghostArea <= 0) return { ...base, ok: false, message: 'Noto 고스트 면적이 0입니다.', railErrors: railErrorsOf(fit, reference), slot: fit.slot }
   const xor = polygonClipping.xor(mine, theirs)
   return {
     ...base, ok: true,
     xorRatio: multiPolygonArea(xor) / ghostArea,
     inkRatio: multiPolygonArea(mine) / ghostArea,
-    railErrors: railErrorsOf(fit, input.measurements),
+    railErrors: railErrorsOf(fit, reference),
     slot: fit.slot,
   }
 }

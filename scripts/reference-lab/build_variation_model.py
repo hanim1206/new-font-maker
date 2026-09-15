@@ -81,6 +81,11 @@ def collect_targets(row: Dict[str, Any]) -> Dict[str, float]:
         for role_id, value in medial["measurements"].items():
             values[f"medial.{role_id}.face"] = value["face"] * SCALE
             values[f"medial.{role_id}.visibleLength"] = value["visibleLength"] * SCALE
+            # 획 마스터 fit은 길이만으로는 획을 못 놓는다. 가시 구간의 양끝(시작·끝 위치)도 타깃으로 둔다.
+            spans = value.get("visibleSpans") or []
+            if spans:
+                values[f"medial.{role_id}.spanFrom"] = min(span["from"] for span in spans) * SCALE
+                values[f"medial.{role_id}.spanTo"] = max(span["to"] for span in spans) * SCALE
     return values
 
 

@@ -4,15 +4,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import { CORPUS_STAGES, corpusIdentity, emptyCorpusRow } from '../../src-next/notoCorpus'
 import type { CorpusDetail, CorpusFont, CorpusIdentity, CorpusModelPrediction, CorpusPayload, CorpusRow, CorpusSnapshot, CorpusStage, MedialMeasurement, PartStage } from '../../src-next/notoCorpus'
+import { NOTO_MODEL_SCHEMAS, predictNotoTarget } from '../../src/services/notoVariationModel'
+import type { VariationModel } from '../../src/services/notoVariationModel'
 
 interface Manifest { schema: string; font: CorpusFont; stageKeys: Record<CorpusStage, string> }
 interface ReportRow extends CorpusRow { stages: Record<CorpusStage, CorpusRow['stages'][CorpusStage] & { artifact: string }> }
 interface Report { stageKeys: Record<CorpusStage, string>; font: CorpusFont; cases: ReportRow[]; medialVariationFromGiyeok?: { character: string; baselineCharacter: string; roleId: string }[] }
-interface InteractionCell { cell: [string, string]; term: number }
-interface Interaction { applied: boolean; pair: string; cells: InteractionCell[] }
-interface VariationLayer { representative: number; effects: Record<'initial' | 'medial' | 'final', Record<string, number>>; defaultThreshold: number; confidence: 'low' | 'normal'; interaction?: Interaction }
-interface VariationModel { schema: string; stageKeys: Record<CorpusStage, string>; targets: Record<string, { layers: Record<string, VariationLayer> }> }
-const MODEL_SCHEMAS = new Set(['noto-variation-model-v1', 'noto-variation-model-v2'])
+const MODEL_SCHEMAS = new Set<string>(NOTO_MODEL_SCHEMAS)
 interface Loaded { root: string; manifest: Manifest; snapshot: CorpusSnapshot; rows: Map<number, ReportRow> }
 const API = '/api/noto-corpus'
 const HEX = /^[a-f0-9]{64}$/
@@ -20,7 +18,6 @@ const NOTO_SHA = '194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e2
 const APPROVED_INPUTS_FILE = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../reference-data/preset-candidates/noto-approved-guide-inputs.v1.json')
 // 변화량 모델이 예측하는 역할면 타깃. read는 실측값과 오버레이에 그릴 방향(orientation)을 함께 준다.
 // 닿자 면은 방향이 고정이고, 홀자 획은 글자마다 측정에 실린 방향을 그대로 쓴다.
-const MODEL_NO_FINAL = '∅'
 type Reading = { value: number; orientation: 'vertical' | 'horizontal' }
 const readFace = (side: string, orientation: 'vertical' | 'horizontal') => (m: Record<string, unknown>): Reading | null => {
   const face = (m.roleFaces as Record<string, number> | undefined)?.[side]
@@ -52,39 +49,21 @@ const MODELED_TARGETS: { target: string; stage: PartStage; drawable: boolean; re
   { target: 'medial.lowerBeam.visibleLength', stage: 'medial', drawable: false, read: readMedial('lowerBeam', 'visibleLength') },
 ]
 
-// 자모쌍 셀 보정항: v2 층의 interaction이 이 글자 자모쌍에 보정을 걸면 그 값과 표시 문자열을 준다.
-// v1 모델은 interaction이 없어 항상 0. pair는 "initial×medial"처럼 두 인자 이름이다.
-function cellCorrection(layer: VariationLayer, identity: CorpusIdentity): { term: number; cell: string | null } {
-  const interaction = layer.interaction
-  if (!interaction?.applied) return { term: 0, cell: null }
-  const level: Record<string, string> = { initial: identity.initialJamo, medial: identity.medialJamo, final: identity.finalJamo ?? MODEL_NO_FINAL }
-  const [factorA, factorB] = interaction.pair.split('×')
-  const match = interaction.cells.find((entry) => entry.cell[0] === level[factorA] && entry.cell[1] === level[factorB])
-  return match ? { term: match.term, cell: match.cell.join('×') } : { term: 0, cell: null }
-}
-
 function predictTarget(model: VariationModel, identity: CorpusIdentity, stages: CorpusDetail['stages']): CorpusModelPrediction[] {
   const predictions: CorpusModelPrediction[] = []
   for (const { target, stage, drawable, read } of MODELED_TARGETS) {
-    const layer = model.targets[target]?.layers[identity.contextId]
+    const prediction = predictNotoTarget(model, target, identity)
     const payload = stages[stage]
-    if (!layer || !payload || payload.status !== 'candidate') continue
+    if (!prediction || !payload || payload.status !== 'candidate') continue
     const reading = read(payload.measurements)
     if (reading === null) continue
-    const effects = {
-      initial: layer.effects.initial[identity.initialJamo] ?? 0,
-      medial: layer.effects.medial[identity.medialJamo] ?? 0,
-      final: layer.effects.final[identity.finalJamo ?? MODEL_NO_FINAL] ?? 0,
-    }
-    const { term, cell } = cellCorrection(layer, identity)
-    const predicted = layer.representative + effects.initial + effects.medial + effects.final + term
     const actual = reading.value * 1000
-    const residual = actual - predicted
+    const residual = actual - prediction.predicted
     predictions.push({
-      target, layer: identity.contextId, stage, orientation: reading.orientation, drawable, representative: layer.representative,
-      predicted, actual, residual, threshold: layer.defaultThreshold,
-      exception: Math.abs(residual) > layer.defaultThreshold, confidence: layer.confidence, effects,
-      cellTerm: term, cell,
+      target, layer: identity.contextId, stage, orientation: reading.orientation, drawable, representative: prediction.representative,
+      predicted: prediction.predicted, actual, residual, threshold: prediction.threshold,
+      exception: Math.abs(residual) > prediction.threshold, confidence: prediction.confidence, effects: prediction.effects,
+      cellTerm: prediction.cellTerm, cell: prediction.cell,
     })
   }
   return predictions
