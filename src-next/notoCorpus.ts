@@ -48,7 +48,10 @@ export interface CorpusPayload { status: CorpusStatus; reasonCodes: string[]; ob
 export interface CorpusModelPrediction {
   target: string
   layer: string
+  stage: PartStage
   orientation: 'vertical' | 'horizontal'
+  // 면 좌표 타깃은 오버레이에 점선을 그리지만, 길이(visibleLength) 타깃은 좌표가 아니라 패널에만 수치로 보인다.
+  drawable: boolean
   representative: number
   predicted: number
   actual: number

@@ -3,7 +3,7 @@ import path from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import { CORPUS_STAGES, corpusIdentity, emptyCorpusRow } from '../../src-next/notoCorpus'
-import type { CorpusDetail, CorpusFont, CorpusIdentity, CorpusModelPrediction, CorpusPayload, CorpusRow, CorpusSnapshot, CorpusStage } from '../../src-next/notoCorpus'
+import type { CorpusDetail, CorpusFont, CorpusIdentity, CorpusModelPrediction, CorpusPayload, CorpusRow, CorpusSnapshot, CorpusStage, MedialMeasurement, PartStage } from '../../src-next/notoCorpus'
 
 interface Manifest { schema: string; font: CorpusFont; stageKeys: Record<CorpusStage, string> }
 interface ReportRow extends CorpusRow { stages: Record<CorpusStage, CorpusRow['stages'][CorpusStage] & { artifact: string }> }
@@ -18,17 +18,29 @@ const API = '/api/noto-corpus'
 const HEX = /^[a-f0-9]{64}$/
 const NOTO_SHA = '194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252'
 const APPROVED_INPUTS_FILE = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../reference-data/preset-candidates/noto-approved-guide-inputs.v1.json')
-// 변화량 모델이 예측하는 역할면 타깃. 값 소스는 각 타깃이 어느 단계 측정에서 실측을 읽는지,
-// orientation은 오버레이에서 가로선/세로선 중 무엇으로 그리는지 알려준다.
+// 변화량 모델이 예측하는 역할면 타깃. read는 실측값과 오버레이에 그릴 방향(orientation)을 함께 준다.
+// 닿자 면은 방향이 고정이고, 홀자 획은 글자마다 측정에 실린 방향을 그대로 쓴다.
 const MODEL_NO_FINAL = '∅'
-const readFace = (side: string) => (m: Record<string, unknown>) => {
+type Reading = { value: number; orientation: 'vertical' | 'horizontal' }
+const readFace = (side: string, orientation: 'vertical' | 'horizontal') => (m: Record<string, unknown>): Reading | null => {
   const face = (m.roleFaces as Record<string, number> | undefined)?.[side]
-  return typeof face === 'number' && Number.isFinite(face) ? face : null
+  return typeof face === 'number' && Number.isFinite(face) ? { value: face, orientation } : null
 }
-const MODELED_TARGETS: { target: string; stage: CorpusStage; orientation: 'vertical' | 'horizontal'; read: (measurements: Record<string, unknown>) => number | null }[] = [
-  { target: 'initial.roleFaces.bottom', stage: 'initial', orientation: 'horizontal', read: readFace('bottom') },
+const readMedial = (role: string, field: 'face' | 'visibleLength') => (m: Record<string, unknown>): Reading | null => {
+  const measurement = m[role] as MedialMeasurement | undefined
+  const value = measurement?.[field]
+  return typeof value === 'number' && Number.isFinite(value) ? { value, orientation: measurement!.orientation } : null
+}
+const MODELED_TARGETS: { target: string; stage: PartStage; drawable: boolean; read: (measurements: Record<string, unknown>) => Reading | null }[] = [
+  { target: 'initial.roleFaces.bottom', stage: 'initial', drawable: true, read: readFace('bottom', 'horizontal') },
   // 첫닿왼선. mixed-final 층에서 ㄱ계×혼합홀자 셀이 v2 선택 보정 대상(ㄱㅢ·ㄲㅝ·ㅋㅘ·ㄱㅝ).
-  { target: 'initial.roleFaces.left', stage: 'initial', orientation: 'vertical', read: readFace('left') },
+  { target: 'initial.roleFaces.left', stage: 'initial', drawable: true, read: readFace('left', 'vertical') },
+  // 홀자 획면. bottom-final 층에서 ㄱ계·ㅋ×ㅗ·ㅜ·ㅛ·ㅠ 셀이 v2 선택 보정 대상.
+  { target: 'medial.baseStem.face', stage: 'medial', drawable: true, read: readMedial('baseStem', 'face') },
+  { target: 'medial.leftStem.face', stage: 'medial', drawable: true, read: readMedial('leftStem', 'face') },
+  { target: 'medial.rightStem.face', stage: 'medial', drawable: true, read: readMedial('rightStem', 'face') },
+  // 윗보 가시길이. 좌표가 아니라 길이라 오버레이 선은 못 그리고 패널 수치로만 확인한다.
+  { target: 'medial.upperBeam.visibleLength', stage: 'medial', drawable: false, read: readMedial('upperBeam', 'visibleLength') },
 ]
 
 // 자모쌍 셀 보정항: v2 층의 interaction이 이 글자 자모쌍에 보정을 걸면 그 값과 표시 문자열을 준다.
@@ -44,12 +56,12 @@ function cellCorrection(layer: VariationLayer, identity: CorpusIdentity): { term
 
 function predictTarget(model: VariationModel, identity: CorpusIdentity, stages: CorpusDetail['stages']): CorpusModelPrediction[] {
   const predictions: CorpusModelPrediction[] = []
-  for (const { target, stage, orientation, read } of MODELED_TARGETS) {
+  for (const { target, stage, drawable, read } of MODELED_TARGETS) {
     const layer = model.targets[target]?.layers[identity.contextId]
     const payload = stages[stage]
     if (!layer || !payload || payload.status !== 'candidate') continue
-    const actualNormalized = read(payload.measurements)
-    if (actualNormalized === null) continue
+    const reading = read(payload.measurements)
+    if (reading === null) continue
     const effects = {
       initial: layer.effects.initial[identity.initialJamo] ?? 0,
       medial: layer.effects.medial[identity.medialJamo] ?? 0,
@@ -57,10 +69,10 @@ function predictTarget(model: VariationModel, identity: CorpusIdentity, stages: 
     }
     const { term, cell } = cellCorrection(layer, identity)
     const predicted = layer.representative + effects.initial + effects.medial + effects.final + term
-    const actual = actualNormalized * 1000
+    const actual = reading.value * 1000
     const residual = actual - predicted
     predictions.push({
-      target, layer: identity.contextId, orientation, representative: layer.representative,
+      target, layer: identity.contextId, stage, orientation: reading.orientation, drawable, representative: layer.representative,
       predicted, actual, residual, threshold: layer.defaultThreshold,
       exception: Math.abs(residual) > layer.defaultThreshold, confidence: layer.confidence, effects,
       cellTerm: term, cell,
