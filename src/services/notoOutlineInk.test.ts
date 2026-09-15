@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import approved from '../../reference-data/preset-candidates/noto-approved-guide-inputs.v1.json'
-import type { StrokeRenderStyle } from '../types'
-import { finalGlyphInkToSvgPath, materializeFinalGlyphInk } from './finalGlyphInk'
-import { NOTO_OUTLINE_ASCENDER, notoOutlineToInkPrimitives, notoOutlineToInkRegions } from './notoOutlineInk'
+import { NOTO_OUTLINE_ASCENDER, notoOutlineGhostPath, notoOutlineToInkRegions } from './notoOutlineInk'
 import type { NotoOutline } from './notoOutlineInk'
-
-const STYLE = { kind: 'brush', weightMultiplier: 1 } as unknown as StrokeRenderStyle
-const MATERIALIZE = { unitsPerEm: 1000, maxCurveErrorFontUnits: 0.5 }
 
 function approvedOutline(character: string): NotoOutline {
   const found = (approved as { cases: { identity: { character: string }; stages: { outline: { observation: NotoOutline } } }[] }).cases
@@ -123,16 +118,15 @@ describe('승인 Noto 윤곽 → 공통 잉크 파이프라인', () => {
     }
   })
 
-  it('primitive로 감싸면 materializeFinalGlyphInk가 union해 SVG 경로를 만든다', () => {
-    const primitives = notoOutlineToInkPrimitives({ glyphId: 'glyph:아', codepoint: 0xc544, outline: approvedOutline('아') })
-    expect(primitives.ok).toBe(true)
-    if (!primitives.ok) return
-    expect(primitives.primitives.every((primitive) => primitive.source.kind === 'noto-outline' && primitive.coordinateSpace === 'glyph-normalized')).toBe(true)
-    expect(new Set(primitives.primitives.map((primitive) => primitive.id)).size).toBe(primitives.primitives.length)
-    const ink = materializeFinalGlyphInk(primitives.primitives, STYLE, MATERIALIZE)
-    expect(ink.ok).toBe(true)
-    if (!ink.ok) return
-    expect(ink.ink.regions.some((region) => region.holes.length === 1)).toBe(true)
-    expect(finalGlyphInkToSvgPath(ink.ink)).toMatch(/^M .* Z$/)
+  it('고스트 경로는 union 없이 outer·hole 링을 그대로 evenodd 경로로 낸다', () => {
+    const regions = notoOutlineToInkRegions(approvedOutline('아'))
+    const ghost = notoOutlineGhostPath(approvedOutline('아'))
+    expect(regions.ok && ghost.ok).toBe(true)
+    if (!regions.ok || !ghost.ok) return
+    const ringCount = regions.regions.reduce((sum, region) => sum + 1 + region.holes.length, 0)
+    expect(ghost.path.match(/ Z/g)?.length).toBe(ringCount)
+    expect(ghost.path).toMatch(/^M .* Z$/)
+    expect(notoOutlineGhostPath(approvedOutline('아'), undefined, 100).path.length).toBeGreaterThan(0)
+    expect(notoOutlineGhostPath({ unitsPerEm: 0, operations: [] })).toEqual({ ok: false, error: 'Noto 윤곽 좌표 변환을 만들 수 없습니다.' })
   })
 })

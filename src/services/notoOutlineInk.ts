@@ -1,9 +1,9 @@
-import type { DeepReadonly, InkPoint, InkRegion, InkRing, ResolvedRegionPrimitive } from '../types'
+import type { DeepReadonly, InkPoint, InkRegion, InkRing } from '../types'
 
 /**
- * Noto 실측 윤곽(reference-lab export)의 폰트 단위 operations를
- * 화면·OTF 공통 InkRegion으로 바꾼다. 곡률·기준선은 보정하지 않고,
- * 곡선만 허용 오차 안에서 직선으로 펴서 union 파이프라인에 태운다.
+ * Noto 실측 윤곽(reference-lab export)의 폰트 단위 operations를 InkRegion 모양의 폴리곤으로 편다.
+ * 용도는 측정·고스트(비교 오버레이)뿐이다. Noto 윤곽은 편집 대상이 아니고 잉크 union에도 넣지 않는다.
+ * 그래서 ResolvedInkPrimitive를 만들지 않고, 화면용 evenodd 경로만 따로 낸다.
  */
 
 export type NotoOutlinePoint = readonly [number, number]
@@ -206,25 +206,22 @@ export function notoOutlineToInkRegions(
   return { ok: true, regions }
 }
 
-export function notoOutlineToInkPrimitives(input: {
-  glyphId: string
-  codepoint: number
-  outline: DeepReadonly<NotoOutline>
-  options?: NotoOutlineInkOptions
-}): { ok: true; primitives: ResolvedRegionPrimitive[] } | { ok: false; message: string } {
-  if (typeof input.glyphId !== 'string' || !input.glyphId.trim() || !Number.isInteger(input.codepoint)) {
-    return { ok: false, message: 'glyphId와 codepoint가 유효해야 합니다.' }
-  }
-  const result = notoOutlineToInkRegions(input.outline, input.options)
-  if (!result.ok) return result
-  return {
-    ok: true,
-    primitives: result.regions.map((region, contourIndex) => ({
-      kind: 'region',
-      coordinateSpace: 'glyph-normalized',
-      id: ['region', input.glyphId, 'noto', String(input.codepoint), String(contourIndex)].map(encodeURIComponent).join(':'),
-      source: { kind: 'noto-outline', glyphId: input.glyphId, codepoint: input.codepoint, contourIndex },
-      region,
-    })),
-  }
+function format(value: number): string {
+  return String(Number(value.toFixed(6)))
+}
+
+/** 고스트 표시용 SVG evenodd 경로. union을 거치지 않는다 — 잉크가 아니라 비교 오버레이다. */
+export function notoOutlineGhostPath(
+  outline: DeepReadonly<NotoOutline>,
+  options: NotoOutlineInkOptions = DEFAULT_NOTO_OUTLINE_INK_OPTIONS,
+  viewBoxSize = 1,
+): { ok: true; path: string } | { ok: false; error: string } {
+  const result = notoOutlineToInkRegions(outline, options)
+  if (!result.ok) return { ok: false, error: result.message }
+  const rings = result.regions.flatMap((region) => [region.outer, ...region.holes])
+  const path = rings.map((ring) => {
+    const [first, ...rest] = ring
+    return `M ${format(first.x * viewBoxSize)} ${format(first.y * viewBoxSize)} ${rest.map((point) => `L ${format(point.x * viewBoxSize)} ${format(point.y * viewBoxSize)}`).join(' ')} Z`
+  }).join(' ')
+  return { ok: true, path }
 }

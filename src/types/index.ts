@@ -466,22 +466,13 @@ export interface ResolvedPartGridInkSource {
   elementId: string
 }
 
-/** 글자 단위 Noto 실측 윤곽. 자모로 쪼개지 않으므로 part·jamoId가 없다. */
-export interface ResolvedNotoOutlineInkSource {
-  kind: 'noto-outline'
-  glyphId: string
-  codepoint: number
-  contourIndex: number
-}
-
-/** 중심선은 획·part grid에서만 온다. Noto 윤곽은 면(region)으로만 들어온다. */
-export type ResolvedCenterlineInkSource = ResolvedStrokeInkSource | ResolvedPartGridInkSource
-export type ResolvedInkSource = ResolvedCenterlineInkSource | ResolvedNotoOutlineInkSource
+// Noto 실측 윤곽은 잉크 소스가 아니다. 측정·고스트·룩으로만 쓰므로 여기에 소스 분기를 두지 않는다.
+export type ResolvedInkSource = ResolvedStrokeInkSource | ResolvedPartGridInkSource
 
 export type InkCoordinateSpace = 'stroke-local-with-glyph-box' | 'glyph-normalized'
 
 export interface ResolvedCenterlinePrimitive<
-  TSource extends ResolvedCenterlineInkSource = ResolvedCenterlineInkSource,
+  TSource extends ResolvedInkSource = ResolvedInkSource,
 > {
   kind: 'centerline'
   coordinateSpace: 'stroke-local-with-glyph-box'
