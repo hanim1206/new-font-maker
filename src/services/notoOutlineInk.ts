@@ -136,6 +136,23 @@ function flattenContours(operations: readonly DeepReadonly<NotoOutlineOperation>
   return contours
 }
 
+/** 윤곽에서 지정한 contour(moveTo 순번)만 남긴다. 자모 역할별 고스트·측정용. */
+export function selectNotoOutlineContours(outline: DeepReadonly<NotoOutline>, contourIds: readonly number[]): NotoOutline {
+  const keep = new Set(contourIds)
+  const operations: NotoOutlineOperation[] = []
+  let contour = -1
+  let active = false
+  for (const op of outline.operations) {
+    if (op.operation === 'moveTo' || (op.operation === 'qCurveTo' && op.arguments[op.arguments.length - 1] === null)) {
+      contour += 1
+      active = keep.has(contour)
+    }
+    if (active) operations.push({ operation: op.operation, arguments: op.arguments.map((point) => point === null ? null : [point[0], point[1]]) })
+    if (op.operation === 'closePath' || op.operation === 'endPath') active = false
+  }
+  return { unitsPerEm: outline.unitsPerEm, operations, ...(outline.fontToGlyphNormalized ? { fontToGlyphNormalized: [...outline.fontToGlyphNormalized] } : {}) }
+}
+
 function signedArea(ring: readonly InkPoint[]): number {
   let area = 0
   for (let index = 0; index < ring.length; index += 1) {
