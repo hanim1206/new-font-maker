@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
 import { validateRoleConstructionScope } from './jamoConstruction'
-import { fitNotoMedialMaster, splitMixedMedialRoles } from './notoMedialMasterFit'
+import { applyRailEdits, boundRailRoles, fitNotoMedialMaster, splitMixedMedialRoles } from './notoMedialMasterFit'
 import type { MedialFitInput } from './notoMedialMasterFit'
 import { resolveShapeGlyphInkPrimitives } from './shapeGlyphInkResolver'
 import type { StrokeRenderStyle } from '../types'
@@ -87,6 +87,34 @@ describe('fitNotoMedialMaster', () => {
     expect(fitNotoMedialMaster({ ...A, thickness: { outerPillar: 0.08 } })).toMatchObject({ ok: false, message: expect.stringContaining('primaryBeam') })
     expect(fitNotoMedialMaster({ ...A, measurements: { ...A.measurements, outerPillar: { ...A.measurements.outerPillar, visibleSpans: [] } } })).toMatchObject({ ok: false, message: expect.stringContaining('가시 구간') })
     expect(fitNotoMedialMaster({ ...A, measurements: { ...A.measurements, outerPillar: { ...A.measurements.outerPillar, faceSide: 'top' } } })).toMatchObject({ ok: false, message: expect.stringContaining('faceSide') })
+  })
+
+  it('rail을 옮기면 결속된 획이 따라오고 두께는 그대로다', () => {
+    const outcome = fitNotoMedialMaster(A)
+    if (!outcome.ok) throw new Error(outcome.message)
+    const { fit } = outcome
+    // 기둥 왼면(outer-left)은 어느 획 끝도 아니라 매이지 않는다. slot에서 따라온다.
+    expect(boundRailRoles(fit)).toEqual(['center-x', 'outer-right', 'outer-top', 'center-y', 'outer-bottom'])
+    // 기둥 중심을 오른쪽으로 20u, 보를 위로 30u.
+    const edited = applyRailEdits(fit, { ...fit.railsEm, 'center-x': fit.railsEm['center-x'] + 0.02, 'center-y': fit.railsEm['center-y'] - 0.03 })
+    expect(edited.ok).toBe(true)
+    if (!edited.ok) return
+    const stem = edited.fit.strokes.find((s) => s.roleId === 'outerPillar')!
+    const beam = edited.fit.strokes.find((s) => s.roleId === 'primaryBeam')!
+    expect(stem.center).toBeCloseTo(0.725, 9)
+    expect(stem.thickness).toBe(0.08)
+    expect(beam.center).toBeCloseTo(0.425, 9)
+    expect(beam.from).toBeCloseTo(0.725, 9) // 보 시작은 기둥 중심 rail에 매여 같이 움직인다
+    expect(beam.thickness).toBe(0.07)
+    // 기둥이 오른쪽으로 갔으니 잉크 박스 왼끝(매이지 않은 outer-left)도 따라온다.
+    expect(edited.fit.slot.x).toBeCloseTo(fit.slot.x + 0.02, 9)
+    expect(edited.fit.railsEm['outer-left']).toBeCloseTo(fit.railsEm['outer-left'] + 0.02, 9)
+    expect(validateRoleConstructionScope(edited.fit.scope).ok).toBe(true)
+    // outer를 옮기면 slot이 바뀐다.
+    const wider = applyRailEdits(fit, { ...fit.railsEm, 'outer-right': fit.railsEm['outer-right'] + 0.05 })
+    expect(wider.ok && wider.fit.slot.width).toBeCloseTo(fit.slot.width + 0.05, 9)
+    // 순서 뒤집기는 거부.
+    expect(applyRailEdits(fit, { ...fit.railsEm, 'center-x': fit.railsEm['outer-right'] + 0.01 }).ok).toBe(false)
   })
 
   it('혼합 홀자는 baseStem·lowerBeam을 가로부, 나머지를 세로부로 가른다', () => {

@@ -78,9 +78,12 @@ export function RulerStrip({ value, min, max, step, base, baseLabel = 'Noto', un
     commit(value + delta)
   }
 
-  const ticks: { raw: number; major: boolean }[] = []
+  const ticks: { raw: number; major: boolean; labeled: boolean }[] = []
   const unitStep = 1 / unitScale
-  for (let units = Math.ceil(toUnits(min)); units <= Math.floor(toUnits(max)); units += 1) ticks.push({ raw: units * unitStep, major: units % 10 === 0 })
+  // 숫자는 겹치지 않을 만큼만. 눈금 창이 넓으면 20·50·100u 간격으로 성기게 적는다.
+  const pixelsPerUnit = (WIDTH - PAD * 2) / (toUnits(max) - toUnits(min))
+  const labelEvery = [10, 20, 50, 100].find((every) => every * pixelsPerUnit >= 28) ?? 100
+  for (let units = Math.ceil(toUnits(min)); units <= Math.floor(toUnits(max)); units += 1) ticks.push({ raw: units * unitStep, major: units % 10 === 0, labeled: units % labelEvery === 0 })
   const shown = toUnits(value)
   const markerX = xOf(value)
 
@@ -110,7 +113,7 @@ export function RulerStrip({ value, min, max, step, base, baseLabel = 'Noto', un
       <text className={`${styles.direction} ${styles.directionEnd}`} x={WIDTH - PAD} y={12}>{axis === 'x' ? '오른쪽 →' : '아래 →'}</text>
       <g className={styles.ticks}>
         {ticks.map((tick) => <line key={tick.raw} x1={xOf(tick.raw)} x2={xOf(tick.raw)} y1={TRACK_Y} y2={TRACK_Y + (tick.major ? 14 : 7)} className={tick.major ? styles.major : undefined} />)}
-        {ticks.filter((tick) => tick.major).map((tick) => <text key={`n${tick.raw}`} x={xOf(tick.raw)} y={TRACK_Y - 6} className={styles.number}>{Math.round(toUnits(tick.raw))}</text>)}
+        {ticks.filter((tick) => tick.labeled).map((tick) => <text key={`n${tick.raw}`} x={xOf(tick.raw)} y={TRACK_Y - 6} className={styles.number}>{Math.round(toUnits(tick.raw))}</text>)}
       </g>
       {base !== undefined && base >= min && base <= max && <g className={styles.base}>
         <line x1={xOf(base)} x2={xOf(base)} y1={TRACK_Y - 16} y2={HEIGHT} />

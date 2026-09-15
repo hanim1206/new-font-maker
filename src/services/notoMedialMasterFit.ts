@@ -51,13 +51,26 @@ export interface FittedStroke {
   thickness: number
 }
 
+export type CoreRailRole = CoreXRailRole | CoreYRailRole
+
+/** 획 하나가 어느 core rail에 매였는지. rail을 옮기면 이 결속으로 획이 따라온다. */
+export interface StrokeRailBinding {
+  roleId: string
+  orientation: 'vertical' | 'horizontal'
+  thickness: number
+  centerRail: CoreRailRole
+  fromRail: CoreRailRole
+  toRail: CoreRailRole
+}
+
 export interface MedialFitResult {
   jamoId: string
   role: MedialFitRole
   slot: BoxConfig
   strokes: FittedStroke[]
   /** core rail 역할 → em 좌표. 리포트에서 측정 face와 비교할 때 쓴다. */
-  railsEm: Record<CoreXRailRole | CoreYRailRole, number>
+  railsEm: Record<CoreRailRole, number>
+  bindings: StrokeRailBinding[]
   grid: RailGrid
   master: JamoRoleMaster
   scope: RoleConstructionScope
@@ -159,30 +172,107 @@ export function fitNotoMedialMaster(input: MedialFitInput): MedialFitOutcome {
     snapStep: 0.001,
     minGap: input.minGap ?? DEFAULT_MIN_GAP,
   })
-  const railIdFor = (axis: 'x' | 'y', v: number): string | undefined => {
-    const roles = axis === 'x' ? CORE_X_RAIL_ROLES : CORE_Y_RAIL_ROLES
-    const role = roles.find((r) => Math.abs(railsEm[r] - v) < EPSILON)
-    return role && `${grid.id}:${axis}:${role}`
+  const roleFor = (axis: 'x' | 'y', v: number): CoreRailRole | undefined => {
+    const roles: readonly CoreRailRole[] = axis === 'x' ? CORE_X_RAIL_ROLES : CORE_Y_RAIL_ROLES
+    return roles.find((r) => Math.abs(railsEm[r] - v) < EPSILON)
   }
-
-  const master = createEmptyJamoRoleMaster({ jamoId: input.jamoId, role: input.role, gridId: grid.id })
-  const channel = master.construction.channels[expectedConstructionChannel(input.role)]!
+  const bindings: StrokeRailBinding[] = []
   for (const s of strokes) {
-    const [ax, ay, bx, by] = s.orientation === 'vertical' ? [s.center, s.from, s.center, s.to] : [s.from, s.center, s.to, s.center]
-    const a = { x: railIdFor('x', ax), y: railIdFor('y', ay) }
-    const b = { x: railIdFor('x', bx), y: railIdFor('y', by) }
-    if (!a.x || !a.y || !b.x || !b.y) return { ok: false, message: `${s.roleId}: 끝점이 rail에 걸리지 않습니다.` }
+    const [centerAxis, spanAxis] = s.orientation === 'vertical' ? ['x', 'y'] as const : ['y', 'x'] as const
+    const centerRail = roleFor(centerAxis, s.center)
+    const fromRail = roleFor(spanAxis, s.from)
+    const toRail = roleFor(spanAxis, s.to)
+    if (!centerRail || !fromRail || !toRail) return { ok: false, message: `${s.roleId}: 끝점이 rail에 걸리지 않습니다.` }
+    bindings.push({ roleId: s.roleId, orientation: s.orientation, thickness: s.thickness, centerRail, fromRail, toRail })
+  }
+  const master = masterFromBindings(input.jamoId, input.role, grid.id, bindings)
+  const scope = createRoleConstructionSourceV1({ grid, masters: [master] })
+  return { ok: true, fit: { jamoId: input.jamoId, role: input.role, slot, strokes, railsEm, bindings, grid, master, scope } }
+}
+
+function railIdOf(gridId: string, role: CoreRailRole): string {
+  const axis = (CORE_X_RAIL_ROLES as readonly string[]).includes(role) ? 'x' : 'y'
+  return `${gridId}:${axis}:${role}`
+}
+
+function masterFromBindings(jamoId: string, role: MedialFitRole, gridId: string, bindings: readonly StrokeRailBinding[]): JamoRoleMaster {
+  const master = createEmptyJamoRoleMaster({ jamoId, role, gridId })
+  const channel = master.construction.channels[expectedConstructionChannel(role)]!
+  for (const b of bindings) {
+    const [ax, ay, bx, by] = b.orientation === 'vertical'
+      ? [b.centerRail, b.fromRail, b.centerRail, b.toRail]
+      : [b.fromRail, b.centerRail, b.toRail, b.centerRail]
     const element: GridCenterlineElement = {
-      id: `noto:${s.roleId}`, kind: 'centerline', closed: false, thickness: s.thickness,
+      id: `noto:${b.roleId}`, kind: 'centerline', closed: false, thickness: b.thickness,
       anchors: [
-        { id: `noto:${s.roleId}:a`, point: { id: `noto:${s.roleId}:a:pt`, xRailId: a.x, yRailId: a.y } },
-        { id: `noto:${s.roleId}:b`, point: { id: `noto:${s.roleId}:b:pt`, xRailId: b.x, yRailId: b.y } },
+        { id: `noto:${b.roleId}:a`, point: { id: `noto:${b.roleId}:a:pt`, xRailId: railIdOf(gridId, ax), yRailId: railIdOf(gridId, ay) } },
+        { id: `noto:${b.roleId}:b`, point: { id: `noto:${b.roleId}:b:pt`, xRailId: railIdOf(gridId, bx), yRailId: railIdOf(gridId, by) } },
       ],
     }
     channel.elements.push(element)
   }
+  return master
+}
+
+/** 이 fit에서 실제로 획이 매인 core rail. 나머지 core rail은 자리만 채운 것이라 편집 대상이 아니다. */
+export function boundRailRoles(fit: Pick<MedialFitResult, 'bindings'>): CoreRailRole[] {
+  const roles = new Set<CoreRailRole>()
+  for (const b of fit.bindings) { roles.add(b.centerRail); roles.add(b.fromRail); roles.add(b.toRail) }
+  return [...CORE_X_RAIL_ROLES, ...CORE_Y_RAIL_ROLES].filter((role) => roles.has(role))
+}
+
+/**
+ * rail 값(em)을 바꿔 같은 결속으로 획을 다시 놓는다. 두께는 결속에 박혀 있어 rail이 움직여도 그대로다.
+ * slot은 outer rail 네 개가 정하고, 안 매인 core rail은 이웃 중점으로 다시 채운다.
+ * 순서가 뒤집히거나 minGap 아래로 붙으면 실패한다 — 호출자는 마지막 유효값을 지킨다.
+ */
+export function applyRailEdits(fit: MedialFitResult, railsEm: Readonly<Record<CoreRailRole, number>>): MedialFitOutcome {
+  // 획은 결속된 rail 값에서 다시 놓는다. 두께는 결속에 박혀 있어 그대로다.
+  const strokes: FittedStroke[] = fit.bindings.map((b) => ({ roleId: b.roleId, orientation: b.orientation, thickness: b.thickness, center: railsEm[b.centerRail], from: railsEm[b.fromRail], to: railsEm[b.toRail] }))
+  if (strokes.some((s) => ![s.center, s.from, s.to].every(Number.isFinite) || s.to <= s.from)) return { ok: false, message: '획의 시작과 끝이 뒤집혔습니다.' }
+  // slot은 fit과 같은 규칙(획 잉크 박스)으로 다시 잡는다. 매이지 않은 outer rail은 여기서 따라온다.
+  const xs: number[] = []
+  const ys: number[] = []
+  for (const s of strokes) {
+    if (s.orientation === 'vertical') { xs.push(s.center - s.thickness / 2, s.center + s.thickness / 2); ys.push(s.from, s.to) }
+    else { ys.push(s.center - s.thickness / 2, s.center + s.thickness / 2); xs.push(s.from, s.to) }
+  }
+  const slot: BoxConfig = { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) }
+  if (slot.width <= 0 || slot.height <= 0) return { ok: false, message: '홀자 잉크 박스를 만들 수 없습니다.' }
+  const bound = new Set(boundRailRoles(fit))
+  const next = { ...railsEm }
+  next['outer-left'] = bound.has('outer-left') ? next['outer-left'] : slot.x
+  next['outer-right'] = bound.has('outer-right') ? next['outer-right'] : slot.x + slot.width
+  next['outer-top'] = bound.has('outer-top') ? next['outer-top'] : slot.y
+  next['outer-bottom'] = bound.has('outer-bottom') ? next['outer-bottom'] : slot.y + slot.height
+  const axes: readonly (readonly CoreRailRole[])[] = [CORE_X_RAIL_ROLES, CORE_Y_RAIL_ROLES]
+  for (const roles of axes) {
+    for (const role of roles.slice(1, -1)) {
+      if (bound.has(role)) continue
+      const index = roles.indexOf(role)
+      const prev = [...roles.slice(0, index)].reverse().find((r) => bound.has(r) || r === roles[0])!
+      const after = roles.slice(index + 1).find((r) => bound.has(r) || r === roles[roles.length - 1])!
+      next[role] = (next[prev] + next[after]) / 2
+    }
+  }
+  const minGap = fit.grid.minGap
+  for (const roles of axes) {
+    const size = roles === CORE_X_RAIL_ROLES ? slot.width : slot.height
+    for (let index = 1; index < roles.length; index += 1) {
+      if ((next[roles[index]] - next[roles[index - 1]]) / size < minGap - EPSILON) return { ok: false, message: `${roles[index - 1]}와 ${roles[index]} 사이가 너무 좁습니다.` }
+    }
+  }
+  const local = (axis: 'x' | 'y', v: number) => axis === 'x' ? (v - slot.x) / slot.width : (v - slot.y) / slot.height
+  const grid = createBasePartGrid({
+    role: fit.role,
+    xCorePositions: Object.fromEntries(CORE_X_RAIL_ROLES.map((r) => [r, local('x', next[r])])) as Record<CoreXRailRole, number>,
+    yCorePositions: Object.fromEntries(CORE_Y_RAIL_ROLES.map((r) => [r, local('y', next[r])])) as Record<CoreYRailRole, number>,
+    snapStep: fit.grid.snapStep,
+    minGap,
+  })
+  const master = masterFromBindings(fit.jamoId, fit.role, grid.id, fit.bindings)
   const scope = createRoleConstructionSourceV1({ grid, masters: [master] })
-  return { ok: true, fit: { jamoId: input.jamoId, role: input.role, slot, strokes, railsEm, grid, master, scope } }
+  return { ok: true, fit: { ...fit, slot, strokes, railsEm: next, grid, master, scope } }
 }
 
 /** 혼합 홀자(ㅘ 등)는 측정 역할 이름으로 가로부(JU_H)·세로부(JU_V)를 가른다. */

@@ -101,36 +101,45 @@ export function medialInputFromPrediction(input: {
   return { ok: true, input: { jamoId: input.jamoId, role: input.role, measurements, thickness: input.thickness } }
 }
 
+/** fit 결과를 리졸버 → 잉크로 만든다. 화면 오버레이와 리포트가 같은 잉크를 쓴다. */
+export function inkOfFit(fit: MedialFitResult, weightMultiplier = 1): { ok: true; regions: readonly DeepReadonly<InkRegion>[] } | { ok: false; message: string } {
+  const primitives = resolveShapeGlyphInkPrimitives({
+    source: fit.scope, masterId: fit.master.id, glyphId: `fit:${fit.jamoId}`,
+    part: partForJamoRole(fit.role), slot: fit.slot, weightMultiplier,
+  })
+  if (!primitives.ok) return { ok: false, message: primitives.issues[0]?.message ?? '마스터를 해석할 수 없습니다.' }
+  const ink = materializeFinalGlyphInk(primitives.primitives, FIT_INK_STYLE, INK_OPTIONS)
+  return ink.ok ? { ok: true, regions: ink.ink.regions } : { ok: false, message: ink.message }
+}
+
+/** 이미 만든 fit(편집 뒤 포함)을 고스트·기준 측정과 비교한다. */
+export function reportFitResult(input: {
+  fit: MedialFitResult
+  ghostOutline: DeepReadonly<NotoOutline>
+  referenceMeasurements: MedialFitInput['measurements']
+  weightMultiplier?: number
+}): MedialFitReport {
+  const { fit } = input
+  const base = { jamoId: fit.jamoId, role: fit.role, slot: fit.slot, railErrors: railErrorsOf(fit, input.referenceMeasurements) }
+  const ink = inkOfFit(fit, input.weightMultiplier)
+  if (!ink.ok) return { ...base, ok: false, message: ink.message }
+  const ghost = notoOutlineToInkRegions(input.ghostOutline)
+  if (!ghost.ok) return { ...base, ok: false, message: ghost.message }
+  const mine = unionOf(ink.regions)
+  const theirs = unionOf(ghost.regions)
+  const ghostArea = multiPolygonArea(theirs)
+  if (ghostArea <= 0) return { ...base, ok: false, message: 'Noto 고스트 면적이 0입니다.' }
+  const xor = polygonClipping.xor(mine, theirs)
+  return { ...base, ok: true, xorRatio: multiPolygonArea(xor) / ghostArea, inkRatio: multiPolygonArea(mine) / ghostArea }
+}
+
 export function reportMedialFit(input: MedialFitInput & {
   ghostOutline: DeepReadonly<NotoOutline>
   weightMultiplier?: number
   /** rail 오차를 잴 기준 측정. 없으면 fit 입력 자신(직접 fit이면 0). 모델 예측으로 fit할 때 실측을 넣는다. */
   referenceMeasurements?: MedialFitInput['measurements']
 }): MedialFitReport {
-  const base = { jamoId: input.jamoId, role: input.role }
   const outcome = fitNotoMedialMaster(input)
-  if (!outcome.ok) return { ...base, ok: false, message: outcome.message, railErrors: [] }
-  const { fit } = outcome
-  const reference = input.referenceMeasurements ?? input.measurements
-  const primitives = resolveShapeGlyphInkPrimitives({
-    source: fit.scope, masterId: fit.master.id, glyphId: `fit:${input.jamoId}`,
-    part: partForJamoRole(input.role), slot: fit.slot, weightMultiplier: input.weightMultiplier ?? 1,
-  })
-  if (!primitives.ok) return { ...base, ok: false, message: primitives.issues[0]?.message ?? '마스터를 해석할 수 없습니다.', railErrors: railErrorsOf(fit, reference), slot: fit.slot }
-  const ink = materializeFinalGlyphInk(primitives.primitives, FIT_INK_STYLE, INK_OPTIONS)
-  if (!ink.ok) return { ...base, ok: false, message: ink.message, railErrors: railErrorsOf(fit, reference), slot: fit.slot }
-  const ghost = notoOutlineToInkRegions(input.ghostOutline)
-  if (!ghost.ok) return { ...base, ok: false, message: ghost.message, railErrors: railErrorsOf(fit, reference), slot: fit.slot }
-  const mine = unionOf(ink.ink.regions)
-  const theirs = unionOf(ghost.regions)
-  const ghostArea = multiPolygonArea(theirs)
-  if (ghostArea <= 0) return { ...base, ok: false, message: 'Noto 고스트 면적이 0입니다.', railErrors: railErrorsOf(fit, reference), slot: fit.slot }
-  const xor = polygonClipping.xor(mine, theirs)
-  return {
-    ...base, ok: true,
-    xorRatio: multiPolygonArea(xor) / ghostArea,
-    inkRatio: multiPolygonArea(mine) / ghostArea,
-    railErrors: railErrorsOf(fit, reference),
-    slot: fit.slot,
-  }
+  if (!outcome.ok) return { jamoId: input.jamoId, role: input.role, ok: false, message: outcome.message, railErrors: [] }
+  return reportFitResult({ fit: outcome.fit, ghostOutline: input.ghostOutline, referenceMeasurements: input.referenceMeasurements ?? input.measurements, weightMultiplier: input.weightMultiplier })
 }

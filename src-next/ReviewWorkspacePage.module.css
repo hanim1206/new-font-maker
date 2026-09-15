@@ -61,3 +61,19 @@
 .railErrors i { margin-right: 4px; color: rgb(var(--color-text-dim-4)); font-style: normal; font-weight: 500; }
 .railErrors span[data-large] { color: #f0561e; }
 .locked { margin: 14px 14px 18px; padding: 12px; border: 1px dashed rgb(var(--color-text-dim-4)); border-radius: 22px; color: rgb(var(--color-text-dim-4)); font-size: 13px; font-weight: 700; text-align: center; }
+
+.chips { display: flex; gap: 6px; padding: 8px 14px 0; overflow-x: auto; scrollbar-width: none; }
+.chips button { flex: 0 0 auto; padding: 4px 11px; border: 1px solid rgb(var(--color-border)); border-radius: 14px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+.chips button[aria-pressed='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary)); color: #fff; }
+.editorHeading { display: flex; align-items: baseline; justify-content: space-between; }
+.editorHeading span { color: rgb(var(--color-text-dim-4)); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+.editorHeading span small { margin-left: 4px; font-weight: 600; letter-spacing: 0; }
+.editorHeading output { font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
+.editorHeading output small { margin-left: 3px; color: rgb(var(--color-text-dim-4)); font-size: 11px; font-weight: 600; }
+.editorHeading em { display: block; color: rgb(var(--color-primary-dark)); font-size: 10px; font-style: normal; font-weight: 700; text-align: right; }
+.editorMeta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: -6px; color: rgb(var(--color-text-dim-4)); font-size: 10px; }
+.editorMeta button { flex: 0 0 auto; padding: 5px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 10px; font-weight: 700; }
+.editorMeta button:disabled { opacity: .4; }
+.dialDock { flex: 0 0 auto; display: flex; flex-direction: column; gap: 2px; padding: 8px 14px 4px; border-top: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); box-shadow: 0 -8px 24px rgb(15 23 42 / .06); }
+.railButton { cursor: grab; outline: none; }
+.railButton:active { cursor: grabbing; }

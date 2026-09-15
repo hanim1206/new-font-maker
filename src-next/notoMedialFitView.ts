@@ -1,14 +1,12 @@
-import { finalGlyphInkToSvgPath, materializeFinalGlyphInk } from '../src/services/finalGlyphInk'
-import { partForJamoRole } from '../src/services/jamoContextRoles'
-import { medialInputFromPrediction, reportMedialFit } from '../src/services/notoFitReport'
+import { finalGlyphInkToSvgPath } from '../src/services/finalGlyphInk'
+import { inkOfFit, medialInputFromPrediction, reportFitResult } from '../src/services/notoFitReport'
 import type { RailError } from '../src/services/notoFitReport'
-import { fitNotoMedialMaster, splitMixedMedialRoles } from '../src/services/notoMedialMasterFit'
-import type { MedialFitInput, MedialRoleMeasurement } from '../src/services/notoMedialMasterFit'
+import { applyRailEdits, boundRailRoles, fitNotoMedialMaster, splitMixedMedialRoles } from '../src/services/notoMedialMasterFit'
+import type { CoreRailRole, MedialFitInput, MedialFitResult, MedialRoleMeasurement } from '../src/services/notoMedialMasterFit'
 import { selectNotoOutlineContours } from '../src/services/notoOutlineInk'
 import type { NotoOutline } from '../src/services/notoOutlineInk'
 import { MEDIAL_ROLE_SETS, predictNotoTarget } from '../src/services/notoVariationModel'
-import { resolveShapeGlyphInkPrimitives } from '../src/services/shapeGlyphInkResolver'
-import type { StrokeRenderStyle } from '../src/types'
+import { CORE_X_RAIL_ROLES } from '../src/services/railGridResolver'
 import type { ApprovedNotoInput } from './notoBoundMaster'
 import type { CorpusIdentity } from './notoCorpus'
 import type { NotoPresetModelBundle } from './notoPreset'
@@ -16,20 +14,21 @@ import type { NotoPresetModelBundle } from './notoPreset'
 /**
  * 검수 화면용 홀자 획 마스터 fit. 변화량 모델 rail로 fit해 잉크 경로를 만들고,
  * 승인 측정이 있는 글자면 Noto 홀자 고스트와의 xor·rail 오차도 같이 낸다.
+ * rail 편집은 fit 결과 위에서 `renderMedialPart`로 다시 놓는다. 두께는 안 변한다.
  */
 
-const STYLE: StrokeRenderStyle = { mode: 'brush', brush: { tip: 'round', aspectRatio: 1, angle: 0 } }
-const INK_OPTIONS = { unitsPerEm: 1000, maxCurveErrorFontUnits: 0.5 }
 const MIXED = 'ㅘㅙㅚㅝㅞㅟㅢ'
+const ROLE_LABEL: Record<string, string> = { outerPillar: '바깥기둥', innerPillar: '안기둥', baseStem: '줄기', leftStem: '왼줄기', rightStem: '오른줄기', primaryBeam: '보', upperBeam: '위보', lowerBeam: '아래보' }
+export const roleLabel = (roleId: string) => ROLE_LABEL[roleId] ?? roleId
 
 export interface MedialFitPart {
   role: MedialFitInput['role']
   roleIds: readonly string[]
-  path?: string
-  /** 승인 측정이 있을 때만. */
-  xorRatio?: number
-  inkRatio?: number
-  railErrors: RailError[]
+  /** 모델 rail 그대로의 fit. 편집의 출발점. */
+  fit?: MedialFitResult
+  /** 승인 측정이 있을 때만: 비교 대상 고스트와 기준 측정. */
+  ghostOutline?: NotoOutline
+  reference?: Record<string, MedialRoleMeasurement>
   message?: string
 }
 
@@ -39,18 +38,33 @@ export interface MedialFitView {
   message?: string
 }
 
-interface ApprovedMedial {
-  measurements: Record<string, MedialRoleMeasurement>
-  contourIds: (roleIds: readonly string[]) => number[]
+export interface RenderedMedialPart {
+  path?: string
+  xorRatio?: number
+  inkRatio?: number
+  railErrors: RailError[]
+  message?: string
 }
 
-function approvedMedialOf(input: ApprovedNotoInput | null): ApprovedMedial | null {
+/** 편집 가능한 rail 하나. id는 part 순번을 붙여 혼합 홀자의 두 part를 구분한다. */
+export interface EditableRail {
+  id: string
+  partIndex: number
+  role: CoreRailRole
+  axis: 'x' | 'y'
+  label: string
+  value: number
+  /** 모델 rail 값. 복원·Δ 표시용. */
+  original: number
+}
+
+function approvedMedialOf(input: ApprovedNotoInput | null) {
   if (!input) return null
   const observation = input.stages.medial.observation as { elements?: { elementId: string; face: { evidence: { contourId: number } } }[] }
   const elements = observation.elements ?? []
   return {
     measurements: input.stages.medial.measurements as Record<string, MedialRoleMeasurement>,
-    contourIds: (roleIds) => elements.filter((e) => roleIds.includes(e.elementId)).map((e) => e.face.evidence.contourId),
+    contourIds: (roleIds: readonly string[]) => elements.filter((e) => roleIds.includes(e.elementId)).map((e) => e.face.evidence.contourId),
   }
 }
 
@@ -74,23 +88,55 @@ export function fitMedialForGlyph(input: {
 
   const parts: MedialFitPart[] = []
   for (const group of groups) {
-    const base: MedialFitPart = { role: group.role, roleIds: group.roleIds, railErrors: [] }
+    const base: MedialFitPart = { role: group.role, roleIds: group.roleIds }
     const made = medialInputFromPrediction({ jamoId: medial, role: group.role, roleIds: group.roleIds, predicted, thickness })
     if (!made.ok) { parts.push({ ...base, message: made.message }); continue }
     const fit = fitNotoMedialMaster(made.input)
     if (!fit.ok) { parts.push({ ...base, message: fit.message }); continue }
-    const primitives = resolveShapeGlyphInkPrimitives({ source: fit.fit.scope, masterId: fit.fit.master.id, glyphId: `review:${input.identity.codepoint}:${group.role}`, part: partForJamoRole(group.role), slot: fit.fit.slot, weightMultiplier: 1 })
-    if (!primitives.ok) { parts.push({ ...base, message: primitives.issues[0]?.message }); continue }
-    const ink = materializeFinalGlyphInk(primitives.primitives, STYLE, INK_OPTIONS)
-    if (!ink.ok) { parts.push({ ...base, message: ink.message }); continue }
-    const part: MedialFitPart = { ...base, path: finalGlyphInkToSvgPath(ink.ink, 1) }
+    const part: MedialFitPart = { ...base, fit: fit.fit }
     if (approved) {
-      const reference = Object.fromEntries(Object.entries(approved.measurements).filter(([roleId]) => group.roleIds.includes(roleId)))
-      const report = reportMedialFit({ ...made.input, ghostOutline: selectNotoOutlineContours(input.outline, approved.contourIds(group.roleIds)), referenceMeasurements: reference })
-      if (report.ok) { part.xorRatio = report.xorRatio; part.inkRatio = report.inkRatio; part.railErrors = report.railErrors }
-      else part.message = report.message
+      part.ghostOutline = selectNotoOutlineContours(input.outline, approved.contourIds(group.roleIds))
+      part.reference = Object.fromEntries(Object.entries(approved.measurements).filter(([roleId]) => group.roleIds.includes(roleId)))
     }
     parts.push(part)
   }
   return { parts }
+}
+
+/** rail 값(em, 없으면 모델 값)으로 획을 놓고 잉크·비교 수치를 낸다. */
+export function renderMedialPart(part: MedialFitPart, railsEm?: Readonly<Record<CoreRailRole, number>>): RenderedMedialPart {
+  if (!part.fit) return { railErrors: [], message: part.message }
+  const placed = railsEm ? applyRailEdits(part.fit, railsEm) : { ok: true as const, fit: part.fit }
+  if (!placed.ok) return { railErrors: [], message: placed.message }
+  const ink = inkOfFit(placed.fit)
+  if (!ink.ok) return { railErrors: [], message: ink.message }
+  const rendered: RenderedMedialPart = { path: finalGlyphInkToSvgPath({ regions: ink.regions }, 1), railErrors: [] }
+  if (part.ghostOutline && part.reference) {
+    const report = reportFitResult({ fit: placed.fit, ghostOutline: part.ghostOutline, referenceMeasurements: part.reference })
+    rendered.railErrors = report.railErrors
+    if (report.ok) { rendered.xorRatio = report.xorRatio; rendered.inkRatio = report.inkRatio } else rendered.message = report.message
+  }
+  return rendered
+}
+
+/** 편집 가능한 rail 목록. 획이 매인 core rail만, 사람이 읽을 이름으로. */
+export function editableRailsOf(parts: readonly MedialFitPart[], railsByPart: readonly (Readonly<Record<CoreRailRole, number>> | undefined)[]): EditableRail[] {
+  const rails: EditableRail[] = []
+  parts.forEach((part, partIndex) => {
+    const fit = part.fit
+    if (!fit) return
+    const current = railsByPart[partIndex] ?? fit.railsEm
+    const partLabel = part.role === 'JU_H' ? '가로부 ' : part.role === 'JU_V' ? '세로부 ' : ''
+    for (const role of boundRailRoles(fit)) {
+      const binding = fit.bindings.find((b) => b.centerRail === role) ?? fit.bindings.find((b) => b.fromRail === role || b.toRail === role)!
+      const kind = binding.centerRail === role ? '중심' : binding.fromRail === role ? '시작' : '끝'
+      rails.push({
+        id: `${partIndex}:${role}`, partIndex, role,
+        axis: (CORE_X_RAIL_ROLES as readonly string[]).includes(role) ? 'x' : 'y',
+        label: `${partLabel}${roleLabel(binding.roleId)} ${kind}`,
+        value: current[role], original: fit.railsEm[role],
+      })
+    }
+  })
+  return rails
 }
