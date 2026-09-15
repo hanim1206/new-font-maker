@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""변화량 모델 v1의 추정·예외·판정·홀드아웃 검증."""
+"""변화량 모델(v1 주효과·v2 상호작용)의 추정·예외·v1.2 판정·홀드아웃 검증."""
 
 import json
 import unittest
@@ -141,18 +141,34 @@ class HoldoutTests(unittest.TestCase):
         self.assertLess(evaluation["reproductionError"]["max"], 1e-6)
 
 
-def shifted_cell_table(initial, medial, shift=30.0):
-    """(첫닿, 홀자) 셀 전체가 받침과 무관하게 같은 양만큼 튀는 합성 표."""
-    return [
-        (character, key, value + (shift if key[0] == initial and key[1] == medial else 0.0))
-        for character, key, value in additive_table()
-    ]
-
-
 ALL_DIAGNOSABLE = {f"{first}×{second}": {"diagnosable": True} for first, second in model.PAIRS}
 ONLY_INITIAL_MEDIAL = {
     f"{first}×{second}": {"diagnosable": (first, second) == ("initial", "medial")} for first, second in model.PAIRS
 }
+
+# 상호작용 판정용 합성 표: 셀마다 받침을 12개 둬 튀는 셀이 홀드아웃(매 10번째)에도 반드시 들어가게 한다.
+# 그래야 홀드아웃 일반화 게이트를 결정적으로 검증할 수 있다.
+IX_FINALS = tuple(f"f{index}" for index in range(12))
+
+
+def interaction_table(shifted_cells, shift=30.0):
+    """(첫닿, 홀자) 셀 전체가 받침과 무관하게 shift만큼 튀는 합성 표. 주효과는 additive, 받침 효과는 0."""
+    rows = []
+    index = 0
+    for initial in INITIALS:
+        for medial in MEDIALS:
+            for final in IX_FINALS:
+                value = REPRESENTATIVE + INITIAL_EFFECT[initial] + MEDIAL_EFFECT[medial]
+                if (initial, medial) in shifted_cells:
+                    value += shift
+                rows.append((f"c{index}", (initial, medial, final), value))
+                index += 1
+    return rows
+
+
+def diagnose_table(target, layer, rows, pair_diagnostics=ALL_DIAGNOSABLE):
+    fitted = model.median_polish([(key, value) for _, key, value in rows])
+    return model.diagnose_v11(target, layer, rows, fitted["residuals"], pair_diagnostics)
 
 
 class InteractionV2Tests(unittest.TestCase):
@@ -168,52 +184,62 @@ class InteractionV2Tests(unittest.TestCase):
         self.assertEqual(cells[0]["observationCount"], 3)
         self.assertEqual(cells[0]["signShare"], 1.0)
 
-    def test_selective_cell_is_absorbed_without_moving_main_effects(self):
-        rows = shifted_cell_table("ㄹ", "ㅏ")
+    def test_generalizing_cells_are_absorbed_without_moving_main_effects(self):
+        # 서로 다른 행·열의 셋(각 첫닿·홀자에 1개뿐)이라 주효과 median은 그대로. 셋 다 홀드아웃에 들어가
+        # 층 p95를 움직이므로 일반화 게이트를 통과한다. 단일 셀 하나는 144행 중 홀드아웃 표본이 적어
+        # p95를 못 움직여 no-generalization으로 남는다(실제 적용 층은 강셀이 여럿).
+        shifted = {("ㄱ", "ㅏ"), ("ㄴ", "ㅓ"), ("ㄷ", "ㅣ")}
+        rows = interaction_table(shifted)
         v1 = model.build_layer_model(rows)
         v2 = model.build_layer_model_v2("initial.roleFaces.bottom", "right-final", rows)
-        self.assertEqual(v2["v11Diagnosis"]["verdict"], "selective-interaction")
+        self.assertEqual(v2["v11Diagnosis"]["verdict"], "interaction")
         self.assertEqual(v2["v11Diagnosis"]["bestPair"], "initial×medial")
+        self.assertGreaterEqual(v2["v11Diagnosis"]["holdoutP95Gain"], model.HOLDOUT_P95_IMPROVE)
+        self.assertLessEqual(v2["v11Diagnosis"]["pairs"]["initial×medial"]["coverage"], model.STRONG_CELL_COVERAGE_LIMIT)
         # 순차 추정: v1 필드(주효과·잔차·예외·홀드아웃)는 v1과 한 글자도 다르지 않다.
         self.assertEqual({key: value for key, value in v2.items() if key not in ("v11Diagnosis", "interaction")}, v1)
         interaction = v2["interaction"]
         self.assertTrue(interaction["applied"])
         self.assertEqual(interaction["pair"], "initial×medial")
-        self.assertEqual([cell["cell"] for cell in interaction["cells"]], [["ㄹ", "ㅏ"]])
-        self.assertAlmostEqual(interaction["cells"][0]["term"], 30.0, places=6)
-        self.assertEqual(v1["exceptions"]["10"]["count"], 3)
+        self.assertEqual({tuple(cell["cell"]) for cell in interaction["cells"]}, shifted)
+        for cell in interaction["cells"]:
+            self.assertAlmostEqual(cell["term"], 30.0, places=6)
+        self.assertGreater(v1["exceptions"]["10"]["count"], 0)
         self.assertEqual(interaction["exceptions"]["10"]["count"], 0)
 
     def test_holdout_with_interaction_reestimates_cell_term_from_training(self):
-        # 홀드아웃 0번(ㄱㅏㄱ)이 튀는 셀에 들어간다. 주효과만으로는 30u를 못 맞히고 셀 보정은 맞힌다.
-        rows = shifted_cell_table("ㄱ", "ㅏ")
+        # 튀는 셀(ㄱㅏ)이 홀드아웃에도 들어간다. 주효과만으로는 30u를 못 맞히고 셀 보정은 맞힌다.
+        rows = interaction_table({("ㄱ", "ㅏ")})
         v2 = model.build_layer_model_v2("initial.roleFaces.bottom", "right-final", rows)
         self.assertAlmostEqual(v2["holdout"]["reproductionError"]["max"], 30.0, places=3)
         self.assertLess(v2["interaction"]["holdout"]["reproductionError"]["max"], 1e-6)
 
-    def test_too_many_strong_cells_is_broad_and_not_applied(self):
-        initials = [f"i{index}" for index in range(12)]
+    def test_holdout_gain_helper(self):
+        rows = interaction_table({("ㄱ", "ㅏ")})
+        gain = model.holdout_p95_gain(rows, ("initial", "medial"), {("ㄱ", "ㅏ"): 30.0})
+        self.assertIsNotNone(gain)
+        self.assertGreaterEqual(gain, model.HOLDOUT_P95_IMPROVE)
+        # 홀드아웃을 못 세우면(관측 없음) 판정 불가로 None.
+        self.assertIsNone(model.holdout_p95_gain([], ("initial", "medial"), {}))
 
-        def residuals_with(shifted):
-            return [
-                ((initial, medial, final), 30.0 if medial == "ㅏ" and index < shifted else 0.0)
-                for index, initial in enumerate(initials)
-                for medial in ("ㅏ", "ㅓ")
-                for final in ("ㄱ", "ㄴ", "ㅅ")
-            ]
-
-        at_limit, _ = model.diagnose_v11("t", "right-final", residuals_with(model.SELECTIVE_MAX_CELLS), ONLY_INITIAL_MEDIAL)
-        over_limit, _ = model.diagnose_v11("t", "right-final", residuals_with(model.SELECTIVE_MAX_CELLS + 1), ONLY_INITIAL_MEDIAL)
-        self.assertEqual(at_limit["verdict"], "selective-interaction")
-        self.assertEqual(over_limit["verdict"], "broad-interaction")
-        self.assertEqual(over_limit["pairs"]["initial×medial"]["absorptionGain"], 1.0)
+    def test_high_coverage_is_broad_and_not_applied(self):
+        # 20셀 중 15셀이 강셀 → coverage 0.75 > 0.6. 셀마다 잔차를 저장하는 셈이라 배제한다.
+        # 셀 수는 많지만 이건 cap이 아니라 coverage가 잡는다(홀드아웃 이전 단계).
+        residuals = []
+        for index in range(20):
+            initial, medial = f"i{index % 10}", ("ㅏ" if index < 10 else "ㅓ")
+            shift = 30.0 if index < 15 else 0.0
+            residuals += [((initial, medial, final), shift) for final in ("ㄱ", "ㄴ", "ㅅ")]
+        diagnosis, _ = model.diagnose_v11("t", "right-final", [], residuals, ONLY_INITIAL_MEDIAL)
+        self.assertEqual(diagnosis["verdict"], "broad-interaction")
+        self.assertGreater(diagnosis["pairs"]["initial×medial"]["coverage"], model.STRONG_CELL_COVERAGE_LIMIT)
 
     def test_weak_absorption_stays_threshold_or_font_variation(self):
         # 강셀 하나가 예외 10개 중 3개만 설명한다 → 흡수 30% < 40%.
         residuals = [((f"i{index}", "ㅏ", "ㄱ"), 0.0) for index in range(60)]
         residuals += [(("i0", "ㅓ", final), 30.0) for final in "ㄱㄴㅅ"]
         residuals += [((f"i{index}", "ㅗ", "ㄱ"), 25.0 if index % 2 else -25.0) for index in range(7)]
-        diagnosis, _ = model.diagnose_v11("t", "right-final", residuals, ONLY_INITIAL_MEDIAL)
+        diagnosis, _ = model.diagnose_v11("t", "right-final", [], residuals, ONLY_INITIAL_MEDIAL)
         self.assertEqual(diagnosis["exceptionsBefore"], 10)
         self.assertEqual(diagnosis["pairs"]["initial×medial"]["absorptionGain"], 0.3)
         self.assertEqual(diagnosis["verdict"], "threshold-or-font-variation")
@@ -221,12 +247,12 @@ class InteractionV2Tests(unittest.TestCase):
     def test_low_exception_ratio_is_preserved_even_with_strong_cell(self):
         residuals = [((f"i{index}", "ㅏ", "ㄱ"), 0.0) for index in range(97)]
         residuals += [(("i0", "ㅓ", final), 30.0) for final in "ㄱㄴㅅ"]
-        diagnosis, _ = model.diagnose_v11("t", "right-final", residuals, ALL_DIAGNOSABLE)
+        diagnosis, _ = model.diagnose_v11("t", "right-final", [], residuals, ALL_DIAGNOSABLE)
         self.assertEqual(diagnosis["verdict"], "exceptions-preserved")
 
     def test_shape_transition_layer_keeps_exceptions(self):
         target, layer = next(iter(model.SHAPE_TRANSITIONS))
-        v2 = model.build_layer_model_v2(target, layer, shifted_cell_table("ㄹ", "ㅏ"))
+        v2 = model.build_layer_model_v2(target, layer, interaction_table({("ㄹ", "ㅏ")}))
         self.assertEqual(v2["v11Diagnosis"]["verdict"], "shape-transition")
         self.assertEqual(v2["v11Diagnosis"]["shapeTransition"], model.SHAPE_TRANSITIONS[(target, layer)])
         self.assertEqual(v2["interaction"], {"applied": False})
@@ -272,7 +298,8 @@ class CorpusVariationModelTests(unittest.TestCase):
         v1 = model.build_layer_model(rows)
         v2 = model.build_layer_model_v2("initial.roleFaces.left", "mixed-final", rows)
         self.assertEqual(v2["effects"], v1["effects"])
-        self.assertEqual(v2["v11Diagnosis"]["verdict"], "selective-interaction")
+        self.assertEqual(v2["v11Diagnosis"]["verdict"], "interaction")
+        self.assertGreaterEqual(v2["v11Diagnosis"]["holdoutP95Gain"], model.HOLDOUT_P95_IMPROVE)
         cells = {tuple(cell["cell"]) for cell in v2["interaction"]["cells"]}
         self.assertLessEqual({("ㄱ", "ㅢ"), ("ㄲ", "ㅝ"), ("ㅋ", "ㅘ"), ("ㄱ", "ㅝ")}, cells)
         self.assertEqual(v1["exceptions"]["10"]["count"], 308)
@@ -282,17 +309,24 @@ class CorpusVariationModelTests(unittest.TestCase):
         )
 
     def test_v2_beam_contact_layer_is_shape_transition(self):
+        # 홀드아웃은 크게 좋아지지만 접촉 on/off 형태 전환이라 셀 보정 대신 예외로 보존한다.
         rows = self.grouped["medial.primaryBeam.visibleLength"]["bottom-final"]
         v2 = model.build_layer_model_v2("medial.primaryBeam.visibleLength", "bottom-final", rows)
         self.assertEqual(v2["v11Diagnosis"]["verdict"], "shape-transition")
         self.assertFalse(v2["interaction"]["applied"])
 
-    def test_v2_giyeok_family_bottom_final_is_broad_under_current_cut(self):
-        # ㄲㅗ −47u 신호가 있는 층. 강셀 13개(ㄱ계×ㅗ·ㅛ·ㅡ 포함)라 10셀 기준에선 광범위로 분류된다.
+    def test_v2_giyeok_family_bottom_final_absorbs_under_holdout_gate(self):
+        # ㄲㅗ −47u 신호 층. 강셀 13개지만 coverage 낮고 홀드아웃이 일반화돼 v1.2에선 흡수된다.
         rows = self.grouped["initial.roleFaces.bottom"]["bottom-final"]
         v2 = model.build_layer_model_v2("initial.roleFaces.bottom", "bottom-final", rows)
-        self.assertEqual(v2["v11Diagnosis"]["verdict"], "broad-interaction")
+        self.assertEqual(v2["v11Diagnosis"]["verdict"], "interaction")
         self.assertEqual(v2["v11Diagnosis"]["pairs"]["initial×medial"]["strongCellCount"], 13)
+        self.assertLessEqual(v2["v11Diagnosis"]["pairs"]["initial×medial"]["coverage"], model.STRONG_CELL_COVERAGE_LIMIT)
+        self.assertGreaterEqual(v2["v11Diagnosis"]["holdoutP95Gain"], model.HOLDOUT_P95_IMPROVE)
+        term = {tuple(cell["cell"]): cell["term"] for cell in v2["interaction"]["cells"]}
+        self.assertAlmostEqual(term[("ㄲ", "ㅗ")], -47.0, delta=1.0)
+        v1 = model.build_layer_model(rows)
+        self.assertLess(v2["interaction"]["exceptions"]["10"]["count"], v1["exceptions"]["10"]["count"])
 
 
 if __name__ == "__main__":
