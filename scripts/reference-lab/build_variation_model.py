@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""전수 관측에서 역할면별 변화량 모델 v1을 만드는 분석 패스.
+"""전수 관측에서 역할면별 변화량 모델을 만드는 분석 패스.
 
-모델은 층(조합 레이아웃 6종)별로 `대표값 + 첫닿자 효과 + 홀자 효과 + 받침 효과`의
-주효과만 median polish로 푼다. 상호작용은 넣지 않고, 임계를 넘는 잔차는 예외로
-실측을 보존한다. 추출 관측·검수·승인 기록은 읽기만 하고, 산출물은 corpus의
-analysis/ 아래에 버전을 붙여 따로 저장한다.
+v1은 층(조합 레이아웃 6종)별로 `대표값 + 첫닿자 효과 + 홀자 효과 + 받침 효과`의
+주효과만 median polish로 푼다. 임계를 넘는 잔차는 예외로 실측을 보존한다.
+
+v2는 v1 주효과를 그대로 두고, v1.1 판정이 고른 층에만 자모쌍 셀 보정항을 순차로
+더한다(셀 보정 = v1 잔차의 셀 중앙값). 주효과가 v1과 같으므로 편집 Δ의 의미가
+바뀌지 않고, 셀 보정항은 편집 단위가 아니라 잔차처럼 딸려간다.
+
+추출 관측·검수·승인 기록은 읽기만 하고, 산출물은 corpus의 analysis/ 아래에
+버전을 붙여 따로 저장한다.
 """
 
 from __future__ import annotations
@@ -35,8 +40,23 @@ HOLDOUT_EVERY = 10
 NO_FINAL = "∅"
 SCALE = 1000.0
 
+SCHEMA_V2 = "noto-variation-model-v2"
+STRONG_CELL_MIN_COUNT = 3
+STRONG_CELL_SIGN_SHARE = 0.8
+ABSORPTION_GAIN_LIMIT = 0.4
+SELECTIVE_MAX_CELLS = 10
+# 셀 보정으로 흡수하면 안 되는 형태 전환. 실제 윤곽 대조로 확인한 층만 적는다.
+SHAPE_TRANSITIONS = {
+    ("medial.primaryBeam.visibleLength", "bottom-final"): (
+        "ㄱ계 다리가 ㅜ·ㅠ·ㅡ 보에 닿아 가시 구간이 잘리고 ㅗ·ㅛ에서는 떠 있다. "
+        "접촉 on/off 전환이라 셀 보정 대신 예외로 보존한다."
+    ),
+}
+
 Key = Tuple[str, str, str]
 Observation = Tuple[Key, float]
+Pair = Tuple[str, str]
+Cell = Tuple[str, str]
 
 
 # ---------------------------------------------------------------- 관측 수집
@@ -135,6 +155,10 @@ def residual_distribution(residuals: Sequence[float]) -> Dict[str, float]:
 PAIRS = (("initial", "medial"), ("initial", "final"), ("medial", "final"))
 
 
+def cell_of(key: Key, pair: Pair) -> Cell:
+    return (key[FACTORS.index(pair[0])], key[FACTORS.index(pair[1])])
+
+
 def pair_cell_diagnostics(
     residuals: Sequence[Tuple[Key, float]],
     exceptions: Sequence[Tuple[Key, float]],
@@ -212,17 +236,33 @@ def split_holdout(observations: Sequence[Tuple[str, Key, float]], every: int = H
     return training, holdout
 
 
-def evaluate_holdout(observations: Sequence[Tuple[str, Key, float]]) -> Optional[Dict[str, Any]]:
+def evaluate_holdout(
+    observations: Sequence[Tuple[str, Key, float]],
+    interaction: Optional[Tuple[Pair, Sequence[Cell]]] = None,
+) -> Optional[Dict[str, Any]]:
+    """홀드아웃 재현 오차. interaction=(자모쌍, 셀들)이면 셀 보정항을 학습분 잔차로 다시 추정해 더한다.
+    셀 선택은 전체 데이터에서 한 것을 그대로 쓴다."""
     training, holdout = split_holdout(observations)
     if not holdout or not training:
         return None
     fitted = median_polish([(observations[index][1], observations[index][2]) for index in training])
+    terms: Dict[Cell, float] = {}
+    if interaction:
+        pair, cells = interaction
+        selected = set(cells)
+        buckets: Dict[Cell, List[float]] = defaultdict(list)
+        for key, residual in fitted["residuals"]:
+            if cell_of(key, pair) in selected:
+                buckets[cell_of(key, pair)].append(residual)
+        terms = {cell: statistics.median(values) for cell, values in buckets.items()}
     errors: List[float] = []
     for index in holdout:
         _, key, value = observations[index]
         predicted = fitted["representative"] + sum(
             fitted["effects"][factor].get(key[position], 0.0) for position, factor in enumerate(FACTORS)
         )
+        if interaction:
+            predicted += terms.get(cell_of(key, interaction[0]), 0.0)
         errors.append(value - predicted)
     return {
         "trainingCount": len(training),
@@ -233,32 +273,42 @@ def evaluate_holdout(observations: Sequence[Tuple[str, Key, float]]) -> Optional
 
 # ---------------------------------------------------------------- 층 모델
 
-def build_layer_model(
-    observations: Sequence[Tuple[str, Key, float]],
-    thresholds: Sequence[float] = THRESHOLDS,
-    default_threshold: float = DEFAULT_THRESHOLD,
+def exception_table(
+    characters: Sequence[str],
+    residuals: Sequence[Tuple[Key, float]],
+    thresholds: Sequence[float],
 ) -> Dict[str, Any]:
-    fitted = median_polish([(key, value) for _, key, value in observations])
-    residuals = fitted["residuals"]
-    characters = [character for character, _, _ in observations]
-    level_counts = {
-        factor: Counter(key[index] for _, key, _ in observations) for index, factor in enumerate(FACTORS)
-    }
-    exceptions_by_threshold: Dict[str, Any] = {}
+    table: Dict[str, Any] = {}
     for threshold in thresholds:
         selected = [
             (character, key, residual)
             for character, (key, residual) in zip(characters, residuals)
             if abs(residual) > threshold
         ]
-        exceptions_by_threshold[f"{threshold:g}"] = {
+        table[f"{threshold:g}"] = {
             "count": len(selected),
-            "ratio": round(len(selected) / len(observations), 4),
+            "ratio": round(len(selected) / len(residuals), 4),
             "characters": [
                 {"character": character, "residual": round(residual, 3)}
                 for character, _, residual in sorted(selected, key=lambda item: -abs(item[2]))
             ],
         }
+    return table
+
+
+def build_layer_model(
+    observations: Sequence[Tuple[str, Key, float]],
+    thresholds: Sequence[float] = THRESHOLDS,
+    default_threshold: float = DEFAULT_THRESHOLD,
+    fitted: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    fitted = fitted or median_polish([(key, value) for _, key, value in observations])
+    residuals = fitted["residuals"]
+    characters = [character for character, _, _ in observations]
+    level_counts = {
+        factor: Counter(key[index] for _, key, _ in observations) for index, factor in enumerate(FACTORS)
+    }
+    exceptions_by_threshold = exception_table(characters, residuals, thresholds)
     default_exceptions = [
         (key, residual) for key, residual in residuals if abs(residual) > default_threshold
     ]
@@ -288,12 +338,145 @@ def build_layer_model(
     }
 
 
-def build_model(report: Dict[str, Any]) -> Dict[str, Any]:
+# ---------------------------------------------------------------- 상호작용 v2 (선택 셀 보정)
+
+def strong_cells(
+    residuals: Sequence[Tuple[Key, float]],
+    pair: Pair,
+    threshold: float = DEFAULT_THRESHOLD,
+) -> List[Dict[str, Any]]:
+    """셀 중앙값이 임계를 넘고 관측이 충분하며 잔차 부호가 일관된 셀. 셀 전체가 한 방향으로 튀는 구조 신호다."""
+    cells: Dict[Cell, List[float]] = defaultdict(list)
+    for key, residual in residuals:
+        cells[cell_of(key, pair)].append(residual)
+    found: List[Dict[str, Any]] = []
+    for cell, values in cells.items():
+        if len(values) < STRONG_CELL_MIN_COUNT:
+            continue
+        term = statistics.median(values)
+        if abs(term) <= threshold:
+            continue
+        sign_share = sum(1 for value in values if value * term > 0) / len(values)
+        if sign_share >= STRONG_CELL_SIGN_SHARE:
+            found.append({"cell": cell, "term": term, "observationCount": len(values), "signShare": sign_share})
+    return sorted(found, key=lambda item: (-abs(item["term"]), item["cell"]))
+
+
+def absorb_cells(residuals: Sequence[Tuple[Key, float]], pair: Pair, terms: Dict[Cell, float]) -> List[Tuple[Key, float]]:
+    """v1 주효과는 그대로 두고 선택 셀 잔차에서만 셀 보정항을 뺀다(순차 추정)."""
+    return [(key, residual - terms.get(cell_of(key, pair), 0.0)) for key, residual in residuals]
+
+
+def diagnose_v11(
+    target: str,
+    layer: str,
+    residuals: Sequence[Tuple[Key, float]],
+    pair_diagnostics: Dict[str, Any],
+    threshold: float = DEFAULT_THRESHOLD,
+) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
+    """v1.1 판정. 강셀을 순차 흡수했을 때 예외가 얼마나 줄고 몇 셀이 필요한지로 층을 나눈다.
+    v1의 "상위 셀 예외 점유율"은 셀이 수백 개인 층의 중간 뭉침을 놓쳐 흡수량으로 바꿨다."""
+    before = sum(1 for _, residual in residuals if abs(residual) > threshold)
+    candidates: Dict[str, Dict[str, Any]] = {}
+    for first, second in PAIRS:
+        name = f"{first}×{second}"
+        if not pair_diagnostics[name]["diagnosable"]:
+            continue
+        cells = strong_cells(residuals, (first, second), threshold)
+        if not cells:
+            continue
+        terms = {item["cell"]: item["term"] for item in cells}
+        after = sum(1 for _, residual in absorb_cells(residuals, (first, second), terms) if abs(residual) > threshold)
+        candidates[name] = {
+            "pair": (first, second),
+            "cells": cells,
+            "exceptionsAfter": after,
+            "absorptionGain": (before - after) / before if before else 0.0,
+        }
+    best_name = max(
+        candidates,
+        key=lambda name: (candidates[name]["absorptionGain"], -len(candidates[name]["cells"])),
+        default=None,
+    )
+    best = candidates.get(best_name) if best_name else None
+    if before / len(residuals) <= EXCEPTION_RATIO_LIMIT:
+        verdict = "exceptions-preserved"
+    elif best and best["absorptionGain"] >= ABSORPTION_GAIN_LIMIT:
+        if (target, layer) in SHAPE_TRANSITIONS:
+            verdict = "shape-transition"
+        elif len(best["cells"]) > SELECTIVE_MAX_CELLS:
+            verdict = "broad-interaction"
+        else:
+            verdict = "selective-interaction"
+    else:
+        verdict = "threshold-or-font-variation"
+    diagnosis = {
+        "verdict": verdict,
+        "exceptionsBefore": before,
+        "bestPair": best_name,
+        "pairs": {
+            name: {
+                "strongCellCount": len(candidate["cells"]),
+                "exceptionsAfter": candidate["exceptionsAfter"],
+                "absorptionGain": round(candidate["absorptionGain"], 4),
+            }
+            for name, candidate in candidates.items()
+        },
+        "shapeTransition": SHAPE_TRANSITIONS.get((target, layer)),
+    }
+    return diagnosis, best
+
+
+def build_layer_model_v2(
+    target: str,
+    layer: str,
+    observations: Sequence[Tuple[str, Key, float]],
+    thresholds: Sequence[float] = THRESHOLDS,
+    default_threshold: float = DEFAULT_THRESHOLD,
+) -> Dict[str, Any]:
+    """v1 층 모델에 v1.1 판정과 선택 셀 보정항을 더한다. 주효과와 v1 필드는 v1과 같다."""
+    fitted = median_polish([(key, value) for _, key, value in observations])
+    result = build_layer_model(observations, thresholds, default_threshold, fitted=fitted)
+    diagnosis, best = diagnose_v11(target, layer, fitted["residuals"], result["pairCells"], default_threshold)
+    result["v11Diagnosis"] = diagnosis
+    if diagnosis["verdict"] != "selective-interaction" or best is None:
+        result["interaction"] = {"applied": False}
+        return result
+    pair = best["pair"]
+    terms = {item["cell"]: item["term"] for item in best["cells"]}
+    residuals = absorb_cells(fitted["residuals"], pair, terms)
+    characters = [character for character, _, _ in observations]
+    result["interaction"] = {
+        "applied": True,
+        "pair": f"{pair[0]}×{pair[1]}",
+        "cells": [
+            {
+                "cell": list(item["cell"]),
+                "term": round(item["term"], 3),
+                "observationCount": item["observationCount"],
+                "signShare": round(item["signShare"], 4),
+            }
+            for item in best["cells"]
+        ],
+        "residuals": residual_distribution([residual for _, residual in residuals]),
+        "exceptions": exception_table(characters, residuals, thresholds),
+        "holdout": evaluate_holdout(observations, (pair, list(terms))),
+    }
+    return result
+
+
+# ---------------------------------------------------------------- 전체 모델
+
+def build_model(report: Dict[str, Any], version: str = "v1") -> Dict[str, Any]:
     grouped = group_observations(report["cases"])
     targets: Dict[str, Any] = {}
     for target in sorted(grouped):
         layers = {
-            layer: build_layer_model(grouped[target][layer])
+            layer: (
+                build_layer_model_v2(target, layer, grouped[target][layer])
+                if version == "v2"
+                else build_layer_model(grouped[target][layer])
+            )
             for layer in LAYERS
             if grouped[target].get(layer)
         }
@@ -303,32 +486,51 @@ def build_model(report: Dict[str, Any]) -> Dict[str, Any]:
 
 def summarize(targets: Dict[str, Any]) -> Dict[str, Any]:
     verdicts: Counter = Counter()
+    v11_verdicts: Counter = Counter()
+    exceptions_before = exceptions_after = applied = 0
     layer_count = 0
     for target in targets.values():
         for layer in target["layers"].values():
             layer_count += 1
             verdicts[layer["diagnosis"]["verdict"]] += 1
-    return {"targetCount": len(targets), "layerModelCount": layer_count, "verdictCounts": dict(verdicts)}
+            if "v11Diagnosis" in layer:
+                v11_verdicts[layer["v11Diagnosis"]["verdict"]] += 1
+                if layer["interaction"]["applied"]:
+                    applied += 1
+                    exceptions_before += layer["exceptions"][f"{layer['defaultThreshold']:g}"]["count"]
+                    exceptions_after += layer["interaction"]["exceptions"][f"{layer['defaultThreshold']:g}"]["count"]
+    summary = {"targetCount": len(targets), "layerModelCount": layer_count, "verdictCounts": dict(verdicts)}
+    if v11_verdicts:
+        summary["v11VerdictCounts"] = dict(v11_verdicts)
+        summary["interactionLayerCount"] = applied
+        summary["interactionExceptions"] = {"before": exceptions_before, "after": exceptions_after}
+    return summary
 
 
-def run(corpus_root: Path, report_name: str = "all.json") -> Dict[str, Any]:
+def run(corpus_root: Path, report_name: str = "all.json", version: str = "v1") -> Dict[str, Any]:
     report_path = corpus_root / "reports" / report_name
     with report_path.open(encoding="utf-8") as source:
         report = json.load(source)
     started = time.monotonic()
-    targets = build_model(report)
+    targets = build_model(report, version)
     summary = summarize(targets)
     summary["elapsedSeconds"] = round(time.monotonic() - started, 3)
     result = {
-        "schema": SCHEMA,
+        "schema": SCHEMA_V2 if version == "v2" else SCHEMA,
         "estimator": ESTIMATOR,
-        "interactions": "none",
+        "interactions": "selective-cell-terms" if version == "v2" else "none",
         "font": report["font"],
         "stageKeys": report["stageKeys"],
         "sourceReport": report_name,
         "measurementScale": "1000-unit",
         "meaning": (
-            "층별 median polish 주효과. 편집 후 = 실측 + 사용자가 바꾼 효과항 Δ. "
+            "층별 median polish 주효과 + v1.1 판정이 고른 층의 자모쌍 셀 보정항. "
+            "셀 보정은 v1 주효과를 고정한 채 v1 잔차의 셀 중앙값으로 순차 추정한다. "
+            "예측 = 대표값 + Σ효과 + 셀 보정. 편집 후 = 실측 + 사용자가 바꾼 주효과 Δ이며 "
+            "셀 보정항은 편집 단위가 아니라 잔차처럼 딸려간다. "
+            "임계를 넘는 잔차는 예외로 실측을 보존한다. 분석 후보이며 승인이나 편집 제약이 아니다."
+            if version == "v2"
+            else "층별 median polish 주효과. 편집 후 = 실측 + 사용자가 바꾼 효과항 Δ. "
             "임계를 넘는 잔차는 예외로 실측을 보존한다. 분석 후보이며 승인이나 편집 제약이 아니다. "
             "배치 보고서의 medialVariationFromGiyeok을 분석 입력으로 대체한다."
         ),
@@ -344,9 +546,21 @@ def run(corpus_root: Path, report_name: str = "all.json") -> Dict[str, Any]:
         "summary": summary,
         "targets": targets,
     }
+    if version == "v2":
+        result["interactionRule"] = {
+            "estimation": "sequential",
+            "strongCellMinCount": STRONG_CELL_MIN_COUNT,
+            "strongCellSignShare": STRONG_CELL_SIGN_SHARE,
+            "absorptionGainLimit": ABSORPTION_GAIN_LIMIT,
+            "selectiveMaxCells": SELECTIVE_MAX_CELLS,
+        }
+        result["shapeTransitions"] = [
+            {"target": target, "layer": layer, "reason": reason}
+            for (target, layer), reason in sorted(SHAPE_TRANSITIONS.items())
+        ]
     output_dir = corpus_root / "analysis"
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / "variation-model-v1.json"
+    output_path = output_dir / f"variation-model-{version}.json"
     with output_path.open("w", encoding="utf-8") as target:
         json.dump(result, target, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
     result["outputPath"] = str(output_path)
@@ -354,7 +568,9 @@ def run(corpus_root: Path, report_name: str = "all.json") -> Dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="역할면 변화량 모델 v1 (주효과 median polish, 관측 불변)")
+    parser = argparse.ArgumentParser(
+        description="역할면 변화량 모델 (v1 주효과 · v2 선택 셀 보정, median polish, 관측 불변)"
+    )
     parser.add_argument(
         "--corpus",
         type=Path,
@@ -362,8 +578,9 @@ def main() -> None:
         / ".reference-fonts/guide-corpus/251eae7645152d1705a55414",
     )
     parser.add_argument("--report", default="all.json")
+    parser.add_argument("--model-version", choices=("v1", "v2"), default="v1")
     args = parser.parse_args()
-    result = run(args.corpus, args.report)
+    result = run(args.corpus, args.report, args.model_version)
     print(json.dumps({"summary": result["summary"], "outputPath": result["outputPath"]}, ensure_ascii=False, indent=2))
 
 

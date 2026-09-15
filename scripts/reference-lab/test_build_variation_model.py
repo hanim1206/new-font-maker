@@ -141,6 +141,97 @@ class HoldoutTests(unittest.TestCase):
         self.assertLess(evaluation["reproductionError"]["max"], 1e-6)
 
 
+def shifted_cell_table(initial, medial, shift=30.0):
+    """(첫닿, 홀자) 셀 전체가 받침과 무관하게 같은 양만큼 튀는 합성 표."""
+    return [
+        (character, key, value + (shift if key[0] == initial and key[1] == medial else 0.0))
+        for character, key, value in additive_table()
+    ]
+
+
+ALL_DIAGNOSABLE = {f"{first}×{second}": {"diagnosable": True} for first, second in model.PAIRS}
+ONLY_INITIAL_MEDIAL = {
+    f"{first}×{second}": {"diagnosable": (first, second) == ("initial", "medial")} for first, second in model.PAIRS
+}
+
+
+class InteractionV2Tests(unittest.TestCase):
+    def test_strong_cell_needs_threshold_sign_consistency_and_count(self):
+        residuals = (
+            [(("ㄱ", "ㅏ", final), 20.0) for final in "ㄱㄴㅅ"]
+            + [(("ㄴ", "ㅏ", "ㄱ"), 20.0), (("ㄴ", "ㅏ", "ㄴ"), 20.0), (("ㄴ", "ㅏ", "ㅅ"), -20.0)]
+            + [(("ㄷ", "ㅏ", final), 20.0) for final in "ㄱㄴ"]
+            + [(("ㄹ", "ㅏ", final), 8.0) for final in "ㄱㄴㅅ"]
+        )
+        cells = model.strong_cells(residuals, ("initial", "medial"))
+        self.assertEqual([item["cell"] for item in cells], [("ㄱ", "ㅏ")])
+        self.assertEqual(cells[0]["observationCount"], 3)
+        self.assertEqual(cells[0]["signShare"], 1.0)
+
+    def test_selective_cell_is_absorbed_without_moving_main_effects(self):
+        rows = shifted_cell_table("ㄹ", "ㅏ")
+        v1 = model.build_layer_model(rows)
+        v2 = model.build_layer_model_v2("initial.roleFaces.bottom", "right-final", rows)
+        self.assertEqual(v2["v11Diagnosis"]["verdict"], "selective-interaction")
+        self.assertEqual(v2["v11Diagnosis"]["bestPair"], "initial×medial")
+        # 순차 추정: v1 필드(주효과·잔차·예외·홀드아웃)는 v1과 한 글자도 다르지 않다.
+        self.assertEqual({key: value for key, value in v2.items() if key not in ("v11Diagnosis", "interaction")}, v1)
+        interaction = v2["interaction"]
+        self.assertTrue(interaction["applied"])
+        self.assertEqual(interaction["pair"], "initial×medial")
+        self.assertEqual([cell["cell"] for cell in interaction["cells"]], [["ㄹ", "ㅏ"]])
+        self.assertAlmostEqual(interaction["cells"][0]["term"], 30.0, places=6)
+        self.assertEqual(v1["exceptions"]["10"]["count"], 3)
+        self.assertEqual(interaction["exceptions"]["10"]["count"], 0)
+
+    def test_holdout_with_interaction_reestimates_cell_term_from_training(self):
+        # 홀드아웃 0번(ㄱㅏㄱ)이 튀는 셀에 들어간다. 주효과만으로는 30u를 못 맞히고 셀 보정은 맞힌다.
+        rows = shifted_cell_table("ㄱ", "ㅏ")
+        v2 = model.build_layer_model_v2("initial.roleFaces.bottom", "right-final", rows)
+        self.assertAlmostEqual(v2["holdout"]["reproductionError"]["max"], 30.0, places=3)
+        self.assertLess(v2["interaction"]["holdout"]["reproductionError"]["max"], 1e-6)
+
+    def test_too_many_strong_cells_is_broad_and_not_applied(self):
+        initials = [f"i{index}" for index in range(12)]
+
+        def residuals_with(shifted):
+            return [
+                ((initial, medial, final), 30.0 if medial == "ㅏ" and index < shifted else 0.0)
+                for index, initial in enumerate(initials)
+                for medial in ("ㅏ", "ㅓ")
+                for final in ("ㄱ", "ㄴ", "ㅅ")
+            ]
+
+        at_limit, _ = model.diagnose_v11("t", "right-final", residuals_with(model.SELECTIVE_MAX_CELLS), ONLY_INITIAL_MEDIAL)
+        over_limit, _ = model.diagnose_v11("t", "right-final", residuals_with(model.SELECTIVE_MAX_CELLS + 1), ONLY_INITIAL_MEDIAL)
+        self.assertEqual(at_limit["verdict"], "selective-interaction")
+        self.assertEqual(over_limit["verdict"], "broad-interaction")
+        self.assertEqual(over_limit["pairs"]["initial×medial"]["absorptionGain"], 1.0)
+
+    def test_weak_absorption_stays_threshold_or_font_variation(self):
+        # 강셀 하나가 예외 10개 중 3개만 설명한다 → 흡수 30% < 40%.
+        residuals = [((f"i{index}", "ㅏ", "ㄱ"), 0.0) for index in range(60)]
+        residuals += [(("i0", "ㅓ", final), 30.0) for final in "ㄱㄴㅅ"]
+        residuals += [((f"i{index}", "ㅗ", "ㄱ"), 25.0 if index % 2 else -25.0) for index in range(7)]
+        diagnosis, _ = model.diagnose_v11("t", "right-final", residuals, ONLY_INITIAL_MEDIAL)
+        self.assertEqual(diagnosis["exceptionsBefore"], 10)
+        self.assertEqual(diagnosis["pairs"]["initial×medial"]["absorptionGain"], 0.3)
+        self.assertEqual(diagnosis["verdict"], "threshold-or-font-variation")
+
+    def test_low_exception_ratio_is_preserved_even_with_strong_cell(self):
+        residuals = [((f"i{index}", "ㅏ", "ㄱ"), 0.0) for index in range(97)]
+        residuals += [(("i0", "ㅓ", final), 30.0) for final in "ㄱㄴㅅ"]
+        diagnosis, _ = model.diagnose_v11("t", "right-final", residuals, ALL_DIAGNOSABLE)
+        self.assertEqual(diagnosis["verdict"], "exceptions-preserved")
+
+    def test_shape_transition_layer_keeps_exceptions(self):
+        target, layer = next(iter(model.SHAPE_TRANSITIONS))
+        v2 = model.build_layer_model_v2(target, layer, shifted_cell_table("ㄹ", "ㅏ"))
+        self.assertEqual(v2["v11Diagnosis"]["verdict"], "shape-transition")
+        self.assertEqual(v2["v11Diagnosis"]["shapeTransition"], model.SHAPE_TRANSITIONS[(target, layer)])
+        self.assertEqual(v2["interaction"], {"applied": False})
+
+
 @unittest.skipUnless((CORPUS / "reports/all.json").is_file(), "corpus unavailable")
 class CorpusVariationModelTests(unittest.TestCase):
     @classmethod
@@ -175,6 +266,33 @@ class CorpusVariationModelTests(unittest.TestCase):
         for layer_rows in layers.values():
             for _, key, _ in layer_rows:
                 self.assertNotEqual(key[1], "ㅣ")
+
+    def test_v2_absorbs_mixed_final_initial_left_cells_without_moving_effects(self):
+        rows = self.grouped["initial.roleFaces.left"]["mixed-final"]
+        v1 = model.build_layer_model(rows)
+        v2 = model.build_layer_model_v2("initial.roleFaces.left", "mixed-final", rows)
+        self.assertEqual(v2["effects"], v1["effects"])
+        self.assertEqual(v2["v11Diagnosis"]["verdict"], "selective-interaction")
+        cells = {tuple(cell["cell"]) for cell in v2["interaction"]["cells"]}
+        self.assertLessEqual({("ㄱ", "ㅢ"), ("ㄲ", "ㅝ"), ("ㅋ", "ㅘ"), ("ㄱ", "ㅝ")}, cells)
+        self.assertEqual(v1["exceptions"]["10"]["count"], 308)
+        self.assertEqual(v2["interaction"]["exceptions"]["10"]["count"], 122)
+        self.assertLess(
+            v2["interaction"]["holdout"]["reproductionError"]["p95"], v1["holdout"]["reproductionError"]["p95"]
+        )
+
+    def test_v2_beam_contact_layer_is_shape_transition(self):
+        rows = self.grouped["medial.primaryBeam.visibleLength"]["bottom-final"]
+        v2 = model.build_layer_model_v2("medial.primaryBeam.visibleLength", "bottom-final", rows)
+        self.assertEqual(v2["v11Diagnosis"]["verdict"], "shape-transition")
+        self.assertFalse(v2["interaction"]["applied"])
+
+    def test_v2_giyeok_family_bottom_final_is_broad_under_current_cut(self):
+        # ㄲㅗ −47u 신호가 있는 층. 강셀 13개(ㄱ계×ㅗ·ㅛ·ㅡ 포함)라 10셀 기준에선 광범위로 분류된다.
+        rows = self.grouped["initial.roleFaces.bottom"]["bottom-final"]
+        v2 = model.build_layer_model_v2("initial.roleFaces.bottom", "bottom-final", rows)
+        self.assertEqual(v2["v11Diagnosis"]["verdict"], "broad-interaction")
+        self.assertEqual(v2["v11Diagnosis"]["pairs"]["initial×medial"]["strongCellCount"], 13)
 
 
 if __name__ == "__main__":
