@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { Check, Copy, Dices, Download, LayoutDashboard, ListTree, LoaderCircle, Redo2, Settings2, TextCursorInput, Undo2, X } from 'lucide-react'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
+import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import { moveHandle, movePoint, moveStroke, scaleStroke } from '../src/services/editorCommands'
@@ -326,6 +327,11 @@ function FocusedGlyph({
     jong: syllable.jongseong?.char ?? '',
   }), [schema, syllable])
   const targets = useMemo(() => getRenderedStrokeTargets(syllable, boxes), [boxes, syllable])
+  // Noto 고스트: 표시·비교 전용. 잉크에 안 섞인다. 켬/끔은 기기에 기억한다.
+  const [ghostVisible, setGhostVisible] = useState(loadGhostVisible)
+  const { ghost, error: ghostError } = useNotoGhost(char, ghostVisible)
+  const comparison = useGhostComparison(ghost, syllable, schema, globalStyle)
+  const toggleGhost = () => setGhostVisible((current) => { saveGhostVisible(!current); return !current })
   const selectedPart = selection.kind === 'none' ? null : selection.editorPart
   const selectedStrokeId = selection.kind === 'stroke' || selection.kind === 'point' || selection.kind === 'handle'
     ? selection.strokeId
@@ -352,6 +358,7 @@ function FocusedGlyph({
       {globalStyle.strokeStyle.mode === 'legacy-snapped-centerline' && <span className={styles.constructionGrid} aria-hidden="true" data-construction-grid="legacy-snapped-centerline" />}
       <span className={styles.designBody} aria-hidden="true" />
       <SvgRenderer syllable={syllable} schema={schema} size={340} className={styles.focusSvg} partStyles={partStyles} globalStyle={globalStyle}>
+        {ghostVisible && ghost && <path d={ghost.path} className={styles.notoGhost} fillRule="evenodd" pointerEvents="none" data-testid="noto-ghost" />}
         {selection.kind === 'component' && <LayoutAreaBoxes boxes={boxes} parts={selection.renderParts} emphasis="focused" />}
         {targets.map((target) => {
           const path = pointsToSvgD(target.stroke.points, target.stroke.closed, target.box, VIEW_BOX_SIZE)
@@ -417,6 +424,13 @@ function FocusedGlyph({
         })}
       </SvgRenderer>
       <span className={styles.focusChar} aria-hidden="true">{char} · {fontSpace.unitsPerEm} UPM</span>
+      <button type="button" className={styles.ghostToggle} aria-pressed={ghostVisible} data-testid="noto-ghost-toggle" onPointerDown={(event) => event.stopPropagation()} onClick={toggleGhost}>
+        Noto 고스트
+        {ghostVisible && comparison && ('xorRatio' in comparison
+          ? <strong data-testid="noto-ghost-xor">xor {(comparison.xorRatio * 100).toFixed(0)}%</strong>
+          : <small>{comparison.message}</small>)}
+        {ghostVisible && ghostError && <small>{ghostError}</small>}
+      </button>
     </div>
   )
 }

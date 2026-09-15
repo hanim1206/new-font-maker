@@ -133,3 +133,10 @@
 .roundBrushMessage { min-height: 104px; margin: 0; display: grid; place-items: center; border: 1px dashed rgb(var(--color-border)); border-radius: 12px; color: rgb(var(--color-text-dim-4)); font-size: 11px; text-align: center; }
 @media (max-height: 720px) { .focusCanvas { width: min(54dvh, 278px); } }
 @media (max-height: 720px) { .brushSection { padding-top: 4px; padding-bottom: calc(env(safe-area-inset-bottom) + 6px); } .brushDrawer { min-height: 212px; gap: 4px; padding: 6px; } .brushHeader { min-height: 27px; } .brushHeader button { width: 28px; height: 28px; } .globalStyleTabs button { min-height: 34px; padding-block: 4px; } .globalStyleTabs small { display: none; } .brushControls { gap: 4px; } .brushControlGrid, .ruleControlGrid, .brushAnglePad, .roundBrushMessage { min-height: 70px; } .brushTips button { min-height: 48px; } .brushTipPreview { height: 24px; } .strokeRuleModes button { min-height: 23px; } .bodyScope button { min-height: 28px; } .bodyControls { gap: 4px; } .bodyDimensionGrid { min-height: 52px; } .bodyDimensionGrid label { gap: 4px; padding-block: 5px; } .bodyReset { min-height: 28px; } }
+
+/* Noto 고스트: 잉크 아래 회색 비교용. 토글은 캔버스 왼쪽 위. */
+.notoGhost { fill: #3a3a36; fill-opacity: .22; }
+.ghostToggle { position: absolute; left: 10px; top: 8px; z-index: 2; display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface) / .92); color: rgb(var(--color-text-dim-4)); font-size: 10px; font-weight: 700; }
+.ghostToggle[aria-pressed='true'] { border-color: rgb(var(--color-text-dim-3)); color: rgb(var(--color-foreground)); }
+.ghostToggle strong { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 700; color: rgb(var(--color-primary-dark)); }
+.ghostToggle small { max-width: 160px; overflow: hidden; color: rgb(var(--color-danger, 214 50 31)); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
