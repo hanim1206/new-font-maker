@@ -216,7 +216,14 @@ def audit_case(identity, payloads):
     required = {"initial", "medial"} | ({"final"} if identity["finalJamo"] else set())
     if required <= owners.keys():
         union = set().union(*(owners[stage] for stage in required))
-        if union != set(range(len(contours))):
+        # 역할이 소유한 윤곽과 좌표가 같은 중복 윤곽(예: 껴의 ㅕ 기둥 복제)은
+        # 어느 역할도 소유하지 않아도 미배정으로 보지 않는다.
+        owned_bounds = [contours[index]["bounds"] for index in union]
+        unaccounted = [
+            index for index in set(range(len(contours))) - union
+            if not any(all(abs(contours[index]["bounds"][side] - owned[side]) <= 1e-3 for side in owned) for owned in owned_bounds)
+        ]
+        if unaccounted:
             issues.append("joint:unassigned-contours")
     return {"identity": identity, "status": "failed" if issues else "blocked" if blocked else "passed",
             "checks": checks, "issues": issues, "blockedStages": blocked,

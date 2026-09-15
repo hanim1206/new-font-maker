@@ -93,7 +93,12 @@ class NotoNoFinalTests(unittest.TestCase):
                 recorder = medial.DecomposingRecordingPen(glyph_set)
                 glyph_set[observed["glyphName"]].draw(recorder)
                 contours = medial.split_contours(recorder.value)
-                self.assertEqual(initial_ids | medial_ids, set(range(len(contours))))
+                # 홀자 윤곽과 좌표·면적이 같은 중복 윤곽(예: 껴의 ㅕ 기둥 복제)은
+                # 홀자 몫으로 회계한다. 초성으로 새면 안 된다.
+                records = {record.contour_id: record for record in initial._contour_records(recorder.value, self.font["head"].unitsPerEm)}
+                accounted = set(initial._duplicate_medial_contours(list(records.values()), set(medial_ids)))
+                self.assertFalse(initial_ids & accounted)
+                self.assertEqual(initial_ids | accounted, set(range(len(contours))))
                 pen = BoundsPen(None)
                 for contour_id in initial_ids:
                     medial._replay(contours[contour_id], pen)
@@ -119,6 +124,19 @@ class NotoNoFinalTests(unittest.TestCase):
             with self.subTest(change=change):
                 result = initial.extract_initial_character(self.font, "걔", "ㄱ", "ㅒ", None, case["contextId"], medial_observation=observation)
                 self.assertEqual(result["selectionArea"]["reasonCode"], "medial-anchor-unavailable")
+
+    def test_duplicate_medial_stem_does_not_leak_into_initial(self):
+        # 껴는 ㅕ 세로기둥이 동일 윤곽 둘(c0·c7)로 그려져 있다. 홀자가 하나만
+        # evidence로 잡아도 중복 c7이 첫닿밑선으로 새면 안 된다. 형제 끼와 같은
+        # baseline 위 값이어야 하고, 초성 선택에 중복 기둥이 포함되면 안 된다.
+        case = next(case for case in contract.no_final_cases() if case["character"] == "껴")
+        observation = medial.extract_medial_character(self.font, "껴", "ㅕ", None)
+        result = initial.extract_initial_character(self.font, "껴", "ㄲ", "ㅕ", None, case["contextId"], medial_observation=observation)
+        self.assertEqual(result["componentGroup"]["status"], "candidate")
+        self.assertEqual(result["componentGroup"]["value"]["contourIds"], [3, 4, 5, 6])
+        bottom = result["roleFaces"]["bottom"]["value"]
+        self.assertLess(bottom, 880.0)  # baseline 위
+        self.assertAlmostEqual(bottom, 812.5, delta=1.0)  # 끼와 같은 ㄲ 바닥
 
     def test_role_conflict_does_not_invent_a_missing_paired_body(self):
         case = next(case for case in contract.no_final_cases() if case["character"] == "뼤")

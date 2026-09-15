@@ -907,6 +907,37 @@ def _has_structure(
     )
 
 
+def _duplicate_medial_contours(
+    records: Sequence[ContourRecord],
+    medial_contour_ids: set[int],
+) -> set[int]:
+    """홀자 소유 윤곽과 좌표·면적이 같은 중복 윤곽도 홀자 몫으로 본다.
+
+    Noto 껴처럼 모음 기둥이 동일한 윤곽 둘로 그려지면, 홀자 추출이 하나만
+    evidence로 잡고 나머지 중복이 첫닿자로 샌다. bbox만 겹치는 다른 획을
+    끌어오지 않도록 부호 있는 면적까지 같아야 중복으로 인정한다.
+    """
+    if not medial_contour_ids:
+        return set(medial_contour_ids)
+    records_by_id = {record.contour_id: record for record in records}
+    medial_shapes = [
+        (records_by_id[contour_id].bounds, records_by_id[contour_id].signed_area)
+        for contour_id in medial_contour_ids
+        if contour_id in records_by_id
+    ]
+    expanded = set(medial_contour_ids)
+    for record in records:
+        if record.contour_id in expanded:
+            continue
+        if any(
+            abs(record.signed_area - area) <= 1.0
+            and all(abs(a - b) <= 1e-3 for a, b in zip(record.bounds, bounds))
+            for bounds, area in medial_shapes
+        ):
+            expanded.add(record.contour_id)
+    return expanded
+
+
 def _build_component_selection(
     records: Sequence[ContourRecord],
     medial_faces: Dict[str, Dict[str, Any]],
@@ -918,6 +949,7 @@ def _build_component_selection(
 ) -> Optional[ComponentSelection]:
     records_by_id = {record.contour_id: record for record in records}
     parents = _containment_parents(records)
+    medial_contour_ids = _duplicate_medial_contours(records, medial_contour_ids)
     selected_ids, margin = _select_component_ids(
         records,
         medial_faces,
