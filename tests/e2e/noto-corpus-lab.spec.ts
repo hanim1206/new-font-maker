@@ -52,9 +52,7 @@ test.describe('실제 Noto corpus 검수판', () => {
   test('자모별 검수 저장과 취소는 격리되고 새 추출 버전에는 승인을 상속하지 않는다', async ({ page }) => {
     await page.goto('/noto-corpus-lab')
     await expect(page.locator(glyphSvg)).toBeVisible()
-    await page.getByLabel('첫닿자 검수 메모', { exact: true }).fill('회귀 테스트: 첫닿자 확인')
     await page.getByText('기준선 맞음', { exact: true }).nth(0).click()
-    await page.getByLabel('홀자 검수 메모', { exact: true }).fill('회귀 테스트: 홀자 확인')
     await page.getByText('기준선 맞음', { exact: true }).nth(1).click()
     await expect(page.getByText(/1\s*\/\s*11,172/).first()).toBeVisible()
     await page.reload()
@@ -159,6 +157,25 @@ test.describe('실제 Noto corpus 검수판', () => {
     await expect(cells).toHaveCount(399)
     await expect(current).toHaveText('깨')
     await expect(page.getByRole('combobox', { name: '축 배치' })).toHaveCount(0)
+  })
+
+  test('기준선은 기본으로 캔버스를 가로지르는 선이고 박스로 바꿀 수 있다', async ({ page }) => {
+    await page.goto('/noto-corpus-lab')
+    await page.getByPlaceholder('예: 가고과너').fill('강')
+    await page.getByTestId('corpus-character').click()
+    await expect(page.locator(glyphSvg)).toHaveAttribute('aria-label', '강 실제 Noto 윤곽과 추출 기준선')
+    const initialLines = page.getByTestId('corpus-guide-initial').locator('line')
+    await expect(initialLines).toHaveCount(4)
+    const spansCanvas = await initialLines.evaluateAll(lines => lines.every(line => {
+      const [x1, x2, y1, y2] = ['x1', 'x2', 'y1', 'y2'].map(key => Number(line.getAttribute(key)))
+      return (x1 === x2 && y1 < 0 && y2 > 1) || (y1 === y2 && x1 < 0 && x2 > 1)
+    }))
+    expect(spansCanvas).toBe(true)
+    await expect(page.locator(glyphSvg).locator('[data-grid]')).toHaveCount(2)
+    await page.getByRole('button', { name: '박스', exact: true }).click()
+    await expect(page.locator('rect[data-testid="corpus-guide-initial"]')).toHaveCount(1)
+    await expect(page.locator('rect[data-testid="corpus-guide-final"]')).toHaveCount(1)
+    await expect(page.getByPlaceholder('검수 메모 (선택)')).toHaveCount(0)
   })
 
   test('상태 강조는 칸을 숨기지 않고 흐리게만 한다', async ({ page }) => {

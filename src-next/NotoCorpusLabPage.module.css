@@ -50,7 +50,7 @@
 .stagePanel li progress { grid-column: 2; width: 100%; height: 5px; border: none; border-radius: 4px; overflow: hidden; accent-color: #2a749f; background: #edf2f6; }
 .stagePanel li progress::-webkit-progress-bar { background: #edf2f6; }
 .stagePanel li progress::-webkit-progress-value { background: #2a749f; }
-.workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 440px); align-items: start; gap: 22px; margin-top: 28px; }
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 330px; align-items: start; gap: 22px; margin-top: 28px; }
 .browser, .inspector { min-width: 0; padding: 22px; border: 1px solid var(--line); border-radius: 19px; background: rgb(255 255 255 / .94); }
 .browser h2 { margin: 0; font-size: 24px; letter-spacing: -.04em; }
 .browser header p { margin-top: 6px; color: var(--muted); font-size: 12px; }
@@ -66,6 +66,10 @@
 .inspector h2 small { display: block; margin-top: 5px; font-size: 12px; color: var(--muted); font-weight: 600; }
 .legend { display: flex; flex-wrap: wrap; gap: 18px; margin: 18px 0 4px; font-size: 12px; font-weight: 750; }
 .legend label { display: flex; align-items: center; gap: 5px; }
+.guideStyle { display: inline-flex; margin-left: auto; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; }
+.guideStyle button { padding: 4px 10px; border: 0; background: white; color: var(--ink); font-size: 11px; font-weight: 700; }
+.guideStyle button + button { border-left: 1px solid var(--line); }
+.guideStyle button[aria-pressed='true'] { background: var(--ink); color: white; }
 .canvas { display: block; width: min(100%, 400px); margin: 0 auto; aspect-ratio: 1; }
 .emptyCanvas { display: grid; place-content: center; min-height: 240px; padding: 28px; margin: 16px 0; border: 1px dashed var(--line); border-radius: 12px; background: #f8fafc; color: var(--muted); font-size: 13px; text-align: center; line-height: 1.9; }
 .caption { text-align: center; color: var(--muted); font-size: 10px; line-height: 1.8; }
@@ -74,7 +78,6 @@
 .partReviews header { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
 .partReviews header span { color: var(--muted); font-size: 10px; }
 .partReviews p { margin-top: 8px; font-size: 11px; line-height: 1.7; color: var(--muted); }
-.partReviews input { width: 100%; padding: 8px; margin-top: 10px; border: 1px solid var(--line); border-radius: 6px; background: white; font-size: 11px; }
 .reviewButtons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .reviewButtons button { padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: white; color: var(--ink); font-size: 10px; }
 .reviewButtons button:first-child { background: #e4f1ed; border-color: #a9cbc0; color: #296957; }

@@ -27,7 +27,17 @@ function Metric({ title, value, total, description }: { title: string; value: nu
   return <article className={styles.metric} aria-label={title}><span>{title}</span><strong>{number(value)}<small> / {number(total)}</small></strong><progress max={total || 1} value={value} /><p>{percent(value, total)} · {description}</p></article>
 }
 
-function GuideCanvas({ detail, visible }: { detail: CorpusDetail; visible: Record<PartStage, boolean> }) {
+type GuideStyle = 'line' | 'box'
+const FACE_ORIENTATION: Record<string, 'vertical' | 'horizontal'> = { left: 'vertical', right: 'vertical', top: 'horizontal', bottom: 'horizontal' }
+const CANVAS_EDGE = [-0.12, 1.12] as const
+// 글자 영역 안 배경 격자: 0.1 간격, 0.5 중심선만 조금 진하게
+const GRID_MINOR = [1, 2, 3, 4, 6, 7, 8, 9].map((step) => `M${step / 10} 0V1M0 ${step / 10}H1`).join('')
+const GRID_MAJOR = 'M.5 0V1M0 .5H1'
+const faceLine = (orientation: 'vertical' | 'horizontal', face: number) => orientation === 'vertical'
+  ? { x1: face, x2: face, y1: CANVAS_EDGE[0], y2: CANVAS_EDGE[1] }
+  : { x1: CANVAS_EDGE[0], x2: CANVAS_EDGE[1], y1: face, y2: face }
+
+function GuideCanvas({ detail, visible, guideStyle }: { detail: CorpusDetail; visible: Record<PartStage, boolean>; guideStyle: GuideStyle }) {
   const drawing = useMemo(() => {
     try {
       const outline = detail.stages.outline?.observation as RawCorpusOutline | null
@@ -39,13 +49,27 @@ function GuideCanvas({ detail, visible }: { detail: CorpusDetail; visible: Recor
   const medial = (detail.stages.medial?.measurements ?? {}) as Record<string, MedialMeasurement>
   return <svg viewBox="-0.12 -0.12 1.24 1.24" className={styles.canvas} role="img" aria-label={`${detail.identity.character} 실제 Noto 윤곽과 추출 기준선`} data-testid="corpus-outline">
     <rect x="0" y="0" width="1" height="1" fill="white" stroke="#d8e1e9" strokeWidth=".003" />
+    <path d={GRID_MINOR} stroke="#edf1f5" strokeWidth="1" vectorEffect="non-scaling-stroke" data-grid="minor" />
+    <path d={GRID_MAJOR} stroke="#d9e2ea" strokeWidth="1" vectorEffect="non-scaling-stroke" data-grid="major" />
     <path d="M-.1 .88H1.1" stroke="#9aaec1" strokeWidth=".002" />
-    {(['initial', 'final'] as const).map((stage) => {
-      const area = (detail.stages[stage]?.measurements as ComponentMeasurement | undefined)?.selectionArea
-      return visible[stage] && area ? <rect key={stage} {...area} fill={PART_COLOR[stage]} fillOpacity=".12" stroke={PART_COLOR[stage]} strokeWidth="2" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" data-testid={`corpus-guide-${stage}`} /> : null
-    })}
-    {visible.medial && <g data-testid="corpus-guide-medial">{Object.entries(medial).flatMap(([id, value]) => value.visibleSpans.map((span, index) => <line key={`${id}-${index}`} x1={value.orientation === 'vertical' ? value.face : span.from} x2={value.orientation === 'vertical' ? value.face : span.to} y1={value.orientation === 'vertical' ? span.from : value.face} y2={value.orientation === 'vertical' ? span.to : value.face} stroke={PART_COLOR.medial} strokeWidth="5" vectorEffect="non-scaling-stroke"><title>{id} · {value.face.toFixed(5)}</title></line>))}</g>}
+    {guideStyle === 'box' && <>
+      {(['initial', 'final'] as const).map((stage) => {
+        const area = (detail.stages[stage]?.measurements as ComponentMeasurement | undefined)?.selectionArea
+        return visible[stage] && area ? <rect key={stage} {...area} fill={PART_COLOR[stage]} fillOpacity=".12" stroke={PART_COLOR[stage]} strokeWidth="2" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" data-testid={`corpus-guide-${stage}`} /> : null
+      })}
+      {visible.medial && <g data-testid="corpus-guide-medial">{Object.entries(medial).flatMap(([id, value]) => value.visibleSpans.map((span, index) => <line key={`${id}-${index}`} x1={value.orientation === 'vertical' ? value.face : span.from} x2={value.orientation === 'vertical' ? value.face : span.to} y1={value.orientation === 'vertical' ? span.from : value.face} y2={value.orientation === 'vertical' ? span.to : value.face} stroke={PART_COLOR.medial} strokeWidth="5" vectorEffect="non-scaling-stroke"><title>{id} · {value.face.toFixed(5)}</title></line>))}</g>}
+    </>}
     <path d={drawing.path} transform={`matrix(${1 / drawing.upm} 0 0 ${-1 / drawing.upm} 0 .88)`} fill="#172b3d" data-source="actual-font-outline" />
+    {/* 선 방식은 윤곽 위에 그려 면이 획 가장자리와 맞는지 바로 보이게 한다. */}
+    {guideStyle === 'line' && <>
+      {(['initial', 'final'] as const).map((stage) => {
+        const measurement = detail.stages[stage]?.measurements as ComponentMeasurement | undefined
+        const area = measurement?.selectionArea
+        const faces = measurement?.roleFaces ?? (area ? { top: area.y, bottom: area.y + area.height, left: area.x, right: area.x + area.width } : null)
+        return visible[stage] && faces ? <g key={stage} data-testid={`corpus-guide-${stage}`}>{Object.entries(faces).filter(([side, value]) => FACE_ORIENTATION[side] && Number.isFinite(value)).map(([side, value]) => <line key={side} {...faceLine(FACE_ORIENTATION[side], value)} stroke={PART_COLOR[stage]} strokeWidth="1.5" strokeOpacity=".9" vectorEffect="non-scaling-stroke"><title>{STAGE_LABEL[stage]} {side} · {value.toFixed(5)}</title></line>)}</g> : null
+      })}
+      {visible.medial && <g data-testid="corpus-guide-medial">{Object.entries(medial).map(([id, value]) => <line key={id} {...faceLine(value.orientation, value.face)} stroke={PART_COLOR.medial} strokeWidth="2" strokeOpacity=".9" vectorEffect="non-scaling-stroke"><title>{id} · {value.face.toFixed(5)}</title></line>)}</g>}
+    </>}
   </svg>
 }
 
@@ -60,7 +84,7 @@ export function NotoCorpusLabPage() {
   const [detail, setDetail] = useState<CorpusDetail | null>(null)
   const [detailError, setDetailError] = useState('')
   const [reviewState, setReviewState] = useState(loadReviews)
-  const [notes, setNotes] = useState<Record<string, string>>({})
+  const [guideStyle, setGuideStyle] = useState<GuideStyle>('line')
   const [showGuides, setShowGuides] = useState(true)
   const [parts, setParts] = useState<Record<PartStage, boolean>>({ initial: true, medial: true, final: true })
 
@@ -124,7 +148,7 @@ export function NotoCorpusLabPage() {
     try {
       const latest = parseCorpusReviews(localStorage.getItem(REVIEW_STORAGE_KEY))
       if (verdict === null) delete latest[entry.reviewKey]
-      else latest[entry.reviewKey] = { verdict, note: notes[entry.reviewKey] ?? reviewFor(detail.row, stage, latest)?.note ?? '', reviewedAt: new Date().toISOString() }
+      else latest[entry.reviewKey] = { verdict, note: reviewFor(detail.row, stage, latest)?.note ?? '', reviewedAt: new Date().toISOString() }
       localStorage.setItem(REVIEW_STORAGE_KEY, JSON.stringify({ schema: REVIEW_STORAGE_KEY, entries: latest }))
       setReviewState({ entries: latest, error: '' })
     } catch (failure) { setReviewState((current) => ({ ...current, error: failure instanceof Error ? failure.message : '검수 기록 저장 실패' })) }
@@ -164,9 +188,9 @@ export function NotoCorpusLabPage() {
           <NotoCorpusMatrix rows={allRows} reviews={reviewState.entries} selected={selected} onSelect={selectCharacter} isHighlighted={matchesFilter} noFinal={scope === 'no-final'} />
         </section>
         <section className={styles.inspector} aria-label="선택 글자 검수" data-testid="corpus-inspector"><header><div><span className={styles.eyebrow}>실제 원본과 관측</span><h2>{selectedRow?.identity.character ?? '가'} <small>{selectedRow ? `${selectedRow.identity.initialJamo} + ${selectedRow.identity.medialJamo} · ${selectedRow.identity.finalJamo ?? '무받침'}` : ''}</small></h2></div><button type="button" onClick={() => setShowGuides((value) => !value)} aria-pressed={showGuides}>{showGuides ? '기준선 숨기기' : '기준선 보이기'}</button></header>
-          <div className={styles.legend}>{PART_STAGES.map((stage) => <label key={stage} style={{ color: PART_COLOR[stage] }}><input type="checkbox" checked={parts[stage]} onChange={(event) => setParts((current) => ({ ...current, [stage]: event.target.checked }))} />{STAGE_LABEL[stage]}</label>)}</div>
+          <div className={styles.legend}>{PART_STAGES.map((stage) => <label key={stage} style={{ color: PART_COLOR[stage] }}><input type="checkbox" checked={parts[stage]} onChange={(event) => setParts((current) => ({ ...current, [stage]: event.target.checked }))} />{STAGE_LABEL[stage]}</label>)}<div className={styles.guideStyle} role="group" aria-label="기준선 표시 방식"><button type="button" aria-pressed={guideStyle === 'line'} onClick={() => setGuideStyle('line')}>선</button><button type="button" aria-pressed={guideStyle === 'box'} onClick={() => setGuideStyle('box')}>박스</button></div></div>
           {detailError && <p role="alert" className={styles.alert}>{detailError}</p>}
-          {detail && detail.identity.codepoint === selected ? <><GuideCanvas detail={detail} visible={visible} /><p className={styles.caption}>닿자: 구조 선택 영역 · 홀자: 실제 노출된 유한 기준면<br />검은 윤곽은 Noto 원본입니다. 생성본이나 레거시 자모가 아닙니다.</p><div className={styles.partReviews}>{PART_STAGES.map((stage) => {
+          {detail && detail.identity.codepoint === selected ? <><GuideCanvas detail={detail} visible={visible} guideStyle={guideStyle} /><p className={styles.caption}>{guideStyle === 'line' ? '선: 역할 기준면을 캔버스 끝까지 연장' : '박스: 닿자 구조 선택 영역 · 홀자 실제 노출 구간'}<br />검은 윤곽은 Noto 원본입니다. 생성본이나 레거시 자모가 아닙니다.</p><div className={styles.partReviews}>{PART_STAGES.map((stage) => {
             const value = detail.row.stages[stage]
             const review = reviewFor(detail.row, stage, reviewState.entries)
             const canReview = Boolean(value.reviewKey && detail.stages[stage]?.observation && detail.stages.outline?.status === 'candidate' && !reviewState.error)
@@ -177,7 +201,6 @@ export function NotoCorpusLabPage() {
               {value.reasonCodes.filter((reason) => reason !== 'no-final').map((reason) => <p key={reason}>{REASON_LABEL[reason] ?? reason}</p>)}
               {review && <p className={styles.reviewVerdict}>{review.verdict === 'approved' ? '내 검수: 맞음' : '내 검수: 문제 있음'}</p>}
               {value.status !== 'not-applicable' && <>
-                <input aria-label={`${STAGE_LABEL[stage]} 검수 메모`} placeholder="검수 메모 (선택)" maxLength={600} disabled={!canReview} value={value.reviewKey ? notes[value.reviewKey] ?? review?.note ?? '' : ''} onChange={(event) => { if (value.reviewKey) setNotes((current) => ({ ...current, [value.reviewKey!]: event.target.value })) }} />
                 <div className={styles.reviewButtons}>
                   <button type="button" disabled={!canReview || roleConflict || value.status !== 'candidate' || !visible[stage] || detail.row.stages.initial.reasonCodes.includes('medial-anchor-role-conflict')} onClick={() => saveReview(stage, 'approved')}>기준선 맞음</button>
                   <button type="button" disabled={!canReview} onClick={() => saveReview(stage, 'rejected')}>문제 있음</button>
