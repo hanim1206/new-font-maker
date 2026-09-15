@@ -8,25 +8,43 @@ import type { CorpusDetail, CorpusFont, CorpusIdentity, CorpusModelPrediction, C
 interface Manifest { schema: string; font: CorpusFont; stageKeys: Record<CorpusStage, string> }
 interface ReportRow extends CorpusRow { stages: Record<CorpusStage, CorpusRow['stages'][CorpusStage] & { artifact: string }> }
 interface Report { stageKeys: Record<CorpusStage, string>; font: CorpusFont; cases: ReportRow[]; medialVariationFromGiyeok?: { character: string; baselineCharacter: string; roleId: string }[] }
-interface VariationLayer { representative: number; effects: Record<'initial' | 'medial' | 'final', Record<string, number>>; defaultThreshold: number; confidence: 'low' | 'normal' }
+interface InteractionCell { cell: [string, string]; term: number }
+interface Interaction { applied: boolean; pair: string; cells: InteractionCell[] }
+interface VariationLayer { representative: number; effects: Record<'initial' | 'medial' | 'final', Record<string, number>>; defaultThreshold: number; confidence: 'low' | 'normal'; interaction?: Interaction }
 interface VariationModel { schema: string; stageKeys: Record<CorpusStage, string>; targets: Record<string, { layers: Record<string, VariationLayer> }> }
+const MODEL_SCHEMAS = new Set(['noto-variation-model-v1', 'noto-variation-model-v2'])
 interface Loaded { root: string; manifest: Manifest; snapshot: CorpusSnapshot; rows: Map<number, ReportRow> }
 const API = '/api/noto-corpus'
 const HEX = /^[a-f0-9]{64}$/
 const NOTO_SHA = '194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252'
 const APPROVED_INPUTS_FILE = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../reference-data/preset-candidates/noto-approved-guide-inputs.v1.json')
-// 변화량 모델 v1이 예측하는 역할면 타깃. 값 소스는 각 타깃이 어느 단계 측정에서 실측을 읽는지 알려준다.
+// 변화량 모델이 예측하는 역할면 타깃. 값 소스는 각 타깃이 어느 단계 측정에서 실측을 읽는지,
+// orientation은 오버레이에서 가로선/세로선 중 무엇으로 그리는지 알려준다.
 const MODEL_NO_FINAL = '∅'
-const MODELED_TARGETS: { target: string; stage: CorpusStage; read: (measurements: Record<string, unknown>) => number | null }[] = [
-  { target: 'initial.roleFaces.bottom', stage: 'initial', read: (m) => {
-    const bottom = (m.roleFaces as Record<string, number> | undefined)?.bottom
-    return typeof bottom === 'number' && Number.isFinite(bottom) ? bottom : null
-  } },
+const readFace = (side: string) => (m: Record<string, unknown>) => {
+  const face = (m.roleFaces as Record<string, number> | undefined)?.[side]
+  return typeof face === 'number' && Number.isFinite(face) ? face : null
+}
+const MODELED_TARGETS: { target: string; stage: CorpusStage; orientation: 'vertical' | 'horizontal'; read: (measurements: Record<string, unknown>) => number | null }[] = [
+  { target: 'initial.roleFaces.bottom', stage: 'initial', orientation: 'horizontal', read: readFace('bottom') },
+  // 첫닿왼선. mixed-final 층에서 ㄱ계×혼합홀자 셀이 v2 선택 보정 대상(ㄱㅢ·ㄲㅝ·ㅋㅘ·ㄱㅝ).
+  { target: 'initial.roleFaces.left', stage: 'initial', orientation: 'vertical', read: readFace('left') },
 ]
+
+// 자모쌍 셀 보정항: v2 층의 interaction이 이 글자 자모쌍에 보정을 걸면 그 값과 표시 문자열을 준다.
+// v1 모델은 interaction이 없어 항상 0. pair는 "initial×medial"처럼 두 인자 이름이다.
+function cellCorrection(layer: VariationLayer, identity: CorpusIdentity): { term: number; cell: string | null } {
+  const interaction = layer.interaction
+  if (!interaction?.applied) return { term: 0, cell: null }
+  const level: Record<string, string> = { initial: identity.initialJamo, medial: identity.medialJamo, final: identity.finalJamo ?? MODEL_NO_FINAL }
+  const [factorA, factorB] = interaction.pair.split('×')
+  const match = interaction.cells.find((entry) => entry.cell[0] === level[factorA] && entry.cell[1] === level[factorB])
+  return match ? { term: match.term, cell: match.cell.join('×') } : { term: 0, cell: null }
+}
 
 function predictTarget(model: VariationModel, identity: CorpusIdentity, stages: CorpusDetail['stages']): CorpusModelPrediction[] {
   const predictions: CorpusModelPrediction[] = []
-  for (const { target, stage, read } of MODELED_TARGETS) {
+  for (const { target, stage, orientation, read } of MODELED_TARGETS) {
     const layer = model.targets[target]?.layers[identity.contextId]
     const payload = stages[stage]
     if (!layer || !payload || payload.status !== 'candidate') continue
@@ -37,13 +55,15 @@ function predictTarget(model: VariationModel, identity: CorpusIdentity, stages: 
       medial: layer.effects.medial[identity.medialJamo] ?? 0,
       final: layer.effects.final[identity.finalJamo ?? MODEL_NO_FINAL] ?? 0,
     }
-    const predicted = layer.representative + effects.initial + effects.medial + effects.final
+    const { term, cell } = cellCorrection(layer, identity)
+    const predicted = layer.representative + effects.initial + effects.medial + effects.final + term
     const actual = actualNormalized * 1000
     const residual = actual - predicted
     predictions.push({
-      target, layer: identity.contextId, representative: layer.representative,
+      target, layer: identity.contextId, orientation, representative: layer.representative,
       predicted, actual, residual, threshold: layer.defaultThreshold,
       exception: Math.abs(residual) > layer.defaultThreshold, confidence: layer.confidence, effects,
+      cellTerm: term, cell,
     })
   }
   return predictions
@@ -112,17 +132,21 @@ export function createNotoCorpusReader(directory: string) {
   }
 
   // 3MB 모델은 스냅샷 hot path에서 빼고 글자 상세에서만 지연 로드·메모이즈한다.
+  // v2(선택 셀 보정)를 우선 읽고, 없으면 v1(주효과)로 폴백한다. v2 주효과는 v1과 같다.
   let modelMemo: { key: string; model: VariationModel | null } | undefined
   async function loadModel(loaded: Loaded): Promise<VariationModel | null> {
-    const file = path.join(loaded.root, 'analysis', 'variation-model-v1.json')
-    const key = `${loaded.root}:${await stat(file).then((info) => info.mtimeMs).catch(() => 0)}`
+    const files = ['variation-model-v2.json', 'variation-model-v1.json'].map((name) => path.join(loaded.root, 'analysis', name))
+    const mtimes = await Promise.all(files.map((file) => stat(file).then((info) => info.mtimeMs).catch(() => 0)))
+    const key = `${loaded.root}:${mtimes.join(':')}`
     if (modelMemo?.key === key) return modelMemo.model
     let model: VariationModel | null = null
-    try {
-      const candidate = await json<VariationModel>(file)
-      // 추출 단계 키가 다르면 모델이 이전 관측 기준이므로 예측을 붙이지 않는다.
-      if (candidate.schema === 'noto-variation-model-v1' && CORPUS_STAGES.every((stage) => candidate.stageKeys[stage] === loaded.manifest.stageKeys[stage])) model = candidate
-    } catch { /* 모델 파일이 없으면 예측 없이 검수만 한다. */ }
+    for (const file of files) {
+      try {
+        const candidate = await json<VariationModel>(file)
+        // 추출 단계 키가 다르면 모델이 이전 관측 기준이므로 예측을 붙이지 않는다.
+        if (MODEL_SCHEMAS.has(candidate.schema) && CORPUS_STAGES.every((stage) => candidate.stageKeys[stage] === loaded.manifest.stageKeys[stage])) { model = candidate; break }
+      } catch { /* 이 버전 파일이 없거나 손상이면 다음 버전으로. 둘 다 없으면 예측 없이 검수만 한다. */ }
+    }
     modelMemo = { key, model }
     return model
   }

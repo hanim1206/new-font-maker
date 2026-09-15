@@ -43,10 +43,12 @@ export interface MedialMeasurement { orientation: 'vertical' | 'horizontal'; fac
 export interface RecordingOperation { operation: string; arguments: ([number, number] | null)[] }
 export interface RawCorpusOutline { unitsPerEm: number; operations: RecordingOperation[] }
 export interface CorpusPayload { status: CorpusStatus; reasonCodes: string[]; observation: unknown; measurements: Record<string, unknown> }
-// 변화량 모델 v1의 한 역할면 타깃 예측. 값은 실측과 같은 1000단위, 화면 좌표는 /1000.
+// 변화량 모델의 한 역할면 타깃 예측. 값은 실측과 같은 1000단위, 화면 좌표는 /1000.
+// v2는 predicted에 셀 보정항(cellTerm)을 더해 넣는다. cell은 그 보정을 건 자모쌍 표시(없으면 null).
 export interface CorpusModelPrediction {
   target: string
   layer: string
+  orientation: 'vertical' | 'horizontal'
   representative: number
   predicted: number
   actual: number
@@ -55,6 +57,8 @@ export interface CorpusModelPrediction {
   exception: boolean
   confidence: 'low' | 'normal'
   effects: { initial: number; medial: number; final: number }
+  cellTerm: number
+  cell: string | null
 }
 export interface CorpusDetail { schema: 'noto-corpus-detail-v1'; identity: CorpusIdentity; font: CorpusFont; row: CorpusRow; stages: Record<CorpusStage, CorpusPayload | null>; model: CorpusModelPrediction[] }
 export interface CorpusReview { verdict: 'approved' | 'rejected'; note: string; reviewedAt: string }

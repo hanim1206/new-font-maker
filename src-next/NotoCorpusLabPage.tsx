@@ -9,8 +9,8 @@ import { notoConflictingParts } from './notoRoleIntegrity'
 const PART_COLOR = { initial: '#db6228', medial: '#2472bc', final: '#238370' }
 // 예측 기준선은 실측(주황 실선)과 대비되게 보라 점선으로 그린다.
 const MODEL_COLOR = '#7c3aed'
-// 타깃 → 어느 단계 색·짧은 이름. 단계 B는 첫닿밑선 하나.
-const MODEL_TARGET_LABEL: Record<string, string> = { 'initial.roleFaces.bottom': '첫닿밑선' }
+// 타깃 → 짧은 이름. 첫닿밑선 외에 v2 선택 보정을 확인할 첫닿왼선을 추가.
+const MODEL_TARGET_LABEL: Record<string, string> = { 'initial.roleFaces.bottom': '첫닿밑선', 'initial.roleFaces.left': '첫닿왼선' }
 const REASON_LABEL: Record<string, string> = { 'context-contract-not-expanded': '실제 문맥 추출 계약이 아직 확장되지 않았습니다.', 'no-role-match': '역할에 맞는 외곽면을 찾지 못했습니다.', 'incomplete-required-medial-roles': '필수 홀자 역할이 일부 빠져 있습니다.', 'no-axis-face': '일부 보조 축평행 면이 없습니다. 필수 역할면 상태와 구분합니다.', 'extractor-error': '추출 중 실행 오류가 발생했습니다.', 'medial-anchor-role-conflict': '홀자 후보와 첫닿자 구조의 역할이 충돌합니다. 기준선 맞음 승인을 차단했습니다.', 'final-separation-unproven': '첫닿자와 받침의 분리 증명이 부족해 자동 포기했습니다. 임의 절단으로 채우지 않습니다.' }
 const number = (value: number) => value.toLocaleString('ko-KR')
 const percent = (value: number, total: number) => total ? `${(value / total * 100).toFixed(2)}%` : '해당 없음'
@@ -74,10 +74,11 @@ function GuideCanvas({ detail, visible, guideStyle, model }: { detail: CorpusDet
       })}
       {visible.medial && <g data-testid="corpus-guide-medial">{Object.entries(medial).map(([id, value]) => <line key={id} {...faceLine(value.orientation, value.face)} stroke={PART_COLOR.medial} strokeWidth="2" strokeOpacity=".9" vectorEffect="non-scaling-stroke"><title>{id} · {value.face.toFixed(5)}</title></line>)}</g>}
     </>}
-    {/* 예측 기준선: 실측과 같은 좌표계에 보라 점선. 실선(실측)과의 간극이 잔차다. */}
-    {model.filter((prediction) => visible.initial && prediction.target === 'initial.roleFaces.bottom').map((prediction) => (
-      <line key={prediction.target} {...faceLine('horizontal', prediction.predicted / 1000)} stroke={MODEL_COLOR} strokeWidth="1.6" strokeDasharray="7 5" vectorEffect="non-scaling-stroke" data-testid="corpus-model-initial-bottom">
-        <title>{MODEL_TARGET_LABEL[prediction.target]} 예측 {(prediction.predicted / 1000).toFixed(5)} · 잔차 {prediction.residual >= 0 ? '+' : ''}{prediction.residual.toFixed(1)}u</title>
+    {/* 예측 기준선: 실측과 같은 좌표계에 보라 점선. 실선(실측)과의 간극이 잔차다.
+        타깃마다 orientation(가로/세로)이 달라 그대로 따른다. 현재 타깃은 모두 첫닿 역할면이라 initial 표시에 묶는다. */}
+    {model.filter(() => visible.initial).map((prediction) => (
+      <line key={prediction.target} {...faceLine(prediction.orientation, prediction.predicted / 1000)} stroke={MODEL_COLOR} strokeWidth="1.6" strokeDasharray="7 5" vectorEffect="non-scaling-stroke" data-testid={`corpus-model-${prediction.target.replace(/\./g, '-')}`}>
+        <title>{MODEL_TARGET_LABEL[prediction.target] ?? prediction.target} 예측 {(prediction.predicted / 1000).toFixed(5)} · 잔차 {prediction.residual >= 0 ? '+' : ''}{prediction.residual.toFixed(1)}u{prediction.cellTerm ? ` · 셀 보정 ${prediction.cellTerm >= 0 ? '+' : ''}${prediction.cellTerm.toFixed(1)}u(${prediction.cell})` : ''}</title>
       </line>
     ))}
   </svg>
@@ -202,10 +203,10 @@ export function NotoCorpusLabPage() {
           {detailError && <p role="alert" className={styles.alert}>{detailError}</p>}
           {detail && detail.identity.codepoint === selected ? <><GuideCanvas detail={detail} visible={visible} guideStyle={guideStyle} model={detail.model} /><p className={styles.caption}>{guideStyle === 'line' ? '선: 역할 기준면을 캔버스 끝까지 연장' : '박스: 닿자 구조 선택 영역 · 홀자 실제 노출 구간'}<br />검은 윤곽은 Noto 원본입니다. 생성본이나 레거시 자모가 아닙니다.</p>
           {detail.model.length > 0 && <div className={styles.modelPanel} data-testid="corpus-model-panel">
-            <header><strong style={{ color: MODEL_COLOR }}>변화량 모델 예측</strong><span>실측(주황 실선) vs 예측(보라 점선). 대표값 + 첫닿·홀자·받침 효과. 승인이 아니라 확인용입니다.</span></header>
+            <header><strong style={{ color: MODEL_COLOR }}>변화량 모델 예측</strong><span>실측(주황 실선) vs 예측(보라 점선). 대표값 + 첫닿·홀자·받침 효과 + v2 셀 보정. 승인이 아니라 확인용입니다.</span></header>
             {detail.model.map((prediction) => <div key={prediction.target} data-testid={`corpus-model-${prediction.target}`} data-exception={prediction.exception}>
               <span>{MODEL_TARGET_LABEL[prediction.target] ?? prediction.target}<small> · {prediction.layer}{prediction.confidence === 'low' ? ' · 저신뢰' : ''}</small></span>
-              <span>실측 {(prediction.actual / 1000).toFixed(5)} · 예측 {(prediction.predicted / 1000).toFixed(5)}</span>
+              <span>실측 {(prediction.actual / 1000).toFixed(5)} · 예측 {(prediction.predicted / 1000).toFixed(5)}{prediction.cellTerm ? ` · 셀 보정 ${prediction.cellTerm >= 0 ? '+' : ''}${prediction.cellTerm.toFixed(1)}u(${prediction.cell})` : ''}</span>
               <strong>잔차 {prediction.residual >= 0 ? '+' : ''}{prediction.residual.toFixed(1)}u {prediction.exception ? `· 예외(임계 ${prediction.threshold}u 초과) 실측 보존` : '· 모델 내'}</strong>
             </div>)}
           </div>}
