@@ -6,8 +6,9 @@ import type { ApprovedNotoInput } from './notoBoundMaster'
 import { allCorpusRows, CORPUS_TOTAL, corpusIdentity, parseCorpusReviews, REVIEW_STORAGE_KEY } from './notoCorpus'
 import type { CorpusReviews, CorpusSnapshot } from './notoCorpus'
 import { NotoCorpusMatrix } from './NotoCorpusMatrix'
-import { fitComponentsForGlyph } from './notoComponentFitView'
-import type { ComponentFitPart } from './notoComponentFitView'
+import { editableComponentRailsOf, fitComponentsForGlyph, renderComponentPart } from './notoComponentFitView'
+import type { ComponentFitPart, RenderedComponentPart } from './notoComponentFitView'
+import type { ComponentFaces } from '../src/services/notoComponentFit'
 import { editableRailsOf, fitMedialForGlyph, renderMedialPart, roleLabel } from './notoMedialFitView'
 import type { EditableRail, MedialFitView, RenderedMedialPart } from './notoMedialFitView'
 import type { CoreRailRole } from '../src/services/notoMedialMasterFit'
@@ -259,14 +260,17 @@ function FitStats({ view, rendered, approved }: { view: MedialFitView; rendered:
 const SIDE_LABEL: Record<string, string> = { left: '왼', right: '오른', top: '위', bottom: '아래' }
 
 /** 닿자 박스 fit 수치. 앱 획 골격이 Noto와 얼마나 다른지 — 승인 글자는 xor·네 변 오차. */
-function ComponentStats({ parts, approved }: { parts: ComponentFitPart[]; approved: boolean }) {
+function ComponentStats({ parts, rendered, approved }: { parts: ComponentFitPart[]; rendered: RenderedComponentPart[]; approved: boolean }) {
   return <div className={styles.fitStats} data-testid="review-component-stats">
-    {parts.map((part) => <div key={part.part} className={`${styles.fitPart} ${styles.componentPart}`}>
-      <div className={styles.fitHead}><span>{part.part === 'CH' ? '첫닿자' : '받침'} {part.jamoId} · 앱 획 · 모델 박스</span>
-        {part.xorRatio !== undefined ? <strong data-testid="review-component-xor">xor {(part.xorRatio * 100).toFixed(1)}%<small> · 잉크 {((part.inkRatio ?? 0) * 100).toFixed(0)}%</small></strong> : <small>{part.message ?? (approved ? '' : '겹쳐 보기만 · 승인 측정 없음')}</small>}
+    {parts.map((part, index) => {
+      const out = rendered[index]
+      return <div key={part.part} className={`${styles.fitPart} ${styles.componentPart}`}>
+        <div className={styles.fitHead}><span>{part.part === 'CH' ? '첫닿자' : '받침'} {part.jamoId} · 앱 획 · 모델 박스</span>
+          {out?.xorRatio !== undefined ? <strong data-testid="review-component-xor">xor {(out.xorRatio * 100).toFixed(1)}%<small> · 잉크 {((out.inkRatio ?? 0) * 100).toFixed(0)}%</small></strong> : <small>{out?.message ?? part.message ?? (approved ? '' : '겹쳐 보기만 · 승인 측정 없음')}</small>}
+        </div>
+        {out && out.faceErrors.length > 0 && <div className={styles.railErrors}>{out.faceErrors.map((face) => <span key={face.side} data-large={Math.abs(face.errorUnits) > 10 || undefined}><i>{SIDE_LABEL[face.side]}</i>{face.errorUnits >= 0 ? '+' : ''}{face.errorUnits.toFixed(1)}u</span>)}</div>}
       </div>
-      {part.faceErrors.length > 0 && <div className={styles.railErrors}>{part.faceErrors.map((face) => <span key={face.side} data-large={Math.abs(face.errorUnits) > 10 || undefined}><i>{SIDE_LABEL[face.side]}</i>{face.errorUnits >= 0 ? '+' : ''}{face.errorUnits.toFixed(1)}u</span>)}</div>}
-    </div>)}
+    })}
   </div>
 }
 
@@ -280,13 +284,19 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
   const { bundle, error: modelError } = useNotoModel()
   const fitView = useMemo(() => bundle ? fitMedialForGlyph({ identity: glyph.identity, bundle, outline: glyph.outline, approved: approvedInputFor(codepoint) }) : null, [bundle, glyph, codepoint])
   const componentParts = useMemo(() => bundle ? fitComponentsForGlyph({ identity: glyph.identity, bundle, outline: glyph.outline, approved: approvedInputFor(codepoint) }) : [], [bundle, glyph, codepoint])
-  const componentOverlays = componentParts.flatMap((part) => part.path ? [part.path] : [])
+  const [facesByPart, setFacesByPart] = useState<(ComponentFaces | undefined)[]>([])
+  const componentRendered = useMemo(() => componentParts.map((part, index) => renderComponentPart(part, facesByPart[index])), [componentParts, facesByPart])
+  const componentOverlays = componentRendered.flatMap((part) => part.path ? [part.path] : [])
   // rail 편집은 세션 임시. part별 em 값. undefined = 모델 rail 그대로.
   const [railsByPart, setRailsByPart] = useState<RailsByPart>([])
   const [selectedRail, setSelectedRail] = useState<string | undefined>()
   const [error, setError] = useState('')
   const rendered = useMemo(() => fitView ? fitView.parts.map((part, index) => renderMedialPart(part, railsByPart[index])) : [], [fitView, railsByPart])
-  const editable = useMemo(() => fitView ? editableRailsOf(fitView.parts, railsByPart) : [], [fitView, railsByPart])
+  // 홀자 마스터 rail(`<n>:<role>`)과 닿자 박스 변(`c<n>:<side>`)을 한 목록으로. 선택·자·드래그가 같은 경로를 탄다.
+  const editable = useMemo(() => [
+    ...(fitView ? editableRailsOf(fitView.parts, railsByPart) : []),
+    ...editableComponentRailsOf(componentParts, facesByPart),
+  ], [fitView, railsByPart, componentParts, facesByPart])
   const overlays = rendered.flatMap((part) => part.path ? [part.path] : [])
   const rail = editable.find((item) => item.id === selectedRail) ?? editable[0]
   const editCount = editable.filter((item) => Math.abs(item.value - item.original) > 1e-9).length
@@ -294,16 +304,27 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
   // 캔버스 드래그·자·키보드가 모두 여기로 온다. 1u 격자는 모델 값에 맞추고, 순서·간격 위반은 마지막 유효값을 지킨다.
   const changeRail = (id: string, next: number) => {
     const target = editable.find((item) => item.id === id)
-    const part = fitView?.parts[target?.partIndex ?? -1]
-    if (!target || !part?.fit) return
+    if (!target) return
     const snapped = target.original + Math.round((next - target.original) * 1000) / 1000
-    const proposed = { ...(railsByPart[target.partIndex] ?? part.fit.railsEm), [target.role]: snapped }
+    if (id.startsWith('c')) {
+      const part = componentParts[target.partIndex]
+      if (!part?.faces) return
+      const proposed = { ...(facesByPart[target.partIndex] ?? part.faces), [target.role]: snapped } as ComponentFaces
+      const check = renderComponentPart(part, proposed)
+      if (!check.path) { setError(check.message ?? '박스 변을 그 자리에 둘 수 없습니다.'); return }
+      setError('')
+      setFacesByPart((current) => { const copy = [...current]; copy[target.partIndex] = proposed; return copy })
+      return
+    }
+    const part = fitView?.parts[target.partIndex]
+    if (!part?.fit) return
+    const proposed = { ...(railsByPart[target.partIndex] ?? part.fit.railsEm), [target.role]: snapped } as Record<CoreRailRole, number>
     const check = renderMedialPart(part, proposed)
     if (!check.path) { setError(check.message ?? '기준선을 그 자리에 둘 수 없습니다.'); return }
     setError('')
     setRailsByPart((current) => { const copy = [...current]; copy[target.partIndex] = proposed; return copy })
   }
-  const resetRails = () => { setRailsByPart([]); setError('') }
+  const resetRails = () => { setRailsByPart([]); setFacesByPart([]); setError('') }
 
   // 자 도구: 스크롤 밖, 탭 바로 위. 눈금 창 = 모델 값 ±100u.
   const ruler = rail && <section className={styles.dialDock} aria-label="기준선 조절">
@@ -330,7 +351,7 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
       {editable.length > 0 && <div className={styles.chips} role="group" aria-label="편집할 기준선">
         {editable.map((item) => <button type="button" key={item.id} aria-pressed={item.id === rail?.id} onClick={() => { setSelectedRail(item.id); setError('') }}>{item.label}</button>)}
       </div>}
-      {modelError ? <p className={styles.status} data-state="error" role="alert">{modelError}</p> : fitView ? <><FitStats view={fitView} rendered={rendered} approved={approved} /><ComponentStats parts={componentParts} approved={approved} /></> : <p className={styles.status} role="status">모델 읽는 중</p>}
+      {modelError ? <p className={styles.status} data-state="error" role="alert">{modelError}</p> : fitView ? <><FitStats view={fitView} rendered={rendered} approved={approved} /><ComponentStats parts={componentParts} rendered={componentRendered} approved={approved} /></> : <p className={styles.status} role="status">모델 읽는 중</p>}
       <div className={styles.head}><span>기준선 실측<small>Noto · 1000 u</small></span><span>{measured.length}개</span></div>
       <div className={styles.values} data-testid="review-values">
         {measured.map((item) => <div className={styles.cell} key={item.id}><span><span className={styles.key}>{item.label}</span><span className={styles.value}>{(item.value * 1000).toFixed(1)}<small>u</small></span></span><i className={styles.bar} style={{ '--p': `${Math.round(item.value * 100)}%` } as React.CSSProperties} /></div>)}

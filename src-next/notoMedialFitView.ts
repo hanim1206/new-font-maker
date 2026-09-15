@@ -50,7 +50,8 @@ export interface RenderedMedialPart {
 export interface EditableRail {
   id: string
   partIndex: number
-  role: CoreRailRole
+  /** 홀자 마스터면 core rail 역할, 닿자 박스면 변 이름(left/right/top/bottom). */
+  role: CoreRailRole | 'left' | 'right' | 'top' | 'bottom'
   axis: 'x' | 'y'
   label: string
   value: number
