@@ -39,8 +39,17 @@ const MODELED_TARGETS: { target: string; stage: PartStage; drawable: boolean; re
   { target: 'medial.baseStem.face', stage: 'medial', drawable: true, read: readMedial('baseStem', 'face') },
   { target: 'medial.leftStem.face', stage: 'medial', drawable: true, read: readMedial('leftStem', 'face') },
   { target: 'medial.rightStem.face', stage: 'medial', drawable: true, read: readMedial('rightStem', 'face') },
-  // 윗보 가시길이. 좌표가 아니라 길이라 오버레이 선은 못 그리고 패널 수치로만 확인한다.
+  // 첫닿·받침 오른면. mixed-final·right-final 층에서 v2 셀 보정 대상.
+  { target: 'initial.roleFaces.right', stage: 'initial', drawable: true, read: readFace('right', 'vertical') },
+  { target: 'final.roleFaces.right', stage: 'final', drawable: true, read: readFace('right', 'vertical') },
+  // 홀자 보 면(가로). primaryBeam·upperBeam·lowerBeam 모두 right-final·mixed-final에서 셀 보정 대상.
+  { target: 'medial.primaryBeam.face', stage: 'medial', drawable: true, read: readMedial('primaryBeam', 'face') },
+  { target: 'medial.upperBeam.face', stage: 'medial', drawable: true, read: readMedial('upperBeam', 'face') },
+  { target: 'medial.lowerBeam.face', stage: 'medial', drawable: true, read: readMedial('lowerBeam', 'face') },
+  // 보 가시길이. 좌표가 아니라 길이라 오버레이 선은 못 그리고 패널 수치로만 확인한다.
   { target: 'medial.upperBeam.visibleLength', stage: 'medial', drawable: false, read: readMedial('upperBeam', 'visibleLength') },
+  { target: 'medial.primaryBeam.visibleLength', stage: 'medial', drawable: false, read: readMedial('primaryBeam', 'visibleLength') },
+  { target: 'medial.lowerBeam.visibleLength', stage: 'medial', drawable: false, read: readMedial('lowerBeam', 'visibleLength') },
 ]
 
 // 자모쌍 셀 보정항: v2 층의 interaction이 이 글자 자모쌍에 보정을 걸면 그 값과 표시 문자열을 준다.

@@ -9,11 +9,13 @@ import { notoConflictingParts } from './notoRoleIntegrity'
 const PART_COLOR = { initial: '#db6228', medial: '#2472bc', final: '#238370' }
 // 예측 기준선은 실측(주황 실선)과 대비되게 보라 점선으로 그린다.
 const MODEL_COLOR = '#7c3aed'
-// 타깃 → 짧은 이름. 첫닿 면 + v2 선택 보정을 확인할 홀자 획면·윗보.
+// 타깃 → 짧은 이름. 첫닿·받침 면 + v2 셀 보정을 확인할 홀자 획면·보.
 const MODEL_TARGET_LABEL: Record<string, string> = {
-  'initial.roleFaces.bottom': '첫닿밑선', 'initial.roleFaces.left': '첫닿왼선',
+  'initial.roleFaces.bottom': '첫닿밑선', 'initial.roleFaces.left': '첫닿왼선', 'initial.roleFaces.right': '첫닿오른선',
+  'final.roleFaces.right': '받침오른선',
   'medial.baseStem.face': '홀자 밑기둥', 'medial.leftStem.face': '홀자 왼기둥', 'medial.rightStem.face': '홀자 오른기둥',
-  'medial.upperBeam.visibleLength': '홀자 윗보 길이',
+  'medial.primaryBeam.face': '홀자 으뜸보', 'medial.upperBeam.face': '홀자 윗보', 'medial.lowerBeam.face': '홀자 아랫보',
+  'medial.upperBeam.visibleLength': '홀자 윗보 길이', 'medial.primaryBeam.visibleLength': '홀자 으뜸보 길이', 'medial.lowerBeam.visibleLength': '홀자 아랫보 길이',
 }
 const REASON_LABEL: Record<string, string> = { 'context-contract-not-expanded': '실제 문맥 추출 계약이 아직 확장되지 않았습니다.', 'no-role-match': '역할에 맞는 외곽면을 찾지 못했습니다.', 'incomplete-required-medial-roles': '필수 홀자 역할이 일부 빠져 있습니다.', 'no-axis-face': '일부 보조 축평행 면이 없습니다. 필수 역할면 상태와 구분합니다.', 'extractor-error': '추출 중 실행 오류가 발생했습니다.', 'medial-anchor-role-conflict': '홀자 후보와 첫닿자 구조의 역할이 충돌합니다. 기준선 맞음 승인을 차단했습니다.', 'final-separation-unproven': '첫닿자와 받침의 분리 증명이 부족해 자동 포기했습니다. 임의 절단으로 채우지 않습니다.' }
 const number = (value: number) => value.toLocaleString('ko-KR')
