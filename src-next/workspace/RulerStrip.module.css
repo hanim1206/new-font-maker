@@ -1,0 +1,12 @@
+.ruler { display: block; width: 100%; height: auto; touch-action: none; user-select: none; outline: none; cursor: ew-resize; }
+.ruler:focus-visible .thumb { stroke: rgb(var(--color-primary)); stroke-width: 2; }
+.track { fill: rgb(var(--color-surface-2)); stroke: rgb(var(--color-border)); stroke-width: 1; }
+.direction { fill: rgb(var(--color-text-dim-4)); font-size: 9px; font-weight: 700; }
+.directionEnd { text-anchor: end; }
+.ticks line { stroke: rgb(var(--color-text-dim-4)); stroke-width: 1; }
+.ticks .major { stroke: rgb(var(--color-text-dim-2)); stroke-width: 1.5; }
+.number { fill: rgb(var(--color-text-dim-3)); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9px; font-weight: 500; text-anchor: middle; }
+.base line { stroke: rgb(var(--color-text-dim-3)); stroke-width: 1; stroke-dasharray: 2 2; }
+.base text { fill: rgb(var(--color-text-dim-3)); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 8px; font-weight: 600; text-anchor: middle; }
+.marker { stroke: #f0561e; stroke-width: 2; }
+.thumb { fill: rgb(var(--color-surface)); stroke: #f0561e; stroke-width: 1.5; filter: drop-shadow(0 2px 4px rgb(15 23 42 / .16)); }

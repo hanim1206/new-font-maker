@@ -45,9 +45,11 @@ interface Props {
   onSelect: (codepoint: number) => void
   isHighlighted: (row: CorpusRow) => boolean
   noFinal: boolean
+  /** 제품 검수 탭의 2층 표시. 편집 가능한 글자 칸에 테두리를 두른다. 랩에서는 넘기지 않는다. */
+  tierOf?: (row: CorpusRow) => 'editable' | 'readonly'
 }
 
-export function NotoCorpusMatrix({ rows, reviews, selected, onSelect, isHighlighted, noFinal }: Props) {
+export function NotoCorpusMatrix({ rows, reviews, selected, onSelect, isHighlighted, noFinal, tierOf }: Props) {
   const [pivotId, setPivotId] = useState<PivotId>('medial-final')
   const [large, setLarge] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -123,7 +125,7 @@ export function NotoCorpusMatrix({ rows, reviews, selected, onSelect, isHighligh
               const row = rows[codepoint - 0xac00]
               const status = statusAt(codepoint)
               return <td key={codepoint} className={colGroupStarts.has(colItems[colIndex]) ? styles.colGroupStart : ''}>
-                <button type="button" className={`${styles.cell} ${styles[status]}`} data-testid="corpus-cell" data-codepoint={codepoint} data-status={status} data-dimmed={!isHighlighted(row)} aria-pressed={codepoint === selected} tabIndex={codepoint === selected ? 0 : -1} aria-label={`${row.identity.character} · ${CELL_STATUS_LABEL[status]}`} onClick={() => onSelect(codepoint)}>
+                <button type="button" className={`${styles.cell} ${styles[status]}`} data-testid="corpus-cell" data-codepoint={codepoint} data-status={status} data-dimmed={!isHighlighted(row)} data-tier={tierOf?.(row)} aria-pressed={codepoint === selected} tabIndex={codepoint === selected ? 0 : -1} aria-label={`${row.identity.character} · ${CELL_STATUS_LABEL[status]}`} onClick={() => onSelect(codepoint)}>
                   <strong>{row.identity.character}</strong>
                   {large && <span className={styles.dots}>{PART_STAGES.map((stage) => {
                     const part = corpusPartStatus(row, stage, reviews)
