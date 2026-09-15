@@ -288,6 +288,11 @@ def _validated_medial_contour_ids(
         if int(face["evidence"]["contourId"]) in records_by_id
     }
     selected = set(required)
+    if context_id in contract.EXPANDED_MEDIAL_CONTEXT_IDS:
+        # 확장 홀자 문맥: 모든 홀자 역할 evidence contour는 홀자 소유다.
+        # 접촉 폐포에 걸리지 않는 떨어진 팔보·안기둥이 받침 클러스터로
+        # 흡수되지 않게 한다. P0 문맥의 선택은 바꾸지 않는다.
+        selected |= candidates
     changed = True
     while changed:
         changed = False

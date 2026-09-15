@@ -94,6 +94,45 @@ class NotoExpandedMedialTests(unittest.TestCase):
                 for side in contract.BOUND_SIDES:
                     self.assertEqual(result["roleFaces"][side]["status"], "candidate")
 
+    def test_role_guards_block_final_body_disguise(self):
+        # ㅠㅛㅜ 받침 문맥: 받침 몸체가 홀자 보·줄기를 위장하지 못한다.
+        import hashlib
+        sha = hashlib.sha256(FONT_PATH.read_bytes()).hexdigest()
+        cases = (
+            ("늆", "ㅠ", "ㅄ"),  # 이전: 모든 역할이 ㅂ 몸체 선택
+            ("꾭", "ㅛ", "ㅂ"),  # 이전: primaryBeam이 ㅂ 윗면 선택
+            ("훋", "ㅜ", "ㄷ"),  # 이전: primaryBeam이 ㄷ 윗면 선택
+            ("훾", "ㅞ", "ㄲ"),  # 이전: 떨어진 팔보·안기둥이 받침 클러스터로 흡수
+            ("휺", "ㅠ", "ㄶ"),  # 곡선 접합 bbox 오차 허용 확인
+        )
+        icases = {c["character"]: c for c in contract.final_cases()}
+        fcases = {c["character"]: c for c in final_contract.expanded_medial_cases()}
+        for character, medial_jamo, final_jamo in cases:
+            with self.subTest(character=character):
+                observation = medial.extract_medial_character(self.font, character, medial_jamo, final_jamo)
+                medial_ids = {
+                    element["face"]["evidence"]["contourId"]
+                    for element in observation["elements"]
+                    if element.get("face", {}).get("evidence")
+                }
+                icase = icases[character]
+                initial_result = initial.extract_initial_character(
+                    self.font, character, icase["initialJamo"], medial_jamo, final_jamo,
+                    icase["contextId"], medial_observation=observation,
+                )
+                initial_ids = set((initial_result.get("componentGroup") or {}).get("value", {}).get("contourIds") or [])
+                fcase = fcases[character]
+                final_result = final.extract_final_character(
+                    self.font, sha, {"wght": 400.0}, character,
+                    fcase["initialJamo"], medial_jamo, final_jamo, fcase["contextId"],
+                    medial_observation=observation,
+                )
+                final_ids = set((final_result.get("componentGroup") or {}).get("value", {}).get("contourIds") or [])
+                self.assertTrue(initial_ids and final_ids)
+                self.assertFalse(initial_ids & final_ids)
+                self.assertFalse(medial_ids & final_ids)
+                self.assertFalse(medial_ids & initial_ids)
+
     def test_final_candidates_across_all_families(self):
         import hashlib
         sha = hashlib.sha256(FONT_PATH.read_bytes()).hexdigest()

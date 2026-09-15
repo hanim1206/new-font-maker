@@ -56,7 +56,7 @@ P1_EXTRACTOR_VERSION = "geometric-role-matcher-v11"
 P1_ROLE_CONTRACT_VERSION = "medial-guide-role-v4"
 MIN_TWIN_STEM_DIRECTIONAL_REACH = 75.0
 MIN_BASE_STEM_BEAM_INTERIOR_RATIO = 0.08
-EXPANDED_FINAL_EXTRACTOR_VERSION = "geometric-role-matcher-v12"
+EXPANDED_FINAL_EXTRACTOR_VERSION = "geometric-role-matcher-v13"
 API_EXTRACTOR_VERSION = EXPANDED_FINAL_EXTRACTOR_VERSION
 API_ROLE_CONTRACT_VERSION = P1_ROLE_CONTRACT_VERSION
 SUPPORTED_MEDIAL_JAMOS = P0_MEDIAL_JAMOS | P1_MEDIAL_JAMOS
@@ -1551,11 +1551,38 @@ def _p1_twin_stem_options(
 def _p1_directional_twin_structures(
     face_hypotheses: Sequence[FaceHypothesis],
     medial_jamo: str,
+    contour_bounds: Optional[Dict[int, Tuple[float, float, float, float]]] = None,
 ) -> List[Tuple[float, FaceHypothesis, List[Tuple[float, FaceHypothesis]]]]:
-    """Keep only bottom-layout beams proved by two stems on expected side."""
+    """Keep only bottom-layout beams proved by two stems on expected side.
+
+    받침 문맥(contour_bounds 지정)에서는 두 가지를 추가로 요구한다.
+    줄기 contour는 보 contour와 세로 잉크 구간이 실제로 겹쳐야 하고,
+    받침이 더 아래에 있으므로 최하단 우선 대신 구조 증거 점수로 고른다.
+    받침 몸체(ㅂ 등)의 좁은 윗면은 전폭 보 대비 낮은 점수로 밀려난다.
+    counter 유무는 판별 기준이 아니다. 나눔처럼 홀자와 받침이 한 윤곽으로
+    융합되면 정상 구조에도 counter가 생긴다.
+    """
     structures: List[Tuple[float, FaceHypothesis, List[Tuple[float, FaceHypothesis]]]] = []
     for beam_score, beam in _p1_main_beam_options(face_hypotheses):
         stem_options = _p1_twin_stem_options(face_hypotheses, beam, medial_jamo)
+        if contour_bounds is not None:
+            beam_box = contour_bounds.get(beam.contour_id)
+            filtered: List[Tuple[float, FaceHypothesis]] = []
+            for score, stem in stem_options:
+                stem_box = contour_bounds.get(stem.contour_id)
+                if stem.contour_id == beam.contour_id:
+                    filtered.append((score, stem))
+                    continue
+                # 곡선 접합의 bbox 오차만 허용한다. ㅂ 윗면과 실제 줄기의
+                # 79unit 간극 같은 비접합은 계속 거부한다.
+                contact_tolerance = 20.0
+                if (
+                    beam_box is not None and stem_box is not None
+                    and stem_box[1] <= beam_box[3] + contact_tolerance
+                    and beam_box[1] <= stem_box[3] + contact_tolerance
+                ):
+                    filtered.append((score, stem))
+            stem_options = filtered
         stems = sorted((hypothesis for _, hypothesis in stem_options), key=lambda item: item.position)
         beam_extent = _hypothesis_extent(beam)
         minimum_separation = max(60.0, min(120.0, beam_extent * 0.15))
@@ -1565,6 +1592,11 @@ def _p1_directional_twin_structures(
         lower_position_score = _range_score(beam.position, 420.0, 800.0, 180.0)
         score = 0.55 * beam_score + 0.35 * support_score + 0.1 * lower_position_score
         structures.append((score, beam, stem_options))
+    if contour_bounds is not None:
+        return sorted(
+            structures,
+            key=lambda item: (-item[0], -item[1].position, item[1].contour_id),
+        )
     return sorted(
         structures,
         key=lambda item: (-item[1].position, -item[0], item[1].contour_id),
@@ -1703,6 +1735,7 @@ def _extract_p1_elements(
     face_hypotheses: Sequence[FaceHypothesis],
     units_per_em: int,
     medial_jamo: str,
+    final_jamo: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Select visible P1 structures by family; never infer hidden joints."""
     roles = {role.element_id: role for role in MEDIAL_ROLE_SPECS[medial_jamo]}
@@ -1855,7 +1888,14 @@ def _extract_p1_elements(
 
     if medial_jamo in {"ㅛ", "ㅠ"}:
         beam_options = _p1_main_beam_options(face_hypotheses)
-        structures = _p1_directional_twin_structures(face_hypotheses, medial_jamo)
+        contour_bounds: Optional[Dict[int, Tuple[float, float, float, float]]] = None
+        if final_jamo is not None:
+            # 받침 문맥: 받침 몸체가 보·줄기 구조를 위장할 수 있으므로
+            # 실제 구조 증거를 추가로 요구한다. 무받침 경로는 바꾸지 않는다.
+            contour_bounds = {feature.contour_id: feature.bounds for feature in features}
+        structures = _p1_directional_twin_structures(
+            face_hypotheses, medial_jamo, contour_bounds
+        )
         if not structures:
             abstained["primaryBeam"] = (
                 "no-role-match",
@@ -2014,6 +2054,29 @@ def _upward_stem_contacts_beam(
     )
 
 
+def _downward_stem_contacts_beam(
+    stem: FaceHypothesis,
+    beam: ContourFeatures,
+    beam_polygons: Sequence[Sequence[Point]],
+) -> bool:
+    """ㅜ: 바탕보 내부에 아래쪽으로 이어지는 실제 노출 세로면만 인정한다."""
+    if stem.orientation != "vertical" or stem.side != "right" or stem.visible_length < 25.0:
+        return False
+    left, top, right, bottom = beam.bounds
+    inset = (right - left) * MIN_BASE_STEM_BEAM_INTERIOR_RATIO
+    if min(stem.position - left, right - stem.position) < inset:
+        return False
+    join_y = stem.start
+    if stem.end <= bottom or not top - FLATTEN_TOLERANCE <= join_y <= bottom + FLATTEN_TOLERANCE:
+        return False
+    # 접합점 위(보 내부)는 실제 잉크, 접합점 아래(줄기 옆 바깥)는 빈 공간이어야 한다.
+    probe_x = stem.position + OUTSIDE_PROBE_OFFSET
+    return (
+        not _is_filled((probe_x, join_y + OUTSIDE_PROBE_OFFSET), beam_polygons)
+        and _is_filled((probe_x, join_y - OUTSIDE_PROBE_OFFSET), beam_polygons)
+    )
+
+
 def _expanded_upward_base(
     operations: Sequence[RecordingOperation],
     features: Sequence[ContourFeatures],
@@ -2021,8 +2084,12 @@ def _expanded_upward_base(
     units_per_em: int,
     medial_jamo: str,
 ) -> Tuple[Optional[ContourFeatures], List[FaceHypothesis], Optional[FaceHypothesis]]:
-    """확장 받침 문맥의 ㅗ·ㅘ: 보를 먼저 찾고 유한 접합면으로 줄기를 묶는다."""
-    beam_role_id = "primaryBeam" if medial_jamo == "ㅗ" else "lowerBeam"
+    """확장 받침 문맥의 ㅗ·ㅘ·ㅜ: 보를 먼저 찾고 유한 접합면으로 줄기를 묶는다."""
+    beam_role_id = "lowerBeam" if medial_jamo == "ㅘ" else "primaryBeam"
+    stem_contacts_beam = (
+        _downward_stem_contacts_beam if medial_jamo == "ㅜ" else _upward_stem_contacts_beam
+    )
+    stem_join = (lambda stem: stem.start) if medial_jamo == "ㅜ" else (lambda stem: stem.end)
     role = next(value for value in MEDIAL_ROLE_SPECS[medial_jamo] if value.element_id == beam_role_id)
     contours = split_contours(operations)
     structures: List[Tuple[float, ContourFeatures, List[FaceHypothesis], Optional[FaceHypothesis]]] = []
@@ -2035,7 +2102,7 @@ def _expanded_upward_base(
         polygons = _flattened_contours(
             contours[beam.contour_id], 1000.0 / units_per_em, BASELINE_Y,
         )
-        stems = [stem for stem in hypotheses if _upward_stem_contacts_beam(stem, beam, polygons)]
+        stems = [stem for stem in hypotheses if stem_contacts_beam(stem, beam, polygons)]
         if stems:
             structures.append((score, beam, stems, None))
     # 합쳐진 윤곽은 bbox 전체를 보로 삼지 않는다. 실제 수평 segment 묶음의
@@ -2054,8 +2121,8 @@ def _expanded_upward_base(
                                      (face.position + bottom) / 2, 0.0, 1.0, face.roi_coverage)
         polygons = _flattened_contours(contours[face.contour_id], 1000.0 / units_per_em, BASELINE_Y)
         stems = [stem for stem in hypotheses
-                 if abs(stem.end - face.position) <= FLATTEN_TOLERANCE
-                 and _upward_stem_contacts_beam(stem, local_beam, polygons)]
+                 if abs(stem_join(stem) - face.position) <= FLATTEN_TOLERANCE
+                 and stem_contacts_beam(stem, local_beam, polygons)]
         if stems:
             structures.append((score, local_beam, stems, face))
     structures.sort(key=lambda item: (-item[0], item[1].contour_id))
@@ -2098,6 +2165,7 @@ def extract_medial_character(
                 face_hypotheses,
                 units_per_em,
                 medial_jamo,
+                final_jamo,
             ),
         }
 
@@ -2109,7 +2177,7 @@ def extract_medial_character(
     left_beam_pillar: Optional[ContourFeatures] = None
     # 승인 당시 P0의 무받침/ㄱ 계약은 그대로 둔다. 다른 받침 문맥에는
     # 위치 점수만 상속하지 않고 실제 보-줄기 연결을 추가로 증명한다.
-    expanded_upward = medial_jamo in {"ㅗ", "ㅘ"} and final_jamo not in P0_FINAL_JAMOS
+    expanded_upward = medial_jamo in {"ㅗ", "ㅘ", "ㅜ"} and final_jamo not in P0_FINAL_JAMOS
     bound_beam, bound_stems, bound_beam_face = _expanded_upward_base(
         recorder.value, features, face_hypotheses, units_per_em, medial_jamo,
     ) if expanded_upward else (None, [], None)
@@ -2118,7 +2186,7 @@ def extract_medial_character(
         stem.contour_id for stem in bound_stems
         if abs(features[stem.contour_id].bounds[2] - stem.position) <= AXIS_TOLERANCE
     }
-    base_beam_role_id = "primaryBeam" if medial_jamo == "ㅗ" else "lowerBeam"
+    base_beam_role_id = "lowerBeam" if medial_jamo == "ㅘ" else "primaryBeam"
     for role in role_specs:
         contour_scored = sorted(
             (
