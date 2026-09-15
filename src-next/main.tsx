@@ -11,6 +11,12 @@ import '../src/index.css'
 const root = createRoot(document.getElementById('root')!)
 
 async function start(): Promise<void> {
+  if (window.location.pathname === '/noto-corpus-lab') {
+    const { NotoCorpusLabPage } = await import('./NotoCorpusLabPage')
+    root.render(<StrictMode><NotoCorpusLabPage /></StrictMode>)
+    return
+  }
+
   if (window.location.pathname === '/reference-lab') {
     const { ReferenceLabPage } = await import('./ReferenceLabPage')
     root.render(<StrictMode><ReferenceLabPage /></StrictMode>)
@@ -23,7 +29,27 @@ async function start(): Promise<void> {
     return
   }
 
+  if (window.location.pathname === '/preset-candidate-lab') {
+    const { PresetCandidateLabPage } = await import('./PresetCandidateLabPage')
+    root.render(<StrictMode><PresetCandidateLabPage /></StrictMode>)
+    return
+  }
+
   if (window.location.pathname === '/font-guide-lab') {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('section') === 'medial') {
+      params.set('section', 'initial')
+      window.history.replaceState(null, '', `/font-guide-lab?${params.toString()}`)
+    }
+    const { FontGuideLabPage } = await import('./FontGuideLabPage')
+    root.render(<StrictMode><FontGuideLabPage /></StrictMode>)
+    return
+  }
+
+  if (window.location.pathname === '/medial-guide-lab') {
+    const params = new URLSearchParams(window.location.search)
+    params.set('section', 'initial')
+    window.history.replaceState(null, '', `/font-guide-lab?${params.toString()}`)
     const { FontGuideLabPage } = await import('./FontGuideLabPage')
     root.render(<StrictMode><FontGuideLabPage /></StrictMode>)
     return

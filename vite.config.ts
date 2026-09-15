@@ -2,11 +2,13 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
+import { notoCorpusApiPlugin } from './scripts/reference-lab/notoCorpusApi'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    notoCorpusApiPlugin(fileURLToPath(new URL('./.reference-fonts/guide-corpus', import.meta.url))),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],

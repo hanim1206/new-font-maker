@@ -1,0 +1,27 @@
+.panel { margin-top: 24px; padding: 18px; border: 1px solid #b6cedf; border-radius: 13px; background: linear-gradient(150deg, #eff7fc, #f9fbfd 70%); color: #17354f; }
+.heading { display: flex; gap: 10px; flex-wrap: wrap; align-items: start; justify-content: space-between; }
+.heading span { font-size: 10px; color: #37739c; font-weight: 750; }
+.heading h3 { margin: 6px 0; font-size: 17px; letter-spacing: -.035em; }
+.heading strong { padding: 6px 9px; border-radius: 7px; background: #deedf7; color: #215f85; font-size: 10px; }
+.description { font-size: 11px; line-height: 1.85; color: #627488; margin: 10px 0; }
+.comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
+.comparison figure { margin: 0; min-width: 0; border: 1px solid #d5dfe8; border-radius: 9px; background: #fff; overflow: hidden; }
+.comparison figure:last-child { border-color: #90b9d6; background: #f4faff; }
+.comparison figcaption { padding: 10px 7px 0; font-size: 10px; text-align: center; font-weight: 750; min-height: 36px; }
+.comparison svg { display: block; width: 100%; aspect-ratio: 1; }
+.status { color: #2c6987; text-align: center; font-size: 11px; line-height: 1.6; }
+.controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin: 18px 0 10px; padding: 14px; min-width: 0; border: 1px solid #d5dfe8; border-radius: 9px; background: #fff; }
+.controls legend { font-size: 12px; font-weight: 750; padding: 0 5px; }
+.controls label { display: grid; gap: 6px; min-width: 0; font-size: 11px; color: #627488; }
+.controls input, .controls select { width: 100%; min-width: 0; padding: 8px; border: 1px solid #d5dfe8; border-radius: 6px; background: #f8fafc; color: #17354f; font-size: 12px; }
+.controls input[type='range'] { padding: 0; accent-color: #2472bc; min-height: 30px; }
+.rangeLabel { grid-column: 1 / -1; grid-row: 2; }
+.controls small { grid-column: 1 / -1; font-size: 10px; color: #627488; font-variant-numeric: tabular-nums; }
+.controls .overlay { display: flex; align-items: center; gap: 6px; font-size: 10px; }
+.overlay input { width: auto; }
+.controls button { padding: 9px; border: 1px solid #a7c9dd; border-radius: 7px; background: #edf6fb; color: #215f85; font-size: 11px; }
+.warning { padding: 12px; border: 1px solid #dfb095; border-radius: 8px; color: #924b2d; background: #fff5ed; font-size: 11px; line-height: 1.8; }
+.provenance { margin-top: 12px; font-size: 10px; color: #627488; }
+.provenance summary { cursor: pointer; font-weight: 750; }
+.provenance p { overflow-wrap: anywhere; line-height: 1.7; }
+@media (max-width: 560px) { .panel { padding: 12px; } .heading h3 { font-size: 16px; } .controls { padding: 10px; gap: 10px; } .comparison { gap: 5px; } .comparison figcaption { font-size: 9px; } }
