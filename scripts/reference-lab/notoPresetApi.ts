@@ -56,6 +56,7 @@ export function createNotoPresetReader(directory: string) {
     const manifest: NotoPresetManifest = {
       schema: NOTO_PRESET_SCHEMA, font: parsed.font, stageKeys: parsed.stageKeys, coordinateFrame: parsed.coordinateFrame,
       glyphCount: glyphs.size, runId: source.runId, updatedAt: new Date(source.time).toISOString(),
+      modelKey: await modelKeyOf(path.dirname(path.dirname(source.file))),
     }
     const loaded = { manifest, glyphs }
     memo = { fingerprint, loaded }
@@ -111,6 +112,13 @@ export function createNotoPresetReader(directory: string) {
     glyph: async (codepoint: number): Promise<NotoPresetGlyph | null> => (await load()).glyphs.get(codepoint) ?? null,
     model,
   }
+}
+
+/** 모델·두께 파일의 mtime 묶음. 모델을 다시 빌드하면 바뀌어 클라이언트 캐시 키가 달라진다. */
+async function modelKeyOf(root: string): Promise<string> {
+  const files = ['analysis/variation-model-v2.json', 'analysis/variation-model-v1.json', 'attributes/role-thickness-v1.json'].map((name) => path.join(root, name))
+  const mtimes = await Promise.all(files.map((file) => stat(file).then((info) => Math.round(info.mtimeMs)).catch(() => 0)))
+  return mtimes.join('-')
 }
 
 function CORPUS_STAGES_MATCH(a: Record<string, string>, b: Record<string, string>): boolean {

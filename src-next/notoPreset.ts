@@ -38,4 +38,6 @@ export interface NotoPresetManifest {
   glyphCount: number
   runId: string
   updatedAt: string
+  /** 모델·두께 파일 버전. 바뀌면 클라이언트가 모델 묶음을 다시 받는다. */
+  modelKey?: string
 }

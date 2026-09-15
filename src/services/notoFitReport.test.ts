@@ -17,18 +17,30 @@ interface ApprovedCase {
   }
 }
 interface ThicknessFile { characters: Record<string, { medialRoles?: Record<string, { thickness: number | null }> }> }
+interface ExtentFile { characters: Record<string, Record<string, { from?: number; to?: number; reasonCode: string | null }>> }
 
-// 두께 파일은 corpus(.reference-fonts, gitignore)에만 있다. 없으면 이 리포트는 건너뛴다.
+// 두께·extent 파일은 corpus(.reference-fonts, gitignore)에만 있다. 두께가 없으면 이 리포트는 건너뛴다.
 const CORPUS = path.resolve(__dirname, '../../.reference-fonts/guide-corpus')
-function locateThickness(): { file: string; run: string } | null {
+function locateThickness(): { file: string; run: string; extentFile: string | null } | null {
   if (!existsSync(CORPUS)) return null
   for (const run of readdirSync(CORPUS).filter((name) => /^[a-f0-9]{24}$/.test(name))) {
     const file = path.join(CORPUS, run, 'attributes', 'role-thickness-v1.json')
-    if (existsSync(file)) return { file, run }
+    const extentFile = path.join(CORPUS, run, 'attributes', 'role-extent-v1.json')
+    if (existsSync(file)) return { file, run, extentFile: existsSync(extentFile) ? extentFile : null }
   }
   return null
 }
 const thicknessSource = locateThickness()
+
+/** 승인 측정의 visibleSpans는 기울어진 면에서 스텁만 남는다. contour extent가 있으면 획 길이는 그걸 쓴다. */
+function withExtents(measurements: Record<string, MedialRoleMeasurement>, extents: Record<string, { from?: number; to?: number; reasonCode: string | null }> | undefined): Record<string, MedialRoleMeasurement> {
+  if (!extents) return measurements
+  return Object.fromEntries(Object.entries(measurements).map(([roleId, value]) => {
+    const extent = extents[roleId]
+    if (!extent || extent.reasonCode !== null || extent.from === undefined || extent.to === undefined) return [roleId, value]
+    return [roleId, { ...value, visibleSpans: [{ from: extent.from / 1000, to: extent.to / 1000 }] }]
+  }))
+}
 
 function medialInputs(entry: ApprovedCase, thickness: Record<string, { thickness: number | null }>): { role: MedialFitInput['role']; measurements: Record<string, MedialRoleMeasurement>; contourIds: number[] }[] {
   const em = (roleIds: string[]) => Object.fromEntries(roleIds.map((id) => [id, (thickness[id]?.thickness ?? NaN) / 1000]))
@@ -48,13 +60,15 @@ function medialInputs(entry: ApprovedCase, thickness: Record<string, { thickness
 
 describe('승인 57자 홀자 획 마스터 fit 리포트', () => {
   it.skipIf(!thicknessSource)('fit → 리졸버 → 잉크 vs Noto 고스트 xor 비율과 rail 오차를 글자별로 낸다', () => {
-    const { file, run } = thicknessSource!
+    const { file, run, extentFile } = thicknessSource!
     const thickness = (JSON.parse(readFileSync(file, 'utf8')) as ThicknessFile).characters
+    const extents = extentFile ? (JSON.parse(readFileSync(extentFile, 'utf8')) as ExtentFile).characters : null
     const cases = (approved as unknown as { cases: ApprovedCase[] }).cases
     const rows: (MedialFitReport & { character: string })[] = []
     for (const entry of cases) {
       const roles = thickness[entry.identity.character]?.medialRoles ?? {}
-      for (const item of medialInputs(entry, roles)) {
+      const measured = { ...entry, stages: { ...entry.stages, medial: { ...entry.stages.medial, measurements: withExtents(entry.stages.medial.measurements, extents?.[entry.identity.character]) } } }
+      for (const item of medialInputs(measured, roles)) {
         const ghostOutline = selectNotoOutlineContours(entry.stages.outline.observation, item.contourIds)
         const report = reportMedialFit({ jamoId: entry.identity.medialJamo, role: item.role, measurements: item.measurements, thickness: (item as { thickness: Record<string, number> }).thickness, ghostOutline })
         rows.push({ character: entry.identity.character, ...report })

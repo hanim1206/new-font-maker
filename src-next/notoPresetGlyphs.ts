@@ -73,8 +73,8 @@ export function glyphCacheKey(manifest: Pick<NotoPresetManifest, 'stageKeys'>, c
   return `${manifest.stageKeys.outline}:${codepoint}`
 }
 
-export function modelCacheKey(manifest: Pick<NotoPresetManifest, 'stageKeys'>): string {
-  return `${manifest.stageKeys.outline}:model`
+export function modelCacheKey(manifest: Pick<NotoPresetManifest, 'stageKeys' | 'modelKey'>): string {
+  return `${manifest.stageKeys.outline}:model:${manifest.modelKey ?? ''}`
 }
 
 export function createNotoPresetGlyphLoader(input: { fetchJson?: FetchJson; cache?: NotoPresetGlyphCache } = {}): NotoPresetGlyphLoader {

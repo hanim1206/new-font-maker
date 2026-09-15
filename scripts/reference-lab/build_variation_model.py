@@ -66,8 +66,12 @@ Cell = Tuple[str, str]
 
 # ---------------------------------------------------------------- 관측 수집
 
-def collect_targets(row: Dict[str, Any]) -> Dict[str, float]:
-    """한 글자의 후보 단계에서 역할면 타깃값을 모은다. 부분·포기 단계는 제외한다."""
+def collect_targets(row: Dict[str, Any], extents: Optional[Dict[str, Any]] = None) -> Dict[str, float]:
+    """한 글자의 후보 단계에서 역할면 타깃값을 모은다. 부분·포기 단계는 제외한다.
+
+    extents가 있으면 spanFrom/spanTo는 contour extent(measure_role_extents)에서 읽는다.
+    visibleSpans는 기울어진 면에서 스텁만 남아 획 길이 원천으로 쓸 수 없다.
+    """
     values: Dict[str, float] = {}
     stages = row["stages"]
     for stage_name in ("initial", "final"):
@@ -82,6 +86,11 @@ def collect_targets(row: Dict[str, Any]) -> Dict[str, float]:
             values[f"medial.{role_id}.face"] = value["face"] * SCALE
             values[f"medial.{role_id}.visibleLength"] = value["visibleLength"] * SCALE
             # 획 마스터 fit은 길이만으로는 획을 못 놓는다. 가시 구간의 양끝(시작·끝 위치)도 타깃으로 둔다.
+            extent = ((extents or {}).get(row["identity"]["character"]) or {}).get(role_id)
+            if isinstance(extent, dict) and extent.get("reasonCode") is None:
+                values[f"medial.{role_id}.spanFrom"] = float(extent["from"])
+                values[f"medial.{role_id}.spanTo"] = float(extent["to"])
+                continue
             spans = value.get("visibleSpans") or []
             if spans:
                 values[f"medial.{role_id}.spanFrom"] = min(span["from"] for span in spans) * SCALE
@@ -94,13 +103,13 @@ def observation_key(row: Dict[str, Any]) -> Key:
     return (identity["initialJamo"], identity["medialJamo"], identity["finalJamo"] or NO_FINAL)
 
 
-def group_observations(rows: Iterable[Dict[str, Any]]) -> Dict[str, Dict[str, List[Tuple[str, Key, float]]]]:
+def group_observations(rows: Iterable[Dict[str, Any]], extents: Optional[Dict[str, Any]] = None) -> Dict[str, Dict[str, List[Tuple[str, Key, float]]]]:
     """target -> layer -> [(character, key, value)]. 글자 순서는 codepoint 순으로 고정한다."""
     grouped: Dict[str, Dict[str, List[Tuple[str, Key, float]]]] = defaultdict(lambda: defaultdict(list))
     for row in sorted(rows, key=lambda item: item["identity"]["codepoint"]):
         layer = row["identity"]["contextId"]
         key = observation_key(row)
-        for target, value in collect_targets(row).items():
+        for target, value in collect_targets(row, extents).items():
             grouped[target][layer].append((row["identity"]["character"], key, value))
     return grouped
 
@@ -512,8 +521,20 @@ def build_layer_model_v2(
 
 # ---------------------------------------------------------------- 전체 모델
 
-def build_model(report: Dict[str, Any], version: str = "v1") -> Dict[str, Any]:
-    grouped = group_observations(report["cases"])
+def load_role_extents(corpus_root: Path, report: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """attributes/role-extent-v1.json이 같은 추출 버전이면 글자별 extent를 준다. 없으면 None."""
+    path = corpus_root / "attributes" / "role-extent-v1.json"
+    if not path.exists():
+        return None
+    with path.open(encoding="utf-8") as source:
+        data = json.load(source)
+    if data.get("schema") != "noto-role-extent-v1" or data.get("stageKeys") != report.get("stageKeys"):
+        return None
+    return data.get("characters") or {}
+
+
+def build_model(report: Dict[str, Any], version: str = "v1", extents: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    grouped = group_observations(report["cases"], extents)
     targets: Dict[str, Any] = {}
     for target in sorted(grouped):
         layers = {
@@ -557,7 +578,8 @@ def run(corpus_root: Path, report_name: str = "all.json", version: str = "v1") -
     with report_path.open(encoding="utf-8") as source:
         report = json.load(source)
     started = time.monotonic()
-    targets = build_model(report, version)
+    extents = load_role_extents(corpus_root, report)
+    targets = build_model(report, version, extents)
     summary = summarize(targets)
     summary["elapsedSeconds"] = round(time.monotonic() - started, 3)
     result = {
@@ -567,6 +589,7 @@ def run(corpus_root: Path, report_name: str = "all.json", version: str = "v1") -
         "font": report["font"],
         "stageKeys": report["stageKeys"],
         "sourceReport": report_name,
+        "spanSource": "role-extent-v1" if extents is not None else "visibleSpans",
         "measurementScale": "1000-unit",
         "meaning": (
             "층별 median polish 주효과 + v1.2 판정이 고른 층의 자모쌍 셀 보정항. "
