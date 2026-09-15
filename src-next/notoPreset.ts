@@ -10,6 +10,26 @@ export interface NotoPresetGlyph {
   baselines: Record<string, number>
 }
 
+/** 검수 화면이 획 마스터를 fit할 때 쓰는 모델 묶음. 변화량 모델은 예측에 필요한 필드만 남긴다. */
+export const NOTO_PRESET_MODEL_SCHEMA = 'noto-preset-model-v1'
+export interface NotoPresetModelBundle {
+  schema: typeof NOTO_PRESET_MODEL_SCHEMA
+  stageKeys: Record<CorpusStage, string>
+  model: {
+    schema: string
+    stageKeys: Record<string, string>
+    targets: Record<string, { layers: Record<string, {
+      representative: number
+      effects: Record<'initial' | 'medial' | 'final', Record<string, number>>
+      defaultThreshold: number
+      confidence: 'low' | 'normal'
+      interaction?: { applied: boolean; pair?: string; cells?: { cell: [string, string]; term: number }[] }
+    }> }>
+  }
+  /** 홀자 → 역할 → 대표 두께(em 비율). corpus 전수 중앙값. */
+  thickness: Record<string, Record<string, number>>
+}
+
 export interface NotoPresetManifest {
   schema: typeof NOTO_PRESET_SCHEMA
   font: CorpusFont

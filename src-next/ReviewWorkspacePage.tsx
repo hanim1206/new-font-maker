@@ -5,8 +5,10 @@ import type { ApprovedNotoInput } from './notoBoundMaster'
 import { allCorpusRows, CORPUS_TOTAL, corpusIdentity, parseCorpusReviews, REVIEW_STORAGE_KEY } from './notoCorpus'
 import type { CorpusReviews, CorpusSnapshot } from './notoCorpus'
 import { NotoCorpusMatrix } from './NotoCorpusMatrix'
+import { fitMedialForGlyph } from './notoMedialFitView'
+import type { MedialFitView } from './notoMedialFitView'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
-import type { NotoPresetGlyph } from './notoPresetGlyphs'
+import type { NotoPresetGlyph, NotoPresetModelBundle } from './notoPresetGlyphs'
 import { MobileWorkspaceShell } from './workspace/WorkspaceChrome'
 import styles from './ReviewWorkspacePage.module.css'
 
@@ -64,12 +66,25 @@ function useNotoGlyph(codepoint: number): { glyph: NotoPresetGlyph | null; error
   return state.codepoint === codepoint ? state : { glyph: null, error: '' }
 }
 
+function useNotoModel(): { bundle: NotoPresetModelBundle | null; error: string } {
+  const [state, setState] = useState<{ bundle: NotoPresetModelBundle | null; error: string }>({ bundle: null, error: '' })
+  useEffect(() => {
+    const controller = new AbortController()
+    notoPresetGlyphs.model(controller.signal)
+      .then((bundle) => setState({ bundle, error: '' }))
+      .catch((failure: Error) => { if (!controller.signal.aborted) setState({ bundle: null, error: failure.message }) })
+    return () => controller.abort()
+  }, [])
+  return state
+}
+
 // 승인 번들은 모듈 상수라 codepoint 인덱스를 한 번만 만든다. 번들이 깨졌으면 전부 실측만으로 둔다.
 const approvedByCodepoint: ReadonlyMap<number, ApprovedNotoInput> = (() => {
   try { return new Map(approvedNotoInputs().map((entry) => [entry.identity.codepoint, entry])) } catch { return new Map() }
 })()
 const approvedCount = approvedByCodepoint.size
 const isApproved = (codepoint: number) => approvedByCodepoint.has(codepoint)
+const approvedInputFor = (codepoint: number): ApprovedNotoInput | null => approvedByCodepoint.get(codepoint) ?? null
 
 /** 승인 측정 = 사용자가 확인한 기준선 입력. 획 마스터 fit의 출발점이 될 글자다. */
 function TierBadge({ approved, className }: { approved: boolean; className?: string }) {
@@ -83,13 +98,15 @@ function baselineRails(glyph: NotoPresetGlyph): Rail[] {
   })
 }
 
-function GhostCanvas({ ghost, rails, approved, selectedRail, onSelectRail, label }: {
+function GhostCanvas({ ghost, rails, approved, selectedRail, onSelectRail, label, overlays = [] }: {
   ghost: string
   rails: Rail[]
   approved: boolean
   selectedRail?: string
   onSelectRail?: (id: string) => void
   label: string
+  /** 내 획 마스터 잉크. 고스트 위에 파랗게 겹친다. */
+  overlays?: string[]
 }) {
   return <svg className={styles.canvas} viewBox={VIEW_BOX} role="img" aria-label={label} data-testid="review-canvas">
     <defs>
@@ -104,6 +121,7 @@ function GhostCanvas({ ghost, rails, approved, selectedRail, onSelectRail, label
     <path d="M-.06 .88H1.02" stroke="#a6a297" strokeWidth=".003" />
     {/* Noto 고스트. 잉크가 아니라 비교용이라 반투명으로 깐다. */}
     <path d={ghost} fill="#3a3a36" fillOpacity={approved ? 0.55 : 0.7} fillRule="evenodd" data-testid="review-ghost" />
+    {overlays.map((path, index) => <path key={index} d={path} fill="#3b6fd6" fillOpacity=".45" fillRule="evenodd" data-testid="review-fit-ink" />)}
     {rails.map((rail) => {
       const selected = rail.id === selectedRail
       const stroke = selected ? '#f0561e' : approved ? '#3b6fd6' : '#8a8577'
@@ -180,6 +198,22 @@ function GlyphTitle({ codepoint, approved }: { codepoint: number; approved: bool
   </section>
 }
 
+const roleLabel = (roleId: string) => ({ outerPillar: '바깥기둥', innerPillar: '안기둥', baseStem: '줄기', leftStem: '왼줄기', rightStem: '오른줄기', primaryBeam: '보', upperBeam: '위보', lowerBeam: '아래보' })[roleId] ?? roleId
+
+/** 획 마스터 fit 수치. 승인 글자는 xor·rail 오차, 나머지는 겹쳐 보기만. */
+function FitStats({ view, approved }: { view: MedialFitView; approved: boolean }) {
+  return <div className={styles.fitStats} data-testid="review-fit-stats">
+    {view.message && <p className={styles.warning} role="alert">{view.message}</p>}
+    {view.parts.map((part) => <div key={part.role} className={styles.fitPart}>
+      <div className={styles.fitHead}><span>홀자 획 마스터 · {part.role === 'JU_H' ? '가로부' : part.role === 'JU_V' ? '세로부' : '모델 rail'}</span>
+        {part.xorRatio !== undefined ? <strong>xor {(part.xorRatio * 100).toFixed(1)}%<small> · 잉크 {((part.inkRatio ?? 0) * 100).toFixed(0)}%</small></strong> : <small>{approved ? part.message ?? '' : '겹쳐 보기만 · 승인 측정 없음'}</small>}
+      </div>
+      {part.railErrors.length > 0 && <div className={styles.railErrors}>{part.railErrors.map((rail) => <span key={rail.roleId} data-large={Math.abs(rail.errorUnits) > 10 || undefined}><i>{roleLabel(rail.roleId)}</i>{rail.errorUnits >= 0 ? '+' : ''}{rail.errorUnits.toFixed(1)}u</span>)}</div>}
+      {part.message && part.xorRatio === undefined && approved && <p className={styles.warning}>{part.message}</p>}
+    </div>)}
+  </div>
+}
+
 function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
   const codepoint = glyph.identity.codepoint
   const approved = isApproved(codepoint)
@@ -187,14 +221,18 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
   const rails = useMemo(() => baselineRails(glyph), [glyph])
   const [selectedRail, setSelectedRail] = useState<string | undefined>()
   const focused = rails.find((rail) => rail.id === selectedRail)
+  const { bundle, error: modelError } = useNotoModel()
+  const fitView = useMemo(() => bundle ? fitMedialForGlyph({ identity: glyph.identity, bundle, outline: glyph.outline, approved: approvedInputFor(codepoint) }) : null, [bundle, glyph, codepoint])
+  const overlays = fitView?.parts.flatMap((part) => part.path ? [part.path] : []) ?? []
   return <MobileWorkspaceShell activeArea="review" statusLabel={approved ? '검수 · 승인 측정' : '검수 · 실측 보기'}>
     <GlyphTitle codepoint={codepoint} approved={approved} />
     <div className={styles.scroll}>
-      <p className={styles.context}>{glyph.identity.initialJamo} + {glyph.identity.medialJamo}{glyph.identity.finalJamo ? ` + ${glyph.identity.finalJamo}` : ''} · <b>{approved ? '승인 측정 있음' : '승인 추출 없음'}</b> · Noto 고스트</p>
+      <p className={styles.context}>{glyph.identity.initialJamo} + {glyph.identity.medialJamo}{glyph.identity.finalJamo ? ` + ${glyph.identity.finalJamo}` : ''} · <b>{approved ? '승인 측정 있음' : '승인 추출 없음'}</b> · 회색 고스트 위 파랑 = 내 획</p>
       <section className={styles.canvasSection}>
-        {'path' in ghost ? <GhostCanvas ghost={ghost.path} rails={rails} approved={approved} selectedRail={selectedRail} onSelectRail={setSelectedRail} label={`${glyph.identity.character} Noto 고스트`} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
+        {'path' in ghost ? <GhostCanvas ghost={ghost.path} rails={rails} approved={approved} selectedRail={selectedRail} onSelectRail={setSelectedRail} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
         <TierBadge approved={approved} className={styles.canvasBadge} />
       </section>
+      {modelError ? <p className={styles.status} data-state="error" role="alert">{modelError}</p> : fitView ? <FitStats view={fitView} approved={approved} /> : <p className={styles.status} role="status">모델 읽는 중</p>}
       <div className={styles.head}><span>기준선 실측<small>Noto · 1000 u{focused ? ` · ${focused.label} 선택` : ''}</small></span><span>{rails.length}개</span></div>
       <div className={styles.values} data-testid="review-values">
         {rails.map((rail) => <button type="button" className={styles.cell} key={rail.id} aria-pressed={rail.id === selectedRail} onClick={() => setSelectedRail(rail.id)}><span><span className={styles.key}>{rail.label}</span><span className={styles.value}>{(rail.value * 1000).toFixed(1)}<small>u</small></span></span><i className={styles.bar} style={{ '--p': `${Math.round(rail.value * 100)}%` } as React.CSSProperties} /></button>)}

@@ -1,7 +1,7 @@
-import { NOTO_PRESET_SCHEMA } from './notoPreset'
-import type { NotoPresetGlyph, NotoPresetManifest } from './notoPreset'
+import { NOTO_PRESET_MODEL_SCHEMA, NOTO_PRESET_SCHEMA } from './notoPreset'
+import type { NotoPresetGlyph, NotoPresetManifest, NotoPresetModelBundle } from './notoPreset'
 
-export type { NotoPresetGlyph, NotoPresetManifest }
+export type { NotoPresetGlyph, NotoPresetManifest, NotoPresetModelBundle }
 
 /**
  * 글자별 Noto 윤곽을 필요한 글자만 API로 받아 IndexedDB에 둔다.
@@ -13,8 +13,8 @@ const DB_NAME = 'noto-preset-glyphs'
 const STORE = 'glyphs'
 
 export interface NotoPresetGlyphCache {
-  get(key: string): Promise<NotoPresetGlyph | undefined>
-  set(key: string, glyph: NotoPresetGlyph): Promise<void>
+  get<T = unknown>(key: string): Promise<T | undefined>
+  set(key: string, value: unknown): Promise<void>
 }
 
 export type FetchJson = <T>(url: string, signal?: AbortSignal) => Promise<T>
@@ -22,6 +22,8 @@ export type FetchJson = <T>(url: string, signal?: AbortSignal) => Promise<T>
 export interface NotoPresetGlyphLoader {
   manifest(signal?: AbortSignal): Promise<NotoPresetManifest>
   glyph(codepoint: number, signal?: AbortSignal): Promise<NotoPresetGlyph>
+  /** 변화량 모델 + 대표 두께. 글자와 같은 캐시에 stageKey로 둔다. */
+  model(signal?: AbortSignal): Promise<NotoPresetModelBundle>
   /** 서버 export가 바뀐 뒤 manifest를 다시 읽고 싶을 때. 캐시 항목은 키가 달라져 자연히 무시된다. */
   reset(): void
 }
@@ -34,8 +36,8 @@ export async function defaultFetchJson<T>(url: string, signal?: AbortSignal): Pr
 }
 
 export function createMemoryGlyphCache(): NotoPresetGlyphCache {
-  const entries = new Map<string, NotoPresetGlyph>()
-  return { get: async (key) => entries.get(key), set: async (key, glyph) => { entries.set(key, glyph) } }
+  const entries = new Map<string, unknown>()
+  return { get: async <T,>(key: string) => entries.get(key) as T | undefined, set: async (key, value) => { entries.set(key, value) } }
 }
 
 /** 열기·읽기·쓰기 어느 단계든 실패하면 조용히 미스로 처리해 화면은 항상 API로 그릴 수 있게 한다. */
@@ -62,13 +64,17 @@ export function createIndexedDbGlyphCache(): NotoPresetGlyphCache {
     } catch { resolve(undefined) }
   }))
   return {
-    get: (key) => run<NotoPresetGlyph | undefined>('readonly', (store) => store.get(key) as IDBRequest<NotoPresetGlyph | undefined>),
-    set: async (key, glyph) => { await run('readwrite', (store) => store.put(glyph, key)) },
+    get: <T,>(key: string) => run<T | undefined>('readonly', (store) => store.get(key) as IDBRequest<T | undefined>),
+    set: async (key, value) => { await run('readwrite', (store) => store.put(value, key)) },
   }
 }
 
 export function glyphCacheKey(manifest: Pick<NotoPresetManifest, 'stageKeys'>, codepoint: number): string {
   return `${manifest.stageKeys.outline}:${codepoint}`
+}
+
+export function modelCacheKey(manifest: Pick<NotoPresetManifest, 'stageKeys'>): string {
+  return `${manifest.stageKeys.outline}:model`
 }
 
 export function createNotoPresetGlyphLoader(input: { fetchJson?: FetchJson; cache?: NotoPresetGlyphCache } = {}): NotoPresetGlyphLoader {
@@ -99,7 +105,7 @@ export function createNotoPresetGlyphLoader(input: { fetchJson?: FetchJson; cach
 
   const sharedGlyph = async (codepoint: number) => {
     const key = glyphCacheKey(await sharedManifest(), codepoint)
-    const cached = await cache.get(key)
+    const cached = await cache.get<NotoPresetGlyph>(key)
     if (cached) return cached
     const pending = inflight.get(key) ?? fetchJson<NotoPresetGlyph>(`${API}/glyph/${codepoint}`).then(async (value) => {
       if (value?.identity?.codepoint !== codepoint || !value.outline?.operations) throw new Error('받은 글자가 요청과 다릅니다.')
@@ -110,12 +116,26 @@ export function createNotoPresetGlyphLoader(input: { fetchJson?: FetchJson; cach
     return pending
   }
 
+  let modelInflight: Promise<NotoPresetModelBundle> | undefined
+  const sharedModel = async () => {
+    const key = modelCacheKey(await sharedManifest())
+    const cached = await cache.get<NotoPresetModelBundle>(key)
+    if (cached) return cached
+    modelInflight ??= fetchJson<NotoPresetModelBundle>(`${API}/model`).then(async (value) => {
+      if (value?.schema !== NOTO_PRESET_MODEL_SCHEMA || !value.model?.targets || !value.thickness) throw new Error('모델 묶음 형식이 다릅니다.')
+      await cache.set(key, value)
+      return value
+    }).finally(() => { modelInflight = undefined })
+    return modelInflight
+  }
+
   return {
     manifest: (signal) => abortable(sharedManifest(), signal),
     glyph: (codepoint, signal) => {
       if (!Number.isInteger(codepoint)) return Promise.reject(new Error('codepoint가 정수여야 합니다.'))
       return abortable(sharedGlyph(codepoint), signal)
     },
+    model: (signal) => abortable(sharedModel(), signal),
     reset: () => { manifestPromise = undefined },
   }
 }
