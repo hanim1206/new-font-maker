@@ -25,8 +25,6 @@
 .badge { display: inline-block; align-self: flex-start; padding: 2px 8px; border: 1px solid rgb(var(--color-text-dim-4)); border-radius: 10px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 10px; font-weight: 700; letter-spacing: .06em; }
 .badge[data-tier='approved'] { border-color: rgb(var(--color-primary)); color: rgb(var(--color-primary-dark)); background: rgb(var(--color-primary-light) / .4); }
 
-.context { margin: 4px 14px 0; color: rgb(var(--color-text-dim-4)); font-size: 11px; letter-spacing: .03em; text-align: center; }
-.context b { color: rgb(var(--color-text-dim-2)); font-weight: 600; }
 
 .canvasSection { position: relative; padding: 8px 14px; }
 /* 드래그 중 브라우저 선택 하이라이트(파란 배경)와 스크롤 제스처를 막는다. */
@@ -39,6 +37,20 @@
 .canvasToggle[aria-pressed='true'] { border-color: rgb(var(--color-foreground)); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 .railButton { cursor: pointer; outline: none; }
 .railButton:focus-visible { stroke: rgb(var(--color-primary) / .18); }
+/* 활성 rail 호버·포커스: 선이 굵어지고 후광이 켜진다. 선택된 rail은 이미 굵고 후광이 있다. */
+.rail .railLine, .rail .railHalo, .rail .railLabel { transition: stroke-width .12s ease, stroke-opacity .12s ease, opacity .12s ease; }
+.rail[data-active='true']:hover .railLine, .rail:has(.railButton:focus-visible) .railLine { stroke-width: .009; }
+.rail:hover .railHalo, .rail:has(.railButton:focus-visible) .railHalo { stroke-opacity: .14; }
+.rail[data-selected] .railLine { stroke-width: .012; }
+.rail[data-selected] .railHalo { stroke-opacity: .22; }
+/* 선택된 rail 위에 올리면 한 단계 더: 후광이 넓어지고 선이 더 굵어져 '잡을 수 있다'가 보인다. */
+.rail:hover[data-selected] .railLine, .rail[data-selected]:has(.railButton:focus-visible) .railLine { stroke-width: .018; }
+.rail:hover[data-selected] .railHalo, .rail[data-selected]:has(.railButton:focus-visible) .railHalo { stroke-width: .06; stroke-opacity: .34; }
+.railHit { pointer-events: stroke; }
+/* 라벨은 여백 띠에 숨어 있다가 호버·포커스 때만 뜬다. 흰 테두리로 격자 위에서도 읽힌다. */
+.railLabel { opacity: 0; paint-order: stroke; stroke: #fff; stroke-width: .012; stroke-linejoin: round; pointer-events: none; }
+.rail:hover .railLabel, .rail:has(.railButton:focus-visible) .railLabel { opacity: 1; }
+.rail[data-selected] .railLabel { font-weight: 800; }
 .warning { padding: 6px 14px; color: rgb(var(--color-danger, 214 50 31)); font-size: 11px; }
 
 .head { display: flex; align-items: baseline; justify-content: space-between; margin: 10px 14px 0; padding: 6px 0 4px; border-bottom: 1px solid rgb(var(--color-foreground)); }
@@ -66,9 +78,6 @@
 .railErrors span[data-large] { color: #f0561e; }
 .locked { margin: 14px 14px 18px; padding: 12px; border: 1px dashed rgb(var(--color-text-dim-4)); border-radius: 22px; color: rgb(var(--color-text-dim-4)); font-size: 13px; font-weight: 700; text-align: center; }
 
-.chips { display: flex; gap: 6px; padding: 8px 14px 0; overflow-x: auto; scrollbar-width: none; }
-.chips button { flex: 0 0 auto; padding: 4px 11px; border: 1px solid rgb(var(--color-border)); border-radius: 14px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
-.chips button[aria-pressed='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary)); color: #fff; }
 .editorHeading { display: flex; align-items: baseline; justify-content: space-between; }
 .editorHeading span { color: rgb(var(--color-text-dim-4)); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
 .editorHeading span small { margin-left: 4px; font-weight: 600; letter-spacing: 0; }
@@ -114,3 +123,9 @@
 .snapTag { margin-left: 8px; padding: 2px 7px; border-radius: 8px; background: #f0561e; color: #fff; font-size: 10px; font-style: normal; font-weight: 800; letter-spacing: 0; }
 .snapTag[data-kind='model'] { background: rgb(var(--color-primary)); }
 .editorHeading em.snapTag { display: inline-block; text-align: left; }
+/* 부품 탭. 켠 부품 색으로 채우고, 나머지는 색 점만. */
+.partTabs { display: flex; gap: 6px; padding: 8px 14px 0; }
+.partTabs button { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 4px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 11px; font-weight: 700; }
+.partTabs button::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--part); opacity: .55; }
+.partTabs button[aria-pressed='true'] { border-color: var(--part); background: var(--part); color: #fff; }
+.partTabs button[aria-pressed='true']::before { background: #fff; opacity: 1; }

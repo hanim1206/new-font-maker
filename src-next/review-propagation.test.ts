@@ -8,7 +8,8 @@ import { applyFacesDelta, applyMedialDelta, editKindOf, hasLayoutEdit, hasShapeE
 
 const slot = { x: 0.5, y: 0.1, width: 0.4, height: 0.8 }
 const medialPart = (part: MedialFitPart['part'], railsEm: Record<string, number>): MedialFitPart => ({ part, role: 'JU_VERTICAL', roleIds: [], fit: { railsEm, slot } as unknown as MedialFitPart['fit'] })
-const componentPart = (part: ComponentFitPart['part'], faces: ComponentFitPart['faces']): ComponentFitPart => ({ part, jamoId: 'ㄱ', faces })
+// family는 닿자 획 변형용 필드. 이 테스트엔 안 쓰이므로 있든 없든 통과하게 단언으로 둔다.
+const componentPart = (part: ComponentFitPart['part'], faces: ComponentFitPart['faces']): ComponentFitPart => ({ part, jamoId: 'ㄱ', family: null, faces } as ComponentFitPart)
 const faces = { left: 0.1, right: 0.5, top: 0.1, bottom: 0.5 }
 const rail = (over: Partial<EditableRail> & Pick<EditableRail, 'id' | 'role' | 'kind' | 'value' | 'original'>): EditableRail => ({ partIndex: 0, axis: 'x', label: over.id, ...over })
 
@@ -77,6 +78,15 @@ describe('propagationCandidates', () => {
     expect(picked.every((item) => item.medialJamo === 'ㅓ')).toBe(true)
     expect(new Set(picked.map((item) => item.initialJamo)).size).toBeGreaterThan(1)
     expect(new Set(picked.map((item) => item.finalJamo)).size).toBeGreaterThan(1)
+  })
+  it('배치 Δ의 이 자모 = 바꾼 부품 자모만 같게. 홀자 중심을 옮기면 같은 홀자, 받침 변을 옮기면 같은 받침', () => {
+    const ae = corpusIdentity('배'.codePointAt(0)!)
+    const medialOnly = propagationCandidates({ source: ae, scope: 'jamo', count: 8, edit: { layout: { medial: { JU: { 'outer-right': 0.01 } }, component: {} }, shape: { medial: {} } } })
+    expect(medialOnly.every((item) => item.medialJamo === 'ㅐ')).toBe(true)
+    expect(medialOnly.some((item) => item.finalJamo !== null)).toBe(true)
+    const finalOnly = propagationCandidates({ source, scope: 'jamo', count: 8, edit: { layout: { medial: {}, component: { JO: { top: 0.01 } } }, shape: { medial: {} } } })
+    expect(finalOnly.every((item) => item.finalJamo === 'ㅁ')).toBe(true)
+    expect(new Set(finalOnly.map((item) => item.medialJamo)).size).toBeGreaterThan(1)
   })
   it('전체는 문맥이 섞이고, 다음 묶음은 다른 글자', () => {
     const all = propagationCandidates({ source, scope: 'all', count: 8 })

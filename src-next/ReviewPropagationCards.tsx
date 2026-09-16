@@ -15,7 +15,7 @@ import styles from './ReviewPropagationCards.module.css'
 
 /**
  * 검수 글자 화면 아래 카드 묶음. 지금 옮긴 기준선 Δ를 다른 글자에 얹어 보여준다. 저장이 아니라 미리보기.
- * - 배치 Δ(중심 rail·닿자 네 변): 범위 `이 층 · 전체`, em 그대로.
+ * - 배치 Δ(중심 rail·닿자 네 변): 기본 `이 자모`(ㅐ면 ㅐ만), `이 층 · 전체`는 일부러 넓힐 때. em 그대로.
  * - 형태 Δ(시작·끝 rail): `이 자모로 올리기`를 누르면 같은 홀자 글자에 슬롯 비율로. 본래 자소 탭 몫.
  * 카드 = Noto 고스트(회색) + Δ 적용한 내 획(검정) + Δ 전 내 획(주황 점선).
  */
@@ -104,7 +104,7 @@ export function ReviewPropagationCards({ source, bundle, edit, changed }: {
   /** 모델 값에서 벗어난 rail. 머리에 이름과 Δ(u)를 보인다. */
   changed: EditableRail[]
 }) {
-  const [scope, setScope] = useState<PropagationScope>('layer')
+  const [scope, setScope] = useState<PropagationScope>('jamo')
   const [layoutPage, setLayoutPage] = useState(0)
   const [shapePage, setShapePage] = useState(0)
   const [promoted, setPromoted] = useState(false)
@@ -112,7 +112,7 @@ export function ReviewPropagationCards({ source, bundle, edit, changed }: {
   const shapeActive = hasShapeEdit(edit)
   const layoutRails = changed.filter((rail) => editKindOf(rail) === 'layout')
   const shapeRails = changed.filter((rail) => editKindOf(rail) === 'shape')
-  const layoutCandidates = useMemo(() => layoutActive ? propagationCandidates({ source, scope, count: CARD_COUNT, page: layoutPage }) : [], [layoutActive, source, scope, layoutPage])
+  const layoutCandidates = useMemo(() => layoutActive ? propagationCandidates({ source, scope, count: CARD_COUNT, page: layoutPage, edit }) : [], [layoutActive, source, scope, layoutPage, edit])
   const shapeCandidates = useMemo(() => shapeActive && promoted ? propagationCandidates({ source, scope: 'jamo', count: CARD_COUNT, page: shapePage }) : [], [shapeActive, promoted, source, shapePage])
   const scopeHint = PROPAGATION_SCOPES.find((item) => item.id === scope)?.hint ?? ''
   return <section className={styles.section} aria-label="다른 글자에 적용하면" data-testid="review-propagation">

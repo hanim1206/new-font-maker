@@ -10,7 +10,7 @@ import { editableComponentRailsOf, fitComponentsForGlyph, renderComponentPart } 
 import type { ComponentFitPart, RenderedComponentPart } from './notoComponentFitView'
 import type { ComponentFaces } from '../src/services/notoComponentFit'
 import { resolveContextBoxes } from '../src/services/contextBoxResolver'
-import type { BoxConfig } from '../src/types'
+import type { BoxConfig, Part } from '../src/types'
 import { editableRailsOf, fitMedialForGlyph, renderMedialPart, roleLabel } from './notoMedialFitView'
 import type { EditableRail, MedialFitView, RenderedMedialPart } from './notoMedialFitView'
 import { useNotoModel } from './notoModel'
@@ -115,18 +115,29 @@ function writeGhostVisible(visible: boolean) {
 }
 
 /** 기준선이 만드는 부품 상자. 홀자는 잉크 slot, 닿자는 네 변. 획 색이 아니라 상자 색으로 부품을 가른다. */
-interface FitBox { id: string; kind: 'medial' | 'component'; label: string; box: BoxConfig }
+interface FitBox { id: string; kind: 'medial' | 'component'; part: Part; label: string; box: BoxConfig }
 
-const BOX_COLOR: Record<FitBox['kind'], string> = { medial: '#3b6fd6', component: '#2f9a6a' }
+/** 부품 색. 상자·rail·라벨이 같은 색을 쓴다. 첫닿자 초록, 홀자 파랑, 받침 보라. 선택·스냅은 주황. */
+const PART_COLOR: Record<Part, string> = { CH: '#2f9a6a', JU: '#3b6fd6', JU_H: '#3b6fd6', JU_V: '#3b6fd6', JO: '#8b5cf6' }
+const INACTIVE_COLOR = '#c9c5bb'
+const ACCENT = '#f0561e'
+/** Noto 실측선 id 앞머리 → 부품. 혼합 홀자의 가로부·세로부는 둘 다 홀자 탭에 속한다. */
+const measuredPartOf = (id: string): 'CH' | 'JU' | 'JO' => id.startsWith('initial.') ? 'CH' : id.startsWith('final.') ? 'JO' : 'JU'
+const isMedialPart = (part: Part) => part === 'JU' || part === 'JU_H' || part === 'JU_V'
+const samePartGroup = (a: Part, b: Part) => a === b || (isMedialPart(a) && isMedialPart(b))
 
-function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], selectedRail, snappedRail, onSelectRail, onDragRail, label, overlays = [], componentOverlays = [], boxes = [] }: {
+type CanvasRail = EditableRail & { part: Part }
+
+function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], activePart, selectedRail, snappedRail, onSelectRail, onDragRail, label, overlays = [], componentOverlays = [], boxes = [] }: {
   ghost: string
   /** Noto 고스트를 끄면 내 획만 남아 어느 획을 바꿀지 보인다. */
   ghostVisible?: boolean
   /** Noto 실측 기준선. 참고용이라 옅은 점선, 조작 없음. */
   measured: Rail[]
-  /** 획 마스터 rail. 잡고 끌 수 있다. */
-  editable?: EditableRail[]
+  /** 획 마스터 rail. 활성 부품 것만 잡고 끌 수 있다. */
+  editable?: CanvasRail[]
+  /** 활성 부품. 이 부품의 rail·상자만 제 색, 나머지는 회색으로 죽인다. 없으면 전부 활성. */
+  activePart?: Part
   selectedRail?: string
   /** 드래그 중 붙은 다른 기준선 id. 그 선을 주황으로 켠다. */
   snappedRail?: string
@@ -142,7 +153,7 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], sele
   boxes?: FitBox[]
 }) {
   const gesture = useRef<{ pointerId: number; id: string; axis: 'x' | 'y'; start: number; startValue: number } | null>(null)
-  const startDrag = (rail: EditableRail) => (event: ReactPointerEvent<SVGLineElement>) => {
+  const startDrag = (rail: CanvasRail) => (event: ReactPointerEvent<SVGLineElement>) => {
     onSelectRail?.(rail.id)
     if (!onDragRail) return
     gesture.current = { pointerId: event.pointerId, id: rail.id, axis: rail.axis, start: rail.axis === 'x' ? event.clientX : event.clientY, startValue: rail.value }
@@ -164,6 +175,10 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], sele
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
   }
   const geometryOf = (axis: 'x' | 'y', value: number) => axis === 'x' ? { x1: value, x2: value, y1: -0.06, y2: 1.02 } : { x1: -0.06, x2: 1.02, y1: value, y2: value }
+  // 라벨은 글자 칸 밖 여백 띠에. x rail은 위(편집)·아래(실측) 띠 가운데, y rail은 오른 띠 끝 정렬. 호버 때만 보인다.
+  const labelAt = (axis: 'x' | 'y', value: number, band: 'top' | 'bottom') => axis === 'x'
+    ? { x: Math.min(0.92, Math.max(0.08, value)), y: band === 'top' ? -0.03 : 1.062, textAnchor: 'middle' as const }
+    : { x: 1.07, y: value - 0.012, textAnchor: 'end' as const }
   return <svg className={styles.canvas} viewBox={VIEW_BOX} role="img" aria-label={label} data-testid="review-canvas">
     <defs>
       {/* 자소 원형 캔버스와 같은 눈금: 1/16 잔선 + 1/4 굵은선 */}
@@ -175,32 +190,45 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], sele
     <rect x="0" y="0" width="1" height="1" fill="url(#review-grid-coarse)" />
     <rect x="0" y="0" width="1" height="1" fill="none" stroke="rgb(196 203 212)" strokeWidth=".004" />
     <path d="M-.06 .88H1.02" stroke="#a6a297" strokeWidth=".003" />
-    {/* 부품 상자. 획보다 아래, 고스트보다 아래. 홀자 파랑·닿자 초록. */}
-    {boxes.map((item) => <g key={item.id} data-testid="review-fit-box" data-kind={item.kind}>
-      <rect x={item.box.x} y={item.box.y} width={item.box.width} height={item.box.height} fill={BOX_COLOR[item.kind]} fillOpacity=".14" stroke={BOX_COLOR[item.kind]} strokeOpacity=".55" strokeWidth=".003" />
-      <text x={item.box.x + 0.008} y={item.box.y - 0.008} fontSize=".024" fill={BOX_COLOR[item.kind]} fillOpacity=".8">{item.label}</text>
-    </g>)}
+    {/* 부품 상자. 획보다 아래, 고스트보다 아래. rail과 같은 부품 색, 비활성 부품은 옅게. */}
+    {boxes.map((item) => {
+      const active = !activePart || samePartGroup(item.part, activePart)
+      const color = PART_COLOR[item.part]
+      return <g key={item.id} data-testid="review-fit-box" data-kind={item.kind} data-active={active}>
+        <rect x={item.box.x} y={item.box.y} width={item.box.width} height={item.box.height} fill={color} fillOpacity={active ? 0.24 : 0.07} stroke={color} strokeOpacity={active ? 0.85 : 0.25} strokeWidth={active ? 0.004 : 0.003} />
+        <text x={item.box.x + 0.008} y={item.box.y - 0.008} fontSize=".024" fill={color} fillOpacity={active ? 0.9 : 0.35}>{item.label}</text>
+      </g>
+    })}
     {/* Noto 고스트. 잉크가 아니라 비교용이라 반투명으로 깐다. 검정 획 아래에 두어 벗어난 곳만 회색으로 보인다. */}
     {ghostVisible && <path d={ghost} fill="#3a3a36" fillOpacity=".55" fillRule="evenodd" data-testid="review-ghost" />}
     {overlays.map((path, index) => <path key={index} d={path} fill="#111" fillRule="evenodd" data-testid="review-fit-ink" />)}
     {componentOverlays.map((path, index) => <path key={`c${index}`} d={path} fill="#111" fillRule="evenodd" data-testid="review-component-ink" />)}
+    {/* Noto 실측선. 활성 부품 것은 부품 색 점선, 나머지는 옅은 회색. 조작 없음. */}
     {measured.map((rail) => {
       const snapped = rail.id === snappedRail
-      return <g key={rail.id} data-rail={rail.id} data-snapped={snapped || undefined}>
-        <line {...geometryOf(rail.axis, rail.value)} stroke={snapped ? '#f0561e' : '#b8b4a8'} strokeWidth={snapped ? 0.006 : 0.003} strokeDasharray=".012 .008" />
-        <text {...(rail.axis === 'x' ? { x: rail.value + 0.012, y: 1.01 } : { x: 0.96, y: rail.value - 0.008 })} fontSize=".026" fill={snapped ? '#f0561e' : '#b8b4a8'}>{rail.label}</text>
+      const active = !activePart || samePartGroup(measuredPartOf(rail.id), activePart)
+      const color = snapped ? ACCENT : active ? PART_COLOR[measuredPartOf(rail.id)] : INACTIVE_COLOR
+      const geometry = geometryOf(rail.axis, rail.value)
+      return <g key={rail.id} className={styles.rail} data-rail={rail.id} data-snapped={snapped || undefined} data-active={active}>
+        <line {...geometry} className={styles.railLine} stroke={color} strokeOpacity={active || snapped ? 0.7 : 0.6} strokeWidth={snapped ? 0.006 : 0.003} strokeDasharray=".012 .008" />
+        {/* 호버용 히트 영역. 조작은 없고 라벨만 띄운다. */}
+        <line {...geometry} className={styles.railHit} stroke="transparent" strokeWidth=".03" />
+        <text {...labelAt(rail.axis, rail.value, 'bottom')} className={styles.railLabel} fontSize=".026" fill={color}>{rail.label}</text>
       </g>
     })}
-    {editable.map((rail) => {
+    {/* 비활성 부품 rail은 먼저 그려 뒤로 보내고 손잡이도 없다. 활성 rail만 잡힌다. */}
+    {[...editable].sort((a, b) => Number(!activePart || samePartGroup(a.part, activePart)) - Number(!activePart || samePartGroup(b.part, activePart))).map((rail) => {
       const selected = rail.id === selectedRail
       const snapped = rail.id === snappedRail
-      const stroke = selected || snapped ? '#f0561e' : '#3b6fd6'
+      const active = !activePart || samePartGroup(rail.part, activePart)
+      const stroke = selected || snapped ? ACCENT : active ? PART_COLOR[rail.part] : INACTIVE_COLOR
       const geometry = geometryOf(rail.axis, rail.value)
-      return <g key={rail.id} data-rail={rail.id} data-selected={selected || undefined} data-snapped={snapped || undefined}>
-        <line {...geometry} stroke={stroke} strokeWidth={selected || snapped ? 0.008 : 0.004} />
-        {onSelectRail && <line {...geometry} className={styles.railButton} data-rail-handle={rail.id} stroke="transparent" strokeWidth=".08" role="button" tabIndex={0} aria-label={`${rail.label} 선택`} aria-pressed={selected} onPointerDown={startDrag(rail)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectRail(rail.id) } }} />}
-        <text {...(rail.axis === 'x' ? { x: rail.value + 0.012, y: -0.025 } : { x: -0.05, y: rail.value - 0.012 })} fontSize=".03" fill={stroke}>{rail.label}</text>
-        {selected && <circle cx={rail.axis === 'x' ? rail.value : 1} cy={rail.axis === 'x' ? 1 : rail.value} r=".03" fill="#fff" stroke="#f0561e" strokeWidth=".01" />}
+      return <g key={rail.id} className={active ? styles.rail : undefined} data-rail={rail.id} data-part={rail.part} data-active={active} data-selected={selected || undefined} data-snapped={snapped || undefined}>
+        {/* 후광. 선택·스냅이면 항상, 활성 rail은 호버 때만(CSS). */}
+        {active && <line {...geometry} className={styles.railHalo} stroke={stroke} strokeWidth=".032" strokeOpacity={selected || snapped ? 0.2 : 0} strokeLinecap="round" />}
+        <line {...geometry} className={styles.railLine} stroke={stroke} strokeWidth={selected || snapped ? 0.012 : active ? 0.004 : 0.003} strokeOpacity={active || snapped ? 1 : 0.8} />
+        {onSelectRail && active && <line {...geometry} className={styles.railButton} data-rail-handle={rail.id} stroke="transparent" strokeWidth=".08" role="button" tabIndex={0} aria-label={`${rail.label} 선택`} aria-pressed={selected} onPointerDown={startDrag(rail)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectRail(rail.id) } }} />}
+        {active && <text {...labelAt(rail.axis, rail.value, 'top')} className={styles.railLabel} fontSize=".03" fill={stroke}>{rail.label}</text>}
       </g>
     })}
   </svg>
@@ -348,13 +376,25 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
     ...editableComponentRailsOf(componentParts, facesByPart),
   ], [fitView, railsByPart, componentParts, facesByPart])
   const overlays = rendered.flatMap((part) => part.path ? [part.path] : [])
+  // rail → 부품. 캔버스 색·탭 필터가 이걸로 가른다.
+  const canvasRails = useMemo<CanvasRail[]>(() => editable.map((item) => ({ ...item, part: item.id.startsWith('c') ? componentParts[item.partIndex]?.part ?? 'CH' : fitView?.parts[item.partIndex]?.part ?? 'JU' })), [editable, fitView, componentParts])
   const boxes = useMemo<FitBox[]>(() => [
-    ...rendered.flatMap((part, index) => part.slot && fitView ? [{ id: `m${index}`, kind: 'medial' as const, label: fitView.parts[index].role === 'JU_H' ? '홀자 가로부' : fitView.parts[index].role === 'JU_V' ? '홀자 세로부' : '홀자', box: part.slot }] : []),
-    ...componentRendered.flatMap((part, index) => part.faces ? [{ id: `c${index}`, kind: 'component' as const, label: componentParts[index].part === 'CH' ? '첫닿자' : '받침', box: { x: part.faces.left, y: part.faces.top, width: part.faces.right - part.faces.left, height: part.faces.bottom - part.faces.top } }] : []),
+    ...rendered.flatMap((part, index) => part.slot && fitView ? [{ id: `m${index}`, kind: 'medial' as const, part: fitView.parts[index].part, label: fitView.parts[index].role === 'JU_H' ? '홀자 가로부' : fitView.parts[index].role === 'JU_V' ? '홀자 세로부' : '홀자', box: part.slot }] : []),
+    ...componentRendered.flatMap((part, index) => part.faces ? [{ id: `c${index}`, kind: 'component' as const, part: componentParts[index].part, label: componentParts[index].part === 'CH' ? '첫닿자' : '받침', box: { x: part.faces.left, y: part.faces.top, width: part.faces.right - part.faces.left, height: part.faces.bottom - part.faces.top } }] : []),
   ], [rendered, fitView, componentRendered, componentParts])
   const [ghostVisible, setGhostVisible] = useState(readGhostVisible)
   const toggleGhost = () => setGhostVisible((current) => { writeGhostVisible(!current); return !current })
-  const rail = editable.find((item) => item.id === selectedRail) ?? editable[0]
+  // 부품 탭. rail이 전부 보이면 잡기 어려워 한 부품씩 켠다. 기본 홀자.
+  const partTabs = useMemo<{ part: Part; label: string }[]>(() => [
+    ...componentParts.filter((part) => part.part === 'CH' && part.faces).map((part) => ({ part: 'CH' as Part, label: `첫닿자 ${part.jamoId}` })),
+    ...(fitView?.parts.some((part) => part.fit) ? [{ part: 'JU' as Part, label: `홀자 ${glyph.identity.medialJamo}` }] : []),
+    ...componentParts.filter((part) => part.part === 'JO' && part.faces).map((part) => ({ part: 'JO' as Part, label: `받침 ${part.jamoId}` })),
+  ], [componentParts, fitView, glyph])
+  const [activePartState, setActivePartState] = useState<Part>('JU')
+  const activePart = partTabs.some((tab) => tab.part === activePartState) ? activePartState : partTabs[0]?.part
+  const activeRails = useMemo(() => activePart ? canvasRails.filter((item) => samePartGroup(item.part, activePart)) : canvasRails, [canvasRails, activePart])
+  const rail = activeRails.find((item) => item.id === selectedRail) ?? activeRails[0]
+  const selectPart = (part: Part) => { setActivePartState(part); setSelectedRail(undefined); setError(''); setSnapHit(null) }
   const editCount = editable.filter((item) => Math.abs(item.value - item.original) > 1e-9).length
   // 다른 글자 카드에 얹을 Δ. 편집 상태에서 모델 값 대비 차이만 뽑는다.
   const propagationEdit = useMemo(() => propagationEditOf({ editable, medialParts: fitView?.parts ?? [], componentParts }), [editable, fitView, componentParts])
@@ -422,15 +462,14 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
   return <MobileWorkspaceShell activeArea="review" statusLabel={approved ? '검수 · 승인 측정' : '검수 · 실측 보기'} drawer={ruler || undefined}>
     <GlyphTitle codepoint={codepoint} approved={approved} />
     <div className={styles.scroll}>
-      <p className={styles.context}>{glyph.identity.initialJamo} + {glyph.identity.medialJamo}{glyph.identity.finalJamo ? ` + ${glyph.identity.finalJamo}` : ''} · <b>{approved ? '승인 측정 있음' : '승인 추출 없음'}</b> · 검정 = 내 획 · 파란 상자 = 홀자 · 초록 상자 = 닿자 · 회색 = Noto 고스트</p>
+      {partTabs.length > 0 && <div className={styles.partTabs} role="group" aria-label="편집할 부품" data-testid="review-part-tabs">
+        {partTabs.map((tab) => <button type="button" key={tab.part} aria-pressed={tab.part === activePart} style={{ '--part': PART_COLOR[tab.part] } as React.CSSProperties} onClick={() => selectPart(tab.part)}>{tab.label}</button>)}
+      </div>}
       <section className={styles.canvasSection}>
-        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={editable} selectedRail={rail?.id} snappedRail={snapHit?.id} onSelectRail={(id) => { setSelectedRail(id); setError('') }} onDragRail={(id, value) => changeRail(id, value, { snap: true })} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
+        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail?.id} snappedRail={snapHit?.id} onSelectRail={(id) => { setSelectedRail(id); setError('') }} onDragRail={(id, value) => changeRail(id, value, { snap: true })} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
         <button type="button" className={styles.canvasToggle} aria-pressed={ghostVisible} onClick={toggleGhost} data-testid="review-ghost-toggle">Noto 고스트</button>
         <TierBadge approved={approved} className={styles.canvasBadge} />
       </section>
-      {editable.length > 0 && <div className={styles.chips} role="group" aria-label="편집할 기준선">
-        {editable.map((item) => <button type="button" key={item.id} aria-pressed={item.id === rail?.id} onClick={() => { setSelectedRail(item.id); setError('') }}>{item.label}</button>)}
-      </div>}
       {modelError && <p className={styles.status} data-state="error" role="alert">{modelError}</p>}
       <ReviewPropagationCards source={glyph.identity} bundle={bundle} edit={propagationEdit} changed={changedRails} />
       {/* 수치는 접어 둔다. 캔버스에 같은 값이 이미 그려져 있어 평소엔 안 봐도 된다. */}

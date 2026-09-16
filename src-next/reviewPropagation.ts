@@ -8,8 +8,9 @@ import type { EditableRail, MedialFitPart } from './notoMedialFitView'
 /**
  * 검수 글자 화면의 rail 편집을 다른 글자에 퍼뜨려 보는 계산. 저장은 없다.
  *
- * 편집은 두 종류로 가른다(탭=범위 원칙).
- * - 배치: 획 중심 rail, 닿자 네 변. 문맥 칸(층)의 속성이라 범위는 `이 층 · 전체`. em Δ 브로드캐스트.
+ * 편집은 두 종류로 가른다.
+ * - 배치: 획 중심 rail, 닿자 네 변. 기본 범위는 `이 자모`(바꾼 부품의 자모가 같은 글자 — ㅐ를 옮기면 ㅐ만, ㅒ는 아님).
+ *   `이 층 · 전체`는 사용자가 일부러 넓힐 때만. em Δ 브로드캐스트.
  * - 형태: 획 길이의 시작·끝 rail. 자모의 속성이라 범위는 `이 자모`. 슬롯 안 비율로 옮긴다(em이 아니다).
  */
 
@@ -32,9 +33,10 @@ export interface PropagationEdit {
   }
 }
 
-/** 배치 Δ를 퍼뜨릴 범위. 글자보다 넓고 자모는 아니다. */
-export type PropagationScope = 'layer' | 'all'
+/** 배치 Δ를 퍼뜨릴 범위. 기본 `이 자모`, 나머지는 일부러 넓히는 것. */
+export type PropagationScope = 'jamo' | 'layer' | 'all'
 export const PROPAGATION_SCOPES: { id: PropagationScope; label: string; hint: string }[] = [
+  { id: 'jamo', label: '이 자모', hint: '바꾼 부품의 자모가 같은 글자' },
   { id: 'layer', label: '이 층', hint: '홀자 계열·받침 유무가 같은 글자' },
   { id: 'all', label: '전체', hint: '모든 글자' },
 ]
@@ -97,28 +99,35 @@ export function applyFacesDelta(faces: ComponentFaces, delta: Partial<ComponentF
 const SAMPLE_INITIALS = [...'ㄱㄴㅁㅅㅇㅈㅎㄹㅂㅋ']
 const SAMPLE_FINALS: (string | null)[] = [null, ...'ㄴㄹㅁㅇㄱㅂ']
 
-/** 표본 묶음. `jamo` = 같은 홀자(형태 Δ용), `layer` = 같은 문맥, `all` = 전부. */
-export type CandidateScope = PropagationScope | 'jamo'
+/** 표본 묶음. `jamo` = 바꾼 부품마다 그 자모가 같은 글자(edit 없으면 같은 홀자), `layer` = 같은 문맥, `all` = 전부. */
+export type CandidateScope = PropagationScope
 
-function scopeMatches(scope: CandidateScope, source: CorpusIdentity, target: CorpusIdentity): boolean {
+function scopeMatches(scope: CandidateScope, source: CorpusIdentity, target: CorpusIdentity, edit?: PropagationEdit): boolean {
   if (scope === 'all') return true
   if (scope === 'layer') return target.contextId === source.contextId
-  return target.medialJamo === source.medialJamo
+  if (!edit) return target.medialJamo === source.medialJamo
+  const { medial, component } = edit.layout
+  const parts = { medial: Object.keys(medial).length > 0, initial: Boolean(component.CH), final: Boolean(component.JO) }
+  if (!parts.medial && !parts.initial && !parts.final) return target.medialJamo === source.medialJamo
+  if (parts.medial && target.medialJamo !== source.medialJamo) return false
+  if (parts.initial && target.initialJamo !== source.initialJamo) return false
+  if (parts.final && target.finalJamo !== source.finalJamo) return false
+  return true
 }
 
 /**
  * 범위에 드는 글자 중 count개. 전체 표본을 고른 간격으로 뽑아 초성·홀자·받침이 겹치지 않게 하고,
  * page를 올리면 다음 묶음으로 넘어간다.
  */
-export function propagationCandidates(input: { source: CorpusIdentity; scope: CandidateScope; count: number; page?: number }): CorpusIdentity[] {
-  const { source, scope, count } = input
+export function propagationCandidates(input: { source: CorpusIdentity; scope: CandidateScope; count: number; page?: number; /** 배치 Δ. `jamo` 범위에서 어느 부품 자모를 맞출지 정한다. */ edit?: PropagationEdit }): CorpusIdentity[] {
+  const { source, scope, count, edit } = input
   const pool: CorpusIdentity[] = []
   for (const final of SAMPLE_FINALS) for (const medial of CORPUS_MEDIALS) for (const initial of SAMPLE_INITIALS) {
     if (!CORPUS_FINALS.includes(final)) continue
     const codepoint = corpusCodepoint(initial, medial, final)
     if (codepoint === source.codepoint) continue
     const identity = corpusIdentity(codepoint)
-    if (scopeMatches(scope, source, identity)) pool.push(identity)
+    if (scopeMatches(scope, source, identity, edit)) pool.push(identity)
   }
   if (pool.length === 0) return []
   const pages = Math.max(1, Math.ceil(pool.length / count))
