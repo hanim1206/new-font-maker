@@ -19,7 +19,8 @@ export interface RulerStripProps {
   /** 기준선 축. 가로 자 하나로 두 축을 다루므로 방향 안내만 바뀐다. */
   axis: 'x' | 'y'
   label: string
-  onChange: (value: number) => void
+  /** source = 손으로 끌거나 탭했는지(pointer), 방향키인지(keyboard). 호출자가 스냅을 손 조작에만 건다. */
+  onChange: (value: number, source: 'pointer' | 'keyboard') => void
 }
 
 const WIDTH = 340
@@ -43,9 +44,9 @@ export function RulerStrip({ value, min, max, step, base, baseLabel = 'Noto', un
   const rawAtX = (x: number) => min + (x - PAD) / (WIDTH - PAD * 2) * span
   const toUnits = (raw: number) => raw * unitScale
 
-  const commit = (raw: number) => {
+  const commit = (raw: number, source: 'pointer' | 'keyboard') => {
     const next = clamp(snap(raw, min, step), min, max)
-    if (Math.abs(next - value) > 1e-12) onChange(next)
+    if (Math.abs(next - value) > 1e-12) onChange(next, source)
   }
   const localX = (event: PointerEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -61,21 +62,21 @@ export function RulerStrip({ value, min, max, step, base, baseLabel = 'Noto', un
     const dx = localX(event) - current.startX
     if (!current.moved && Math.abs(dx) < TAP_SLOP) return
     current.moved = true
-    commit(current.startValue + dx / (WIDTH - PAD * 2) * span)
+    commit(current.startValue + dx / (WIDTH - PAD * 2) * span, 'pointer')
   }
   const onPointerUp = (event: PointerEvent<SVGSVGElement>) => {
     const current = gesture.current
     if (!current || current.pointerId !== event.pointerId) return
     gesture.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-    if (!current.moved) commit(rawAtX(localX(event)))
+    if (!current.moved) commit(rawAtX(localX(event)), 'pointer')
   }
   const onKeyDown = (event: KeyboardEvent<SVGSVGElement>) => {
     const big = event.shiftKey ? 10 : 1
     const delta = event.key === 'ArrowRight' || event.key === 'ArrowUp' ? step * big : event.key === 'ArrowLeft' || event.key === 'ArrowDown' ? -step * big : event.key === 'Home' ? min - value : event.key === 'End' ? max - value : null
     if (delta === null) return
     event.preventDefault()
-    commit(value + delta)
+    commit(value + delta, 'keyboard')
   }
 
   const ticks: { raw: number; major: boolean; labeled: boolean }[] = []

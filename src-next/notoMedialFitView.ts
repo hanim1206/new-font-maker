@@ -17,6 +17,7 @@ import type { ApprovedNotoInput } from './notoBoundMaster'
 
 const ROLE_LABEL: Record<string, string> = { outerPillar: '바깥기둥', innerPillar: '안기둥', baseStem: '줄기', leftStem: '왼줄기', rightStem: '오른줄기', primaryBeam: '보', upperBeam: '위보', lowerBeam: '아래보' }
 export const roleLabel = (roleId: string) => ROLE_LABEL[roleId] ?? roleId
+const KIND_LABEL = { center: '중심', start: '시작', end: '끝' } as const
 
 export interface MedialFitPart {
   part: ContextMedialPart['part']
@@ -54,6 +55,8 @@ export interface EditableRail {
   role: FitRailKey | 'left' | 'right' | 'top' | 'bottom'
   axis: 'x' | 'y'
   label: string
+  /** 획의 중심선(center)·길이 시작(start)·길이 끝(end), 닿자 상자의 변(face). 중심·변 = 배치, 시작·끝 = 형태(길이). */
+  kind: 'center' | 'start' | 'end' | 'face'
   value: number
   /** 모델 rail 값. 복원·Δ 표시용. */
   original: number
@@ -117,11 +120,11 @@ export function editableRailsOf(parts: readonly MedialFitPart[], railsByPart: re
     const partLabel = part.role === 'JU_H' ? '가로부 ' : part.role === 'JU_V' ? '세로부 ' : ''
     for (const role of boundRailRoles(fit)) {
       const binding = fit.bindings.find((b) => b.centerRail === role) ?? fit.bindings.find((b) => b.fromRail === role || b.toRail === role)!
-      const kind = binding.centerRail === role ? '중심' : binding.fromRail === role ? '시작' : '끝'
+      const kind = binding.centerRail === role ? 'center' : binding.fromRail === role ? 'start' : 'end'
       rails.push({
-        id: `${partIndex}:${role}`, partIndex, role,
+        id: `${partIndex}:${role}`, partIndex, role, kind,
         axis: fitRailAxis(role),
-        label: `${partLabel}${roleLabel(binding.roleId)} ${kind}`,
+        label: `${partLabel}${roleLabel(binding.roleId)} ${KIND_LABEL[kind]}`,
         value: current[role], original: fit.railsEm[role],
       })
     }

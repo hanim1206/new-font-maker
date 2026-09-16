@@ -99,3 +99,18 @@
 .pickXor[data-tone='mid'] { background: #fff2c9; color: #7a5a0c; }
 .pickXor[data-tone='far'] { background: #ffe0c2; color: #8a4a12; }
 .pickXor[data-tone='bad'] { background: #ffd2cf; color: #8f2a22; }
+
+/* 수치 접기. 평소엔 캔버스만 보고, 필요할 때 펼친다. */
+.fold { margin: 12px 14px 16px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; }
+.fold > summary { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 9px 12px; cursor: pointer; color: rgb(var(--color-text-dim-3)); font-size: 10.5px; font-weight: 700; letter-spacing: .06em; list-style: none; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: '▾'; color: rgb(var(--color-text-dim-4)); }
+.fold[open] > summary::after { content: '▴'; }
+.fold > summary small { color: rgb(var(--color-text-dim-4)); font-weight: 500; letter-spacing: 0; }
+.fold .fitStats { margin-left: 8px; margin-right: 8px; }
+.fold .head { margin-left: 8px; margin-right: 8px; }
+.fold .values { margin: 0 8px 8px; }
+/* 드래그 중 걸린 자리 표시. 모델은 파랑, 다른 기준선·격자는 주황. */
+.snapTag { margin-left: 8px; padding: 2px 7px; border-radius: 8px; background: #f0561e; color: #fff; font-size: 10px; font-style: normal; font-weight: 800; letter-spacing: 0; }
+.snapTag[data-kind='model'] { background: rgb(var(--color-primary)); }
+.editorHeading em.snapTag { display: inline-block; text-align: left; }

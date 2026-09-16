@@ -103,7 +103,7 @@ export function editableComponentRailsOf(parts: readonly ComponentFitPart[], fac
     const current = facesByPart[partIndex] ?? part.faces
     const partLabel = part.part === 'CH' ? '첫닿자' : '받침'
     for (const side of SIDES) {
-      rails.push({ id: `c${partIndex}:${side}`, partIndex, role: side, axis: side === 'left' || side === 'right' ? 'x' : 'y', label: `${partLabel} ${SIDE_LABEL[side]}`, value: current[side], original: part.faces[side] })
+      rails.push({ id: `c${partIndex}:${side}`, partIndex, role: side, kind: 'face', axis: side === 'left' || side === 'right' ? 'x' : 'y', label: `${partLabel} ${SIDE_LABEL[side]}`, value: current[side], original: part.faces[side] })
     }
   })
   return rails

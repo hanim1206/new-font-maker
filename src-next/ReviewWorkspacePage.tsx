@@ -16,6 +16,11 @@ import type { EditableRail, MedialFitView, RenderedMedialPart } from './notoMedi
 import { useNotoModel } from './notoModel'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
 import type { NotoPresetGlyph, NotoPresetXorMap } from './notoPresetGlyphs'
+import { ReviewPropagationCards } from './ReviewPropagationCards'
+import { useNotoGlyph } from './useNotoGlyph'
+import { propagationEditOf } from './reviewPropagation'
+import { snapRail } from './railSnap'
+import type { SnapHit } from './railSnap'
 import { RulerStrip } from './workspace/RulerStrip'
 import { MobileWorkspaceShell } from './workspace/WorkspaceChrome'
 import styles from './ReviewWorkspacePage.module.css'
@@ -59,19 +64,6 @@ async function getJson<T>(url: string, signal: AbortSignal): Promise<T> {
   const value = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error((value as { error?: string }).error ?? '자료를 읽지 못했습니다.')
   return value as T
-}
-
-function useNotoGlyph(codepoint: number): { glyph: NotoPresetGlyph | null; error: string } {
-  const [state, setState] = useState<{ codepoint: number; glyph: NotoPresetGlyph | null; error: string }>({ codepoint, glyph: null, error: '' })
-  useEffect(() => {
-    const controller = new AbortController()
-    setState({ codepoint, glyph: null, error: '' })
-    notoPresetGlyphs.glyph(codepoint, controller.signal)
-      .then((glyph) => setState({ codepoint, glyph, error: '' }))
-      .catch((failure: Error) => { if (!controller.signal.aborted) setState({ codepoint, glyph: null, error: failure.message }) })
-    return () => controller.abort()
-  }, [codepoint])
-  return state.codepoint === codepoint ? state : { glyph: null, error: '' }
 }
 
 function useNotoXorMap(): { xorMap: NotoPresetXorMap | null; error: string } {
@@ -127,7 +119,7 @@ interface FitBox { id: string; kind: 'medial' | 'component'; label: string; box:
 
 const BOX_COLOR: Record<FitBox['kind'], string> = { medial: '#3b6fd6', component: '#2f9a6a' }
 
-function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], selectedRail, onSelectRail, onDragRail, label, overlays = [], componentOverlays = [], boxes = [] }: {
+function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], selectedRail, snappedRail, onSelectRail, onDragRail, label, overlays = [], componentOverlays = [], boxes = [] }: {
   ghost: string
   /** Noto 고스트를 끄면 내 획만 남아 어느 획을 바꿀지 보인다. */
   ghostVisible?: boolean
@@ -136,6 +128,8 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], sele
   /** 획 마스터 rail. 잡고 끌 수 있다. */
   editable?: EditableRail[]
   selectedRail?: string
+  /** 드래그 중 붙은 다른 기준선 id. 그 선을 주황으로 켠다. */
+  snappedRail?: string
   onSelectRail?: (id: string) => void
   /** 캔버스에서 rail을 직접 끈다. 값은 em 제안값, 호출자가 순서·간격을 판정한다. */
   onDragRail?: (id: string, value: number) => void
@@ -190,16 +184,20 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], sele
     {ghostVisible && <path d={ghost} fill="#3a3a36" fillOpacity=".55" fillRule="evenodd" data-testid="review-ghost" />}
     {overlays.map((path, index) => <path key={index} d={path} fill="#111" fillRule="evenodd" data-testid="review-fit-ink" />)}
     {componentOverlays.map((path, index) => <path key={`c${index}`} d={path} fill="#111" fillRule="evenodd" data-testid="review-component-ink" />)}
-    {measured.map((rail) => <g key={rail.id} data-rail={rail.id}>
-      <line {...geometryOf(rail.axis, rail.value)} stroke="#b8b4a8" strokeWidth=".003" strokeDasharray=".012 .008" />
-      <text {...(rail.axis === 'x' ? { x: rail.value + 0.012, y: 1.01 } : { x: 0.96, y: rail.value - 0.008 })} fontSize=".026" fill="#b8b4a8">{rail.label}</text>
-    </g>)}
+    {measured.map((rail) => {
+      const snapped = rail.id === snappedRail
+      return <g key={rail.id} data-rail={rail.id} data-snapped={snapped || undefined}>
+        <line {...geometryOf(rail.axis, rail.value)} stroke={snapped ? '#f0561e' : '#b8b4a8'} strokeWidth={snapped ? 0.006 : 0.003} strokeDasharray=".012 .008" />
+        <text {...(rail.axis === 'x' ? { x: rail.value + 0.012, y: 1.01 } : { x: 0.96, y: rail.value - 0.008 })} fontSize=".026" fill={snapped ? '#f0561e' : '#b8b4a8'}>{rail.label}</text>
+      </g>
+    })}
     {editable.map((rail) => {
       const selected = rail.id === selectedRail
-      const stroke = selected ? '#f0561e' : '#3b6fd6'
+      const snapped = rail.id === snappedRail
+      const stroke = selected || snapped ? '#f0561e' : '#3b6fd6'
       const geometry = geometryOf(rail.axis, rail.value)
-      return <g key={rail.id} data-rail={rail.id} data-selected={selected || undefined}>
-        <line {...geometry} stroke={stroke} strokeWidth={selected ? 0.008 : 0.004} />
+      return <g key={rail.id} data-rail={rail.id} data-selected={selected || undefined} data-snapped={snapped || undefined}>
+        <line {...geometry} stroke={stroke} strokeWidth={selected || snapped ? 0.008 : 0.004} />
         {onSelectRail && <line {...geometry} className={styles.railButton} data-rail-handle={rail.id} stroke="transparent" strokeWidth=".08" role="button" tabIndex={0} aria-label={`${rail.label} 선택`} aria-pressed={selected} onPointerDown={startDrag(rail)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectRail(rail.id) } }} />}
         <text {...(rail.axis === 'x' ? { x: rail.value + 0.012, y: -0.025 } : { x: -0.05, y: rail.value - 0.012 })} fontSize=".03" fill={stroke}>{rail.label}</text>
         {selected && <circle cx={rail.axis === 'x' ? rail.value : 1} cy={rail.axis === 'x' ? 1 : rail.value} r=".03" fill="#fff" stroke="#f0561e" strokeWidth=".01" />}
@@ -341,6 +339,8 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
   const [railsByPart, setRailsByPart] = useState<RailsByPart>([])
   const [selectedRail, setSelectedRail] = useState<string | undefined>()
   const [error, setError] = useState('')
+  // 손으로 끌다 걸린 자리. 자·방향키 이동엔 없다.
+  const [snapHit, setSnapHit] = useState<SnapHit | null>(null)
   const rendered = useMemo(() => fitView ? fitView.parts.map((part, index) => renderMedialPart(part, railsByPart[index])) : [], [fitView, railsByPart])
   // 홀자 마스터 rail(`<n>:<role>`)과 닿자 박스 변(`c<n>:<side>`)을 한 목록으로. 선택·자·드래그가 같은 경로를 탄다.
   const editable = useMemo(() => [
@@ -356,41 +356,64 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
   const toggleGhost = () => setGhostVisible((current) => { writeGhostVisible(!current); return !current })
   const rail = editable.find((item) => item.id === selectedRail) ?? editable[0]
   const editCount = editable.filter((item) => Math.abs(item.value - item.original) > 1e-9).length
+  // 다른 글자 카드에 얹을 Δ. 편집 상태에서 모델 값 대비 차이만 뽑는다.
+  const propagationEdit = useMemo(() => propagationEditOf({ editable, medialParts: fitView?.parts ?? [], componentParts }), [editable, fitView, componentParts])
+  const changedRails = useMemo(() => editable.filter((item) => Math.abs(item.value - item.original) > 1e-9), [editable])
 
-  // 캔버스 드래그·자·키보드가 모두 여기로 온다. 1u 격자는 모델 값에 맞추고, 순서·간격 위반은 마지막 유효값을 지킨다.
-  const changeRail = (id: string, next: number) => {
-    const target = editable.find((item) => item.id === id)
-    if (!target) return
-    const snapped = target.original + Math.round((next - target.original) * 1000) / 1000
-    if (id.startsWith('c')) {
+  // 값 하나를 놓아 본다. 순서·간격 위반이면 false, 호출자는 마지막 유효값을 지킨다.
+  const tryPlace = (target: EditableRail, value: number): true | string => {
+    const rounded = target.original + Math.round((value - target.original) * 1000) / 1000
+    if (target.id.startsWith('c')) {
       const part = componentParts[target.partIndex]
-      if (!part?.faces) return
-      const proposed = { ...(facesByPart[target.partIndex] ?? part.faces), [target.role]: snapped } as ComponentFaces
+      if (!part?.faces) return '박스가 없습니다.'
+      const proposed = { ...(facesByPart[target.partIndex] ?? part.faces), [target.role]: rounded } as ComponentFaces
       const check = renderComponentPart(part, proposed)
-      if (!check.path) { setError(check.message ?? '박스 변을 그 자리에 둘 수 없습니다.'); return }
-      setError('')
+      if (!check.path) return check.message ?? '박스 변을 그 자리에 둘 수 없습니다.'
       setFacesByPart((current) => { const copy = [...current]; copy[target.partIndex] = proposed; return copy })
-      return
+      return true
     }
     const part = fitView?.parts[target.partIndex]
-    if (!part?.fit) return
-    const proposed: Record<string, number> = { ...(railsByPart[target.partIndex] ?? part.fit.railsEm), [target.role]: snapped }
+    if (!part?.fit) return '획 마스터가 없습니다.'
+    const proposed: Record<string, number> = { ...(railsByPart[target.partIndex] ?? part.fit.railsEm), [target.role]: rounded }
     const check = renderMedialPart(part, proposed)
-    if (!check.path) { setError(check.message ?? '기준선을 그 자리에 둘 수 없습니다.'); return }
-    setError('')
+    if (!check.path) return check.message ?? '기준선을 그 자리에 둘 수 없습니다.'
     setRailsByPart((current) => { const copy = [...current]; copy[target.partIndex] = proposed; return copy })
+    return true
   }
-  const resetRails = () => { setRailsByPart([]); setFacesByPart([]); setError('') }
+  // 스냅 후보 = 같은 축의 Noto 실측선 + 다른 부품의 rail. 같은 부품 rail은 겹치면 순서 위반이라 뺀다.
+  const snapCandidatesFor = (target: EditableRail) => [
+    ...measured.map((rail) => ({ id: rail.id, label: rail.label, axis: rail.axis, value: rail.value })),
+    ...editable.filter((rail) => rail.id !== target.id && !(rail.partIndex === target.partIndex && rail.id.startsWith('c') === target.id.startsWith('c'))).map((rail) => ({ id: rail.id, label: rail.label, axis: rail.axis, value: rail.value })),
+  ]
+  // 캔버스 드래그·자·키보드가 모두 여기로 온다. 1u 격자는 모델 값에 맞추고, 손 조작(snap)엔 모델 → 다른 기준선 → 격자 순으로 걸린다.
+  const changeRail = (id: string, next: number, options?: { snap?: boolean }) => {
+    const target = editable.find((item) => item.id === id)
+    if (!target) return
+    if (options?.snap) {
+      const snapped = snapRail({ value: next, original: target.original, axis: target.axis, candidates: snapCandidatesFor(target) })
+      if (snapped.hit && tryPlace(target, snapped.value) === true) {
+        setError('')
+        if (snapped.hit.kind !== snapHit?.kind || snapped.hit.id !== snapHit?.id || snapped.hit.value !== snapHit?.value) navigator.vibrate?.(8)
+        setSnapHit(snapped.hit)
+        return
+      }
+      // 걸린 자리에 못 놓으면 스냅을 풀고 원래 값으로.
+    }
+    setSnapHit(null)
+    const placed = tryPlace(target, next)
+    setError(placed === true ? '' : placed)
+  }
+  const resetRails = () => { setRailsByPart([]); setFacesByPart([]); setError(''); setSnapHit(null) }
 
   // 자 도구: 스크롤 밖, 탭 바로 위. 눈금 창 = 모델 값 ±100u.
   const ruler = rail && <section className={styles.dialDock} aria-label="기준선 조절">
     <div className={styles.editorHeading}>
-      <span>{rail.label}<small data-testid="review-edit-status">{editCount ? ` · ${editCount}개 변경 · 저장 안 됨` : ' · 모델 rail'}</small></span>
+      <span>{rail.label}<small data-testid="review-edit-status">{editCount ? ` · ${editCount}개 변경 · 저장 안 됨` : ' · 모델 rail'}</small>{snapHit && <em className={styles.snapTag} data-testid="review-snap" data-kind={snapHit.kind}>탁 · {snapHit.label}</em>}</span>
       <output aria-live="polite" data-testid="review-rail-value">{(rail.value * 1000).toFixed(1)}<small>u</small><em>Δ {((rail.value - rail.original) * 1000).toFixed(1)}</em></output>
     </div>
-    <RulerStrip value={rail.value} min={rail.original - 0.1} max={rail.original + 0.1} step={0.001} base={rail.original} baseLabel="모델" unitScale={1000} unit="u" axis={rail.axis} label={`${rail.label} 위치`} onChange={(value) => changeRail(rail.id, value)} />
+    <RulerStrip value={rail.value} min={rail.original - 0.1} max={rail.original + 0.1} step={0.001} base={rail.original} baseLabel="모델" unitScale={1000} unit="u" axis={rail.axis} label={`${rail.label} 위치`} onChange={(value, source) => changeRail(rail.id, value, { snap: source === 'pointer' })} />
     <div className={styles.editorMeta}>
-      <span>캔버스 선 끌기 · 자 탭·끌기 1 u · 방향키 1 u · Shift 10 u · 두께 고정</span>
+      <span>끌기 = 모델·기준선·격자에 탁 · 자 탭·끌기 1 u · 방향키 1 u · Shift 10 u · 두께 고정</span>
       <button type="button" disabled={!editCount} onClick={resetRails}>모델 rail로 복원</button>
     </div>
     {error && <p className={styles.warning} role="alert">{error}</p>}
@@ -401,18 +424,24 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
     <div className={styles.scroll}>
       <p className={styles.context}>{glyph.identity.initialJamo} + {glyph.identity.medialJamo}{glyph.identity.finalJamo ? ` + ${glyph.identity.finalJamo}` : ''} · <b>{approved ? '승인 측정 있음' : '승인 추출 없음'}</b> · 검정 = 내 획 · 파란 상자 = 홀자 · 초록 상자 = 닿자 · 회색 = Noto 고스트</p>
       <section className={styles.canvasSection}>
-        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={editable} selectedRail={rail?.id} onSelectRail={(id) => { setSelectedRail(id); setError('') }} onDragRail={changeRail} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
+        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={editable} selectedRail={rail?.id} snappedRail={snapHit?.id} onSelectRail={(id) => { setSelectedRail(id); setError('') }} onDragRail={(id, value) => changeRail(id, value, { snap: true })} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
         <button type="button" className={styles.canvasToggle} aria-pressed={ghostVisible} onClick={toggleGhost} data-testid="review-ghost-toggle">Noto 고스트</button>
         <TierBadge approved={approved} className={styles.canvasBadge} />
       </section>
       {editable.length > 0 && <div className={styles.chips} role="group" aria-label="편집할 기준선">
         {editable.map((item) => <button type="button" key={item.id} aria-pressed={item.id === rail?.id} onClick={() => { setSelectedRail(item.id); setError('') }}>{item.label}</button>)}
       </div>}
-      {modelError ? <p className={styles.status} data-state="error" role="alert">{modelError}</p> : fitView ? <><FitStats view={fitView} rendered={rendered} approved={approved} /><ComponentStats parts={componentParts} rendered={componentRendered} approved={approved} /></> : <p className={styles.status} role="status">모델 읽는 중</p>}
-      <div className={styles.head}><span>기준선 실측<small>Noto · 1000 u</small></span><span>{measured.length}개</span></div>
-      <div className={styles.values} data-testid="review-values">
-        {measured.map((item) => <div className={styles.cell} key={item.id}><span><span className={styles.key}>{item.label}</span><span className={styles.value}>{(item.value * 1000).toFixed(1)}<small>u</small></span></span><i className={styles.bar} style={{ '--p': `${Math.round(item.value * 100)}%` } as React.CSSProperties} /></div>)}
-      </div>
+      {modelError && <p className={styles.status} data-state="error" role="alert">{modelError}</p>}
+      <ReviewPropagationCards source={glyph.identity} bundle={bundle} edit={propagationEdit} changed={changedRails} />
+      {/* 수치는 접어 둔다. 캔버스에 같은 값이 이미 그려져 있어 평소엔 안 봐도 된다. */}
+      <details className={styles.fold} data-testid="review-numbers">
+        <summary>수치 보기<small>획 마스터 xor · 기준선 실측 {measured.length}개</small></summary>
+        {fitView ? <><FitStats view={fitView} rendered={rendered} approved={approved} /><ComponentStats parts={componentParts} rendered={componentRendered} approved={approved} /></> : !modelError && <p className={styles.status} role="status">모델 읽는 중</p>}
+        <div className={styles.head}><span>기준선 실측<small>Noto · 1000 u</small></span><span>{measured.length}개</span></div>
+        <div className={styles.values} data-testid="review-values">
+          {measured.map((item) => <div className={styles.cell} key={item.id}><span><span className={styles.key}>{item.label}</span><span className={styles.value}>{(item.value * 1000).toFixed(1)}<small>u</small></span></span><i className={styles.bar} style={{ '--p': `${Math.round(item.value * 100)}%` } as React.CSSProperties} /></div>)}
+        </div>
+      </details>
     </div>
   </MobileWorkspaceShell>
 }
