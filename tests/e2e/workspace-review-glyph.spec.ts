@@ -120,6 +120,32 @@ test('기준선 드래그는 모델 자리와 격자에 탁 걸리고 방향키�
   await expect(snap).toHaveCount(0)
 })
 
+/** 기준값에서 옮긴 만큼 캔버스에 띠와 수치가 칠해지고, 토글로 끌 수 있다. */
+test('기준선을 옮기면 변화 띠와 Δ 수치가 보이고 토글로 끈다', async ({ page }) => {
+  await page.goto('/workspace/review/glyph?char=%EB%A9%88')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByTestId('review-delta-band')).toHaveCount(0)
+  await expect(page.getByTestId('review-delta-toggle')).toBeDisabled()
+  await selectRail(page, '바깥기둥 중심')
+  await page.getByTestId('ruler-strip').focus()
+  await page.keyboard.press('Shift+ArrowRight')
+  await page.keyboard.press('Shift+ArrowRight')
+  await expect(page.getByTestId('review-delta-band')).toHaveCount(1)
+  await expect(page.getByTestId('review-delta-label')).toHaveText('+20u')
+  // 다른 rail을 고르면 띠는 그 rail 것만. 안 옮긴 rail이면 띠 없음, 수치는 작게 남는다.
+  await selectRail(page, '보 중심')
+  await expect(page.getByTestId('review-delta-band')).toHaveCount(0)
+  await expect(page.getByTestId('review-delta-label')).toHaveAttribute('data-active', 'false')
+  await selectRail(page, '바깥기둥 중심')
+  await expect(page.getByTestId('review-delta-band')).toHaveCount(1)
+  await page.getByTestId('review-delta-toggle').click()
+  await expect(page.getByTestId('review-delta-band')).toHaveCount(0)
+  await page.getByTestId('review-delta-toggle').click()
+  await expect(page.getByTestId('review-delta-band')).toHaveCount(1)
+  await page.getByRole('button', { name: '모델 rail로 복원' }).click()
+  await expect(page.getByTestId('review-delta-band')).toHaveCount(0)
+})
+
 /** 부품 탭: 켠 부품 rail만 손잡이·제 색, 나머지는 회색으로 죽는다. */
 test('부품 탭을 바꾸면 그 부품 rail만 잡히고 칩도 바뀐다', async ({ page }) => {
   await page.goto('/workspace/review/glyph?char=%EB%A9%88')

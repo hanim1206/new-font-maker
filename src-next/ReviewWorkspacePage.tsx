@@ -128,7 +128,7 @@ const samePartGroup = (a: Part, b: Part) => a === b || (isMedialPart(a) && isMed
 
 type CanvasRail = EditableRail & { part: Part }
 
-function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], activePart, selectedRail, snappedRail, onSelectRail, onDragRail, label, overlays = [], componentOverlays = [], boxes = [] }: {
+function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], activePart, selectedRail, snappedRail, showDelta = true, onSelectRail, onDragRail, label, overlays = [], componentOverlays = [], boxes = [] }: {
   ghost: string
   /** Noto 고스트를 끄면 내 획만 남아 어느 획을 바꿀지 보인다. */
   ghostVisible?: boolean
@@ -141,6 +141,8 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
   selectedRail?: string
   /** 드래그 중 붙은 다른 기준선 id. 그 선을 주황으로 켠다. */
   snappedRail?: string
+  /** 기준값(지금은 모델, 저장이 생기면 마지막 저장값)에서 얼마나 옮겼는지 띠로 칠할지. */
+  showDelta?: boolean
   onSelectRail?: (id: string) => void
   /** 캔버스에서 rail을 직접 끈다. 값은 em 제안값, 호출자가 순서·간격을 판정한다. */
   onDragRail?: (id: string, value: number) => void
@@ -203,6 +205,12 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
     {ghostVisible && <path d={ghost} fill="#3a3a36" fillOpacity=".55" fillRule="evenodd" data-testid="review-ghost" />}
     {overlays.map((path, index) => <path key={index} d={path} fill="#111" fillRule="evenodd" data-testid="review-fit-ink" />)}
     {componentOverlays.map((path, index) => <path key={`c${index}`} d={path} fill="#111" fillRule="evenodd" data-testid="review-component-ink" />)}
+    {/* Δ 띠. 지금 선택한 rail 하나만: 기준값 자리와 지금 자리 사이를 주황 단색으로 칠한다. 잉크 위에 얹어 옮긴 구간이 바로 보인다. */}
+    {showDelta && editable.filter((rail) => rail.id === selectedRail && Math.abs(rail.value - rail.original) > 1e-9).map((rail) => {
+      const [from, to] = rail.value > rail.original ? [rail.original, rail.value] : [rail.value, rail.original]
+      const band = rail.axis === 'x' ? { x: from, y: -0.06, width: to - from, height: 1.08 } : { x: -0.06, y: from, width: 1.08, height: to - from }
+      return <rect key={`d${rail.id}`} {...band} fill={ACCENT} fillOpacity=".38" data-testid="review-delta-band" data-rail={rail.id} />
+    })}
     {/* Noto 실측선. 활성 부품 것은 부품 색 점선, 나머지는 옅은 회색. 조작 없음. */}
     {measured.map((rail) => {
       const snapped = rail.id === snappedRail
@@ -230,6 +238,14 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
         {onSelectRail && active && <line {...geometry} className={styles.railButton} data-rail-handle={rail.id} stroke="transparent" strokeWidth=".08" role="button" tabIndex={0} aria-label={`${rail.label} 선택`} aria-pressed={selected} onPointerDown={startDrag(rail)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectRail(rail.id) } }} />}
         {active && <text {...labelAt(rail.axis, rail.value, 'top')} className={styles.railLabel} fontSize=".03" fill={stroke}>{rail.label}</text>}
       </g>
+    })}
+    {/* Δ 수치. 선택한 rail은 크게, 나머지 바뀐 rail은 작고 옅게(저장 안 된 변경이 있다는 표시만). */}
+    {showDelta && editable.filter((rail) => Math.abs(rail.value - rail.original) > 1e-9).map((rail) => {
+      const active = rail.id === selectedRail
+      const units = Math.round((rail.value - rail.original) * 1000)
+      const mid = (rail.value + rail.original) / 2
+      const at = rail.axis === 'x' ? { x: Math.min(0.92, Math.max(0.08, mid)), y: 1.066, textAnchor: 'middle' as const } : { x: 1.07, y: mid + 0.012, textAnchor: 'end' as const }
+      return <text key={`u${rail.id}`} {...at} className={styles.deltaLabel} fontSize={active ? '.034' : '.024'} fill={active ? ACCENT : PART_COLOR[rail.part]} fillOpacity={active ? 1 : 0.55} data-testid="review-delta-label" data-active={active}>{units > 0 ? '+' : ''}{units}u</text>
     })}
   </svg>
 }
@@ -369,6 +385,8 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
   const [error, setError] = useState('')
   // 손으로 끌다 걸린 자리. 자·방향키 이동엔 없다.
   const [snapHit, setSnapHit] = useState<SnapHit | null>(null)
+  // 기준값에서 얼마나 옮겼는지 캔버스에 띠로. 저장 전 변화량 확인용.
+  const [showDelta, setShowDelta] = useState(true)
   const rendered = useMemo(() => fitView ? fitView.parts.map((part, index) => renderMedialPart(part, railsByPart[index])) : [], [fitView, railsByPart])
   // 홀자 마스터 rail(`<n>:<role>`)과 닿자 박스 변(`c<n>:<side>`)을 한 목록으로. 선택·자·드래그가 같은 경로를 탄다.
   const editable = useMemo(() => [
@@ -454,7 +472,10 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
     <RulerStrip value={rail.value} min={rail.original - 0.1} max={rail.original + 0.1} step={0.001} base={rail.original} baseLabel="모델" unitScale={1000} unit="u" axis={rail.axis} label={`${rail.label} 위치`} onChange={(value, source) => changeRail(rail.id, value, { snap: source === 'pointer' })} />
     <div className={styles.editorMeta}>
       <span>끌기 = 모델·기준선·격자에 탁 · 자 탭·끌기 1 u · 방향키 1 u · Shift 10 u · 두께 고정</span>
-      <button type="button" disabled={!editCount} onClick={resetRails}>모델 rail로 복원</button>
+      <span className={styles.metaButtons}>
+        <button type="button" aria-pressed={showDelta} disabled={!editCount} onClick={() => setShowDelta((current) => !current)} data-testid="review-delta-toggle">변화 띠</button>
+        <button type="button" disabled={!editCount} onClick={resetRails}>모델 rail로 복원</button>
+      </span>
     </div>
     {error && <p className={styles.warning} role="alert">{error}</p>}
   </section>
@@ -466,7 +487,7 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
         {partTabs.map((tab) => <button type="button" key={tab.part} aria-pressed={tab.part === activePart} style={{ '--part': PART_COLOR[tab.part] } as React.CSSProperties} onClick={() => selectPart(tab.part)}>{tab.label}</button>)}
       </div>}
       <section className={styles.canvasSection}>
-        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail?.id} snappedRail={snapHit?.id} onSelectRail={(id) => { setSelectedRail(id); setError('') }} onDragRail={(id, value) => changeRail(id, value, { snap: true })} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
+        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail?.id} snappedRail={snapHit?.id} showDelta={showDelta} onSelectRail={(id) => { setSelectedRail(id); setError('') }} onDragRail={(id, value) => changeRail(id, value, { snap: true })} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
         <button type="button" className={styles.canvasToggle} aria-pressed={ghostVisible} onClick={toggleGhost} data-testid="review-ghost-toggle">Noto 고스트</button>
         <TierBadge approved={approved} className={styles.canvasBadge} />
       </section>

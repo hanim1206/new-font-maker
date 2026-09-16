@@ -87,6 +87,10 @@
 .editorMeta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: -6px; color: rgb(var(--color-text-dim-4)); font-size: 10px; }
 .editorMeta button { flex: 0 0 auto; padding: 5px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 10px; font-weight: 700; }
 .editorMeta button:disabled { opacity: .4; }
+.metaButtons { display: inline-flex; gap: 6px; }
+.editorMeta button[aria-pressed='true'] { border-color: rgb(var(--color-foreground)); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+/* Δ 수치는 띠 여백에 항상. 흰 테두리로 격자 위에서 읽힌다. */
+.deltaLabel { paint-order: stroke; stroke: #fff; stroke-width: .012; stroke-linejoin: round; font-weight: 800; pointer-events: none; }
 .dialDock { flex: 0 0 auto; display: flex; flex-direction: column; gap: 2px; padding: 8px 14px 4px; border-top: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); box-shadow: 0 -8px 24px rgb(15 23 42 / .06); }
 .railButton { cursor: grab; outline: none; }
 .railButton:active { cursor: grabbing; }
