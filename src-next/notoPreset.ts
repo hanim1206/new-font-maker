@@ -30,6 +30,16 @@ export interface NotoPresetModelBundle {
   thickness: Record<string, Record<string, number>>
 }
 
+/** 글자별 Noto 대비 xor(앱 기본 획 기준). 격자 색칠용. */
+export const NOTO_PRESET_XOR_SCHEMA = 'noto-preset-xor-v1'
+export interface NotoPresetXorMap {
+  schema: typeof NOTO_PRESET_XOR_SCHEMA
+  stageKeys: Record<CorpusStage, string>
+  generatedAt: string
+  source: string
+  characters: Record<string, { xor: number; ink: number }>
+}
+
 export interface NotoPresetManifest {
   schema: typeof NOTO_PRESET_SCHEMA
   font: CorpusFont
@@ -40,4 +50,6 @@ export interface NotoPresetManifest {
   updatedAt: string
   /** 모델·두께 파일 버전. 바뀌면 클라이언트가 모델 묶음을 다시 받는다. */
   modelKey?: string
+  /** 글자 xor 리포트 버전. */
+  xorKey?: string
 }

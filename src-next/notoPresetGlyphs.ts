@@ -1,7 +1,7 @@
-import { NOTO_PRESET_MODEL_SCHEMA, NOTO_PRESET_SCHEMA } from './notoPreset'
-import type { NotoPresetGlyph, NotoPresetManifest, NotoPresetModelBundle } from './notoPreset'
+import { NOTO_PRESET_MODEL_SCHEMA, NOTO_PRESET_SCHEMA, NOTO_PRESET_XOR_SCHEMA } from './notoPreset'
+import type { NotoPresetGlyph, NotoPresetManifest, NotoPresetModelBundle, NotoPresetXorMap } from './notoPreset'
 
-export type { NotoPresetGlyph, NotoPresetManifest, NotoPresetModelBundle }
+export type { NotoPresetGlyph, NotoPresetManifest, NotoPresetModelBundle, NotoPresetXorMap }
 
 /**
  * 글자별 Noto 윤곽을 필요한 글자만 API로 받아 IndexedDB에 둔다.
@@ -24,6 +24,8 @@ export interface NotoPresetGlyphLoader {
   glyph(codepoint: number, signal?: AbortSignal): Promise<NotoPresetGlyph>
   /** 변화량 모델 + 대표 두께. 글자와 같은 캐시에 stageKey로 둔다. */
   model(signal?: AbortSignal): Promise<NotoPresetModelBundle>
+  /** 글자별 xor 리포트. 없으면 거부된다(격자는 상태 색으로 남는다). */
+  xor(signal?: AbortSignal): Promise<NotoPresetXorMap>
   /** 서버 export가 바뀐 뒤 manifest를 다시 읽고 싶을 때. 캐시 항목은 키가 달라져 자연히 무시된다. */
   reset(): void
 }
@@ -129,6 +131,20 @@ export function createNotoPresetGlyphLoader(input: { fetchJson?: FetchJson; cach
     return modelInflight
   }
 
+  let xorInflight: Promise<NotoPresetXorMap> | undefined
+  const sharedXor = async () => {
+    const manifest = await sharedManifest()
+    const key = `${manifest.stageKeys.outline}:xor:${manifest.xorKey ?? ''}`
+    const cached = await cache.get<NotoPresetXorMap>(key)
+    if (cached) return cached
+    xorInflight ??= fetchJson<NotoPresetXorMap>(`${API}/xor`).then(async (value) => {
+      if (value?.schema !== NOTO_PRESET_XOR_SCHEMA || !value.characters) throw new Error('글자 xor 리포트 형식이 다릅니다.')
+      await cache.set(key, value)
+      return value
+    }).finally(() => { xorInflight = undefined })
+    return xorInflight
+  }
+
   return {
     manifest: (signal) => abortable(sharedManifest(), signal),
     glyph: (codepoint, signal) => {
@@ -136,6 +152,7 @@ export function createNotoPresetGlyphLoader(input: { fetchJson?: FetchJson; cach
       return abortable(sharedGlyph(codepoint), signal)
     },
     model: (signal) => abortable(sharedModel(), signal),
+    xor: (signal) => abortable(sharedXor(), signal),
     reset: () => { manifestPromise = undefined },
   }
 }

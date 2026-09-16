@@ -1,12 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import polygonClipping from 'polygon-clipping'
-import { materializeFinalGlyphInk } from '../src/services/finalGlyphInk'
-import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
-import { multiPolygonArea, unionOf } from '../src/services/notoFitReport'
+import { appGlyphInkRegions, ghostXorRatio } from '../src/services/notoGlyphXor'
 import { notoOutlineGhostPath, notoOutlineToInkRegions } from '../src/services/notoOutlineInk'
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
 import type { DecomposedSyllable, DeepReadonly, InkRegion, LayoutSchema } from '../src/types'
-import { weightToMultiplier } from '../src/utils/globalStyleUtils'
 import { CORPUS_TOTAL } from './notoCorpus'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
 
@@ -16,8 +12,6 @@ import { notoPresetGlyphs } from './notoPresetGlyphs'
  * 고스트는 표시·비교 전용이다. 잉크 union에 들어가지 않는다.
  */
 
-const HORIZONTAL_INK_BOUNDS = { min: 0, max: 1 } as const
-const INK_OPTIONS = { unitsPerEm: 1000, maxCurveErrorFontUnits: 0.5 }
 export const NOTO_GHOST_STORAGE_KEY = 'noto-ghost-visible-v1'
 
 export interface NotoGhost {
@@ -43,27 +37,6 @@ export function useNotoGhost(char: string, enabled: boolean): { ghost: NotoGhost
   }, [codepoint, valid])
   if (!valid || state.codepoint !== codepoint) return { ghost: null, error: '' }
   return { ghost: state.ghost, error: state.error }
-}
-
-/** 앱 잉크(현재 획·레이아웃·전역 스타일)를 화면·OTF와 같은 파이프라인으로 만든다. */
-export function appGlyphInkRegions(syllable: DecomposedSyllable, schema: LayoutSchema, globalStyle: GlobalStyle): { ok: true; regions: readonly DeepReadonly<InkRegion>[] } | { ok: false; message: string } {
-  const resolved = resolveGlyphInkPrimitives({
-    syllable, placement: { kind: 'schema', schema },
-    weightMultiplier: weightToMultiplier(globalStyle.weight),
-    globalLinecap: globalStyle.linecap, globalLinejoin: globalStyle.linejoin,
-    horizontalInkBounds: HORIZONTAL_INK_BOUNDS,
-  })
-  if (!resolved.primitives.length) return { ok: false, message: '앱 획이 없습니다.' }
-  const ink = materializeFinalGlyphInk(resolved.primitives, globalStyle.strokeStyle, INK_OPTIONS)
-  return ink.ok ? { ok: true, regions: ink.ink.regions } : { ok: false, message: ink.message }
-}
-
-export function ghostXorRatio(app: readonly DeepReadonly<InkRegion>[], ghost: readonly DeepReadonly<InkRegion>[]): { xorRatio: number; inkRatio: number } | null {
-  const mine = unionOf(app)
-  const theirs = unionOf(ghost)
-  const ghostArea = multiPolygonArea(theirs)
-  if (ghostArea <= 0) return null
-  return { xorRatio: multiPolygonArea(polygonClipping.xor(mine, theirs)) / ghostArea, inkRatio: multiPolygonArea(mine) / ghostArea }
 }
 
 export function useGhostComparison(ghost: NotoGhost | null, syllable: DecomposedSyllable, schema: LayoutSchema, globalStyle: GlobalStyle): { xorRatio: number; inkRatio: number } | { message: string } | null {

@@ -82,3 +82,9 @@
   .rowLabel .bar { display: none; }
   .cell { scroll-margin-left: 96px; }
 }
+
+/* xor 척도 색. data-tone이 있으면 상태 색보다 우선한다. */
+.cell[data-tone='good'] { background: #dff3e8; color: #1f6b4c; }
+.cell[data-tone='mid'] { background: #fff2c9; color: #7a5a0c; }
+.cell[data-tone='far'] { background: #ffe0c2; color: #8a4a12; }
+.cell[data-tone='bad'] { background: #ffd2cf; color: #8f2a22; }

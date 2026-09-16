@@ -3,8 +3,8 @@ import path from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import type { CorpusFont, CorpusStage } from '../../src-next/notoCorpus'
-import { NOTO_PRESET_MODEL_SCHEMA, NOTO_PRESET_SCHEMA } from '../../src-next/notoPreset'
-import type { NotoPresetGlyph, NotoPresetManifest, NotoPresetModelBundle } from '../../src-next/notoPreset'
+import { NOTO_PRESET_MODEL_SCHEMA, NOTO_PRESET_SCHEMA, NOTO_PRESET_XOR_SCHEMA } from '../../src-next/notoPreset'
+import type { NotoPresetGlyph, NotoPresetManifest, NotoPresetModelBundle, NotoPresetXorMap } from '../../src-next/notoPreset'
 import { CORPUS_MEDIALS } from '../../src-next/notoCorpus'
 
 /**
@@ -57,6 +57,7 @@ export function createNotoPresetReader(directory: string) {
       schema: NOTO_PRESET_SCHEMA, font: parsed.font, stageKeys: parsed.stageKeys, coordinateFrame: parsed.coordinateFrame,
       glyphCount: glyphs.size, runId: source.runId, updatedAt: new Date(source.time).toISOString(),
       modelKey: await modelKeyOf(path.dirname(path.dirname(source.file))),
+      xorKey: String(Math.round(await stat(path.join(path.dirname(source.file), 'noto-glyph-xor-v1.json')).then((info) => info.mtimeMs).catch(() => 0))),
     }
     const loaded = { manifest, glyphs }
     memo = { fingerprint, loaded }
@@ -107,10 +108,29 @@ export function createNotoPresetReader(directory: string) {
     return bundle
   }
 
+  // 글자 xor 리포트(NOTO_XOR_REPORT=1 vitest가 만든다). 없으면 격자는 상태 색으로만 보인다.
+  let xorMemo: { key: string; value: NotoPresetXorMap } | undefined
+  async function xor(): Promise<NotoPresetXorMap> {
+    const source = await locate()
+    const file = path.join(path.dirname(path.dirname(source.file)), 'analysis', 'noto-glyph-xor-v1.json')
+    const time = await stat(file).then((info) => info.mtimeMs).catch(() => 0)
+    if (!time) throw new Error('글자 xor 리포트가 없습니다. NOTO_XOR_REPORT=1 npx vitest run src/services/notoGlyphXor.test.ts 를 실행하세요.')
+    const key = `${file}:${time}`
+    if (xorMemo?.key === key) return xorMemo.value
+    const raw = JSON.parse(await readFile(file, 'utf8')) as { schema: string; stageKeys: Record<string, string>; generatedAt: string; source: string; characters: Record<string, { xor: number; ink: number } | { error: string }> }
+    if (raw.schema !== 'noto-glyph-xor-v1') throw new Error('글자 xor 리포트 형식이 다릅니다.')
+    const characters: NotoPresetXorMap['characters'] = {}
+    for (const [character, entry] of Object.entries(raw.characters)) if ('xor' in entry) characters[character] = { xor: entry.xor, ink: entry.ink }
+    const value: NotoPresetXorMap = { schema: NOTO_PRESET_XOR_SCHEMA, stageKeys: raw.stageKeys as NotoPresetXorMap['stageKeys'], generatedAt: raw.generatedAt, source: raw.source, characters }
+    xorMemo = { key, value }
+    return value
+  }
+
   return {
     manifest: async () => (await load()).manifest,
     glyph: async (codepoint: number): Promise<NotoPresetGlyph | null> => (await load()).glyphs.get(codepoint) ?? null,
     model,
+    xor,
   }
 }
 
@@ -135,9 +155,14 @@ export function notoPresetApiPlugin(directory: string): Plugin {
     if (request.method !== 'GET') return send(405, { error: '읽기 전용 API입니다.' })
     const match = /^\/api\/noto-preset\/glyph\/(\d+)$/.exec(url.pathname)
     const wantsModel = url.pathname === `${API}/model`
-    if (url.pathname !== API && !match && !wantsModel) return send(404, { error: '없는 프리셋 경로입니다.' })
+    const wantsXor = url.pathname === `${API}/xor`
+    if (url.pathname !== API && !match && !wantsModel && !wantsXor) return send(404, { error: '없는 프리셋 경로입니다.' })
     void (async () => {
       try {
+        if (wantsXor) {
+          response.setHeader('Cache-Control', 'private, max-age=60')
+          return send(200, await reader.xor())
+        }
         if (wantsModel) {
           response.setHeader('Cache-Control', 'private, max-age=60')
           return send(200, await reader.model())

@@ -65,7 +65,7 @@ interface GlobalStyleActions {
   setHydrated: () => void
 }
 
-const DEFAULT_STYLE: GlobalStyle = {
+export const DEFAULT_STYLE: GlobalStyle = {
   slant: 0,
   weight: 400,
   letterSpacing: 0,

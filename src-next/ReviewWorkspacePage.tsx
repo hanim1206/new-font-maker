@@ -13,7 +13,7 @@ import { editableRailsOf, fitMedialForGlyph, renderMedialPart, roleLabel } from 
 import type { EditableRail, MedialFitView, RenderedMedialPart } from './notoMedialFitView'
 import type { CoreRailRole } from '../src/services/notoMedialMasterFit'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
-import type { NotoPresetGlyph, NotoPresetModelBundle } from './notoPresetGlyphs'
+import type { NotoPresetGlyph, NotoPresetModelBundle, NotoPresetXorMap } from './notoPresetGlyphs'
 import { RulerStrip } from './workspace/RulerStrip'
 import { MobileWorkspaceShell } from './workspace/WorkspaceChrome'
 import styles from './ReviewWorkspacePage.module.css'
@@ -83,6 +83,24 @@ function useNotoModel(): { bundle: NotoPresetModelBundle | null; error: string }
   }, [])
   return state
 }
+
+function useNotoXorMap(): { xorMap: NotoPresetXorMap | null; error: string } {
+  const [state, setState] = useState<{ xorMap: NotoPresetXorMap | null; error: string }>({ xorMap: null, error: '' })
+  useEffect(() => {
+    const controller = new AbortController()
+    notoPresetGlyphs.xor(controller.signal)
+      .then((xorMap) => setState({ xorMap, error: '' }))
+      .catch((failure: Error) => { if (!controller.signal.aborted) setState({ xorMap: null, error: failure.message }) })
+    return () => controller.abort()
+  }, [])
+  return state
+}
+
+/** xor 비율 → 격자 색 단계. 게이트가 아니라 눈에 띄게 하는 용도. */
+const XOR_TONES: { max: number; tone: 'good' | 'mid' | 'far' | 'bad'; label: string }[] = [
+  { max: 0.15, tone: 'good', label: '15% 미만' }, { max: 0.3, tone: 'mid', label: '30% 미만' }, { max: 0.6, tone: 'far', label: '60% 미만' }, { max: Infinity, tone: 'bad', label: '60% 이상' },
+]
+const xorTone = (xor: number) => XOR_TONES.find((entry) => xor < entry.max)!.tone
 
 // 승인 번들은 모듈 상수라 codepoint 인덱스를 한 번만 만든다. 번들이 깨졌으면 전부 실측만으로 둔다.
 const approvedByCodepoint: ReadonlyMap<number, ApprovedNotoInput> = (() => {
@@ -206,6 +224,10 @@ function GridScreen() {
 
   const rows = useMemo(() => snapshot ? allCorpusRows(snapshot) : [], [snapshot])
   const identity = corpusIdentity(selected)
+  const { xorMap, error: xorError } = useNotoXorMap()
+  const [colorBy, setColorBy] = useState<'xor' | 'status'>('xor')
+  const xorOf = (character: string) => xorMap?.characters[character]?.xor
+  const selectedXor = xorOf(identity.character)
 
   return <MobileWorkspaceShell activeArea="review" statusLabel="검수 · 글자 격자">
     <section className={styles.titleSection}>
@@ -216,11 +238,20 @@ function GridScreen() {
     <div className={styles.scroll}>
       {error && <p className={styles.status} data-state="error" role="alert">{error}</p>}
       {/* 칸 탭 = 선택, 선택된 칸 다시 탭 = 글자 화면. 키보드 화살표 이동은 선택만 바꾼다. */}
-      {rows.length > 0 && <div className={styles.matrixSection}><NotoCorpusMatrix rows={rows} reviews={reviews} selected={selected} onSelect={(codepoint) => { if (codepoint === selected) window.location.assign(glyphHref(codepoint)); else setSelected(codepoint) }} isHighlighted={() => true} noFinal={false} tierOf={(row) => isApproved(row.identity.codepoint) ? 'editable' : 'readonly'} /><p className={styles.status}>파란 테두리 칸 = 승인 측정 {approvedCount}자(획 마스터 fit 출발점). 나머지는 실측 기준선만.</p></div>}
+      {rows.length > 0 && <div className={styles.matrixSection}><NotoCorpusMatrix rows={rows} reviews={reviews} selected={selected} onSelect={(codepoint) => { if (codepoint === selected) window.location.assign(glyphHref(codepoint)); else setSelected(codepoint) }} isHighlighted={() => true} noFinal={false} tierOf={(row) => isApproved(row.identity.codepoint) ? 'editable' : 'readonly'} toneOf={colorBy === 'xor' && xorMap ? (row) => { const xor = xorOf(row.identity.character); return xor === undefined ? undefined : xorTone(xor) } : undefined} /></div>}
+      <div className={styles.colorBar}>
+        <div className={styles.segment} role="group" aria-label="칸 색 기준">
+          <button type="button" aria-current={colorBy === 'xor' ? 'page' : undefined} onClick={() => setColorBy('xor')} disabled={!xorMap}>Noto 대비 xor</button>
+          <button type="button" aria-current={colorBy === 'status' ? 'page' : undefined} onClick={() => setColorBy('status')}>추출 상태</button>
+        </div>
+        {colorBy === 'xor' && xorMap && <div className={styles.toneLegend} data-testid="review-xor-legend">{XOR_TONES.map((entry) => <span key={entry.tone} data-tone={entry.tone}>{entry.label}</span>)}<small>앱 기본 획 기준 · {new Date(xorMap.generatedAt).toLocaleDateString('ko-KR')}</small></div>}
+        {colorBy === 'xor' && xorError && <p className={styles.status} data-state="error">{xorError}</p>}
+      </div>
+      <p className={styles.status}>파란 테두리 칸 = 승인 측정 {approvedCount}자(획 마스터 fit 출발점). 나머지는 실측 기준선만.</p>
       <a className={styles.pick} href={glyphHref(selected)} data-testid="review-pick">
         <GlyphMini codepoint={selected} />
         <span className={styles.pickBody}>
-          <strong>선택 · {identity.character}</strong>
+          <strong>선택 · {identity.character}{selectedXor !== undefined && <em className={styles.pickXor} data-tone={xorTone(selectedXor)} data-testid="review-pick-xor"> xor {(selectedXor * 100).toFixed(0)}%</em>}</strong>
           <small>{identity.initialJamo} + {identity.medialJamo}{identity.finalJamo ? ` + ${identity.finalJamo}` : ' · 받침 없음'}</small>
           <TierBadge approved={isApproved(selected)} />
           <small className={styles.hint}>카드 탭 또는 같은 칸 다시 탭 → 글자 열기</small>

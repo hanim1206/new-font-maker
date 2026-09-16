@@ -78,3 +78,20 @@
 .railButton { cursor: grab; outline: none; }
 .railButton:active { cursor: grabbing; }
 .componentPart { border-color: rgb(47 154 106 / .4); background: rgb(47 154 106 / .08); }
+
+.colorBar { display: flex; flex-direction: column; gap: 6px; margin: 0 14px; }
+.colorBar .segment button { padding: 5px 12px; border: 0; background: transparent; color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; }
+.colorBar .segment button[aria-current='page'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+.colorBar .segment button:disabled { opacity: .4; }
+.toneLegend { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 10px; }
+.toneLegend span { padding: 2px 8px; border-radius: 8px; font-weight: 700; }
+.toneLegend span[data-tone='good'] { background: #dff3e8; color: #1f6b4c; }
+.toneLegend span[data-tone='mid'] { background: #fff2c9; color: #7a5a0c; }
+.toneLegend span[data-tone='far'] { background: #ffe0c2; color: #8a4a12; }
+.toneLegend span[data-tone='bad'] { background: #ffd2cf; color: #8f2a22; }
+.toneLegend small { color: rgb(var(--color-text-dim-4)); }
+.pickXor { margin-left: 6px; padding: 1px 6px; border-radius: 8px; font-size: 10px; font-style: normal; font-weight: 700; }
+.pickXor[data-tone='good'] { background: #dff3e8; color: #1f6b4c; }
+.pickXor[data-tone='mid'] { background: #fff2c9; color: #7a5a0c; }
+.pickXor[data-tone='far'] { background: #ffe0c2; color: #8a4a12; }
+.pickXor[data-tone='bad'] { background: #ffd2cf; color: #8f2a22; }
