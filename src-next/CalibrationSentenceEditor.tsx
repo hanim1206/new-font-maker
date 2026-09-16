@@ -4,6 +4,7 @@ import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
 import { useContextPlacement, usePlacementStore } from './notoModel'
 import { adoptFamilyStrokes, familyOfSyllable } from '../src/utils/jamoContextStrokes'
+import { PART_COLOR, PART_LABEL } from './partColors'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import { moveHandle, movePoint, moveStroke, scaleStroke } from '../src/services/editorCommands'
@@ -77,6 +78,8 @@ const SAMPLE_SENTENCES = [
   '하늘을 우러러 한 점 부끄럼 없기를',
 ] as const
 const VIEW_BOX_SIZE = 100
+/** 검수 캔버스와 같은 여백. 글자 칸(0–1) 밖 0.08씩 더 보여 라벨·튀어나온 획이 잘리지 않는다. */
+const CANVAS_VIEWPORT = { x: -0.08, y: -0.08, width: 1.16, height: 1.16 }
 
 const LAYOUT_LABELS: Record<LayoutType, string> = {
   'choseong-only': '초성 단독',
@@ -237,6 +240,21 @@ function layoutAreaLabel(part: MobileEditorPart): string {
   return '종성'
 }
 
+/** 부품 상자. 검수 캔버스 GhostCanvas와 같은 색·농도·라벨. 선택 부품만 제 색, 나머지는 옅게. 선택이 없으면 전부 제 색. */
+function PartBoxes({ boxes, activePart }: { boxes: Partial<Record<Part, BoxConfig>>; activePart: MobileEditorPart | null }) {
+  const editorPartOf = (part: Part): MobileEditorPart => part === 'CH' ? 'CH' : part === 'JO' ? 'JO' : 'JU'
+  return <g aria-hidden="true" data-testid="jamo-part-boxes">
+    {(Object.entries(boxes) as [Part, BoxConfig][]).map(([part, box]) => {
+      const active = !activePart || editorPartOf(part) === activePart
+      const color = PART_COLOR[part]
+      return <g key={part} data-part={part} data-active={active}>
+        <rect x={box.x * VIEW_BOX_SIZE} y={box.y * VIEW_BOX_SIZE} width={box.width * VIEW_BOX_SIZE} height={box.height * VIEW_BOX_SIZE} fill={color} fillOpacity={active ? 0.24 : 0.07} stroke={color} strokeOpacity={active ? 0.85 : 0.25} strokeWidth={active ? 0.4 : 0.3} />
+        <text x={box.x * VIEW_BOX_SIZE + 0.8} y={box.y * VIEW_BOX_SIZE - 0.8} fontSize={2.4} fontWeight={600} fill={color} fillOpacity={active ? 0.9 : 0.35} className={styles.partBoxLabel}>{PART_LABEL[part]}</text>
+      </g>
+    })}
+  </g>
+}
+
 function LayoutAreaBoxes({
   boxes,
   parts,
@@ -358,30 +376,34 @@ function FocusedGlyph({
   const selectedStrokeId = selection.kind === 'stroke' || selection.kind === 'point' || selection.kind === 'handle'
     ? selection.strokeId
     : null
-  const partStyles = selectedPart ? {
-    CH: { opacity: selectedPart === 'CH' ? 1 : .28 },
-    JU: { opacity: selectedPart === 'JU' ? 1 : .28 },
-    JU_H: { opacity: selectedPart === 'JU' ? 1 : .28 },
-    JU_V: { opacity: selectedPart === 'JU' ? 1 : .28 },
-    JO: { opacity: selectedPart === 'JO' ? 1 : .28 },
-  } : undefined
+  // 검수 캔버스와 같은 규칙: 잉크는 전부 제 색, 어느 부품을 잡았는지는 부품 상자 농도로만 보인다.
+  const partStyles = undefined
   const canvasStyle = {
-    '--major-grid-size': `${100 / grid.majorDivisions}%`,
-    '--minor-grid-size': `${grid.minorInterval / fontSpace.unitsPerEm * 100}%`,
-    '--design-body-left': `${designBody.x / fontSpace.unitsPerEm * 100}%`,
-    '--design-body-top': `${designBody.y / fontSpace.unitsPerEm * 100}%`,
-    '--design-body-width': `${designBody.width / fontSpace.unitsPerEm * 100}%`,
-    '--design-body-height': `${designBody.height / fontSpace.unitsPerEm * 100}%`,
     '--construction-band-size': `${GRID_SYSTEM_2_UNIT * GRID_SYSTEM_2_STROKE_UNITS * 100}%`,
   } as CSSProperties
+  // 눈금·글자몸 상자는 SVG 안에 그린다. 검수 캔버스처럼 글자 칸 밖 여백(-0.08)까지 보이고 라벨이 잘리지 않는다.
+  const minorStep = grid.minorInterval / fontSpace.unitsPerEm * VIEW_BOX_SIZE
+  const majorStep = VIEW_BOX_SIZE / grid.majorDivisions
+  const body = { x: designBody.x / fontSpace.unitsPerEm * VIEW_BOX_SIZE, y: designBody.y / fontSpace.unitsPerEm * VIEW_BOX_SIZE, width: designBody.width / fontSpace.unitsPerEm * VIEW_BOX_SIZE, height: designBody.height / fontSpace.unitsPerEm * VIEW_BOX_SIZE }
 
   return (
     <div className={styles.focusCanvas} style={canvasStyle} onPointerDown={() => onSelect({ kind: 'none' })}>
       {globalStyle.strokeStyle.mode === 'legacy-snapped-centerline' && <span className={styles.constructionGrid} aria-hidden="true" data-construction-grid="legacy-snapped-centerline" />}
-      <span className={styles.designBody} aria-hidden="true" />
-      <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} size={340} className={styles.focusSvg} partStyles={partStyles} globalStyle={globalStyle}>
-        {ghostVisible && ghost && <path d={ghost.path} className={styles.notoGhost} fillRule="evenodd" pointerEvents="none" data-testid="noto-ghost" />}
-        {selection.kind === 'component' && <LayoutAreaBoxes boxes={boxes} parts={selection.renderParts} emphasis="focused" />}
+      <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} size={340} viewportBox={CANVAS_VIEWPORT} className={styles.focusSvg} partStyles={partStyles} globalStyle={globalStyle} underlay={<>
+        {/* 검수 캔버스(GhostCanvas)와 같은 깔개: 흰 칸 → 1/16 잔선·1/4 굵은선 눈금 → 칸 테두리 → 글자몸 → 기준선(0.88) → 부품 상자 → Noto 고스트. 전부 잉크 아래. */}
+        <defs>
+          <pattern id="jamo-grid-fine" width={minorStep} height={minorStep} patternUnits="userSpaceOnUse"><path d={`M${minorStep} 0V${minorStep}H0`} fill="none" stroke="rgb(218 223 230 / .7)" strokeWidth={0.2} /></pattern>
+          <pattern id="jamo-grid-coarse" width={majorStep} height={majorStep} patternUnits="userSpaceOnUse"><path d={`M${majorStep} 0V${majorStep}H0`} fill="none" stroke="rgb(196 203 212 / .8)" strokeWidth={0.3} /></pattern>
+        </defs>
+        <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill="#fff" />
+        <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill="url(#jamo-grid-fine)" data-testid="jamo-grid" />
+        <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill="url(#jamo-grid-coarse)" />
+        <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill="none" stroke="rgb(196 203 212)" strokeWidth={0.4} />
+        <rect x={body.x} y={body.y} width={body.width} height={body.height} fill="none" stroke="rgb(59 111 214 / .18)" strokeWidth={0.3} data-testid="jamo-design-body" />
+        <line x1={-6} x2={102} y1={88} y2={88} stroke="#a6a297" strokeWidth={0.3} />
+        <PartBoxes boxes={boxes} activePart={selectedPart} />
+        {ghostVisible && ghost && <path d={ghost.path} className={styles.notoGhost} fillRule="evenodd" data-testid="noto-ghost" />}
+      </>}>
         {targets.map((target) => {
           const path = pointsToSvgD(target.stroke.points, target.stroke.closed, target.box, VIEW_BOX_SIZE)
           const component = componentFor(char, target.editorPart, target.jamo)

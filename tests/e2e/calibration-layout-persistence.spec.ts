@@ -55,7 +55,8 @@ test('Calibration 레이아웃 제스처를 canonical 저장·Undo·Redo·재접
   await page.getByRole('button', { name: '보정 문장 직접 입력' }).click()
   await page.getByRole('textbox', { name: '보정 문장 직접 입력' }).fill('에 네')
   const focused = page.getByRole('region', { name: '에 완성 글자 편집' }).locator('svg')
-  await focused.locator('path').nth(1).click({ force: true })
+  // 획 겨냥 영역으로 고른다. svg path 순서는 깔개(눈금·고스트)가 끼면 밀린다. nth(1) = ㅔ 첫 획.
+  await focused.locator('[data-editor-hit="stroke"]').nth(1).click({ force: true })
   await expect(page.getByText(/중성 영역 · 같은 구조의 글자에 함께 적용/)).toBeVisible()
 
   const beforeState = await readLayoutState(page)

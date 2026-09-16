@@ -1,6 +1,6 @@
 import { finalGlyphInkToSvgPath } from '../src/services/finalGlyphInk'
 import { fitNotoComponent, inkOfComponentFit, reportComponentFit } from '../src/services/notoComponentFit'
-import type { ComponentFaces, FaceError } from '../src/services/notoComponentFit'
+import type { ComponentFaces, FaceError, FitInkStyle } from '../src/services/notoComponentFit'
 import { selectNotoOutlineContours } from '../src/services/notoOutlineInk'
 import type { NotoOutline } from '../src/services/notoOutlineInk'
 import { useJamoStore } from '../src/stores/jamoStore'
@@ -84,11 +84,12 @@ export function fitComponentsForGlyph(input: {
 }
 
 /** 네 변(없으면 모델 값)으로 획을 놓고 잉크·비교 수치를 낸다. */
-export function renderComponentPart(part: ComponentFitPart, faces?: ComponentFaces): RenderedComponentPart {
+/** 네 변으로 닿자 fit을 놓고 잉크·오차를 만든다. style은 화면용 끝 모양(글로벌 스타일). 없으면 일자 끝. */
+export function renderComponentPart(part: ComponentFitPart, faces?: ComponentFaces, style?: FitInkStyle): RenderedComponentPart {
   if (!part.jamo || !part.faces) return { faceErrors: [], message: part.message }
-  const fit = fitNotoComponent({ part: part.part, jamo: part.jamo, family: part.family, faces: faces ?? part.faces, glyphId: `review:${part.part}:${part.jamoId}` })
+  const fit = fitNotoComponent({ part: part.part, jamo: part.jamo, family: part.family, faces: faces ?? part.faces, glyphId: `review:${part.part}:${part.jamoId}`, globalLinecap: style?.linecap, globalLinejoin: style?.linejoin, strokeStyle: style?.strokeStyle })
   if (!fit.ok) return { faceErrors: [], message: fit.message }
-  const ink = inkOfComponentFit(fit.fit)
+  const ink = inkOfComponentFit(fit.fit, style)
   if (!ink.ok) return { faceErrors: [], message: ink.message }
   const rendered: RenderedComponentPart = { path: finalGlyphInkToSvgPath({ regions: ink.regions }, 1), faces: { ...fit.fit.faces }, faceErrors: [] }
   if (part.ghostOutline && part.reference) {

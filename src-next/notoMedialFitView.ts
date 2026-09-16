@@ -1,6 +1,7 @@
 import { finalGlyphInkToSvgPath } from '../src/services/finalGlyphInk'
 import { inkOfFit, reportFitResult } from '../src/services/notoFitReport'
 import type { RailError } from '../src/services/notoFitReport'
+import type { FitInkStyle } from '../src/services/notoComponentFit'
 import { applyRailEdits, boundRailRoles, fitRailAxis } from '../src/services/notoMedialMasterFit'
 import type { FitRailKey, MedialFitInput, MedialFitResult, MedialRoleMeasurement } from '../src/services/notoMedialMasterFit'
 import { selectNotoOutlineContours } from '../src/services/notoOutlineInk'
@@ -95,11 +96,12 @@ export function fitMedialForGlyph(input: {
 }
 
 /** rail 값(em, 없으면 모델 값)으로 획을 놓고 잉크·비교 수치를 낸다. */
-export function renderMedialPart(part: MedialFitPart, railsEm?: Readonly<Record<string, number>>): RenderedMedialPart {
+/** rail 값으로 홀자 fit을 다시 놓고 잉크·슬롯·오차를 만든다. style은 화면용 끝 모양(글로벌 스타일). 측정은 style과 무관하게 일자 끝 기준. */
+export function renderMedialPart(part: MedialFitPart, railsEm?: Readonly<Record<string, number>>, style?: FitInkStyle): RenderedMedialPart {
   if (!part.fit) return { railErrors: [], message: part.message }
   const placed = railsEm ? applyRailEdits(part.fit, railsEm) : { ok: true as const, fit: part.fit }
   if (!placed.ok) return { railErrors: [], message: placed.message }
-  const ink = inkOfFit(placed.fit)
+  const ink = inkOfFit(placed.fit, 1, style)
   if (!ink.ok) return { railErrors: [], message: ink.message }
   const rendered: RenderedMedialPart = { path: finalGlyphInkToSvgPath({ regions: ink.regions }, 1), slot: { ...placed.fit.slot }, railErrors: [] }
   if (part.ghostOutline && part.reference) {

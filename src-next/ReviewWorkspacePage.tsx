@@ -21,6 +21,8 @@ import { propagationEditOf } from './reviewPropagation'
 import { snapRail } from './railSnap'
 import type { SnapHit } from './railSnap'
 import { MobileWorkspaceShell } from './workspace/WorkspaceChrome'
+import { useFitInkStyle } from './useFitInkStyle'
+import { INACTIVE_PART_COLOR, PART_COLOR } from './partColors'
 import styles from './ReviewWorkspacePage.module.css'
 
 /**
@@ -116,8 +118,7 @@ function writeGhostVisible(visible: boolean) {
 interface FitBox { id: string; kind: 'medial' | 'component'; part: Part; label: string; box: BoxConfig }
 
 /** 부품 색. 상자·rail·라벨이 같은 색을 쓴다. 첫닿자 초록, 홀자 파랑, 받침 보라. 선택·스냅은 주황. */
-const PART_COLOR: Record<Part, string> = { CH: '#2f9a6a', JU: '#3b6fd6', JU_H: '#3b6fd6', JU_V: '#3b6fd6', JO: '#8b5cf6' }
-const INACTIVE_COLOR = '#c9c5bb'
+const INACTIVE_COLOR = INACTIVE_PART_COLOR
 const ACCENT = '#f0561e'
 /** Noto 실측선 id 앞머리 → 부품. 혼합 홀자의 가로부·세로부는 둘 다 홀자 탭에 속한다. */
 const measuredPartOf = (id: string): 'CH' | 'JU' | 'JO' => id.startsWith('initial.') ? 'CH' : id.startsWith('final.') ? 'JO' : 'JU'
@@ -208,8 +209,8 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
     })}
     {/* Noto 고스트. 잉크가 아니라 비교용이라 반투명으로 깐다. 검정 획 아래에 두어 벗어난 곳만 회색으로 보인다. */}
     {ghostVisible && <path d={ghost} fill="#3a3a36" fillOpacity=".55" fillRule="evenodd" data-testid="review-ghost" />}
-    {overlays.map((path, index) => <path key={index} d={path} fill="#111" fillRule="evenodd" data-testid="review-fit-ink" />)}
-    {componentOverlays.map((path, index) => <path key={`c${index}`} d={path} fill="#111" fillRule="evenodd" data-testid="review-component-ink" />)}
+    {overlays.map((path, index) => <path key={index} d={path} fill="#1a1a1a" fillRule="evenodd" data-testid="review-fit-ink" />)}
+    {componentOverlays.map((path, index) => <path key={`c${index}`} d={path} fill="#1a1a1a" fillRule="evenodd" data-testid="review-component-ink" />)}
     {/* Δ 띠. 지금 선택한 rail 하나만: 기준값 자리와 지금 자리 사이를 주황 단색으로 칠한다. 잉크 위에 얹어 옮긴 구간이 바로 보인다. */}
     {showDelta && editable.filter((rail) => rail.id === selectedRail && Math.abs(rail.value - rail.original) > 1e-9).map((rail) => {
       const [from, to] = rail.value > rail.original ? [rail.original, rail.value] : [rail.value, rail.original]
@@ -350,7 +351,9 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
   const fitView = useMemo(() => context ? fitMedialForGlyph({ context, outline: glyph.outline, approved: approvedInputFor(codepoint) }) : null, [context, glyph, codepoint])
   const componentParts = useMemo(() => context ? fitComponentsForGlyph({ context, outline: glyph.outline, approved: approvedInputFor(codepoint) }) : [], [context, glyph, codepoint])
   const [facesByPart, setFacesByPart] = useState<(ComponentFaces | undefined)[]>([])
-  const componentRendered = useMemo(() => componentParts.map((part, index) => renderComponentPart(part, facesByPart[index])), [componentParts, facesByPart])
+  // 화면 잉크는 자소 탭과 같은 글로벌 끝 모양으로. 측정·xor는 이 스타일을 안 탄다.
+  const inkStyle = useFitInkStyle()
+  const componentRendered = useMemo(() => componentParts.map((part, index) => renderComponentPart(part, facesByPart[index], inkStyle)), [componentParts, facesByPart, inkStyle])
   const componentOverlays = componentRendered.flatMap((part) => part.path ? [part.path] : [])
   // rail 편집은 세션 임시. part별 em 값. undefined = 모델 rail 그대로.
   const [railsByPart, setRailsByPart] = useState<RailsByPart>([])
@@ -358,7 +361,7 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
   const [error, setError] = useState('')
   // 손으로 끌다 걸린 자리. 자·방향키 이동엔 없다.
   const [snapHit, setSnapHit] = useState<SnapHit | null>(null)
-  const rendered = useMemo(() => fitView ? fitView.parts.map((part, index) => renderMedialPart(part, railsByPart[index])) : [], [fitView, railsByPart])
+  const rendered = useMemo(() => fitView ? fitView.parts.map((part, index) => renderMedialPart(part, railsByPart[index], inkStyle)) : [], [fitView, railsByPart, inkStyle])
   // 홀자 마스터 rail(`<n>:<role>`)과 닿자 박스 변(`c<n>:<side>`)을 한 목록으로. 선택·자·드래그가 같은 경로를 탄다.
   const editable = useMemo(() => [
     ...(fitView ? editableRailsOf(fitView.parts, railsByPart) : []),

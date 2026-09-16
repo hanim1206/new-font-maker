@@ -28,7 +28,19 @@ export interface ComponentFitInput {
   weightMultiplier?: number
   globalLinecap?: StrokeDataV2['linecap']
   globalLinejoin?: StrokeDataV2['linejoin']
+  /** 잉크 면을 만드는 획 스타일. 없으면 fit 기본(둥근 붓촉 = 일자 stroker). brush 모드만 받는다. */
+  strokeStyle?: StrokeRenderStyle
 }
+
+/** 화면이 fit 잉크를 글로벌 스타일로 그릴 때 넘기는 묶음. 검수 캔버스·카드가 자소 탭과 같은 끝 모양으로 보이게. */
+export interface FitInkStyle {
+  linecap: StrokeDataV2['linecap']
+  linejoin: StrokeDataV2['linejoin']
+  strokeStyle: StrokeRenderStyle
+}
+
+/** brush 모드만 fit 잉크에 쓴다. 면·점 스타일은 일자 끝을 못 만들어 fit 기본으로 돌아간다. */
+export const fitStrokeStyleOf = (style?: FitInkStyle): StrokeRenderStyle => style && style.strokeStyle.mode === 'brush' ? style.strokeStyle : FIT_INK_STYLE
 
 export interface ComponentFitResult {
   part: ComponentFitInput['part']
@@ -85,13 +97,13 @@ function inkBounds(regions: readonly DeepReadonly<InkRegion>[]): ComponentFaces 
  * 두께/2 안쪽 상자는 둥근 끝 가정이라, 일자 끝(butt)이나 기울어진 획 끝에서는 잉크가 faces에 못 미치거나 넘친다.
  * 실제 잉크를 재서 상자를 늘리고 옮기기를 몇 번 반복하면 두께가 고정이어도 빠르게 수렴한다.
  */
-function refineBoxToFaces(strokes: readonly StrokeDataV2[], box: BoxConfig, faces: ComponentFaces, makePrimitives: (box: BoxConfig) => ResolvedCenterlinePrimitive<ResolvedStrokeInkSource>[]): BoxConfig {
+function refineBoxToFaces(strokes: readonly StrokeDataV2[], box: BoxConfig, faces: ComponentFaces, makePrimitives: (box: BoxConfig) => ResolvedCenterlinePrimitive<ResolvedStrokeInkSource>[], strokeStyle: StrokeRenderStyle = FIT_INK_STYLE): BoxConfig {
   const bounds = getStrokeCenterlineBounds(strokes as StrokeDataV2[])
   if (!bounds) return box
   const spreads = { x: bounds.maxX - bounds.minX > EPSILON, y: bounds.maxY - bounds.minY > EPSILON }
   let current = { ...box }
   for (let pass = 0; pass < 4; pass += 1) {
-    const ink = materializeFinalGlyphInk(makePrimitives(current), FIT_INK_STYLE, INK_OPTIONS)
+    const ink = materializeFinalGlyphInk(makePrimitives(current), strokeStyle, INK_OPTIONS)
     if (!ink.ok) return current
     const actual = inkBounds(ink.ink.regions)
     if (!actual) return current
@@ -135,12 +147,12 @@ export function fitNotoComponent(input: ComponentFitInput): ComponentFitOutcome 
       effectiveLinejoin: stroke.linejoin ?? input.globalLinejoin ?? 'miter',
     }
   })
-  const box = refineBoxToFaces(strokes, placed.box, input.faces, makePrimitives)
+  const box = refineBoxToFaces(strokes, placed.box, input.faces, makePrimitives, input.strokeStyle?.mode === 'brush' ? input.strokeStyle : FIT_INK_STYLE)
   return { ok: true, fit: { part: input.part, jamoId: input.jamo.char, faces: { ...input.faces }, box, thickness: placed.thickness, primitives: makePrimitives(box) } }
 }
 
-export function inkOfComponentFit(fit: ComponentFitResult): { ok: true; regions: readonly DeepReadonly<InkRegion>[] } | { ok: false; message: string } {
-  const ink = materializeFinalGlyphInk(fit.primitives, FIT_INK_STYLE, INK_OPTIONS)
+export function inkOfComponentFit(fit: ComponentFitResult, style?: FitInkStyle): { ok: true; regions: readonly DeepReadonly<InkRegion>[] } | { ok: false; message: string } {
+  const ink = materializeFinalGlyphInk(fit.primitives, fitStrokeStyleOf(style), INK_OPTIONS)
   return ink.ok ? { ok: true, regions: ink.ink.regions } : { ok: false, message: ink.message }
 }
 

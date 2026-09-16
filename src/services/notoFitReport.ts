@@ -1,5 +1,5 @@
 import polygonClipping, { type MultiPolygon, type Polygon } from 'polygon-clipping'
-import type { DeepReadonly, InkRegion, StrokeRenderStyle } from '../types'
+import type { DeepReadonly, InkRegion } from '../types'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
 import { partForJamoRole } from './jamoContextRoles'
 import { fitNotoMedialMaster } from './notoMedialMasterFit'
@@ -8,6 +8,8 @@ import { notoOutlineToInkRegions } from './notoOutlineInk'
 import { medialRoleGeometry } from './notoVariationModel'
 import type { NotoOutline } from './notoOutlineInk'
 import { resolveShapeGlyphInkPrimitives } from './shapeGlyphInkResolver'
+import { fitStrokeStyleOf } from './notoComponentFit'
+import type { FitInkStyle } from './notoComponentFit'
 
 /**
  * 획 마스터 fit 결과를 Noto 고스트와 겹쳐 얼마나·어디서 벗어났는지 숫자로 낸다.
@@ -15,7 +17,6 @@ import { resolveShapeGlyphInkPrimitives } from './shapeGlyphInkResolver'
  */
 
 // 캡·조인은 primitive 쪽(butt/miter)이 정하므로 붓 모양은 두께만 뜻한다.
-const FIT_INK_STYLE: StrokeRenderStyle = { mode: 'brush', brush: { tip: 'round', aspectRatio: 1, angle: 0 } }
 const INK_OPTIONS = { unitsPerEm: 1000, maxCurveErrorFontUnits: 0.5 }
 
 export interface RailError {
@@ -102,15 +103,19 @@ export function medialInputFromPrediction(input: {
 }
 
 /** fit 결과를 리졸버 → 잉크로 만든다. 화면 오버레이와 리포트가 같은 잉크를 쓴다. */
-export function inkOfFit(fit: MedialFitResult, weightMultiplier = 1): { ok: true; regions: readonly DeepReadonly<InkRegion>[] } | { ok: false; message: string } {
+/**
+ * fit 결과를 잉크 면으로. 측정·xor는 style 없이(Noto 획 끝은 일자라 butt/miter 고정) 부르고,
+ * 화면은 글로벌 스타일을 넘겨 자소 탭과 같은 끝 모양으로 그린다.
+ */
+export function inkOfFit(fit: MedialFitResult, weightMultiplier = 1, style?: FitInkStyle): { ok: true; regions: readonly DeepReadonly<InkRegion>[] } | { ok: false; message: string } {
   const primitives = resolveShapeGlyphInkPrimitives({
     source: fit.scope, masterId: fit.master.id, glyphId: `fit:${fit.jamoId}`,
     part: partForJamoRole(fit.role), slot: fit.slot, weightMultiplier,
     // Noto 획 끝은 일자다. 둥근 캡이면 끝이 삐져 xor가 부풀고 화면에서도 다른 획과 어긋나 보인다.
-    globalLinecap: 'butt', globalLinejoin: 'miter',
+    globalLinecap: style?.linecap ?? 'butt', globalLinejoin: style?.linejoin ?? 'miter',
   })
   if (!primitives.ok) return { ok: false, message: primitives.issues[0]?.message ?? '마스터를 해석할 수 없습니다.' }
-  const ink = materializeFinalGlyphInk(primitives.primitives, FIT_INK_STYLE, INK_OPTIONS)
+  const ink = materializeFinalGlyphInk(primitives.primitives, fitStrokeStyleOf(style), INK_OPTIONS)
   return ink.ok ? { ok: true, regions: ink.ink.regions } : { ok: false, message: ink.message }
 }
 

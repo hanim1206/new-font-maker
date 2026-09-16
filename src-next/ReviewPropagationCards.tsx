@@ -8,6 +8,7 @@ import { fitMedialForGlyph, renderMedialPart } from './notoMedialFitView'
 import type { EditableRail } from './notoMedialFitView'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 import { useNotoGlyph } from './useNotoGlyph'
+import { useFitInkStyle } from './useFitInkStyle'
 import { applyFacesDelta, applyMedialDelta, editKindOf, hasLayoutEdit, hasShapeEdit, PROPAGATION_SCOPES, propagationCandidates, shapeDeltaToEm } from './reviewPropagation'
 import type { CandidateScope, EditKind, PropagationEdit, PropagationScope } from './reviewPropagation'
 import styles from './ReviewPropagationCards.module.css'
@@ -28,6 +29,7 @@ const BOX_COLOR: Record<CardBox['kind'], string> = { medial: '#3b6fd6', componen
 
 function PropagationCard({ identity, bundle, edit, mode }: { identity: CorpusIdentity; bundle: NotoPresetModelBundle; edit: PropagationEdit; mode: EditKind }) {
   const { glyph, error } = useNotoGlyph(identity.codepoint)
+  const inkStyle = useFitInkStyle()
   const view = useMemo(() => {
     if (!glyph) return null
     const ghost = notoOutlineGhostPath(glyph.outline)
@@ -40,14 +42,14 @@ function PropagationCard({ identity, bundle, edit, mode }: { identity: CorpusIde
     let skipped = 0
     let touched = 0
     for (const part of medialView.parts) {
-      const base = renderMedialPart(part)
+      const base = renderMedialPart(part, undefined, inkStyle)
       // 배치는 em Δ 그대로, 형태는 이 글자 슬롯 길이에 비율을 곱해 em으로.
       const delta = !part.fit ? undefined : mode === 'layout' ? edit.layout.medial[part.part] : (() => { const ratios = edit.shape.medial[part.part]; return ratios && part.fit ? shapeDeltaToEm(ratios, part.fit.slot, part.fit.bindings) : undefined })()
       if (!delta || !part.fit) { if (base.path) after.push(base.path); continue }
       const applied = applyMedialDelta(part.fit, delta)
       skipped += applied.skipped
       if (applied.applied === 0) { if (base.path) after.push(base.path); continue }
-      const moved = renderMedialPart(part, applied.rails)
+      const moved = renderMedialPart(part, applied.rails, inkStyle)
       // 순서·간격 위반이면 이 글자는 Δ를 못 받는다(클램프 = 자동 예외).
       if (!moved.path) { if (base.path) after.push(base.path); skipped += applied.applied; continue }
       touched += 1
@@ -56,10 +58,10 @@ function PropagationCard({ identity, bundle, edit, mode }: { identity: CorpusIde
       if (moved.slot) boxes.push({ kind: 'medial', box: moved.slot })
     }
     for (const part of componentParts) {
-      const base = renderComponentPart(part)
+      const base = renderComponentPart(part, undefined, inkStyle)
       const delta = mode === 'layout' ? edit.layout.component[part.part] : undefined
       if (!delta || !part.faces) { if (base.path) after.push(base.path); continue }
-      const moved = renderComponentPart(part, applyFacesDelta(part.faces, delta))
+      const moved = renderComponentPart(part, applyFacesDelta(part.faces, delta), inkStyle)
       if (!moved.path) { if (base.path) after.push(base.path); skipped += 1; continue }
       touched += 1
       after.push(moved.path)
@@ -67,7 +69,7 @@ function PropagationCard({ identity, bundle, edit, mode }: { identity: CorpusIde
       if (moved.faces) boxes.push({ kind: 'component', box: { x: moved.faces.left, y: moved.faces.top, width: moved.faces.right - moved.faces.left, height: moved.faces.bottom - moved.faces.top } })
     }
     return { ghost: 'path' in ghost ? ghost.path : null, after, before, boxes, skipped, touched }
-  }, [glyph, identity, bundle, edit, mode])
+  }, [glyph, identity, bundle, edit, mode, inkStyle])
   // Δ가 아직 없으면 그냥 내 획. '안 닿음' 표시도, 흐리게도 안 한다.
   const live = mode === 'layout' ? hasLayoutEdit(edit) : hasShapeEdit(edit)
   const note = !view ? (error || '읽는 중') : !live ? '' : view.touched === 0 ? 'Δ 안 닿음' : view.skipped > 0 ? '일부 Δ 미적용' : ''

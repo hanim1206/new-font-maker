@@ -35,6 +35,8 @@ interface SvgRendererProps {
   partStyles?: Partial<Record<Part, PartStyle>>
   // SVG 안에 추가 렌더링할 children (slant transform 그룹 내부에 배치)
   children?: ReactNode
+  // 글리프 잉크 아래에 깔 요소 (부품 상자·고스트 등). slant 그룹 안, 글리프보다 먼저 그린다.
+  underlay?: ReactNode
   // SVG overflow 제어 (기본: 'visible')
   overflow?: 'visible' | 'hidden'
   // 글리프를 viewBox 영역 내로 클리핑 (overflow와 독립적으로 설정 가능)
@@ -73,6 +75,7 @@ export function SvgRenderer({
   clipGlyphs,
   enableTransition = false,
   children,
+  underlay,
   svgRef,
   className,
 }: SvgRendererProps) {
@@ -247,6 +250,8 @@ export function SvgRenderer({
 
       {/* 글자 전체에 slant 적용 */}
       <g transform={slantTransform}>
+        {/* 잉크 아래 깔개 (부품 상자·고스트). 이벤트 없음. */}
+        {underlay && <g pointerEvents="none">{underlay}</g>}
         {/* 글리프 렌더링 — clipGlyphs이면 clipPath로 제한 */}
         <g clipPath={shouldClipGlyphs ? `url(#${clipId})` : undefined} pointerEvents="none">
           {renderOrder.map((part) => renderPart(part))}

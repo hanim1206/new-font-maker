@@ -57,14 +57,15 @@
 .spaceGlyph { color: transparent !important; user-select: none; }
 .punctuationGlyph { font-family: ui-sans-serif, system-ui, sans-serif; font-size: .72em; line-height: 1.38em !important; }
 .editor { min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 16px; }
-.focusCanvas { position: relative; width: min(84vw, 368px); aspect-ratio: 1; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 20px; background-color: rgb(var(--color-surface-2)); background-image: linear-gradient(rgb(var(--color-border-subtle) / .28) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--color-border-subtle) / .28) 1px, transparent 1px), linear-gradient(rgb(var(--color-border) / .72) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--color-border) / .72) 1px, transparent 1px); background-size: var(--minor-grid-size) var(--minor-grid-size), var(--minor-grid-size) var(--minor-grid-size), var(--major-grid-size) var(--major-grid-size), var(--major-grid-size) var(--major-grid-size); touch-action: manipulation; }
-.designBody { position: absolute; z-index: 0; left: var(--design-body-left); top: var(--design-body-top); width: var(--design-body-width); height: var(--design-body-height); border: 1px solid rgb(var(--color-primary) / .18); pointer-events: none; }
+/* 검수 캔버스(ReviewWorkspacePage .canvas)와 같은 틀: 흰 바탕, 20px 모서리. 눈금·글자몸은 SVG 깔개에 그린다. */
+.focusCanvas { position: relative; width: min(84vw, 368px); aspect-ratio: 1; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 20px; background-color: #fff; touch-action: manipulation; }
 .focusSvg { position: relative; z-index: 1; width: 100%; height: 100%; }
 .layoutAreaBox { fill: rgb(var(--color-primary)); stroke: rgb(var(--color-primary)); vector-effect: non-scaling-stroke; pointer-events: none; }
 .layoutAreaBoxFocused { fill-opacity: .1; stroke-width: 1.5; stroke-opacity: .9; }
 .layoutAreaBoxSource { fill-opacity: .16; stroke-width: 1.5; stroke-opacity: 1; }
 .layoutAreaBoxAffected { fill-opacity: .07; stroke-width: 1; stroke-opacity: .58; }
-.focusChar { position: absolute; right: 10px; bottom: 7px; color: rgb(var(--color-text-dim-5)); font-size: 12px; font-weight: 700; pointer-events: none; }
+.focusChar { position: absolute; z-index: 2; right: 14px; bottom: 12px; color: rgb(var(--color-text-dim-5)); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 700; pointer-events: none; }
+.partBoxLabel { font-family: ui-monospace, 'SF Mono', Menlo, monospace; pointer-events: none; }
 .point { fill: rgb(var(--color-surface)); stroke: rgb(var(--color-primary)); stroke-width: .8; cursor: pointer; }
 .activePoint { fill: rgb(var(--color-primary)); stroke: white; stroke-width: 1; cursor: pointer; }
 .pointHitTarget { cursor: pointer; }
@@ -136,12 +137,15 @@
 @media (max-height: 720px) { .focusCanvas { width: min(54dvh, 278px); } }
 @media (max-height: 720px) { .brushSection { padding-top: 4px; padding-bottom: calc(env(safe-area-inset-bottom) + 6px); } .brushDrawer { min-height: 212px; gap: 4px; padding: 6px; } .brushHeader { min-height: 27px; } .brushHeader button { width: 28px; height: 28px; } .globalStyleTabs button { min-height: 34px; padding-block: 4px; } .globalStyleTabs small { display: none; } .brushControls { gap: 4px; } .brushControlGrid, .ruleControlGrid, .brushAnglePad, .roundBrushMessage { min-height: 70px; } .brushTips button { min-height: 48px; } .brushTipPreview { height: 24px; } .strokeRuleModes button { min-height: 23px; } .bodyScope button { min-height: 28px; } .bodyControls { gap: 4px; } .bodyDimensionGrid { min-height: 52px; } .bodyDimensionGrid label { gap: 4px; padding-block: 5px; } .bodyReset { min-height: 28px; } }
 
-/* Noto 고스트: 잉크 아래 회색 비교용. 토글은 캔버스 왼쪽 위. */
-.notoGhost { fill: #3a3a36; fill-opacity: .22; }
-.ghostToggle { position: absolute; left: 10px; top: 8px; z-index: 2; min-height: 44px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface) / .92); color: rgb(var(--color-text-dim-4)); font-size: 10px; font-weight: 700; }
-.ghostToggle[aria-pressed='true'] { border-color: rgb(var(--color-text-dim-3)); color: rgb(var(--color-foreground)); }
+/* Noto 고스트: 잉크 아래 회색 비교용(검수 캔버스와 같은 농도). 토글은 검수 캔버스 토글과 같은 알약 — 켜면 검게. */
+.notoGhost { fill: #3a3a36; fill-opacity: .55; }
+.ghostToggle { position: absolute; left: 14px; top: 12px; z-index: 2; min-height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; }
+.ghostToggle[aria-pressed='true'] { border-color: rgb(var(--color-foreground)); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 .ghostToggle strong { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 700; color: rgb(var(--color-primary-dark)); }
+.ghostToggle[aria-pressed='true'] strong { color: #9fc0ff; }
 .ghostToggle small { max-width: 160px; overflow: hidden; color: rgb(var(--color-danger, 214 50 31)); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.placementToggle { composes: ghostToggle; top: 56px; }
+.placementToggle { composes: ghostToggle; top: 52px; }
 .placementToggle small { color: rgb(var(--color-text-dim-4)); }
 .placementToggle[data-placement='boxes'] small { color: rgb(var(--color-primary-dark)); }
+.placementToggle[aria-pressed='true'] small { color: rgb(var(--color-surface) / .8); }
+.placementToggle[aria-pressed='true'][data-placement='boxes'] small { color: #9fc0ff; }
