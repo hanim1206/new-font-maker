@@ -12,8 +12,8 @@ export interface GlobalStyle {
   slant: number         // 기울기 (도, -30~30, 기본 0)
   weight: number        // 두께 (100~900, 100단위, 기본 400)
   letterSpacing: number // 자간 (0~0.3, 기본 0)
-  linecap: StrokeLinecap  // 획 끝 모양 (기본 'round')
-  linejoin: StrokeLinejoin // 획 꺾임 모양 (기본 'round')
+  linecap: StrokeLinecap  // 획 끝 모양 (기본 'butt' — Noto 계열처럼 각진 끝)
+  linejoin: StrokeLinejoin // 획 꺾임 모양 (기본 'miter')
   brush: BrushStyle       // 폰트 전체에 적용하는 붓촉
   strokeStyle: StrokeRenderStyle // 중심선을 최종 윤곽으로 바꾸는 공통 규칙
 }
@@ -65,12 +65,16 @@ interface GlobalStyleActions {
   setHydrated: () => void
 }
 
+/**
+ * 기본은 각진 끝(butt/miter). brush 모드에서 끝이 둥글지 않으면 일정 폭 stroker로 면을 만들어
+ * Noto 고딕 계열 목표·fit 리포트(butt/miter)와 같은 모양이 된다. 둥근 끝은 사용자가 고르는 옵션.
+ */
 export const DEFAULT_STYLE: GlobalStyle = {
   slant: 0,
   weight: 400,
   letterSpacing: 0,
-  linecap: 'round',
-  linejoin: 'round',
+  linecap: 'butt',
+  linejoin: 'miter',
   brush: { tip: 'round', aspectRatio: 0.5, angle: 0 },
   strokeStyle: { mode: 'brush', brush: { tip: 'round', aspectRatio: 0.5, angle: 0 } },
 }
@@ -201,13 +205,12 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
       loadFontData: (data) =>
         set((state) => {
           state.style = { ...data.style }
-          // linecap 백필 (구형 데이터 호환)
+          // linecap·linejoin 백필 (구형 데이터 호환)
           if (!state.style.linecap) {
-            state.style.linecap = 'round'
+            state.style.linecap = DEFAULT_STYLE.linecap
           }
-          // linejoin 백필 (구형 데이터 호환)
           if (!state.style.linejoin) {
-            state.style.linejoin = 'round'
+            state.style.linejoin = DEFAULT_STYLE.linejoin
           }
           state.style = normalizeGlobalStyle(state.style)
           state.exclusions = [...data.exclusions]
@@ -217,6 +220,15 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
     })),
     {
       name: STORAGE_KEY,
+      // v1: 기본 끝 모양이 round → butt/miter로 바뀜. 옛 기본값 그대로인 저장분만 따라간다(새 셸엔 끝 모양 UI가 없다).
+      version: 1,
+      migrate: (persisted, version) => {
+        const state = persisted as { style?: Partial<GlobalStyle>; exclusions?: GlobalStyleExclusion[] }
+        if (version < 1 && state.style && state.style.linecap === 'round' && state.style.linejoin === 'round') {
+          state.style = { ...state.style, linecap: DEFAULT_STYLE.linecap, linejoin: DEFAULT_STYLE.linejoin }
+        }
+        return state
+      },
       partialize: (state) => ({
         style: state.style,
         exclusions: state.exclusions,
@@ -226,13 +238,12 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
           console.error('GlobalStyle store hydration failed:', error)
         }
         if (state) {
-          // linecap 백필 (기존 데이터 호환)
+          // linecap·linejoin 백필 (기존 데이터 호환)
           if (!state.style.linecap) {
-            state.style.linecap = 'round'
+            state.style.linecap = DEFAULT_STYLE.linecap
           }
-          // linejoin 백필 (기존 데이터 호환)
           if (!state.style.linejoin) {
-            state.style.linejoin = 'round'
+            state.style.linejoin = DEFAULT_STYLE.linejoin
           }
           state.style = normalizeGlobalStyle(state.style)
           state.setHydrated()

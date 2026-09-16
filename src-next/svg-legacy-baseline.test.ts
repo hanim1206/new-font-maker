@@ -109,7 +109,8 @@ describe('기존 선 전용 SVG 의미 baseline', () => {
     const preset = createUserPreset01(legacy)
     useJamoStore.setState({ choseong: { ...legacy.choseong, ...preset.choseong }, jungseong: { ...legacy.jungseong, ...preset.jungseong }, jongseong: { ...legacy.jongseong, ...preset.jongseong } })
     const jamos = useJamoStore.getState()
-    const style = useGlobalStyleStore.getState().style
+    // baseline fixture는 옛 기본 끝 모양(round/round)으로 만든 것. 지금 기본은 butt/miter라 여기서 옛 값을 박아 둔다.
+    const style = { ...useGlobalStyleStore.getState().style, linecap: 'round' as const, linejoin: 'round' as const }
     expect(style.strokeStyle).toMatchObject({ mode: 'brush', brush: { tip: 'round' } })
 
     const collectNamespace = (calibrationOverlay: boolean) => Object.fromEntries(CHARS.map((char) => {
