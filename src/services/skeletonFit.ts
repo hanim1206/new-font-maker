@@ -34,11 +34,14 @@ function rectPolygon(faces: ContextFaces, margin = 0): MultiPolygon {
   return [[[[l, t], [r, t], [r, b], [l, b], [l, t]]]]
 }
 
-/** 글자 윤곽에서 부품 네 변 안의 잉크만 남긴다. */
-export function clipGhostToFaces(outline: DeepReadonly<NotoOutline>, faces: ContextFaces, margin = 0.002): { ghost: MultiPolygon; area: number } | null {
+/** 글자 윤곽에서 부품 네 변 안의 잉크만 남긴다. 다른 부품의 상자가 이 상자에 겹치면(과의 ㅗ 줄기 등) 그 잉크는 뺀다. */
+export function clipGhostToFaces(outline: DeepReadonly<NotoOutline>, faces: ContextFaces, margin = 0.002, exclude: readonly ContextFaces[] = []): { ghost: MultiPolygon; area: number } | null {
   const regions = notoOutlineToInkRegions(outline)
   if (!regions.ok) return null
-  const ghost = polygonClipping.intersection(unionOf(regions.regions), rectPolygon(faces, margin))
+  let ghost = polygonClipping.intersection(unionOf(regions.regions), rectPolygon(faces, margin))
+  for (const other of exclude) {
+    try { ghost = polygonClipping.difference(ghost, rectPolygon(other, -margin)) } catch { /* 빼기 실패면 그대로 */ }
+  }
   const area = multiPolygonArea(ghost)
   return area > 0 ? { ghost, area } : null
 }
@@ -53,7 +56,12 @@ export function partFacesOf(identity: ModelIdentity, model: ContextModel, part: 
 export function buildSkeletonSample(input: { char: string; identity: ModelIdentity; part: Part; outline: DeepReadonly<NotoOutline>; model: ContextModel }): SkeletonSample | null {
   const faces = partFacesOf(input.identity, input.model, input.part)
   if (!faces) return null
-  const clipped = clipGhostToFaces(input.outline, faces)
+  // 같은 글자의 다른 부품 상자(혼합 홀자의 줄기가 첫닿자 상자로 올라오는 경우 등)는 이 부품 잉크가 아니다.
+  const others: Part[] = input.part === 'CH' || input.part === 'JO'
+    ? ['JU', 'JU_H', 'JU_V', input.part === 'CH' ? 'JO' : 'CH']
+    : ['CH', 'JO', ...(input.part === 'JU_H' ? ['JU_V' as Part] : input.part === 'JU_V' ? ['JU_H' as Part] : [])]
+  const exclude = others.flatMap((part) => { const f = (part === 'JO' && !input.identity.finalJamo) ? null : partFacesOf(input.identity, input.model, part); return f ? [f] : [] })
+  const clipped = clipGhostToFaces(input.outline, faces, 0.002, exclude)
   if (!clipped) return null
   return { char: input.char, identity: input.identity, part: input.part, faces, ghost: clipped.ghost, ghostArea: clipped.area }
 }
