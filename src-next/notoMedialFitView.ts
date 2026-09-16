@@ -1,15 +1,13 @@
 import { finalGlyphInkToSvgPath } from '../src/services/finalGlyphInk'
-import { inkOfFit, medialInputFromPrediction, reportFitResult } from '../src/services/notoFitReport'
+import { inkOfFit, reportFitResult } from '../src/services/notoFitReport'
 import type { RailError } from '../src/services/notoFitReport'
-import { applyRailEdits, boundRailRoles, fitNotoMedialMaster, fitRailAxis, splitMixedMedialRoles } from '../src/services/notoMedialMasterFit'
+import { applyRailEdits, boundRailRoles, fitRailAxis } from '../src/services/notoMedialMasterFit'
 import type { FitRailKey, MedialFitInput, MedialFitResult, MedialRoleMeasurement } from '../src/services/notoMedialMasterFit'
 import { selectNotoOutlineContours } from '../src/services/notoOutlineInk'
 import type { NotoOutline } from '../src/services/notoOutlineInk'
 import type { BoxConfig } from '../src/types'
-import { MEDIAL_ROLE_SETS, predictNotoTarget } from '../src/services/notoVariationModel'
+import type { ContextBoxResolution, ContextMedialPart } from '../src/services/contextBoxResolver'
 import type { ApprovedNotoInput } from './notoBoundMaster'
-import type { CorpusIdentity } from './notoCorpus'
-import type { NotoPresetModelBundle } from './notoPreset'
 
 /**
  * 검수 화면용 홀자 획 마스터 fit. 변화량 모델 rail로 fit해 잉크 경로를 만들고,
@@ -17,11 +15,11 @@ import type { NotoPresetModelBundle } from './notoPreset'
  * rail 편집은 fit 결과 위에서 `renderMedialPart`로 다시 놓는다. 두께는 안 변한다.
  */
 
-const MIXED = 'ㅘㅙㅚㅝㅞㅟㅢ'
 const ROLE_LABEL: Record<string, string> = { outerPillar: '바깥기둥', innerPillar: '안기둥', baseStem: '줄기', leftStem: '왼줄기', rightStem: '오른줄기', primaryBeam: '보', upperBeam: '위보', lowerBeam: '아래보' }
 export const roleLabel = (roleId: string) => ROLE_LABEL[roleId] ?? roleId
 
 export interface MedialFitPart {
+  part: ContextMedialPart['part']
   role: MedialFitInput['role']
   roleIds: readonly string[]
   /** 모델 rail 그대로의 fit. 편집의 출발점. */
@@ -71,39 +69,26 @@ function approvedMedialOf(input: ApprovedNotoInput | null) {
   }
 }
 
+/**
+ * 칸 해석 함수가 낸 홀자 fit(모델 rail)에 승인 측정의 고스트·기준값을 붙인다.
+ * fit 자체는 `resolveContextBoxes`가 렌더러와 같은 규칙으로 만든다.
+ */
 export function fitMedialForGlyph(input: {
-  identity: CorpusIdentity
-  bundle: NotoPresetModelBundle
+  context: ContextBoxResolution
   outline: NotoOutline
   approved: ApprovedNotoInput | null
 }): MedialFitView {
-  const medial = input.identity.medialJamo
-  const roleIds = MEDIAL_ROLE_SETS[medial]
-  if (!roleIds) return { parts: [], message: `${medial}의 역할 구성이 없습니다.` }
-  const thickness = input.bundle.thickness[medial]
-  if (!thickness) return { parts: [], message: `${medial}의 대표 두께가 없습니다.` }
-  const predicted = (target: string) => predictNotoTarget(input.bundle.model, target, input.identity)?.predicted ?? null
   const approved = approvedMedialOf(input.approved)
-
-  const groups: { role: MedialFitInput['role']; roleIds: readonly string[] }[] = MIXED.includes(medial)
-    ? (() => { const split = splitMixedMedialRoles(Object.fromEntries(roleIds.map((id) => [id, true]))); return [{ role: 'JU_H' as const, roleIds: Object.keys(split.horizontal) }, { role: 'JU_V' as const, roleIds: Object.keys(split.vertical) }] })()
-    : [{ role: 'ㅗㅛㅜㅠㅡ'.includes(medial) ? 'JU_HORIZONTAL' : 'JU_VERTICAL', roleIds }]
-
-  const parts: MedialFitPart[] = []
-  for (const group of groups) {
-    const base: MedialFitPart = { role: group.role, roleIds: group.roleIds }
-    const made = medialInputFromPrediction({ jamoId: medial, role: group.role, roleIds: group.roleIds, predicted, thickness })
-    if (!made.ok) { parts.push({ ...base, message: made.message }); continue }
-    const fit = fitNotoMedialMaster(made.input)
-    if (!fit.ok) { parts.push({ ...base, message: fit.message }); continue }
-    const part: MedialFitPart = { ...base, fit: fit.fit }
-    if (approved) {
+  const parts: MedialFitPart[] = input.context.medial.map((group) => {
+    const part: MedialFitPart = { part: group.part, role: group.role, roleIds: group.roleIds, fit: group.fit, message: group.message }
+    if (group.fit && approved) {
       part.ghostOutline = selectNotoOutlineContours(input.outline, approved.contourIds(group.roleIds))
       part.reference = Object.fromEntries(Object.entries(approved.measurements).filter(([roleId]) => group.roleIds.includes(roleId)))
     }
-    parts.push(part)
-  }
-  return { parts }
+    return part
+  })
+  const unresolvable = parts.length > 0 && parts.every((part) => !part.fit && part.roleIds.length === 0)
+  return unresolvable ? { parts: [], message: parts[0].message } : { parts }
 }
 
 /** rail 값(em, 없으면 모델 값)으로 획을 놓고 잉크·비교 수치를 낸다. */

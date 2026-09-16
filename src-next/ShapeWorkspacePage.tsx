@@ -24,6 +24,7 @@ import { parseShapeSystemSourceV2 } from '../src/services/shapeSystemSourceV2'
 import { useGlobalStyleStore, weightToMultiplier } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
+import { useContextPlacement } from './notoModel'
 import {
   flushShapeSystemStorePersistence,
   initializeStarterShapeSystem,
@@ -144,11 +145,13 @@ function GlyphPreview({ char, compact = false }: { char: string; compact?: boole
     globalPadding,
     paddingOverrides[syllable.layoutType],
   )
+  const { placement } = useContextPlacement(syllable, schema, globalStyle)
 
   return (
     <SvgRenderer
       syllable={syllable}
-      schema={schema}
+      schema={placement.kind === 'schema' ? placement.schema : undefined}
+      boxes={placement.kind === 'boxes' ? placement.boxes : undefined}
       size={compact ? 68 : 340}
       className={compact ? styles.cardGlyph : styles.canvasGlyph}
       globalStyle={globalStyle}

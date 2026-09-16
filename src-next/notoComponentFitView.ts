@@ -3,13 +3,11 @@ import { fitNotoComponent, inkOfComponentFit, reportComponentFit } from '../src/
 import type { ComponentFaces, FaceError } from '../src/services/notoComponentFit'
 import { selectNotoOutlineContours } from '../src/services/notoOutlineInk'
 import type { NotoOutline } from '../src/services/notoOutlineInk'
-import { predictNotoTarget } from '../src/services/notoVariationModel'
 import { useJamoStore } from '../src/stores/jamoStore'
 import type { JamoData, Part } from '../src/types'
 import type { ApprovedNotoInput } from './notoBoundMaster'
-import type { CorpusIdentity } from './notoCorpus'
 import type { EditableRail } from './notoMedialFitView'
-import type { NotoPresetModelBundle } from './notoPreset'
+import type { ContextBoxResolution } from '../src/services/contextBoxResolver'
 
 /**
  * 검수 화면용 닿자(첫닿자·받침) 박스 fit. 앱의 현재 획을 변화량 모델이 예측한 네 변 박스에 놓는다.
@@ -52,23 +50,26 @@ function approvedFacesOf(input: ApprovedNotoInput | null, part: 'CH' | 'JO'): { 
   return { faces: faces as ComponentFaces, contourIds }
 }
 
+/**
+ * 칸 해석 함수가 낸 닿자 네 변(모델 예측)에 앱 획과 승인 측정(고스트·실측 네 변)을 붙인다.
+ * 네 변 자체는 `resolveContextBoxes`가 렌더러와 같은 규칙으로 만든다.
+ */
 export function fitComponentsForGlyph(input: {
-  identity: CorpusIdentity
-  bundle: NotoPresetModelBundle
+  context: ContextBoxResolution
   outline: NotoOutline
   approved: ApprovedNotoInput | null
 }): ComponentFitPart[] {
   const store = useJamoStore.getState()
+  const { identity } = input.context
   const jobs: { part: 'CH' | 'JO'; jamo: JamoData | undefined; jamoId: string }[] = [
-    { part: 'CH', jamo: store.choseong[input.identity.initialJamo], jamoId: input.identity.initialJamo },
-    ...(input.identity.finalJamo ? [{ part: 'JO' as const, jamo: store.jongseong[input.identity.finalJamo], jamoId: input.identity.finalJamo }] : []),
+    { part: 'CH', jamo: store.choseong[identity.initialJamo], jamoId: identity.initialJamo },
+    ...(identity.finalJamo ? [{ part: 'JO' as const, jamo: store.jongseong[identity.finalJamo], jamoId: identity.finalJamo }] : []),
   ]
   return jobs.map((job) => {
     if (!job.jamo) return { part: job.part, jamoId: job.jamoId, message: `${job.jamoId}: 앱 획이 없습니다.` }
-    const predictedSide = (side: keyof ComponentFaces) => (predictNotoTarget(input.bundle.model, `${STAGE_OF[job.part]}.roleFaces.${side}`, input.identity)?.predicted ?? NaN) / 1000
-    const faces: ComponentFaces = { left: predictedSide('left'), right: predictedSide('right'), top: predictedSide('top'), bottom: predictedSide('bottom') }
-    if (!SIDES.every((side) => Number.isFinite(faces[side]))) return { part: job.part, jamoId: job.jamoId, jamo: job.jamo, message: '이 문맥의 박스 예측이 없습니다.' }
-    const part: ComponentFitPart = { part: job.part, jamoId: job.jamoId, jamo: job.jamo, faces }
+    const resolved = input.context.parts.find((part) => part.part === job.part)
+    if (!resolved) return { part: job.part, jamoId: job.jamoId, jamo: job.jamo, message: input.context.issues.find((issue) => issue.part === job.part)?.message ?? '이 문맥의 박스 예측이 없습니다.' }
+    const part: ComponentFitPart = { part: job.part, jamoId: job.jamoId, jamo: job.jamo, faces: { ...resolved.faces } }
     const reference = approvedFacesOf(input.approved, job.part)
     if (reference) {
       part.reference = reference.faces

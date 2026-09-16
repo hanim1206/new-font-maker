@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerE
 import { Check, Copy, Dices, Download, LayoutDashboard, ListTree, LoaderCircle, Redo2, Settings2, TextCursorInput, Undo2, X } from 'lucide-react'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
+import { useContextPlacement, usePlacementStore } from './notoModel'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import { moveHandle, movePoint, moveStroke, scaleStroke } from '../src/services/editorCommands'
@@ -298,14 +299,16 @@ function Glyph({
     width: 1 - effectiveSchema.padding.left - effectiveSchema.padding.right,
     height: 1,
   }
+  // 배치는 칸 해석 함수(모델 상자)가 우선, 못 풀면 스키마.
+  const { placement } = useContextPlacement(decomposed, effectiveSchema, globalStyle)
   const boxes = layoutHighlight?.layoutType === decomposed.layoutType
-    ? calculateBoxes(effectiveSchema, {
+    ? placement.kind === 'boxes' ? placement.boxes : calculateBoxes(effectiveSchema, {
       cho: decomposed.choseong?.char ?? '',
       jung: decomposed.jungseong?.char ?? '',
       jong: decomposed.jongseong?.char ?? '',
     })
     : null
-  return <SvgRenderer syllable={decomposed} schema={effectiveSchema} viewportBox={viewportBox} size={size} overflow="visible" clipGlyphs={false} globalStyle={globalStyle}>
+  return <SvgRenderer syllable={decomposed} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} viewportBox={viewportBox} size={size} overflow="visible" clipGlyphs={false} globalStyle={globalStyle}>
     {boxes && layoutHighlight && <LayoutAreaBoxes boxes={boxes} parts={layoutHighlight.parts} emphasis={layoutHighlight.source ? 'source' : 'affected'} />}
   </SvgRenderer>
 }
@@ -335,16 +338,20 @@ function FocusedGlyph({
   designBody: { x: number; y: number; width: number; height: number }
   globalStyle: GlobalStyle
 }) {
-  const boxes = useMemo(() => calculateBoxes(schema, {
+  // 배치는 칸 해석 함수(모델 상자)가 우선, 못 풀면 스키마. 획 겨냥·편집 오버레이도 같은 상자를 쓴다.
+  const { placement } = useContextPlacement(syllable, schema, globalStyle)
+  const notoPlacement = usePlacementStore((state) => state.notoPlacement)
+  const setNotoPlacement = usePlacementStore((state) => state.setNotoPlacement)
+  const boxes = useMemo(() => placement.kind === 'boxes' ? placement.boxes : calculateBoxes(schema, {
     cho: syllable.choseong?.char ?? '',
     jung: syllable.jungseong?.char ?? '',
     jong: syllable.jongseong?.char ?? '',
-  }), [schema, syllable])
+  }), [placement, schema, syllable])
   const targets = useMemo(() => getRenderedStrokeTargets(syllable, boxes), [boxes, syllable])
   // Noto 고스트: 표시·비교 전용. 잉크에 안 섞인다. 켬/끔은 기기에 기억한다.
   const [ghostVisible, setGhostVisible] = useState(loadGhostVisible)
   const { ghost, error: ghostError } = useNotoGhost(char, ghostVisible)
-  const comparison = useGhostComparison(ghost, syllable, schema, globalStyle)
+  const comparison = useGhostComparison(ghost, syllable, placement, globalStyle)
   const toggleGhost = () => setGhostVisible((current) => { saveGhostVisible(!current); return !current })
   const selectedPart = selection.kind === 'none' ? null : selection.editorPart
   const selectedStrokeId = selection.kind === 'stroke' || selection.kind === 'point' || selection.kind === 'handle'
@@ -371,7 +378,7 @@ function FocusedGlyph({
     <div className={styles.focusCanvas} style={canvasStyle} onPointerDown={() => onSelect({ kind: 'none' })}>
       {globalStyle.strokeStyle.mode === 'legacy-snapped-centerline' && <span className={styles.constructionGrid} aria-hidden="true" data-construction-grid="legacy-snapped-centerline" />}
       <span className={styles.designBody} aria-hidden="true" />
-      <SvgRenderer syllable={syllable} schema={schema} size={340} className={styles.focusSvg} partStyles={partStyles} globalStyle={globalStyle}>
+      <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} size={340} className={styles.focusSvg} partStyles={partStyles} globalStyle={globalStyle}>
         {ghostVisible && ghost && <path d={ghost.path} className={styles.notoGhost} fillRule="evenodd" pointerEvents="none" data-testid="noto-ghost" />}
         {selection.kind === 'component' && <LayoutAreaBoxes boxes={boxes} parts={selection.renderParts} emphasis="focused" />}
         {targets.map((target) => {
@@ -444,6 +451,10 @@ function FocusedGlyph({
           ? <strong data-testid="noto-ghost-xor">xor {(comparison.xorRatio * 100).toFixed(0)}%</strong>
           : <small>{comparison.message}</small>)}
         {ghostVisible && ghostError && <small>{ghostError}</small>}
+      </button>
+      <button type="button" className={styles.placementToggle} aria-pressed={notoPlacement} data-testid="noto-placement-toggle" data-placement={placement.kind} onPointerDown={(event) => event.stopPropagation()} onClick={() => setNotoPlacement(!notoPlacement)}>
+        Noto 배치
+        <small>{notoPlacement ? placement.kind === 'boxes' ? '모델 상자' : '스키마(못 풂)' : '스키마'}</small>
       </button>
     </div>
   )

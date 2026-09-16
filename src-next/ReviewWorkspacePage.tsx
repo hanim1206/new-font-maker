@@ -9,11 +9,13 @@ import { NotoCorpusMatrix } from './NotoCorpusMatrix'
 import { editableComponentRailsOf, fitComponentsForGlyph, renderComponentPart } from './notoComponentFitView'
 import type { ComponentFitPart, RenderedComponentPart } from './notoComponentFitView'
 import type { ComponentFaces } from '../src/services/notoComponentFit'
+import { resolveContextBoxes } from '../src/services/contextBoxResolver'
 import type { BoxConfig } from '../src/types'
 import { editableRailsOf, fitMedialForGlyph, renderMedialPart, roleLabel } from './notoMedialFitView'
 import type { EditableRail, MedialFitView, RenderedMedialPart } from './notoMedialFitView'
+import { useNotoModel } from './notoModel'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
-import type { NotoPresetGlyph, NotoPresetModelBundle, NotoPresetXorMap } from './notoPresetGlyphs'
+import type { NotoPresetGlyph, NotoPresetXorMap } from './notoPresetGlyphs'
 import { RulerStrip } from './workspace/RulerStrip'
 import { MobileWorkspaceShell } from './workspace/WorkspaceChrome'
 import styles from './ReviewWorkspacePage.module.css'
@@ -70,18 +72,6 @@ function useNotoGlyph(codepoint: number): { glyph: NotoPresetGlyph | null; error
     return () => controller.abort()
   }, [codepoint])
   return state.codepoint === codepoint ? state : { glyph: null, error: '' }
-}
-
-function useNotoModel(): { bundle: NotoPresetModelBundle | null; error: string } {
-  const [state, setState] = useState<{ bundle: NotoPresetModelBundle | null; error: string }>({ bundle: null, error: '' })
-  useEffect(() => {
-    const controller = new AbortController()
-    notoPresetGlyphs.model(controller.signal)
-      .then((bundle) => setState({ bundle, error: '' }))
-      .catch((failure: Error) => { if (!controller.signal.aborted) setState({ bundle: null, error: failure.message }) })
-    return () => controller.abort()
-  }, [])
-  return state
 }
 
 function useNotoXorMap(): { xorMap: NotoPresetXorMap | null; error: string } {
@@ -340,8 +330,10 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
   const ghost = useMemo(() => notoOutlineGhostPath(glyph.outline), [glyph])
   const measured = useMemo(() => baselineRails(glyph), [glyph])
   const { bundle, error: modelError } = useNotoModel()
-  const fitView = useMemo(() => bundle ? fitMedialForGlyph({ identity: glyph.identity, bundle, outline: glyph.outline, approved: approvedInputFor(codepoint) }) : null, [bundle, glyph, codepoint])
-  const componentParts = useMemo(() => bundle ? fitComponentsForGlyph({ identity: glyph.identity, bundle, outline: glyph.outline, approved: approvedInputFor(codepoint) }) : [], [bundle, glyph, codepoint])
+  // 칸 해석 함수 한 번 → 홀자 fit(rail)과 닿자 네 변. 렌더러·격자 xor와 같은 상자다.
+  const context = useMemo(() => bundle ? resolveContextBoxes({ identity: glyph.identity, model: bundle }) : null, [bundle, glyph])
+  const fitView = useMemo(() => context ? fitMedialForGlyph({ context, outline: glyph.outline, approved: approvedInputFor(codepoint) }) : null, [context, glyph, codepoint])
+  const componentParts = useMemo(() => context ? fitComponentsForGlyph({ context, outline: glyph.outline, approved: approvedInputFor(codepoint) }) : [], [context, glyph, codepoint])
   const [facesByPart, setFacesByPart] = useState<(ComponentFaces | undefined)[]>([])
   const componentRendered = useMemo(() => componentParts.map((part, index) => renderComponentPart(part, facesByPart[index])), [componentParts, facesByPart])
   const componentOverlays = componentRendered.flatMap((part) => part.path ? [part.path] : [])

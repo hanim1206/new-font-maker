@@ -142,3 +142,6 @@
 .ghostToggle[aria-pressed='true'] { border-color: rgb(var(--color-text-dim-3)); color: rgb(var(--color-foreground)); }
 .ghostToggle strong { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 700; color: rgb(var(--color-primary-dark)); }
 .ghostToggle small { max-width: 160px; overflow: hidden; color: rgb(var(--color-danger, 214 50 31)); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.placementToggle { composes: ghostToggle; top: 56px; }
+.placementToggle small { color: rgb(var(--color-text-dim-4)); }
+.placementToggle[data-placement='boxes'] small { color: rgb(var(--color-primary-dark)); }

@@ -15,8 +15,10 @@ import type { NotoOutline } from './notoOutlineInk'
 export interface ComponentFaces { left: number; right: number; top: number; bottom: number }
 
 export interface ComponentFitInput {
-  part: Extract<Part, 'CH' | 'JO'>
+  part: Part
   jamo: DeepReadonly<JamoData>
+  /** 혼합 홀자의 가로부·세로부처럼 채널 하나만 놓을 때. 없으면 strokes, 없으면 세로+가로 합. */
+  channel?: 'horizontalStrokes' | 'verticalStrokes'
   /** em 좌표 잉크 바깥면. */
   faces: ComponentFaces
   glyphId: string
@@ -41,8 +43,11 @@ const FIT_INK_STYLE: StrokeRenderStyle = { mode: 'brush', brush: { tip: 'round',
 const INK_OPTIONS = { unitsPerEm: 1000, maxCurveErrorFontUnits: 0.5 }
 const EPSILON = 1e-6
 
-function strokesOf(jamo: DeepReadonly<JamoData>): StrokeDataV2[] {
-  const strokes = jamo.strokes?.length ? jamo.strokes : [...(jamo.verticalStrokes ?? []), ...(jamo.horizontalStrokes ?? [])]
+export function componentStrokesOf(jamo: DeepReadonly<JamoData>, channel?: ComponentFitInput['channel']): StrokeDataV2[] {
+  // 리졸버(selectMixedChannel)와 같은 규칙: 채널이 있으면 그 채널, 없으면 strokes.
+  const strokes = channel
+    ? (jamo[channel]?.length ? jamo[channel] : jamo.strokes) ?? []
+    : jamo.strokes?.length ? jamo.strokes : [...(jamo.verticalStrokes ?? []), ...(jamo.horizontalStrokes ?? [])]
   return strokes.map((stroke) => structuredClone(stroke) as StrokeDataV2)
 }
 
@@ -53,14 +58,15 @@ export function componentBoxFromFaces(strokes: readonly StrokeDataV2[], faces: C
   const thickness = Math.max(...strokes.map((stroke) => stroke.thickness), 0) * weightMultiplier
   const innerWidth = faces.right - faces.left - thickness
   const innerHeight = faces.bottom - faces.top - thickness
-  if (innerWidth <= EPSILON || innerHeight <= EPSILON) return '박스가 획 두께보다 작습니다.'
   const spanX = bounds.maxX - bounds.minX
   const spanY = bounds.maxY - bounds.minY
-  // 한 방향으로 퍼지지 않는 획(세로 한 줄 등)은 그 축을 상자 가운데에 둔다.
-  const width = spanX > EPSILON ? innerWidth / spanX : innerWidth
-  const height = spanY > EPSILON ? innerHeight / spanY : innerHeight
-  const x = spanX > EPSILON ? faces.left + thickness / 2 - bounds.minX * width : faces.left + thickness / 2 + innerWidth / 2 - bounds.minX * width
-  const y = spanY > EPSILON ? faces.top + thickness / 2 - bounds.minY * height : faces.top + thickness / 2 + innerHeight / 2 - bounds.minY * height
+  // 중심선이 퍼지는 축에서만 상자가 두께보다 커야 한다. ㅡ 한 줄처럼 안 퍼지는 축은
+  // 상자 크기가 잉크에 안 쓰이므로(두께가 곧 잉크) 앱 두께가 Noto보다 굵어도 가운데에 두면 된다.
+  if ((spanX > EPSILON && innerWidth <= EPSILON) || (spanY > EPSILON && innerHeight <= EPSILON)) return '박스가 획 두께보다 작습니다.'
+  const width = spanX > EPSILON ? innerWidth / spanX : Math.max(innerWidth, EPSILON)
+  const height = spanY > EPSILON ? innerHeight / spanY : Math.max(innerHeight, EPSILON)
+  const x = spanX > EPSILON ? faces.left + thickness / 2 - bounds.minX * width : (faces.left + faces.right) / 2 - bounds.minX * width
+  const y = spanY > EPSILON ? faces.top + thickness / 2 - bounds.minY * height : (faces.top + faces.bottom) / 2 - bounds.minY * height
   return { box: { x, y, width, height }, thickness }
 }
 
@@ -109,13 +115,13 @@ function refineBoxToFaces(strokes: readonly StrokeDataV2[], box: BoxConfig, face
 }
 
 export function fitNotoComponent(input: ComponentFitInput): ComponentFitOutcome {
-  const strokes = strokesOf(input.jamo)
+  const strokes = componentStrokesOf(input.jamo, input.channel)
   if (!strokes.length) return { ok: false, message: `${input.jamo.char}: 앱 획이 없습니다.` }
   if (![input.faces.left, input.faces.right, input.faces.top, input.faces.bottom].every(Number.isFinite)) return { ok: false, message: '박스 네 변이 없습니다.' }
   const placed = componentBoxFromFaces(strokes, input.faces, input.weightMultiplier ?? 1)
   if (typeof placed === 'string') return { ok: false, message: placed }
   const makePrimitives = (box: BoxConfig) => strokes.map((stroke): ResolvedCenterlinePrimitive<ResolvedStrokeInkSource> => {
-    const source: ResolvedStrokeInkSource = { kind: 'stroke', glyphId: input.glyphId, part: input.part, channel: 'strokes', jamoId: input.jamo.char, strokeId: stroke.id }
+    const source: ResolvedStrokeInkSource = { kind: 'stroke', glyphId: input.glyphId, part: input.part, channel: input.channel ?? 'strokes', jamoId: input.jamo.char, strokeId: stroke.id }
     return {
       kind: 'centerline', coordinateSpace: 'stroke-local-with-glyph-box',
       id: ['centerline', source.glyphId, source.part, source.channel, source.jamoId, source.strokeId].map(encodeURIComponent).join(':'),

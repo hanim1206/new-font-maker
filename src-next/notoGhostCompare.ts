@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { appGlyphInkRegions, ghostXorRatio } from '../src/services/notoGlyphXor'
+import type { GlyphInkPlacement } from '../src/services/notoGlyphXor'
 import { notoOutlineGhostPath, notoOutlineToInkRegions } from '../src/services/notoOutlineInk'
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
-import type { DecomposedSyllable, DeepReadonly, InkRegion, LayoutSchema } from '../src/types'
+import type { DecomposedSyllable, DeepReadonly, InkRegion } from '../src/types'
 import { CORPUS_TOTAL } from './notoCorpus'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
 
@@ -39,13 +40,13 @@ export function useNotoGhost(char: string, enabled: boolean): { ghost: NotoGhost
   return { ghost: state.ghost, error: state.error }
 }
 
-export function useGhostComparison(ghost: NotoGhost | null, syllable: DecomposedSyllable, schema: LayoutSchema, globalStyle: GlobalStyle): { xorRatio: number; inkRatio: number } | { message: string } | null {
+export function useGhostComparison(ghost: NotoGhost | null, syllable: DecomposedSyllable, placement: GlyphInkPlacement, globalStyle: GlobalStyle): { xorRatio: number; inkRatio: number } | { message: string } | null {
   return useMemo(() => {
     if (!ghost) return null
-    const app = appGlyphInkRegions(syllable, schema, globalStyle)
+    const app = appGlyphInkRegions(syllable, placement, globalStyle)
     if (!app.ok) return { message: app.message }
-    return ghostXorRatio(app.regions, ghost.regions) ?? { message: 'Noto 고스트 면적이 0입니다.' }
-  }, [ghost, syllable, schema, globalStyle])
+    return ghostXorRatio(app.regions, ghost.regions, placement.kind) ?? { message: 'Noto 고스트 면적이 0입니다.' }
+  }, [ghost, syllable, placement, globalStyle])
 }
 
 export function loadGhostVisible(): boolean {

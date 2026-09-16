@@ -76,6 +76,16 @@ export function predictNotoTarget(model: VariationModel, target: string, identit
   }
 }
 
+/** 문맥 칸 id. corpus·모델·앱이 같은 규칙을 쓴다: 홀자 계열(right·bottom·mixed) + 받침 유무. */
+export function modelContextId(medialJamo: string, finalJamo: string | null): string {
+  const family = 'ㅘㅙㅚㅝㅞㅟㅢ'.includes(medialJamo) ? 'mixed' : 'ㅗㅛㅜㅠㅡ'.includes(medialJamo) ? 'bottom' : 'right'
+  return family + (finalJamo ? '-final' : '')
+}
+
+export function modelIdentityOf(initialJamo: string, medialJamo: string, finalJamo: string | null): ModelIdentity {
+  return { initialJamo, medialJamo, finalJamo, contextId: modelContextId(medialJamo, finalJamo) }
+}
+
 /** 홀자별 역할 구성. corpus 전수(11,172자)에서 예외 없이 이 조합만 나온다. */
 export const MEDIAL_ROLE_SETS: Readonly<Record<string, readonly string[]>> = {
   ㅏ: ['outerPillar', 'primaryBeam'], ㅓ: ['outerPillar', 'primaryBeam'], ㅢ: ['outerPillar', 'primaryBeam'],

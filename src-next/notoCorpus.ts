@@ -1,3 +1,4 @@
+import { modelContextId } from '../src/services/notoVariationModel'
 export const CORPUS_TOTAL = 11172
 export const CORPUS_STAGES = ['outline', 'initial', 'medial', 'final'] as const
 export const PART_STAGES = ['initial', 'medial', 'final'] as const
@@ -72,8 +73,7 @@ export function corpusIdentity(codepoint: number): CorpusIdentity {
   if (!Number.isInteger(offset) || offset < 0 || offset >= CORPUS_TOTAL) throw new Error('현대 한글 범위가 아닙니다.')
   const medialJamo = CORPUS_MEDIALS[Math.floor((offset % 588) / 28)]
   const finalJamo = CORPUS_FINALS[offset % 28]
-  const family = 'ㅘㅙㅚㅝㅞㅟㅢ'.includes(medialJamo) ? 'mixed' : 'ㅗㅛㅜㅠㅡ'.includes(medialJamo) ? 'bottom' : 'right'
-  return { codepoint, character: String.fromCodePoint(codepoint), initialJamo: CORPUS_INITIALS[Math.floor(offset / 588)], medialJamo, finalJamo, contextId: family + (finalJamo ? '-final' : '') }
+  return { codepoint, character: String.fromCodePoint(codepoint), initialJamo: CORPUS_INITIALS[Math.floor(offset / 588)], medialJamo, finalJamo, contextId: modelContextId(medialJamo, finalJamo) }
 }
 
 export function corpusCodepoint(initial: string, medial: string, final: string | null): number {
