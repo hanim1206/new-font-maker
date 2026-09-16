@@ -58,6 +58,7 @@ import {
   type DrawerState,
 } from './workspace/WorkspaceChrome'
 import styles from './ShapeWorkspacePage.module.css'
+import { CalibrationSentenceEditor } from './CalibrationSentenceEditor'
 
 const CONTEXTS = [
   { char: 'ㄱ', label: '단독', role: 'STANDALONE', context: { baseContext: 'choseong-only' } },
@@ -1463,7 +1464,7 @@ function OverviewScreen() {
                     <div className={styles.jamoPreview}><GlyphPreview char={master.jamoId} compact /></div>
                     <div><strong>{ROLE_LABELS[role]} {master.jamoId}</strong><span>저장 요소 {elementCount}개 · 직접 보정 {master.contextVariants?.length ?? 0}개</span></div>
                     {role === 'CH' && master.jamoId === 'ㄱ'
-                      ? <a href="/workspace/jamo">원형 보기</a>
+                      ? <a href="/workspace/jamo/master">원형 보기</a>
                       : <button type="button" disabled>화면 연결 전</button>}
                   </li>
                 )
@@ -1480,7 +1481,7 @@ function OverviewScreen() {
                   <div className={styles.jamoPreview}><GlyphPreview char={jamoId} compact /></div>
                   <div><strong>{jamoId}</strong><OverviewStatus role={jamoId === 'ㅏ' || jamoId === 'ㅙ' ? 'JU_VERTICAL' : 'CH'} jamoId={jamoId} /></div>
                   {jamoId === 'ㄱ' && hydrationStatus !== 'blocked'
-                    ? <a href="/workspace/jamo">화면 보기</a>
+                    ? <a href="/workspace/jamo/master">화면 보기</a>
                     : <button type="button" disabled>{hydrationStatus === 'blocked' ? '확인 필요' : '연결 전'}</button>}
                 </li>
               ))}
@@ -1898,7 +1899,7 @@ function ContextScreen() {
             : '카드를 보는 것만으로는 보정 데이터를 만들지 않아요.'}
         />
         <div className={styles.reviewActions}>
-          <a href="/workspace/jamo">원형 보기</a>
+          <a href="/workspace/jamo/master">원형 보기</a>
           {!source && hydrationStatus === 'ready' ? (
             <button type="button" onClick={handleInitialize}>추천 기본 구조로 시작</button>
           ) : (
@@ -1929,10 +1930,16 @@ function NotFoundScreen(): ReactNode {
   )
 }
 
+/** 자소 탭. 문장에서 글자를 골라 획을 직접 편집한다. 칸(레이아웃)은 뼈대 탭 몫. */
+function JamoEditorScreen() {
+  return <CalibrationSentenceEditor chrome="workspace" />
+}
+
 export function ShapeWorkspacePage() {
   if (window.location.pathname === '/workspace/jamos') return <OverviewScreen />
   if (window.location.pathname === '/workspace/skeleton') return <SharedLayoutScreen />
   if (window.location.pathname === '/workspace/jamo/result') return <ContextScreen />
-  if (window.location.pathname === '/workspace/jamo') return <MasterScreen />
+  if (window.location.pathname === '/workspace/jamo/master') return <MasterScreen />
+  if (window.location.pathname === '/workspace/jamo') return <JamoEditorScreen />
   return <NotFoundScreen />
 }

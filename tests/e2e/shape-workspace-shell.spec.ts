@@ -35,7 +35,7 @@ test('J-02 자소 원형 Rail은 네 방향을 직접 편집하고 한 transacti
   await page.goto('/workspace/jamo/result?char=ㄱ')
   await page.getByRole('button', { name: '추천 기본 구조로 시작' }).click()
   await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
-  await page.goto('/workspace/jamo')
+  await page.goto('/workspace/jamo/master')
 
   await expect(page.getByRole('heading', { name: '초성 ㄱ 원형', exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: '초성 ㄱ 원형 편집 캔버스' })).toBeVisible()
@@ -121,7 +121,7 @@ test('J-02 전체 4×4 점유 면은 연속 채우기·비우기 draft를 한 tr
   await page.goto('/workspace/jamo/result?char=ㄱ')
   await page.getByRole('button', { name: '추천 기본 구조로 시작' }).click()
   await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
-  await page.goto('/workspace/jamo')
+  await page.goto('/workspace/jamo/master')
   await page.waitForTimeout(350)
 
   const initializedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
@@ -300,7 +300,7 @@ test('L-01 공통 layout Rail은 7개 binding 결과를 draft로 미리 보고 �
 })
 
 test('비교 카드 선택과 드로어 열기는 저장 데이터에 영향을 주지 않는다', async ({ page }) => {
-  await page.goto('/workspace/jamo')
+  await page.goto('/workspace/jamo/master')
   await page.waitForTimeout(450)
 
   const before = await page.evaluate(([shapeKey, layoutKey, jamoKey]) => ({
@@ -335,12 +335,23 @@ test('J-01에서 J-02와 J-03으로 이동하고 잘못된 workspace 경로를 �
   await page.getByRole('link', { name: '자소 원형 새 화면 검토' }).click()
   await expect(page.getByText('J-02 · 자소 원형')).toBeVisible()
   await page.getByRole('navigation', { name: '프로젝트 주 내비게이션' }).getByRole('link', { name: '자소' }).click()
+  await expect(page).toHaveURL(/\/workspace\/jamo$/)
+  await expect(page.getByRole('region', { name: /완성 글자 편집/ })).toBeVisible()
+  // 편집기 문장 글자 버튼은 글자 크기에 매여 44px보다 좁다. 여기서는 넘침만 본다.
+  const editorOverflow = await page.evaluate(() => ({
+    horizontal: document.documentElement.scrollWidth - window.innerWidth,
+    vertical: document.documentElement.scrollHeight - window.innerHeight,
+  }))
+  expect(editorOverflow.horizontal).toBeLessThanOrEqual(0)
+  expect(editorOverflow.vertical).toBeLessThanOrEqual(0)
+
+  await page.goto('/workspace/jamos')
   await expect(page.getByRole('heading', { name: '자소 현황', exact: true })).toBeVisible()
   await expect(page.getByText('기존 렌더링 미리보기이며 Shape 마스터 상태를 뜻하지 않아요.')).toBeVisible()
   await expectMobileShellContract(page)
 
   await page.getByRole('link', { name: '화면 보기' }).click()
-  await expect(page).toHaveURL(/\/workspace\/jamo$/)
+  await expect(page).toHaveURL(/\/workspace\/jamo\/master$/)
   await expect(page.getByText('J-02 · 자소 원형')).toBeVisible()
 
   await page.getByRole('button', { name: '고 가로모음 관찰' }).click()
@@ -644,7 +655,7 @@ test('연결된 strict 7-role source에서도 관찰은 Shape 저장을 다시 �
     }
   }, { shapeKey: SHAPE_KEY })
 
-  await page.goto('/workspace/jamo')
+  await page.goto('/workspace/jamo/master')
   await expect(page.getByText('역할별 마스터 1개가 연결되어 있어요.')).toBeVisible()
   await expect(page.getByRole('img', { name: 'Shape 마스터 ㄱ 최종 윤곽' })).toBeVisible()
   const masterInk = page.getByRole('img', { name: 'Shape 마스터 ㄱ 최종 윤곽' }).locator('path[data-final-ink="true"]')

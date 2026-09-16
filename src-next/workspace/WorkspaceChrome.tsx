@@ -60,7 +60,7 @@ export function MobileWorkspaceShell({
         <nav className={styles.primaryNav} aria-label="프로젝트 주 내비게이션">
           <button type="button" disabled aria-current={activeArea === 'home' ? 'page' : undefined}><Home size={19} /><span>홈</span></button>
           <a href="/workspace/skeleton" aria-current={activeArea === 'skeleton' ? 'page' : undefined}><Grid2X2 size={19} /><span>뼈대</span></a>
-          <a href="/workspace/jamos" aria-current={activeArea === 'jamo' ? 'page' : undefined}><Shapes size={19} /><span>자소</span></a>
+          <a href="/workspace/jamo" aria-current={activeArea === 'jamo' ? 'page' : undefined}><Shapes size={19} /><span>자소</span></a>
           <a href="/workspace/review" aria-current={activeArea === 'review' ? 'page' : undefined}><ScanSearch size={19} /><span>검수</span></a>
           <button type="button" disabled aria-current={activeArea === 'output' ? 'page' : undefined}><Upload size={19} /><span>출력</span></button>
         </nav>

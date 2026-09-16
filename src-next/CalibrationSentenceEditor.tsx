@@ -56,6 +56,11 @@ import { BrushStyleTrackpad } from './BrushStyleTrackpad'
 import { GlobalStyleTrackpad, type GlobalStylePanel } from './GlobalStyleTrackpad'
 import { GRID_SYSTEM_2_STROKE_UNITS, GRID_SYSTEM_2_UNIT } from '../src/services/gridSystem2Geometry'
 import { ShapeRulePanel } from './ShapeRulePanel'
+import { MobileWorkspaceShell } from './workspace/WorkspaceChrome'
+import { useUIStore } from '../src/stores/uiStore'
+
+/** 어느 껍데기 안에 그릴지. standalone = 옛 `/` 전체 화면, workspace = 셸 자소 탭 안. */
+export type EditorChrome = 'standalone' | 'workspace'
 
 const SAMPLE_SENTENCES = [
   '별을 노래하는 마음으로',
@@ -902,7 +907,8 @@ function DesignBodyControls({
   </div>
 }
 
-export function CalibrationSentenceEditor() {
+export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: EditorChrome } = {}) {
+  const projectName = useUIStore((state) => state.currentProjectName) ?? '새 한글 폰트'
   const choseong = useJamoStore((state) => state.choseong)
   const jungseong = useJamoStore((state) => state.jungseong)
   const jongseong = useJamoStore((state) => state.jongseong)
@@ -1214,25 +1220,26 @@ export function CalibrationSentenceEditor() {
         </button>
       : <span key={`${lineIndex}-${char}-${charIndex}`} className={/\s/u.test(char) ? styles.spaceGlyph : styles.punctuationGlyph} style={{ inlineSize: width }} aria-label={/\s/u.test(char) ? '공백' : char}>{char}</span>
   }
-  return (
-    <main className={styles.page}>
-      <header className={styles.header}>
-        <div><span>FONT CALIBRATION</span><strong>문장에서 글자를 직접 다듬으세요</strong></div>
-        <nav aria-label="폰트 추출 및 편집 기록">
-          <a href="/workspace/jamo" className={styles.workspaceLink} aria-label="자소 원형 새 화면 검토" title="자소 원형 새 화면 검토"><LayoutDashboard size={18} /></a>
-          <button type="button" className={styles.exportButton} data-export-state={exportState} onClick={exportCurrentFont} disabled={exportState === 'exporting'} aria-label={exportState === 'exporting' ? `OTF 추출 중: ${exportProgress}` : exportState === 'downloaded' ? 'OTF 추출 완료' : exportState === 'failed' ? 'OTF 추출 실패' : '현재 작업을 OTF로 추출'} title={exportState === 'exporting' ? exportProgress : '현재 작업을 OTF로 추출'}>
-            {exportState === 'exporting' ? <LoaderCircle className={styles.exportSpinner} size={18} /> : exportState === 'downloaded' ? <Check size={18} /> : exportState === 'failed' ? <X size={18} /> : <Download size={18} />}
-          </button>
-          <button hidden type="button" className={styles.copyButton} data-copy-state={copyState} onClick={copyAnalysisValues} aria-label={copyState === 'copied' ? '분석용 값 복사됨' : copyState === 'failed' ? '분석용 값 복사 실패' : '분석용 값 복사'} title="분석용 값 복사">
-            {copyState === 'copied' ? <Check size={18} /> : <Copy size={18} />}
-          </button>
-          <button type="button" disabled={selection.kind === 'none'} onClick={() => setIsShapeRuleOpen(true)} aria-label="선택 자모 형태 규칙" title="현재 자모의 획과 형태 예절"><ListTree size={18} /></button>
-          <button type="button" data-active={isGlobalStyleOpen || undefined} onClick={() => isGlobalStyleOpen ? closeGlobalStyle() : setGlobalStylePanel('body')} aria-label="글로벌 스타일 설정" title="글자 네모꼴과 획 스타일"><Settings2 size={18} /></button>
-          <button type="button" onClick={undo} disabled={history.length === 0} aria-label="마지막 편집 되돌리기"><Undo2 size={18} />{history.length > 0 && <span>{history.length}</span>}</button>
-          <button type="button" onClick={redo} disabled={future.length === 0} aria-label="되돌린 편집 다시 실행"><Redo2 size={18} /></button>
-        </nav>
-      </header>
-
+  // 셸 안에서는 실행취소·다시실행이 셸 머리에 있으니 도구 줄에서는 뺀다.
+  const actions = (
+    <nav aria-label="폰트 추출 및 편집 기록">
+      <a href="/workspace/jamo/master" className={styles.workspaceLink} aria-label="자소 원형 새 화면 검토" title="자소 원형 새 화면 검토"><LayoutDashboard size={18} /></a>
+      <button type="button" className={styles.exportButton} data-export-state={exportState} onClick={exportCurrentFont} disabled={exportState === 'exporting'} aria-label={exportState === 'exporting' ? `OTF 추출 중: ${exportProgress}` : exportState === 'downloaded' ? 'OTF 추출 완료' : exportState === 'failed' ? 'OTF 추출 실패' : '현재 작업을 OTF로 추출'} title={exportState === 'exporting' ? exportProgress : '현재 작업을 OTF로 추출'}>
+        {exportState === 'exporting' ? <LoaderCircle className={styles.exportSpinner} size={18} /> : exportState === 'downloaded' ? <Check size={18} /> : exportState === 'failed' ? <X size={18} /> : <Download size={18} />}
+      </button>
+      <button hidden type="button" className={styles.copyButton} data-copy-state={copyState} onClick={copyAnalysisValues} aria-label={copyState === 'copied' ? '분석용 값 복사됨' : copyState === 'failed' ? '분석용 값 복사 실패' : '분석용 값 복사'} title="분석용 값 복사">
+        {copyState === 'copied' ? <Check size={18} /> : <Copy size={18} />}
+      </button>
+      <button type="button" disabled={selection.kind === 'none'} onClick={() => setIsShapeRuleOpen(true)} aria-label="선택 자모 형태 규칙" title="현재 자모의 획과 형태 예절"><ListTree size={18} /></button>
+      <button type="button" data-active={isGlobalStyleOpen || undefined} onClick={() => isGlobalStyleOpen ? closeGlobalStyle() : setGlobalStylePanel('body')} aria-label="글로벌 스타일 설정" title="글자 네모꼴과 획 스타일"><Settings2 size={18} /></button>
+      {chrome === 'standalone' && <>
+        <button type="button" onClick={undo} disabled={history.length === 0} aria-label="마지막 편집 되돌리기"><Undo2 size={18} />{history.length > 0 && <span>{history.length}</span>}</button>
+        <button type="button" onClick={redo} disabled={future.length === 0} aria-label="되돌린 편집 다시 실행"><Redo2 size={18} /></button>
+      </>}
+    </nav>
+  )
+  const body = (
+    <>
       <section className={styles.sentence} aria-label="보정 문장">
         <div className={styles.sentenceActions}>
           <button type="button" onClick={pickSampleSentence} aria-label="예시 문장 무작위 선택" title="예시 문장 바꾸기"><Dices size={19} aria-hidden="true" /></button>
@@ -1259,7 +1266,7 @@ export function CalibrationSentenceEditor() {
         </div>)}
       </section>
 
-      <section className={styles.editor} aria-label={`${selectedChar} 완성 글자 편집`}>
+      <section className={styles.editor} data-chrome={chrome} aria-label={`${selectedChar} 완성 글자 편집`}>
         <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={isBrushStyleOpen ? { kind: 'none' } : selection} onSelect={isBrushStyleOpen ? () => {} : selectFromCanvas} selectedPoints={isBrushStyleOpen ? [] : selectedPoints} onPointSelect={isBrushStyleOpen ? () => {} : selectPointFromCanvas} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
       </section>
 
@@ -1297,6 +1304,28 @@ export function CalibrationSentenceEditor() {
         onMultiSelectArmedChange={setMultiSelectArmed}
       />}
       {isShapeRuleOpen && selection.kind !== 'none' && <ShapeRulePanel jamo={selection.jamo} selectedStrokeId={selection.kind === 'component' ? null : selection.strokeId} onClose={() => setIsShapeRuleOpen(false)} />}
+    </>
+  )
+  if (chrome === 'workspace') {
+    return (
+      <MobileWorkspaceShell
+        activeArea="jamo"
+        projectName={projectName}
+        statusLabel="획 편집"
+        history={{ canUndo: history.length > 0, canRedo: future.length > 0, onUndo: undo, onRedo: redo }}
+      >
+        <div className={`${styles.header} ${styles.headerCompact}`}>{actions}</div>
+        {body}
+      </MobileWorkspaceShell>
+    )
+  }
+  return (
+    <main className={styles.page}>
+      <header className={styles.header}>
+        <div><span>FONT CALIBRATION</span><strong>문장에서 글자를 직접 다듬으세요</strong></div>
+        {actions}
+      </header>
+      {body}
     </main>
   )
 }
