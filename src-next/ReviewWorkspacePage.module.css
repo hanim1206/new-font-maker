@@ -34,6 +34,10 @@
 .canvas text { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: 600; pointer-events: none; }
 .canvasBadge { position: absolute; right: 24px; top: 18px; }
 .canvasToggle { position: absolute; left: 24px; top: 18px; padding: 4px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; }
+.canvasReset { position: absolute; left: 24px; bottom: 18px; padding: 4px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; }
+.canvasReset:disabled { opacity: .5; }
+.canvasReset:not(:disabled) { border-color: #f0561e; color: #f0561e; }
+.canvasWarning { position: absolute; right: 24px; bottom: 18px; max-width: 58%; margin: 0; padding: 4px 10px; border-radius: 10px; background: rgb(var(--color-surface) / .92); color: rgb(var(--color-danger, 214 50 31)); font-size: 10.5px; font-weight: 600; text-align: right; }
 .canvasToggle[aria-pressed='true'] { border-color: rgb(var(--color-foreground)); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 .railButton { cursor: pointer; outline: none; }
 .railButton:focus-visible { stroke: rgb(var(--color-primary) / .18); }
@@ -53,48 +57,13 @@
 .rail[data-selected] .railLabel { font-weight: 800; }
 .warning { padding: 6px 14px; color: rgb(var(--color-danger, 214 50 31)); font-size: 11px; }
 
-.head { display: flex; align-items: baseline; justify-content: space-between; margin: 10px 14px 0; padding: 6px 0 4px; border-bottom: 1px solid rgb(var(--color-foreground)); }
-.head span:first-child { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
-.head span:first-child small { display: block; color: rgb(var(--color-text-dim-4)); font-weight: 500; letter-spacing: .06em; text-transform: none; }
-.head span:last-child { color: rgb(var(--color-text-dim-4)); font-size: 10px; }
-.values { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin: 0 14px; }
-.cell { display: flex; align-items: flex-end; justify-content: space-between; width: 100%; padding: 8px 0 6px; border: 0; border-top: 1px solid rgb(var(--color-border-subtle)); border-radius: 0; background: transparent; color: inherit; font: inherit; text-align: left; }
-.cell[aria-pressed='true'] { border-top-color: #f0561e; }
-.cell[aria-pressed='true'] .key { color: #f0561e; }
-.cell > span { display: flex; flex-direction: column; }
-.cell .key { margin-bottom: 3px; color: rgb(var(--color-text-dim-3)); font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
-.cell .value { font-size: 18px; font-weight: 600; letter-spacing: -.02em; line-height: 1; }
-.cell .value small { margin-left: 2px; color: rgb(var(--color-text-dim-4)); font-size: 10px; font-weight: 500; }
-.bar { position: relative; width: 6px; height: 30px; border-radius: 3px; background: linear-gradient(180deg, rgb(var(--color-primary-light)), rgb(var(--color-border-subtle))); }
-.bar::after { content: ''; position: absolute; left: -3px; right: -3px; top: var(--p, 50%); height: 2px; background: rgb(var(--color-foreground)); }
-.fitStats { margin: 6px 14px 0; display: flex; flex-direction: column; gap: 6px; }
-.fitPart { padding: 8px 10px; border: 1px solid rgb(var(--color-primary) / .3); border-radius: 10px; background: rgb(var(--color-primary-light) / .25); }
-.fitHead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.fitHead span { color: rgb(var(--color-text-dim-3)); font-size: 10px; font-weight: 700; letter-spacing: .06em; }
-.fitHead strong { font-size: 15px; font-weight: 800; letter-spacing: -.01em; }
-.fitHead strong small, .fitHead > small { color: rgb(var(--color-text-dim-4)); font-size: 10px; font-weight: 600; }
-.railErrors { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 600; }
-.railErrors i { margin-right: 4px; color: rgb(var(--color-text-dim-4)); font-style: normal; font-weight: 500; }
-.railErrors span[data-large] { color: #f0561e; }
 .locked { margin: 14px 14px 18px; padding: 12px; border: 1px dashed rgb(var(--color-text-dim-4)); border-radius: 22px; color: rgb(var(--color-text-dim-4)); font-size: 13px; font-weight: 700; text-align: center; }
 
-.editorHeading { display: flex; align-items: baseline; justify-content: space-between; }
-.editorHeading span { color: rgb(var(--color-text-dim-4)); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
-.editorHeading span small { margin-left: 4px; font-weight: 600; letter-spacing: 0; }
-.editorHeading output { font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
-.editorHeading output small { margin-left: 3px; color: rgb(var(--color-text-dim-4)); font-size: 11px; font-weight: 600; }
-.editorHeading em { display: block; color: rgb(var(--color-primary-dark)); font-size: 10px; font-style: normal; font-weight: 700; text-align: right; }
-.editorMeta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: -6px; color: rgb(var(--color-text-dim-4)); font-size: 10px; }
-.editorMeta button { flex: 0 0 auto; padding: 5px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 10px; font-weight: 700; }
-.editorMeta button:disabled { opacity: .4; }
-.metaButtons { display: inline-flex; gap: 6px; }
-.editorMeta button[aria-pressed='true'] { border-color: rgb(var(--color-foreground)); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 /* Δ 수치는 띠 여백에 항상. 흰 테두리로 격자 위에서 읽힌다. */
+.snapTag { paint-order: stroke; stroke: #fff; stroke-width: .012; stroke-linejoin: round; font-weight: 800; pointer-events: none; }
 .deltaLabel { paint-order: stroke; stroke: #fff; stroke-width: .012; stroke-linejoin: round; font-weight: 800; pointer-events: none; }
-.dialDock { flex: 0 0 auto; display: flex; flex-direction: column; gap: 2px; padding: 8px 14px 4px; border-top: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); box-shadow: 0 -8px 24px rgb(15 23 42 / .06); }
 .railButton { cursor: grab; outline: none; }
 .railButton:active { cursor: grabbing; }
-.componentPart { border-color: rgb(47 154 106 / .4); background: rgb(47 154 106 / .08); }
 
 .colorBar { display: flex; flex-direction: column; gap: 6px; margin: 0 14px; }
 .colorBar .segment button { padding: 5px 12px; border: 0; background: transparent; color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; }
@@ -113,20 +82,7 @@
 .pickXor[data-tone='far'] { background: #ffe0c2; color: #8a4a12; }
 .pickXor[data-tone='bad'] { background: #ffd2cf; color: #8f2a22; }
 
-/* 수치 접기. 평소엔 캔버스만 보고, 필요할 때 펼친다. */
-.fold { margin: 12px 14px 16px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; }
-.fold > summary { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 9px 12px; cursor: pointer; color: rgb(var(--color-text-dim-3)); font-size: 10.5px; font-weight: 700; letter-spacing: .06em; list-style: none; }
-.fold > summary::-webkit-details-marker { display: none; }
-.fold > summary::after { content: '▾'; color: rgb(var(--color-text-dim-4)); }
-.fold[open] > summary::after { content: '▴'; }
-.fold > summary small { color: rgb(var(--color-text-dim-4)); font-weight: 500; letter-spacing: 0; }
-.fold .fitStats { margin-left: 8px; margin-right: 8px; }
-.fold .head { margin-left: 8px; margin-right: 8px; }
-.fold .values { margin: 0 8px 8px; }
 /* 드래그 중 걸린 자리 표시. 모델은 파랑, 다른 기준선·격자는 주황. */
-.snapTag { margin-left: 8px; padding: 2px 7px; border-radius: 8px; background: #f0561e; color: #fff; font-size: 10px; font-style: normal; font-weight: 800; letter-spacing: 0; }
-.snapTag[data-kind='model'] { background: rgb(var(--color-primary)); }
-.editorHeading em.snapTag { display: inline-block; text-align: left; }
 /* 부품 탭. 켠 부품 색으로 채우고, 나머지는 색 점만. */
 .partTabs { display: flex; gap: 6px; padding: 8px 14px 0; }
 .partTabs button { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 4px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 11px; font-weight: 700; }

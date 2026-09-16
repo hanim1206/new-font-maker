@@ -7,7 +7,7 @@
 .scopes button { flex: 0 0 auto; padding: 4px 11px; border: 1px solid rgb(var(--color-border)); border-radius: 14px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
 .scopes button[aria-pressed='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary)); color: #fff; }
 .scopes button:disabled { opacity: .4; }
-.deltas { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 8px 0 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 600; color: rgb(var(--color-primary-dark)); }
+.deltas { min-height: 24px; display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 8px 0 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 600; color: rgb(var(--color-primary-dark)); }
 .deltas i { margin-right: 4px; color: rgb(var(--color-text-dim-4)); font-style: normal; font-weight: 500; }
 .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 10px 0 0; }
 .card { margin: 0; }
@@ -16,6 +16,6 @@
 .card figcaption { display: flex; flex-direction: column; align-items: center; margin-top: 3px; line-height: 1.2; }
 .card figcaption b { font-size: 13px; font-weight: 700; }
 .card figcaption small { color: rgb(var(--color-text-dim-4)); font-size: 9px; font-weight: 600; text-align: center; }
-.empty, .legend { padding: 8px 0 0; color: rgb(var(--color-text-dim-4)); font-size: 10.5px; }
+.empty { padding: 8px 0 0; color: rgb(var(--color-text-dim-4)); font-size: 10.5px; }
 .shape { margin-top: 12px; padding: 0 10px 10px; border: 1px dashed rgb(var(--color-primary) / .5); border-radius: 12px; background: rgb(var(--color-primary-light) / .2); }
 .shape .head { border-bottom-color: rgb(var(--color-primary) / .4); }

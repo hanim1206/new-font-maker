@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react'
 import { resolveContextBoxes } from '../src/services/contextBoxResolver'
-import { fitRailAxis } from '../src/services/notoMedialMasterFit'
 import { notoOutlineGhostPath } from '../src/services/notoOutlineInk'
-import type { BoxConfig } from '../src/types'
+import type { BoxConfig, Part } from '../src/types'
 import type { CorpusIdentity } from './notoCorpus'
 import { fitComponentsForGlyph, renderComponentPart } from './notoComponentFitView'
 import { fitMedialForGlyph, renderMedialPart } from './notoMedialFitView'
@@ -10,14 +9,15 @@ import type { EditableRail } from './notoMedialFitView'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 import { useNotoGlyph } from './useNotoGlyph'
 import { applyFacesDelta, applyMedialDelta, editKindOf, hasLayoutEdit, hasShapeEdit, PROPAGATION_SCOPES, propagationCandidates, shapeDeltaToEm } from './reviewPropagation'
-import type { EditKind, PropagationEdit, PropagationScope } from './reviewPropagation'
+import type { CandidateScope, EditKind, PropagationEdit, PropagationScope } from './reviewPropagation'
 import styles from './ReviewPropagationCards.module.css'
 
 /**
- * 검수 글자 화면 아래 카드 묶음. 지금 옮긴 기준선 Δ를 다른 글자에 얹어 보여준다. 저장이 아니라 미리보기.
- * - 배치 Δ(중심 rail·닿자 네 변): 기본 `이 자모`(ㅐ면 ㅐ만), `이 층 · 전체`는 일부러 넓힐 때. em 그대로.
- * - 형태 Δ(시작·끝 rail): `이 자모로 올리기`를 누르면 같은 홀자 글자에 슬롯 비율로. 본래 자소 탭 몫.
- * 카드 = Noto 고스트(회색) + Δ 적용한 내 획(검정) + Δ 전 내 획(주황 점선).
+ * 검수 글자 화면 아래 카드 묶음. 기준선을 잡으면 이 레이아웃(같은 문맥) 글자를 늘 띄워 두고, 옮긴 Δ만 얹는다. 저장이 아니라 미리보기.
+ * 카드는 rail을 옮길 때가 아니라 잡을 때 정해진다. 옮기는 동안 후보가 안 바뀌어 번쩍이지 않는다.
+ * - 배치 Δ(중심 rail·닿자 네 변): 기본 `이 레이아웃`, `전체`는 일부러 넓힐 때. em 그대로. 자모 하나만 고르는 칩은 없다(그건 형태).
+ * - 형태 Δ(시작·끝 rail): `이 자모로 올리기`를 누르면 카드가 같은 자모 글자로 바뀌고 슬롯 비율로 얹는다. 본래 자소 탭 몫.
+ * 카드 = Noto 고스트(회색) + Δ 적용한 내 획(검정) + Δ 전 내 획(주황 점선). Δ 없으면 내 획만.
  */
 
 const VIEW_BOX = '-0.08 -0.08 1.16 1.16'
@@ -42,9 +42,9 @@ function PropagationCard({ identity, bundle, edit, mode }: { identity: CorpusIde
     for (const part of medialView.parts) {
       const base = renderMedialPart(part)
       // 배치는 em Δ 그대로, 형태는 이 글자 슬롯 길이에 비율을 곱해 em으로.
-      const delta = !part.fit ? undefined : mode === 'layout' ? edit.layout.medial[part.part] : (() => { const ratios = edit.shape.medial[part.part]; return ratios && part.fit ? shapeDeltaToEm(ratios, part.fit.slot, fitRailAxis) : undefined })()
+      const delta = !part.fit ? undefined : mode === 'layout' ? edit.layout.medial[part.part] : (() => { const ratios = edit.shape.medial[part.part]; return ratios && part.fit ? shapeDeltaToEm(ratios, part.fit.slot, part.fit.bindings) : undefined })()
       if (!delta || !part.fit) { if (base.path) after.push(base.path); continue }
-      const applied = applyMedialDelta(part.fit.railsEm, delta)
+      const applied = applyMedialDelta(part.fit, delta)
       skipped += applied.skipped
       if (applied.applied === 0) { if (base.path) after.push(base.path); continue }
       const moved = renderMedialPart(part, applied.rails)
@@ -68,8 +68,10 @@ function PropagationCard({ identity, bundle, edit, mode }: { identity: CorpusIde
     }
     return { ghost: 'path' in ghost ? ghost.path : null, after, before, boxes, skipped, touched }
   }, [glyph, identity, bundle, edit, mode])
-  const note = !view ? (error || '읽는 중') : view.touched === 0 ? 'Δ 안 닿음' : view.skipped > 0 ? '일부 Δ 미적용' : ''
-  return <figure className={styles.card} data-testid="review-propagation-card" data-mode={mode} data-touched={view ? view.touched > 0 : undefined}>
+  // Δ가 아직 없으면 그냥 내 획. '안 닿음' 표시도, 흐리게도 안 한다.
+  const live = mode === 'layout' ? hasLayoutEdit(edit) : hasShapeEdit(edit)
+  const note = !view ? (error || '읽는 중') : !live ? '' : view.touched === 0 ? 'Δ 안 닿음' : view.skipped > 0 ? '일부 Δ 미적용' : ''
+  return <figure className={styles.card} data-testid="review-propagation-card" data-mode={mode} data-touched={view && live ? view.touched > 0 : undefined}>
     <svg viewBox={VIEW_BOX} role="img" aria-label={`${identity.character} 미리보기`}>
       <rect x="0" y="0" width="1" height="1" fill="#fff" />
       {view?.boxes.map((item, index) => <rect key={index} x={item.box.x} y={item.box.y} width={item.box.width} height={item.box.height} fill={BOX_COLOR[item.kind]} fillOpacity=".12" stroke={BOX_COLOR[item.kind]} strokeOpacity=".5" strokeWidth=".004" />)}
@@ -97,46 +99,45 @@ function CardGrid({ candidates, bundle, edit, mode }: { candidates: CorpusIdenti
   </div>
 }
 
-export function ReviewPropagationCards({ source, bundle, edit, changed }: {
+export function ReviewPropagationCards({ source, bundle, edit, changed, focus }: {
   source: CorpusIdentity
   bundle: NotoPresetModelBundle | null
   edit: PropagationEdit
   /** 모델 값에서 벗어난 rail. 머리에 이름과 Δ(u)를 보인다. */
   changed: EditableRail[]
+  /** 지금 잡은 rail의 부품. 이게 있어야 카드가 뜬다. */
+  focus?: Part
 }) {
-  const [scope, setScope] = useState<PropagationScope>('jamo')
-  const [layoutPage, setLayoutPage] = useState(0)
-  const [shapePage, setShapePage] = useState(0)
+  const [scope, setScope] = useState<PropagationScope>('layer')
+  const [page, setPage] = useState(0)
   const [promoted, setPromoted] = useState(false)
   const layoutActive = hasLayoutEdit(edit)
   const shapeActive = hasShapeEdit(edit)
   const layoutRails = changed.filter((rail) => editKindOf(rail) === 'layout')
   const shapeRails = changed.filter((rail) => editKindOf(rail) === 'shape')
-  const layoutCandidates = useMemo(() => layoutActive ? propagationCandidates({ source, scope, count: CARD_COUNT, page: layoutPage, edit }) : [], [layoutActive, source, scope, layoutPage, edit])
-  const shapeCandidates = useMemo(() => shapeActive && promoted ? propagationCandidates({ source, scope: 'jamo', count: CARD_COUNT, page: shapePage }) : [], [shapeActive, promoted, source, shapePage])
+  // 그리드는 하나. 형태 Δ를 올리면 같은 자모 카드에 형태 모드로 얹고, 아니면 배치 모드(Δ 없으면 내 획만).
+  const mode: EditKind = shapeActive && promoted ? 'shape' : 'layout'
+  const cardScope: CandidateScope = mode === 'shape' ? 'jamo' : scope
+  const candidates = useMemo(() => focus ? propagationCandidates({ source, scope: cardScope, count: CARD_COUNT, page, focus }) : [], [focus, source, cardScope, page])
   const scopeHint = PROPAGATION_SCOPES.find((item) => item.id === scope)?.hint ?? ''
+  const hint = layoutActive ? `배치 Δ · ${scopeHint} · 저장 안 됨` : shapeActive ? '배치 Δ 없음 · 아래 형태 Δ만' : focus ? `${scopeHint} · 기준선을 옮기면 Δ가 얹힙니다` : '기준선을 잡으면 여기 보입니다'
   return <section className={styles.section} aria-label="다른 글자에 적용하면" data-testid="review-propagation">
     <div className={styles.head}>
-      <span>다른 글자에 적용하면<small>{layoutActive ? `배치 Δ · ${scopeHint} · 저장 안 됨` : shapeActive ? '배치 Δ 없음 · 아래 형태 Δ만' : '기준선을 옮기면 여기 보입니다'}</small></span>
-      {layoutActive && <button type="button" onClick={() => setLayoutPage((current) => current + 1)} data-testid="review-propagation-next">다른 글자</button>}
+      <span>다른 글자에 적용하면<small>{hint}</small></span>
+      {focus && <button type="button" onClick={() => setPage((current) => current + 1)} data-testid="review-propagation-next">다른 글자</button>}
     </div>
     <div className={styles.scopes} role="group" aria-label="배치 적용 범위">
-      {PROPAGATION_SCOPES.map((item) => <button type="button" key={item.id} aria-pressed={item.id === scope} disabled={!layoutActive} onClick={() => { setScope(item.id); setLayoutPage(0) }}>{item.label}</button>)}
+      {PROPAGATION_SCOPES.map((item) => <button type="button" key={item.id} aria-pressed={item.id === scope} disabled={!focus || mode === 'shape'} onClick={() => { setScope(item.id); setPage(0) }}>{item.label}</button>)}
     </div>
-    {layoutActive && <>
-      <DeltaList rails={layoutRails} testId="review-propagation-deltas" />
-      <CardGrid candidates={layoutCandidates} bundle={bundle} edit={edit} mode="layout" />
-    </>}
+    {/* Δ 줄은 늘 자리를 차지한다. 옮길 때 카드가 아래로 밀리지 않게. */}
+    <DeltaList rails={layoutRails} testId="review-propagation-deltas" />
     {shapeActive && <div className={styles.shape} data-testid="review-propagation-shape">
       <div className={styles.head}>
         <span>자모 형태 Δ<small>시작·끝 = 획 길이 · 자소 탭 몫 · 같은 홀자에 슬롯 비율로</small></span>
-        {promoted
-          ? <button type="button" onClick={() => setShapePage((current) => current + 1)} data-testid="review-propagation-shape-next">다른 글자</button>
-          : <button type="button" onClick={() => setPromoted(true)} data-testid="review-propagation-promote">이 자모로 올리기</button>}
+        {!promoted && <button type="button" onClick={() => setPromoted(true)} data-testid="review-propagation-promote">이 자모로 올리기</button>}
       </div>
       <DeltaList rails={shapeRails} testId="review-propagation-shape-deltas" />
-      {promoted && <CardGrid candidates={shapeCandidates} bundle={bundle} edit={edit} mode="shape" />}
     </div>}
-    {(layoutActive || (shapeActive && promoted)) && <p className={styles.legend}>검정 = Δ 적용한 내 획 · 주황 점선 = Δ 전 · 회색 = Noto 고스트 · 'Δ 안 닿음' = 역할이 달라 그대로</p>}
+    {focus && <CardGrid candidates={candidates} bundle={bundle} edit={edit} mode={mode} />}
   </section>
 }
