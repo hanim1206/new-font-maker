@@ -255,7 +255,7 @@ function GridScreen() {
     <section className={styles.titleSection}>
       <span className={styles.screenId}>R-01 · 검수</span>
       <h1>글자 격자<small>Noto 고스트 · {snapshot ? `${snapshot.rows.length.toLocaleString()}자 추출` : '읽는 중'}</small></h1>
-      <nav className={styles.segment} aria-label="검수 보기"><a href="/">문장</a><span aria-current="page">격자</span></nav>
+      <nav className={styles.segment} aria-label="검수 보기"><a href="/workspace/jamo">문장</a><span aria-current="page">격자</span></nav>
     </section>
     <div className={styles.scroll}>
       {error && <p className={styles.status} data-state="error" role="alert">{error}</p>}
@@ -289,7 +289,11 @@ function GlyphTitle({ codepoint, approved }: { codepoint: number; approved: bool
   return <section className={styles.titleSection}>
     <span className={styles.screenId}>R-02 · 검수 › 글자</span>
     <h1>{character}<small>{approved ? '승인 측정 검수' : '실측 보기'}</small></h1>
-    <nav className={styles.segment} aria-label="검수 보기"><a href={`${GRID_PATH}?char=${encodeURIComponent(character)}`}>‹ 격자</a><span aria-current="page">글자</span></nav>
+    <div className={styles.titleRow}>
+      <nav className={styles.segment} aria-label="검수 보기"><a href={`${GRID_PATH}?char=${encodeURIComponent(character)}`}>‹ 격자</a><span aria-current="page">글자</span></nav>
+      {/* 검수에서 본 글자를 자소 탭 편집기로 바로 연다. 어느 탭이든 글자가 편집 진입점. */}
+      <a className={styles.editLink} href={`/workspace/jamo?char=${encodeURIComponent(character)}`} data-testid="review-edit-glyph">이 글자 획 편집 ›</a>
+    </div>
   </section>
 }
 

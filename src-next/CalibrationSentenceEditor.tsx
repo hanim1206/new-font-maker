@@ -117,6 +117,15 @@ function isEditableHangul(char: string): boolean {
   return isPrecomposedSyllable || isCompatibilityJamo
 }
 
+/** `?char=염`처럼 다른 탭에서 글자를 들고 들어오면 그 글자로 연다. 문장에 없으면 앞에 붙인다. */
+function initialFocus(): { char: string; sentence: string; custom: boolean } {
+  const requested = [...(new URLSearchParams(window.location.search).get('char') ?? '')][0]
+  const base = SAMPLE_SENTENCES[0]
+  if (!requested || !isEditableHangul(requested)) return { char: '과', sentence: base, custom: false }
+  if ([...base].includes(requested)) return { char: requested, sentence: base, custom: false }
+  return { char: requested, sentence: `${requested} ${base}`, custom: true }
+}
+
 function tokenizeSentenceLine(line: string): Array<{ text: string; start: number; whitespace: boolean }> {
   const tokens: Array<{ text: string; start: number; whitespace: boolean }> = []
   for (const char of [...line]) {
@@ -919,8 +928,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const fontSpace = useCalibrationProjectStore((state) => state.fontSpace)
   const grid = useCalibrationProjectStore((state) => state.grid)
   const metrics = useCalibrationProjectStore((state) => state.metrics)
-  const [sampleSentence, setSampleSentence] = useState<string>(SAMPLE_SENTENCES[0])
-  const [selectedChar, setSelectedChar] = useState('과')
+  const [focus] = useState(initialFocus)
+  const [sampleSentence, setSampleSentence] = useState<string>(focus.sentence)
+  const [selectedChar, setSelectedChar] = useState(focus.char)
   const [selection, setSelection] = useState<Selection>({ kind: 'none' })
   const [selectedPoints, setSelectedPoints] = useState<SelectedPoint[]>([])
   const [multiSelectArmed, setMultiSelectArmed] = useState(false)
@@ -933,7 +943,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const [exportProgress, setExportProgress] = useState('')
   const [inkGapLimiter, setInkGapLimiter] = useState<CalibrationInkGapViolation | null>(null)
   const [isDirectInputActive, setIsDirectInputActive] = useState(false)
-  const [isCustomSentence, setIsCustomSentence] = useState(false)
+  const [isCustomSentence, setIsCustomSentence] = useState(focus.custom)
   const [globalStylePanel, setGlobalStylePanel] = useState<GlobalStylePanel | null>(null)
   const [previewBrush, setPreviewBrush] = useState<StrokeRenderStyle | null>(null)
   const [isShapeRuleOpen, setIsShapeRuleOpen] = useState(false)

@@ -42,3 +42,12 @@ test('자소 탭은 셸 안에서 문장·캔버스·트랙패드를 보여주�
   await page.getByRole('region', { name: '보정 문장' }).getByRole('button', { name: '별 편집' }).click()
   await expect(page.getByRole('region', { name: '별 완성 글자 편집' })).toBeVisible()
 })
+
+test('검수 글자 화면에서 이 글자 획 편집으로 들어오면 그 글자가 열린다', async ({ page }) => {
+  await page.goto('/workspace/review/glyph?char=%EC%97%BC')
+  await page.getByTestId('review-edit-glyph').click()
+  await expect(page).toHaveURL(/\/workspace\/jamo\?char=%EC%97%BC$/)
+  await expect(page.getByRole('region', { name: '염 완성 글자 편집' })).toBeVisible()
+  // 문장에 없던 글자라 문장 앞에 붙는다.
+  await expect(page.getByRole('region', { name: '보정 문장' }).getByRole('button', { name: '염 편집' })).toHaveAttribute('aria-current', 'true')
+})
