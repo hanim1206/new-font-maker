@@ -110,8 +110,9 @@ export function polylineToFlatInkGroups(
   if (path.length < 2) return []
   const count = closed ? path.length : path.length - 1
   const directions = Array.from({ length: count }, (_, index) => unit(path[index], path[(index + 1) % path.length]))
-  const left = offsetSide(path, directions, closed, half, 1, join, roundVertices)
-  const right = offsetSide(path, directions, closed, half, -1, join, roundVertices)
+  // 급한 굽이 안쪽에서 오프셋 선이 제 몸을 지나 작은 고리가 생기면 잘라낸다.
+  const left = removeLoops(offsetSide(path, directions, closed, half, 1, join, roundVertices), closed)
+  const right = removeLoops(offsetSide(path, directions, closed, half, -1, join, roundVertices), closed)
   if (left.length < 2 || right.length < 2) return []
   if (closed) {
     const rings: BrushContour[] = Math.abs(ringArea(left)) >= Math.abs(ringArea(right)) ? [left, right] : [right, left]
@@ -123,7 +124,99 @@ export function polylineToFlatInkGroups(
   const endArc = cap === 'round' ? roundCap(path[path.length - 1], endDir, half, roundVertices) : []
   const startArc = cap === 'round' ? roundCap(path[0], { x: -startDir.x, y: -startDir.y }, half, roundVertices) : []
   const ring = [...left, ...endArc, ...right.reverse(), ...startArc]
+  // 급한 굽이 안쪽에서 오프셋 선이 제 몸을 지나면 윤곽 하나로는 Boolean이 못 받는다. 그때만 조각(세그먼트 사각형 + 조인 + 캡)으로 낸다.
+  if (ringSelfIntersects(ring)) return piecewiseFlatInkGroups(path, directions, half, cap, join, roundVertices)
   return [[ring]]
+}
+
+function intersectionOf(a1: BrushPoint, a2: BrushPoint, b1: BrushPoint, b2: BrushPoint): BrushPoint | null {
+  const d = (a2.x - a1.x) * (b2.y - b1.y) - (a2.y - a1.y) * (b2.x - b1.x)
+  if (Math.abs(d) <= EPSILON) return null
+  const t = ((b1.x - a1.x) * (b2.y - b1.y) - (b1.y - a1.y) * (b2.x - b1.x)) / d
+  return { x: a1.x + (a2.x - a1.x) * t, y: a1.y + (a2.y - a1.y) * t }
+}
+
+/**
+ * 오프셋 점 열의 국소 고리 제거. 변 i와 그 뒤 변 j가 교차하면 사이 점을 교점 하나로 바꾼다.
+ * 두께보다 작은 굽이에서 생기는 안쪽 고리가 대상이다. 열린 선만 본다(닫힌 선의 고리는 드물고 잘못 자르면 형태가 깨진다).
+ */
+export function removeLoops(points: BrushPoint[], closed: boolean): BrushPoint[] {
+  if (closed || points.length < 4) return points
+  const out = [...points]
+  let i = 0
+  while (i < out.length - 3) {
+    let cut = false
+    for (let j = i + 2; j < out.length - 1; j += 1) {
+      if (!segmentsCross(out[i], out[i + 1], out[j], out[j + 1])) continue
+      const p = intersectionOf(out[i], out[i + 1], out[j], out[j + 1])
+      if (!p) continue
+      out.splice(i + 1, j - i, p)
+      cut = true
+      break
+    }
+    if (!cut) i += 1
+  }
+  return out
+}
+
+function cross(o: BrushPoint, a: BrushPoint, b: BrushPoint): number {
+  return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+}
+
+function segmentsCross(a1: BrushPoint, a2: BrushPoint, b1: BrushPoint, b2: BrushPoint): boolean {
+  const d1 = cross(a1, a2, b1), d2 = cross(a1, a2, b2), d3 = cross(b1, b2, a1), d4 = cross(b1, b2, a2)
+  return ((d1 > EPSILON && d2 < -EPSILON) || (d1 < -EPSILON && d2 > EPSILON)) && ((d3 > EPSILON && d4 < -EPSILON) || (d3 < -EPSILON && d4 > EPSILON))
+}
+
+/** 인접하지 않은 변끼리 교차하는지. n이 수백이라 O(n²)로 충분하다. */
+export function ringSelfIntersects(ring: readonly BrushPoint[]): boolean {
+  const n = ring.length
+  for (let i = 0; i < n; i += 1) {
+    const a1 = ring[i], a2 = ring[(i + 1) % n]
+    for (let j = i + 2; j < n; j += 1) {
+      if (i === 0 && j === n - 1) continue
+      if (segmentsCross(a1, a2, ring[j], ring[(j + 1) % n])) return true
+    }
+  }
+  return false
+}
+
+function circle(center: BrushPoint, radius: number, vertices: number): BrushContour {
+  return Array.from({ length: vertices }, (_, index) => {
+    const theta = index / vertices * Math.PI * 2
+    return { x: center.x + Math.cos(theta) * radius, y: center.y + Math.sin(theta) * radius }
+  })
+}
+
+/**
+ * 조각 방식: 세그먼트마다 사각형, 꺾임마다 조인 패치(양쪽 다 얹는다 — 안쪽은 사각형에 덮인다), 열린 끝에 캡.
+ * 조각은 전부 볼록해서 Boolean이 안전하지만 곡선을 잘게 편 자리마다 조각이 생겨 느리다. 윤곽 하나가 안 될 때만 쓴다.
+ */
+function piecewiseFlatInkGroups(path: readonly BrushPoint[], directions: readonly (BrushPoint | null)[], half: number, cap: StrokeLinecap, join: StrokeLinejoin, vertices: number): BrushInkGroup[] {
+  const groups: BrushInkGroup[] = []
+  const count = directions.length
+  for (let index = 0; index < count; index += 1) {
+    const dir = directions[index]
+    if (!dir) continue
+    const n = normalOf(dir)
+    const from = path[index], to = path[(index + 1) % path.length]
+    groups.push([[add(from, n, half), add(to, n, half), add(to, n, -half), add(from, n, -half)]])
+  }
+  for (let index = 1; index < path.length - 1; index += 1) {
+    const incoming = directions[index - 1], outgoing = directions[index]
+    if (!incoming || !outgoing) continue
+    const vertex = path[index]
+    if (join === 'round') { groups.push([circle(vertex, half, vertices)]); continue }
+    const nA = normalOf(incoming), nB = normalOf(outgoing)
+    const cosine = nA.x * nB.x + nA.y * nB.y
+    for (const sign of [1, -1]) {
+      const a = add(vertex, nA, half * sign), b = add(vertex, nB, half * sign)
+      const miter = join === 'miter' && 1 + cosine > EPSILON && Math.sqrt(2 / (1 + cosine)) <= MITER_LIMIT
+      groups.push([miter ? [vertex, a, add(vertex, { x: nA.x + nB.x, y: nA.y + nB.y }, half * sign / (1 + cosine)), b] : [vertex, a, b]])
+    }
+  }
+  if (cap === 'round') groups.push([circle(path[0], half, vertices)], [circle(path[path.length - 1], half, vertices)])
+  return groups
 }
 
 /** 끝점에서 +n → dir → −n 순으로 도는 반원의 안쪽 점들(양 끝 제외). */

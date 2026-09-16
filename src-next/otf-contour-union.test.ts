@@ -7,6 +7,14 @@ import { strokeToContours } from '../src/services/strokeToOutline'
 import { mergeStrokeContourGroupsForCff } from '../src/services/contourBoolean'
 import { normalizeClosedStrokePoints } from '../src/utils/strokePathUtils'
 
+
+/** 이 파일의 교차부·구멍 검사는 옛 기본 획(2026-02) 골격을 전제한다. 다듬은 기본 획은 획 끝·교차 위치가 다르다. */
+async function useLegacyJamos(): Promise<void> {
+  const { useJamoStore } = await import('../src/stores/jamoStore')
+  const legacy = legacyJamos as unknown as Record<'choseong' | 'jungseong' | 'jongseong', Record<string, JamoData>>
+  useJamoStore.setState({ choseong: structuredClone(legacy.choseong), jungseong: structuredClone(legacy.jungseong), jongseong: structuredClone(legacy.jongseong) })
+}
+
 const UPM = 1000
 const ASCENDER = 880
 const STYLE = {
@@ -114,9 +122,7 @@ describe('CFF 컨투어 정규화와 겹침 제거', () => {
       removeItem: (key: string) => memory.delete(key),
     })
     const { collectGlyphDataForChar } = await import('../src/services/fontExportUtils')
-    // 가로획 왼끝이 세로획 위에 놓이는 옛 기본 ㅂ(2026-02)으로 교차부를 본다. 다듬은 기본 ㅂ은 획 끝 위치가 다르다.
-    const { useJamoStore } = await import('../src/stores/jamoStore')
-    useJamoStore.setState({ choseong: { ...useJamoStore.getState().choseong, ㅂ: structuredClone((legacyJamos.choseong as Record<string, JamoData>)['ㅂ']) } })
+    await useLegacyJamos()
     const glyph = collectGlyphDataForChar('ㅂ')
     if (!glyph) throw new Error('ㅂ 출력 데이터를 만들 수 없습니다.')
     const groups = glyph.strokes.map((resolved) => strokeToContours(resolved.stroke, resolved.box, UPM, {
@@ -148,6 +154,7 @@ describe('CFF 컨투어 정규화와 겹침 제거', () => {
 
     try {
       const { collectGlyphDataForChar } = await import('../src/services/fontExportUtils')
+      await useLegacyJamos()
       const glyph = collectGlyphDataForChar('ㅇ')
       if (!glyph) throw new Error('ㅇ 출력 데이터를 만들 수 없습니다.')
       const circle = glyph.strokes.find((resolved) => resolved.stroke.closed)
@@ -198,6 +205,7 @@ describe('CFF 컨투어 정규화와 겹침 제거', () => {
 
     try {
       const { collectGlyphDataForChar } = await import('../src/services/fontExportUtils')
+      await useLegacyJamos()
       for (const char of ['ㅁ', 'ㅎ']) {
         const glyph = collectGlyphDataForChar(char)
         if (!glyph) throw new Error(`${char} 출력 데이터를 만들 수 없습니다.`)
@@ -227,6 +235,7 @@ describe('CFF 컨투어 정규화와 겹침 제거', () => {
 
   it('실제 ㅙ의 복합중성 교차부를 채운다', async () => {
     const { collectGlyphDataForChar } = await import('../src/services/fontExportUtils')
+    await useLegacyJamos()
     const glyph = collectGlyphDataForChar('ㅙ')
     if (!glyph) throw new Error('ㅙ 출력 데이터를 만들 수 없습니다.')
     const groups = glyph.strokes.map((resolved) => strokeToContours(resolved.stroke, resolved.box, UPM, {

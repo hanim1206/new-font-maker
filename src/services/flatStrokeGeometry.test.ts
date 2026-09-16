@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { polylineToFlatInkGroups } from './flatStrokeGeometry'
+import { polylineToFlatInkGroups, ringSelfIntersects, strokeToFlatInkGroups } from './flatStrokeGeometry'
+import { materializeFinalGlyphInk } from './finalGlyphInk'
+import type { StrokeDataV2 } from '../types'
 import { unionInkRegions } from './inkBoolean'
 import { brushInkGroupsToInkRegions } from './inkGeometry'
 import type { InkRegion } from '../types'
@@ -55,6 +57,21 @@ describe('polylineToFlatInkGroups', () => {
     expect(ink).toHaveLength(1)
     expect(ink[0].holes).toHaveLength(1)
     expect(bounds(ink)).toEqual({ left: -0.1, right: 1.1, top: -0.1, bottom: 1.1 })
+  })
+
+  it('급한 S자 곡선을 납작한 상자에 놓아도 잉크가 나온다(윤곽이 제 몸을 지나면 조각으로)', () => {
+    // 사용자 프리셋 01의 ㄱ 갈고리를 ㅝ 문맥의 납작한 첫닿자 상자에 놓은 경우. 윤곽 하나는 self-intersection이 났다.
+    const stroke: StrokeDataV2 = { id: 'ㄱ-1', closed: false, thickness: 0.07, points: [{ x: 0, y: 0.002 }, { x: 1, y: 0.002, handleOut: { x: 1, y: -0.047 } }, { x: 0.92, y: 1, handleIn: { x: 0.995, y: 0.585 } }] }
+    const box = { x: 0.1, y: 0.1, width: 0.45, height: 0.22 }
+    const groups = strokeToFlatInkGroups(stroke, box, 1, 'butt', 'miter')
+    expect(groups.length).toBeGreaterThan(0)
+    expect(groups.every((group) => !ringSelfIntersects(group[0]))).toBe(true)
+    const ink = materializeFinalGlyphInk([{
+      kind: 'centerline', coordinateSpace: 'stroke-local-with-glyph-box', id: 'p', stroke, box, weightMultiplier: 1,
+      effectiveLinecap: 'butt', effectiveLinejoin: 'miter',
+      source: { kind: 'stroke', glyphId: 'g', part: 'CH', channel: 'strokes', jamoId: 'ㄱ', strokeId: 'ㄱ-1' },
+    }], { mode: 'brush', brush: { tip: 'round', aspectRatio: 1, angle: 0 } }, { unitsPerEm: 1000, maxCurveErrorFontUnits: 0.5 })
+    expect(ink.ok).toBe(true)
   })
 
   it('둥근 캡·조인은 호로 잇는다', () => {

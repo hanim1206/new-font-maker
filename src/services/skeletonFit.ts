@@ -135,6 +135,11 @@ function shift(jamo: JamoData, param: SkeletonParam, delta: number, channel?: 'h
 const LIMIT = { min: -0.2, max: 1.2 }
 
 export interface SkeletonFitOptions {
+  /**
+   * 열린 획의 앵커에 길이 0 핸들을 심어 곡률도 자유 좌표로 둔다(처음엔 직선 그대로).
+   * ㄱ·ㅋ처럼 Noto가 휘는데 앱 골격이 직선뿐인 자모가 이걸로 휜다. 닫힌 획은 안 건드린다.
+   */
+  seedHandles?: boolean
   /** 시작 보폭(박스 비율). 개선이 없으면 절반씩 줄인다. */
   step?: number
   /** 이보다 작아지면 멈춘다. */
@@ -158,8 +163,9 @@ export interface SkeletonFitResult {
  * 20개 안팎 파라미터·문맥 6개면 자모당 수 초.
  */
 export function fitSkeleton(seed: DeepReadonly<JamoData>, samples: readonly SkeletonSample[], options: SkeletonFitOptions = {}): SkeletonFitResult {
-  const { step: startStep = 0.06, minStep = 0.004, maxRounds = 12, channel } = options
+  const { step: startStep = 0.06, minStep = 0.004, maxRounds = 12, channel, seedHandles = false } = options
   const jamo = structuredClone(seed) as JamoData
+  if (seedHandles) seedOpenStrokeHandles(strokeList(jamo, channel))
   const params = skeletonParams(jamo, channel)
   let best = meanXor(jamo, samples, channel)
   const before = best
@@ -189,14 +195,37 @@ export function fitSkeleton(seed: DeepReadonly<JamoData>, samples: readonly Skel
     else step = Math.max(step / 2, minStep * 0.999)
   }
   // 상자 fit은 축별로 중심선 범위를 네 변에 맞추므로 좌표의 축별 아핀은 결과를 안 바꾼다.
-  // 편집 좌표를 0~1로 되돌리고 0.001 단위로 정리한다.
-  normalizeSkeleton(strokeList(jamo, channel))
-  for (const stroke of strokeList(jamo, channel)) for (const point of stroke.points) {
+  // 편집 좌표를 0~1로 되돌리고 0.001 단위로 정리한다. 정리가 잉크를 깨면(드물게 Boolean 실패) 정리 전 결과를 돌려준다.
+  const tidy = structuredClone(jamo) as JamoData
+  normalizeSkeleton(strokeList(tidy, channel))
+  if (seedHandles) pruneZeroHandles(strokeList(tidy, channel))
+  for (const stroke of strokeList(tidy, channel)) for (const point of stroke.points) {
     point.x = round3(point.x); point.y = round3(point.y)
     if (point.handleIn) point.handleIn = { x: round3(point.handleIn.x), y: round3(point.handleIn.y) }
     if (point.handleOut) point.handleOut = { x: round3(point.handleOut.x), y: round3(point.handleOut.y) }
   }
-  return { jamo, before, after: meanXor(jamo, samples, channel), evaluations, moved }
+  const tidyXor = meanXor(tidy, samples, channel)
+  if (Number.isFinite(tidyXor) && tidyXor <= best + 0.005) return { jamo: tidy, before, after: tidyXor, evaluations: evaluations + 1, moved }
+  return { jamo, before, after: best, evaluations: evaluations + 1, moved }
+}
+
+/** 열린 획의 앵커마다 없는 핸들을 앵커 자리에 심는다(길이 0 = 직선 유지). 첫 앵커는 out, 끝 앵커는 in, 안쪽은 둘 다. */
+export function seedOpenStrokeHandles(strokes: StrokeDataV2[]): void {
+  for (const stroke of strokes) {
+    if (stroke.closed || stroke.points.length < 2) continue
+    stroke.points.forEach((point, index) => {
+      if (index > 0 && !point.handleIn) point.handleIn = { x: point.x, y: point.y }
+      if (index < stroke.points.length - 1 && !point.handleOut) point.handleOut = { x: point.x, y: point.y }
+    })
+  }
+}
+
+/** fit 뒤 앵커와 같은 자리에 남은 핸들은 지운다(직선은 직선으로 저장). */
+export function pruneZeroHandles(strokes: StrokeDataV2[], tolerance = 0.002): void {
+  for (const stroke of strokes) for (const point of stroke.points) {
+    if (point.handleIn && Math.hypot(point.handleIn.x - point.x, point.handleIn.y - point.y) <= tolerance) delete point.handleIn
+    if (point.handleOut && Math.hypot(point.handleOut.x - point.x, point.handleOut.y - point.y) <= tolerance) delete point.handleOut
+  }
 }
 
 /** 중심선 범위(곡선 포함)를 축별로 0~1에 맞춘다. 한 축으로 안 퍼진 획(ㅡ 한 줄)은 그 축을 그대로 둔다. */
@@ -219,11 +248,12 @@ function round3(value: number): number {
 }
 
 /** 자모마다 골격을 볼 문맥 글자. 초성은 홀자 계열·받침 유무를 섞고, 받침은 초성·홀자를 섞는다. */
-export function skeletonContextChars(part: 'CH' | 'JO', jamo: string): string[] {
+export function skeletonContextChars(part: 'CH' | 'JO' | 'JU', jamo: string): string[] {
   const initials = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
   const medials = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
   const finals = [null, ...'ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ']
   const compose = (i: string, m: string, f: string | null) => String.fromCodePoint(0xac00 + (initials.indexOf(i) * 21 + medials.indexOf(m)) * 28 + finals.indexOf(f))
   if (part === 'CH') return [compose(jamo, 'ㅏ', null), compose(jamo, 'ㅗ', null), compose(jamo, 'ㅘ', null), compose(jamo, 'ㅣ', 'ㄴ'), compose(jamo, 'ㅜ', 'ㅇ'), compose(jamo, 'ㅓ', 'ㄹ')]
+  if (part === 'JU') return [compose('ㄱ', jamo, null), compose('ㅁ', jamo, null), compose('ㅅ', jamo, null), compose('ㄱ', jamo, 'ㄴ'), compose('ㅇ', jamo, 'ㄹ'), compose('ㅂ', jamo, 'ㅇ')]
   return [compose('ㄱ', 'ㅏ', jamo), compose('ㅁ', 'ㅗ', jamo), compose('ㅇ', 'ㅘ', jamo), compose('ㅅ', 'ㅣ', jamo), compose('ㅂ', 'ㅜ', jamo)]
 }

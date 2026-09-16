@@ -91,7 +91,7 @@ export function medialPartGroups(medialJamo: string): { part: ContextMedialPart[
   const roleIds = MEDIAL_ROLE_SETS[medialJamo]
   if (!roleIds) return null
   if (MIXED.includes(medialJamo)) {
-    const split = splitMixedMedialRoles(Object.fromEntries(roleIds.map((id) => [id, true])))
+    const split = splitMixedMedialRoles(Object.fromEntries(roleIds.map((id) => [id, true])), medialJamo)
     return [
       { part: 'JU_H', role: 'JU_H', roleIds: Object.keys(split.horizontal) },
       { part: 'JU_V', role: 'JU_V', roleIds: Object.keys(split.vertical) },

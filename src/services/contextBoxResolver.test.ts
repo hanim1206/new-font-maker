@@ -5,7 +5,9 @@ import { createNotoPresetReader } from '../../scripts/reference-lab/notoPresetAp
 import { CHOSEONG_MAP, JONGSEONG_MAP, JUNGSEONG_MAP } from '../data/Hangul'
 import { DEFAULT_STYLE } from '../stores/globalStyleStore'
 import { decomposeSyllable } from '../utils/hangulUtils'
-import { identityOfSyllable, medialPartGroups, resolveContextBoxes } from './contextBoxResolver'
+import { identityOfSyllable, medialPartGroups, predictComponentFaces, resolveContextBoxes } from './contextBoxResolver'
+import { fitNotoComponent, inkOfComponentFit } from './notoComponentFit'
+import { createUserPreset01 } from '../../src-next/userPreset01'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
 import { resolveGlyphInkPrimitives } from './glyphInkResolver'
 import { modelIdentityOf } from './notoVariationModel'
@@ -22,6 +24,9 @@ describe('칸 해석 함수', () => {
 
   it('홀자 역할을 part로 가른다 — 혼합은 가로부·세로부, 아래홀자는 JU_HORIZONTAL', () => {
     expect(medialPartGroups('ㅘ')?.map((g) => [g.part, g.roleIds.join(',')])).toEqual([['JU_H', 'baseStem,lowerBeam'], ['JU_V', 'outerPillar,upperBeam']])
+    // ㅜ 계열은 윗보가 줄기 보다: ㅝ = ㅜ(줄기+윗보) + ㅓ(기둥+아래보).
+    expect(medialPartGroups('ㅝ')?.map((g) => [g.part, g.roleIds.join(',')])).toEqual([['JU_H', 'baseStem,upperBeam'], ['JU_V', 'lowerBeam,outerPillar']])
+    expect(medialPartGroups('ㅞ')?.map((g) => [g.part, g.roleIds.join(',')])).toEqual([['JU_H', 'baseStem,upperBeam'], ['JU_V', 'innerPillar,lowerBeam,outerPillar']])
     expect(medialPartGroups('ㅗ')?.[0]).toMatchObject({ part: 'JU', role: 'JU_HORIZONTAL' })
     expect(medialPartGroups('ㅏ')?.[0]).toMatchObject({ part: 'JU', role: 'JU_VERTICAL' })
     expect(medialPartGroups('ㅃ')).toBeNull()
@@ -59,6 +64,20 @@ describe.skipIf(!existsSync(CORPUS))('칸 해석 — 모델', () => {
     expect(Math.max(...points.map((p) => p.x))).toBeCloseTo(faces.right, 3)
     expect(Math.min(...points.map((p) => p.y))).toBeCloseTo(faces.top, 3)
     expect(Math.max(...points.map((p) => p.y))).toBeCloseTo(faces.bottom, 3)
+  })
+
+  it.each(['궈', '귀', '규', '가'])('%s: 사용자 프리셋 01의 갈고리 ㄱ도 첫닿자 잉크가 나온다', async (char) => {
+    // 납작한 첫닿자 상자에서 급한 곡선 오프셋이 제 몸을 지나 Boolean이 깨지던 경우.
+    const model = await bundle
+    const preset = createUserPreset01().choseong['ㄱ']
+    const syllable = { ...decompose(char), choseong: preset }
+    const identity = identityOfSyllable(syllable)!
+    const faces = predictComponentFaces(identity, model, 'CH')!
+    const fit = fitNotoComponent({ part: 'CH', jamo: preset, faces, glyphId: char })
+    expect(fit.ok).toBe(true)
+    if (!fit.ok) return
+    const ink = inkOfComponentFit(fit.fit)
+    expect(ink.ok ? 'ok' : ink.message).toBe('ok')
   })
 
   it('Δ는 네 변에 더해지고 상자는 저장값이 아니라 파생값이다', async () => {

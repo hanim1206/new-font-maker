@@ -354,13 +354,16 @@ export function applyRailEdits(fit: MedialFitResult, railsEm: Readonly<Record<st
 
 /**
  * 혼합 홀자(ㅘ 등)는 측정 역할 이름으로 가로부(JU_H)·세로부(JU_V)를 가른다.
- * 가로부 = ㅗ·ㅜ·ㅡ 쪽: baseStem(줄기)·lowerBeam(ㅘ·ㅙ·ㅝ·ㅞ의 보)·primaryBeam(ㅚ·ㅟ·ㅢ의 보). 나머지 기둥·윗보는 세로부.
+ * 가로부 = ㅗ·ㅜ·ㅡ 쪽: baseStem(줄기) + 줄기에 붙은 보 + primaryBeam(ㅚ·ㅟ·ㅢ의 보). 나머지 기둥·보는 세로부.
+ * 보 이름은 y 위치(upper/lower)라 ㅗ 계열(ㅘ·ㅙ)은 아래보가 줄기 보이고 ㅜ 계열(ㅝ·ㅞ)은 윗보가 줄기 보다.
+ * medialJamo가 없으면 ㅗ 계열로 본다.
  */
-export function splitMixedMedialRoles<T>(measurements: Readonly<Record<string, T>>): { horizontal: Record<string, T>; vertical: Record<string, T> } {
+export function splitMixedMedialRoles<T>(measurements: Readonly<Record<string, T>>, medialJamo?: string): { horizontal: Record<string, T>; vertical: Record<string, T> } {
+  const stemBeam = medialJamo && 'ㅝㅞ'.includes(medialJamo) ? 'upperBeam' : 'lowerBeam'
   const horizontal: Record<string, T> = {}
   const vertical: Record<string, T> = {}
   for (const [roleId, value] of Object.entries(measurements)) {
-    if (roleId === 'baseStem' || roleId === 'lowerBeam' || roleId === 'primaryBeam') horizontal[roleId] = value
+    if (roleId === 'baseStem' || roleId === stemBeam || roleId === 'primaryBeam') horizontal[roleId] = value
     else vertical[roleId] = value
   }
   return { horizontal, vertical }
