@@ -117,9 +117,75 @@ describe('fitNotoMedialMaster', () => {
     expect(applyRailEdits(fit, { ...fit.railsEm, 'center-x': fit.railsEm['outer-right'] + 0.01 }).ok).toBe(false)
   })
 
-  it('혼합 홀자는 baseStem·lowerBeam을 가로부, 나머지를 세로부로 가른다', () => {
+  it('혼합 홀자는 baseStem·lowerBeam·primaryBeam을 가로부, 기둥·윗보를 세로부로 가른다', () => {
     const split = splitMixedMedialRoles({ baseStem: 1, lowerBeam: 2, outerPillar: 3, upperBeam: 4 })
     expect(Object.keys(split.horizontal)).toEqual(['baseStem', 'lowerBeam'])
     expect(Object.keys(split.vertical)).toEqual(['outerPillar', 'upperBeam'])
+    // ㅚ·ㅟ·ㅢ의 primaryBeam은 ㅗ·ㅜ·ㅡ의 보다. ㅢ는 primaryBeam 하나가 가로부 전부다.
+    const ui = splitMixedMedialRoles({ outerPillar: 1, primaryBeam: 2 })
+    expect(Object.keys(ui.horizontal)).toEqual(['primaryBeam'])
+    expect(Object.keys(ui.vertical)).toEqual(['outerPillar'])
+  })
+
+  it('획 끝이 가장자리에서 부동소수 잡음만큼 떨어져 있어도 그 rail에 걸린다', () => {
+    // 보 둘의 끝이 1e-6 차이. 하나는 slot 오른끝, 다른 하나는 그보다 1e-6 안쪽 — 둘 다 outer-right.
+    const outcome = fitNotoMedialMaster({
+      jamoId: 'ㅑ', role: 'JU_VERTICAL',
+      measurements: {
+        outerPillar: { face: 0.75, faceSide: 'right', orientation: 'vertical', visibleSpans: [{ from: 0.05, to: 0.52 }] },
+        upperBeam: { face: 0.17, faceSide: 'top', orientation: 'horizontal', visibleSpans: [{ from: 0.69, to: 0.8809199999999999 }] },
+        lowerBeam: { face: 0.35, faceSide: 'top', orientation: 'horizontal', visibleSpans: [{ from: 0.69, to: 0.880921 }] },
+      },
+      thickness: { outerPillar: 0.08, upperBeam: 0.07, lowerBeam: 0.07 },
+    })
+    expect(outcome.ok).toBe(true)
+    if (!outcome.ok) return
+    expect(outcome.fit.auxRails).toEqual([])
+    expect(outcome.fit.bindings.map((b) => b.toRail)).toEqual(['outer-bottom', 'outer-right', 'outer-right'])
+    expect(validateRoleConstructionScope(outcome.fit.scope).ok).toBe(true)
+  })
+
+  it('ㅖ: 짧은 안기둥 끝은 core 5개에 안 들어가면 보조 rail에 매고, minGap 안이면 이웃 rail에 붙인다', () => {
+    // 안기둥이 바깥기둥보다 위로 20u 짧고(보조 rail), 아래로 4u 짧다(outer-bottom에 붙음. slot 높이 0.5 × minGap 0.01 = 5u).
+    const outcome = fitNotoMedialMaster({
+      jamoId: 'ㅖ', role: 'JU_VERTICAL',
+      measurements: {
+        innerPillar: { face: 0.62, faceSide: 'right', orientation: 'vertical', visibleSpans: [{ from: 0.07, to: 0.546 }] },
+        outerPillar: { face: 0.79, faceSide: 'right', orientation: 'vertical', visibleSpans: [{ from: 0.05, to: 0.55 }] },
+        upperBeam: { face: 0.19, faceSide: 'top', orientation: 'horizontal', visibleSpans: [{ from: 0.41, to: 0.58 }] },
+        lowerBeam: { face: 0.35, faceSide: 'top', orientation: 'horizontal', visibleSpans: [{ from: 0.41, to: 0.58 }] },
+      },
+      thickness: { innerPillar: 0.078, outerPillar: 0.079, upperBeam: 0.066, lowerBeam: 0.067 },
+    })
+    expect(outcome.ok).toBe(true)
+    if (!outcome.ok) return
+    const { fit } = outcome
+    // y축: 보 중심 둘 → inner-top·inner-bottom, 안기둥 위끝 → 보조 rail, 안기둥 아래끝 → outer-bottom.
+    expect(fit.auxRails).toEqual(['aux-y-1'])
+    expect(fit.railsEm['aux-y-1']).toBe(0.07)
+    const inner = fit.bindings.find((b) => b.roleId === 'innerPillar')!
+    expect(inner).toMatchObject({ centerRail: 'inner-left', fromRail: 'aux-y-1', toRail: 'outer-bottom' })
+    expect(fit.strokes.find((s) => s.roleId === 'innerPillar')!.to).toBe(0.55)
+    // x축: 기둥 둘 → inner-left·inner-right, 보 시작 = slot 왼끝, 보 끝 = 안기둥 중심(접합).
+    const upper = fit.bindings.find((b) => b.roleId === 'upperBeam')!
+    expect(upper).toMatchObject({ fromRail: 'outer-left', toRail: 'inner-left' })
+    // 보조 rail은 그리드에 값 순서대로 들어가고 편집 목록에도 나온다.
+    const yIds = fit.grid.yRails.map((rail) => rail.id.split(':').at(-1))
+    expect(yIds).toEqual(['outer-top', 'aux-y-1', 'inner-top', 'center-y', 'inner-bottom', 'outer-bottom'])
+    expect(fit.grid.yRails.find((rail) => rail.id.endsWith('aux-y-1'))).toMatchObject({ kind: 'auxiliary' })
+    expect(boundRailRoles(fit)).toContain('aux-y-1')
+    expect(validateRoleConstructionScope(fit.scope).ok).toBe(true)
+    // 리졸버·잉크 파이프라인도 보조 rail 앵커를 그대로 읽는다.
+    const primitives = resolveShapeGlyphInkPrimitives({ source: fit.scope, masterId: fit.master.id, glyphId: 'ㅖ', part: 'JU', slot: fit.slot, weightMultiplier: 1 })
+    expect(primitives.ok).toBe(true)
+    if (!primitives.ok) return
+    expect(materializeFinalGlyphInk(primitives.primitives, STYLE, { unitsPerEm: 1000, maxCurveErrorFontUnits: 0.5 }).ok).toBe(true)
+    // 보조 rail을 옮기면 안기둥 위끝만 따라온다.
+    const edited = applyRailEdits(fit, { ...fit.railsEm, 'aux-y-1': 0.09 })
+    expect(edited.ok).toBe(true)
+    if (!edited.ok) return
+    expect(edited.fit.strokes.find((s) => s.roleId === 'innerPillar')!.from).toBe(0.09)
+    expect(edited.fit.strokes.find((s) => s.roleId === 'outerPillar')!.from).toBe(0.05)
+    expect(validateRoleConstructionScope(edited.fit.scope).ok).toBe(true)
   })
 })

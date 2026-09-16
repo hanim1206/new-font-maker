@@ -11,7 +11,6 @@ import type { ComponentFitPart, RenderedComponentPart } from './notoComponentFit
 import type { ComponentFaces } from '../src/services/notoComponentFit'
 import { editableRailsOf, fitMedialForGlyph, renderMedialPart, roleLabel } from './notoMedialFitView'
 import type { EditableRail, MedialFitView, RenderedMedialPart } from './notoMedialFitView'
-import type { CoreRailRole } from '../src/services/notoMedialMasterFit'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
 import type { NotoPresetGlyph, NotoPresetModelBundle, NotoPresetXorMap } from './notoPresetGlyphs'
 import { RulerStrip } from './workspace/RulerStrip'
@@ -305,7 +304,8 @@ function ComponentStats({ parts, rendered, approved }: { parts: ComponentFitPart
   </div>
 }
 
-type RailsByPart = (Record<CoreRailRole, number> | undefined)[]
+// 홀자 마스터 rail 키(core 역할 또는 보조 rail) → em 값.
+type RailsByPart = (Record<string, number> | undefined)[]
 
 function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
   const codepoint = glyph.identity.codepoint
@@ -349,7 +349,7 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
     }
     const part = fitView?.parts[target.partIndex]
     if (!part?.fit) return
-    const proposed = { ...(railsByPart[target.partIndex] ?? part.fit.railsEm), [target.role]: snapped } as Record<CoreRailRole, number>
+    const proposed: Record<string, number> = { ...(railsByPart[target.partIndex] ?? part.fit.railsEm), [target.role]: snapped }
     const check = renderMedialPart(part, proposed)
     if (!check.path) { setError(check.message ?? '기준선을 그 자리에 둘 수 없습니다.'); return }
     setError('')

@@ -1,12 +1,11 @@
 import { finalGlyphInkToSvgPath } from '../src/services/finalGlyphInk'
 import { inkOfFit, medialInputFromPrediction, reportFitResult } from '../src/services/notoFitReport'
 import type { RailError } from '../src/services/notoFitReport'
-import { applyRailEdits, boundRailRoles, fitNotoMedialMaster, splitMixedMedialRoles } from '../src/services/notoMedialMasterFit'
-import type { CoreRailRole, MedialFitInput, MedialFitResult, MedialRoleMeasurement } from '../src/services/notoMedialMasterFit'
+import { applyRailEdits, boundRailRoles, fitNotoMedialMaster, fitRailAxis, splitMixedMedialRoles } from '../src/services/notoMedialMasterFit'
+import type { FitRailKey, MedialFitInput, MedialFitResult, MedialRoleMeasurement } from '../src/services/notoMedialMasterFit'
 import { selectNotoOutlineContours } from '../src/services/notoOutlineInk'
 import type { NotoOutline } from '../src/services/notoOutlineInk'
 import { MEDIAL_ROLE_SETS, predictNotoTarget } from '../src/services/notoVariationModel'
-import { CORE_X_RAIL_ROLES } from '../src/services/railGridResolver'
 import type { ApprovedNotoInput } from './notoBoundMaster'
 import type { CorpusIdentity } from './notoCorpus'
 import type { NotoPresetModelBundle } from './notoPreset'
@@ -50,8 +49,8 @@ export interface RenderedMedialPart {
 export interface EditableRail {
   id: string
   partIndex: number
-  /** 홀자 마스터면 core rail 역할, 닿자 박스면 변 이름(left/right/top/bottom). */
-  role: CoreRailRole | 'left' | 'right' | 'top' | 'bottom'
+  /** 홀자 마스터면 rail 키(core 역할 또는 보조 rail), 닿자 박스면 변 이름(left/right/top/bottom). */
+  role: FitRailKey | 'left' | 'right' | 'top' | 'bottom'
   axis: 'x' | 'y'
   label: string
   value: number
@@ -105,7 +104,7 @@ export function fitMedialForGlyph(input: {
 }
 
 /** rail 값(em, 없으면 모델 값)으로 획을 놓고 잉크·비교 수치를 낸다. */
-export function renderMedialPart(part: MedialFitPart, railsEm?: Readonly<Record<CoreRailRole, number>>): RenderedMedialPart {
+export function renderMedialPart(part: MedialFitPart, railsEm?: Readonly<Record<string, number>>): RenderedMedialPart {
   if (!part.fit) return { railErrors: [], message: part.message }
   const placed = railsEm ? applyRailEdits(part.fit, railsEm) : { ok: true as const, fit: part.fit }
   if (!placed.ok) return { railErrors: [], message: placed.message }
@@ -121,7 +120,7 @@ export function renderMedialPart(part: MedialFitPart, railsEm?: Readonly<Record<
 }
 
 /** 편집 가능한 rail 목록. 획이 매인 core rail만, 사람이 읽을 이름으로. */
-export function editableRailsOf(parts: readonly MedialFitPart[], railsByPart: readonly (Readonly<Record<CoreRailRole, number>> | undefined)[]): EditableRail[] {
+export function editableRailsOf(parts: readonly MedialFitPart[], railsByPart: readonly (Readonly<Record<string, number>> | undefined)[]): EditableRail[] {
   const rails: EditableRail[] = []
   parts.forEach((part, partIndex) => {
     const fit = part.fit
@@ -133,7 +132,7 @@ export function editableRailsOf(parts: readonly MedialFitPart[], railsByPart: re
       const kind = binding.centerRail === role ? '중심' : binding.fromRail === role ? '시작' : '끝'
       rails.push({
         id: `${partIndex}:${role}`, partIndex, role,
-        axis: (CORE_X_RAIL_ROLES as readonly string[]).includes(role) ? 'x' : 'y',
+        axis: fitRailAxis(role),
         label: `${partLabel}${roleLabel(binding.roleId)} ${kind}`,
         value: current[role], original: fit.railsEm[role],
       })
