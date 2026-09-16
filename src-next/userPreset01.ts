@@ -4,8 +4,10 @@ import type { JamoData, StrokeDataV2 } from '../src/types'
 type JamoType = JamoData['type']
 export type JamoPresetMap = Record<JamoType, Record<string, JamoData>>
 
-function cloneBase(type: JamoType, char: string): JamoData {
-  return structuredClone((baseJamos[type] as Record<string, JamoData>)[char])
+type BaseJamoMaps = Record<JamoType, Record<string, JamoData>>
+
+function cloneBase(base: BaseJamoMaps, type: JamoType, char: string): JamoData {
+  return structuredClone(base[type][char])
 }
 
 function stroke(jamo: JamoData, id: string): StrokeDataV2 {
@@ -15,10 +17,11 @@ function stroke(jamo: JamoData, id: string): StrokeDataV2 {
   return found
 }
 
-function createJamoPreset(): JamoPresetMap {
-  const choseong = Object.fromEntries(['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅇ', 'ㅋ', 'ㅎ'].map((char) => [char, cloneBase('choseong', char)]))
-  const jungseong = Object.fromEntries(['ㅏ', 'ㅔ', 'ㅘ', 'ㅜ', 'ㅝ', 'ㅡ'].map((char) => [char, cloneBase('jungseong', char)]))
-  const jongseong = Object.fromEntries(['ㄹ', 'ㅎ'].map((char) => [char, cloneBase('jongseong', char)]))
+/** 기본 획 위에 사용자 프리셋 01의 점 편집을 얹는다. 기본 획을 바꿔 넣으면(옛 기본 고정 테스트 등) 그 위에 얹는다. */
+export function createUserPreset01(base: BaseJamoMaps = baseJamos as unknown as BaseJamoMaps): JamoPresetMap {
+  const choseong = Object.fromEntries(['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅇ', 'ㅋ', 'ㅎ'].map((char) => [char, cloneBase(base, 'choseong', char)]))
+  const jungseong = Object.fromEntries(['ㅏ', 'ㅔ', 'ㅘ', 'ㅜ', 'ㅝ', 'ㅡ'].map((char) => [char, cloneBase(base, 'jungseong', char)]))
+  const jongseong = Object.fromEntries(['ㄹ', 'ㅎ'].map((char) => [char, cloneBase(base, 'jongseong', char)]))
 
   stroke(choseong['ㄱ'], 'ㄱ-1').points[2] = { x: .92, y: 1, handleIn: { x: .995, y: .585 } }
   stroke(choseong['ㄴ'], 'ㄴ-1').points[2] = { x: .995, y: .95, handleIn: { x: .67, y: .98 } }
@@ -63,4 +66,4 @@ function createJamoPreset(): JamoPresetMap {
   return { choseong, jungseong, jongseong }
 }
 
-export const USER_PRESET_01_JAMOS = createJamoPreset()
+export const USER_PRESET_01_JAMOS = createUserPreset01()

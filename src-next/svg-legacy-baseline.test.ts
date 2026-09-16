@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import fixture from './fixtures/legacy-svg-centerlines-v1.json'
+import legacyJamos from '../src/data/fixtures/baseJamosLegacy2026-02.json'
+import { createUserPreset01 } from './userPreset01'
+import type { JamoData } from '../src/types'
 import { LEGACY_CALIBRATION_LAYOUT_PROFILE_V1 } from '../src/data/legacyCalibrationLayoutProfileV1'
 import type { AnchorPoint, BoxConfig, DecomposedSyllable, LayoutSchema, Part } from '../src/types'
 import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
@@ -101,6 +104,10 @@ describe('기존 선 전용 SVG 의미 baseline', () => {
       import('../src/utils/hangulUtils'),
     ])
     const layout = useLayoutStore.getState()
+    // 옛 기본 획(2026-02) + 사용자 프리셋 01. baseline fixture는 그때 획으로 만든 것이다.
+    const legacy = legacyJamos as unknown as Record<'choseong' | 'jungseong' | 'jongseong', Record<string, JamoData>>
+    const preset = createUserPreset01(legacy)
+    useJamoStore.setState({ choseong: { ...legacy.choseong, ...preset.choseong }, jungseong: { ...legacy.jungseong, ...preset.jungseong }, jongseong: { ...legacy.jongseong, ...preset.jongseong } })
     const jamos = useJamoStore.getState()
     const style = useGlobalStyleStore.getState().style
     expect(style.strokeStyle).toMatchObject({ mode: 'brush', brush: { tip: 'round' } })

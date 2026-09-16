@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import baseJamos from '../src/data/baseJamos.json'
+// 옛 기본 획(2026-02) 고정. ㄱ 직각 골격을 전제한 기하 테스트다.
+import baseJamos from '../src/data/fixtures/baseJamosLegacy2026-02.json'
 import type { JamoData, StrokeDataV2 } from '../src/types'
 import { applyComponentPlacementProfile } from '../src/data/componentPlacementProfiles'
 import { fitStrokesToBox, getJamoRenderBox, measureJamoGeometry } from '../src/utils/jamoGeometry'

@@ -1,10 +1,11 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import baseJamos from '../data/baseJamos.json'
+// 옛 기본 획(2026-02)에 고정한다. 기본 획은 Noto 골격 다듬기로 바뀌지만 이 컴파일러 계약은 그때 획 기준이다.
+import baseJamos from '../data/fixtures/baseJamosLegacy2026-02.json'
 import basePresets from '../data/basePresets.json'
 import { LEGACY_CALIBRATION_LAYOUT_PROFILE_V1 } from '../data/legacyCalibrationLayoutProfileV1'
 import type { LayoutSchema, LayoutType } from '../types'
 import { PRESET_SOURCE_MANIFEST } from '../../src-next/presetCandidateSource'
-import { USER_PRESET_01_JAMOS } from '../../src-next/userPreset01'
+import { createUserPreset01 } from '../../src-next/userPreset01'
 import {
   compileNeutralGothicNotoCandidate,
   createPresetCandidateSeedSchemas,
@@ -18,6 +19,7 @@ import {
 
 const BASE_SCHEMAS = basePresets.schemas as unknown as Record<LayoutType, LayoutSchema>
 const BASE_JAMOS = baseJamos as unknown as PresetCandidateJamoMaps
+const USER_PRESET_01_JAMOS = createUserPreset01(BASE_JAMOS)
 const JAMO_MAPS: PresetCandidateJamoMaps = {
   choseong: { ...BASE_JAMOS.choseong, ...USER_PRESET_01_JAMOS.choseong },
   jungseong: { ...BASE_JAMOS.jungseong, ...USER_PRESET_01_JAMOS.jungseong },

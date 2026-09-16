@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import legacyJamos from '../src/data/fixtures/baseJamosLegacy2026-02.json'
+import type { JamoData } from '../src/types'
 import type { BoxConfig, StrokeDataV2 } from '../src/types'
 import type { Contour } from '../src/services/strokeToOutline'
 import { strokeToContours } from '../src/services/strokeToOutline'
@@ -112,6 +114,9 @@ describe('CFF 컨투어 정규화와 겹침 제거', () => {
       removeItem: (key: string) => memory.delete(key),
     })
     const { collectGlyphDataForChar } = await import('../src/services/fontExportUtils')
+    // 가로획 왼끝이 세로획 위에 놓이는 옛 기본 ㅂ(2026-02)으로 교차부를 본다. 다듬은 기본 ㅂ은 획 끝 위치가 다르다.
+    const { useJamoStore } = await import('../src/stores/jamoStore')
+    useJamoStore.setState({ choseong: { ...useJamoStore.getState().choseong, ㅂ: structuredClone((legacyJamos.choseong as Record<string, JamoData>)['ㅂ']) } })
     const glyph = collectGlyphDataForChar('ㅂ')
     if (!glyph) throw new Error('ㅂ 출력 데이터를 만들 수 없습니다.')
     const groups = glyph.strokes.map((resolved) => strokeToContours(resolved.stroke, resolved.box, UPM, {

@@ -3,6 +3,8 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import approved from '../../reference-data/preset-candidates/noto-approved-guide-inputs.v1.json'
 import { CHOSEONG_MAP } from '../data/Hangul'
+// 직각 ㄱ으로 상자 산술을 검증한다. 기본 ㄱ은 Noto 골격 다듬기로 다리가 기울어 옛 기본 획(2026-02)을 쓴다.
+import legacyJamos from '../data/fixtures/baseJamosLegacy2026-02.json'
 import type { JamoData } from '../types'
 import { componentBoxFromFaces, fitNotoComponent, inkOfComponentFit, reportComponentFit } from './notoComponentFit'
 import type { ComponentFitReport } from './notoComponentFit'
@@ -19,7 +21,7 @@ interface ApprovedCase {
   }
 }
 
-const GIYEOK = CHOSEONG_MAP['ㄱ'] as JamoData
+const GIYEOK = (legacyJamos.choseong as Record<string, JamoData>)['ㄱ']
 
 describe('componentBoxFromFaces', () => {
   it('잉크 바깥면이 faces에 닿도록 중심선 상자를 두께 절반 안쪽에 둔다', () => {

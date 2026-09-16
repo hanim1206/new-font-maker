@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { CHOSEONG_MAP } from '../src/data/Hangul'
+// 옛 기본 획(2026-02) 고정. 직각 ㄱ·ㄴ의 끝점 방향을 읽는 테스트다.
+import legacyJamos from '../src/data/fixtures/baseJamosLegacy2026-02.json'
+import type { JamoData } from '../src/types'
+
+const CHOSEONG_MAP = legacyJamos.choseong as unknown as Record<string, JamoData>
 import { analyzeTerminal, inwardTerminalAngle, writingTerminalAngle, writingTerminalSides } from './ruleLabMetadata'
 
 describe('형태 규칙 실험실 끝점 분석', () => {
