@@ -5,7 +5,6 @@ import type { JamoData, JamoOverride, Padding } from '../types'
 import { migrateJamoData, needsMigration } from '../utils/strokeMigration'
 import baseJamos from '../data/baseJamos.json'
 import { createDebouncedStorage } from '../utils/debouncedStorage'
-import { USER_PRESET_01_JAMOS } from '../../src-next/userPreset01'
 
 const STORAGE_KEY = 'font-maker-jamo-data'
 const rawStorage = createDebouncedStorage(300)
@@ -166,11 +165,12 @@ function migrateMap(jamoMap: Record<string, JamoData>): Record<string, JamoData>
   return result
 }
 
-// baseJamos.json에서 초기 데이터 로드
+// baseJamos.json에서 초기 데이터 로드. 기본 프리셋 = Noto 고스트에 맞춘 골격(skeletonFit) 그대로.
+// 옛 직각 골격 위의 손편집(userPreset01)은 더 이상 덮지 않는다 — Noto 골격의 핸들·변형을 지워 버린다.
 const BASE_JAMOS = {
-  choseong: { ...(baseJamos.choseong as Record<string, JamoData>), ...USER_PRESET_01_JAMOS.choseong },
-  jungseong: { ...(baseJamos.jungseong as Record<string, JamoData>), ...USER_PRESET_01_JAMOS.jungseong },
-  jongseong: { ...(baseJamos.jongseong as Record<string, JamoData>), ...USER_PRESET_01_JAMOS.jongseong },
+  choseong: baseJamos.choseong as Record<string, JamoData>,
+  jungseong: baseJamos.jungseong as Record<string, JamoData>,
+  jongseong: baseJamos.jongseong as Record<string, JamoData>,
 }
 
 export const useJamoStore = create<JamoState & JamoActions>()(

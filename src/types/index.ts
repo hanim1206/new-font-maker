@@ -1709,9 +1709,17 @@ export interface JamoContextualInkSafety {
   minimumGap: number
 }
 
+/** 홀자 계열: 오른홀자(가)·아래홀자(고)·혼합(과). 닿자 골격이 계열마다 다르다. */
+export type MedialFamily = 'right' | 'bottom' | 'mixed'
+
 export interface JamoData {
   char: string
   type: 'choseong' | 'jungseong' | 'jongseong'
+  /**
+   * 문맥 계열별 `strokes` 변형(닿자용). 기본 프리셋이 Noto 골격에 맞춰 넣는다.
+   * 렌더·잉크·편집 겨냥은 `strokesForFamily`로 고르고, 사용자가 편집하면 그 문맥 획만 남고 지워진다.
+   */
+  contextStrokes?: Partial<Record<MedialFamily, StrokeDataV2[]>>
   // 기존 데이터는 slot-normalized(기본값). 실제 종횡비를 보존해 만든 신규 마스터만 ink-normalized.
   geometryMode?: JamoGeometryMode
   // 일반 자모는 strokes 사용, 혼합중성은 horizontalStrokes + verticalStrokes만 사용

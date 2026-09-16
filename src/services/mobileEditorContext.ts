@@ -1,4 +1,5 @@
 import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../data/Hangul'
+import { adoptFamilyStrokes, familyOfSyllable } from '../utils/jamoContextStrokes'
 import type {
   BoxConfig,
   DecomposedSyllable,
@@ -288,9 +289,13 @@ export function getRenderedStrokeTargets(
   syllable: DecomposedSyllable,
   boxes: Partial<Record<Part, BoxConfig>>
 ): RenderedStrokeTarget[] {
+  // 닿자는 이 문맥 계열의 획 변형을 겨냥하고, 편집은 그 변형을 기본 획으로 올린 자모에 적용한다.
+  const family = familyOfSyllable(syllable)
+  const cho = syllable.choseong ? adoptFamilyStrokes(syllable.choseong, family) : null
+  const jong = syllable.jongseong ? adoptFamilyStrokes(syllable.jongseong, family) : null
   const result = [
-    ...targets('CH', 'CH', syllable.choseong, syllable.choseong?.strokes, boxes.CH),
-    ...targets('JO', 'JO', syllable.jongseong, syllable.jongseong?.strokes, boxes.JO),
+    ...targets('CH', 'CH', cho, cho?.strokes, boxes.CH),
+    ...targets('JO', 'JO', jong, jong?.strokes, boxes.JO),
   ]
   if (boxes.JU && syllable.jungseong) {
     result.push(...targets('JU', 'JU', syllable.jungseong, syllable.jungseong.strokes, boxes.JU))

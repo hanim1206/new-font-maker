@@ -1,5 +1,6 @@
 import polygonClipping from 'polygon-clipping'
-import type { BoxConfig, DeepReadonly, InkRegion, JamoData, Part, ResolvedCenterlinePrimitive, ResolvedStrokeInkSource, StrokeDataV2, StrokeRenderStyle } from '../types'
+import type { BoxConfig, DeepReadonly, InkRegion, JamoData, MedialFamily, Part, ResolvedCenterlinePrimitive, ResolvedStrokeInkSource, StrokeDataV2, StrokeRenderStyle } from '../types'
+import { strokesForFamily } from '../utils/jamoContextStrokes'
 import { getStrokeCenterlineBounds } from '../utils/jamoGeometry'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
 import { multiPolygonArea, unionOf } from './notoFitReport'
@@ -19,6 +20,8 @@ export interface ComponentFitInput {
   jamo: DeepReadonly<JamoData>
   /** 혼합 홀자의 가로부·세로부처럼 채널 하나만 놓을 때. 없으면 strokes, 없으면 세로+가로 합. */
   channel?: 'horizontalStrokes' | 'verticalStrokes'
+  /** 닿자의 문맥 계열별 획 변형을 고를 때. */
+  family?: MedialFamily | null
   /** em 좌표 잉크 바깥면. */
   faces: ComponentFaces
   glyphId: string
@@ -43,11 +46,12 @@ const FIT_INK_STYLE: StrokeRenderStyle = { mode: 'brush', brush: { tip: 'round',
 const INK_OPTIONS = { unitsPerEm: 1000, maxCurveErrorFontUnits: 0.5 }
 const EPSILON = 1e-6
 
-export function componentStrokesOf(jamo: DeepReadonly<JamoData>, channel?: ComponentFitInput['channel']): StrokeDataV2[] {
-  // 리졸버(selectMixedChannel)와 같은 규칙: 채널이 있으면 그 채널, 없으면 strokes.
+export function componentStrokesOf(jamo: DeepReadonly<JamoData>, channel?: ComponentFitInput['channel'], family?: MedialFamily | null): StrokeDataV2[] {
+  // 리졸버(selectMixedChannel·selectGeneralChannels)와 같은 규칙: 채널이 있으면 그 채널, 없으면 문맥 계열 strokes.
+  const base = strokesForFamily(jamo, family)
   const strokes = channel
-    ? (jamo[channel]?.length ? jamo[channel] : jamo.strokes) ?? []
-    : jamo.strokes?.length ? jamo.strokes : [...(jamo.verticalStrokes ?? []), ...(jamo.horizontalStrokes ?? [])]
+    ? (jamo[channel]?.length ? jamo[channel] : base) ?? []
+    : base?.length ? base : [...(jamo.verticalStrokes ?? []), ...(jamo.horizontalStrokes ?? [])]
   return strokes.map((stroke) => structuredClone(stroke) as StrokeDataV2)
 }
 
@@ -115,7 +119,7 @@ function refineBoxToFaces(strokes: readonly StrokeDataV2[], box: BoxConfig, face
 }
 
 export function fitNotoComponent(input: ComponentFitInput): ComponentFitOutcome {
-  const strokes = componentStrokesOf(input.jamo, input.channel)
+  const strokes = componentStrokesOf(input.jamo, input.channel, input.family)
   if (!strokes.length) return { ok: false, message: `${input.jamo.char}: 앱 획이 없습니다.` }
   if (![input.faces.left, input.faces.right, input.faces.top, input.faces.bottom].every(Number.isFinite)) return { ok: false, message: '박스 네 변이 없습니다.' }
   const placed = componentBoxFromFaces(strokes, input.faces, input.weightMultiplier ?? 1)

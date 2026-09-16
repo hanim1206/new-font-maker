@@ -34,7 +34,6 @@ import {
   type PresetCompositionTarget,
 } from './presetCompositionInput'
 import { PRESET_SOURCE_MANIFEST, type PresetSourceElement } from './presetCandidateSource'
-import { USER_PRESET_01_JAMOS } from './userPreset01'
 import { createPresetCompositionGuideMaster } from '../src/services/presetCompositionGuideMaster'
 import { generatePresetGuideGlyph, selectPresetGuideComponentPath } from '../src/services/presetGuideGlyph'
 import styles from './PresetCandidateLabPage.module.css'
@@ -55,9 +54,9 @@ const DEFAULT_DISPLAY: DisplayContract = {
   advanceNormalization: false,
 }
 const CURRENT_JAMOS = {
-  choseong: { ...(baseJamos.choseong as Record<string, JamoData>), ...USER_PRESET_01_JAMOS.choseong },
-  jungseong: { ...(baseJamos.jungseong as Record<string, JamoData>), ...USER_PRESET_01_JAMOS.jungseong },
-  jongseong: { ...(baseJamos.jongseong as Record<string, JamoData>), ...USER_PRESET_01_JAMOS.jongseong },
+  choseong: baseJamos.choseong as Record<string, JamoData>,
+  jungseong: baseJamos.jungseong as Record<string, JamoData>,
+  jongseong: baseJamos.jongseong as Record<string, JamoData>,
 }
 const CURRENT_SCHEMAS = createCurrentPresetSchemas(BASE_PRESETS_SCHEMAS, LEGACY_CALIBRATION_LAYOUT_PROFILE_V1)
 const R4_STYLE: GlobalStyle = {

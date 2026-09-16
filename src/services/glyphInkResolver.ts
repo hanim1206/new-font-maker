@@ -9,10 +9,12 @@ import type {
   ResolvedGlyphInkResult,
   ResolvedStrokeInkSource,
   StrokeDataV2,
+  MedialFamily,
 } from '../types'
 import { resolveSyllableContextualInkSafety } from '../utils/contextualInkSafety'
 import { getJamoRenderBox } from '../utils/jamoGeometry'
 import { calculateBoxes } from '../utils/layoutCalculator'
+import { familyOfSyllable, strokesForFamily } from '../utils/jamoContextStrokes'
 
 const DEFAULT_HORIZONTAL_INK_BOUNDS = { min: 0, max: 1 } as const
 
@@ -79,12 +81,13 @@ function selectMixedChannel(
   }
 }
 
-function selectGeneralChannels(jamo: JamoData): SelectedPartStrokes | null {
-  if (jamo.strokes && jamo.strokes.length > 0) {
+function selectGeneralChannels(jamo: JamoData, family: MedialFamily | null): SelectedPartStrokes | null {
+  const strokes = strokesForFamily(jamo, family)
+  if (strokes && strokes.length > 0) {
     return {
       jamo,
-      strokes: jamo.strokes,
-      sources: jamo.strokes.map((stroke) => ({ stroke, channel: 'strokes' })),
+      strokes,
+      sources: strokes.map((stroke) => ({ stroke, channel: 'strokes' })),
     }
   }
 
@@ -118,7 +121,8 @@ function selectPartStrokes(
     : part === 'JU'
       ? syllable.jungseong
       : syllable.jongseong
-  return jamo ? selectGeneralChannels(jamo) : null
+  // 닿자는 홀자 계열별 획 변형이 있을 수 있다. 홀자 자신은 변형이 없다.
+  return jamo ? selectGeneralChannels(jamo, part === 'JU' ? null : familyOfSyllable(syllable)) : null
 }
 
 function primitiveId(source: ResolvedStrokeInkSource): string {

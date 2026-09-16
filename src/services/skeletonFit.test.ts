@@ -5,7 +5,7 @@ import { createNotoPresetReader } from '../../scripts/reference-lab/notoPresetAp
 import { CHOSEONG_LIST, CHOSEONG_MAP, JONGSEONG_LIST, JUNGSEONG_LIST, JUNGSEONG_MAP } from '../data/Hangul'
 import { modelIdentityOf } from './notoVariationModel'
 import type { NotoOutline } from './notoOutlineInk'
-import { buildSkeletonSample, fitSkeleton, meanXor, skeletonContextChars, skeletonParams } from './skeletonFit'
+import { buildSkeletonSample, fitSkeleton, fitSkeletonMultiStart, meanXor, skeletonContextChars, skeletonFamilyChars, skeletonParams, skeletonSeedVariants } from './skeletonFit'
 import type { SkeletonSample } from './skeletonFit'
 import type { JamoData } from '../types'
 import legacyJamos from '../data/fixtures/baseJamosLegacy2026-02.json'
@@ -46,11 +46,11 @@ function identityOfChar(char: string) {
 const MIXED = 'ㅘㅙㅚㅝㅞㅟㅢ'
 
 /** 골격을 볼 문맥 표본. 홀자는 문맥 목록은 'JU'로 뽑되 부품(JU·JU_H·JU_V)은 따로 준다. */
-async function samplesFor(part: 'CH' | 'JO' | 'JU' | 'JU_H' | 'JU_V', jamo: string): Promise<SkeletonSample[]> {
+async function samplesFor(part: 'CH' | 'JO' | 'JU' | 'JU_H' | 'JU_V', jamo: string, chars?: string[]): Promise<SkeletonSample[]> {
   const model = await RUN!.model()
   const map = await outlines()
   const listPart = part === 'CH' || part === 'JO' ? part : 'JU'
-  return skeletonContextChars(listPart, jamo).flatMap((char) => {
+  return (chars ?? skeletonContextChars(listPart, jamo)).flatMap((char) => {
     const outline = map.get(char)
     const sample = outline ? buildSkeletonSample({ char, identity: identityOfChar(char), part, outline, model }) : null
     return sample ? [sample] : []
@@ -98,6 +98,19 @@ describe.skipIf(!RUN)('골격 다듬기 — 모델', () => {
     }
   }, 120000)
 
+  it('ㄱ 가 계열: 다듬은 공용 골격에서 출발하면 갇히고, 옛 직각 골격을 출발점으로 더하면 벗어난다', async () => {
+    const samples = await samplesFor('CH', 'ㄱ', skeletonFamilyChars('right', 'ㄱ'))
+    const legacy = (legacyJamos.choseong as Record<string, JamoData>)['ㄱ']
+    expect(skeletonSeedVariants(legacy).length).toBe(2)
+    // 공용(6문맥 타협) 골격 = 현재 기본 ㄱ. 여기서 가 계열만 다시 fit하면 골짜기에 갇힌다.
+    const shared = CHOSEONG_MAP['ㄱ']
+    const stuck = fitSkeleton(shared, samples, { seedHandles: true, maxRounds: 4, minStep: 0.01 })
+    const multi = fitSkeletonMultiStart(shared, samples, { seedHandles: true, maxRounds: 4, minStep: 0.01, extraStarts: [legacy] })
+    console.log(`[skeleton ㄱ right] 공용 출발 ${(stuck.after * 100).toFixed(1)}% · 옛 골격 추가 ${(multi.after * 100).toFixed(1)}%`)
+    expect(multi.after).toBeLessThanOrEqual(stuck.after)
+    expect(multi.after).toBeLessThan(0.3)
+  }, 300000)
+
   it('ㅅ 첫닿자: 좌표 하강이 평균 xor를 줄이고 획 수·앵커 수는 그대로다', async () => {
     const samples = await samplesFor('CH', 'ㅅ')
     expect(samples.length).toBeGreaterThanOrEqual(4)
@@ -130,14 +143,40 @@ describe.skipIf(!RUN || !process.env.NOTO_SKELETON_FIT)('골격 다듬기 — �
       ...JUNGSEONG_LIST.flatMap((jamo) => MIXED.includes(jamo) ? [{ part: 'JU_H' as const, jamo, map: base.jungseong }, { part: 'JU_V' as const, jamo, map: base.jungseong }] : [{ part: 'JU' as const, jamo, map: base.jungseong }]),
       ...JONGSEONG_LIST.filter(Boolean).map((jamo) => ({ part: 'JO' as const, jamo, map: base.jongseong })),
     ].filter((job) => !only || only.includes(job.part))
+      // NOTO_SKELETON_JAMOS=ㄱ,ㅋ 처럼 자모 몇 개만 돌릴 때.
+      .filter((job) => !process.env.NOTO_SKELETON_JAMOS || process.env.NOTO_SKELETON_JAMOS.split(',').includes(job.jamo))
     for (const job of jobs) {
       const samples = await samplesFor(job.part, job.jamo)
       const seed = job.map[job.jamo]
       if (!seed || samples.length < 3) { console.log(`[skeleton] ${job.part} ${job.jamo}: 문맥 부족(${samples.length}) — 건너뜀`); continue }
-      const result = fitSkeleton(seed, samples, { channel: channelOf[job.part], seedHandles: true })
+      const legacySeed = (legacyJamos[job.part === 'CH' ? 'choseong' : job.part === 'JO' ? 'jongseong' : 'jungseong'] as Record<string, JamoData>)[job.jamo]
+      const extraStarts = legacySeed && JSON.stringify(legacySeed) !== JSON.stringify(seed) ? [legacySeed] : []
+      const result = fitSkeletonMultiStart(seed, samples, { channel: channelOf[job.part], seedHandles: true, extraStarts, maxMillis: 30_000 })
       if (result.after < result.before) job.map[job.jamo] = result.jamo
       report[`${job.part}:${job.jamo}`] = { part: job.part, before: Number(result.before.toFixed(4)), after: Number(result.after.toFixed(4)), evaluations: result.evaluations, contexts: samples.map((s) => s.char) }
       console.log(`[skeleton] ${job.part} ${job.jamo}: ${(result.before * 100).toFixed(1)}% → ${(result.after * 100).toFixed(1)}% (${result.evaluations} evals, ${((Date.now() - started) / 1000).toFixed(0)}s)`)
+      // 첫닿자는 홀자 계열별 변형도 본다. 공용 골격보다 2%p 넘게 좋아질 때만 contextStrokes에 둔다.
+      if (job.part !== 'CH') continue
+      const shared = job.map[job.jamo]
+      const families = (process.env.NOTO_SKELETON_FAMILIES?.split(',') as ('right' | 'bottom' | 'mixed')[] | undefined) ?? ['right', 'bottom', 'mixed']
+      // 이번에 돌리는 계열만 새로 정한다. 다른 계열의 변형은 남긴다.
+      for (const family of families) delete shared.contextStrokes?.[family]
+      if (shared.contextStrokes && Object.keys(shared.contextStrokes).length === 0) delete shared.contextStrokes
+      for (const family of families) {
+        const familySamples = await samplesFor('CH', job.jamo, skeletonFamilyChars(family, job.jamo))
+        if (familySamples.length < 3) continue
+        const sharedXor = meanXor(shared, familySamples)
+        // 공용 골격이 이미 그 계열에서 충분히 맞으면(25% 미만) 변형을 안 만든다. 획 많은 자모(ㅃ·ㅉ)는 계열 fit이 십수 분 걸린다.
+        if (Number.isFinite(sharedXor) && sharedXor < 0.25) { console.log(`[skeleton]   ${job.jamo} ${family}: 공용 ${(sharedXor * 100).toFixed(1)}% — 충분, 건너뜀`); continue }
+        const variant = fitSkeletonMultiStart(shared, familySamples, { seedHandles: true, extraStarts: legacySeed ? [legacySeed] : [], maxMillis: 12_000 })
+        const keep = Number.isFinite(sharedXor) && variant.after <= sharedXor - 0.02
+        if (keep) (shared.contextStrokes ??= {})[family] = variant.jamo.strokes
+        report[`${job.part}:${job.jamo}:${family}`] = { part: job.part, before: Number(sharedXor.toFixed(4)), after: Number((keep ? variant.after : sharedXor).toFixed(4)), evaluations: variant.evaluations, contexts: familySamples.map((s) => s.char) }
+        console.log(`[skeleton]   ${job.jamo} ${family}: 공용 ${(sharedXor * 100).toFixed(1)}% → 변형 ${(variant.after * 100).toFixed(1)}%${keep ? ' ✓' : ' (버림)'}`)
+      }
+      // 자모 하나 끝날 때마다 써 둔다. 중간에 끊어도 진행분이 남는다.
+      base.exportedAt = new Date().toISOString()
+      writeFileSync(file, JSON.stringify(base, null, 2) + '\n')
     }
     base.exportedAt = new Date().toISOString()
     writeFileSync(file, JSON.stringify(base, null, 2) + '\n')
@@ -145,7 +184,7 @@ describe.skipIf(!RUN || !process.env.NOTO_SKELETON_FIT)('골격 다듬기 — �
     const reportFile = path.join(CORPUS, source.runId, 'analysis', 'skeleton-fit-report-v1.json')
     const previous = existsSync(reportFile) ? (JSON.parse(readFileSync(reportFile, 'utf8')) as { results?: typeof report }).results ?? {} : {}
     writeFileSync(reportFile, JSON.stringify({ schema: 'skeleton-fit-report-v1', generatedAt: new Date().toISOString(), meaning: '자모 기본 획을 모델 상자에 놓고 Noto 부품 잉크(네 변으로 자름)와의 평균 xor를 좌표 하강으로 줄인 결과. 두께·획 수 고정. 부품 일부만 돌리면 나머지는 이전 결과를 유지한다.', results: { ...previous, ...report } }, null, 2))
-    expect(Object.keys(report).length).toBeGreaterThan(only ? 5 : 30)
+    expect(Object.keys(report).length).toBeGreaterThan(only || process.env.NOTO_SKELETON_JAMOS ? 0 : 30)
     // 기본 획 파일이 여전히 읽히는지.
     expect(meanXor(base.choseong['ㅅ'], await samplesFor('CH', 'ㅅ'))).toBeLessThan(1)
   }, 60 * 60 * 1000)

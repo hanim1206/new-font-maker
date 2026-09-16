@@ -330,9 +330,18 @@ function validateJamoMap(
       continue
     }
     exactKeys(jamo, [
-      'char', 'type', 'geometryMode', 'strokes', 'horizontalStrokes', 'verticalStrokes',
+      'char', 'type', 'geometryMode', 'strokes', 'horizontalStrokes', 'verticalStrokes', 'contextStrokes',
       'contextualInkSafety', 'padding', 'horizontalPadding', 'verticalPadding', 'overrides',
     ], ['char', 'type'], path, issues)
+    if (jamo.contextStrokes !== undefined) {
+      if (!isRecord(jamo.contextStrokes)) push(issues, 'invalid-field', `${path}.contextStrokes`, 'contextStrokes는 객체여야 합니다.')
+      else {
+        exactKeys(jamo.contextStrokes, ['right', 'bottom', 'mixed'], [], `${path}.contextStrokes`, issues)
+        for (const family of ['right', 'bottom', 'mixed'] as const) {
+          if (jamo.contextStrokes[family] !== undefined) validateStrokeArray(jamo.contextStrokes[family], `${path}.contextStrokes.${family}`, issues, allowLegacy)
+        }
+      }
+    }
     if (jamo.char !== char) push(issues, 'invalid-field', `${path}.char`, 'JamoData char가 map key와 다릅니다.')
     if (jamo.type !== type) push(issues, 'invalid-field', `${path}.type`, 'JamoData type이 map과 다릅니다.')
     if (jamo.geometryMode !== undefined && jamo.geometryMode !== 'slot-normalized' && jamo.geometryMode !== 'ink-normalized') push(issues, 'invalid-field', `${path}.geometryMode`, 'geometryMode가 유효하지 않습니다.')

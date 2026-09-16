@@ -4,7 +4,8 @@ import type { ComponentFaces, FaceError } from '../src/services/notoComponentFit
 import { selectNotoOutlineContours } from '../src/services/notoOutlineInk'
 import type { NotoOutline } from '../src/services/notoOutlineInk'
 import { useJamoStore } from '../src/stores/jamoStore'
-import type { JamoData, Part } from '../src/types'
+import type { JamoData, MedialFamily, Part } from '../src/types'
+import { medialFamilyOf } from '../src/utils/jamoContextStrokes'
 import type { ApprovedNotoInput } from './notoBoundMaster'
 import type { EditableRail } from './notoMedialFitView'
 import type { ContextBoxResolution } from '../src/services/contextBoxResolver'
@@ -19,6 +20,8 @@ export interface ComponentFitPart {
   part: Extract<Part, 'CH' | 'JO'>
   jamoId: string
   jamo?: JamoData
+  /** 문맥 계열. 닿자 획 변형 선택용. 없으면 기본 획. */
+  family?: MedialFamily | null
   /** 모델이 예측한 네 변(em). 편집의 출발점. */
   faces?: ComponentFaces
   ghostOutline?: NotoOutline
@@ -61,15 +64,16 @@ export function fitComponentsForGlyph(input: {
 }): ComponentFitPart[] {
   const store = useJamoStore.getState()
   const { identity } = input.context
+  const family = medialFamilyOf(identity.medialJamo)
   const jobs: { part: 'CH' | 'JO'; jamo: JamoData | undefined; jamoId: string }[] = [
     { part: 'CH', jamo: store.choseong[identity.initialJamo], jamoId: identity.initialJamo },
     ...(identity.finalJamo ? [{ part: 'JO' as const, jamo: store.jongseong[identity.finalJamo], jamoId: identity.finalJamo }] : []),
   ]
   return jobs.map((job) => {
-    if (!job.jamo) return { part: job.part, jamoId: job.jamoId, message: `${job.jamoId}: 앱 획이 없습니다.` }
+    if (!job.jamo) return { part: job.part, jamoId: job.jamoId, family, message: `${job.jamoId}: 앱 획이 없습니다.` }
     const resolved = input.context.parts.find((part) => part.part === job.part)
-    if (!resolved) return { part: job.part, jamoId: job.jamoId, jamo: job.jamo, message: input.context.issues.find((issue) => issue.part === job.part)?.message ?? '이 문맥의 박스 예측이 없습니다.' }
-    const part: ComponentFitPart = { part: job.part, jamoId: job.jamoId, jamo: job.jamo, faces: { ...resolved.faces } }
+    if (!resolved) return { part: job.part, jamoId: job.jamoId, jamo: job.jamo, family, message: input.context.issues.find((issue) => issue.part === job.part)?.message ?? '이 문맥의 박스 예측이 없습니다.' }
+    const part: ComponentFitPart = { part: job.part, jamoId: job.jamoId, jamo: job.jamo, family, faces: { ...resolved.faces } }
     const reference = approvedFacesOf(input.approved, job.part)
     if (reference) {
       part.reference = reference.faces
@@ -82,7 +86,7 @@ export function fitComponentsForGlyph(input: {
 /** 네 변(없으면 모델 값)으로 획을 놓고 잉크·비교 수치를 낸다. */
 export function renderComponentPart(part: ComponentFitPart, faces?: ComponentFaces): RenderedComponentPart {
   if (!part.jamo || !part.faces) return { faceErrors: [], message: part.message }
-  const fit = fitNotoComponent({ part: part.part, jamo: part.jamo, faces: faces ?? part.faces, glyphId: `review:${part.part}:${part.jamoId}` })
+  const fit = fitNotoComponent({ part: part.part, jamo: part.jamo, family: part.family, faces: faces ?? part.faces, glyphId: `review:${part.part}:${part.jamoId}` })
   if (!fit.ok) return { faceErrors: [], message: fit.message }
   const ink = inkOfComponentFit(fit.fit)
   if (!ink.ok) return { faceErrors: [], message: ink.message }

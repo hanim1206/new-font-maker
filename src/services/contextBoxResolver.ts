@@ -5,6 +5,7 @@ import { medialInputFromPrediction } from './notoFitReport'
 import { fitNotoMedialMaster, splitMixedMedialRoles } from './notoMedialMasterFit'
 import type { MedialFitInput, MedialFitResult } from './notoMedialMasterFit'
 import { MEDIAL_ROLE_SETS, modelIdentityOf, predictNotoTarget } from './notoVariationModel'
+import { medialFamilyOf } from '../utils/jamoContextStrokes'
 import type { ModelIdentity, VariationModel } from './notoVariationModel'
 
 /**
@@ -133,10 +134,10 @@ function jamoForPart(syllable: DeepReadonly<DecomposedSyllable> | undefined, par
 }
 
 /** 네 변 → 앱 획을 놓을 상자. 획이 있으면 잉크가 네 변에 닿도록 두께만큼 안쪽으로 다듬는다. */
-function placePart(part: Part, faces: ContextFaces, syllable: DeepReadonly<DecomposedSyllable> | undefined, glyphId: string, ends?: StrokeEnds): ContextPartBox | string {
+function placePart(part: Part, faces: ContextFaces, syllable: DeepReadonly<DecomposedSyllable> | undefined, glyphId: string, medialJamo: string, ends?: StrokeEnds): ContextPartBox | string {
   const jamo = jamoForPart(syllable, part)
   if (!jamo) return { part, faces, box: facesToBox(faces), fitted: false }
-  const fit = fitNotoComponent({ part, jamo, channel: CHANNEL_OF[part], faces, glyphId: `${glyphId}:${part}`, globalLinecap: ends?.linecap, globalLinejoin: ends?.linejoin })
+  const fit = fitNotoComponent({ part, jamo, channel: CHANNEL_OF[part], family: medialFamilyOf(medialJamo), faces, glyphId: `${glyphId}:${part}`, globalLinecap: ends?.linecap, globalLinejoin: ends?.linejoin })
   if (!fit.ok) return fit.message
   return { part, faces, box: fit.fit.box, fitted: true }
 }
@@ -157,7 +158,7 @@ export function resolveContextBoxes(input: {
   const parts: ContextPartBox[] = []
   const issues: ContextBoxResolution['issues'] = []
   const place = (part: Part, faces: ContextFaces) => {
-    const placed = placePart(part, withDelta(faces, delta?.[part]), syllable, glyphId, input.ends)
+    const placed = placePart(part, withDelta(faces, delta?.[part]), syllable, glyphId, identity.medialJamo, input.ends)
     if (typeof placed === 'string') issues.push({ part, message: placed })
     else parts.push(placed)
   }

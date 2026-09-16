@@ -1,5 +1,5 @@
 import polygonClipping, { type MultiPolygon } from 'polygon-clipping'
-import type { AnchorPoint, DeepReadonly, InkRegion, JamoData, Part, StrokeDataV2 } from '../types'
+import type { AnchorPoint, DeepReadonly, InkRegion, JamoData, MedialFamily, Part, StrokeDataV2 } from '../types'
 import type { ContextFaces, ContextModel } from './contextBoxResolver'
 import { fitContextMedial, predictComponentFaces, boxToFaces } from './contextBoxResolver'
 import { fitNotoComponent, inkOfComponentFit } from './notoComponentFit'
@@ -146,6 +146,8 @@ export interface SkeletonFitOptions {
   minStep?: number
   /** 한 보폭에서 도는 최대 회수. */
   maxRounds?: number
+  /** 시간 예산(ms). 넘기면 그때까지 가장 좋은 골격으로 끝낸다. 획 많은 자모가 십수 분 도는 일을 막는다. */
+  maxMillis?: number
   channel?: 'horizontalStrokes' | 'verticalStrokes'
 }
 
@@ -163,7 +165,7 @@ export interface SkeletonFitResult {
  * 20개 안팎 파라미터·문맥 6개면 자모당 수 초.
  */
 export function fitSkeleton(seed: DeepReadonly<JamoData>, samples: readonly SkeletonSample[], options: SkeletonFitOptions = {}): SkeletonFitResult {
-  const { step: startStep = 0.06, minStep = 0.004, maxRounds = 12, channel, seedHandles = false } = options
+  const { step: startStep = 0.06, minStep = 0.004, maxRounds = 12, maxMillis = 45_000, channel, seedHandles = false } = options
   const jamo = structuredClone(seed) as JamoData
   if (seedHandles) seedOpenStrokeHandles(strokeList(jamo, channel))
   const params = skeletonParams(jamo, channel)
@@ -172,11 +174,14 @@ export function fitSkeleton(seed: DeepReadonly<JamoData>, samples: readonly Skel
   let evaluations = 1
   let moved = 0
   let step = startStep
-  while (step >= minStep) {
+  const deadline = Date.now() + maxMillis
+  const outOfTime = () => Date.now() > deadline
+  while (step >= minStep && !outOfTime()) {
     let improvedAtStep = false
-    for (let round = 0; round < maxRounds; round += 1) {
+    for (let round = 0; round < maxRounds && !outOfTime(); round += 1) {
       let improved = false
       for (const param of params) {
+        if (outOfTime()) break
         for (const direction of [1, -1]) {
           const current = readParam(jamo, param, channel)
           const next = current + direction * step
@@ -243,16 +248,74 @@ export function normalizeSkeleton(strokes: StrokeDataV2[]): void {
   }
 }
 
+/**
+ * 다른 출발점들. 좌표 하강은 국소 최소에 잘 걸린다 — ㄱ 다리처럼 끝점을 멀리(왼아래) 보내며 휘어야 할 때
+ * 작은 걸음마다 xor가 안 줄어 못 간다. 열린 획마다 마지막 앵커를 왼·가운데·오른쪽으로 보내고
+ * 직전 앵커 쪽에 handleIn을 심은 씨앗을 만든다.
+ */
+export function skeletonSeedVariants(seed: DeepReadonly<JamoData>, channel?: 'horizontalStrokes' | 'verticalStrokes'): JamoData[] {
+  const variants: JamoData[] = []
+  const base = structuredClone(seed) as JamoData
+  const strokes = strokeList(base, channel)
+  // 획이 많은 자모(ㅃ·ㅉ 등)는 씨앗이 획 수 × 3으로 불어 fit이 수십 분 걸린다. 다리 하나가 문제인 ㄱ·ㅋ·ㄴ 같은 2획 이하만 본다.
+  if (strokes.filter((stroke) => !stroke.closed).length > 2) return variants
+  strokes.forEach((stroke, strokeIndex) => {
+    if (stroke.closed || stroke.points.length < 2) return
+    for (const targetX of [0.05, 0.5, 0.95]) {
+      const clone = structuredClone(base) as JamoData
+      const target = strokeList(clone, channel)[strokeIndex]
+      const last = target.points[target.points.length - 1]
+      const prev = target.points[target.points.length - 2]
+      if (Math.abs(last.x - targetX) < 0.1) continue
+      last.x = targetX
+      last.handleIn = { x: prev.x, y: prev.y + (last.y - prev.y) * 0.6 }
+      variants.push(clone)
+    }
+  })
+  return variants
+}
+
+/**
+ * 여러 출발점에서 굵게 돌려 가장 좋은 것을 고른 뒤 그 자리에서 곱게 다듬는다.
+ * 기본 출발점 결과가 threshold보다 나쁠 때만 대안 씨앗을 본다(대부분 자모는 한 번이면 충분하다).
+ */
+export function fitSkeletonMultiStart(seed: DeepReadonly<JamoData>, samples: readonly SkeletonSample[], options: SkeletonFitOptions & { threshold?: number; extraStarts?: readonly DeepReadonly<JamoData>[] } = {}): SkeletonFitResult {
+  const { threshold = 0.3, extraStarts = [], ...rest } = options
+  const first = fitSkeleton(seed, samples, rest)
+  let best = first
+  let evaluations = first.evaluations
+  // 이미 다듬은 골격에서 다시 출발하면 그 골짜기에 갇힌다. 옛 직각 골격 같은 다른 출발점은 항상 같이 본다.
+  const starts = [...extraStarts, ...(first.after <= threshold ? [] : skeletonSeedVariants(seed, rest.channel))].slice(0, 4)
+  for (const start of starts) {
+    const coarse = fitSkeleton(start, samples, { ...rest, minStep: 0.02, maxRounds: 4, maxMillis: (rest.maxMillis ?? 45_000) / 2 })
+    evaluations += coarse.evaluations
+    if (coarse.after >= best.after) continue
+    const refined = fitSkeleton(coarse.jamo, samples, rest)
+    evaluations += refined.evaluations
+    if (refined.after < best.after) best = refined
+  }
+  return { ...best, before: first.before, evaluations }
+}
+
 function round3(value: number): number {
   return Math.round(value * 1000) / 1000
 }
 
+const INITIALS = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
+const MEDIALS = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
+const FINALS = [null, ...'ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ']
+const composeChar = (i: string, m: string, f: string | null) => String.fromCodePoint(0xac00 + (INITIALS.indexOf(i) * 21 + MEDIALS.indexOf(m)) * 28 + FINALS.indexOf(f))
+
+/** 첫닿자의 계열별 변형을 볼 문맥 글자. 계열 안에서 홀자·받침 유무를 섞는다. */
+export function skeletonFamilyChars(family: MedialFamily, jamo: string): string[] {
+  if (family === 'right') return [composeChar(jamo, 'ㅏ', null), composeChar(jamo, 'ㅓ', null), composeChar(jamo, 'ㅣ', 'ㄴ'), composeChar(jamo, 'ㅐ', 'ㄹ'), composeChar(jamo, 'ㅕ', null)]
+  if (family === 'bottom') return [composeChar(jamo, 'ㅗ', null), composeChar(jamo, 'ㅜ', null), composeChar(jamo, 'ㅡ', 'ㅇ'), composeChar(jamo, 'ㅛ', 'ㄴ'), composeChar(jamo, 'ㅠ', null)]
+  return [composeChar(jamo, 'ㅘ', null), composeChar(jamo, 'ㅝ', null), composeChar(jamo, 'ㅢ', 'ㄴ'), composeChar(jamo, 'ㅟ', null), composeChar(jamo, 'ㅚ', 'ㅇ')]
+}
+
 /** 자모마다 골격을 볼 문맥 글자. 초성은 홀자 계열·받침 유무를 섞고, 받침은 초성·홀자를 섞는다. */
 export function skeletonContextChars(part: 'CH' | 'JO' | 'JU', jamo: string): string[] {
-  const initials = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
-  const medials = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
-  const finals = [null, ...'ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ']
-  const compose = (i: string, m: string, f: string | null) => String.fromCodePoint(0xac00 + (initials.indexOf(i) * 21 + medials.indexOf(m)) * 28 + finals.indexOf(f))
+  const compose = composeChar
   if (part === 'CH') return [compose(jamo, 'ㅏ', null), compose(jamo, 'ㅗ', null), compose(jamo, 'ㅘ', null), compose(jamo, 'ㅣ', 'ㄴ'), compose(jamo, 'ㅜ', 'ㅇ'), compose(jamo, 'ㅓ', 'ㄹ')]
   if (part === 'JU') return [compose('ㄱ', jamo, null), compose('ㅁ', jamo, null), compose('ㅅ', jamo, null), compose('ㄱ', jamo, 'ㄴ'), compose('ㅇ', jamo, 'ㄹ'), compose('ㅂ', jamo, 'ㅇ')]
   return [compose('ㄱ', 'ㅏ', jamo), compose('ㅁ', 'ㅗ', jamo), compose('ㅇ', 'ㅘ', jamo), compose('ㅅ', 'ㅣ', jamo), compose('ㅂ', 'ㅜ', jamo)]

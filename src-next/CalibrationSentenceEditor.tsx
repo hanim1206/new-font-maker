@@ -3,6 +3,7 @@ import { Check, Copy, Dices, Download, LayoutDashboard, ListTree, LoaderCircle, 
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
 import { useContextPlacement, usePlacementStore } from './notoModel'
+import { adoptFamilyStrokes, familyOfSyllable } from '../src/utils/jamoContextStrokes'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import { moveHandle, movePoint, moveStroke, scaleStroke } from '../src/services/editorCommands'
@@ -728,7 +729,7 @@ function InferenceTrackpad({
   }
   const toggleCurve = () => {
     if ((selection.kind !== 'point' && selection.kind !== 'handle') || !selectedStroke) return
-    const before = structuredClone(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo)
+    const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
     const after = structuredClone(before)
     const collections = [after.strokes, after.horizontalStrokes, after.verticalStrokes]
     for (const strokes of collections) {
@@ -766,7 +767,7 @@ function InferenceTrackpad({
   }
   const addStroke = () => {
     if (selection.kind === 'none' || selection.kind === 'component') return
-    const before = structuredClone(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo)
+    const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
     const strokeId = `stroke-${Date.now()}`
     const stroke: StrokeDataV2 = {
       id: strokeId,
@@ -782,14 +783,14 @@ function InferenceTrackpad({
     if ((selection.kind !== 'stroke' && selection.kind !== 'point' && selection.kind !== 'handle') || !selectedStroke || !mergeTarget) return
     const merged = mergeStrokes(selectedStroke, mergeTarget)
     if (!merged) return
-    const before = structuredClone(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo)
+    const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
     const after = updateJamoStroke(updateJamoStroke(before, selectedStroke.id, () => merged), mergeTarget.id, () => null)
     onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId: selectedStroke.id, delta: { x: 0, y: 0 } })
     onSelectionChange({ ...selection, kind: 'stroke', strokeId: selectedStroke.id, jamo: after })
   }
   const disconnectStroke = () => {
     if ((selection.kind !== 'point' && selection.kind !== 'handle') || !selectedStroke || !canDisconnect) return
-    const before = structuredClone(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo)
+    const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
     if (selectedStroke.closed) {
       const points = [...selectedStroke.points.slice(selection.pointIndex), ...selectedStroke.points.slice(0, selection.pointIndex)]
       const after = updateJamoStroke(before, selectedStroke.id, (stroke) => ({ ...stroke, points, closed: false }))
@@ -806,7 +807,7 @@ function InferenceTrackpad({
   }
   const deleteSelection = () => {
     if ((selection.kind !== 'stroke' && selection.kind !== 'point' && selection.kind !== 'handle') || !selectedStroke || !canDelete) return
-    const before = structuredClone(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo)
+    const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
     const after = selection.kind === 'point' || selection.kind === 'handle'
       ? updateJamoStroke(before, selectedStroke.id, (stroke) => ({ ...stroke, points: stroke.points.filter((_, index) => index !== selection.pointIndex) }))
       : updateJamoStroke(before, selectedStroke.id, () => null)

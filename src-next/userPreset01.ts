@@ -17,7 +17,11 @@ function stroke(jamo: JamoData, id: string): StrokeDataV2 {
   return found
 }
 
-/** 기본 획 위에 사용자 프리셋 01의 점 편집을 얹는다. 기본 획을 바꿔 넣으면(옛 기본 고정 테스트 등) 그 위에 얹는다. */
+/**
+ * [유물] 옛 직각 기본 획(2026-02) 위에 손으로 넣은 점 편집. 앱 기본에는 더 이상 안 얹는다 —
+ * 기본 프리셋은 Noto 고스트에 맞춘 골격(baseJamos, skeletonFit)이고 이 편집은 그 핸들·변형을 지운다.
+ * 옛 골격을 전제한 테스트(fixture)에서만 쓴다.
+ */
 export function createUserPreset01(base: BaseJamoMaps = baseJamos as unknown as BaseJamoMaps): JamoPresetMap {
   const choseong = Object.fromEntries(['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅇ', 'ㅋ', 'ㅎ'].map((char) => [char, cloneBase(base, 'choseong', char)]))
   const jungseong = Object.fromEntries(['ㅏ', 'ㅔ', 'ㅘ', 'ㅜ', 'ㅝ', 'ㅡ'].map((char) => [char, cloneBase(base, 'jungseong', char)]))
