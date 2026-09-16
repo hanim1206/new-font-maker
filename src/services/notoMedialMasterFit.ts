@@ -110,9 +110,9 @@ function strokeOf(roleId: string, m: MedialRoleMeasurement, thickness: number): 
 }
 
 /** 값을 MATCH 안에서 묶어 오름차순으로. 부동소수 잡음으로 같은 자리가 둘로 갈리지 않게 한다. */
-function cluster(values: readonly number[]): number[] {
+function cluster(values: readonly number[], tolerance = MATCH): number[] {
   const out: number[] = []
-  for (const v of [...values].sort((a, b) => a - b)) if (!out.length || v - out[out.length - 1] > MATCH) out.push(v)
+  for (const v of [...values].sort((a, b) => a - b)) if (!out.length || v - out[out.length - 1] > tolerance) out.push(v)
   return out
 }
 
@@ -131,7 +131,9 @@ function assignAxis(
   gapEm: number,
 ): AxisAssignment | string {
   const [lo, hi] = edges
-  const interior = (values: readonly number[]) => cluster(values).filter((v) => v > lo + MATCH && v < hi - MATCH)
+  // gapEm(minGap) 안에 붙은 값은 같은 rail로 본다. 따로 core rail을 만들면 grid 검증이 minGap 위반으로 막는다.
+  // 예: ㅑ 두 보의 오른끝이 1.5u 다를 때 짧은 쪽은 outer-right에 붙는다(railFor가 gapEm 안에서 찾아 준다).
+  const interior = (values: readonly number[]) => cluster(values, gapEm).filter((v) => v > lo + gapEm && v < hi - gapEm)
   const [outerLo, innerLo, center, innerHi, outerHi] = roles
   const values: Record<string, number> = { [outerLo]: lo, [outerHi]: hi }
   const aux: FitRailKey[] = []

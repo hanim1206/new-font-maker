@@ -145,12 +145,12 @@ describe('fitNotoMedialMaster', () => {
     expect(validateRoleConstructionScope(outcome.fit.scope).ok).toBe(true)
   })
 
-  it('ㅖ: 짧은 안기둥 끝은 core 5개에 안 들어가면 보조 rail에 매고, minGap 안이면 이웃 rail에 붙인다', () => {
-    // 안기둥이 바깥기둥보다 위로 20u 짧고(보조 rail), 아래로 4u 짧다(outer-bottom에 붙음. slot 높이 0.5 × minGap 0.01 = 5u).
+  it('ㅖ: 짧은 안기둥 끝은 core 5개에 안 들어가면 보조 rail에 맨다', () => {
+    // 안기둥이 바깥기둥보다 위·아래로 20u씩 짧다. 보 중심 둘이 core를 쓰고 안기둥 끝 둘은 보조 rail.
     const outcome = fitNotoMedialMaster({
       jamoId: 'ㅖ', role: 'JU_VERTICAL',
       measurements: {
-        innerPillar: { face: 0.62, faceSide: 'right', orientation: 'vertical', visibleSpans: [{ from: 0.07, to: 0.546 }] },
+        innerPillar: { face: 0.62, faceSide: 'right', orientation: 'vertical', visibleSpans: [{ from: 0.07, to: 0.53 }] },
         outerPillar: { face: 0.79, faceSide: 'right', orientation: 'vertical', visibleSpans: [{ from: 0.05, to: 0.55 }] },
         upperBeam: { face: 0.19, faceSide: 'top', orientation: 'horizontal', visibleSpans: [{ from: 0.41, to: 0.58 }] },
         lowerBeam: { face: 0.35, faceSide: 'top', orientation: 'horizontal', visibleSpans: [{ from: 0.41, to: 0.58 }] },
@@ -160,18 +160,18 @@ describe('fitNotoMedialMaster', () => {
     expect(outcome.ok).toBe(true)
     if (!outcome.ok) return
     const { fit } = outcome
-    // y축: 보 중심 둘 → inner-top·inner-bottom, 안기둥 위끝 → 보조 rail, 안기둥 아래끝 → outer-bottom.
-    expect(fit.auxRails).toEqual(['aux-y-1'])
+    // y축: 보 중심 둘 → inner-top·inner-bottom, 안기둥 위끝·아래끝 → 보조 rail.
+    expect(fit.auxRails).toEqual(['aux-y-1', 'aux-y-2'])
     expect(fit.railsEm['aux-y-1']).toBe(0.07)
+    expect(fit.railsEm['aux-y-2']).toBe(0.53)
     const inner = fit.bindings.find((b) => b.roleId === 'innerPillar')!
-    expect(inner).toMatchObject({ centerRail: 'inner-left', fromRail: 'aux-y-1', toRail: 'outer-bottom' })
-    expect(fit.strokes.find((s) => s.roleId === 'innerPillar')!.to).toBe(0.55)
+    expect(inner).toMatchObject({ centerRail: 'inner-left', fromRail: 'aux-y-1', toRail: 'aux-y-2' })
     // x축: 기둥 둘 → inner-left·inner-right, 보 시작 = slot 왼끝, 보 끝 = 안기둥 중심(접합).
     const upper = fit.bindings.find((b) => b.roleId === 'upperBeam')!
     expect(upper).toMatchObject({ fromRail: 'outer-left', toRail: 'inner-left' })
     // 보조 rail은 그리드에 값 순서대로 들어가고 편집 목록에도 나온다.
     const yIds = fit.grid.yRails.map((rail) => rail.id.split(':').at(-1))
-    expect(yIds).toEqual(['outer-top', 'aux-y-1', 'inner-top', 'center-y', 'inner-bottom', 'outer-bottom'])
+    expect(yIds).toEqual(['outer-top', 'aux-y-1', 'inner-top', 'center-y', 'inner-bottom', 'aux-y-2', 'outer-bottom'])
     expect(fit.grid.yRails.find((rail) => rail.id.endsWith('aux-y-1'))).toMatchObject({ kind: 'auxiliary' })
     expect(boundRailRoles(fit)).toContain('aux-y-1')
     expect(validateRoleConstructionScope(fit.scope).ok).toBe(true)
@@ -187,5 +187,29 @@ describe('fitNotoMedialMaster', () => {
     expect(edited.fit.strokes.find((s) => s.roleId === 'innerPillar')!.from).toBe(0.09)
     expect(edited.fit.strokes.find((s) => s.roleId === 'outerPillar')!.from).toBe(0.05)
     expect(validateRoleConstructionScope(edited.fit.scope).ok).toBe(true)
+  })
+
+  it('minGap 안의 값은 이웃 rail에 붙는다 — ㅑ 두 보 끝이 1.5u 다르면 짧은 쪽이 outer-right에 붙고 grid가 유효하다', () => {
+    // 먈에서 생긴 버그: 짧은 보 끝이 inner-right로 들어가 outer-right와 1.5u 차이 → minGap 위반 → 잉크가 안 그려졌다.
+    // slot 너비 ≈ 0.21 × minGap 0.01 ≈ 2.1u 안이면 같은 rail이다.
+    const outcome = fitNotoMedialMaster({
+      jamoId: 'ㅑ', role: 'JU_VERTICAL',
+      measurements: {
+        outerPillar: { face: 0.75, faceSide: 'right', orientation: 'vertical', visibleSpans: [{ from: 0.05, to: 0.52 }] },
+        upperBeam: { face: 0.17, faceSide: 'top', orientation: 'horizontal', visibleSpans: [{ from: 0.73, to: 0.878 }] },
+        lowerBeam: { face: 0.35, faceSide: 'top', orientation: 'horizontal', visibleSpans: [{ from: 0.73, to: 0.8765 }] },
+      },
+      thickness: { outerPillar: 0.083, upperBeam: 0.069, lowerBeam: 0.069 },
+    })
+    expect(outcome.ok).toBe(true)
+    if (!outcome.ok) return
+    const { fit } = outcome
+    expect(fit.auxRails).toEqual([])
+    const lower = fit.bindings.find((b) => b.roleId === 'lowerBeam')!
+    expect(lower).toMatchObject({ fromRail: 'center-x', toRail: 'outer-right' })
+    expect(fit.strokes.find((s) => s.roleId === 'lowerBeam')!.to).toBe(fit.railsEm['outer-right'])
+    expect(validateRoleConstructionScope(fit.scope).ok).toBe(true)
+    const primitives = resolveShapeGlyphInkPrimitives({ source: fit.scope, masterId: fit.master.id, glyphId: 'ㅑ', part: 'JU', slot: fit.slot, weightMultiplier: 1 })
+    expect(primitives.ok).toBe(true)
   })
 })
