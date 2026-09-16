@@ -1,5 +1,8 @@
 import type { ComponentFaces } from '../src/services/notoComponentFit'
-import type { MedialFitResult, StrokeRailBinding } from '../src/services/notoMedialMasterFit'
+import type { StrokeRailBinding } from '../src/services/notoMedialMasterFit'
+import { applyMedialDelta, resolveSemanticRail, semanticKeyOf } from '../src/services/medialRailDelta'
+import type { SemanticDelta, SemanticRailKey } from '../src/services/medialRailDelta'
+import type { ContextBoxDelta } from '../src/services/contextBoxResolver'
 import type { BoxConfig, Part } from '../src/types'
 import { CORPUS_FINALS, CORPUS_MEDIALS, corpusCodepoint, corpusIdentity } from './notoCorpus'
 import type { CorpusIdentity } from './notoCorpus'
@@ -7,28 +10,24 @@ import type { ComponentFitPart } from './notoComponentFitView'
 import type { EditableRail, MedialFitPart } from './notoMedialFitView'
 
 /**
- * 검수 글자 화면의 rail 편집을 다른 글자에 퍼뜨려 보는 계산. 저장은 없다.
+ * 검수 글자 화면의 rail 편집을 다른 글자에 퍼뜨려 보는 계산. 저장은 `layoutDeltaStore`가 맡고, 여기선 카드 미리보기용 Δ만 뽑는다.
  *
  * 편집은 두 종류로 가른다.
  * - 배치: 획 중심 rail, 닿자 네 변. 층 속성이라 기본 범위는 `이 레이아웃`(홀자 계열·받침 유무가 같은 글자), `전체`는 일부러 넓힐 때. em Δ 브로드캐스트.
  *   특정 자모만 옮기는 건 배치가 아니라 형태(자소 탭 몫)라 범위 칩에 없다.
  * - 형태: 획 길이의 시작·끝 rail. 자모의 속성이라 같은 자모 글자에만, 슬롯 안 비율로 옮긴다(em이 아니다).
  *
- * Δ는 rail 키(`inner-bottom` 등)가 아니라 **획 역할 + 중심/시작/끝**(`primaryBeam.center`)으로 든다.
- * 같은 보라도 ㅐ는 `inner-bottom`, ㅏ는 `center-y`에 매여 있어 키로 얹으면 엉뚱한 rail이 움직이거나 아무것도 안 움직인다.
+ * Δ는 획 역할 키(`primaryBeam.center`)로 든다 — 규칙은 `src/services/medialRailDelta.ts`. 여기서 재수출한다.
  */
+
+export { applyMedialDelta, resolveSemanticRail, semanticKeyOf }
+export type { SemanticDelta, SemanticRailKey }
 
 export type MedialPartKey = MedialFitPart['part']
 export type ComponentPartKey = ComponentFitPart['part']
 export type EditKind = 'layout' | 'shape'
 
 export const editKindOf = (rail: Pick<EditableRail, 'kind'>): EditKind => rail.kind === 'start' || rail.kind === 'end' ? 'shape' : 'layout'
-
-/** 획 역할과 어느 rail인지. 예: `primaryBeam.center`, `outerPillar.end`. 글자가 달라도 같은 획을 가리킨다. */
-export type SemanticRailKey = `${string}.${RailKind}`
-export type RailKind = 'center' | 'start' | 'end'
-export type SemanticDelta = Partial<Record<SemanticRailKey, number>>
-type FitBindings = Pick<MedialFitResult, 'bindings'>
 
 export interface PropagationEdit {
   layout: {
@@ -41,31 +40,6 @@ export interface PropagationEdit {
     /** 홀자 part별 시작·끝 rail Δ를 그 축 슬롯 길이로 나눈 비율. 획 역할 키. */
     medial: Partial<Record<MedialPartKey, SemanticDelta>>
   }
-}
-
-/** rail 키가 어느 획의 중심/시작/끝인지. 편집 rail 목록과 같은 규칙: 중심으로 매인 획이 먼저. */
-export function semanticKeyOf(bindings: readonly StrokeRailBinding[], railKey: string): SemanticRailKey | null {
-  const center = bindings.find((b) => b.centerRail === railKey)
-  if (center) return `${center.roleId}.center`
-  const span = bindings.find((b) => b.fromRail === railKey || b.toRail === railKey)
-  if (!span) return null
-  return `${span.roleId}.${span.fromRail === railKey ? 'start' : 'end'}`
-}
-
-/** 획 역할 키를 이 글자의 rail 키와 축으로 푼다. 그 획이 없는 홀자면 null. */
-export function resolveSemanticRail(bindings: readonly StrokeRailBinding[], key: string): { railKey: string; axis: 'x' | 'y' } | null {
-  const dot = key.lastIndexOf('.')
-  if (dot < 0) return null
-  const roleId = key.slice(0, dot)
-  const kind = key.slice(dot + 1) as RailKind
-  const binding = bindings.find((b) => b.roleId === roleId)
-  if (!binding) return null
-  const centerAxis = binding.orientation === 'vertical' ? 'x' : 'y'
-  if (kind === 'center') return { railKey: binding.centerRail, axis: centerAxis }
-  const spanAxis = centerAxis === 'x' ? 'y' : 'x'
-  if (kind === 'start') return { railKey: binding.fromRail, axis: spanAxis }
-  if (kind === 'end') return { railKey: binding.toRail, axis: spanAxis }
-  return null
 }
 
 /** 배치 Δ를 퍼뜨릴 범위. 기본 `이 레이아웃`(같은 문맥), `전체`는 일부러 넓히는 것. */
@@ -107,27 +81,10 @@ export function propagationEditOf(input: { editable: readonly EditableRail[]; me
 }
 
 export const hasLayoutEdit = (edit: PropagationEdit) => Object.keys(edit.layout.medial).length > 0 || Object.keys(edit.layout.component).length > 0
-export const hasShapeEdit = (edit: PropagationEdit) => Object.keys(edit.shape.medial).length > 0
 
-/**
- * 획 역할 Δ(em)를 다른 글자의 rail 값에 얹는다. 그 획이 없는 홀자(ㅑ에 보 없음)는 건너뛰고 개수로 알려준다.
- * 두 역할 키가 이 글자에서 같은 rail로 풀리면(ㅏ의 기둥 중심 = 보 시작) 먼저 온 것만 얹는다.
- */
-export function applyMedialDelta(fit: Pick<MedialFitResult, 'railsEm'> & FitBindings, delta: Readonly<SemanticDelta>): { rails: Record<string, number>; applied: number; skipped: number } {
-  const rails: Record<string, number> = { ...fit.railsEm }
-  const touched = new Set<string>()
-  let applied = 0
-  let skipped = 0
-  for (const [key, value] of Object.entries(delta)) {
-    if (value === undefined) continue
-    const resolved = resolveSemanticRail(fit.bindings, key)
-    if (!resolved || !(resolved.railKey in rails) || touched.has(resolved.railKey)) { skipped += 1; continue }
-    rails[resolved.railKey] += value
-    touched.add(resolved.railKey)
-    applied += 1
-  }
-  return { rails, applied, skipped }
-}
+/** 배치 Δ를 저장 형태(`ContextBoxDelta`)로. 형태 Δ(시작·끝)는 자모 몫이라 여기 안 든다. */
+export const layoutDeltaOf = (edit: PropagationEdit): ContextBoxDelta => ({ faces: edit.layout.component, medial: edit.layout.medial })
+export const hasShapeEdit = (edit: PropagationEdit) => Object.keys(edit.shape.medial).length > 0
 
 /** 비율 Δ를 대상 글자의 슬롯 길이(그 획 축)에 곱해 em Δ로 만든다. 없는 획은 그대로 둬서 applyMedialDelta가 건너뛰게 한다. */
 export function shapeDeltaToEm(ratios: Readonly<SemanticDelta>, slot: BoxConfig, bindings: readonly StrokeRailBinding[]): SemanticDelta {

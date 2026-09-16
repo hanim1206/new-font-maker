@@ -3,6 +3,9 @@
 .head span:first-child { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .head span:first-child small { display: block; color: rgb(var(--color-text-dim-4)); font-weight: 500; letter-spacing: .06em; text-transform: none; }
 .head button { flex: 0 0 auto; padding: 4px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 10px; font-weight: 700; }
+.actions { display: flex; flex: 0 0 auto; gap: 6px; }
+.head .apply { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary)); color: #fff; }
+.scopes .clear { margin-left: auto; border-style: dashed; color: rgb(var(--color-text-dim-3)); }
 .scopes { display: flex; gap: 6px; padding: 8px 0 0; }
 .scopes button { flex: 0 0 auto; padding: 4px 11px; border: 1px solid rgb(var(--color-border)); border-radius: 14px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
 .scopes button[aria-pressed='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary)); color: #fff; }

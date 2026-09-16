@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { identityOfSyllable, resolveContextBoxes } from '../src/services/contextBoxResolver'
-import type { ContextBoxDelta, ContextBoxResolution } from '../src/services/contextBoxResolver'
+import type { ContextBoxResolution } from '../src/services/contextBoxResolver'
 import type { GlyphInkPlacement } from '../src/services/notoGlyphXor'
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
 import type { DecomposedSyllable, LayoutSchema } from '../src/types'
+import { useLayoutDelta } from './layoutDeltaStore'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 
@@ -48,15 +49,17 @@ export type GlyphPlacement = GlyphInkPlacement
 
 /**
  * 한 글자의 배치. 모델 상자가 완전히 풀리면 boxes, 아니면 schema.
- * 모델 상자는 획 두께(전역 캡)에 맞춰 다듬으므로 전역 스타일을 받는다.
+ * 모델 상자는 획 두께(전역 캡)에 맞춰 다듬으므로 전역 스타일을 받고,
+ * 검수 화면에서 저장한 배치 Δ(`layoutDeltaStore`, 전체 + 이 레이아웃)를 문맥별로 얹는다.
  */
-export function useContextPlacement(syllable: DecomposedSyllable, schema: LayoutSchema, globalStyle: Pick<GlobalStyle, 'linecap' | 'linejoin'>, delta?: ContextBoxDelta): { placement: GlyphPlacement; resolution: ContextBoxResolution | null } {
+export function useContextPlacement(syllable: DecomposedSyllable, schema: LayoutSchema, globalStyle: Pick<GlobalStyle, 'linecap' | 'linejoin'>): { placement: GlyphPlacement; resolution: ContextBoxResolution | null } {
   const { bundle } = useNotoModel()
   const enabled = usePlacementStore((state) => state.notoPlacement)
+  const identity = useMemo(() => enabled && bundle ? identityOfSyllable(syllable) : null, [enabled, bundle, syllable])
+  const delta = useLayoutDelta(identity?.contextId)
   return useMemo(() => {
-    const identity = enabled && bundle ? identityOfSyllable(syllable) : null
     const resolution = identity && bundle ? resolveContextBoxes({ identity, model: bundle, syllable, ends: { linecap: globalStyle.linecap, linejoin: globalStyle.linejoin }, delta }) : null
     if (resolution?.complete) return { placement: { kind: 'boxes', boxes: resolution.boxes }, resolution }
     return { placement: { kind: 'schema', schema }, resolution }
-  }, [bundle, enabled, syllable, schema, globalStyle.linecap, globalStyle.linejoin, delta])
+  }, [bundle, identity, syllable, schema, globalStyle.linecap, globalStyle.linejoin, delta])
 }

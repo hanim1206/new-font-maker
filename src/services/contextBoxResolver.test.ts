@@ -5,7 +5,7 @@ import { createNotoPresetReader } from '../../scripts/reference-lab/notoPresetAp
 import { CHOSEONG_MAP, JONGSEONG_MAP, JUNGSEONG_MAP } from '../data/Hangul'
 import { DEFAULT_STYLE } from '../stores/globalStyleStore'
 import { decomposeSyllable } from '../utils/hangulUtils'
-import { identityOfSyllable, medialPartGroups, predictComponentFaces, resolveContextBoxes } from './contextBoxResolver'
+import { addContextBoxDelta, hasContextBoxDelta, identityOfSyllable, medialPartGroups, predictComponentFaces, resolveContextBoxes } from './contextBoxResolver'
 import { fitNotoComponent, inkOfComponentFit } from './notoComponentFit'
 import { createUserPreset01 } from '../../src-next/userPreset01'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
@@ -30,6 +30,19 @@ describe('칸 해석 함수', () => {
     expect(medialPartGroups('ㅗ')?.[0]).toMatchObject({ part: 'JU', role: 'JU_HORIZONTAL' })
     expect(medialPartGroups('ㅏ')?.[0]).toMatchObject({ part: 'JU', role: 'JU_VERTICAL' })
     expect(medialPartGroups('ㅃ')).toBeNull()
+  })
+
+  it('Δ 더하기 — 전체 위에 이 레이아웃을 얹고, 0만 남으면 Δ 없음으로 본다', () => {
+    const sum = addContextBoxDelta({ faces: { CH: { left: 0.01 } }, medial: { JU: { 'outerPillar.center': 0.02 } } }, { faces: { CH: { left: -0.01, right: 0.005 }, JO: { top: 0.003 } }, medial: { JU: { 'outerPillar.center': 0.01, 'primaryBeam.center': -0.004 } } })
+    expect(sum.faces?.CH?.left).toBeCloseTo(0, 12)
+    expect(sum.faces?.CH?.right).toBeCloseTo(0.005, 12)
+    expect(sum.faces?.JO?.top).toBeCloseTo(0.003, 12)
+    expect(sum.medial?.JU?.['outerPillar.center']).toBeCloseTo(0.03, 12)
+    expect(sum.medial?.JU?.['primaryBeam.center']).toBeCloseTo(-0.004, 12)
+    expect(addContextBoxDelta(undefined, undefined)).toEqual({})
+    expect(hasContextBoxDelta(undefined)).toBe(false)
+    expect(hasContextBoxDelta({ faces: { CH: { left: 0 } } })).toBe(false)
+    expect(hasContextBoxDelta({ medial: { JU: { 'outerPillar.center': 0.001 } } })).toBe(true)
   })
 })
 
@@ -85,7 +98,7 @@ describe.skipIf(!existsSync(CORPUS))('칸 해석 — 모델', () => {
     const syllable = decompose('가')
     const identity = identityOfSyllable(syllable)!
     const base = resolveContextBoxes({ identity, model })
-    const moved = resolveContextBoxes({ identity, model, delta: { CH: { left: -0.02 }, JU: { bottom: 0.01 } } })
+    const moved = resolveContextBoxes({ identity, model, delta: { faces: { CH: { left: -0.02 }, JU: { bottom: 0.01 } } } })
     const ch = (r: typeof base) => r.parts.find((p) => p.part === 'CH')!.faces
     const ju = (r: typeof base) => r.parts.find((p) => p.part === 'JU')!.faces
     expect(ch(moved).left).toBeCloseTo(ch(base).left - 0.02, 9)
@@ -94,5 +107,39 @@ describe.skipIf(!existsSync(CORPUS))('칸 해석 — 모델', () => {
     // 획 없이 풀면 상자 = 네 변 그대로.
     expect(base.parts.every((p) => !p.fitted)).toBe(true)
     expect(base.boxes.CH).toEqual({ x: ch(base).left, y: ch(base).top, width: ch(base).right - ch(base).left, height: ch(base).bottom - ch(base).top })
+  })
+
+  it('가: 첫닿자 네 변 Δ는 faces에 그대로 더해지고, 홀자 중심 rail Δ는 slot을 같은 만큼 옮긴다', async () => {
+    const model = await bundle
+    const syllable = decompose('가')
+    const identity = identityOfSyllable(syllable)!
+    const base = resolveContextBoxes({ identity, model, syllable })
+    const moved = resolveContextBoxes({ identity, model, syllable, delta: { faces: { CH: { left: -0.02, right: 0.01 } }, medial: { JU: { 'outerPillar.center': 0.03 } } } })
+    expect(moved.complete).toBe(true)
+    const ch = (r: typeof base) => r.parts.find((p) => p.part === 'CH')!.faces
+    expect(ch(moved).left).toBeCloseTo(ch(base).left - 0.02, 9)
+    expect(ch(moved).right).toBeCloseTo(ch(base).right + 0.01, 9)
+    expect(ch(moved).top).toBeCloseTo(ch(base).top, 9)
+    // ㅏ의 기둥은 홀자 잉크의 왼쪽 끝이다. 기둥 중심이 30u 오른쪽으로 가면 slot 왼쪽도 30u 따라오고(보 끝은 그대로), 앱 상자도 좁아진다.
+    const ju = (r: typeof base) => r.medial.find((m) => m.part === 'JU')!.fit!
+    expect(ju(moved).railsEm['center-x']).toBeCloseTo(ju(base).railsEm['center-x'] + 0.03, 9)
+    expect(ju(moved).slot.x).toBeCloseTo(ju(base).slot.x + 0.03, 9)
+    expect(ju(moved).slot.x + ju(moved).slot.width).toBeCloseTo(ju(base).slot.x + ju(base).slot.width, 9)
+    expect(moved.boxes.JU!.x).toBeGreaterThan(base.boxes.JU!.x)
+    expect(moved.boxes.JU!.width).toBeLessThan(base.boxes.JU!.width)
+  })
+
+  it('가: 홀자 Δ가 순서를 뒤집으면 그 글자는 Δ를 받지 않고 모델 rail 그대로다(자동 예외)', async () => {
+    const model = await bundle
+    const syllable = decompose('가')
+    const identity = identityOfSyllable(syllable)!
+    const base = resolveContextBoxes({ identity, model, syllable })
+    // 기둥 중심을 보 끝(outer-right) 너머로 보내면 보의 시작 > 끝이라 다시 놓지 못한다.
+    const broken = resolveContextBoxes({ identity, model, syllable, delta: { medial: { JU: { 'outerPillar.center': 0.5 } } } })
+    expect(broken.complete).toBe(true)
+    expect(broken.medial.find((m) => m.part === 'JU')!.fit!.railsEm).toEqual(base.medial.find((m) => m.part === 'JU')!.fit!.railsEm)
+    // 이 글자에 없는 획 역할 키(ㅏ에 안기둥 없음)도 그냥 건너뛴다.
+    const missing = resolveContextBoxes({ identity, model, syllable, delta: { medial: { JU: { 'innerPillar.center': 0.05 } } } })
+    expect(missing.boxes).toEqual(base.boxes)
   })
 })

@@ -17,6 +17,7 @@ import { notoPresetGlyphs } from './notoPresetGlyphs'
 import type { NotoPresetGlyph, NotoPresetXorMap } from './notoPresetGlyphs'
 import { ReviewPropagationCards } from './ReviewPropagationCards'
 import { useNotoGlyph } from './useNotoGlyph'
+import { useLayoutDelta } from './layoutDeltaStore'
 import { propagationEditOf } from './reviewPropagation'
 import { snapRail } from './railSnap'
 import type { SnapHit } from './railSnap'
@@ -346,8 +347,9 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
   const ghost = useMemo(() => notoOutlineGhostPath(glyph.outline), [glyph])
   const measured = useMemo(() => baselineRails(glyph), [glyph])
   const { bundle, error: modelError } = useNotoModel()
-  // 칸 해석 함수 한 번 → 홀자 fit(rail)과 닿자 네 변. 렌더러·격자 xor와 같은 상자다.
-  const context = useMemo(() => bundle ? resolveContextBoxes({ identity: glyph.identity, model: bundle }) : null, [bundle, glyph])
+  // 칸 해석 함수 한 번 → 홀자 fit(rail)과 닿자 네 변. 렌더러와 같은 상자(저장된 배치 Δ 포함)다. 여기 값이 편집의 `original`.
+  const savedDelta = useLayoutDelta(glyph.identity.contextId)
+  const context = useMemo(() => bundle ? resolveContextBoxes({ identity: glyph.identity, model: bundle, delta: savedDelta }) : null, [bundle, glyph, savedDelta])
   const fitView = useMemo(() => context ? fitMedialForGlyph({ context, outline: glyph.outline, approved: approvedInputFor(codepoint) }) : null, [context, glyph, codepoint])
   const componentParts = useMemo(() => context ? fitComponentsForGlyph({ context, outline: glyph.outline, approved: approvedInputFor(codepoint) }) : [], [context, glyph, codepoint])
   const [facesByPart, setFacesByPart] = useState<(ComponentFaces | undefined)[]>([])
@@ -452,7 +454,8 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
         {error && <p className={styles.canvasWarning} role="alert">{error}</p>}
       </section>
       {modelError && <p className={styles.status} data-state="error" role="alert">{modelError}</p>}
-      <ReviewPropagationCards source={glyph.identity} bundle={bundle} edit={propagationEdit} changed={changedRails} focus={rail?.part} />
+      {/* 적용하면 Δ가 저장되고 context가 새 original로 다시 풀리므로 세션 편집은 비운다. */}
+      <ReviewPropagationCards source={glyph.identity} bundle={bundle} edit={propagationEdit} changed={changedRails} focus={rail?.part} onApplied={resetRails} />
     </div>
   </MobileWorkspaceShell>
 }

@@ -182,3 +182,46 @@ test('부품 탭을 바꾸면 그 부품 rail만 잡히고 칩도 바뀐다', as
   await expect(canvas.locator('[data-testid="review-fit-box"][data-kind="component"]').first()).toHaveAttribute('data-active', 'true')
   await expect(canvas.locator('[data-testid="review-fit-box"][data-kind="medial"]').first()).toHaveAttribute('data-active', 'false')
 })
+
+test('배치 Δ를 적용하면 저장되어 새로 열어도 rail이 그 자리에 있고, 같은 문맥 글자만 받고, 지우면 돌아온다', async ({ page }) => {
+  const KEY = 'noto-layout-delta-v1'
+  await page.goto('/workspace/review/glyph?char=%EB%A9%88')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  await selectRail(page, '바깥기둥 중심')
+  const handle = page.getByTestId('review-canvas').locator('[data-rail-handle][aria-pressed="true"]')
+  const before = Number(await handle.getAttribute('x1'))
+  await page.keyboard.press('Shift+ArrowRight')
+  await expect(resetButton(page)).toContainText('1개 변경')
+  expect(Number(await handle.getAttribute('x1'))).toBeCloseTo(before + 0.01, 6)
+
+  // 적용 → 저장소에 이 레이아웃(right-final) Δ가 들어가고, 세션 편집은 비워져 Δ 0에서 다시 시작한다. rail 자리는 그대로.
+  const propagation = page.getByTestId('review-propagation')
+  await propagation.getByTestId('review-propagation-apply').click()
+  await expect(resetButton(page)).toContainText('모델 rail')
+  await expect(page.getByTestId('review-propagation-deltas')).toBeEmpty()
+  await expect(propagation.getByTestId('review-propagation-clear')).toBeVisible()
+  await expect(propagation.getByTestId('review-propagation-apply')).toHaveCount(0)
+  const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
+  expect(stored.layers['right-final'].medial.JU['outerPillar.center']).toBeCloseTo(0.01, 9)
+  expect(stored.all).toEqual({})
+  await expect.poll(async () => Number(await page.getByTestId('review-canvas').getByRole('button', { name: '바깥기둥 중심 선택' }).getAttribute('x1'))).toBeCloseTo(before + 0.01, 6)
+
+  // 새로 열어도 저장된 Δ가 original에 들어 있다.
+  await page.reload()
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  const reopened = page.getByTestId('review-canvas').getByRole('button', { name: '바깥기둥 중심 선택' })
+  await expect.poll(async () => Number(await reopened.getAttribute('x1'))).toBeCloseTo(before + 0.01, 6)
+  await expect(resetButton(page)).toContainText('모델 rail')
+
+  // 다른 문맥(세로 홀자, 받침 없음 = 머)은 안 받는다.
+  await page.goto('/workspace/review/glyph?char=%EB%A8%B8')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByTestId('review-propagation').getByTestId('review-propagation-clear')).toHaveCount(0)
+
+  // 지우면 모델 rail로 돌아온다.
+  await page.goto('/workspace/review/glyph?char=%EB%A9%88')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  await page.getByTestId('review-propagation').getByTestId('review-propagation-clear').click()
+  await expect.poll(async () => Number(await page.getByTestId('review-canvas').getByRole('button', { name: '바깥기둥 중심 선택' }).getAttribute('x1'))).toBeCloseTo(before, 6)
+  expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state.layers, KEY)).toEqual({})
+})
