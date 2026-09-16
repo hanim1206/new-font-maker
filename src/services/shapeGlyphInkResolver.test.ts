@@ -445,15 +445,25 @@ describe('Shape master 공통 최종 InkRegion', () => {
     expect(result).toMatchObject({ ok: false, issues: [{ code: 'unsupported-boundary-treatment' }] })
   })
 
-  it('아직 면으로 재현하지 못하는 non-round cap/join을 fail-loud 처리한다', () => {
+  it('brush 스타일의 non-round cap/join은 일자 stroker로 면을 만들고, 다른 스타일은 fail-loud 처리한다', () => {
     const resolved = resolve(scope('ㄱ', [lineElement('line:non-round', 'vertical')]))
     if (!resolved.ok) throw new Error(resolved.issues[0]?.message)
     const primitive = resolved.primitives[0]
     expect(primitive.kind).toBe('centerline')
     if (primitive.kind !== 'centerline') return
+    const flat = materializeFinalGlyphInk([
+      { ...primitive, effectiveLinecap: 'butt', effectiveLinejoin: 'miter' },
+    ], STYLE, MATERIALIZATION_OPTIONS)
+    expect(flat.ok).toBe(true)
+    if (!flat.ok) return
+    // butt 끝은 중심선 끝에서 잘리므로 세로 범위가 round보다 두께만큼 짧다.
+    const round = materializeFinalGlyphInk([primitive], STYLE, MATERIALIZATION_OPTIONS)
+    if (!round.ok) throw new Error(round.message)
+    const spanY = (ink: typeof flat.ink) => { const ys = ink.regions.flatMap((r) => r.outer.map((p) => p.y)); return Math.max(...ys) - Math.min(...ys) }
+    expect(spanY(round.ink) - spanY(flat.ink)).toBeCloseTo(primitive.stroke.thickness * primitive.weightMultiplier, 3)
     const result = materializeFinalGlyphInk([
       { ...primitive, effectiveLinecap: 'butt' },
-    ], STYLE, MATERIALIZATION_OPTIONS)
+    ], { mode: 'dot-pattern', dotSize: 1, gap: 0, rows: 1, stagger: false, omitEvery: 0 }, MATERIALIZATION_OPTIONS)
     expect(result).toEqual({
       ok: false,
       primitiveId: primitive.id,

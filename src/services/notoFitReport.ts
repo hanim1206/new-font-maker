@@ -14,7 +14,7 @@ import { resolveShapeGlyphInkPrimitives } from './shapeGlyphInkResolver'
  * 게이트가 아니라 리포트다. xor 비율은 "얼마나", rail 오차는 "어느 기준선이".
  */
 
-// 면 primitive만 넘기므로 중심선 스타일은 round/round 기본으로 충분하다.
+// 캡·조인은 primitive 쪽(butt/miter)이 정하므로 붓 모양은 두께만 뜻한다.
 const FIT_INK_STYLE: StrokeRenderStyle = { mode: 'brush', brush: { tip: 'round', aspectRatio: 1, angle: 0 } }
 const INK_OPTIONS = { unitsPerEm: 1000, maxCurveErrorFontUnits: 0.5 }
 
@@ -106,6 +106,8 @@ export function inkOfFit(fit: MedialFitResult, weightMultiplier = 1): { ok: true
   const primitives = resolveShapeGlyphInkPrimitives({
     source: fit.scope, masterId: fit.master.id, glyphId: `fit:${fit.jamoId}`,
     part: partForJamoRole(fit.role), slot: fit.slot, weightMultiplier,
+    // Noto 획 끝은 일자다. 둥근 캡이면 끝이 삐져 xor가 부풀고 화면에서도 다른 획과 어긋나 보인다.
+    globalLinecap: 'butt', globalLinejoin: 'miter',
   })
   if (!primitives.ok) return { ok: false, message: primitives.issues[0]?.message ?? '마스터를 해석할 수 없습니다.' }
   const ink = materializeFinalGlyphInk(primitives.primitives, FIT_INK_STYLE, INK_OPTIONS)

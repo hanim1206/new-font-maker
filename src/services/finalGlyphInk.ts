@@ -8,6 +8,7 @@ import type {
   StrokeRenderStyle,
 } from '../types'
 import { unionInkRegions } from './inkBoolean'
+import { strokeToFlatInkGroups } from './flatStrokeGeometry'
 import { brushInkGroupsToInkRegions } from './inkGeometry'
 import { strokeToRenderInkGroups } from './strokeRenderGeometry'
 import type { Contour } from './strokeToOutline'
@@ -128,22 +129,26 @@ export function materializeFinalGlyphInk(
       regions.push(cloneRegion(primitive.region))
       continue
     }
-    if (primitive.effectiveLinecap !== 'round' || primitive.effectiveLinejoin !== 'round') {
+    // 끝·꺾임이 둥글지 않은 중심선은 붓 tip 방식으로 못 만든다. brush 모드에서만 일자 stroker로 대신한다.
+    const flat = primitive.effectiveLinecap !== 'round' || primitive.effectiveLinejoin !== 'round'
+    if (flat && strokeStyle.mode !== 'brush') {
       return {
         ok: false,
         primitiveId: primitive.id,
-        message: `중심선 ${primitive.id}의 ${primitive.effectiveLinecap}/${primitive.effectiveLinejoin} 윤곽 변환은 아직 지원하지 않습니다.`,
+        message: `중심선 ${primitive.id}의 ${primitive.effectiveLinecap}/${primitive.effectiveLinejoin} 윤곽 변환은 ${strokeStyle.mode} 스타일에서 지원하지 않습니다.`,
       }
     }
     const vertices = resolveFinalInkEllipseVertexCount(primitive.stroke.thickness * primitive.weightMultiplier / 2, options)
     if (vertices === 0) return { ok: false, primitiveId: primitive.id, message: '최종 잉크 곡선 오차 옵션이 유효하지 않습니다.' }
-    const groups = strokeToRenderInkGroups(
-      primitive.stroke as StrokeDataV2,
-      { ...primitive.box },
-      primitive.weightMultiplier,
-      strokeStyle as StrokeRenderStyle,
-      { ellipseVertexCount: vertices },
-    )
+    const groups = flat
+      ? strokeToFlatInkGroups(primitive.stroke as StrokeDataV2, { ...primitive.box }, primitive.weightMultiplier, primitive.effectiveLinecap, primitive.effectiveLinejoin, vertices)
+      : strokeToRenderInkGroups(
+        primitive.stroke as StrokeDataV2,
+        { ...primitive.box },
+        primitive.weightMultiplier,
+        strokeStyle as StrokeRenderStyle,
+        { ellipseVertexCount: vertices },
+      )
     const strokeRegions = brushInkGroupsToInkRegions(groups)
     if (strokeRegions.length === 0) {
       return { ok: false, primitiveId: primitive.id, message: `중심선 ${primitive.id}을 면으로 만들 수 없습니다.` }

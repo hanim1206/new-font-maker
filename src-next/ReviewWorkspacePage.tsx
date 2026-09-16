@@ -9,6 +9,7 @@ import { NotoCorpusMatrix } from './NotoCorpusMatrix'
 import { editableComponentRailsOf, fitComponentsForGlyph, renderComponentPart } from './notoComponentFitView'
 import type { ComponentFitPart, RenderedComponentPart } from './notoComponentFitView'
 import type { ComponentFaces } from '../src/services/notoComponentFit'
+import type { BoxConfig } from '../src/types'
 import { editableRailsOf, fitMedialForGlyph, renderMedialPart, roleLabel } from './notoMedialFitView'
 import type { EditableRail, MedialFitView, RenderedMedialPart } from './notoMedialFitView'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
@@ -122,9 +123,24 @@ function baselineRails(glyph: NotoPresetGlyph): Rail[] {
 }
 
 const VIEW_BOX_SIZE = 1.16
+const GHOST_STORAGE_KEY = 'review-ghost-visible-v1'
 
-function GhostCanvas({ ghost, measured, editable = [], selectedRail, onSelectRail, onDragRail, label, overlays = [], componentOverlays = [] }: {
+function readGhostVisible(): boolean {
+  try { return localStorage.getItem(GHOST_STORAGE_KEY) !== 'off' } catch { return true }
+}
+function writeGhostVisible(visible: boolean) {
+  try { localStorage.setItem(GHOST_STORAGE_KEY, visible ? 'on' : 'off') } catch { /* 저장 못 해도 화면은 동작 */ }
+}
+
+/** 기준선이 만드는 부품 상자. 홀자는 잉크 slot, 닿자는 네 변. 획 색이 아니라 상자 색으로 부품을 가른다. */
+interface FitBox { id: string; kind: 'medial' | 'component'; label: string; box: BoxConfig }
+
+const BOX_COLOR: Record<FitBox['kind'], string> = { medial: '#3b6fd6', component: '#2f9a6a' }
+
+function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], selectedRail, onSelectRail, onDragRail, label, overlays = [], componentOverlays = [], boxes = [] }: {
   ghost: string
+  /** Noto 고스트를 끄면 내 획만 남아 어느 획을 바꿀지 보인다. */
+  ghostVisible?: boolean
   /** Noto 실측 기준선. 참고용이라 옅은 점선, 조작 없음. */
   measured: Rail[]
   /** 획 마스터 rail. 잡고 끌 수 있다. */
@@ -134,10 +150,12 @@ function GhostCanvas({ ghost, measured, editable = [], selectedRail, onSelectRai
   /** 캔버스에서 rail을 직접 끈다. 값은 em 제안값, 호출자가 순서·간격을 판정한다. */
   onDragRail?: (id: string, value: number) => void
   label: string
-  /** 내 획 마스터 잉크. 고스트 위에 파랗게 겹친다. */
+  /** 내 홀자 획 마스터 잉크. 검정. */
   overlays?: string[]
-  /** 닿자 박스 fit 잉크(앱 획). 초록으로 구분한다. */
+  /** 닿자 박스 fit 잉크(앱 획). 검정. */
   componentOverlays?: string[]
+  /** 획 뒤에 칠하는 부품 상자. */
+  boxes?: FitBox[]
 }) {
   const gesture = useRef<{ pointerId: number; id: string; axis: 'x' | 'y'; start: number; startValue: number } | null>(null)
   const startDrag = (rail: EditableRail) => (event: ReactPointerEvent<SVGLineElement>) => {
@@ -173,10 +191,15 @@ function GhostCanvas({ ghost, measured, editable = [], selectedRail, onSelectRai
     <rect x="0" y="0" width="1" height="1" fill="url(#review-grid-coarse)" />
     <rect x="0" y="0" width="1" height="1" fill="none" stroke="rgb(196 203 212)" strokeWidth=".004" />
     <path d="M-.06 .88H1.02" stroke="#a6a297" strokeWidth=".003" />
-    {/* Noto 고스트. 잉크가 아니라 비교용이라 반투명으로 깐다. */}
-    <path d={ghost} fill="#3a3a36" fillOpacity=".55" fillRule="evenodd" data-testid="review-ghost" />
-    {overlays.map((path, index) => <path key={index} d={path} fill="#3b6fd6" fillOpacity=".45" fillRule="evenodd" data-testid="review-fit-ink" />)}
-    {componentOverlays.map((path, index) => <path key={`c${index}`} d={path} fill="#2f9a6a" fillOpacity=".4" fillRule="evenodd" data-testid="review-component-ink" />)}
+    {/* 부품 상자. 획보다 아래, 고스트보다 아래. 홀자 파랑·닿자 초록. */}
+    {boxes.map((item) => <g key={item.id} data-testid="review-fit-box" data-kind={item.kind}>
+      <rect x={item.box.x} y={item.box.y} width={item.box.width} height={item.box.height} fill={BOX_COLOR[item.kind]} fillOpacity=".14" stroke={BOX_COLOR[item.kind]} strokeOpacity=".55" strokeWidth=".003" />
+      <text x={item.box.x + 0.008} y={item.box.y - 0.008} fontSize=".024" fill={BOX_COLOR[item.kind]} fillOpacity=".8">{item.label}</text>
+    </g>)}
+    {/* Noto 고스트. 잉크가 아니라 비교용이라 반투명으로 깐다. 검정 획 아래에 두어 벗어난 곳만 회색으로 보인다. */}
+    {ghostVisible && <path d={ghost} fill="#3a3a36" fillOpacity=".55" fillRule="evenodd" data-testid="review-ghost" />}
+    {overlays.map((path, index) => <path key={index} d={path} fill="#111" fillRule="evenodd" data-testid="review-fit-ink" />)}
+    {componentOverlays.map((path, index) => <path key={`c${index}`} d={path} fill="#111" fillRule="evenodd" data-testid="review-component-ink" />)}
     {measured.map((rail) => <g key={rail.id} data-rail={rail.id}>
       <line {...geometryOf(rail.axis, rail.value)} stroke="#b8b4a8" strokeWidth=".003" strokeDasharray=".012 .008" />
       <text {...(rail.axis === 'x' ? { x: rail.value + 0.012, y: 1.01 } : { x: 0.96, y: rail.value - 0.008 })} fontSize=".026" fill="#b8b4a8">{rail.label}</text>
@@ -329,6 +352,12 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
     ...editableComponentRailsOf(componentParts, facesByPart),
   ], [fitView, railsByPart, componentParts, facesByPart])
   const overlays = rendered.flatMap((part) => part.path ? [part.path] : [])
+  const boxes = useMemo<FitBox[]>(() => [
+    ...rendered.flatMap((part, index) => part.slot && fitView ? [{ id: `m${index}`, kind: 'medial' as const, label: fitView.parts[index].role === 'JU_H' ? '홀자 가로부' : fitView.parts[index].role === 'JU_V' ? '홀자 세로부' : '홀자', box: part.slot }] : []),
+    ...componentRendered.flatMap((part, index) => part.faces ? [{ id: `c${index}`, kind: 'component' as const, label: componentParts[index].part === 'CH' ? '첫닿자' : '받침', box: { x: part.faces.left, y: part.faces.top, width: part.faces.right - part.faces.left, height: part.faces.bottom - part.faces.top } }] : []),
+  ], [rendered, fitView, componentRendered, componentParts])
+  const [ghostVisible, setGhostVisible] = useState(readGhostVisible)
+  const toggleGhost = () => setGhostVisible((current) => { writeGhostVisible(!current); return !current })
   const rail = editable.find((item) => item.id === selectedRail) ?? editable[0]
   const editCount = editable.filter((item) => Math.abs(item.value - item.original) > 1e-9).length
 
@@ -374,9 +403,10 @@ function GlyphView({ glyph }: { glyph: NotoPresetGlyph }) {
   return <MobileWorkspaceShell activeArea="review" statusLabel={approved ? '검수 · 승인 측정' : '검수 · 실측 보기'} drawer={ruler || undefined}>
     <GlyphTitle codepoint={codepoint} approved={approved} />
     <div className={styles.scroll}>
-      <p className={styles.context}>{glyph.identity.initialJamo} + {glyph.identity.medialJamo}{glyph.identity.finalJamo ? ` + ${glyph.identity.finalJamo}` : ''} · <b>{approved ? '승인 측정 있음' : '승인 추출 없음'}</b> · 회색 고스트 위 파랑 = 홀자 획, 초록 = 닿자 획</p>
+      <p className={styles.context}>{glyph.identity.initialJamo} + {glyph.identity.medialJamo}{glyph.identity.finalJamo ? ` + ${glyph.identity.finalJamo}` : ''} · <b>{approved ? '승인 측정 있음' : '승인 추출 없음'}</b> · 검정 = 내 획 · 파란 상자 = 홀자 · 초록 상자 = 닿자 · 회색 = Noto 고스트</p>
       <section className={styles.canvasSection}>
-        {'path' in ghost ? <GhostCanvas ghost={ghost.path} measured={measured} editable={editable} selectedRail={rail?.id} onSelectRail={(id) => { setSelectedRail(id); setError('') }} onDragRail={changeRail} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
+        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={editable} selectedRail={rail?.id} onSelectRail={(id) => { setSelectedRail(id); setError('') }} onDragRail={changeRail} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
+        <button type="button" className={styles.canvasToggle} aria-pressed={ghostVisible} onClick={toggleGhost} data-testid="review-ghost-toggle">Noto 고스트</button>
         <TierBadge approved={approved} className={styles.canvasBadge} />
       </section>
       {editable.length > 0 && <div className={styles.chips} role="group" aria-label="편집할 기준선">

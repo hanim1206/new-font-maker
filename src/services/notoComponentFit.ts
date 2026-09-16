@@ -64,23 +64,69 @@ export function componentBoxFromFaces(strokes: readonly StrokeDataV2[], faces: C
   return { box: { x, y, width, height }, thickness }
 }
 
+function inkBounds(regions: readonly DeepReadonly<InkRegion>[]): ComponentFaces | null {
+  const points = regions.flatMap((region) => region.outer)
+  if (!points.length) return null
+  return { left: Math.min(...points.map((p) => p.x)), right: Math.max(...points.map((p) => p.x)), top: Math.min(...points.map((p) => p.y)), bottom: Math.max(...points.map((p) => p.y)) }
+}
+
+/**
+ * 잉크 바깥 범위가 faces에 정확히 오도록 상자를 축별로 다듬는다.
+ * 두께/2 안쪽 상자는 둥근 끝 가정이라, 일자 끝(butt)이나 기울어진 획 끝에서는 잉크가 faces에 못 미치거나 넘친다.
+ * 실제 잉크를 재서 상자를 늘리고 옮기기를 몇 번 반복하면 두께가 고정이어도 빠르게 수렴한다.
+ */
+function refineBoxToFaces(strokes: readonly StrokeDataV2[], box: BoxConfig, faces: ComponentFaces, makePrimitives: (box: BoxConfig) => ResolvedCenterlinePrimitive<ResolvedStrokeInkSource>[]): BoxConfig {
+  const bounds = getStrokeCenterlineBounds(strokes as StrokeDataV2[])
+  if (!bounds) return box
+  const spreads = { x: bounds.maxX - bounds.minX > EPSILON, y: bounds.maxY - bounds.minY > EPSILON }
+  let current = { ...box }
+  for (let pass = 0; pass < 4; pass += 1) {
+    const ink = materializeFinalGlyphInk(makePrimitives(current), FIT_INK_STYLE, INK_OPTIONS)
+    if (!ink.ok) return current
+    const actual = inkBounds(ink.ink.regions)
+    if (!actual) return current
+    const error = Math.max(Math.abs(actual.left - faces.left), Math.abs(actual.right - faces.right), Math.abs(actual.top - faces.top), Math.abs(actual.bottom - faces.bottom))
+    if (error < 1e-6) return current
+    const next = { ...current }
+    if (spreads.x && actual.right - actual.left > EPSILON) {
+      const scale = (faces.right - faces.left) / (actual.right - actual.left)
+      next.width = current.width * scale
+      next.x = current.x + faces.left - (current.x + (actual.left - current.x) * scale)
+    } else {
+      next.x = current.x + (faces.left + faces.right) / 2 - (actual.left + actual.right) / 2
+    }
+    if (spreads.y && actual.bottom - actual.top > EPSILON) {
+      const scale = (faces.bottom - faces.top) / (actual.bottom - actual.top)
+      next.height = current.height * scale
+      next.y = current.y + faces.top - (current.y + (actual.top - current.y) * scale)
+    } else {
+      next.y = current.y + (faces.top + faces.bottom) / 2 - (actual.top + actual.bottom) / 2
+    }
+    if (!(next.width > EPSILON) || !(next.height > EPSILON)) return current
+    current = next
+  }
+  return current
+}
+
 export function fitNotoComponent(input: ComponentFitInput): ComponentFitOutcome {
   const strokes = strokesOf(input.jamo)
   if (!strokes.length) return { ok: false, message: `${input.jamo.char}: 앱 획이 없습니다.` }
   if (![input.faces.left, input.faces.right, input.faces.top, input.faces.bottom].every(Number.isFinite)) return { ok: false, message: '박스 네 변이 없습니다.' }
   const placed = componentBoxFromFaces(strokes, input.faces, input.weightMultiplier ?? 1)
   if (typeof placed === 'string') return { ok: false, message: placed }
-  const primitives = strokes.map((stroke): ResolvedCenterlinePrimitive<ResolvedStrokeInkSource> => {
+  const makePrimitives = (box: BoxConfig) => strokes.map((stroke): ResolvedCenterlinePrimitive<ResolvedStrokeInkSource> => {
     const source: ResolvedStrokeInkSource = { kind: 'stroke', glyphId: input.glyphId, part: input.part, channel: 'strokes', jamoId: input.jamo.char, strokeId: stroke.id }
     return {
       kind: 'centerline', coordinateSpace: 'stroke-local-with-glyph-box',
       id: ['centerline', source.glyphId, source.part, source.channel, source.jamoId, source.strokeId].map(encodeURIComponent).join(':'),
-      source, stroke, box: { ...placed.box }, weightMultiplier: input.weightMultiplier ?? 1,
-      effectiveLinecap: stroke.linecap ?? input.globalLinecap ?? 'round',
-      effectiveLinejoin: stroke.linejoin ?? input.globalLinejoin ?? 'round',
+      source, stroke, box: { ...box }, weightMultiplier: input.weightMultiplier ?? 1,
+      // Noto 닿자 끝은 일자다. 기본을 butt/miter로 두어 홀자 fit 획과 같은 모양으로 놓는다.
+      effectiveLinecap: stroke.linecap ?? input.globalLinecap ?? 'butt',
+      effectiveLinejoin: stroke.linejoin ?? input.globalLinejoin ?? 'miter',
     }
   })
-  return { ok: true, fit: { part: input.part, jamoId: input.jamo.char, faces: { ...input.faces }, box: placed.box, thickness: placed.thickness, primitives } }
+  const box = refineBoxToFaces(strokes, placed.box, input.faces, makePrimitives)
+  return { ok: true, fit: { part: input.part, jamoId: input.jamo.char, faces: { ...input.faces }, box, thickness: placed.thickness, primitives: makePrimitives(box) } }
 }
 
 export function inkOfComponentFit(fit: ComponentFitResult): { ok: true; regions: readonly DeepReadonly<InkRegion>[] } | { ok: false; message: string } {

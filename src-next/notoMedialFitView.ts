@@ -5,6 +5,7 @@ import { applyRailEdits, boundRailRoles, fitNotoMedialMaster, fitRailAxis, split
 import type { FitRailKey, MedialFitInput, MedialFitResult, MedialRoleMeasurement } from '../src/services/notoMedialMasterFit'
 import { selectNotoOutlineContours } from '../src/services/notoOutlineInk'
 import type { NotoOutline } from '../src/services/notoOutlineInk'
+import type { BoxConfig } from '../src/types'
 import { MEDIAL_ROLE_SETS, predictNotoTarget } from '../src/services/notoVariationModel'
 import type { ApprovedNotoInput } from './notoBoundMaster'
 import type { CorpusIdentity } from './notoCorpus'
@@ -39,6 +40,8 @@ export interface MedialFitView {
 
 export interface RenderedMedialPart {
   path?: string
+  /** 획을 놓은 뒤의 홀자 잉크 박스(em). 화면에서 기준선 상자로 칠한다. */
+  slot?: BoxConfig
   xorRatio?: number
   inkRatio?: number
   railErrors: RailError[]
@@ -110,7 +113,7 @@ export function renderMedialPart(part: MedialFitPart, railsEm?: Readonly<Record<
   if (!placed.ok) return { railErrors: [], message: placed.message }
   const ink = inkOfFit(placed.fit)
   if (!ink.ok) return { railErrors: [], message: ink.message }
-  const rendered: RenderedMedialPart = { path: finalGlyphInkToSvgPath({ regions: ink.regions }, 1), railErrors: [] }
+  const rendered: RenderedMedialPart = { path: finalGlyphInkToSvgPath({ regions: ink.regions }, 1), slot: { ...placed.fit.slot }, railErrors: [] }
   if (part.ghostOutline && part.reference) {
     const report = reportFitResult({ fit: placed.fit, ghostOutline: part.ghostOutline, referenceMeasurements: part.reference })
     rendered.railErrors = report.railErrors

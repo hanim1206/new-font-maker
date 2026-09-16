@@ -39,19 +39,24 @@ describe('componentBoxFromFaces', () => {
     expect(fitNotoComponent({ part: 'CH', jamo: GIYEOK, faces: { left: 0.1, right: 0.15, top: 0.1, bottom: 0.9 }, glyphId: 'x' })).toMatchObject({ ok: false })
   })
 
-  it('fit 잉크의 바깥 범위는 faces 근처에 온다(round cap 여유)', () => {
+  it('fit 잉크의 바깥 범위는 faces에 온다(일자 끝)', () => {
     const faces = { left: 0.1, right: 0.5, top: 0.15, bottom: 0.79 }
     const fit = fitNotoComponent({ part: 'CH', jamo: GIYEOK, faces, glyphId: 'ㄱ' })
     expect(fit.ok).toBe(true)
     if (!fit.ok) return
+    // ㄱ 가로획 왼끝·세로획 아래끝은 일자라 중심선이 faces까지 간다. 윗면·오른면은 두께/2 안쪽.
+    expect(fit.fit.box.x).toBeCloseTo(0.1, 5)
+    expect(fit.fit.box.x + fit.fit.box.width).toBeCloseTo(0.5 - 0.035, 5)
+    expect(fit.fit.box.y).toBeCloseTo(0.15 + 0.035, 5)
+    expect(fit.fit.box.y + fit.fit.box.height).toBeCloseTo(0.79, 5)
     const ink = inkOfComponentFit(fit.fit)
     expect(ink.ok).toBe(true)
     if (!ink.ok) return
     const points = ink.regions.flatMap((region) => region.outer)
-    expect(Math.min(...points.map((p) => p.x))).toBeCloseTo(faces.left, 2)
-    expect(Math.max(...points.map((p) => p.x))).toBeCloseTo(faces.right, 2)
-    expect(Math.min(...points.map((p) => p.y))).toBeCloseTo(faces.top, 2)
-    expect(Math.max(...points.map((p) => p.y))).toBeCloseTo(faces.bottom, 2)
+    expect(Math.min(...points.map((p) => p.x))).toBeCloseTo(faces.left, 5)
+    expect(Math.max(...points.map((p) => p.x))).toBeCloseTo(faces.right, 5)
+    expect(Math.min(...points.map((p) => p.y))).toBeCloseTo(faces.top, 5)
+    expect(Math.max(...points.map((p) => p.y))).toBeCloseTo(faces.bottom, 5)
   })
 })
 

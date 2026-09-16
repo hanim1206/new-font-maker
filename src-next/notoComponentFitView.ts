@@ -30,6 +30,8 @@ export interface ComponentFitPart {
 
 export interface RenderedComponentPart {
   path?: string
+  /** 획을 놓은 네 변(em). 화면에서 닿자 박스로 칠한다. */
+  faces?: ComponentFaces
   xorRatio?: number
   inkRatio?: number
   faceErrors: FaceError[]
@@ -83,7 +85,7 @@ export function renderComponentPart(part: ComponentFitPart, faces?: ComponentFac
   if (!fit.ok) return { faceErrors: [], message: fit.message }
   const ink = inkOfComponentFit(fit.fit)
   if (!ink.ok) return { faceErrors: [], message: ink.message }
-  const rendered: RenderedComponentPart = { path: finalGlyphInkToSvgPath({ regions: ink.regions }, 1), faceErrors: [] }
+  const rendered: RenderedComponentPart = { path: finalGlyphInkToSvgPath({ regions: ink.regions }, 1), faces: { ...fit.fit.faces }, faceErrors: [] }
   if (part.ghostOutline && part.reference) {
     const report = reportComponentFit({ fit: fit.fit, ghostOutline: part.ghostOutline, referenceFaces: part.reference })
     rendered.faceErrors = report.faceErrors
