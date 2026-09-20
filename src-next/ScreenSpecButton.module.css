@@ -1,0 +1,42 @@
+/* 좁은 화면(셸이 화면을 꽉 채움)에서는 조작 영역을 안 가리게 왼쪽 가장자리의 얇은 탭으로, 넓은 화면에서는 셸 바깥 오른쪽 아래 구석에 둔다.
+   터치 영역은 셸 계약대로 44×44를 지키고, 보이는 탭(.tab)만 얇다. */
+.button { position: fixed; left: 0; top: 46%; z-index: 2147483000; width: 44px; height: 44px; display: flex; align-items: center; justify-content: flex-start; padding: 0; border: 0; background: transparent; color: rgb(var(--color-text-3)); cursor: pointer; }
+.tab { width: 16px; height: 44px; display: grid; place-items: center; border: 1px solid rgb(var(--color-border)); border-left: 0; border-radius: 0 8px 8px 0; background: rgb(var(--color-surface)); box-shadow: 0 4px 14px rgb(15 23 42 / .16); }
+.tab svg { width: 12px; height: 12px; }
+@media (min-width: 640px) {
+  .button { left: auto; top: auto; right: 14px; bottom: 14px; justify-content: center; }
+  .tab { width: 44px; border-left: 1px solid rgb(var(--color-border)); border-radius: 50%; }
+  .tab svg { width: 18px; height: 18px; }
+}
+.button[aria-pressed='true'] .tab { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary)); color: rgb(var(--color-primary-foreground)); }
+.button[data-has-spec='false'] .tab { opacity: .55; }
+
+.panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 2147482999; width: min(400px, 100vw); display: flex; flex-direction: column; border-left: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); box-shadow: -12px 0 32px rgb(15 23 42 / .14); font-size: 12px; line-height: 1.55; }
+.head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 12px 10px 16px; border-bottom: 1px solid rgb(var(--color-border-subtle)); }
+.head div { min-width: 0; display: flex; flex-direction: column; }
+.head strong { font-size: 14px; }
+.head span { color: rgb(var(--color-text-4)); font-size: 10px; }
+.head button { width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-3)); cursor: pointer; }
+.body { flex: 1 1 auto; padding: 4px 16px 96px; overflow-y: auto; overscroll-behavior: contain; }
+.body code { padding: 1px 4px; border-radius: 4px; background: rgb(var(--color-surface-3)); font-size: .92em; }
+
+.title { margin: 12px 0 4px; font-size: 16px; }
+.section { display: flex; align-items: baseline; gap: 7px; margin: 18px 0 6px; padding-top: 10px; border-top: 1px solid rgb(var(--color-border-subtle)); font-size: 13px; }
+.section span { color: rgb(var(--color-primary-dark)); font-variant-numeric: tabular-nums; }
+.note { margin: 4px 0; color: rgb(var(--color-text-3)); }
+.features { margin: 0; padding: 0; list-style: none; }
+.feature { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 0 6px; padding: 3px 0; }
+.feature[data-numbered='false'] > * { grid-column: 1 / -1; }
+.number { color: rgb(var(--color-primary-dark)); font-weight: 700; font-variant-numeric: tabular-nums; }
+.feature strong { color: rgb(178 77 61); }
+
+.reference { grid-column: 2; margin: 3px 0 5px; border-left: 2px solid rgb(var(--color-primary) / .35); padding-left: 8px; }
+.reference summary, .all summary { color: rgb(var(--color-primary-dark)); font-size: 11px; font-weight: 700; cursor: pointer; }
+.reference ul { margin: 2px 0 0; padding: 0; list-style: none; color: rgb(var(--color-text-2)); }
+
+.all { margin-top: 22px; padding-top: 10px; border-top: 1px solid rgb(var(--color-border)); }
+.all ul { margin: 6px 0 0; padding: 0; list-style: none; }
+.all a { min-height: 44px; align-content: center; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; padding: 6px 8px; border-radius: 8px; color: inherit; text-decoration: none; }
+.all a:hover, .all a[aria-current='page'] { background: rgb(var(--color-primary-light) / .6); }
+.all a code { grid-column: 1; background: transparent; padding: 0; color: rgb(var(--color-text-4)); }
+.all a span { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: rgb(var(--color-text-4)); font-size: 10px; }
