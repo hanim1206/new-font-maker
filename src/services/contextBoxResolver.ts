@@ -4,7 +4,7 @@ import type { ComponentFaces } from './notoComponentFit'
 import { medialInputFromPrediction } from './notoFitReport'
 import { applyMedialDelta } from './medialRailDelta'
 import type { SemanticDelta } from './medialRailDelta'
-import { applyRailEdits, fitNotoMedialMaster, splitMixedMedialRoles } from './notoMedialMasterFit'
+import { applyRailEdits, applySlotFacesDelta, fitNotoMedialMaster, splitMixedMedialRoles } from './notoMedialMasterFit'
 import type { MedialFitInput, MedialFitResult } from './notoMedialMasterFit'
 import { MEDIAL_ROLE_SETS, modelIdentityOf, predictNotoTarget } from './notoVariationModel'
 import { medialFamilyOf } from '../utils/jamoContextStrokes'
@@ -27,8 +27,9 @@ export type MedialPart = Extract<Part, 'JU' | 'JU_H' | 'JU_V'>
 
 /**
  * 배치 Δ. 저장 단위는 이것뿐이다(상자는 저장하지 않는다).
- * - `faces`: 닿자(첫닿자·받침) 네 변 오프셋(em).
+ * - `faces`: 네 변 오프셋(em). 닿자(CH·JO)는 상자에 그대로 얹고, 홀자(JU·JU_H·JU_V)는 잉크 상자 변이라 rail을 축별 아핀으로 다시 놓는다(두께 고정, `applySlotFacesDelta`).
  * - `medial`: 홀자 part별 획 역할 중심 rail 오프셋(em, `primaryBeam.center` 같은 키). 모델 rail에 얹어 fit을 다시 놓으므로 slot이 따라온다.
+ * 홀자는 상자 변 Δ를 먼저, 중심 rail Δ를 그 위에 얹는다.
  * 순서·간격 위반으로 다시 놓지 못하는 글자는 Δ를 받지 않고 모델 rail 그대로다(클램프 = 자동 예외).
  */
 export interface ContextBoxDelta {
@@ -143,7 +144,7 @@ export function medialPartGroups(medialJamo: string): { part: ContextMedialPart[
  * 모델 rail로 홀자 획 마스터를 fit한다. 검수 화면과 칸 해석이 같은 fit을 쓴다.
  * 홀자 Δ가 있으면 획 역할 키로 rail에 얹어 다시 놓는다. 못 놓으면(순서·간격 위반) 모델 rail 그대로.
  */
-export function fitContextMedial(identity: ModelIdentity, model: ContextModel, medialDelta?: ContextBoxDelta['medial']): ContextMedialPart[] {
+export function fitContextMedial(identity: ModelIdentity, model: ContextModel, medialDelta?: ContextBoxDelta['medial'], facesDelta?: ContextBoxDelta['faces']): ContextMedialPart[] {
   const groups = medialPartGroups(identity.medialJamo)
   if (!groups) return [{ part: 'JU', role: 'JU_VERTICAL', roleIds: [], message: `${identity.medialJamo}의 역할 구성이 없습니다.` }]
   const thickness = model.thickness[identity.medialJamo]
@@ -154,8 +155,15 @@ export function fitContextMedial(identity: ModelIdentity, model: ContextModel, m
     if (!made.ok) return { ...group, message: made.message }
     const fit = fitNotoMedialMaster(made.input)
     if (!fit.ok) return { ...group, message: fit.message }
-    return { ...group, fit: withMedialDelta(fit.fit, medialDelta?.[group.part]) }
+    return { ...group, fit: withMedialDelta(withSlotFacesDelta(fit.fit, facesDelta?.[group.part]), medialDelta?.[group.part]) }
   })
+}
+
+/** 홀자 상자 변 Δ. 닿자와 달리 상자만 미는 게 아니라 rail을 다시 놓아 fit의 slot이 따라오게 한다. 못 놓으면 그대로. */
+function withSlotFacesDelta(fit: MedialFitResult, delta?: Partial<ContextFaces>): MedialFitResult {
+  if (!delta || !SIDES.some((side) => Math.abs(delta[side] ?? 0) > 1e-12)) return fit
+  const moved = applySlotFacesDelta(fit, delta)
+  return moved.ok ? moved.fit : fit
 }
 
 function withMedialDelta(fit: MedialFitResult, delta?: SemanticDelta): MedialFitResult {
@@ -207,17 +215,18 @@ export function resolveContextBoxes(input: {
   const glyphId = syllable?.char ?? `${identity.initialJamo}${identity.medialJamo}${identity.finalJamo ?? ''}`
   const parts: ContextPartBox[] = []
   const issues: ContextBoxResolution['issues'] = []
-  const place = (part: Part, faces: ContextFaces) => {
-    const placed = placePart(part, withDelta(faces, delta?.faces?.[part]), syllable, glyphId, identity.medialJamo, input.ends)
+  // 닿자 변 Δ는 여기서 상자에 얹는다. 홀자 변 Δ는 fit 단계에서 이미 slot에 들어가 있어 다시 얹지 않는다.
+  const place = (part: Part, faces: ContextFaces, facesDelta?: Partial<ContextFaces>) => {
+    const placed = placePart(part, withDelta(faces, facesDelta), syllable, glyphId, identity.medialJamo, input.ends)
     if (typeof placed === 'string') issues.push({ part, message: placed })
     else parts.push(placed)
   }
 
   const initial = predictComponentFaces(identity, model, 'CH')
-  if (initial) place('CH', initial)
+  if (initial) place('CH', initial, delta?.faces?.CH)
   else issues.push({ part: 'CH', message: '이 문맥의 첫닿자 박스 예측이 없습니다.' })
 
-  const medial = fitContextMedial(identity, model, delta?.medial)
+  const medial = fitContextMedial(identity, model, delta?.medial, delta?.faces)
   for (const group of medial) {
     if (group.fit) place(group.part, boxToFaces(group.fit.slot))
     else issues.push({ part: group.part, message: group.message ?? '홀자 fit 실패' })
@@ -225,7 +234,7 @@ export function resolveContextBoxes(input: {
 
   if (identity.finalJamo) {
     const final = predictComponentFaces(identity, model, 'JO')
-    if (final) place('JO', final)
+    if (final) place('JO', final, delta?.faces?.JO)
     else issues.push({ part: 'JO', message: '이 문맥의 받침 박스 예측이 없습니다.' })
   }
 

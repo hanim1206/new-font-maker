@@ -303,3 +303,48 @@ test('자소를 통째로 잡으면 트랙패드 대신 레이아웃으로 넘�
   await expect(page.getByTestId('jamo-layout-handoff')).toHaveCount(0)
   await expect(page.getByRole('group', { name: '선택한 글자 형태를 조절하는 트랙패드' })).toBeVisible()
 })
+
+/** ㅣ는 획이 하나라 가로로는 크기를 못 바꾼다. 상자 변을 밀면 통째로 옮겨지고, 세로 변은 기둥 길이를 바꾼다. */
+test('홀자 상자 변을 옮겨 적용하면 ㅣ 글자도 문장 줄에서 자리가 바뀌고 저장된다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EA%B8%B0&mode=layout')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  const canvas = page.getByTestId('review-canvas')
+  // 홀자 탭에 상자 네 변이 있고, 기둥 중심도 이제 잠기지 않는다.
+  for (const side of ['왼변', '오른변', '윗변', '아랫변']) await expect(canvas.getByRole('button', { name: `홀자 ${side} 선택` })).toHaveCount(1)
+  await expect(canvas.getByRole('button', { name: '바깥기둥 중심 선택' })).toHaveCount(1)
+
+  const sentenceGlyph = page.getByRole('button', { name: '기 편집' })
+  const before = await sentenceGlyph.innerHTML()
+  const medialBox = canvas.locator('[data-testid="review-fit-box"][data-kind="medial"] rect')
+  const xBefore = Number(await medialBox.getAttribute('x'))
+  const widthBefore = Number(await medialBox.getAttribute('width'))
+  await selectRail(page, '홀자 왼변')
+  await page.keyboard.press('Shift+ArrowLeft')
+  await page.keyboard.press('Shift+ArrowLeft')
+  // 통째로 20u 왼쪽. 두께(상자 너비)는 그대로.
+  await expect.poll(async () => Number(await medialBox.getAttribute('x'))).toBeCloseTo(xBefore - 0.02, 6)
+  expect(Number(await medialBox.getAttribute('width'))).toBeCloseTo(widthBefore, 6)
+  await expect(page.getByTestId('review-propagation-deltas')).toContainText('홀자 왼변')
+  await expect(page.getByTestId('review-propagation-card').first()).toHaveAttribute('data-touched', 'true', { timeout: 20_000 })
+
+  await page.getByTestId('review-propagation-apply').click()
+  await expect.poll(() => sentenceGlyph.innerHTML()).not.toBe(before)
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('noto-layout-delta-v1')!).state)
+  expect(stored.layers.right.faces.JU.left).toBeCloseTo(-0.02, 9)
+  // 적용 뒤에도 상자는 그 자리, 세션 Δ는 0.
+  await expect.poll(async () => Number(await medialBox.getAttribute('x'))).toBeCloseTo(xBefore - 0.02, 6)
+  await expect(resetButton(page)).toContainText('모델 rail')
+})
+
+test('ㅏ의 홀자 오른변을 밀면 보가 길어지고 기둥 두께는 그대로다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EA%B0%80&mode=layout')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  const medialBox = page.getByTestId('review-canvas').locator('[data-testid="review-fit-box"][data-kind="medial"] rect')
+  const x = Number(await medialBox.getAttribute('x'))
+  const width = Number(await medialBox.getAttribute('width'))
+  await selectRail(page, '홀자 오른변')
+  await page.keyboard.press('Shift+ArrowRight')
+  await expect.poll(async () => Number(await medialBox.getAttribute('width'))).toBeCloseTo(width + 0.01, 6)
+  expect(Number(await medialBox.getAttribute('x'))).toBeCloseTo(x, 6)
+  await expect(resetButton(page)).toContainText('1개 변경')
+})

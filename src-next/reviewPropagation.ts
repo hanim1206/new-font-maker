@@ -36,6 +36,8 @@ export interface PropagationEdit {
     medial: Partial<Record<MedialPartKey, SemanticDelta>>
     /** 닿자 part별 네 변 Δ(em). */
     component: Partial<Record<ComponentPartKey, Partial<ComponentFaces>>>
+    /** 홀자 part별 상자 네 변 Δ(em). rail id가 `s`로 시작하는 변. */
+    slot: Partial<Record<MedialPartKey, Partial<ComponentFaces>>>
   }
   shape: {
     /** 홀자 part별 시작·끝 rail Δ를 그 축 슬롯 길이로 나눈 비율. 획 역할 키. */
@@ -55,10 +57,17 @@ const spanOf = (slot: BoxConfig, axis: 'x' | 'y') => axis === 'x' ? slot.width :
 
 /** 편집 가능한 rail 목록(값·모델 값)에서 Δ를 뽑아 배치·형태로 가른다. 바뀐 것만 남는다. */
 export function propagationEditOf(input: { editable: readonly EditableRail[]; medialParts: readonly MedialFitPart[]; componentParts: readonly ComponentFitPart[] }): PropagationEdit {
-  const edit: PropagationEdit = { layout: { medial: {}, component: {} }, shape: { medial: {} } }
+  const edit: PropagationEdit = { layout: { medial: {}, component: {}, slot: {} }, shape: { medial: {} } }
   for (const rail of input.editable) {
     const delta = rail.value - rail.original
     if (Math.abs(delta) <= EPSILON) continue
+    if (rail.kind === 'face' && rail.id.startsWith('s')) {
+      const part = input.medialParts[rail.partIndex]
+      if (!part) continue
+      const faces = (edit.layout.slot[part.part] ??= {})
+      faces[rail.role as keyof ComponentFaces] = delta
+      continue
+    }
     if (rail.kind === 'face') {
       const part = input.componentParts[rail.partIndex]
       if (!part) continue
@@ -106,10 +115,10 @@ export function unreachedRailIds(input: { identity: CorpusIdentity; model: Conte
   return unreached
 }
 
-export const hasLayoutEdit = (edit: PropagationEdit) => Object.keys(edit.layout.medial).length > 0 || Object.keys(edit.layout.component).length > 0
+export const hasLayoutEdit = (edit: PropagationEdit) => Object.keys(edit.layout.medial).length > 0 || Object.keys(edit.layout.component).length > 0 || Object.keys(edit.layout.slot).length > 0
 
 /** 배치 Δ를 저장 형태(`ContextBoxDelta`)로. 형태 Δ(시작·끝)는 자모 몫이라 여기 안 든다. */
-export const layoutDeltaOf = (edit: PropagationEdit): ContextBoxDelta => ({ faces: edit.layout.component, medial: edit.layout.medial })
+export const layoutDeltaOf = (edit: PropagationEdit): ContextBoxDelta => ({ faces: { ...edit.layout.component, ...edit.layout.slot }, medial: edit.layout.medial })
 export const hasShapeEdit = (edit: PropagationEdit) => Object.keys(edit.shape.medial).length > 0
 
 /** 비율 Δ를 대상 글자의 슬롯 길이(그 획 축)에 곱해 em Δ로 만든다. 없는 획은 그대로 둬서 applyMedialDelta가 건너뛰게 한다. */

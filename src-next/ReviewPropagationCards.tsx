@@ -4,7 +4,7 @@ import { notoOutlineGhostPath } from '../src/services/notoOutlineInk'
 import type { BoxConfig, Part } from '../src/types'
 import type { CorpusIdentity } from './notoCorpus'
 import { fitComponentsForGlyph, renderComponentPart } from './notoComponentFitView'
-import { fitMedialForGlyph, renderMedialPart } from './notoMedialFitView'
+import { fitMedialForGlyph, renderMedialPart, withSlotFaces } from './notoMedialFitView'
 import type { EditableRail } from './notoMedialFitView'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 import { useNotoGlyph } from './useNotoGlyph'
@@ -46,17 +46,22 @@ function PropagationCard({ identity, bundle, edit, mode }: { identity: CorpusIde
     const boxes: CardBox[] = []
     let skipped = 0
     let touched = 0
-    for (const part of medialView.parts) {
-      const base = renderMedialPart(part, undefined, inkStyle)
+    for (const modelPart of medialView.parts) {
+      const base = renderMedialPart(modelPart, undefined, inkStyle)
+      // 홀자 상자 변 Δ는 배치 모드에서만. 칸 해석과 같은 순서로 rail Δ보다 먼저 얹는다. 못 놓는 글자는 Δ를 안 받는다.
+      const slotDelta = mode === 'layout' ? edit.layout.slot[modelPart.part] : undefined
+      const slotMoved = withSlotFaces(modelPart, slotDelta)
+      const part = slotMoved.ok ? slotMoved.part : modelPart
+      const slotTouched = slotMoved.ok && part !== modelPart
+      if (slotDelta && !slotMoved.ok) skipped += 1
       // 배치는 em Δ 그대로, 형태는 이 글자 슬롯 길이에 비율을 곱해 em으로.
       const delta = !part.fit ? undefined : mode === 'layout' ? edit.layout.medial[part.part] : (() => { const ratios = edit.shape.medial[part.part]; return ratios && part.fit ? shapeDeltaToEm(ratios, part.fit.slot, part.fit.bindings) : undefined })()
-      if (!delta || !part.fit) { if (base.path) after.push(base.path); continue }
-      const applied = applyMedialDelta(part.fit, delta)
-      skipped += applied.skipped
-      if (applied.applied === 0) { if (base.path) after.push(base.path); continue }
-      const moved = renderMedialPart(part, applied.rails, inkStyle)
+      const applied = delta && part.fit ? applyMedialDelta(part.fit, delta) : null
+      if (applied) skipped += applied.skipped
+      if (!slotTouched && !(applied && applied.applied > 0)) { if (base.path) after.push(base.path); continue }
+      const moved = renderMedialPart(part, applied && applied.applied > 0 ? applied.rails : undefined, inkStyle)
       // 순서·간격 위반이면 이 글자는 Δ를 못 받는다(클램프 = 자동 예외).
-      if (!moved.path) { if (base.path) after.push(base.path); skipped += applied.applied; continue }
+      if (!moved.path) { if (base.path) after.push(base.path); skipped += applied?.applied ?? 0; continue }
       touched += 1
       after.push(moved.path)
       if (base.path) before.push(base.path)

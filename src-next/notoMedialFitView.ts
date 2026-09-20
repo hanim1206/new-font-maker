@@ -2,8 +2,8 @@ import { finalGlyphInkToSvgPath } from '../src/services/finalGlyphInk'
 import { inkOfFit, reportFitResult } from '../src/services/notoFitReport'
 import type { RailError } from '../src/services/notoFitReport'
 import type { FitInkStyle } from '../src/services/notoComponentFit'
-import { applyRailEdits, boundRailRoles, fitRailAxis } from '../src/services/notoMedialMasterFit'
-import type { FitRailKey, MedialFitInput, MedialFitResult, MedialRoleMeasurement } from '../src/services/notoMedialMasterFit'
+import { applyRailEdits, applySlotFacesDelta, boundRailRoles, fitRailAxis } from '../src/services/notoMedialMasterFit'
+import type { FitRailKey, MedialFitInput, MedialFitResult, MedialRoleMeasurement, SlotFacesDelta } from '../src/services/notoMedialMasterFit'
 import { selectNotoOutlineContours } from '../src/services/notoOutlineInk'
 import type { NotoOutline } from '../src/services/notoOutlineInk'
 import type { BoxConfig } from '../src/types'
@@ -110,6 +110,38 @@ export function renderMedialPart(part: MedialFitPart, railsEm?: Readonly<Record<
     if (report.ok) { rendered.xorRatio = report.xorRatio; rendered.inkRatio = report.inkRatio } else rendered.message = report.message
   }
   return rendered
+}
+
+const SLOT_SIDES = ['left', 'right', 'top', 'bottom'] as const
+const SLOT_SIDE_LABEL = { left: '왼변', right: '오른변', top: '윗변', bottom: '아랫변' } as const
+const hasSlotDelta = (delta?: SlotFacesDelta) => !!delta && SLOT_SIDES.some((side) => Math.abs(delta[side] ?? 0) > 1e-12)
+
+/**
+ * 홀자 상자 변 Δ를 얹은 part. 칸 해석과 같은 순서(상자 변 → 중심 rail)라 이 fit이 rail 편집의 새 출발점이 된다.
+ * 못 놓으면(상자가 획 두께보다 좁아짐, 순서·간격 위반) 이유를 돌려준다.
+ */
+export function withSlotFaces(part: MedialFitPart, delta?: SlotFacesDelta): { ok: true; part: MedialFitPart } | { ok: false; message: string } {
+  if (!part.fit || !hasSlotDelta(delta)) return { ok: true, part }
+  const moved = applySlotFacesDelta(part.fit, delta!)
+  return moved.ok ? { ok: true, part: { ...part, fit: moved.fit } } : { ok: false, message: moved.message }
+}
+
+/**
+ * 홀자 상자 네 변 rail. 중심 rail은 slot 가장자리를 만드는 획만 글자에 닿아서(ㅣ·ㅡ는 아예 안 닿음), 홀자 자리는 이 변으로 옮긴다.
+ * 값은 지금 그려진 상자의 변, 기준값은 거기서 이 변의 세션 Δ를 뺀 자리. id는 `s<part 순번>:<변>`.
+ */
+export function editableSlotRailsOf(parts: readonly MedialFitPart[], slots: readonly (BoxConfig | undefined)[], deltaByPart: readonly (SlotFacesDelta | undefined)[]): EditableRail[] {
+  const rails: EditableRail[] = []
+  parts.forEach((part, partIndex) => {
+    const slot = slots[partIndex]
+    if (!part.fit || !slot) return
+    const partLabel = part.role === 'JU_H' ? '가로부 ' : part.role === 'JU_V' ? '세로부 ' : '홀자 '
+    const sides = { left: slot.x, right: slot.x + slot.width, top: slot.y, bottom: slot.y + slot.height }
+    for (const side of SLOT_SIDES) {
+      rails.push({ id: `s${partIndex}:${side}`, partIndex, role: side, kind: 'face', axis: side === 'left' || side === 'right' ? 'x' : 'y', label: `${partLabel}${SLOT_SIDE_LABEL[side]}`, value: sides[side], original: sides[side] - (deltaByPart[partIndex]?.[side] ?? 0) })
+    }
+  })
+  return rails
 }
 
 /** 편집 가능한 rail 목록. 획이 매인 core rail만, 사람이 읽을 이름으로. */

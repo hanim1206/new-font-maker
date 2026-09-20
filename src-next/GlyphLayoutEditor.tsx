@@ -4,9 +4,10 @@ import { notoOutlineGhostPath } from '../src/services/notoOutlineInk'
 import { approvedInputFor, isApproved } from './notoApprovedIndex'
 import { editableComponentRailsOf, fitComponentsForGlyph, renderComponentPart } from './notoComponentFitView'
 import type { ComponentFaces } from '../src/services/notoComponentFit'
+import type { SlotFacesDelta } from '../src/services/notoMedialMasterFit'
 import { resolveContextBoxes } from '../src/services/contextBoxResolver'
 import type { BoxConfig, Part } from '../src/types'
-import { editableRailsOf, fitMedialForGlyph, renderMedialPart } from './notoMedialFitView'
+import { editableRailsOf, editableSlotRailsOf, fitMedialForGlyph, renderMedialPart, withSlotFaces } from './notoMedialFitView'
 import type { EditableRail } from './notoMedialFitView'
 import { useNotoModel } from './notoModel'
 import type { NotoPresetGlyph } from './notoPresetGlyphs'
@@ -219,8 +220,14 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
   </svg>
 }
 
-// 홀자 마스터 rail 키(core 역할 또는 보조 rail) → em 값.
-type RailsByPart = (Record<string, number> | undefined)[]
+// 홀자 마스터 rail 키(core 역할 또는 보조 rail) → 세션에서 옮긴 em Δ.
+type RailDeltaByPart = (Record<string, number> | undefined)[]
+
+/** fit rail 값에 세션 Δ를 얹은 절대값. Δ가 없으면 undefined(= fit 그대로). */
+function railsWithDelta(railsEm?: Readonly<Record<string, number>>, delta?: Readonly<Record<string, number>>): Record<string, number> | undefined {
+  if (!railsEm || !delta) return undefined
+  return Object.fromEntries(Object.entries(railsEm).map(([key, value]) => [key, value + (delta[key] ?? 0)]))
+}
 
 function GlyphLayoutBody({ glyph, initialPart, onCommitted }: { glyph: NotoPresetGlyph; initialPart?: Part; onCommitted?: GlyphLayoutEditorProps['onCommitted'] }) {
   const codepoint = glyph.identity.codepoint
@@ -238,18 +245,22 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted }: { glyph: NotoPrese
   const inkStyle = useFitInkStyle()
   const componentRendered = useMemo(() => componentParts.map((part, index) => renderComponentPart(part, facesByPart[index], inkStyle)), [componentParts, facesByPart, inkStyle])
   const componentOverlays = componentRendered.flatMap((part) => part.path ? [part.path] : [])
-  // rail 편집은 세션 임시. part별 em 값. undefined = 모델 rail 그대로.
-  const [railsByPart, setRailsByPart] = useState<RailsByPart>([])
+  // 홀자 편집은 세션 임시이고 칸 해석과 같은 순서로 쌓는다: 상자 변 Δ로 rail을 다시 놓고(`slotParts`), 그 위에 rail Δ를 얹는다.
+  const [slotDeltaByPart, setSlotDeltaByPart] = useState<(SlotFacesDelta | undefined)[]>([])
+  const [railDeltaByPart, setRailDeltaByPart] = useState<RailDeltaByPart>([])
+  const slotParts = useMemo(() => fitView ? fitView.parts.map((part, index) => { const moved = withSlotFaces(part, slotDeltaByPart[index]); return moved.ok ? moved.part : part }) : [], [fitView, slotDeltaByPart])
+  const railsByPart = useMemo(() => slotParts.map((part, index) => railsWithDelta(part.fit?.railsEm, railDeltaByPart[index])), [slotParts, railDeltaByPart])
   const [selectedRail, setSelectedRail] = useState<string | undefined>()
   const [error, setError] = useState('')
   // 손으로 끌다 걸린 자리. 자·방향키 이동엔 없다.
   const [snapHit, setSnapHit] = useState<SnapHit | null>(null)
-  const rendered = useMemo(() => fitView ? fitView.parts.map((part, index) => renderMedialPart(part, railsByPart[index], inkStyle)) : [], [fitView, railsByPart, inkStyle])
-  // 홀자 마스터 rail(`<n>:<role>`)과 닿자 박스 변(`c<n>:<side>`)을 한 목록으로. 선택·자·드래그가 같은 경로를 탄다.
+  const rendered = useMemo(() => slotParts.map((part, index) => renderMedialPart(part, railsByPart[index], inkStyle)), [slotParts, railsByPart, inkStyle])
+  // 홀자 마스터 rail(`<n>:<role>`), 홀자 상자 변(`s<n>:<side>`), 닿자 박스 변(`c<n>:<side>`)을 한 목록으로. 선택·자·드래그가 같은 경로를 탄다.
   const editable = useMemo(() => [
-    ...(fitView ? editableRailsOf(fitView.parts, railsByPart) : []),
+    ...editableRailsOf(slotParts, railsByPart),
+    ...editableSlotRailsOf(slotParts, rendered.map((part) => part.slot), slotDeltaByPart),
     ...editableComponentRailsOf(componentParts, facesByPart),
-  ], [fitView, railsByPart, componentParts, facesByPart])
+  ], [slotParts, railsByPart, rendered, slotDeltaByPart, componentParts, facesByPart])
   const overlays = rendered.flatMap((part) => part.path ? [part.path] : [])
   // rail → 부품. 캔버스 색·탭 필터가 이걸로 가른다.
   // 옮겨도 글자에 안 닿는 배치 rail은 잠근다. 세션 편집과 무관하게 저장된 상자 기준으로 한 번만 본다.
@@ -275,7 +286,7 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted }: { glyph: NotoPrese
   const selectPart = (part: Part) => { setActivePartState(part); setSelectedRail(undefined); setError(''); setSnapHit(null) }
   const editCount = editable.filter((item) => Math.abs(item.value - item.original) > 1e-9).length
   // 다른 글자 카드에 얹을 Δ. 편집 상태에서 모델 값 대비 차이만 뽑는다.
-  const propagationEdit = useMemo(() => propagationEditOf({ editable, medialParts: fitView?.parts ?? [], componentParts }), [editable, fitView, componentParts])
+  const propagationEdit = useMemo(() => propagationEditOf({ editable, medialParts: slotParts, componentParts }), [editable, slotParts, componentParts])
   const changedRails = useMemo(() => editable.filter((item) => Math.abs(item.value - item.original) > 1e-9), [editable])
 
   // 값 하나를 놓아 본다. 순서·간격 위반이면 false, 호출자는 마지막 유효값을 지킨다.
@@ -290,12 +301,23 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted }: { glyph: NotoPrese
       setFacesByPart((current) => { const copy = [...current]; copy[target.partIndex] = proposed; return copy })
       return true
     }
-    const part = fitView?.parts[target.partIndex]
+    if (target.id.startsWith('s')) {
+      const base = fitView?.parts[target.partIndex]
+      if (!base?.fit) return '획 마스터가 없습니다.'
+      const proposed: SlotFacesDelta = { ...slotDeltaByPart[target.partIndex], [target.role]: rounded - target.original }
+      const moved = withSlotFaces(base, proposed)
+      if (!moved.ok) return moved.message
+      const check = renderMedialPart(moved.part, railsWithDelta(moved.part.fit?.railsEm, railDeltaByPart[target.partIndex]))
+      if (!check.path) return check.message ?? '홀자 상자를 그 자리에 둘 수 없습니다.'
+      setSlotDeltaByPart((current) => { const copy = [...current]; copy[target.partIndex] = proposed; return copy })
+      return true
+    }
+    const part = slotParts[target.partIndex]
     if (!part?.fit) return '획 마스터가 없습니다.'
-    const proposed: Record<string, number> = { ...(railsByPart[target.partIndex] ?? part.fit.railsEm), [target.role]: rounded }
-    const check = renderMedialPart(part, proposed)
+    const proposed: Record<string, number> = { ...railDeltaByPart[target.partIndex], [target.role]: rounded - part.fit.railsEm[target.role] }
+    const check = renderMedialPart(part, railsWithDelta(part.fit.railsEm, proposed))
     if (!check.path) return check.message ?? '기준선을 그 자리에 둘 수 없습니다.'
-    setRailsByPart((current) => { const copy = [...current]; copy[target.partIndex] = proposed; return copy })
+    setRailDeltaByPart((current) => { const copy = [...current]; copy[target.partIndex] = proposed; return copy })
     return true
   }
   // 스냅 후보 = 같은 축의 Noto 실측선 + 다른 부품의 rail. 같은 부품 rail은 겹치면 순서 위반이라 뺀다.
@@ -321,7 +343,7 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted }: { glyph: NotoPrese
     const placed = tryPlace(target, next)
     setError(placed === true ? '' : placed)
   }
-  const resetRails = () => { setRailsByPart([]); setFacesByPart([]); setError(''); setSnapHit(null) }
+  const resetRails = () => { setSlotDeltaByPart([]); setRailDeltaByPart([]); setFacesByPart([]); setError(''); setSnapHit(null) }
 
   return <div className={styles.editor} data-testid="glyph-layout-editor">
       <section className={styles.canvasSection}>

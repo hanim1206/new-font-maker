@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
 import { validateRoleConstructionScope } from './jamoConstruction'
-import { applyRailEdits, boundRailRoles, fitNotoMedialMaster, splitMixedMedialRoles } from './notoMedialMasterFit'
+import { applyRailEdits, applySlotFacesDelta, boundRailRoles, fitNotoMedialMaster, splitMixedMedialRoles } from './notoMedialMasterFit'
 import type { MedialFitInput } from './notoMedialMasterFit'
 import { resolveShapeGlyphInkPrimitives } from './shapeGlyphInkResolver'
 import type { StrokeRenderStyle } from '../types'
@@ -211,5 +211,68 @@ describe('fitNotoMedialMaster', () => {
     expect(validateRoleConstructionScope(fit.scope).ok).toBe(true)
     const primitives = resolveShapeGlyphInkPrimitives({ source: fit.scope, masterId: fit.master.id, glyphId: 'ㅑ', part: 'JU', slot: fit.slot, weightMultiplier: 1 })
     expect(primitives.ok).toBe(true)
+  })
+})
+
+describe('applySlotFacesDelta', () => {
+  // ㅣ 하나. 가로 축엔 잉크 끝을 만드는 rail이 기둥 중심 하나뿐이다.
+  const I: MedialFitInput = {
+    jamoId: 'ㅣ', role: 'JU_VERTICAL',
+    measurements: { outerPillar: { face: 0.79, faceSide: 'right', orientation: 'vertical', visibleSpans: [{ from: 0.05, to: 0.96 }] } },
+    thickness: { outerPillar: 0.08 },
+  }
+  const fitOf = (input: MedialFitInput) => { const made = fitNotoMedialMaster(input); if (!made.ok) throw new Error(made.message); return made.fit }
+  const sides = (slot: { x: number; y: number; width: number; height: number }) => ({ left: slot.x, right: slot.x + slot.width, top: slot.y, bottom: slot.y + slot.height })
+
+  it('안 매인 core rail이 연달아 있는 홀자(ㅣ)도 rail 편집을 받는다 — 다시 채운 rail이 fit과 같은 자리다', () => {
+    const fit = fitOf(I)
+    const same = applyRailEdits(fit, fit.railsEm)
+    expect(same.ok).toBe(true)
+    if (!same.ok) return
+    for (const [key, value] of Object.entries(fit.railsEm)) expect(same.fit.railsEm[key]).toBeCloseTo(value, 9)
+    const moved = applyRailEdits(fit, { ...fit.railsEm, 'center-x': fit.railsEm['center-x'] + 0.01 })
+    expect(moved.ok && moved.fit.slot.x).toBeCloseTo(fit.slot.x + 0.01, 9)
+  })
+
+  it('ㅏ의 상자 변을 옮기면 잉크 박스가 새 변에 닿고 두께는 그대로다', () => {
+    const fit = fitOf(A)
+    const before = sides(fit.slot)
+    const moved = applySlotFacesDelta(fit, { left: -0.02, right: 0.03, top: 0.01, bottom: -0.04 })
+    expect(moved.ok).toBe(true)
+    if (!moved.ok) return
+    const after = sides(moved.fit.slot)
+    expect(after.left).toBeCloseTo(before.left - 0.02, 9)
+    expect(after.right).toBeCloseTo(before.right + 0.03, 9)
+    expect(after.top).toBeCloseTo(before.top + 0.01, 9)
+    expect(after.bottom).toBeCloseTo(before.bottom - 0.04, 9)
+    expect(moved.fit.strokes.map((stroke) => stroke.thickness)).toEqual(fit.strokes.map((stroke) => stroke.thickness))
+    // 보 시작은 여전히 기둥 중심에 붙어 있다.
+    const stem = moved.fit.strokes.find((stroke) => stroke.roleId === 'outerPillar')!
+    const beam = moved.fit.strokes.find((stroke) => stroke.roleId === 'primaryBeam')!
+    expect(beam.from).toBeCloseTo(stem.center, 9)
+    expect(validateRoleConstructionScope(moved.fit.scope).ok).toBe(true)
+  })
+
+  it('획 하나뿐인 축(ㅣ의 가로)은 크기를 못 바꾸므로 두 변 오프셋을 더해 통째로 옮긴다', () => {
+    const fit = fitOf(I)
+    const before = sides(fit.slot)
+    const moved = applySlotFacesDelta(fit, { left: 0.02 })
+    expect(moved.ok).toBe(true)
+    if (!moved.ok) return
+    expect(sides(moved.fit.slot).left).toBeCloseTo(before.left + 0.02, 9)
+    expect(sides(moved.fit.slot).right).toBeCloseTo(before.right + 0.02, 9)
+    expect(moved.fit.slot.width).toBeCloseTo(fit.slot.width, 9)
+    const both = applySlotFacesDelta(fit, { left: 0.02, right: -0.005 })
+    expect(both.ok && sides(both.fit.slot).left).toBeCloseTo(before.left + 0.015, 9)
+    // 세로 축은 기둥의 시작·끝이 따로라 늘어난다.
+    const taller = applySlotFacesDelta(fit, { top: -0.01, bottom: 0.02 })
+    expect(taller.ok && taller.fit.slot.height).toBeCloseTo(fit.slot.height + 0.03, 9)
+  })
+
+  it('Δ가 0이면 그대로고, 상자가 획 두께보다 좁아지면 거부한다', () => {
+    const fit = fitOf(A)
+    const same = applySlotFacesDelta(fit, {})
+    expect(same.ok && same.fit.slot).toEqual(fit.slot)
+    expect(applySlotFacesDelta(fit, { right: -fit.slot.width }).ok).toBe(false)
   })
 })

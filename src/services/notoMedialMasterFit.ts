@@ -330,12 +330,16 @@ export function applyRailEdits(fit: MedialFitResult, railsEm: Readonly<Record<st
   next['outer-bottom'] = bound.has('outer-bottom') ? next['outer-bottom'] : slot.y + slot.height
   const axes: readonly (readonly CoreRailRole[])[] = [CORE_X_RAIL_ROLES, CORE_Y_RAIL_ROLES]
   for (const roles of axes) {
+    // fit(`assignAxis`)과 같은 규칙으로 채운다: 앞쪽은 방금 채운 rail도 이웃으로 친다.
+    // 매인 rail만 이웃으로 보면 안 매인 rail이 연달아 있을 때(ㅣ·ㅡ) 같은 값으로 겹쳐 간격 검사에서 늘 떨어진다.
+    const settled = new Set<string>([roles[0], roles[roles.length - 1], ...roles.filter((r) => bound.has(r))])
     for (const role of roles.slice(1, -1)) {
       if (bound.has(role)) continue
       const index = roles.indexOf(role)
-      const prev = [...roles.slice(0, index)].reverse().find((r) => bound.has(r) || r === roles[0])!
+      const prev = [...roles.slice(0, index)].reverse().find((r) => settled.has(r))!
       const after = roles.slice(index + 1).find((r) => bound.has(r) || r === roles[roles.length - 1])!
       next[role] = (next[prev] + next[after]) / 2
+      settled.add(role)
     }
   }
   const minGap = fit.grid.minGap
@@ -350,6 +354,63 @@ export function applyRailEdits(fit: MedialFitResult, railsEm: Readonly<Record<st
   const master = masterFromBindings(fit.jamoId, fit.role, grid.id, fit.bindings)
   const scope = createRoleConstructionSourceV1({ grid, masters: [master] })
   return { ok: true, fit: { ...fit, slot, strokes, railsEm: next, grid, master, scope } }
+}
+
+/** 홀자 상자(잉크 박스) 네 변에 얹는 em 오프셋. */
+export type SlotFacesDelta = Partial<Record<'left' | 'right' | 'top' | 'bottom', number>>
+
+/** 한 축에서 잉크 끝을 만드는 rail과 그 rail에서 잉크 끝까지의 거리(획 중심이면 두께/2, 획 끝이면 0). */
+function axisExtremes(fit: MedialFitResult, railsEm: Readonly<Record<string, number>>, axis: 'x' | 'y') {
+  const lows: { rail: string; offset: number }[] = []
+  const highs: { rail: string; offset: number }[] = []
+  for (const b of fit.bindings) {
+    const crosses = (b.orientation === 'vertical') === (axis === 'x')
+    if (crosses) { lows.push({ rail: b.centerRail, offset: b.thickness / 2 }); highs.push({ rail: b.centerRail, offset: b.thickness / 2 }) }
+    else { lows.push({ rail: b.fromRail, offset: 0 }); highs.push({ rail: b.toRail, offset: 0 }) }
+  }
+  const low = lows.reduce((best, item) => railsEm[item.rail] - item.offset < railsEm[best.rail] - best.offset ? item : best)
+  const high = highs.reduce((best, item) => railsEm[item.rail] + item.offset > railsEm[best.rail] + best.offset ? item : best)
+  return { low, high }
+}
+
+/**
+ * 홀자 상자의 변을 옮긴다. 그 축의 rail 전부를 한 번의 아핀(늘이기 + 옮기기)으로 다시 놓아 잉크 박스가 새 변에 닿게 한다.
+ * 두께는 결속에 박혀 있어 그대로다 — 늘어나는 건 획 사이 간격과 획 길이뿐이다.
+ * 그 축에 잉크 끝을 만드는 rail이 하나뿐이면(ㅣ의 가로, ㅡ의 세로) 크기를 못 바꾸므로 두 변의 오프셋을 더해 통째로 옮긴다.
+ * 순서·간격 위반이면 실패한다 — 호출자는 원래 fit을 지킨다.
+ */
+export function applySlotFacesDelta(fit: MedialFitResult, delta: SlotFacesDelta): MedialFitOutcome {
+  const railsEm: Record<string, number> = { ...fit.railsEm }
+  for (const axis of ['x', 'y'] as const) {
+    const dLow = (axis === 'x' ? delta.left : delta.top) ?? 0
+    const dHigh = (axis === 'x' ? delta.right : delta.bottom) ?? 0
+    if (Math.abs(dLow) <= EPSILON * 1e-3 && Math.abs(dHigh) <= EPSILON * 1e-3) continue
+    const keys = Object.keys(fit.railsEm).filter((key) => fitRailAxis(key) === axis)
+    const start = axis === 'x' ? fit.slot.x : fit.slot.y
+    const targetLow = start + dLow
+    const targetHigh = start + (axis === 'x' ? fit.slot.width : fit.slot.height) + dHigh
+    // 늘이면 잉크 끝을 만드는 획이 바뀔 수 있어(두께는 안 늘어나므로) 몇 번 다시 고른다.
+    let mapped = { ...fit.railsEm }
+    for (let round = 0; round < 4; round += 1) {
+      const { low, high } = axisExtremes(fit, mapped, axis)
+      const from = fit.railsEm[low.rail]
+      const to = fit.railsEm[high.rail]
+      let scale = 1
+      let shift = dLow + dHigh
+      if (Math.abs(to - from) > EPSILON) {
+        scale = ((targetHigh - high.offset) - (targetLow + low.offset)) / (to - from)
+        if (!(scale > 0)) return { ok: false, message: '홀자 상자가 획 두께보다 좁아집니다.' }
+        shift = targetLow + low.offset - scale * from
+      }
+      const next = { ...mapped }
+      for (const key of keys) next[key] = scale * fit.railsEm[key] + shift
+      const settled = keys.every((key) => Math.abs(next[key] - mapped[key]) <= EPSILON * 1e-3)
+      mapped = next
+      if (settled) break
+    }
+    for (const key of keys) railsEm[key] = mapped[key]
+  }
+  return applyRailEdits(fit, railsEm)
 }
 
 /**
