@@ -17,9 +17,6 @@ import { setBaseMasterAreaCellsV1 } from '../src/services/baseMasterAreaCommands
 import { partForJamoRole } from '../src/services/jamoContextRoles'
 import { projectPartGridToSlot } from '../src/services/partGridSlotProjection'
 import { resolveRailGrid } from '../src/services/railGridResolver'
-import { parseLayoutGridSystemSourceV1 } from '../src/services/layoutGridSystemSourceV1'
-import { resolveAllGridBoundSchemas } from '../src/services/layoutGridProjection'
-import { setLayoutGridRailV1 } from '../src/services/layoutGridRailCommandsV1'
 import { parseShapeSystemSourceV2 } from '../src/services/shapeSystemSourceV2'
 import { useGlobalStyleStore, weightToMultiplier } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
@@ -33,7 +30,6 @@ import {
 import { useUIStore } from '../src/stores/uiStore'
 import { useFontProject } from '../src/hooks/useFontProject'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
-import { calculateRawBoxes } from '../src/utils/layoutCalculator'
 import type {
   ContextGridPresetCatalogV1,
   CoreRailRole,
@@ -42,14 +38,10 @@ import type {
   JamoPartRole,
   JamoVariantContext,
   LayoutSchema,
-  LayoutType,
   Padding,
-  Part,
   ShapeSystemSourceV2,
-  SharedLayoutType,
   SetBaseMasterAreaCellsV1Command,
 } from '../src/types'
-import { SHARED_LAYOUT_TYPES } from '../src/types'
 import {
   ContextComparisonStrip,
   EditScopeBar,
@@ -108,16 +100,6 @@ const ROLE_LABELS: Record<JamoPartRole, string> = {
 }
 
 const REPRESENTATIVE_JAMOS = ['ㄱ', 'ㅇ', 'ㅏ', 'ㅂ', 'ㅎ', 'ㅙ'] as const
-const LAYOUT_SLOT_PARTS = ['CH', 'JU', 'JU_H', 'JU_V', 'JO'] as const satisfies readonly Part[]
-const SHARED_LAYOUT_LABELS: Record<SharedLayoutType, string> = {
-  'choseong-only': '단독',
-  'choseong-jungseong-vertical': '세로',
-  'choseong-jungseong-horizontal': '가로',
-  'choseong-jungseong-mixed': '혼합',
-  'choseong-jungseong-vertical-jongseong': '세로+받침',
-  'choseong-jungseong-horizontal-jongseong': '가로+받침',
-  'choseong-jungseong-mixed-jongseong': '혼합+받침',
-}
 
 function withEffectivePadding(
   schema: LayoutSchema,
@@ -162,30 +144,6 @@ function GlyphPreview({ char, compact = false }: { char: string; compact?: boole
 }
 
 /** 저장하지 않은 공통 layout Rail draft도 이 미리보기에는 즉시 투영한다. */
-function DerivedSchemaGlyphPreview({ char, schema, compact = false }: {
-  char: string
-  schema: LayoutSchema
-  compact?: boolean
-}) {
-  const choseong = useJamoStore((state) => state.choseong)
-  const jungseong = useJamoStore((state) => state.jungseong)
-  const jongseong = useJamoStore((state) => state.jongseong)
-  const globalStyle = useGlobalStyleStore((state) => state.style)
-  const syllable = useMemo(
-    () => decomposeSyllable(char, choseong, jungseong, jongseong),
-    [char, choseong, jungseong, jongseong],
-  )
-  return <SvgRenderer
-    syllable={syllable}
-    schema={schema}
-    size={compact ? 68 : 340}
-    className={compact ? styles.cardGlyph : styles.canvasGlyph}
-    globalStyle={globalStyle}
-    overflow="visible"
-    clipGlyphs={false}
-  />
-}
-
 type ShapeMasterPreviewState =
   | { kind: 'legacy' }
   | { kind: 'error'; message: string }
@@ -1132,301 +1090,6 @@ function MasterScreen() {
   )
 }
 
-type LayoutRailEditModel = {
-  id: string
-  axis: 'x' | 'y'
-  value: number
-  min: number
-  max: number
-}
-
-type LayoutRailGesture = {
-  railId: string
-  startValue: number
-  startClientX: number
-  startClientY: number
-  moved: boolean
-}
-
-function resolveLayoutRailModels(source: DeepReadonly<ShapeSystemSourceV2> | null): {
-  kind: 'unavailable'; message: string
-} | { kind: 'ready'; rails: LayoutRailEditModel[] } {
-  if (!source?.layoutGridSystem) return { kind: 'unavailable', message: '공통 layout grid가 아직 연결되지 않았습니다.' }
-  const parsed = parseLayoutGridSystemSourceV1(source.layoutGridSystem)
-  if (!parsed.ok) return { kind: 'unavailable', message: '공통 layout grid를 안전하게 해석할 수 없습니다.' }
-  const sourceRails = new Map(
-    [...parsed.source.grid.xRails, ...parsed.source.grid.yRails].map((rail) => [rail.id, rail]),
-  )
-  const rails: LayoutRailEditModel[] = []
-  for (const axis of ['x', 'y'] as const) {
-    const axisRails = axis === 'x' ? parsed.resolvedGrid.xRails : parsed.resolvedGrid.yRails
-    for (let index = 0; index < axisRails.length; index += 1) {
-      const rail = axisRails[index]
-      const sourceRail = sourceRails.get(rail.id)
-      if (!sourceRail || sourceRail.position.kind !== 'absolute') continue
-      rails.push({
-        id: rail.id,
-        axis,
-        value: rail.value,
-        min: index === 0 ? 0 : axisRails[index - 1].value + parsed.source.grid.minGap,
-        max: index === axisRails.length - 1 ? 1 : axisRails[index + 1].value - parsed.source.grid.minGap,
-      })
-    }
-  }
-  return rails.length > 0
-    ? { kind: 'ready', rails }
-    : { kind: 'unavailable', message: '직접 이동할 수 있는 공통 layout Rail이 없습니다.' }
-}
-
-function SharedLayoutScreen() {
-  const [selectedRailId, setSelectedRailId] = useState<string | null>(null)
-  const [hoveredRailId, setHoveredRailId] = useState<string | null>(null)
-  const [draftValue, setDraftValue] = useState<number | null>(null)
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const [feedback, setFeedback] = useState<string | null>(null)
-  const canvasRef = useRef<HTMLDivElement | null>(null)
-  const gestureRef = useRef<LayoutRailGesture | null>(null)
-  const draftValueRef = useRef<number | null>(null)
-  const transactionSequence = useRef(0)
-  const hydrationStatus = useShapeSystemStore((state) => state.hydrationStatus)
-  const source = useShapeSystemStore((state) => state.source)
-  const connectLayoutGrid = useShapeSystemStore((state) => state.connectLayoutGrid)
-  const setLayoutGridRail = useShapeSystemStore((state) => state.setLayoutGridRail)
-  const canUndo = useShapeSystemStore((state) => state.past.length > 0)
-  const canRedo = useShapeSystemStore((state) => state.future.length > 0)
-  const undo = useShapeSystemStore((state) => state.undo)
-  const redo = useShapeSystemStore((state) => state.redo)
-  const projectName = useUIStore((state) => state.currentProjectName) ?? '새 한글 폰트'
-  const { currentProjectId, saveCurrent } = useFontProject()
-  const schemas = useLayoutStore((state) => state.layoutSchemas)
-  const globalPadding = useLayoutStore((state) => state.globalPadding)
-  const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
-  const choseong = useJamoStore((state) => state.choseong)
-  const jungseong = useJamoStore((state) => state.jungseong)
-  const jongseong = useJamoStore((state) => state.jongseong)
-  const effectiveSchemas = useMemo(() => Object.fromEntries(
-    Object.entries(schemas).map(([layoutType, schema]) => [
-      layoutType,
-      withEffectivePadding(schema, globalPadding, paddingOverrides[layoutType as LayoutType]),
-    ]),
-  ) as Record<LayoutType, LayoutSchema>, [globalPadding, paddingOverrides, schemas])
-  const committed = useMemo(() => resolveLayoutRailModels(source), [source])
-  const selected = committed.kind === 'ready'
-    ? committed.rails.find((rail) => rail.id === selectedRailId) ?? committed.rails[0]
-    : null
-  const draftSource = useMemo(() => {
-    if (!source || !selected || draftValue === null) return source
-    const result = setLayoutGridRailV1(source, {
-      transactionId: 'shape-workspace:layout-draft',
-      railId: selected.id,
-      position: { kind: 'absolute', value: draftValue },
-    })
-    return result.ok ? result.source : source
-  }, [draftValue, selected, source])
-  const visible = useMemo(() => resolveLayoutRailModels(draftSource), [draftSource])
-  const projectedSchemas = useMemo(() => {
-    if (!draftSource?.layoutGridSystem) return effectiveSchemas
-    const parsed = parseLayoutGridSystemSourceV1(draftSource.layoutGridSystem)
-    if (!parsed.ok) return effectiveSchemas
-    const projection = resolveAllGridBoundSchemas({
-      schemas: effectiveSchemas,
-      grid: parsed.resolvedGrid,
-      bindings: parsed.source.bindings,
-    })
-    return projection.ok ? projection.schemas : effectiveSchemas
-  }, [draftSource, effectiveSchemas])
-  const contextItems = useMemo(() => CONTEXTS.map((context) => {
-    const layoutType = decomposeSyllable(context.char, choseong, jungseong, jongseong).layoutType
-    return {
-      id: context.char,
-      label: context.char,
-      detail: context.label,
-      preview: <DerivedSchemaGlyphPreview char={context.char} compact schema={projectedSchemas[layoutType]} />,
-    }
-  }), [choseong, jungseong, jongseong, projectedSchemas])
-  const committedRails = useMemo(() => {
-    const model = resolveLayoutRailModels(source)
-    return model.kind === 'ready' ? model.rails : []
-  }, [source])
-  const visibleRails = useMemo(() => {
-    const model = resolveLayoutRailModels(draftSource)
-    return model.kind === 'ready' ? model.rails : []
-  }, [draftSource])
-
-  const clearDraft = useCallback(() => {
-    gestureRef.current = null
-    draftValueRef.current = null
-    setDraftValue(null)
-  }, [])
-  const persistShapeChange = useCallback(async () => {
-    setSaveState('saving')
-    setFeedback(null)
-    try {
-      flushShapeSystemStorePersistence()
-      if (currentProjectId && !(await saveCurrent())) throw new Error('프로젝트 서버 저장에 실패했습니다.')
-      setSaveState('saved')
-      setFeedback(currentProjectId ? '프로젝트와 기기에 저장했습니다.' : '이 기기에 저장했습니다.')
-    } catch (error) {
-      setSaveState('error')
-      setFeedback(error instanceof Error ? error.message : '저장하지 못했습니다.')
-    }
-  }, [currentProjectId, saveCurrent])
-  const commit = useCallback((rail: LayoutRailEditModel, value: number) => {
-    if (Math.abs(value - rail.value) < 0.000001) return clearDraft()
-    transactionSequence.current += 1
-    const result = setLayoutGridRail({
-      transactionId: `shape-workspace:layout:${transactionSequence.current}`,
-      railId: rail.id,
-      position: { kind: 'absolute', value },
-    })
-    if (!result.ok) {
-      setSaveState('error')
-      setFeedback(result.error.message)
-      return clearDraft()
-    }
-    clearDraft()
-    void persistShapeChange()
-  }, [clearDraft, persistShapeChange, setLayoutGridRail])
-  const beginGesture = (rail: LayoutRailEditModel, event: ReactPointerEvent<HTMLDivElement>) => {
-    setSelectedRailId(rail.id)
-    setHoveredRailId(rail.id)
-    gestureRef.current = { railId: rail.id, startValue: rail.value, startClientX: event.clientX, startClientY: event.clientY, moved: false }
-    draftValueRef.current = null
-    setDraftValue(null)
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }
-  const railAtPointer = useCallback((clientX: number, clientY: number): LayoutRailEditModel | null => {
-    const bounds = canvasRef.current?.getBoundingClientRect()
-    if (!bounds) return null
-    const closest = committedRails.reduce<{ rail: LayoutRailEditModel; distance: number } | null>((nearest, rail) => {
-      const coordinate = rail.axis === 'x'
-        ? bounds.left + bounds.width * rail.value
-        : bounds.top + bounds.height * rail.value
-      const pointer = rail.axis === 'x' ? clientX : clientY
-      const candidate = { rail, distance: Math.abs(pointer - coordinate) }
-      return !nearest || candidate.distance < nearest.distance ? candidate : nearest
-    }, null)
-    return closest && closest.distance <= 22 ? closest.rail : null
-  }, [committedRails])
-  const updateDraft = (rail: LayoutRailEditModel, clientX: number, clientY: number) => {
-    const gesture = gestureRef.current
-    const bounds = canvasRef.current?.getBoundingClientRect()
-    if (!gesture || gesture.railId !== rail.id || !bounds) return
-    const distance = rail.axis === 'x' ? clientX - gesture.startClientX : clientY - gesture.startClientY
-    const length = rail.axis === 'x' ? bounds.width : bounds.height
-    if (!gesture.moved && Math.abs(distance) < 3) return
-    gesture.moved = true
-    const value = snapRailDraft(gesture.startValue + distance / length, rail.min, rail.max)
-    draftValueRef.current = value
-    setDraftValue(value)
-  }
-  const finishGesture = (rail: LayoutRailEditModel, event: ReactPointerEvent<HTMLDivElement>) => {
-    const gesture = gestureRef.current
-    if (!gesture || gesture.railId !== rail.id) return
-    updateDraft(rail, event.clientX, event.clientY)
-    gestureRef.current = null
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-    const committedRail = committed.kind === 'ready'
-      ? committed.rails.find((candidate) => candidate.id === rail.id)
-      : undefined
-    if (gesture.moved && committedRail) commit(committedRail, draftValueRef.current ?? gesture.startValue)
-    else clearDraft()
-  }
-  const handleCanvasPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const gesture = gestureRef.current
-    if (gesture) {
-      const rail = committedRails.find((candidate) => candidate.id === gesture.railId)
-      if (rail) updateDraft(rail, event.clientX, event.clientY)
-      return
-    }
-    setHoveredRailId(railAtPointer(event.clientX, event.clientY)?.id ?? null)
-  }
-  const handleCanvasPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const rail = railAtPointer(event.clientX, event.clientY)
-    if (rail) beginGesture(rail, event)
-  }
-  const handleCanvasPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const gesture = gestureRef.current
-    const rail = gesture && committedRails.find((candidate) => candidate.id === gesture.railId)
-    if (rail) finishGesture(rail, event)
-  }
-  const cancelCanvasGesture = () => {
-    setHoveredRailId(null)
-    clearDraft()
-  }
-  const handleConnect = () => {
-    const result = connectLayoutGrid({ transactionId: 'shape-workspace:connect-layout', schemas: effectiveSchemas })
-    if (!result.ok) { setSaveState('error'); setFeedback(result.error.message); return }
-    void persistShapeChange()
-  }
-  const handleInitialize = () => {
-    const result = initializeStarterShapeSystem()
-    if (!result.ok) { setSaveState('error'); setFeedback(result.error.message); return }
-    void persistShapeChange()
-  }
-  const handleHistory = (direction: 'undo' | 'redo') => {
-    const result = direction === 'undo' ? undo() : redo()
-    if (!result.ok) { setSaveState('error'); setFeedback(result.error.message); return }
-    clearDraft()
-    void persistShapeChange()
-  }
-  const saveLabel = saveState === 'saving' ? '저장 중…'
-    : saveState === 'saved' ? currentProjectId ? '프로젝트 저장됨' : '기기에 저장됨'
-      : saveState === 'error' ? '저장 확인 필요' : selected ? '공통 기준선 편집' : '공통 기준선 관찰'
-  const layoutOverlays = useMemo(() => SHARED_LAYOUT_TYPES.map((layoutType) => ({
-    layoutType,
-    boxes: calculateRawBoxes(projectedSchemas[layoutType]),
-  })), [projectedSchemas])
-
-  return (
-    <MobileWorkspaceShell
-      activeArea="skeleton"
-      projectName={projectName}
-      statusLabel={saveLabel}
-      history={{ canUndo, canRedo, onUndo: () => handleHistory('undo'), onRedo: () => handleHistory('redo') }}
-    >
-      <section className={styles.titleSection}>
-        <span className={styles.screenId}>L-01 · 공통 배치 기준선</span>
-        <h1>공통 layout grid</h1>
-        <EditScopeBar items={[{ label: '현재 대상', value: '공통 배치 Rail' }, { label: '수정 범위', value: '7개 layout binding' }, { label: '영향', value: '조합 결과 7개' }]} />
-        <ShapeStatus />
-        {feedback && <p className={styles.saveFeedback} data-state={saveState} role={saveState === 'error' ? 'alert' : 'status'}>{feedback}</p>}
-      </section>
-      <div className={styles.workspaceScroll}>
-        {hydrationStatus === 'ready' && source?.layoutGridSystem && visible.kind === 'ready' ? <>
-          <section className={styles.canvasSection} aria-label="공통 layout Rail 편집 캔버스">
-            <div className={`${styles.canvas} ${styles.layoutGridCanvas}`} ref={canvasRef} data-selected={selected ? 'true' : undefined} data-hovered={hoveredRailId ? 'true' : undefined} onPointerMove={handleCanvasPointerMove} onPointerDown={handleCanvasPointerDown} onPointerUp={handleCanvasPointerUp} onPointerCancel={cancelCanvasGesture} onLostPointerCapture={cancelCanvasGesture} onPointerLeave={() => { if (!gestureRef.current) setHoveredRailId(null) }}>
-              <span className={styles.canvasGrid} aria-hidden="true" />
-              <svg className={styles.layoutGridOverlays} viewBox="0 0 1 1" aria-label="공통 layout grid의 7개 슬롯 경계">
-                {layoutOverlays.map(({ layoutType, boxes }) => (
-                  <g key={layoutType} data-layout-overlay={layoutType}>
-                    <title>{SHARED_LAYOUT_LABELS[layoutType]} layout 슬롯</title>
-                    {LAYOUT_SLOT_PARTS.flatMap((part) => {
-                      const box = boxes[part]
-                      return box ? [<rect key={part} data-part={part} x={box.x} y={box.y} width={box.width} height={box.height} />] : []
-                    })}
-                  </g>
-                ))}
-              </svg>
-              {visibleRails.map((rail) => <div key={rail.id} className={styles.layoutCanvasRailHandle} data-rail-id={rail.id} data-selected={rail.id === selected?.id || undefined} data-hovered={rail.id === hoveredRailId || undefined} data-axis={rail.axis} style={rail.axis === 'x' ? { left: `${rail.value * 100}%` } : { top: `${rail.value * 100}%` }} aria-hidden="true"><span /></div>)}
-            </div>
-            <ul className={styles.layoutOverlayLegend} aria-label="겹쳐 보이는 layout 종류">
-              {SHARED_LAYOUT_TYPES.map((layoutType) => <li key={layoutType} data-layout={layoutType}>{SHARED_LAYOUT_LABELS[layoutType]}</li>)}
-            </ul>
-            <p className={styles.layoutCanvasHelp}>선 가까이 가면 그 Rail이 강조됩니다. 탭하면 핸들이 나타나고, 그대로 끌면 7개 결과를 임시로 보여줘요.</p>
-          </section>
-          <ContextComparisonStrip heading="공통 배치가 쓰이는 7개 조합" eyebrow="연결 결과" items={contextItems} observedId="가" interactive={false} description="카드는 공통 layout binding으로 다시 계산한 읽기 전용 결과예요." />
-        </> : <section className={styles.layoutSetup} aria-label="공통 layout grid 연결">
-          <Grid2X2 size={24} aria-hidden="true" />
-          <h2>{hydrationStatus === 'blocked' ? '저장 데이터 확인이 필요해요' : !source ? '형태 시스템을 먼저 시작하세요' : '기존 배치를 공통 기준선으로 연결하세요'}</h2>
-          <p>{hydrationStatus === 'blocked' ? '현재는 안전을 위해 공통 grid를 만들거나 편집하지 않아요.' : !source ? '기존 글자 결과를 바꾸지 않고, 추천 기본 구조를 먼저 준비합니다.' : '현재 7개 layout schema의 경계를 stable Rail과 binding으로 한 번만 올립니다.'}</p>
-          {hydrationStatus !== 'blocked' && (!source ? <button type="button" onClick={handleInitialize}>추천 기본 구조로 시작</button> : <button type="button" onClick={handleConnect}>기존 7개 배치를 공통 기준선으로 연결</button>)}
-        </section>}
-      </div>
-    </MobileWorkspaceShell>
-  )
-}
-
 function OverviewStatus({ role, jamoId }: { role: JamoPartRole; jamoId: string }) {
   const hydrationStatus = useShapeSystemStore((state) => state.hydrationStatus)
   const source = useShapeSystemStore((state) => state.source)
@@ -1938,9 +1601,15 @@ function JamoEditorScreen() {
   return <CalibrationSentenceEditor chrome="workspace" />
 }
 
+/** 뼈대 탭은 없앴다(글자에 닿지 않던 화면). 옛 주소는 자소 탭으로 넘긴다. */
+function LegacySkeletonRedirect() {
+  useEffect(() => { window.location.replace('/workspace/jamo') }, [])
+  return null
+}
+
 export function ShapeWorkspacePage() {
+  if (window.location.pathname === '/workspace/skeleton') return <LegacySkeletonRedirect />
   if (window.location.pathname === '/workspace/jamos') return <OverviewScreen />
-  if (window.location.pathname === '/workspace/skeleton') return <SharedLayoutScreen />
   if (window.location.pathname === '/workspace/jamo/result') return <ContextScreen />
   if (window.location.pathname === '/workspace/jamo/master') return <MasterScreen />
   if (window.location.pathname === '/workspace/jamo') return <JamoEditorScreen />

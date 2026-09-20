@@ -254,49 +254,13 @@ test('J-02 전체 4×4 점유 면은 연속 채우기·비우기 draft를 한 tr
   await expectMobileShellContract(page)
 })
 
-test('L-01 공통 layout Rail은 7개 binding 결과를 draft로 미리 보고 한 번 저장·Undo한다', async ({ page }) => {
+test('뼈대 탭은 없고 옛 뼈대 주소는 자소 탭으로 넘어간다', async ({ page }) => {
   await page.goto('/workspace/skeleton')
-  await expect(page.getByRole('heading', { name: '공통 layout grid', exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '추천 기본 구조로 시작' }).click()
-  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
-  await page.getByRole('button', { name: '기존 7개 배치를 공통 기준선으로 연결' }).click()
-  await expect(page.getByRole('region', { name: '공통 layout Rail 편집 캔버스' })).toBeVisible()
-  await expect(page.locator('[data-layout-overlay]')).toHaveCount(7)
-  await expect(page.getByRole('list', { name: '공통 배치가 쓰이는 7개 조합' }).getByRole('listitem')).toHaveCount(7)
-
-  const connectedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
-  const splitRailId = await page.evaluate((key) => {
-    const source = JSON.parse(localStorage.getItem(key)!).state.source
-    return source.layoutGridSystem.bindings['choseong-jungseong-vertical'].splitRailIds['choseong-jungseong-vertical:x:ch-ju']
-  }, SHAPE_KEY)
-  const rail = page.locator(`[data-rail-id="${splitRailId}"]`)
-  const railBox = await rail.boundingBox()
-  const canvasBox = await rail.locator('xpath=..').boundingBox()
-  if (!railBox || !canvasBox) throw new Error('공통 layout split Rail 위치를 찾을 수 없습니다.')
-  const resultCards = page.getByRole('list', { name: '공통 배치가 쓰이는 7개 조합' })
-  await expect(resultCards.getByRole('button')).toHaveCount(0)
-  const preview = resultCards.locator('[data-context-id="가"] svg')
-  const beforePreview = await preview.evaluate((element) => element.outerHTML)
-  const beforeValue = await rail.getAttribute('aria-valuenow')
-
-  await page.mouse.move(railBox.x + railBox.width / 2, canvasBox.y + canvasBox.height * 0.2)
-  await expect(rail).toHaveAttribute('data-hovered', 'true')
-  await page.mouse.down()
-  await page.mouse.move(railBox.x + railBox.width / 2 + 18, canvasBox.y + canvasBox.height * 0.2, { steps: 3 })
-  await expect(rail).not.toHaveAttribute('aria-valuenow', beforeValue ?? '')
-  expect(await preview.evaluate((element) => element.outerHTML)).not.toBe(beforePreview)
-  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(connectedRaw)
-  await page.mouse.up()
-  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
-  await page.waitForTimeout(350)
-  const movedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
-  expect(movedRaw).not.toBe(connectedRaw)
-
-  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
-  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
-  await page.waitForTimeout(350)
-  expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(connectedRaw)
-  await expectMobileShellContract(page)
+  await expect(page).toHaveURL(/\/workspace\/jamo$/)
+  const nav = page.getByRole('navigation', { name: '프로젝트 주 내비게이션' })
+  await expect(nav.getByRole('link', { name: '자소' })).toHaveAttribute('aria-current', 'page')
+  await expect(nav.getByRole('link')).toHaveText(['자소', '검수'])
+  await expect(nav.getByText('뼈대')).toHaveCount(0)
 })
 
 test('비교 카드 선택과 드로어 열기는 저장 데이터에 영향을 주지 않는다', async ({ page }) => {
@@ -336,7 +300,8 @@ test('J-01에서 J-02와 J-03으로 이동하고 잘못된 workspace 경로를 �
   await expect(page.getByText('J-02 · 자소 원형')).toBeVisible()
   await page.getByRole('navigation', { name: '프로젝트 주 내비게이션' }).getByRole('link', { name: '자소' }).click()
   await expect(page).toHaveURL(/\/workspace\/jamo$/)
-  await expect(page.getByRole('region', { name: /완성 글자 편집/ })).toBeVisible()
+  // 자소 탭은 레이아웃이 기본이다.
+  await expect(page.getByRole('region', { name: /레이아웃 수정/ })).toBeVisible()
   // 편집기 문장 글자 버튼은 글자 크기에 매여 44px보다 좁다. 여기서는 넘침만 본다.
   const editorOverflow = await page.evaluate(() => ({
     horizontal: document.documentElement.scrollWidth - window.innerWidth,

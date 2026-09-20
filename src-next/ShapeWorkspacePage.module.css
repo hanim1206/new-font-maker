@@ -36,43 +36,6 @@
 
 .cardGlyph { width: 68px; height: 68px; margin: auto; pointer-events: none; }
 
-.layoutGridCanvas { touch-action: none; }
-.layoutGridCanvas[data-hovered='true'] { cursor: grab; }
-.layoutGridOverlays { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-.layoutGridOverlays g { fill: none; stroke-width: .004; vector-effect: non-scaling-stroke; }
-.layoutGridOverlays g:nth-of-type(1) { stroke: #64748b; stroke-dasharray: .02 .014; }
-.layoutGridOverlays g:nth-of-type(2) { stroke: #4f7ee8; }
-.layoutGridOverlays g:nth-of-type(3) { stroke: #0f9e89; }
-.layoutGridOverlays g:nth-of-type(4) { stroke: #9b6ed2; }
-.layoutGridOverlays g:nth-of-type(5) { stroke: #d97706; }
-.layoutGridOverlays g:nth-of-type(6) { stroke: #d1487c; }
-.layoutGridOverlays g:nth-of-type(7) { stroke: #64748b; stroke-dasharray: .008 .012; }
-.layoutCanvasRailHandle { position: absolute; z-index: 3; pointer-events: none; }
-.layoutCanvasRailHandle[data-axis='x'] { top: 0; bottom: 0; width: 2px; margin-left: -1px; }
-.layoutCanvasRailHandle[data-axis='y'] { right: 0; left: 0; height: 2px; margin-top: -1px; }
-.layoutCanvasRailHandle span { position: absolute; display: block; background: rgb(var(--color-text-dim-3) / .38); }
-.layoutCanvasRailHandle[data-axis='x'] span { inset: 0; }
-.layoutCanvasRailHandle[data-axis='y'] span { inset: 0; }
-.layoutCanvasRailHandle[data-hovered='true'] span { background: rgb(var(--color-primary) / .72); box-shadow: 0 0 0 1px rgb(var(--color-primary-light) / .65); }
-.layoutCanvasRailHandle[data-selected='true'] { z-index: 4; }
-.layoutCanvasRailHandle[data-selected='true'] span { background: rgb(var(--color-primary)); box-shadow: 0 0 0 1px rgb(var(--color-primary-light)); }
-.layoutCanvasRailHandle::after { position: absolute; width: 18px; height: 18px; border: 3px solid white; border-radius: 50%; content: ''; opacity: 0; background: rgb(var(--color-primary)); box-shadow: 0 1px 5px rgb(15 23 42 / .3); transition: opacity .12s ease; }
-.layoutCanvasRailHandle[data-axis='x']::after { top: 9px; left: -8px; }
-.layoutCanvasRailHandle[data-axis='y']::after { top: -8px; left: 9px; }
-.layoutCanvasRailHandle[data-selected='true']::after { opacity: 1; }
-.layoutCanvasHelp { max-width: 330px; margin: 8px auto 0; color: rgb(var(--color-text-dim-3)); font-size: 10px; line-height: 1.45; text-align: center; }
-.layoutOverlayLegend { max-width: 330px; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 8px; margin: 8px auto 0; padding: 0; list-style: none; }
-.layoutOverlayLegend li { display: inline-flex; align-items: center; gap: 4px; color: rgb(var(--color-text-dim-3)); font-size: 9px; }
-.layoutOverlayLegend li::before { width: 8px; height: 2px; content: ''; background: #64748b; }
-.layoutOverlayLegend li[data-layout='choseong-jungseong-vertical']::before { background: #4f7ee8; }
-.layoutOverlayLegend li[data-layout='choseong-jungseong-horizontal']::before { background: #0f9e89; }
-.layoutOverlayLegend li[data-layout='choseong-jungseong-mixed']::before { background: #9b6ed2; }
-.layoutOverlayLegend li[data-layout='choseong-jungseong-vertical-jongseong']::before { background: #d97706; }
-.layoutOverlayLegend li[data-layout='choseong-jungseong-horizontal-jongseong']::before { background: #d1487c; }
-.layoutSetup { min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 28px 24px; text-align: center; }
-.layoutSetup h2 { font-size: 17px; }
-.layoutSetup p { max-width: 280px; color: rgb(var(--color-text-dim-3)); font-size: 11px; line-height: 1.5; }
-.layoutSetup button { min-height: 44px; padding: 0 14px; border: 0; border-radius: 10px; background: rgb(var(--color-primary)); color: white; font-size: 11px; font-weight: 750; }
 
 .contextActionRow { display: flex; justify-content: flex-end; padding: 8px 14px 0; }
 .contextActionRow a { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0 14px; border-radius: 10px; background: rgb(var(--color-primary)); color: white; font-size: 11px; font-weight: 750; text-decoration: none; }
