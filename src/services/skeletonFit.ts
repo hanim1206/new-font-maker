@@ -212,14 +212,151 @@ export function fitSkeleton(seed: DeepReadonly<JamoData>, samples: readonly Skel
   const tidy = structuredClone(jamo) as JamoData
   normalizeSkeleton(strokeList(tidy, channel))
   if (seedHandles) pruneZeroHandles(strokeList(tidy, channel))
-  for (const stroke of strokeList(tidy, channel)) for (const point of stroke.points) {
+  roundSkeleton(strokeList(tidy, channel))
+  const tidyXor = meanXor(tidy, samples, channel)
+  if (!Number.isFinite(tidyXor) || tidyXor > best + 0.005) return { jamo, before, after: best, evaluations: evaluations + 1, moved }
+  // 좌표 하강은 거의 수평·수직인 획을 1~2° 틀어 놓는다(xor는 거의 안 바뀌어 되돌릴 이유가 없다).
+  // 둥근 끝에서는 안 보이지만 일자 끝(butt)은 끝이 획 방향에 수직으로 잘려 그 기울기가 그대로 드러난다.
+  // 축에 가까운 직선·접선은 축에 붙인다. 붙여서 xor가 1%p 넘게 나빠지면(진짜 기울기) 붙이기 전으로.
+  const snapped = structuredClone(tidy) as JamoData
+  const axesSnapped = snapSkeletonAxes(strokeList(snapped, channel))
+  const ellipsesRebuilt = regularizeSkeletonEllipses(strokeList(snapped, channel))
+  if (axesSnapped || ellipsesRebuilt) {
+    roundSkeleton(strokeList(snapped, channel))
+    const snappedXor = meanXor(snapped, samples, channel)
+    if (Number.isFinite(snappedXor) && snappedXor <= tidyXor + 0.01) return { jamo: snapped, before, after: snappedXor, evaluations: evaluations + 2, moved }
+  }
+  return { jamo: tidy, before, after: tidyXor, evaluations: evaluations + 2, moved }
+}
+
+function roundSkeleton(strokes: StrokeDataV2[]): void {
+  for (const stroke of strokes) for (const point of stroke.points) {
     point.x = round3(point.x); point.y = round3(point.y)
     if (point.handleIn) point.handleIn = { x: round3(point.handleIn.x), y: round3(point.handleIn.y) }
     if (point.handleOut) point.handleOut = { x: round3(point.handleOut.x), y: round3(point.handleOut.y) }
   }
-  const tidyXor = meanXor(tidy, samples, channel)
-  if (Number.isFinite(tidyXor) && tidyXor <= best + 0.005) return { jamo: tidy, before, after: tidyXor, evaluations: evaluations + 1, moved }
-  return { jamo, before, after: best, evaluations: evaluations + 1, moved }
+}
+
+export interface SnapSkeletonAxesOptions {
+  /** 핸들 없는 직선이 축에서 이 각도 안이면 수평·수직으로 붙인다. */
+  segmentDegrees?: number
+  /** 양쪽 핸들이 있는 앵커의 접선이 축에서 이 각도 안이면 핸들을 축에 붙인다(ㅇ·ㅎ 원의 위·아래·좌·우). */
+  tangentDegrees?: number
+}
+
+/** 축에서 벗어난 각도(0~45°). */
+function axisDeviationDegrees(dx: number, dy: number): number {
+  const angle = Math.abs(Math.atan2(dy, dx) * 180 / Math.PI) % 90
+  return Math.min(angle, 90 - angle)
+}
+
+/**
+ * 거의 수평·수직인 직선을 축에 붙인다. 붙인 직선으로 이어진 앵커들은 같은 좌표(평균)를 받으므로
+ * ㄹ·ㅁ처럼 한 획 안에서 꺾이는 골격도 직각이 된다. 앵커를 옮기면 붙은 핸들도 같이 옮긴다(곡률 유지).
+ * 양쪽 핸들이 있는 앵커는 접선이 축에 가까우면 핸들의 축 밖 좌표를 앵커에 맞춘다.
+ * 무엇이든 바꿨으면 true.
+ */
+export function snapSkeletonAxes(strokes: StrokeDataV2[], options: SnapSkeletonAxesOptions = {}): boolean {
+  const { segmentDegrees = 15, tangentDegrees = 12 } = options
+  let changed = false
+  for (const stroke of strokes) {
+    const points = stroke.points
+    const count = points.length
+    // 축마다 앵커를 그룹으로 묶는다(union-find). 같은 그룹은 그 축 좌표를 평균으로 맞춘다.
+    for (const axis of ['x', 'y'] as const) {
+      const parent = points.map((_, index) => index)
+      const find = (index: number): number => (parent[index] === index ? index : (parent[index] = find(parent[index])))
+      const segmentCount = stroke.closed ? count : count - 1
+      for (let index = 0; index < segmentCount; index += 1) {
+        const from = points[index]
+        const to = points[(index + 1) % count]
+        if (from.handleOut || to.handleIn) continue
+        const dx = to.x - from.x, dy = to.y - from.y
+        // 겹친 앵커(닫힌 ㅁ의 마지막 = 첫 앵커)는 두 축 모두 같이 움직인다. 갈라지면 안쪽 링이 제 몸을 지난다.
+        if (Math.hypot(dx, dy) <= 1e-6) { parent[find(index)] = find((index + 1) % count); continue }
+        // 수평 직선은 y를, 수직 직선은 x를 맞춘다.
+        const horizontal = Math.abs(dx) >= Math.abs(dy)
+        if ((axis === 'y') !== horizontal) continue
+        if (axisDeviationDegrees(dx, dy) > segmentDegrees) continue
+        parent[find(index)] = find((index + 1) % count)
+      }
+      const groups = new Map<number, number[]>()
+      points.forEach((_, index) => { const root = find(index); groups.set(root, [...(groups.get(root) ?? []), index]) })
+      for (const members of groups.values()) {
+        if (members.length < 2) continue
+        const target = members.reduce((sum, index) => sum + points[index][axis], 0) / members.length
+        for (const index of members) {
+          const point = points[index]
+          const delta = target - point[axis]
+          if (Math.abs(delta) <= 1e-9) continue
+          point[axis] = target
+          if (point.handleIn) point.handleIn[axis] += delta
+          if (point.handleOut) point.handleOut[axis] += delta
+          changed = true
+        }
+      }
+    }
+    for (const point of points) {
+      if (!point.handleIn || !point.handleOut) continue
+      const dx = point.handleOut.x - point.handleIn.x, dy = point.handleOut.y - point.handleIn.y
+      if (Math.hypot(dx, dy) <= 1e-6 || axisDeviationDegrees(dx, dy) > tangentDegrees) continue
+      const axis = Math.abs(dx) >= Math.abs(dy) ? 'y' : 'x'
+      if (point.handleIn[axis] === point[axis] && point.handleOut[axis] === point[axis]) continue
+      point.handleIn[axis] = point[axis]
+      point.handleOut[axis] = point[axis]
+      changed = true
+    }
+  }
+  return changed
+}
+
+/** 사분원 하나를 3차 베지어로 그릴 때 핸들 길이 / 반지름. */
+const ELLIPSE_KAPPA = 0.5523
+
+/**
+ * ㅇ·ㅎ의 원(앵커 4개, 전부 양쪽 핸들, 닫힘)을 앵커 범위에 맞는 축 정렬 타원으로 다시 그린다.
+ * 좌표 하강은 원의 앵커·핸들을 제각각 움직여 찌그러진 달걀을 만든다(ㄶ 받침은 원이 아예 무너졌다).
+ * Noto의 ㅇ은 타원에 가까우니 위·오른쪽·아래·왼쪽 앵커와 kappa 핸들로 되돌린다. 앵커 순서(시계·반시계)는 유지한다.
+ */
+export function regularizeSkeletonEllipses(strokes: StrokeDataV2[]): boolean {
+  let changed = false
+  for (const stroke of strokes) {
+    const points = stroke.points
+    if (!stroke.closed || points.length !== 4 || !points.every((point) => point.handleIn && point.handleOut)) continue
+    const xs = points.map((point) => point.x), ys = points.map((point) => point.y)
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys)
+    const rx = (maxX - minX) / 2, ry = (maxY - minY) / 2
+    if (rx <= 1e-6 || ry <= 1e-6) continue
+    const cx = minX + rx, cy = minY + ry
+    // 각 앵커를 중심에서 본 각도로 위·오른쪽·아래·왼쪽 중 가장 가까운 자리에 놓는다. 자리가 겹치면(무너진 원) 순서대로 돌린다.
+    const slots = [
+      { x: cx, y: cy - ry, tangent: { x: 1, y: 0 } },
+      { x: cx + rx, y: cy, tangent: { x: 0, y: 1 } },
+      { x: cx, y: cy + ry, tangent: { x: -1, y: 0 } },
+      { x: cx - rx, y: cy, tangent: { x: 0, y: -1 } },
+    ]
+    const angleOf = (x: number, y: number) => Math.atan2((y - cy) / ry, (x - cx) / rx)
+    const first = Math.round((angleOf(points[0].x, points[0].y) + Math.PI / 2) / (Math.PI / 2)) & 3
+    // 앵커 1이 앵커 0의 시계 방향(각도 증가) 쪽이면 시계, 아니면 반시계.
+    const sweep = angleOf(points[1].x, points[1].y) - angleOf(points[0].x, points[0].y)
+    const clockwise = ((sweep + Math.PI * 3) % (Math.PI * 2)) - Math.PI > 0
+    const next = points.map((point, index) => {
+      const slot = slots[(first + (clockwise ? index : -index) + 8) & 3]
+      const sign = clockwise ? 1 : -1
+      const hx = slot.tangent.x * rx * ELLIPSE_KAPPA * sign, hy = slot.tangent.y * ry * ELLIPSE_KAPPA * sign
+      return { ...point, x: slot.x, y: slot.y, handleIn: { x: slot.x - hx, y: slot.y - hy }, handleOut: { x: slot.x + hx, y: slot.y + hy } }
+    })
+    const same = next.every((point, index) => {
+      const old = points[index]
+      return Math.abs(point.x - old.x) < 1e-9 && Math.abs(point.y - old.y) < 1e-9
+        && Math.abs(point.handleIn.x - old.handleIn!.x) < 1e-9 && Math.abs(point.handleIn.y - old.handleIn!.y) < 1e-9
+        && Math.abs(point.handleOut.x - old.handleOut!.x) < 1e-9 && Math.abs(point.handleOut.y - old.handleOut!.y) < 1e-9
+    })
+    if (same) continue
+    stroke.points = next
+    changed = true
+  }
+  return changed
 }
 
 /** 열린 획의 앵커마다 없는 핸들을 앵커 자리에 심는다(길이 0 = 직선 유지). 첫 앵커는 out, 끝 앵커는 in, 안쪽은 둘 다. */

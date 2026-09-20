@@ -5,7 +5,7 @@ import { createNotoPresetReader } from '../../scripts/reference-lab/notoPresetAp
 import { CHOSEONG_LIST, CHOSEONG_MAP, JONGSEONG_LIST, JUNGSEONG_LIST, JUNGSEONG_MAP } from '../data/Hangul'
 import { modelIdentityOf } from './notoVariationModel'
 import type { NotoOutline } from './notoOutlineInk'
-import { buildSkeletonSample, fitSkeleton, fitSkeletonMultiStart, meanXor, skeletonContextChars, skeletonFamilyChars, skeletonParams, skeletonSeedVariants } from './skeletonFit'
+import { buildSkeletonSample, fitSkeleton, fitSkeletonMultiStart, meanXor, skeletonContextChars, skeletonFamilyChars, skeletonParams, skeletonSeedVariants, regularizeSkeletonEllipses, snapSkeletonAxes } from './skeletonFit'
 import type { SkeletonSample } from './skeletonFit'
 import type { JamoData } from '../types'
 import legacyJamos from '../data/fixtures/baseJamosLegacy2026-02.json'
@@ -23,6 +23,77 @@ describe('골격 다듬기 — 파라미터', () => {
   it('문맥 글자는 홀자 계열·받침을 섞는다', () => {
     expect(skeletonContextChars('CH', 'ㅅ')).toEqual(['사', '소', '솨', '신', '숭', '설'])
     expect(skeletonContextChars('JO', 'ㄹ')).toEqual(['갈', '몰', '왈', '실', '불'])
+  })
+})
+
+describe('골격 다듬기 — 축 붙이기', () => {
+  it('ㄹ처럼 한 획에서 꺾이는 직선은 이어진 앵커가 같은 좌표를 받아 직각이 된다', () => {
+    const strokes = [{ id: 'ㄹ', closed: false, thickness: 0.07, points: [{ x: 0, y: 0 }, { x: 0.942, y: 0 }, { x: 0.935, y: 0.485 }, { x: 0.084, y: 0.5 }, { x: 0.071, y: 1 }, { x: 1, y: 1 }] }]
+    expect(snapSkeletonAxes(strokes)).toBe(true)
+    const [a, b, c, d, e, f] = strokes[0].points
+    expect(b.x).toBeCloseTo(c.x, 9)
+    expect(c.y).toBeCloseTo(d.y, 9)
+    expect(d.x).toBeCloseTo(e.x, 9)
+    expect(a.y).toBe(b.y); expect(e.y).toBe(f.y)
+    expect(b.x).toBeCloseTo(0.9385, 9)
+    // 두 번 붙여도 더 안 바뀐다.
+    expect(snapSkeletonAxes(strokes)).toBe(false)
+  })
+
+  it('한계를 넘는 기울기(ㅎ 꼭지 30°)는 그대로 두고, 앵커를 옮기면 핸들도 따라간다', () => {
+    const strokes = [
+      { id: 'tick', closed: false, thickness: 0.07, points: [{ x: 0.433, y: 0.08 }, { x: 0.567, y: 0 }] },
+      { id: 'leg', closed: false, thickness: 0.07, points: [{ x: 0, y: 0 }, { x: 1, y: 0.01, handleOut: { x: 1, y: 0.3 } }, { x: 0.9, y: 1, handleIn: { x: 0.95, y: 0.7 } }] },
+    ]
+    expect(snapSkeletonAxes(strokes)).toBe(true)
+    expect(strokes[0].points).toEqual([{ x: 0.433, y: 0.08 }, { x: 0.567, y: 0 }])
+    expect(strokes[1].points[0].y).toBeCloseTo(0.005, 9)
+    expect(strokes[1].points[1].y).toBeCloseTo(0.005, 9)
+    expect(strokes[1].points[1].handleOut!.y).toBeCloseTo(0.295, 9)
+    // 핸들 달린 곡선 구간은 직선이 아니라 건드리지 않는다.
+    expect(strokes[1].points[2]).toEqual({ x: 0.9, y: 1, handleIn: { x: 0.95, y: 0.7 } })
+  })
+
+  it('원의 위·아래·좌·우 앵커는 접선을 축에 붙인다', () => {
+    const strokes = [{ id: 'circle', closed: true, thickness: 0.07, points: [
+      { x: 0.5, y: 0, handleIn: { x: 0.3, y: 0.02 }, handleOut: { x: 0.76, y: 0.06 } },
+      { x: 1, y: 0.5, handleIn: { x: 0.95, y: 0.3 }, handleOut: { x: 1.02, y: 0.7 } },
+      { x: 0.5, y: 1, handleIn: { x: 0.7, y: 1 }, handleOut: { x: 0.3, y: 1 } },
+      { x: 0, y: 0.5, handleIn: { x: 0.3, y: 0.9 }, handleOut: { x: 0.1, y: 0.3 } },
+    ] }]
+    expect(snapSkeletonAxes(strokes)).toBe(true)
+    const [top, right, bottom, left] = strokes[0].points
+    expect([top.handleIn!.y, top.handleOut!.y]).toEqual([0, 0])
+    expect([right.handleIn!.x, right.handleOut!.x]).toEqual([1, 1])
+    expect(bottom).toEqual({ x: 0.5, y: 1, handleIn: { x: 0.7, y: 1 }, handleOut: { x: 0.3, y: 1 } })
+    // 접선이 축에서 먼(18°) 앵커는 그대로.
+    expect(left.handleIn).toEqual({ x: 0.3, y: 0.9 })
+  })
+
+  it('찌그러진 원은 앵커 범위의 축 정렬 타원으로 다시 그리고, 앵커 순서는 지킨다', () => {
+    // 받침 ㄶ의 무너진 ㅎ 원(위·오른쪽 앵커가 붙어 있다).
+    const stroke = { id: 'circle', closed: true, thickness: 0.07, points: [
+      { x: 0.783, y: 0.402, handleIn: { x: 0.752, y: 0.61 }, handleOut: { x: 0.761, y: 0.253 } },
+      { x: 0.92, y: 0.466, handleIn: { x: 0.94, y: 0.186 }, handleOut: { x: 0.779, y: 0.635 } },
+      { x: 0.743, y: 0.992, handleIn: { x: 0.949, y: 0.932 }, handleOut: { x: 0.592, y: 1.044 } },
+      { x: 0.5, y: 0.645, handleIn: { x: 0.393, y: 0.843 }, handleOut: { x: 0.647, y: 0.476 } },
+    ] }
+    expect(regularizeSkeletonEllipses([stroke])).toBe(true)
+    const [top, right, bottom, left] = stroke.points
+    expect([top.x, top.y]).toEqual([expect.closeTo(0.71, 9), expect.closeTo(0.402, 9)])
+    expect([right.x, right.y]).toEqual([expect.closeTo(0.92, 9), expect.closeTo(0.697, 9)])
+    expect([bottom.x, bottom.y]).toEqual([expect.closeTo(0.71, 9), expect.closeTo(0.992, 9)])
+    expect([left.x, left.y]).toEqual([expect.closeTo(0.5, 9), expect.closeTo(0.697, 9)])
+    // 시계 방향(위 → 오른쪽): 위 앵커의 out 핸들은 오른쪽으로, 접선은 수평.
+    expect(top.handleOut!.x).toBeGreaterThan(top.x)
+    expect(top.handleOut!.y).toBeCloseTo(top.y, 9)
+    expect(top.handleIn!.x).toBeLessThan(top.x)
+    expect(right.handleOut!.y).toBeGreaterThan(right.y)
+    expect(right.handleOut!.x).toBeCloseTo(right.x, 9)
+    expect(regularizeSkeletonEllipses([stroke])).toBe(false)
+    // 원이 아닌 것(열린 획, 앵커 3개)은 안 건드린다.
+    const open = { id: 'o', closed: false, thickness: 0.07, points: stroke.points.map((p) => ({ ...p })) }
+    expect(regularizeSkeletonEllipses([open])).toBe(false)
   })
 })
 
