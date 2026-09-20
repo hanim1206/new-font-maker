@@ -149,3 +149,17 @@
 .placementToggle[data-placement='boxes'] small { color: rgb(var(--color-primary-dark)); }
 .placementToggle[aria-pressed='true'] small { color: rgb(var(--color-surface) / .8); }
 .placementToggle[aria-pressed='true'][data-placement='boxes'] small { color: #9fc0ff; }
+
+/* 자소 탭 편집 모드(획 · 레이아웃). 머리줄 왼쪽에 둔다. .header button 기본 모양을 덮어쓴다. */
+.headerCompact:has(.modeSegment) { justify-content: space-between; }
+.header .modeSegment { display: inline-flex; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 14px; background: rgb(var(--color-surface)); }
+.header .modeSegment button { width: auto; height: auto; min-height: 32px; display: inline-flex; align-items: center; padding: 5px 14px; border-radius: 0; background: transparent; color: rgb(var(--color-text-dim-4)); font-size: 11px; font-weight: 700; }
+.header .modeSegment button[aria-pressed='true'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+.header .modeSegment button:disabled { opacity: .4; }
+/* 레이아웃 모드: 문장 아래 남은 높이를 기준선 편집부가 스크롤로 쓴다. */
+.layoutMode { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: calc(env(safe-area-inset-bottom) + 12px); }
+.layoutHandoff { min-height: 176px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 16px; border: 1px dashed rgb(var(--color-border)); border-radius: 16px; background: rgb(var(--color-surface-2)); }
+.layoutHandoff p { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.layoutHandoff strong { font-size: 13px; }
+.layoutHandoff span { color: rgb(var(--color-text-dim-4)); font-size: 11px; line-height: 1.45; }
+.layoutHandoff button { align-self: flex-start; min-height: 40px; padding: 0 16px; border: 0; border-radius: 12px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 12px; font-weight: 700; }

@@ -9,7 +9,8 @@ import type { EditableRail } from './notoMedialFitView'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 import { useNotoGlyph } from './useNotoGlyph'
 import { useFitInkStyle } from './useFitInkStyle'
-import { useLayoutDelta, useLayoutDeltaStore, useScopeDelta } from './layoutDeltaStore'
+import { layoutDeltaSnapshot, useLayoutDelta, useLayoutDeltaStore, useScopeDelta } from './layoutDeltaStore'
+import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { applyFacesDelta, applyMedialDelta, editKindOf, hasLayoutEdit, hasShapeEdit, layoutDeltaOf, PROPAGATION_SCOPES, propagationCandidates, shapeDeltaToEm } from './reviewPropagation'
 import type { CandidateScope, EditKind, PropagationEdit, PropagationScope } from './reviewPropagation'
 import styles from './ReviewPropagationCards.module.css'
@@ -105,7 +106,7 @@ function CardGrid({ candidates, bundle, edit, mode }: { candidates: CorpusIdenti
   </div>
 }
 
-export function ReviewPropagationCards({ source, bundle, edit, changed, focus, onApplied }: {
+export function ReviewPropagationCards({ source, bundle, edit, changed, focus, onApplied, onCommitted }: {
   source: CorpusIdentity
   bundle: NotoPresetModelBundle | null
   edit: PropagationEdit
@@ -115,12 +116,15 @@ export function ReviewPropagationCards({ source, bundle, edit, changed, focus, o
   focus?: Part
   /** 배치 Δ를 저장한 뒤. 호출자는 세션 편집을 비워 새 original에서 다시 시작한다. */
   onApplied?: () => void
+  /** 저장소가 바뀐 직후(적용·지우기). 앞뒤 스냅샷을 넘겨 호출자가 Undo 기록을 남긴다. */
+  onCommitted?: (before: LayoutDeltaSnapshot, after: LayoutDeltaSnapshot) => void
 }) {
   const [scope, setScope] = useState<PropagationScope>('layer')
   const applyDelta = useLayoutDeltaStore((state) => state.apply)
   const clearDelta = useLayoutDeltaStore((state) => state.clear)
   const saved = useScopeDelta(scope, source.contextId)
-  const apply = () => { applyDelta(scope, source.contextId, layoutDeltaOf(edit)); onApplied?.() }
+  const commit = (change: () => void) => { const before = layoutDeltaSnapshot(); change(); onCommitted?.(before, layoutDeltaSnapshot()); onApplied?.() }
+  const apply = () => commit(() => applyDelta(scope, source.contextId, layoutDeltaOf(edit)))
   const [page, setPage] = useState(0)
   const [promoted, setPromoted] = useState(false)
   const layoutActive = hasLayoutEdit(edit)
@@ -144,7 +148,7 @@ export function ReviewPropagationCards({ source, bundle, edit, changed, focus, o
     <div className={styles.scopes} role="group" aria-label="배치 적용 범위">
       {PROPAGATION_SCOPES.map((item) => <button type="button" key={item.id} aria-pressed={item.id === scope} disabled={!focus || mode === 'shape'} onClick={() => { setScope(item.id); setPage(0) }}>{item.label}</button>)}
       {/* 이 범위에 저장된 Δ가 있으면 알려 주고 지울 수 있다. 저장된 Δ는 이미 캔버스 original에 들어 있다. */}
-      {saved && <button type="button" className={styles.clear} onClick={() => { clearDelta(scope, source.contextId); onApplied?.() }} data-testid="review-propagation-clear">저장된 Δ 지우기</button>}
+      {saved && <button type="button" className={styles.clear} onClick={() => commit(() => clearDelta(scope, source.contextId))} data-testid="review-propagation-clear">저장된 Δ 지우기</button>}
     </div>
     {/* Δ 줄은 늘 자리를 차지한다. 옮길 때 카드가 아래로 밀리지 않게. */}
     <DeltaList rails={layoutRails} testId="review-propagation-deltas" />

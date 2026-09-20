@@ -2,7 +2,10 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerE
 import { Check, Copy, Dices, Download, LayoutDashboard, ListTree, LoaderCircle, Redo2, Settings2, TextCursorInput, Undo2, X } from 'lucide-react'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
-import { useContextPlacement, usePlacementStore } from './notoModel'
+import { useContextPlacement, useNotoModel, usePlacementStore } from './notoModel'
+import { GlyphLayoutEditor } from './GlyphLayoutEditor'
+import { useLayoutDeltaStore } from './layoutDeltaStore'
+import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { adoptFamilyStrokes, familyOfSyllable } from '../src/utils/jamoContextStrokes'
 import { PART_COLOR, PART_LABEL } from './partColors'
 import { useJamoStore } from '../src/stores/jamoStore'
@@ -114,6 +117,12 @@ type HistoryEntry =
     }
   | { kind: 'jamo'; jamoType: JamoData['type']; char: string; before: JamoData; after: JamoData; edit: SampleGlyphEdit }
   | { kind: 'brush'; before: StrokeRenderStyle; after: StrokeRenderStyle }
+  // 레이아웃 모드에서 적용·지운 배치 Δ. 저장소 앞뒤를 통째로 든다.
+  | { kind: 'layoutDelta'; before: LayoutDeltaSnapshot; after: LayoutDeltaSnapshot }
+
+/** 자소 탭 편집 모드. 획 = 점·획·자소 형태, 레이아웃 = 기준선으로 배치(Δ 저장). */
+type EditMode = 'stroke' | 'layout'
+const initialEditMode = (): EditMode => new URLSearchParams(window.location.search).get('mode') === 'layout' ? 'layout' : 'stroke'
 
 function isEditableHangul(char: string): boolean {
   const code = char.codePointAt(0) ?? 0
@@ -981,6 +990,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const [globalStylePanel, setGlobalStylePanel] = useState<GlobalStylePanel | null>(null)
   const [previewBrush, setPreviewBrush] = useState<StrokeRenderStyle | null>(null)
   const [isShapeRuleOpen, setIsShapeRuleOpen] = useState(false)
+  const [editMode, setEditMode] = useState<EditMode>(initialEditMode)
+  // Undo/Redo로 저장된 Δ가 바뀌면 레이아웃 편집부를 새로 띄워 세션 편집(절대값)을 버린다.
+  const [layoutEpoch, setLayoutEpoch] = useState(0)
   const directInputRef = useRef<HTMLTextAreaElement>(null)
   const isGlobalStyleOpen = globalStylePanel !== null
   const isBrushStyleOpen = globalStylePanel === 'brush'
@@ -1007,6 +1019,14 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     () => resolveSyllableContextualInkSafety(previewedSyllable, focusedBoxes).syllable,
     [focusedBoxes, previewedSyllable],
   )
+  // 레이아웃 모드는 글자가 모델 상자로 그려질 때만 뜻이 있다. 그때는 옛 경로(자소 통째 이동 → 스키마)가 글자에 안 닿으므로 셸 안에서는 끈다.
+  const { placement } = useContextPlacement(syllable, effectiveSchema, previewGlobalStyle)
+  const { bundle: notoBundle, error: notoModelError } = useNotoModel()
+  const notoPlacementOn = usePlacementStore((state) => state.notoPlacement)
+  const modelPending = notoPlacementOn && !notoBundle && !notoModelError
+  const layoutAvailable = chrome === 'workspace' && isEditableHangul(selectedChar) && (selectedChar.codePointAt(0) ?? 0) >= 0xac00 && (placement.kind === 'boxes' || modelPending)
+  const isLayoutMode = editMode === 'layout' && layoutAvailable
+  const schemaMoveLocked = chrome === 'workspace' && placement.kind === 'boxes'
   const snapStep = fontUnitsToNormalized(grid.snapInterval, fontSpace)
   const minimumInkGap = fontUnitsToNormalized(grid.minorInterval, fontSpace)
   const sentenceEm = 40
@@ -1155,6 +1175,17 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     useGlobalStyleStore.getState().setStrokeRenderStyle(after)
     setPreviewBrush(null)
   }
+  const commitLayoutDelta = (before: LayoutDeltaSnapshot, after: LayoutDeltaSnapshot) => {
+    if (JSON.stringify(before) === JSON.stringify(after)) return
+    setHistory((entries) => [...entries, { kind: 'layoutDelta', before, after }])
+    setFuture([])
+  }
+  const chooseEditMode = (mode: EditMode) => {
+    setEditMode(mode)
+    setPreviewJamo(null)
+    setPreviewSchema(null)
+    if (mode === 'layout') closeGlobalStyle()
+  }
   const closeGlobalStyle = () => {
     setPreviewBrush(null)
     setGlobalStylePanel(null)
@@ -1163,11 +1194,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     const entry = history.at(-1)
     if (!entry) return
     if (entry.kind === 'layout') useLayoutStore.getState().setUserPartOverrides(entry.layoutType, entry.beforeOverrides)
+    else if (entry.kind === 'layoutDelta') { useLayoutDeltaStore.getState().restore(entry.before); setLayoutEpoch((epoch) => epoch + 1) }
     else if (entry.kind === 'brush') useGlobalStyleStore.getState().setStrokeRenderStyle(entry.before)
     else updateJamo(entry.before)
     setHistory((entries) => entries.slice(0, -1))
     setFuture((entries) => [...entries, entry])
-    if (entry.kind !== 'brush') useCalibrationProjectStore.getState().removeSampleGlyphEdit(entry.edit.id)
+    if (entry.kind === 'layout' || entry.kind === 'jamo') useCalibrationProjectStore.getState().removeSampleGlyphEdit(entry.edit.id)
     setPreviewJamo(null)
     setPreviewSchema(null)
     setSelection({ kind: 'none' })
@@ -1177,11 +1209,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     const entry = future.at(-1)
     if (!entry) return
     if (entry.kind === 'layout') useLayoutStore.getState().setUserPartOverrides(entry.layoutType, entry.afterOverrides)
+    else if (entry.kind === 'layoutDelta') { useLayoutDeltaStore.getState().restore(entry.after); setLayoutEpoch((epoch) => epoch + 1) }
     else if (entry.kind === 'brush') useGlobalStyleStore.getState().setStrokeRenderStyle(entry.after)
     else updateJamo(entry.after)
     setFuture((entries) => entries.slice(0, -1))
     setHistory((entries) => [...entries, entry])
-    if (entry.kind !== 'brush') useCalibrationProjectStore.getState().addSampleGlyphEdit(entry.edit)
+    if (entry.kind === 'layout' || entry.kind === 'jamo') useCalibrationProjectStore.getState().addSampleGlyphEdit(entry.edit)
     setPreviewJamo(null)
     setPreviewSchema(null)
     setSelection({ kind: 'none' })
@@ -1310,6 +1343,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         </div>)}
       </section>
 
+      {isLayoutMode ? <section className={styles.layoutMode} aria-label={`${selectedChar} 레이아웃 수정`} data-testid="jamo-layout-mode">
+        <GlyphLayoutEditor key={`${selectedChar}:${layoutEpoch}`} codepoint={selectedChar.codePointAt(0) ?? 0xac00} initialPart={selection.kind === 'none' ? undefined : selection.editorPart} onCommitted={commitLayoutDelta} />
+      </section> : <>
       <section className={styles.editor} data-chrome={chrome} aria-label={`${selectedChar} 완성 글자 편집`}>
         <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={isBrushStyleOpen ? { kind: 'none' } : selection} onSelect={isBrushStyleOpen ? () => {} : selectFromCanvas} selectedPoints={isBrushStyleOpen ? [] : selectedPoints} onPointSelect={isBrushStyleOpen ? () => {} : selectPointFromCanvas} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
       </section>
@@ -1327,7 +1363,13 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
           renderPreview={(strokeStyle) => <Glyph char="한" size={42} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={null} previewSchema={null} layoutHighlight={null} globalStyle={{ ...globalStyle, strokeStyle, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : globalStyle.brush }} />}
           embedded
         />}
-      /> : <InferenceTrackpad
+      /> : schemaMoveLocked && selection.kind === 'component' ? <section className={styles.trackpadSection} data-testid="jamo-layout-handoff">
+        {/* 모델 상자로 그리는 글자는 자소를 통째로 옮겨도(옛 스키마 저장) 글자에 안 닿는다. 배치는 기준선으로 고친다. */}
+        <div className={styles.layoutHandoff}>
+          <p><strong>{PART_LABEL[selection.editorPart]} 자리는 레이아웃에서 고쳐요</strong><span>기준선을 옮기면 같은 레이아웃 글자에 함께 적용됩니다. 획을 고치려면 획을 눌러 주세요.</span></p>
+          <button type="button" onClick={() => chooseEditMode('layout')}>레이아웃에서 고치기</button>
+        </div>
+      </section> : <InferenceTrackpad
         glyph={selectedChar}
         syllable={syllable}
         selection={selection}
@@ -1347,6 +1389,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         onInkGapLimitChange={setInkGapLimiter}
         onMultiSelectArmedChange={setMultiSelectArmed}
       />}
+      </>}
       {isShapeRuleOpen && selection.kind !== 'none' && <ShapeRulePanel jamo={selection.jamo} selectedStrokeId={selection.kind === 'component' ? null : selection.strokeId} onClose={() => setIsShapeRuleOpen(false)} />}
     </>
   )
@@ -1355,10 +1398,16 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
       <MobileWorkspaceShell
         activeArea="jamo"
         projectName={projectName}
-        statusLabel="획 편집"
+        statusLabel={isLayoutMode ? '레이아웃 수정' : '획 편집'}
         history={{ canUndo: history.length > 0, canRedo: future.length > 0, onUndo: undo, onRedo: redo }}
       >
-        <div className={`${styles.header} ${styles.headerCompact}`}>{actions}</div>
+        <div className={`${styles.header} ${styles.headerCompact}`}>
+          <span className={styles.modeSegment} role="group" aria-label="편집 모드" data-testid="jamo-edit-mode">
+            <button type="button" aria-pressed={isLayoutMode} disabled={!layoutAvailable} title={layoutAvailable ? undefined : '이 글자는 모델 상자로 그려지지 않아 기준선 편집을 쓸 수 없어요'} onClick={() => chooseEditMode('layout')}>레이아웃</button>
+            <button type="button" aria-pressed={!isLayoutMode} onClick={() => chooseEditMode('stroke')}>획</button>
+          </span>
+          {actions}
+        </div>
         {body}
       </MobileWorkspaceShell>
     )

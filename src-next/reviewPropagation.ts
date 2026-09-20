@@ -2,7 +2,8 @@ import type { ComponentFaces } from '../src/services/notoComponentFit'
 import type { StrokeRailBinding } from '../src/services/notoMedialMasterFit'
 import { applyMedialDelta, resolveSemanticRail, semanticKeyOf } from '../src/services/medialRailDelta'
 import type { SemanticDelta, SemanticRailKey } from '../src/services/medialRailDelta'
-import type { ContextBoxDelta } from '../src/services/contextBoxResolver'
+import { addContextBoxDelta, resolveContextBoxes } from '../src/services/contextBoxResolver'
+import type { ContextBoxDelta, ContextModel } from '../src/services/contextBoxResolver'
 import type { BoxConfig, Part } from '../src/types'
 import { CORPUS_FINALS, CORPUS_MEDIALS, corpusCodepoint, corpusIdentity } from './notoCorpus'
 import type { CorpusIdentity } from './notoCorpus'
@@ -78,6 +79,31 @@ export function propagationEditOf(input: { editable: readonly EditableRail[]; me
     }
   }
   return edit
+}
+
+const PROBE = 0.001
+const sameBoxes = (a: Partial<Record<Part, BoxConfig>>, b: Partial<Record<Part, BoxConfig>>) => (Object.keys({ ...a, ...b }) as Part[]).every((part) => {
+  const left = a[part]; const right = b[part]
+  return !!left && !!right && (['x', 'y', 'width', 'height'] as const).every((key) => Math.abs(left[key] - right[key]) <= EPSILON)
+})
+
+/**
+ * 옮겨도 글자에 안 닿는 배치 rail. 앱 렌더러는 홀자를 slot 상자에 스케일해 그리므로, slot 경계를 안 미는 안쪽 중심 rail은 상자를 못 바꾼다.
+ * 규칙을 따로 두지 않고 1u를 양쪽으로 얹어 칸 해석을 다시 돌려 본다. 둘 다 상자가 그대로면 안 닿는 rail이다(한쪽만 막히면 순서 클램프일 수 있다).
+ * 닿자 네 변은 상자 자체라 늘 닿고, 시작·끝 rail은 배치가 아니라 여기서 안 본다.
+ */
+export function unreachedRailIds(input: { identity: CorpusIdentity; model: ContextModel; delta?: ContextBoxDelta; editable: readonly EditableRail[]; medialParts: readonly MedialFitPart[] }): Set<string> {
+  const base = resolveContextBoxes({ identity: input.identity, model: input.model, delta: input.delta }).boxes
+  const unreached = new Set<string>()
+  for (const rail of input.editable) {
+    if (rail.kind !== 'center') continue
+    const part = input.medialParts[rail.partIndex]
+    const key = part?.fit ? semanticKeyOf(part.fit.bindings, rail.role) : null
+    if (!part || !key) continue
+    const moves = [PROBE, -PROBE].some((step) => !sameBoxes(base, resolveContextBoxes({ identity: input.identity, model: input.model, delta: addContextBoxDelta(input.delta, { medial: { [part.part]: { [key]: step } } }) }).boxes))
+    if (!moves) unreached.add(rail.id)
+  }
+  return unreached
 }
 
 export const hasLayoutEdit = (edit: PropagationEdit) => Object.keys(edit.layout.medial).length > 0 || Object.keys(edit.layout.component).length > 0

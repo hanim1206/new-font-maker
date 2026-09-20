@@ -4,8 +4,6 @@
 .titleSection h1 small { margin-left: 8px; color: rgb(var(--color-text-dim-4)); font-size: 10px; font-weight: 600; letter-spacing: .06em; }
 .scroll { flex: 1; min-height: 0; overflow-y: auto; }
 
-.titleRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.editLink { min-height: 44px; display: inline-flex; align-items: center; padding: 0 14px; border-radius: 12px; background: rgb(var(--color-primary)); color: white; font-size: 11px; font-weight: 750; text-decoration: none; }
 .segment { display: inline-flex; align-self: flex-start; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 14px; background: rgb(var(--color-surface)); }
 .segment a, .segment span { padding: 5px 12px; color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; text-decoration: none; }
 .segment [aria-current='page'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
@@ -21,49 +19,6 @@
 .pickBody strong { font-size: 13px; }
 .pickBody small { color: rgb(var(--color-text-dim-4)); font-size: 10px; }
 .pick > span:last-child { color: rgb(var(--color-text-dim-4)); font-size: 20px; }
-
-.badge { display: inline-block; align-self: flex-start; padding: 2px 8px; border: 1px solid rgb(var(--color-text-dim-4)); border-radius: 10px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 10px; font-weight: 700; letter-spacing: .06em; }
-.badge[data-tier='approved'] { border-color: rgb(var(--color-primary)); color: rgb(var(--color-primary-dark)); background: rgb(var(--color-primary-light) / .4); }
-
-
-.canvasSection { position: relative; padding: 8px 14px; }
-/* 드래그 중 브라우저 선택 하이라이트(파란 배경)와 스크롤 제스처를 막는다. */
-.canvas { position: relative; width: min(100%, 330px); aspect-ratio: 1; margin: 0 auto; display: block; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 20px; background: #fff; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; -webkit-tap-highlight-color: transparent; }
-.canvas * { user-select: none; -webkit-user-select: none; }
-.canvas line { pointer-events: stroke; }
-.canvas text { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: 600; pointer-events: none; }
-.canvasBadge { position: absolute; right: 14px; top: 12px; }
-.canvasToggle { position: absolute; left: 14px; top: 12px; min-height: 32px; display: inline-flex; align-items: center; padding: 4px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; }
-.canvasReset { position: absolute; left: 14px; bottom: 12px; min-height: 32px; display: inline-flex; align-items: center; padding: 4px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; }
-.canvasReset:disabled { opacity: .5; }
-.canvasReset:not(:disabled) { border-color: #f0561e; color: #f0561e; }
-.canvasWarning { position: absolute; right: 14px; bottom: 12px; max-width: 58%; margin: 0; padding: 4px 10px; border-radius: 10px; background: rgb(var(--color-surface) / .92); color: rgb(var(--color-danger, 214 50 31)); font-size: 10.5px; font-weight: 600; text-align: right; }
-.canvasToggle[aria-pressed='true'] { border-color: rgb(var(--color-foreground)); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
-.railButton { cursor: pointer; outline: none; }
-.railButton:focus-visible { stroke: rgb(var(--color-primary) / .18); }
-/* 활성 rail 호버·포커스: 선이 굵어지고 후광이 켜진다. 선택된 rail은 이미 굵고 후광이 있다. */
-.rail .railLine, .rail .railHalo, .rail .railLabel { transition: stroke-width .12s ease, stroke-opacity .12s ease, opacity .12s ease; }
-.rail[data-active='true']:hover .railLine, .rail:has(.railButton:focus-visible) .railLine { stroke-width: .009; }
-.rail:hover .railHalo, .rail:has(.railButton:focus-visible) .railHalo { stroke-opacity: .14; }
-.rail[data-selected] .railLine { stroke-width: .012; }
-.rail[data-selected] .railHalo { stroke-opacity: .22; }
-/* 선택된 rail 위에 올리면 한 단계 더: 후광이 넓어지고 선이 더 굵어져 '잡을 수 있다'가 보인다. */
-.rail:hover[data-selected] .railLine, .rail[data-selected]:has(.railButton:focus-visible) .railLine { stroke-width: .018; }
-.rail:hover[data-selected] .railHalo, .rail[data-selected]:has(.railButton:focus-visible) .railHalo { stroke-width: .06; stroke-opacity: .34; }
-.railHit { pointer-events: stroke; }
-/* 라벨은 여백 띠에 숨어 있다가 호버·포커스 때만 뜬다. 흰 테두리로 격자 위에서도 읽힌다. */
-.railLabel { opacity: 0; paint-order: stroke; stroke: #fff; stroke-width: .012; stroke-linejoin: round; pointer-events: none; }
-.rail:hover .railLabel, .rail:has(.railButton:focus-visible) .railLabel { opacity: 1; }
-.rail[data-selected] .railLabel { font-weight: 800; }
-.warning { padding: 6px 14px; color: rgb(var(--color-danger, 214 50 31)); font-size: 11px; }
-
-.locked { margin: 14px 14px 18px; padding: 12px; border: 1px dashed rgb(var(--color-text-dim-4)); border-radius: 22px; color: rgb(var(--color-text-dim-4)); font-size: 13px; font-weight: 700; text-align: center; }
-
-/* Δ 수치는 띠 여백에 항상. 흰 테두리로 격자 위에서 읽힌다. */
-.snapTag { paint-order: stroke; stroke: #fff; stroke-width: .012; stroke-linejoin: round; font-weight: 800; pointer-events: none; }
-.deltaLabel { paint-order: stroke; stroke: #fff; stroke-width: .012; stroke-linejoin: round; font-weight: 800; pointer-events: none; }
-.railButton { cursor: grab; outline: none; }
-.railButton:active { cursor: grabbing; }
 
 .colorBar { display: flex; flex-direction: column; gap: 6px; margin: 0 14px; }
 .colorBar .segment button { padding: 5px 12px; border: 0; background: transparent; color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; }
@@ -82,10 +37,3 @@
 .pickXor[data-tone='far'] { background: #ffe0c2; color: #8a4a12; }
 .pickXor[data-tone='bad'] { background: #ffd2cf; color: #8f2a22; }
 
-/* 드래그 중 걸린 자리 표시. 모델은 파랑, 다른 기준선·격자는 주황. */
-/* 부품 탭. 켠 부품 색으로 채우고, 나머지는 색 점만. */
-.partTabs { display: flex; gap: 6px; padding: 8px 14px 0; }
-.partTabs button { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 4px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 11px; font-weight: 700; }
-.partTabs button::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--part); opacity: .55; }
-.partTabs button[aria-pressed='true'] { border-color: var(--part); background: var(--part); color: #fff; }
-.partTabs button[aria-pressed='true']::before { background: #fff; opacity: 1; }

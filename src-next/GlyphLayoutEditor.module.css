@@ -1,0 +1,48 @@
+.editor { display: flex; flex-direction: column; }
+.status { padding: 8px 14px; color: rgb(var(--color-text-dim-4)); font-size: 12px; }
+.status[data-state='error'] { color: rgb(var(--color-danger, 214 50 31)); }
+
+.badge { display: inline-block; align-self: flex-start; padding: 2px 8px; border: 1px solid rgb(var(--color-text-dim-4)); border-radius: 10px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 10px; font-weight: 700; letter-spacing: .06em; }
+
+.canvasSection { position: relative; padding: 8px 14px; }
+/* 드래그 중 브라우저 선택 하이라이트(파란 배경)와 스크롤 제스처를 막는다. */
+.canvas { position: relative; width: min(100%, 330px); aspect-ratio: 1; margin: 0 auto; display: block; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 20px; background: #fff; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; -webkit-tap-highlight-color: transparent; }
+.canvas * { user-select: none; -webkit-user-select: none; }
+.canvas line { pointer-events: stroke; }
+.canvas text { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: 600; pointer-events: none; }
+.canvasBadge { position: absolute; right: 14px; top: 12px; }
+.canvasToggle { position: absolute; left: 14px; top: 12px; min-height: 32px; display: inline-flex; align-items: center; padding: 4px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; }
+.canvasReset { position: absolute; left: 14px; bottom: 12px; min-height: 32px; display: inline-flex; align-items: center; padding: 4px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; }
+.canvasReset:disabled { opacity: .5; }
+.canvasReset:not(:disabled) { border-color: #f0561e; color: #f0561e; }
+.canvasWarning { position: absolute; right: 14px; bottom: 12px; max-width: 58%; margin: 0; padding: 4px 10px; border-radius: 10px; background: rgb(var(--color-surface) / .92); color: rgb(var(--color-danger, 214 50 31)); font-size: 10.5px; font-weight: 600; text-align: right; }
+.canvasToggle[aria-pressed='true'] { border-color: rgb(var(--color-foreground)); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+.railButton { cursor: pointer; outline: none; }
+.railButton:focus-visible { stroke: rgb(var(--color-primary) / .18); }
+/* 활성 rail 호버·포커스: 선이 굵어지고 후광이 켜진다. 선택된 rail은 이미 굵고 후광이 있다. */
+.rail .railLine, .rail .railHalo, .rail .railLabel { transition: stroke-width .12s ease, stroke-opacity .12s ease, opacity .12s ease; }
+.rail[data-active='true']:hover .railLine, .rail:has(.railButton:focus-visible) .railLine { stroke-width: .009; }
+.rail:hover .railHalo, .rail:has(.railButton:focus-visible) .railHalo { stroke-opacity: .14; }
+.rail[data-selected] .railLine { stroke-width: .012; }
+.rail[data-selected] .railHalo { stroke-opacity: .22; }
+/* 선택된 rail 위에 올리면 한 단계 더: 후광이 넓어지고 선이 더 굵어져 '잡을 수 있다'가 보인다. */
+.rail:hover[data-selected] .railLine, .rail[data-selected]:has(.railButton:focus-visible) .railLine { stroke-width: .018; }
+.rail:hover[data-selected] .railHalo, .rail[data-selected]:has(.railButton:focus-visible) .railHalo { stroke-width: .06; stroke-opacity: .34; }
+.railHit { pointer-events: stroke; }
+/* 라벨은 여백 띠에 숨어 있다가 호버·포커스 때만 뜬다. 흰 테두리로 격자 위에서도 읽힌다. */
+.railLabel { opacity: 0; paint-order: stroke; stroke: #fff; stroke-width: .012; stroke-linejoin: round; pointer-events: none; }
+.rail:hover .railLabel, .rail:has(.railButton:focus-visible) .railLabel { opacity: 1; }
+.rail[data-selected] .railLabel { font-weight: 800; }
+.warning { padding: 6px 14px; color: rgb(var(--color-danger, 214 50 31)); font-size: 11px; }
+
+/* Δ 수치는 띠 여백에 항상. 흰 테두리로 격자 위에서 읽힌다. */
+.snapTag { paint-order: stroke; stroke: #fff; stroke-width: .012; stroke-linejoin: round; font-weight: 800; pointer-events: none; }
+.deltaLabel { paint-order: stroke; stroke: #fff; stroke-width: .012; stroke-linejoin: round; font-weight: 800; pointer-events: none; }
+.railButton { cursor: grab; outline: none; }
+.railButton:active { cursor: grabbing; }
+/* 부품 고르기 히트 상자. 비활성 상자는 손가락 커서, 활성 상자는 rail 잡기 위해 기본 커서. 포커스는 옅은 테두리로. */
+.boxHit { outline: none; transition: fill-opacity .12s ease; }
+.boxHit[data-active='false'] { cursor: pointer; fill: var(--part); fill-opacity: 0; }
+/* 비활성 상자에 올리면 그 부품 색이 진해져 '누르면 켜진다'가 보인다. */
+.boxHit[data-active='false']:hover, .boxHit[data-active='false']:focus-visible { fill-opacity: .18; }
+.boxHit:focus-visible { stroke: var(--part); stroke-width: .006; }

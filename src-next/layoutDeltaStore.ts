@@ -24,7 +24,13 @@ interface LayoutDeltaState {
   /** 한 범위의 Δ를 비운다. */
   clear: (scope: PropagationScope, contextId: string) => void
   clearAll: () => void
+  /** 저장된 Δ를 통째로 되돌린다. 자소 탭 Undo/Redo가 적용·지우기 앞뒤 스냅샷으로 부른다. */
+  restore: (snapshot: LayoutDeltaSnapshot) => void
 }
+
+/** 저장되는 값 전부. Δ가 작아서 Undo 기록에 통째로 넣는다. */
+export interface LayoutDeltaSnapshot { all: ContextBoxDelta; layers: Record<string, ContextBoxDelta> }
+export const layoutDeltaSnapshot = (): LayoutDeltaSnapshot => { const { all, layers } = useLayoutDeltaStore.getState(); return structuredClone({ all, layers }) }
 
 /** 0(1e-12 아래)만 남은 부품·part 항목을 걷어 낸다. 비면 undefined. */
 function pruned(delta: ContextBoxDelta): ContextBoxDelta | undefined {
@@ -64,6 +70,7 @@ export const useLayoutDeltaStore = create<LayoutDeltaState>()(persist((set) => (
     return { layers }
   }),
   clearAll: () => set({ all: {}, layers: {} }),
+  restore: (snapshot) => set({ all: structuredClone(snapshot.all), layers: structuredClone(snapshot.layers) }),
 }), {
   name: LAYOUT_DELTA_STORAGE_KEY,
   storage: createJSONStorage(() => localStorage),
