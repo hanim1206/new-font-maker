@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>밀집 화면 · sunset 규칙 · 2026-09-15</title>
+<style>
+  :root{--paper:#f0eee7;--ink:#1a1a17;--ink2:#6a685f;--ink3:#a6a297;--line:#dcd8cc;--hot:#f0561e;--blue:#3b6fd6;--green:#3f9a6a;--yellow:#d9a52a;--red:#d6321f;--purple:#8a6fd6;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;--sans:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+  *{box-sizing:border-box}
+  body{margin:0;background:#cfcdc4;font-family:var(--sans);color:var(--ink);font-size:13px;line-height:1.4}
+  .top{padding:30px 40px 6px}.top h1{margin:0 0 4px;font-size:20px}.top p{margin:0;color:#444;max-width:900px}
+  .row{display:flex;gap:28px;flex-wrap:wrap;padding:20px 40px 40px;align-items:flex-start}
+  .shot{width:340px}.shot h3{margin:0 0 6px;font-size:13px}.shot h3 small{font-weight:400;color:#555;margin-left:6px}
+  .cap{margin-top:8px;font-size:12px;color:#222;display:flex;flex-direction:column;gap:3px}
+  .cap div b{display:inline-block;min-width:18px;height:18px;border-radius:9px;background:#1a1a17;color:#fff;text-align:center;line-height:18px;font:600 11px var(--mono);margin-right:6px}
+  .phone{width:340px;height:736px;background:var(--paper);border-radius:30px;border:5px solid #1d1d1b;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 16px 40px rgba(0,0,0,.22)}
+  .notch{position:absolute;left:50%;top:7px;transform:translateX(-50%);width:96px;height:22px;background:#1d1d1b;border-radius:12px;z-index:3}
+  .status{height:40px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 20px 4px;font:600 11px var(--sans);position:relative;z-index:2}
+  .hd{display:flex;align-items:center;padding:6px 18px 0;position:relative;z-index:2}
+  .hd h2{margin:0;font-size:19px;font-weight:800;flex:1}
+  .hd .undo{font:600 12px var(--mono);color:var(--ink2);margin-right:14px}.hd .chev{font-size:14px;color:var(--ink2)}
+
+  /* 히어로 */
+  .hero{margin:10px 0 0;padding:18px 22px 16px;position:relative}
+  .hero .dots{position:absolute;left:22px;top:10px;display:flex;flex-direction:column;gap:5px}
+  .hero .dots i{width:7px;height:7px;border-radius:50%}
+  .hero .txt{font-size:30px;font-weight:800;line-height:1.25;letter-spacing:.02em;text-align:center;margin-top:14px}
+  .hero .txt b{color:var(--hot)}
+  .hero .g{font-size:120px;font-weight:900;line-height:1;text-align:center}
+  .hero.tint{background:linear-gradient(180deg,#fde9e0 0%,#f0eee7 100%)}
+
+  /* 정보 블록 (sunset) */
+  .info{padding:6px 22px 0;flex:1;overflow:hidden}
+  .head{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0 4px;border-bottom:1px solid var(--ink)}
+  .head .k{font:600 10px var(--mono);letter-spacing:.12em;text-transform:uppercase}
+  .head .k small{display:block;font-weight:500;color:var(--ink3);letter-spacing:.06em;text-transform:none;margin-top:1px}
+  .head .d{font:500 10px var(--mono);color:var(--ink3)}
+  .head .sd{display:inline-flex;gap:3px;margin-left:6px;vertical-align:middle}.head .sd i{width:6px;height:6px;border-radius:50%}
+  .big{display:flex;align-items:baseline;gap:8px;padding:10px 0 4px}
+  .big .v{font:700 48px var(--sans);letter-spacing:-.03em;line-height:1}
+  .big .u{font:500 14px var(--mono);color:var(--ink3)}
+  .big .ic{margin-left:auto;font-size:26px;color:var(--ink2)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+  .cell{padding:10px 0 8px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-end}
+  .cell .k{font:600 9.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);display:block;margin-bottom:4px}
+  .cell .v{font:600 20px var(--sans);letter-spacing:-.02em;line-height:1}
+  .cell .v small{font:500 11px var(--mono);color:var(--ink3);margin-left:2px}
+  .cell .v.hot{color:var(--hot)}.cell .v.red{color:var(--red)}
+  .bar{width:6px;height:36px;border-radius:3px;position:relative;background:linear-gradient(180deg,var(--c1,#e07a3a),var(--c2,#cfd6e6))}
+  .bar::after{content:"";position:absolute;left:-3px;right:-3px;top:var(--p,50%);height:2px;background:var(--ink)}
+  .wide{margin-top:10px;height:40px;border-radius:8px;position:relative;overflow:hidden;background:linear-gradient(90deg,#f3d98a 0%,#f5c07a 30%,#cfd6e6 30.5%,#dfe3ea 100%)}
+  .wide .v{position:absolute;left:12px;top:50%;transform:translateY(-50%);font:700 22px var(--sans);letter-spacing:-.02em}
+  .wide .v small{font:500 11px var(--mono);color:var(--ink2);margin-left:2px}
+  .wide .r{position:absolute;right:12px;top:50%;transform:translateY(-50%);font:500 10px var(--mono);color:var(--ink2)}
+  .list{margin-top:6px}
+  .li{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:13px}
+  .li .g{font-size:20px;font-weight:800;width:24px}
+  .li .k{font:600 9.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);flex:1}
+  .li .k b{display:block;font:500 12.5px var(--sans);color:var(--ink);letter-spacing:0;text-transform:none;margin-top:1px}
+  .li .n{font:600 13px var(--mono)}
+  .li .n.red{color:var(--red)}.li .n.yel{color:var(--yellow)}
+  .cta{margin:8px 22px 0;height:50px;border-radius:25px;background:var(--ink);color:#fff;font:700 15px var(--sans);display:flex;align-items:center;justify-content:center}
+  .cta.hot{background:var(--hot)}
+  .cta.ghost{background:transparent;color:var(--ink2);height:36px;margin-top:0}
+  .dots2{display:flex;justify-content:center;gap:5px;margin:6px 0 4px}
+  .dots2 i{width:5px;height:5px;border-radius:50%;background:#cbc7ba}.dots2 i.on{background:var(--ink)}
+  .home{height:4px;width:110px;background:#1d1d1b;border-radius:2px;margin:2px auto 8px;opacity:.85}
+  .mx{display:grid;grid-template-columns:repeat(28,1fr);gap:1.5px;margin-top:8px}
+  .mx i{aspect-ratio:1;border-radius:1.5px;background:#e6e3d8}.mx i.h{background:var(--hot)}.mx i.x{background:#b9a6e8}
+  .side{width:340px;font-size:12.5px;color:#222}.side h2{font-size:15px;margin:0 0 8px}
+  .side div{display:flex;gap:8px;padding:6px 0;border-top:1px solid #bbb8ad}
+  .side div>b{flex:0 0 20px;height:20px;border-radius:50%;background:#1a1a17;color:#fff;font:600 11px var(--mono);display:flex;align-items:center;justify-content:center}
+</style>
+</head>
+<body>
+<div class="top"><h1>밀집 화면 · sunset 규칙</h1><p>라디오 화면(조절)은 값 하나. 홈·확인·검수 요약·출력처럼 숫자가 여럿인 화면은 sunset 규칙: 위 히어로 하나, 아래 모노 라벨 + 큰 값 2열, 값 옆 미니 세로 바, 맨 아래 풀폭 바 + 종합 수치.</p></div>
+<div class="row">
+
+<!-- 홈 -->
+<div class="shot"><h3>홈<small>진행 현황</small></h3>
+<div class="phone"><div class="notch"></div><div class="status"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+  <div class="hd"><h2>별빛고딕</h2><span class="undo">↶ ↷</span><span class="chev">⋯</span></div>
+  <div class="hero tint"><div class="dots"><i style="background:var(--hot)"></i><i style="background:var(--yellow)"></i><i style="background:var(--purple)"></i></div><div class="txt">별을 노래하는<br>마음으로</div></div>
+  <div class="info">
+    <div class="head"><span class="k">today's font <small>기본 고딕에서 시작 · 3일째</small></span><span class="d">9/15/2026</span></div>
+    <div class="big"><span class="v">2,932</span><span class="u">/ 11,172 확인</span><span class="ic">☼</span></div>
+    <div class="grid">
+      <div class="cell"><div><span class="k">next · 다음 할 일</span><span class="v hot">기준선</span></div></div>
+      <div class="cell"><div><span class="k">time · 예상</span><span class="v">7<small>min</small></span></div></div>
+      <div class="cell"><div><span class="k">인상</span><span class="v">완료</span></div><span class="bar" style="--c1:var(--green);--c2:#dfe3ea;--p:12%"></span></div>
+      <div class="cell"><div><span class="k">기준선 · 7층</span><span class="v">2<small>/7</small></span></div><span class="bar" style="--c1:var(--hot);--c2:#dfe3ea;--p:70%"></span></div>
+      <div class="cell"><div><span class="k">자소 원형</span><span class="v">12<small>/67</small></span></div><span class="bar" style="--c1:var(--hot);--c2:#dfe3ea;--p:80%"></span></div>
+      <div class="cell"><div><span class="k">문제 · 충돌</span><span class="v red">17</span></div><span class="bar" style="--c1:var(--red);--c2:#dfe3ea;--p:30%"></span></div>
+    </div>
+    <div class="head" style="border-bottom:0;padding-top:12px"><span class="k">% overall · 전체 진행</span></div>
+    <div class="wide" style="background:linear-gradient(90deg,#f3d98a 0%,#f5c07a 26%,#cfd6e6 26.5%,#dfe3ea 100%)"><span class="v">26<small>%</small></span><span class="r">출력 가능 · 테스트 OTF</span></div>
+  </div>
+  <div class="cta hot">기준선 이어서 하기</div>
+  <div class="dots2"><i class="on"></i><i></i><i></i><i></i></div><div class="home"></div>
+</div>
+<div class="cap"><div><b>1</b>히어로 = 현재 문장, 옅은 주황 틴트. 점 3개 = 인상 색 요약.</div><div><b>2</b>큰 값 하나(확인 글자 수), 아래 2열. 미니 바 = 진행 위치.</div><div><b>3</b>풀폭 바 = 전체 진행. 오른쪽에 지금 가능한 출력.</div></div>
+</div>
+
+<!-- 확인 -->
+<div class="shot"><h3>확인<small>적용 전 영향 · 라디오 E 대체</small></h3>
+<div class="phone"><div class="notch"></div><div class="status"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+  <div class="hd"><h2>뼈대</h2><span class="undo">↶ ↷</span><span class="chev">⌂</span></div>
+  <div class="hero"><div class="g">각</div></div>
+  <div class="info">
+    <div class="head"><span class="k">apply · 첫닿밑선 <small>세로+받침 층 · 이 층</small></span><span class="d">Δ −16u</span></div>
+    <div class="big"><span class="v">4,617</span><span class="u">자 같이 움직임</span><span class="ic">↧</span></div>
+    <div class="grid">
+      <div class="cell"><div><span class="k">before · 프리셋</span><span class="v">528<small>u</small></span></div><span class="bar" style="--c1:#cfd6e6;--c2:#cfd6e6;--p:38%"></span></div>
+      <div class="cell"><div><span class="k">after · 적용 후</span><span class="v hot">512<small>u</small></span></div><span class="bar" style="--c1:var(--hot);--c2:#cfd6e6;--p:52%"></span></div>
+      <div class="cell"><div><span class="k">예외 · 실측 유지</span><span class="v">11</span></div><span class="bar" style="--c1:var(--purple);--c2:#dfe3ea;--p:90%"></span></div>
+      <div class="cell"><div><span class="k">충돌 예상</span><span class="v red">2</span></div><span class="bar" style="--c1:var(--red);--c2:#dfe3ea;--p:85%"></span></div>
+    </div>
+    <div class="head" style="border-bottom:0;padding-top:10px"><span class="k">sheet ㄱ · 행 홀자 × 열 받침</span><span class="d">← → 다른 첫닿자</span></div>
+    <div class="mx" id="mx"></div>
+  </div>
+  <div class="cta">적용</div><div class="cta ghost">돌아가기</div>
+  <div class="dots2"><i></i><i></i><i class="on"></i></div><div class="home"></div>
+</div>
+<div class="cap"><div><b>4</b>히어로 = 조절하던 글자. 큰 값 = 영향 수.</div><div><b>5</b>전/후 두 셀에 미니 바로 위치 비교. 예외·충돌은 색.</div><div><b>6</b>매트릭스는 아래 시트 한 장, 밀집이지만 라벨 규칙 동일.</div></div>
+</div>
+
+<!-- 검수 요약 -->
+<div class="shot"><h3>검수<small>문제 요약</small></h3>
+<div class="phone"><div class="notch"></div><div class="status"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+  <div class="hd"><h2>검수</h2><span class="undo">↶ ↷</span><span class="chev">⌂</span></div>
+  <div class="hero"><div class="txt">넓은 <b>닭</b>장 옆<br><b>값</b>진 흙</div></div>
+  <div class="info">
+    <div class="head"><span class="k">issues · 문제 <span class="sd"><i style="background:var(--red)"></i><i style="background:var(--yellow)"></i><i style="background:var(--purple)"></i></span><small>충돌 · 간격 · 예외</small></span><span class="d">11,172자</span></div>
+    <div class="big"><span class="v red">17</span><span class="u">충돌·간격</span><span class="ic">⚠</span></div>
+    <div class="grid">
+      <div class="cell"><div><span class="k">확인 끝</span><span class="v">2,932</span></div><span class="bar" style="--c1:var(--green);--c2:#dfe3ea;--p:74%"></span></div>
+      <div class="cell"><div><span class="k">내가 바꿈</span><span class="v">4,617</span></div><span class="bar" style="--c1:var(--blue);--c2:#dfe3ea;--p:58%"></span></div>
+      <div class="cell"><div><span class="k">이 글자만</span><span class="v">3</span></div><span class="bar" style="--c1:var(--yellow);--c2:#dfe3ea;--p:96%"></span></div>
+      <div class="cell"><div><span class="k">자동 예외</span><span class="v">312</span></div><span class="bar" style="--c1:var(--purple);--c2:#dfe3ea;--p:88%"></span></div>
+    </div>
+    <div class="list">
+      <div class="li"><span class="g">닭</span><span class="k">collision<b>받침 ㄺ 와 ㅏ 겹침</b></span><span class="n red">−6u</span></div>
+      <div class="li"><span class="g">값</span><span class="k">gap<b>받침 ㅄ 잉크 간격</b></span><span class="n red">2u</span></div>
+      
+      <div class="li"><span class="g">ㄱ</span><span class="k">pattern · 3자<b>같은 간격 문제 → 자모 단위로?</b></span><span class="n">↑</span></div>
+    </div>
+    <div class="wide" style="background:linear-gradient(90deg,#bfe0cc 0%,#bfe0cc 26%,#dfe3ea 26.5%,#dfe3ea 100%)"><span class="v">26<small>%</small></span><span class="r">확인 끝 · 나머지 8,240</span></div>
+  </div>
+  <div class="cta">닭 보정하기</div>
+  <div class="dots2"><i></i><i></i><i class="on"></i><i></i></div><div class="home"></div>
+</div>
+<div class="cap"><div><b>7</b>히어로 = 문제 글자 있는 문장. 큰 값 = 충돌 수.</div><div><b>8</b>문제 목록도 같은 라벨 규칙. 오른쪽 수치 = 얼마나.</div><div><b>9</b>승격 제안은 목록 한 줄로 흡수. 배너 없음.</div></div>
+</div>
+
+<div class="side">
+  <h2>두 규칙의 경계</h2>
+  <div><b>R</b><span><b>라디오</b>: 값 하나를 바꾸는 화면. 조절(기준선·점·인상). 다이얼 고정.</span></div>
+  <div><b>S</b><span><b>sunset</b>: 값 여럿을 읽는 화면. 홈·확인·검수 요약·출력·자소 현황. 다이얼 없음, 버튼 하나.</span></div>
+  <div><b>=</b><span>공통: 웜 페이퍼, 잉크, 주황 하나. 모노 라벨. 상태색은 점·바에만.</span></div>
+  <div><b>→</b><span>사용자 흐름: 읽는 화면(S)에서 고르고 → 바꾸는 화면(R)에서 돌리고 → 읽는 화면(S)에서 확인.</span></div>
+</div>
+
+</div>
+<script>
+  const m=document.getElementById('mx'); let s='';
+  for(let r=0;r<21;r++)for(let c=0;c<28;c++){const v=r<=8&&c>0; let cls=v?'h':''; if(v&&((r*7+c*3)%23===0)) cls='x'; s+=`<i class="${cls}"></i>`}
+  m.innerHTML=s;
+</script>
+</body>
+</html>

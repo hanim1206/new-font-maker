@@ -1,0 +1,1441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Font Maker Wireframe</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="Font Maker Wireframe" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;title&gt;Font Maker Wireframe&lt;/title&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(
+    --background,
+    var(--color-background-primary, light-dark(rgb(255 255 255), rgb(24 24 24)))
+  ) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: var(
+    --color-background-primary,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --popover: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255), rgb(45 45 45))
+  );
+  --popover-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --primary: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --primary-foreground: var(
+    --color-text-inverse,
+    light-dark(rgb(255 255 255), rgb(13 13 13))
+  );
+  --secondary: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+  );
+  --secondary-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: var(
+    --color-text-secondary,
+    light-dark(rgb(26 28 31 / 49.4%), rgb(255 255 255 / 49.8%))
+  );
+  --accent: var(
+    --color-background-info,
+    light-dark(rgb(229 242 255), rgb(13 39 63))
+  );
+  --accent-foreground: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --destructive: var(
+    --color-text-warning,
+    light-dark(rgb(226 85 7), rgb(255 133 73))
+  );
+  --border: var(
+    --color-border-secondary,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+  --input: var(
+    --color-border-primary,
+    light-dark(
+      rgb(26 28 31 / 11.8%),
+      color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+    )
+  );
+  --ring: var(
+    --color-ring-primary,
+    light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
+  );
+  --font-size-base: var(--font-text-md-size, 14px);
+  --blue: light-dark(rgb(51 156 255), rgb(51 156 255));
+  --orange: light-dark(rgb(226 85 7), rgb(251 106 34));
+  --green: light-dark(rgb(0 162 64), rgb(64 201 119));
+  --red: light-dark(rgb(224 46 42), rgb(255 103 100));
+  --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
+  --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --radius: var(--border-radius-lg, 12.5px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 17 17&#x27;%3E%3Cpath d=&#x27;M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z&#x27;/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  /* Preserve MCP aliases for older inline renderers without creating :root cycles. */
+  --color-background-primary: var(
+    --background,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --color-text-primary: var(
+    --foreground,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --color-border-secondary: var(
+    --border,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+
+  margin: 0;
+  padding: 5px;
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: superellipse(1.5);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: superellipse(1.5);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card, .progress) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress {
+  display: flex;
+  height: 6px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+}
+
+.progress-bar {
+  height: 100%;
+  flex-shrink: 0;
+  border: 0;
+  background: var(--viz-series-1);
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: superellipse(1.5);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: superellipse(1.5);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+  [aria-pressed=&quot;true&quot;],
+  [aria-selected=&quot;true&quot;],
+  .is-selected
+) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+/* Model-authored chart rules can otherwise stretch icons after these styles load. */
+svg.lucide {
+  display: block;
+  width: 16px !important;
+  height: 16px !important;
+  flex: none;
+  margin: 0 !important;
+  stroke-width: 1.6;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div id=&quot;font-maker-wireframe&quot;&gt;
+  &lt;style&gt;
+    #font-maker-wireframe {
+      color: light-dark(#252722, #f1f1ed);
+      font-family: Pretendard, &quot;Apple SD Gothic Neo&quot;, &quot;Noto Sans KR&quot;, sans-serif;
+      color-scheme: light dark;
+    }
+    #font-maker-wireframe * { box-sizing: border-box; }
+    #font-maker-wireframe button { font: inherit; color: inherit; }
+    #font-maker-wireframe .fm-review-bar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin-bottom: 14px; padding: 10px;
+      background: light-dark(#eeefe9, #252722); border: 1px solid light-dark(#d8dad1, #444740);
+      border-radius: 14px;
+    }
+    #font-maker-wireframe .fm-review-title { font-size: 13px; font-weight: 800; margin-right: 2px; }
+    #font-maker-wireframe .fm-screen-picker { display: flex; gap: 4px; flex: 1; overflow-x: auto; scrollbar-width: thin; padding: 1px; }
+    #font-maker-wireframe .fm-screen-button,
+    #font-maker-wireframe .fm-mode-button,
+    #font-maker-wireframe .fm-state-button {
+      border: 1px solid light-dark(#c9cbc1, #55584f); background: light-dark(#fafaf7, #30322d);
+      min-height: 34px; padding: 6px 10px; border-radius: 9px; white-space: nowrap; cursor: pointer;
+      font-size: 12px;
+    }
+    #font-maker-wireframe .fm-screen-button[aria-pressed=&quot;true&quot;],
+    #font-maker-wireframe .fm-mode-button[aria-pressed=&quot;true&quot;],
+    #font-maker-wireframe .fm-state-button[aria-pressed=&quot;true&quot;] {
+      color: light-dark(#173c2f, #e7fff4); border-color: light-dark(#527e6c, #71a98f);
+      background: light-dark(#dcebe4, #244638); font-weight: 800;
+    }
+    #font-maker-wireframe .fm-review-controls { display: flex; gap: 4px; }
+    #font-maker-wireframe .fm-stage {
+      min-height: 810px; display: grid; place-items: start center; overflow: auto;
+      padding: 18px; border-radius: 18px;
+      background-color: light-dark(#dfe0da, #161714);
+      background-image: radial-gradient(light-dark(#c8cac1, #2c2e29) 0.7px, transparent 0.7px);
+      background-size: 12px 12px;
+    }
+    #font-maker-wireframe .fm-device {
+      position: relative; overflow: hidden; background: light-dark(#f9f9f6, #20221e);
+      border: 1px solid light-dark(#b8bab1, #4f524a); color: light-dark(#242621, #eeeeea);
+      box-shadow: 0 18px 60px rgba(15, 18, 14, .16);
+    }
+    #font-maker-wireframe .fm-device[data-device=&quot;mobile&quot;] {
+      width: 390px; height: 780px; border-radius: 30px;
+    }
+    #font-maker-wireframe .fm-device[data-device=&quot;desktop&quot;] {
+      width: min(1120px, calc(100vw - 76px)); height: 730px; border-radius: 16px;
+    }
+    #font-maker-wireframe .fm-app { height: 100%; display: flex; flex-direction: column; }
+    #font-maker-wireframe .fm-header {
+      height: 56px; flex: 0 0 56px; display: flex; align-items: center; gap: 9px;
+      padding: 0 14px; background: light-dark(#ffffff, #292b26); border-bottom: 1px solid light-dark(#dfe1d9, #41443d);
+    }
+    #font-maker-wireframe .fm-project-name { font-size: 14px; font-weight: 800; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #font-maker-wireframe .fm-save { font-size: 11px; color: light-dark(#5f756a, #a4c2b3); }
+    #font-maker-wireframe .fm-icon-button {
+      width: 34px; height: 34px; border-radius: 9px; border: 1px solid light-dark(#d2d4cc, #4b4e46);
+      background: light-dark(#f7f7f3, #30322d); cursor: pointer;
+    }
+    #font-maker-wireframe .fm-content-shell { min-height: 0; flex: 1; display: flex; }
+    #font-maker-wireframe .fm-left-nav {
+      width: 154px; padding: 14px 10px; border-right: 1px solid light-dark(#dfe1d9, #41443d);
+      background: light-dark(#f3f4ef, #252722); display: none;
+    }
+    #font-maker-wireframe .fm-left-nav button {
+      width: 100%; text-align: left; border: 0; background: transparent; padding: 11px 12px; border-radius: 9px; cursor: pointer;
+    }
+    #font-maker-wireframe .fm-left-nav button[data-active=&quot;true&quot;] { background: light-dark(#dfe9e1, #30453a); font-weight: 800; }
+    #font-maker-wireframe .fm-workspace { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+    #font-maker-wireframe .fm-page-scroll { flex: 1; min-height: 0; overflow: auto; padding: 14px 14px 104px; }
+    #font-maker-wireframe .fm-page-heading { display: flex; align-items: end; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    #font-maker-wireframe .fm-page-heading h2 { margin: 0; font-size: 20px; letter-spacing: -.03em; }
+    #font-maker-wireframe .fm-page-heading small { color: light-dark(#6c6f68, #b2b4ad); }
+    #font-maker-wireframe .fm-scope {
+      min-height: 34px; display: flex; align-items: center; gap: 7px; padding: 7px 10px; margin-bottom: 12px;
+      border: 1px solid light-dark(#bfcfc5, #52675c); background: light-dark(#edf5f0, #263b31); border-radius: 10px;
+      color: light-dark(#25483a, #d5efe2); font-size: 12px; font-weight: 700;
+    }
+    #font-maker-wireframe .fm-grid-two { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    #font-maker-wireframe .fm-panel {
+      background: light-dark(#fff, #292b26); border: 1px solid light-dark(#d9dbd3, #444740); border-radius: 13px; padding: 12px;
+    }
+    #font-maker-wireframe .fm-panel-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 800; margin-bottom: 10px; }
+    #font-maker-wireframe .fm-muted { color: light-dark(#74776f, #aaada5); font-size: 11px; }
+    #font-maker-wireframe .fm-preview-text { font-size: 29px; letter-spacing: .04em; line-height: 1.35; text-align: center; padding: 21px 6px; }
+    #font-maker-wireframe .fm-progress { height: 7px; background: light-dark(#e4e5df, #393b36); border-radius: 99px; overflow: hidden; }
+    #font-maker-wireframe .fm-progress span { display: block; height: 100%; background: light-dark(#789c88, #82b29a); border-radius: inherit; }
+    #font-maker-wireframe .fm-task-row { display: grid; grid-template-columns: 38px 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid light-dark(#ecece7, #383a35); }
+    #font-maker-wireframe .fm-task-row:first-of-type { border-top: 0; }
+    #font-maker-wireframe .fm-task-mark { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid light-dark(#ced1c8, #4c5047); border-radius: 50%; font-weight: 800; }
+    #font-maker-wireframe .fm-task-row strong { display: block; font-size: 13px; }
+    #font-maker-wireframe .fm-primary,
+    #font-maker-wireframe .fm-secondary,
+    #font-maker-wireframe .fm-tool {
+      min-height: 40px; border-radius: 10px; padding: 8px 12px; cursor: pointer; font-weight: 750;
+    }
+    #font-maker-wireframe .fm-primary { border: 1px solid light-dark(#305b49, #7fb39a); color: #fff; background: light-dark(#3e6d59, #3c765d); }
+    #font-maker-wireframe .fm-secondary { border: 1px solid light-dark(#c9cbc3, #51544d); background: light-dark(#f8f8f4, #30322d); }
+    #font-maker-wireframe .fm-wide { width: 100%; }
+    #font-maker-wireframe .fm-canvas {
+      position: relative; aspect-ratio: 1; width: 100%; max-height: 410px; overflow: hidden;
+      border: 1px solid light-dark(#bfc2b9, #565a51); border-radius: 12px; background-color: light-dark(#fafaf6, #1f211d);
+      background-image: linear-gradient(light-dark(#e6e7e1, #343631) 1px, transparent 1px), linear-gradient(90deg, light-dark(#e6e7e1, #343631) 1px, transparent 1px);
+      background-size: 20% 20%;
+    }
+    #font-maker-wireframe .fm-glyph { position: absolute; inset: 15%; display: grid; place-items: center; font-size: 158px; line-height: 1; font-weight: 700; color: light-dark(#40433d, #e0e2dc); }
+    #font-maker-wireframe .fm-rail { position: absolute; background: light-dark(#7c9f90, #7eae97); opacity: .85; }
+    #font-maker-wireframe .fm-rail.x { width: 1px; top: 8%; bottom: 8%; }
+    #font-maker-wireframe .fm-rail.y { height: 1px; left: 8%; right: 8%; }
+    #font-maker-wireframe .fm-rail.selected { width: 3px; box-shadow: 0 0 0 4px rgba(91, 140, 117, .15); }
+    #font-maker-wireframe .fm-handle { position: absolute; width: 16px; height: 16px; border-radius: 50%; border: 3px solid light-dark(#35624f, #94cbb0); background: light-dark(#fff, #20221e); transform: translate(-50%,-50%); }
+    #font-maker-wireframe .fm-slot { position: absolute; border: 2px dashed light-dark(#a5a9a0, #676b62); background: rgba(130,140,130,.04); }
+    #font-maker-wireframe .fm-context-strip { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 8px; scroll-snap-type: x mandatory; }
+    #font-maker-wireframe .fm-context-tile {
+      scroll-snap-align: start; min-width: 76px; height: 83px; border-radius: 10px; border: 1px solid light-dark(#d0d2ca, #4e5149);
+      background: light-dark(#fff, #292b26); display: grid; place-items: center; cursor: pointer; position: relative;
+    }
+    #font-maker-wireframe .fm-context-tile strong { font-size: 28px; }
+    #font-maker-wireframe .fm-context-tile small { position: absolute; left: 7px; bottom: 5px; font-size: 9px; color: light-dark(#72766e, #adb0a8); }
+    #font-maker-wireframe .fm-context-tile[data-selected=&quot;true&quot;] { border: 2px solid light-dark(#3f715c, #84b99f); background: light-dark(#edf4ef, #263b31); }
+    #font-maker-wireframe .fm-tool-row { display: flex; gap: 6px; overflow-x: auto; padding: 7px 0; }
+    #font-maker-wireframe .fm-tool { white-space: nowrap; min-height: 38px; border: 1px solid light-dark(#ced0c8, #4f524a); background: light-dark(#f6f6f2, #2f312c); font-size: 11px; }
+    #font-maker-wireframe .fm-tool[data-active=&quot;true&quot;] { background: light-dark(#dfece5, #2b493a); border-color: light-dark(#648a78, #76aa90); }
+    #font-maker-wireframe .fm-chip-row { display: flex; flex-wrap: wrap; gap: 7px; }
+    #font-maker-wireframe .fm-chip { padding: 7px 10px; border-radius: 999px; border: 1px solid light-dark(#d0d2ca, #4d5048); background: transparent; font-size: 11px; cursor: pointer; }
+    #font-maker-wireframe .fm-chip[data-active=&quot;true&quot;] { background: light-dark(#e0ebe4, #2c473a); border-color: light-dark(#6f927f, #77a98f); font-weight: 800; }
+    #font-maker-wireframe .fm-jamo-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    #font-maker-wireframe .fm-jamo-item { min-height: 92px; position: relative; display: grid; place-items: center; border: 1px solid light-dark(#d6d8d0, #484b44); background: light-dark(#fff, #292b26); border-radius: 11px; cursor: pointer; }
+    #font-maker-wireframe .fm-jamo-item strong { font-size: 31px; }
+    #font-maker-wireframe .fm-jamo-item small { position: absolute; bottom: 7px; left: 8px; font-size: 9px; color: light-dark(#777a72, #aeb1aa); }
+    #font-maker-wireframe .fm-status-dot { position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%; background: #84a690; }
+    #font-maker-wireframe .fm-status-dot.warn { background: #c5924f; }
+    #font-maker-wireframe .fm-sentence { font-size: 25px; line-height: 1.8; word-break: keep-all; padding: 16px 4px; }
+    #font-maker-wireframe .fm-sentence mark { background: light-dark(#d9ebe1, #355845); color: inherit; border-radius: 5px; padding: 2px; }
+    #font-maker-wireframe .fm-check-row { display: flex; gap: 9px; align-items: start; padding: 9px 0; border-top: 1px solid light-dark(#e9eae4, #383a35); font-size: 12px; }
+    #font-maker-wireframe .fm-check-row:first-of-type { border-top: 0; }
+    #font-maker-wireframe .fm-check-symbol { width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid light-dark(#aeb5ac, #657067); border-radius: 50%; flex: 0 0 20px; font-size: 10px; }
+    #font-maker-wireframe .fm-bottom-nav {
+      height: 64px; flex: 0 0 64px; display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid light-dark(#d8dad2, #42453e);
+      background: light-dark(#fff, #292b26); z-index: 9;
+    }
+    #font-maker-wireframe .fm-bottom-nav button { border: 0; background: transparent; font-size: 10px; cursor: pointer; }
+    #font-maker-wireframe .fm-bottom-nav button[data-active=&quot;true&quot;] { color: light-dark(#34604e, #8bc0a6); font-weight: 900; }
+    #font-maker-wireframe .fm-drawer {
+      position: absolute; z-index: 12; left: 0; right: 0; bottom: 64px; padding: 9px 14px 14px;
+      background: light-dark(#fff, #2a2c27); border-top: 1px solid light-dark(#c8cbc2, #53574e); border-radius: 18px 18px 0 0;
+      box-shadow: 0 -14px 35px rgba(15,18,14,.16); transition: transform .2s ease;
+    }
+    #font-maker-wireframe .fm-drawer[data-level=&quot;closed&quot;] { transform: none; min-height: 52px; height: 52px; overflow: hidden; }
+    #font-maker-wireframe .fm-drawer[data-level=&quot;mid&quot;] { transform: translateY(0); min-height: 205px; }
+    #font-maker-wireframe .fm-drawer[data-level=&quot;full&quot;] { transform: translateY(0); min-height: 380px; }
+    #font-maker-wireframe .fm-drawer-grip { width: 38px; height: 4px; border-radius: 99px; margin: 0 auto 10px; background: light-dark(#c9cbc4, #656960); }
+    #font-maker-wireframe .fm-drawer-head { display: flex; justify-content: space-between; align-items: center; min-height: 31px; font-size: 12px; font-weight: 800; }
+    #font-maker-wireframe .fm-axis-pad { height: 112px; border: 1px solid light-dark(#cbd0c8, #565d55); border-radius: 12px; position: relative; margin-top: 10px; background: light-dark(#f4f6f1, #242824); }
+    #font-maker-wireframe .fm-axis-pad::before, #font-maker-wireframe .fm-axis-pad::after { content:&quot;&quot;; position:absolute; background: light-dark(#cdd1ca, #4c524b); }
+    #font-maker-wireframe .fm-axis-pad::before { width: 1px; top: 10px; bottom: 10px; left: 50%; }
+    #font-maker-wireframe .fm-axis-pad::after { height: 1px; left: 10px; right: 10px; top: 50%; }
+    #font-maker-wireframe .fm-pad-point { position: absolute; left: 62%; top: 37%; width: 18px; height: 18px; border-radius: 50%; transform: translate(-50%,-50%); background: light-dark(#477461, #73aa8f); }
+    #font-maker-wireframe .fm-desktop-side { display: none; width: 250px; padding: 14px; border-left: 1px solid light-dark(#dfe1d9, #41443d); background: light-dark(#f4f4f0, #252722); }
+    #font-maker-wireframe .fm-error-strip { display: none; padding: 9px 11px; margin-bottom: 10px; border-radius: 9px; background: light-dark(#fff1da, #4b3824); border: 1px solid light-dark(#d8ae72, #9e7140); color: light-dark(#684313, #ffe0b6); font-size: 11px; }
+    #font-maker-wireframe .fm-device[data-state=&quot;error&quot;] .fm-error-strip { display: block; }
+    #font-maker-wireframe .fm-device[data-device=&quot;desktop&quot;] .fm-left-nav,
+    #font-maker-wireframe .fm-device[data-device=&quot;desktop&quot;] .fm-desktop-side { display: block; }
+    #font-maker-wireframe .fm-device[data-device=&quot;desktop&quot;] .fm-bottom-nav { display: none; }
+    #font-maker-wireframe .fm-device[data-device=&quot;desktop&quot;] .fm-page-scroll { padding: 18px; }
+    #font-maker-wireframe .fm-device[data-device=&quot;desktop&quot;] .fm-grid-two { grid-template-columns: minmax(0, 1.35fr) minmax(260px, .65fr); }
+    #font-maker-wireframe .fm-device[data-device=&quot;desktop&quot;] .fm-jamo-grid { grid-template-columns: repeat(6, 1fr); }
+    #font-maker-wireframe .fm-device[data-device=&quot;desktop&quot;] .fm-drawer { display: none; }
+    #font-maker-wireframe .fm-device[data-device=&quot;desktop&quot;] .fm-canvas { max-width: 460px; margin-inline: auto; }
+    #font-maker-wireframe .fm-device[data-state=&quot;selected&quot;] .fm-handle { box-shadow: 0 0 0 8px rgba(85,132,110,.18); }
+    @media (max-width: 520px) {
+      #font-maker-wireframe .fm-stage { padding: 6px 0; min-height: 790px; border-radius: 0; }
+      #font-maker-wireframe .fm-device[data-device=&quot;mobile&quot;] { width: min(390px, 100%); border-radius: 18px; }
+      #font-maker-wireframe .fm-review-bar { margin-inline: 0; border-radius: 10px; }
+    }
+  &lt;/style&gt;
+
+  &lt;div class=&quot;fm-review-bar&quot; aria-label=&quot;와이어프레임 검토 도구&quot;&gt;
+    &lt;span class=&quot;fm-review-title&quot;&gt;화면&lt;/span&gt;
+    &lt;div class=&quot;fm-screen-picker&quot; id=&quot;fm-screen-picker&quot;&gt;&lt;/div&gt;
+    &lt;div class=&quot;fm-review-controls&quot; aria-label=&quot;화면 크기&quot;&gt;
+      &lt;button type=&quot;button&quot; class=&quot;fm-mode-button&quot; data-device-choice=&quot;mobile&quot;&gt;390px&lt;/button&gt;
+      &lt;button type=&quot;button&quot; class=&quot;fm-mode-button&quot; data-device-choice=&quot;desktop&quot;&gt;데스크톱&lt;/button&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;fm-review-controls&quot; aria-label=&quot;화면 상태&quot;&gt;
+      &lt;button type=&quot;button&quot; class=&quot;fm-state-button&quot; data-state-choice=&quot;base&quot;&gt;기본&lt;/button&gt;
+      &lt;button type=&quot;button&quot; class=&quot;fm-state-button&quot; data-state-choice=&quot;selected&quot;&gt;선택&lt;/button&gt;
+      &lt;button type=&quot;button&quot; class=&quot;fm-state-button&quot; data-state-choice=&quot;drawer&quot;&gt;조절&lt;/button&gt;
+      &lt;button type=&quot;button&quot; class=&quot;fm-state-button&quot; data-state-choice=&quot;error&quot;&gt;오류&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+  &lt;div class=&quot;fm-stage&quot;&gt;
+    &lt;section class=&quot;fm-device&quot; id=&quot;fm-device&quot; data-device=&quot;mobile&quot; data-state=&quot;base&quot; aria-label=&quot;한글 폰트 메이커 예상 화면&quot;&gt;
+      &lt;div class=&quot;fm-app&quot; id=&quot;fm-app&quot;&gt;&lt;/div&gt;
+    &lt;/section&gt;
+  &lt;/div&gt;
+
+  &lt;script&gt;
+    (() =&gt; {
+      const root = document.getElementById(&#x27;font-maker-wireframe&#x27;);
+      const device = document.getElementById(&#x27;fm-device&#x27;);
+      const app = document.getElementById(&#x27;fm-app&#x27;);
+      const picker = document.getElementById(&#x27;fm-screen-picker&#x27;);
+      const screenMeta = [
+        [&#x27;P-03&#x27;,&#x27;제작 홈&#x27;], [&#x27;F-01&#x27;,&#x27;전체 스타일&#x27;], [&#x27;F-02&#x27;,&#x27;공통 레이아웃&#x27;], [&#x27;J-01&#x27;,&#x27;자소 현황&#x27;],
+        [&#x27;J-02&#x27;,&#x27;자소 원형&#x27;], [&#x27;J-03&#x27;,&#x27;조합 보정&#x27;], [&#x27;V-01&#x27;,&#x27;문장 검수&#x27;], [&#x27;E-01&#x27;,&#x27;출력&#x27;]
+      ];
+      let currentScreen = &#x27;P-03&#x27;;
+      let currentDevice = &#x27;mobile&#x27;;
+      let currentState = &#x27;base&#x27;;
+      let selectedContext = 1;
+      const navFor = id =&gt; id.startsWith(&#x27;F-&#x27;) ? &#x27;뼈대&#x27; : id.startsWith(&#x27;J-&#x27;) ? &#x27;자소&#x27; : id.startsWith(&#x27;V-&#x27;) ? &#x27;검수&#x27; : id.startsWith(&#x27;E-&#x27;) ? &#x27;출력&#x27; : &#x27;홈&#x27;;
+
+      const railCanvas = (glyph=&#x27;가&#x27;, layout=false) =&gt; `
+        &lt;div class=&quot;fm-canvas&quot; aria-label=&quot;${glyph} 편집 캔버스&quot;&gt;
+          ${layout ? &#x27;&lt;div class=&quot;fm-slot&quot; style=&quot;left:10%;top:10%;width:45%;height:47%&quot;&gt;&lt;/div&gt;&lt;div class=&quot;fm-slot&quot; style=&quot;left:58%;top:10%;width:30%;height:47%&quot;&gt;&lt;/div&gt;&lt;div class=&quot;fm-slot&quot; style=&quot;left:10%;top:60%;width:78%;height:27%&quot;&gt;&lt;/div&gt;&#x27; : &#x27;&#x27;}
+          &lt;span class=&quot;fm-rail x&quot; style=&quot;left:20%&quot;&gt;&lt;/span&gt;&lt;span class=&quot;fm-rail x selected&quot; style=&quot;left:50%&quot;&gt;&lt;/span&gt;&lt;span class=&quot;fm-rail x&quot; style=&quot;left:80%&quot;&gt;&lt;/span&gt;
+          &lt;span class=&quot;fm-rail y&quot; style=&quot;top:20%&quot;&gt;&lt;/span&gt;&lt;span class=&quot;fm-rail y&quot; style=&quot;top:50%&quot;&gt;&lt;/span&gt;&lt;span class=&quot;fm-rail y&quot; style=&quot;top:80%&quot;&gt;&lt;/span&gt;
+          &lt;div class=&quot;fm-glyph&quot;&gt;${glyph}&lt;/div&gt;&lt;span class=&quot;fm-handle&quot; style=&quot;left:50%;top:20%&quot;&gt;&lt;/span&gt;
+        &lt;/div&gt;`;
+      const contexts = (labels=[&#x27;ㄱ&#x27;,&#x27;가&#x27;,&#x27;고&#x27;,&#x27;과&#x27;,&#x27;각&#x27;,&#x27;곡&#x27;,&#x27;곽&#x27;]) =&gt; `&lt;div class=&quot;fm-context-strip&quot; aria-label=&quot;7개 조합 비교&quot;&gt;${labels.map((x,i)=&gt;`&lt;button type=&quot;button&quot; class=&quot;fm-context-tile&quot; data-context=&quot;${i}&quot; data-selected=&quot;${selectedContext===i}&quot;&gt;&lt;strong&gt;${x}&lt;/strong&gt;&lt;small&gt;${i===0?&#x27;단독&#x27;:i&lt;4?&#x27;받침 없음&#x27;:&#x27;받침 있음&#x27;}&lt;/small&gt;&lt;/button&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;`;
+      const tools = (active=&#x27;선택&#x27;) =&gt; `&lt;div class=&quot;fm-tool-row&quot;&gt;${[&#x27;선택&#x27;,&#x27;중심선&#x27;,&#x27;면 채우기&#x27;,&#x27;레일&#x27;,&#x27;곡률·사선&#x27;].map(x=&gt;`&lt;button type=&quot;button&quot; class=&quot;fm-tool&quot; data-active=&quot;${x===active}&quot;&gt;${x}&lt;/button&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;`;
+      const heading = (id,title,sub=&#x27;&#x27;) =&gt; `&lt;div class=&quot;fm-page-heading&quot;&gt;&lt;div&gt;&lt;small&gt;${id}&lt;/small&gt;&lt;h2&gt;${title}&lt;/h2&gt;&lt;/div&gt;${sub?`&lt;small&gt;${sub}&lt;/small&gt;`:&#x27;&#x27;}&lt;/div&gt;`;
+      const error = text =&gt; `&lt;div class=&quot;fm-error-strip&quot;&gt;⚠ ${text}&lt;/div&gt;`;
+
+      const pages = {
+        &#x27;P-03&#x27;: () =&gt; `${heading(&#x27;P-03&#x27;,&#x27;폰트 제작 홈&#x27;,&#x27;다음 작업 1개&#x27;)}${error(&#x27;초성 ㄹ의 조합 결과 1개를 확인해야 합니다.&#x27;)}
+          &lt;div class=&quot;fm-panel&quot;&gt;&lt;div class=&quot;fm-panel-title&quot;&gt;&lt;span&gt;현재 글꼴&lt;/span&gt;&lt;span class=&quot;fm-muted&quot;&gt;마지막 저장 14:32&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;fm-preview-text&quot;&gt;봄 하늘의 고운 빛&lt;/div&gt;&lt;/div&gt;
+          &lt;div style=&quot;height:10px&quot;&gt;&lt;/div&gt;&lt;div class=&quot;fm-panel&quot;&gt;&lt;div class=&quot;fm-panel-title&quot;&gt;&lt;span&gt;이어서 작업하기&lt;/span&gt;&lt;span class=&quot;fm-muted&quot;&gt;3 / 4단계&lt;/span&gt;&lt;/div&gt;
+            &lt;div class=&quot;fm-task-row&quot;&gt;&lt;span class=&quot;fm-task-mark&quot;&gt;✓&lt;/span&gt;&lt;div&gt;&lt;strong&gt;뼈대&lt;/strong&gt;&lt;span class=&quot;fm-muted&quot;&gt;전체 스타일과 7개 레이아웃&lt;/span&gt;&lt;/div&gt;&lt;span&gt;완료&lt;/span&gt;&lt;/div&gt;
+            &lt;div class=&quot;fm-task-row&quot;&gt;&lt;span class=&quot;fm-task-mark&quot;&gt;18&lt;/span&gt;&lt;div&gt;&lt;strong&gt;자소 원형&lt;/strong&gt;&lt;span class=&quot;fm-muted&quot;&gt;초성 원형 18/19&lt;/span&gt;&lt;/div&gt;&lt;span&gt;1개 남음&lt;/span&gt;&lt;/div&gt;
+            &lt;div class=&quot;fm-task-row&quot;&gt;&lt;span class=&quot;fm-task-mark&quot;&gt;7&lt;/span&gt;&lt;div&gt;&lt;strong&gt;조합 확인&lt;/strong&gt;&lt;span class=&quot;fm-muted&quot;&gt;확인하지 않은 조합 7개&lt;/span&gt;&lt;/div&gt;&lt;span&gt;확인 필요&lt;/span&gt;&lt;/div&gt;
+            &lt;div class=&quot;fm-task-row&quot;&gt;&lt;span class=&quot;fm-task-mark&quot;&gt;○&lt;/span&gt;&lt;div&gt;&lt;strong&gt;검수·출력&lt;/strong&gt;&lt;span class=&quot;fm-muted&quot;&gt;대표 문장 검수 전&lt;/span&gt;&lt;/div&gt;&lt;span&gt;대기&lt;/span&gt;&lt;/div&gt;
+            &lt;button class=&quot;fm-primary fm-wide&quot; data-go=&quot;J-02&quot;&gt;초성 ㄹ 원형 만들기&lt;/button&gt;&lt;/div&gt;`,
+        &#x27;F-01&#x27;: () =&gt; `${heading(&#x27;F-01&#x27;,&#x27;전체 스타일&#x27;)}${error(&#x27;굵기를 더 높이면 ㅂ의 속공간이 닫힐 수 있습니다.&#x27;)}
+          &lt;div class=&quot;fm-grid-two&quot;&gt;&lt;div&gt;&lt;div class=&quot;fm-panel&quot;&gt;&lt;div class=&quot;fm-panel-title&quot;&gt;&lt;span&gt;대표 문구&lt;/span&gt;&lt;span class=&quot;fm-muted&quot;&gt;본문 32px&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;fm-preview-text&quot;&gt;사이좋은 글자의 리듬&lt;/div&gt;&lt;/div&gt;
+          &lt;div style=&quot;height:10px&quot;&gt;&lt;/div&gt;&lt;div class=&quot;fm-panel&quot;&gt;&lt;div class=&quot;fm-panel-title&quot;&gt;&lt;span&gt;조절 대상&lt;/span&gt;&lt;span class=&quot;fm-muted&quot;&gt;폰트 전체&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;fm-chip-row&quot;&gt;${[&#x27;중심선 굵기&#x27;,&#x27;기울기&#x27;,&#x27;글자 네모꼴&#x27;,&#x27;여백&#x27;,&#x27;끝처리&#x27;].map((x,i)=&gt;`&lt;button class=&quot;fm-chip&quot; data-active=&quot;${i===0}&quot;&gt;${x}&lt;/button&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
+          &lt;div class=&quot;fm-panel&quot;&gt;&lt;div class=&quot;fm-panel-title&quot;&gt;&lt;span&gt;대표 결과&lt;/span&gt;&lt;span class=&quot;fm-muted&quot;&gt;선·면 혼합&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;fm-preview-text&quot;&gt;가 곡 ㅇ&lt;/div&gt;&lt;button class=&quot;fm-primary fm-wide&quot; data-go=&quot;F-02&quot;&gt;7개 레이아웃으로 확인&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;`,
+        &#x27;F-02&#x27;: () =&gt; `${heading(&#x27;F-02&#x27;,&#x27;공통 레이아웃&#x27;)}&lt;div class=&quot;fm-scope&quot;&gt;▦ 7개 레이아웃 · 공통 기준선 &lt;span style=&quot;margin-left:auto&quot;&gt;범위 변경&lt;/span&gt;&lt;/div&gt;${error(&#x27;선택 레일은 최소 간격 때문에 여기서 멈췄습니다.&#x27;)}
+          &lt;div class=&quot;fm-grid-two&quot;&gt;&lt;div&gt;${railCanvas([&#x27;ㄱ&#x27;,&#x27;가&#x27;,&#x27;고&#x27;,&#x27;과&#x27;,&#x27;각&#x27;,&#x27;곡&#x27;,&#x27;곽&#x27;][selectedContext],true)}${tools(&#x27;선택&#x27;)}&lt;/div&gt;
+          &lt;div&gt;&lt;div class=&quot;fm-panel&quot;&gt;&lt;div class=&quot;fm-panel-title&quot;&gt;&lt;span&gt;7개 조합&lt;/span&gt;&lt;span class=&quot;fm-muted&quot;&gt;모두 함께 갱신&lt;/span&gt;&lt;/div&gt;${contexts()}&lt;div class=&quot;fm-muted&quot;&gt;카드를 눌러 관찰할 조합만 바꿉니다.&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;height:10px&quot;&gt;&lt;/div&gt;&lt;button class=&quot;fm-secondary fm-wide&quot;&gt;조합 기본값 보기&lt;/button&gt;&lt;div style=&quot;height:7px&quot;&gt;&lt;/div&gt;&lt;button class=&quot;fm-primary fm-wide&quot; data-go=&quot;J-01&quot;&gt;자소 만들기&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;`,
+        &#x27;J-01&#x27;: () =&gt; `${heading(&#x27;J-01&#x27;,&#x27;자소 현황&#x27;,&#x27;초성 18/19&#x27;)}${error(&#x27;ㄹ 원형이 없어 관련 조합을 만들 수 없습니다.&#x27;)}
+          &lt;div class=&quot;fm-chip-row&quot; style=&quot;margin-bottom:10px&quot;&gt;${[&#x27;단독 자음&#x27;,&#x27;초성&#x27;,&#x27;중성&#x27;,&#x27;받침&#x27;].map((x,i)=&gt;`&lt;button class=&quot;fm-chip&quot; data-active=&quot;${i===1}&quot;&gt;${x}&lt;/button&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;
+          &lt;div class=&quot;fm-panel&quot;&gt;&lt;div class=&quot;fm-panel-title&quot;&gt;&lt;span&gt;초성 원형&lt;/span&gt;&lt;span class=&quot;fm-muted&quot;&gt;경고 1&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;fm-jamo-grid&quot;&gt;${[&#x27;ㄱ&#x27;,&#x27;ㄴ&#x27;,&#x27;ㄷ&#x27;,&#x27;ㄹ&#x27;,&#x27;ㅁ&#x27;,&#x27;ㅂ&#x27;,&#x27;ㅅ&#x27;,&#x27;ㅇ&#x27;,&#x27;ㅈ&#x27;,&#x27;ㅊ&#x27;,&#x27;ㅋ&#x27;,&#x27;ㅌ&#x27;].map((x,i)=&gt;`&lt;button class=&quot;fm-jamo-item&quot; data-go=&quot;J-02&quot;&gt;&lt;span class=&quot;fm-status-dot ${i===3?&#x27;warn&#x27;:&#x27;&#x27;}&quot;&gt;&lt;/span&gt;&lt;strong&gt;${x}&lt;/strong&gt;&lt;small&gt;${i===3?&#x27;미작업&#x27;:i===5?&#x27;보정 2&#x27;:&#x27;확인됨&#x27;}&lt;/small&gt;&lt;/button&gt;`).join(&#x27;&#x27;)}&lt;/div&gt;&lt;/div&gt;`,
+        &#x27;J-02&#x27;: () =&gt; `${heading(&#x27;J-02&#x27;,&#x27;초성 ㄱ 원형&#x27;)}&lt;div class=&quot;fm-scope&quot;&gt;◉ 초성 ㄱ 원형 · 모든 초성 조합에 반영&lt;/div&gt;${error(&#x27;이 기준선은 조합 보정 2곳에서 사용 중입니다.&#x27;)}
+          &lt;div class=&quot;fm-grid-two&quot;&gt;&lt;div&gt;${railCanvas(&#x27;ㄱ&#x27;)}${tools(currentState===&#x27;selected&#x27;?&#x27;레일&#x27;:&#x27;선택&#x27;)}&lt;/div&gt;&lt;div&gt;&lt;div class=&quot;fm-panel&quot;&gt;&lt;div class=&quot;fm-panel-title&quot;&gt;&lt;span&gt;자동 결과&lt;/span&gt;&lt;span class=&quot;fm-muted&quot;&gt;7개&lt;/span&gt;&lt;/div&gt;${contexts([&#x27;ㄱ&#x27;,&#x27;가&#x27;,&#x27;고&#x27;,&#x27;과&#x27;,&#x27;각&#x27;,&#x27;곡&#x27;,&#x27;곽&#x27;])}&lt;/div&gt;&lt;div style=&quot;height:10px&quot;&gt;&lt;/div&gt;&lt;div class=&quot;fm-panel&quot;&gt;&lt;div class=&quot;fm-panel-title&quot;&gt;&lt;span&gt;레이어&lt;/span&gt;&lt;span class=&quot;fm-muted&quot;&gt;편집: 자소 형태&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;fm-chip-row&quot;&gt;&lt;button class=&quot;fm-chip&quot; data-active=&quot;true&quot;&gt;결과 윤곽&lt;/button&gt;&lt;button class=&quot;fm-chip&quot; data-active=&quot;true&quot;&gt;기준선&lt;/button&gt;&lt;button class=&quot;fm-chip&quot;&gt;레이아웃 영역&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;height:10px&quot;&gt;&lt;/div&gt;&lt;button class=&quot;fm-primary fm-wide&quot; data-go=&quot;J-03&quot;&gt;조합별 결과 확인&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;`,
+        &#x27;J-03&#x27;: () =&gt; `${heading(&#x27;J-03&#x27;,&#x27;초성 ㄱ · 조합별 결과&#x27;)}&lt;div class=&quot;fm-scope&quot;&gt;◎ 비교 모드 · 아직 원형이나 보정을 수정하지 않음&lt;/div&gt;${error(&#x27;가로모음+받침 조합에서 중성과 최소 간격이 부족합니다.&#x27;)}
+          &lt;div class=&quot;fm-grid-two&quot;&gt;&lt;div&gt;${contexts([&#x27;ㄱ&#x27;,&#x27;가&#x27;,&#x27;고&#x27;,&#x27;과&#x27;,&#x27;각&#x27;,&#x27;곡&#x27;,&#x27;곽&#x27;])}${railCanvas([&#x27;ㄱ&#x27;,&#x27;가&#x27;,&#x27;고&#x27;,&#x27;과&#x27;,&#x27;각&#x27;,&#x27;곡&#x27;,&#x27;곽&#x27;][selectedContext],true)}&lt;/div&gt;&lt;div&gt;&lt;div class=&quot;fm-panel&quot;&gt;&lt;div class=&quot;fm-panel-title&quot;&gt;&lt;span&gt;현재 결과&lt;/span&gt;&lt;span class=&quot;fm-muted&quot;&gt;${selectedContext===5?&#x27;경고&#x27;:&#x27;자동&#x27;}&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;fm-check-row&quot;&gt;&lt;span class=&quot;fm-check-symbol&quot;&gt;1&lt;/span&gt;&lt;div&gt;&lt;strong&gt;자소 원형&lt;/strong&gt;&lt;div class=&quot;fm-muted&quot;&gt;초성 ㄱ의 기본 모양&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;fm-check-row&quot;&gt;&lt;span class=&quot;fm-check-symbol&quot;&gt;2&lt;/span&gt;&lt;div&gt;&lt;strong&gt;조합 기본값&lt;/strong&gt;&lt;div class=&quot;fm-muted&quot;&gt;${selectedContext&lt;4?&#x27;받침 없음&#x27;:&#x27;받침 있음&#x27;} 규칙 적용&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;fm-check-row&quot;&gt;&lt;span class=&quot;fm-check-symbol&quot;&gt;3&lt;/span&gt;&lt;div&gt;&lt;strong&gt;이 조합 보정&lt;/strong&gt;&lt;div class=&quot;fm-muted&quot;&gt;아직 없음&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;height:8px&quot;&gt;&lt;/div&gt;&lt;button class=&quot;fm-primary fm-wide&quot;&gt;이 조합만 보정&lt;/button&gt;&lt;div style=&quot;height:6px&quot;&gt;&lt;/div&gt;&lt;button class=&quot;fm-secondary fm-wide&quot;&gt;원형 수정&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;`,
+        &#x27;V-01&#x27;: () =&gt; `${heading(&#x27;V-01&#x27;,&#x27;문장·전체 글자 검수&#x27;,&#x27;예시 문장&#x27;)}${error(&#x27;8개 글자에서 같은 가로모음+받침 간격 문제가 반복됩니다.&#x27;)}
+          &lt;div class=&quot;fm-grid-two&quot;&gt;&lt;div class=&quot;fm-panel&quot;&gt;&lt;div class=&quot;fm-panel-title&quot;&gt;&lt;span&gt;조판 결과&lt;/span&gt;&lt;span class=&quot;fm-muted&quot;&gt;32px · 자간 0&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;fm-sentence&quot;&gt;가느다란 &lt;mark&gt;공간&lt;/mark&gt; 사이로 곱게 흐르는 한글의 리듬을 살펴봅니다.&lt;/div&gt;&lt;/div&gt;
+          &lt;div&gt;&lt;div class=&quot;fm-panel&quot;&gt;&lt;div class=&quot;fm-panel-title&quot;&gt;&lt;span&gt;선택 글자&lt;/span&gt;&lt;span class=&quot;fm-muted&quot;&gt;공&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;fm-preview-text&quot;&gt;공&lt;/div&gt;&lt;div class=&quot;fm-check-row&quot;&gt;&lt;span class=&quot;fm-check-symbol&quot;&gt;!&lt;/span&gt;&lt;div&gt;&lt;strong&gt;초성·중성 간격&lt;/strong&gt;&lt;div class=&quot;fm-muted&quot;&gt;같은 조합 8개에서 반복&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;button class=&quot;fm-primary fm-wide&quot; data-go=&quot;F-02&quot;&gt;공통 레이아웃에서 수정&lt;/button&gt;&lt;/div&gt;&lt;div style=&quot;height:8px&quot;&gt;&lt;/div&gt;&lt;button class=&quot;fm-secondary fm-wide&quot; data-go=&quot;E-01&quot;&gt;출력 확인&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;`,
+        &#x27;E-01&#x27;: () =&gt; `${heading(&#x27;E-01&#x27;,&#x27;출력&#x27;)}${error(&#x27;완성 OTF를 만들려면 미확인 조합 7개를 검토해야 합니다.&#x27;)}
+          &lt;div class=&quot;fm-grid-two&quot;&gt;&lt;div&gt;&lt;div class=&quot;fm-panel&quot;&gt;&lt;div class=&quot;fm-panel-title&quot;&gt;&lt;span&gt;최종 미리보기&lt;/span&gt;&lt;span class=&quot;fm-muted&quot;&gt;revision 42&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;fm-preview-text&quot;&gt;한글 폰트 메이커&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;height:10px&quot;&gt;&lt;/div&gt;&lt;div class=&quot;fm-panel&quot;&gt;&lt;div class=&quot;fm-panel-title&quot;&gt;&lt;span&gt;폰트 정보&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;fm-check-row&quot;&gt;&lt;span class=&quot;fm-check-symbol&quot;&gt;Aa&lt;/span&gt;&lt;div&gt;&lt;strong&gt;가족 이름&lt;/strong&gt;&lt;div class=&quot;fm-muted&quot;&gt;나의 첫 한글 폰트&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;fm-check-row&quot;&gt;&lt;span class=&quot;fm-check-symbol&quot;&gt;1&lt;/span&gt;&lt;div&gt;&lt;strong&gt;버전&lt;/strong&gt;&lt;div class=&quot;fm-muted&quot;&gt;1.0 · 11,223 글리프&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
+          &lt;div&gt;&lt;div class=&quot;fm-panel&quot;&gt;&lt;div class=&quot;fm-panel-title&quot;&gt;&lt;span&gt;검증 체크리스트&lt;/span&gt;&lt;span class=&quot;fm-muted&quot;&gt;3/4&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;fm-check-row&quot;&gt;&lt;span class=&quot;fm-check-symbol&quot;&gt;✓&lt;/span&gt;&lt;div&gt;필수 역할 원형&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;fm-check-row&quot;&gt;&lt;span class=&quot;fm-check-symbol&quot;&gt;✓&lt;/span&gt;&lt;div&gt;참조와 윤곽&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;fm-check-row&quot;&gt;&lt;span class=&quot;fm-check-symbol&quot;&gt;!&lt;/span&gt;&lt;div&gt;미확인 조합 7개&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;fm-check-row&quot;&gt;&lt;span class=&quot;fm-check-symbol&quot;&gt;✓&lt;/span&gt;&lt;div&gt;전체 글리프 생성&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;height:8px&quot;&gt;&lt;/div&gt;&lt;button class=&quot;fm-secondary fm-wide&quot;&gt;테스트 OTF 만들기&lt;/button&gt;&lt;div style=&quot;height:6px&quot;&gt;&lt;/div&gt;&lt;button class=&quot;fm-primary fm-wide&quot; ${currentState===&#x27;error&#x27;?&#x27;disabled&#x27;:&#x27;&#x27;}&gt;완성 OTF 만들기&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;`
+      };
+
+      const nav = active =&gt; `&lt;nav class=&quot;fm-left-nav&quot; aria-label=&quot;주 메뉴&quot;&gt;${[&#x27;홈&#x27;,&#x27;뼈대&#x27;,&#x27;자소&#x27;,&#x27;검수&#x27;,&#x27;출력&#x27;].map(x=&gt;`&lt;button data-nav=&quot;${x}&quot; data-active=&quot;${x===active}&quot;&gt;${x}&lt;/button&gt;`).join(&#x27;&#x27;)}&lt;/nav&gt;`;
+      const bottomNav = active =&gt; `&lt;nav class=&quot;fm-bottom-nav&quot; aria-label=&quot;모바일 주 메뉴&quot;&gt;${[&#x27;홈&#x27;,&#x27;뼈대&#x27;,&#x27;자소&#x27;,&#x27;검수&#x27;,&#x27;출력&#x27;].map(x=&gt;`&lt;button data-nav=&quot;${x}&quot; data-active=&quot;${x===active}&quot;&gt;${x}&lt;/button&gt;`).join(&#x27;&#x27;)}&lt;/nav&gt;`;
+      const side = () =&gt; `&lt;aside class=&quot;fm-desktop-side&quot;&gt;&lt;div class=&quot;fm-panel-title&quot;&gt;&lt;span&gt;정밀 조절&lt;/span&gt;&lt;span class=&quot;fm-muted&quot;&gt;선택 레일 X&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;fm-axis-pad&quot;&gt;&lt;span class=&quot;fm-pad-point&quot;&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;height:10px&quot; class=&quot;fm-muted&quot;&gt;현재 값 500 UPM&lt;br&gt;스냅 5 UPM · 범위 225–775&lt;/div&gt;&lt;div style=&quot;height:12px&quot;&gt;&lt;/div&gt;&lt;button class=&quot;fm-secondary fm-wide&quot;&gt;숫자로 입력&lt;/button&gt;&lt;/aside&gt;`;
+      const drawer = () =&gt; `&lt;section class=&quot;fm-drawer&quot; data-level=&quot;${currentState===&#x27;drawer&#x27;?&#x27;mid&#x27;:currentState===&#x27;selected&#x27;?&#x27;closed&#x27;:&#x27;closed&#x27;}&quot; aria-label=&quot;정밀 조절 드로어&quot;&gt;&lt;div class=&quot;fm-drawer-grip&quot;&gt;&lt;/div&gt;&lt;div class=&quot;fm-drawer-head&quot;&gt;&lt;span&gt;정밀 조절 · 선택 레일 X&lt;/span&gt;&lt;span&gt;500 UPM&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;fm-axis-pad&quot;&gt;&lt;span class=&quot;fm-pad-point&quot;&gt;&lt;/span&gt;&lt;/div&gt;&lt;/section&gt;`;
+
+      function render() {
+        device.dataset.device = currentDevice;
+        device.dataset.state = currentState;
+        const active = navFor(currentScreen);
+        const hasPrecisionDrawer = [&#x27;F-01&#x27;,&#x27;F-02&#x27;,&#x27;J-02&#x27;,&#x27;J-03&#x27;].includes(currentScreen);
+        app.innerHTML = `&lt;header class=&quot;fm-header&quot;&gt;&lt;span class=&quot;fm-project-name&quot;&gt;나의 첫 한글 폰트&lt;/span&gt;&lt;span class=&quot;fm-save&quot;&gt;저장됨&lt;/span&gt;&lt;button class=&quot;fm-icon-button&quot; aria-label=&quot;실행 취소&quot;&gt;↶&lt;/button&gt;&lt;button class=&quot;fm-icon-button&quot; aria-label=&quot;다시 실행&quot;&gt;↷&lt;/button&gt;&lt;/header&gt;&lt;div class=&quot;fm-content-shell&quot;&gt;${nav(active)}&lt;main class=&quot;fm-workspace&quot;&gt;&lt;div class=&quot;fm-page-scroll&quot;&gt;${pages[currentScreen]()}&lt;/div&gt;${bottomNav(active)}&lt;/main&gt;${side()}&lt;/div&gt;${hasPrecisionDrawer ? drawer() : &#x27;&#x27;}`;
+        picker.innerHTML = screenMeta.map(([id,label])=&gt;`&lt;button type=&quot;button&quot; class=&quot;fm-screen-button&quot; data-screen=&quot;${id}&quot; aria-pressed=&quot;${id===currentScreen}&quot;&gt;${id} ${label}&lt;/button&gt;`).join(&#x27;&#x27;);
+        root.querySelectorAll(&#x27;[data-device-choice]&#x27;).forEach(b=&gt;b.setAttribute(&#x27;aria-pressed&#x27;, String(b.dataset.deviceChoice===currentDevice)));
+        root.querySelectorAll(&#x27;[data-state-choice]&#x27;).forEach(b=&gt;b.setAttribute(&#x27;aria-pressed&#x27;, String(b.dataset.stateChoice===currentState)));
+      }
+      root.addEventListener(&#x27;click&#x27;, event =&gt; {
+        const target = event.target.closest(&#x27;button&#x27;);
+        if (!target) return;
+        if (target.dataset.screen) currentScreen = target.dataset.screen;
+        if (target.dataset.deviceChoice) currentDevice = target.dataset.deviceChoice;
+        if (target.dataset.stateChoice) currentState = target.dataset.stateChoice;
+        if (target.dataset.go) currentScreen = target.dataset.go;
+        if (target.dataset.context) selectedContext = Number(target.dataset.context);
+        if (target.dataset.nav) {
+          const map = { &#x27;홈&#x27;:&#x27;P-03&#x27;, &#x27;뼈대&#x27;:&#x27;F-01&#x27;, &#x27;자소&#x27;:&#x27;J-01&#x27;, &#x27;검수&#x27;:&#x27;V-01&#x27;, &#x27;출력&#x27;:&#x27;E-01&#x27; };
+          currentScreen = map[target.dataset.nav];
+        }
+        render();
+      });
+      render();
+    })();
+  &lt;/script&gt;
+&lt;/div&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handleLeave = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+</body>
+</html>

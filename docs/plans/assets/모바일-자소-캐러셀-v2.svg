@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="430" height="932" viewBox="0 0 430 932">
+  <defs>
+    <clipPath id="screen"><rect width="430" height="932" rx="32"/></clipPath>
+  </defs>
+  <g clip-path="url(#screen)" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, sans-serif">
+    <rect width="430" height="932" fill="#F5F6F8"/>
+
+    <rect width="430" height="106" fill="#FFFFFF"/>
+    <text x="24" y="38" font-size="13" font-weight="650" fill="#17191C">12:31</text>
+    <text x="406" y="38" font-size="12" text-anchor="end" fill="#656B73">●  Wi-Fi  74%</text>
+    <text x="24" y="79" font-size="28" fill="#17191C">‹</text>
+    <text x="215" y="76" font-size="17" font-weight="700" text-anchor="middle" fill="#17191C">글자 편집</text>
+    <text x="406" y="75" font-size="24" text-anchor="end" fill="#17191C">···</text>
+
+    <text x="24" y="139" font-size="20" font-weight="750" fill="#17191C">초성 ㄱ 편집</text>
+    <rect x="317" y="116" width="89" height="34" rx="17" fill="#FFFFFF" stroke="#D2D6DC"/>
+    <text x="361" y="138" font-size="12" font-weight="650" text-anchor="middle" fill="#41464E">조합 편집</text>
+    <text x="24" y="163" font-size="12" fill="#777D86">글자 속 다른 자소를 탭하면 편집 대상이 바뀝니다</text>
+
+    <rect x="-12" y="195" width="100" height="212" rx="20" fill="#FFFFFF" stroke="#D8DCE1"/>
+    <text x="49" y="321" font-size="68" text-anchor="middle" fill="#A0A5AD">끔</text>
+
+    <rect x="100" y="182" width="230" height="238" rx="26" fill="#FFFFFF" stroke="#9DA3AC" stroke-width="1.5"/>
+    <line x1="122" y1="261" x2="308" y2="261" stroke="#DDE0E4" stroke-dasharray="4 5"/>
+    <line x1="122" y1="340" x2="308" y2="340" stroke="#DDE0E4" stroke-dasharray="4 5"/>
+    <rect x="129" y="201" width="172" height="91" rx="14" fill="#EAF2FF" stroke="#3B74D7" stroke-width="2"/>
+    <text x="215" y="345" font-size="142" font-weight="500" text-anchor="middle" fill="#17191C">금</text>
+    <rect x="163" y="204" width="104" height="25" rx="12.5" fill="#3B74D7"/>
+    <text x="215" y="221" font-size="11" font-weight="700" text-anchor="middle" fill="#FFFFFF">초성 ㄱ 활성</text>
+
+    <rect x="342" y="195" width="100" height="212" rx="20" fill="#FFFFFF" stroke="#D8DCE1"/>
+    <text x="383" y="321" font-size="68" text-anchor="middle" fill="#A0A5AD">늠</text>
+
+    <text x="215" y="449" font-size="12" text-anchor="middle" fill="#656B73">짧게 넘기기 · 길게 눌러 빠른 선택</text>
+    <rect x="194" y="460" width="42" height="5" rx="2.5" fill="#AEB3BA"/>
+
+    <rect x="16" y="482" width="398" height="96" rx="18" fill="#FFFFFF" stroke="#B8BDC5"/>
+    <text x="32" y="505" font-size="11" font-weight="650" fill="#777D86">길게 누르는 동안만 표시</text>
+    <text x="48" y="548" font-size="21" text-anchor="middle" fill="#A0A5AD">ㅎ</text>
+    <rect x="70" y="516" width="56" height="50" rx="15" fill="#3B74D7"/>
+    <text x="98" y="550" font-size="23" font-weight="700" text-anchor="middle" fill="#FFFFFF">ㄱ</text>
+    <text x="150" y="548" font-size="21" text-anchor="middle" fill="#5A6069">ㄲ</text>
+    <text x="202" y="548" font-size="21" text-anchor="middle" fill="#5A6069">ㄴ</text>
+    <text x="254" y="548" font-size="21" text-anchor="middle" fill="#5A6069">ㄷ</text>
+    <text x="306" y="548" font-size="21" text-anchor="middle" fill="#5A6069">ㄸ</text>
+    <text x="358" y="548" font-size="21" text-anchor="middle" fill="#5A6069">ㄹ</text>
+    <path d="M98 571 L90 579 L106 579 Z" fill="#3B74D7"/>
+
+    <rect x="0" y="598" width="430" height="334" rx="28" fill="#FFFFFF"/>
+    <rect x="184" y="611" width="62" height="5" rx="2.5" fill="#CDD1D7"/>
+    <text x="24" y="653" font-size="16" font-weight="750" fill="#17191C">ㄱ · 위쪽형 보정</text>
+    <rect x="280" y="630" width="126" height="32" rx="16" fill="#EAF2FF"/>
+    <text x="343" y="651" font-size="12" font-weight="650" text-anchor="middle" fill="#245EB9">위쪽형 전체에 적용</text>
+    <text x="24" y="677" font-size="12" fill="#777D86">기본 스켈레톤은 유지하고 역할 차이만 조절</text>
+
+    <rect x="24" y="700" width="382" height="148" rx="18" fill="#F2F4F7" stroke="#D8DCE1"/>
+    <line x1="215" y1="724" x2="215" y2="818" stroke="#D0D4DA" stroke-dasharray="3 4"/>
+    <line x1="58" y1="771" x2="372" y2="771" stroke="#D0D4DA" stroke-dasharray="3 4"/>
+    <circle cx="215" cy="771" r="11" fill="#3B74D7"/>
+    <text x="215" y="826" font-size="11" text-anchor="middle" fill="#777D86">트랙패드로 선택된 조절점 이동</text>
+
+    <rect x="24" y="873" width="94" height="34" rx="17" fill="#F0F2F5"/>
+    <text x="71" y="895" font-size="12" font-weight="650" text-anchor="middle" fill="#41464E">기본형 보기</text>
+    <rect x="292" y="873" width="114" height="34" rx="17" fill="#17191C"/>
+    <text x="349" y="895" font-size="12" font-weight="650" text-anchor="middle" fill="#FFFFFF">보정 초기화</text>
+  </g>
+</svg>

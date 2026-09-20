@@ -1,257 +1,83 @@
 # AGENTS.md
 
-이 문서는 AI 어시스턴트가 한글 폰트 메이커 코드베이스에서 작업할 때 참고하는 가이드입니다.
+한글 폰트 메이커에서 AI가 일하는 규칙. `CLAUDE.md`와 내용이 같다. 둘 중 하나를 고치면 다른 쪽도 같이 고친다.
 
 ## 작업 전 필독
 
-- 모든 작업자는 작업을 시작하기 전에 [`docs/PRODUCT_PHILOSOPHY.md`](docs/PRODUCT_PHILOSOPHY.md)를 읽고, 제품 방향과 의사결정 원칙을 작업에 반영한다.
-- 새 결정이나 검증 결과가 기존 철학·가설·미결정 사항을 바꾸면 해당 문서도 함께 갱신한다.
+1. 옵시디언 `개인 프로젝트/폰트메이커/원칙.md` — 한 화면. 여기 어긋나는 제안은 먼저 원칙을 바꿀지 묻는다.
+2. `docs/PRODUCT_PHILOSOPHY.md` — 제품 방향과 판단 원칙.
+3. 진행 중인 플랜이 있으면 `docs/plans/`의 해당 문서 맨 아래 `진행 기록`부터 읽는다.
 
-## 기획 회의 및 Obsidian 운영
+## 문서는 두 곳
 
-- 사용자가 프로젝트 아이디어를 제안하면 먼저 피드백하고, 별도 확인을 기다리지 않고 아이디어별 Markdown 파일로 기록한다. 사용자가 기록하지 말라고 한 경우만 제외한다.
-- 새 아이디어는 새 파일로 만들고, 기존 아이디어의 발전 내용은 해당 파일에 합친다.
-- 모든 아이디어를 `입력 → 생성 엔진 ↔ 편집 → 출력`로 분류한다. 전역 이슈만 `공통 기반`에 둔다.
-- 아이디어가 충분히 모이면 전체를 함께 검토해 `프로젝트 반영 · 보류 · 제외`로 나눈다. 검토 전 아이디어를 확정안처럼 쓰지 않는다.
-- 문서는 짧고 자연스러운 한국어로 쓰며, 회의 원문·장황한 설명·딱딱한 템플릿은 넣지 않는다.
-- 아이디어 폴더: `/Users/hanim/Documents/Obsidian Vault/Codex/한글 폰트 메이커/아이디어/`
-- 파일 형식: YAML Properties(`project`, `area`, `status`, `created`) + 제목 + 짧은 본문
-- 파일명: `YYYY-MM-DD_제목.md`
-- 목록: `/Users/hanim/Documents/Obsidian Vault/Codex/한글 폰트 메이커/아이디어-목록.base`
+옵시디언 볼트 `/Users/hanim/Documents/Obsidian Vault/개인 프로젝트/폰트메이커/`는 **사용자가 읽는 곳**, 이 레포 `docs/`는 **AI가 읽고 쓰는 곳**이다.
 
-### 이미지 래퍼런스 분석
+| 옵시디언 (사용자) | 레포 (AI) |
+|---|---|
+| `주간/` 주간 노트 — 사용자가 쓴다 | `docs/plans/YYYY-MM-DD_제목.md` 플랜 + 진행 기록 |
+| `아이디어/` 사용자 생각과 짧은 아이디어 | `docs/specs/` 명세 |
+| `원칙.md` `결정과 뒤집힘.md` `열린 질문.md` | `docs/PRODUCT_PHILOSOPHY.md` |
+| `이미지 래퍼런스/` + 캔버스, `자모 데이터/` | `docs/archive/` 끝난 것 |
 
-- 이미지 래퍼런스 작업 공간은 `/Users/hanim/Documents/Obsidian Vault/Codex/한글 폰트 메이커/이미지 래퍼런스/`다.
-- 사용자는 이 작업 공간의 Obsidian Canvas에 이미지 래퍼런스를 그룹별로 배치하고 설명 문서와 연결한다.
-- 사용자가 Canvas 안의 설명 문서를 읽어 달라고 하면, 문서만 따로 읽지 말고 Canvas의 그룹과 연결선을 확인하여 해당 문서에 연결된 이미지들을 모두 함께 확인한다.
-- 연결된 이미지와 설명 문서의 관계를 해석하고, 그 맥락을 유지한 채 사용자와 대화하며 한글 폰트 메이커 앱에 적용할 수 있는 방향까지 분석한다.
-- 사용자가 명시적으로 “정리해줘”라고 요청한 경우에만 분석 결과를 `/Users/hanim/Documents/Obsidian Vault/Codex/한글 폰트 메이커/이미지 래퍼런스 분석/`에 저장한다. 그 외에는 파일을 만들거나 기존 문서를 수정하지 않는다.
+AI가 만드는 플랜·명세·실행 기록·측정 결과는 **옵시디언에 저장하지 않는다.** 예외는 아래 규칙 3과 6뿐이다.
 
-## 프로젝트 개요
+## 규칙
 
-React + TypeScript 기반의 웹 한글 폰트 디자인 도구입니다. 사용자가 한글 자모(초성, 중성, 종성)의 획을 개별적으로 편집하고, 10가지 한글 음절 조합 패턴에 대한 레이아웃 프리셋을 조정하여 커스텀 폰트를 제작할 수 있습니다. 모든 좌표는 해상도 독립적인 0–1 정규화 좌표계를 사용합니다.
+1. **플랜**은 `docs/plans/YYYY-MM-DD_제목.md`에 만든다. 게이트 표(D0 계약 → G0 대표 → G1 홀드아웃 → G2 전수 → G3 사용자 검증)가 필수이고, 2페이지를 넘기지 않는다. 맨 위에 `이번에 비교하는 것 / 이번 승인으로 바뀌는 것 / 바뀌지 않는 것` 세 줄을 쓴다.
+2. **진행 기록**은 그 플랜 파일 맨 아래 `## 진행 기록`에 날짜와 함께 이어 붙인다. 새 문서를 만들지 않는다. 사실 / 가설 / 미결정을 구분한다.
+3. **게이트가 닫히거나 결정이 뒤집히면** 옵시디언 `결정과 뒤집힘.md`에 한 줄을 이어 붙인다. 형식: `날짜 · 결정 · 왜 · 출처(나/AI) · 뒤집은 것`. 뒤집힘은 앞에 **뒤집힘** 표시.
+4. 사용자가 `마무리`라고 하면 세 줄만 제안한다: 바뀐 원칙 / 뒤집힌 결정 / 새 열린 질문. 사용자가 ✔한 것만 해당 문서에 반영한다. ✔ 없이 원칙·결정 문서를 고치지 않는다.
+5. `원칙.md`와 `PRODUCT_PHILOSOPHY.md`는 원칙이 바뀔 때만 고친다. 구현 상태는 플랜의 진행 기록에만 쓴다.
+6. 주간 노트의 `==하이라이트==`는 사용자의 질문이다. 그 자리 바로 아래에 `> 답변` 인용 블록으로 짧게 답한다. 문서의 다른 부분은 고치지 않는다.
+7. 사용자가 `빌림`이라고 하면 이해 못 한 채 넘어간다는 뜻이다. `결정과 뒤집힘.md`의 `빌린 결정` 절에 한 줄(무엇 · 한 문장 왜 · 나중에 물어볼 질문)을 남기고, 가능하면 사용자가 읽을 수 있는 말로 된 테스트를 하나 붙인다.
+8. `구현해`라고 한 경우에만 코드를 바꾸고, `문서화해`라고 한 경우에만 옵시디언에 쓴다. 둘은 서로 대신하지 않는다. 기획 논의 중에는 코드도 문서도 고치지 않는다.
+9. 한 단계에 판단할 변수는 하나, 확인 질문은 셋 이하. 사용자 승인 전에는 다음 단계와 production 값을 바꾸지 않는다.
+10. 문서는 짧고 자연스러운 한국어로. 회의 원문, 장황한 설명, 딱딱한 템플릿, 과도한 표를 넣지 않는다.
 
-## 기술 스택
+## 세션 키워드
 
-- **프레임워크:** React 19.1 (함수형 컴포넌트, 훅만 사용)
-- **언어:** TypeScript 5.8 (strict 모드)
-- **빌드:** Vite 5.0 (번들링 전 `tsc -b`로 타입 검사)
-- **상태 관리:** Zustand 5.0 + Immer 11.1 (`set(state => { state.x = y })` 패턴으로 불변 업데이트)
-- **폼:** React Hook Form 7.61
-- **스타일링:** CSS Modules (`.module.css`) + 전역 CSS
-- **PWA:** vite-plugin-pwa + Workbox 7.4 (오프라인 우선, 설치 가능)
-- **린팅:** ESLint 9 (flat config) + typescript-eslint, react-hooks, react-refresh 플러그인
-- **테스트 프레임워크:** 현재 미설정
+사용자는 첫 줄에 단계를 말한다. `플랜: …` `구현: …` `정리` `마무리` `문서화해` `빌림`.
 
-## 개발 명령어
+## 용어
+
+- Font Guide Lab의 가이드선 묶음은 `기준선`, 개별 선은 `보선`.
+- 제품 논의는 `입력 → 생성 엔진 ↔ 편집 → 출력` 네 영역으로 나눈다. 전역 이슈만 `공통 기반`.
+
+## 이미지 래퍼런스
+
+- 작업 공간은 옵시디언 `이미지 래퍼런스/`와 `이미지 래퍼런스 캔버스.canvas`. 설명 문서를 읽어 달라고 하면 캔버스의 그룹과 연결선을 따라 연결된 이미지를 함께 본다.
+- 분석 결과는 사용자가 `정리해줘`라고 한 경우에만 `이미지 래퍼런스 분석/`에 저장한다.
+
+## 코드베이스
+
+React 19 + TypeScript 5.8 (strict) + Vite. 상태는 Zustand + Immer. 스타일은 CSS Modules. 테스트는 Vitest(`npm test`)와 Playwright(`npm run test:e2e`). 기준선 추출·코퍼스 분석은 `scripts/reference-lab/` Python.
 
 ```bash
-npm run dev       # Vite 개발 서버 실행 (HMR)
-npm run build     # TypeScript 타입 검사 + Vite 프로덕션 빌드
-npm run lint      # ESLint 검사
-npm run preview   # 프로덕션 빌드 로컬 미리보기
+npm run dev            # 개발 서버
+npm run build          # tsc -b + vite build
+npm test               # vitest (src, src-next)
+npm run test:e2e       # playwright
+npm run lint
+npm run reference:lab  # 레퍼런스 랩 서버
+npm run reference:noto # Noto 코퍼스 추출
 ```
 
-## 프로젝트 구조
+구조:
+- `src-next/` — 실제 앱 엔트리(`index.html` → `src-next/main.tsx`). 화면과 라우트: `/` 문장 보정, `/workspace/*` 형태 셸, `/workspace/review/*` 검수, `/grid-lab` `/rule-lab` 등 랩.
+- `src/` — `services/` `stores/` `types/` `data/` `utils/` `renderers/`는 공용이고 `src-next`가 가져다 쓴다. `src/components/`의 옛 3컬럼 편집기는 라우팅에서 빠진 죽은 코드다(삭제 예정, 확장 금지).
+- `scripts/reference-lab/` — Python 추출기·검증기·서버. `reference-data/` — 관측값·승인 입력·캐시.
+- `docs/` — 위 문서 규칙.
 
-```
-src/
-├── components/               # React UI 컴포넌트
-│   ├── ControlPanel/         # 좌측 사이드바 – 레이아웃 타입/자모 선택
-│   ├── PreviewPanel/         # 우측 상단 – 텍스트 입력 및 실시간 미리보기
-│   ├── EditorPanel/          # 우측 하단 – 편집기 디스패처
-│   │   ├── EditorPanel.tsx   # 레이아웃/자모 에디터 전환 라우팅
-│   │   ├── LayoutEditor.tsx  # Split/Padding 슬라이더 편집
-│   │   ├── JamoEditor.tsx    # 획 단위 자모 편집
-│   │   └── SplitEditor.tsx   # 재사용 가능한 Split/Padding 슬라이더
-│   ├── CharacterEditor/      # 획 편집 세부 컴포넌트
-│   │   ├── CharacterPreview.tsx  # 자모 대형 SVG 미리보기
-│   │   ├── StrokeList.tsx        # 획 목록 및 선택
-│   │   ├── StrokeEditor.tsx      # 키보드 기반 획 조절
-│   │   └── StrokeInspector.tsx   # 숫자 입력 필드 (정밀 편집)
-│   └── BoxEditor/            # [레거시] SplitEditor로 대체됨, 확장하지 말 것
-├── stores/                   # Zustand 상태 저장소
-│   ├── uiStore.ts            # UI 상태: 뷰 모드, 선택 상태 (비영속)
-│   ├── layoutStore.ts        # 레이아웃 스키마 (localStorage 영속)
-│   └── jamoStore.ts          # 자모 획 데이터 (localStorage 영속)
-├── data/                     # 정적 데이터
-│   ├── Hangul.ts             # 자모별 획 맵: CHOSEONG_MAP, JUNGSEONG_MAP, JONGSEONG_MAP
-│   ├── baseJamos.json        # 67개 자모 기본 획 데이터
-│   ├── basePresets.json      # 10개 기본 레이아웃 스키마 정의
-│   └── layoutConfigs.ts      # 레이아웃 설정 헬퍼 + DEFAULT_LAYOUT_CONFIGS
-├── renderers/
-│   └── SvgRenderer.tsx       # 핵심 SVG 렌더링 엔진
-├── utils/
-│   ├── hangulUtils.ts        # decomposeSyllable(), classifyLayout(), classifyJungseong()
-│   ├── layoutCalculator.ts   # calculateBoxes() – Split/Padding → BoxConfig 변환
-│   ├── pathUtils.ts          # 베지어 곡선 유틸리티
-│   └── storage.ts            # LocalStorage 헬퍼
-├── types/
-│   └── index.ts              # 모든 핵심 TypeScript 인터페이스 및 타입
-├── App.tsx                   # 루트 컴포넌트 (반응형 레이아웃)
-├── App.css                   # 메인 앱 스타일
-├── main.tsx                  # 엔트리 포인트
-└── index.css                 # 전역 스타일
-```
+## 컨벤션
 
-## 아키텍처 및 데이터 흐름
+- 코드 식별자는 영문, UI 레이블·주석·문서는 한글.
+- 모든 좌표는 0–1 정규화. `StrokeData`는 구별된 유니온, `isPathStroke()`로 좁힌다.
+- Zustand는 `set(state => { state.x = y })` 패턴. State와 Actions 인터페이스 분리.
+- 커밋은 `COMMIT_CONVENTION.md`: `<type>(<scope>): <한글 제목>`. AI 워터마크·Co-Author 금지.
+- 유지할 설계 결정: Split + Padding 레이아웃, 스키마와 계산된 박스의 분리, 획 우선(centerline) 모델과 두께 고정 — 나머지는 옵시디언 `원칙.md`.
 
-한글 음절의 렌더링 파이프라인:
+## 주의
 
-1. **분해** – `decomposeSyllable("한")` → `{ choseong: 'ㅎ', jungseong: 'ㅏ', jongseong: 'ㄴ' }`
-2. **분류** – `classifyLayout(분해결과)` → `LayoutType` (10가지 중 하나)
-3. **스키마 조회** – `layoutStore.getLayoutSchema(type)` → `LayoutSchema` (splits + padding)
-4. **박스 계산** – `calculateBoxes(schema)` → `Partial<Record<Part, BoxConfig>>` (0–1 좌표)
-5. **획 데이터 조회** – `CHOSEONG_MAP['ㅎ'].strokes` → 획 배열
-6. **렌더링** – `SvgRenderer`가 획을 계산된 박스에 스케일링 → SVG 출력
-
-### 상태 관리
-
-Zustand 스토어 3개, 공통 패턴:
-
-```typescript
-export const useStore = create<State & Actions>()(
-  persist(           // 선택사항 – layoutStore, jamoStore에서 사용
-    immer((set, get) => ({
-      // 상태 필드
-      key: value,
-      // 액션: Immer 드래프트를 직접 변형
-      setKey: (val) => set((state) => { state.key = val }),
-    })),
-    { name: '저장소-키', partialize: (state) => ({ /* 영속화할 부분 */ }) }
-  )
-)
-```
-
-| 스토어 | 영속화 | 용도 |
-|--------|--------|------|
-| `uiStore` | 안 함 | 뷰 모드, 선택 상태, 편집 컨텍스트 |
-| `layoutStore` | `font-maker-layout-schemas` | 10가지 레이아웃 타입별 스키마 |
-| `jamoStore` | `font-maker-jamo-data` | 67개 자모의 획 데이터 |
-
-### 레이아웃 타입 (10종)
-
-| 타입 | 구성 파트 | 예시 |
-|------|-----------|------|
-| `choseong-only` | CH | ㄱ, ㄴ |
-| `jungseong-vertical-only` | JU | ㅏ, ㅓ |
-| `jungseong-horizontal-only` | JU | ㅗ, ㅜ |
-| `jungseong-mixed-only` | JU_H + JU_V | ㅘ, ㅢ |
-| `choseong-jungseong-vertical` | CH + JU | 가, 너 |
-| `choseong-jungseong-horizontal` | CH + JU | 고, 누 |
-| `choseong-jungseong-mixed` | CH + JU_H + JU_V | 과, 의 |
-| `choseong-jungseong-vertical-jongseong` | CH + JU + JO | 강, 넌 |
-| `choseong-jungseong-horizontal-jongseong` | CH + JU + JO | 공, 눈 |
-| `choseong-jungseong-mixed-jongseong` | CH + JU_H + JU_V + JO | 광, 권 |
-
-파트 약어: `CH` = 초성, `JU` = 중성, `JU_H` = 혼합중성 가로부, `JU_V` = 혼합중성 세로부, `JO` = 종성
-
-## 주요 컨벤션
-
-### TypeScript
-
-- **strict 모드** 활성화: `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`
-- Target: ES2022, Module: ESNext (bundler resolution)
-- 모든 타입은 `src/types/index.ts`에 정의
-- 획 타입은 구별된 유니온 사용: `RectStrokeData` (`direction: 'horizontal' | 'vertical'`) vs `PathStrokeData` (`direction: 'path'`)
-- `StrokeData` 타입 좁히기 시 `isPathStroke(stroke)` 타입 가드 사용
-
-### 컴포넌트
-
-- 함수형 컴포넌트만 사용 (클래스 컴포넌트 금지)
-- CSS Modules로 컴포넌트 스코프 스타일링
-- 반응형: 데스크톱 (>768px) vs 모바일 (<=768px), 조건부 렌더링
-- 이벤트 핸들러 접두사: `handle*`
-- 상태 setter 접두사: `set*`
-
-### 네이밍
-
-- **코드 식별자**는 영문으로 작성
-- **UI 레이블, 주석, 문서**는 한글로 작성
-- 스토어 파일: `*Store.ts` → `use*Store` 내보내기
-- 유틸리티 파일: `*Utils.ts`
-- 참조 객체: `*_MAP` (예: `CHOSEONG_MAP`)
-
-### 좌표계
-
-- 모든 위치와 크기는 **0–1 정규화 좌표** 사용
-- `BoxConfig`: `{ x, y, width, height }` 각각 0–1 범위
-- `StrokeData`: `{ x, y, width, height }` 부모 박스 내 0–1 상대 좌표
-- 해상도 독립적이며 어떤 크기로든 스케일링 가능
-
-### 커밋 메시지
-
-`COMMIT_CONVENTION.md`에 정의된 **Conventional Commits** 규칙 준수:
-
-```
-<type>(<scope>): <한글 제목>
-```
-
-- type과 scope는 영문, subject와 body는 한글
-- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `ci`, `build`
-- 제목은 명령형 (~추가, ~수정, ~삭제)
-- 제목 끝에 마침표 사용하지 않음
-- AI 워터마크나 Co-Author 어트리뷰션 포함 금지
-
-### 유지해야 할 설계 결정
-
-다음 아키텍처 결정은 의도된 것이며 반드시 유지해야 함:
-
-- **Split + Padding 레이아웃 시스템** (raw x/y/width/height가 아닌 분할선 + 여백 방식)
-- **0–1 정규화 좌표계** 전체 적용
-- **Zustand + Immer 패턴** (`set()` 내에서 드래프트 직접 변형)
-- **스키마와 계산된 박스의 분리** (`layoutSchemas`는 영속화, `layoutConfigs`는 파생값)
-- **키보드 우선 획 편집** (화살표 키 + Shift 수정자)
-- **타입 안전한 스토어 패턴** (State와 Actions 인터페이스 분리)
-
-## 관련 문서
-
-- `PROJECT_OVERVIEW.md` – 상세 프로젝트 분석 (아키텍처, 데이터 흐름, 구현 상태, 로드맵)
-- `COMMIT_CONVENTION.md` – 커밋 메시지 가이드라인
-
-## 주요 작업 가이드
-
-### 새로운 획 타입 추가
-1. `src/types/index.ts`의 `StrokeData` 구별된 유니온에 새 타입 추가
-2. 타입 가드 함수 추가
-3. `SvgRenderer.tsx`에서 새 획 렌더링 처리
-4. `CharacterEditor/` 컴포넌트에 편집 지원 추가
-
-### 레이아웃 계산 수정
-1. `src/utils/layoutCalculator.ts`의 `calculateBoxes()` 수정
-2. 레이아웃 스토어가 `syncConfigFromSchema()`를 통해 `layoutConfigs`를 자동 동기화함
-
-### 새로운 레이아웃 타입 추가
-1. `src/types/index.ts`의 `LayoutType` 유니온에 리터럴 추가
-2. `src/utils/hangulUtils.ts`에 분류 로직 추가
-3. `src/data/basePresets.json`에 기본 스키마 추가
-4. `src/utils/layoutCalculator.ts`에 계산 로직 추가
-
-### 스토어 사용법
-- 상태 읽기: `const value = useStore((s) => s.field)`
-- 상태 변경: 액션에서 Immer 드래프트를 직접 변형 (새 객체를 반환하지 않음)
-- 레이아웃 스토어는 `layoutSchemas`만 영속화하고, `layoutConfigs`는 hydration 시 재계산됨
-
-## 주의사항
-
-### SVG 이벤트 레이어링 (중요)
-
-- **SvgRenderer의 `{children}`은 단일 `<g>` 안에 순서대로 렌더링됨** — 나중에 렌더된 요소가 이벤트를 먼저 받음
-- **StrokeOverlay는 viewBox 전체를 덮는 투명 배경 rect를 가짐** (`<rect fill="transparent">`) → 이 뒤에 렌더된 오버레이만 이벤트를 받을 수 있음
-- 따라서 **PaddingOverlay는 반드시 StrokeOverlay 뒤에 렌더링**해야 패딩 드래그가 동작함
-- 이벤트가 안 먹히는 SVG 문제를 디버깅할 때: 코드 구조보다 **실제 DOM 렌더 순서**를 먼저 확인할 것
-- 수정 후 반드시 **Playwright 등 자동화 테스트로 검증** 후 사용자에게 확인 요청할 것
-
-### UI 라우팅 구조
-
-- 편집 메뉴에서 자모(ㄱ 등) 클릭 → `controlMode='layout'` + `editingPartInLayout` 설정 → **LayoutEditor의 자모 편집 서브모드** 진입 (JamoEditor가 아님)
-- `JamoEditor` 컴포넌트는 `controlMode='jamo'`일 때만 렌더되며, 현재 UI 플로우에서는 도달하지 않음
-- 자모 편집 관련 수정은 **LayoutEditor 내부**에서 해야 함
-
-### 기타
-
-- `BoxEditor/`는 레거시 코드 (`SplitEditor`로 대체됨). 확장하지 말 것
-- 규칙 시스템 (`Rule`, `Condition`, `Action` 타입)은 타입만 정의되어 있고 UI가 없음 — 향후 구현 예정
-- 테스트 프레임워크 미설치. 테스트 추가 시 Vitest 권장 (Vite와 호환)
-- `.gitignore`가 최소한(`node_modules`만 포함)이므로 `dist/`, `.env`, IDE 설정 파일을 커밋하지 않도록 주의
-- 혼합중성(ㅘ, ㅢ 등)은 일반 `strokes` 배열 대신 `horizontalStrokes`와 `verticalStrokes`를 분리하여 사용
+- SVG 이벤트는 DOM 렌더 순서가 결정한다. `StrokeOverlay`의 투명 배경 rect 뒤에 렌더된 오버레이만 이벤트를 받는다. 안 먹히면 코드 구조보다 실제 렌더 순서를 먼저 본다. 수정 후 Playwright로 확인한다.
+- 혼합중성(ㅘ, ㅢ 등)은 `horizontalStrokes` / `verticalStrokes`를 분리해 쓴다.
+- `.gitignore`가 최소한이다. `dist/`, `.env`, IDE 설정을 커밋하지 않는다.

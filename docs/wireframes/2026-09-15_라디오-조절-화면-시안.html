@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>라디오 원칙 · 단순화안 · 2026-09-15</title>
+<style>
+  :root{--paper:#f0eee7;--ink:#1a1a17;--ink2:#6a685f;--ink3:#a6a297;--line:#dcd8cc;--hot:#f0561e;--hotbg:#fde9e0;--blue:#3b6fd6;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;--sans:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+  *{box-sizing:border-box}
+  body{margin:0;background:#cfcdc4;font-family:var(--sans);color:var(--ink);font-size:13px;line-height:1.4}
+  .top{padding:30px 40px 6px}.top h1{margin:0 0 4px;font-size:20px}.top p{margin:0;color:#444;max-width:900px}
+  .row{display:flex;gap:28px;flex-wrap:wrap;padding:20px 40px 40px;align-items:flex-start}
+  .shot{width:340px}.shot h3{margin:0 0 6px;font-size:13px}.shot h3 small{font-weight:400;color:#555;margin-left:6px}
+  .cap{margin-top:8px;font-size:12px;color:#222;display:flex;flex-direction:column;gap:3px}
+  .cap div b{display:inline-block;min-width:18px;height:18px;border-radius:9px;background:#1a1a17;color:#fff;text-align:center;line-height:18px;font:600 11px var(--mono);margin-right:6px}
+
+  .phone{width:340px;height:736px;background:var(--paper);border-radius:30px;border:5px solid #1d1d1b;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 16px 40px rgba(0,0,0,.22)}
+  .notch{position:absolute;left:50%;top:7px;transform:translateX(-50%);width:96px;height:22px;background:#1d1d1b;border-radius:12px}
+  .status{height:40px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 20px 4px;font:600 11px var(--sans)}
+  .hd{display:flex;align-items:center;padding:6px 18px 0}
+  .hd h2{margin:0;font-size:19px;font-weight:800;flex:1;letter-spacing:-.01em}
+  .hd .chev{font-size:14px;color:var(--ink2)}
+  .hd .undo{font:600 12px var(--mono);color:var(--ink2);margin-right:14px}
+
+  /* 라디오 화면 */
+  .ctx{text-align:center;font:500 11px var(--mono);color:var(--ink3);letter-spacing:.04em;margin-top:22px}
+  .ctx b{color:var(--ink2);font-weight:600}
+  .glyph{position:relative;height:150px;display:flex;align-items:center;justify-content:center;margin-top:2px}
+  .glyph .g{font-size:132px;font-weight:900;line-height:1;color:var(--ink);letter-spacing:-.02em}
+  .glyph .g.faint{color:#d8d5ca}
+  .glyph .rail{position:absolute;left:40px;right:40px;height:0;border-top:2px solid var(--hot)}
+  .glyph .rail::after{content:"";position:absolute;right:-6px;top:-6px;width:12px;height:12px;border-radius:50%;background:var(--hot);border:2px solid var(--paper)}
+  .glyph .rail.ghost{border-top:1px dashed #cfcbbf}.glyph .rail.ghost::after{display:none}
+  .glyph .pt{position:absolute;width:12px;height:12px;border-radius:50%;background:var(--hot);border:2px solid var(--paper);box-shadow:0 0 0 1.5px var(--hot)}
+  .glyph .axis{position:absolute;background:var(--hot);opacity:.5}
+  .big{text-align:center;margin-top:8px;font:700 56px var(--mono);letter-spacing:-.04em;line-height:1}
+  .big small{font-size:16px;color:var(--ink3);font-weight:500;margin-left:4px;letter-spacing:0}
+  .big .z{color:#d0ccbf}
+  .big .d{display:block;font:600 12px var(--mono);color:var(--hot);letter-spacing:.02em;margin-top:6px}
+  .band{display:flex;justify-content:center;gap:18px;margin-top:14px;font:600 12px var(--sans);color:var(--ink3)}
+  .band span{position:relative;padding-bottom:6px}
+  .band span.on{color:var(--hot)}
+  .band span.on::after{content:"";position:absolute;left:50%;bottom:0;width:4px;height:4px;border-radius:50%;background:var(--hot);transform:translateX(-50%)}
+  .band .n{font:500 10.5px var(--mono);color:var(--ink3);align-self:center;margin-left:4px}
+
+  .dial{flex:1;position:relative;overflow:hidden;min-height:0}
+  .dial .arc{position:absolute;left:50%;top:26px;width:520px;height:520px;transform:translateX(-50%);border-radius:50%;
+      background:radial-gradient(circle,transparent 0 238px,#e3e0d4 238px 240px,transparent 240px);}
+  .dial .ticks{position:absolute;left:50%;top:26px;width:520px;height:520px;transform:translateX(-50%);border-radius:50%;
+      background:repeating-conic-gradient(from -14deg,var(--ink3) 0 .35deg,transparent .35deg 2deg);
+      -webkit-mask:radial-gradient(circle,transparent 0 222px,#000 222px 236px,transparent 236px);mask:radial-gradient(circle,transparent 0 222px,#000 222px 236px,transparent 236px)}
+  .dial .ticksBig{position:absolute;left:50%;top:26px;width:520px;height:520px;transform:translateX(-50%);border-radius:50%;
+      background:repeating-conic-gradient(from -14deg,var(--ink2) 0 .5deg,transparent .5deg 10deg);
+      -webkit-mask:radial-gradient(circle,transparent 0 214px,#000 214px 236px,transparent 236px);mask:radial-gradient(circle,transparent 0 214px,#000 214px 236px,transparent 236px)}
+  .dial .nums{position:absolute;left:0;right:0;top:30px;display:flex;justify-content:space-between;padding:0 34px;font:500 10px var(--mono);color:var(--ink3)}
+  .dial .nums span:nth-child(2){transform:translateY(-14px)}.dial .nums span:nth-child(4){transform:translateY(-14px)}
+  .dial .needle{position:absolute;left:50%;top:16px;width:2px;height:64px;background:var(--hot);transform:translateX(-50%)}
+  .dial .needle::before{content:"";position:absolute;left:-4px;top:-8px;border:5px solid transparent;border-bottom:8px solid var(--hot)}
+  .dial .thumb{position:absolute;left:50%;top:70px;width:22px;height:38px;border-radius:12px;background:#fff;border:1px solid var(--line);box-shadow:0 2px 6px rgba(0,0,0,.14);transform:translateX(-50%)}
+  .dial .thumb::after{content:"";position:absolute;left:50%;top:8px;bottom:8px;width:2px;background:var(--hot);transform:translateX(-50%)}
+  .dial .base{position:absolute;left:50%;top:44px;width:1px;height:22px;background:var(--ink3);transform:translateX(calc(-50% + 46px))}
+  .dial .base::after{content:"프리셋";position:absolute;left:4px;top:4px;font:500 9px var(--mono);color:var(--ink3);white-space:nowrap}
+  .dial .hint{position:absolute;left:0;right:0;bottom:120px;text-align:center;font:500 10px var(--mono);color:var(--ink3);letter-spacing:.04em}
+  .dial .axis{position:absolute;left:50%;transform:translateX(-50%);bottom:150px;display:inline-flex;border:1px solid var(--line);border-radius:14px;overflow:hidden;font:600 10.5px var(--mono);background:#fff}
+  .dial .axis span{padding:3px 10px;color:var(--ink3)}.dial .axis span.on{background:var(--ink);color:#fff}
+
+  .transport{height:96px;display:flex;align-items:center;justify-content:center;gap:34px}
+  .tb{width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--ink)}
+  .tb.main{width:64px;height:64px;border-radius:50%;background:#fff;box-shadow:0 3px 10px rgba(0,0,0,.12);font-size:14px;font-weight:700}
+  .tb.main.hot{background:var(--hot);color:#fff}
+  .dots{display:flex;justify-content:center;gap:5px;margin-bottom:4px}
+  .dots i{width:5px;height:5px;border-radius:50%;background:#cbc7ba}.dots i.on{background:var(--ink)}
+  .home{height:4px;width:110px;background:#1d1d1b;border-radius:2px;margin:6px auto 8px;opacity:.85}
+
+  /* 고르기 화면 */
+  .sent{padding:26px 22px 0;font-size:36px;font-weight:800;line-height:1.35;letter-spacing:.02em;text-align:center}
+  .sent b{color:var(--hot);position:relative}
+  .sent b::after{content:"";position:absolute;left:0;right:0;bottom:-3px;height:3px;background:var(--hot);border-radius:2px}
+  .sent u{text-decoration:none;color:var(--ink);border-bottom:2px solid #c9d3ee}
+  .sent .dim{color:#c8c4b7}
+  .list{padding:22px 22px 0;display:flex;flex-direction:column;gap:0}
+  .li{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);font-size:15px}
+  .li .v{margin-left:auto;font:500 12px var(--mono);color:var(--ink3)}
+  .li.on{color:var(--hot);font-weight:700}.li.on .v{color:var(--hot)}
+  .li i{width:26px;height:0;border-top:1.5px solid currentColor;opacity:.6}
+  .li.on i{opacity:1}
+  .fill{flex:1}
+  .small{text-align:center;font:500 11px var(--mono);color:var(--ink3);letter-spacing:.04em}
+
+  /* 확인 시트 */
+  .confirm{padding:26px 22px 0;text-align:center}
+  .confirm .n{font:700 54px var(--mono);letter-spacing:-.04em;line-height:1}
+  .confirm .n small{font-size:16px;color:var(--ink3);font-weight:500}
+  .confirm p{margin:8px 0 0;color:var(--ink2);font-size:13px}
+  .mx{margin:18px 22px 0;display:grid;grid-template-columns:repeat(28,1fr);gap:1.5px}
+  .mx i{aspect-ratio:1;border-radius:1.5px;background:#e6e3d8}.mx i.h{background:var(--hot)}.mx i.x{background:#b9a6e8}
+  .legend{margin-top:8px;text-align:center;font:500 10px var(--mono);color:var(--ink3)}
+  .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;vertical-align:-1px;margin:0 3px 0 10px}
+  .btn{display:block;margin:0 22px;height:52px;border-radius:26px;background:var(--ink);color:#fff;font:700 15px var(--sans);display:flex;align-items:center;justify-content:center}
+  .btn.ghost{background:transparent;color:var(--ink2);height:40px}
+
+  .side{width:340px;font-size:12.5px;color:#222}
+  .side h2{font-size:15px;margin:0 0 8px}
+  .side div{display:flex;gap:8px;padding:6px 0;border-top:1px solid #bbb8ad}
+  .side div b{flex:0 0 20px;height:20px;border-radius:50%;background:#1a1a17;color:#fff;font:600 11px var(--mono);display:flex;align-items:center;justify-content:center}
+  .side div.q b{background:#e0c86a;color:#1a1a17}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>라디오 원칙 · 단순화안</h1>
+  <p>한 화면 = 대상 하나 · 값 하나 · 컨트롤러 하나. 컨트롤러는 하단 원호 다이얼로 전 화면 고정. 이전 hi-fi의 문장·펜스·대표글자·눈금자·매트릭스는 이 화면에서 빠져 앞뒤 단계로 이동.</p>
+</div>
+<div class="row">
+
+<!-- A 고르기 -->
+<div class="shot"><h3>A · 고르기<small>문장에서 글자 탭</small></h3>
+<div class="phone"><div class="notch"></div><div class="status"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+  <div class="hd"><h2>뼈대</h2><span class="undo">↶ ↷</span><span class="chev">⌂</span></div>
+  <div class="sent">강 <b>각</b>진<br><u>돌</u><u>담</u> <u>밑</u><br>작은 <u>꽃</u>이<br><span class="dim">핀다</span></div>
+  <div class="fill"></div>
+  <div class="small">이 층의 글자 · 밑줄</div>
+  <div class="transport"><span class="tb">⚄</span><span class="tb main">각</span><span class="tb">⌨</span></div>
+  <div class="dots"><i class="on"></i><i></i><i></i></div><div class="home"></div>
+</div>
+<div class="cap"><div><b>1</b>문장만. 글자 하나 고르면 다음으로. 주사위·직접입력은 트랜스포트 양옆.</div></div>
+</div>
+
+<!-- B 조절 (핵심) -->
+<div class="shot"><h3>B · 조절<small>라디오 화면 · 핵심</small></h3>
+<div class="phone"><div class="notch"></div><div class="status"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+  <div class="hd"><h2>뼈대</h2><span class="undo">↶ ↷</span><span class="chev">⌂</span></div>
+  <div class="ctx">각 · 세로+받침 · <b>첫닿밑선</b></div>
+  <div class="glyph"><span class="g">각</span><span class="rail ghost" style="top:22%"></span><span class="rail" style="top:52%"></span><span class="rail ghost" style="top:66%"></span></div>
+  <div class="big"><span class="z">0</span>512<small>u</small><span class="d">Δ −16 · 프리셋 528</span></div>
+  <div class="band"><span class="on">이 층</span><span>이 자모</span><span>이 글자</span><span class="n">· 4,617자</span></div>
+  <div class="dial">
+    <div class="arc"></div><div class="ticks"></div><div class="ticksBig"></div>
+    <div class="nums"><span>480</span><span>500</span><span>520</span><span>540</span><span>560</span></div>
+    <div class="base"></div><div class="needle"></div><div class="thumb"></div>
+    <div class="hint">좌우로 돌리기 · 8u 스냅</div>
+  </div>
+  <div class="transport"><span class="tb">◀</span><span class="tb main hot">확인</span><span class="tb">▶</span></div>
+  <div class="dots"><i></i><i class="on"></i><i></i></div><div class="home"></div>
+</div>
+<div class="cap"><div><b>2</b>글자 하나, 활성 기준선만 주황. 나머지 선은 점선으로 흐리게.</div><div><b>3</b>큰 숫자 = 라디오 주파수. Δ와 프리셋값은 한 줄.</div><div><b>4</b>밴드 토글 = 펜스. FM/AM 자리. 영향 수는 옆에 작게.</div><div><b>5</b>◀ ▶ = 이전·다음 기준선. 순서대로 훑음. 확인 = 적용.</div></div>
+</div>
+
+<!-- C 자소 점 -->
+<div class="shot"><h3>C · 같은 컨트롤러 · 자소 점<small>2D는 축 토글</small></h3>
+<div class="phone"><div class="notch"></div><div class="status"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+  <div class="hd"><h2>자소</h2><span class="undo">↶ ↷</span><span class="chev">⌂</span></div>
+  <div class="ctx">ㄱ 원형 · 1번 획 · <b>끝점</b></div>
+  <div class="glyph"><span class="g">ㄱ</span><span class="pt" style="left:63%;top:24%"></span><span class="axis" style="left:63%;top:8%;width:1.5px;height:32%;transform:translateX(-50%)"></span></div>
+  <div class="big">812<small>u</small><span class="d">y · Δ +4 · x 742</span></div>
+  <div class="band"><span class="on">이 자모</span><span>이 조합</span><span class="n">· 1,482자</span></div>
+  <div class="dial">
+    <div class="arc"></div><div class="ticks"></div><div class="ticksBig"></div>
+    <div class="nums"><span>780</span><span>800</span><span>820</span><span>840</span><span>860</span></div>
+    <div class="needle"></div><div class="thumb"></div>
+    <div class="axis"><span>x</span><span class="on">y</span></div>
+    <div class="hint">좌우로 돌리기 · 4u 스냅</div>
+  </div>
+  <div class="transport"><span class="tb">◀</span><span class="tb main hot">확인</span><span class="tb">▶</span></div>
+  <div class="dots"><i></i><i class="on"></i><i></i></div><div class="home"></div>
+</div>
+<div class="cap"><div><b>6</b>점 이동도 같은 다이얼. x/y 축 토글로 번갈아. 패드 없음.</div><div><b>7</b>◀ ▶ = 이전·다음 점. 획 추가·삭제는 여기 없음, 글자 길게 눌러 메뉴.</div></div>
+</div>
+
+<!-- D 인상 -->
+<div class="shot"><h3>D · 같은 컨트롤러 · 인상<small>굵기</small></h3>
+<div class="phone"><div class="notch"></div><div class="status"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+  <div class="hd"><h2>인상</h2><span class="undo">↶ ↷</span><span class="chev">⌂</span></div>
+  <div class="ctx">폰트 전체 · <b>굵기</b></div>
+  <div class="glyph" style="height:150px"><span class="g" style="font-size:44px;font-weight:900;letter-spacing:.04em;line-height:1.3;text-align:center">별을 노래하는<br>마음으로</span></div>
+  <div class="big">86<small>u</small><span class="d">Δ +6 · 프리셋 80</span></div>
+  <div class="band"><span class="on">굵기</span><span>붓촉</span><span>네모꼴</span><span>기울기</span></div>
+  <div class="dial">
+    <div class="arc"></div><div class="ticks"></div><div class="ticksBig"></div>
+    <div class="nums"><span>60</span><span>70</span><span>80</span><span>90</span><span>100</span></div>
+    <div class="base" style="transform:translateX(calc(-50% - 40px))"></div><div class="needle"></div><div class="thumb"></div>
+    <div class="hint">좌우로 돌리기 · 2u 스냅</div>
+  </div>
+  <div class="transport"><span class="tb">◀</span><span class="tb main">출력</span><span class="tb">▶</span></div>
+  <div class="dots"><i class="on"></i><i></i><i></i><i></i></div><div class="home"></div>
+</div>
+<div class="cap"><div><b>8</b>인상도 같은 틀. 밴드 = 네 파라미터. 문장이 글자 자리에.</div><div><b>9</b>가운데 버튼이 "출력". 최단 경로가 화면 안에.</div></div>
+</div>
+
+<!-- E 확인 -->
+<div class="shot"><h3>E · 확인<small>적용 전 영향 한 장</small></h3>
+<div class="phone"><div class="notch"></div><div class="status"><span>9:41</span><span>●●● ᯤ ▮</span></div>
+  <div class="hd"><h2>뼈대</h2><span class="undo">↶ ↷</span><span class="chev">⌂</span></div>
+  <div class="confirm"><div class="n">4,617<small>자</small></div><p>첫닿밑선 −16u · 세로+받침 층</p></div>
+  <div class="mx" id="mx"></div>
+  <div class="legend"><i style="background:var(--hot)"></i>같이 움직임<i style="background:#b9a6e8"></i>예외 11 · 실측 유지</div>
+  <div class="fill"></div>
+  <span class="btn">적용</span><span class="btn ghost">돌아가기</span>
+  <div class="dots"><i></i><i></i><i class="on"></i></div><div class="home"></div>
+</div>
+<div class="cap"><div><b>10</b>"확인" 누르면 이 한 장. 숫자 크게, 격자는 첫닿자 ㄱ 시트만. 적용이 유일한 큰 버튼.</div></div>
+</div>
+
+<div class="side">
+  <h2>이전 hi-fi에서 빠진 것 → 어디로</h2>
+  <div><b>→</b><span>문장 스트립 → A 고르기 화면 전체. 조절 중엔 안 보임.</span></div>
+  <div><b>→</b><span>펜스 칩 3+고급 → 밴드 토글 3. 고급은 설정에.</span></div>
+  <div><b>→</b><span>대표 7자 → 없음. ◀ ▶ 로 기준선 순회, 글자는 A에서 고름.</span></div>
+  <div><b>→</b><span>눈금자·모든 기준선 → 활성 선 하나만. 나머지 점선.</span></div>
+  <div><b>→</b><span>매트릭스 → E 확인 화면 한 장.</span></div>
+  <div><b>→</b><span>스냅 키 1/4/8/16 → 힌트 한 줄. 두 손가락으로 배율.</span></div>
+  <div><b>→</b><span>하단 5탭 → 홈 아이콘 하나 + 점 인디케이터. 탭바 제거.</span></div>
+  <div><b>→</b><span>컨트롤 5종 → 1종(다이얼) + 축 토글. 패드·자·미터 통합.</span></div>
+  <div class="q"><b>?</b><span>탭바 제거가 맞나. 홈 ⌂ 하나 + 점으로 단계 표시 vs 5탭 유지.</span></div>
+  <div class="q"><b>?</b><span>점 이동을 x/y 번갈아 하는 게 패드보다 나은지. 일관성 vs 속도.</span></div>
+  <div class="q"><b>?</b><span>대표 7자 스트립 없애도 되나. 층 바꾸려면 A로 돌아가 다른 글자 골라야 함.</span></div>
+</div>
+
+</div>
+<script>
+  const m=document.getElementById('mx'); let s='';
+  for(let r=0;r<21;r++)for(let c=0;c<28;c++){const v=r<=8&&c>0; let cls=v?'h':''; if(v&&((r*7+c*3)%23===0)) cls='x'; s+=`<i class="${cls}"></i>`}
+  m.innerHTML=s;
+</script>
+</body>
+</html>

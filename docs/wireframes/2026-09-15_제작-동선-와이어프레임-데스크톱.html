@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>제작 동선 와이어프레임 · 2026-09-15</title>
+<style>
+  :root{--ink:#1c1c1c;--dim:#6b6b6b;--line:#c9c9c9;--bg:#f3f3f1;--panel:#fff;--acc:#2f6fed;--accbg:#e6eeff;--note:#fff6c2;--noteline:#e0c86a;--ok:#4caf7d;--warn:#e0a63a;--bad:#e05a5a;--ex:#9b7be0}
+  *{box-sizing:border-box}
+  body{margin:0;background:#dcdcd8;font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:var(--ink);font-size:13px;line-height:1.45}
+  header.top{padding:28px 40px 8px}
+  header.top h1{margin:0 0 4px;font-size:22px}
+  header.top p{margin:0;color:var(--dim)}
+  .board{margin:28px 40px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:20px}
+  .board>h2{margin:0 0 4px;font-size:16px}
+  .board>h2 small{font-weight:400;color:var(--dim);margin-left:8px}
+  .board>p.lead{margin:0 0 14px;color:var(--dim)}
+  .frame{background:var(--panel);border:2px solid #333;border-radius:6px;overflow:hidden;position:relative}
+  .desk{width:1180px;height:720px}
+  .mob{width:390px;height:780px}
+  .row{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap}
+  /* 셸 */
+  .shell{display:grid;grid-template-rows:56px 1fr;height:100%}
+  .bar{display:grid;grid-template-columns:200px 1fr 120px;align-items:center;border-bottom:1px solid var(--line);padding:0 14px;gap:14px}
+  .bar .proj{font-weight:700}.bar .proj small{display:block;font-weight:400;color:var(--dim)}
+  .sentence{display:flex;align-items:center;gap:10px;border:1px dashed var(--line);border-radius:6px;padding:4px 10px;height:42px}
+  .sentence .txt{font-size:24px;letter-spacing:2px;flex:1;white-space:nowrap;overflow:hidden}
+  .sentence .txt b{background:var(--accbg);border-radius:3px;padding:0 2px}
+  .ico{width:30px;height:30px;border:1px solid var(--line);border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:var(--dim);background:#fafafa}
+  .hist{display:flex;gap:6px;justify-content:flex-end}
+  .body{display:grid;grid-template-columns:72px 1fr 300px;height:100%;min-height:0}
+  .tabs{border-right:1px solid var(--line);display:flex;flex-direction:column;padding:10px 6px;gap:6px}
+  .tab{border:1px solid var(--line);border-radius:8px;padding:8px 4px;text-align:center;font-size:11px;color:var(--dim);background:#fafafa}
+  .tab.on{background:var(--accbg);border-color:var(--acc);color:var(--acc);font-weight:700}
+  .tab small{display:block;font-size:9px;color:var(--dim)}
+  .main{padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+  .side{border-left:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:12px}
+  .title{font-size:15px;font-weight:700}.title small{font-weight:400;color:var(--dim);margin-left:8px}
+  .fence{display:flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fafafa}
+  .fence .lbl{color:var(--dim);margin-right:4px}
+  .chip{border:1px solid var(--line);border-radius:14px;padding:3px 10px;background:#fff}
+  .chip.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .chip.adv{border-style:dashed;color:var(--dim)}
+  .canvas{flex:1;border:1px solid var(--line);border-radius:8px;background:repeating-linear-gradient(0deg,#f7f7f7 0 23px,#ededed 23px 24px),repeating-linear-gradient(90deg,transparent 0 23px,#e6e6e6 23px 24px);position:relative;min-height:0}
+  .glyph{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:260px;font-weight:900;line-height:1;color:#222}
+  .rail{position:absolute;left:0;right:0;height:0;border-top:2px solid var(--acc)}
+  .rail span{position:absolute;left:8px;top:-9px;background:var(--acc);color:#fff;font-size:10px;padding:1px 6px;border-radius:3px}
+  .rail i{position:absolute;right:10px;top:-7px;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid var(--acc)}
+  .rail.v{top:0;bottom:0;width:0;height:auto;border-top:0;border-left:2px solid var(--acc)}
+  .rail.v span{top:10px;left:6px}
+  .rail.ghost{border-color:#bbb;border-style:dashed}.rail.ghost span{background:#bbb}
+  .strip{display:flex;gap:8px}
+  .card{border:1px solid var(--line);border-radius:8px;background:#fff;padding:6px;text-align:center;flex:1}
+  .card .g{font-size:34px;font-weight:800;line-height:1.1}
+  .card small{color:var(--dim);font-size:10px}
+  .card.on{border-color:var(--acc);background:var(--accbg)}
+  .panel{border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px}
+  .panel h4{margin:0 0 6px;font-size:12px}
+  .panel .big{font-size:22px;font-weight:800}
+  .kv{display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:12px}
+  .kv span:nth-child(even){text-align:right;font-variant-numeric:tabular-nums}
+  .input{border:1px solid var(--line);border-radius:6px;padding:5px 8px;background:#fff;display:inline-block;min-width:70px;text-align:right}
+  .btn{border:1px solid #333;border-radius:6px;padding:7px 12px;background:#fff;font-weight:700;display:inline-block}
+  .btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+  .btn.ghost{border-color:var(--line);color:var(--dim);font-weight:400}
+  /* 다이얼 */
+  .dials{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .dial{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px;text-align:center}
+  .dial .knob{width:92px;height:92px;border-radius:50%;margin:8px auto;border:6px solid #333;position:relative;background:conic-gradient(#333 0 0);background:radial-gradient(circle,#fff 55%,#eee 56%)}
+  .dial .knob::after{content:"";position:absolute;left:50%;top:6px;width:4px;height:26px;background:#333;transform-origin:50% 40px;transform:translateX(-50%) rotate(var(--r,0deg))}
+  .dial .knob::before{content:"";position:absolute;inset:-14px;border-radius:50%;border:2px dotted #bbb}
+  .dial b{display:block;font-size:13px}.dial small{color:var(--dim)}
+  .dial .val{font-size:18px;font-weight:800;margin-top:4px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:6px}
+  .seg span{padding:3px 8px;font-size:11px;border-right:1px solid var(--line)}.seg span:last-child{border-right:0}.seg span.on{background:var(--accbg);color:var(--acc);font-weight:700}
+  /* 매트릭스 */
+  .mx{border:1px solid var(--line);border-radius:8px;background:#fff;padding:8px;overflow:hidden}
+  .mx .sheets{display:flex;gap:3px;margin-bottom:6px;flex-wrap:wrap}
+  .mx .sheets span{border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px}
+  .mx .sheets span.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .grid{display:grid;gap:2px}
+  .grid i{display:block;aspect-ratio:1;border-radius:2px;background:#e4e4e4;font-style:normal;font-size:8px;line-height:1;text-align:center;overflow:hidden}
+  .grid i.h{background:var(--acc)} .grid i.c{background:var(--ok)} .grid i.w{background:var(--warn)} .grid i.b{background:var(--bad)} .grid i.x{background:var(--ex)} .grid i.d{background:#f0f0f0;color:#ccc}
+  .grid i.dm{opacity:.25}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--dim);margin-top:6px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:3px}
+  /* 주석 */
+  .note{position:absolute;background:var(--note);border:1px solid var(--noteline);border-radius:6px;padding:6px 9px;font-size:11.5px;max-width:230px;box-shadow:0 2px 6px rgba(0,0,0,.12);z-index:5}
+  .note b{display:inline-block;width:18px;height:18px;border-radius:50%;background:#333;color:#fff;text-align:center;line-height:18px;font-size:11px;margin-right:5px}
+  .notes{margin-top:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:8px 24px;font-size:12.5px}
+  .notes div b{display:inline-block;width:18px;height:18px;border-radius:50%;background:#333;color:#fff;text-align:center;line-height:18px;font-size:11px;margin-right:6px}
+  .list{display:flex;flex-direction:column;gap:6px}
+  .li{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:#fff}
+  .li .g{font-size:20px;font-weight:800;width:28px;text-align:center}
+  .li .bar{display:block;height:6px;border-radius:3px;background:#e4e4e4;flex:1;position:relative;border:0;padding:0;grid-template-columns:none}
+  .li .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--ok)}
+  .li.on{border-color:var(--acc);background:var(--accbg)}
+  .banner{border:1px solid var(--warn);background:#fff8e6;border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:12px}
+  .banner .btn{padding:4px 10px}
+  /* 모바일 */
+  .mshell{display:flex;flex-direction:column;height:100%}
+  .mbar{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .msent{margin:8px 12px;font-size:22px;letter-spacing:1px;border:1px dashed var(--line);border-radius:6px;padding:6px 10px;white-space:nowrap;overflow:hidden}
+  .msent b{background:var(--accbg);border-radius:3px;padding:0 2px}
+  .mcanvas{flex:1;margin:0 12px;position:relative}
+  .drawer{border-top:1px solid var(--line);background:#fafafa;padding:10px 12px}
+  .drawer h4{margin:0 0 6px;font-size:12px;display:flex;justify-content:space-between}
+  .ruler{height:64px;border:1px solid #333;border-radius:6px;background:repeating-linear-gradient(90deg,#333 0 1px,transparent 1px 12px) bottom/100% 10px no-repeat,#fff;position:relative}
+  .ruler::after{content:"";position:absolute;left:58%;top:-6px;bottom:-6px;width:3px;background:var(--acc)}
+  .ruler span{position:absolute;left:8px;top:6px;font-size:11px;color:var(--dim)}
+  .mtabs{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--line)}
+  .mtabs span{padding:10px 0;text-align:center;font-size:11px;color:var(--dim)}
+  .mtabs span.on{color:var(--acc);font-weight:700;background:var(--accbg)}
+  .flow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:8px 0 0}
+  .flow span{border:1px solid #333;border-radius:6px;padding:4px 10px;background:#fff;font-weight:700}
+  .flow span.sub{border-color:var(--line);color:var(--dim);font-weight:400}
+  .flow em{font-style:normal;color:var(--dim)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>프리셋 → 커스텀 제작 동선 · 확인용 와이어프레임</h1>
+  <p>2026-09-15 · 디자인만 보여주는 더미. 색은 상태 구분용, 실제 시각 스타일 아님. 노란 메모 = 논의 포인트.</p>
+  <div class="flow">
+    <span>0 시작</span><em>→</em><span>1 인상</span><span class="sub">폰트 전체</span><em>→</em><span>2 뼈대</span><span class="sub">이 층</span><em>→</em><span>3 자소</span><span class="sub">이 자모</span><em>→</em><span>4 검수</span><span class="sub">이 글자만</span><em>→</em><span>5 출력</span>
+  </div>
+</header>
+
+<!-- ───────── 0 시작 ───────── -->
+<section class="board">
+  <h2>0 · 시작<small>새 폰트 → 프리셋 → 곧장 문장 화면</small></h2>
+  <p class="lead">빈 캔버스는 절대 안 보여줌. 프리셋 카드 자체가 예시 문장을 그 프리셋으로 렌더.</p>
+  <div class="frame desk" style="height:520px">
+    <div style="padding:40px 60px;display:grid;grid-template-columns:1fr 1fr;gap:40px;height:100%">
+      <div>
+        <div class="title" style="font-size:22px">새 한글 폰트</div>
+        <div style="margin:18px 0 6px;color:var(--dim)">폰트 이름</div>
+        <div class="input" style="width:100%;text-align:left;padding:10px">별빛고딕</div>
+        <div style="margin:22px 0 6px;color:var(--dim)">시작 프리셋</div>
+        <div class="list">
+          <div class="li on" style="padding:12px"><div style="flex:1"><b>기본 고딕</b><br><small style="color:var(--dim)">Noto Sans KR 기준선 기반 · 11,172자</small></div><span class="chip on">선택</span></div>
+          <div class="li" style="padding:12px;opacity:.5"><div style="flex:1"><b>둥근 고딕</b><br><small>준비 중</small></div></div>
+          <div class="li" style="padding:12px;opacity:.5"><div style="flex:1"><b>내 폰트에서 복제</b><br><small>기존 프로젝트를 출발점으로</small></div></div>
+        </div>
+        <div style="margin-top:26px"><span class="btn pri">이 프리셋으로 시작</span> <span class="btn ghost">프로젝트 목록</span></div>
+      </div>
+      <div class="panel" style="display:flex;flex-direction:column;justify-content:center;gap:18px">
+        <div style="font-size:34px;font-weight:700;line-height:1.5">별을 노래하는<br>마음으로 모든<br>죽어가는 것을</div>
+        <div style="font-size:16px;line-height:1.6;color:#333">가나다라마바사 아자차카타파하<br>각곡관광권 꽃봄뜻 흙닭값</div>
+        <small style="color:var(--dim)">프리셋 그대로의 결과. 시작 후 언제든 출력 가능.</small>
+      </div>
+    </div>
+    <div class="note" style="right:24px;top:20px"><b>A</b>프리셋 1종으로 출발. 카드 추가는 나중.</div>
+  </div>
+</section>
+
+<!-- ───────── 셸 해부 ───────── -->
+<section class="board">
+  <h2>공통 셸<small>모든 탭이 공유하는 뼈대</small></h2>
+  <p class="lead">상단 = 문장(피드백 + 진입점). 왼쪽 = 탭(= 범위). 오른쪽 = 속성·정밀 조절. 현행 상단 아이콘 6개는 여기서 흩어짐.</p>
+  <div class="frame desk" style="height:420px">
+    <div class="shell">
+      <div class="bar">
+        <div class="proj">별빛고딕 <small>자동 저장됨 · 3분 전</small></div>
+        <div class="sentence"><span class="ico">🎲</span><span class="ico">⌨</span><div class="txt">별을 노래하는 마음으로 모든 죽어가는 것을</div><span class="ico" title="폰트 전체 텍스트">Aa</span></div>
+        <div class="hist"><span class="ico">↶</span><span class="ico">↷</span><span class="ico">⋯</span></div>
+      </div>
+      <div class="body">
+        <div class="tabs">
+          <div class="tab">홈<small>다음 할 일</small></div>
+          <div class="tab on">뼈대<small>전체·층</small></div>
+          <div class="tab">자소<small>이 자모</small></div>
+          <div class="tab">검수<small>이 글자</small></div>
+          <div class="tab">출력<small>OTF</small></div>
+        </div>
+        <div class="main"><div class="canvas" style="min-height:200px"></div></div>
+        <div class="side"><div class="panel" style="flex:1">속성 · 수치 · 출처</div><div class="panel">정밀 조절 (보조)</div></div>
+      </div>
+    </div>
+    <div class="note" style="left:230px;top:64px"><b>1</b>문장은 항상 위. 글자 누르면 현재 탭의 범위로 편집 진입.</div>
+    <div class="note" style="left:230px;top:118px"><b>2</b>🎲 주사위는 현재 펜스 범위 안 글자로 문장을 뽑음.</div>
+    <div class="note" style="right:150px;top:64px"><b>3</b>Undo/Redo·더보기(출력·프로젝트)만 우상단.</div>
+    <div class="note" style="left:90px;top:300px"><b>4</b>탭 순서 = 작업 순서 = 범위. 홈은 안내만.</div>
+    <div class="note" style="right:24px;top:300px"><b>5</b>데스크톱: 직접 드래그·방향키·숫자가 기본, 패드는 보조 scrubber.</div>
+  </div>
+</section>
+
+<!-- ───────── 1 인상 ───────── -->
+<section class="board">
+  <h2>1 · 뼈대 › 인상<small>펜스 = 폰트 전체 · 다이얼 4개</small></h2>
+  <p class="lead">비전문가 절반의 종착지. 여기서 만족하면 바로 출력. 글로벌 스타일 팝업이 이 화면으로 승격.</p>
+  <div class="frame desk" style="height:620px">
+    <div class="shell">
+      <div class="bar">
+        <div class="proj">별빛고딕 <small>자동 저장됨</small></div>
+        <div class="sentence"><span class="ico">🎲</span><span class="ico">⌨</span><div class="txt" style="font-weight:800">별을 노래하는 마음으로 모든 죽어가는 것을</div></div>
+        <div class="hist"><span class="ico">↶</span><span class="ico">↷</span><span class="ico">⋯</span></div>
+      </div>
+      <div class="body" style="grid-template-columns:72px 1fr">
+        <div class="tabs">
+          <div class="tab">홈</div><div class="tab on">뼈대</div><div class="tab">자소</div><div class="tab">검수</div><div class="tab">출력</div>
+        </div>
+        <div class="main">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="title">인상 잡기 <small>폰트 전체에 적용</small></div>
+            <div class="seg"><span class="on">인상</span><span>기준선</span></div>
+          </div>
+          <div class="panel" style="text-align:center;padding:26px 10px">
+            <div style="font-size:56px;font-weight:900;letter-spacing:4px;line-height:1.2">별을 노래하는</div>
+            <div style="font-size:22px;font-weight:700;margin-top:8px">가나다라마바사 각곡관광권 꽃봄뜻</div>
+          </div>
+          <div class="dials">
+            <div class="dial"><b>굵기</b><small>획 두께</small><div class="knob" style="--r:40deg"></div><div class="val">86 u</div></div>
+            <div class="dial"><b>붓촉</b><small>모양 · 각도</small><div class="knob" style="--r:-25deg;border-radius:40%"></div><div class="val">납작 60% · −25°</div><div class="seg"><span>원형</span><span class="on">납작</span><span>네모</span></div></div>
+            <div class="dial"><b>네모꼴</b><small>가로 × 세로</small><div class="knob" style="--r:0deg;border-radius:14px"></div><div class="val">850 × 850</div></div>
+            <div class="dial"><b>기울기</b><small>slant</small><div class="knob" style="--r:8deg"></div><div class="val">0°</div></div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px"><span class="btn ghost">기본값으로</span><span class="btn">다음 · 기준선 다듬기</span><span class="btn pri">이대로 출력 →</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="note" style="left:330px;top:250px"><b>6</b>다이얼은 실제 값 + 눈금 + 즉시 미리보기. 돌리는 동안 값 표시, 손 떼면 Undo 1건.</div>
+    <div class="note" style="right:24px;top:540px"><b>7</b>출력은 이 단계부터 열림. "3분 폰트" 최단 경로.</div>
+  </div>
+</section>
+
+<!-- ───────── 2 뼈대·기준선 ───────── -->
+<section class="board">
+  <h2>2 · 뼈대 › 기준선<small>펜스 = 이 층 · 자로 밀기</small></h2>
+  <p class="lead">대표 7자 중 하나를 골라 기준선을 민다. 펜스를 먼저 정하고, 영향 글자 수와 위치를 오른쪽 매트릭스에서 먼저 본다. 노토 변화량 모델의 "층 대표값 Δ"가 여기서 바뀜.</p>
+  <div class="frame desk">
+    <div class="shell">
+      <div class="bar">
+        <div class="proj">별빛고딕 <small>자동 저장됨</small></div>
+        <div class="sentence"><span class="ico">🎲</span><span class="ico">⌨</span><div class="txt">강 <b>각</b>진 <b>돌</b>담 <b>밑</b> 작은 <b>꽃</b>이 <b>핀</b>다</div></div>
+        <div class="hist"><span class="ico">↶</span><span class="ico">↷</span><span class="ico">⋯</span></div>
+      </div>
+      <div class="body">
+        <div class="tabs">
+          <div class="tab">홈</div><div class="tab on">뼈대</div><div class="tab">자소</div><div class="tab">검수</div><div class="tab">출력</div>
+        </div>
+        <div class="main">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="title">기준선 다듬기</div>
+            <div class="seg"><span>인상</span><span class="on">기준선</span></div>
+          </div>
+          <div class="fence"><span class="lbl">펜스</span><span class="chip on">이 층 · 세로모음+받침</span><span class="chip">이 자모 · ㄱ</span><span class="chip">이 글자만 · 각</span><span class="chip adv">고급 ▾</span><span style="flex:1"></span><span style="color:var(--dim)">영향 <b style="color:var(--acc)">4,617자</b></span></div>
+          <div class="strip">
+            <div class="card"><div class="g">ㄱ</div><small>단독</small></div>
+            <div class="card"><div class="g">가</div><small>세로</small></div>
+            <div class="card"><div class="g">고</div><small>가로</small></div>
+            <div class="card"><div class="g">과</div><small>혼합</small></div>
+            <div class="card on"><div class="g">각</div><small>세로+받침</small></div>
+            <div class="card"><div class="g">곡</div><small>가로+받침</small></div>
+            <div class="card"><div class="g">곽</div><small>혼합+받침</small></div>
+          </div>
+          <div class="canvas">
+            <div class="glyph">각</div>
+            <div class="rail ghost" style="top:12%"><span>윗선</span></div>
+            <div class="rail" style="top:19%"><span>첫닿윗선 · 812</span><i></i></div>
+            <div class="rail" style="top:49%;border-width:3px"><span>첫닿밑선 · 512 ← 드래그 중</span><i style="background:var(--acc)"></i></div>
+            <div class="rail" style="top:63%"><span>받침윗선 · 372</span><i></i></div>
+            <div class="rail" style="top:88%"><span>받침밑선 · 118</span><i></i></div>
+            <div class="rail v" style="left:64%"><span>기둥선</span><i style="top:auto;bottom:10px;right:auto;left:-7px"></i></div>
+          </div>
+        </div>
+        <div class="side">
+          <div class="panel">
+            <h4>선택 · 첫닿밑선</h4>
+            <div class="kv"><span>값</span><span class="input">512</span><span>프리셋 기준</span><span>528</span><span>변화 Δ</span><span style="color:var(--acc)">−16 u</span><span>출처</span><span>층 대표값</span></div>
+          </div>
+          <div class="mx">
+            <h4 style="margin:0 0 6px">영향 글자 · 세로모음+받침 층</h4>
+            <div class="sheets"><span class="on">ㄱ</span><span>ㄲ</span><span>ㄴ</span><span>ㄷ</span><span>ㄸ</span><span>ㄹ</span><span>ㅁ</span><span>ㅂ</span><span>…</span></div>
+            <div class="grid" id="mx-fence" style="grid-template-columns:repeat(28,1fr)"></div>
+            <div class="legend"><span><i style="background:var(--acc)"></i>같이 움직임</span><span><i style="background:#e4e4e4"></i>영향 없음</span><span><i style="background:var(--ex)"></i>예외 · 실측 유지</span></div>
+          </div>
+          <div class="panel"><h4>정밀 조절</h4><div class="ruler"><span>자 · 위아래로 문지르기</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="note" style="left:330px;top:250px"><b>8</b>펜스 기본 셋. 고급 열면 "홀자 효과 · ㅏ" "받침 효과 · ㄱ" 추가. 초기값은 가장 좁은 것으로 할지 미정.</div>
+    <div class="note" style="left:100px;top:330px"><b>9</b>기준선 = 자. 손잡이 잡고 드래그, 방향키 1u, Shift 10u, 숫자 입력. 사용자 용어(첫닿밑선)만 노출.</div>
+    <div class="note" style="right:330px;top:64px"><b>10</b>주사위가 이 층 글자로 문장을 뽑음. 강조된 글자가 같이 움직임.</div>
+    <div class="note" style="right:24px;top:660px"><b>11</b>매트릭스가 펜스 미리보기. 시트 = 첫닿자, 행 홀자 × 열 받침.</div>
+  </div>
+</section>
+
+<!-- ───────── 3 자소 ───────── -->
+<section class="board">
+  <h2>3 · 자소<small>펜스 = 이 자모 고정 · 원형 편집 → 조합 7카드 자동</small></h2>
+  <p class="lead">현행 워크스페이스 J-01/J-02 구조 유지. 왼쪽에 자소 현황이 붙고 대표 6자가 맨 위. 획·점 편집은 데스크톱 직접 드래그.</p>
+  <div class="frame desk">
+    <div class="shell">
+      <div class="bar">
+        <div class="proj">별빛고딕 <small>자동 저장됨</small></div>
+        <div class="sentence"><span class="ico">🎲</span><span class="ico">⌨</span><div class="txt"><b>가</b>을 <b>강</b>가에 <b>국</b>화 <b>꽃</b> <b>곱</b>게</div></div>
+        <div class="hist"><span class="ico">↶</span><span class="ico">↷</span><span class="ico">⋯</span></div>
+      </div>
+      <div class="body" style="grid-template-columns:72px 190px 1fr 300px">
+        <div class="tabs">
+          <div class="tab">홈</div><div class="tab">뼈대</div><div class="tab on">자소</div><div class="tab">검수</div><div class="tab">출력</div>
+        </div>
+        <div class="side" style="border-left:0;border-right:1px solid var(--line);gap:6px;overflow:hidden">
+          <div class="title" style="font-size:13px">자소 현황 <small>12 / 67</small></div>
+          <div style="font-size:11px;color:var(--dim)">대표 6자</div>
+          <div class="list">
+            <div class="li on"><span class="g">ㄱ</span><span class="bar"><i style="width:70%"></i></span></div>
+            <div class="li"><span class="g">ㅇ</span><span class="bar"><i style="width:100%"></i></span></div>
+            <div class="li"><span class="g">ㅏ</span><span class="bar"><i style="width:100%"></i></span></div>
+            <div class="li"><span class="g">ㅂ</span><span class="bar"><i style="width:30%"></i></span></div>
+            <div class="li"><span class="g">ㅎ</span><span class="bar"><i style="width:0"></i></span></div>
+            <div class="li"><span class="g">ㅙ</span><span class="bar"><i style="width:0"></i></span></div>
+          </div>
+          <div style="font-size:11px;color:var(--dim);margin-top:4px">초성 19 · 중성 21 · 받침 27</div>
+          <div class="list"><div class="li"><span class="g">ㄴ</span><span class="bar"><i style="width:0"></i></span></div><div class="li"><span class="g">ㄷ</span><span class="bar"><i style="width:0"></i></span></div><div class="li" style="color:var(--dim)">…</div></div>
+        </div>
+        <div class="main">
+          <div class="title">초성 ㄱ 원형 <small>이 자모의 모든 조합에 반영</small></div>
+          <div class="fence"><span class="lbl">펜스</span><span class="chip on">이 자모 · ㄱ</span><span class="chip">이 조합만 · 세로+받침</span><span style="flex:1"></span><span style="color:var(--dim)">영향 <b style="color:var(--acc)">1,482자</b></span></div>
+          <div class="canvas">
+            <div class="glyph" style="font-size:300px">ㄱ</div>
+            <span style="position:absolute;left:34%;top:26%;width:12px;height:12px;border:2px solid var(--acc);background:#fff;border-radius:2px"></span>
+            <span style="position:absolute;left:62%;top:26%;width:12px;height:12px;border:2px solid var(--acc);background:var(--acc);border-radius:2px"></span>
+            <span style="position:absolute;left:60%;top:72%;width:12px;height:12px;border:2px solid var(--acc);background:#fff;border-radius:2px"></span>
+            <div style="position:absolute;left:14px;bottom:12px;display:flex;gap:6px"><span class="chip">획 추가</span><span class="chip">곡선</span><span class="chip">연결</span><span class="chip" style="color:var(--bad)">삭제</span></div>
+          </div>
+        </div>
+        <div class="side">
+          <div class="panel"><h4>선택 · 1번 획 끝점</h4><div class="kv"><span>x</span><span class="input">742</span><span>y</span><span class="input">812</span><span>붙은 기준선</span><span>첫닿윗선</span></div></div>
+          <div class="panel">
+            <h4>조합별 결과 · 7</h4>
+            <div class="strip" style="flex-wrap:wrap">
+              <div class="card" style="flex:0 0 30%"><div class="g">ㄱ</div></div><div class="card" style="flex:0 0 30%"><div class="g">가</div></div><div class="card" style="flex:0 0 30%"><div class="g">고</div></div>
+              <div class="card" style="flex:0 0 30%"><div class="g">과</div></div><div class="card" style="flex:0 0 30%;border-color:var(--warn)"><div class="g">각</div><small style="color:var(--warn)">간격 좁음</small></div><div class="card" style="flex:0 0 30%"><div class="g">곡</div></div>
+              <div class="card" style="flex:0 0 30%"><div class="g">곽</div></div>
+            </div>
+          </div>
+          <div class="panel"><h4>정밀 조절</h4><div class="ruler" style="height:80px;background:#fff"><span>패드 · 선택한 점 이동</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="note" style="left:270px;top:150px"><b>12</b>구조 명령(추가·삭제·연결)은 캔버스 안 컨텍스트. 패드에서 분리.</div>
+    <div class="note" style="right:24px;top:440px"><b>13</b>원형 저장하면 7카드 갱신. 문제 카드 누르면 펜스가 "이 조합만"으로.</div>
+  </div>
+</section>
+
+<!-- ───────── 4 검수 ───────── -->
+<section class="board">
+  <h2>4 · 검수<small>펜스 = 이 글자만 · 찾는 곳</small></h2>
+  <p class="lead">현행 문장 보정 + 코퍼스 매트릭스가 합쳐진 화면. 문제 셀 누르면 그 글자 편집. 같은 문제가 반복되면 승격 제안.</p>
+  <div class="frame desk">
+    <div class="shell">
+      <div class="bar">
+        <div class="proj">별빛고딕 <small>자동 저장됨</small></div>
+        <div class="sentence"><span class="ico">🎲</span><span class="ico on" style="background:var(--accbg);border-color:var(--acc)">⌨</span><div class="txt">넓은 <b style="background:#ffe1e1">닭</b>장 옆 <b style="background:#ffe1e1">값</b>진 <b style="background:#fff0d0">흙</b></div><span class="ico">Aa</span></div>
+        <div class="hist"><span class="ico">↶</span><span class="ico">↷</span><span class="ico">⋯</span></div>
+      </div>
+      <div class="body" style="grid-template-columns:72px 1fr 320px">
+        <div class="tabs">
+          <div class="tab">홈</div><div class="tab">뼈대</div><div class="tab">자소</div><div class="tab on">검수</div><div class="tab">출력</div>
+        </div>
+        <div class="main">
+          <div class="banner">⚠ <div style="flex:1"><b>ㄱ 초성 + 세로모음</b> 3글자에서 같은 간격 문제. 자모 단위로 올려서 한 번에 고칠까요?</div><span class="btn">자소 탭에서 ㄱ 열기</span><span class="btn ghost">아니오</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="title">글자 격자 <small>11,172자 · 확인 안 함 8,240 · 문제 17</small></div>
+            <div class="seg"><span class="on">시트 첫닿자</span><span>행 홀자</span><span>열 받침</span></div>
+          </div>
+          <div class="mx" style="flex:1;overflow:hidden">
+            <div class="sheets"><span class="on">ㄱ</span><span>ㄲ</span><span>ㄴ</span><span>ㄷ</span><span>ㄸ</span><span>ㄹ</span><span>ㅁ</span><span>ㅂ</span><span>ㅃ</span><span>ㅅ</span><span>ㅆ</span><span>ㅇ</span><span>ㅈ</span><span>ㅉ</span><span>ㅊ</span><span>ㅋ</span><span>ㅌ</span><span>ㅍ</span><span>ㅎ</span></div>
+            <div class="grid" id="mx-review" style="grid-template-columns:repeat(28,1fr)"></div>
+            <div class="legend"><span><i style="background:#e4e4e4"></i>기본값 그대로</span><span><i style="background:var(--acc)"></i>내가 바꿈</span><span><i style="background:var(--ok)"></i>확인 끝</span><span><i style="background:var(--warn)"></i>이 글자만 보정</span><span><i style="background:var(--bad)"></i>충돌·간격</span><span><i style="background:var(--ex)"></i>자동 예외</span></div>
+          </div>
+        </div>
+        <div class="side">
+          <div class="panel"><h4>문제 목록 · 17</h4><div class="list"><div class="li" style="border-color:var(--bad)"><span class="g">닭</span><span style="flex:1">받침 ㄺ 와 ㅏ 겹침</span></div><div class="li" style="border-color:var(--bad)"><span class="g">값</span><span style="flex:1">받침 ㅄ 잉크 간격 2u</span></div><div class="li" style="border-color:var(--warn)"><span class="g">흙</span><span style="flex:1">ㅡ 보선 짧음</span></div><div class="li" style="color:var(--dim)">…</div></div></div>
+          <div class="panel"><h4>선택 · 닭</h4><div class="canvas" style="height:150px"><div class="glyph" style="font-size:110px">닭</div></div><div style="margin-top:8px;display:flex;gap:6px"><span class="btn pri" style="flex:1;text-align:center">이 글자만 보정</span><span class="btn ghost">확인 끝</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="note" style="left:100px;top:64px"><b>14</b>직접 입력 모드. 문제 글자는 문장에서도 색으로 표시.</div>
+    <div class="note" style="left:100px;top:150px"><b>15</b>승격 = 좁은 범위에서 발견한 걸 위 단계로. 명세 1.1 원칙.</div>
+    <div class="note" style="right:24px;top:360px"><b>16</b>셀 색 = 제작 상태. 랩의 추출·승인 상태와 다른 함수.</div>
+  </div>
+</section>
+
+<!-- ───────── 5 출력 ───────── -->
+<section class="board">
+  <h2>5 · 출력<small>테스트 OTF → 설치 확인 → 완성 OTF</small></h2>
+  <div class="frame desk" style="height:420px">
+    <div class="shell">
+      <div class="bar">
+        <div class="proj">별빛고딕 <small>자동 저장됨</small></div>
+        <div class="sentence"><span class="ico">🎲</span><span class="ico">⌨</span><div class="txt">별을 노래하는 마음으로 모든 죽어가는 것을</div></div>
+        <div class="hist"><span class="ico">↶</span><span class="ico">↷</span><span class="ico">⋯</span></div>
+      </div>
+      <div class="body" style="grid-template-columns:72px 1fr">
+        <div class="tabs">
+          <div class="tab">홈</div><div class="tab">뼈대</div><div class="tab">자소</div><div class="tab">검수</div><div class="tab on">출력</div>
+        </div>
+        <div class="main" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="panel"><h4 style="font-size:15px">테스트 OTF</h4><p style="color:var(--dim)">지금 상태 그대로. 설치해서 다른 앱에서 확인용. 몇 번이고 출력.</p><div class="kv"><span>글자 수</span><span>11,172</span><span>포함</span><span>한글 · 기본 문장부호</span></div><div style="margin-top:14px"><span class="btn pri">테스트 OTF 내려받기</span></div></div>
+          <div class="panel" style="border-color:var(--warn)"><h4 style="font-size:15px">완성 OTF</h4><p style="color:var(--dim)">검수 게이트 통과 후.</p><div class="kv"><span style="color:var(--bad)">충돌·간격 문제</span><span style="color:var(--bad)">17</span><span>확인 안 한 글자</span><span>8,240</span><span>자동 예외</span><span>312</span></div><div style="margin-top:14px"><span class="btn ghost">문제 17개 먼저 보기 →</span> <span class="btn" style="opacity:.4">완성 OTF</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="note" style="right:24px;top:300px"><b>17</b>"확인 안 한 글자"는 막지 않음. 충돌만 게이트. 어디까지 막을지 논의.</div>
+  </div>
+</section>
+
+<!-- ───────── 모바일 ───────── -->
+<section class="board">
+  <h2>모바일 · 뼈대 › 기준선<small>같은 구조, 드로어로 접힘</small></h2>
+  <p class="lead">위→아래: 헤더 · 문장 · 펜스 · 캔버스 · 정밀 조절 드로어(자 모드) · 5탭. 매트릭스는 드로어 확장 시 시트 하나만.</p>
+  <div class="row">
+    <div class="frame mob">
+      <div class="mshell">
+        <div class="mbar"><b>별빛고딕</b><span><span class="ico">↶</span> <span class="ico">↷</span> <span class="ico">⋯</span></span></div>
+        <div class="msent">강 <b>각</b>진 <b>돌</b>담 <b>밑</b> 작은 <b>꽃</b> 🎲</div>
+        <div class="fence" style="margin:0 12px 8px;font-size:12px"><span class="chip on">이 층</span><span class="chip">이 자모</span><span class="chip">이 글자</span><span style="flex:1"></span><span style="color:var(--dim)">4,617자</span></div>
+        <div class="strip" style="margin:0 12px 8px"><div class="card" style="padding:3px"><div class="g" style="font-size:20px">가</div></div><div class="card" style="padding:3px"><div class="g" style="font-size:20px">고</div></div><div class="card on" style="padding:3px"><div class="g" style="font-size:20px">각</div></div><div class="card" style="padding:3px"><div class="g" style="font-size:20px">곡</div></div><div class="card" style="padding:3px"><div class="g" style="font-size:20px">곽</div></div></div>
+        <div class="canvas mcanvas">
+          <div class="glyph" style="font-size:170px">각</div>
+          <div class="rail" style="top:20%"><span>첫닿윗선</span><i></i></div>
+          <div class="rail" style="top:50%;border-width:3px"><span>첫닿밑선 · 512</span><i style="background:var(--acc)"></i></div>
+          <div class="rail" style="top:64%"><span>받침윗선</span><i></i></div>
+          <div class="rail" style="top:88%"><span>받침밑선</span><i></i></div>
+        </div>
+        <div class="drawer"><h4><span>정밀 조절 · 첫닿밑선</span><span>512 u · Δ −16</span></h4><div class="ruler"><span>자 · 위아래로 문지르기 · 스냅 8u</span></div></div>
+        <div class="mtabs"><span>홈</span><span class="on">뼈대</span><span>자소</span><span>검수</span><span>출력</span></div>
+      </div>
+      <div class="note" style="left:60px;top:560px"><b>18</b>드로어가 "자" 모드. 점 선택하면 "패드", 인상 화면에선 "다이얼"로 바뀜. 도구별 물성 다르게.</div>
+    </div>
+    <div style="flex:1;min-width:300px" class="notes">
+      <div><b>A</b>프리셋은 1종으로 출발</div>
+      <div><b>1</b>문장 = 피드백 + 진입점, 모든 탭 공통</div>
+      <div><b>2</b>주사위 = 현재 펜스 범위 안에서 뽑기</div>
+      <div><b>3</b>Undo/Redo·더보기만 우상단</div>
+      <div><b>4</b>탭 = 작업 순서 = 범위</div>
+      <div><b>5</b>데스크톱 직접 조작 기본, 패드 보조</div>
+      <div><b>6</b>다이얼은 실제 값·눈금·즉시 반영·Undo 1건</div>
+      <div><b>7</b>인상 단계부터 출력 가능</div>
+      <div><b>8</b>펜스 기본 셋 + 고급 둘. 초기값 미정</div>
+      <div><b>9</b>기준선 = 자. 드래그·방향키·숫자</div>
+      <div><b>10</b>강조된 글자가 같이 움직임</div>
+      <div><b>11</b>매트릭스 = 펜스 미리보기</div>
+      <div><b>12</b>구조 명령은 캔버스 컨텍스트, 패드와 분리</div>
+      <div><b>13</b>원형 저장 → 7카드 갱신, 문제 카드 → 이 조합만</div>
+      <div><b>14</b>문장에서도 문제 글자 색 표시</div>
+      <div><b>15</b>승격 제안 = 좁은 범위 → 위 단계</div>
+      <div><b>16</b>셀 색 = 제작 상태, 랩 상태와 분리</div>
+      <div><b>17</b>출력 게이트 범위 논의 필요</div>
+      <div><b>18</b>드로어 = 대상별 도구(자·패드·다이얼)</div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // 매트릭스 더미: 행 홀자 21 × 열 받침 28 (없음 + 27)
+  function fill(id, mode){
+    const el=document.getElementById(id); if(!el) return;
+    const rows=21, cols=28; let s='';
+    for(let r=0;r<rows;r++){for(let c=0;c<cols;c++){
+      let cls='';
+      if(mode==='fence'){ // 세로모음(0..8) × 받침 있음(1..27) = 같이 움직임
+        const vertical=r<=8, hasFinal=c>0;
+        cls = vertical&&hasFinal ? 'h' : 'dm';
+        if(vertical&&hasFinal&&((r*7+c*3)%23===0)) cls='x';
+      } else {
+        const k=(r*31+c*17)%100;
+        cls = k<58?'':k<70?'c':k<84?'h':k<90?'w':k<94?'x':'b';
+        if(c===0&&r>8&&r<14) cls='d';
+      }
+      s+='<i class="'+cls+'"></i>';
+    }}
+    el.innerHTML=s;
+  }
+  fill('mx-fence','fence'); fill('mx-review','review');
+</script>
+</body>
+</html>

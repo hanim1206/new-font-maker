@@ -1,0 +1,2083 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>모바일 통합 편집 v3</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="모바일 통합 편집 v3" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;title&gt;모바일 통합 편집 v3&lt;/title&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(
+    --background,
+    var(--color-background-primary, light-dark(rgb(255 255 255), rgb(24 24 24)))
+  ) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: var(
+    --color-background-primary,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --popover: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255), rgb(45 45 45))
+  );
+  --popover-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --primary: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --primary-foreground: var(
+    --color-text-inverse,
+    light-dark(rgb(255 255 255), rgb(13 13 13))
+  );
+  --secondary: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+  );
+  --secondary-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: var(
+    --color-text-secondary,
+    light-dark(rgb(26 28 31 / 49.4%), rgb(255 255 255 / 49.8%))
+  );
+  --accent: var(
+    --color-background-info,
+    light-dark(rgb(229 242 255), rgb(13 39 63))
+  );
+  --accent-foreground: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --destructive: var(
+    --color-text-warning,
+    light-dark(rgb(226 85 7), rgb(255 133 73))
+  );
+  --border: var(
+    --color-border-secondary,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+  --input: var(
+    --color-border-primary,
+    light-dark(
+      rgb(26 28 31 / 11.8%),
+      color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+    )
+  );
+  --ring: var(
+    --color-ring-primary,
+    light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
+  );
+  --font-size-base: var(--font-text-md-size, 14px);
+  --blue: light-dark(rgb(51 156 255), rgb(51 156 255));
+  --orange: light-dark(rgb(226 85 7), rgb(251 106 34));
+  --green: light-dark(rgb(0 162 64), rgb(64 201 119));
+  --red: light-dark(rgb(224 46 42), rgb(255 103 100));
+  --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
+  --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --radius: var(--border-radius-lg, 12.5px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 17 17&#x27;%3E%3Cpath d=&#x27;M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z&#x27;/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  /* Preserve MCP aliases for older inline renderers without creating :root cycles. */
+  --color-background-primary: var(
+    --background,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --color-text-primary: var(
+    --foreground,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --color-border-secondary: var(
+    --border,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+
+  margin: 0;
+  padding: 5px;
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: superellipse(1.5);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: superellipse(1.5);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card, .progress) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress {
+  display: flex;
+  height: 6px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+}
+
+.progress-bar {
+  height: 100%;
+  flex-shrink: 0;
+  border: 0;
+  background: var(--viz-series-1);
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: superellipse(1.5);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: superellipse(1.5);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+  [aria-pressed=&quot;true&quot;],
+  [aria-selected=&quot;true&quot;],
+  .is-selected
+) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+/* Model-authored chart rules can otherwise stretch icons after these styles load. */
+svg.lucide {
+  display: block;
+  width: 16px !important;
+  height: 16px !important;
+  flex: none;
+  margin: 0 !important;
+  stroke-width: 1.6;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div id=&quot;font-maker-mobile-v3&quot;&gt;
+  &lt;div class=&quot;viz-controls&quot; aria-label=&quot;와이어프레임 단계&quot;&gt;
+    &lt;button class=&quot;btn&quot; type=&quot;button&quot; data-step=&quot;0&quot; aria-pressed=&quot;true&quot;&gt;1 자소 선택&lt;/button&gt;
+    &lt;button class=&quot;btn&quot; type=&quot;button&quot; data-step=&quot;1&quot; aria-pressed=&quot;false&quot;&gt;2 빠른 탐색&lt;/button&gt;
+    &lt;button class=&quot;btn&quot; type=&quot;button&quot; data-step=&quot;2&quot; aria-pressed=&quot;false&quot;&gt;3 획 편집&lt;/button&gt;
+    &lt;button class=&quot;btn&quot; type=&quot;button&quot; data-step=&quot;3&quot; aria-pressed=&quot;false&quot;&gt;4 획 스타일&lt;/button&gt;
+    &lt;button class=&quot;btn&quot; type=&quot;button&quot; data-step=&quot;4&quot; aria-pressed=&quot;false&quot;&gt;5 글자 배치&lt;/button&gt;
+    &lt;button class=&quot;btn&quot; type=&quot;button&quot; data-step=&quot;5&quot; aria-pressed=&quot;false&quot;&gt;6 히스토리&lt;/button&gt;
+    &lt;button class=&quot;btn&quot; type=&quot;button&quot; data-step=&quot;6&quot; aria-pressed=&quot;false&quot;&gt;7 복원 비교&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;section class=&quot;fmv3-phone&quot; aria-label=&quot;화이트 테마 모바일 폰트 편집기 와이어프레임&quot;&gt;
+    &lt;div class=&quot;fmv3-screen&quot;&gt;&lt;/div&gt;
+  &lt;/section&gt;
+&lt;/div&gt;
+
+&lt;style&gt;
+  #font-maker-mobile-v3 {
+    width: 100%;
+    display: grid;
+    justify-items: center;
+    gap: 14px;
+  }
+
+  #font-maker-mobile-v3 &gt; .viz-controls {
+    width: min(736px, 100%);
+    justify-content: center;
+  }
+
+  #font-maker-mobile-v3 .fmv3-phone {
+    width: min(390px, 100%);
+    max-width: calc(100% - 2px);
+    min-height: 760px;
+    box-sizing: border-box;
+    overflow: hidden;
+    background: #f7f8fa;
+    color: #181b1f;
+    border: 1px solid #d9dfe6;
+    border-radius: 28px;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+    font-family: Pretendard, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;
+  }
+
+  #font-maker-mobile-v3 .fmv3-screen {
+    min-height: 760px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #font-maker-mobile-v3 .fmv3-appbar {
+    height: 54px;
+    flex: 0 0 54px;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 8px;
+    background: #ffffff;
+    border-bottom: 1px solid #ebeff3;
+  }
+
+  #font-maker-mobile-v3 .fmv3-appbar strong {
+    text-align: center;
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  #font-maker-mobile-v3 .fmv3-icon-button,
+  #font-maker-mobile-v3 .fmv3-text-button,
+  #font-maker-mobile-v3 .fmv3-mode-button,
+  #font-maker-mobile-v3 .fmv3-segment button,
+  #font-maker-mobile-v3 .fmv3-history-item,
+  #font-maker-mobile-v3 .fmv3-action {
+    border: 0;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  #font-maker-mobile-v3 .fmv3-icon-button {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    color: #414852;
+    border-radius: 10px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-icon-button:hover,
+  #font-maker-mobile-v3 .fmv3-icon-button:focus-visible {
+    background: #f0f3f6;
+  }
+
+  #font-maker-mobile-v3 .fmv3-icon-button svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-editor-head {
+    padding: 13px 16px 10px;
+    background: #ffffff;
+  }
+
+  #font-maker-mobile-v3 .fmv3-editor-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-editor-title strong {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  #font-maker-mobile-v3 .fmv3-active-label {
+    color: #2f6fed;
+    font-size: 12px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-mode-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-mode-button {
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: 10px;
+    background: #f7f8fa;
+    color: #414852;
+    border: 1px solid #e1e6ec;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  #font-maker-mobile-v3 .fmv3-mode-button[aria-pressed=&quot;true&quot;] {
+    background: #e8f0ff;
+    color: #2358c9;
+    border-color: #bcd0f8;
+  }
+
+  #font-maker-mobile-v3 .fmv3-workspace {
+    position: relative;
+    flex: 1;
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 20px 16px;
+    overflow: hidden;
+  }
+
+  #font-maker-mobile-v3 .fmv3-carousel {
+    display: grid;
+    grid-template-columns: 68px minmax(0, 1fr) 68px;
+    align-items: center;
+    gap: 8px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-side-glyph {
+    color: #a5adb7;
+    font-size: 42px;
+    text-align: center;
+    user-select: none;
+  }
+
+  #font-maker-mobile-v3 .fmv3-glyph-stage {
+    position: relative;
+    height: 222px;
+    display: grid;
+    place-items: center;
+    background: #ffffff;
+    border: 1px solid #e4e8ed;
+    border-radius: 22px;
+    box-shadow: 0 10px 32px rgba(15, 23, 42, 0.08);
+  }
+
+  #font-maker-mobile-v3 .fmv3-composed-glyph {
+    position: relative;
+    width: 120px;
+    height: 158px;
+    color: #24282e;
+  }
+
+  #font-maker-mobile-v3 .fmv3-glyph-part {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    font-size: 68px;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  #font-maker-mobile-v3 .fmv3-glyph-part.initial {
+    top: 0;
+    left: 25px;
+    width: 70px;
+    height: 60px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-glyph-part.medial {
+    top: 47px;
+    left: 13px;
+    width: 94px;
+    height: 54px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-glyph-part.final {
+    top: 96px;
+    left: 24px;
+    width: 72px;
+    height: 62px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-glyph-part.is-active {
+    color: #2f6fed;
+    background: #e8f0ff;
+    border-radius: 12px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-glyph-part.is-selected {
+    color: #2f6fed;
+    background: rgba(47, 111, 237, 0.08);
+    border: 2px solid #2f6fed;
+    border-radius: 12px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-point {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 3px solid #2f6fed;
+  }
+
+  #font-maker-mobile-v3 .fmv3-carousel-hint {
+    margin-top: 12px;
+    color: #707883;
+    font-size: 12px;
+    text-align: center;
+  }
+
+  #font-maker-mobile-v3 .fmv3-fast-picker {
+    position: absolute;
+    z-index: 5;
+    left: 18px;
+    right: 18px;
+    top: 18px;
+    padding: 10px;
+    background: #ffffff;
+    border: 1px solid #d9dfe6;
+    border-radius: 16px;
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.16);
+  }
+
+  #font-maker-mobile-v3 .fmv3-fast-picker small {
+    display: block;
+    margin: 0 4px 8px;
+    color: #707883;
+    font-size: 11px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-fast-row {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-fast-row span {
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 9px;
+    color: #59616c;
+    font-size: 17px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-fast-row span.is-current {
+    background: #2f6fed;
+    color: #ffffff;
+  }
+
+  #font-maker-mobile-v3 .fmv3-drawer {
+    flex: 0 0 auto;
+    padding: 8px 16px 18px;
+    background: #ffffff;
+    border-top: 1px solid #e7ebef;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -8px 28px rgba(15, 23, 42, 0.06);
+  }
+
+  #font-maker-mobile-v3 .fmv3-grabber {
+    width: 40px;
+    height: 4px;
+    margin: 0 auto 12px;
+    background: #d6dbe2;
+    border-radius: 999px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-drawer-head {
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-drawer-head strong {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  #font-maker-mobile-v3 .fmv3-drawer-head span,
+  #font-maker-mobile-v3 .fmv3-drawer-head button {
+    color: #707883;
+    font-size: 12px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-text-button {
+    min-height: 36px;
+    padding: 0 8px;
+    background: transparent;
+    color: #2f6fed !important;
+    font-weight: 500;
+  }
+
+  #font-maker-mobile-v3 .fmv3-scope {
+    margin: 2px 0 12px;
+    padding: 9px 11px;
+    background: #f0f5ff;
+    color: #2358c9;
+    border-radius: 10px;
+    font-size: 12px;
+    text-align: center;
+  }
+
+  #font-maker-mobile-v3 .fmv3-trackpad {
+    position: relative;
+    height: 132px;
+    overflow: hidden;
+    background: #f5f7f9;
+    border: 1px solid #dfe4ea;
+    border-radius: 16px;
+    touch-action: none;
+  }
+
+  #font-maker-mobile-v3 .fmv3-trackpad::before,
+  #font-maker-mobile-v3 .fmv3-trackpad::after {
+    content: &quot;&quot;;
+    position: absolute;
+    pointer-events: none;
+  }
+
+  #font-maker-mobile-v3 .fmv3-trackpad.xy::before {
+    inset: 0 36%;
+    background: linear-gradient(to bottom, transparent, rgba(47, 111, 237, 0.13), transparent);
+  }
+
+  #font-maker-mobile-v3 .fmv3-trackpad.xy::after {
+    inset: 36% 0;
+    background: linear-gradient(to right, transparent, rgba(47, 111, 237, 0.13), transparent);
+  }
+
+  #font-maker-mobile-v3 .fmv3-trackpad.x::after {
+    inset: 33% 0;
+    background: linear-gradient(to right, transparent, rgba(47, 111, 237, 0.18), transparent);
+  }
+
+  #font-maker-mobile-v3 .fmv3-trackpad-grid {
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(#e9edf1 1px, transparent 1px), linear-gradient(90deg, #e9edf1 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.6;
+  }
+
+  #font-maker-mobile-v3 .fmv3-touch-point {
+    position: absolute;
+    z-index: 2;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 48px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #2f6fed;
+    color: #ffffff;
+    box-shadow: 0 8px 22px rgba(47, 111, 237, 0.24);
+    font-size: 18px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-locked-axis {
+    position: absolute;
+    z-index: 2;
+    right: 10px;
+    top: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #8b939d;
+    font-size: 11px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-track-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 7px;
+    margin-top: 10px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-track-actions button {
+    min-height: 38px;
+    border: 1px solid #dfe4ea;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #59616c;
+    font: inherit;
+    font-size: 12px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-track-actions button[aria-pressed=&quot;true&quot;] {
+    background: #e8f0ff;
+    color: #2358c9;
+    border-color: #bcd0f8;
+  }
+
+  #font-maker-mobile-v3 .fmv3-segment {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    padding: 4px;
+    background: #f0f3f6;
+    border-radius: 12px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-segment button {
+    min-height: 40px;
+    border-radius: 9px;
+    background: transparent;
+    color: #707883;
+    font-size: 13px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-segment button[aria-pressed=&quot;true&quot;] {
+    background: #ffffff;
+    color: #181b1f;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+  }
+
+  #font-maker-mobile-v3 .fmv3-style-controls {
+    display: grid;
+    gap: 14px;
+    margin-top: 14px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-control-head {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    color: #414852;
+    font-size: 12px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-control-head output {
+    color: #2f6fed;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #font-maker-mobile-v3 .fmv3-range {
+    width: 100%;
+    accent-color: #2f6fed;
+  }
+
+  #font-maker-mobile-v3 .fmv3-drawer-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-action {
+    min-height: 42px;
+    border-radius: 11px;
+    background: #f0f3f6;
+    color: #414852;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  #font-maker-mobile-v3 .fmv3-action.primary {
+    background: #2f6fed;
+    color: #ffffff;
+  }
+
+  #font-maker-mobile-v3 .fmv3-layout-workspace {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-layout-canvas {
+    position: relative;
+    height: 270px;
+    padding: 18px;
+    background: #ffffff;
+    border: 1px solid #e4e8ed;
+    border-radius: 22px;
+    box-shadow: 0 10px 32px rgba(15, 23, 42, 0.07);
+  }
+
+  #font-maker-mobile-v3 .fmv3-layout-box {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    color: #707883;
+    background: #f7f8fa;
+    border: 1px solid #d9dfe6;
+    border-radius: 12px;
+    font-size: 13px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-layout-box.initial {
+    left: 22px;
+    top: 28px;
+    width: calc(50% - 24px);
+    height: 142px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-layout-box.medial {
+    right: 22px;
+    top: 28px;
+    width: calc(50% - 24px);
+    height: 142px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-layout-box.final {
+    left: 22px;
+    right: 22px;
+    bottom: 24px;
+    height: 60px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-split-line {
+    position: absolute;
+    z-index: 2;
+    left: 50%;
+    top: 37px;
+    height: 124px;
+    border-left: 3px solid #2f6fed;
+  }
+
+  #font-maker-mobile-v3 .fmv3-split-line::after {
+    content: &quot;↔&quot;;
+    position: absolute;
+    left: -18px;
+    top: 45px;
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #2f6fed;
+    color: #ffffff;
+  }
+
+  #font-maker-mobile-v3 .fmv3-representatives {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-top: 12px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-representatives span {
+    height: 44px;
+    display: grid;
+    place-items: center;
+    background: #ffffff;
+    border: 1px solid #e4e8ed;
+    border-radius: 10px;
+    font-size: 21px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-full-page {
+    flex: 1;
+    padding: 18px 16px 24px;
+    background: #f7f8fa;
+  }
+
+  #font-maker-mobile-v3 .fmv3-full-page &gt; h2 {
+    margin: 0 0 4px;
+    font-size: 18px;
+    font-weight: 500;
+  }
+
+  #font-maker-mobile-v3 .fmv3-full-page &gt; p {
+    margin: 0 0 18px;
+    color: #707883;
+    font-size: 12px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-history-list {
+    overflow: hidden;
+    background: #ffffff;
+    border: 1px solid #e4e8ed;
+    border-radius: 16px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-history-item {
+    width: 100%;
+    min-height: 78px;
+    display: grid;
+    gap: 5px;
+    padding: 13px 14px;
+    text-align: left;
+    background: #ffffff;
+    color: #181b1f;
+    border-bottom: 1px solid #ebeff3;
+  }
+
+  #font-maker-mobile-v3 .fmv3-history-item:last-child {
+    border-bottom: 0;
+  }
+
+  #font-maker-mobile-v3 .fmv3-history-item small,
+  #font-maker-mobile-v3 .fmv3-history-item span {
+    color: #707883;
+    font-size: 11px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-history-item strong {
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  #font-maker-mobile-v3 .fmv3-compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-snapshot {
+    min-height: 210px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: #ffffff;
+    border: 1px solid #e4e8ed;
+    border-radius: 16px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-snapshot.is-current {
+    border-color: #8fb1f4;
+    box-shadow: inset 0 0 0 1px #8fb1f4;
+  }
+
+  #font-maker-mobile-v3 .fmv3-snapshot small {
+    color: #707883;
+    font-size: 11px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-snapshot span {
+    font-size: 68px;
+  }
+
+  #font-maker-mobile-v3 .fmv3-snapshot strong {
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  #font-maker-mobile-v3 .fmv3-compare-meta {
+    display: grid;
+    gap: 7px;
+    margin: 14px 0;
+    padding: 13px 14px;
+    background: #ffffff;
+    border-radius: 14px;
+    color: #59616c;
+    font-size: 12px;
+  }
+
+  #font-maker-mobile-v3 button:focus-visible,
+  #font-maker-mobile-v3 input:focus-visible {
+    outline: 2px solid #2f6fed;
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 420px) {
+    #font-maker-mobile-v3 .fmv3-phone {
+      width: calc(100vw - 10px);
+      max-width: 390px;
+    }
+
+    #font-maker-mobile-v3 .fmv3-phone,
+    #font-maker-mobile-v3 .fmv3-screen {
+      min-height: 720px;
+      border-radius: 20px;
+    }
+
+    #font-maker-mobile-v3 .fmv3-workspace {
+      padding-inline: 12px;
+    }
+
+    #font-maker-mobile-v3 .fmv3-carousel {
+      grid-template-columns: 52px minmax(0, 1fr) 52px;
+    }
+
+    #font-maker-mobile-v3 .fmv3-side-glyph {
+      font-size: 34px;
+    }
+
+    #font-maker-mobile-v3 .fmv3-glyph-stage {
+      height: 205px;
+    }
+  }
+&lt;/style&gt;
+
+&lt;script&gt;
+  (() =&gt; {
+    const root = document.getElementById(&#x27;font-maker-mobile-v3&#x27;);
+    const screen = root.querySelector(&#x27;.fmv3-screen&#x27;);
+    let step = 0;
+    let flatness = 60;
+    let angle = 25;
+
+    const icon = (name) =&gt; `&lt;i data-lucide=&quot;${name}&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;`;
+
+    const appbar = (title, backAction = &#x27;editor&#x27;, showHistory = true) =&gt; `
+      &lt;header class=&quot;fmv3-appbar&quot;&gt;
+        &lt;button class=&quot;fmv3-icon-button&quot; type=&quot;button&quot; data-action=&quot;${backAction}&quot; aria-label=&quot;뒤로 가기&quot;&gt;${icon(&#x27;chevron-left&#x27;)}&lt;/button&gt;
+        &lt;strong&gt;${title}&lt;/strong&gt;
+        ${showHistory
+          ? `&lt;button class=&quot;fmv3-icon-button&quot; type=&quot;button&quot; data-action=&quot;history&quot; aria-label=&quot;편집 히스토리&quot;&gt;${icon(&#x27;history&#x27;)}&lt;/button&gt;`
+          : &#x27;&lt;span&gt;&lt;/span&gt;&#x27;}
+      &lt;/header&gt;`;
+
+    const modeHeader = (active = &#x27;&#x27;) =&gt; `
+      &lt;div class=&quot;fmv3-editor-head&quot;&gt;
+        &lt;div class=&quot;fmv3-editor-title&quot;&gt;
+          &lt;strong&gt;곰 편집&lt;/strong&gt;
+          &lt;span class=&quot;fmv3-active-label&quot;&gt;중성 ㅗ 활성&lt;/span&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;fmv3-mode-row&quot;&gt;
+          &lt;button class=&quot;fmv3-mode-button&quot; type=&quot;button&quot; data-action=&quot;style&quot; aria-pressed=&quot;${String(active === &#x27;style&#x27;)}&quot;&gt;획 스타일&lt;/button&gt;
+          &lt;button class=&quot;fmv3-mode-button&quot; type=&quot;button&quot; data-action=&quot;layout&quot; aria-pressed=&quot;${String(active === &#x27;layout&#x27;)}&quot;&gt;글자 배치&lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;`;
+
+    const glyph = (selected = &#x27;&#x27;) =&gt; `
+      &lt;div class=&quot;fmv3-composed-glyph&quot; role=&quot;img&quot; aria-label=&quot;곰, 중성 ㅗ가 활성화됨&quot;&gt;
+        &lt;span class=&quot;fmv3-glyph-part initial ${selected === &#x27;stroke&#x27; ? &#x27;is-selected&#x27; : &#x27;&#x27;}&quot;&gt;ㄱ${selected === &#x27;stroke&#x27; ? &#x27;&lt;i class=&quot;fmv3-point&quot;&gt;&lt;/i&gt;&#x27; : &#x27;&#x27;}&lt;/span&gt;
+        &lt;span class=&quot;fmv3-glyph-part medial ${selected ? &#x27;&#x27; : &#x27;is-active&#x27;}&quot;&gt;ㅗ&lt;/span&gt;
+        &lt;span class=&quot;fmv3-glyph-part final&quot;&gt;ㅁ&lt;/span&gt;
+      &lt;/div&gt;`;
+
+    const carousel = (selected = &#x27;&#x27;, fast = false) =&gt; `
+      &lt;div class=&quot;fmv3-workspace&quot;&gt;
+        ${fast ? `
+          &lt;div class=&quot;fmv3-fast-picker&quot; aria-label=&quot;중성 빠른 탐색&quot;&gt;
+            &lt;small&gt;누르고 좌우로 밀어 중성 선택 · 손을 떼면 확정&lt;/small&gt;
+            &lt;div class=&quot;fmv3-fast-row&quot;&gt;&lt;span&gt;ㅏ&lt;/span&gt;&lt;span&gt;ㅑ&lt;/span&gt;&lt;span&gt;ㅓ&lt;/span&gt;&lt;span&gt;ㅕ&lt;/span&gt;&lt;span class=&quot;is-current&quot;&gt;ㅗ&lt;/span&gt;&lt;span&gt;ㅛ&lt;/span&gt;&lt;span&gt;ㅜ&lt;/span&gt;&lt;span&gt;ㅠ&lt;/span&gt;&lt;/div&gt;
+          &lt;/div&gt;` : &#x27;&#x27;}
+        &lt;div class=&quot;fmv3-carousel&quot;&gt;
+          &lt;div class=&quot;fmv3-side-glyph&quot;&gt;굠&lt;/div&gt;
+          &lt;div class=&quot;fmv3-glyph-stage&quot;&gt;${glyph(selected)}&lt;/div&gt;
+          &lt;div class=&quot;fmv3-side-glyph&quot;&gt;굼&lt;/div&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;fmv3-carousel-hint&quot;&gt;활성 중성만 바뀝니다 · 길게 눌러 빠른 탐색&lt;/div&gt;
+      &lt;/div&gt;`;
+
+    const trackpad = (active = false, axis = &#x27;xy&#x27;) =&gt; `
+      &lt;section class=&quot;fmv3-drawer&quot; aria-label=&quot;정밀 편집 트랙패드&quot;&gt;
+        &lt;div class=&quot;fmv3-grabber&quot;&gt;&lt;/div&gt;
+        &lt;div class=&quot;fmv3-drawer-head&quot;&gt;
+          &lt;strong&gt;${active ? &#x27;초성 ㄱ · 1번 획 · 끝점&#x27; : &#x27;정밀 편집&#x27;}&lt;/strong&gt;
+          &lt;span&gt;${active ? &#x27;가로 +0.003 · 세로 −0.002&#x27; : &#x27;대상을 선택하세요&#x27;}&lt;/span&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;fmv3-trackpad ${active ? axis : &#x27;idle&#x27;}&quot;&gt;
+          &lt;div class=&quot;fmv3-trackpad-grid&quot;&gt;&lt;/div&gt;
+          ${active ? `&lt;span class=&quot;fmv3-touch-point&quot;&gt;${axis === &#x27;x&#x27; ? &#x27;↔&#x27; : &#x27;↕↔&#x27;}&lt;/span&gt;` : &#x27;&#x27;}
+          ${axis === &#x27;x&#x27; ? `&lt;span class=&quot;fmv3-locked-axis&quot;&gt;${icon(&#x27;lock&#x27;)} 세로 잠금&lt;/span&gt;` : &#x27;&#x27;}
+        &lt;/div&gt;
+        &lt;div class=&quot;fmv3-track-actions&quot;&gt;
+          &lt;button type=&quot;button&quot; aria-pressed=&quot;${String(active)}&quot;&gt;정밀&lt;/button&gt;
+          &lt;button type=&quot;button&quot; aria-pressed=&quot;false&quot;&gt;가로 잠금&lt;/button&gt;
+          &lt;button type=&quot;button&quot; aria-pressed=&quot;false&quot;&gt;세로 잠금&lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/section&gt;`;
+
+    const styleDrawer = () =&gt; `
+      &lt;section class=&quot;fmv3-drawer&quot; aria-label=&quot;폰트 전체 획 스타일&quot;&gt;
+        &lt;div class=&quot;fmv3-grabber&quot;&gt;&lt;/div&gt;
+        &lt;div class=&quot;fmv3-drawer-head&quot;&gt;
+          &lt;strong&gt;획 스타일&lt;/strong&gt;
+          &lt;button class=&quot;fmv3-text-button&quot; type=&quot;button&quot; data-action=&quot;editor&quot;&gt;완료&lt;/button&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;fmv3-scope&quot;&gt;폰트 전체에 적용&lt;/div&gt;
+        &lt;div class=&quot;fmv3-segment&quot; role=&quot;group&quot; aria-label=&quot;붓촉 모양&quot;&gt;
+          &lt;button type=&quot;button&quot; aria-pressed=&quot;false&quot;&gt;원형&lt;/button&gt;
+          &lt;button type=&quot;button&quot; aria-pressed=&quot;true&quot;&gt;납작형&lt;/button&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;fmv3-style-controls&quot;&gt;
+          &lt;label&gt;
+            &lt;span class=&quot;fmv3-control-head&quot;&gt;&lt;span&gt;납작함&lt;/span&gt;&lt;output id=&quot;fmv3-flatness-output&quot;&gt;${flatness}&lt;/output&gt;&lt;/span&gt;
+            &lt;input class=&quot;fmv3-range&quot; id=&quot;fmv3-flatness&quot; type=&quot;range&quot; min=&quot;0&quot; max=&quot;100&quot; value=&quot;${flatness}&quot;&gt;
+          &lt;/label&gt;
+          &lt;label&gt;
+            &lt;span class=&quot;fmv3-control-head&quot;&gt;&lt;span&gt;각도&lt;/span&gt;&lt;output id=&quot;fmv3-angle-output&quot;&gt;+${angle}°&lt;/output&gt;&lt;/span&gt;
+            &lt;input class=&quot;fmv3-range&quot; id=&quot;fmv3-angle&quot; type=&quot;range&quot; min=&quot;-90&quot; max=&quot;90&quot; value=&quot;${angle}&quot;&gt;
+          &lt;/label&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;fmv3-drawer-footer&quot;&gt;
+          &lt;button class=&quot;fmv3-action&quot; type=&quot;button&quot; data-action=&quot;compare&quot;&gt;변경 전 비교&lt;/button&gt;
+          &lt;button class=&quot;fmv3-action&quot; type=&quot;button&quot; data-action=&quot;history&quot;&gt;히스토리&lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/section&gt;`;
+
+    const editorScreen = (kind) =&gt; {
+      const isFast = kind === &#x27;fast&#x27;;
+      const isStroke = kind === &#x27;stroke&#x27;;
+      const isStyle = kind === &#x27;style&#x27;;
+      return `${appbar(&#x27;글자 편집&#x27;)}${modeHeader(isStyle ? &#x27;style&#x27; : &#x27;&#x27;)}${carousel(isStroke ? &#x27;stroke&#x27; : &#x27;&#x27;, isFast)}${isStyle ? styleDrawer() : trackpad(isStroke)}`;
+    };
+
+    const layoutScreen = () =&gt; `
+      ${appbar(&#x27;글자 배치&#x27;)}
+      &lt;div class=&quot;fmv3-editor-head&quot;&gt;
+        &lt;div class=&quot;fmv3-editor-title&quot;&gt;&lt;strong&gt;곰 · 글자 배치&lt;/strong&gt;&lt;span class=&quot;fmv3-active-label&quot;&gt;분할선 선택&lt;/span&gt;&lt;/div&gt;
+        &lt;div class=&quot;fmv3-scope&quot;&gt;가로모음 + 받침 전체에 적용&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;fmv3-layout-workspace&quot;&gt;
+        &lt;div class=&quot;fmv3-layout-canvas&quot; aria-label=&quot;초성 중성 종성 배치 영역&quot;&gt;
+          &lt;div class=&quot;fmv3-layout-box initial&quot;&gt;초성&lt;/div&gt;
+          &lt;div class=&quot;fmv3-layout-box medial&quot;&gt;중성&lt;/div&gt;
+          &lt;div class=&quot;fmv3-layout-box final&quot;&gt;종성&lt;/div&gt;
+          &lt;div class=&quot;fmv3-split-line&quot; aria-label=&quot;초성과 중성 사이 분할선&quot;&gt;&lt;/div&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;fmv3-representatives&quot; aria-label=&quot;변경 영향을 받는 대표 글자&quot;&gt;&lt;span&gt;곰&lt;/span&gt;&lt;span&gt;눈&lt;/span&gt;&lt;span&gt;금&lt;/span&gt;&lt;span&gt;글&lt;/span&gt;&lt;/div&gt;
+      &lt;/div&gt;
+      ${trackpad(true, &#x27;x&#x27;)}`;
+
+    const historyScreen = () =&gt; `
+      ${appbar(&#x27;편집 히스토리&#x27;, &#x27;editor&#x27;, false)}
+      &lt;main class=&quot;fmv3-full-page&quot;&gt;
+        &lt;h2&gt;편집 히스토리&lt;/h2&gt;
+        &lt;p&gt;항목을 눌러 과거와 현재를 비교합니다&lt;/p&gt;
+        &lt;div class=&quot;fmv3-history-list&quot;&gt;
+          &lt;button class=&quot;fmv3-history-item&quot; type=&quot;button&quot; data-action=&quot;compare&quot;&gt;&lt;small&gt;방금 · 획 스타일&lt;/small&gt;&lt;strong&gt;각도 0° → +25°&lt;/strong&gt;&lt;span&gt;폰트 전체&lt;/span&gt;&lt;/button&gt;
+          &lt;button class=&quot;fmv3-history-item&quot; type=&quot;button&quot; data-action=&quot;compare&quot;&gt;&lt;small&gt;오후 3:41 · 초성 ㄱ&lt;/small&gt;&lt;strong&gt;1번 획 끝점을 오른쪽으로 이동&lt;/strong&gt;&lt;span&gt;ㄱ 위쪽형 · 현재 레이아웃 보정&lt;/span&gt;&lt;/button&gt;
+          &lt;button class=&quot;fmv3-history-item&quot; type=&quot;button&quot; data-action=&quot;compare&quot;&gt;&lt;small&gt;오후 3:36 · 글자 배치&lt;/small&gt;&lt;strong&gt;초성·중성 분할선 이동&lt;/strong&gt;&lt;span&gt;가로모음 + 받침 전체&lt;/span&gt;&lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/main&gt;`;
+
+    const compareScreen = () =&gt; `
+      ${appbar(&#x27;과거 상태 비교&#x27;, &#x27;history&#x27;, false)}
+      &lt;main class=&quot;fmv3-full-page&quot;&gt;
+        &lt;h2&gt;오후 3:41 상태&lt;/h2&gt;
+        &lt;p&gt;복원해도 이후 기록은 삭제되지 않습니다&lt;/p&gt;
+        &lt;div class=&quot;fmv3-compare-grid&quot;&gt;
+          &lt;div class=&quot;fmv3-snapshot&quot;&gt;&lt;small&gt;선택한 시점&lt;/small&gt;&lt;span&gt;곰&lt;/span&gt;&lt;strong&gt;끝점 이동 전&lt;/strong&gt;&lt;/div&gt;
+          &lt;div class=&quot;fmv3-snapshot is-current&quot;&gt;&lt;small&gt;현재&lt;/small&gt;&lt;span&gt;곰&lt;/span&gt;&lt;strong&gt;끝점 이동 후&lt;/strong&gt;&lt;/div&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;fmv3-compare-meta&quot;&gt;
+          &lt;span&gt;&lt;strong&gt;대상&lt;/strong&gt; · 초성 ㄱ · 1번 획 끝점&lt;/span&gt;
+          &lt;span&gt;&lt;strong&gt;범위&lt;/strong&gt; · ㄱ 위쪽형 · 현재 레이아웃 보정&lt;/span&gt;
+          &lt;span&gt;&lt;strong&gt;변경&lt;/strong&gt; · 가로 +0.003&lt;/span&gt;
+        &lt;/div&gt;
+        &lt;button class=&quot;fmv3-action primary&quot; type=&quot;button&quot; data-action=&quot;restore&quot; style=&quot;width:100%&quot;&gt;이 시점으로 복원&lt;/button&gt;
+      &lt;/main&gt;`;
+
+    const render = () =&gt; {
+      if (step === 0) screen.innerHTML = editorScreen(&#x27;select&#x27;);
+      if (step === 1) screen.innerHTML = editorScreen(&#x27;fast&#x27;);
+      if (step === 2) screen.innerHTML = editorScreen(&#x27;stroke&#x27;);
+      if (step === 3) screen.innerHTML = editorScreen(&#x27;style&#x27;);
+      if (step === 4) screen.innerHTML = layoutScreen();
+      if (step === 5) screen.innerHTML = historyScreen();
+      if (step === 6) screen.innerHTML = compareScreen();
+
+      root.querySelectorAll(&#x27;[data-step]&#x27;).forEach((button) =&gt; {
+        button.setAttribute(&#x27;aria-pressed&#x27;, String(Number(button.dataset.step) === step));
+      });
+
+      const flatnessInput = root.querySelector(&#x27;#fmv3-flatness&#x27;);
+      const angleInput = root.querySelector(&#x27;#fmv3-angle&#x27;);
+      if (flatnessInput) {
+        flatnessInput.addEventListener(&#x27;input&#x27;, (event) =&gt; {
+          flatness = Number(event.target.value);
+          root.querySelector(&#x27;#fmv3-flatness-output&#x27;).textContent = String(flatness);
+        });
+      }
+      if (angleInput) {
+        angleInput.addEventListener(&#x27;input&#x27;, (event) =&gt; {
+          angle = Number(event.target.value);
+          root.querySelector(&#x27;#fmv3-angle-output&#x27;).textContent = `${angle &gt; 0 ? &#x27;+&#x27; : &#x27;&#x27;}${angle}°`;
+        });
+      }
+
+      if (window.lucide) window.lucide.createIcons({ attrs: { width: 16, height: 16 } });
+    };
+
+    root.addEventListener(&#x27;click&#x27;, (event) =&gt; {
+      const stepButton = event.target.closest(&#x27;[data-step]&#x27;);
+      if (stepButton) {
+        step = Number(stepButton.dataset.step);
+        render();
+        return;
+      }
+
+      const actionButton = event.target.closest(&#x27;[data-action]&#x27;);
+      if (!actionButton) return;
+      const action = actionButton.dataset.action;
+      if (action === &#x27;style&#x27;) step = 3;
+      if (action === &#x27;layout&#x27;) step = 4;
+      if (action === &#x27;history&#x27;) step = 5;
+      if (action === &#x27;compare&#x27;) step = 6;
+      if (action === &#x27;editor&#x27; || action === &#x27;restore&#x27;) step = 2;
+      render();
+    });
+
+    render();
+  })();
+&lt;/script&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handleLeave = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+</body>
+</html>
