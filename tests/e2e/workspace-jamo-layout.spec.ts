@@ -62,7 +62,6 @@ test('중심 rail(배치)을 옮기면 이 레이아웃 카드 8장에 Δ가 얹
   await expect(page.getByTestId('review-propagation-shape')).toHaveCount(0)
   const cards = page.getByTestId('review-propagation-card')
   await expect(cards).toHaveCount(8)
-  await expect(cards.first()).toHaveAttribute('data-mode', 'layout')
   await expect(cards.first()).toHaveAttribute('data-touched', 'true', { timeout: 20_000 })
   // 기본 범위 = 이 레이아웃: 세로 홀자+받침 글자만, 홀자는 섞인다.
   await expect(propagation.getByRole('button', { name: '이 레이아웃', exact: true })).toHaveAttribute('aria-pressed', 'true')

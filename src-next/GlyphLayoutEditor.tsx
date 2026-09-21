@@ -379,16 +379,14 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes }: { g
       {modelError && <p className={styles.status} data-state="error" role="alert">{modelError}</p>}
       {/* 적용하면 Δ가 저장되고 context가 새 original로 다시 풀리므로 세션 편집은 비운다. */}
       <ReviewPropagationCards ref={cardsRef} source={glyph.identity} bundle={bundle} edit={propagationEdit} changed={changedRails} fixed={fixedRails} focus={rail?.part} ghostVisible={ghostVisible} onApplied={resetRails} onCommitted={onCommitted} onSelectPart={selectPart} onScopeLabel={setScopeLabel} />
-      {/* 하단 바는 한 줄짜리 상태 기계. Δ 없음 → `ㄱ 획 고치기`. 배치 Δ → `복원 | …에 적용`(범위는 카드가 앎).
-          형태 Δ만 → `복원 | 획 고치기(비활성)` + 이유: 획 캔버스는 저장된 배치로 그려서 글자가 튀어 보인다. */}
+      {/* 하단 바는 한 줄짜리 상태 기계. Δ 없음 → `ㄱ 획 고치기`. Δ 있음 → `복원 | …에 적용`(범위는 카드가 앎). 편집기가 내놓는 rail은 전부 배치라 Δ가 있으면 늘 적용할 수 있다. */}
       {(onEditStrokes && activePart) || editCount > 0 ? <div className={styles.strokeCta} data-testid="jamo-stroke-cta-bar">
         <div className={styles.ctaRow}>
           {editCount > 0 && <button type="button" className={styles.resetCta} onClick={resetRails} data-testid="review-reset">복원 · {editCount}개 변경</button>}
           {canApply
             ? <button type="button" className={styles.applyCta} onClick={() => cardsRef.current?.apply()} data-testid="review-propagation-apply">{scopeLabel}에 적용</button>
-            : <button type="button" disabled={editCount > 0} onClick={() => activePart && onEditStrokes?.(activePart)} data-testid="jamo-stroke-cta">{activeJamo} 획 고치기</button>}
+            : <button type="button" onClick={() => activePart && onEditStrokes?.(activePart)} data-testid="jamo-stroke-cta">{activeJamo} 획 고치기</button>}
         </div>
-        {!canApply && editCount > 0 && <small>먼저 되돌리세요</small>}
       </div> : null}
   </div>
 }

@@ -3,9 +3,9 @@ import type { ComponentFitPart } from './notoComponentFitView'
 import type { EditableRail, MedialFitPart } from './notoMedialFitView'
 import { corpusIdentity } from './notoCorpus'
 import type { StrokeRailBinding } from '../src/services/notoMedialMasterFit'
-import { applyFacesDelta, applyMedialDelta, editKindOf, hasLayoutEdit, hasShapeEdit, propagationCandidates, propagationEditOf, resolveSemanticRail, semanticKeyOf, shapeDeltaToEm, layoutDeltaOf } from './reviewPropagation'
+import { applyFacesDelta, applyMedialDelta, hasLayoutEdit, layoutDeltaOf, propagationCandidates, propagationEditOf, resolveSemanticRail, semanticKeyOf } from './reviewPropagation'
 
-/** 검수 rail 편집 → 배치·형태 Δ → 다른 글자 표본. 순수 계산만 본다. Δ는 획 역할 키(`primaryBeam.center`)로 든다. */
+/** 레이아웃 rail 편집 → 배치 Δ → 다른 글자 표본. 순수 계산만 본다. Δ는 획 역할 키(`primaryBeam.center`)로 든다. 획 길이(시작·끝)는 여기서 안 다룬다. */
 
 const slot = { x: 0.5, y: 0.1, width: 0.4, height: 0.8 }
 const bind = (roleId: string, orientation: StrokeRailBinding['orientation'], centerRail: string, fromRail: string, toRail: string): StrokeRailBinding => ({ roleId, orientation, thickness: 0.08, centerRail, fromRail, toRail } as StrokeRailBinding)
@@ -18,15 +18,6 @@ const medialPart = (part: MedialFitPart['part'], railsEm: Record<string, number>
 const componentPart = (part: ComponentFitPart['part'], faces: ComponentFitPart['faces']): ComponentFitPart => ({ part, jamoId: 'ㄱ', family: null, faces } as ComponentFitPart)
 const faces = { left: 0.1, right: 0.5, top: 0.1, bottom: 0.5 }
 const rail = (over: Partial<EditableRail> & Pick<EditableRail, 'id' | 'role' | 'kind' | 'value' | 'original'>): EditableRail => ({ partIndex: 0, axis: 'x', label: over.id, ...over })
-
-describe('editKindOf', () => {
-  it('중심 rail·닿자 변 = 배치, 시작·끝 rail = 형태', () => {
-    expect(editKindOf({ kind: 'center' })).toBe('layout')
-    expect(editKindOf({ kind: 'face' })).toBe('layout')
-    expect(editKindOf({ kind: 'start' })).toBe('shape')
-    expect(editKindOf({ kind: 'end' })).toBe('shape')
-  })
-})
 
 describe('semanticKeyOf · resolveSemanticRail', () => {
   it('rail 키 → 획 역할 키. 중심으로 매인 획이 먼저, 아니면 시작·끝', () => {
@@ -50,7 +41,7 @@ describe('semanticKeyOf · resolveSemanticRail', () => {
 describe('propagationEditOf', () => {
   const medialParts = [medialPart('JU', { 'inner-right': 0.7, 'inner-bottom': 0.5, 'inner-top': 0.2, 'outer-top': 0.1 })]
   const componentParts = [componentPart('CH', faces)]
-  it('안 바뀐 rail은 빠지고, 중심은 em Δ로 배치에, 시작은 슬롯 비율로 형태에 들어간다 — 획 역할 키로', () => {
+  it('안 바뀐 rail은 빠지고, 중심은 em Δ로 든다 — 획 역할 키로. 시작·끝 rail(획 길이)은 버린다', () => {
     const edit = propagationEditOf({
       editable: [
         rail({ id: '0:inner-right', role: 'inner-right', kind: 'center', value: 0.712, original: 0.7 }),
@@ -62,10 +53,9 @@ describe('propagationEditOf', () => {
     })
     expect(edit.layout.medial.JU).toEqual({ 'outerPillar.center': expect.closeTo(0.012, 9) })
     expect(edit.layout.component.CH).toEqual({ right: expect.closeTo(-0.02, 9) })
-    // 0.08 / 슬롯 높이 0.8 = 0.1
-    expect(edit.shape.medial.JU).toEqual({ 'innerPillar.start': expect.closeTo(0.1, 9) })
+    // 시작 rail이 80u 움직였어도 배치 Δ엔 안 든다.
+    expect(Object.keys(edit.layout.medial.JU ?? {})).toEqual(['outerPillar.center'])
     expect(hasLayoutEdit(edit)).toBe(true)
-    expect(hasShapeEdit(edit)).toBe(true)
   })
   it('고정한 변 rail은 Δ가 0이어도 `{ at }`으로 들고, 중심 rail의 고정 표시는 무시한다', () => {
     const edit = propagationEditOf({
@@ -83,14 +73,13 @@ describe('propagationEditOf', () => {
     expect(layoutDeltaOf(edit).faces?.CH?.top).toEqual({ at: 0.1 })
     expect(applyFacesDelta(faces, { top: { at: 0.3 }, right: -0.02 })).toEqual({ ...faces, top: 0.3, right: expect.closeTo(faces.right - 0.02, 9) })
   })
-  it('편집이 없으면 둘 다 비어 있다', () => {
+  it('편집이 없으면 비어 있다. 시작·끝 rail만 움직여도 비어 있다', () => {
     const edit = propagationEditOf({ editable: [rail({ id: '0:inner-right', role: 'inner-right', kind: 'center', value: 0.7, original: 0.7 })], medialParts, componentParts })
     expect(hasLayoutEdit(edit)).toBe(false)
-    expect(hasShapeEdit(edit)).toBe(false)
   })
 })
 
-describe('applyMedialDelta · shapeDeltaToEm · applyFacesDelta', () => {
+describe('applyMedialDelta · applyFacesDelta', () => {
   const aRails = { 'center-x': 0.6, 'center-y': 0.5, 'outer-right': 0.9, 'outer-top': 0.1, 'outer-bottom': 0.9, 'inner-bottom': 0.7 }
   it('ㅐ 보 중심(inner-bottom) Δ가 ㅏ에선 center-y에 얹힌다. inner-bottom은 안 건드린다', () => {
     const out = applyMedialDelta({ railsEm: aRails, bindings: A_BINDINGS }, { 'primaryBeam.center': -0.11 })
@@ -110,12 +99,6 @@ describe('applyMedialDelta · shapeDeltaToEm · applyFacesDelta', () => {
     expect(out.rails['center-x']).toBeCloseTo(0.62, 9)
     expect(out).toMatchObject({ applied: 1, skipped: 1 })
   })
-  it('비율 Δ는 대상 슬롯 길이에 곱해 em이 된다', () => {
-    // 보 시작은 x축(슬롯 폭 0.2), 기둥 끝은 y축(슬롯 높이 0.6)
-    const em = shapeDeltaToEm({ 'primaryBeam.start': 0.1, 'outerPillar.end': -0.05 }, { x: 0, y: 0, width: 0.2, height: 0.6 }, A_BINDINGS)
-    expect(em['primaryBeam.start']).toBeCloseTo(0.02, 9)
-    expect(em['outerPillar.end']).toBeCloseTo(-0.03, 9)
-  })
   it('네 변 Δ는 준 변만 옮긴다', () => {
     expect(applyFacesDelta(faces, { top: -0.01 })).toEqual({ ...faces, top: expect.closeTo(0.09, 9) })
   })
@@ -128,21 +111,6 @@ describe('propagationCandidates', () => {
     expect(picked).toHaveLength(8)
     expect(picked.every((item) => item.contextId === source.contextId && item.codepoint !== source.codepoint)).toBe(true)
     expect(new Set(picked.map((item) => item.medialJamo)).size).toBeGreaterThan(1)
-  })
-  it('같은 홀자 묶음은 초성·받침이 섞인다', () => {
-    const picked = propagationCandidates({ source, scope: 'sameJamo', count: 8 })
-    expect(picked.every((item) => item.medialJamo === 'ㅓ')).toBe(true)
-    expect(new Set(picked.map((item) => item.initialJamo)).size).toBeGreaterThan(1)
-    expect(new Set(picked.map((item) => item.finalJamo)).size).toBeGreaterThan(1)
-  })
-  it('sameJamo(형태 카드 전용) = 잡은 부품 자모만 같게. 홀자를 잡으면 같은 홀자, 받침을 잡으면 같은 받침', () => {
-    const ae = corpusIdentity('배'.codePointAt(0)!)
-    const medialOnly = propagationCandidates({ source: ae, scope: 'sameJamo', count: 8, focus: 'JU' })
-    expect(medialOnly.every((item) => item.medialJamo === 'ㅐ')).toBe(true)
-    expect(medialOnly.some((item) => item.finalJamo !== null)).toBe(true)
-    const finalOnly = propagationCandidates({ source, scope: 'sameJamo', count: 8, focus: 'JO' })
-    expect(finalOnly.every((item) => item.finalJamo === 'ㅁ')).toBe(true)
-    expect(new Set(finalOnly.map((item) => item.medialJamo)).size).toBeGreaterThan(1)
   })
   it('이 자모만 = 같은 문맥에서 잡은 부품의 자모가 고른 것 중 하나. 표본 밖 자모(ㅋ 받침)도 고르면 들어온다', () => {
     const initials = propagationCandidates({ source, scope: 'jamo', count: 8, focus: 'CH', jamos: ['ㅁ', 'ㅋ'] })
