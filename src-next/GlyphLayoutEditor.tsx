@@ -201,7 +201,8 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
       const selected = rail.id === selectedRail
       const snapped = rail.id === snappedRail
       const active = !activePart || samePartGroup(rail.part, activePart)
-      const stroke = selected || snapped ? ACCENT : active ? PART_COLOR[rail.part] : INACTIVE_COLOR
+      // 선택한 rail은 부품 색 그대로 굵게. 주황은 스냅('탁') 순간에만 쓴다.
+      const stroke = snapped ? ACCENT : active ? PART_COLOR[rail.part] : INACTIVE_COLOR
       const geometry = geometryOf(rail.axis, rail.value)
       return <g key={rail.id} className={active ? styles.rail : undefined} data-rail={rail.id} data-part={rail.part} data-active={active} data-locked={rail.locked || undefined} data-selected={selected || undefined} data-snapped={snapped || undefined}>
         {/* 후광. 선택·스냅이면 항상, 활성 rail은 호버 때만(CSS). */}
@@ -220,7 +221,7 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
       const units = Math.round((rail.value - rail.original) * 1000)
       const mid = (rail.value + rail.original) / 2
       const at = rail.axis === 'x' ? { x: Math.min(0.92, Math.max(0.08, mid)), y: 1.066, textAnchor: 'middle' as const } : { x: 1.07, y: mid + 0.012, textAnchor: 'end' as const }
-      return <text key={`u${rail.id}`} {...at} className={styles.deltaLabel} fontSize={active ? '.034' : '.024'} fill={active ? ACCENT : PART_COLOR[rail.part]} fillOpacity={active ? 1 : 0.55} data-testid="review-delta-label" data-active={active}>{units > 0 ? '+' : ''}{units}u</text>
+      return <text key={`u${rail.id}`} {...at} className={styles.deltaLabel} fontSize={active ? '.034' : '.024'} fill={PART_COLOR[rail.part]} fillOpacity={active ? 1 : 0.55} data-testid="review-delta-label" data-active={active}>{units > 0 ? '+' : ''}{units}u</text>
     })}
   </svg>
 }
