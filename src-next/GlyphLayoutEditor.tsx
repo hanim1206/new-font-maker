@@ -235,7 +235,7 @@ function railsWithDelta(railsEm?: Readonly<Record<string, number>>, delta?: Read
   return Object.fromEntries(Object.entries(railsEm).map(([key, value]) => [key, value + (delta[key] ?? 0)]))
 }
 
-function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes }: { glyph: NotoPresetGlyph; initialPart?: Part; onCommitted?: GlyphLayoutEditorProps['onCommitted']; onEditStrokes?: GlyphLayoutEditorProps['onEditStrokes'] }) {
+function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPickCharacter }: { glyph: NotoPresetGlyph; initialPart?: Part; onCommitted?: GlyphLayoutEditorProps['onCommitted']; onEditStrokes?: GlyphLayoutEditorProps['onEditStrokes']; onPickCharacter?: GlyphLayoutEditorProps['onPickCharacter'] }) {
   const codepoint = glyph.identity.codepoint
   const approved = isApproved(codepoint)
   const ghost = useMemo(() => notoOutlineGhostPath(glyph.outline), [glyph])
@@ -382,7 +382,7 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes }: { g
       </section>
       {modelError && <p className={styles.status} data-state="error" role="alert">{modelError}</p>}
       {/* 적용하면 Δ가 저장되고 context가 새 original로 다시 풀리므로 세션 편집은 비운다. */}
-      <ReviewPropagationCards ref={cardsRef} source={glyph.identity} bundle={bundle} edit={propagationEdit} changed={changedRails} fixed={fixedRails} focus={rail?.part} ghostVisible={ghostVisible} onApplied={resetRails} onCommitted={onCommitted} onSelectPart={selectPart} onScopeLabel={setScopeLabel} />
+      <ReviewPropagationCards ref={cardsRef} source={glyph.identity} bundle={bundle} edit={propagationEdit} changed={changedRails} fixed={fixedRails} focus={rail?.part} ghostVisible={ghostVisible} onApplied={resetRails} onCommitted={onCommitted} onSelectPart={selectPart} onScopeLabel={setScopeLabel} onPickCharacter={onPickCharacter} />
       {/* 하단 바는 한 줄짜리 상태 기계. Δ 없음 → `ㄱ 획 고치기`. Δ 있음 → `복원 | …에 적용`(범위는 카드가 앎). 편집기가 내놓는 rail은 전부 배치라 Δ가 있으면 늘 적용할 수 있다. */}
       {(onEditStrokes && activePart) || editCount > 0 ? <div className={styles.strokeCta} data-testid="jamo-stroke-cta-bar">
         <div className={styles.ctaRow}>
@@ -404,10 +404,12 @@ export interface GlyphLayoutEditorProps {
   onCommitted?: (before: LayoutDeltaSnapshot, after: LayoutDeltaSnapshot) => void
   /** 켠 부품의 획 편집으로 내려간다. 주면 하단에 `ㄱ 획 고치기`가 뜬다. */
   onEditStrokes?: (part: Part) => void
+  /** 예시 글자 카드를 누르면 그 글자를 연다. */
+  onPickCharacter?: (character: string) => void
 }
 
-export function GlyphLayoutEditor({ codepoint, initialPart, onCommitted, onEditStrokes }: GlyphLayoutEditorProps) {
+export function GlyphLayoutEditor({ codepoint, initialPart, onCommitted, onEditStrokes, onPickCharacter }: GlyphLayoutEditorProps) {
   const { glyph, error } = useNotoGlyph(codepoint)
-  if (glyph) return <GlyphLayoutBody key={codepoint} glyph={glyph} initialPart={initialPart} onCommitted={onCommitted} onEditStrokes={onEditStrokes} />
+  if (glyph) return <GlyphLayoutBody key={codepoint} glyph={glyph} initialPart={initialPart} onCommitted={onCommitted} onEditStrokes={onEditStrokes} onPickCharacter={onPickCharacter} />
   return <p className={styles.status} data-state={error ? 'error' : 'loading'} role={error ? 'alert' : 'status'}>{error || 'Noto 윤곽 읽는 중'}</p>
 }

@@ -272,7 +272,7 @@ test('자소 탭은 레이아웃으로 열리고, 기준선을 적용하면 문�
 
 test('옛 검수 글자 화면 주소는 같은 글자의 자소 탭 레이아웃 모드로 넘어간다', async ({ page }) => {
   await page.goto('/workspace/review/glyph?char=%EB%A9%88')
-  await expect(page).toHaveURL(/\/workspace\/jamo\?char=%EB%A9%88&mode=layout$/)
+  await expect(page).toHaveURL(/\/workspace\/jamo\?char=%EB%A9%88&mode=layout&solo=1$/)
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible({ timeout: 20_000 })
 })
 
@@ -685,6 +685,31 @@ test('획이 모델 상자에 안 맞아도 획 편집에서 완료로 레이아
 })
 
 /** 세로 예산(2026-09-21): 도구 줄은 머리 `…` 메뉴로, 레이아웃 모드의 보정 문장은 한 줄. 390×844 첫 화면에 범위 띠와 표본 첫 줄 네 장이 세로 스크롤 없이 온전히 보인다. */
+test('예시 글자 카드를 누르면 그 글자가 열리고 문장에는 그 글자 하나만 남는다. 안 끝난 Δ가 있으면 카드는 잠긴다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
+  const cards = page.getByTestId('review-propagation-card')
+  await expect(cards).toHaveCount(8, { timeout: 20_000 })
+  const sentence = page.getByRole('region', { name: '보정 문장' })
+  expect(await sentence.getByRole('button', { name: /편집/ }).count()).toBeGreaterThan(1)
+
+  // Δ가 있는 동안은 글자를 바꾸면 편집이 날아가므로 카드가 잠긴다. 복원하면 풀린다.
+  await selectRail(page, '바깥기둥 중심')
+  await page.keyboard.press('Shift+ArrowRight')
+  await expect(resetButton(page)).toContainText('1개 변경')
+  await expect(cards.first().getByTestId('review-propagation-open')).toBeDisabled()
+  await resetButton(page).click()
+  await expect(cards.first().getByTestId('review-propagation-open')).toBeEnabled()
+
+  const name = await cards.first().locator('figcaption b').innerText()
+  await cards.first().getByTestId('review-propagation-open').click()
+  await expect(page.getByRole('region', { name: `${name} 레이아웃 수정` })).toBeVisible()
+  await expect(sentence.getByRole('button', { name: /편집/ })).toHaveCount(1)
+  await expect(sentence.getByRole('button', { name: `${name} 편집` })).toHaveAttribute('aria-current', 'true')
+  // 새 글자의 카드가 다시 뜨고, 연 글자는 그 안에 없다.
+  await expect(cards).toHaveCount(8, { timeout: 20_000 })
+  expect(await cards.locator('figcaption b').allInnerTexts()).not.toContain(name)
+})
+
 test('레이아웃 모드 첫 화면에 범위 띠와 표본 다섯 장이 온전히 보이고, 도구는 … 메뉴에 있다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })

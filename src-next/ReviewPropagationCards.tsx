@@ -32,7 +32,7 @@ const CARD_COUNT = 8
 interface CardBox { kind: 'medial' | 'component'; box: BoxConfig }
 const BOX_COLOR: Record<CardBox['kind'], string> = { medial: '#3b6fd6', component: '#2f9a6a' }
 
-function PropagationCard({ identity, bundle, edit, ghostVisible }: { identity: CorpusIdentity; bundle: NotoPresetModelBundle; edit: PropagationEdit; ghostVisible: boolean }) {
+function PropagationCard({ identity, bundle, edit, ghostVisible, onPick }: { identity: CorpusIdentity; bundle: NotoPresetModelBundle; edit: PropagationEdit; ghostVisible: boolean; onPick?: (character: string) => void }) {
   const { glyph, error } = useNotoGlyph(identity.codepoint)
   const inkStyle = useFitInkStyle()
   // 이 글자에 이미 저장된 Δ 위에 지금 편집 Δ를 얹는다. 렌더러가 보는 상자와 같은 출발점.
@@ -88,6 +88,8 @@ function PropagationCard({ identity, bundle, edit, ghostVisible }: { identity: C
   const live = hasLayoutEdit(edit)
   const note = !view ? (error || '읽는 중') : !live ? '' : view.touched === 0 ? 'Δ 안 닿음' : view.skipped > 0 ? '일부 Δ 미적용' : ''
   return <figure className={styles.card} data-testid="review-propagation-card" data-touched={view && live ? view.touched > 0 : undefined}>
+    {/* 카드를 누르면 그 글자를 연다. 안 끝난 Δ가 있으면 잠근다 — 글자를 바꾸면 편집이 날아가서다(`획 고치기`와 같은 규칙). */}
+    <button type="button" disabled={!onPick || live} onClick={() => onPick?.(identity.character)} aria-label={`${identity.character} 열기`} data-testid="review-propagation-open">
     <svg viewBox={VIEW_BOX} role="img" aria-label={`${identity.character} 미리보기`}>
       <rect x="0" y="0" width="1" height="1" fill="#fff" />
       {view?.boxes.map((item, index) => <rect key={index} x={item.box.x} y={item.box.y} width={item.box.width} height={item.box.height} fill={BOX_COLOR[item.kind]} fillOpacity=".12" stroke={BOX_COLOR[item.kind]} strokeOpacity=".5" strokeWidth=".004" />)}
@@ -95,6 +97,7 @@ function PropagationCard({ identity, bundle, edit, ghostVisible }: { identity: C
       {view?.after.map((path, index) => <path key={index} d={path} fill="#111" fillRule="evenodd" />)}
       {view?.before.map((path, index) => <path key={`b${index}`} d={path} fill="none" stroke="#f0561e" strokeWidth=".006" strokeDasharray=".012 .008" />)}
     </svg>
+    </button>
     <figcaption>
       <b>{identity.character}</b>
       {note && <small>{note}</small>}
@@ -113,17 +116,17 @@ function DeltaList({ rails, fixed, testId }: { rails: EditableRail[]; fixed?: Re
   </div>
 }
 
-function CardGrid({ candidates, bundle, edit, ghostVisible, onNearEnd }: { candidates: CorpusIdentity[]; bundle: NotoPresetModelBundle | null; edit: PropagationEdit; ghostVisible: boolean; /** 오른쪽 끝 가까이 밀었을 때. 다음 묶음을 붙인다. */ onNearEnd: () => void }) {
+function CardGrid({ candidates, bundle, edit, ghostVisible, onNearEnd, onPick }: { candidates: CorpusIdentity[]; bundle: NotoPresetModelBundle | null; edit: PropagationEdit; ghostVisible: boolean; onPick?: (character: string) => void; /** 오른쪽 끝 가까이 밀었을 때. 다음 묶음을 붙인다. */ onNearEnd: () => void }) {
   if (!bundle) return <p className={styles.empty}>모델 읽는 중</p>
   return <div className={styles.cards} data-testid="review-propagation-cards" onScroll={(event) => { const el = event.currentTarget; if (el.scrollLeft + el.clientWidth * 2 >= el.scrollWidth) onNearEnd() }}>
-    {candidates.map((identity) => <PropagationCard key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} ghostVisible={ghostVisible} />)}
+    {candidates.map((identity) => <PropagationCard key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} ghostVisible={ghostVisible} onPick={onPick} />)}
   </div>
 }
 
 /** 편집기 하단 바가 `적용`을 누를 때 쓰는 손잡이. 범위·고른 자모는 카드가 들고 있어서 여기로 판다. */
 export interface ReviewPropagationHandle { apply: () => void }
 
-export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, focus, ghostVisible = true, onApplied, onCommitted, onSelectPart, onScopeLabel, ref }: {
+export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, focus, ghostVisible = true, onApplied, onCommitted, onSelectPart, onScopeLabel, onPickCharacter, ref }: {
   source: CorpusIdentity
   bundle: NotoPresetModelBundle | null
   edit: PropagationEdit
@@ -143,6 +146,8 @@ export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, f
   ghostVisible?: boolean
   /** 지금 범위 이름(`이 레이아웃` · `ㄱ·ㅋ` · `전체`). 하단 바의 `…에 적용` 글씨용. */
   onScopeLabel?: (label: string) => void
+  /** 예시 글자 카드를 눌렀을 때. 호출자가 그 글자를 연다. */
+  onPickCharacter?: (character: string) => void
   ref?: Ref<ReviewPropagationHandle>
 }) {
   const [scope, setScope] = useState<PropagationScope>('layer')
@@ -195,7 +200,7 @@ export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, f
     <div className={styles.deltaRow}>
       <DeltaList rails={changed} fixed={fixed} testId="review-propagation-deltas" />
     </div>
-    {focus && <CardGrid key={rowKey} candidates={candidates} bundle={bundle} edit={edit} ghostVisible={ghostVisible} onNearEnd={loadNextBatch} />}
+    {focus && <CardGrid key={rowKey} candidates={candidates} bundle={bundle} edit={edit} ghostVisible={ghostVisible} onNearEnd={loadNextBatch} onPick={onPickCharacter} />}
     {/* 자모 고르기 시트. 잡은 부품 자리에 올 수 있는 자모 전부. 기본은 잡은 자모 하나, 마지막 하나는 못 끈다. 여러 개를 켜면 같은 Δ가 자모마다 따로 저장된다. */}
     {pickerOpen && focus && <div className={styles.sheetBackdrop} onClick={() => setPickerOpen(false)}>
       <div className={styles.sheet} role="dialog" aria-modal="true" aria-label={`${PART_GROUP_LABEL[group]} 자모 고르기`} onClick={(event) => event.stopPropagation()}>

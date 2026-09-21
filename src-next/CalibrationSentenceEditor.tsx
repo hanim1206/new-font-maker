@@ -139,11 +139,13 @@ function isEditableHangul(char: string): boolean {
   return isPrecomposedSyllable || isCompatibilityJamo
 }
 
-/** `?char=염`처럼 다른 탭에서 글자를 들고 들어오면 그 글자로 연다. 문장에 없으면 앞에 붙인다. */
+/** `?char=염`처럼 다른 탭에서 글자를 들고 들어오면 그 글자로 연다. 문장에 없으면 앞에 붙인다. `&solo=1`(검수 격자에서 글자를 눌러 들어올 때)이면 문장에 그 글자 하나만 올린다. */
 function initialFocus(): { char: string; sentence: string; custom: boolean } {
-  const requested = [...(new URLSearchParams(window.location.search).get('char') ?? '')][0]
+  const params = new URLSearchParams(window.location.search)
+  const requested = [...(params.get('char') ?? '')][0]
   const base = SAMPLE_SENTENCES[0]
   if (!requested || !isEditableHangul(requested)) return { char: '과', sentence: base, custom: false }
+  if (params.get('solo') === '1') return { char: requested, sentence: requested, custom: true }
   if ([...base].includes(requested)) return { char: requested, sentence: base, custom: false }
   return { char: requested, sentence: `${requested} ${base}`, custom: true }
 }
@@ -1100,6 +1102,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     setPreviewSchema(null)
     setInkGapLimiter(null)
   }
+  // 예시 글자 카드를 누르면 그 글자를 열고 문장에는 그 글자 하나만 올린다. 예시 문장은 주사위로 돌아온다.
+  const openSoloChar = (char: string) => {
+    setSampleSentence(char)
+    setIsCustomSentence(true)
+    chooseChar(char)
+  }
   const selectFromCanvas = (nextSelection: Selection) => {
     setSelection(nextSelection)
     if (nextSelection.kind === 'point' || nextSelection.kind === 'handle') {
@@ -1377,7 +1385,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
       </section>
 
       {isLayoutMode ? <section className={styles.layoutMode} aria-label={`${selectedChar} 레이아웃 수정`} data-testid="jamo-layout-mode">
-        <GlyphLayoutEditor key={`${selectedChar}:${layoutEpoch}`} codepoint={selectedChar.codePointAt(0) ?? 0xac00} initialPart={selection.kind === 'none' ? strokeEntryPart ?? undefined : selection.editorPart} onCommitted={commitLayoutDelta} onEditStrokes={editStrokes} />
+        <GlyphLayoutEditor key={`${selectedChar}:${layoutEpoch}`} codepoint={selectedChar.codePointAt(0) ?? 0xac00} initialPart={selection.kind === 'none' ? strokeEntryPart ?? undefined : selection.editorPart} onCommitted={commitLayoutDelta} onEditStrokes={editStrokes} onPickCharacter={openSoloChar} />
       </section> : <>
       <section className={styles.editor} data-chrome={chrome} aria-label={`${selectedChar} 완성 글자 편집`}>
         <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={isBrushStyleOpen ? { kind: 'none' } : selection} onSelect={isBrushStyleOpen ? () => {} : selectFromCanvas} selectedPoints={isBrushStyleOpen ? [] : selectedPoints} onPointSelect={isBrushStyleOpen ? () => {} : selectPointFromCanvas} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
