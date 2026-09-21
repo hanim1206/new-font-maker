@@ -6,3 +6,10 @@
 .card rect { fill-opacity: .26; }
 /* 켜진 칸은 색이 다 찬다. 테두리나 표지를 더 붙이면 누르는 것처럼 보인다. */
 .card[data-active] rect { fill-opacity: 1; }
+/* 획 편집: `기본` 칸까지 일곱. 세로가 모자란 화면에서는 칸을 줄여 캔버스 높이 안에 든다(캔버스 규칙과 같은 274px 고정 높이, 간격 6개 42px). */
+.strip[data-dense] .card { width: clamp(18px, calc((100dvh - 274px - 42px) / 7), 34px); }
+.card .ink { fill: none; stroke: rgb(var(--color-foreground)); stroke-linecap: butt; stroke-linejoin: miter; }
+/* 그 자소가 안 나오는 칸. 자리는 지키고 더 흐리다. */
+.card[data-absent] { opacity: .4; }
+/* `기본` 칸 바탕은 켜져 있어도 다른 칸처럼 옅다. 진하면 획이 묻힌다. */
+.card[data-active] rect.baseFill { fill-opacity: .26; }

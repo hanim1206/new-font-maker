@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
 })
 
-test('자소 탭 획 편집은 셸 안에서 문장·캔버스·트랙패드를 보여주고 획을 선택한다', async ({ page }) => {
+test('자소 탭 획 편집은 셸 안에서 문장·캔버스·도구 줄을 보여주고 획을 선택한다', async ({ page }) => {
   await page.goto('/workspace/jamo?mode=stroke')
 
   // 하단 내비는 없다. 화면 이동은 머리 `…` 메뉴 안에 있다.
@@ -17,7 +17,9 @@ test('자소 탭 획 편집은 셸 안에서 문장·캔버스·트랙패드를 
   await expect(page.getByRole('region', { name: '보정 문장' })).toBeVisible()
   const editor = page.getByRole('region', { name: /완성 글자 편집/ })
   await expect(editor).toBeVisible()
-  await expect(page.getByRole('group', { name: '선택한 글자 형태를 조절하는 트랙패드' })).toBeVisible()
+  // 셸 안에는 조절판이 없다. 옮기기는 캔버스에서 직접 하고 아래에는 도구 줄이 온다.
+  await expect(page.getByRole('group', { name: '선택한 글자 형태를 조절하는 트랙패드' })).toHaveCount(0)
+  await expect(page.getByTestId('jamo-stroke-tools')).toBeVisible()
 
   // 실행취소·다시실행은 셸 머리에만 있다.
   await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeDisabled()
@@ -30,10 +32,10 @@ test('자소 탭 획 편집은 셸 안에서 문장·캔버스·트랙패드를 
   }))
   expect(overflow.horizontal).toBeLessThanOrEqual(0)
   expect(overflow.vertical).toBeLessThanOrEqual(0)
-  const trackpadBox = await page.getByRole('group', { name: '선택한 글자 형태를 조절하는 트랙패드' }).boundingBox()
+  const trackpadBox = await page.getByTestId('jamo-stroke-tools').boundingBox()
   const bottom = page.viewportSize()?.height ?? 0
   expect(trackpadBox && trackpadBox.y + trackpadBox.height <= bottom + 1).toBe(true)
-  // 트랙패드 아래 `완료`도 화면 안에 들어온다(하단 내비가 없어 바닥이 곧 화면 끝이다).
+  // 도구 줄 아래 `완료`도 화면 안에 들어온다(하단 내비가 없어 바닥이 곧 화면 끝이다).
   const doneBox = await page.getByTestId('jamo-stroke-done').boundingBox()
   expect(doneBox && trackpadBox && doneBox.y >= trackpadBox.y + trackpadBox.height - 1 && doneBox.y + doneBox.height <= bottom + 1).toBe(true)
 
