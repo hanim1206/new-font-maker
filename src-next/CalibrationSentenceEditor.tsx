@@ -71,6 +71,7 @@ import { useFontExportStore } from './fontExportStore'
 import { useGlobalStyleStore, type GlobalStyle } from '../src/stores/globalStyleStore'
 import { BrushStyleTrackpad } from './BrushStyleTrackpad'
 import { StemBeakControls } from './StemBeakControls'
+import { designBodySvgTransform } from '../src/services/designBodyPlacement'
 import { DEFAULT_STEM_BEAK, type StemBeakStyle } from '../src/services/stemBeak'
 import styleMode from './GlobalStyleMode.module.css'
 import { GlobalStyleTrackpad, type GlobalStylePanel } from './GlobalStyleTrackpad'
@@ -418,7 +419,7 @@ function FocusedGlyph({
   globalStyle: GlobalStyle
 }) {
   // 배치는 칸 해석 함수(모델 상자)가 우선, 못 풀면 스키마. 획 겨냥·편집 오버레이도 같은 상자를 쓴다.
-  const { placement, resolution } = useContextPlacement(syllable, schema, globalStyle)
+  const { placement, resolution, referencePlacement } = useContextPlacement(syllable, schema, globalStyle)
   const boxes = useMemo(() => placement.kind === 'boxes' ? placement.boxes : calculateBoxes(schema, {
     cho: syllable.choseong?.char ?? '',
     jung: syllable.jungseong?.char ?? '',
@@ -432,7 +433,8 @@ function FocusedGlyph({
   // Noto 고스트: 표시·비교 전용. 잉크에 안 섞인다. 켬/끔은 기기에 기억한다.
   const [ghostVisible, setGhostVisible] = useState(loadGhostVisible)
   const { ghost, error: ghostError } = useNotoGhost(char, ghostVisible)
-  const comparison = useGhostComparison(ghost, syllable, placement, globalStyle)
+  // Noto 고스트는 기준 틀(기본 네모꼴) 좌표다. 견줄 때는 네모꼴을 얹기 전 자리끼리 견주고, 그릴 때는 고스트를 같은 변환으로 옮긴다.
+  const comparison = useGhostComparison(ghost, syllable, referencePlacement, globalStyle)
   const toggleGhost = () => setGhostVisible((current) => { saveGhostVisible(!current); return !current })
   const selectedPart = selection.kind === 'none' ? null : selection.editorPart
   const selectedStrokeId = selection.kind === 'stroke' || selection.kind === 'point' || selection.kind === 'handle'
@@ -504,7 +506,7 @@ function FocusedGlyph({
         <line x1={-6} x2={102} y1={88} y2={88} stroke="#a6a297" strokeWidth={0.3} />
         <PartBoxes boxes={inkBoxes} activePart={selectedPart} />
       </>} underlay={<>
-        {ghostVisible && ghost && <path d={ghost.path} className={styles.notoGhost} fillRule="evenodd" data-testid="noto-ghost" />}
+        {ghostVisible && ghost && <path d={ghost.path} transform={designBodySvgTransform(schema.padding, VIEW_BOX_SIZE)} className={styles.notoGhost} fillRule="evenodd" data-testid="noto-ghost" />}
       </>}>
         {targets.map((target) => {
           // 잠긴 동안 다른 자소는 눌리지 않는다. 잠긴 자소의 획은 자소 통째 선택을 거치지 않고 바로 잡힌다.

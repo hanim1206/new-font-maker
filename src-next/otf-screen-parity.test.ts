@@ -190,6 +190,33 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
     }
   })
 
+  it('네모꼴 가로 600: 글자가 틀을 따라 줄고, OTF 잉크가 글자 폭 안에 든다(화면과 같은 상자)', async () => {
+    const { measure } = await setup()
+    const { useLayoutStore } = await import('../src/stores/layoutStore')
+    const before = useLayoutStore.getState().globalPadding
+    const wide = ['한', '를', '뷁'].map((char) => ({ char, ...measure(char) }))
+    useLayoutStore.getState().setGlobalPadding({ ...before, left: 0.2, right: 0.2 })
+    try {
+      const rows = ['한', '를', '뷁'].map((char) => ({ char, ...measure(char) }))
+      console.info(rows.map((row) => `${row.char} 네모꼴 600 · 모델 ${(row.modelXor * 100).toFixed(3)}% · 가장자리 ${row.edgeDrift.toFixed(2)}유닛 · 글자 폭 ${row.data.advanceWidth}`).join('\n'))
+      rows.forEach((row, index) => {
+        expect(row.screenKind, row.char).toBe('boxes')
+        expect(row.otfBoxes, row.char).toEqual(row.screenBoxes)
+        expect(row.edgeDrift, row.char).toBeLessThan(1)
+        expect(row.data.advanceWidth, row.char).toBe(600)
+        // 잉크의 가로 범위가 글자 폭 안에 든다(전에는 1000 기준 자리에 그대로 남아 옆 글자와 겹쳤다).
+        const xs = row.otf.flatMap((polygon) => polygon[0].map(([x]) => x))
+        expect(Math.min(...xs) - 0.2, row.char).toBeGreaterThanOrEqual(-0.02)
+        expect(Math.max(...xs) - 0.2, row.char).toBeLessThanOrEqual(0.62)
+        // 기본 네모꼴일 때보다 상자가 좁아졌다.
+        const width = (boxes: typeof row.screenBoxes) => Math.max(...boxes.flatMap((item) => item ? [item.box.x + item.box.width] : [])) - Math.min(...boxes.flatMap((item) => item ? [item.box.x] : []))
+        expect(width(row.screenBoxes), row.char).toBeLessThan(width(wide[index].screenBoxes) * 0.75)
+      })
+    } finally {
+      useLayoutStore.getState().setGlobalPadding(before)
+    }
+  })
+
   it('G1 — 레이아웃 대표 12자와 Δ 세 층(전체 · 이 레이아웃 · 이 자모)이 OTF에 그대로 들어간다', async () => {
     const { measure, deltaStore, resolver, hangul, jamo, rule } = await setup()
     const before = Object.fromEntries(HOLDOUT.map((char) => [char, measure(char)]))

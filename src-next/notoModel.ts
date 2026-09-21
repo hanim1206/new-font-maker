@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { identityOfSyllable, resolveContextBoxes } from '../src/services/contextBoxResolver'
 import type { ContextBoxDelta, ContextBoxResolution } from '../src/services/contextBoxResolver'
+import { isReferenceBody, mapBoxToDesignBody, mapFacesToDesignBody } from '../src/services/designBodyPlacement'
 import type { GlyphInkPlacement } from '../src/services/notoGlyphXor'
 import type { ModelIdentity } from '../src/services/notoVariationModel'
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
@@ -49,11 +50,22 @@ export function contextPlacementOf(input: {
   schema: LayoutSchema
   ends: Pick<GlobalStyle, 'linecap' | 'linejoin'>
   delta: ContextBoxDelta | undefined
-}): { placement: GlyphPlacement; resolution: ContextBoxResolution | null } {
+}): { placement: GlyphPlacement; resolution: ContextBoxResolution | null; referencePlacement: GlyphPlacement } {
   const { bundle, identity, syllable, schema, ends, delta } = input
-  const resolution = identity && bundle ? resolveContextBoxes({ identity, model: bundle, syllable, ends: { linecap: ends.linecap, linejoin: ends.linejoin }, delta }) : null
-  if (resolution?.complete) return { placement: { kind: 'boxes', boxes: resolution.boxes }, resolution }
-  return { placement: { kind: 'schema', schema }, resolution }
+  const reference = identity && bundle ? resolveContextBoxes({ identity, model: bundle, syllable, ends: { linecap: ends.linecap, linejoin: ends.linejoin }, delta }) : null
+  // 모델 상자와 레이아웃 Δ는 기본 네모꼴(850) 기준 좌표다. 사용자 네모꼴은 맨 끝에 한 번 얹는다 — 화면과 OTF가 여기를 같이 지나므로 둘이 안 갈라진다.
+  const resolution = reference && !isReferenceBody(schema.padding) ? inDesignBody(reference, schema.padding) : reference
+  // `referencePlacement`는 네모꼴을 얹기 전 자리다. Noto 고스트(기준 틀 좌표)와 견줄 때만 쓴다.
+  if (resolution?.complete && reference) return { placement: { kind: 'boxes', boxes: resolution.boxes }, resolution, referencePlacement: { kind: 'boxes', boxes: reference.boxes } }
+  return { placement: { kind: 'schema', schema }, resolution, referencePlacement: { kind: 'schema', schema } }
+}
+
+function inDesignBody(resolution: ContextBoxResolution, padding: LayoutSchema['padding']): ContextBoxResolution {
+  return {
+    ...resolution,
+    parts: resolution.parts.map((part) => ({ ...part, faces: mapFacesToDesignBody(part.faces, padding), box: mapBoxToDesignBody(part.box, padding) })),
+    boxes: Object.fromEntries(Object.entries(resolution.boxes).map(([part, box]) => [part, mapBoxToDesignBody(box, padding)])) as ContextBoxResolution['boxes'],
+  }
 }
 
 /**
@@ -61,7 +73,7 @@ export function contextPlacementOf(input: {
  * 모델 상자는 획 두께(전역 캡)에 맞춰 다듬으므로 전역 스타일을 받고,
  * 레이아웃 모드에서 저장한 배치 Δ(`layoutDeltaStore`, 전체 + 이 레이아웃 + 자모 층)를 글자별로 얹는다.
  */
-export function useContextPlacement(syllable: DecomposedSyllable, schema: LayoutSchema, globalStyle: Pick<GlobalStyle, 'linecap' | 'linejoin'>): { placement: GlyphPlacement; resolution: ContextBoxResolution | null } {
+export function useContextPlacement(syllable: DecomposedSyllable, schema: LayoutSchema, globalStyle: Pick<GlobalStyle, 'linecap' | 'linejoin'>): { placement: GlyphPlacement; resolution: ContextBoxResolution | null; referencePlacement: GlyphPlacement } {
   const { bundle } = useNotoModel()
   const identity = useMemo(() => bundle ? identityOfSyllable(syllable) : null, [bundle, syllable])
   const delta = useLayoutDelta(identity)
