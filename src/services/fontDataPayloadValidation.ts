@@ -454,13 +454,24 @@ function validateStrokeStyle(value: unknown, path: string, issues: FontPayloadVa
   if (value.mode === 'dot-pattern' && typeof value.stagger !== 'boolean') push(issues, 'invalid-field', `${path}.stagger`, 'stagger는 boolean이어야 합니다.')
 }
 
+function validateStemBeak(value: unknown, path: string, issues: FontPayloadValidationIssue[]): void {
+  if (!isRecord(value)) return push(issues, 'invalid-field', path, 'stemBeak는 객체여야 합니다.')
+  exactKeys(value, ['enabled', 'shape', 'size', 'angle'], ['enabled', 'shape', 'size', 'angle'], path, issues)
+  if (!['angled', 'slab', 'round', 'bar', 'flare'].includes(String(value.shape))) push(issues, 'invalid-field', `${path}.shape`, 'stemBeak shape이 유효하지 않습니다.')
+  if (typeof value.enabled !== 'boolean') push(issues, 'invalid-field', `${path}.enabled`, 'stemBeak enabled는 boolean이어야 합니다.')
+  finite(value.size, `${path}.size`, issues)
+  finite(value.angle, `${path}.angle`, issues)
+}
+
 function validateGlobalStyle(value: unknown, issues: FontPayloadValidationIssue[], allowLegacy: boolean): void {
   if (!isRecord(value)) return
   const style = value.style
   if (isRecord(style)) {
     const path = '$.globalStyle.style'
     const keys = ['slant', 'weight', 'letterSpacing', 'linecap', 'linejoin', 'brush', 'strokeStyle']
-    exactKeys(style, keys, keys, path, issues)
+    // 부리는 나중에 생긴 값이라 없어도 된다(옛 저장분).
+    exactKeys(style, [...keys, 'stemBeak'], keys, path, issues)
+    if (style.stemBeak !== undefined) validateStemBeak(style.stemBeak, `${path}.stemBeak`, issues)
     for (const key of ['slant', 'weight', 'letterSpacing']) finite(style[key], `${path}.${key}`, issues)
     if (!['round', 'butt', 'square'].includes(String(style.linecap))) push(issues, 'invalid-field', `${path}.linecap`, 'linecap이 유효하지 않습니다.')
     if (!['miter', 'round', 'bevel'].includes(String(style.linejoin))) push(issues, 'invalid-field', `${path}.linejoin`, 'linejoin이 유효하지 않습니다.')
@@ -474,7 +485,7 @@ function validateGlobalStyle(value: unknown, issues: FontPayloadValidationIssue[
       if (!isRecord(entry)) return push(issues, 'invalid-field', path, 'exclusion은 객체여야 합니다.')
       exactKeys(entry, ['id', 'property', 'layoutType'], ['id', 'property', 'layoutType'], path, issues)
       if (typeof entry.id !== 'string' || entry.id.length === 0) push(issues, 'invalid-field', `${path}.id`, 'exclusion id가 유효하지 않습니다.')
-      if (!['slant', 'weight', 'letterSpacing', 'linecap', 'linejoin', 'brush', 'strokeStyle'].includes(String(entry.property))) push(issues, 'invalid-field', `${path}.property`, 'exclusion property가 유효하지 않습니다.')
+      if (!['slant', 'weight', 'letterSpacing', 'linecap', 'linejoin', 'brush', 'strokeStyle', 'stemBeak'].includes(String(entry.property))) push(issues, 'invalid-field', `${path}.property`, 'exclusion property가 유효하지 않습니다.')
       if (!LAYOUT_TYPE_SET.has(String(entry.layoutType))) push(issues, 'invalid-field', `${path}.layoutType`, 'layoutType이 유효하지 않습니다.')
     })
   }

@@ -28,6 +28,7 @@ import type { GlyphData, GlyphPlacementResolver } from './fontExportUtils'
 import { mergeStrokeContourGroupsForCff } from './contourBoolean'
 import { brushInkGroupsToFontContours, strokeToBrushInkGroups } from './brushGeometry'
 import { strokeToRenderInkGroups } from './strokeRenderGeometry'
+import { stemBeakInkGroups } from './stemBeak'
 import type { DeepReadonly } from '../types'
 import type { FinalGlyphInk } from './finalGlyphInk'
 import { projectFinalGlyphInkToFontContours } from './finalGlyphInk'
@@ -356,6 +357,15 @@ export function glyphDataToFontContours(glyphData: GlyphData): Contour[] {
     )
     if (contours.length > 0) contourGroups.push(contours)
   }
+
+  // 세로줄기 부리: 화면과 같은 함수로 만든 면을 획 잉크와 함께 합친다.
+  const beakGroups = stemBeakInkGroups(glyphData.strokes.map((resolved, index) => ({
+    stroke: resolved.stroke,
+    box: resolved.box,
+    weightMultiplier: glyphData.weightMultiplier,
+    group: resolved.beakGroup ?? `stroke-${index}`,
+  })), glyphData.stemBeak, glyphData.strokeStyle)
+  contourGroups.push(...brushInkGroupsToFontContours(beakGroups.flat(), UPM, ASCENDER, glyphData.slant))
 
   let mergedContours: Contour[]
   try {

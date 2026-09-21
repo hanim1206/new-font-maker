@@ -19,6 +19,33 @@ test.describe('획 문법 랩', () => {
     await expect(giyeok.getByText('이름 없음')).toBeVisible()
   })
 
+  test('부리를 켜고 모양을 고르면 표본 글자와 낱자 카드에 한 번에 반영되고, 끄면 사라진다', async ({ page }) => {
+    await page.goto('/stroke-grammar-lab')
+    const samples = page.getByTestId('stem-beak-samples')
+    await expect(samples.locator('svg')).toHaveCount(14)
+    await expect(page.locator('[data-stem-beak]')).toHaveCount(0)
+    await expect(page.locator('polygon[data-marker="beak"]')).toHaveCount(0)
+
+    await page.locator('button[data-beak-shape="round"]').click()
+    await expect(page.getByLabel('부리 켜기')).toBeChecked()
+    await expect(page.locator('button[data-beak-shape="round"]')).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByLabel('부리 각도')).toBeDisabled()
+    const beakCount = await samples.locator('[data-stem-beak]').count()
+    expect(beakCount).toBeGreaterThan(14)
+    // ㅂ 카드: 획 하나 안의 두 세로 마디에 부리 자리 둘. ㄱ 카드: 없음.
+    await expect(page.locator('article[data-jamo="ㅂ"][data-jamo-type="choseong"] polygon[data-marker="beak"]')).toHaveCount(2)
+    await expect(page.locator('article[data-jamo="ㄱ"][data-jamo-type="choseong"] polygon[data-marker="beak"]')).toHaveCount(0)
+
+    const roundPath = await samples.locator('[data-stem-beak]').first().getAttribute('d')
+    await page.locator('button[data-beak-shape="angled"]').click()
+    await expect(page.getByLabel('부리 각도')).toBeEnabled()
+    await expect(samples.locator('[data-stem-beak]')).toHaveCount(beakCount)
+    expect(await samples.locator('[data-stem-beak]').first().getAttribute('d')).not.toBe(roundPath)
+
+    await page.getByLabel('부리 켜기').uncheck()
+    await expect(page.locator('[data-stem-beak]')).toHaveCount(0)
+  })
+
   test('360 너비에서 가로로 넘치지 않는다', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 740 })
     await page.goto('/stroke-grammar-lab')

@@ -7,6 +7,7 @@ import type { GlobalStyle } from '../stores/globalStyleStore'
 import { brushInkGroupsToSvgPaths, strokeToBrushInkGroups } from '../services/brushGeometry'
 import { resolveGlyphInkPrimitives } from '../services/glyphInkResolver'
 import { strokeToRenderInkGroups } from '../services/strokeRenderGeometry'
+import { stemBeakGroupOf, stemBeakInkGroups } from '../services/stemBeak'
 
 // 파트별 스타일 (자모 편집 시 비편집 파트 흐리게 표시 등)
 export interface PartStyle {
@@ -107,6 +108,18 @@ export function SvgRenderer({
   }), [resolvedInk.primitives])
   const boxes = resolvedInk.boxes
   const renderOrder = resolvedInk.renderOrder
+  // 세로줄기 부리: 획 데이터가 아니라 전역 스타일이 얹는 면이다. 추출기와 같은 함수로 만든다.
+  const stemBeak = globalStyle?.stemBeak
+  const beakRenderStyle = globalStyle?.strokeStyle
+  const beakPathsById = useMemo(() => {
+    const groups = stemBeakInkGroups(centerlines.map((primitive) => ({
+      stroke: asLegacyReadonlyStroke(primitive.stroke),
+      box: primitive.box,
+      weightMultiplier: primitive.weightMultiplier,
+      group: stemBeakGroupOf(primitive.source),
+    })), stemBeak, beakRenderStyle)
+    return new Map(centerlines.map((primitive, index) => [primitive.id, brushInkGroupsToSvgPaths(groups[index], VIEW_BOX_SIZE)]))
+  }, [centerlines, stemBeak, beakRenderStyle])
 
   const renderPrimitive = (
     primitive: ResolvedCenterlinePrimitive,
@@ -117,6 +130,7 @@ export function SvgRenderer({
     const d = pointsToSvgD(stroke.points, stroke.closed, primitive.box, VIEW_BOX_SIZE)
     if (!d) return null
     const strokeWidth = stroke.thickness * primitive.weightMultiplier * VIEW_BOX_SIZE
+    const beaks = beakPathsById.get(primitive.id) ?? []
 
     const renderStyle = globalStyle?.strokeStyle ?? (globalStyle?.brush ? { mode: 'brush' as const, brush: globalStyle.brush } : undefined)
     if (renderStyle && (renderStyle.mode !== 'brush' || renderStyle.brush.tip !== 'round')) {
@@ -129,6 +143,16 @@ export function SvgRenderer({
       return (
         <g key={primitive.id}>
           {paths.map((path, index) => <path key={`${primitive.id}-brush-${index}`} d={path} fill={color} fillRule="evenodd" />)}
+          {beaks.map((path, index) => <path key={`${primitive.id}-beak-${index}`} d={path} fill={color} data-stem-beak="true" />)}
+        </g>
+      )
+    }
+
+    if (beaks.length > 0) {
+      return (
+        <g key={primitive.id}>
+          <path d={d} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap={primitive.effectiveLinecap} strokeLinejoin={primitive.effectiveLinejoin} />
+          {beaks.map((path, index) => <path key={`${primitive.id}-beak-${index}`} d={path} fill={color} data-stem-beak="true" />)}
         </g>
       )
     }

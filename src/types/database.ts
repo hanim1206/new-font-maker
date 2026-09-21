@@ -21,6 +21,8 @@ export interface FontGlobalStyle {
   linejoin: StrokeLinejoin
   brush: BrushStyle
   strokeStyle: StrokeRenderStyle
+  /** 세로줄기 부리. 나중에 생긴 값이라 옛 저장분에는 없다. */
+  stemBeak?: { enabled: boolean; shape: 'angled' | 'slab' | 'round' | 'bar' | 'flare'; size: number; angle: number }
 }
 
 export interface FontGlobalStyleExclusion {

@@ -47,11 +47,24 @@ export type JamoType = JamoData['type']
 type GrammarTable = Record<JamoType, Record<string, Record<string, StemName | null>>>
 const TABLE = grammar as unknown as GrammarTable
 
+export interface StemSegmentEnd {
+  point: number
+  x: number
+  y: number
+  /** 획의 끝이면 `end`, 다음 마디로 꺾여 이어지는 자리면 `corner`. */
+  kind: 'end' | 'corner'
+  /** 획의 끝이면서 같은 채널의 다른 획에 안 붙어 있을 때만 열린 끝이다. 꺾임은 늘 닫혀 있다. */
+  open: boolean
+}
+
 export interface StemSegment {
   shape: StemShape
   /** 마디가 시작하고 끝나는 점의 순번(`stroke.points` 기준). 닫힌 획은 끝 순번이 시작보다 작을 수 있다. */
   fromPoint: number
   toPoint: number
+  /** 마디의 머리와 맺음. 가로줄기는 왼 · 오른, 나머지는 위 · 아래. 둥근줄기에는 없다. */
+  head: StemSegmentEnd | null
+  tail: StemSegmentEnd | null
 }
 
 export interface StemCorner {
@@ -103,33 +116,30 @@ export function describeJamoStrokes(jamo: JamoData, options: DescribeOptions = {
     return strokes.map((stroke) => {
       const bound = stroke.id in table && !options.released?.has(stroke.id)
       const others = strokes.filter((other) => other.id !== stroke.id)
-      return { strokeId: stroke.id, channel, bound, name: bound ? table[stroke.id] : null, ...describeGeometry(stroke, others) }
+      return { strokeId: stroke.id, channel, bound, name: bound ? table[stroke.id] : null, ...describeStrokeGeometry(stroke, others) }
     })
   })
 }
 
-type Geometry = Pick<StrokeDescription, 'segments' | 'corners' | 'head' | 'tail'>
+export type StrokeGeometry = Pick<StrokeDescription, 'segments' | 'corners' | 'head' | 'tail'>
 
-function describeGeometry(stroke: StrokeDataV2, others: readonly StrokeDataV2[]): Geometry {
+/** 이름표 없이 획 하나의 모양만 읽는다. `others`는 같은 채널의 나머지 획(닿음 판정용). */
+export function describeStrokeGeometry(stroke: StrokeDataV2, others: readonly StrokeDataV2[]): StrokeGeometry {
   const points = ringPoints(stroke)
   if (points.length < 2) return { segments: [], corners: [], head: null, tail: null }
 
   if (stroke.closed && points.every(hasHandle)) {
-    return { segments: [{ shape: 'dunggeunjulgi', fromPoint: 0, toPoint: 0 }], corners: [], head: null, tail: null }
+    return { segments: [{ shape: 'dunggeunjulgi', fromPoint: 0, toPoint: 0, head: null, tail: null }], corners: [], head: null, tail: null }
   }
 
+  const isOpen = (point: number) => others.every((other) => distanceToStroke(points[point], other) > TOUCH_DISTANCE)
   const corners = cornersOf(points, stroke.closed)
-  const segments = segmentsOf(points, corners, stroke.closed)
+  const segments = segmentsOf(points, corners, stroke.closed, isOpen)
   if (stroke.closed) return { segments, corners, head: null, tail: null }
 
   const last = points.length - 1
   const firstIsHead = comesFirst(points[0], points[last])
-  const end = (point: number): StemEnd => ({
-    point,
-    x: points[point].x,
-    y: points[point].y,
-    open: others.every((other) => distanceToStroke(points[point], other) > TOUCH_DISTANCE),
-  })
+  const end = (point: number): StemEnd => ({ point, x: points[point].x, y: points[point].y, open: isOpen(point) })
   return { segments, corners, head: end(firstIsHead ? 0 : last), tail: end(firstIsHead ? last : 0) }
 }
 
@@ -175,9 +185,21 @@ function turnDegrees(ax: number, ay: number, bx: number, by: number): number {
   return Math.acos(cosine) * 180 / Math.PI
 }
 
-function segmentsOf(points: readonly AnchorPoint[], corners: readonly StemCorner[], closed: boolean): StemSegment[] {
+function segmentsOf(points: readonly AnchorPoint[], corners: readonly StemCorner[], closed: boolean, isOpen: (point: number) => boolean): StemSegment[] {
   const last = points.length - 1
-  const segment = (fromPoint: number, toPoint: number): StemSegment => ({ shape: shapeOf(points[fromPoint], points[toPoint]), fromPoint, toPoint })
+  const isStrokeEnd = (point: number) => !closed && (point === 0 || point === last)
+  const end = (point: number): StemSegmentEnd => {
+    const kind = isStrokeEnd(point) ? 'end' : 'corner'
+    return { point, x: points[point].x, y: points[point].y, kind, open: kind === 'end' && isOpen(point) }
+  }
+  const segment = (fromPoint: number, toPoint: number): StemSegment => {
+    const shape = shapeOf(points[fromPoint], points[toPoint])
+    const from = points[fromPoint]
+    const to = points[toPoint]
+    // 가로줄기는 왼쪽이 머리, 나머지는 위쪽이 머리.
+    const fromIsHead = shape === 'garojulgi' ? from.x <= to.x : from.y <= to.y
+    return { shape, fromPoint, toPoint, head: end(fromIsHead ? fromPoint : toPoint), tail: end(fromIsHead ? toPoint : fromPoint) }
+  }
   if (!closed) {
     const stops = [0, ...corners.map(({ point }) => point), last]
     return stops.slice(1).map((toPoint, index) => segment(stops[index], toPoint))

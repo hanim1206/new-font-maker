@@ -33,3 +33,21 @@
 .card li code { color: rgb(var(--color-text-4)); font-size: 10px; }
 .card li strong { color: rgb(var(--color-text-2)); font-weight: 800; }
 .card li span { grid-column: 2 / -1; color: rgb(var(--color-text-4)); font-size: 10px; }
+.legendBeak { display: inline-block; width: 12px; height: 10px; background: rgb(220 38 38 / .45); clip-path: polygon(100% 0, 0 10%, 60% 100%, 100% 100%); }
+.beak { fill: rgb(220 38 38 / .45); stroke: none; }
+
+.hero, .legend, .section, .beakPanel { width: min(1320px, 100%); margin-inline: auto; }
+.beakPanel { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 18px; box-sizing: border-box; margin-top: 16px; padding: 18px 20px; border: 1px solid rgb(var(--color-border)); border-radius: 16px; background: white; }
+.beakControls { display: grid; align-content: start; gap: 10px; }
+.beakControls h2 { font-size: 20px; letter-spacing: -.03em; }
+.beakControls p { color: rgb(var(--color-text-3)); font-size: 12px; line-height: 1.6; }
+.beakControls label { display: grid; gap: 4px; color: rgb(var(--color-text-2)); font-size: 12px; font-weight: 700; }
+.beakControls label span { display: flex; justify-content: space-between; }
+.beakToggle { grid-auto-flow: column; justify-content: start; align-items: center; gap: 8px !important; font-size: 14px !important; }
+.beakSamples { display: flex; flex-wrap: wrap; align-content: start; gap: 4px; min-width: 0; }
+@media (max-width: 720px) { .beakPanel { grid-template-columns: minmax(0, 1fr); } }
+.beakShapes { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.beakShapes button { display: grid; justify-items: center; gap: 4px; padding: 8px 4px 6px; border: 2px solid rgb(var(--color-border-subtle)); border-radius: 12px; background: #f8fafc; color: rgb(var(--color-text-3)); font-size: 11px; font-weight: 750; }
+.beakShapes button svg { width: 56px; height: 56px; fill: #1f2937; }
+.beakShapes button[aria-checked='true'] { border-color: #1d4f9b; background: #e8effd; color: #1d4f9b; }
+.beakShapes button[aria-checked='true'] svg { fill: #1d4f9b; }

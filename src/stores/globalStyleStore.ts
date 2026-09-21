@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { persist } from 'zustand/middleware'
 import type { BrushStyle, LayoutType, StrokeLinecap, StrokeLinejoin, StrokeRenderStyle } from '../types'
+import { DEFAULT_STEM_BEAK, normalizeStemBeak, type StemBeakStyle } from '../services/stemBeak'
 
 export { weightToMultiplier } from '../utils/globalStyleUtils'
 
@@ -16,6 +17,7 @@ export interface GlobalStyle {
   linejoin: StrokeLinejoin // 획 꺾임 모양 (기본 'miter')
   brush: BrushStyle       // 폰트 전체에 적용하는 붓촉
   strokeStyle: StrokeRenderStyle // 중심선을 최종 윤곽으로 바꾸는 공통 규칙
+  stemBeak?: StemBeakStyle // 세로줄기 열린 머리에 얹는 부리. 없으면 꺼짐(옛 저장분)
 }
 
 // 숫자 속성만 (updateStyle에서 사용)
@@ -43,6 +45,7 @@ interface GlobalStyleActions {
   updateLinejoin: (value: StrokeLinejoin) => void
   setBrushStyle: (value: BrushStyle) => void
   setStrokeRenderStyle: (value: StrokeRenderStyle) => void
+  setStemBeak: (value: Partial<StemBeakStyle>) => void
 
   // 제외 규칙 관리
   addExclusion: (property: keyof GlobalStyle, layoutType: LayoutType) => void
@@ -77,6 +80,7 @@ export const DEFAULT_STYLE: GlobalStyle = {
   linejoin: 'miter',
   brush: { tip: 'round', aspectRatio: 0.5, angle: 0 },
   strokeStyle: { mode: 'brush', brush: { tip: 'round', aspectRatio: 0.5, angle: 0 } },
+  stemBeak: { ...DEFAULT_STEM_BEAK },
 }
 
 export function normalizeBrushStyle(value: Partial<BrushStyle> | undefined): BrushStyle {
@@ -117,7 +121,7 @@ export function normalizeStrokeRenderStyle(
 function normalizeGlobalStyle(style: GlobalStyle): GlobalStyle {
   const brush = normalizeBrushStyle(style.brush)
   const strokeStyle = normalizeStrokeRenderStyle(style.strokeStyle, brush)
-  return { ...style, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : brush, strokeStyle }
+  return { ...style, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : brush, strokeStyle, stemBeak: normalizeStemBeak(style.stemBeak) }
 }
 
 export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>()(
@@ -152,6 +156,11 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
         set((state) => {
           state.style.strokeStyle = normalizeStrokeRenderStyle(value, state.style.brush)
           if (state.style.strokeStyle.mode === 'brush') state.style.brush = state.style.strokeStyle.brush
+        }),
+
+      setStemBeak: (value) =>
+        set((state) => {
+          state.style.stemBeak = normalizeStemBeak({ ...DEFAULT_STEM_BEAK, ...state.style.stemBeak, ...value })
         }),
 
       addExclusion: (property, layoutType) =>

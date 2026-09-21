@@ -16,6 +16,7 @@ import type {
 import { useJamoStore } from '../stores/jamoStore'
 import { useLayoutStore } from '../stores/layoutStore'
 import { useGlobalStyleStore, weightToMultiplier } from '../stores/globalStyleStore'
+import { stemBeakGroupOf, type StemBeakStyle } from './stemBeak'
 import type { GlobalStyle } from '../stores/globalStyleStore'
 import { decomposeSyllableWithOverrides } from '../utils/hangulUtils'
 import { resolveGlyphInkPrimitives } from './glyphInkResolver'
@@ -40,6 +41,8 @@ export interface ResolvedStroke {
   box: BoxConfig
   effectiveLinecap: StrokeLinecap
   effectiveLinejoin: StrokeLinejoin
+  /** 부리의 닿음 판정을 같이 볼 묶음(같은 자소의 같은 채널). 없으면 획마다 따로 본다. */
+  beakGroup?: string
 }
 
 /** 단일 폰트 글리프에 필요한 모든 데이터 */
@@ -52,6 +55,8 @@ export interface GlyphData {
   slant: number
   brush: BrushStyle
   strokeStyle: StrokeRenderStyle
+  /** 세로줄기 부리. 없으면 꺼짐. */
+  stemBeak?: StemBeakStyle
   /** 자소 상자를 어디서 가져왔는지. 모델 상자를 기대했는데 스키마로 떨어진 글자를 세는 데 쓴다. */
   placementKind: GlyphInkPlacement['kind']
 }
@@ -103,6 +108,7 @@ function projectCenterlinesToLegacyOtfStrokes(
       box: { ...primitive.box, x: primitive.box.x - originX },
       effectiveLinecap: primitive.effectiveLinecap,
       effectiveLinejoin: primitive.effectiveLinejoin,
+      beakGroup: stemBeakGroupOf(primitive.source),
     }
   })
 }
@@ -186,6 +192,7 @@ export function collectGlyphDataWithPlacement(char: string, placementOf?: GlyphP
     slant: effectiveStyle.slant,
     brush: effectiveStyle.brush,
     strokeStyle: effectiveStyle.strokeStyle,
+    stemBeak: effectiveStyle.stemBeak,
     placementKind: placement.kind,
   }
 }
