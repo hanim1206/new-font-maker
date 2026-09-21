@@ -50,13 +50,13 @@
       "unicode": 44285,
       "advanceWidth": 850,
       "bbox": {
-        "x1": -85,
-        "y1": -102,
-        "x2": 855,
-        "y2": 851
+        "x1": -81,
+        "y1": -99,
+        "x2": 851,
+        "y2": 849
       },
-      "commandCount": 41,
-      "commandsSha256": "e42080f9df25bf2b66523f4da570ae35c06fb8efe84c5fe6cbbd89ee7b2be0ec"
+      "commandCount": 100,
+      "commandsSha256": "e5dbbe7e62b68c801173f5598bdae978647307aa4032af0ba609b84fe68ba996"
     }
   }
 }

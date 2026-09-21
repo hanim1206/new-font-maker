@@ -49,7 +49,28 @@ describe('공통 절단각 면적형 획', () => {
     ])
     const sharp = strokeToAngledAreaInkGroups(curve, box, 1, { ...area, cornerRadius: 0 })[0][0]
     const rounded = strokeToAngledAreaInkGroups(curve, box, 1, { ...area, cornerRadius: 1 })[0][0]
-    expect(rounded).toEqual(sharp)
+    // 곡률은 끝면의 네 모서리만 굴린다. 곡선의 옆면(끝 모서리를 뺀 나머지 점)은 그대로다.
+    const half = sharp.length / 2
+    const ends = new Set([0, half - 1, half, sharp.length - 1])
+    const sides = sharp.filter((_, index) => !ends.has(index))
+    for (const point of sides) expect(rounded).toContainEqual(point)
+    expect(rounded.length).toBe(sharp.length + 4 * 4)
+  })
+
+  it('꺾임 없는 직선 줄기(홀자)도 끝 모서리가 굴려진다 — 곡률 0이면 네 점 그대로', () => {
+    const stem = stroke([{ x: 0.5, y: 0.1 }, { x: 0.5, y: 0.9 }])
+    const sharp = strokeToAngledAreaInkGroups(stem, box, 1, { ...area, cornerRadius: 0 })[0][0]
+    const rounded = strokeToAngledAreaInkGroups(stem, box, 1, { ...area, cornerRadius: 0.6 })[0][0]
+    expect(sharp).toHaveLength(4)
+    expect(rounded).toHaveLength(20)
+    // 굴린 윤곽은 각진 윤곽 밖으로 나가지 않는다.
+    const xs = sharp.map((point) => point.x), ys = sharp.map((point) => point.y)
+    for (const point of rounded) {
+      expect(point.x).toBeGreaterThanOrEqual(Math.min(...xs) - 1e-9)
+      expect(point.x).toBeLessThanOrEqual(Math.max(...xs) + 1e-9)
+      expect(point.y).toBeGreaterThanOrEqual(Math.min(...ys) - 1e-9)
+      expect(point.y).toBeLessThanOrEqual(Math.max(...ys) + 1e-9)
+    }
   })
 
   it('짧은 획·중복점·베지어·닫힌 곡선에서 빈 값이나 NaN을 만들지 않는다', () => {

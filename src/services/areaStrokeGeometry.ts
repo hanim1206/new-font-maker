@@ -112,7 +112,32 @@ function openStrokeContour(points: BrushPoint[], halfWidth: number, cutDirection
     ...points.slice(1, -1).flatMap((center, innerIndex) => joinPoints(points[innerIndex], center, points[innerIndex + 2], halfWidth, -1, cornerRadius)),
     add(add(points.at(-1)!, lastTangent, -endShift), offsets.at(-1)!, -1),
   ].reverse()
-  return [...left, ...right]
+  // 끝면의 네 모서리도 꺾임과 같은 곡률로 굴린다. 꺾임이 없는 직선 줄기(홀자 대부분)는 굴릴 자리가 여기뿐이다.
+  const ends = new Set([0, left.length - 1, left.length, left.length + right.length - 1])
+  return filletCorners([...left, ...right], ends, Math.max(0, Math.min(1, cornerRadius)) * halfWidth)
+}
+
+/** 고른 꼭짓점만 길이 `reach`만큼 양쪽 변을 따라 물러나 2차 곡선으로 굴린다. 이웃 변의 45%를 넘지 않는다. */
+function filletCorners(contour: BrushContour, corners: ReadonlySet<number>, reach: number): BrushContour {
+  if (reach <= EPSILON) return contour
+  return contour.flatMap((corner, index) => {
+    if (!corners.has(index)) return [corner]
+    const previous = contour[(index - 1 + contour.length) % contour.length]
+    const next = contour[(index + 1) % contour.length]
+    const toPrevious = unit(corner, previous)
+    const toNext = unit(corner, next)
+    if (!toPrevious || !toNext) return [corner]
+    const back = Math.min(reach, Math.hypot(previous.x - corner.x, previous.y - corner.y) * 0.45)
+    const forward = Math.min(reach, Math.hypot(next.x - corner.x, next.y - corner.y) * 0.45)
+    const start = add(corner, toPrevious, back)
+    const end = add(corner, toNext, forward)
+    const steps = 4
+    return Array.from({ length: steps + 1 }, (_, step) => {
+      const t = step / steps
+      const a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, c = t * t
+      return { x: a * start.x + b * corner.x + c * end.x, y: a * start.y + b * corner.y + c * end.y }
+    })
+  })
 }
 
 /**

@@ -73,7 +73,7 @@ const NONROUND_STYLES: Record<'ellipse' | 'rectangle' | 'angledArea', GlobalStyl
 const NONROUND_SVG_BASELINE = {
   ellipse: { pathCount: 8, sha256: '57567e96079dd9c3e8864eed021b3f21ef7fc35c40d52ee760b657d64ea3df9b' },
   rectangle: { pathCount: 8, sha256: 'b5a0676c4d02582c824b10fe06d67d21390885101e8f1bc3d124166058192e3c' },
-  angledArea: { pathCount: 6, sha256: '1f983684b25cf00a05ae7ad1a96152ba9058f6acdf799ef49ac2d58c115240cf' },
+  angledArea: { pathCount: 6, sha256: '0015d35d022e4e73a1f41a61430c0278bad0c98156a9739dc52f8e2b708ee3fe' },
 }
 
 function deepFreeze<T>(value: T): T {
