@@ -1,6 +1,7 @@
-import { useRef } from 'react'
+import { useRef, type PointerEvent } from 'react'
 import { DEFAULT_STEM_BEAK, STEM_BEAK_SHAPES, stemBeakInkGroups, type StemBeakShape, type StemBeakStyle } from '../src/services/stemBeak'
 import type { StrokeDataV2 } from '../src/types'
+import { endRangeDrag, moveRangeDrag, startRangeDrag } from './rangeDrag'
 import styles from './StemBeakControls.module.css'
 
 const UNIT_BOX = { x: 0, y: 0, width: 1, height: 1 }
@@ -34,6 +35,15 @@ export function StemBeakControls({ committed, draft, onDraftChange, onCommit }: 
   const pick = (next: Partial<StemBeakStyle>) => onCommit(committed, { ...committed, ...next })
   const preview = (next: Partial<StemBeakStyle>) => { latest.current = { ...latest.current, ...next }; onDraftChange(latest.current) }
   const commit = () => { if (draft) onCommit(committed, latest.current) }
+  const drag = (key: 'size' | 'angle') => {
+    const apply = (value: number | null) => { if (value !== null && value !== latest.current[key]) preview({ [key]: value }) }
+    return {
+      onPointerDown: (event: PointerEvent<HTMLInputElement>) => apply(startRangeDrag(event)),
+      onPointerMove: (event: PointerEvent<HTMLInputElement>) => apply(moveRangeDrag(event)),
+      onPointerUp: (event: PointerEvent<HTMLInputElement>) => { endRangeDrag(event); commit() },
+      onPointerCancel: (event: PointerEvent<HTMLInputElement>) => { endRangeDrag(event); commit() },
+    }
+  }
   const isDefault = !committed.enabled && committed.shape === DEFAULT_STEM_BEAK.shape && committed.size === DEFAULT_STEM_BEAK.size && committed.angle === DEFAULT_STEM_BEAK.angle
   return <div className={styles.controls} role="tabpanel" aria-label="부리 설정">
     <p><strong>세로줄기의 열린 머리에 한 번에</strong><span>획 데이터는 그대로입니다</span></p>
@@ -48,8 +58,8 @@ export function StemBeakControls({ committed, draft, onDraftChange, onCommit }: 
       ))}
     </div>
     <div className={styles.sliders}>
-      <label><span>크기 <output>{beak.size.toFixed(1)}</output></span><input aria-label="부리 크기" type="range" min={0.5} max={2} step={0.1} value={beak.size} disabled={!beak.enabled} onChange={(event) => preview({ size: Number(event.target.value) })} onPointerUp={commit} onKeyUp={commit} onBlur={commit} /></label>
-      <label><span>각도 <output>{beak.angle}°</output></span><input aria-label="부리 각도" type="range" min={-60} max={60} step={5} value={beak.angle} disabled={!beak.enabled || beak.shape !== 'angled'} onChange={(event) => preview({ angle: Number(event.target.value) })} onPointerUp={commit} onKeyUp={commit} onBlur={commit} /></label>
+      <label><span>크기 <output>{beak.size.toFixed(1)}</output></span><input aria-label="부리 크기" type="range" min={0.5} max={2} step={0.1} value={beak.size} disabled={!beak.enabled} onChange={(event) => preview({ size: Number(event.target.value) })} {...drag('size')} onKeyUp={commit} onBlur={commit} /></label>
+      <label><span>각도 <output>{beak.angle}°</output></span><input aria-label="부리 각도" type="range" min={-60} max={60} step={5} value={beak.angle} disabled={!beak.enabled || beak.shape !== 'angled'} onChange={(event) => preview({ angle: Number(event.target.value) })} {...drag('angle')} onKeyUp={commit} onBlur={commit} /></label>
     </div>
     <button type="button" disabled={isDefault} onClick={() => onCommit(committed, { ...DEFAULT_STEM_BEAK })}>부리 처음 값으로</button>
   </div>

@@ -1,6 +1,7 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import type { BrushTip, StrokeLinecap, StrokeLinejoin, StrokeRenderStyle } from '../src/types'
+import { endRangeDrag, moveRangeDrag, startRangeDrag } from './rangeDrag'
 import styles from './CalibrationSentenceEditor.module.css'
 
 const TIP_OPTIONS: Array<{ tip: BrushTip; label: string }> = [
@@ -146,8 +147,10 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
   }
   const range = (label: string, value: number, min: number, max: number, step: number, update: (value: number) => StrokeRenderStyle, output: string) => <label className={styles.ruleControl}>
     <span>{label} {activeValue === label && <output>{output}</output>}</span>
-    <input type="range" min={min} max={max} step={step} value={value} onPointerDown={() => begin(label)}
-      onChange={(event) => { begin(label); preview(update(Number(event.target.value))) }} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
+    <input type="range" min={min} max={max} step={step} value={value}
+      onPointerDown={(event) => { begin(label); const next = startRangeDrag(event); if (next !== null && next !== value) preview(update(next)) }}
+      onPointerMove={(event) => { const next = moveRangeDrag(event); if (next !== null && next !== value) preview(update(next)) }}
+      onChange={(event) => { begin(label); preview(update(Number(event.target.value))) }} onPointerUp={(event) => { endRangeDrag(event); finish() }} onPointerCancel={(event) => { endRangeDrag(event); cancel() }}
       onKeyDown={(event) => handleRangeKeys(event, label)} onKeyUp={finish} aria-label={label === '납작함' ? '붓촉 납작함' : label} />
   </label>
   const angle = current.mode === 'angled-area' ? current.cutAngle : current.mode === 'brush' ? current.brush.angle : 0

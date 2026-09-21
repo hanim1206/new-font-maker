@@ -72,6 +72,7 @@ import { useGlobalStyleStore, type GlobalStyle } from '../src/stores/globalStyle
 import { BrushStyleTrackpad, type StrokeEnds } from './BrushStyleTrackpad'
 import { StemBeakControls } from './StemBeakControls'
 import { designBodySvgTransform } from '../src/services/designBodyPlacement'
+import { endRangeDrag, moveRangeDrag, startRangeDrag } from './rangeDrag'
 import { DEFAULT_STEM_BEAK, type StemBeakStyle } from '../src/services/stemBeak'
 import styleMode from './GlobalStyleMode.module.css'
 import { GlobalStyleTrackpad, type GlobalStylePanel } from './GlobalStyleTrackpad'
@@ -1117,6 +1118,15 @@ function DesignBodyControls({
   const selectLayoutScope = () => {
     setScope('layout')
   }
+  const dragBody = (dimension: 'width' | 'height') => {
+    const apply = (value: number | null) => { if (value !== null && value !== Math.round(dimension === 'width' ? body.width : body.height)) updateBody(dimension, value) }
+    return {
+      onPointerDown: (event: ReactPointerEvent<HTMLInputElement>) => apply(startRangeDrag(event)),
+      onPointerMove: (event: ReactPointerEvent<HTMLInputElement>) => apply(moveRangeDrag(event)),
+      onPointerUp: endRangeDrag,
+      onPointerCancel: endRangeDrag,
+    }
+  }
 
   return <div className={styles.bodyControls} role="tabpanel" aria-label="글자 네모꼴 설정">
     <div className={styles.bodyScope} role="tablist" aria-label="네모꼴 적용 범위">
@@ -1125,8 +1135,8 @@ function DesignBodyControls({
     </div>
     <p><strong>{scope === 'font' ? '모든 레이아웃의 기본 네모꼴' : `${LAYOUT_LABELS[layoutType]}만 별도 적용`}</strong><span>Font Space {fontSpace.unitsPerEm}은 고정됩니다</span></p>
     <div className={styles.bodyDimensionGrid}>
-      <label><span>가로 <output>{Math.round(body.width)}</output></span><input type="range" min="500" max="1000" step="5" value={Math.round(body.width)} onChange={(event) => updateBody('width', Number(event.target.value))} /></label>
-      <label><span>세로 <output>{Math.round(body.height)}</output></span><input type="range" min="500" max="1000" step="5" value={Math.round(body.height)} onChange={(event) => updateBody('height', Number(event.target.value))} /></label>
+      <label><span>가로 <output>{Math.round(body.width)}</output></span><input type="range" min="500" max="1000" step="5" value={Math.round(body.width)} onChange={(event) => updateBody('width', Number(event.target.value))} {...dragBody('width')} /></label>
+      <label><span>세로 <output>{Math.round(body.height)}</output></span><input type="range" min="500" max="1000" step="5" value={Math.round(body.height)} onChange={(event) => updateBody('height', Number(event.target.value))} {...dragBody('height')} /></label>
     </div>
     <button type="button" className={styles.bodyReset} disabled={scope === 'layout' ? !layoutOverride : body.width === 850 && body.height === 850} onClick={() => scope === 'layout' ? removePaddingOverride(layoutType) : resetGlobalPadding()}>{scope === 'layout' ? '폰트 전체 설정 따르기' : '기본 850 × 850으로 되돌리기'}</button>
   </div>
@@ -1151,11 +1161,14 @@ function StyleToneControls({
 }) {
   const tone = draft ?? committed
   const commit = () => { if (draft) onCommit(committed, draft) }
+  const setWeight = (weight: number | null) => { if (weight !== null && weight !== tone.weight) onDraftChange({ ...tone, weight }) }
   return <div className={styleMode.weight} role="tabpanel" aria-label="굵기 설정">
     <p><strong>폰트 전체에 한 값</strong><span>획 모양과 상자는 그대로입니다</span></p>
     <div className={styleMode.weightBox}>
       <div className={styleMode.weightHead}><span>굵기</span><output>{tone.weight}</output></div>
-      <input type="range" min="100" max="900" step="100" value={tone.weight} aria-label="굵기" data-testid="style-weight" onChange={(event) => onDraftChange({ ...tone, weight: Number(event.target.value) })} onPointerUp={commit} onKeyUp={commit} onBlur={commit} />
+      <input type="range" min="100" max="900" step="100" value={tone.weight} aria-label="굵기" data-testid="style-weight" onChange={(event) => setWeight(Number(event.target.value))}
+        onPointerDown={(event) => setWeight(startRangeDrag(event))} onPointerMove={(event) => setWeight(moveRangeDrag(event))}
+        onPointerUp={(event) => { endRangeDrag(event); commit() }} onPointerCancel={(event) => { endRangeDrag(event); commit() }} onKeyUp={commit} onBlur={commit} />
       <div className={styleMode.ticks} aria-hidden="true">{WEIGHT_STOPS.map((stop) => <span key={stop} data-on={stop === tone.weight || undefined}>{stop}</span>)}</div>
     </div>
     <button type="button" disabled={tone.weight === DEFAULT_WEIGHT} onClick={() => onCommit(committed, { ...committed, weight: DEFAULT_WEIGHT })}>기본 400으로 되돌리기</button>
