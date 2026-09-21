@@ -1,9 +1,14 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 
-/** 자소 탭 `레이아웃` 모드(옛 검수 글자 화면): 수치 패널은 없고, 잡은 rail의 이 레이아웃(같은 문맥) 카드가 늘 떠 있다. 기준선을 옮기면 배치 Δ는 카드에, 형태 Δ는 '이 자모로 올리기'로 같은 자모 카드에 얹힌다. */
+/** 자소 탭 `레이아웃` 모드(옛 검수 글자 화면): 수치 패널은 없고, 잡은 rail의 이 레이아웃(같은 문맥) 표본이 상단 `닿는 글자` 줄에 늘 떠 있다. 기준선을 옮기면 배치 Δ가 그 줄에 얹힌다. */
+
+/** 한 묶음. 줄이 안 차면 다음 묶음이 붙으므로 장수는 화면 폭을 탄다 — 최소만 잰다. */
+const BATCH = 8
+const expectFilledRow = async (cards: Locator, timeout = 20_000) =>
+  expect.poll(() => cards.count(), { timeout }).toBeGreaterThanOrEqual(BATCH)
 
 /** 유니코드 음절의 홀자 번호(ㅏ=0 … ㅣ=20). */
 const medialIndexOf = (name: string) => Math.floor(((name.codePointAt(0)! - 0xac00) % 588) / 28)
@@ -46,14 +51,14 @@ async function selectMedialBox(page: Page) {
   await expect(hit).toHaveAttribute('aria-pressed', 'true')
 }
 
-test('수치 패널은 없고, 편집 전에도 이 레이아웃 카드가 Δ 없이 떠 있다', async ({ page }) => {
+test('수치 패널은 없고, 편집 전에도 닿는 글자 줄이 Δ 없이 떠 있다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-canvas')).toBeVisible()
   await expect(page.getByTestId('review-numbers')).toHaveCount(0)
-  // 모델이 오면 첫 rail이 잡히고, 같은 문맥(세로 홀자+받침) 카드 8장이 Δ 없이 뜬다. 범위 칩은 이 레이아웃(기본)·이 자모만 둘. 자모 고르기는 이 자모만을 눌러야 뜬다.
+  // 모델이 오면 첫 rail이 잡히고, 같은 문맥(세로 홀자+받침) 글자가 Δ 없이 뜬다. 범위 칩은 이 레이아웃(기본)·이 자모만 둘. 자모 고르기는 이 자모만을 눌러야 뜬다.
   const propagation = page.getByTestId('review-propagation')
   const cards = page.getByTestId('review-propagation-card')
-  await expect(cards).toHaveCount(8, { timeout: 20_000 })
+  await expectFilledRow(cards)
   await expect(propagation.getByRole('button', { name: '이 레이아웃', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await expect(propagation.getByRole('button', { name: '이 자모만', exact: true })).toBeEnabled()
   // `전체`는 고를 수 없다. 저장된 전체 Δ가 없으니 칩 자체가 없다.
@@ -66,7 +71,7 @@ test('수치 패널은 없고, 편집 전에도 이 레이아웃 카드가 Δ �
   expect(new Set(names.map(medialIndexOf)).size).toBeGreaterThan(1)
 })
 
-test('중심 rail(배치)을 옮기면 이 레이아웃 카드 8장에 Δ가 얹히고 이 자모만으로 좁힐 수 있다', async ({ page }) => {
+test('중심 rail(배치)을 옮기면 닿는 글자 줄에 Δ가 얹히고 이 자모만으로 좁힐 수 있다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   await selectMedialBox(page)
@@ -78,7 +83,7 @@ test('중심 rail(배치)을 옮기면 이 레이아웃 카드 8장에 Δ가 얹
   await expect(propagation.getByTestId('review-propagation-deltas')).toContainText('바깥기둥 중심')
   await expect(page.getByTestId('review-propagation-shape')).toHaveCount(0)
   const cards = page.getByTestId('review-propagation-card')
-  await expect(cards).toHaveCount(8)
+  await expectFilledRow(cards)
   await expect(cards.first()).toHaveAttribute('data-touched', 'true', { timeout: 20_000 })
   // 기본 범위 = 이 레이아웃: 세로 홀자+받침 글자만, 홀자는 섞인다.
   await expect(propagation.getByRole('button', { name: '이 레이아웃', exact: true })).toHaveAttribute('aria-pressed', 'true')
@@ -86,22 +91,22 @@ test('중심 rail(배치)을 옮기면 이 레이아웃 카드 8장에 Δ가 얹
   expect(names.every(sameContextAs멈)).toBe(true)
   expect(new Set(names.map(medialIndexOf)).size).toBeGreaterThan(1)
 
-  // `다른 글자` 버튼은 없다. 카드 줄을 옆으로 밀어 끝에 가까워지면 다음 묶음이 붙는다. 앞 묶음은 그대로 남는다.
+  // `다른 글자` 버튼은 없다. 줄을 옆으로 밀어 끝에 가까워지면 다음 묶음이 붙는다. 앞 묶음은 그대로 남는다.
   await expect(page.getByTestId('review-propagation-next')).toHaveCount(0)
   await page.getByTestId('review-propagation-cards').evaluate((el) => el.scrollTo({ left: el.scrollWidth }))
-  await expect(cards).toHaveCount(16)
-  expect((await cards.locator('figcaption b').allInnerTexts()).slice(0, 8)).toEqual(names)
+  await expect.poll(() => cards.count()).toBeGreaterThan(names.length)
+  expect((await cards.locator('figcaption b').allInnerTexts()).slice(0, names.length)).toEqual(names)
 
-  // 범위를 좁히면 한 묶음으로 돌아가고 줄은 맨 앞에서 시작한다. 잡은 홀자(ㅓ)가 같은 글자만 남는다.
+  // 범위를 좁히면 줄을 새로 만들어 맨 앞에서 시작한다. 잡은 홀자(ㅓ)가 같은 글자만 남는다.
   await propagation.getByRole('button', { name: '이 자모만', exact: true }).click()
   await page.getByTestId('review-propagation-jamos-done').click()
-  await expect(cards).toHaveCount(8)
+  await expectFilledRow(cards)
   expect(await page.getByTestId('review-propagation-cards').evaluate((el) => el.scrollLeft)).toBe(0)
   await expect.poll(async () => (await cards.locator('figcaption b').allInnerTexts()).every((name) => medialIndexOf(name) === medialIndexOf('멈'))).toBe(true)
 
-  // 복원해도 카드는 그대로, Δ만 빠진다.
+  // 복원해도 줄은 그대로, Δ만 빠진다.
   await resetButton(page).click()
-  await expect(cards).toHaveCount(8)
+  await expectFilledRow(cards)
   await expect(page.getByTestId('review-propagation-deltas')).toBeEmpty()
   await expect.poll(() => cards.first().getAttribute('data-touched')).toBeNull()
 })
@@ -362,9 +367,6 @@ test('켠 부품의 획 고치기로 내려가고, 안 끝난 변경이 있으�
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
   await expect(pressedPart).toHaveAttribute('aria-label', '첫닿자 ㅁ 선택', { timeout: 20_000 })
   await expect(cta).toHaveText('ㅁ 획 고치기')
-
-  // 획 편집 중 문장에서 다른 글자를 고르면 기본 상태(레이아웃)로 돌아간다.
-  await cta.click()
   // 받침 ㅁ으로 들어가도 눌리는 획 수는 같다(같은 ㅁ) — 잠금이 자소를 따라간다.
   await canvas.getByRole('button', { name: '받침 ㅁ 선택' }).click({ position: { x: 4, y: 4 } })
   await cta.click()
@@ -374,13 +376,13 @@ test('켠 부품의 획 고치기로 내려가고, 안 끝난 변경이 있으�
   await page.getByTestId('jamo-stroke-back').click()
   await expect(pressedPart).toHaveAttribute('aria-label', '받침 ㅁ 선택', { timeout: 20_000 })
   await canvas.getByRole('button', { name: '첫닿자 ㅁ 선택' }).click({ position: { x: 4, y: 4 } })
+
+  // 획 편집 중 문장에서 다른 글자를 고르면 기본 상태(레이아웃)로 돌아간다.
+  await cta.click()
   await page.getByRole('button', { name: '별 편집' }).click()
   await expect(page.getByRole('region', { name: '별 레이아웃 수정' })).toBeVisible()
 })
 
-test('주소 &mode=stroke&part=JO는 받침이 잡힌 획 편집을 바로 연다', async ({ page }) => {
-  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=stroke&part=JO')
-  await expect(page.getByRole('region', { name: '멈 완성 글자 편집' })).toBeVisible()
 /** 셸 안 획 편집은 조절판 없이 캔버스에서 바로 끈다. 점이 손가락을 따라오고, 한 번 끌기가 기록 한 줄이다. */
 test('획 편집은 캔버스에서 꼭짓점을 직접 끌어 옮기고 Undo 한 번에 돌아온다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EA%B0%81')
@@ -413,6 +415,9 @@ test('획 편집은 캔버스에서 꼭짓점을 직접 끌어 옮기고 Undo �
   await expect(tools.getByRole('button', { name: '곡선화' })).toBeEnabled()
   await tools.getByRole('button', { name: '꼭짓점 여러 개 고르기' }).click()
   await page.locator('[data-editor-point="hit"]').nth(2).dispatchEvent('pointerdown')
+  await expect(page.getByTestId('jamo-stroke-tools')).toContainText('점 2개 함께')
+})
+
 /**
  * 기준 틀: 처음 고치는 순간 고치기 전 획이 틀로 굳는다. 그 뒤로는 획 하나를 상자 밖으로 끌어도 나머지 획이 제자리고, 끈 획은 상자 밖으로 튀어나온다.
  * 전에는 획 전체 범위를 다시 상자에 꽉 채워서 끌 때마다 다른 획 좌표가 같이 바뀌었다.
@@ -491,9 +496,6 @@ test('획을 옆 자소 쪽으로 끌면 최소 간격에서 한 번 걸리고, 
   await expect(canvas).not.toHaveAttribute('data-gap-warning', 'true')
 })
 
-  await expect(page.getByTestId('jamo-stroke-tools')).toContainText('점 2개 함께')
-})
-
 /** `완료`는 고친 채로 나가고, `뒤로`는 이번에 들어와서 고친 획을 되돌리고 나간다. 되돌린 것은 Redo로 살린다. */
 test('획 편집의 뒤로는 이번에 고친 획을 되돌리고 레이아웃으로 나간다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88')
@@ -529,6 +531,9 @@ test('획 편집의 뒤로는 이번에 고친 획을 되돌리고 레이아웃�
   await expect.poll(selectedStroke).toBe(before)
 })
 
+test('주소 &mode=stroke&part=JO는 받침이 잡힌 획 편집을 바로 연다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=stroke&part=JO')
+  await expect(page.getByRole('region', { name: '멈 완성 글자 편집' })).toBeVisible()
   await expect(page.getByTestId('jamo-stroke-tools')).toBeVisible()
   await expect(page.locator('[data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(1)
   await page.getByTestId('jamo-stroke-done').click()
@@ -658,7 +663,7 @@ test('이 자모만으로 좁혀 적용하면 같은 레이아웃의 그 자모 
   // Undo → 가가 돌아오고 저장소도 빈다. Redo → 다시.
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
   await expect.poll(() => 가.innerHTML()).toBe(가Before)
-  expect((await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)).jamo).toEqual({})
+  expect((await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)).rules).toEqual({})
   await page.getByRole('button', { name: '형태 편집 다시 실행' }).click()
   await expect.poll(() => 가.innerHTML()).not.toBe(가Before)
 
@@ -800,20 +805,86 @@ test('같은 레이아웃에 쌓인 오버라이드가 범위 띠에 보이고, 
   await expect(overrides.nth(0)).toHaveAttribute('data-kind', 'all')
 })
 
-test('Noto 고스트를 끄면 다른 글자 카드에서도 고스트가 빠지고, 켜면 돌아온다', async ({ page }) => {
+/** 범위 고르기 화면(2026-09-21): 검수 격자를 그대로 쓰고, 범위가 되는 조작은 행·열·그룹 머리 셋뿐이다. 쓸면 지나간 머리가 한 번에 바뀐다. */
+test('더 보기에서 추천 칩이 표를 켜고, 열 머리를 쓸어 빼면 닿는 글자 수가 준다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  await page.getByTestId('layout-override-more').first().click()
+  const picker = page.getByTestId('layout-scope-picker')
+  await expect(picker).toBeVisible()
+  const countOf = async () => Number((await page.getByTestId('scope-picker-count').innerText()).replace(/[^\d]/g, ''))
+  // 열 때는 그 옵션의 범위 그대로다. 이 레이아웃(세로 홀자 + 받침) = 4,617자.
+  const opened = await countOf()
+  expect(opened).toBe(4617)
+  await expect(page.getByTestId('scope-picker-confirm')).toBeDisabled()
+
+  // 추천 칩 = 표를 켜 주는 지름길. 구조군 칩은 같은 구조군 첫닿자 열만 켠다.
+  const chip = page.getByTestId('scope-picker-chip').filter({ hasText: '구조군' })
+  await chip.click()
+  await expect(chip).toHaveAttribute('aria-pressed', 'true')
+  const afterChip = await countOf()
+  expect(afterChip).toBeLessThan(opened)
+  await expect(page.getByTestId('scope-picker-name')).toContainText('첫닿자')
+
+  // 켠 열 머리를 다시 누르면 그 열만 빠지고 글자 수가 따라 준다. 칩은 꺼진 것으로 본다.
+  const onHead = picker.locator('[data-testid="corpus-head"][aria-pressed="true"]').last()
+  await onHead.dispatchEvent('pointerdown')
+  await expect.poll(countOf).toBeLessThan(afterChip)
+  await expect(chip).toHaveAttribute('aria-pressed', 'false')
+
+  // 칸 누르기는 범위를 안 바꾼다 — 크게 보기만.
+  const narrowed = await countOf()
+  await picker.getByTestId('corpus-cell').nth(3).click()
+  expect(await countOf()).toBe(narrowed)
+
+  // `이 범위로` = 확정. 옵션 스택의 켠 박스가 그 범위 이름과 글자 수로 바뀐다.
+  const name = await page.getByTestId('scope-picker-name').innerText()
+  await page.getByTestId('scope-picker-confirm').click()
+  await expect(picker).toHaveCount(0)
+  const selected = page.locator('[data-selected="true"]').filter({ has: page.getByTestId('layout-override-select') })
+  await expect(selected).toHaveCount(1)
+  await expect(selected).toContainText(narrowed.toLocaleString())
+  expect(name).toContain('첫닿자')
+})
+
+/** 상단 두 줄(2026-09-21): 적용이 어디까지 닿았는지 `내 문장`에서 바로 보인다. 다음 편집이 시작되면 표시가 빠진다. */
+test('적용하면 문장에서 그 범위에 든 글자가 표시되고, 다시 옮기면 표시가 빠진다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  const sentence = page.getByRole('region', { name: '보정 문장' })
+  const marked = sentence.locator('button[data-layout-applied="true"]')
+  await expect(marked).toHaveCount(0)
+
+  await selectMedialBox(page)
+  await selectRail(page, '바깥기둥 중심')
+  await page.keyboard.press('Shift+ArrowRight')
+  await page.getByTestId('review-propagation-apply').click()
+  // 이 레이아웃(세로 홀자 + 받침)에 든 글자만. 멈·별은 들고, 받침 없는 마는 안 든다.
+  await expect(sentence.getByRole('button', { name: '멈 편집' })).toHaveAttribute('data-layout-applied', 'true')
+  await expect(sentence.getByRole('button', { name: '별 편집' })).toHaveAttribute('data-layout-applied', 'true')
+  await expect(sentence.getByRole('button', { name: '마 편집' })).not.toHaveAttribute('data-layout-applied', 'true')
+
+  // 다음 편집이 시작되면 표시가 빠진다.
+  await selectRail(page, '바깥기둥 중심')
+  await page.keyboard.press('Shift+ArrowRight')
+  await expect(marked).toHaveCount(0)
+})
+
+test('Noto 고스트를 끄면 닿는 글자 줄에서도 고스트가 빠지고, 켜면 돌아온다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   const cards = page.getByTestId('review-propagation-card')
   const cardGhosts = page.getByTestId('review-propagation-ghost')
-  await expect(cards).toHaveCount(8, { timeout: 20_000 })
-  await expect(cardGhosts).toHaveCount(8)
+  await expectFilledRow(cards)
+  const count = await cards.count()
+  await expect(cardGhosts).toHaveCount(count)
 
   await page.getByTestId('review-ghost-toggle').click()
   await expect(page.getByTestId('review-ghost')).toHaveCount(0)
   await expect(cardGhosts).toHaveCount(0)
-  await expect(cards).toHaveCount(8)
+  await expect(cards).toHaveCount(count)
 
   await page.getByTestId('review-ghost-toggle').click()
-  await expect(cardGhosts).toHaveCount(8)
+  await expect(cardGhosts).toHaveCount(count)
 })
 
 /** 고정 Δ(G0·G1): 노에서 첫닿자 윗변을 `이 자리에 맞추기`로 고정해 이 레이아웃에 적용하면 bottom 계열 글자의 닿자 윗변이 전부 같은 자리에 모인다. 더하기는 제각각. */
@@ -894,10 +965,10 @@ test('획이 모델 상자에 안 맞아도 획 편집에서 완료로 레이아
 })
 
 /** 세로 예산(2026-09-21): 도구 줄은 머리 `…` 메뉴로, 레이아웃 모드의 보정 문장은 한 줄. 390×844 첫 화면에 범위 띠와 표본 첫 줄 네 장이 세로 스크롤 없이 온전히 보인다. */
-test('예시 글자 카드를 누르면 그 글자가 열리고 문장에는 그 글자 하나만 남는다. 안 끝난 Δ가 있으면 카드는 잠긴다', async ({ page }) => {
+test('닿는 글자를 누르면 그 글자가 열리고 문장에는 그 글자 하나만 남는다. 안 끝난 Δ가 있으면 잠긴다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   const cards = page.getByTestId('review-propagation-card')
-  await expect(cards).toHaveCount(8, { timeout: 20_000 })
+  await expectFilledRow(cards)
   const sentence = page.getByRole('region', { name: '보정 문장' })
   expect(await sentence.getByRole('button', { name: /편집/ }).count()).toBeGreaterThan(1)
 
@@ -915,22 +986,31 @@ test('예시 글자 카드를 누르면 그 글자가 열리고 문장에는 그
   await expect(page.getByRole('region', { name: `${name} 레이아웃 수정` })).toBeVisible()
   await expect(sentence.getByRole('button', { name: /편집/ })).toHaveCount(1)
   await expect(sentence.getByRole('button', { name: `${name} 편집` })).toHaveAttribute('aria-current', 'true')
-  // 새 글자의 카드가 다시 뜨고, 연 글자는 그 안에 없다.
-  await expect(cards).toHaveCount(8, { timeout: 20_000 })
+  // 새 글자의 줄이 다시 뜨고, 연 글자는 그 안에 없다.
+  await expectFilledRow(cards)
   expect(await cards.locator('figcaption b').allInnerTexts()).not.toContain(name)
 })
 
-test('레이아웃 모드 첫 화면에 범위 띠와 표본 다섯 장이 온전히 보이고, 도구는 … 메뉴에 있다', async ({ page }) => {
+test('레이아웃 모드 첫 화면에 상단 두 줄과 옵션 스택이 온전히 보이고, 도구는 … 메뉴에 있다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   const sentence = page.getByRole('region', { name: '보정 문장' })
   await expect(sentence).toHaveAttribute('data-compact', 'true')
-  expect((await sentence.boundingBox())!.height).toBeLessThanOrEqual(60)
+  const sentenceBox = (await sentence.boundingBox())!
+  expect(sentenceBox.height).toBeLessThanOrEqual(60)
   // 고른 글자(멈)는 한 줄 문장에서 보이는 자리에 있다.
   await expect(page.getByRole('button', { name: '멈 편집' })).toBeInViewport({ ratio: 1 })
   await expect(page.getByTestId('layout-option-stack')).toBeInViewport({ ratio: 1 })
   const cards = page.getByTestId('review-propagation-card')
   await expect(cards.first()).toBeVisible({ timeout: 20_000 })
+  // 상단 두 줄: `내 문장` 바로 아래가 `닿는 글자`고, 그 아래가 캔버스다. 하단 표본 줄은 없다.
+  const touched = (await page.getByTestId('touched-glyph-row').boundingBox())!
+  expect(touched.y).toBeCloseTo(sentenceBox.y + sentenceBox.height, 0)
+  expect(touched.y + touched.height).toBeLessThanOrEqual((await page.getByTestId('review-canvas').boundingBox())!.y)
+  // 칸은 문장 글자와 같은 크기다(문장 24px 글자 = 27.84px 칸, viewBox 여백 1.16배).
+  const sentenceGlyph = (await page.getByRole('button', { name: '멈 편집' }).boundingBox())!
+  const cell = (await cards.first().boundingBox())!
+  expect(cell.height).toBeCloseTo(sentenceGlyph.height * 1.16, 0)
   const barTop = (await page.getByTestId('jamo-stroke-cta').boundingBox())!.y
   const row = (await page.getByTestId('review-propagation-cards').boundingBox())!
   for (let index = 0; index < 5; index += 1) {
@@ -942,7 +1022,7 @@ test('레이아웃 모드 첫 화면에 범위 띠와 표본 다섯 장이 온�
   // 도구 넷은 `…` 메뉴 안. 닫혀 있으면 안 보이고, 열면 이름과 함께 보인다. 바깥(Escape)으로 닫힌다.
   const menu = page.getByTestId('workspace-more-menu')
   await expect(menu).toBeHidden()
-  await page.getByRole('button', { name: '프로젝트 더보기' }).click()
+  await page.getByRole('button', { name: '주 메뉴' }).click()
   await expect(menu.getByRole('link', { name: '자소 원형 새 화면 검토' })).toBeVisible()
   await expect(menu.getByRole('button', { name: '현재 작업을 OTF로 추출' })).toContainText('OTF 추출')
   await expect(menu.getByRole('button', { name: '선택 자모 형태 규칙' })).toBeVisible()
@@ -954,7 +1034,7 @@ test('레이아웃 모드 첫 화면에 범위 띠와 표본 다섯 장이 온�
   // 획 편집에서도 문장은 한 줄이고, 메뉴의 글로벌 스타일이 전처럼 패널을 연다.
   await page.getByTestId('jamo-stroke-cta').click()
   await expect(sentence).toHaveAttribute('data-compact', 'true')
-  await page.getByRole('button', { name: '프로젝트 더보기' }).click()
+  await page.getByRole('button', { name: '주 메뉴' }).click()
   await menu.getByRole('button', { name: '글로벌 스타일 설정' }).click()
   await expect(menu).toBeHidden()
   await expect(page.getByRole('region', { name: '글로벌 스타일 설정' })).toBeVisible()

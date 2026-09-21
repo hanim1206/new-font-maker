@@ -5,6 +5,7 @@ import type { OverrideGroup } from './layoutOverrides'
 import type { CorpusIdentity } from './notoCorpus'
 import { PART_COLOR } from './partColors'
 import { PART_GROUP_LABEL } from './reviewPropagation'
+import { ScopeThumbnail } from './ScopeThumbnail'
 import { compareBreadth, familyOfContext, finalOfContext, isEmptyRule, matchesRule, ruleGlyphCount, ruleKey, ruleName, ruleOfContext } from './scopeRule'
 import type { ScopeRule } from './scopeRule'
 import styles from './LayoutOptionStack.module.css'
@@ -47,7 +48,7 @@ function ruleColor(rule: ScopeRule): string {
 
 export interface StackEntry { rule: ScopeRule; key: string; delta: ReturnType<typeof storedRules>[number]['delta'] | null }
 
-export function LayoutOptionStack({ source, drafts, scope, fixedDisabled, onScope, onOpenPicker, onSelect, onRemove }: {
+export function LayoutOptionStack({ source, drafts, scope, fixedDisabled, onScope, onOpenPicker, onSelect, onRemove, onOpenScope }: {
   source: CorpusIdentity
   /** 지금 고른 범위가 저장될 자리들. 켜지는 박스이기도 하다. 자모를 여럿 고르면 자모마다 하나씩이다. */
   drafts: ScopeRule[]
@@ -58,6 +59,8 @@ export function LayoutOptionStack({ source, drafts, scope, fixedDisabled, onScop
   onOpenPicker: () => void
   onSelect: (rule: ScopeRule) => void
   onRemove: (rule: ScopeRule) => void
+  /** 박스의 `더 보기`. 그 규칙으로 범위 고르기 화면을 연다. */
+  onOpenScope?: (rule: ScopeRule) => void
 }) {
   const rules = useLayoutDeltaStore((state) => state.rules)
   const draftKeys = drafts.map(ruleKey)
@@ -89,15 +92,21 @@ export function LayoutOptionStack({ source, drafts, scope, fixedDisabled, onScop
           data-jamo={jamo?.jamo} data-group={jamo ? PART_OF_RULE_KEY[jamo.part] : undefined}
           data-selected={on || undefined} data-stored={delta ? 'true' : undefined}>
           <button type="button" className={styles.body} data-testid="layout-override-select" aria-label={name} aria-pressed={locked ? undefined : on} disabled={locked || fixedDisabled} onClick={() => onSelect(rule)}>
-            <span className={styles.name}>
-              <b>{name}</b>
-              <em>{ruleGlyphCount(rule).toLocaleString()}자</em>
-              {locked && <em>기본값</em>}
+            {/* 머리 그림 = 그 규칙의 몬드리안. 범위 고르기 화면 머리와 같은 그림이다. */}
+            <ScopeThumbnail rule={rule} contextId={source.contextId} size={26} />
+            <span className={styles.bodyText}>
+              <span className={styles.name}>
+                <b>{name}</b>
+                <em>{ruleGlyphCount(rule).toLocaleString()}자</em>
+                {locked && <em>기본값</em>}
+              </span>
+              <small data-empty={lines.length === 0 || undefined}>
+                {lines.length === 0 ? '아직 고친 것 없음' : `${lines[0]}${lines.length > 1 ? ` 외 ${lines.length - 1}` : ''}`}
+              </small>
             </span>
-            <small data-empty={lines.length === 0 || undefined}>
-              {lines.length === 0 ? '아직 고친 것 없음' : `${lines[0]}${lines.length > 1 ? ` 외 ${lines.length - 1}` : ''}`}
-            </small>
           </button>
+          {/* `더 보기` = 범위 고르기 화면. 표에서 이 범위를 다시 집는 자리다. `전체`는 고르는 범위가 아니라 없다. */}
+          {!locked && onOpenScope && <button type="button" className={styles.more} aria-label={`${name} 범위 고르기`} disabled={fixedDisabled} onClick={() => onOpenScope(rule)} data-testid="layout-override-more">더 보기 ›</button>}
           {delta && <button type="button" className={styles.remove} aria-label={`${name} 오버라이드 지우기`} onClick={() => onRemove(rule)} data-testid="layout-override-remove">×</button>}
         </li>
       })}

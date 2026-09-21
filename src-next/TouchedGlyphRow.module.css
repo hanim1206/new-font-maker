@@ -1,0 +1,15 @@
+/* `닿는 글자` 줄. 문장 줄(`내 문장`) 바로 아래에 붙고 글자 크기·칸 높이가 같다. 줄 높이는 고정이라 범위가 바뀌어도 아래가 안 밀린다. */
+.row { --row-em: 24px; flex: 0 0 auto; box-sizing: border-box; height: 44px; padding: 0 12px; display: flex; align-items: center; border-bottom: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface-2)); }
+/* 한 줄만 차지한다. 줄이 차면 옆으로 밀어 더 본다. */
+.cards { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain; }
+.cards::-webkit-scrollbar { display: none; }
+.card { flex: 0 0 auto; margin: 0; }
+/* 칸 그림이 곧 버튼이다. 잠겨도(안 끝난 Δ) 모양은 그대로다. */
+.card button { display: block; padding: 0; border: 0; border-radius: 4px; background: none; line-height: 0; cursor: pointer; }
+.card button:disabled { cursor: default; }
+.card button:focus { outline: none; }
+.card button:focus-visible { outline: 2px solid rgb(var(--color-primary)); outline-offset: 1px; }
+.card svg { display: block; inline-size: calc(var(--row-em) * 1.16); block-size: calc(var(--row-em) * 1.16); }
+.card[data-touched='false'] svg { opacity: .45; }
+/* 글자 이름은 그림이 이미 말한다. 칸 높이를 문장 줄과 맞추려고 화면에서는 숨기고 읽기 도구에만 남긴다. */
+.caption { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

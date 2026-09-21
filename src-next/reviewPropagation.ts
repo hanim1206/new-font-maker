@@ -130,6 +130,8 @@ export function unreachedRailIds(input: { identity: CorpusIdentity; model: Conte
   return unreached
 }
 
+/** Δ가 하나도 없는 편집. 획 편집의 `닿는 글자` 줄처럼 배치 Δ와 상관없는 자리에서 쓴다. */
+export const NO_LAYOUT_EDIT: PropagationEdit = { layout: { medial: {}, component: {}, slot: {} } }
 export const hasLayoutEdit = (edit: PropagationEdit) => Object.keys(edit.layout.medial).length > 0 || Object.keys(edit.layout.component).length > 0 || Object.keys(edit.layout.slot).length > 0
 
 /** 배치 Δ를 저장 형태(`ContextBoxDelta`)로. 형태 Δ(시작·끝)는 자모 몫이라 여기 안 든다. */
@@ -179,11 +181,12 @@ const SAMPLE_FINALS: (string | null)[] = [null, ...'ㄴㄹㅁㅇㄱㅂ']
 /** 잡은 부품의 자모. 초성이면 첫닿자, 받침이면 받침, 홀자 계열은 홀자. */
 export const focusJamoOf = (identity: CorpusIdentity, focus?: Part): string | null => focus === 'CH' ? identity.initialJamo : focus === 'JO' ? identity.finalJamo : identity.medialJamo
 
-function scopeMatches(scope: PropagationScope, source: CorpusIdentity, target: CorpusIdentity, focus: Part | undefined, jamos: readonly string[]): boolean {
+function scopeMatches(scope: PropagationScope, source: CorpusIdentity, target: CorpusIdentity, focus: Part | undefined, jamos: readonly string[], anyContext = false): boolean {
   if (scope === 'all') return true
   if (scope === 'layer') return target.contextId === source.contextId
   const jamo = focusJamoOf(target, focus)
-  return target.contextId === source.contextId && jamo !== null && jamos.includes(jamo)
+  // 획 편집의 범위(`모든 ㅁ 글자`)는 레이아웃을 안 가린다. 배치 Δ는 늘 한 레이아웃 안이라 기본은 같은 문맥.
+  return (anyContext || target.contextId === source.contextId) && jamo !== null && jamos.includes(jamo)
 }
 
 /** 묶음에 없는 초성을 먼저 집는다. 없으면 맨 앞. */
@@ -193,8 +196,8 @@ const takeFresh = (rest: readonly CorpusIdentity[], page: readonly CorpusIdentit
  * 고른 글자로 짠 묶음들. `layer`는 그 레이아웃의 묶음 그대로, `jamo`는 그중 고른 자모만, `all`은 여섯 레이아웃을 한 묶음에 섞는다.
  * 원본 글자는 빠지고, 빠진 자리는 같은 레이아웃의 다른 고른 글자로 메운다.
  */
-function curatedPages(source: CorpusIdentity, scope: PropagationScope, count: number, focus: Part | undefined, jamos: readonly string[]): CorpusIdentity[][] {
-  const usable = (item: CorpusIdentity) => item.codepoint !== source.codepoint && scopeMatches(scope, source, item, focus, jamos)
+function curatedPages(source: CorpusIdentity, scope: PropagationScope, count: number, focus: Part | undefined, jamos: readonly string[], anyContext = false): CorpusIdentity[][] {
+  const usable = (item: CorpusIdentity) => item.codepoint !== source.codepoint && scopeMatches(scope, source, item, focus, jamos, anyContext)
   if (scope === 'all') {
     // 레이아웃마다 줄을 세우고 돌아가며 한 장씩 뽑는다. 뽑은 글자는 줄에서 빠져 다음 묶음에 다시 안 나온다.
     const queues = Object.values(SAMPLE_BATCHES).map((batches) => identitiesOf(batches.join('')).filter(usable))
@@ -212,7 +215,8 @@ function curatedPages(source: CorpusIdentity, scope: PropagationScope, count: nu
     }
     return pages
   }
-  const batches = (SAMPLE_BATCHES[source.contextId] ?? []).map(identitiesOf)
+  // 레이아웃을 안 가리는 범위면 여섯 문맥의 고른 글자를 다 쓴다.
+  const batches = (anyContext ? Object.values(SAMPLE_BATCHES).flat() : SAMPLE_BATCHES[source.contextId] ?? []).map(identitiesOf)
   if (scope === 'jamo') {
     const matched = batches.flat().filter(usable)
     return Array.from({ length: Math.ceil(matched.length / count) }, (_, index) => matched.slice(index * count, (index + 1) * count))
@@ -233,8 +237,8 @@ function curatedPages(source: CorpusIdentity, scope: PropagationScope, count: nu
  * 범위에 드는 글자 중 count개. 고른 글자 묶음이 먼저 나오고, 모자란 자리와 그 뒤 묶음은 기계 조합을 고른 간격으로 뽑아 채운다.
  * page를 올리면 다음 묶음으로 넘어간다. `jamo` 범위는 고른 자모가 표본 목록에 없어도 그 자모 글자를 넣는다.
  */
-export function propagationCandidates(input: { source: CorpusIdentity; scope: PropagationScope; count: number; page?: number; /** 잡은 부품. `jamo` 범위에서 어느 부품 자모를 맞출지 정한다. */ focus?: Part; /** `jamo` 범위에서 고른 자모. */ jamos?: readonly string[] }): CorpusIdentity[] {
-  const { source, scope, count, focus } = input
+export function propagationCandidates(input: { source: CorpusIdentity; scope: PropagationScope; count: number; page?: number; /** 잡은 부품. `jamo` 범위에서 어느 부품 자모를 맞출지 정한다. */ focus?: Part; /** `jamo` 범위에서 고른 자모. */ jamos?: readonly string[]; /** `jamo` 범위를 레이아웃 너머로 넓힌다(획 편집의 `모든 ㅁ 글자`). */ anyContext?: boolean }): CorpusIdentity[] {
+  const { source, scope, count, focus, anyContext = false } = input
   const jamos = input.jamos ?? []
   const group = focus ? jamoPartOf(focus) : 'JU'
   // 고른 자모가 표본 목록 밖이면(ㅋ 받침 등) 그 자모를 목록에 보태 카드가 비지 않게 한다.
@@ -246,9 +250,9 @@ export function propagationCandidates(input: { source: CorpusIdentity; scope: Pr
     const codepoint = corpusCodepoint(initial, medial, final)
     if (codepoint === source.codepoint) continue
     const identity = corpusIdentity(codepoint)
-    if (scopeMatches(scope, source, identity, focus, jamos)) pool.push(identity)
+    if (scopeMatches(scope, source, identity, focus, jamos, anyContext)) pool.push(identity)
   }
-  const curated = curatedPages(source, scope, count, focus, jamos)
+  const curated = curatedPages(source, scope, count, focus, jamos, anyContext)
   const curatedCodepoints = new Set(curated.flat().map((item) => item.codepoint))
   const fill = pool.filter((item) => !curatedCodepoints.has(item.codepoint))
   const fillPages = Math.ceil(fill.length / count)

@@ -7,6 +7,8 @@
   --unsupported-bg: #f0ebf7; --unsupported-fg: #634690; --unsupported-line: #d4c6ea; --unsupported-dot: #8a64c2;
   --rejected-bg: #fdeae5; --rejected-fg: #a8432b; --rejected-line: #e8b3a4; --rejected-dot: #d4512f;
   --unprocessed-bg: #f5f7f9; --unprocessed-fg: #aab6c1; --unprocessed-line: #dfe5ea; --unprocessed-dot: #cfd7de;
+  /* 범위 고르기에서 켠 줄·칸. 주황 하나로 통일한다(캔버스의 선택 색과 같은 말). */
+  --pick: #f0561e; --pick-fg: #fff; --pick-weak: #fdece5;
   margin-top: 16px;
 }
 .large { --cell: 52px; }
@@ -90,3 +92,17 @@
   .rowLabel .bar { display: none; }
   .cell { scroll-margin-left: 96px; }
 }
+
+/* 범위 고르기: 19열이 한 화면에 들어와야 어디가 켜졌는지 보인다. 칸이 작아 글자는 모양만 읽힌다. */
+.picking { --cell: 22px; }
+.picking .rowHead { min-width: 40px; padding: 0 2px; }
+.picking .colHead { min-width: calc(var(--cell) + 2px); padding: 3px 0 2px; font-size: 11px; }
+.picking .cell strong { font-size: 13px; }
+.picking .tabs button { min-height: 30px; padding: 0 8px; font-size: 11px; }
+
+/* 범위 고르기(`variant: picker`). 머리가 곧 버튼이고, 쓸어서 여러 줄을 한 번에 켠다. 켠 줄과 칸만 진하다. */
+.headButton { width: 100%; min-height: 22px; padding: 2px 4px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; text-align: inherit; touch-action: none; cursor: pointer; }
+.headButton[aria-pressed='true'] { background: var(--pick); color: var(--pick-fg); font-weight: 800; }
+.headButton:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.cell[data-picked='true'] { border-color: var(--pick); background: var(--pick-weak); }
+.cell[data-picked='false'] { opacity: .35; }

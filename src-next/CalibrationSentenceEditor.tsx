@@ -20,6 +20,10 @@ import { scaleLayoutParts, translateLayoutParts } from '../src/services/layoutPr
 import { getRenderedStrokeTargets } from '../src/services/mobileEditorContext'
 import { LayoutContextCards } from './LayoutContextCards'
 import { corpusIdentity } from './notoCorpus'
+import { TouchedGlyphRow } from './TouchedGlyphRow'
+import { focusJamoOf, NO_LAYOUT_EDIT } from './reviewPropagation'
+import { matchesRule } from './scopeRule'
+import type { ScopeRule } from './scopeRule'
 import { useUnifiedTrackpad } from '../src/features/mobile-editor/useUnifiedTrackpad'
 import { calculateBoxes } from '../src/utils/layoutCalculator'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
@@ -1158,6 +1162,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const [pendingStrokePart, setPendingStrokePart] = useState<MobileEditorPart | null>(initialStrokePart)
   // Undo/Redo로 저장된 Δ가 바뀌면 레이아웃 편집부를 새로 띄워 세션 편집(절대값)을 버린다.
   const [layoutEpoch, setLayoutEpoch] = useState(0)
+  // 방금 적용한 배치 범위. 문장 줄에서 그 범위에 든 글자를 표시한다(적용의 신호). 다음 편집이 시작되거나 글자를 떠나면 빈다.
+  const [appliedScope, setAppliedScope] = useState<readonly ScopeRule[]>([])
+  useEffect(() => { setAppliedScope([]) }, [selectedChar])
   const directInputRef = useRef<HTMLTextAreaElement>(null)
   const isGlobalStyleOpen = globalStylePanel !== null
   const isBrushStyleOpen = globalStylePanel === 'brush'
@@ -1224,6 +1231,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const strokeCardPart = lockedPart ?? (selection.kind !== 'none' ? selection.editorPart : null)
   const strokeCardJamo = strokeCardPart === 'CH' ? syllable.choseong : strokeCardPart === 'JU' ? syllable.jungseong : strokeCardPart === 'JO' ? syllable.jongseong : null
   const strokeCardInk = strokeCardPart && strokeCardJamo ? { part: strokeCardPart, jamo: strokeCardJamo } : null
+  // 획 편집 `닿는 글자` 줄의 범위 자모. 고치는 자리의 자모 하나(`모든 ㅁ 글자`).
+  const strokeRowJamo = layoutAvailable && strokeCardPart ? focusJamoOf(corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00), strokeCardPart) : null
   const snapStep = fontUnitsToNormalized(grid.snapInterval, fontSpace)
   const minimumInkGap = fontUnitsToNormalized(grid.minorInterval, fontSpace)
   // 간격 경고: 고친 자소(기준 틀이 굳은 것)가 이 글자에서 옆 자소에 최소 간격보다 가깝고, 고치기 전(틀 = 고치기 전 획)보다 더 붙었을 때. 프리셋이 원래 좁은 글자는 안 울린다.
@@ -1568,8 +1577,13 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
       const hasSafety = [previewed.choseong, previewed.jungseong, previewed.jongseong].some((jamo) => jamo?.contextualInkSafety)
       isSafetyAdjusted = hasSafety && resolveSyllableContextualInkSafety(previewed, screenBoxesOf(previewed, contextSchema)).limitedParts.length > 0
     }
+    // 방금 적용한 범위에 든 글자. 적용이 어디까지 닿았는지 문장에서 바로 보인다.
+    const isScopeApplied = appliedScope.length > 0 && isEditableHangul(char) && (() => {
+      const identity = corpusIdentity(char.codePointAt(0) ?? 0)
+      return appliedScope.some((rule) => matchesRule(rule, identity))
+    })()
     return isEditableHangul(char)
-      ? <button key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width }} type="button" aria-current={char === selectedChar ? 'true' : undefined} data-ink-gap-limiter={inkGapLimiter?.id === contextId ? 'true' : undefined} data-ink-safety-adjusted={isSafetyAdjusted ? 'true' : undefined} aria-label={`${char} 편집${isSafetyAdjusted ? ', 충돌 안전 보정됨' : ''}`} onClick={() => chooseChar(char)}>
+      ? <button key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width }} type="button" aria-current={char === selectedChar ? 'true' : undefined} data-ink-gap-limiter={inkGapLimiter?.id === contextId ? 'true' : undefined} data-ink-safety-adjusted={isSafetyAdjusted ? 'true' : undefined} data-layout-applied={isScopeApplied ? 'true' : undefined} aria-label={`${char} 편집${isSafetyAdjusted ? ', 충돌 안전 보정됨' : ''}`} onClick={() => chooseChar(char)}>
           <Glyph char={char} size={sentenceEm} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={previewJamo} previewSchema={previewSchema} layoutHighlight={layoutHighlight} globalStyle={previewGlobalStyle} />
         </button>
       : <span key={`${lineIndex}-${char}-${charIndex}`} className={/\s/u.test(char) ? styles.spaceGlyph : styles.punctuationGlyph} style={{ inlineSize: width }} aria-label={/\s/u.test(char) ? '공백' : char}>{char}</span>
@@ -1623,8 +1637,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
       </section>
 
       {isLayoutMode ? <section className={styles.layoutMode} aria-label={`${selectedChar} 레이아웃 수정`} data-testid="jamo-layout-mode">
-        <GlyphLayoutEditor key={`${selectedChar}:${layoutEpoch}`} codepoint={selectedChar.codePointAt(0) ?? 0xac00} initialPart={selection.kind === 'none' ? strokeEntryPart ?? undefined : selection.editorPart} onCommitted={commitLayoutDelta} onEditStrokes={editStrokes} onPickCharacter={openSoloChar} />
+        <GlyphLayoutEditor key={`${selectedChar}:${layoutEpoch}`} codepoint={selectedChar.codePointAt(0) ?? 0xac00} initialPart={selection.kind === 'none' ? strokeEntryPart ?? undefined : selection.editorPart} onCommitted={commitLayoutDelta} onEditStrokes={editStrokes} onPickCharacter={openSoloChar} onScopeApplied={setAppliedScope} />
       </section> : <>
+      {/* 획 편집에도 같은 자리·같은 높이로 `닿는 글자` 줄이 선다. 범위는 고치는 자모가 든 글자 전부(레이아웃을 안 가린다).
+          줄이 두 모드에 다 있어야 `획 고치기`로 오갈 때 캔버스가 안 튄다. */}
+      {chrome === 'workspace' && layoutAvailable && !isBrushStyleOpen && strokeRowJamo && strokeCardPart &&
+        <TouchedGlyphRow source={corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00)} bundle={notoBundle} edit={NO_LAYOUT_EDIT} ghostVisible={false} focus={strokeCardPart} scope="jamo" group={strokeCardPart} jamos={[strokeRowJamo]} anyContext />}
       <section className={styles.editor} data-chrome={chrome} aria-label={`${selectedChar} 완성 글자 편집`}>
         {/* 셸 안에서는 레이아웃 모드와 같은 자리(캔버스 왼쪽)에 같은 여섯 칸 표지가 선다. 획 편집에서는 `기본` 칸이 하나 더 오고 칸마다 고치는 자소가 그려진다. */}
         <div className={styles.strokeStage}>
@@ -1690,7 +1708,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
       <MobileWorkspaceShell
         activeArea="jamo"
         projectName={projectName}
-        statusLabel={isLayoutMode ? '레이아웃 수정' : lockedPart && selection.kind !== 'none' ? `획 편집 · ${selection.jamo.char} · 모든 ${selection.jamo.char} 글자` : '획 편집'}
         history={{ canUndo: history.length > 0, canRedo: future.length > 0, onUndo: undo, onRedo: redo }}
         menu={<div data-edit-mode={isLayoutMode ? 'layout' : 'stroke'} data-testid="jamo-toolbar">{actions}</div>}
         menuBadge={exportState === 'exporting' ? 'busy' : exportState === 'downloaded' ? 'done' : exportState === 'failed' ? 'failed' : null}

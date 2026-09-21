@@ -15,12 +15,13 @@ import { useNotoModel } from './notoModel'
 import type { NotoPresetGlyph } from './notoPresetGlyphs'
 import { LayoutContextCards } from './LayoutContextCards'
 import { ReviewPropagationCards } from './ReviewPropagationCards'
-import type { ReviewPropagationHandle } from './ReviewPropagationCards'
+import type { ReviewPropagationHandle, ScopeSelection } from './ReviewPropagationCards'
+import { TouchedGlyphRow } from './TouchedGlyphRow'
+import type { ScopeRule } from './scopeRule'
 import { useNotoGlyph } from './useNotoGlyph'
 import { useLayoutDelta } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { hasLayoutEdit, propagationEditOf, unreachedRailIds } from './reviewPropagation'
-import type { PropagationScope } from './reviewPropagation'
 import { snapRail } from './railSnap'
 import type { SnapHit } from './railSnap'
 import { useFitInkStyle } from './useFitInkStyle'
@@ -82,7 +83,7 @@ type CanvasRail = EditableRail & { part: Part; locked?: boolean }
 // 방향키 → 축 방향 부호. 가로 위치(x)는 좌우, 세로 위치(y)는 상하(아래가 +).
 const nudgeOf = (key: string, axis: 'x' | 'y'): number => axis === 'x' ? (key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0) : (key === 'ArrowDown' ? 1 : key === 'ArrowUp' ? -1 : 0)
 
-function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], activePart, selectedRail, snappedRail, snapHit, showDelta = true, onSelectRail, onDragRail, onNudgeRail, onSelectPart, label, overlays = [], componentOverlays = [], boxes = [] }: {
+function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], activePart, selectedRail, snappedRail, snapHit, showDelta = true, onSelectRail, onDragRail, onDragState, onNudgeRail, onSelectPart, label, overlays = [], componentOverlays = [], boxes = [] }: {
   ghost: string
   /** Noto 고스트를 끄면 내 획만 남아 어느 획을 바꿀지 보인다. */
   ghostVisible?: boolean
@@ -104,6 +105,8 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
   onSelectRail?: (id: string) => void
   /** 캔버스에서 rail을 직접 끈다. 값은 em 제안값, 호출자가 순서·간격을 판정한다. */
   onDragRail?: (id: string, value: number) => void
+  /** 끌기가 시작되고(true) 끝날 때(false). 호출자가 끄는 동안 미뤄 둘 것을 안다. */
+  onDragState?: (dragging: boolean) => void
   /** 부품 상자를 누르면 그 부품이 켜진다. 탭 대신 캔버스가 부품을 고른다. */
   onSelectPart?: (part: Part) => void
   label: string
@@ -120,6 +123,7 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
     if (!onDragRail) return
     gesture.current = { pointerId: event.pointerId, id: rail.id, axis: rail.axis, start: rail.axis === 'x' ? event.clientX : event.clientY, startValue: rail.value }
     event.currentTarget.setPointerCapture(event.pointerId)
+    onDragState?.(true)
   }
   const moveDrag = (event: ReactPointerEvent<SVGLineElement>) => {
     const current = gesture.current
@@ -135,6 +139,7 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
     if (gesture.current?.pointerId !== event.pointerId) return
     gesture.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    onDragState?.(false)
   }
   const geometryOf = (axis: 'x' | 'y', value: number) => axis === 'x' ? { x1: value, x2: value, y1: -0.06, y2: 1.02 } : { x1: -0.06, x2: 1.02, y1: value, y2: value }
   // 라벨은 글자 칸 밖 여백 띠에. x rail은 위(편집)·아래(실측) 띠 가운데, y rail은 오른 띠 끝 정렬. 호버 때만 보인다.
@@ -231,7 +236,7 @@ function railsWithDelta(railsEm?: Readonly<Record<string, number>>, delta?: Read
   return Object.fromEntries(Object.entries(railsEm).map(([key, value]) => [key, value + (delta[key] ?? 0)]))
 }
 
-function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPickCharacter }: { glyph: NotoPresetGlyph; initialPart?: Part; onCommitted?: GlyphLayoutEditorProps['onCommitted']; onEditStrokes?: GlyphLayoutEditorProps['onEditStrokes']; onPickCharacter?: GlyphLayoutEditorProps['onPickCharacter'] }) {
+function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPickCharacter, onScopeApplied }: { glyph: NotoPresetGlyph; initialPart?: Part; onCommitted?: GlyphLayoutEditorProps['onCommitted']; onEditStrokes?: GlyphLayoutEditorProps['onEditStrokes']; onPickCharacter?: GlyphLayoutEditorProps['onPickCharacter']; onScopeApplied?: GlyphLayoutEditorProps['onScopeApplied'] }) {
   const codepoint = glyph.identity.codepoint
   const ghost = useMemo(() => notoOutlineGhostPath(glyph.outline), [glyph])
   const measured = useMemo(() => baselineRails(glyph), [glyph])
@@ -301,10 +306,13 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
   const fixRail = () => { if (rail && rail.kind === 'face') setFixedRails((current) => new Set(current).add(rail.id)) }
   const unfixRail = (id: string) => setFixedRails((current) => { if (!current.has(id)) return current; const next = new Set(current); next.delete(id); return next })
   const canApply = hasLayoutEdit(propagationEdit)
+  // 하단 바는 끄는 동안 얼린다. 잡을 때의 상태로 서 있다가 손을 떼면 바뀐다 — 끄는 중에 버튼이 바뀌며 번쩍이지 않게. 방향키 이동은 끌기가 아니라 바로 바뀐다.
+  const [heldBar, setHeldBar] = useState<{ editCount: number; canApply: boolean } | null>(null)
+  const bar = heldBar ?? { editCount, canApply }
   const cardsRef = useRef<ReviewPropagationHandle>(null)
   const [scopeLabel, setScopeLabel] = useState('이 레이아웃')
-  // 범위는 카드 묶음이 들고 있다. 캔버스 옆 여섯 칸 표지가 `전체`를 알아야 해서 여기로 올려 둔다.
-  const [scope, setScope] = useState<PropagationScope>('layer')
+  // 범위는 옵션 스택이 고른다. 상단 `닿는 글자` 줄과 캔버스 옆 여섯 칸 표지가 알아야 해서 여기로 올려 둔다.
+  const [selection, setSelection] = useState<ScopeSelection>({ scope: 'layer', group: 'JU', jamos: [] })
 
   // 값 하나를 놓아 본다. 순서·간격 위반이면 false, 호출자는 마지막 유효값을 지킨다.
   const tryPlace = (target: EditableRail, value: number): true | string => {
@@ -343,10 +351,15 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
     ...measured.map((rail) => ({ id: rail.id, label: rail.label, axis: rail.axis, value: rail.value })),
     ...editable.filter((rail) => rail.id !== target.id && !(rail.partIndex === target.partIndex && rail.id.startsWith('c') === target.id.startsWith('c'))).map((rail) => ({ id: rail.id, label: rail.label, axis: rail.axis, value: rail.value })),
   ]
+  // 적용 직후 문장 줄 표시. 다음 편집이 시작되면 지운다.
+  const applyMarked = useRef(false)
+  const markApplied = (rules: readonly ScopeRule[]) => { applyMarked.current = rules.length > 0; onScopeApplied?.(rules) }
+  const clearApplied = () => { if (!applyMarked.current) return; applyMarked.current = false; onScopeApplied?.([]) }
   // 캔버스 드래그·자·키보드가 모두 여기로 온다. 1u 격자는 모델 값에 맞추고, 손 조작(snap)엔 모델 → 다른 기준선 → 격자 순으로 걸린다.
   const changeRail = (id: string, next: number, options?: { snap?: boolean }) => {
     const target = editable.find((item) => item.id === id)
     if (!target || lockedRails.has(target.id)) return
+    clearApplied()
     // 고정한 변을 다시 옮기면 더하기로 돌아간다.
     unfixRail(id)
     if (options?.snap) {
@@ -366,11 +379,13 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
   const resetRails = () => { setSlotDeltaByPart([]); setRailDeltaByPart([]); setFacesByPart([]); setFixedRails(new Set()); setError(''); setSnapHit(null) }
 
   return <div className={styles.editor} data-testid="glyph-layout-editor">
+      {/* 상단 두 줄의 아랫줄. 윗줄은 `내 문장`이라 이 편집부 바로 위에 있다. 글자 크기·칸 높이가 같고 줄 높이는 고정이다. */}
+      <TouchedGlyphRow source={glyph.identity} bundle={bundle} edit={propagationEdit} ghostVisible={ghostVisible} focus={rail?.part} scope={selection.scope} group={selection.group} jamos={selection.jamos} rule={selection.rule} onPick={onPickCharacter} />
       <section className={styles.canvasSection}>
-        {/* 캔버스 왼쪽 세로 표지. 여섯 칸 중 지금 고치는 칸을 켜기만 한다 — 범위는 아래 범위 띠에서 고른다. */}
-        <LayoutContextCards activeContextId={glyph.identity.contextId} allActive={scope === 'all'} />
+        {/* 캔버스 왼쪽 세로 표지. 여섯 칸 중 지금 고치는 칸을 켜기만 한다 — 범위는 아래 옵션 스택에서 고른다. */}
+        <LayoutContextCards activeContextId={glyph.identity.contextId} allActive={selection.scope === 'all'} />
         <div className={styles.canvasArea}>
-        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail?.id} snappedRail={snapHit?.id} snapHit={snapHit} onSelectRail={(id) => { if (id !== rail?.id) setSnapHit(null); setSelectedRail(id); setError('') }} onSelectPart={selectPart} onDragRail={(id, value) => changeRail(id, value, { snap: true })} onNudgeRail={(id, delta) => { const target = editable.find((item) => item.id === id); if (target) changeRail(id, target.value + delta) }} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
+        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail?.id} snappedRail={snapHit?.id} snapHit={snapHit} onSelectRail={(id) => { if (id !== rail?.id) setSnapHit(null); setSelectedRail(id); setError('') }} onSelectPart={selectPart} onDragRail={(id, value) => changeRail(id, value, { snap: true })} onDragState={(dragging) => setHeldBar(dragging ? { editCount, canApply } : null)} onNudgeRail={(id, delta) => { const target = editable.find((item) => item.id === id); if (target) changeRail(id, target.value + delta) }} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
         <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="review-ghost-toggle" />
         {/* 변 rail을 잡으면 `이 자리에 맞추기`. 누르면 범위 안 글자가 전부 이 자리(em)에 모인다. 탁 걸린 자리면 주황 테두리. 고정 뒤엔 `= 자리` 표지. */}
         {rail && rail.kind === 'face' && (fixable
@@ -382,12 +397,12 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
       </section>
       {modelError && <p className={styles.status} data-state="error" role="alert">{modelError}</p>}
       {/* 적용하면 Δ가 저장되고 context가 새 original로 다시 풀리므로 세션 편집은 비운다. */}
-      <ReviewPropagationCards ref={cardsRef} source={glyph.identity} bundle={bundle} edit={propagationEdit} changed={changedRails} fixed={fixedRails} focus={rail?.part} ghostVisible={ghostVisible} onApplied={resetRails} onCommitted={onCommitted} onSelectPart={selectPart} onScopeLabel={setScopeLabel} onScope={setScope} onPickCharacter={onPickCharacter} />
-      {/* 하단 바는 한 줄짜리 상태 기계. Δ 없음 → `ㄱ 획 고치기`. Δ 있음 → `복원 | …에 적용`(범위는 카드가 앎). 편집기가 내놓는 rail은 전부 배치라 Δ가 있으면 늘 적용할 수 있다. */}
-      {(onEditStrokes && activePart) || editCount > 0 ? <div className={styles.strokeCta} data-testid="jamo-stroke-cta-bar">
+      <ReviewPropagationCards ref={cardsRef} source={glyph.identity} edit={propagationEdit} changed={changedRails} fixed={fixedRails} focus={rail?.part} railRole={rail?.role} onApplied={resetRails} onCommitted={onCommitted} onSelectPart={selectPart} onScopeLabel={setScopeLabel} onScopeChange={setSelection} onScopeApplied={markApplied} />
+      {/* 하단 바는 한 줄짜리 상태 기계. Δ 없음 → `ㄱ 획 고치기`. Δ 있음 → `복원 | …에 적용`(범위는 카드가 앎). 편집기가 내놓는 rail은 전부 배치라 Δ가 있으면 늘 적용할 수 있다. 끄는 동안에는 잡을 때 상태로 얼어 있다(`heldBar`). */}
+      {(onEditStrokes && activePart) || bar.editCount > 0 ? <div className={styles.strokeCta} data-testid="jamo-stroke-cta-bar" data-held={heldBar ? true : undefined}>
         <div className={styles.ctaRow}>
-          {editCount > 0 && <button type="button" className={styles.resetCta} onClick={resetRails} data-testid="review-reset">복원 · {editCount}개 변경</button>}
-          {canApply
+          {bar.editCount > 0 && <button type="button" className={styles.resetCta} onClick={resetRails} data-testid="review-reset">복원 · {bar.editCount}개 변경</button>}
+          {bar.canApply
             ? <button type="button" className={styles.applyCta} onClick={() => cardsRef.current?.apply()} data-testid="review-propagation-apply">{scopeLabel}에 적용</button>
             : <button type="button" onClick={() => activePart && onEditStrokes?.(activePart)} data-testid="jamo-stroke-cta">{activeJamo} 획 고치기</button>}
         </div>
@@ -404,12 +419,14 @@ export interface GlyphLayoutEditorProps {
   onCommitted?: (before: LayoutDeltaSnapshot, after: LayoutDeltaSnapshot) => void
   /** 켠 부품의 획 편집으로 내려간다. 주면 하단에 `ㄱ 획 고치기`가 뜬다. */
   onEditStrokes?: (part: Part) => void
-  /** 예시 글자 카드를 누르면 그 글자를 연다. */
+  /** 예시 글자를 누르면 그 글자를 연다. */
   onPickCharacter?: (character: string) => void
+  /** 방금 적용한 범위. 문장 줄이 그 범위에 든 글자를 잠깐 표시한다. 다음 편집이 시작되면 빈 목록으로 다시 부른다. */
+  onScopeApplied?: (rules: readonly ScopeRule[]) => void
 }
 
-export function GlyphLayoutEditor({ codepoint, initialPart, onCommitted, onEditStrokes, onPickCharacter }: GlyphLayoutEditorProps) {
+export function GlyphLayoutEditor({ codepoint, initialPart, onCommitted, onEditStrokes, onPickCharacter, onScopeApplied }: GlyphLayoutEditorProps) {
   const { glyph, error } = useNotoGlyph(codepoint)
-  if (glyph) return <GlyphLayoutBody key={codepoint} glyph={glyph} initialPart={initialPart} onCommitted={onCommitted} onEditStrokes={onEditStrokes} onPickCharacter={onPickCharacter} />
+  if (glyph) return <GlyphLayoutBody key={codepoint} glyph={glyph} initialPart={initialPart} onCommitted={onCommitted} onEditStrokes={onEditStrokes} onPickCharacter={onPickCharacter} onScopeApplied={onScopeApplied} />
   return <p className={styles.status} data-state={error ? 'error' : 'loading'} role={error ? 'alert' : 'status'}>{error || 'Noto 윤곽 읽는 중'}</p>
 }

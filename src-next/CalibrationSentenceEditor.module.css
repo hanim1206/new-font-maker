@@ -57,6 +57,8 @@
 .sentenceRun button[aria-current='true']::after { background: rgb(var(--color-primary)); }
 .sentenceRun button[data-ink-safety-adjusted='true'] { border-radius: 4px; background: rgb(183 121 31 / .1); box-shadow: inset 0 0 0 1px rgb(183 121 31 / .58); }
 .sentenceRun button[data-ink-gap-limiter='true'] { border-radius: 4px; background: rgb(178 77 61 / .12); box-shadow: inset 0 0 0 1.5px rgb(178 77 61 / .78); }
+/* 방금 적용한 배치 범위에 든 글자. 적용이 어디까지 닿았는지 알리는 표시라 다음 편집이 시작되면 빠진다. */
+.sentenceRun button[data-layout-applied='true'] { border-radius: 4px; background: rgb(var(--color-primary) / .14); }
 .sentenceRun button[data-ink-gap-limiter='true']::after { background: #b24d3d; }
 .sentenceRun button:focus { outline: none; }
 .sentenceRun button:focus-visible::after { height: 3px; background: rgb(var(--color-primary)); }

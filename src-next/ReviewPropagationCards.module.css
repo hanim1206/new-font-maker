@@ -1,6 +1,7 @@
 .section { margin: 10px 14px 0; }
 /* Δ 줄. 늘 한 줄 자리를 차지한다. */
-.deltaRow { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0 0; }
+/* Δ 줄은 화면에 안 보인다. 끌 때마다 글씨가 바뀌는 게 산만해서 뺐고, 읽기 도구에만 남긴다. 무엇이 얼마나 움직였는지는 캔버스의 Δ 수치가 말한다. */
+.deltaRow { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .deltaRow .deltas { flex: 1 1 auto; min-width: 0; padding: 4px 0 0; }
 /* 자모 고르기 시트. 아래에서 올라오고 바깥을 누르면 닫힌다. */
 .sheetBackdrop { position: fixed; z-index: 100; inset: 0; display: flex; align-items: flex-end; justify-content: center; background: rgb(20 24 31 / .28); }
@@ -16,16 +17,3 @@
 .jamos button:disabled { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary)); color: #fff; opacity: 1; }
 .deltas { min-height: 24px; display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 8px 0 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 600; color: rgb(var(--color-primary-dark)); }
 .deltas i { margin-right: 4px; color: rgb(var(--color-text-dim-4)); font-style: normal; font-weight: 500; }
-/* 한 줄만 차지한다. 다섯 장이 온전히 보이고 여섯째가 살짝 걸쳐 옆으로 밀 수 있음을 알린다. 끝 가까이 밀면 다음 묶음이 붙는다. */
-.cards { display: flex; gap: 8px; padding: 6px 0 10px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; }
-.cards::-webkit-scrollbar { display: none; }
-.card { flex: 0 0 calc((100% - 40px) / 5.35); min-width: 0; margin: 0; scroll-snap-align: start; }
-/* 카드 그림이 곧 버튼이다. 잠겨도(안 끝난 Δ) 모양은 그대로다. */
-.card button { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
-.card button:disabled { cursor: default; }
-.card svg { display: block; width: 100%; aspect-ratio: 1; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: #fff; }
-.card[data-touched='false'] svg { opacity: .55; }
-.card figcaption { display: flex; flex-direction: column; align-items: center; margin-top: 3px; line-height: 1.2; }
-.card figcaption b { font-size: 13px; font-weight: 700; }
-.card figcaption small { color: rgb(var(--color-text-dim-4)); font-size: 9px; font-weight: 600; text-align: center; }
-.empty { padding: 8px 0 0; color: rgb(var(--color-text-dim-4)); font-size: 10.5px; }
