@@ -98,7 +98,7 @@ async function collectStyleBaseline(browser: Browser, style: typeof STYLES[keyof
         version: 0,
       }))
     }, style)
-    await page.goto('/calibration')
+    await page.goto('/calibration?otf=schema')
     const downloadPromise = page.waitForEvent('download')
     await page.getByRole('button', { name: '현재 작업을 OTF로 추출' }).click()
     await page.getByTestId('font-export-confirm').click()

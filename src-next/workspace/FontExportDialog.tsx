@@ -11,6 +11,7 @@ export function FontExportDialog() {
 
 function FontExportForm() {
   const savedName = useFontExportStore((state) => state.familyName)
+  const lastError = useFontExportStore((state) => state.error)
   const cancel = useFontExportStore((state) => state.cancel)
   const confirm = useFontExportStore((state) => state.confirm)
   const [name, setName] = useState(savedName)
@@ -29,6 +30,7 @@ function FontExportForm() {
         <b>폰트 이름</b>
         <small>설치했을 때 글꼴 목록에 보이는 이름이에요. 파일도 이 이름으로 저장됩니다.</small>
       </header>
+      {lastError ? <small role="alert" data-testid="font-export-error">지난 추출 실패: {lastError}</small> : null}
       <input type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder={DEFAULT_FONT_NAME} maxLength={40} autoFocus onFocus={(event) => event.target.select()} aria-label="폰트 이름" data-testid="font-export-name" />
       <div className={styles.actions}>
         <button type="button" onClick={cancel}>취소</button>

@@ -10,8 +10,8 @@
  * - Design Body 좌측 inset만 OTF 글리프 원점으로 투영
  */
 import type {
-  BoxConfig, BrushStyle, Padding, ResolvedInkPrimitive, StrokeDataV2, StrokeLinecap, StrokeLinejoin,
-  StrokeRenderStyle, LayoutType,
+  BoxConfig, BrushStyle, DecomposedSyllable, GlyphInkPlacement, LayoutSchema, Padding, ResolvedInkPrimitive,
+  StrokeDataV2, StrokeLinecap, StrokeLinejoin, StrokeRenderStyle, LayoutType,
 } from '../types'
 import { useJamoStore } from '../stores/jamoStore'
 import { useLayoutStore } from '../stores/layoutStore'
@@ -52,7 +52,20 @@ export interface GlyphData {
   slant: number
   brush: BrushStyle
   strokeStyle: StrokeRenderStyle
+  /** 자소 상자를 어디서 가져왔는지. 모델 상자를 기대했는데 스키마로 떨어진 글자를 세는 데 쓴다. */
+  placementKind: GlyphInkPlacement['kind']
 }
+
+/**
+ * 자소 상자를 정하는 함수. 화면의 칸 해석(모델 상자 + 레이아웃 Δ)을 추출기에 그대로 넘기는 자리다.
+ * 모델과 Δ 스토어는 `src-next`에 있어 추출기가 직접 읽지 않고 호출자가 넣어 준다.
+ * 없으면 split/padding 스키마로 그린다.
+ */
+export type GlyphPlacementResolver = (
+  syllable: DecomposedSyllable,
+  schema: LayoutSchema,
+  ends: { linecap: StrokeLinecap; linejoin: StrokeLinejoin },
+) => GlyphInkPlacement
 
 export function calculateSpaceAdvance(padding: Padding): number {
   const bodyWidth = 1 - padding.left - padding.right
@@ -103,6 +116,11 @@ function projectCenterlinesToLegacyOtfStrokes(
  * @returns GlyphData 또는 null (비한글)
  */
 export function collectGlyphDataForChar(char: string): GlyphData | null {
+  return collectGlyphDataWithPlacement(char)
+}
+
+/** `collectGlyphDataForChar`에 상자 출처만 바꿔 끼운 것. 나머지 해석(패딩·스타일·원점·폭)은 같다. */
+export function collectGlyphDataWithPlacement(char: string, placementOf?: GlyphPlacementResolver): GlyphData | null {
   const code = char.charCodeAt(0)
 
   // 범위 체크
@@ -140,9 +158,12 @@ export function collectGlyphDataForChar(char: string): GlyphData | null {
   const weightMultiplier = weightToMultiplier(effectiveStyle.weight)
   // Design Body/advance와 Ink Bounds를 분리한다. 편집한 돌출 획을 Body에
   // 다시 맞춰 축소하지 않고 화면과 같은 EM 경계 안에서 출력한다.
+  const placement: GlyphInkPlacement = placementOf
+    ? placementOf(syllable, schemaWithPadding, { linecap: effectiveStyle.linecap, linejoin: effectiveStyle.linejoin })
+    : { kind: 'schema', schema: schemaWithPadding }
   const resolvedInk = resolveGlyphInkPrimitives({
     syllable,
-    placement: { kind: 'schema', schema: schemaWithPadding },
+    placement,
     weightMultiplier,
     globalLinecap: effectiveStyle.linecap,
     globalLinejoin: effectiveStyle.linejoin,
@@ -165,6 +186,7 @@ export function collectGlyphDataForChar(char: string): GlyphData | null {
     slant: effectiveStyle.slant,
     brush: effectiveStyle.brush,
     strokeStyle: effectiveStyle.strokeStyle,
+    placementKind: placement.kind,
   }
 }
 
@@ -181,20 +203,21 @@ export function collectGlyphDataForChar(char: string): GlyphData | null {
  */
 export function collectAllGlyphData(
   onProgress?: (completed: number, total: number) => void,
+  placementOf?: GlyphPlacementResolver,
 ): GlyphData[] {
   const result: GlyphData[] = []
 
   // 독립 자음 (ㄱ-ㅎ, 30개)
   for (let code = 0x3131; code <= 0x314E; code++) {
     const char = String.fromCharCode(code)
-    const glyph = collectGlyphDataForChar(char)
+    const glyph = collectGlyphDataWithPlacement(char, placementOf)
     if (glyph) result.push(glyph)
   }
 
   // 독립 모음 (ㅏ-ㅣ, 21개)
   for (let code = 0x314F; code <= 0x3163; code++) {
     const char = String.fromCharCode(code)
-    const glyph = collectGlyphDataForChar(char)
+    const glyph = collectGlyphDataWithPlacement(char, placementOf)
     if (glyph) result.push(glyph)
   }
 
@@ -206,7 +229,7 @@ export function collectAllGlyphData(
   for (let i = 0; i < totalSyllables; i++) {
     const code = 0xAC00 + i
     const char = String.fromCharCode(code)
-    const glyph = collectGlyphDataForChar(char)
+    const glyph = collectGlyphDataWithPlacement(char, placementOf)
     if (glyph) result.push(glyph)
 
     // 진행 보고 (100개마다)
@@ -216,6 +239,14 @@ export function collectAllGlyphData(
   }
 
   return result
+}
+
+/** 폰트에 넣는 글자 전부, 글리프 순서대로(독립 자음 → 독립 모음 → 완성형 음절). */
+export function allExportChars(): string[] {
+  const chars: string[] = []
+  for (let code = 0x3131; code <= 0x3163; code++) chars.push(String.fromCharCode(code))
+  for (let code = 0xAC00; code <= 0xD7A3; code++) chars.push(String.fromCharCode(code))
+  return chars
 }
 
 /**

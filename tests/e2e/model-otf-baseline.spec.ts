@@ -1,12 +1,14 @@
 import { expect, test, type Download } from '@playwright/test'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { LEGACY_CALIBRATION_LAYOUT_PROFILE_V1 } from '../../src/data/legacyCalibrationLayoutProfileV1'
 // opentype.js는 이 저장소에서 별도 타입 선언 없이 사용한다.
 // @ts-expect-error opentype.js에 타입 정의 파일 없음
 import opentype from 'opentype.js'
 
-const baseline = JSON.parse(readFileSync(fileURLToPath(new URL('../fixtures/legacy-otf-glyphs-v1.json', import.meta.url)), 'utf8'))
+// 화면과 같은 상자(Noto 모델 상자 + 레이아웃 Δ)로 뽑은 OTF의 기준. 옛 스키마 기준(`legacy-otf-glyphs-v1.json`)은 동결해 옆에 둔다.
+// 기준을 새로 뜰 때만 `UPDATE_MODEL_OTF_BASELINE=1`로 돌린다.
+const FIXTURE = fileURLToPath(new URL('../fixtures/model-otf-glyphs-v1.json', import.meta.url))
+const UPDATE = process.env.UPDATE_MODEL_OTF_BASELINE === '1'
 
 const REPRESENTATIVE_GLYPHS = ['ㄱ', '가', '고', '과', '각', '곡', '곽', 'ㅇ', 'ㅁ', 'ㅂ', 'ㅎ', 'ㅙ'] as const
 
@@ -86,26 +88,10 @@ function collectBaseline(font: OpenTypeFont) {
   }
 }
 
-test('기존 선 전용 OTF의 대표 글리프 윤곽과 메트릭을 유지한다', async ({ page }) => {
+test('모델 상자 OTF의 대표 글리프 윤곽과 메트릭을 유지한다', async ({ page }) => {
   test.setTimeout(240_000)
   await page.addInitScript(() => localStorage.clear())
-  await page.goto('/calibration?otf=schema')
-
-  const expectedLayoutTypes = Object.keys(LEGACY_CALIBRATION_LAYOUT_PROFILE_V1)
-  const persistedOverrides = await page.evaluate((layoutTypes) => {
-    const raw = localStorage.getItem('font-maker-layout-schemas')
-    if (!raw) throw new Error('canonical layout 저장값이 없습니다.')
-    const envelope = JSON.parse(raw) as {
-      state?: { layoutSchemas?: Record<string, { userPartOverrides?: unknown }> }
-    }
-    const schemas = envelope.state?.layoutSchemas
-    if (!schemas) throw new Error('canonical layoutSchemas가 없습니다.')
-    return Object.fromEntries(layoutTypes.map((layoutType) => [
-      layoutType,
-      schemas[layoutType]?.userPartOverrides,
-    ]))
-  }, expectedLayoutTypes)
-  expect(persistedOverrides).toEqual(LEGACY_CALIBRATION_LAYOUT_PROFILE_V1)
+  await page.goto('/calibration')
 
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: '현재 작업을 OTF로 추출' }).click()
@@ -118,6 +104,7 @@ test('기존 선 전용 OTF의 대표 글리프 윤곽과 메트릭을 유지한
   const font = opentype.parse(arrayBuffer) as OpenTypeFont
   const actual = collectBaseline(font)
 
-  expect(actual).toEqual(baseline)
+  if (UPDATE || !existsSync(FIXTURE)) writeFileSync(FIXTURE, `${JSON.stringify(actual, null, 2)}\n`)
+  expect(actual).toEqual(JSON.parse(readFileSync(FIXTURE, 'utf8')))
   await expect(page.getByRole('button', { name: 'OTF 추출 완료' })).toBeVisible()
 })

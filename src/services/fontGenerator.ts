@@ -2,7 +2,7 @@
  * opentype.js를 사용한 TTF 폰트 생성 및 다운로드
  *
  * 파이프라인:
- * 1. collectAllGlyphData() — 스토어에서 글리프 데이터 수집
+ * 1. collectGlyphDataWithPlacement() — 스토어에서 글리프 데이터 수집
  * 2. strokeToContours() — 각 획을 윤곽 컨투어로 변환
  * 3. contoursToPath() — 컨투어를 opentype.js Path로 변환
  * 4. opentype.Font — 폰트 조립 + ArrayBuffer → 다운로드
@@ -12,7 +12,8 @@ import * as opentype from 'opentype.js'
 import { strokeToContours } from './strokeToOutline'
 import type { Contour } from './strokeToOutline'
 import {
-  collectAllGlyphData,
+  allExportChars,
+  collectGlyphDataWithPlacement,
   UPM,
   DEFAULT_ADVANCE_WIDTH,
   ASCENDER,
@@ -23,7 +24,7 @@ import {
   getCurrentSpaceAdvance,
 } from './fontExportUtils'
 import { useGlobalStyleStore } from '../stores/globalStyleStore'
-import type { GlyphData } from './fontExportUtils'
+import type { GlyphData, GlyphPlacementResolver } from './fontExportUtils'
 import { mergeStrokeContourGroupsForCff } from './contourBoolean'
 import { brushInkGroupsToFontContours, strokeToBrushInkGroups } from './brushGeometry'
 import { strokeToRenderInkGroups } from './strokeRenderGeometry'
@@ -38,6 +39,8 @@ export interface FontGeneratorOptions {
   familyName?: string
   styleName?: string
   onProgress?: (completed: number, total: number, phase: string) => void
+  /** 자소 상자 출처. 화면과 같은 칸 해석을 넘기면 받은 폰트가 화면과 같아진다. 없으면 스키마. */
+  placementOf?: GlyphPlacementResolver
 }
 
 /** 폰트 생성 결과 */
@@ -46,6 +49,8 @@ export interface FontGeneratorResult {
   glyphCount: number
   fileSize?: number
   error?: string
+  /** `placementOf`를 줬는데도 스키마 상자로 떨어진 음절 수. 기본 획이면 0이어야 한다. */
+  schemaFallbackCount?: number
 }
 
 export interface FontIdentity {
@@ -316,11 +321,10 @@ function contoursToPath(contours: Contour[]): InstanceType<typeof opentype.Path>
 // ===== 글리프 생성 =====
 
 /**
- * GlyphData → opentype.js Glyph 변환
+ * GlyphData → OTF에 들어가는 최종 컨투어(폰트 좌표, 획 겹침 합친 뒤).
+ * 화면 잉크와 맞는지 재는 테스트가 같은 값을 보도록 따로 뺐다.
  */
-function createGlyph(
-  glyphData: GlyphData,
-): InstanceType<typeof opentype.Glyph> {
+export function glyphDataToFontContours(glyphData: GlyphData): Contour[] {
   // CFF 1은 겹친 컨투어를 even-odd로 상쇄하므로 획별 잉크 묶음을 유지한다.
   const contourGroups: Contour[][] = []
 
@@ -360,6 +364,16 @@ function createGlyph(
     const reason = error instanceof Error ? error.message : String(error)
     throw new Error(`${glyphData.char}(U+${glyphData.unicode.toString(16).toUpperCase()}) 컨투어 합치기 실패: ${reason}`)
   }
+  return mergedContours
+}
+
+/**
+ * GlyphData → opentype.js Glyph 변환
+ */
+function createGlyph(
+  glyphData: GlyphData,
+): InstanceType<typeof opentype.Glyph> {
+  const mergedContours = glyphDataToFontContours(glyphData)
 
   // 겹침이 제거된 컨투어 → opentype.js Path
   const path = contoursToPath(mergedContours)
@@ -542,15 +556,23 @@ export async function generateAndDownloadFont(
     familyName = 'FontMaker',
     styleName = 'Regular',
     onProgress,
+    placementOf,
   } = options
 
   try {
     // Phase 1: 글리프 데이터 수집
     onProgress?.(0, 1, '글리프 데이터 수집 중...')
 
-    const glyphDataList = collectAllGlyphData((completed, total) => {
-      onProgress?.(completed, total, '글리프 데이터 수집 중...')
-    })
+    // 모델 상자는 글자마다 획을 칸에 맞추느라 전수에 십여 초가 걸린다. 나눠 돌려 진행 표시가 멈추지 않게 한다.
+    const glyphDataList = (await processInChunks(
+      allExportChars(),
+      (char) => collectGlyphDataWithPlacement(char, placementOf),
+      placementOf ? 100 : 2000,
+      (done, total) => onProgress?.(done, total, '글리프 데이터 수집 중...'),
+    )).filter((data): data is GlyphData => data !== null)
+    const schemaFallbackCount = placementOf
+      ? glyphDataList.filter((data) => data.unicode >= 0xAC00 && data.placementKind === 'schema').length
+      : undefined
 
     if (glyphDataList.length === 0) {
       return { success: false, glyphCount: 0, error: '생성할 글리프가 없습니다.' }
@@ -639,6 +661,7 @@ export async function generateAndDownloadFont(
       success: true,
       glyphCount: glyphs.length,
       fileSize,
+      schemaFallbackCount,
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
