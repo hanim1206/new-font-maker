@@ -22,6 +22,10 @@ const DEFAULTS: Record<StrokeRenderStyle['mode'], StrokeRenderStyle> = {
   'dot-pattern': { mode: 'dot-pattern', dotSize: 1, gap: 0.5, rows: 1, stagger: false, omitEvery: 0 },
   'legacy-snapped-centerline': { mode: 'legacy-snapped-centerline' },
 }
+/** 각도판 가운데에서 이 거리(px) 밖을 잡으면 돌리기, 안을 잡으면 밀기다. 막대 길이의 절반이 36px이다. */
+const ANGLE_PAD_TURN_RADIUS = 24
+/** 돌리는 중 가운데에서 이 거리(px) 안은 방향을 읽지 않는다. */
+const ANGLE_PAD_DEAD_RADIUS = 10
 function clamp(value: number, min: number, max: number): number { return Math.max(min, Math.min(max, Math.round(value))) }
 function clampCutAngle(value: number, preferredSign = 1): number {
   const limited = clamp(value, -60, 60)
@@ -47,7 +51,9 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
   const current = draft ?? committed
   const beforeRef = useRef<StrokeRenderStyle | null>(null)
   const latestRef = useRef(current)
-  const angleGesture = useRef<{ before: StrokeRenderStyle; startX: number; startAngle: number } | null>(null)
+  // 각도판은 두 가지로 잡힌다. 막대 끝 · 바깥을 잡으면 `turn`: 손가락이 가운데를 중심으로 돈 만큼 각도가 돈다.
+  // 막대 가운데를 잡으면 `slide`: 돌릴 중심이 손가락 밑이라 방향을 못 읽으므로, 오른쪽 · 아래로 끈 만큼 시계 방향으로 돈다.
+  const angleGesture = useRef<{ before: StrokeRenderStyle; startAngle: number; mode: 'turn' | 'slide'; turned: number; pointerAngle: number; startX: number; startY: number } | null>(null)
   const [activeValue, setActiveValue] = useState<string | null>(null)
   latestRef.current = current
 
@@ -82,18 +88,42 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
   const handleRangeKeys = (event: KeyboardEvent<HTMLInputElement>, name: string) => {
     if (event.key.startsWith('Arrow') || event.key === 'Home' || event.key === 'End') begin(name)
   }
+  /** 각도판 가운데에서 본 손가락의 방향(도, 화면 시계 방향이 +)과 거리(px). */
+  const pointerFromCenter = (event: PointerEvent<HTMLDivElement>): { angle: number; radius: number } => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const dx = event.clientX - (rect.left + rect.width / 2)
+    const dy = event.clientY - (rect.top + rect.height / 2)
+    return { angle: Math.atan2(dy, dx) * 180 / Math.PI, radius: Math.hypot(dx, dy) }
+  }
   const handleAnglePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     const angle = current.mode === 'angled-area' ? current.cutAngle : current.mode === 'brush' ? current.brush.angle : 0
     event.currentTarget.setPointerCapture(event.pointerId)
-    angleGesture.current = { before: committed, startX: event.clientX, startAngle: angle }
+    const pointer = pointerFromCenter(event)
+    angleGesture.current = { before: committed, startAngle: angle, mode: pointer.radius >= ANGLE_PAD_TURN_RADIUS ? 'turn' : 'slide', turned: 0, pointerAngle: pointer.angle, startX: event.clientX, startY: event.clientY }
     setActiveValue('angle')
   }
   const handleAnglePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (!angleGesture.current || !event.currentTarget.hasPointerCapture(event.pointerId)) return
+    const gesture = angleGesture.current
+    if (!gesture || !event.currentTarget.hasPointerCapture(event.pointerId)) return
     const limit = current.mode === 'angled-area' ? 60 : 90
-    const sensitivity = limit * 2 / Math.max(event.currentTarget.clientWidth, 1)
-    const rawAngle = angleGesture.current.startAngle + (event.clientX - angleGesture.current.startX) * sensitivity
-    const angle = current.mode === 'angled-area' ? clampCutAngle(rawAngle, Math.sign(angleGesture.current.startAngle)) : clamp(rawAngle, -limit, limit)
+    if (gesture.mode === 'turn') {
+      const pointer = pointerFromCenter(event)
+      // 가운데를 스치는 동안은 방향이 흔들리므로 건너뛴다. 한 걸음씩 돈 양을 쌓아 ±180° 경계를 넘어도 안 튄다.
+      if (pointer.radius < ANGLE_PAD_DEAD_RADIUS) return
+      let step = pointer.angle - gesture.pointerAngle
+      if (step > 180) step -= 360
+      if (step < -180) step += 360
+      gesture.turned += step
+      gesture.pointerAngle = pointer.angle
+    } else {
+      const sensitivity = limit * 2 / Math.max(event.currentTarget.clientWidth, 1)
+      gesture.turned = (event.clientX - gesture.startX + event.clientY - gesture.startY) * sensitivity
+    }
+    const rawAngle = gesture.startAngle + gesture.turned
+    // 납작 붓은 반 바퀴 돌리면 같은 모양이라 돌릴 때는 −90~90 안으로 접는다. 밀 때와 절단각은 끝에서 멈춘다.
+    const angle = current.mode === 'angled-area'
+      ? clampCutAngle(rawAngle, Math.sign(gesture.startAngle))
+      : gesture.mode === 'turn' ? Math.round(((rawAngle + 90) % 180 + 180) % 180 - 90) : clamp(rawAngle, -limit, limit)
     if (current.mode === 'angled-area') preview({ ...current, cutAngle: angle })
     else if (current.mode === 'brush') preview({ ...current, brush: { ...current.brush, angle } })
   }
