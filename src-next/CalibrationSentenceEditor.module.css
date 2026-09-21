@@ -31,12 +31,12 @@
 .bodyDimensionGrid input { width: 100%; accent-color: rgb(var(--color-primary)); }
 .bodyReset { width: 100%; min-height: 32px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-size: 11px; font-weight: 650; }
 .bodyReset:disabled { opacity: .45; }
-.sentence { position: relative; box-sizing: border-box; flex: 0 0 104px; height: 104px; display: flex; align-items: flex-start; padding: 8px 56px 8px 12px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; border-bottom: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
+.sentence { position: relative; box-sizing: border-box; flex: 0 0 104px; height: 104px; display: flex; align-items: flex-start; padding: 8px 56px 8px 12px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; border-bottom: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface-3)); }
 .sentence::-webkit-scrollbar { display: none; }
 /* 레이아웃 모드: 한 줄 가로 스크롤. 버튼 둘은 오른쪽에 붙어 가로로 놓인다. */
 .sentence[data-compact] { flex-basis: 56px; height: 56px; align-items: center; padding: 0 0 0 12px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .sentence[data-compact] .sentenceRun { flex: 0 0 auto; flex-wrap: nowrap; padding-right: 12px; }
-.sentence[data-compact] .sentenceActions { position: sticky; top: auto; right: 0; order: 9; flex: 0 0 auto; flex-direction: row; align-self: stretch; align-items: center; margin-left: auto; padding: 0 10px 0 8px; translate: none; background: linear-gradient(90deg, transparent, rgb(var(--color-surface)) 10px); }
+.sentence[data-compact] .sentenceActions { position: sticky; top: auto; right: 0; order: 9; flex: 0 0 auto; flex-direction: row; align-self: stretch; align-items: center; margin-left: auto; padding: 0 10px 0 8px; translate: none; background: linear-gradient(90deg, transparent, rgb(var(--color-surface-3)) 10px); }
 .sentenceActions { position: absolute; z-index: 2; top: 50%; right: 10px; display: flex; flex-direction: column; gap: 6px; translate: 0 -50%; }
 .sentenceActions button { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); }
 .sentenceActions button:active { scale: .96; }
