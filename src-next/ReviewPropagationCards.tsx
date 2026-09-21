@@ -8,7 +8,7 @@ import { LayoutOptionStack, stackLabel } from './LayoutOptionStack'
 import { seedRuleOf } from './layoutOverrides'
 import type { OverrideGroup } from './layoutOverrides'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
-import { ruleFromKey, ruleKey, ruleOfContext } from './scopeRule'
+import { matchesRule, ruleFromKey, ruleKey, ruleOfContext } from './scopeRule'
 import { LayoutScopePicker } from './LayoutScopePicker'
 import type { RuleJamoPart, ScopeRule } from './scopeRule'
 import { layoutDeltaOf } from './reviewPropagation'
@@ -90,6 +90,12 @@ export function ReviewPropagationCards({ source, edit, changed, fixed, focus, ra
   const [scopeOpen, setScopeOpen] = useState<{ rule: ScopeRule; mode: 'new' | 'edit' | 'apply'; part?: RuleJamoPart } | null>(null)
   // 레이아웃 칸이 바뀌면 이 칸에서 만든 슬롯은 버리고 기본으로 돌아간다.
   useEffect(() => { setSlots([]); setSelectedKey(ruleKey(baseRule)) }, [baseRule])
+
+  // 켠 옵션이 이 글자에 안 닿게 되면(범위를 고쳐 이 글자가 빠졌거나, 이 글자가 안 든 범위에 저장했거나) 스택에서 사라지니 기본으로 돌아간다.
+  useEffect(() => {
+    if (selectedKey === ruleKey(baseRule) || slots.some((rule) => ruleKey(rule) === selectedKey)) return
+    if (!matchesRule(ruleFromKey(selectedKey), source)) setSelectedKey(ruleKey(baseRule))
+  }, [selectedKey, baseRule, slots, source])
 
   // 켠 박스가 곧 지금 범위다. 키에서 규칙을 되살린다 — 저장된 것이든 세션 슬롯이든 같은 길.
   const target = useMemo<ScopeRule>(() => ruleFromKey(selectedKey), [selectedKey])

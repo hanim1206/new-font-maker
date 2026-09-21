@@ -18,21 +18,13 @@ import styles from './LayoutOptionStack.module.css'
  * 순서는 **좁은 것이 위**다(9/22 뒤집힘). 좁힌 범위가 위에 쌓이고, 바닥인 `이 레이아웃`은 `기본` 머리글 아래에 선다.
  * 옛 `전체`(읽기 전용)가 있으면 가장 넓으니 맨 아래다. Δ를 더하는 순서(`compareBreadth`, 넓은 것부터)는 그대로다.
  * 박스는 카드가 아니라 **줄**이다(테두리·그림자 없음). 고르기는 줄 앞의 라디오가 말하고(하나만 켜진다) 켠 줄만 옅은 파란 면이 깔린다. 범위 고치기(연필)와 지우기(×)도 켠 줄에만 선다 — 박스 전체가 누르는 자리라 꺼진 박스 옆의 ×는 잘못 눌린다.
- * 이 레이아웃과 상관없는 규칙은 안 보인다. 조건 없는 규칙은 어디서나 보인다.
- * 아직 안 한 것: 넷 이상일 때 `이 글자 / 전체` 거르기.
+ * **지금 고치는 글자에 닿는 옵션만** 보인다(9/22). `각`을 고치는데 `첫닿자 ㅁ` 옵션이 같이 서 있으면 이 글자에서 안 보이는 값을 고르고 저장하게 된다.
+ * 조건 없는 규칙(옛 `전체`)은 어느 글자에나 닿으니 어디서나 보인다. 이 화면에서 방금 만든 빈 슬롯은 거르지 않는다.
  */
 
 const RULE_PART = { CH: 'initial', JU: 'medial', JO: 'final' } as const
 const PART_OF_RULE_KEY: Record<RuleJamoPart, OverrideGroup> = { initial: 'CH', medial: 'JU', final: 'JO' }
 const RULE_PARTS = ['initial', 'medial', 'final'] as const
-
-/** 이 문맥 화면에 보일 규칙인가. 조건 없는 것은 어디서나, 나머지는 이 문맥을 품을 때만. */
-function belongsHere(rule: ScopeRule, contextId: string): boolean {
-  if (isEmptyRule(rule)) return true
-  if (rule.medialFamily && !rule.medialFamily.includes(familyOfContext(contextId))) return false
-  if (rule.hasFinal !== undefined && rule.hasFinal !== finalOfContext(contextId)) return false
-  return true
-}
 
 /** 박스가 이미 이 레이아웃 자리에 서 있으니 **칸 조건은 떼고** 좁힌 것만 남긴다. */
 function narrowedOf(rule: ScopeRule, contextId: string): ScopeRule {
@@ -74,12 +66,13 @@ export function LayoutOptionStack({ source, slots, selectedKey, baseKey, onAdd, 
 }) {
   const rules = useLayoutDeltaStore((state) => state.rules)
   const entries = useMemo<StackEntry[]>(() => {
-    const stored = storedRules({ rules }).filter(({ rule }) => belongsHere(rule, source.contextId))
+    // 저장된 옵션은 이 글자에 닿는 것만. 닿는 글자에 든 층 목록이 곧 이 스택이다.
+    const stored = storedRules({ rules }).filter(({ rule }) => matchesRule(rule, source))
     const storedKeys = new Set(stored.map(({ key }) => key))
     const extra = slots.filter((rule) => !storedKeys.has(ruleKey(rule))).map((rule) => ({ rule, key: ruleKey(rule), delta: null }))
     // 좁은 것이 위. Δ를 더하는 순서(넓은 것부터)를 화면에서만 뒤집는다.
     return [...stored, ...extra].sort((a, b) => compareBreadth(b.rule, a.rule))
-  }, [rules, source.contextId, slots])
+  }, [rules, source, slots])
   // 바닥 = `이 레이아웃`과 옛 `전체`. 좁힌 범위와 갈라 `기본` 줄 아래에 둔다.
   const isFloor = ({ rule, key }: StackEntry) => key === baseKey || isEmptyRule(rule)
   const narrowed = entries.filter((entry) => !isFloor(entry))

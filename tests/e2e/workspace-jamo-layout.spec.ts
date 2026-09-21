@@ -1149,3 +1149,21 @@ test('보선을 옮기고 새 옵션으로 저장하면, 옮긴 부품의 자모
   const keys = await page.evaluate(() => Object.keys(JSON.parse(window.localStorage.getItem('noto-layout-delta-v1') ?? '{}').state?.rules ?? {}))
   expect(keys).toEqual(['f=right|j=1|i=ㅂ'])
 })
+
+test('옵션 스택에는 지금 고치는 글자에 닿는 옵션만 선다', async ({ page }) => {
+  // 같은 칸(오른쪽 홀자 · 받침)에 첫닿자 ㄱ 옵션과 첫닿자 ㅁ 옵션을 심어 둔다.
+  const rules = { 'f=right|j=1|i=ㄱ': { faces: { CH: { top: 0.01 } } }, 'f=right|j=1|i=ㅁ': { faces: { CH: { top: 0.02 } } } }
+  await page.addInitScript(([key, value]) => { if (!window.localStorage.getItem(key)) window.localStorage.setItem(key, value) }, ['noto-layout-delta-v1', JSON.stringify({ state: { rules }, version: 0 })] as const)
+
+  // 각: ㄱ 옵션만 선다. ㅁ 옵션은 이 글자에 안 닿는다.
+  await page.goto('/workspace/jamo?char=%EA%B0%81&mode=layout')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByTestId('layout-override-card')).toHaveCount(1)
+  await expect(page.locator('[data-testid="layout-override-card"][data-jamo="ㄱ"]')).toBeVisible()
+
+  // 맘: 거꾸로 ㅁ 옵션만 선다.
+  await page.goto('/workspace/jamo?char=%EB%A7%98&mode=layout')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByTestId('layout-override-card')).toHaveCount(1)
+  await expect(page.locator('[data-testid="layout-override-card"][data-jamo="ㅁ"]')).toBeVisible()
+})
