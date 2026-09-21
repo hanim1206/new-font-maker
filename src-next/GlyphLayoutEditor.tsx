@@ -3,7 +3,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import { notoOutlineGhostPath } from '../src/services/notoOutlineInk'
 import { DevGhostToggle } from './DevGhostToggle'
 import { DEV_TOOLS_ENABLED } from './devTools'
-import { approvedInputFor, isApproved } from './notoApprovedIndex'
+import { approvedInputFor } from './notoApprovedIndex'
 import { editableComponentRailsOf, fitComponentsForGlyph, renderComponentPart } from './notoComponentFitView'
 import type { ComponentFaces } from '../src/services/notoComponentFit'
 import type { SlotFacesDelta } from '../src/services/notoMedialMasterFit'
@@ -43,11 +43,6 @@ const BASELINE_RAILS: Record<string, { axis: 'x' | 'y'; label: string }> = {
 }
 
 interface Rail { id: string; axis: 'x' | 'y'; label: string; value: number }
-
-/** 승인 측정 = 사용자가 확인한 기준선 입력. 획 마스터 fit의 출발점이 될 글자다. */
-export function TierBadge({ approved, className }: { approved: boolean; className?: string }) {
-  return <span className={`${styles.badge} ${className ?? ''}`} data-tier={approved ? 'approved' : 'measured'} data-testid="review-tier">{approved ? '승인 측정' : '실측만'}</span>
-}
 
 function baselineRails(glyph: NotoPresetGlyph): Rail[] {
   return Object.entries(glyph.baselines).flatMap(([id, value]) => {
@@ -98,7 +93,7 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
   selectedRail?: string
   /** 드래그 중 붙은 다른 기준선 id. 그 선을 주황으로 켠다. */
   snappedRail?: string
-  /** 끌다 걸린 자리. 캔버스 위쪽에 '탁 · 모델' 같은 표지로. */
+  /** 끌다 걸린 자리. 글자 표지는 없고 잡은 rail이 주황이 된다. 종류는 캔버스 `data-snap`에. */
   snapHit?: SnapHit | null
   /** 기준값(지금은 모델, 저장이 생기면 마지막 저장값)에서 얼마나 옮겼는지 띠로 칠할지. */
   showDelta?: boolean
@@ -144,7 +139,7 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
   const labelAt = (axis: 'x' | 'y', value: number, band: 'top' | 'bottom') => axis === 'x'
     ? { x: Math.min(0.92, Math.max(0.08, value)), y: band === 'top' ? -0.03 : 1.062, textAnchor: 'middle' as const }
     : { x: 1.07, y: value - 0.012, textAnchor: 'end' as const }
-  return <svg className={styles.canvas} viewBox={VIEW_BOX} role="img" aria-label={label} data-testid="review-canvas">
+  return <svg className={styles.canvas} viewBox={VIEW_BOX} role="img" aria-label={label} data-testid="review-canvas" data-snap={snapHit?.kind}>
     <defs>
       {/* 자소 원형 캔버스와 같은 눈금: 1/16 잔선 + 1/4 굵은선 */}
       <pattern id="review-grid-fine" width=".0625" height=".0625" patternUnits="userSpaceOnUse"><path d="M.0625 0V.0625H0" fill="none" stroke="rgb(218 223 230 / .7)" strokeWidth=".002" /></pattern>
@@ -199,7 +194,8 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
     {/* 비활성 부품 rail은 먼저 그려 뒤로 보내고 손잡이도 없다. 활성 rail만 잡힌다. */}
     {[...editable].sort((a, b) => Number(!activePart || samePartGroup(a.part, activePart)) - Number(!activePart || samePartGroup(b.part, activePart))).map((rail) => {
       const selected = rail.id === selectedRail
-      const snapped = rail.id === snappedRail
+      // 걸린 상대 rail과, 걸린 채 잡고 있는 rail 둘 다. 모델·격자엔 상대 rail이 없어 잡은 rail만 주황이 된다.
+      const snapped = rail.id === snappedRail || (!!snapHit && selected)
       const active = !activePart || samePartGroup(rail.part, activePart)
       // 선택한 rail은 부품 색 그대로 굵게. 주황은 스냅('탁') 순간에만 쓴다.
       const stroke = snapped ? ACCENT : active ? PART_COLOR[rail.part] : INACTIVE_COLOR
@@ -213,8 +209,6 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
         {active && <text {...labelAt(rail.axis, rail.value, 'top')} className={styles.railLabel} fontSize=".03" fill={stroke}>{rail.label}{rail.locked ? ' · 글자에 안 닿음' : ''}</text>}
       </g>
     })}
-    {/* 스냅 표지. 자 도구가 없으니 캔버스 안에서 알린다. */}
-    {snapHit && <text x="0.5" y="-0.042" textAnchor="middle" className={styles.snapTag} fontSize=".03" fill={snapHit.kind === 'model' ? '#3b6fd6' : ACCENT} data-testid="review-snap" data-kind={snapHit.kind}>탁 · {snapHit.label}</text>}
     {/* Δ 수치. 선택한 rail은 크게, 나머지 바뀐 rail은 작고 옅게(저장 안 된 변경이 있다는 표시만). */}
     {showDelta && editable.filter((rail) => Math.abs(rail.value - rail.original) > 1e-9).map((rail) => {
       const active = rail.id === selectedRail
@@ -237,7 +231,6 @@ function railsWithDelta(railsEm?: Readonly<Record<string, number>>, delta?: Read
 
 function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPickCharacter }: { glyph: NotoPresetGlyph; initialPart?: Part; onCommitted?: GlyphLayoutEditorProps['onCommitted']; onEditStrokes?: GlyphLayoutEditorProps['onEditStrokes']; onPickCharacter?: GlyphLayoutEditorProps['onPickCharacter'] }) {
   const codepoint = glyph.identity.codepoint
-  const approved = isApproved(codepoint)
   const ghost = useMemo(() => notoOutlineGhostPath(glyph.outline), [glyph])
   const measured = useMemo(() => baselineRails(glyph), [glyph])
   const { bundle, error: modelError } = useNotoModel()
@@ -282,13 +275,13 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
   ], [rendered, fitView, componentRendered, componentParts, glyph])
   const [ghostVisible, setGhostVisible] = useState(readGhostVisible)
   const toggleGhost = () => setGhostVisible((current) => { writeGhostVisible(!current); return !current })
-  // 켤 수 있는 부품. rail이 전부 보이면 잡기 어려워 한 부품씩 켠다. 캔버스의 부품 상자를 눌러 고르고, 기본은 홀자.
+  // 켤 수 있는 부품. rail이 전부 보이면 잡기 어려워 한 부품씩 켠다. 캔버스의 부품 상자를 눌러 고르고, 기본은 첫닿자.
   const parts = useMemo<Part[]>(() => [
     ...(componentParts.some((part) => part.part === 'CH' && part.faces) ? ['CH' as Part] : []),
     ...(fitView?.parts.some((part) => part.fit) ? ['JU' as Part] : []),
     ...(componentParts.some((part) => part.part === 'JO' && part.faces) ? ['JO' as Part] : []),
   ], [componentParts, fitView])
-  const [activePartState, setActivePartState] = useState<Part>(initialPart ?? 'JU')
+  const [activePartState, setActivePartState] = useState<Part>(initialPart ?? 'CH')
   const activePart = parts.some((part) => samePartGroup(part, activePartState)) ? activePartState : parts[0]
   const activeRails = useMemo(() => activePart ? canvasRails.filter((item) => samePartGroup(item.part, activePart)) : canvasRails, [canvasRails, activePart])
   const rail = activeRails.find((item) => item.id === selectedRail && !item.locked) ?? activeRails.find((item) => !item.locked)
@@ -370,10 +363,9 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
 
   return <div className={styles.editor} data-testid="glyph-layout-editor">
       <section className={styles.canvasSection}>
-        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail?.id} snappedRail={snapHit?.id} snapHit={snapHit} onSelectRail={(id) => { setSelectedRail(id); setError('') }} onSelectPart={selectPart} onDragRail={(id, value) => changeRail(id, value, { snap: true })} onNudgeRail={(id, delta) => { const target = editable.find((item) => item.id === id); if (target) changeRail(id, target.value + delta) }} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
+        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail?.id} snappedRail={snapHit?.id} snapHit={snapHit} onSelectRail={(id) => { if (id !== rail?.id) setSnapHit(null); setSelectedRail(id); setError('') }} onSelectPart={selectPart} onDragRail={(id, value) => changeRail(id, value, { snap: true })} onNudgeRail={(id, delta) => { const target = editable.find((item) => item.id === id); if (target) changeRail(id, target.value + delta) }} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
         <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="review-ghost-toggle" />
-        <TierBadge approved={approved} className={styles.canvasBadge} />
-        {/* 변 rail을 잡으면 `이 자리에 맞추기`. 누르면 범위 안 글자가 전부 이 자리(em)에 모인다. 탁 걸린 자리면 표지 아래 바로. 고정 뒤엔 `= 자리` 표지. */}
+        {/* 변 rail을 잡으면 `이 자리에 맞추기`. 누르면 범위 안 글자가 전부 이 자리(em)에 모인다. 탁 걸린 자리면 주황 테두리. 고정 뒤엔 `= 자리` 표지. */}
         {rail && rail.kind === 'face' && (fixable
           ? <button type="button" className={styles.canvasFix} data-snapped={!!snapHit || undefined} onClick={fixRail} data-testid="review-fix-rail">이 자리에 맞추기</button>
           : <span className={styles.canvasFixed} data-testid="review-fixed-rail">{rail.label} = {Math.round(rail.value * 1000)} · 고정</span>)}

@@ -107,7 +107,6 @@ test('기준선 드래그는 모델 자리와 격자에 탁 걸리고 방향키�
   const canvas = page.getByTestId('review-canvas')
   const box = (await canvas.boundingBox())!
   const handle = canvas.locator('[data-rail-handle][aria-pressed="true"]')
-  const snap = page.getByTestId('review-snap')
   const x1 = Number(await handle.getAttribute('x1'))
   const pxOf = (em: number) => box.x + (em + 0.08) / 1.16 * box.width
   // 세로 rail 손잡이는 위쪽 여백에서 잡는다. 캔버스 가운데는 가로 rail 손잡이가 덮고 있다.
@@ -119,19 +118,21 @@ test('기준선 드래그는 모델 자리와 격자에 탁 걸리고 방향키�
   await page.mouse.move(pxOf(x1 + 0.06), y, { steps: 6 })
   await expect(page.getByTestId('review-delta-label')).toHaveCount(1)
   await page.mouse.move(pxOf(x1 + 0.002), y, { steps: 4 })
-  // 모델에 붙으면 Δ 0 → 수치 없음, 캔버스 위 스냅 표지만.
-  await expect(snap).toHaveText('탁 · 모델')
+  // 모델에 붙으면 Δ 0 → 수치 없음. 스냅 글자 표지는 없고 캔버스 data-snap에만 남는다.
+  await expect(canvas).toHaveAttribute('data-snap', 'model')
+  // 모델·격자엔 상대 기준선이 없으니 잡은 기준선이 주황으로 바뀐다.
+  await expect(canvas.locator('[data-rail][data-selected="true"]')).toHaveAttribute('data-snapped', 'true')
   await expect(page.getByTestId('review-delta-label')).toHaveCount(0)
   // 모델(≈0.75)에서 멀어져 격자 13/16(0.8125)이나 그 옆 기준선에 걸린다.
   await page.mouse.move(pxOf(0.815), y, { steps: 8 })
   await page.mouse.up()
-  await expect(snap).toBeVisible()
-  expect(['grid', 'rail']).toContain(await snap.getAttribute('data-kind'))
+  await expect(canvas).toHaveAttribute('data-snap', /^(grid|rail)$/)
 
   // 방향키 1u 이동은 스냅을 푼다.
   await handle.focus()
   await page.keyboard.press('ArrowRight')
-  await expect(snap).toHaveCount(0)
+  await expect(canvas).not.toHaveAttribute('data-snap')
+  await expect(canvas.locator('[data-rail][data-selected="true"]')).not.toHaveAttribute('data-snapped')
 })
 
 /** 기준값에서 옮긴 만큼 캔버스에 띠와 수치가 칠해지고, 복원하면 사라진다. */

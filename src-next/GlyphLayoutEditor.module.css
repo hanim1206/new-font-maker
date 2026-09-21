@@ -2,7 +2,6 @@
 .status { padding: 8px 14px; color: rgb(var(--color-text-dim-4)); font-size: 12px; }
 .status[data-state='error'] { color: rgb(var(--color-danger, 214 50 31)); }
 
-.badge { display: inline-block; align-self: flex-start; padding: 2px 8px; border: 1px solid rgb(var(--color-text-dim-4)); border-radius: 10px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 10px; font-weight: 700; letter-spacing: .06em; }
 
 .canvasSection { position: relative; padding: 8px 14px; }
 /* 드래그 중 브라우저 선택 하이라이트(파란 배경)와 스크롤 제스처를 막는다. */
@@ -10,7 +9,6 @@
 .canvas * { user-select: none; -webkit-user-select: none; }
 .canvas line { pointer-events: stroke; }
 .canvas text { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: 600; pointer-events: none; }
-.canvasBadge { position: absolute; right: 14px; top: 12px; }
 /* 변 고정. 캔버스 위쪽 가운데, 스냅 표지 바로 아래. 탁 걸린 자리면 주황으로 켜진다. */
 .canvasFix { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); min-height: 30px; padding: 4px 12px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface) / .96); color: rgb(var(--color-text-dim-3)); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
 .canvasFix[data-snapped='true'] { border-color: #f0561e; color: #f0561e; }
@@ -35,7 +33,6 @@
 .warning { padding: 6px 14px; color: rgb(var(--color-danger, 214 50 31)); font-size: 11px; }
 
 /* Δ 수치는 띠 여백에 항상. 흰 테두리로 격자 위에서 읽힌다. */
-.snapTag { paint-order: stroke; stroke: #fff; stroke-width: .012; stroke-linejoin: round; font-weight: 800; pointer-events: none; }
 .deltaLabel { paint-order: stroke; stroke: #fff; stroke-width: .012; stroke-linejoin: round; font-weight: 800; pointer-events: none; }
 .railButton { cursor: grab; outline: none; }
 .railButton:active { cursor: grabbing; }
