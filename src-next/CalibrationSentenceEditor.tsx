@@ -12,6 +12,11 @@ import { adoptFamilyStrokes, familyOfSyllable } from '../src/utils/jamoContextSt
 import { withFrameFrom, withoutFrame } from '../src/utils/jamoFrame'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
 import { componentProtrusion } from '../src/services/notoComponentFit'
+import { faceSnapCandidates, pointAnchors, snapStrokeDrag, strokeBodyAnchors, strokeSnapCandidates, withoutOwnCandidates } from './strokeSnap'
+import type { SnapAnchors } from './strokeSnap'
+import type { SnapCandidate, SnapHit } from './railSnap'
+import { baselineRails } from './notoBaselineRails'
+import { useNotoGlyph } from './useNotoGlyph'
 import { PART_COLOR, PART_LABEL } from './partColors'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
@@ -452,10 +457,21 @@ function FocusedGlyph({
   // 눈금·글자몸 상자는 SVG 안에 그린다. 검수 캔버스처럼 글자 칸 밖 여백(-0.08)까지 보이고 라벨이 잘리지 않는다.
   // 직접 끌기. 누른 자리에서 고르기가 먼저 일어나고(리렌더), 문턱을 넘는 첫 움직임에 이동을 시작한다 — 그때의 `dragApiRef`는 새 선택을 안다.
   const canvasRef = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ pointerId: number; startX: number; startY: number; box: BoxConfig; started: boolean } | null>(null)
-  const startDrag = (event: ReactPointerEvent<SVGElement>, box: BoxConfig) => {
+  const drag = useRef<{ pointerId: number; startX: number; startY: number; box: BoxConfig; started: boolean; anchors: SnapAnchors; candidates: SnapCandidate[] } | null>(null)
+  // 스냅: 레이아웃의 기준선 스냅과 같은 규칙(처음 자리 → 기준선 · 상자 변 · 다른 획 → 격자), 축마다 따로. 후보는 이 글자의 Noto 기준선 + 부품 상자 네 변 + 같은 글자 안 획의 중심선 · 끝.
+  const { glyph: notoGlyph } = useNotoGlyph(char.codePointAt(0) ?? 0xac00)
+  const guideRails = useMemo<SnapCandidate[]>(() => !dragApiRef ? [] : [
+    ...(notoGlyph ? baselineRails(notoGlyph) : []),
+    ...(resolution ? faceSnapCandidates(resolution.parts) : []),
+  ], [dragApiRef, notoGlyph, resolution])
+  const strokeCandidates = useMemo(() => strokeSnapCandidates(targets.map((target) => ({ strokeId: target.stroke.id, label: `${target.jamo.char} 획`, stroke: target.stroke, box: target.box }))), [targets])
+  const [snapHits, setSnapHits] = useState<{ x: SnapHit | null; y: SnapHit | null } | null>(null)
+  // 이름표에는 기준선 · 획 · 격자만 올린다. `처음 자리`는 끄는 내내 걸려 있어서 뺀다.
+  const snapHitLabels = snapHits ? [snapHits.x, snapHits.y].filter((hit): hit is SnapHit => Boolean(hit) && hit!.kind !== 'model').map((hit) => hit.label).filter((label, index, labels) => labels.indexOf(label) === index) : []
+  const startDrag = (event: ReactPointerEvent<SVGElement>, box: BoxConfig, anchors: SnapAnchors, dragged: { strokeId: string; pointIndex?: number }) => {
     if (!dragApiRef || !canvasRef.current) return
-    drag.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, box, started: false }
+    // 닻과 후보는 누른 순간의 자리로 굳힌다. 끄는 동안 자기 자신에게 걸리지 않게 자기 후보는 뺀다.
+    drag.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, box, started: false, anchors, candidates: withoutOwnCandidates([...guideRails, ...strokeCandidates], dragged) }
     canvasRef.current.setPointerCapture(event.pointerId)
   }
   const moveDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -474,12 +490,15 @@ function FocusedGlyph({
     // 글자가 기울어 있으면(skewX) 화면의 세로 이동이 기운 축을 따라 옆으로도 읽힌다. 기울기 전 좌표로 되돌린다: x = x' + tan(기울기) · y'.
     const emPerPx = CANVAS_VIEWPORT.width / canvas.getBoundingClientRect().width
     const uprightDx = dx + Math.tan(globalStyle.slant * Math.PI / 180) * dy
-    api.change({ x: uprightDx * emPerPx / state.box.width / 0.001, y: dy * emPerPx / state.box.height / 0.001 })
+    const snapped = snapStrokeDrag({ anchors: state.anchors, requested: { x: uprightDx * emPerPx, y: dy * emPerPx }, candidates: state.candidates })
+    setSnapHits((current) => current?.x?.value === snapped.hits.x?.value && current?.y?.value === snapped.hits.y?.value && current?.x?.label === snapped.hits.x?.label && current?.y?.label === snapped.hits.y?.label ? current : snapped.hits)
+    api.change({ x: snapped.delta.x / state.box.width / 0.001, y: snapped.delta.y / state.box.height / 0.001 })
   }
   const endDrag = (event: ReactPointerEvent<HTMLDivElement>, cancelled: boolean) => {
     const state = drag.current
     if (!state || event.pointerId !== state.pointerId) return
     drag.current = null
+    setSnapHits(null)
     if (canvasRef.current?.hasPointerCapture(event.pointerId)) canvasRef.current.releasePointerCapture(event.pointerId)
     if (!state.started) return
     if (cancelled) dragApiRef?.current?.cancel()
@@ -506,6 +525,12 @@ function FocusedGlyph({
         <rect x={body.x} y={body.y} width={body.width} height={body.height} fill="none" stroke="rgb(59 111 214 / .18)" strokeWidth={0.3} data-testid="jamo-design-body" />
         <line x1={-6} x2={102} y1={88} y2={88} stroke="#a6a297" strokeWidth={0.3} />
         <PartBoxes boxes={inkBoxes} activePart={selectedPart} />
+        {/* 레이아웃의 기준선을 읽기 전용으로 옅게 깐다. 획을 끌면 여기에 걸린다. */}
+        {guideRails.length > 0 && <g aria-hidden="true" data-testid="stroke-guide-rails">
+          {guideRails.map((rail) => rail.axis === 'x'
+            ? <line key={rail.id} x1={rail.value * VIEW_BOX_SIZE} x2={rail.value * VIEW_BOX_SIZE} y1={-6} y2={106} className={styles.guideRail} />
+            : <line key={rail.id} x1={-6} x2={106} y1={rail.value * VIEW_BOX_SIZE} y2={rail.value * VIEW_BOX_SIZE} className={styles.guideRail} />)}
+        </g>}
       </>} underlay={<>
         {ghostVisible && ghost && <path d={ghost.path} transform={designBodySvgTransform(schema.padding, VIEW_BOX_SIZE)} className={styles.notoGhost} fillRule="evenodd" data-testid="noto-ghost" />}
       </>}>
@@ -531,7 +556,7 @@ function FocusedGlyph({
               event.stopPropagation()
               if (sameComponent) {
                 onSelect({ kind: 'stroke', component, editorPart: target.editorPart, renderPart: target.renderPart, jamo: target.jamo, strokeId: target.stroke.id, box: target.box })
-                startDrag(event, target.box)
+                startDrag(event, target.box, strokeBodyAnchors(target.stroke, target.box), { strokeId: target.stroke.id })
               } else {
                 onSelect({ kind: 'component', component, editorPart: target.editorPart, renderParts: roleRenderParts(target.editorPart, boxes), jamo: target.jamo })
               }
@@ -547,7 +572,7 @@ function FocusedGlyph({
           const selectPoint = (event: ReactPointerEvent<SVGCircleElement>) => {
               event.stopPropagation()
               onPointSelect({ kind: 'point', component, editorPart: target.editorPart, renderPart: target.renderPart, jamo: target.jamo, strokeId: target.stroke.id, pointIndex, box: target.box })
-              startDrag(event, target.box)
+              startDrag(event, target.box, pointAnchors(point, target.box), { strokeId: target.stroke.id, pointIndex })
           }
           return <g key={`point-${target.renderPart}-${target.stroke.id}-${pointIndex}`}>
             <circle cx={x} cy={y} r={7.5} fill="transparent" pointerEvents="all" className={styles.pointHitTarget} data-editor-point="hit" onPointerDown={selectPoint} />
@@ -574,13 +599,23 @@ function FocusedGlyph({
                 onPointerDown={(event) => {
                   event.stopPropagation()
                   onSelect({ ...selection, kind: 'handle', handle })
-                  startDrag(event, target.box)
+                  startDrag(event, target.box, pointAnchors(handlePoint, target.box), { strokeId: target.stroke.id, pointIndex: selection.pointIndex })
                 }}
               />,
             ]
           })
         })}
+        {/* 걸린 자리. 레이아웃처럼 주황 선으로 보인다. `처음 자리`는 선을 안 긋는다 — 끄는 내내 떠 있어서 시끄럽다. */}
+        {snapHits && (['x', 'y'] as const).map((axis) => {
+          const hit = snapHits[axis]
+          if (!hit || hit.kind === 'model') return null
+          const at = hit.value * VIEW_BOX_SIZE
+          return axis === 'x'
+            ? <line key={axis} x1={at} x2={at} y1={-8} y2={108} className={styles.snapHitLine} data-testid="stroke-snap-hit" data-axis="x" />
+            : <line key={axis} x1={-8} x2={108} y1={at} y2={at} className={styles.snapHitLine} data-testid="stroke-snap-hit" data-axis="y" />
+        })}
       </SvgRenderer>
+      {snapHitLabels.length > 0 && <span className={styles.snapHitChip} data-testid="stroke-snap-chip">{snapHitLabels.join(' · ')}</span>}
       <span className={styles.focusChar} aria-hidden="true">{char} · {fontSpace.unitsPerEm} UPM</span>
       <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="noto-ghost-toggle">
         {ghostVisible && comparison && ('xorRatio' in comparison
@@ -644,6 +679,8 @@ function InferenceTrackpad({
   multiSelectArmed?: boolean
 }) {
   const direct = Boolean(dragApiRef)
+  // 조절판은 상자 좌표 눈금에 붙인다. 직접 조작은 캔버스가 em 기준 스냅을 끝낸 값을 넘기므로 여기서 다시 붙이지 않는다.
+  const moveGridStep = direct ? undefined : snapStep
   const startSchema = useRef(schema)
   const currentSchema = useRef(schema)
   const startJamo = useRef<JamoData | null>(null)
@@ -714,11 +751,11 @@ function InferenceTrackpad({
   const moveSelectedPoints = (source: JamoData, requested: StrokeMoveDelta) => {
     if (selection.kind !== 'point' || selectedPoints.length < 2) {
       return selection.kind === 'point'
-        ? movePoint(source, selection.strokeId, selection.pointIndex, requested, CALIBRATION_FREEFORM_BOUNDS, snapStep)
+        ? movePoint(source, selection.strokeId, selection.pointIndex, requested, CALIBRATION_FREEFORM_BOUNDS, moveGridStep)
         : null
     }
     const first = selectedPoints[0]
-    const firstResult = movePoint(source, first.strokeId, first.pointIndex, requested, CALIBRATION_FREEFORM_BOUNDS, snapStep)
+    const firstResult = movePoint(source, first.strokeId, first.pointIndex, requested, CALIBRATION_FREEFORM_BOUNDS, moveGridStep)
     let jamo = firstResult.jamo
     for (const point of selectedPoints.slice(1)) {
       jamo = movePoint(jamo, point.strokeId, point.pointIndex, firstResult.delta, CALIBRATION_FREEFORM_BOUNDS).jamo
@@ -763,7 +800,8 @@ function InferenceTrackpad({
     }
   }
   const changeMove = (movement: StrokeMoveDelta) => {
-    const normalized = {
+    // 직접 조작은 캔버스가 em 기준으로 이미 스냅해서 넘긴다(레이아웃과 같은 규칙). 여기서 상자 좌표 눈금에 한 번 더 붙이면 걸린 자리가 어긋난다.
+    const normalized = direct ? { x: movement.x * .001, y: movement.y * .001 } : {
       x: Math.round(movement.x * .001 / snapStep) * snapStep,
       y: Math.round(movement.y * .001 / snapStep) * snapStep,
     }
@@ -786,11 +824,11 @@ function InferenceTrackpad({
       const createCandidate = (factor: number) => {
         const movementAtFactor = { x: normalized.x * factor, y: normalized.y * factor }
         const moved = selection.kind === 'stroke'
-          ? moveStroke(startJamo.current!, selection.strokeId, movementAtFactor, CALIBRATION_FREEFORM_BOUNDS, snapStep)
+          ? moveStroke(startJamo.current!, selection.strokeId, movementAtFactor, CALIBRATION_FREEFORM_BOUNDS, moveGridStep)
           : selection.kind === 'point'
             ? moveSelectedPoints(startJamo.current!, movementAtFactor)
             : selection.kind === 'handle'
-              ? moveHandle(startJamo.current!, selection.strokeId, selection.pointIndex, selection.handle, movementAtFactor, CALIBRATION_FREEFORM_BOUNDS, snapStep)
+              ? moveHandle(startJamo.current!, selection.strokeId, selection.pointIndex, selection.handle, movementAtFactor, CALIBRATION_FREEFORM_BOUNDS, moveGridStep)
               : null
         return moved && frameForEdit ? { ...moved, jamo: frameForEdit(moved.jamo) } : moved
       }

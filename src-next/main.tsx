@@ -11,6 +11,12 @@ import '../src/index.css'
 const root = createRoot(document.getElementById('root')!)
 
 async function start(): Promise<void> {
+  if (import.meta.env.DEV && window.location.pathname === '/global-style-preview') {
+    const { GlobalStylePreviewPage } = await import('./GlobalStylePreviewPage')
+    root.render(<StrictMode><GlobalStylePreviewPage /></StrictMode>)
+    return
+  }
+
   if (window.location.pathname === '/noto-corpus-lab') {
     const { NotoCorpusLabPage } = await import('./NotoCorpusLabPage')
     root.render(<StrictMode><NotoCorpusLabPage /></StrictMode>)

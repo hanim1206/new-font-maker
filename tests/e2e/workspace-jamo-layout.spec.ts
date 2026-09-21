@@ -457,6 +457,47 @@ test('획을 상자 밖으로 끌어도 다른 획은 제자리고, 틀 다시 �
 })
 
 /**
+ * 획 끌기 스냅은 레이아웃의 기준선 스냅과 같은 규칙이다(처음 자리 → 기준선 · 상자 변 · 다른 획 → 격자), 축마다 따로.
+ * 가로로 끄는 동안 y는 처음 자리에 붙어 손 떨림이 안 들어가고, 기준선에 가까이 가면 걸려서 주황 선과 이름표가 뜬다. 캔버스 뒤에는 레이아웃의 기준선이 깔린다.
+ */
+test('획을 가로로 끌면 세로로 흔들려도 반듯하게 가고, 기준선에 걸린다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EA%B0%81&mode=stroke&part=CH')
+  const canvas = page.getByTestId('focus-canvas')
+  await expect(canvas).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
+  await expect.poll(() => page.locator('[data-testid="stroke-guide-rails"] line').count()).toBeGreaterThan(8)
+  const dots = page.locator('[data-editor-point="visible"]')
+  const positions = () => dots.evaluateAll((els) => els.map((el) => [Number(el.getAttribute('cx')), Number(el.getAttribute('cy'))]))
+  const before = await positions()
+  const box = await dots.nth(0).boundingBox()
+  if (!box) throw new Error('점이 없다')
+  const cx = box.x + box.width / 2
+  const cy = box.y + box.height / 2
+
+  // ㄱ 가로 획의 왼쪽 끝을 오른쪽으로 끌며 세로로 ±4px 흔든다.
+  await page.mouse.move(cx, cy)
+  await page.mouse.down()
+  for (const [dx, dy] of [[5, 2], [10, -3], [14, 4], [18, -2], [22, 3]]) await page.mouse.move(cx + dx, cy + dy)
+  const during = await positions()
+  expect(during[0][1]).toBeCloseTo(before[0][1], 6)
+  expect(during[0][0]).toBeGreaterThan(before[0][0] + 4)
+  // 받침 왼변 근처라 거기에 걸린다: 이름표와 주황 세로선.
+  await expect(page.getByTestId('stroke-snap-chip')).toContainText('받침 왼변')
+  await expect(page.locator('[data-testid="stroke-snap-hit"][data-axis="x"]')).toHaveCount(1)
+  await page.mouse.up()
+  await expect(page.getByTestId('stroke-snap-chip')).toHaveCount(0)
+  expect((await positions())[0]).toEqual(during[0])
+
+  // 세로로 크게 벗어나면 y도 풀려 사선으로 간다.
+  const again = await dots.nth(0).boundingBox()
+  if (!again) throw new Error('점이 없다')
+  await page.mouse.move(again.x + again.width / 2, again.y + again.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(again.x + again.width / 2 + 6, again.y + again.height / 2 + 14, { steps: 5 })
+  await page.mouse.up()
+  expect((await positions())[0][1]).toBeGreaterThan(before[0][1] + 2)
+})
+
+/**
  * 최소 잉크 간격은 막지 않고 알린다. 간격은 화면과 같은 상자(모델 상자)로 잰다 — `서`는 ㅅ과 ㅓ 사이 여유가 17u뿐이다(옛 스키마 상자로는 188u로 잘못 쟀다).
  * 걸린 자리에서 한 번 붙들고, 50u 넘게 더 끌면 넘어간다. 넘어간 자모는 자동 되당김 없이 그린 대로 나오고 캔버스가 주황으로 알린다.
  */
@@ -806,7 +847,11 @@ test('같은 레이아웃에 쌓인 오버라이드가 범위 띠에 보이고, 
 })
 
 /** 범위 고르기 화면(2026-09-21): 검수 격자를 그대로 쓰고, 범위가 되는 조작은 행·열·그룹 머리 셋뿐이다. 쓸면 지나간 머리가 한 번에 바뀐다. */
-test('더 보기에서 추천 칩이 표를 켜고, 열 머리를 쓸어 빼면 닿는 글자 수가 준다', async ({ page }) => {
+/**
+ * 범위 고르기 화면(2026-09-21 다시 잡음): 표는 행 홀자 × 열 받침 한 장뿐이고 첫닿자는 표 위 한 줄이다.
+ * 범위가 되는 조작은 **사각 하나** — 칸 하나, 칸을 끈 사각, 머리(그 줄 통째)다. 새로 집으면 갈아치운다.
+ */
+test('표에서 사각을 집으면 그게 범위가 되고, 추천 칩은 표를 켜 준다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   await page.getByTestId('layout-override-more').first().click()
@@ -814,28 +859,52 @@ test('더 보기에서 추천 칩이 표를 켜고, 열 머리를 쓸어 빼면 
   await expect(picker).toBeVisible()
   const countOf = async () => Number((await page.getByTestId('scope-picker-count').innerText()).replace(/[^\d]/g, ''))
   // 열 때는 그 옵션의 범위 그대로다. 이 레이아웃(세로 홀자 + 받침) = 4,617자.
-  const opened = await countOf()
-  expect(opened).toBe(4617)
+  expect(await countOf()).toBe(4617)
   await expect(page.getByTestId('scope-picker-confirm')).toBeDisabled()
+  // 걷어낸 것: 하단 표본 줄과 크게 보기, 발치의 받침 세그먼트.
+  await expect(picker.getByTestId('scope-picker-sample')).toHaveCount(0)
+  await expect(picker.getByTestId('scope-picker-final')).toHaveCount(0)
+  // 표 위 한 줄이 첫닿자 19개를 맡는다(시트 탭 대신).
+  await expect(picker.getByTestId('corpus-sheet')).toHaveCount(19)
 
-  // 추천 칩 = 표를 켜 주는 지름길. 구조군 칩은 같은 구조군 첫닿자 열만 켠다.
+  // 칸 하나 = 사각 하나. 첫 칸은 홀자 ㅏ × 받침 없음이고, 첫닿자는 표 밖이라 19개가 다 남는다.
+  await picker.getByTestId('corpus-cell').first().click()
+  await expect.poll(countOf).toBe(19)
+
+  // 칸을 끌면 지나간 행·열의 곱이 범위다. `없` 열과 받침 두 열을 같이 끌어도 `없`이 안 빠진다.
+  const cells = picker.getByTestId('corpus-cell')
+  const from = await cells.nth(0).boundingBox()
+  const to = await cells.nth(2).boundingBox()
+  if (!from || !to) throw new Error('칸 자리를 못 읽었습니다.')
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 4 })
+  await page.mouse.up()
+  await expect.poll(countOf).toBe(57)
+
+  // 행 머리 = 그 홀자 줄 통째(받침 전부). 한 축이 전부인 사각이다.
+  await picker.locator('tbody [data-testid="corpus-head"]').first().click()
+  await expect.poll(countOf).toBe(532)
+  // 열 머리도 같다 — 받침 ㄱ 열 × 홀자 전부.
+  await picker.locator('thead [data-testid="corpus-head"]').nth(1).click()
+  await expect.poll(countOf).toBe(399)
+
+  // 추천 칩 = 표를 켜 주는 지름길. 누르면 그 규칙으로 갈아치운다.
   const chip = page.getByTestId('scope-picker-chip').filter({ hasText: '구조군' })
   await chip.click()
   await expect(chip).toHaveAttribute('aria-pressed', 'true')
-  const afterChip = await countOf()
-  expect(afterChip).toBeLessThan(opened)
   await expect(page.getByTestId('scope-picker-name')).toContainText('첫닿자')
+  const afterChip = await countOf()
 
-  // 켠 열 머리를 다시 누르면 그 열만 빠지고 글자 수가 따라 준다. 칩은 꺼진 것으로 본다.
-  const onHead = picker.locator('[data-testid="corpus-head"][aria-pressed="true"]').last()
-  await onHead.dispatchEvent('pointerdown')
-  await expect.poll(countOf).toBeLessThan(afterChip)
+  // 첫닿자 줄을 누르면 표가 그 자모로 다시 그려질 뿐 범위는 그대로다.
+  await picker.getByTestId('corpus-sheet').nth(1).click()
+  expect(await countOf()).toBe(afterChip)
+
+  // 표에서 사각을 다시 집으면 칩은 꺼진 것으로 본다(표 밖 첫닿자 조건은 남는다).
+  await picker.locator('tbody [data-testid="corpus-head"]').nth(1).click()
   await expect(chip).toHaveAttribute('aria-pressed', 'false')
-
-  // 칸 누르기는 범위를 안 바꾼다 — 크게 보기만.
   const narrowed = await countOf()
-  await picker.getByTestId('corpus-cell').nth(3).click()
-  expect(await countOf()).toBe(narrowed)
+  expect(narrowed).toBeLessThan(afterChip)
 
   // `이 범위로` = 확정. 옵션 스택의 켠 박스가 그 범위 이름과 글자 수로 바뀐다.
   const name = await page.getByTestId('scope-picker-name').innerText()
@@ -1105,18 +1174,6 @@ test('홀자 획이 상자에 안 맞으면 레이아웃 캔버스는 상자만 
   await expect(resetButton(page)).toContainText('1개 변경')
 })
 
-test('닿는 글자 줄만 옆으로 밀리고, 바깥 화면에는 가로 스크롤이 안 생긴다', async ({ page }) => {
-  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
-  const cards = page.getByTestId('review-propagation-cards')
-  await expect(cards.locator('figure').first()).toBeVisible({ timeout: 20_000 })
-  // 숨긴 이름표가 줄의 잘림을 빠져나가면 바깥 덩어리가 옆으로 늘어난다.
-  const leaking = await cards.evaluate((el) => {
-    const out: string[] = []
-    for (let node = el.parentElement; node; node = node.parentElement) if (node.scrollWidth > node.clientWidth + 1) out.push(`${node.tagName} ${node.clientWidth}<${node.scrollWidth}`)
-    return out
-  })
-  expect(leaking).toEqual([])
-})
 
 test('보선을 옮기고 새 옵션으로 저장하면, 옮긴 부품의 자모가 미리 골라진 범위에 바로 적용되고 그 옵션이 켜진다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%B0%9C&mode=layout')
@@ -1166,4 +1223,17 @@ test('옵션 스택에는 지금 고치는 글자에 닿는 옵션만 선다', a
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   await expect(page.getByTestId('layout-override-card')).toHaveCount(1)
   await expect(page.locator('[data-testid="layout-override-card"][data-jamo="ㅁ"]')).toBeVisible()
+})
+
+test('닿는 글자 줄만 옆으로 밀리고, 바깥 화면에는 가로 스크롤이 안 생긴다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
+  const cards = page.getByTestId('review-propagation-cards')
+  await expect(cards.locator('figure').first()).toBeVisible({ timeout: 20_000 })
+  // 숨긴 이름표가 줄의 잘림을 빠져나가면 바깥 덩어리가 옆으로 늘어난다.
+  const leaking = await cards.evaluate((el) => {
+    const out: string[] = []
+    for (let node = el.parentElement; node; node = node.parentElement) if (node.scrollWidth > node.clientWidth + 1) out.push(`${node.tagName} ${node.clientWidth}<${node.scrollWidth}`)
+    return out
+  })
+  expect(leaking).toEqual([])
 })

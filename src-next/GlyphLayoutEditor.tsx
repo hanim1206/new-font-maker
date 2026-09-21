@@ -25,6 +25,8 @@ import { useNotoGlyph } from './useNotoGlyph'
 import { useLayoutDelta } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { hasLayoutEdit, propagationEditOf, unreachedRailIds } from './reviewPropagation'
+import { baselineRails } from './notoBaselineRails'
+import type { BaselineRail } from './notoBaselineRails'
 import { snapRail } from './railSnap'
 import type { SnapHit } from './railSnap'
 import { useFitInkStyle } from './useFitInkStyle'
@@ -41,23 +43,6 @@ import styles from './GlyphLayoutEditor.module.css'
 
 const VIEW_BOX = '-0.08 -0.08 1.16 1.16'
 // export 기준선 id → 축·표시 이름. 길이(visibleLength) 타깃은 좌표가 아니라 그리지 않는다.
-const BASELINE_RAILS: Record<string, { axis: 'x' | 'y'; label: string }> = {
-  'initial.roleFaces.left': { axis: 'x', label: 'CH 왼선' }, 'initial.roleFaces.right': { axis: 'x', label: 'CH 오른선' },
-  'initial.roleFaces.top': { axis: 'y', label: 'CH 윗선' }, 'initial.roleFaces.bottom': { axis: 'y', label: 'CH 밑선' },
-  'final.roleFaces.right': { axis: 'x', label: 'JO 오른선' }, 'final.roleFaces.top': { axis: 'y', label: 'JO 윗선' },
-  'medial.primaryBeam.face': { axis: 'y', label: 'JU 가로보' }, 'medial.upperBeam.face': { axis: 'y', label: 'JU 위보' }, 'medial.lowerBeam.face': { axis: 'y', label: 'JU 아래보' },
-  'medial.baseStem.face': { axis: 'x', label: 'JU 줄기' }, 'medial.leftStem.face': { axis: 'x', label: 'JU 왼줄기' }, 'medial.rightStem.face': { axis: 'x', label: 'JU 오른줄기' },
-}
-
-interface Rail { id: string; axis: 'x' | 'y'; label: string; value: number }
-
-function baselineRails(glyph: NotoPresetGlyph): Rail[] {
-  return Object.entries(glyph.baselines).flatMap(([id, value]) => {
-    const spec = BASELINE_RAILS[id]
-    return spec && Number.isFinite(value) ? [{ id, axis: spec.axis, label: spec.label, value }] : []
-  })
-}
-
 const VIEW_BOX_SIZE = 1.16
 const GHOST_STORAGE_KEY = 'review-ghost-visible-v1'
 
@@ -92,7 +77,7 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
   /** Noto 고스트를 끄면 내 획만 남아 어느 획을 바꿀지 보인다. */
   ghostVisible?: boolean
   /** Noto 실측 기준선. 참고용이라 옅은 점선, 조작 없음. */
-  measured: Rail[]
+  measured: BaselineRail[]
   /** 획 마스터 rail. 활성 부품 것만 잡고 끌 수 있다. */
   editable?: CanvasRail[]
   /** 활성 부품. 이 부품의 rail·상자만 제 색, 나머지는 회색으로 죽인다. 없으면 전부 활성. */
