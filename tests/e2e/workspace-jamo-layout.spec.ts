@@ -68,13 +68,17 @@ test('중심 rail(배치)을 옮기면 이 레이아웃 카드 8장에 Δ가 얹
   const names = await cards.locator('figcaption b').allInnerTexts()
   expect(names.every(sameContextAs멈)).toBe(true)
   expect(new Set(names.map(medialIndexOf)).size).toBeGreaterThan(1)
-  const firstBatch = await cards.allInnerTexts()
 
-  await page.getByTestId('review-propagation-next').click()
-  await expect.poll(async () => (await cards.allInnerTexts()).join()).not.toBe(firstBatch.join())
+  // `다른 글자` 버튼은 없다. 카드 줄을 옆으로 밀어 끝에 가까워지면 다음 묶음이 붙는다. 앞 묶음은 그대로 남는다.
+  await expect(page.getByTestId('review-propagation-next')).toHaveCount(0)
+  await page.getByTestId('review-propagation-cards').evaluate((el) => el.scrollTo({ left: el.scrollWidth }))
+  await expect(cards).toHaveCount(16)
+  expect((await cards.locator('figcaption b').allInnerTexts()).slice(0, 8)).toEqual(names)
 
+  // 범위를 바꾸면 한 묶음으로 돌아가고 줄은 맨 앞에서 시작한다.
   await propagation.getByRole('button', { name: '전체', exact: true }).click()
   await expect(cards).toHaveCount(8)
+  expect(await page.getByTestId('review-propagation-cards').evaluate((el) => el.scrollLeft)).toBe(0)
   await expect.poll(async () => (await cards.locator('figcaption b').allInnerTexts()).some((name) => !sameContextAs멈(name))).toBe(true)
 
   // 복원해도 카드는 그대로, Δ만 빠진다.
@@ -681,7 +685,7 @@ test('획이 모델 상자에 안 맞아도 획 편집에서 완료로 레이아
 })
 
 /** 세로 예산(2026-09-21): 도구 줄은 머리 `…` 메뉴로, 레이아웃 모드의 보정 문장은 한 줄. 390×844 첫 화면에 범위 띠와 표본 첫 줄 네 장이 세로 스크롤 없이 온전히 보인다. */
-test('레이아웃 모드 첫 화면에 범위 띠와 표본 네 장이 온전히 보이고, 도구는 … 메뉴에 있다', async ({ page }) => {
+test('레이아웃 모드 첫 화면에 범위 띠와 표본 다섯 장이 온전히 보이고, 도구는 … 메뉴에 있다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   const sentence = page.getByRole('region', { name: '보정 문장' })
@@ -693,9 +697,11 @@ test('레이아웃 모드 첫 화면에 범위 띠와 표본 네 장이 온전�
   const cards = page.getByTestId('review-propagation-card')
   await expect(cards.first()).toBeVisible({ timeout: 20_000 })
   const barTop = (await page.getByTestId('jamo-stroke-cta').boundingBox())!.y
-  for (let index = 0; index < 4; index += 1) {
+  const row = (await page.getByTestId('review-propagation-cards').boundingBox())!
+  for (let index = 0; index < 5; index += 1) {
     const box = (await cards.nth(index).boundingBox())!
     expect(box.y + box.height).toBeLessThanOrEqual(barTop)
+    expect(box.x + box.width).toBeLessThanOrEqual(row.x + row.width + 0.5)
   }
 
   // 도구 넷은 `…` 메뉴 안. 닫혀 있으면 안 보이고, 열면 이름과 함께 보인다. 바깥(Escape)으로 닫힌다.

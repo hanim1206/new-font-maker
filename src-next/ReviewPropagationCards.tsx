@@ -113,9 +113,9 @@ function DeltaList({ rails, fixed, testId }: { rails: EditableRail[]; fixed?: Re
   </div>
 }
 
-function CardGrid({ candidates, bundle, edit, ghostVisible }: { candidates: CorpusIdentity[]; bundle: NotoPresetModelBundle | null; edit: PropagationEdit; ghostVisible: boolean }) {
+function CardGrid({ candidates, bundle, edit, ghostVisible, onNearEnd }: { candidates: CorpusIdentity[]; bundle: NotoPresetModelBundle | null; edit: PropagationEdit; ghostVisible: boolean; /** 오른쪽 끝 가까이 밀었을 때. 다음 묶음을 붙인다. */ onNearEnd: () => void }) {
   if (!bundle) return <p className={styles.empty}>모델 읽는 중</p>
-  return <div className={styles.cards}>
+  return <div className={styles.cards} data-testid="review-propagation-cards" onScroll={(event) => { const el = event.currentTarget; if (el.scrollLeft + el.clientWidth * 2 >= el.scrollWidth) onNearEnd() }}>
     {candidates.map((identity) => <PropagationCard key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} ghostVisible={ghostVisible} />)}
   </div>
 }
@@ -157,7 +157,7 @@ export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, f
   const target = useMemo<LayoutDeltaTarget>(() => scope === 'all' ? { scope } : scope === 'layer' ? { scope, contextId: source.contextId } : { scope, contextId: source.contextId, jamos: jamos.map((jamo) => jamoKeyOf(group, jamo)) }, [scope, source.contextId, jamos, group])
   const commit = (change: () => void) => { const before = layoutDeltaSnapshot(); change(); onCommitted?.(before, layoutDeltaSnapshot()); onApplied?.() }
   // 자모 칩을 누르면 그 부품이 켜지고 고른 자모는 그 하나가 돼 표본이 그 글자로 바뀐다. 여러 자모는 시트에서 고른다.
-  const pickJamo = (jamoGroup: OverrideGroup, jamo: string) => { setPage(0); onSelectPart?.(jamoGroup); setPicked({ group: jamoGroup, jamos: [jamo] }); setScope('jamo') }
+  const pickJamo = (jamoGroup: OverrideGroup, jamo: string) => { onSelectPart?.(jamoGroup); setPicked({ group: jamoGroup, jamos: [jamo] }); setScope('jamo') }
   // `이 자모만`의 자모 고르기 시트. 고르는 즉시 표본이 바뀌고 `완료`는 닫기만 한다.
   const [pickerOpen, setPickerOpen] = useState(false)
   useEffect(() => {
@@ -166,9 +166,23 @@ export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, f
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [pickerOpen])
-  const [page, setPage] = useState(0)
-  // 표본은 지금 범위의 글자. Δ 없으면 내 획만.
-  const candidates = useMemo(() => focus ? propagationCandidates({ source, scope, count: CARD_COUNT, page, focus, jamos }) : [], [focus, source, scope, page, jamos])
+  // 표본은 지금 범위의 글자. Δ 없으면 내 획만. 한 묶음(8장)으로 시작하고, 옆으로 밀어 끝에 가까워지면 다음 묶음을 붙인다. 한 바퀴 돌아 새 글자가 없으면 멈춘다.
+  // 글자·범위·고른 자모가 바뀌면 줄을 새로 만들고(key) 한 묶음으로 돌아간다.
+  const rowKey = `${source.codepoint}:${scope}:${group}:${jamos.join('')}`
+  const [loaded, setLoaded] = useState({ rowKey, batches: 1 })
+  const batches = loaded.rowKey === rowKey ? loaded.batches : 1
+  const { candidates, exhausted } = useMemo(() => {
+    const list: CorpusIdentity[] = []
+    if (!focus) return { candidates: list, exhausted: true }
+    const seen = new Set<number>()
+    for (let page = 0; page < batches; page += 1) {
+      const fresh = propagationCandidates({ source, scope, count: CARD_COUNT, page, focus, jamos }).filter((item) => !seen.has(item.codepoint))
+      if (fresh.length === 0) return { candidates: list, exhausted: true }
+      for (const item of fresh) { seen.add(item.codepoint); list.push(item) }
+    }
+    return { candidates: list, exhausted: false }
+  }, [focus, source, scope, batches, jamos])
+  const loadNextBatch = () => { if (!exhausted) setLoaded((current) => (current.rowKey === rowKey ? current.batches : 1) === batches ? { rowKey, batches: batches + 1 } : current) }
   const scopeLabel = scope === 'jamo' ? jamos.join('·') : PROPAGATION_SCOPES.find((item) => item.id === scope)?.label ?? ''
   useEffect(() => { onScopeLabel?.(scopeLabel) }, [onScopeLabel, scopeLabel])
   // 적용 = 지금 범위에 Δ 저장. 하단 바가 ref로 부른다. 닫힘값은 렌더마다 새로 잡는다(ref 갱신은 값싸다).
@@ -176,13 +190,12 @@ export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, f
   return <section className={styles.section} aria-label="다른 글자에 적용하면" data-testid="review-propagation">
     {/* 범위 띠 = 적용 범위 고르기 + 쌓인 오버라이드. 저장된 Δ는 이미 캔버스 original에 들어 있고, 지우기는 칩 ×로(Undo 됨). */}
     <LayoutScopeStrip source={source} selected={target} picked={scope === 'jamo' ? { group, jamos } : null} fixedDisabled={!focus} jamoDisabled={false}
-      onScope={(next) => { setScope(next); setPage(0) }} onPickJamo={pickJamo} onOpenPicker={() => { setScope('jamo'); setPage(0); setPickerOpen(true) }} onRemove={(removed) => commit(() => clearDelta(removed))} />
-    {/* Δ 줄은 늘 자리를 차지한다. 옮길 때 카드가 아래로 밀리지 않게. `다른 글자`는 같은 줄 오른쪽 끝. */}
+      onScope={setScope} onPickJamo={pickJamo} onOpenPicker={() => { setScope('jamo'); setPickerOpen(true) }} onRemove={(removed) => commit(() => clearDelta(removed))} />
+    {/* Δ 줄은 늘 자리를 차지한다. 옮길 때 카드가 아래로 밀리지 않게. */}
     <div className={styles.deltaRow}>
       <DeltaList rails={changed} fixed={fixed} testId="review-propagation-deltas" />
-      {focus && <button type="button" onClick={() => setPage((current) => current + 1)} data-testid="review-propagation-next">다른 글자</button>}
     </div>
-    {focus && <CardGrid candidates={candidates} bundle={bundle} edit={edit} ghostVisible={ghostVisible} />}
+    {focus && <CardGrid key={rowKey} candidates={candidates} bundle={bundle} edit={edit} ghostVisible={ghostVisible} onNearEnd={loadNextBatch} />}
     {/* 자모 고르기 시트. 잡은 부품 자리에 올 수 있는 자모 전부. 기본은 잡은 자모 하나, 마지막 하나는 못 끈다. 여러 개를 켜면 같은 Δ가 자모마다 따로 저장된다. */}
     {pickerOpen && focus && <div className={styles.sheetBackdrop} onClick={() => setPickerOpen(false)}>
       <div className={styles.sheet} role="dialog" aria-modal="true" aria-label={`${PART_GROUP_LABEL[group]} 자모 고르기`} onClick={(event) => event.stopPropagation()}>
@@ -191,7 +204,7 @@ export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, f
           <button type="button" onClick={() => setPickerOpen(false)} data-testid="review-propagation-jamos-done">완료</button>
         </header>
         <div className={styles.jamos} role="group" aria-label={`${PART_GROUP_LABEL[group]} 자모`} data-testid="review-propagation-jamos">
-          {jamoChoicesFor(focus).map((jamo) => { const on = jamos.includes(jamo); return <button type="button" key={jamo} aria-pressed={on} disabled={on && jamos.length === 1} data-jamo={jamo} onClick={() => { togglePicked(jamo); setPage(0) }}>{jamo}</button> })}
+          {jamoChoicesFor(focus).map((jamo) => { const on = jamos.includes(jamo); return <button type="button" key={jamo} aria-pressed={on} disabled={on && jamos.length === 1} data-jamo={jamo} onClick={() => togglePicked(jamo)}>{jamo}</button> })}
         </div>
       </div>
     </div>}
