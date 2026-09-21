@@ -1,8 +1,16 @@
 import type { ReactNode } from 'react'
-import { Italic, Paintbrush, Scan, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import styles from './CalibrationSentenceEditor.module.css'
+import mode from './GlobalStyleMode.module.css'
 
-export type GlobalStylePanel = 'body' | 'brush' | 'tone'
+export type GlobalStylePanel = 'body' | 'brush' | 'tone' | 'beak'
+
+const TABS: { id: GlobalStylePanel; label: string }[] = [
+  { id: 'body', label: '글자 네모꼴' },
+  { id: 'brush', label: '획 스타일' },
+  { id: 'tone', label: '굵기' },
+  { id: 'beak', label: '부리' },
+]
 
 export function GlobalStyleTrackpad({
   panel,
@@ -11,6 +19,8 @@ export function GlobalStyleTrackpad({
   bodyControls,
   brushControls,
   toneControls,
+  beakControls,
+  fill = false,
 }: {
   panel: GlobalStylePanel
   onPanelChange: (panel: GlobalStylePanel) => void
@@ -18,31 +28,23 @@ export function GlobalStyleTrackpad({
   bodyControls: ReactNode
   brushControls: ReactNode
   toneControls: ReactNode
+  beakControls: ReactNode
+  /** 셸 안: 하단에 붙은 작은 패널이 아니라 문장 · 캔버스 아래 남은 높이를 다 쓴다. */
+  fill?: boolean
 }) {
   return (
-    <section className={styles.brushSection} aria-label="글로벌 스타일 설정">
+    <section className={`${styles.brushSection} ${mode.panel} ${fill ? mode.fill : ''}`} aria-label="글로벌 스타일 설정">
       <div className={styles.brushDrawer}>
         <header className={styles.brushHeader}>
           <div><strong>글로벌 스타일</strong><span>글자 전체 인상 설정</span></div>
           <button type="button" onClick={onClose} aria-label="글로벌 스타일 설정 닫기"><X size={17} /></button>
         </header>
 
-        <div className={styles.globalStyleTabs} role="tablist" aria-label="글로벌 스타일 항목">
-          <button type="button" role="tab" aria-selected={panel === 'body'} onClick={() => onPanelChange('body')}>
-            <Scan size={16} aria-hidden="true" />
-            <span><strong>글자 네모꼴</strong><small>크기와 여백</small></span>
-          </button>
-          <button type="button" role="tab" aria-selected={panel === 'brush'} onClick={() => onPanelChange('brush')}>
-            <Paintbrush size={16} aria-hidden="true" />
-            <span><strong>획 스타일</strong><small>붓촉과 방향</small></span>
-          </button>
-          <button type="button" role="tab" aria-selected={panel === 'tone'} onClick={() => onPanelChange('tone')}>
-            <Italic size={16} aria-hidden="true" />
-            <span><strong>굵기 · 기울기</strong><small>폰트 전체 한 값</small></span>
-          </button>
+        <div className={mode.tabs} role="tablist" aria-label="글로벌 스타일 항목">
+          {TABS.map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={panel === tab.id} onClick={() => onPanelChange(tab.id)}>{tab.label}</button>)}
         </div>
 
-        {panel === 'body' ? bodyControls : panel === 'brush' ? brushControls : toneControls}
+        {panel === 'body' ? bodyControls : panel === 'brush' ? brushControls : panel === 'tone' ? toneControls : beakControls}
       </div>
     </section>
   )

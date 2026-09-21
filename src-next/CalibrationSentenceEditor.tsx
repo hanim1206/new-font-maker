@@ -70,6 +70,9 @@ import { centeredDesignBodyPadding, paddingToDesignBody } from './designBody'
 import { useFontExportStore } from './fontExportStore'
 import { useGlobalStyleStore, type GlobalStyle } from '../src/stores/globalStyleStore'
 import { BrushStyleTrackpad } from './BrushStyleTrackpad'
+import { StemBeakControls } from './StemBeakControls'
+import { DEFAULT_STEM_BEAK, type StemBeakStyle } from '../src/services/stemBeak'
+import styleMode from './GlobalStyleMode.module.css'
 import { GlobalStyleTrackpad, type GlobalStylePanel } from './GlobalStyleTrackpad'
 import { GRID_SYSTEM_2_STROKE_UNITS, GRID_SYSTEM_2_UNIT } from '../src/services/gridSystem2Geometry'
 import { ShapeRulePanel } from './ShapeRulePanel'
@@ -142,6 +145,7 @@ type HistoryEntry =
   | { kind: 'jamo'; jamoType: JamoData['type']; char: string; before: JamoData; after: JamoData; edit: SampleGlyphEdit }
   | { kind: 'brush'; before: StrokeRenderStyle; after: StrokeRenderStyle }
   | { kind: 'tone'; before: StyleTone; after: StyleTone }
+  | { kind: 'beak'; before: StemBeakStyle; after: StemBeakStyle }
   // 레이아웃 모드에서 적용·지운 배치 Δ. 저장소 앞뒤를 통째로 든다.
   | { kind: 'layoutDelta'; before: LayoutDeltaSnapshot; after: LayoutDeltaSnapshot }
 
@@ -1126,9 +1130,12 @@ function DesignBodyControls({
   </div>
 }
 
-const DEFAULT_TONE: StyleTone = { weight: 400, slant: 0 }
+const DEFAULT_WEIGHT = 400
+/** 글로벌 스타일 공간에서 문장 글자 하나의 크기(px). 평소는 24. */
+const STYLE_SPACE_EM = 140
+const WEIGHT_STOPS = [100, 200, 300, 400, 500, 600, 700, 800, 900]
 
-/** 굵기 · 기울기. 폰트 전체에 한 값씩이고 레이아웃별 값은 없다. 끄는 동안은 미리보기만, 손을 떼면 적용한다. */
+/** 굵기. 폰트 전체에 한 값이고 100 단위로만 멈춘다. 끄는 동안은 미리보기만, 손을 떼면 적용한다. 기울기는 저장소에 있지만 지금은 화면에 내놓지 않는다. */
 function StyleToneControls({
   committed,
   draft,
@@ -1142,14 +1149,14 @@ function StyleToneControls({
 }) {
   const tone = draft ?? committed
   const commit = () => { if (draft) onCommit(committed, draft) }
-  const isDefault = tone.weight === DEFAULT_TONE.weight && tone.slant === DEFAULT_TONE.slant
-  return <div className={styles.bodyControls} role="tabpanel" aria-label="굵기와 기울기 설정">
+  return <div className={styleMode.weight} role="tabpanel" aria-label="굵기 설정">
     <p><strong>폰트 전체에 한 값</strong><span>획 모양과 상자는 그대로입니다</span></p>
-    <div className={styles.bodyDimensionGrid}>
-      <label><span>굵기 <output>{tone.weight}</output></span><input type="range" min="100" max="900" step="100" value={tone.weight} aria-label="굵기" data-testid="style-weight" onChange={(event) => onDraftChange({ ...tone, weight: Number(event.target.value) })} onPointerUp={commit} onKeyUp={commit} onBlur={commit} /></label>
-      <label><span>기울기 <output>{tone.slant}°</output></span><input type="range" min="-30" max="30" step="1" value={tone.slant} aria-label="기울기" data-testid="style-slant" onChange={(event) => onDraftChange({ ...tone, slant: Number(event.target.value) })} onPointerUp={commit} onKeyUp={commit} onBlur={commit} /></label>
+    <div className={styleMode.weightBox}>
+      <div className={styleMode.weightHead}><span>굵기</span><output>{tone.weight}</output></div>
+      <input type="range" min="100" max="900" step="100" value={tone.weight} aria-label="굵기" data-testid="style-weight" onChange={(event) => onDraftChange({ ...tone, weight: Number(event.target.value) })} onPointerUp={commit} onKeyUp={commit} onBlur={commit} />
+      <div className={styleMode.ticks} aria-hidden="true">{WEIGHT_STOPS.map((stop) => <span key={stop} data-on={stop === tone.weight || undefined}>{stop}</span>)}</div>
     </div>
-    <button type="button" className={styles.bodyReset} disabled={isDefault} onClick={() => onCommit(committed, DEFAULT_TONE)}>기본 400 · 0°로 되돌리기</button>
+    <button type="button" disabled={tone.weight === DEFAULT_WEIGHT} onClick={() => onCommit(committed, { ...committed, weight: DEFAULT_WEIGHT })}>기본 400으로 되돌리기</button>
   </div>
 }
 
@@ -1188,6 +1195,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const [globalStylePanel, setGlobalStylePanel] = useState<GlobalStylePanel | null>(null)
   const [previewBrush, setPreviewBrush] = useState<StrokeRenderStyle | null>(null)
   const [previewTone, setPreviewTone] = useState<StyleTone | null>(null)
+  const [previewBeak, setPreviewBeak] = useState<StemBeakStyle | null>(null)
   const [isShapeRuleOpen, setIsShapeRuleOpen] = useState(false)
   const [editMode, setEditMode] = useState<EditMode>(initialEditMode)
   // `획 고치기`로 들어온 자소. 획 편집에서 선택을 푼 채 `완료`해도 레이아웃이 이 부품을 다시 켠다.
@@ -1203,11 +1211,15 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const directInputRef = useRef<HTMLTextAreaElement>(null)
   const isGlobalStyleOpen = globalStylePanel !== null
   const isBrushStyleOpen = globalStylePanel === 'brush'
+  // 셸 안에서는 글로벌 스타일을 연 동안 캔버스가 보기 전용이다(어느 탭이든, 어느 모드에서 열었든). 옛 단독 화면은 전처럼 획 스타일 탭에서만 잠근다.
+  const styleLocksCanvas = chrome === 'workspace' ? globalStylePanel !== null : isBrushStyleOpen
+  // 셸 안의 글로벌 스타일 공간: 캔버스를 치우고 문장 줄이 크게 자라 미리보기를 맡는다.
+  const styleSpaceOpen = chrome === 'workspace' && globalStylePanel !== null
   const maps = useMemo(() => ({ choseong, jungseong, jongseong }), [choseong, jungseong, jongseong])
   const previewGlobalStyle = useMemo(() => {
     const strokeStyle = previewBrush ?? globalStyle.strokeStyle
-    return { ...globalStyle, ...previewTone, strokeStyle, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : globalStyle.brush }
-  }, [globalStyle, previewBrush, previewTone])
+    return { ...globalStyle, ...previewTone, stemBeak: previewBeak ?? globalStyle.stemBeak, strokeStyle, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : globalStyle.brush }
+  }, [globalStyle, previewBeak, previewBrush, previewTone])
   const baseSyllable = useMemo(() => decomposeSyllable(selectedChar, choseong, jungseong, jongseong), [selectedChar, choseong, jungseong, jongseong])
   const previewedSyllable = useMemo(() => withPreviewJamo(baseSyllable, previewJamo), [baseSyllable, previewJamo])
   const baseSchema = schemas[previewedSyllable.layoutType]
@@ -1481,6 +1493,13 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     setFuture([])
     applyTone(after)
   }
+  const commitBeak = (before: StemBeakStyle, after: StemBeakStyle) => {
+    setPreviewBeak(null)
+    if (JSON.stringify(before) === JSON.stringify(after)) return
+    setHistory((entries) => [...entries, { kind: 'beak', before, after }])
+    setFuture([])
+    useGlobalStyleStore.getState().setStemBeak(after)
+  }
   const commitLayoutDelta = (before: LayoutDeltaSnapshot, after: LayoutDeltaSnapshot) => {
     if (JSON.stringify(before) === JSON.stringify(after)) return
     setHistory((entries) => [...entries, { kind: 'layoutDelta', before, after }])
@@ -1523,6 +1542,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const closeGlobalStyle = () => {
     setPreviewBrush(null)
     setPreviewTone(null)
+    setPreviewBeak(null)
     setGlobalStylePanel(null)
   }
   // 기록 한 줄을 저장소에서 되돌린다. 기록 · 선택 정리는 호출자가 한다.
@@ -1531,6 +1551,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     else if (entry.kind === 'layoutDelta') { useLayoutDeltaStore.getState().restore(entry.before); setLayoutEpoch((epoch) => epoch + 1) }
     else if (entry.kind === 'brush') useGlobalStyleStore.getState().setStrokeRenderStyle(entry.before)
     else if (entry.kind === 'tone') applyTone(entry.before)
+    else if (entry.kind === 'beak') useGlobalStyleStore.getState().setStemBeak(entry.before)
     else updateJamo(entry.before)
     if (entry.kind === 'layout' || entry.kind === 'jamo') useCalibrationProjectStore.getState().removeSampleGlyphEdit(entry.edit.id)
   }
@@ -1563,6 +1584,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     else if (entry.kind === 'layoutDelta') { useLayoutDeltaStore.getState().restore(entry.after); setLayoutEpoch((epoch) => epoch + 1) }
     else if (entry.kind === 'brush') useGlobalStyleStore.getState().setStrokeRenderStyle(entry.after)
     else if (entry.kind === 'tone') applyTone(entry.after)
+    else if (entry.kind === 'beak') useGlobalStyleStore.getState().setStemBeak(entry.after)
     else updateJamo(entry.after)
     setFuture((entries) => entries.slice(0, -1))
     setHistory((entries) => [...entries, entry])
@@ -1642,6 +1664,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   }
   // 셸 안에서는 도구가 머리 `…` 메뉴로 들어가 이름이 붙고, 실행취소·다시실행은 셸 머리에 있으니 뺀다.
   const menuLabel = (text: string) => chrome === 'workspace' ? <em>{text}</em> : null
+  const toggleGlobalStyle = () => isGlobalStyleOpen ? closeGlobalStyle() : setGlobalStylePanel('body')
   const actions = (
     <nav aria-label="폰트 추출 및 편집 기록">
       <a href="/workspace/jamo/master" className={styles.workspaceLink} aria-label="자소 원형 새 화면 검토" title="자소 원형 새 화면 검토"><LayoutDashboard size={18} />{menuLabel('자소 원형')}</a>
@@ -1653,7 +1676,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         {copyState === 'copied' ? <Check size={18} /> : <Copy size={18} />}
       </button>
       <button type="button" disabled={selection.kind === 'none'} onClick={() => setIsShapeRuleOpen(true)} aria-label="선택 자모 형태 규칙" title="현재 자모의 획과 형태 예절"><ListTree size={18} />{menuLabel('형태 규칙')}</button>
-      <button type="button" data-active={isGlobalStyleOpen || undefined} disabled={isLayoutMode} onClick={() => isGlobalStyleOpen ? closeGlobalStyle() : setGlobalStylePanel('body')} aria-label="글로벌 스타일 설정" title="글자 네모꼴과 획 스타일"><Settings2 size={18} />{menuLabel('네모꼴 · 획 스타일')}</button>
+      {chrome === 'standalone' && <button type="button" data-active={isGlobalStyleOpen || undefined} onClick={toggleGlobalStyle} aria-label="글로벌 스타일 설정" title="글자 네모꼴과 획 스타일"><Settings2 size={18} />{menuLabel('네모꼴 · 획 스타일')}</button>}
       {chrome === 'standalone' && <>
         <button type="button" onClick={undo} disabled={history.length === 0} aria-label="마지막 편집 되돌리기"><Undo2 size={18} />{history.length > 0 && <span>{history.length}</span>}</button>
         <button type="button" onClick={redo} disabled={future.length === 0} aria-label="되돌린 편집 다시 실행"><Redo2 size={18} /></button>
@@ -1662,7 +1685,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   )
   const body = (
     <>
-      <section ref={sentenceRef} className={styles.sentence} data-compact={sentenceCompact || undefined} aria-label="보정 문장">
+      <section ref={sentenceRef} className={`${styles.sentence} ${chrome === 'workspace' ? styleMode.strip : ''}`} data-compact={sentenceCompact || undefined} data-grown={styleSpaceOpen || undefined} aria-label="보정 문장">
         <div className={styles.sentenceActions}>
           <button type="button" onClick={pickSampleSentence} aria-label="예시 문장 무작위 선택" title="예시 문장 바꾸기"><Dices size={19} aria-hidden="true" /></button>
           <button type="button" data-active={isDirectInputActive || undefined} onClick={startDirectInput} aria-label="보정 문장 직접 입력" title="직접 입력"><TextCursorInput size={19} aria-hidden="true" /></button>
@@ -1679,7 +1702,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
           autoCorrect="off"
           spellCheck={false}
         />
-        {calibrationLines.map((line, lineIndex) => <div key={line} className={styles.sentenceRun} style={{ fontSize: sentenceEm }}>
+        {calibrationLines.map((line, lineIndex) => <div key={line} className={`${styles.sentenceRun} ${chrome === 'workspace' ? styleMode.run : ''}`} style={{ fontSize: styleSpaceOpen ? STYLE_SPACE_EM : sentenceEm }}>
           {tokenizeSentenceLine(line).map((token) => token.whitespace
             ? [...token.text].map((char, index) => renderSentenceCharacter(char, token.start + index, lineIndex))
             : <span key={`${lineIndex}-word-${token.start}`} className={styles.wordRun}>{[...token.text].map((char, index) => renderSentenceCharacter(char, token.start + index, lineIndex))}</span>
@@ -1688,26 +1711,27 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         </div>)}
       </section>
 
-      {isLayoutMode ? <section className={styles.layoutMode} aria-label={`${selectedChar} 레이아웃 수정`} data-testid="jamo-layout-mode">
+      {isLayoutMode && !styleLocksCanvas ? <section className={styles.layoutMode} aria-label={`${selectedChar} 레이아웃 수정`} data-testid="jamo-layout-mode">
         <GlyphLayoutEditor key={`${selectedChar}:${layoutEpoch}`} codepoint={selectedChar.codePointAt(0) ?? 0xac00} initialPart={selection.kind === 'none' ? strokeEntryPart ?? undefined : selection.editorPart} onCommitted={commitLayoutDelta} onEditStrokes={editStrokes} onPickCharacter={openSoloChar} onScopeApplied={setAppliedScope} />
       </section> : <>
       {/* 획 편집에도 같은 자리·같은 높이로 `닿는 글자` 줄이 선다. 범위는 고치는 자모가 든 글자 전부(레이아웃을 안 가린다).
           줄이 두 모드에 다 있어야 `획 고치기`로 오갈 때 캔버스가 안 튄다. */}
-      {chrome === 'workspace' && layoutAvailable && !isBrushStyleOpen && strokeRowJamo && strokeCardPart &&
+      {chrome === 'workspace' && layoutAvailable && !styleLocksCanvas && strokeRowJamo && strokeCardPart &&
         <TouchedGlyphRow source={corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00)} bundle={notoBundle} edit={NO_LAYOUT_EDIT} ghostVisible={false} focus={strokeCardPart} scope="jamo" group={strokeCardPart} jamos={[strokeRowJamo]} anyContext />}
-      <section className={styles.editor} data-chrome={chrome} aria-label={`${selectedChar} 완성 글자 편집`}>
+      {!styleSpaceOpen && <section className={styles.editor} data-chrome={chrome} aria-label={`${selectedChar} 완성 글자 편집`}>
         {/* 셸 안에서는 레이아웃 모드와 같은 자리(캔버스 왼쪽)에 같은 여섯 칸 표지가 선다. 획 편집에서는 `기본` 칸이 하나 더 오고 칸마다 고치는 자소가 그려진다. */}
         <div className={styles.strokeStage}>
-        {chrome === 'workspace' && layoutAvailable && !isBrushStyleOpen && <LayoutContextCards activeContextId={corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00).contextId} allActive={false} ink={strokeCardInk ?? undefined} />}
+        {chrome === 'workspace' && layoutAvailable && !styleLocksCanvas && <LayoutContextCards activeContextId={corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00).contextId} allActive={false} ink={strokeCardInk ?? undefined} />}
         <div className={styles.focusArea}>
-        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={isBrushStyleOpen ? { kind: 'none' } : selection} onSelect={isBrushStyleOpen ? () => {} : selectFromCanvas} selectedPoints={isBrushStyleOpen ? [] : selectedPoints} onPointSelect={isBrushStyleOpen ? () => {} : selectPointFromCanvas} lockedPart={isBrushStyleOpen ? null : lockedPart} dragApiRef={directManipulation && !isBrushStyleOpen ? dragApiRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
+        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={styleLocksCanvas ? { kind: 'none' } : selection} onSelect={styleLocksCanvas ? () => {} : selectFromCanvas} selectedPoints={styleLocksCanvas ? [] : selectedPoints} onPointSelect={styleLocksCanvas ? () => {} : selectPointFromCanvas} lockedPart={styleLocksCanvas ? null : lockedPart} dragApiRef={directManipulation && !styleLocksCanvas ? dragApiRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
         </div>
         </div>
-      </section>
+      </section>}
 
       {globalStylePanel ? <GlobalStyleTrackpad
         panel={globalStylePanel}
-        onPanelChange={(panel) => { setPreviewBrush(null); setPreviewTone(null); setGlobalStylePanel(panel) }}
+        onPanelChange={(panel) => { setPreviewBrush(null); setPreviewTone(null); setPreviewBeak(null); setGlobalStylePanel(panel) }}
+        fill={chrome === 'workspace'}
         onClose={closeGlobalStyle}
         bodyControls={<DesignBodyControls layoutType={previewedSyllable.layoutType} fontSpace={fontSpace} />}
         brushControls={<BrushStyleTrackpad
@@ -1717,7 +1741,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
           onCommit={commitBrush}
           renderPreview={(strokeStyle) => <Glyph char="한" size={42} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={null} previewSchema={null} layoutHighlight={null} globalStyle={{ ...globalStyle, strokeStyle, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : globalStyle.brush }} />}
           embedded
+          productOptions={chrome === 'workspace'}
         />}
+        beakControls={<StemBeakControls committed={globalStyle.stemBeak ?? DEFAULT_STEM_BEAK} draft={previewBeak} onDraftChange={setPreviewBeak} onCommit={commitBeak} />}
         toneControls={<StyleToneControls committed={{ weight: globalStyle.weight, slant: globalStyle.slant }} draft={previewTone} onDraftChange={setPreviewTone} onCommit={commitTone} />}
       /> : <InferenceTrackpad
         glyph={selectedChar}
@@ -1763,6 +1789,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         projectName={projectName}
         history={{ canUndo: history.length > 0, canRedo: future.length > 0, onUndo: undo, onRedo: redo }}
         menu={<div data-edit-mode={isLayoutMode ? 'layout' : 'stroke'} data-testid="jamo-toolbar">{actions}</div>}
+        tools={<button type="button" className={styleMode.headerTool} data-active={isGlobalStyleOpen || undefined} onClick={toggleGlobalStyle} aria-label="글로벌 스타일 설정" aria-pressed={isGlobalStyleOpen} title="폰트 전체에 먹는 네모꼴 · 획 모양 · 굵기 · 부리"><Settings2 size={18} /></button>}
         menuBadge={exportState === 'exporting' ? 'busy' : exportState === 'downloaded' ? 'done' : exportState === 'failed' ? 'failed' : null}
       >
         {body}

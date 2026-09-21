@@ -29,6 +29,7 @@ export function MobileWorkspaceShell({
   history,
   menu,
   menuBadge,
+  tools,
 }: {
   children: ReactNode
   drawer?: ReactNode
@@ -39,6 +40,8 @@ export function MobileWorkspaceShell({
   menu?: ReactNode
   /** 메뉴 안 도구의 진행 상태를 `☰` 단추에 점으로 보인다. */
   menuBadge?: 'busy' | 'done' | 'failed' | null
+  /** 머리 오른쪽, 되돌리기 앞에 늘 보이는 도구(어느 모드에서든 쓰는 것). */
+  tools?: ReactNode
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   useEffect(() => {
@@ -69,6 +72,7 @@ export function MobileWorkspaceShell({
             <strong>{projectName}</strong>
           </div>
           <div className={styles.headerActions} aria-label="프로젝트 편집 기록">
+            {tools}
             <button type="button" disabled={!history?.canUndo} onClick={history?.onUndo} aria-label="형태 편집 실행 취소"><Undo2 size={18} /></button>
             <button type="button" disabled={!history?.canRedo} onClick={history?.onRedo} aria-label="형태 편집 다시 실행"><Redo2 size={18} /></button>
           </div>

@@ -1026,17 +1026,16 @@ test('레이아웃 모드 첫 화면에 상단 두 줄과 옵션 스택이 온�
   await expect(menu.getByRole('link', { name: '자소 원형 새 화면 검토' })).toBeVisible()
   await expect(menu.getByRole('button', { name: '현재 작업을 OTF로 추출' })).toContainText('OTF 추출')
   await expect(menu.getByRole('button', { name: '선택 자모 형태 규칙' })).toBeVisible()
-  // 네모꼴 · 획 스타일 패널은 획 편집 화면 것이라 레이아웃 모드에서는 꺼져 있다.
-  await expect(menu.getByRole('button', { name: '글로벌 스타일 설정' })).toBeDisabled()
+  // 글로벌 스타일은 폰트 전체 값이라 메뉴 안이 아니라 머리에 늘 나와 있다(레이아웃 모드에서도 켜져 있다).
+  await expect(menu.getByRole('button', { name: '글로벌 스타일 설정' })).toHaveCount(0)
   await page.keyboard.press('Escape')
   await expect(menu).toBeHidden()
+  await expect(page.getByRole('button', { name: '글로벌 스타일 설정' })).toBeEnabled()
 
-  // 획 편집에서도 문장은 한 줄이고, 메뉴의 글로벌 스타일이 전처럼 패널을 연다.
+  // 획 편집에서도 문장은 한 줄이고, 머리의 글로벌 스타일이 패널을 연다.
   await page.getByTestId('jamo-stroke-cta').click()
   await expect(sentence).toHaveAttribute('data-compact', 'true')
-  await page.getByRole('button', { name: '주 메뉴' }).click()
-  await menu.getByRole('button', { name: '글로벌 스타일 설정' }).click()
-  await expect(menu).toBeHidden()
+  await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
   await expect(page.getByRole('region', { name: '글로벌 스타일 설정' })).toBeVisible()
 })
 

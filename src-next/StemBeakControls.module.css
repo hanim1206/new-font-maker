@@ -1,0 +1,13 @@
+.controls { min-height: 0; display: flex; flex: 1; flex-direction: column; gap: 6px; }
+.controls > p { min-height: 25px; margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: rgb(var(--color-text-dim-3)); font-size: 10px; }
+.controls > p strong { min-width: 0; overflow: hidden; color: rgb(var(--color-foreground)); text-overflow: ellipsis; white-space: nowrap; }
+.controls > p span { flex: 0 0 auto; color: rgb(var(--color-text-dim-4)); }
+.shapes { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+.shapes button { min-width: 0; min-height: 72px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px 2px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-4)); font-size: 9px; font-weight: 600; }
+.shapes button svg { width: 38px; height: 38px; fill: rgb(var(--color-text-4)); }
+.shapes button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shapes button[aria-checked='true'] { background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); }
+.shapes button[aria-checked='true'] svg { fill: rgb(var(--color-foreground)); }
+.sliders { min-height: 62px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.sliders label span { display: flex; justify-content: space-between; }
+.sliders output { font-family: ui-monospace, monospace; }

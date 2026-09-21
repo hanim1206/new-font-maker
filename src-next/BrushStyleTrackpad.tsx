@@ -21,7 +21,7 @@ function clampCutAngle(value: number, preferredSign = 1): number {
 function aspectRatioToFlatness(value: number): number { return Math.round((1 - value) / 0.8 * 100) }
 function flatnessToAspectRatio(value: number): number { return Math.max(0.2, Math.min(1, 1 - value / 100 * 0.8)) }
 
-export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, onClose, renderPreview, embedded = false }: {
+export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, onClose, renderPreview, embedded = false, productOptions = false }: {
   committed: StrokeRenderStyle
   draft: StrokeRenderStyle | null
   onDraftChange: (style: StrokeRenderStyle | null) => void
@@ -29,6 +29,8 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
   onClose?: () => void
   renderPreview: (style: StrokeRenderStyle) => ReactNode
   embedded?: boolean
+  /** 제품 화면용 선택지: 네모형 붓촉과 레거시 스냅 획을 뺀다. 이미 그 값으로 저장된 폰트는 그대로 그려지고, 다른 것을 고르면 바뀐다. */
+  productOptions?: boolean
 }) {
   const current = draft ?? committed
   const beforeRef = useRef<StrokeRenderStyle | null>(null)
@@ -120,11 +122,11 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
   </div>
 
   const controls = <div className={styles.brushControls} role={embedded ? 'tabpanel' : undefined} aria-label={embedded ? '획 스타일' : undefined}>
-    <div className={styles.strokeRuleModes} role="radiogroup" aria-label="획 생성 규칙">
-      {([['brush', '붓촉형'], ['angled-area', '절단 끝'], ['legacy-snapped-centerline', '레거시 스냅 획']] as const).map(([mode, label]) => <button key={mode} type="button" role="radio" aria-checked={current.mode === mode} onClick={() => selectMode(mode)}>{label}</button>)}
+    <div className={styles.strokeRuleModes} style={productOptions ? { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' } : undefined} role="radiogroup" aria-label="획 생성 규칙">
+      {([['brush', '붓촉형'], ['angled-area', '절단 끝'], ['legacy-snapped-centerline', '레거시 스냅 획']] as const).filter(([mode]) => !productOptions || mode !== 'legacy-snapped-centerline').map(([mode, label]) => <button key={mode} type="button" role="radio" aria-checked={current.mode === mode} onClick={() => selectMode(mode)}>{label}</button>)}
     </div>
     {current.mode === 'brush' && <>
-      <div className={styles.brushTips} role="radiogroup" aria-label="붓촉 모양">{TIP_OPTIONS.map(({ tip, label }) => {
+      <div className={styles.brushTips} style={productOptions ? { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' } : undefined} role="radiogroup" aria-label="붓촉 모양">{TIP_OPTIONS.filter(({ tip }) => !productOptions || tip !== 'rectangle').map(({ tip, label }) => {
         const previewStyle: StrokeRenderStyle = { ...current, brush: { ...current.brush, tip } }
         return <button key={tip} type="button" role="radio" aria-checked={current.brush.tip === tip} onClick={() => selectTip(tip)}>
           <span className={styles.brushTipPreview}>{renderPreview(previewStyle)}</span><span className={`${styles.brushTipIcon} ${styles[`brushTipIcon_${tip}`]}`} aria-hidden="true" /><strong>{label}</strong>

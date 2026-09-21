@@ -1,0 +1,75 @@
+/* 글로벌 스타일을 연 동안: 캔버스를 치우고 문장 줄이 그 자리에서 크게 자란다(한 줄 · 가로 스크롤 그대로). 패널은 남은 높이를 다 쓴다. */
+section.strip { transition: flex-basis var(--motion-slow) var(--ease-standard), height var(--motion-slow) var(--ease-standard); }
+section.strip[data-grown='true'] { flex-basis: 196px; height: 196px; padding-left: 16px; background: rgb(var(--color-surface)); }
+section.strip[data-grown='true'] > div:first-child { display: none; }
+.run { transition: font-size var(--motion-slow) var(--ease-standard); }
+/* 글자 그림은 글자 크기(em)를 따라 같이 자란다. 평소 1em = 24px라 전과 같다. */
+.run svg { width: 1em; height: 1em; }
+section.strip[data-grown='true'] .run button::after { bottom: -8px; height: 3px; }
+@media (prefers-reduced-motion: reduce) { section.strip, .run { transition: none; } }
+section.fill { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+section.fill > div { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; }
+/* 탭: 글자만, 고른 것에 밑줄 */
+.tabs { display: flex; gap: 18px; border-bottom: 1px solid rgb(var(--color-border-subtle)); }
+.tabs button { flex: 0 0 auto; min-height: 44px; padding: 0; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 0; background: transparent; color: rgb(var(--color-text-5)); font-size: 13px; font-weight: 600; }
+.tabs button[aria-selected='true'] { color: rgb(var(--color-foreground)); border-bottom-color: rgb(var(--color-foreground)); }
+.weight { min-height: 0; display: flex; flex: 1; flex-direction: column; gap: 6px; }
+.weight > p { min-height: 25px; margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: rgb(var(--color-text-dim-4)); font-size: 10px; }
+.weight > p strong { color: rgb(var(--color-foreground)); }
+.weightBox { display: flex; flex-direction: column; gap: 8px; padding: 6px 0; }
+.weightHead { display: flex; align-items: baseline; justify-content: space-between; font-size: 11px; font-weight: 700; }
+.weightHead output { color: rgb(var(--color-foreground)); font-family: ui-monospace, monospace; font-size: 15px; }
+/* 눈금은 손잡이 중심이 지나는 자리에 맞춘다(손잡이 반폭 11px만큼 안쪽). */
+.ticks { display: flex; justify-content: space-between; padding: 0 11px; }
+.ticks span { position: relative; width: 0; display: flex; justify-content: center; color: rgb(var(--color-text-dim-4)); font-family: ui-monospace, monospace; font-size: 9px; padding-top: 7px; }
+.ticks span::before { content: ''; position: absolute; top: 0; left: -0.5px; width: 1px; height: 5px; background: rgb(var(--color-border-light)); }
+.ticks span[data-on='true'] { color: rgb(var(--color-foreground)); font-weight: 700; }
+.ticks span[data-on='true']::before { background: rgb(var(--color-foreground)); }
+/* 머리의 글로벌 스타일 입구. 눌리는 자리는 44px 그대로 두고, 켜진 표시는 안쪽 34px 면으로만 그려 머리 위아래에 숨 쉴 틈을 둔다.
+   되돌리기 · 다시와는 한 묶음이 아니라서 간격과 가는 구분선으로 떼어 놓는다. */
+.headerTool { position: relative; isolation: isolate; margin-right: 13px; }
+.headerTool::before { content: ''; position: absolute; z-index: -1; inset: 5px; border-radius: 10px; background: transparent; transition: background var(--motion-fast) var(--ease-standard); }
+.headerTool::after { content: ''; position: absolute; top: 14px; right: -8px; bottom: 14px; width: 1px; background: rgb(var(--color-border)); }
+.headerTool[data-active='true'] { color: rgb(var(--color-primary)) !important; }
+.headerTool[data-active='true']::before { background: rgb(var(--color-primary-light) / .7); }
+
+/* ===== 패널 안 공통 생김새: 테두리 상자 없이 흰 면 하나, 검정 · 회색만 ===== */
+section.panel { padding: 0; }
+section.panel > div { border: 0; border-radius: 0; background: rgb(var(--color-surface)); padding: 10px 16px calc(env(safe-area-inset-bottom) + 16px); gap: 12px; scrollbar-width: none; }
+section.panel > div::-webkit-scrollbar { display: none; }
+.panel header strong { font-size: 15px; }
+.panel header span { color: rgb(var(--color-text-5)); }
+.panel header button { border: 0; background: transparent; color: rgb(var(--color-text-4)); }
+.panel [role='tabpanel'] > p strong { font-weight: 600; color: rgb(var(--color-text-3)); }
+.panel [role='tabpanel'] label { border: 0; border-radius: 0; background: transparent; padding: 8px 0 4px; gap: 8px; font-size: 12px; font-weight: 600; }
+.panel [role='tabpanel'] > div { column-gap: 16px; }
+.panel [role='tabpanel'] output { color: rgb(var(--color-foreground)); font-size: 13px; }
+/* 되돌리기: 덜 중요한 동작이라 밑줄 글자로 */
+.panel [role='tabpanel'] > button:last-child { width: 100%; min-height: 44px; margin-top: auto; border: 0; background: transparent; color: rgb(var(--color-text-4)); font-size: 12px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+.panel [role='tabpanel'] > button:last-child:disabled { opacity: .45; text-decoration: none; }
+/* 범위 고르기: 회색 길 위의 흰 알약 */
+.panel [role='tabpanel'] > [role='tablist'] { gap: 2px; padding: 2px; border-radius: 9px; background: rgb(var(--color-surface-3)); }
+.panel [role='tabpanel'] > [role='tablist'] button { min-height: 32px; border-radius: 7px; font-size: 11px; font-weight: 600; color: rgb(var(--color-text-4)); background: transparent; box-shadow: none; }
+.panel [role='tabpanel'] > [role='tablist'] button[aria-selected='true'] { background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); box-shadow: 0 1px 2px rgb(15 23 42 / .12); }
+
+/* ===== 슬라이더: 손잡이 없는 채움 막대 ===== */
+.panel input[type='range'] { -webkit-appearance: none; appearance: none; width: 100%; height: 34px; margin: 0; border-radius: 10px; overflow: hidden; background: rgb(var(--color-surface-3)); cursor: ew-resize; touch-action: pan-y; }
+.panel input[type='range']::-webkit-slider-runnable-track { height: 34px; background: transparent; }
+/* 손잡이 왼쪽으로 긴 그림자를 깔아 지나온 쪽을 채운다(입력의 overflow: hidden이 밖을 자른다). */
+.panel input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 34px; border: 0; border-radius: 0 10px 10px 0; background: linear-gradient(#fff, #fff) center / 3px 16px no-repeat, rgb(var(--color-foreground)); box-shadow: -1000px 0 0 1000px rgb(var(--color-foreground)); }
+.panel input[type='range']::-moz-range-track { height: 34px; background: transparent; }
+.panel input[type='range']::-moz-range-progress { height: 34px; background: rgb(var(--color-foreground)); }
+.panel input[type='range']::-moz-range-thumb { width: 22px; height: 34px; border: 0; border-radius: 0 10px 10px 0; background: linear-gradient(#fff, #fff) center / 3px 16px no-repeat, rgb(var(--color-foreground)); }
+.panel input[type='range']:focus-visible { outline: 2px solid rgb(var(--color-ring)); outline-offset: 2px; }
+.panel input[type='range']:disabled { opacity: .35; cursor: default; }
+
+/* ===== 획 스타일 탭: 같은 말투(테두리 없이, 고른 것만 옅은 면, 파랑 없음) ===== */
+.panel [role='radiogroup'][aria-label='획 생성 규칙'] { gap: 2px; padding: 2px; border-radius: 9px; background: rgb(var(--color-surface-3)); }
+.panel [role='radiogroup'][aria-label='획 생성 규칙'] button { min-height: 32px; border: 0; border-radius: 7px; background: transparent; color: rgb(var(--color-text-4)); font-size: 11px; font-weight: 600; }
+.panel [role='radiogroup'][aria-label='획 생성 규칙'] button[aria-checked='true'] { background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); box-shadow: 0 1px 2px rgb(15 23 42 / .12); }
+.panel [role='radiogroup'][aria-label='붓촉 모양'] button { border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-4)); box-shadow: none; }
+.panel [role='radiogroup'][aria-label='붓촉 모양'] button[aria-checked='true'] { background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); box-shadow: none; }
+.panel [role='slider'] { border: 0; border-radius: 10px; background-color: rgb(var(--color-surface-3)); }
+.panel [role='slider']::before, .panel [role='slider']::after { background: rgb(var(--color-text-6) / .5); }
+.panel [role='slider'] > span[aria-hidden='true']:last-of-type { background: rgb(var(--color-foreground)); }
+.panel [role='tabpanel'] > p:only-of-type, .panel [role='tabpanel'] p[class*='roundBrushMessage'] { border-color: rgb(var(--color-border-subtle)); }

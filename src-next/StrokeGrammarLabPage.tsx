@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import baseJamos from '../src/data/baseJamos.json'
 import { useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
-import { DEFAULT_STEM_BEAK, STEM_BEAK_SHAPES, stemBeakInkGroups, type StemBeakShape, type StemBeakStyle } from '../src/services/stemBeak'
+import { DEFAULT_STEM_BEAK, STEM_BEAK_SHAPES, stemBeakInkGroups, type StemBeakStyle } from '../src/services/stemBeak'
 import {
   describeJamoStrokes,
   STEM_NAME_LABEL,
@@ -13,6 +13,7 @@ import {
 } from '../src/services/strokeGrammar'
 import type { AnchorPoint, JamoData, StrokeDataV2 } from '../src/types'
 import { AppGlyph } from './AppGlyph'
+import { BeakShapeThumb } from './StemBeakControls'
 import styles from './StrokeGrammarLabPage.module.css'
 
 /**
@@ -64,20 +65,6 @@ function centerlineD(stroke: StrokeDataV2): string {
   for (let index = 1; index < points.length; index += 1) parts.push(curve(points[index - 1], points[index]))
   if (stroke.closed) parts.push(curve(points[points.length - 1], points[0]), 'Z')
   return parts.join(' ')
-}
-
-/** 모양 고르기 버튼의 그림. 실제 부리 함수로 그리므로 버튼에서 본 모양이 그대로 글자에 나온다. */
-const THUMB_STEM: StrokeDataV2 = { id: 'thumb', points: [{ x: 0.56, y: 0.3 }, { x: 0.56, y: 1.1 }], closed: false, thickness: 0.2 }
-
-function BeakShapeThumb({ shape, size, angle }: { shape: StemBeakShape; size: number; angle: number }) {
-  const [[[contour]]] = stemBeakInkGroups([{ stroke: THUMB_STEM, box: UNIT_BOX, weightMultiplier: 1, group: 'thumb' }], { enabled: true, shape, size, angle })
-  const half = THUMB_STEM.thickness / 2
-  return (
-    <svg viewBox="0 0 100 100" aria-hidden="true">
-      <rect x={(0.56 - half) * 100} y={30} width={half * 200} height={80} />
-      <polygon points={contour.map((point) => `${point.x * 100},${point.y * 100}`).join(' ')} />
-    </svg>
-  )
 }
 
 function colorOf(stroke: StrokeDescription): string {
