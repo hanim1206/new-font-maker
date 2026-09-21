@@ -65,7 +65,7 @@ function GridScreen() {
   const [selected, setSelected] = useState(codepointFromUrl)
   const identity = corpusIdentity(selected)
 
-  return <MobileWorkspaceShell activeArea="review" statusLabel="검수 · 글자 격자">
+  return <MobileWorkspaceShell activeArea="review">
     <div className={styles.scroll}>
       {/* 칸 탭 = 선택, 선택된 칸 다시 탭 = 글자 화면. 키보드 화살표 이동은 선택만 바꾼다. */}
       <div className={styles.matrixSection}><NotoCorpusMatrix rows={ROWS} reviews={NO_REVIEWS} selected={selected} onSelect={(codepoint) => { if (codepoint === selected) window.location.assign(glyphHref(codepoint)); else setSelected(codepoint) }} isHighlighted={() => true} noFinal={false} renderCell={renderCell} variant="viewer" /></div>

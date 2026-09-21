@@ -10,7 +10,7 @@ test('자소 탭 획 편집은 셸 안에서 문장·캔버스·도구 줄을 �
   await page.goto('/workspace/jamo?mode=stroke')
 
   // 하단 내비는 없다. 화면 이동은 머리 `…` 메뉴 안에 있다.
-  await page.getByRole('button', { name: '프로젝트 더보기' }).click()
+  await page.getByRole('button', { name: '주 메뉴' }).click()
   const nav = page.getByRole('navigation', { name: '프로젝트 주 내비게이션' })
   await expect(nav.getByRole('link', { name: '자소' })).toHaveAttribute('aria-current', 'page')
   await page.keyboard.press('Escape')

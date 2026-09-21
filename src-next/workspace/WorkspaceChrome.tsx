@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import {
   ChevronDown,
   ChevronUp,
-  MoreHorizontal,
+  Menu,
   Redo2,
   ScanSearch,
   Shapes,
@@ -26,7 +26,6 @@ export function MobileWorkspaceShell({
   drawer,
   activeArea,
   projectName = '새 한글 폰트',
-  statusLabel = '화면 검토 모드',
   history,
   menu,
   menuBadge,
@@ -35,11 +34,10 @@ export function MobileWorkspaceShell({
   drawer?: ReactNode
   activeArea: WorkspaceArea
   projectName?: string
-  statusLabel?: string
   history?: WorkspaceHistoryControls
-  /** 머리 `…` 메뉴에서 화면 이동(자소 · 검수) 아래에 넣을 도구(링크·버튼). 항목을 누르면 메뉴는 닫힌다. */
+  /** 머리 `☰` 메뉴에서 화면 이동(자소 · 검수) 아래에 넣을 도구(링크·버튼). 항목을 누르면 메뉴는 닫힌다. */
   menu?: ReactNode
-  /** 메뉴 안 도구의 진행 상태를 `…` 단추에 점으로 보인다. */
+  /** 메뉴 안 도구의 진행 상태를 `☰` 단추에 점으로 보인다. */
   menuBadge?: 'busy' | 'done' | 'failed' | null
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -53,14 +51,9 @@ export function MobileWorkspaceShell({
     <main className={styles.page}>
       <div className={styles.shell}>
         <header className={styles.projectHeader}>
-          <div className={styles.projectIdentity}>
-            <strong>{projectName}</strong>
-            <span>{statusLabel}</span>
-          </div>
-          <div className={styles.headerActions} aria-label="프로젝트 편집 기록">
-            <button type="button" disabled={!history?.canUndo} onClick={history?.onUndo} aria-label="형태 편집 실행 취소"><Undo2 size={18} /></button>
-            <button type="button" disabled={!history?.canRedo} onClick={history?.onRedo} aria-label="형태 편집 다시 실행"><Redo2 size={18} /></button>
-            <button type="button" aria-label="프로젝트 더보기" aria-haspopup="menu" aria-expanded={menuOpen} data-badge={menuBadge ?? undefined} onClick={() => setMenuOpen((open) => !open)}><MoreHorizontal size={20} /></button>
+          {/* 왼쪽은 이동(햄버거), 오른쪽은 편집 기록. 읽기만 하는 모드 표시는 두지 않는다. */}
+          <div className={styles.headerMenu}>
+            <button type="button" aria-label="주 메뉴" aria-haspopup="menu" aria-expanded={menuOpen} data-badge={menuBadge ?? undefined} onClick={() => setMenuOpen((open) => !open)}><Menu size={20} /></button>
             {/* 메뉴는 늘 DOM에 있다(도구의 상태·testid가 닫혀 있어도 읽힌다). 닫히면 숨기기만 한다. */}
             {menuOpen && <div className={styles.moreBackdrop} onClick={() => setMenuOpen(false)} aria-hidden="true" />}
             <div className={styles.moreMenu} hidden={!menuOpen} onClick={() => setMenuOpen(false)} data-testid="workspace-more-menu">
@@ -71,6 +64,13 @@ export function MobileWorkspaceShell({
               </nav>
               {menu}
             </div>
+          </div>
+          <div className={styles.projectIdentity}>
+            <strong>{projectName}</strong>
+          </div>
+          <div className={styles.headerActions} aria-label="프로젝트 편집 기록">
+            <button type="button" disabled={!history?.canUndo} onClick={history?.onUndo} aria-label="형태 편집 실행 취소"><Undo2 size={18} /></button>
+            <button type="button" disabled={!history?.canRedo} onClick={history?.onRedo} aria-label="형태 편집 다시 실행"><Redo2 size={18} /></button>
           </div>
         </header>
 

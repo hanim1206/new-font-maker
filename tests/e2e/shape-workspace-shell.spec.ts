@@ -34,7 +34,7 @@ test.beforeEach(async ({ page }) => {
 test('J-02 자소 원형 Rail은 네 방향을 직접 편집하고 한 transaction으로 저장·Undo한다', async ({ page }) => {
   await page.goto('/workspace/jamo/result?char=ㄱ')
   await page.getByRole('button', { name: '추천 기본 구조로 시작' }).click()
-  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await expect(page.locator('[data-save-state="saved"]')).toBeVisible()
   await page.goto('/workspace/jamo/master')
 
   await expect(page.getByRole('heading', { name: '초성 ㄱ 원형', exact: true })).toBeVisible()
@@ -68,7 +68,7 @@ test('J-02 자소 원형 Rail은 네 방향을 직접 편집하고 한 transacti
   expect(await comparisonPaths.evaluateAll((paths) => paths.map((path) => path.getAttribute('d')))).not.toEqual(beforePaths)
   expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
   await page.mouse.up()
-  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await expect(page.locator('[data-save-state="saved"]')).toBeVisible()
   await page.waitForTimeout(350)
   const committedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
   expect(committedRaw).not.toBe(initializedRaw)
@@ -80,7 +80,7 @@ test('J-02 자소 원형 Rail은 네 방향을 직접 편집하고 한 transacti
   expect(changedRails[0]).toBe(changedRails[1])
 
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
-  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await expect(page.locator('[data-save-state="saved"]')).toBeVisible()
   expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
 
   const cancelRail = page.getByRole('slider', { name: '캔버스 안쪽 아래 기준선' })
@@ -120,7 +120,7 @@ test('J-02 자소 원형 Rail은 네 방향을 직접 편집하고 한 transacti
 test('J-02 전체 4×4 점유 면은 연속 채우기·비우기 draft를 한 transaction으로 저장·취소·복원한다', async ({ page }) => {
   await page.goto('/workspace/jamo/result?char=ㄱ')
   await page.getByRole('button', { name: '추천 기본 구조로 시작' }).click()
-  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await expect(page.locator('[data-save-state="saved"]')).toBeVisible()
   await page.goto('/workspace/jamo/master')
   await page.waitForTimeout(350)
 
@@ -257,7 +257,7 @@ test('J-02 전체 4×4 점유 면은 연속 채우기·비우기 draft를 한 tr
 test('뼈대 탭은 없고 옛 뼈대 주소는 자소 탭으로 넘어간다', async ({ page }) => {
   await page.goto('/workspace/skeleton')
   await expect(page).toHaveURL(/\/workspace\/jamo$/)
-  await page.getByRole('button', { name: '프로젝트 더보기' }).click()
+  await page.getByRole('button', { name: '주 메뉴' }).click()
   const nav = page.getByRole('navigation', { name: '프로젝트 주 내비게이션' })
   await expect(nav.getByRole('link', { name: '자소' })).toHaveAttribute('aria-current', 'page')
   await expect(nav.getByRole('link')).toHaveText(['자소', '검수'])
@@ -267,7 +267,7 @@ test('뼈대 탭은 없고 옛 뼈대 주소는 자소 탭으로 넘어간다', 
 test('하단 내비는 없고 검수는 머리 메뉴로 가며, 메뉴의 OTF 추출은 폰트 이름을 물은 뒤 그 이름의 OTF를 받는다', async ({ page }) => {
   test.setTimeout(180_000)
   await page.goto('/workspace/jamo')
-  const more = page.getByRole('button', { name: '프로젝트 더보기' })
+  const more = page.getByRole('button', { name: '주 메뉴' })
   const nav = page.getByRole('navigation', { name: '프로젝트 주 내비게이션' })
   // 닫힌 메뉴 안에만 있으므로 화면 아래를 차지하지 않는다.
   await expect(nav).toBeHidden()
@@ -331,7 +331,7 @@ test('J-01에서 J-02와 J-03으로 이동하고 잘못된 workspace 경로를 �
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0)
   await page.getByRole('link', { name: '자소 원형 새 화면 검토' }).click()
   await expect(page.getByText('J-02 · 자소 원형')).toBeVisible()
-  await page.getByRole('button', { name: '프로젝트 더보기' }).click()
+  await page.getByRole('button', { name: '주 메뉴' }).click()
   await page.getByRole('navigation', { name: '프로젝트 주 내비게이션' }).getByRole('link', { name: '자소' }).click()
   await expect(page).toHaveURL(/\/workspace\/jamo$/)
   // 자소 탭은 레이아웃이 기본이다.
@@ -403,7 +403,7 @@ test('J-03의 모든 관찰 동작은 저장과 variant를 만들지 않는다',
 test('추천 구조에서 문맥 Rail을 pointerup 한 번으로 저장하고 cancel·Undo·Redo·reload를 지킨다', async ({ page }) => {
   await page.goto('/workspace/jamo/result?char=ㄱ')
   await page.getByRole('button', { name: '추천 기본 구조로 시작' }).click()
-  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await expect(page.locator('[data-save-state="saved"]')).toBeVisible()
   const initializedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
   expect(initializedRaw).not.toBeNull()
 
@@ -448,7 +448,7 @@ test('추천 구조에서 문맥 Rail을 pointerup 한 번으로 저장하고 ca
   await page.mouse.down()
   await page.mouse.move(resetCanvasRailBox.x + resetCanvasRailBox.width * 2.2, resetCanvasRailBox.y + resetCanvasRailBox.height / 2, { steps: 4 })
   await page.mouse.up()
-  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await expect(page.locator('[data-save-state="saved"]')).toBeVisible()
   await page.waitForTimeout(350)
   const committedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
   expect(committedRaw).not.toBe(initializedRaw)
@@ -460,12 +460,12 @@ test('추천 구조에서 문맥 Rail을 pointerup 한 번으로 저장하고 ca
   await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
 
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
-  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await expect(page.locator('[data-save-state="saved"]')).toBeVisible()
   expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
   await expect(page.getByRole('button', { name: '형태 편집 다시 실행' })).toBeEnabled()
 
   await page.getByRole('button', { name: '형태 편집 다시 실행' }).click()
-  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await expect(page.locator('[data-save-state="saved"]')).toBeVisible()
   expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(committedRaw)
 
   const committedValue = String(committedOverride.value)
@@ -478,7 +478,7 @@ test('추천 구조에서 문맥 Rail을 pointerup 한 번으로 저장하고 ca
 test('네 방향 기준선을 선택하고 세로 Rail도 캔버스에서 한 transaction으로 보정한다', async ({ page }) => {
   await page.goto('/workspace/jamo/result?char=ㄱ')
   await page.getByRole('button', { name: '추천 기본 구조로 시작' }).click()
-  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await expect(page.locator('[data-save-state="saved"]')).toBeVisible()
   const initializedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
   await page.getByRole('button', { name: '이 조합만 보정' }).click()
 
@@ -501,7 +501,7 @@ test('네 방향 기준선을 선택하고 세로 Rail도 캔버스에서 한 tr
   expect(await finalPath.getAttribute('d')).not.toBe(pathBefore)
   expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
   await page.mouse.up()
-  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await expect(page.locator('[data-save-state="saved"]')).toBeVisible()
 
   const committedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
   expect(committedRaw).not.toBe(initializedRaw)
@@ -522,7 +522,7 @@ test('네 방향 기준선을 선택하고 세로 Rail도 캔버스에서 한 tr
 test('캔버스의 선택되지 않은 가로·세로 Rail도 한 번의 제스처로 선택·미리보기·저장한다', async ({ page }) => {
   await page.goto('/workspace/jamo/result?char=ㄱ')
   await page.getByRole('button', { name: '추천 기본 구조로 시작' }).click()
-  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await expect(page.locator('[data-save-state="saved"]')).toBeVisible()
   const initializedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
   await page.getByRole('button', { name: '이 조합만 보정' }).click()
 
@@ -550,7 +550,7 @@ test('캔버스의 선택되지 않은 가로·세로 Rail도 한 번의 제스�
   expect(await finalPath.getAttribute('d')).not.toBe(horizontalPathBefore)
   expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
   await page.mouse.up()
-  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await expect(page.locator('[data-save-state="saved"]')).toBeVisible()
   const horizontalCommittedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
   expect(horizontalCommittedRaw).not.toBe(initializedRaw)
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
@@ -575,7 +575,7 @@ test('캔버스의 선택되지 않은 가로·세로 Rail도 한 번의 제스�
   expect(await finalPath.getAttribute('d')).not.toBe(verticalPathBefore)
   expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(initializedRaw)
   await page.mouse.up()
-  await expect(page.getByText('이 기기에 저장했습니다.')).toBeVisible()
+  await expect(page.locator('[data-save-state="saved"]')).toBeVisible()
   const verticalCommittedRaw = await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)
   expect(verticalCommittedRaw).not.toBe(initializedRaw)
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
@@ -681,4 +681,12 @@ test('연결된 strict 7-role source에서도 관찰은 Shape 저장을 다시 �
   expect(await page.evaluate((key) => localStorage.getItem(key), SHAPE_KEY)).toBe(before)
   expect(await page.evaluate(() => (window as unknown as { __shapeWrites: number }).__shapeWrites)).toBe(0)
   await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeDisabled()
+})
+
+test('저장이 잘 되면 토스트로 방해하지 않고 화면도 흐려지지 않는다', async ({ page }) => {
+  await page.goto('/workspace/jamo/result?char=ㄱ')
+  await page.getByRole('button', { name: '추천 기본 구조로 시작' }).click()
+  await expect(page.locator('[data-save-state="saved"]')).toBeVisible()
+  await expect(page.getByTestId('save-toast')).toHaveCount(0)
+  await expect(page.locator('[data-saving]')).toHaveCount(0)
 })

@@ -1,0 +1,36 @@
+/* 화면 아래 가운데. 접힌 정밀 조절 드로어(손잡이 54px) 바로 위에 앉아 손잡이를 가리지 않는다. */
+.toast {
+  position: fixed;
+  z-index: 70;
+  bottom: calc(68px + env(safe-area-inset-bottom));
+  left: 50%;
+  max-width: min(92vw, 360px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 14px;
+  transform: translateX(-50%);
+  border-radius: 13px;
+  background: rgb(24 28 35 / .92);
+  box-shadow: 0 10px 28px rgb(20 24 31 / .24);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  animation: save-toast-in .16s ease-out;
+}
+.toast[data-tone='error'] { background: #b24d3d; }
+.toast span { min-width: 0; }
+/* 레포의 44px 터치 규격을 토스트 닫기에도 지킨다. */
+.toast button {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: rgb(255 255 255 / .16);
+  color: inherit;
+}
+@keyframes save-toast-in { from { opacity: 0; transform: translate(-50%, 6px); } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }

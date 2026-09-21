@@ -44,6 +44,9 @@ import {
   type ComparisonItem,
   type DrawerState,
 } from './workspace/WorkspaceChrome'
+import { SaveToast } from './workspace/SaveToast'
+import { saveToastView } from './workspace/saveToastView'
+import { useDelayedSaving } from './workspace/useDelayedSaving'
 import styles from './ShapeWorkspacePage.module.css'
 import { CalibrationSentenceEditor } from './CalibrationSentenceEditor'
 
@@ -587,6 +590,9 @@ function MasterScreen() {
   const [areaDraft, setAreaDraft] = useState<BaseAreaDraft | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [feedback, setFeedback] = useState<string | null>(null)
+  // 저장이 300ms를 넘겨야 흐림과 토스트를 함께 켠다. 빠른 저장에서 깜빡이지 않도록.
+  const savingLate = useDelayedSaving(saveState === 'saving')
+  const toast = saveToastView(saveState, feedback, savingLate)
   const railCanvasRef = useRef<HTMLDivElement | null>(null)
   const areaLayerRef = useRef<HTMLDivElement | null>(null)
   const railGestureRef = useRef<BaseRailGesture | null>(null)
@@ -830,13 +836,6 @@ function MasterScreen() {
     commitCurrentAreaGesture()
   }
 
-  const saveLabel = saveState === 'saving'
-    ? '저장 중…'
-    : saveState === 'saved'
-      ? currentProjectId ? '프로젝트 저장됨' : '기기에 저장됨'
-      : saveState === 'error'
-        ? '저장 확인 필요'
-        : committedModel.kind === 'ready' ? '원형 편집' : '원형 관찰'
   const editReason = hydrationStatus === 'blocked'
     ? '저장 데이터를 확인한 뒤 편집할 수 있어요.'
     : !source
@@ -859,7 +858,6 @@ function MasterScreen() {
     <MobileWorkspaceShell
       activeArea="jamo"
       projectName={projectName}
-      statusLabel={saveLabel}
       history={{ canUndo, canRedo, onUndo: () => handleHistory('undo'), onRedo: () => handleHistory('redo') }}
       drawer={!areaToolActive ? (
         <PrecisionControlDrawer
@@ -936,10 +934,9 @@ function MasterScreen() {
           { label: '영향', value: activeTool === 'area' ? '초성 조합 6개' : '단독·초성 조합 7개' },
         ]} />
         <ShapeStatus />
-        {feedback && <p className={styles.saveFeedback} data-state={saveState} role={saveState === 'error' ? 'alert' : 'status'}>{feedback}</p>}
       </section>
 
-      <div className={styles.workspaceScroll}>
+      <div className={styles.workspaceScroll} data-saving={savingLate || undefined} aria-busy={savingLate || undefined} data-save-state={saveState}>
         <section className={styles.canvasSection} aria-label="초성 ㄱ 원형 편집 캔버스">
           <div className={styles.layerToggles} aria-label="캔버스 레이어">
             <button type="button" aria-pressed="true">결과 윤곽</button>
@@ -1042,6 +1039,13 @@ function MasterScreen() {
           <button type="button" disabled><CircleDot size={18} />레일</button>
         </section>
       </div>
+      {toast && (
+        <SaveToast
+          tone={toast.tone}
+          message={toast.message}
+          onDismiss={toast.dismissable ? () => { setSaveState('idle'); setFeedback(null) } : undefined}
+        />
+      )}
     </MobileWorkspaceShell>
   )
 }
@@ -1125,6 +1129,9 @@ function ContextScreen() {
   const [draftValue, setDraftValue] = useState<number | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [feedback, setFeedback] = useState<string | null>(null)
+  // 저장이 300ms를 넘겨야 흐림과 토스트를 함께 켠다. 빠른 저장에서 깜빡이지 않도록.
+  const savingLate = useDelayedSaving(saveState === 'saving')
+  const toast = saveToastView(saveState, feedback, savingLate)
   const railGestureRef = useRef<RailGesture | null>(null)
   const draftValueRef = useRef<number | null>(null)
   const railCanvasRef = useRef<HTMLDivElement | null>(null)
@@ -1270,13 +1277,6 @@ function ContextScreen() {
     setFeedback(null)
   }
 
-  const saveLabel = saveState === 'saving'
-    ? '저장 중…'
-    : saveState === 'saved'
-      ? currentProjectId ? '프로젝트 저장됨' : '기기에 저장됨'
-      : saveState === 'error'
-        ? '저장 확인 필요'
-        : isEditing ? '현재 조합 보정 중' : '조합 비교'
 
   const editReason = hydrationStatus === 'blocked'
     ? '저장 데이터를 확인한 뒤 편집할 수 있어요.'
@@ -1331,7 +1331,6 @@ function ContextScreen() {
     <MobileWorkspaceShell
       activeArea="jamo"
       projectName={projectName}
-      statusLabel={saveLabel}
       history={{
         canUndo,
         canRedo,
@@ -1432,10 +1431,9 @@ function ContextScreen() {
           { label: '영향', value: isEditing ? '현재 자소·현재 조합' : '저장 변경 없음' },
         ]} actionLabel={isEditing ? '범위 고정' : '범위 잠김'} />
         <ShapeStatus editable />
-        {feedback && <p className={styles.saveFeedback} data-state={saveState} role={saveState === 'error' ? 'alert' : 'status'}>{feedback}</p>}
       </section>
 
-      <div className={styles.workspaceScroll} ref={workspaceScrollRef}>
+      <div className={styles.workspaceScroll} ref={workspaceScrollRef} data-saving={savingLate || undefined} aria-busy={savingLate || undefined} data-save-state={saveState}>
         <section className={styles.resultPreview} aria-label={`${active.char} ${active.label} 결과 미리보기`} aria-live="polite">
           <div><span>{visibleModel.kind === 'ready' ? 'Shape 초성 파트 실시간 결과' : '기존 렌더링 미리보기'}</span><strong>{active.char} · {active.label}</strong></div>
           {visibleModel.kind === 'ready' ? (
@@ -1535,6 +1533,13 @@ function ContextScreen() {
         </div>
         <p id="context-edit-disabled" className={styles.disabledReason}>{editReason}</p>
       </div>
+      {toast && (
+        <SaveToast
+          tone={toast.tone}
+          message={toast.message}
+          onDismiss={toast.dismissable ? () => { setSaveState('idle'); setFeedback(null) } : undefined}
+        />
+      )}
     </MobileWorkspaceShell>
   )
 }
