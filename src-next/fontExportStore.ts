@@ -28,16 +28,7 @@ export function placementResolverOf(bundle: NotoPresetModelBundle, deltas: Layou
   }
 }
 
-/**
- * `?otf=schema`면 옛 split/padding 상자로 추출한다. 동결한 옛 OTF 기준(레거시 스냅샷 e2e)을 같은 길로 다시 뽑기 위한 문이고,
- * 제품 화면에는 이 값을 거는 곳이 없다.
- */
-export function exportUsesSchemaBoxes(search: string): boolean {
-  return new URLSearchParams(search).get('otf') === 'schema'
-}
-
-export async function exportPlacementResolver(search = window.location.search): Promise<GlyphPlacementResolver | undefined> {
-  if (exportUsesSchemaBoxes(search)) return undefined
+export async function exportPlacementResolver(): Promise<GlyphPlacementResolver> {
   return placementResolverOf(await loadNotoModel(), layoutDeltaSnapshot())
 }
 
@@ -78,7 +69,7 @@ export const useFontExportStore = create<FontExportState & FontExportActions>()(
     try { localStorage.setItem(FONT_NAME_STORAGE_KEY, familyName) } catch { /* 저장 못 해도 추출은 된다 */ }
     set({ dialogOpen: false, familyName, status: 'exporting', progress: '준비 중...', error: '' })
     // 모델을 못 읽으면 멈춘다. 조용히 스키마로 떨어지면 받은 폰트가 화면과 달라진다.
-    let placementOf: GlyphPlacementResolver | undefined
+    let placementOf: GlyphPlacementResolver
     try {
       placementOf = await exportPlacementResolver()
     } catch (failure) {

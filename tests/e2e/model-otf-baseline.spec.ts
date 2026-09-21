@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 // @ts-expect-error opentype.js에 타입 정의 파일 없음
 import opentype from 'opentype.js'
 
-// 화면과 같은 상자(Noto 모델 상자 + 레이아웃 Δ)로 뽑은 OTF의 기준. 옛 스키마 기준(`legacy-otf-glyphs-v1.json`)은 동결해 옆에 둔다.
+// 화면과 같은 상자(Noto 모델 상자 + 레이아웃 Δ)로 뽑은 OTF의 기준. 옛 스키마 기준은 이 기준이 대체했다.
 // 기준을 새로 뜰 때만 `UPDATE_MODEL_OTF_BASELINE=1`로 돌린다.
 const FIXTURE = fileURLToPath(new URL('../fixtures/model-otf-glyphs-v1.json', import.meta.url))
 const UPDATE = process.env.UPDATE_MODEL_OTF_BASELINE === '1'

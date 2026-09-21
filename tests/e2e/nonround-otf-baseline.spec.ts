@@ -1,15 +1,15 @@
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { expect, test, type Browser, type Download } from '@playwright/test'
 // opentype.js는 이 저장소에서 별도 타입 선언 없이 사용한다.
 // @ts-expect-error opentype.js에 타입 정의 파일 없음
 import opentype from 'opentype.js'
 
-const baseline = JSON.parse(readFileSync(
-  fileURLToPath(new URL('../fixtures/nonround-otf-glyphs-v1.json', import.meta.url)),
-  'utf8',
-))
+// 붓촉 3종(납작·네모·절단)을 실제 OTF로 고정한다. 상자는 화면과 같은 칸 해석에서 온다.
+// 기준을 새로 뜰 때만 `UPDATE_NONROUND_OTF_BASELINE=1`로 돌린다.
+const FIXTURE = fileURLToPath(new URL('../fixtures/nonround-otf-glyphs-v1.json', import.meta.url))
+const UPDATE = process.env.UPDATE_NONROUND_OTF_BASELINE === '1'
 
 const STYLES = {
   ellipse: {
@@ -98,7 +98,7 @@ async function collectStyleBaseline(browser: Browser, style: typeof STYLES[keyof
         version: 0,
       }))
     }, style)
-    await page.goto('/calibration?otf=schema')
+    await page.goto('/calibration')
     const downloadPromise = page.waitForEvent('download')
     await page.getByRole('button', { name: '현재 작업을 OTF로 추출' }).click()
     await page.getByTestId('font-export-confirm').click()
@@ -135,9 +135,10 @@ async function collectStyleBaseline(browser: Browser, style: typeof STYLES[keyof
 }
 
 test('납작형·네모형·절단형 실제 OTF의 곽 윤곽을 exact 기준으로 유지한다', async ({ browser }) => {
-  test.setTimeout(360_000)
-  const actual = Object.fromEntries(await Promise.all(
-    Object.entries(STYLES).map(async ([name, style]) => [name, await collectStyleBaseline(browser, style)]),
-  ))
-  expect(actual).toEqual(baseline)
+  test.setTimeout(900_000)
+  const actual: Record<string, Awaited<ReturnType<typeof collectStyleBaseline>>> = {}
+  // 모델 상자 추출은 글자마다 획을 칸에 맞추느라 한 번에 20초쯤 쓴다. 셋을 동시에 돌리면 CPU를 서로 뺏어 더 느리다.
+  for (const [name, style] of Object.entries(STYLES)) actual[name] = await collectStyleBaseline(browser, style)
+  if (UPDATE || !existsSync(FIXTURE)) writeFileSync(FIXTURE, `${JSON.stringify(actual, null, 2)}\n`)
+  expect(actual).toEqual(JSON.parse(readFileSync(FIXTURE, 'utf8')))
 })
