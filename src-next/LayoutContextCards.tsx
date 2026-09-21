@@ -75,19 +75,17 @@ export function LayoutContextCards({ activeContextId, allActive, ink }: {
   ink?: LayoutContextInk
 }) {
   const { bundle } = useNotoModel()
-  const all = useLayoutDeltaStore((state) => state.all)
-  const layers = useLayoutDeltaStore((state) => state.layers)
-  const jamo = useLayoutDeltaStore((state) => state.jamo)
+  const rules = useLayoutDeltaStore((state) => state.rules)
   // 칸마다 대표 글자. 저장된 Δ를 얹어야 적용한 수정이 표지에도 보인다.
   const sampleParts = useMemo(() => Object.fromEntries(LAYOUT_CONTEXT_IDS.map((contextId) => {
     const identity = corpusIdentity(layoutSampleCharOf(contextId).codePointAt(0)!)
-    const delta = effectiveLayoutDelta({ all, layers, jamo }, identity)
+    const delta = effectiveLayoutDelta({ rules }, identity)
     const boxes = bundle ? resolveContextBoxes({ identity, model: bundle, delta }).boxes : {}
     return [contextId, PART_ORDER.flatMap((part): LayoutContextBox[] => {
       const box = boxes[part]
       return box ? [{ part, box }] : []
     })] as const
-  })), [bundle, all, layers, jamo])
+  })), [bundle, rules])
   // `기본` 칸: 닿자는 대지 가운데 정사각에, 홀자는 제 계열(받침 없는 칸) 상자에 놓는다. 칸 전체를 그 자소의 부품 색으로 다른 칸처럼 옅게 칠하고 획은 칸 한가운데로 옮긴다.
   const baseStrokes = !ink ? [] : ink.part === 'JU'
     ? inkStrokesOf(ink, medialFamilyOf(ink.jamo.char) ?? 'right', sampleParts[medialFamilyOf(ink.jamo.char) ?? 'right'])

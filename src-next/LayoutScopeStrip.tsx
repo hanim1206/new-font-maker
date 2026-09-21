@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { jamoKeyOf, useLayoutDeltaStore } from './layoutDeltaStore'
-import type { LayoutDeltaTarget } from './layoutDeltaStore'
-import { deltaSummary, overrideCardsOf, partOfGroup, scopeChipsOf } from './layoutOverrides'
+import { useLayoutDeltaStore } from './layoutDeltaStore'
+import { deltaSummary, overrideCardsOf, partOfGroup, ruleOfJamoChip, scopeChipsOf } from './layoutOverrides'
 import type { OverrideGroup, ScopeChip } from './layoutOverrides'
+import { ruleGlyphCount, ruleKey, ruleOfContext } from './scopeRule'
+import type { ScopeRule } from './scopeRule'
 import type { CorpusIdentity } from './notoCorpus'
 import { PART_COLOR } from './partColors'
-import { overrideGlyphCount, PART_GROUP_LABEL } from './reviewPropagation'
+import { PART_GROUP_LABEL } from './reviewPropagation'
 import styles from './LayoutScopeStrip.module.css'
 
 /**
@@ -21,15 +22,19 @@ const NEUTRAL = '#8a8f98'
 const EDGE = 14
 const FIXED_LABEL = { layer: '이 레이아웃', picker: '이 자모만', all: '전체' } as const
 
-const isSelected = (chip: ScopeChip, selected: LayoutDeltaTarget) =>
-  chip.kind === 'picker' ? selected.scope === 'jamo'
-    : chip.kind === 'jamo' ? selected.scope === 'jamo' && selected.jamos.includes(jamoKeyOf(partOfGroup[chip.group], chip.jamo))
-      : selected.scope === chip.kind
+/** 칩이 켜졌나. 자모 칩은 고른 범위에 그 자모가 들었나로 본다(여러 자모를 고르면 여럿이 켜진다). */
+const isSelected = (chip: ScopeChip, selected: ScopeRule, contextId: string, pickerOn: boolean) =>
+  chip.kind === 'picker' ? pickerOn
+    : chip.kind === 'jamo' ? (selected[RULE_PART[chip.group]] ?? []).includes(chip.jamo)
+      : ruleKey(selected) === ruleKey(chip.kind === 'all' ? {} : ruleOfContext(contextId))
+const RULE_PART = { CH: 'initial', JU: 'medial', JO: 'final' } as const
 
-export function LayoutScopeStrip({ source, selected, picked, fixedDisabled, jamoDisabled, onScope, onPickJamo, onOpenPicker, onRemove }: {
+export function LayoutScopeStrip({ source, selected, pickerOn, picked, fixedDisabled, jamoDisabled, onScope, onPickJamo, onOpenPicker, onRemove }: {
   source: CorpusIdentity
   /** 지금 적용 범위. 맞는 칩을 켠다. */
-  selected: LayoutDeltaTarget
+  selected: ScopeRule
+  /** `이 자모만`을 고른 상태인가. 자모 조건이 없는 규칙과 구별해야 해서 따로 받는다. */
+  pickerOn: boolean
   /** `이 자모만`에서 고른 자모. 저장 전이어도 칩으로 보인다. 다른 범위일 때는 null. */
   picked: { group: OverrideGroup; jamos: string[] } | null
   /** 앞의 두 칩을 끈다(잡은 rail 없음 · 형태 모드). */
@@ -40,15 +45,13 @@ export function LayoutScopeStrip({ source, selected, picked, fixedDisabled, jamo
   /** 자모 칩을 누르면 그 자모 하나만 고른다. 여러 개는 시트에서. */
   onPickJamo: (group: OverrideGroup, jamo: string) => void
   onOpenPicker: () => void
-  onRemove: (target: LayoutDeltaTarget) => void
+  onRemove: (rule: ScopeRule) => void
 }) {
-  const all = useLayoutDeltaStore((state) => state.all)
-  const layers = useLayoutDeltaStore((state) => state.layers)
-  const jamo = useLayoutDeltaStore((state) => state.jamo)
-  const chips = useMemo(() => scopeChipsOf(overrideCardsOf({ all, layers, jamo }, source.contextId), picked), [all, layers, jamo, source.contextId, picked])
+  const rules = useLayoutDeltaStore((state) => state.rules)
+  const chips = useMemo(() => scopeChipsOf(overrideCardsOf({ rules }, source.contextId), picked), [rules, source.contextId, picked])
   // 고른 칩이 띠 밖에 있으면 가로로만 끌어온다. 세로 스크롤은 건드리지 않는다.
   const listRef = useRef<HTMLUListElement>(null)
-  const selectedKey = selected.scope === 'jamo' ? selected.jamos.join(',') : selected.scope
+  const selectedKey = ruleKey(selected)
   useEffect(() => {
     const list = listRef.current
     const chip = list?.querySelector<HTMLElement>('[data-selected="true"]:not([data-kind="picker"])')
@@ -60,16 +63,16 @@ export function LayoutScopeStrip({ source, selected, picked, fixedDisabled, jamo
   }, [selectedKey, chips.length])
   return <ul ref={listRef} className={styles.strip} role="group" aria-label="배치 적용 범위" data-testid="layout-scope-strip">
     {chips.map((chip) => {
-      const on = isSelected(chip, selected)
+      const on = isSelected(chip, selected, source.contextId, pickerOn)
       const key = chip.kind === 'jamo' ? `${chip.group}:${chip.jamo}` : chip.kind
       const name = chip.kind === 'jamo' ? `${chip.jamo} · ${PART_GROUP_LABEL[chip.group]}` : FIXED_LABEL[chip.kind]
       const delta = chip.kind === 'picker' ? null : chip.delta
-      const target: LayoutDeltaTarget | null = chip.kind === 'picker' ? null
-        : chip.kind === 'jamo' ? { scope: 'jamo', contextId: source.contextId, jamos: [jamoKeyOf(partOfGroup[chip.group], chip.jamo)] }
-          : chip.kind === 'all' ? { scope: 'all' }
-            : { scope: 'layer', contextId: source.contextId }
+      const rule: ScopeRule | null = chip.kind === 'picker' ? null
+        : chip.kind === 'jamo' ? ruleOfJamoChip(source.contextId, chip.group, chip.jamo)
+          : chip.kind === 'all' ? {}
+            : ruleOfContext(source.contextId)
       const lines = delta ? deltaSummary(delta, chip.kind !== 'jamo') : []
-      const count = !delta || chip.kind === 'picker' ? null : overrideGlyphCount(chip.kind === 'jamo' ? { scope: 'jamo', contextId: source.contextId, group: chip.group, jamo: chip.jamo } : chip.kind === 'all' ? { scope: 'all' } : { scope: 'layer', contextId: source.contextId })
+      const count = !delta || !rule ? null : ruleGlyphCount(rule)
       const color = chip.kind === 'jamo' ? PART_COLOR[partOfGroup[chip.group]] : NEUTRAL
       // `전체`는 읽기 전용이라 몸통이 잠겨 있다. 지우기 ×만 산다.
       const locked = chip.kind === 'all'
@@ -82,7 +85,7 @@ export function LayoutScopeStrip({ source, selected, picked, fixedDisabled, jamo
           </span>
           {lines.length > 0 && <small>{lines[0]}{lines.length > 1 ? ` 외 ${lines.length - 1}` : ''}</small>}
         </button>
-        {delta && target && <button type="button" className={styles.remove} aria-label={`${name} 오버라이드 지우기`} onClick={() => onRemove(target)} data-testid="layout-override-remove">×</button>}
+        {delta && rule && <button type="button" className={styles.remove} aria-label={`${name} 오버라이드 지우기`} onClick={() => onRemove(rule)} data-testid="layout-override-remove">×</button>}
       </li>
     })}
   </ul>

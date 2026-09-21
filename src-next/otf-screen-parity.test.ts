@@ -82,12 +82,12 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
   afterAll(() => { vi.unstubAllGlobals() })
 
   async function setup() {
-    const [exportUtils, generator, xor, fit, hangul, jamo, layout, style, deltaStore, exportStore, notoModel, resolver, inkResolver] = await Promise.all([
+    const [exportUtils, generator, xor, fit, hangul, jamo, layout, style, deltaStore, exportStore, notoModel, resolver, inkResolver, rule] = await Promise.all([
       import('../src/services/fontExportUtils'), import('../src/services/fontGenerator'), import('../src/services/notoGlyphXor'),
       import('../src/services/notoFitReport'), import('../src/utils/hangulUtils'), import('../src/stores/jamoStore'),
       import('../src/stores/layoutStore'), import('../src/stores/globalStyleStore'), import('./layoutDeltaStore'),
       import('./fontExportStore'), import('./notoModel'), import('../src/services/contextBoxResolver'),
-      import('../src/services/glyphInkResolver'),
+      import('../src/services/glyphInkResolver'), import('./scopeRule'),
     ])
     /** 한 글자의 (OTF 잉크, 화면 잉크, 스키마 OTF 잉크). */
     const measure = (char: string) => {
@@ -126,7 +126,7 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
       const floorXor = fit.multiPolygonArea(polygonClipping.xor(schemaMine, toInk(legacy))) / fit.multiPolygonArea(schemaMine)
       return { data, globalStyle, floorXor, screenBoxes, otfBoxes, edgeDrift: edgeDriftUnits(toInk(data)), screenKind: screenPlacement.kind, otf: toInk(data), modelXor: ratio(toInk(data)), schemaXor: ratio(toInk(legacy)) }
     }
-    return { measure, deltaStore, resolver, hangul, jamo }
+    return { measure, deltaStore, resolver, hangul, jamo, rule }
   }
 
   it('G0 — 별을노래하는: 모델 상자 OTF는 화면과 상자가 같고 가장자리 어긋남이 1유닛 아래, 옛 스키마 OTF는 크게 다르다', async () => {
@@ -166,7 +166,7 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
   })
 
   it('G1 — 레이아웃 대표 12자와 Δ 세 층(전체 · 이 레이아웃 · 이 자모)이 OTF에 그대로 들어간다', async () => {
-    const { measure, deltaStore, resolver, hangul, jamo } = await setup()
+    const { measure, deltaStore, resolver, hangul, jamo, rule } = await setup()
     const before = Object.fromEntries(HOLDOUT.map((char) => [char, measure(char)]))
     for (const char of HOLDOUT) {
       expect(before[char].otfBoxes, char).toEqual(before[char].screenBoxes)
@@ -179,9 +179,10 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
     const snapshot = deltaStore.layoutDeltaSnapshot()
     try {
       const store = deltaStore.useLayoutDeltaStore.getState()
-      store.apply({ scope: 'all' }, { faces: { CH: { left: 0.01 } } })
-      store.apply({ scope: 'layer', contextId: identity.contextId }, { faces: { JO: { bottom: -0.02 } } })
-      store.apply({ scope: 'jamo', contextId: identity.contextId, jamos: [deltaStore.jamoKeyOf('CH', 'ㄱ')] }, { faces: { CH: { top: 0.015 } } })
+      const context = rule.ruleOfContext(identity.contextId)
+      store.apply({}, { faces: { CH: { left: 0.01 } } })
+      store.apply(context, { faces: { JO: { bottom: -0.02 } } })
+      store.apply(rule.withJamos(context, 'initial', ['ㄱ']), { faces: { CH: { top: 0.015 } } })
       const after = measure('각')
       const moved = (part: string) => {
         const a = before['각'].data.strokes.find((item) => item.stroke.id.startsWith(part))!.box

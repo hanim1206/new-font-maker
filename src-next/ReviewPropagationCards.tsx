@@ -10,12 +10,14 @@ import type { EditableRail } from './notoMedialFitView'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 import { useNotoGlyph } from './useNotoGlyph'
 import { useFitInkStyle } from './useFitInkStyle'
-import { jamoKeyOf, jamoPartOf, layoutDeltaSnapshot, useLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
+import { jamoPartOf, layoutDeltaSnapshot, useLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import { LayoutScopeStrip } from './LayoutScopeStrip'
 import type { OverrideGroup } from './layoutOverrides'
-import type { LayoutDeltaSnapshot, LayoutDeltaTarget, PropagationScope } from './layoutDeltaStore'
+import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
+import { ruleOfContext, withJamos } from './scopeRule'
+import type { RuleJamoPart, ScopeRule } from './scopeRule'
 import { applyFacesDelta, applyMedialDelta, focusJamoOf, hasLayoutEdit, jamoChoicesFor, layoutDeltaOf, PART_GROUP_LABEL, PROPAGATION_SCOPES, propagationCandidates } from './reviewPropagation'
-import type { PropagationEdit } from './reviewPropagation'
+import type { PropagationEdit, PropagationScope } from './reviewPropagation'
 import styles from './ReviewPropagationCards.module.css'
 
 /**
@@ -28,6 +30,7 @@ import styles from './ReviewPropagationCards.module.css'
 
 const VIEW_BOX = '-0.08 -0.08 1.16 1.16'
 const CARD_COUNT = 8
+const RULE_PART: Record<OverrideGroup, RuleJamoPart> = { CH: 'initial', JU: 'medial', JO: 'final' }
 
 interface CardBox { kind: 'medial' | 'component'; box: BoxConfig }
 const BOX_COLOR: Record<CardBox['kind'], string> = { medial: '#3b6fd6', component: '#2f9a6a' }
@@ -161,7 +164,18 @@ export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, f
   const [picked, setPicked] = useState<{ group: OverrideGroup; jamos: string[] } | null>(null)
   const jamos = useMemo(() => picked?.group === group && picked.jamos.length > 0 ? picked.jamos : focusJamo ? [focusJamo] : [], [focusJamo, picked, group])
   const togglePicked = (jamo: string) => setPicked(jamos.includes(jamo) ? (jamos.length > 1 ? { group, jamos: jamos.filter((item) => item !== jamo) } : { group, jamos }) : { group, jamos: [...jamos, jamo] })
-  const target = useMemo<LayoutDeltaTarget>(() => scope === 'all' ? { scope } : scope === 'layer' ? { scope, contextId: source.contextId } : { scope, contextId: source.contextId, jamos: jamos.map((jamo) => jamoKeyOf(group, jamo)) }, [scope, source.contextId, jamos, group])
+  // 고른 범위 = 규칙식. `이 레이아웃`은 문맥만, `이 자모만`은 거기에 잡은 부품의 자모 목록을 얹은 것.
+  const target = useMemo<ScopeRule>(() => {
+    if (scope === 'all') return {}
+    const base = ruleOfContext(source.contextId)
+    return scope === 'layer' ? base : withJamos(base, RULE_PART[group], jamos)
+  }, [scope, source.contextId, jamos, group])
+  // 저장은 자모마다 규칙 하나씩이다. 칩 ×가 고른 자모 중 하나만 지울 수 있어야 해서 — 목록 하나로 합치는 건 옵션 박스(B)에서 정한다.
+  const saveTargets = useMemo<ScopeRule[]>(() => {
+    if (scope !== 'jamo') return [target]
+    const base = ruleOfContext(source.contextId)
+    return jamos.map((jamo) => withJamos(base, RULE_PART[group], [jamo]))
+  }, [scope, target, source.contextId, jamos, group])
   const commit = (change: () => void) => { const before = layoutDeltaSnapshot(); change(); onCommitted?.(before, layoutDeltaSnapshot()); onApplied?.() }
   // 자모 칩을 누르면 그 부품이 켜지고 고른 자모는 그 하나가 돼 표본이 그 글자로 바뀐다. 여러 자모는 시트에서 고른다.
   const pickJamo = (jamoGroup: OverrideGroup, jamo: string) => { onSelectPart?.(jamoGroup); setPicked({ group: jamoGroup, jamos: [jamo] }); setScope('jamo') }
@@ -194,10 +208,10 @@ export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, f
   useEffect(() => { onScopeLabel?.(scopeLabel) }, [onScopeLabel, scopeLabel])
   useEffect(() => { onScope?.(scope) }, [onScope, scope])
   // 적용 = 지금 범위에 Δ 저장. 하단 바가 ref로 부른다. 닫힘값은 렌더마다 새로 잡는다(ref 갱신은 값싸다).
-  useImperativeHandle(ref, () => ({ apply: () => commit(() => applyDelta(target, layoutDeltaOf(edit))) }))
+  useImperativeHandle(ref, () => ({ apply: () => commit(() => { for (const rule of saveTargets) applyDelta(rule, layoutDeltaOf(edit)) }) }))
   return <section className={styles.section} aria-label="다른 글자에 적용하면" data-testid="review-propagation">
     {/* 범위 띠 = 적용 범위 고르기 + 쌓인 오버라이드. 저장된 Δ는 이미 캔버스 original에 들어 있고, 지우기는 칩 ×로(Undo 됨). */}
-    <LayoutScopeStrip source={source} selected={target} picked={scope === 'jamo' ? { group, jamos } : null} fixedDisabled={!focus} jamoDisabled={false}
+    <LayoutScopeStrip source={source} selected={target} pickerOn={scope === 'jamo'} picked={scope === 'jamo' ? { group, jamos } : null} fixedDisabled={!focus} jamoDisabled={false}
       onScope={setScope} onPickJamo={pickJamo} onOpenPicker={() => { setScope('jamo'); setPickerOpen(true) }} onRemove={(removed) => commit(() => clearDelta(removed))} />
     {/* Δ 줄은 늘 자리를 차지한다. 옮길 때 카드가 아래로 밀리지 않게. */}
     <div className={styles.deltaRow}>

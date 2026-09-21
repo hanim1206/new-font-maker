@@ -12,6 +12,15 @@ const finalIndexOf = (name: string) => (name.codePointAt(0)! - 0xac00) % 28
 /** 세로 홀자 계열(ㅏㅐㅑㅒㅓㅔㅕㅖㅣ) + 받침 있음 = 멈과 같은 문맥. */
 const sameContextAs멈 = (name: string) => [0, 1, 2, 3, 4, 5, 6, 7, 20].includes(medialIndexOf(name)) && finalIndexOf(name) > 0
 
+/**
+ * 저장 자리는 범위 규칙식 키다(`src-next/scopeRule.ts`의 `ruleKey`와 같은 모양).
+ * 옛 세 층은 읽을 때 이 자리로 옮겨진다 — `layers['right-final']` → `f=right|j=1`.
+ */
+const layerKey = (contextId: string) =>
+  `f=${contextId.startsWith('mixed') ? 'mixed' : contextId.startsWith('bottom') ? 'bottom' : 'right'}|j=${contextId.endsWith('-final') ? '1' : '0'}`
+const jamoRuleKey = (contextId: string, part: 'CH' | 'JU' | 'JO', jamo: string) =>
+  `${layerKey(contextId)}|${part === 'CH' ? 'i' : part === 'JU' ? 'm' : 'n'}=${jamo}`
+
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
 })
@@ -217,8 +226,8 @@ test('배치 Δ를 적용하면 저장되어 새로 열어도 rail이 그 자리
   await expect(propagation.locator('[data-testid="layout-override-card"][data-kind="layer"]')).toBeVisible()
   await expect(page.getByTestId('review-propagation-apply')).toHaveCount(0)
   const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
-  expect(stored.layers['right-final'].medial.JU['outerPillar.center']).toBeCloseTo(0.01, 9)
-  expect(stored.all).toEqual({})
+  expect(stored.rules[layerKey('right-final')].medial.JU['outerPillar.center']).toBeCloseTo(0.01, 9)
+  expect(stored.rules['']).toBeUndefined()
   await expect.poll(async () => Number(await page.getByTestId('review-canvas').getByRole('button', { name: '바깥기둥 중심 선택' }).getAttribute('x1'))).toBeCloseTo(before + 0.01, 6)
 
   // 새로 열어도 저장된 Δ가 original에 들어 있다.
@@ -240,7 +249,7 @@ test('배치 Δ를 적용하면 저장되어 새로 열어도 rail이 그 자리
   await page.locator('[data-testid="layout-override-card"][data-kind="layer"]').getByTestId('layout-override-remove').click()
   await selectMedialBox(page)
   await expect.poll(async () => Number(await page.getByTestId('review-canvas').getByRole('button', { name: '바깥기둥 중심 선택' }).getAttribute('x1'))).toBeCloseTo(before, 6)
-  expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state.layers, KEY)).toEqual({})
+  expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state.rules, KEY)).toEqual({})
 })
 
 /** ㅓ의 보 중심은 slot 경계를 안 밀어 앱 글자에 안 닿는다. 그런 배치 rail은 보이기만 하고 손잡이가 없다. */
@@ -511,7 +520,7 @@ test('홀자 상자 변을 옮겨 적용하면 ㅣ 글자도 문장 줄에서 �
   await page.getByTestId('review-propagation-apply').click()
   await expect.poll(() => sentenceGlyph.innerHTML()).not.toBe(before)
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('noto-layout-delta-v1')!).state)
-  expect(stored.layers.right.faces.JU.left).toBeCloseTo(-0.02, 9)
+  expect(stored.rules[layerKey('right')].faces.JU.left).toBeCloseTo(-0.02, 9)
   // 적용 뒤에도 상자는 그 자리, 세션 Δ는 0.
   await expect.poll(async () => Number(await medialBox.getAttribute('x'))).toBeCloseTo(xBefore - 0.02, 6)
   await expect(resetButton(page)).toHaveCount(0)
@@ -578,10 +587,9 @@ test('이 자모만으로 좁혀 적용하면 같은 레이아웃의 그 자모 
   await page.getByTestId('review-propagation-apply').click()
   await expect(resetButton(page)).toHaveCount(0)
   const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
-  expect(stored.jamo.right['CH:ㄱ'].faces.CH.right).toBeCloseTo(0.02, 9)
-  expect(stored.jamo.right['CH:ㅋ'].faces.CH.right).toBeCloseTo(0.02, 9)
-  expect(stored.layers).toEqual({})
-  expect(stored.all).toEqual({})
+  expect(stored.rules[jamoRuleKey('right', 'CH', 'ㄱ')].faces.CH.right).toBeCloseTo(0.02, 9)
+  expect(stored.rules[jamoRuleKey('right', 'CH', 'ㅋ')].faces.CH.right).toBeCloseTo(0.02, 9)
+  expect(Object.keys(stored.rules).sort()).toEqual([jamoRuleKey('right', 'CH', 'ㄱ'), jamoRuleKey('right', 'CH', 'ㅋ')].sort())
   await expect.poll(() => 가.innerHTML()).not.toBe(가Before)
   expect(await 마.innerHTML()).toBe(마Before)
 
@@ -617,8 +625,8 @@ test('이 자모만으로 좁혀 적용하면 같은 레이아웃의 그 자모 
   await page.locator('[data-testid="layout-override-card"][data-jamo="ㄱ"]').getByTestId('layout-override-remove').click()
   await expect(page.getByTestId('layout-override-card')).toHaveCount(1)
   const cleared = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
-  expect(cleared.jamo.right['CH:ㄱ']).toBeUndefined()
-  expect(cleared.jamo.right['CH:ㅋ'].faces.CH.right).toBeCloseTo(0.02, 9)
+  expect(cleared.rules[jamoRuleKey('right', 'CH', 'ㄱ')]).toBeUndefined()
+  expect(cleared.rules[jamoRuleKey('right', 'CH', 'ㅋ')].faces.CH.right).toBeCloseTo(0.02, 9)
   await expect.poll(() => 가.innerHTML()).toBe(가Before)
 })
 
@@ -639,8 +647,8 @@ test('받침을 이 자모만으로 적용하면 받침이 그 자모인 글자�
   expect(names.every((name) => finalIndexOf(name) === 1)).toBe(true)
   await page.getByTestId('review-propagation-apply').click()
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('noto-layout-delta-v1')!).state)
-  expect(stored.jamo['right-final']['JO:ㄱ'].faces.JO.top).toBeCloseTo(-0.01, 9)
-  expect(Object.keys(stored.jamo['right-final'])).toEqual(['JO:ㄱ'])
+  expect(stored.rules[jamoRuleKey('right-final', 'JO', 'ㄱ')].faces.JO.top).toBeCloseTo(-0.01, 9)
+  expect(Object.keys(stored.rules)).toEqual([jamoRuleKey('right-final', 'JO', 'ㄱ')])
 })
 
 /** 자모 층이 생기기 전 저장분(`jamo` 없음)도 그대로 읽고, 위에 자모 층을 더할 수 있다. */
@@ -659,8 +667,8 @@ test('옛 저장 형식(jamo 없음)을 읽어 이 레이아웃 Δ가 살아 있
   await page.getByTestId('review-propagation-jamos-done').click()
   await page.getByTestId('review-propagation-apply').click()
   const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
-  expect(stored.layers.right.faces.CH.right).toBeCloseTo(0.02, 9)
-  expect(stored.jamo.right['CH:ㄱ'].faces.CH.top).toBeCloseTo(-0.01, 9)
+  expect(stored.rules[layerKey('right')].faces.CH.right).toBeCloseTo(0.02, 9)
+  expect(stored.rules[jamoRuleKey('right', 'CH', 'ㄱ')].faces.CH.top).toBeCloseTo(-0.01, 9)
 })
 
 /**
@@ -719,9 +727,9 @@ test('같은 레이아웃에 쌓인 오버라이드가 범위 띠에 보이고, 
   await expect(page.getByTestId('layout-scope-strip')).toBeInViewport({ ratio: 1 })
   await expect(overrides.nth(0)).toBeInViewport()
   const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
-  expect(stored.all.faces.CH.top).toBeCloseTo(-0.01, 9)
-  expect(stored.jamo.bottom['CH:ㄴ'].faces.CH.top).toBeCloseTo(0.02, 9)
-  expect(stored.jamo.bottom['CH:ㄹ'].faces.CH.top).toBeCloseTo(-0.02, 9)
+  expect(stored.rules[''].faces.CH.top).toBeCloseTo(-0.01, 9)
+  expect(stored.rules[jamoRuleKey('bottom', 'CH', 'ㄴ')].faces.CH.top).toBeCloseTo(0.02, 9)
+  expect(stored.rules[jamoRuleKey('bottom', 'CH', 'ㄹ')].faces.CH.top).toBeCloseTo(-0.02, 9)
 
   // ㄴ 칩을 누르면 표본이 ㄴ 글자만(같은 문맥), 켜진 자모 칩은 ㄴ 하나.
   const cards = page.getByTestId('review-propagation-card')
@@ -738,8 +746,8 @@ test('같은 레이아웃에 쌓인 오버라이드가 범위 띠에 보이고, 
   await expect(overrides).toHaveCount(2)
   await expect(overrides.nth(1)).toHaveAttribute('data-jamo', 'ㄹ')
   const after = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
-  expect(after.jamo.bottom['CH:ㄴ']).toBeUndefined()
-  expect(after.jamo.bottom['CH:ㄹ'].faces.CH.top).toBeCloseTo(-0.02, 9)
+  expect(after.rules[jamoRuleKey('bottom', 'CH', 'ㄴ')]).toBeUndefined()
+  expect(after.rules[jamoRuleKey('bottom', 'CH', 'ㄹ')].faces.CH.top).toBeCloseTo(-0.02, 9)
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
   await expect(overrides).toHaveCount(3)
 
@@ -814,7 +822,7 @@ test('변을 이 자리에 맞추면 범위 안 글자가 같은 자리에 모�
   await page.getByTestId('review-propagation-apply').click()
   await expect(page.getByTestId('review-reset')).toHaveCount(0)
   const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
-  expect(stored.layers.bottom.faces.CH.top).toEqual({ at: expect.closeTo(at2, 3) })
+  expect(stored.rules[layerKey('bottom')].faces.CH.top).toEqual({ at: expect.closeTo(at2, 3) })
   await expect(page.locator('[data-testid="layout-override-card"][data-kind="layer"]')).toContainText(`첫닿자 윗변 = ${Math.round(at2 * 1000)}`)
   await expect.poll(async () => Number(await canvas.getByRole('button', { name: '첫닿자 윗변 선택' }).getAttribute('y1'))).toBeCloseTo(at2, 3)
   await page.goto('/workspace/jamo?char=%EB%A1%9C&mode=layout')

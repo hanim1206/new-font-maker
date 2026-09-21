@@ -1,8 +1,10 @@
 import { hasContextBoxDelta, isFixedFace, isZeroFace } from '../src/services/contextBoxResolver'
 import type { ContextBoxDelta, FaceDelta } from '../src/services/contextBoxResolver'
 import type { Part } from '../src/types'
-import { jamoKeyOf } from './layoutDeltaStore'
-import type { LayoutDeltaTarget } from './layoutDeltaStore'
+import { storedRules } from './layoutDeltaStore'
+import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
+import { isEmptyRule, ruleKey, ruleOfContext, withJamos } from './scopeRule'
+import type { RuleJamoPart, ScopeRule } from './scopeRule'
 import { roleLabel } from './notoMedialFitView'
 import { jamoChoicesFor } from './reviewPropagation'
 
@@ -49,26 +51,38 @@ export function deltaSummary(delta: ContextBoxDelta, withPart: boolean): string[
 }
 
 const GROUP_ORDER: OverrideGroup[] = ['CH', 'JU', 'JO']
+const RULE_PART: Record<OverrideGroup, RuleJamoPart> = { CH: 'initial', JU: 'medial', JO: 'final' }
 
-/** 저장소에서 이 레이아웃에 쌓인 오버라이드를 뽑는다. 자모별은 부품 순, 그 안에서 자모 순. */
-export function overrideCardsOf(state: { all: ContextBoxDelta; layers: Record<string, ContextBoxDelta>; jamo: Record<string, Record<string, ContextBoxDelta>> }, contextId: string): OverrideCard[] {
+/**
+ * 저장소에서 이 레이아웃에 쌓인 오버라이드를 뽑는다. 자모별은 부품 순, 그 안에서 자모 순.
+ * 규칙식 중 지금 화면이 만들 수 있는 모양(`전체` · 이 문맥 · 이 문맥 + 자모 하나)만 카드가 된다.
+ */
+export function overrideCardsOf(snapshot: LayoutDeltaSnapshot, contextId: string): OverrideCard[] {
   const cards: OverrideCard[] = []
-  if (hasContextBoxDelta(state.all)) cards.push({ kind: 'all', delta: state.all })
-  const layer = state.layers[contextId]
-  if (hasContextBoxDelta(layer)) cards.push({ kind: 'layer', delta: layer })
-  const jamoLayer = state.jamo[contextId] ?? {}
+  const base = ruleOfContext(contextId)
+  const baseKey = ruleKey(base)
+  const byKey = new Map(storedRules(snapshot).map((entry) => [entry.key, entry.delta]))
+  const at = (rule: ScopeRule) => { const delta = byKey.get(ruleKey(rule)); return delta && hasContextBoxDelta(delta) ? delta : null }
+  const all = at({})
+  if (all) cards.push({ kind: 'all', delta: all })
+  const layer = byKey.get(baseKey)
+  if (layer && hasContextBoxDelta(layer)) cards.push({ kind: 'layer', delta: layer })
   for (const group of GROUP_ORDER) {
-    const order = jamoChoicesFor(partOfGroup[group])
-    const entries = Object.entries(jamoLayer)
-      .flatMap(([key, delta]) => key.startsWith(`${group}:`) && hasContextBoxDelta(delta) ? [{ jamo: key.slice(group.length + 1), delta }] : [])
-      .sort((a, b) => order.indexOf(a.jamo) - order.indexOf(b.jamo))
-    for (const entry of entries) cards.push({ kind: 'jamo', group, jamo: entry.jamo, delta: entry.delta })
+    for (const jamo of jamoChoicesFor(partOfGroup[group])) {
+      const delta = at(withJamos(base, RULE_PART[group], [jamo]))
+      if (delta) cards.push({ kind: 'jamo', group, jamo, delta })
+    }
   }
   return cards
 }
 
-export const targetOfCard = (card: OverrideCard, contextId: string): LayoutDeltaTarget =>
-  card.kind === 'all' ? { scope: 'all' } : card.kind === 'layer' ? { scope: 'layer', contextId } : { scope: 'jamo', contextId, jamos: [jamoKeyOf(partOfGroup[card.group], card.jamo)] }
+/** 카드가 가리키는 범위. 지우기·고르기가 이걸 쓴다. */
+export const ruleOfCard = (card: OverrideCard, contextId: string): ScopeRule =>
+  card.kind === 'all' ? {} : card.kind === 'layer' ? ruleOfContext(contextId) : withJamos(ruleOfContext(contextId), RULE_PART[card.group], [card.jamo])
+/** 자모 칩 하나가 가리키는 범위. */
+export const ruleOfJamoChip = (contextId: string, group: OverrideGroup, jamo: string): ScopeRule =>
+  withJamos(ruleOfContext(contextId), RULE_PART[group], [jamo])
+export { isEmptyRule }
 
 /**
  * 범위 띠의 칩. 앞의 둘은 늘 있다(`이 레이아웃` · `이 자모만`(자모 고르기 문)). 그 뒤에 자모 칩이 부품 순·자모 순으로 붙는다.
