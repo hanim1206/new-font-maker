@@ -1,0 +1,252 @@
+{
+  "ㄱ": {
+    "initialHorizontal": 1,
+    "initialVertical": 1,
+    "initialHorizontalNoFinal": 1,
+    "initialVerticalNoFinal": 1,
+    "finalHorizontalMixed": 1,
+    "finalVertical": 1,
+    "height": "2줄",
+    "inkSpaceGroup": "S1"
+  },
+  "ㄲ": {
+    "initialHorizontal": 4,
+    "initialVertical": 4,
+    "initialHorizontalNoFinal": 4,
+    "initialVerticalNoFinal": 4,
+    "finalHorizontalMixed": 3,
+    "finalVertical": 3,
+    "height": "2줄",
+    "inkSpaceGroup": "S3"
+  },
+  "ㄴ": {
+    "initialHorizontal": 2,
+    "initialVertical": 2,
+    "initialHorizontalNoFinal": 2,
+    "initialVerticalNoFinal": 2,
+    "finalHorizontalMixed": 2,
+    "finalVertical": 2,
+    "height": "2줄",
+    "inkSpaceGroup": "S1"
+  },
+  "ㄷ": {
+    "initialHorizontal": 2,
+    "initialVertical": 3,
+    "initialHorizontalNoFinal": 2,
+    "initialVerticalNoFinal": 3,
+    "finalHorizontalMixed": 1,
+    "finalVertical": 1,
+    "height": "2줄",
+    "inkSpaceGroup": "S1"
+  },
+  "ㄸ": {
+    "initialHorizontal": 5,
+    "initialVertical": 5,
+    "initialHorizontalNoFinal": 6,
+    "initialVerticalNoFinal": 6,
+    "height": "2줄",
+    "inkSpaceGroup": "S5"
+  },
+  "ㄹ": {
+    "initialHorizontal": 5,
+    "initialVertical": 5,
+    "initialHorizontalNoFinal": 6,
+    "initialVerticalNoFinal": 6,
+    "finalHorizontalMixed": 4,
+    "finalVertical": 4,
+    "height": "3줄",
+    "inkSpaceGroup": "S5"
+  },
+  "ㅁ": {
+    "initialHorizontal": 2,
+    "initialVertical": 3,
+    "initialHorizontalNoFinal": 2,
+    "initialVerticalNoFinal": 3,
+    "finalHorizontalMixed": 1,
+    "finalVertical": 1,
+    "height": "2줄",
+    "inkSpaceGroup": "S1"
+  },
+  "ㅂ": {
+    "initialHorizontal": 5,
+    "initialVertical": 5,
+    "initialHorizontalNoFinal": 6,
+    "initialVerticalNoFinal": 6,
+    "finalHorizontalMixed": 4,
+    "finalVertical": 4,
+    "height": "3줄",
+    "inkSpaceGroup": "S5"
+  },
+  "ㅃ": {
+    "initialHorizontal": 6,
+    "initialVertical": 6,
+    "initialHorizontalNoFinal": 8,
+    "initialVerticalNoFinal": 8,
+    "height": "3줄",
+    "inkSpaceGroup": "S7"
+  },
+  "ㅅ": {
+    "initialHorizontal": 2,
+    "initialVertical": 1,
+    "initialHorizontalNoFinal": 2,
+    "initialVerticalNoFinal": 1,
+    "finalHorizontalMixed": 1,
+    "finalVertical": 3,
+    "height": "2줄",
+    "inkSpaceGroup": "S1"
+  },
+  "ㅆ": {
+    "initialHorizontal": 4,
+    "initialVertical": 4,
+    "initialHorizontalNoFinal": 4,
+    "initialVerticalNoFinal": 4,
+    "finalHorizontalMixed": 4,
+    "finalVertical": 4,
+    "height": "2줄",
+    "inkSpaceGroup": "S3"
+  },
+  "ㅇ": {
+    "initialHorizontal": 2,
+    "initialVertical": 3,
+    "initialHorizontalNoFinal": 2,
+    "initialVerticalNoFinal": 3,
+    "finalHorizontalMixed": 1,
+    "finalVertical": 1,
+    "height": "2줄",
+    "inkSpaceGroup": "S1"
+  },
+  "ㅈ": {
+    "initialHorizontal": 3,
+    "initialVertical": 3,
+    "initialHorizontalNoFinal": 3,
+    "initialVerticalNoFinal": 3,
+    "finalHorizontalMixed": 3,
+    "finalVertical": 3,
+    "height": "2줄",
+    "inkSpaceGroup": "S2"
+  },
+  "ㅉ": {
+    "initialHorizontal": 6,
+    "initialVertical": 6,
+    "initialHorizontalNoFinal": 8,
+    "initialVerticalNoFinal": 8,
+    "height": "3줄",
+    "inkSpaceGroup": "S7"
+  },
+  "ㅊ": {
+    "initialHorizontal": 5,
+    "initialVertical": 5,
+    "initialHorizontalNoFinal": 6,
+    "initialVerticalNoFinal": 6,
+    "finalHorizontalMixed": 5,
+    "finalVertical": 5,
+    "height": "3줄",
+    "inkSpaceGroup": "S6"
+  },
+  "ㅋ": {
+    "initialHorizontal": 3,
+    "initialVertical": 3,
+    "initialHorizontalNoFinal": 5,
+    "initialVerticalNoFinal": 5,
+    "finalHorizontalMixed": 3,
+    "finalVertical": 3,
+    "height": "3줄",
+    "inkSpaceGroup": "S4"
+  },
+  "ㅌ": {
+    "initialHorizontal": 5,
+    "initialVertical": 5,
+    "initialHorizontalNoFinal": 6,
+    "initialVerticalNoFinal": 6,
+    "finalHorizontalMixed": 4,
+    "finalVertical": 4,
+    "height": "3줄",
+    "inkSpaceGroup": "S5"
+  },
+  "ㅍ": {
+    "initialHorizontal": 4,
+    "initialVertical": 4,
+    "initialHorizontalNoFinal": 4,
+    "initialVerticalNoFinal": 4,
+    "finalHorizontalMixed": 3,
+    "finalVertical": 3,
+    "height": "2줄",
+    "inkSpaceGroup": "S3"
+  },
+  "ㅎ": {
+    "initialHorizontal": 6,
+    "initialVertical": 6,
+    "initialHorizontalNoFinal": 7,
+    "initialVerticalNoFinal": 7,
+    "finalHorizontalMixed": 5,
+    "finalVertical": 5,
+    "height": "3줄",
+    "inkSpaceGroup": "S6"
+  },
+  "ㄳ": {
+    "finalHorizontalMixed": 4,
+    "finalVertical": 4,
+    "height": "문헌_속공간_그룹:",
+    "inkSpaceGroup": "문헌_위치_아래: 4"
+  },
+  "ㄵ": {
+    "finalHorizontalMixed": 6,
+    "finalVertical": 6,
+    "height": "문헌_속공간_그룹:",
+    "inkSpaceGroup": "문헌_위치_아래:"
+  },
+  "ㄶ": {
+    "finalHorizontalMixed": 6,
+    "finalVertical": 6,
+    "height": "문헌_속공간_그룹:",
+    "inkSpaceGroup": "문헌_위치_아래:"
+  },
+  "ㄺ": {
+    "finalHorizontalMixed": 6,
+    "finalVertical": 6,
+    "height": "문헌_속공간_그룹:",
+    "inkSpaceGroup": "문헌_위치_아래:"
+  },
+  "ㄻ": {
+    "finalHorizontalMixed": 6,
+    "finalVertical": 6,
+    "height": "문헌_속공간_그룹:",
+    "inkSpaceGroup": "문헌_위치_아래:"
+  },
+  "ㄼ": {
+    "finalHorizontalMixed": 6,
+    "finalVertical": 6,
+    "height": "문헌_속공간_그룹:",
+    "inkSpaceGroup": "문헌_위치_아래:"
+  },
+  "ㄽ": {
+    "finalHorizontalMixed": 6,
+    "finalVertical": 6,
+    "height": "문헌_속공간_그룹:",
+    "inkSpaceGroup": "문헌_위치_아래:"
+  },
+  "ㄾ": {
+    "finalHorizontalMixed": 6,
+    "finalVertical": 6,
+    "height": "문헌_속공간_그룹:",
+    "inkSpaceGroup": "문헌_위치_아래:"
+  },
+  "ㄿ": {
+    "finalHorizontalMixed": 6,
+    "finalVertical": 6,
+    "height": "문헌_속공간_그룹:",
+    "inkSpaceGroup": "문헌_위치_아래:"
+  },
+  "ㅀ": {
+    "finalHorizontalMixed": 6,
+    "finalVertical": 6,
+    "height": "문헌_속공간_그룹:",
+    "inkSpaceGroup": "문헌_위치_아래:"
+  },
+  "ㅄ": {
+    "finalHorizontalMixed": 6,
+    "finalVertical": 6,
+    "height": "문헌_속공간_그룹:",
+    "inkSpaceGroup": "문헌_위치_아래:"
+  }
+}

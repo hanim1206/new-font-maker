@@ -12,6 +12,7 @@ import {
   type GlyphOutline,
   type OutlineResponse,
 } from './ReferenceLabPage'
+import { groupsOf } from './jamoLiteratureGroups'
 import styles from './ReferenceGroupLabPage.module.css'
 
 const FONT_CATALOG_URL = '/api/reference/v1/fonts'
@@ -59,63 +60,13 @@ function groupJamos(groups: readonly ContextGroup[]): string[] {
   return groups.flatMap(({ jamos }) => jamos)
 }
 
-const INITIAL_HORIZONTAL_GROUPS: readonly ContextGroup[] = [
-  { id: 1, jamos: ['ㄱ'] },
-  { id: 2, jamos: ['ㄴ', 'ㄷ', 'ㅁ', 'ㅅ', 'ㅇ'] },
-  { id: 3, jamos: ['ㅈ', 'ㅋ'] },
-  { id: 4, jamos: ['ㅍ', 'ㄲ', 'ㅆ'] },
-  { id: 5, jamos: ['ㄹ', 'ㅂ', 'ㅊ', 'ㅌ', 'ㄸ'] },
-  { id: 6, jamos: ['ㅎ', 'ㅃ', 'ㅉ'] },
-]
-
-const INITIAL_HORIZONTAL_NO_FINAL_GROUPS: readonly ContextGroup[] = [
-  { id: 1, jamos: ['ㄱ'] },
-  { id: 2, jamos: ['ㄴ', 'ㄷ', 'ㅁ', 'ㅅ', 'ㅇ'] },
-  { id: 3, jamos: ['ㅈ'] },
-  { id: 4, jamos: ['ㅍ', 'ㄲ', 'ㅆ'] },
-  { id: 5, jamos: ['ㅋ'] },
-  { id: 6, jamos: ['ㄹ', 'ㅂ', 'ㅊ', 'ㅌ', 'ㄸ'] },
-  { id: 7, jamos: ['ㅎ'] },
-  { id: 8, jamos: ['ㅃ', 'ㅉ'] },
-]
-
-const INITIAL_VERTICAL_GROUPS: readonly ContextGroup[] = [
-  { id: 1, jamos: ['ㄱ', 'ㅅ'] },
-  { id: 2, jamos: ['ㄴ'] },
-  { id: 3, jamos: ['ㄷ', 'ㅁ', 'ㅇ', 'ㅈ', 'ㅋ'] },
-  { id: 4, jamos: ['ㅍ', 'ㄲ', 'ㅆ'] },
-  { id: 5, jamos: ['ㄹ', 'ㅂ', 'ㅊ', 'ㅌ', 'ㄸ'] },
-  { id: 6, jamos: ['ㅎ', 'ㅃ', 'ㅉ'] },
-]
-
-const INITIAL_VERTICAL_NO_FINAL_GROUPS: readonly ContextGroup[] = [
-  { id: 1, jamos: ['ㄱ', 'ㅅ'] },
-  { id: 2, jamos: ['ㄴ'] },
-  { id: 3, jamos: ['ㄷ', 'ㅁ', 'ㅇ', 'ㅈ'] },
-  { id: 4, jamos: ['ㅍ', 'ㄲ', 'ㅆ'] },
-  { id: 5, jamos: ['ㅋ'] },
-  { id: 6, jamos: ['ㄹ', 'ㅂ', 'ㅊ', 'ㅌ', 'ㄸ'] },
-  { id: 7, jamos: ['ㅎ'] },
-  { id: 8, jamos: ['ㅃ', 'ㅉ'] },
-]
-
-const FINAL_HORIZONTAL_MIXED_GROUPS: readonly ContextGroup[] = [
-  { id: 1, jamos: ['ㄱ', 'ㄷ', 'ㅁ', 'ㅅ', 'ㅇ'] },
-  { id: 2, jamos: ['ㄴ'] },
-  { id: 3, jamos: ['ㅈ', 'ㅋ', 'ㅍ', 'ㄲ'] },
-  { id: 4, jamos: ['ㄹ', 'ㅂ', 'ㅌ', 'ㄳ', 'ㅆ'] },
-  { id: 5, jamos: ['ㅊ', 'ㅎ'] },
-  { id: 6, jamos: ['ㄵ', 'ㄶ', 'ㄺ', 'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅄ'] },
-]
-
-const FINAL_VERTICAL_GROUPS: readonly ContextGroup[] = [
-  { id: 1, jamos: ['ㄱ', 'ㄷ', 'ㅁ', 'ㅇ'] },
-  { id: 2, jamos: ['ㄴ'] },
-  { id: 3, jamos: ['ㅅ', 'ㅈ', 'ㅋ', 'ㅍ', 'ㄲ'] },
-  { id: 4, jamos: ['ㄹ', 'ㅂ', 'ㅌ', 'ㄳ', 'ㅆ'] },
-  { id: 5, jamos: ['ㅊ', 'ㅎ'] },
-  { id: 6, jamos: ['ㄵ', 'ㄶ', 'ㄺ', 'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅄ'] },
-]
+/** 구조군 표는 `src/data/jamoLiteratureGroups.json` 하나가 출처다. 여기서는 기준마다 그룹 목록으로 펴서 쓴다. */
+const INITIAL_HORIZONTAL_GROUPS: readonly ContextGroup[] = groupsOf('initialHorizontal')
+const INITIAL_HORIZONTAL_NO_FINAL_GROUPS: readonly ContextGroup[] = groupsOf('initialHorizontalNoFinal')
+const INITIAL_VERTICAL_GROUPS: readonly ContextGroup[] = groupsOf('initialVertical')
+const INITIAL_VERTICAL_NO_FINAL_GROUPS: readonly ContextGroup[] = groupsOf('initialVerticalNoFinal')
+const FINAL_HORIZONTAL_MIXED_GROUPS: readonly ContextGroup[] = groupsOf('finalHorizontalMixed')
+const FINAL_VERTICAL_GROUPS: readonly ContextGroup[] = groupsOf('finalVertical')
 
 const CRITERIA: readonly Criterion[] = [
   {
