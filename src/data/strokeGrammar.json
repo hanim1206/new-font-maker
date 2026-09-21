@@ -1,0 +1,320 @@
+{
+  "version": 1,
+  "choseong": {
+    "ㄱ": {
+      "ㄱ-1": null
+    },
+    "ㄲ": {
+      "ㄲ-1": null,
+      "ㄲ-3": null
+    },
+    "ㄴ": {
+      "ㄴ-1": null
+    },
+    "ㄷ": {
+      "ㄷ-1": null
+    },
+    "ㄸ": {
+      "ㄸ-1": null,
+      "ㄸ-4": null
+    },
+    "ㄹ": {
+      "ㄹ-1": null
+    },
+    "ㅁ": {
+      "ㅁ-1": null
+    },
+    "ㅂ": {
+      "ㅂ-1": null,
+      "ㅂ-3": "geolchim"
+    },
+    "ㅃ": {
+      "ㅃ-1": null,
+      "ㅃ-3": "geolchim",
+      "ㅃ-5": null,
+      "ㅃ-7": "geolchim"
+    },
+    "ㅅ": {
+      "ㅅ-left": null,
+      "ㅅ-right": null
+    },
+    "ㅆ": {
+      "ㅆ-1l": null,
+      "ㅆ-1r": null,
+      "ㅆ-2l": null,
+      "ㅆ-2r": null
+    },
+    "ㅇ": {
+      "ㅇ-circle": null
+    },
+    "ㅈ": {
+      "ㅈ-1": null,
+      "ㅈ-left": null,
+      "ㅈ-right": null
+    },
+    "ㅉ": {
+      "ㅉ-1l": null,
+      "ㅉ-1r": null,
+      "ㅉ-2l": null,
+      "ㅉ-2r": null,
+      "ㅉ-1": null
+    },
+    "ㅊ": {
+      "ㅊ-dot": "kkokji",
+      "ㅊ-1": null,
+      "ㅊ-left": null,
+      "ㅊ-right": null
+    },
+    "ㅋ": {
+      "ㅋ-1": null,
+      "ㅋ-3": "deotjulgi"
+    },
+    "ㅌ": {
+      "ㅌ-1": null,
+      "ㅌ-4": "deotjulgi"
+    },
+    "ㅍ": {
+      "ㅍ-1": null,
+      "ㅍ-2": null,
+      "ㅍ-3": null,
+      "ㅍ-4": null
+    },
+    "ㅎ": {
+      "ㅎ-1": "kkokji",
+      "ㅎ-2": null,
+      "ㅎ-circle": null
+    }
+  },
+  "jungseong": {
+    "ㅏ": {
+      "ㅏ-1": "gidung",
+      "ㅏ-2": "gyeotjulgi"
+    },
+    "ㅐ": {
+      "ㅐ-1": "gidung",
+      "ㅐ-2": "geolchim",
+      "ㅐ-3": "gidung"
+    },
+    "ㅑ": {
+      "ㅑ-1": "gidung",
+      "ㅑ-2": "gyeotjulgi",
+      "ㅑ-3": "gyeotjulgi"
+    },
+    "ㅒ": {
+      "ㅒ-1": "gidung",
+      "ㅒ-2": "geolchim",
+      "ㅒ-3": "geolchim",
+      "ㅒ-4": "gidung"
+    },
+    "ㅓ": {
+      "ㅓ-1": "gidung",
+      "ㅓ-2": "gyeotjulgi"
+    },
+    "ㅔ": {
+      "ㅔ-1": "gidung",
+      "ㅔ-2": "gyeotjulgi",
+      "ㅔ-3": "gidung"
+    },
+    "ㅕ": {
+      "ㅕ-1": "gidung",
+      "ㅕ-2": "gyeotjulgi",
+      "ㅕ-3": "gyeotjulgi"
+    },
+    "ㅖ": {
+      "ㅖ-1": "gidung",
+      "ㅖ-2": "gyeotjulgi",
+      "ㅖ-3": "gyeotjulgi",
+      "ㅖ-4": "gidung"
+    },
+    "ㅗ": {
+      "ㅗ-1": "jjalbeungidung",
+      "ㅗ-2": "bo"
+    },
+    "ㅘ": {
+      "ㅘ-1": "jjalbeungidung",
+      "ㅘ-2": "bo",
+      "ㅘ-3": "gidung",
+      "ㅘ-4": "gyeotjulgi"
+    },
+    "ㅙ": {
+      "ㅙ-1": "jjalbeungidung",
+      "ㅙ-2": "bo",
+      "ㅙ-3": "gidung",
+      "ㅙ-4": "geolchim",
+      "ㅙ-5": "gidung"
+    },
+    "ㅚ": {
+      "ㅚ-1": "jjalbeungidung",
+      "ㅚ-2": "bo",
+      "ㅚ-3": "gidung"
+    },
+    "ㅛ": {
+      "ㅛ-1": "jjalbeungidung",
+      "ㅛ-2": "jjalbeungidung",
+      "ㅛ-3": "bo"
+    },
+    "ㅜ": {
+      "ㅜ-1": "bo",
+      "ㅜ-2": "jjalbeungidung"
+    },
+    "ㅝ": {
+      "ㅝ-1": "bo",
+      "ㅝ-2": "jjalbeungidung",
+      "ㅝ-3": "gidung",
+      "ㅝ-4": "gyeotjulgi"
+    },
+    "ㅞ": {
+      "ㅞ-1": "bo",
+      "ㅞ-2": "jjalbeungidung",
+      "ㅞ-3": "gidung",
+      "ㅞ-4": "gyeotjulgi",
+      "ㅞ-5": "gidung"
+    },
+    "ㅟ": {
+      "ㅟ-1": "bo",
+      "ㅟ-2": "jjalbeungidung",
+      "ㅟ-3": "gidung"
+    },
+    "ㅠ": {
+      "ㅠ-1": "bo",
+      "ㅠ-2": "jjalbeungidung",
+      "ㅠ-3": "jjalbeungidung"
+    },
+    "ㅡ": {
+      "ㅡ-1": "bo"
+    },
+    "ㅢ": {
+      "ㅢ-1": "bo",
+      "ㅢ-2": "gidung"
+    },
+    "ㅣ": {
+      "ㅣ-1": "gidung"
+    }
+  },
+  "jongseong": {
+    "ㄱ": {
+      "ㄱ종-1": null
+    },
+    "ㄲ": {
+      "ㄲ종-1": null,
+      "ㄲ종-3": null
+    },
+    "ㄳ": {
+      "ㄳ종-left": null,
+      "ㄳ종-right": null,
+      "ㄳ종-1": null
+    },
+    "ㄴ": {
+      "ㄴ종-1": null
+    },
+    "ㄵ": {
+      "ㄵ종-left": null,
+      "ㄵ종-right": null,
+      "ㄵ종-1": null,
+      "ㄵ종-3": null
+    },
+    "ㄶ": {
+      "ㄶ종-circle": null,
+      "ㄶ종-1": null,
+      "ㄶ종-3": "kkokji",
+      "ㄶ종-4": null
+    },
+    "ㄷ": {
+      "ㄷ종-1": null
+    },
+    "ㄹ": {
+      "ㄹ종-1": null
+    },
+    "ㄺ": {
+      "ㄺ종-1": null,
+      "ㄺ종-6": null
+    },
+    "ㄻ": {
+      "ㄻ종-1": null,
+      "ㄻ종-6": null
+    },
+    "ㄼ": {
+      "ㄼ종-1": null,
+      "ㄼ종-6": null,
+      "ㄼ종-8": "geolchim"
+    },
+    "ㄽ": {
+      "ㄽ종-left": null,
+      "ㄽ종-right": null,
+      "ㄽ종-1": null
+    },
+    "ㄾ": {
+      "ㄾ종-1": null,
+      "ㄾ종-6": null,
+      "ㄾ종-9": "deotjulgi"
+    },
+    "ㄿ": {
+      "ㄿ종-1": null,
+      "ㄿ종-6": null,
+      "ㄿ종-8": null,
+      "ㄿ종-9": null
+    },
+    "ㅀ": {
+      "ㅀ종-circle": null,
+      "ㅀ종-1": null,
+      "ㅀ종-6": "kkokji",
+      "ㅀ종-7": null
+    },
+    "ㅁ": {
+      "ㅁ종-1": null
+    },
+    "ㅂ": {
+      "ㅂ종-1": null,
+      "ㅂ종-3": "geolchim"
+    },
+    "ㅄ": {
+      "ㅄ종-left": null,
+      "ㅄ종-right": null,
+      "ㅄ종-1": null,
+      "ㅄ종-3": "geolchim"
+    },
+    "ㅅ": {
+      "ㅅ종-left": null,
+      "ㅅ종-right": null
+    },
+    "ㅆ": {
+      "ㅆ종-1l": null,
+      "ㅆ종-1r": null,
+      "ㅆ종-2l": null,
+      "ㅆ종-2r": null
+    },
+    "ㅇ": {
+      "ㅇ종-circle": null
+    },
+    "ㅈ": {
+      "ㅈ종-1": null,
+      "ㅈ종-left": null,
+      "ㅈ종-right": null
+    },
+    "ㅊ": {
+      "ㅊ종-dot": "kkokji",
+      "ㅊ종-1": null,
+      "ㅊ종-left": null,
+      "ㅊ종-right": null
+    },
+    "ㅋ": {
+      "ㅋ종-1": null,
+      "ㅋ종-3": "deotjulgi"
+    },
+    "ㅌ": {
+      "ㅌ종-1": null,
+      "ㅌ종-4": "deotjulgi"
+    },
+    "ㅍ": {
+      "ㅍ종-1": null,
+      "ㅍ종-2": null,
+      "ㅍ종-3": null,
+      "ㅍ종-4": null
+    },
+    "ㅎ": {
+      "ㅎ종-1": "kkokji",
+      "ㅎ종-2": null,
+      "ㅎ종-circle": null
+    }
+  }
+}

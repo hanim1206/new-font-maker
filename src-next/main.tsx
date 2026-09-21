@@ -29,6 +29,12 @@ async function start(): Promise<void> {
     return
   }
 
+  if (window.location.pathname === '/stroke-grammar-lab') {
+    const { StrokeGrammarLabPage } = await import('./StrokeGrammarLabPage')
+    root.render(<StrictMode><StrokeGrammarLabPage /></StrictMode>)
+    return
+  }
+
   if (window.location.pathname === '/preset-candidate-lab') {
     const { PresetCandidateLabPage } = await import('./PresetCandidateLabPage')
     root.render(<StrictMode><PresetCandidateLabPage /></StrictMode>)

@@ -21,6 +21,7 @@ export const LAB_SCREEN_ROUTES = [
   '/noto-corpus-lab',
   '/reference-lab',
   '/reference-group-lab',
+  '/stroke-grammar-lab',
   '/preset-candidate-lab',
   '/font-guide-lab',
   '/five-guide-lab',
