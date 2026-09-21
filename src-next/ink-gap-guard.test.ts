@@ -47,6 +47,11 @@ describe('컴포넌트 간 Ink Gap Guard', () => {
     expect(preservesMinimumInkGap(makeSyllable(makeJungseong(0)), boxes, 'JU', 0.1)).toBe(true)
   })
 
+  it('전역 굵기 배율만큼 잉크가 굵어져 간격이 준다(중심선은 그대로)', () => {
+    // 중심선 사이 0.2, 두께 0.05 × 2.2 = 0.11 → 0.2 − 0.11 = 0.09
+    expect(getMinimumInterComponentInkGap(makeSyllable(makeJungseong(0)), boxes, 'JU', 2.2)).toBeCloseTo(0.09)
+  })
+
   it('다른 컴포넌트의 잉크와 겹치는 후보를 거부한다', () => {
     expect(getMinimumInterComponentInkGap(makeSyllable(makeJungseong(-0.5)), boxes, 'JU')).toBeLessThan(0)
     expect(preservesMinimumInkGap(makeSyllable(makeJungseong(-0.5)), boxes, 'JU', 0.1)).toBe(false)

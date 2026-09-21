@@ -614,8 +614,9 @@ export function strokeToContours(
   const capType: StrokeLinecap = stroke.linecap ?? style.globalLinecap ?? 'round'
   const joinType: StrokeLinejoin = stroke.linejoin ?? style.globalLinejoin ?? 'round'
 
-  // 앵커 → 절대 좌표 변환
-  const absAnchors = renderPoints.map(a => anchorToAbsolute(a, box, upm, style.slant, style.ascender))
+  // 앵커 → 절대 좌표 변환. 기울기는 여기서 주지 않는다 — 화면(`SvgRenderer`)은 곧은 잉크를 만든 뒤 통째로 기울인다.
+  // 중심선을 먼저 기울이고 굵기를 입히면 기둥이 1/cos(기울기)만큼 굵어지고 가로줄기 끝이 기울지 않아 화면과 어긋난다.
+  const absAnchors = renderPoints.map(a => anchorToAbsolute(a, box, upm, 0, style.ascender))
 
   // 세그먼트 수 결정
   const segCount = stroke.closed ? absAnchors.length : absAnchors.length - 1
@@ -643,11 +644,18 @@ export function strokeToContours(
     ))
   }
 
-  if (stroke.closed) {
-    return assembleClosedContours(absAnchors, segments, segTangents, effectiveHalfWidth, joinType)
-  } else {
-    return assembleOpenContours(absAnchors, segments, segTangents, effectiveHalfWidth, capType, joinType)
-  }
+  const contours = stroke.closed
+    ? assembleClosedContours(absAnchors, segments, segTangents, effectiveHalfWidth, joinType)
+    : assembleOpenContours(absAnchors, segments, segTangents, effectiveHalfWidth, capType, joinType)
+  return slantContours(contours, upm, style.slant, style.ascender)
+}
+
+/** 다 만든 윤곽을 글자 칸 세로 중심 기준으로 기울인다(`SvgRenderer`의 skewX(−기울기)와 같은 식). 방향(CW/CCW)은 그대로다. */
+function slantContours(contours: Contour[], upm: number, slant: number, ascender: number): Contour[] {
+  if (slant === 0) return contours
+  const tangent = Math.tan(slant * Math.PI / 180)
+  const verticalCenter = ascender - upm / 2
+  return contours.map((contour) => contour.map((point) => ({ ...point, x: Math.round(point.x + (point.y - verticalCenter) * tangent) })))
 }
 
 /**

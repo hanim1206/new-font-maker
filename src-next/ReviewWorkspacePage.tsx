@@ -55,7 +55,7 @@ function LazyCellGlyph({ char }: { char: string }) {
   const [visible, setVisible] = useState(false)
   useEffect(() => holder.current && !visible ? observeCell(holder.current, () => setVisible(true)) : undefined, [visible])
   return visible
-    ? <AppGlyph char={char} size={CELL_GLYPH_SIZE} />
+    ? <AppGlyph char={char} size={CELL_GLYPH_SIZE} upright />
     : <span ref={holder} className={styles.cellHolder} aria-hidden="true" />
 }
 
@@ -70,7 +70,7 @@ function GridScreen() {
       {/* 칸 탭 = 선택, 선택된 칸 다시 탭 = 글자 화면. 키보드 화살표 이동은 선택만 바꾼다. */}
       <div className={styles.matrixSection}><NotoCorpusMatrix rows={ROWS} reviews={NO_REVIEWS} selected={selected} onSelect={(codepoint) => { if (codepoint === selected) window.location.assign(glyphHref(codepoint)); else setSelected(codepoint) }} isHighlighted={() => true} noFinal={false} renderCell={renderCell} variant="viewer" /></div>
       <a className={styles.pick} href={glyphHref(selected)} data-testid="review-pick">
-        <AppGlyph char={identity.character} size={76} />
+        <AppGlyph char={identity.character} size={76} upright />
         <span className={styles.pickBody}>
           <strong>선택 · {identity.character}</strong>
           <small>{identity.initialJamo} + {identity.medialJamo}{identity.finalJamo ? ` + ${identity.finalJamo}` : ' · 받침 없음'}</small>

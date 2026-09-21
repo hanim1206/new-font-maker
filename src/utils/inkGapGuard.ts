@@ -57,7 +57,7 @@ function sampleSegment(
   return points
 }
 
-function toInkPolyline(target: RenderedStrokeTarget): InkPolyline | null {
+function toInkPolyline(target: RenderedStrokeTarget, weightMultiplier = 1): InkPolyline | null {
   const source = target.stroke.points
   if (source.length === 0) return null
   const points = [toGlyphPoint(source[0], target.box)]
@@ -67,7 +67,7 @@ function toInkPolyline(target: RenderedStrokeTarget): InkPolyline | null {
   if (target.stroke.closed && source.length > 1) {
     points.push(...sampleSegment(source[source.length - 1], source[0], target.box))
   }
-  return { points, radius: target.stroke.thickness / 2 }
+  return { points, radius: target.stroke.thickness * weightMultiplier / 2 }
 }
 
 function pointToSegmentDistance(point: Point, start: Point, end: Point): number {
@@ -129,15 +129,17 @@ function polylineDistance(first: InkPolyline, second: InkPolyline): number {
   return minimum
 }
 
-/** 선택 컴포넌트와 다른 컴포넌트 사이의 최소 실제 잉크 간격. */
+/** 선택 컴포넌트와 다른 컴포넌트 사이의 최소 실제 잉크 간격. `weightMultiplier`는 전역 굵기 배율 — 중심선은 그대로고 잉크만 굵어지므로 간격이 그만큼 준다. */
 export function getMinimumInterComponentInkGap(
   syllable: DecomposedSyllable,
   boxes: Partial<Record<Part, BoxConfig>>,
   activePart: MobileEditorPart,
+  weightMultiplier = 1,
 ): number {
   const targets = getRenderedStrokeTargets(syllable, boxes)
-  const active = targets.filter((target) => target.editorPart === activePart).map(toInkPolyline).filter((value): value is InkPolyline => value !== null)
-  const others = targets.filter((target) => target.editorPart !== activePart).map(toInkPolyline).filter((value): value is InkPolyline => value !== null)
+  const toPolyline = (target: RenderedStrokeTarget) => toInkPolyline(target, weightMultiplier)
+  const active = targets.filter((target) => target.editorPart === activePart).map(toPolyline).filter((value): value is InkPolyline => value !== null)
+  const others = targets.filter((target) => target.editorPart !== activePart).map(toPolyline).filter((value): value is InkPolyline => value !== null)
   if (active.length === 0 || others.length === 0) return Number.POSITIVE_INFINITY
 
   let minimum = Number.POSITIVE_INFINITY

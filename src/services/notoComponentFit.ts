@@ -38,6 +38,8 @@ export interface FitInkStyle {
   linecap: StrokeDataV2['linecap']
   linejoin: StrokeDataV2['linejoin']
   strokeStyle: StrokeRenderStyle
+  /** 전역 굵기 배율. 상자(중심선)는 그대로 두고 잉크만 굵게 한다. 없으면 1. */
+  weightMultiplier?: number
 }
 
 /** brush 모드만 fit 잉크에 쓴다. 면·점 스타일은 일자 끝을 못 만들어 fit 기본으로 돌아간다. */
@@ -175,7 +177,10 @@ export function fitNotoComponent(input: ComponentFitInput): ComponentFitOutcome 
 }
 
 export function inkOfComponentFit(fit: ComponentFitResult, style?: FitInkStyle): { ok: true; regions: readonly DeepReadonly<InkRegion>[] } | { ok: false; message: string } {
-  const ink = materializeFinalGlyphInk(fit.primitives, fitStrokeStyleOf(style), INK_OPTIONS)
+  // 굵기는 중심선을 지킨다: fit이 정한 상자는 그대로, 잉크 두께만 전역 배율을 따른다(획 편집 캔버스 · OTF와 같은 방식).
+  const weight = style?.weightMultiplier ?? 1
+  const primitives = weight === 1 ? fit.primitives : fit.primitives.map((primitive) => ({ ...primitive, weightMultiplier: primitive.weightMultiplier * weight }))
+  const ink = materializeFinalGlyphInk(primitives, fitStrokeStyleOf(style), INK_OPTIONS)
   return ink.ok ? { ok: true, regions: ink.ink.regions } : { ok: false, message: ink.message }
 }
 

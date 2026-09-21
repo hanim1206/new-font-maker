@@ -95,6 +95,14 @@ export function decomposeSyllable(
   }
 }
 
+/** 완성형 글자(첫닿자 + 홀자 [+ 받침])의 레이아웃. 자모 데이터 없이 홀자 글자와 받침 유무만으로 가른다. */
+export function layoutTypeOfSyllable(medialJamo: string, hasFinal: boolean): LayoutType {
+  const family = classifyJungseong(medialJamo)
+  if (family === 'vertical') return hasFinal ? 'choseong-jungseong-vertical-jongseong' : 'choseong-jungseong-vertical'
+  if (family === 'horizontal') return hasFinal ? 'choseong-jungseong-horizontal-jongseong' : 'choseong-jungseong-horizontal'
+  return hasFinal ? 'choseong-jungseong-mixed-jongseong' : 'choseong-jungseong-mixed'
+}
+
 // ===== 레이아웃 분류 =====
 function classifyLayout(
   choseong: JamoData | null,

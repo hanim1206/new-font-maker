@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
-import { Paintbrush, Scan, X } from 'lucide-react'
+import { Italic, Paintbrush, Scan, X } from 'lucide-react'
 import styles from './CalibrationSentenceEditor.module.css'
 
-export type GlobalStylePanel = 'body' | 'brush'
+export type GlobalStylePanel = 'body' | 'brush' | 'tone'
 
 export function GlobalStyleTrackpad({
   panel,
@@ -10,12 +10,14 @@ export function GlobalStyleTrackpad({
   onClose,
   bodyControls,
   brushControls,
+  toneControls,
 }: {
   panel: GlobalStylePanel
   onPanelChange: (panel: GlobalStylePanel) => void
   onClose: () => void
   bodyControls: ReactNode
   brushControls: ReactNode
+  toneControls: ReactNode
 }) {
   return (
     <section className={styles.brushSection} aria-label="글로벌 스타일 설정">
@@ -34,9 +36,13 @@ export function GlobalStyleTrackpad({
             <Paintbrush size={16} aria-hidden="true" />
             <span><strong>획 스타일</strong><small>붓촉과 방향</small></span>
           </button>
+          <button type="button" role="tab" aria-selected={panel === 'tone'} onClick={() => onPanelChange('tone')}>
+            <Italic size={16} aria-hidden="true" />
+            <span><strong>굵기 · 기울기</strong><small>폰트 전체 한 값</small></span>
+          </button>
         </div>
 
-        {panel === 'body' ? bodyControls : brushControls}
+        {panel === 'body' ? bodyControls : panel === 'brush' ? brushControls : toneControls}
       </div>
     </section>
   )

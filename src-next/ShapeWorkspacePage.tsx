@@ -17,7 +17,7 @@ import { partForJamoRole } from '../src/services/jamoContextRoles'
 import { projectPartGridToSlot } from '../src/services/partGridSlotProjection'
 import { resolveRailGrid } from '../src/services/railGridResolver'
 import { parseShapeSystemSourceV2 } from '../src/services/shapeSystemSourceV2'
-import { useGlobalStyleStore, weightToMultiplier } from '../src/stores/globalStyleStore'
+import { useEffectiveGlobalStyle, weightToMultiplier } from '../src/stores/globalStyleStore'
 import { AppGlyph } from './AppGlyph'
 import {
   flushShapeSystemStorePersistence,
@@ -51,13 +51,13 @@ import styles from './ShapeWorkspacePage.module.css'
 import { CalibrationSentenceEditor } from './CalibrationSentenceEditor'
 
 const CONTEXTS = [
-  { char: 'ㄱ', label: '단독', role: 'STANDALONE', context: { baseContext: 'choseong-only' } },
-  { char: '가', label: '세로모음', role: 'CH', context: { baseContext: 'vertical' } },
-  { char: '고', label: '가로모음', role: 'CH', context: { baseContext: 'horizontal' } },
-  { char: '과', label: '혼합모음', role: 'CH', context: { baseContext: 'mixed' } },
-  { char: '각', label: '세로+받침', role: 'CH', context: { baseContext: 'vertical-with-jongseong' } },
-  { char: '곡', label: '가로+받침', role: 'CH', context: { baseContext: 'horizontal-with-jongseong' } },
-  { char: '곽', label: '혼합+받침', role: 'CH', context: { baseContext: 'mixed-with-jongseong' } },
+  { char: 'ㄱ', label: '단독', role: 'STANDALONE', context: { baseContext: 'choseong-only' }, layoutType: 'choseong-only' },
+  { char: '가', label: '세로모음', role: 'CH', context: { baseContext: 'vertical' }, layoutType: 'choseong-jungseong-vertical' },
+  { char: '고', label: '가로모음', role: 'CH', context: { baseContext: 'horizontal' }, layoutType: 'choseong-jungseong-horizontal' },
+  { char: '과', label: '혼합모음', role: 'CH', context: { baseContext: 'mixed' }, layoutType: 'choseong-jungseong-mixed' },
+  { char: '각', label: '세로+받침', role: 'CH', context: { baseContext: 'vertical-with-jongseong' }, layoutType: 'choseong-jungseong-vertical-jongseong' },
+  { char: '곡', label: '가로+받침', role: 'CH', context: { baseContext: 'horizontal-with-jongseong' }, layoutType: 'choseong-jungseong-horizontal-jongseong' },
+  { char: '곽', label: '혼합+받침', role: 'CH', context: { baseContext: 'mixed-with-jongseong' }, layoutType: 'choseong-jungseong-mixed-jongseong' },
 ] as const
 
 type WorkspaceContext = (typeof CONTEXTS)[number]
@@ -110,7 +110,8 @@ type ShapeMasterPreviewState =
 
 /** J-02에서는 실제 CH ㄱ 마스터가 있을 때만 공통 Shape final regions를 해석한다. */
 function useShapeMasterPreview(source: DeepReadonly<ShapeSystemSourceV2> | null): ShapeMasterPreviewState {
-  const globalStyle = useGlobalStyleStore((state) => state.style)
+  // 단독 ㄱ 마스터 미리보기라 레이아웃은 `choseong-only`다.
+  const globalStyle = useEffectiveGlobalStyle('choseong-only')
   return useMemo(() => {
     const scope = source?.roleSources.CH
     if (!scope) return { kind: 'legacy' as const }
@@ -455,7 +456,7 @@ function resolveBaseEditModel(input: {
 }
 
 function ShapePartPreview({ context, source }: { context: WorkspaceContext; source: DeepReadonly<ShapeSystemSourceV2> | null }) {
-  const globalStyle = useGlobalStyleStore((state) => state.style)
+  const globalStyle = useEffectiveGlobalStyle(context.layoutType)
   const model = useMemo(() => resolveContextEditModel({
     source,
     active: context,
@@ -1147,7 +1148,7 @@ function ContextScreen() {
   const removeOverride = useShapeSystemStore((state) => state.removeContextCoreRailOverride)
   const undo = useShapeSystemStore((state) => state.undo)
   const redo = useShapeSystemStore((state) => state.redo)
-  const globalStyle = useGlobalStyleStore((state) => state.style)
+  const globalStyle = useEffectiveGlobalStyle(active.layoutType)
   const projectName = useUIStore((state) => state.currentProjectName) ?? '새 한글 폰트'
   const { currentProjectId, saveCurrent } = useFontProject()
 

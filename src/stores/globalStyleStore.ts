@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { persist } from 'zustand/middleware'
@@ -81,6 +82,23 @@ export const DEFAULT_STYLE: GlobalStyle = {
   brush: { tip: 'round', aspectRatio: 0.5, angle: 0 },
   strokeStyle: { mode: 'brush', brush: { tip: 'round', aspectRatio: 0.5, angle: 0 } },
   stemBeak: { ...DEFAULT_STEM_BEAK },
+}
+
+/**
+ * 한 레이아웃에 실제로 먹는 전역 스타일. 전역 값을 읽는 모든 곳이 이 길 하나를 거친다.
+ * 제외 규칙이 없으면 같은 객체를 그대로 돌려준다(메모가 안 깨진다).
+ */
+export function effectiveStyleOf(style: GlobalStyle, exclusions: readonly GlobalStyleExclusion[], layoutType: LayoutType): GlobalStyle {
+  const excluded = exclusions.filter((exclusion) => exclusion.layoutType === layoutType)
+  if (excluded.length === 0) return style
+  const effective = { ...style }
+  for (const exclusion of excluded) {
+    // 제외된 속성은 기본값으로 되돌림
+    const prop = exclusion.property
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(effective as any)[prop] = DEFAULT_STYLE[prop]
+  }
+  return effective
 }
 
 export function normalizeBrushStyle(value: Partial<BrushStyle> | undefined): BrushStyle {
@@ -191,18 +209,7 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
 
       getEffectiveStyle: (layoutType) => {
         const { style, exclusions } = get()
-        const effective = { ...style }
-
-        for (const exclusion of exclusions) {
-          if (exclusion.layoutType === layoutType) {
-            // 제외된 속성은 기본값으로 되돌림
-            const prop = exclusion.property
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ;(effective as any)[prop] = DEFAULT_STYLE[prop]
-          }
-        }
-
-        return effective
+        return { ...effectiveStyleOf(style, exclusions, layoutType) }
       },
 
       resetStyle: () =>
@@ -261,6 +268,13 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
     }
   )
 )
+
+/** `getEffectiveStyle`의 구독판. 화면은 `state.style`을 바로 읽지 않고 이 훅으로 읽는다. */
+export function useEffectiveGlobalStyle(layoutType: LayoutType): GlobalStyle {
+  const style = useGlobalStyleStore((state) => state.style)
+  const exclusions = useGlobalStyleStore((state) => state.exclusions)
+  return useMemo(() => effectiveStyleOf(style, exclusions, layoutType), [style, exclusions, layoutType])
+}
 
 /**
  * 획별 linecap 오버라이드와 글로벌 기본값을 결합하여 최종 linecap 결정

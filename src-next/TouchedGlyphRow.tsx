@@ -4,6 +4,7 @@ import type { CorpusIdentity } from './notoCorpus'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 import { useNotoGlyph } from './useNotoGlyph'
 import { useFitInkStyle } from './useFitInkStyle'
+import { layoutTypeOfSyllable } from '../src/utils/hangulUtils'
 import { useLayoutDelta } from './layoutDeltaStore'
 import { propagationCardBaseOf, propagationCardViewOf } from './propagationCardView'
 import type { PropagationCardBox } from './propagationCardView'
@@ -33,7 +34,7 @@ const BOX_COLOR: Record<PropagationCardBox['kind'], string> = { medial: '#3b6fd6
 
 function TouchedGlyph({ identity, bundle, edit, ghostVisible, onPick }: { identity: CorpusIdentity; bundle: NotoPresetModelBundle; edit: PropagationEdit; ghostVisible: boolean; onPick?: (character: string) => void }) {
   const { glyph, error } = useNotoGlyph(identity.codepoint)
-  const inkStyle = useFitInkStyle()
+  const inkStyle = useFitInkStyle(layoutTypeOfSyllable(identity.medialJamo, identity.finalJamo !== null))
   // 이 글자에 이미 저장된 Δ 위에 지금 편집 Δ를 얹는다. 렌더러가 보는 상자와 같은 출발점.
   const savedDelta = useLayoutDelta(identity)
   // 보선을 끄는 동안 움직임마다 칸 수만큼 도는 길이라 둘로 나눈다(`propagationCardView.ts`).

@@ -122,7 +122,7 @@ export function renderMedialPart(part: MedialFitPart, railsEm?: Readonly<Record<
     if (fitted.ok && ink.ok) { rendered.path = finalGlyphInkToSvgPath({ regions: ink.regions }, 1); rendered.inkBox = { ...fitted.fit.box } }
     else rendered.message = ink.ok ? undefined : ink.message
   } else {
-    const ink = inkOfFit(placed.fit, 1, style)
+    const ink = inkOfFit(placed.fit, style?.weightMultiplier ?? 1, style)
     if (!ink.ok) return { railErrors: [], message: ink.message }
     rendered.path = finalGlyphInkToSvgPath({ regions: ink.regions }, 1)
   }

@@ -38,6 +38,8 @@ interface SvgRendererProps {
   children?: ReactNode
   // 글리프 잉크 아래에 깔 요소 (부품 상자·고스트 등). slant 그룹 안, 글리프보다 먼저 그린다.
   underlay?: ReactNode
+  // 기울지 않는 깔개 (눈금·글자몸·기준선·부품 상자). slant 그룹 밖, 맨 아래에 그린다.
+  straightUnderlay?: ReactNode
   // SVG overflow 제어 (기본: 'visible')
   overflow?: 'visible' | 'hidden'
   // 글리프를 viewBox 영역 내로 클리핑 (overflow와 독립적으로 설정 가능)
@@ -77,6 +79,7 @@ export function SvgRenderer({
   enableTransition = false,
   children,
   underlay,
+  straightUnderlay,
   svgRef,
   className,
 }: SvgRendererProps) {
@@ -271,6 +274,9 @@ export function SvgRenderer({
           </clipPath>
         </defs>
       )}
+
+      {/* 곧은 깔개 — 글자가 기울어도 자리의 기준은 곧게 남는다. 이벤트 없음. */}
+      {straightUnderlay && <g pointerEvents="none">{straightUnderlay}</g>}
 
       {/* 글자 전체에 slant 적용 */}
       <g transform={slantTransform}>

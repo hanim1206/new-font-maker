@@ -108,7 +108,10 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
       }).placement
       const screen = xor.appGlyphInkRegions(syllable, screenPlacement, globalStyle)
       if (!screen.ok) throw new Error(`${char} 화면 잉크 실패: ${screen.message}`)
-      const mine = fit.unionOf(screen.regions)
+      // 화면의 기울기는 SVG 변환이다(`SvgRenderer`: 글자 칸 세로 중심 기준 skewX(−기울기)). 같은 식을 잉크에 얹어 OTF와 견준다.
+      const tangent = Math.tan(globalStyle.slant * Math.PI / 180)
+      const upright = fit.unionOf(screen.regions)
+      const mine: MultiPolygon = tangent === 0 ? upright : upright.map((polygon) => polygon.map((ring) => ring.map(([x, y]) => [x - tangent * (y - 0.5), y] as [number, number])))
       const toInk = (glyph: NonNullable<typeof data>) => otfInk(generator.glyphDataToFontContours(glyph), exportUtils.UPM, exportUtils.ASCENDER, padding.left)
       // 화면이 실제로 그리는 상자(칸 해석 → 공통 ink resolver)와 OTF 데이터의 상자. 원점 이동만 빼면 같은 수여야 한다.
       const screenBoxes = inkResolver.resolveGlyphInkPrimitives({
@@ -163,6 +166,28 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
     expect(bar.effectiveLinecap).toBe('butt')
     expect(Math.abs(overhang.start)).toBeLessThan(0.002)
     expect(Math.abs(overhang.end)).toBeLessThan(0.002)
+  })
+
+  it('G2 — 전역 굵기 700 · 기울기 12°: OTF가 화면과 같은 굵기 · 같은 기울기다', async () => {
+    const { measure } = await setup()
+    const { useGlobalStyleStore } = await import('../src/stores/globalStyleStore')
+    const before = useGlobalStyleStore.getState().style
+    useGlobalStyleStore.getState().updateStyle('weight', 700)
+    useGlobalStyleStore.getState().updateStyle('slant', 12)
+    try {
+      const rows = ['한', '과', '의', '곽'].map((char) => ({ char, ...measure(char) }))
+      console.info(rows.map((row) => `${row.char} 굵기 700 · 기울기 12° · 모델 ${(row.modelXor * 100).toFixed(3)}% · 가장자리 ${row.edgeDrift.toFixed(2)}유닛`).join('\n'))
+      for (const row of rows) {
+        expect(row.data.weightMultiplier, row.char).toBeCloseTo(1.72, 9)
+        // 굵기는 중심선을 지킨다: 상자는 굵기와 무관하게 화면과 같다.
+        expect(row.otfBoxes, row.char).toEqual(row.screenBoxes)
+        expect(row.edgeDrift, row.char).toBeLessThan(1)
+        expect(row.modelXor, row.char).toBeLessThan(0.015)
+      }
+    } finally {
+      useGlobalStyleStore.getState().updateStyle('weight', before.weight)
+      useGlobalStyleStore.getState().updateStyle('slant', before.slant)
+    }
   })
 
   it('G1 — 레이아웃 대표 12자와 Δ 세 층(전체 · 이 레이아웃 · 이 자모)이 OTF에 그대로 들어간다', async () => {

@@ -25,6 +25,7 @@ import { hasLayoutEdit, propagationEditOf, unreachedRailIds } from './reviewProp
 import { snapRail } from './railSnap'
 import type { SnapHit } from './railSnap'
 import { useFitInkStyle } from './useFitInkStyle'
+import { layoutTypeOfSyllable } from '../src/utils/hangulUtils'
 import { INACTIVE_PART_COLOR, PART_COLOR } from './partColors'
 import styles from './GlyphLayoutEditor.module.css'
 
@@ -248,7 +249,7 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
   const componentParts = useMemo(() => context ? fitComponentsForGlyph({ context, outline: glyph.outline, approved: approvedInputFor(codepoint) }) : [], [context, glyph, codepoint])
   const [facesByPart, setFacesByPart] = useState<(ComponentFaces | undefined)[]>([])
   // 화면 잉크는 자소 탭과 같은 글로벌 끝 모양으로. 측정·xor는 이 스타일을 안 탄다.
-  const inkStyle = useFitInkStyle()
+  const inkStyle = useFitInkStyle(layoutTypeOfSyllable(glyph.identity.medialJamo, glyph.identity.finalJamo !== null))
   const componentRendered = useMemo(() => componentParts.map((part, index) => renderComponentPart(part, facesByPart[index], inkStyle)), [componentParts, facesByPart, inkStyle])
   const componentOverlays = componentRendered.flatMap((part) => part.path ? [part.path] : [])
   // 홀자 편집은 세션 임시이고 칸 해석과 같은 순서로 쌓는다: 상자 변 Δ로 rail을 다시 놓고(`slotParts`), 그 위에 rail Δ를 얹는다.

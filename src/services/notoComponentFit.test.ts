@@ -60,6 +60,24 @@ describe('componentBoxFromFaces', () => {
     expect(Math.min(...points.map((p) => p.y))).toBeCloseTo(faces.top, 5)
     expect(Math.max(...points.map((p) => p.y))).toBeCloseTo(faces.bottom, 5)
   })
+
+  it('전역 굵기는 중심선을 지킨다: 상자는 그대로, 잉크만 faces 밖으로 굵어진다', () => {
+    const faces = { left: 0.1, right: 0.5, top: 0.15, bottom: 0.79 }
+    const fit = fitNotoComponent({ part: 'CH', jamo: GIYEOK, faces, glyphId: 'ㄱ' })
+    expect(fit.ok).toBe(true)
+    if (!fit.ok) return
+    const style = { linecap: 'butt', linejoin: 'miter', strokeStyle: { mode: 'brush', brush: { tip: 'round', aspectRatio: 1, angle: 0 } } } as const
+    const regular = inkOfComponentFit(fit.fit, style)
+    const bold = inkOfComponentFit(fit.fit, { ...style, weightMultiplier: 2 })
+    expect(regular.ok && bold.ok).toBe(true)
+    if (!regular.ok || !bold.ok) return
+    const top = (regions: typeof regular.regions) => Math.min(...regions.flatMap((region) => region.outer).map((p) => p.y))
+    // ㄱ 윗면: 두께 0.07 → 0.14. 중심선은 제자리라 윗면이 두께 절반(0.035)만큼 faces 밖으로 나간다.
+    expect(top(regular.regions)).toBeCloseTo(faces.top, 5)
+    expect(top(bold.regions)).toBeCloseTo(faces.top - 0.035, 5)
+    // fit 자체(상자 · primitive)는 굵기를 모른다.
+    expect(fit.fit.primitives.every((primitive) => primitive.weightMultiplier === 1)).toBe(true)
+  })
 })
 
 // corpus(.reference-fonts)가 있을 때만: 승인 57자 첫닿자를 실측 박스·모델 박스로 놓고 Noto 첫닿자 고스트와 비교한다.

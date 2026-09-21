@@ -24,7 +24,7 @@ const NO_REVIEWS = {}
 const SAMPLE_COUNT = 6
 const CELL_GLYPH_SIZE = 26
 
-const renderCell = (row: CorpusRow) => <AppGlyph char={row.identity.character} size={CELL_GLYPH_SIZE} />
+const renderCell = (row: CorpusRow) => <AppGlyph char={row.identity.character} size={CELL_GLYPH_SIZE} upright />
 
 /** 받침 축을 다루는 세 자리. 표에서 받침이 시트로 접혀 있어도 이 세그먼트가 뜻을 말한다. */
 type FinalMode = 'all' | 'with' | 'without'
