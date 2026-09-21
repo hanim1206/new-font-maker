@@ -126,7 +126,7 @@ function CardGrid({ candidates, bundle, edit, ghostVisible, onNearEnd, onPick }:
 /** 편집기 하단 바가 `적용`을 누를 때 쓰는 손잡이. 범위·고른 자모는 카드가 들고 있어서 여기로 판다. */
 export interface ReviewPropagationHandle { apply: () => void }
 
-export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, focus, ghostVisible = true, onApplied, onCommitted, onSelectPart, onScopeLabel, onPickCharacter, ref }: {
+export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, focus, ghostVisible = true, onApplied, onCommitted, onSelectPart, onScopeLabel, onScope, onPickCharacter, ref }: {
   source: CorpusIdentity
   bundle: NotoPresetModelBundle | null
   edit: PropagationEdit
@@ -146,6 +146,8 @@ export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, f
   ghostVisible?: boolean
   /** 지금 범위 이름(`이 레이아웃` · `ㄱ·ㅋ` · `전체`). 하단 바의 `…에 적용` 글씨용. */
   onScopeLabel?: (label: string) => void
+  /** 지금 범위. 캔버스 옆 레이아웃 여섯 칸 표지가 어느 칸을 켤지 정할 때 쓴다. */
+  onScope?: (scope: PropagationScope) => void
   /** 예시 글자 카드를 눌렀을 때. 호출자가 그 글자를 연다. */
   onPickCharacter?: (character: string) => void
   ref?: Ref<ReviewPropagationHandle>
@@ -190,6 +192,7 @@ export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, f
   const loadNextBatch = () => { if (!exhausted) setLoaded((current) => (current.rowKey === rowKey ? current.batches : 1) === batches ? { rowKey, batches: batches + 1 } : current) }
   const scopeLabel = scope === 'jamo' ? jamos.join('·') : PROPAGATION_SCOPES.find((item) => item.id === scope)?.label ?? ''
   useEffect(() => { onScopeLabel?.(scopeLabel) }, [onScopeLabel, scopeLabel])
+  useEffect(() => { onScope?.(scope) }, [onScope, scope])
   // 적용 = 지금 범위에 Δ 저장. 하단 바가 ref로 부른다. 닫힘값은 렌더마다 새로 잡는다(ref 갱신은 값싸다).
   useImperativeHandle(ref, () => ({ apply: () => commit(() => applyDelta(target, layoutDeltaOf(edit))) }))
   return <section className={styles.section} aria-label="다른 글자에 적용하면" data-testid="review-propagation">

@@ -13,11 +13,12 @@ import { editableRailsOf, editableSlotRailsOf, fitMedialForGlyph, renderMedialPa
 import type { EditableRail } from './notoMedialFitView'
 import { useNotoModel } from './notoModel'
 import type { NotoPresetGlyph } from './notoPresetGlyphs'
+import { LayoutContextCards } from './LayoutContextCards'
 import { ReviewPropagationCards } from './ReviewPropagationCards'
 import type { ReviewPropagationHandle } from './ReviewPropagationCards'
 import { useNotoGlyph } from './useNotoGlyph'
 import { useLayoutDelta } from './layoutDeltaStore'
-import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
+import type { LayoutDeltaSnapshot, PropagationScope } from './layoutDeltaStore'
 import { hasLayoutEdit, propagationEditOf, unreachedRailIds } from './reviewPropagation'
 import { snapRail } from './railSnap'
 import type { SnapHit } from './railSnap'
@@ -301,6 +302,8 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
   const canApply = hasLayoutEdit(propagationEdit)
   const cardsRef = useRef<ReviewPropagationHandle>(null)
   const [scopeLabel, setScopeLabel] = useState('이 레이아웃')
+  // 범위는 카드 묶음이 들고 있다. 캔버스 옆 여섯 칸 표지가 `전체`를 알아야 해서 여기로 올려 둔다.
+  const [scope, setScope] = useState<PropagationScope>('layer')
 
   // 값 하나를 놓아 본다. 순서·간격 위반이면 false, 호출자는 마지막 유효값을 지킨다.
   const tryPlace = (target: EditableRail, value: number): true | string => {
@@ -363,6 +366,9 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
 
   return <div className={styles.editor} data-testid="glyph-layout-editor">
       <section className={styles.canvasSection}>
+        {/* 캔버스 왼쪽 세로 표지. 여섯 칸 중 지금 고치는 칸을 켜기만 한다 — 범위는 아래 범위 띠에서 고른다. */}
+        <LayoutContextCards activeContextId={glyph.identity.contextId} allActive={scope === 'all'} />
+        <div className={styles.canvasArea}>
         {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail?.id} snappedRail={snapHit?.id} snapHit={snapHit} onSelectRail={(id) => { if (id !== rail?.id) setSnapHit(null); setSelectedRail(id); setError('') }} onSelectPart={selectPart} onDragRail={(id, value) => changeRail(id, value, { snap: true })} onNudgeRail={(id, delta) => { const target = editable.find((item) => item.id === id); if (target) changeRail(id, target.value + delta) }} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
         <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="review-ghost-toggle" />
         {/* 변 rail을 잡으면 `이 자리에 맞추기`. 누르면 범위 안 글자가 전부 이 자리(em)에 모인다. 탁 걸린 자리면 주황 테두리. 고정 뒤엔 `= 자리` 표지. */}
@@ -371,10 +377,11 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
           : <span className={styles.canvasFixed} data-testid="review-fixed-rail">{rail.label} = {Math.round(rail.value * 1000)} · 고정</span>)}
         {/* 자 도구는 없다. 캔버스 안에서 끌기·방향키(1u · Shift 10u)로 옮기고, 경고는 캔버스 위에 겹쳐 높이가 안 흔들린다. 복원은 하단 바. */}
         {(error || inkIssue) && <p className={styles.canvasWarning} role="alert" data-testid="review-canvas-warning">{error || `홀자 획이 상자에 안 맞습니다 · ${inkIssue}`}</p>}
+        </div>
       </section>
       {modelError && <p className={styles.status} data-state="error" role="alert">{modelError}</p>}
       {/* 적용하면 Δ가 저장되고 context가 새 original로 다시 풀리므로 세션 편집은 비운다. */}
-      <ReviewPropagationCards ref={cardsRef} source={glyph.identity} bundle={bundle} edit={propagationEdit} changed={changedRails} fixed={fixedRails} focus={rail?.part} ghostVisible={ghostVisible} onApplied={resetRails} onCommitted={onCommitted} onSelectPart={selectPart} onScopeLabel={setScopeLabel} onPickCharacter={onPickCharacter} />
+      <ReviewPropagationCards ref={cardsRef} source={glyph.identity} bundle={bundle} edit={propagationEdit} changed={changedRails} fixed={fixedRails} focus={rail?.part} ghostVisible={ghostVisible} onApplied={resetRails} onCommitted={onCommitted} onSelectPart={selectPart} onScopeLabel={setScopeLabel} onScope={setScope} onPickCharacter={onPickCharacter} />
       {/* 하단 바는 한 줄짜리 상태 기계. Δ 없음 → `ㄱ 획 고치기`. Δ 있음 → `복원 | …에 적용`(범위는 카드가 앎). 편집기가 내놓는 rail은 전부 배치라 Δ가 있으면 늘 적용할 수 있다. */}
       {(onEditStrokes && activePart) || editCount > 0 ? <div className={styles.strokeCta} data-testid="jamo-stroke-cta-bar">
         <div className={styles.ctaRow}>

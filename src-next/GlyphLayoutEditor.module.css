@@ -3,7 +3,9 @@
 .status[data-state='error'] { color: rgb(var(--color-danger, 214 50 31)); }
 
 
-.canvasSection { position: relative; padding: 8px 14px; }
+/* 캔버스 왼쪽에 레이아웃 여섯 칸 표지가 세로로 선다. 캔버스 위 겹치는 표지(`canvasFix` 등)는 표지 띠가 아니라 캔버스를 기준으로 놓는다. */
+.canvasSection { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 14px; }
+.canvasArea { position: relative; flex: 1 1 auto; min-width: 0; }
 /* 드래그 중 브라우저 선택 하이라이트(파란 배경)와 스크롤 제스처를 막는다. */
 .canvas { position: relative; width: min(100%, 330px); aspect-ratio: 1; margin: 0 auto; display: block; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 20px; background: #fff; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; -webkit-tap-highlight-color: transparent; }
 .canvas * { user-select: none; -webkit-user-select: none; }

@@ -150,6 +150,23 @@ const SAMPLE_BATCHES: Readonly<Record<string, readonly string[]>> = {
 }
 const identitiesOf = (text: string): CorpusIdentity[] => [...text].map((character) => corpusIdentity(character.codePointAt(0)!))
 
+/** 레이아웃 여섯 칸. 홀자 계열(오른쪽·아래·섞임) × 받침 유무. `modelContextId`가 만드는 id와 같다. */
+export const LAYOUT_CONTEXT_IDS = ['right', 'right-final', 'bottom', 'bottom-final', 'mixed', 'mixed-final'] as const
+export const LAYOUT_CONTEXT_LABEL: Readonly<Record<string, string>> = {
+  right: '오른쪽 홀자', 'right-final': '오른쪽 홀자 · 받침',
+  bottom: '아래 홀자', 'bottom-final': '아래 홀자 · 받침',
+  mixed: '섞임 홀자', 'mixed-final': '섞임 홀자 · 받침',
+}
+/**
+ * 그 칸을 대표하는 글자. 여섯 칸 카드가 상자 모양을 뽑을 때 쓴다.
+ * 고른 글자 묶음의 맨 앞을 그냥 쓰지 않는다 — ㅣ(기둥 하나)·ㅡ(가로보 하나)처럼 역할이 하나뿐인 홀자는
+ * 상자가 선 하나로 납작해져서 칸이 어떻게 생겼는지 못 보여 준다. 칸마다 역할이 다 있는 흔한 글자를 하나씩 고정한다.
+ */
+const LAYOUT_SAMPLE_CHAR: Readonly<Record<string, string>> = {
+  right: '가', 'right-final': '한', bottom: '고', 'bottom-final': '북', mixed: '와', 'mixed-final': '원',
+}
+export const layoutSampleCharOf = (contextId: string): string => LAYOUT_SAMPLE_CHAR[contextId] ?? '한'
+
 // 고른 글자가 모자랄 때 채우는 기계 조합. 초성·받침은 자주 쓰는 것 위주로 골라 문맥이 고루 섞이게 한다.
 const SAMPLE_INITIALS = [...'ㄱㄴㅁㅅㅇㅈㅎㄹㅂㅋ']
 const SAMPLE_FINALS: (string | null)[] = [null, ...'ㄴㄹㅁㅇㄱㅂ']
