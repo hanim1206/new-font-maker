@@ -75,3 +75,8 @@ section.panel > div::-webkit-scrollbar { display: none; }
 .panel [role='slider']::before, .panel [role='slider']::after { background: rgb(var(--color-text-6) / .5); }
 .panel [role='slider'] > span[aria-hidden='true']:last-of-type { background: rgb(var(--color-foreground)); }
 .panel [role='tabpanel'] > p:only-of-type, .panel [role='tabpanel'] p[class*='roundBrushMessage'] { border-color: rgb(var(--color-border-subtle)); }
+
+/* 네모꼴 막대: 양 끝에 길쭉한 틀 · 납작한 틀 그림 */
+.shapeRow { display: flex; align-items: center; gap: 10px; }
+.shapeRow input { flex: 1 1 auto; min-width: 0; }
+.shapeIcon { flex: 0 0 auto; display: block; box-sizing: border-box; border: 1.5px solid rgb(var(--color-text-4)); border-radius: 2px; }

@@ -100,6 +100,36 @@ test('스타일을 열면 캔버스가 비키고 문장 줄이 한 줄 그대로
   await expect.poll(async () => (await glyph.boundingBox())?.height ?? 0).toBeLessThan(30)
 })
 
+test('글자 네모꼴은 막대 하나다: 길쭉 ↔ 정네모 ↔ 납작, 정네모 근처에서 걸린다', async ({ page }) => {
+  await page.goto(`/workspace/jamo?char=${encodeURIComponent('한')}`)
+  await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
+  const panel = page.getByRole('tabpanel', { name: '글자 네모꼴 설정' })
+  await expect(panel.locator('input[type="range"]')).toHaveCount(1)
+  const shape = panel.getByTestId('style-body-shape')
+  const size = panel.getByTestId('style-body-size')
+  await expect(size).toHaveText('850 × 850')
+
+  // 길쭉: 세로는 그대로, 가로만 준다. 문장 글자도 같이 좁아진다.
+  const glyph = page.getByRole('region', { name: '보정 문장' }).getByRole('button', { name: /^한 편집/ }).locator('svg')
+  // 문장이 다 자란 뒤의 폭을 기준으로 잰다.
+  await expect.poll(async () => (await glyph.boundingBox())?.height ?? 0).toBeGreaterThan(130)
+  const before = (await glyph.boundingBox())?.width ?? 0
+  await shape.fill('-100')
+  await expect(size).toHaveText('500 × 850')
+  await expect.poll(async () => (await glyph.boundingBox())?.width ?? 0).toBeLessThan(before * 0.7)
+
+  // 납작: 가로가 글자 칸 끝(1000)에 닿은 뒤에는 세로가 준다.
+  await shape.fill('30')
+  await expect(size).toHaveText('1000 × 850')
+  await shape.fill('100')
+  await expect(size).toHaveText('1000 × 500')
+
+  // 정네모 근처는 정네모로 걸린다.
+  await shape.fill('3')
+  await expect(size).toHaveText('850 × 850')
+  await expect(shape).toHaveValue('0')
+})
+
 test('기울어진 글자: 잉크 · 핸들만 기울고 눈금은 곧으며, 점을 세로로 끌어도 손가락 아래에 있다', async ({ page }) => {
   await page.goto(`/workspace/jamo?mode=stroke&char=${encodeURIComponent('한')}`)
   await expect(page.getByTestId('focus-canvas').locator('svg')).toBeVisible()
