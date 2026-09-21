@@ -10,6 +10,7 @@ import { effectiveLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { adoptFamilyStrokes, familyOfSyllable } from '../src/utils/jamoContextStrokes'
 import { withFrameFrom, withoutFrame } from '../src/utils/jamoFrame'
+import { weightToMultiplier } from '../src/utils/globalStyleUtils'
 import { componentProtrusion } from '../src/services/notoComponentFit'
 import { PART_COLOR, PART_LABEL } from './partColors'
 import { useJamoStore } from '../src/stores/jamoStore'
@@ -119,6 +120,9 @@ const DRAG_THRESHOLD_PX = 3
 type PreviewJamo = { type: JamoData['type']; char: string; data: JamoData; baseline?: JamoData; pastGapLimit?: boolean }
 /** 최소 잉크 간격에 걸린 자리에서 이만큼(em) 더 끌어야 넘어간다. 한 번 "탁" 걸리는 세기. */
 const GAP_STICK_EM = 0.05
+/** 잡은 획의 색. 후광 없이 획을 이 색으로 덮는다. 옆 자소에 너무 붙은 자소의 획은 경고색. */
+const ACTIVE_STROKE = 'rgb(var(--color-primary))'
+const ACTIVE_STROKE_WARNING = '#e0321a'
 type PreviewSchema = { layoutType: LayoutType; schema: LayoutSchema }
 type SelectedPoint = { strokeId: string; pointIndex: number }
 type HistoryEntry =
@@ -266,6 +270,7 @@ function roleRenderParts(part: MobileEditorPart, boxes: Partial<Record<Part, Box
   return [part]
 }
 
+const NO_PARTS: readonly MobileEditorPart[] = []
 const editorPartOf = (part: Part): MobileEditorPart => part === 'CH' ? 'CH' : part === 'JO' ? 'JO' : 'JU'
 /** `획 고치기`로 잠긴 동안 고치지 않는 자소의 잉크 농도. */
 const LOCKED_OUT_OPACITY = 0.22
@@ -377,7 +382,7 @@ function FocusedGlyph({
   onPointSelect,
   lockedPart = null,
   dragApiRef,
-  gapWarning = false,
+  gapWarningParts = NO_PARTS,
   fontSpace,
   grid,
   designBody,
@@ -391,8 +396,8 @@ function FocusedGlyph({
   lockedPart?: MobileEditorPart | null
   /** 주면 잡은 점 · 핸들 · 획을 캔버스에서 바로 끈다(셸 안). 없으면 누르기로 고르기만 한다. */
   dragApiRef?: RefObject<StrokeDragApi | null>
-  /** 고친 자소가 옆 자소에 최소 간격보다 가깝게(그리고 고치기 전보다 더) 붙었다. 캔버스 바탕에 색을 깔아 알린다. */
-  gapWarning?: boolean
+  /** 옆 자소에 최소 간격보다 가깝게(그리고 고치기 전보다 더) 붙은 자소들. 그 자소의 잡은 획을 경고색으로 그린다. */
+  gapWarningParts?: readonly MobileEditorPart[]
   onSelect: (selection: Selection) => void
   selectedPoints: SelectedPoint[]
   onPointSelect: (selection: Extract<Selection, { kind: 'point' }>) => void
@@ -469,7 +474,7 @@ function FocusedGlyph({
   const body = { x: designBody.x / fontSpace.unitsPerEm * VIEW_BOX_SIZE, y: designBody.y / fontSpace.unitsPerEm * VIEW_BOX_SIZE, width: designBody.width / fontSpace.unitsPerEm * VIEW_BOX_SIZE, height: designBody.height / fontSpace.unitsPerEm * VIEW_BOX_SIZE }
 
   return (
-    <div ref={canvasRef} className={styles.focusCanvas} style={canvasStyle} data-testid="focus-canvas" data-placement={placement.kind} data-direct={dragApiRef ? true : undefined} data-gap-warning={gapWarning ? true : undefined} onPointerDown={() => onSelect({ kind: 'none' })} onPointerMove={moveDrag} onPointerUp={(event) => endDrag(event, false)} onPointerCancel={(event) => endDrag(event, true)}>
+    <div ref={canvasRef} className={styles.focusCanvas} style={canvasStyle} data-testid="focus-canvas" data-placement={placement.kind} data-direct={dragApiRef ? true : undefined} data-gap-warning={gapWarningParts.length ? true : undefined} onPointerDown={() => onSelect({ kind: 'none' })} onPointerMove={moveDrag} onPointerUp={(event) => endDrag(event, false)} onPointerCancel={(event) => endDrag(event, true)}>
       {globalStyle.strokeStyle.mode === 'legacy-snapped-centerline' && <span className={styles.constructionGrid} aria-hidden="true" data-construction-grid="legacy-snapped-centerline" />}
       <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} size={340} viewportBox={CANVAS_VIEWPORT} className={styles.focusSvg} partStyles={partStyles} globalStyle={globalStyle} underlay={<>
         {/* 검수 캔버스(GhostCanvas)와 같은 깔개: 흰 칸 → 1/16 잔선·1/4 굵은선 눈금 → 칸 테두리 → 글자몸 → 기준선(0.88) → 부품 상자 → Noto 고스트. 전부 잉크 아래. */}
@@ -492,11 +497,14 @@ function FocusedGlyph({
           const path = pointsToSvgD(target.stroke.points, target.stroke.closed, target.box, VIEW_BOX_SIZE)
           const component = componentFor(char, target.editorPart, target.jamo)
           const sameComponent = lockedPart !== null || selectedPart === target.editorPart
-          return <path
-            key={`hit-${target.renderPart}-${target.stroke.id}`}
+          const isSelected = selectedStrokeId === target.stroke.id
+          // 잡은 획은 테두리(후광) 없이 획 색으로만 알린다: 잉크와 같은 굵기 · 같은 끝 모양으로 덮어 파랗게, 옆 자소에 너무 붙은 자소면 빨갛게. 눌림 영역은 그 위에 투명하게 넓게 둔다.
+          return <g key={`hit-${target.renderPart}-${target.stroke.id}`}>
+          {isSelected && <path d={path} fill="none" stroke={gapWarningParts.includes(target.editorPart) ? ACTIVE_STROKE_WARNING : ACTIVE_STROKE} strokeWidth={target.stroke.thickness * weightToMultiplier(globalStyle.weight) * VIEW_BOX_SIZE} strokeLinecap={target.stroke.linecap ?? globalStyle.linecap ?? 'butt'} strokeLinejoin={target.stroke.linejoin ?? globalStyle.linejoin ?? 'miter'} pointerEvents="none" data-active-stroke={gapWarningParts.includes(target.editorPart) ? 'warning' : 'active'} />}
+          <path
             d={path}
             fill="none"
-            stroke={selectedStrokeId === target.stroke.id ? 'rgb(var(--color-primary) / .3)' : 'transparent'}
+            stroke="transparent"
             strokeWidth={Math.max(12, target.stroke.thickness * VIEW_BOX_SIZE + 8)}
             pointerEvents="stroke"
             data-editor-hit="stroke"
@@ -511,6 +519,7 @@ function FocusedGlyph({
               }
             }}
           />
+          </g>
         })}
         {selectedPart && selection.kind !== 'component' && targets.filter((target) => target.editorPart === selectedPart).flatMap((target) => target.stroke.points.map((point, pointIndex) => {
           const { x, y } = absolutePoint(point, target.box)
@@ -1218,9 +1227,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const snapStep = fontUnitsToNormalized(grid.snapInterval, fontSpace)
   const minimumInkGap = fontUnitsToNormalized(grid.minorInterval, fontSpace)
   // 간격 경고: 고친 자소(기준 틀이 굳은 것)가 이 글자에서 옆 자소에 최소 간격보다 가깝고, 고치기 전(틀 = 고치기 전 획)보다 더 붙었을 때. 프리셋이 원래 좁은 글자는 안 울린다.
-  const gapWarning = useMemo(() => {
-    if (chrome !== 'workspace' || placement.kind !== 'boxes') return false
-    return (['CH', 'JU', 'JO'] as const).some((part) => {
+  const gapWarningParts = useMemo((): readonly MobileEditorPart[] => {
+    if (chrome !== 'workspace' || placement.kind !== 'boxes') return NO_PARTS
+    return (['CH', 'JU', 'JO'] as const).filter((part) => {
       const jamo = part === 'CH' ? syllable.choseong : part === 'JU' ? syllable.jungseong : syllable.jongseong
       if (!jamo?.frame) return false
       const beforeJamo: JamoData = { ...jamo, ...jamo.frame }
@@ -1621,7 +1630,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         <div className={styles.strokeStage}>
         {chrome === 'workspace' && layoutAvailable && !isBrushStyleOpen && <LayoutContextCards activeContextId={corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00).contextId} allActive={false} ink={strokeCardInk ?? undefined} />}
         <div className={styles.focusArea}>
-        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={isBrushStyleOpen ? { kind: 'none' } : selection} onSelect={isBrushStyleOpen ? () => {} : selectFromCanvas} selectedPoints={isBrushStyleOpen ? [] : selectedPoints} onPointSelect={isBrushStyleOpen ? () => {} : selectPointFromCanvas} lockedPart={isBrushStyleOpen ? null : lockedPart} dragApiRef={directManipulation && !isBrushStyleOpen ? dragApiRef : undefined} gapWarning={gapWarning} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
+        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={isBrushStyleOpen ? { kind: 'none' } : selection} onSelect={isBrushStyleOpen ? () => {} : selectFromCanvas} selectedPoints={isBrushStyleOpen ? [] : selectedPoints} onPointSelect={isBrushStyleOpen ? () => {} : selectPointFromCanvas} lockedPart={isBrushStyleOpen ? null : lockedPart} dragApiRef={directManipulation && !isBrushStyleOpen ? dragApiRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
         </div>
         </div>
       </section>
