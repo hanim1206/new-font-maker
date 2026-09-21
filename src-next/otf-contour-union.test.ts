@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 import { describe, expect, it, vi } from 'vitest'
 import legacyJamos from '../src/data/fixtures/baseJamosLegacy2026-02.json'
 import type { JamoData } from '../src/types'
@@ -257,5 +260,36 @@ describe('CFF 컨투어 정규화와 겹침 제거', () => {
     const merged = mergeStrokeContourGroupsForCff([[outer, hole]])
     expect(evenOddFilled({ x: 50, y: 50 }, merged)).toBe(false)
     expect(evenOddFilled({ x: 12, y: 50 }, merged)).toBe(true)
+  })
+
+  it('납작 붓촉 + 모델 상자에서 여러 항 union이 터지는 글자도 잉크를 합쳐 내보낸다', async () => {
+    const memory = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => memory.get(key) ?? null,
+      setItem: (key: string, value: string) => memory.set(key, value),
+      removeItem: (key: string) => memory.delete(key),
+    })
+    const MODEL = JSON.parse(readFileSync(fileURLToPath(new URL('../public/noto-preset/model.json', import.meta.url)), 'utf8')) as NotoPresetModelBundle
+    const [utils, generator, exportStore, deltaStore, style] = await Promise.all([
+      import('../src/services/fontExportUtils'), import('../src/services/fontGenerator'),
+      import('./fontExportStore'), import('./layoutDeltaStore'), import('../src/stores/globalStyleStore'),
+    ])
+    const brush = { tip: 'ellipse' as const, aspectRatio: 0.5, angle: 0 }
+    style.useGlobalStyleStore.setState((state) => ({ style: { ...state.style, brush, strokeStyle: { mode: 'brush', brush } } }))
+    try {
+      const placementOf = exportStore.placementResolverOf(MODEL, deltaStore.layoutDeltaSnapshot())
+      // 이 둘은 polygon-clipping의 여러 항 union이 SweepLine에서 터지던 글자다. 하나만 터져도 추출 전체가 실패했다.
+      for (const char of ['쭈', '쮑']) {
+        const glyph = utils.collectGlyphDataWithPlacement(char, placementOf)
+        if (!glyph) throw new Error(`${char} 출력 데이터 없음`)
+        const contours = generator.glyphDataToFontContours(glyph)
+        expect(contours.length, char).toBeGreaterThan(0)
+        // 합쳐졌으면 획 수(획당 최소 1링)보다 링이 적다. 안 합쳐지면 획마다 링이 그대로 남는다.
+        expect(contours.length, char).toBeLessThan(glyph.strokes.length * 4)
+      }
+    } finally {
+      style.useGlobalStyleStore.getState().resetStyle()
+      vi.unstubAllGlobals()
+    }
   })
 })
