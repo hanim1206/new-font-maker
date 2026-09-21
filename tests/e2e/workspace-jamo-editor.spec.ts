@@ -9,8 +9,11 @@ test.beforeEach(async ({ page }) => {
 test('자소 탭 획 편집은 셸 안에서 문장·캔버스·트랙패드를 보여주고 획을 선택한다', async ({ page }) => {
   await page.goto('/workspace/jamo?mode=stroke')
 
+  // 하단 내비는 없다. 화면 이동은 머리 `…` 메뉴 안에 있다.
+  await page.getByRole('button', { name: '프로젝트 더보기' }).click()
   const nav = page.getByRole('navigation', { name: '프로젝트 주 내비게이션' })
   await expect(nav.getByRole('link', { name: '자소' })).toHaveAttribute('aria-current', 'page')
+  await page.keyboard.press('Escape')
   await expect(page.getByRole('region', { name: '보정 문장' })).toBeVisible()
   const editor = page.getByRole('region', { name: /완성 글자 편집/ })
   await expect(editor).toBeVisible()
@@ -28,11 +31,11 @@ test('자소 탭 획 편집은 셸 안에서 문장·캔버스·트랙패드를 
   expect(overflow.horizontal).toBeLessThanOrEqual(0)
   expect(overflow.vertical).toBeLessThanOrEqual(0)
   const trackpadBox = await page.getByRole('group', { name: '선택한 글자 형태를 조절하는 트랙패드' }).boundingBox()
-  const navBox = await nav.boundingBox()
-  expect(trackpadBox && navBox && trackpadBox.y + trackpadBox.height <= navBox.y + 1).toBe(true)
-  // 트랙패드 아래 `완료`도 내비게이션 위에 들어온다.
+  const bottom = page.viewportSize()?.height ?? 0
+  expect(trackpadBox && trackpadBox.y + trackpadBox.height <= bottom + 1).toBe(true)
+  // 트랙패드 아래 `완료`도 화면 안에 들어온다(하단 내비가 없어 바닥이 곧 화면 끝이다).
   const doneBox = await page.getByTestId('jamo-stroke-done').boundingBox()
-  expect(doneBox && navBox && trackpadBox && doneBox.y >= trackpadBox.y + trackpadBox.height - 1 && doneBox.y + doneBox.height <= navBox.y + 1).toBe(true)
+  expect(doneBox && trackpadBox && doneBox.y >= trackpadBox.y + trackpadBox.height - 1 && doneBox.y + doneBox.height <= bottom + 1).toBe(true)
 
   // 획 두 번 눌러 선택(첫 클릭 = 부품, 둘째 = 획).
   const focusSvg = editor.locator('svg')

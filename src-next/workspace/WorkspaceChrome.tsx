@@ -3,17 +3,15 @@ import type { ReactNode } from 'react'
 import {
   ChevronDown,
   ChevronUp,
-  Home,
   MoreHorizontal,
   Redo2,
   ScanSearch,
   Shapes,
   Undo2,
-  Upload,
 } from 'lucide-react'
 import styles from './WorkspaceChrome.module.css'
 
-export type WorkspaceArea = 'home' | 'jamo' | 'review' | 'output'
+export type WorkspaceArea = 'jamo' | 'review'
 export type DrawerState = 'collapsed' | 'medium' | 'expanded'
 
 export interface WorkspaceHistoryControls {
@@ -39,7 +37,7 @@ export function MobileWorkspaceShell({
   projectName?: string
   statusLabel?: string
   history?: WorkspaceHistoryControls
-  /** 머리 `…` 메뉴에 넣을 도구(링크·버튼). 없으면 `…`는 꺼져 있다. 항목을 누르면 메뉴는 닫힌다. */
+  /** 머리 `…` 메뉴에서 화면 이동(자소 · 검수) 아래에 넣을 도구(링크·버튼). 항목을 누르면 메뉴는 닫힌다. */
   menu?: ReactNode
   /** 메뉴 안 도구의 진행 상태를 `…` 단추에 점으로 보인다. */
   menuBadge?: 'busy' | 'done' | 'failed' | null
@@ -63,24 +61,22 @@ export function MobileWorkspaceShell({
           <div className={styles.headerActions} aria-label="프로젝트 편집 기록">
             <button type="button" disabled={!history?.canUndo} onClick={history?.onUndo} aria-label="형태 편집 실행 취소"><Undo2 size={18} /></button>
             <button type="button" disabled={!history?.canRedo} onClick={history?.onRedo} aria-label="형태 편집 다시 실행"><Redo2 size={18} /></button>
-            <button type="button" disabled={!menu} aria-label="프로젝트 더보기" aria-haspopup="menu" aria-expanded={menu ? menuOpen : undefined} data-badge={menuBadge ?? undefined} onClick={() => setMenuOpen((open) => !open)}><MoreHorizontal size={20} /></button>
+            <button type="button" aria-label="프로젝트 더보기" aria-haspopup="menu" aria-expanded={menuOpen} data-badge={menuBadge ?? undefined} onClick={() => setMenuOpen((open) => !open)}><MoreHorizontal size={20} /></button>
             {/* 메뉴는 늘 DOM에 있다(도구의 상태·testid가 닫혀 있어도 읽힌다). 닫히면 숨기기만 한다. */}
-            {menu && <>
-              {menuOpen && <div className={styles.moreBackdrop} onClick={() => setMenuOpen(false)} aria-hidden="true" />}
-              <div className={styles.moreMenu} hidden={!menuOpen} onClick={() => setMenuOpen(false)} data-testid="workspace-more-menu">{menu}</div>
-            </>}
+            {menuOpen && <div className={styles.moreBackdrop} onClick={() => setMenuOpen(false)} aria-hidden="true" />}
+            <div className={styles.moreMenu} hidden={!menuOpen} onClick={() => setMenuOpen(false)} data-testid="workspace-more-menu">
+              {/* 하단 내비를 없애고 화면 이동을 여기로 옮겼다. 출력은 화면이 넘기는 도구의 `OTF 추출`이 맡는다. */}
+              <nav className={styles.menuNav} aria-label="프로젝트 주 내비게이션">
+                <a href="/workspace/jamo" aria-current={activeArea === 'jamo' ? 'page' : undefined}><Shapes size={18} /><em>자소</em></a>
+                <a href="/workspace/review" aria-current={activeArea === 'review' ? 'page' : undefined}><ScanSearch size={18} /><em>검수</em></a>
+              </nav>
+              {menu}
+            </div>
           </div>
         </header>
 
         {children}
         {drawer}
-
-        <nav className={styles.primaryNav} aria-label="프로젝트 주 내비게이션">
-          <button type="button" disabled aria-current={activeArea === 'home' ? 'page' : undefined}><Home size={19} /><span>홈</span></button>
-          <a href="/workspace/jamo" aria-current={activeArea === 'jamo' ? 'page' : undefined}><Shapes size={19} /><span>자소</span></a>
-          <a href="/workspace/review" aria-current={activeArea === 'review' ? 'page' : undefined}><ScanSearch size={19} /><span>검수</span></a>
-          <button type="button" disabled aria-current={activeArea === 'output' ? 'page' : undefined}><Upload size={19} /><span>출력</span></button>
-        </nav>
       </div>
     </main>
   )
