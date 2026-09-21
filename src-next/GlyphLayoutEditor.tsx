@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { notoOutlineGhostPath } from '../src/services/notoOutlineInk'
 import { DevGhostToggle } from './DevGhostToggle'
+import { DEV_TOOLS_ENABLED } from './devTools'
 import { approvedInputFor, isApproved } from './notoApprovedIndex'
 import { editableComponentRailsOf, fitComponentsForGlyph, renderComponentPart } from './notoComponentFitView'
 import type { ComponentFaces } from '../src/services/notoComponentFit'
@@ -59,6 +60,8 @@ const VIEW_BOX_SIZE = 1.16
 const GHOST_STORAGE_KEY = 'review-ghost-visible-v1'
 
 function readGhostVisible(): boolean {
+  // 끄는 버튼이 개발용이라 배포 빌드에서는 늘 꺼 둔다.
+  if (!DEV_TOOLS_ENABLED) return false
   try { return localStorage.getItem(GHOST_STORAGE_KEY) !== 'off' } catch { return true }
 }
 function writeGhostVisible(visible: boolean) {

@@ -6,6 +6,7 @@ import type { GlobalStyle } from '../src/stores/globalStyleStore'
 import type { DecomposedSyllable, DeepReadonly, InkRegion } from '../src/types'
 import { CORPUS_TOTAL } from './notoCorpus'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
+import { DEV_TOOLS_ENABLED } from './devTools'
 
 /**
  * 자소 편집 화면용 Noto 고스트. 편집 중인 글자 전체의 Noto 윤곽을 깔고,
@@ -50,6 +51,8 @@ export function useGhostComparison(ghost: NotoGhost | null, syllable: Decomposed
 }
 
 export function loadGhostVisible(): boolean {
+  // 끄는 버튼이 개발용이라 배포 빌드에서는 늘 꺼 둔다.
+  if (!DEV_TOOLS_ENABLED) return false
   try { return localStorage.getItem(NOTO_GHOST_STORAGE_KEY) !== 'off' } catch { return true }
 }
 
