@@ -67,7 +67,9 @@ section.panel > div::-webkit-scrollbar { display: none; }
 .panel [role='radiogroup'][aria-label='획 생성 규칙'] { gap: 2px; padding: 2px; border-radius: 9px; background: rgb(var(--color-surface-3)); }
 .panel [role='radiogroup'][aria-label='획 생성 규칙'] button { min-height: 32px; border: 0; border-radius: 7px; background: transparent; color: rgb(var(--color-text-4)); font-size: 11px; font-weight: 600; }
 .panel [role='radiogroup'][aria-label='획 생성 규칙'] button[aria-checked='true'] { background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); box-shadow: 0 1px 2px rgb(15 23 42 / .12); }
+.panel [role='radiogroup'][aria-label='획 끝 모양'] button,
 .panel [role='radiogroup'][aria-label='붓촉 모양'] button { border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-4)); box-shadow: none; }
+.panel [role='radiogroup'][aria-label='획 끝 모양'] button[aria-checked='true'],
 .panel [role='radiogroup'][aria-label='붓촉 모양'] button[aria-checked='true'] { background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); box-shadow: none; }
 .panel [role='slider'] { border: 0; border-radius: 10px; background-color: rgb(var(--color-surface-3)); }
 .panel [role='slider']::before, .panel [role='slider']::after { background: rgb(var(--color-text-6) / .5); }

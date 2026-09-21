@@ -69,7 +69,7 @@ import { resolveSyllableContextualInkSafety, withContextualInkSafety } from '../
 import { centeredDesignBodyPadding, paddingToDesignBody } from './designBody'
 import { useFontExportStore } from './fontExportStore'
 import { useGlobalStyleStore, type GlobalStyle } from '../src/stores/globalStyleStore'
-import { BrushStyleTrackpad } from './BrushStyleTrackpad'
+import { BrushStyleTrackpad, type StrokeEnds } from './BrushStyleTrackpad'
 import { StemBeakControls } from './StemBeakControls'
 import { designBodySvgTransform } from '../src/services/designBodyPlacement'
 import { DEFAULT_STEM_BEAK, type StemBeakStyle } from '../src/services/stemBeak'
@@ -144,7 +144,7 @@ type HistoryEntry =
       edit: SampleGlyphEdit
     }
   | { kind: 'jamo'; jamoType: JamoData['type']; char: string; before: JamoData; after: JamoData; edit: SampleGlyphEdit }
-  | { kind: 'brush'; before: StrokeRenderStyle; after: StrokeRenderStyle }
+  | { kind: 'brush'; before: StrokeRenderStyle; after: StrokeRenderStyle; ends?: { before: StrokeEnds; after: StrokeEnds } }
   | { kind: 'tone'; before: StyleTone; after: StyleTone }
   | { kind: 'beak'; before: StemBeakStyle; after: StemBeakStyle }
   // 레이아웃 모드에서 적용·지운 배치 Δ. 저장소 앞뒤를 통째로 든다.
@@ -1473,14 +1473,22 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     useCalibrationProjectStore.getState().addSampleGlyphEdit(edit)
     setPreviewSchema(null)
   }
-  const commitBrush = (before: StrokeRenderStyle, after: StrokeRenderStyle) => {
-    if (JSON.stringify(before) === JSON.stringify(after)) {
+  const applyEnds = (ends: StrokeEnds) => {
+    const store = useGlobalStyleStore.getState()
+    store.updateLinecap(ends.linecap)
+    store.updateLinejoin(ends.linejoin)
+  }
+  // `각진 끝 ↔ 둥근 끝`은 붓촉은 같고 끝 모양만 다르다. 한 번 고른 것이 되돌리기 한 줄이 되게 끝 모양을 같은 기록에 싣는다.
+  const commitBrush = (before: StrokeRenderStyle, after: StrokeRenderStyle, ends?: { before: StrokeEnds; after: StrokeEnds }) => {
+    const endsChanged = ends && (ends.before.linecap !== ends.after.linecap || ends.before.linejoin !== ends.after.linejoin) ? ends : undefined
+    if (JSON.stringify(before) === JSON.stringify(after) && !endsChanged) {
       setPreviewBrush(null)
       return
     }
-    setHistory((entries) => [...entries, { kind: 'brush', before, after }])
+    setHistory((entries) => [...entries, { kind: 'brush', before, after, ends: endsChanged }])
     setFuture([])
     useGlobalStyleStore.getState().setStrokeRenderStyle(after)
+    if (endsChanged) applyEnds(endsChanged.after)
     setPreviewBrush(null)
   }
   const applyTone = (tone: StyleTone) => {
@@ -1551,7 +1559,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const revertEntry = (entry: HistoryEntry) => {
     if (entry.kind === 'layout') useLayoutStore.getState().setUserPartOverrides(entry.layoutType, entry.beforeOverrides)
     else if (entry.kind === 'layoutDelta') { useLayoutDeltaStore.getState().restore(entry.before); setLayoutEpoch((epoch) => epoch + 1) }
-    else if (entry.kind === 'brush') useGlobalStyleStore.getState().setStrokeRenderStyle(entry.before)
+    else if (entry.kind === 'brush') { useGlobalStyleStore.getState().setStrokeRenderStyle(entry.before); if (entry.ends) applyEnds(entry.ends.before) }
     else if (entry.kind === 'tone') applyTone(entry.before)
     else if (entry.kind === 'beak') useGlobalStyleStore.getState().setStemBeak(entry.before)
     else updateJamo(entry.before)
@@ -1584,7 +1592,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     if (!entry) return
     if (entry.kind === 'layout') useLayoutStore.getState().setUserPartOverrides(entry.layoutType, entry.afterOverrides)
     else if (entry.kind === 'layoutDelta') { useLayoutDeltaStore.getState().restore(entry.after); setLayoutEpoch((epoch) => epoch + 1) }
-    else if (entry.kind === 'brush') useGlobalStyleStore.getState().setStrokeRenderStyle(entry.after)
+    else if (entry.kind === 'brush') { useGlobalStyleStore.getState().setStrokeRenderStyle(entry.after); if (entry.ends) applyEnds(entry.ends.after) }
     else if (entry.kind === 'tone') applyTone(entry.after)
     else if (entry.kind === 'beak') useGlobalStyleStore.getState().setStemBeak(entry.after)
     else updateJamo(entry.after)
@@ -1741,7 +1749,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
           draft={previewBrush}
           onDraftChange={setPreviewBrush}
           onCommit={commitBrush}
-          renderPreview={(strokeStyle) => <Glyph char="한" size={42} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={null} previewSchema={null} layoutHighlight={null} globalStyle={{ ...globalStyle, strokeStyle, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : globalStyle.brush }} />}
+          ends={{ linecap: globalStyle.linecap, linejoin: globalStyle.linejoin }}
+          renderPreview={(strokeStyle, ends) => <Glyph char="한" size={42} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={null} previewSchema={null} layoutHighlight={null} globalStyle={{ ...globalStyle, ...ends, strokeStyle, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : globalStyle.brush }} />}
           embedded
           productOptions={chrome === 'workspace'}
         />}

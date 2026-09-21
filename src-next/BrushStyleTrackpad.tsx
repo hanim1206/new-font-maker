@@ -1,10 +1,20 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { X } from 'lucide-react'
-import type { BrushTip, StrokeRenderStyle } from '../src/types'
+import type { BrushTip, StrokeLinecap, StrokeLinejoin, StrokeRenderStyle } from '../src/types'
 import styles from './CalibrationSentenceEditor.module.css'
 
 const TIP_OPTIONS: Array<{ tip: BrushTip; label: string }> = [
   { tip: 'round', label: '원형' }, { tip: 'ellipse', label: '납작형' }, { tip: 'rectangle', label: '네모형' },
+]
+export type StrokeEnds = { linecap: StrokeLinecap; linejoin: StrokeLinejoin }
+/**
+ * 제품 화면의 고르기는 붓촉 이름이 아니라 **글자에 나오는 결과**로 부른다.
+ * 둥근 붓촉은 끝 모양(linecap)에 따라 각진 끝(기본, Noto 고딕처럼)도 둥근 끝도 되므로 둘을 따로 내놓는다. 납작 붓은 붓촉이 끝을 만든다.
+ */
+const END_CHOICES: Array<{ id: 'square' | 'round' | 'flat'; label: string; tip: BrushTip; ends: StrokeEnds | null }> = [
+  { id: 'square', label: '각진 끝', tip: 'round', ends: { linecap: 'butt', linejoin: 'miter' } },
+  { id: 'round', label: '둥근 끝', tip: 'round', ends: { linecap: 'round', linejoin: 'round' } },
+  { id: 'flat', label: '납작 붓', tip: 'ellipse', ends: null },
 ]
 const DEFAULTS: Record<StrokeRenderStyle['mode'], StrokeRenderStyle> = {
   brush: { mode: 'brush', brush: { tip: 'round', aspectRatio: 0.5, angle: 0 } },
@@ -21,16 +31,18 @@ function clampCutAngle(value: number, preferredSign = 1): number {
 function aspectRatioToFlatness(value: number): number { return Math.round((1 - value) / 0.8 * 100) }
 function flatnessToAspectRatio(value: number): number { return Math.max(0.2, Math.min(1, 1 - value / 100 * 0.8)) }
 
-export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, onClose, renderPreview, embedded = false, productOptions = false }: {
+export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, onClose, renderPreview, embedded = false, productOptions = false, ends }: {
   committed: StrokeRenderStyle
   draft: StrokeRenderStyle | null
   onDraftChange: (style: StrokeRenderStyle | null) => void
-  onCommit: (before: StrokeRenderStyle, after: StrokeRenderStyle) => void
+  onCommit: (before: StrokeRenderStyle, after: StrokeRenderStyle, ends?: { before: StrokeEnds; after: StrokeEnds }) => void
   onClose?: () => void
-  renderPreview: (style: StrokeRenderStyle) => ReactNode
+  renderPreview: (style: StrokeRenderStyle, ends?: StrokeEnds) => ReactNode
   embedded?: boolean
   /** 제품 화면용 선택지: 네모형 붓촉과 레거시 스냅 획을 뺀다. 이미 그 값으로 저장된 폰트는 그대로 그려지고, 다른 것을 고르면 바뀐다. */
   productOptions?: boolean
+  /** 지금 저장된 끝 모양. 제품 화면의 `각진 끝 / 둥근 끝`을 가르는 데 쓴다. */
+  ends?: StrokeEnds
 }) {
   const current = draft ?? committed
   const beforeRef = useRef<StrokeRenderStyle | null>(null)
@@ -59,6 +71,13 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
     if (current.mode !== 'brush' || tip === current.brush.tip) return
     const next: StrokeRenderStyle = { ...current, brush: { ...current.brush, tip } }
     preview(next); onCommit(committed, next)
+  }
+  const endChoice = current.mode !== 'brush' ? null : current.brush.tip === 'ellipse' ? 'flat' : current.brush.tip === 'round' ? (ends?.linecap === 'round' ? 'round' : 'square') : null
+  const selectEndChoice = (choice: typeof END_CHOICES[number]) => {
+    if (current.mode !== 'brush' || choice.id === endChoice) return
+    const next: StrokeRenderStyle = { ...current, brush: { ...current.brush, tip: choice.tip } }
+    preview(next)
+    onCommit(committed, next, choice.ends && ends ? { before: ends, after: choice.ends } : undefined)
   }
   const handleRangeKeys = (event: KeyboardEvent<HTMLInputElement>, name: string) => {
     if (event.key.startsWith('Arrow') || event.key === 'Home' || event.key === 'End') begin(name)
@@ -126,14 +145,21 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
       {([['brush', '붓촉형'], ['angled-area', '절단 끝'], ['legacy-snapped-centerline', '레거시 스냅 획']] as const).filter(([mode]) => !productOptions || mode !== 'legacy-snapped-centerline').map(([mode, label]) => <button key={mode} type="button" role="radio" aria-checked={current.mode === mode} onClick={() => selectMode(mode)}>{label}</button>)}
     </div>
     {current.mode === 'brush' && <>
-      <div className={styles.brushTips} style={productOptions ? { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' } : undefined} role="radiogroup" aria-label="붓촉 모양">{TIP_OPTIONS.filter(({ tip }) => !productOptions || tip !== 'rectangle').map(({ tip, label }) => {
+      {productOptions
+        ? <div className={styles.brushTips} style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }} role="radiogroup" aria-label="획 끝 모양">{END_CHOICES.map((choice) => {
+          const previewStyle: StrokeRenderStyle = { ...current, brush: { ...current.brush, tip: choice.tip } }
+          return <button key={choice.id} type="button" role="radio" aria-checked={endChoice === choice.id} data-end-choice={choice.id} onClick={() => selectEndChoice(choice)}>
+            <span className={styles.brushTipPreview}>{renderPreview(previewStyle, choice.ends ?? ends)}</span><span className={`${styles.brushTipIcon} ${styles[`brushTipIcon_${choice.tip}`]}`} style={choice.id === 'square' ? { borderRadius: 3, rotate: '0deg' } : undefined} aria-hidden="true" /><strong>{choice.label}</strong>
+          </button>
+        })}</div>
+        : <div className={styles.brushTips} role="radiogroup" aria-label="붓촉 모양">{TIP_OPTIONS.map(({ tip, label }) => {
         const previewStyle: StrokeRenderStyle = { ...current, brush: { ...current.brush, tip } }
         return <button key={tip} type="button" role="radio" aria-checked={current.brush.tip === tip} onClick={() => selectTip(tip)}>
           <span className={styles.brushTipPreview}>{renderPreview(previewStyle)}</span><span className={`${styles.brushTipIcon} ${styles[`brushTipIcon_${tip}`]}`} aria-hidden="true" /><strong>{label}</strong>
         </button>
-      })}</div>
+      })}</div>}
       {current.brush.tip !== 'round' && <div className={styles.brushControlGrid}>{range('납작함', aspectRatioToFlatness(current.brush.aspectRatio), 0, 100, 1, (value) => ({ ...current, brush: { ...current.brush, aspectRatio: flatnessToAspectRatio(value) } }), `${aspectRatioToFlatness(current.brush.aspectRatio)}%`)}{renderAnglePad()}</div>}
-      {current.brush.tip === 'round' && <p className={styles.roundBrushMessage}>원형은 모든 방향에서 같은 굵기로 그려집니다.</p>}
+      {current.brush.tip === 'round' && <p className={styles.roundBrushMessage}>{productOptions ? '끝 모양만 다르고, 굵기는 어느 방향이든 같습니다.' : '원형은 모든 방향에서 같은 굵기로 그려집니다.'}</p>}
     </>}
     {current.mode === 'angled-area' && <div className={styles.ruleControlGrid}>{renderAnglePad()}{range('모서리 곡률', Math.round(current.cornerRadius * 100), 0, 100, 1, (value) => ({ ...current, cornerRadius: value / 100 }), `${Math.round(current.cornerRadius * 100)}%`)}</div>}
     {current.mode === 'legacy-snapped-centerline' && <div className={styles.constructionRuleMessage}>
