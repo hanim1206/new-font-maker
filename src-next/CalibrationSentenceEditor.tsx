@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerE
 import { Check, Copy, Dices, Download, LayoutDashboard, ListTree, LoaderCircle, Redo2, Settings2, TextCursorInput, Undo2, X } from 'lucide-react'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
-import { useContextPlacement, useNotoModel, usePlacementStore } from './notoModel'
+import { DevGhostToggle } from './DevGhostToggle'
+import { facesToBox } from '../src/services/contextBoxResolver'
+import { useContextPlacement, useNotoModel } from './notoModel'
 import { GlyphLayoutEditor } from './GlyphLayoutEditor'
 import { useLayoutDeltaStore } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
@@ -122,7 +124,13 @@ type HistoryEntry =
 
 /** 자소 탭 편집 모드. 획 = 점·획·자소 형태, 레이아웃 = 기준선으로 배치(Δ 저장). */
 type EditMode = 'stroke' | 'layout'
-const initialEditMode = (): EditMode => new URLSearchParams(window.location.search).get('mode') === 'layout' ? 'layout' : 'stroke'
+// 자소 탭은 레이아웃이 기본이다. `&mode=stroke`(+ `&part=CH|JU|JO`)만 획 편집을 바로 연다. 옛 `&mode=layout`은 기본과 같다.
+const initialEditMode = (): EditMode => new URLSearchParams(window.location.search).get('mode') === 'stroke' ? 'stroke' : 'layout'
+const initialStrokePart = (): MobileEditorPart | null => {
+  const params = new URLSearchParams(window.location.search)
+  const part = params.get('part')
+  return params.get('mode') === 'stroke' && (part === 'CH' || part === 'JU' || part === 'JO') ? part : null
+}
 
 function isEditableHangul(char: string): boolean {
   const code = char.codePointAt(0) ?? 0
@@ -367,15 +375,17 @@ function FocusedGlyph({
   globalStyle: GlobalStyle
 }) {
   // 배치는 칸 해석 함수(모델 상자)가 우선, 못 풀면 스키마. 획 겨냥·편집 오버레이도 같은 상자를 쓴다.
-  const { placement } = useContextPlacement(syllable, schema, globalStyle)
-  const notoPlacement = usePlacementStore((state) => state.notoPlacement)
-  const setNotoPlacement = usePlacementStore((state) => state.setNotoPlacement)
+  const { placement, resolution } = useContextPlacement(syllable, schema, globalStyle)
   const boxes = useMemo(() => placement.kind === 'boxes' ? placement.boxes : calculateBoxes(schema, {
     cho: syllable.choseong?.char ?? '',
     jung: syllable.jungseong?.char ?? '',
     jong: syllable.jongseong?.char ?? '',
   }), [placement, schema, syllable])
   const targets = useMemo(() => getRenderedStrokeTargets(syllable, boxes), [boxes, syllable])
+  // 화면에 보이는 부품 상자는 레이아웃 모드와 같은 잉크 바깥면이다. 획을 놓는 `boxes`는 두께 절반만큼 안쪽인 중심선 상자라 그대로 그리면 잉크가 상자를 뚫고 나온다.
+  const inkBoxes = useMemo(() => placement.kind === 'boxes' && resolution
+    ? Object.fromEntries(resolution.parts.map((part) => [part.part, facesToBox(part.faces)])) as Partial<Record<Part, BoxConfig>>
+    : boxes, [placement, resolution, boxes])
   // Noto 고스트: 표시·비교 전용. 잉크에 안 섞인다. 켬/끔은 기기에 기억한다.
   const [ghostVisible, setGhostVisible] = useState(loadGhostVisible)
   const { ghost, error: ghostError } = useNotoGhost(char, ghostVisible)
@@ -396,7 +406,7 @@ function FocusedGlyph({
   const body = { x: designBody.x / fontSpace.unitsPerEm * VIEW_BOX_SIZE, y: designBody.y / fontSpace.unitsPerEm * VIEW_BOX_SIZE, width: designBody.width / fontSpace.unitsPerEm * VIEW_BOX_SIZE, height: designBody.height / fontSpace.unitsPerEm * VIEW_BOX_SIZE }
 
   return (
-    <div className={styles.focusCanvas} style={canvasStyle} onPointerDown={() => onSelect({ kind: 'none' })}>
+    <div className={styles.focusCanvas} style={canvasStyle} data-testid="focus-canvas" data-placement={placement.kind} onPointerDown={() => onSelect({ kind: 'none' })}>
       {globalStyle.strokeStyle.mode === 'legacy-snapped-centerline' && <span className={styles.constructionGrid} aria-hidden="true" data-construction-grid="legacy-snapped-centerline" />}
       <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} size={340} viewportBox={CANVAS_VIEWPORT} className={styles.focusSvg} partStyles={partStyles} globalStyle={globalStyle} underlay={<>
         {/* 검수 캔버스(GhostCanvas)와 같은 깔개: 흰 칸 → 1/16 잔선·1/4 굵은선 눈금 → 칸 테두리 → 글자몸 → 기준선(0.88) → 부품 상자 → Noto 고스트. 전부 잉크 아래. */}
@@ -410,7 +420,7 @@ function FocusedGlyph({
         <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill="none" stroke="rgb(196 203 212)" strokeWidth={0.4} />
         <rect x={body.x} y={body.y} width={body.width} height={body.height} fill="none" stroke="rgb(59 111 214 / .18)" strokeWidth={0.3} data-testid="jamo-design-body" />
         <line x1={-6} x2={102} y1={88} y2={88} stroke="#a6a297" strokeWidth={0.3} />
-        <PartBoxes boxes={boxes} activePart={selectedPart} />
+        <PartBoxes boxes={inkBoxes} activePart={selectedPart} />
         {ghostVisible && ghost && <path d={ghost.path} className={styles.notoGhost} fillRule="evenodd" data-testid="noto-ghost" />}
       </>}>
         {targets.map((target) => {
@@ -477,17 +487,12 @@ function FocusedGlyph({
         })}
       </SvgRenderer>
       <span className={styles.focusChar} aria-hidden="true">{char} · {fontSpace.unitsPerEm} UPM</span>
-      <button type="button" className={styles.ghostToggle} aria-pressed={ghostVisible} data-testid="noto-ghost-toggle" onPointerDown={(event) => event.stopPropagation()} onClick={toggleGhost}>
-        Noto 고스트
+      <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="noto-ghost-toggle">
         {ghostVisible && comparison && ('xorRatio' in comparison
           ? <strong data-testid="noto-ghost-xor">xor {(comparison.xorRatio * 100).toFixed(0)}%</strong>
           : <small>{comparison.message}</small>)}
         {ghostVisible && ghostError && <small>{ghostError}</small>}
-      </button>
-      <button type="button" className={styles.placementToggle} aria-pressed={notoPlacement} data-testid="noto-placement-toggle" data-placement={placement.kind} onPointerDown={(event) => event.stopPropagation()} onClick={() => setNotoPlacement(!notoPlacement)}>
-        Noto 배치
-        <small>{notoPlacement ? placement.kind === 'boxes' ? '모델 상자' : '스키마(못 풂)' : '스키마'}</small>
-      </button>
+      </DevGhostToggle>
     </div>
   )
 }
@@ -991,6 +996,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const [previewBrush, setPreviewBrush] = useState<StrokeRenderStyle | null>(null)
   const [isShapeRuleOpen, setIsShapeRuleOpen] = useState(false)
   const [editMode, setEditMode] = useState<EditMode>(initialEditMode)
+  // `획 고치기`로 들어온 자소. 획 편집에서 선택을 푼 채 `완료`해도 레이아웃이 이 부품을 다시 켠다.
+  const [strokeEntryPart, setStrokeEntryPart] = useState<MobileEditorPart | null>(initialStrokePart)
+  const [pendingStrokePart, setPendingStrokePart] = useState<MobileEditorPart | null>(initialStrokePart)
   // Undo/Redo로 저장된 Δ가 바뀌면 레이아웃 편집부를 새로 띄워 세션 편집(절대값)을 버린다.
   const [layoutEpoch, setLayoutEpoch] = useState(0)
   const directInputRef = useRef<HTMLTextAreaElement>(null)
@@ -1020,17 +1028,42 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     [focusedBoxes, previewedSyllable],
   )
   // 레이아웃 모드는 글자가 모델 상자로 그려질 때만 뜻이 있다. 그때는 옛 경로(자소 통째 이동 → 스키마)가 글자에 안 닿으므로 셸 안에서는 끈다.
-  const { placement } = useContextPlacement(syllable, effectiveSchema, previewGlobalStyle)
+  const { placement, resolution: placementResolution } = useContextPlacement(syllable, effectiveSchema, previewGlobalStyle)
   const { bundle: notoBundle, error: notoModelError } = useNotoModel()
-  const notoPlacementOn = usePlacementStore((state) => state.notoPlacement)
-  const modelPending = notoPlacementOn && !notoBundle && !notoModelError
-  const layoutAvailable = chrome === 'workspace' && isEditableHangul(selectedChar) && (selectedChar.codePointAt(0) ?? 0) >= 0xac00 && (placement.kind === 'boxes' || modelPending)
+  // 레이아웃 모드는 모델이 있으면 열린다. 지금 획이 모델 상자에 맞는지(`placement.kind`)에 매지 않는다 —
+  // 획을 고치다 맞춤이 깨지면(ㅡ를 곡선으로 → 상자가 획 두께보다 작음) 나가는 문(`완료`)까지 사라져 갇힌다.
+  const layoutAvailable = chrome === 'workspace' && isEditableHangul(selectedChar) && (selectedChar.codePointAt(0) ?? 0) >= 0xac00 && !notoModelError
+  // 모델은 왔는데 이 글자 획이 상자에 안 맞아 옛 배치(스키마)로 그리는 중. 이유를 말해 준다.
+  const boxFitIssue = chrome === 'workspace' && notoBundle && placement.kind !== 'boxes' ? placementResolution?.issues[0] ?? null : null
   const isLayoutMode = editMode === 'layout' && layoutAvailable
   const schemaMoveLocked = chrome === 'workspace' && placement.kind === 'boxes'
+  // 자소 통째 선택. 레이아웃의 `획 고치기`가 이 상태로 획 편집을 연다.
+  const componentSelectionOf = (part: MobileEditorPart): Selection | null => {
+    const boxes = placement.kind === 'boxes' ? placement.boxes : focusedBoxes
+    const target = getRenderedStrokeTargets(syllable, boxes).find((item) => item.editorPart === part)
+    return target ? { kind: 'component', component: componentFor(selectedChar, part, target.jamo), editorPart: part, renderParts: roleRenderParts(part, boxes), jamo: target.jamo } : null
+  }
+  // 주소로 바로 연 획 편집(`&mode=stroke&part=`)은 첫 렌더에서 한 번 그 자소를 잡는다.
+  if (pendingStrokePart) {
+    setPendingStrokePart(null)
+    const entry = componentSelectionOf(pendingStrokePart)
+    if (entry) setSelection(entry)
+  }
   const snapStep = fontUnitsToNormalized(grid.snapInterval, fontSpace)
   const minimumInkGap = fontUnitsToNormalized(grid.minorInterval, fontSpace)
   const sentenceEm = 40
   const calibrationLines = useMemo(() => [sampleSentence], [sampleSentence])
+  // 레이아웃 모드에서는 문장이 한 줄 가로 스크롤이다(아래 편집부에 세로 자리를 내준다). 고른 글자가 가려져 있으면 가로로만 끌어온다.
+  const sentenceRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const section = sentenceRef.current
+    const current = isLayoutMode ? section?.querySelector<HTMLElement>('button[aria-current="true"]') : null
+    if (!section || !current) return
+    const left = current.offsetLeft - 12
+    const right = current.offsetLeft + current.offsetWidth + 100
+    if (left < section.scrollLeft) section.scrollLeft = left
+    else if (right > section.scrollLeft + section.clientWidth) section.scrollLeft = right - section.clientWidth
+  }, [isLayoutMode, selectedChar, sampleSentence])
   const collisionContexts = useMemo<CalibrationInkGapContext[]>(() => {
     const contexts = calibrationLines.flatMap((line, lineIndex) => [...line].flatMap((char, charIndex) => {
       if (!isEditableHangul(char)) return []
@@ -1057,6 +1090,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   }, [calibrationLines, choseong, effectiveSchema, globalPadding, jungseong, jongseong, paddingOverrides, schemas, selectedChar, syllable])
 
   const chooseChar = (char: string) => {
+    // 글자를 바꾸면 기본 상태(레이아웃)로 돌아간다.
+    if (chrome === 'workspace') { setEditMode('layout'); setStrokeEntryPart(null) }
     setSelectedChar(char)
     setSelection({ kind: 'none' })
     setSelectedPoints([])
@@ -1186,6 +1221,13 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     setPreviewSchema(null)
     if (mode === 'layout') closeGlobalStyle()
   }
+  const editStrokes = (part: Part) => {
+    const editorPart: MobileEditorPart = part === 'CH' ? 'CH' : part === 'JO' ? 'JO' : 'JU'
+    setStrokeEntryPart(editorPart)
+    setSelection(componentSelectionOf(editorPart) ?? { kind: 'none' })
+    setSelectedPoints([])
+    chooseEditMode('stroke')
+  }
   const closeGlobalStyle = () => {
     setPreviewBrush(null)
     setGlobalStylePanel(null)
@@ -1297,18 +1339,20 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         </button>
       : <span key={`${lineIndex}-${char}-${charIndex}`} className={/\s/u.test(char) ? styles.spaceGlyph : styles.punctuationGlyph} style={{ inlineSize: width }} aria-label={/\s/u.test(char) ? '공백' : char}>{char}</span>
   }
-  // 셸 안에서는 실행취소·다시실행이 셸 머리에 있으니 도구 줄에서는 뺀다.
+  // 셸 안에서는 도구가 머리 `…` 메뉴로 들어가 이름이 붙고, 실행취소·다시실행은 셸 머리에 있으니 뺀다.
+  const menuLabel = (text: string) => chrome === 'workspace' ? <em>{text}</em> : null
   const actions = (
     <nav aria-label="폰트 추출 및 편집 기록">
-      <a href="/workspace/jamo/master" className={styles.workspaceLink} aria-label="자소 원형 새 화면 검토" title="자소 원형 새 화면 검토"><LayoutDashboard size={18} /></a>
+      <a href="/workspace/jamo/master" className={styles.workspaceLink} aria-label="자소 원형 새 화면 검토" title="자소 원형 새 화면 검토"><LayoutDashboard size={18} />{menuLabel('자소 원형')}</a>
       <button type="button" className={styles.exportButton} data-export-state={exportState} onClick={exportCurrentFont} disabled={exportState === 'exporting'} aria-label={exportState === 'exporting' ? `OTF 추출 중: ${exportProgress}` : exportState === 'downloaded' ? 'OTF 추출 완료' : exportState === 'failed' ? 'OTF 추출 실패' : '현재 작업을 OTF로 추출'} title={exportState === 'exporting' ? exportProgress : '현재 작업을 OTF로 추출'}>
         {exportState === 'exporting' ? <LoaderCircle className={styles.exportSpinner} size={18} /> : exportState === 'downloaded' ? <Check size={18} /> : exportState === 'failed' ? <X size={18} /> : <Download size={18} />}
+        {menuLabel('OTF 추출')}
       </button>
       <button hidden type="button" className={styles.copyButton} data-copy-state={copyState} onClick={copyAnalysisValues} aria-label={copyState === 'copied' ? '분석용 값 복사됨' : copyState === 'failed' ? '분석용 값 복사 실패' : '분석용 값 복사'} title="분석용 값 복사">
         {copyState === 'copied' ? <Check size={18} /> : <Copy size={18} />}
       </button>
-      <button type="button" disabled={selection.kind === 'none'} onClick={() => setIsShapeRuleOpen(true)} aria-label="선택 자모 형태 규칙" title="현재 자모의 획과 형태 예절"><ListTree size={18} /></button>
-      <button type="button" data-active={isGlobalStyleOpen || undefined} onClick={() => isGlobalStyleOpen ? closeGlobalStyle() : setGlobalStylePanel('body')} aria-label="글로벌 스타일 설정" title="글자 네모꼴과 획 스타일"><Settings2 size={18} /></button>
+      <button type="button" disabled={selection.kind === 'none'} onClick={() => setIsShapeRuleOpen(true)} aria-label="선택 자모 형태 규칙" title="현재 자모의 획과 형태 예절"><ListTree size={18} />{menuLabel('형태 규칙')}</button>
+      <button type="button" data-active={isGlobalStyleOpen || undefined} disabled={isLayoutMode} onClick={() => isGlobalStyleOpen ? closeGlobalStyle() : setGlobalStylePanel('body')} aria-label="글로벌 스타일 설정" title="글자 네모꼴과 획 스타일"><Settings2 size={18} />{menuLabel('네모꼴 · 획 스타일')}</button>
       {chrome === 'standalone' && <>
         <button type="button" onClick={undo} disabled={history.length === 0} aria-label="마지막 편집 되돌리기"><Undo2 size={18} />{history.length > 0 && <span>{history.length}</span>}</button>
         <button type="button" onClick={redo} disabled={future.length === 0} aria-label="되돌린 편집 다시 실행"><Redo2 size={18} /></button>
@@ -1317,7 +1361,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   )
   const body = (
     <>
-      <section className={styles.sentence} aria-label="보정 문장">
+      <section ref={sentenceRef} className={styles.sentence} data-compact={isLayoutMode || undefined} aria-label="보정 문장">
         <div className={styles.sentenceActions}>
           <button type="button" onClick={pickSampleSentence} aria-label="예시 문장 무작위 선택" title="예시 문장 바꾸기"><Dices size={19} aria-hidden="true" /></button>
           <button type="button" data-active={isDirectInputActive || undefined} onClick={startDirectInput} aria-label="보정 문장 직접 입력" title="직접 입력"><TextCursorInput size={19} aria-hidden="true" /></button>
@@ -1344,7 +1388,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
       </section>
 
       {isLayoutMode ? <section className={styles.layoutMode} aria-label={`${selectedChar} 레이아웃 수정`} data-testid="jamo-layout-mode">
-        <GlyphLayoutEditor key={`${selectedChar}:${layoutEpoch}`} codepoint={selectedChar.codePointAt(0) ?? 0xac00} initialPart={selection.kind === 'none' ? undefined : selection.editorPart} onCommitted={commitLayoutDelta} />
+        <GlyphLayoutEditor key={`${selectedChar}:${layoutEpoch}`} codepoint={selectedChar.codePointAt(0) ?? 0xac00} initialPart={selection.kind === 'none' ? strokeEntryPart ?? undefined : selection.editorPart} onCommitted={commitLayoutDelta} onEditStrokes={editStrokes} />
       </section> : <>
       <section className={styles.editor} data-chrome={chrome} aria-label={`${selectedChar} 완성 글자 편집`}>
         <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={isBrushStyleOpen ? { kind: 'none' } : selection} onSelect={isBrushStyleOpen ? () => {} : selectFromCanvas} selectedPoints={isBrushStyleOpen ? [] : selectedPoints} onPointSelect={isBrushStyleOpen ? () => {} : selectPointFromCanvas} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
@@ -1363,11 +1407,10 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
           renderPreview={(strokeStyle) => <Glyph char="한" size={42} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={null} previewSchema={null} layoutHighlight={null} globalStyle={{ ...globalStyle, strokeStyle, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : globalStyle.brush }} />}
           embedded
         />}
-      /> : schemaMoveLocked && selection.kind === 'component' ? <section className={styles.trackpadSection} data-testid="jamo-layout-handoff">
-        {/* 모델 상자로 그리는 글자는 자소를 통째로 옮겨도(옛 스키마 저장) 글자에 안 닿는다. 배치는 기준선으로 고친다. */}
+      /> : schemaMoveLocked && selection.kind === 'component' ? <section className={styles.trackpadSection} data-testid="jamo-stroke-hint">
+        {/* 모델 상자로 그리는 글자는 자소를 통째로 옮겨도(옛 스키마 저장) 글자에 안 닿는다. 자리는 레이아웃에서, 여기서는 획만 고친다. */}
         <div className={styles.layoutHandoff}>
-          <p><strong>{PART_LABEL[selection.editorPart]} 자리는 레이아웃에서 고쳐요</strong><span>기준선을 옮기면 같은 레이아웃 글자에 함께 적용됩니다. 획을 고치려면 획을 눌러 주세요.</span></p>
-          <button type="button" onClick={() => chooseEditMode('layout')}>레이아웃에서 고치기</button>
+          <p><strong>{selection.jamo.char} 획을 눌러 고르세요</strong><span>획을 고치면 같은 {selection.jamo.char} 글자 전부에 닿습니다. 자리와 크기는 완료 뒤 레이아웃에서 고쳐요.</span></p>
         </div>
       </section> : <InferenceTrackpad
         glyph={selectedChar}
@@ -1389,6 +1432,11 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         onInkGapLimitChange={setInkGapLimiter}
         onMultiSelectArmedChange={setMultiSelectArmed}
       />}
+      {/* 획 편집은 끄는 즉시 저장된다. `완료`는 저장이 아니라 레이아웃으로 돌아가는 문이다. */}
+      {layoutAvailable && !globalStylePanel && <div className={styles.strokeDoneBar}>
+        {boxFitIssue && <p role="status" data-testid="jamo-box-fit-issue">이 획은 모델 상자에 안 맞아 옛 배치로 그립니다 · {boxFitIssue.message}</p>}
+        <button type="button" onClick={() => chooseEditMode('layout')} data-testid="jamo-stroke-done">완료</button>
+      </div>}
       </>}
       {isShapeRuleOpen && selection.kind !== 'none' && <ShapeRulePanel jamo={selection.jamo} selectedStrokeId={selection.kind === 'component' ? null : selection.strokeId} onClose={() => setIsShapeRuleOpen(false)} />}
     </>
@@ -1400,14 +1448,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         projectName={projectName}
         statusLabel={isLayoutMode ? '레이아웃 수정' : '획 편집'}
         history={{ canUndo: history.length > 0, canRedo: future.length > 0, onUndo: undo, onRedo: redo }}
+        menu={<div data-edit-mode={isLayoutMode ? 'layout' : 'stroke'} data-testid="jamo-toolbar">{actions}</div>}
+        menuBadge={exportState === 'exporting' ? 'busy' : exportState === 'downloaded' ? 'done' : exportState === 'failed' ? 'failed' : null}
       >
-        <div className={`${styles.header} ${styles.headerCompact}`}>
-          <span className={styles.modeSegment} role="group" aria-label="편집 모드" data-testid="jamo-edit-mode">
-            <button type="button" aria-pressed={isLayoutMode} disabled={!layoutAvailable} title={layoutAvailable ? undefined : '이 글자는 모델 상자로 그려지지 않아 기준선 편집을 쓸 수 없어요'} onClick={() => chooseEditMode('layout')}>레이아웃</button>
-            <button type="button" aria-pressed={!isLayoutMode} onClick={() => chooseEditMode('stroke')}>획</button>
-          </span>
-          {actions}
-        </div>
         {body}
       </MobileWorkspaceShell>
     )

@@ -5,7 +5,7 @@ import { createNotoPresetReader } from '../../scripts/reference-lab/notoPresetAp
 import { CHOSEONG_MAP, JONGSEONG_MAP, JUNGSEONG_MAP } from '../data/Hangul'
 import { DEFAULT_STYLE } from '../stores/globalStyleStore'
 import { decomposeSyllable } from '../utils/hangulUtils'
-import { addContextBoxDelta, hasContextBoxDelta, identityOfSyllable, medialPartGroups, predictComponentFaces, resolveContextBoxes } from './contextBoxResolver'
+import { addContextBoxDelta, addFaceDelta, facesOffsets, hasContextBoxDelta, identityOfSyllable, medialPartGroups, predictComponentFaces, resolveContextBoxes } from './contextBoxResolver'
 import { fitNotoComponent, inkOfComponentFit } from './notoComponentFit'
 import { createUserPreset01 } from '../../src-next/userPreset01'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
@@ -43,6 +43,20 @@ describe('칸 해석 함수', () => {
     expect(hasContextBoxDelta(undefined)).toBe(false)
     expect(hasContextBoxDelta({ faces: { CH: { left: 0 } } })).toBe(false)
     expect(hasContextBoxDelta({ medial: { JU: { 'outerPillar.center': 0.001 } } })).toBe(true)
+  })
+
+  it('변 고정 — 좁은 층의 고정은 앞을 버리고 교체, 고정 뒤 더하기는 at + n, 고정은 0 자리여도 Δ 있음', () => {
+    expect(addFaceDelta(0.01, { at: 0.7 })).toEqual({ at: 0.7 })
+    expect(addFaceDelta({ at: 0.7 }, 0.01)).toEqual({ at: expect.closeTo(0.71, 12) })
+    expect(addFaceDelta({ at: 0.7 }, { at: 0.2 })).toEqual({ at: 0.2 })
+    expect(addFaceDelta(undefined, { at: 0.7 })).toEqual({ at: 0.7 })
+    expect(addFaceDelta(0.01, undefined)).toBe(0.01)
+    const sum = addContextBoxDelta({ faces: { CH: { top: 0.01, left: 0.02 } } }, { faces: { CH: { top: { at: 0.718 } } } })
+    expect(sum.faces?.CH?.top).toEqual({ at: 0.718 })
+    expect(sum.faces?.CH?.left).toBeCloseTo(0.02, 12)
+    expect(hasContextBoxDelta({ faces: { CH: { top: { at: 0 } } } })).toBe(true)
+    // 지금 변 기준 오프셋으로 풀기: 고정은 at - 지금 값.
+    expect(facesOffsets({ left: 0.1, right: 0.5, top: 0.2, bottom: 0.6 }, { top: { at: 0.25 }, left: -0.01 })).toEqual({ top: expect.closeTo(0.05, 9), left: expect.closeTo(-0.01, 9) })
   })
 })
 
@@ -107,6 +121,30 @@ describe.skipIf(!existsSync(CORPUS))('칸 해석 — 모델', () => {
     // 획 없이 풀면 상자 = 네 변 그대로.
     expect(base.parts.every((p) => !p.fitted)).toBe(true)
     expect(base.boxes.CH).toEqual({ x: ch(base).left, y: ch(base).top, width: ch(base).right - ch(base).left, height: ch(base).bottom - ch(base).top })
+  })
+
+  it('변 고정 — 예측이 다른 글자들의 첫닿자 윗변이 같은 자리에 모이고, 홀자 변 고정은 slot 변이 그 자리에 간다', async () => {
+    const model = await bundle
+    const 노 = identityOfSyllable(decompose('노'))!
+    const 로 = identityOfSyllable(decompose('로'))!
+    const top = (r: ReturnType<typeof resolveContextBoxes>) => r.parts.find((p) => p.part === 'CH')!.faces.top
+    const base노 = resolveContextBoxes({ identity: 노, model })
+    const base로 = resolveContextBoxes({ identity: 로, model })
+    // 더하기: 예측 차이가 그대로 남는다.
+    const add노 = resolveContextBoxes({ identity: 노, model, delta: { faces: { CH: { top: 0.01 } } } })
+    const add로 = resolveContextBoxes({ identity: 로, model, delta: { faces: { CH: { top: 0.01 } } } })
+    expect(add노.parts.length).toBeGreaterThan(0)
+    expect(top(add노) - top(add로)).toBeCloseTo(top(base노) - top(base로), 9)
+    // 고정: 둘 다 같은 자리.
+    const fix노 = resolveContextBoxes({ identity: 노, model, delta: { faces: { CH: { top: { at: 0.12 } } } } })
+    const fix로 = resolveContextBoxes({ identity: 로, model, delta: { faces: { CH: { top: { at: 0.12 } } } } })
+    expect(top(fix노)).toBeCloseTo(0.12, 9)
+    expect(top(fix로)).toBeCloseTo(0.12, 9)
+    // 홀자 변 고정: ㅗ 상자 윗변을 0.5로.
+    const juTop = (r: ReturnType<typeof resolveContextBoxes>) => r.medial.find((m) => m.part === 'JU')!.fit!.slot.y
+    const fixJu = resolveContextBoxes({ identity: 노, model, delta: { faces: { JU: { top: { at: 0.5 } } } } })
+    expect(juTop(fixJu)).toBeCloseTo(0.5, 6)
+    expect(juTop(base노)).not.toBeCloseTo(0.5, 3)
   })
 
   it('가: 첫닿자 네 변 Δ는 faces에 그대로 더해지고, 홀자 중심 rail Δ는 slot을 같은 만큼 옮긴다', async () => {

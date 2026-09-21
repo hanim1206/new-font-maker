@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   ChevronDown,
@@ -29,6 +30,8 @@ export function MobileWorkspaceShell({
   projectName = '새 한글 폰트',
   statusLabel = '화면 검토 모드',
   history,
+  menu,
+  menuBadge,
 }: {
   children: ReactNode
   drawer?: ReactNode
@@ -36,7 +39,18 @@ export function MobileWorkspaceShell({
   projectName?: string
   statusLabel?: string
   history?: WorkspaceHistoryControls
+  /** 머리 `…` 메뉴에 넣을 도구(링크·버튼). 없으면 `…`는 꺼져 있다. 항목을 누르면 메뉴는 닫힌다. */
+  menu?: ReactNode
+  /** 메뉴 안 도구의 진행 상태를 `…` 단추에 점으로 보인다. */
+  menuBadge?: 'busy' | 'done' | 'failed' | null
 }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
   return (
     <main className={styles.page}>
       <div className={styles.shell}>
@@ -49,7 +63,12 @@ export function MobileWorkspaceShell({
           <div className={styles.headerActions} aria-label="프로젝트 편집 기록">
             <button type="button" disabled={!history?.canUndo} onClick={history?.onUndo} aria-label="형태 편집 실행 취소"><Undo2 size={18} /></button>
             <button type="button" disabled={!history?.canRedo} onClick={history?.onRedo} aria-label="형태 편집 다시 실행"><Redo2 size={18} /></button>
-            <button type="button" disabled aria-label="프로젝트 더보기"><MoreHorizontal size={20} /></button>
+            <button type="button" disabled={!menu} aria-label="프로젝트 더보기" aria-haspopup="menu" aria-expanded={menu ? menuOpen : undefined} data-badge={menuBadge ?? undefined} onClick={() => setMenuOpen((open) => !open)}><MoreHorizontal size={20} /></button>
+            {/* 메뉴는 늘 DOM에 있다(도구의 상태·testid가 닫혀 있어도 읽힌다). 닫히면 숨기기만 한다. */}
+            {menu && <>
+              {menuOpen && <div className={styles.moreBackdrop} onClick={() => setMenuOpen(false)} aria-hidden="true" />}
+              <div className={styles.moreMenu} hidden={!menuOpen} onClick={() => setMenuOpen(false)} data-testid="workspace-more-menu">{menu}</div>
+            </>}
           </div>
         </header>
 

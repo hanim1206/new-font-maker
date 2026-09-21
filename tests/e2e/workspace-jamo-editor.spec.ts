@@ -6,8 +6,8 @@ test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
 })
 
-test('자소 탭은 셸 안에서 문장·캔버스·트랙패드를 보여주고 획을 선택한다', async ({ page }) => {
-  await page.goto('/workspace/jamo')
+test('자소 탭 획 편집은 셸 안에서 문장·캔버스·트랙패드를 보여주고 획을 선택한다', async ({ page }) => {
+  await page.goto('/workspace/jamo?mode=stroke')
 
   const nav = page.getByRole('navigation', { name: '프로젝트 주 내비게이션' })
   await expect(nav.getByRole('link', { name: '자소' })).toHaveAttribute('aria-current', 'page')
@@ -30,6 +30,9 @@ test('자소 탭은 셸 안에서 문장·캔버스·트랙패드를 보여주�
   const trackpadBox = await page.getByRole('group', { name: '선택한 글자 형태를 조절하는 트랙패드' }).boundingBox()
   const navBox = await nav.boundingBox()
   expect(trackpadBox && navBox && trackpadBox.y + trackpadBox.height <= navBox.y + 1).toBe(true)
+  // 트랙패드 아래 `완료`도 내비게이션 위에 들어온다.
+  const doneBox = await page.getByTestId('jamo-stroke-done').boundingBox()
+  expect(doneBox && navBox && trackpadBox && doneBox.y >= trackpadBox.y + trackpadBox.height - 1 && doneBox.y + doneBox.height <= navBox.y + 1).toBe(true)
 
   // 획 두 번 눌러 선택(첫 클릭 = 부품, 둘째 = 획).
   const focusSvg = editor.locator('svg')
@@ -38,18 +41,18 @@ test('자소 탭은 셸 안에서 문장·캔버스·트랙패드를 보여주�
   await strokeHit.dispatchEvent('pointerdown')
   await expect(focusSvg.locator('[data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(1)
 
-  // 문장에서 다른 글자를 고르면 캔버스가 바뀐다.
+  // 문장에서 다른 글자를 고르면 그 글자의 레이아웃(기본 상태)으로 돌아간다.
   await page.getByRole('region', { name: '보정 문장' }).getByRole('button', { name: '별 편집' }).click()
-  await expect(page.getByRole('region', { name: '별 완성 글자 편집' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '별 레이아웃 수정' })).toBeVisible()
 })
 
-test('검수 격자에서 글자를 열면 자소 탭 레이아웃 모드로 그 글자가 열리고, 획으로 바꾸면 같은 글자 획 편집이다', async ({ page }) => {
+test('검수 격자에서 글자를 열면 자소 탭 레이아웃 모드로 그 글자가 열리고, 획 고치기를 누르면 같은 글자 획 편집이다', async ({ page }) => {
   await page.goto('/workspace/review?char=%EC%97%BC')
   await page.getByTestId('review-pick').click()
   await expect(page).toHaveURL(/\/workspace\/jamo\?char=%EC%97%BC&mode=layout$/)
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible({ timeout: 20_000 })
   // 문장에 없던 글자라 문장 앞에 붙는다.
   await expect(page.getByRole('region', { name: '보정 문장' }).getByRole('button', { name: '염 편집' })).toHaveAttribute('aria-current', 'true')
-  await page.getByTestId('jamo-edit-mode').getByRole('button', { name: '획' }).click()
+  await page.getByTestId('jamo-stroke-cta').click()
   await expect(page.getByRole('region', { name: '염 완성 글자 편집' })).toBeVisible()
 })

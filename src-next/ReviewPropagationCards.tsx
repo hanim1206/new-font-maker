@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
-import { resolveContextBoxes } from '../src/services/contextBoxResolver'
+import { useEffect, useImperativeHandle, useMemo, useState } from 'react'
+import type { Ref } from 'react'
+import { boxToFaces, facesOffsets, resolveContextBoxes } from '../src/services/contextBoxResolver'
 import { notoOutlineGhostPath } from '../src/services/notoOutlineInk'
 import type { BoxConfig, Part } from '../src/types'
 import type { CorpusIdentity } from './notoCorpus'
@@ -9,17 +10,19 @@ import type { EditableRail } from './notoMedialFitView'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 import { useNotoGlyph } from './useNotoGlyph'
 import { useFitInkStyle } from './useFitInkStyle'
-import { layoutDeltaSnapshot, useLayoutDelta, useLayoutDeltaStore, useScopeDelta } from './layoutDeltaStore'
-import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
-import { applyFacesDelta, applyMedialDelta, editKindOf, hasLayoutEdit, hasShapeEdit, layoutDeltaOf, PROPAGATION_SCOPES, propagationCandidates, shapeDeltaToEm } from './reviewPropagation'
-import type { CandidateScope, EditKind, PropagationEdit, PropagationScope } from './reviewPropagation'
+import { jamoKeyOf, jamoPartOf, layoutDeltaSnapshot, useLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
+import { LayoutScopeStrip } from './LayoutScopeStrip'
+import type { OverrideGroup } from './layoutOverrides'
+import type { LayoutDeltaSnapshot, LayoutDeltaTarget, PropagationScope } from './layoutDeltaStore'
+import { applyFacesDelta, applyMedialDelta, editKindOf, focusJamoOf, hasLayoutEdit, hasShapeEdit, jamoChoicesFor, layoutDeltaOf, PART_GROUP_LABEL, PROPAGATION_SCOPES, propagationCandidates, shapeDeltaToEm } from './reviewPropagation'
+import type { CandidateScope, EditKind, PropagationEdit } from './reviewPropagation'
 import styles from './ReviewPropagationCards.module.css'
 
 /**
  * 검수 글자 화면 아래 카드 묶음. 기준선을 잡으면 이 레이아웃(같은 문맥) 글자를 늘 띄워 두고, 옮긴 Δ만 얹는다.
  * 카드는 미리보기, `적용`을 누르면 배치 Δ가 `layoutDeltaStore`에 범위대로 저장돼 앱 전체 배치에 얹힌다. 형태 Δ는 저장하지 않는다(자소 탭 몫).
  * 카드는 rail을 옮길 때가 아니라 잡을 때 정해진다. 옮기는 동안 후보가 안 바뀌어 번쩍이지 않는다.
- * - 배치 Δ(중심 rail·닿자 네 변): 기본 `이 레이아웃`, `전체`는 일부러 넓힐 때. em 그대로. 자모 하나만 고르는 칩은 없다(그건 형태).
+ * - 배치 Δ(중심 rail·홀자 상자 변·닿자 네 변): 기본 `이 레이아웃`, `이 자모만`은 잡은 부품의 자모로 좁힐 때(여러 자모 가능), `전체`는 일부러 넓힐 때. em 그대로.
  * - 형태 Δ(시작·끝 rail): `이 자모로 올리기`를 누르면 카드가 같은 자모 글자로 바뀌고 슬롯 비율로 얹는다. 본래 자소 탭 몫.
  * 카드 = Noto 고스트(회색) + Δ 적용한 내 획(검정) + Δ 전 내 획(주황 점선). Δ 없으면 내 획만.
  */
@@ -30,11 +33,11 @@ const CARD_COUNT = 8
 interface CardBox { kind: 'medial' | 'component'; box: BoxConfig }
 const BOX_COLOR: Record<CardBox['kind'], string> = { medial: '#3b6fd6', component: '#2f9a6a' }
 
-function PropagationCard({ identity, bundle, edit, mode }: { identity: CorpusIdentity; bundle: NotoPresetModelBundle; edit: PropagationEdit; mode: EditKind }) {
+function PropagationCard({ identity, bundle, edit, mode, ghostVisible }: { identity: CorpusIdentity; bundle: NotoPresetModelBundle; edit: PropagationEdit; mode: EditKind; ghostVisible: boolean }) {
   const { glyph, error } = useNotoGlyph(identity.codepoint)
   const inkStyle = useFitInkStyle()
   // 이 글자에 이미 저장된 Δ 위에 지금 편집 Δ를 얹는다. 렌더러가 보는 상자와 같은 출발점.
-  const savedDelta = useLayoutDelta(identity.contextId)
+  const savedDelta = useLayoutDelta(identity)
   const view = useMemo(() => {
     if (!glyph) return null
     const ghost = notoOutlineGhostPath(glyph.outline)
@@ -49,7 +52,8 @@ function PropagationCard({ identity, bundle, edit, mode }: { identity: CorpusIde
     for (const modelPart of medialView.parts) {
       const base = renderMedialPart(modelPart, undefined, inkStyle)
       // 홀자 상자 변 Δ는 배치 모드에서만. 칸 해석과 같은 순서로 rail Δ보다 먼저 얹는다. 못 놓는 글자는 Δ를 안 받는다.
-      const slotDelta = mode === 'layout' ? edit.layout.slot[modelPart.part] : undefined
+      // 고정은 이 글자의 slot 변 기준 오프셋으로 풀어 아핀에 넘긴다(칸 해석과 같은 규칙).
+      const slotDelta = mode === 'layout' && modelPart.fit ? facesOffsets(boxToFaces(modelPart.fit.slot), edit.layout.slot[modelPart.part]) : undefined
       const slotMoved = withSlotFaces(modelPart, slotDelta)
       const part = slotMoved.ok ? slotMoved.part : modelPart
       const slotTouched = slotMoved.ok && part !== modelPart
@@ -61,9 +65,10 @@ function PropagationCard({ identity, bundle, edit, mode }: { identity: CorpusIde
       if (!slotTouched && !(applied && applied.applied > 0)) { if (base.path) after.push(base.path); continue }
       const moved = renderMedialPart(part, applied && applied.applied > 0 ? applied.rails : undefined, inkStyle)
       // 순서·간격 위반이면 이 글자는 Δ를 못 받는다(클램프 = 자동 예외).
-      if (!moved.path) { if (base.path) after.push(base.path); skipped += applied?.applied ?? 0; continue }
+      // rail을 못 놓으면(slot 없음) 이 글자는 Δ를 못 받는다. 앱 획이 칸에 안 맞는 건(잉크 없음) Δ 문제가 아니라 상자만 보인다.
+      if (!moved.slot) { if (base.path) after.push(base.path); skipped += applied?.applied ?? 0; continue }
       touched += 1
-      after.push(moved.path)
+      if (moved.path) after.push(moved.path)
       if (base.path) before.push(base.path)
       if (moved.slot) boxes.push({ kind: 'medial', box: moved.slot })
     }
@@ -87,7 +92,7 @@ function PropagationCard({ identity, bundle, edit, mode }: { identity: CorpusIde
     <svg viewBox={VIEW_BOX} role="img" aria-label={`${identity.character} 미리보기`}>
       <rect x="0" y="0" width="1" height="1" fill="#fff" />
       {view?.boxes.map((item, index) => <rect key={index} x={item.box.x} y={item.box.y} width={item.box.width} height={item.box.height} fill={BOX_COLOR[item.kind]} fillOpacity=".12" stroke={BOX_COLOR[item.kind]} strokeOpacity=".5" strokeWidth=".004" />)}
-      {view?.ghost && <path d={view.ghost} fill="#3a3a36" fillOpacity=".35" fillRule="evenodd" />}
+      {ghostVisible && view?.ghost && <path d={view.ghost} fill="#3a3a36" fillOpacity=".35" fillRule="evenodd" data-testid="review-propagation-ghost" />}
       {view?.after.map((path, index) => <path key={index} d={path} fill="#111" fillRule="evenodd" />)}
       {view?.before.map((path, index) => <path key={`b${index}`} d={path} fill="none" stroke="#f0561e" strokeWidth=".006" strokeDasharray=".012 .008" />)}
     </svg>
@@ -98,65 +103,92 @@ function PropagationCard({ identity, bundle, edit, mode }: { identity: CorpusIde
   </figure>
 }
 
-function DeltaList({ rails, testId }: { rails: EditableRail[]; testId: string }) {
+/** Δ 줄. 더하기는 `+10u`, 고정은 `= 718`(em×1000 자리). */
+function DeltaList({ rails, fixed, testId }: { rails: EditableRail[]; fixed?: ReadonlySet<string>; testId: string }) {
   return <div className={styles.deltas} data-testid={testId}>
-    {rails.map((rail) => { const units = (rail.value - rail.original) * 1000; return <span key={rail.id}><i>{rail.label}</i>{units >= 0 ? '+' : ''}{units.toFixed(0)}u</span> })}
+    {rails.map((rail) => {
+      if (fixed?.has(rail.id)) return <span key={rail.id} data-fixed="true"><i>{rail.label}</i>= {Math.round(rail.value * 1000)}</span>
+      const units = (rail.value - rail.original) * 1000
+      return <span key={rail.id}><i>{rail.label}</i>{units >= 0 ? '+' : ''}{units.toFixed(0)}u</span>
+    })}
   </div>
 }
 
-function CardGrid({ candidates, bundle, edit, mode }: { candidates: CorpusIdentity[]; bundle: NotoPresetModelBundle | null; edit: PropagationEdit; mode: EditKind }) {
+function CardGrid({ candidates, bundle, edit, mode, ghostVisible }: { candidates: CorpusIdentity[]; bundle: NotoPresetModelBundle | null; edit: PropagationEdit; mode: EditKind; ghostVisible: boolean }) {
   if (!bundle) return <p className={styles.empty}>모델 읽는 중</p>
   return <div className={styles.cards}>
-    {candidates.map((identity) => <PropagationCard key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} mode={mode} />)}
+    {candidates.map((identity) => <PropagationCard key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} mode={mode} ghostVisible={ghostVisible} />)}
   </div>
 }
 
-export function ReviewPropagationCards({ source, bundle, edit, changed, focus, onApplied, onCommitted }: {
+/** 편집기 하단 바가 `적용`을 누를 때 쓰는 손잡이. 범위·고른 자모는 카드가 들고 있어서 여기로 판다. */
+export interface ReviewPropagationHandle { apply: () => void }
+
+export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, focus, ghostVisible = true, onApplied, onCommitted, onSelectPart, onScopeLabel, ref }: {
   source: CorpusIdentity
   bundle: NotoPresetModelBundle | null
   edit: PropagationEdit
-  /** 모델 값에서 벗어난 rail. 머리에 이름과 Δ(u)를 보인다. */
+  /** 모델 값에서 벗어난 rail(고정된 rail 포함). 머리에 이름과 Δ(u)를 보인다. */
   changed: EditableRail[]
+  /** 고정(`= 자리`)한 변 rail id. Δ 줄 표시용. */
+  fixed?: ReadonlySet<string>
   /** 지금 잡은 rail의 부품. 이게 있어야 카드가 뜬다. */
   focus?: Part
   /** 배치 Δ를 저장한 뒤. 호출자는 세션 편집을 비워 새 original에서 다시 시작한다. */
   onApplied?: () => void
   /** 저장소가 바뀐 직후(적용·지우기). 앞뒤 스냅샷을 넘겨 호출자가 Undo 기록을 남긴다. */
   onCommitted?: (before: LayoutDeltaSnapshot, after: LayoutDeltaSnapshot) => void
+  /** 오버라이드 카드(자모별)를 누르면 그 부품을 켠다. 캔버스의 부품 고르기와 같은 경로. */
+  onSelectPart?: (part: Part) => void
+  /** 편집 캔버스의 `Noto 고스트` 토글을 따른다. 끄면 카드에서도 고스트를 뺀다. */
+  ghostVisible?: boolean
+  /** 지금 범위 이름(`이 레이아웃` · `ㄱ·ㅋ` · `전체`). 하단 바의 `…에 적용` 글씨용. */
+  onScopeLabel?: (label: string) => void
+  ref?: Ref<ReviewPropagationHandle>
 }) {
   const [scope, setScope] = useState<PropagationScope>('layer')
   const applyDelta = useLayoutDeltaStore((state) => state.apply)
   const clearDelta = useLayoutDeltaStore((state) => state.clear)
-  const saved = useScopeDelta(scope, source.contextId)
+  // `이 자모만`에서 고른 자모. 기본은 잡은 자모 하나. 부품이 바뀌면 고른 것을 버린다. 최소 하나는 남는다.
+  const focusJamo = focusJamoOf(source, focus)
+  const group = focus ? jamoPartOf(focus) : 'JU'
+  const [picked, setPicked] = useState<{ group: OverrideGroup; jamos: string[] } | null>(null)
+  const jamos = useMemo(() => picked?.group === group && picked.jamos.length > 0 ? picked.jamos : focusJamo ? [focusJamo] : [], [focusJamo, picked, group])
+  const togglePicked = (jamo: string) => setPicked(jamos.includes(jamo) ? (jamos.length > 1 ? { group, jamos: jamos.filter((item) => item !== jamo) } : { group, jamos }) : { group, jamos: [...jamos, jamo] })
+  const target = useMemo<LayoutDeltaTarget>(() => scope === 'all' ? { scope } : scope === 'layer' ? { scope, contextId: source.contextId } : { scope, contextId: source.contextId, jamos: jamos.map((jamo) => jamoKeyOf(group, jamo)) }, [scope, source.contextId, jamos, group])
   const commit = (change: () => void) => { const before = layoutDeltaSnapshot(); change(); onCommitted?.(before, layoutDeltaSnapshot()); onApplied?.() }
-  const apply = () => commit(() => applyDelta(scope, source.contextId, layoutDeltaOf(edit)))
+  // 자모 칩을 누르면 그 부품이 켜지고 고른 자모는 그 하나가 돼 표본이 그 글자로 바뀐다. 여러 자모는 시트에서 고른다.
+  const pickJamo = (jamoGroup: OverrideGroup, jamo: string) => { setPage(0); onSelectPart?.(jamoGroup); setPicked({ group: jamoGroup, jamos: [jamo] }); setScope('jamo') }
+  // `이 자모만`의 자모 고르기 시트. 고르는 즉시 표본이 바뀌고 `완료`는 닫기만 한다.
+  const [pickerOpen, setPickerOpen] = useState(false)
+  useEffect(() => {
+    if (!pickerOpen) return
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setPickerOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pickerOpen])
   const [page, setPage] = useState(0)
   const [promoted, setPromoted] = useState(false)
-  const layoutActive = hasLayoutEdit(edit)
   const shapeActive = hasShapeEdit(edit)
   const layoutRails = changed.filter((rail) => editKindOf(rail) === 'layout')
   const shapeRails = changed.filter((rail) => editKindOf(rail) === 'shape')
   // 그리드는 하나. 형태 Δ를 올리면 같은 자모 카드에 형태 모드로 얹고, 아니면 배치 모드(Δ 없으면 내 획만).
   const mode: EditKind = shapeActive && promoted ? 'shape' : 'layout'
-  const cardScope: CandidateScope = mode === 'shape' ? 'jamo' : scope
-  const candidates = useMemo(() => focus ? propagationCandidates({ source, scope: cardScope, count: CARD_COUNT, page, focus }) : [], [focus, source, cardScope, page])
-  const scopeHint = PROPAGATION_SCOPES.find((item) => item.id === scope)?.hint ?? ''
-  const hint = layoutActive ? `배치 Δ · ${scopeHint} · 적용하면 저장` : shapeActive ? '배치 Δ 없음 · 아래 형태 Δ만' : focus ? `${scopeHint} · 기준선을 옮기면 Δ가 얹힙니다` : '기준선을 잡으면 여기 보입니다'
+  const cardScope: CandidateScope = mode === 'shape' ? 'sameJamo' : scope
+  const candidates = useMemo(() => focus ? propagationCandidates({ source, scope: cardScope, count: CARD_COUNT, page, focus, jamos }) : [], [focus, source, cardScope, page, jamos])
+  const scopeLabel = scope === 'jamo' ? jamos.join('·') : PROPAGATION_SCOPES.find((item) => item.id === scope)?.label ?? ''
+  useEffect(() => { onScopeLabel?.(scopeLabel) }, [onScopeLabel, scopeLabel])
+  // 적용 = 지금 범위에 Δ 저장. 하단 바가 ref로 부른다. 닫힘값은 렌더마다 새로 잡는다(ref 갱신은 값싸다).
+  useImperativeHandle(ref, () => ({ apply: () => commit(() => applyDelta(target, layoutDeltaOf(edit))) }))
   return <section className={styles.section} aria-label="다른 글자에 적용하면" data-testid="review-propagation">
-    <div className={styles.head}>
-      <span>다른 글자에 적용하면<small>{hint}</small></span>
-      <span className={styles.actions}>
-        {focus && <button type="button" onClick={() => setPage((current) => current + 1)} data-testid="review-propagation-next">다른 글자</button>}
-        {layoutActive && <button type="button" className={styles.apply} onClick={apply} data-testid="review-propagation-apply">적용</button>}
-      </span>
+    {/* 범위 띠 = 적용 범위 고르기 + 쌓인 오버라이드. 저장된 Δ는 이미 캔버스 original에 들어 있고, 지우기는 칩 ×로(Undo 됨). */}
+    <LayoutScopeStrip source={source} selected={target} picked={scope === 'jamo' && mode !== 'shape' ? { group, jamos } : null} fixedDisabled={!focus || mode === 'shape'} jamoDisabled={mode === 'shape'}
+      onScope={(next) => { setScope(next); setPage(0) }} onPickJamo={pickJamo} onOpenPicker={() => { setScope('jamo'); setPage(0); setPickerOpen(true) }} onRemove={(removed) => commit(() => clearDelta(removed))} />
+    {/* Δ 줄은 늘 자리를 차지한다. 옮길 때 카드가 아래로 밀리지 않게. `다른 글자`는 같은 줄 오른쪽 끝. */}
+    <div className={styles.deltaRow}>
+      <DeltaList rails={layoutRails} fixed={fixed} testId="review-propagation-deltas" />
+      {focus && <button type="button" onClick={() => setPage((current) => current + 1)} data-testid="review-propagation-next">다른 글자</button>}
     </div>
-    <div className={styles.scopes} role="group" aria-label="배치 적용 범위">
-      {PROPAGATION_SCOPES.map((item) => <button type="button" key={item.id} aria-pressed={item.id === scope} disabled={!focus || mode === 'shape'} onClick={() => { setScope(item.id); setPage(0) }}>{item.label}</button>)}
-      {/* 이 범위에 저장된 Δ가 있으면 알려 주고 지울 수 있다. 저장된 Δ는 이미 캔버스 original에 들어 있다. */}
-      {saved && <button type="button" className={styles.clear} onClick={() => commit(() => clearDelta(scope, source.contextId))} data-testid="review-propagation-clear">저장된 Δ 지우기</button>}
-    </div>
-    {/* Δ 줄은 늘 자리를 차지한다. 옮길 때 카드가 아래로 밀리지 않게. */}
-    <DeltaList rails={layoutRails} testId="review-propagation-deltas" />
     {shapeActive && <div className={styles.shape} data-testid="review-propagation-shape">
       <div className={styles.head}>
         <span>자모 형태 Δ<small>시작·끝 = 획 길이 · 자소 탭 몫 · 같은 홀자에 슬롯 비율로</small></span>
@@ -164,6 +196,18 @@ export function ReviewPropagationCards({ source, bundle, edit, changed, focus, o
       </div>
       <DeltaList rails={shapeRails} testId="review-propagation-shape-deltas" />
     </div>}
-    {focus && <CardGrid candidates={candidates} bundle={bundle} edit={edit} mode={mode} />}
+    {focus && <CardGrid candidates={candidates} bundle={bundle} edit={edit} mode={mode} ghostVisible={ghostVisible} />}
+    {/* 자모 고르기 시트. 잡은 부품 자리에 올 수 있는 자모 전부. 기본은 잡은 자모 하나, 마지막 하나는 못 끈다. 여러 개를 켜면 같은 Δ가 자모마다 따로 저장된다. */}
+    {pickerOpen && focus && mode !== 'shape' && <div className={styles.sheetBackdrop} onClick={() => setPickerOpen(false)}>
+      <div className={styles.sheet} role="dialog" aria-modal="true" aria-label={`${PART_GROUP_LABEL[group]} 자모 고르기`} onClick={(event) => event.stopPropagation()}>
+        <header>
+          <span><b>{PART_GROUP_LABEL[group]} 자모 고르기</b><small>이 레이아웃에서 {PART_GROUP_LABEL[group]}{group === 'JO' ? '이' : '가'} 고른 자모인 글자에만 · 자모마다 따로 저장</small></span>
+          <button type="button" onClick={() => setPickerOpen(false)} data-testid="review-propagation-jamos-done">완료</button>
+        </header>
+        <div className={styles.jamos} role="group" aria-label={`${PART_GROUP_LABEL[group]} 자모`} data-testid="review-propagation-jamos">
+          {jamoChoicesFor(focus).map((jamo) => { const on = jamos.includes(jamo); return <button type="button" key={jamo} aria-pressed={on} disabled={on && jamos.length === 1} data-jamo={jamo} onClick={() => { togglePicked(jamo); setPage(0) }}>{jamo}</button> })}
+        </div>
+      </div>
+    </div>}
   </section>
 }

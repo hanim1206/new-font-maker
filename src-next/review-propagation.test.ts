@@ -3,7 +3,7 @@ import type { ComponentFitPart } from './notoComponentFitView'
 import type { EditableRail, MedialFitPart } from './notoMedialFitView'
 import { corpusIdentity } from './notoCorpus'
 import type { StrokeRailBinding } from '../src/services/notoMedialMasterFit'
-import { applyFacesDelta, applyMedialDelta, editKindOf, hasLayoutEdit, hasShapeEdit, propagationCandidates, propagationEditOf, resolveSemanticRail, semanticKeyOf, shapeDeltaToEm } from './reviewPropagation'
+import { applyFacesDelta, applyMedialDelta, editKindOf, hasLayoutEdit, hasShapeEdit, propagationCandidates, propagationEditOf, resolveSemanticRail, semanticKeyOf, shapeDeltaToEm, layoutDeltaOf } from './reviewPropagation'
 
 /** 검수 rail 편집 → 배치·형태 Δ → 다른 글자 표본. 순수 계산만 본다. Δ는 획 역할 키(`primaryBeam.center`)로 든다. */
 
@@ -67,6 +67,22 @@ describe('propagationEditOf', () => {
     expect(hasLayoutEdit(edit)).toBe(true)
     expect(hasShapeEdit(edit)).toBe(true)
   })
+  it('고정한 변 rail은 Δ가 0이어도 `{ at }`으로 들고, 중심 rail의 고정 표시는 무시한다', () => {
+    const edit = propagationEditOf({
+      editable: [
+        rail({ id: 'c0:top', partIndex: 0, role: 'top', kind: 'face', axis: 'y', value: 0.1, original: 0.1 }),
+        rail({ id: 'c0:right', partIndex: 0, role: 'right', kind: 'face', value: 0.48, original: 0.5 }),
+        rail({ id: 's0:bottom', partIndex: 0, role: 'bottom', kind: 'face', axis: 'y', value: 0.9, original: 0.88 }),
+        rail({ id: '0:inner-right', role: 'inner-right', kind: 'center', value: 0.7, original: 0.7 }),
+      ],
+      medialParts, componentParts, fixed: new Set(['c0:top', 's0:bottom', '0:inner-right']),
+    })
+    expect(edit.layout.component.CH).toEqual({ top: { at: 0.1 }, right: expect.closeTo(-0.02, 9) })
+    expect(edit.layout.slot.JU).toEqual({ bottom: { at: 0.9 } })
+    expect(edit.layout.medial.JU).toBeUndefined()
+    expect(layoutDeltaOf(edit).faces?.CH?.top).toEqual({ at: 0.1 })
+    expect(applyFacesDelta(faces, { top: { at: 0.3 }, right: -0.02 })).toEqual({ ...faces, top: 0.3, right: expect.closeTo(faces.right - 0.02, 9) })
+  })
   it('편집이 없으면 둘 다 비어 있다', () => {
     const edit = propagationEditOf({ editable: [rail({ id: '0:inner-right', role: 'inner-right', kind: 'center', value: 0.7, original: 0.7 })], medialParts, componentParts })
     expect(hasLayoutEdit(edit)).toBe(false)
@@ -114,19 +130,31 @@ describe('propagationCandidates', () => {
     expect(new Set(picked.map((item) => item.medialJamo)).size).toBeGreaterThan(1)
   })
   it('같은 홀자 묶음은 초성·받침이 섞인다', () => {
-    const picked = propagationCandidates({ source, scope: 'jamo', count: 8 })
+    const picked = propagationCandidates({ source, scope: 'sameJamo', count: 8 })
     expect(picked.every((item) => item.medialJamo === 'ㅓ')).toBe(true)
     expect(new Set(picked.map((item) => item.initialJamo)).size).toBeGreaterThan(1)
     expect(new Set(picked.map((item) => item.finalJamo)).size).toBeGreaterThan(1)
   })
-  it('jamo(형태 카드 전용) = 잡은 부품 자모만 같게. 홀자를 잡으면 같은 홀자, 받침을 잡으면 같은 받침', () => {
+  it('sameJamo(형태 카드 전용) = 잡은 부품 자모만 같게. 홀자를 잡으면 같은 홀자, 받침을 잡으면 같은 받침', () => {
     const ae = corpusIdentity('배'.codePointAt(0)!)
-    const medialOnly = propagationCandidates({ source: ae, scope: 'jamo', count: 8, focus: 'JU' })
+    const medialOnly = propagationCandidates({ source: ae, scope: 'sameJamo', count: 8, focus: 'JU' })
     expect(medialOnly.every((item) => item.medialJamo === 'ㅐ')).toBe(true)
     expect(medialOnly.some((item) => item.finalJamo !== null)).toBe(true)
-    const finalOnly = propagationCandidates({ source, scope: 'jamo', count: 8, focus: 'JO' })
+    const finalOnly = propagationCandidates({ source, scope: 'sameJamo', count: 8, focus: 'JO' })
     expect(finalOnly.every((item) => item.finalJamo === 'ㅁ')).toBe(true)
     expect(new Set(finalOnly.map((item) => item.medialJamo)).size).toBeGreaterThan(1)
+  })
+  it('이 자모만 = 같은 문맥에서 잡은 부품의 자모가 고른 것 중 하나. 표본 밖 자모(ㅋ 받침)도 고르면 들어온다', () => {
+    const initials = propagationCandidates({ source, scope: 'jamo', count: 8, focus: 'CH', jamos: ['ㅁ', 'ㅋ'] })
+    expect(initials.length).toBeGreaterThan(0)
+    expect(initials.every((item) => item.contextId === source.contextId && ['ㅁ', 'ㅋ'].includes(item.initialJamo))).toBe(true)
+    expect(new Set(initials.map((item) => item.initialJamo)).size).toBe(2)
+    const finals = propagationCandidates({ source, scope: 'jamo', count: 8, focus: 'JO', jamos: ['ㅋ'] })
+    expect(finals.length).toBeGreaterThan(0)
+    expect(finals.every((item) => item.contextId === source.contextId && item.finalJamo === 'ㅋ')).toBe(true)
+    const medials = propagationCandidates({ source, scope: 'jamo', count: 8, focus: 'JU', jamos: ['ㅓ'] })
+    expect(medials.every((item) => item.contextId === source.contextId && item.medialJamo === 'ㅓ')).toBe(true)
+    expect(propagationCandidates({ source, scope: 'jamo', count: 8, focus: 'CH', jamos: [] })).toEqual([])
   })
   it('전체는 문맥이 섞이고, 다음 묶음은 다른 글자', () => {
     const all = propagationCandidates({ source, scope: 'all', count: 8 })

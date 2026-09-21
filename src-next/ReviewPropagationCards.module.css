@@ -3,17 +3,28 @@
 .head span:first-child { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .head span:first-child small { display: block; color: rgb(var(--color-text-dim-4)); font-weight: 500; letter-spacing: .06em; text-transform: none; }
 .head button { flex: 0 0 auto; padding: 4px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 10px; font-weight: 700; }
-.actions { display: flex; flex: 0 0 auto; gap: 6px; }
-.head .apply { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary)); color: #fff; }
-.scopes .clear { margin-left: auto; border-style: dashed; color: rgb(var(--color-text-dim-3)); }
-.scopes { display: flex; gap: 6px; padding: 8px 0 0; }
-.scopes button { flex: 0 0 auto; padding: 4px 11px; border: 1px solid rgb(var(--color-border)); border-radius: 14px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
-.scopes button[aria-pressed='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary)); color: #fff; }
-.scopes button:disabled { opacity: .4; }
+/* Δ 줄과 `다른 글자`가 한 줄. Δ가 길어 두 줄이 돼도 단추는 위에 붙는다. */
+.deltaRow { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0 0; }
+.deltaRow .deltas { flex: 1 1 auto; min-width: 0; padding: 4px 0 0; }
+.deltaRow button { flex: 0 0 auto; padding: 4px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 10px; font-weight: 700; }
+/* 자모 고르기 시트. 아래에서 올라오고 바깥을 누르면 닫힌다. */
+.sheetBackdrop { position: fixed; z-index: 100; inset: 0; display: flex; align-items: flex-end; justify-content: center; background: rgb(20 24 31 / .28); }
+.sheet { width: min(100%, 480px); box-sizing: border-box; padding: 12px 16px calc(env(safe-area-inset-bottom) + 16px); border-radius: 18px 18px 0 0; background: rgb(var(--color-surface)); box-shadow: 0 -8px 28px rgb(20 24 31 / .18); }
+.sheet header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 10px; }
+.sheet header span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sheet header b { font-size: 13px; font-weight: 700; }
+.sheet header small { color: rgb(var(--color-text-dim-4)); font-size: 10.5px; line-height: 1.35; }
+.sheet header button { flex: 0 0 auto; min-height: 36px; padding: 0 16px; border: 0; border-radius: 10px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 12px; font-weight: 700; }
+.jamos { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
+.jamos button { min-height: 44px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 16px; font-weight: 700; }
+.jamos button[aria-pressed='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary-light)); color: rgb(var(--color-primary-dark)); }
+.jamos button:disabled { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary)); color: #fff; opacity: 1; }
 .deltas { min-height: 24px; display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 8px 0 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 600; color: rgb(var(--color-primary-dark)); }
 .deltas i { margin-right: 4px; color: rgb(var(--color-text-dim-4)); font-style: normal; font-weight: 500; }
-.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 10px 0 0; }
-.card { margin: 0; }
+/* 한 줄만 차지한다. 네 장이 보이고 나머지는 옆으로 민다. */
+.cards { display: flex; gap: 8px; padding: 6px 0 0; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; }
+.cards::-webkit-scrollbar { display: none; }
+.card { flex: 0 0 calc((100% - 24px) / 4); min-width: 0; margin: 0; scroll-snap-align: start; }
 .card svg { display: block; width: 100%; aspect-ratio: 1; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: #fff; }
 .card[data-touched='false'] svg { opacity: .55; }
 .card figcaption { display: flex; flex-direction: column; align-items: center; margin-top: 3px; line-height: 1.2; }

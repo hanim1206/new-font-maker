@@ -1,7 +1,11 @@
 import { finalGlyphInkToSvgPath } from '../src/services/finalGlyphInk'
 import { inkOfFit, reportFitResult } from '../src/services/notoFitReport'
 import type { RailError } from '../src/services/notoFitReport'
+import { inkOfComponentFit } from '../src/services/notoComponentFit'
 import type { FitInkStyle } from '../src/services/notoComponentFit'
+import { boxToFaces, fitPartStrokes } from '../src/services/contextBoxResolver'
+import { useJamoStore } from '../src/stores/jamoStore'
+import type { DeepReadonly, JamoData } from '../src/types'
 import { applyRailEdits, applySlotFacesDelta, boundRailRoles, fitRailAxis } from '../src/services/notoMedialMasterFit'
 import type { FitRailKey, MedialFitInput, MedialFitResult, MedialRoleMeasurement, SlotFacesDelta } from '../src/services/notoMedialMasterFit'
 import { selectNotoOutlineContours } from '../src/services/notoOutlineInk'
@@ -11,9 +15,10 @@ import type { ContextBoxResolution, ContextMedialPart } from '../src/services/co
 import type { ApprovedNotoInput } from './notoBoundMaster'
 
 /**
- * 검수 화면용 홀자 획 마스터 fit. 변화량 모델 rail로 fit해 잉크 경로를 만들고,
- * 승인 측정이 있는 글자면 Noto 홀자 고스트와의 xor·rail 오차도 같이 낸다.
- * rail 편집은 fit 결과 위에서 `renderMedialPart`로 다시 놓는다. 두께는 안 변한다.
+ * 레이아웃 편집기용 홀자. 획 마스터 fit은 **기하 엔진**이다: 변화량 모델 rail로 slot(홀자 잉크 상자)을 내고, rail·상자 변 편집의 순서·간격을 판정한다.
+ * 화면 잉크는 fit이 아니라 **앱 획**(`useJamoStore`)을 그 slot 네 변에 맞춘 것 — 문장 줄·획 편집과 같은 호출(`fitPartStrokes`)이라 캔버스 = 글자다.
+ * 그래서 획 편집에서 홀자를 고치면 레이아웃에도 보인다. 앱 획에 안 닿는 시작·끝 rail은 편집기가 안 내놓는다.
+ * 승인 측정이 있는 글자면 Noto 홀자 고스트와의 xor·rail 오차도 같이 내는데, 그건 fit 잉크 기준(측정용)이다.
  */
 
 const ROLE_LABEL: Record<string, string> = { outerPillar: '바깥기둥', innerPillar: '안기둥', baseStem: '줄기', leftStem: '왼줄기', rightStem: '오른줄기', primaryBeam: '보', upperBeam: '위보', lowerBeam: '아래보' }
@@ -26,6 +31,9 @@ export interface MedialFitPart {
   roleIds: readonly string[]
   /** 모델 rail 그대로의 fit. 편집의 출발점. */
   fit?: MedialFitResult
+  /** 앱 홀자 획과 그 홀자. 있으면 화면 잉크를 이 획으로 그린다(없으면 획 마스터 잉크 — 앱 밖 테스트용). */
+  jamo?: DeepReadonly<JamoData>
+  medialJamo?: string
   /** 승인 측정이 있을 때만: 비교 대상 고스트와 기준 측정. */
   ghostOutline?: NotoOutline
   reference?: Record<string, MedialRoleMeasurement>
@@ -39,9 +47,12 @@ export interface MedialFitView {
 }
 
 export interface RenderedMedialPart {
+  /** 화면 잉크. 앱 획이 slot에 안 맞으면 없다(`slot`은 있고 `message`에 이유). */
   path?: string
-  /** 획을 놓은 뒤의 홀자 잉크 박스(em). 화면에서 기준선 상자로 칠한다. */
+  /** rail을 놓은 뒤의 홀자 잉크 박스(em). 화면에서 기준선 상자로 칠한다. 있으면 rail 자리 자체는 유효하다. */
   slot?: BoxConfig
+  /** 앱 획을 slot에 맞춰 다듬은 중심선 상자. 칸 해석의 `boxes[part]`와 같은 값. */
+  inkBox?: BoxConfig
   xorRatio?: number
   inkRatio?: number
   railErrors: RailError[]
@@ -83,8 +94,10 @@ export function fitMedialForGlyph(input: {
   approved: ApprovedNotoInput | null
 }): MedialFitView {
   const approved = approvedMedialOf(input.approved)
+  const medialJamo = input.context.identity.medialJamo
+  const jamo = useJamoStore.getState().jungseong[medialJamo]
   const parts: MedialFitPart[] = input.context.medial.map((group) => {
-    const part: MedialFitPart = { part: group.part, role: group.role, roleIds: group.roleIds, fit: group.fit, message: group.message }
+    const part: MedialFitPart = { part: group.part, role: group.role, roleIds: group.roleIds, fit: group.fit, message: group.message, jamo, medialJamo }
     if (group.fit && approved) {
       part.ghostOutline = selectNotoOutlineContours(input.outline, approved.contourIds(group.roleIds))
       part.reference = Object.fromEntries(Object.entries(approved.measurements).filter(([roleId]) => group.roleIds.includes(roleId)))
@@ -101,9 +114,18 @@ export function renderMedialPart(part: MedialFitPart, railsEm?: Readonly<Record<
   if (!part.fit) return { railErrors: [], message: part.message }
   const placed = railsEm ? applyRailEdits(part.fit, railsEm) : { ok: true as const, fit: part.fit }
   if (!placed.ok) return { railErrors: [], message: placed.message }
-  const ink = inkOfFit(placed.fit, 1, style)
-  if (!ink.ok) return { railErrors: [], message: ink.message }
-  const rendered: RenderedMedialPart = { path: finalGlyphInkToSvgPath({ regions: ink.regions }, 1), slot: { ...placed.fit.slot }, railErrors: [] }
+  const rendered: RenderedMedialPart = { slot: { ...placed.fit.slot }, railErrors: [] }
+  if (part.jamo && part.medialJamo) {
+    // 앱 획을 slot 네 변에 맞춘다. 못 맞추면(고친 획이 칸보다 큼 등) 상자만 남기고 이유를 돌려준다 — rail 자리는 여전히 유효.
+    const fitted = fitPartStrokes({ part: part.part, jamo: part.jamo, faces: boxToFaces(placed.fit.slot), glyphId: 'layout-editor', medialJamo: part.medialJamo, ends: style })
+    const ink = fitted.ok ? inkOfComponentFit(fitted.fit, style) : fitted
+    if (fitted.ok && ink.ok) { rendered.path = finalGlyphInkToSvgPath({ regions: ink.regions }, 1); rendered.inkBox = { ...fitted.fit.box } }
+    else rendered.message = ink.ok ? undefined : ink.message
+  } else {
+    const ink = inkOfFit(placed.fit, 1, style)
+    if (!ink.ok) return { railErrors: [], message: ink.message }
+    rendered.path = finalGlyphInkToSvgPath({ regions: ink.regions }, 1)
+  }
   if (part.ghostOutline && part.reference) {
     const report = reportFitResult({ fit: placed.fit, ghostOutline: part.ghostOutline, referenceMeasurements: part.reference })
     rendered.railErrors = report.railErrors

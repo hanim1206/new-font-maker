@@ -2,11 +2,13 @@ import type { ComponentFaces } from '../src/services/notoComponentFit'
 import type { StrokeRailBinding } from '../src/services/notoMedialMasterFit'
 import { applyMedialDelta, resolveSemanticRail, semanticKeyOf } from '../src/services/medialRailDelta'
 import type { SemanticDelta, SemanticRailKey } from '../src/services/medialRailDelta'
-import { addContextBoxDelta, resolveContextBoxes } from '../src/services/contextBoxResolver'
-import type { ContextBoxDelta, ContextModel } from '../src/services/contextBoxResolver'
+import { addContextBoxDelta, faceWithDelta, resolveContextBoxes } from '../src/services/contextBoxResolver'
+import type { ContextBoxDelta, ContextModel, FacesDelta } from '../src/services/contextBoxResolver'
 import type { BoxConfig, Part } from '../src/types'
-import { CORPUS_FINALS, CORPUS_MEDIALS, corpusCodepoint, corpusIdentity } from './notoCorpus'
+import { CORPUS_FINALS, CORPUS_INITIALS, CORPUS_MEDIALS, CORPUS_TOTAL, corpusCodepoint, corpusIdentity } from './notoCorpus'
 import type { CorpusIdentity } from './notoCorpus'
+import { jamoPartOf } from './layoutDeltaStore'
+import type { PropagationScope } from './layoutDeltaStore'
 import type { ComponentFitPart } from './notoComponentFitView'
 import type { EditableRail, MedialFitPart } from './notoMedialFitView'
 
@@ -34,10 +36,10 @@ export interface PropagationEdit {
   layout: {
     /** 홀자 part별 중심 rail Δ(em). 획 역할 키. */
     medial: Partial<Record<MedialPartKey, SemanticDelta>>
-    /** 닿자 part별 네 변 Δ(em). */
-    component: Partial<Record<ComponentPartKey, Partial<ComponentFaces>>>
-    /** 홀자 part별 상자 네 변 Δ(em). rail id가 `s`로 시작하는 변. */
-    slot: Partial<Record<MedialPartKey, Partial<ComponentFaces>>>
+    /** 닿자 part별 네 변 Δ. 더하기(em) 또는 고정(`{ at }`). */
+    component: Partial<Record<ComponentPartKey, FacesDelta>>
+    /** 홀자 part별 상자 네 변 Δ. rail id가 `s`로 시작하는 변. 더하기 또는 고정. */
+    slot: Partial<Record<MedialPartKey, FacesDelta>>
   }
   shape: {
     /** 홀자 part별 시작·끝 rail Δ를 그 축 슬롯 길이로 나눈 비율. 획 역할 키. */
@@ -45,34 +47,60 @@ export interface PropagationEdit {
   }
 }
 
-/** 배치 Δ를 퍼뜨릴 범위. 기본 `이 레이아웃`(같은 문맥), `전체`는 일부러 넓히는 것. */
-export type PropagationScope = 'layer' | 'all'
+/** 범위 칩. 기본 `이 레이아웃`(같은 문맥), `이 자모만`은 좁힐 때, `전체`는 일부러 넓힐 때. 자모 범위의 힌트는 고른 자모에 따라 카드가 만든다. */
+export type { PropagationScope }
 export const PROPAGATION_SCOPES: { id: PropagationScope; label: string; hint: string }[] = [
   { id: 'layer', label: '이 레이아웃', hint: '홀자 계열·받침 유무가 같은 글자' },
+  { id: 'jamo', label: '이 자모만', hint: '이 레이아웃에서 잡은 부품의 자모가 같은 글자' },
   { id: 'all', label: '전체', hint: '모든 글자' },
 ]
+
+/** 오버라이드 카드에 적는 닿는 글자 수. 11,172자 전수에서 센다. 문맥·자모별로 메모. */
+const glyphCountCache = new Map<string, number>()
+export function overrideGlyphCount(target: { scope: 'all' } | { scope: 'layer'; contextId: string } | { scope: 'jamo'; contextId: string; group: 'CH' | 'JU' | 'JO'; jamo: string }): number {
+  if (target.scope === 'all') return CORPUS_TOTAL
+  const key = target.scope === 'layer' ? `layer:${target.contextId}` : `jamo:${target.contextId}:${target.group}:${target.jamo}`
+  const cached = glyphCountCache.get(key)
+  if (cached !== undefined) return cached
+  let count = 0
+  for (let offset = 0; offset < CORPUS_TOTAL; offset += 1) {
+    const identity = corpusIdentity(0xac00 + offset)
+    if (identity.contextId !== target.contextId) continue
+    if (target.scope === 'layer' || focusJamoOf(identity, target.group) === target.jamo) count += 1
+  }
+  glyphCountCache.set(key, count)
+  return count
+}
+
+/** 부품 묶음 → 그 자리에 올 수 있는 자모 전부. `이 자모만`의 고르기 목록. */
+export const jamoChoicesFor = (part: Part): readonly string[] => jamoPartOf(part) === 'CH' ? CORPUS_INITIALS : jamoPartOf(part) === 'JO' ? CORPUS_FINALS.filter((jamo): jamo is string => jamo !== null) : CORPUS_MEDIALS
+export const PART_GROUP_LABEL: Record<'CH' | 'JU' | 'JO', string> = { CH: '첫닿자', JU: '홀자', JO: '받침' }
 
 const EPSILON = 1e-9
 const spanOf = (slot: BoxConfig, axis: 'x' | 'y') => axis === 'x' ? slot.width : slot.height
 
-/** 편집 가능한 rail 목록(값·모델 값)에서 Δ를 뽑아 배치·형태로 가른다. 바뀐 것만 남는다. */
-export function propagationEditOf(input: { editable: readonly EditableRail[]; medialParts: readonly MedialFitPart[]; componentParts: readonly ComponentFitPart[] }): PropagationEdit {
+/**
+ * 편집 가능한 rail 목록(값·모델 값)에서 Δ를 뽑아 배치·형태로 가른다. 바뀐 것만 남는다.
+ * `fixed`에 든 변 rail은 Δ가 0이어도 고정(`{ at: 지금 값 }`)으로 든다 — 범위 안 글자를 전부 이 자리에 모으는 뜻.
+ */
+export function propagationEditOf(input: { editable: readonly EditableRail[]; medialParts: readonly MedialFitPart[]; componentParts: readonly ComponentFitPart[]; fixed?: ReadonlySet<string> }): PropagationEdit {
   const edit: PropagationEdit = { layout: { medial: {}, component: {}, slot: {} }, shape: { medial: {} } }
   for (const rail of input.editable) {
     const delta = rail.value - rail.original
-    if (Math.abs(delta) <= EPSILON) continue
+    const fixed = rail.kind === 'face' && (input.fixed?.has(rail.id) ?? false)
+    if (Math.abs(delta) <= EPSILON && !fixed) continue
     if (rail.kind === 'face' && rail.id.startsWith('s')) {
       const part = input.medialParts[rail.partIndex]
       if (!part) continue
       const faces = (edit.layout.slot[part.part] ??= {})
-      faces[rail.role as keyof ComponentFaces] = delta
+      faces[rail.role as keyof ComponentFaces] = fixed ? { at: rail.value } : delta
       continue
     }
     if (rail.kind === 'face') {
       const part = input.componentParts[rail.partIndex]
       if (!part) continue
       const faces = (edit.layout.component[part.part] ??= {})
-      faces[rail.role as keyof ComponentFaces] = delta
+      faces[rail.role as keyof ComponentFaces] = fixed ? { at: rail.value } : delta
       continue
     }
     const part = input.medialParts[rail.partIndex]
@@ -132,39 +160,49 @@ export function shapeDeltaToEm(ratios: Readonly<SemanticDelta>, slot: BoxConfig,
   return delta
 }
 
-export function applyFacesDelta(faces: ComponentFaces, delta: Partial<ComponentFaces>): ComponentFaces {
-  return { left: faces.left + (delta.left ?? 0), right: faces.right + (delta.right ?? 0), top: faces.top + (delta.top ?? 0), bottom: faces.bottom + (delta.bottom ?? 0) }
+/** 네 변에 Δ를 얹는다. 더하기는 더하고, 고정은 그 자리로. */
+export function applyFacesDelta(faces: ComponentFaces, delta: FacesDelta): ComponentFaces {
+  return { left: faceWithDelta(faces.left, delta.left), right: faceWithDelta(faces.right, delta.right), top: faceWithDelta(faces.top, delta.top), bottom: faceWithDelta(faces.bottom, delta.bottom) }
 }
 
 // 카드에 올릴 글자 표본. 초성·받침은 자주 쓰는 것 위주로 골라 문맥이 고루 섞이게 한다.
 const SAMPLE_INITIALS = [...'ㄱㄴㅁㅅㅇㅈㅎㄹㅂㅋ']
 const SAMPLE_FINALS: (string | null)[] = [null, ...'ㄴㄹㅁㅇㄱㅂ']
 
-/** 표본 묶음. `layer` = 같은 문맥, `all` = 전부, `jamo` = 잡은 부품(focus)의 자모가 같은 글자(없으면 같은 홀자) — 형태 Δ 카드 전용, 범위 칩엔 없다. */
-export type CandidateScope = PropagationScope | 'jamo'
+/**
+ * 표본 묶음. `layer` = 같은 문맥, `jamo` = 같은 문맥에서 잡은 부품의 자모가 고른 것 중 하나, `all` = 전부.
+ * `sameJamo` = 문맥 무관하게 잡은 부품의 자모가 같은 글자 — 형태 Δ 카드 전용, 범위 칩엔 없다.
+ */
+export type CandidateScope = PropagationScope | 'sameJamo'
 
 /** 잡은 부품의 자모. 초성이면 첫닿자, 받침이면 받침, 홀자 계열은 홀자. */
-const focusJamoOf = (identity: CorpusIdentity, focus?: Part): string | null => focus === 'CH' ? identity.initialJamo : focus === 'JO' ? identity.finalJamo : identity.medialJamo
+export const focusJamoOf = (identity: CorpusIdentity, focus?: Part): string | null => focus === 'CH' ? identity.initialJamo : focus === 'JO' ? identity.finalJamo : identity.medialJamo
 
-function scopeMatches(scope: CandidateScope, source: CorpusIdentity, target: CorpusIdentity, focus?: Part): boolean {
+function scopeMatches(scope: CandidateScope, source: CorpusIdentity, target: CorpusIdentity, focus: Part | undefined, jamos: readonly string[]): boolean {
   if (scope === 'all') return true
   if (scope === 'layer') return target.contextId === source.contextId
+  if (scope === 'jamo') { const jamo = focusJamoOf(target, focus); return target.contextId === source.contextId && jamo !== null && jamos.includes(jamo) }
   return focusJamoOf(target, focus) === focusJamoOf(source, focus)
 }
 
 /**
  * 범위에 드는 글자 중 count개. 전체 표본을 고른 간격으로 뽑아 초성·홀자·받침이 겹치지 않게 하고,
- * page를 올리면 다음 묶음으로 넘어간다.
+ * page를 올리면 다음 묶음으로 넘어간다. `jamo` 범위는 고른 자모가 표본 목록에 없어도 그 자모 글자를 넣는다.
  */
-export function propagationCandidates(input: { source: CorpusIdentity; scope: CandidateScope; count: number; page?: number; /** 잡은 부품. `jamo` 범위에서 어느 부품 자모를 맞출지 정한다. */ focus?: Part }): CorpusIdentity[] {
+export function propagationCandidates(input: { source: CorpusIdentity; scope: CandidateScope; count: number; page?: number; /** 잡은 부품. `jamo`·`sameJamo` 범위에서 어느 부품 자모를 맞출지 정한다. */ focus?: Part; /** `jamo` 범위에서 고른 자모. */ jamos?: readonly string[] }): CorpusIdentity[] {
   const { source, scope, count, focus } = input
+  const jamos = input.jamos ?? []
+  const group = focus ? jamoPartOf(focus) : 'JU'
+  // 고른 자모가 표본 목록 밖이면(ㅋ 받침 등) 그 자모를 목록에 보태 카드가 비지 않게 한다.
+  const initials = scope === 'jamo' && group === 'CH' ? [...new Set([...SAMPLE_INITIALS, ...jamos])] : SAMPLE_INITIALS
+  const finals = scope === 'jamo' && group === 'JO' ? [...new Set([...SAMPLE_FINALS, ...jamos])] : SAMPLE_FINALS
   const pool: CorpusIdentity[] = []
-  for (const final of SAMPLE_FINALS) for (const medial of CORPUS_MEDIALS) for (const initial of SAMPLE_INITIALS) {
-    if (!CORPUS_FINALS.includes(final)) continue
+  for (const final of finals) for (const medial of CORPUS_MEDIALS) for (const initial of initials) {
+    if (!CORPUS_FINALS.includes(final) || !CORPUS_INITIALS.includes(initial)) continue
     const codepoint = corpusCodepoint(initial, medial, final)
     if (codepoint === source.codepoint) continue
     const identity = corpusIdentity(codepoint)
-    if (scopeMatches(scope, source, identity, focus)) pool.push(identity)
+    if (scopeMatches(scope, source, identity, focus, jamos)) pool.push(identity)
   }
   if (pool.length === 0) return []
   const pages = Math.max(1, Math.ceil(pool.length / count))

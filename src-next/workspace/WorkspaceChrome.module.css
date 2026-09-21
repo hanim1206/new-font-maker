@@ -8,6 +8,23 @@
 .headerActions { display: flex; gap: 3px; }
 .headerActions button { width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-dim-3)); }
 .headerActions button:disabled { opacity: .34; }
+/* `…` 메뉴. 단추 아래로 떨어지고 바깥을 누르면 닫힌다. 안의 링크·버튼은 아이콘 + 이름 한 줄. */
+.headerActions { position: relative; }
+.headerActions > button[data-badge]::after { content: ''; position: absolute; top: 9px; right: 9px; width: 7px; height: 7px; border-radius: 50%; background: rgb(var(--color-primary)); }
+.headerActions > button[data-badge] { position: relative; }
+.headerActions > button[data-badge='failed']::after { background: #b24d3d; }
+.headerActions > button[data-badge='busy']::after { animation: more-badge 1s ease-in-out infinite alternate; }
+@keyframes more-badge { to { opacity: .25; } }
+.moreBackdrop { position: fixed; z-index: 60; inset: 0; }
+.moreMenu { position: absolute; z-index: 61; top: calc(100% + 4px); right: 0; min-width: 196px; padding: 6px; border: 1px solid rgb(var(--color-border)); border-radius: 14px; background: rgb(var(--color-surface)); box-shadow: 0 10px 28px rgb(20 24 31 / .16); }
+.moreMenu[hidden] { display: none; }
+.moreMenu nav { display: flex; flex-direction: column; gap: 2px; }
+.moreMenu nav a,
+.moreMenu nav button { width: 100%; height: auto; min-height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: flex-start; gap: 10px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-foreground)); font-size: 13px; font-weight: 600; text-align: left; text-decoration: none; white-space: nowrap; }
+.moreMenu nav em { font-style: normal; }
+.moreMenu nav button[hidden] { display: none; }
+.moreMenu nav button:disabled { opacity: .38; }
+.moreMenu nav button[data-active='true'] { color: rgb(var(--color-primary)); background: rgb(var(--color-primary-light) / .5); }
 
 .scopeBar { min-width: 0; display: grid; grid-template-columns: repeat(var(--scope-columns, 3), minmax(0, 1fr)) 44px; gap: 5px; padding: 7px; border: 1px solid rgb(var(--color-primary) / .22); border-radius: 13px; background: rgb(var(--color-primary-light) / .35); }
 .scopeBar div { min-width: 0; display: flex; flex-direction: column; gap: 1px; }

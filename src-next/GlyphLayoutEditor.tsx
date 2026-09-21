@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { notoOutlineGhostPath } from '../src/services/notoOutlineInk'
+import { DevGhostToggle } from './DevGhostToggle'
 import { approvedInputFor, isApproved } from './notoApprovedIndex'
 import { editableComponentRailsOf, fitComponentsForGlyph, renderComponentPart } from './notoComponentFitView'
 import type { ComponentFaces } from '../src/services/notoComponentFit'
@@ -12,10 +13,11 @@ import type { EditableRail } from './notoMedialFitView'
 import { useNotoModel } from './notoModel'
 import type { NotoPresetGlyph } from './notoPresetGlyphs'
 import { ReviewPropagationCards } from './ReviewPropagationCards'
+import type { ReviewPropagationHandle } from './ReviewPropagationCards'
 import { useNotoGlyph } from './useNotoGlyph'
 import { useLayoutDelta } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
-import { propagationEditOf, unreachedRailIds } from './reviewPropagation'
+import { hasLayoutEdit, propagationEditOf, unreachedRailIds } from './reviewPropagation'
 import { snapRail } from './railSnap'
 import type { SnapHit } from './railSnap'
 import { useFitInkStyle } from './useFitInkStyle'
@@ -229,14 +231,14 @@ function railsWithDelta(railsEm?: Readonly<Record<string, number>>, delta?: Read
   return Object.fromEntries(Object.entries(railsEm).map(([key, value]) => [key, value + (delta[key] ?? 0)]))
 }
 
-function GlyphLayoutBody({ glyph, initialPart, onCommitted }: { glyph: NotoPresetGlyph; initialPart?: Part; onCommitted?: GlyphLayoutEditorProps['onCommitted'] }) {
+function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes }: { glyph: NotoPresetGlyph; initialPart?: Part; onCommitted?: GlyphLayoutEditorProps['onCommitted']; onEditStrokes?: GlyphLayoutEditorProps['onEditStrokes'] }) {
   const codepoint = glyph.identity.codepoint
   const approved = isApproved(codepoint)
   const ghost = useMemo(() => notoOutlineGhostPath(glyph.outline), [glyph])
   const measured = useMemo(() => baselineRails(glyph), [glyph])
   const { bundle, error: modelError } = useNotoModel()
   // 칸 해석 함수 한 번 → 홀자 fit(rail)과 닿자 네 변. 렌더러와 같은 상자(저장된 배치 Δ 포함)다. 여기 값이 편집의 `original`.
-  const savedDelta = useLayoutDelta(glyph.identity.contextId)
+  const savedDelta = useLayoutDelta(glyph.identity)
   const context = useMemo(() => bundle ? resolveContextBoxes({ identity: glyph.identity, model: bundle, delta: savedDelta }) : null, [bundle, glyph, savedDelta])
   const fitView = useMemo(() => context ? fitMedialForGlyph({ context, outline: glyph.outline, approved: approvedInputFor(codepoint) }) : null, [context, glyph, codepoint])
   const componentParts = useMemo(() => context ? fitComponentsForGlyph({ context, outline: glyph.outline, approved: approvedInputFor(codepoint) }) : [], [context, glyph, codepoint])
@@ -257,11 +259,14 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted }: { glyph: NotoPrese
   const rendered = useMemo(() => slotParts.map((part, index) => renderMedialPart(part, railsByPart[index], inkStyle)), [slotParts, railsByPart, inkStyle])
   // 홀자 마스터 rail(`<n>:<role>`), 홀자 상자 변(`s<n>:<side>`), 닿자 박스 변(`c<n>:<side>`)을 한 목록으로. 선택·자·드래그가 같은 경로를 탄다.
   const editable = useMemo(() => [
-    ...editableRailsOf(slotParts, railsByPart),
+    // 중심 rail만. 시작·끝 rail(획 길이)은 앱 획에 안 닿고 저장도 안 돼서 레이아웃엔 안 내놓는다 — 획 길이는 `획 고치기`에서.
+    ...editableRailsOf(slotParts, railsByPart).filter((item) => item.kind === 'center'),
     ...editableSlotRailsOf(slotParts, rendered.map((part) => part.slot), slotDeltaByPart),
     ...editableComponentRailsOf(componentParts, facesByPart),
   ], [slotParts, railsByPart, rendered, slotDeltaByPart, componentParts, facesByPart])
   const overlays = rendered.flatMap((part) => part.path ? [part.path] : [])
+  // 앱 획이 slot에 안 맞는 홀자 part. 상자는 그대로 그리고 이유만 알린다.
+  const inkIssue = rendered.find((part) => part.slot && !part.path)?.message
   // rail → 부품. 캔버스 색·탭 필터가 이걸로 가른다.
   // 옮겨도 글자에 안 닿는 배치 rail은 잠근다. 세션 편집과 무관하게 저장된 상자 기준으로 한 번만 본다.
   const lockedRails = useMemo(() => bundle && fitView ? unreachedRailIds({ identity: glyph.identity, model: bundle, delta: savedDelta, editable: editableRailsOf(fitView.parts, []), medialParts: fitView.parts }) : new Set<string>(), [bundle, fitView, glyph, savedDelta])
@@ -283,11 +288,22 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted }: { glyph: NotoPrese
   const activePart = parts.some((part) => samePartGroup(part, activePartState)) ? activePartState : parts[0]
   const activeRails = useMemo(() => activePart ? canvasRails.filter((item) => samePartGroup(item.part, activePart)) : canvasRails, [canvasRails, activePart])
   const rail = activeRails.find((item) => item.id === selectedRail && !item.locked) ?? activeRails.find((item) => !item.locked)
+  const activeJamo = activePart === 'CH' ? glyph.identity.initialJamo : activePart === 'JO' ? glyph.identity.finalJamo ?? '' : glyph.identity.medialJamo
   const selectPart = (part: Part) => { setActivePartState(part); setSelectedRail(undefined); setError(''); setSnapHit(null) }
-  const editCount = editable.filter((item) => Math.abs(item.value - item.original) > 1e-9).length
-  // 다른 글자 카드에 얹을 Δ. 편집 상태에서 모델 값 대비 차이만 뽑는다.
-  const propagationEdit = useMemo(() => propagationEditOf({ editable, medialParts: slotParts, componentParts }), [editable, slotParts, componentParts])
-  const changedRails = useMemo(() => editable.filter((item) => Math.abs(item.value - item.original) > 1e-9), [editable])
+  // 고정한 변 rail. `이 자리에 맞추기`를 누르면 들어가고, 그 rail을 다시 옮기거나 복원하면 빠진다. 세션 상태.
+  const [fixedRails, setFixedRails] = useState<Set<string>>(() => new Set())
+  const isEdited = (item: EditableRail) => Math.abs(item.value - item.original) > 1e-9 || fixedRails.has(item.id)
+  const editCount = editable.filter(isEdited).length
+  // 다른 글자 카드에 얹을 Δ. 편집 상태에서 모델 값 대비 차이만 뽑는다(고정은 Δ 0이어도 든다).
+  const propagationEdit = useMemo(() => propagationEditOf({ editable, medialParts: slotParts, componentParts, fixed: fixedRails }), [editable, slotParts, componentParts, fixedRails])
+  const changedRails = useMemo(() => editable.filter((item) => Math.abs(item.value - item.original) > 1e-9 || fixedRails.has(item.id)), [editable, fixedRails])
+  // 맞추기는 상자 변(닿자 `c*`, 홀자 `s*`)만. 중심 rail은 더하기뿐.
+  const fixable = !!rail && rail.kind === 'face' && !fixedRails.has(rail.id)
+  const fixRail = () => { if (rail && rail.kind === 'face') setFixedRails((current) => new Set(current).add(rail.id)) }
+  const unfixRail = (id: string) => setFixedRails((current) => { if (!current.has(id)) return current; const next = new Set(current); next.delete(id); return next })
+  const canApply = hasLayoutEdit(propagationEdit)
+  const cardsRef = useRef<ReviewPropagationHandle>(null)
+  const [scopeLabel, setScopeLabel] = useState('이 레이아웃')
 
   // 값 하나를 놓아 본다. 순서·간격 위반이면 false, 호출자는 마지막 유효값을 지킨다.
   const tryPlace = (target: EditableRail, value: number): true | string => {
@@ -308,7 +324,8 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted }: { glyph: NotoPrese
       const moved = withSlotFaces(base, proposed)
       if (!moved.ok) return moved.message
       const check = renderMedialPart(moved.part, railsWithDelta(moved.part.fit?.railsEm, railDeltaByPart[target.partIndex]))
-      if (!check.path) return check.message ?? '홀자 상자를 그 자리에 둘 수 없습니다.'
+      // 유효성은 rail 자리(slot)로 본다. 앱 획이 그 칸에 안 맞는 건 배치를 막을 이유가 아니다.
+      if (!check.slot) return check.message ?? '홀자 상자를 그 자리에 둘 수 없습니다.'
       setSlotDeltaByPart((current) => { const copy = [...current]; copy[target.partIndex] = proposed; return copy })
       return true
     }
@@ -316,7 +333,7 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted }: { glyph: NotoPrese
     if (!part?.fit) return '획 마스터가 없습니다.'
     const proposed: Record<string, number> = { ...railDeltaByPart[target.partIndex], [target.role]: rounded - part.fit.railsEm[target.role] }
     const check = renderMedialPart(part, railsWithDelta(part.fit.railsEm, proposed))
-    if (!check.path) return check.message ?? '기준선을 그 자리에 둘 수 없습니다.'
+    if (!check.slot) return check.message ?? '기준선을 그 자리에 둘 수 없습니다.'
     setRailDeltaByPart((current) => { const copy = [...current]; copy[target.partIndex] = proposed; return copy })
     return true
   }
@@ -329,6 +346,8 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted }: { glyph: NotoPrese
   const changeRail = (id: string, next: number, options?: { snap?: boolean }) => {
     const target = editable.find((item) => item.id === id)
     if (!target || lockedRails.has(target.id)) return
+    // 고정한 변을 다시 옮기면 더하기로 돌아간다.
+    unfixRail(id)
     if (options?.snap) {
       const snapped = snapRail({ value: next, original: target.original, axis: target.axis, candidates: snapCandidatesFor(target) })
       if (snapped.hit && tryPlace(target, snapped.value) === true) {
@@ -343,20 +362,34 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted }: { glyph: NotoPrese
     const placed = tryPlace(target, next)
     setError(placed === true ? '' : placed)
   }
-  const resetRails = () => { setSlotDeltaByPart([]); setRailDeltaByPart([]); setFacesByPart([]); setError(''); setSnapHit(null) }
+  const resetRails = () => { setSlotDeltaByPart([]); setRailDeltaByPart([]); setFacesByPart([]); setFixedRails(new Set()); setError(''); setSnapHit(null) }
 
   return <div className={styles.editor} data-testid="glyph-layout-editor">
       <section className={styles.canvasSection}>
         {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail?.id} snappedRail={snapHit?.id} snapHit={snapHit} onSelectRail={(id) => { setSelectedRail(id); setError('') }} onSelectPart={selectPart} onDragRail={(id, value) => changeRail(id, value, { snap: true })} onNudgeRail={(id, delta) => { const target = editable.find((item) => item.id === id); if (target) changeRail(id, target.value + delta) }} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
-        <button type="button" className={styles.canvasToggle} aria-pressed={ghostVisible} onClick={toggleGhost} data-testid="review-ghost-toggle">Noto 고스트</button>
+        <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="review-ghost-toggle" />
         <TierBadge approved={approved} className={styles.canvasBadge} />
-        {/* 자 도구는 없다. 캔버스 안에서 끌기·방향키(1u · Shift 10u)로 옮기고, 복원과 경고도 캔버스 위에 겹쳐 높이가 안 흔들린다. */}
-        <button type="button" className={styles.canvasReset} disabled={!editCount} onClick={resetRails} data-testid="review-reset">{editCount ? `복원 · ${editCount}개 변경` : '모델 rail'}</button>
-        {error && <p className={styles.canvasWarning} role="alert">{error}</p>}
+        {/* 변 rail을 잡으면 `이 자리에 맞추기`. 누르면 범위 안 글자가 전부 이 자리(em)에 모인다. 탁 걸린 자리면 표지 아래 바로. 고정 뒤엔 `= 자리` 표지. */}
+        {rail && rail.kind === 'face' && (fixable
+          ? <button type="button" className={styles.canvasFix} data-snapped={!!snapHit || undefined} onClick={fixRail} data-testid="review-fix-rail">이 자리에 맞추기</button>
+          : <span className={styles.canvasFixed} data-testid="review-fixed-rail">{rail.label} = {Math.round(rail.value * 1000)} · 고정</span>)}
+        {/* 자 도구는 없다. 캔버스 안에서 끌기·방향키(1u · Shift 10u)로 옮기고, 경고는 캔버스 위에 겹쳐 높이가 안 흔들린다. 복원은 하단 바. */}
+        {(error || inkIssue) && <p className={styles.canvasWarning} role="alert" data-testid="review-canvas-warning">{error || `홀자 획이 상자에 안 맞습니다 · ${inkIssue}`}</p>}
       </section>
       {modelError && <p className={styles.status} data-state="error" role="alert">{modelError}</p>}
       {/* 적용하면 Δ가 저장되고 context가 새 original로 다시 풀리므로 세션 편집은 비운다. */}
-      <ReviewPropagationCards source={glyph.identity} bundle={bundle} edit={propagationEdit} changed={changedRails} focus={rail?.part} onApplied={resetRails} onCommitted={onCommitted} />
+      <ReviewPropagationCards ref={cardsRef} source={glyph.identity} bundle={bundle} edit={propagationEdit} changed={changedRails} fixed={fixedRails} focus={rail?.part} ghostVisible={ghostVisible} onApplied={resetRails} onCommitted={onCommitted} onSelectPart={selectPart} onScopeLabel={setScopeLabel} />
+      {/* 하단 바는 한 줄짜리 상태 기계. Δ 없음 → `ㄱ 획 고치기`. 배치 Δ → `복원 | …에 적용`(범위는 카드가 앎).
+          형태 Δ만 → `복원 | 획 고치기(비활성)` + 이유: 획 캔버스는 저장된 배치로 그려서 글자가 튀어 보인다. */}
+      {(onEditStrokes && activePart) || editCount > 0 ? <div className={styles.strokeCta} data-testid="jamo-stroke-cta-bar">
+        <div className={styles.ctaRow}>
+          {editCount > 0 && <button type="button" className={styles.resetCta} onClick={resetRails} data-testid="review-reset">복원 · {editCount}개 변경</button>}
+          {canApply
+            ? <button type="button" className={styles.applyCta} onClick={() => cardsRef.current?.apply()} data-testid="review-propagation-apply">{scopeLabel}에 적용</button>
+            : <button type="button" disabled={editCount > 0} onClick={() => activePart && onEditStrokes?.(activePart)} data-testid="jamo-stroke-cta">{activeJamo} 획 고치기</button>}
+        </div>
+        {!canApply && editCount > 0 && <small>먼저 되돌리세요</small>}
+      </div> : null}
   </div>
 }
 
@@ -367,10 +400,12 @@ export interface GlyphLayoutEditorProps {
   initialPart?: Part
   /** 배치 Δ를 적용하거나 지운 직후. 앞뒤 스냅샷으로 호출자가 Undo 기록을 남긴다. */
   onCommitted?: (before: LayoutDeltaSnapshot, after: LayoutDeltaSnapshot) => void
+  /** 켠 부품의 획 편집으로 내려간다. 주면 하단에 `ㄱ 획 고치기`가 뜬다. */
+  onEditStrokes?: (part: Part) => void
 }
 
-export function GlyphLayoutEditor({ codepoint, initialPart, onCommitted }: GlyphLayoutEditorProps) {
+export function GlyphLayoutEditor({ codepoint, initialPart, onCommitted, onEditStrokes }: GlyphLayoutEditorProps) {
   const { glyph, error } = useNotoGlyph(codepoint)
-  if (glyph) return <GlyphLayoutBody key={codepoint} glyph={glyph} initialPart={initialPart} onCommitted={onCommitted} />
+  if (glyph) return <GlyphLayoutBody key={codepoint} glyph={glyph} initialPart={initialPart} onCommitted={onCommitted} onEditStrokes={onEditStrokes} />
   return <p className={styles.status} data-state={error ? 'error' : 'loading'} role={error ? 'alert' : 'status'}>{error || 'Noto 윤곽 읽는 중'}</p>
 }

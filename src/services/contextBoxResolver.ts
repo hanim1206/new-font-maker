@@ -1,6 +1,6 @@
 import type { BoxConfig, DecomposedSyllable, DeepReadonly, JamoData, Part, StrokeLinecap, StrokeLinejoin } from '../types'
 import { fitNotoComponent } from './notoComponentFit'
-import type { ComponentFaces } from './notoComponentFit'
+import type { ComponentFaces, ComponentFitOutcome } from './notoComponentFit'
 import { medialInputFromPrediction } from './notoFitReport'
 import { applyMedialDelta } from './medialRailDelta'
 import type { SemanticDelta } from './medialRailDelta'
@@ -26,27 +26,56 @@ export type ContextFaces = ComponentFaces
 export type MedialPart = Extract<Part, 'JU' | 'JU_H' | 'JU_V'>
 
 /**
+ * 변 하나의 Δ. 숫자면 더하기(em 오프셋), `{ at }`이면 고정(em 절대 자리 — 예측값을 버리고 그 자리에 둔다).
+ * 고정은 "노·도·로의 닿자 윗변을 한 선에" 같은 의도용이다. 더하기는 글자마다 예측값이 달라 결과 자리도 다르지만, 고정은 범위 안 글자가 전부 같은 자리에 모인다.
+ * `at`은 em 숫자다 — "각 글자의 홀자 윗선" 같은 상대 위치가 아니다.
+ */
+export type FaceDelta = number | { at: number }
+export type FacesDelta = Partial<Record<keyof ContextFaces, FaceDelta>>
+export const isFixedFace = (delta: FaceDelta | undefined): delta is { at: number } => typeof delta === 'object' && delta !== null
+/** 변 Δ가 없는 것과 같은지. 고정은 값이 0이어도 뜻이 있다. */
+export const isZeroFace = (delta: FaceDelta | undefined): boolean => delta === undefined || (typeof delta === 'number' && Math.abs(delta) <= 1e-12)
+/** 지금 변 값에 Δ를 얹은 자리. */
+export const faceWithDelta = (current: number, delta: FaceDelta | undefined): number => delta === undefined ? current : isFixedFace(delta) ? delta.at : current + delta
+/** 지금 네 변 기준으로 Δ를 오프셋 숫자로 푼다. 고정은 `at - 지금 값`. slot 아핀처럼 오프셋만 받는 곳에 넘긴다. */
+export function facesOffsets(faces: ContextFaces, delta?: FacesDelta): Partial<ContextFaces> {
+  const offsets: Partial<ContextFaces> = {}
+  if (!delta) return offsets
+  for (const side of SIDES) if (delta[side] !== undefined) offsets[side] = faceWithDelta(faces[side], delta[side]) - faces[side]
+  return offsets
+}
+/**
+ * 변 Δ 둘을 층 순서(넓은 것 → 좁은 것)로 합친다. 더하기는 더하고, 고정은 앞을 버리고 교체한다. 고정 뒤 더하기는 `at + n`.
+ */
+export function addFaceDelta(base: FaceDelta | undefined, extra: FaceDelta | undefined): FaceDelta | undefined {
+  if (extra === undefined) return base
+  if (isFixedFace(extra)) return { at: extra.at }
+  if (base === undefined) return extra
+  return isFixedFace(base) ? { at: base.at + extra } : base + extra
+}
+
+/**
  * 배치 Δ. 저장 단위는 이것뿐이다(상자는 저장하지 않는다).
- * - `faces`: 네 변 오프셋(em). 닿자(CH·JO)는 상자에 그대로 얹고, 홀자(JU·JU_H·JU_V)는 잉크 상자 변이라 rail을 축별 아핀으로 다시 놓는다(두께 고정, `applySlotFacesDelta`).
- * - `medial`: 홀자 part별 획 역할 중심 rail 오프셋(em, `primaryBeam.center` 같은 키). 모델 rail에 얹어 fit을 다시 놓으므로 slot이 따라온다.
+ * - `faces`: 네 변 Δ(`FaceDelta`: 더하기 또는 고정). 닿자(CH·JO)는 상자에 그대로 얹고, 홀자(JU·JU_H·JU_V)는 잉크 상자 변이라 rail을 축별 아핀으로 다시 놓는다(두께 고정, `applySlotFacesDelta`).
+ * - `medial`: 홀자 part별 획 역할 중심 rail 오프셋(em, `primaryBeam.center` 같은 키). 모델 rail에 얹어 fit을 다시 놓으므로 slot이 따라온다. 더하기만.
  * 홀자는 상자 변 Δ를 먼저, 중심 rail Δ를 그 위에 얹는다.
  * 순서·간격 위반으로 다시 놓지 못하는 글자는 Δ를 받지 않고 모델 rail 그대로다(클램프 = 자동 예외).
  */
 export interface ContextBoxDelta {
-  faces?: Partial<Record<Part, Partial<ContextFaces>>>
+  faces?: Partial<Record<Part, FacesDelta>>
   medial?: Partial<Record<MedialPart, SemanticDelta>>
 }
 
 const EMPTY_DELTA: ContextBoxDelta = {}
 
-/** 두 Δ를 더한다. `전체` Δ 위에 `이 레이아웃` Δ를 얹을 때. */
+/** 두 Δ를 층 순서로 합친다(`base`가 넓은 층). 더하기는 더하고, 변 고정은 교체한다. */
 export function addContextBoxDelta(base: ContextBoxDelta | undefined, extra: ContextBoxDelta | undefined): ContextBoxDelta {
   if (!base) return extra ?? EMPTY_DELTA
   if (!extra) return base
   const faces: NonNullable<ContextBoxDelta['faces']> = {}
-  for (const source of [base.faces, extra.faces]) for (const [part, offsets] of Object.entries(source ?? {}) as [Part, Partial<ContextFaces>][]) {
+  for (const source of [base.faces, extra.faces]) for (const [part, offsets] of Object.entries(source ?? {}) as [Part, FacesDelta][]) {
     const target = (faces[part] ??= {})
-    for (const side of SIDES) if (offsets[side] !== undefined) target[side] = (target[side] ?? 0) + offsets[side]!
+    for (const side of SIDES) { const merged = addFaceDelta(target[side], offsets[side]); if (merged !== undefined) target[side] = merged }
   }
   const medial: NonNullable<ContextBoxDelta['medial']> = {}
   for (const source of [base.medial, extra.medial]) for (const [part, rails] of Object.entries(source ?? {}) as [MedialPart, SemanticDelta][]) {
@@ -60,7 +89,7 @@ export function addContextBoxDelta(base: ContextBoxDelta | undefined, extra: Con
 export function hasContextBoxDelta(delta: ContextBoxDelta | undefined): boolean {
   if (!delta) return false
   const nonZero = (values: object) => Object.values(values).some((value) => typeof value === 'number' && Math.abs(value) > 1e-12)
-  return Object.values(delta.faces ?? {}).some((offsets) => offsets && nonZero(offsets)) || Object.values(delta.medial ?? {}).some((rails) => rails && nonZero(rails))
+  return Object.values(delta.faces ?? {}).some((offsets) => offsets && Object.values(offsets).some((value) => !isZeroFace(value as FaceDelta))) || Object.values(delta.medial ?? {}).some((rails) => rails && nonZero(rails))
 }
 
 /** 모델 묶음에서 칸 해석에 필요한 부분. `NotoPresetModelBundle`이 이 모양을 만족한다. */
@@ -113,9 +142,9 @@ export function boxToFaces(box: BoxConfig): ContextFaces {
   return { left: box.x, right: box.x + box.width, top: box.y, bottom: box.y + box.height }
 }
 
-function withDelta(faces: ContextFaces, delta?: Partial<ContextFaces>): ContextFaces {
+function withDelta(faces: ContextFaces, delta?: FacesDelta): ContextFaces {
   if (!delta) return { ...faces }
-  return { left: faces.left + (delta.left ?? 0), right: faces.right + (delta.right ?? 0), top: faces.top + (delta.top ?? 0), bottom: faces.bottom + (delta.bottom ?? 0) }
+  return { left: faceWithDelta(faces.left, delta.left), right: faceWithDelta(faces.right, delta.right), top: faceWithDelta(faces.top, delta.top), bottom: faceWithDelta(faces.bottom, delta.bottom) }
 }
 
 /** 앱 음절에서 모델 신원을 만든다. 자모 하나짜리(초성만·중성만)는 문맥 칸이 없어 null. */
@@ -160,9 +189,11 @@ export function fitContextMedial(identity: ModelIdentity, model: ContextModel, m
 }
 
 /** 홀자 상자 변 Δ. 닿자와 달리 상자만 미는 게 아니라 rail을 다시 놓아 fit의 slot이 따라오게 한다. 못 놓으면 그대로. */
-function withSlotFacesDelta(fit: MedialFitResult, delta?: Partial<ContextFaces>): MedialFitResult {
-  if (!delta || !SIDES.some((side) => Math.abs(delta[side] ?? 0) > 1e-12)) return fit
-  const moved = applySlotFacesDelta(fit, delta)
+function withSlotFacesDelta(fit: MedialFitResult, delta?: FacesDelta): MedialFitResult {
+  // 고정은 지금 slot 변 기준 오프셋으로 풀어 아핀에 넘긴다.
+  const offsets = facesOffsets(boxToFaces(fit.slot), delta)
+  if (!SIDES.some((side) => Math.abs(offsets[side] ?? 0) > 1e-12)) return fit
+  const moved = applySlotFacesDelta(fit, offsets)
   return moved.ok ? moved.fit : fit
 }
 
@@ -191,11 +222,19 @@ function jamoForPart(syllable: DeepReadonly<DecomposedSyllable> | undefined, par
   return syllable.jungseong
 }
 
+/**
+ * 부품 하나의 앱 획을 네 변에 맞춘다. 칸 해석(문장 줄·획 편집)과 레이아웃 편집기가 **같은 호출**을 써서 캔버스 잉크 = 글자 잉크가 된다.
+ * 홀자도 닿자와 같은 규칙이다. 혼합 홀자는 part가 가로부·세로부 획을 가른다.
+ */
+export function fitPartStrokes(input: { part: Part; jamo: DeepReadonly<JamoData>; faces: ContextFaces; glyphId: string; medialJamo: string; ends?: StrokeEnds }): ComponentFitOutcome {
+  return fitNotoComponent({ part: input.part, jamo: input.jamo, channel: CHANNEL_OF[input.part], family: medialFamilyOf(input.medialJamo), faces: input.faces, glyphId: `${input.glyphId}:${input.part}`, globalLinecap: input.ends?.linecap, globalLinejoin: input.ends?.linejoin })
+}
+
 /** 네 변 → 앱 획을 놓을 상자. 획이 있으면 잉크가 네 변에 닿도록 두께만큼 안쪽으로 다듬는다. */
 function placePart(part: Part, faces: ContextFaces, syllable: DeepReadonly<DecomposedSyllable> | undefined, glyphId: string, medialJamo: string, ends?: StrokeEnds): ContextPartBox | string {
   const jamo = jamoForPart(syllable, part)
   if (!jamo) return { part, faces, box: facesToBox(faces), fitted: false }
-  const fit = fitNotoComponent({ part, jamo, channel: CHANNEL_OF[part], family: medialFamilyOf(medialJamo), faces, glyphId: `${glyphId}:${part}`, globalLinecap: ends?.linecap, globalLinejoin: ends?.linejoin })
+  const fit = fitPartStrokes({ part, jamo, faces, glyphId, medialJamo, ends })
   if (!fit.ok) return fit.message
   return { part, faces, box: fit.fit.box, fitted: true }
 }
@@ -216,7 +255,7 @@ export function resolveContextBoxes(input: {
   const parts: ContextPartBox[] = []
   const issues: ContextBoxResolution['issues'] = []
   // 닿자 변 Δ는 여기서 상자에 얹는다. 홀자 변 Δ는 fit 단계에서 이미 slot에 들어가 있어 다시 얹지 않는다.
-  const place = (part: Part, faces: ContextFaces, facesDelta?: Partial<ContextFaces>) => {
+  const place = (part: Part, faces: ContextFaces, facesDelta?: FacesDelta) => {
     const placed = placePart(part, withDelta(faces, facesDelta), syllable, glyphId, identity.medialJamo, input.ends)
     if (typeof placed === 'string') issues.push({ part, message: placed })
     else parts.push(placed)
