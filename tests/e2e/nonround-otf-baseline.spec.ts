@@ -98,7 +98,7 @@ async function collectStyleBaseline(browser: Browser, style: typeof STYLES[keyof
         version: 0,
       }))
     }, style)
-    await page.goto('/')
+    await page.goto('/calibration')
     const downloadPromise = page.waitForEvent('download')
     await page.getByRole('button', { name: '현재 작업을 OTF로 추출' }).click()
     const download = await downloadPromise

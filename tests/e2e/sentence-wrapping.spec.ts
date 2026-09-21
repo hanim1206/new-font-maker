@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test('예시 문장은 글자가 아니라 어절 단위로 줄바꿈한다', async ({ page }) => {
   await page.addInitScript(() => localStorage.clear())
-  await page.goto('/')
+  await page.goto('/calibration')
   await page.getByRole('button', { name: '보정 문장 직접 입력' }).click()
   await page.getByRole('textbox', { name: '보정 문장 직접 입력' }).fill('그곳이 차마 꿈엔들 잊힐리야')
 

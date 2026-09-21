@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test('에에서 조절한 중성 레이아웃을 네의 예시 글자에도 전파한다', async ({ page }) => {
   await page.addInitScript(() => localStorage.clear())
-  await page.goto('/')
+  await page.goto('/calibration')
   await page.getByRole('button', { name: '보정 문장 직접 입력' }).click()
   await page.getByRole('textbox', { name: '보정 문장 직접 입력' }).fill('에 네')
 

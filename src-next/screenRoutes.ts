@@ -6,7 +6,7 @@
 
 /** 제품 화면. 주소마다 명세 파일이 하나씩 있어야 한다. */
 export const PRODUCT_SCREEN_ROUTES = [
-  '/',
+  '/calibration',
   '/workspace/jamos',
   '/workspace/jamo',
   '/workspace/jamo/master',
@@ -28,6 +28,7 @@ export const LAB_SCREEN_ROUTES = [
 
 /** 화면이 아닌 주소: 다른 화면으로 넘기기만 하거나, 셸 분기용 접두어. */
 export const NON_SCREEN_ROUTES = [
+  '/',
   '/workspace',
   '/workspace/review/glyph',
   '/workspace/skeleton',

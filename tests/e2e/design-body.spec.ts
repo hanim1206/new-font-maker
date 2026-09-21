@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.clear())
-  await page.goto('/')
+  await page.goto('/calibration')
 })
 
 test('폰트 전체와 현재 레이아웃의 네모꼴을 따로 조절한다', async ({ page }) => {

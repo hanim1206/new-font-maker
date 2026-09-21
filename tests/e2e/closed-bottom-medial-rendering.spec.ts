@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test('동의 ㅗ는 ㄷ의 실제 하단 잉크를 관통하지 않는다', async ({ page }) => {
   await page.addInitScript(() => localStorage.clear())
-  await page.goto('/')
+  await page.goto('/calibration')
   await page.getByRole('button', { name: '보정 문장 직접 입력' }).click()
   await page.getByRole('textbox', { name: '보정 문장 직접 입력' }).fill('동')
 

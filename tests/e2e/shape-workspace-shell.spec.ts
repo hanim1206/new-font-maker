@@ -293,7 +293,7 @@ test('비교 카드 선택과 드로어 열기는 저장 데이터에 영향을 
 })
 
 test('J-01에서 J-02와 J-03으로 이동하고 잘못된 workspace 경로를 숨기지 않는다', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/calibration')
   await expect(page.getByRole('link', { name: '자소 원형 새 화면 검토' })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0)
   await page.getByRole('link', { name: '자소 원형 새 화면 검토' }).click()

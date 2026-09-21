@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test('에의 ㅔ 가로점은 네모꼴 축소 비율을 따라 유지된다', async ({ page }) => {
   await page.addInitScript(() => localStorage.clear())
-  await page.goto('/')
+  await page.goto('/calibration')
   await page.getByRole('button', { name: '보정 문장 직접 입력' }).click()
   await page.getByRole('textbox', { name: '보정 문장 직접 입력' }).fill('에')
 
@@ -26,7 +26,7 @@ test('에의 ㅔ 가로점은 네모꼴 축소 비율을 따라 유지된다', a
 
 test('글로벌 가로폭을 줄이면 예시 문장의 띄어쓰기도 함께 줄어든다', async ({ page }) => {
   await page.addInitScript(() => localStorage.clear())
-  await page.goto('/')
+  await page.goto('/calibration')
   await page.getByRole('button', { name: '보정 문장 직접 입력' }).click()
   await page.getByRole('textbox', { name: '보정 문장 직접 입력' }).fill('가 나')
 

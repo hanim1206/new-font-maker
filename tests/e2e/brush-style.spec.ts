@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
     localStorage.clear()
     sessionStorage.setItem('brush-style-initialized', 'true')
   })
-  await page.goto('/')
+  await page.goto('/calibration')
 })
 
 test('원형·납작형·네모형 붓촉을 전역 미리보기와 이력에 적용한다', async ({ page }) => {

@@ -89,7 +89,7 @@ function collectBaseline(font: OpenTypeFont) {
 test('기존 선 전용 OTF의 대표 글리프 윤곽과 메트릭을 유지한다', async ({ page }) => {
   test.setTimeout(240_000)
   await page.addInitScript(() => localStorage.clear())
-  await page.goto('/')
+  await page.goto('/calibration')
 
   const expectedLayoutTypes = Object.keys(LEGACY_CALIBRATION_LAYOUT_PROFILE_V1)
   const persistedOverrides = await page.evaluate((layoutTypes) => {

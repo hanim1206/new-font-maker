@@ -22,7 +22,7 @@ export default defineConfig({
         background_color: '#f0eee7',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
+        start_url: '/workspace/jamo',
         icons: [
           {
             src: 'pwa-192x192.svg',

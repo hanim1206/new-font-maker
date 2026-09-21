@@ -55,7 +55,7 @@ export function MobileWorkspaceShell({
     <main className={styles.page}>
       <div className={styles.shell}>
         <header className={styles.projectHeader}>
-          <a className={styles.backLink} href="/" aria-label="문장 보정으로 돌아가기">문장 보정</a>
+          <a className={styles.backLink} href="/calibration" aria-label="문장 보정으로 돌아가기">문장 보정</a>
           <div className={styles.projectIdentity}>
             <strong>{projectName}</strong>
             <span>{statusLabel}</span>

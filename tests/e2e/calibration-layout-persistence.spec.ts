@@ -48,7 +48,7 @@ test('Calibration 레이아웃 제스처를 canonical 저장·Undo·Redo·재접
       originalSetItem.call(this, key, value)
     }
   }, { layoutKey: LAYOUT_KEY })
-  await page.goto('/')
+  await page.goto('/calibration')
   await page.waitForTimeout(450)
   await resetLayoutWriteCount(page)
 

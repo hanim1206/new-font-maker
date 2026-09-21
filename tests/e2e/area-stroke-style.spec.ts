@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/calibration')
   await page.evaluate(() => localStorage.clear())
   await page.reload()
   await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()

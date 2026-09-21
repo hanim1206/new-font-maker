@@ -24,7 +24,7 @@ test('자소 편집에서 버튼을 누르면 그 화면의 명세가 뜨고 다
 })
 
 test('문장 보정 명세는 자소 편집을 가리킨 줄을 펼쳐 보여 준다', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/calibration')
   await page.getByTestId('screen-spec-button').click()
   const panel = page.getByTestId('screen-spec-panel')
   await expect(panel).toContainText('문장보정')
