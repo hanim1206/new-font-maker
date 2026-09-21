@@ -30,6 +30,12 @@ async function selectPartBox(page: Page, label: string) {
   if ((await hit.getAttribute('aria-pressed')) !== 'true') await hit.dispatchEvent('pointerdown')
   await expect(hit).toHaveAttribute('aria-pressed', 'true')
 }
+/** 기본은 첫닿자라 홀자 rail을 잡으려면 먼저 홀자 상자를 켠다. 홀자 라벨은 글자마다 달라 부품으로 찾는다. */
+async function selectMedialBox(page: Page) {
+  const hit = page.getByTestId('review-canvas').locator('[data-testid="review-part-hit"][data-part^="JU"]').first()
+  if ((await hit.getAttribute('aria-pressed')) !== 'true') await hit.dispatchEvent('pointerdown')
+  await expect(hit).toHaveAttribute('aria-pressed', 'true')
+}
 
 test('수치 패널은 없고, 편집 전에도 이 레이아웃 카드가 Δ 없이 떠 있다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
@@ -53,6 +59,7 @@ test('수치 패널은 없고, 편집 전에도 이 레이아웃 카드가 Δ �
 test('중심 rail(배치)을 옮기면 이 레이아웃 카드 8장에 Δ가 얹히고 전체로 넓힐 수 있다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  await selectMedialBox(page)
   await selectRail(page, '바깥기둥 중심')
   await page.keyboard.press('Shift+ArrowRight')
   await expect(resetButton(page)).toContainText('1개 변경')
@@ -93,6 +100,7 @@ test('레이아웃 캔버스에는 시작·끝 rail 손잡이가 없고 형태 �
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   const canvas = page.getByTestId('review-canvas')
+  await selectMedialBox(page)
   await expect(canvas.getByRole('button', { name: '바깥기둥 중심 선택' })).toHaveCount(1)
   await expect(canvas.getByRole('button', { name: /(시작|끝) 선택$/ })).toHaveCount(0)
   await expect(canvas.locator('[data-rail$=":outer-top"], [data-rail$=":outer-bottom"]')).toHaveCount(0)
@@ -103,6 +111,7 @@ test('레이아웃 캔버스에는 시작·끝 rail 손잡이가 없고 형태 �
 test('기준선 드래그는 모델 자리와 격자에 탁 걸리고 방향키는 안 걸린다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  await selectMedialBox(page)
   await selectRail(page, '바깥기둥 중심')
   const canvas = page.getByTestId('review-canvas')
   const box = (await canvas.boundingBox())!
@@ -141,6 +150,7 @@ test('기준선을 옮기면 변화 띠와 Δ 수치가 보이고 복원하면 �
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   await expect(page.getByTestId('review-delta-band')).toHaveCount(0)
   await expect(resetButton(page)).toHaveCount(0)
+  await selectMedialBox(page)
   await selectRail(page, '바깥기둥 중심')
   await page.keyboard.press('Shift+ArrowRight')
   await page.keyboard.press('Shift+ArrowRight')
@@ -165,30 +175,31 @@ test('부품 상자를 누르면 그 부품 rail만 잡히고 칩도 바뀐다',
   const canvas = page.getByTestId('review-canvas')
   const hits = canvas.getByTestId('review-part-hit')
   await expect(hits).toHaveCount(3)
-  await expect(hits.and(canvas.locator('[aria-pressed="true"]'))).toHaveAttribute('aria-label', '홀자 ㅓ 선택')
+  // 기본은 첫닿자: 첫닿자 rail만 손잡이가 있고, 홀자 rail은 손잡이 없이 회색.
+  await expect(hits.and(canvas.locator('[aria-pressed="true"]'))).toHaveAttribute('aria-label', '첫닿자 ㅁ 선택')
   await expect(hits.and(canvas.locator('[aria-pressed="false"]'))).toHaveCount(2)
-  // 홀자 탭: 홀자 rail만 손잡이가 있고, 닿자 rail은 손잡이 없이 회색.
-  await expect(canvas.locator('[data-rail-handle]').first()).toBeAttached()
-  await expect(canvas.locator('[data-rail-handle^="c"]')).toHaveCount(0)
-  await expect(canvas.locator('[data-rail="c0:top"]')).toHaveAttribute('data-active', 'false')
-  await expect(page.getByRole('group', { name: '편집할 기준선' })).toHaveCount(0)
-
-  // 상자 안(잉크 위)을 눌러도 부품이 바뀐다. 실제 클릭으로 렌더 순서(잉크 아래에 히트 상자가 묻히지 않는지)까지 확인한다.
-  await canvas.getByRole('button', { name: '첫닿자 ㅁ 선택' }).click({ position: { x: 4, y: 4 } })
-  await expect(canvas.getByRole('button', { name: '첫닿자 ㅁ 선택' })).toHaveAttribute('aria-pressed', 'true')
-  await expect(canvas.getByRole('button', { name: '홀자 ㅓ 선택' })).toHaveAttribute('aria-pressed', 'false')
   await expect(canvas.locator('[data-rail-handle^="c0:"]')).toHaveCount(4)
   await expect(canvas.locator('[data-rail-handle]:not([data-rail-handle^="c"])')).toHaveCount(0)
   await expect(canvas.locator('[data-rail="c0:top"]')).toHaveAttribute('data-active', 'true')
+  await expect(page.getByRole('group', { name: '편집할 기준선' })).toHaveCount(0)
+
+  // 상자 안(잉크 위)을 눌러도 부품이 바뀐다. 실제 클릭으로 렌더 순서(잉크 아래에 히트 상자가 묻히지 않는지)까지 확인한다.
+  await canvas.getByRole('button', { name: '홀자 ㅓ 선택' }).click()
+  await expect(canvas.getByRole('button', { name: '홀자 ㅓ 선택' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(canvas.getByRole('button', { name: '첫닿자 ㅁ 선택' })).toHaveAttribute('aria-pressed', 'false')
+  await expect(canvas.locator('[data-rail-handle]').first()).toBeAttached()
+  await expect(canvas.locator('[data-rail-handle^="c"]')).toHaveCount(0)
+  await expect(canvas.locator('[data-rail="c0:top"]')).toHaveAttribute('data-active', 'false')
   // 상자도 켠 부품만 진하다.
-  await expect(canvas.locator('[data-testid="review-fit-box"][data-kind="component"]').first()).toHaveAttribute('data-active', 'true')
-  await expect(canvas.locator('[data-testid="review-fit-box"][data-kind="medial"]').first()).toHaveAttribute('data-active', 'false')
+  await expect(canvas.locator('[data-testid="review-fit-box"][data-kind="medial"]').first()).toHaveAttribute('data-active', 'true')
+  await expect(canvas.locator('[data-testid="review-fit-box"][data-kind="component"]').first()).toHaveAttribute('data-active', 'false')
 })
 
 test('배치 Δ를 적용하면 저장되어 새로 열어도 rail이 그 자리에 있고, 같은 문맥 글자만 받고, 지우면 돌아온다', async ({ page }) => {
   const KEY = 'noto-layout-delta-v1'
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  await selectMedialBox(page)
   await selectRail(page, '바깥기둥 중심')
   const handle = page.getByTestId('review-canvas').locator('[data-rail-handle][aria-pressed="true"]')
   const before = Number(await handle.getAttribute('x1'))
@@ -211,6 +222,7 @@ test('배치 Δ를 적용하면 저장되어 새로 열어도 rail이 그 자리
   // 새로 열어도 저장된 Δ가 original에 들어 있다.
   await page.reload()
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  await selectMedialBox(page)
   const reopened = page.getByTestId('review-canvas').getByRole('button', { name: '바깥기둥 중심 선택' })
   await expect.poll(async () => Number(await reopened.getAttribute('x1'))).toBeCloseTo(before + 0.01, 6)
   await expect(resetButton(page)).toHaveCount(0)
@@ -224,6 +236,7 @@ test('배치 Δ를 적용하면 저장되어 새로 열어도 rail이 그 자리
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   await page.locator('[data-testid="layout-override-card"][data-kind="layer"]').getByTestId('layout-override-remove').click()
+  await selectMedialBox(page)
   await expect.poll(async () => Number(await page.getByTestId('review-canvas').getByRole('button', { name: '바깥기둥 중심 선택' }).getAttribute('x1'))).toBeCloseTo(before, 6)
   expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state.layers, KEY)).toEqual({})
 })
@@ -233,6 +246,7 @@ test('옮겨도 글자에 안 닿는 배치 rail은 잠겨 있다', async ({ pag
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   const canvas = page.getByTestId('review-canvas')
+  await selectMedialBox(page)
   await expect(canvas.locator('[data-locked="true"]')).not.toHaveCount(0)
   await expect(canvas.getByRole('button', { name: '보 중심 선택' })).toHaveCount(0)
   await expect(canvas.getByRole('button', { name: '바깥기둥 중심 선택' })).toHaveCount(1)
@@ -249,6 +263,7 @@ test('자소 탭은 레이아웃으로 열리고, 기준선을 적용하면 문�
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   const before = await sentenceGlyph.innerHTML()
 
+  await selectMedialBox(page)
   await selectRail(page, '바깥기둥 중심')
   await page.keyboard.press('Shift+ArrowRight')
   await page.keyboard.press('Shift+ArrowRight')
@@ -284,6 +299,9 @@ test('켠 부품의 획 고치기로 내려가고, 안 끝난 변경이 있으�
   const canvas = page.getByTestId('review-canvas')
   const cta = page.getByTestId('jamo-stroke-cta')
   const pressedPart = canvas.getByTestId('review-part-hit').and(canvas.locator('[aria-pressed="true"]'))
+  // 기본은 첫닿자. 홀자를 켜면 바뀌고, 다시 첫닿자로 돌아온다.
+  await expect(cta).toHaveText('ㅁ 획 고치기')
+  await canvas.getByRole('button', { name: '홀자 ㅓ 선택' }).click()
   await expect(cta).toHaveText('ㅓ 획 고치기')
   await canvas.getByRole('button', { name: '첫닿자 ㅁ 선택' }).click({ position: { x: 4, y: 4 } })
   await expect(cta).toHaveText('ㅁ 획 고치기')
@@ -336,6 +354,7 @@ test('홀자 상자 변을 옮겨 적용하면 ㅣ 글자도 문장 줄에서 �
   await page.goto('/workspace/jamo?char=%EA%B8%B0&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   const canvas = page.getByTestId('review-canvas')
+  await selectMedialBox(page)
   // 홀자 탭에 상자 네 변이 있고, 기둥 중심도 이제 잠기지 않는다.
   for (const side of ['왼변', '오른변', '윗변', '아랫변']) await expect(canvas.getByRole('button', { name: `홀자 ${side} 선택` })).toHaveCount(1)
   await expect(canvas.getByRole('button', { name: '바깥기둥 중심 선택' })).toHaveCount(1)
@@ -369,6 +388,7 @@ test('ㅏ의 홀자 오른변을 밀면 보가 길어지고 기둥 두께는 그
   const medialBox = page.getByTestId('review-canvas').locator('[data-testid="review-fit-box"][data-kind="medial"] rect')
   const x = Number(await medialBox.getAttribute('x'))
   const width = Number(await medialBox.getAttribute('width'))
+  await selectMedialBox(page)
   await selectRail(page, '홀자 오른변')
   await page.keyboard.press('Shift+ArrowRight')
   await expect.poll(async () => Number(await medialBox.getAttribute('width'))).toBeCloseTo(width + 0.01, 6)
@@ -388,11 +408,10 @@ test('이 자모만으로 좁혀 적용하면 같은 레이아웃의 그 자모 
   const 마Before = await 마.innerHTML()
   await page.getByTestId('jamo-stroke-done').click()
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
-  const canvas = page.getByTestId('review-canvas')
   const propagation = page.getByTestId('review-propagation')
 
-  // 첫닿자 ㄱ을 잡고 오른변을 20u 민다.
-  await canvas.getByRole('button', { name: '첫닿자 ㄱ 선택' }).click({ position: { x: 4, y: 4 } })
+  // 첫닿자 ㄱ(기본으로 켜져 있다)을 잡고 오른변을 20u 민다.
+  await selectPartBox(page, '첫닿자 ㄱ')
   await selectRail(page, '첫닿자 오른변')
   await page.keyboard.press('Shift+ArrowRight')
   await page.keyboard.press('Shift+ArrowRight')
@@ -498,8 +517,7 @@ test('옛 저장 형식(jamo 없음)을 읽어 이 레이아웃 Δ가 살아 있
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   const propagation = page.getByTestId('review-propagation')
   await expect(propagation.locator('[data-testid="layout-override-card"][data-kind="layer"]')).toContainText('첫닿자 오른변 +20u')
-  const canvas = page.getByTestId('review-canvas')
-  await canvas.getByRole('button', { name: '첫닿자 ㄱ 선택' }).click({ position: { x: 4, y: 4 } })
+  await selectPartBox(page, '첫닿자 ㄱ')
   await selectRail(page, '첫닿자 윗변')
   await page.keyboard.press('Shift+ArrowUp')
   await propagation.getByRole('button', { name: '이 자모만', exact: true }).click()
@@ -620,6 +638,7 @@ test('변을 이 자리에 맞추면 범위 안 글자가 같은 자리에 모�
   const cardTops = async () => (await cards.locator('svg rect[fill="#2f9a6a"]').evaluateAll((nodes) => nodes.map((n) => Number(n.getAttribute('y'))))).filter((v) => Number.isFinite(v))
 
   // 홀자 rail(중심)엔 맞추기가 없다.
+  await selectMedialBox(page)
   await expect(page.getByTestId('review-fix-rail')).toHaveCount(0)
   await selectPartBox(page, '첫닿자 ㄴ')
   await selectRail(page, '첫닿자 윗변')
@@ -694,6 +713,7 @@ test('예시 글자 카드를 누르면 그 글자가 열리고 문장에는 그
   expect(await sentence.getByRole('button', { name: /편집/ }).count()).toBeGreaterThan(1)
 
   // Δ가 있는 동안은 글자를 바꾸면 편집이 날아가므로 카드가 잠긴다. 복원하면 풀린다.
+  await selectMedialBox(page)
   await selectRail(page, '바깥기둥 중심')
   await page.keyboard.press('Shift+ArrowRight')
   await expect(resetButton(page)).toContainText('1개 변경')
@@ -789,6 +809,7 @@ test('홀자 획이 상자에 안 맞으면 레이아웃 캔버스는 상자만 
   await expect(page.getByTestId('review-canvas-warning')).toContainText('박스가 획 두께보다 작습니다')
   await expect(page.getByTestId('review-fit-ink')).toHaveCount(0)
   // 상자 변은 여전히 옮겨진다.
+  await selectMedialBox(page)
   await selectRail(page, '홀자 아랫변')
   await page.keyboard.press('Shift+ArrowDown')
   await expect(resetButton(page)).toContainText('1개 변경')

@@ -144,7 +144,8 @@ function initialFocus(): { char: string; sentence: string; custom: boolean } {
   const params = new URLSearchParams(window.location.search)
   const requested = [...(params.get('char') ?? '')][0]
   const base = SAMPLE_SENTENCES[0]
-  if (!requested || !isEditableHangul(requested)) return { char: '과', sentence: base, custom: false }
+  // 그냥 들어오면 문장 첫 글자를 잡는다. 문장에 없는 글자를 포커스한 채 열지 않는다.
+  if (!requested || !isEditableHangul(requested)) return { char: [...base].find(isEditableHangul) ?? [...base][0], sentence: base, custom: false }
   if (params.get('solo') === '1') return { char: requested, sentence: requested, custom: true }
   if ([...base].includes(requested)) return { char: requested, sentence: base, custom: false }
   return { char: requested, sentence: `${requested} ${base}`, custom: true }

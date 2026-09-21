@@ -390,7 +390,7 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
 export interface GlyphLayoutEditorProps {
   /** 완성형 한글 codepoint. */
   codepoint: number
-  /** 처음 켤 부품 탭. 없으면 홀자. */
+  /** 처음 켤 부품 탭. 없으면 첫닿자. */
   initialPart?: Part
   /** 배치 Δ를 적용하거나 지운 직후. 앞뒤 스냅샷으로 호출자가 Undo 기록을 남긴다. */
   onCommitted?: (before: LayoutDeltaSnapshot, after: LayoutDeltaSnapshot) => void
