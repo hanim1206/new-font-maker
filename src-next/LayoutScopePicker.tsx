@@ -10,7 +10,7 @@ import type { RuleJamoPart, ScopeRule } from './scopeRule'
 import styles from './LayoutScopePicker.module.css'
 
 /**
- * 범위 고르기 화면. 옵션 스택의 `범위 지정`과 박스의 `더 보기`가 연다. 계약은 `docs/specs/적용범위-규칙식.md` §6·§7.
+ * 범위 고르기 화면. 옵션 스택의 `옵션 추가`와 켠 박스의 연필이 연다. 계약은 `docs/specs/적용범위-규칙식.md` §6·§7.
  *
  * 범위 = 규칙식 = **축 셋의 자모 목록**이다. 그래서 화면도 축마다 줄 하나다 — 첫닿자 · 홀자 · 받침.
  * 격자(표)로 고르던 길은 9/22에 버렸다: 축이 셋인데 표는 둘밖에 못 담아 셋째 축이 늘 밖으로 새고

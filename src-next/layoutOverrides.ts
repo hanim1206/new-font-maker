@@ -26,6 +26,19 @@ const KIND_LABEL: Record<string, string> = { center: '중심', start: '시작', 
 const PART_LABEL: Record<string, string> = { CH: '첫닿자', JU: '홀자', JU_H: '홀자 가로부', JU_V: '홀자 세로부', JO: '받침' }
 const units = (value: number) => { const n = Math.round(value * 1000); return `${n > 0 ? '+' : ''}${n}u` }
 
+/** Δ가 부품마다 몇 군데를 고쳤나. 옵션 박스의 부품 점이 쓴다. 섞임홀자의 가로부·세로부는 홀자 하나로 센다. */
+export function deltaPartCounts(delta: ContextBoxDelta): { group: OverrideGroup; count: number }[] {
+  const counts: Record<OverrideGroup, number> = { CH: 0, JU: 0, JO: 0 }
+  const groupOf = (part: string): OverrideGroup => part === 'CH' ? 'CH' : part === 'JO' ? 'JO' : 'JU'
+  for (const [part, faces] of Object.entries(delta.faces ?? {})) {
+    for (const value of Object.values(faces ?? {})) if (!isZeroFace(value as FaceDelta)) counts[groupOf(part)] += 1
+  }
+  for (const [part, rails] of Object.entries(delta.medial ?? {})) {
+    for (const value of Object.values(rails ?? {})) if (typeof value === 'number' && Math.abs(value) > 1e-12) counts[groupOf(part)] += 1
+  }
+  return (['CH', 'JU', 'JO'] as const).flatMap((group) => counts[group] ? [{ group, count: counts[group] }] : [])
+}
+
 /** Δ 한 항목 = 한 줄 요약. 자모 카드는 부품이 이름에 있어 변 이름만, 넓은 카드는 부품까지 붙인다. */
 export function deltaSummary(delta: ContextBoxDelta, withPart: boolean): string[] {
   const lines: string[] = []

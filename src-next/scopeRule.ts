@@ -134,7 +134,8 @@ const CONTEXT_LABEL: Record<string, string> = {
 }
 const PART_LABEL: Record<RuleJamoPart, string> = { initial: '첫닿자', medial: '홀자', final: '받침' }
 const jamoLabel = (jamo: string | null): string => jamo ?? '없음'
-const jamoPhrase = (jamos: readonly (string | null)[]): string =>
+/** 자모 목록 한 마디. 넷 이상이면 `ㄱ 외 3`. 옵션 박스의 알약도 이 말을 쓴다. */
+export const jamoPhrase = (jamos: readonly (string | null)[]): string =>
   jamos.length > 3 ? `${jamoLabel(jamos[0])} 외 ${jamos.length - 1}` : jamos.map(jamoLabel).join('·')
 
 /**

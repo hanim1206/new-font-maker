@@ -18,7 +18,7 @@ import styles from './ReviewPropagationCards.module.css'
  * 캔버스 아래 적용 범위 묶음: 옵션 스택 + Δ 줄 + 범위 고르기 화면.
  * `적용`을 누르면 배치 Δ가 `layoutDeltaStore`에 **켠 박스의 범위**대로 저장돼 앱 전체 배치에 얹힌다. 획 길이(형태)는 여기서 안 다룬다 — `획 고치기`의 몫.
  *
- * 옵션 박스 = **빈 범위 슬롯**이다(9/22). `범위 지정`으로 만들면 Δ가 없어도 박스로 남고, 여럿 만들어 두고 하나씩 켜서 고친다.
+ * 옵션 박스 = **빈 범위 슬롯**이다(9/22). `옵션 추가`로 만들면 Δ가 없어도 박스로 남고, 여럿 만들어 두고 하나씩 켜서 고친다.
  * 켠 박스 하나가 곧 지금 범위고, 저장은 규칙 하나다(옛 `자모마다 규칙 하나씩`은 박스가 자모 목록을 통째로 들면서 필요 없어졌다).
  * 범위에 닿는 글자 표본은 여기가 아니라 상단 `닿는 글자` 줄(`TouchedGlyphRow`)이 보인다 — 고른 범위만 위로 알린다.
  */
@@ -79,7 +79,7 @@ export function ReviewPropagationCards({ source, edit, changed, fixed, focus, ra
   const storedDeltas = useLayoutDeltaStore((state) => state.rules)
   // 이 레이아웃 = 늘 서 있는 기본 옵션. 지울 수 없고 다른 옵션의 출발점이다.
   const baseRule = useMemo(() => ruleOfContext(source.contextId), [source.contextId])
-  // `범위 지정`으로 만든 빈 범위 슬롯. Δ가 아직 없어도 박스로 남는다(계약 §4를 9/22에 뒤집었다).
+  // `옵션 추가`로 만든 빈 범위 슬롯. Δ가 아직 없어도 박스로 남는다(계약 §4를 9/22에 뒤집었다).
   const [slots, setSlots] = useState<ScopeRule[]>([])
   const [selectedKey, setSelectedKey] = useState(() => ruleKey(baseRule))
   // 열려 있는 범위 고르기 화면. `new`는 새 옵션을 만들고, `edit`은 그 박스의 범위를 고쳐 쓴다.
@@ -134,7 +134,7 @@ export function ReviewPropagationCards({ source, edit, changed, fixed, focus, ra
   // 적용 = 지금 범위에 Δ 저장. 하단 바가 ref로 부른다. 닫힘값은 렌더마다 새로 잡는다(ref 갱신은 값싸다).
   useImperativeHandle(ref, () => ({ apply: () => commit(() => { for (const rule of saveTargets) applyDelta(rule, layoutDeltaOf(edit)); onScopeApplied?.(saveTargets) }) }))
   return <section className={styles.section} aria-label="다른 글자에 적용하면" data-testid="review-propagation">
-    {/* 옵션 스택 = 쌓인 범위 박스. `범위 지정`이 새 박스를 만들고, 박스를 누르면 그게 지금 범위다. 지우기는 ×로(Undo 됨). */}
+    {/* 옵션 스택 = 쌓인 범위 박스. `옵션 추가`가 새 박스를 만들고, 박스를 누르면 그게 지금 범위다. 지우기는 ×로(Undo 됨). */}
     <LayoutOptionStack source={source} slots={[baseRule, ...slots]} selectedKey={selectedKey} baseKey={ruleKey(baseRule)}
       onAdd={() => setScopeOpen({ rule: baseRule, mode: 'new' })} onSelect={selectRule} onRemove={removeRule}
       onOpenScope={(rule) => setScopeOpen({ rule, mode: 'edit' })} />
