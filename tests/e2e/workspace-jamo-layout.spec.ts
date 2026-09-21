@@ -1103,3 +1103,15 @@ test('홀자 획이 상자에 안 맞으면 레이아웃 캔버스는 상자만 
   await expect(resetButton(page)).toContainText('1개 변경')
 })
 
+test('닿는 글자 줄만 옆으로 밀리고, 바깥 화면에는 가로 스크롤이 안 생긴다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
+  const cards = page.getByTestId('review-propagation-cards')
+  await expect(cards.locator('figure').first()).toBeVisible({ timeout: 20_000 })
+  // 숨긴 이름표가 줄의 잘림을 빠져나가면 바깥 덩어리가 옆으로 늘어난다.
+  const leaking = await cards.evaluate((el) => {
+    const out: string[] = []
+    for (let node = el.parentElement; node; node = node.parentElement) if (node.scrollWidth > node.clientWidth + 1) out.push(`${node.tagName} ${node.clientWidth}<${node.scrollWidth}`)
+    return out
+  })
+  expect(leaking).toEqual([])
+})

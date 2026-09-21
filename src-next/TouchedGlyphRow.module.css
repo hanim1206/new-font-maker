@@ -4,7 +4,8 @@
 /* 한 줄만 차지한다. 줄이 차면 옆으로 밀어 더 본다. */
 .cards { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain; }
 .cards::-webkit-scrollbar { display: none; }
-.card { flex: 0 0 auto; margin: 0; }
+/* 숨긴 이름표(absolute)를 칸 안에 가둔다. 안 가두면 `.cards`의 잘림을 빠져나가 바깥 덩어리에 가로 스크롤이 생긴다. */
+.card { position: relative; flex: 0 0 auto; margin: 0; }
 /* 칸 그림이 곧 버튼이다. 잠겨도(안 끝난 Δ) 모양은 그대로다. */
 .card button { display: block; padding: 0; border: 0; border-radius: 4px; background: none; line-height: 0; cursor: pointer; }
 .card button:disabled { cursor: default; }
