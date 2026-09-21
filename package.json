@@ -8,6 +8,7 @@
     "reference:lab": "node scripts/reference-lab/start.mjs",
     "reference:noto": "python3 -B scripts/reference-lab/noto_guide_corpus.py",
     "reference:preset-inputs": "python3 -B scripts/reference-lab/build_noto_preset_inputs.py",
+    "reference:noto-static": "vite-node scripts/reference-lab/exportNotoPresetStatic.ts",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
