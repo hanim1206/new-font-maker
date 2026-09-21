@@ -9,6 +9,8 @@ import { GlyphLayoutEditor } from './GlyphLayoutEditor'
 import { useLayoutDeltaStore } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { adoptFamilyStrokes, familyOfSyllable } from '../src/utils/jamoContextStrokes'
+import { withFrameFrom, withoutFrame } from '../src/utils/jamoFrame'
+import { componentProtrusion } from '../src/services/notoComponentFit'
 import { PART_COLOR, PART_LABEL } from './partColors'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
@@ -578,6 +580,8 @@ function InferenceTrackpad({
   onMultiSelectArmedChange,
   dragApiRef,
   multiSelectArmed = false,
+  frameForEdit,
+  partBoxes,
 }: {
   glyph: string
   syllable: DecomposedSyllable
@@ -591,7 +595,11 @@ function InferenceTrackpad({
   collisionContexts: CalibrationInkGapContext[]
   onPreviewJamo: (preview: PreviewJamo | null) => void
   onPreviewSchema: (preview: PreviewSchema | null) => void
-  onCommitJamo: (before: JamoData, after: JamoData, raw: RawGlyphEdit) => void
+  onCommitJamo: (before: JamoData, after: JamoData, raw: RawGlyphEdit, options?: { unframed?: boolean }) => void
+  /** 지금 글자의 부품 상자(중심선 상자). 튀어나온 양을 em으로 바꿀 때 쓴다 — 선택이 들고 있는 상자는 고친 뒤 낡을 수 있다. */
+  partBoxes?: Partial<Record<Part, BoxConfig>>
+  /** 고치는 중의 자모에 기준 틀을 굳혀 돌려준다. 끄는 동안의 간격 계산이 놓은 뒤와 같은 배치를 보게 한다. */
+  frameForEdit?: (jamo: JamoData) => JamoData
   onCommitSchema: (before: LayoutSchema, after: LayoutSchema, raw: RawGlyphEdit) => void
   onCancel: () => void
   onSelectionChange: (selection: Selection) => void
@@ -741,13 +749,14 @@ function InferenceTrackpad({
     } else if (selection.kind !== 'none' && startJamo.current) {
       const createCandidate = (factor: number) => {
         const movementAtFactor = { x: normalized.x * factor, y: normalized.y * factor }
-        return selection.kind === 'stroke'
+        const moved = selection.kind === 'stroke'
           ? moveStroke(startJamo.current!, selection.strokeId, movementAtFactor, CALIBRATION_FREEFORM_BOUNDS, snapStep)
           : selection.kind === 'point'
             ? moveSelectedPoints(startJamo.current!, movementAtFactor)
             : selection.kind === 'handle'
               ? moveHandle(startJamo.current!, selection.strokeId, selection.pointIndex, selection.handle, movementAtFactor, CALIBRATION_FREEFORM_BOUNDS, snapStep)
               : null
+        return moved && frameForEdit ? { ...moved, jamo: frameForEdit(moved.jamo) } : moved
       }
       const safeFactor = findMaximumSafeEditFactor((factor) => {
         const candidate = createCandidate(factor)
@@ -961,10 +970,31 @@ function InferenceTrackpad({
     const directLabel = selection.kind === 'none'
       ? '고칠 획을 누르세요'
       : `${selection.kind === 'stroke' ? `${selection.jamo.char}의 획` : selection.kind === 'handle' ? `${selection.jamo.char}의 곡선 핸들` : selection.kind === 'point' ? `${selection.jamo.char}의 점` : ''} · 캔버스에서 끌어 옮기기${selectedPoints.length > 1 ? ` · 점 ${selectedPoints.length}개 함께` : ''}${inkGapLimiter ? ` · ${inkGapLimiter.char}에서 최소 잉크 간격` : ''}`
+    // 기준 틀이 굳은 자모만: 틀 밖으로 나간 양(u)과 `틀 다시 맞추기`. 튀어나옴은 저장값이 아니라 여기서 계산한다.
+    const liveJamo = editable ? activeVisibleJamo ?? selection.jamo : null
+    const protrusion = editable && liveJamo?.frame
+      ? componentProtrusion({ jamo: liveJamo, channel: selection.renderPart === 'JU_H' ? 'horizontalStrokes' : selection.renderPart === 'JU_V' ? 'verticalStrokes' : undefined, family: selection.editorPart === 'JU' ? null : familyOfSyllable(syllable) }, partBoxes?.[selection.renderPart] ?? selection.box)
+      : null
+    const protrusionLabel = protrusion
+      ? ([['위', protrusion.top], ['아래', protrusion.bottom], ['왼쪽', protrusion.left], ['오른쪽', protrusion.right]] as const).filter(([, amount]) => Math.round(amount * unitsPerEm) >= 1).map(([side, amount]) => `${side} +${Math.round(amount * unitsPerEm)}u`).join(' · ')
+      : ''
+    const resetFrame = () => {
+      if (!editable) return
+      const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
+      if (!before.frame) return
+      onCommitJamo(before, withoutFrame(before), { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId: selection.strokeId, delta: { x: 0, y: 0 } }, { unframed: true })
+    }
     // 자리가 흔들리지 않게 단추는 늘 같은 여섯 개를 그리고, 못 쓰는 것은 끈다.
     return (
       <section className={styles.strokeToolSection} data-testid="jamo-stroke-tools">
         <p className={styles.strokeToolStatus}><span>{directLabel}</span><output>x {Math.round(delta.x * unitsPerEm)} · y {Math.round(delta.y * unitsPerEm)}</output></p>
+        {/* 줄은 늘 자리를 차지한다 — 틀이 굳는 순간 도구 줄이 밀리면 캔버스가 흔들린다. */}
+        <p className={styles.strokeFrameStatus} data-testid="jamo-frame-status" data-framed={liveJamo?.frame ? true : undefined}>
+          {liveJamo?.frame && <>
+            <span data-protruding={protrusionLabel ? true : undefined}>{protrusionLabel ? `상자 밖 ${protrusionLabel}` : '틀 안 · 획을 끌어도 다른 획은 제자리'}</span>
+            <button type="button" onClick={resetFrame} data-testid="jamo-frame-reset">틀 다시 맞추기</button>
+          </>}
+        </p>
         <div className={styles.strokeToolRow} role="toolbar" aria-label="획 편집 도구">
           <button type="button" onClick={addStroke} disabled={!editable} aria-label="선 추가"><Plus size={18} aria-hidden="true" /><span>추가</span></button>
           <button type="button" onClick={deleteSelection} disabled={!canDelete} aria-label={selection.kind === 'stroke' ? '획 삭제' : '꼭짓점 삭제'}><Trash2 size={18} aria-hidden="true" /><span>삭제</span></button>
@@ -1293,13 +1323,17 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     const stored = getJamo(preview.type, preview.char) ?? preview.data
     setPreviewJamo({
       ...preview,
-      data: withContextualInkSafety(stored, preview.baseline ?? preview.data, preview.data, minimumInkGap),
+      data: withContextualInkSafety(stored, preview.baseline ?? preview.data, frameForEdit(preview.data), minimumInkGap),
     })
   }
-  const commitJamo = (before: JamoData, after: JamoData, raw: RawGlyphEdit) => {
+  // 기준 틀은 처음 고치는 순간에 굳는다: 저장돼 있던(고치기 전) 획이 틀이 된다. 끄는 중 미리보기도 같은 틀을 써서 끄는 동안부터 다른 획이 안 움직인다.
+  const frameForEdit = (jamo: JamoData): JamoData => withFrameFrom(jamo, adoptFamilyStrokes(getJamo(jamo.type, jamo.char) ?? jamo, familyOfSyllable(syllable)))
+  const commitJamo = (before: JamoData, after: JamoData, raw: RawGlyphEdit, options?: { unframed?: boolean }) => {
     if (JSON.stringify(before) === JSON.stringify(after)) return
     const storedBefore = structuredClone(getJamo(before.type, before.char) ?? before)
-    const safeAfter = withContextualInkSafety(storedBefore, before, after, minimumInkGap)
+    // `틀 다시 맞추기`만 틀 없이 저장한다. 되돌리기는 기록의 `before`(틀이 없던 때)로 돌아가므로 틀도 같이 사라진다.
+    const framedAfter = options?.unframed ? withoutFrame(after) : frameForEdit(after)
+    const safeAfter = withContextualInkSafety(storedBefore, before, framedAfter, minimumInkGap)
     const edit = createSampleGlyphEdit(raw)
     setHistory((entries) => [...entries, { kind: 'jamo', jamoType: before.type, char: before.char, before: storedBefore, after: safeAfter, edit }])
     setFuture([])
@@ -1584,6 +1618,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         onMultiSelectArmedChange={setMultiSelectArmed}
         dragApiRef={directManipulation ? dragApiRef : undefined}
         multiSelectArmed={multiSelectArmed}
+        frameForEdit={frameForEdit}
+        partBoxes={placement.kind === 'boxes' ? placement.boxes : focusedBoxes}
       />}
       {/* 획 편집은 끄는 즉시 저장된다. `완료`는 저장이 아니라 레이아웃으로 돌아가는 문이다. */}
       {layoutAvailable && !globalStylePanel && <div className={styles.strokeDoneBar}>

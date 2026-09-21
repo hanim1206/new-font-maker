@@ -1,6 +1,7 @@
 import polygonClipping from 'polygon-clipping'
 import type { BoxConfig, DeepReadonly, InkRegion, JamoData, MedialFamily, Part, ResolvedCenterlinePrimitive, ResolvedStrokeInkSource, StrokeDataV2, StrokeRenderStyle } from '../types'
 import { strokesForFamily } from '../utils/jamoContextStrokes'
+import { frameJamoOf } from '../utils/jamoFrame'
 import { getStrokeCenterlineBounds } from '../utils/jamoGeometry'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
 import { multiPolygonArea, unionOf } from './notoFitReport'
@@ -130,13 +131,35 @@ function refineBoxToFaces(strokes: readonly StrokeDataV2[], box: BoxConfig, face
   return current
 }
 
+/**
+ * 기준 틀 밖으로 나간 양(em, 변마다 0 이상). 틀이 없으면 null — 그때는 획이 곧 틀이라 튀어나올 수 없다.
+ * 중심선 범위끼리 견준다. 저장하는 값이 아니라 볼 때마다 계산하는 값이다.
+ */
+export function componentProtrusion(input: Pick<ComponentFitInput, 'jamo' | 'channel' | 'family'>, box: BoxConfig): ComponentFaces | null {
+  const frameJamo = frameJamoOf(input.jamo)
+  if (!frameJamo) return null
+  const frame = getStrokeCenterlineBounds(componentStrokesOf(frameJamo, input.channel, input.family))
+  const actual = getStrokeCenterlineBounds(componentStrokesOf(input.jamo, input.channel, input.family))
+  if (!frame || !actual) return null
+  return {
+    left: Math.max(0, frame.minX - actual.minX) * box.width,
+    right: Math.max(0, actual.maxX - frame.maxX) * box.width,
+    top: Math.max(0, frame.minY - actual.minY) * box.height,
+    bottom: Math.max(0, actual.maxY - frame.maxY) * box.height,
+  }
+}
+
 export function fitNotoComponent(input: ComponentFitInput): ComponentFitOutcome {
   const strokes = componentStrokesOf(input.jamo, input.channel, input.family)
   if (!strokes.length) return { ok: false, message: `${input.jamo.char}: 앱 획이 없습니다.` }
   if (![input.faces.left, input.faces.right, input.faces.top, input.faces.bottom].every(Number.isFinite)) return { ok: false, message: '박스 네 변이 없습니다.' }
-  const placed = componentBoxFromFaces(strokes, input.faces, input.weightMultiplier ?? 1)
+  // 기준 틀이 있으면 상자는 틀(고치기 전 획 사본)로 정하고, 지금 획은 그 상자에 그대로 놓는다 — 틀 밖으로 나간 획은 faces 밖으로 튀어나온다.
+  const frameJamo = frameJamoOf(input.jamo)
+  const framed = frameJamo ? componentStrokesOf(frameJamo, input.channel, input.family) : []
+  const boxStrokes = framed.length ? framed : strokes
+  const placed = componentBoxFromFaces(boxStrokes, input.faces, input.weightMultiplier ?? 1)
   if (typeof placed === 'string') return { ok: false, message: placed }
-  const makePrimitives = (box: BoxConfig) => strokes.map((stroke): ResolvedCenterlinePrimitive<ResolvedStrokeInkSource> => {
+  const primitivesOf = (source: readonly StrokeDataV2[]) => (box: BoxConfig) => source.map((stroke): ResolvedCenterlinePrimitive<ResolvedStrokeInkSource> => {
     const source: ResolvedStrokeInkSource = { kind: 'stroke', glyphId: input.glyphId, part: input.part, channel: input.channel ?? 'strokes', jamoId: input.jamo.char, strokeId: stroke.id }
     return {
       kind: 'centerline', coordinateSpace: 'stroke-local-with-glyph-box',
@@ -147,8 +170,8 @@ export function fitNotoComponent(input: ComponentFitInput): ComponentFitOutcome 
       effectiveLinejoin: stroke.linejoin ?? input.globalLinejoin ?? 'miter',
     }
   })
-  const box = refineBoxToFaces(strokes, placed.box, input.faces, makePrimitives, input.strokeStyle?.mode === 'brush' ? input.strokeStyle : FIT_INK_STYLE)
-  return { ok: true, fit: { part: input.part, jamoId: input.jamo.char, faces: { ...input.faces }, box, thickness: placed.thickness, primitives: makePrimitives(box) } }
+  const box = refineBoxToFaces(boxStrokes, placed.box, input.faces, primitivesOf(boxStrokes), input.strokeStyle?.mode === 'brush' ? input.strokeStyle : FIT_INK_STYLE)
+  return { ok: true, fit: { part: input.part, jamoId: input.jamo.char, faces: { ...input.faces }, box, thickness: placed.thickness, primitives: primitivesOf(strokes)(box) } }
 }
 
 export function inkOfComponentFit(fit: ComponentFitResult, style?: FitInkStyle): { ok: true; regions: readonly DeepReadonly<InkRegion>[] } | { ok: false; message: string } {

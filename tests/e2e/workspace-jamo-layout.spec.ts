@@ -404,6 +404,42 @@ test('획 편집은 캔버스에서 꼭짓점을 직접 끌어 옮기고 Undo �
   await expect(tools.getByRole('button', { name: '곡선화' })).toBeEnabled()
   await tools.getByRole('button', { name: '꼭짓점 여러 개 고르기' }).click()
   await page.locator('[data-editor-point="hit"]').nth(2).dispatchEvent('pointerdown')
+/**
+ * 기준 틀: 처음 고치는 순간 고치기 전 획이 틀로 굳는다. 그 뒤로는 획 하나를 상자 밖으로 끌어도 나머지 획이 제자리고, 끈 획은 상자 밖으로 튀어나온다.
+ * 전에는 획 전체 범위를 다시 상자에 꽉 채워서 끌 때마다 다른 획 좌표가 같이 바뀌었다.
+ */
+test('획을 상자 밖으로 끌어도 다른 획은 제자리고, 틀 다시 맞추기로 꽉 채운다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EA%B0%81&mode=stroke&part=CH')
+  await expect(page.getByTestId('focus-canvas')).toBeVisible({ timeout: 20_000 })
+  const dots = page.locator('[data-editor-point="visible"]')
+  const positions = () => dots.evaluateAll((els) => els.map((el) => `${Number(el.getAttribute('cx')).toFixed(2)},${Number(el.getAttribute('cy')).toFixed(2)}`))
+  const status = page.getByTestId('jamo-frame-status')
+  await expect(status).toHaveText('')
+  const before = await positions()
+  expect(before).toHaveLength(3)
+
+  // ㄱ 세로 획의 끝점을 아래로 끈다(상자 밖).
+  const box = await dots.nth(2).boundingBox()
+  if (!box) throw new Error('끝점이 없다')
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 30, { steps: 6 })
+  // 끄는 동안부터 나머지 두 점은 안 움직인다.
+  expect((await positions()).slice(0, 2)).toEqual(before.slice(0, 2))
+  await page.mouse.up()
+  const after = await positions()
+  expect(after.slice(0, 2)).toEqual(before.slice(0, 2))
+  expect(Number(after[2].split(',')[1])).toBeGreaterThan(Number(before[2].split(',')[1]) + 4)
+  await expect(status).toContainText(/상자 밖 아래 \+\d+u/)
+
+  // 틀 다시 맞추기 → 끝점이 상자 안으로 돌아오고 틀 표시가 사라진다. Undo하면 튀어나온 채로 돌아온다.
+  await page.getByTestId('jamo-frame-reset').click()
+  await expect(status).toHaveText('')
+  await expect.poll(async () => Number((await positions())[2].split(',')[1])).toBeCloseTo(Number(before[2].split(',')[1]), 0)
+  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
+  await expect(status).toContainText('상자 밖 아래')
+})
+
   await expect(page.getByTestId('jamo-stroke-tools')).toContainText('점 2개 함께')
 })
 

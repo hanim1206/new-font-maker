@@ -1720,6 +1720,12 @@ export interface JamoData {
    * 렌더·잉크·편집 겨냥은 `strokesForFamily`로 고르고, 사용자가 편집하면 그 문맥 획만 남고 지워진다.
    */
   contextStrokes?: Partial<Record<MedialFamily, StrokeDataV2[]>>
+  /**
+   * 기준 틀. 사용자가 이 자모를 처음 고치는 순간의 획 사본이다. 있으면 자소를 상자에 놓을 때 지금 획이 아니라 이 사본의 범위를 상자에 맞춘다.
+   * 그래서 획 하나를 옮겨도 나머지가 제자리에 있고, 틀 밖으로 나간 획은 상자 밖으로 튀어나온다. 없으면 지금 획이 곧 틀이다(프리셋 그대로).
+   * 튀어나옴 여부는 저장하지 않는다 — 틀과 지금 획에서 계산한다.
+   */
+  frame?: JamoFrame
   // 기존 데이터는 slot-normalized(기본값). 실제 종횡비를 보존해 만든 신규 마스터만 ink-normalized.
   geometryMode?: JamoGeometryMode
   // 일반 자모는 strokes 사용, 혼합중성은 horizontalStrokes + verticalStrokes만 사용
@@ -1738,6 +1744,9 @@ export interface JamoData {
   // 조건부 변형 목록 (특정 음절 문맥에서 다른 획/패딩 사용)
   overrides?: JamoOverride[]
 }
+
+/** 기준 틀이 담는 획 채널. `JamoData`의 획 채널과 같은 꼴이라 같은 규칙(채널 · 문맥 계열)으로 고른다. */
+export type JamoFrame = Pick<JamoData, 'strokes' | 'horizontalStrokes' | 'verticalStrokes' | 'contextStrokes'>
 
 // ===== 음절 분해 결과 =====
 export interface DecomposedSyllable {

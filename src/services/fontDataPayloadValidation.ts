@@ -330,7 +330,7 @@ function validateJamoMap(
       continue
     }
     exactKeys(jamo, [
-      'char', 'type', 'geometryMode', 'strokes', 'horizontalStrokes', 'verticalStrokes', 'contextStrokes',
+      'char', 'type', 'geometryMode', 'strokes', 'horizontalStrokes', 'verticalStrokes', 'contextStrokes', 'frame',
       'contextualInkSafety', 'padding', 'horizontalPadding', 'verticalPadding', 'overrides',
     ], ['char', 'type'], path, issues)
     if (jamo.contextStrokes !== undefined) {
@@ -339,6 +339,22 @@ function validateJamoMap(
         exactKeys(jamo.contextStrokes, ['right', 'bottom', 'mixed'], [], `${path}.contextStrokes`, issues)
         for (const family of ['right', 'bottom', 'mixed'] as const) {
           if (jamo.contextStrokes[family] !== undefined) validateStrokeArray(jamo.contextStrokes[family], `${path}.contextStrokes.${family}`, issues, allowLegacy)
+        }
+      }
+    }
+    // 기준 틀: 획 채널과 같은 꼴의 사본.
+    if (jamo.frame !== undefined) {
+      if (!isRecord(jamo.frame)) push(issues, 'invalid-field', `${path}.frame`, 'frame은 객체여야 합니다.')
+      else {
+        exactKeys(jamo.frame, ['strokes', 'horizontalStrokes', 'verticalStrokes', 'contextStrokes'], [], `${path}.frame`, issues)
+        for (const channel of ['strokes', 'horizontalStrokes', 'verticalStrokes'] as const) {
+          if (jamo.frame[channel] !== undefined) validateStrokeArray(jamo.frame[channel], `${path}.frame.${channel}`, issues, allowLegacy)
+        }
+        if (jamo.frame.contextStrokes !== undefined) {
+          if (!isRecord(jamo.frame.contextStrokes)) push(issues, 'invalid-field', `${path}.frame.contextStrokes`, 'contextStrokes는 객체여야 합니다.')
+          else for (const family of ['right', 'bottom', 'mixed'] as const) {
+            if (jamo.frame.contextStrokes[family] !== undefined) validateStrokeArray(jamo.frame.contextStrokes[family], `${path}.frame.contextStrokes.${family}`, issues, allowLegacy)
+          }
         }
       }
     }
