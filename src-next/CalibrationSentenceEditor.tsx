@@ -1052,7 +1052,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   }
   const snapStep = fontUnitsToNormalized(grid.snapInterval, fontSpace)
   const minimumInkGap = fontUnitsToNormalized(grid.minorInterval, fontSpace)
-  const sentenceEm = 40
+  const sentenceEm = 24
   const calibrationLines = useMemo(() => [sampleSentence], [sampleSentence])
   // 레이아웃 모드에서는 문장이 한 줄 가로 스크롤이다(아래 편집부에 세로 자리를 내준다). 고른 글자가 가려져 있으면 가로로만 끌어온다.
   const sentenceRef = useRef<HTMLElement>(null)
