@@ -1,37 +1,55 @@
-/* 범위 고르기 = 풀스크린. 표가 세로를 다 쓰고 머리·추천·받침·표본·발은 고정 높이다. */
-.backdrop { position: fixed; z-index: 120; inset: 0; display: flex; align-items: stretch; justify-content: center; background: rgb(20 24 31 / .3); }
-.sheet { width: min(100%, 480px); height: 100dvh; box-sizing: border-box; display: flex; flex-direction: column; padding: max(10px, env(safe-area-inset-top)) 12px calc(env(safe-area-inset-bottom) + 10px); background: rgb(var(--color-surface)); }
+/* 범위 고르기 = 풀스크린. 머리 · 추천 · 축 줄 셋 · 표본 · 발. 격자(표)는 9/22에 걷어냈다. */
+.backdrop { position: fixed; z-index: 120; inset: 0; display: flex; align-items: flex-end; justify-content: center; background: rgb(20 24 31 / .3); }
+/* 내용이 줄 셋 + 표본 한 줄이라 풀스크린을 안 쓴다. 하단에서 올라오는 시트. */
+.sheet { width: min(100%, 480px); max-height: 100dvh; border-radius: 18px 18px 0 0; box-sizing: border-box; display: flex; flex-direction: column; padding: max(10px, env(safe-area-inset-top)) 12px calc(env(safe-area-inset-bottom) + 10px); background: rgb(var(--color-surface)); }
 
 .head { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 4px 2px 10px; }
 .headText { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
 .headText b { overflow: hidden; font-size: 14px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-.headText small { color: rgb(var(--color-text-dim-4)); font-size: 10.5px; }
-.count { flex: 0 0 auto; color: rgb(var(--color-text-dim-3)); font-size: 13px; font-weight: 750; }
+.headText small { color: rgb(var(--color-text-5)); font-size: 10.5px; }
+.count { flex: 0 0 auto; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.count span { margin-left: 1px; color: rgb(var(--color-text-5)); font-size: 10.5px; font-weight: 600; }
 
-.chips { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding-bottom: 8px; overflow-x: auto; scrollbar-width: none; }
+/* 고르는 법 한 줄. 켠 것만 검정이라 아래 자모 줄과 같은 말을 쓴다. */
+.chips { flex: 0 0 auto; display: flex; align-items: center; gap: 5px; padding-bottom: 14px; overflow-x: auto; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
-.chipsLabel { flex: 0 0 auto; color: rgb(var(--color-text-dim-4)); font-size: 10px; font-weight: 750; }
-.chips button { flex: 0 0 auto; min-height: 32px; padding: 0 11px; border: 1px solid rgb(var(--color-border)); border-radius: 999px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-size: 11.5px; font-weight: 650; white-space: nowrap; }
-.chips button em { color: rgb(var(--color-text-dim-4)); font-style: normal; font-weight: 700; }
-.chips button[aria-pressed='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary-light) / .6); color: rgb(var(--color-primary-dark)); }
-.chips button[aria-pressed='true'] em { color: rgb(var(--color-primary-dark)); }
+.manual { position: sticky; left: 0; z-index: 1; box-shadow: 8px 0 8px -6px rgb(var(--color-surface)); }
+.chips button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; height: 27px; padding: 0 9px; border: 0; border-radius: 7px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-2)); font-size: 11px; font-weight: 650; white-space: nowrap; }
+.chips button em { color: rgb(var(--color-text-5)); font-size: 10px; font-style: normal; font-variant-numeric: tabular-nums; }
+.chips button[aria-pressed='true'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+.chips button[aria-pressed='true'] em { color: rgb(var(--color-surface) / .65); }
 
-/* 검수 탭과 같은 격자. 남은 세로를 다 쓴다. */
-.matrixSection { --ink: rgb(var(--color-foreground)); --line: rgb(var(--color-border)); --muted: rgb(var(--color-text-dim-4)); flex: 1 1 auto; min-height: 0; display: flex; }
+/* 축 줄 셋. 규칙식이 목록 셋이라 화면도 줄 셋이다. 위 한 줄과는 선으로 가른다 — 고르는 법과 고른 값은 다른 층이다. */
+.axes { flex: 0 1 auto; display: flex; flex-direction: column; gap: 10px; padding: 14px 0 12px; border-top: 1px solid rgb(var(--color-border-subtle)); transition: opacity .12s; }
+/* 추천이 켜져 있으면 여기는 그 규칙을 비추는 중이다. 흐리게만 — 누르면 바로 `직접 선택`으로 돌아온다. */
+.axes[data-dim] { opacity: .42; }
+.axis { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.axisLabel { flex: 0 0 52px; display: flex; flex-direction: column; color: rgb(var(--color-text-4)); font-size: 11px; font-weight: 700; }
+.axisLabel small { color: rgb(var(--color-text-5)); font-size: 9.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fixed { color: rgb(var(--color-text-5)); font-size: 11.5px; font-style: normal; }
 
-.finals { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 8px 0 6px; }
-.finals span { color: rgb(var(--color-text-dim-4)); font-size: 10px; font-weight: 750; }
-.finals button { flex: 1 1 0; min-height: 34px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 12px; font-weight: 700; }
-.finals button[aria-pressed='true'] { border-color: rgb(var(--color-foreground)); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+.all { flex: 0 0 auto; height: 30px; padding: 0 9px; border: 1px solid rgb(var(--color-border)); border-radius: 8px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-3)); font-size: 11px; font-weight: 700; }
+.all[aria-pressed='true'] { border-color: rgb(var(--color-foreground)); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 
-.samples { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 4px 0 8px; }
-.zoom { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 6px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; }
-.zoom figcaption { color: rgb(var(--color-text-dim-4)); font-size: 9px; font-weight: 700; }
-.sampleRow { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 4px; overflow: hidden; }
-.sampleRow span { flex: 0 0 auto; display: grid; place-items: center; }
-.sampleRow small { flex: 0 0 auto; color: rgb(var(--color-text-dim-4)); font-size: 10px; }
+/* 자모 줄. 첫닿자 19 · 받침 27은 옆으로 민다. */
+/* 자모가 적은 줄(홀자 5개)은 띠가 내용만큼만이어야 한다 — 남는 폭까지 검정이면 빈 띠가 길어진다. */
+.jamos { flex: 0 1 auto; min-width: 0; display: flex; gap: 3px; overflow-x: auto; scrollbar-width: none; }
+.jamos::-webkit-scrollbar { display: none; }
+.jamos button { flex: 0 0 auto; min-width: 30px; height: 30px; padding: 0 4px; border: 0; border-radius: 8px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); font-size: 14px; font-weight: 600; }
+.jamos button[aria-pressed='true'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-weight: 800; }
+/* 전부 켜진 줄은 낱낱의 알약이 아니라 띠 하나다. 바탕을 줄에 깔고 버튼은 비운다. */
+.axis[data-all] .jamos { border-radius: 8px; background: rgb(var(--color-foreground)); }
+.axis[data-all] .jamos button[aria-pressed='true'] { background: transparent; }
 
-.foot { flex: 0 0 auto; display: flex; gap: 8px; }
+/* 켠 범위 글자 몇 장. 표를 걷어낸 뒤 여기가 유일한 확인 수단이다. */
+.samples { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 10px 0 6px; border-top: 1px solid rgb(var(--color-border-subtle)); overflow-x: auto; scrollbar-width: none; }
+.samples::-webkit-scrollbar { display: none; }
+/* SvgRenderer는 크기를 CSS로 받는다 — size prop만으로는 안 줄어든다. */
+.samples span { flex: 0 0 auto; display: grid; place-items: center; width: 32px; height: 32px; }
+.samples span svg { width: 30px; height: 30px; }
+.samples small { flex: 0 0 auto; color: rgb(var(--color-text-5)); font-size: 10.5px; }
+
+.foot { flex: 0 0 auto; display: flex; gap: 8px; padding-top: 8px; }
 .foot button { min-height: 46px; border-radius: 12px; font-size: 13px; font-weight: 750; }
 .cancel { flex: 0 0 96px; border: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); }
 .confirm { flex: 1 1 auto; border: 0; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }

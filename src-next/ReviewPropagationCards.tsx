@@ -4,24 +4,27 @@ import type { Part } from '../src/types'
 import type { CorpusIdentity } from './notoCorpus'
 import type { EditableRail } from './notoMedialFitView'
 import { jamoPartOf, layoutDeltaSnapshot, useLayoutDeltaStore } from './layoutDeltaStore'
-import { LayoutOptionStack } from './LayoutOptionStack'
+import { LayoutOptionStack, stackLabel } from './LayoutOptionStack'
 import type { OverrideGroup } from './layoutOverrides'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
-import { ruleName, ruleOfContext, withJamos } from './scopeRule'
+import { ruleFromKey, ruleKey, ruleOfContext } from './scopeRule'
 import { LayoutScopePicker } from './LayoutScopePicker'
 import type { RuleJamoPart, ScopeRule } from './scopeRule'
-import { focusJamoOf, jamoChoicesFor, layoutDeltaOf, PART_GROUP_LABEL, PROPAGATION_SCOPES } from './reviewPropagation'
+import { layoutDeltaOf } from './reviewPropagation'
 import type { PropagationEdit, PropagationScope } from './reviewPropagation'
 import styles from './ReviewPropagationCards.module.css'
 
 /**
- * 캔버스 아래 적용 범위 묶음: 옵션 스택 + Δ 줄 + 자모 고르기 시트.
- * `적용`을 누르면 배치 Δ가 `layoutDeltaStore`에 범위대로 저장돼 앱 전체 배치에 얹힌다. 획 길이(형태)는 여기서 안 다룬다 — `획 고치기`의 몫.
- * - 배치 Δ(중심 rail·홀자 상자 변·닿자 네 변): 기본 `이 레이아웃`, `이 자모만`은 잡은 부품의 자모로 좁힐 때(여러 자모 가능), `전체`는 일부러 넓힐 때. em 그대로.
+ * 캔버스 아래 적용 범위 묶음: 옵션 스택 + Δ 줄 + 범위 고르기 화면.
+ * `적용`을 누르면 배치 Δ가 `layoutDeltaStore`에 **켠 박스의 범위**대로 저장돼 앱 전체 배치에 얹힌다. 획 길이(형태)는 여기서 안 다룬다 — `획 고치기`의 몫.
+ *
+ * 옵션 박스 = **빈 범위 슬롯**이다(9/22). `범위 지정`으로 만들면 Δ가 없어도 박스로 남고, 여럿 만들어 두고 하나씩 켜서 고친다.
+ * 켠 박스 하나가 곧 지금 범위고, 저장은 규칙 하나다(옛 `자모마다 규칙 하나씩`은 박스가 자모 목록을 통째로 들면서 필요 없어졌다).
  * 범위에 닿는 글자 표본은 여기가 아니라 상단 `닿는 글자` 줄(`TouchedGlyphRow`)이 보인다 — 고른 범위만 위로 알린다.
  */
 
 const RULE_PART: Record<OverrideGroup, RuleJamoPart> = { CH: 'initial', JU: 'medial', JO: 'final' }
+const GROUP_OF_PART: Record<RuleJamoPart, OverrideGroup> = { initial: 'CH', medial: 'JU', final: 'JO' }
 
 /** Δ 줄. 더하기는 `+10u`, 고정은 `= 718`(em×1000 자리). */
 function DeltaList({ rails, fixed, testId }: { rails: EditableRail[]; fixed?: ReadonlySet<string>; testId: string }) {
@@ -71,83 +74,78 @@ export function ReviewPropagationCards({ source, edit, changed, fixed, focus, ra
   onScopeApplied?: (rules: readonly ScopeRule[]) => void
   ref?: Ref<ReviewPropagationHandle>
 }) {
-  const [scope, setScope] = useState<PropagationScope>('layer')
-  // 범위 고르기 화면에서 확정한 규칙. 있으면 이게 지금 범위다(칩·자모 시트가 만드는 것보다 넓거나 좁을 수 있다).
-  const [custom, setCustom] = useState<ScopeRule | null>(null)
-  // 열려 있는 범위 고르기 화면과 그 화면이 들고 연 규칙.
-  const [scopeOpen, setScopeOpen] = useState<ScopeRule | null>(null)
-  const chooseScope = (next: PropagationScope) => { setCustom(null); setScope(next) }
   const applyDelta = useLayoutDeltaStore((state) => state.apply)
   const clearDelta = useLayoutDeltaStore((state) => state.clear)
-  // `이 자모만`에서 고른 자모. 기본은 잡은 자모 하나. 부품이 바뀌면 고른 것을 버린다. 최소 하나는 남는다.
-  const focusJamo = focusJamoOf(source, focus)
-  const group = focus ? jamoPartOf(focus) : 'JU'
-  const [picked, setPicked] = useState<{ group: OverrideGroup; jamos: string[] } | null>(null)
-  const jamos = useMemo(() => picked?.group === group && picked.jamos.length > 0 ? picked.jamos : focusJamo ? [focusJamo] : [], [focusJamo, picked, group])
-  const togglePicked = (jamo: string) => setPicked(jamos.includes(jamo) ? (jamos.length > 1 ? { group, jamos: jamos.filter((item) => item !== jamo) } : { group, jamos }) : { group, jamos: [...jamos, jamo] })
-  // 고른 범위 = 규칙식. `이 레이아웃`은 문맥만, `이 자모만`은 거기에 잡은 부품의 자모 목록을 얹은 것.
-  const target = useMemo<ScopeRule>(() => {
-    if (custom) return custom
-    if (scope === 'all') return {}
-    const base = ruleOfContext(source.contextId)
-    return scope === 'layer' ? base : withJamos(base, RULE_PART[group], jamos)
-  }, [custom, scope, source.contextId, jamos, group])
-  // 저장은 자모마다 규칙 하나씩이다. 칩 ×가 고른 자모 중 하나만 지울 수 있어야 해서 — 목록 하나로 합치는 건 옵션 박스(B)에서 정한다.
-  const saveTargets = useMemo<ScopeRule[]>(() => {
-    if (custom || scope !== 'jamo') return [target]
-    const base = ruleOfContext(source.contextId)
-    return jamos.map((jamo) => withJamos(base, RULE_PART[group], [jamo]))
-  }, [custom, scope, target, source.contextId, jamos, group])
+  const storedDeltas = useLayoutDeltaStore((state) => state.rules)
+  // 이 레이아웃 = 늘 서 있는 기본 옵션. 지울 수 없고 다른 옵션의 출발점이다.
+  const baseRule = useMemo(() => ruleOfContext(source.contextId), [source.contextId])
+  // `범위 지정`으로 만든 빈 범위 슬롯. Δ가 아직 없어도 박스로 남는다(계약 §4를 9/22에 뒤집었다).
+  const [slots, setSlots] = useState<ScopeRule[]>([])
+  const [selectedKey, setSelectedKey] = useState(() => ruleKey(baseRule))
+  // 열려 있는 범위 고르기 화면. `new`는 새 옵션을 만들고, `edit`은 그 박스의 범위를 고쳐 쓴다.
+  const [scopeOpen, setScopeOpen] = useState<{ rule: ScopeRule; mode: 'new' | 'edit' } | null>(null)
+  // 레이아웃 칸이 바뀌면 이 칸에서 만든 슬롯은 버리고 기본으로 돌아간다.
+  useEffect(() => { setSlots([]); setSelectedKey(ruleKey(baseRule)) }, [baseRule])
+
+  // 켠 박스가 곧 지금 범위다. 키에서 규칙을 되살린다 — 저장된 것이든 세션 슬롯이든 같은 길.
+  const target = useMemo<ScopeRule>(() => ruleFromKey(selectedKey), [selectedKey])
+  const saveTargets = useMemo<ScopeRule[]>(() => [target], [target])
+  // 지금 범위가 어느 부품을 좁히고 있나. 상단 `닿는 글자` 줄과 캔버스 표지가 이걸 본다.
+  const rulePart = (['initial', 'medial', 'final'] as const).find((part) => target[part]?.length)
+  const group: OverrideGroup = rulePart ? GROUP_OF_PART[rulePart] : focus ? jamoPartOf(focus) : 'JU'
+  const jamos = useMemo(() => rulePart ? (target[rulePart] as (string | null)[]).filter((jamo): jamo is string => jamo !== null) : [], [rulePart, target])
+  const scope: PropagationScope = rulePart ? 'jamo' : 'layer'
+
   const commit = (change: () => void) => { const before = layoutDeltaSnapshot(); change(); onCommitted?.(before, layoutDeltaSnapshot()); onApplied?.() }
-  // 옵션 박스를 누르면 그게 지금 범위가 된다. 자모 조건이 있으면 그 부품이 켜지고 표본이 그 자모 글자로 바뀐다.
+  // 옵션 박스를 누르면 그게 지금 범위가 된다. 자모 조건이 있으면 그 부품이 켜진다.
   const selectRule = (rule: ScopeRule) => {
-    setCustom(null)
-    const picked = (['initial', 'medial', 'final'] as const).flatMap((part) => rule[part]?.length ? [{ part, jamos: rule[part]! }] : [])[0]
-    if (!picked) { setScope('layer'); return }
-    const jamoGroup = (Object.keys(RULE_PART) as OverrideGroup[]).find((key) => RULE_PART[key] === picked.part) ?? 'CH'
-    onSelectPart?.(jamoGroup)
-    setPicked({ group: jamoGroup, jamos: [...picked.jamos] })
-    setScope('jamo')
+    setSelectedKey(ruleKey(rule))
+    const part = (['initial', 'medial', 'final'] as const).find((item) => rule[item]?.length)
+    if (part) onSelectPart?.(GROUP_OF_PART[part])
   }
-  // `이 자모만`의 자모 고르기 시트. 고르는 즉시 표본이 바뀌고 `완료`는 닫기만 한다.
-  const [pickerOpen, setPickerOpen] = useState(false)
-  useEffect(() => {
-    if (!pickerOpen) return
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setPickerOpen(false) }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [pickerOpen])
-  const scopeLabel = custom ? ruleName(custom) : scope === 'jamo' ? jamos.join('·') : PROPAGATION_SCOPES.find((item) => item.id === scope)?.label ?? ''
+  // 박스 지우기. 저장된 Δ가 있으면 그걸 지우고(Undo 됨), 빈 슬롯이면 목록에서만 뺀다.
+  const removeRule = (rule: ScopeRule) => {
+    const key = ruleKey(rule)
+    if (storedDeltas[key]) commit(() => clearDelta(rule))
+    setSlots((list) => list.filter((item) => ruleKey(item) !== key))
+    if (selectedKey === key) setSelectedKey(ruleKey(baseRule))
+  }
+  // 범위 고르기 화면이 확정한 규칙. 새로 만들면 슬롯이 하나 늘고, 고쳐 쓰면 그 자리의 Δ까지 옮긴다.
+  const confirmScope = (rule: ScopeRule) => {
+    const open = scopeOpen
+    setScopeOpen(null)
+    if (!open) return
+    const key = ruleKey(rule)
+    const oldKey = ruleKey(open.rule)
+    if (open.mode === 'edit' && key !== oldKey) {
+      const moved = storedDeltas[oldKey]
+      if (moved) commit(() => { clearDelta(open.rule); applyDelta(rule, moved) })
+      setSlots((list) => list.map((item) => ruleKey(item) === oldKey ? rule : item))
+    } else if (open.mode === 'new') {
+      setSlots((list) => list.some((item) => ruleKey(item) === key) ? list : [...list, rule])
+    }
+    setSelectedKey(key)
+  }
+  // 하단 바의 `…에 적용`. 박스에 적는 것과 같은 짧은 이름을 쓴다(이 레이아웃 앞머리는 뗀다).
+  const scopeLabel = stackLabel(target, source.contextId)
   useEffect(() => { onScopeLabel?.(scopeLabel) }, [onScopeLabel, scopeLabel])
   // 고른 범위를 위로 알린다. 표본은 상단 `닿는 글자` 줄이 그린다.
-  useEffect(() => { onScopeChange?.({ scope, group, jamos, rule: custom ?? undefined }) }, [onScopeChange, scope, group, jamos, custom])
+  useEffect(() => { onScopeChange?.({ scope, group, jamos, rule: target }) }, [onScopeChange, scope, group, jamos, target])
   // 적용 = 지금 범위에 Δ 저장. 하단 바가 ref로 부른다. 닫힘값은 렌더마다 새로 잡는다(ref 갱신은 값싸다).
   useImperativeHandle(ref, () => ({ apply: () => commit(() => { for (const rule of saveTargets) applyDelta(rule, layoutDeltaOf(edit)); onScopeApplied?.(saveTargets) }) }))
   return <section className={styles.section} aria-label="다른 글자에 적용하면" data-testid="review-propagation">
-    {/* 옵션 스택 = 적용 범위 고르기 + 쌓인 오버라이드. 저장된 Δ는 이미 캔버스 original에 들어 있고, 지우기는 박스 ×로(Undo 됨). */}
-    <LayoutOptionStack source={source} drafts={saveTargets} scope={scope === 'jamo' ? 'jamo' : 'layer'} fixedDisabled={!focus}
-      onScope={chooseScope} onOpenPicker={() => { chooseScope('jamo'); setPickerOpen(true) }} onSelect={selectRule} onRemove={(removed) => commit(() => clearDelta(removed))}
-      onOpenScope={(rule) => setScopeOpen(rule)} />
+    {/* 옵션 스택 = 쌓인 범위 박스. `범위 지정`이 새 박스를 만들고, 박스를 누르면 그게 지금 범위다. 지우기는 ×로(Undo 됨). */}
+    <LayoutOptionStack source={source} slots={[baseRule, ...slots]} selectedKey={selectedKey} baseKey={ruleKey(baseRule)}
+      onAdd={() => setScopeOpen({ rule: baseRule, mode: 'new' })} onSelect={selectRule} onRemove={removeRule}
+      onOpenScope={(rule) => setScopeOpen({ rule, mode: 'edit' })} />
     {/* Δ 줄은 화면에서 숨기고 읽기 도구에만 남긴다(CSS). 자리를 안 차지하니 옮겨도 아래가 안 밀린다. */}
     <div className={styles.deltaRow}>
       <DeltaList rails={changed} fixed={fixed} testId="review-propagation-deltas" />
     </div>
-    {/* 자모 고르기 시트. 잡은 부품 자리에 올 수 있는 자모 전부. 기본은 잡은 자모 하나, 마지막 하나는 못 끈다. 여러 개를 켜면 같은 Δ가 자모마다 따로 저장된다. */}
-    {pickerOpen && focus && <div className={styles.sheetBackdrop} onClick={() => setPickerOpen(false)}>
-      <div className={styles.sheet} role="dialog" aria-modal="true" aria-label={`${PART_GROUP_LABEL[group]} 자모 고르기`} onClick={(event) => event.stopPropagation()}>
-        <header>
-          <span><b>{PART_GROUP_LABEL[group]} 자모 고르기</b><small>이 레이아웃에서 {PART_GROUP_LABEL[group]}{group === 'JO' ? '이' : '가'} 고른 자모인 글자에만 · 자모마다 따로 저장</small></span>
-          <button type="button" onClick={() => setPickerOpen(false)} data-testid="review-propagation-jamos-done">완료</button>
-        </header>
-        <div className={styles.jamos} role="group" aria-label={`${PART_GROUP_LABEL[group]} 자모`} data-testid="review-propagation-jamos">
-          {jamoChoicesFor(focus).map((jamo) => { const on = jamos.includes(jamo); return <button type="button" key={jamo} aria-pressed={on} disabled={on && jamos.length === 1} data-jamo={jamo} onClick={() => togglePicked(jamo)}>{jamo}</button> })}
-        </div>
-      </div>
-    </div>}
-    {/* 범위 고르기 화면. 검수 격자를 그대로 쓰고, 머리를 눌러(쓸어) 범위를 집는다. `이 범위로`가 지금 범위를 갈아치운다. */}
-    {scopeOpen && focus && <LayoutScopePicker source={source} rule={scopeOpen} part={RULE_PART[group]} railRole={railRole}
+    {/* 범위 고르기 화면. 검수 격자를 그대로 쓰고 사각을 집는다. `이 범위로`가 박스를 만들거나 그 박스의 범위를 고쳐 쓴다. */}
+    {scopeOpen && <LayoutScopePicker source={source} rule={scopeOpen.rule} part={RULE_PART[group]} railRole={railRole}
       deltaLine={changed.length > 0 ? `${changed[0].label} ${changed.length > 1 ? `외 ${changed.length - 1}` : ''}`.trim() : undefined}
       onCancel={() => setScopeOpen(null)}
-      onConfirm={(rule) => { setCustom(rule); setScopeOpen(null) }} />}
+      onConfirm={confirmScope} />}
   </section>
 }

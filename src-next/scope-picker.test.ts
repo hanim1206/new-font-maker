@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { corpusIdentity } from './notoCorpus'
-import { axisOn, contextIdOfRule, ruleOfSets, ruleSamples, scopeChipsFor, setsOfRule, toggleAxis } from './scopePicker'
+import { CORPUS_INITIALS, corpusIdentity } from './notoCorpus'
+import { axisAllOn, axisOn, contextIdOfRule, ruleOfSets, ruleSamples, scopeChipsFor, setsOfRule, toggleAxisAll, toggleAxisValue } from './scopePicker'
 import { matchesRule, ruleGlyphCount, ruleOfContext } from './scopeRule'
 import type { ScopeRule } from './scopeRule'
 
-/** 범위 고르기의 가운데: 규칙식 ↔ 축 값 집합. 표에서 머리를 눌러 만든 것이 그대로 규칙식으로 저장돼야 한다. */
+/** 범위 고르기의 가운데: 규칙식 ↔ 축 값 집합. 축 줄에서 켠 자모가 그대로 규칙식으로 저장돼야 한다. */
 
 const 멈 = corpusIdentity('멈'.codePointAt(0)!)
 const 가 = corpusIdentity('가'.codePointAt(0)!)
@@ -23,9 +23,9 @@ describe('규칙식 ↔ 축 값 집합', () => {
   })
 
   it('계열 전부를 켜면 자모 목록이 아니라 계열 조건으로 접힌다', () => {
-    const sets = setsOfRule({ hasFinal: true, medial: [...'ㅏㅐㅑㅒㅓㅔㅕㅖ'] })
-    expect(ruleOfSets(sets).medialFamily).toBeUndefined()
-    const whole = toggleAxis(sets, 'medial', ['ㅣ'], true)
+    const partial = setsOfRule({ hasFinal: true, medial: [...'ㅏㅐㅑㅒㅓㅔㅕㅖ'] })
+    expect(ruleOfSets(partial).medialFamily).toBeUndefined()
+    const whole = toggleAxisValue(partial, 'medial', 'ㅣ')
     expect(ruleOfSets(whole)).toEqual({ medialFamily: ['right'], hasFinal: true })
   })
 
@@ -34,20 +34,41 @@ describe('규칙식 ↔ 축 값 집합', () => {
     expect(ruleOfSets(setsOfRule({ hasFinal: true }))).toEqual({ hasFinal: true })
     expect(ruleOfSets(setsOfRule({ final: ['ㄱ'] }))).toEqual({ final: ['ㄱ'] })
   })
+
+  it('받침 목록에 `없음`이 들어도 그대로 남는다', () => {
+    const rule = ruleOfSets({ ...setsOfRule({}), final: new Set([null, 'ㄱ', 'ㄲ']) })
+    expect(rule.final).toEqual([null, 'ㄱ', 'ㄲ'])
+    expect(matchesRule(rule, corpusIdentity('가'.codePointAt(0)!))).toBe(true)
+    expect(matchesRule(rule, corpusIdentity('각'.codePointAt(0)!))).toBe(true)
+    expect(matchesRule(rule, corpusIdentity('간'.codePointAt(0)!))).toBe(false)
+  })
 })
 
-describe('머리 토글', () => {
-  it('마지막 하나까지 끄지는 않는다 — 아무 글자도 안 닿는 범위는 만들 수 없다', () => {
-    const sets = setsOfRule({ initial: ['ㄱ'] })
-    expect(toggleAxis(sets, 'initial', ['ㄱ'], false)).toBe(sets)
+describe('축 줄 고르기', () => {
+  const layer = setsOfRule(ruleOfContext('right-final'))
+
+  it('자모 하나를 넣고 뺀다. 표에 없는 다른 축은 그대로 둔다', () => {
+    const one = toggleAxisValue(layer, 'initial', 'ㄱ')
+    expect(axisOn(one, 'initial', 'ㄱ')).toBe(false)
+    expect(axisOn(one, 'medial', 'ㅏ')).toBe(true)
+    expect(ruleGlyphCount(ruleOfSets(one))).toBeLessThan(ruleGlyphCount(ruleOfSets(layer)))
   })
 
-  it('그룹 머리는 그 그룹 값을 한꺼번에 바꾼다', () => {
-    const sets = setsOfRule(ruleOfContext('right-final'))
-    const off = toggleAxis(sets, 'medial', [...'ㅏㅐㅑㅒ'], false)
-    expect(axisOn(off, 'medial', 'ㅏ')).toBe(false)
-    expect(axisOn(off, 'medial', 'ㅓ')).toBe(true)
-    expect(ruleGlyphCount(ruleOfSets(off))).toBeLessThan(ruleGlyphCount(ruleOfSets(sets)))
+  it('마지막 하나까지 빼지는 않는다 — 아무 글자도 안 닿는 범위는 만들 수 없다', () => {
+    const only = setsOfRule({ initial: ['ㄱ'] })
+    expect(toggleAxisValue(only, 'initial', 'ㄱ')).toBe(only)
+  })
+
+  it('`전체`는 전부 켜고, 이미 전부면 하나만 남긴다', () => {
+    const items = [...'ㄱㄲㄴ']
+    const narrowed = toggleAxisAll(layer, 'initial', CORPUS_INITIALS, 'ㅁ')
+    expect(ruleOfSets(narrowed).initial).toEqual(['ㅁ'])
+    expect(axisAllOn(narrowed, 'initial', CORPUS_INITIALS)).toBe(false)
+    const back = toggleAxisAll(narrowed, 'initial', CORPUS_INITIALS, 'ㅁ')
+    expect(axisAllOn(back, 'initial', CORPUS_INITIALS)).toBe(true)
+    expect(ruleOfSets(back).initial).toBeUndefined()
+    // 목록에 없는 자모를 지키라고 하면 첫 자모를 남긴다.
+    expect(ruleOfSets(toggleAxisAll(setsOfRule({ initial: items }), 'initial', items, 'ㅎ')).initial).toEqual(['ㄱ'])
   })
 })
 

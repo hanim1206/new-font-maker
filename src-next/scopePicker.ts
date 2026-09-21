@@ -1,7 +1,7 @@
 import { CORPUS_FINALS, CORPUS_INITIALS, CORPUS_MEDIALS, corpusCodepoint, corpusIdentity } from './notoCorpus'
 import type { CorpusIdentity } from './notoCorpus'
 import { MEDIAL_ROLE_SETS } from '../src/services/notoVariationModel'
-import { criterionFor, sameGroupJamos, sameTraitJamos } from './jamoLiteratureGroups'
+import { criterionFor, JAMO_LITERATURE_GROUPS, sameGroupJamos, sameTraitJamos } from './jamoLiteratureGroups'
 import { roleLabel } from './notoMedialFitView'
 import { familyOfContext, finalOfContext, matchesRule, normalizeRule, ruleGlyphCount, ruleName } from './scopeRule'
 import type { MedialFamilyId, RuleJamoPart, ScopeRule } from './scopeRule'
@@ -9,9 +9,9 @@ import type { MedialFamilyId, RuleJamoPart, ScopeRule } from './scopeRule'
 /**
  * 범위 고르기 화면(`LayoutScopePicker`)의 계산. 계약은 `docs/specs/적용범위-규칙식.md` §6·§7.
  *
- * 표에서 머리를 누르는 건 **축 값을 켜고 끄는 일**이고, 저장은 규칙식 하나다.
- * 그래서 규칙식 ↔ 축 값 집합을 오가는 길(`setsOfRule` · `ruleOfSets`)이 이 파일의 가운데다.
- * 집합으로 풀면 머리 토글·드래그가 단순해지고, 접을 때 계열·받침 유무 같은 짧은 말로 도로 줄어든다.
+ * 화면은 **축마다 자모 줄 하나**다(첫닿자 · 홀자 · 받침). 저장은 규칙식 하나고, 그 사이를 잇는 길이
+ * `setsOfRule` · `ruleOfSets`다. 집합으로 풀면 줄 토글이 단순해지고, 접을 때 계열·받침 유무 같은 짧은 말로 도로 줄어든다.
+ * 표(격자)로 고르는 길은 9/22에 버렸다 — 축이 셋인데 표는 둘밖에 못 담아 셋째 축이 늘 밖으로 샜다.
  */
 
 export const MEDIAL_FAMILY_ITEMS: Readonly<Record<MedialFamilyId, string[]>> = {
@@ -55,16 +55,8 @@ export function ruleOfSets(sets: ScopeSets): ScopeRule {
     if (families.length > 0 && covered.length === sets.medial.size) rule.medialFamily = families
     else rule.medial = [...sets.medial]
   }
-  if (!sameItems(sets.final, CORPUS_FINALS)) {
-    const hasNone = sets.final.has(null)
-    const finals = [...sets.final].filter((value): value is string => value !== null)
-    // 받침 없음만 = `hasFinal: false`, 받침 전부 = `hasFinal: true`, 그 사이는 자모 목록.
-    // 목록은 받침이 있다는 뜻을 품으므로 `없음`은 목록과 같이 못 산다 — 그때는 없음을 버린다(화면의 받침 세그먼트가 막는다).
-    if (hasNone && finals.length === 0) rule.hasFinal = false
-    else if (!hasNone && finals.length === FINAL_JAMOS.length) rule.hasFinal = true
-    else if (finals.length > 0) rule.final = finals
-    else rule.hasFinal = false
-  }
+  // 받침은 목록 그대로 넘긴다. `없음`만 · 받침 자모 전부는 `normalizeRule`이 유무 조건으로 접는다.
+  if (!sameItems(sets.final, CORPUS_FINALS)) rule.final = CORPUS_FINALS.filter((value) => sets.final.has(value))
   return normalizeRule(rule)
 }
 
@@ -72,14 +64,32 @@ export function ruleOfSets(sets: ScopeSets): ScopeRule {
 export const axisOn = (sets: ScopeSets, axis: 'initial' | 'medial' | 'final', value: string | null): boolean =>
   axis === 'final' ? sets.final.has(value) : axis === 'initial' ? sets.initial.has(value as string) : sets.medial.has(value as string)
 
-/** 축 값 여럿을 한꺼번에 켜거나 끈다. 마지막 하나까지 끄면 아무 글자도 안 닿으므로 그때는 안 끈다. */
-export function toggleAxis(sets: ScopeSets, axis: 'initial' | 'medial' | 'final', values: readonly (string | null)[], on: boolean): ScopeSets {
+/**
+ * 축 하나에서 자모를 넣고 뺀다. 마지막 하나까지 빼면 아무 글자도 안 닿으므로 그때는 안 뺀다.
+ * 범위 고르기가 축마다 줄 하나를 놓기 때문에(표가 아니라) 조작은 이 하나면 된다.
+ */
+export function toggleAxisValue(sets: ScopeSets, axis: 'initial' | 'medial' | 'final', value: string | null): ScopeSets {
   const next: ScopeSets = { initial: new Set(sets.initial), medial: new Set(sets.medial), final: new Set(sets.final) }
   const target = next[axis] as Set<string | null>
-  for (const value of values) { if (on) target.add(value); else target.delete(value) }
-  if (target.size === 0) return sets
+  if (target.has(value)) { if (target.size === 1) return sets; target.delete(value) } else target.add(value)
   return next
 }
+
+/**
+ * 줄 머리의 `전체`. 전부 안 켜졌으면 전부 켜고, 이미 전부면 **하나만 남긴다**(`keep`, 보통 지금 글자의 자모).
+ * 전부 끄기를 안 두는 건 아무 글자도 안 닿는 범위를 만들 수 없어서다.
+ */
+export function toggleAxisAll(sets: ScopeSets, axis: 'initial' | 'medial' | 'final', items: readonly (string | null)[], keep: string | null): ScopeSets {
+  const next: ScopeSets = { initial: new Set(sets.initial), medial: new Set(sets.medial), final: new Set(sets.final) }
+  const whole = items.every((item) => (sets[axis] as Set<string | null>).has(item)) && (sets[axis] as Set<string | null>).size === items.length
+  const only = items.includes(keep) ? keep : items[0]
+  next[axis] = new Set(whole ? [only] : items) as never
+  return next
+}
+
+/** 그 축이 지금 전부 켜져 있나. 줄 머리 `전체`의 눌림 표시. */
+export const axisAllOn = (sets: ScopeSets, axis: 'initial' | 'medial' | 'final', items: readonly (string | null)[]): boolean =>
+  (sets[axis] as Set<string | null>).size === items.length && items.every((item) => (sets[axis] as Set<string | null>).has(item))
 
 export interface ScopeChip {
   id: string
@@ -89,12 +99,10 @@ export interface ScopeChip {
   rule: ScopeRule
 }
 
-const RULE_PART_LABEL: Record<RuleJamoPart, string> = { initial: '첫닿자', medial: '홀자', final: '받침' }
-const jamoPhrase = (jamos: readonly string[]) => jamos.length > 3 ? `${jamos.slice(0, 2).join('·')} 외 ${jamos.length - 2}` : jamos.join('·')
-
 /**
  * 추천 칩. 지금 고친 것에서 나오고, 누르면 표를 그 규칙으로 **갈아치운다**(합치지 않는다).
  * 순서는 계약 §7 그대로 — 구조군 · rail 역할 · 속공간 · 높이. 홀자를 잡았으면 구조군은 없다(구조군 표가 닿자 것이라서).
+ * 이름은 짧게 짓는다(`구조군 ㅁ`) — 긴 설명은 칩 줄을 옆으로 밀어 버린다. 무엇이 같은지는 켠 표가 말한다.
  */
 export function scopeChipsFor(input: { source: CorpusIdentity; part: RuleJamoPart; railRole?: string }): ScopeChip[] {
   const { source, part, railRole } = input
@@ -108,18 +116,19 @@ export function scopeChipsFor(input: { source: CorpusIdentity; part: RuleJamoPar
   }
   if (jamo && (part === 'initial' || part === 'final')) {
     const jamos = sameGroupJamos(criterionFor(part, source.contextId), jamo)
-    if (jamos.length > 1) add('group', `${jamo}과 같은 구조군 ${RULE_PART_LABEL[part]}`, { ...base, [part]: jamos })
+    if (jamos.length > 1) add('group', `구조군 ${jamo}`, { ...base, [part]: jamos })
   }
   if (railRole) {
     // 그 rail 역할을 가진 홀자 전부. 계열을 안 가린다 — 역할이 같으면 같은 자리가 움직여서다.
     const medials = CORPUS_MEDIALS.filter((medial) => MEDIAL_ROLE_SETS[medial]?.includes(railRole))
-    if (medials.length > 1) add('role', `${roleLabel(railRole)} 있는 홀자`, { hasFinal: base.hasFinal, medial: medials })
+    if (medials.length > 1) add('role', `${roleLabel(railRole)} 홀자`, { hasFinal: base.hasFinal, medial: medials })
   }
   if (jamo && part !== 'medial') {
     const space = sameTraitJamos('inkSpaceGroup', jamo)
-    if (space.length > 1) add('space', `속공간이 같은 ${RULE_PART_LABEL[part]} ${jamoPhrase(space)}`, { ...base, [part]: space })
+    if (space.length > 1) add('space', '속공간', { ...base, [part]: space })
     const height = sameTraitJamos('height', jamo)
-    if (height.length > 1 && height.length < CORPUS_INITIALS.length) add('height', `높이가 같은 ${RULE_PART_LABEL[part]} ${jamoPhrase(height)}`, { ...base, [part]: height })
+    const heightLabel = JAMO_LITERATURE_GROUPS[jamo]?.height
+    if (height.length > 1 && height.length < CORPUS_INITIALS.length) add('height', `높이 ${heightLabel ?? '같음'}`, { ...base, [part]: height })
   }
   return chips.slice(0, 4)
 }

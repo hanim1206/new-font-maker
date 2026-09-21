@@ -16,7 +16,8 @@ export interface ScopeRule {
   /** 부품별 자모 목록. 없으면 안 따진다. 혼합 홀자는 쪼개지 않고 홀자 하나로 본다(`ㅘ`). */
   initial?: string[]
   medial?: string[]
-  final?: string[]
+  /** 받침 자모 목록. `null`은 **받침 없음**이다 — 표에서 `없` 열과 받침 열을 같이 끌면 이 모양이 된다. */
+  final?: (string | null)[]
 }
 
 export type MedialFamilyId = 'right' | 'bottom' | 'mixed'
@@ -42,7 +43,7 @@ export function matchesRule(rule: ScopeRule, identity: RuleIdentity): boolean {
   if (rule.hasFinal !== undefined && rule.hasFinal !== (identity.finalJamo !== null)) return false
   if (rule.initial && !rule.initial.includes(identity.initialJamo)) return false
   if (rule.medial && !rule.medial.includes(identity.medialJamo)) return false
-  if (rule.final && (identity.finalJamo === null || !rule.final.includes(identity.finalJamo))) return false
+  if (rule.final && !rule.final.includes(identity.finalJamo)) return false
   return true
 }
 
@@ -53,11 +54,18 @@ export function normalizeRule(rule: ScopeRule): ScopeRule {
   if (rule.hasFinal !== undefined) next.hasFinal = rule.hasFinal
   if (rule.initial?.length) next.initial = sortedJamos(rule.initial, CORPUS_INITIALS)
   if (rule.medial?.length) next.medial = sortedJamos(rule.medial, CORPUS_MEDIALS)
-  if (rule.final?.length) next.final = sortedJamos(rule.final, FINAL_JAMOS)
+  if (rule.final?.length) {
+    // 받침 목록이 `없음` 하나거나 받침 자모 전부면 유무 조건으로 접는다 — 같은 뜻이 같은 키여야 한다.
+    const finals = sortedJamos(rule.final, FINAL_ORDER)
+    if (finals.length === 1 && finals[0] === null) next.hasFinal = false
+    else if (finals.length === FINAL_JAMOS.length && !finals.includes(null)) next.hasFinal = true
+    else next.final = finals
+  }
   return next
 }
 const FINAL_JAMOS = [...'ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ']
-const sortedJamos = (jamos: readonly string[], order: readonly string[]): string[] =>
+const FINAL_ORDER: (string | null)[] = [null, ...FINAL_JAMOS]
+const sortedJamos = <T extends string | null>(jamos: readonly T[], order: readonly (string | null)[]): T[] =>
   Array.from(new Set(jamos)).sort((a, b) => order.indexOf(a) - order.indexOf(b))
 
 /** 저장소 키. 정규화한 규칙을 그대로 읽을 수 있는 문자열로. `{}`는 빈 문자열이다. */
@@ -68,7 +76,8 @@ export function ruleKey(rule: ScopeRule): string {
   if (normalized.hasFinal !== undefined) parts.push(`j=${normalized.hasFinal ? '1' : '0'}`)
   if (normalized.initial) parts.push(`i=${normalized.initial.join('')}`)
   if (normalized.medial) parts.push(`m=${normalized.medial.join('')}`)
-  if (normalized.final) parts.push(`n=${normalized.final.join('')}`)
+  // 받침 `없음`은 자모가 아니라 `0`으로 적는다.
+  if (normalized.final) parts.push(`n=${normalized.final.map((jamo) => jamo ?? '0').join('')}`)
   return parts.join('|')
 }
 
@@ -82,7 +91,7 @@ export function ruleFromKey(key: string): ScopeRule {
     else if (name === 'j') rule.hasFinal = value === '1'
     else if (name === 'i') rule.initial = [...value]
     else if (name === 'm') rule.medial = [...value]
-    else if (name === 'n') rule.final = [...value]
+    else if (name === 'n') rule.final = [...value].map((jamo) => jamo === '0' ? null : jamo)
   }
   return normalizeRule(rule)
 }
@@ -124,7 +133,9 @@ const CONTEXT_LABEL: Record<string, string> = {
   mixed: '섞임 홀자', 'mixed-final': '섞임 홀자 · 받침',
 }
 const PART_LABEL: Record<RuleJamoPart, string> = { initial: '첫닿자', medial: '홀자', final: '받침' }
-const jamoPhrase = (jamos: readonly string[]): string => jamos.length > 3 ? `${jamos[0]} 외 ${jamos.length - 1}` : jamos.join('·')
+const jamoLabel = (jamo: string | null): string => jamo ?? '없음'
+const jamoPhrase = (jamos: readonly (string | null)[]): string =>
+  jamos.length > 3 ? `${jamoLabel(jamos[0])} 외 ${jamos.length - 1}` : jamos.map(jamoLabel).join('·')
 
 /**
  * 규칙에서 이름을 짓는다. 저장하지 않는다 — 범위가 바뀌면 이름도 따라 바뀌어야 한다.
