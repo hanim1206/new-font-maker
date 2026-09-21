@@ -1,0 +1,32 @@
+/* 범위 고르기 줄 + 그 아래 옵션 박스 스택. 절의 좌우 여백까지 흘려 스크롤이 잘린 듯 보이게 한다. */
+.stack { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; }
+
+.picker { display: flex; align-items: center; gap: 6px; }
+.scopeBtn { flex: 0 0 auto; min-height: 30px; padding: 4px 12px; border: 1px solid rgb(var(--color-border)); border-radius: 999px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 12px; font-weight: 600; }
+.scopeBtn[aria-pressed='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary)); color: #fff; }
+.scopeBtn:disabled { opacity: .4; }
+.hint { margin-left: auto; color: rgb(var(--color-text-dim-4)); font-size: 10px; }
+
+.head { display: flex; align-items: baseline; gap: 5px; color: rgb(var(--color-text-dim-4)); font-size: 10px; }
+.head b { color: rgb(var(--color-text-dim-3)); font-size: 10px; font-weight: 700; }
+
+/* 스택은 길어져도 화면을 밀지 않는다. 넘치면 안에서 세로로 민다. */
+.list { display: flex; flex-direction: column; gap: 5px; max-height: 148px; overflow-y: auto; margin: 0; padding: 0; list-style: none; scrollbar-width: none; }
+.list::-webkit-scrollbar { display: none; }
+
+.opt { display: flex; align-items: stretch; min-height: 38px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface)); overflow: hidden; }
+.opt[data-stored='true'] { border-color: color-mix(in srgb, var(--chip-color) 55%, transparent); background: color-mix(in srgb, var(--chip-color) 14%, rgb(var(--color-surface))); }
+/* 아직 적용 안 한 범위는 점선이다. Δ를 넣고 적용하면 실선이 된다. */
+.opt[data-stored='true'] { border-style: solid; }
+.opt:not([data-stored='true']) { border-style: dashed; }
+.opt[data-selected='true'] { border-color: rgb(var(--color-primary)); box-shadow: inset 0 0 0 1px rgb(var(--color-primary)); }
+
+.body { display: flex; flex: 1; min-width: 0; flex-direction: column; justify-content: center; gap: 1px; padding: 4px 11px; border: 0; background: transparent; color: rgb(var(--color-foreground)); text-align: left; }
+.body:disabled { opacity: .55; }
+.name { display: flex; align-items: baseline; gap: 5px; min-width: 0; line-height: 1.2; }
+.name b { overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.name em { flex: 0 0 auto; color: rgb(var(--color-text-dim-4)); font-size: 9.5px; font-style: normal; font-weight: 600; }
+.body small { overflow: hidden; color: rgb(var(--color-text-dim-3)); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9.5px; font-weight: 600; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.body small[data-empty='true'] { color: rgb(var(--color-text-dim-4)); font-family: inherit; font-weight: 500; }
+
+.remove { flex: 0 0 auto; width: 30px; border: 0; border-left: 1px dashed color-mix(in srgb, var(--chip-color) 45%, transparent); background: transparent; color: rgb(var(--color-text-dim-3)); font-size: 14px; font-weight: 700; }

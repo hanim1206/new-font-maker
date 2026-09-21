@@ -11,7 +11,7 @@ import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 import { useNotoGlyph } from './useNotoGlyph'
 import { useFitInkStyle } from './useFitInkStyle'
 import { jamoPartOf, layoutDeltaSnapshot, useLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
-import { LayoutScopeStrip } from './LayoutScopeStrip'
+import { LayoutOptionStack } from './LayoutOptionStack'
 import type { OverrideGroup } from './layoutOverrides'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { ruleOfContext, withJamos } from './scopeRule'
@@ -177,8 +177,15 @@ export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, f
     return jamos.map((jamo) => withJamos(base, RULE_PART[group], [jamo]))
   }, [scope, target, source.contextId, jamos, group])
   const commit = (change: () => void) => { const before = layoutDeltaSnapshot(); change(); onCommitted?.(before, layoutDeltaSnapshot()); onApplied?.() }
-  // 자모 칩을 누르면 그 부품이 켜지고 고른 자모는 그 하나가 돼 표본이 그 글자로 바뀐다. 여러 자모는 시트에서 고른다.
-  const pickJamo = (jamoGroup: OverrideGroup, jamo: string) => { onSelectPart?.(jamoGroup); setPicked({ group: jamoGroup, jamos: [jamo] }); setScope('jamo') }
+  // 옵션 박스를 누르면 그게 지금 범위가 된다. 자모 조건이 있으면 그 부품이 켜지고 표본이 그 자모 글자로 바뀐다.
+  const selectRule = (rule: ScopeRule) => {
+    const picked = (['initial', 'medial', 'final'] as const).flatMap((part) => rule[part]?.length ? [{ part, jamos: rule[part]! }] : [])[0]
+    if (!picked) { setScope('layer'); return }
+    const jamoGroup = (Object.keys(RULE_PART) as OverrideGroup[]).find((key) => RULE_PART[key] === picked.part) ?? 'CH'
+    onSelectPart?.(jamoGroup)
+    setPicked({ group: jamoGroup, jamos: [...picked.jamos] })
+    setScope('jamo')
+  }
   // `이 자모만`의 자모 고르기 시트. 고르는 즉시 표본이 바뀌고 `완료`는 닫기만 한다.
   const [pickerOpen, setPickerOpen] = useState(false)
   useEffect(() => {
@@ -210,9 +217,9 @@ export function ReviewPropagationCards({ source, bundle, edit, changed, fixed, f
   // 적용 = 지금 범위에 Δ 저장. 하단 바가 ref로 부른다. 닫힘값은 렌더마다 새로 잡는다(ref 갱신은 값싸다).
   useImperativeHandle(ref, () => ({ apply: () => commit(() => { for (const rule of saveTargets) applyDelta(rule, layoutDeltaOf(edit)) }) }))
   return <section className={styles.section} aria-label="다른 글자에 적용하면" data-testid="review-propagation">
-    {/* 범위 띠 = 적용 범위 고르기 + 쌓인 오버라이드. 저장된 Δ는 이미 캔버스 original에 들어 있고, 지우기는 칩 ×로(Undo 됨). */}
-    <LayoutScopeStrip source={source} selected={target} pickerOn={scope === 'jamo'} picked={scope === 'jamo' ? { group, jamos } : null} fixedDisabled={!focus} jamoDisabled={false}
-      onScope={setScope} onPickJamo={pickJamo} onOpenPicker={() => { setScope('jamo'); setPickerOpen(true) }} onRemove={(removed) => commit(() => clearDelta(removed))} />
+    {/* 옵션 스택 = 적용 범위 고르기 + 쌓인 오버라이드. 저장된 Δ는 이미 캔버스 original에 들어 있고, 지우기는 박스 ×로(Undo 됨). */}
+    <LayoutOptionStack source={source} drafts={saveTargets} scope={scope === 'jamo' ? 'jamo' : 'layer'} fixedDisabled={!focus}
+      onScope={setScope} onOpenPicker={() => { setScope('jamo'); setPickerOpen(true) }} onSelect={selectRule} onRemove={(removed) => commit(() => clearDelta(removed))} />
     {/* Δ 줄은 늘 자리를 차지한다. 옮길 때 카드가 아래로 밀리지 않게. */}
     <div className={styles.deltaRow}>
       <DeltaList rails={changed} fixed={fixed} testId="review-propagation-deltas" />

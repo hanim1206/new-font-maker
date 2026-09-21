@@ -689,9 +689,9 @@ test('같은 레이아웃에 쌓인 오버라이드가 범위 띠에 보이고, 
   await page.goto('/workspace/jamo?char=%EB%85%B8&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   const propagation = page.getByTestId('review-propagation')
-  // 찬 칩은 심어 둔 전체 하나. 빈 칩은 이 레이아웃·이 자모만 둘뿐이다(전체를 고르는 칩은 없다).
+  // 찬 박스는 심어 둔 전체 하나. 그 아래 지금 고른 범위(이 레이아웃)가 점선 박스로 선다. 전체를 고르는 길은 없다.
   await expect(overrides).toHaveCount(1)
-  await expect(page.getByTestId('layout-scope-chip')).toHaveCount(2)
+  await expect(page.getByTestId('layout-scope-chip')).toHaveCount(1)
   await expect(overrides.nth(0).getByTestId('layout-override-select')).toBeDisabled()
   await selectPartBox(page, '첫닿자 ㄴ')
   await selectRail(page, '첫닿자 윗변')
@@ -724,7 +724,7 @@ test('같은 레이아웃에 쌓인 오버라이드가 범위 띠에 보이고, 
   // bottom(가로 홀자 5 × 받침 없음) 첫닿자 하나 = 5자.
   await expect(overrides.nth(2)).toContainText('5자')
   // 띠는 캔버스 바로 아래라 첫 화면에서 세로 스크롤 없이 보인다.
-  await expect(page.getByTestId('layout-scope-strip')).toBeInViewport({ ratio: 1 })
+  await expect(page.getByTestId('layout-option-stack')).toBeInViewport({ ratio: 1 })
   await expect(overrides.nth(0)).toBeInViewport()
   const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
   expect(stored.rules[''].faces.CH.top).toBeCloseTo(-0.01, 9)
@@ -886,7 +886,7 @@ test('레이아웃 모드 첫 화면에 범위 띠와 표본 다섯 장이 온�
   expect((await sentence.boundingBox())!.height).toBeLessThanOrEqual(60)
   // 고른 글자(멈)는 한 줄 문장에서 보이는 자리에 있다.
   await expect(page.getByRole('button', { name: '멈 편집' })).toBeInViewport({ ratio: 1 })
-  await expect(page.getByTestId('layout-scope-strip')).toBeInViewport({ ratio: 1 })
+  await expect(page.getByTestId('layout-option-stack')).toBeInViewport({ ratio: 1 })
   const cards = page.getByTestId('review-propagation-card')
   await expect(cards.first()).toBeVisible({ timeout: 20_000 })
   const barTop = (await page.getByTestId('jamo-stroke-cta').boundingBox())!.y
