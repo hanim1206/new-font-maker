@@ -41,7 +41,7 @@
 .sentence { position: relative; box-sizing: border-box; flex: 0 0 104px; height: 104px; display: flex; align-items: flex-start; padding: 8px 56px 8px 12px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; border-bottom: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface-3)); }
 .sentence::-webkit-scrollbar { display: none; }
 /* 셸 안(레이아웃 · 획 편집): 한 줄 가로 스크롤. 버튼 둘은 오른쪽에 붙어 가로로 놓인다. */
-.sentence[data-compact] { flex-basis: 56px; height: 56px; align-items: center; padding: 0 0 0 12px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.sentence[data-compact] { flex-basis: var(--top-row-h, 44px); height: var(--top-row-h, 44px); align-items: center; padding: 0 0 0 12px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .sentence[data-compact] .sentenceRun { flex: 0 0 auto; flex-wrap: nowrap; padding-right: 12px; }
 .sentence[data-compact] .sentenceActions { position: sticky; top: auto; right: 0; order: 9; flex: 0 0 auto; flex-direction: row; align-self: stretch; align-items: center; margin-left: auto; padding: 0 10px 0 8px; translate: none; background: linear-gradient(90deg, transparent, rgb(var(--color-surface-3)) 10px); }
 .sentenceActions { position: absolute; z-index: 2; top: 50%; right: 10px; display: flex; flex-direction: column; gap: 6px; translate: 0 -50%; }
@@ -152,9 +152,12 @@
 /* Noto 고스트: 잉크 아래 회색 비교용(검수 캔버스와 같은 농도). */
 .notoGhost { fill: #3a3a36; fill-opacity: .55; }
 
-/* 레이아웃 모드: 문장 아래 남은 높이를 기준선 편집부가 스크롤로 쓴다. */
+/* 문장 줄부터 편집부까지 한 덩어리. 레이아웃 모드에서는 이 덩어리가 세로로 밀린다: `내 문장`은 위로 빠지고 `닿는 글자` 줄이 그 자리에 붙는다(sticky).
+   그래서 상단 두 줄은 높이가 같다(`--top-row-h`). 획 편집에서는 안 밀리고 그냥 세로 flex다. */
+.scrollArea { --top-row-h: 44px; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.scrollArea[data-scroll] { overflow-y: auto; overscroll-behavior: contain; }
 /* 아래 여백은 두지 않는다. sticky CTA가 여백만큼 떠서 하단 내비와 틈이 생긴다. 안전 영역은 CTA가 챙긴다. */
-.layoutMode { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.layoutMode { flex: 1 0 auto; }
 /* 획 편집의 나가는 문. 트랙패드 아래 한 줄. */
 .strokeDoneBar { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 16px calc(env(safe-area-inset-bottom) + 10px); background: rgb(var(--color-surface)); }
 .strokeDoneBar p { margin: 0; color: rgb(var(--color-danger, 214 50 31)); font-size: 10.5px; font-weight: 600; text-align: center; }

@@ -1039,6 +1039,26 @@ test('레이아웃 모드 첫 화면에 상단 두 줄과 옵션 스택이 온�
   await expect(page.getByRole('region', { name: '글로벌 스타일 설정' })).toBeVisible()
 })
 
+/** 상단 두 줄은 높이가 같다. 아래로 밀면 `닿는 글자` 줄이 `내 문장`을 밀어 올리고 그 자리에 붙는다 — 옵션을 고르는 동안에도 닿는 글자가 보인다. */
+test('아래로 밀면 닿는 글자 줄이 문장 줄을 밀어 올리고 그 자리에 붙는다', async ({ page }) => {
+  // 낮은 화면이라야 밀 거리가 문장 줄 높이보다 길다.
+  await page.setViewportSize({ width: 390, height: 540 })
+  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
+  await expect(page.getByTestId('review-propagation-card').first()).toBeVisible({ timeout: 20_000 })
+  const sentence = page.getByRole('region', { name: '보정 문장' })
+  const touched = page.getByTestId('touched-glyph-row')
+  const sentenceBox = (await sentence.boundingBox())!
+  expect((await touched.boundingBox())!.height).toBeCloseTo(sentenceBox.height, 0)
+
+  await page.getByTestId('layout-option-stack').scrollIntoViewIfNeeded()
+  await expect(sentence).not.toBeInViewport()
+  const stuck = (await touched.boundingBox())!
+  expect(stuck.y).toBeCloseTo(sentenceBox.y, 0)
+  // 붙은 줄도 눌린다(캔버스에 안 가린다).
+  await expect(page.getByTestId('review-propagation-card').first().getByTestId('review-propagation-open')).toBeEnabled()
+  await expect(page.getByTestId('layout-option-stack')).toBeInViewport()
+})
+
 /**
  * 레이아웃 캔버스의 홀자 = 앱 획(G0). 저장된 ㅗ 줄기를 왼쪽으로 옮겨 두면 레이아웃 캔버스의 홀자 잉크가 기본 획일 때와 달라진다.
  * 전에는 Noto rail로 만든 획 마스터 잉크라 앱 획을 고쳐도 캔버스가 그대로였다. 기준선 상자(slot)는 같다.

@@ -1,5 +1,6 @@
-/* `닿는 글자` 줄. 문장 줄(`내 문장`) 바로 아래에 붙고 글자 크기·칸 높이가 같다. 줄 높이는 고정이라 범위가 바뀌어도 아래가 안 밀린다. */
-.row { --row-em: 24px; flex: 0 0 auto; box-sizing: border-box; height: 44px; padding: 0 12px; display: flex; align-items: center; border-bottom: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface-2)); }
+/* `닿는 글자` 줄. 문장 줄(`내 문장`) 바로 아래에 붙고 글자 크기·줄 높이가 같다(`--top-row-h`). 줄 높이는 고정이라 범위가 바뀌어도 아래가 안 밀린다.
+   아래로 밀면 문장 줄을 밀어 올리고 그 자리에 붙는다 — 옵션을 고르는 동안에도 닿는 글자가 보인다. */
+.row { --row-em: 24px; position: sticky; top: 0; z-index: 4; flex: 0 0 auto; box-sizing: border-box; height: var(--top-row-h, 44px); padding: 0 12px; display: flex; align-items: center; border-bottom: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface-2)); }
 /* 한 줄만 차지한다. 줄이 차면 옆으로 밀어 더 본다. */
 .cards { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain; }
 .cards::-webkit-scrollbar { display: none; }

@@ -1708,6 +1708,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   )
   const body = (
     <>
+      {/* 문장 줄부터 편집부까지 한 덩어리. 레이아웃 모드에서만 세로로 밀린다 — `내 문장`이 위로 빠지고 `닿는 글자` 줄이 그 자리에 붙는다.
+          두 모드가 같은 덩어리를 써야 오갈 때 문장 줄이 다시 안 그려진다(가로 스크롤 자리 유지). */}
+      <div className={styles.scrollArea} data-scroll={(isLayoutMode && !styleLocksCanvas) || undefined}>
       <section ref={sentenceRef} className={`${styles.sentence} ${chrome === 'workspace' ? styleMode.strip : ''}`} data-compact={sentenceCompact || undefined} data-grown={styleSpaceOpen || undefined} aria-label="보정 문장">
         <div className={styles.sentenceActions}>
           <button type="button" onClick={pickSampleSentence} aria-label="예시 문장 무작위 선택" title="예시 문장 바꾸기"><Dices size={19} aria-hidden="true" /></button>
@@ -1803,6 +1806,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         </div>
       </div>}
       </>}
+      </div>
       {isShapeRuleOpen && selection.kind !== 'none' && <ShapeRulePanel jamo={selection.jamo} selectedStrokeId={selection.kind === 'component' ? null : selection.strokeId} onClose={() => setIsShapeRuleOpen(false)} />}
     </>
   )
