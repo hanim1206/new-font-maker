@@ -58,7 +58,7 @@ import {
 } from './calibrationInkGap'
 import { resolveSyllableContextualInkSafety, withContextualInkSafety } from '../src/utils/contextualInkSafety'
 import { centeredDesignBodyPadding, paddingToDesignBody } from './designBody'
-import { generateAndDownloadFont } from '../src/services/fontGenerator'
+import { useFontExportStore } from './fontExportStore'
 import { useGlobalStyleStore, type GlobalStyle } from '../src/stores/globalStyleStore'
 import { BrushStyleTrackpad } from './BrushStyleTrackpad'
 import { GlobalStyleTrackpad, type GlobalStylePanel } from './GlobalStyleTrackpad'
@@ -987,8 +987,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [future, setFuture] = useState<HistoryEntry[]>([])
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
-  const [exportState, setExportState] = useState<'idle' | 'exporting' | 'downloaded' | 'failed'>('idle')
-  const [exportProgress, setExportProgress] = useState('')
+  const exportState = useFontExportStore((state) => state.status)
+  const exportProgress = useFontExportStore((state) => state.progress)
+  const exportCurrentFont = useFontExportStore((state) => state.request)
   const [inkGapLimiter, setInkGapLimiter] = useState<CalibrationInkGapViolation | null>(null)
   const [isDirectInputActive, setIsDirectInputActive] = useState(false)
   const [isCustomSentence, setIsCustomSentence] = useState(focus.custom)
@@ -1289,18 +1290,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
       setCopyState('failed')
     }
     window.setTimeout(() => setCopyState('idle'), 1800)
-  }
-  const exportCurrentFont = async () => {
-    if (exportState === 'exporting') return
-    setExportState('exporting')
-    setExportProgress('준비 중...')
-    const result = await generateAndDownloadFont({
-      familyName: 'FontMaker',
-      onProgress: (_completed, _total, phase) => setExportProgress(phase),
-    })
-    setExportProgress('')
-    setExportState(result.success ? 'downloaded' : 'failed')
-    window.setTimeout(() => setExportState('idle'), 1800)
   }
   const renderSentenceCharacter = (char: string, charIndex: number, lineIndex: number) => {
     const decomposedForMetrics = isEditableHangul(char)

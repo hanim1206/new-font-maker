@@ -101,6 +101,7 @@ async function collectStyleBaseline(browser: Browser, style: typeof STYLES[keyof
     await page.goto('/calibration')
     const downloadPromise = page.waitForEvent('download')
     await page.getByRole('button', { name: '현재 작업을 OTF로 추출' }).click()
+    await page.getByTestId('font-export-confirm').click()
     const download = await downloadPromise
     const bytes = await downloadBytes(download)
     const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)

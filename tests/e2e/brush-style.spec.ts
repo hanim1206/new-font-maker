@@ -113,6 +113,7 @@ test('네모형 붓촉을 적용한 OTF를 끝까지 생성한다', async ({ pag
 
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: '현재 작업을 OTF로 추출' }).click()
+  await page.getByTestId('font-export-confirm').click()
   const download = await downloadPromise
 
   expect(download.suggestedFilename()).toMatch(/\.otf$/i)

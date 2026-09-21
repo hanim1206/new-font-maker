@@ -109,6 +109,7 @@ test('기존 선 전용 OTF의 대표 글리프 윤곽과 메트릭을 유지한
 
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: '현재 작업을 OTF로 추출' }).click()
+  await page.getByTestId('font-export-confirm').click()
   const download = await downloadPromise
   expect(download.suggestedFilename()).toMatch(/\.otf$/i)
 

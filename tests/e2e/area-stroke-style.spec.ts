@@ -46,6 +46,7 @@ test('절단형 끝처리로 전체 OTF를 생성하고 다운로드한다', asy
   await page.getByRole('tabpanel', { name: '획 스타일' }).getByRole('radio', { name: '절단 끝', exact: true }).click()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: '현재 작업을 OTF로 추출' }).click()
+  await page.getByTestId('font-export-confirm').click()
   const download = await downloadPromise
   expect(download.suggestedFilename()).toMatch(/\.otf$/i)
   await expect(page.getByRole('button', { name: 'OTF 추출 완료' })).toBeVisible()
@@ -69,6 +70,7 @@ test('레거시 스냅 획을 미리보기·복원·전체 OTF에 적용한다',
 
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: '현재 작업을 OTF로 추출' }).click()
+  await page.getByTestId('font-export-confirm').click()
   const download = await downloadPromise
   expect(download.suggestedFilename()).toMatch(/\.otf$/i)
   await expect(page.getByRole('button', { name: 'OTF 추출 완료' })).toBeVisible()
