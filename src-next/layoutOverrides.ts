@@ -71,17 +71,24 @@ export const targetOfCard = (card: OverrideCard, contextId: string): LayoutDelta
   card.kind === 'all' ? { scope: 'all' } : card.kind === 'layer' ? { scope: 'layer', contextId } : { scope: 'jamo', contextId, jamos: [jamoKeyOf(partOfGroup[card.group], card.jamo)] }
 
 /**
- * 범위 띠의 칩. 앞의 셋은 늘 있다(`이 레이아웃` · `이 자모만`(자모 고르기 문) · `전체`). 그 뒤에 자모 칩이 부품 순·자모 순으로 붙는다.
+ * 범위 띠의 칩. 앞의 둘은 늘 있다(`이 레이아웃` · `이 자모만`(자모 고르기 문)). 그 뒤에 자모 칩이 부품 순·자모 순으로 붙는다.
  * 자모 칩 = 저장된 것 + 지금 고른 것(아직 저장 전). `delta`가 있으면 찬 칩(요약·×), 없으면 빈 칩.
+ * `전체`는 **고를 수 없다.** 한 문맥에서 잡은 변 Δ는 다른 홀자 계열에서 뜻이 달라진다(오른변이 홀자 경계이기도 글자 테두리이기도 하다).
+ * 예전에 저장된 전체 Δ가 있을 때만 읽기 전용 칩으로 남아 무엇이 얹혀 있는지 보이고 ×로 지울 수 있다.
  */
 export type ScopeChip =
-  | { kind: 'layer' | 'all'; delta: ContextBoxDelta | null }
+  | { kind: 'layer'; delta: ContextBoxDelta | null }
+  | { kind: 'all'; delta: ContextBoxDelta }
   | { kind: 'picker' }
   | { kind: 'jamo'; group: OverrideGroup; jamo: string; delta: ContextBoxDelta | null }
 
 export function scopeChipsOf(cards: OverrideCard[], picked: { group: OverrideGroup; jamos: string[] } | null): ScopeChip[] {
-  const stored = (kind: 'layer' | 'all') => cards.find((card) => card.kind === kind)?.delta ?? null
-  const chips: ScopeChip[] = [{ kind: 'layer', delta: stored('layer') }, { kind: 'picker' }, { kind: 'all', delta: stored('all') }]
+  const storedAll = cards.find((card) => card.kind === 'all')?.delta ?? null
+  const chips: ScopeChip[] = [
+    { kind: 'layer', delta: cards.find((card) => card.kind === 'layer')?.delta ?? null },
+    { kind: 'picker' },
+    ...(storedAll ? [{ kind: 'all' as const, delta: storedAll }] : []),
+  ]
   for (const group of GROUP_ORDER) {
     const saved = cards.flatMap((card) => card.kind === 'jamo' && card.group === group ? [card] : [])
     const extra = picked?.group === group ? picked.jamos.filter((jamo) => !saved.some((card) => card.jamo === jamo)) : []

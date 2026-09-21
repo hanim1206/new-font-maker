@@ -41,13 +41,14 @@ test('수치 패널은 없고, 편집 전에도 이 레이아웃 카드가 Δ �
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-canvas')).toBeVisible()
   await expect(page.getByTestId('review-numbers')).toHaveCount(0)
-  // 모델이 오면 첫 rail이 잡히고, 같은 문맥(세로 홀자+받침) 카드 8장이 Δ 없이 뜬다. 범위 칩은 이 레이아웃(기본)·이 자모만·전체 셋. 자모 고르기는 이 자모만을 눌러야 뜬다.
+  // 모델이 오면 첫 rail이 잡히고, 같은 문맥(세로 홀자+받침) 카드 8장이 Δ 없이 뜬다. 범위 칩은 이 레이아웃(기본)·이 자모만 둘. 자모 고르기는 이 자모만을 눌러야 뜬다.
   const propagation = page.getByTestId('review-propagation')
   const cards = page.getByTestId('review-propagation-card')
   await expect(cards).toHaveCount(8, { timeout: 20_000 })
   await expect(propagation.getByRole('button', { name: '이 레이아웃', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await expect(propagation.getByRole('button', { name: '이 자모만', exact: true })).toBeEnabled()
-  await expect(propagation.getByRole('button', { name: '전체', exact: true })).toBeEnabled()
+  // `전체`는 고를 수 없다. 저장된 전체 Δ가 없으니 칩 자체가 없다.
+  await expect(propagation.getByRole('button', { name: '전체', exact: true })).toHaveCount(0)
   await expect(page.getByTestId('review-propagation-jamos')).toHaveCount(0)
   await expect(page.getByTestId('review-propagation-deltas')).toBeEmpty()
   await expect.poll(() => cards.first().getAttribute('data-touched')).toBeNull()
@@ -56,7 +57,7 @@ test('수치 패널은 없고, 편집 전에도 이 레이아웃 카드가 Δ �
   expect(new Set(names.map(medialIndexOf)).size).toBeGreaterThan(1)
 })
 
-test('중심 rail(배치)을 옮기면 이 레이아웃 카드 8장에 Δ가 얹히고 전체로 넓힐 수 있다', async ({ page }) => {
+test('중심 rail(배치)을 옮기면 이 레이아웃 카드 8장에 Δ가 얹히고 이 자모만으로 좁힐 수 있다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   await selectMedialBox(page)
@@ -82,11 +83,12 @@ test('중심 rail(배치)을 옮기면 이 레이아웃 카드 8장에 Δ가 얹
   await expect(cards).toHaveCount(16)
   expect((await cards.locator('figcaption b').allInnerTexts()).slice(0, 8)).toEqual(names)
 
-  // 범위를 바꾸면 한 묶음으로 돌아가고 줄은 맨 앞에서 시작한다.
-  await propagation.getByRole('button', { name: '전체', exact: true }).click()
+  // 범위를 좁히면 한 묶음으로 돌아가고 줄은 맨 앞에서 시작한다. 잡은 홀자(ㅓ)가 같은 글자만 남는다.
+  await propagation.getByRole('button', { name: '이 자모만', exact: true }).click()
+  await page.getByTestId('review-propagation-jamos-done').click()
   await expect(cards).toHaveCount(8)
   expect(await page.getByTestId('review-propagation-cards').evaluate((el) => el.scrollLeft)).toBe(0)
-  await expect.poll(async () => (await cards.locator('figcaption b').allInnerTexts()).some((name) => !sameContextAs멈(name))).toBe(true)
+  await expect.poll(async () => (await cards.locator('figcaption b').allInnerTexts()).every((name) => medialIndexOf(name) === medialIndexOf('멈'))).toBe(true)
 
   // 복원해도 카드는 그대로, Δ만 빠진다.
   await resetButton(page).click()
@@ -313,8 +315,9 @@ test('켠 부품의 획 고치기로 내려가고, 안 끝난 변경이 있으�
   const apply = page.getByTestId('review-propagation-apply')
   await expect(apply).toHaveText('이 레이아웃에 적용')
   await expect(cta).toHaveCount(0)
-  await page.getByTestId('review-propagation').getByRole('button', { name: '전체', exact: true }).click()
-  await expect(apply).toHaveText('전체에 적용')
+  await page.getByTestId('review-propagation').getByRole('button', { name: '이 자모만', exact: true }).click()
+  await page.getByTestId('review-propagation-jamos-done').click()
+  await expect(apply).toHaveText('ㅁ에 적용')
   await resetButton(page).click()
   await expect(apply).toHaveCount(0)
   await expect(cta).toBeEnabled()
@@ -624,24 +627,28 @@ test('옛 저장 형식(jamo 없음)을 읽어 이 레이아웃 Δ가 살아 있
   expect(stored.jamo.right['CH:ㄱ'].faces.CH.top).toBeCloseTo(-0.01, 9)
 })
 
-/** 범위 띠(G0·G1): 노에서 ㄴ, 로에서 ㄹ을 각각 이 자모만으로 적용하면 bottom 레이아웃 띠에 전체·ㄴ·ㄹ이 찬 칩으로. 칩 누르면 표본이 그 글자, ×는 그 층만. 다른 레이아웃에선 전체만. 띠는 첫 화면(390×844)에서 스크롤 없이 보인다. */
+/**
+ * 범위 띠(G0·G1): 노에서 ㄴ, 로에서 ㄹ을 각각 이 자모만으로 적용하면 bottom 레이아웃 띠에 전체·ㄴ·ㄹ이 찬 칩으로. 칩 누르면 표본이 그 글자, ×는 그 층만.
+ * 다른 레이아웃에선 전체만. 띠는 첫 화면(390×844)에서 스크롤 없이 보인다.
+ * `전체`는 이제 고를 수 없어 옛 저장분을 심어 연다. 읽기 전용 칩으로 서서 ×로만 지운다.
+ */
 test('같은 레이아웃에 쌓인 오버라이드가 범위 띠에 보이고, 칩마다 따로 고르고 지운다', async ({ page }) => {
   const KEY = 'noto-layout-delta-v1'
   const initialOf = (name: string) => 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'[Math.floor((name.codePointAt(0)! - 0xac00) / 588)]
   const overrides = page.getByTestId('layout-override-card')
 
-  // 노: 전체에 첫닿자 윗변 -10u, 그다음 ㄴ만 윗변 +20u(ㄴ 작게).
+  // 옛 전체 Δ(첫닿자 윗변 -10u)를 심어 둔다. 지금 UI로는 만들 수 없는 층이다.
+  // 이동할 때마다 다시 돌므로 비어 있을 때만 쓴다 — 안 그러면 뒤에 쌓은 자모 Δ를 덮는다.
+  await page.addInitScript(([key, value]) => { if (!window.localStorage.getItem(key)) window.localStorage.setItem(key, value) }, [KEY, JSON.stringify({ state: { all: { faces: { CH: { top: -0.01 } } }, layers: {}, jamo: {} }, version: 0 })] as const)
+
+  // 노: 심어 둔 전체 위에 ㄴ만 윗변 +20u(ㄴ 작게).
   await page.goto('/workspace/jamo?char=%EB%85%B8&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   const propagation = page.getByTestId('review-propagation')
-  await expect(overrides).toHaveCount(0)
-  await expect(page.getByTestId('layout-scope-chip')).toHaveCount(3)
-  await selectPartBox(page, '첫닿자 ㄴ')
-  await selectRail(page, '첫닿자 윗변')
-  await page.keyboard.press('Shift+ArrowUp')
-  await propagation.getByRole('button', { name: '전체', exact: true }).click()
-  await page.getByTestId('review-propagation-apply').click()
+  // 찬 칩은 심어 둔 전체 하나. 빈 칩은 이 레이아웃·이 자모만 둘뿐이다(전체를 고르는 칩은 없다).
   await expect(overrides).toHaveCount(1)
+  await expect(page.getByTestId('layout-scope-chip')).toHaveCount(2)
+  await expect(overrides.nth(0).getByTestId('layout-override-select')).toBeDisabled()
   await selectPartBox(page, '첫닿자 ㄴ')
   await selectRail(page, '첫닿자 윗변')
   await page.keyboard.press('Shift+ArrowDown')
@@ -686,9 +693,9 @@ test('같은 레이아웃에 쌓인 오버라이드가 범위 띠에 보이고, 
   await expect(overrides.nth(1)).toHaveAttribute('data-selected', 'true')
   await expect(overrides.nth(2)).not.toHaveAttribute('data-selected', 'true')
   await expect.poll(async () => { const names = await cards.locator('figcaption b').allInnerTexts(); return names.length > 0 && names.every((name) => initialOf(name) === 'ㄴ' && [8, 12, 13, 17, 18].includes(medialIndexOf(name)) && finalIndexOf(name) === 0) }).toBe(true)
-  // 전체 칩을 누르면 범위가 전체.
-  await overrides.nth(0).getByTestId('layout-override-select').click()
-  await expect(propagation.getByRole('button', { name: '전체', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  // 전체 칩은 잠겨 있다. 눌러도 범위가 되지 않고 이 레이아웃이 그대로 켜져 있다.
+  await expect(overrides.nth(0).getByTestId('layout-override-select')).toBeDisabled()
+  await expect(overrides.nth(0)).not.toHaveAttribute('data-selected', 'true')
 
   // ㄴ 칩 ×: ㄴ만 사라지고 ㄹ·전체는 그대로. Undo로 돌아온다.
   await overrides.nth(1).getByTestId('layout-override-remove').click()

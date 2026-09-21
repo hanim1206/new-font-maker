@@ -29,14 +29,14 @@ describe('overrideCardsOf', () => {
 
 describe('scopeChipsOf', () => {
   const label = (chip: ReturnType<typeof scopeChipsOf>[number]) => `${chip.kind === 'jamo' ? `${chip.group}:${chip.jamo}` : chip.kind}${chip.kind !== 'picker' && chip.delta ? '*' : ''}`
-  it('앞의 셋은 늘 있고 저장된 층만 찬다', () => {
-    expect(scopeChipsOf([], null).map(label)).toEqual(['layer', 'picker', 'all'])
+  it('앞의 둘은 늘 있고 저장된 층만 찬다. 전체는 옛 저장분이 있을 때만 읽기 전용으로 선다', () => {
+    expect(scopeChipsOf([], null).map(label)).toEqual(['layer', 'picker'])
     const cards = overrideCardsOf({ all: { faces: { CH: { top: 0.01 } } }, layers: {}, jamo: {} }, 'right')
     expect(scopeChipsOf(cards, null).map(label)).toEqual(['layer', 'picker', 'all*'])
   })
   it('자모 칩 = 저장된 것 + 지금 고른 것. 부품 순·자모 순으로 섞이고, 이미 저장된 자모는 한 번만', () => {
     const cards = overrideCardsOf({ all: {}, layers: {}, jamo: { bottom: { 'CH:ㄹ': { faces: { CH: { top: 0.02 } } }, 'JO:ㄴ': { faces: { JO: { top: 0.01 } } } } } }, 'bottom')
-    expect(scopeChipsOf(cards, { group: 'CH', jamos: ['ㄹ', 'ㄱ'] }).map(label)).toEqual(['layer', 'picker', 'all', 'CH:ㄱ', 'CH:ㄹ*', 'JO:ㄴ*'])
+    expect(scopeChipsOf(cards, { group: 'CH', jamos: ['ㄹ', 'ㄱ'] }).map(label)).toEqual(['layer', 'picker', 'CH:ㄱ', 'CH:ㄹ*', 'JO:ㄴ*'])
   })
 })
 

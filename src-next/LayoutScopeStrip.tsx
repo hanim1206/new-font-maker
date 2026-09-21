@@ -10,8 +10,9 @@ import styles from './LayoutScopeStrip.module.css'
 
 /**
  * 범위 띠. 적용 범위 고르기와 쌓인 오버라이드 보기를 한 줄에 합친 것. 계산은 `layoutOverrides.ts`.
- * 앞의 셋(`이 레이아웃` · `이 자모만` · `전체`)은 늘 있고, 그 뒤에 자모 칩(저장된 것 + 지금 고른 것)이 붙는다.
+ * 앞의 둘(`이 레이아웃` · `이 자모만`)은 늘 있고, 그 뒤에 자모 칩(저장된 것 + 지금 고른 것)이 붙는다.
  * 저장된 Δ가 있는 칩은 부품 색으로 차고 글자 수 · Δ 요약 · ×가 붙는다. ×는 그 층만 지운다. 다른 레이아웃 것은 안 보인다(`전체`는 어디서나).
+ * `전체`는 고를 수 없다 — 옛 저장분이 있을 때만 읽기 전용으로 서서 ×로 지우는 길만 준다.
  * 칩을 누르면 그게 적용 범위가 되고 표본이 그 글자로 바뀐다. `이 자모만`은 자모 고르기 시트를 연다.
  */
 
@@ -31,11 +32,11 @@ export function LayoutScopeStrip({ source, selected, picked, fixedDisabled, jamo
   selected: LayoutDeltaTarget
   /** `이 자모만`에서 고른 자모. 저장 전이어도 칩으로 보인다. 다른 범위일 때는 null. */
   picked: { group: OverrideGroup; jamos: string[] } | null
-  /** 앞의 세 칩을 끈다(잡은 rail 없음 · 형태 모드). */
+  /** 앞의 두 칩을 끈다(잡은 rail 없음 · 형태 모드). */
   fixedDisabled: boolean
   /** 자모 칩을 끈다(형태 모드). */
   jamoDisabled: boolean
-  onScope: (scope: 'layer' | 'all') => void
+  onScope: (scope: 'layer') => void
   /** 자모 칩을 누르면 그 자모 하나만 고른다. 여러 개는 시트에서. */
   onPickJamo: (group: OverrideGroup, jamo: string) => void
   onOpenPicker: () => void
@@ -70,9 +71,11 @@ export function LayoutScopeStrip({ source, selected, picked, fixedDisabled, jamo
       const lines = delta ? deltaSummary(delta, chip.kind !== 'jamo') : []
       const count = !delta || chip.kind === 'picker' ? null : overrideGlyphCount(chip.kind === 'jamo' ? { scope: 'jamo', contextId: source.contextId, group: chip.group, jamo: chip.jamo } : chip.kind === 'all' ? { scope: 'all' } : { scope: 'layer', contextId: source.contextId })
       const color = chip.kind === 'jamo' ? PART_COLOR[partOfGroup[chip.group]] : NEUTRAL
-      const press = () => chip.kind === 'picker' ? onOpenPicker() : chip.kind === 'jamo' ? onPickJamo(chip.group, chip.jamo) : onScope(chip.kind)
+      // `전체`는 읽기 전용이라 몸통이 잠겨 있다. 지우기 ×만 산다.
+      const locked = chip.kind === 'all'
+      const press = () => chip.kind === 'picker' ? onOpenPicker() : chip.kind === 'jamo' ? onPickJamo(chip.group, chip.jamo) : chip.kind === 'layer' ? onScope('layer') : undefined
       return <li key={key} className={styles.chip} style={{ '--chip-color': color } as React.CSSProperties} data-testid={delta ? 'layout-override-card' : 'layout-scope-chip'} data-kind={chip.kind} data-jamo={chip.kind === 'jamo' ? chip.jamo : undefined} data-group={chip.kind === 'jamo' ? chip.group : undefined} data-selected={on || undefined} data-stored={delta ? 'true' : undefined}>
-        <button type="button" className={styles.body} data-testid="layout-override-select" aria-label={name} aria-pressed={on} disabled={chip.kind === 'jamo' ? jamoDisabled : fixedDisabled} onClick={press}>
+        <button type="button" className={styles.body} data-testid="layout-override-select" aria-label={name} aria-pressed={locked ? undefined : on} disabled={locked || (chip.kind === 'jamo' ? jamoDisabled : fixedDisabled)} onClick={press}>
           <span className={styles.name}>
             {chip.kind === 'jamo' ? <><b>{chip.jamo}</b><i>{PART_GROUP_LABEL[chip.group]}</i></> : <b>{name}</b>}
             {count !== null && <em>{count.toLocaleString()}자</em>}

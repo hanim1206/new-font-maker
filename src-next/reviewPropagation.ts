@@ -37,7 +37,10 @@ export interface PropagationEdit {
   }
 }
 
-/** 범위 칩. 기본 `이 레이아웃`(같은 문맥), `이 자모만`은 좁힐 때, `전체`는 일부러 넓힐 때. 자모 범위의 힌트는 고른 자모에 따라 카드가 만든다. */
+/**
+ * 범위 칩. 기본 `이 레이아웃`(같은 문맥), `이 자모만`은 좁힐 때. 자모 범위의 힌트는 고른 자모에 따라 카드가 만든다.
+ * `전체`는 고르는 범위가 아니다(옛 저장분 이름용으로만 남는다) — 넓히기는 프리셋·기본값 쪽 일이고, 변 Δ는 홀자 계열을 건너면 뜻이 달라진다.
+ */
 export type { PropagationScope }
 export const PROPAGATION_SCOPES: { id: PropagationScope; label: string; hint: string }[] = [
   { id: 'layer', label: '이 레이아웃', hint: '홀자 계열·받침 유무가 같은 글자' },
