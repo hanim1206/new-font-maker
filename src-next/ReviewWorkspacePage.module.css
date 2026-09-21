@@ -1,39 +1,17 @@
-.titleSection { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px 8px; }
-.screenId { color: rgb(var(--color-primary)); font-size: 10px; font-weight: 800; letter-spacing: .05em; }
-.titleSection h1 { margin: 0; font-size: 18px; }
-.titleSection h1 small { margin-left: 8px; color: rgb(var(--color-text-dim-4)); font-size: 10px; font-weight: 600; letter-spacing: .06em; }
-.scroll { flex: 1; min-height: 0; overflow-y: auto; }
+/* 세로 스크롤은 격자 안에서만. 격자가 남은 높이를 다 쓰고 선택 카드는 그 아래에 붙는다. */
+.scroll { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 
-.segment { display: inline-flex; align-self: flex-start; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 14px; background: rgb(var(--color-surface)); }
-.segment a, .segment span { padding: 5px 12px; color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; text-decoration: none; }
-.segment [aria-current='page'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 
-.matrixSection { padding: 0 8px 10px; }
+/* 격자 컴포넌트는 랩 쪽 변수(`--ink` 등)로 그린다. 검수 탭에서는 앱 토큰으로 채운다. */
+.matrixSection { --ink: rgb(var(--color-foreground)); --line: rgb(var(--color-border)); --muted: rgb(var(--color-text-dim-4)); flex: 1; min-height: 0; display: flex; padding: 0 8px 8px; }
+.cellHolder { display: block; width: 100%; height: 100%; }
 .status { padding: 8px 14px; color: rgb(var(--color-text-dim-4)); font-size: 11px; }
 .status[data-state='error'] { color: rgb(var(--color-danger, 214 50 31)); }
 
-.pick { position: sticky; bottom: 8px; z-index: 2; display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; align-items: center; gap: 10px; margin: 0 14px 12px; padding: 8px 10px; border: 1px solid rgb(var(--color-primary) / .4); border-radius: 12px; background: rgb(var(--color-surface)); box-shadow: 0 6px 20px rgb(15 23 42 / .12); color: inherit; text-decoration: none; }
+.pick { flex: none; display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; align-items: center; gap: 10px; margin: 0 14px 12px; padding: 8px 10px; border: 1px solid rgb(var(--color-primary) / .4); border-radius: 12px; background: rgb(var(--color-surface)); box-shadow: 0 6px 20px rgb(15 23 42 / .12); color: inherit; text-decoration: none; }
 .pickBody .hint { color: rgb(var(--color-primary-dark)); font-size: 10px; font-weight: 700; }
 .pick svg { width: 76px; height: 76px; border-radius: 6px; background: #fff; }
 .pickBody { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .pickBody strong { font-size: 13px; }
 .pickBody small { color: rgb(var(--color-text-dim-4)); font-size: 10px; }
 .pick > span:last-child { color: rgb(var(--color-text-dim-4)); font-size: 20px; }
-
-.colorBar { display: flex; flex-direction: column; gap: 6px; margin: 0 14px; }
-.colorBar .segment button { padding: 5px 12px; border: 0; background: transparent; color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 700; }
-.colorBar .segment button[aria-current='page'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
-.colorBar .segment button:disabled { opacity: .4; }
-.toneLegend { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 10px; }
-.toneLegend span { padding: 2px 8px; border-radius: 8px; font-weight: 700; }
-.toneLegend span[data-tone='good'] { background: #dff3e8; color: #1f6b4c; }
-.toneLegend span[data-tone='mid'] { background: #fff2c9; color: #7a5a0c; }
-.toneLegend span[data-tone='far'] { background: #ffe0c2; color: #8a4a12; }
-.toneLegend span[data-tone='bad'] { background: #ffd2cf; color: #8f2a22; }
-.toneLegend small { color: rgb(var(--color-text-dim-4)); }
-.pickXor { margin-left: 6px; padding: 1px 6px; border-radius: 8px; font-size: 10px; font-style: normal; font-weight: 700; }
-.pickXor[data-tone='good'] { background: #dff3e8; color: #1f6b4c; }
-.pickXor[data-tone='mid'] { background: #fff2c9; color: #7a5a0c; }
-.pickXor[data-tone='far'] { background: #ffe0c2; color: #8a4a12; }
-.pickXor[data-tone='bad'] { background: #ffd2cf; color: #8f2a22; }
-

@@ -8,6 +8,10 @@
   .tab svg { width: 18px; height: 18px; }
 }
 .toggle[aria-pressed='true'] .tab { border-color: rgb(var(--color-foreground)); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+/* 켰을 때 토글 옆에 뜨는 도구 상자. */
+.panel { position: fixed; left: 22px; top: calc(46% - 52px); z-index: 2147483000; display: grid; gap: 5px; padding: 8px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); box-shadow: 0 4px 14px rgb(15 23 42 / .16); color: rgb(var(--color-text-dim-4)); font-size: 10px; }
+.panel select { max-width: 72vw; height: 36px; padding: 0 7px; border: 1px solid rgb(var(--color-border)); border-radius: 7px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-size: 12px; }
+@media (min-width: 640px) { .panel { left: auto; top: auto; right: 66px; bottom: 66px; } }
 .toggle strong, .toggle small { padding: 3px 7px; border: 1px solid rgb(var(--color-border)); border-radius: 8px; background: rgb(var(--color-surface)); box-shadow: 0 4px 14px rgb(15 23 42 / .16); white-space: nowrap; }
 .toggle strong { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 700; color: rgb(var(--color-primary-dark)); }
 .toggle small { max-width: 160px; overflow: hidden; color: rgb(var(--color-danger, 214 50 31)); font-size: 9px; text-overflow: ellipsis; }

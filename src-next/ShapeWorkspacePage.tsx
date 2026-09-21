@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { CircleDot, Grid2X2, LockKeyhole, ScanSearch, Shapes } from 'lucide-react'
-import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { FinalInkRenderer } from '../src/renderers/FinalInkRenderer'
 import { materializeFinalGlyphInk, type FinalGlyphInk } from '../src/services/finalGlyphInk'
 import {
@@ -19,9 +18,7 @@ import { projectPartGridToSlot } from '../src/services/partGridSlotProjection'
 import { resolveRailGrid } from '../src/services/railGridResolver'
 import { parseShapeSystemSourceV2 } from '../src/services/shapeSystemSourceV2'
 import { useGlobalStyleStore, weightToMultiplier } from '../src/stores/globalStyleStore'
-import { useJamoStore } from '../src/stores/jamoStore'
-import { useLayoutStore } from '../src/stores/layoutStore'
-import { useContextPlacement } from './notoModel'
+import { AppGlyph } from './AppGlyph'
 import {
   flushShapeSystemStorePersistence,
   initializeStarterShapeSystem,
@@ -29,7 +26,6 @@ import {
 } from '../src/stores/shapeSystemStore'
 import { useUIStore } from '../src/stores/uiStore'
 import { useFontProject } from '../src/hooks/useFontProject'
-import { decomposeSyllable } from '../src/utils/hangulUtils'
 import type {
   ContextGridPresetCatalogV1,
   CoreRailRole,
@@ -37,8 +33,6 @@ import type {
   GridCellRef,
   JamoPartRole,
   JamoVariantContext,
-  LayoutSchema,
-  Padding,
   ShapeSystemSourceV2,
   SetBaseMasterAreaCellsV1Command,
 } from '../src/types'
@@ -101,46 +95,8 @@ const ROLE_LABELS: Record<JamoPartRole, string> = {
 
 const REPRESENTATIVE_JAMOS = ['ㄱ', 'ㅇ', 'ㅏ', 'ㅂ', 'ㅎ', 'ㅙ'] as const
 
-function withEffectivePadding(
-  schema: LayoutSchema,
-  globalPadding: Padding,
-  override: Partial<Padding> | undefined,
-): LayoutSchema {
-  const padding = { ...globalPadding, ...override }
-  return { ...schema, padding, designBodyPadding: padding }
-}
-
 function GlyphPreview({ char, compact = false }: { char: string; compact?: boolean }) {
-  const choseong = useJamoStore((state) => state.choseong)
-  const jungseong = useJamoStore((state) => state.jungseong)
-  const jongseong = useJamoStore((state) => state.jongseong)
-  const schemas = useLayoutStore((state) => state.layoutSchemas)
-  const globalPadding = useLayoutStore((state) => state.globalPadding)
-  const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
-  const globalStyle = useGlobalStyleStore((state) => state.style)
-  const syllable = useMemo(
-    () => decomposeSyllable(char, choseong, jungseong, jongseong),
-    [char, choseong, jungseong, jongseong],
-  )
-  const schema = withEffectivePadding(
-    schemas[syllable.layoutType],
-    globalPadding,
-    paddingOverrides[syllable.layoutType],
-  )
-  const { placement } = useContextPlacement(syllable, schema, globalStyle)
-
-  return (
-    <SvgRenderer
-      syllable={syllable}
-      schema={placement.kind === 'schema' ? placement.schema : undefined}
-      boxes={placement.kind === 'boxes' ? placement.boxes : undefined}
-      size={compact ? 68 : 340}
-      className={compact ? styles.cardGlyph : styles.canvasGlyph}
-      globalStyle={globalStyle}
-      overflow="visible"
-      clipGlyphs={false}
-    />
-  )
+  return <AppGlyph char={char} size={compact ? 68 : 340} className={compact ? styles.cardGlyph : styles.canvasGlyph} />
 }
 
 /** 저장하지 않은 공통 layout Rail draft도 이 미리보기에는 즉시 투영한다. */

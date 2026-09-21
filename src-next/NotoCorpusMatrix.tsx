@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { KeyboardEvent } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
+import { Table2 } from 'lucide-react'
+import { DevStickyToggle } from './DevGhostToggle'
 import { CELL_STATUS_LABEL, CORPUS_INITIALS, corpusCellStatus, corpusCodepoint, corpusIdentity, corpusPartStatus, PART_STAGES, STAGE_LABEL } from './notoCorpus'
 import type { CorpusCellStatus, CorpusReviews, CorpusRow } from './notoCorpus'
 import styles from './NotoCorpusMatrix.module.css'
@@ -45,13 +47,19 @@ interface Props {
   onSelect: (codepoint: number) => void
   isHighlighted: (row: CorpusRow) => boolean
   noFinal: boolean
-  /** 제품 검수 탭의 2층 표시. 편집 가능한 글자 칸에 테두리를 두른다. 랩에서는 넘기지 않는다. */
-  tierOf?: (row: CorpusRow) => 'editable' | 'readonly'
-  /** 칸 색을 추출 상태 대신 다른 척도로. 반환값은 CSS data-tone(good/mid/far/bad). */
-  toneOf?: (row: CorpusRow) => 'good' | 'mid' | 'far' | 'bad' | undefined
+  /** 칸 안에 그릴 것. 없으면 글자를 텍스트로 쓴다. 검수 탭은 프로젝트 획으로 그린 글자를 넘긴다. */
+  renderCell?: (row: CorpusRow) => ReactNode
+  /**
+   * `lab`(기본)은 추출 상태(칸 색·머리줄 막대·범례·자모 점·`크게` 전환)와 축 배치를 다 보인다.
+   * `viewer`는 검수 탭용. 추출 결과를 안 읽으니 상태 표시가 없고, 칸은 늘 보통 크기, 축 배치는 개발용 스티키 토글 안으로 들어가며,
+   * 격자가 부모의 남은 높이를 다 쓴다(부모가 높이를 정해 줘야 한다).
+   */
+  variant?: 'lab' | 'viewer'
 }
 
-export function NotoCorpusMatrix({ rows, reviews, selected, onSelect, isHighlighted, noFinal, tierOf, toneOf }: Props) {
+export function NotoCorpusMatrix({ rows, reviews, selected, onSelect, isHighlighted, noFinal, renderCell, variant = 'lab' }: Props) {
+  const showStatus = variant === 'lab'
+  const [pivotOpen, setPivotOpen] = useState(false)
   const [pivotId, setPivotId] = useState<PivotId>('medial-final')
   const [large, setLarge] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -95,15 +103,17 @@ export function NotoCorpusMatrix({ rows, reviews, selected, onSelect, isHighligh
     selectAlong(axis, items[Math.min(items.length - 1, Math.max(0, index + step))])
   }
 
-  return <div className={`${styles.matrix} ${large ? styles.large : ''}`} data-testid="corpus-matrix">
-    <div className={styles.toolbar}>
-      {noFinal ? <p className={styles.scopeNote}>무받침 범위는 행 홀자 × 열 첫닿자 한 장으로 봅니다.</p> : <label>축 배치<select value={pivot.id} onChange={(event) => setPivotId(event.target.value as PivotId)}>{PIVOTS.map((value) => <option key={value.id} value={value.id}>{value.label}</option>)}</select></label>}
+  const pivotSelect = <label>축 배치<select value={pivot.id} onChange={(event) => setPivotId(event.target.value as PivotId)}>{PIVOTS.map((value) => <option key={value.id} value={value.id}>{value.label}</option>)}</select></label>
+  return <div className={`${styles.matrix} ${large ? styles.large : ''} ${showStatus ? '' : styles.fill}`} data-testid="corpus-matrix">
+    {!showStatus && !noFinal && <DevStickyToggle pressed={pivotOpen} onToggle={() => setPivotOpen((open) => !open)} testId="corpus-pivot-toggle" label="축 배치" icon={<Table2 size={18} />} panel={pivotSelect} />}
+    {showStatus && <div className={styles.toolbar}>
+      {noFinal ? <p className={styles.scopeNote}>무받침 범위는 행 홀자 × 열 첫닿자 한 장으로 봅니다.</p> : pivotSelect}
       <div className={styles.segment} role="group" aria-label="칸 크기"><button type="button" aria-pressed={!large} onClick={() => setLarge(false)}>보통</button><button type="button" aria-pressed={large} onClick={() => setLarge(true)}>크게 · 자모 점</button></div>
-    </div>
-    {!noFinal && <div className={styles.tabs} role="group" aria-label={`${AXES[pivot.sheet].label} 시트`}>{sheets.map(({ value, total, counts }) => <button key={value ?? 'none'} type="button" aria-pressed={value === sheet} title={`${jamoLabel(value)} · 문제 ${issueCount(counts)}칸`} onClick={() => selectAlong(pivot.sheet, value)}><span>{jamoLabel(value)}</span><StatusBar counts={counts} total={total} /></button>)}</div>}
+    </div>}
+    {!noFinal && <div className={styles.tabs} role="group" aria-label={`${AXES[pivot.sheet].label} 시트`}>{sheets.map(({ value, total, counts }) => <button key={value ?? 'none'} type="button" aria-pressed={value === sheet} title={showStatus ? `${jamoLabel(value)} · 문제 ${issueCount(counts)}칸` : jamoLabel(value)} onClick={() => selectAlong(pivot.sheet, value)}><span>{jamoLabel(value)}</span>{showStatus && <StatusBar counts={counts} total={total} />}</button>)}</div>}
     <div className={styles.summary}>
       <strong>{noFinal ? '무받침' : `${AXES[pivot.sheet].label} ${jamoLabel(sheet)} 시트`} · {rowItems.length * colItems.length}자</strong>
-      <div className={styles.legend}>{LEGEND_ORDER.map((status) => <span key={status}><i className={styles[status]} />{CELL_STATUS_LABEL[status]} {sheetCounts[status]}</span>)}</div>
+      {showStatus && <div className={styles.legend}>{LEGEND_ORDER.map((status) => <span key={status}><i className={styles[status]} />{CELL_STATUS_LABEL[status]} {sheetCounts[status]}</span>)}</div>}
     </div>
     <div ref={wrapRef} className={styles.gridWrap} onKeyDown={handleKeyDown}>
       <table className={styles.grid} aria-label="글자 격자">
@@ -114,7 +124,7 @@ export function NotoCorpusMatrix({ rows, reviews, selected, onSelect, isHighligh
           </tr>
           <tr className={styles.jamoRow}>{colItems.map((colValue) => {
             const counts = countStatuses(rowItems.map((rowValue) => statusAt(at(rowValue, colValue))))
-            return <th key={colValue ?? 'none'} scope="col" className={`${styles.colHead} ${colGroupStarts.has(colValue) ? styles.colGroupStart : ''} ${colValue === selectedValues[pivot.cols] ? styles.current : ''}`}>{jamoLabel(colValue)}<StatusBar counts={counts} total={rowItems.length} /><small>{issueCount(counts) || ''}</small></th>
+            return <th key={colValue ?? 'none'} scope="col" className={`${styles.colHead} ${colGroupStarts.has(colValue) ? styles.colGroupStart : ''} ${colValue === selectedValues[pivot.cols] ? styles.current : ''}`}>{jamoLabel(colValue)}{showStatus && <><StatusBar counts={counts} total={rowItems.length} /><small>{issueCount(counts) || ''}</small></>}</th>
           })}</tr>
         </thead>
         <tbody>{AXES[pivot.rows].groups.flatMap((group) => group.items.map((rowValue, index) => {
@@ -122,14 +132,14 @@ export function NotoCorpusMatrix({ rows, reviews, selected, onSelect, isHighligh
           const counts = countStatuses(codepoints.map(statusAt))
           return <tr key={rowValue ?? 'none'} className={index === 0 ? styles.rowGroupStart : ''}>
             {index === 0 && <th className={styles.rowGroup} rowSpan={group.items.length} scope="rowgroup">{group.name}</th>}
-            <th scope="row" className={`${styles.rowHead} ${rowValue === selectedValues[pivot.rows] ? styles.current : ''}`}><span className={styles.rowLabel}><span>{jamoLabel(rowValue)}</span><StatusBar counts={counts} total={colItems.length} /><small>{issueCount(counts) || ''}</small></span></th>
+            <th scope="row" className={`${styles.rowHead} ${rowValue === selectedValues[pivot.rows] ? styles.current : ''}`}><span className={styles.rowLabel}><span>{jamoLabel(rowValue)}</span>{showStatus && <><StatusBar counts={counts} total={colItems.length} /><small>{issueCount(counts) || ''}</small></>}</span></th>
             {codepoints.map((codepoint, colIndex) => {
               const row = rows[codepoint - 0xac00]
               const status = statusAt(codepoint)
               return <td key={codepoint} className={colGroupStarts.has(colItems[colIndex]) ? styles.colGroupStart : ''}>
-                <button type="button" className={`${styles.cell} ${styles[status]}`} data-testid="corpus-cell" data-codepoint={codepoint} data-status={status} data-dimmed={!isHighlighted(row)} data-tier={tierOf?.(row)} data-tone={toneOf?.(row)} aria-pressed={codepoint === selected} tabIndex={codepoint === selected ? 0 : -1} aria-label={`${row.identity.character} · ${CELL_STATUS_LABEL[status]}`} onClick={() => onSelect(codepoint)}>
-                  <strong>{row.identity.character}</strong>
-                  {large && <span className={styles.dots}>{PART_STAGES.map((stage) => {
+                <button type="button" className={`${styles.cell} ${showStatus ? styles[status] : styles.plain}`} data-testid="corpus-cell" data-codepoint={codepoint} data-status={showStatus ? status : undefined} data-dimmed={!isHighlighted(row)} aria-pressed={codepoint === selected} tabIndex={codepoint === selected ? 0 : -1} aria-label={showStatus ? `${row.identity.character} · ${CELL_STATUS_LABEL[status]}` : row.identity.character} onClick={() => onSelect(codepoint)}>
+                  {renderCell ? renderCell(row) : <strong>{row.identity.character}</strong>}
+                  {large && showStatus && <span className={styles.dots}>{PART_STAGES.map((stage) => {
                     const part = corpusPartStatus(row, stage, reviews)
                     return <i key={stage} className={part === 'not-applicable' ? styles.notApplicable : ''} style={part === 'not-applicable' ? undefined : { background: `var(--${part}-dot)` }} title={`${STAGE_LABEL[stage]} · ${part === 'not-applicable' ? '해당 없음' : CELL_STATUS_LABEL[part]}`} />
                   })}</span>}
@@ -140,6 +150,6 @@ export function NotoCorpusMatrix({ rows, reviews, selected, onSelect, isHighligh
         }))}</tbody>
       </table>
     </div>
-    <p className={styles.hint}>칸을 누른 뒤 <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> 칸 이동{!noFinal && <> · <kbd>[</kbd><kbd>]</kbd> 이전·다음 시트</>} · 머리글 막대는 그 줄의 상태 분포, 숫자는 문제 칸 수입니다. 승인은 오른쪽 검수 패널에서 기준선을 보고 합니다.</p>
+    <p className={styles.hint}>칸을 누른 뒤 <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> 칸 이동{!noFinal && <> · <kbd>[</kbd><kbd>]</kbd> 이전·다음 시트</>}{showStatus && <> · 머리글 막대는 그 줄의 상태 분포, 숫자는 문제 칸 수입니다. 승인은 오른쪽 검수 패널에서 기준선을 보고 합니다.</>}</p>
   </div>
 }

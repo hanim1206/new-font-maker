@@ -10,6 +10,13 @@
   margin-top: 16px;
 }
 .large { --cell: 52px; }
+/* 검수 탭: 부모의 남은 높이를 격자가 다 쓴다. 위 도구 줄이 없어 시트 탭이 맨 위다. */
+.fill { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; margin-top: 8px; }
+.fill .tabs { flex: none; margin-top: 0; }
+.fill .summary { flex: none; margin: 8px 0 6px; }
+.fill .gridWrap { flex: 1; min-height: 0; max-height: none; }
+.fill .hint { flex: none; }
+@media (max-width: 719px) { .fill .hint { display: none; } }
 .toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 10px; }
 .toolbar label { display: grid; gap: 5px; min-width: 0; color: var(--muted); font-size: 10px; }
 .toolbar select { max-width: 100%; height: 36px; padding: 0 7px; border: 1px solid var(--line); border-radius: 7px; background: #f8fafc; color: var(--ink); font-size: 12px; }
@@ -58,8 +65,6 @@
 .cell strong { font-size: 19px; font-weight: 400; line-height: 1; }
 .large .cell strong { font-size: 24px; }
 .cell[data-dimmed='true'] { opacity: .18; }
-.cell[data-tier='editable'] { border: 2px solid #2f6fed; }
-.cell[data-tier='editable'] strong { font-weight: 600; }
 .cell[aria-pressed='true'] { opacity: 1; outline: 3px solid var(--ink); outline-offset: 1px; }
 .dots { display: flex; gap: 3px; }
 .dots i { width: 6px; height: 6px; border-radius: 50%; }
@@ -71,6 +76,9 @@
 .unsupported { background: var(--unsupported-bg); color: var(--unsupported-fg); border-color: var(--unsupported-line); }
 .rejected { background: var(--rejected-bg); color: var(--rejected-fg); border-color: var(--rejected-line); }
 .unprocessed { background: var(--unprocessed-bg); color: var(--unprocessed-fg); border-color: var(--unprocessed-line); }
+/* 추출 상태 없이 글자만 보는 칸(검수 탭). 흰 바탕에 옅은 테두리. */
+.plain { background: #fff; color: var(--ink); border-color: #e3e9ee; }
+.cell svg { width: calc(var(--cell) - 6px); height: calc(var(--cell) - 6px); pointer-events: none; }
 
 .bar { display: flex; height: 4px; overflow: hidden; border-radius: 2px; background: var(--unprocessed-dot); }
 .bar b { height: 100%; }
@@ -82,9 +90,3 @@
   .rowLabel .bar { display: none; }
   .cell { scroll-margin-left: 96px; }
 }
-
-/* xor 척도 색. data-tone이 있으면 상태 색보다 우선한다. */
-.cell[data-tone='good'] { background: #dff3e8; color: #1f6b4c; }
-.cell[data-tone='mid'] { background: #fff2c9; color: #7a5a0c; }
-.cell[data-tone='far'] { background: #ffe0c2; color: #8a4a12; }
-.cell[data-tone='bad'] { background: #ffd2cf; color: #8f2a22; }
