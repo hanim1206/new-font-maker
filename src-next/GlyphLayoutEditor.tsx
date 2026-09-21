@@ -17,7 +17,10 @@ import { LayoutContextCards } from './LayoutContextCards'
 import { ReviewPropagationCards } from './ReviewPropagationCards'
 import type { ReviewPropagationHandle, ScopeSelection } from './ReviewPropagationCards'
 import { TouchedGlyphRow } from './TouchedGlyphRow'
+import { ruleGlyphCount, ruleOfContext } from './scopeRule'
 import type { ScopeRule } from './scopeRule'
+import { seedRuleOf } from './layoutOverrides'
+import { stackLabel } from './LayoutOptionStack'
 import { useNotoGlyph } from './useNotoGlyph'
 import { useLayoutDelta } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
@@ -314,6 +317,8 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
   const [scopeLabel, setScopeLabel] = useState('이 레이아웃')
   // 범위는 옵션 스택이 고른다. 상단 `닿는 글자` 줄과 캔버스 옆 여섯 칸 표지가 알아야 해서 여기로 올려 둔다.
   const [selection, setSelection] = useState<ScopeSelection>({ scope: 'layer', group: 'JU', jamos: [] })
+  // `신규 옵션에 저장`이 미리 골라 둘 범위. 버튼 아랫줄에 적어 누르기 전에 어디에 몇 자인지 보인다.
+  const seedRule = useMemo(() => seedRuleOf(glyph.identity, rail?.part).rule, [glyph.identity, rail?.part])
 
   // 값 하나를 놓아 본다. 순서·간격 위반이면 false, 호출자는 마지막 유효값을 지킨다.
   const tryPlace = (target: EditableRail, value: number): true | string => {
@@ -399,13 +404,24 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
       {modelError && <p className={styles.status} data-state="error" role="alert">{modelError}</p>}
       {/* 적용하면 Δ가 저장되고 context가 새 original로 다시 풀리므로 세션 편집은 비운다. */}
       <ReviewPropagationCards ref={cardsRef} source={glyph.identity} edit={propagationEdit} changed={changedRails} fixed={fixedRails} focus={rail?.part} railRole={rail?.role} onApplied={resetRails} onCommitted={onCommitted} onSelectPart={selectPart} onScopeLabel={setScopeLabel} onScopeChange={setSelection} onScopeApplied={markApplied} />
-      {/* 하단 바는 한 줄짜리 상태 기계. Δ 없음 → `ㄱ 획 고치기`. Δ 있음 → `복원 | …에 적용`(범위는 카드가 앎). 편집기가 내놓는 rail은 전부 배치라 Δ가 있으면 늘 적용할 수 있다. 끄는 동안에는 잡을 때 상태로 얼어 있다(`heldBar`). */}
+      {/* 하단 바는 한 줄짜리 상태 기계. Δ 없음 → `ㄱ 획 고치기`. Δ 있음 → `복원(아이콘) | 선택 옵션에 저장 | 신규 옵션에 저장`. 저장할 자리는 둘 — 라디오로 켠 옵션, 또는 범위를 새로 골라 만드는 새 옵션. 어느 옵션인지는 스택의 라디오가 말하므로 버튼에 이름을 안 적는다. 편집기가 내놓는 rail은 전부 배치라 Δ가 있으면 늘 적용할 수 있다. 끄는 동안에는 잡을 때 상태로 얼어 있다(`heldBar`). */}
       {(onEditStrokes && activePart) || bar.editCount > 0 ? <div className={styles.strokeCta} data-testid="jamo-stroke-cta-bar" data-held={heldBar ? true : undefined}>
         <div className={styles.ctaRow}>
-          {bar.editCount > 0 && <button type="button" className={styles.resetCta} onClick={resetRails} data-testid="review-reset">복원 · {bar.editCount}개 변경</button>}
+          {/* 복원은 정사각 아이콘 버튼. 바뀐 보선 수는 모서리 숫자로, 말은 읽어 주는 글에만 싣는다. */}
+          {bar.editCount > 0 && <button type="button" className={styles.resetCta} onClick={resetRails} data-testid="review-reset" title={`복원 · ${bar.editCount}개 변경`}>
+            <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4.2 8.2A6.3 6.3 0 1 1 3.8 11" /><path d="M3.6 4.2v4.2h4.2" /></svg>
+            <em aria-hidden="true">{bar.editCount}</em>
+            <span className={styles.srOnly}>복원 · {bar.editCount}개 변경</span>
+          </button>}
           {bar.canApply
-            ? <button type="button" className={styles.applyCta} onClick={() => cardsRef.current?.apply()} data-testid="review-propagation-apply">{scopeLabel}에 적용</button>
+            ? <button type="button" className={styles.applyCta} onClick={() => cardsRef.current?.apply()} data-testid="review-propagation-apply" aria-label={`선택 옵션(${scopeLabel})에 저장`}>
+              <span>선택 옵션에 저장</span><small data-testid="review-propagation-apply-scope">{scopeLabel} · {ruleGlyphCount(selection.rule ?? ruleOfContext(glyph.identity.contextId)).toLocaleString()}자</small>
+            </button>
             : <button type="button" onClick={() => activePart && onEditStrokes?.(activePart)} data-testid="jamo-stroke-cta">{activeJamo} 획 고치기</button>}
+          {/* 주 버튼은 신규다 — 보선을 끌 때의 뜻은 대개 `이 자모가 이상하다`고, 넓은 범위에 잘못 저장하는 쪽이 더 비싸다. 두 버튼 다 저장될 범위와 글자 수를 아랫줄에 적는다. */}
+          {bar.canApply && <button type="button" className={styles.newCta} onClick={() => cardsRef.current?.applyAsNew()} data-testid="review-propagation-apply-new">
+            <span>신규 옵션에 저장</span><small data-testid="review-propagation-apply-new-scope">{stackLabel(seedRule, glyph.identity.contextId)} · {ruleGlyphCount(seedRule).toLocaleString()}자</small>
+          </button>}
         </div>
       </div> : null}
   </div>

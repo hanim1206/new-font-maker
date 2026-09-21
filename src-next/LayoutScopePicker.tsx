@@ -48,7 +48,7 @@ function AxisRow({ label, axis, items, sets, keep, onToggle, onAll }: {
   </div>
 }
 
-export function LayoutScopePicker({ source, rule, deltaLine, part, railRole, onCancel, onConfirm }: {
+export function LayoutScopePicker({ source, rule, deltaLine, part, railRole, confirmLabel = '이 범위로', allowUnchanged = false, onCancel, onConfirm }: {
   /** 지금 고치는 글자. 줄에 놓이는 자모와 칸 제한이 여기서 나온다. */
   source: CorpusIdentity
   /** 열 때의 범위. `취소`는 여기로 되돌린다. */
@@ -59,6 +59,10 @@ export function LayoutScopePicker({ source, rule, deltaLine, part, railRole, onC
   part: RuleJamoPart
   /** 잡은 rail의 역할(`outerPillar` 등). 추천 칩 `…홀자`가 여기서 나온다. */
   railRole?: string
+  /** 확정 버튼 글씨. 옮긴 값을 들고 들어오면 `신규 옵션에 저장`이다. */
+  confirmLabel?: string
+  /** 열 때의 범위 그대로도 확정할 수 있나. 미리 골라 준 범위로 바로 적용하는 길에서 켠다. */
+  allowUnchanged?: boolean
   onCancel: () => void
   onConfirm: (rule: ScopeRule) => void
 }) {
@@ -135,7 +139,7 @@ export function LayoutScopePicker({ source, rule, deltaLine, part, railRole, onC
 
       <footer className={styles.foot}>
         <button type="button" className={styles.cancel} onClick={onCancel} data-testid="scope-picker-cancel">취소</button>
-        <button type="button" className={styles.confirm} disabled={count === 0 || ruleKey(current) === ruleKey(rule)} onClick={() => onConfirm(current)} data-testid="scope-picker-confirm">이 범위로</button>
+        <button type="button" className={styles.confirm} disabled={count === 0 || (!allowUnchanged && ruleKey(current) === ruleKey(rule))} onClick={() => onConfirm(current)} data-testid="scope-picker-confirm">{confirmLabel}</button>
       </footer>
     </div>
   </div>

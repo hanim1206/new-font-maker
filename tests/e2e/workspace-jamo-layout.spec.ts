@@ -931,7 +931,9 @@ test('변을 이 자리에 맞추면 범위 안 글자가 같은 자리에 모�
   expect(at2).toBeCloseTo(at - 0.001, 3)
 
   // 적용: 저장은 `{ at }`. 오버라이드 카드 요약도 `= 자리`. 로를 열면 첫닿자 윗변이 그 자리에서 시작한다.
-  await expect(page.getByTestId('review-propagation-apply')).toHaveText('이 레이아웃에 적용')
+  await expect(page.getByTestId('review-propagation-apply')).toContainText('선택 옵션에 저장')
+  await expect(page.getByTestId('review-propagation-apply-scope')).toHaveText(/^이 레이아웃 · [\d,]+자$/)
+  await expect(page.getByTestId('review-propagation-apply')).toHaveAccessibleName('선택 옵션(이 레이아웃)에 저장')
   await page.getByTestId('review-propagation-apply').click()
   await expect(page.getByTestId('review-reset')).toHaveCount(0)
   const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
@@ -1114,4 +1116,36 @@ test('닿는 글자 줄만 옆으로 밀리고, 바깥 화면에는 가로 스�
     return out
   })
   expect(leaking).toEqual([])
+})
+
+test('보선을 옮기고 새 옵션으로 저장하면, 옮긴 부품의 자모가 미리 골라진 범위에 바로 적용되고 그 옵션이 켜진다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EB%B0%9C&mode=layout')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  await selectPartBox(page, '첫닿자 ㅂ')
+  await selectRail(page, '첫닿자 윗변')
+  await page.keyboard.press('Shift+ArrowDown')
+  await page.keyboard.press('Shift+ArrowDown')
+
+  // 저장할 자리는 둘 — 켠 옵션(`이 레이아웃`), 또는 새 옵션.
+  await expect(page.getByTestId('review-propagation-apply')).toContainText('선택 옵션에 저장')
+  // 두 버튼 다 저장될 범위와 글자 수를 아랫줄에 적는다. 신규는 옮긴 부품의 자모 하나가 씨앗이다.
+  await expect(page.getByTestId('review-propagation-apply-scope')).toHaveText('이 레이아웃 · 4,617자')
+  await expect(page.getByTestId('review-propagation-apply-new-scope')).toHaveText('첫닿자 ㅂ · 243자')
+  await expect(page.getByTestId('review-propagation-apply')).toHaveAccessibleName('선택 옵션(이 레이아웃)에 저장')
+  await page.getByTestId('review-propagation-apply-new').click()
+
+  // 범위 고르기 화면은 옮긴 부품(첫닿자)의 지금 글자 자모 하나를 골라 둔 채 열리고, 그대로 확정할 수 있다.
+  const picker = page.getByTestId('layout-scope-picker')
+  await expect(picker.getByTestId('scope-picker-name')).toContainText('첫닿자 ㅂ')
+  await expect(picker.getByTestId('scope-picker-confirm')).toHaveText('신규 옵션에 저장')
+  await expect(picker.getByTestId('scope-picker-confirm')).toBeEnabled()
+  await picker.getByTestId('scope-picker-confirm').click()
+  await expect(picker).toHaveCount(0)
+
+  // 옵션이 생기고, 값이 거기에만 들어가고(바닥에는 안 들어간다), 그 옵션이 켜진다. 세션 편집은 비워진다.
+  const card = page.locator('[data-testid="layout-override-card"][data-jamo="ㅂ"]')
+  await expect(card).toHaveAttribute('data-selected', 'true')
+  await expect(page.getByTestId('review-reset')).toHaveCount(0)
+  const keys = await page.evaluate(() => Object.keys(JSON.parse(window.localStorage.getItem('noto-layout-delta-v1') ?? '{}').state?.rules ?? {}))
+  expect(keys).toEqual(['f=right|j=1|i=ㅂ'])
 })

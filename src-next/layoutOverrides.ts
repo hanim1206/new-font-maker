@@ -26,6 +26,18 @@ const KIND_LABEL: Record<string, string> = { center: '중심', start: '시작', 
 const PART_LABEL: Record<string, string> = { CH: '첫닿자', JU: '홀자', JU_H: '홀자 가로부', JU_V: '홀자 세로부', JO: '받침' }
 const units = (value: number) => { const n = Math.round(value * 1000); return `${n > 0 ? '+' : ''}${n}u` }
 
+/**
+ * `신규 옵션에 저장`이 미리 골라 두는 범위 — 방금 옮긴 부품의 지금 글자 자모 하나.
+ * 잡은 부품이 없거나 그 자리에 자모가 없으면(민글자의 받침) 이 레이아웃 그대로다.
+ */
+export function seedRuleOf(identity: { contextId: string; initialJamo: string; medialJamo: string; finalJamo: string | null }, part: Part | undefined): { rule: ScopeRule; part?: RuleJamoPart } {
+  const base = ruleOfContext(identity.contextId)
+  if (!part) return { rule: base }
+  const rulePart: RuleJamoPart = part === 'CH' ? 'initial' : part === 'JO' ? 'final' : 'medial'
+  const jamo = rulePart === 'initial' ? identity.initialJamo : rulePart === 'final' ? identity.finalJamo : identity.medialJamo
+  return jamo ? { rule: withJamos(base, rulePart, [jamo]), part: rulePart } : { rule: base }
+}
+
 /** Δ가 부품마다 몇 군데를 고쳤나. 옵션 박스의 부품 점이 쓴다. 섞임홀자의 가로부·세로부는 홀자 하나로 센다. */
 export function deltaPartCounts(delta: ContextBoxDelta): { group: OverrideGroup; count: number }[] {
   const counts: Record<OverrideGroup, number> = { CH: 0, JU: 0, JO: 0 }

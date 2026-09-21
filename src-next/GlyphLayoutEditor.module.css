@@ -49,6 +49,13 @@
 .strokeCta { position: sticky; bottom: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 14px; border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface) / .96); }
 .ctaRow { display: flex; gap: 8px; width: min(100%, 420px); }
 .strokeCta button { flex: 1 1 auto; min-width: 0; min-height: 44px; border: 0; border-radius: 12px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 700; white-space: nowrap; }
-.strokeCta .applyCta { background: rgb(var(--color-primary)); color: #fff; }
-.strokeCta .resetCta { flex: 0 0 auto; padding: 0 14px; border: 1px solid #f0561e; background: rgb(var(--color-surface)); color: #f0561e; }
+/* 저장 버튼 둘. 주 버튼은 신규(파랑), 선택 옵션은 보조(회색). 아랫줄에 저장될 범위와 글자 수. */
+.strokeCta .applyCta, .strokeCta .newCta { display: flex; flex: 1 1 0; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 0 6px; line-height: 1.15; }
+.strokeCta .applyCta small, .strokeCta .newCta small { max-width: 100%; overflow: hidden; font-size: 10.5px; font-weight: 500; font-variant-numeric: tabular-nums; opacity: .72; text-overflow: ellipsis; white-space: nowrap; }
+.strokeCta .applyCta { background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); }
+.strokeCta .newCta { background: rgb(var(--color-primary)); color: #fff; }
+/* 복원 = 정사각 아이콘 버튼. 바뀐 보선 수는 모서리 숫자. */
+.strokeCta .resetCta { position: relative; flex: 0 0 44px; display: grid; place-items: center; width: 44px; padding: 0; border: 1px solid #f0561e; background: rgb(var(--color-surface)); color: #f0561e; }
+.resetCta em { position: absolute; top: -5px; right: -5px; display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #f0561e; color: #fff; font-size: 10px; font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .strokeCta button:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-dim-4)); }
