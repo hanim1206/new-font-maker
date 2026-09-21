@@ -419,7 +419,8 @@ test('획 편집은 캔버스에서 꼭짓점을 직접 끌어 옮기고 Undo �
  */
 test('획을 상자 밖으로 끌어도 다른 획은 제자리고, 틀 다시 맞추기로 꽉 채운다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EA%B0%81&mode=stroke&part=CH')
-  await expect(page.getByTestId('focus-canvas')).toBeVisible({ timeout: 20_000 })
+  // 모델 상자가 온 뒤에 잰다. 그 전 첫 렌더는 옛 스키마 상자라 점 자리가 다르다.
+  await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
   const dots = page.locator('[data-editor-point="visible"]')
   const positions = () => dots.evaluateAll((els) => els.map((el) => `${Number(el.getAttribute('cx')).toFixed(2)},${Number(el.getAttribute('cy')).toFixed(2)}`))
   const status = page.getByTestId('jamo-frame-status')
@@ -427,26 +428,67 @@ test('획을 상자 밖으로 끌어도 다른 획은 제자리고, 틀 다시 �
   const before = await positions()
   expect(before).toHaveLength(3)
 
-  // ㄱ 세로 획의 끝점을 아래로 끈다(상자 밖).
-  const box = await dots.nth(2).boundingBox()
+  // ㄱ 가로 획의 왼쪽 끝을 왼쪽으로 조금 끈다(상자 밖). 이웃 자소가 없는 쪽이라 최소 잉크 간격 멈춤에 안 걸린다.
+  // 글자 칸(EM) 왼쪽 끝까지는 안 간다 — 잉크가 칸 끝을 넘으면 `getJamoRenderBox`가 자소를 통째로 밀어서 다른 점도 움직인다(그건 틀이 아니라 칸 보호다).
+  const box = await dots.nth(0).boundingBox()
   if (!box) throw new Error('끝점이 없다')
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
   await page.mouse.down()
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 30, { steps: 6 })
+  await page.mouse.move(box.x + box.width / 2 - 10, box.y + box.height / 2, { steps: 6 })
   // 끄는 동안부터 나머지 두 점은 안 움직인다.
-  expect((await positions()).slice(0, 2)).toEqual(before.slice(0, 2))
+  expect((await positions()).slice(1)).toEqual(before.slice(1))
   await page.mouse.up()
   const after = await positions()
-  expect(after.slice(0, 2)).toEqual(before.slice(0, 2))
-  expect(Number(after[2].split(',')[1])).toBeGreaterThan(Number(before[2].split(',')[1]) + 4)
-  await expect(status).toContainText(/상자 밖 아래 \+\d+u/)
+  expect(after.slice(1)).toEqual(before.slice(1))
+  expect(Number(after[0].split(',')[0])).toBeLessThan(Number(before[0].split(',')[0]) - 2)
+  await expect(status).toContainText(/상자 밖 왼쪽 \+\d+u/)
 
   // 틀 다시 맞추기 → 끝점이 상자 안으로 돌아오고 틀 표시가 사라진다. Undo하면 튀어나온 채로 돌아온다.
   await page.getByTestId('jamo-frame-reset').click()
   await expect(status).toHaveText('')
-  await expect.poll(async () => Number((await positions())[2].split(',')[1])).toBeCloseTo(Number(before[2].split(',')[1]), 0)
+  await expect.poll(async () => Number((await positions())[0].split(',')[0])).toBeCloseTo(Number(before[0].split(',')[0]), 0)
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
-  await expect(status).toContainText('상자 밖 아래')
+  await expect(status).toContainText('상자 밖 왼쪽')
+})
+
+/**
+ * 최소 잉크 간격은 막지 않고 알린다. 간격은 화면과 같은 상자(모델 상자)로 잰다 — `서`는 ㅅ과 ㅓ 사이 여유가 17u뿐이다(옛 스키마 상자로는 188u로 잘못 쟀다).
+ * 걸린 자리에서 한 번 붙들고, 50u 넘게 더 끌면 넘어간다. 넘어간 자모는 자동 되당김 없이 그린 대로 나오고 캔버스가 주황으로 알린다.
+ */
+test('획을 옆 자소 쪽으로 끌면 최소 간격에서 한 번 걸리고, 더 끌면 넘어가며 캔버스가 경고한다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EC%84%9C&mode=stroke&part=JU')
+  const canvas = page.getByTestId('focus-canvas')
+  await expect(canvas).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
+  const canvasBox = await canvas.boundingBox()
+  if (!canvasBox) throw new Error('캔버스가 없다')
+  const unitsPerPx = 1160 / canvasBox.width
+  const dots = page.locator('[data-editor-point="visible"]')
+  const xs = await dots.evaluateAll((els) => els.map((el) => Number(el.getAttribute('cx'))))
+  const barEnd = dots.nth(xs.indexOf(Math.min(...xs)))
+  const centerX = async () => { const box = await barEnd.boundingBox(); if (!box) throw new Error('점이 없다'); return box.x + box.width / 2 }
+  const start = await barEnd.boundingBox()
+  if (!start) throw new Error('점이 없다')
+  const startX = start.x + start.width / 2
+  const y = start.y + start.height / 2
+  const tools = page.getByTestId('jamo-stroke-tools')
+
+  // 36u를 청하면 여유(17u, 눈금 5u → 20u)에서 붙들린다.
+  await page.mouse.move(startX, y)
+  await page.mouse.down()
+  await page.mouse.move(startX - 10, y, { steps: 5 })
+  expect(Math.round((startX - await centerX()) * unitsPerPx)).toBeLessThanOrEqual(22)
+  await expect(tools).toContainText('더 끌면 넘어감')
+  await expect(canvas).not.toHaveAttribute('data-gap-warning', 'true')
+  // 더 끌면 풀려서 손가락을 따라온다.
+  await page.mouse.move(startX - 40, y, { steps: 8 })
+  expect(Math.round((startX - await centerX()) * unitsPerPx)).toBeGreaterThan(120)
+  await expect(tools).toContainText('옆 자소에 너무 붙음')
+  await page.mouse.up()
+  // 놓은 뒤에도 되당겨지지 않고, 캔버스가 경고한다. Undo하면 경고도 사라진다.
+  expect(Math.round((startX - await centerX()) * unitsPerPx)).toBeGreaterThan(120)
+  await expect(canvas).toHaveAttribute('data-gap-warning', 'true')
+  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
+  await expect(canvas).not.toHaveAttribute('data-gap-warning', 'true')
 })
 
   await expect(page.getByTestId('jamo-stroke-tools')).toContainText('점 2개 함께')

@@ -1,4 +1,4 @@
-import type { DecomposedSyllable, JamoData, LayoutSchema, MobileEditorPart } from '../src/types'
+import type { BoxConfig, DecomposedSyllable, JamoData, LayoutSchema, MobileEditorPart, Part } from '../src/types'
 import { calculateBoxes } from '../src/utils/layoutCalculator'
 import { getMinimumInterComponentInkGap } from './inkGapGuard'
 
@@ -9,6 +9,11 @@ export interface CalibrationInkGapContext {
   char: string
   syllable: DecomposedSyllable
   schema: LayoutSchema
+  /**
+   * 화면이 이 글자를 놓는 상자(모델 상자 + 레이아웃 Δ + 기준 틀). 주면 옛 스키마 상자 대신 이걸로 잰다 — 재는 배치가 보이는 배치와 같아야 멈춤이 맞다.
+   * 자소 맞춤(잉크를 재서 다듬기)이 들어 있어 비싸므로 그 자모가 든 글자에서만, 끌기 한 번에 한 번만 부른다.
+   */
+  boxesOf?: (syllable: DecomposedSyllable) => Partial<Record<Part, BoxConfig>>
 }
 
 export interface CalibrationInkGapViolation {
@@ -36,6 +41,17 @@ function withCandidateJamo(syllable: DecomposedSyllable, candidate: JamoData): D
   return { ...syllable, jongseong: candidate }
 }
 
+// 끌기 한 번(= baseline 객체 하나) 동안 글자별 화면 상자를 기억한다. 고치는 자모에는 기준 틀이 굳어 있어 끄는 동안 상자가 안 바뀐다.
+const screenBoxCache = new WeakMap<JamoData, Map<string, Partial<Record<Part, BoxConfig>>>>()
+function screenBoxesOf(context: CalibrationInkGapContext, candidateSyllable: DecomposedSyllable, baseline: JamoData): Partial<Record<Part, BoxConfig>> | null {
+  if (!context.boxesOf) return null
+  let perContext = screenBoxCache.get(baseline)
+  if (!perContext) { perContext = new Map(); screenBoxCache.set(baseline, perContext) }
+  let boxes = perContext.get(context.id)
+  if (!boxes) { boxes = context.boxesOf(candidateSyllable); perContext.set(context.id, boxes) }
+  return boxes
+}
+
 function worsensInkGap(candidateGap: number, baselineGap: number, minimumGap: number): boolean {
   return candidateGap + EPSILON < Math.min(baselineGap, minimumGap)
 }
@@ -52,7 +68,7 @@ export function findJamoInkGapViolation(
     if (jamoForType(context.syllable, candidate.type)?.char !== candidate.char) continue
     const candidateSyllable = withCandidateJamo(context.syllable, candidate)
     const baselineSyllable = withCandidateJamo(context.syllable, baseline)
-    const boxes = calculateBoxes(context.schema, contextFor(candidateSyllable))
+    const boxes = screenBoxesOf(context, candidateSyllable, baseline) ?? calculateBoxes(context.schema, contextFor(candidateSyllable))
     const candidateGap = getMinimumInterComponentInkGap(candidateSyllable, boxes, activePart)
     const baselineGap = getMinimumInterComponentInkGap(baselineSyllable, boxes, activePart)
     if (worsensInkGap(candidateGap, baselineGap, minimumGap)) {

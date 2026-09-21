@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 import { ArrowLeft, Check, Copy, CopyPlus, Dices, Download, LayoutDashboard, Link2, ListTree, LoaderCircle, Plus, Redo2, Settings2, Spline, TextCursorInput, Trash2, Undo2, Unlink, X } from 'lucide-react'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
 import { DevGhostToggle } from './DevGhostToggle'
-import { facesToBox } from '../src/services/contextBoxResolver'
-import { useContextPlacement, useNotoModel } from './notoModel'
+import { facesToBox, identityOfSyllable } from '../src/services/contextBoxResolver'
+import { contextPlacementOf, useContextPlacement, useNotoModel } from './notoModel'
 import { GlyphLayoutEditor } from './GlyphLayoutEditor'
-import { useLayoutDeltaStore } from './layoutDeltaStore'
+import { effectiveLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { adoptFamilyStrokes, familyOfSyllable } from '../src/utils/jamoContextStrokes'
 import { withFrameFrom, withoutFrame } from '../src/utils/jamoFrame'
@@ -53,7 +53,7 @@ import { createSampleGlyphEdit } from './editInference'
 import { createCalibrationAnalysisSnapshot } from './calibrationAnalysisSnapshot'
 import { StrokeToolRail } from '../src/features/mobile-editor/StrokeToolRail'
 import { CALIBRATION_FREEFORM_BOUNDS } from './calibrationEditPolicy'
-import { findMaximumSafeEditFactor } from './inkGapGuard'
+import { findMaximumSafeEditFactor, getMinimumInterComponentInkGap } from './inkGapGuard'
 import {
   findJamoInkGapViolation,
   findLayoutInkGapViolation,
@@ -115,7 +115,10 @@ type StrokeDragApi = { begin: () => void; change: (movement: StrokeMoveDelta) =>
 /** 끌기로 치는 최소 거리(px). 이보다 짧으면 누르기다. */
 const DRAG_THRESHOLD_PX = 3
 
-type PreviewJamo = { type: JamoData['type']; char: string; data: JamoData; baseline?: JamoData }
+/** `pastGapLimit`: 사용자가 최소 잉크 간격의 걸림을 밀고 넘어간 미리보기. 문맥 안전 보정(자동 되당김)을 얹지 않는다. */
+type PreviewJamo = { type: JamoData['type']; char: string; data: JamoData; baseline?: JamoData; pastGapLimit?: boolean }
+/** 최소 잉크 간격에 걸린 자리에서 이만큼(em) 더 끌어야 넘어간다. 한 번 "탁" 걸리는 세기. */
+const GAP_STICK_EM = 0.05
 type PreviewSchema = { layoutType: LayoutType; schema: LayoutSchema }
 type SelectedPoint = { strokeId: string; pointIndex: number }
 type HistoryEntry =
@@ -374,6 +377,7 @@ function FocusedGlyph({
   onPointSelect,
   lockedPart = null,
   dragApiRef,
+  gapWarning = false,
   fontSpace,
   grid,
   designBody,
@@ -387,6 +391,8 @@ function FocusedGlyph({
   lockedPart?: MobileEditorPart | null
   /** 주면 잡은 점 · 핸들 · 획을 캔버스에서 바로 끈다(셸 안). 없으면 누르기로 고르기만 한다. */
   dragApiRef?: RefObject<StrokeDragApi | null>
+  /** 고친 자소가 옆 자소에 최소 간격보다 가깝게(그리고 고치기 전보다 더) 붙었다. 캔버스 바탕에 색을 깔아 알린다. */
+  gapWarning?: boolean
   onSelect: (selection: Selection) => void
   selectedPoints: SelectedPoint[]
   onPointSelect: (selection: Extract<Selection, { kind: 'point' }>) => void
@@ -463,7 +469,7 @@ function FocusedGlyph({
   const body = { x: designBody.x / fontSpace.unitsPerEm * VIEW_BOX_SIZE, y: designBody.y / fontSpace.unitsPerEm * VIEW_BOX_SIZE, width: designBody.width / fontSpace.unitsPerEm * VIEW_BOX_SIZE, height: designBody.height / fontSpace.unitsPerEm * VIEW_BOX_SIZE }
 
   return (
-    <div ref={canvasRef} className={styles.focusCanvas} style={canvasStyle} data-testid="focus-canvas" data-placement={placement.kind} data-direct={dragApiRef ? true : undefined} onPointerDown={() => onSelect({ kind: 'none' })} onPointerMove={moveDrag} onPointerUp={(event) => endDrag(event, false)} onPointerCancel={(event) => endDrag(event, true)}>
+    <div ref={canvasRef} className={styles.focusCanvas} style={canvasStyle} data-testid="focus-canvas" data-placement={placement.kind} data-direct={dragApiRef ? true : undefined} data-gap-warning={gapWarning ? true : undefined} onPointerDown={() => onSelect({ kind: 'none' })} onPointerMove={moveDrag} onPointerUp={(event) => endDrag(event, false)} onPointerCancel={(event) => endDrag(event, true)}>
       {globalStyle.strokeStyle.mode === 'legacy-snapped-centerline' && <span className={styles.constructionGrid} aria-hidden="true" data-construction-grid="legacy-snapped-centerline" />}
       <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} size={340} viewportBox={CANVAS_VIEWPORT} className={styles.focusSvg} partStyles={partStyles} globalStyle={globalStyle} underlay={<>
         {/* 검수 캔버스(GhostCanvas)와 같은 깔개: 흰 칸 → 1/16 잔선·1/4 굵은선 눈금 → 칸 테두리 → 글자몸 → 기준선(0.88) → 부품 상자 → Noto 고스트. 전부 잉크 아래. */}
@@ -595,7 +601,7 @@ function InferenceTrackpad({
   collisionContexts: CalibrationInkGapContext[]
   onPreviewJamo: (preview: PreviewJamo | null) => void
   onPreviewSchema: (preview: PreviewSchema | null) => void
-  onCommitJamo: (before: JamoData, after: JamoData, raw: RawGlyphEdit, options?: { unframed?: boolean }) => void
+  onCommitJamo: (before: JamoData, after: JamoData, raw: RawGlyphEdit, options?: { unframed?: boolean; pastGapLimit?: boolean }) => void
   /** 지금 글자의 부품 상자(중심선 상자). 튀어나온 양을 em으로 바꿀 때 쓴다 — 선택이 들고 있는 상자는 고친 뒤 낡을 수 있다. */
   partBoxes?: Partial<Record<Part, BoxConfig>>
   /** 고치는 중의 자모에 기준 틀을 굳혀 돌려준다. 끄는 동안의 간격 계산이 놓은 뒤와 같은 배치를 보게 한다. */
@@ -617,6 +623,8 @@ function InferenceTrackpad({
   const currentJamo = useRef<JamoData | null>(null)
   const currentDelta = useRef<StrokeMoveDelta>({ x: 0, y: 0 })
   const currentScale = useRef<StrokeScale>({ x: 1, y: 1 })
+  // 직접 조작에서는 최소 잉크 간격이 막지 않고 알린다: 걸린 자리에서 한 번 붙들고, 더 끌면 넘어간다.
+  const pastGapLimit = useRef(false)
   const [delta, setDelta] = useState<StrokeMoveDelta>({ x: 0, y: 0 })
   const [scale, setScale] = useState<StrokeScale>({ x: 1, y: 1 })
   const [inkGapLimiter, setInkGapLimiter] = useState<CalibrationInkGapViolation | null>(null)
@@ -701,6 +709,7 @@ function InferenceTrackpad({
   }, [selection, onInkGapLimitChange])
 
   const beginMove = () => {
+    pastGapLimit.current = false
     setDelta({ x: 0, y: 0 })
     updateInkGapLimiter(null)
     if (selection.kind === 'component') {
@@ -762,14 +771,20 @@ function InferenceTrackpad({
         const candidate = createCandidate(factor)
         return !candidate || !jamoInkGapViolation(candidate.jamo)
       })
-      const result = createCandidate(safeFactor)
-      if (!result) return
+      const held = createCandidate(safeFactor)
+      if (!held) return
+      const requested = createCandidate(1)
+      const limited = safeFactor < 0.9999 && Boolean(requested)
+      // 걸린 자리(held)에서 요청 자리까지의 거리(em). 여유가 있던 글자에서만 붙든다 — 처음부터 좁은 글자는 붙들 자리가 출발점이라 끌기가 먹통처럼 느껴진다.
+      const overshoot = limited && requested ? Math.hypot((requested.delta.x - held.delta.x) * selection.box.width, (requested.delta.y - held.delta.y) * selection.box.height) : 0
+      const past = direct && limited && Boolean(requested) && (safeFactor < 0.02 || overshoot > GAP_STICK_EM)
+      const result = past && requested ? requested : held
+      pastGapLimit.current = past
       currentJamo.current = result.jamo
       setDelta(result.delta)
       currentDelta.current = result.delta
-      const requested = createCandidate(1)
-      updateInkGapLimiter(safeFactor < 0.9999 && requested ? jamoInkGapViolation(requested.jamo) : null)
-      onPreviewJamo({ type: selection.jamo.type, char: selection.jamo.char, data: result.jamo, baseline: startJamo.current })
+      updateInkGapLimiter(limited && requested ? jamoInkGapViolation(requested.jamo) : null)
+      onPreviewJamo({ type: selection.jamo.type, char: selection.jamo.char, data: result.jamo, baseline: startJamo.current, pastGapLimit: past })
     }
   }
   const commitMove = () => {
@@ -786,7 +801,8 @@ function InferenceTrackpad({
           : selection.kind === 'handle'
             ? { kind: 'handle-move', ...common, pointIndex: selection.pointIndex, handle: selection.handle }
             : { kind: 'stroke-move', ...common }
-      onCommitJamo(startJamo.current, currentJamo.current, raw)
+      onCommitJamo(startJamo.current, currentJamo.current, raw, { pastGapLimit: pastGapLimit.current })
+      pastGapLimit.current = false
     }
   }
   const changeScale = (relative: StrokeScale, axis: 'x' | 'y') => {
@@ -969,7 +985,7 @@ function InferenceTrackpad({
     const onPoint = selection.kind === 'point' || selection.kind === 'handle'
     const directLabel = selection.kind === 'none'
       ? '고칠 획을 누르세요'
-      : `${selection.kind === 'stroke' ? `${selection.jamo.char}의 획` : selection.kind === 'handle' ? `${selection.jamo.char}의 곡선 핸들` : selection.kind === 'point' ? `${selection.jamo.char}의 점` : ''} · 캔버스에서 끌어 옮기기${selectedPoints.length > 1 ? ` · 점 ${selectedPoints.length}개 함께` : ''}${inkGapLimiter ? ` · ${inkGapLimiter.char}에서 최소 잉크 간격` : ''}`
+      : `${selection.kind === 'stroke' ? `${selection.jamo.char}의 획` : selection.kind === 'handle' ? `${selection.jamo.char}의 곡선 핸들` : selection.kind === 'point' ? `${selection.jamo.char}의 점` : ''} · 캔버스에서 끌어 옮기기${selectedPoints.length > 1 ? ` · 점 ${selectedPoints.length}개 함께` : ''}${inkGapLimiter ? pastGapLimit.current ? ` · ${inkGapLimiter.char}에서 옆 자소에 너무 붙음` : ` · ${inkGapLimiter.char}에서 최소 간격 · 더 끌면 넘어감` : ''}`
     // 기준 틀이 굳은 자모만: 틀 밖으로 나간 양(u)과 `틀 다시 맞추기`. 튀어나옴은 저장값이 아니라 여기서 계산한다.
     const liveJamo = editable ? activeVisibleJamo ?? selection.jamo : null
     const protrusion = editable && liveJamo?.frame
@@ -1155,13 +1171,25 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     jung: previewedSyllable.jungseong?.char ?? '',
     jong: previewedSyllable.jongseong?.char ?? '',
   }), [effectiveSchema, previewedSyllable])
+  // 간격은 화면이 글자를 놓는 상자로 잰다(모델 상자 + 레이아웃 Δ + 기준 틀). 옛 스키마 상자로 재면 자주 쓰는 글자의 92%에서 10u 넘게 어긋나고 셋 중 하나는 닿음 판정이 뒤집힌다(`ink-gap-box-parity.test.ts`).
+  // 모델이 없거나 그 글자를 못 풀면 스키마 상자로 돌아간다. 독립 실행(`/calibration`)은 전과 같다.
+  const { bundle: notoBundle, error: notoModelError } = useNotoModel()
+  const layoutDeltaRules = useLayoutDeltaStore((state) => state.rules)
+  const previewEnds = useMemo(() => ({ linecap: previewGlobalStyle.linecap, linejoin: previewGlobalStyle.linejoin }), [previewGlobalStyle.linecap, previewGlobalStyle.linejoin])
+  const screenBoxesOf = useCallback((target: DecomposedSyllable, schema: LayoutSchema): Partial<Record<Part, BoxConfig>> => {
+    const legacy = () => calculateBoxes(schema, { cho: target.choseong?.char ?? '', jung: target.jungseong?.char ?? '', jong: target.jongseong?.char ?? '' })
+    if (chrome !== 'workspace' || !notoBundle) return legacy()
+    const identity = identityOfSyllable(target)
+    const { placement } = contextPlacementOf({ bundle: notoBundle, identity, syllable: target, schema, ends: previewEnds, delta: effectiveLayoutDelta({ rules: layoutDeltaRules }, identity) })
+    return placement.kind === 'boxes' ? placement.boxes : legacy()
+  }, [chrome, notoBundle, previewEnds, layoutDeltaRules])
+  const measuresOnScreenBoxes = chrome === 'workspace' && Boolean(notoBundle)
   const syllable = useMemo(
-    () => resolveSyllableContextualInkSafety(previewedSyllable, focusedBoxes).syllable,
-    [focusedBoxes, previewedSyllable],
+    () => resolveSyllableContextualInkSafety(previewedSyllable, screenBoxesOf(previewedSyllable, effectiveSchema)).syllable,
+    [effectiveSchema, previewedSyllable, screenBoxesOf],
   )
   // 레이아웃 모드는 글자가 모델 상자로 그려질 때만 뜻이 있다. 그때는 옛 경로(자소 통째 이동 → 스키마)가 글자에 안 닿으므로 셸 안에서는 끈다.
   const { placement, resolution: placementResolution } = useContextPlacement(syllable, effectiveSchema, previewGlobalStyle)
-  const { bundle: notoBundle, error: notoModelError } = useNotoModel()
   // 레이아웃 모드는 모델이 있으면 열린다. 지금 획이 모델 상자에 맞는지(`placement.kind`)에 매지 않는다 —
   // 획을 고치다 맞춤이 깨지면(ㅡ를 곡선으로 → 상자가 획 두께보다 작음) 나가는 문(`완료`)까지 사라져 갇힌다.
   const layoutAvailable = chrome === 'workspace' && isEditableHangul(selectedChar) && (selectedChar.codePointAt(0) ?? 0) >= 0xac00 && !notoModelError
@@ -1189,6 +1217,18 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const strokeCardInk = strokeCardPart && strokeCardJamo ? { part: strokeCardPart, jamo: strokeCardJamo } : null
   const snapStep = fontUnitsToNormalized(grid.snapInterval, fontSpace)
   const minimumInkGap = fontUnitsToNormalized(grid.minorInterval, fontSpace)
+  // 간격 경고: 고친 자소(기준 틀이 굳은 것)가 이 글자에서 옆 자소에 최소 간격보다 가깝고, 고치기 전(틀 = 고치기 전 획)보다 더 붙었을 때. 프리셋이 원래 좁은 글자는 안 울린다.
+  const gapWarning = useMemo(() => {
+    if (chrome !== 'workspace' || placement.kind !== 'boxes') return false
+    return (['CH', 'JU', 'JO'] as const).some((part) => {
+      const jamo = part === 'CH' ? syllable.choseong : part === 'JU' ? syllable.jungseong : syllable.jongseong
+      if (!jamo?.frame) return false
+      const beforeJamo: JamoData = { ...jamo, ...jamo.frame }
+      const beforeSyllable: DecomposedSyllable = part === 'CH' ? { ...syllable, choseong: beforeJamo } : part === 'JU' ? { ...syllable, jungseong: beforeJamo } : { ...syllable, jongseong: beforeJamo }
+      const now = getMinimumInterComponentInkGap(syllable, placement.boxes, part)
+      return now + 1e-6 < Math.min(minimumInkGap, getMinimumInterComponentInkGap(beforeSyllable, placement.boxes, part))
+    })
+  }, [chrome, minimumInkGap, placement, syllable])
   const sentenceEm = 24
   const calibrationLines = useMemo(() => [sampleSentence], [sampleSentence])
   // 셸 안(레이아웃 · 획 편집 둘 다)에서는 문장이 한 줄 가로 스크롤이다(아래 편집부에 세로 자리를 내준다). 고른 글자가 가려져 있으면 가로로만 끌어온다.
@@ -1204,12 +1244,14 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     else if (right > section.scrollLeft + section.clientWidth) section.scrollLeft = right - section.clientWidth
   }, [sentenceCompact, selectedChar, sampleSentence])
   const collisionContexts = useMemo<CalibrationInkGapContext[]>(() => {
-    const contexts = calibrationLines.flatMap((line, lineIndex) => [...line].flatMap((char, charIndex) => {
+    const contexts = calibrationLines.flatMap((line, lineIndex) => [...line].flatMap((char, charIndex): CalibrationInkGapContext[] => {
       if (!isEditableHangul(char)) return []
       const decomposed = decomposeSyllable(char, choseong, jungseong, jongseong)
       const base = schemas[decomposed.layoutType]
       const padding = { ...globalPadding, ...paddingOverrides[decomposed.layoutType] }
       const schema = { ...base, padding, designBodyPadding: padding }
+      // 셸 안: 화면과 같은 상자로 잰다. 상자 풀기(자소 맞춤)는 비싸서 미루고, 간격 검사가 그 자모가 든 글자에서만 부른다.
+      if (measuresOnScreenBoxes) return [{ id: `sentence-${lineIndex}-${charIndex}`, char, syllable: decomposed, schema, boxesOf: (target: DecomposedSyllable) => screenBoxesOf(target, schema) }]
       const boxes = calculateBoxes(schema, {
         cho: decomposed.choseong?.char ?? '',
         jung: decomposed.jungseong?.char ?? '',
@@ -1223,10 +1265,10 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
       }]
     }))
     if (!contexts.some((item) => item.char === selectedChar)) {
-      contexts.unshift({ id: 'focused', char: selectedChar, syllable, schema: effectiveSchema })
+      contexts.unshift({ id: 'focused', char: selectedChar, syllable, schema: effectiveSchema, boxesOf: measuresOnScreenBoxes ? (target: DecomposedSyllable) => screenBoxesOf(target, effectiveSchema) : undefined })
     }
     return contexts
-  }, [calibrationLines, choseong, effectiveSchema, globalPadding, jungseong, jongseong, paddingOverrides, schemas, selectedChar, syllable])
+  }, [calibrationLines, choseong, effectiveSchema, globalPadding, jungseong, jongseong, measuresOnScreenBoxes, paddingOverrides, schemas, screenBoxesOf, selectedChar, syllable])
 
   const chooseChar = (char: string) => {
     // 글자를 바꾸면 기본 상태(레이아웃)로 돌아간다.
@@ -1323,17 +1365,20 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     const stored = getJamo(preview.type, preview.char) ?? preview.data
     setPreviewJamo({
       ...preview,
-      data: withContextualInkSafety(stored, preview.baseline ?? preview.data, frameForEdit(preview.data), minimumInkGap),
+      // 걸림을 밀고 넘어간 미리보기는 되당기지 않는다 — 넘어간 만큼 그대로 보여야 한다.
+      data: preview.pastGapLimit ? withoutInkSafety(frameForEdit(preview.data)) : withContextualInkSafety(stored, preview.baseline ?? preview.data, frameForEdit(preview.data), minimumInkGap),
     })
   }
   // 기준 틀은 처음 고치는 순간에 굳는다: 저장돼 있던(고치기 전) 획이 틀이 된다. 끄는 중 미리보기도 같은 틀을 써서 끄는 동안부터 다른 획이 안 움직인다.
   const frameForEdit = (jamo: JamoData): JamoData => withFrameFrom(jamo, adoptFamilyStrokes(getJamo(jamo.type, jamo.char) ?? jamo, familyOfSyllable(syllable)))
-  const commitJamo = (before: JamoData, after: JamoData, raw: RawGlyphEdit, options?: { unframed?: boolean }) => {
+  // 문맥 안전 보정(글자마다 부딪히면 변화량을 줄여 그리는 자동 되당김)을 뗀다. 사용자가 걸림을 밀고 넘어갔다는 건 붙여도 좋다는 뜻이라, 그 자모는 그린 대로 나온다.
+  const withoutInkSafety = (jamo: JamoData): JamoData => { const next = { ...jamo }; delete next.contextualInkSafety; return next }
+  const commitJamo = (before: JamoData, after: JamoData, raw: RawGlyphEdit, options?: { unframed?: boolean; pastGapLimit?: boolean }) => {
     if (JSON.stringify(before) === JSON.stringify(after)) return
     const storedBefore = structuredClone(getJamo(before.type, before.char) ?? before)
     // `틀 다시 맞추기`만 틀 없이 저장한다. 되돌리기는 기록의 `before`(틀이 없던 때)로 돌아가므로 틀도 같이 사라진다.
     const framedAfter = options?.unframed ? withoutFrame(after) : frameForEdit(after)
-    const safeAfter = withContextualInkSafety(storedBefore, before, framedAfter, minimumInkGap)
+    const safeAfter = options?.pastGapLimit ? withoutInkSafety(framedAfter) : withContextualInkSafety(storedBefore, before, framedAfter, minimumInkGap)
     const edit = createSampleGlyphEdit(raw)
     setHistory((entries) => [...entries, { kind: 'jamo', jamoType: before.type, char: before.char, before: storedBefore, after: safeAfter, edit }])
     setFuture([])
@@ -1510,12 +1555,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
       const contextBase = schemas[previewed.layoutType]
       const padding = { ...globalPadding, ...paddingOverrides[previewed.layoutType] }
       const contextSchema = { ...contextBase, padding, designBodyPadding: padding }
-      const contextBoxes = calculateBoxes(contextSchema, {
-        cho: previewed.choseong?.char ?? '',
-        jung: previewed.jungseong?.char ?? '',
-        jong: previewed.jongseong?.char ?? '',
-      })
-      isSafetyAdjusted = resolveSyllableContextualInkSafety(previewed, contextBoxes).limitedParts.length > 0
+      // 보정할 것이 있는 글자(고친 자모가 든 글자)에서만 상자를 푼다. 상자는 화면과 같은 것.
+      const hasSafety = [previewed.choseong, previewed.jungseong, previewed.jongseong].some((jamo) => jamo?.contextualInkSafety)
+      isSafetyAdjusted = hasSafety && resolveSyllableContextualInkSafety(previewed, screenBoxesOf(previewed, contextSchema)).limitedParts.length > 0
     }
     return isEditableHangul(char)
       ? <button key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width }} type="button" aria-current={char === selectedChar ? 'true' : undefined} data-ink-gap-limiter={inkGapLimiter?.id === contextId ? 'true' : undefined} data-ink-safety-adjusted={isSafetyAdjusted ? 'true' : undefined} aria-label={`${char} 편집${isSafetyAdjusted ? ', 충돌 안전 보정됨' : ''}`} onClick={() => chooseChar(char)}>
@@ -1579,7 +1621,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         <div className={styles.strokeStage}>
         {chrome === 'workspace' && layoutAvailable && !isBrushStyleOpen && <LayoutContextCards activeContextId={corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00).contextId} allActive={false} ink={strokeCardInk ?? undefined} />}
         <div className={styles.focusArea}>
-        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={isBrushStyleOpen ? { kind: 'none' } : selection} onSelect={isBrushStyleOpen ? () => {} : selectFromCanvas} selectedPoints={isBrushStyleOpen ? [] : selectedPoints} onPointSelect={isBrushStyleOpen ? () => {} : selectPointFromCanvas} lockedPart={isBrushStyleOpen ? null : lockedPart} dragApiRef={directManipulation && !isBrushStyleOpen ? dragApiRef : undefined} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
+        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={isBrushStyleOpen ? { kind: 'none' } : selection} onSelect={isBrushStyleOpen ? () => {} : selectFromCanvas} selectedPoints={isBrushStyleOpen ? [] : selectedPoints} onPointSelect={isBrushStyleOpen ? () => {} : selectPointFromCanvas} lockedPart={isBrushStyleOpen ? null : lockedPart} dragApiRef={directManipulation && !isBrushStyleOpen ? dragApiRef : undefined} gapWarning={gapWarning} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
         </div>
         </div>
       </section>

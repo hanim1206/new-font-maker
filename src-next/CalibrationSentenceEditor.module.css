@@ -171,3 +171,6 @@
 .strokeFrameStatus { margin: 0; min-height: 26px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 600; }
 .strokeFrameStatus span[data-protruding] { color: #f0561e; }
 .strokeFrameStatus button { min-height: 26px; padding: 0 10px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-size: 10.5px; font-weight: 650; }
+/* 고친 자소가 옆 자소에 너무 붙었다. 막지는 않고 캔버스 테두리와 바탕으로 알린다. */
+.focusCanvas[data-gap-warning] { border-color: #f0561e; }
+.focusCanvas[data-gap-warning]::after { content: ''; position: absolute; inset: 0; z-index: 2; background: rgb(240 86 30 / .09); pointer-events: none; }
