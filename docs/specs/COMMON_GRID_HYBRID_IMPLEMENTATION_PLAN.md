@@ -57,7 +57,7 @@
 |---|---|
 | **자소 기본 마스터** (`jamo role master`) | `ㄱ`, `ㅇ`, `ㅏ`의 기본 뼈대·면·곡률·레일 관계를 역할별로 정의하는 원본이다. 저장 단위는 `jamoId + role`이므로 같은 `ㄱ`의 CH와 JO 마스터는 기본적으로 분리된다. |
 | **자소 역할** (`part role`) | 한글 조합 안에서 자소가 담당하는 자리다. STANDALONE, CH, 세로 JU, 가로 JU, JU_H, JU_V, JO로 구분하며 각 역할은 서로 다른 기본 형태 그리드와 프리셋을 가질 수 있다. |
-| **레이아웃 문맥** (`layout context`) | 자소가 어떤 조합 안에 놓였는지를 나타낸다. 초성 단독, 세로중성, 가로중성, 혼합중성 및 각 유형의 종성 포함형 등 7개 기본 문맥에 선택적 특징 태그를 붙이고 기본 문맥까지 fallback한다. |
+| **레이아웃 문맥** (`layout context`) | 자소가 어떤 조합 안에 놓였는지를 나타낸다. 초성 단독, 세로홀자, 가로홀자, 섞임홀자 및 각 유형의 종성 포함형 등 7개 기본 문맥에 선택적 특징 태그를 붙이고 기본 문맥까지 fallback한다. |
 | **레이아웃 그리드** (`layoutGrid`) | Font Space에서 CH·JU·JO가 차지할 영역을 정하는 공통 절대 레일이다. 자소의 내부 형태가 아니라 자소를 담는 슬롯의 위치와 크기를 결정한다. |
 | **파트 슬롯** (`part slot`) | `layoutGrid`와 `calculateBoxes()`가 계산한 초성·중성·종성의 실제 배치 영역이다. 문맥별 자소 형태가 마지막에 투영되는 컨테이너다. |
 | **기본 파트 그리드** (`basePartGrid`) | 자소 기본 마스터가 사용하는 0–1 로컬 형태 그리드다. 역할별로 공유하며, 아직 특정 레이아웃 슬롯의 실제 크기는 반영하지 않은 원본이다. |
@@ -97,7 +97,7 @@
 
 1. **마스터 저장 단위는 `jamoId + role`로 한다.** 같은 `ㄱ`이라도 CH, JO, 단독 자음은 서로 다른 역할 마스터를 기본으로 가지며, 필요할 때만 사용자가 복사하거나 연결한다.
 2. **7개 문맥은 기본 대분류로 유지하고 선택적 특징 태그를 허용한다.** 실제 베리에이션 선택은 기본 문맥에 `medialClass`, `finalWidthClass`, `initialClass` 같은 태그를 더한 fallback 규칙으로 해결하며 모든 조합을 enum으로 늘리지 않는다.
-3. **혼합중성은 채널별로 역할과 `gridId`를 가진다.** 하나의 `JamoConstruction.gridId`를 horizontal/vertical 채널이 공유하지 않는다.
+3. **섞임홀자는 채널별로 역할과 `gridId`를 가진다.** 하나의 `JamoConstruction.gridId`를 horizontal/vertical 채널이 공유하지 않는다.
 4. **베리에이션은 sparse patch와 live inheritance로 저장한다.** 값이 없으면 상위를 상속하고, override를 제거하면 프리셋 기반 상태로 돌아간다. 프리셋 적용 결과를 숫자로 복제하지 않는다.
 5. **모든 편집 가능 참조 위치에 안정 ID를 부여한다.** 배열 인덱스나 객체 경로를 참조 재연결 주소로 사용하지 않는다.
 6. **채워진 셀 내부에 레일을 추가하면 원자 셀을 분할해 보이는 실루엣을 보존한다.** 삭제 시 이웃 셀의 점유·곡률·사선 상태가 다르면 자동 병합하지 않고 차단한다.
@@ -117,7 +117,7 @@
 
 ### Step 3 진입 전 설계 스파이크 산출물
 
-- `jamoId + role` 마스터와 혼합중성 channel별 grid를 포함한 타입 컴파일 테스트.
+- `jamoId + role` 마스터와 섞임홀자 channel별 grid를 포함한 타입 컴파일 테스트.
 - 7개 기본 문맥과 특징 태그의 deterministic fallback 테스트.
 - sparse override 적용·제거·상위 마스터 변경·고아 참조 검출 테스트.
 - 채워진 셀에 X/Y 레일을 삽입하고 실루엣을 보존하는 분할 테스트.
@@ -139,7 +139,7 @@
 
 - 자음 단독과 초성이 포함된 6개 조합, 총 7개 레이아웃이 하나의 공통 레이아웃 그리드를 공유한다.
 - 사용자가 공통 레일을 움직이면 연결된 7개 레이아웃의 초성·중성·종성 영역이 즉시 다시 계산된다.
-- 초성·세로중성·가로중성·혼합중성 가로부·혼합중성 세로부·종성은 역할별 자소 기본 마스터와 형태 그리드를 공유한다.
+- 초성·세로홀자·가로홀자·섞임홀자 가로부·섞임홀자 세로부·종성은 역할별 자소 기본 마스터와 형태 그리드를 공유한다.
 - 하나의 `jamoId + role` 기본 마스터는 그 역할이 쓰이는 레이아웃 문맥에 맞춰 자동 파생된다. 비교 보드는 최대 7개 레이아웃을 함께 보여줄 수 있지만 각 카드는 자기 역할 마스터를 해석하며, 현재 역할 편집은 그 역할을 사용하는 카드에만 반영된다.
 - 문맥별 기본 파생은 역할·문맥 프리셋으로 모든 관련 자소에 일괄 적용되며, 특정 자소의 보정은 그 위에 override로 저장한다.
 - 자소 형태 그리드는 X/Y축마다 5개의 의미 기반 코어 레일을 공통 계약으로 가진다. 두 축 모두 코어 레일만 있을 때 기본 원자 셀은 4×4이며, 복잡한 자소에는 코어 레일 사이에 보조 레일을 추가할 수 있다.
@@ -207,7 +207,7 @@ resolvedPartGrid + resolved jamo construction
 
 - 마스터의 영속 단위는 `jamoId + role`이다. 예를 들어 초성 `ㄱ`의 CH 마스터와 종성 `ㄱ`의 JO 마스터는 기본적으로 분리하며, 필요할 때만 사용자 명령으로 복사하거나 연결한다.
 - 역할 마스터는 해당 역할에서 `ㄱ`다운 뼈대와 내부 레일 관계를 정의한다. 하나의 추상적 자소 개념이 여러 역할 마스터를 가질 수 있다.
-- 기본 마스터를 모든 레이아웃에 동일한 절대 윤곽으로 넣지 않는다. 세로중성·가로중성·혼합중성 및 종성 유무에 따른 문맥 프리셋으로 자동 파생한다.
+- 기본 마스터를 모든 레이아웃에 동일한 절대 윤곽으로 넣지 않는다. 세로홀자·가로홀자·섞임홀자 및 종성 유무에 따른 문맥 프리셋으로 자동 파생한다.
 - 기본 문맥 집합은 7개 공통 레이아웃과 대응하지만, 실제 선택 키는 선택적 특징 태그를 포함할 수 있다. 결과 규칙이 같은 문맥은 같은 프리셋 또는 베리에이션을 공유한다.
 - 문맥 해석은 가장 구체적인 `baseContext + feature tags`에서 시작해 태그가 적은 기본 문맥 순으로 deterministic fallback한다.
 - 자소별로 더 세밀한 보정이 필요한 경우에만 해당 자소·해당 문맥의 레일 override와 참조 재연결을 저장한다.
@@ -568,7 +568,7 @@ projectPartGridToSlot({
 
 1. `InkRegion`, `ResolvedInkPrimitive`, `ResolvedCenterlinePrimitive` 타입을 추가한다.
 2. `resolveGlyphInkPrimitives()`를 새 순수 서비스로 추출한다.
-   - 현재 `SvgRenderer`는 파트별 획과 혼합중성 채널을 직접 해석한다 (`src/renderers/SvgRenderer.tsx:125-235`).
+   - 현재 `SvgRenderer`는 파트별 획과 섞임홀자 채널을 직접 해석한다 (`src/renderers/SvgRenderer.tsx:125-235`).
    - `fontExportUtils`에도 렌더 순서와 파트 획 수집 로직이 복제되어 있다 (`src/services/fontExportUtils.ts:78-115`).
 3. 화면과 OTF가 같은 자모 채널·박스·문맥 안전 보정·linecap/linejoin 해석 결과를 사용하게 한다.
 4. resolver 입력에 향후 `resolvedPartGrid`를 받을 자리를 만들되 이 단계에서는 기존 중심선 좌표만 어댑트한다.
@@ -655,7 +655,7 @@ projectPartGridToSlot({
 #### 완료 기준
 
 - 레일 추가 후 기존 레일 ID와 교점 참조가 변하지 않는다.
-- 마스터가 `jamoId + role`로 분리되고 혼합중성의 각 채널이 자기 역할과 grid ID를 가진다.
+- 마스터가 `jamoId + role`로 분리되고 섞임홀자의 각 채널이 자기 역할과 grid ID를 가진다.
 - 모든 역할별 기본 형태 그리드가 X/Y축마다 같은 의미의 코어 레일 5개를 가지며 코어-only 기본 셀은 4×4다.
 - 채워진 셀에 레일을 추가해도 전후 `InkRegion` 실루엣이 동일하고 새 셀은 원자 인접 셀 조건을 만족한다.
 - 코어 레일 삭제가 항상 거부되고 코어 role과 사용처가 반환된다.
@@ -701,7 +701,7 @@ projectPartGridToSlot({
 6. 7개 기본 문맥에 선택적 `medialClass`, `finalWidthClass`, `initialClass`를 조합하는 variant selector와 deterministic fallback 순서를 구현한다.
 7. `resolveContextualPartGrid()`와 `projectPartGridToSlot()`을 순수 서비스로 작성하고 각 결과값의 provenance를 함께 반환한다.
 8. 모든 자소에 같은 raw 레일 배열을 적용하지 않고 STANDALONE/CH/JU/JU_H/JU_V/JO 역할별 live 프리셋을 적용한다.
-9. 혼합중성 horizontal/vertical 채널은 각각 JU_H/JU_V 역할 grid와 슬롯을 해석한다.
+9. 섞임홀자 horizontal/vertical 채널은 각각 JU_H/JU_V 역할 grid와 슬롯을 해석한다.
 10. 보정 화면, 충돌 검사, 모바일, SVG, OTF가 동일한 레이아웃 및 문맥 그리드 해석 서비스를 통과하게 한다.
 11. `ㄱ·가·고·과·각·곡·곽` 비교 보드를 구현한다. 각 카드에서 슬롯, 코어 레일, 자동 파생 상태, 값의 상속 출처를 구분해 표시한다.
 12. 레일 드래그 중에는 로컬 `draftGrid`와 `PreviewLayouts`만 갱신하고 pointerup에 한 번 커밋한다. pointercancel은 draft를 롤백한다.
@@ -735,7 +735,7 @@ projectPartGridToSlot({
 - 동일한 기본 문맥에서 특징 태그가 있는 세부 variant와 기본 preset fallback이 결정적으로 선택된다.
 - 레이아웃 슬롯을 움직여도 `ㄱ` 기본 마스터와 문맥 override 원본 값은 변하지 않고 `resolvedPartGrid`만 바뀐다.
 - 역할·문맥 프리셋을 바꾸면 해당 역할의 관련 자소에 일괄 반영되고 다른 역할은 변하지 않는다.
-- 혼합중성의 horizontal/vertical 채널이 서로 다른 grid와 slot을 사용해도 화면과 OTF에서 같은 결과를 낸다.
+- 섞임홀자의 horizontal/vertical 채널이 서로 다른 grid와 slot을 사용해도 화면과 OTF에서 같은 결과를 낸다.
 - Design Body 가로·세로 변경 시 레일과 슬롯이 동일한 비율로 변환된다.
 - 문맥별 중성 배치와 닫힌 초성 충돌 제한이 유지된다.
 
@@ -757,7 +757,7 @@ projectPartGridToSlot({
 2. `GridCenterlineElement`와 `GridAreaElement`를 구현한다.
    - 한 `GridAreaElement`가 여러 `filledCells`를 소유하며 셀 하나를 독립 면처럼 이동하지 않는다.
    - 신규 중심선의 앵커·꺾임은 X/Y Rail ID의 교점으로만 저장하고 자유 좌표를 별도 원본으로 두지 않는다.
-3. 혼합중성은 `main/horizontal/vertical` 채널로 기존 렌더 의미를 보존하되 각 채널이 자기 역할과 `gridId`를 가진다.
+3. 섞임홀자는 `main/horizontal/vertical` 채널로 기존 렌더 의미를 보존하되 각 채널이 자기 역할과 `gridId`를 가진다.
 4. 현재 Grid 2의 셀 외곽·곡률·사선 로직을 UI 모델에서 분리해 `InkRegion[]`을 반환하게 한다.
    - 현재 실험 모델은 SVG `Q`/`L` 문자열을 직접 만든다 (`src-next/gridSystem2EditorModel.ts:596-660`).
    - 면 도구를 켜면 현재 역할 part grid의 모든 원자 셀을 직접 조작 대상으로 노출한다. 중심선과 겹치거나 안전하다고 추측한 일부 셀만 골라 노출하지 않는다.
@@ -777,7 +777,7 @@ projectPartGridToSlot({
 12. 특정 자소나 일부 획만 다르게 둘 때는 보조 레일을 추가하고 선택한 참조만 재연결한다.
 13. 보조 레일 추가·참조 재연결 전후를 7개 비교 보드에서 즉시 확인한다.
 14. 중심선 굵기는 Font Space에서 유지하고 면은 그리드와 함께 투영한다. `가·고·각·곡` stem 폭 측정이 허용 범위를 벗어날 때만 면 전용 inset constraint를 추가한다.
-15. 첫 수직 검증은 `ㄱ` 기본 마스터와 가로중성 문맥 보정, `ㅇ` 면+내부 공간과 납작형 문맥 보정, `ㅏ` 기존 중심선, `ㅂ·ㅎ·ㅙ`의 축별 코어 Rail 5개 충분성 검증으로 제한한다.
+15. 첫 수직 검증은 `ㄱ` 기본 마스터와 가로홀자 문맥 보정, `ㅇ` 면+내부 공간과 납작형 문맥 보정, `ㅏ` 기존 중심선, `ㅂ·ㅎ·ㅙ`의 축별 코어 Rail 5개 충분성 검증으로 제한한다.
 16. 굵기 UI를 조건부로 변경한다.
    - 선 전용: `전체 획 굵기`.
    - 혼합: `선 획 굵기`.
@@ -800,7 +800,7 @@ projectPartGridToSlot({
 - 면 도구에서 현재 part grid의 모든 원자 셀이 보이며 한 `GridAreaElement`의 점유 집합으로 연속 채우기·비우기 된다.
 - 신규 중심선의 앵커·꺾임이 Rail 교점에 고정되고 Rail 이동 뒤에도 같은 ID 참조를 유지한다.
 - 하나의 `ㄱ` 기본 마스터에서 `가·고·과·각·곡·곽`용 자동 파생 결과를 함께 확인한다.
-- `고` 문맥의 `ㄱ`에 보조 레일을 추가하고 가로획만 재연결해도 기본 마스터와 다른 문맥은 변하지 않는다.
+- `고` 문맥의 `ㄱ`에 보조 레일을 추가하고 가로줄기만 재연결해도 기본 마스터와 다른 문맥은 변하지 않는다.
 - 역할·문맥 코어 프리셋을 수정하면 해당 문맥의 모든 관련 자소가 갱신된다.
 - 현재 자소 문맥 override를 삭제하면 자동 파생 기본값으로 정확히 복원된다.
 - `ㅇ`의 outer와 hole이 명시적으로 분리되어 표시된다.
@@ -934,7 +934,7 @@ projectPartGridToSlot({
 1. 초성·중성·종성 자모별로 기존 중심선 유지, 그리드 연결, 면 추가 여부를 명시적으로 선택한다.
 2. 각 자소별로 역할·문맥 프리셋만으로 충분한지, 자소별 override가 필요한지 명시적으로 검토한다.
 3. 동일한 결과를 갖는 문맥 베리에이션은 공유하고 불필요한 7벌 복제를 만들지 않는다.
-4. 혼합중성의 horizontal/vertical 채널과 겹받침을 포함한 전체 조합을 검증한다.
+4. 섞임홀자의 horizontal/vertical 채널과 겹받침을 포함한 전체 조합을 검증한다.
 5. 캐시를 `base construction → contextual local geometry → quantized slot projection → final union`의 단계로 나눈다.
 6. 키는 `jamoId + role + variant selector + revision IDs + style`을 기본으로 하고 slot 값이 필요하면 고정 정밀도로 양자화한다. 드래그 중 raw float box를 그대로 키로 사용하지 않는다.
 7. 화면은 보이는 문장과 7개 비교 카드만 계산한다.
@@ -970,7 +970,7 @@ projectPartGridToSlot({
 4. `jamoId + role` 기본 마스터가 역할·문맥 프리셋에 따라 7개 레이아웃에서 자동 파생된다.
 5. 프리셋은 STANDALONE/CH/JU/JU_H/JU_V/JO 역할별로 적용되며 관련 없는 역할을 바꾸지 않는다.
 6. 7개 기본 문맥과 특징 태그의 fallback 결과가 입력 순서와 무관하게 결정적이다.
-7. 혼합중성 horizontal/vertical 채널은 각각 자기 역할·grid·slot을 가진다.
+7. 섞임홀자 horizontal/vertical 채널은 각각 자기 역할·grid·slot을 가진다.
 8. 모든 역할별 기본 형태 그리드는 같은 의미의 X/Y 5개 코어 레일을 가지며 대표 검증 결과가 잠금되기 전에는 확장 가능성을 닫지 않는다.
 9. 코어 레일은 삭제하거나 ID를 교체할 수 없고 위치 이동과 문맥 override만 가능하다.
 10. 특정 자소의 특정 형태는 보조 레일과 참조 재연결로 수정할 수 있으며 기본 마스터와 다른 문맥은 변하지 않는다.
@@ -997,7 +997,7 @@ projectPartGridToSlot({
 | 모든 역할에 같은 프리셋을 적용함 | 단독 자음·초성·중성·종성의 조형 규칙이 섞임 | STANDALONE/CH/JU/JU_H/JU_V/JO 역할별 프리셋으로 분리한다 |
 | CH와 JO가 하나의 construction을 공유함 | 역할별 기본 비례 차이가 예외 override로 누적됨 | 영속 마스터를 `jamoId + role`로 분리하고 필요할 때만 연결한다 |
 | 7개 문맥 enum이 실제 조합 차이를 모두 떠안음 | 문맥 폭발 또는 부정확한 자동 파생 | 7개 기본 문맥에 선택적 특징 태그와 deterministic fallback을 둔다 |
-| 혼합중성 채널이 하나의 gridId를 공유함 | JU_H/JU_V 슬롯과 형태 좌표가 뒤섞임 | channel별 role·gridId·elements 구조를 사용한다 |
+| 섞임홀자 채널이 하나의 gridId를 공유함 | JU_H/JU_V 슬롯과 형태 좌표가 뒤섞임 | channel별 role·gridId·elements 구조를 사용한다 |
 | 코어 레일을 실제 레일로 교체·삭제함 | 프리셋·초기화·구형 데이터 의미 손실 | 코어 ID를 영구 유지하고 문맥 위치 override 또는 보조 레일 재연결만 허용한다 |
 | 보조 레일에 absolute 값과 relative 값이 동시에 남음 | 좌표 원본과 Undo 결과가 모호해짐 | `absolute | between` union 중 하나만 저장한다 |
 | between 레일이 순환하거나 레일 순서가 교차함 | 좌표 해석 실패·음수 셀·Boolean 오류 | 동일 축 비순환 그래프, ratio 범위, 단조 순서와 minGap을 저장 전에 검증한다 |
@@ -1065,7 +1065,7 @@ npm run test:e2e
 - X/Y 각 5개의 의미 기반 코어 레일을 최소 계약으로 둔다.
 - 코어 레일은 보존하고, 추가 형태는 보조 레일과 참조 재연결로 표현한다.
 - 레이아웃 슬롯과 자소 형태 원본은 분리하되 최종 `resolvedPartGrid`에서 연결한다.
-- 역할 마스터는 `jamoId + role`로 분리하고 혼합중성 채널은 각자의 role·grid를 가진다.
+- 역할 마스터는 `jamoId + role`로 분리하고 섞임홀자 채널은 각자의 role·grid를 가진다.
 - 7개 기본 문맥 위에 선택적 특징 태그와 deterministic fallback을 둔다.
 - sparse override·live inheritance·provenance·고아 참조 차단을 데이터 계약으로 둔다.
 - 셀 분할은 실루엣을 보존하고 pointercancel은 롤백한다.

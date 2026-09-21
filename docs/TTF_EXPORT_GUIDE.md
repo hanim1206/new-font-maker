@@ -250,10 +250,10 @@ async function processInChunks<T>(
 **해결:** `fontY = upm - svgY` 적용, 슬랜트도 뒤집힌 Y 기준으로 계산
 
 ### 2. SvgRenderer 로직 불완전 복제
-**문제:** 패딩, 혼합중성, 오버라이드 누락 시 글리프 위치/크기가 미리보기와 다름
+**문제:** 패딩, 섞임홀자, 오버라이드 누락 시 글리프 위치/크기가 미리보기와 다름
 **해결:** SvgRenderer.tsx의 모든 분기를 하나씩 읽고 정확히 복제. 특히:
 - `computeEffectivePadding()`: globalPadding + override 머지
-- 혼합중성의 `horizontalStrokes`/`verticalStrokes` 분리
+- 섞임홀자의 `horizontalStrokes`/`verticalStrokes` 분리
 - 자모별 패딩(`jamoPadding`) 박스 축소 적용
 
 ### 3. 베지어 곡선 오프셋 오류
