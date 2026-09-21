@@ -138,7 +138,19 @@ export function applyFacesDelta(faces: ComponentFaces, delta: FacesDelta): Compo
   return { left: faceWithDelta(faces.left, delta.left), right: faceWithDelta(faces.right, delta.right), top: faceWithDelta(faces.top, delta.top), bottom: faceWithDelta(faces.bottom, delta.bottom) }
 }
 
-// 카드에 올릴 글자 표본. 초성·받침은 자주 쓰는 것 위주로 골라 문맥이 고루 섞이게 한다.
+// 카드에 먼저 올리는 글자. 우리말에서 자주 쓰는 글자를 레이아웃마다 사용자가 묶음(카드 한 장면)째 골랐다 — 묶음 안에서 초성·받침이 되도록 안 겹친다.
+// 고른 기록은 옵시디언 `아이디어/2026-09-21_예시-글자-후보.md`. 드문 자모나 묶음이 다 돌고 나면 아래 기계 조합으로 채운다.
+const SAMPLE_BATCHES: Readonly<Record<string, readonly string[]>> = {
+  right: ['이처계때께하서녀', '에터키며가례대지', '피야배려다혜써게'],
+  'right-final': ['한임명집실것없력', '있심년할책정법같', '일많겠성힘닭짧적'],
+  bottom: ['고조수끄뿌요크효', '도구누유쓰보트표', '로뉴초교부무뜨으'],
+  'bottom-final': ['는급꽃몫북들품용', '을죽놓숲뜻큼균통', '은를중습춤곧쪽높'],
+  mixed: ['와뇌최쾌뭐뒤화궤', '의쉬죄과되뛰봐꽤', '위회귀쇠띄놔줘돼'],
+  'mixed-final': ['됨쉽횟봤권뭘왕퀵', '원될줬광획쉰뛸놨', '된웠관훨꽝쫙'],
+}
+const identitiesOf = (text: string): CorpusIdentity[] => [...text].map((character) => corpusIdentity(character.codePointAt(0)!))
+
+// 고른 글자가 모자랄 때 채우는 기계 조합. 초성·받침은 자주 쓰는 것 위주로 골라 문맥이 고루 섞이게 한다.
 const SAMPLE_INITIALS = [...'ㄱㄴㅁㅅㅇㅈㅎㄹㅂㅋ']
 const SAMPLE_FINALS: (string | null)[] = [null, ...'ㄴㄹㅁㅇㄱㅂ']
 
@@ -154,8 +166,51 @@ function scopeMatches(scope: PropagationScope, source: CorpusIdentity, target: C
   return target.contextId === source.contextId && jamo !== null && jamos.includes(jamo)
 }
 
+/** 묶음에 없는 초성을 먼저 집는다. 없으면 맨 앞. */
+const takeFresh = (rest: readonly CorpusIdentity[], page: readonly CorpusIdentity[]): CorpusIdentity | undefined => rest.find((item) => !page.some((other) => other.initialJamo === item.initialJamo)) ?? rest[0]
+
 /**
- * 범위에 드는 글자 중 count개. 전체 표본을 고른 간격으로 뽑아 초성·홀자·받침이 겹치지 않게 하고,
+ * 고른 글자로 짠 묶음들. `layer`는 그 레이아웃의 묶음 그대로, `jamo`는 그중 고른 자모만, `all`은 여섯 레이아웃을 한 묶음에 섞는다.
+ * 원본 글자는 빠지고, 빠진 자리는 같은 레이아웃의 다른 고른 글자로 메운다.
+ */
+function curatedPages(source: CorpusIdentity, scope: PropagationScope, count: number, focus: Part | undefined, jamos: readonly string[]): CorpusIdentity[][] {
+  const usable = (item: CorpusIdentity) => item.codepoint !== source.codepoint && scopeMatches(scope, source, item, focus, jamos)
+  if (scope === 'all') {
+    // 레이아웃마다 줄을 세우고 돌아가며 한 장씩 뽑는다. 뽑은 글자는 줄에서 빠져 다음 묶음에 다시 안 나온다.
+    const queues = Object.values(SAMPLE_BATCHES).map((batches) => identitiesOf(batches.join('')).filter(usable))
+    const pages: CorpusIdentity[][] = []
+    while (queues.some((queue) => queue.length > 0)) {
+      const page: CorpusIdentity[] = []
+      for (let turn = 0; page.length < count && queues.some((queue) => queue.length > 0); turn += 1) {
+        const queue = queues[turn % queues.length]
+        const next = takeFresh(queue, page)
+        if (!next) continue
+        queue.splice(queue.indexOf(next), 1)
+        page.push(next)
+      }
+      pages.push(page)
+    }
+    return pages
+  }
+  const batches = (SAMPLE_BATCHES[source.contextId] ?? []).map(identitiesOf)
+  if (scope === 'jamo') {
+    const matched = batches.flat().filter(usable)
+    return Array.from({ length: Math.ceil(matched.length / count) }, (_, index) => matched.slice(index * count, (index + 1) * count))
+  }
+  return batches.map((batch) => {
+    const page = batch.filter(usable).slice(0, count)
+    const target = Math.min(count, batch.length)
+    while (page.length < target) {
+      const next = takeFresh(batches.flat().filter((item) => usable(item) && !page.includes(item)), page)
+      if (!next) break
+      page.push(next)
+    }
+    return page
+  })
+}
+
+/**
+ * 범위에 드는 글자 중 count개. 고른 글자 묶음이 먼저 나오고, 모자란 자리와 그 뒤 묶음은 기계 조합을 고른 간격으로 뽑아 채운다.
  * page를 올리면 다음 묶음으로 넘어간다. `jamo` 범위는 고른 자모가 표본 목록에 없어도 그 자모 글자를 넣는다.
  */
 export function propagationCandidates(input: { source: CorpusIdentity; scope: PropagationScope; count: number; page?: number; /** 잡은 부품. `jamo` 범위에서 어느 부품 자모를 맞출지 정한다. */ focus?: Part; /** `jamo` 범위에서 고른 자모. */ jamos?: readonly string[] }): CorpusIdentity[] {
@@ -173,14 +228,24 @@ export function propagationCandidates(input: { source: CorpusIdentity; scope: Pr
     const identity = corpusIdentity(codepoint)
     if (scopeMatches(scope, source, identity, focus, jamos)) pool.push(identity)
   }
-  if (pool.length === 0) return []
-  const pages = Math.max(1, Math.ceil(pool.length / count))
-  const page = ((input.page ?? 0) % pages + pages) % pages
-  const picked: CorpusIdentity[] = []
-  for (let i = 0; i < count; i += 1) {
-    const slot = i * pages + page
-    if (slot >= pool.length) break
-    picked.push(pool[slot])
+  const curated = curatedPages(source, scope, count, focus, jamos)
+  const curatedCodepoints = new Set(curated.flat().map((item) => item.codepoint))
+  const fill = pool.filter((item) => !curatedCodepoints.has(item.codepoint))
+  const fillPages = Math.ceil(fill.length / count)
+  // `jamo` 범위는 고른 자모 글자가 몇 없어서 고른 글자와 기계 조합을 한 묶음에 같이 올린다. 나머지 범위는 고른 묶음이 다 돈 뒤에 기계 조합이 나온다.
+  const mixed = scope === 'jamo'
+  const total = mixed ? Math.max(curated.length, fillPages) : curated.length + fillPages
+  if (total === 0) return []
+  const page = ((input.page ?? 0) % total + total) % total
+  const picked = page < curated.length ? [...curated[page]] : []
+  if (page < curated.length && !mixed) return picked
+  // 기계 조합은 고른 간격으로 뽑는다.
+  const stride = Math.max(1, fillPages)
+  const offset = mixed ? page % stride : page - curated.length
+  for (let i = 0; picked.length < count; i += 1) {
+    const slot = i * stride + offset
+    if (slot >= fill.length) break
+    picked.push(fill[slot])
   }
   return picked
 }
