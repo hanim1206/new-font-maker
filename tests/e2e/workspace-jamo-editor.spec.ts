@@ -162,3 +162,28 @@ test('획 편집 `사각`은 닫힌 네 점 획을 넣고, `복제`는 고른 �
   expect(square && copy && Math.abs(copy.width - square.width) < 2 && copy.x > square.x && copy.y > square.y).toBe(true)
   await page.screenshot({ path: 'test-results/stroke-add-square-duplicate.png' })
 })
+
+test('획 편집 `초기화`는 고친 자소를 프리셋으로 되돌리고, 되돌리기 한 번이면 고친 모양이 돌아온다', async ({ page }) => {
+  await page.goto('/workspace/jamo?mode=stroke')
+  const editor = page.getByRole('region', { name: /완성 글자 편집/ })
+  await expect(editor).toBeVisible()
+  const tools = page.getByRole('toolbar', { name: '획 편집 도구' })
+  const reset = page.getByTestId('jamo-stroke-reset')
+  const strokes = editor.locator('svg [data-editor-hit="stroke"]')
+  await strokes.first().dispatchEvent('pointerdown')
+  await strokes.first().dispatchEvent('pointerdown')
+  const before = await strokes.count()
+  // 손대기 전에는 프리셋 그대로라 꺼져 있다.
+  await expect(reset).toBeDisabled()
+
+  await tools.getByRole('button', { name: '획 복제' }).click()
+  await expect(strokes).toHaveCount(before + 1)
+  await expect(reset).toBeEnabled()
+  await reset.click()
+  await expect(strokes).toHaveCount(before)
+  await expect(reset).toBeDisabled()
+  await expect(editor.locator('svg [data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(1)
+
+  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
+  await expect(strokes).toHaveCount(before + 1)
+})

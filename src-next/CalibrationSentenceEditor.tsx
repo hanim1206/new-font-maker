@@ -1,5 +1,5 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type Ref, type RefObject, type TextareaHTMLAttributes } from 'react'
-import { ArrowLeft, Check, Circle, Copy, CopyPlus, Delete, Dices, Download, LayoutDashboard, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, Settings2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
+import { ArrowLeft, Check, Circle, Copy, CopyPlus, Delete, Dices, Download, LayoutDashboard, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, RotateCcw, Settings2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
@@ -20,7 +20,7 @@ import type { SnapCandidate, SnapHit } from './railSnap'
 import { baselineRails } from './notoBaselineRails'
 import { useNotoGlyph } from './useNotoGlyph'
 import { PART_COLOR, PART_LABEL } from './partColors'
-import { useJamoStore } from '../src/stores/jamoStore'
+import { getBaseJamo, useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import { moveHandle, movePoint, moveStroke, scaleStroke } from '../src/services/editorCommands'
 import { scaleLayoutParts, translateLayoutParts } from '../src/services/layoutProfileCommands'
@@ -1250,6 +1250,19 @@ function InferenceTrackpad({
     onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId, delta: { x: 0, y: 0 } })
     onSelectionChange({ ...selection, kind: 'stroke', strokeId, jamo: after, pointsOpen: false })
   }
+  // 지금 자소(고른 것, 없으면 잠긴 것)를 기본 프리셋으로 되돌린다. 문맥 변형까지 처음 그대로 — 틀 · 잉크 간격 보정도 얹지 않는다.
+  // 되돌리기 한 줄이라 확인 창은 두지 않는다.
+  const resetBase = creationBase ? getBaseJamo(creationBase.jamo.type, creationBase.jamo.char) : undefined
+  const canResetJamo = Boolean(creationBase && resetBase
+    && JSON.stringify(getJamo(creationBase.jamo.type, creationBase.jamo.char)) !== JSON.stringify(resetBase))
+  const resetJamo = () => {
+    const selection = creationBase
+    if (!selection || !resetBase || !canResetJamo) return
+    const before = structuredClone(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo)
+    const firstStrokeId = getJamoStrokes(adoptFamilyStrokes(resetBase, familyOfSyllable(syllable)))[0]?.id ?? selection.strokeId
+    onCommitJamo(before, resetBase, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId: firstStrokeId, delta: { x: 0, y: 0 } }, { unframed: true, pastGapLimit: true })
+    onSelectionChange({ ...selection, kind: 'stroke', strokeId: firstStrokeId, jamo: resetBase, pointsOpen: false })
+  }
   const connectStroke = () => {
     if ((selection.kind !== 'stroke' && selection.kind !== 'point' && selection.kind !== 'handle') || !selectedStroke || !mergeTarget) return
     const merged = mergeStrokes(selectedStroke, mergeTarget)
@@ -1371,6 +1384,7 @@ function InferenceTrackpad({
           {deleteButton}
         </>}
         {multiSelectButton}
+        {creationBase && <button type="button" onClick={resetJamo} disabled={!canResetJamo} aria-label={`${creationBase.jamo.char} 프리셋으로 초기화`} data-testid="jamo-stroke-reset"><RotateCcw size={18} aria-hidden="true" /><span>초기화</span></button>}
       </div>
     )
     return (

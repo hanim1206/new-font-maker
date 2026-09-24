@@ -173,6 +173,12 @@ const BASE_JAMOS = {
   jongseong: baseJamos.jongseong as Record<string, JamoData>,
 }
 
+/** 한 자모의 기본 프리셋(baseJamos.json) 사본. 사용자가 고친 것과 상관없는 처음 모양. */
+export function getBaseJamo(type: 'choseong' | 'jungseong' | 'jongseong', char: string): JamoData | undefined {
+  const base = BASE_JAMOS[type][char]
+  return base ? deepClone(base) : undefined
+}
+
 export const useJamoStore = create<JamoState & JamoActions>()(
   persist(
     immer((set, get) => ({
