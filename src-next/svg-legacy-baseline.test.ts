@@ -103,6 +103,9 @@ describe('기존 선 전용 SVG 의미 baseline', () => {
       import('../src/stores/globalStyleStore'),
       import('../src/utils/hangulUtils'),
     ])
+    // baseline fixture는 옛 기본 네모꼴(850 정네모, 사방 0.075)에서 만든 것. 지금 기본은 Noto 몸통(840 × 910)이라 여기서 옛 틀을 박아 둔다.
+    const { LEGACY_REFERENCE_BODY_PADDING } = await import('../src/services/designBodyPlacement')
+    useLayoutStore.getState().setGlobalPadding({ ...LEGACY_REFERENCE_BODY_PADDING })
     const layout = useLayoutStore.getState()
     // 옛 기본 획(2026-02) + 사용자 프리셋 01. baseline fixture는 그때 획으로 만든 것이다.
     const legacy = legacyJamos as unknown as Record<'choseong' | 'jungseong' | 'jongseong', Record<string, JamoData>>

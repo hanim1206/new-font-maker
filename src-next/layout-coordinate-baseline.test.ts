@@ -87,8 +87,9 @@ function collectBaseline(runtimePadding: Padding) {
 
 describe('Step 1 레이아웃 좌표 기준값', () => {
   it('layoutStore와 Calibration USER_PRESET_01의 fresh-state 좌표를 exact canonical JSON으로 보존한다', async () => {
-    const { DEFAULT_GLOBAL_PADDING } = await import('../src/stores/layoutStore')
-    const actual = collectBaseline(DEFAULT_GLOBAL_PADDING)
+    // 기준값은 옛 기본 네모꼴(850 정네모, 사방 0.075)에서 얼린 것. 기본 네모꼴이 Noto 몸통으로 바뀐 뒤(2026-09-24)에도 옛 틀에서는 같은 좌표가 나와야 한다.
+    const { LEGACY_REFERENCE_BODY_PADDING } = await import('../src/services/designBodyPlacement')
+    const actual = collectBaseline(LEGACY_REFERENCE_BODY_PADDING)
     expect(canonicalJson(actual)).toBe(canonicalJson(baseline))
   })
 })

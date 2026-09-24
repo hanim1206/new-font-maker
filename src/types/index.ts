@@ -213,7 +213,7 @@ export interface LayoutGap {
 export interface LayoutSchema {
   id: LayoutType
   slots: Part[]
-  // Font Space 안의 바깥 Design Body. 있으면 기본 850×850 좌표로 계산한
+  // Font Space 안의 바깥 Design Body. 있으면 기본 네모꼴(Noto 몸통 840×910) 좌표로 계산한
   // 내부 분할·여백을 이 영역에 비례 변환한다.
   designBodyPadding?: Padding
   splits?: Split[] // 0~N개의 기준선

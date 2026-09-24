@@ -72,12 +72,12 @@ import {
   type CalibrationInkGapViolation,
 } from './calibrationInkGap'
 import { resolveSyllableContextualInkSafety, withContextualInkSafety } from '../src/utils/contextualInkSafety'
-import { centeredDesignBodyPadding, paddingToDesignBody } from './designBody'
+import { designBodyPaddingOfSize, paddingToDesignBody } from './designBody'
 import { useFontExportStore } from './fontExportStore'
 import { useGlobalStyleStore, type GlobalStyle } from '../src/stores/globalStyleStore'
 import { BrushStyleTrackpad, type StrokeEnds } from './BrushStyleTrackpad'
 import { StemBeakControls } from './StemBeakControls'
-import { designBodySvgTransform } from '../src/services/designBodyPlacement'
+import { designBodySvgTransform, REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../src/services/designBodyPlacement'
 import { endRangeDrag, moveRangeDrag, startRangeDrag } from './rangeDrag'
 import { DEFAULT_STEM_BEAK, type StemBeakStyle } from '../src/services/stemBeak'
 import styleMode from './GlobalStyleMode.module.css'
@@ -1234,31 +1234,33 @@ function InferenceTrackpad({
 }
 
 /**
- * 제품 화면의 네모꼴: 막대 하나(길쭉 ↔ 정네모 ↔ 납작). 고르는 건 장평 하나뿐이라 가로 · 세로를 따로 두지 않는다.
+ * 제품 화면의 네모꼴: 막대 하나(길쭉 ↔ 노토 비율 ↔ 납작). 고르는 건 장평 하나뿐이라 가로 · 세로를 따로 두지 않는다.
+ * 0점은 기본 네모꼴 = 노토 몸통(840 × 910, 세로가 김). 정네모(W = H)는 막대 오른쪽의 한 지점이다.
  * 왼쪽은 세로를 둔 채 가로를 줄이고(500까지), 오른쪽은 가로를 글자 칸 끝(1000)까지 늘린 뒤 세로를 줄인다(500까지).
  */
-const BODY_SQUARE = 850
+const BODY_W = Math.round(REFERENCE_WIDTH * 1000)
+const BODY_H = Math.round(REFERENCE_HEIGHT * 1000)
 const BODY_MIN = 500
 const BODY_MAX = 1000
-/** 막대는 −100(가장 길쭉) ~ 0(정네모) ~ 100(가장 납작). 정네모가 막대 한가운데에 오게 양쪽을 따로 편다. */
+/** 막대는 −100(가장 길쭉) ~ 0(노토 비율) ~ 100(가장 납작). 0점이 막대 한가운데에 오게 양쪽을 따로 편다. */
 const BODY_SHAPE_LIMIT = 100
 const BODY_SHAPE_STICKY = 4
-const TALL_SPAN = BODY_SQUARE - BODY_MIN
-const FLAT_SPAN = (BODY_MAX - BODY_SQUARE) + (BODY_SQUARE - BODY_MIN)
+const TALL_SPAN = BODY_W - BODY_MIN
+const FLAT_SPAN = (BODY_MAX - BODY_W) + (BODY_H - BODY_MIN)
 const roundTo5 = (value: number) => Math.round(value / 5) * 5
 
 function bodyOfShape(shape: number): { width: number; height: number } {
-  if (shape <= 0) return { width: roundTo5(BODY_SQUARE + shape / BODY_SHAPE_LIMIT * TALL_SPAN), height: BODY_SQUARE }
+  if (shape <= 0) return { width: roundTo5(BODY_W + shape / BODY_SHAPE_LIMIT * TALL_SPAN), height: BODY_H }
   const amount = shape / BODY_SHAPE_LIMIT * FLAT_SPAN
-  const widen = Math.min(amount, BODY_MAX - BODY_SQUARE)
-  return { width: roundTo5(BODY_SQUARE + widen), height: roundTo5(BODY_SQUARE - (amount - widen)) }
+  const widen = Math.min(amount, BODY_MAX - BODY_W)
+  return { width: roundTo5(BODY_W + widen), height: roundTo5(BODY_H - (amount - widen)) }
 }
 
 /** 저장된 가로 · 세로를 막대 자리로 읽는다. 옛 화면에서 둘을 따로 맞춘 값은 비율만 읽어 보여 주고, 막대를 움직이기 전에는 값을 안 건드린다. */
 function shapeOfBody(width: number, height: number): number {
   const ratio = width / Math.max(height, 1)
-  if (ratio <= 1) return Math.round((BODY_SQUARE * ratio - BODY_SQUARE) / TALL_SPAN * BODY_SHAPE_LIMIT)
-  const amount = ratio <= BODY_MAX / BODY_SQUARE ? BODY_SQUARE * ratio - BODY_SQUARE : (BODY_MAX - BODY_SQUARE) + (BODY_SQUARE - BODY_MAX / ratio)
+  if (ratio <= BODY_W / BODY_H) return Math.round((ratio * BODY_H - BODY_W) / TALL_SPAN * BODY_SHAPE_LIMIT)
+  const amount = ratio <= BODY_MAX / BODY_H ? ratio * BODY_H - BODY_W : (BODY_MAX - BODY_W) + (BODY_H - BODY_MAX / ratio)
   return Math.round(amount / FLAT_SPAN * BODY_SHAPE_LIMIT)
 }
 
@@ -1268,19 +1270,20 @@ function DesignBodyShapeControls({ fontSpace }: { fontSpace: { unitsPerEm: numbe
   const resetGlobalPadding = useLayoutStore((state) => state.resetGlobalPadding)
   const body = paddingToDesignBody(globalPadding, fontSpace)
   const shape = Math.max(-BODY_SHAPE_LIMIT, Math.min(BODY_SHAPE_LIMIT, shapeOfBody(body.width, body.height)))
-  const isSquare = Math.round(body.width) === BODY_SQUARE && Math.round(body.height) === BODY_SQUARE
-  // 정네모 근처에서는 탁 걸린다.
+  const isReference = Math.round(body.width) === BODY_W && Math.round(body.height) === BODY_H
+  const isSquare = Math.round(body.width) === Math.round(body.height)
+  // 노토 비율(0점) 근처에서는 탁 걸린다.
   const setShape = (value: number | null) => {
     if (value === null) return
     const next = Math.abs(value) <= BODY_SHAPE_STICKY ? 0 : value
-    if (next === shape && !(next === 0 && !isSquare)) return
+    if (next === shape && !(next === 0 && !isReference)) return
     const target = bodyOfShape(next)
-    setGlobalPadding(centeredDesignBodyPadding(target.width, target.height, fontSpace))
+    setGlobalPadding(designBodyPaddingOfSize(target.width, target.height, fontSpace))
   }
   return <div className={styleMode.weight} role="tabpanel" aria-label="글자 네모꼴 설정">
     <p><strong>글자가 들어가는 틀의 모양</strong><span>틀을 바꾸면 글자도 같이 바뀝니다</span></p>
     <div className={styleMode.weightBox}>
-      <div className={styleMode.weightHead}><span>{shape === 0 ? '정네모' : shape < 0 ? '길쭉하게' : '납작하게'}</span><output data-testid="style-body-size">{Math.round(body.width)} × {Math.round(body.height)}</output></div>
+      <div className={styleMode.weightHead}><span>{isReference ? '노토 비율' : isSquare ? '정네모' : shape < 0 ? '길쭉하게' : '납작하게'}</span><output data-testid="style-body-size">{Math.round(body.width)} × {Math.round(body.height)}</output></div>
       <div className={styleMode.shapeRow}>
         <span className={styleMode.shapeIcon} style={{ width: 12, height: 20 }} aria-hidden="true" />
         <input type="range" min={-BODY_SHAPE_LIMIT} max={BODY_SHAPE_LIMIT} step="1" value={shape} aria-label="네모꼴 모양" data-testid="style-body-shape" onChange={(event) => setShape(Number(event.target.value))}
@@ -1288,7 +1291,7 @@ function DesignBodyShapeControls({ fontSpace }: { fontSpace: { unitsPerEm: numbe
         <span className={styleMode.shapeIcon} style={{ width: 22, height: 12 }} aria-hidden="true" />
       </div>
     </div>
-    <button type="button" disabled={isSquare} onClick={resetGlobalPadding}>정네모 850 × 850으로 되돌리기</button>
+    <button type="button" disabled={isReference} onClick={resetGlobalPadding}>노토 몸통 {BODY_W} × {BODY_H}으로 되돌리기</button>
   </div>
 }
 
@@ -1311,7 +1314,7 @@ function DesignBodyControls({
   const body = paddingToDesignBody(padding, fontSpace)
 
   const updateBody = (dimension: 'width' | 'height', value: number) => {
-    const next = centeredDesignBodyPadding(
+    const next = designBodyPaddingOfSize(
       dimension === 'width' ? value : body.width,
       dimension === 'height' ? value : body.height,
       fontSpace,
@@ -1350,7 +1353,7 @@ function DesignBodyControls({
       <label><span>가로 <output>{Math.round(body.width)}</output></span><input type="range" min="500" max="1000" step="5" value={Math.round(body.width)} onChange={(event) => updateBody('width', Number(event.target.value))} {...dragBody('width')} /></label>
       <label><span>세로 <output>{Math.round(body.height)}</output></span><input type="range" min="500" max="1000" step="5" value={Math.round(body.height)} onChange={(event) => updateBody('height', Number(event.target.value))} {...dragBody('height')} /></label>
     </div>
-    <button type="button" className={styles.bodyReset} disabled={scope === 'layout' ? !layoutOverride : body.width === 850 && body.height === 850} onClick={() => scope === 'layout' ? removePaddingOverride(layoutType) : resetGlobalPadding()}>{scope === 'layout' ? '폰트 전체 설정 따르기' : '기본 850 × 850으로 되돌리기'}</button>
+    <button type="button" className={styles.bodyReset} disabled={scope === 'layout' ? !layoutOverride : body.width === BODY_W && body.height === BODY_H} onClick={() => scope === 'layout' ? removePaddingOverride(layoutType) : resetGlobalPadding()}>{scope === 'layout' ? '폰트 전체 설정 따르기' : '기본 840 × 910으로 되돌리기'}</button>
   </div>
 }
 

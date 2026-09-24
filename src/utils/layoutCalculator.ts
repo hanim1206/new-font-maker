@@ -37,7 +37,11 @@ const DEFAULT_PADDING: Padding = {
   right: 0.05,
 }
 
-/** 모든 레이아웃이 해석되는 canonical 850×850 Design Body 경계. */
+/**
+ * 옛 Split + Padding 스키마가 해석되는 canonical Design Body 경계(850 × 850, 사방 0.075). 스키마의 분할값과 간격이 이 틀에서 만들어졌다.
+ * Noto 모델 상자의 기준 네모꼴(`designBodyPlacement.REFERENCE_BODY_PADDING`, 840 × 910)과는 다른 것이다: 여기서 계산한 상자를
+ * 사용자 네모꼴로 옮기는 선형 변환만 같다. 사용자 기본 네모꼴이 Noto 몸통으로 바뀌어도(2026-09-24) 이 값은 그대로 둔다.
+ */
 export const DESIGN_BODY_BASE_PADDING: Padding = {
   top: 0.075,
   bottom: 0.075,

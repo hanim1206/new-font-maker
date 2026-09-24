@@ -16,7 +16,7 @@ test('폰트 전체와 현재 레이아웃의 네모꼴을 따로 조절한다',
   const beforePreview = await sentenceGlyph.innerHTML()
   const beforeAdvance = await sentenceButton.boundingBox()
   const width = settings.locator('label').filter({ hasText: '가로' }).locator('input')
-  await expect(width).toHaveValue('850')
+  await expect(width).toHaveValue('840')
   await width.fill('900')
   await expect(settings.getByText('900', { exact: true })).toBeVisible()
   await expect.poll(() => sentenceGlyph.innerHTML()).not.toBe(beforePreview)
@@ -29,10 +29,10 @@ test('폰트 전체와 현재 레이아웃의 네모꼴을 따로 조절한다',
 
   await settings.getByRole('button', { name: '폰트 전체 설정 따르기' }).click()
   await expect(settings.locator('label').filter({ hasText: '가로' }).locator('input')).toHaveValue('900')
-  await expect(settings.locator('label').filter({ hasText: '세로' }).locator('input')).toHaveValue('850')
+  await expect(settings.locator('label').filter({ hasText: '세로' }).locator('input')).toHaveValue('910')
 
   await settings.getByRole('tab', { name: '폰트 전체' }).click()
-  await settings.getByRole('button', { name: '기본 850 × 850으로 되돌리기' }).click()
-  await expect(settings.locator('label').filter({ hasText: '가로' }).locator('input')).toHaveValue('850')
-  await expect(settings.locator('label').filter({ hasText: '세로' }).locator('input')).toHaveValue('850')
+  await settings.getByRole('button', { name: '기본 840 × 910으로 되돌리기' }).click()
+  await expect(settings.locator('label').filter({ hasText: '가로' }).locator('input')).toHaveValue('840')
+  await expect(settings.locator('label').filter({ hasText: '세로' }).locator('input')).toHaveValue('910')
 })

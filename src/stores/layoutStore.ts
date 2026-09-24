@@ -5,6 +5,7 @@ import type { LayoutType, BoxConfig, LayoutSchema, Part, Padding, PartOverride, 
 import { DEFAULT_LAYOUT_CONFIGS, type LayoutConfig } from '../data/layoutConfigs'
 import { calculateBoxes, DEFAULT_LAYOUT_SCHEMAS as CALC_SCHEMAS, BASE_PRESETS_SCHEMAS } from '../utils/layoutCalculator'
 import { createDebouncedStorage } from '../utils/debouncedStorage'
+import { REFERENCE_BODY_PADDING, normalizeReferencePadding } from '../services/designBodyPlacement'
 
 const STORAGE_KEY = 'font-maker-layout-schemas'
 const rawStorage = createDebouncedStorage(300)
@@ -14,13 +15,8 @@ export function flushLayoutStorePersistence(): void {
   rawStorage.flush(STORAGE_KEY)
 }
 
-// 글로벌 패딩 기본값
-export const DEFAULT_GLOBAL_PADDING: Padding = {
-  top: 0.075,
-  bottom: 0.075,
-  left: 0.075,
-  right: 0.075,
-}
+// 글로벌 패딩 기본값 = 기본 네모꼴(Noto 몸통 840 × 910)
+export const DEFAULT_GLOBAL_PADDING: Padding = { ...REFERENCE_BODY_PADDING }
 
 interface LayoutState {
   // 레이아웃 타입별 스키마 (Split + Padding 기반)
@@ -415,7 +411,7 @@ export const useLayoutStore = create<LayoutState & LayoutActions>()(
       loadFontData: (data) =>
         set((state) => {
           state.layoutSchemas = deepClone(data.layoutSchemas)
-          state.globalPadding = { ...data.globalPadding }
+          state.globalPadding = normalizeReferencePadding({ ...data.globalPadding })
           state.paddingOverrides = deepClone(data.paddingOverrides)
           syncAllConfigs(state)
         }),
@@ -447,6 +443,8 @@ export const useLayoutStore = create<LayoutState & LayoutActions>()(
           if (!state.globalPadding) {
             state.globalPadding = { ...DEFAULT_GLOBAL_PADDING }
           }
+          // 2026-09-24 이전 저장값(사방 0.075 = 옛 기본 네모꼴)은 새 기본으로 읽는다.
+          state.globalPadding = normalizeReferencePadding(state.globalPadding)
           if (!state.paddingOverrides) {
             state.paddingOverrides = {}
           }

@@ -1,19 +1,42 @@
 import type { BoxConfig, Padding } from '../types'
 
 /**
- * Noto 모델 상자는 기본 네모꼴(850 × 850, 사방 여백 0.075) 기준의 em 좌표다.
+ * Noto 모델 상자는 기본 네모꼴 기준의 em 좌표다. 기본 네모꼴 = Noto 여섯 레이아웃 잉크의 합집합(840 × 910).
+ * 여백은 위 50 · 아래 40 · 왼 50 · 오른 110. 오른쪽이 넓은 건 Noto 한글이 글자 칸 왼쪽으로 치우쳐 앉아서다(데이터 그대로).
  * 사용자가 네모꼴을 바꾸면 그 기준 틀을 사용자 틀로 옮기는 선형 변환을 상자에 얹는다 — 틀을 줄이면 글자도 같이 준다.
  * 중심선 상자만 옮기므로 획 두께는 그대로다(원칙: 두께는 고정). 기본 네모꼴에서는 아무것도 바꾸지 않는다.
+ * 2026-09-24 이전의 기본 네모꼴은 850 정네모(사방 0.075)였다. 그때 저장된 값은 `normalizeReferencePadding`이 새 기본으로 읽는다.
  */
-export const REFERENCE_BODY_PADDING: Padding = { top: 0.075, bottom: 0.075, left: 0.075, right: 0.075 }
+export const REFERENCE_BODY_PADDING: Padding = { top: 0.05, bottom: 0.04, left: 0.05, right: 0.11 }
+export const LEGACY_REFERENCE_BODY_PADDING: Padding = { top: 0.075, bottom: 0.075, left: 0.075, right: 0.075 }
 
 const EPSILON = 1e-9
-const REFERENCE_WIDTH = 1 - REFERENCE_BODY_PADDING.left - REFERENCE_BODY_PADDING.right
-const REFERENCE_HEIGHT = 1 - REFERENCE_BODY_PADDING.top - REFERENCE_BODY_PADDING.bottom
+const SIDES = ['top', 'bottom', 'left', 'right'] as const
+export const REFERENCE_WIDTH = 1 - REFERENCE_BODY_PADDING.left - REFERENCE_BODY_PADDING.right
+export const REFERENCE_HEIGHT = 1 - REFERENCE_BODY_PADDING.top - REFERENCE_BODY_PADDING.bottom
+
+const samePadding = (a: Padding, b: Padding) => SIDES.every((side) => Math.abs(a[side] - b[side]) < EPSILON)
 
 export function isReferenceBody(padding: Padding | undefined): boolean {
   if (!padding) return true
-  return (['top', 'bottom', 'left', 'right'] as const).every((side) => Math.abs(padding[side] - REFERENCE_BODY_PADDING[side]) < EPSILON)
+  return samePadding(padding, REFERENCE_BODY_PADDING)
+}
+
+/** 옛 기본 네모꼴(사방 0.075)로 저장된 여백은 "기본"이라는 뜻이므로 새 기본으로 읽는다. 그 외는 그대로. */
+export function normalizeReferencePadding(padding: Padding): Padding {
+  return samePadding(padding, LEGACY_REFERENCE_BODY_PADDING) ? { ...REFERENCE_BODY_PADDING } : padding
+}
+
+/**
+ * 가로 · 세로 크기로 여백을 만든다. 남는 칸은 기본 네모꼴의 여백 비율(왼 50 : 오른 110, 위 50 : 아래 40)로 나눈다.
+ * 그래서 기본 크기로 돌아오면 정확히 기본 네모꼴이 되고, 글자는 Noto와 같은 자리에 앉는다.
+ */
+export function designBodyPaddingForSize(width: number, height: number, fontSpace: { width: number; height: number }): Padding {
+  const spareX = Math.max(0, fontSpace.width - width) / fontSpace.width
+  const spareY = Math.max(0, fontSpace.height - height) / fontSpace.height
+  const ratioX = REFERENCE_BODY_PADDING.left / (REFERENCE_BODY_PADDING.left + REFERENCE_BODY_PADDING.right)
+  const ratioY = REFERENCE_BODY_PADDING.top / (REFERENCE_BODY_PADDING.top + REFERENCE_BODY_PADDING.bottom)
+  return { left: spareX * ratioX, right: spareX * (1 - ratioX), top: spareY * ratioY, bottom: spareY * (1 - ratioY) }
 }
 
 export function designBodyScale(padding: Padding): { x: number; y: number } {

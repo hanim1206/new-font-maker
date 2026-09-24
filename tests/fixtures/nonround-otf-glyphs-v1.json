@@ -8,15 +8,15 @@
     },
     "glyph": {
       "unicode": 44285,
-      "advanceWidth": 850,
+      "advanceWidth": 840,
       "bbox": {
-        "x1": -70,
+        "x1": -45,
         "y1": -95,
-        "x2": 840,
+        "x2": 865,
         "y2": 844
       },
       "commandCount": 169,
-      "commandsSha256": "39bb7c9f43056ef667caeb11d2876419e11e51f305c61f36fee47cd5bdcc50e8"
+      "commandsSha256": "da27292ce0a1f31bca10499f8bac40cb14f4d19bed09d07a96e832b761f2dce7"
     }
   },
   "rectangle": {
@@ -28,15 +28,15 @@
     },
     "glyph": {
       "unicode": 44285,
-      "advanceWidth": 850,
+      "advanceWidth": 840,
       "bbox": {
-        "x1": -66,
+        "x1": -41,
         "y1": -93,
-        "x2": 836,
+        "x2": 861,
         "y2": 843
       },
       "commandCount": 32,
-      "commandsSha256": "8306be17ac01049000cd2b65b8789c5debc4e339b3a6921178336ef006ced8e7"
+      "commandsSha256": "218f7a1bb584191c61a797156bca3033cbcbda84508946e59f59feb4b313663b"
     }
   },
   "angledArea": {
@@ -48,15 +48,15 @@
     },
     "glyph": {
       "unicode": 44285,
-      "advanceWidth": 850,
+      "advanceWidth": 840,
       "bbox": {
-        "x1": -81,
+        "x1": -56,
         "y1": -99,
-        "x2": 851,
+        "x2": 876,
         "y2": 849
       },
       "commandCount": 100,
-      "commandsSha256": "8f16b066cb6b8c1aeab3c67d10217c029561ac5a6baed10b9fe1dac11ce55787"
+      "commandsSha256": "a8908092f68ebb9b8ab2e35057acff1471c77a9c2f0828cecfac6a3231be5cfa"
     }
   }
 }

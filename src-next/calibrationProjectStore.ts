@@ -57,7 +57,10 @@ export interface SampleGlyphEdit {
 
 export const DEFAULT_FONT_SPACE: FontSpace = { unitsPerEm: 1000, width: 1000, height: 1000 }
 export const DEFAULT_FONT_GRID: FontGrid = { majorDivisions: 8, minorInterval: 25, snapInterval: 5 }
-export const DEFAULT_DESIGN_BODY: DesignBody = { x: 75, y: 75, width: 850, height: 850 }
+/** 기본 네모꼴 = Noto 몸통. `REFERENCE_BODY_PADDING`(위 50 · 아래 40 · 왼 50 · 오른 110)과 같은 값. */
+export const DEFAULT_DESIGN_BODY: DesignBody = { x: 50, y: 50, width: 840, height: 910 }
+const LEGACY_DESIGN_BODY: DesignBody = { x: 75, y: 75, width: 850, height: 850 }
+const isLegacyDesignBody = (body: DesignBody) => body.x === LEGACY_DESIGN_BODY.x && body.y === LEGACY_DESIGN_BODY.y && body.width === LEGACY_DESIGN_BODY.width && body.height === LEGACY_DESIGN_BODY.height
 export const DEFAULT_FONT_METRICS: FontMetrics = {
   hangulAdvance: 1000,
   spaceAdvance: 500,
@@ -88,7 +91,7 @@ function mergePersistedProject(
     ...currentState,
     ...(isRecord(persisted.fontSpace) && { fontSpace: persisted.fontSpace as unknown as FontSpace }),
     ...(isRecord(persisted.grid) && { grid: persisted.grid as unknown as FontGrid }),
-    ...(isRecord(persisted.designBody) && { designBody: persisted.designBody as unknown as DesignBody }),
+    ...(isRecord(persisted.designBody) && { designBody: isLegacyDesignBody(persisted.designBody as unknown as DesignBody) ? DEFAULT_DESIGN_BODY : persisted.designBody as unknown as DesignBody }),
     ...(isRecord(persisted.metrics) && { metrics: persisted.metrics as unknown as FontMetrics }),
     ...(Array.isArray(persisted.sampleGlyphEdits) && {
       sampleGlyphEdits: structuredClone(persisted.sampleGlyphEdits) as SampleGlyphEdit[],
