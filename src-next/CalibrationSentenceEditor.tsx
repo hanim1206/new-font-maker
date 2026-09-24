@@ -285,16 +285,6 @@ function absolutePoint(point: { x: number; y: number }, box: BoxConfig): { x: nu
   }
 }
 
-/** 잡은 획의 둘레 상자(뷰박스 좌표). 꼭짓점 · 핸들을 다 감싸고 잉크 반 굵기 + 여유만큼 넓힌다. */
-function strokeFrame(stroke: StrokeDataV2, box: BoxConfig, pad: number): { x: number; y: number; width: number; height: number } {
-  const corners = stroke.points.flatMap((point) => [point, point.handleIn, point.handleOut].filter((item): item is { x: number; y: number } => Boolean(item)).map((item) => absolutePoint(item, box)))
-  const xs = corners.map((corner) => corner.x)
-  const ys = corners.map((corner) => corner.y)
-  const x = Math.min(...xs) - pad
-  const y = Math.min(...ys) - pad
-  return { x, y, width: Math.max(...xs) + pad - x, height: Math.max(...ys) + pad - y }
-}
-
 function roleRenderParts(part: MobileEditorPart, boxes: Partial<Record<Part, BoxConfig>>): Part[] {
   if (part === 'JU' && (boxes.JU_H || boxes.JU_V)) {
     const mixedParts: Part[] = ['JU_H', 'JU_V']
@@ -562,16 +552,14 @@ function FocusedGlyph({
           const component = componentFor(char, target.editorPart, target.jamo)
           const sameComponent = lockedPart !== null || selectedPart === target.editorPart
           const isSelected = selectedStrokeId === target.stroke.id
-          // 피그마처럼: 잉크는 제 색 그대로 두고, 잡은 획은 가는 중심선으로 알린다. 점이 닫혀 있으면(획만 잡힘) 둘레 상자도 두른다.
+          // 피그마처럼: 잉크는 제 색 그대로 두고, 잡은 획은 가는 중심선으로만 알린다. 획 바깥에 둘레 상자는 두르지 않는다.
           // 옆 자소에 너무 붙은 자소면 빨갛게. 안 잡힌 획은 마우스를 올리면 중심선이 옅게 뜬다. 눌림 영역은 그 위에 투명하게 넓게 둔다.
           const warning = gapWarningParts.includes(target.editorPart)
           const pointsOpen = pointsOpenStrokeId === target.stroke.id
-          const frame = isSelected && !pointsOpen ? strokeFrame(target.stroke, target.box, target.stroke.thickness * weightToMultiplier(globalStyle.weight) * VIEW_BOX_SIZE / 2 + 1.4) : null
           return <g key={`hit-${target.renderPart}-${target.stroke.id}`} className={styles.strokeTarget} style={{ '--selection-color': warning ? SELECTION_WARNING_COLOR : SELECTION_COLOR } as CSSProperties}>
           {isSelected
             ? <path d={path} className={styles.selectedCenterline} pointerEvents="none" data-active-stroke={warning ? 'warning' : 'active'} />
             : <path d={path} className={styles.hoverCenterline} pointerEvents="none" />}
-          {frame && <rect x={frame.x} y={frame.y} width={frame.width} height={frame.height} className={styles.selectedFrame} pointerEvents="none" data-testid="stroke-selection-frame" />}
           <path
             d={path}
             fill="none"

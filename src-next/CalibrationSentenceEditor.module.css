@@ -108,12 +108,11 @@ section.sentence[data-sheet] { flex-basis: var(--sheet-h); height: var(--sheet-h
 .focusChar { position: absolute; z-index: 2; right: 14px; bottom: 12px; color: rgb(var(--color-text-dim-5)); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 700; pointer-events: none; }
 .partBoxLabel { font-family: ui-monospace, 'SF Mono', Menlo, monospace; pointer-events: none; }
 /* 획 편집 선택 표시 — 피그마 · 일러스트레이터 관례. 잉크는 제 색 그대로, 선택은 한 가지 파랑으로 모양이 갈린다.
-   획 = 가는 중심선(+ 점이 닫혀 있으면 둘레 상자) · 꼭짓점 = 동그라미 · 곡선 핸들 = 마름모. 잡힌 것만 속이 찬다. */
+   획 = 가는 중심선(바깥 상자 없음) · 꼭짓점 = 동그라미 · 곡선 핸들 = 마름모. 잡힌 것만 속이 찬다. */
 .focusCanvas { --selection-color: #0d99ff; }
 .selectedCenterline { fill: none; stroke: var(--selection-color); stroke-width: .45; stroke-linecap: round; stroke-linejoin: round; }
 .hoverCenterline { fill: none; stroke: var(--selection-color); stroke-width: .35; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
 @media (hover: hover) { .strokeTarget:hover .hoverCenterline { opacity: .75; } }
-.selectedFrame { fill: none; stroke: var(--selection-color); stroke-width: .35; }
 .point { fill: #fff; stroke: var(--selection-color); stroke-width: .6; cursor: pointer; }
 .activePoint { fill: var(--selection-color); stroke: #fff; stroke-width: .7; cursor: pointer; }
 .pointHitTarget { cursor: pointer; }
