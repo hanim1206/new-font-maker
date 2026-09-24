@@ -116,11 +116,11 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
   const dragging = draggingId !== null
   // 잡은 보선의 처음 자리. 거기 겹친 실측 점선은 끄는 동안 뺀다 — 주황 띠가 이미 처음 자리를 보여 준다.
   const draggedFrom = editable.find((item) => item.id === draggingId)
-  // 보선이 선택돼 있으면 그 보선이 아닌 곳의 첫 탭은 선택 풀기에만 쓴다 — 고치자마자 다른 영역 · 보선이 켜지면 어색하다.
+  // 보선이 선택돼 있으면 다른 영역 · 빈 곳의 첫 탭은 선택 풀기에만 쓴다 — 고치자마자 다른 영역이 켜지면 어색하다.
+  // 손잡이는 켠 영역 보선에만 있으니, 같은 영역의 다른 보선은 바로 잡는다.
   const releaseHold = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (!selectedRail || !onReleaseRail) return
-    const handle = (event.target as Element).closest('[data-rail-handle]')?.getAttribute('data-rail-handle')
-    if (handle === selectedRail) return
+    if ((event.target as Element).closest('[data-rail-handle]')) return
     event.stopPropagation()
     event.preventDefault()
     onReleaseRail()

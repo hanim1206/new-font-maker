@@ -135,3 +135,26 @@ test('보선이 선택된 채 다른 영역을 누르면 선택만 풀리고, �
   await medial.click()
   await expect(medial).toHaveAttribute('aria-pressed', 'true')
 })
+
+test('켠 영역의 보선을 옮긴 뒤 같은 영역의 다른 보선은 바로 잡아 옮긴다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  const canvas = page.getByTestId('review-canvas')
+  const box = (await canvas.boundingBox())!
+  const pxOf = (em: number) => box.x + (em + 0.08) / 1.16 * box.width
+  const y = box.y + (-0.045 + 0.08) / 1.16 * box.height
+  const drag = async (id: string) => {
+    const handle = canvas.locator(`[data-rail-handle="${id}"]`)
+    const x1 = Number(await handle.getAttribute('x1'))
+    await page.mouse.move(pxOf(x1), y)
+    await page.mouse.down()
+    await page.mouse.move(pxOf(x1 + 0.05), y, { steps: 6 })
+    await page.mouse.up()
+    return { before: x1, after: Number(await handle.getAttribute('x1')) }
+  }
+  await drag('c0:left')
+  await expect(canvas).toHaveAttribute('data-held', 'c0:left')
+  const right = await drag('c0:right')
+  expect(right.after - right.before).toBeGreaterThan(0.03)
+  await expect(canvas).toHaveAttribute('data-held', 'c0:right')
+})
