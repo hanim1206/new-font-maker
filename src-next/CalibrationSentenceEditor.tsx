@@ -1923,8 +1923,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         else if (last?.kind === 'word' && (/\s/u.test(char) || !/\s$/u.test(last.text))) last.text += char
         else groups.push({ kind: 'word', start: index, text: char })
         return groups
-      }, []).map((group) => group.kind === 'break'
-        ? [group.index === sentenceCaret && caret(`caret-${group.index}`), <span key={`break-${group.index}`} className={styles.lineBreak} aria-hidden="true" />]
+      }, []).map((group, groupIndex, groups) => group.kind === 'break'
+        // 빈 줄(엔터 두 번 · 맨 앞 엔터)도 한 줄 높이를 차지하게 폭 없는 버팀목을 세운다.
+        ? [(groupIndex === 0 || groups[groupIndex - 1].kind === 'break') && <span key={`empty-${group.index}`} className={styles.emptyLine} aria-hidden="true" />, group.index === sentenceCaret && caret(`caret-${group.index}`), <span key={`break-${group.index}`} className={styles.lineBreak} aria-hidden="true" />]
         : <span key={`word-${group.start}`} className={styles.wordRun}>{[...group.text].flatMap((char, index) => withCaret(char, group.start + index))}</span>)}
       {sentenceCaret >= chars.length && caret('caret-end')}
       {chars.length === 0 && <span className={styles.sentenceSheetHint}>고칠 글자가 든 문장을 적어 보세요</span>}

@@ -89,7 +89,9 @@ section.sentence[data-sheet] { flex-basis: var(--sheet-h); height: var(--sheet-h
 .sheetInput { position: fixed; top: 0; left: 0; width: 1px; height: 1px; padding: 0; overflow: hidden; border: 0; opacity: 0; pointer-events: none; font-size: 16px; }
 /* 커서는 폭이 없다: 옮겨도 글자 사이가 벌어지지 않는다. 선은 그림자로 그린다. */
 .sentence[data-sheet-wrap] .sentenceRun .directInputCaret { width: 0; margin: 0; background: none; box-shadow: 0 0 0 1px rgb(var(--color-primary)); }
-.sentenceRun span.lineBreak { flex: 0 0 100%; block-size: 0; }
+/* 100%보다 1px 넓게: 폭 없는 커서도 같은 줄에 못 끼고 다음 줄 왼쪽에서 시작한다. */
+.sentenceRun span.lineBreak { flex: 0 0 calc(100% + 1px); block-size: 0; }
+.sentenceRun span.emptyLine { inline-size: 0; block-size: 1em; }
 .sentenceRun span.sentenceSheetHint { block-size: auto; margin-left: 6px; color: rgb(var(--color-text-5)); font-size: 16px; line-height: 1.4; text-align: left; }
 .spaceGlyph { color: transparent !important; user-select: none; }
 .punctuationGlyph { font-family: ui-sans-serif, system-ui, sans-serif; font-size: .72em; line-height: 1.38em !important; }
