@@ -173,10 +173,10 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
     {measured.map((rail) => {
       const snapped = rail.id === snappedRail
       const active = !activePart || samePartGroup(measuredPartOf(rail.id), activePart)
-      const color = snapped ? ACCENT : active ? PART_COLOR[measuredPartOf(rail.id)] : INACTIVE_COLOR
+      const color = active ? PART_COLOR[measuredPartOf(rail.id)] : INACTIVE_COLOR
       const geometry = geometryOf(rail.axis, rail.value)
       return <g key={rail.id} className={styles.rail} data-rail={rail.id} data-snapped={snapped || undefined} data-active={active}>
-        <line {...geometry} className={styles.railLine} stroke={color} strokeOpacity={active || snapped ? 0.7 : 0.6} strokeWidth={snapped ? 0.006 : 0.003} strokeDasharray=".012 .008" />
+        <line {...geometry} className={styles.railLine} stroke={color} strokeOpacity={active ? 0.7 : 0.6} strokeWidth={0.003} strokeDasharray=".012 .008" />
         {/* 호버용 히트 영역. 조작은 없고 라벨만 띄운다. */}
         <line {...geometry} className={styles.railHit} stroke="transparent" strokeWidth=".03" />
         <text {...labelAt(rail.axis, rail.value, 'bottom')} className={styles.railLabel} fontSize=".026" fill={color}>{rail.label}</text>
@@ -194,16 +194,16 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
     {/* 비활성 부품 rail은 먼저 그려 뒤로 보내고 손잡이도 없다. 활성 rail만 잡힌다. */}
     {[...editable].sort((a, b) => Number(!activePart || samePartGroup(a.part, activePart)) - Number(!activePart || samePartGroup(b.part, activePart))).map((rail) => {
       const selected = rail.id === selectedRail
-      // 걸린 상대 rail과, 걸린 채 잡고 있는 rail 둘 다. 모델·격자엔 상대 rail이 없어 잡은 rail만 주황이 된다. 손을 떼면 영역 색으로 돌아간다.
+      // 걸린 상대 rail과, 걸린 채 잡고 있는 rail 둘 다(표지만). 모델·격자엔 상대 rail이 없어 잡은 rail에만 붙는다.
       const snapped = dragging && (rail.id === snappedRail || (!!snapHit && selected))
       const active = !activePart || samePartGroup(rail.part, activePart)
-      // 끄는 중: 부품 색 얇게, 걸리면 주황 얇게. 손을 떼면 부품 색 굵게.
-      const stroke = snapped ? ACCENT : active ? PART_COLOR[rail.part] : INACTIVE_COLOR
+      // 끄는 중엔 부품 색 얇게, 손을 떼면 굵게. 걸려도 선 색은 안 바꾼다 — 번쩍여서 뺐다. 걸림은 진동과 `이 자리에 맞추기` 버튼으로.
+      const stroke = active ? PART_COLOR[rail.part] : INACTIVE_COLOR
       const geometry = geometryOf(rail.axis, rail.value)
       return <g key={rail.id} className={active ? styles.rail : undefined} data-rail={rail.id} data-part={rail.part} data-active={active} data-locked={rail.locked || undefined} data-selected={selected || undefined} data-snapped={snapped || undefined} data-dragging={dragging || undefined}>
         {/* 후광. 선택이면 손 뗀 뒤에만, 활성 rail은 호버 때만(CSS). */}
         {active && <line {...geometry} className={styles.railHalo} stroke={stroke} strokeWidth=".032" strokeOpacity={selected && !dragging ? 0.2 : 0} strokeLinecap="round" />}
-        <line {...geometry} className={styles.railLine} stroke={stroke} strokeWidth={dragging ? active ? 0.004 : 0.003 : selected ? 0.012 : active ? 0.004 : 0.003} strokeOpacity={rail.locked ? 0.45 : active || snapped ? 1 : 0.8} strokeDasharray={rail.locked ? '.02 .012' : undefined} />
+        <line {...geometry} className={styles.railLine} stroke={stroke} strokeWidth={dragging ? active ? 0.004 : 0.003 : selected ? 0.012 : active ? 0.004 : 0.003} strokeOpacity={rail.locked ? 0.45 : active ? 1 : 0.8} strokeDasharray={rail.locked ? '.02 .012' : undefined} />
         {onSelectRail && active && !rail.locked && <line {...geometry} className={styles.railButton} data-rail-handle={rail.id} stroke="transparent" strokeWidth=".08" role="button" tabIndex={0} aria-label={`${rail.label} 선택`} aria-pressed={selected} onPointerDown={startDrag(rail)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectRail(rail.id) } else if (onNudgeRail) { const nudge = nudgeOf(event.key, rail.axis); if (nudge !== 0) { event.preventDefault(); onSelectRail(rail.id); onNudgeRail(rail.id, nudge * (event.shiftKey ? 10 : 1) / 1000) } } }} />}
         {active && rail.locked && <line {...geometry} className={styles.railHit} stroke="transparent" strokeWidth=".03" />}
         {active && <text {...labelAt(rail.axis, rail.value, 'top')} className={styles.railLabel} fontSize=".03" fill={stroke}>{rail.label}{rail.locked ? ' · 글자에 안 닿음' : ''}</text>}

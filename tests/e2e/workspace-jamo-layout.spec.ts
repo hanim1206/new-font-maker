@@ -145,7 +145,7 @@ test('기준선 드래그는 모델 자리와 격자에 탁 걸리고 방향키�
   await page.mouse.move(pxOf(x1 + 0.002), y, { steps: 4 })
   // 모델에 붙으면 Δ 0 → 수치 없음. 스냅 글자 표지는 없고 캔버스 data-snap에만 남는다.
   await expect(canvas).toHaveAttribute('data-snap', 'model')
-  // 모델·격자엔 상대 기준선이 없으니 잡은 기준선이 주황으로 바뀐다.
+  // 모델·격자엔 상대 기준선이 없으니 잡은 기준선에 걸림 표지가 붙는다(색은 안 바뀐다).
   await expect(canvas.locator('[data-rail][data-selected="true"]')).toHaveAttribute('data-snapped', 'true')
   await expect(page.getByTestId('review-delta-label')).toHaveCount(0)
   // 모델(≈0.75)에서 멀어져 격자 13/16(0.8125)이나 그 옆 기준선에 걸린다.

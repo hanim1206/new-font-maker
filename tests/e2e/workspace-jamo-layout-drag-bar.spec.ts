@@ -64,7 +64,7 @@ test('보선을 캔버스 밖까지 끌어도 글자 칸(0–1em) 안에서 멈�
   await page.mouse.up()
 })
 
-test('보선은 끄는 동안 얇고 걸릴 때만 주황, 손을 떼면 영역 색으로 굵어진다', async ({ page }) => {
+test('보선은 끄는 동안 얇고 걸려도 영역 색 그대로, 손을 떼면 굵어진다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   const canvas = page.getByTestId('review-canvas')
@@ -83,10 +83,10 @@ test('보선은 끄는 동안 얇고 걸릴 때만 주황, 손을 떼면 영역 
   await page.mouse.move(pxOf(x1 + 0.06), y, { steps: 6 })
   await expect(rail).toHaveAttribute('data-dragging', 'true')
   expect(await width()).toBeLessThan(0.006)
-  // 모델 자리로 돌아오면 걸린다: 주황, 여전히 얇게.
+  // 모델 자리로 돌아오면 걸린다. 선 색은 안 바뀌고 여전히 얇다(번쩍임을 뺐다).
   await page.mouse.move(pxOf(x1 + 0.002), y, { steps: 4 })
   await expect(rail).toHaveAttribute('data-snapped', 'true')
-  await expect(line).toHaveAttribute('stroke', '#f0561e')
+  await expect(line).toHaveAttribute('stroke', partColor!)
   expect(await width()).toBeLessThan(0.006)
 
   await page.mouse.up()
