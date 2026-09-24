@@ -507,7 +507,7 @@ export interface GlyphLayoutEditorProps {
   onCommitted?: (before: LayoutDeltaSnapshot, after: LayoutDeltaSnapshot) => void
   /** 켠 부품의 획 편집으로 내려간다. 주면 켜진 상자를 한 번 더 누르면 간다(누르거나 올리면 상자가 진해진다). 버튼은 없다. 옮긴 보선을 저장해야 열린다. */
   onEditStrokes?: (part: Part) => void
-  /** 예시 글자를 누르면 그 글자를 연다. */
+  /** 예시 글자를 누르면 그 글자를 연다. 위 문장은 그대로 둔다. */
   onPickCharacter?: (character: string) => void
   /** 방금 적용한 범위. 문장 줄이 그 범위에 든 글자를 잠깐 표시한다. 다음 편집이 시작되면 빈 목록으로 다시 부른다. */
   onScopeApplied?: (rules: readonly ScopeRule[]) => void

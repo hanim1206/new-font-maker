@@ -1092,7 +1092,7 @@ test('획이 모델 상자에 안 맞아도 획 편집에서 완료로 레이아
 })
 
 /** 세로 예산(2026-09-21): 도구 줄은 머리 `…` 메뉴로, 레이아웃 모드의 보정 문장은 한 줄. 390×844 첫 화면에 범위 띠와 표본 첫 줄 네 장이 세로 스크롤 없이 온전히 보인다. */
-test('닿는 글자를 누르면 그 글자가 열리고 문장에는 그 글자 하나만 남는다. 안 끝난 Δ가 있으면 잠긴다', async ({ page }) => {
+test('닿는 글자를 누르면 그 글자가 열리고 위 문장은 그대로다. 안 끝난 Δ가 있으면 잠긴다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   const cards = page.getByTestId('review-propagation-card')
   await expectFilledRow(cards)
@@ -1108,11 +1108,11 @@ test('닿는 글자를 누르면 그 글자가 열리고 문장에는 그 글자
   await resetButton(page).click()
   await expect(cards.first().getByTestId('review-propagation-open')).toBeEnabled()
 
+  const sentenceBefore = await sentence.getByRole('button', { name: /편집/ }).allInnerTexts()
   const name = await cards.first().locator('figcaption b').innerText()
   await cards.first().getByTestId('review-propagation-open').click()
   await expect(page.getByRole('region', { name: `${name} 레이아웃 수정` })).toBeVisible()
-  await expect(sentence.getByRole('button', { name: /편집/ })).toHaveCount(1)
-  await expect(sentence.getByRole('button', { name: `${name} 편집` })).toHaveAttribute('aria-current', 'true')
+  expect(await sentence.getByRole('button', { name: /편집/ }).allInnerTexts()).toEqual(sentenceBefore)
   // 새 글자의 줄이 다시 뜨고, 연 글자는 그 안에 없다.
   await expectFilledRow(cards)
   expect(await cards.locator('figcaption b').allInnerTexts()).not.toContain(name)

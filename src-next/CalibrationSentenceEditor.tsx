@@ -1587,12 +1587,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     setPreviewSchema(null)
     setInkGapLimiter(null)
   }
-  // 예시 글자 카드를 누르면 그 글자를 열고 문장에는 그 글자 하나만 올린다. 예시 문장은 주사위로 돌아온다.
-  const openSoloChar = (char: string) => {
-    setSampleSentence(char)
-    setIsCustomSentence(true)
-    chooseChar(char)
-  }
   const selectFromCanvas = (requested: Selection) => {
     let nextSelection = requested
     // 빈 곳은 피그마처럼 획 · 점 · 핸들을 다 푼다(획 편집에 잠긴 동안도). 잠긴 동안 다른 자소는 안 잡힌다.
@@ -2087,7 +2081,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
       </section>
 
       {isLayoutMode && !styleLocksCanvas ? <section className={styles.layoutMode} aria-label={`${selectedChar} 레이아웃 수정`} data-testid="jamo-layout-mode">
-        <GlyphLayoutEditor key={`${selectedChar}:${layoutEpoch}`} codepoint={selectedChar.codePointAt(0) ?? 0xac00} initialPart={selection.kind === 'none' ? strokeEntryPart ?? undefined : selection.editorPart} onCommitted={commitLayoutDelta} onEditStrokes={editStrokes} onPickCharacter={openSoloChar} onScopeApplied={setAppliedScope} leaveGuardRef={layoutLeaveGuardRef} />
+        <GlyphLayoutEditor key={`${selectedChar}:${layoutEpoch}`} codepoint={selectedChar.codePointAt(0) ?? 0xac00} initialPart={selection.kind === 'none' ? strokeEntryPart ?? undefined : selection.editorPart} onCommitted={commitLayoutDelta} onEditStrokes={editStrokes} onPickCharacter={chooseChar} onScopeApplied={setAppliedScope} leaveGuardRef={layoutLeaveGuardRef} />
       </section> : <>
       {/* 획 편집에도 같은 자리·같은 높이로 `닿는 글자` 줄이 선다. 범위는 고치는 자모가 든 글자 전부(레이아웃을 안 가린다).
           줄이 두 모드에 다 있어야 `획 고치기`로 오갈 때 캔버스가 안 튄다. */}
