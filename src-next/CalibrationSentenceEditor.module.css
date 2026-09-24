@@ -6,8 +6,8 @@
 .strokeStage, .focusArea { display: contents; }
 .editor[data-chrome='workspace'] .strokeStage { display: flex; align-items: center; gap: 8px; }
 .editor[data-chrome='workspace'] .focusArea { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; }
-/* 고정 높이 306 = 머리 50 · 문장 한 줄 56 · 도구 줄 130(상태 · 틀 · 단추 세 줄) · `뒤로 · 완료` 54 · 편집부 여백 16. 끄는 동안 화면이 같이 밀리지 않게 터치는 캔버스가 다 받는다. */
-.editor[data-chrome='workspace'] .focusCanvas { width: min(100%, 330px, max(180px, calc(100dvh - 306px))); touch-action: none; }
+/* 고정 높이 400 = 머리 50 · 문장 한 줄 56 · 도구 줄 224(상태 · 틀 · 단추 · 트랙패드 94) · `뒤로 · 완료` 54 · 편집부 여백 16. 끄는 동안 화면이 같이 밀리지 않게 터치는 캔버스가 다 받는다. */
+.editor[data-chrome='workspace'] .focusCanvas { width: min(100%, 330px, max(180px, calc(100dvh - 400px))); touch-action: none; }
 .header div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .header div span { color: rgb(var(--color-text-dim-4)); font-size: 9px; font-weight: 750; letter-spacing: .12em; }
 .header strong { font-size: 14px; line-height: 1.18; }
@@ -70,7 +70,9 @@
 .punctuationGlyph { font-family: ui-sans-serif, system-ui, sans-serif; font-size: .72em; line-height: 1.38em !important; }
 .editor { min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 16px; }
 /* 검수 캔버스(ReviewWorkspacePage .canvas)와 같은 틀: 흰 바탕, 20px 모서리. 눈금·글자몸은 SVG 깔개에 그린다. */
-.focusCanvas { position: relative; width: min(84vw, 368px); aspect-ratio: 1; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 20px; background-color: #fff; touch-action: manipulation; }
+.focusCanvas { position: relative; width: min(84vw, 368px); aspect-ratio: 1; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 20px; background-color: #fff; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+/* 캔버스를 끌다가 밖으로 나가도 문장 줄 글자가 파랗게 잡히지 않게. 레이아웃 캔버스와 같다. */
+.focusCanvas * { user-select: none; -webkit-user-select: none; }
 .focusSvg { position: relative; z-index: 1; width: 100%; height: 100%; }
 .layoutAreaBox { fill: rgb(var(--color-primary)); stroke: rgb(var(--color-primary)); vector-effect: non-scaling-stroke; pointer-events: none; }
 .layoutAreaBoxFocused { fill-opacity: .1; stroke-width: 1.5; stroke-opacity: .9; }
@@ -172,6 +174,9 @@
 .strokeToolRow { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
 .strokeToolRow button { min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 10px; font-weight: 650; }
 .strokeToolRow button:disabled { opacity: .35; }
+.strokeTrackpad { height: 88px; border-radius: 12px; }
+/* 세로가 낮은 화면(SE 등)에서는 왼쪽 자소 줄(280)이 편집부에 들어가게 트랙패드를 줄인다. */
+@media (max-height: 720px) { .strokeTrackpad { height: 56px; } }
 .strokeToolRow button[aria-pressed='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary) / .12); color: rgb(var(--color-primary)); }
 .strokeFrameStatus { margin: 0; min-height: 26px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 600; }
 .strokeFrameStatus span[data-protruding] { color: #f0561e; }

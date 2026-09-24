@@ -57,5 +57,20 @@
 /* 복원 = 정사각 아이콘 버튼. 바뀐 보선 수는 모서리 숫자. */
 .strokeCta .resetCta { position: relative; flex: 0 0 44px; display: grid; place-items: center; width: 44px; padding: 0; border: 1px solid #f0561e; background: rgb(var(--color-surface)); color: #f0561e; }
 .resetCta em { position: absolute; top: -5px; right: -5px; display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #f0561e; color: #fff; font-size: 10px; font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+.strokeCta .strokeMiniCta { flex: 0 0 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: 44px; padding: 0; border: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); }
+.strokeMiniCta small { font-size: 9.5px; font-weight: 700; line-height: 1.1; }
+/* 저장 안 한 보선을 두고 떠날 때 묻는 창. 폰트 이름 창과 같은 바닥 시트. */
+.leaveBackdrop { position: fixed; z-index: 100; inset: 0; display: flex; align-items: flex-end; justify-content: center; background: rgb(20 24 31 / .28); }
+.leaveSheet { width: min(100%, 480px); box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 16px 16px calc(env(safe-area-inset-bottom) + 16px); border-radius: 18px 18px 0 0; background: rgb(var(--color-surface)); box-shadow: 0 -8px 28px rgb(20 24 31 / .18); }
+.leaveSheet header { display: flex; flex-direction: column; gap: 2px; }
+.leaveSheet header b { font-size: 13px; font-weight: 700; }
+.leaveSheet header small { color: rgb(var(--color-text-dim-4)); font-size: 10.5px; line-height: 1.35; }
+.leaveActions { display: flex; flex-direction: column; gap: 8px; }
+.leaveActions button { min-height: 44px; border: 0; border-radius: 10px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 13px; font-weight: 700; }
+.leaveActions .leaveSave { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+@media (min-width: 720px) {
+  .leaveBackdrop { align-items: center; }
+  .leaveSheet { border-radius: 18px; padding-bottom: 16px; }
+}
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .strokeCta button:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-dim-4)); }

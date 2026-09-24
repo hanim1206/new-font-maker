@@ -44,3 +44,22 @@ test('하단 바는 보선을 끄는 동안 안 바뀌고 손을 떼면 적용 �
   await page.mouse.up()
   await expect(apply).toBeVisible()
 })
+
+test('보선을 캔버스 밖까지 끌어도 글자 칸(0–1em) 안에서 멈춘다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  const canvas = page.getByTestId('review-canvas')
+  const box = (await canvas.boundingBox())!
+  const handle = canvas.locator('[data-rail-handle="c0:left"]')
+  const x1 = Number(await handle.getAttribute('x1'))
+  const pxOf = (em: number) => box.x + (em + 0.08) / 1.16 * box.width
+  const y = box.y + (-0.045 + 0.08) / 1.16 * box.height
+  await page.mouse.move(pxOf(x1), y)
+  await page.mouse.down()
+  await page.mouse.move(pxOf(x1) - 300, y, { steps: 12 })
+  expect(Number(await handle.getAttribute('x1'))).toBeCloseTo(0, 3)
+  await page.mouse.move(pxOf(x1) + 600, y, { steps: 24 })
+  // 오른쪽으로는 같은 부품의 오른변에 막히거나 칸 끝(1em)에서 멈춘다.
+  expect(Number(await handle.getAttribute('x1'))).toBeLessThanOrEqual(1)
+  await page.mouse.up()
+})

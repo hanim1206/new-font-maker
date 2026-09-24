@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { PointerEvent as ReactPointerEvent, RefObject } from 'react'
 import { notoOutlineGhostPath } from '../src/services/notoOutlineInk'
 import { DevGhostToggle } from './DevGhostToggle'
 import { DEV_TOOLS_ENABLED } from './devTools'
@@ -225,7 +225,7 @@ function railsWithDelta(railsEm?: Readonly<Record<string, number>>, delta?: Read
   return Object.fromEntries(Object.entries(railsEm).map(([key, value]) => [key, value + (delta[key] ?? 0)]))
 }
 
-function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPickCharacter, onScopeApplied }: { glyph: NotoPresetGlyph; initialPart?: Part; onCommitted?: GlyphLayoutEditorProps['onCommitted']; onEditStrokes?: GlyphLayoutEditorProps['onEditStrokes']; onPickCharacter?: GlyphLayoutEditorProps['onPickCharacter']; onScopeApplied?: GlyphLayoutEditorProps['onScopeApplied'] }) {
+function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPickCharacter, onScopeApplied, leaveGuardRef }: { glyph: NotoPresetGlyph; initialPart?: Part; onCommitted?: GlyphLayoutEditorProps['onCommitted']; onEditStrokes?: GlyphLayoutEditorProps['onEditStrokes']; onPickCharacter?: GlyphLayoutEditorProps['onPickCharacter']; onScopeApplied?: GlyphLayoutEditorProps['onScopeApplied']; leaveGuardRef?: GlyphLayoutEditorProps['leaveGuardRef'] }) {
   const codepoint = glyph.identity.codepoint
   const ghost = useMemo(() => notoOutlineGhostPath(glyph.outline), [glyph])
   const measured = useMemo(() => baselineRails(glyph), [glyph])
@@ -347,9 +347,11 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
   const markApplied = (rules: readonly ScopeRule[]) => { applyMarked.current = rules.length > 0; onScopeApplied?.(rules) }
   const clearApplied = () => { if (!applyMarked.current) return; applyMarked.current = false; onScopeApplied?.([]) }
   // 캔버스 드래그·자·키보드가 모두 여기로 온다. 1u 격자는 모델 값에 맞추고, 손 조작(snap)엔 모델 → 다른 기준선 → 격자 순으로 걸린다.
-  const changeRail = (id: string, next: number, options?: { snap?: boolean }) => {
+  const changeRail = (id: string, requested: number, options?: { snap?: boolean }) => {
     const target = editable.find((item) => item.id === id)
     if (!target || lockedRails.has(target.id)) return
+    // 보선은 글자 칸(0–1em) 안에서만 움직인다. 끌다가 캔버스 밖으로 빠져나가 못 잡는 일이 없게. 처음부터 칸 밖이던 보선은 그 자리까지 허용한다.
+    const next = Math.min(Math.max(requested, Math.min(0, target.original)), Math.max(1, target.original))
     clearApplied()
     // 고정한 변을 다시 옮기면 더하기로 돌아간다.
     unfixRail(id)
@@ -368,10 +370,32 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
     setError(placed === true ? '' : placed)
   }
   const resetRails = () => { setSlotDeltaByPart([]); setRailDeltaByPart([]); setFacesByPart([]); setFixedRails(new Set()); setError(''); setSnapHit(null) }
+  // 보선 이동은 저장 버튼을 눌러야 남는다. 저장 안 한 채 떠나려 하면(획 고치기 · 다른 글자 · 되돌리기) 먼저 묻는다.
+  const [leaving, setLeaving] = useState<{ next: () => void; saveable: boolean } | null>(null)
+  const guardLeave: LayoutLeaveGuard = (next, options) => { if (editCount > 0) setLeaving({ next, saveable: options?.saveable ?? true }); else next() }
+  useEffect(() => {
+    if (!leaveGuardRef) return
+    leaveGuardRef.current = guardLeave
+  })
+  useEffect(() => () => { if (leaveGuardRef) leaveGuardRef.current = null }, [leaveGuardRef])
+  // 새로고침 · 탭 이동(다른 주소)은 브라우저 확인 창으로 막는다.
+  useEffect(() => {
+    if (editCount === 0) return
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [editCount])
+  const leave = (save: boolean) => {
+    const next = leaving?.next
+    setLeaving(null)
+    if (save) cardsRef.current?.apply()
+    else resetRails()
+    next?.()
+  }
 
   return <div className={styles.editor} data-testid="glyph-layout-editor">
       {/* 상단 두 줄의 아랫줄. 윗줄은 `내 문장`이라 이 편집부 바로 위에 있다. 글자 크기·칸 높이가 같고 줄 높이는 고정이다. */}
-      <TouchedGlyphRow source={glyph.identity} bundle={bundle} edit={propagationEdit} ghostVisible={ghostVisible} focus={rail?.part} scope={selection.scope} group={selection.group} jamos={selection.jamos} rule={selection.rule} onPick={onPickCharacter} />
+      <TouchedGlyphRow source={glyph.identity} bundle={bundle} edit={propagationEdit} ghostVisible={ghostVisible} focus={rail?.part} scope={selection.scope} group={selection.group} jamos={selection.jamos} rule={selection.rule} onPick={onPickCharacter && ((character) => guardLeave(() => onPickCharacter(character)))} />
       <section className={styles.canvasSection}>
         {/* 캔버스 왼쪽 세로 표지. 여섯 칸 중 지금 고치는 칸을 켜기만 한다 — 범위는 아래 옵션 스택에서 고른다. */}
         <LayoutContextCards activeContextId={glyph.identity.contextId} allActive={selection.scope === 'all'} />
@@ -398,6 +422,11 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
             <em aria-hidden="true">{bar.editCount}</em>
             <span className={styles.srOnly}>복원 · {bar.editCount}개 변경</span>
           </button>}
+          {/* 보선을 옮긴 뒤에도 획 편집으로 가는 길은 남긴다. 누르면 저장할지 먼저 묻는다. */}
+          {bar.editCount > 0 && onEditStrokes && activePart && <button type="button" className={styles.strokeMiniCta} onClick={() => guardLeave(() => onEditStrokes(activePart))} data-testid="jamo-stroke-cta-mini" aria-label={`${activeJamo} 획 고치기`}>
+            <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12.8 3.8l3.4 3.4L7.4 16H4v-3.4z" /><path d="M11 5.6l3.4 3.4" /></svg>
+            <small aria-hidden="true">획</small>
+          </button>}
           {bar.canApply
             ? <button type="button" className={styles.applyCta} onClick={() => cardsRef.current?.apply()} data-testid="review-propagation-apply" aria-label={`선택 옵션(${scopeLabel})에 저장`}>
               <span>선택 옵션에 저장</span><small data-testid="review-propagation-apply-scope">{scopeLabel} · {ruleGlyphCount(selection.rule ?? ruleOfContext(glyph.identity.contextId)).toLocaleString()}자</small>
@@ -409,6 +438,19 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
           </button>}
         </div>
       </div> : null}
+      {/* 취소 버튼은 따로 없다. 바깥을 누르면 닫히고 편집은 그대로 남는다. */}
+      {leaving && <div className={styles.leaveBackdrop} onClick={() => setLeaving(null)} data-testid="layout-leave-backdrop">
+        <div className={styles.leaveSheet} role="alertdialog" aria-modal="true" aria-label="저장 안 한 레이아웃" onClick={(event) => event.stopPropagation()} data-testid="layout-leave-dialog">
+          <header>
+            <b>옮긴 보선이 아직 저장되지 않았어요</b>
+            <small>보선 {editCount}개 · 저장하지 않고 나가면 사라져요.</small>
+          </header>
+          <div className={styles.leaveActions}>
+            {canApply && leaving.saveable && <button type="button" className={styles.leaveSave} onClick={() => leave(true)} data-testid="layout-leave-save">선택 옵션({scopeLabel})에 저장하고 계속</button>}
+            <button type="button" onClick={() => leave(false)} data-testid="layout-leave-discard">저장하지 않고 계속</button>
+          </div>
+        </div>
+      </div>}
   </div>
 }
 
@@ -425,10 +467,15 @@ export interface GlyphLayoutEditorProps {
   onPickCharacter?: (character: string) => void
   /** 방금 적용한 범위. 문장 줄이 그 범위에 든 글자를 잠깐 표시한다. 다음 편집이 시작되면 빈 목록으로 다시 부른다. */
   onScopeApplied?: (rules: readonly ScopeRule[]) => void
+  /** 편집기가 여기에 `떠나기 전 묻기`를 걸어 둔다. 호출자는 글자를 바꾸거나 되돌리기 전에 이걸 거친다. */
+  leaveGuardRef?: RefObject<LayoutLeaveGuard | null>
 }
 
-export function GlyphLayoutEditor({ codepoint, initialPart, onCommitted, onEditStrokes, onPickCharacter, onScopeApplied }: GlyphLayoutEditorProps) {
+/** 저장 안 한 보선 이동이 있으면 묻고, 없으면 바로 `next`를 부른다. 되돌리기처럼 저장하면 곧바로 그 저장이 되돌려지는 길은 `saveable: false`. */
+export type LayoutLeaveGuard = (next: () => void, options?: { saveable?: boolean }) => void
+
+export function GlyphLayoutEditor({ codepoint, initialPart, onCommitted, onEditStrokes, onPickCharacter, onScopeApplied, leaveGuardRef }: GlyphLayoutEditorProps) {
   const { glyph, error } = useNotoGlyph(codepoint)
-  if (glyph) return <GlyphLayoutBody key={codepoint} glyph={glyph} initialPart={initialPart} onCommitted={onCommitted} onEditStrokes={onEditStrokes} onPickCharacter={onPickCharacter} onScopeApplied={onScopeApplied} />
+  if (glyph) return <GlyphLayoutBody key={codepoint} glyph={glyph} initialPart={initialPart} onCommitted={onCommitted} onEditStrokes={onEditStrokes} onPickCharacter={onPickCharacter} onScopeApplied={onScopeApplied} leaveGuardRef={leaveGuardRef} />
   return <p className={styles.status} data-state={error ? 'error' : 'loading'} role={error ? 'alert' : 'status'}>{error || 'Noto 윤곽 읽는 중'}</p>
 }

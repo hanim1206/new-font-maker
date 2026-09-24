@@ -17,9 +17,9 @@ test('자소 탭 획 편집은 셸 안에서 문장·캔버스·도구 줄을 �
   await expect(page.getByRole('region', { name: '보정 문장' })).toBeVisible()
   const editor = page.getByRole('region', { name: /완성 글자 편집/ })
   await expect(editor).toBeVisible()
-  // 셸 안에는 조절판이 없다. 옮기기는 캔버스에서 직접 하고 아래에는 도구 줄이 온다.
-  await expect(page.getByRole('group', { name: '선택한 글자 형태를 조절하는 트랙패드' })).toHaveCount(0)
+  // 옮기기는 캔버스에서 직접 하고, 아래 도구 줄에 섬세한 편집용 트랙패드가 늘 함께 있다.
   await expect(page.getByTestId('jamo-stroke-tools')).toBeVisible()
+  await expect(page.getByTestId('jamo-stroke-trackpad')).toBeVisible()
 
   // 실행취소·다시실행은 셸 머리에만 있다.
   await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeDisabled()
@@ -45,6 +45,15 @@ test('자소 탭 획 편집은 셸 안에서 문장·캔버스·도구 줄을 �
   await strokeHit.dispatchEvent('pointerdown')
   await strokeHit.dispatchEvent('pointerdown')
   await expect(focusSvg.locator('[data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(1)
+
+  // 트랙패드로 끌면 고른 획이 옮겨지고 바로 저장된다(실행 취소가 켜진다).
+  const pad = await page.getByTestId('jamo-stroke-trackpad').boundingBox()
+  expect(pad).not.toBeNull()
+  await page.mouse.move(pad!.x + 100, pad!.y + pad!.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(pad!.x + 130, pad!.y + pad!.height / 2, { steps: 6 })
+  await page.mouse.up()
+  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
 
   // 문장에서 다른 글자를 고르면 그 글자의 레이아웃(기본 상태)으로 돌아간다.
   await page.getByRole('region', { name: '보정 문장' }).getByRole('button', { name: '별 편집' }).click()

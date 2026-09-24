@@ -336,13 +336,13 @@ test('켠 부품의 획 고치기로 내려가고, 안 끝난 변경이 있으�
   await expect(apply).toHaveCount(0)
   await expect(cta).toBeEnabled()
 
-  // 획 편집은 그 자소의 첫 획이 잡힌 채 열려 도구 줄이 바로 켜진다. `눌러 고르세요` 안내도 조절판도 없다 — 옮기기는 캔버스에서 한다.
+  // 획 편집은 그 자소의 첫 획이 잡힌 채 열려 도구 줄이 바로 켜진다. `눌러 고르세요` 안내는 없다. 옮기기는 캔버스에서 하고, 잘게 옮길 트랙패드가 도구 줄 아래에 있다.
   const layoutCanvasBox = await canvas.boundingBox()
   await cta.click()
   await expect(page.getByTestId('jamo-toolbar')).toHaveAttribute('data-edit-mode', 'stroke')
   const editor = page.getByRole('region', { name: '멈 완성 글자 편집' })
   await expect(page.getByTestId('jamo-stroke-hint')).toHaveCount(0)
-  await expect(page.getByRole('group', { name: '선택한 글자 형태를 조절하는 트랙패드' })).toHaveCount(0)
+  await expect(page.getByTestId('jamo-stroke-trackpad')).toBeVisible()
   await expect(page.getByRole('toolbar', { name: '획 편집 도구' }).getByRole('button', { name: '선 추가' })).toBeEnabled()
   const strokeHits = editor.locator('svg [data-editor-hit="stroke"]')
   await expect(strokeHits.and(editor.locator('[data-selected="true"]'))).toHaveCount(1)
