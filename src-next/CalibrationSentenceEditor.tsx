@@ -1955,7 +1955,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
           {/* 아래 버튼 바. 화면 아래에 떠 있고, 자판이 열리면 자판 위로 올라간다. 누를 때 입력칸 포커스를 뺏지 않아 자판이 닫히지 않는다. */}
           <div className={styles.sentenceSheetBar} style={{ '--keyboard-inset': `${keyboardInset}px` } as CSSProperties} onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.preventDefault()} onMouseDown={(event) => event.preventDefault()}>
             <button type="button" onClick={rollSentence} aria-label="예시 문장 바꾸기" data-testid="sentence-sheet-roll"><Dices size={18} aria-hidden="true" />다른 문장</button>
-            <button type="button" onClick={clearSentence} disabled={sampleSentence.length === 0} aria-label="문장 전체 지우기" data-testid="sentence-sheet-clear"><Delete size={18} aria-hidden="true" />전체 지우기</button>
+            <button type="button" onClick={clearSentence} disabled={sampleSentence.length === 0} aria-label="문장 전체 삭제" data-testid="sentence-sheet-clear"><Delete size={18} aria-hidden="true" />전체 삭제</button>
           </div>
         </>}
         </> : <>
