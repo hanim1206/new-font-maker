@@ -66,6 +66,20 @@
 .sentenceRun span { flex: 0 0 auto; block-size: 1em; color: rgb(var(--color-foreground)); line-height: 1em; text-align: center; }
 .sentenceRun .directInputCaret { width: 2px; height: .82em; margin-left: 2px; align-self: center; background: rgb(var(--color-primary)); animation: input-caret-blink 1s steps(1, end) infinite; }
 @keyframes input-caret-blink { 0%, 48% { opacity: 1; } 49%, 100% { opacity: 0; } }
+/* 셸 문장 줄의 `문장` 버튼과 전체 화면 */
+.sentenceActions button.sentenceOpen { width: auto; padding: 0 12px; font-size: 13px; font-weight: 600; }
+.sentenceSheet { position: fixed; z-index: 90; inset: 0; display: flex; flex-direction: column; background: rgb(var(--color-surface)); }
+.sentenceSheet > header { flex: 0 0 auto; display: flex; justify-content: flex-end; padding: max(10px, env(safe-area-inset-top)) 12px 6px; }
+.sentenceSheet > header button, .sentenceSheet > footer button { min-height: 40px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 14px; font-weight: 600; }
+.sentenceSheet > header button { border-color: rgb(var(--color-foreground)); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+.sentenceSheet > footer { flex: 0 0 auto; display: flex; justify-content: center; padding: 10px 16px calc(env(safe-area-inset-bottom) + 14px); }
+.sentenceSheetStage { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px; cursor: text; }
+.sentenceSheetStage .sentenceRun { gap: 14px 0; }
+/* iOS는 16px 아래 입력칸에 포커스하면 화면을 확대한다. */
+.sheetInput { position: fixed; top: 0; left: 0; width: 1px; height: 1px; padding: 0; overflow: hidden; border: 0; opacity: 0; pointer-events: none; font-size: 16px; }
+.sentenceRun button.sentenceClear { block-size: 1em; display: inline-grid; place-items: center; margin-left: 6px; color: rgb(var(--color-muted-foreground)); line-height: 0; }
+.sentenceRun button.sentenceClear svg { inline-size: 22px; block-size: 22px; }
+.sentenceRun span.sentenceSheetHint { block-size: auto; margin-left: 4px; color: rgb(var(--color-foreground) / .4); font-size: 16px; line-height: 1.4; text-align: left; }
 .spaceGlyph { color: transparent !important; user-select: none; }
 .punctuationGlyph { font-family: ui-sans-serif, system-ui, sans-serif; font-size: .72em; line-height: 1.38em !important; }
 .editor { min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 16px; }
