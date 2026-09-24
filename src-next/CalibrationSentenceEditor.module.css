@@ -107,12 +107,19 @@ section.sentence[data-sheet] { flex-basis: var(--sheet-h); height: var(--sheet-h
 .layoutAreaBoxAffected { fill-opacity: .07; stroke-width: 1; stroke-opacity: .58; }
 .focusChar { position: absolute; z-index: 2; right: 14px; bottom: 12px; color: rgb(var(--color-text-dim-5)); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 700; pointer-events: none; }
 .partBoxLabel { font-family: ui-monospace, 'SF Mono', Menlo, monospace; pointer-events: none; }
-.point { fill: rgb(var(--color-surface)); stroke: rgb(var(--color-primary)); stroke-width: .8; cursor: pointer; }
-.activePoint { fill: rgb(var(--color-primary)); stroke: white; stroke-width: 1; cursor: pointer; }
+/* 획 편집 선택 표시 — 피그마 · 일러스트레이터 관례. 잉크는 제 색 그대로, 선택은 한 가지 파랑으로 모양이 갈린다.
+   획 = 가는 중심선(+ 점이 닫혀 있으면 둘레 상자) · 꼭짓점 = 동그라미 · 곡선 핸들 = 마름모. 잡힌 것만 속이 찬다. */
+.focusCanvas { --selection-color: #0d99ff; }
+.selectedCenterline { fill: none; stroke: var(--selection-color); stroke-width: .45; stroke-linecap: round; stroke-linejoin: round; }
+.hoverCenterline { fill: none; stroke: var(--selection-color); stroke-width: .35; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+@media (hover: hover) { .strokeTarget:hover .hoverCenterline { opacity: .75; } }
+.selectedFrame { fill: none; stroke: var(--selection-color); stroke-width: .35; }
+.point { fill: #fff; stroke: var(--selection-color); stroke-width: .6; cursor: pointer; }
+.activePoint { fill: var(--selection-color); stroke: #fff; stroke-width: .7; cursor: pointer; }
 .pointHitTarget { cursor: pointer; }
-.handleLine { stroke: rgb(var(--color-primary) / .55); stroke-width: .55; pointer-events: none; }
-.handle { fill: rgb(var(--color-surface)); stroke: rgb(var(--color-primary)); stroke-width: .8; cursor: pointer; }
-.activeHandle { fill: rgb(var(--color-primary)); stroke: white; stroke-width: .9; cursor: pointer; }
+.handleLine { stroke: var(--selection-color); stroke-width: .3; opacity: .8; pointer-events: none; }
+.handle { fill: #fff; stroke: var(--selection-color); stroke-width: .5; cursor: pointer; }
+.activeHandle { fill: var(--selection-color); stroke: #fff; stroke-width: .6; cursor: pointer; }
 .trackpadSection { flex: 0 0 auto; padding: 10px 16px calc(env(safe-area-inset-bottom) + 12px); border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
 .trackpad { position: relative; height: 176px; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 16px; background: rgb(var(--color-surface-2)); touch-action: none; }
 .trackpadDisabled { opacity: .55; }

@@ -146,9 +146,14 @@ test('기울어진 글자: 잉크 · 핸들만 기울고 눈금은 곧으며, �
   })
   expect(layers).toEqual({ skewed: true, grid: false, body: false, hit: true })
 
+  // 모델 상자가 온 뒤에 누른다. 그 전 첫 렌더는 옛 스키마 상자라 점 자리가 다르다.
+  await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
   const strokeHit = svg.locator('[data-editor-hit="stroke"]').first()
-  await strokeHit.dispatchEvent('pointerdown', { pointerId: 1, button: 0 })
-  await strokeHit.dispatchEvent('pointerdown', { pointerId: 2, button: 0 })
+  // 자소 → 획 → (한 번 더) 점.
+  for (let tap = 0; tap < 3; tap += 1) {
+    await strokeHit.dispatchEvent('pointerdown', { button: 0 })
+    await strokeHit.dispatchEvent('pointerup', { button: 0 })
+  }
   const point = svg.locator('[data-editor-point="hit"]').last()
   const box = await point.boundingBox()
   if (!box) throw new Error('점 핸들이 없습니다.')

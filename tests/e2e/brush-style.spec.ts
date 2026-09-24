@@ -12,8 +12,11 @@ test.beforeEach(async ({ page }) => {
 test('원형·납작형·네모형 붓촉을 전역 미리보기와 이력에 적용한다', async ({ page }) => {
   const focusSvg = page.getByRole('region', { name: /완성 글자 편집/ }).locator('svg')
   const strokeHit = focusSvg.locator('[data-editor-hit="stroke"]').first()
-  await strokeHit.dispatchEvent('pointerdown', { pointerId: 1, button: 0 })
-  await strokeHit.dispatchEvent('pointerdown', { pointerId: 2, button: 0 })
+  // 자소 → 획 → (한 번 더) 점.
+  for (let tap = 0; tap < 3; tap += 1) {
+    await strokeHit.dispatchEvent('pointerdown', { button: 0 })
+    await strokeHit.dispatchEvent('pointerup', { button: 0 })
+  }
   await expect(focusSvg.locator('[data-editor-point="visible"]').first()).toBeVisible()
   await expect(focusSvg.locator('[data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(1)
 

@@ -408,6 +408,17 @@ test('켠 부품의 획 고치기로 내려가고, 안 끝난 변경이 있으�
   await expect(pressedPart).toHaveAttribute('aria-label', '받침 ㅁ 선택', { timeout: 20_000 })
 })
 
+/** 획을 눌러 잡고, 한 번 더 눌러 점을 편다(피그마식: 누르면 획, 한 번 더 누르면 점). `pick`은 몇 번째 획을 누를지 중심선 `d`로 고른다. */
+async function openStrokePoints(page: Page, pick: (paths: string[]) => number = () => 0) {
+  const hits = page.locator('[data-editor-hit="stroke"]')
+  const hit = hits.nth(pick(await hits.evaluateAll((els) => els.map((el) => el.getAttribute('d') ?? ''))))
+  for (let tap = 0; tap < 2; tap += 1) {
+    await hit.dispatchEvent('pointerdown')
+    await hit.dispatchEvent('pointerup')
+  }
+  await expect(page.locator('[data-editor-point="visible"]').first()).toBeVisible()
+}
+
 /** 셸 안 획 편집은 조절판 없이 캔버스에서 바로 끈다. 점이 손가락을 따라오고, 한 번 끌기가 기록 한 줄이다. */
 test('획 편집은 캔버스에서 꼭짓점을 직접 끌어 옮기고 Undo 한 번에 돌아온다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EA%B0%81')
@@ -415,6 +426,7 @@ test('획 편집은 캔버스에서 꼭짓점을 직접 끌어 옮기고 Undo �
   await page.getByTestId('review-canvas').locator('[data-edit-part]').first().dispatchEvent('click')
   // 문장 줄이 접히는 동안 캔버스가 올라간다. 다 접힌 뒤에 잰다.
   await page.waitForFunction(() => document.querySelector('section[aria-label="보정 문장"]')?.getBoundingClientRect().height === 0)
+  await openStrokePoints(page)
   const corner = page.locator('[data-editor-point="visible"]').nth(1)
   const centerOf = async () => { const box = await corner.boundingBox(); if (!box) throw new Error('꼭짓점이 없다'); return { x: box.x + box.width / 2, y: box.y + box.height / 2 } }
   const start = await centerOf()
@@ -432,12 +444,13 @@ test('획 편집은 캔버스에서 꼭짓점을 직접 끌어 옮기고 Undo �
   const undoButton = page.getByRole('button', { name: '형태 편집 실행 취소' })
   await undoButton.click()
   await expect(undoButton).toBeDisabled()
+  // 되돌리면 획만 잡힌 상태로 돌아온다. 점은 다시 편다.
+  await openStrokePoints(page)
   await expect.poll(async () => Math.round((await centerOf()).x)).toBe(Math.round(start.x))
   const tools = page.getByRole('toolbar', { name: '획 편집 도구' })
   await expect(tools.getByRole('button', { name: '선 추가' })).toBeEnabled()
 
   // 점을 잡으면 삭제 · 곡선이 켜지고, `여러 점`을 켜 두면 누르는 점이 더해진다.
-  await corner.dispatchEvent('pointerdown')
   await page.locator('[data-editor-point="hit"]').nth(1).dispatchEvent('pointerdown')
   await expect(tools.getByRole('button', { name: '곡선화' })).toBeEnabled()
   await tools.getByRole('button', { name: '꼭짓점 여러 개 고르기' }).click()
@@ -453,6 +466,7 @@ test('획을 상자 밖으로 끌어도 다른 획은 제자리고, 틀 다시 �
   await page.goto('/workspace/jamo?char=%EA%B0%81&mode=stroke&part=CH')
   // 모델 상자가 온 뒤에 잰다. 그 전 첫 렌더는 옛 스키마 상자라 점 자리가 다르다.
   await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
+  await openStrokePoints(page)
   const dots = page.locator('[data-editor-point="visible"]')
   const positions = () => dots.evaluateAll((els) => els.map((el) => `${Number(el.getAttribute('cx')).toFixed(2)},${Number(el.getAttribute('cy')).toFixed(2)}`))
   // 틀 설명 줄은 없다. `틀 다시 맞추기`는 숨겨 두었다(기능만 남음).
@@ -479,6 +493,7 @@ test('획을 상자 밖으로 끌어도 다른 획은 제자리고, 틀 다시 �
   await reset.evaluate((button: HTMLButtonElement) => button.click())
   await expect.poll(async () => Number((await positions())[0].split(',')[0])).toBeCloseTo(Number(before[0].split(',')[0]), 0)
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
+  await openStrokePoints(page)
   await expect.poll(async () => (await positions())[0]).toBe(after[0])
 })
 
@@ -491,6 +506,7 @@ test('획을 가로로 끌면 세로로 흔들려도 반듯하게 가고, 기준
   const canvas = page.getByTestId('focus-canvas')
   await expect(canvas).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
   await expect.poll(() => page.locator('[data-testid="stroke-guide-rails"] line').count()).toBeGreaterThan(8)
+  await openStrokePoints(page)
   const dots = page.locator('[data-editor-point="visible"]')
   const positions = () => dots.evaluateAll((els) => els.map((el) => [Number(el.getAttribute('cx')), Number(el.getAttribute('cy'))]))
   const before = await positions()
@@ -534,6 +550,9 @@ test('획을 옆 자소 쪽으로 끌면 최소 간격에서 한 번 걸리고, 
   const canvasBox = await canvas.boundingBox()
   if (!canvasBox) throw new Error('캔버스가 없다')
   const unitsPerPx = 1160 / canvasBox.width
+  // ㅓ의 곁줄기(가장 왼쪽까지 가는 획)의 점을 편다.
+  const leftmostX = (d: string) => Math.min(...[...d.matchAll(/(-?[\d.]+)[ ,](-?[\d.]+)/g)].map((match) => Number(match[1])))
+  await openStrokePoints(page, (paths) => paths.map(leftmostX).reduce((best, x, index, xs) => x < xs[best] ? index : best, 0))
   const dots = page.locator('[data-editor-point="visible"]')
   const xs = await dots.evaluateAll((els) => els.map((el) => Number(el.getAttribute('cx'))))
   const barEnd = dots.nth(xs.indexOf(Math.min(...xs)))
@@ -576,6 +595,7 @@ test('획 편집의 뒤로는 이번에 고친 획을 되돌리고 레이아웃�
   await page.waitForFunction(() => document.querySelector('section[aria-label="보정 문장"]')?.getBoundingClientRect().height === 0)
   const before = await selectedStroke()
   expect(before).toBeTruthy()
+  await openStrokePoints(page, (paths) => Math.max(0, paths.indexOf(before!)))
   // 획을 통째로 옮기면 상자 맞춤이 도로 펴 버릴 수 있어서 꼭짓점을 잡아 옮긴다.
   // 캔버스에서 꼭짓점을 두 번 끌어 기록 두 줄을 만든다.
   const dot = page.locator('[data-editor-point="visible"]').first()
