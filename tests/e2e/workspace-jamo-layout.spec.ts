@@ -334,7 +334,8 @@ test('자소 탭은 레이아웃으로 열리고, 기준선을 적용하면 문�
 
 test('옛 검수 글자 화면 주소는 같은 글자의 자소 탭 레이아웃 모드로 넘어간다', async ({ page }) => {
   await page.goto('/workspace/review/glyph?char=%EB%A9%88')
-  await expect(page).toHaveURL(/\/workspace\/jamo\?char=%EB%A9%88&mode=layout&solo=1$/)
+  await expect(page).toHaveURL(/\/workspace\/jamo$/)
+  await expect(page.getByRole('region', { name: '보정 문장' }).getByRole('button', { name: '멈 편집' })).toHaveAttribute('aria-current', 'true')
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible({ timeout: 20_000 })
 })
 

@@ -45,10 +45,12 @@ test('격자 칸은 내 획으로 그려지고 Noto 검수 표시는 없다', as
   await expect(cell(page, '각')).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByTestId('review-pick')).toContainText('선택 · 각')
   await cell(page, '각').click()
-  await expect(page).toHaveURL(/\/workspace\/jamo\?char=%EA%B0%81&mode=layout&solo=1$/)
-  // 격자에서 들어오면 보정 문장에는 그 글자 하나만 올라간다.
+  // 들고 온 글자는 여는 데만 쓰고 주소에서는 지운다(새로고침하면 기본 문장).
+  await expect(page).toHaveURL(/\/workspace\/jamo$/)
+  // 격자에서 들어와도 보정 문장은 그대로 두고, 문장에 없던 글자는 앞에 붙는다.
   const sentence = page.getByRole('region', { name: '보정 문장' })
-  await expect(sentence.getByRole('button', { name: /편집/ })).toHaveCount(1)
+  await expect(sentence.getByRole('button', { name: /편집/ }).nth(1)).toBeVisible()
+  await expect(sentence.getByRole('button', { name: /편집/ }).first()).toHaveAccessibleName('각 편집')
   await expect(sentence.getByRole('button', { name: '각 편집' })).toHaveAttribute('aria-current', 'true')
 })
 

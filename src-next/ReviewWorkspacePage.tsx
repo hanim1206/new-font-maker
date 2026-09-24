@@ -22,7 +22,7 @@ function codepointFromUrl(): number {
 }
 
 function glyphHref(codepoint: number): string {
-  return `/workspace/jamo?char=${encodeURIComponent(String.fromCodePoint(codepoint))}&mode=layout&solo=1`
+  return `/workspace/jamo?char=${encodeURIComponent(String.fromCodePoint(codepoint))}&mode=layout`
 }
 
 // 글자 목록은 앱이 만든다. 추출 결과가 없는 빈 snapshot이면 11,172자가 전부 빈 행으로 나온다.

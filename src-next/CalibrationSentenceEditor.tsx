@@ -178,14 +178,13 @@ function isEditableHangul(char: string): boolean {
   return isPrecomposedSyllable || isCompatibilityJamo
 }
 
-/** `?char=염`처럼 다른 탭에서 글자를 들고 들어오면 그 글자로 연다. 문장에 없으면 앞에 붙인다. `&solo=1`(검수 격자에서 글자를 눌러 들어올 때)이면 문장에 그 글자 하나만 올린다. */
+/** `?char=염`처럼 다른 탭에서 글자를 들고 들어오면 그 글자로 연다. 문장은 그대로 두고, 문장에 없으면 앞에 붙인다. */
 function initialFocus(): { char: string; sentence: string; custom: boolean } {
   const params = new URLSearchParams(window.location.search)
   const requested = [...(params.get('char') ?? '')][0]
   const base = SAMPLE_SENTENCES[0]
   // 그냥 들어오면 문장 첫 글자를 잡는다. 문장에 없는 글자를 포커스한 채 열지 않는다.
   if (!requested || !isEditableHangul(requested)) return { char: [...base].find(isEditableHangul) ?? [...base][0], sentence: base, custom: false }
-  if (params.get('solo') === '1') return { char: requested, sentence: requested, custom: true }
   if ([...base].includes(requested)) return { char: requested, sentence: base, custom: false }
   return { char: requested, sentence: `${requested} ${base}`, custom: true }
 }
@@ -1411,6 +1410,14 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const grid = useCalibrationProjectStore((state) => state.grid)
   const metrics = useCalibrationProjectStore((state) => state.metrics)
   const [focus] = useState(initialFocus)
+  // 주소로 들고 온 글자 · 모드는 여는 데만 쓴다. 남겨 두면 새로고침할 때마다 그 글자로 다시 열린다.
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const opened = ['char', 'mode', 'part', 'solo'].filter((key) => url.searchParams.has(key))
+    if (!opened.length) return
+    opened.forEach((key) => url.searchParams.delete(key))
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+  }, [])
   const [sampleSentence, setSampleSentence] = useState<string>(focus.sentence)
   const [selectedChar, setSelectedChar] = useState(focus.char)
   const [selection, setSelection] = useState<Selection>({ kind: 'none' })
