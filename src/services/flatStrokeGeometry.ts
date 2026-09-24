@@ -179,22 +179,24 @@ export function polylineToFlatInkGroups(
   const endArc = cap === 'round' ? roundCap(path[path.length - 1], endDir, half, roundVertices) : []
   const startArc = cap === 'round' ? roundCap(path[0], { x: -startDir.x, y: -startDir.y }, half, roundVertices) : []
   if (cornerRounding && cap === 'butt') {
-    // 끝면 네 모서리 굴림. 반지름은 반폭과 이웃 변 길이에 걸린다 — 반폭이면 두 호가 중심선에서 만나 반원.
-    // 옆면으로 물러나는 길이는 그 쪽 오프셋 변에 남은 곧은 길이(바로 앞 꺾임 굴림이 쓰고 남은 것)의 4/5를 넘지 않는다.
+    // 끝면 네 모서리 굴림. 반지름은 반폭과 끝 앵커 구간(마지막 앵커 → 끝)의 길이에 걸린다 — 반폭이면 두 호가 중심선에서 만나 반원.
+    // 옆면은 곡선일 수 있어 직선 토막이 아니라 호 길이로 되짚어 자르고, 그 자리의 접선과 끝면을 잇는 3차 곡선으로 굴린다.
     const end = path[path.length - 1], start = path[0]
-    const gap = (a: BrushPoint, b: BrushPoint) => Math.hypot(a.x - b.x, a.y - b.y)
-    const endReach = Math.min(cornerRounding.radius, half, 0.8 * Math.min(gap(left[left.length - 1], left[left.length - 2]), gap(right[right.length - 1], right[right.length - 2])))
-    const startReach = Math.min(cornerRounding.radius, half, 0.8 * Math.min(gap(left[0], left[1]), gap(right[0], right[1])))
+    const anchorList = [...cornerRounding.anchors].filter((index) => index > 0 && index < path.length - 1).sort((a, b) => a - b)
+    const arcLength = (from: number, to: number) => { let sum = 0; for (let i = from; i < to; i += 1) sum += Math.hypot(path[i + 1].x - path[i].x, path[i + 1].y - path[i].y); return sum }
+    const lastAnchor = anchorList.length > 0 ? anchorList[anchorList.length - 1] : 0
+    const firstAnchor = anchorList.length > 0 ? anchorList[0] : path.length - 1
+    const endReach = Math.min(cornerRounding.radius, half, FILLET_EDGE_LIMIT * arcLength(lastAnchor, path.length - 1))
+    const startReach = Math.min(cornerRounding.radius, half, FILLET_EDGE_LIMIT * arcLength(0, firstAnchor))
     const nEnd = normalOf(endDir), nStart = normalOf(startDir)
-    const backward = { x: -startDir.x, y: -startDir.y }
     if (endReach > EPSILON) {
-      left.splice(left.length - 1, 1, ...endCornerFillet(end, endDir, nEnd, half, endReach, roundVertices))
-      // right는 아직 시작 → 끝 순서다(아래에서 뒤집는다). 끝에서는 옆면 → 끝면, 시작에서는 끝면 → 옆면 순으로 둔다.
-      right.splice(right.length - 1, 1, ...endCornerFillet(end, endDir, { x: -nEnd.x, y: -nEnd.y }, half, endReach, roundVertices))
+      roundSideEnd(left, true, end, nEnd, half, endReach, roundVertices)
+      // right는 아직 시작 → 끝 순서다(아래에서 뒤집는다).
+      roundSideEnd(right, true, end, { x: -nEnd.x, y: -nEnd.y }, half, endReach, roundVertices)
     }
     if (startReach > EPSILON) {
-      right.splice(0, 1, ...endCornerFillet(start, backward, { x: -nStart.x, y: -nStart.y }, half, startReach, roundVertices).reverse())
-      left.splice(0, 1, ...endCornerFillet(start, backward, nStart, half, startReach, roundVertices).reverse())
+      roundSideEnd(right, false, start, { x: -nStart.x, y: -nStart.y }, half, startReach, roundVertices)
+      roundSideEnd(left, false, start, nStart, half, startReach, roundVertices)
     }
   }
   const joined = [...left, ...endArc, ...right.reverse(), ...startArc]
@@ -317,16 +319,57 @@ function roundCap(end: BrushPoint, dir: BrushPoint, half: number, vertices: numb
   })
 }
 
+/** 원을 3차 베지어로 흉내 낼 때의 손잡이 비율. */
+const KAPPA = 0.5522847498
+
 /**
- * 열린 끝면의 한 모서리 굴림. `tip`은 중심선 끝점, `outward`는 획 밖을 향하는 방향, `side`는 모서리가 있는 쪽의 단위 법선.
- * 옆면에 접하는 점에서 끝면에 접하는 점까지 반지름 `reach`의 사분호. 양 끝을 포함한다.
+ * 열린 끝면의 한 모서리 굴림 — 옆면 점 열을 제자리에서 고친다. `side`가 시작 → 끝 순서일 때 `atEnd`는 끝 쪽, 아니면 시작 쪽.
+ * 옆면을 끝에서부터 호 길이 `reach`만큼 되짚어 자르고, 자른 자리의 접선과 끝면(tip + sideDir·(half − reach))을
+ * 3차 곡선으로 잇는다. 옆면이 곧으면 사분원과 같고(오차 0.03%), 곡선이면 접선이 이어져 꺾이지 않는다.
  */
-function endCornerFillet(tip: BrushPoint, outward: BrushPoint, side: BrushPoint, half: number, reach: number, vertices: number): BrushPoint[] {
-  const corner = add(tip, side, half)
-  const sideTangent = add(corner, outward, -reach)
-  const faceTangent = add(tip, side, half - reach)
-  const center = add(add(tip, outward, -reach), side, half - reach)
-  return [sideTangent, ...arc(center, { x: sideTangent.x - center.x, y: sideTangent.y - center.y }, { x: faceTangent.x - center.x, y: faceTangent.y - center.y }, reach, vertices), faceTangent]
+function roundSideEnd(side: BrushPoint[], atEnd: boolean, tip: BrushPoint, sideDir: BrushPoint, half: number, reach: number, vertices: number): void {
+  if (side.length < 2) return
+  // 배열 끝(atEnd) 또는 처음에서 안쪽으로 걸어 들어간다.
+  const step = atEnd ? -1 : 1
+  let index = atEnd ? side.length - 1 : 0
+  let remaining = reach
+  let cut: BrushPoint | null = null
+  let tangent: BrushPoint | null = null
+  while (index + step >= 0 && index + step < side.length) {
+    const from = side[index], to = side[index + step]
+    const length = Math.hypot(to.x - from.x, to.y - from.y)
+    if (length >= remaining) {
+      const t = length <= EPSILON ? 0 : remaining / length
+      cut = { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t }
+      // 접선은 끝(모서리) 쪽을 향한다.
+      tangent = length <= EPSILON ? null : { x: (from.x - to.x) / length, y: (from.y - to.y) / length }
+      break
+    }
+    remaining -= length
+    index += step
+  }
+  if (!cut || !tangent) return
+  const face = add(tip, sideDir, half - reach)
+  // 접선과 끝면이 만나는 점이 곡선의 모서리(손잡이 방향). 거의 나란하면 옛 모서리로 대신한다.
+  const faceDir = sideDir
+  const denominator = tangent.x * faceDir.y - tangent.y * faceDir.x
+  const corner = Math.abs(denominator) <= 1e-9
+    ? add(tip, sideDir, half)
+    : (() => { const s = ((face.x - cut.x) * faceDir.y - (face.y - cut.y) * faceDir.x) / denominator; return add(cut, tangent, s) })()
+  const p1 = add(cut, { x: corner.x - cut.x, y: corner.y - cut.y }, KAPPA)
+  const p2 = add(face, { x: corner.x - face.x, y: corner.y - face.y }, KAPPA)
+  const steps = Math.max(3, Math.ceil(vertices / 4))
+  const curve = Array.from({ length: steps + 1 }, (_, i) => {
+    const t = i / steps, u = 1 - t
+    return {
+      x: u * u * u * cut.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * face.x,
+      y: u * u * u * cut.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * face.y,
+    }
+  })
+  // 되짚은 구간의 점을 지우고 곡선을 넣는다. 끝 쪽은 [.., 자른 점 → 끝면], 시작 쪽은 [끝면 → 자른 점, ..].
+  // 자른 자리는 side[index]와 side[index + step] 사이다. side[index]부터 바깥은 전부 곡선으로 바뀐다.
+  if (atEnd) side.splice(index, side.length - index, ...curve)
+  else side.splice(0, index + 1, ...curve.reverse())
 }
 
 /** 획 데이터 → 일자 끝 면. brushGeometry의 tip 방식과 같은 좌표계(glyph-normalized). `roundness`(0~1)는 모서리를 `둥글기 × 반폭`으로 굴린다. */

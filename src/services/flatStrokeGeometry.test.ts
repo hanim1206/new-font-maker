@@ -107,12 +107,12 @@ describe('전역 둥글기(roundness)', () => {
     const expected = 0.06 - 4 * (0.05 * 0.05 - Math.PI * 0.05 * 0.05 / 4)
     expect(area(ink[0])).toBeLessThan(0.06)
     expect(area(ink[0])).toBeGreaterThan(expected * 0.98)
-    // 끝면 가운데(중심선 끝)에는 잉크가 닿고, 끝 모서리 쪽 점은 전부 반지름 0.05의 원(중심 0.75, 0.5) 위에 있다.
+    // 끝면 가운데(중심선 끝)에는 잉크가 닿고, 끝 모서리 쪽 점은 전부 반지름 0.05의 원(중심 0.75, 0.5) 위에 있다(3차 곡선 근사, 오차 0.03%).
     const pts = ink[0].outer
     expect(pts.some((p) => Math.abs(p.x - 0.8) < 1e-9 && Math.abs(p.y - 0.5) < 1e-9)).toBe(true)
     const endQuadrant = pts.filter((p) => p.x > 0.75 + 1e-9)
     expect(endQuadrant.length).toBeGreaterThan(4)
-    for (const p of endQuadrant) expect(Math.hypot(p.x - 0.75, p.y - 0.5)).toBeCloseTo(0.05, 9)
+    for (const p of endQuadrant) expect(Math.hypot(p.x - 0.75, p.y - 0.5)).toBeCloseTo(0.05, 4)
   })
 
   it('반쯤(0.5)이면 끝면에 곧은 가운데가 남는다', () => {
