@@ -10,6 +10,12 @@ import '../src/index.css'
 
 const root = createRoot(document.getElementById('root')!)
 
+// 요소 끌어 옮기기(이미지 · 링크 · 선택한 글자)를 앱 전체에서 막는다. 입력칸은 예외. CSS `-webkit-user-drag`가 안 먹는 브라우저(Firefox)용.
+document.addEventListener('dragstart', (event) => {
+  if (event.target instanceof Element && event.target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])')) return
+  event.preventDefault()
+})
+
 async function start(): Promise<void> {
   if (import.meta.env.DEV && window.location.pathname === '/global-style-preview') {
     const { GlobalStylePreviewPage } = await import('./GlobalStylePreviewPage')
