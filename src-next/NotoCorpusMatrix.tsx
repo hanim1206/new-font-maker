@@ -25,6 +25,12 @@ const PIVOTS = [
 ] as const satisfies readonly { id: string; rows: Axis; cols: Axis; sheet: Axis; label: string }[]
 type PivotId = typeof PIVOTS[number]['id']
 const BAR_ORDER: CorpusCellStatus[] = ['reviewed', 'candidate', 'missing', 'unsupported', 'rejected']
+// 검수 탭 칸 바탕 = 레이아웃(문맥 칸) 6개. 같은 레이아웃 규칙을 쓰는 글자끼리 같은 색이다. 색은 모듈 CSS의 `.plain[data-context]`.
+const CONTEXT_LEGEND = [
+  ['right', '세로홀자'], ['right-final', '세로홀자 + 받침'],
+  ['bottom', '가로홀자'], ['bottom-final', '가로홀자 + 받침'],
+  ['mixed', '섞임홀자'], ['mixed-final', '섞임홀자 + 받침'],
+] as const
 const LEGEND_ORDER: CorpusCellStatus[] = [...BAR_ORDER, 'unprocessed']
 
 const jamoLabel = (value: Jamo) => value ?? '없음'
@@ -113,7 +119,9 @@ export function NotoCorpusMatrix({ rows, reviews, selected, onSelect, isHighligh
     {!noFinal && <div className={styles.tabs} role="group" aria-label={`${AXES[pivot.sheet].label} 시트`}>{sheets.map(({ value, total, counts }) => <button key={value ?? 'none'} type="button" aria-pressed={value === sheet} title={showStatus ? `${jamoLabel(value)} · 문제 ${issueCount(counts)}칸` : jamoLabel(value)} onClick={() => selectAlong(pivot.sheet, value)}><span>{jamoLabel(value)}</span>{showStatus && <StatusBar counts={counts} total={total} />}</button>)}</div>}
     <div className={styles.summary}>
       <strong>{`${noFinal ? '무받침' : `${AXES[pivot.sheet].label} ${jamoLabel(sheet)} 시트`} · ${rowItems.length * colItems.length}자`}</strong>
-      {showStatus && <div className={styles.legend}>{LEGEND_ORDER.map((status) => <span key={status}><i className={styles[status]} />{CELL_STATUS_LABEL[status]} {sheetCounts[status]}</span>)}</div>}
+      {showStatus
+        ? <div className={styles.legend}>{LEGEND_ORDER.map((status) => <span key={status}><i className={styles[status]} />{CELL_STATUS_LABEL[status]} {sheetCounts[status]}</span>)}</div>
+        : <div className={styles.legend} aria-label="칸 색 = 레이아웃" data-testid="corpus-context-legend">{CONTEXT_LEGEND.map(([id, label]) => <span key={id}><i className={styles.plain} data-context={id} />{label}</span>)}</div>}
     </div>
     <div ref={wrapRef} className={styles.gridWrap} onKeyDown={handleKeyDown}>
       <table className={styles.grid} aria-label="글자 격자">
@@ -142,7 +150,7 @@ export function NotoCorpusMatrix({ rows, reviews, selected, onSelect, isHighligh
               const row = rows[codepoint - 0xac00]
               const status = statusAt(codepoint)
               return <td key={codepoint} className={colGroupStarts.has(colItems[colIndex]) ? styles.colGroupStart : ''}>
-                <button type="button" className={`${styles.cell} ${showStatus ? styles[status] : styles.plain}`} data-testid="corpus-cell" data-codepoint={codepoint} data-status={showStatus ? status : undefined} data-dimmed={!isHighlighted(row)} aria-pressed={codepoint === selected} tabIndex={codepoint === selected ? 0 : -1} aria-label={showStatus ? `${row.identity.character} · ${CELL_STATUS_LABEL[status]}` : row.identity.character} onClick={() => onSelect(codepoint)}>
+                <button type="button" className={`${styles.cell} ${showStatus ? styles[status] : styles.plain}`} data-testid="corpus-cell" data-codepoint={codepoint} data-status={showStatus ? status : undefined} data-context={showStatus ? undefined : row.identity.contextId} data-dimmed={!isHighlighted(row)} aria-pressed={codepoint === selected} tabIndex={codepoint === selected ? 0 : -1} aria-label={showStatus ? `${row.identity.character} · ${CELL_STATUS_LABEL[status]}` : row.identity.character} onClick={() => onSelect(codepoint)}>
                   {renderCell ? renderCell(row) : <strong>{row.identity.character}</strong>}
                   {large && showStatus && <span className={styles.dots}>{PART_STAGES.map((stage) => {
                     const part = corpusPartStatus(row, stage, reviews)

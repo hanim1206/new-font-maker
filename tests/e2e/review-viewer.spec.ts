@@ -104,3 +104,15 @@ test('축 배치 셋과 받침 없음·겹받침·혼합 홀자 칸이 모두 �
   await expectDrawn(19 * 28, ['가', '핳', '낣'])
   expect(pageErrors).toEqual([])
 })
+
+test('칸 바탕은 레이아웃 색이다 — 같은 레이아웃 규칙을 쓰는 글자끼리 같은 색', async ({ page }) => {
+  await page.route('**/api/noto-corpus**', (route) => route.abort())
+  await page.goto('/workspace/review')
+  await expect(page.getByTestId('corpus-context-legend')).toBeVisible({ timeout: 20_000 })
+  const expected: Record<string, string> = { 가: 'right', 각: 'right-final', 고: 'bottom', 곡: 'bottom-final', 과: 'mixed', 곽: 'mixed-final' }
+  for (const [char, context] of Object.entries(expected)) await expect(cell(page, char)).toHaveAttribute('data-context', context)
+  const background = (char: string) => cell(page, char).evaluate((element) => getComputedStyle(element).backgroundColor)
+  expect(await background('각')).toBe(await background('긴'))
+  expect(await background('각')).not.toBe(await background('가'))
+  expect(await background('각')).not.toBe(await background('곡'))
+})

@@ -76,8 +76,14 @@
 .unsupported { background: var(--unsupported-bg); color: var(--unsupported-fg); border-color: var(--unsupported-line); }
 .rejected { background: var(--rejected-bg); color: var(--rejected-fg); border-color: var(--rejected-line); }
 .unprocessed { background: var(--unprocessed-bg); color: var(--unprocessed-fg); border-color: var(--unprocessed-line); }
-/* 추출 상태 없이 글자만 보는 칸(검수 탭). 흰 바탕에 옅은 테두리. */
+/* 추출 상태 없이 글자만 보는 칸(검수 탭). 바탕은 레이아웃 색: 홀자 계열마다 색상 하나, 받침 없음은 옅게 · 받침 있음은 한 톤 진하게. */
 .plain { background: #fff; color: var(--ink); border-color: #e3e9ee; }
+.plain[data-context='right'] { background: #fdf0e2; border-color: #f3dcc2; }
+.plain[data-context='right-final'] { background: #f9dcbc; border-color: #eec59a; }
+.plain[data-context='bottom'] { background: #e8f2fb; border-color: #d0e2f2; }
+.plain[data-context='bottom-final'] { background: #cbe2f6; border-color: #aecde9; }
+.plain[data-context='mixed'] { background: #efe9f9; border-color: #ddd3f1; }
+.plain[data-context='mixed-final'] { background: #dacdf3; border-color: #c4b3ea; }
 .cell svg { width: calc(var(--cell) - 6px); height: calc(var(--cell) - 6px); pointer-events: none; }
 
 .bar { display: flex; height: 4px; overflow: hidden; border-radius: 2px; background: var(--unprocessed-dot); }
