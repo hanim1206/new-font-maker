@@ -540,6 +540,37 @@ test('획을 가로로 끌면 세로로 흔들려도 반듯하게 가고, 기준
   expect((await positions())[0][1]).toBeGreaterThan(before[0][1] + 2)
 })
 
+/** 잡은 획 가까이 누르면 다른 획이 아니라 잡은 획의 가장 가까운 꼭짓점이 잡힌다. 꼭짓점 · 곡선 핸들은 보이는 점보다 넓게(약 23px) 눌린다. */
+test('잡은 획의 꼭짓점과 곡선 핸들은 조금 비껴 눌러도 잡힌다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EA%B0%81&mode=stroke&part=CH')
+  await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
+  // 들어올 때 잡혀 있던 것을 빈 곳으로 풀고, 획을 한 번만 누른다.
+  await page.getByTestId('focus-canvas').dispatchEvent('pointerdown')
+  const hit = page.locator('[data-editor-hit="stroke"]').first()
+  await hit.dispatchEvent('pointerdown')
+  await hit.dispatchEvent('pointerup')
+  // 획만 잡힌 상태: 점은 안 보여도 눌림 영역은 깔려 있다.
+  await expect(page.locator('[data-editor-point="visible"]')).toHaveCount(0)
+  const catches = page.locator('[data-editor-point="catch"]')
+  await expect(catches.first()).toBeAttached()
+  const centerOf = async (locator: Locator) => { const box = await locator.boundingBox(); if (!box) throw new Error('자리가 없다'); return { x: box.x + box.width / 2, y: box.y + box.height / 2 } }
+  const target = await centerOf(catches.nth(1))
+  await page.mouse.click(target.x + 10, target.y + 6)
+  const active = page.locator('[data-editor-point="visible"][r="2.8"]')
+  await expect(active).toHaveCount(1)
+  const picked = await centerOf(active)
+  expect(Math.hypot(picked.x - target.x, picked.y - target.y)).toBeLessThanOrEqual(3)
+
+  // 곡선으로 바꾸면 핸들이 뜬다. 점을 다시 잡고, 핸들을 꼭짓점 반대쪽으로 14px 비껴 눌러도 핸들이 잡힌다.
+  await page.getByRole('toolbar', { name: '획 편집 도구' }).getByRole('button', { name: '곡선화' }).click()
+  await page.mouse.click(picked.x, picked.y)
+  await expect(page.locator('[data-editor-handle="active"]')).toHaveCount(0)
+  const handle = await centerOf(page.locator('[data-editor-handle]').first())
+  const length = Math.hypot(handle.x - picked.x, handle.y - picked.y) || 1
+  await page.mouse.click(handle.x + (handle.x - picked.x) / length * 14, handle.y + (handle.y - picked.y) / length * 14)
+  await expect(page.locator('[data-editor-handle="active"]')).toHaveCount(1)
+})
+
 /**
  * 최소 잉크 간격은 막지 않고 알린다. 간격은 화면과 같은 상자(모델 상자)로 잰다 — `서`는 ㅅ과 ㅓ 사이 여유가 17u뿐이다(옛 스키마 상자로는 188u로 잘못 쟀다).
  * 걸린 자리에서 한 번 붙들고, 50u 넘게 더 끌면 넘어간다. 넘어간 자모는 자동 되당김 없이 그린 대로 나오고 캔버스가 주황으로 알린다.

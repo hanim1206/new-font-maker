@@ -140,8 +140,8 @@ const GAP_STICK_EM = 0.05
 /** 선택 색. 피그마처럼 잉크는 제 색 그대로 두고, 잡은 획은 가는 중심선 + 둘레 상자로 알린다. 옆 자소에 너무 붙은 자소의 획은 경고색. */
 const SELECTION_COLOR = '#0d99ff'
 const SELECTION_WARNING_COLOR = '#e0321a'
-/** 꼭짓점 눌림 반지름(뷰박스 단위). 겹치면 누른 자리에서 가장 가까운 점이 잡힌다. */
-const POINT_HIT_RADIUS = 7.5
+/** 꼭짓점 · 곡선 핸들 눌림 반지름(뷰박스 단위). 330px 캔버스에서 약 23px — 손가락 폭 한 개. 겹치면 누른 자리에서 가장 가까운 것이 잡힌다. */
+const POINT_HIT_RADIUS = 8
 type PreviewSchema = { layoutType: LayoutType; schema: LayoutSchema }
 /** 폰트 전체 굵기(100–900) · 기울기(도). 끄는 동안은 미리보기, 손을 떼면 저장 + 기록 한 줄. */
 type StyleTone = { weight: number; slant: number }
@@ -491,6 +491,49 @@ function FocusedGlyph({
       return distance < best.distance ? { index, distance } : best
     }, { index: 0, distance: Infinity })
   }
+  // 잡은 획의 꼭짓점 · 핸들 눌림. 잡은 획의 눌림 영역은 다른 획보다 위에 깔려서, 잡은 획 가까이를 누르면 다른 획이 아니라 이 획의 점이 잡힌다.
+  // 영역이 겹치면 누른 자리에서 가장 가까운 꼭짓점 · 핸들이 잡힌다. 점이 아직 안 펼쳐졌으면 끌면 획째 옮기고, 떼면 그 점이 잡힌다.
+  // `pressed`: 누른 눌림 영역의 주인. 누른 자리가 어느 영역에도 안 들면(좌표 없는 합성 이벤트 등) 그대로 잡는다.
+  const pressActiveStroke = (event: ReactPointerEvent<SVGElement>, target: (typeof targets)[number], pressed: { pointIndex: number; handle?: 'in' | 'out' }) => {
+    event.stopPropagation()
+    const matrix = (event.currentTarget as SVGGraphicsElement).getScreenCTM()
+    const at = matrix ? new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()) : null
+    const distanceTo = (point: { x: number; y: number }) => {
+      if (!at) return Infinity
+      const { x, y } = absolutePoint(point, target.box)
+      return Math.hypot(x - at.x, y - at.y)
+    }
+    let best: { pointIndex: number; handle?: 'in' | 'out'; distance: number } = { pointIndex: 0, distance: Infinity }
+    target.stroke.points.forEach((point, pointIndex) => {
+      const distance = distanceTo(point)
+      if (distance < best.distance) best = { pointIndex, distance }
+    })
+    if ((selection.kind === 'point' || selection.kind === 'handle') && selection.strokeId === target.stroke.id) {
+      const point = target.stroke.points[selection.pointIndex]
+      for (const handle of ['in', 'out'] as const) {
+        const handlePoint = handle === 'in' ? point?.handleIn : point?.handleOut
+        const distance = handlePoint ? distanceTo(handlePoint) : Infinity
+        if (distance < best.distance) best = { pointIndex: selection.pointIndex, handle, distance }
+      }
+    }
+    if (best.distance > POINT_HIT_RADIUS) best = { ...pressed, distance: 0 }
+    const component = componentFor(char, target.editorPart, target.jamo)
+    const picked = target.stroke.points[best.pointIndex]
+    if (best.handle && (selection.kind === 'point' || selection.kind === 'handle')) {
+      const handlePoint = best.handle === 'in' ? picked.handleIn! : picked.handleOut!
+      onSelect({ ...selection, kind: 'handle', handle: best.handle })
+      startDrag(event, target.box, pointAnchors(handlePoint, target.box), { strokeId: target.stroke.id, pointIndex: best.pointIndex })
+      return
+    }
+    const pointSelection = { kind: 'point', component, editorPart: target.editorPart, renderPart: target.renderPart, jamo: target.jamo, strokeId: target.stroke.id, pointIndex: best.pointIndex, box: target.box } as const
+    const pointsShown = pointsOpenStrokeId === target.stroke.id || selectedPoints.some((point) => point.strokeId === target.stroke.id)
+    if (pointsShown) {
+      onPointSelect(pointSelection)
+      startDrag(event, target.box, pointAnchors(picked, target.box), { strokeId: target.stroke.id, pointIndex: best.pointIndex })
+    } else {
+      startDrag(event, target.box, strokeBodyAnchors(target.stroke, target.box), { strokeId: target.stroke.id }, () => onPointSelect(pointSelection))
+    }
+  }
   const startDrag = (event: ReactPointerEvent<SVGElement>, box: BoxConfig, anchors: SnapAnchors, dragged: { strokeId: string; pointIndex?: number }, onTap?: () => void) => {
     // 끌기가 없는 화면은 누르기가 곧 탭이다.
     if (!dragApiRef || !canvasRef.current) { onTap?.(); return }
@@ -605,30 +648,21 @@ function FocusedGlyph({
           />
           </g>
         })}
-        {/* 점은 펼친 획에만 뜬다. `여러 점`으로 다른 획에서 골라 둔 점이 있으면 그 획의 점도 남긴다. */}
+        {/* 점은 펼친 획에만 뜬다. `여러 점`으로 다른 획에서 골라 둔 점이 있으면 그 획의 점도 남긴다.
+            잡기만 하고 아직 안 펼친 획도 꼭짓점 눌림 영역(`catch`)은 깐다 — 잡은 획 가까이 누르면 다른 획보다 이 획의 점이 먼저다. */}
         {selectedPart && selection.kind !== 'component' && targets.filter((target) => target.editorPart === selectedPart
-          && (target.stroke.id === pointsOpenStrokeId || selectedPoints.some((point) => point.strokeId === target.stroke.id))).flatMap((target) => target.stroke.points.map((point, pointIndex) => {
-          const { x, y } = absolutePoint(point, target.box)
-          const active = selectedPoints.some((point) => point.strokeId === target.stroke.id && point.pointIndex === pointIndex)
-            || ((selection.kind === 'point' || selection.kind === 'handle') && selection.strokeId === target.stroke.id && selection.pointIndex === pointIndex)
-          const component = componentFor(char, target.editorPart, target.jamo)
-          const selectPoint = (event: ReactPointerEvent<SVGCircleElement>) => {
-              event.stopPropagation()
-              // 눌림 영역이 겹치면 나중에 그린 점이 먹는다. 누른 자리에서 가장 가까운 점을 잡는다(누른 자리가 영역 밖이면 누른 점 그대로).
-              const nearest = nearestPoint(event, target.stroke, target.box)
-              const pressed = absolutePoint(point, target.box)
-              const matrix = event.currentTarget.getScreenCTM()
-              const at = matrix ? new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()) : null
-              const index = at && Math.hypot(pressed.x - at.x, pressed.y - at.y) <= POINT_HIT_RADIUS ? nearest.index : pointIndex
-              const picked = target.stroke.points[index]
-              onPointSelect({ kind: 'point', component, editorPart: target.editorPart, renderPart: target.renderPart, jamo: target.jamo, strokeId: target.stroke.id, pointIndex: index, box: target.box })
-              startDrag(event, target.box, pointAnchors(picked, target.box), { strokeId: target.stroke.id, pointIndex: index })
-          }
-          return <g key={`point-${target.renderPart}-${target.stroke.id}-${pointIndex}`}>
-            <circle cx={x} cy={y} r={POINT_HIT_RADIUS} fill="transparent" pointerEvents="all" className={styles.pointHitTarget} data-editor-point="hit" onPointerDown={selectPoint} />
-            <circle cx={x} cy={y} r={active ? 2.8 : 2.1} className={active ? styles.activePoint : styles.point} data-editor-point="visible" pointerEvents="none" />
-          </g>
-        }))}
+          && (target.stroke.id === selectedStrokeId || selectedPoints.some((point) => point.strokeId === target.stroke.id))).flatMap((target) => {
+          const shown = target.stroke.id === pointsOpenStrokeId || selectedPoints.some((point) => point.strokeId === target.stroke.id)
+          return target.stroke.points.map((point, pointIndex) => {
+            const { x, y } = absolutePoint(point, target.box)
+            const active = selectedPoints.some((point) => point.strokeId === target.stroke.id && point.pointIndex === pointIndex)
+              || ((selection.kind === 'point' || selection.kind === 'handle') && selection.strokeId === target.stroke.id && selection.pointIndex === pointIndex)
+            return <g key={`point-${target.renderPart}-${target.stroke.id}-${pointIndex}`}>
+              <circle cx={x} cy={y} r={POINT_HIT_RADIUS} fill="transparent" pointerEvents="all" className={styles.pointHitTarget} data-editor-point={shown ? 'hit' : 'catch'} onPointerDown={(event) => pressActiveStroke(event, target, { pointIndex })} />
+              {shown && <circle cx={x} cy={y} r={active ? 2.8 : 2.1} className={active ? styles.activePoint : styles.point} data-editor-point="visible" pointerEvents="none" />}
+            </g>
+          })
+        })}
         {(selection.kind === 'point' || selection.kind === 'handle') && targets.filter((target) => target.stroke.id === selection.strokeId).flatMap((target) => {
           const point = target.stroke.points[selection.pointIndex]
           if (!point) return []
@@ -640,6 +674,8 @@ function FocusedGlyph({
             const active = selection.kind === 'handle' && selection.handle === handle
             return [
               <line key={`handle-line-${target.renderPart}-${handle}`} x1={anchor.x} y1={anchor.y} x2={position.x} y2={position.y} className={styles.handleLine} />,
+              // 핸들 눌림 영역은 꼭짓점과 같은 크기. 겹치면 누른 자리에서 가까운 쪽이 잡힌다.
+              <circle key={`handle-hit-${target.renderPart}-${handle}`} cx={position.x} cy={position.y} r={POINT_HIT_RADIUS} fill="transparent" pointerEvents="all" className={styles.pointHitTarget} data-editor-handle-hit={handle} onPointerDown={(event) => pressActiveStroke(event, target, { pointIndex: selection.pointIndex, handle })} />,
               // 핸들은 마름모. 꼭짓점(동그라미)과 모양으로 갈린다.
               <rect
                 key={`handle-${target.renderPart}-${handle}`}
@@ -650,11 +686,7 @@ function FocusedGlyph({
                 transform={`rotate(45 ${position.x} ${position.y})`}
                 className={active ? styles.activeHandle : styles.handle}
                 data-editor-handle={active ? 'active' : 'idle'}
-                onPointerDown={(event) => {
-                  event.stopPropagation()
-                  onSelect({ ...selection, kind: 'handle', handle })
-                  startDrag(event, target.box, pointAnchors(handlePoint, target.box), { strokeId: target.stroke.id, pointIndex: selection.pointIndex })
-                }}
+                onPointerDown={(event) => pressActiveStroke(event, target, { pointIndex: selection.pointIndex, handle })}
               />,
             ]
           })
