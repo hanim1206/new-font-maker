@@ -44,8 +44,12 @@
 /* 부품 고르기 히트 상자. 비활성 상자는 손가락 커서, 활성 상자는 rail 잡기 위해 기본 커서. 포커스는 옅은 테두리로. */
 .boxHit { outline: none; transition: fill-opacity .12s ease; }
 .boxHit[data-active='false'] { cursor: pointer; fill: var(--part); fill-opacity: 0; }
-/* 비활성 상자에 올리면 그 부품 색이 진해져 '누르면 켜진다'가 보인다. */
-.boxHit[data-active='false']:hover, .boxHit[data-active='false']:focus-visible { fill-opacity: .18; }
+/* 비활성 상자에 올리면 그 부품 색이 진해져 '누르면 켜진다'가 보인다. 마우스 기기에서만 — 터치는 탭 뒤 :hover가 남아 켜지지 않은 상자가 칠해진다.
+   보선이 선택된 동안(`data-held`)은 첫 탭이 선택 풀기라 미리 칠하지 않는다. */
+@media (hover: hover) {
+  .canvas:not([data-held]) .boxHit[data-active='false']:hover { fill-opacity: .18; }
+}
+.canvas:not([data-held]) .boxHit[data-active='false']:focus-visible { fill-opacity: .18; }
 .boxHit:focus-visible { stroke: var(--part); stroke-width: .006; }
 
 /* 레이아웃 → 획 CTA. 스크롤되는 레이아웃 영역 바닥에 붙어 전파 카드 위로 늘 보인다. */
