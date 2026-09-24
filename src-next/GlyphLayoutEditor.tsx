@@ -163,10 +163,14 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
     {ghostVisible && <path d={ghost} fill="#3a3a36" fillOpacity=".55" fillRule="evenodd" data-testid="review-ghost" />}
     {overlays.map((path, index) => <path key={index} d={path} fill="#1a1a1a" fillRule="evenodd" data-testid="review-fit-ink" />)}
     {componentOverlays.map((path, index) => <path key={`c${index}`} d={path} fill="#1a1a1a" fillRule="evenodd" data-testid="review-component-ink" />)}
-    {/* Δ 띠. 지금 선택한 rail 하나만: 기준값 자리와 지금 자리 사이를 주황 단색으로 칠한다. 잉크 위에 얹어 옮긴 구간이 바로 보인다. */}
+    {/* Δ 띠. 지금 선택한 rail 하나만: 기준값 자리와 지금 자리 사이를 주황 단색으로 칠한다. 잉크 위에 얹어 옮긴 구간이 바로 보인다.
+        길이는 그 rail의 영역 상자 안으로만 — 캔버스 끝까지 그으면 다른 영역까지 덮는다. 상자가 없으면 캔버스 끝까지. */}
     {showDelta && editable.filter((rail) => rail.id === selectedRail && Math.abs(rail.value - rail.original) > 1e-9).map((rail) => {
       const [from, to] = rail.value > rail.original ? [rail.original, rail.value] : [rail.value, rail.original]
-      const band = rail.axis === 'x' ? { x: from, y: -0.06, width: to - from, height: 1.08 } : { x: -0.06, y: from, width: 1.08, height: to - from }
+      const area = boxes.find((item) => item.id === `${rail.id.startsWith('c') ? 'c' : 'm'}${rail.partIndex}`)?.box
+      const band = rail.axis === 'x'
+        ? { x: from, y: area?.y ?? -0.06, width: to - from, height: area?.height ?? 1.08 }
+        : { x: area?.x ?? -0.06, y: from, width: area?.width ?? 1.08, height: to - from }
       return <rect key={`d${rail.id}`} {...band} fill={ACCENT} fillOpacity=".38" data-testid="review-delta-band" data-rail={rail.id} />
     })}
     {/* Noto 실측선. 활성 부품 것은 부품 색 점선, 나머지는 옅은 회색. 조작 없음. */}

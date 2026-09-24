@@ -89,9 +89,16 @@ test('보선은 끄는 동안 얇고 걸려도 영역 색 그대로, 손을 떼�
   await expect(line).toHaveAttribute('stroke', partColor!)
   expect(await width()).toBeLessThan(0.006)
 
+  // 모델 자리에서 떼면 Δ가 없어 띠도 없다. 벌려 놓고 뗀다.
+  await page.mouse.move(pxOf(x1 + 0.05), y, { steps: 4 })
   await page.mouse.up()
   await expect(rail).not.toHaveAttribute('data-dragging')
   await expect(rail).not.toHaveAttribute('data-snapped')
   await expect(line).toHaveAttribute('stroke', partColor!)
   await expect.poll(width).toBeGreaterThan(0.01)
+  // 변화 띠는 첫닿자 상자 높이만큼만. 캔버스 끝까지 가서 받침·홀자 영역을 덮지 않는다.
+  const band = page.getByTestId('review-delta-band')
+  const boxRect = canvas.locator('[data-testid="review-part-hit"][data-part="CH"]')
+  expect(Number(await band.getAttribute('y'))).toBeCloseTo(Number(await boxRect.getAttribute('y')), 6)
+  expect(Number(await band.getAttribute('height'))).toBeCloseTo(Number(await boxRect.getAttribute('height')), 6)
 })
