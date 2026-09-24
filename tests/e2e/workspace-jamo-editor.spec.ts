@@ -102,3 +102,21 @@ test('획 편집 `원` 버튼은 지금 자모 상자에 닫힌 타원 획을 �
   expect(tools && done && done.y >= tools.y + tools.height - 1 && done.y + done.height <= bottom + 1).toBe(true)
   await page.screenshot({ path: 'test-results/stroke-add-circle.png' })
 })
+
+test('ㅇ처럼 이미 꽉 찬 원이 있으면 `원`은 가운데로 작게 넣어 겹치지 않는다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EC%97%BC&mode=stroke')
+  const editor = page.getByRole('region', { name: '염 완성 글자 편집' })
+  await expect(editor).toBeVisible({ timeout: 20_000 })
+  const focusSvg = editor.locator('svg')
+  const strokeHit = focusSvg.locator('[data-editor-hit="stroke"]').first()
+  await strokeHit.dispatchEvent('pointerdown')
+  await strokeHit.dispatchEvent('pointerdown')
+  const selected = focusSvg.locator('[data-editor-hit="stroke"][data-selected="true"]')
+  const original = await selected.boundingBox()
+
+  await page.getByTestId('jamo-stroke-add-circle').click()
+  await expect(selected).toHaveCount(1)
+  const added = await selected.boundingBox()
+  expect(original && added && added.width < original.width * .9 && added.height < original.height * .9).toBe(true)
+  await page.screenshot({ path: 'test-results/stroke-add-circle-ieung.png' })
+})

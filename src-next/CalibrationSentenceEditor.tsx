@@ -980,9 +980,20 @@ function InferenceTrackpad({
     if (selection.kind === 'none' || selection.kind === 'component') return
     const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
     const strokeId = `stroke-${Date.now()}`
+    // ㅇ처럼 이미 상자에 꽉 찬 원이 있으면 똑같이 겹쳐 안 보인다. 같은 크기의 닫힌 획이 있는 동안 가운데로 줄인다.
+    const closedBounds = getJamoStrokes(before).filter((stroke) => stroke.closed).map((stroke) => ({
+      minX: Math.min(...stroke.points.map((point) => point.x)),
+      maxX: Math.max(...stroke.points.map((point) => point.x)),
+      minY: Math.min(...stroke.points.map((point) => point.y)),
+      maxY: Math.max(...stroke.points.map((point) => point.y)),
+    }))
+    const overlaps = (radius: number) => closedBounds.some((bounds) => [bounds.minX, bounds.minY].every((value) => Math.abs(value - (.5 - radius)) < .05)
+      && [bounds.maxX, bounds.maxY].every((value) => Math.abs(value - (.5 + radius)) < .05))
+    let radius = .5
+    while (overlaps(radius) && radius > .1) radius *= .6
     const stroke: StrokeDataV2 = {
       id: strokeId,
-      points: createCirclePath().points,
+      points: createCirclePath(.5, .5, radius, radius).points,
       closed: true,
       thickness: selectedStroke?.thickness ?? .07,
       label: 'circle',
