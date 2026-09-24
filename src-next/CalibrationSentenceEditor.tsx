@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
-import { ArrowLeft, Check, CircleX, Copy, CopyPlus, Dices, Download, LayoutDashboard, Link2, ListTree, LoaderCircle, Plus, Redo2, Settings2, Spline, TextCursorInput, Trash2, Undo2, Unlink, X } from 'lucide-react'
+import { ArrowLeft, Check, Copy, CopyPlus, Dices, Download, LayoutDashboard, Link2, ListTree, LoaderCircle, Plus, Redo2, Settings2, Spline, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
@@ -1335,6 +1335,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const directInputRef = useRef<HTMLTextAreaElement>(null)
   // 셸 안의 `문장` 전체 화면. 커서 자리는 글자 수(코드 포인트)로 센다.
   const [sentenceSheetOpen, setSentenceSheetOpen] = useState(false)
+  // 닫히는 애니메이션 동안만 true. 끝나면(`onAnimationEnd`) 내린다.
+  const [sentenceSheetClosing, setSentenceSheetClosing] = useState(false)
   const [sentenceCaret, setSentenceCaret] = useState(0)
   const sheetInputRef = useRef<HTMLTextAreaElement>(null)
   const isGlobalStyleOpen = globalStylePanel !== null
@@ -1569,6 +1571,13 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     sheetInputRef.current?.blur()
     // 빈 문장으로 닫으면 작은 줄이 비므로 편집하던 글자 하나를 남긴다.
     if (!sampleSentence.trim()) setSampleSentence(selectedChar)
+    // 움직임 줄이기를 켠 기기는 애니메이션이 없어 끝 신호도 안 온다. 바로 닫는다.
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) setSentenceSheetOpen(false)
+    else setSentenceSheetClosing(true)
+  }
+  const finishSentenceSheetClose = () => {
+    if (!sentenceSheetClosing) return
+    setSentenceSheetClosing(false)
     setSentenceSheetOpen(false)
   }
   const placeSentenceCaret = (index: number) => {
@@ -1885,8 +1894,10 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     const chars = [...sampleSentence]
     const caret = (key: string) => <span key={key} className={styles.directInputCaret} aria-hidden="true" data-testid="sentence-sheet-caret" />
     const withCaret = (char: string, index: number) => index === sentenceCaret ? [caret(`caret-${index}`), renderSentenceCharacter(char, index, 0, true)] : [renderSentenceCharacter(char, index, 0, true)]
-    return <div className={styles.sentenceSheet} role="dialog" aria-modal="true" aria-label="문장" data-testid="sentence-sheet">
+    return <div className={styles.sentenceSheet} role="dialog" aria-modal="true" aria-label="문장" data-closing={sentenceSheetClosing || undefined} onAnimationEnd={(event) => { if (event.target === event.currentTarget) finishSentenceSheetClose() }} data-testid="sentence-sheet">
+      {/* 셸 머리와 같은 높이 · 같은 자리. 열면 머리 내용만 바뀐 것처럼 보인다. */}
       <header>
+        <strong>문장</strong>
         <button type="button" onClick={closeSentenceSheet} data-testid="sentence-sheet-done">완료</button>
       </header>
       <textarea
@@ -1913,12 +1924,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
           }, []).map((group) => <span key={`word-${group.start}`} className={styles.wordRun}>{[...group.text].flatMap((char, index) => withCaret(char, group.start + index))}</span>)}
           {sentenceCaret >= chars.length && caret('caret-end')}
           {chars.length > 0
-            ? <button type="button" className={styles.sentenceClear} onClick={(event) => { event.stopPropagation(); clearSentence() }} aria-label="문장 비우기" data-testid="sentence-sheet-clear"><CircleX size={22} aria-hidden="true" /></button>
+            ? <button type="button" className={styles.sentenceClear} onClick={(event) => { event.stopPropagation(); clearSentence() }} aria-label="문장 비우기" data-testid="sentence-sheet-clear"><span aria-hidden="true"><X size={12} strokeWidth={3} /></span></button>
             : <span className={styles.sentenceSheetHint}>고칠 글자가 든 문장을 적어 보세요</span>}
         </div>
       </div>
       <footer>
-        <button type="button" onClick={rollSentence} aria-label="예시 문장 바꾸기" data-testid="sentence-sheet-roll"><Dices size={20} aria-hidden="true" />다른 문장</button>
+        <button type="button" onClick={rollSentence} aria-label="예시 문장 바꾸기" data-testid="sentence-sheet-roll"><Dices size={18} aria-hidden="true" />다른 문장</button>
       </footer>
     </div>
   }
@@ -1930,7 +1941,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
       <section ref={sentenceRef} className={`${styles.sentence} ${chrome === 'workspace' ? styleMode.strip : ''}`} data-compact={sentenceCompact || undefined} data-grown={styleSpaceOpen || undefined} data-collapsed={sentenceCollapsed || undefined} aria-hidden={sentenceCollapsed || undefined} inert={sentenceCollapsed || undefined} aria-label="보정 문장">
         {/* 셸 안에서는 `문장` 버튼 하나. 문장 바꾸기(주사위 · 직접 입력)는 전체 화면에서 한다. */}
         {chrome === 'workspace' ? <div className={styles.sentenceActions}>
-          <button type="button" className={styles.sentenceOpen} onClick={openSentenceSheet} aria-label="문장 크게 보기 · 바꾸기" data-testid="sentence-sheet-open">문장</button>
+          <button type="button" className={styles.sentenceOpen} onClick={openSentenceSheet} aria-label="문장 크게 보기 · 바꾸기" title="문장 크게 보기 · 바꾸기" data-testid="sentence-sheet-open"><ZoomIn size={19} aria-hidden="true" /></button>
         </div> : <>
         <div className={styles.sentenceActions}>
           <button type="button" onClick={() => guardLayoutLeave(pickSampleSentence)} aria-label="예시 문장 무작위 선택" title="예시 문장 바꾸기"><Dices size={19} aria-hidden="true" /></button>

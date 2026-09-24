@@ -66,20 +66,36 @@
 .sentenceRun span { flex: 0 0 auto; block-size: 1em; color: rgb(var(--color-foreground)); line-height: 1em; text-align: center; }
 .sentenceRun .directInputCaret { width: 2px; height: .82em; margin-left: 2px; align-self: center; background: rgb(var(--color-primary)); animation: input-caret-blink 1s steps(1, end) infinite; }
 @keyframes input-caret-blink { 0%, 48% { opacity: 1; } 49%, 100% { opacity: 0; } }
-/* 셸 문장 줄의 `문장` 버튼과 전체 화면 */
-.sentenceActions button.sentenceOpen { width: auto; padding: 0 12px; font-size: 13px; font-weight: 600; }
-.sentenceSheet { position: fixed; z-index: 90; inset: 0; display: flex; flex-direction: column; background: rgb(var(--color-surface)); }
-.sentenceSheet > header { flex: 0 0 auto; display: flex; justify-content: flex-end; padding: max(10px, env(safe-area-inset-top)) 12px 6px; }
-.sentenceSheet > header button, .sentenceSheet > footer button { min-height: 40px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 14px; font-weight: 600; }
-.sentenceSheet > header button { border-color: rgb(var(--color-foreground)); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
-.sentenceSheet > footer { flex: 0 0 auto; display: flex; justify-content: center; padding: 10px 16px calc(env(safe-area-inset-bottom) + 14px); }
-.sentenceSheetStage { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px; cursor: text; }
-.sentenceSheetStage .sentenceRun { gap: 14px 0; }
+/* 셸 문장 줄의 `문장` 입구와 전체 화면. 말투는 글로벌 스타일 공간과 같다: 흰 면, 검정 · 회색만, 테두리 없음, 느린 표준 곡선. */
+.sentenceActions button.sentenceOpen { width: 36px; height: 36px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-4)); transition: background var(--motion-fast) var(--ease-standard); }
+.sentenceActions button.sentenceOpen:active { scale: 1; background: rgb(var(--color-foreground) / .07); }
+.sentenceSheet { position: fixed; z-index: 90; inset: 0; display: flex; flex-direction: column; background: rgb(var(--color-surface)); animation: sentence-sheet-in var(--motion-slow) var(--ease-standard) both; }
+.sentenceSheet[data-closing] { animation-name: sentence-sheet-out; pointer-events: none; }
+/* 문장은 작은 줄의 글자 크기(24px)에서 자라 나온다. 글로벌 스타일 공간의 문장 줄과 같은 움직임. */
+.sentenceSheet .sentenceSheetStage .sentenceRun { animation: sentence-sheet-grow var(--motion-slow) var(--ease-standard) both; }
+.sentenceSheet[data-closing] .sentenceSheetStage .sentenceRun { animation-name: sentence-sheet-shrink; }
+@keyframes sentence-sheet-in { from { opacity: 0; } }
+@keyframes sentence-sheet-out { to { opacity: 0; } }
+@keyframes sentence-sheet-grow { from { font-size: 24px; translate: 0 -8px; } }
+@keyframes sentence-sheet-shrink { to { font-size: 24px; translate: 0 -8px; } }
+@media (prefers-reduced-motion: reduce) { .sentenceSheet, .sentenceSheet .sentenceSheetStage .sentenceRun { animation: none; } }
+.sentenceSheet > header { flex: 0 0 auto; box-sizing: border-box; min-height: 50px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: max(2px, env(safe-area-inset-top)) 6px 2px 16px; }
+.sentenceSheet > header strong { color: rgb(var(--color-foreground)); font-size: 15px; font-weight: 700; }
+.sentenceSheet > header button { min-width: 44px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-foreground)); font-size: 15px; font-weight: 700; }
+.sentenceSheet > header button:active { background: rgb(var(--color-foreground) / .07); }
+.sentenceSheet > footer { flex: 0 0 auto; display: flex; justify-content: center; padding: 8px 16px calc(env(safe-area-inset-bottom) + 16px); }
+.sentenceSheet > footer button { min-height: 40px; display: inline-flex; align-items: center; gap: 7px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 600; }
+.sentenceSheet > footer button:active { background: rgb(var(--color-foreground) / .1); }
+.sentenceSheetStage { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px 16px; cursor: text; }
+.sentenceSheetStage .sentenceRun { gap: 16px 0; }
 /* iOS는 16px 아래 입력칸에 포커스하면 화면을 확대한다. */
 .sheetInput { position: fixed; top: 0; left: 0; width: 1px; height: 1px; padding: 0; overflow: hidden; border: 0; opacity: 0; pointer-events: none; font-size: 16px; }
-.sentenceRun button.sentenceClear { block-size: 1em; display: inline-grid; place-items: center; margin-left: 6px; color: rgb(var(--color-muted-foreground)); line-height: 0; }
-.sentenceRun button.sentenceClear svg { inline-size: 22px; block-size: 22px; }
-.sentenceRun span.sentenceSheetHint { block-size: auto; margin-left: 4px; color: rgb(var(--color-foreground) / .4); font-size: 16px; line-height: 1.4; text-align: left; }
+/* 비우기: 문장 끝, 커서 뒤에 옅은 회색 원. 눌리는 자리는 넉넉히. */
+.sentenceRun button.sentenceClear { inline-size: 36px; block-size: 1em; display: inline-grid; place-items: center; margin-left: 2px; }
+.sentenceRun button.sentenceClear > span { inline-size: 20px; block-size: 20px; display: grid; place-items: center; border-radius: 50%; background: rgb(var(--color-text-6) / .55); color: rgb(var(--color-surface)); }
+.sentenceRun button.sentenceClear svg { inline-size: 12px; block-size: 12px; }
+.sentenceRun button.sentenceClear:active > span { background: rgb(var(--color-text-4)); }
+.sentenceRun span.sentenceSheetHint { block-size: auto; margin-left: 6px; color: rgb(var(--color-text-5)); font-size: 16px; line-height: 1.4; text-align: left; }
 .spaceGlyph { color: transparent !important; user-select: none; }
 .punctuationGlyph { font-family: ui-sans-serif, system-ui, sans-serif; font-size: .72em; line-height: 1.38em !important; }
 .editor { min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 16px; }
