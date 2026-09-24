@@ -21,6 +21,7 @@ import { baselineRails } from './notoBaselineRails'
 import { useNotoGlyph } from './useNotoGlyph'
 import { PART_COLOR, PART_LABEL } from './partColors'
 import { getBaseJamo, useJamoStore } from '../src/stores/jamoStore'
+import confirmStyles from './workspace/FontExportDialog.module.css'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import { moveHandle, movePoint, moveStroke, scaleStroke } from '../src/services/editorCommands'
 import { scaleLayoutParts, translateLayoutParts } from '../src/services/layoutProfileCommands'
@@ -904,6 +905,14 @@ function InferenceTrackpad({
   const [inkGapLimiter, setInkGapLimiter] = useState<CalibrationInkGapViolation | null>(null)
   // `추가`를 눌러 선 · 원 · 사각을 펼쳤는지. 펼쳐도 도구 칸은 스크롤하지 않는다 — `추가`가 제자리에 있어야 한다.
   const [addMenuOpen, setAddMenuOpen] = useState(false)
+  // `초기화`를 눌러 되돌릴지 묻는 창이 떠 있는지.
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
+  useEffect(() => {
+    if (!resetConfirmOpen) return
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setResetConfirmOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [resetConfirmOpen])
   const selectedJamo = selection.kind === 'stroke' || selection.kind === 'point' || selection.kind === 'handle'
     ? selection.jamo
     : null
@@ -1251,12 +1260,13 @@ function InferenceTrackpad({
     onSelectionChange({ ...selection, kind: 'stroke', strokeId, jamo: after, pointsOpen: false })
   }
   // 지금 자소(고른 것, 없으면 잠긴 것)를 기본 프리셋으로 되돌린다. 문맥 변형까지 처음 그대로 — 틀 · 잉크 간격 보정도 얹지 않는다.
-  // 되돌리기 한 줄이라 확인 창은 두지 않는다.
+  // 고친 획이 한 번에 다 사라지니 먼저 묻는다(되돌리기로 되살릴 수는 있다).
   const resetBase = creationBase ? getBaseJamo(creationBase.jamo.type, creationBase.jamo.char) : undefined
   const canResetJamo = Boolean(creationBase && resetBase
     && JSON.stringify(getJamo(creationBase.jamo.type, creationBase.jamo.char)) !== JSON.stringify(resetBase))
   const resetJamo = () => {
     const selection = creationBase
+    setResetConfirmOpen(false)
     if (!selection || !resetBase || !canResetJamo) return
     const before = structuredClone(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo)
     const firstStrokeId = getJamoStrokes(adoptFamilyStrokes(resetBase, familyOfSyllable(syllable)))[0]?.id ?? selection.strokeId
@@ -1384,7 +1394,7 @@ function InferenceTrackpad({
           {deleteButton}
         </>}
         {multiSelectButton}
-        {creationBase && <button type="button" onClick={resetJamo} disabled={!canResetJamo} aria-label={`${creationBase.jamo.char} 프리셋으로 초기화`} data-testid="jamo-stroke-reset"><RotateCcw size={18} aria-hidden="true" /><span>초기화</span></button>}
+        {creationBase && <button type="button" onClick={() => setResetConfirmOpen(true)} disabled={!canResetJamo} aria-label={`${creationBase.jamo.char} 프리셋으로 초기화`} data-testid="jamo-stroke-reset"><RotateCcw size={18} aria-hidden="true" /><span>초기화</span></button>}
       </div>
     )
     return (
@@ -1411,6 +1421,21 @@ function InferenceTrackpad({
           {!toolSlot && strokeTools}
         </div>
         {toolSlot && createPortal(strokeTools, toolSlot)}
+        {resetConfirmOpen && creationBase && createPortal(
+          <div className={confirmStyles.backdrop} onClick={() => setResetConfirmOpen(false)}>
+            <div className={confirmStyles.sheet} role="alertdialog" aria-modal="true" aria-label="프리셋으로 초기화" onClick={(event) => event.stopPropagation()} data-testid="jamo-stroke-reset-confirm">
+              <header>
+                <b>{creationBase.jamo.char} 자소를 폰트 프리셋으로 되돌릴까요?</b>
+                <small>이 자소에서 고친 획이 모두 사라지고 처음 프리셋 모양으로 돌아가요. 실행 취소로 되살릴 수 있어요.</small>
+              </header>
+              <div className={confirmStyles.actions}>
+                <button type="button" onClick={() => setResetConfirmOpen(false)}>취소</button>
+                <button type="submit" onClick={resetJamo} autoFocus data-testid="jamo-stroke-reset-ok">되돌리기</button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
       </section>
     )
   }
