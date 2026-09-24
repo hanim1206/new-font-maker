@@ -1,11 +1,11 @@
-/* 좁은 화면(셸이 화면을 꽉 채움)에서는 조작 영역을 안 가리게 왼쪽 가장자리의 얇은 탭으로, 넓은 화면에서는 셸 바깥 오른쪽 아래 구석에 둔다.
+/* 좁은 화면(셸이 화면을 꽉 채움)에서는 조작 영역을 안 가리게 오른쪽 가장자리의 얇은 탭으로, 넓은 화면에서는 셸 바깥 오른쪽 아래 구석에 둔다.
    터치 영역은 셸 계약대로 44×44를 지키고, 보이는 탭(.tab)만 얇다. */
-.button { position: fixed; left: 0; top: 46%; z-index: 2147483000; width: 44px; height: 44px; display: flex; align-items: center; justify-content: flex-start; padding: 0; border: 0; background: transparent; color: rgb(var(--color-text-3)); cursor: pointer; }
-.tab { width: 16px; height: 44px; display: grid; place-items: center; border: 1px solid rgb(var(--color-border)); border-left: 0; border-radius: 0 8px 8px 0; background: rgb(var(--color-surface)); box-shadow: 0 4px 14px rgb(15 23 42 / .16); }
+.button { position: fixed; right: 0; top: 46%; z-index: 2147483000; width: 44px; height: 44px; display: flex; align-items: center; justify-content: flex-end; padding: 0; border: 0; background: transparent; color: rgb(var(--color-text-3)); cursor: pointer; }
+.tab { width: 16px; height: 44px; display: grid; place-items: center; border: 1px solid rgb(var(--color-border)); border-right: 0; border-radius: 8px 0 0 8px; background: rgb(var(--color-surface)); box-shadow: 0 4px 14px rgb(15 23 42 / .16); }
 .tab svg { width: 12px; height: 12px; }
 @media (min-width: 640px) {
-  .button { left: auto; top: auto; right: 14px; bottom: 14px; justify-content: center; }
-  .tab { width: 44px; border-left: 1px solid rgb(var(--color-border)); border-radius: 50%; }
+  .button { top: auto; right: 14px; bottom: 14px; justify-content: center; }
+  .tab { width: 44px; border-right: 1px solid rgb(var(--color-border)); border-radius: 50%; }
   .tab svg { width: 18px; height: 18px; }
 }
 .button[aria-pressed='true'] .tab { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary)); color: rgb(var(--color-primary-foreground)); }

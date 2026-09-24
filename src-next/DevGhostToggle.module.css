@@ -1,17 +1,17 @@
-/* 토글은 개발용이라 캔버스 밖, 화면 명세 플로팅 버튼(ScreenSpecButton) 바로 위에 같은 모양으로 띄운다. 좁은 화면은 왼쪽 가장자리 얇은 탭, 넓은 화면은 오른쪽 아래 동그라미. 터치 영역은 44×44. */
-.toggle { position: fixed; left: 0; top: calc(46% - 52px); z-index: 2147483000; min-width: 44px; height: 44px; display: flex; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; color: rgb(var(--color-text-3)); cursor: pointer; }
-.tab { flex: 0 0 auto; width: 16px; height: 44px; display: grid; place-items: center; border: 1px solid rgb(var(--color-border)); border-left: 0; border-radius: 0 8px 8px 0; background: rgb(var(--color-surface)); box-shadow: 0 4px 14px rgb(15 23 42 / .16); }
+/* 토글은 개발용이라 캔버스 밖, 화면 명세 플로팅 버튼(ScreenSpecButton) 바로 위에 같은 모양으로 띄운다. 좁은 화면은 오른쪽 가장자리 얇은 탭, 넓은 화면은 오른쪽 아래 동그라미. 터치 영역은 44×44. */
+.toggle { position: fixed; right: 0; top: calc(46% - 52px); z-index: 2147483000; min-width: 44px; height: 44px; display: flex; flex-direction: row-reverse; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; color: rgb(var(--color-text-3)); cursor: pointer; }
+.tab { flex: 0 0 auto; width: 16px; height: 44px; display: grid; place-items: center; border: 1px solid rgb(var(--color-border)); border-right: 0; border-radius: 8px 0 0 8px; background: rgb(var(--color-surface)); box-shadow: 0 4px 14px rgb(15 23 42 / .16); }
 .tab svg { width: 12px; height: 12px; }
 @media (min-width: 640px) {
-  .toggle { left: auto; top: auto; right: 14px; bottom: 66px; flex-direction: row-reverse; }
-  .tab { width: 44px; border-left: 1px solid rgb(var(--color-border)); border-radius: 50%; }
+  .toggle { top: auto; right: 14px; bottom: 66px; }
+  .tab { width: 44px; border-right: 1px solid rgb(var(--color-border)); border-radius: 50%; }
   .tab svg { width: 18px; height: 18px; }
 }
 .toggle[aria-pressed='true'] .tab { border-color: rgb(var(--color-foreground)); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 /* 켰을 때 토글 옆에 뜨는 도구 상자. */
-.panel { position: fixed; left: 22px; top: calc(46% - 52px); z-index: 2147483000; display: grid; gap: 5px; padding: 8px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); box-shadow: 0 4px 14px rgb(15 23 42 / .16); color: rgb(var(--color-text-dim-4)); font-size: 10px; }
+.panel { position: fixed; right: 22px; top: calc(46% - 52px); z-index: 2147483000; display: grid; gap: 5px; padding: 8px 10px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); box-shadow: 0 4px 14px rgb(15 23 42 / .16); color: rgb(var(--color-text-dim-4)); font-size: 10px; }
 .panel select { max-width: 72vw; height: 36px; padding: 0 7px; border: 1px solid rgb(var(--color-border)); border-radius: 7px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-size: 12px; }
-@media (min-width: 640px) { .panel { left: auto; top: auto; right: 66px; bottom: 66px; } }
+@media (min-width: 640px) { .panel { top: auto; right: 66px; bottom: 66px; } }
 .toggle strong, .toggle small { padding: 3px 7px; border: 1px solid rgb(var(--color-border)); border-radius: 8px; background: rgb(var(--color-surface)); box-shadow: 0 4px 14px rgb(15 23 42 / .16); white-space: nowrap; }
 .toggle strong { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 700; color: rgb(var(--color-primary-dark)); }
 .toggle small { max-width: 160px; overflow: hidden; color: rgb(var(--color-danger, 214 50 31)); font-size: 9px; text-overflow: ellipsis; }
