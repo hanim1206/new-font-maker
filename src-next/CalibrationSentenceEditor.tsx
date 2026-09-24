@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
-import { ArrowLeft, Check, Copy, CopyPlus, Delete, Dices, Download, LayoutDashboard, Link2, ListTree, LoaderCircle, Plus, Redo2, Settings2, Spline, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
+import { ArrowLeft, Check, Circle, Copy, CopyPlus, Delete, Dices, Download, LayoutDashboard, Link2, ListTree, LoaderCircle, Plus, Redo2, Settings2, Spline, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
 import { DevGhostToggle } from './DevGhostToggle'
@@ -33,7 +33,7 @@ import type { ScopeRule } from './scopeRule'
 import { useUnifiedTrackpad } from '../src/features/mobile-editor/useUnifiedTrackpad'
 import { calculateBoxes } from '../src/utils/layoutCalculator'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
-import { pointsToSvgD } from '../src/utils/pathUtils'
+import { createCirclePath, pointsToSvgD } from '../src/utils/pathUtils'
 import { addHandlesToPoint, mergeStrokes, pointHasHandles, removeHandlesFromPoint, splitStroke } from '../src/utils/strokeEditUtils'
 import { MERGE_PROXIMITY } from '../src/utils/snapUtils'
 import type {
@@ -975,6 +975,22 @@ function InferenceTrackpad({
     onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId, delta: { x: 0, y: 0 } })
     onSelectionChange({ ...selection, kind: 'stroke', strokeId, jamo: after })
   }
+  // ㅇ·ㅎ의 둥근 획. 지금 자모 상자에 꽉 차는 타원을 닫힌 곡선으로 넣는다(ㅇ 프리셋과 같은 4점 베지어).
+  const addCircle = () => {
+    if (selection.kind === 'none' || selection.kind === 'component') return
+    const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
+    const strokeId = `stroke-${Date.now()}`
+    const stroke: StrokeDataV2 = {
+      id: strokeId,
+      points: createCirclePath().points,
+      closed: true,
+      thickness: selectedStroke?.thickness ?? .07,
+      label: 'circle',
+    }
+    const after = addJamoStroke(before, selection.strokeId, stroke)
+    onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId, delta: { x: 0, y: 0 } })
+    onSelectionChange({ ...selection, kind: 'stroke', strokeId, jamo: after })
+  }
   const connectStroke = () => {
     if ((selection.kind !== 'stroke' && selection.kind !== 'point' && selection.kind !== 'handle') || !selectedStroke || !mergeTarget) return
     const merged = mergeStrokes(selectedStroke, mergeTarget)
@@ -1064,7 +1080,7 @@ function InferenceTrackpad({
       if (!before.frame) return
       onCommitJamo(before, withoutFrame(before), { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId: selection.strokeId, delta: { x: 0, y: 0 } }, { unframed: true })
     }
-    // 자리가 흔들리지 않게 단추는 늘 같은 여섯 개를 그리고, 못 쓰는 것은 끈다.
+    // 자리가 흔들리지 않게 단추는 늘 같은 일곱 개를 그리고, 못 쓰는 것은 끈다.
     return (
       <section className={styles.strokeToolSection} data-testid="jamo-stroke-tools">
         {/* 경고만 한 줄. 알릴 게 없으면 줄을 접는다 — 늘어나고 줄어드는 건 트랙패드라 캔버스는 안 흔들린다. */}
@@ -1088,6 +1104,7 @@ function InferenceTrackpad({
           </div>
           <div className={styles.strokeToolRow} role="toolbar" aria-label="획 편집 도구">
             <button type="button" onClick={addStroke} disabled={!editable} aria-label="선 추가"><Plus size={18} aria-hidden="true" /><span>추가</span></button>
+            <button type="button" onClick={addCircle} disabled={!editable} aria-label="원 넣기" data-testid="jamo-stroke-add-circle"><Circle size={18} aria-hidden="true" /><span>원</span></button>
             <button type="button" onClick={deleteSelection} disabled={!canDelete} aria-label={selection.kind === 'stroke' ? '획 삭제' : '꼭짓점 삭제'}><Trash2 size={18} aria-hidden="true" /><span>삭제</span></button>
             <button type="button" onClick={toggleCurve} disabled={!onPoint} aria-label={selectedPointHasCurve ? '직선화' : '곡선화'}><Spline size={18} aria-hidden="true" /><span>{selectedPointHasCurve ? '직선' : '곡선'}</span></button>
             <button type="button" onClick={connectStroke} disabled={!mergeTarget} aria-label="가까운 선 연결"><Link2 size={18} aria-hidden="true" /><span>잇기</span></button>

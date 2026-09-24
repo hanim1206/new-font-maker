@@ -73,3 +73,32 @@ test('검수 격자에서 글자를 열면 자소 탭 레이아웃 모드로 그
   await page.getByTestId('review-canvas').locator('[data-edit-part]').first().dispatchEvent('click')
   await expect(page.getByRole('region', { name: '염 완성 글자 편집' })).toBeVisible()
 })
+
+test('획 편집 `원` 버튼은 지금 자모 상자에 닫힌 타원 획을 하나 넣고 그 획을 고른다', async ({ page }) => {
+  await page.goto('/workspace/jamo?mode=stroke')
+  const editor = page.getByRole('region', { name: /완성 글자 편집/ })
+  await expect(editor).toBeVisible()
+  const circle = page.getByTestId('jamo-stroke-add-circle')
+  // 획을 고르기 전에는 넣을 자모가 없어 꺼져 있다.
+  await expect(circle).toBeDisabled()
+
+  const focusSvg = editor.locator('svg')
+  const strokes = focusSvg.locator('[data-editor-hit="stroke"]')
+  const strokeHit = strokes.first()
+  await strokeHit.dispatchEvent('pointerdown')
+  await strokeHit.dispatchEvent('pointerdown')
+  const before = await strokes.count()
+
+  await expect(circle).toBeEnabled()
+  await circle.click()
+  await expect(strokes).toHaveCount(before + 1)
+  await expect(focusSvg.locator('[data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(1)
+  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
+
+  // 단추가 한 줄 늘어도 도구 줄과 `완료`가 화면 안에 들어온다.
+  const tools = await page.getByTestId('jamo-stroke-tools').boundingBox()
+  const done = await page.getByTestId('jamo-stroke-done').boundingBox()
+  const bottom = page.viewportSize()?.height ?? 0
+  expect(tools && done && done.y >= tools.y + tools.height - 1 && done.y + done.height <= bottom + 1).toBe(true)
+  await page.screenshot({ path: 'test-results/stroke-add-circle.png' })
+})

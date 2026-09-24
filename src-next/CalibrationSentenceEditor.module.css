@@ -198,8 +198,8 @@ section.sentence[data-sheet] { flex-basis: var(--sheet-h); height: var(--sheet-h
 .editor[data-chrome='workspace'][data-stroke-tools] { flex: 0 0 auto; }
 .strokeToolSection { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px 16px 10px; border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
 .strokeWorkRow { flex: 1 1 auto; min-height: 0; display: flex; gap: 6px; }
-.strokeToolRow { flex: 0 0 auto; display: grid; grid-template-columns: repeat(2, 48px); grid-template-rows: repeat(3, minmax(40px, 56px)); align-content: start; gap: 6px; }
-.strokeToolRow button { min-height: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 10px; font-weight: 650; }
+.strokeToolRow { flex: 0 0 auto; display: grid; grid-template-columns: repeat(2, 48px); grid-template-rows: repeat(4, minmax(34px, 56px)); align-content: start; gap: 6px; }
+.strokeToolRow button { min-height: 34px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 10px; font-weight: 650; }
 .strokeToolRow button:disabled { opacity: .35; }
 .strokeTrackpad { flex: 1 1 auto; min-width: 0; height: auto; border-radius: 12px; }
 .strokeToolRow button[aria-pressed='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary) / .12); color: rgb(var(--color-primary)); }
