@@ -71,7 +71,10 @@
 .sentenceActions button.sentenceOpen:active { scale: 1; background: rgb(var(--color-foreground) / .07); }
 /* 펼친 동안(접히는 동안까지): 여러 줄로 감긴다. 첫 줄은 한 줄일 때와 같은 자리에서 시작하고, 돋보기(닫기)는 오른쪽 위 그 자리에 선다. */
 .sentence[data-sheet-wrap] { align-items: flex-start; padding: 10px 0 0 12px; overflow: hidden; cursor: text; }
-.sentence[data-sheet-wrap] .sentenceRun { flex: 1 1 auto; flex-wrap: wrap; padding-right: 48px; row-gap: 16px; }
+.sentence[data-sheet-wrap] .sentenceRun { flex: 1 1 auto; flex-wrap: wrap; padding-right: 48px; row-gap: 0; }
+/* 줄 간격은 행 간격 대신 아래 여백으로: 엔터로 끊은 자리(높이 0인 줄)가 간격을 한 번 더 먹지 않는다. */
+.sentence[data-sheet-wrap] .sentenceRun > * { margin-bottom: 16px; }
+.sentence[data-sheet-wrap] .sentenceRun > .lineBreak { margin-bottom: 0; }
 .sentence[data-sheet-wrap] .sentenceActions { position: absolute; top: 0; right: 0; height: var(--top-row-h, 44px); background: none; }
 section.sentence[data-sheet] { flex-basis: var(--sheet-h); height: var(--sheet-h); background: rgb(var(--color-surface)); }
 /* 편집부는 그대로 두고(보선 초안 유지) 펼친 줄 아래로 가린다. */
@@ -84,6 +87,9 @@ section.sentence[data-sheet] { flex-basis: var(--sheet-h); height: var(--sheet-h
 @media (prefers-reduced-motion: reduce) { .sentenceSheetBar { animation: none; transition: none; } }
 /* iOS는 16px 아래 입력칸에 포커스하면 화면을 확대한다. */
 .sheetInput { position: fixed; top: 0; left: 0; width: 1px; height: 1px; padding: 0; overflow: hidden; border: 0; opacity: 0; pointer-events: none; font-size: 16px; }
+/* 커서는 폭이 없다: 옮겨도 글자 사이가 벌어지지 않는다. 선은 그림자로 그린다. */
+.sentence[data-sheet-wrap] .sentenceRun .directInputCaret { width: 0; margin: 0; background: none; box-shadow: 0 0 0 1px rgb(var(--color-primary)); }
+.sentenceRun span.lineBreak { flex: 0 0 100%; block-size: 0; }
 .sentenceRun span.sentenceSheetHint { block-size: auto; margin-left: 6px; color: rgb(var(--color-text-5)); font-size: 16px; line-height: 1.4; text-align: left; }
 .spaceGlyph { color: transparent !important; user-select: none; }
 .punctuationGlyph { font-family: ui-sans-serif, system-ui, sans-serif; font-size: .72em; line-height: 1.38em !important; }

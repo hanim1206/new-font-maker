@@ -1916,13 +1916,16 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     const caret = (key: string) => <span key={key} className={styles.directInputCaret} aria-hidden="true" data-testid="sentence-sheet-caret" />
     const withCaret = (char: string, index: number) => index === sentenceCaret ? [caret(`caret-${index}`), renderSentenceCharacter(char, index, 0, true)] : [renderSentenceCharacter(char, index, 0, true)]
     return <>
-      {/* 단어와 뒤 공백을 한 덩어리로 묶어 줄이 바뀔 때 공백이 다음 줄 앞에 서지 않게 한다. */}
-      {tokenizeSentenceLine(sampleSentence).reduce<{ start: number; text: string }[]>((groups, token) => {
+      {/* 단어와 뒤 공백을 한 덩어리로 묶어 줄이 바뀔 때 공백이 다음 줄 앞에 서지 않게 한다. 엔터(\n)는 줄을 끊는다. */}
+      {chars.reduce<({ kind: 'word'; start: number; text: string } | { kind: 'break'; index: number })[]>((groups, char, index) => {
         const last = groups.at(-1)
-        if (token.whitespace && last) last.text += token.text
-        else groups.push({ start: token.start, text: token.text })
+        if (char === '\n') groups.push({ kind: 'break', index })
+        else if (last?.kind === 'word' && (/\s/u.test(char) || !/\s$/u.test(last.text))) last.text += char
+        else groups.push({ kind: 'word', start: index, text: char })
         return groups
-      }, []).map((group) => <span key={`word-${group.start}`} className={styles.wordRun}>{[...group.text].flatMap((char, index) => withCaret(char, group.start + index))}</span>)}
+      }, []).map((group) => group.kind === 'break'
+        ? [group.index === sentenceCaret && caret(`caret-${group.index}`), <span key={`break-${group.index}`} className={styles.lineBreak} aria-hidden="true" />]
+        : <span key={`word-${group.start}`} className={styles.wordRun}>{[...group.text].flatMap((char, index) => withCaret(char, group.start + index))}</span>)}
       {sentenceCaret >= chars.length && caret('caret-end')}
       {chars.length === 0 && <span className={styles.sentenceSheetHint}>고칠 글자가 든 문장을 적어 보세요</span>}
     </>
@@ -1945,8 +1948,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
             value={sampleSentence}
             onChange={(event) => { setSampleSentence(event.target.value); setIsCustomSentence(true); syncSentenceCaret(event.target) }}
             onSelect={(event) => syncSentenceCaret(event.currentTarget)}
-            // 한 줄 문장이다. 엔터는 자판을 닫는다.
-            onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.blur() } }}
             aria-label="문장 입력"
             autoCapitalize="none"
             autoCorrect="off"
