@@ -1,5 +1,7 @@
 /* 글로벌 스타일을 연 동안: 캔버스를 치우고 문장 줄이 그 자리에서 크게 자란다(한 줄 · 가로 스크롤 그대로). 패널은 남은 높이를 다 쓴다. */
-section.strip { transition: flex-basis var(--motion-slow) var(--ease-standard), height var(--motion-slow) var(--ease-standard); }
+section.strip { transition: flex-basis var(--motion-slow) var(--ease-standard), height var(--motion-slow) var(--ease-standard), opacity var(--motion-slow) var(--ease-standard), translate var(--motion-slow) var(--ease-standard); }
+/* 획 편집: 문장 줄이 위로 빠지며 접힌다. */
+section.strip[data-collapsed='true'] { flex-basis: 0; height: 0; border-bottom-width: 0; opacity: 0; translate: 0 -100%; pointer-events: none; }
 section.strip[data-grown='true'] { flex-basis: 196px; height: 196px; padding-left: 16px; background: rgb(var(--color-surface)); }
 section.strip[data-grown='true'] > div:first-child { display: none; }
 .run { transition: font-size var(--motion-slow) var(--ease-standard); }

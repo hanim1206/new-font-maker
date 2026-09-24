@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 
 /**
  * 보선 이동은 저장 버튼을 눌러야 남는다. 저장 안 한 채 떠나려 하면 먼저 묻는다.
- * 보선을 옮긴 뒤에도 획 편집으로 가는 길(`획` 버튼)은 남는다.
+ * 획 편집은 옮긴 보선을 저장해야 갈 수 있다(묻는 창 없이 칩이 잠긴다).
  */
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -25,18 +25,23 @@ async function dragRail(page: Page) {
   await expect(page.getByTestId('review-reset')).toContainText('1개 변경')
 }
 
-test('보선을 옮긴 뒤 `획`을 누르면 저장할지 묻고, 저장하면 획 편집으로 간다', async ({ page }) => {
+test('보선을 옮긴 채로는 획 편집에 못 가고, 저장하면 칩이 풀려 획 편집으로 간다', async ({ page }) => {
   await dragRail(page)
-  await expect(page.getByTestId('jamo-stroke-cta')).toHaveCount(0)
-  await page.getByTestId('jamo-stroke-cta-mini').click()
-  const dialog = page.getByTestId('layout-leave-dialog')
-  await expect(dialog).toBeVisible()
-  await expect(page.getByTestId('layout-leave-save')).toBeVisible()
-  await page.getByTestId('layout-leave-save').click()
-  await expect(dialog).toHaveCount(0)
+  const chip = page.getByTestId('jamo-stroke-chip')
+  await expect(chip).toHaveAttribute('aria-disabled', 'true')
+  await chip.click({ force: true })
+  await expect(page.getByTestId('layout-leave-dialog')).toHaveCount(0)
+  await expect(page.getByTestId('jamo-stroke-tools')).toHaveCount(0)
+  // 켜진 상자를 다시 눌러도 안 간다.
+  const active = page.getByTestId('review-canvas').locator('[data-testid="review-part-hit"][aria-pressed="true"]').first()
+  await active.dispatchEvent('click')
+  await expect(page.getByTestId('jamo-stroke-tools')).toHaveCount(0)
+  // 저장하면 풀린다.
+  await page.getByTestId('review-propagation-apply').click()
+  await expect(page.getByTestId('review-reset')).toHaveCount(0)
+  await expect(chip).not.toHaveAttribute('aria-disabled', 'true')
+  await chip.click()
   await expect(page.getByTestId('jamo-stroke-tools')).toBeVisible()
-  // 저장은 기록에 남아 되돌릴 수 있다.
-  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
 })
 
 test('보선을 옮긴 채 다른 글자를 누르면 묻고, 바깥을 누르면 그대로 · 버리면 글자가 바뀐다', async ({ page }) => {

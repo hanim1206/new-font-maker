@@ -6,8 +6,8 @@
 .strokeStage, .focusArea { display: contents; }
 .editor[data-chrome='workspace'] .strokeStage { display: flex; align-items: center; gap: 8px; }
 .editor[data-chrome='workspace'] .focusArea { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; }
-/* 고정 높이 400 = 머리 50 · 문장 한 줄 56 · 도구 줄 224(상태 · 틀 · 단추 · 트랙패드 94) · `뒤로 · 완료` 54 · 편집부 여백 16. 끄는 동안 화면이 같이 밀리지 않게 터치는 캔버스가 다 받는다. */
-.editor[data-chrome='workspace'] .focusCanvas { width: min(100%, 330px, max(180px, calc(100dvh - 400px))); touch-action: none; }
+/* 캔버스 크기는 레이아웃 캔버스(330)와 같다. 남는 세로는 트랙패드가 먹는다. 고정 높이 330 = 머리 · 닿는 글자 줄 · `완료` 196 + 트랙패드 줄 최소(단추 세 칸) 134 — 이보다 낮은 화면에서만 캔버스가 줄어든다. 끄는 동안 화면이 같이 밀리지 않게 터치는 캔버스가 다 받는다. */
+.editor[data-chrome='workspace'] .focusCanvas { width: min(100%, 330px, max(180px, calc(100dvh - 330px))); touch-action: none; }
 .header div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .header div span { color: rgb(var(--color-text-dim-4)); font-size: 9px; font-weight: 750; letter-spacing: .12em; }
 .header strong { font-size: 14px; line-height: 1.18; }
@@ -167,20 +167,16 @@
 .strokeDoneBar button { flex: 1 1 auto; min-height: 44px; border: 0; border-radius: 12px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 700; }
 .strokeDoneBar .strokeBack { flex: 0 0 48px; display: grid; place-items: center; border: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); }
 /* 셸 안 획 편집의 도구 줄. 조절판 자리를 대신한다 — 옮기기는 캔버스에서 직접 한다. */
-.strokeToolSection { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; padding: 8px 16px 10px; border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
-.strokeToolStatus { margin: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; color: rgb(var(--color-text-dim-4)); font-size: 11px; font-weight: 600; }
-.strokeToolStatus span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.strokeToolStatus output { flex: 0 0 auto; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10.5px; }
-.strokeToolRow { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
-.strokeToolRow button { min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 10px; font-weight: 650; }
+/* 획 편집 도구 줄 아래에서는 캔버스가 제 크기만 차지하고, 남는 세로는 트랙패드가 가져간다. */
+.editor[data-chrome='workspace'][data-stroke-tools] { flex: 0 0 auto; }
+.strokeToolSection { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px 16px 10px; border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
+.strokeWorkRow { flex: 1 1 auto; min-height: 0; display: flex; gap: 6px; }
+.strokeToolRow { flex: 0 0 auto; display: grid; grid-template-columns: repeat(2, 48px); grid-template-rows: repeat(3, minmax(40px, 56px)); align-content: start; gap: 6px; }
+.strokeToolRow button { min-height: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 10px; font-weight: 650; }
 .strokeToolRow button:disabled { opacity: .35; }
-.strokeTrackpad { height: 88px; border-radius: 12px; }
-/* 세로가 낮은 화면(SE 등)에서는 왼쪽 자소 줄(280)이 편집부에 들어가게 트랙패드를 줄인다. */
-@media (max-height: 720px) { .strokeTrackpad { height: 56px; } }
+.strokeTrackpad { flex: 1 1 auto; min-width: 0; height: auto; border-radius: 12px; }
 .strokeToolRow button[aria-pressed='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary) / .12); color: rgb(var(--color-primary)); }
-.strokeFrameStatus { margin: 0; min-height: 26px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: rgb(var(--color-text-dim-4)); font-size: 10.5px; font-weight: 600; }
-.strokeFrameStatus span[data-protruding] { color: #f0561e; }
-.strokeFrameStatus button { min-height: 26px; padding: 0 10px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-size: 10.5px; font-weight: 650; }
+.strokeWarning { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f0561e; font-size: 10.5px; font-weight: 600; }
 /* 획 편집 캔버스 뒤에 까는 레이아웃 기준선(읽기 전용)과, 끌다 걸린 자리. 걸린 색은 레이아웃과 같은 주황. */
 .guideRail { stroke: rgb(59 111 214 / .32); stroke-width: .25; stroke-dasharray: 1.2 1.2; pointer-events: none; }
 .snapHitLine { stroke: #f0561e; stroke-width: .5; pointer-events: none; }

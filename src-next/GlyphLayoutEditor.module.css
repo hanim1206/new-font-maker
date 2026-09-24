@@ -43,6 +43,11 @@
 .railButton:active { cursor: grabbing; }
 /* 부품 고르기 히트 상자. 비활성 상자는 손가락 커서, 활성 상자는 rail 잡기 위해 기본 커서. 포커스는 옅은 테두리로. */
 .boxHit { outline: none; transition: fill-opacity .12s ease; }
+.boxHit[data-active='true'] { cursor: pointer; }
+.editChip { cursor: pointer; outline: none; }
+.editChip[data-locked] { cursor: default; opacity: .35; }
+.editChip text { font-family: inherit; font-weight: 700; pointer-events: none; }
+.editChip:focus-visible rect { stroke: rgb(var(--color-foreground)); stroke-width: .004; }
 .boxHit[data-active='false'] { cursor: pointer; fill: var(--part); fill-opacity: 0; }
 /* 비활성 상자에 올리면 그 부품 색이 진해져 '누르면 켜진다'가 보인다. 마우스 기기에서만 — 터치는 탭 뒤 :hover가 남아 켜지지 않은 상자가 칠해진다.
    보선이 선택된 동안(`data-held`)은 첫 탭이 선택 풀기라 미리 칠하지 않는다. */
@@ -64,8 +69,6 @@
 /* 복원 = 정사각 아이콘 버튼. 바뀐 보선 수는 모서리 숫자. */
 .strokeCta .resetCta { position: relative; flex: 0 0 44px; display: grid; place-items: center; width: 44px; padding: 0; border: 1px solid #f0561e; background: rgb(var(--color-surface)); color: #f0561e; }
 .resetCta em { position: absolute; top: -5px; right: -5px; display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #f0561e; color: #fff; font-size: 10px; font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
-.strokeCta .strokeMiniCta { flex: 0 0 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: 44px; padding: 0; border: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); }
-.strokeMiniCta small { font-size: 9.5px; font-weight: 700; line-height: 1.1; }
 /* 저장 안 한 보선을 두고 떠날 때 묻는 창. 폰트 이름 창과 같은 바닥 시트. */
 .leaveBackdrop { position: fixed; z-index: 100; inset: 0; display: flex; align-items: flex-end; justify-content: center; background: rgb(20 24 31 / .28); }
 .leaveSheet { width: min(100%, 480px); box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 16px 16px calc(env(safe-area-inset-bottom) + 16px); border-radius: 18px 18px 0 0; background: rgb(var(--color-surface)); box-shadow: 0 -8px 28px rgb(20 24 31 / .18); }

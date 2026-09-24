@@ -68,11 +68,12 @@ test('굵기는 100 단위로만 멈추고, 끄는 동안은 미리보기 · 손
 
 test('부리를 그림 버튼에서 고르면 문장 글자에 바로 얹히고 되돌리기에 들어간다', async ({ page }) => {
   await page.goto(`/workspace/jamo?mode=stroke&char=${encodeURIComponent('한')}`)
-  const sentence = page.getByRole('region', { name: '보정 문장' })
-  await expect(sentence).toBeVisible()
+  // 획 편집에서는 문장 줄이 접혀 있다가 스타일을 열면 다시 내려와 자란다.
+  const sentence = page.locator('section[aria-label="보정 문장"]')
   await expect(sentence.locator('[data-stem-beak]')).toHaveCount(0)
 
   await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
+  await expect(page.getByRole('region', { name: '보정 문장' })).toBeVisible()
   const panel = page.getByRole('region', { name: '글로벌 스타일 설정' })
   await panel.getByRole('tab', { name: '부리' }).click()
   await panel.getByRole('radio', { name: '각진 부리' }).click()

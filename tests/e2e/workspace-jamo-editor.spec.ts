@@ -14,7 +14,9 @@ test('자소 탭 획 편집은 셸 안에서 문장·캔버스·도구 줄을 �
   const nav = page.getByRole('navigation', { name: '프로젝트 주 내비게이션' })
   await expect(nav.getByRole('link', { name: '자소' })).toHaveAttribute('aria-current', 'page')
   await page.keyboard.press('Escape')
-  await expect(page.getByRole('region', { name: '보정 문장' })).toBeVisible()
+  // 획 편집에서는 문장 줄이 위로 접히고 `닿는 글자` 줄만 남는다.
+  await expect(page.locator('section[aria-label="보정 문장"]')).toHaveAttribute('data-collapsed', 'true')
+  await expect(page.getByRole('region', { name: '보정 문장' })).toHaveCount(0)
   const editor = page.getByRole('region', { name: /완성 글자 편집/ })
   await expect(editor).toBeVisible()
   // 옮기기는 캔버스에서 직접 하고, 아래 도구 줄에 섬세한 편집용 트랙패드가 늘 함께 있다.
@@ -55,7 +57,8 @@ test('자소 탭 획 편집은 셸 안에서 문장·캔버스·도구 줄을 �
   await page.mouse.up()
   await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
 
-  // 문장에서 다른 글자를 고르면 그 글자의 레이아웃(기본 상태)으로 돌아간다.
+  // `완료`로 레이아웃에 돌아오면 문장 줄이 다시 내려오고, 거기서 다른 글자를 고르면 그 글자의 레이아웃이다.
+  await page.getByTestId('jamo-stroke-done').click()
   await page.getByRole('region', { name: '보정 문장' }).getByRole('button', { name: '별 편집' }).click()
   await expect(page.getByRole('region', { name: '별 레이아웃 수정' })).toBeVisible()
 })
@@ -67,6 +70,6 @@ test('검수 격자에서 글자를 열면 자소 탭 레이아웃 모드로 그
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible({ timeout: 20_000 })
   // 문장에 없던 글자라 문장 앞에 붙는다.
   await expect(page.getByRole('region', { name: '보정 문장' }).getByRole('button', { name: '염 편집' })).toHaveAttribute('aria-current', 'true')
-  await page.getByTestId('jamo-stroke-cta').click()
+  await page.getByTestId('jamo-stroke-chip').click()
   await expect(page.getByRole('region', { name: '염 완성 글자 편집' })).toBeVisible()
 })

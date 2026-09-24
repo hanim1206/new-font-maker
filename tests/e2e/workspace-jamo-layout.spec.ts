@@ -51,6 +51,24 @@ async function selectMedialBox(page: Page) {
   await expect(hit).toHaveAttribute('aria-pressed', 'true')
 }
 
+/** 켜진 부품 상자를 한 번 더 누르면 그 자소 획 편집이다. 보선을 놓으려고 누른 탭은 획 편집으로 새지 않는다. */
+test('켜진 상자를 다시 누르면 획 편집으로 가고, 보선을 놓는 탭은 그대로 레이아웃이다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  const active = page.getByTestId('review-canvas').locator('[data-testid="review-part-hit"][data-edit-part]').first()
+  await expect(active).toHaveAttribute('data-part', 'CH')
+  const box = (await active.boundingBox())!
+  // 보선을 잡은 채 상자 안을 누르면 보선만 놓인다.
+  await selectRail(page, '첫닿자 오른변')
+  await page.mouse.click(box.x + box.width * 0.4, box.y + box.height * 0.5)
+  await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
+  await expect(page.getByTestId('jamo-stroke-tools')).toHaveCount(0)
+  // 다시 누르면 획 편집.
+  await page.mouse.click(box.x + box.width * 0.4, box.y + box.height * 0.5)
+  await expect(page.getByTestId('jamo-stroke-tools')).toBeVisible()
+  await expect(page.getByRole('region', { name: '멈 완성 글자 편집' })).toBeVisible()
+})
+
 test('수치 패널은 없고, 편집 전에도 닿는 글자 줄이 Δ 없이 떠 있다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-canvas')).toBeVisible()
@@ -296,7 +314,7 @@ test('자소 탭은 레이아웃으로 열리고, 기준선을 적용하면 문�
   await expect.poll(() => sentenceGlyph.innerHTML()).not.toBe(before)
   await expect(page.locator('[data-testid="layout-override-card"][data-kind="layer"]')).toBeVisible()
 
-  await page.getByTestId('jamo-stroke-cta').click()
+  await page.getByTestId('jamo-stroke-chip').click()
   await expect(page.getByTestId('jamo-layout-mode')).toHaveCount(0)
   await expect(page.getByRole('region', { name: '멈 완성 글자 편집' })).toBeVisible()
   await page.getByTestId('jamo-stroke-done').click()
@@ -309,33 +327,33 @@ test('옛 검수 글자 화면 주소는 같은 글자의 자소 탭 레이아�
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible({ timeout: 20_000 })
 })
 
-/** 하단 바는 한 칸짜리 상태 기계다. 부품을 켜면 `ㅁ 획 고치기`, 안 끝난 변경이 있으면 비활성, 획 편집에서는 `완료`로 그 부품이 켜진 채 돌아온다. */
+/** 획 편집 입구는 켜진 상자 모서리의 칩이다. 부품을 켜면 칩이 `ㅁ 획`, 보선을 옮기면 하단 바가 서고, 획 편집에서는 `완료`로 그 부품이 켜진 채 돌아온다. */
 test('켠 부품의 획 고치기로 내려가고, 안 끝난 변경이 있으면 막히고, 완료하면 그 부품이 켜진 레이아웃으로 돌아온다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   const canvas = page.getByTestId('review-canvas')
-  const cta = page.getByTestId('jamo-stroke-cta')
+  // 획 편집으로 가는 길은 켜진 상자 모서리의 칩(또는 켜진 상자를 한 번 더 누르기). 하단 CTA는 없다.
+  const cta = page.getByTestId('jamo-stroke-chip')
   const pressedPart = canvas.getByTestId('review-part-hit').and(canvas.locator('[aria-pressed="true"]'))
   // 기본은 첫닿자. 홀자를 켜면 바뀌고, 다시 첫닿자로 돌아온다.
-  await expect(cta).toHaveText('ㅁ 획 고치기')
+  await expect(page.getByTestId('jamo-stroke-cta-bar')).toHaveCount(0)
+  await expect(cta).toHaveAttribute('aria-label', 'ㅁ 획 고치기')
   await canvas.getByRole('button', { name: '홀자 ㅓ 선택' }).click()
-  await expect(cta).toHaveText('ㅓ 획 고치기')
+  await expect(cta).toHaveAttribute('aria-label', 'ㅓ 획 고치기')
   await canvas.getByRole('button', { name: '첫닿자 ㅁ 선택' }).click({ position: { x: 4, y: 4 } })
-  await expect(cta).toHaveText('ㅁ 획 고치기')
-  await expect(cta).toBeEnabled()
+  await expect(cta).toHaveAttribute('aria-label', 'ㅁ 획 고치기')
 
   // 배치 Δ가 생기면 하단 바가 `…에 적용`으로 바뀐다. 획 고치기는 그동안 없다. 복원하면 돌아온다.
   await selectRail(page, '첫닿자 오른변')
   await page.keyboard.press('Shift+ArrowRight')
   const apply = page.getByTestId('review-propagation-apply')
   await expect(apply).toHaveText('이 레이아웃에 적용')
-  await expect(cta).toHaveCount(0)
   await page.getByTestId('review-propagation').getByRole('button', { name: '이 자모만', exact: true }).click()
   await page.getByTestId('review-propagation-jamos-done').click()
   await expect(apply).toHaveText('ㅁ에 적용')
   await resetButton(page).click()
   await expect(apply).toHaveCount(0)
-  await expect(cta).toBeEnabled()
+  await expect(page.getByTestId('jamo-stroke-cta-bar')).toHaveCount(0)
 
   // 획 편집은 그 자소의 첫 획이 잡힌 채 열려 도구 줄이 바로 켜진다. `눌러 고르세요` 안내는 없다. 옮기기는 캔버스에서 하고, 잘게 옮길 트랙패드가 도구 줄 아래에 있다.
   const layoutCanvasBox = await canvas.boundingBox()
@@ -351,11 +369,12 @@ test('켠 부품의 획 고치기로 내려가고, 안 끝난 변경이 있으�
   const lockedHitCount = await strokeHits.count()
   await page.getByTestId('focus-canvas').dispatchEvent('pointerdown')
   await expect(strokeHits.and(editor.locator('[data-selected="true"]'))).toHaveCount(1)
-  // 셸 안 획 캔버스는 레이아웃 캔버스와 같은 자리 · 같은 크기다(왼쪽 세로 표지 + 남은 너비, 최대 330px).
+  // 셸 안 획 캔버스는 레이아웃 캔버스와 같은 크기 · 같은 가로 자리다. 문장 줄이 접힌 만큼 위로 올라간다.
+  await page.waitForFunction(() => document.querySelector('section[aria-label="보정 문장"]')?.getBoundingClientRect().height === 0)
   const focusBox = await page.getByTestId('focus-canvas').boundingBox()
   expect(Math.round(focusBox?.width ?? 0)).toBe(Math.round(layoutCanvasBox?.width ?? 0))
   expect(Math.round(focusBox?.x ?? 0)).toBe(Math.round(layoutCanvasBox?.x ?? 0))
-  expect(Math.round(focusBox?.y ?? 0)).toBe(Math.round(layoutCanvasBox?.y ?? 0))
+  expect(focusBox!.y).toBeLessThan(layoutCanvasBox!.y)
   // 왼쪽 표지는 `기본` + 여섯 칸. 획은 기본 획에 저장되니 켜진 건 `기본`뿐이고, 첫닿자는 여섯 칸 모두에 그려진다.
   const stripCards = page.getByTestId('layout-context-cards').locator('li')
   await expect(stripCards).toHaveCount(7)
@@ -367,7 +386,7 @@ test('켠 부품의 획 고치기로 내려가고, 안 끝난 변경이 있으�
   await page.getByTestId('jamo-stroke-done').click()
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
   await expect(pressedPart).toHaveAttribute('aria-label', '첫닿자 ㅁ 선택', { timeout: 20_000 })
-  await expect(cta).toHaveText('ㅁ 획 고치기')
+  await expect(cta).toHaveAttribute('aria-label', 'ㅁ 획 고치기')
   // 받침 ㅁ으로 들어가도 눌리는 획 수는 같다(같은 ㅁ) — 잠금이 자소를 따라간다.
   await canvas.getByRole('button', { name: '받침 ㅁ 선택' }).click({ position: { x: 4, y: 4 } })
   await cta.click()
@@ -376,19 +395,15 @@ test('켠 부품의 획 고치기로 내려가고, 안 끝난 변경이 있으�
   await expect(stripCards.and(page.locator('[data-absent]'))).toHaveCount(3)
   await page.getByTestId('jamo-stroke-back').click()
   await expect(pressedPart).toHaveAttribute('aria-label', '받침 ㅁ 선택', { timeout: 20_000 })
-  await canvas.getByRole('button', { name: '첫닿자 ㅁ 선택' }).click({ position: { x: 4, y: 4 } })
-
-  // 획 편집 중 문장에서 다른 글자를 고르면 기본 상태(레이아웃)로 돌아간다.
-  await cta.click()
-  await page.getByRole('button', { name: '별 편집' }).click()
-  await expect(page.getByRole('region', { name: '별 레이아웃 수정' })).toBeVisible()
 })
 
 /** 셸 안 획 편집은 조절판 없이 캔버스에서 바로 끈다. 점이 손가락을 따라오고, 한 번 끌기가 기록 한 줄이다. */
 test('획 편집은 캔버스에서 꼭짓점을 직접 끌어 옮기고 Undo 한 번에 돌아온다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EA%B0%81')
   await expect(page.getByTestId('review-canvas')).toBeVisible({ timeout: 20_000 })
-  await page.getByTestId('jamo-stroke-cta').click()
+  await page.getByTestId('jamo-stroke-chip').click()
+  // 문장 줄이 접히는 동안 캔버스가 올라간다. 다 접힌 뒤에 잰다.
+  await page.waitForFunction(() => document.querySelector('section[aria-label="보정 문장"]')?.getBoundingClientRect().height === 0)
   const corner = page.locator('[data-editor-point="visible"]').nth(1)
   const centerOf = async () => { const box = await corner.boundingBox(); if (!box) throw new Error('꼭짓점이 없다'); return { x: box.x + box.width / 2, y: box.y + box.height / 2 } }
   const start = await centerOf()
@@ -429,8 +444,9 @@ test('획을 상자 밖으로 끌어도 다른 획은 제자리고, 틀 다시 �
   await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
   const dots = page.locator('[data-editor-point="visible"]')
   const positions = () => dots.evaluateAll((els) => els.map((el) => `${Number(el.getAttribute('cx')).toFixed(2)},${Number(el.getAttribute('cy')).toFixed(2)}`))
-  const status = page.getByTestId('jamo-frame-status')
-  await expect(status).toHaveText('')
+  // 틀 설명 줄은 없다. `틀 다시 맞추기`는 숨겨 두었다(기능만 남음).
+  const reset = page.getByTestId('jamo-frame-reset')
+  await expect(reset).toBeHidden()
   const before = await positions()
   expect(before).toHaveLength(3)
 
@@ -447,14 +463,12 @@ test('획을 상자 밖으로 끌어도 다른 획은 제자리고, 틀 다시 �
   const after = await positions()
   expect(after.slice(1)).toEqual(before.slice(1))
   expect(Number(after[0].split(',')[0])).toBeLessThan(Number(before[0].split(',')[0]) - 2)
-  await expect(status).toContainText(/상자 밖 왼쪽 \+\d+u/)
 
-  // 틀 다시 맞추기 → 끝점이 상자 안으로 돌아오고 틀 표시가 사라진다. Undo하면 튀어나온 채로 돌아온다.
-  await page.getByTestId('jamo-frame-reset').click()
-  await expect(status).toHaveText('')
+  // 틀 다시 맞추기 → 끝점이 상자 안으로 돌아온다. Undo하면 튀어나온 채로 돌아온다.
+  await reset.evaluate((button: HTMLButtonElement) => button.click())
   await expect.poll(async () => Number((await positions())[0].split(',')[0])).toBeCloseTo(Number(before[0].split(',')[0]), 0)
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
-  await expect(status).toContainText('상자 밖 왼쪽')
+  await expect.poll(async () => (await positions())[0]).toBe(after[0])
 })
 
 /**
@@ -547,7 +561,8 @@ test('획 편집의 뒤로는 이번에 고친 획을 되돌리고 레이아웃�
   // 잡힌 획의 중심선. 저장소 문자열은 처음엔 비어 있을 수 있어서 화면에 그려진 획으로 비교한다.
   const selectedStroke = () => page.locator('[data-editor-hit="stroke"][data-selected="true"]').getAttribute('d')
 
-  await page.getByTestId('jamo-stroke-cta').click()
+  await page.getByTestId('jamo-stroke-chip').click()
+  await page.waitForFunction(() => document.querySelector('section[aria-label="보정 문장"]')?.getBoundingClientRect().height === 0)
   const before = await selectedStroke()
   expect(before).toBeTruthy()
   // 획을 통째로 옮기면 상자 맞춤이 도로 펴 버릴 수 있어서 꼭짓점을 잡아 옮긴다.
@@ -564,12 +579,19 @@ test('획 편집의 뒤로는 이번에 고친 획을 되돌리고 레이아웃�
   await expect(undoButton).toBeEnabled()
   await expect.poll(selectedStroke).not.toBe(before)
 
+  // 고친 게 있으면 `뒤로`는 먼저 묻는다. 바깥을 누르면 그대로 남고, `저장하지 않고 나가기`면 되돌리고 나간다.
   await page.getByTestId('jamo-stroke-back').click()
+  await expect(page.getByTestId('stroke-back-dialog')).toContainText('2번 고침')
+  await page.getByTestId('stroke-back-backdrop').click({ position: { x: 10, y: 10 } })
+  await expect(page.getByTestId('stroke-back-dialog')).toHaveCount(0)
+  await expect(page.getByTestId('jamo-stroke-tools')).toBeVisible()
+  await page.getByTestId('jamo-stroke-back').click()
+  await page.getByTestId('stroke-back-discard').click()
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
   await expect(undoButton).toBeDisabled()
   await expect(redoButton).toBeEnabled()
   // 다시 들어가 보면 획이 들어오기 전 그대로다.
-  await page.getByTestId('jamo-stroke-cta').click()
+  await page.getByTestId('jamo-stroke-chip').click()
   await expect.poll(selectedStroke).toBe(before)
 })
 
@@ -1085,7 +1107,8 @@ test('레이아웃 모드 첫 화면에 상단 두 줄과 옵션 스택이 온�
   const sentenceGlyph = (await page.getByRole('button', { name: '멈 편집' }).boundingBox())!
   const cell = (await cards.first().boundingBox())!
   expect(cell.height).toBeCloseTo(sentenceGlyph.height * 1.16, 0)
-  const barTop = (await page.getByTestId('jamo-stroke-cta').boundingBox())!.y
+  // 하단 바는 보선을 옮겼을 때만 선다. 지금은 화면 끝이 바닥이다.
+  const barTop = page.viewportSize()!.height
   const row = (await page.getByTestId('review-propagation-cards').boundingBox())!
   for (let index = 0; index < 5; index += 1) {
     const box = (await cards.nth(index).boundingBox())!
@@ -1106,9 +1129,9 @@ test('레이아웃 모드 첫 화면에 상단 두 줄과 옵션 스택이 온�
   await expect(menu).toBeHidden()
   await expect(page.getByRole('button', { name: '글로벌 스타일 설정' })).toBeEnabled()
 
-  // 획 편집에서도 문장은 한 줄이고, 머리의 글로벌 스타일이 패널을 연다.
-  await page.getByTestId('jamo-stroke-cta').click()
-  await expect(sentence).toHaveAttribute('data-compact', 'true')
+  // 획 편집에서는 문장 줄이 위로 접히고, 머리의 글로벌 스타일이 패널을 연다.
+  await page.getByTestId('jamo-stroke-chip').click()
+  await expect(page.locator('section[aria-label="보정 문장"]')).toHaveAttribute('data-collapsed', 'true')
   await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
   await expect(page.getByRole('region', { name: '글로벌 스타일 설정' })).toBeVisible()
 })

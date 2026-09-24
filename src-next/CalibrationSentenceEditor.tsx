@@ -7,12 +7,12 @@ import { facesToBox, identityOfSyllable } from '../src/services/contextBoxResolv
 import { contextPlacementOf, useContextPlacement, useNotoModel } from './notoModel'
 import { GlyphLayoutEditor } from './GlyphLayoutEditor'
 import type { LayoutLeaveGuard } from './GlyphLayoutEditor'
+import leaveSheetStyles from './GlyphLayoutEditor.module.css'
 import { effectiveLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { adoptFamilyStrokes, familyOfSyllable } from '../src/utils/jamoContextStrokes'
 import { withFrameFrom, withoutFrame } from '../src/utils/jamoFrame'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
-import { componentProtrusion } from '../src/services/notoComponentFit'
 import { faceSnapCandidates, pointAnchors, snapStrokeDrag, strokeBodyAnchors, strokeSnapCandidates, withoutOwnCandidates } from './strokeSnap'
 import type { SnapAnchors } from './strokeSnap'
 import type { SnapCandidate, SnapHit } from './railSnap'
@@ -650,7 +650,6 @@ function InferenceTrackpad({
   dragApiRef,
   multiSelectArmed = false,
   frameForEdit,
-  partBoxes,
 }: {
   glyph: string
   syllable: DecomposedSyllable
@@ -665,8 +664,6 @@ function InferenceTrackpad({
   onPreviewJamo: (preview: PreviewJamo | null) => void
   onPreviewSchema: (preview: PreviewSchema | null) => void
   onCommitJamo: (before: JamoData, after: JamoData, raw: RawGlyphEdit, options?: { unframed?: boolean; pastGapLimit?: boolean }) => void
-  /** 지금 글자의 부품 상자(중심선 상자). 튀어나온 양을 em으로 바꿀 때 쓴다 — 선택이 들고 있는 상자는 고친 뒤 낡을 수 있다. */
-  partBoxes?: Partial<Record<Part, BoxConfig>>
   /** 고치는 중의 자모에 기준 틀을 굳혀 돌려준다. 끄는 동안의 간격 계산이 놓은 뒤와 같은 배치를 보게 한다. */
   frameForEdit?: (jamo: JamoData) => JamoData
   onCommitSchema: (before: LayoutSchema, after: LayoutSchema, raw: RawGlyphEdit) => void
@@ -1051,17 +1048,13 @@ function InferenceTrackpad({
   if (direct) {
     const editable = selection.kind === 'stroke' || selection.kind === 'point' || selection.kind === 'handle'
     const onPoint = selection.kind === 'point' || selection.kind === 'handle'
-    const directLabel = selection.kind === 'none'
-      ? '고칠 획을 누르세요'
-      : `${selection.kind === 'stroke' ? `${selection.jamo.char}의 획` : selection.kind === 'handle' ? `${selection.jamo.char}의 곡선 핸들` : selection.kind === 'point' ? `${selection.jamo.char}의 점` : ''} · 캔버스나 트랙패드로 옮기기${selectedPoints.length > 1 ? ` · 점 ${selectedPoints.length}개 함께` : ''}${inkGapLimiter ? pastGapLimit.current ? ` · ${inkGapLimiter.char}에서 옆 자소에 너무 붙음` : ` · ${inkGapLimiter.char}에서 최소 간격 · 더 끌면 넘어감` : ''}`
-    // 기준 틀이 굳은 자모만: 틀 밖으로 나간 양(u)과 `틀 다시 맞추기`. 튀어나옴은 저장값이 아니라 여기서 계산한다.
+    // 조작 안내 문구는 두지 않는다. 여러 점·간격 경고처럼 지금 상태가 바뀐 것만 알린다.
+    const directLabel = [
+      selectedPoints.length > 1 ? `점 ${selectedPoints.length}개 함께` : '',
+      inkGapLimiter ? pastGapLimit.current ? `${inkGapLimiter.char}에서 옆 자소에 너무 붙음` : `${inkGapLimiter.char}에서 최소 간격 · 더 끌면 넘어감` : '',
+    ].filter(Boolean).join(' · ')
+    // 기준 틀이 굳은 자모만 `틀 다시 맞추기`가 된다.
     const liveJamo = editable ? activeVisibleJamo ?? selection.jamo : null
-    const protrusion = editable && liveJamo?.frame
-      ? componentProtrusion({ jamo: liveJamo, channel: selection.renderPart === 'JU_H' ? 'horizontalStrokes' : selection.renderPart === 'JU_V' ? 'verticalStrokes' : undefined, family: selection.editorPart === 'JU' ? null : familyOfSyllable(syllable) }, partBoxes?.[selection.renderPart] ?? selection.box)
-      : null
-    const protrusionLabel = protrusion
-      ? ([['위', protrusion.top], ['아래', protrusion.bottom], ['왼쪽', protrusion.left], ['오른쪽', protrusion.right]] as const).filter(([, amount]) => Math.round(amount * unitsPerEm) >= 1).map(([side, amount]) => `${side} +${Math.round(amount * unitsPerEm)}u`).join(' · ')
-      : ''
     const resetFrame = () => {
       if (!editable) return
       const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
@@ -1071,35 +1064,33 @@ function InferenceTrackpad({
     // 자리가 흔들리지 않게 단추는 늘 같은 여섯 개를 그리고, 못 쓰는 것은 끈다.
     return (
       <section className={styles.strokeToolSection} data-testid="jamo-stroke-tools">
-        <p className={styles.strokeToolStatus}><span>{directLabel}</span><output>x {Math.round(delta.x * unitsPerEm)} · y {Math.round(delta.y * unitsPerEm)}</output></p>
-        {/* 줄은 늘 자리를 차지한다 — 틀이 굳는 순간 도구 줄이 밀리면 캔버스가 흔들린다. */}
-        <p className={styles.strokeFrameStatus} data-testid="jamo-frame-status" data-framed={liveJamo?.frame ? true : undefined}>
-          {liveJamo?.frame && <>
-            <span data-protruding={protrusionLabel ? true : undefined}>{protrusionLabel ? `상자 밖 ${protrusionLabel}` : '틀 안 · 획을 끌어도 다른 획은 제자리'}</span>
-            <button type="button" onClick={resetFrame} data-testid="jamo-frame-reset">틀 다시 맞추기</button>
-          </>}
-        </p>
-        <div className={styles.strokeToolRow} role="toolbar" aria-label="획 편집 도구">
-          <button type="button" onClick={addStroke} disabled={!editable} aria-label="선 추가"><Plus size={18} aria-hidden="true" /><span>추가</span></button>
-          <button type="button" onClick={deleteSelection} disabled={!canDelete} aria-label={selection.kind === 'stroke' ? '획 삭제' : '꼭짓점 삭제'}><Trash2 size={18} aria-hidden="true" /><span>삭제</span></button>
-          <button type="button" onClick={toggleCurve} disabled={!onPoint} aria-label={selectedPointHasCurve ? '직선화' : '곡선화'}><Spline size={18} aria-hidden="true" /><span>{selectedPointHasCurve ? '직선' : '곡선'}</span></button>
-          <button type="button" onClick={connectStroke} disabled={!mergeTarget} aria-label="가까운 선 연결"><Link2 size={18} aria-hidden="true" /><span>잇기</span></button>
-          <button type="button" onClick={disconnectStroke} disabled={!canDisconnect} aria-label="선 끊기"><Unlink size={18} aria-hidden="true" /><span>끊기</span></button>
-          <button type="button" onClick={() => onMultiSelectArmedChange(!multiSelectArmed)} disabled={!editable} aria-pressed={multiSelectArmed} aria-label="꼭짓점 여러 개 고르기"><CopyPlus size={18} aria-hidden="true" /><span>여러 점</span></button>
-        </div>
-        {/* 섬세한 편집용 조절판. 손가락이 글자를 가리지 않고, 1px이 1u라 캔버스 끌기보다 잘게 옮긴다. */}
-        <div
-          {...trackpad.handlers}
-          className={`${legacyTrackpadStyles.trackpad} ${styles.trackpad} ${styles.strokeTrackpad} ${selection.kind === 'none' ? styles.trackpadDisabled : ''}`}
-          role="group"
-          aria-label="선택한 획을 잘게 옮기는 트랙패드"
-          aria-disabled={selection.kind === 'none'}
-          data-testid="jamo-stroke-trackpad"
-        >
-          <span className={legacyTrackpadStyles.horizontalLane} aria-hidden="true" />
-          <span className={legacyTrackpadStyles.verticalLane} aria-hidden="true" />
-          {trackpad.visualState.points.map((point, index) => <span key={index} className={legacyTrackpadStyles.pinchPoint} style={{ left: point.x, top: point.y }} aria-hidden="true" />)}
-          <span className={styles.trackpadLabel}>{selection.kind === 'stroke' ? '트랙패드 · 한 손가락 이동 · 두 손가락 비율' : '트랙패드 · 한 손가락 이동'}</span>
+        {/* 경고만 한 줄. 알릴 게 없으면 줄을 접는다 — 늘어나고 줄어드는 건 트랙패드라 캔버스는 안 흔들린다. */}
+        {directLabel && <p className={styles.strokeWarning}>{directLabel}</p>}
+        {/* `틀 다시 맞추기`는 일단 숨긴다(기능은 남겨 둔다). */}
+        <button type="button" hidden onClick={resetFrame} disabled={!liveJamo?.frame} data-testid="jamo-frame-reset">틀 다시 맞추기</button>
+        {/* 트랙패드가 남는 세로를 다 먹고, 도구 단추는 그 오른쪽에 2열로 선다(단추 줄이 차지하던 세로를 트랙패드에 준다). */}
+        <div className={styles.strokeWorkRow}>
+          {/* 섬세한 편집용 조절판. 손가락이 글자를 가리지 않고, 1px이 1u라 캔버스 끌기보다 잘게 옮긴다. */}
+          <div
+            {...trackpad.handlers}
+            className={`${legacyTrackpadStyles.trackpad} ${styles.trackpad} ${styles.strokeTrackpad} ${selection.kind === 'none' ? styles.trackpadDisabled : ''}`}
+            role="group"
+            aria-label="선택한 획을 잘게 옮기는 트랙패드"
+            aria-disabled={selection.kind === 'none'}
+            data-testid="jamo-stroke-trackpad"
+          >
+            <span className={legacyTrackpadStyles.horizontalLane} aria-hidden="true" />
+            <span className={legacyTrackpadStyles.verticalLane} aria-hidden="true" />
+            {trackpad.visualState.points.map((point, index) => <span key={index} className={legacyTrackpadStyles.pinchPoint} style={{ left: point.x, top: point.y }} aria-hidden="true" />)}
+          </div>
+          <div className={styles.strokeToolRow} role="toolbar" aria-label="획 편집 도구">
+            <button type="button" onClick={addStroke} disabled={!editable} aria-label="선 추가"><Plus size={18} aria-hidden="true" /><span>추가</span></button>
+            <button type="button" onClick={deleteSelection} disabled={!canDelete} aria-label={selection.kind === 'stroke' ? '획 삭제' : '꼭짓점 삭제'}><Trash2 size={18} aria-hidden="true" /><span>삭제</span></button>
+            <button type="button" onClick={toggleCurve} disabled={!onPoint} aria-label={selectedPointHasCurve ? '직선화' : '곡선화'}><Spline size={18} aria-hidden="true" /><span>{selectedPointHasCurve ? '직선' : '곡선'}</span></button>
+            <button type="button" onClick={connectStroke} disabled={!mergeTarget} aria-label="가까운 선 연결"><Link2 size={18} aria-hidden="true" /><span>잇기</span></button>
+            <button type="button" onClick={disconnectStroke} disabled={!canDisconnect} aria-label="선 끊기"><Unlink size={18} aria-hidden="true" /><span>끊기</span></button>
+            <button type="button" onClick={() => onMultiSelectArmedChange(!multiSelectArmed)} disabled={!editable} aria-pressed={multiSelectArmed} aria-label="꼭짓점 여러 개 고르기"><CopyPlus size={18} aria-hidden="true" /><span>여러 점</span></button>
+          </div>
         </div>
       </section>
     )
@@ -1429,6 +1420,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const calibrationLines = useMemo(() => [sampleSentence], [sampleSentence])
   // 셸 안(레이아웃 · 획 편집 둘 다)에서는 문장이 한 줄 가로 스크롤이다(아래 편집부에 세로 자리를 내준다). 고른 글자가 가려져 있으면 가로로만 끌어온다.
   const sentenceCompact = chrome === 'workspace'
+  // 획 편집에서는 문장 줄이 위로 접혀 사라지고 `닿는 글자` 줄만 남는다. 그만큼 캔버스와 트랙패드가 커진다.
+  const sentenceCollapsed = chrome === 'workspace' && layoutAvailable && !isLayoutMode && !styleLocksCanvas && !styleSpaceOpen
   const sentenceRef = useRef<HTMLElement>(null)
   useEffect(() => {
     const section = sentenceRef.current
@@ -1696,7 +1689,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     if (entry.kind === 'layout' || entry.kind === 'jamo') useCalibrationProjectStore.getState().removeSampleGlyphEdit(entry.edit.id)
   }
   // `뒤로`: 이번에 획 편집에 들어와서 한 일을 전부 되돌리고 레이아웃으로 나간다. 되돌린 것은 Redo에 쌓여서 다시 살릴 수 있다.
+  const strokeEditCount = Math.max(0, history.length - strokeEntryMark)
+  const [strokeBackAsk, setStrokeBackAsk] = useState(false)
+  // `뒤로`는 고친 게 있으면 먼저 묻는다. 끄는 즉시 저장되지만 사용자에게 `뒤로`는 버리기다.
+  const askStrokeBack = () => strokeEditCount > 0 ? setStrokeBackAsk(true) : cancelStrokeEdits()
   const cancelStrokeEdits = () => {
+    setStrokeBackAsk(false)
     const reverted = history.slice(Math.min(strokeEntryMark, history.length)).reverse()
     reverted.forEach(revertEntry)
     if (reverted.length) {
@@ -1828,7 +1826,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
       {/* 문장 줄부터 편집부까지 한 덩어리. 레이아웃 모드에서만 세로로 밀린다 — `내 문장`이 위로 빠지고 `닿는 글자` 줄이 그 자리에 붙는다.
           두 모드가 같은 덩어리를 써야 오갈 때 문장 줄이 다시 안 그려진다(가로 스크롤 자리 유지). */}
       <div className={styles.scrollArea} data-scroll={(isLayoutMode && !styleLocksCanvas) || undefined}>
-      <section ref={sentenceRef} className={`${styles.sentence} ${chrome === 'workspace' ? styleMode.strip : ''}`} data-compact={sentenceCompact || undefined} data-grown={styleSpaceOpen || undefined} aria-label="보정 문장">
+      <section ref={sentenceRef} className={`${styles.sentence} ${chrome === 'workspace' ? styleMode.strip : ''}`} data-compact={sentenceCompact || undefined} data-grown={styleSpaceOpen || undefined} data-collapsed={sentenceCollapsed || undefined} aria-hidden={sentenceCollapsed || undefined} inert={sentenceCollapsed || undefined} aria-label="보정 문장">
         <div className={styles.sentenceActions}>
           <button type="button" onClick={() => guardLayoutLeave(pickSampleSentence)} aria-label="예시 문장 무작위 선택" title="예시 문장 바꾸기"><Dices size={19} aria-hidden="true" /></button>
           <button type="button" data-active={isDirectInputActive || undefined} onClick={startDirectInput} aria-label="보정 문장 직접 입력" title="직접 입력"><TextCursorInput size={19} aria-hidden="true" /></button>
@@ -1861,7 +1859,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
           줄이 두 모드에 다 있어야 `획 고치기`로 오갈 때 캔버스가 안 튄다. */}
       {chrome === 'workspace' && layoutAvailable && !styleLocksCanvas && strokeRowJamo && strokeCardPart &&
         <TouchedGlyphRow source={corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00)} bundle={notoBundle} edit={NO_LAYOUT_EDIT} ghostVisible={false} focus={strokeCardPart} scope="jamo" group={strokeCardPart} jamos={[strokeRowJamo]} anyContext />}
-      {!styleSpaceOpen && <section className={styles.editor} data-chrome={chrome} aria-label={`${selectedChar} 완성 글자 편집`}>
+      {!styleSpaceOpen && <section className={styles.editor} data-chrome={chrome} data-stroke-tools={!globalStylePanel && directManipulation ? true : undefined} aria-label={`${selectedChar} 완성 글자 편집`}>
         {/* 셸 안에서는 레이아웃 모드와 같은 자리(캔버스 왼쪽)에 같은 여섯 칸 표지가 선다. 획 편집에서는 `기본` 칸이 하나 더 오고 칸마다 고치는 자소가 그려진다. */}
         <div className={styles.strokeStage}>
         {chrome === 'workspace' && layoutAvailable && !styleLocksCanvas && <LayoutContextCards activeContextId={corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00).contextId} allActive={false} ink={strokeCardInk ?? undefined} />}
@@ -1911,15 +1909,26 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         dragApiRef={directManipulation ? dragApiRef : undefined}
         multiSelectArmed={multiSelectArmed}
         frameForEdit={frameForEdit}
-        partBoxes={placement.kind === 'boxes' ? placement.boxes : focusedBoxes}
       />}
       {/* 획 편집은 끄는 즉시 저장된다. `완료`는 저장이 아니라 레이아웃으로 돌아가는 문이다. */}
       {layoutAvailable && !globalStylePanel && <div className={styles.strokeDoneBar}>
         {boxFitIssue && <p role="status" data-testid="jamo-box-fit-issue">이 획은 모델 상자에 안 맞아 옛 배치로 그립니다 · {boxFitIssue.message}</p>}
         {/* `완료`는 고친 채로, 왼쪽 `뒤로`는 이번에 들어와서 고친 것을 되돌리고 레이아웃으로 나간다(취소). */}
         <div className={styles.strokeDoneRow}>
-          <button type="button" className={styles.strokeBack} onClick={cancelStrokeEdits} aria-label="고친 획을 되돌리고 레이아웃으로 돌아가기" title="고친 획을 되돌리고 레이아웃으로" data-testid="jamo-stroke-back"><ArrowLeft size={18} /></button>
+          <button type="button" className={styles.strokeBack} onClick={askStrokeBack} aria-label="고친 획을 되돌리고 레이아웃으로 돌아가기" title="고친 획을 되돌리고 레이아웃으로" data-testid="jamo-stroke-back"><ArrowLeft size={18} /></button>
           <button type="button" onClick={() => chooseEditMode('layout')} data-testid="jamo-stroke-done">완료</button>
+        </div>
+      </div>}
+      {strokeBackAsk && <div className={leaveSheetStyles.leaveBackdrop} onClick={() => setStrokeBackAsk(false)} data-testid="stroke-back-backdrop">
+        <div className={leaveSheetStyles.leaveSheet} role="alertdialog" aria-modal="true" aria-label="저장 안 한 획" onClick={(event) => event.stopPropagation()} data-testid="stroke-back-dialog">
+          <header>
+            <b>고친 획이 아직 저장되지 않았어요</b>
+            <small>{strokeEditCount}번 고침 · 저장하지 않고 나가면 되돌아가요.</small>
+          </header>
+          <div className={leaveSheetStyles.leaveActions}>
+            <button type="button" className={leaveSheetStyles.leaveSave} onClick={() => { setStrokeBackAsk(false); chooseEditMode('layout') }} data-testid="stroke-back-save">저장하고 나가기</button>
+            <button type="button" onClick={cancelStrokeEdits} data-testid="stroke-back-discard">저장하지 않고 나가기</button>
+          </div>
         </div>
       </div>}
       </>}

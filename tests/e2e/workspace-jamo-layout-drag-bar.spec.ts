@@ -19,14 +19,14 @@ test('하단 바는 보선을 끄는 동안 안 바뀌고 손을 떼면 적용 �
   const apply = page.getByTestId('review-propagation-apply')
   const reset = page.getByTestId('review-reset')
 
-  await expect(page.getByTestId('jamo-stroke-cta')).toBeVisible()
+  // 옮긴 보선이 없으면 하단 바가 없다(획 편집은 캔버스 칩으로 간다).
+  await expect(bar).toHaveCount(0)
   await page.mouse.move(pxOf(x1), y)
   await page.mouse.down()
   await page.mouse.move(pxOf(x1 + 0.03), y, { steps: 6 })
-  // 끄는 중: 캔버스의 Δ 수치는 실시간, 하단 바는 그대로 `획 고치기`.
+  // 끄는 중: 캔버스의 Δ 수치는 실시간, 하단 바는 잡을 때 그대로(없음).
   await expect(page.getByTestId('review-delta-label')).toHaveCount(1)
-  await expect(bar).toHaveAttribute('data-held', 'true')
-  await expect(page.getByTestId('jamo-stroke-cta')).toBeVisible()
+  await expect(bar).toHaveCount(0)
   await expect(apply).toHaveCount(0)
   await expect(reset).toHaveCount(0)
 
