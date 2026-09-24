@@ -49,7 +49,7 @@ describe('신규 보정 화면 자유 편집 경계', () => {
   })
 })
 
-describe('글자 칸 가로 끝 경계', () => {
+describe('글자 칸 끝 경계', () => {
   const box = { x: 0.1, y: 0.1, width: 0.4, height: 0.4 }
   const strokes = jamo.strokes ?? []
 
@@ -61,11 +61,19 @@ describe('글자 칸 가로 끝 경계', () => {
     expect(second).toMatchObject({ x: 1, y: 1 })
   })
 
-  it('세로는 막지 않고, 이미 칸 밖에 있는 점은 그 자리까지 허용한다', () => {
-    const outside: JamoData = { ...jamo, strokes: [{ ...strokes[0], points: [{ x: -1, y: 0 }, { x: 1, y: 1 }] }] }
+  it('점을 칸 아래 밖으로 끌면 세로도 칸 끝(두께 절반 안쪽)에서 멈춘다', () => {
+    const bounds = calibrationEditBounds(box, strokes)
+    const moved = movePoint(jamo, 'ㅏ-1', 0, { x: 0, y: 5 }, bounds)
+    const [first] = moved.jamo.strokes?.[0].points ?? []
+    expect(box.y + first.y * box.height).toBeCloseTo(0.965)
+  })
+
+  it('이미 칸 밖에 있는 점은 가로 · 세로 모두 그 자리까지 허용한다', () => {
+    const outside: JamoData = { ...jamo, strokes: [{ ...strokes[0], points: [{ x: -1, y: -2 }, { x: 1, y: 3 }] }] }
     const bounds = calibrationEditBounds(box, outside.strokes ?? [])
     expect(bounds.minX).toBe(-1)
-    expect(bounds.minY).toBe(Number.NEGATIVE_INFINITY)
+    expect(bounds.minY).toBe(-2)
+    expect(bounds.maxY).toBe(3)
   })
 
   it('굵기 배율만큼 끝이 더 안쪽이다', () => {
