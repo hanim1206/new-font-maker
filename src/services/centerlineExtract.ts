@@ -1,4 +1,4 @@
-import type { MultiPolygon } from 'polygon-clipping'
+import type { MultiPolygon } from './polygonBoolean'
 import type { AnchorPoint, BoxConfig, DeepReadonly, JamoData, MedialFamily, StrokeDataV2 } from '../types'
 import { fitNotoComponent } from './notoComponentFit'
 import type { ComponentFaces } from './notoComponentFit'

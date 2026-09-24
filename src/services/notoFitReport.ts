@@ -1,4 +1,5 @@
-import polygonClipping, { type MultiPolygon, type Polygon } from 'polygon-clipping'
+import * as polygonBoolean from './polygonBoolean'
+import type { MultiPolygon, Polygon } from './polygonBoolean'
 import type { DeepReadonly, InkRegion } from '../types'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
 import { partForJamoRole } from './jamoContextRoles'
@@ -56,7 +57,7 @@ export function multiPolygonArea(shape: MultiPolygon): number {
         const [x2, y2] = ring[(i + 1) % ring.length]
         area += x1 * y2 - x2 * y1
       }
-      // polygon-clipping은 outer를 CCW, hole을 CW로 주므로 부호가 이미 반대다. 절댓값으로 outer − holes.
+      // polygonBoolean은 outer를 CCW, hole을 CW로 주므로 부호가 이미 반대다. 절댓값으로 outer − holes.
       total += (index === 0 ? 1 : -1) * Math.abs(area / 2)
     })
   }
@@ -66,7 +67,7 @@ export function multiPolygonArea(shape: MultiPolygon): number {
 export function unionOf(regions: readonly DeepReadonly<InkRegion>[]): MultiPolygon {
   const polygons = regions.map(regionToPolygon)
   if (!polygons.length) return []
-  return polygonClipping.union(polygons[0], ...polygons.slice(1))
+  return polygonBoolean.union(polygons[0], ...polygons.slice(1))
 }
 
 /** 측정 face와 fit 중심선을 같은 자리로 되돌려 비교한다. 직접 fit이면 0, 모델 예측 rail이면 예측 오차가 된다. */
@@ -136,7 +137,7 @@ export function reportFitResult(input: {
   const theirs = unionOf(ghost.regions)
   const ghostArea = multiPolygonArea(theirs)
   if (ghostArea <= 0) return { ...base, ok: false, message: 'Noto 고스트 면적이 0입니다.' }
-  const xor = polygonClipping.xor(mine, theirs)
+  const xor = polygonBoolean.xor(mine, theirs)
   return { ...base, ok: true, xorRatio: multiPolygonArea(xor) / ghostArea, inkRatio: multiPolygonArea(mine) / ghostArea }
 }
 

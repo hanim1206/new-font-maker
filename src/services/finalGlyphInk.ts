@@ -91,7 +91,7 @@ function compareKey(first: string, second: string): number {
   return first < second ? -1 : first > second ? 1 : 0
 }
 
-/** 입력 순서와 polygon-clipping의 링 시작점에 의존하지 않는 최종 직렬화 순서. */
+/** 입력 순서와 Boolean 결과의 링 시작점에 의존하지 않는 최종 직렬화 순서. */
 export function canonicalizeInkRegions(source: readonly DeepReadonly<InkRegion>[]): InkRegion[] {
   return source.map((region) => ({
     outer: canonicalRing(region.outer),

@@ -1,4 +1,4 @@
-import polygonClipping from 'polygon-clipping'
+import * as polygonBoolean from './polygonBoolean'
 import type { BoxConfig, DeepReadonly, InkRegion, JamoData, MedialFamily, Part, ResolvedCenterlinePrimitive, ResolvedStrokeInkSource, StrokeDataV2, StrokeRenderStyle } from '../types'
 import { strokesForFamily } from '../utils/jamoContextStrokes'
 import { frameJamoOf } from '../utils/jamoFrame'
@@ -212,6 +212,6 @@ export function reportComponentFit(input: { fit: ComponentFitResult; ghostOutlin
   const theirs = unionOf(ghost.regions)
   const ghostArea = multiPolygonArea(theirs)
   if (ghostArea <= 0) return { ...base, ok: false, message: 'Noto 고스트 면적이 0입니다.' }
-  const xor = polygonClipping.xor(mine, theirs)
+  const xor = polygonBoolean.xor(mine, theirs)
   return { ...base, ok: true, xorRatio: multiPolygonArea(xor) / ghostArea, inkRatio: multiPolygonArea(mine) / ghostArea }
 }

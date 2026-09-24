@@ -16,7 +16,7 @@
         "y2": 844
       },
       "commandCount": 169,
-      "commandsSha256": "2be00e3f7da060ae03ec8860289c0238bff01fcda07066c15660f3ef9f0c9164"
+      "commandsSha256": "39bb7c9f43056ef667caeb11d2876419e11e51f305c61f36fee47cd5bdcc50e8"
     }
   },
   "rectangle": {
@@ -36,7 +36,7 @@
         "y2": 843
       },
       "commandCount": 32,
-      "commandsSha256": "118349332130de4d03fd908d92ae9f20e72e20d4b11f0aa725a000529634c09f"
+      "commandsSha256": "8306be17ac01049000cd2b65b8789c5debc4e339b3a6921178336ef006ced8e7"
     }
   },
   "angledArea": {
@@ -56,7 +56,7 @@
         "y2": 849
       },
       "commandCount": 100,
-      "commandsSha256": "e5dbbe7e62b68c801173f5598bdae978647307aa4032af0ba609b84fe68ba996"
+      "commandsSha256": "8f16b066cb6b8c1aeab3c67d10217c029561ac5a6baed10b9fe1dac11ce55787"
     }
   }
 }

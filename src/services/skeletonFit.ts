@@ -1,4 +1,5 @@
-import polygonClipping, { type MultiPolygon } from 'polygon-clipping'
+import * as polygonBoolean from './polygonBoolean'
+import type { MultiPolygon } from './polygonBoolean'
 import type { AnchorPoint, DeepReadonly, InkRegion, JamoData, MedialFamily, Part, StrokeDataV2 } from '../types'
 import type { ContextFaces, ContextModel } from './contextBoxResolver'
 import { fitContextMedial, predictComponentFaces, boxToFaces } from './contextBoxResolver'
@@ -38,9 +39,9 @@ function rectPolygon(faces: ContextFaces, margin = 0): MultiPolygon {
 export function clipGhostToFaces(outline: DeepReadonly<NotoOutline>, faces: ContextFaces, margin = 0.002, exclude: readonly ContextFaces[] = []): { ghost: MultiPolygon; area: number } | null {
   const regions = notoOutlineToInkRegions(outline)
   if (!regions.ok) return null
-  let ghost = polygonClipping.intersection(unionOf(regions.regions), rectPolygon(faces, margin))
+  let ghost = polygonBoolean.intersection(unionOf(regions.regions), rectPolygon(faces, margin))
   for (const other of exclude) {
-    try { ghost = polygonClipping.difference(ghost, rectPolygon(other, -margin)) } catch { /* 빼기 실패면 그대로 */ }
+    try { ghost = polygonBoolean.difference(ghost, rectPolygon(other, -margin)) } catch { /* 빼기 실패면 그대로 */ }
   }
   const area = multiPolygonArea(ghost)
   return area > 0 ? { ghost, area } : null
@@ -78,7 +79,7 @@ export function sampleXor(jamo: DeepReadonly<JamoData>, sample: SkeletonSample, 
   const regions = partInkRegions(jamo, sample, channel)
   if (!regions) return null
   try {
-    return multiPolygonArea(polygonClipping.xor(unionOf(regions), sample.ghost)) / sample.ghostArea
+    return multiPolygonArea(polygonBoolean.xor(unionOf(regions), sample.ghost)) / sample.ghostArea
   } catch {
     return null
   }

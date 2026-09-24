@@ -1,9 +1,5 @@
-import polygonClipping, {
-  type MultiPolygon,
-  type Pair,
-  type Polygon,
-  type Ring,
-} from 'polygon-clipping'
+import * as polygonBoolean from './polygonBoolean'
+import type { MultiPolygon, Pair, Polygon, Ring } from './polygonBoolean'
 import type { InkPoint, InkRegion, InkRing } from '../types'
 
 export interface InkBooleanOptions {
@@ -171,25 +167,6 @@ function validateOptions(options: InkBooleanOptions): void {
 }
 
 /**
- * polygon-clipping은 여러 항을 한 번에 union할 때 드물게 SweepLine에서 터진다
- * ("Unable to find segment ..."). 같은 입력도 둘씩 접으면 통과하므로 그때만 접는다.
- * 그래도 안 되는 한 항은 합치지 않고 따로 둔다. 겹친 자리가 뚫릴 수 있어도
- * 폰트 전체를 못 내보내는 것보다 낫다.
- */
-function unionPolygons(polygons: Polygon[]): MultiPolygon {
-  try {
-    return polygonClipping.union(polygons[0], ...polygons.slice(1))
-  } catch {
-    let merged: MultiPolygon = [polygons[0]]
-    for (const polygon of polygons.slice(1)) {
-      try { merged = polygonClipping.union(merged, [polygon]) }
-      catch { merged = [...merged, polygon] }
-    }
-    return merged
-  }
-}
-
-/**
  * 좌표계의 크기나 방향을 가정하지 않고, 호출자가 넘긴 정밀도 정책으로
  * 잉크 면을 합친다. 결과 outer는 CW, hole은 CCW로 정규화한다.
  */
@@ -205,7 +182,7 @@ export function unionInkRegions(
   if (polygons.length === 0) return []
   const result: MultiPolygon = polygons.length === 1 || !hasPossibleOverlap(polygons)
     ? polygons.map((polygon) => polygon)
-    : unionPolygons(polygons)
+    : polygonBoolean.union(polygons[0], ...polygons.slice(1))
 
   return result
     .map((polygon) => polygonToInkRegion(polygon, options))

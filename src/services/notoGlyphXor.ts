@@ -1,4 +1,4 @@
-import polygonClipping from 'polygon-clipping'
+import * as polygonBoolean from './polygonBoolean'
 import type { GlobalStyle } from '../stores/globalStyleStore'
 import type { BoxConfig, DecomposedSyllable, DeepReadonly, InkRegion, JamoData, LayoutSchema, LayoutType, Part } from '../types'
 import { weightToMultiplier } from '../utils/globalStyleUtils'
@@ -50,7 +50,7 @@ export function ghostXorRatio(app: readonly DeepReadonly<InkRegion>[], ghost: re
   const theirs = unionOf(ghost)
   const ghostArea = multiPolygonArea(theirs)
   if (ghostArea <= 0) return null
-  return { xorRatio: multiPolygonArea(polygonClipping.xor(mine, theirs)) / ghostArea, inkRatio: multiPolygonArea(mine) / ghostArea, placement }
+  return { xorRatio: multiPolygonArea(polygonBoolean.xor(mine, theirs)) / ghostArea, inkRatio: multiPolygonArea(mine) / ghostArea, placement }
 }
 
 export interface GlyphXorInput {
