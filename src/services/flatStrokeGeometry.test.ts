@@ -186,19 +186,40 @@ describe('전역 둥글기(roundness)', () => {
 
   it('가로·세로 대비: 세로 토막은 굵고 가로 토막은 얇으며, ㄱ 꺾임에서 두 폭이 교점으로 만난다', () => {
     const corner = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }]
-    const width = contrastWidthOf(1) // 세로 1.5 · 가로 0.5
-    expect(width({ x: 1, y: 0 })).toBeCloseTo(0.5, 9)
-    expect(width({ x: 0, y: 1 })).toBeCloseTo(1.5, 9)
-    expect(width({ x: 1, y: 1 })).toBeCloseTo(1, 9)
+    const width = contrastWidthOf(1) // 세로 1.8 · 가로 0.55 (세로 굵게 쪽이 깊다)
+    expect(width({ x: 1, y: 0 })).toBeCloseTo(0.55, 9)
+    expect(width({ x: 0, y: 1 })).toBeCloseTo(1.8, 9)
+    expect(width({ x: 1, y: 1 })).toBeCloseTo(1.175, 9)
+    // − 쪽(가로 굵게)은 완만하다.
+    expect(contrastWidthOf(-1)({ x: 1, y: 0 })).toBeCloseTo(1.5, 9)
+    expect(contrastWidthOf(-1)({ x: 0, y: 1 })).toBeCloseTo(0.5, 9)
     const ink = union(polylineToFlatInkGroups(corner, false, 0.2, 'butt', 'miter', undefined, undefined, width))
     expect(ink).toHaveLength(1)
-    // 가로 토막 반폭 0.05, 세로 토막 반폭 0.15.
-    expect(bounds(ink)).toEqual({ left: 0, right: 1.15, top: -0.05, bottom: 1 })
-    // 바깥 모서리 교점(1.15, -0.05)과 안쪽 교점(0.85, 0.05)이 윤곽에 있다.
-    expect(ink[0].outer.some((p) => Math.abs(p.x - 1.15) < 1e-9 && Math.abs(p.y + 0.05) < 1e-9)).toBe(true)
-    expect(ink[0].outer.some((p) => Math.abs(p.x - 0.85) < 1e-9 && Math.abs(p.y - 0.05) < 1e-9)).toBe(true)
+    // 가로 토막 반폭 0.055, 세로 토막 반폭 0.18.
+    expect(bounds(ink)).toEqual({ left: 0, right: 1.18, top: -0.055, bottom: 1 })
+    // 바깥 모서리 교점(1.18, -0.055)과 안쪽 교점(0.82, 0.055)이 윤곽에 있다.
+    expect(ink[0].outer.some((p) => Math.abs(p.x - 1.18) < 1e-9 && Math.abs(p.y + 0.055) < 1e-9)).toBe(true)
+    expect(ink[0].outer.some((p) => Math.abs(p.x - 0.82) < 1e-9 && Math.abs(p.y - 0.055) < 1e-9)).toBe(true)
+    // 곡선 토막은 대비를 절반만 받는다(ㅇ이 뒤틀리지 않게).
+    expect(width({ x: 0, y: 1 }, true)).toBeCloseTo(1.4, 9)
+    expect(width({ x: 1, y: 0 }, true)).toBeCloseTo(0.775, 9)
     // 대비 0이면 전과 점 하나까지 같다.
     const plain = polylineToFlatInkGroups(corner, false, 0.2, 'butt', 'miter')
     expect(polylineToFlatInkGroups(corner, false, 0.2, 'butt', 'miter', undefined, undefined, contrastWidthOf(0))).toEqual(plain)
+  })
+
+  it('안쪽 둥글기는 반폭을 넘어 더 파이고, 이웃 변의 45%에서 멈춘다', () => {
+    const corner = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }]
+    const anchors = new Set([0, 1, 2])
+    const inner = (radius: number) => union(polylineToFlatInkGroups(corner, false, 0.2, 'butt', 'miter', undefined, { radius: 0, innerRadius: radius, anchors }))
+    // 안쪽 교점(0.9, 0.1)에서 물러난 자리: 반지름 0.1이면 0.1, 0.3이면 0.3 → 접점 (0.6, 0.1)과 (0.9, 0.4).
+    const at = (ink: ReturnType<typeof inner>, x: number, y: number) => ink[0].outer.some((p) => Math.abs(p.x - x) < 1e-9 && Math.abs(p.y - y) < 1e-9)
+    expect(at(inner(0.1), 0.8, 0.1)).toBe(true)
+    expect(at(inner(0.3), 0.6, 0.1)).toBe(true)
+    expect(at(inner(0.3), 0.9, 0.4)).toBe(true)
+    // 안쪽 굴림은 오목한 모서리를 메우므로 면적이 는다.
+    expect(area(inner(0.3)[0])).toBeGreaterThan(area(inner(0.1)[0]))
+    // 반지름 3(반폭 30배)이면 이웃 변(안쪽 오프셋 변 0.9 · 0.9)의 45%에서 걸린다: 접점은 0.9 − 0.405.
+    expect(at(inner(3), 0.495, 0.1)).toBe(true)
   })
 })

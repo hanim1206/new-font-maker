@@ -373,7 +373,7 @@ export interface BrushStrokeRenderStyle {
    * 채운 윤곽으로 그린다(화면·OTF 같은 함수). 없거나 0이면 옛 그리기(linecap · linejoin) 그대로. 잉크는 각진 끝의 네모 밖으로 안 나간다.
    */
   roundness?: number
-  /** 안쪽(오목한 꺾임 · 닫힌 획의 구멍) 둥글기. 없으면 `roundness`를 따른다(연결). */
+  /** 안쪽(오목한 꺾임 · 닫힌 획의 구멍) 둥글기. 0 ~ 3(반폭의 배수 — 바깥과 달리 반폭을 넘어 더 파일 수 있다). 없으면 `roundness`를 따른다(연결). */
   innerRoundness?: number
   /** 가로·세로 두께 대비. −1 ~ 1, + 는 세로 굵게 · 가로 얇게. 없거나 0이면 한 굵기. 둥근 붓촉에서만 뜻이 있다. */
   contrast?: number

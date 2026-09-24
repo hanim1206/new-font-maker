@@ -4,6 +4,7 @@ import { immer } from 'zustand/middleware/immer'
 import { persist } from 'zustand/middleware'
 import type { BrushStyle, LayoutType, StrokeLinecap, StrokeLinejoin, StrokeRenderStyle } from '../types'
 import { DEFAULT_STEM_BEAK, normalizeStemBeak, type StemBeakStyle } from '../services/stemBeak'
+import { INNER_ROUNDNESS_MAX } from '../services/flatStrokeGeometry'
 
 export { weightToMultiplier } from '../utils/globalStyleUtils'
 
@@ -136,7 +137,7 @@ export function normalizeStrokeRenderStyle(
   // 전역 둥글기(0~1). 없거나 0이면 키 자체를 안 둔다 — 옛 저장분과 같은 모양.
   const roundness = input?.mode === 'brush' && Number.isFinite(input.roundness) ? Math.max(0, Math.min(1, input.roundness as number)) : 0
   // 안쪽 둥글기는 따로 정했을 때만 키를 둔다. 없으면 바깥을 따른다(연결).
-  const innerRoundness = input?.mode === 'brush' && Number.isFinite(input.innerRoundness) ? Math.max(0, Math.min(1, input.innerRoundness as number)) : undefined
+  const innerRoundness = input?.mode === 'brush' && Number.isFinite(input.innerRoundness) ? Math.max(0, Math.min(INNER_ROUNDNESS_MAX, input.innerRoundness as number)) : undefined
   const contrast = input?.mode === 'brush' && Number.isFinite(input.contrast) ? Math.max(-1, Math.min(1, input.contrast as number)) : 0
   const style: StrokeRenderStyle = { mode: 'brush', brush: normalizeBrushStyle(candidate) }
   if (roundness > 0) style.roundness = roundness

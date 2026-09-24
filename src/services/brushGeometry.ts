@@ -104,16 +104,18 @@ export function flattenStrokeCenterlineWithAnchors(
   stroke: StrokeDataV2,
   box: BoxConfig,
   tolerance = DEFAULT_FLATNESS_TOLERANCE,
-): { points: BrushPoint[]; anchorIndices: Set<number> } {
+): { points: BrushPoint[]; anchorIndices: Set<number>; curvedSegments: Set<number> } {
   let anchors = normalizeClosedStrokePoints(stroke.points, stroke.closed)
   if (stroke.closed && box.width > 0 && box.height > 0) {
     const ratio = box.width / box.height
     if (Math.abs(ratio - 1) > 0.05) anchors = adjustHandlesForAspectRatio(anchors, ratio)
   }
-  if (anchors.length < 2) return { points: [], anchorIndices: new Set() }
+  if (anchors.length < 2) return { points: [], anchorIndices: new Set(), curvedSegments: new Set() }
 
   const output: BrushPoint[] = [toGlyphPoint(anchors[0], box)]
   const rawAnchorIndices = new Set<number>([0])
+  // 곡선(손잡이가 있는 앵커 사이)을 편 토막의 시작 점 번호. 가로·세로 대비가 곡선을 부드럽게 다루려고 쓴다.
+  const rawCurvedStarts = new Set<number>()
   const segmentCount = stroke.closed ? anchors.length : anchors.length - 1
   for (let index = 0; index < segmentCount; index += 1) {
     const from = anchors[index]
@@ -122,11 +124,13 @@ export function flattenStrokeCenterlineWithAnchors(
     const p3 = toGlyphPoint(to, box)
     const out = from.handleOut ? toGlyphPoint(from.handleOut, box) : undefined
     const incoming = to.handleIn ? toGlyphPoint(to.handleIn, box) : undefined
+    const before = output.length
     if (out && incoming) flattenCubic(p0, out, incoming, p3, tolerance, output)
     else if (out || incoming) {
       const cubic = quadraticToCubic(p0, out ?? incoming!, p3)
       flattenCubic(cubic[0], cubic[1], cubic[2], cubic[3], tolerance, output)
     } else output.push(p3)
+    if (out || incoming) for (let i = before - 1; i < output.length - 1; i += 1) rawCurvedStarts.add(i)
     rawAnchorIndices.add(output.length - 1)
   }
 
@@ -134,12 +138,14 @@ export function flattenStrokeCenterlineWithAnchors(
   // 너무 가까운 점을 지우면 자리가 밀린다. 지워진 점이 앵커였으면 바로 앞 점을 앵커로 친다.
   const points: BrushPoint[] = []
   const anchorIndices = new Set<number>()
+  const curvedSegments = new Set<number>()
   output.forEach((current, index) => {
     const keep = index === 0 || Math.hypot(current.x - output[index - 1].x, current.y - output[index - 1].y) > MIN_DISTANCE
     if (keep) points.push(current)
     if (rawAnchorIndices.has(index) && points.length > 0) anchorIndices.add(points.length - 1)
+    if (rawCurvedStarts.has(index) && points.length > 0) curvedSegments.add(points.length - 1)
   })
-  return { points, anchorIndices }
+  return { points, anchorIndices, curvedSegments }
 }
 
 function rotate(source: BrushPoint, radians: number): BrushPoint {

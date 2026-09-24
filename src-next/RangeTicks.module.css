@@ -1,0 +1,7 @@
+.ticks { position: relative; display: block; height: 18px; margin-top: -4px; }
+.ticks i { position: absolute; top: 0; translate: -50% 0; width: 1px; height: 5px; background: rgb(var(--color-border)); font-style: normal; }
+.ticks i[data-major] { height: 7px; background: rgb(var(--color-text-dim-2)); }
+.ticks b { position: absolute; top: 9px; left: 50%; translate: -50% 0; font-size: 9px; font-weight: 600; line-height: 1; color: rgb(var(--color-text-dim-3)); white-space: nowrap; }
+/* 양 끝 눈금의 글씨는 막대 안쪽으로 붙여 잘리지 않게. */
+.ticks i[data-edge='start'] b { left: 0; translate: 0 0; }
+.ticks i[data-edge='end'] b { left: auto; right: 0; translate: 0 0; }

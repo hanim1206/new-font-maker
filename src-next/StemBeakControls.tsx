@@ -2,6 +2,7 @@ import { useRef, type PointerEvent } from 'react'
 import { DEFAULT_STEM_BEAK, STEM_BEAK_SHAPES, stemBeakInkGroups, type StemBeakShape, type StemBeakStyle } from '../src/services/stemBeak'
 import type { StrokeDataV2 } from '../src/types'
 import { endRangeDrag, moveRangeDrag, startRangeDrag } from './rangeDrag'
+import { RangeTicks } from './RangeTicks'
 import styles from './StemBeakControls.module.css'
 
 const UNIT_BOX = { x: 0, y: 0, width: 1, height: 1 }
@@ -58,8 +59,8 @@ export function StemBeakControls({ committed, draft, onDraftChange, onCommit }: 
       ))}
     </div>
     <div className={styles.sliders}>
-      <label><span>크기 <output>{beak.size.toFixed(1)}</output></span><input aria-label="부리 크기" type="range" min={0.5} max={2} step={0.1} value={beak.size} disabled={!beak.enabled} onChange={(event) => preview({ size: Number(event.target.value) })} {...drag('size')} onKeyUp={commit} onBlur={commit} /></label>
-      <label><span>각도 <output>{beak.angle}°</output></span><input aria-label="부리 각도" type="range" min={-60} max={60} step={5} value={beak.angle} disabled={!beak.enabled || beak.shape !== 'angled'} onChange={(event) => preview({ angle: Number(event.target.value) })} {...drag('angle')} onKeyUp={commit} onBlur={commit} /></label>
+      <label><span>크기 <output>{beak.size.toFixed(1)}</output></span><input aria-label="부리 크기" type="range" min={0.5} max={2} step={0.1} value={beak.size} disabled={!beak.enabled} onChange={(event) => preview({ size: Number(event.target.value) })} {...drag('size')} onKeyUp={commit} onBlur={commit} /><RangeTicks min={0.5} max={2} ticks={[{ at: 0.5, text: '0.5' }, { at: 1, text: '1' }, { at: 1.5, text: '1.5' }, { at: 2, text: '2' }]} /></label>
+      <label><span>각도 <output>{beak.angle}°</output></span><input aria-label="부리 각도" type="range" min={-60} max={60} step={5} value={beak.angle} disabled={!beak.enabled || beak.shape !== 'angled'} onChange={(event) => preview({ angle: Number(event.target.value) })} {...drag('angle')} onKeyUp={commit} onBlur={commit} /><RangeTicks min={-60} max={60} ticks={[{ at: -60, text: '−60°' }, { at: -30 }, { at: 0, text: '0°' }, { at: 30 }, { at: 60, text: '60°' }]} /></label>
     </div>
     <button type="button" disabled={isDefault} onClick={() => onCommit(committed, { ...DEFAULT_STEM_BEAK })}>부리 처음 값으로</button>
   </div>

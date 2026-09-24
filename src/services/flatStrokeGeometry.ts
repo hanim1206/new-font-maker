@@ -16,12 +16,16 @@ import type { BrushContour, BrushInkGroup, BrushPoint } from './brushGeometry'
 const EPSILON = 1e-12
 /** 모서리를 굴릴 때 이웃 변의 이 비율보다 깊이 물러나지 않는다. 짧은 변이 통째로 호가 되지 않게. */
 const FILLET_EDGE_LIMIT = 0.45
+/** 안쪽 둥글기의 상한(반폭의 배수). 바깥은 1(끝이 반원)에서 끝나지만 안쪽은 더 크게 파일 수 있다(09-25 사용자). */
+export const INNER_ROUNDNESS_MAX = 3
 
 /**
  * 모서리 굴림 지시. `anchors`는 점 열에서 앵커(꺾임 후보) 자리, `radius`는 glyph 좌표의 호 반지름(바깥 · 볼록한 모서리와 열린 끝).
  * `innerRadius`는 안쪽(오목한 꺾임 · 닫힌 획의 구멍 링) 반지름. 없으면 `radius`와 같다.
  */
 export interface FlatCornerRounding { radius: number; anchors: ReadonlySet<number>; innerRadius?: number }
+/** 토막별 반폭 배율. `curved`는 그 토막이 곡선을 편 것인지. */
+export type FlatWidthOf = (direction: BrushPoint, curved: boolean) => number
 /** SVG stroke-miterlimit 기본값. 이보다 뾰족하면 bevel로 떨어진다. */
 const MITER_LIMIT = 4
 const ROUND_VERTICES = 24
@@ -162,20 +166,21 @@ export function polylineToFlatInkGroups(
   join: StrokeLinejoin,
   roundVertices = ROUND_VERTICES,
   rounding?: FlatCornerRounding,
-  widthOf?: (direction: BrushPoint) => number,
+  widthOf?: FlatWidthOf,
+  curvedSegments?: ReadonlySet<number>,
 ): BrushInkGroup[] {
   if (points.length < 2 || !(thickness > 0)) return []
   const half = thickness / 2
   // 토막마다 반폭. 가로·세로 대비가 있으면 방향에 따라 다르다(`widthOf`는 배율).
-  const halfOf = (direction: BrushPoint | null): number => direction && widthOf ? half * Math.max(0.05, widthOf(direction)) : half
+  const halfOf = (direction: BrushPoint | null, index: number): number => direction && widthOf ? half * Math.max(0.05, widthOf(direction, curvedSegments?.has(index) ?? false)) : half
   let path = points.map((p) => ({ x: p.x, y: p.y }))
   const segmentCount = closed ? path.length : path.length - 1
   const dirs = Array.from({ length: segmentCount }, (_, index) => unit(path[index], path[(index + 1) % path.length]))
   if (!closed && cap === 'square') {
     const first = dirs[0]
     const last = dirs[segmentCount - 1]
-    if (first) path[0] = add(path[0], first, -halfOf(first))
-    if (last) path[path.length - 1] = add(path[path.length - 1], last, halfOf(last))
+    if (first) path[0] = add(path[0], first, -halfOf(first, 0))
+    if (last) path[path.length - 1] = add(path[path.length - 1], last, halfOf(last, segmentCount - 1))
   }
   const kept: number[] = []
   path = path.filter((point, index) => {
@@ -193,7 +198,11 @@ export function polylineToFlatInkGroups(
       : undefined
   const count = closed ? path.length : path.length - 1
   const directions = Array.from({ length: count }, (_, index) => unit(path[index], path[(index + 1) % path.length]))
-  const halves = directions.map(halfOf)
+  // 점을 지웠으면 곡선 토막 번호도 새 번호로 옮긴다.
+  const curvedNow = curvedSegments && kept.length !== points.length
+    ? new Set(kept.map((source, index) => curvedSegments.has(source) ? index : -1).filter((index) => index >= 0))
+    : curvedSegments
+  const halves = directions.map((direction, index) => direction && widthOf ? half * Math.max(0.05, widthOf(direction, curvedNow?.has(index) ?? false)) : half)
   // 급한 굽이 안쪽에서 오프셋 선이 제 몸을 지나 작은 고리가 생기면 잘라낸다.
   const left = removeLoops(offsetSide(path, directions, closed, halves, half, 1, join, roundVertices, cornerRounding), closed)
   const right = removeLoops(offsetSide(path, directions, closed, halves, half, -1, join, roundVertices, cornerRounding), closed)
@@ -420,28 +429,38 @@ export function strokeToFlatInkGroups(
   innerRoundness?: number,
   contrast = 0,
 ): BrushInkGroup[] {
-  const { points, anchorIndices } = flattenStrokeCenterlineWithAnchors(stroke, box)
+  const { points, anchorIndices, curvedSegments } = flattenStrokeCenterlineWithAnchors(stroke, box)
   const thickness = Math.max(stroke.thickness * weightMultiplier, 0.001)
   const inner = innerRoundness ?? roundness
   const rounding = Math.max(roundness, inner) > 0
-    ? { radius: Math.min(1, Math.max(0, roundness)) * thickness / 2, innerRadius: Math.min(1, Math.max(0, inner)) * thickness / 2, anchors: anchorIndices }
+    // 안쪽은 반폭을 넘어서도 굴린다(최대 3배). 이웃 변 길이 한도(45%)에 걸려 자연히 멈춘다.
+    ? { radius: Math.min(1, Math.max(0, roundness)) * thickness / 2, innerRadius: Math.min(INNER_ROUNDNESS_MAX, Math.max(0, inner)) * thickness / 2, anchors: anchorIndices }
     : undefined
-  return polylineToFlatInkGroups(points, stroke.closed, thickness, cap, join, roundVertices, rounding, contrast !== 0 ? contrastWidthOf(contrast) : undefined)
+  return polylineToFlatInkGroups(points, stroke.closed, thickness, cap, join, roundVertices, rounding, contrast !== 0 ? contrastWidthOf(contrast) : undefined, curvedSegments)
 }
 
-/** 가로·세로 대비가 최대(±1)일 때 반폭이 얼마나 벌어지는지. 0.5면 세로 : 가로 = 3 : 1. */
-const CONTRAST_STRENGTH = 0.5
+/** 대비 +1(세로 굵게)에서 세로 반폭이 느는 비율과 가로 반폭이 주는 비율. 1.8 : 0.55 ≈ 3.3 : 1. 세로 굵게 쪽이 훨씬 깊다(09-25 사용자). */
+const CONTRAST_VERTICAL_GAIN = 0.8
+const CONTRAST_HORIZONTAL_LOSS = 0.45
+/** 대비 −1(가로 굵게) 쪽은 완만하다. 막대는 −0.3까지만 연다. */
+const CONTRAST_REVERSE = 0.5
+/** 곡선(ㅇ · ㅎ의 ㅇ · ㅅ의 삐침)은 대비를 이만큼만 받는다. 직선처럼 다 받으면 ㅇ이 붓글씨처럼 뒤틀린다(09-25 사용자). */
+const CONTRAST_ON_CURVES = 0.5
 
 /**
  * 가로·세로 두께 대비의 토막별 배율. `contrast` −1 ~ 1, + 는 세로 굵게 · 가로 얇게.
- * 배율 = 1 − c · 0.5 · cos 2θ (θ는 가로에서 잰 각). 가로 1 − 0.5c, 세로 1 + 0.5c, 45°와 곡선의 중간은 1. 각진 곳 없이 매끈하다.
+ * u = sin²θ(θ는 가로에서 잰 각, 가로 0 · 세로 1)로 세로 배율과 가로 배율 사이를 잇는다 — 45°와 곡선의 중간은 그 사이, 각진 곳 없이 매끈하다.
+ * + 쪽: 세로 1 + 0.8c · 가로 1 − 0.45c. − 쪽: 세로 1 + 0.5c · 가로 1 − 0.5c.
  */
-export function contrastWidthOf(contrast: number): (direction: BrushPoint) => number {
-  const c = Math.max(-1, Math.min(1, contrast)) * CONTRAST_STRENGTH
-  return (direction) => {
+export function contrastWidthOf(contrast: number): FlatWidthOf {
+  const c = Math.max(-1, Math.min(1, contrast))
+  const vertical = c >= 0 ? c * CONTRAST_VERTICAL_GAIN : c * CONTRAST_REVERSE
+  const horizontal = c >= 0 ? -c * CONTRAST_HORIZONTAL_LOSS : -c * CONTRAST_REVERSE
+  return (direction, curved = false) => {
     const length = Math.hypot(direction.x, direction.y)
     if (length <= EPSILON) return 1
-    const sine2 = (direction.y / length) ** 2
-    return 1 - c * (1 - 2 * sine2)
+    const u = (direction.y / length) ** 2
+    const damping = curved ? CONTRAST_ON_CURVES : 1
+    return 1 + (u * vertical + (1 - u) * horizontal) * damping
   }
 }

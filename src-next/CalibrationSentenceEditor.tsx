@@ -78,6 +78,7 @@ import { designBodyPaddingOfSize, paddingToDesignBody } from './designBody'
 import { useFontExportStore } from './fontExportStore'
 import { useGlobalStyleStore, type GlobalStyle } from '../src/stores/globalStyleStore'
 import { BrushStyleTrackpad, type StrokeEnds } from './BrushStyleTrackpad'
+import { RangeTicks } from './RangeTicks'
 import { StemBeakControls } from './StemBeakControls'
 import { designBodySvgTransform, REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../src/services/designBodyPlacement'
 import { endRangeDrag, moveRangeDrag, startRangeDrag } from './rangeDrag'
@@ -1523,8 +1524,11 @@ function DesignBodyShapeControls({ fontSpace }: { fontSpace: { unitsPerEm: numbe
       <div className={styleMode.weightHead}><span>{isReference ? '노토 비율' : isSquare ? '정네모' : shape < 0 ? '길쭉하게' : '납작하게'}</span><output data-testid="style-body-size">{Math.round(body.width)} × {Math.round(body.height)}</output></div>
       <div className={styleMode.shapeRow}>
         <span className={styleMode.shapeIcon} style={{ width: 12, height: 20 }} aria-hidden="true" />
-        <input type="range" min={-BODY_SHAPE_LIMIT} max={BODY_SHAPE_LIMIT} step="1" value={shape} aria-label="네모꼴 모양" data-testid="style-body-shape" onChange={(event) => setShape(Number(event.target.value))}
-          onPointerDown={(event) => setShape(startRangeDrag(event))} onPointerMove={(event) => setShape(moveRangeDrag(event))} onPointerUp={endRangeDrag} onPointerCancel={endRangeDrag} />
+        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <input type="range" min={-BODY_SHAPE_LIMIT} max={BODY_SHAPE_LIMIT} step="1" value={shape} aria-label="네모꼴 모양" data-testid="style-body-shape" onChange={(event) => setShape(Number(event.target.value))}
+            onPointerDown={(event) => setShape(startRangeDrag(event))} onPointerMove={(event) => setShape(moveRangeDrag(event))} onPointerUp={endRangeDrag} onPointerCancel={endRangeDrag} />
+          <RangeTicks min={-BODY_SHAPE_LIMIT} max={BODY_SHAPE_LIMIT} ticks={[{ at: -BODY_SHAPE_LIMIT, text: '길쭉' }, { at: -50 }, { at: 0, text: '정네모' }, { at: 50 }, { at: BODY_SHAPE_LIMIT, text: '납작' }]} />
+        </span>
         <span className={styleMode.shapeIcon} style={{ width: 22, height: 12 }} aria-hidden="true" />
       </div>
     </div>

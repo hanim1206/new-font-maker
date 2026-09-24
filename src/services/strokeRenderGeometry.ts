@@ -8,7 +8,7 @@ import {
   type BrushPoint,
 } from './brushGeometry'
 import { strokeToAngledAreaInkGroups } from './areaStrokeGeometry'
-import { contrastWidthOf, strokeToFlatInkGroups } from './flatStrokeGeometry'
+import { contrastWidthOf, INNER_ROUNDNESS_MAX, strokeToFlatInkGroups } from './flatStrokeGeometry'
 import { strokeToGridSystem2InkGroups } from './gridSystem2Geometry'
 
 /** 획 스타일의 전역 둥글기(0~1). 둥근 붓촉의 brush 모드에서만 뜻이 있고, 그 밖에는 0. */
@@ -22,7 +22,7 @@ export function roundnessOf(style: StrokeRenderStyle | undefined): number {
 export function innerRoundnessOf(style: StrokeRenderStyle | undefined): number {
   if (!style || style.mode !== 'brush' || style.brush.tip !== 'round') return 0
   const value = style.innerRoundness
-  return value !== undefined && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : roundnessOf(style)
+  return value !== undefined && Number.isFinite(value) ? Math.max(0, Math.min(INNER_ROUNDNESS_MAX, value)) : roundnessOf(style)
 }
 
 /** 가로·세로 두께 대비(−1 ~ 1). 둥근 붓촉의 brush 모드에서만 뜻이 있고, 그 밖에는 0. */
@@ -35,7 +35,7 @@ export function contrastOf(style: StrokeRenderStyle | undefined): number {
 /** 세로줄기(기둥)의 굵기 배율. 부리처럼 기둥 폭을 따로 재는 쪽이 대비를 같이 읽게. */
 export function verticalWidthFactorOf(style: StrokeRenderStyle | undefined): number {
   const contrast = contrastOf(style)
-  return contrast === 0 ? 1 : contrastWidthOf(contrast)({ x: 0, y: 1 })
+  return contrast === 0 ? 1 : contrastWidthOf(contrast)({ x: 0, y: 1 }, false)
 }
 
 /** 바깥이든 안쪽이든 둥글기가 있거나 가로·세로 대비가 있는가 — 일자 stroker로 가야 하는 조건. */

@@ -2,6 +2,7 @@ import { useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode
 import { X } from 'lucide-react'
 import type { BrushTip, StrokeLinecap, StrokeLinejoin, StrokeRenderStyle } from '../src/types'
 import { endRangeDrag, moveRangeDrag, startRangeDrag } from './rangeDrag'
+import { RangeTicks, type RangeTick } from './RangeTicks'
 import styles from './CalibrationSentenceEditor.module.css'
 
 const TIP_OPTIONS: Array<{ tip: BrushTip; label: string }> = [
@@ -163,13 +164,14 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
     setActiveValue(null)
     onDraftChange(null)
   }
-  const range = (label: string, value: number, min: number, max: number, step: number, update: (value: number) => StrokeRenderStyle, output: string) => <label className={styles.ruleControl}>
+  const range = (label: string, value: number, min: number, max: number, step: number, update: (value: number) => StrokeRenderStyle, output: string, ticks?: readonly RangeTick[]) => <label className={styles.ruleControl}>
     <span>{label} {activeValue === label && <output>{output}</output>}</span>
     <input type="range" min={min} max={max} step={step} value={value}
       onPointerDown={(event) => { begin(label); const next = startRangeDrag(event); if (next !== null && next !== value) preview(update(next)) }}
       onPointerMove={(event) => { const next = moveRangeDrag(event); if (next !== null && next !== value) preview(update(next)) }}
       onChange={(event) => { begin(label); preview(update(Number(event.target.value))) }} onPointerUp={(event) => { endRangeDrag(event); finish() }} onPointerCancel={(event) => { endRangeDrag(event); cancel() }}
       onKeyDown={(event) => handleRangeKeys(event, label)} onKeyUp={finish} aria-label={label === '납작함' ? '붓촉 납작함' : label} data-testid={label === '바깥 둥글기' ? 'style-roundness' : label === '안쪽 둥글기' ? 'style-inner-roundness' : label === '가로·세로 대비' ? 'style-contrast' : undefined} />
+    {ticks && <RangeTicks min={min} max={max} ticks={ticks} />}
   </label>
   const angle = current.mode === 'angled-area' ? current.cutAngle : current.mode === 'brush' ? current.brush.angle : 0
   const angleLimit = current.mode === 'angled-area' ? 60 : 90
@@ -210,10 +212,12 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
           <span className={styles.brushTipPreview}>{renderPreview(previewStyle)}</span><span className={`${styles.brushTipIcon} ${styles[`brushTipIcon_${tip}`]}`} aria-hidden="true" /><strong>{label}</strong>
         </button>
       })}</div>}
-      {current.brush.tip !== 'round' && <div className={styles.brushControlGrid}>{range('납작함', aspectRatioToFlatness(current.brush.aspectRatio), 0, 100, 1, (value) => ({ ...current, brush: { ...current.brush, aspectRatio: flatnessToAspectRatio(value) } }), `${aspectRatioToFlatness(current.brush.aspectRatio)}%`)}{renderAnglePad()}</div>}
+      {current.brush.tip !== 'round' && <div className={styles.brushControlGrid}>{range('납작함', aspectRatioToFlatness(current.brush.aspectRatio), 0, 100, 5, (value) => ({ ...current, brush: { ...current.brush, aspectRatio: flatnessToAspectRatio(value) } }), `${aspectRatioToFlatness(current.brush.aspectRatio)}%`, [{ at: 0, text: '0' }, { at: 50, text: '50' }, { at: 100, text: '100' }])}{renderAnglePad()}</div>}
       {current.brush.tip === 'round' && productOptions && <div className={styles.brushControlGrid} style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', minHeight: 0 }}>
-        {range('바깥 둥글기', roundnessOf(current), 0, 100, 1, (value) => ({ ...current, roundness: value / 100 }), `${roundnessOf(current)}%`)}
-        {range('안쪽 둥글기', innerRoundnessOf(current), 0, 100, 1, (value) => ({ ...current, innerRoundness: value / 100 }), `${innerRoundnessOf(current)}%`)}
+        {/* 막대는 5 단위로 탁탁 걸린다(09-25 사용자). */}
+        {range('바깥 둥글기', roundnessOf(current), 0, 100, 5, (value) => ({ ...current, roundness: value / 100 }), `${roundnessOf(current)}%`, [{ at: 0 }, { at: 50 }, { at: 100, text: '반원' }])}
+        {/* 안쪽은 반폭을 넘어 300%까지. 100에 눈금(바깥의 끝). */}
+        {range('안쪽 둥글기', innerRoundnessOf(current), 0, 300, 5, (value) => ({ ...current, innerRoundness: value / 100 }), `${innerRoundnessOf(current)}%`, [{ at: 0 }, { at: 100, text: '100' }, { at: 200, text: '200' }, { at: 300, text: '300' }])}
         {/* 안쪽을 따로 정하면 풀린다. `바깥과 같이`로 다시 바깥을 따르게 한다. */}
         {!innerLinked(current) && <button type="button" className={styles.ruleLinkButton} style={{ gridColumn: 'span 2' }} onClick={() => {
           const { innerRoundness: _dropped, ...rest } = current as Extract<StrokeRenderStyle, { mode: 'brush' }>
@@ -221,7 +225,8 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
           preview(rest); onCommit(committed, rest)
         }}>바깥과 같이</button>}
         {/* 가로·세로 두께 대비. 가운데 0이 같은 굵기, 오른쪽은 세로 굵게 · 가로 얇게. */}
-        <div style={{ gridColumn: 'span 2' }}>{range('가로·세로 대비', contrastOf(current), -100, 100, 1, (value) => ({ ...current, contrast: value / 100 }), contrastLabel(contrastOf(current)))}</div>
+        {/* 세로 굵게(+) 쪽이 훨씬 깊다. 가로 굵게(−)는 −30까지만. 0에 눈금. */}
+        <div style={{ gridColumn: 'span 2' }}>{range('가로·세로 대비', contrastOf(current), -30, 100, 5, (value) => ({ ...current, contrast: value / 100 }), contrastLabel(contrastOf(current)), [{ at: -30, text: '가로' }, { at: 0, text: '같음' }, { at: 25 }, { at: 50, text: '세로' }, { at: 75 }, { at: 100, text: '세로 최대' }])}</div>
       </div>}
       {current.brush.tip === 'round' && !productOptions && <p className={styles.roundBrushMessage}>원형은 모든 방향에서 같은 굵기로 그려집니다.</p>}
     </>}
