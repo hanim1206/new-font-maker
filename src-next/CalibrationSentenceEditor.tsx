@@ -1,5 +1,5 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type Ref, type RefObject, type TextareaHTMLAttributes } from 'react'
-import { ArrowLeft, Check, Circle, Copy, CopyPlus, Delete, Dices, Download, LayoutDashboard, Link2, ListTree, LoaderCircle, Plus, Redo2, Settings2, Spline, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
+import { ArrowLeft, Check, Circle, Copy, CopyPlus, Delete, Dices, Download, LayoutDashboard, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, Settings2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
@@ -338,6 +338,22 @@ function addJamoStroke(jamo: JamoData, selectedStrokeId: string, stroke: StrokeD
   if (jamo.horizontalStrokes) return { ...jamo, horizontalStrokes: [...jamo.horizontalStrokes, stroke] }
   if (jamo.verticalStrokes) return { ...jamo, verticalStrokes: [...jamo.verticalStrokes, stroke] }
   return { ...jamo, strokes: [stroke] }
+}
+
+// 복제한 획이 원본과 겹쳐 안 보이지 않게 조금 비켜 놓는다. 핸들도 절대 좌표라 같이 옮긴다.
+const DUPLICATE_OFFSET = .03
+
+function offsetStroke(stroke: StrokeDataV2, id: string, offset: number): StrokeDataV2 {
+  const shift = (point: { x: number; y: number }) => ({ ...point, x: point.x + offset, y: point.y + offset })
+  return {
+    ...structuredClone(stroke),
+    id,
+    points: stroke.points.map((point) => ({
+      ...shift(point),
+      ...(point.handleIn ? { handleIn: shift(point.handleIn) } : {}),
+      ...(point.handleOut ? { handleOut: shift(point.handleOut) } : {}),
+    })),
+  }
 }
 
 function endpointDistance(strokeA: StrokeDataV2, strokeB: StrokeDataV2): number {
@@ -886,6 +902,8 @@ function InferenceTrackpad({
   const [delta, setDelta] = useState<StrokeMoveDelta>({ x: 0, y: 0 })
   const [scale, setScale] = useState<StrokeScale>({ x: 1, y: 1 })
   const [inkGapLimiter, setInkGapLimiter] = useState<CalibrationInkGapViolation | null>(null)
+  // `추가`를 눌러 선 · 원 · 사각을 펼쳤는지. 펼쳐도 도구 칸은 스크롤하지 않는다 — `추가`가 제자리에 있어야 한다.
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
   const selectedJamo = selection.kind === 'stroke' || selection.kind === 'point' || selection.kind === 'handle'
     ? selection.jamo
     : null
@@ -1188,13 +1206,13 @@ function InferenceTrackpad({
     onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId, delta: { x: 0, y: 0 } })
     onSelectionChange({ ...selection, kind: 'stroke', strokeId, jamo: after, pointsOpen: false })
   }
-  // ㅇ·ㅎ의 둥근 획. 지금 자모 상자에 꽉 차는 타원을 닫힌 곡선으로 넣는다(ㅇ 프리셋과 같은 4점 베지어).
-  const addCircle = () => {
+  // 닫힌 도형 획. 원은 ㅇ·ㅎ의 둥근 획(ㅇ 프리셋과 같은 4점 베지어), 사각은 모서리가 곧은 4점. 지금 자모 상자에 꽉 차게 넣는다.
+  const addClosedShape = (shape: 'circle' | 'square') => {
     const selection = creationBase
     if (!selection) return
     const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
     const strokeId = `stroke-${Date.now()}`
-    // ㅇ처럼 이미 상자에 꽉 찬 원이 있으면 똑같이 겹쳐 안 보인다. 같은 크기의 닫힌 획이 있는 동안 가운데로 줄인다.
+    // ㅇ처럼 이미 상자에 꽉 찬 닫힌 획이 있으면 똑같이 겹쳐 안 보인다. 같은 크기의 닫힌 획이 있는 동안 가운데로 줄인다.
     const closedBounds = getJamoStrokes(before).filter((stroke) => stroke.closed).map((stroke) => ({
       minX: Math.min(...stroke.points.map((point) => point.x)),
       maxX: Math.max(...stroke.points.map((point) => point.x)),
@@ -1205,14 +1223,30 @@ function InferenceTrackpad({
       && [bounds.maxX, bounds.maxY].every((value) => Math.abs(value - (.5 + radius)) < .05))
     let radius = .5
     while (overlaps(radius) && radius > .1) radius *= .6
-    const stroke: StrokeDataV2 = {
-      id: strokeId,
-      points: createCirclePath(.5, .5, radius, radius).points,
-      closed: true,
-      thickness: selectedStroke?.thickness ?? .07,
-      label: 'circle',
-    }
+    const stroke: StrokeDataV2 = shape === 'circle'
+      ? {
+        id: strokeId,
+        points: createCirclePath(.5, .5, radius, radius).points,
+        closed: true,
+        thickness: selectedStroke?.thickness ?? .07,
+        label: 'circle',
+      }
+      : {
+        id: strokeId,
+        points: [{ x: .5 - radius, y: .5 - radius }, { x: .5 + radius, y: .5 - radius }, { x: .5 + radius, y: .5 + radius }, { x: .5 - radius, y: .5 + radius }],
+        closed: true,
+        thickness: selectedStroke?.thickness ?? .07,
+      }
     const after = addJamoStroke(before, selection.strokeId, stroke)
+    onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId, delta: { x: 0, y: 0 } })
+    onSelectionChange({ ...selection, kind: 'stroke', strokeId, jamo: after, pointsOpen: false })
+  }
+  // 고른 획을 두께·모양 그대로 하나 더 만들어 조금 비켜 놓고, 새 획을 고른다.
+  const duplicateStroke = () => {
+    if (selection.kind !== 'stroke' || !selectedStroke) return
+    const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
+    const strokeId = `stroke-${Date.now()}`
+    const after = addJamoStroke(before, selectedStroke.id, offsetStroke(selectedStroke, strokeId, DUPLICATE_OFFSET))
     onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId, delta: { x: 0, y: 0 } })
     onSelectionChange({ ...selection, kind: 'stroke', strokeId, jamo: after, pointsOpen: false })
   }
@@ -1305,18 +1339,40 @@ function InferenceTrackpad({
       if (!before.frame) return
       onCommitJamo(before, withoutFrame(before), { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId: selection.strokeId, delta: { x: 0, y: 0 } }, { unframed: true })
     }
-    // 자리가 흔들리지 않게 단추는 늘 같은 일곱 개를 그리고, 못 쓰는 것은 끈다.
-  const strokeTools = (
-    <div className={styles.strokeToolRow} role="toolbar" aria-label="획 편집 도구">
-      <button type="button" onClick={addStroke} disabled={!creationBase} aria-label="선 추가"><Plus size={18} aria-hidden="true" /><span>추가</span></button>
-      <button type="button" onClick={addCircle} disabled={!creationBase} aria-label="원 넣기" data-testid="jamo-stroke-add-circle"><Circle size={18} aria-hidden="true" /><span>원</span></button>
-      <button type="button" onClick={deleteSelection} disabled={!canDelete} aria-label={selection.kind === 'stroke' ? '획 삭제' : '꼭짓점 삭제'}><Trash2 size={18} aria-hidden="true" /><span>삭제</span></button>
-      <button type="button" onClick={toggleCurve} disabled={!onPoint} aria-label={selectedPointHasCurve ? '직선화' : '곡선화'}><Spline size={18} aria-hidden="true" /><span>{selectedPointHasCurve ? '직선' : '곡선'}</span></button>
-      <button type="button" onClick={connectStroke} disabled={!mergeTarget} aria-label="가까운 선 연결"><Link2 size={18} aria-hidden="true" /><span>잇기</span></button>
-      <button type="button" onClick={disconnectStroke} disabled={!canDisconnect} aria-label="선 끊기"><Unlink size={18} aria-hidden="true" /><span>끊기</span></button>
-      <button type="button" onClick={() => onMultiSelectArmedChange(!multiSelectArmed)} disabled={!editable} aria-pressed={multiSelectArmed} aria-label="꼭짓점 여러 개 고르기"><CopyPlus size={18} aria-hidden="true" /><span>여러 점</span></button>
-    </div>
-  )
+    // 첫 칸 `추가`만 늘 같은 자리. 나머지는 지금 고른 것(획 · 점)에 쓰는 단추만 같은 순서로 세운다.
+    // `추가`를 누르면 선 · 원 · 사각이 바로 아래로 펼쳐지고, 하나를 고르거나 다시 누르면 접힌다.
+    const pickAdd = (add: () => void) => {
+      setAddMenuOpen(false)
+      add()
+    }
+    const multiSelectButton = editable && <button type="button" onClick={() => onMultiSelectArmedChange(!multiSelectArmed)} aria-pressed={multiSelectArmed} aria-label="꼭짓점 여러 개 고르기"><CopyPlus size={18} aria-hidden="true" /><span>여러 점</span></button>
+    const deleteButton = canDelete && <button type="button" onClick={deleteSelection} aria-label={selection.kind === 'stroke' ? '획 삭제' : '꼭짓점 삭제'}><Trash2 size={18} aria-hidden="true" /><span>삭제</span></button>
+    const connectButton = mergeTarget && <button type="button" onClick={connectStroke} aria-label="가까운 선 연결"><Link2 size={18} aria-hidden="true" /><span>잇기</span></button>
+    const strokeTools = (
+      <div className={styles.strokeToolRow} role="toolbar" aria-label="획 편집 도구">
+        <button type="button" onClick={() => setAddMenuOpen((open) => !open)} disabled={!creationBase} aria-expanded={addMenuOpen && Boolean(creationBase)} aria-label="획 추가"><Plus size={18} aria-hidden="true" /><span>추가</span></button>
+        {/* 늘 그려 두고 높이만 0 ↔ 제 높이로 굴린다. 글로벌 스타일을 열 때처럼 `추가`는 제자리, 아래 단추만 스르륵 밀려난다. */}
+        {creationBase && <div className={styles.strokeAddMenu} data-open={addMenuOpen} inert={!addMenuOpen}>
+          <div>
+            <button type="button" className={styles.strokeAddItem} onClick={() => pickAdd(addStroke)} aria-label="선 추가"><Minus size={18} aria-hidden="true" /><span>선</span></button>
+            <button type="button" className={styles.strokeAddItem} onClick={() => pickAdd(() => addClosedShape('circle'))} aria-label="원 넣기" data-testid="jamo-stroke-add-circle"><Circle size={18} aria-hidden="true" /><span>원</span></button>
+            <button type="button" className={styles.strokeAddItem} onClick={() => pickAdd(() => addClosedShape('square'))} aria-label="사각 넣기" data-testid="jamo-stroke-add-square"><Square size={18} aria-hidden="true" /><span>사각</span></button>
+          </div>
+        </div>}
+        {selection.kind === 'stroke' && <>
+          <button type="button" onClick={duplicateStroke} aria-label="획 복제" data-testid="jamo-stroke-duplicate"><Copy size={18} aria-hidden="true" /><span>복제</span></button>
+          {deleteButton}
+          {connectButton}
+        </>}
+        {onPoint && <>
+          <button type="button" onClick={toggleCurve} aria-label={selectedPointHasCurve ? '직선화' : '곡선화'}><Spline size={18} aria-hidden="true" /><span>{selectedPointHasCurve ? '직선' : '곡선'}</span></button>
+          {canDisconnect && <button type="button" onClick={disconnectStroke} aria-label="선 끊기"><Unlink size={18} aria-hidden="true" /><span>끊기</span></button>}
+          {connectButton}
+          {deleteButton}
+        </>}
+        {multiSelectButton}
+      </div>
+    )
     return (
       <section className={styles.strokeToolSection} data-testid="jamo-stroke-tools">
         {/* 경고만 한 줄. 알릴 게 없으면 줄을 접는다 — 늘어나고 줄어드는 건 트랙패드라 캔버스는 안 흔들린다. */}

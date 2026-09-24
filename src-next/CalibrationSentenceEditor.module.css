@@ -210,6 +210,12 @@ section.sentence[data-sheet] { flex-basis: var(--sheet-h); height: var(--sheet-h
 .strokeToolRow button:disabled { opacity: .35; }
 /* `추가`에서 펼쳐진 선 · 원 · 사각. 옅은 파랑 바탕으로 `추가` 밑에 딸린 것임을 보인다. */
 .strokeToolRow .strokeAddItem { border-style: dashed; background: rgb(var(--color-primary) / .06); }
+/* 펼침 칸: 높이를 0fr ↔ 1fr로 굴려 아래 단추를 민다(글로벌 스타일 열 때와 같은 속도·곡선). 접힌 동안은 앞 간격까지 먹어 자리가 안 남는다. */
+.strokeAddMenu { grid-column: 1 / -1; display: grid; grid-template-rows: 0fr; margin-top: -6px; opacity: 0; visibility: hidden; transition: grid-template-rows var(--motion-slow) var(--ease-standard), margin-top var(--motion-slow) var(--ease-standard), opacity var(--motion-slow) var(--ease-standard), visibility 0s linear var(--motion-slow); }
+.strokeAddMenu[data-open='true'] { grid-template-rows: 1fr; margin-top: 0; opacity: 1; visibility: visible; transition-delay: 0s; }
+.strokeAddMenu > div { min-height: 0; overflow: hidden; display: grid; grid-template-columns: repeat(2, 48px); grid-auto-rows: minmax(34px, 56px); gap: 6px; }
+.strokeToolSlot .strokeAddMenu > div { display: flex; flex-direction: column; }
+@media (prefers-reduced-motion: reduce) { .strokeAddMenu { transition: none; } }
 .strokeToolRow button[aria-expanded='true'] { border-color: rgb(var(--color-primary)); color: rgb(var(--color-primary)); }
 .strokeTrackpad { flex: 1 1 auto; min-width: 0; height: auto; border-radius: 12px; }
 .strokeToolRow button[aria-pressed='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary) / .12); color: rgb(var(--color-primary)); }

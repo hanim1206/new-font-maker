@@ -78,9 +78,10 @@ test('획 편집 `원` 버튼은 지금 자모 상자에 닫힌 타원 획을 �
   await page.goto('/workspace/jamo?mode=stroke')
   const editor = page.getByRole('region', { name: /완성 글자 편집/ })
   await expect(editor).toBeVisible()
+  const add = page.getByRole('toolbar', { name: '획 편집 도구' }).getByRole('button', { name: '획 추가' })
   const circle = page.getByTestId('jamo-stroke-add-circle')
   // 획을 고르기 전에는 넣을 자모가 없어 꺼져 있다.
-  await expect(circle).toBeDisabled()
+  await expect(add).toBeDisabled()
 
   const focusSvg = editor.locator('svg')
   const strokes = focusSvg.locator('[data-editor-hit="stroke"]')
@@ -89,8 +90,11 @@ test('획 편집 `원` 버튼은 지금 자모 상자에 닫힌 타원 획을 �
   await strokeHit.dispatchEvent('pointerdown')
   const before = await strokes.count()
 
-  await expect(circle).toBeEnabled()
+  // `추가`를 누르면 선 · 원 · 사각이 아래로 펼쳐지고, 고르면 접힌다.
+  await add.click()
+  await expect(add).toHaveAttribute('aria-expanded', 'true')
   await circle.click()
+  await expect(circle).toBeHidden()
   await expect(strokes).toHaveCount(before + 1)
   await expect(focusSvg.locator('[data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(1)
   await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
@@ -114,9 +118,47 @@ test('ㅇ처럼 이미 꽉 찬 원이 있으면 `원`은 가운데로 작게 넣
   const selected = focusSvg.locator('[data-editor-hit="stroke"][data-selected="true"]')
   const original = await selected.boundingBox()
 
+  await page.getByRole('button', { name: '획 추가' }).click()
   await page.getByTestId('jamo-stroke-add-circle').click()
   await expect(selected).toHaveCount(1)
   const added = await selected.boundingBox()
   expect(original && added && added.width < original.width * .9 && added.height < original.height * .9).toBe(true)
   await page.screenshot({ path: 'test-results/stroke-add-circle-ieung.png' })
+})
+
+test('획 편집 `사각`은 닫힌 네 점 획을 넣고, `복제`는 고른 획을 조금 비켜 하나 더 만든다', async ({ page }) => {
+  await page.goto('/workspace/jamo?mode=stroke')
+  const editor = page.getByRole('region', { name: /완성 글자 편집/ })
+  await expect(editor).toBeVisible()
+  const tools = page.getByRole('toolbar', { name: '획 편집 도구' })
+  const focusSvg = editor.locator('svg')
+  const strokes = focusSvg.locator('[data-editor-hit="stroke"]')
+  const selected = focusSvg.locator('[data-editor-hit="stroke"][data-selected="true"]')
+  await strokes.first().dispatchEvent('pointerdown')
+  await strokes.first().dispatchEvent('pointerdown')
+  const before = await strokes.count()
+
+  // 획을 잡으면 복제가 있고, 점에만 쓰는 곡선 · 끊기는 없다.
+  await expect(tools.getByRole('button', { name: '획 복제' })).toBeVisible()
+  await expect(tools.getByRole('button', { name: '곡선화' })).toHaveCount(0)
+  await expect(tools.getByRole('button', { name: '선 끊기' })).toHaveCount(0)
+
+  // 펼쳐도 `추가`는 제자리다. 도구 칸이 스크롤되어 위로 밀리지 않는다.
+  const addButton = tools.getByRole('button', { name: '획 추가' })
+  const addBefore = await addButton.boundingBox()
+  await addButton.click()
+  await expect(page.getByTestId('jamo-stroke-add-square')).toBeVisible()
+  await page.waitForTimeout(400)
+  expect((await addButton.boundingBox())?.y).toBe(addBefore?.y)
+  await page.screenshot({ path: 'test-results/stroke-add-menu-open.png' })
+  await page.getByTestId('jamo-stroke-add-square').click()
+  await expect(strokes).toHaveCount(before + 1)
+  await expect(selected).toHaveCount(1)
+  const square = await selected.boundingBox()
+
+  await tools.getByRole('button', { name: '획 복제' }).click()
+  await expect(strokes).toHaveCount(before + 2)
+  const copy = await selected.boundingBox()
+  expect(square && copy && Math.abs(copy.width - square.width) < 2 && copy.x > square.x && copy.y > square.y).toBe(true)
+  await page.screenshot({ path: 'test-results/stroke-add-square-duplicate.png' })
 })

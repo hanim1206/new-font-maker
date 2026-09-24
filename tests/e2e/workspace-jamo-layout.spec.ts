@@ -374,7 +374,7 @@ test('켠 부품의 획 고치기로 내려가고, 안 끝난 변경이 있으�
   const editor = page.getByRole('region', { name: '멈 완성 글자 편집' })
   await expect(page.getByTestId('jamo-stroke-hint')).toHaveCount(0)
   await expect(page.getByTestId('jamo-stroke-trackpad')).toBeVisible()
-  await expect(page.getByRole('toolbar', { name: '획 편집 도구' }).getByRole('button', { name: '선 추가' })).toBeEnabled()
+  await expect(page.getByRole('toolbar', { name: '획 편집 도구' }).getByRole('button', { name: '획 추가' })).toBeEnabled()
   const strokeHits = editor.locator('svg [data-editor-hit="stroke"]')
   await expect(strokeHits.and(editor.locator('[data-selected="true"]'))).toHaveCount(1)
   // 잠긴 동안 눌리는 획은 첫닿자 ㅁ 것뿐이다. 빈 곳을 눌러도 획은 잡힌 채다.
@@ -449,7 +449,7 @@ test('획 편집은 캔버스에서 꼭짓점을 직접 끌어 옮기고 Undo �
   await openStrokePoints(page)
   await expect.poll(async () => Math.round((await centerOf()).x)).toBe(Math.round(start.x))
   const tools = page.getByRole('toolbar', { name: '획 편집 도구' })
-  await expect(tools.getByRole('button', { name: '선 추가' })).toBeEnabled()
+  await expect(tools.getByRole('button', { name: '획 추가' })).toBeEnabled()
 
   // 점을 잡으면 삭제 · 곡선이 켜지고, `여러 점`을 켜 두면 누르는 점이 더해진다.
   await page.locator('[data-editor-point="hit"]').nth(1).dispatchEvent('pointerdown')
