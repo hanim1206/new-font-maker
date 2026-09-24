@@ -163,4 +163,24 @@ describe('전역 둥글기(roundness)', () => {
     expect(area(rounded[0])).toBeLessThan(area(plain[0]))
     expect(area(rounded[0])).toBeGreaterThan(area(plain[0]) * 0.97)
   })
+
+  it('바깥과 안쪽 둥글기를 따로 준다 — 안쪽 0이면 안 모서리는 각지고, 바깥 0이면 끝과 바깥 모서리는 각진다', () => {
+    const corner = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }]
+    const anchors = new Set([0, 1, 2])
+    const outerOnly = union(polylineToFlatInkGroups(corner, false, 0.2, 'butt', 'miter', undefined, { radius: 0.1, innerRadius: 0, anchors }))
+    // 안쪽 교점(0.9, 0.1)이 그대로 있고 바깥 모서리(1.1, -0.1)는 비었다.
+    expect(outerOnly[0].outer.some((p) => Math.abs(p.x - 0.9) < 1e-9 && Math.abs(p.y - 0.1) < 1e-9)).toBe(true)
+    expect(outerOnly[0].outer.some((p) => Math.abs(p.x - 1.1) < 1e-9 && Math.abs(p.y + 0.1) < 1e-9)).toBe(false)
+    const innerOnly = union(polylineToFlatInkGroups(corner, false, 0.2, 'butt', 'miter', undefined, { radius: 0, innerRadius: 0.1, anchors }))
+    // 바깥 모서리와 끝면 모서리는 그대로, 안쪽 교점만 호로 파였다.
+    expect(bounds(innerOnly)).toEqual({ left: 0, right: 1.1, top: -0.1, bottom: 1 })
+    expect(innerOnly[0].outer.some((p) => Math.abs(p.x - 1.1) < 1e-9 && Math.abs(p.y + 0.1) < 1e-9)).toBe(true)
+    expect(innerOnly[0].outer.some((p) => Math.abs(p.x) < 1e-9 && Math.abs(p.y - 0.1) < 1e-9)).toBe(true)
+    expect(innerOnly[0].outer.some((p) => Math.abs(p.x - 0.9) < 1e-9 && Math.abs(p.y - 0.1) < 1e-9)).toBe(false)
+    // 닫힌 획: 안쪽 0이면 구멍은 각진 사각형 그대로.
+    const square = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }]
+    const ring = union(polylineToFlatInkGroups(square, true, 0.2, 'butt', 'miter', undefined, { radius: 0.1, innerRadius: 0, anchors: new Set([0, 1, 2, 3]) }))
+    expect(ring[0].holes[0]).toHaveLength(4)
+    expect(ring[0].outer.length).toBeGreaterThan(4)
+  })
 })

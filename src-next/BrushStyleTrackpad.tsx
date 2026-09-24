@@ -20,6 +20,9 @@ const END_CHOICES: Array<{ id: 'plain' | 'flat'; label: string; tip: BrushTip }>
 /** 둥글기 막대를 움직이면 저장된 끝 모양은 각진 끝으로 돌아간다 — 둥근 끝 위에 또 굴리지 않는다. */
 const SQUARE_ENDS: StrokeEnds = { linecap: 'butt', linejoin: 'miter' }
 const roundnessOf = (style: StrokeRenderStyle): number => style.mode === 'brush' && style.brush.tip === 'round' ? Math.round((style.roundness ?? 0) * 100) : 0
+/** 안쪽 둥글기(%). 따로 정하지 않았으면 바깥을 따른다(연결). */
+const innerRoundnessOf = (style: StrokeRenderStyle): number => style.mode === 'brush' && style.brush.tip === 'round' && style.innerRoundness !== undefined ? Math.round(style.innerRoundness * 100) : roundnessOf(style)
+const innerLinked = (style: StrokeRenderStyle): boolean => style.mode !== 'brush' || style.innerRoundness === undefined
 const DEFAULTS: Record<StrokeRenderStyle['mode'], StrokeRenderStyle> = {
   brush: { mode: 'brush', brush: { tip: 'round', aspectRatio: 0.5, angle: 0 } },
   'angled-area': { mode: 'angled-area', cutAngle: 35, cornerRadius: 0.2 },
@@ -67,7 +70,7 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
     if (beforeRef.current) {
       const after = latestRef.current
       // 둥글기를 줬는데 저장된 끝 모양이 둥근 끝이면 각진 끝으로 같이 되돌린다(막대가 이긴다). 되돌리기 한 줄에 같이 실린다.
-      const squareEnds = ends && roundnessOf(after) > 0 && (ends.linecap !== 'butt' || ends.linejoin !== 'miter')
+      const squareEnds = ends && Math.max(roundnessOf(after), innerRoundnessOf(after)) > 0 && (ends.linecap !== 'butt' || ends.linejoin !== 'miter')
       onCommit(beforeRef.current, after, squareEnds ? { before: ends, after: SQUARE_ENDS } : undefined)
     }
     beforeRef.current = null
@@ -163,7 +166,7 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
       onPointerDown={(event) => { begin(label); const next = startRangeDrag(event); if (next !== null && next !== value) preview(update(next)) }}
       onPointerMove={(event) => { const next = moveRangeDrag(event); if (next !== null && next !== value) preview(update(next)) }}
       onChange={(event) => { begin(label); preview(update(Number(event.target.value))) }} onPointerUp={(event) => { endRangeDrag(event); finish() }} onPointerCancel={(event) => { endRangeDrag(event); cancel() }}
-      onKeyDown={(event) => handleRangeKeys(event, label)} onKeyUp={finish} aria-label={label === '납작함' ? '붓촉 납작함' : label} data-testid={label === '둥글기' ? 'style-roundness' : undefined} />
+      onKeyDown={(event) => handleRangeKeys(event, label)} onKeyUp={finish} aria-label={label === '납작함' ? '붓촉 납작함' : label} data-testid={label === '바깥 둥글기' ? 'style-roundness' : label === '안쪽 둥글기' ? 'style-inner-roundness' : undefined} />
   </label>
   const angle = current.mode === 'angled-area' ? current.cutAngle : current.mode === 'brush' ? current.brush.angle : 0
   const angleLimit = current.mode === 'angled-area' ? 60 : 90
@@ -204,8 +207,15 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
         </button>
       })}</div>}
       {current.brush.tip !== 'round' && <div className={styles.brushControlGrid}>{range('납작함', aspectRatioToFlatness(current.brush.aspectRatio), 0, 100, 1, (value) => ({ ...current, brush: { ...current.brush, aspectRatio: flatnessToAspectRatio(value) } }), `${aspectRatioToFlatness(current.brush.aspectRatio)}%`)}{renderAnglePad()}</div>}
-      {current.brush.tip === 'round' && productOptions && <div className={styles.brushControlGrid} style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
-        {range('둥글기', roundnessOf(current), 0, 100, 1, (value) => ({ ...current, roundness: value / 100 }), `${roundnessOf(current)}%`)}
+      {current.brush.tip === 'round' && productOptions && <div className={styles.brushControlGrid} style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', minHeight: 0 }}>
+        {range('바깥 둥글기', roundnessOf(current), 0, 100, 1, (value) => ({ ...current, roundness: value / 100 }), `${roundnessOf(current)}%`)}
+        {range('안쪽 둥글기', innerRoundnessOf(current), 0, 100, 1, (value) => ({ ...current, innerRoundness: value / 100 }), `${innerRoundnessOf(current)}%`)}
+        {/* 안쪽을 따로 정하면 풀린다. `바깥과 같이`로 다시 바깥을 따르게 한다. */}
+        {!innerLinked(current) && <button type="button" className={styles.ruleLinkButton} style={{ gridColumn: 'span 2' }} onClick={() => {
+          const { innerRoundness: _dropped, ...rest } = current as Extract<StrokeRenderStyle, { mode: 'brush' }>
+          void _dropped
+          preview(rest); onCommit(committed, rest)
+        }}>바깥과 같이</button>}
       </div>}
       {current.brush.tip === 'round' && !productOptions && <p className={styles.roundBrushMessage}>원형은 모든 방향에서 같은 굵기로 그려집니다.</p>}
     </>}

@@ -35,13 +35,27 @@ test('레이아웃 모드에서도 머리의 입구로 열리고, 닫으면 레�
   await expect(panel.getByRole('radio', { name: '네모형', exact: true })).toHaveCount(0)
   await expect(panel.getByRole('radio', { name: '레거시 스냅 획', exact: true })).toHaveCount(0)
 
-  // 둥글기 막대: 기본 0(각진 끝). 60%로 놓으면 획 스타일에 저장되고, 되돌리기 한 번에 0으로 돌아온다.
+  // 둥글기 막대 둘: 기본 0(각진 끝). 바깥을 60%로 놓으면 안쪽이 따라오고(연결), 획 스타일에 저장되며, 되돌리기 한 번에 0으로 돌아온다.
   const roundness = panel.getByTestId('style-roundness')
+  const inner = panel.getByTestId('style-inner-roundness')
   await expect(roundness).toHaveValue('0')
+  await expect(inner).toHaveValue('0')
   await roundness.fill('60')
   await roundness.dispatchEvent('pointerup', { pointerId: 1 })
+  await expect(inner).toHaveValue('60')
   expect(await storedStyle(page)).toMatchObject({ strokeStyle: { mode: 'brush', roundness: 0.6 }, linecap: 'butt', linejoin: 'miter' })
-  // 둥글기가 있으면 획이 SVG stroke가 아니라 채운 윤곽으로 그려진다(OTF와 같은 함수).
+  expect((await storedStyle(page)).strokeStyle).not.toHaveProperty('innerRoundness')
+  // 안쪽을 따로 놓으면 풀리고, `바깥과 같이`로 다시 연결된다.
+  await inner.fill('20')
+  await inner.dispatchEvent('pointerup', { pointerId: 1 })
+  expect(await storedStyle(page)).toMatchObject({ strokeStyle: { mode: 'brush', roundness: 0.6, innerRoundness: 0.2 } })
+  await panel.getByRole('button', { name: '바깥과 같이' }).click()
+  await expect(inner).toHaveValue('60')
+  expect((await storedStyle(page)).strokeStyle).not.toHaveProperty('innerRoundness')
+  // 되돌리기 둘(같이 · 안쪽 20) → 바깥 60만 남는다. 둥글기가 있으면 획이 SVG stroke가 아니라 채운 윤곽으로 그려진다(OTF와 같은 함수).
+  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
+  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
+  await expect(roundness).toHaveValue('60')
   const canvas = page.getByTestId('focus-canvas').locator('svg')
   await expect(canvas.locator('path[fill="none"][stroke-linecap]')).toHaveCount(0)
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()

@@ -373,6 +373,8 @@ export interface BrushStrokeRenderStyle {
    * 채운 윤곽으로 그린다(화면·OTF 같은 함수). 없거나 0이면 옛 그리기(linecap · linejoin) 그대로. 잉크는 각진 끝의 네모 밖으로 안 나간다.
    */
   roundness?: number
+  /** 안쪽(오목한 꺾임 · 닫힌 획의 구멍) 둥글기. 없으면 `roundness`를 따른다(연결). */
+  innerRoundness?: number
 }
 
 export interface AngledAreaStrokeRenderStyle {

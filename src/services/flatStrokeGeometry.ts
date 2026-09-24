@@ -17,8 +17,11 @@ const EPSILON = 1e-12
 /** 모서리를 굴릴 때 이웃 변의 이 비율보다 깊이 물러나지 않는다. 짧은 변이 통째로 호가 되지 않게. */
 const FILLET_EDGE_LIMIT = 0.45
 
-/** 모서리 굴림 지시. `anchors`는 점 열에서 앵커(꺾임 후보) 자리, `radius`는 glyph 좌표의 호 반지름. */
-export interface FlatCornerRounding { radius: number; anchors: ReadonlySet<number> }
+/**
+ * 모서리 굴림 지시. `anchors`는 점 열에서 앵커(꺾임 후보) 자리, `radius`는 glyph 좌표의 호 반지름(바깥 · 볼록한 모서리와 열린 끝).
+ * `innerRadius`는 안쪽(오목한 꺾임 · 닫힌 획의 구멍 링) 반지름. 없으면 `radius`와 같다.
+ */
+export interface FlatCornerRounding { radius: number; anchors: ReadonlySet<number>; innerRadius?: number }
 /** SVG stroke-miterlimit 기본값. 이보다 뾰족하면 bevel로 떨어진다. */
 const MITER_LIMIT = 4
 const ROUND_VERTICES = 24
@@ -64,7 +67,7 @@ function offsetSide(points: readonly BrushPoint[], dirs: readonly (BrushPoint | 
     const cosine = nA.x * nB.x + nA.y * nB.y
     return 1 + cosine > EPSILON ? add(vertex, { x: nA.x + nB.x, y: nA.y + nB.y }, half * sign / (1 + cosine)) : add(vertex, nA, half * sign)
   }
-  const corners = rounding && rounding.radius > EPSILON ? points.map((_, index) => cornerOf(index)) : []
+  const corners = rounding && Math.max(rounding.radius, rounding.innerRadius ?? 0) > EPSILON ? points.map((_, index) => cornerOf(index)) : []
   const edgeLimit = (index: number, miter: BrushPoint): number => {
     const previous = corners[(index - 1 + count) % count], next = corners[(index + 1) % count]
     const toPrevious = previous ? Math.hypot(miter.x - previous.x, miter.y - previous.y) : Infinity
@@ -91,10 +94,11 @@ function offsetSide(points: readonly BrushPoint[], dirs: readonly (BrushPoint | 
     const miter = miterable ? add(vertex, { x: nA.x + nB.x, y: nA.y + nB.y }, half * sign / (1 + cosine)) : null
     // 앵커 꺾임의 굴림: 안팎 모두 두 오프셋 선의 교점(miter)에서 양쪽으로 d만큼 물러나 반지름 r의 호로 잇는다.
     // d = r·tan(θ/2). 이웃 변이 짧으면 d를 줄이고 r도 그에 맞춘다(호는 늘 두 변에 접한다).
-    if (rounding && rounding.radius > EPSILON && rounding.anchors.has(index) && miter) {
+    const cornerRadius = rounding ? (outer ? rounding.radius : rounding.innerRadius ?? rounding.radius) : 0
+    if (rounding && cornerRadius > EPSILON && rounding.anchors.has(index) && miter) {
       const tanHalf = Math.sqrt(Math.max(0, (1 - cosine) / (1 + cosine)))
       if (tanHalf > EPSILON) {
-        const d = Math.min(rounding.radius * tanHalf, edgeLimit(index, miter))
+        const d = Math.min(cornerRadius * tanHalf, edgeLimit(index, miter))
         const r = d / tanHalf
         if (d > EPSILON) {
           const t1 = add(miter, incoming, -d)
@@ -158,10 +162,11 @@ export function polylineToFlatInkGroups(
   })
   if (path.length < 2) return []
   // 점을 지웠으면 앵커 자리를 새 번호로 옮긴다.
-  const cornerRounding = rounding && rounding.radius > EPSILON && kept.length === points.length
+  const rounds = !!rounding && Math.max(rounding.radius, rounding.innerRadius ?? 0) > EPSILON
+  const cornerRounding = rounds && kept.length === points.length
     ? rounding
-    : rounding && rounding.radius > EPSILON
-      ? { radius: rounding.radius, anchors: new Set(kept.map((source, index) => rounding.anchors.has(source) ? index : -1).filter((index) => index >= 0)) }
+    : rounds
+      ? { ...rounding, anchors: new Set(kept.map((source, index) => rounding.anchors.has(source) ? index : -1).filter((index) => index >= 0)) }
       : undefined
   const count = closed ? path.length : path.length - 1
   const directions = Array.from({ length: count }, (_, index) => unit(path[index], path[(index + 1) % path.length]))
@@ -178,7 +183,7 @@ export function polylineToFlatInkGroups(
   // 반원은 바깥으로 돈다: 끝에서는 +n → dir → −n, 시작에서는 −n → −dir → +n.
   const endArc = cap === 'round' ? roundCap(path[path.length - 1], endDir, half, roundVertices) : []
   const startArc = cap === 'round' ? roundCap(path[0], { x: -startDir.x, y: -startDir.y }, half, roundVertices) : []
-  if (cornerRounding && cap === 'butt') {
+  if (cornerRounding && cornerRounding.radius > EPSILON && cap === 'butt') {
     // 끝면 네 모서리 굴림. 반지름은 반폭과 끝 앵커 구간(마지막 앵커 → 끝)의 길이에 걸린다 — 반폭이면 두 호가 중심선에서 만나 반원.
     // 옆면은 곡선일 수 있어 직선 토막이 아니라 호 길이로 되짚어 자르고, 그 자리의 접선과 끝면을 잇는 3차 곡선으로 굴린다.
     const end = path[path.length - 1], start = path[0]
@@ -372,7 +377,10 @@ function roundSideEnd(side: BrushPoint[], atEnd: boolean, tip: BrushPoint, sideD
   else side.splice(0, index + 1, ...curve.reverse())
 }
 
-/** 획 데이터 → 일자 끝 면. brushGeometry의 tip 방식과 같은 좌표계(glyph-normalized). `roundness`(0~1)는 모서리를 `둥글기 × 반폭`으로 굴린다. */
+/**
+ * 획 데이터 → 일자 끝 면. brushGeometry의 tip 방식과 같은 좌표계(glyph-normalized).
+ * `roundness`(0~1)는 바깥 모서리와 끝을, `innerRoundness`는 안쪽 모서리를 `둥글기 × 반폭`으로 굴린다. 안쪽이 없으면 바깥을 따른다.
+ */
 export function strokeToFlatInkGroups(
   stroke: StrokeDataV2,
   box: BoxConfig,
@@ -381,9 +389,13 @@ export function strokeToFlatInkGroups(
   join: StrokeLinejoin,
   roundVertices?: number,
   roundness = 0,
+  innerRoundness?: number,
 ): BrushInkGroup[] {
   const { points, anchorIndices } = flattenStrokeCenterlineWithAnchors(stroke, box)
   const thickness = Math.max(stroke.thickness * weightMultiplier, 0.001)
-  const rounding = roundness > 0 ? { radius: Math.min(1, roundness) * thickness / 2, anchors: anchorIndices } : undefined
+  const inner = innerRoundness ?? roundness
+  const rounding = Math.max(roundness, inner) > 0
+    ? { radius: Math.min(1, Math.max(0, roundness)) * thickness / 2, innerRadius: Math.min(1, Math.max(0, inner)) * thickness / 2, anchors: anchorIndices }
+    : undefined
   return polylineToFlatInkGroups(points, stroke.closed, thickness, cap, join, roundVertices, rounding)
 }

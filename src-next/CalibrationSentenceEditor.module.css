@@ -161,6 +161,7 @@ section.sentence[data-sheet] { flex-basis: var(--sheet-h); height: var(--sheet-h
 .ruleControl > span { display: flex; justify-content: space-between; color: rgb(var(--color-text-dim-2)); font-size: 10px; font-weight: 700; }
 .ruleControl output { color: rgb(var(--color-primary-dark)); font-family: ui-monospace, monospace; }
 .ruleControl input { width: 100%; accent-color: rgb(var(--color-primary)); }
+.ruleLinkButton { min-height: 24px; padding: 0 8px; border: 1px solid rgb(var(--color-border-subtle)); border-radius: 8px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-2)); font-size: 10px; font-weight: 700; }
 .dotControlGrid { min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; overflow-y: auto; }
 .dotControlGrid .ruleControl { min-height: 46px; padding-block: 5px; gap: 4px; }
 .ruleToggle { min-height: 34px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid rgb(var(--color-border-subtle)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-2)); font-size: 10px; font-weight: 700; }
@@ -204,9 +205,12 @@ section.sentence[data-sheet] { flex-basis: var(--sheet-h); height: var(--sheet-h
 .editor[data-chrome='workspace'][data-stroke-tools] { flex: 0 0 auto; }
 .strokeToolSection { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px 16px 10px; border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
 .strokeWorkRow { flex: 1 1 auto; min-height: 0; display: flex; gap: 6px; }
-.strokeToolRow { flex: 0 0 auto; display: grid; grid-template-columns: repeat(2, 48px); grid-template-rows: repeat(4, minmax(34px, 56px)); align-content: start; gap: 6px; }
+.strokeToolRow { flex: 0 0 auto; display: grid; grid-template-columns: repeat(2, 48px); grid-auto-rows: minmax(34px, 56px); align-content: start; gap: 6px; }
 .strokeToolRow button { min-height: 34px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 10px; font-weight: 650; }
 .strokeToolRow button:disabled { opacity: .35; }
+/* `추가`에서 펼쳐진 선 · 원 · 사각. 옅은 파랑 바탕으로 `추가` 밑에 딸린 것임을 보인다. */
+.strokeToolRow .strokeAddItem { border-style: dashed; background: rgb(var(--color-primary) / .06); }
+.strokeToolRow button[aria-expanded='true'] { border-color: rgb(var(--color-primary)); color: rgb(var(--color-primary)); }
 .strokeTrackpad { flex: 1 1 auto; min-width: 0; height: auto; border-radius: 12px; }
 .strokeToolRow button[aria-pressed='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary) / .12); color: rgb(var(--color-primary)); }
 /* 캔버스 왼쪽 도구 줄. `contain: size`로 제 높이를 안 내세워 캔버스 높이만큼만 보이고, 넘치는 단추는 한 칸씩 스냅으로 넘긴다(관성으로 여러 칸 튀지 않게 `always`). 위아래 끝은 흐려서 더 있다는 걸 알린다. */

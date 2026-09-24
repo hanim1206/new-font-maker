@@ -18,9 +18,21 @@ export function roundnessOf(style: StrokeRenderStyle | undefined): number {
   return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0
 }
 
+/** 안쪽(오목한 꺾임 · 구멍) 둥글기. 따로 없으면 바깥을 따른다. */
+export function innerRoundnessOf(style: StrokeRenderStyle | undefined): number {
+  if (!style || style.mode !== 'brush' || style.brush.tip !== 'round') return 0
+  const value = style.innerRoundness
+  return value !== undefined && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : roundnessOf(style)
+}
+
+/** 바깥이든 안쪽이든 둥글기가 있는가. */
+export function hasRoundness(style: StrokeRenderStyle | undefined): boolean {
+  return roundnessOf(style) > 0 || innerRoundnessOf(style) > 0
+}
+
 /** 둥근 붓촉인데 둥글기가 있으면 SVG stroke 대신 채운 윤곽으로 그려야 한다(화면 · OTF 공통 분기). */
 export function needsFilledRenderInk(style: StrokeRenderStyle | undefined): boolean {
-  return !!style && (style.mode !== 'brush' || style.brush.tip !== 'round' || roundnessOf(style) > 0)
+  return !!style && (style.mode !== 'brush' || style.brush.tip !== 'round' || hasRoundness(style))
 }
 
 const DOT_VERTICES = 16
@@ -106,9 +118,9 @@ export function strokeToRenderInkGroups(
   if (style.mode === 'angled-area') return strokeToAngledAreaInkGroups(stroke, box, weightMultiplier, style)
   if (style.mode === 'dot-pattern') return strokeToDotPatternInkGroups(stroke, box, weightMultiplier, style)
   if (style.mode === 'legacy-snapped-centerline') return strokeToGridSystem2InkGroups(stroke, box, weightMultiplier)
-  if (style.brush.tip === 'round' && roundnessOf(style) > 0) {
+  if (style.brush.tip === 'round' && hasRoundness(style)) {
     // 전역 둥글기: 각진 끝(butt · miter) 윤곽의 모서리를 굴린다. 저장된 linecap · linejoin은 안 본다.
-    return strokeToFlatInkGroups(stroke, box, weightMultiplier, 'butt', 'miter', options?.ellipseVertexCount, roundnessOf(style))
+    return strokeToFlatInkGroups(stroke, box, weightMultiplier, 'butt', 'miter', options?.ellipseVertexCount, roundnessOf(style), innerRoundnessOf(style))
   }
   if (style.brush.tip === 'round') {
     const centerline = flattenStrokeCenterline(stroke, box)
