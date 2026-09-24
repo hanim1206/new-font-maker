@@ -63,7 +63,7 @@ import {
 import { createSampleGlyphEdit } from './editInference'
 import { createCalibrationAnalysisSnapshot } from './calibrationAnalysisSnapshot'
 import { StrokeToolRail } from '../src/features/mobile-editor/StrokeToolRail'
-import { CALIBRATION_FREEFORM_BOUNDS } from './calibrationEditPolicy'
+import { CALIBRATION_FREEFORM_BOUNDS, calibrationEditBounds } from './calibrationEditPolicy'
 import { findMaximumSafeEditFactor, getMinimumInterComponentInkGap } from './inkGapGuard'
 import {
   findJamoInkGapViolation,
@@ -751,14 +751,31 @@ function InferenceTrackpad({
     setInkGapLimiter(violation)
     onInkGapLimitChange(violation)
   }
+  // 가로는 글자 칸 끝에서 멈춘다. 넘기면 그리는 단계가 자모 전체를 반대쪽으로 밀어 넣는다.
+  const editBounds = (source: JamoData) => selection.kind === 'none' || selection.kind === 'component'
+    ? CALIBRATION_FREEFORM_BOUNDS
+    : calibrationEditBounds(selection.box, getJamoStrokes(source), weightToMultiplier(useGlobalStyleStore.getState().style.weight))
   const moveSelectedPoints = (source: JamoData, requested: StrokeMoveDelta) => {
     if (selection.kind !== 'point' || selectedPoints.length < 2) {
       return selection.kind === 'point'
-        ? movePoint(source, selection.strokeId, selection.pointIndex, requested, CALIBRATION_FREEFORM_BOUNDS, moveGridStep())
+        ? movePoint(source, selection.strokeId, selection.pointIndex, requested, editBounds(source), moveGridStep())
         : null
     }
     const first = selectedPoints[0]
-    const firstResult = movePoint(source, first.strokeId, first.pointIndex, requested, CALIBRATION_FREEFORM_BOUNDS, moveGridStep())
+    // 첫 점의 경계를 좁혀, 가장 바깥 점이 칸 끝에 닿으면 다 같이 멈춘다.
+    const strokes = getJamoStrokes(source)
+    const xs = selectedPoints.flatMap((point) => {
+      const found = strokes.find((stroke) => stroke.id === point.strokeId)?.points[point.pointIndex]
+      return found ? [found.x] : []
+    })
+    const firstX = strokes.find((stroke) => stroke.id === first.strokeId)?.points[first.pointIndex]?.x
+    const bounds = editBounds(source)
+    const groupBounds = firstX === undefined || !xs.length ? bounds : {
+      ...bounds,
+      minX: Math.min(firstX, bounds.minX + firstX - Math.min(...xs)),
+      maxX: Math.max(firstX, bounds.maxX - (Math.max(...xs) - firstX)),
+    }
+    const firstResult = movePoint(source, first.strokeId, first.pointIndex, requested, groupBounds, moveGridStep())
     let jamo = firstResult.jamo
     for (const point of selectedPoints.slice(1)) {
       jamo = movePoint(jamo, point.strokeId, point.pointIndex, firstResult.delta, CALIBRATION_FREEFORM_BOUNDS).jamo
@@ -827,11 +844,11 @@ function InferenceTrackpad({
       const createCandidate = (factor: number) => {
         const movementAtFactor = { x: normalized.x * factor, y: normalized.y * factor }
         const moved = selection.kind === 'stroke'
-          ? moveStroke(startJamo.current!, selection.strokeId, movementAtFactor, CALIBRATION_FREEFORM_BOUNDS, moveGridStep())
+          ? moveStroke(startJamo.current!, selection.strokeId, movementAtFactor, editBounds(startJamo.current!), moveGridStep())
           : selection.kind === 'point'
             ? moveSelectedPoints(startJamo.current!, movementAtFactor)
             : selection.kind === 'handle'
-              ? moveHandle(startJamo.current!, selection.strokeId, selection.pointIndex, selection.handle, movementAtFactor, CALIBRATION_FREEFORM_BOUNDS, moveGridStep())
+              ? moveHandle(startJamo.current!, selection.strokeId, selection.pointIndex, selection.handle, movementAtFactor, editBounds(startJamo.current!), moveGridStep())
               : null
         return moved && frameForEdit ? { ...moved, jamo: frameForEdit(moved.jamo) } : moved
       }
@@ -897,7 +914,7 @@ function InferenceTrackpad({
         x: 1 + (nextScale.x - 1) * factor,
         y: 1 + (nextScale.y - 1) * factor,
       })
-      const createCandidate = (factor: number) => scaleStroke(startJamo.current!, selection.strokeId, scaleAtFactor(factor), CALIBRATION_FREEFORM_BOUNDS)
+      const createCandidate = (factor: number) => scaleStroke(startJamo.current!, selection.strokeId, scaleAtFactor(factor), editBounds(startJamo.current!))
       const safeFactor = findMaximumSafeEditFactor((factor) => !jamoInkGapViolation(createCandidate(factor).jamo))
       const result = createCandidate(safeFactor)
       currentJamo.current = result.jamo

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { JamoData } from '../src/types'
 import { moveHandle, movePoint, moveStroke, scaleStroke } from '../src/services/editorCommands'
-import { CALIBRATION_FREEFORM_BOUNDS } from './calibrationEditPolicy'
+import { CALIBRATION_FREEFORM_BOUNDS, calibrationEditBounds } from './calibrationEditPolicy'
 
 const jamo: JamoData = {
   char: 'ㅏ',
@@ -46,5 +46,30 @@ describe('신규 보정 화면 자유 편집 경계', () => {
     )
     expect(constrained.changed).toBe(false)
     expect(constrained.jamo.strokes?.[0].points[1]).toMatchObject({ x: 1, y: 1 })
+  })
+})
+
+describe('글자 칸 가로 끝 경계', () => {
+  const box = { x: 0.1, y: 0.1, width: 0.4, height: 0.4 }
+  const strokes = jamo.strokes ?? []
+
+  it('점을 칸 왼쪽 밖으로 끌면 칸 끝(두께 절반 안쪽)에서 멈추고 다른 점은 그대로다', () => {
+    const bounds = calibrationEditBounds(box, strokes)
+    const moved = movePoint(jamo, 'ㅏ-1', 0, { x: -2, y: 0 }, bounds)
+    const [first, second] = moved.jamo.strokes?.[0].points ?? []
+    expect(box.x + first.x * box.width).toBeCloseTo(0.035)
+    expect(second).toMatchObject({ x: 1, y: 1 })
+  })
+
+  it('세로는 막지 않고, 이미 칸 밖에 있는 점은 그 자리까지 허용한다', () => {
+    const outside: JamoData = { ...jamo, strokes: [{ ...strokes[0], points: [{ x: -1, y: 0 }, { x: 1, y: 1 }] }] }
+    const bounds = calibrationEditBounds(box, outside.strokes ?? [])
+    expect(bounds.minX).toBe(-1)
+    expect(bounds.minY).toBe(Number.NEGATIVE_INFINITY)
+  })
+
+  it('굵기 배율만큼 끝이 더 안쪽이다', () => {
+    const heavy = calibrationEditBounds(box, strokes, 2)
+    expect(box.x + heavy.minX * box.width).toBeCloseTo(0.07)
   })
 })
