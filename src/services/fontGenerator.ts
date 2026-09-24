@@ -27,7 +27,7 @@ import { useGlobalStyleStore } from '../stores/globalStyleStore'
 import type { GlyphData, GlyphPlacementResolver } from './fontExportUtils'
 import { mergeStrokeContourGroupsForCff } from './contourBoolean'
 import { brushInkGroupsToFontContours, strokeToBrushInkGroups } from './brushGeometry'
-import { needsFilledRenderInk, strokeToRenderInkGroups } from './strokeRenderGeometry'
+import { needsFilledRenderInk, strokeToRenderInkGroups, verticalWidthFactorOf } from './strokeRenderGeometry'
 import { stemBeakInkGroups } from './stemBeak'
 import type { DeepReadonly } from '../types'
 import type { FinalGlyphInk } from './finalGlyphInk'
@@ -363,7 +363,8 @@ export function glyphDataToFontContours(glyphData: GlyphData): Contour[] {
   const beakGroups = stemBeakInkGroups(glyphData.strokes.map((resolved, index) => ({
     stroke: resolved.stroke,
     box: resolved.box,
-    weightMultiplier: glyphData.weightMultiplier,
+    // 부리는 기둥 폭에 맞춘다(화면과 같이 가로·세로 대비를 읽는다).
+    weightMultiplier: glyphData.weightMultiplier * verticalWidthFactorOf(glyphData.strokeStyle),
     group: resolved.beakGroup ?? `stroke-${index}`,
   })), glyphData.stemBeak, glyphData.strokeStyle)
   contourGroups.push(...brushInkGroupsToFontContours(beakGroups.flat(), UPM, ASCENDER, glyphData.slant))

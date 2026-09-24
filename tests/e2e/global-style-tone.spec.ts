@@ -52,6 +52,15 @@ test('레이아웃 모드에서도 머리의 입구로 열리고, 닫으면 레�
   await panel.getByRole('button', { name: '바깥과 같이' }).click()
   await expect(inner).toHaveValue('60')
   expect((await storedStyle(page)).strokeStyle).not.toHaveProperty('innerRoundness')
+  // 가로·세로 대비 막대: 0이 같은 굵기. +40이면 저장되고 되돌리기 한 번에 0.
+  const contrast = panel.getByTestId('style-contrast')
+  await expect(contrast).toHaveValue('0')
+  await contrast.fill('40')
+  await contrast.dispatchEvent('pointerup', { pointerId: 1 })
+  expect(await storedStyle(page)).toMatchObject({ strokeStyle: { mode: 'brush', contrast: 0.4 } })
+  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
+  await expect(contrast).toHaveValue('0')
+  expect((await storedStyle(page)).strokeStyle).not.toHaveProperty('contrast')
   // 되돌리기 둘(같이 · 안쪽 20) → 바깥 60만 남는다. 둥글기가 있으면 획이 SVG stroke가 아니라 채운 윤곽으로 그려진다(OTF와 같은 함수).
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()

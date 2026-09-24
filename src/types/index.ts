@@ -375,6 +375,8 @@ export interface BrushStrokeRenderStyle {
   roundness?: number
   /** 안쪽(오목한 꺾임 · 닫힌 획의 구멍) 둥글기. 없으면 `roundness`를 따른다(연결). */
   innerRoundness?: number
+  /** 가로·세로 두께 대비. −1 ~ 1, + 는 세로 굵게 · 가로 얇게. 없거나 0이면 한 굵기. 둥근 붓촉에서만 뜻이 있다. */
+  contrast?: number
 }
 
 export interface AngledAreaStrokeRenderStyle {

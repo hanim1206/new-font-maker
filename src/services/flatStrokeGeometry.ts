@@ -53,19 +53,38 @@ function arc(center: BrushPoint, from: BrushPoint, to: BrushPoint, radius: numbe
  * 한쪽(sign) 오프셋 점 열. 꺾임마다 바깥이면 조인 규칙, 안쪽이면 두 오프셋 선의 교점.
  * 열린 선의 양 끝은 캡이 따로 처리하므로 끝점의 수직 오프셋만 둔다.
  */
-function offsetSide(points: readonly BrushPoint[], dirs: readonly (BrushPoint | null)[], closed: boolean, half: number, sign: number, join: StrokeLinejoin, vertices: number, rounding?: FlatCornerRounding): BrushPoint[] {
+/**
+ * 두 오프셋 선(들어오는 토막을 hIn만큼, 나가는 토막을 hOut만큼 민 선)의 교점. 폭이 같으면 옛 식(점 하나까지 같게), 다르면 직선 교점.
+ * 거의 반대 방향(교점이 없음)이면 null.
+ */
+function miterOf(vertex: BrushPoint, incoming: BrushPoint, outgoing: BrushPoint, hIn: number, hOut: number, sign: number): BrushPoint | null {
+  const nA = normalOf(incoming), nB = normalOf(outgoing)
+  const cosine = nA.x * nB.x + nA.y * nB.y
+  if (1 + cosine <= EPSILON) return null
+  if (Math.abs(hIn - hOut) <= EPSILON) return add(vertex, { x: nA.x + nB.x, y: nA.y + nB.y }, hIn * sign / (1 + cosine))
+  const a = add(vertex, nA, hIn * sign), b = add(vertex, nB, hOut * sign)
+  const denominator = incoming.x * outgoing.y - incoming.y * outgoing.x
+  if (Math.abs(denominator) <= 1e-12) return a
+  const t = ((b.x - a.x) * outgoing.y - (b.y - a.y) * outgoing.x) / denominator
+  return add(a, incoming, t)
+}
+
+/**
+ * `halves`는 토막마다의 반폭(가로·세로 대비가 있으면 다르다). `baseHalf`는 대비 없는 반폭 — 굴림 반지름의 기준.
+ */
+function offsetSide(points: readonly BrushPoint[], dirs: readonly (BrushPoint | null)[], closed: boolean, halves: readonly number[], baseHalf: number, sign: number, join: StrokeLinejoin, vertices: number, rounding?: FlatCornerRounding): BrushPoint[] {
   const count = points.length
   const out: BrushPoint[] = []
+  const halfIn = (index: number) => halves[(index - 1 + count) % count]
+  const halfOut = (index: number) => halves[index % count]
   // 굴림의 물러남 한도는 중심선이 아니라 이 쪽 오프셋 변(교점 → 교점)의 길이로 잰다. 안쪽 변은 중심선보다 짧아서 중심선으로 재면 이웃 굴림과 겹친다.
   const cornerOf = (index: number): BrushPoint | null => {
     const vertex = points[index]
     const incoming = closed || index > 0 ? dirs[(index - 1 + count) % count] : null
     const outgoing = closed || index < count - 1 ? dirs[index % count] : null
     if (!incoming && !outgoing) return null
-    if (!incoming || !outgoing) return add(vertex, normalOf(incoming ?? outgoing!), half * sign)
-    const nA = normalOf(incoming), nB = normalOf(outgoing)
-    const cosine = nA.x * nB.x + nA.y * nB.y
-    return 1 + cosine > EPSILON ? add(vertex, { x: nA.x + nB.x, y: nA.y + nB.y }, half * sign / (1 + cosine)) : add(vertex, nA, half * sign)
+    if (!incoming || !outgoing) return add(vertex, normalOf(incoming ?? outgoing!), (incoming ? halfIn(index) : halfOut(index)) * sign)
+    return miterOf(vertex, incoming, outgoing, halfIn(index), halfOut(index), sign) ?? add(vertex, normalOf(incoming), halfIn(index) * sign)
   }
   const corners = rounding && Math.max(rounding.radius, rounding.innerRadius ?? 0) > EPSILON ? points.map((_, index) => cornerOf(index)) : []
   const edgeLimit = (index: number, miter: BrushPoint): number => {
@@ -79,22 +98,23 @@ function offsetSide(points: readonly BrushPoint[], dirs: readonly (BrushPoint | 
     const incoming = closed || index > 0 ? dirs[(index - 1 + count) % count] : null
     const outgoing = closed || index < count - 1 ? dirs[index % count] : null
     if (!incoming && !outgoing) continue
-    if (!incoming || !outgoing) { out.push(add(vertex, normalOf(incoming ?? outgoing!), half * sign)); continue }
+    if (!incoming || !outgoing) { out.push(add(vertex, normalOf(incoming ?? outgoing!), (incoming ? halfIn(index) : halfOut(index)) * sign)); continue }
+    const hIn = halfIn(index), hOut = halfOut(index)
     const nA = normalOf(incoming)
     const nB = normalOf(outgoing)
-    const a = add(vertex, nA, half * sign)
-    const b = add(vertex, nB, half * sign)
+    const a = add(vertex, nA, hIn * sign)
+    const b = add(vertex, nB, hOut * sign)
     const cosine = nA.x * nB.x + nA.y * nB.y
     const cross = incoming.x * outgoing.y - incoming.y * outgoing.x
     // 거의 직진: 두 오프셋 점이 사실상 같다.
     if (Math.abs(cross) <= 1e-9 && cosine > 0) { out.push(a); continue }
     // 바깥쪽 = 오프셋 방향이 꺾이는 쪽의 반대.
     const outer = (nA.x + nB.x) * sign * (outgoing.x - incoming.x) + (nA.y + nB.y) * sign * (outgoing.y - incoming.y) < 0
-    const miterable = 1 + cosine > EPSILON
-    const miter = miterable ? add(vertex, { x: nA.x + nB.x, y: nA.y + nB.y }, half * sign / (1 + cosine)) : null
+    const miter = miterOf(vertex, incoming, outgoing, hIn, hOut, sign)
     // 앵커 꺾임의 굴림: 안팎 모두 두 오프셋 선의 교점(miter)에서 양쪽으로 d만큼 물러나 반지름 r의 호로 잇는다.
-    // d = r·tan(θ/2). 이웃 변이 짧으면 d를 줄이고 r도 그에 맞춘다(호는 늘 두 변에 접한다).
-    const cornerRadius = rounding ? (outer ? rounding.radius : rounding.innerRadius ?? rounding.radius) : 0
+    // d = r·tan(θ/2). 이웃 변이 짧으면 d를 줄이고 r도 그에 맞춘다(호는 늘 두 변에 접한다). 반지름은 그 자리 반폭을 따른다.
+    const localScale = baseHalf > EPSILON ? (hIn + hOut) / (2 * baseHalf) : 1
+    const cornerRadius = rounding ? (outer ? rounding.radius : rounding.innerRadius ?? rounding.radius) * localScale : 0
     if (rounding && cornerRadius > EPSILON && rounding.anchors.has(index) && miter) {
       const tanHalf = Math.sqrt(Math.max(0, (1 - cosine) / (1 + cosine)))
       if (tanHalf > EPSILON) {
@@ -110,7 +130,7 @@ function offsetSide(points: readonly BrushPoint[], dirs: readonly (BrushPoint | 
       }
     }
     if (!outer) { if (miter) out.push(miter); else out.push(a, b); continue }
-    if (join === 'round') { out.push(a, ...arc(vertex, { x: a.x - vertex.x, y: a.y - vertex.y }, { x: b.x - vertex.x, y: b.y - vertex.y }, half, vertices), b); continue }
+    if (join === 'round') { out.push(a, ...arc(vertex, { x: a.x - vertex.x, y: a.y - vertex.y }, { x: b.x - vertex.x, y: b.y - vertex.y }, (hIn + hOut) / 2, vertices), b); continue }
     // miter 길이 비율 = sqrt(2/(1+cos φ)). 한계를 넘으면 bevel.
     if (join === 'miter' && miter && Math.sqrt(2 / (1 + cosine)) <= MITER_LIMIT) out.push(miter)
     else out.push(a, b)
@@ -142,17 +162,20 @@ export function polylineToFlatInkGroups(
   join: StrokeLinejoin,
   roundVertices = ROUND_VERTICES,
   rounding?: FlatCornerRounding,
+  widthOf?: (direction: BrushPoint) => number,
 ): BrushInkGroup[] {
   if (points.length < 2 || !(thickness > 0)) return []
   const half = thickness / 2
+  // 토막마다 반폭. 가로·세로 대비가 있으면 방향에 따라 다르다(`widthOf`는 배율).
+  const halfOf = (direction: BrushPoint | null): number => direction && widthOf ? half * Math.max(0.05, widthOf(direction)) : half
   let path = points.map((p) => ({ x: p.x, y: p.y }))
   const segmentCount = closed ? path.length : path.length - 1
   const dirs = Array.from({ length: segmentCount }, (_, index) => unit(path[index], path[(index + 1) % path.length]))
   if (!closed && cap === 'square') {
     const first = dirs[0]
     const last = dirs[segmentCount - 1]
-    if (first) path[0] = add(path[0], first, -half)
-    if (last) path[path.length - 1] = add(path[path.length - 1], last, half)
+    if (first) path[0] = add(path[0], first, -halfOf(first))
+    if (last) path[path.length - 1] = add(path[path.length - 1], last, halfOf(last))
   }
   const kept: number[] = []
   path = path.filter((point, index) => {
@@ -170,9 +193,10 @@ export function polylineToFlatInkGroups(
       : undefined
   const count = closed ? path.length : path.length - 1
   const directions = Array.from({ length: count }, (_, index) => unit(path[index], path[(index + 1) % path.length]))
+  const halves = directions.map(halfOf)
   // 급한 굽이 안쪽에서 오프셋 선이 제 몸을 지나 작은 고리가 생기면 잘라낸다.
-  const left = removeLoops(offsetSide(path, directions, closed, half, 1, join, roundVertices, cornerRounding), closed)
-  const right = removeLoops(offsetSide(path, directions, closed, half, -1, join, roundVertices, cornerRounding), closed)
+  const left = removeLoops(offsetSide(path, directions, closed, halves, half, 1, join, roundVertices, cornerRounding), closed)
+  const right = removeLoops(offsetSide(path, directions, closed, halves, half, -1, join, roundVertices, cornerRounding), closed)
   if (left.length < 2 || right.length < 2) return []
   if (closed) {
     const rings: BrushContour[] = Math.abs(ringArea(left)) >= Math.abs(ringArea(right)) ? [left, right] : [right, left]
@@ -180,9 +204,10 @@ export function polylineToFlatInkGroups(
   }
   const endDir = directions[count - 1]!
   const startDir = directions[0]!
+  const endHalf = halves[count - 1], startHalf = halves[0]
   // 반원은 바깥으로 돈다: 끝에서는 +n → dir → −n, 시작에서는 −n → −dir → +n.
-  const endArc = cap === 'round' ? roundCap(path[path.length - 1], endDir, half, roundVertices) : []
-  const startArc = cap === 'round' ? roundCap(path[0], { x: -startDir.x, y: -startDir.y }, half, roundVertices) : []
+  const endArc = cap === 'round' ? roundCap(path[path.length - 1], endDir, endHalf, roundVertices) : []
+  const startArc = cap === 'round' ? roundCap(path[0], { x: -startDir.x, y: -startDir.y }, startHalf, roundVertices) : []
   if (cornerRounding && cornerRounding.radius > EPSILON && cap === 'butt') {
     // 끝면 네 모서리 굴림. 반지름은 반폭과 끝 앵커 구간(마지막 앵커 → 끝)의 길이에 걸린다 — 반폭이면 두 호가 중심선에서 만나 반원.
     // 옆면은 곡선일 수 있어 직선 토막이 아니라 호 길이로 되짚어 자르고, 그 자리의 접선과 끝면을 잇는 3차 곡선으로 굴린다.
@@ -191,17 +216,18 @@ export function polylineToFlatInkGroups(
     const arcLength = (from: number, to: number) => { let sum = 0; for (let i = from; i < to; i += 1) sum += Math.hypot(path[i + 1].x - path[i].x, path[i + 1].y - path[i].y); return sum }
     const lastAnchor = anchorList.length > 0 ? anchorList[anchorList.length - 1] : 0
     const firstAnchor = anchorList.length > 0 ? anchorList[0] : path.length - 1
-    const endReach = Math.min(cornerRounding.radius, half, FILLET_EDGE_LIMIT * arcLength(lastAnchor, path.length - 1))
-    const startReach = Math.min(cornerRounding.radius, half, FILLET_EDGE_LIMIT * arcLength(0, firstAnchor))
+    // 반지름은 그 끝 토막의 반폭을 따른다(대비가 있으면 세로 끝이 더 크게 굴려진다).
+    const endReach = Math.min(cornerRounding.radius * endHalf / half, endHalf, FILLET_EDGE_LIMIT * arcLength(lastAnchor, path.length - 1))
+    const startReach = Math.min(cornerRounding.radius * startHalf / half, startHalf, FILLET_EDGE_LIMIT * arcLength(0, firstAnchor))
     const nEnd = normalOf(endDir), nStart = normalOf(startDir)
     if (endReach > EPSILON) {
-      roundSideEnd(left, true, end, nEnd, half, endReach, roundVertices)
+      roundSideEnd(left, true, end, nEnd, endHalf, endReach, roundVertices)
       // right는 아직 시작 → 끝 순서다(아래에서 뒤집는다).
-      roundSideEnd(right, true, end, { x: -nEnd.x, y: -nEnd.y }, half, endReach, roundVertices)
+      roundSideEnd(right, true, end, { x: -nEnd.x, y: -nEnd.y }, endHalf, endReach, roundVertices)
     }
     if (startReach > EPSILON) {
-      roundSideEnd(right, false, start, { x: -nStart.x, y: -nStart.y }, half, startReach, roundVertices)
-      roundSideEnd(left, false, start, nStart, half, startReach, roundVertices)
+      roundSideEnd(right, false, start, { x: -nStart.x, y: -nStart.y }, startHalf, startReach, roundVertices)
+      roundSideEnd(left, false, start, nStart, startHalf, startReach, roundVertices)
     }
   }
   const joined = [...left, ...endArc, ...right.reverse(), ...startArc]
@@ -210,7 +236,7 @@ export function polylineToFlatInkGroups(
     ? joined.filter((point, index) => index === 0 || Math.hypot(point.x - joined[index - 1].x, point.y - joined[index - 1].y) > EPSILON)
     : joined
   // 급한 굽이 안쪽에서 오프셋 선이 제 몸을 지나면 윤곽 하나로는 Boolean이 못 받는다. 그때만 조각(세그먼트 사각형 + 조인 + 캡)으로 낸다.
-  if (ringSelfIntersects(ring)) return piecewiseFlatInkGroups(path, directions, half, cap, join, roundVertices)
+  if (ringSelfIntersects(ring)) return piecewiseFlatInkGroups(path, directions, halves, cap, join, roundVertices)
   return [[ring]]
 }
 
@@ -277,13 +303,14 @@ function circle(center: BrushPoint, radius: number, vertices: number): BrushCont
  * 조각 방식: 세그먼트마다 사각형, 꺾임마다 조인 패치(양쪽 다 얹는다 — 안쪽은 사각형에 덮인다), 열린 끝에 캡.
  * 조각은 전부 볼록해서 Boolean이 안전하지만 곡선을 잘게 편 자리마다 조각이 생겨 느리다. 윤곽 하나가 안 될 때만 쓴다.
  */
-function piecewiseFlatInkGroups(path: readonly BrushPoint[], directions: readonly (BrushPoint | null)[], half: number, cap: StrokeLinecap, join: StrokeLinejoin, vertices: number): BrushInkGroup[] {
+function piecewiseFlatInkGroups(path: readonly BrushPoint[], directions: readonly (BrushPoint | null)[], halves: readonly number[], cap: StrokeLinecap, join: StrokeLinejoin, vertices: number): BrushInkGroup[] {
   const groups: BrushInkGroup[] = []
   const count = directions.length
   for (let index = 0; index < count; index += 1) {
     const dir = directions[index]
     if (!dir) continue
     const n = normalOf(dir)
+    const half = halves[index]
     const from = path[index], to = path[(index + 1) % path.length]
     groups.push([[add(from, n, half), add(to, n, half), add(to, n, -half), add(from, n, -half)]])
   }
@@ -291,16 +318,17 @@ function piecewiseFlatInkGroups(path: readonly BrushPoint[], directions: readonl
     const incoming = directions[index - 1], outgoing = directions[index]
     if (!incoming || !outgoing) continue
     const vertex = path[index]
-    if (join === 'round') { groups.push([circle(vertex, half, vertices)]); continue }
+    const hIn = halves[index - 1], hOut = halves[index]
+    if (join === 'round') { groups.push([circle(vertex, (hIn + hOut) / 2, vertices)]); continue }
     const nA = normalOf(incoming), nB = normalOf(outgoing)
     const cosine = nA.x * nB.x + nA.y * nB.y
     for (const sign of [1, -1]) {
-      const a = add(vertex, nA, half * sign), b = add(vertex, nB, half * sign)
-      const miter = join === 'miter' && 1 + cosine > EPSILON && Math.sqrt(2 / (1 + cosine)) <= MITER_LIMIT
-      groups.push([miter ? [vertex, a, add(vertex, { x: nA.x + nB.x, y: nA.y + nB.y }, half * sign / (1 + cosine)), b] : [vertex, a, b]])
+      const a = add(vertex, nA, hIn * sign), b = add(vertex, nB, hOut * sign)
+      const miter = join === 'miter' && 1 + cosine > EPSILON && Math.sqrt(2 / (1 + cosine)) <= MITER_LIMIT ? miterOf(vertex, incoming, outgoing, hIn, hOut, sign) : null
+      groups.push([miter ? [vertex, a, miter, b] : [vertex, a, b]])
     }
   }
-  if (cap === 'round') groups.push([circle(path[0], half, vertices)], [circle(path[path.length - 1], half, vertices)])
+  if (cap === 'round') groups.push([circle(path[0], halves[0], vertices)], [circle(path[path.length - 1], halves[count - 1], vertices)])
   return groups
 }
 
@@ -390,6 +418,7 @@ export function strokeToFlatInkGroups(
   roundVertices?: number,
   roundness = 0,
   innerRoundness?: number,
+  contrast = 0,
 ): BrushInkGroup[] {
   const { points, anchorIndices } = flattenStrokeCenterlineWithAnchors(stroke, box)
   const thickness = Math.max(stroke.thickness * weightMultiplier, 0.001)
@@ -397,5 +426,22 @@ export function strokeToFlatInkGroups(
   const rounding = Math.max(roundness, inner) > 0
     ? { radius: Math.min(1, Math.max(0, roundness)) * thickness / 2, innerRadius: Math.min(1, Math.max(0, inner)) * thickness / 2, anchors: anchorIndices }
     : undefined
-  return polylineToFlatInkGroups(points, stroke.closed, thickness, cap, join, roundVertices, rounding)
+  return polylineToFlatInkGroups(points, stroke.closed, thickness, cap, join, roundVertices, rounding, contrast !== 0 ? contrastWidthOf(contrast) : undefined)
+}
+
+/** 가로·세로 대비가 최대(±1)일 때 반폭이 얼마나 벌어지는지. 0.5면 세로 : 가로 = 3 : 1. */
+const CONTRAST_STRENGTH = 0.5
+
+/**
+ * 가로·세로 두께 대비의 토막별 배율. `contrast` −1 ~ 1, + 는 세로 굵게 · 가로 얇게.
+ * 배율 = 1 − c · 0.5 · cos 2θ (θ는 가로에서 잰 각). 가로 1 − 0.5c, 세로 1 + 0.5c, 45°와 곡선의 중간은 1. 각진 곳 없이 매끈하다.
+ */
+export function contrastWidthOf(contrast: number): (direction: BrushPoint) => number {
+  const c = Math.max(-1, Math.min(1, contrast)) * CONTRAST_STRENGTH
+  return (direction) => {
+    const length = Math.hypot(direction.x, direction.y)
+    if (length <= EPSILON) return 1
+    const sine2 = (direction.y / length) ** 2
+    return 1 - c * (1 - 2 * sine2)
+  }
 }

@@ -137,9 +137,11 @@ export function normalizeStrokeRenderStyle(
   const roundness = input?.mode === 'brush' && Number.isFinite(input.roundness) ? Math.max(0, Math.min(1, input.roundness as number)) : 0
   // 안쪽 둥글기는 따로 정했을 때만 키를 둔다. 없으면 바깥을 따른다(연결).
   const innerRoundness = input?.mode === 'brush' && Number.isFinite(input.innerRoundness) ? Math.max(0, Math.min(1, input.innerRoundness as number)) : undefined
+  const contrast = input?.mode === 'brush' && Number.isFinite(input.contrast) ? Math.max(-1, Math.min(1, input.contrast as number)) : 0
   const style: StrokeRenderStyle = { mode: 'brush', brush: normalizeBrushStyle(candidate) }
   if (roundness > 0) style.roundness = roundness
   if (innerRoundness !== undefined) style.innerRoundness = innerRoundness
+  if (contrast !== 0) style.contrast = contrast
   return style
 }
 
@@ -176,7 +178,7 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
           state.style.brush = normalizeBrushStyle(value)
           // 붓촉만 바꿀 때 전역 둥글기는 그대로 둔다.
           const previous = state.style.strokeStyle.mode === 'brush' ? state.style.strokeStyle : undefined
-          state.style.strokeStyle = normalizeStrokeRenderStyle({ mode: 'brush', brush: state.style.brush, roundness: previous?.roundness, innerRoundness: previous?.innerRoundness })
+          state.style.strokeStyle = normalizeStrokeRenderStyle({ mode: 'brush', brush: state.style.brush, roundness: previous?.roundness, innerRoundness: previous?.innerRoundness, contrast: previous?.contrast })
         }),
 
       setStrokeRenderStyle: (value) =>

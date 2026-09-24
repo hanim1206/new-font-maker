@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { polylineToFlatInkGroups, ringSelfIntersects, strokeToFlatInkGroups } from './flatStrokeGeometry'
+import { contrastWidthOf, polylineToFlatInkGroups, ringSelfIntersects, strokeToFlatInkGroups } from './flatStrokeGeometry'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
 import type { StrokeDataV2 } from '../types'
 import { unionInkRegions } from './inkBoolean'
@@ -182,5 +182,23 @@ describe('전역 둥글기(roundness)', () => {
     const ring = union(polylineToFlatInkGroups(square, true, 0.2, 'butt', 'miter', undefined, { radius: 0.1, innerRadius: 0, anchors: new Set([0, 1, 2, 3]) }))
     expect(ring[0].holes[0]).toHaveLength(4)
     expect(ring[0].outer.length).toBeGreaterThan(4)
+  })
+
+  it('가로·세로 대비: 세로 토막은 굵고 가로 토막은 얇으며, ㄱ 꺾임에서 두 폭이 교점으로 만난다', () => {
+    const corner = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }]
+    const width = contrastWidthOf(1) // 세로 1.5 · 가로 0.5
+    expect(width({ x: 1, y: 0 })).toBeCloseTo(0.5, 9)
+    expect(width({ x: 0, y: 1 })).toBeCloseTo(1.5, 9)
+    expect(width({ x: 1, y: 1 })).toBeCloseTo(1, 9)
+    const ink = union(polylineToFlatInkGroups(corner, false, 0.2, 'butt', 'miter', undefined, undefined, width))
+    expect(ink).toHaveLength(1)
+    // 가로 토막 반폭 0.05, 세로 토막 반폭 0.15.
+    expect(bounds(ink)).toEqual({ left: 0, right: 1.15, top: -0.05, bottom: 1 })
+    // 바깥 모서리 교점(1.15, -0.05)과 안쪽 교점(0.85, 0.05)이 윤곽에 있다.
+    expect(ink[0].outer.some((p) => Math.abs(p.x - 1.15) < 1e-9 && Math.abs(p.y + 0.05) < 1e-9)).toBe(true)
+    expect(ink[0].outer.some((p) => Math.abs(p.x - 0.85) < 1e-9 && Math.abs(p.y - 0.05) < 1e-9)).toBe(true)
+    // 대비 0이면 전과 점 하나까지 같다.
+    const plain = polylineToFlatInkGroups(corner, false, 0.2, 'butt', 'miter')
+    expect(polylineToFlatInkGroups(corner, false, 0.2, 'butt', 'miter', undefined, undefined, contrastWidthOf(0))).toEqual(plain)
   })
 })

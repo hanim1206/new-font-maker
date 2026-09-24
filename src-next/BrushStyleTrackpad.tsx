@@ -23,6 +23,9 @@ const roundnessOf = (style: StrokeRenderStyle): number => style.mode === 'brush'
 /** 안쪽 둥글기(%). 따로 정하지 않았으면 바깥을 따른다(연결). */
 const innerRoundnessOf = (style: StrokeRenderStyle): number => style.mode === 'brush' && style.brush.tip === 'round' && style.innerRoundness !== undefined ? Math.round(style.innerRoundness * 100) : roundnessOf(style)
 const innerLinked = (style: StrokeRenderStyle): boolean => style.mode !== 'brush' || style.innerRoundness === undefined
+/** 가로·세로 대비(%). + 는 세로 굵게 · 가로 얇게. */
+const contrastOf = (style: StrokeRenderStyle): number => style.mode === 'brush' && style.brush.tip === 'round' ? Math.round((style.contrast ?? 0) * 100) : 0
+const contrastLabel = (value: number): string => value === 0 ? '같음' : value > 0 ? `세로 +${value}%` : `가로 +${-value}%`
 const DEFAULTS: Record<StrokeRenderStyle['mode'], StrokeRenderStyle> = {
   brush: { mode: 'brush', brush: { tip: 'round', aspectRatio: 0.5, angle: 0 } },
   'angled-area': { mode: 'angled-area', cutAngle: 35, cornerRadius: 0.2 },
@@ -70,7 +73,7 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
     if (beforeRef.current) {
       const after = latestRef.current
       // 둥글기를 줬는데 저장된 끝 모양이 둥근 끝이면 각진 끝으로 같이 되돌린다(막대가 이긴다). 되돌리기 한 줄에 같이 실린다.
-      const squareEnds = ends && Math.max(roundnessOf(after), innerRoundnessOf(after)) > 0 && (ends.linecap !== 'butt' || ends.linejoin !== 'miter')
+      const squareEnds = ends && (Math.max(roundnessOf(after), innerRoundnessOf(after)) > 0 || contrastOf(after) !== 0) && (ends.linecap !== 'butt' || ends.linejoin !== 'miter')
       onCommit(beforeRef.current, after, squareEnds ? { before: ends, after: SQUARE_ENDS } : undefined)
     }
     beforeRef.current = null
@@ -166,7 +169,7 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
       onPointerDown={(event) => { begin(label); const next = startRangeDrag(event); if (next !== null && next !== value) preview(update(next)) }}
       onPointerMove={(event) => { const next = moveRangeDrag(event); if (next !== null && next !== value) preview(update(next)) }}
       onChange={(event) => { begin(label); preview(update(Number(event.target.value))) }} onPointerUp={(event) => { endRangeDrag(event); finish() }} onPointerCancel={(event) => { endRangeDrag(event); cancel() }}
-      onKeyDown={(event) => handleRangeKeys(event, label)} onKeyUp={finish} aria-label={label === '납작함' ? '붓촉 납작함' : label} data-testid={label === '바깥 둥글기' ? 'style-roundness' : label === '안쪽 둥글기' ? 'style-inner-roundness' : undefined} />
+      onKeyDown={(event) => handleRangeKeys(event, label)} onKeyUp={finish} aria-label={label === '납작함' ? '붓촉 납작함' : label} data-testid={label === '바깥 둥글기' ? 'style-roundness' : label === '안쪽 둥글기' ? 'style-inner-roundness' : label === '가로·세로 대비' ? 'style-contrast' : undefined} />
   </label>
   const angle = current.mode === 'angled-area' ? current.cutAngle : current.mode === 'brush' ? current.brush.angle : 0
   const angleLimit = current.mode === 'angled-area' ? 60 : 90
@@ -189,9 +192,10 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
   </div>
 
   const controls = <div className={styles.brushControls} role={embedded ? 'tabpanel' : undefined} aria-label={embedded ? '획 스타일' : undefined}>
-    <div className={styles.strokeRuleModes} style={productOptions ? { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' } : undefined} role="radiogroup" aria-label="획 생성 규칙">
-      {([['brush', '붓촉형'], ['angled-area', '절단 끝'], ['legacy-snapped-centerline', '레거시 스냅 획']] as const).filter(([mode]) => !productOptions || mode !== 'legacy-snapped-centerline').map(([mode, label]) => <button key={mode} type="button" role="radio" aria-checked={current.mode === mode} onClick={() => selectMode(mode)}>{label}</button>)}
-    </div>
+    {/* 제품 화면은 붓촉형만 쓴다(절단 끝 · 레거시는 뺐다, 09-25 사용자). 옛 저장분이 다른 규칙이면 붓촉형으로 돌아올 길만 남긴다. */}
+    {(!productOptions || current.mode !== 'brush') && <div className={styles.strokeRuleModes} style={productOptions ? { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' } : undefined} role="radiogroup" aria-label="획 생성 규칙">
+      {([['brush', '붓촉형'], ['angled-area', '절단 끝'], ['legacy-snapped-centerline', '레거시 스냅 획']] as const).filter(([mode]) => !productOptions || mode === 'brush' || mode === current.mode).map(([mode, label]) => <button key={mode} type="button" role="radio" aria-checked={current.mode === mode} onClick={() => selectMode(mode)}>{label}</button>)}
+    </div>}
     {current.mode === 'brush' && <>
       {productOptions
         ? <div className={styles.brushTips} style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }} role="radiogroup" aria-label="획 끝 모양">{END_CHOICES.map((choice) => {
@@ -216,6 +220,8 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
           void _dropped
           preview(rest); onCommit(committed, rest)
         }}>바깥과 같이</button>}
+        {/* 가로·세로 두께 대비. 가운데 0이 같은 굵기, 오른쪽은 세로 굵게 · 가로 얇게. */}
+        <div style={{ gridColumn: 'span 2' }}>{range('가로·세로 대비', contrastOf(current), -100, 100, 1, (value) => ({ ...current, contrast: value / 100 }), contrastLabel(contrastOf(current)))}</div>
       </div>}
       {current.brush.tip === 'round' && !productOptions && <p className={styles.roundBrushMessage}>원형은 모든 방향에서 같은 굵기로 그려집니다.</p>}
     </>}

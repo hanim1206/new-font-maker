@@ -6,7 +6,7 @@ import { weightToMultiplier } from '../utils/globalStyleUtils'
 import type { GlobalStyle } from '../stores/globalStyleStore'
 import { brushInkGroupsToSvgPaths, strokeToBrushInkGroups } from '../services/brushGeometry'
 import { resolveGlyphInkPrimitives } from '../services/glyphInkResolver'
-import { needsFilledRenderInk, strokeToRenderInkGroups } from '../services/strokeRenderGeometry'
+import { needsFilledRenderInk, strokeToRenderInkGroups, verticalWidthFactorOf } from '../services/strokeRenderGeometry'
 import { stemBeakGroupOf, stemBeakInkGroups } from '../services/stemBeak'
 
 // 파트별 스타일 (자모 편집 시 비편집 파트 흐리게 표시 등)
@@ -118,7 +118,8 @@ export function SvgRenderer({
     const groups = stemBeakInkGroups(centerlines.map((primitive) => ({
       stroke: asLegacyReadonlyStroke(primitive.stroke),
       box: primitive.box,
-      weightMultiplier: primitive.weightMultiplier,
+      // 부리는 기둥 폭에 맞춘다. 가로·세로 대비가 있으면 기둥이 그만큼 굵다.
+      weightMultiplier: primitive.weightMultiplier * verticalWidthFactorOf(beakRenderStyle),
       group: stemBeakGroupOf(primitive.source),
     })), stemBeak, beakRenderStyle)
     return new Map(centerlines.map((primitive, index) => [primitive.id, brushInkGroupsToSvgPaths(groups[index], VIEW_BOX_SIZE)]))

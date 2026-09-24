@@ -8,7 +8,7 @@ import {
   type BrushPoint,
 } from './brushGeometry'
 import { strokeToAngledAreaInkGroups } from './areaStrokeGeometry'
-import { strokeToFlatInkGroups } from './flatStrokeGeometry'
+import { contrastWidthOf, strokeToFlatInkGroups } from './flatStrokeGeometry'
 import { strokeToGridSystem2InkGroups } from './gridSystem2Geometry'
 
 /** 획 스타일의 전역 둥글기(0~1). 둥근 붓촉의 brush 모드에서만 뜻이 있고, 그 밖에는 0. */
@@ -25,9 +25,22 @@ export function innerRoundnessOf(style: StrokeRenderStyle | undefined): number {
   return value !== undefined && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : roundnessOf(style)
 }
 
-/** 바깥이든 안쪽이든 둥글기가 있는가. */
+/** 가로·세로 두께 대비(−1 ~ 1). 둥근 붓촉의 brush 모드에서만 뜻이 있고, 그 밖에는 0. */
+export function contrastOf(style: StrokeRenderStyle | undefined): number {
+  if (!style || style.mode !== 'brush' || style.brush.tip !== 'round') return 0
+  const value = style.contrast ?? 0
+  return Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0
+}
+
+/** 세로줄기(기둥)의 굵기 배율. 부리처럼 기둥 폭을 따로 재는 쪽이 대비를 같이 읽게. */
+export function verticalWidthFactorOf(style: StrokeRenderStyle | undefined): number {
+  const contrast = contrastOf(style)
+  return contrast === 0 ? 1 : contrastWidthOf(contrast)({ x: 0, y: 1 })
+}
+
+/** 바깥이든 안쪽이든 둥글기가 있거나 가로·세로 대비가 있는가 — 일자 stroker로 가야 하는 조건. */
 export function hasRoundness(style: StrokeRenderStyle | undefined): boolean {
-  return roundnessOf(style) > 0 || innerRoundnessOf(style) > 0
+  return roundnessOf(style) > 0 || innerRoundnessOf(style) > 0 || contrastOf(style) !== 0
 }
 
 /** 둥근 붓촉인데 둥글기가 있으면 SVG stroke 대신 채운 윤곽으로 그려야 한다(화면 · OTF 공통 분기). */
@@ -120,7 +133,7 @@ export function strokeToRenderInkGroups(
   if (style.mode === 'legacy-snapped-centerline') return strokeToGridSystem2InkGroups(stroke, box, weightMultiplier)
   if (style.brush.tip === 'round' && hasRoundness(style)) {
     // 전역 둥글기: 각진 끝(butt · miter) 윤곽의 모서리를 굴린다. 저장된 linecap · linejoin은 안 본다.
-    return strokeToFlatInkGroups(stroke, box, weightMultiplier, 'butt', 'miter', options?.ellipseVertexCount, roundnessOf(style), innerRoundnessOf(style))
+    return strokeToFlatInkGroups(stroke, box, weightMultiplier, 'butt', 'miter', options?.ellipseVertexCount, roundnessOf(style), innerRoundnessOf(style), contrastOf(style))
   }
   if (style.brush.tip === 'round') {
     const centerline = flattenStrokeCenterline(stroke, box)

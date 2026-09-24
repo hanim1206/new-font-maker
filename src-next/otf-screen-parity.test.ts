@@ -228,6 +228,30 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
     }
   })
 
+  it('G2 — 가로·세로 대비 ±0.6(둥글기 0 · 1): OTF가 화면과 같은 윤곽이고 상자는 그대로다', async () => {
+    const { measure } = await setup()
+    const { useGlobalStyleStore } = await import('../src/stores/globalStyleStore')
+    const before = useGlobalStyleStore.getState().style.strokeStyle
+    const chars = ['한', '과', '의', '곽', '을']
+    const square = chars.map((char) => ({ char, ...measure(char) }))
+    try {
+      for (const [contrast, roundness] of [[0.6, 0], [-0.6, 0], [0.6, 1]] as const) {
+        useGlobalStyleStore.getState().setStrokeRenderStyle({ mode: 'brush', brush: { tip: 'round', aspectRatio: 0.5, angle: 0 }, contrast, ...(roundness > 0 ? { roundness } : {}) })
+        const rows = chars.map((char) => ({ char, ...measure(char) }))
+        console.info(rows.map((row) => `${row.char} 대비 ${contrast} 둥글기 ${roundness} · 모델 ${(row.modelXor * 100).toFixed(3)}% · 가장자리 ${row.edgeDrift.toFixed(2)}유닛`).join('\n'))
+        rows.forEach((row, index) => {
+          expect(row.data.strokeStyle, row.char).toMatchObject({ mode: 'brush', contrast })
+          expect(row.otfBoxes, row.char).toEqual(row.screenBoxes)
+          expect(row.otfBoxes, row.char).toEqual(square[index].otfBoxes)
+          expect(row.edgeDrift, row.char).toBeLessThan(1)
+          expect(row.modelXor, row.char).toBeLessThan(0.015)
+        })
+      }
+    } finally {
+      useGlobalStyleStore.getState().setStrokeRenderStyle(before)
+    }
+  })
+
   it('네모꼴 가로 600: 글자가 틀을 따라 줄고, OTF 잉크가 글자 폭 안에 든다(화면과 같은 상자)', async () => {
     const { measure } = await setup()
     const { useLayoutStore } = await import('../src/stores/layoutStore')
