@@ -107,11 +107,14 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
   boxes?: FitBox[]
 }) {
   const gesture = useRef<{ pointerId: number; id: string; axis: 'x' | 'y'; start: number; startValue: number } | null>(null)
+  // 끄는 동안엔 선을 얇게 두고, 손을 떼야 굵어진다(확정). 주황도 끄는 동안 걸린 순간에만.
+  const [dragging, setDragging] = useState(false)
   const startDrag = (rail: CanvasRail) => (event: ReactPointerEvent<SVGLineElement>) => {
     onSelectRail?.(rail.id)
     if (!onDragRail) return
     gesture.current = { pointerId: event.pointerId, id: rail.id, axis: rail.axis, start: rail.axis === 'x' ? event.clientX : event.clientY, startValue: rail.value }
     event.currentTarget.setPointerCapture(event.pointerId)
+    setDragging(true)
     onDragState?.(true)
   }
   const moveDrag = (event: ReactPointerEvent<SVGLineElement>) => {
@@ -128,6 +131,7 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
     if (gesture.current?.pointerId !== event.pointerId) return
     gesture.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    setDragging(false)
     onDragState?.(false)
   }
   const geometryOf = (axis: 'x' | 'y', value: number) => axis === 'x' ? { x1: value, x2: value, y1: -0.06, y2: 1.02 } : { x1: -0.06, x2: 1.02, y1: value, y2: value }
@@ -190,16 +194,16 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
     {/* 비활성 부품 rail은 먼저 그려 뒤로 보내고 손잡이도 없다. 활성 rail만 잡힌다. */}
     {[...editable].sort((a, b) => Number(!activePart || samePartGroup(a.part, activePart)) - Number(!activePart || samePartGroup(b.part, activePart))).map((rail) => {
       const selected = rail.id === selectedRail
-      // 걸린 상대 rail과, 걸린 채 잡고 있는 rail 둘 다. 모델·격자엔 상대 rail이 없어 잡은 rail만 주황이 된다.
-      const snapped = rail.id === snappedRail || (!!snapHit && selected)
+      // 걸린 상대 rail과, 걸린 채 잡고 있는 rail 둘 다. 모델·격자엔 상대 rail이 없어 잡은 rail만 주황이 된다. 손을 떼면 영역 색으로 돌아간다.
+      const snapped = dragging && (rail.id === snappedRail || (!!snapHit && selected))
       const active = !activePart || samePartGroup(rail.part, activePart)
-      // 선택한 rail은 부품 색 그대로 굵게. 주황은 스냅('탁') 순간에만 쓴다.
+      // 끄는 중: 부품 색 얇게, 걸리면 주황 얇게. 손을 떼면 부품 색 굵게.
       const stroke = snapped ? ACCENT : active ? PART_COLOR[rail.part] : INACTIVE_COLOR
       const geometry = geometryOf(rail.axis, rail.value)
-      return <g key={rail.id} className={active ? styles.rail : undefined} data-rail={rail.id} data-part={rail.part} data-active={active} data-locked={rail.locked || undefined} data-selected={selected || undefined} data-snapped={snapped || undefined}>
-        {/* 후광. 선택·스냅이면 항상, 활성 rail은 호버 때만(CSS). */}
-        {active && <line {...geometry} className={styles.railHalo} stroke={stroke} strokeWidth=".032" strokeOpacity={selected || snapped ? 0.2 : 0} strokeLinecap="round" />}
-        <line {...geometry} className={styles.railLine} stroke={stroke} strokeWidth={selected || snapped ? 0.012 : active ? 0.004 : 0.003} strokeOpacity={rail.locked ? 0.45 : active || snapped ? 1 : 0.8} strokeDasharray={rail.locked ? '.02 .012' : undefined} />
+      return <g key={rail.id} className={active ? styles.rail : undefined} data-rail={rail.id} data-part={rail.part} data-active={active} data-locked={rail.locked || undefined} data-selected={selected || undefined} data-snapped={snapped || undefined} data-dragging={dragging || undefined}>
+        {/* 후광. 선택이면 손 뗀 뒤에만, 활성 rail은 호버 때만(CSS). */}
+        {active && <line {...geometry} className={styles.railHalo} stroke={stroke} strokeWidth=".032" strokeOpacity={selected && !dragging ? 0.2 : 0} strokeLinecap="round" />}
+        <line {...geometry} className={styles.railLine} stroke={stroke} strokeWidth={dragging ? active ? 0.004 : 0.003 : selected ? 0.012 : active ? 0.004 : 0.003} strokeOpacity={rail.locked ? 0.45 : active || snapped ? 1 : 0.8} strokeDasharray={rail.locked ? '.02 .012' : undefined} />
         {onSelectRail && active && !rail.locked && <line {...geometry} className={styles.railButton} data-rail-handle={rail.id} stroke="transparent" strokeWidth=".08" role="button" tabIndex={0} aria-label={`${rail.label} 선택`} aria-pressed={selected} onPointerDown={startDrag(rail)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectRail(rail.id) } else if (onNudgeRail) { const nudge = nudgeOf(event.key, rail.axis); if (nudge !== 0) { event.preventDefault(); onSelectRail(rail.id); onNudgeRail(rail.id, nudge * (event.shiftKey ? 10 : 1) / 1000) } } }} />}
         {active && rail.locked && <line {...geometry} className={styles.railHit} stroke="transparent" strokeWidth=".03" />}
         {active && <text {...labelAt(rail.axis, rail.value, 'top')} className={styles.railLabel} fontSize=".03" fill={stroke}>{rail.label}{rail.locked ? ' · 글자에 안 닿음' : ''}</text>}

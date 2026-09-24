@@ -63,3 +63,35 @@ test('보선을 캔버스 밖까지 끌어도 글자 칸(0–1em) 안에서 멈�
   expect(Number(await handle.getAttribute('x1'))).toBeLessThanOrEqual(1)
   await page.mouse.up()
 })
+
+test('보선은 끄는 동안 얇고 걸릴 때만 주황, 손을 떼면 영역 색으로 굵어진다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  const canvas = page.getByTestId('review-canvas')
+  const box = (await canvas.boundingBox())!
+  const handle = canvas.locator('[data-rail-handle="c0:left"]')
+  const rail = canvas.locator('g[data-rail="c0:left"][data-part]')
+  const line = rail.locator('line').nth(1)
+  const x1 = Number(await handle.getAttribute('x1'))
+  const pxOf = (em: number) => box.x + (em + 0.08) / 1.16 * box.width
+  const y = box.y + (-0.045 + 0.08) / 1.16 * box.height
+  const width = async () => Number.parseFloat(await line.evaluate((element) => getComputedStyle(element).strokeWidth))
+  const partColor = await line.getAttribute('stroke')
+
+  await page.mouse.move(pxOf(x1), y)
+  await page.mouse.down()
+  await page.mouse.move(pxOf(x1 + 0.06), y, { steps: 6 })
+  await expect(rail).toHaveAttribute('data-dragging', 'true')
+  expect(await width()).toBeLessThan(0.006)
+  // 모델 자리로 돌아오면 걸린다: 주황, 여전히 얇게.
+  await page.mouse.move(pxOf(x1 + 0.002), y, { steps: 4 })
+  await expect(rail).toHaveAttribute('data-snapped', 'true')
+  await expect(line).toHaveAttribute('stroke', '#f0561e')
+  expect(await width()).toBeLessThan(0.006)
+
+  await page.mouse.up()
+  await expect(rail).not.toHaveAttribute('data-dragging')
+  await expect(rail).not.toHaveAttribute('data-snapped')
+  await expect(line).toHaveAttribute('stroke', partColor!)
+  await expect.poll(width).toBeGreaterThan(0.01)
+})
