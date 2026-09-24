@@ -163,6 +163,9 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
     if (current?.pointerId !== event.pointerId) return
     gesture.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    // 끌기를 끝낸 탭이 손 밑 켜진 상자의 `획 고치기`로 새지 않게 이번 클릭은 먹는다.
+    // 보선을 처음 자리로 되돌려 Δ가 0이면 획 편집 잠금도 풀려 있어서, 터치 브라우저에선 바로 넘어가 버렸다.
+    releasedByTap.current = true
     setDraggingId(null)
     onDragState?.(false)
   }

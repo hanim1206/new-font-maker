@@ -163,3 +163,31 @@ test('켠 영역의 보선을 옮긴 뒤 같은 영역의 다른 보선은 바�
   // 변화 띠는 선택한 보선 하나가 아니라 이 영역에서 옮긴 보선 전부.
   await expect(page.getByTestId('review-delta-band')).toHaveCount(2)
 })
+
+test('보선을 처음 자리로 되돌려 켜진 상자 위에서 손을 떼도 획 편집으로 가지 않는다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  const canvas = page.getByTestId('review-canvas')
+  const handle = canvas.locator('[data-rail-handle="c0:left"]')
+  const x1 = Number(await handle.getAttribute('x1'))
+  const box = (await canvas.boundingBox())!
+  const pxOf = (em: number) => box.x + (em + 0.08) / 1.16 * box.width
+  const y = box.y + (-0.045 + 0.08) / 1.16 * box.height
+  const initial = canvas.locator('[data-testid="review-part-hit"][data-part="CH"]')
+  const strokeTools = page.getByTestId('jamo-stroke-tools')
+
+  await page.mouse.move(pxOf(x1), y)
+  await page.mouse.down()
+  await page.mouse.move(pxOf(x1 + 0.05 / DRAG_GAIN), y, { steps: 6 })
+  await page.mouse.move(pxOf(x1 + 0.002 / DRAG_GAIN), y, { steps: 4 })
+  await page.mouse.up()
+  await expect(page.getByTestId('review-delta-label')).toHaveCount(0)
+  // 터치 브라우저는 끌기를 끝낸 클릭을 손 밑 상자로 보낸다. 그 클릭은 먹는다.
+  await initial.dispatchEvent('click')
+  await expect(strokeTools).toHaveCount(0)
+  // 다음 탭은 선택만 풀고, 그다음 탭에 획 편집으로 간다.
+  await initial.click()
+  await expect(strokeTools).toHaveCount(0)
+  await initial.click()
+  await expect(strokeTools).toBeVisible()
+})
