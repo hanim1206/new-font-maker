@@ -61,6 +61,8 @@ interface FitBox { id: string; kind: 'medial' | 'component'; part: Part; label: 
 /** 부품 색. 상자·rail·라벨이 같은 색을 쓴다. 첫닿자 초록, 홀자 파랑, 받침 보라. 선택·스냅은 주황. */
 const INACTIVE_COLOR = INACTIVE_PART_COLOR
 const ACCENT = '#f0561e'
+/** `이 자리에 맞추기`. 2026-09-24 사용자 요청으로 일단 끈다. 켜면 버튼과 `고정` 표지가 돌아온다. */
+const FIX_RAIL_ENABLED = false
 /** Noto 실측선 id 앞머리 → 부품. 혼합 홀자의 가로부·세로부는 둘 다 홀자 탭에 속한다. */
 const measuredPartOf = (id: string): 'CH' | 'JU' | 'JO' => id.startsWith('initial.') ? 'CH' : id.startsWith('final.') ? 'JO' : 'JU'
 const isMedialPart = (part: Part) => part === 'JU' || part === 'JU_H' || part === 'JU_V'
@@ -108,13 +110,16 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
 }) {
   const gesture = useRef<{ pointerId: number; id: string; axis: 'x' | 'y'; start: number; startValue: number } | null>(null)
   // 끄는 동안엔 선을 얇게 두고, 손을 떼야 굵어진다(확정). 주황도 끄는 동안 걸린 순간에만.
-  const [dragging, setDragging] = useState(false)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const dragging = draggingId !== null
+  // 잡은 보선의 처음 자리. 거기 겹친 실측 점선은 끄는 동안 뺀다 — 주황 띠가 이미 처음 자리를 보여 준다.
+  const draggedFrom = editable.find((item) => item.id === draggingId)
   const startDrag = (rail: CanvasRail) => (event: ReactPointerEvent<SVGLineElement>) => {
     onSelectRail?.(rail.id)
     if (!onDragRail) return
     gesture.current = { pointerId: event.pointerId, id: rail.id, axis: rail.axis, start: rail.axis === 'x' ? event.clientX : event.clientY, startValue: rail.value }
     event.currentTarget.setPointerCapture(event.pointerId)
-    setDragging(true)
+    setDraggingId(rail.id)
     onDragState?.(true)
   }
   const moveDrag = (event: ReactPointerEvent<SVGLineElement>) => {
@@ -131,7 +136,7 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
     if (gesture.current?.pointerId !== event.pointerId) return
     gesture.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-    setDragging(false)
+    setDraggingId(null)
     onDragState?.(false)
   }
   const geometryOf = (axis: 'x' | 'y', value: number) => axis === 'x' ? { x1: value, x2: value, y1: -0.06, y2: 1.02 } : { x1: -0.06, x2: 1.02, y1: value, y2: value }
@@ -146,16 +151,20 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
       <pattern id="review-grid-coarse" width=".25" height=".25" patternUnits="userSpaceOnUse"><path d="M.25 0V.25H0" fill="none" stroke="rgb(196 203 212 / .8)" strokeWidth=".003" /></pattern>
     </defs>
     <rect x="0" y="0" width="1" height="1" fill="#fff" />
-    <rect x="0" y="0" width="1" height="1" fill="url(#review-grid-fine)" data-testid="review-grid" />
-    <rect x="0" y="0" width="1" height="1" fill="url(#review-grid-coarse)" />
-    <rect x="0" y="0" width="1" height="1" fill="none" stroke="rgb(196 203 212)" strokeWidth=".004" />
+    {/* 격자 · 글자몸 테두리 · Noto 실측선 · 다른 부품 보선은 끄는 동안에만 깐다(맞출 자리). 평소엔 켠 부품 보선과 베이스라인만. */}
+    {dragging && <>
+      <rect x="0" y="0" width="1" height="1" fill="url(#review-grid-fine)" data-testid="review-grid" />
+      <rect x="0" y="0" width="1" height="1" fill="url(#review-grid-coarse)" />
+      <rect x="0" y="0" width="1" height="1" fill="none" stroke="rgb(196 203 212)" strokeWidth=".004" />
+    </>}
     <path d="M-.06 .88H1.02" stroke="#a6a297" strokeWidth=".003" />
-    {/* 부품 상자. 획보다 아래, 고스트보다 아래. rail과 같은 부품 색, 비활성 부품은 옅게. */}
+    {/* 부품 상자. 획보다 아래, 고스트보다 아래. rail과 같은 부품 색. */}
     {boxes.map((item) => {
       const active = !activePart || samePartGroup(item.part, activePart)
       const color = PART_COLOR[item.part]
       return <g key={item.id} data-testid="review-fit-box" data-kind={item.kind} data-active={active}>
-        <rect x={item.box.x} y={item.box.y} width={item.box.width} height={item.box.height} fill={color} fillOpacity={active ? 0.24 : 0.07} stroke={color} strokeOpacity={active ? 0.85 : 0.25} strokeWidth={active ? 0.004 : 0.003} />
+        {/* 켠 부품만 칠하고 테두리를 두른다. 안 켠 부품은 이름표만 남긴다 — 눌러서 바꿀 자리. */}
+        {active && <rect x={item.box.x} y={item.box.y} width={item.box.width} height={item.box.height} fill={color} fillOpacity={0.36} stroke={color} strokeOpacity={0.85} strokeWidth={0.004} />}
         <text x={item.box.x + 0.008} y={item.box.y - 0.008} fontSize=".024" fill={color} fillOpacity={active ? 0.9 : 0.35}>{item.label}</text>
       </g>
     })}
@@ -174,7 +183,7 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
       return <rect key={`d${rail.id}`} {...band} fill={ACCENT} fillOpacity=".38" data-testid="review-delta-band" data-rail={rail.id} />
     })}
     {/* Noto 실측선. 활성 부품 것은 부품 색 점선, 나머지는 옅은 회색. 조작 없음. */}
-    {measured.map((rail) => {
+    {dragging && measured.filter((rail) => !(draggedFrom && rail.axis === draggedFrom.axis && Math.abs(rail.value - draggedFrom.original) < 0.002)).map((rail) => {
       const snapped = rail.id === snappedRail
       const active = !activePart || samePartGroup(measuredPartOf(rail.id), activePart)
       const color = active ? PART_COLOR[measuredPartOf(rail.id)] : INACTIVE_COLOR
@@ -196,7 +205,7 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
         onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (!active) onSelectPart(item.part) } }} />
     })}
     {/* 비활성 부품 rail은 먼저 그려 뒤로 보내고 손잡이도 없다. 활성 rail만 잡힌다. */}
-    {[...editable].sort((a, b) => Number(!activePart || samePartGroup(a.part, activePart)) - Number(!activePart || samePartGroup(b.part, activePart))).map((rail) => {
+    {[...editable].filter((rail) => dragging || !activePart || samePartGroup(rail.part, activePart)).sort((a, b) => Number(!activePart || samePartGroup(a.part, activePart)) - Number(!activePart || samePartGroup(b.part, activePart))).map((rail) => {
       const selected = rail.id === selectedRail
       // 걸린 상대 rail과, 걸린 채 잡고 있는 rail 둘 다(표지만). 모델·격자엔 상대 rail이 없어 잡은 rail에만 붙는다.
       const snapped = dragging && (rail.id === snappedRail || (!!snapHit && selected))
@@ -411,7 +420,7 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
         {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail?.id} snappedRail={snapHit?.id} snapHit={snapHit} onSelectRail={(id) => { if (id !== rail?.id) setSnapHit(null); setSelectedRail(id); setError('') }} onSelectPart={selectPart} onDragRail={(id, value) => changeRail(id, value, { snap: true })} onDragState={(dragging) => setHeldBar(dragging ? { editCount, canApply } : null)} onNudgeRail={(id, delta) => { const target = editable.find((item) => item.id === id); if (target) changeRail(id, target.value + delta) }} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
         <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="review-ghost-toggle" />
         {/* 변 rail을 잡으면 `이 자리에 맞추기`. 누르면 범위 안 글자가 전부 이 자리(em)에 모인다. 탁 걸린 자리면 주황 테두리. 고정 뒤엔 `= 자리` 표지. */}
-        {rail && rail.kind === 'face' && (fixable
+        {FIX_RAIL_ENABLED && rail && rail.kind === 'face' && (fixable
           ? <button type="button" className={styles.canvasFix} data-snapped={!!snapHit || undefined} onClick={fixRail} data-testid="review-fix-rail">이 자리에 맞추기</button>
           : <span className={styles.canvasFixed} data-testid="review-fixed-rail">{rail.label} = {Math.round(rail.value * 1000)} · 고정</span>)}
         {/* 자 도구는 없다. 캔버스 안에서 끌기·방향키(1u · Shift 10u)로 옮기고, 경고는 캔버스 위에 겹쳐 높이가 안 흔들린다. 복원은 하단 바. */}

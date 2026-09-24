@@ -205,7 +205,8 @@ test('부품 상자를 누르면 그 부품 rail만 잡히고 칩도 바뀐다',
   await expect(canvas.getByRole('button', { name: '첫닿자 ㅁ 선택' })).toHaveAttribute('aria-pressed', 'false')
   await expect(canvas.locator('[data-rail-handle]').first()).toBeAttached()
   await expect(canvas.locator('[data-rail-handle^="c"]')).toHaveCount(0)
-  await expect(canvas.locator('[data-rail="c0:top"]')).toHaveAttribute('data-active', 'false')
+  // 끄지 않을 때는 다른 부품 보선을 아예 그리지 않는다(끄는 동안에만 깐다).
+  await expect(canvas.locator('[data-rail="c0:top"]')).toHaveCount(0)
   // 상자도 켠 부품만 진하다.
   await expect(canvas.locator('[data-testid="review-fit-box"][data-kind="medial"]').first()).toHaveAttribute('data-active', 'true')
   await expect(canvas.locator('[data-testid="review-fit-box"][data-kind="component"]').first()).toHaveAttribute('data-active', 'false')
@@ -617,7 +618,8 @@ test('홀자 상자 변을 옮겨 적용하면 ㅣ 글자도 문장 줄에서 �
 test('ㅏ의 홀자 오른변을 밀면 보가 길어지고 기둥 두께는 그대로다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EA%B0%80&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
-  const medialBox = page.getByTestId('review-canvas').locator('[data-testid="review-fit-box"][data-kind="medial"] rect')
+  // 안 켠 부품 상자는 칠하지 않아 그림 rect가 없다. 늘 있는 누름 상자로 읽는다(같은 자리).
+  const medialBox = page.getByTestId('review-canvas').locator('[data-testid="review-part-hit"][aria-label^="홀자"]').first()
   const x = Number(await medialBox.getAttribute('x'))
   const width = Number(await medialBox.getAttribute('width'))
   await selectMedialBox(page)
@@ -957,7 +959,8 @@ test('Noto 고스트를 끄면 닿는 글자 줄에서도 고스트가 빠지고
 })
 
 /** 고정 Δ(G0·G1): 노에서 첫닿자 윗변을 `이 자리에 맞추기`로 고정해 이 레이아웃에 적용하면 bottom 계열 글자의 닿자 윗변이 전부 같은 자리에 모인다. 더하기는 제각각. */
-test('변을 이 자리에 맞추면 범위 안 글자가 같은 자리에 모이고, 다시 옮기면 더하기로 돌아온다', async ({ page }) => {
+// `이 자리에 맞추기`는 2026-09-24 사용자 요청으로 꺼 둠(`FIX_RAIL_ENABLED`). 켜면 이 테스트도 다시 켠다.
+test.skip('변을 이 자리에 맞추면 범위 안 글자가 같은 자리에 모이고, 다시 옮기면 더하기로 돌아온다', async ({ page }) => {
   const KEY = 'noto-layout-delta-v1'
   await page.goto('/workspace/jamo?char=%EB%85%B8&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
@@ -1139,7 +1142,7 @@ test('획 편집에서 고친 홀자가 레이아웃 캔버스에도 보인다',
     await target.goto('/workspace/jamo?char=%EB%85%B8&mode=layout')
     await expect(target.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
     await expect(target.getByTestId('review-fit-ink').first()).toBeVisible()
-    const box = target.getByTestId('review-canvas').locator('[data-testid="review-fit-box"][data-kind="medial"] rect')
+    const box = target.getByTestId('review-canvas').locator('[data-testid="review-part-hit"][aria-label^="홀자"]').first()
     return { ink: await target.getByTestId('review-fit-ink').first().getAttribute('d'), slot: [await box.getAttribute('x'), await box.getAttribute('y'), await box.getAttribute('width'), await box.getAttribute('height')].join() }
   }
   const base = await inkOf(page)
