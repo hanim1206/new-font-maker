@@ -139,6 +139,8 @@ const GAP_STICK_EM = 0.05
 /** 선택 색. 피그마처럼 잉크는 제 색 그대로 두고, 잡은 획은 가는 중심선 + 둘레 상자로 알린다. 옆 자소에 너무 붙은 자소의 획은 경고색. */
 const SELECTION_COLOR = '#0d99ff'
 const SELECTION_WARNING_COLOR = '#e0321a'
+/** 꼭짓점 눌림 반지름(뷰박스 단위). 겹치면 누른 자리에서 가장 가까운 점이 잡힌다. */
+const POINT_HIT_RADIUS = 7.5
 type PreviewSchema = { layoutType: LayoutType; schema: LayoutSchema }
 /** 폰트 전체 굵기(100–900) · 기울기(도). 끄는 동안은 미리보기, 손을 떼면 저장 + 기록 한 줄. */
 type StyleTone = { weight: number; slant: number }
@@ -478,6 +480,17 @@ function FocusedGlyph({
   const [snapHits, setSnapHits] = useState<{ x: SnapHit | null; y: SnapHit | null } | null>(null)
   // 이름표에는 기준선 · 획 · 격자만 올린다. `처음 자리`는 끄는 내내 걸려 있어서 뺀다.
   const snapHitLabels = snapHits ? [snapHits.x, snapHits.y].filter((hit): hit is SnapHit => Boolean(hit) && hit!.kind !== 'model').map((hit) => hit.label).filter((label, index, labels) => labels.indexOf(label) === index) : []
+  // 누른 자리에서 가장 가까운 꼭짓점. 좌표는 누른 요소의 화면 변환을 거꾸로 돌려 얻는다 — 글자가 기울어도 맞는다.
+  const nearestPoint = (event: ReactPointerEvent<SVGElement>, stroke: StrokeDataV2, box: BoxConfig): { index: number; distance: number } => {
+    const matrix = (event.currentTarget as SVGGraphicsElement).getScreenCTM()
+    if (!matrix) return { index: 0, distance: Infinity }
+    const at = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse())
+    return stroke.points.reduce((best, point, index) => {
+      const { x, y } = absolutePoint(point, box)
+      const distance = Math.hypot(x - at.x, y - at.y)
+      return distance < best.distance ? { index, distance } : best
+    }, { index: 0, distance: Infinity })
+  }
   const startDrag = (event: ReactPointerEvent<SVGElement>, box: BoxConfig, anchors: SnapAnchors, dragged: { strokeId: string; pointIndex?: number }, onTap?: () => void) => {
     // 끌기가 없는 화면은 누르기가 곧 탭이다.
     if (!dragApiRef || !canvasRef.current) { onTap?.(); return }
@@ -578,8 +591,9 @@ function FocusedGlyph({
                   onSelect({ ...strokeSelection, pointsOpen: true })
                   startDrag(event, target.box, anchors, { strokeId: target.stroke.id })
                 } else if (isSelected) {
-                  // 잡힌 획을 한 번 더 누르면(끌지 않고 떼면) 점이 펼쳐진다.
-                  startDrag(event, target.box, anchors, { strokeId: target.stroke.id }, () => onSelect({ ...strokeSelection, pointsOpen: true }))
+                  // 잡힌 획을 한 번 더 누르면(끌지 않고 떼면) 점이 펼쳐지고, 누른 자리에서 가장 가까운 꼭짓점이 잡힌다.
+                  const pointIndex = nearestPoint(event, target.stroke, target.box).index
+                  startDrag(event, target.box, anchors, { strokeId: target.stroke.id }, () => onPointSelect({ ...strokeSelection, kind: 'point', pointIndex }))
                 } else {
                   onSelect(strokeSelection)
                   startDrag(event, target.box, anchors, { strokeId: target.stroke.id })
@@ -600,11 +614,18 @@ function FocusedGlyph({
           const component = componentFor(char, target.editorPart, target.jamo)
           const selectPoint = (event: ReactPointerEvent<SVGCircleElement>) => {
               event.stopPropagation()
-              onPointSelect({ kind: 'point', component, editorPart: target.editorPart, renderPart: target.renderPart, jamo: target.jamo, strokeId: target.stroke.id, pointIndex, box: target.box })
-              startDrag(event, target.box, pointAnchors(point, target.box), { strokeId: target.stroke.id, pointIndex })
+              // 눌림 영역이 겹치면 나중에 그린 점이 먹는다. 누른 자리에서 가장 가까운 점을 잡는다(누른 자리가 영역 밖이면 누른 점 그대로).
+              const nearest = nearestPoint(event, target.stroke, target.box)
+              const pressed = absolutePoint(point, target.box)
+              const matrix = event.currentTarget.getScreenCTM()
+              const at = matrix ? new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()) : null
+              const index = at && Math.hypot(pressed.x - at.x, pressed.y - at.y) <= POINT_HIT_RADIUS ? nearest.index : pointIndex
+              const picked = target.stroke.points[index]
+              onPointSelect({ kind: 'point', component, editorPart: target.editorPart, renderPart: target.renderPart, jamo: target.jamo, strokeId: target.stroke.id, pointIndex: index, box: target.box })
+              startDrag(event, target.box, pointAnchors(picked, target.box), { strokeId: target.stroke.id, pointIndex: index })
           }
           return <g key={`point-${target.renderPart}-${target.stroke.id}-${pointIndex}`}>
-            <circle cx={x} cy={y} r={7.5} fill="transparent" pointerEvents="all" className={styles.pointHitTarget} data-editor-point="hit" onPointerDown={selectPoint} />
+            <circle cx={x} cy={y} r={POINT_HIT_RADIUS} fill="transparent" pointerEvents="all" className={styles.pointHitTarget} data-editor-point="hit" onPointerDown={selectPoint} />
             <circle cx={x} cy={y} r={active ? 2.8 : 2.1} className={active ? styles.activePoint : styles.point} data-editor-point="visible" pointerEvents="none" />
           </g>
         }))}
