@@ -100,7 +100,7 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
   onDragState?: (dragging: boolean) => void
   /** 부품 상자를 누르면 그 부품이 켜진다. 탭 대신 캔버스가 부품을 고른다. */
   onSelectPart?: (part: Part) => void
-  /** 옮긴 보선을 놓은 뒤 첫 탭. 선택만 풀고 그 탭은 다른 부품·보선에 넘기지 않는다. */
+  /** 보선이 선택된 채 다른 곳을 누른 첫 탭. 선택만 풀고 그 탭은 다른 부품·보선에 넘기지 않는다. */
   onReleaseRail?: () => void
   label: string
   /** 내 홀자 획 마스터 잉크. 검정. */
@@ -116,21 +116,18 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
   const dragging = draggingId !== null
   // 잡은 보선의 처음 자리. 거기 겹친 실측 점선은 끄는 동안 뺀다 — 주황 띠가 이미 처음 자리를 보여 준다.
   const draggedFrom = editable.find((item) => item.id === draggingId)
-  // 방금 옮긴 보선. 이 보선이 아닌 곳을 누르면 그 탭은 선택 풀기에만 쓴다 — 옮기자마자 다른 영역이 켜지면 어색하다.
-  const [heldId, setHeldId] = useState<string | null>(null)
+  // 보선이 선택돼 있으면 그 보선이 아닌 곳의 첫 탭은 선택 풀기에만 쓴다 — 고치자마자 다른 영역 · 보선이 켜지면 어색하다.
   const releaseHold = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (!heldId) return
+    if (!selectedRail || !onReleaseRail) return
     const handle = (event.target as Element).closest('[data-rail-handle]')?.getAttribute('data-rail-handle')
-    if (handle === heldId) return
+    if (handle === selectedRail) return
     event.stopPropagation()
     event.preventDefault()
-    setHeldId(null)
-    onReleaseRail?.()
+    onReleaseRail()
   }
   const startDrag = (rail: CanvasRail) => (event: ReactPointerEvent<SVGLineElement>) => {
     onSelectRail?.(rail.id)
     if (!onDragRail) return
-    setHeldId(null)
     gesture.current = { pointerId: event.pointerId, id: rail.id, axis: rail.axis, start: rail.axis === 'x' ? event.clientX : event.clientY, startValue: rail.value }
     event.currentTarget.setPointerCapture(event.pointerId)
     setDraggingId(rail.id)
@@ -150,8 +147,6 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
     const current = gesture.current
     if (current?.pointerId !== event.pointerId) return
     gesture.current = null
-    const now = editable.find((item) => item.id === current.id)?.value
-    if (now !== undefined && Math.abs(now - current.startValue) > 1e-9) setHeldId(current.id)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     setDraggingId(null)
     onDragState?.(false)
@@ -161,7 +156,7 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
   const labelAt = (axis: 'x' | 'y', value: number, band: 'top' | 'bottom') => axis === 'x'
     ? { x: Math.min(0.92, Math.max(0.08, value)), y: band === 'top' ? -0.03 : 1.062, textAnchor: 'middle' as const }
     : { x: 1.07, y: value - 0.012, textAnchor: 'end' as const }
-  return <svg className={styles.canvas} viewBox={VIEW_BOX} role="img" aria-label={label} data-testid="review-canvas" data-snap={snapHit?.kind} data-held={heldId ?? undefined} onPointerDownCapture={releaseHold}>
+  return <svg className={styles.canvas} viewBox={VIEW_BOX} role="img" aria-label={label} data-testid="review-canvas" data-snap={snapHit?.kind} data-held={selectedRail} onPointerDownCapture={releaseHold}>
     <defs>
       {/* 자소 원형 캔버스와 같은 눈금: 1/16 잔선 + 1/4 굵은선 */}
       <pattern id="review-grid-fine" width=".0625" height=".0625" patternUnits="userSpaceOnUse"><path d="M.0625 0V.0625H0" fill="none" stroke="rgb(218 223 230 / .7)" strokeWidth=".002" /></pattern>
@@ -280,8 +275,6 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
   const slotParts = useMemo(() => fitView ? fitView.parts.map((part, index) => { const moved = withSlotFaces(part, slotDeltaByPart[index]); return moved.ok ? moved.part : part }) : [], [fitView, slotDeltaByPart])
   const railsByPart = useMemo(() => slotParts.map((part, index) => railsWithDelta(part.fit?.railsEm, railDeltaByPart[index])), [slotParts, railDeltaByPart])
   const [selectedRail, setSelectedRail] = useState<string | undefined>()
-  // 옮긴 보선을 놓고 다른 곳을 한 번 누르면 선택이 풀린다. 그동안 캔버스엔 굵은 보선 · 변화 띠가 없다. 다음 선택에서 다시 켜진다.
-  const [railReleased, setRailReleased] = useState(false)
   const [error, setError] = useState('')
   // 손으로 끌다 걸린 자리. 자·방향키 이동엔 없다.
   const [snapHit, setSnapHit] = useState<SnapHit | null>(null)
@@ -318,7 +311,7 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
   const activeRails = useMemo(() => activePart ? canvasRails.filter((item) => samePartGroup(item.part, activePart)) : canvasRails, [canvasRails, activePart])
   const rail = activeRails.find((item) => item.id === selectedRail && !item.locked) ?? activeRails.find((item) => !item.locked)
   const activeJamo = activePart === 'CH' ? glyph.identity.initialJamo : activePart === 'JO' ? glyph.identity.finalJamo ?? '' : glyph.identity.medialJamo
-  const selectPart = (part: Part) => { setActivePartState(part); setSelectedRail(undefined); setRailReleased(false); setError(''); setSnapHit(null) }
+  const selectPart = (part: Part) => { setActivePartState(part); setSelectedRail(undefined); setError(''); setSnapHit(null) }
   // 고정한 변 rail. `이 자리에 맞추기`를 누르면 들어가고, 그 rail을 다시 옮기거나 복원하면 빠진다. 세션 상태.
   const [fixedRails, setFixedRails] = useState<Set<string>>(() => new Set())
   const isEdited = (item: EditableRail) => Math.abs(item.value - item.original) > 1e-9 || fixedRails.has(item.id)
@@ -436,7 +429,7 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
         {/* 캔버스 왼쪽 세로 표지. 여섯 칸 중 지금 고치는 칸을 켜기만 한다 — 범위는 아래 옵션 스택에서 고른다. */}
         <LayoutContextCards activeContextId={glyph.identity.contextId} allActive={selection.scope === 'all'} />
         <div className={styles.canvasArea}>
-        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={railReleased ? undefined : rail?.id} snappedRail={snapHit?.id} snapHit={snapHit} onSelectRail={(id) => { if (id !== rail?.id) setSnapHit(null); setSelectedRail(id); setRailReleased(false); setError('') }} onReleaseRail={() => { setSelectedRail(undefined); setRailReleased(true); setSnapHit(null) }} onSelectPart={selectPart} onDragRail={(id, value) => changeRail(id, value, { snap: true })} onDragState={(dragging) => setHeldBar(dragging ? { editCount, canApply } : null)} onNudgeRail={(id, delta) => { const target = editable.find((item) => item.id === id); if (target) changeRail(id, target.value + delta) }} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
+        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail && rail.id === selectedRail ? rail.id : undefined} snappedRail={snapHit?.id} snapHit={snapHit} onSelectRail={(id) => { if (id !== rail?.id) setSnapHit(null); setSelectedRail(id); setError('') }} onReleaseRail={() => { setSelectedRail(undefined); setSnapHit(null) }} onSelectPart={selectPart} onDragRail={(id, value) => changeRail(id, value, { snap: true })} onDragState={(dragging) => setHeldBar(dragging ? { editCount, canApply } : null)} onNudgeRail={(id, delta) => { const target = editable.find((item) => item.id === id); if (target) changeRail(id, target.value + delta) }} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
         <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="review-ghost-toggle" />
         {/* 변 rail을 잡으면 `이 자리에 맞추기`. 누르면 범위 안 글자가 전부 이 자리(em)에 모인다. 탁 걸린 자리면 주황 테두리. 고정 뒤엔 `= 자리` 표지. */}
         {FIX_RAIL_ENABLED && rail && rail.kind === 'face' && (fixable

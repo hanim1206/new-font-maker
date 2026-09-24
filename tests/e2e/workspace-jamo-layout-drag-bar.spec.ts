@@ -103,7 +103,7 @@ test('보선은 끄는 동안 얇고 걸려도 영역 색 그대로, 손을 떼�
   expect(Number(await band.getAttribute('height'))).toBeCloseTo(Number(await boxRect.getAttribute('height')), 6)
 })
 
-test('보선을 옮긴 뒤 다른 영역을 누르면 선택만 풀리고, 한 번 더 눌러야 그 영역이 켜진다', async ({ page }) => {
+test('보선이 선택된 채 다른 영역을 누르면 선택만 풀리고, 한 번 더 눌러야 그 영역이 켜진다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   const canvas = page.getByTestId('review-canvas')
