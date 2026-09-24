@@ -70,6 +70,6 @@ test('검수 격자에서 글자를 열면 자소 탭 레이아웃 모드로 그
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible({ timeout: 20_000 })
   // 문장에 없던 글자라 문장 앞에 붙는다.
   await expect(page.getByRole('region', { name: '보정 문장' }).getByRole('button', { name: '염 편집' })).toHaveAttribute('aria-current', 'true')
-  await page.getByTestId('jamo-stroke-chip').click()
+  await page.getByTestId('review-canvas').locator('[data-edit-part]').first().dispatchEvent('click')
   await expect(page.getByRole('region', { name: '염 완성 글자 편집' })).toBeVisible()
 })

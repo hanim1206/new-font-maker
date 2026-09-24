@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 
 /**
  * 보선 이동은 저장 버튼을 눌러야 남는다. 저장 안 한 채 떠나려 하면 먼저 묻는다.
- * 획 편집은 옮긴 보선을 저장해야 갈 수 있다(묻는 창 없이 칩이 잠긴다).
+ * 획 편집은 옮긴 보선을 저장해야 갈 수 있다(묻는 창 없이 켜진 상자를 눌러도 안 간다).
  */
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -25,13 +25,11 @@ async function dragRail(page: Page) {
   await expect(page.getByTestId('review-reset')).toContainText('1개 변경')
 }
 
-test('보선을 옮긴 채로는 획 편집에 못 가고, 저장하면 칩이 풀려 획 편집으로 간다', async ({ page }) => {
+test('보선을 옮긴 채로는 획 편집에 못 가고, 저장하면 켜진 상자를 눌러 간다', async ({ page }) => {
   await dragRail(page)
-  const chip = page.getByTestId('jamo-stroke-chip')
-  await expect(chip).toHaveAttribute('aria-disabled', 'true')
-  await chip.click({ force: true })
-  await expect(page.getByTestId('layout-leave-dialog')).toHaveCount(0)
-  await expect(page.getByTestId('jamo-stroke-tools')).toHaveCount(0)
+  // 옮긴 보선이 있는 동안 켜진 상자는 획 편집 입구가 아니다.
+  const chip = page.getByTestId('review-canvas').locator('[data-edit-part]').first()
+  await expect(chip).toHaveCount(0)
   // 켜진 상자를 다시 눌러도 안 간다.
   const active = page.getByTestId('review-canvas').locator('[data-testid="review-part-hit"][aria-pressed="true"]').first()
   await active.dispatchEvent('click')
@@ -39,8 +37,7 @@ test('보선을 옮긴 채로는 획 편집에 못 가고, 저장하면 칩이 �
   // 저장하면 풀린다.
   await page.getByTestId('review-propagation-apply').click()
   await expect(page.getByTestId('review-reset')).toHaveCount(0)
-  await expect(chip).not.toHaveAttribute('aria-disabled', 'true')
-  await chip.click()
+  await chip.dispatchEvent('click')
   await expect(page.getByTestId('jamo-stroke-tools')).toBeVisible()
 })
 

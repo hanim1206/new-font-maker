@@ -74,7 +74,7 @@ type CanvasRail = EditableRail & { part: Part; locked?: boolean }
 // 방향키 → 축 방향 부호. 가로 위치(x)는 좌우, 세로 위치(y)는 상하(아래가 +).
 const nudgeOf = (key: string, axis: 'x' | 'y'): number => axis === 'x' ? (key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0) : (key === 'ArrowDown' ? 1 : key === 'ArrowUp' ? -1 : 0)
 
-function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], activePart, selectedRail, snappedRail, snapHit, showDelta = true, onSelectRail, onDragRail, onDragState, onNudgeRail, onSelectPart, onEditPart, editLocked = false, editLabel, onReleaseRail, label, overlays = [], componentOverlays = [], boxes = [] }: {
+function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], activePart, selectedRail, snappedRail, snapHit, showDelta = true, onSelectRail, onDragRail, onDragState, onNudgeRail, onSelectPart, onEditPart, editLocked = false, onReleaseRail, label, overlays = [], componentOverlays = [], boxes = [] }: {
   ghost: string
   /** Noto 고스트를 끄면 내 획만 남아 어느 획을 바꿀지 보인다. */
   ghostVisible?: boolean
@@ -100,11 +100,10 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
   onDragState?: (dragging: boolean) => void
   /** 부품 상자를 누르면 그 부품이 켜진다. 탭 대신 캔버스가 부품을 고른다. */
   onSelectPart?: (part: Part) => void
-  /** 켜진 부품을 한 번 더 누르면 그 자소 획 편집으로 간다. 켜진 상자 모서리에 `editLabel` 칩이 선다. */
+  /** 켜진 부품을 한 번 더 누르면 그 자소 획 편집으로 간다. */
   onEditPart?: (part: Part) => void
-  /** 옮긴 보선을 아직 저장 안 했으면 획 편집으로 못 간다. 칩은 흐리게 서고 눌리지 않는다. */
+  /** 옮긴 보선을 아직 저장 안 했으면 획 편집으로 못 간다. */
   editLocked?: boolean
-  editLabel?: string
   /** 보선이 선택된 채 다른 곳을 누른 첫 탭. 선택만 풀고 그 탭은 다른 부품·보선에 넘기지 않는다. */
   onReleaseRail?: () => void
   label: string
@@ -124,11 +123,13 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
   // 보선이 선택돼 있으면 다른 영역 · 빈 곳의 첫 탭은 선택 풀기에만 쓴다 — 고치자마자 다른 영역이 켜지면 어색하다.
   // 손잡이는 켠 영역 보선에만 있으니, 같은 영역의 다른 보선은 바로 잡는다.
   const releaseHold = (event: ReactPointerEvent<SVGSVGElement>) => {
+    // 새 탭마다 먹을지 다시 정한다(끌다 끝나 클릭이 안 온 탭의 표시가 남지 않게).
+    releasedByTap.current = false
     if (!selectedRail || !onReleaseRail) return
     if ((event.target as Element).closest('[data-rail-handle]')) return
     event.stopPropagation()
     event.preventDefault()
-    // 보선을 놓으려고 누른 탭이 켜진 상자의 `획 고치기`로 새지 않게 이번 클릭은 먹는다.
+    // 보선을 놓으려고 누른 탭이 켜진 상자의 `획 고치기`로 새지 않게 이번 클릭은 먹는다(부품을 켠 탭도 같다 — 아래 상자 pointerdown).
     releasedByTap.current = true
     onReleaseRail()
   }
@@ -137,8 +138,6 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
     if (releasedByTap.current) { releasedByTap.current = false; return }
     onEditPart?.(part)
   }
-  const activeBoxes = activePart ? boxes.filter((item) => samePartGroup(item.part, activePart)) : []
-  const chipAt = activeBoxes.length ? { right: Math.max(...activeBoxes.map((item) => item.box.x + item.box.width)), top: Math.min(...activeBoxes.map((item) => item.box.y)) } : null
   const startDrag = (rail: CanvasRail) => (event: ReactPointerEvent<SVGLineElement>) => {
     onSelectRail?.(rail.id)
     if (!onDragRail) return
@@ -223,13 +222,13 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
     })}
     {/* 부품 고르기. 실측선 위·편집 rail 아래에 투명 히트 상자를 깔아 상자 안 아무 데나 누르면 그 부품이 켜진다. rail 손잡이가 뒤에 그려져 rail이 먼저 잡힌다.
         활성 상자는 이벤트를 통과시켜 그 안의 실측선 호버와 잉크가 그대로 살고, 겹친 자리에서 비활성 상자를 눌러 넘어갈 수 있다. */}
-    {/* 켜진 상자를 한 번 더 누르면 획 편집(`onEditPart`). 켜진 상자를 먼저 그려서 겹친 자리는 여전히 비활성 상자가 잡는다. */}
+    {/* 켜진 상자를 한 번 더 누르면 획 편집(`onEditPart`). 올리거나 누르는 동안 상자가 부품 색으로 진해진다. 켜진 상자를 먼저 그려서 겹친 자리는 여전히 비활성 상자가 잡는다. */}
     {onSelectPart && [...boxes].sort((a, b) => Number(!activePart || !samePartGroup(a.part, activePart)) - Number(!activePart || !samePartGroup(b.part, activePart))).map((item) => {
       const active = !activePart || samePartGroup(item.part, activePart)
       const editable = active && !!onEditPart && !!activePart && !editLocked
       {/* pointer-events는 `auto`(투명 fill도 칠한 것으로 잡힘). `all`은 Chromium에서 rect 기하 밖까지 잡아 다른 상자를 가린다. */}
       return <rect key={`h${item.id}`} x={item.box.x} y={item.box.y} width={item.box.width} height={item.box.height} fill="transparent" pointerEvents={active && !editable ? 'none' : 'auto'} style={{ '--part': PART_COLOR[item.part] } as React.CSSProperties} className={styles.boxHit} data-testid="review-part-hit" data-part={item.part} data-active={active} role="button" tabIndex={0} aria-label={`${item.label} 선택`} data-edit-part={editable || undefined} aria-pressed={active}
-        onPointerDown={() => { if (!active) onSelectPart(item.part) }}
+        onPointerDown={() => { if (!active) { releasedByTap.current = true; onSelectPart(item.part) } }}
         onClick={() => { if (editable) editPart(item.part); else releasedByTap.current = false }}
         onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (editable) onEditPart(item.part); else if (!active) onSelectPart(item.part) } }} />
     })}
@@ -251,15 +250,6 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
         {active && <text {...labelAt(rail.axis, rail.value, 'top')} className={styles.railLabel} fontSize=".03" fill={stroke}>{rail.label}{rail.locked ? ' · 글자에 안 닿음' : ''}</text>}
       </g>
     })}
-    {/* 켜진 부품의 `획 고치기` 칩. 상자 오른쪽 위 모서리 안쪽에 선다. 끄는 동안엔 숨긴다. */}
-    {/* 옮긴 보선이 있으면 먼저 저장해야 한다 — 칩은 흐리게 서고 눌리지 않는다(묻는 창 없이). */}
-    {onEditPart && activePart && chipAt && editLabel && !dragging && <g className={styles.editChip} transform={`translate(${Math.min(chipAt.right, 0.99) - 0.012} ${Math.max(chipAt.top, 0.01) + 0.012})`} role="button" tabIndex={editLocked ? -1 : 0} aria-label={`${editLabel} 고치기`} aria-disabled={editLocked || undefined} data-locked={editLocked || undefined} data-testid="jamo-stroke-chip"
-      onPointerDown={(event) => event.stopPropagation()}
-      onClick={() => { releasedByTap.current = false; if (!editLocked) onEditPart(activePart) }}
-      onKeyDown={(event) => { if ((event.key === 'Enter' || event.key === ' ') && !editLocked) { event.preventDefault(); onEditPart(activePart) } }}>
-      <rect x="-.18" y="0" width=".18" height=".072" rx=".02" fill={PART_COLOR[activePart]} />
-      <text x="-.09" y=".048" textAnchor="middle" fontSize=".036" fill="#fff">{editLabel} ›</text>
-    </g>}
     {/* Δ 수치. 선택한 rail은 크게, 나머지 바뀐 rail은 작고 옅게(저장 안 된 변경이 있다는 표시만). */}
     {showDelta && editable.filter((rail) => Math.abs(rail.value - rail.original) > 1e-9).map((rail) => {
       const active = rail.id === selectedRail
@@ -336,7 +326,6 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
   const activePart = parts.some((part) => samePartGroup(part, activePartState)) ? activePartState : parts[0]
   const activeRails = useMemo(() => activePart ? canvasRails.filter((item) => samePartGroup(item.part, activePart)) : canvasRails, [canvasRails, activePart])
   const rail = activeRails.find((item) => item.id === selectedRail && !item.locked) ?? activeRails.find((item) => !item.locked)
-  const activeJamo = activePart === 'CH' ? glyph.identity.initialJamo : activePart === 'JO' ? glyph.identity.finalJamo ?? '' : glyph.identity.medialJamo
   const selectPart = (part: Part) => { setActivePartState(part); setSelectedRail(undefined); setError(''); setSnapHit(null) }
   // 고정한 변 rail. `이 자리에 맞추기`를 누르면 들어가고, 그 rail을 다시 옮기거나 복원하면 빠진다. 세션 상태.
   const [fixedRails, setFixedRails] = useState<Set<string>>(() => new Set())
@@ -455,7 +444,7 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
         {/* 캔버스 왼쪽 세로 표지. 여섯 칸 중 지금 고치는 칸을 켜기만 한다 — 범위는 아래 옵션 스택에서 고른다. */}
         <LayoutContextCards activeContextId={glyph.identity.contextId} allActive={selection.scope === 'all'} />
         <div className={styles.canvasArea}>
-        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail && rail.id === selectedRail ? rail.id : undefined} snappedRail={snapHit?.id} snapHit={snapHit} onSelectRail={(id) => { if (id !== rail?.id) setSnapHit(null); setSelectedRail(id); setError('') }} onReleaseRail={() => { setSelectedRail(undefined); setSnapHit(null) }} onSelectPart={selectPart} onEditPart={onEditStrokes ? (part) => { if (editCount === 0) onEditStrokes(part) } : undefined} editLocked={editCount > 0} editLabel={activeJamo ? `${activeJamo} 획` : undefined} onDragRail={(id, value) => changeRail(id, value, { snap: true })} onDragState={(dragging) => setHeldBar(dragging ? { editCount, canApply } : null)} onNudgeRail={(id, delta) => { const target = editable.find((item) => item.id === id); if (target) changeRail(id, target.value + delta) }} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
+        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail && rail.id === selectedRail ? rail.id : undefined} snappedRail={snapHit?.id} snapHit={snapHit} onSelectRail={(id) => { if (id !== rail?.id) setSnapHit(null); setSelectedRail(id); setError('') }} onReleaseRail={() => { setSelectedRail(undefined); setSnapHit(null) }} onSelectPart={selectPart} onEditPart={onEditStrokes ? (part) => { if (editCount === 0) onEditStrokes(part) } : undefined} editLocked={editCount > 0} onDragRail={(id, value) => changeRail(id, value, { snap: true })} onDragState={(dragging) => setHeldBar(dragging ? { editCount, canApply } : null)} onNudgeRail={(id, delta) => { const target = editable.find((item) => item.id === id); if (target) changeRail(id, target.value + delta) }} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
         <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="review-ghost-toggle" />
         {/* 변 rail을 잡으면 `이 자리에 맞추기`. 누르면 범위 안 글자가 전부 이 자리(em)에 모인다. 탁 걸린 자리면 주황 테두리. 고정 뒤엔 `= 자리` 표지. */}
         {FIX_RAIL_ENABLED && rail && rail.kind === 'face' && (fixable
@@ -511,7 +500,7 @@ export interface GlyphLayoutEditorProps {
   initialPart?: Part
   /** 배치 Δ를 적용하거나 지운 직후. 앞뒤 스냅샷으로 호출자가 Undo 기록을 남긴다. */
   onCommitted?: (before: LayoutDeltaSnapshot, after: LayoutDeltaSnapshot) => void
-  /** 켠 부품의 획 편집으로 내려간다. 주면 켜진 상자 모서리에 `ㄱ 획` 칩이 서고, 켜진 상자를 한 번 더 눌러도 간다. 옮긴 보선을 저장해야 열린다. */
+  /** 켠 부품의 획 편집으로 내려간다. 주면 켜진 상자를 한 번 더 누르면 간다(누르거나 올리면 상자가 진해진다). 버튼은 없다. 옮긴 보선을 저장해야 열린다. */
   onEditStrokes?: (part: Part) => void
   /** 예시 글자를 누르면 그 글자를 연다. */
   onPickCharacter?: (character: string) => void
