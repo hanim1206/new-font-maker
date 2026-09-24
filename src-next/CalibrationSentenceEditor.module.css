@@ -76,17 +76,14 @@
 section.sentence[data-sheet] { flex-basis: var(--sheet-h); height: var(--sheet-h); background: rgb(var(--color-surface)); }
 /* 편집부는 그대로 두고(보선 초안 유지) 펼친 줄 아래로 가린다. */
 .scrollArea[data-sheet] { overflow: hidden; }
-.sentenceRoll { position: absolute; bottom: calc(env(safe-area-inset-bottom) + 16px); left: 50%; min-height: 40px; display: inline-flex; align-items: center; gap: 7px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 600; translate: -50% 0; animation: sentence-roll-in var(--motion-slow) var(--ease-standard) both; }
-.sentenceRoll:active { background: rgb(var(--color-foreground) / .1); }
-@keyframes sentence-roll-in { from { opacity: 0; translate: -50% 8px; } }
-@media (prefers-reduced-motion: reduce) { .sentenceRoll { animation: none; } }
+.sentenceSheetBar { position: fixed; z-index: 5; left: 50%; bottom: calc(max(env(safe-area-inset-bottom), var(--keyboard-inset, 0px)) + 16px); display: flex; gap: 8px; padding: 4px; border-radius: 999px; background: rgb(var(--color-surface) / .92); box-shadow: 0 4px 18px rgb(15 23 42 / .12), 0 0 0 1px rgb(var(--color-border-subtle)); backdrop-filter: blur(8px); translate: -50% 0; transition: bottom var(--motion-fast) var(--ease-standard); animation: sentence-bar-in var(--motion-slow) var(--ease-standard) both; }
+.sentenceSheetBar button { min-height: 40px; display: inline-flex; align-items: center; gap: 7px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.sentenceSheetBar button:active { background: rgb(var(--color-foreground) / .1); }
+.sentenceSheetBar button:disabled { opacity: .4; }
+@keyframes sentence-bar-in { from { opacity: 0; translate: -50% 8px; } }
+@media (prefers-reduced-motion: reduce) { .sentenceSheetBar { animation: none; transition: none; } }
 /* iOS는 16px 아래 입력칸에 포커스하면 화면을 확대한다. */
 .sheetInput { position: fixed; top: 0; left: 0; width: 1px; height: 1px; padding: 0; overflow: hidden; border: 0; opacity: 0; pointer-events: none; font-size: 16px; }
-/* 비우기: 문장 끝, 커서 뒤에 옅은 회색 원. 눌리는 자리는 넉넉히. */
-.sentenceRun button.sentenceClear { inline-size: 36px; block-size: 1em; display: inline-grid; place-items: center; margin-left: 2px; }
-.sentenceRun button.sentenceClear > span { inline-size: 20px; block-size: 20px; display: grid; place-items: center; border-radius: 50%; background: rgb(var(--color-text-6) / .55); color: rgb(var(--color-surface)); }
-.sentenceRun button.sentenceClear svg { inline-size: 12px; block-size: 12px; }
-.sentenceRun button.sentenceClear:active > span { background: rgb(var(--color-text-4)); }
 .sentenceRun span.sentenceSheetHint { block-size: auto; margin-left: 6px; color: rgb(var(--color-text-5)); font-size: 16px; line-height: 1.4; text-align: left; }
 .spaceGlyph { color: transparent !important; user-select: none; }
 .punctuationGlyph { font-family: ui-sans-serif, system-ui, sans-serif; font-size: .72em; line-height: 1.38em !important; }

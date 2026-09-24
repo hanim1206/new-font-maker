@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
-import { ArrowLeft, Check, Copy, CopyPlus, Dices, Download, LayoutDashboard, Link2, ListTree, LoaderCircle, Plus, Redo2, Settings2, Spline, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
+import { ArrowLeft, Check, Copy, CopyPlus, Delete, Dices, Download, LayoutDashboard, Link2, ListTree, LoaderCircle, Plus, Redo2, Settings2, Spline, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
 import { DevGhostToggle } from './DevGhostToggle'
@@ -1579,6 +1579,21 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     setSentenceSheetOpen(false)
     setSentenceSheetClosing(true)
   }
+  // 펼친 동안 아래 버튼 바가 자판 위로 뜨게 자판 높이를 잰다(보이는 화면 아래 끝 ~ 창 아래 끝).
+  const [keyboardInset, setKeyboardInset] = useState(0)
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!sentenceSheetOpen || !viewport) return
+    const measure = () => setKeyboardInset(Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop)))
+    measure()
+    viewport.addEventListener('resize', measure)
+    viewport.addEventListener('scroll', measure)
+    return () => {
+      viewport.removeEventListener('resize', measure)
+      viewport.removeEventListener('scroll', measure)
+      setKeyboardInset(0)
+    }
+  }, [sentenceSheetOpen])
   // 줄어드는 시간(--motion-slow)이 지나면 한 줄로 돌아간다.
   useEffect(() => {
     if (!sentenceSheetClosing) return
@@ -1909,9 +1924,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         return groups
       }, []).map((group) => <span key={`word-${group.start}`} className={styles.wordRun}>{[...group.text].flatMap((char, index) => withCaret(char, group.start + index))}</span>)}
       {sentenceCaret >= chars.length && caret('caret-end')}
-      {chars.length > 0
-        ? <button type="button" className={styles.sentenceClear} onClick={(event) => { event.stopPropagation(); clearSentence() }} aria-label="문장 비우기" data-testid="sentence-sheet-clear"><span aria-hidden="true"><X size={12} strokeWidth={3} /></span></button>
-        : <span className={styles.sentenceSheetHint}>고칠 글자가 든 문장을 적어 보세요</span>}
+      {chars.length === 0 && <span className={styles.sentenceSheetHint}>고칠 글자가 든 문장을 적어 보세요</span>}
     </>
   }
   const body = (
@@ -1939,7 +1952,11 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
             autoCorrect="off"
             spellCheck={false}
           />
-          <button type="button" className={styles.sentenceRoll} onClick={(event) => { event.stopPropagation(); rollSentence() }} aria-label="예시 문장 바꾸기" data-testid="sentence-sheet-roll"><Dices size={18} aria-hidden="true" />다른 문장</button>
+          {/* 아래 버튼 바. 화면 아래에 떠 있고, 자판이 열리면 자판 위로 올라간다. 누를 때 입력칸 포커스를 뺏지 않아 자판이 닫히지 않는다. */}
+          <div className={styles.sentenceSheetBar} style={{ '--keyboard-inset': `${keyboardInset}px` } as CSSProperties} onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.preventDefault()} onMouseDown={(event) => event.preventDefault()}>
+            <button type="button" onClick={rollSentence} aria-label="예시 문장 바꾸기" data-testid="sentence-sheet-roll"><Dices size={18} aria-hidden="true" />다른 문장</button>
+            <button type="button" onClick={clearSentence} disabled={sampleSentence.length === 0} aria-label="문장 전체 지우기" data-testid="sentence-sheet-clear"><Delete size={18} aria-hidden="true" />전체 지우기</button>
+          </div>
         </>}
         </> : <>
         <div className={styles.sentenceActions}>
