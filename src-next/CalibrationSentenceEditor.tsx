@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type Ref, type RefObject, type TextareaHTMLAttributes } from 'react'
 import { ArrowLeft, Check, Circle, Copy, CopyPlus, Delete, Dices, Download, LayoutDashboard, Link2, ListTree, LoaderCircle, Plus, Redo2, Settings2, Spline, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
@@ -346,6 +346,38 @@ function LayoutAreaBoxes({
       />
     })}
   </g>
+}
+
+/**
+ * 문장 입력칸. 칸 안 글자는 바로 바뀌고, 문장 그림(글자마다 획 맞추기 · 커서)은 전환으로 뒤따른다 — 치는 동안 입력이 막히지 않는다.
+ * 늦게 돌아오는 내 값은 무시하고, 밖에서 바꾼 값(주사위 · 전체 삭제)만 칸에 받는다.
+ */
+function SentenceTextarea({ value, onValueChange, onCaretChange, ref, ...rest }: Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange' | 'onSelect'> & {
+  value: string
+  onValueChange: (value: string) => void
+  onCaretChange?: (input: HTMLTextAreaElement) => void
+  ref?: Ref<HTMLTextAreaElement>
+}) {
+  const [draft, setDraft] = useState(value)
+  const sent = useRef<string[]>([])
+  useEffect(() => {
+    const index = sent.current.indexOf(value)
+    if (index >= 0) { sent.current = sent.current.slice(index + 1); return }
+    sent.current = []
+    setDraft(value)
+  }, [value])
+  return <textarea
+    {...rest}
+    ref={ref}
+    value={draft}
+    onChange={(event) => {
+      const input = event.target
+      setDraft(input.value)
+      sent.current.push(input.value)
+      startTransition(() => { onValueChange(input.value); onCaretChange?.(input) })
+    }}
+    onSelect={(event) => { const input = event.currentTarget; startTransition(() => onCaretChange?.(input)) }}
+  />
 }
 
 function Glyph({
@@ -2118,12 +2150,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
           <button type="button" className={styles.sentenceOpen} onClick={(event) => { event.stopPropagation(); if (sentenceSheetOpen) closeSentenceSheet(); else openSentenceSheet() }} aria-label={sentenceSheetOpen ? '문장 접기' : '문장 크게 보기 · 바꾸기'} aria-expanded={sentenceSheetOpen} title={sentenceSheetOpen ? '문장 접기' : '문장 크게 보기 · 바꾸기'} data-testid="sentence-sheet-toggle">{sentenceSheetOpen ? <X size={19} aria-hidden="true" /> : <ZoomIn size={19} aria-hidden="true" />}</button>
         </div>
         {sentenceSheetOpen && <>
-          <textarea
+          <SentenceTextarea
             ref={sheetInputRef}
             className={styles.sheetInput}
             value={sampleSentence}
-            onChange={(event) => { setSampleSentence(event.target.value); setIsCustomSentence(true); syncSentenceCaret(event.target) }}
-            onSelect={(event) => syncSentenceCaret(event.currentTarget)}
+            onValueChange={(value) => { setSampleSentence(value); setIsCustomSentence(true) }}
+            onCaretChange={syncSentenceCaret}
             aria-label="문장 입력"
             autoCapitalize="none"
             autoCorrect="off"
@@ -2140,11 +2172,11 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
           <button type="button" onClick={() => guardLayoutLeave(pickSampleSentence)} aria-label="예시 문장 무작위 선택" title="예시 문장 바꾸기"><Dices size={19} aria-hidden="true" /></button>
           <button type="button" data-active={isDirectInputActive || undefined} onClick={startDirectInput} aria-label="보정 문장 직접 입력" title="직접 입력"><TextCursorInput size={19} aria-hidden="true" /></button>
         </div>
-        <textarea
+        <SentenceTextarea
           ref={directInputRef}
           className={styles.directInput}
           value={sampleSentence}
-          onChange={(event) => updateDirectInput(event.target.value)}
+          onValueChange={updateDirectInput}
           onFocus={() => setIsDirectInputActive(true)}
           onBlur={() => setIsDirectInputActive(false)}
           aria-label="보정 문장 직접 입력"
@@ -2153,7 +2185,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
           spellCheck={false}
         />
         </>}
-        {calibrationLines.map((line, lineIndex) => <div key={line} className={`${styles.sentenceRun} ${chrome === 'workspace' ? styleMode.run : ''}`} style={{ fontSize: sentenceSheetOpen ? SENTENCE_SHEET_EM : styleSpaceOpen ? STYLE_SPACE_EM : sentenceEm }}>
+        {/* 줄 key는 순번. 문장 글자로 두면 한 글자 칠 때마다 줄 안 글자가 전부 새로 만들어져 움찔거리고 획 맞추기를 처음부터 다시 한다. */}
+        {calibrationLines.map((line, lineIndex) => <div key={lineIndex} className={`${styles.sentenceRun} ${chrome === 'workspace' ? styleMode.run : ''}`} style={{ fontSize: sentenceSheetOpen ? SENTENCE_SHEET_EM : styleSpaceOpen ? STYLE_SPACE_EM : sentenceEm }}>
           {sentenceSheetOpen ? renderSheetRun() : tokenizeSentenceLine(line).map((token) => token.whitespace
             ? [...token.text].map((char, index) => renderSentenceCharacter(char, token.start + index, lineIndex))
             : <span key={`${lineIndex}-word-${token.start}`} className={styles.wordRun}>{[...token.text].map((char, index) => renderSentenceCharacter(char, token.start + index, lineIndex))}</span>
