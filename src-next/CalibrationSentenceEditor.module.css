@@ -209,6 +209,11 @@ section.sentence[data-sheet] { flex-basis: var(--sheet-h); height: var(--sheet-h
 .strokeToolRow button:disabled { opacity: .35; }
 .strokeTrackpad { flex: 1 1 auto; min-width: 0; height: auto; border-radius: 12px; }
 .strokeToolRow button[aria-pressed='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary) / .12); color: rgb(var(--color-primary)); }
+/* 캔버스 왼쪽 도구 줄. `contain: size`로 제 높이를 안 내세워 캔버스 높이만큼만 보이고, 넘치는 단추는 한 칸씩 스냅으로 넘긴다(관성으로 여러 칸 튀지 않게 `always`). 위아래 끝은 흐려서 더 있다는 걸 알린다. */
+.strokeToolSlot { flex: 0 0 48px; align-self: stretch; min-height: 0; contain: size; overflow-y: auto; overscroll-behavior: contain; scroll-snap-type: y mandatory; scrollbar-width: none; mask-image: linear-gradient(to bottom, transparent 0, #000 10px, #000 calc(100% - 18px), transparent 100%); }
+.strokeToolSlot::-webkit-scrollbar { display: none; }
+.strokeToolSlot .strokeToolRow { display: flex; flex-direction: column; gap: 6px; padding: 4px 0 12px; }
+.strokeToolSlot .strokeToolRow button { flex: 0 0 48px; min-height: 48px; scroll-snap-align: start; scroll-snap-stop: always; scroll-margin-top: 4px; }
 .strokeWarning { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f0561e; font-size: 10.5px; font-weight: 600; }
 /* 획 편집 캔버스 뒤에 까는 레이아웃 기준선(읽기 전용)과, 끌다 걸린 자리. 걸린 색은 레이아웃과 같은 주황. */
 .guideRail { stroke: rgb(59 111 214 / .32); stroke-width: .25; stroke-dasharray: 1.2 1.2; pointer-events: none; }

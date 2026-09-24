@@ -9,6 +9,8 @@
 /* 칸 그림이 곧 버튼이다. 잠겨도(안 끝난 Δ) 모양은 그대로다. */
 .card button { display: block; padding: 0; border: 0; border-radius: 4px; background: none; line-height: 0; cursor: pointer; }
 .card button:disabled { cursor: default; }
+/* 지금 열린 글자 칸. */
+.card[data-active] button { background: rgb(var(--color-primary) / .14); box-shadow: inset 0 0 0 1.5px rgb(var(--color-primary)); }
 .card button:focus { outline: none; }
 .card button:focus-visible { outline: 2px solid rgb(var(--color-primary)); outline-offset: 1px; }
 .card svg { display: block; inline-size: calc(var(--row-em) * 1.16); block-size: calc(var(--row-em) * 1.16); }

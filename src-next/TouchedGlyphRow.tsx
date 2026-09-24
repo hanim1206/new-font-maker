@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { Part } from '../src/types'
 import type { CorpusIdentity } from './notoCorpus'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
@@ -6,6 +6,7 @@ import { useNotoGlyph } from './useNotoGlyph'
 import { useFitInkStyle } from './useFitInkStyle'
 import { layoutTypeOfSyllable } from '../src/utils/hangulUtils'
 import { useLayoutDelta } from './layoutDeltaStore'
+import { useJamoStore } from '../src/stores/jamoStore'
 import { propagationCardBaseOf, propagationCardViewOf } from './propagationCardView'
 import type { PropagationCardBox } from './propagationCardView'
 import { hasLayoutEdit, propagationCandidates } from './reviewPropagation'
@@ -32,21 +33,27 @@ const FILL_LIMIT = 8
 
 const BOX_COLOR: Record<PropagationCardBox['kind'], string> = { medial: '#3b6fd6', component: '#2f9a6a' }
 
-function TouchedGlyph({ identity, bundle, edit, ghostVisible, onPick }: { identity: CorpusIdentity; bundle: NotoPresetModelBundle; edit: PropagationEdit; ghostVisible: boolean; onPick?: (character: string) => void }) {
+// 카드마다 props가 그대로면 다시 그리지 않는다. 획을 끄는 동안 부모가 매 움직임 다시 그려도 카드는 쉰다.
+const TouchedGlyph = memo(function TouchedGlyph({ identity, bundle, edit, ghostVisible, active = false, onPick }: { identity: CorpusIdentity; bundle: NotoPresetModelBundle; edit: PropagationEdit; ghostVisible: boolean; active?: boolean; onPick?: (character: string) => void }) {
   const { glyph, error } = useNotoGlyph(identity.codepoint)
   const inkStyle = useFitInkStyle(layoutTypeOfSyllable(identity.medialJamo, identity.finalJamo !== null))
   // 이 글자에 이미 저장된 Δ 위에 지금 편집 Δ를 얹는다. 렌더러가 보는 상자와 같은 출발점.
   const savedDelta = useLayoutDelta(identity)
   // 보선을 끄는 동안 움직임마다 칸 수만큼 도는 길이라 둘로 나눈다(`propagationCardView.ts`).
   // 글자당 한 번: 고스트 · 칸 해석 · fit · Δ 없는 내 획. 끄는 동안에는 Δ 얹기만 돈다.
-  const base = useMemo(() => glyph ? propagationCardBaseOf({ glyph, identity, bundle, savedDelta, inkStyle }) : null, [glyph, identity, bundle, savedDelta, inkStyle])
+  // 카드는 앱 획을 스토어에서 읽어 그린다. 이 글자의 자모 획이 저장으로 바뀔 때만 다시 그리게 셋을 따로 구독한다.
+  const initialStrokes = useJamoStore((state) => state.choseong[identity.initialJamo])
+  const medialStrokes = useJamoStore((state) => state.jungseong[identity.medialJamo])
+  const finalStrokes = useJamoStore((state) => identity.finalJamo ? state.jongseong[identity.finalJamo] : undefined)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 획 셋은 계산 안에서 스토어로 읽힌다. 바뀌면 다시 그리라는 신호로만 둔다.
+  const base = useMemo(() => glyph ? propagationCardBaseOf({ glyph, identity, bundle, savedDelta, inkStyle }) : null, [glyph, identity, bundle, savedDelta, inkStyle, initialStrokes, medialStrokes, finalStrokes])
   const view = useMemo(() => base ? propagationCardViewOf(base, edit, inkStyle) : null, [base, edit, inkStyle])
   // Δ가 아직 없으면 그냥 내 획. '안 닿음' 표시도, 흐리게도 안 한다.
   const live = hasLayoutEdit(edit)
   const note = !view ? (error || '읽는 중') : !live ? '' : view.touched === 0 ? 'Δ 안 닿음' : view.skipped > 0 ? '일부 Δ 미적용' : ''
-  return <figure className={styles.card} data-testid="review-propagation-card" data-char={identity.character} data-touched={view && live ? view.touched > 0 : undefined}>
+  return <figure className={styles.card} data-testid="review-propagation-card" data-char={identity.character} data-touched={view && live ? view.touched > 0 : undefined} data-active={active || undefined}>
     {/* 칸 그림이 곧 버튼이다. 문장 줄의 글자를 누르는 것과 같은 동작. */}
-    <button type="button" disabled={!onPick || live} onClick={() => onPick?.(identity.character)} aria-label={`${identity.character} 열기${note ? `, ${note}` : ''}`} title={note || undefined} data-testid="review-propagation-open">
+    <button type="button" disabled={!onPick || live} aria-current={active || undefined} onClick={() => onPick?.(identity.character)} aria-label={`${identity.character} 열기${note ? `, ${note}` : ''}`} title={note || undefined} data-testid="review-propagation-open">
     <svg viewBox={VIEW_BOX} role="img" aria-label={`${identity.character} 미리보기`}>
       {view?.boxes.map((item, index) => <rect key={index} x={item.box.x} y={item.box.y} width={item.box.width} height={item.box.height} fill={BOX_COLOR[item.kind]} fillOpacity=".12" stroke={BOX_COLOR[item.kind]} strokeOpacity=".5" strokeWidth=".004" />)}
       {ghostVisible && view?.ghost && <path d={view.ghost} fill="#3a3a36" fillOpacity=".35" fillRule="evenodd" data-testid="review-propagation-ghost" />}
@@ -60,9 +67,9 @@ function TouchedGlyph({ identity, bundle, edit, ghostVisible, onPick }: { identi
       {note && <small>{note}</small>}
     </figcaption>
   </figure>
-}
+})
 
-export function TouchedGlyphRow({ source, bundle, edit, ghostVisible = true, focus, scope, group, jamos, anyContext, rule, onPick }: {
+export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, edit, ghostVisible = true, focus, scope, group, jamos, anyContext, rule, activeChar, onPick }: {
   source: CorpusIdentity
   bundle: NotoPresetModelBundle | null
   edit: PropagationEdit
@@ -80,6 +87,8 @@ export function TouchedGlyphRow({ source, bundle, edit, ghostVisible = true, foc
   anyContext?: boolean
   /** 범위 고르기 화면에서 확정한 규칙. 있으면 표본을 이 규칙에서 뽑는다(칩·자모 시트보다 넓거나 좁을 수 있다). */
   rule?: ScopeRule
+  /** 지금 열린 글자. 줄에 있으면 그 칸을 켠다(획 편집에서 줄을 그대로 두고 누른 칸만 바꿀 때). */
+  activeChar?: string
   /** 글자를 누르면 그 글자를 연다. 없으면 보기만 한다. */
   onPick?: (character: string) => void
 }) {
@@ -116,7 +125,7 @@ export function TouchedGlyphRow({ source, bundle, edit, ghostVisible = true, foc
   return <section className={styles.row} aria-label="닿는 글자" data-testid="touched-glyph-row">
     {/* 범위가 바뀌면 줄을 새로 만들어 맨 앞에서 시작한다. */}
     <div key={rowKey} ref={scroller} className={styles.cards} data-testid="review-propagation-cards" onScroll={(event) => { const el = event.currentTarget; if (el.scrollLeft + el.clientWidth * 2 >= el.scrollWidth) loadNextBatch() }}>
-      {bundle && focus && candidates.map((identity) => <TouchedGlyph key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} ghostVisible={ghostVisible} onPick={onPick} />)}
+      {bundle && focus && candidates.map((identity) => <TouchedGlyph key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} ghostVisible={ghostVisible} active={identity.character === activeChar} onPick={onPick} />)}
     </div>
   </section>
-}
+})
