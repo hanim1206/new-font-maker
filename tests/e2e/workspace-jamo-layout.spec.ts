@@ -172,9 +172,9 @@ test('기준선을 옮기면 변화 띠와 Δ 수치가 보이고 복원하면 �
   await page.keyboard.press('Shift+ArrowRight')
   await expect(page.getByTestId('review-delta-band')).toHaveCount(1)
   await expect(page.getByTestId('review-delta-label')).toHaveText('+20u')
-  // 다른 rail을 고르면 띠는 그 rail 것만. 안 옮긴 rail이면 띠 없음, 수치는 작게 남는다.
+  // 다른 rail을 골라도 띠는 이 영역에서 옮긴 것 그대로 남는다. 수치는 작게 남는다.
   await selectRail(page, '홀자 윗변')
-  await expect(page.getByTestId('review-delta-band')).toHaveCount(0)
+  await expect(page.getByTestId('review-delta-band')).toHaveCount(1)
   await expect(page.getByTestId('review-delta-label')).toHaveAttribute('data-active', 'false')
   await selectRail(page, '바깥기둥 중심')
   await expect(page.getByTestId('review-delta-band')).toHaveCount(1)

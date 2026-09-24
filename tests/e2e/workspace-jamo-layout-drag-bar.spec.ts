@@ -122,12 +122,12 @@ test('보선이 선택된 채 다른 영역을 누르면 선택만 풀리고, �
   await expect(canvas).toHaveAttribute('data-held', 'c0:left')
   await expect(page.getByTestId('review-delta-band')).toHaveCount(1)
 
-  // 첫 탭: 선택만 풀린다. 부품은 그대로 첫닿자, 굵은 보선 · 변화 띠가 빠진다.
+  // 첫 탭: 선택만 풀린다. 부품은 그대로 첫닿자, 굵은 보선이 빠진다. 변화 띠는 이 영역에서 옮긴 것이라 남는다.
   await medial.click()
   await expect(canvas).not.toHaveAttribute('data-held')
   await expect(initial).toHaveAttribute('aria-pressed', 'true')
   await expect(canvas.locator('[data-rail][data-selected]')).toHaveCount(0)
-  await expect(page.getByTestId('review-delta-band')).toHaveCount(0)
+  await expect(page.getByTestId('review-delta-band')).toHaveCount(1)
   // 옮긴 값은 그대로 남아 있다.
   await expect(page.getByTestId('review-reset')).toContainText('1개 변경')
 
@@ -157,4 +157,6 @@ test('켠 영역의 보선을 옮긴 뒤 같은 영역의 다른 보선은 바�
   const right = await drag('c0:right')
   expect(right.after - right.before).toBeGreaterThan(0.03)
   await expect(canvas).toHaveAttribute('data-held', 'c0:right')
+  // 변화 띠는 선택한 보선 하나가 아니라 이 영역에서 옮긴 보선 전부.
+  await expect(page.getByTestId('review-delta-band')).toHaveCount(2)
 })
