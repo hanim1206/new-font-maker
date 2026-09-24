@@ -102,3 +102,36 @@ test('보선은 끄는 동안 얇고 걸려도 영역 색 그대로, 손을 떼�
   expect(Number(await band.getAttribute('y'))).toBeCloseTo(Number(await boxRect.getAttribute('y')), 6)
   expect(Number(await band.getAttribute('height'))).toBeCloseTo(Number(await boxRect.getAttribute('height')), 6)
 })
+
+test('보선을 옮긴 뒤 다른 영역을 누르면 선택만 풀리고, 한 번 더 눌러야 그 영역이 켜진다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  const canvas = page.getByTestId('review-canvas')
+  const box = (await canvas.boundingBox())!
+  const handle = canvas.locator('[data-rail-handle="c0:left"]')
+  const x1 = Number(await handle.getAttribute('x1'))
+  const pxOf = (em: number) => box.x + (em + 0.08) / 1.16 * box.width
+  const y = box.y + (-0.045 + 0.08) / 1.16 * box.height
+  const medial = canvas.getByRole('button', { name: '홀자 ㅓ 선택' })
+  const initial = canvas.getByRole('button', { name: '첫닿자 ㅁ 선택' })
+
+  await page.mouse.move(pxOf(x1), y)
+  await page.mouse.down()
+  await page.mouse.move(pxOf(x1 + 0.05), y, { steps: 6 })
+  await page.mouse.up()
+  await expect(canvas).toHaveAttribute('data-held', 'c0:left')
+  await expect(page.getByTestId('review-delta-band')).toHaveCount(1)
+
+  // 첫 탭: 선택만 풀린다. 부품은 그대로 첫닿자, 굵은 보선 · 변화 띠가 빠진다.
+  await medial.click()
+  await expect(canvas).not.toHaveAttribute('data-held')
+  await expect(initial).toHaveAttribute('aria-pressed', 'true')
+  await expect(canvas.locator('[data-rail][data-selected]')).toHaveCount(0)
+  await expect(page.getByTestId('review-delta-band')).toHaveCount(0)
+  // 옮긴 값은 그대로 남아 있다.
+  await expect(page.getByTestId('review-reset')).toContainText('1개 변경')
+
+  // 둘째 탭부터 평소대로 그 영역이 켜진다.
+  await medial.click()
+  await expect(medial).toHaveAttribute('aria-pressed', 'true')
+})
