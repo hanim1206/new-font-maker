@@ -66,28 +66,20 @@
 .sentenceRun span { flex: 0 0 auto; block-size: 1em; color: rgb(var(--color-foreground)); line-height: 1em; text-align: center; }
 .sentenceRun .directInputCaret { width: 2px; height: .82em; margin-left: 2px; align-self: center; background: rgb(var(--color-primary)); animation: input-caret-blink 1s steps(1, end) infinite; }
 @keyframes input-caret-blink { 0%, 48% { opacity: 1; } 49%, 100% { opacity: 0; } }
-/* 셸 문장 줄의 `문장` 입구와 전체 화면. 말투는 글로벌 스타일 공간과 같다: 흰 면, 검정 · 회색만, 테두리 없음, 느린 표준 곡선. */
+/* 셸 문장 줄의 돋보기와 펼친 문장 줄. 글로벌 스타일 공간처럼 줄이 그 자리에서 자라고(높이 · 글자 크기) 접히면 원래 크기로 돌아간다. */
 .sentenceActions button.sentenceOpen { width: 36px; height: 36px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-4)); transition: background var(--motion-fast) var(--ease-standard); }
 .sentenceActions button.sentenceOpen:active { scale: 1; background: rgb(var(--color-foreground) / .07); }
-.sentenceSheet { position: fixed; z-index: 90; inset: 0; display: flex; flex-direction: column; background: rgb(var(--color-surface)); animation: sentence-sheet-in var(--motion-slow) var(--ease-standard) both; }
-.sentenceSheet[data-closing] { animation-name: sentence-sheet-out; pointer-events: none; }
-/* 문장은 작은 줄의 글자 크기(24px)에서 자라 나온다. 글로벌 스타일 공간의 문장 줄과 같은 움직임. */
-.sentenceSheet .sentenceSheetStage .sentenceRun { animation: sentence-sheet-grow var(--motion-slow) var(--ease-standard) both; }
-.sentenceSheet[data-closing] .sentenceSheetStage .sentenceRun { animation-name: sentence-sheet-shrink; }
-@keyframes sentence-sheet-in { from { opacity: 0; } }
-@keyframes sentence-sheet-out { to { opacity: 0; } }
-@keyframes sentence-sheet-grow { from { font-size: 24px; translate: 0 -8px; } }
-@keyframes sentence-sheet-shrink { to { font-size: 24px; translate: 0 -8px; } }
-@media (prefers-reduced-motion: reduce) { .sentenceSheet, .sentenceSheet .sentenceSheetStage .sentenceRun { animation: none; } }
-.sentenceSheet > header { flex: 0 0 auto; box-sizing: border-box; min-height: 50px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: max(2px, env(safe-area-inset-top)) 6px 2px 16px; }
-.sentenceSheet > header strong { color: rgb(var(--color-foreground)); font-size: 15px; font-weight: 700; }
-.sentenceSheet > header button { min-width: 44px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-foreground)); font-size: 15px; font-weight: 700; }
-.sentenceSheet > header button:active { background: rgb(var(--color-foreground) / .07); }
-.sentenceSheet > footer { flex: 0 0 auto; display: flex; justify-content: center; padding: 8px 16px calc(env(safe-area-inset-bottom) + 16px); }
-.sentenceSheet > footer button { min-height: 40px; display: inline-flex; align-items: center; gap: 7px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 600; }
-.sentenceSheet > footer button:active { background: rgb(var(--color-foreground) / .1); }
-.sentenceSheetStage { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px 16px; cursor: text; }
-.sentenceSheetStage .sentenceRun { gap: 16px 0; }
+/* 펼친 동안(접히는 동안까지): 여러 줄로 감긴다. 첫 줄은 한 줄일 때와 같은 자리에서 시작하고, 돋보기(닫기)는 오른쪽 위 그 자리에 선다. */
+.sentence[data-sheet-wrap] { align-items: flex-start; padding: 10px 0 0 12px; overflow: hidden; cursor: text; }
+.sentence[data-sheet-wrap] .sentenceRun { flex: 1 1 auto; flex-wrap: wrap; padding-right: 48px; row-gap: 16px; }
+.sentence[data-sheet-wrap] .sentenceActions { position: absolute; top: 0; right: 0; height: var(--top-row-h, 44px); background: none; }
+section.sentence[data-sheet] { flex-basis: var(--sheet-h); height: var(--sheet-h); background: rgb(var(--color-surface)); }
+/* 편집부는 그대로 두고(보선 초안 유지) 펼친 줄 아래로 가린다. */
+.scrollArea[data-sheet] { overflow: hidden; }
+.sentenceRoll { position: absolute; bottom: calc(env(safe-area-inset-bottom) + 16px); left: 50%; min-height: 40px; display: inline-flex; align-items: center; gap: 7px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 600; translate: -50% 0; animation: sentence-roll-in var(--motion-slow) var(--ease-standard) both; }
+.sentenceRoll:active { background: rgb(var(--color-foreground) / .1); }
+@keyframes sentence-roll-in { from { opacity: 0; translate: -50% 8px; } }
+@media (prefers-reduced-motion: reduce) { .sentenceRoll { animation: none; } }
 /* iOS는 16px 아래 입력칸에 포커스하면 화면을 확대한다. */
 .sheetInput { position: fixed; top: 0; left: 0; width: 1px; height: 1px; padding: 0; overflow: hidden; border: 0; opacity: 0; pointer-events: none; font-size: 16px; }
 /* 비우기: 문장 끝, 커서 뒤에 옅은 회색 원. 눌리는 자리는 넉넉히. */
