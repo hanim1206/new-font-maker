@@ -190,6 +190,44 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
     }
   })
 
+  it('G2 — 전역 둥글기 0.5 · 1: OTF가 화면과 같은 윤곽이고, 잉크가 둥글기 0의 상자 밖으로 안 나간다', async () => {
+    const { measure } = await setup()
+    const { useGlobalStyleStore } = await import('../src/stores/globalStyleStore')
+    const before = useGlobalStyleStore.getState().style.strokeStyle
+    const chars = ['한', '과', '의', '곽', '을']
+    const square = chars.map((char) => ({ char, ...measure(char) }))
+    const extent = (shape: MultiPolygon) => {
+      const xs = shape.flatMap((polygon) => polygon[0].map(([x]) => x)), ys = shape.flatMap((polygon) => polygon[0].map(([, y]) => y))
+      return { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) }
+    }
+    try {
+      for (const roundness of [0.5, 1]) {
+        useGlobalStyleStore.getState().setStrokeRenderStyle({ mode: 'brush', brush: { tip: 'round', aspectRatio: 0.5, angle: 0 }, roundness })
+        const rows = chars.map((char) => ({ char, ...measure(char) }))
+        console.info(rows.map((row) => `${row.char} 둥글기 ${roundness} · 모델 ${(row.modelXor * 100).toFixed(3)}% · 가장자리 ${row.edgeDrift.toFixed(2)}유닛`).join('\n'))
+        rows.forEach((row, index) => {
+          expect(row.data.strokeStyle, row.char).toMatchObject({ mode: 'brush', roundness })
+          // 둥글기는 상자를 안 건드린다.
+          expect(row.otfBoxes, row.char).toEqual(row.screenBoxes)
+          expect(row.otfBoxes, row.char).toEqual(square[index].otfBoxes)
+          expect(row.edgeDrift, row.char).toBeLessThan(1)
+          expect(row.modelXor, row.char).toBeLessThan(0.015)
+          // 잉크는 각진 끝 네모 안에서만 굴려진다 — 극점이 밖으로 안 나간다(정수 반올림 1유닛 허용).
+          const now = extent(row.otf), was = extent(square[index].otf)
+          expect(now.left, row.char).toBeGreaterThanOrEqual(was.left - 0.001)
+          expect(now.top, row.char).toBeGreaterThanOrEqual(was.top - 0.001)
+          expect(now.right, row.char).toBeLessThanOrEqual(was.right + 0.001)
+          expect(now.bottom, row.char).toBeLessThanOrEqual(was.bottom + 0.001)
+          // 그래도 모양은 바뀌었다(모서리가 깎인 만큼 면적이 준다).
+          const area = (shape: MultiPolygon) => shape.reduce((sum, polygon) => sum + Math.abs(polygon[0].reduce((acc, [x, y], i, ring) => { const [nx, ny] = ring[(i + 1) % ring.length]; return acc + x * ny - nx * y }, 0)) / 2, 0)
+          expect(area(row.otf), row.char).toBeLessThan(area(square[index].otf))
+        })
+      }
+    } finally {
+      useGlobalStyleStore.getState().setStrokeRenderStyle(before)
+    }
+  })
+
   it('네모꼴 가로 600: 글자가 틀을 따라 줄고, OTF 잉크가 글자 폭 안에 든다(화면과 같은 상자)', async () => {
     const { measure } = await setup()
     const { useLayoutStore } = await import('../src/stores/layoutStore')

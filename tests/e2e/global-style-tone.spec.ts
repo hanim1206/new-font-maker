@@ -27,20 +27,27 @@ test('레이아웃 모드에서도 머리의 입구로 열리고, 닫으면 레�
   const box = await panel.boundingBox()
   expect(box && box.y + box.height).toBeGreaterThan(830)
 
-  // 획 스타일: 고르기는 글자에 나오는 결과로 부른다(각진 끝 · 둥근 끝 · 납작 붓). 기본은 각진 끝이다 — 전에는 `원형`이 골라진 채 끝이 각져 있었다.
+  // 획 스타일: 고르기는 글자에 나오는 결과로 부른다(일반 붓 · 납작 붓). 옛 `각진 끝 / 둥근 끝`은 둥글기 막대가 대신한다.
   await panel.getByRole('tab', { name: '획 스타일' }).click()
   const endChoices = panel.getByRole('radiogroup', { name: '획 끝 모양' }).getByRole('radio')
-  await expect(endChoices).toHaveText(['각진 끝', '둥근 끝', '납작 붓'])
-  await expect(panel.getByRole('radio', { name: '각진 끝', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await expect(endChoices).toHaveText(['일반 붓', '납작 붓'])
+  await expect(panel.getByRole('radio', { name: '일반 붓', exact: true })).toHaveAttribute('aria-checked', 'true')
   await expect(panel.getByRole('radio', { name: '네모형', exact: true })).toHaveCount(0)
   await expect(panel.getByRole('radio', { name: '레거시 스냅 획', exact: true })).toHaveCount(0)
 
-  // 둥근 끝을 고르면 끝 모양이 같이 저장되고, 되돌리기 한 번에 붓촉과 끝 모양이 함께 돌아온다.
-  await panel.getByRole('radio', { name: '둥근 끝', exact: true }).click()
-  expect(await storedStyle(page)).toMatchObject({ linecap: 'round', linejoin: 'round' })
+  // 둥글기 막대: 기본 0(각진 끝). 60%로 놓으면 획 스타일에 저장되고, 되돌리기 한 번에 0으로 돌아온다.
+  const roundness = panel.getByTestId('style-roundness')
+  await expect(roundness).toHaveValue('0')
+  await roundness.fill('60')
+  await roundness.dispatchEvent('pointerup', { pointerId: 1 })
+  expect(await storedStyle(page)).toMatchObject({ strokeStyle: { mode: 'brush', roundness: 0.6 }, linecap: 'butt', linejoin: 'miter' })
+  // 둥글기가 있으면 획이 SVG stroke가 아니라 채운 윤곽으로 그려진다(OTF와 같은 함수).
+  const canvas = page.getByTestId('focus-canvas').locator('svg')
+  await expect(canvas.locator('path[fill="none"][stroke-linecap]')).toHaveCount(0)
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
-  expect(await storedStyle(page)).toMatchObject({ linecap: 'butt', linejoin: 'miter' })
-  await expect(panel.getByRole('radio', { name: '각진 끝', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await expect(roundness).toHaveValue('0')
+  expect((await storedStyle(page)).strokeStyle).not.toHaveProperty('roundness')
+  await expect(canvas.locator('path[fill="none"][stroke-linecap]').first()).toBeVisible()
 
   await panel.getByRole('button', { name: '글로벌 스타일 설정 닫기' }).click()
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()

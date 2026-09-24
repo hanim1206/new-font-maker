@@ -88,3 +88,79 @@ describe('polylineToFlatInkGroups', () => {
     expect(area(ink[0])).toBeLessThan(area(mitered[0]) + 0.02 * 2)
   })
 })
+
+describe('전역 둥글기(roundness)', () => {
+  const line = [{ x: 0.2, y: 0.5 }, { x: 0.8, y: 0.5 }]
+  const ends = new Set([0, 1])
+
+  it('둥글기 0이면 각진 끝과 점 하나까지 같다', () => {
+    const plain = polylineToFlatInkGroups(line, false, 0.1, 'butt', 'miter')
+    const zero = polylineToFlatInkGroups(line, false, 0.1, 'butt', 'miter', undefined, { radius: 0, anchors: ends })
+    expect(zero).toEqual(plain)
+  })
+
+  it('둥글기 1의 직선은 끝이 반원이 되고 잉크가 각진 끝의 네모 밖으로 안 나간다', () => {
+    const ink = union(polylineToFlatInkGroups(line, false, 0.1, 'butt', 'miter', undefined, { radius: 0.05, anchors: ends }))
+    expect(ink).toHaveLength(1)
+    expect(bounds(ink)).toEqual({ left: 0.2, right: 0.8, top: 0.45, bottom: 0.55 })
+    // 네모 0.06에서 양 끝 모서리 넷(반지름 0.05의 사분원 밖)이 빠진다. 다각형 호라 조금 더 작다.
+    const expected = 0.06 - 4 * (0.05 * 0.05 - Math.PI * 0.05 * 0.05 / 4)
+    expect(area(ink[0])).toBeLessThan(0.06)
+    expect(area(ink[0])).toBeGreaterThan(expected * 0.98)
+    // 끝면 가운데(중심선 끝)에는 잉크가 닿고, 끝 모서리 쪽 점은 전부 반지름 0.05의 원(중심 0.75, 0.5) 위에 있다.
+    const pts = ink[0].outer
+    expect(pts.some((p) => Math.abs(p.x - 0.8) < 1e-9 && Math.abs(p.y - 0.5) < 1e-9)).toBe(true)
+    const endQuadrant = pts.filter((p) => p.x > 0.75 + 1e-9)
+    expect(endQuadrant.length).toBeGreaterThan(4)
+    for (const p of endQuadrant) expect(Math.hypot(p.x - 0.75, p.y - 0.5)).toBeCloseTo(0.05, 9)
+  })
+
+  it('반쯤(0.5)이면 끝면에 곧은 가운데가 남는다', () => {
+    const ink = union(polylineToFlatInkGroups(line, false, 0.1, 'butt', 'miter', undefined, { radius: 0.025, anchors: ends }))
+    expect(bounds(ink)).toEqual({ left: 0.2, right: 0.8, top: 0.45, bottom: 0.55 })
+    const face = ink[0].outer.filter((p) => Math.abs(p.x - 0.8) < 1e-9).map((p) => p.y).sort()
+    expect(face[0]).toBeCloseTo(0.475, 9)
+    expect(face[face.length - 1]).toBeCloseTo(0.525, 9)
+  })
+
+  it('직각 꺾임은 안팎 모서리가 다 굴려지고, 둥글기 1이면 바깥이 원형 결합과 같다', () => {
+    const corner = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }]
+    const anchors = new Set([0, 1, 2])
+    const rounded = union(polylineToFlatInkGroups(corner, false, 0.2, 'butt', 'miter', undefined, { radius: 0.1, anchors }))
+    const mitered = union(polylineToFlatInkGroups(corner, false, 0.2, 'butt', 'miter'))
+    expect(rounded).toHaveLength(1)
+    // 바깥 모서리(1.1, -0.1)는 비고, 꼭짓점(1, 0)에서 반폭 안에 든다 = 원형 결합.
+    const outerCorner = rounded[0].outer.filter((p) => p.x > 1 && p.y < 0)
+    expect(outerCorner.length).toBeGreaterThan(2)
+    for (const p of outerCorner) expect(Math.hypot(p.x - 1, p.y)).toBeCloseTo(0.1, 6)
+    // 안쪽 모서리(0.9, 0.1)도 호로 파인다: 그 점은 잉크 안쪽 오프셋 교점인데 윤곽에 없다.
+    expect(rounded[0].outer.some((p) => Math.abs(p.x - 0.9) < 1e-9 && Math.abs(p.y - 0.1) < 1e-9)).toBe(false)
+    expect(area(rounded[0])).toBeLessThan(area(mitered[0]))
+  })
+
+  it('곡선을 잘게 편 점은 굴리지 않는다 — 앵커가 아닌 꺾임은 그대로', () => {
+    // 세 점을 앵커 없이(끝 둘만 앵커) 주면 가운데 꺾임은 miter 그대로다.
+    const corner = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }]
+    const rounded = union(polylineToFlatInkGroups(corner, false, 0.2, 'butt', 'miter', undefined, { radius: 0.1, anchors: new Set([0, 2]) }))
+    expect(bounds(rounded)).toEqual({ left: 0, right: 1.1, top: -0.1, bottom: 1 })
+  })
+
+  it('획 데이터에서는 앵커 자리를 따라 굴리고, 곡선 획도 상자 밖으로 안 나간다', () => {
+    const curve: StrokeDataV2 = {
+      id: 'c', thickness: 0.1, closed: false,
+      points: [{ x: 0.1, y: 0.1, handleOut: { x: 0.9, y: 0.1 } }, { x: 0.9, y: 0.9, handleIn: { x: 0.9, y: 0.1 } }],
+    }
+    const box = { x: 0, y: 0, width: 1, height: 1 }
+    const plain = union(strokeToFlatInkGroups(curve, box, 1, 'butt', 'miter'))
+    const rounded = union(strokeToFlatInkGroups(curve, box, 1, 'butt', 'miter', undefined, 1))
+    expect(rounded).toHaveLength(1)
+    // 끝이 비스듬해 모서리를 굴리면 극점이 아주 조금 안으로 든다. 밖으로는 절대 안 나간다.
+    const before = bounds(plain), after = bounds(rounded)
+    expect(after.left).toBeGreaterThanOrEqual(before.left - 1e-9)
+    expect(after.top).toBeGreaterThanOrEqual(before.top - 1e-9)
+    expect(after.right).toBeLessThanOrEqual(before.right + 1e-9)
+    expect(after.bottom).toBeLessThanOrEqual(before.bottom + 1e-9)
+    expect(area(rounded[0])).toBeLessThan(area(plain[0]))
+    expect(area(rounded[0])).toBeGreaterThan(area(plain[0]) * 0.97)
+  })
+})

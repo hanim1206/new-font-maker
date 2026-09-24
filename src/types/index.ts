@@ -368,6 +368,11 @@ export interface BrushStyle {
 export interface BrushStrokeRenderStyle {
   mode: 'brush'
   brush: BrushStyle
+  /**
+   * 전역 둥글기. 0(각짐) ~ 1(반원). 둥근 붓촉에서만 뜻이 있고, 0보다 크면 끝·꺾임 모서리를 `둥글기 × 반폭`으로 굴린
+   * 채운 윤곽으로 그린다(화면·OTF 같은 함수). 없거나 0이면 옛 그리기(linecap · linejoin) 그대로. 잉크는 각진 끝의 네모 밖으로 안 나간다.
+   */
+  roundness?: number
 }
 
 export interface AngledAreaStrokeRenderStyle {

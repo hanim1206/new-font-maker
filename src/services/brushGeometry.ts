@@ -93,14 +93,27 @@ export function flattenStrokeCenterline(
   box: BoxConfig,
   tolerance = DEFAULT_FLATNESS_TOLERANCE,
 ): BrushPoint[] {
+  return flattenStrokeCenterlineWithAnchors(stroke, box, tolerance).points
+}
+
+/**
+ * `flattenStrokeCenterline`과 같은 점 열에, 그중 어느 점이 앵커(사용자가 찍은 꼭짓점)인지를 같이 돌려준다.
+ * 곡선을 잘게 편 점은 앵커가 아니다. 꺾임을 굴리는 쪽이 앵커 자리에서만 굴리려고 쓴다.
+ */
+export function flattenStrokeCenterlineWithAnchors(
+  stroke: StrokeDataV2,
+  box: BoxConfig,
+  tolerance = DEFAULT_FLATNESS_TOLERANCE,
+): { points: BrushPoint[]; anchorIndices: Set<number> } {
   let anchors = normalizeClosedStrokePoints(stroke.points, stroke.closed)
   if (stroke.closed && box.width > 0 && box.height > 0) {
     const ratio = box.width / box.height
     if (Math.abs(ratio - 1) > 0.05) anchors = adjustHandlesForAspectRatio(anchors, ratio)
   }
-  if (anchors.length < 2) return []
+  if (anchors.length < 2) return { points: [], anchorIndices: new Set() }
 
   const output: BrushPoint[] = [toGlyphPoint(anchors[0], box)]
+  const rawAnchorIndices = new Set<number>([0])
   const segmentCount = stroke.closed ? anchors.length : anchors.length - 1
   for (let index = 0; index < segmentCount; index += 1) {
     const from = anchors[index]
@@ -114,10 +127,19 @@ export function flattenStrokeCenterline(
       const cubic = quadraticToCubic(p0, out ?? incoming!, p3)
       flattenCubic(cubic[0], cubic[1], cubic[2], cubic[3], tolerance, output)
     } else output.push(p3)
+    rawAnchorIndices.add(output.length - 1)
   }
 
   if (stroke.closed && output.length > 1) output.pop()
-  return output.filter((current, index) => index === 0 || Math.hypot(current.x - output[index - 1].x, current.y - output[index - 1].y) > MIN_DISTANCE)
+  // 너무 가까운 점을 지우면 자리가 밀린다. 지워진 점이 앵커였으면 바로 앞 점을 앵커로 친다.
+  const points: BrushPoint[] = []
+  const anchorIndices = new Set<number>()
+  output.forEach((current, index) => {
+    const keep = index === 0 || Math.hypot(current.x - output[index - 1].x, current.y - output[index - 1].y) > MIN_DISTANCE
+    if (keep) points.push(current)
+    if (rawAnchorIndices.has(index) && points.length > 0) anchorIndices.add(points.length - 1)
+  })
+  return { points, anchorIndices }
 }
 
 function rotate(source: BrushPoint, radians: number): BrushPoint {

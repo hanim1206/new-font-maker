@@ -10,7 +10,7 @@ import type {
 import { unionInkRegions } from './inkBoolean'
 import { strokeToFlatInkGroups } from './flatStrokeGeometry'
 import { brushInkGroupsToInkRegions } from './inkGeometry'
-import { strokeToRenderInkGroups } from './strokeRenderGeometry'
+import { roundnessOf, strokeToRenderInkGroups } from './strokeRenderGeometry'
 import type { Contour } from './strokeToOutline'
 
 const BOOLEAN_OPTIONS = { positionEpsilon: 1e-9, minRingArea: 1e-12 } as const
@@ -130,7 +130,9 @@ export function materializeFinalGlyphInk(
       continue
     }
     // 끝·꺾임이 둥글지 않은 중심선은 붓 tip 방식으로 못 만든다. brush 모드에서만 일자 stroker로 대신한다.
-    const flat = primitive.effectiveLinecap !== 'round' || primitive.effectiveLinejoin !== 'round'
+    // 전역 둥글기가 있으면 끝 모양과 상관없이 일자 stroker가 모서리를 굴린다(화면 · OTF와 같은 함수).
+    const roundness = roundnessOf(strokeStyle as StrokeRenderStyle)
+    const flat = roundness > 0 || primitive.effectiveLinecap !== 'round' || primitive.effectiveLinejoin !== 'round'
     if (flat && strokeStyle.mode !== 'brush') {
       return {
         ok: false,
@@ -141,7 +143,9 @@ export function materializeFinalGlyphInk(
     const vertices = resolveFinalInkEllipseVertexCount(primitive.stroke.thickness * primitive.weightMultiplier / 2, options)
     if (vertices === 0) return { ok: false, primitiveId: primitive.id, message: '최종 잉크 곡선 오차 옵션이 유효하지 않습니다.' }
     const groups = flat
-      ? strokeToFlatInkGroups(primitive.stroke as StrokeDataV2, { ...primitive.box }, primitive.weightMultiplier, primitive.effectiveLinecap, primitive.effectiveLinejoin, vertices)
+      ? (roundness > 0
+        ? strokeToFlatInkGroups(primitive.stroke as StrokeDataV2, { ...primitive.box }, primitive.weightMultiplier, 'butt', 'miter', vertices, roundness)
+        : strokeToFlatInkGroups(primitive.stroke as StrokeDataV2, { ...primitive.box }, primitive.weightMultiplier, primitive.effectiveLinecap, primitive.effectiveLinejoin, vertices))
       : strokeToRenderInkGroups(
         primitive.stroke as StrokeDataV2,
         { ...primitive.box },

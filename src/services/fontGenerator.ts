@@ -27,7 +27,7 @@ import { useGlobalStyleStore } from '../stores/globalStyleStore'
 import type { GlyphData, GlyphPlacementResolver } from './fontExportUtils'
 import { mergeStrokeContourGroupsForCff } from './contourBoolean'
 import { brushInkGroupsToFontContours, strokeToBrushInkGroups } from './brushGeometry'
-import { strokeToRenderInkGroups } from './strokeRenderGeometry'
+import { needsFilledRenderInk, strokeToRenderInkGroups } from './strokeRenderGeometry'
 import { stemBeakInkGroups } from './stemBeak'
 import type { DeepReadonly } from '../types'
 import type { FinalGlyphInk } from './finalGlyphInk'
@@ -331,9 +331,10 @@ export function glyphDataToFontContours(glyphData: GlyphData): Contour[] {
 
   for (const resolved of glyphData.strokes) {
     const renderStyle = glyphData.strokeStyle ?? { mode: 'brush' as const, brush: glyphData.brush }
-    if (renderStyle.mode !== 'brush' || renderStyle.brush.tip !== 'round') {
+    // 둥근 붓촉이라도 전역 둥글기가 있으면 화면과 같은 채운 윤곽(`strokeToRenderInkGroups`)으로 간다.
+    if (needsFilledRenderInk(renderStyle)) {
       const groups = brushInkGroupsToFontContours(
-        renderStyle.mode === 'brush'
+        renderStyle.mode === 'brush' && renderStyle.brush.tip !== 'round'
           ? strokeToBrushInkGroups(resolved.stroke, resolved.box, glyphData.weightMultiplier, renderStyle.brush)
           : strokeToRenderInkGroups(resolved.stroke, resolved.box, glyphData.weightMultiplier, renderStyle),
         UPM,

@@ -10,13 +10,16 @@ const TIP_OPTIONS: Array<{ tip: BrushTip; label: string }> = [
 export type StrokeEnds = { linecap: StrokeLinecap; linejoin: StrokeLinejoin }
 /**
  * 제품 화면의 고르기는 붓촉 이름이 아니라 **글자에 나오는 결과**로 부른다.
- * 둥근 붓촉은 끝 모양(linecap)에 따라 각진 끝(기본, Noto 고딕처럼)도 둥근 끝도 되므로 둘을 따로 내놓는다. 납작 붓은 붓촉이 끝을 만든다.
+ * 일반 붓은 어느 방향이든 굵기가 같고 끝·꺾임의 둥글기를 막대로 준다(0 각짐 ~ 1 반원). 납작 붓은 붓촉이 끝을 만든다.
+ * 옛 `각진 끝 / 둥근 끝` 두 고르기는 둥글기 막대가 대신한다 — `둥근 끝`으로 저장된 폰트는 막대를 움직이기 전까지 그대로 그려진다.
  */
-const END_CHOICES: Array<{ id: 'square' | 'round' | 'flat'; label: string; tip: BrushTip; ends: StrokeEnds | null }> = [
-  { id: 'square', label: '각진 끝', tip: 'round', ends: { linecap: 'butt', linejoin: 'miter' } },
-  { id: 'round', label: '둥근 끝', tip: 'round', ends: { linecap: 'round', linejoin: 'round' } },
-  { id: 'flat', label: '납작 붓', tip: 'ellipse', ends: null },
+const END_CHOICES: Array<{ id: 'plain' | 'flat'; label: string; tip: BrushTip }> = [
+  { id: 'plain', label: '일반 붓', tip: 'round' },
+  { id: 'flat', label: '납작 붓', tip: 'ellipse' },
 ]
+/** 둥글기 막대를 움직이면 저장된 끝 모양은 각진 끝으로 돌아간다 — 둥근 끝 위에 또 굴리지 않는다. */
+const SQUARE_ENDS: StrokeEnds = { linecap: 'butt', linejoin: 'miter' }
+const roundnessOf = (style: StrokeRenderStyle): number => style.mode === 'brush' && style.brush.tip === 'round' ? Math.round((style.roundness ?? 0) * 100) : 0
 const DEFAULTS: Record<StrokeRenderStyle['mode'], StrokeRenderStyle> = {
   brush: { mode: 'brush', brush: { tip: 'round', aspectRatio: 0.5, angle: 0 } },
   'angled-area': { mode: 'angled-area', cutAngle: 35, cornerRadius: 0.2 },
@@ -60,7 +63,16 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
 
   const preview = (next: StrokeRenderStyle) => { latestRef.current = next; onDraftChange(next) }
   const begin = (name: string) => { if (!beforeRef.current) beforeRef.current = committed; setActiveValue(name) }
-  const finish = () => { if (beforeRef.current) onCommit(beforeRef.current, latestRef.current); beforeRef.current = null; setActiveValue(null) }
+  const finish = () => {
+    if (beforeRef.current) {
+      const after = latestRef.current
+      // 둥글기를 줬는데 저장된 끝 모양이 둥근 끝이면 각진 끝으로 같이 되돌린다(막대가 이긴다). 되돌리기 한 줄에 같이 실린다.
+      const squareEnds = ends && roundnessOf(after) > 0 && (ends.linecap !== 'butt' || ends.linejoin !== 'miter')
+      onCommit(beforeRef.current, after, squareEnds ? { before: ends, after: SQUARE_ENDS } : undefined)
+    }
+    beforeRef.current = null
+    setActiveValue(null)
+  }
   const cancel = () => {
     const before = beforeRef.current
     beforeRef.current = null
@@ -79,12 +91,12 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
     const next: StrokeRenderStyle = { ...current, brush: { ...current.brush, tip } }
     preview(next); onCommit(committed, next)
   }
-  const endChoice = current.mode !== 'brush' ? null : current.brush.tip === 'ellipse' ? 'flat' : current.brush.tip === 'round' ? (ends?.linecap === 'round' ? 'round' : 'square') : null
+  const endChoice = current.mode !== 'brush' ? null : current.brush.tip === 'ellipse' ? 'flat' : current.brush.tip === 'round' ? 'plain' : null
   const selectEndChoice = (choice: typeof END_CHOICES[number]) => {
     if (current.mode !== 'brush' || choice.id === endChoice) return
     const next: StrokeRenderStyle = { ...current, brush: { ...current.brush, tip: choice.tip } }
     preview(next)
-    onCommit(committed, next, choice.ends && ends ? { before: ends, after: choice.ends } : undefined)
+    onCommit(committed, next)
   }
   const handleRangeKeys = (event: KeyboardEvent<HTMLInputElement>, name: string) => {
     if (event.key.startsWith('Arrow') || event.key === 'Home' || event.key === 'End') begin(name)
@@ -151,7 +163,7 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
       onPointerDown={(event) => { begin(label); const next = startRangeDrag(event); if (next !== null && next !== value) preview(update(next)) }}
       onPointerMove={(event) => { const next = moveRangeDrag(event); if (next !== null && next !== value) preview(update(next)) }}
       onChange={(event) => { begin(label); preview(update(Number(event.target.value))) }} onPointerUp={(event) => { endRangeDrag(event); finish() }} onPointerCancel={(event) => { endRangeDrag(event); cancel() }}
-      onKeyDown={(event) => handleRangeKeys(event, label)} onKeyUp={finish} aria-label={label === '납작함' ? '붓촉 납작함' : label} />
+      onKeyDown={(event) => handleRangeKeys(event, label)} onKeyUp={finish} aria-label={label === '납작함' ? '붓촉 납작함' : label} data-testid={label === '둥글기' ? 'style-roundness' : undefined} />
   </label>
   const angle = current.mode === 'angled-area' ? current.cutAngle : current.mode === 'brush' ? current.brush.angle : 0
   const angleLimit = current.mode === 'angled-area' ? 60 : 90
@@ -179,10 +191,10 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
     </div>
     {current.mode === 'brush' && <>
       {productOptions
-        ? <div className={styles.brushTips} style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }} role="radiogroup" aria-label="획 끝 모양">{END_CHOICES.map((choice) => {
+        ? <div className={styles.brushTips} style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }} role="radiogroup" aria-label="획 끝 모양">{END_CHOICES.map((choice) => {
           const previewStyle: StrokeRenderStyle = { ...current, brush: { ...current.brush, tip: choice.tip } }
           return <button key={choice.id} type="button" role="radio" aria-checked={endChoice === choice.id} data-end-choice={choice.id} onClick={() => selectEndChoice(choice)}>
-            <span className={styles.brushTipPreview}>{renderPreview(previewStyle, choice.ends ?? ends)}</span><span className={`${styles.brushTipIcon} ${styles[`brushTipIcon_${choice.tip}`]}`} style={choice.id === 'square' ? { borderRadius: 3, rotate: '0deg' } : undefined} aria-hidden="true" /><strong>{choice.label}</strong>
+            <span className={styles.brushTipPreview}>{renderPreview(previewStyle, ends)}</span><span className={`${styles.brushTipIcon} ${styles[`brushTipIcon_${choice.tip}`]}`} style={choice.id === 'plain' ? { borderRadius: 3, rotate: '0deg' } : undefined} aria-hidden="true" /><strong>{choice.label}</strong>
           </button>
         })}</div>
         : <div className={styles.brushTips} role="radiogroup" aria-label="붓촉 모양">{TIP_OPTIONS.map(({ tip, label }) => {
@@ -192,7 +204,10 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
         </button>
       })}</div>}
       {current.brush.tip !== 'round' && <div className={styles.brushControlGrid}>{range('납작함', aspectRatioToFlatness(current.brush.aspectRatio), 0, 100, 1, (value) => ({ ...current, brush: { ...current.brush, aspectRatio: flatnessToAspectRatio(value) } }), `${aspectRatioToFlatness(current.brush.aspectRatio)}%`)}{renderAnglePad()}</div>}
-      {current.brush.tip === 'round' && <p className={styles.roundBrushMessage}>{productOptions ? '끝 모양만 다르고, 굵기는 어느 방향이든 같습니다.' : '원형은 모든 방향에서 같은 굵기로 그려집니다.'}</p>}
+      {current.brush.tip === 'round' && productOptions && <div className={styles.brushControlGrid} style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
+        {range('둥글기', roundnessOf(current), 0, 100, 1, (value) => ({ ...current, roundness: value / 100 }), `${roundnessOf(current)}%`)}
+      </div>}
+      {current.brush.tip === 'round' && !productOptions && <p className={styles.roundBrushMessage}>원형은 모든 방향에서 같은 굵기로 그려집니다.</p>}
     </>}
     {current.mode === 'angled-area' && <div className={styles.ruleControlGrid}>{renderAnglePad()}{range('모서리 곡률', Math.round(current.cornerRadius * 100), 0, 100, 1, (value) => ({ ...current, cornerRadius: value / 100 }), `${Math.round(current.cornerRadius * 100)}%`)}</div>}
     {current.mode === 'legacy-snapped-centerline' && <div className={styles.constructionRuleMessage}>

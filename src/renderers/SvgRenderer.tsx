@@ -6,7 +6,7 @@ import { weightToMultiplier } from '../utils/globalStyleUtils'
 import type { GlobalStyle } from '../stores/globalStyleStore'
 import { brushInkGroupsToSvgPaths, strokeToBrushInkGroups } from '../services/brushGeometry'
 import { resolveGlyphInkPrimitives } from '../services/glyphInkResolver'
-import { strokeToRenderInkGroups } from '../services/strokeRenderGeometry'
+import { needsFilledRenderInk, strokeToRenderInkGroups } from '../services/strokeRenderGeometry'
 import { stemBeakGroupOf, stemBeakInkGroups } from '../services/stemBeak'
 
 // 파트별 스타일 (자모 편집 시 비편집 파트 흐리게 표시 등)
@@ -136,9 +136,10 @@ export function SvgRenderer({
     const beaks = beakPathsById.get(primitive.id) ?? []
 
     const renderStyle = globalStyle?.strokeStyle ?? (globalStyle?.brush ? { mode: 'brush' as const, brush: globalStyle.brush } : undefined)
-    if (renderStyle && (renderStyle.mode !== 'brush' || renderStyle.brush.tip !== 'round')) {
+    // 둥근 붓촉이라도 전역 둥글기가 있으면 SVG stroke로는 못 그려 OTF와 같은 채운 윤곽으로 간다.
+    if (renderStyle && needsFilledRenderInk(renderStyle)) {
       const paths = brushInkGroupsToSvgPaths(
-        renderStyle.mode === 'brush'
+        renderStyle.mode === 'brush' && renderStyle.brush.tip !== 'round'
           ? strokeToBrushInkGroups(stroke, primitive.box, primitive.weightMultiplier, renderStyle.brush)
           : strokeToRenderInkGroups(stroke, primitive.box, primitive.weightMultiplier, renderStyle),
         VIEW_BOX_SIZE,

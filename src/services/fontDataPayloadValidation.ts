@@ -446,8 +446,10 @@ function validateStrokeStyle(value: unknown, path: string, issues: FontPayloadVa
   }
   const allowed = fields[value.mode]
   if (!allowed) return push(issues, 'invalid-field', `${path}.mode`, 'strokeStyle mode가 유효하지 않습니다.')
-  exactKeys(value, allowed, allowed, path, issues)
+  // 전역 둥글기는 나중에 생긴 값이라 brush 모드에 없어도 된다(옛 저장분).
+  exactKeys(value, value.mode === 'brush' ? [...allowed, 'roundness'] : allowed, allowed, path, issues)
   if (value.mode === 'brush') validateBrush(value.brush, `${path}.brush`, issues)
+  if (value.mode === 'brush' && value.roundness !== undefined) finite(value.roundness, `${path}.roundness`, issues)
   for (const key of allowed) {
     if (!['mode', 'brush', 'stagger'].includes(key)) finite(value[key], `${path}.${key}`, issues)
   }
