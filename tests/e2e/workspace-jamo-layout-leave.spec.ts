@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
 
+// 보선 끌기 배율(`GlyphLayoutEditor` RAIL_DRAG_GAIN). 손은 옮길 em의 1/배율만큼 간다.
+const DRAG_GAIN = 0.7
+
 /**
  * 보선 이동은 저장 버튼을 눌러야 남는다. 저장 안 한 채 떠나려 하면 먼저 묻는다.
  * 획 편집은 옮긴 보선을 저장해야 갈 수 있다(묻는 창 없이 켜진 상자를 눌러도 안 간다).
@@ -20,7 +23,7 @@ async function dragRail(page: Page) {
   const y = box.y + (-0.045 + 0.08) / 1.16 * box.height
   await page.mouse.move(pxOf(x1), y)
   await page.mouse.down()
-  await page.mouse.move(pxOf(x1 + 0.03), y, { steps: 6 })
+  await page.mouse.move(pxOf(x1 + 0.03 / DRAG_GAIN), y, { steps: 6 })
   await page.mouse.up()
   await expect(page.getByTestId('review-reset')).toContainText('1개 변경')
 }

@@ -44,6 +44,8 @@ import styles from './GlyphLayoutEditor.module.css'
 const VIEW_BOX = '-0.08 -0.08 1.16 1.16'
 // export 기준선 id → 축·표시 이름. 길이(visibleLength) 타깃은 좌표가 아니라 그리지 않는다.
 const VIEW_BOX_SIZE = 1.16
+// 보선 끌기 배율. 손이 1px 가면 보선은 이만큼만 간다 — 1:1은 너무 예민했다.
+const RAIL_DRAG_GAIN = 0.7
 const GHOST_STORAGE_KEY = 'review-ghost-visible-v1'
 
 function readGhostVisible(): boolean {
@@ -151,9 +153,9 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
     if (!current || current.pointerId !== event.pointerId) return
     const svg = event.currentTarget.ownerSVGElement
     if (!svg) return
-    // viewBox 1.16 단위를 화면 px로 환산해 1:1로 옮긴다.
+    // viewBox 1.16 단위를 화면 px로 환산하고, 묵직하게 배율을 곱한다.
     const rect = svg.getBoundingClientRect()
-    const unitsPerPixel = VIEW_BOX_SIZE / (current.axis === 'x' ? rect.width : rect.height)
+    const unitsPerPixel = VIEW_BOX_SIZE / (current.axis === 'x' ? rect.width : rect.height) * RAIL_DRAG_GAIN
     onDragRail?.(current.id, current.startValue + ((current.axis === 'x' ? event.clientX : event.clientY) - current.start) * unitsPerPixel)
   }
   const endDrag = (event: ReactPointerEvent<SVGLineElement>) => {

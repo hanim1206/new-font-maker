@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test'
 
+// 보선 끌기 배율(`GlyphLayoutEditor` RAIL_DRAG_GAIN). 손은 옮길 em의 1/배율만큼 간다.
+const DRAG_GAIN = 0.7
+
 /**
  * 하단 바는 보선을 끄는 동안 잡을 때 상태로 얼어 있고, 손을 떼면 바뀐다.
  * 캔버스 · 닿는 글자 줄은 끄는 동안에도 실시간이다.
@@ -23,7 +26,7 @@ test('하단 바는 보선을 끄는 동안 안 바뀌고 손을 떼면 적용 �
   await expect(bar).toHaveCount(0)
   await page.mouse.move(pxOf(x1), y)
   await page.mouse.down()
-  await page.mouse.move(pxOf(x1 + 0.03), y, { steps: 6 })
+  await page.mouse.move(pxOf(x1 + 0.03 / DRAG_GAIN), y, { steps: 6 })
   // 끄는 중: 캔버스의 Δ 수치는 실시간, 하단 바는 잡을 때 그대로(없음).
   await expect(page.getByTestId('review-delta-label')).toHaveCount(1)
   await expect(bar).toHaveCount(0)
@@ -39,7 +42,7 @@ test('하단 바는 보선을 끄는 동안 안 바뀌고 손을 떼면 적용 �
   const x2 = Number(await handle.getAttribute('x1'))
   await page.mouse.move(pxOf(x2), y)
   await page.mouse.down()
-  await page.mouse.move(pxOf(x2 + 0.01), y, { steps: 3 })
+  await page.mouse.move(pxOf(x2 + 0.01 / DRAG_GAIN), y, { steps: 3 })
   await expect(apply).toBeVisible()
   await page.mouse.up()
   await expect(apply).toBeVisible()
@@ -56,9 +59,9 @@ test('보선을 캔버스 밖까지 끌어도 글자 칸(0–1em) 안에서 멈�
   const y = box.y + (-0.045 + 0.08) / 1.16 * box.height
   await page.mouse.move(pxOf(x1), y)
   await page.mouse.down()
-  await page.mouse.move(pxOf(x1) - 300, y, { steps: 12 })
+  await page.mouse.move(pxOf(x1) - 300 / DRAG_GAIN, y, { steps: 12 })
   expect(Number(await handle.getAttribute('x1'))).toBeCloseTo(0, 3)
-  await page.mouse.move(pxOf(x1) + 600, y, { steps: 24 })
+  await page.mouse.move(pxOf(x1) + 600 / DRAG_GAIN, y, { steps: 24 })
   // 오른쪽으로는 같은 부품의 오른변에 막히거나 칸 끝(1em)에서 멈춘다.
   expect(Number(await handle.getAttribute('x1'))).toBeLessThanOrEqual(1)
   await page.mouse.up()
@@ -80,17 +83,17 @@ test('보선은 끄는 동안 얇고 걸려도 영역 색 그대로, 손을 떼�
 
   await page.mouse.move(pxOf(x1), y)
   await page.mouse.down()
-  await page.mouse.move(pxOf(x1 + 0.06), y, { steps: 6 })
+  await page.mouse.move(pxOf(x1 + 0.06 / DRAG_GAIN), y, { steps: 6 })
   await expect(rail).toHaveAttribute('data-dragging', 'true')
   expect(await width()).toBeLessThan(0.006)
   // 모델 자리로 돌아오면 걸린다. 선 색은 안 바뀌고 여전히 얇다(번쩍임을 뺐다).
-  await page.mouse.move(pxOf(x1 + 0.002), y, { steps: 4 })
+  await page.mouse.move(pxOf(x1 + 0.002 / DRAG_GAIN), y, { steps: 4 })
   await expect(rail).toHaveAttribute('data-snapped', 'true')
   await expect(line).toHaveAttribute('stroke', partColor!)
   expect(await width()).toBeLessThan(0.006)
 
   // 모델 자리에서 떼면 Δ가 없어 띠도 없다. 벌려 놓고 뗀다.
-  await page.mouse.move(pxOf(x1 + 0.05), y, { steps: 4 })
+  await page.mouse.move(pxOf(x1 + 0.05 / DRAG_GAIN), y, { steps: 4 })
   await page.mouse.up()
   await expect(rail).not.toHaveAttribute('data-dragging')
   await expect(rail).not.toHaveAttribute('data-snapped')
@@ -117,7 +120,7 @@ test('보선이 선택된 채 다른 영역을 누르면 선택만 풀리고, �
 
   await page.mouse.move(pxOf(x1), y)
   await page.mouse.down()
-  await page.mouse.move(pxOf(x1 + 0.05), y, { steps: 6 })
+  await page.mouse.move(pxOf(x1 + 0.05 / DRAG_GAIN), y, { steps: 6 })
   await page.mouse.up()
   await expect(canvas).toHaveAttribute('data-held', 'c0:left')
   await expect(page.getByTestId('review-delta-band')).toHaveCount(1)
@@ -148,7 +151,7 @@ test('켠 영역의 보선을 옮긴 뒤 같은 영역의 다른 보선은 바�
     const x1 = Number(await handle.getAttribute('x1'))
     await page.mouse.move(pxOf(x1), y)
     await page.mouse.down()
-    await page.mouse.move(pxOf(x1 + 0.05), y, { steps: 6 })
+    await page.mouse.move(pxOf(x1 + 0.05 / DRAG_GAIN), y, { steps: 6 })
     await page.mouse.up()
     return { before: x1, after: Number(await handle.getAttribute('x1')) }
   }

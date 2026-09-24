@@ -3,6 +3,9 @@ import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 
+// 보선 끌기 배율(`GlyphLayoutEditor` RAIL_DRAG_GAIN). 손은 옮길 em의 1/배율만큼 간다.
+const DRAG_GAIN = 0.7
+
 /** 자소 탭 `레이아웃` 모드(옛 검수 글자 화면): 수치 패널은 없고, 잡은 rail의 이 레이아웃(같은 문맥) 표본이 상단 `닿는 글자` 줄에 늘 떠 있다. 기준선을 옮기면 배치 Δ가 그 줄에 얹힌다. */
 
 /** 한 묶음. 줄이 안 차면 다음 묶음이 붙으므로 장수는 화면 폭을 탄다 — 최소만 잰다. */
@@ -166,16 +169,16 @@ test('기준선 드래그는 모델 자리와 격자에 탁 걸리고 방향키�
   // 멀리 끌었다가 모델 자리 근처(+2u)로 돌아오면 모델에 붙는다.
   await page.mouse.move(pxOf(x1), y)
   await page.mouse.down()
-  await page.mouse.move(pxOf(x1 + 0.06), y, { steps: 6 })
+  await page.mouse.move(pxOf(x1 + 0.06 / DRAG_GAIN), y, { steps: 6 })
   await expect(page.getByTestId('review-delta-label')).toHaveCount(1)
-  await page.mouse.move(pxOf(x1 + 0.002), y, { steps: 4 })
+  await page.mouse.move(pxOf(x1 + 0.002 / DRAG_GAIN), y, { steps: 4 })
   // 모델에 붙으면 Δ 0 → 수치 없음. 스냅 글자 표지는 없고 캔버스 data-snap에만 남는다.
   await expect(canvas).toHaveAttribute('data-snap', 'model')
   // 모델·격자엔 상대 기준선이 없으니 잡은 기준선에 걸림 표지가 붙는다(색은 안 바뀐다).
   await expect(canvas.locator('[data-rail][data-selected="true"]')).toHaveAttribute('data-snapped', 'true')
   await expect(page.getByTestId('review-delta-label')).toHaveCount(0)
   // 모델(≈0.75)에서 멀어져 격자 13/16(0.8125)이나 그 옆 기준선에 걸린다.
-  await page.mouse.move(pxOf(0.815), y, { steps: 8 })
+  await page.mouse.move(pxOf(x1 + (0.815 - x1) / DRAG_GAIN), y, { steps: 8 })
   await page.mouse.up()
   await expect(canvas).toHaveAttribute('data-snap', /^(grid|rail)$/)
 
