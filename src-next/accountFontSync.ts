@@ -60,6 +60,11 @@ export function accountFontName(): string | null {
   return session?.name ?? null
 }
 
+/** 지금 연 계정 폰트를 서버가 마지막으로 받은 때(ISO). 게이트가 꺼졌거나 아직 안 올렸으면 null. 폰트 탭이 쓴다. */
+export function accountFontUpdatedAt(): string | null {
+  return session?.updatedAt ?? null
+}
+
 function opened(me: string, fontId: string, name: string, updatedAt: string | null): AccountStartResult {
   session = { me, fontId, name, updatedAt }
   writeStamp(localStorage, { owner: me, fontId, pending: false })

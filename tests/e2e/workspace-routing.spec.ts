@@ -14,9 +14,9 @@ const storedStyle = (page: Page) => page.evaluate(() => JSON.parse(localStorage.
 const mark = (page: Page) => page.evaluate(() => { (window as unknown as { __routeMark?: number }).__routeMark = 1 })
 const marked = (page: Page) => page.evaluate(() => (window as unknown as { __routeMark?: number }).__routeMark === 1)
 
+/** 하단 탭으로 화면을 옮긴다. */
 async function openMenuAndGo(page: Page, name: string): Promise<void> {
-  await page.getByRole('button', { name: '주 메뉴' }).click()
-  await page.getByTestId('workspace-more-menu').getByRole('link', { name }).click()
+  await page.getByTestId('workspace-tabs').getByRole('link', { name }).click()
 }
 
 test('자소 → 검수 → 자소를 오가도 되돌리기 기록이 남는다', async ({ page }) => {
@@ -37,8 +37,7 @@ test('자소 → 검수 → 자소를 오가도 되돌리기 기록이 남는다
   // 검수로. 주소는 바뀌고 페이지는 그대로다.
   await openMenuAndGo(page, '검수')
   await expect(page).toHaveURL(/\/workspace\/review$/)
-  // 메뉴는 닫혀도 DOM에 남는다 — 지금 화면 표시는 닫힌 채로 읽는다.
-  await expect(page.getByTestId('workspace-more-menu').locator('a[href="/workspace/review"]')).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByTestId('workspace-tabs').getByRole('link', { name: '검수' })).toHaveAttribute('aria-current', 'page')
   expect(await marked(page)).toBe(true)
 
   // 다시 자소로. 되돌리기가 살아 있고, 누르면 둥글기가 0으로 돌아온다.

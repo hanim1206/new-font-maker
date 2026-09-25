@@ -1,0 +1,12 @@
+.screen { min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 20px; padding: 24px 20px; overflow-y: auto; }
+.identity { display: flex; flex-direction: column; gap: 4px; }
+.identity h1 { margin: 0; overflow: hidden; font-size: 22px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.identity p { margin: 0; color: rgb(var(--color-text-dim-4)); font-size: 12.5px; }
+
+/* 이 폰트를 파일로 내보내는 주 버튼. 진행 · 완료 · 실패가 아이콘과 아랫줄에 뜬다. */
+.exportButton { min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; border: 0; border-radius: 10px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 15px; font-weight: 700; }
+.exportButton:disabled { opacity: .6; }
+.exportButton small { font-size: 11px; font-weight: 600; opacity: .8; }
+.exportButton[data-export-state='failed'] { background: rgb(190 52 48); }
+.exportSpinner { animation: font-export-spin 1s linear infinite; }
+@keyframes font-export-spin { to { transform: rotate(360deg); } }

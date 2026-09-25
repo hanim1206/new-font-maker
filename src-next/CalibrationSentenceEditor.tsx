@@ -2342,7 +2342,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         </button>
       : <span key={`${lineIndex}-${char}-${charIndex}`} data-char-index={inSheet ? charIndex : undefined} className={/\s/u.test(char) ? styles.spaceGlyph : styles.punctuationGlyph} style={{ inlineSize: width }} aria-label={/\s/u.test(char) ? '공백' : char}>{char}</span>
   }
-  // 셸 안에서는 도구가 머리 `…` 메뉴로 들어가 이름이 붙고, 실행취소·다시실행은 셸 머리에 있으니 뺀다.
+  // 셸 안에서는 도구 줄이 없다(출력은 폰트 탭, 형태 규칙은 머리, 실행취소 · 다시실행은 셸 머리). 아래 줄은 옛 단독 화면 것.
   const menuLabel = (text: string) => chrome === 'workspace' ? <em>{text}</em> : null
   const toggleGlobalStyle = () => isGlobalStyleOpen ? closeGlobalStyle() : guardLayoutLeave(() => { if (sentenceSheetOpen) closeSentenceSheet(); setGlobalStylePanel('body') })
   const actions = (
@@ -2535,9 +2535,11 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         activeArea="jamo"
         projectName={projectName}
         history={{ canUndo: history.length > 0, canRedo: future.length > 0, onUndo: () => guardLayoutLeave(undo, { saveable: false }), onRedo: () => guardLayoutLeave(redo, { saveable: false }) }}
-        menu={<div data-edit-mode={isLayoutMode ? 'layout' : 'stroke'} data-testid="jamo-toolbar">{actions}</div>}
-        tools={<button type="button" className={styleMode.headerTool} data-active={isGlobalStyleOpen || undefined} onClick={toggleGlobalStyle} aria-label="글로벌 스타일 설정" aria-pressed={isGlobalStyleOpen} title="폰트 전체에 먹는 네모꼴 · 획 모양 · 굵기 · 부리"><Settings2 size={18} /></button>}
-        menuBadge={exportState === 'exporting' ? 'busy' : exportState === 'downloaded' ? 'done' : exportState === 'failed' ? 'failed' : null}
+        tools={<>
+          {/* 형태 규칙은 고른 자모가 있을 때만 머리에 나온다. 폰트 전체 도구(글로벌 스타일)는 그 오른쪽. */}
+          {selection.kind !== 'none' && <button type="button" className={styleMode.headerTool} onClick={() => setIsShapeRuleOpen(true)} aria-label="선택 자모 형태 규칙" title="현재 자모의 획과 형태 예절"><ListTree size={18} /></button>}
+          <button type="button" className={styleMode.headerTool} data-active={isGlobalStyleOpen || undefined} onClick={toggleGlobalStyle} aria-label="글로벌 스타일 설정" aria-pressed={isGlobalStyleOpen} title="폰트 전체에 먹는 네모꼴 · 획 모양 · 굵기 · 부리"><Settings2 size={18} /></button>
+        </>}
       >
         {body}
       </MobileWorkspaceShell>

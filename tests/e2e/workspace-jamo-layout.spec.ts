@@ -303,7 +303,6 @@ test('자소 탭은 레이아웃으로 열리고, 기준선을 적용하면 문�
   // 세그먼트 전환은 없다. 기본이 레이아웃이다.
   await expect(page.getByTestId('jamo-edit-mode')).toHaveCount(0)
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
-  await expect(page.getByTestId('jamo-toolbar')).toHaveAttribute('data-edit-mode', 'layout')
   const sentenceGlyph = page.getByRole('button', { name: '멈 편집' })
   // 모델 상자로 그려진 뒤의 글자를 기준으로 잡는다.
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
@@ -370,7 +369,7 @@ test('켠 부품의 획 고치기로 내려가고, 안 끝난 변경이 있으�
   // 획 편집은 그 자소의 첫 획이 잡힌 채 열려 도구 줄이 바로 켜진다. `눌러 고르세요` 안내는 없다. 옮기기는 캔버스에서 하고, 잘게 옮길 트랙패드가 도구 줄 아래에 있다.
   const layoutCanvasBox = await canvas.boundingBox()
   await cta.dispatchEvent('click')
-  await expect(page.getByTestId('jamo-toolbar')).toHaveAttribute('data-edit-mode', 'stroke')
+  await expect(page.getByTestId('jamo-stroke-done')).toBeVisible()
   const editor = page.getByRole('region', { name: '멈 완성 글자 편집' })
   await expect(page.getByTestId('jamo-stroke-hint')).toHaveCount(0)
   await expect(page.getByTestId('jamo-stroke-trackpad')).toBeVisible()
@@ -1206,16 +1205,11 @@ test('레이아웃 모드 첫 화면에 상단 두 줄과 옵션 스택이 온�
     expect(box.x + box.width).toBeLessThanOrEqual(row.x + row.width + 0.5)
   }
 
-  // 도구 넷은 `…` 메뉴 안. 닫혀 있으면 안 보이고, 열면 이름과 함께 보인다. 바깥(Escape)으로 닫힌다.
-  const menu = page.getByTestId('workspace-more-menu')
-  await expect(menu).toBeHidden()
-  await page.getByRole('button', { name: '주 메뉴' }).click()
-  await expect(menu.getByRole('button', { name: '현재 작업을 OTF로 추출' })).toContainText('OTF 추출')
-  await expect(menu.getByRole('button', { name: '선택 자모 형태 규칙' })).toBeVisible()
-  // 글로벌 스타일은 폰트 전체 값이라 메뉴 안이 아니라 머리에 늘 나와 있다(레이아웃 모드에서도 켜져 있다).
-  await expect(menu.getByRole('button', { name: '글로벌 스타일 설정' })).toHaveCount(0)
-  await page.keyboard.press('Escape')
-  await expect(menu).toBeHidden()
+  // 햄버거 메뉴는 없다. OTF 추출은 폰트 탭, 형태 규칙은 고른 자모가 있을 때만 머리에 나온다.
+  await expect(page.getByTestId('workspace-more-menu')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '현재 작업을 OTF로 추출' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '선택 자모 형태 규칙' })).toHaveCount(0)
+  // 글로벌 스타일은 폰트 전체 값이라 머리에 늘 나와 있다(레이아웃 모드에서도 켜져 있다).
   await expect(page.getByRole('button', { name: '글로벌 스타일 설정' })).toBeEnabled()
 
   // 획 편집에서는 문장 줄이 위로 접히고, 머리의 글로벌 스타일이 패널을 연다.

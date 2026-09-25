@@ -9,11 +9,10 @@ test.beforeEach(async ({ page }) => {
 test('자소 탭 획 편집은 셸 안에서 문장·캔버스·도구 줄을 보여주고 획을 선택한다', async ({ page }) => {
   await page.goto('/workspace/jamo?mode=stroke')
 
-  // 하단 내비는 없다. 화면 이동은 머리 `…` 메뉴 안에 있다.
-  await page.getByRole('button', { name: '주 메뉴' }).click()
+  // 화면 이동은 하단 탭 셋. 지금 화면은 `자소`.
   const nav = page.getByRole('navigation', { name: '프로젝트 주 내비게이션' })
   await expect(nav.getByRole('link', { name: '자소' })).toHaveAttribute('aria-current', 'page')
-  await page.keyboard.press('Escape')
+  await expect(nav.getByRole('link')).toHaveText(['폰트', '자소', '검수'])
   // 획 편집에서는 문장 줄이 위로 접히고 `닿는 글자` 줄만 남는다.
   await expect(page.locator('section[aria-label="보정 문장"]')).toHaveAttribute('data-collapsed', 'true')
   await expect(page.getByRole('region', { name: '보정 문장' })).toHaveCount(0)

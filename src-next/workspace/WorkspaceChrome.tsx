@@ -1,23 +1,14 @@
-import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import {
-  FolderOpen,
-  LogOut,
-  Menu,
-  Redo2,
-  ScanSearch,
-  Shapes,
-  Undo2,
-} from 'lucide-react'
+import { ChevronLeft, Redo2, ScanSearch, Shapes, Type, Undo2 } from 'lucide-react'
 import { flushAccountFont, useAccountSaveStore } from '../accountFontSync'
-import { authGateMode, signOutAndReload } from '../betaAuth'
 import { useFontExportStore } from '../fontExportStore'
-import { onLinkClick } from '../router'
 import { useUIStore } from '../../src/stores/uiStore'
+import { onLinkClick } from '../router'
 import { SaveToast } from './SaveToast'
 import styles from './WorkspaceChrome.module.css'
 
-export type WorkspaceArea = 'jamo' | 'review'
+/** 폰트 덱의 화면 셋. 하단 탭 하나씩. */
+export type WorkspaceArea = 'font' | 'jamo' | 'review'
 
 export interface WorkspaceHistoryControls {
   canUndo: boolean
@@ -26,59 +17,39 @@ export interface WorkspaceHistoryControls {
   onRedo: () => void
 }
 
+/**
+ * 폰트 덱의 셸. 덱 셋(내 폰트 → 폰트 → 획) 가운데 둘째.
+ * 머리 왼쪽 `‹ 내 폰트`는 위 덱으로 나가는 문, 가운데는 지금 연 폰트 이름, 오른쪽은 되돌리기 · 다시 실행.
+ * 아래는 탭 셋(폰트 · 자소 · 검수). 햄버거 메뉴는 없다 — 항목이 전부 제 자리를 찾았다(출력은 폰트 탭, 로그아웃은 내 폰트).
+ */
 export function MobileWorkspaceShell({
   children,
   activeArea,
   projectName,
   history,
-  menu,
-  menuBadge,
   tools,
+  tabsHidden = false,
 }: {
   children: ReactNode
   activeArea: WorkspaceArea
   /** 머리 가운데 이름. 안 넘기면 지금 연 폰트 이름(어느 화면이든 같다). */
   projectName?: string
   history?: WorkspaceHistoryControls
-  /** 머리 `☰` 메뉴에서 화면 이동(자소 · 검수) 아래에 넣을 도구(링크·버튼). 항목을 누르면 메뉴는 닫힌다. */
-  menu?: ReactNode
-  /** 메뉴 안 도구의 진행 상태를 `☰` 단추에 점으로 보인다. */
-  menuBadge?: 'busy' | 'done' | 'failed' | null
   /** 머리 오른쪽, 되돌리기 앞에 늘 보이는 도구(어느 모드에서든 쓰는 것). */
   tools?: ReactNode
+  /** 획 덱처럼 폰트 덱 위에 얹힌 화면은 탭을 감춘다. */
+  tabsHidden?: boolean
 }) {
-  const [menuOpen, setMenuOpen] = useState(false)
   const openedName = useUIStore((state) => state.currentProjectName)
   const title = projectName ?? openedName ?? '새 한글 폰트'
-  useEffect(() => {
-    if (!menuOpen) return
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false) }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [menuOpen])
   return (
     <main className={styles.page}>
-      <div className={styles.shell}>
+      <div className={styles.shell} data-tabs={tabsHidden ? 'hidden' : undefined}>
         <header className={styles.projectHeader}>
-          {/* 왼쪽은 이동(햄버거), 오른쪽은 편집 기록. 읽기만 하는 모드 표시는 두지 않는다. */}
-          <div className={styles.headerMenu}>
-            <button type="button" aria-label="주 메뉴" aria-haspopup="menu" aria-expanded={menuOpen} data-badge={menuBadge ?? undefined} onClick={() => setMenuOpen((open) => !open)}><Menu size={20} /></button>
-            {/* 메뉴는 늘 DOM에 있다(도구의 상태·testid가 닫혀 있어도 읽힌다). 닫히면 숨기기만 한다. */}
-            {menuOpen && <div className={styles.moreBackdrop} onClick={() => setMenuOpen(false)} aria-hidden="true" />}
-            <div className={styles.moreMenu} hidden={!menuOpen} onClick={() => setMenuOpen(false)} data-testid="workspace-more-menu">
-              {/* 하단 내비를 없애고 화면 이동을 여기로 옮겼다. 출력은 화면이 넘기는 도구의 `OTF 추출`이 맡는다. */}
-              <nav className={styles.menuNav} aria-label="프로젝트 주 내비게이션">
-                <a href="/workspace/jamo" onClick={onLinkClick} aria-current={activeArea === 'jamo' ? 'page' : undefined}><Shapes size={18} /><em>자소</em></a>
-                <a href="/workspace/review" onClick={onLinkClick} aria-current={activeArea === 'review' ? 'page' : undefined}><ScanSearch size={18} /><em>검수</em></a>
-              </nav>
-              {menu}
-              {/* 로그아웃은 자주 누를 일이 없어 메뉴 맨 끝에 둔다. 로그인 게이트가 꺼진 개발 서버에서는 없다. */}
-              {authGateMode() === 'on' && <nav className={styles.menuNav} aria-label="계정">
-                <button type="button" onClick={() => void goToFontHome()} data-testid="workspace-font-home"><FolderOpen size={18} /><em>내 폰트</em></button>
-                <button type="button" onClick={() => void signOutAndReload()} data-testid="workspace-sign-out"><LogOut size={18} /><em>로그아웃</em></button>
-              </nav>}
-            </div>
-          </div>
+          {/* 왼쪽은 위 덱으로 나가는 문, 오른쪽은 편집 기록. 읽기만 하는 모드 표시는 두지 않는다. */}
+          <button type="button" className={styles.back} onClick={() => void goToFontHome()} aria-label="내 폰트로" data-testid="workspace-font-home">
+            <ChevronLeft size={20} aria-hidden="true" /><span>내 폰트</span>
+          </button>
           <div className={styles.projectIdentity}>
             <strong>{title}</strong>
           </div>
@@ -90,6 +61,12 @@ export function MobileWorkspaceShell({
         </header>
 
         {children}
+
+        {!tabsHidden && <nav className={styles.tabs} aria-label="프로젝트 주 내비게이션" data-testid="workspace-tabs">
+          <a href="/workspace/font" onClick={onLinkClick} aria-current={activeArea === 'font' ? 'page' : undefined}><Type size={20} aria-hidden="true" /><em>폰트</em></a>
+          <a href="/workspace/jamo" onClick={onLinkClick} aria-current={activeArea === 'jamo' ? 'page' : undefined}><Shapes size={20} aria-hidden="true" /><em>자소</em></a>
+          <a href="/workspace/review" onClick={onLinkClick} aria-current={activeArea === 'review' ? 'page' : undefined}><ScanSearch size={20} aria-hidden="true" /><em>검수</em></a>
+        </nav>}
       </div>
       <AccountSaveToast />
       <ExportNoticeToast />
