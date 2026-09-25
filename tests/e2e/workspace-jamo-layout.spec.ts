@@ -571,6 +571,33 @@ test('잡은 획의 꼭짓점과 곡선 핸들은 조금 비껴 눌러도 잡힌
   await expect(page.locator('[data-editor-handle="active"]')).toHaveCount(1)
 })
 
+/** 조절판은 캔버스 끌기와 같은 계산이다: px → em(배율 1/3) · 같은 스냅. 자모 상자 크기와 상관없이 60px이면 점이 화면에서 약 20px 간다. */
+test('조절판 끌기는 캔버스의 1/3 배율로 가고, 캔버스와 같은 자리에 걸린다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EA%B0%81&mode=stroke&part=CH')
+  await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
+  await openStrokePoints(page)
+  const firstHit = page.locator('[data-editor-point="hit"]').first()
+  await firstHit.dispatchEvent('pointerdown')
+  await firstHit.dispatchEvent('pointerup')
+  const active = page.locator('[data-editor-point="visible"][r="2.8"]')
+  await expect(active).toHaveCount(1)
+  const centerX = async () => { const box = await active.boundingBox(); if (!box) throw new Error('잡은 점이 없다'); return box.x + box.width / 2 }
+  const before = await centerX()
+  const pad = await page.getByTestId('jamo-stroke-trackpad').boundingBox()
+  if (!pad) throw new Error('조절판이 없다')
+  const y = pad.y + pad.height / 2
+  await page.mouse.move(pad.x + 20, y)
+  await page.mouse.down()
+  await page.mouse.move(pad.x + 80, y, { steps: 8 })
+  const during = await centerX()
+  await page.mouse.up()
+  // 스냅(격자 · 기준선)으로 몇 px 걸릴 수 있다.
+  expect(during - before).toBeGreaterThan(12)
+  expect(during - before).toBeLessThan(28)
+  expect(Math.abs(await centerX() - during)).toBeLessThanOrEqual(1)
+  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
+})
+
 /**
  * 최소 잉크 간격은 막지 않고 알린다. 간격은 화면과 같은 상자(모델 상자)로 잰다 — `서`는 ㅅ과 ㅓ 사이 여유가 17u뿐이다(옛 스키마 상자로는 188u로 잘못 쟀다).
  * 걸린 자리에서 한 번 붙들고, 50u 넘게 더 끌면 넘어간다. 넘어간 자모는 자동 되당김 없이 그린 대로 나오고 캔버스가 주황으로 알린다.
@@ -1325,4 +1352,16 @@ test('닿는 글자 줄만 옆으로 밀리고, 바깥 화면에는 가로 스�
     return out
   })
   expect(leaking).toEqual([])
+})
+
+/** 획 편집에 잠긴 동안 빈 곳을 눌러 선택이 풀려도 부품 상자는 잠긴 자소만 제 색이다. 다른 자소 상자가 켜지지 않는다. */
+test('획 편집 중 빈 곳을 눌러도 잠긴 자소 상자만 켜져 있다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EA%B0%81&mode=stroke&part=CH')
+  const canvas = page.getByTestId('focus-canvas')
+  await expect(canvas).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
+  const boxes = page.getByTestId('jamo-part-boxes').locator('g[data-part]')
+  await canvas.dispatchEvent('pointerdown')
+  await expect(page.locator('svg [data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(0)
+  await expect(boxes.and(page.locator('[data-active="true"]'))).toHaveCount(1)
+  await expect(boxes.and(page.locator('[data-active="true"]'))).toHaveAttribute('data-part', 'CH')
 })

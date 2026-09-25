@@ -203,8 +203,15 @@ type Selection =
 
 /** 캔버스 직접 끌기가 조절판과 같은 이동 계산을 쓰게 하는 문. `change`의 단위는 조절판과 같다(1 = 상자 좌표 0.001). */
 type StrokeDragApi = { begin: () => void; change: (movement: StrokeMoveDelta) => void; commit: () => void; cancel: () => void }
-/** 끌기로 치는 최소 거리(px). 이보다 짧으면 누르기다. */
+/** 끌기로 치는 최소 거리(px). 이보다 짧으면 누르기다. 조절판도 같은 문턱을 쓴다. */
 const DRAG_THRESHOLD_PX = 3
+/**
+ * 조절판 끌기를 캔버스 끌기와 같은 계산(px → em, 같은 스냅)으로 돌리는 문. 캔버스가 연다.
+ * `move`는 조절판에서 손가락이 간 거리(px). `begin`이 false면 지금 선택으로는 못 끈다(조절판 옛 계산으로 간다).
+ */
+type PadDragApi = { begin: () => boolean; move: (dx: number, dy: number) => void; end: (cancelled: boolean) => void }
+/** 조절판 배율. 캔버스 끌기의 1/3 — 1px ≈ 1u(1000u 칸). 섬세한 편집용이라 캔버스보다 잘게 가되, 자모 상자 크기와 상관없이 늘 같다. */
+const PAD_DRAG_GAIN = 1 / 3
 
 /** `pastGapLimit`: 사용자가 최소 잉크 간격의 걸림을 밀고 넘어간 미리보기. 문맥 안전 보정(자동 되당김)을 얹지 않는다. */
 type PreviewJamo = { type: JamoData['type']; char: string; data: JamoData; baseline?: JamoData; pastGapLimit?: boolean }
@@ -395,7 +402,7 @@ function layoutAreaLabel(part: MobileEditorPart): string {
   return '종성'
 }
 
-/** 부품 상자. 검수 캔버스 GhostCanvas와 같은 색·농도·라벨. 선택 부품만 제 색, 나머지는 옅게. 선택이 없으면 전부 제 색. */
+/** 부품 상자. 검수 캔버스 GhostCanvas와 같은 색·농도·라벨. 선택 부품만 제 색, 나머지는 옅게. 선택이 없으면 전부 제 색(획 편집에 잠긴 동안은 잠긴 자소만). */
 function PartBoxes({ boxes, activePart }: { boxes: Partial<Record<Part, BoxConfig>>; activePart: MobileEditorPart | null }) {
   return <g aria-hidden="true" data-testid="jamo-part-boxes">
     {(Object.entries(boxes) as [Part, BoxConfig][]).map(([part, box]) => {
@@ -528,6 +535,7 @@ function FocusedGlyph({
   onPointSelect,
   lockedPart = null,
   dragApiRef,
+  padDragRef,
   gapWarningParts = NO_PARTS,
   fontSpace,
   grid,
@@ -542,6 +550,8 @@ function FocusedGlyph({
   lockedPart?: MobileEditorPart | null
   /** 주면 잡은 점 · 핸들 · 획을 캔버스에서 바로 끈다(셸 안). 없으면 누르기로 고르기만 한다. */
   dragApiRef?: RefObject<StrokeDragApi | null>
+  /** 캔버스가 조절판에 여는 끌기 문. 조절판도 캔버스와 같은 px → em 계산 · 같은 스냅을 탄다. */
+  padDragRef?: RefObject<PadDragApi | null>
   /** 옆 자소에 최소 간격보다 가깝게(그리고 고치기 전보다 더) 붙은 자소들. 그 자소의 잡은 획을 경고색으로 그린다. */
   gapWarningParts?: readonly MobileEditorPart[]
   onSelect: (selection: Selection) => void
@@ -674,14 +684,49 @@ function FocusedGlyph({
       state.started = true
       api.begin()
     }
-    // 화면 px → 글자 칸(em) → 그 획이 놓인 상자 좌표. 그래야 점이 손가락을 따라온다.
-    // 글자가 기울어 있으면(skewX) 화면의 세로 이동이 기운 축을 따라 옆으로도 읽힌다. 기울기 전 좌표로 되돌린다: x = x' + tan(기울기) · y'.
-    const emPerPx = CANVAS_VIEWPORT.width / canvas.getBoundingClientRect().width
+    applySnappedMove(state, dx, dy, 1)
+  }
+  // 화면 px → 글자 칸(em) → 그 획이 놓인 상자 좌표. 캔버스는 배율 1이라 점이 손가락을 따라오고, 조절판은 `PAD_DRAG_GAIN`만큼 잘게 간다.
+  // 글자가 기울어 있으면(skewX) 화면의 세로 이동이 기운 축을 따라 옆으로도 읽힌다. 기울기 전 좌표로 되돌린다: x = x' + tan(기울기) · y'.
+  const applySnappedMove = (state: { box: BoxConfig; anchors: SnapAnchors; candidates: SnapCandidate[] }, dx: number, dy: number, gain: number) => {
+    const api = dragApiRef?.current
+    const canvas = canvasRef.current
+    if (!api || !canvas) return
+    const emPerPx = CANVAS_VIEWPORT.width / canvas.getBoundingClientRect().width * gain
     const uprightDx = dx + Math.tan(globalStyle.slant * Math.PI / 180) * dy
     const snapped = snapStrokeDrag({ anchors: state.anchors, requested: { x: uprightDx * emPerPx, y: dy * emPerPx }, candidates: state.candidates })
     setSnapHits((current) => current?.x?.value === snapped.hits.x?.value && current?.y?.value === snapped.hits.y?.value && current?.x?.label === snapped.hits.x?.label && current?.y?.label === snapped.hits.y?.label ? current : snapped.hits)
     api.change({ x: snapped.delta.x / state.box.width / 0.001, y: snapped.delta.y / state.box.height / 0.001 })
   }
+  // 조절판 끌기: 잡은 획 · 점 · 핸들의 닻과 후보를 캔버스 끌기와 똑같이 굳히고, 같은 스냅으로 옮긴다.
+  const padDrag = useRef<{ box: BoxConfig; anchors: SnapAnchors; candidates: SnapCandidate[] } | null>(null)
+  const beginPadDrag = () => {
+    if (!dragApiRef?.current || (selection.kind !== 'stroke' && selection.kind !== 'point' && selection.kind !== 'handle')) return false
+    const target = targets.find((item) => item.stroke.id === selection.strokeId)
+    if (!target) return false
+    const point = selection.kind === 'stroke' ? null : target.stroke.points[selection.pointIndex]
+    const handlePoint = selection.kind === 'handle' && point ? selection.handle === 'in' ? point.handleIn : point.handleOut : point
+    if (selection.kind !== 'stroke' && !handlePoint) return false
+    const anchors = handlePoint ? pointAnchors(handlePoint, target.box) : strokeBodyAnchors(target.stroke, target.box)
+    const dragged = selection.kind === 'stroke' ? { strokeId: target.stroke.id } : { strokeId: target.stroke.id, pointIndex: selection.pointIndex }
+    padDrag.current = { box: target.box, anchors, candidates: withoutOwnCandidates([...guideRails, ...strokeCandidates], dragged) }
+    dragApiRef.current.begin()
+    return true
+  }
+  useEffect(() => {
+    if (!padDragRef) return
+    padDragRef.current = {
+      begin: beginPadDrag,
+      move: (dx, dy) => { if (padDrag.current) applySnappedMove(padDrag.current, dx, dy, PAD_DRAG_GAIN) },
+      end: (cancelled) => {
+        if (!padDrag.current) return
+        padDrag.current = null
+        setSnapHits(null)
+        if (cancelled) dragApiRef?.current?.cancel()
+        else dragApiRef?.current?.commit()
+      },
+    }
+  })
   const endDrag = (event: ReactPointerEvent<HTMLDivElement>, cancelled: boolean) => {
     const state = drag.current
     if (!state || event.pointerId !== state.pointerId) return
@@ -712,7 +757,7 @@ function FocusedGlyph({
         <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill="none" stroke="rgb(196 203 212)" strokeWidth={0.4} />
         <rect x={body.x} y={body.y} width={body.width} height={body.height} fill="none" stroke="rgb(59 111 214 / .18)" strokeWidth={0.3} data-testid="jamo-design-body" />
         <line x1={-6} x2={102} y1={88} y2={88} stroke="#a6a297" strokeWidth={0.3} />
-        <PartBoxes boxes={inkBoxes} activePart={selectedPart} />
+        <PartBoxes boxes={inkBoxes} activePart={selectedPart ?? lockedPart} />
         {/* 레이아웃의 기준선을 읽기 전용으로 옅게 깐다. 획을 끌면 여기에 걸린다. */}
         {guideRails.length > 0 && <g aria-hidden="true" data-testid="stroke-guide-rails">
           {guideRails.map((rail) => rail.axis === 'x'
@@ -855,6 +900,7 @@ function InferenceTrackpad({
   onInkGapLimitChange,
   onMultiSelectArmedChange,
   dragApiRef,
+  padDragRef,
   multiSelectArmed = false,
   frameForEdit,
   toolSlot = null,
@@ -883,6 +929,8 @@ function InferenceTrackpad({
   onMultiSelectArmedChange: (armed: boolean) => void
   /** 주면 조절판 대신 도구 줄을 그리고, 이동 계산을 캔버스 직접 끌기에 내준다(셸 안). */
   dragApiRef?: RefObject<StrokeDragApi | null>
+  /** 캔버스가 여는 조절판 끌기 문. 있으면 획 · 점 · 핸들 이동은 캔버스와 같은 계산으로 간다. */
+  padDragRef?: RefObject<PadDragApi | null>
   /** 직접 조작에서 `여러 점` 토글이 켜져 있는지. 상태는 부모가 든다. */
   multiSelectArmed?: boolean
   /** 도구 단추를 그릴 자리(캔버스 왼쪽 세로 줄). 있으면 단추는 거기로 가고 트랙패드가 가로를 다 쓴다. */
@@ -1310,16 +1358,32 @@ function InferenceTrackpad({
     onSelectionChange({ ...selection, kind: 'stroke', strokeId: selection.kind === 'stroke' ? getJamoStrokes(after)[0]?.id ?? selectedStroke.id : selectedStroke.id, jamo: after })
   }
 
+  // 조절판 이동이 캔버스 끌기 계산(px → em · 같은 스냅)으로 가는 중인지. 셸 안의 획 · 점 · 핸들만 그렇고, 자소 통째 · 옛 화면은 옛 계산이다.
+  const padRouted = useRef(false)
   const trackpad = useUnifiedTrackpad({
     enabled: selection.kind !== 'none',
     scaleEnabled: selection.kind === 'component' || selection.kind === 'stroke',
-    onMoveStart: () => { padMove.current = true; beginMove() },
-    onMoveChange: changeMove,
-    onMoveCommit: commitMove,
+    moveDeadzone: direct ? DRAG_THRESHOLD_PX : undefined,
+    onMoveStart: () => {
+      padRouted.current = Boolean(direct && padDragRef?.current?.begin())
+      if (padRouted.current) return
+      padMove.current = true
+      beginMove()
+    },
+    onMoveChange: (movement) => padRouted.current ? padDragRef?.current?.move(movement.x, movement.y) : changeMove(movement),
+    onMoveCommit: () => {
+      if (!padRouted.current) return commitMove()
+      padRouted.current = false
+      padDragRef?.current?.end(false)
+    },
     onScaleStart: beginScale,
     onScaleChange: changeScale,
     onScaleCommit: commitScale,
-    onCancel: cancel,
+    onCancel: () => {
+      if (!padRouted.current) return cancel()
+      padRouted.current = false
+      padDragRef?.current?.end(true)
+    },
   })
   useEffect(() => {
     // 직접 조작에서는 `여러 점` 토글이 이 상태를 든다. 조절판에 손가락을 대는 방식은 조절판이 있을 때만.
@@ -1661,6 +1725,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const [strokeToolSlot, setStrokeToolSlot] = useState<HTMLDivElement | null>(null)
   // 셸 안에서는 조절판 없이 캔버스에서 바로 끈다. 이동 계산은 도구 줄 컴포넌트(`InferenceTrackpad`)가 들고 이 ref로 캔버스에 내준다.
   const dragApiRef = useRef<StrokeDragApi | null>(null)
+  const padDragRef = useRef<PadDragApi | null>(null)
   const directManipulation = chrome === 'workspace'
   const [previewJamo, setPreviewJamo] = useState<PreviewJamo | null>(null)
   const [previewSchema, setPreviewSchema] = useState<PreviewSchema | null>(null)
@@ -2379,7 +2444,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
           ? <div ref={setStrokeToolSlot} className={styles.strokeToolSlot} data-testid="jamo-stroke-tool-slot" />
           : chrome === 'workspace' && layoutAvailable && !styleLocksCanvas && <LayoutContextCards activeContextId={corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00).contextId} allActive={false} ink={strokeCardInk ?? undefined} />}
         <div className={styles.focusArea}>
-        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={styleLocksCanvas ? { kind: 'none' } : selection} onSelect={styleLocksCanvas ? () => {} : selectFromCanvas} selectedPoints={styleLocksCanvas ? [] : selectedPoints} onPointSelect={styleLocksCanvas ? () => {} : selectPointFromCanvas} lockedPart={styleLocksCanvas ? null : lockedPart} dragApiRef={directManipulation && !styleLocksCanvas ? dragApiRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
+        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={styleLocksCanvas ? { kind: 'none' } : selection} onSelect={styleLocksCanvas ? () => {} : selectFromCanvas} selectedPoints={styleLocksCanvas ? [] : selectedPoints} onPointSelect={styleLocksCanvas ? () => {} : selectPointFromCanvas} lockedPart={styleLocksCanvas ? null : lockedPart} dragApiRef={directManipulation && !styleLocksCanvas ? dragApiRef : undefined} padDragRef={directManipulation && !styleLocksCanvas ? padDragRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
         </div>
         </div>
       </section>}
@@ -2406,10 +2471,10 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         glyph={selectedChar}
         syllable={syllable}
         selection={selection}
+        creationSelection={lockedPart && selection.kind === 'none' ? firstStrokeSelectionOf(lockedPart) : null}
         selectedPoints={selectedPoints}
         layoutType={syllable.layoutType}
         schema={effectiveSchema}
-        creationSelection={lockedPart && selection.kind === 'none' ? firstStrokeSelectionOf(lockedPart) : null}
         snapStep={snapStep}
         unitsPerEm={fontSpace.unitsPerEm}
         minimumInkGap={minimumInkGap}
@@ -2423,6 +2488,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         onInkGapLimitChange={setInkGapLimiter}
         onMultiSelectArmedChange={setMultiSelectArmed}
         dragApiRef={directManipulation ? dragApiRef : undefined}
+        padDragRef={directManipulation ? padDragRef : undefined}
         multiSelectArmed={multiSelectArmed}
         frameForEdit={frameForEdit}
         toolSlot={strokeToolSlot}

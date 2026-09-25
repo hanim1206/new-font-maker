@@ -65,7 +65,7 @@ test('자소 탭 획 편집은 셸 안에서 문장·캔버스·도구 줄을 �
 
 test('검수 격자에서 글자를 열면 자소 탭 레이아웃 모드로 그 글자가 열리고, 획 고치기를 누르면 같은 글자 획 편집이다', async ({ page }) => {
   await page.goto('/workspace/review?char=%EC%97%BC')
-  await page.getByTestId('review-pick').click()
+  await page.locator(`[data-testid="corpus-cell"][data-codepoint="${'염'.codePointAt(0)}"]`).click()
   await expect(page).toHaveURL(/\/workspace\/jamo$/)
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible({ timeout: 20_000 })
   // 문장에 없던 글자라 문장 앞에 붙는다.
