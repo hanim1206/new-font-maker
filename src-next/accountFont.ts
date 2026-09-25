@@ -31,6 +31,8 @@ export interface LocalStamp {
   pending: boolean
   /** 편집 화면을 열 때 이 이름으로 새 폰트를 만든다(메인 화면의 `새 폰트 만들기`). */
   create?: string
+  /** 사본을 방금 비웠다(다른 폰트로 옮김) — 게이트가 꺼진 dev에서는 평소 사본이 이기지만 이때만 기록에서 읽는다. 열면 지운다. */
+  fresh?: boolean
 }
 
 const EMPTY_STAMP: LocalStamp = { owner: null, fontId: null, pending: false }
@@ -45,6 +47,7 @@ export function readStamp(storage: Storage): LocalStamp {
       pending: value.pending === true,
     }
     if (typeof value.create === 'string' && value.create.trim()) stamp.create = value.create.trim()
+    if (value.fresh === true) stamp.fresh = true
     return stamp
   } catch {
     return EMPTY_STAMP
@@ -87,9 +90,14 @@ export function editorPlanOf(stamp: LocalStamp, me: string): EditorPlan {
   return stamp.fontId ? 'open' : 'home'
 }
 
-/** 연 폰트에서 서버 값과 사본 중 무엇을 쓸지. 서버가 이기고, 이 폰트의 사본에 못 올린 변경이 있을 때만 사본을 올린다. */
-export function openPlanOf(stamp: LocalStamp, me: string, fontId: string): 'use-server' | 'push-local' {
-  return stamp.owner === me && stamp.fontId === fontId && stamp.pending ? 'push-local' : 'use-server'
+/**
+ * 연 폰트에서 서버 값과 사본 중 무엇을 쓸지. 서버가 이기고, 이 폰트의 사본에 못 올린 변경이 있을 때만 사본을 올린다.
+ * 게이트가 꺼진 dev(`localOwner`)는 반대다 — 브라우저 사본이 원본이고 기록은 목록용이라, 사본을 방금 비운 때(`fresh`)만 기록에서 읽는다.
+ */
+export function openPlanOf(stamp: LocalStamp, me: string, fontId: string, localOwner = false): 'use-server' | 'push-local' {
+  if (stamp.owner !== me || stamp.fontId !== fontId) return 'use-server'
+  if (localOwner) return stamp.fresh ? 'use-server' : 'push-local'
+  return stamp.pending ? 'push-local' : 'use-server'
 }
 
 /**

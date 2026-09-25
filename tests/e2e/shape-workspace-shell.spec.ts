@@ -49,13 +49,14 @@ test('폰트 탭의 OTF 추출은 폰트 이름을 물은 뒤 그 이름의 OTF�
   const nav = page.getByRole('navigation', { name: '프로젝트 주 내비게이션' })
   await nav.getByRole('link', { name: '폰트' }).click()
   await expect(page).toHaveURL(/\/workspace\/font$/)
-  await expect(page.getByTestId('font-workspace').getByRole('heading', { level: 1 })).toHaveText('새 한글 폰트')
+  // 게이트가 꺼진 dev는 이 기기 폰트 `내 폰트`가 자동으로 만들어져 열린다.
+  await expect(page.getByTestId('font-workspace').getByRole('heading', { level: 1 })).toHaveText('내 폰트')
 
   // OTF 추출 → 이름 창. 취소하면 아무 일도 없다.
   const dialog = page.getByTestId('font-export-dialog')
   const exportButton = page.getByTestId('font-workspace').getByRole('button', { name: /OTF/ })
   await exportButton.click()
-  await expect(page.getByTestId('font-export-name')).toHaveValue('FontMaker')
+  await expect(page.getByTestId('font-export-name')).toHaveValue('내 폰트')
   await dialog.getByRole('button', { name: '취소' }).click()
   await expect(dialog).toHaveCount(0)
 

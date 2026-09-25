@@ -17,7 +17,7 @@ test('자소 편집에서 버튼을 누르면 그 화면의 명세가 뜨고 다
   await expect(panel).toContainText('자소편집')
   await expect(panel).toContainText('/workspace/jamo')
   await expect(panel.getByRole('heading', { name: /레이아웃 편집/ })).toBeVisible()
-  await expect(panel.getByTestId('screen-spec-feature').filter({ hasText: '6.14' })).toContainText('적용')
+  await expect(panel.getByTestId('screen-spec-feature').filter({ hasText: '6.14' })).toContainText('상시 저장')
 
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('screen-spec-panel')).toHaveCount(0)

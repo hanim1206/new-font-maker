@@ -13,13 +13,13 @@ import {
 } from './accountFont'
 import { deleteFont, listFonts, renameFont } from './accountFontApi'
 import type { FontSummary } from './accountFontApi'
-import { signOutAndReload } from './betaAuth'
+import { authGateMode, signOutAndReload } from './betaAuth'
 import styles from './FontHomePage.module.css'
 
 const EDITOR_PATH = '/workspace/jamo'
 
 /**
- * 메인 화면 `내 폰트`(`/fonts`). 로그인하면 여기부터. 목록과 `새 폰트 만들기`가 한 화면에 있다.
+ * 메인 화면 `내 폰트`(`/fonts`). 로그인하면 여기부터. 목록과 `새 폰트 만들기`가 한 화면에 있다. 게이트가 꺼진 개발 서버는 이 기기 목록(`localFontApi`)으로 같은 화면.
  * 폰트를 고르면 지금 사본의 못 올린 변경을 먼저 올리고, 사본을 그 폰트로 바꿔 편집 화면을 연다.
  */
 export function FontHomePage({ me, nickname }: { me: string; nickname: string | null }) {
@@ -49,11 +49,13 @@ export function FontHomePage({ me, nickname }: { me: string; nickname: string | 
   const open = async (fontId: string) => {
     if (busy) return
     setBusy(true)
-    if (readStamp(localStorage).fontId !== fontId) {
+    // 다른 폰트로 가면 사본을 비우고 `fresh`를 남긴다 — 게이트가 꺼진 dev는 평소 사본이 이기므로 이때만 기록에서 읽게.
+    const switching = readStamp(localStorage).fontId !== fontId
+    if (switching) {
       if (!(await settled())) { setBusy(false); return }
       clearLocalFont(localStorage)
     }
-    writeStamp(localStorage, { owner: me, fontId, pending: false })
+    writeStamp(localStorage, switching ? { owner: me, fontId, pending: false, fresh: true } : { owner: me, fontId, pending: false })
     window.location.assign(EDITOR_PATH)
   }
 
@@ -141,7 +143,10 @@ export function FontHomePage({ me, nickname }: { me: string; nickname: string | 
       {full && <p className={styles.note}>폰트는 {FONT_LIMIT}개까지 만들 수 있어요. 하나를 지우면 새로 만들 수 있어요.</p>}
       {failure && <p className={styles.failure} role="alert">{failure}</p>}
 
-      <footer><button type="button" onClick={() => void signOutAndReload()}>로그아웃</button></footer>
+      {/* 게이트가 꺼진 개발 서버는 계정이 없다 — 목록은 이 기기(localStorage)에 있다. */}
+      <footer>{authGateMode() === 'on'
+        ? <button type="button" onClick={() => void signOutAndReload()}>로그아웃</button>
+        : <span className={styles.note} data-testid="font-home-local">이 기기에만 저장되는 개발용 목록</span>}</footer>
     </section>
   </main>
 }

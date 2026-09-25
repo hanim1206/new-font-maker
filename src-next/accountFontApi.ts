@@ -1,10 +1,14 @@
 import { supabase } from '../src/lib/supabase'
 import type { FontData } from '../src/types/database'
+import { authGateMode } from './betaAuth'
+import * as local from './localFontApi'
 
 /**
  * `font_projects` 서버 호출. 스토어를 가져오지 않아 메인 화면(`/fonts`)도 쓴다.
  * 지운 폰트(`deleted_at`)는 읽지 않는다. RLS가 내 줄만 돌려준다.
+ * 로그인 게이트가 꺼진 개발 서버에서는 같은 함수가 localStorage(`localFontApi`)를 본다 — 메인 화면과 편집 화면이 dev에서도 같은 길.
  */
+const isLocal = () => authGateMode() === 'off'
 
 const TABLE = 'font_projects'
 
@@ -18,6 +22,7 @@ export type ApiResult<T> = { ok: true; value: T } | { ok: false; message: string
 const failed = (error: { message: string }): { ok: false; message: string } => ({ ok: false, message: error.message })
 
 export async function listFonts(me: string): Promise<ApiResult<FontSummary[]>> {
+  if (isLocal()) return local.listFonts()
   const { data, error } = await supabase
     .from(TABLE)
     .select('id, name, updated_at')
@@ -29,6 +34,7 @@ export async function listFonts(me: string): Promise<ApiResult<FontSummary[]>> {
 }
 
 export async function fetchFont(fontId: string): Promise<ApiResult<FontRow | null>> {
+  if (isLocal()) return local.fetchFont(fontId)
   const { data, error } = await supabase
     .from(TABLE)
     .select('id, name, font_data, updated_at')
@@ -40,6 +46,7 @@ export async function fetchFont(fontId: string): Promise<ApiResult<FontRow | nul
 }
 
 export async function createFont(me: string, name: string, fontData: FontData): Promise<ApiResult<{ id: string; updatedAt: string | null }>> {
+  if (isLocal()) return local.createFont(name, fontData)
   const { data, error } = await supabase
     .from(TABLE)
     .insert({ name, user_id: me, font_data: fontData })
@@ -57,6 +64,7 @@ export async function createFont(me: string, name: string, fontData: FontData): 
  * null이면 조건 없이 덮는다(`내 것으로 덮기`, 사본 올리기).
  */
 export async function saveFont(fontId: string, fontData: FontData, expectedUpdatedAt: string | null = null): Promise<ApiResult<string | null>> {
+  if (isLocal()) return local.saveFont(fontId, fontData, expectedUpdatedAt)
   let query = supabase
     .from(TABLE)
     .update({ font_data: fontData, updated_at: new Date().toISOString() })
@@ -80,18 +88,21 @@ async function fontExists(fontId: string): Promise<boolean> {
 }
 
 export async function renameFont(fontId: string, name: string): Promise<ApiResult<null>> {
+  if (isLocal()) return local.renameFont(fontId, name)
   const { error } = await supabase.from(TABLE).update({ name }).eq('id', fontId)
   return error ? failed(error) : { ok: true, value: null }
 }
 
 /** 소프트 삭제. 줄은 남고 목록 · 한도에서 빠진다. 되살리기는 관리자가 `deleted_at`을 비운다. */
 export async function deleteFont(fontId: string): Promise<ApiResult<null>> {
+  if (isLocal()) return local.deleteFont(fontId)
   const { error } = await supabase.from(TABLE).update({ deleted_at: new Date().toISOString() }).eq('id', fontId)
   return error ? failed(error) : { ok: true, value: null }
 }
 
 /** 추출할 때마다 +1 한 값. 파일 버전 `1.00n`의 n. */
 export async function bumpExportRevision(fontId: string): Promise<ApiResult<number>> {
+  if (isLocal()) return local.bumpExportRevision(fontId)
   const { data, error } = await supabase.rpc('bump_font_export_revision', { font_id: fontId })
   if (error) return failed(error)
   if (typeof data !== 'number') return { ok: false, message: '추출 버전을 올리지 못했습니다.' }

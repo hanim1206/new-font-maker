@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { LOCAL_OWNER } from './localFontApi'
 import { applyFontData, collectFontData } from '../src/services/fontDataBridge'
 import { useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
@@ -102,7 +103,7 @@ export async function startAccountFont(me: string): Promise<AccountStartResult> 
     return { ok: false, reason: 'home' }
   }
   let updatedAt = fetched.value.updatedAt
-  if (openPlanOf(stamp, me, fontId) === 'push-local') {
+  if (openPlanOf(stamp, me, fontId, me === LOCAL_OWNER) === 'push-local') {
     const saved = await saveFont(fontId, collectAccountFontData())
     if (!saved.ok) return { ok: false, reason: 'network', message: saved.message }
     updatedAt = saved.value

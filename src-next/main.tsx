@@ -9,7 +9,8 @@ import { LEGACY_CALIBRATION_LAYOUT_PROFILE_V1 } from '../src/data/legacyCalibrat
 import { DEFAULT_LAYOUT_SCHEMAS } from '../src/utils/layoutCalculator'
 import '../src/index.css'
 import { setPersistWriteErrorHandler } from '../src/utils/debouncedStorage'
-import { dropForeignCopy, readStamp } from './accountFont'
+import { dropForeignCopy, readStamp, writeStamp } from './accountFont'
+import { LOCAL_OWNER } from './localFontApi'
 import { showAppNotice } from './appNotice'
 import { AppErrorBoundary } from './AppErrorBoundary'
 import { AppNoticeBar } from './AppNoticeBar'
@@ -61,8 +62,18 @@ document.addEventListener('dragstart', (event) => {
   event.preventDefault()
 })
 
-/** 메인 화면 `내 폰트`. 로그인 게이트가 켜졌을 때만 있다. */
+/** 메인 화면 `내 폰트`. 게이트가 켜지면 계정, 꺼지면(개발 서버) 이 기기의 목록(`localFontApi`). */
 const FONTS_PATH = '/fonts'
+
+/**
+ * 게이트가 꺼진 개발 서버: 계정 대신 `local`이 주인이다. 아직 이 기기 폰트를 고른 적이 없으면(옛 사본 · 로그인 사본 · 빈 상태)
+ * 지금 사본을 첫 폰트로 만든다 — 편집 주소로 바로 들어와도 메인 화면으로 튕기지 않고, 있던 작업도 잃지 않는다.
+ */
+function adoptLocalCopy(): void {
+  const stamp = readStamp(window.localStorage)
+  if (stamp.owner === LOCAL_OWNER) return
+  writeStamp(window.localStorage, { owner: LOCAL_OWNER, fontId: null, pending: false, create: '내 폰트' })
+}
 
 /**
  * 로그인 게이트(베타). 로그인 안 됐으면 앱 대신 코드 입력 화면을 띄운다.
@@ -71,8 +82,13 @@ const FONTS_PATH = '/fonts'
 async function gate(): Promise<void> {
   const mode = authGateMode()
   if (mode === 'off') {
-    if (window.location.pathname === FONTS_PATH) { window.location.replace('/workspace/jamo'); return }
-    return start()
+    adoptLocalCopy()
+    if (window.location.pathname === FONTS_PATH) {
+      const { FontHomePage } = await import('./FontHomePage')
+      show(<FontHomePage me={LOCAL_OWNER} nickname="내 폰트" />)
+      return
+    }
+    return start(LOCAL_OWNER)
   }
   const { AuthMisconfiguredPage, BetaLoginPage } = await import('./BetaLoginPage')
   if (mode === 'misconfigured') {
@@ -94,7 +110,7 @@ async function gate(): Promise<void> {
   return start(user.id)
 }
 
-/** `me`가 있으면(로그인 게이트가 켜졌을 때) 편집 화면을 열기 전에 계정 폰트를 불러온다. */
+/** 편집 화면을 열기 전에 계정 폰트(게이트 꺼지면 이 기기 폰트)를 불러온다. */
 async function start(me?: string): Promise<void> {
   // 랩 화면은 개발 서버에서만. 프로덕션 번들에는 랩 청크가 들어가지 않는다.
   if (import.meta.env.DEV) {
@@ -103,14 +119,12 @@ async function start(me?: string): Promise<void> {
   }
 
   // 같은 폰트는 한 탭에서만. 스토어가 사본을 읽기 전에 막는다.
-  const lockName = editLockName(me, me ? readStamp(window.localStorage).fontId : null)
-  const held = await holdEditLock(lockName, {
-    steal: takeStealRequest(window.sessionStorage),
-    onLost: () => {
-      suspendWork()
-      show(<EditLockedPage lost />)
-    },
-  })
+  const initialFontId = me ? readStamp(window.localStorage).fontId : null
+  const onLost = () => {
+    suspendWork()
+    show(<EditLockedPage lost />)
+  }
+  const held = await holdEditLock(editLockName(me, initialFontId), { steal: takeStealRequest(window.sessionStorage), onLost })
   if (!held) {
     show(<EditLockedPage lost={false} />)
     return
@@ -145,6 +159,12 @@ async function start(me?: string): Promise<void> {
     if (!started.ok) {
       const { AccountFontFailedPage } = await import('./BetaLoginPage')
       show(<AccountFontFailedPage reason={started.reason} message={started.message} />)
+      return
+    }
+    // 새로 만든 폰트는 이제 id가 생겼다. 그 이름으로도 잠가야 둘째 탭이 같은 폰트를 알아본다(처음 잠금은 `new`였다).
+    const fontId = readStamp(window.localStorage).fontId
+    if (fontId !== initialFontId && !(await holdEditLock(editLockName(me, fontId), { steal: false, onLost }))) {
+      show(<EditLockedPage lost={false} />)
       return
     }
   }
