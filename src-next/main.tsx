@@ -7,7 +7,8 @@ import {
 import { LEGACY_CALIBRATION_LAYOUT_PROFILE_V1 } from '../src/data/legacyCalibrationLayoutProfileV1'
 import { DEFAULT_LAYOUT_SCHEMAS } from '../src/utils/layoutCalculator'
 import '../src/index.css'
-import { authGateMode, hasSession } from './betaAuth'
+import { dropForeignCopy } from './accountFont'
+import { authGateMode, sessionUserId } from './betaAuth'
 
 const root = createRoot(document.getElementById('root')!)
 
@@ -26,11 +27,13 @@ async function gate(): Promise<void> {
     root.render(<StrictMode><AuthMisconfiguredPage /></StrictMode>)
     return
   }
-  if (await hasSession()) return start()
-  root.render(<StrictMode><BetaLoginPage onSignedIn={() => void start()} /></StrictMode>)
+  const me = await sessionUserId()
+  if (me) return start(me)
+  root.render(<StrictMode><BetaLoginPage onSignedIn={() => void gate()} /></StrictMode>)
 }
 
-async function start(): Promise<void> {
+/** `me`가 있으면(로그인 게이트가 켜졌을 때) 편집 화면을 열기 전에 계정 폰트를 불러온다. */
+async function start(me?: string): Promise<void> {
   if (import.meta.env.DEV && window.location.pathname === '/global-style-preview') {
     const { GlobalStylePreviewPage } = await import('./GlobalStylePreviewPage')
     root.render(<StrictMode><GlobalStylePreviewPage /></StrictMode>)
@@ -93,6 +96,9 @@ async function start(): Promise<void> {
     return
   }
 
+  // 남의 이름표가 붙은 브라우저 사본은 스토어가 읽기 전에 지운다(공용 기기).
+  if (me) dropForeignCopy(window.localStorage, me)
+
   const migration = runLayoutProfileMigrationBootstrap({
     storage: window.localStorage,
     defaultSchemas: DEFAULT_LAYOUT_SCHEMAS,
@@ -114,6 +120,16 @@ async function start(): Promise<void> {
       </StrictMode>,
     )
     return
+  }
+
+  if (me) {
+    const { startAccountFont } = await import('./accountFontSync')
+    const started = await startAccountFont(me)
+    if (!started.ok) {
+      const { AccountFontFailedPage } = await import('./BetaLoginPage')
+      root.render(<StrictMode><AccountFontFailedPage reason={started.reason} message={started.message} /></StrictMode>)
+      return
+    }
   }
 
   const { default: App } = await import('./App')

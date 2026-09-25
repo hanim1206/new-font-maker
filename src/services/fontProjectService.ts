@@ -58,7 +58,7 @@ export const fontProjectService = {
   async create(input: CreateFontProjectInput): Promise<FontProject> {
     const userId = await getCurrentUserId()
     const parsed = parseAndMigrateFontData(input.font_data)
-    if (!parsed.ok) throw new Error('저장할 폰트 데이터가 1.4 계약을 통과하지 못했습니다.')
+    if (!parsed.ok) throw new Error('저장할 폰트 데이터가 저장 계약을 통과하지 못했습니다.')
     const { data, error } = await supabase
       .from(TABLE)
       .insert({
@@ -80,7 +80,7 @@ export const fontProjectService = {
     const updateInput = { ...input }
     if (input.font_data !== undefined) {
       const parsed = parseAndMigrateFontData(input.font_data)
-      if (!parsed.ok) throw new Error('저장할 폰트 데이터가 1.4 계약을 통과하지 못했습니다.')
+      if (!parsed.ok) throw new Error('저장할 폰트 데이터가 저장 계약을 통과하지 못했습니다.')
       updateInput.font_data = parsed.data
     }
     const { data, error } = await supabase

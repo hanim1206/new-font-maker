@@ -163,7 +163,7 @@ describe('FontData 레이아웃 저장 계약', () => {
 
     const serialized = JSON.stringify(collectFontData())
     const parsed = JSON.parse(serialized) as FontData
-    expect(parsed.version).toBe('1.4.0')
+    expect(parsed.version).toBe('1.5.0')
 
     applyFontData(parsed)
     const roundTripped = collectFontData()
@@ -221,7 +221,7 @@ describe('FontData 레이아웃 저장 계약', () => {
     ])
   })
 
-  it('1.2 payload를 기존 필드 손실 없이 1.4로 한 번만 이관한다', () => {
+  it('1.2 payload를 기존 필드 손실 없이 1.5로 한 번만 이관한다', () => {
     const legacy = structuredClone(originalFontData) as unknown as FontDataV1_2
     legacy.version = '1.2.0'
     const before = structuredClone(legacy)
@@ -229,14 +229,14 @@ describe('FontData 레이아웃 저장 계약', () => {
     expect(first.ok).toBe(true)
     if (!first.ok) return
     expect(first.migratedFrom).toBe('1.2.0')
-    expect(first.data.version).toBe('1.4.0')
+    expect(first.data.version).toBe('1.5.0')
     expect(first.data).not.toHaveProperty('shapeSystem')
     expect({ ...first.data, version: '1.2.0' }).toEqual(legacy)
     expect(legacy).toEqual(before)
     expect(parseAndMigrateFontData(first.data)).toEqual({ ok: true, data: first.data })
   })
 
-  it('1.3 Shape v1을 1.4 Shape v2의 명시적 null/null 상태로 이관한다', () => {
+  it('1.3 Shape v1을 1.5 Shape v2의 명시적 null/null 상태로 이관한다', () => {
     const legacy = structuredClone(originalFontData) as unknown as FontDataV1_3
     legacy.version = '1.3.0'
     legacy.shapeSystem = shapeEnvelopeV1()
@@ -245,7 +245,7 @@ describe('FontData 레이아웃 저장 계약', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.migratedFrom).toBe('1.3.0')
-    expect(result.data.version).toBe('1.4.0')
+    expect(result.data.version).toBe('1.5.0')
     expect(result.data.shapeSystem?.version).toBe(2)
     expect(result.data.shapeSystem?.layoutGridSystem).toBeNull()
     expect(result.data.shapeSystem?.contextPresetCatalog).toBeNull()

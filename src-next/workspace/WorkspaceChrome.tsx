@@ -10,7 +10,9 @@ import {
   Shapes,
   Undo2,
 } from 'lucide-react'
+import { useAccountSaveStore } from '../accountFontSync'
 import { authGateMode, signOutAndReload } from '../betaAuth'
+import { SaveToast } from './SaveToast'
 import styles from './WorkspaceChrome.module.css'
 
 export type WorkspaceArea = 'jamo' | 'review'
@@ -87,8 +89,20 @@ export function MobileWorkspaceShell({
         {children}
         {drawer}
       </div>
+      <AccountSaveToast />
     </main>
   )
+}
+
+/** 계정 자동 저장이 실패했을 때만 알린다. 성공은 알리지 않고, 저장 중에도 편집을 막지 않는다. */
+function AccountSaveToast() {
+  const failed = useAccountSaveStore((state) => state.status === 'error')
+  if (!failed) return null
+  return <SaveToast
+    tone="error"
+    message="계정에 저장하지 못했어요. 이 기기에는 남아 있고, 잠시 뒤 다시 올려요."
+    onDismiss={() => useAccountSaveStore.setState({ status: 'idle' })}
+  />
 }
 
 export interface EditScopeItem {

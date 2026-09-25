@@ -69,3 +69,19 @@ export function AuthMisconfiguredPage() {
     </div>
   </main>
 }
+
+/** 로그인은 됐는데 계정 폰트를 불러오지 못했을 때. 빈 폰트로 열면 자동 저장이 서버를 덮으므로 열지 않는다. */
+export function AccountFontFailedPage({ reason, message }: { reason: 'network' | 'invalid-font'; message: string }) {
+  return <main className={styles.page} role="alert">
+    <div className={styles.card} data-testid="account-font-failed" data-reason={reason}>
+      <header>
+        <h1>폰트를 불러오지 못했어요</h1>
+        <p>{reason === 'network'
+          ? '인터넷 연결을 확인하고 다시 시도해 주세요.'
+          : '저장된 폰트를 읽을 수 없어요. 초대한 사람에게 알려 주세요. 폰트는 서버에 그대로 있어요.'}</p>
+      </header>
+      <button type="button" onClick={() => window.location.reload()}>다시 시도</button>
+      <footer>{message}</footer>
+    </div>
+  </main>
+}

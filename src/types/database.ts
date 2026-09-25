@@ -11,6 +11,7 @@ import type {
   StrokeLinejoin,
   StrokeRenderStyle,
 } from './index'
+import type { ContextBoxDelta } from '../services/contextBoxResolver'
 
 // ===== 글로벌 스타일 (DB 저장용) =====
 export interface FontGlobalStyle {
@@ -34,7 +35,13 @@ export interface FontGlobalStyleExclusion {
 // ===== 폰트 데이터 (font_data JSONB 컬럼 구조) =====
 export const LEGACY_FONT_DATA_VERSION = '1.2.0' as const
 export const FONT_DATA_V1_3_VERSION = '1.3.0' as const
-export const FONT_DATA_VERSION = '1.4.0' as const
+export const FONT_DATA_V1_4_VERSION = '1.4.0' as const
+export const FONT_DATA_VERSION = '1.5.0' as const
+
+/** 사용자 레이아웃 조정(`noto-layout-delta-v1`). 범위 규칙식 키 → Δ. 1.5부터 저장한다. */
+export interface FontLayoutDelta {
+  rules: Record<string, ContextBoxDelta>
+}
 
 interface FontDataPayload {
   // layoutStore에서 영속화하는 데이터
@@ -66,13 +73,20 @@ export interface FontDataV1_3 extends FontDataPayload {
   shapeSystem?: DeepReadonly<ShapeSystemSourceV1>
 }
 
+export interface FontDataV1_4 extends FontDataPayload {
+  version: typeof FONT_DATA_V1_4_VERSION
+  shapeSystem?: DeepReadonly<ShapeSystemSourceV2>
+}
+
 export interface FontData extends FontDataPayload {
   version: typeof FONT_DATA_VERSION
   /** Shape v2 raw source만 저장하며 resolved grid/box/윤곽/provenance/history는 저장하지 않는다. */
   shapeSystem?: DeepReadonly<ShapeSystemSourceV2>
+  /** 없으면 조정 없음. 1.4 이하에서 올린 값에는 없다. */
+  layoutDelta?: FontLayoutDelta
 }
 
-export type PersistedFontData = FontDataV1_2 | FontDataV1_3 | FontData
+export type PersistedFontData = FontDataV1_2 | FontDataV1_3 | FontDataV1_4 | FontData
 
 // ===== font_projects 테이블 Row =====
 export interface FontProject {

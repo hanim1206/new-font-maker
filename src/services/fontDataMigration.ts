@@ -1,6 +1,7 @@
 import type { FontData, FontDataV1_2 } from '../types/database'
 import {
   FONT_DATA_V1_3_VERSION,
+  FONT_DATA_V1_4_VERSION,
   FONT_DATA_VERSION,
   LEGACY_FONT_DATA_VERSION,
 } from '../types/database'
@@ -32,7 +33,7 @@ export type FontDataParseResult =
   | {
     ok: true
     data: FontData
-    migratedFrom?: typeof LEGACY_FONT_DATA_VERSION | typeof FONT_DATA_V1_3_VERSION
+    migratedFrom?: typeof LEGACY_FONT_DATA_VERSION | typeof FONT_DATA_V1_3_VERSION | typeof FONT_DATA_V1_4_VERSION
   }
   | { ok: false; issues: FontDataParseIssue[] }
 
@@ -110,13 +111,30 @@ function validatePayload(value: Record<string, unknown>): FontDataParseIssue[] {
   return issues
 }
 
+/** 1.5 `layoutDelta`: `{ rules: { [규칙식 키]: Δ 객체 } }`. Δ 안쪽은 스토어가 읽을 때 다시 걸러 낸다. */
+function validateLayoutDelta(value: unknown): FontDataParseIssue[] {
+  if (!isRecord(value)) return [issue('invalid-field', '$.layoutDelta', 'layoutDelta는 객체여야 합니다.')]
+  const issues = Object.keys(value)
+    .filter((key) => key !== 'rules')
+    .map((key) => issue('unsupported-field', `$.layoutDelta.${key}`, '지원하지 않는 layoutDelta 필드입니다.'))
+  if (!isRecord(value.rules)) {
+    issues.push(issue('invalid-field', '$.layoutDelta.rules', 'layoutDelta.rules는 객체여야 합니다.'))
+    return issues
+  }
+  for (const [key, delta] of Object.entries(value.rules)) {
+    if (!isRecord(delta)) issues.push(issue('invalid-field', `$.layoutDelta.rules.${key}`, 'Δ는 객체여야 합니다.'))
+  }
+  return issues
+}
+
 function sortIssues(issues: FontDataParseIssue[]): FontDataParseIssue[] {
   return issues.sort((left, right) => left.path.localeCompare(right.path) || left.code.localeCompare(right.code))
 }
 
 /**
  * DB/local JSON ingress의 유일한 FontData version 경계다.
- * 1.2/1.3은 원본 payload를 보존한 1.4로 올리되 layout grid/catalog를 추측해 만들지 않는다.
+ * 1.2/1.3/1.4는 원본 payload를 보존한 1.5로 올리되 layout grid/catalog를 추측해 만들지 않는다.
+ * 1.4 이하에는 `layoutDelta`가 없고, 올려도 만들지 않는다(없음 = 조정 없음).
  */
 export function parseAndMigrateFontData(value: unknown): FontDataParseResult {
   if (!isRecord(value)) {
@@ -127,6 +145,7 @@ export function parseAndMigrateFontData(value: unknown): FontDataParseResult {
   }
   if (value.version !== LEGACY_FONT_DATA_VERSION
     && value.version !== FONT_DATA_V1_3_VERSION
+    && value.version !== FONT_DATA_V1_4_VERSION
     && value.version !== FONT_DATA_VERSION) {
     return {
       ok: false,
@@ -135,13 +154,13 @@ export function parseAndMigrateFontData(value: unknown): FontDataParseResult {
   }
 
   const allowedKeys = new Set<string>(COMMON_KEYS)
-  if (value.version === FONT_DATA_V1_3_VERSION || value.version === FONT_DATA_VERSION) {
-    allowedKeys.add('shapeSystem')
-  }
+  if (value.version !== LEGACY_FONT_DATA_VERSION) allowedKeys.add('shapeSystem')
+  if (value.version === FONT_DATA_VERSION) allowedKeys.add('layoutDelta')
   const issues = Object.keys(value)
     .filter((key) => !allowedKeys.has(key))
     .map((key) => issue('unsupported-field', `$.${key}`, '지원하지 않는 FontData 필드입니다.'))
   issues.push(...validatePayload(value))
+  if (value.version === FONT_DATA_VERSION && hasOwn(value, 'layoutDelta')) issues.push(...validateLayoutDelta(value.layoutDelta))
   if (issues.length > 0) return { ok: false, issues: sortIssues(issues) }
 
   let cloned: Record<string, unknown>
@@ -155,8 +174,7 @@ export function parseAndMigrateFontData(value: unknown): FontDataParseResult {
   if (canonicalIssues.length > 0) return { ok: false, issues: sortIssues(canonicalIssues) }
 
   let shapeSystem: FontData['shapeSystem']
-  if ((value.version === FONT_DATA_V1_3_VERSION || value.version === FONT_DATA_VERSION)
-    && hasOwn(value, 'shapeSystem')) {
+  if (value.version !== LEGACY_FONT_DATA_VERSION && hasOwn(value, 'shapeSystem')) {
     if (value.shapeSystem === undefined) {
       return { ok: false, issues: [issue('invalid-shape-system', '$.shapeSystem', 'shapeSystem은 undefined로 저장할 수 없습니다.')] }
     }
@@ -183,9 +201,7 @@ export function parseAndMigrateFontData(value: unknown): FontDataParseResult {
   delete (data as FontData & { shapeSystem?: unknown }).shapeSystem
   if (shapeSystem) data.shapeSystem = shapeSystem
 
-  return value.version === LEGACY_FONT_DATA_VERSION
-    ? { ok: true, data, migratedFrom: LEGACY_FONT_DATA_VERSION }
-    : value.version === FONT_DATA_V1_3_VERSION
-      ? { ok: true, data, migratedFrom: FONT_DATA_V1_3_VERSION }
-      : { ok: true, data }
+  return value.version === FONT_DATA_VERSION
+    ? { ok: true, data }
+    : { ok: true, data, migratedFrom: value.version }
 }
