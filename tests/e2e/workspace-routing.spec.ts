@@ -24,8 +24,8 @@ test('자소 → 검수 → 자소를 오가도 되돌리기 기록이 남는다
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
   await mark(page)
 
-  // 기록 한 줄: 둥글기 60.
-  await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
+  // 기록 한 줄: 폰트 탭에서 둥글기 60.
+  await openMenuAndGo(page, '폰트')
   const panel = page.getByRole('region', { name: '글로벌 스타일 설정' })
   await panel.getByRole('tab', { name: '획 스타일' }).click()
   const roundness = panel.getByTestId('style-roundness')

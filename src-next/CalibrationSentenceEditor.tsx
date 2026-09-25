@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type Ref, type RefObject, type TextareaHTMLAttributes } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref, type RefObject, type TextareaHTMLAttributes } from 'react'
 import { ArrowLeft, Check, Circle, Copy, CopyPlus, Delete, Dices, Download, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, RotateCcw, Settings2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
@@ -94,6 +94,8 @@ import { useUIStore } from '../src/stores/uiStore'
 
 /** 어느 껍데기 안에 그릴지. standalone = 옛 `/` 전체 화면, workspace = 셸 자소 탭 안. */
 export type EditorChrome = 'standalone' | 'workspace'
+/** 셸 안 편집기의 자리. `edit`는 자소 탭(캔버스), `style`은 폰트 탭(글로벌 스타일 공간만, 캔버스 없음). */
+export type EditorSpace = 'edit' | 'style'
 
 /**
  * 주사위로 도는 예시 문장. 첫 줄은 처음 열 때 문장이라 자리를 지킨다(e2e가 기댄다).
@@ -1697,7 +1699,7 @@ function StyleToneControls({
   </div>
 }
 
-export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: EditorChrome } = {}) {
+export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit', above }: { chrome?: EditorChrome; space?: EditorSpace; above?: ReactNode } = {}) {
   const projectName = useUIStore((state) => state.currentProjectName) ?? '새 한글 폰트'
   const choseong = useJamoStore((state) => state.choseong)
   const jungseong = useJamoStore((state) => state.jungseong)
@@ -1729,6 +1731,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const dragApiRef = useRef<StrokeDragApi | null>(null)
   const padDragRef = useRef<PadDragApi | null>(null)
   const directManipulation = chrome === 'workspace'
+  // 폰트 탭: 글로벌 스타일 공간이 늘 열려 있고 닫히지 않는다. 캔버스 · 레이아웃 · 획 편집은 없다.
+  const styleOnly = chrome === 'workspace' && space === 'style'
   const [previewJamo, setPreviewJamo] = useState<PreviewJamo | null>(null)
   const [previewSchema, setPreviewSchema] = useState<PreviewSchema | null>(null)
   // 되돌리기 기록은 화면 밖 저장소에 둔다 — 자소↔검수를 오가며 화면이 다시 열려도 남는다.
@@ -1743,7 +1747,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const [inkGapLimiter, setInkGapLimiter] = useState<CalibrationInkGapViolation | null>(null)
   const [isDirectInputActive, setIsDirectInputActive] = useState(false)
   const [isCustomSentence, setIsCustomSentence] = useState(focus.custom)
-  const [globalStylePanel, setGlobalStylePanel] = useState<GlobalStylePanel | null>(null)
+  const [globalStylePanel, setGlobalStylePanel] = useState<GlobalStylePanel | null>(styleOnly ? 'body' : null)
   const [previewBrush, setPreviewBrush] = useState<StrokeRenderStyle | null>(null)
   const [previewTone, setPreviewTone] = useState<StyleTone | null>(null)
   const [previewBeak, setPreviewBeak] = useState<StemBeakStyle | null>(null)
@@ -2213,7 +2217,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
     setPreviewBrush(null)
     setPreviewTone(null)
     setPreviewBeak(null)
-    setGlobalStylePanel(null)
+    if (!styleOnly) setGlobalStylePanel(null)
   }
   // 기록 한 줄을 저장소에서 되돌린다. 기록 · 선택 정리는 호출자가 한다.
   const revertEntry = (entry: HistoryEntry) => {
@@ -2388,6 +2392,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
       {/* 문장 줄부터 편집부까지 한 덩어리. 레이아웃 모드에서만 세로로 밀린다 — `내 문장`이 위로 빠지고 `닿는 글자` 줄이 그 자리에 붙는다.
           두 모드가 같은 덩어리를 써야 오갈 때 문장 줄이 다시 안 그려진다(가로 스크롤 자리 유지). */}
       <div className={styles.scrollArea} data-scroll={(isLayoutMode && !styleLocksCanvas) || undefined} data-sheet={sentenceSheetOpen || sentenceSheetClosing || undefined}>
+      {styleOnly && above}
       <section ref={sentenceRef} className={`${styles.sentence} ${chrome === 'workspace' ? styleMode.strip : ''}`} data-compact={sentenceCompact || undefined} data-grown={styleSpaceOpen || undefined} data-sheet={sentenceSheetOpen || undefined} data-sheet-wrap={sentenceSheetOpen || sentenceSheetClosing || undefined} style={{ '--sheet-h': `${sentenceSheetHeight}px` } as CSSProperties} onClick={pickSentenceCaret} data-collapsed={sentenceCollapsed || undefined} aria-hidden={sentenceCollapsed || undefined} inert={sentenceCollapsed || undefined} aria-label="보정 문장">
         {/* 셸 안에서는 돋보기 하나. 누르면 문장 줄이 그 자리에서 펼쳐지고, 같은 자리의 닫기로 접힌다. 문장 바꾸기(주사위 · 직접 입력)는 펼친 줄에서 한다. */}
         {chrome === 'workspace' ? <>
@@ -2463,6 +2468,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
         panel={globalStylePanel}
         onPanelChange={(panel) => { setPreviewBrush(null); setPreviewTone(null); setPreviewBeak(null); setGlobalStylePanel(panel) }}
         fill={chrome === 'workspace'}
+        closable={!styleOnly}
         onClose={closeGlobalStyle}
         bodyControls={chrome === 'workspace' ? <DesignBodyShapeControls fontSpace={fontSpace} /> : <DesignBodyControls layoutType={previewedSyllable.layoutType} fontSpace={fontSpace} />}
         brushControls={<BrushStyleTrackpad
@@ -2532,14 +2538,13 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   if (chrome === 'workspace') {
     return (
       <MobileWorkspaceShell
-        activeArea="jamo"
+        activeArea={styleOnly ? 'font' : 'jamo'}
         projectName={projectName}
         history={{ canUndo: history.length > 0, canRedo: future.length > 0, onUndo: () => guardLayoutLeave(undo, { saveable: false }), onRedo: () => guardLayoutLeave(redo, { saveable: false }) }}
-        tools={<>
-          {/* 형태 규칙은 고른 자모가 있을 때만 머리에 나온다. 폰트 전체 도구(글로벌 스타일)는 그 오른쪽. */}
-          {selection.kind !== 'none' && <button type="button" className={styleMode.headerTool} onClick={() => setIsShapeRuleOpen(true)} aria-label="선택 자모 형태 규칙" title="현재 자모의 획과 형태 예절"><ListTree size={18} /></button>}
-          <button type="button" className={styleMode.headerTool} data-active={isGlobalStyleOpen || undefined} onClick={toggleGlobalStyle} aria-label="글로벌 스타일 설정" aria-pressed={isGlobalStyleOpen} title="폰트 전체에 먹는 네모꼴 · 획 모양 · 굵기 · 부리"><Settings2 size={18} /></button>
-        </>}
+        tools={
+          /* 형태 규칙은 자소 탭에서 고른 자모가 있을 때만 머리에 나온다. 글로벌 스타일은 폰트 탭 자체라 여는 단추가 없다. */
+          !styleOnly && selection.kind !== 'none' ? <button type="button" className={styleMode.headerTool} onClick={() => setIsShapeRuleOpen(true)} aria-label="선택 자모 형태 규칙" title="현재 자모의 획과 형태 예절"><ListTree size={18} /></button> : undefined
+        }
       >
         {body}
       </MobileWorkspaceShell>

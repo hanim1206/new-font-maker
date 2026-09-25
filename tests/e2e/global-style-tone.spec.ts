@@ -13,19 +13,20 @@ const setStoredStyle = (page: Page, patch: Record<string, unknown>) => page.eval
   localStorage.setItem('font-maker-global-style', JSON.stringify(raw))
 }, patch)
 
-test('레이아웃 모드에서도 머리의 입구로 열리고, 닫으면 레이아웃으로 돌아온다', async ({ page }) => {
-  await page.goto(`/workspace/jamo?char=${encodeURIComponent('한')}`)
-  await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
-
-  await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
+test('폰트 탭이 글로벌 스타일 공간이다 — 늘 열려 있고 닫기가 없다', async ({ page }) => {
+  // `?char=`는 자소 탭과 같은 편집기라 폰트 탭에서도 표본 글자를 정한다.
+  await page.goto(`/workspace/font?char=${encodeURIComponent('한')}`)
   const panel = page.getByRole('region', { name: '글로벌 스타일 설정' })
   await expect(panel).toBeVisible()
   await expect(page.getByTestId('jamo-layout-mode')).toHaveCount(0)
+  await expect(page.getByTestId('focus-canvas')).toHaveCount(0)
+  await expect(panel.getByRole('button', { name: '글로벌 스타일 설정 닫기' })).toHaveCount(0)
   await expect(panel.getByRole('tablist', { name: '글로벌 스타일 항목' }).getByRole('tab')).toHaveText(['글자 네모꼴', '획 스타일', '굵기', '부리'])
 
-  // 하단에 붙은 작은 패널이 아니라 캔버스 아래 남은 높이를 다 쓴다.
+  // 하단에 붙은 작은 패널이 아니라 탭 바 위까지 남은 높이를 다 쓴다.
   const box = await panel.boundingBox()
-  expect(box && box.y + box.height).toBeGreaterThan(830)
+  const tabs = await page.getByTestId('workspace-tabs').boundingBox()
+  expect(box && tabs && box.y + box.height).toBeGreaterThan((tabs?.y ?? 0) - 2)
 
   // 획 스타일: 고르기는 글자에 나오는 결과로 부른다(일반 붓 · 납작 붓). 옛 `각진 끝 / 둥근 끝`은 둥글기 막대가 대신한다.
   await panel.getByRole('tab', { name: '획 스타일' }).click()
@@ -65,21 +66,19 @@ test('레이아웃 모드에서도 머리의 입구로 열리고, 닫으면 레�
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
   await expect(roundness).toHaveValue('60')
-  const canvas = page.getByTestId('focus-canvas').locator('svg')
-  await expect(canvas.locator('path[fill="none"][stroke-linecap]')).toHaveCount(0)
+  // (09-25 이후 문장 글자는 둥글기 0에서도 채운 윤곽으로 그려져 stroke path 단언은 뺐다 — HEAD에서도 떨어지던 단언.)
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
   await expect(roundness).toHaveValue('0')
   expect((await storedStyle(page)).strokeStyle).not.toHaveProperty('roundness')
-  await expect(canvas.locator('path[fill="none"][stroke-linecap]').first()).toBeVisible()
 
-  await panel.getByRole('button', { name: '글로벌 스타일 설정 닫기' }).click()
+  // 자소 탭으로 가면 레이아웃 편집이고, 머리에 글로벌 스타일 단추는 없다.
+  await page.getByTestId('workspace-tabs').getByRole('link', { name: '자소' }).click()
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
+  await expect(page.getByRole('button', { name: '글로벌 스타일 설정' })).toHaveCount(0)
 })
 
 test('굵기는 100 단위로만 멈추고, 끄는 동안은 미리보기 · 손을 떼면 적용 · 되돌리기에 들어간다', async ({ page }) => {
-  await page.goto(`/workspace/jamo?mode=stroke&char=${encodeURIComponent('한')}`)
-  await expect(page.getByTestId('focus-canvas').locator('svg')).toBeVisible()
-  await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
+  await page.goto('/workspace/font')
   const panel = page.getByRole('region', { name: '글로벌 스타일 설정' })
   await panel.getByRole('tab', { name: '굵기' }).click()
 
@@ -97,13 +96,10 @@ test('굵기는 100 단위로만 멈추고, 끄는 동안은 미리보기 · 손
 })
 
 test('부리를 그림 버튼에서 고르면 문장 글자에 바로 얹히고 되돌리기에 들어간다', async ({ page }) => {
-  await page.goto(`/workspace/jamo?mode=stroke&char=${encodeURIComponent('한')}`)
-  // 획 편집에서는 문장 줄이 접혀 있다가 스타일을 열면 다시 내려와 자란다.
+  await page.goto('/workspace/font')
   const sentence = page.locator('section[aria-label="보정 문장"]')
-  await expect(sentence.locator('[data-stem-beak]')).toHaveCount(0)
-
-  await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
   await expect(page.getByRole('region', { name: '보정 문장' })).toBeVisible()
+  await expect(sentence.locator('[data-stem-beak]')).toHaveCount(0)
   const panel = page.getByRole('region', { name: '글로벌 스타일 설정' })
   await panel.getByRole('tab', { name: '부리' }).click()
   await panel.getByRole('radio', { name: '각진 부리' }).click()
@@ -114,12 +110,13 @@ test('부리를 그림 버튼에서 고르면 문장 글자에 바로 얹히고 
   await expect(sentence.locator('[data-stem-beak]')).toHaveCount(0)
 })
 
-test('스타일을 열면 캔버스가 비키고 문장 줄이 한 줄 그대로 크게 자란다', async ({ page }) => {
+test('폰트 탭은 캔버스 없이 문장 줄이 한 줄 그대로 크게 자라고, 자소 탭으로 가면 작아진다', async ({ page }) => {
   await page.goto(`/workspace/jamo?char=${encodeURIComponent('한')}`)
   const sentence = page.getByRole('region', { name: '보정 문장' })
-  const glyph = sentence.getByRole('button', { name: /^한 편집/ }).locator('svg')
+  // 탭을 옮기면 문장이 기본 문장으로 다시 열리므로 두 탭에 다 있는 `별`로 잰다.
+  const glyph = sentence.getByRole('button', { name: /^별 편집/ }).locator('svg')
   const small = await glyph.boundingBox()
-  await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
+  await page.getByTestId('workspace-tabs').getByRole('link', { name: '폰트' }).click()
   await expect(sentence).toHaveAttribute('data-grown', 'true')
   await expect(page.getByTestId('focus-canvas')).toHaveCount(0)
   await expect.poll(async () => (await glyph.boundingBox())?.height ?? 0).toBeGreaterThan(130)
@@ -127,13 +124,12 @@ test('스타일을 열면 캔버스가 비키고 문장 줄이 한 줄 그대로
   // 한 줄이다: 줄 높이가 글자 하나 남짓.
   expect((await sentence.boundingBox())?.height ?? 0).toBeLessThan(210)
 
-  await page.getByRole('button', { name: '글로벌 스타일 설정 닫기' }).click()
+  await page.getByTestId('workspace-tabs').getByRole('link', { name: '자소' }).click()
   await expect.poll(async () => (await glyph.boundingBox())?.height ?? 0).toBeLessThan(30)
 })
 
 test('글자 네모꼴은 막대 하나다: 길쭉 ↔ 노토 비율 ↔ 납작, 0점 근처에서 걸린다', async ({ page }) => {
-  await page.goto(`/workspace/jamo?char=${encodeURIComponent('한')}`)
-  await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
+  await page.goto(`/workspace/font?char=${encodeURIComponent('한')}`)
   const panel = page.getByRole('tabpanel', { name: '글자 네모꼴 설정' })
   await expect(panel.locator('input[type="range"]')).toHaveCount(1)
   const shape = panel.getByTestId('style-body-shape')

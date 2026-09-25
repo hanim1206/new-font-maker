@@ -1209,14 +1209,12 @@ test('레이아웃 모드 첫 화면에 상단 두 줄과 옵션 스택이 온�
   await expect(page.getByTestId('workspace-more-menu')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '현재 작업을 OTF로 추출' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '선택 자모 형태 규칙' })).toHaveCount(0)
-  // 글로벌 스타일은 폰트 전체 값이라 머리에 늘 나와 있다(레이아웃 모드에서도 켜져 있다).
-  await expect(page.getByRole('button', { name: '글로벌 스타일 설정' })).toBeEnabled()
+  // 글로벌 스타일은 폰트 탭 자체라 자소 탭 머리에 여는 단추가 없다.
+  await expect(page.getByRole('button', { name: '글로벌 스타일 설정' })).toHaveCount(0)
 
-  // 획 편집에서는 문장 줄이 위로 접히고, 머리의 글로벌 스타일이 패널을 연다.
+  // 획 편집에서는 문장 줄이 위로 접힌다.
   await page.getByTestId('review-canvas').locator('[data-edit-part]').first().dispatchEvent('click')
   await expect(page.locator('section[aria-label="보정 문장"]')).toHaveAttribute('data-collapsed', 'true')
-  await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
-  await expect(page.getByRole('region', { name: '글로벌 스타일 설정' })).toBeVisible()
 })
 
 /** 상단 두 줄은 높이가 같다. 아래로 밀면 `닿는 글자` 줄이 `내 문장`을 밀어 올리고 그 자리에 붙는다 — 옵션을 고르는 동안에도 닿는 글자가 보인다. */

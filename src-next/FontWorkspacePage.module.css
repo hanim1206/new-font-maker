@@ -1,10 +1,11 @@
-.screen { min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 20px; padding: 24px 20px; overflow-y: auto; }
-.identity { display: flex; flex-direction: column; gap: 4px; }
-.identity h1 { margin: 0; overflow: hidden; font-size: 22px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-.identity p { margin: 0; color: rgb(var(--color-text-dim-4)); font-size: 12.5px; }
+/* 폰트 정보 줄. 문장 표본 위에 한 줄 — 이름은 왼쪽, 추출은 오른쪽. */
+.identity { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px 10px; border-bottom: 1px solid rgb(var(--color-border-subtle)); }
+.name { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.name h1 { margin: 0; overflow: hidden; font-size: 18px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.name p { margin: 0; color: rgb(var(--color-text-dim-4)); font-size: 12px; }
 
-/* 이 폰트를 파일로 내보내는 주 버튼. 진행 · 완료 · 실패가 아이콘과 아랫줄에 뜬다. */
-.exportButton { min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; border: 0; border-radius: 10px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 15px; font-weight: 700; }
+/* 이 폰트를 파일로 내보내는 주 버튼. 진행 · 완료 · 실패가 아이콘과 작은 글자에 뜬다. */
+.exportButton { flex: none; min-height: 40px; display: flex; align-items: center; gap: 6px; padding: 0 14px; border: 0; border-radius: 10px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 700; white-space: nowrap; }
 .exportButton:disabled { opacity: .6; }
 .exportButton small { font-size: 11px; font-weight: 600; opacity: .8; }
 .exportButton[data-export-state='failed'] { background: rgb(190 52 48); }
