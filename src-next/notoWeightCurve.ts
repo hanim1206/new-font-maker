@@ -1,10 +1,11 @@
 import pooled from '../reference-data/noto-weight-pooled.v1.json'
-import { weightToMultiplier } from '../src/utils/globalStyleUtils'
+import { legacyWeightToMultiplier, weightToMultiplier } from '../src/utils/globalStyleUtils'
 
 /**
  * 노토 굵기 곡선. `scripts/reference-lab/measure_weight_offsets.py`가 노토 가변 폰트를 100~900으로 놓고 잰
  * 첫닿자 줄기 두께 · 속공간 · 바깥 변 성장 몫의 400 대비 중앙값이다(`reference-data/noto-weight-pooled.v1.json`).
- * 플랜 `2026-09-25_굵기-보정-층`의 실험실(`/weight-lab`)만 읽는다. 제품 화면과 추출은 아직 `weightToMultiplier`를 쓴다.
+ * 세로줄기 배율 아홉 칸은 09-26부터 제품의 `weightToMultiplier`에 상수로 들어갔다(플랜 `2026-09-25_굵기-곡선-적용`).
+ * 여기는 실험실(`/weight-lab`)이 가로줄기 · 속공간 · 바깥 변 몫 · 옛 직선 오차를 볼 때 읽는다.
  */
 
 interface Quantile { median: number; q1: number; q3: number; n: number }
@@ -77,7 +78,7 @@ export function notoCenterlineInset(weight: number, baseThickness: number): numb
   return delta * (0.5 - notoOuterEdgeGrowthShare(weight))
 }
 
-/** 앱 배율이 노토보다 몇 % 두꺼운가(+면 앱이 두껍다). */
-export function appThicknessErrorAt(weight: number): number {
-  return weightToMultiplier(weight) / notoThicknessMultiplier(weight) - 1
+/** 09-26 이전 직선 배율이 노토보다 몇 % 두꺼웠나(+면 옛 앱이 두껍다). 지금 제품 배율은 노토 곡선 그대로라 오차가 0이다. */
+export function legacyThicknessErrorAt(weight: number): number {
+  return legacyWeightToMultiplier(weight) / notoThicknessMultiplier(weight) - 1
 }

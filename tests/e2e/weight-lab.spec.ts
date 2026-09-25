@@ -18,7 +18,7 @@ test('세 칸과 측정표가 뜨고 굵기 막대가 배율을 바꾼다', asyn
   await expect(corrected.locator('svg path').first()).toBeVisible()
   await expect(page.getByTestId('weight-lab-ghost')).toBeVisible()
 
-  // 900: 앱은 2.2, 노토는 그보다 얇다. 오차는 +.
+  // 900: 옛 직선은 2.2, 노토 곡선(지금 앱)은 그보다 얇다. 오차는 +.
   await expect(naive).toHaveAttribute('data-multiplier', '2.200')
   const corrected900 = Number(await corrected.getAttribute('data-multiplier'))
   expect(corrected900).toBeGreaterThan(1.5)

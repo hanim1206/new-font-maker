@@ -170,7 +170,7 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
 
   it('G2 — 전역 굵기 700 · 기울기 12°: OTF가 화면과 같은 굵기 · 같은 기울기다', async () => {
     const { measure } = await setup()
-    const { useGlobalStyleStore } = await import('../src/stores/globalStyleStore')
+    const { useGlobalStyleStore, weightToMultiplier } = await import('../src/stores/globalStyleStore')
     const before = useGlobalStyleStore.getState().style
     useGlobalStyleStore.getState().updateStyle('weight', 700)
     useGlobalStyleStore.getState().updateStyle('slant', 12)
@@ -178,7 +178,8 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
       const rows = ['한', '과', '의', '곽'].map((char) => ({ char, ...measure(char) }))
       console.info(rows.map((row) => `${row.char} 굵기 700 · 기울기 12° · 모델 ${(row.modelXor * 100).toFixed(3)}% · 가장자리 ${row.edgeDrift.toFixed(2)}유닛`).join('\n'))
       for (const row of rows) {
-        expect(row.data.weightMultiplier, row.char).toBeCloseTo(1.72, 9)
+        // 700의 배율은 노토 곡선(1.6075). 화면·OTF가 같은 `weightToMultiplier`를 읽는지만 본다.
+        expect(row.data.weightMultiplier, row.char).toBeCloseTo(weightToMultiplier(700), 9)
         // 굵기는 중심선을 지킨다: 상자는 굵기와 무관하게 화면과 같다.
         expect(row.otfBoxes, row.char).toEqual(row.screenBoxes)
         expect(row.edgeDrift, row.char).toBeLessThan(1)
