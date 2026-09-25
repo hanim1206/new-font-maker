@@ -30,7 +30,8 @@ export function DevLabButton({ pathname }: { pathname: string }) {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [open])
-  const routes = [...LAB_SCREEN_ROUTES, ...DEV_ONLY_ROUTES]
+  // 개발 전용 주소가 랩 목록에도 있으면 한 번만 보인다(React key 중복 경고).
+  const routes = [...new Set<string>([...LAB_SCREEN_ROUTES, ...DEV_ONLY_ROUTES])]
 
   return <>
     <button type="button" className={styles.button} aria-pressed={open} aria-label="실험실 목록" title="실험실 목록 (개발용)" data-testid="dev-lab-button" onClick={() => setOpen((value) => !value)}>
