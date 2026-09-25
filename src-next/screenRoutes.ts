@@ -18,6 +18,7 @@ export const LAB_SCREEN_ROUTES = [
   '/global-style-preview',
   '/grid-lab',
   '/rule-lab',
+  '/weight-lab',
   '/noto-corpus-lab',
   '/reference-lab',
   '/reference-group-lab',

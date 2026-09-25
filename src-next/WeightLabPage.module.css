@@ -1,0 +1,45 @@
+.page { min-height: 100dvh; padding: 28px; background: rgb(var(--color-background)); color: rgb(var(--color-foreground)); }
+.header { width: min(1320px, 100%); margin: 0 auto 18px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
+.header div { display: grid; gap: 3px; }
+.header span { color: rgb(var(--color-primary)); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.header h1 { font-size: clamp(24px, 4vw, 38px); line-height: 1.1; }
+.header p { max-width: 760px; color: rgb(var(--color-text-3)); font-size: 13px; }
+.header a { flex: 0 0 auto; padding: 9px 12px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-2)); font-size: 12px; font-weight: 700; text-decoration: none; }
+
+.controls { width: min(1320px, 100%); margin: 0 auto 12px; display: grid; gap: 10px; padding: 12px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chips button { min-width: 34px; min-height: 34px; border: 1px solid rgb(var(--color-border)); border-radius: 7px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-size: 16px; font-weight: 750; }
+.chips button[aria-selected='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary-light)); color: rgb(var(--color-primary-dark)); }
+.slider { display: grid; grid-template-columns: 90px minmax(0, 1fr); align-items: center; gap: 12px; font-size: 13px; }
+.slider strong { font-variant-numeric: tabular-nums; }
+.slider input { width: 100%; }
+.status { color: rgb(var(--color-text-3)); font-size: 12px; }
+.status[data-state='error'] { color: rgb(var(--color-danger, 180 40 40)); }
+.toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgb(var(--color-text-2)); }
+
+.panels { width: min(1320px, 100%); margin: 0 auto 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.panel { min-width: 0; padding: 12px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); }
+.panel h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 8px; font-size: 15px; }
+.panel h2 small { color: rgb(var(--color-text-3)); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.panel p { margin-top: 8px; color: rgb(var(--color-text-3)); font-size: 12px; }
+.panel code, .note code { padding: 1px 4px; border-radius: 4px; background: rgb(var(--color-surface-2)); font-size: 11px; }
+.glyph { aspect-ratio: 1; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 8px; background: rgb(var(--color-surface-2)); }
+.glyph svg { display: block; width: 100%; height: 100%; }
+.ghost { fill: rgb(var(--color-foreground)); fill-rule: evenodd; }
+.ghostUnder { fill: rgb(var(--color-primary)); fill-opacity: .28; fill-rule: evenodd; }
+
+.numbers { width: min(1320px, 100%); margin: 0 auto; padding: 12px 14px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); }
+.numbers h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 8px; font-size: 15px; }
+.numbers h2 small { color: rgb(var(--color-text-3)); font-size: 12px; font-weight: 600; }
+.numbers table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.numbers th { padding: 6px 8px; text-align: left; color: rgb(var(--color-text-3)); font-weight: 600; white-space: nowrap; }
+.numbers td { padding: 6px 8px; border-bottom: 1px solid rgb(var(--color-border-subtle)); }
+.note { margin-top: 8px; color: rgb(var(--color-text-3)); font-size: 12px; }
+
+@media (max-width: 900px) {
+  .page { padding: 16px; }
+  .header { flex-direction: column; align-items: flex-start; }
+  .panels { grid-template-columns: 1fr; }
+  .numbers table, .numbers tbody, .numbers tr, .numbers th, .numbers td { display: block; }
+  .numbers th { padding-bottom: 0; }
+}
