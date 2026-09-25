@@ -41,6 +41,9 @@ async function selectRail(page: Page, label: string) {
   await expect(handle).toHaveAttribute('aria-pressed', 'true')
 }
 const resetButton = (page: Page) => page.getByTestId('review-reset')
+/** 상시 저장: 보선을 놓으면 켠 옵션에 저장된다. 저장된 옵션 줄이 서면 저장이 끝난 것이다. */
+const storedOption = (page: Page) => page.locator('[data-testid="layout-override-card"][data-stored="true"]')
+const undoButton = (page: Page) => page.getByRole('button', { name: '형태 편집 실행 취소' })
 /** 캔버스 부품 상자를 눌러 켠다. 이미 켜진 상자는 이벤트를 통과시키므로 건너뛰고, 다른 부품 rail 손잡이가 위에 겹칠 수 있어 pointerdown을 직접 보낸다. */
 async function selectPartBox(page: Page, label: string) {
   const hit = page.getByTestId('review-canvas').getByRole('button', { name: `${label} 선택` })
@@ -106,7 +109,7 @@ test('중심 rail(배치)을 옮기면 닿는 글자 줄에 Δ가 얹히고 이 
   await selectMedialBox(page)
   await selectRail(page, '바깥기둥 중심')
   await page.keyboard.press('Shift+ArrowRight')
-  await expect(resetButton(page)).toContainText('1개 변경')
+  await expect(storedOption(page).first()).toBeVisible()
 
   const propagation = page.getByTestId('review-propagation')
   await expect(propagation.getByTestId('review-propagation-deltas')).toContainText('바깥기둥 중심')
@@ -134,7 +137,7 @@ test('중심 rail(배치)을 옮기면 닿는 글자 줄에 Δ가 얹히고 이 
   await expect.poll(async () => (await cards.locator('figcaption b').allInnerTexts()).every((name) => medialIndexOf(name) === medialIndexOf('멈'))).toBe(true)
 
   // 복원해도 줄은 그대로, Δ만 빠진다.
-  await resetButton(page).click()
+  await undoButton(page).click()
   await expectFilledRow(cards)
   await expect(page.getByTestId('review-propagation-deltas')).toBeEmpty()
   await expect.poll(() => cards.first().getAttribute('data-touched')).toBeNull()
@@ -207,7 +210,10 @@ test('기준선을 옮기면 변화 띠와 Δ 수치가 보이고 복원하면 �
   await expect(page.getByTestId('review-delta-label')).toHaveAttribute('data-active', 'false')
   await selectRail(page, '바깥기둥 중심')
   await expect(page.getByTestId('review-delta-band')).toHaveCount(1)
-  await resetButton(page).click()
+  // 띠 · 수치는 이 화면에 들어올 때 자리에서 잰다. 방향키 한 번 = 저장 한 번이라 되돌리기 한 번에 +10u, 두 번에 사라진다.
+  await undoButton(page).click()
+  await expect(page.getByTestId('review-delta-label')).toHaveText('+10u')
+  await undoButton(page).click()
   await expect(page.getByTestId('review-delta-band')).toHaveCount(0)
   await expect(resetButton(page)).toHaveCount(0)
 })
@@ -250,12 +256,11 @@ test('배치 Δ를 적용하면 저장되어 새로 열어도 rail이 그 자리
   const handle = page.getByTestId('review-canvas').locator('[data-rail-handle][aria-pressed="true"]')
   const before = Number(await handle.getAttribute('x1'))
   await page.keyboard.press('Shift+ArrowRight')
-  await expect(resetButton(page)).toContainText('1개 변경')
+  await expect(storedOption(page).first()).toBeVisible()
   expect(Number(await handle.getAttribute('x1'))).toBeCloseTo(before + 0.01, 6)
 
   // 적용 → 저장소에 이 레이아웃(right-final) Δ가 들어가고, 세션 편집은 비워져 Δ 0에서 다시 시작한다. rail 자리는 그대로.
   const propagation = page.getByTestId('review-propagation')
-  await page.getByTestId('review-propagation-apply').click()
   await expect(resetButton(page)).toHaveCount(0)
   await expect(page.getByTestId('review-propagation-deltas')).toBeEmpty()
   await expect(propagation.locator('[data-testid="layout-override-card"][data-kind="layer"]')).toBeVisible()
@@ -310,11 +315,8 @@ test('자소 탭은 레이아웃으로 열리고, 기준선을 적용하면 문�
 
   await selectMedialBox(page)
   await selectRail(page, '바깥기둥 중심')
+  // 방향키 한 번 = 저장 한 번 = 기록 한 줄. 놓는 순간 문장 줄 글자가 바뀐다.
   await page.keyboard.press('Shift+ArrowRight')
-  await page.keyboard.press('Shift+ArrowRight')
-  // 적용 전에는 문장 줄이 그대로다.
-  expect(await sentenceGlyph.innerHTML()).toBe(before)
-  await page.getByTestId('review-propagation-apply').click()
   await expect.poll(() => sentenceGlyph.innerHTML()).not.toBe(before)
 
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
@@ -354,17 +356,13 @@ test('켠 부품의 획 고치기로 내려가고, 안 끝난 변경이 있으�
   await canvas.getByRole('button', { name: '첫닿자 ㅁ 선택' }).click({ position: { x: 4, y: 4 } })
   await expect(cta).toHaveAttribute('data-part', 'CH')
 
-  // 배치 Δ가 생기면 하단 바가 `…에 적용`으로 바뀐다. 획 고치기는 그동안 없다. 복원하면 돌아온다.
+  // 보선을 놓으면 켠 옵션(이 레이아웃)에 바로 저장된다. 하단 바는 없고, 되돌리면 저장이 빠진다.
   await selectRail(page, '첫닿자 오른변')
   await page.keyboard.press('Shift+ArrowRight')
-  const apply = page.getByTestId('review-propagation-apply')
-  await expect(apply).toHaveText('이 레이아웃에 적용')
-  await page.getByTestId('review-propagation').getByRole('button', { name: '이 자모만', exact: true }).click()
-  await page.getByTestId('review-propagation-jamos-done').click()
-  await expect(apply).toHaveText('ㅁ에 적용')
-  await resetButton(page).click()
-  await expect(apply).toHaveCount(0)
+  await expect(storedOption(page).first()).toBeVisible()
   await expect(page.getByTestId('jamo-stroke-cta-bar')).toHaveCount(0)
+  await undoButton(page).click()
+  await expect(storedOption(page)).toHaveCount(0)
 
   // 획 편집은 그 자소의 첫 획이 잡힌 채 열려 도구 줄이 바로 켜진다. `눌러 고르세요` 안내는 없다. 옮기기는 캔버스에서 하고, 잘게 옮길 트랙패드가 도구 줄 아래에 있다.
   const layoutCanvasBox = await canvas.boundingBox()
@@ -714,10 +712,8 @@ test('홀자 상자 변을 옮겨 적용하면 ㅣ 글자도 문장 줄에서 �
   // 통째로 20u 왼쪽. 두께(상자 너비)는 그대로.
   await expect.poll(async () => Number(await medialBox.getAttribute('x'))).toBeCloseTo(xBefore - 0.02, 6)
   expect(Number(await medialBox.getAttribute('width'))).toBeCloseTo(widthBefore, 6)
-  await expect(page.getByTestId('review-propagation-deltas')).toContainText('홀자 왼변')
-  await expect(page.getByTestId('review-propagation-card').first()).toHaveAttribute('data-touched', 'true', { timeout: 20_000 })
-
-  await page.getByTestId('review-propagation-apply').click()
+  // 놓는 순간 저장되어 세션 Δ 줄은 비고 문장 글자가 바로 바뀐다.
+  await expect(storedOption(page).first()).toBeVisible()
   await expect.poll(() => sentenceGlyph.innerHTML()).not.toBe(before)
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('noto-layout-delta-v1')!).state)
   expect(stored.rules[layerKey('right')].faces.JU.left).toBeCloseTo(-0.02, 9)
@@ -738,7 +734,7 @@ test('ㅏ의 홀자 오른변을 밀면 보가 길어지고 기둥 두께는 그
   await page.keyboard.press('Shift+ArrowRight')
   await expect.poll(async () => Number(await medialBox.getAttribute('width'))).toBeCloseTo(width + 0.01, 6)
   expect(Number(await medialBox.getAttribute('x'))).toBeCloseTo(x, 6)
-  await expect(resetButton(page)).toContainText('1개 변경')
+  await expect(storedOption(page).first()).toBeVisible()
 })
 
 /** 2026-09-21 `이 자모만` 층(G0·G1). 가에서 첫닿자 ㄱ 오른변을 밀어 ㄱ·ㅋ에만 적용하면 같은 문장의 가는 바뀌고 마는 그대로다. 층별로 따로 저장·지우기, Undo/Redo. */
@@ -772,7 +768,6 @@ test('이 자모만으로 좁혀 적용하면 같은 레이아웃의 그 자모 
   await expect(jamos.locator('button')).toHaveCount(19)
   await jamos.locator('[data-jamo="ㅋ"]').click()
   await expect(jamos.locator('[data-jamo="ㅋ"]')).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByTestId('review-propagation-apply')).toContainText('ㄱ·ㅋ')
   // 완료 = 시트 닫기. 고른 자모는 저장 전에도 띠에 빈 칩으로 보인다.
   await page.getByTestId('review-propagation-jamos-done').click()
   await expect(jamos).toHaveCount(0)
@@ -785,7 +780,6 @@ test('이 자모만으로 좁혀 적용하면 같은 레이아웃의 그 자모 
   expect(names.every((name) => [0, 1, 2, 3, 4, 5, 6, 7, 20].includes(medialIndexOf(name)) && finalIndexOf(name) === 0)).toBe(true)
 
   // 적용: 자모 층에 ㄱ·ㅋ 키로 따로 저장. 문장의 가는 바뀌고 마는 그대로.
-  await page.getByTestId('review-propagation-apply').click()
   await expect(resetButton(page)).toHaveCount(0)
   const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
   expect(stored.rules[jamoRuleKey('right', 'CH', 'ㄱ')].faces.CH.right).toBeCloseTo(0.02, 9)
@@ -846,7 +840,6 @@ test('받침을 이 자모만으로 적용하면 받침이 그 자모인 글자�
   const names = await page.getByTestId('review-propagation-card').locator('figcaption b').allInnerTexts()
   expect(names.length).toBeGreaterThan(0)
   expect(names.every((name) => finalIndexOf(name) === 1)).toBe(true)
-  await page.getByTestId('review-propagation-apply').click()
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('noto-layout-delta-v1')!).state)
   expect(stored.rules[jamoRuleKey('right-final', 'JO', 'ㄱ')].faces.JO.top).toBeCloseTo(-0.01, 9)
   expect(Object.keys(stored.rules)).toEqual([jamoRuleKey('right-final', 'JO', 'ㄱ')])
@@ -866,7 +859,6 @@ test('옛 저장 형식(jamo 없음)을 읽어 이 레이아웃 Δ가 살아 있
   await page.keyboard.press('Shift+ArrowUp')
   await propagation.getByRole('button', { name: '이 자모만', exact: true }).click()
   await page.getByTestId('review-propagation-jamos-done').click()
-  await page.getByTestId('review-propagation-apply').click()
   const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
   expect(stored.rules[layerKey('right')].faces.CH.right).toBeCloseTo(0.02, 9)
   expect(stored.rules[jamoRuleKey('right', 'CH', 'ㄱ')].faces.CH.top).toBeCloseTo(-0.01, 9)
@@ -900,7 +892,6 @@ test('같은 레이아웃에 쌓인 오버라이드가 범위 띠에 보이고, 
   await page.keyboard.press('Shift+ArrowDown')
   await propagation.getByRole('button', { name: '이 자모만', exact: true }).click()
   await page.getByTestId('review-propagation-jamos-done').click()
-  await page.getByTestId('review-propagation-apply').click()
   await expect(overrides).toHaveCount(2)
 
   // 로: ㄹ만 윗변 -20u(ㄹ 크게). 찬 칩은 전체 → ㄴ → ㄹ.
@@ -913,7 +904,6 @@ test('같은 레이아웃에 쌓인 오버라이드가 범위 띠에 보이고, 
   await page.keyboard.press('Shift+ArrowUp')
   await propagation.getByRole('button', { name: '이 자모만', exact: true }).click()
   await page.getByTestId('review-propagation-jamos-done').click()
-  await page.getByTestId('review-propagation-apply').click()
   await expect(overrides).toHaveCount(3)
   await expect(overrides.nth(0)).toHaveAttribute('data-kind', 'all')
   await expect(overrides.nth(0)).toContainText('첫닿자 윗변 -10u')
@@ -1040,16 +1030,15 @@ test('적용하면 문장에서 그 범위에 든 글자가 표시되고, 다시
   await selectMedialBox(page)
   await selectRail(page, '바깥기둥 중심')
   await page.keyboard.press('Shift+ArrowRight')
-  await page.getByTestId('review-propagation-apply').click()
   // 이 레이아웃(세로 홀자 + 받침)에 든 글자만. 멈·별은 들고, 받침 없는 마는 안 든다.
   await expect(sentence.getByRole('button', { name: '멈 편집' })).toHaveAttribute('data-layout-applied', 'true')
   await expect(sentence.getByRole('button', { name: '별 편집' })).toHaveAttribute('data-layout-applied', 'true')
   await expect(sentence.getByRole('button', { name: '마 편집' })).not.toHaveAttribute('data-layout-applied', 'true')
 
-  // 다음 편집이 시작되면 표시가 빠진다.
+  // 다시 옮기면 옮기는 동안 빠졌다가 놓는 순간 새 저장으로 다시 표시된다.
   await selectRail(page, '바깥기둥 중심')
   await page.keyboard.press('Shift+ArrowRight')
-  await expect(marked).toHaveCount(0)
+  await expect(sentence.getByRole('button', { name: '멈 편집' })).toHaveAttribute('data-layout-applied', 'true')
 })
 
 test('Noto 고스트를 끄면 닿는 글자 줄에서도 고스트가 빠지고, 켜면 돌아온다', async ({ page }) => {
@@ -1114,10 +1103,6 @@ test.skip('변을 이 자리에 맞추면 범위 안 글자가 같은 자리에 
   expect(at2).toBeCloseTo(at - 0.001, 3)
 
   // 적용: 저장은 `{ at }`. 오버라이드 카드 요약도 `= 자리`. 로를 열면 첫닿자 윗변이 그 자리에서 시작한다.
-  await expect(page.getByTestId('review-propagation-apply')).toContainText('선택 옵션에 저장')
-  await expect(page.getByTestId('review-propagation-apply-scope')).toHaveText(/^이 레이아웃 · [\d,]+자$/)
-  await expect(page.getByTestId('review-propagation-apply')).toHaveAccessibleName('선택 옵션(이 레이아웃)에 저장')
-  await page.getByTestId('review-propagation-apply').click()
   await expect(page.getByTestId('review-reset')).toHaveCount(0)
   const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
   expect(stored.rules[layerKey('bottom')].faces.CH.top).toEqual({ at: expect.closeTo(at2, 3) })
@@ -1150,21 +1135,20 @@ test('획이 모델 상자에 안 맞아도 획 편집에서 완료로 레이아
 })
 
 /** 세로 예산(2026-09-21): 도구 줄은 머리 `…` 메뉴로, 레이아웃 모드의 보정 문장은 한 줄. 390×844 첫 화면에 범위 띠와 표본 첫 줄 네 장이 세로 스크롤 없이 온전히 보인다. */
-test('닿는 글자를 누르면 그 글자가 열리고 위 문장은 그대로다. 안 끝난 Δ가 있으면 잠긴다', async ({ page }) => {
+test('닿는 글자를 누르면 그 글자가 열리고 위 문장은 그대로다. 옮겨도 잠기지 않는다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   const cards = page.getByTestId('review-propagation-card')
   await expectFilledRow(cards)
   const sentence = page.getByRole('region', { name: '보정 문장' })
   expect(await sentence.getByRole('button', { name: /편집/ }).count()).toBeGreaterThan(1)
 
-  // Δ가 있는 동안은 글자를 바꾸면 편집이 날아가므로 카드가 잠긴다. 복원하면 풀린다.
+  // 상시 저장이라 옮겨도 카드가 잠기지 않는다.
   await selectMedialBox(page)
   await selectRail(page, '바깥기둥 중심')
   await page.keyboard.press('Shift+ArrowRight')
-  await expect(resetButton(page)).toContainText('1개 변경')
-  await expect(cards.first().getByTestId('review-propagation-open')).toBeDisabled()
-  await resetButton(page).click()
+  await expect(storedOption(page).first()).toBeVisible()
   await expect(cards.first().getByTestId('review-propagation-open')).toBeEnabled()
+  await undoButton(page).click()
 
   const sentenceBefore = await sentence.getByRole('button', { name: /편집/ }).allInnerTexts()
   const name = await cards.first().locator('figcaption b').innerText()
@@ -1280,11 +1264,11 @@ test('홀자 획이 상자에 안 맞으면 레이아웃 캔버스는 상자만 
   await selectMedialBox(page)
   await selectRail(page, '홀자 아랫변')
   await page.keyboard.press('Shift+ArrowDown')
-  await expect(resetButton(page)).toContainText('1개 변경')
+  await expect(storedOption(page).first()).toBeVisible()
 })
 
 
-test('보선을 옮기고 새 옵션으로 저장하면, 옮긴 부품의 자모가 미리 골라진 범위에 바로 적용되고 그 옵션이 켜진다', async ({ page }) => {
+test('보선을 옮기면 이 레이아웃에 바로 저장되고, 켠 옵션의 연필로 범위를 좁히면 Δ가 그 옵션으로 옮겨 간다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%B0%9C&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   await selectPartBox(page, '첫닿자 ㅂ')
@@ -1292,18 +1276,16 @@ test('보선을 옮기고 새 옵션으로 저장하면, 옮긴 부품의 자모
   await page.keyboard.press('Shift+ArrowDown')
   await page.keyboard.press('Shift+ArrowDown')
 
-  // 저장할 자리는 둘 — 켠 옵션(`이 레이아웃`), 또는 새 옵션.
-  await expect(page.getByTestId('review-propagation-apply')).toContainText('선택 옵션에 저장')
-  // 두 버튼 다 저장될 범위와 글자 수를 아랫줄에 적는다. 신규는 옮긴 부품의 자모 하나가 씨앗이다.
-  await expect(page.getByTestId('review-propagation-apply-scope')).toHaveText('이 레이아웃 · 4,617자')
-  await expect(page.getByTestId('review-propagation-apply-new-scope')).toHaveText('첫닿자 ㅂ · 243자')
-  await expect(page.getByTestId('review-propagation-apply')).toHaveAccessibleName('선택 옵션(이 레이아웃)에 저장')
-  await page.getByTestId('review-propagation-apply-new').click()
+  // 놓는 순간 켠 옵션(바닥 `이 레이아웃`)에 저장된다. 방향키 두 번 = 기록 두 줄.
+  const base = page.locator('[data-testid="layout-override-card"][data-base="true"]')
+  await expect(base).toHaveAttribute('data-stored', 'true')
+  await expect(page.getByTestId('review-propagation-apply-new')).toHaveCount(0)
 
-  // 범위 고르기 화면은 옮긴 부품(첫닿자)의 지금 글자 자모 하나를 골라 둔 채 열리고, 그대로 확정할 수 있다.
+  // 좁히기는 뒤에: 켠 옵션의 연필 → 범위 고르기의 첫닿자 줄 `전체`를 누르면 지금 글자의 ㅂ 하나만 남는다 → 이 범위로. Δ가 새 옵션으로 옮겨 간다.
+  await base.getByTestId('layout-override-more').click()
   const picker = page.getByTestId('layout-scope-picker')
+  await picker.locator('[data-axis="initial"]').getByTestId('scope-axis-all').click()
   await expect(picker.getByTestId('scope-picker-name')).toContainText('첫닿자 ㅂ')
-  await expect(picker.getByTestId('scope-picker-confirm')).toHaveText('신규 옵션에 저장')
   await expect(picker.getByTestId('scope-picker-confirm')).toBeEnabled()
   await picker.getByTestId('scope-picker-confirm').click()
   await expect(picker).toHaveCount(0)

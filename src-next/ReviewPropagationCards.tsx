@@ -5,7 +5,6 @@ import type { CorpusIdentity } from './notoCorpus'
 import type { EditableRail } from './notoMedialFitView'
 import { jamoPartOf, layoutDeltaSnapshot, useLayoutDeltaStore } from './layoutDeltaStore'
 import { LayoutOptionStack, stackLabel } from './LayoutOptionStack'
-import { seedRuleOf } from './layoutOverrides'
 import type { OverrideGroup } from './layoutOverrides'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { matchesRule, ruleFromKey, ruleKey, ruleOfContext } from './scopeRule'
@@ -42,7 +41,7 @@ function DeltaList({ rails, fixed, testId }: { rails: EditableRail[]; fixed?: Re
  * 편집기 하단 바가 쓰는 손잡이. 범위·고른 자모는 이 묶음이 들고 있어서 여기로 판다.
  * `apply`(`선택 옵션에 저장`)는 켠 옵션에 저장하고, `applyAsNew`(`신규 옵션에 저장`)는 옮긴 값을 든 채 범위 고르기 화면을 열어 **새 옵션**에 저장한다.
  */
-export interface ReviewPropagationHandle { apply: () => void; applyAsNew: () => void }
+export interface ReviewPropagationHandle { apply: () => void }
 
 /** 지금 고른 범위. 상단 `닿는 글자` 줄과 캔버스 옆 여섯 칸 표지가 이걸 보고 그린다. */
 export interface ScopeSelection {
@@ -133,26 +132,18 @@ export function ReviewPropagationCards({ source, edit, changed, fixed, focus, ra
       setSlots((list) => list.map((item) => ruleKey(item) === oldKey ? rule : item))
     } else if (open.mode === 'new') {
       setSlots((list) => list.some((item) => ruleKey(item) === key) ? list : [...list, rule])
-    } else if (open.mode === 'apply') {
-      // 옮긴 값을 그 범위에 바로 저장한다. 같은 범위의 옵션이 이미 있으면 같은 키라 거기에 더해진다.
-      commit(() => { applyDelta(rule, layoutDeltaOf(edit)); onScopeApplied?.([rule]) })
     }
     setSelectedKey(key)
-  }
-  // `신규 옵션에 저장` — 방금 옮긴 부품의 지금 글자 자모 하나를 미리 골라 둔 채 범위 고르기 화면을 연다. 대부분 그대로 확정하면 끝난다.
-  const openApplyAsNew = () => {
-    const seed = seedRuleOf(source, focus)
-    setScopeOpen({ rule: seed.rule, mode: 'apply', part: seed.part })
   }
   // 하단 바의 `…에 적용`. 박스에 적는 것과 같은 짧은 이름을 쓴다(이 레이아웃 앞머리는 뗀다).
   const scopeLabel = stackLabel(target, source.contextId)
   useEffect(() => { onScopeLabel?.(scopeLabel) }, [onScopeLabel, scopeLabel])
   // 고른 범위를 위로 알린다. 표본은 상단 `닿는 글자` 줄이 그린다.
   useEffect(() => { onScopeChange?.({ scope, group, jamos, rule: target }) }, [onScopeChange, scope, group, jamos, target])
-  // 적용 = 지금 범위에 Δ 저장. 하단 바가 ref로 부른다. 닫힘값은 렌더마다 새로 잡는다(ref 갱신은 값싸다).
+  // 저장 = 지금 범위에 Δ 저장. 편집기가 보선을 놓는 순간 ref로 부른다(상시 저장). 닫힘값은 렌더마다 새로 잡는다(ref 갱신은 값싸다).
+  // 다른 범위로 옮기려면 켠 박스의 연필(범위 고치기)이 Δ까지 옮긴다.
   useImperativeHandle(ref, () => ({
     apply: () => commit(() => { for (const rule of saveTargets) applyDelta(rule, layoutDeltaOf(edit)); onScopeApplied?.(saveTargets) }),
-    applyAsNew: openApplyAsNew,
   }))
   return <section className={styles.section} aria-label="다른 글자에 적용하면" data-testid="review-propagation">
     {/* 옵션 스택 = 쌓인 범위 박스. `옵션 추가`가 새 박스를 만들고, 박스를 누르면 그게 지금 범위다. 지우기는 ×로(Undo 됨). */}
@@ -165,7 +156,6 @@ export function ReviewPropagationCards({ source, edit, changed, fixed, focus, ra
     </div>
     {/* 범위 고르기 화면. 검수 격자를 그대로 쓰고 사각을 집는다. `이 범위로`가 박스를 만들거나 그 박스의 범위를 고쳐 쓴다. */}
     {scopeOpen && <LayoutScopePicker source={source} rule={scopeOpen.rule} part={scopeOpen.part ?? RULE_PART[group]} railRole={railRole}
-      confirmLabel={scopeOpen.mode === 'apply' ? '신규 옵션에 저장' : undefined} allowUnchanged={scopeOpen.mode === 'apply'}
       deltaLine={changed.length > 0 ? `${changed[0].label} ${changed.length > 1 ? `외 ${changed.length - 1}` : ''}`.trim() : undefined}
       onCancel={() => setScopeOpen(null)}
       onConfirm={confirmScope} />}

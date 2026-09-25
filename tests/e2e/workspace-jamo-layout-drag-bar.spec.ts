@@ -4,10 +4,10 @@ import { expect, test } from '@playwright/test'
 const DRAG_GAIN = 0.7
 
 /**
- * 하단 바는 보선을 끄는 동안 잡을 때 상태로 얼어 있고, 손을 떼면 바뀐다.
- * 캔버스 · 닿는 글자 줄은 끄는 동안에도 실시간이다.
+ * 상시 저장: 보선을 끄는 동안은 미리보기(캔버스 · 닿는 글자 줄은 실시간), 손을 떼는 순간 켠 옵션에 저장된다.
+ * 하단 바 · 복원 · 저장 버튼은 없다. 되돌리기는 셸 머리.
  */
-test('하단 바는 보선을 끄는 동안 안 바뀌고 손을 떼면 적용 버튼이 된다', async ({ page }) => {
+test('보선을 끄는 동안은 저장하지 않고, 손을 떼면 켠 옵션에 저장된다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   const canvas = page.getByTestId('review-canvas')
@@ -18,34 +18,30 @@ test('하단 바는 보선을 끄는 동안 안 바뀌고 손을 떼면 적용 �
   const pxOf = (em: number) => box.x + (em + 0.08) / 1.16 * box.width
   // 세로 보선 손잡이는 위쪽 여백에서 잡는다.
   const y = box.y + (-0.045 + 0.08) / 1.16 * box.height
-  const bar = page.getByTestId('jamo-stroke-cta-bar')
-  const apply = page.getByTestId('review-propagation-apply')
-  const reset = page.getByTestId('review-reset')
+  const stored = page.locator('[data-testid="layout-override-card"][data-stored="true"]')
+  const undo = page.getByRole('button', { name: '형태 편집 실행 취소' })
 
-  // 옮긴 보선이 없으면 하단 바가 없다(획 편집은 캔버스 칩으로 간다).
-  await expect(bar).toHaveCount(0)
+  await expect(page.getByTestId('jamo-stroke-cta-bar')).toHaveCount(0)
+  await expect(stored).toHaveCount(0)
+  await expect(undo).toBeDisabled()
   await page.mouse.move(pxOf(x1), y)
   await page.mouse.down()
   await page.mouse.move(pxOf(x1 + 0.03 / DRAG_GAIN), y, { steps: 6 })
-  // 끄는 중: 캔버스의 Δ 수치는 실시간, 하단 바는 잡을 때 그대로(없음).
+  // 끄는 중: 캔버스의 Δ 수치는 실시간, 저장은 아직.
   await expect(page.getByTestId('review-delta-label')).toHaveCount(1)
-  await expect(bar).toHaveCount(0)
-  await expect(apply).toHaveCount(0)
-  await expect(reset).toHaveCount(0)
+  await expect(stored).toHaveCount(0)
+  await expect(undo).toBeDisabled()
 
   await page.mouse.up()
-  await expect(bar).not.toHaveAttribute('data-held', 'true')
-  await expect(apply).toBeVisible()
-  await expect(reset).toContainText('1개 변경')
+  // 놓는 순간 저장 · 기록 한 줄. 세션 편집은 비고 하단 바는 없다.
+  await expect(stored).toHaveCount(1)
+  await expect(undo).toBeEnabled()
+  await expect(page.getByTestId('jamo-stroke-cta-bar')).toHaveCount(0)
+  await expect(page.getByTestId('review-reset')).toHaveCount(0)
 
-  // 이미 Δ가 있는 채로 다시 끌면 끄는 동안에도 적용 버튼은 그대로 서 있다.
-  const x2 = Number(await handle.getAttribute('x1'))
-  await page.mouse.move(pxOf(x2), y)
-  await page.mouse.down()
-  await page.mouse.move(pxOf(x2 + 0.01 / DRAG_GAIN), y, { steps: 3 })
-  await expect(apply).toBeVisible()
-  await page.mouse.up()
-  await expect(apply).toBeVisible()
+  // 되돌리면 저장이 빠진다.
+  await undo.click()
+  await expect(stored).toHaveCount(0)
 })
 
 test('보선을 캔버스 밖까지 끌어도 글자 칸(0–1em) 안에서 멈춘다', async ({ page }) => {
@@ -132,7 +128,7 @@ test('보선이 선택된 채 다른 영역을 누르면 선택만 풀리고, �
   await expect(canvas.locator('[data-rail][data-selected]')).toHaveCount(0)
   await expect(page.getByTestId('review-delta-band')).toHaveCount(1)
   // 옮긴 값은 그대로 남아 있다.
-  await expect(page.getByTestId('review-reset')).toContainText('1개 변경')
+  await expect(page.locator('[data-testid="layout-override-card"][data-stored="true"]').first()).toBeVisible()
 
   // 둘째 탭부터 평소대로 그 영역이 켜진다.
   await medial.click()

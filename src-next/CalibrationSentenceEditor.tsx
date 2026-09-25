@@ -1,5 +1,5 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref, type RefObject, type TextareaHTMLAttributes } from 'react'
-import { ArrowLeft, Check, Circle, Copy, CopyPlus, Delete, Dices, Download, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, RotateCcw, Settings2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
+import { ArrowLeft, Check, Circle, ClipboardPaste, Copy, CopyPlus, Delete, Dices, Download, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, RotateCcw, Settings2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
@@ -7,12 +7,11 @@ import { DevGhostToggle } from './DevGhostToggle'
 import { facesToBox, identityOfSyllable } from '../src/services/contextBoxResolver'
 import { contextPlacementOf, useContextPlacement, useNotoModel } from './notoModel'
 import { GlyphLayoutEditor } from './GlyphLayoutEditor'
-import type { LayoutLeaveGuard } from './GlyphLayoutEditor'
 import leaveSheetStyles from './GlyphLayoutEditor.module.css'
 import { effectiveLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { useEditHistoryStore } from './editHistoryStore'
-import { setNavigationGuard } from './router'
+import { newLayoutEntry } from './layoutEntry'
 import { adoptFamilyStrokes, familyOfSyllable } from '../src/utils/jamoContextStrokes'
 import { withFrameFrom, withoutFrame } from '../src/utils/jamoFrame'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
@@ -1771,6 +1770,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   // 펼친 문장 줄의 높이(px). 열 때 편집부 자리 전체를 재서 그만큼 자란다.
   const [sentenceSheetHeight, setSentenceSheetHeight] = useState(0)
   const [sentenceCaret, setSentenceCaret] = useState(0)
+  // 고른 범위의 끝(글자 수). 커서만 있으면 `sentenceCaret`과 같다. 입력칸이 안 보이므로 범위는 문장 줄에 칠해 보인다.
+  const [sentenceSelectionEnd, setSentenceSelectionEnd] = useState(0)
+  const [sentenceCopied, setSentenceCopied] = useState(false)
   const sheetInputRef = useRef<HTMLTextAreaElement>(null)
   const isGlobalStyleOpen = globalStylePanel !== null
   const isBrushStyleOpen = globalStylePanel === 'brush'
@@ -1822,6 +1824,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   // 모델은 왔는데 이 글자 획이 상자에 안 맞아 옛 배치(스키마)로 그리는 중. 이유를 말해 준다.
   const boxFitIssue = chrome === 'workspace' && notoBundle && placement.kind !== 'boxes' ? placementResolution?.issues[0] ?? null : null
   const isLayoutMode = editMode === 'layout' && layoutAvailable
+  // 레이아웃 화면에 들어올 때 보선 자리. 상시 저장이라 `original`은 놓을 때마다 바뀌므로 주황 띠 · Δ는 이 기준에서 잰다. 글자를 바꾸거나 다시 들어오면 새 기준, 되돌리기(`layoutEpoch`)에는 그대로.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const layoutEntry = useMemo(() => newLayoutEntry(), [selectedChar, isLayoutMode])
   const schemaMoveLocked = chrome === 'workspace' && placement.kind === 'boxes'
   // 그 자소의 첫 획. `획 고치기`는 자소 통째 선택을 거치지 않고 이 상태로 열려 조절판이 바로 뜬다(혼합 홀자는 가로부 먼저).
   const firstStrokeSelectionOf = (part: MobileEditorPart): Selection | null => {
@@ -1909,14 +1914,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   }, [calibrationLines, choseong, effectiveSchema, globalPadding, jungseong, jongseong, measuresOnScreenBoxes, paddingOverrides, schemas, screenBoxesOf, selectedChar, syllable])
 
   // 레이아웃 편집기가 걸어 두는 `떠나기 전 묻기`. 저장 안 한 보선이 있으면 편집기가 묻고, 편집기가 없으면 바로 간다.
-  const layoutLeaveGuardRef = useRef<LayoutLeaveGuard | null>(null)
-  const guardLayoutLeave: LayoutLeaveGuard = (next, options) => layoutLeaveGuardRef.current ? layoutLeaveGuardRef.current(next, options) : next()
-  // 화면 이동(자소 → 검수)도 같은 문을 거친다. 셸 안에서만 — 옛 단독 화면은 라우터를 안 쓴다.
-  useEffect(() => {
-    if (chrome !== 'workspace') return
-    setNavigationGuard((proceed) => guardLayoutLeave(proceed))
-    return () => setNavigationGuard(null)
-  }, [chrome])
   const chooseChar = (char: string) => {
     // 글자를 바꾸면 기본 상태(레이아웃)로 돌아간다.
     if (chrome === 'workspace') { setEditMode('layout'); setStrokeEntryPart(null) }
@@ -2064,9 +2061,57 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     input.focus({ preventScroll: true })
     const offset = [...input.value].slice(0, index).join('').length
     input.setSelectionRange(offset, offset)
+    setSentenceSelectionEnd(index)
   }
   const syncSentenceCaret = (input: HTMLTextAreaElement) => {
     setSentenceCaret([...input.value.slice(0, input.selectionStart ?? input.value.length)].length)
+    setSentenceSelectionEnd([...input.value.slice(0, input.selectionEnd ?? input.value.length)].length)
+  }
+  // 마우스로 쓰는 화면에서는 펼치자마자 입력칸에 커서를 둔다(⌘V · ⌘A가 바로 먹게). 폰은 누를 때까지 자판을 안 연다.
+  useEffect(() => {
+    if (!sentenceSheetOpen || !window.matchMedia?.('(pointer: fine)').matches) return
+    placeSentenceCaret([...sampleSentence].length)
+  // 펼칠 때 한 번만.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sentenceSheetOpen])
+  // 고른 범위를 문장 줄 글자에 칠한다. 글자 그림은 입력칸과 따로라 DOM 표시로 얹는다.
+  useEffect(() => {
+    const root = sentenceRef.current
+    if (!root) return
+    const from = Math.min(sentenceCaret, sentenceSelectionEnd)
+    const to = Math.max(sentenceCaret, sentenceSelectionEnd)
+    root.querySelectorAll<HTMLElement>('[data-char-index]').forEach((element) => {
+      const index = Number(element.dataset.charIndex)
+      element.toggleAttribute('data-sheet-selected', sentenceSheetOpen && index >= from && index < to)
+    })
+  }, [sentenceSheetOpen, sentenceCaret, sentenceSelectionEnd, sampleSentence])
+  // 고른 범위가 있으면 그것만, 없으면 문장 전체를 복사한다.
+  const copySentence = () => {
+    const input = sheetInputRef.current
+    const wasFocused = Boolean(input && document.activeElement === input)
+    const text = input && input.selectionStart !== input.selectionEnd ? input.value.slice(input.selectionStart, input.selectionEnd) : sampleSentence
+    void copyText(text)
+      .then(() => { setSentenceCopied(true); window.setTimeout(() => setSentenceCopied(false), 1200) })
+      .catch(() => {})
+      .finally(() => { if (wasFocused) input?.focus({ preventScroll: true }) })
+  }
+  // 커서 자리에(고른 범위가 있으면 그 자리를 바꿔) 붙인다. 폰은 입력칸을 길게 누를 수 없어 이 단추가 붙여넣기 길이다.
+  const pasteSentence = () => {
+    const input = sheetInputRef.current
+    if (!input || !navigator.clipboard?.readText) return
+    if (document.activeElement !== input) {
+      input.focus({ preventScroll: true })
+      input.setSelectionRange(input.value.length, input.value.length)
+    }
+    void navigator.clipboard.readText().then((text) => {
+      if (!text) return
+      input.focus({ preventScroll: true })
+      // 브라우저 입력으로 넣어야 ⌘Z로 되돌릴 수 있다. 안 되는 브라우저는 직접 넣고 입력 이벤트를 쏜다.
+      if (!document.execCommand('insertText', false, text)) {
+        input.setRangeText(text, input.selectionStart, input.selectionEnd, 'end')
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+    }).catch(() => {})
   }
   // 글자를 누르면 가까운 쪽 가장자리, 빈 곳을 누르면 문장 끝.
   const pickSentenceCaret = (event: ReactMouseEvent<HTMLElement>) => {
@@ -2341,14 +2386,14 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         ? <button key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width }} type="button" tabIndex={-1} data-char-index={charIndex} aria-label={`${char} 앞뒤에 커서 두기`}>
             <Glyph char={char} size={sentenceEm} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={previewJamo} previewSchema={previewSchema} layoutHighlight={null} globalStyle={previewGlobalStyle} />
           </button>
-        : <button key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width }} type="button" aria-current={char === selectedChar ? 'true' : undefined} data-ink-gap-limiter={inkGapLimiter?.id === contextId ? 'true' : undefined} data-ink-safety-adjusted={isSafetyAdjusted ? 'true' : undefined} data-layout-applied={isScopeApplied ? 'true' : undefined} aria-label={`${char} 편집${isSafetyAdjusted ? ', 충돌 안전 보정됨' : ''}`} onClick={() => char === selectedChar ? chooseChar(char) : guardLayoutLeave(() => chooseChar(char))}>
+        : <button key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width }} type="button" aria-current={char === selectedChar ? 'true' : undefined} data-ink-gap-limiter={inkGapLimiter?.id === contextId ? 'true' : undefined} data-ink-safety-adjusted={isSafetyAdjusted ? 'true' : undefined} data-layout-applied={isScopeApplied ? 'true' : undefined} aria-label={`${char} 편집${isSafetyAdjusted ? ', 충돌 안전 보정됨' : ''}`} onClick={() => chooseChar(char)}>
           <Glyph char={char} size={sentenceEm} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={previewJamo} previewSchema={previewSchema} layoutHighlight={layoutHighlight} globalStyle={previewGlobalStyle} />
         </button>
       : <span key={`${lineIndex}-${char}-${charIndex}`} data-char-index={inSheet ? charIndex : undefined} className={/\s/u.test(char) ? styles.spaceGlyph : styles.punctuationGlyph} style={{ inlineSize: width }} aria-label={/\s/u.test(char) ? '공백' : char}>{char}</span>
   }
   // 셸 안에서는 도구 줄이 없다(출력은 폰트 탭, 형태 규칙은 머리, 실행취소 · 다시실행은 셸 머리). 아래 줄은 옛 단독 화면 것.
   const menuLabel = (text: string) => chrome === 'workspace' ? <em>{text}</em> : null
-  const toggleGlobalStyle = () => isGlobalStyleOpen ? closeGlobalStyle() : guardLayoutLeave(() => { if (sentenceSheetOpen) closeSentenceSheet(); setGlobalStylePanel('body') })
+  const toggleGlobalStyle = () => { if (isGlobalStyleOpen) closeGlobalStyle(); else { if (sentenceSheetOpen) closeSentenceSheet(); setGlobalStylePanel('body') } }
   const actions = (
     <nav aria-label="폰트 추출 및 편집 기록">
       <button type="button" className={styles.exportButton} data-export-state={exportState} onClick={exportCurrentFont} disabled={exportState === 'exporting'} aria-label={exportState === 'exporting' ? `OTF 추출 중: ${exportProgress}` : exportState === 'downloaded' ? 'OTF 추출 완료' : exportState === 'failed' ? 'OTF 추출 실패' : '현재 작업을 OTF로 추출'} title={exportState === 'exporting' ? exportProgress : '현재 작업을 OTF로 추출'}>
@@ -2415,11 +2460,13 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
           <div className={styles.sentenceSheetBar} style={{ '--keyboard-inset': `${keyboardInset}px` } as CSSProperties} onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.preventDefault()} onMouseDown={(event) => event.preventDefault()}>
             <button type="button" onClick={rollSentence} aria-label="예시 문장 바꾸기" data-testid="sentence-sheet-roll"><Dices size={18} aria-hidden="true" />다른 문장</button>
             <button type="button" onClick={clearSentence} disabled={sampleSentence.length === 0} aria-label="문장 전체 삭제" data-testid="sentence-sheet-clear"><Delete size={18} aria-hidden="true" />전체 삭제</button>
+            <button type="button" className={styles.sentenceSheetIcon} onClick={copySentence} disabled={sampleSentence.length === 0} aria-label={sentenceCopied ? '복사함' : '문장 복사'} title="복사" data-testid="sentence-sheet-copy">{sentenceCopied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}</button>
+            <button type="button" className={styles.sentenceSheetIcon} onClick={pasteSentence} aria-label="붙여넣기" title="붙여넣기" data-testid="sentence-sheet-paste"><ClipboardPaste size={18} aria-hidden="true" /></button>
           </div>
         </>}
         </> : <>
         <div className={styles.sentenceActions}>
-          <button type="button" onClick={() => guardLayoutLeave(pickSampleSentence)} aria-label="예시 문장 무작위 선택" title="예시 문장 바꾸기"><Dices size={19} aria-hidden="true" /></button>
+          <button type="button" onClick={pickSampleSentence} aria-label="예시 문장 무작위 선택" title="예시 문장 바꾸기"><Dices size={19} aria-hidden="true" /></button>
           <button type="button" data-active={isDirectInputActive || undefined} onClick={startDirectInput} aria-label="보정 문장 직접 입력" title="직접 입력"><TextCursorInput size={19} aria-hidden="true" /></button>
         </div>
         <SentenceTextarea
@@ -2446,7 +2493,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       </section>
 
       {isLayoutMode && !styleLocksCanvas ? <section className={styles.layoutMode} aria-label={`${selectedChar} 레이아웃 수정`} data-testid="jamo-layout-mode">
-        <GlyphLayoutEditor key={`${selectedChar}:${layoutEpoch}`} codepoint={selectedChar.codePointAt(0) ?? 0xac00} initialPart={selection.kind === 'none' ? strokeEntryPart ?? undefined : selection.editorPart} onCommitted={commitLayoutDelta} onEditStrokes={editStrokes} onPickCharacter={chooseChar} onScopeApplied={setAppliedScope} leaveGuardRef={layoutLeaveGuardRef} />
+        <GlyphLayoutEditor key={`${selectedChar}:${layoutEpoch}`} entry={layoutEntry} codepoint={selectedChar.codePointAt(0) ?? 0xac00} initialPart={selection.kind === 'none' ? strokeEntryPart ?? undefined : selection.editorPart} onCommitted={commitLayoutDelta} onEditStrokes={editStrokes} onPickCharacter={chooseChar} onScopeApplied={setAppliedScope} />
       </section> : <>
       {/* 획 편집에도 같은 자리·같은 높이로 `닿는 글자` 줄이 선다. 범위는 고치는 자모가 든 글자 전부(레이아웃을 안 가린다).
           줄이 두 모드에 다 있어야 `획 고치기`로 오갈 때 캔버스가 안 튄다. */}
@@ -2541,7 +2588,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         activeArea={styleOnly ? 'font' : 'jamo'}
         projectName={projectName}
         cover={cover}
-        history={{ canUndo: history.length > 0, canRedo: future.length > 0, onUndo: () => guardLayoutLeave(undo, { saveable: false }), onRedo: () => guardLayoutLeave(redo, { saveable: false }) }}
+        history={{ canUndo: history.length > 0, canRedo: future.length > 0, onUndo: undo, onRedo: redo }}
         tools={
           /* 형태 규칙은 자소 탭에서 고른 자모가 있을 때만 머리에 나온다. 글로벌 스타일은 폰트 탭 자체라 여는 단추가 없다. */
           !styleOnly && selection.kind !== 'none' ? <button type="button" className={styleMode.headerTool} onClick={() => setIsShapeRuleOpen(true)} aria-label="선택 자모 형태 규칙" title="현재 자모의 획과 형태 예절"><ListTree size={18} /></button> : undefined

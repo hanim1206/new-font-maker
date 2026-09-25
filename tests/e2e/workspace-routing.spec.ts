@@ -72,12 +72,12 @@ test('브라우저 뒤로 가기는 화면만 바꾸고, 검수 칸은 그 글�
   expect(await marked(page)).toBe(true)
 })
 
-test('보선을 옮긴 채 검수로 가면 저장을 묻고, 저장하지 않고 계속하면 검수로 간다', async ({ page }) => {
+test('보선을 옮기면 바로 저장되어 검수로 가도 묻지 않고, Δ는 남아 있다', async ({ page }) => {
   await page.goto(`/workspace/jamo?char=${encodeURIComponent('한')}`)
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
   await mark(page)
 
-  // 홀자 상자를 켜고 바깥기둥 중심 보선을 방향키로 옮긴다. 하단 바가 선다.
+  // 홀자 상자를 켜고 바깥기둥 중심 보선을 방향키로 옮긴다.
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   const medial = page.getByTestId('review-canvas').locator('[data-testid="review-part-hit"][data-part^="JU"]').first()
   if ((await medial.getAttribute('aria-pressed')) !== 'true') await medial.dispatchEvent('pointerdown')
@@ -87,13 +87,15 @@ test('보선을 옮긴 채 검수로 가면 저장을 묻고, 저장하지 않�
   await page.keyboard.press('Enter')
   await expect(handle).toHaveAttribute('aria-pressed', 'true')
   await page.keyboard.press('Shift+ArrowRight')
-  await expect(page.getByTestId('jamo-stroke-cta-bar')).toBeVisible()
+  // 놓는 순간 켠 옵션에 저장된다. 하단 바 · 묻기는 없다.
+  await expect(page.locator('[data-testid="layout-override-card"][data-stored="true"]')).toBeVisible()
+  await expect(page.getByTestId('jamo-stroke-cta-bar')).toHaveCount(0)
 
   await openMenuAndGo(page, '검수')
-  const dialog = page.getByTestId('layout-leave-dialog')
-  await expect(dialog).toBeVisible()
-  await expect(page).toHaveURL(/\/workspace\/jamo$/)
-  await dialog.getByTestId('layout-leave-discard').click()
+  await expect(page.getByTestId('layout-leave-dialog')).toHaveCount(0)
   await expect(page).toHaveURL(/\/workspace\/review$/)
   expect(await marked(page)).toBe(true)
+  // 돌아오면 Δ가 그대로고 되돌리기도 살아 있다.
+  await openMenuAndGo(page, '자소')
+  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
 })
