@@ -245,7 +245,8 @@ export function polylineToFlatInkGroups(
     ? joined.filter((point, index) => index === 0 || Math.hypot(point.x - joined[index - 1].x, point.y - joined[index - 1].y) > EPSILON)
     : joined
   // 급한 굽이 안쪽에서 오프셋 선이 제 몸을 지나면 윤곽 하나로는 Boolean이 못 받는다. 그때만 조각(세그먼트 사각형 + 조인 + 캡)으로 낸다.
-  if (ringSelfIntersects(ring)) return piecewiseFlatInkGroups(path, directions, halves, cap, join, roundVertices)
+  // 머리핀처럼 되돌아 꺾이면 테두리는 안 꼬여도 안쪽 가장자리가 앞 토막 몸을 지나며 잉크를 잘라 먹는다(피드백 35, 가로줄기에 흰 쐐기). 그때도 조각으로.
+  if (ringSelfIntersects(ring) || hasHairpinTurn(directions, closed)) return piecewiseFlatInkGroups(path, directions, halves, cap, join, roundVertices)
   return [[ring]]
 }
 
@@ -286,6 +287,20 @@ function cross(o: BrushPoint, a: BrushPoint, b: BrushPoint): number {
 function segmentsCross(a1: BrushPoint, a2: BrushPoint, b1: BrushPoint, b2: BrushPoint): boolean {
   const d1 = cross(a1, a2, b1), d2 = cross(a1, a2, b2), d3 = cross(b1, b2, a1), d4 = cross(b1, b2, a2)
   return ((d1 > EPSILON && d2 < -EPSILON) || (d1 < -EPSILON && d2 > EPSILON)) && ((d3 > EPSILON && d4 < -EPSILON) || (d3 < -EPSILON && d4 > EPSILON))
+}
+
+/** 이만큼(약 100°)보다 크게 되돌아 꺾이는 이음이 있으면 윤곽 하나로는 붓이 지나간 자리를 못 담는다. */
+const HAIRPIN_COS = -0.17
+
+/** 이어진 두 토막의 방향이 크게 되돌아 꺾이는 자리가 있는지. 곡선을 잘게 편 토막 사이는 거의 곧아 걸리지 않는다. */
+export function hasHairpinTurn(directions: readonly (BrushPoint | null)[], closed: boolean): boolean {
+  const count = directions.length
+  const last = closed ? count : count - 1
+  for (let index = 0; index < last; index += 1) {
+    const current = directions[index], next = directions[(index + 1) % count]
+    if (current && next && current.x * next.x + current.y * next.y < HAIRPIN_COS) return true
+  }
+  return false
 }
 
 /** 인접하지 않은 변끼리 교차하는지. n이 수백이라 O(n²)로 충분하다. */

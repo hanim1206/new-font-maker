@@ -74,6 +74,28 @@ describe('polylineToFlatInkGroups', () => {
     expect(ink.ok).toBe(true)
   })
 
+  it('머리핀처럼 되돌아 꺾여도 앞 토막 몸을 잘라 먹지 않는다(피드백 35, 가로줄기의 흰 쐐기)', () => {
+    // 사용자가 ㄱ 끝점을 왼쪽 아래로 끌고 핸들을 가로줄기 쪽으로 당긴 획. 곡선이 가로줄기 끝에서 거의 되돌아 나온다.
+    const stroke: StrokeDataV2 = { id: 'ㄱ-1', closed: false, thickness: 0.07, points: [{ x: 0, y: 0 }, { x: 0.976, y: 0 }, { x: 0, y: 1, handleIn: { x: 0.18985410339720532, y: 0.16978478190862545 } }] }
+    // 레이아웃 화면의 첫닿자 칸처럼 세로가 조금 긴 상자.
+    const box = { x: 0.2, y: 0.2, width: 0.4, height: 0.45 }
+    const ink = union(strokeToFlatInkGroups(stroke, box, 1, 'butt', 'miter'))
+    const inside = (x: number, y: number) => ink.some((region) => {
+      let hit = false
+      const ring = region.outer
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+        if ((ring[i].y > y) !== (ring[j].y > y) && x < (ring[j].x - ring[i].x) * (y - ring[i].y) / (ring[j].y - ring[i].y) + ring[i].x) hit = !hit
+      }
+      return hit
+    })
+    // 가로줄기 몸(중심선과 윗쪽 절반)은 끝까지 다 차 있다.
+    for (let t = 0.05; t < 0.95; t += 0.05) {
+      const x = box.x + t * box.width
+      expect(inside(x, box.y), `중심선 t=${t.toFixed(2)}`).toBe(true)
+      expect(inside(x, box.y - 0.01), `윗쪽 t=${t.toFixed(2)}`).toBe(true)
+    }
+  })
+
   it('둥근 캡·조인은 호로 잇는다', () => {
     const corner = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }]
     const ink = union(polylineToFlatInkGroups(corner, false, 0.2, 'round', 'round'))

@@ -215,7 +215,11 @@ export function fitSkeleton(seed: DeepReadonly<JamoData>, samples: readonly Skel
   if (seedHandles) pruneZeroHandles(strokeList(tidy, channel))
   roundSkeleton(strokeList(tidy, channel))
   const tidyXor = meanXor(tidy, samples, channel)
-  if (!Number.isFinite(tidyXor) || tidyXor > best + 0.005) return { jamo, before, after: best, evaluations: evaluations + 1, moved }
+  if (!Number.isFinite(tidyXor) || tidyXor > best + 0.005) {
+    // 정리 전 결과로 돌아가도 앵커 자리에 남은 길이 0 핸들은 지운다(모양은 그대로다).
+    if (seedHandles) pruneZeroHandles(strokeList(jamo, channel))
+    return { jamo, before, after: best, evaluations: evaluations + 1, moved }
+  }
   // 좌표 하강은 거의 수평·수직인 획을 1~2° 틀어 놓는다(xor는 거의 안 바뀌어 되돌릴 이유가 없다).
   // 둥근 끝에서는 안 보이지만 일자 끝(butt)은 끝이 획 방향에 수직으로 잘려 그 기울기가 그대로 드러난다.
   // 축에 가까운 직선·접선은 축에 붙인다. 붙여서 xor가 1%p 넘게 나빠지면(진짜 기울기) 붙이기 전으로.
