@@ -47,6 +47,8 @@ interface SvgRendererProps {
   clipGlyphs?: boolean
   // path에 CSS transition 적용 여부 (기본: false)
   enableTransition?: boolean
+  // 굵기 배율을 직접 준다. 없으면 `globalStyle.weight`에서 계산한다. 실험실(굵기 보정 층)이 노토 곡선을 대 볼 때만 쓴다.
+  weightMultiplier?: number
   // SVG ref 전달
   svgRef?: React.RefObject<SVGSVGElement | null>
   // 추가 className (반응형 크기 조절 등)
@@ -77,6 +79,7 @@ export function SvgRenderer({
   overflow = 'visible',
   clipGlyphs,
   enableTransition = false,
+  weightMultiplier: weightMultiplierProp,
   children,
   underlay,
   straightUnderlay,
@@ -90,7 +93,7 @@ export function SvgRenderer({
 
   // 글로벌 스타일 값 (기본값 적용)
   const slant = globalStyle?.slant ?? 0
-  const weightMultiplier = globalStyle ? weightToMultiplier(globalStyle.weight) : 1.0
+  const weightMultiplier = weightMultiplierProp ?? (globalStyle ? weightToMultiplier(globalStyle.weight) : 1.0)
   const resolvedInk = useMemo(() => resolveGlyphInkPrimitives({
     syllable,
     placement: schema

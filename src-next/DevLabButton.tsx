@@ -7,6 +7,7 @@ import styles from './DevLabButton.module.css'
 const LAB_NAMES: Record<string, string> = {
   '/grid-lab': '형태 그리드',
   '/rule-lab': '규칙',
+  '/weight-lab': '굵기 보정',
   '/noto-corpus-lab': '노토 코퍼스',
   '/reference-lab': '레퍼런스',
   '/reference-group-lab': '레퍼런스 묶음',
