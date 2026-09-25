@@ -16,9 +16,9 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: 'Font Maker Next',
-        short_name: 'Font Maker Next',
-        description: '완성 글자 편집에서 전체 한글 폰트의 규칙을 만드는 실험',
+        name: '한글 폰트 메이커',
+        short_name: '한글 폰트 메이커',
+        description: '내 손으로 한글 폰트를 만들어 보는 도구',
         theme_color: '#292820',
         background_color: '#f0eee7',
         display: 'standalone',

@@ -20,6 +20,29 @@ function Page() {
   return <HomeRedirect />
 }
 
+/**
+ * 캔버스(`data-pinch-lock`) 위에서만 브라우저 확대를 막는다. 나머지 화면은 확대된다.
+ * `touch-action: none`만으로는 iOS Safari가 핀치를 안 막아 제스처 이벤트도 같이 막는다.
+ */
+function usePinchLock(): void {
+  useEffect(() => {
+    const locked = (event: Event) => event.target instanceof Element && event.target.closest('[data-pinch-lock]') !== null
+    const onGesture = (event: Event) => { if (locked(event)) event.preventDefault() }
+    const onTouchMove = (event: TouchEvent) => { if (event.touches.length > 1 && locked(event)) event.preventDefault() }
+    const onWheel = (event: WheelEvent) => { if (event.ctrlKey && locked(event)) event.preventDefault() }
+    const options: AddEventListenerOptions = { capture: true, passive: false }
+    for (const type of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(type, onGesture, options)
+    document.addEventListener('touchmove', onTouchMove, options)
+    document.addEventListener('wheel', onWheel, options)
+    return () => {
+      for (const type of ['gesturestart', 'gesturechange', 'gestureend']) document.removeEventListener(type, onGesture, options)
+      document.removeEventListener('touchmove', onTouchMove, options)
+      document.removeEventListener('wheel', onWheel, options)
+    }
+  }, [])
+}
+
 export default function App() {
+  usePinchLock()
   return <><Page /><FontExportDialog /></>
 }

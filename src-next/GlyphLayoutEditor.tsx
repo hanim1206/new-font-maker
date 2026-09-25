@@ -174,7 +174,7 @@ function GhostCanvas({ ghost, ghostVisible = true, measured, editable = [], acti
   const labelAt = (axis: 'x' | 'y', value: number, band: 'top' | 'bottom') => axis === 'x'
     ? { x: Math.min(0.92, Math.max(0.08, value)), y: band === 'top' ? -0.03 : 1.062, textAnchor: 'middle' as const }
     : { x: 1.07, y: value - 0.012, textAnchor: 'end' as const }
-  return <svg className={styles.canvas} viewBox={VIEW_BOX} role="img" aria-label={label} data-testid="review-canvas" data-snap={snapHit?.kind} data-held={selectedRail} onPointerDownCapture={releaseHold}>
+  return <svg className={styles.canvas} viewBox={VIEW_BOX} role="img" aria-label={label} data-testid="review-canvas" data-pinch-lock data-snap={snapHit?.kind} data-held={selectedRail} onPointerDownCapture={releaseHold}>
     <defs>
       {/* 자소 원형 캔버스와 같은 눈금: 1/16 잔선 + 1/4 굵은선 */}
       <pattern id="review-grid-fine" width=".0625" height=".0625" patternUnits="userSpaceOnUse"><path d="M.0625 0V.0625H0" fill="none" stroke="rgb(218 223 230 / .7)" strokeWidth=".002" /></pattern>

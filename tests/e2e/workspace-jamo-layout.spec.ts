@@ -1210,7 +1210,6 @@ test('레이아웃 모드 첫 화면에 상단 두 줄과 옵션 스택이 온�
   const menu = page.getByTestId('workspace-more-menu')
   await expect(menu).toBeHidden()
   await page.getByRole('button', { name: '주 메뉴' }).click()
-  await expect(menu.getByRole('link', { name: '자소 원형 새 화면 검토' })).toBeVisible()
   await expect(menu.getByRole('button', { name: '현재 작업을 OTF로 추출' })).toContainText('OTF 추출')
   await expect(menu.getByRole('button', { name: '선택 자모 형태 규칙' })).toBeVisible()
   // 글로벌 스타일은 폰트 전체 값이라 메뉴 안이 아니라 머리에 늘 나와 있다(레이아웃 모드에서도 켜져 있다).

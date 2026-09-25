@@ -7,16 +7,14 @@
 /** 제품 화면. 주소마다 명세 파일이 하나씩 있어야 한다. */
 export const PRODUCT_SCREEN_ROUTES = [
   '/fonts',
-  '/calibration',
-  '/workspace/jamos',
   '/workspace/jamo',
-  '/workspace/jamo/master',
-  '/workspace/jamo/result',
   '/workspace/review',
 ] as const
 
-/** 랩. 명세는 있어도 되고 없어도 된다. */
+/** 랩. 개발 서버에서만 열린다(`devLabs.tsx` · `devPages.tsx`). 명세는 있어도 되고 없어도 된다. */
 export const LAB_SCREEN_ROUTES = [
+  '/calibration',
+  '/global-style-preview',
   '/grid-lab',
   '/rule-lab',
   '/noto-corpus-lab',
@@ -34,5 +32,8 @@ export const NON_SCREEN_ROUTES = [
   '/workspace',
   '/workspace/review/glyph',
   '/workspace/skeleton',
+  '/workspace/jamos',
+  '/workspace/jamo/master',
+  '/workspace/jamo/result',
   '/medial-guide-lab',
 ] as const
