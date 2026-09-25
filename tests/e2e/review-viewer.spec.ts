@@ -38,12 +38,14 @@ test('격자 칸은 내 획으로 그려지고 Noto 검수 표시는 없다', as
   await expect(page.getByText('Noto 대비 xor')).toHaveCount(0)
   await expect(page.getByText('승인 측정')).toHaveCount(0)
   await expect(page.getByRole('group', { name: '칸 크기' })).toHaveCount(0)
-  await expect(page.getByTestId('review-pick').locator('svg')).toBeVisible()
+  // 아래 선택 카드는 없다. 시트 탭은 선택만 바꾼다.
+  await expect(page.getByTestId('review-pick')).toHaveCount(0)
+  await page.getByRole('group', { name: '첫닿자 시트' }).getByRole('button', { name: 'ㄴ', exact: true }).click()
+  await expect(cell(page, '나')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page).toHaveURL(/\/workspace\/review$/)
 
-  // 칸 탭 = 선택, 같은 칸 다시 탭 = 자소 탭 레이아웃 모드.
-  await cell(page, '각').click()
-  await expect(cell(page, '각')).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByTestId('review-pick')).toContainText('선택 · 각')
+  // 칸 탭 = 자소 탭 레이아웃 모드로 바로 간다.
+  await page.getByRole('group', { name: '첫닿자 시트' }).getByRole('button', { name: 'ㄱ', exact: true }).click()
   await cell(page, '각').click()
   // 들고 온 글자는 여는 데만 쓰고 주소에서는 지운다(새로고침하면 기본 문장).
   await expect(page).toHaveURL(/\/workspace\/jamo$/)
@@ -110,7 +112,8 @@ test('축 배치 셋과 받침 없음·겹받침·혼합 홀자 칸이 모두 �
 test('칸 바탕은 레이아웃 색이다 — 같은 레이아웃 규칙을 쓰는 글자끼리 같은 색', async ({ page }) => {
   await page.route('**/api/noto-corpus**', (route) => route.abort())
   await page.goto('/workspace/review')
-  await expect(page.getByTestId('corpus-context-legend')).toBeVisible({ timeout: 20_000 })
+  await expect(cell(page, '가')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByTestId('corpus-context-legend')).toHaveCount(0)
   const expected: Record<string, string> = { 가: 'right', 각: 'right-final', 고: 'bottom', 곡: 'bottom-final', 과: 'mixed', 곽: 'mixed-final' }
   for (const [char, context] of Object.entries(expected)) await expect(cell(page, char)).toHaveAttribute('data-context', context)
   const background = (char: string) => cell(page, char).evaluate((element) => getComputedStyle(element).backgroundColor)

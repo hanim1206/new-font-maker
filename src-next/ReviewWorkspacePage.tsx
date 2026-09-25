@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AppGlyph } from './AppGlyph'
-import { allCorpusRows, CORPUS_TOTAL, corpusIdentity } from './notoCorpus'
+import { allCorpusRows, CORPUS_TOTAL } from './notoCorpus'
 import type { CorpusRow, CorpusSnapshot } from './notoCorpus'
 import { NotoCorpusMatrix } from './NotoCorpusMatrix'
 import { MobileWorkspaceShell } from './workspace/WorkspaceChrome'
@@ -9,7 +9,7 @@ import styles from './ReviewWorkspacePage.module.css'
 /**
  * 검수 탭. 지금 프로젝트의 글자를 격자(표)로 한눈에 훑는 뷰어다.
  * 칸은 프로젝트 획으로 그린다(`AppGlyph`). Noto 추출 결과·xor·승인 측정은 여기서 안 읽는다 — 그건 랩(`/noto-corpus-lab`) 몫.
- * 글자를 열면 자소 탭의 `레이아웃` 모드로 간다. 기준선 편집부는 `GlyphLayoutEditor`.
+ * 칸을 누르면 그 글자의 자소 탭 `레이아웃` 모드로 간다. 기준선 편집부는 `GlyphLayoutEditor`.
  * 옛 글자 화면 주소(`/workspace/review/glyph`)는 같은 글자의 자소 탭으로 넘긴다.
  */
 
@@ -63,25 +63,14 @@ const renderCell = (row: CorpusRow) => <LazyCellGlyph char={row.identity.charact
 
 function GridScreen() {
   const [selected, setSelected] = useState(codepointFromUrl)
-  const identity = corpusIdentity(selected)
 
   return <MobileWorkspaceShell activeArea="review">
     <div className={styles.scroll}>
-      {/* 칸 탭 = 선택, 선택된 칸 다시 탭 = 글자 화면. 키보드 화살표 이동은 선택만 바꾼다. */}
-      <div className={styles.matrixSection}><NotoCorpusMatrix rows={ROWS} reviews={NO_REVIEWS} selected={selected} onSelect={(codepoint) => { if (codepoint === selected) window.location.assign(glyphHref(codepoint)); else setSelected(codepoint) }} isHighlighted={() => true} noFinal={false} renderCell={renderCell} variant="viewer" /></div>
-      <a className={styles.pick} href={glyphHref(selected)} data-testid="review-pick">
-        <AppGlyph char={identity.character} size={76} upright />
-        <span className={styles.pickBody}>
-          <strong>선택 · {identity.character}</strong>
-          <small>{identity.initialJamo} + {identity.medialJamo}{identity.finalJamo ? ` + ${identity.finalJamo}` : ' · 받침 없음'}</small>
-          <small className={styles.hint}>카드 탭 또는 같은 칸 다시 탭 → 글자 열기</small>
-        </span>
-        <span aria-hidden="true">›</span>
-      </a>
+      {/* 칸 탭 = 글자 열기. 시트 탭·키보드 화살표는 선택(시트·초점)만 바꾼다. */}
+      <div className={styles.matrixSection}><NotoCorpusMatrix rows={ROWS} reviews={NO_REVIEWS} selected={selected} onSelect={setSelected} onOpen={(codepoint) => window.location.assign(glyphHref(codepoint))} isHighlighted={() => true} noFinal={false} renderCell={renderCell} variant="viewer" /></div>
     </div>
   </MobileWorkspaceShell>
 }
-
 
 export function ReviewWorkspacePage() {
   const legacyGlyph = window.location.pathname === GLYPH_PATH
