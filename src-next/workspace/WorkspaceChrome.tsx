@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
-  ChevronDown,
-  ChevronUp,
   FolderOpen,
   LogOut,
   Menu,
@@ -18,7 +16,6 @@ import { SaveToast } from './SaveToast'
 import styles from './WorkspaceChrome.module.css'
 
 export type WorkspaceArea = 'jamo' | 'review'
-export type DrawerState = 'collapsed' | 'medium' | 'expanded'
 
 export interface WorkspaceHistoryControls {
   canUndo: boolean
@@ -29,7 +26,6 @@ export interface WorkspaceHistoryControls {
 
 export function MobileWorkspaceShell({
   children,
-  drawer,
   activeArea,
   projectName = '새 한글 폰트',
   history,
@@ -38,7 +34,6 @@ export function MobileWorkspaceShell({
   tools,
 }: {
   children: ReactNode
-  drawer?: ReactNode
   activeArea: WorkspaceArea
   projectName?: string
   history?: WorkspaceHistoryControls
@@ -90,7 +85,6 @@ export function MobileWorkspaceShell({
         </header>
 
         {children}
-        {drawer}
       </div>
       <AccountSaveToast />
       <ExportNoticeToast />
@@ -121,107 +115,4 @@ function AccountSaveToast() {
     message="계정에 저장하지 못했어요. 이 기기에는 남아 있고, 잠시 뒤 다시 올려요."
     onDismiss={() => useAccountSaveStore.setState({ status: 'idle' })}
   />
-}
-
-export interface EditScopeItem {
-  label: string
-  value: string
-}
-
-export function EditScopeBar({
-  items,
-  actionLabel = '범위 변경',
-  onRequestChange,
-}: {
-  items: readonly EditScopeItem[]
-  actionLabel?: string
-  onRequestChange?: () => void
-}) {
-  return (
-    <div className={styles.scopeBar} aria-label="수정 범위">
-      {items.map((item) => <div key={item.label}><span>{item.label}</span><strong>{item.value}</strong></div>)}
-      <button type="button" disabled={!onRequestChange} onClick={onRequestChange}>{actionLabel}</button>
-    </div>
-  )
-}
-
-export interface ComparisonItem {
-  id: string
-  label: string
-  detail: string
-  preview: ReactNode
-}
-
-export function ContextComparisonStrip({
-  heading,
-  eyebrow = '관찰 문맥',
-  items,
-  observedId,
-  onObserve,
-  description,
-  interactive = true,
-}: {
-  heading: string
-  eyebrow?: string
-  items: readonly ComparisonItem[]
-  observedId: string
-  onObserve?: (id: string) => void
-  description?: string
-  interactive?: boolean
-}) {
-  const active = items.find((item) => item.id === observedId) ?? items[0]
-  return (
-    <section className={styles.comparisonSection} aria-labelledby="workspace-context-heading">
-      <div className={styles.sectionHeading}>
-        <div><span>{eyebrow}</span><h2 id="workspace-context-heading">{heading}</h2></div>
-        {interactive && active && <strong>{active.label} · {active.detail}</strong>}
-      </div>
-      <ul className={styles.comparisonStrip} aria-label={heading}>
-        {items.map((item) => (
-          <li key={item.id} data-context-id={item.id}>
-            {interactive ? <button
-              type="button"
-              className={styles.contextCard}
-              aria-current={observedId === item.id ? 'true' : undefined}
-              onClick={() => onObserve?.(item.id)}
-              aria-label={`${item.label} ${item.detail} 관찰`}
-            >
-              <span className={styles.cardPreview}>{item.preview}</span>
-              <strong>{item.label}</strong>
-              <span>{item.detail}</span>
-            </button> : <div className={styles.contextCard} aria-label={`${item.label} ${item.detail} 연결 결과`}>
-              <span className={styles.cardPreview}>{item.preview}</span>
-              <strong>{item.label}</strong>
-              <span>{item.detail}</span>
-            </div>}
-          </li>
-        ))}
-      </ul>
-      {description && <p>{description}</p>}
-    </section>
-  )
-}
-
-export function PrecisionControlDrawer({
-  state,
-  onStateChange,
-  targetLabel,
-  children,
-}: {
-  state: DrawerState
-  onStateChange: (state: DrawerState) => void
-  targetLabel: string
-  children?: ReactNode
-}) {
-  const expanded = state !== 'collapsed'
-  const toggle = () => onStateChange(state === 'collapsed' ? 'medium' : state === 'medium' ? 'expanded' : 'collapsed')
-  return (
-    <section className={styles.drawer} data-state={state} aria-label="정밀 조절">
-      <button type="button" className={styles.drawerHandle} onClick={toggle} aria-expanded={expanded} aria-label="정밀 조절">
-        <span><strong>정밀 조절</strong><small>{targetLabel}</small></span>
-        {expanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
-      </button>
-      {expanded && <div className={styles.drawerBody}>{children}</div>}
-    </section>
-  )
 }

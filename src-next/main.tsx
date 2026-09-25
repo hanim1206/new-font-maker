@@ -53,66 +53,10 @@ async function gate(): Promise<void> {
 
 /** `me`가 있으면(로그인 게이트가 켜졌을 때) 편집 화면을 열기 전에 계정 폰트를 불러온다. */
 async function start(me?: string): Promise<void> {
-  if (import.meta.env.DEV && window.location.pathname === '/global-style-preview') {
-    const { GlobalStylePreviewPage } = await import('./GlobalStylePreviewPage')
-    root.render(<StrictMode><GlobalStylePreviewPage /></StrictMode>)
-    return
-  }
-
-  if (window.location.pathname === '/noto-corpus-lab') {
-    const { NotoCorpusLabPage } = await import('./NotoCorpusLabPage')
-    root.render(<StrictMode><NotoCorpusLabPage /></StrictMode>)
-    return
-  }
-
-  if (window.location.pathname === '/reference-lab') {
-    const { ReferenceLabPage } = await import('./ReferenceLabPage')
-    root.render(<StrictMode><ReferenceLabPage /></StrictMode>)
-    return
-  }
-
-  if (window.location.pathname === '/reference-group-lab') {
-    const { ReferenceGroupLabPage } = await import('./ReferenceGroupLabPage')
-    root.render(<StrictMode><ReferenceGroupLabPage /></StrictMode>)
-    return
-  }
-
-  if (window.location.pathname === '/stroke-grammar-lab') {
-    const { StrokeGrammarLabPage } = await import('./StrokeGrammarLabPage')
-    root.render(<StrictMode><StrokeGrammarLabPage /></StrictMode>)
-    return
-  }
-
-  if (window.location.pathname === '/preset-candidate-lab') {
-    const { PresetCandidateLabPage } = await import('./PresetCandidateLabPage')
-    root.render(<StrictMode><PresetCandidateLabPage /></StrictMode>)
-    return
-  }
-
-  if (window.location.pathname === '/font-guide-lab') {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('section') === 'medial') {
-      params.set('section', 'initial')
-      window.history.replaceState(null, '', `/font-guide-lab?${params.toString()}`)
-    }
-    const { FontGuideLabPage } = await import('./FontGuideLabPage')
-    root.render(<StrictMode><FontGuideLabPage /></StrictMode>)
-    return
-  }
-
-  if (window.location.pathname === '/medial-guide-lab') {
-    const params = new URLSearchParams(window.location.search)
-    params.set('section', 'initial')
-    window.history.replaceState(null, '', `/font-guide-lab?${params.toString()}`)
-    const { FontGuideLabPage } = await import('./FontGuideLabPage')
-    root.render(<StrictMode><FontGuideLabPage /></StrictMode>)
-    return
-  }
-
-  if (window.location.pathname === '/five-guide-lab') {
-    const { FiveGuideLabPage } = await import('./FiveGuideLabPage')
-    root.render(<StrictMode><FiveGuideLabPage /></StrictMode>)
-    return
+  // 랩 화면은 개발 서버에서만. 프로덕션 번들에는 랩 청크가 들어가지 않는다.
+  if (import.meta.env.DEV) {
+    const { showDevLab } = await import('./devLabs')
+    if (await showDevLab((node) => root.render(<StrictMode>{node}</StrictMode>))) return
   }
 
   const migration = runLayoutProfileMigrationBootstrap({

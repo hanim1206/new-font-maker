@@ -29,41 +29,9 @@
 .moreMenu nav button:disabled { opacity: .38; }
 .moreMenu nav button[data-active='true'] { color: rgb(var(--color-primary)); background: rgb(var(--color-primary-light) / .5); }
 
-.scopeBar { min-width: 0; display: grid; grid-template-columns: repeat(var(--scope-columns, 3), minmax(0, 1fr)) 44px; gap: 5px; padding: 7px; border: 1px solid rgb(var(--color-primary) / .22); border-radius: 13px; background: rgb(var(--color-primary-light) / .35); }
-.scopeBar div { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.scopeBar span { color: rgb(var(--color-text-dim-4)); font-size: 8px; font-weight: 700; }
-.scopeBar strong { overflow: hidden; color: rgb(var(--color-primary-dark)); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.scopeBar button { min-width: 44px; min-height: 44px; padding: 0 6px; border: 0; border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-4)); font-size: 9px; font-weight: 750; }
-
-.comparisonSection { padding: 8px 0 10px; border-top: 1px solid rgb(var(--color-border-subtle)); border-bottom: 1px solid rgb(var(--color-border-subtle)); }
-.sectionHeading { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; padding: 0 14px 8px; }
-.sectionHeading div { display: flex; flex-direction: column; }
-.sectionHeading span { color: rgb(var(--color-text-dim-4)); font-size: 9px; font-weight: 750; }
-.sectionHeading h2 { font-size: 14px; }
-.sectionHeading > strong { color: rgb(var(--color-primary-dark)); font-size: 10px; }
-.comparisonStrip { display: flex; gap: 7px; padding: 0 14px 6px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; list-style: none; }
-.comparisonStrip li { flex: 0 0 92px; scroll-snap-align: start; }
-.contextCard { position: relative; flex: 0 0 92px; min-height: 112px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: 72px auto; align-items: center; gap: 0 4px; padding: 6px 7px; scroll-snap-align: start; border: 1px solid rgb(var(--color-border)); border-radius: 13px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); text-align: left; }
-.comparisonStrip li .contextCard { width: 100%; }
-.contextCard[aria-current='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary-light) / .38); box-shadow: 0 0 0 2px rgb(var(--color-primary) / .1); }
-.cardPreview { grid-column: 1 / -1; width: 68px; height: 68px; margin: auto; display: grid; place-items: center; pointer-events: none; }
-.cardPreview > * { width: 68px; height: 68px; }
-.contextCard strong { font-size: 13px; }
-.contextCard > span:last-child { overflow: hidden; color: rgb(var(--color-text-dim-4)); font-size: 8px; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
-.comparisonSection > p { padding: 0 14px; color: rgb(var(--color-text-dim-4)); font-size: 9px; }
-
-.drawer { flex: 0 0 auto; border-top: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); box-shadow: 0 -8px 24px rgb(15 23 42 / .06); }
-.drawerHandle { width: 100%; min-height: 54px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 15px; border: 0; background: transparent; color: rgb(var(--color-foreground)); text-align: left; }
-.drawerHandle > span { min-width: 0; display: flex; flex-direction: column; }
-.drawerHandle strong { font-size: 12px; }
-.drawerHandle small { color: rgb(var(--color-text-dim-4)); font-size: 9px; }
-.drawerBody { max-height: 180px; padding: 0 14px 12px; overflow-y: auto; }
-
 @media (max-width: 380px) {
   .headerMenu button,
   .headerActions button { width: 40px; }
-  .scopeBar { grid-template-columns: repeat(var(--scope-columns, 3), minmax(0, 1fr)) 40px; }
-  .scopeBar strong { font-size: 9px; }
 }
 
 @media (min-width: 720px) {
