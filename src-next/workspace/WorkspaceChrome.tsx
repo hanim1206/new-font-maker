@@ -4,6 +4,7 @@ import { flushAccountFont, useAccountSaveStore } from '../accountFontSync'
 import { useFontExportStore } from '../fontExportStore'
 import { useUIStore } from '../../src/stores/uiStore'
 import { navigate, onLinkClick } from '../router'
+import { useHistoryShortcuts } from './keyboardShortcuts'
 import { SaveToast } from './SaveToast'
 import styles from './WorkspaceChrome.module.css'
 
@@ -48,6 +49,8 @@ export function MobileWorkspaceShell({
 }) {
   const openedName = useUIStore((state) => state.currentProjectName)
   const title = projectName ?? openedName ?? '새 한글 폰트'
+  // ⌘Z · ⇧⌘Z는 머리의 되돌리기 · 다시 실행 단추와 같은 일.
+  useHistoryShortcuts(history)
   return (
     <main className={styles.page}>
       <div className={styles.shell} data-tabs={tabsHidden ? 'hidden' : undefined}>

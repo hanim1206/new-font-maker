@@ -88,6 +88,7 @@ import styleMode from './GlobalStyleMode.module.css'
 import { GlobalStyleTrackpad, type GlobalStylePanel } from './GlobalStyleTrackpad'
 import { GRID_SYSTEM_2_STROKE_UNITS, GRID_SYSTEM_2_UNIT } from '../src/services/gridSystem2Geometry'
 import { ShapeRulePanel } from './ShapeRulePanel'
+import { isDeleteKey, isTypingTarget } from './workspace/keyboardShortcuts'
 import { MobileWorkspaceShell } from './workspace/WorkspaceChrome'
 import { useUIStore } from '../src/stores/uiStore'
 
@@ -1360,6 +1361,17 @@ function InferenceTrackpad({
     onCommitJamo(before, after, { kind: selection.kind === 'stroke' ? 'stroke-move' : 'point-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId: selectedStroke.id, ...(selection.kind === 'stroke' ? {} : { pointIndex: selection.pointIndex }), delta: { x: 0, y: 0 } } as RawGlyphEdit)
     onSelectionChange({ ...selection, kind: 'stroke', strokeId: selection.kind === 'stroke' ? getJamoStrokes(after)[0]?.id ?? selectedStroke.id : selectedStroke.id, jamo: after })
   }
+  // Delete · Backspace = `삭제` 단추. 입력칸에서는 글자 지우기에 맡긴다.
+  useEffect(() => {
+    if (!canDelete) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isDeleteKey(event) || event.isComposing || isTypingTarget(event.target)) return
+      event.preventDefault()
+      deleteSelection()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
 
   // 조절판 이동이 캔버스 끌기 계산(px → em · 같은 스냅)으로 가는 중인지. 셸 안의 획 · 점 · 핸들만 그렇고, 자소 통째 · 옛 화면은 옛 계산이다.
   const padRouted = useRef(false)
@@ -2242,6 +2254,18 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [nudgeActive, snapStep])
+  // Esc = 빈 곳 누르기(획 · 점 · 핸들을 다 푼다). 레이아웃 모드의 켠 상자는 그대로 둔다.
+  const escapeActive = !isLayoutMode && !globalStylePanel && selection.kind !== 'none'
+  useEffect(() => {
+    if (!escapeActive) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.isComposing || isTypingTarget(event.target)) return
+      setSelection({ kind: 'none' })
+      setSelectedPoints([])
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [escapeActive])
   const chooseEditMode = (mode: EditMode) => {
     setEditMode(mode)
     setStrokeRowAnchor(null)
