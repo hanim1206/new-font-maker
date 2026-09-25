@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { flushAccountFont, useAccountSaveStore } from '../accountFontSync'
 import { authGateMode, signOutAndReload } from '../betaAuth'
+import { useFontExportStore } from '../fontExportStore'
 import { SaveToast } from './SaveToast'
 import styles from './WorkspaceChrome.module.css'
 
@@ -92,8 +93,17 @@ export function MobileWorkspaceShell({
         {drawer}
       </div>
       <AccountSaveToast />
+      <ExportNoticeToast />
     </main>
   )
+}
+
+/** 추출이 실패했거나 빈 칸으로 넣은 글자가 있으면 그 자리에서 알린다. 닫을 때까지 남는다. */
+function ExportNoticeToast() {
+  const notice = useFontExportStore((state) => state.notice)
+  const dismiss = useFontExportStore((state) => state.dismissNotice)
+  if (!notice) return null
+  return <SaveToast tone="error" message={notice} onDismiss={dismiss} />
 }
 
 /** 메인 화면으로. 못 올린 변경은 먼저 올려 본다(못 올려도 사본의 이름표에 남아 메인 화면이 다시 올린다). */

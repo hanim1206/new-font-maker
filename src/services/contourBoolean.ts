@@ -6,6 +6,8 @@ import type { Contour } from './strokeToOutline'
 const CFF_BOOLEAN_OPTIONS = {
   positionEpsilon: 1e-6,
   minRingArea: 0.5,
+  // 급하게 휜 획은 스트로커 윤곽이 제 몸을 지난다(피드백 35). NonZero로 풀면 화면(SVG 선)과 같은 잉크다.
+  resolveSelfIntersections: true,
 } as const
 
 function sameCffPosition(

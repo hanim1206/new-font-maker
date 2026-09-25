@@ -55,6 +55,8 @@ export interface FontGeneratorResult {
   error?: string
   /** `placementOf`를 줬는데도 스키마 상자로 떨어진 음절 수. 기본 획이면 0이어야 한다. */
   schemaFallbackCount?: number
+  /** 윤곽을 만들지 못해 빈 글리프로 넣은 글자. 폰트는 만들어졌다. */
+  skippedChars?: string[]
 }
 
 export interface FontIdentity {
@@ -406,6 +408,17 @@ function createGlyph(
   })
 }
 
+/** 윤곽을 못 만든 글자. 자리(cmap · 너비)는 지키고 모양만 비운다. */
+function createEmptyGlyph(glyphData: GlyphData): InstanceType<typeof opentype.Glyph> {
+  const unicodeHex = glyphData.unicode.toString(16).toUpperCase().padStart(4, '0')
+  return new opentype.Glyph({
+    name: `uni${unicodeHex}`,
+    unicode: glyphData.unicode,
+    advanceWidth: glyphData.advanceWidth,
+    path: new opentype.Path(),
+  })
+}
+
 /** Shape final regions에는 출력 좌표 투영만 적용한다. Boolean과 획 확장은 재실행하지 않는다. */
 function createFinalRegionGlyph(
   glyphData: FinalRegionGlyphData,
@@ -610,9 +623,19 @@ export async function generateAndDownloadFont(
       createSpaceGlyph(getCurrentSpaceAdvance()),
     ]
 
+    // 한 글자가 실패해도 폰트 전체를 버리지 않는다. 그 글자만 빈 글리프로 넣고 알린다(피드백 35).
+    const skippedChars: string[] = []
     const hangulGlyphs = await processInChunks(
       glyphDataList,
-      (data) => createGlyph(data),
+      (data) => {
+        try {
+          return createGlyph(data)
+        } catch (error) {
+          console.error(`글리프 생성 실패, 빈 글리프로 넣음: ${data.char}`, error)
+          skippedChars.push(data.char)
+          return createEmptyGlyph(data)
+        }
+      },
       100,
       (done, total) => {
         onProgress?.(done, total, '글리프 윤곽 변환 중...')
@@ -681,6 +704,7 @@ export async function generateAndDownloadFont(
       glyphCount: glyphs.length,
       fileSize,
       schemaFallbackCount,
+      skippedChars,
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

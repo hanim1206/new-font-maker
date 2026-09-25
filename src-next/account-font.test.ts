@@ -271,3 +271,12 @@ describe('계정 폰트 열기 · 자동 저장', () => {
     expect(calls.find((call) => call.op === 'rpc')?.payload).toEqual({ name: 'bump_font_export_revision', args: { font_id: 'f1' } })
   })
 })
+
+describe('추출 알림', () => {
+  it('빈 칸으로 넣은 글자는 셋까지 이름을 대고 나머지는 수로', async () => {
+    const { skippedNotice } = await import('./fontExportStore')
+    expect(skippedNotice([])).toBeNull()
+    expect(skippedNotice(['빽'])).toBe('폰트는 받았지만 빽: 모양을 만들지 못해 빈 칸으로 들어갔어요. 획을 고쳐 다시 받아 주세요.')
+    expect(skippedNotice(['ㄱ', '가', '각', '간', '갇'])).toContain('ㄱ · 가 · 각 외 2자')
+  })
+})

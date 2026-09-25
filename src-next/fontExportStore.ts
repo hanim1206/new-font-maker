@@ -38,6 +38,8 @@ interface FontExportState {
   progress: string
   /** 마지막 추출이 실패한 이유. 성공하면 비운다. */
   error: string
+  /** 편집 화면 토스트로 바로 알릴 말(실패 · 빠진 글자). 닫거나 다시 추출하면 비운다. */
+  notice: string | null
   /** 마지막 추출에서 모델 상자를 못 쓰고 스키마로 그린 음절 수. */
   schemaFallbackCount: number
   dialogOpen: boolean
@@ -48,7 +50,16 @@ interface FontExportState {
 interface FontExportActions {
   request: () => void
   cancel: () => void
+  dismissNotice: () => void
   confirm: (familyName: string) => Promise<void>
+}
+
+/** 빈 글리프로 넣은 글자 알림. 없으면 null. */
+export function skippedNotice(chars: readonly string[]): string | null {
+  if (chars.length === 0) return null
+  const head = chars.slice(0, 3).join(' · ')
+  const who = chars.length > 3 ? `${head} 외 ${chars.length - 3}자` : head
+  return `폰트는 받았지만 ${who}: 모양을 만들지 못해 빈 칸으로 들어갔어요. 획을 고쳐 다시 받아 주세요.`
 }
 
 function loadFamilyName(): string {
@@ -59,23 +70,26 @@ export const useFontExportStore = create<FontExportState & FontExportActions>()(
   status: 'idle',
   progress: '',
   error: '',
+  notice: null,
   schemaFallbackCount: 0,
   dialogOpen: false,
   familyName: loadFamilyName(),
   request: () => { if (get().status !== 'exporting') set({ dialogOpen: true, familyName: accountFontName() ?? loadFamilyName() }) },
   cancel: () => set({ dialogOpen: false }),
+  dismissNotice: () => set({ notice: null }),
   confirm: async (name) => {
     if (get().status === 'exporting') return
     const familyName = name.trim() || DEFAULT_FONT_NAME
     try { localStorage.setItem(FONT_NAME_STORAGE_KEY, familyName) } catch { /* 저장 못 해도 추출은 된다 */ }
-    set({ dialogOpen: false, familyName, status: 'exporting', progress: '준비 중...', error: '' })
+    set({ dialogOpen: false, familyName, status: 'exporting', progress: '준비 중...', error: '', notice: null })
     // 모델을 못 읽으면 멈춘다. 조용히 스키마로 떨어지면 받은 폰트가 화면과 달라진다.
     let placementOf: GlyphPlacementResolver
     try {
       placementOf = await exportPlacementResolver()
     } catch (failure) {
       const reason = failure instanceof Error ? failure.message : String(failure)
-      set({ progress: '', status: 'failed', error: `Noto 모델을 읽지 못해 추출을 멈췄습니다: ${reason}` })
+      const error = `Noto 모델을 읽지 못해 추출을 멈췄습니다: ${reason}`
+      set({ progress: '', status: 'failed', error, notice: `OTF를 만들지 못했어요. ${error}` })
       window.setTimeout(() => set({ status: 'idle' }), 1800)
       return
     }
@@ -87,7 +101,13 @@ export const useFontExportStore = create<FontExportState & FontExportActions>()(
       revision,
       onProgress: (_completed, _total, phase) => set({ progress: phase }),
     })
-    set({ progress: '', status: result.success ? 'downloaded' : 'failed', error: result.success ? '' : result.error ?? '', schemaFallbackCount: result.schemaFallbackCount ?? 0 })
+    set({
+      progress: '',
+      status: result.success ? 'downloaded' : 'failed',
+      error: result.success ? '' : result.error ?? '',
+      notice: result.success ? skippedNotice(result.skippedChars ?? []) : `OTF를 만들지 못했어요. ${result.error ?? ''}`.trim(),
+      schemaFallbackCount: result.schemaFallbackCount ?? 0,
+    })
     window.setTimeout(() => set({ status: 'idle' }), 1800)
   },
 }))

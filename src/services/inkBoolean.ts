@@ -7,6 +7,11 @@ export interface InkBooleanOptions {
   positionEpsilon: number
   /** 입력 좌표계 제곱 단위로 표현한 최소 링 면적. */
   minRingArea: number
+  /**
+   * 스스로 겹친 링을 만나면 던지지 않고 Clipper2 union(NonZero)으로 푼다. 기본은 던진다(fail-closed).
+   * 스트로커가 만든 획 윤곽처럼 NonZero가 맞는 채우기일 때만 켠다(OTF 합치기).
+   */
+  resolveSelfIntersections?: boolean
 }
 
 interface Bounds {
@@ -58,23 +63,26 @@ function segmentsIntersect(firstStart: Pair, firstEnd: Pair, secondStart: Pair, 
     || pointOnSegment(firstEnd, secondStart, secondEnd, epsilon)
 }
 
-function assertSimpleRing(ring: Ring, options: InkBooleanOptions, label: string): void {
+function assertFiniteRing(ring: Ring, label: string): void {
   if (ring.some(([x, y]) => !Number.isFinite(x) || !Number.isFinite(y))) {
     throw new Error(`${label}에 유한하지 않은 좌표가 있습니다.`)
   }
+}
+
+function isSimpleRing(ring: Ring, options: InkBooleanOptions): boolean {
   for (let first = 0; first < ring.length; first += 1) {
     const firstNext = (first + 1) % ring.length
     for (let second = first + 1; second < ring.length; second += 1) {
       const secondNext = (second + 1) % ring.length
       if (first === second || firstNext === second || secondNext === first) continue
-      if (segmentsIntersect(ring[first], ring[firstNext], ring[second], ring[secondNext], options.positionEpsilon)) {
-        throw new Error(`${label}에 self-intersection이 있어 Boolean을 수행할 수 없습니다.`)
-      }
+      if (segmentsIntersect(ring[first], ring[firstNext], ring[second], ring[secondNext], options.positionEpsilon)) return false
     }
   }
+  return true
 }
 
-function inkRingToPolygonRing(source: readonly InkPoint[], options: InkBooleanOptions, label: string): Ring {
+/** 링 하나를 정리한다. 스스로 겹쳤으면 옵션에 따라 던지거나 `selfIntersecting`에 표시한다. */
+function inkRingToPolygonRing(source: readonly InkPoint[], options: InkBooleanOptions, label: string, flags: { selfIntersecting: boolean }): Ring {
   const ring: Ring = []
   for (const point of source) {
     const pair: Pair = [point.x, point.y]
@@ -85,7 +93,13 @@ function inkRingToPolygonRing(source: readonly InkPoint[], options: InkBooleanOp
   if (ring.length > 1 && samePosition(ring[0], ring[ring.length - 1], options.positionEpsilon)) {
     ring.pop()
   }
-  if (ring.length >= 3) assertSimpleRing(ring, options, label)
+  if (ring.length >= 3) {
+    assertFiniteRing(ring, label)
+    if (!isSimpleRing(ring, options)) {
+      if (!options.resolveSelfIntersections) throw new Error(`${label}에 self-intersection이 있어 Boolean을 수행할 수 없습니다.`)
+      flags.selfIntersecting = true
+    }
+  }
   return ring
 }
 
@@ -111,11 +125,12 @@ function normalizeRing(
   return directed.map(([x, y]) => ({ x, y }))
 }
 
-function inkRegionToPolygon(region: Readonly<InkRegion>, options: InkBooleanOptions): Polygon | null {
-  const outer = inkRingToPolygonRing(region.outer, options, 'InkRegion outer ring')
-  if (outer.length < 3 || Math.abs(signedArea(outer)) < options.minRingArea) return null
+function inkRegionToPolygon(region: Readonly<InkRegion>, options: InkBooleanOptions, flags: { selfIntersecting: boolean }): Polygon | null {
+  const outer = inkRingToPolygonRing(region.outer, options, 'InkRegion outer ring', flags)
+  // 스스로 겹친 링은 부호 면적이 서로 상쇄돼 작게 나올 수 있어 면적으로 거르지 않는다.
+  if (outer.length < 3 || (!flags.selfIntersecting && Math.abs(signedArea(outer)) < options.minRingArea)) return null
   const holes = region.holes
-    .map((hole) => inkRingToPolygonRing(hole, options, 'InkRegion hole ring'))
+    .map((hole) => inkRingToPolygonRing(hole, options, 'InkRegion hole ring', flags))
     .filter((ring) => ring.length >= 3 && Math.abs(signedArea(ring)) >= options.minRingArea)
   return [outer, ...holes]
 }
@@ -175,12 +190,14 @@ export function unionInkRegions(
   options: InkBooleanOptions,
 ): InkRegion[] {
   validateOptions(options)
+  const flags = { selfIntersecting: false }
   const polygons = regions
-    .map((region) => inkRegionToPolygon(region, options))
+    .map((region) => inkRegionToPolygon(region, options, flags))
     .filter((polygon): polygon is Polygon => polygon !== null)
 
   if (polygons.length === 0) return []
-  const result: MultiPolygon = polygons.length === 1 || !hasPossibleOverlap(polygons)
+  // 스스로 겹친 링이 있으면 하나뿐이어도 union을 거쳐 겹침 없는 링으로 푼다.
+  const result: MultiPolygon = !flags.selfIntersecting && (polygons.length === 1 || !hasPossibleOverlap(polygons))
     ? polygons.map((polygon) => polygon)
     : polygonBoolean.union(polygons[0], ...polygons.slice(1))
 
