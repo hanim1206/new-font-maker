@@ -57,6 +57,10 @@ export interface FontGeneratorResult {
   schemaFallbackCount?: number
   /** 윤곽을 만들지 못해 빈 글리프로 넣은 글자. 폰트는 만들어졌다. */
   skippedChars?: string[]
+  /** 만든 파일 그대로. 완료 페이지가 `FontFace`로 그리고 `다시 받기`에 쓴다. */
+  bytes?: ArrayBuffer
+  /** 내려받은 파일 이름(`이름.otf`). */
+  fileName?: string
 }
 
 export interface FontIdentity {
@@ -514,9 +518,9 @@ function createSpaceGlyph(advanceWidth: number): InstanceType<typeof opentype.Gl
 // ===== 다운로드 =====
 
 /**
- * ArrayBuffer를 TTF 파일로 다운로드
+ * ArrayBuffer를 TTF 파일로 다운로드. 완료 페이지의 `다시 받기`도 같은 길.
  */
-function downloadTTF(
+export function downloadTTF(
   arrayBuffer: ArrayBuffer,
   fileName: string = 'fontmaker.otf'
 ): void {
@@ -714,7 +718,8 @@ export async function generateAndDownloadFont(
     const fileSize = arrayBuffer.byteLength
 
     const sanitizedName = familyName.replace(/[^a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ\s_-]/g, '').trim() || 'fontmaker'
-    downloadTTF(arrayBuffer, `${sanitizedName}.otf`)
+    const fileName = `${sanitizedName}.otf`
+    downloadTTF(arrayBuffer, fileName)
 
     return {
       success: true,
@@ -722,6 +727,8 @@ export async function generateAndDownloadFont(
       fileSize,
       schemaFallbackCount,
       skippedChars,
+      bytes: arrayBuffer,
+      fileName,
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

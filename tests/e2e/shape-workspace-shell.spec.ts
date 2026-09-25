@@ -59,15 +59,17 @@ test('폰트 탭의 OTF 추출은 폰트 이름을 물은 뒤 그 이름의 OTF�
   await dialog.getByRole('button', { name: '취소' }).click()
   await expect(dialog).toHaveCount(0)
 
-  // 이름을 넣고 추출하면 파일 이름이 그 이름이고, 다음에 열 때 기억한다.
+  // 이름을 넣고 추출하면 파일 이름이 그 이름이고, 다음에 열 때 기억한다. 도는 동안 대기 층, 끝나면 완료 페이지.
   await exportButton.click()
   await page.getByTestId('font-export-name').fill('한임체')
   const downloadPromise = page.waitForEvent('download', { timeout: 170_000 })
   await page.getByTestId('font-export-confirm').click()
   await expect(dialog).toHaveCount(0)
+  await expect(page.getByTestId('font-export-overlay')).toBeVisible()
   expect((await downloadPromise).suggestedFilename()).toBe('한임체.otf')
   await expect.poll(() => page.evaluate(() => localStorage.getItem('font-export-family-name-v1'))).toBe('한임체')
-  await expect(page.getByRole('button', { name: 'OTF 추출 완료' })).toBeVisible()
+  await expect(page).toHaveURL(/\/workspace\/font\/export$/)
+  await expect(page.getByTestId('font-export-done')).toBeVisible()
 
   await nav.getByRole('link', { name: '검수' }).click()
   await expect(page).toHaveURL(/\/workspace\/review$/)

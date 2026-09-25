@@ -1,0 +1,7 @@
+/* 영상 한 컷처럼: 어두운 바탕 위 자막 띠. 글자는 흰색 — 내 획은 검정으로 그려지니 뒤집는다. */
+.frame { margin: 0; padding: 28px 16px; border-radius: 14px; background: linear-gradient(160deg, #2a3140, #10141c); }
+.band { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.band p { margin: 0; padding: 4px 12px; border-radius: 6px; background: rgb(0 0 0 / .78); color: #fff; font-size: 1em; line-height: 1.35; white-space: nowrap; letter-spacing: .01em; }
+.glyph { display: inline-block; vertical-align: -0.2em; filter: invert(1); }
+.glyph svg { display: block; width: 1em; height: 1em; }
+.plain { display: inline-block; min-width: .3em; }

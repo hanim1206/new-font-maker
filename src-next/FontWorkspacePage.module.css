@@ -11,3 +11,12 @@
 .exportButton[data-export-state='failed'] { background: rgb(190 52 48); }
 .exportSpinner { animation: font-export-spin 1s linear infinite; }
 @keyframes font-export-spin { to { transform: rotate(360deg); } }
+
+/* 대기 층. 셸의 `cover` 자리(머리와 탭 사이)를 다 채운다. */
+.overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px 16px; overflow-y: auto; background: rgb(20 24 31 / .72); backdrop-filter: blur(2px); }
+.overlayCard { width: min(100%, 420px); display: flex; flex-direction: column; gap: 10px; padding: 22px 18px 18px; border-radius: 18px; background: rgb(var(--color-surface)); box-shadow: 0 18px 48px rgb(0 0 0 / .3); }
+.percent { margin: 0; display: flex; align-items: baseline; gap: 2px; font-variant-numeric: tabular-nums; }
+.percent strong { font-size: 44px; font-weight: 800; line-height: 1; }
+.percent span { color: rgb(var(--color-text-dim-4)); font-size: 18px; font-weight: 700; }
+.phase { margin: 0 0 6px; color: rgb(var(--color-text-dim-4)); font-size: 12.5px; }
+.hint { margin: 4px 0 0; color: rgb(var(--color-text-dim-4)); font-size: 12px; line-height: 1.5; }

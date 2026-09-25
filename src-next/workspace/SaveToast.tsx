@@ -9,11 +9,14 @@ export function SaveToast({
   tone,
   message,
   onDismiss,
+  action,
 }: {
-  tone: 'saving' | 'error'
+  tone: 'saving' | 'error' | 'done'
   message: string
-  /** 주면 닫기 단추가 생긴다. `error`에만 준다. */
+  /** 주면 닫기 단추가 생긴다. `error` · `done`에 준다. */
   onDismiss?: () => void
+  /** 메시지 옆 글 단추(예: `완료 페이지 보기`). */
+  action?: { label: string; onClick: () => void }
 }) {
   return (
     <div
@@ -23,6 +26,7 @@ export function SaveToast({
       data-testid="save-toast"
     >
       <span>{message}</span>
+      {action && <button type="button" className={styles.action} onClick={action.onClick}>{action.label}</button>}
       {onDismiss && <button type="button" onClick={onDismiss} aria-label="알림 닫기"><X size={15} /></button>}
     </div>
   )

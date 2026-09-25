@@ -3,7 +3,7 @@ import { ChevronLeft, Redo2, ScanSearch, Shapes, Type, Undo2 } from 'lucide-reac
 import { flushAccountFont, useAccountSaveStore } from '../accountFontSync'
 import { useFontExportStore } from '../fontExportStore'
 import { useUIStore } from '../../src/stores/uiStore'
-import { onLinkClick } from '../router'
+import { navigate, onLinkClick } from '../router'
 import { SaveToast } from './SaveToast'
 import styles from './WorkspaceChrome.module.css'
 
@@ -29,6 +29,8 @@ export function MobileWorkspaceShell({
   history,
   tools,
   tabsHidden = false,
+  back,
+  cover,
 }: {
   children: ReactNode
   activeArea: WorkspaceArea
@@ -39,6 +41,10 @@ export function MobileWorkspaceShell({
   tools?: ReactNode
   /** 획 덱처럼 폰트 덱 위에 얹힌 화면은 탭을 감춘다. */
   tabsHidden?: boolean
+  /** 머리 왼쪽 문. 기본은 위 덱(`내 폰트`). 폰트 덱 안의 하위 화면(추출 완료)은 `‹ 폰트`처럼 제 상위를 준다. */
+  back?: { label: string; href: string }
+  /** 머리와 탭 사이(내용 자리)만 덮는 층. 추출 대기처럼 내용은 막되 탭으로는 나갈 수 있어야 하는 것. */
+  cover?: ReactNode
 }) {
   const openedName = useUIStore((state) => state.currentProjectName)
   const title = projectName ?? openedName ?? '새 한글 폰트'
@@ -47,9 +53,13 @@ export function MobileWorkspaceShell({
       <div className={styles.shell} data-tabs={tabsHidden ? 'hidden' : undefined}>
         <header className={styles.projectHeader}>
           {/* 왼쪽은 위 덱으로 나가는 문, 오른쪽은 편집 기록. 읽기만 하는 모드 표시는 두지 않는다. */}
-          <button type="button" className={styles.back} onClick={() => void goToFontHome()} aria-label="내 폰트로" data-testid="workspace-font-home">
-            <ChevronLeft size={20} aria-hidden="true" /><span>내 폰트</span>
-          </button>
+          {back
+            ? <a className={styles.back} href={back.href} onClick={onLinkClick} aria-label={`${back.label}(으)로`} data-testid="workspace-back">
+              <ChevronLeft size={20} aria-hidden="true" /><span>{back.label}</span>
+            </a>
+            : <button type="button" className={styles.back} onClick={() => void goToFontHome()} aria-label="내 폰트로" data-testid="workspace-font-home">
+              <ChevronLeft size={20} aria-hidden="true" /><span>내 폰트</span>
+            </button>}
           <div className={styles.projectIdentity}>
             <strong>{title}</strong>
           </div>
@@ -60,7 +70,11 @@ export function MobileWorkspaceShell({
           </div>
         </header>
 
-        {children}
+        {/* 내용 자리. 머리 · 탭과 같은 세로 flex라 화면 배분은 전과 같고, `cover`가 이 자리만 덮는다. */}
+        <div className={styles.body}>
+          {children}
+          {cover && <div className={styles.cover}>{cover}</div>}
+        </div>
 
         {!tabsHidden && <nav className={styles.tabs} aria-label="프로젝트 주 내비게이션" data-testid="workspace-tabs">
           <a href="/workspace/font" onClick={onLinkClick} aria-current={activeArea === 'font' ? 'page' : undefined}><Type size={20} aria-hidden="true" /><em>폰트</em></a>
@@ -74,12 +88,17 @@ export function MobileWorkspaceShell({
   )
 }
 
-/** 추출이 실패했거나 빈 칸으로 넣은 글자가 있으면 그 자리에서 알린다. 닫을 때까지 남는다. */
+/**
+ * 추출이 실패했거나 빈 칸으로 넣은 글자가 있으면 그 자리에서 알린다. 닫을 때까지 남는다.
+ * 폰트 탭이 아닌 곳에서 추출이 끝나면 화면을 바꾸지 않고 `완료 페이지 보기`만 준다(획을 만지는 중에 화면이 바뀌면 작업이 끊긴다).
+ */
 function ExportNoticeToast() {
   const notice = useFontExportStore((state) => state.notice)
+  const doneElsewhere = useFontExportStore((state) => state.doneElsewhere)
   const dismiss = useFontExportStore((state) => state.dismissNotice)
-  if (!notice) return null
-  return <SaveToast tone="error" message={notice} onDismiss={dismiss} />
+  if (notice) return <SaveToast tone="error" message={notice} onDismiss={dismiss} />
+  if (doneElsewhere) return <SaveToast tone="done" message="OTF가 나왔어요." onDismiss={dismiss} action={{ label: '완료 페이지 보기', onClick: () => { dismiss(); navigate('/workspace/font/export') } }} />
+  return null
 }
 
 /** 메인 화면으로. 못 올린 변경은 먼저 올려 본다(못 올려도 사본의 이름표에 남아 메인 화면이 다시 올린다). */

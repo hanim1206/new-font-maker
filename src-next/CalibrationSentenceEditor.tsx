@@ -1699,7 +1699,7 @@ function StyleToneControls({
   </div>
 }
 
-export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit', above }: { chrome?: EditorChrome; space?: EditorSpace; above?: ReactNode } = {}) {
+export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit', above, cover }: { chrome?: EditorChrome; space?: EditorSpace; above?: ReactNode; cover?: ReactNode } = {}) {
   const projectName = useUIStore((state) => state.currentProjectName) ?? '새 한글 폰트'
   const choseong = useJamoStore((state) => state.choseong)
   const jungseong = useJamoStore((state) => state.jungseong)
@@ -2540,6 +2540,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       <MobileWorkspaceShell
         activeArea={styleOnly ? 'font' : 'jamo'}
         projectName={projectName}
+        cover={cover}
         history={{ canUndo: history.length > 0, canRedo: future.length > 0, onUndo: () => guardLayoutLeave(undo, { saveable: false }), onRedo: () => guardLayoutLeave(redo, { saveable: false }) }}
         tools={
           /* 형태 규칙은 자소 탭에서 고른 자모가 있을 때만 머리에 나온다. 글로벌 스타일은 폰트 탭 자체라 여는 단추가 없다. */

@@ -19,6 +19,9 @@
   animation: save-toast-in .16s ease-out;
 }
 .toast[data-tone='error'] { background: #b24d3d; }
+.toast[data-tone='done'] { background: rgb(var(--color-primary)); }
+/* 글 단추. 닫기와 같은 높이, 글이 있어 폭은 내용대로. */
+.toast button.action { width: auto; padding: 0 12px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .toast span { min-width: 0; }
 /* 레포의 44px 터치 규격을 토스트 닫기에도 지킨다. */
 .toast button {

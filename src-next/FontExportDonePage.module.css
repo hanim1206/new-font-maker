@@ -1,0 +1,11 @@
+.screen { min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 16px; padding: 20px 16px 24px; overflow-y: auto; }
+.head { display: flex; flex-direction: column; gap: 4px; }
+.head h1 { margin: 0; font-size: 20px; font-weight: 800; }
+.head p { margin: 0; color: rgb(var(--color-text-dim-4)); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.download { min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 10px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 15px; font-weight: 700; }
+.skipped { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid rgb(190 52 48 / .4); border-radius: 12px; }
+.skipped h2 { margin: 0; font-size: 13px; font-weight: 700; color: rgb(190 52 48); }
+.skipped p { margin: 0; color: rgb(var(--color-text-dim-4)); font-size: 12px; }
+.skipped ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; }
+.skipped a { min-width: 40px; min-height: 40px; display: grid; place-items: center; border-radius: 8px; background: rgb(var(--color-surface-2)); color: inherit; font-size: 18px; font-weight: 700; text-decoration: none; }
+.note { margin: 0; color: rgb(var(--color-text-dim-4)); font-size: 12px; line-height: 1.5; }

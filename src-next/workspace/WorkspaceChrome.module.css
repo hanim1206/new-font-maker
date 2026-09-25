@@ -6,8 +6,12 @@
 .projectIdentity { min-width: 0; display: flex; flex-direction: column; align-items: center; }
 .projectIdentity strong { max-width: 100%; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 /* `‹ 내 폰트` — 위 덱으로 나가는 문. 글자가 있어 어디로 가는지 읽힌다. */
-.back { height: 44px; display: flex; align-items: center; gap: 0; padding: 0 10px 0 4px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-dim-3)); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.back { height: 44px; text-decoration: none; display: flex; align-items: center; gap: 0; padding: 0 10px 0 4px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-dim-3)); font-size: 13px; font-weight: 600; white-space: nowrap; }
 .headerActions { display: flex; gap: 3px; }
+.body { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+/* 덮개 자리는 늘 있지만 비어 있으면 손을 통과시킨다. 덮개가 그려질 때만 그 덮개가 받는다. */
+.cover { position: absolute; z-index: 30; inset: 0; pointer-events: none; }
+.cover > * { pointer-events: auto; }
 .headerActions button { width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-dim-3)); }
 .headerActions button:disabled { opacity: .34; }
 

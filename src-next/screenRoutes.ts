@@ -8,6 +8,7 @@
 export const PRODUCT_SCREEN_ROUTES = [
   '/fonts',
   '/workspace/font',
+  '/workspace/font/export',
   '/workspace/jamo',
   '/workspace/review',
 ] as const
