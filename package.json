@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "test": "vitest run src src-next",
     "test:e2e": "playwright test",
+    "beta:accounts": "vite-node scripts/beta-accounts.ts",
     "jamo:groups:docs": "node scripts/jamo-groups-docs.mjs"
   },
   "dependencies": {

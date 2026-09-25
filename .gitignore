@@ -9,6 +9,8 @@ test-results/
 playwright-report/
 .reference-fonts/
 .reference-cache/
+# 베타 초대 코드와 카톡 메시지 (scripts/beta-accounts.ts가 만든다)
+beta-accounts/
 
 # 대용량 재생성 가능 관측 덤프 (evaluate/build 스크립트로 재생성)
 reference-data/font-guide-calibrations/*.final-component-g2.v1.json

@@ -3,12 +3,14 @@ import type { ReactNode } from 'react'
 import {
   ChevronDown,
   ChevronUp,
+  LogOut,
   Menu,
   Redo2,
   ScanSearch,
   Shapes,
   Undo2,
 } from 'lucide-react'
+import { authGateMode, signOutAndReload } from '../betaAuth'
 import styles from './WorkspaceChrome.module.css'
 
 export type WorkspaceArea = 'jamo' | 'review'
@@ -66,6 +68,10 @@ export function MobileWorkspaceShell({
                 <a href="/workspace/review" aria-current={activeArea === 'review' ? 'page' : undefined}><ScanSearch size={18} /><em>검수</em></a>
               </nav>
               {menu}
+              {/* 로그아웃은 자주 누를 일이 없어 메뉴 맨 끝에 둔다. 로그인 게이트가 꺼진 개발 서버에서는 없다. */}
+              {authGateMode() === 'on' && <nav className={styles.menuNav} aria-label="계정">
+                <button type="button" onClick={() => void signOutAndReload()} data-testid="workspace-sign-out"><LogOut size={18} /><em>로그아웃</em></button>
+              </nav>}
             </div>
           </div>
           <div className={styles.projectIdentity}>

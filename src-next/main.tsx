@@ -7,6 +7,7 @@ import {
 import { LEGACY_CALIBRATION_LAYOUT_PROFILE_V1 } from '../src/data/legacyCalibrationLayoutProfileV1'
 import { DEFAULT_LAYOUT_SCHEMAS } from '../src/utils/layoutCalculator'
 import '../src/index.css'
+import { authGateMode, hasSession } from './betaAuth'
 
 const root = createRoot(document.getElementById('root')!)
 
@@ -15,6 +16,19 @@ document.addEventListener('dragstart', (event) => {
   if (event.target instanceof Element && event.target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])')) return
   event.preventDefault()
 })
+
+/** 로그인 게이트(베타). 로그인 안 됐으면 앱 대신 코드 입력 화면을 띄우고, 들어오면 그 자리에서 앱을 연다. */
+async function gate(): Promise<void> {
+  const mode = authGateMode()
+  if (mode === 'off') return start()
+  const { AuthMisconfiguredPage, BetaLoginPage } = await import('./BetaLoginPage')
+  if (mode === 'misconfigured') {
+    root.render(<StrictMode><AuthMisconfiguredPage /></StrictMode>)
+    return
+  }
+  if (await hasSession()) return start()
+  root.render(<StrictMode><BetaLoginPage onSignedIn={() => void start()} /></StrictMode>)
+}
 
 async function start(): Promise<void> {
   if (import.meta.env.DEV && window.location.pathname === '/global-style-preview') {
@@ -106,7 +120,7 @@ async function start(): Promise<void> {
   root.render(<StrictMode><App /></StrictMode>)
 }
 
-void start()
+void gate()
 
 // 개발 서버에서만 화면 명세 버튼을 붙인다. 배포 빌드에서는 이 분기와 버튼 코드가 통째로 빠진다. `VITE_SCREEN_SPEC=off`로 끌 수 있다.
 if (import.meta.env.DEV && import.meta.env.VITE_SCREEN_SPEC !== 'off') void import('./mountScreenSpecButton').then(({ mountScreenSpecButton }) => mountScreenSpecButton())

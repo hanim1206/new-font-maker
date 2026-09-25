@@ -1,0 +1,15 @@
+.page { min-height: 100dvh; box-sizing: border-box; display: flex; align-items: center; justify-content: center; padding: 24px 16px calc(env(safe-area-inset-bottom) + 24px); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); }
+.card { width: min(100%, 400px); box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 24px 20px; border-radius: 18px; background: rgb(var(--color-surface)); box-shadow: 0 8px 28px rgb(20 24 31 / .1); }
+.card header { display: flex; flex-direction: column; gap: 6px; }
+.card h1 { margin: 0; font-size: 20px; font-weight: 800; }
+.card header p { margin: 0; color: rgb(var(--color-text-dim-4)); font-size: 13px; line-height: 1.5; }
+.card label { display: flex; flex-direction: column; gap: 6px; }
+.card label span { font-size: 12px; font-weight: 700; }
+.card input { min-height: 48px; box-sizing: border-box; padding: 0 14px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 18px; letter-spacing: .08em; text-transform: uppercase; }
+.card input::placeholder { color: rgb(var(--color-text-dim-4) / .5); }
+.card input:focus { outline: 2px solid rgb(var(--color-primary) / .5); outline-offset: 1px; }
+.card input[aria-invalid='true'] { border-color: rgb(214 69 65); }
+.card small { color: rgb(190 52 48); font-size: 12.5px; }
+.card button { min-height: 48px; border: 0; border-radius: 10px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 15px; font-weight: 700; }
+.card button:disabled { opacity: .45; }
+.card footer { color: rgb(var(--color-text-dim-4)); font-size: 11.5px; text-align: center; }
