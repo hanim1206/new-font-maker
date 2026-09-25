@@ -566,6 +566,24 @@ async function processInChunks<T, R>(
   return results
 }
 
+/**
+ * 윈도우는 usWinAscent/usWinDescent 밖의 잉크를 잘라 그린다. 획을 위아래로 크게 옮긴 글자도 잘리지 않게
+ * 실제 잉크 끝까지 넓힌다. 줄 간격(hhea · typo)은 그대로라 맥과 줄 높이는 바뀌지 않는다.
+ */
+export function windowsClipMetrics(
+  glyphs: ReadonlyArray<InstanceType<typeof opentype.Glyph>>,
+): { usWinAscent: number; usWinDescent: number } {
+  let yMax = ASCENDER
+  let yMin = DESCENDER
+  for (const glyph of glyphs) {
+    if (!glyph.path?.commands.length) continue
+    const box = glyph.getBoundingBox()
+    yMax = Math.max(yMax, box.y2)
+    yMin = Math.min(yMin, box.y1)
+  }
+  return { usWinAscent: Math.ceil(yMax), usWinDescent: Math.ceil(-yMin) }
+}
+
 // ===== 메인 생성 함수 =====
 
 /**
@@ -678,8 +696,7 @@ export async function generateAndDownloadFont(
           ulCodePageRange1: OS2_CODE_PAGE_RANGE_1,
           ulCodePageRange2: 0,
           // Windows 클리핑 메트릭 (양수값, macOS는 hhea 사용하므로 영향 없음)
-          usWinAscent: ASCENDER,
-          usWinDescent: Math.abs(DESCENDER),
+          ...windowsClipMetrics(glyphs),
           sTypoAscender: ASCENDER,
           sTypoDescender: DESCENDER,
           sTypoLineGap: 0,
@@ -763,8 +780,7 @@ export async function downloadPrototypeFont(
           ulUnicodeRange1: OS2_UNICODE_RANGE_1,
           ulUnicodeRange2: OS2_UNICODE_RANGE_2,
           ulCodePageRange1: OS2_CODE_PAGE_RANGE_1,
-          usWinAscent: ASCENDER,
-          usWinDescent: Math.abs(DESCENDER),
+          ...windowsClipMetrics(glyphs),
           sTypoAscender: ASCENDER,
           sTypoDescender: DESCENDER,
           sTypoLineGap: 0,
