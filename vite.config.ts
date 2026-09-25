@@ -12,7 +12,8 @@ export default defineConfig({
     notoCorpusApiPlugin(fileURLToPath(new URL('./.reference-fonts/guide-corpus', import.meta.url))),
     notoPresetApiPlugin(fileURLToPath(new URL('./.reference-fonts/guide-corpus', import.meta.url))),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 편집 중에 저절로 바뀌지 않게. 새 버전은 알림(`appUpdate.ts`) 뒤 사용자가 새로고침한다.
+      registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
         name: 'Font Maker Next',

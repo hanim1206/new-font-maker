@@ -29,6 +29,11 @@ const storage = {
 interface Call { op: 'select' | 'insert' | 'update' | 'rpc'; payload?: unknown }
 const calls: Call[] = []
 let serverFont: { id: string; name: string; font_data: unknown } | null = null
+/** 서버 줄의 `updated_at`. 저장될 때마다 바뀐다. 다른 기기 저장은 이 값을 바꿔 흉내 낸다. */
+let serverStamp = 't0'
+let stampCount = 0
+/** 저장 때 `updated_at` 조건이 붙었는지(충돌 확인). */
+const updateFilters: (string | undefined)[] = []
 let updateError: { message: string } | null = null
 let insertError: { message: string } | null = null
 let rpcResult: { data: unknown; error: { message: string } | null } = { data: 1, error: null }
@@ -37,18 +42,26 @@ const fakeSupabase = vi.hoisted(() => ({
   rpc: (name: string, args: unknown) => { calls.push({ op: 'rpc', payload: { name, args } }); return Promise.resolve(rpcResult) },
   from: () => {
     let op: Call['op'] = 'select'
+    const filters: Record<string, unknown> = {}
     const chain = {
       select: () => { if (op === 'select') calls.push({ op }); return chain },
       insert: (value: unknown) => { op = 'insert'; calls.push({ op, payload: value }); return chain },
       update: (value: unknown) => { op = 'update'; calls.push({ op, payload: value }); return chain },
-      eq: () => chain,
+      eq: (column: string, value: unknown) => { filters[column] = value; return chain },
       is: () => chain,
       order: () => chain,
-      maybeSingle: () => Promise.resolve({ data: serverFont, error: null }),
-      single: () => Promise.resolve(insertError ? { data: null, error: insertError } : { data: { id: 'new-font' }, error: null }),
-      then: (resolve: (value: unknown) => void) => resolve(op === 'update'
-        ? { error: updateError, count: updateError ? null : 1 }
-        : { data: [], error: null }),
+      maybeSingle: () => Promise.resolve({ data: serverFont ? { ...serverFont, updated_at: serverStamp } : null, error: null }),
+      single: () => Promise.resolve(insertError ? { data: null, error: insertError } : { data: { id: 'new-font', updated_at: serverStamp }, error: null }),
+      then: (resolve: (value: unknown) => void) => {
+        if (op !== 'update') return resolve({ data: [], error: null })
+        updateFilters.push(filters.updated_at as string | undefined)
+        if (updateError) return resolve({ data: null, error: updateError })
+        // 조건이 붙었는데 서버 값이 달라졌으면 0줄(다른 기기가 먼저 저장).
+        if ('updated_at' in filters && filters.updated_at !== serverStamp) return resolve({ data: [], error: null })
+        stampCount += 1
+        serverStamp = `t${stampCount}`
+        return resolve({ data: [{ updated_at: serverStamp }], error: null })
+      },
     }
     return chain
   },
@@ -125,6 +138,12 @@ let nextExportRevision: typeof import('./accountFontSync').nextExportRevision
 let accountFontName: typeof import('./accountFontSync').accountFontName
 let useAccountSaveStore: typeof import('./accountFontSync').useAccountSaveStore
 let resetAccountFontForTest: typeof import('./accountFontSync').resetAccountFontForTest
+let resolveAccountConflict: typeof import('./accountFontSync').resolveAccountConflict
+let suspendAccountFont: typeof import('./accountFontSync').suspendAccountFont
+let CONFLICT_BACKUP_KEY: string
+let appNotice: typeof import('./appNotice')
+let workGuard: typeof import('./workGuard')
+const reload = vi.fn()
 let useLayoutDeltaStore: typeof import('./layoutDeltaStore').useLayoutDeltaStore
 let useGlobalStyleStore: typeof import('../src/stores/globalStyleStore').useGlobalStyleStore
 let baseFont: FontData
@@ -133,7 +152,7 @@ const DELTA = { rules: { '*': { faces: { CH: { top: 0.02 } } } } } as unknown as
 beforeAll(async () => {
   vi.useFakeTimers()
   vi.stubGlobal('localStorage', storage)
-  vi.stubGlobal('window', { localStorage: storage, addEventListener: vi.fn(), removeEventListener: vi.fn() })
+  vi.stubGlobal('window', { localStorage: storage, addEventListener: vi.fn(), removeEventListener: vi.fn(), location: { reload } })
   vi.stubGlobal('document', { addEventListener: vi.fn(), visibilityState: 'visible' })
   const sync = await import('./accountFontSync')
   collectAccountFontData = sync.collectAccountFontData
@@ -143,6 +162,11 @@ beforeAll(async () => {
   accountFontName = sync.accountFontName
   useAccountSaveStore = sync.useAccountSaveStore
   resetAccountFontForTest = sync.resetAccountFontForTest
+  resolveAccountConflict = sync.resolveAccountConflict
+  suspendAccountFont = sync.suspendAccountFont
+  CONFLICT_BACKUP_KEY = sync.CONFLICT_BACKUP_KEY
+  appNotice = await import('./appNotice')
+  workGuard = await import('./workGuard')
   useLayoutDeltaStore = (await import('./layoutDeltaStore')).useLayoutDeltaStore
   useGlobalStyleStore = (await import('../src/stores/globalStyleStore')).useGlobalStyleStore
   baseFont = collectAccountFontData()
@@ -160,6 +184,11 @@ beforeEach(() => {
   updateError = null
   insertError = null
   rpcResult = { data: 1, error: null }
+  serverStamp = 't0'
+  stampCount = 0
+  updateFilters.length = 0
+  reload.mockClear()
+  appNotice.resetAppNoticeForTest()
   storageValues.clear()
   useLayoutDeltaStore.getState().clearAll()
 })
@@ -269,6 +298,88 @@ describe('계정 폰트 열기 · 자동 저장', () => {
     rpcResult = { data: 5, error: null }
     expect(await nextExportRevision()).toBe(5)
     expect(calls.find((call) => call.op === 'rpc')?.payload).toEqual({ name: 'bump_font_export_revision', args: { font_id: 'f1' } })
+  })
+})
+
+describe('다른 기기 · 다른 탭과 겹칠 때', () => {
+  const bumpWeight = (by: number) => useGlobalStyleStore.getState().loadFontData({ style: { ...baseFont.globalStyle.style, weight: baseFont.globalStyle.style.weight + by }, exclusions: [] })
+
+  async function openF1() {
+    writeStamp(storage, stampOf({ owner: 'me', fontId: 'f1' }))
+    serverFont = { id: 'f1', name: 'test1', font_data: structuredClone(baseFont) }
+    await startAccountFont('me')
+    calls.length = 0
+    updateFilters.length = 0
+  }
+
+  it('저장은 연 뒤 서버 값이 그대로일 때만 덮고, 저장한 값을 다음 표로 쓴다', async () => {
+    await openF1()
+    bumpWeight(10)
+    await vi.advanceTimersByTimeAsync(10_000)
+    bumpWeight(20)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(updateFilters).toEqual(['t0', 't1'])
+    expect(useAccountSaveStore.getState().status).toBe('saved')
+  })
+
+  it('다른 기기가 먼저 저장했으면 덮지 않고 알린다. 다시 올리지도 않는다', async () => {
+    await openF1()
+    serverStamp = 'other-device'
+    bumpWeight(10)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(useAccountSaveStore.getState().status).toBe('conflict')
+    expect(appNotice.topAppNotice(appNotice.useAppNoticeStore.getState())?.kind).toBe('conflict')
+    await vi.advanceTimersByTimeAsync(60_000)
+    bumpWeight(20)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(updateFilters).toEqual(['t0'])
+    expect(readStamp(storage).pending).toBe(true)
+  })
+
+  it('`내 것으로 덮기`는 조건 없이 한 번 덮고, 그다음부터 다시 조건 저장', async () => {
+    await openF1()
+    serverStamp = 'other-device'
+    bumpWeight(10)
+    await vi.advanceTimersByTimeAsync(10_000)
+    await resolveAccountConflict('mine')
+    expect(updateFilters).toEqual(['t0', undefined])
+    expect(useAccountSaveStore.getState().status).toBe('saved')
+    expect(appNotice.topAppNotice(appNotice.useAppNoticeStore.getState())).toBeNull()
+    bumpWeight(20)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(updateFilters).toEqual(['t0', undefined, 't1'])
+  })
+
+  it('`그걸 불러오기`는 내 것을 백업 칸에 남기고, 이름표를 비운 뒤 새로 불러온다(서버 값으로 열린다)', async () => {
+    await openF1()
+    serverStamp = 'other-device'
+    bumpWeight(10)
+    await vi.advanceTimersByTimeAsync(10_000)
+    await resolveAccountConflict('theirs')
+    const backup = JSON.parse(storage.getItem(CONFLICT_BACKUP_KEY)!)
+    expect(backup.fontId).toBe('f1')
+    expect(backup.fontData.globalStyle.style.weight).toBe(baseFont.globalStyle.style.weight + 10)
+    expect(readStamp(storage)).toEqual(stampOf({ owner: 'me', fontId: 'f1' }))
+    expect(reload).toHaveBeenCalledOnce()
+    expect(await flushAccountFont()).toBe(true)
+  })
+
+  it('다른 탭이 편집을 가져가면 이 탭은 더 올리지 않고, 사본 이름표는 새 탭이 올리게 남긴다', async () => {
+    await openF1()
+    bumpWeight(10)
+    suspendAccountFont()
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(updateFilters).toEqual([])
+    expect(readStamp(storage).pending).toBe(true)
+    expect(await flushAccountFont()).toBe(true)
+  })
+
+  it('오류 화면 백업: 편집 화면이 열렸으면 지금 폰트 JSON, 이름은 폰트 이름', async () => {
+    await openF1()
+    const backup = workGuard.buildWorkBackup(storage, new Date(2026, 8, 25))
+    expect(backup.raw).toBe(false)
+    expect(backup.fileName).toBe('test1_2026-09-25.json')
+    expect(backup.data).toMatchObject({ version: '1.5.0', preset: 'basic-gothic' })
   })
 })
 

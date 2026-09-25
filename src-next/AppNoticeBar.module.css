@@ -1,0 +1,52 @@
+/* 저장 토스트(`SaveToast`, 아래 68px) 위에 앉는다. 둘이 같이 떠도 겹치지 않게. */
+.bar {
+  position: fixed;
+  z-index: 80;
+  bottom: calc(124px + env(safe-area-inset-bottom));
+  left: 50%;
+  width: max-content;
+  max-width: min(92vw, 420px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px 6px 14px;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  border-radius: 13px;
+  background: rgb(24 28 35 / .94);
+  box-shadow: 0 10px 28px rgb(20 24 31 / .24);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  animation: app-notice-in .16s ease-out;
+}
+.bar[data-tone='error'] { background: #b24d3d; }
+.bar span { flex: 1 1 auto; min-width: 0; max-width: 100%; padding: 4px 0; line-height: 1.4; }
+/* 레포의 44px 터치 규격. */
+.action {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: #fff;
+  color: rgb(24 28 35);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+.bar[data-tone='error'] .action { color: #b24d3d; }
+.action + .action { background: rgb(255 255 255 / .16); color: inherit; }
+.bar[data-tone='error'] .action + .action { color: #fff; }
+.close {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: rgb(255 255 255 / .16);
+  color: inherit;
+}
+@keyframes app-notice-in { from { opacity: 0; transform: translate(-50%, 6px); } }
+@media (prefers-reduced-motion: reduce) { .bar { animation: none; } }

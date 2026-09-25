@@ -45,3 +45,17 @@ test('열어 둔 상태는 다른 화면으로 가도 이어지고, 명세 없�
   await expect(panel.getByRole('link', { name: /자소편집/ })).toHaveAttribute('href', '/workspace/jamo')
   await expect(page.getByTestId('screen-spec-button')).toHaveAttribute('data-has-spec', 'false')
 })
+
+test('실험실 목록 탭: 랩 주소를 모아 보여 주고 누르면 그 랩으로 간다', async ({ page }) => {
+  await page.goto('/workspace/jamo')
+  await page.getByTestId('dev-lab-button').click()
+  const panel = page.getByTestId('dev-lab-panel')
+  await expect(panel.getByRole('link')).toHaveCount(11)
+  await page.screenshot({ path: 'test-results/dev-lab-panel.png' })
+  await panel.getByRole('link', { name: /획 문법/ }).click()
+  await expect(page).toHaveURL(/\/stroke-grammar-lab$/)
+  await page.getByTestId('dev-lab-button').click()
+  await expect(page.getByTestId('dev-lab-panel').getByRole('link', { name: /획 문법/ })).toHaveAttribute('aria-current', 'page')
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('dev-lab-panel')).toHaveCount(0)
+})

@@ -9,7 +9,9 @@ import { DEFAULT_FONT_PRESET } from '../src/types/database'
 import type { FontData } from '../src/types/database'
 import { editorPlanOf, openPlanOf, readStamp, writeStamp } from './accountFont'
 import { bumpExportRevision, createFont, fetchFont, saveFont } from './accountFontApi'
+import { clearAppNotice, showAppNotice } from './appNotice'
 import { useLayoutDeltaStore } from './layoutDeltaStore'
+import { registerWorkGuard } from './workGuard'
 
 /**
  * 계정 저장의 실행 부분. 편집 화면을 열 때 이름표의 폰트를 불러오고(`accountFont.ts` 규칙), 고치면 서버에 올린다.
@@ -21,7 +23,8 @@ export const SERVER_SAVE_IDLE_MS = 10_000
 /** 실패하면 이만큼 뒤 다시. 그 전에 또 고치면 그때 올린다. */
 const RETRY_MS = 30_000
 
-export type AccountSaveStatus = 'idle' | 'saving' | 'saved' | 'error'
+/** `conflict`: 다른 기기가 먼저 저장했다. 고를 때까지 올리지 않는다. */
+export type AccountSaveStatus = 'idle' | 'saving' | 'saved' | 'error' | 'conflict'
 
 export const useAccountSaveStore = create<{ status: AccountSaveStatus }>(() => ({ status: 'idle' }))
 
@@ -47,15 +50,18 @@ function applyAccountFontData(value: unknown): { ok: true } | { ok: false; messa
   return { ok: true }
 }
 
-let session: { me: string; fontId: string; name: string } | null = null
+/** `updatedAt`: 내가 마지막으로 읽거나 올린 서버 값의 표. 다음 저장은 서버가 이 값일 때만 덮는다. */
+let session: { me: string; fontId: string; name: string; updatedAt: string | null } | null = null
+/** 다른 탭이 편집을 가져갔다. 이 탭은 더 올리지 않는다. */
+let suspended = false
 
 /** 지금 연 계정 폰트의 이름. 로그인 게이트가 꺼졌으면 null. 머리와 추출 창이 쓴다. */
 export function accountFontName(): string | null {
   return session?.name ?? null
 }
 
-function opened(me: string, fontId: string, name: string): AccountStartResult {
-  session = { me, fontId, name }
+function opened(me: string, fontId: string, name: string, updatedAt: string | null): AccountStartResult {
+  session = { me, fontId, name, updatedAt }
   writeStamp(localStorage, { owner: me, fontId, pending: false })
   useUIStore.setState({ currentProjectName: name })
   watchStores()
@@ -79,7 +85,7 @@ export async function startAccountFont(me: string): Promise<AccountStartResult> 
       writeStamp(localStorage, { owner: me, fontId: null, pending: false })
       return created.limit ? { ok: false, reason: 'home' } : { ok: false, reason: 'network', message: created.message }
     }
-    return opened(me, created.value, name)
+    return opened(me, created.value.id, name, created.value.updatedAt)
   }
 
   const fontId = stamp.fontId!
@@ -90,14 +96,16 @@ export async function startAccountFont(me: string): Promise<AccountStartResult> 
     writeStamp(localStorage, { owner: me, fontId: null, pending: false })
     return { ok: false, reason: 'home' }
   }
+  let updatedAt = fetched.value.updatedAt
   if (openPlanOf(stamp, me, fontId) === 'push-local') {
     const saved = await saveFont(fontId, collectAccountFontData())
     if (!saved.ok) return { ok: false, reason: 'network', message: saved.message }
+    updatedAt = saved.value
   } else {
     const applied = applyAccountFontData(fetched.value.fontData)
     if (!applied.ok) return { ok: false, reason: 'invalid-font', message: applied.message }
   }
-  return opened(me, fontId, fetched.value.name)
+  return opened(me, fontId, fetched.value.name, updatedAt)
 }
 
 /**
@@ -124,7 +132,7 @@ function schedule(ms: number): void {
 }
 
 function markChanged(): void {
-  if (!session) return
+  if (!session || suspended) return
   revision += 1
   writeStamp(localStorage, { owner: session.me, fontId: session.fontId, pending: true })
   schedule(SERVER_SAVE_IDLE_MS)
@@ -132,21 +140,27 @@ function markChanged(): void {
 
 /** 못 올린 변경이 있으면 지금 올린다. 탭을 벗어날 때 · 메인 화면으로 갈 때 · 로그아웃 전에 부른다. 다 올라갔으면 true. */
 export async function flushAccountFont(): Promise<boolean> {
-  if (!session) return true
+  if (!session || suspended) return true
   if (timer) { clearTimeout(timer); timer = null }
   if (inFlight) await inFlight
   if (revision === savedRevision) return true
+  // 충돌은 사용자가 고를 때까지 올리지 않는다(아무 쪽도 잃지 않게).
+  if (useAccountSaveStore.getState().status === 'conflict') return false
   const target = revision
-  const { fontId, me } = session
+  const current = session
   let ok = false
   inFlight = (async () => {
     useAccountSaveStore.setState({ status: 'saving' })
-    const result = await saveFont(fontId, collectAccountFontData())
+    const result = await saveFont(current.fontId, collectAccountFontData(), current.updatedAt)
     if (result.ok) {
       savedRevision = target
-      if (revision === target) writeStamp(localStorage, { owner: me, fontId, pending: false })
+      current.updatedAt = result.value
+      if (revision === target) writeStamp(localStorage, { owner: current.me, fontId: current.fontId, pending: false })
       useAccountSaveStore.setState({ status: 'saved' })
       ok = true
+    } else if (result.conflict) {
+      useAccountSaveStore.setState({ status: 'conflict' })
+      showConflictNotice()
     } else {
       useAccountSaveStore.setState({ status: 'error' })
       schedule(RETRY_MS)
@@ -160,7 +174,49 @@ export async function flushAccountFont(): Promise<boolean> {
 }
 
 export function hasUnsavedAccountChanges(): boolean {
-  return session !== null && (revision !== savedRevision || inFlight !== null)
+  return session !== null && !suspended && (revision !== savedRevision || inFlight !== null)
+}
+
+/** `그걸 불러오기` 전에 내 것을 남기는 칸(최신 하나만). 되살리기는 아직 없다. */
+export const CONFLICT_BACKUP_KEY = 'font-maker-conflict-backup-v1'
+
+function showConflictNotice(): void {
+  showAppNotice('conflict', {
+    tone: 'error',
+    message: '다른 기기에서 이 폰트를 먼저 고쳤어요.',
+    actions: [
+      { label: '그걸 불러오기', run: () => resolveAccountConflict('theirs') },
+      { label: '내 것으로 덮기', run: () => void resolveAccountConflict('mine') },
+    ],
+  })
+}
+
+/**
+ * 충돌 풀기. `theirs`: 내 것을 백업 칸에 남기고 서버 값으로 다시 연다(새로 불러오기).
+ * `mine`: 조건 없이 한 번 덮고, 그다음부터 다시 조건 저장.
+ */
+export async function resolveAccountConflict(choice: 'theirs' | 'mine'): Promise<void> {
+  if (!session) return
+  clearAppNotice('conflict')
+  if (choice === 'theirs') {
+    try {
+      localStorage.setItem(CONFLICT_BACKUP_KEY, JSON.stringify({ savedAt: new Date().toISOString(), fontId: session.fontId, fontData: collectAccountFontData() }))
+    } catch { /* 백업 칸을 못 쓰면 그래도 서버 값을 연다 — 사용자가 고른 쪽 */ }
+    writeStamp(localStorage, { owner: session.me, fontId: session.fontId, pending: false })
+    suspended = true
+    if (timer) { clearTimeout(timer); timer = null }
+    window.location.reload()
+    return
+  }
+  session.updatedAt = null
+  useAccountSaveStore.setState({ status: 'idle' })
+  await flushAccountFont()
+}
+
+/** 다른 탭이 편집을 가져갔다. 올리던 것은 끝까지 두고, 더는 올리지 않는다. 못 올린 건 사본 이름표(`pending`)로 새 탭이 올린다. */
+export function suspendAccountFont(): void {
+  suspended = true
+  if (timer) { clearTimeout(timer); timer = null }
 }
 
 const LOCAL_EXPORT_REVISION_KEY = 'font-export-revision-v1'
@@ -218,6 +274,7 @@ function watchStores(): void {
 /** 테스트용: 모듈 상태를 되돌린다. */
 export function resetAccountFontForTest(): void {
   session = null
+  suspended = false
   revision = 0
   savedRevision = 0
   inFlight = null
@@ -225,3 +282,10 @@ export function resetAccountFontForTest(): void {
   timer = null
   useAccountSaveStore.setState({ status: 'idle' })
 }
+
+registerWorkGuard({
+  flush: flushAccountFont,
+  collect: collectAccountFontData,
+  name: () => accountFontName() ?? useUIStore.getState().currentProjectName ?? null,
+  suspend: suspendAccountFont,
+})

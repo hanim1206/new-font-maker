@@ -1,0 +1,14 @@
+/* 오류 화면 · 탭 잠금 화면. 로그인 화면(`BetaLoginPage`) 카드와 같은 모양. */
+.page { min-height: 100dvh; box-sizing: border-box; display: flex; align-items: center; justify-content: center; padding: 24px 16px calc(env(safe-area-inset-bottom) + 24px); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); }
+.card { width: min(100%, 400px); box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 24px 20px; border-radius: 18px; background: rgb(var(--color-surface)); box-shadow: 0 8px 28px rgb(20 24 31 / .1); }
+.card header { display: flex; flex-direction: column; gap: 6px; }
+.card h1 { margin: 0; font-size: 20px; font-weight: 800; }
+.card header p { margin: 0; color: rgb(var(--color-text-dim-4)); font-size: 13px; line-height: 1.5; }
+.primary, .secondary { min-height: 48px; border-radius: 10px; font-size: 15px; font-weight: 700; }
+.primary { border: 0; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+.secondary { border: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); }
+.primary:disabled, .secondary:disabled { opacity: .45; }
+.note { margin: 0; color: rgb(var(--color-text-dim-4)); font-size: 12px; line-height: 1.5; }
+.details { color: rgb(var(--color-text-dim-4)); font-size: 11.5px; }
+.details summary { min-height: 32px; display: flex; align-items: center; cursor: pointer; }
+.details pre { max-height: 40vh; overflow: auto; margin: 6px 0 0; padding: 10px; border-radius: 8px; background: rgb(var(--color-surface-2)); font-size: 11px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }

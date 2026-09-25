@@ -1,0 +1,20 @@
+/* 화면 명세 탭(`ScreenSpecButton`) 바로 아래(좁은 화면) · 왼쪽(넓은 화면). 모양은 그 탭과 같다. */
+.button { position: fixed; right: 0; top: calc(46% + 52px); z-index: 2147483000; width: 44px; height: 44px; display: flex; align-items: center; justify-content: flex-end; padding: 0; border: 0; background: transparent; color: rgb(var(--color-text-3)); cursor: pointer; }
+.tab { width: 16px; height: 44px; display: grid; place-items: center; border: 1px solid rgb(var(--color-border)); border-right: 0; border-radius: 8px 0 0 8px; background: rgb(var(--color-surface)); box-shadow: 0 4px 14px rgb(15 23 42 / .16); }
+.tab svg { width: 12px; height: 12px; }
+@media (min-width: 640px) {
+  .button { top: auto; right: 66px; bottom: 14px; justify-content: center; }
+  .tab { width: 44px; border-right: 1px solid rgb(var(--color-border)); border-radius: 50%; }
+  .tab svg { width: 18px; height: 18px; }
+}
+.button[aria-pressed='true'] .tab { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary)); color: rgb(var(--color-primary-foreground)); }
+
+.backdrop { position: fixed; inset: 0; z-index: 2147482998; }
+.panel { position: fixed; right: 12px; bottom: 12px; z-index: 2147482999; width: min(320px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; box-sizing: border-box; padding: 6px; border: 1px solid rgb(var(--color-border)); border-radius: 14px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); box-shadow: 0 12px 32px rgb(15 23 42 / .18); font-size: 13px; }
+.panel header { display: flex; align-items: center; justify-content: space-between; padding: 0 0 0 10px; }
+.panel header button { width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-3)); cursor: pointer; }
+.panel ul { margin: 0; padding: 0; list-style: none; }
+.panel li a, .home { min-height: 44px; box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; color: inherit; text-decoration: none; }
+.panel li a:hover, .panel li a[aria-current='page'], .home:hover { background: rgb(var(--color-primary-light) / .6); }
+.panel code { color: rgb(var(--color-text-4)); font-size: 11px; }
+.home { display: flex; margin-top: 4px; border-top: 1px solid rgb(var(--color-border-subtle)); border-radius: 0 0 8px 8px; color: rgb(var(--color-primary-dark)); font-weight: 700; }

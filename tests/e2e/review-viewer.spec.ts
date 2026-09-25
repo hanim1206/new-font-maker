@@ -63,6 +63,8 @@ test('자모 획을 고치면 그 자모가 든 칸의 글자가 바뀐다', asy
   const jamos = baseJamos()
   jamos.choseong['ㄱ'].strokes[0].points[1].x = 0.6
   jamos.choseong['ㄱ'].strokes[0].points[2].x = 0.6
+  // 같은 폰트는 한 탭에서만 편집한다(탭 잠금). 앞 탭을 닫고 연다.
+  await page.close()
   const edited = await context.newPage()
   await edited.addInitScript((state) => { localStorage.setItem('font-maker-jamo-data', JSON.stringify({ state, version: 0 })) }, { choseong: jamos.choseong, jungseong: jamos.jungseong, jongseong: jamos.jongseong })
   await openGrid(edited)
@@ -76,6 +78,8 @@ test('저장된 배치 Δ는 닿는 칸의 배치만 바꾼다', async ({ page, 
 
   // 세로 홀자 · 받침 있음 레이아웃에서 첫닿자가 ㄱ인 글자만.
   const delta = { all: {}, layers: {}, jamo: { 'right-final': { 'CH:ㄱ': { faces: { CH: { bottom: -0.08 } } } } } }
+  // 같은 폰트는 한 탭에서만 편집한다(탭 잠금). 앞 탭을 닫고 연다.
+  await page.close()
   const moved = await context.newPage()
   await moved.addInitScript((state) => { localStorage.setItem('noto-layout-delta-v1', JSON.stringify({ state, version: 0 })) }, delta)
   await openGrid(moved)

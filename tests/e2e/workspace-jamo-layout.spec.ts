@@ -1263,6 +1263,8 @@ test('획 편집에서 고친 홀자가 레이아웃 캔버스에도 보인다',
   const jamos = JSON.parse(readFileSync(fileURLToPath(new URL('../../src/data/baseJamos.json', import.meta.url)), 'utf8'))
   const stem = jamos.jungseong['ㅗ'].strokes.find((stroke: { points: { x: number }[] }) => stroke.points.every((point) => Math.abs(point.x - stroke.points[0].x) < 1e-9))
   for (const point of stem.points) point.x = 0.25
+  // 같은 폰트는 한 탭에서만 편집한다(탭 잠금). 앞 탭을 닫고 연다.
+  await page.close()
   const edited = await context.newPage()
   await edited.setViewportSize({ width: 390, height: 844 })
   await edited.addInitScript((state) => { localStorage.setItem('font-maker-jamo-data', JSON.stringify({ state, version: 0 })) }, { choseong: jamos.choseong, jungseong: jamos.jungseong, jongseong: jamos.jongseong })

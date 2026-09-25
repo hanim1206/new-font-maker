@@ -5,6 +5,13 @@ export interface FlushableStateStorage extends StateStorage {
   flush: (name?: string) => void
 }
 
+let writeErrorHandler: ((error: unknown, name: string) => void) | null = null
+
+/** 예약된 쓰기가 실패하면(저장 공간 초과 등) 부른다. 앱이 알림을 붙인다(`main.tsx`). */
+export function setPersistWriteErrorHandler(handler: ((error: unknown, name: string) => void) | null): void {
+  writeErrorHandler = handler
+}
+
 /**
  * localStorage를 디바운스로 감싼 스토리지
  *
@@ -45,7 +52,8 @@ export function createDebouncedStorage(delay = 300): FlushableStateStorage {
       dirty.add(name)
       clearTimeout(timers[name])
       timers[name] = setTimeout(() => {
-        try { flushOne(name) } catch { /* dirty를 유지해 명시 flush에서 관측·재시도한다. */ }
+        // dirty를 유지해 명시 flush에서 관측·재시도한다. 실패는 앱에 알린다.
+        try { flushOne(name) } catch (error) { writeErrorHandler?.(error, name) }
       }, delay)
     },
     removeItem: (name: string) => {

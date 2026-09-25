@@ -9,9 +9,11 @@ import type { FontData } from '../src/types/database'
 const TABLE = 'font_projects'
 
 export interface FontSummary { id: string; name: string; updatedAt: string }
-export interface FontRow { id: string; name: string; fontData: unknown }
+/** `updatedAt`은 충돌 확인용 표(`saveFont`의 `expectedUpdatedAt`). */
+export interface FontRow { id: string; name: string; fontData: unknown; updatedAt: string | null }
 
-export type ApiResult<T> = { ok: true; value: T } | { ok: false; message: string; limit?: boolean }
+/** `conflict`: 내가 연 뒤 다른 곳(기기 · 탭)이 먼저 저장했다. */
+export type ApiResult<T> = { ok: true; value: T } | { ok: false; message: string; limit?: boolean; conflict?: boolean }
 
 const failed = (error: { message: string }): { ok: false; message: string } => ({ ok: false, message: error.message })
 
@@ -29,35 +31,52 @@ export async function listFonts(me: string): Promise<ApiResult<FontSummary[]>> {
 export async function fetchFont(fontId: string): Promise<ApiResult<FontRow | null>> {
   const { data, error } = await supabase
     .from(TABLE)
-    .select('id, name, font_data')
+    .select('id, name, font_data, updated_at')
     .eq('id', fontId)
     .is('deleted_at', null)
     .maybeSingle()
   if (error) return failed(error)
-  return { ok: true, value: data ? { id: data.id as string, name: data.name as string, fontData: data.font_data } : null }
+  return { ok: true, value: data ? { id: data.id as string, name: data.name as string, fontData: data.font_data, updatedAt: (data.updated_at as string | undefined) ?? null } : null }
 }
 
-export async function createFont(me: string, name: string, fontData: FontData): Promise<ApiResult<string>> {
+export async function createFont(me: string, name: string, fontData: FontData): Promise<ApiResult<{ id: string; updatedAt: string | null }>> {
   const { data, error } = await supabase
     .from(TABLE)
     .insert({ name, user_id: me, font_data: fontData })
-    .select('id')
+    .select('id, updated_at')
     .single()
   // DB 트리거가 한도(3)를 넘으면 `font-limit`로 막는다.
   if (error) return { ok: false, message: error.message, limit: error.message.includes('font-limit') }
-  return { ok: true, value: (data as { id: string }).id }
+  const row = data as { id: string; updated_at?: string }
+  return { ok: true, value: { id: row.id, updatedAt: row.updated_at ?? null } }
 }
 
-/** 폰트를 돌려받지 않는다(내보내는 데이터양을 늘리지 않게). */
-export async function saveFont(fontId: string, fontData: FontData): Promise<ApiResult<null>> {
-  const { error, count } = await supabase
+/**
+ * 폰트를 돌려받지 않는다(내보내는 데이터양을 늘리지 않게). 저장된 `updated_at`만 돌려받아 다음 저장의 표로 쓴다.
+ * `expectedUpdatedAt`을 주면 서버 값이 그대로일 때만 덮는다. 다르면 `conflict` — 다른 기기가 먼저 저장했다.
+ * null이면 조건 없이 덮는다(`내 것으로 덮기`, 사본 올리기).
+ */
+export async function saveFont(fontId: string, fontData: FontData, expectedUpdatedAt: string | null = null): Promise<ApiResult<string | null>> {
+  let query = supabase
     .from(TABLE)
-    .update({ font_data: fontData, updated_at: new Date().toISOString() }, { count: 'exact' })
+    .update({ font_data: fontData, updated_at: new Date().toISOString() })
     .eq('id', fontId)
     .is('deleted_at', null)
+  if (expectedUpdatedAt) query = query.eq('updated_at', expectedUpdatedAt)
+  const { data, error } = await query.select('updated_at')
   if (error) return failed(error)
-  if (count === 0) return { ok: false, message: '계정의 폰트를 찾지 못했습니다(다른 기기에서 지웠을 수 있어요).' }
-  return { ok: true, value: null }
+  const row = (data as { updated_at?: string }[] | null)?.[0]
+  if (row) return { ok: true, value: row.updated_at ?? null }
+  if (expectedUpdatedAt && await fontExists(fontId)) {
+    return { ok: false, conflict: true, message: '다른 기기에서 먼저 저장했어요.' }
+  }
+  return { ok: false, message: '계정의 폰트를 찾지 못했습니다(다른 기기에서 지웠을 수 있어요).' }
+}
+
+/** 지우지 않은 폰트가 있는지만. 충돌과 삭제를 가른다. 확인을 못 하면 있다고 친다(덮지 않는 쪽). */
+async function fontExists(fontId: string): Promise<boolean> {
+  const { data, error } = await supabase.from(TABLE).select('id').eq('id', fontId).is('deleted_at', null).maybeSingle()
+  return error ? true : data !== null
 }
 
 export async function renameFont(fontId: string, name: string): Promise<ApiResult<null>> {
