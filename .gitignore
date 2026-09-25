@@ -4,7 +4,8 @@ dist/
 *.local
 .omc/
 .vercel
-.claude/
+.claude/*
+!.claude/skills/
 test-results/
 playwright-report/
 .reference-fonts/
