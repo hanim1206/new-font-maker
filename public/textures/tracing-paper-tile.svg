@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <filter id="paper" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.006 0.012" numOctaves="3" seed="141" stitchTiles="stitch" result="cloud"/>
+    <feColorMatrix in="cloud" type="saturate" values="0" result="cloudMono"/>
+    <feComponentTransfer in="cloudMono" result="paleCloud">
+      <feFuncR type="table" tableValues="0.78 0.99"/>
+      <feFuncG type="table" tableValues="0.78 0.99"/>
+      <feFuncB type="table" tableValues="0.78 0.99"/>
+    </feComponentTransfer>
+    <feTurbulence type="fractalNoise" baseFrequency="0.012 0.19" numOctaves="2" seed="37" stitchTiles="stitch" result="fibre"/>
+    <feColorMatrix in="fibre" type="saturate" values="0" result="fibreMono"/>
+    <feComponentTransfer in="fibreMono" result="softFibre">
+      <feFuncR type="table" tableValues="0.74 1"/>
+      <feFuncG type="table" tableValues="0.74 1"/>
+      <feFuncB type="table" tableValues="0.74 1"/>
+    </feComponentTransfer>
+    <feBlend in="paleCloud" in2="softFibre" mode="multiply"/>
+  </filter>
+  <rect width="1024" height="1024" fill="#fbfbf9"/>
+  <rect width="1024" height="1024" filter="url(#paper)" opacity="0.46"/>
+</svg>
