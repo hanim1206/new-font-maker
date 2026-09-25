@@ -11,6 +11,8 @@ import type { LayoutLeaveGuard } from './GlyphLayoutEditor'
 import leaveSheetStyles from './GlyphLayoutEditor.module.css'
 import { effectiveLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
+import { useEditHistoryStore } from './editHistoryStore'
+import { setNavigationGuard } from './router'
 import { adoptFamilyStrokes, familyOfSyllable } from '../src/utils/jamoContextStrokes'
 import { withFrameFrom, withoutFrame } from '../src/utils/jamoFrame'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
@@ -226,7 +228,7 @@ type PreviewSchema = { layoutType: LayoutType; schema: LayoutSchema }
 /** 폰트 전체 굵기(100–900) · 기울기(도). 끄는 동안은 미리보기, 손을 떼면 저장 + 기록 한 줄. */
 type StyleTone = { weight: number; slant: number }
 type SelectedPoint = { strokeId: string; pointIndex: number }
-type HistoryEntry =
+export type HistoryEntry =
   | {
       kind: 'layout'
       layoutType: LayoutType
@@ -1729,8 +1731,11 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   const directManipulation = chrome === 'workspace'
   const [previewJamo, setPreviewJamo] = useState<PreviewJamo | null>(null)
   const [previewSchema, setPreviewSchema] = useState<PreviewSchema | null>(null)
-  const [history, setHistory] = useState<HistoryEntry[]>([])
-  const [future, setFuture] = useState<HistoryEntry[]>([])
+  // 되돌리기 기록은 화면 밖 저장소에 둔다 — 자소↔검수를 오가며 화면이 다시 열려도 남는다.
+  const history = useEditHistoryStore((state) => state.history)
+  const future = useEditHistoryStore((state) => state.future)
+  const setHistory = useEditHistoryStore((state) => state.setHistory)
+  const setFuture = useEditHistoryStore((state) => state.setFuture)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const exportState = useFontExportStore((state) => state.status)
   const exportProgress = useFontExportStore((state) => state.progress)
@@ -1902,6 +1907,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone' }: { chrome?: 
   // 레이아웃 편집기가 걸어 두는 `떠나기 전 묻기`. 저장 안 한 보선이 있으면 편집기가 묻고, 편집기가 없으면 바로 간다.
   const layoutLeaveGuardRef = useRef<LayoutLeaveGuard | null>(null)
   const guardLayoutLeave: LayoutLeaveGuard = (next, options) => layoutLeaveGuardRef.current ? layoutLeaveGuardRef.current(next, options) : next()
+  // 화면 이동(자소 → 검수)도 같은 문을 거친다. 셸 안에서만 — 옛 단독 화면은 라우터를 안 쓴다.
+  useEffect(() => {
+    if (chrome !== 'workspace') return
+    setNavigationGuard((proceed) => guardLayoutLeave(proceed))
+    return () => setNavigationGuard(null)
+  }, [chrome])
   const chooseChar = (char: string) => {
     // 글자를 바꾸면 기본 상태(레이아웃)로 돌아간다.
     if (chrome === 'workspace') { setEditMode('layout'); setStrokeEntryPart(null) }

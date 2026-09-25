@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { MobileWorkspaceShell } from './workspace/WorkspaceChrome'
+import { navigate, onLinkClick, usePathname } from './router'
 import styles from './ShapeWorkspacePage.module.css'
 import { CalibrationSentenceEditor } from './CalibrationSentenceEditor'
 
@@ -13,7 +14,7 @@ function NotFoundScreen(): ReactNode {
         <span className={styles.screenId}>WORKSPACE</span>
         <h1>작업 화면을 찾을 수 없어요</h1>
         <p>잘못된 주소를 문장 보정 화면으로 숨기지 않았습니다.</p>
-        <a href="/workspace/jamo">자소 탭으로 이동</a>
+        <a href="/workspace/jamo" onClick={onLinkClick}>자소 탭으로 이동</a>
       </section>
     </MobileWorkspaceShell>
   )
@@ -25,12 +26,13 @@ function JamoEditorScreen() {
 }
 
 function LegacyRedirect() {
-  useEffect(() => { window.location.replace('/workspace/jamo') }, [])
+  useEffect(() => { navigate('/workspace/jamo', { replace: true }) }, [])
   return null
 }
 
 export function ShapeWorkspacePage() {
-  if (LEGACY_PATHS.has(window.location.pathname)) return <LegacyRedirect />
-  if (window.location.pathname === '/workspace/jamo') return <JamoEditorScreen />
+  const pathname = usePathname()
+  if (LEGACY_PATHS.has(pathname)) return <LegacyRedirect />
+  if (pathname === '/workspace/jamo') return <JamoEditorScreen />
   return <NotFoundScreen />
 }

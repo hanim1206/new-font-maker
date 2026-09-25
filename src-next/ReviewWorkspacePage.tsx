@@ -4,6 +4,7 @@ import { allCorpusRows, CORPUS_TOTAL } from './notoCorpus'
 import type { CorpusRow, CorpusSnapshot } from './notoCorpus'
 import { NotoCorpusMatrix } from './NotoCorpusMatrix'
 import { MobileWorkspaceShell } from './workspace/WorkspaceChrome'
+import { navigate, usePathname } from './router'
 import styles from './ReviewWorkspacePage.module.css'
 
 /**
@@ -67,13 +68,13 @@ function GridScreen() {
   return <MobileWorkspaceShell activeArea="review">
     <div className={styles.scroll}>
       {/* 칸 탭 = 글자 열기. 시트 탭·키보드 화살표는 선택(시트·초점)만 바꾼다. */}
-      <div className={styles.matrixSection}><NotoCorpusMatrix rows={ROWS} reviews={NO_REVIEWS} selected={selected} onSelect={setSelected} onOpen={(codepoint) => window.location.assign(glyphHref(codepoint))} isHighlighted={() => true} noFinal={false} renderCell={renderCell} variant="viewer" /></div>
+      <div className={styles.matrixSection}><NotoCorpusMatrix rows={ROWS} reviews={NO_REVIEWS} selected={selected} onSelect={setSelected} onOpen={(codepoint) => navigate(glyphHref(codepoint))} isHighlighted={() => true} noFinal={false} renderCell={renderCell} variant="viewer" /></div>
     </div>
   </MobileWorkspaceShell>
 }
 
 export function ReviewWorkspacePage() {
-  const legacyGlyph = window.location.pathname === GLYPH_PATH
-  useEffect(() => { if (legacyGlyph) window.location.replace(glyphHref(codepointFromUrl())) }, [legacyGlyph])
+  const legacyGlyph = usePathname() === GLYPH_PATH
+  useEffect(() => { if (legacyGlyph) navigate(glyphHref(codepointFromUrl()), { replace: true }) }, [legacyGlyph])
   return legacyGlyph ? null : <GridScreen />
 }

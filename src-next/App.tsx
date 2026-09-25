@@ -1,23 +1,27 @@
 import { lazy, Suspense, useEffect } from 'react'
+import { navigate, usePathname, useRouteKey } from './router'
 import { ReviewWorkspacePage } from './ReviewWorkspacePage'
 import { ShapeWorkspacePage } from './ShapeWorkspacePage'
 import { FontExportDialog } from './workspace/FontExportDialog'
 
 /** 앱을 열면 자소 탭이 처음이다. `?char=` 같은 쿼리는 그대로 넘긴다. 프로덕션에서 모르는 주소도 여기로 온다. */
 function HomeRedirect() {
-  useEffect(() => { window.location.replace(`/workspace/jamo${window.location.search}${window.location.hash}`) }, [])
+  useEffect(() => { navigate(`/workspace/jamo${window.location.search}${window.location.hash}`, { replace: true }) }, [])
   return null
 }
 
 // 랩 · 셸 없는 옛 문장 보정은 개발 서버에서만. 프로덕션 빌드에서는 이 분기가 사라져 청크도 안 만든다.
 const DevPage = import.meta.env.DEV ? lazy(() => import('./devPages')) : null
 
+/** 주소가 바뀌면 화면만 바꾼다(새로고침 없음). `key`는 같은 경로라도 새 주소(`?char=`)로 들어올 때 화면을 다시 연다. */
 function Page() {
-  if (window.location.pathname === '/') return <HomeRedirect />
-  if (window.location.pathname === '/workspace/review' || window.location.pathname.startsWith('/workspace/review/')) return <ReviewWorkspacePage />
-  if (window.location.pathname === '/workspace' || window.location.pathname.startsWith('/workspace/')) return <ShapeWorkspacePage />
+  const pathname = usePathname()
+  const key = useRouteKey()
+  if (pathname === '/') return <HomeRedirect key={key} />
+  if (pathname === '/workspace/review' || pathname.startsWith('/workspace/review/')) return <ReviewWorkspacePage key={key} />
+  if (pathname === '/workspace' || pathname.startsWith('/workspace/')) return <ShapeWorkspacePage key={key} />
   if (DevPage) return <Suspense fallback={null}><DevPage /></Suspense>
-  return <HomeRedirect />
+  return <HomeRedirect key={key} />
 }
 
 /**

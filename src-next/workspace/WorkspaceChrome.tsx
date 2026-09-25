@@ -12,6 +12,8 @@ import {
 import { flushAccountFont, useAccountSaveStore } from '../accountFontSync'
 import { authGateMode, signOutAndReload } from '../betaAuth'
 import { useFontExportStore } from '../fontExportStore'
+import { onLinkClick } from '../router'
+import { useUIStore } from '../../src/stores/uiStore'
 import { SaveToast } from './SaveToast'
 import styles from './WorkspaceChrome.module.css'
 
@@ -27,7 +29,7 @@ export interface WorkspaceHistoryControls {
 export function MobileWorkspaceShell({
   children,
   activeArea,
-  projectName = '새 한글 폰트',
+  projectName,
   history,
   menu,
   menuBadge,
@@ -35,6 +37,7 @@ export function MobileWorkspaceShell({
 }: {
   children: ReactNode
   activeArea: WorkspaceArea
+  /** 머리 가운데 이름. 안 넘기면 지금 연 폰트 이름(어느 화면이든 같다). */
   projectName?: string
   history?: WorkspaceHistoryControls
   /** 머리 `☰` 메뉴에서 화면 이동(자소 · 검수) 아래에 넣을 도구(링크·버튼). 항목을 누르면 메뉴는 닫힌다. */
@@ -45,6 +48,8 @@ export function MobileWorkspaceShell({
   tools?: ReactNode
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const openedName = useUIStore((state) => state.currentProjectName)
+  const title = projectName ?? openedName ?? '새 한글 폰트'
   useEffect(() => {
     if (!menuOpen) return
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false) }
@@ -63,8 +68,8 @@ export function MobileWorkspaceShell({
             <div className={styles.moreMenu} hidden={!menuOpen} onClick={() => setMenuOpen(false)} data-testid="workspace-more-menu">
               {/* 하단 내비를 없애고 화면 이동을 여기로 옮겼다. 출력은 화면이 넘기는 도구의 `OTF 추출`이 맡는다. */}
               <nav className={styles.menuNav} aria-label="프로젝트 주 내비게이션">
-                <a href="/workspace/jamo" aria-current={activeArea === 'jamo' ? 'page' : undefined}><Shapes size={18} /><em>자소</em></a>
-                <a href="/workspace/review" aria-current={activeArea === 'review' ? 'page' : undefined}><ScanSearch size={18} /><em>검수</em></a>
+                <a href="/workspace/jamo" onClick={onLinkClick} aria-current={activeArea === 'jamo' ? 'page' : undefined}><Shapes size={18} /><em>자소</em></a>
+                <a href="/workspace/review" onClick={onLinkClick} aria-current={activeArea === 'review' ? 'page' : undefined}><ScanSearch size={18} /><em>검수</em></a>
               </nav>
               {menu}
               {/* 로그아웃은 자주 누를 일이 없어 메뉴 맨 끝에 둔다. 로그인 게이트가 꺼진 개발 서버에서는 없다. */}
@@ -75,7 +80,7 @@ export function MobileWorkspaceShell({
             </div>
           </div>
           <div className={styles.projectIdentity}>
-            <strong>{projectName}</strong>
+            <strong>{title}</strong>
           </div>
           <div className={styles.headerActions} aria-label="프로젝트 편집 기록">
             {tools}
