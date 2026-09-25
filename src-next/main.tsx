@@ -8,7 +8,7 @@ import { LEGACY_CALIBRATION_LAYOUT_PROFILE_V1 } from '../src/data/legacyCalibrat
 import { DEFAULT_LAYOUT_SCHEMAS } from '../src/utils/layoutCalculator'
 import '../src/index.css'
 import { dropForeignCopy } from './accountFont'
-import { authGateMode, sessionUserId } from './betaAuth'
+import { authGateMode, sessionUser } from './betaAuth'
 
 const root = createRoot(document.getElementById('root')!)
 
@@ -18,18 +18,37 @@ document.addEventListener('dragstart', (event) => {
   event.preventDefault()
 })
 
-/** 로그인 게이트(베타). 로그인 안 됐으면 앱 대신 코드 입력 화면을 띄우고, 들어오면 그 자리에서 앱을 연다. */
+/** 메인 화면 `내 폰트`. 로그인 게이트가 켜졌을 때만 있다. */
+const FONTS_PATH = '/fonts'
+
+/**
+ * 로그인 게이트(베타). 로그인 안 됐으면 앱 대신 코드 입력 화면을 띄운다.
+ * 들어오면 메인 화면(`/fonts`)부터. 편집 주소를 바로 열거나 새로고침하면 마지막 폰트로 바로 연다.
+ */
 async function gate(): Promise<void> {
   const mode = authGateMode()
-  if (mode === 'off') return start()
+  if (mode === 'off') {
+    if (window.location.pathname === FONTS_PATH) { window.location.replace('/workspace/jamo'); return }
+    return start()
+  }
   const { AuthMisconfiguredPage, BetaLoginPage } = await import('./BetaLoginPage')
   if (mode === 'misconfigured') {
     root.render(<StrictMode><AuthMisconfiguredPage /></StrictMode>)
     return
   }
-  const me = await sessionUserId()
-  if (me) return start(me)
-  root.render(<StrictMode><BetaLoginPage onSignedIn={() => void gate()} /></StrictMode>)
+  const user = await sessionUser()
+  if (!user) {
+    root.render(<StrictMode><BetaLoginPage onSignedIn={() => window.location.assign(FONTS_PATH)} /></StrictMode>)
+    return
+  }
+  // 남의 이름표가 붙은 브라우저 사본은 스토어가 읽기 전에 지운다(공용 기기).
+  dropForeignCopy(window.localStorage, user.id)
+  if (window.location.pathname === FONTS_PATH) {
+    const { FontHomePage } = await import('./FontHomePage')
+    root.render(<StrictMode><FontHomePage me={user.id} nickname={user.nickname} /></StrictMode>)
+    return
+  }
+  return start(user.id)
 }
 
 /** `me`가 있으면(로그인 게이트가 켜졌을 때) 편집 화면을 열기 전에 계정 폰트를 불러온다. */
@@ -96,9 +115,6 @@ async function start(me?: string): Promise<void> {
     return
   }
 
-  // 남의 이름표가 붙은 브라우저 사본은 스토어가 읽기 전에 지운다(공용 기기).
-  if (me) dropForeignCopy(window.localStorage, me)
-
   const migration = runLayoutProfileMigrationBootstrap({
     storage: window.localStorage,
     defaultSchemas: DEFAULT_LAYOUT_SCHEMAS,
@@ -125,6 +141,7 @@ async function start(me?: string): Promise<void> {
   if (me) {
     const { startAccountFont } = await import('./accountFontSync')
     const started = await startAccountFont(me)
+    if (!started.ok && started.reason === 'home') { window.location.replace(FONTS_PATH); return }
     if (!started.ok) {
       const { AccountFontFailedPage } = await import('./BetaLoginPage')
       root.render(<StrictMode><AccountFontFailedPage reason={started.reason} message={started.message} /></StrictMode>)

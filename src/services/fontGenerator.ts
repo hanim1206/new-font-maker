@@ -9,6 +9,7 @@
  */
 // @ts-expect-error opentype.js에 타입 정의 파일 없음
 import * as opentype from 'opentype.js'
+import { fontVersionText, setHeadFontRevision } from './fontRevision'
 import { strokeToContours } from './strokeToOutline'
 import type { Contour } from './strokeToOutline'
 import {
@@ -42,6 +43,8 @@ export interface FontGeneratorOptions {
   onProgress?: (completed: number, total: number, phase: string) => void
   /** 자소 상자 출처. 화면과 같은 칸 해석을 넘기면 받은 폰트가 화면과 같아진다. 없으면 스키마. */
   placementOf?: GlyphPlacementResolver
+  /** 이 폰트를 몇 번째 받는지. 파일 버전이 `1.00n`이 된다(`fontRevision.ts`). 없으면 1.000. */
+  revision?: number
 }
 
 /** 폰트 생성 결과 */
@@ -205,8 +208,10 @@ function setFontNameRecords(
   familyName: string,
   styleName: string,
   identity: FontIdentity,
+  revision = 0,
 ): void {
   const names = font.names as OpenTypeFontNames
+  const version = fontVersionText(revision)
   const hasKoreanName = familyName !== identity.asciiFamilyName
   const copyright = `Copyright (c) ${new Date().getFullYear()}`
   const fullEnglishName = `${identity.asciiFamilyName} ${styleName}`
@@ -219,9 +224,9 @@ function setFontNameRecords(
     platformNames.copyright = { en: copyright }
     platformNames.fontFamily = { en: identity.asciiFamilyName }
     platformNames.fontSubfamily = { en: styleName }
-    platformNames.uniqueID = { en: `1.000;NONE;${identity.postScriptName}` }
+    platformNames.uniqueID = { en: `${version};NONE;${identity.postScriptName}` }
     platformNames.fullName = { en: fullEnglishName }
-    platformNames.version = { en: 'Version 1.000' }
+    platformNames.version = { en: `Version ${version}` }
     platformNames.postScriptName = { en: identity.postScriptName }
     platformNames.preferredFamily = { en: identity.asciiFamilyName }
     platformNames.preferredSubfamily = { en: styleName }
@@ -569,6 +574,7 @@ export async function generateAndDownloadFont(
     styleName = 'Regular',
     onProgress,
     placementOf,
+    revision = 0,
   } = options
 
   try {
@@ -660,10 +666,11 @@ export async function generateAndDownloadFont(
     })
 
     // name 테이블 설정 (macOS Font Book 유효성 + Windows 호환)
-    setFontNameRecords(font, familyName, styleName, identity)
+    setFontNameRecords(font, familyName, styleName, identity, revision)
 
     // Phase 4: 다운로드
     const arrayBuffer = font.toArrayBuffer() as ArrayBuffer
+    setHeadFontRevision(arrayBuffer, revision)
     const fileSize = arrayBuffer.byteLength
 
     const sanitizedName = familyName.replace(/[^a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ\s_-]/g, '').trim() || 'fontmaker'

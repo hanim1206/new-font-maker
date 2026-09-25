@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { identityOfSyllable } from '../src/services/contextBoxResolver'
 import type { GlyphPlacementResolver } from '../src/services/fontExportUtils'
 import { generateAndDownloadFont } from '../src/services/fontGenerator'
+import { accountFontName, nextExportRevision } from './accountFontSync'
 import { effectiveLayoutDelta, layoutDeltaSnapshot } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { contextPlacementOf, loadNotoModel } from './notoModel'
@@ -40,7 +41,7 @@ interface FontExportState {
   /** 마지막 추출에서 모델 상자를 못 쓰고 스키마로 그린 음절 수. */
   schemaFallbackCount: number
   dialogOpen: boolean
-  /** 마지막으로 쓴 폰트 이름. 다음 창에 미리 채운다. */
+  /** 창에 미리 채울 폰트 이름. 계정 폰트면 그 이름, 아니면 마지막으로 쓴 이름. */
   familyName: string
 }
 
@@ -61,7 +62,7 @@ export const useFontExportStore = create<FontExportState & FontExportActions>()(
   schemaFallbackCount: 0,
   dialogOpen: false,
   familyName: loadFamilyName(),
-  request: () => { if (get().status !== 'exporting') set({ dialogOpen: true }) },
+  request: () => { if (get().status !== 'exporting') set({ dialogOpen: true, familyName: accountFontName() ?? loadFamilyName() }) },
   cancel: () => set({ dialogOpen: false }),
   confirm: async (name) => {
     if (get().status === 'exporting') return
@@ -78,9 +79,12 @@ export const useFontExportStore = create<FontExportState & FontExportActions>()(
       window.setTimeout(() => set({ status: 'idle' }), 1800)
       return
     }
+    // 받을 때마다 파일 버전을 올린다. 같은 이름으로 다시 설치해도 OS가 새 파일로 알아본다.
+    const revision = await nextExportRevision()
     const result = await generateAndDownloadFont({
       familyName,
       placementOf,
+      revision,
       onProgress: (_completed, _total, phase) => set({ progress: phase }),
     })
     set({ progress: '', status: result.success ? 'downloaded' : 'failed', error: result.success ? '' : result.error ?? '', schemaFallbackCount: result.schemaFallbackCount ?? 0 })

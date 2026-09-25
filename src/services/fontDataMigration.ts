@@ -3,6 +3,7 @@ import {
   FONT_DATA_V1_3_VERSION,
   FONT_DATA_V1_4_VERSION,
   FONT_DATA_VERSION,
+  FONT_PRESET_IDS,
   LEGACY_FONT_DATA_VERSION,
 } from '../types/database'
 import {
@@ -155,12 +156,19 @@ export function parseAndMigrateFontData(value: unknown): FontDataParseResult {
 
   const allowedKeys = new Set<string>(COMMON_KEYS)
   if (value.version !== LEGACY_FONT_DATA_VERSION) allowedKeys.add('shapeSystem')
-  if (value.version === FONT_DATA_VERSION) allowedKeys.add('layoutDelta')
+  if (value.version === FONT_DATA_VERSION) {
+    allowedKeys.add('layoutDelta')
+    allowedKeys.add('preset')
+  }
   const issues = Object.keys(value)
     .filter((key) => !allowedKeys.has(key))
     .map((key) => issue('unsupported-field', `$.${key}`, '지원하지 않는 FontData 필드입니다.'))
   issues.push(...validatePayload(value))
   if (value.version === FONT_DATA_VERSION && hasOwn(value, 'layoutDelta')) issues.push(...validateLayoutDelta(value.layoutDelta))
+  if (value.version === FONT_DATA_VERSION && hasOwn(value, 'preset')
+    && !(FONT_PRESET_IDS as readonly unknown[]).includes(value.preset)) {
+    issues.push(issue('invalid-field', '$.preset', '알 수 없는 preset입니다.'))
+  }
   if (issues.length > 0) return { ok: false, issues: sortIssues(issues) }
 
   let cloned: Record<string, unknown>

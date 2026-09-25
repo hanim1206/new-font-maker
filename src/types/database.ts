@@ -38,6 +38,11 @@ export const FONT_DATA_V1_3_VERSION = '1.3.0' as const
 export const FONT_DATA_V1_4_VERSION = '1.4.0' as const
 export const FONT_DATA_VERSION = '1.5.0' as const
 
+/** 폰트가 어느 기본 폰트에서 시작했는지. 저장 칸과 화면에는 우리 이름만 쓴다. */
+export const FONT_PRESET_IDS = ['basic-gothic'] as const
+export type FontPresetId = (typeof FONT_PRESET_IDS)[number]
+export const DEFAULT_FONT_PRESET: FontPresetId = 'basic-gothic'
+
 /** 사용자 레이아웃 조정(`noto-layout-delta-v1`). 범위 규칙식 키 → Δ. 1.5부터 저장한다. */
 export interface FontLayoutDelta {
   rules: Record<string, ContextBoxDelta>
@@ -84,6 +89,8 @@ export interface FontData extends FontDataPayload {
   shapeSystem?: DeepReadonly<ShapeSystemSourceV2>
   /** 없으면 조정 없음. 1.4 이하에서 올린 값에는 없다. */
   layoutDelta?: FontLayoutDelta
+  /** 시작한 기본 폰트. 없으면(1.4 이하) `basic-gothic`으로 읽는다. */
+  preset?: FontPresetId
 }
 
 export type PersistedFontData = FontDataV1_2 | FontDataV1_3 | FontDataV1_4 | FontData

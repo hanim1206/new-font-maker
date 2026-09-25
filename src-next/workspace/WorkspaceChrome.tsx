@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import {
   ChevronDown,
   ChevronUp,
+  FolderOpen,
   LogOut,
   Menu,
   Redo2,
@@ -10,7 +11,7 @@ import {
   Shapes,
   Undo2,
 } from 'lucide-react'
-import { useAccountSaveStore } from '../accountFontSync'
+import { flushAccountFont, useAccountSaveStore } from '../accountFontSync'
 import { authGateMode, signOutAndReload } from '../betaAuth'
 import { SaveToast } from './SaveToast'
 import styles from './WorkspaceChrome.module.css'
@@ -72,6 +73,7 @@ export function MobileWorkspaceShell({
               {menu}
               {/* 로그아웃은 자주 누를 일이 없어 메뉴 맨 끝에 둔다. 로그인 게이트가 꺼진 개발 서버에서는 없다. */}
               {authGateMode() === 'on' && <nav className={styles.menuNav} aria-label="계정">
+                <button type="button" onClick={() => void goToFontHome()} data-testid="workspace-font-home"><FolderOpen size={18} /><em>내 폰트</em></button>
                 <button type="button" onClick={() => void signOutAndReload()} data-testid="workspace-sign-out"><LogOut size={18} /><em>로그아웃</em></button>
               </nav>}
             </div>
@@ -92,6 +94,12 @@ export function MobileWorkspaceShell({
       <AccountSaveToast />
     </main>
   )
+}
+
+/** 메인 화면으로. 못 올린 변경은 먼저 올려 본다(못 올려도 사본의 이름표에 남아 메인 화면이 다시 올린다). */
+async function goToFontHome(): Promise<void> {
+  await flushAccountFont()
+  window.location.assign('/fonts')
 }
 
 /** 계정 자동 저장이 실패했을 때만 알린다. 성공은 알리지 않고, 저장 중에도 편집을 막지 않는다. */
