@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { navigate, usePathname, useRouteKey } from './router'
+import { DashboardLabPage } from './DashboardLabPage'
 import { FontExportDonePage } from './FontExportDonePage'
 import { FontWorkspacePage } from './FontWorkspacePage'
 import { ReviewWorkspacePage } from './ReviewWorkspacePage'
@@ -20,6 +21,7 @@ function Page() {
   const pathname = usePathname()
   const key = useRouteKey()
   if (pathname === '/') return <HomeRedirect key={key} />
+  if (pathname === '/dashboard') return <DashboardLabPage key={key} />
   if (pathname === '/workspace/font') return <FontWorkspacePage key={key} />
   if (pathname === '/workspace/font/export') return <FontExportDonePage key={key} />
   if (pathname === '/workspace/review' || pathname.startsWith('/workspace/review/')) return <ReviewWorkspacePage key={key} />

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 /**
  * 게이트가 꺼진 개발 서버의 `내 폰트`(`/fonts`). 계정 대신 이 기기 목록(localStorage)으로 같은 화면이 뜬다.
- * 편집 주소로 바로 들어오면 지금 사본이 첫 폰트가 되고, 셸 머리 `‹ 내 폰트`로 돌아와 새로 만들고 열고 이름 바꾼다.
+ * 편집 주소로 바로 들어오면 지금 사본이 첫 폰트가 되고, 셸 머리 `‹ 내 폰트` → 대시보드 `새 폰트`로 목록에 와서 새로 만들고 열고 이름 바꾼다.
  */
 
 test.beforeEach(async ({ page }) => {
@@ -16,6 +16,8 @@ test('편집 주소로 들어오면 첫 폰트가 생기고, 내 폰트에서 �
   await expect(page.locator('header strong').first()).toHaveText('내 폰트')
 
   await page.getByTestId('workspace-font-home').click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await page.getByTestId('dashboard-font-list').click()
   await expect(page).toHaveURL(/\/fonts$/)
   const home = page.getByTestId('font-home')
   await expect(home).toBeVisible()
@@ -24,17 +26,17 @@ test('편집 주소로 들어오면 첫 폰트가 생기고, 내 폰트에서 �
   await expect(page.getByTestId('font-home-local')).toBeVisible()
   await expect(home.getByRole('button', { name: '로그아웃' })).toHaveCount(0)
 
-  // 새 폰트 만들기 → 편집 화면 → 돌아오면 둘. 이름은 `내 폰트 2`.
+  // 새 폰트 만들기 → 대시보드(카드 머리에 이름) → 돌아오면 둘. 이름은 `내 폰트 2`.
   await page.getByTestId('font-home-create').click()
-  await expect(page).toHaveURL(/\/workspace\/jamo$/)
-  await expect(page.locator('header strong').first()).toHaveText('내 폰트 2')
-  await page.getByTestId('workspace-font-home').click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.locator('article header strong').first()).toHaveText('내 폰트 2')
+  await page.getByTestId('dashboard-font-list').click()
   await expect(page.getByTestId('font-home-item')).toHaveCount(2)
 
   // 첫 폰트를 열면 그 이름으로 열린다.
   await page.getByTestId('font-home-item').filter({ hasText: /^내 폰트지금 연 폰트|내 폰트오늘|내 폰트$/ }).first().getByRole('button').first().click()
-  await expect(page).toHaveURL(/\/workspace\/jamo$/)
-  await expect(page.locator('header strong').first()).toHaveText(/^내 폰트/)
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.locator('article header strong').first()).toHaveText(/^내 폰트/)
 })
 
 test('/fonts로 바로 열어도 목록이 뜨고 한도 3에서 새로 만들기가 꺼진다', async ({ page }) => {
@@ -44,9 +46,9 @@ test('/fonts로 바로 열어도 목록이 뜨고 한도 3에서 새로 만들�
     const count = await page.getByTestId('font-home-item').count()
     if (count >= 3) break
     await page.getByTestId('font-home-create').click()
-    await expect(page).toHaveURL(/\/workspace\/jamo$/)
-    await expect(page.getByTestId('jamo-layout-mode')).toBeVisible({ timeout: 20_000 })
-    await page.getByTestId('workspace-font-home').click()
+    await expect(page).toHaveURL(/\/dashboard$/)
+    await expect(page.locator('article header strong').first()).toBeVisible({ timeout: 20_000 })
+    await page.getByTestId('dashboard-font-list').click()
     await expect(page).toHaveURL(/\/fonts$/)
   }
   await expect(page.getByTestId('font-home-item')).toHaveCount(3)

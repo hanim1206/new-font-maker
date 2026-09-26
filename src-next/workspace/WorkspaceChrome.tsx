@@ -104,10 +104,10 @@ function ExportNoticeToast() {
   return null
 }
 
-/** 메인 화면으로. 못 올린 변경은 먼저 올려 본다(못 올려도 사본의 이름표에 남아 메인 화면이 다시 올린다). */
+/** 대시보드로(지금 폰트의 한눈 화면). 못 올린 변경은 먼저 올려 본다(못 올려도 사본의 이름표에 남아 다음에 다시 올린다). 같은 마운트라 새로고침 없이 간다. */
 async function goToFontHome(): Promise<void> {
   await flushAccountFont()
-  window.location.assign('/fonts')
+  navigate('/dashboard')
 }
 
 /** 계정 자동 저장이 실패했을 때만 알린다. 성공은 알리지 않고, 저장 중에도 편집을 막지 않는다. */

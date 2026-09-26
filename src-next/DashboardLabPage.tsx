@@ -10,16 +10,19 @@ import { useWorkbenchStore, workbenchSyllable } from '../src/stores/workbenchSto
 import type { LayoutSchema, Padding } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { AppGlyph } from './AppGlyph'
-import { authGateMode, sessionUser } from './betaAuth'
+import { flushAccountFont } from './accountFontSync'
+import { authGateMode, sessionUser, signOutAndReload } from './betaAuth'
+import { navigate } from './router'
 import { useContextPlacement } from './notoModel'
 import { PART_COLOR } from './partColors'
 import styles from './DashboardLabPage.module.css'
 
 /**
- * 대시보드 시안(`/dashboard-lab`). 2026-09-26 사용자 스케치를 지금 앱 부품 · 토큰으로 옮긴 것.
- * 위는 폰트 카드 캐러셀(스와이프 = 활성 폰트 전환), 아래는 왼쪽 레일(목차 · 스크롤 따라감) + 섹션 다섯.
+ * 대시보드(`/dashboard`). 지금 연 폰트의 한눈 화면 — 셸 머리 `‹ 내 폰트`가 여기로 오고, 내 폰트 목록에서 폰트를 고르면 여기부터.
+ * 2026-09-26 사용자 스케치를 앱 부품 · 토큰으로 옮긴 것. 위는 폰트 카드(지금 폰트 하나 + `새 폰트` → 내 폰트 목록), 아래는 왼쪽 레일(목차 · 스크롤 따라감) + 섹션 다섯.
  * 순서는 원칙 "큰 것부터 작은 것": 스타일 → 레이아웃 → 초성 → 중성 → 종성. 전체 목록이고, 손댄 자소는 점.
- * 저장하지 않고 제품 값도 안 바꾼다. 둘째 카드는 같은 엔진으로 그린 예시다(폰트 둘을 동시에 들 수 없다).
+ * 초 · 중 · 종은 요약 줄이고 화살표가 섹션 홈, 자소 카드는 그 자소 하나만 도마에 올려 자모 에디터로 간다.
+ * 아직 시안인 것: 카드의 이름 바꾸기 · 다운로드 · 메뉴, 스타일 타일 · 레이아웃 카드 탭. 파일 이름은 옛 랩 이름 그대로다.
  */
 
 type SectionId = 'style' | 'layout' | 'choseong' | 'jungseong' | 'jongseong'
@@ -227,7 +230,7 @@ function FontCardMenu({ active, onRename }: { active: boolean; onRename: () => v
 
 /**
  * 머리 오른쪽 마이페이지. 아이콘 하나, 누르면 아래로 계정 카드 — 아이디 · 요금제 · 폰트 수, 맨 아래 로그아웃.
- * 게이트가 켜져 있으면 실제 친구 아이디를 읽고, 꺼져 있으면 예시 값. 시안이라 로그아웃은 동작하지 않는다.
+ * 게이트가 켜져 있으면 실제 친구 아이디를 읽고, 꺼져 있으면 예시 값(그때는 로그아웃 단추도 없다). 요금제 · 폰트 수는 아직 예시.
  */
 function AccountMenu() {
   const [open, setOpen] = useState(false)
@@ -259,7 +262,7 @@ function AccountMenu() {
         <div><dt>폰트</dt><dd>1 / 1개</dd></div>
         <div><dt>가입</dt><dd>2026. 9. 26.</dd></div>
       </dl>
-      <button type="button" className={styles.signOut}>로그아웃</button>
+      {authGateMode() === 'on' && <button type="button" className={styles.signOut} onClick={() => void signOutAndReload()}>로그아웃</button>}
     </div>}
   </div>
 }
@@ -277,11 +280,11 @@ type JamoType = 'choseong' | 'jungseong' | 'jongseong'
 const JAMO_LABEL: Record<JamoType, string> = { choseong: '초성', jungseong: '중성', jongseong: '종성' }
 const PREVIEW_COUNT = 4
 
-/** 자모 에디터(획 편집)로. 도마를 그 자소들로 바꾸고 첫 자소의 대표 글자를 그 자소 획 편집으로 연다. 랩은 앱과 다른 마운트라 진짜 이동이다(도마는 저장돼 살아남는다). */
+/** 자모 에디터(획 편집)로. 도마를 그 자소들로 바꾸고 첫 자소의 대표 글자를 그 자소 획 편집으로 연다. */
 const EDITOR_PART: Record<JamoType, 'CH' | 'JU' | 'JO'> = { choseong: 'CH', jungseong: 'JU', jongseong: 'JO' }
 function openEditor(type: JamoType, chars: readonly string[]) {
   useWorkbenchStore.getState().place(type, chars)
-  window.location.assign(`/workspace/jamo?char=${encodeURIComponent(workbenchSyllable(type, chars[0]))}&mode=stroke&part=${EDITOR_PART[type]}`)
+  navigate(`/workspace/jamo?char=${encodeURIComponent(workbenchSyllable(type, chars[0]))}&mode=stroke&part=${EDITOR_PART[type]}`)
 }
 
 /** 대시보드의 자소 줄. 앞 네 장만 보이고(손댄 것 우선은 다음), 카드는 홈을 건너뛰고 그 자소 하나만 도마에 올려 편집기로 간다. 머리(화살표)가 홈이다. */
@@ -481,8 +484,8 @@ export function DashboardLabPage() {
         {/* 폰트 카드. 옆으로 밀면 활성 폰트가 바뀌고 아래 전부가 그 폰트로 바뀐다. 카드 자체는 문이 아니다. */}
         <div className={styles.carousel} onScroll={onCarousel}>
           <FontCard name={name} note={modified > 0 ? `마지막 고침 · 오늘 · 손댄 자소 ${modified}` : '마지막 고침 · 오늘 · 프리셋 그대로'} active={activeCard === 0} />
-          <FontCard name="둥글레체" note="예시 · 손댄 자소 12" active={activeCard === 1} />
-          <button type="button" className={styles.add} aria-label="새 폰트 만들기"><Plus size={22} /><span>새 폰트</span></button>
+          {/* 폰트 목록 · 새로 만들기는 `내 폰트`(`/fonts`)가 한다. 다른 마운트라 진짜 이동 — 못 올린 변경은 먼저 올린다. */}
+          <button type="button" className={styles.add} aria-label="새 폰트 만들기 · 내 폰트 목록" data-testid="dashboard-font-list" onClick={() => void flushAccountFont().then(() => window.location.assign('/fonts'))}><Plus size={22} /><span>새 폰트</span></button>
         </div>
 
         <div className={styles.body}>

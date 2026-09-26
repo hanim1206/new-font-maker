@@ -16,11 +16,11 @@ import type { FontSummary } from './accountFontApi'
 import { authGateMode, signOutAndReload } from './betaAuth'
 import styles from './FontHomePage.module.css'
 
-const EDITOR_PATH = '/workspace/jamo'
+const DASHBOARD_PATH = '/dashboard'
 
 /**
  * 메인 화면 `내 폰트`(`/fonts`). 로그인하면 여기부터. 목록과 `새 폰트 만들기`가 한 화면에 있다. 게이트가 꺼진 개발 서버는 이 기기 목록(`localFontApi`)으로 같은 화면.
- * 폰트를 고르면 지금 사본의 못 올린 변경을 먼저 올리고, 사본을 그 폰트로 바꿔 편집 화면을 연다.
+ * 폰트를 고르면 지금 사본의 못 올린 변경을 먼저 올리고, 사본을 그 폰트로 바꿔 대시보드를 연다.
  */
 export function FontHomePage({ me, nickname }: { me: string; nickname: string | null }) {
   const [fonts, setFonts] = useState<FontSummary[] | null>(null)
@@ -56,7 +56,7 @@ export function FontHomePage({ me, nickname }: { me: string; nickname: string | 
       clearLocalFont(localStorage)
     }
     writeStamp(localStorage, switching ? { owner: me, fontId, pending: false, fresh: true } : { owner: me, fontId, pending: false })
-    window.location.assign(EDITOR_PATH)
+    window.location.assign(DASHBOARD_PATH)
   }
 
   const createNew = async () => {
@@ -67,7 +67,7 @@ export function FontHomePage({ me, nickname }: { me: string; nickname: string | 
     const stamp = readStamp(localStorage)
     if (!keepsLocalForNewFont(stamp, fonts.length, hasLocalFont(localStorage))) clearLocalFont(localStorage)
     writeStamp(localStorage, { owner: me, fontId: null, pending: false, create: nextFontName(nickname, fonts.map((font) => font.name)) })
-    window.location.assign(EDITOR_PATH)
+    window.location.assign(DASHBOARD_PATH)
   }
 
   const saveName = async (event: FormEvent) => {

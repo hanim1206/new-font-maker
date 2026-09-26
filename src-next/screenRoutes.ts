@@ -7,6 +7,7 @@
 /** 제품 화면. 주소마다 명세 파일이 하나씩 있어야 한다. */
 export const PRODUCT_SCREEN_ROUTES = [
   '/fonts',
+  '/dashboard',
   '/workspace/font',
   '/workspace/font/export',
   '/workspace/jamo',
