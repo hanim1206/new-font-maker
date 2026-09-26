@@ -110,7 +110,8 @@
 .homeHead h2 { margin: 0; font-size: 15px; font-weight: 800; }
 .homeHead span { color: rgb(var(--color-text-5)); font-size: 12px; font-variant-numeric: tabular-nums; }
 .back { width: 40px; min-height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-text-3)); }
-.homeScroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
+/* 스크롤바 자리는 늘 비워 둔다. 안 그러면 경계 높이에서 스크롤바 → 판 너비 → 칸 크기 → 판 높이가 매 프레임 뒤집힌다. */
+.homeScroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
 
 /* 묶기 칩 한 줄. 켜진 칩만 검정. */
 .chips { display: flex; gap: 6px; padding: 12px 12px 14px; overflow-x: auto; scrollbar-width: none; }
