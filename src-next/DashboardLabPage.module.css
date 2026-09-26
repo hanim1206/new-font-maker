@@ -1,0 +1,120 @@
+/* 대시보드 시안. 셸 크기 · 머리 높이는 WorkspaceChrome과 같다. 검정 · 회색만, 상자 안 상자 없음. */
+.page { min-height: 100dvh; overflow: hidden; background: rgb(var(--color-background)); }
+.shell { position: relative; width: min(100%, 480px); height: 100dvh; box-sizing: border-box; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; background: rgb(var(--color-surface)); box-shadow: var(--shadow-md); }
+.head { min-height: 50px; display: flex; align-items: center; justify-content: space-between; padding: max(2px, env(safe-area-inset-top)) 8px 2px 16px; border-bottom: 1px solid rgb(var(--color-border-subtle)); }
+.head h1 { margin: 0; font-size: 15px; font-weight: 800; }
+.head button { min-height: 40px; padding: 0 10px; border: 0; background: transparent; color: rgb(var(--color-text-4)); font-size: 12px; }
+
+/* 마이페이지. 아이콘 원 하나, 아래로 계정 카드가 내려온다. */
+.account { position: relative; }
+.head .avatar { width: 40px; min-height: 40px; padding: 0; display: grid; place-items: center; border-radius: 999px; color: rgb(var(--color-text-3)); }
+.head .avatar[aria-expanded='true'] { background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); }
+.accountPanel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 20; width: 240px; padding: 14px; border-radius: 16px; background: rgb(var(--color-surface)); border: 1px solid rgb(var(--color-border-subtle)); box-shadow: 0 12px 32px rgb(0 0 0 / .14); display: flex; flex-direction: column; gap: 12px; }
+.accountWho { display: flex; align-items: center; gap: 10px; }
+.accountWho div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.accountWho strong { font-size: 14px; font-weight: 750; overflow: hidden; text-overflow: ellipsis; }
+.accountWho span { color: rgb(var(--color-text-4)); font-size: 12px; }
+.accountMark { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; background: rgb(var(--color-surface-3)); font-size: 14px; font-weight: 800; }
+.accountFacts { margin: 0; padding: 10px 0; border-top: 1px solid rgb(var(--color-border-subtle)); border-bottom: 1px solid rgb(var(--color-border-subtle)); display: flex; flex-direction: column; gap: 6px; }
+.accountFacts div { display: flex; justify-content: space-between; font-size: 12px; }
+.accountFacts dt { color: rgb(var(--color-text-4)); }
+.accountFacts dd { margin: 0; font-weight: 650; }
+.head .signOut { min-height: 40px; width: 100%; border-radius: 10px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 13px; font-weight: 700; }
+
+.scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
+
+/* 폰트 카드 캐러셀. 스냅 한 장씩, 다음 카드가 조금 보인다. 활성 카드만 또렷하다. */
+.carousel { display: flex; gap: 10px; padding: 14px 16px 14px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; scrollbar-width: none; }
+.carousel::-webkit-scrollbar { display: none; }
+.card { flex: 0 0 82%; scroll-snap-align: start; display: flex; flex-direction: column; gap: 12px; min-height: 148px; padding: 14px 16px; border-radius: 16px; background: rgb(var(--color-surface-2)); opacity: .5; transition: opacity var(--motion-normal) var(--ease-standard); }
+.card[data-active='true'] { opacity: 1; }
+.card header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.card header strong { font-size: 15px; font-weight: 750; }
+.card header span { color: rgb(var(--color-text-4)); font-size: 12px; white-space: nowrap; }
+.sentence { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 10px; line-height: 0; }
+.word { display: inline-flex; white-space: nowrap; }
+.word svg { display: block; }
+.add { flex: 0 0 96px; scroll-snap-align: start; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 16px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-3)); font-size: 12px; font-weight: 700; }
+
+/* 카드 안 추출 버튼. 워크스페이스 폰트 탭의 `OTF 추출`과 같은 생김새. */
+.card footer { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: auto; }
+.nameInput { min-width: 0; flex: 1; margin: -3px 0 -3px -6px; padding: 2px 6px; border: 1px solid rgb(var(--color-primary)); border-radius: 8px; background: rgb(var(--color-surface)); color: inherit; font: inherit; font-size: 15px; font-weight: 750; outline: none; }
+/* `…` 더보기. 다운로드 옆 같은 크기의 원, 색은 옅게 — 주 동작은 다운로드. */
+.more { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); }
+.cardMenu { position: fixed; z-index: 30; width: 200px; padding: 6px; border-radius: 14px; background: rgb(var(--color-surface)); border: 1px solid rgb(var(--color-border-subtle)); box-shadow: 0 12px 32px rgb(0 0 0 / .14); display: flex; flex-direction: column; }
+.cardMenu > button { min-height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border: 0; border-radius: 9px; background: none; color: rgb(var(--color-foreground)); font-size: 13px; font-weight: 650; text-align: left; }
+.cardMenu > button:not(:disabled):hover { background: rgb(var(--color-surface-2)); }
+.cardMenu > button:disabled { color: rgb(var(--color-text-4)); }
+.cardMenu > button small { margin-left: auto; font-size: 11px; font-weight: 500; }
+.cardMenu [data-danger] { color: rgb(var(--color-danger, 214 50 31)); }
+.cardMenuConfirm { padding: 8px 6px 4px; display: flex; flex-direction: column; gap: 10px; }
+.cardMenuConfirm p { margin: 0; font-size: 12.5px; line-height: 1.45; word-break: keep-all; }
+.cardMenuConfirm div { display: flex; gap: 6px; }
+.cardMenuConfirm button { flex: 1; min-height: 36px; border: 0; border-radius: 9px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 13px; font-weight: 700; }
+.cardMenuConfirm button[data-danger] { background: rgb(var(--color-danger, 214 50 31)); color: #fff; }
+/* 원 하나(40px). 탭하면 색이 바뀌고 오른쪽으로 자라며 글자가 들어온다 — 있던 요소가 제자리에서 자라는 전환. */
+.download { height: 40px; display: inline-flex; align-items: center; gap: 0; padding: 0 11px; border: 0; border-radius: 999px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 700; transition: background-color var(--motion-normal) var(--ease-standard), gap var(--motion-normal) var(--ease-standard), padding var(--motion-normal) var(--ease-standard); }
+.download svg { flex: none; }
+.download span { max-width: 0; overflow: hidden; opacity: 0; white-space: nowrap; transition: max-width var(--motion-slow) var(--ease-standard), opacity var(--motion-normal) var(--ease-standard); }
+.download[data-armed] { gap: 6px; padding: 0 14px 0 12px; background: rgb(var(--color-primary)); }
+.download[data-armed] span { max-width: 80px; opacity: 1; }
+
+/* 왼쪽 레일 + 내용. 레일은 회색 길 위 흰 알약, 스크롤에 붙어 따라온다. */
+.body { display: flex; align-items: flex-start; border-top: 1px solid rgb(var(--color-border-subtle)); }
+.rail { position: sticky; top: 0; flex: 0 0 92px; display: flex; flex-direction: column; gap: 2px; padding: 10px 6px; background: rgb(var(--color-surface-2)); min-height: calc(100dvh - 50px); }
+.rail button { min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-4)); font-size: 13.5px; font-weight: 700; }
+.railLink { margin-top: 18px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+.rail button[aria-current='true'] { background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); box-shadow: var(--shadow-sm); }
+.content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.content section { padding: 6px 12px 18px; }
+.content section + section { border-top: 1px solid rgb(var(--color-border-subtle)); }
+
+/* 섹션 머리 전체가 문이다. 화살표는 표시일 뿐. */
+.sectionHead { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 6px; padding: 0 2px; border: 0; background: transparent; color: rgb(var(--color-foreground)); text-align: left; }
+.sectionHead h2 { margin: 0; font-size: 15px; font-weight: 800; }
+.sectionHead span { color: rgb(var(--color-text-5)); font-size: 12px; font-variant-numeric: tabular-nums; }
+.sectionHead em { color: rgb(var(--color-text-5)); font-size: 12px; font-style: normal; }
+.sectionHead svg { margin-left: auto; color: rgb(var(--color-text-5)); }
+
+/* 스타일 타일 넷. 글자 하나에 값 하나. */
+.tiles { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.tiles li { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0 8px; border-radius: 12px; background: rgb(var(--color-surface-2)); }
+.tiles em { color: rgb(var(--color-text-4)); font-size: 11px; font-style: normal; }
+.tiles strong { font-size: 12.5px; font-weight: 750; font-variant-numeric: tabular-nums; }
+
+/* 글자 격자 3열. 칸은 평평한 면, 손댄 칸은 모서리에 점. */
+.grid { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.thumb { position: relative; width: 100%; aspect-ratio: 1; display: grid; place-items: center; border: 0; border-radius: 12px; background: rgb(var(--color-surface-2)); }
+.thumb[data-modified]::after { content: ''; position: absolute; top: 8px; right: 8px; width: 6px; height: 6px; border-radius: 999px; background: rgb(var(--color-foreground)); }
+.ink { display: block; width: 72px; height: 72px; }
+.ink svg { display: block; width: 100%; height: 100%; }
+.inkSmall { display: block; width: 52px; height: 52px; }
+.inkSmall svg { display: block; width: 100%; height: 100%; }
+
+/* 대시보드의 자소 요약 줄. 앞 네 장, 4열. */
+.preview { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+
+/* 섹션 홈. 셸 위를 덮는 층, 오른쪽에서 밀려온다. 머리 높이는 셸 머리와 같다. */
+.home { position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column; background: rgb(var(--color-surface)); transform: translateX(100%); transition: transform var(--motion-slow) var(--ease-standard); }
+.home[data-open] { transform: translateX(0); }
+.homeHead { min-height: 50px; display: flex; align-items: center; gap: 4px; padding: max(2px, env(safe-area-inset-top)) 12px 2px 4px; border-bottom: 1px solid rgb(var(--color-border-subtle)); }
+.homeHead h2 { margin: 0; font-size: 15px; font-weight: 800; }
+.homeHead span { color: rgb(var(--color-text-5)); font-size: 12px; font-variant-numeric: tabular-nums; }
+.back { width: 40px; min-height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-text-3)); }
+.homeScroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
+
+/* 묶기 칩 한 줄. 켜진 칩만 검정. */
+.chips { display: flex; gap: 6px; padding: 12px 12px 14px; overflow-x: auto; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chips button { flex: none; min-height: 34px; padding: 0 13px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 700; transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard); }
+.chips button[aria-selected='true'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+
+/* 판. 카드와 소제목은 전부 절대좌표, 자리는 transform으로 옮긴다. */
+.board { position: relative; transition: height var(--motion-slow) var(--ease-standard); }
+.groupHead { position: absolute; top: 0; left: 12px; height: 30px; display: flex; align-items: flex-end; padding-bottom: 8px; color: rgb(var(--color-text-4)); font-size: 12px; font-weight: 700; transition: transform var(--motion-slow) var(--ease-standard); animation: fadeIn var(--motion-normal) var(--ease-standard); }
+.homeCard { position: absolute; top: 0; left: 0; display: grid; place-items: center; border: 0; border-radius: 12px; background: rgb(var(--color-surface-2)); transition: transform var(--motion-slow) var(--ease-standard), width var(--motion-slow) var(--ease-standard), height var(--motion-slow) var(--ease-standard); }
+.homeCard[data-modified]::after { content: ''; position: absolute; top: 8px; right: 8px; width: 6px; height: 6px; border-radius: 999px; background: rgb(var(--color-foreground)); }
+@keyframes fadeIn { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .home, .board, .groupHead, .homeCard { transition: none; animation: none; } }
+.picto { display: block; width: 52px; height: 52px; }
+.picto svg { display: block; width: 100%; height: 100%; }

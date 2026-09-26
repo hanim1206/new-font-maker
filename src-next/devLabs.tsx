@@ -64,6 +64,12 @@ export async function showDevLab(show: (node: ReactNode) => void): Promise<boole
     return true
   }
 
+  if (path === '/dashboard-lab') {
+    const { DashboardLabPage } = await import('./DashboardLabPage')
+    show(<DashboardLabPage />)
+    return true
+  }
+
   if (path === '/five-guide-lab') {
     const { FiveGuideLabPage } = await import('./FiveGuideLabPage')
     show(<FiveGuideLabPage />)
