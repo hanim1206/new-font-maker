@@ -505,7 +505,7 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
   return <div className={styles.home} data-testid="jamo-home" data-type={type}>
     <header className={styles.homeHead}>
       <button type="button" className={styles.back} aria-label="대시보드" onClick={() => navigate('/dashboard')}><ChevronLeft size={22} aria-hidden="true" /></button>
-      <h2>{JAMO_LABEL[type]}</h2>
+      <h2>고칠 {JAMO_LABEL[type]}</h2>
       <span>{chars.length}</span>
     </header>
     <div className={styles.homeScroll}>
