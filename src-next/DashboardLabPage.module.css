@@ -119,6 +119,8 @@
 .chips::-webkit-scrollbar { display: none; }
 .chips button { flex: none; min-height: 34px; padding: 0 13px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 700; transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard); }
 .chips button[aria-selected='true'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+/* 칩 줄 끝 `+` — 묶음 만들기. 칩과 같은 높이의 동그라미. */
+.chips .chipAdd { width: 34px; padding: 0; display: grid; place-items: center; background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); }
 
 /* 판. 카드와 소제목은 전부 절대좌표, 자리는 transform으로 옮긴다. */
 .board { position: relative; transition: height var(--motion-slow) var(--ease-standard); }
@@ -148,7 +150,6 @@
 .benchGo { flex: none; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .benchGo:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
 .groupMore { position: absolute; top: 0; right: 8px; width: 40px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-text-5)); transition: transform var(--motion-slow) var(--ease-standard); animation: fadeIn var(--motion-normal) var(--ease-standard); }
-.benchSave { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); animation: popIn var(--motion-normal) var(--ease-standard); }
 .benchGroupName { height: 26px; display: inline-flex; align-items: center; padding: 0 4px; color: rgb(var(--color-text-4)); font-size: 12px; font-weight: 700; }
 
 /* 묶음 바텀시트. 섹션 홈 위에 깔리고 바깥을 누르면 닫힌다. */
@@ -182,6 +183,6 @@
 @keyframes fadeIn { from { opacity: 0; } }
 @keyframes popIn { from { opacity: 0; transform: scale(0.6); } }
 @keyframes sheetUp { from { transform: translateY(100%); } to { transform: none; } }
-@media (prefers-reduced-motion: reduce) { .home, .board, .groupHead, .homeCard, .benchChips, .benchClear, .benchSave, .groupMore, .sheetLayer, .sheet, .toast { transition: none; animation: none; } }
+@media (prefers-reduced-motion: reduce) { .home, .board, .groupHead, .homeCard, .benchChips, .benchClear, .groupMore, .sheetLayer, .sheet, .toast { transition: none; animation: none; } }
 .picto { display: block; width: 52px; height: 52px; }
 .picto svg { display: block; width: 100%; height: 100%; }
