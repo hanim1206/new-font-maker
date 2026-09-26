@@ -221,7 +221,7 @@ function FontCardMenu({ active, onRename }: { active: boolean; onRename: () => v
         </div>
         : <>
           <button type="button" role="menuitem" onClick={() => { close(); onRename() }}><PencilLine size={16} aria-hidden="true" />이름 바꾸기</button>
-          <button type="button" role="menuitem" disabled><Copy size={16} aria-hidden="true" />복사<small>베타는 폰트 하나</small></button>
+          <button type="button" role="menuitem" disabled><Copy size={16} aria-hidden="true" />복제</button>
           <button type="button" role="menuitem" data-danger onClick={() => setConfirming(true)}><Trash2 size={16} aria-hidden="true" />삭제</button>
         </>}
     </div>}
@@ -280,19 +280,22 @@ type JamoType = 'choseong' | 'jungseong' | 'jongseong'
 const JAMO_LABEL: Record<JamoType, string> = { choseong: '초성', jungseong: '중성', jongseong: '종성' }
 const PREVIEW_COUNT = 4
 
-/** 자모 에디터(획 편집)로. 도마를 그 자소들로 바꾸고 첫 자소의 대표 글자를 그 자소 획 편집으로 연다. */
+/**
+ * 자모 에디터(획 편집)로. 섹션 홈의 `편집 n`만 부른다. 도마를 그 자소들로 두고 첫 자소의 대표 글자를 그 자소 획 편집으로 연다.
+ * 지금 홈 주소(묶기 포함)를 `returnTo`로 남겨 편집기 `‹`가 이 홈으로 돌아온다.
+ */
 const EDITOR_PART: Record<JamoType, 'CH' | 'JU' | 'JO'> = { choseong: 'CH', jungseong: 'JU', jongseong: 'JO' }
 function openEditor(type: JamoType, chars: readonly string[]) {
-  useWorkbenchStore.getState().place(type, chars)
+  useWorkbenchStore.getState().place(type, chars, `${window.location.pathname}${window.location.search}`)
   navigate(`/workspace/jamo?char=${encodeURIComponent(workbenchSyllable(type, chars[0]))}&mode=stroke&part=${EDITOR_PART[type]}`)
 }
 
-/** 대시보드의 자소 줄. 앞 네 장만 보이고(손댄 것 우선은 다음), 카드는 홈을 건너뛰고 그 자소 하나만 도마에 올려 편집기로 간다. 머리(화살표)가 홈이다. */
+/** 대시보드의 자소 줄. 앞 네 장만 보이고(손댄 것 우선은 다음), 머리(화살표)가 홈이다. 카드도 편집기로 바로 가지 않는다 — 그 자소 하나만 도마에 올려 홈으로. */
 function JamoPreview({ type, chars }: { type: JamoType; chars: readonly string[] }) {
   const isJamoModified = useJamoStore((state) => state.isJamoModified)
   return <ul className={styles.preview}>
     {chars.slice(0, PREVIEW_COUNT).map((char) => <li key={char}>
-      <button type="button" className={styles.thumb} aria-label={`${char} 편집`} data-modified={isJamoModified(type, char) || undefined} onClick={() => openEditor(type, [char])}>
+      <button type="button" className={styles.thumb} aria-label={`${char} 도마에 올리기`} data-modified={isJamoModified(type, char) || undefined} onClick={() => { useWorkbenchStore.getState().place(type, [char]); navigate(`/dashboard/${type}`) }}>
         <Lazy className={styles.inkSmall}><AppGlyph char={char} size={52} upright /></Lazy>
       </button>
     </li>)}
@@ -344,11 +347,12 @@ const GROUP_HEAD = 30
 const GROUP_GAP = 14
 
 /**
- * 섹션 홈. 대시보드 위로 오른쪽에서 밀려 들어오는 층. 위는 뒤로 · 제목, 그 아래 묶기 칩 한 줄, 그 아래 4열 판.
+ * 섹션 홈 페이지(`/dashboard/choseong` · `jungseong` · `jongseong`). 위는 뒤로 · 제목, 그 아래 묶기 칩 한 줄, 그 아래 4열 판.
+ * 묶기는 주소 `?group=`에 둔다 — 새로고침 · 편집기에서 `‹`로 돌아와도 남는다. 칩을 바꿀 땐 기록을 쌓지 않고 주소만 고친다.
  * 카드 19장은 한 번만 만들고(key = 글자) 묶기가 바뀌면 자리만 옮긴다 — 절대좌표 + transform 전환이라 글자를 다시 그리지 않는다.
  * 카드 탭 = 도마에 담기 · 빼기, 소제목 탭 = 그 묶음을 도마에(교체), 아래 `편집 n` = 도마를 들고 편집기로. 담기 · 빼기는 여기서만 한다.
  */
-function JamoHome({ type, chars, onClose }: { type: JamoType; chars: readonly string[]; onClose: () => void }) {
+function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] }) {
   const isJamoModified = useJamoStore((state) => state.isJamoModified)
   const jamos = useJamoStore((state) => state[type])
   const benchType = useWorkbenchStore((state) => state.type)
@@ -362,7 +366,14 @@ function JamoHome({ type, chars, onClose }: { type: JamoType; chars: readonly st
     return jamo ? (jamo.strokes?.length ?? 0) + (jamo.horizontalStrokes?.length ?? 0) + (jamo.verticalStrokes?.length ?? 0) : 0
   }
   const groupings = GROUPINGS[type]
-  const [groupingId, setGroupingId] = useState(groupings[0].id)
+  const [groupingId, setGroupingIdState] = useState(() => new URLSearchParams(window.location.search).get('group') ?? groupings[0].id)
+  const setGroupingId = (id: string) => {
+    setGroupingIdState(id)
+    const url = new URL(window.location.href)
+    if (id === groupings[0].id) url.searchParams.delete('group')
+    else url.searchParams.set('group', id)
+    window.history.replaceState(window.history.state, '', url)
+  }
   const grouping = groupings.find((g) => g.id === groupingId) ?? groupings[0]
   const groups = useMemo(() => grouping.groups(chars, strokeCount), [grouping, chars, jamos]) // eslint-disable-line react-hooks/exhaustive-deps
   const modified = chars.filter((c) => isJamoModified(type, c)).length
@@ -394,15 +405,9 @@ function JamoHome({ type, chars, onClose }: { type: JamoType; chars: readonly st
     return { cards, heads, height: Math.max(0, y - GROUP_GAP) }
   }, [groups, cell])
 
-  // 들어올 때 오른쪽에서 밀려온다. 뒤로는 반대로 나간 뒤 닫힌다.
-  const [open, setOpen] = useState(false)
-  useEffect(() => { const frame = requestAnimationFrame(() => setOpen(true)); return () => cancelAnimationFrame(frame) }, [])
-  const [closing, setClosing] = useState(false)
-  const back = () => { setClosing(true); setOpen(false) }
-
-  return <div className={styles.home} data-open={open || undefined} onTransitionEnd={(event) => { if (closing && event.target === event.currentTarget) onClose() }}>
+  return <div className={styles.home} data-testid="jamo-home" data-type={type}>
     <header className={styles.homeHead}>
-      <button type="button" className={styles.back} aria-label="뒤로" onClick={back}><ChevronLeft size={22} aria-hidden="true" /></button>
+      <button type="button" className={styles.back} aria-label="대시보드" onClick={() => navigate('/dashboard')}><ChevronLeft size={22} aria-hidden="true" /></button>
       <h2>{JAMO_LABEL[type]}</h2>
       <span>{chars.length}{modified ? ` · 손댄 ${modified}` : ''}</span>
     </header>
@@ -448,7 +453,6 @@ export function DashboardLabPage() {
   const [renamed, setRenamed] = useState<string | null>(null)
   const [compact, setCompact] = useState(false)
   const carousel = useRef<HTMLDivElement>(null)
-  const [home, setHome] = useState<JamoType | null>(null)
   const [active, setActive] = useState<SectionId>('style')
   const scroller = useRef<HTMLDivElement>(null)
   const sections = useRef<Partial<Record<SectionId, HTMLElement | null>>>({})
@@ -529,22 +533,35 @@ export function DashboardLabPage() {
 
             {/* 초·중·종은 요약 줄만. 전체 격자와 묶기는 섹션 홈으로 갔다. 레이아웃 6장은 여기서 바로 에디터로. */}
             <section ref={(el) => { sections.current.choseong = el }}>
-              <SectionHead title="초성" count={CHOSEONG_LIST.length} modified={modifiedBy.choseong} onClick={() => setHome('choseong')} />
+              <SectionHead title="초성" count={CHOSEONG_LIST.length} modified={modifiedBy.choseong} onClick={() => navigate('/dashboard/choseong')} />
               <JamoPreview type="choseong" chars={CHOSEONG_LIST} />
             </section>
             <section ref={(el) => { sections.current.jungseong = el }}>
-              <SectionHead title="중성" count={JUNGSEONG_LIST.length} modified={modifiedBy.jungseong} onClick={() => setHome('jungseong')} />
+              <SectionHead title="중성" count={JUNGSEONG_LIST.length} modified={modifiedBy.jungseong} onClick={() => navigate('/dashboard/jungseong')} />
               <JamoPreview type="jungseong" chars={JUNGSEONG_LIST} />
             </section>
             <section ref={(el) => { sections.current.jongseong = el }}>
-              <SectionHead title="종성" count={FINALS.length} modified={modifiedBy.jongseong} onClick={() => setHome('jongseong')} />
+              <SectionHead title="종성" count={FINALS.length} modified={modifiedBy.jongseong} onClick={() => navigate('/dashboard/jongseong')} />
               <JamoPreview type="jongseong" chars={FINALS} />
             </section>
           </div>
         </div>
       </div>
+    </div>
+  </main>
+}
 
-      {home && <JamoHome key={home} type={home} chars={home === 'choseong' ? CHOSEONG_LIST : home === 'jungseong' ? JUNGSEONG_LIST : FINALS} onClose={() => setHome(null)} />}
+const JAMO_CHARS: Record<JamoType, readonly string[]> = { choseong: CHOSEONG_LIST, jungseong: JUNGSEONG_LIST, jongseong: FINALS }
+
+/** 섹션 홈 주소(`/dashboard/<종류>`). 모르는 종류면 대시보드로 넘긴다. */
+export function JamoHomePage() {
+  const type = window.location.pathname.split('/')[2] as JamoType
+  const known = type in JAMO_CHARS
+  useEffect(() => { if (!known) navigate('/dashboard', { replace: true }) }, [known])
+  if (!known) return null
+  return <main className={styles.page}>
+    <div className={styles.shell}>
+      <JamoHome type={type} chars={JAMO_CHARS[type]} />
     </div>
   </main>
 }
