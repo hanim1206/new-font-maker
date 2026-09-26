@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, Ellipsis, PencilLine, Plus, ScanSearch, Trash2, UserRound, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Dices, Download, Ellipsis, LoaderCircle, PencilLine, Plus, ScanSearch, Trash2, UserRound, X } from 'lucide-react'
 import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../src/data/Hangul'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { useEffectiveGlobalStyle, useGlobalStyleStore } from '../src/stores/globalStyleStore'
@@ -12,16 +12,18 @@ import type { LayoutSchema, Padding, Part } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { AppGlyph } from './AppGlyph'
 import { editedDayText, FONT_LIMIT, nextFontName } from './accountFont'
-import { deleteFont, listFonts, renameFont } from './accountFontApi'
+import { createFont, deleteFont, listFonts, renameFont } from './accountFontApi'
 import type { FontSummary } from './accountFontApi'
-import { accountFontSession, renamedAccountFont } from './accountFontSync'
-import { showAppNotice } from './appNotice'
+import { accountFontName, accountFontSession, collectAccountFontData, renamedAccountFont } from './accountFontSync'
+import { DEFAULT_FONT_NAME, FONT_NAME_STORAGE_KEY, useFontExportStore } from './fontExportStore'
+import { clearAppNotice, showAppNotice } from './appNotice'
 import { leaveDeletedFont, openFont, openNewFont } from './fontSwitch'
 import { authGateMode, sessionUser } from './betaAuth'
 import { useUnseenReply } from './useFeedback'
 import { navigate } from './router'
 import { useContextPlacement } from './notoModel'
 import { PART_COLOR } from './partColors'
+import { randomSampleSentence } from './sampleSentences'
 import styles from './DashboardLabPage.module.css'
 
 /**
@@ -29,7 +31,7 @@ import styles from './DashboardLabPage.module.css'
  * 2026-09-26 사용자 스케치를 앱 부품 · 토큰으로 옮긴 것. 위는 폰트 카드(지금 폰트 하나 + `새 폰트` → 내 폰트 목록), 아래는 왼쪽 레일(목차 · 스크롤 따라감) + 섹션 다섯.
  * 순서: 스타일 → 초성 → 중성 → 종성 → 레이아웃(2026-09-27 사용자 요청으로 레이아웃을 뒤로). 전체 목록이고, 손댄 자소는 점.
  * 초 · 중 · 종은 요약 줄이고 화살표가 섹션 홈, 자소 카드는 그 자소 하나만 도마에 올려 자모 에디터로 간다.
- * 아직 시안인 것: 카드의 이름 바꾸기 · 다운로드 · 메뉴, 스타일 타일 · 레이아웃 카드 탭. 파일 이름은 옛 랩 이름 그대로다.
+ * 아직 없는 것: `…`의 복제, 스타일 타일 하나하나의 탭(머리 `›`만 폰트 탭으로). 파일 이름은 옛 랩 이름 그대로다.
  */
 
 type SectionId = 'style' | 'layout' | 'choseong' | 'jungseong' | 'jongseong'
@@ -189,44 +191,46 @@ function StylePicto({ kind }: { kind: 'weight' | 'slant' | 'roundness' | 'beak' 
 
 /**
  * 지금 폰트 카드. 이름은 머리 알약에 있어 여기선 마지막 고침과 예시 문장만.
- * 버튼은 둘: `…`(이름 바꾸기 · 복제 · 삭제) · 다운로드. 이름 바꾸기 · 삭제 확인은 `…` 시트 안에서 한다.
+ * 왼쪽 아래 주사위는 예시 문장을 문장 보정의 문장 목록에서 하나 뽑아 바꾼다.
+ * 오른쪽 버튼은 둘: `…`(이름 바꾸기 · 복제 · 삭제) · 다운로드. 이름 바꾸기 · 삭제 확인은 `…` 시트 안에서 한다.
+ * 다운로드도 같은 시트가 올라와 폰트 이름(설치 이름 · 파일 이름)을 받고 OTF를 만든다.
  */
-function FontCard({ name, note, onRename, onDelete }: {
+function FontCard({ name, note, onRename, onDuplicate, onDelete }: {
   name: string
   note: string
   onRename: (name: string) => void
+  /** 없으면(한도가 찼거나 랩 화면) 복제를 흐리게. */
+  onDuplicate?: () => void
   /** 없으면(계정 폰트를 안 연 랩 화면) 삭제를 흐리게. */
   onDelete?: () => void
 }) {
-  // 추출 버튼은 원형 아이콘. 탭하면 색이 바뀌며 옆으로 자라 `다운로드`가 들어온다(시안에서는 다시 탭하면 돌아간다).
-  const [armed, setArmed] = useState(false)
+  const [sentence, setSentence] = useState(SENTENCE)
   return <article className={styles.card}>
     <header>
       <strong>{name}</strong><span>{note}</span>
     </header>
-    <p className={styles.sentence} aria-label={SENTENCE}>
-      {SENTENCE.split(' ').map((word, index) => <span key={index} className={styles.word}>
+    <p className={styles.sentence} aria-label={sentence}>
+      {sentence.split(' ').map((word, index) => <span key={index} className={styles.word}>
         {[...word].map((char, at) => isHangul(char) ? <AppGlyph key={at} char={char} size={34} /> : <span key={at}>{char}</span>)}
       </span>)}
     </p>
     {/* 추출은 폰트의 속성 — 워크스페이스 폰트 탭과 같은 버튼을 카드 안에. 화면 하단엔 두지 않는다. */}
     <footer>
-      <FontCardMenu label="더보기" name={name} onRename={onRename} onDelete={onDelete} />
-      <button type="button" className={styles.download} data-armed={armed || undefined} aria-label="다운로드" onClick={() => setArmed((value) => !value)}><Download size={18} aria-hidden="true" /><span>다운로드</span></button>
+      <button type="button" className={`${styles.more} ${styles.roll}`} aria-label="예시 문장 바꾸기" onClick={() => setSentence(randomSampleSentence(sentence))}><Dices size={18} aria-hidden="true" /></button>
+      <FontCardMenu label="더보기" name={name} onRename={onRename} onDuplicate={onDuplicate} onDelete={onDelete} />
+      <FontCardDownload />
     </footer>
   </article>
 }
 
 /**
- * 폰트 카드의 `…` 메뉴 = 아래에서 올라오는 떠 있는 시트(토스식). 뒤는 머리까지 어둡게 덮는다.
- * 이름 바꾸기 · 삭제 확인은 같은 시트가 그 화면으로 바뀐다 — 카드로 돌아가 고치지 않는다.
- * 바깥 탭 · Esc면 닫히고, 닫힐 땐 거꾸로 내려간다. 키보드가 올라오면 시트도 그 위로 올라탄다. 복제는 아직 없어 흐리게.
+ * 아래에서 올라오는 떠 있는 시트의 여닫기. 닫기는 내려가는 애니메이션이 끝난 뒤 치우고, 키보드가 가린 높이는 `keyboard`로 준다.
  */
-function FontCardMenu({ label, name, onRename, onDelete }: { label: string; name: string; onRename: (name: string) => void; onDelete?: () => void }) {
+function useFloatingSheet(onClosed?: () => void) {
+  const closed = useRef(onClosed)
+  closed.current = onClosed
   const [open, setOpen] = useState(false)
   const [closing, setClosing] = useState(false)
-  const [step, setStep] = useState<'menu' | 'rename' | 'delete'>('menu')
-  const [draft, setDraft] = useState(name)
   const [keyboard, setKeyboard] = useState(0)
   const close = () => setClosing(true)
   useEffect(() => {
@@ -248,9 +252,73 @@ function FontCardMenu({ label, name, onRename, onDelete }: { label: string; name
   useEffect(() => {
     if (!closing) return
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const timer = window.setTimeout(() => { setOpen(false); setClosing(false); setStep('menu'); setKeyboard(0) }, reduce ? 0 : 260)
+    const timer = window.setTimeout(() => { setOpen(false); setClosing(false); setKeyboard(0); closed.current?.() }, reduce ? 0 : 260)
     return () => window.clearTimeout(timer)
   }, [closing])
+  // 폰트 목록 알림(복제 `열기` 등)은 시트를 가리니 시트를 열면 치운다.
+  return { open, closing, keyboard, show: () => { clearAppNotice('font-list'); setOpen(true) }, close }
+}
+
+/**
+ * 카드의 다운로드. 검은 원을 누르면 `…`와 같은 시트가 올라와 폰트 이름을 받고, `다운로드`로 OTF를 만든다(폰트 탭 추출과 같은 가게).
+ * 버튼은 검은 원에 아이콘만 — 만드는 동안 도는 아이콘(퍼센트는 이름표에), 끝나면 잠깐 체크. 이 화면에서 받았으니 편집 셸의 `OTF가 나왔어요` 토스트는 치운다.
+ */
+function FontCardDownload() {
+  const status = useFontExportStore((state) => state.status)
+  const percent = useFontExportStore((state) => state.percent)
+  const confirm = useFontExportStore((state) => state.confirm)
+  const dismissNotice = useFontExportStore((state) => state.dismissNotice)
+  const [draft, setDraft] = useState('')
+  const { open, closing, keyboard, show, close } = useFloatingSheet()
+  const exporting = status === 'exporting'
+  useEffect(() => { if (status === 'downloaded') dismissNotice() }, [status, dismissNotice])
+  const start = () => {
+    let saved = ''
+    try { saved = localStorage.getItem(FONT_NAME_STORAGE_KEY)?.trim() ?? '' } catch { /* 없으면 기본 이름 */ }
+    setDraft(accountFontName() ?? (saved || DEFAULT_FONT_NAME))
+    show()
+  }
+  const next = draft.trim()
+  const submit = () => {
+    if (!next || exporting) return
+    close()
+    void confirm(next)
+  }
+  const label = exporting ? `다운로드 준비 중 ${percent}%` : status === 'downloaded' ? '받았어요' : status === 'failed' ? '다시 받기' : '다운로드'
+  return <>
+    <button type="button" className={styles.download} data-state={status} aria-label={label} aria-haspopup="dialog" aria-expanded={open} disabled={exporting} onClick={start} data-testid="dashboard-font-download">
+      {exporting ? <LoaderCircle className={styles.downloadSpin} size={18} aria-hidden="true" /> : status === 'downloaded' ? <Check size={18} aria-hidden="true" /> : <Download size={18} aria-hidden="true" />}
+    </button>
+    {open && <div className={styles.menuSheetLayer} data-closing={closing || undefined} style={keyboard ? { paddingBottom: keyboard } : undefined} onPointerDown={(event) => { if (event.target === event.currentTarget) close() }}>
+      <div className={styles.menuSheet} role="dialog" aria-label="폰트 다운로드">
+        <form className={styles.menuSheetStep} onSubmit={(event) => { event.preventDefault(); submit() }}>
+          <h3>폰트 이름</h3>
+          <p>설치하면 글꼴 목록에 이 이름으로 보여요. 파일 이름도 같아요.</p>
+          <label className={styles.menuSheetField}>
+            <input value={draft} aria-label="폰트 이름" autoFocus maxLength={40} enterKeyHint="go" placeholder="이름을 적어 주세요" data-testid="dashboard-font-download-name"
+              onFocus={(event) => event.currentTarget.select()}
+              onChange={(event) => setDraft(event.currentTarget.value)} />
+            {draft && <button type="button" aria-label="지우기" onClick={(event) => { setDraft(''); (event.currentTarget.previousElementSibling as HTMLInputElement | null)?.focus() }}><X size={14} strokeWidth={3} aria-hidden="true" /></button>}
+          </label>
+          <div className={styles.menuSheetActions}>
+            <button type="button" onClick={close}>취소</button>
+            <button type="submit" data-primary disabled={!next} data-testid="dashboard-font-download-confirm">다운로드</button>
+          </div>
+        </form>
+      </div>
+    </div>}
+  </>
+}
+
+/**
+ * 폰트 카드의 `…` 메뉴 = 아래에서 올라오는 떠 있는 시트(토스식). 뒤는 머리까지 어둡게 덮는다.
+ * 이름 바꾸기 · 삭제 확인은 같은 시트가 그 화면으로 바뀐다 — 카드로 돌아가 고치지 않는다.
+ * 바깥 탭 · Esc면 닫히고, 닫힐 땐 거꾸로 내려간다. 키보드가 올라오면 시트도 그 위로 올라탄다. 복제는 자리가 남았을 때만 — 지금 폰트를 `○○ 사본`으로 하나 더 만든다.
+ */
+function FontCardMenu({ label, name, onRename, onDuplicate, onDelete }: { label: string; name: string; onRename: (name: string) => void; onDuplicate?: () => void; onDelete?: () => void }) {
+  const [step, setStep] = useState<'menu' | 'rename' | 'delete'>('menu')
+  const [draft, setDraft] = useState(name)
+  const { open, closing, keyboard, show, close } = useFloatingSheet(() => setStep('menu'))
   const next = draft.trim()
   const canSave = next.length > 0 && next !== name
   const save = () => {
@@ -259,7 +327,7 @@ function FontCardMenu({ label, name, onRename, onDelete }: { label: string; name
     close()
   }
   return <>
-    <button type="button" className={styles.more} aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => { setDraft(name); setOpen(true) }}><Ellipsis size={18} aria-hidden="true" /></button>
+    <button type="button" className={styles.more} aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => { setDraft(name); show() }}><Ellipsis size={18} aria-hidden="true" /></button>
     {open && <div className={styles.menuSheetLayer} data-closing={closing || undefined} style={keyboard ? { paddingBottom: keyboard } : undefined} onPointerDown={(event) => { if (event.target === event.currentTarget) close() }}>
       <div className={styles.menuSheet} role={step === 'menu' ? 'menu' : 'dialog'} aria-label={label}>
         {step === 'rename' && <form key="rename" className={styles.menuSheetStep} onSubmit={(event) => { event.preventDefault(); save() }}>
@@ -285,7 +353,7 @@ function FontCardMenu({ label, name, onRename, onDelete }: { label: string; name
         </div>}
         {step === 'menu' && <>
           <button type="button" role="menuitem" onClick={() => setStep('rename')}><PencilLine size={22} aria-hidden="true" />이름 바꾸기</button>
-          <button type="button" role="menuitem" disabled><Copy size={22} aria-hidden="true" />복제</button>
+          <button type="button" role="menuitem" disabled={!onDuplicate} data-testid="dashboard-font-duplicate" onClick={() => { close(); onDuplicate?.() }}><Copy size={22} aria-hidden="true" />복제{!onDuplicate && <small>폰트 {FONT_LIMIT}개가 다 찼어요</small>}</button>
           <button type="button" role="menuitem" data-danger disabled={!onDelete} data-testid="dashboard-font-delete" onClick={() => setStep('delete')}><Trash2 size={22} aria-hidden="true" />삭제</button>
         </>}
       </div>
@@ -674,6 +742,12 @@ function GroupSheet({ type, all, group, benchChars, builtinNameOf, onClose, onCr
 }
 
 const FONT_SAVE_FAILED = '지금 폰트를 저장하지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요.'
+/** 복제 이름. `내 폰트` → `내 폰트 사본`, 이미 있으면 `내 폰트 사본 2`, `3`… */
+function copyName(name: string, taken: readonly string[]): string {
+  const base = `${name} 사본`
+  if (!taken.includes(base)) return base
+  for (let n = 2; ; n += 1) if (!taken.includes(`${base} ${n}`)) return `${base} ${n}`
+}
 const fontListFailed = (message: string) => showAppNotice('font-list', { tone: 'error', message, dismissable: true })
 
 /**
@@ -729,6 +803,21 @@ function useFontList() {
         setFonts((list) => list?.map((font) => font.id === session.fontId ? { ...font, name: next } : font) ?? list)
       })
     },
+    /**
+     * 카드 `…` 복제. 지금 화면의 폰트 그대로 `○○ 사본`을 새로 만들고, 여기 머문다 — 알림의 `열기`로 사본으로 간다.
+     * 자리가 없으면(한도) 없다. 서버가 한 번 더 막으면 알림만.
+     */
+    duplicateCurrent: session && fonts && fonts.length < FONT_LIMIT ? () => {
+      if (moving) return
+      const current = fonts.find((font) => font.id === session.fontId)?.name ?? accountFontName() ?? '내 폰트'
+      const name = copyName(current, fonts.map((font) => font.name))
+      void createFont(session.me, name, collectAccountFontData()).then((created) => {
+        if (!created.ok) { fontListFailed(created.limit ? `폰트는 ${FONT_LIMIT}개까지 만들 수 있어요.` : '복제하지 못했어요. 다시 해 주세요.'); return }
+        const at = new Date().toISOString()
+        setFonts((list) => list && [...list, { id: created.value.id, name, updatedAt: created.value.updatedAt ?? at, createdAt: at }])
+        showAppNotice('font-list', { tone: 'info', message: `‘${name}’을 만들었어요.`, dismissable: true, actions: [{ label: '열기', run: () => { clearAppNotice('font-list'); void go(name, () => openFont(session.me, created.value.id, name)) } }] })
+      })
+    } : undefined,
     /** 카드 `…` 삭제. 지우면 최근 폰트(없으면 새 폰트)로 다시 연다. */
     removeCurrent: session ? () => {
       if (moving) return
@@ -852,7 +941,7 @@ export function DashboardLabPage() {
       <div ref={scroller} className={styles.scroll} onScroll={onScroll} onWheel={unpin} onTouchStart={unpin} onPointerDown={unpin} onKeyDown={unpin} data-moving={fontList.movingTo !== null || undefined} aria-busy={fontList.movingTo !== null || undefined}>
         {/* 지금 폰트 카드 하나. 다른 폰트는 머리 알약 시트에서. */}
         <div className={styles.fontCardRow}>
-          <FontCard name={name} note={modified > 0 ? '마지막 고침 · 오늘' : '마지막 고침 · 오늘 · 프리셋 그대로'} onRename={fontList.renameCurrent} onDelete={fontList.removeCurrent} />
+          <FontCard name={name} note={modified > 0 ? '마지막 고침 · 오늘' : '마지막 고침 · 오늘 · 프리셋 그대로'} onRename={fontList.renameCurrent} onDuplicate={fontList.duplicateCurrent} onDelete={fontList.removeCurrent} />
         </div>
 
         <div className={styles.body}>

@@ -4,7 +4,7 @@ import type { Page } from '@playwright/test'
 /**
  * 게이트가 꺼진 개발 서버의 내 폰트 드로어(대시보드 머리 알약). 계정 대신 이 기기 목록(localStorage)으로 같은 규칙(한도 3 · 소프트 삭제)이다.
  * 편집 주소로 바로 들어오면 지금 사본이 첫 폰트가 되고, 드로어에서 새로 만들고 다른 폰트로 바꿔 연다(만든 순서 그대로).
- * 이름 바꾸기 · 삭제는 카드 `…`. 옛 `/fonts`는 대시보드로.
+ * 이름 바꾸기 · 복제 · 삭제는 카드 `…`. 옛 `/fonts`는 대시보드로.
  */
 
 test.beforeEach(async ({ page }) => {
@@ -31,14 +31,14 @@ test('편집 주소로 들어오면 첫 폰트가 생기고, 드로어에서 새
   await openSheet(page)
   await expect(rows(page)).toHaveCount(1)
 
-  // 새 폰트 → 대시보드를 다시 열고 알약이 `내 폰트 2`. 드로어는 만든 순서 — 둘째 줄이 지금 폰트(✓).
+  // 새 폰트 → 대시보드를 다시 열고 알약이 `내 폰트체`(닉네임 + 체, 로컬 닉네임은 `내 폰트`). 드로어는 만든 순서 — 둘째 줄이 지금 폰트(✓).
   await page.getByTestId('dashboard-font-create').click()
   await expect(page.getByTestId('dashboard-font-sheet')).toHaveCount(0, { timeout: 20_000 })
-  await expect(switcher(page)).toHaveText('내 폰트 2', { timeout: 20_000 })
+  await expect(switcher(page)).toHaveText('내 폰트체', { timeout: 20_000 })
   await openSheet(page)
   await expect(rows(page)).toHaveCount(2)
   await expect(rows(page).nth(0)).toContainText('내 폰트')
-  await expect(rows(page).nth(1)).toContainText('내 폰트 2')
+  await expect(rows(page).nth(1)).toContainText('내 폰트체')
   await expect(rows(page).nth(1).getByLabel('지금 연 폰트')).toBeVisible()
 
   // 다른 줄을 누르면 그 폰트로 다시 연다. 순서는 그대로.
@@ -94,4 +94,35 @@ test('옛 /fonts는 대시보드로, 한도 3에서 새 폰트가 꺼지고, 지
   await openSheet(page)
   await expect(rows(page)).toHaveCount(2)
   await expect(page.getByTestId('dashboard-font-create')).toBeEnabled()
+})
+
+test('카드 `…` 복제는 지금 폰트를 `사본`으로 하나 더 만들고, 알림의 열기로 간다. 한도가 차면 흐려진다', async ({ page }) => {
+  await page.goto('/workspace/jamo')
+  await expect(page.getByTestId('jamo-layout-mode')).toBeVisible({ timeout: 20_000 })
+  await page.getByTestId('workspace-font-home').click()
+  await expect(switcher(page)).toHaveText('내 폰트')
+
+  const more = page.getByRole('button', { name: '더보기', exact: true })
+  const duplicate = page.getByTestId('dashboard-font-duplicate')
+  await more.click()
+  await duplicate.click()
+  await expect(page.getByText('‘내 폰트 사본’을 만들었어요.')).toBeVisible()
+  // 여기 머문다. 드로어에 사본이 둘째 줄로.
+  await expect(switcher(page)).toHaveText('내 폰트')
+  await openSheet(page)
+  await expect(rows(page)).toHaveCount(2)
+  await expect(rows(page).nth(1)).toContainText('내 폰트 사본')
+  await page.keyboard.press('Escape')
+
+  // 같은 이름이 있으면 번호가 붙는다. 알림의 `열기`로 사본에 간다.
+  await more.click()
+  await duplicate.click()
+  await expect(page.getByText('‘내 폰트 사본 2’을 만들었어요.')).toBeVisible()
+  await page.getByRole('button', { name: '열기', exact: true }).click()
+  await expect(switcher(page)).toHaveText('내 폰트 사본 2', { timeout: 20_000 })
+
+  // 셋이 찼으니 복제가 흐려진다.
+  await more.click()
+  await expect(duplicate).toBeDisabled()
+  await expect(duplicate).toContainText('다 찼어요')
 })
