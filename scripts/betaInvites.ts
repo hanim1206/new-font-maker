@@ -1,4 +1,6 @@
 import { webcrypto } from 'node:crypto'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import path from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 import type { User } from '@supabase/supabase-js'
 import { betaCredentialsOf, betaInviteLinkOf, betaInviteMessage, DEFAULT_BETA_EMAIL_DOMAIN, generateBetaCode } from '../src-next/betaCode'
@@ -6,7 +8,13 @@ import { betaCredentialsOf, betaInviteLinkOf, betaInviteMessage, DEFAULT_BETA_EM
 /**
  * 베타 친구 계정 발급. CLI(`beta-accounts.ts`)와 로컬 관리자 화면(`betaInviteApi.ts`)이 같이 쓴다.
  * `service_role` 키를 쓰므로 이 맥에서만 돈다 — 브라우저 번들에 들어가면 안 된다.
+ *
+ * 발급한 코드는 이 맥의 `codeFile`(`beta-accounts/codes.json`, 커밋 안 함)에 남겨 나중에도 다시 복사한다.
+ * 코드가 곧 비번이라 DB에는 두지 않는다. 이 파일이 생기기 전에 만든 계정은 코드를 모른다 — `새 코드`로 다시 준다.
  */
+
+/** 발급한 코드를 남기는 파일(레포 기준). `beta-accounts/`는 gitignore. */
+export const BETA_CODE_FILE = 'beta-accounts/codes.json'
 
 export interface BetaInviteEnv {
   supabaseUrl: string
@@ -37,6 +45,8 @@ export interface BetaAccount {
   email: string
   createdAt: string
   lastSignInAt: string | null
+  /** 이 맥에 남은 코드와 메시지. 모르면 없음. */
+  invite?: BetaInvite
 }
 
 export interface BetaInvite {
@@ -51,7 +61,10 @@ export type BetaIssueMode = 'add' | 'reissue'
 const randomBytes = (length: number) => webcrypto.getRandomValues(new Uint8Array(length))
 const nicknameOf = (user: User): string | null => user.user_metadata?.nickname ?? null
 
-export function createBetaInvites(env: BetaInviteEnv) {
+/** 계정 이메일 → 마지막으로 준 코드. */
+type CodeBook = Record<string, { nickname: string; code: string; issuedAt: string }>
+
+export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
   const supabase = createClient(env.supabaseUrl, env.serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
@@ -86,11 +99,30 @@ export function createBetaInvites(env: BetaInviteEnv) {
     }
   }
 
-  /** 지금 베타 계정. 새로 만든 게 위로. */
+  async function readCodes(): Promise<CodeBook> {
+    try { return JSON.parse(await readFile(codeFile, 'utf8')) as CodeBook } catch { return {} }
+  }
+
+  async function saveCode(email: string, nickname: string, code: string): Promise<void> {
+    const book = await readCodes()
+    book[email] = { nickname, code, issuedAt: new Date().toISOString() }
+    await mkdir(path.dirname(codeFile), { recursive: true })
+    await writeFile(codeFile, `${JSON.stringify(book, null, 2)}\n`, { mode: 0o600 })
+  }
+
+  /** 지금 베타 계정. 새로 만든 게 위로. 이 맥에 코드가 남아 있으면 메시지까지. */
   async function list(): Promise<BetaAccount[]> {
-    return (await allUsers())
+    const [users, book] = await Promise.all([allUsers(), readCodes()])
+    return users
       .filter(isBeta)
-      .map((user) => ({ nickname: nicknameOf(user), email: user.email!, createdAt: user.created_at, lastSignInAt: user.last_sign_in_at ?? null }))
+      .map((user) => {
+        const nickname = nicknameOf(user)
+        const saved = book[user.email!]
+        return {
+          nickname, email: user.email!, createdAt: user.created_at, lastSignInAt: user.last_sign_in_at ?? null,
+          invite: saved ? inviteOf(nickname ?? saved.nickname, saved.code) : undefined,
+        }
+      })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   }
 
@@ -115,6 +147,7 @@ export function createBetaInvites(env: BetaInviteEnv) {
           : await admin.createUser({ email, password, email_confirm: true, user_metadata: { nickname, beta: true } })
         if (error) throw new Error(`${nickname}: ${error.message}`)
         takenEmails.add(email)
+        await saveCode(email, nickname, code)
         const invite = inviteOf(nickname, code)
         issued.push(invite)
         onIssued?.(invite)

@@ -32,9 +32,13 @@
 .list ul { margin: 0; padding: 0; list-style: none; }
 .list li { min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .list li + li { box-shadow: 0 -1px 0 rgb(var(--color-border-subtle)); }
-.list li div { display: flex; flex-direction: column; gap: 2px; }
+.list li { gap: 8px; padding: 10px 0; }
+.list li div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.list li code { font-size: 14px; font-weight: 700; letter-spacing: .08em; user-select: text; }
+.list li em { color: rgb(var(--color-text-5)); font-size: 12.5px; font-style: normal; }
 .list li strong { font-size: 15px; font-weight: 700; }
 .list li span { color: rgb(var(--color-text-4)); font-size: 12px; }
 .list li button { min-height: 34px; padding: 0 14px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-2)); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.list li button[data-copied] { background: rgb(var(--color-primary-light)); color: rgb(var(--color-primary-dark)); }
 .list li button[data-confirming] { background: rgb(214 69 65); color: #fff; }
 .list li button:disabled { opacity: .45; }

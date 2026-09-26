@@ -1,8 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import path from 'node:path'
 import { loadEnv } from 'vite'
 import type { Plugin } from 'vite'
 import { isDrawableName } from '../src-next/betaWelcome'
-import { betaInviteEnvOf, createBetaInvites } from './betaInvites'
+import { BETA_CODE_FILE, betaInviteEnvOf, createBetaInvites } from './betaInvites'
 import type { BetaInvite, BetaIssueMode } from './betaInvites'
 
 /**
@@ -46,7 +47,7 @@ export function rejectReasonOf(request: Pick<IncomingMessage, 'headers'> & { soc
 
 export function betaInviteApiPlugin(root: string): Plugin {
   let mode = 'development'
-  const invites = () => createBetaInvites(betaInviteEnvOf(loadEnv(mode, root, '')))
+  const invites = () => createBetaInvites(betaInviteEnvOf(loadEnv(mode, root, '')), path.join(root, BETA_CODE_FILE))
 
   return {
     name: 'beta-invite-api',

@@ -7,8 +7,8 @@ import styles from './AdminInvitePage.module.css'
 const API = '/api/beta-invites'
 const HEADER = 'x-beta-admin'
 
-interface Account { nickname: string | null; email: string; createdAt: string; lastSignInAt: string | null }
 interface Invite { nickname: string; code: string; link: string; message: string }
+interface Account { nickname: string | null; email: string; createdAt: string; lastSignInAt: string | null; invite?: Invite }
 type Issued = Invite & { mode: 'add' | 'reissue' }
 
 async function call<T>(init?: { mode: 'add' | 'reissue'; nickname: string }): Promise<T> {
@@ -26,7 +26,7 @@ const dateOf = (iso: string | null) => iso
 
 /**
  * 로컬 관리자 화면. 닉네임 하나 넣으면 계정 · 코드 · 이름 붙은 링크가 한 번에 나오고, 카톡 메시지 한 통으로 복사한다.
- * 개발 서버에서만 열린다(`main.tsx`). 코드는 비번이라 발급한 그 자리에서만 보인다 — 잊으면 `새 코드`.
+ * 개발 서버에서만 열린다(`main.tsx`). 발급한 코드는 이 맥 파일에 남아 목록에서 다시 복사한다. 그 전 계정은 코드를 몰라 `새 코드`로.
  */
 export function AdminInvitePage() {
   const [nickname, setNickname] = useState('')
@@ -35,7 +35,8 @@ export function AdminInvitePage() {
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState('')
   const [issued, setIssued] = useState<Issued | null>(null)
-  const [copied, setCopied] = useState(false)
+  /** 방금 복사한 메시지의 계정 이메일, 위 결과 카드는 `issued`. */
+  const [copied, setCopied] = useState<string | null>(null)
   const [confirming, setConfirming] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
@@ -52,7 +53,7 @@ export function AdminInvitePage() {
     if (busy) return
     setBusy(true)
     setFailure('')
-    setCopied(false)
+    setCopied(null)
     setConfirming(null)
     try {
       const { invite } = await call<{ invite: Invite }>({ mode, nickname: name })
@@ -72,11 +73,10 @@ export function AdminInvitePage() {
     void issue('add', nickname.trim())
   }
 
-  const copy = async () => {
-    if (!issued) return
+  const copy = async (key: string, message: string) => {
     try {
-      await navigator.clipboard.writeText(issued.message)
-      setCopied(true)
+      await navigator.clipboard.writeText(message)
+      setCopied(key)
     } catch {
       setFailure('복사하지 못했어요. 아래 글을 직접 골라 복사해 주세요.')
     }
@@ -89,7 +89,7 @@ export function AdminInvitePage() {
     <div className={styles.shell} data-testid="admin-invite">
       <header className={styles.head}>
         <h1>베타 초대</h1>
-        <p>이 맥에서만 열려요. 코드는 발급한 자리에서만 보여요.</p>
+        <p>이 맥에서만 열려요. 발급한 코드는 이 맥에 남아요.</p>
       </header>
 
       <form className={styles.issue} onSubmit={submit}>
@@ -118,8 +118,8 @@ export function AdminInvitePage() {
         </div>
         <code className={styles.code}>{issued.code}</code>
         <pre className={styles.message}>{issued.message}</pre>
-        <button type="button" onClick={() => void copy()} data-copied={copied || undefined} data-testid="admin-invite-copy">
-          {copied ? '복사했어요 — 카톡에 붙여 넣으세요' : '카톡 메시지 복사'}
+        <button type="button" onClick={() => void copy('issued', issued.message)} data-copied={copied === 'issued' || undefined} data-testid="admin-invite-copy">
+          {copied === 'issued' ? '복사했어요 — 카톡에 붙여 넣으세요' : '카톡 메시지 복사'}
         </button>
       </section>}
 
@@ -133,8 +133,16 @@ export function AdminInvitePage() {
             return <li key={account.email}>
               <div>
                 <strong>{name ?? '(닉네임 없음)'}</strong>
+                {account.invite ? <code>{account.invite.code}</code> : <em>코드 모름</em>}
                 <span>마지막 로그인 {dateOf(account.lastSignInAt)}</span>
               </div>
+              {account.invite && <button
+                type="button"
+                data-copied={copied === account.email || undefined}
+                onClick={() => void copy(account.email, account.invite!.message)}
+              >
+                {copied === account.email ? '복사함' : '메시지 복사'}
+              </button>}
               {name && <button
                 type="button"
                 disabled={busy}

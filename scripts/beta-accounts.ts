@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { betaInviteEnvOf, createBetaInvites } from './betaInvites'
+import { BETA_CODE_FILE, betaInviteEnvOf, createBetaInvites } from './betaInvites'
 import type { BetaInvite } from './betaInvites'
 
 /**
@@ -28,9 +28,9 @@ async function main(): Promise<void> {
 
   if (command === 'list') {
     const env = betaInviteEnvOf({ BETA_APP_URL: 'http://unused.invalid', ...process.env })
-    const accounts = await createBetaInvites(env).list()
+    const accounts = await createBetaInvites(env, path.join(ROOT, BETA_CODE_FILE)).list()
     if (accounts.length === 0) console.log('베타 계정이 없습니다.')
-    for (const account of accounts) console.log(`${account.nickname ?? '(닉네임 없음)'}\t${account.email}\t마지막 로그인 ${account.lastSignInAt ?? '없음'}`)
+    for (const account of accounts) console.log(`${account.nickname ?? '(닉네임 없음)'}\t${account.email}\t${account.invite?.code ?? '(코드 모름)'}\t마지막 로그인 ${account.lastSignInAt ?? '없음'}`)
     return
   }
 
@@ -44,7 +44,7 @@ async function main(): Promise<void> {
   let issued: BetaInvite[] = []
   // 중간에 실패해도 이미 만든 계정의 코드는 파일로 남긴다.
   try {
-    issued = await createBetaInvites(env).issue(command, nicknames, ({ nickname, code }) => {
+    issued = await createBetaInvites(env, path.join(ROOT, BETA_CODE_FILE)).issue(command, nicknames, ({ nickname, code }) => {
       console.log(`${command === 'add' ? '만듦' : '새 코드'}\t${nickname}\t${code}`)
     })
   } catch (error) {
