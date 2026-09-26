@@ -32,6 +32,8 @@
 .head .signOut { min-height: 40px; width: 100%; border-radius: 10px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 13px; font-weight: 700; }
 
 .scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
+/* 다른 폰트로 옮겨 가는 중. 판을 흐리고 막는다 — 다시 열리면 `index.html` 뼈대가 이어받는다. */
+.scroll[data-moving] { opacity: .35; pointer-events: none; transition: opacity var(--motion-normal) var(--ease-standard); }
 
 /* 폰트 카드 캐러셀. 스냅 한 장씩, 다음 카드가 조금 보인다. 활성 카드만 또렷하다. */
 .fontCardRow { padding: 14px 16px; }

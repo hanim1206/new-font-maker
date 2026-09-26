@@ -24,6 +24,58 @@
   </head>
   <body>
     <div id="root"></div>
+    <!--
+      대시보드 뼈대. 앱 JS가 뜨기 전(폰트 바꾸기 · 새로고침)에 흰 화면 대신 보인다. React가 첫 화면을 그리면 #root 안이 통째로 바뀐다.
+      알약 이름은 폰트를 바꿀 때 남긴 값(`fontSwitch.ts` NEXT_FONT_NAME_KEY)을 한 번 읽고 지운다. 없으면 회색 막대.
+      크기 · 색은 DashboardLabPage.module.css와 src/index.css 토큰을 손으로 옮긴 것 — 거기가 바뀌면 같이 고친다.
+    -->
+    <style>
+      /* 앱 CSS가 뜨기 전엔 body 기본 여백(8px)이 남아 스크롤바가 생겼다 사라지며 폭이 움찔한다. 뼈대가 있을 때만 여백을 없애고 넘침을 자른다. */
+      body:has(> #root > .boot) { margin: 0; overflow: hidden; }
+      .boot { height: 100dvh; overflow: hidden; background: rgb(247 248 250); font-family: Pretendard, -apple-system, system-ui, sans-serif; }
+      .boot-shell { width: min(100%, 480px); height: 100dvh; margin: 0 auto; overflow: hidden; background: #fff; box-shadow: 0 4px 12px rgb(0 0 0 / .06); }
+      .boot-head { height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 2px 8px 2px 8px; box-sizing: border-box; }
+      .boot-pill { height: 36px; display: inline-flex; align-items: center; padding: 0 18px; border-radius: 999px; background: rgb(248 249 251); color: rgb(24 27 31); font-size: 15px; font-weight: 600; }
+      .boot-pill:empty::before { content: ''; width: 64px; height: 12px; border-radius: 6px; background: rgb(231 235 240); }
+      .boot-me { width: 28px; height: 28px; margin-right: 8px; border-radius: 999px; background: rgb(240 243 246); }
+      .boot-cardrow { padding: 14px 16px; }
+      .boot-card { height: 188px; box-sizing: border-box; padding: 18px 16px 14px; border-radius: 16px; background: rgb(248 249 251); display: flex; flex-direction: column; gap: 12px; }
+      .boot-foot { margin-top: auto; display: flex; justify-content: flex-end; gap: 6px; }
+      .boot-foot i { width: 40px; height: 40px; border-radius: 999px; background: rgb(240 243 246); }
+      .boot-bar { border-radius: 8px; background: rgb(231 235 240); }
+      .boot-body { display: flex; border-top: 1px solid rgb(235 238 242); }
+      .boot-rail { flex: 0 0 92px; min-height: calc(100dvh - 266px); padding: 10px 6px; box-sizing: border-box; background: rgb(248 249 251); display: flex; flex-direction: column; gap: 2px; }
+      .boot-rail i { height: 44px; display: grid; place-items: center; }
+      .boot-rail i::before { content: ''; width: 40px; height: 12px; border-radius: 6px; background: rgb(231 235 240); }
+      .boot-content { flex: 1; min-width: 0; padding: 18px 12px; }
+      .boot-tiles { margin-top: 16px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+      .boot-tiles i { height: 107px; border-radius: 12px; background: rgb(248 249 251); }
+      .boot-bar, .boot-rail i::before, .boot-pill:empty::before, .boot-me { animation: boot-pulse 1.2s ease-in-out infinite; }
+      @keyframes boot-pulse { 50% { opacity: .55; } }
+      @media (prefers-reduced-motion: reduce) { .boot * , .boot *::before { animation: none !important; } }
+    </style>
+    <script>
+      if (location.pathname === '/dashboard') {
+        var bootName = ''
+        try { bootName = sessionStorage.getItem('next-font-name') || ''; sessionStorage.removeItem('next-font-name') } catch (e) {}
+        var root = document.getElementById('root')
+        root.innerHTML =
+          '<div class="boot" aria-busy="true"><div class="boot-shell">' +
+            '<div class="boot-head"><span class="boot-pill"></span><span class="boot-me"></span></div>' +
+            '<div class="boot-cardrow"><div class="boot-card">' +
+              '<span class="boot-bar" style="width:40%;height:12px"></span>' +
+              '<span class="boot-bar" style="width:78%;height:34px;margin-top:6px"></span>' +
+              '<span class="boot-bar" style="width:46%;height:34px"></span>' +
+              '<span class="boot-foot"><i></i><i></i></span>' +
+            '</div></div>' +
+            '<div class="boot-body"><div class="boot-rail"><i></i><i></i><i></i><i></i><i></i></div>' +
+              '<div class="boot-content"><span class="boot-bar" style="display:block;width:30%;height:14px"></span>' +
+              '<div class="boot-tiles"><i></i><i></i><i></i><i></i></div></div>' +
+            '</div>' +
+          '</div></div>'
+        root.querySelector('.boot-pill').textContent = bootName
+      }
+    </script>
     <script type="module" src="/src-next/main.tsx"></script>
   </body>
 </html>

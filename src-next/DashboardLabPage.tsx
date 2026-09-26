@@ -714,6 +714,8 @@ function useFontList() {
   const [fonts, setFonts] = useState<FontSummary[] | null>(null)
   const [nickname, setNickname] = useState<string | null>(null)
   const [moving, setMoving] = useState(false)
+  // 옮겨 가는 폰트 이름. 누르자마자 알약이 이 이름이 되고 드로어가 닫히며 판이 흐려진다 — 다시 열리는 동안 기다리는 걸 보인다.
+  const [movingTo, setMovingTo] = useState<string | null>(null)
   useEffect(() => {
     if (!session) return
     void listFonts(session.me).then((listed) => { if (listed.ok) setFonts(listed.value) })
@@ -721,11 +723,13 @@ function useFontList() {
     else setNickname('내 폰트')
   }, [session])
 
-  const go = async (move: () => Promise<boolean>) => {
+  const go = async (to: string, move: () => Promise<boolean>) => {
     if (moving) return
     setMoving(true)
+    setMovingTo(to)
     if (await move()) return
     setMoving(false)
+    setMovingTo(null)
     fontListFailed(FONT_SAVE_FAILED)
   }
   return {
@@ -735,10 +739,15 @@ function useFontList() {
     fonts: fonts && [...fonts].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     full: (fonts?.length ?? FONT_LIMIT) >= FONT_LIMIT,
     moving,
-    open: (fontId: string) => { if (session && fontId !== session.fontId) void go(() => openFont(session.me, fontId)) },
+    movingTo,
+    open: (fontId: string) => {
+      const font = fonts?.find((item) => item.id === fontId)
+      if (session && font && fontId !== session.fontId) void go(font.name, () => openFont(session.me, fontId, font.name))
+    },
     create: () => {
       if (!session || !fonts || fonts.length >= FONT_LIMIT) return
-      void go(() => openNewFont(session.me, nextFontName(nickname, fonts.map((font) => font.name))))
+      const name = nextFontName(nickname, fonts.map((font) => font.name))
+      void go(name, () => openNewFont(session.me, name))
     },
     /** 카드 `…` 이름 바꾸기. 계정 폰트를 안 연 랩 화면이면 머리 이름만 바꾼다. */
     renameCurrent: (next: string) => {
@@ -824,6 +833,7 @@ export function DashboardLabPage() {
   const [sheet, setSheet] = useState<'closed' | 'open' | 'closing'>('closed')
   const sheetOpen = sheet === 'open'
   const closeSheet = () => setSheet((state) => state === 'open' ? 'closing' : state)
+  useEffect(() => { if (fontList.movingTo !== null) closeSheet() }, [fontList.movingTo])
   const head = useRef<HTMLElement>(null)
   const [active, setActive] = useState<SectionId>('style')
   const scroller = useRef<HTMLDivElement>(null)
@@ -854,13 +864,13 @@ export function DashboardLabPage() {
         {/* 회색 알약 = 지금 폰트. 누르면 내 폰트 시트(바꾸기 · 새로 · 이름 · 삭제). 계정 폰트를 안 연 랩 화면이면 이름만. */}
         <h1 className={styles.title}>
           <button type="button" className={styles.switcher} disabled={!fontList.canList} aria-haspopup="dialog" aria-expanded={sheetOpen} onClick={() => sheetOpen ? closeSheet() : setSheet('open')} data-testid="dashboard-font-switcher">
-            <span>{name}</span>{fontList.canList && <ChevronDown size={18} aria-hidden="true" data-open={sheetOpen || undefined} />}
+            <span>{fontList.movingTo ?? name}</span>{fontList.canList && <ChevronDown size={18} aria-hidden="true" data-open={sheetOpen || undefined} />}
           </button>
         </h1>
         <AccountMenu fontCount={fontList.fonts?.length ?? null} />
       </header>
 
-      <div ref={scroller} className={styles.scroll} onScroll={onScroll}>
+      <div ref={scroller} className={styles.scroll} onScroll={onScroll} data-moving={fontList.movingTo !== null || undefined} aria-busy={fontList.movingTo !== null || undefined}>
         {/* 지금 폰트 카드 하나. 다른 폰트는 머리 알약 시트에서. */}
         <div className={styles.fontCardRow}>
           <FontCard name={name} note={modified > 0 ? '마지막 고침 · 오늘' : '마지막 고침 · 오늘 · 프리셋 그대로'} onRename={fontList.renameCurrent} onDelete={fontList.removeCurrent} />

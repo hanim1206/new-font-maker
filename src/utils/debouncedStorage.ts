@@ -7,6 +7,20 @@ export interface FlushableStateStorage extends StateStorage {
 
 let writeErrorHandler: ((error: unknown, name: string) => void) | null = null
 
+/** 만든 스토리지마다 `예약 버리기`를 모아 둔다. 폰트를 바꿔 떠날 때 한 번에 부른다. */
+const discarders = new Set<() => void>()
+let frozen = false
+
+/**
+ * 예약된 쓰기를 모두 버리고, 이 페이지가 끝날 때까지 새 쓰기도 받지 않는다.
+ * 폰트를 바꿔 떠나기 직전에 부른다 — 사본을 비운 뒤 옛 폰트가 떠나면서(`beforeunload`) 다시 써지지 않게.
+ * 예약이 끝나기를 기다리지 않아도 된다(옛 400ms 기다림 대신).
+ */
+export function freezePersistedWrites(): void {
+  frozen = true
+  for (const discard of discarders) discard()
+}
+
 /** 예약된 쓰기가 실패하면(저장 공간 초과 등) 부른다. 앱이 알림을 붙인다(`main.tsx`). */
 export function setPersistWriteErrorHandler(handler: ((error: unknown, name: string) => void) | null): void {
   writeErrorHandler = handler
@@ -42,12 +56,18 @@ export function createDebouncedStorage(delay = 300): FlushableStateStorage {
   if (typeof window !== 'undefined') {
     window.addEventListener('beforeunload', flush)
   }
+  discarders.add(() => {
+    for (const name of Object.keys(timers)) clearTimeout(timers[name])
+    for (const name of Object.keys(timers)) delete timers[name]
+    dirty.clear()
+  })
 
   return {
     getItem: (name: string) => {
       return cache[name] ?? localStorage.getItem(name)
     },
     setItem: (name: string, value: string) => {
+      if (frozen) return
       cache[name] = value
       dirty.add(name)
       clearTimeout(timers[name])
