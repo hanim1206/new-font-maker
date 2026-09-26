@@ -302,7 +302,8 @@ function JamoPreview({ type, chars }: { type: JamoType; chars: readonly string[]
 }
 
 /**
- * 섹션 홈의 묶기. 축 하나만 고른다 — 숨기지 않고 소제목으로 나눈다(전체 목록 원칙).
+ * 섹션 홈의 묶기. 축 하나만 고른다. 그 기준에 해당하는 것만 소제목으로 나누고, 해당 없는 글자는 숨긴다
+ * (`해당 없음` 묶음을 억지로 만들지 않는다 — 전부 보려면 `전체`).
  * 묶는 기준은 편집이 퍼지는 단위에 가깝게: 줄기 계열(어휘사전) · 홑/쌍 · 우리 획 수.
  */
 type Grouping = { id: string; label: string; groups: (chars: readonly string[], strokeCount: (char: string) => number) => { label: string | null; chars: string[] }[] }
@@ -344,14 +345,11 @@ const BY_FINAL_KIND: Grouping = {
     { label: '겹받침', chars: chars.filter((c) => CLUSTER_FINAL[c]) },
   ].filter((group) => group.chars.length > 0),
 }
-// 겹받침은 앞 자음(왼쪽 반)이 같은 것끼리. 겹받침 아닌 것도 한 칸에 둬야 전체 선택이 빠짐없다.
+// 겹받침은 앞 자음(왼쪽 반)이 같은 것끼리. 홑 · 쌍받침은 숨긴다.
 const BY_CLUSTER_HEAD: Grouping = {
   id: 'head', label: '겹받침 앞 자음', groups: (chars) => {
     const heads = [...new Set(chars.map((c) => CLUSTER_FINAL[c]).filter(Boolean))]
-    return [
-      ...heads.map((head) => ({ label: `${head} 겹받침`, chars: chars.filter((c) => CLUSTER_FINAL[c] === head) })),
-      { label: '홑 · 쌍받침', chars: chars.filter((c) => !CLUSTER_FINAL[c]) },
-    ].filter((group) => group.chars.length > 0)
+    return heads.map((head) => ({ label: `${head} 겹받침`, chars: chars.filter((c) => CLUSTER_FINAL[c] === head) }))
   },
 }
 const GROUPINGS: Record<JamoType, Grouping[]> = {
@@ -456,6 +454,9 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
     }
     return { cards, heads, height: Math.max(0, y - GROUP_GAP) }
   }, [groups, cell])
+  // 숨는 카드는 마지막 자리에서 흐려진다. 자리를 옮기며 사라지면 어디서 빠졌는지 안 보인다.
+  const lastAt = useRef(new Map<string, { x: number; y: number }>())
+  useLayoutEffect(() => { for (const [char, at] of layout.cards) lastAt.current.set(char, at) }, [layout])
 
   return <div className={styles.home} data-testid="jamo-home" data-type={type}>
     <header className={styles.homeHead}>
@@ -474,8 +475,9 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
           return <button key={label} type="button" className={styles.groupHead} style={{ transform: `translateY(${y}px)` }} role="checkbox" aria-checked={whole} onClick={() => group && (whole ? remove : add)(type, group.chars)}><span className={styles.check} aria-hidden="true"><Check size={14} strokeWidth={3} /></span>{label}</button>
         })}
         {cell > 0 && chars.map((char) => {
-          const at = layout.cards.get(char)
-          return <button key={char} type="button" className={styles.homeCard} style={{ width: cell, height: cell, transform: at ? `translate(${at.x}px, ${at.y}px)` : undefined }} aria-label={`${char} 도마에 ${onBench(char) ? '빼기' : '담기'}`} aria-pressed={onBench(char)} onClick={() => toggle(type, char)}>
+          const shown = layout.cards.has(char)
+          const at = layout.cards.get(char) ?? lastAt.current.get(char)
+          return <button key={char} type="button" className={styles.homeCard} style={{ width: cell, height: cell, transform: at ? `translate(${at.x}px, ${at.y}px)` : undefined }} data-hidden={shown ? undefined : true} aria-hidden={shown ? undefined : true} tabIndex={shown ? undefined : -1} aria-label={`${char} 도마에 ${onBench(char) ? '빼기' : '담기'}`} aria-pressed={onBench(char)} onClick={() => toggle(type, char)}>
             <span className={styles.inkSmall}><AppGlyph char={char} size={52} upright /></span>
           </button>
         })}
