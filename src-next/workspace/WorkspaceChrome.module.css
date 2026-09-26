@@ -1,6 +1,6 @@
 .page { min-height: 100dvh; overflow: hidden; background: rgb(var(--color-background)); }
 .shell { position: relative; width: min(100%, 480px); height: 100dvh; box-sizing: border-box; margin: 0 auto; padding-bottom: env(safe-area-inset-bottom); display: flex; flex-direction: column; overflow: hidden; background: rgb(var(--color-surface)); box-shadow: var(--shadow-md); }
-.projectHeader { min-height: 50px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px; padding: max(2px, env(safe-area-inset-top)) 10px 2px 8px; border-bottom: 1px solid rgb(var(--color-border-subtle)); }
+.projectHeader { min-height: 50px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px; padding: max(2px, env(safe-area-inset-top)) 10px 2px 8px; }
 .projectIdentity { min-width: 0; display: flex; flex-direction: column; align-items: center; }
 .projectIdentity strong { max-width: 100%; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 /* `‹ 내 폰트` — 위 덱으로 나가는 문. 글자가 있어 어디로 가는지 읽힌다. */

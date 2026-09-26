@@ -576,7 +576,8 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
         <button type="button" className={styles.chipAdd} aria-label="묶음 만들기" onClick={() => setSheet({ kind: 'create' })}><Plus size={18} aria-hidden="true" /></button>
       </div>
       <div ref={board} className={styles.board} style={{ height: layout.height }}>
-        {layout.heads.map(({ key, group, y }) => {
+        {/* 소제목도 칸 크기를 잰 뒤에 놓는다 — 먼저 놓으면 칸 0 자리에서 제자리로 미끄러져 내려온다. */}
+        {cell > 0 && layout.heads.map(({ key, group, y }) => {
           const whole = group.chars.every(onBench)
           return [
             <button key={key} type="button" className={styles.groupHead} style={{ transform: `translateY(${y}px)` }} role="checkbox" aria-checked={whole} onClick={() => (whole ? remove : add)(type, group.chars)}><span className={styles.check} aria-hidden="true"><Check size={14} strokeWidth={3} /></span>{group.label}<span className={styles.groupCount}>{group.chars.length}</span></button>,

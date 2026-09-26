@@ -1,5 +1,5 @@
 .page { position: relative; width: min(100%, 480px); height: 100dvh; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; background: rgb(var(--color-surface)); box-shadow: var(--shadow-md); }
-.header { flex: 0 0 auto; min-height: 64px; display: flex; align-items: center; justify-content: space-between; padding: max(10px, env(safe-area-inset-top)) 14px 10px; border-bottom: 1px solid rgb(var(--color-border-subtle)); }
+.header { flex: 0 0 auto; min-height: 64px; display: flex; align-items: center; justify-content: space-between; padding: max(10px, env(safe-area-inset-top)) 14px 10px; }
 /* 셸 안 획 캔버스는 레이아웃 캔버스와 같은 크기다(가로 100%, 최대 330px). 세로가 모자란 화면에서만 줄인다 — 머리 50 · 문장 한 줄 56 · 도구 줄 · `완료` · 편집부 여백을 뺀 나머지, 바닥 180px. */
 /* 레이아웃 모드의 캔버스 절과 같은 배치: 왼쪽 세로 표지 + 남은 너비 가운데에 캔버스. 여백 · 간격도 같아서 두 모드의 캔버스가 같은 자리에 선다. */
 .editor[data-chrome='workspace'] { justify-content: flex-start; align-items: stretch; padding: 8px 14px; }
