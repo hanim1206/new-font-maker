@@ -2611,18 +2611,29 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       {isShapeRuleOpen && selection.kind !== 'none' && <ShapeRulePanel jamo={selection.jamo} selectedStrokeId={selection.kind === 'component' ? null : selection.strokeId} onClose={() => setIsShapeRuleOpen(false)} />}
     </>
   )
-  // 도마 칩 줄. 지금 글자에 든 도마 자소가 검정, 손댄 자소는 점. 탭하면 그 자소의 대표 글자로 바꾼다(문장에 없으면 앞에 붙인다).
+  // 도마 칩 줄. 획 편집(자모 에디터)에서만 — 레이아웃 편집엔 도마가 없다. 지금 글자에 든 도마 자소가 검정, 손댄 자소는 점.
+  // 탭하면 그 자소의 대표 글자로 바꾸되 획 편집에 머문다(문장에 없으면 앞에 붙인다). `닿는 글자` 줄에서 글자를 고르는 것과 같은 길.
   const benchJamo = benchType ? workbenchJamoOf(benchType, selectedChar) : null
+  const benchPart: MobileEditorPart | null = benchType === 'choseong' ? 'CH' : benchType === 'jungseong' ? 'JU' : benchType === 'jongseong' ? 'JO' : null
   const pickBenchJamo = (char: string) => {
-    if (!benchType || char === benchJamo) return
+    if (!benchType || !benchPart || char === benchJamo) return
     const syllable = workbenchSyllable(benchType, char)
     if (![...sampleSentence].includes(syllable)) {
       setSampleSentence((sentence) => `${syllable} ${sentence}`)
       setIsCustomSentence(true)
     }
-    chooseChar(syllable)
+    setEditMode('stroke')
+    setStrokeEntryPart(benchPart)
+    setStrokeRowAnchor(null)
+    setSelectedChar(syllable)
+    setSelection({ kind: 'none' })
+    setSelectedPoints([])
+    setPreviewJamo(null)
+    setPreviewSchema(null)
+    setInkGapLimiter(null)
+    pickFirstStrokeRef.current = true
   }
-  const benchRow = benchType && benchChars.length > 0 && (
+  const benchRow = benchType && benchChars.length > 0 && editMode === 'stroke' && (
     <div className={styles.bench} role="tablist" aria-label="도마" data-testid="workbench">
       {benchChars.map((char) => <button key={char} type="button" role="tab" aria-selected={char === benchJamo} data-modified={isJamoModified(benchType, char) || undefined} onClick={() => pickBenchJamo(char)}>{char}</button>)}
     </div>

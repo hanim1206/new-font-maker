@@ -277,10 +277,11 @@ type JamoType = 'choseong' | 'jungseong' | 'jongseong'
 const JAMO_LABEL: Record<JamoType, string> = { choseong: '초성', jungseong: '중성', jongseong: '종성' }
 const PREVIEW_COUNT = 4
 
-/** 편집기로. 도마를 그 자소들로 바꾸고 첫 자소의 대표 글자를 연다. 랩은 앱과 다른 마운트라 진짜 이동이다(도마는 저장돼 살아남는다). */
+/** 자모 에디터(획 편집)로. 도마를 그 자소들로 바꾸고 첫 자소의 대표 글자를 그 자소 획 편집으로 연다. 랩은 앱과 다른 마운트라 진짜 이동이다(도마는 저장돼 살아남는다). */
+const EDITOR_PART: Record<JamoType, 'CH' | 'JU' | 'JO'> = { choseong: 'CH', jungseong: 'JU', jongseong: 'JO' }
 function openEditor(type: JamoType, chars: readonly string[]) {
   useWorkbenchStore.getState().place(type, chars)
-  window.location.assign(`/workspace/jamo?char=${encodeURIComponent(workbenchSyllable(type, chars[0]))}`)
+  window.location.assign(`/workspace/jamo?char=${encodeURIComponent(workbenchSyllable(type, chars[0]))}&mode=stroke&part=${EDITOR_PART[type]}`)
 }
 
 /** 대시보드의 자소 줄. 앞 네 장만 보이고(손댄 것 우선은 다음), 카드는 홈을 건너뛰고 그 자소 하나만 도마에 올려 편집기로 간다. 머리(화살표)가 홈이다. */
