@@ -109,10 +109,11 @@ describe('브라우저 사본 이름표', () => {
   })
 
   it('새 폰트 이름은 친구 아이디, 겹치면 번호. 아이디가 없으면 My Font', () => {
-    expect(nextFontName('test1', [])).toBe('test1')
-    expect(nextFontName('test1', ['test1'])).toBe('test1 2')
-    expect(nextFontName('test1', ['test1', 'test1 2'])).toBe('test1 3')
-    expect(nextFontName('test1', ['test1 2'])).toBe('test1')
+    expect(nextFontName('test1', [])).toBe('test1체')
+    expect(nextFontName('test1', ['test1체'])).toBe('test1체 2')
+    expect(nextFontName('test1', ['test1체', 'test1체 2'])).toBe('test1체 3')
+    expect(nextFontName('test1', ['test1체 2'])).toBe('test1체')
+    expect(nextFontName('하늘체', [])).toBe('하늘체')
     expect(nextFontName(null, [])).toBe('My Font')
   })
 
@@ -126,7 +127,7 @@ describe('브라우저 사본 이름표', () => {
   it('고른 폰트가 없으면 최근 폰트를, 없으면 새 폰트를 연다', () => {
     const fonts = [{ id: 'recent' }, { id: 'old' }]
     expect(autoPickOf(stampOf({ owner: 'a' }), 'a', fonts, true, '민지')).toEqual({ clear: true, stamp: { owner: 'a', fontId: 'recent', pending: false, fresh: true } })
-    expect(autoPickOf(stampOf({ owner: 'a' }), 'a', [], true, '민지')).toEqual({ clear: true, stamp: { owner: 'a', fontId: null, pending: false, create: '민지' } })
+    expect(autoPickOf(stampOf({ owner: 'a' }), 'a', [], true, '민지')).toEqual({ clear: true, stamp: { owner: 'a', fontId: null, pending: false, create: '민지체' } })
     // 로그인 전 작업이 있고 계정이 비었으면 그 작업이 첫 폰트 — 사본을 남긴다.
     expect(autoPickOf(stampOf({}), 'a', [], true, '민지').clear).toBe(false)
     expect(autoPickOf(stampOf({}), 'a', fonts, true, '민지').clear).toBe(true)

@@ -101,11 +101,12 @@ export function openPlanOf(stamp: LocalStamp, me: string, fontId: string, localO
 }
 
 /**
- * 새 폰트 이름. 발급할 때 적은 친구 아이디(`user_metadata.nickname`)로, 겹치면 `test1 2` · `test1 3`.
- * 아이디가 없으면 `My Font`.
+ * 새 폰트 이름. 발급할 때 적은 친구 아이디(`user_metadata.nickname`)에 `체`를 붙여 `test1체`, 겹치면 `test1체 2` · `test1체 3`.
+ * 아이디가 이미 `체`로 끝나면 그대로. 아이디가 없으면 `My Font`.
  */
 export function nextFontName(nickname: string | null | undefined, taken: readonly string[]): string {
-  const base = nickname?.trim() || 'My Font'
+  const id = nickname?.trim()
+  const base = id ? (id.endsWith('체') ? id : `${id}체`) : 'My Font'
   const used = new Set(taken.map((name) => name.trim()))
   if (!used.has(base)) return base
   for (let n = 2; ; n += 1) if (!used.has(`${base} ${n}`)) return `${base} ${n}`
