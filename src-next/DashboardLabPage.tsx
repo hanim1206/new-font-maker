@@ -292,10 +292,9 @@ function openEditor(type: JamoType, chars: readonly string[]) {
 
 /** 대시보드의 자소 줄. 앞 네 장만 보이고(손댄 것 우선은 다음), 머리(화살표)가 홈이다. 카드도 편집기로 바로 가지 않는다 — 그 자소 하나만 도마에 올려 홈으로. */
 function JamoPreview({ type, chars }: { type: JamoType; chars: readonly string[] }) {
-  const isJamoModified = useJamoStore((state) => state.isJamoModified)
   return <ul className={styles.preview}>
     {chars.slice(0, PREVIEW_COUNT).map((char) => <li key={char}>
-      <button type="button" className={styles.thumb} aria-label={`${char} 도마에 올리기`} data-modified={isJamoModified(type, char) || undefined} onClick={() => { useWorkbenchStore.getState().place(type, [char]); navigate(`/dashboard/${type}`) }}>
+      <button type="button" className={styles.thumb} aria-label={`${char} 도마에 올리기`} onClick={() => { useWorkbenchStore.getState().place(type, [char]); navigate(`/dashboard/${type}`) }}>
         <Lazy className={styles.inkSmall}><AppGlyph char={char} size={52} upright /></Lazy>
       </button>
     </li>)}
@@ -487,7 +486,7 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
       <div className={styles.benchChips} style={benchHeight === null ? undefined : { height: benchHeight }}><div ref={benchInner} aria-label="도마">
         {benchCount === 0 ? <em>카드나 묶음을 눌러 도마에 올리세요</em> : benchChars.map((char) => <button key={char} type="button" data-chip={char} aria-label={`${char} 도마에서 빼기`} onClick={() => toggle(type, char)}>{char}</button>)}
       </div></div>
-      <button type="button" className={styles.benchClear} aria-label="도마 비우기" disabled={benchCount === 0} onClick={clear}><Trash2 size={18} aria-hidden="true" /></button>
+      {benchCount > 0 && <button type="button" className={styles.benchClear} aria-label="도마 비우기" onClick={clear}><Trash2 size={18} aria-hidden="true" /></button>}
       <button type="button" className={styles.benchGo} disabled={benchCount === 0} onClick={() => openEditor(type, benchChars)}>편집 {benchCount}</button>
     </footer>
   </div>

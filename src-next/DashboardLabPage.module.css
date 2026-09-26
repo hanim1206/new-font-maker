@@ -95,7 +95,6 @@
 /* 글자 격자 3열. 칸은 평평한 면, 손댄 칸은 모서리에 점. */
 .grid { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .thumb { position: relative; width: 100%; aspect-ratio: 1; display: grid; place-items: center; border: 0; border-radius: 12px; background: rgb(var(--color-surface-2)); }
-.thumb[data-modified]::after { content: ''; position: absolute; top: 8px; right: 8px; width: 6px; height: 6px; border-radius: 999px; background: rgb(var(--color-foreground)); }
 .ink { display: block; width: 72px; height: 72px; }
 .ink svg { display: block; width: 100%; height: 100%; }
 .inkSmall { display: block; width: 52px; height: 52px; }
@@ -140,11 +139,11 @@
 .benchChips > div { position: relative; min-height: 40px; display: flex; flex-wrap: wrap; align-content: center; align-items: center; gap: 4px; }
 .benchChips button { min-width: 26px; height: 26px; display: inline-grid; place-items: center; padding: 0 4px; border: 0; border-radius: 8px; background: rgb(var(--color-surface-2)); color: inherit; font-size: 13px; font-weight: 700; }
 .benchChips em { color: rgb(var(--color-text-5)); font-size: 12px; font-style: normal; animation: fadeIn var(--motion-normal) var(--ease-standard); }
-.benchClear { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-text-4)); }
-.benchClear:disabled { color: rgb(var(--color-text-6)); }
+.benchClear { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-text-6)); animation: popIn var(--motion-normal) var(--ease-standard); }
 .benchGo { flex: none; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .benchGo:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
 @keyframes fadeIn { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .home, .board, .groupHead, .homeCard, .benchChips { transition: none; animation: none; } }
+@keyframes popIn { from { opacity: 0; transform: scale(0.6); } }
+@media (prefers-reduced-motion: reduce) { .home, .board, .groupHead, .homeCard, .benchChips, .benchClear { transition: none; animation: none; } }
 .picto { display: block; width: 52px; height: 52px; }
 .picto svg { display: block; width: 100%; height: 100%; }
