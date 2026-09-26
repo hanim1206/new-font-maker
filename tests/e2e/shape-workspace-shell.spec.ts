@@ -20,7 +20,7 @@ test('옛 화면 주소(현황 · 원형 · 조합별 결과)는 자소 탭으�
   await page.goto('/workspace/not-a-screen')
   await expect(page.getByRole('heading', { name: '작업 화면을 찾을 수 없어요' })).toBeVisible()
   await expect(page.getByText('잘못된 주소를 문장 보정 화면으로 숨기지 않았습니다.')).toBeVisible()
-  await expect(page.getByRole('link', { name: '자소 탭으로 이동' })).toHaveAttribute('href', '/workspace/jamo')
+  await expect(page.getByRole('link', { name: '대시보드로 이동' })).toHaveAttribute('href', '/dashboard')
 })
 
 test('옛 뼈대 주소는 자소 화면으로 넘어간다', async ({ page }) => {

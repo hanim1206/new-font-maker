@@ -7,9 +7,15 @@ import { ReviewWorkspacePage } from './ReviewWorkspacePage'
 import { ShapeWorkspacePage } from './ShapeWorkspacePage'
 import { FontExportDialog } from './workspace/FontExportDialog'
 
-/** 앱을 열면 자소 탭이 처음이다. `?char=` 같은 쿼리는 그대로 넘긴다. 프로덕션에서 모르는 주소도 여기로 온다. */
+/**
+ * 앱을 열면 대시보드가 처음이다 — 화면 사이 입구가 다 거기 있다. 프로덕션에서 모르는 주소도 여기로 온다.
+ * 글자 쿼리(`?char=`)가 있으면 그 글자를 여는 링크라 자소 화면으로 그대로 넘긴다.
+ */
 function HomeRedirect() {
-  useEffect(() => { navigate(`/workspace/jamo${window.location.search}${window.location.hash}`, { replace: true }) }, [])
+  useEffect(() => {
+    const { search, hash } = window.location
+    navigate(new URLSearchParams(search).has('char') ? `/workspace/jamo${search}${hash}` : '/dashboard', { replace: true })
+  }, [])
   return null
 }
 

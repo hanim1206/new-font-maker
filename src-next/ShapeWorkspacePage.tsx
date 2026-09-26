@@ -14,7 +14,7 @@ function NotFoundScreen(): ReactNode {
         <span className={styles.screenId}>WORKSPACE</span>
         <h1>작업 화면을 찾을 수 없어요</h1>
         <p>잘못된 주소를 문장 보정 화면으로 숨기지 않았습니다.</p>
-        <a href="/workspace/jamo" onClick={onLinkClick}>자소 탭으로 이동</a>
+        <a href="/dashboard" onClick={onLinkClick}>대시보드로 이동</a>
       </section>
     </MobileWorkspaceShell>
   )
