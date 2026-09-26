@@ -51,6 +51,8 @@ export interface StemBeakSource {
   box: BoxConfig
   weightMultiplier: number
   group: string
+  /** 이 획에만 먹는 부리(사용자 묶음 값). 없으면 전역 `style`을 따른다. 꺼진 값도 값이다. */
+  style?: StemBeakStyle
 }
 
 /** 닿음을 같이 볼 묶음 이름: 같은 자소의 같은 채널. */
@@ -68,13 +70,15 @@ const DEPTH_RATIO = 0.9
  * `renderStyle`이 납작 · 네모 붓촉이면 줄기 폭을 그 붓촉이 실제로 남기는 폭으로 잰다(굵기 그대로 쓰면 부리가 줄기보다 넓다).
  */
 export function stemBeakInkGroups(sources: readonly StemBeakSource[], style: StemBeakStyle | undefined, renderStyle?: StrokeRenderStyle): BrushInkGroup[][] {
-  if (!style?.enabled) return sources.map(() => [])
+  if (!style?.enabled && !sources.some((source) => source.style?.enabled)) return sources.map(() => [])
   return sources.map((source) => {
+    const own = source.style ?? style
+    if (!own?.enabled) return []
     const others = sources.filter((other) => other !== source && other.group === source.group).map(({ stroke }) => stroke)
     const { segments } = describeStrokeGeometry(source.stroke, others)
     return segments.flatMap((segment) => {
       if (segment.shape !== 'serojulgi' || !segment.head || segment.head.kind !== 'end' || !segment.head.open || !segment.tail) return []
-      const contour = beakContour(source, segment.head, segment.tail, style, renderStyle)
+      const contour = beakContour(source, segment.head, segment.tail, own, renderStyle)
       return contour ? [[contour]] : []
     })
   })

@@ -2,6 +2,9 @@
 .controls > p { min-height: 25px; margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: rgb(var(--color-text-dim-3)); font-size: 10px; }
 .controls > p strong { min-width: 0; overflow: hidden; color: rgb(var(--color-foreground)); text-overflow: ellipsis; white-space: nowrap; }
 .controls > p span { flex: 0 0 auto; color: rgb(var(--color-text-dim-4)); }
+.scope { min-height: 25px; display: flex; gap: 4px; }
+.scope button { min-width: 0; min-height: 25px; padding: 0 10px; overflow: hidden; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-text-4)); font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.scope button[aria-checked='true'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 .shapes { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
 .shapes button { min-width: 0; min-height: 72px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px 2px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-4)); font-size: 9px; font-weight: 600; }
 .shapes button svg { width: 38px; height: 38px; fill: rgb(var(--color-text-4)); }

@@ -16,6 +16,7 @@ import type {
 import { useJamoStore } from '../stores/jamoStore'
 import { useLayoutStore } from '../stores/layoutStore'
 import { useGlobalStyleStore, weightToMultiplier } from '../stores/globalStyleStore'
+import { groupBeakResolverOf, useJamoGroupStore, type GroupBeakResolver } from '../stores/jamoGroupStore'
 import { stemBeakGroupOf, type StemBeakStyle } from './stemBeak'
 import type { GlobalStyle } from '../stores/globalStyleStore'
 import { decomposeSyllableWithOverrides } from '../utils/hangulUtils'
@@ -43,6 +44,8 @@ export interface ResolvedStroke {
   effectiveLinejoin: StrokeLinejoin
   /** 부리의 닿음 판정을 같이 볼 묶음(같은 자소의 같은 채널). 없으면 획마다 따로 본다. */
   beakGroup?: string
+  /** 사용자 묶음의 부리. 없으면 글자의 `stemBeak`(전역)을 따른다. */
+  beakStyle?: StemBeakStyle
 }
 
 /** 단일 폰트 글리프에 필요한 모든 데이터 */
@@ -88,6 +91,7 @@ function computeEffectivePadding(
 function projectCenterlinesToLegacyOtfStrokes(
   primitives: readonly ResolvedInkPrimitive[],
   originX: number,
+  groupBeakOf: GroupBeakResolver,
 ): ResolvedStroke[] {
   return primitives.map((primitive) => {
     if (primitive.kind !== 'centerline') {
@@ -100,6 +104,7 @@ function projectCenterlinesToLegacyOtfStrokes(
       effectiveLinecap: primitive.effectiveLinecap,
       effectiveLinejoin: primitive.effectiveLinejoin,
       beakGroup: stemBeakGroupOf(primitive.source),
+      beakStyle: groupBeakOf(primitive.source),
     }
   })
 }
@@ -169,7 +174,7 @@ export function collectGlyphDataWithPlacement(char: string, placementOf?: GlyphP
 
   // 글자 폭과 원점은 노토 비율(왼 50 : 몸통 840 : 오른 30, `fontMetrics`). 몸통 왼쪽에서 왼 여백만큼 앞이 원점이다.
   const originX = hangulOriginX(effectivePadding)
-  const outputStrokes = projectCenterlinesToLegacyOtfStrokes(resolvedInk.primitives, originX)
+  const outputStrokes = projectCenterlinesToLegacyOtfStrokes(resolvedInk.primitives, originX, groupBeakResolverOf(useJamoGroupStore.getState().groups))
   if (outputStrokes.length === 0) return null
   const advanceWidth = hangulAdvance(effectivePadding, effectiveStyle.letterSpacing)
 

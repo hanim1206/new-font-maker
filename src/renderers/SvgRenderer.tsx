@@ -8,6 +8,7 @@ import { brushInkGroupsToSvgPaths, strokeToBrushInkGroups } from '../services/br
 import { resolveGlyphInkPrimitives } from '../services/glyphInkResolver'
 import { needsFilledRenderInk, strokeToRenderInkGroups, verticalWidthFactorOf } from '../services/strokeRenderGeometry'
 import { stemBeakGroupOf, stemBeakInkGroups } from '../services/stemBeak'
+import { useGroupBeakResolver } from '../stores/jamoGroupStore'
 
 // 파트별 스타일 (자모 편집 시 비편집 파트 흐리게 표시 등)
 export interface PartStyle {
@@ -117,6 +118,8 @@ export function SvgRenderer({
   // 세로줄기 부리: 획 데이터가 아니라 전역 스타일이 얹는 면이다. 추출기와 같은 함수로 만든다.
   const stemBeak = globalStyle?.stemBeak
   const beakRenderStyle = globalStyle?.strokeStyle
+  // 사용자 묶음에 부리 값이 있으면 그 자소의 획은 그 값을 쓴다.
+  const groupBeakOf = useGroupBeakResolver()
   const beakPathsById = useMemo(() => {
     const groups = stemBeakInkGroups(centerlines.map((primitive) => ({
       stroke: asLegacyReadonlyStroke(primitive.stroke),
@@ -124,9 +127,10 @@ export function SvgRenderer({
       // 부리는 기둥 폭에 맞춘다. 가로·세로 대비가 있으면 기둥이 그만큼 굵다.
       weightMultiplier: primitive.weightMultiplier * verticalWidthFactorOf(beakRenderStyle),
       group: stemBeakGroupOf(primitive.source),
+      style: groupBeakOf(primitive.source),
     })), stemBeak, beakRenderStyle)
     return new Map(centerlines.map((primitive, index) => [primitive.id, brushInkGroupsToSvgPaths(groups[index], VIEW_BOX_SIZE)]))
-  }, [centerlines, stemBeak, beakRenderStyle])
+  }, [centerlines, stemBeak, beakRenderStyle, groupBeakOf])
 
   const renderPrimitive = (
     primitive: ResolvedCenterlinePrimitive,

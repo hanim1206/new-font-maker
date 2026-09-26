@@ -169,3 +169,17 @@ describe('세로줄기 부리 — 저장과 추출', () => {
     expect(styleIssues({ ...style, stemBeak: { enabled: 'yes', shape: 'angled', size: 1 } }).map(({ path }) => path)).toEqual(expect.arrayContaining(['$.globalStyle.style.stemBeak.enabled']))
   })
 })
+
+describe('획마다 부리 값(사용자 묶음)', () => {
+  it('전역이 꺼져 있어도 획 값이 켜져 있으면 그 획만 부리가 붙는다', () => {
+    const sources = sourcesOf(structuredClone(presets.jungseong['ㅣ']))
+    const groups = stemBeakInkGroups(sources.map((source) => ({ ...source, style: ON })), DEFAULT_STEM_BEAK)
+    expect(groups.flat().length).toBe(1)
+  })
+
+  it('전역이 켜져 있어도 획 값이 꺼져 있으면 붙지 않는다', () => {
+    const sources = sourcesOf(structuredClone(presets.jungseong['ㅣ']))
+    const groups = stemBeakInkGroups(sources.map((source) => ({ ...source, style: DEFAULT_STEM_BEAK })), ON)
+    expect(groups.flat().length).toBe(0)
+  })
+})

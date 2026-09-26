@@ -377,6 +377,7 @@ export function glyphDataToFontContours(glyphData: GlyphData): Contour[] {
     // 부리는 기둥 폭에 맞춘다(화면과 같이 가로·세로 대비를 읽는다).
     weightMultiplier: glyphData.weightMultiplier * verticalWidthFactorOf(glyphData.strokeStyle),
     group: resolved.beakGroup ?? `stroke-${index}`,
+    style: resolved.beakStyle,
   })), glyphData.stemBeak, glyphData.strokeStyle)
   contourGroups.push(...brushInkGroupsToFontContours(beakGroups.flat(), UPM, ASCENDER, glyphData.slant))
 

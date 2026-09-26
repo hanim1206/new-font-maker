@@ -139,16 +139,49 @@
 .homeCard[aria-pressed='true'] svg { opacity: 1; }
 
 /* 도마 줄. 홈 맨 아래 고정 — 왼쪽은 올라온 자소, 오른쪽은 `편집 n`. */
-.bench { flex: none; display: flex; align-items: flex-end; gap: 10px; padding: 10px 12px calc(env(safe-area-inset-bottom) + 10px); border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
-.benchChips { flex: 1; min-width: 0; overflow: hidden; transition: height var(--motion-slow) var(--ease-standard); }
+.bench { flex: none; display: flex; align-items: flex-end; gap: 4px; padding: 10px 12px calc(env(safe-area-inset-bottom) + 10px); border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
+.benchChips { flex: 1; min-width: 0; margin-right: 6px; overflow: hidden; transition: height var(--motion-slow) var(--ease-standard); }
 .benchChips > div { position: relative; min-height: 40px; display: flex; flex-wrap: wrap; align-content: center; align-items: center; gap: 4px; }
 .benchChips button { min-width: 26px; height: 26px; display: inline-grid; place-items: center; padding: 0 4px; border: 0; border-radius: 8px; background: rgb(var(--color-surface-2)); color: inherit; font-size: 13px; font-weight: 700; }
 .benchChips em { color: rgb(var(--color-text-5)); font-size: 12px; font-style: normal; animation: fadeIn var(--motion-normal) var(--ease-standard); }
 .benchClear { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-text-6)); animation: popIn var(--motion-normal) var(--ease-standard); }
 .benchGo { flex: none; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .benchGo:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
+.groupMore { position: absolute; top: 0; right: 8px; width: 40px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-text-5)); transition: transform var(--motion-slow) var(--ease-standard); animation: fadeIn var(--motion-normal) var(--ease-standard); }
+.benchSave { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); animation: popIn var(--motion-normal) var(--ease-standard); }
+.benchGroupName { height: 26px; display: inline-flex; align-items: center; padding: 0 4px; color: rgb(var(--color-text-4)); font-size: 12px; font-weight: 700; }
+
+/* 묶음 바텀시트. 섹션 홈 위에 깔리고 바깥을 누르면 닫힌다. */
+.sheetLayer { position: absolute; inset: 0; z-index: 30; display: flex; align-items: flex-end; background: rgb(0 0 0 / .32); animation: fadeIn var(--motion-normal) var(--ease-standard); }
+.sheet { width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 22px 20px calc(env(safe-area-inset-bottom) + 16px); border-radius: 20px 20px 0 0; background: rgb(var(--color-surface)); animation: sheetUp 360ms cubic-bezier(0.32, 0.72, 0, 1); }
+/* 시트가 열린 동안 뒤 판은 멈춘다. */
+.homeScroll[data-locked] { overflow: hidden; }
+.sheet h3 { margin: 0; font-size: 19px; font-weight: 800; }
+.sheet > p { margin: -6px 0 0; display: flex; gap: 8px; color: rgb(var(--color-text-3)); font-size: 14px; font-weight: 700; }
+.sheet > p span { color: rgb(var(--color-text-5)); font-weight: 600; }
+.sheetField { display: flex; flex-direction: column; gap: 6px; }
+.sheetField span { color: rgb(var(--color-text-4)); font-size: 12px; font-weight: 600; }
+.sheetField input { min-height: 48px; padding: 0 14px; border: 0; border-radius: 12px; background: rgb(var(--color-surface-2)); color: inherit; font: inherit; font-size: 16px; font-weight: 700; outline: none; }
+.sheetField input:focus { box-shadow: inset 0 0 0 2px rgb(var(--color-foreground)); }
+.sheetField b { margin-left: 4px; color: rgb(var(--color-foreground)); font-weight: 700; }
+/* 묶음 고치기 판. 홈 카드처럼 안 든 글자는 흐리고 든 글자는 진하다. */
+.sheetGrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.sheetGrid button { aspect-ratio: 1; display: grid; place-items: center; padding: 0; border: 0; border-radius: 10px; background: rgb(var(--color-surface-2)); transition: background-color var(--motion-fast) var(--ease-standard); }
+.sheetGrid button svg { opacity: 0.18; transition: opacity var(--motion-fast) var(--ease-standard); }
+.sheetGrid button[aria-pressed='true'] { background: rgb(var(--color-surface-3)); }
+.sheetGrid button[aria-pressed='true'] svg { opacity: 1; }
+.sheetDiff { min-height: 18px; color: rgb(var(--color-text-4)); font-size: 12px; font-style: normal; font-weight: 600; }
+.sheetDiff[data-empty] { color: rgb(var(--color-danger, 220 38 38)); }
+.sheetActions { display: flex; gap: 8px; }
+.sheetDelete { flex: none; min-height: 52px; padding: 0 18px; border: 0; border-radius: 14px; background: transparent; color: rgb(var(--color-text-4)); font-size: 15px; font-weight: 700; }
+.sheetSave { flex: 1; min-height: 52px; border: 0; border-radius: 14px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 16px; font-weight: 750; }
+.sheetSave:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
+.toast { position: absolute; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 72px); z-index: 25; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 8px 12px 16px; border-radius: 14px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 600; animation: popIn var(--motion-normal) var(--ease-standard); }
+.toast button { flex: none; min-height: 32px; padding: 0 10px; border: 0; background: transparent; color: inherit; font-size: 13px; font-weight: 800; }
+
 @keyframes fadeIn { from { opacity: 0; } }
 @keyframes popIn { from { opacity: 0; transform: scale(0.6); } }
-@media (prefers-reduced-motion: reduce) { .home, .board, .groupHead, .homeCard, .benchChips, .benchClear { transition: none; animation: none; } }
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .home, .board, .groupHead, .homeCard, .benchChips, .benchClear, .benchSave, .groupMore, .sheetLayer, .sheet, .toast { transition: none; animation: none; } }
 .picto { display: block; width: 52px; height: 52px; }
 .picto svg { display: block; width: 100%; height: 100%; }

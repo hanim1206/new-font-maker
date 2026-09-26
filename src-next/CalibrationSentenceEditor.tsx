@@ -23,6 +23,7 @@ import { useNotoGlyph } from './useNotoGlyph'
 import { PART_COLOR, PART_LABEL } from './partColors'
 import { getBaseJamo, useJamoStore } from '../src/stores/jamoStore'
 import { useWorkbenchStore, workbenchJamoOf, workbenchSyllable } from '../src/stores/workbenchStore'
+import { groupMatching, useJamoGroupStore } from '../src/stores/jamoGroupStore'
 import confirmStyles from './workspace/FontExportDialog.module.css'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import { moveHandle, movePoint, moveStroke, scaleStroke } from '../src/services/editorCommands'
@@ -242,7 +243,8 @@ export type HistoryEntry =
   | { kind: 'jamo'; jamoType: JamoData['type']; char: string; before: JamoData; after: JamoData; edit: SampleGlyphEdit }
   | { kind: 'brush'; before: StrokeRenderStyle; after: StrokeRenderStyle; ends?: { before: StrokeEnds; after: StrokeEnds } }
   | { kind: 'tone'; before: StyleTone; after: StyleTone }
-  | { kind: 'beak'; before: StemBeakStyle; after: StemBeakStyle }
+  // `groupId`가 있으면 사용자 묶음의 부리. `groupBefore`는 되돌릴 값(없으면 전역을 따르던 상태).
+  | { kind: 'beak'; before: StemBeakStyle; after: StemBeakStyle; groupId?: string; groupBefore?: StemBeakStyle }
   // 레이아웃 모드에서 적용·지운 배치 Δ. 저장소 앞뒤를 통째로 든다.
   | { kind: 'layoutDelta'; before: LayoutDeltaSnapshot; after: LayoutDeltaSnapshot }
 
@@ -1769,6 +1771,11 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const [previewBrush, setPreviewBrush] = useState<StrokeRenderStyle | null>(null)
   const [previewTone, setPreviewTone] = useState<StyleTone | null>(null)
   const [previewBeak, setPreviewBeak] = useState<StemBeakStyle | null>(null)
+  // 도마가 사용자 묶음과 똑같으면 부리를 그 묶음에만 줄 수 있다. 스타일 공간은 `이 폰트 전체`로 들어오는 곳이라 기본은 전체.
+  const benchGroup = useJamoGroupStore((state) => groupMatching(state.groups, benchType, benchChars))
+  const [beakToGroup, setBeakToGroup] = useState(false)
+  const beakGroup = beakToGroup ? benchGroup : null
+  const groupPreviewBeak = useJamoGroupStore((state) => (beakGroup && state.previewBeak?.groupId === beakGroup.id ? state.previewBeak.beak : null))
   const [isShapeRuleOpen, setIsShapeRuleOpen] = useState(false)
   const [editMode, setEditMode] = useState<EditMode>(initialEditMode)
   // `획 고치기`로 들어온 자소. 획 편집에서 선택을 푼 채 `완료`해도 레이아웃이 이 부품을 다시 켠다.
@@ -2232,11 +2239,22 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   }
   const commitBeak = (before: StemBeakStyle, after: StemBeakStyle) => {
     setPreviewBeak(null)
+    useJamoGroupStore.getState().setPreviewBeak(null)
     if (JSON.stringify(before) === JSON.stringify(after)) return
-    setHistory((entries) => [...entries, { kind: 'beak', before, after }])
     setFuture([])
+    if (beakGroup) {
+      setHistory((entries) => [...entries, { kind: 'beak', before, after, groupId: beakGroup.id, groupBefore: beakGroup.stemBeak }])
+      useJamoGroupStore.getState().setStemBeak(beakGroup.id, after)
+      return
+    }
+    setHistory((entries) => [...entries, { kind: 'beak', before, after }])
     useGlobalStyleStore.getState().setStemBeak(after)
   }
+  const draftBeak = (beak: StemBeakStyle | null) => {
+    if (beakGroup) useJamoGroupStore.getState().setPreviewBeak(beak ? { groupId: beakGroup.id, beak } : null)
+    else setPreviewBeak(beak)
+  }
+  const committedBeak = (beakGroup ? beakGroup.stemBeak : undefined) ?? globalStyle.stemBeak ?? DEFAULT_STEM_BEAK
   const commitLayoutDelta = (before: LayoutDeltaSnapshot, after: LayoutDeltaSnapshot) => {
     if (JSON.stringify(before) === JSON.stringify(after)) return
     setHistory((entries) => [...entries, { kind: 'layoutDelta', before, after }])
@@ -2293,6 +2311,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     setPreviewBrush(null)
     setPreviewTone(null)
     setPreviewBeak(null)
+    useJamoGroupStore.getState().setPreviewBeak(null)
     if (!styleOnly) setGlobalStylePanel(null)
   }
   // 기록 한 줄을 저장소에서 되돌린다. 기록 · 선택 정리는 호출자가 한다.
@@ -2301,7 +2320,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     else if (entry.kind === 'layoutDelta') { useLayoutDeltaStore.getState().restore(entry.before); setLayoutEpoch((epoch) => epoch + 1) }
     else if (entry.kind === 'brush') { useGlobalStyleStore.getState().setStrokeRenderStyle(entry.before); if (entry.ends) applyEnds(entry.ends.before) }
     else if (entry.kind === 'tone') applyTone(entry.before)
-    else if (entry.kind === 'beak') useGlobalStyleStore.getState().setStemBeak(entry.before)
+    else if (entry.kind === 'beak') { if (entry.groupId) useJamoGroupStore.getState().setStemBeak(entry.groupId, entry.groupBefore); else useGlobalStyleStore.getState().setStemBeak(entry.before) }
     else updateJamo(entry.before)
     if (entry.kind === 'layout' || entry.kind === 'jamo') useCalibrationProjectStore.getState().removeSampleGlyphEdit(entry.edit.id)
   }
@@ -2339,7 +2358,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     else if (entry.kind === 'layoutDelta') { useLayoutDeltaStore.getState().restore(entry.after); setLayoutEpoch((epoch) => epoch + 1) }
     else if (entry.kind === 'brush') { useGlobalStyleStore.getState().setStrokeRenderStyle(entry.after); if (entry.ends) applyEnds(entry.ends.after) }
     else if (entry.kind === 'tone') applyTone(entry.after)
-    else if (entry.kind === 'beak') useGlobalStyleStore.getState().setStemBeak(entry.after)
+    else if (entry.kind === 'beak') { if (entry.groupId) useJamoGroupStore.getState().setStemBeak(entry.groupId, entry.after); else useGlobalStyleStore.getState().setStemBeak(entry.after) }
     else updateJamo(entry.after)
     setFuture((entries) => entries.slice(0, -1))
     setHistory((entries) => [...entries, entry])
@@ -2544,7 +2563,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
 
       {globalStylePanel ? <GlobalStyleTrackpad
         panel={globalStylePanel}
-        onPanelChange={(panel) => { setPreviewBrush(null); setPreviewTone(null); setPreviewBeak(null); setGlobalStylePanel(panel) }}
+        onPanelChange={(panel) => { setPreviewBrush(null); setPreviewTone(null); setPreviewBeak(null); useJamoGroupStore.getState().setPreviewBeak(null); setGlobalStylePanel(panel) }}
         fill={chrome === 'workspace'}
         closable={!styleOnly}
         onClose={closeGlobalStyle}
@@ -2559,7 +2578,13 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
           embedded
           productOptions={chrome === 'workspace'}
         />}
-        beakControls={<StemBeakControls committed={globalStyle.stemBeak ?? DEFAULT_STEM_BEAK} draft={previewBeak} onDraftChange={setPreviewBeak} onCommit={commitBeak} />}
+        beakControls={<StemBeakControls
+          committed={committedBeak}
+          draft={beakGroup ? groupPreviewBeak : previewBeak}
+          onDraftChange={draftBeak}
+          onCommit={commitBeak}
+          scope={benchGroup && { groupName: benchGroup.name, groupSize: benchGroup.chars.length, toGroup: beakGroup !== null, onChange: (toGroup) => { draftBeak(null); setBeakToGroup(toGroup) } }}
+        />}
         toneControls={<StyleToneControls committed={{ weight: globalStyle.weight, slant: globalStyle.slant }} draft={previewTone} onDraftChange={setPreviewTone} onCommit={commitTone} />}
       /> : <InferenceTrackpad
         glyph={selectedChar}

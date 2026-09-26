@@ -452,14 +452,14 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
     const jamo = jamos[char]
     return jamo ? (jamo.strokes?.length ?? 0) + (jamo.horizontalStrokes?.length ?? 0) + (jamo.verticalStrokes?.length ?? 0) : 0
   }
-  // 사용자 묶음은 `내 묶음` 칩 하나에 소제목으로 쌓인다. 한 글자가 여러 묶음에 들 수 있다(판에 카드가 겹쳐 놓인다).
+  // 사용자 묶음은 맨 뒤 `내 묶음` 칩 하나에 소제목으로 쌓인다. 한 글자가 여러 묶음에 들 수 있다(판에 카드가 겹쳐 놓인다).
   const userGroups = useJamoGroupStore((state) => state.groups)
   const mine = useMemo(() => userGroups.filter((group) => group.type === type), [userGroups, type])
   const groupings = useMemo(() => {
     const base = GROUPINGS[type]
     if (!mine.length) return base
     const MINE: Grouping = { id: 'mine', label: '내 묶음', groups: () => mine.map((group) => ({ id: group.id, label: group.name, chars: group.chars })) }
-    return [base[0], MINE, ...base.slice(1)]
+    return [...base, MINE]
   }, [type, mine])
   const benchGroup = groupMatching(mine, benchType, benchChars)
   const [sheet, setSheet] = useState<{ kind: 'create' } | { kind: 'edit'; id: string } | null>(null)
@@ -563,7 +563,7 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
       <button type="button" className={styles.back} aria-label="대시보드" onClick={() => navigate('/dashboard')}><ChevronLeft size={22} aria-hidden="true" /></button>
       <h2>고칠 {JAMO_LABEL[type]}</h2>
     </header>
-    <div className={styles.homeScroll}>
+    <div className={styles.homeScroll} data-locked={sheet ? true : undefined}>
       {groupings.length > 1 && <div className={styles.chips} role="tablist" aria-label="묶기">
         {groupings.map((g) => <button key={g.id} type="button" role="tab" aria-selected={g.id === grouping.id} onClick={() => setGroupingId(g.id)}>{g.label}</button>)}
       </div>}
@@ -591,19 +591,22 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
     <footer className={styles.bench}>
       <div className={styles.benchChips} style={benchHeight === null ? undefined : { height: benchHeight }}><div ref={benchInner} aria-label="도마">
         {benchCount === 0 ? <em>카드나 묶음을 눌러 도마에 올리세요</em> : benchChars.map((char) => <button key={char} type="button" data-chip={char} aria-label={`${char} 도마에서 빼기`} onClick={() => toggle(type, char)}>{char}</button>)}
-        {/* 도마가 곧 묶음의 초안이다. 둘 이상이면 저장할 수 있고, 이미 있는 묶음과 같으면 그 이름을 보인다. */}
-        {benchCount >= 2 && (benchGroup
-          ? <span key="group" data-chip="__group" className={styles.benchGroupName}>{benchGroup.name}</span>
-          : <button key="save" type="button" data-chip="__save" className={styles.benchSave} onClick={() => setSheet({ kind: 'create' })}><Plus size={12} strokeWidth={3} aria-hidden="true" />묶음으로 저장</button>)}
+        {/* 도마가 이미 있는 묶음과 같으면 그 이름을 칩 끝에 보인다. */}
+        {benchGroup && <span key="group" data-chip="__group" className={styles.benchGroupName}>{benchGroup.name}</span>}
       </div></div>
       {benchCount > 0 && <button type="button" className={styles.benchClear} aria-label="도마 비우기" onClick={clear}><Trash2 size={18} aria-hidden="true" /></button>}
+      {/* 도마가 곧 묶음의 초안이다. 둘 이상이고 아직 없는 묶음이면 `편집` 바로 왼쪽 `+`로 저장한다. */}
+      {benchCount >= 2 && !benchGroup && <button type="button" className={styles.benchSave} aria-label="묶음으로 저장" onClick={() => setSheet({ kind: 'create' })}><Plus size={20} aria-hidden="true" /></button>}
       <button type="button" className={styles.benchGo} disabled={benchCount === 0} onClick={() => openEditor(type, benchChars)}>편집 {benchCount}</button>
     </footer>
     {toast && <div className={styles.toast} role="status">{toast.text}<button type="button" onClick={() => { toast.undo(); setToast(null) }}>되돌리기</button></div>}
     {sheet && <GroupSheet
+      type={type}
+      all={chars}
       key={sheet.kind === 'edit' ? sheet.id : 'create'}
       group={sheet.kind === 'edit' ? mine.find((group) => group.id === sheet.id) ?? null : null}
       benchChars={benchType === type ? benchChars : []}
+      builtinName={GROUPINGS[type].slice(1).flatMap((g) => g.groups(chars, strokeCount)).find((g) => g.label && sameChars(g.chars, benchChars))?.label ?? null}
       onClose={() => setSheet(null)}
       onCreate={saveGroup}
       onDelete={deleteGroup}
@@ -618,44 +621,61 @@ function suggestedName(chars: readonly string[]): string {
 
 /**
  * 묶음 바텀시트. 만들 때는 이름 한 칸과 `저장` — 이름은 미리 채워 두어 바로 눌러도 된다.
- * 고칠 때는 이름 · 지금 도마로 글자 바꾸기 · 지우기. 묶음을 가리키는 값(부리)은 글자를 따라간다는 걸 바꾸기 전에 보인다.
- * 지우기는 확인하지 않는다 — 대신 되돌리기 토스트.
+ * 고칠 때는 이름 + 그 종류 자소 판에서 칸을 탭해 넣고 뺀다(도마와 상관없이 한 화면에서 끝난다).
+ * 묶음을 가리키는 값(부리)이 글자를 따라간다는 걸 저장 전에 한 줄로 보인다. 지우기는 확인하지 않는다 — 대신 되돌리기 토스트.
  */
-function GroupSheet({ group, benchChars, onClose, onCreate, onDelete }: {
+function GroupSheet({ type, all, group, benchChars, builtinName, onClose, onCreate, onDelete }: {
+  type: JamoType
+  /** 그 종류 자소 전부(ㄱㄴㄷ 순). 고칠 때 판으로 깐다. */
+  all: readonly string[]
   group: JamoGroup | null
   benchChars: readonly string[]
+  /** 도마가 기본 묶음 하나와 똑같으면 그 이름(`삐침 있음`)을 기본값으로. */
+  builtinName: string | null
   onClose: () => void
   onCreate: (name: string) => void
   onDelete: (id: string) => void
 }) {
-  const [name, setName] = useState(() => group?.name ?? suggestedName(benchChars))
-  const added = group ? benchChars.filter((char) => !group.chars.includes(char)) : []
-  const dropped = group ? group.chars.filter((char) => !benchChars.includes(char)) : []
-  const canSwap = group !== null && benchChars.length > 0 && !sameChars(group.chars, benchChars)
+  const [name, setName] = useState(() => group?.name ?? builtinName ?? suggestedName(benchChars))
+  const [draft, setDraft] = useState<readonly string[]>(() => group?.chars ?? [])
+  // 시트가 다 올라온 뒤에 입력칸을 켠다. 올라오는 중(화면 밖)에 포커스하면 브라우저가 입력칸을 보이려고 뒤 판 · 셸을 스크롤한다.
+  const input = useRef<HTMLInputElement>(null)
+  const focusName = () => { if (!group) input.current?.focus({ preventScroll: true }) }
+  // 움직임 줄이기면 애니메이션이 없어 끝 신호도 없다 — 바로 켠다.
+  useEffect(() => { if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) focusName() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const toggleDraft = (char: string) => setDraft((current) => (current.includes(char) ? current.filter((c) => c !== char) : all.filter((c) => c === char || current.includes(c))))
+  const added = group ? draft.filter((char) => !group.chars.includes(char)) : []
+  const dropped = group ? group.chars.filter((char) => !draft.includes(char)) : []
+  const changed = added.length > 0 || dropped.length > 0
   const save = () => {
     if (!group) { onCreate(name); return }
     const store = useJamoGroupStore.getState()
     store.rename(group.id, name)
+    if (changed) store.setChars(group.id, draft)
     onClose()
   }
-  const swap = () => {
-    if (!group) return
-    useJamoGroupStore.getState().setChars(group.id, benchChars)
-    useJamoGroupStore.getState().rename(group.id, name)
-    onClose()
-  }
+  const shown = group ? draft : benchChars
   return <div className={styles.sheetLayer} onClick={onClose}>
-    <form className={styles.sheet} role="dialog" aria-label={group ? '묶음 고치기' : '묶음으로 저장'} onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); save() }}>
+    <form className={styles.sheet} onAnimationEnd={focusName} role="dialog" aria-label={group ? '묶음 고치기' : '묶음으로 저장'} onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); save() }}>
       <h3>{group ? '묶음 고치기' : '이 도마를 묶음으로'}</h3>
-      <p>{(group?.chars ?? benchChars).join(' ')}<span>{(group?.chars ?? benchChars).length}자</span></p>
-      <label className={styles.sheetField}><span>이름</span><input value={name} onChange={(event) => setName(event.target.value)} onFocus={(event) => event.currentTarget.select()} autoFocus={!group} maxLength={20} aria-label="묶음 이름" /></label>
-      {canSwap && <button type="button" className={styles.sheetSwap} onClick={swap}>
-        <strong>지금 도마로 글자 바꾸기</strong>
-        <span>{[added.length ? `+ ${added.join(' ')}` : '', dropped.length ? `− ${dropped.join(' ')}` : ''].filter(Boolean).join('  ')}{group.stemBeak ? ' · 이 묶음 부리가 글자를 따라가요' : ''}</span>
-      </button>}
+      {!group && <p>{shown.join(' ')}<span>{shown.length}자</span></p>}
+      <label className={styles.sheetField}><span>이름</span><input ref={input} value={name} onChange={(event) => setName(event.target.value)} onFocus={(event) => event.currentTarget.select()} maxLength={20} aria-label="묶음 이름" /></label>
+      {group && <div className={styles.sheetField}>
+        <span>글자 <b>{draft.length}자</b></span>
+        <div className={styles.sheetGrid} role="group" aria-label="묶음 글자">
+          {all.map((char) => <button key={char} type="button" aria-pressed={draft.includes(char)} aria-label={`${char} ${draft.includes(char) ? '빼기' : '넣기'}`} onClick={() => toggleDraft(char)}>
+            <JamoGlyph type={type} char={char} size={22} />
+          </button>)}
+        </div>
+        <em className={styles.sheetDiff} data-empty={draft.length === 0 || undefined}>{draft.length === 0
+          ? '글자를 하나 이상 남겨 주세요 · 묶음을 없애려면 지우기'
+          : changed
+            ? `${[added.length ? `+ ${added.join(' ')}` : '', dropped.length ? `− ${dropped.join(' ')}` : ''].filter(Boolean).join('  ')}${group.stemBeak ? ' · 이 묶음 부리가 글자를 따라가요' : ''}`
+            : ''}</em>
+      </div>}
       <div className={styles.sheetActions}>
         {group && <button type="button" className={styles.sheetDelete} onClick={() => onDelete(group.id)}>지우기</button>}
-        <button type="submit" className={styles.sheetSave} disabled={!name.trim()}>{group ? '이름 저장' : '저장'}</button>
+        <button type="submit" className={styles.sheetSave} disabled={!name.trim() || (group !== null && draft.length === 0)}>저장</button>
       </div>
     </form>
   </div>

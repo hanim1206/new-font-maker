@@ -24,11 +24,13 @@ export function BeakShapeThumb({ shape, size, angle }: { shape: StemBeakShape | 
  * 세로줄기 일괄 부리. 모양은 그림 버튼에서 고르면 바로 적용, 크기 · 각도는 끄는 동안 미리보기만 하고 손을 떼면 적용한다.
  * 저장과 되돌리기 기록은 부모가 맡는다.
  */
-export function StemBeakControls({ committed, draft, onDraftChange, onCommit }: {
+export function StemBeakControls({ committed, draft, onDraftChange, onCommit, scope }: {
   committed: StemBeakStyle
   draft: StemBeakStyle | null
   onDraftChange: (beak: StemBeakStyle | null) => void
   onCommit: (before: StemBeakStyle, after: StemBeakStyle) => void
+  /** 도마가 사용자 묶음이면 전체와 그 묶음 가운데 어디에 먹일지 고른다. */
+  scope?: { groupName: string; groupSize: number; toGroup: boolean; onChange: (toGroup: boolean) => void } | null
 }) {
   const beak = draft ?? committed
   const latest = useRef(beak)
@@ -47,7 +49,10 @@ export function StemBeakControls({ committed, draft, onDraftChange, onCommit }: 
   }
   const isDefault = !committed.enabled && committed.shape === DEFAULT_STEM_BEAK.shape && committed.size === DEFAULT_STEM_BEAK.size && committed.angle === DEFAULT_STEM_BEAK.angle
   return <div className={styles.controls} role="tabpanel" aria-label="부리 설정">
-    <p><strong>세로줄기의 열린 머리에 한 번에</strong><span>획 데이터는 그대로입니다</span></p>
+    {scope ? <div className={styles.scope} role="radiogroup" aria-label="부리 적용 범위">
+      <button type="button" role="radio" aria-checked={!scope.toGroup} onClick={() => scope.onChange(false)}>전체</button>
+      <button type="button" role="radio" aria-checked={scope.toGroup} onClick={() => scope.onChange(true)}>「{scope.groupName}」 {scope.groupSize}자</button>
+    </div> : <p><strong>세로줄기의 열린 머리에 한 번에</strong><span>획 데이터는 그대로입니다</span></p>}
     <div className={styles.shapes} role="radiogroup" aria-label="부리 모양">
       <button type="button" role="radio" aria-checked={!beak.enabled} data-beak-shape="none" onClick={() => pick({ enabled: false })}>
         <BeakShapeThumb shape={null} size={beak.size} angle={beak.angle} /><span>없음</span>
