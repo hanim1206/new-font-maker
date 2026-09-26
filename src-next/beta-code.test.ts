@@ -53,7 +53,7 @@ describe('베타 초대 코드', () => {
     expect(withoutGuide).toContain('민지님')
     expect(withoutGuide).toContain('https://font.example')
     expect(withoutGuide).toContain('K7QM-4XPA-9TRD')
-    expect(withoutGuide).toContain('단톡방')
+    expect(withoutGuide).toContain('피드백은 한임에게')
     expect(withoutGuide).not.toContain('설치')
     expect(betaInviteMessage({ ...base, installGuideUrl: 'https://guide.example' })).toContain('3. 받은 폰트 설치하는 법: https://guide.example')
   })

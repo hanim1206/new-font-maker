@@ -79,6 +79,6 @@ export function betaInviteMessage({ nickname, code, appUrl, installGuideUrl }: B
     `2. 초대 코드를 넣어요: ${code}`,
   ]
   if (installGuideUrl) lines.push(`3. 받은 폰트 설치하는 법: ${installGuideUrl}`)
-  lines.push('', '이상한 점은 단톡방에 스크린샷과 함께 알려 주세요. 코드를 잊으면 저한테 물어봐 주세요.')
+  lines.push('', '피드백은 한임에게 편하게 보내 주세요. 코드를 잊으면 저한테 물어봐 주세요.')
   return lines.join('\n')
 }
