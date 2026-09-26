@@ -55,13 +55,13 @@ export function MobileWorkspaceShell({
     <main className={styles.page}>
       <div className={styles.shell} data-tabs={tabsHidden ? 'hidden' : undefined}>
         <header className={styles.projectHeader}>
-          {/* 왼쪽은 위 덱으로 나가는 문, 오른쪽은 편집 기록. 읽기만 하는 모드 표시는 두지 않는다. */}
+          {/* 왼쪽은 위 덱으로 나가는 문 — 화살표만, 대시보드 카드 단추와 같은 40px 원. 이름은 읽기용 레이블에만. 오른쪽은 편집 기록. */}
           {back
-            ? <a className={styles.back} href={back.href} onClick={onLinkClick} aria-label={`${back.label}(으)로`} data-testid="workspace-back">
-              <ChevronLeft size={20} aria-hidden="true" /><span>{back.label}</span>
+            ? <a className={styles.back} href={back.href} onClick={onLinkClick} aria-label={`${back.label}(으)로`} title={back.label} data-testid="workspace-back">
+              <ChevronLeft size={20} aria-hidden="true" />
             </a>
-            : <button type="button" className={styles.back} onClick={() => void goToFontHome()} aria-label="내 폰트로" data-testid="workspace-font-home">
-              <ChevronLeft size={20} aria-hidden="true" /><span>내 폰트</span>
+            : <button type="button" className={styles.back} onClick={() => void goToFontHome()} aria-label="내 폰트로" title="내 폰트" data-testid="workspace-font-home">
+              <ChevronLeft size={20} aria-hidden="true" />
             </button>}
           <div className={styles.projectIdentity}>
             <strong>{title}</strong>

@@ -32,10 +32,11 @@ test('뼈대 탭은 없고 옛 뼈대 주소는 자소 탭으로 넘어간다', 
   await expect(nav.getByText('뼈대')).toHaveCount(0)
 })
 
-test('머리는 `‹ 내 폰트` · 폰트 이름 · 되돌리기고 햄버거는 없다', async ({ page }) => {
+test('머리는 `‹`(화살표만) · 폰트 이름 · 되돌리기고 햄버거는 없다', async ({ page }) => {
   await page.goto('/workspace/jamo')
   await expect(page.getByRole('button', { name: '주 메뉴' })).toHaveCount(0)
-  await expect(page.getByTestId('workspace-font-home')).toHaveText('내 폰트')
+  await expect(page.getByTestId('workspace-font-home')).toHaveAttribute('aria-label', '내 폰트로')
+  await expect(page.getByTestId('workspace-font-home')).toHaveText('')
   await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeVisible()
   // 하단 탭은 화면 바닥에 붙는다.
   const tabs = page.getByTestId('workspace-tabs')

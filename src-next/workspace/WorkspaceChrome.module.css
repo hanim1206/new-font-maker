@@ -2,11 +2,12 @@
 /* 탭이 없는 화면(획 덱)은 셸이 홈 인디케이터 여백을 맡는다. */
 .shell[data-tabs='hidden'] { padding-bottom: env(safe-area-inset-bottom); }
 .shell { position: relative; width: min(100%, 480px); height: 100dvh; box-sizing: border-box; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; background: rgb(var(--color-surface)); box-shadow: var(--shadow-md); }
-.projectHeader { min-height: 50px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px; padding: max(2px, env(safe-area-inset-top)) 10px 2px 4px; border-bottom: 1px solid rgb(var(--color-border-subtle)); }
+.projectHeader { min-height: 50px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px; padding: max(2px, env(safe-area-inset-top)) 10px 2px 8px; border-bottom: 1px solid rgb(var(--color-border-subtle)); }
 .projectIdentity { min-width: 0; display: flex; flex-direction: column; align-items: center; }
 .projectIdentity strong { max-width: 100%; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 /* `‹ 내 폰트` — 위 덱으로 나가는 문. 글자가 있어 어디로 가는지 읽힌다. */
-.back { height: 44px; text-decoration: none; display: flex; align-items: center; gap: 0; padding: 0 10px 0 4px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-dim-3)); font-size: 13px; font-weight: 600; white-space: nowrap; }
+/* 뒤로 = 화살표만. 대시보드 카드의 `…`와 같은 40px 원. */
+.back { width: 40px; height: 40px; box-sizing: border-box; text-decoration: none; display: grid; place-items: center; padding: 0; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); }
 .headerActions { display: flex; gap: 3px; }
 .body { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 /* 덮개 자리는 늘 있지만 비어 있으면 손을 통과시킨다. 덮개가 그려질 때만 그 덮개가 받는다. */
