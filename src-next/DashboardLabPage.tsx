@@ -422,8 +422,8 @@ const GROUPINGS: Record<JamoType, Grouping[]> = {
   jungseong: [ALL, BY_MEDIAL_KIND, BY_SIDE_STEM, BY_STROKES],
   jongseong: [ALL, BY_FINAL_KIND, BY_CLUSTER_HEAD, BY_STROKES],
 }
-// 칩을 안 골랐을 때. 중성은 `전체`보다 홀자(레이아웃 6칸과 같은 말)가 먼저 쓸모 있다.
-const DEFAULT_GROUPING: Record<JamoType, string> = { choseong: 'all', jungseong: 'kind', jongseong: 'all' }
+// 칩을 안 골랐을 때. 중성은 홀자(레이아웃 6칸과 같은 말), 종성은 홑 · 쌍 · 겹이 `전체`보다 먼저 쓸모 있다.
+const DEFAULT_GROUPING: Record<JamoType, string> = { choseong: 'all', jungseong: 'kind', jongseong: 'kind' }
 
 const HOME_COLUMNS = 4
 const HOME_GAP = 6
