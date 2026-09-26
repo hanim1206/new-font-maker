@@ -65,7 +65,7 @@ const renderCell = (row: CorpusRow) => <LazyCellGlyph char={row.identity.charact
 function GridScreen() {
   const [selected, setSelected] = useState(codepointFromUrl)
 
-  return <MobileWorkspaceShell activeArea="review">
+  return <MobileWorkspaceShell activeArea="review" heading="검수">
     <div className={styles.scroll}>
       {/* 칸 탭 = 글자 열기. 시트 탭·키보드 화살표는 선택(시트·초점)만 바꾼다. */}
       <div className={styles.matrixSection}><NotoCorpusMatrix rows={ROWS} reviews={NO_REVIEWS} selected={selected} onSelect={setSelected} onOpen={(codepoint) => navigate(glyphHref(codepoint))} isHighlighted={() => true} noFinal={false} renderCell={renderCell} variant="viewer" /></div>

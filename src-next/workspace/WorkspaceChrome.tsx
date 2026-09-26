@@ -31,12 +31,15 @@ export function MobileWorkspaceShell({
   tools,
   back,
   cover,
+  heading,
 }: {
   children: ReactNode
   /** 어느 화면인지. 탭은 없어졌지만 부르는 쪽이 이름표로 준다. */
   activeArea: WorkspaceArea
   /** 머리 가운데 이름. 안 넘기면 지금 연 폰트 이름(어느 화면이든 같다). */
   projectName?: string
+  /** 보기만 하는 화면(검수)의 제목. 주면 `‹` 옆에 왼쪽 정렬로 굵게 두고, 편집 기록 단추는 뺀다 — 대시보드 섹션 홈 머리와 같은 생김새. */
+  heading?: string
   history?: WorkspaceHistoryControls
   /** 머리 오른쪽, 되돌리기 앞에 늘 보이는 도구(어느 모드에서든 쓰는 것). */
   tools?: ReactNode
@@ -61,14 +64,16 @@ export function MobileWorkspaceShell({
             : <button type="button" className={styles.back} onClick={() => void goToFontHome()} aria-label="내 폰트로" title="내 폰트" data-testid="workspace-font-home">
               <ChevronLeft size={20} aria-hidden="true" />
             </button>}
-          <div className={styles.projectIdentity}>
-            <strong>{title}</strong>
-          </div>
-          <div className={styles.headerActions} aria-label="프로젝트 편집 기록">
+          {heading
+            ? <h2 className={styles.heading}>{heading}</h2>
+            : <div className={styles.projectIdentity}>
+              <strong>{title}</strong>
+            </div>}
+          {!heading && <div className={styles.headerActions} aria-label="프로젝트 편집 기록">
             {tools}
             <button type="button" disabled={!history?.canUndo} onClick={history?.onUndo} aria-label="형태 편집 실행 취소"><Undo2 size={18} /></button>
             <button type="button" disabled={!history?.canRedo} onClick={history?.onRedo} aria-label="형태 편집 다시 실행"><Redo2 size={18} /></button>
-          </div>
+          </div>}
         </header>
 
         {/* 내용 자리. 머리 아래를 다 쓰고, `cover`가 이 자리만 덮는다. */}

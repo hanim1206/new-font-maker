@@ -11,27 +11,31 @@
 }
 .large { --cell: 52px; }
 /* 검수 탭: 부모의 남은 높이를 격자가 다 쓴다. 위 도구 줄이 없어 시트 탭이 맨 위다.
-   상태 막대·숫자가 없으니 머리글을 좁히고, 색은 랩의 파란 회색 대신 앱 토큰(surface·primary)으로 맞춘다. */
-.fill { --cell: 40px; --edge: var(--line); flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; margin-top: 0; }
-.fill .tabs { flex: none; gap: 6px; margin-top: 0; padding: 10px 0; }
-.fill .tabs button { min-width: 40px; height: 40px; padding: 0 10px; place-items: center; align-content: center; border: 0; border-radius: 6px; background: rgb(var(--color-surface-3)); font-size: 15px; font-weight: 700; }
-.fill .tabs button[aria-pressed='true'] { background: var(--ink); color: white; }
-.fill .gridWrap { flex: 1; min-height: 0; max-height: none; border-color: var(--line); border-radius: 12px; }
-.fill .grid thead th, .fill .grid tbody th { background: rgb(var(--color-surface-2)); }
-.fill .groupRow th { height: 22px; font-size: 9px; }
+   대시보드 섹션 홈과 같은 톤 — 시트 탭은 알약 칩, 표는 선·머리글 바탕 없이 흰 면, 칸은 둥근 타일.
+   칸 바탕은 레이아웃 색(`.plain[data-context]`) 그대로. 묶음(세로·가로·섞임) 사이는 선 대신 빈 간격. */
+.fill { --cell: 42px; --edge: var(--line); flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; margin-top: 0; }
+.fill .tabs { flex: none; gap: 6px; margin-top: 0; padding: 8px 16px 16px; scrollbar-width: none; }
+.fill .tabs::-webkit-scrollbar { display: none; }
+.fill .tabs button { min-width: 0; height: 34px; padding: 0 13px; place-items: center; align-content: center; border: 0; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-3)); font-size: 15px; font-weight: 700; transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard); }
+.fill .tabs button[aria-pressed='true'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+.fill .gridWrap { flex: 1; min-height: 0; max-height: none; border: 0; border-radius: 0; background: rgb(var(--color-surface)); }
+.fill .grid thead th, .fill .grid tbody th { border: 0; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); }
+.fill .groupRow th { height: 22px; padding-left: 8px; font-size: 11px; font-weight: 600; }
 .fill .jamoRow th { top: 22px; }
-.fill .grid .corner { padding: 6px 8px; background: rgb(var(--color-surface-3)); font-size: 9px; }
-.fill .colHead { padding: 8px 2px; font-size: 14px; }
-.fill .rowGroup { width: 20px; min-width: 20px; font-size: 9px; }
-.fill .rowHead { left: 20px; min-width: 36px; padding: 0 6px; text-align: center; }
+/* 코너의 `행 홀자 ↓ 열 받침 →` 설명은 뺀다. 칸은 sticky 가림막으로 남긴다. */
+.fill .grid .corner { padding: 0; border: 0; background: rgb(var(--color-surface)); font-size: 0; }
+.fill .colHead { padding: 8px 2px; font-size: 14px; font-weight: 700; }
+.fill .rowGroup { width: 24px; min-width: 24px; font-size: 10px; font-weight: 600; text-align: center; }
+.fill .rowHead { left: 24px; min-width: 36px; padding: 0 6px; text-align: center; }
 .fill .rowLabel { justify-content: center; }
-.fill .rowLabel > span:first-child { width: auto; font-size: 14px; }
-.fill .grid .current { background: rgb(var(--color-primary-light)); color: rgb(var(--color-primary-dark)); }
-.fill .grid td { border-color: rgb(var(--color-border-subtle)); }
-/* 칸은 td를 꽉 채운다. 여백·둥글기 없이 바탕색이 격자 전체를 덮는다. */
-.fill .grid td { width: var(--cell); height: var(--cell); }
-.fill .cell { width: 100%; height: var(--cell); margin: 0; border: 0; border-radius: 0; scroll-margin-left: 64px; }
-.fill .cell[aria-pressed='true'] { outline: 2px solid rgb(var(--color-primary)); outline-offset: -2px; }
+.fill .rowLabel > span:first-child { width: auto; font-size: 14px; font-weight: 700; }
+.fill .grid .current { background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); }
+.fill .grid td { width: var(--cell); height: var(--cell); padding: 2px; border: 0; }
+.fill .grid .colGroupStart { border-left: 0; }
+.fill .grid .rowGroupStart > th, .fill .grid .rowGroupStart > td { border-top: 12px solid rgb(var(--color-surface)); }
+.fill .grid tbody tr:hover td { background: transparent; }
+.fill .cell { width: 100%; height: var(--cell); margin: 0; border: 0; border-radius: 10px; scroll-margin-left: 64px; }
+.fill .cell[aria-pressed='true'] { outline: 2px solid rgb(var(--color-foreground)); outline-offset: -2px; }
 .fill .hint { flex: none; }
 @media (max-width: 719px) { .fill .hint { display: none; } }
 .toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 10px; }
