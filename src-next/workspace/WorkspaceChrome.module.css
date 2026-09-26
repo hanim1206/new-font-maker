@@ -5,7 +5,8 @@
 .projectIdentity strong { max-width: 100%; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 /* `‹ 내 폰트` — 위 덱으로 나가는 문. 글자가 있어 어디로 가는지 읽힌다. */
 /* 뒤로 = 화살표만. 대시보드 카드의 `…`와 같은 40px 원. */
-.back { width: 40px; height: 40px; box-sizing: border-box; text-decoration: none; display: grid; place-items: center; padding: 0; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); }
+/* 뒤로도 오른쪽 머리 단추와 같은 생김새 — 44px, 바탕 없음, 흐린 글자색. */
+.back { width: 44px; height: 44px; box-sizing: border-box; text-decoration: none; display: grid; place-items: center; padding: 0; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-dim-3)); }
 .headerActions { display: flex; gap: 3px; }
 .body { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 /* 덮개 자리는 늘 있지만 비어 있으면 손을 통과시킨다. 덮개가 그려질 때만 그 덮개가 받는다. */
@@ -15,7 +16,7 @@
 .headerActions button:disabled { opacity: .34; }
 
 @media (max-width: 380px) {
-  .headerActions button { width: 40px; }
+  .headerActions button, .back { width: 40px; }
   .back span { display: none; }
 }
 

@@ -53,7 +53,7 @@ export function MobileWorkspaceShell({
     <main className={styles.page}>
       <div className={styles.shell}>
         <header className={styles.projectHeader}>
-          {/* 왼쪽은 위 덱으로 나가는 문 — 화살표만, 대시보드 카드 단추와 같은 40px 원. 이름은 읽기용 레이블에만. 오른쪽은 편집 기록. */}
+          {/* 왼쪽은 위 덱으로 나가는 문 — 화살표만, 오른쪽 머리 단추와 같은 생김새. 이름은 읽기용 레이블에만. 오른쪽은 편집 기록. */}
           {back
             ? <a className={styles.back} href={back.href} onClick={onLinkClick} aria-label={`${back.label}(으)로`} title={back.label} data-testid="workspace-back">
               <ChevronLeft size={20} aria-hidden="true" />
