@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   BETA_CODE_ALPHABET,
   betaCredentialsOf,
+  betaInviteLinkOf,
   betaInviteMessage,
   formatBetaCode,
   generateBetaCode,
@@ -51,10 +52,16 @@ describe('베타 초대 코드', () => {
     const base = { nickname: '민지', code: 'K7QM-4XPA-9TRD', appUrl: 'https://font.example' }
     const withoutGuide = betaInviteMessage(base)
     expect(withoutGuide).toContain('민지님')
-    expect(withoutGuide).toContain('https://font.example')
+    expect(withoutGuide).toContain('https://font.example/?to=%EB%AF%BC%EC%A7%80')
     expect(withoutGuide).toContain('K7QM-4XPA-9TRD')
     expect(withoutGuide).toContain('피드백은 한임에게')
     expect(withoutGuide).not.toContain('설치')
     expect(betaInviteMessage({ ...base, installGuideUrl: 'https://guide.example' })).toContain('3. 받은 폰트 설치하는 법: https://guide.example')
+  })
+
+  it('초대 링크에 이름이 `to`로 붙고, 앱 주소의 다른 파라미터는 남는다', () => {
+    const link = betaInviteLinkOf('https://font.example/?ref=kakao', '민지')
+    expect(new URL(link).searchParams.get('to')).toBe('민지')
+    expect(new URL(link).searchParams.get('ref')).toBe('kakao')
   })
 })

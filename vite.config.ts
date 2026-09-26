@@ -4,6 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
 import { notoCorpusApiPlugin } from './scripts/reference-lab/notoCorpusApi'
 import { notoPresetApiPlugin } from './scripts/reference-lab/notoPresetApi'
+import { betaInviteApiPlugin } from './scripts/betaInviteApi'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -11,6 +12,8 @@ export default defineConfig({
     react(),
     notoCorpusApiPlugin(fileURLToPath(new URL('./.reference-fonts/guide-corpus', import.meta.url))),
     notoPresetApiPlugin(fileURLToPath(new URL('./.reference-fonts/guide-corpus', import.meta.url))),
+    // 로컬 관리자 화면(`/admin`)의 베타 계정 발급. 개발 서버에만 붙는다.
+    betaInviteApiPlugin(fileURLToPath(new URL('.', import.meta.url))),
     VitePWA({
       // 편집 중에 저절로 바뀌지 않게. 새 버전은 알림(`appUpdate.ts`) 뒤 사용자가 새로고침한다.
       registerType: 'prompt',

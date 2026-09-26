@@ -65,6 +65,7 @@ document.addEventListener('dragstart', (event) => {
 /** 옛 메인 화면 주소. 폰트 목록은 대시보드 캐러셀로 옮겼다(09-26) — 들어오면 대시보드로 바꿔 적는다. */
 const FONTS_PATH = '/fonts'
 const DASHBOARD_PATH = '/dashboard'
+const ADMIN_PATH = '/admin'
 /** 게이트가 꺼진 개발 서버에서 새 폰트 이름. */
 const LOCAL_NICKNAME = '내 폰트'
 
@@ -111,6 +112,12 @@ function adoptLocalCopy(): void {
  */
 async function gate(): Promise<void> {
   if (window.location.pathname === FONTS_PATH) window.history.replaceState(null, '', DASHBOARD_PATH)
+  // 베타 초대 관리자 화면. 개발 서버에서만, 로그인과 상관없이(발급 API가 이 맥에서만 받는다). 배포 번들에는 없다.
+  if (import.meta.env.DEV && window.location.pathname === ADMIN_PATH) {
+    const { AdminInvitePage } = await import('./AdminInvitePage')
+    show(<AdminInvitePage />)
+    return
+  }
   const mode = authGateMode()
   if (mode === 'off') {
     adoptLocalCopy()

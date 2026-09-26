@@ -1,0 +1,40 @@
+/* 로컬 관리자 화면. 로그인 화면과 같은 480 흰 판, 머리 줄 보더 없음. */
+.page { min-height: 100dvh; background: rgb(var(--color-background)); color: rgb(var(--color-foreground)); }
+.shell { width: min(100%, 480px); min-height: 100dvh; box-sizing: border-box; margin: 0 auto; padding: 0 16px 40px; display: flex; flex-direction: column; gap: 20px; background: rgb(var(--color-surface)); box-shadow: var(--shadow-md); }
+.head { padding-top: 40px; display: flex; flex-direction: column; gap: 4px; }
+.head h1 { margin: 0; font-size: 22px; font-weight: 800; }
+.head p { margin: 0; color: rgb(var(--color-text-4)); font-size: 13px; }
+
+.issue { display: flex; flex-direction: column; }
+.issue label { display: flex; flex-direction: column; gap: 8px; }
+.issue label span { color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 700; }
+.issue input { min-height: 52px; box-sizing: border-box; padding: 0 14px; border: 0; border-radius: 12px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font: inherit; font-size: 17px; font-weight: 700; }
+.issue input::placeholder { color: rgb(var(--color-text-5)); }
+.issue input:focus { outline: none; background: rgb(var(--color-surface)); box-shadow: inset 0 0 0 1.5px rgb(var(--color-foreground)); }
+.issue input[aria-invalid='true'] { box-shadow: inset 0 0 0 1.5px rgb(214 69 65); }
+.issue small { margin-top: 8px; color: rgb(190 52 48); font-size: 12.5px; }
+.issue button, .result > button { min-height: 52px; margin-top: 12px; border: 0; border-radius: 999px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 15px; font-weight: 700; }
+.issue button:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-4)); }
+
+.failure { margin: 0; color: rgb(190 52 48); font-size: 13px; }
+
+.result { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 14px; background: rgb(var(--color-surface-2)); }
+.resultHead { display: flex; align-items: baseline; gap: 8px; }
+.resultHead strong { font-size: 17px; font-weight: 800; }
+.resultHead span { color: rgb(var(--color-text-4)); font-size: 12.5px; }
+.code { font-size: 22px; font-weight: 800; letter-spacing: .1em; }
+.message { margin: 0; padding: 12px; border-radius: 10px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-2)); font: inherit; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; user-select: text; }
+.result > button { margin-top: 2px; background: rgb(var(--color-primary)); }
+.result > button[data-copied] { background: rgb(var(--color-foreground)); }
+
+.list h2 { margin: 0 0 8px; font-size: 14px; font-weight: 800; color: rgb(var(--color-text-3)); }
+.empty { margin: 0; color: rgb(var(--color-text-5)); font-size: 13px; }
+.list ul { margin: 0; padding: 0; list-style: none; }
+.list li { min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.list li + li { box-shadow: 0 -1px 0 rgb(var(--color-border-subtle)); }
+.list li div { display: flex; flex-direction: column; gap: 2px; }
+.list li strong { font-size: 15px; font-weight: 700; }
+.list li span { color: rgb(var(--color-text-4)); font-size: 12px; }
+.list li button { min-height: 34px; padding: 0 14px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-2)); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.list li button[data-confirming] { background: rgb(214 69 65); color: #fff; }
+.list li button:disabled { opacity: .45; }

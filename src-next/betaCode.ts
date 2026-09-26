@@ -69,13 +69,20 @@ export interface BetaInviteMessageInput {
   installGuideUrl?: string
 }
 
-/** 카톡으로 한 번에 보내는 초대 메시지: 링크 · 코드 · 설치 안내 · 제보 안내. */
+/** 초대 링크. 로그인 화면이 `?to=`의 이름으로 인사한다(`betaWelcome.ts`). 앱 주소에 다른 파라미터가 있어도 살린다. */
+export function betaInviteLinkOf(appUrl: string, nickname: string): string {
+  const url = new URL(appUrl)
+  url.searchParams.set('to', nickname)
+  return url.toString()
+}
+
+/** 카톡으로 한 번에 보내는 초대 메시지: 이름 붙은 링크 · 코드 · 설치 안내 · 제보 안내. */
 export function betaInviteMessage({ nickname, code, appUrl, installGuideUrl }: BetaInviteMessageInput): string {
   const lines = [
     '[한글 폰트 메이커 베타 초대]',
     `${nickname}님, 내 손으로 한글 폰트를 만들어 보는 베타에 초대해요.`,
     '',
-    `1. 여기서 열어요: ${appUrl}`,
+    `1. 여기서 열어요: ${betaInviteLinkOf(appUrl, nickname)}`,
     `2. 초대 코드를 넣어요: ${code}`,
   ]
   if (installGuideUrl) lines.push(`3. 받은 폰트 설치하는 법: ${installGuideUrl}`)
