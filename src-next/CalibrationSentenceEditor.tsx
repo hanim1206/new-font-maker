@@ -1762,6 +1762,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   // 도마. 섹션 홈 · 대시보드가 올려 둔 자소 묶음. 여기서는 전환만 하고 담기 · 빼기는 하지 않는다.
   const benchType = useWorkbenchStore((state) => state.type)
   const benchChars = useWorkbenchStore((state) => state.chars)
+  const benchCarried = benchType !== null && benchChars.length > 0
   const isJamoModified = useJamoStore((state) => state.isJamoModified)
   const [globalStylePanel, setGlobalStylePanel] = useState<GlobalStylePanel | null>(styleOnly ? 'body' : null)
   const [previewBrush, setPreviewBrush] = useState<StrokeRenderStyle | null>(null)
@@ -2585,14 +2586,15 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         frameForEdit={frameForEdit}
         toolSlot={strokeToolSlot}
       />}
-      {/* 획 편집은 끄는 즉시 저장된다. `완료`는 저장이 아니라 레이아웃으로 돌아가는 문이다. */}
-      {layoutAvailable && !globalStylePanel && <div className={styles.strokeDoneBar}>
+      {/* 획 편집은 끄는 즉시 저장된다. `완료`는 저장이 아니라 레이아웃으로 돌아가는 문이다.
+          도마를 들고 왔으면 줄이 없다 — 머리 `‹`가 섹션 홈으로 가는 완료이고, 취소는 따로 두지 않는다(되돌리기는 ↶). */}
+      {layoutAvailable && !globalStylePanel && (boxFitIssue || !benchCarried) && <div className={styles.strokeDoneBar}>
         {boxFitIssue && <p role="status" data-testid="jamo-box-fit-issue">이 획은 모델 상자에 안 맞아 옛 배치로 그립니다 · {boxFitIssue.message}</p>}
         {/* `완료`는 고친 채로, 왼쪽 `뒤로`는 이번에 들어와서 고친 것을 되돌리고 레이아웃으로 나간다(취소). */}
-        <div className={styles.strokeDoneRow}>
+        {!benchCarried && <div className={styles.strokeDoneRow}>
           <button type="button" className={styles.strokeBack} onClick={askStrokeBack} aria-label="고친 획을 되돌리고 레이아웃으로 돌아가기" title="고친 획을 되돌리고 레이아웃으로" data-testid="jamo-stroke-back"><ArrowLeft size={18} /></button>
           <button type="button" onClick={() => chooseEditMode('layout')} data-testid="jamo-stroke-done">완료</button>
-        </div>
+        </div>}
       </div>}
       {strokeBackAsk && <div className={leaveSheetStyles.leaveBackdrop} onClick={() => setStrokeBackAsk(false)} data-testid="stroke-back-backdrop">
         <div className={leaveSheetStyles.leaveSheet} role="alertdialog" aria-modal="true" aria-label="저장 안 한 획" onClick={(event) => event.stopPropagation()} data-testid="stroke-back-dialog">
