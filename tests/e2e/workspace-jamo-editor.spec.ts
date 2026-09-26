@@ -132,6 +132,36 @@ test('획 편집 `복사`한 획은 다른 자소에 `붙여넣기`로 같은 �
   await page.screenshot({ path: 'test-results/stroke-copy-paste.png' })
 })
 
+test('획을 안 잡고 자소만 잠긴 채 `복사`하면 그 자소 획이 다 담기고, `붙여넣기`는 한꺼번에 비켜 더한다 (빱의 받침 ㅂ)', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EB%B9%B1&mode=stroke&part=JO')
+  const canvas = page.getByTestId('focus-canvas')
+  await expect(canvas).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
+  const editor = page.getByRole('region', { name: /완성 글자 편집/ })
+  const tools = page.getByRole('toolbar', { name: '획 편집 도구' })
+  const strokes = editor.locator('svg [data-editor-hit="stroke"]')
+  const selected = editor.locator('svg [data-editor-hit="stroke"][data-selected="true"]')
+  await expect(strokes.first()).toBeVisible()
+  // 잠긴 동안 눌리는 획은 받침 ㅂ 것뿐이다.
+  const before = await strokes.count()
+  expect(before).toBeGreaterThan(1)
+
+  // 획을 잡으면 획 하나 복사, 빈 곳으로 풀면 자소 통째 복사.
+  await expect(tools.getByRole('button', { name: 'ㅂ 획 모두 복사' })).toHaveCount(0)
+  await canvas.dispatchEvent('pointerdown')
+  await expect(selected).toHaveCount(0)
+  await tools.getByRole('button', { name: 'ㅂ 획 모두 복사' }).click()
+  await tools.getByRole('button', { name: '획 붙여넣기' }).click()
+  // 원래 획은 그대로 두고 ㅂ 획 전부가 더해진다. 같은 자리라 겹치지 않게 비켜 놓는다.
+  await expect(strokes).toHaveCount(before * 2)
+  await expect(selected).toHaveCount(0)
+  const paths = await strokes.evaluateAll((items) => items.map((item) => item.getAttribute('d')))
+  expect(new Set(paths).size).toBe(before * 2)
+  await page.screenshot({ path: 'test-results/stroke-copy-whole-jamo.png' })
+  // 되돌리기 한 번이면 한꺼번에 빠진다.
+  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
+  await expect(strokes).toHaveCount(before)
+})
+
 test('ㅇ처럼 이미 꽉 찬 원이 있으면 `원`은 가운데로 작게 넣어 겹치지 않는다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EC%97%BC&mode=stroke')
   const editor = page.getByRole('region', { name: '염 완성 글자 편집' })

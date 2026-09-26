@@ -361,7 +361,8 @@ function addJamoStroke(jamo: JamoData, selectedStrokeId: string, stroke: StrokeD
 const PASTE_OFFSET = .03
 
 // 획 복사판. 앱 안에서만 들고 다닌다(시스템 클립보드는 안 쓴다). 자소를 바꿔도 남아서 ㅁ에서 복사 → ㅣ에 붙여넣기가 된다.
-const useStrokeClipboard = create<{ stroke: StrokeDataV2 | null }>(() => ({ stroke: null }))
+// 획 하나, 또는 자소만 잡혔을 때 그 자소 획 전부(ㅂ → ㅃ)를 담는다.
+const useStrokeClipboard = create<{ strokes: StrokeDataV2[] }>(() => ({ strokes: [] }))
 
 function samePoints(a: StrokeDataV2, b: StrokeDataV2): boolean {
   return a.points.length === b.points.length && a.points.every((point, index) => Math.hypot(point.x - b.points[index].x, point.y - b.points[index].y) < .005)
@@ -1312,27 +1313,36 @@ function InferenceTrackpad({
     onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId, delta: { x: 0, y: 0 } })
     onSelectionChange({ ...selection, kind: 'stroke', strokeId, jamo: after, pointsOpen: false })
   }
-  // 고른 획을 두께·모양 그대로 복사판에 담는다.
-  const clipboardStroke = useStrokeClipboard((state) => state.stroke)
+  // 고른 획을 두께·모양 그대로 복사판에 담는다. 획을 안 잡고 자소만 잡혔으면 그 자소 획을 전부 담는다.
+  const clipboardStrokes = useStrokeClipboard((state) => state.strokes)
   const [strokeCopied, setStrokeCopied] = useState(false)
+  const wholeJamoSource = selection.kind === 'component' ? selection.jamo
+    : selection.kind === 'none' ? creationBase?.jamo ?? null
+      : null
   const copyStroke = () => {
-    if (selection.kind !== 'stroke' || !selectedStroke) return
-    useStrokeClipboard.setState({ stroke: structuredClone(selectedStroke) })
+    const strokes = selection.kind === 'stroke' && selectedStroke ? [selectedStroke]
+      : wholeJamoSource ? getJamoStrokes(adoptFamilyStrokes(getJamo(wholeJamoSource.type, wholeJamoSource.char) ?? wholeJamoSource, familyOfSyllable(syllable)))
+        : []
+    if (strokes.length === 0) return
+    useStrokeClipboard.setState({ strokes: structuredClone(strokes) })
     setStrokeCopied(true)
     window.setTimeout(() => setStrokeCopied(false), 1200)
   }
-  // 지금 자소(고른 것, 없으면 잠긴 것)에 복사한 획을 같은 자리(자소 상자 안 0–1 좌표)로 넣고 새 획을 고른다. 같은 자리에 똑같은 획이 있으면 비켜 놓는다.
+  // 지금 자소(고른 것, 없으면 잠긴 것)에 복사한 획을 같은 자리(자소 상자 안 0–1 좌표)로 더한다. 원래 획은 그대로 둔다.
+  // 같은 자리에 똑같은 획이 있으면 묶음째 같은 만큼 비켜 놓는다. 한 획이면 그 획을, 여럿이면 선택을 풀어 붙인 모양을 다 보이게 한다.
   const pasteStroke = () => {
     const selection = creationBase
-    if (!selection || !clipboardStroke) return
+    if (!selection || clipboardStrokes.length === 0) return
     const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
-    const strokeId = `stroke-${Date.now()}`
+    const stamp = Date.now()
+    const ids = clipboardStrokes.map((_, index) => clipboardStrokes.length === 1 ? `stroke-${stamp}` : `stroke-${stamp}-${index}`)
     const existing = getJamoStrokes(before)
+    const pasted = (offset: number) => clipboardStrokes.map((stroke, index) => offsetStroke(stroke, ids[index], offset))
     let offset = 0
-    while (offset < .3 && existing.some((stroke) => samePoints(stroke, offsetStroke(clipboardStroke, strokeId, offset)))) offset += PASTE_OFFSET
-    const after = addJamoStroke(before, selection.strokeId, offsetStroke(clipboardStroke, strokeId, offset))
-    onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId, delta: { x: 0, y: 0 } })
-    onSelectionChange({ ...selection, kind: 'stroke', strokeId, jamo: after, pointsOpen: false })
+    while (offset < .3 && pasted(offset).some((copy) => existing.some((stroke) => samePoints(stroke, copy)))) offset += PASTE_OFFSET
+    const after = pasted(offset).reduce((jamo, stroke) => addJamoStroke(jamo, selection.strokeId, stroke), before)
+    onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId: ids[0], delta: { x: 0, y: 0 } })
+    onSelectionChange(ids.length === 1 ? { ...selection, kind: 'stroke', strokeId: ids[0], jamo: after, pointsOpen: false } : { kind: 'none' })
   }
   // 지금 자소(고른 것, 없으면 잠긴 것)를 기본 프리셋으로 되돌린다. 문맥 변형까지 처음 그대로 — 틀 · 잉크 간격 보정도 얹지 않는다.
   // 고친 획이 한 번에 다 사라지니 먼저 묻는다(되돌리기로 되살릴 수는 있다).
@@ -1388,10 +1398,10 @@ function InferenceTrackpad({
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.isComposing || isTypingTarget(event.target)) return
       const key = event.key.toLowerCase()
-      if (key === 'c' && selection.kind === 'stroke' && selectedStroke) {
+      if (key === 'c' && ((selection.kind === 'stroke' && selectedStroke) || wholeJamoSource)) {
         event.preventDefault()
         copyStroke()
-      } else if (key === 'v' && creationBase && clipboardStroke) {
+      } else if (key === 'v' && creationBase && clipboardStrokes.length > 0) {
         event.preventDefault()
         pasteStroke()
       }
@@ -1510,7 +1520,8 @@ function InferenceTrackpad({
           {connectButton}
           {deleteButton}
         </>}
-        {creationBase && clipboardStroke && <button type="button" onClick={pasteStroke} aria-label="획 붙여넣기" data-testid="jamo-stroke-paste"><ClipboardPaste size={18} aria-hidden="true" /><span>붙여넣기</span></button>}
+        {selection.kind !== 'stroke' && wholeJamoSource && <button type="button" onClick={copyStroke} aria-label={`${wholeJamoSource.char} 획 모두 복사`} data-testid="jamo-strokes-copy-all">{strokeCopied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}<span>{strokeCopied ? '복사함' : '복사'}</span></button>}
+        {creationBase && clipboardStrokes.length > 0 && <button type="button" onClick={pasteStroke} aria-label="획 붙여넣기" data-testid="jamo-stroke-paste"><ClipboardPaste size={18} aria-hidden="true" /><span>붙여넣기</span></button>}
         {creationBase && <button type="button" onClick={() => setResetConfirmOpen(true)} disabled={!canResetJamo} aria-label={`${creationBase.jamo.char} 프리셋으로 초기화`} data-testid="jamo-stroke-reset"><RotateCcw size={18} aria-hidden="true" /><span>초기화</span></button>}
       </div>
     )
