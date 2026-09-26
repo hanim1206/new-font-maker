@@ -312,8 +312,8 @@ function AccountMenu() {
   </div>
 }
 
-function SectionHead({ title, count, hint, onClick }: { title: string; count?: number; hint?: string; onClick?: () => void }) {
-  return <button type="button" className={styles.sectionHead} onClick={onClick}>
+function SectionHead({ title, count, hint, onClick, testId }: { title: string; count?: number; hint?: string; onClick?: () => void; testId?: string }) {
+  return <button type="button" className={styles.sectionHead} onClick={onClick} data-testid={testId}>
     <h2>{title}</h2>
     {count !== undefined && <span>{count}</span>}
     {hint && <em>{hint}</em>}
@@ -728,12 +728,12 @@ export function DashboardLabPage() {
           <nav className={styles.rail} aria-label="목차">
             {SECTIONS.map(({ id, label }) => <button key={id} type="button" aria-current={active === id ? 'true' : undefined} onClick={() => jump(id)}>{label}</button>)}
             {/* 검수는 섹션이 아니라 다른 화면(격자). 틈을 두고 따로. */}
-            <button type="button" className={styles.railLink} onClick={() => navigate('/workspace/review')}><ScanSearch size={16} aria-hidden="true" />검수</button>
+            <button type="button" className={styles.railLink} onClick={() => navigate('/workspace/review')} data-testid="dashboard-review"><ScanSearch size={16} aria-hidden="true" />검수</button>
           </nav>
 
           <div className={styles.content}>
             <section ref={(el) => { sections.current.style = el }}>
-              <SectionHead title="스타일" hint="이 폰트 전체" onClick={() => navigate('/workspace/font')} />
+              <SectionHead title="스타일" hint="이 폰트 전체" onClick={() => navigate('/workspace/font')} testId="dashboard-style" />
               <ul className={styles.tiles}>
                 <li><span className={styles.picto}><StylePicto kind="weight" /></span><em>굵기</em><strong>{style.weight}</strong></li>
                 <li><span className={styles.picto}><StylePicto kind="slant" /></span><em>기울기</em><strong>{style.slant}°</strong></li>
@@ -743,7 +743,7 @@ export function DashboardLabPage() {
             </section>
 
             <section ref={(el) => { sections.current.layout = el }}>
-              <SectionHead title="레이아웃" count={6} onClick={() => navigate('/workspace/jamo')} />
+              <SectionHead title="레이아웃" count={6} onClick={() => navigate('/workspace/jamo')} testId="dashboard-layout" />
               <ul className={styles.grid}>
                 {LAYOUT_SAMPLES.map((char) => <li key={char}>
                   <button type="button" className={styles.thumb} aria-label={`${char} 레이아웃`} onClick={() => navigate(`/workspace/jamo?char=${encodeURIComponent(char)}`)}>

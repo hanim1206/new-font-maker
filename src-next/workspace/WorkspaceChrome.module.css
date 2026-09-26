@@ -1,7 +1,5 @@
 .page { min-height: 100dvh; overflow: hidden; background: rgb(var(--color-background)); }
-/* 탭이 없는 화면(획 덱)은 셸이 홈 인디케이터 여백을 맡는다. */
-.shell[data-tabs='hidden'] { padding-bottom: env(safe-area-inset-bottom); }
-.shell { position: relative; width: min(100%, 480px); height: 100dvh; box-sizing: border-box; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; background: rgb(var(--color-surface)); box-shadow: var(--shadow-md); }
+.shell { position: relative; width: min(100%, 480px); height: 100dvh; box-sizing: border-box; margin: 0 auto; padding-bottom: env(safe-area-inset-bottom); display: flex; flex-direction: column; overflow: hidden; background: rgb(var(--color-surface)); box-shadow: var(--shadow-md); }
 .projectHeader { min-height: 50px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px; padding: max(2px, env(safe-area-inset-top)) 10px 2px 8px; border-bottom: 1px solid rgb(var(--color-border-subtle)); }
 .projectIdentity { min-width: 0; display: flex; flex-direction: column; align-items: center; }
 .projectIdentity strong { max-width: 100%; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
@@ -15,12 +13,6 @@
 .cover > * { pointer-events: auto; }
 .headerActions button { width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-dim-3)); }
 .headerActions button:disabled { opacity: .34; }
-
-/* 하단 탭 셋(폰트 · 자소 · 검수). 폰트 덱 안의 화면 이동. 지금 화면은 색으로. */
-.tabs { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); padding: 4px 8px calc(env(safe-area-inset-bottom) + 4px); border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
-.tabs a { min-height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border-radius: 10px; color: rgb(var(--color-text-dim-4)); font-size: 11px; font-weight: 700; text-decoration: none; }
-.tabs a em { font-style: normal; }
-.tabs a[aria-current='page'] { color: rgb(var(--color-primary)); }
 
 @media (max-width: 380px) {
   .headerActions button { width: 40px; }

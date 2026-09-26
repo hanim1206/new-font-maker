@@ -12,6 +12,11 @@ const setStoredStyle = (page: Page, patch: Record<string, unknown>) => page.eval
   Object.assign(raw.state.style, patch)
   localStorage.setItem('font-maker-global-style', JSON.stringify(raw))
 }, patch)
+/** 하단 탭은 없다. 머리 `‹`로 대시보드에 나가 그 입구(스타일 · 레이아웃)로 들어간다. */
+async function goVia(page: Page, entry: '스타일' | '레이아웃'): Promise<void> {
+  await page.getByTestId('workspace-font-home').click()
+  await page.getByTestId(entry === '스타일' ? 'dashboard-style' : 'dashboard-layout').click()
+}
 
 test('폰트 탭이 글로벌 스타일 공간이다 — 늘 열려 있고 닫기가 없다', async ({ page }) => {
   // `?char=`는 자소 탭과 같은 편집기라 폰트 탭에서도 표본 글자를 정한다.
@@ -23,10 +28,9 @@ test('폰트 탭이 글로벌 스타일 공간이다 — 늘 열려 있고 닫�
   await expect(panel.getByRole('button', { name: '글로벌 스타일 설정 닫기' })).toHaveCount(0)
   await expect(panel.getByRole('tablist', { name: '글로벌 스타일 항목' }).getByRole('tab')).toHaveText(['글자 네모꼴', '획 스타일', '굵기', '부리'])
 
-  // 하단에 붙은 작은 패널이 아니라 탭 바 위까지 남은 높이를 다 쓴다.
+  // 하단에 붙은 작은 패널이 아니라 화면 바닥까지 남은 높이를 다 쓴다(하단 탭은 없다).
   const box = await panel.boundingBox()
-  const tabs = await page.getByTestId('workspace-tabs').boundingBox()
-  expect(box && tabs && box.y + box.height).toBeGreaterThan((tabs?.y ?? 0) - 2)
+  expect(box && box.y + box.height).toBeGreaterThan(page.viewportSize()!.height - 24)
 
   // 획 스타일: 고르기는 글자에 나오는 결과로 부른다(일반 붓 · 납작 붓). 옛 `각진 끝 / 둥근 끝`은 둥글기 막대가 대신한다.
   await panel.getByRole('tab', { name: '획 스타일' }).click()
@@ -71,8 +75,8 @@ test('폰트 탭이 글로벌 스타일 공간이다 — 늘 열려 있고 닫�
   await expect(roundness).toHaveValue('0')
   expect((await storedStyle(page)).strokeStyle).not.toHaveProperty('roundness')
 
-  // 자소 탭으로 가면 레이아웃 편집이고, 머리에 글로벌 스타일 단추는 없다.
-  await page.getByTestId('workspace-tabs').getByRole('link', { name: '자소' }).click()
+  // 대시보드 레이아웃으로 가면 레이아웃 편집이고, 머리에 글로벌 스타일 단추는 없다.
+  await goVia(page, '레이아웃')
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
   await expect(page.getByRole('button', { name: '글로벌 스타일 설정' })).toHaveCount(0)
 })
@@ -116,7 +120,7 @@ test('폰트 탭은 캔버스 없이 문장 줄이 한 줄 그대로 크게 자�
   // 탭을 옮기면 문장이 기본 문장으로 다시 열리므로 두 탭에 다 있는 `별`로 잰다.
   const glyph = sentence.getByRole('button', { name: /^별 편집/ }).locator('svg')
   const small = await glyph.boundingBox()
-  await page.getByTestId('workspace-tabs').getByRole('link', { name: '폰트' }).click()
+  await goVia(page, '스타일')
   await expect(sentence).toHaveAttribute('data-grown', 'true')
   await expect(page.getByTestId('focus-canvas')).toHaveCount(0)
   await expect.poll(async () => (await glyph.boundingBox())?.height ?? 0).toBeGreaterThan(130)
@@ -124,7 +128,7 @@ test('폰트 탭은 캔버스 없이 문장 줄이 한 줄 그대로 크게 자�
   // 한 줄이다: 줄 높이가 글자 하나 남짓.
   expect((await sentence.boundingBox())?.height ?? 0).toBeLessThan(210)
 
-  await page.getByTestId('workspace-tabs').getByRole('link', { name: '자소' }).click()
+  await goVia(page, '레이아웃')
   await expect.poll(async () => (await glyph.boundingBox())?.height ?? 0).toBeLessThan(30)
 })
 

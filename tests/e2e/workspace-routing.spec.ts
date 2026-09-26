@@ -14,9 +14,11 @@ const storedStyle = (page: Page) => page.evaluate(() => JSON.parse(localStorage.
 const mark = (page: Page) => page.evaluate(() => { (window as unknown as { __routeMark?: number }).__routeMark = 1 })
 const marked = (page: Page) => page.evaluate(() => (window as unknown as { __routeMark?: number }).__routeMark === 1)
 
-/** 하단 탭으로 화면을 옮긴다. */
-async function openMenuAndGo(page: Page, name: string): Promise<void> {
-  await page.getByTestId('workspace-tabs').getByRole('link', { name }).click()
+/** 하단 탭은 없다. 머리 `‹`로 대시보드에 나가 그 입구로 들어간다(폰트 = 스타일, 자소 = 레이아웃). */
+async function openMenuAndGo(page: Page, name: '폰트' | '자소' | '검수'): Promise<void> {
+  await page.getByTestId('workspace-font-home').click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await page.getByTestId({ 폰트: 'dashboard-style', 자소: 'dashboard-layout', 검수: 'dashboard-review' }[name]).click()
 }
 
 test('자소 → 검수 → 자소를 오가도 되돌리기 기록이 남는다', async ({ page }) => {
@@ -37,7 +39,6 @@ test('자소 → 검수 → 자소를 오가도 되돌리기 기록이 남는다
   // 검수로. 주소는 바뀌고 페이지는 그대로다.
   await openMenuAndGo(page, '검수')
   await expect(page).toHaveURL(/\/workspace\/review$/)
-  await expect(page.getByTestId('workspace-tabs').getByRole('link', { name: '검수' })).toHaveAttribute('aria-current', 'page')
   expect(await marked(page)).toBe(true)
 
   // 다시 자소로. 되돌리기가 살아 있고, 누르면 둥글기가 0으로 돌아온다.
@@ -59,6 +60,9 @@ test('브라우저 뒤로 가기는 화면만 바꾸고, 검수 칸은 그 글�
 
   await openMenuAndGo(page, '검수')
   await expect(page).toHaveURL(/\/workspace\/review$/)
+  // 대시보드를 거쳐 왔으니 두 번 물러난다.
+  await page.goBack()
+  await expect(page).toHaveURL(/\/dashboard$/)
   await page.goBack()
   await expect(page).toHaveURL(/\/workspace\/jamo$/)
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()

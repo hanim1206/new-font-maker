@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ChevronLeft, Redo2, ScanSearch, Shapes, Type, Undo2 } from 'lucide-react'
+import { ChevronLeft, Redo2, Undo2 } from 'lucide-react'
 import { flushAccountFont, useAccountSaveStore } from '../accountFontSync'
 import { useFontExportStore } from '../fontExportStore'
 import { useUIStore } from '../../src/stores/uiStore'
@@ -9,7 +9,7 @@ import { useHistoryShortcuts } from './keyboardShortcuts'
 import { SaveToast } from './SaveToast'
 import styles from './WorkspaceChrome.module.css'
 
-/** 폰트 덱의 화면 셋. 하단 탭 하나씩. */
+/** 폰트 덱의 화면 셋. 하단 탭은 없다 — 입구는 대시보드(스타일 · 레이아웃 · 섹션 홈 · 검수)가 맡는다. */
 export type WorkspaceArea = 'font' | 'jamo' | 'review'
 
 export interface WorkspaceHistoryControls {
@@ -22,30 +22,27 @@ export interface WorkspaceHistoryControls {
 /**
  * 폰트 덱의 셸. 덱 셋(내 폰트 → 폰트 → 획) 가운데 둘째.
  * 머리 왼쪽 `‹ 내 폰트`는 위 덱으로 나가는 문, 가운데는 지금 연 폰트 이름, 오른쪽은 되돌리기 · 다시 실행.
- * 아래는 탭 셋(폰트 · 자소 · 검수). 햄버거 메뉴는 없다 — 항목이 전부 제 자리를 찾았다(출력은 폰트 탭, 로그아웃은 내 폰트).
+ * 하단 탭 · 햄버거 메뉴는 없다 — 화면 사이 이동은 대시보드가 하고, 출력은 폰트 화면, 로그아웃은 대시보드 계정 메뉴.
  */
 export function MobileWorkspaceShell({
   children,
-  activeArea,
   projectName,
   history,
   tools,
-  tabsHidden = false,
   back,
   cover,
 }: {
   children: ReactNode
+  /** 어느 화면인지. 탭은 없어졌지만 부르는 쪽이 이름표로 준다. */
   activeArea: WorkspaceArea
   /** 머리 가운데 이름. 안 넘기면 지금 연 폰트 이름(어느 화면이든 같다). */
   projectName?: string
   history?: WorkspaceHistoryControls
   /** 머리 오른쪽, 되돌리기 앞에 늘 보이는 도구(어느 모드에서든 쓰는 것). */
   tools?: ReactNode
-  /** 획 덱처럼 폰트 덱 위에 얹힌 화면은 탭을 감춘다. */
-  tabsHidden?: boolean
   /** 머리 왼쪽 문. 기본은 위 덱(`내 폰트`). 폰트 덱 안의 하위 화면(추출 완료)은 `‹ 폰트`처럼 제 상위를 준다. */
   back?: { label: string; href: string }
-  /** 머리와 탭 사이(내용 자리)만 덮는 층. 추출 대기처럼 내용은 막되 탭으로는 나갈 수 있어야 하는 것. */
+  /** 머리 아래(내용 자리)만 덮는 층. 추출 대기처럼 내용은 막되 머리 `‹`로는 나갈 수 있어야 하는 것. */
   cover?: ReactNode
 }) {
   const openedName = useUIStore((state) => state.currentProjectName)
@@ -54,7 +51,7 @@ export function MobileWorkspaceShell({
   useHistoryShortcuts(history)
   return (
     <main className={styles.page}>
-      <div className={styles.shell} data-tabs={tabsHidden ? 'hidden' : undefined}>
+      <div className={styles.shell}>
         <header className={styles.projectHeader}>
           {/* 왼쪽은 위 덱으로 나가는 문 — 화살표만, 대시보드 카드 단추와 같은 40px 원. 이름은 읽기용 레이블에만. 오른쪽은 편집 기록. */}
           {back
@@ -74,17 +71,12 @@ export function MobileWorkspaceShell({
           </div>
         </header>
 
-        {/* 내용 자리. 머리 · 탭과 같은 세로 flex라 화면 배분은 전과 같고, `cover`가 이 자리만 덮는다. */}
+        {/* 내용 자리. 머리 아래를 다 쓰고, `cover`가 이 자리만 덮는다. */}
         <div className={styles.body}>
           {children}
           {cover && <div className={styles.cover}>{cover}</div>}
         </div>
 
-        {!tabsHidden && <nav className={styles.tabs} aria-label="프로젝트 주 내비게이션" data-testid="workspace-tabs">
-          <a href="/workspace/font" onClick={onLinkClick} aria-current={activeArea === 'font' ? 'page' : undefined}><Type size={20} aria-hidden="true" /><em>폰트</em></a>
-          <a href="/workspace/jamo" onClick={onLinkClick} aria-current={activeArea === 'jamo' ? 'page' : undefined}><Shapes size={20} aria-hidden="true" /><em>자소</em></a>
-          <a href="/workspace/review" onClick={onLinkClick} aria-current={activeArea === 'review' ? 'page' : undefined}><ScanSearch size={20} aria-hidden="true" /><em>검수</em></a>
-        </nav>}
       </div>
       <AccountSaveToast />
       <ExportNoticeToast />
@@ -94,7 +86,7 @@ export function MobileWorkspaceShell({
 
 /**
  * 추출이 실패했거나 빈 칸으로 넣은 글자가 있으면 그 자리에서 알린다. 닫을 때까지 남는다.
- * 폰트 탭이 아닌 곳에서 추출이 끝나면 화면을 바꾸지 않고 `완료 페이지 보기`만 준다(획을 만지는 중에 화면이 바뀌면 작업이 끊긴다).
+ * 폰트 화면이 아닌 곳에서 추출이 끝나면 화면을 바꾸지 않고 `완료 페이지 보기`만 준다(획을 만지는 중에 화면이 바뀌면 작업이 끊긴다).
  */
 function ExportNoticeToast() {
   const notice = useFontExportStore((state) => state.notice)

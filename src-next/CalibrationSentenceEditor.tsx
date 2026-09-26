@@ -1762,7 +1762,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   // 도마. 섹션 홈 · 대시보드가 올려 둔 자소 묶음. 여기서는 전환만 하고 담기 · 빼기는 하지 않는다.
   const benchType = useWorkbenchStore((state) => state.type)
   const benchChars = useWorkbenchStore((state) => state.chars)
-  const benchCarried = benchType !== null && benchChars.length > 0
+  // 섹션 홈 `편집 n`으로 들어왔는지. 돌아갈 곳(`returnTo`)이 있을 때만 — 레이아웃 카드로 들어오면 도마가 남아 있어도 아니다.
+  const benchCarried = useWorkbenchStore((state) => state.type !== null && state.chars.length > 0 && state.returnTo !== null)
   const isJamoModified = useJamoStore((state) => state.isJamoModified)
   const [globalStylePanel, setGlobalStylePanel] = useState<GlobalStylePanel | null>(styleOnly ? 'body' : null)
   const [previewBrush, setPreviewBrush] = useState<StrokeRenderStyle | null>(null)

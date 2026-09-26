@@ -23,13 +23,10 @@ test('옛 화면 주소(현황 · 원형 · 조합별 결과)는 자소 탭으�
   await expect(page.getByRole('link', { name: '자소 탭으로 이동' })).toHaveAttribute('href', '/workspace/jamo')
 })
 
-test('뼈대 탭은 없고 옛 뼈대 주소는 자소 탭으로 넘어간다', async ({ page }) => {
+test('옛 뼈대 주소는 자소 화면으로 넘어간다', async ({ page }) => {
   await page.goto('/workspace/skeleton')
   await expect(page).toHaveURL(/\/workspace\/jamo$/)
-  const nav = page.getByRole('navigation', { name: '프로젝트 주 내비게이션' })
-  await expect(nav.getByRole('link', { name: '자소' })).toHaveAttribute('aria-current', 'page')
-  await expect(nav.getByRole('link')).toHaveText(['폰트', '자소', '검수'])
-  await expect(nav.getByText('뼈대')).toHaveCount(0)
+  await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
 })
 
 test('머리는 `‹`(화살표만) · 폰트 이름 · 되돌리기고 햄버거는 없다', async ({ page }) => {
@@ -38,17 +35,15 @@ test('머리는 `‹`(화살표만) · 폰트 이름 · 되돌리기고 햄버�
   await expect(page.getByTestId('workspace-font-home')).toHaveAttribute('aria-label', '내 폰트로')
   await expect(page.getByTestId('workspace-font-home')).toHaveText('')
   await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeVisible()
-  // 하단 탭은 화면 바닥에 붙는다.
-  const tabs = page.getByTestId('workspace-tabs')
-  const box = (await tabs.boundingBox())!
-  expect(box.y + box.height).toBeGreaterThan(page.viewportSize()!.height - 2)
+  // 하단 탭은 없다 — 화면 사이 이동은 대시보드가 한다.
+  await expect(page.getByTestId('workspace-tabs')).toHaveCount(0)
 })
 
-test('폰트 탭의 OTF 추출은 폰트 이름을 물은 뒤 그 이름의 OTF를 받는다', async ({ page }) => {
+test('폰트 화면의 OTF 추출은 폰트 이름을 물은 뒤 그 이름의 OTF를 받는다', async ({ page }) => {
   test.setTimeout(180_000)
-  await page.goto('/workspace/jamo')
-  const nav = page.getByRole('navigation', { name: '프로젝트 주 내비게이션' })
-  await nav.getByRole('link', { name: '폰트' }).click()
+  // 폰트 화면 입구는 대시보드 `스타일`.
+  await page.goto('/dashboard')
+  await page.getByTestId('dashboard-style').click()
   await expect(page).toHaveURL(/\/workspace\/font$/)
   // 게이트가 꺼진 dev는 이 기기 폰트 `내 폰트`가 자동으로 만들어져 열린다.
   await expect(page.getByTestId('font-workspace').getByRole('heading', { level: 1 })).toHaveText('내 폰트')
@@ -73,6 +68,9 @@ test('폰트 탭의 OTF 추출은 폰트 이름을 물은 뒤 그 이름의 OTF�
   await expect(page).toHaveURL(/\/workspace\/font\/export$/)
   await expect(page.getByTestId('font-export-done')).toBeVisible()
 
-  await nav.getByRole('link', { name: '검수' }).click()
-  await expect(page).toHaveURL(/\/workspace\/review$/)
+  // 완료 페이지의 `‹`는 폰트 화면으로, 거기 `‹`는 대시보드로.
+  await page.getByTestId('workspace-back').click()
+  await expect(page).toHaveURL(/\/workspace\/font$/)
+  await page.getByTestId('workspace-font-home').click()
+  await expect(page).toHaveURL(/\/dashboard$/)
 })

@@ -52,13 +52,15 @@ test('폰트 탭: 대기 층에 퍼센트가 오르고, 끝나면 완료 페이�
   await expect(page).toHaveURL(/\/workspace\/font$/)
 })
 
-test('자소 탭에서 끝나면 화면은 안 바뀌고 토스트의 완료 페이지 보기로 간다', async ({ page }) => {
+test('자소 화면에서 끝나면 화면은 안 바뀌고 토스트의 완료 페이지 보기로 간다', async ({ page }) => {
   test.setTimeout(240_000)
   await page.goto('/workspace/font')
   const downloadPromise = page.waitForEvent('download', { timeout: 200_000 })
   await startExport(page, '토스트체')
   await expect(page.getByTestId('font-export-overlay')).toBeVisible()
-  await page.getByTestId('workspace-tabs').getByRole('link', { name: '자소' }).click()
+  // 대기 층은 내용만 덮는다. 머리 `‹`로 대시보드에 나가 레이아웃으로 들어간다.
+  await page.getByTestId('workspace-font-home').click()
+  await page.getByTestId('dashboard-layout').click()
   await expect(page).toHaveURL(/\/workspace\/jamo$/)
   await expect(page.getByTestId('font-export-overlay')).toHaveCount(0)
 
