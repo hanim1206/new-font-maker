@@ -5,11 +5,13 @@
 .head h1 { margin: 0; font-size: 15px; font-weight: 800; }
 /* 머리 왼쪽 회색 알약 = 지금 폰트 이름 + 꺾쇠. 누르면 내 폰트 시트. 긴 이름은 한 줄에서 `…`. */
 .head .title { flex: 1; min-width: 0; display: flex; margin-left: -8px; }
-.head .switcher { max-width: 100%; min-height: 36px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px 0 18px; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 15px; font-weight: 500; transition: background-color var(--motion-fast) var(--ease-standard); }
+.head .switcher { max-width: 100%; min-height: 36px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px 0 18px; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 15px; font-weight: 600; transition: background-color var(--motion-fast) var(--ease-standard); }
 .head .switcher span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .head .switcher svg { flex: none; color: rgb(var(--color-text-4)); transition: transform var(--motion-normal) var(--ease-standard); }
 .head .switcher svg[data-open] { transform: rotate(180deg); }
 .head .switcher:not(:disabled):active { background: rgb(var(--color-surface-3)); }
+/* 드로어가 열리면 알약 면은 빠진다 — 이름과 꺾쇠만 드로어 위에 남는다. */
+.head .switcher[aria-expanded='true'] { background: transparent; }
 .head .switcher:disabled { background: transparent; padding-left: 8px; }
 .head button { min-height: 40px; padding: 0 10px; border: 0; background: transparent; color: rgb(var(--color-text-4)); font-size: 12px; }
 
@@ -44,19 +46,33 @@
 /* 카드 안 추출 버튼. 워크스페이스 폰트 탭의 `OTF 추출`과 같은 생김새. */
 .card footer { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: auto; }
 /* `…` 더보기. 다운로드 옆 같은 크기의 원, 색은 옅게 — 주 동작은 다운로드. */
-.nameInput { min-width: 0; flex: 1; margin: -3px 0 -3px -6px; padding: 2px 6px; border: 1px solid rgb(var(--color-primary)); border-radius: 8px; background: rgb(var(--color-surface)); color: inherit; font: inherit; font-size: 15px; font-weight: 750; outline: none; }
 .more { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); }
-.cardMenu { position: fixed; z-index: 30; width: 200px; padding: 6px; border-radius: 14px; background: rgb(var(--color-surface)); border: 1px solid rgb(var(--color-border-subtle)); box-shadow: 0 12px 32px rgb(0 0 0 / .14); display: flex; flex-direction: column; }
-.cardMenu > button { min-height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border: 0; border-radius: 9px; background: none; color: rgb(var(--color-foreground)); font-size: 13px; font-weight: 650; text-align: left; }
-.cardMenu > button:not(:disabled):hover { background: rgb(var(--color-surface-2)); }
-.cardMenu > button:disabled { color: rgb(var(--color-text-4)); }
-.cardMenu > button small { margin-left: auto; font-size: 11px; font-weight: 500; }
-.cardMenu [data-danger] { color: rgb(var(--color-danger, 214 50 31)); }
-.cardMenuConfirm { padding: 8px 6px 4px; display: flex; flex-direction: column; gap: 10px; }
-.cardMenuConfirm p { margin: 0; font-size: 12.5px; line-height: 1.45; word-break: keep-all; }
-.cardMenuConfirm div { display: flex; gap: 6px; }
-.cardMenuConfirm button { flex: 1; min-height: 36px; border: 0; border-radius: 9px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 13px; font-weight: 700; }
-.cardMenuConfirm button[data-danger] { background: rgb(var(--color-danger, 214 50 31)); color: #fff; }
+/* 카드 `…` 시트. 화면 아래에 좌우 12px 띄워 뜨고, 뒤는 머리까지 어둡게. 셸 너비(480)를 넘지 않는다. */
+.menuSheetLayer { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; background: rgb(0 0 0 / .36); transition: padding-bottom var(--motion-normal) var(--ease-standard); animation: fadeIn var(--motion-normal) var(--ease-standard); }
+.menuSheet { width: min(100%, 480px); box-sizing: border-box; margin: 0 12px calc(env(safe-area-inset-bottom) + 12px); padding: 10px; border-radius: 28px; background: rgb(var(--color-surface)); display: flex; flex-direction: column; animation: sheetUp 360ms cubic-bezier(0.32, 0.72, 0, 1); }
+.menuSheet::before { content: ''; width: 36px; height: 4px; margin: 2px auto 10px; border-radius: 999px; background: rgb(var(--color-surface-3)); }
+.menuSheetLayer[data-closing] { animation: fadeOut 260ms var(--ease-standard) forwards; }
+.menuSheetLayer[data-closing] .menuSheet { animation: sheetDown 260ms cubic-bezier(0.4, 0, 0.6, 1) forwards; }
+.menuSheet > button { min-height: 58px; display: flex; align-items: center; gap: 14px; padding: 0 16px; border: 0; border-radius: 16px; background: none; color: rgb(var(--color-foreground)); font-size: 17px; font-weight: 600; text-align: left; }
+.menuSheet > button svg { flex: none; color: rgb(var(--color-text-4)); }
+.menuSheet > button:not(:disabled):active { background: rgb(var(--color-surface-2)); }
+.menuSheet > button:disabled { color: rgb(var(--color-text-5)); }
+.menuSheet [data-danger] { color: rgb(var(--color-danger, 214 50 31)); }
+.menuSheet > button[data-danger] svg { color: inherit; }
+/* 시트 안 둘째 화면(이름 바꾸기 · 삭제 확인). 제목 · 내용 · 아래 큰 단추 둘. 바뀔 때 살짝 떠오른다. */
+.menuSheetStep { margin: 0; padding: 4px 6px 2px; display: flex; flex-direction: column; gap: 8px; animation: stepIn 220ms cubic-bezier(0.2, 0, 0, 1); }
+.menuSheetStep h3 { margin: 0; padding: 0 10px; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+.menuSheetStep p { margin: 0; padding: 0 10px; color: rgb(var(--color-text-4)); font-size: 15px; }
+.menuSheetField { position: relative; margin-top: 10px; display: flex; align-items: center; }
+.menuSheetField input { width: 100%; min-height: 56px; box-sizing: border-box; padding: 0 48px 0 16px; border: 0; border-radius: 16px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font: inherit; font-size: 18px; font-weight: 600; outline: none; caret-color: rgb(var(--color-foreground)); }
+.menuSheetField input::placeholder { color: rgb(var(--color-text-5)); font-weight: 500; }
+.menuSheetField button { position: absolute; right: 12px; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 999px; background: rgb(var(--color-text-5)); color: rgb(var(--color-surface)); animation: popIn var(--motion-normal) var(--ease-standard); }
+.menuSheetActions { margin-top: 16px; display: flex; gap: 8px; }
+.menuSheetActions button { flex: 1; min-height: 56px; border: 0; border-radius: 16px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 17px; font-weight: 700; transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
+.menuSheetActions button:not(:disabled):active { transform: scale(0.97); }
+.menuSheetActions button[data-primary] { flex: 2; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+.menuSheetActions button[data-primary]:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
+.menuSheetActions button[data-danger] { flex: 2; background: rgb(var(--color-danger, 214 50 31)); color: #fff; }
 /* 원 하나(40px). 탭하면 색이 바뀌고 오른쪽으로 자라며 글자가 들어온다 — 있던 요소가 제자리에서 자라는 전환. */
 .download { height: 40px; display: inline-flex; align-items: center; gap: 0; padding: 0 11px; border: 0; border-radius: 999px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 700; transition: background-color var(--motion-normal) var(--ease-standard), gap var(--motion-normal) var(--ease-standard), padding var(--motion-normal) var(--ease-standard); }
 .download svg { flex: none; }
@@ -202,6 +218,8 @@
 @keyframes drawerUp { from { transform: none; } to { transform: translateY(-100%); } }
 @keyframes fadeOut { to { opacity: 0; } }
 @keyframes sheetUp { from { transform: translateY(100%); } to { transform: none; } }
-@media (prefers-reduced-motion: reduce) { .home, .board, .groupHead, .homeCard, .benchChips em, .benchClear, .benchGo, .benchCount, .groupMore, .sheetLayer, .sheet, .toast { transition: none; animation: none; } }
+@keyframes stepIn { from { opacity: 0; transform: translateY(6px); } }
+@keyframes sheetDown { from { transform: none; } to { transform: translateY(calc(100% + 24px)); } }
+@media (prefers-reduced-motion: reduce) { .home, .board, .groupHead, .homeCard, .benchChips em, .benchClear, .benchGo, .benchCount, .groupMore, .sheetLayer, .sheet, .menuSheetLayer, .menuSheet, .menuSheetStep, .menuSheetField button, .menuSheetActions button, .toast { transition: none; animation: none; } }
 .picto { display: block; width: 52px; height: 52px; }
 .picto svg { display: block; width: 100%; height: 100%; }

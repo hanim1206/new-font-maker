@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, Ellipsis, PencilLine, Plus, ScanSearch, Trash2, UserRound } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, Ellipsis, PencilLine, Plus, ScanSearch, Trash2, UserRound, X } from 'lucide-react'
 import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../src/data/Hangul'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { useEffectiveGlobalStyle, useGlobalStyleStore } from '../src/stores/globalStyleStore'
@@ -188,7 +188,7 @@ function StylePicto({ kind }: { kind: 'weight' | 'slant' | 'roundness' | 'beak' 
 
 /**
  * 지금 폰트 카드. 이름은 머리 알약에 있어 여기선 마지막 고침과 예시 문장만.
- * 버튼은 둘: `…`(이름 바꾸기 · 복제 · 삭제) · 다운로드. 이름 바꾸기는 카드 맨 위 줄이 잠깐 입력칸이 된다.
+ * 버튼은 둘: `…`(이름 바꾸기 · 복제 · 삭제) · 다운로드. 이름 바꾸기 · 삭제 확인은 `…` 시트 안에서 한다.
  */
 function FontCard({ name, note, onRename, onDelete }: {
   name: string
@@ -199,23 +199,9 @@ function FontCard({ name, note, onRename, onDelete }: {
 }) {
   // 추출 버튼은 원형 아이콘. 탭하면 색이 바뀌며 옆으로 자라 `다운로드`가 들어온다(시안에서는 다시 탭하면 돌아간다).
   const [armed, setArmed] = useState(false)
-  const [renaming, setRenaming] = useState(false)
-  const commit = (value: string) => {
-    setRenaming(false)
-    const next = value.trim()
-    if (next && next !== name) onRename(next)
-  }
   return <article className={styles.card}>
     <header>
-      {renaming
-        ? <input className={styles.nameInput} defaultValue={name} aria-label="폰트 이름" autoFocus maxLength={40}
-          onFocus={(event) => event.currentTarget.select()}
-          onBlur={(event) => commit(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') event.currentTarget.blur()
-            if (event.key === 'Escape') setRenaming(false)
-          }} />
-        : <><strong>{name}</strong><span>{note}</span></>}
+      <strong>{name}</strong><span>{note}</span>
     </header>
     <p className={styles.sentence} aria-label={SENTENCE}>
       {SENTENCE.split(' ').map((word, index) => <span key={index} className={styles.word}>
@@ -224,62 +210,84 @@ function FontCard({ name, note, onRename, onDelete }: {
     </p>
     {/* 추출은 폰트의 속성 — 워크스페이스 폰트 탭과 같은 버튼을 카드 안에. 화면 하단엔 두지 않는다. */}
     <footer>
-      <FontCardMenu label="더보기" onRename={() => setRenaming(true)} onDelete={onDelete} />
+      <FontCardMenu label="더보기" name={name} onRename={onRename} onDelete={onDelete} />
       <button type="button" className={styles.download} data-armed={armed || undefined} aria-label="다운로드" onClick={() => setArmed((value) => !value)}><Download size={18} aria-hidden="true" /><span>다운로드</span></button>
     </footer>
   </article>
 }
 
 /**
- * 폰트 카드의 `…` 메뉴. 스크롤 영역에서 잘리지 않게 버튼 자리를 재서 화면에 고정해 띄운다.
- * 바깥 탭 · Esc · 스크롤이면 닫힌다. 복제는 아직 없어 흐리게, 삭제는 메뉴 안에서 한 번 더 묻는다.
+ * 폰트 카드의 `…` 메뉴 = 아래에서 올라오는 떠 있는 시트(토스식). 뒤는 머리까지 어둡게 덮는다.
+ * 이름 바꾸기 · 삭제 확인은 같은 시트가 그 화면으로 바뀐다 — 카드로 돌아가 고치지 않는다.
+ * 바깥 탭 · Esc면 닫히고, 닫힐 땐 거꾸로 내려간다. 키보드가 올라오면 시트도 그 위로 올라탄다. 복제는 아직 없어 흐리게.
  */
-const MENU_WIDTH = 200
-
-function FontCardMenu({ label, onRename, onDelete }: { label: string; onRename: () => void; onDelete?: () => void }) {
-  const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null)
-  const [confirming, setConfirming] = useState(false)
-  const button = useRef<HTMLButtonElement>(null)
-  const panel = useRef<HTMLDivElement>(null)
-  const close = () => { setAnchor(null); setConfirming(false) }
+function FontCardMenu({ label, name, onRename, onDelete }: { label: string; name: string; onRename: (name: string) => void; onDelete?: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const [step, setStep] = useState<'menu' | 'rename' | 'delete'>('menu')
+  const [draft, setDraft] = useState(name)
+  const [keyboard, setKeyboard] = useState(0)
+  const close = () => setClosing(true)
   useEffect(() => {
-    if (!anchor) return
-    const onPointer = (event: PointerEvent) => {
-      const target = event.target as Node
-      if (!panel.current?.contains(target) && !button.current?.contains(target)) close()
-    }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') close() }
-    document.addEventListener('pointerdown', onPointer)
+    if (!open) return
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setClosing(true) }
     document.addEventListener('keydown', onKey)
-    document.addEventListener('scroll', close, true)
+    // 모바일 키보드가 가린 높이만큼 시트를 올린다.
+    const viewport = window.visualViewport
+    const onViewport = () => { if (viewport) setKeyboard(Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)) }
+    viewport?.addEventListener('resize', onViewport)
+    viewport?.addEventListener('scroll', onViewport)
     return () => {
-      document.removeEventListener('pointerdown', onPointer)
       document.removeEventListener('keydown', onKey)
-      document.removeEventListener('scroll', close, true)
+      viewport?.removeEventListener('resize', onViewport)
+      viewport?.removeEventListener('scroll', onViewport)
     }
-  }, [anchor])
-  const toggle = () => {
-    if (anchor) return close()
-    const rect = button.current?.getBoundingClientRect()
-    // 버튼 오른쪽 아래로 연다. 화면 오른쪽 끝에 닿으면 16px 안쪽으로 당긴다.
-    if (rect) setAnchor({ left: Math.min(rect.left, window.innerWidth - MENU_WIDTH - 16), top: rect.bottom + 6 })
+  }, [open])
+  // 내려가는 애니메이션이 끝나면 치운다. 동작 줄이기면 바로.
+  useEffect(() => {
+    if (!closing) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const timer = window.setTimeout(() => { setOpen(false); setClosing(false); setStep('menu'); setKeyboard(0) }, reduce ? 0 : 260)
+    return () => window.clearTimeout(timer)
+  }, [closing])
+  const next = draft.trim()
+  const canSave = next.length > 0 && next !== name
+  const save = () => {
+    if (!canSave) return
+    onRename(next)
+    close()
   }
   return <>
-    <button ref={button} type="button" className={styles.more} aria-label={label} aria-haspopup="menu" aria-expanded={!!anchor} onClick={toggle}><Ellipsis size={18} aria-hidden="true" /></button>
-    {anchor && <div ref={panel} className={styles.cardMenu} role="menu" style={{ left: anchor.left, top: anchor.top }}>
-      {confirming
-        ? <div className={styles.cardMenuConfirm}>
-          <p>이 폰트를 지울까요? 되돌릴 수 없어요.</p>
-          <div>
-            <button type="button" onClick={() => setConfirming(false)}>취소</button>
+    <button type="button" className={styles.more} aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => { setDraft(name); setOpen(true) }}><Ellipsis size={18} aria-hidden="true" /></button>
+    {open && <div className={styles.menuSheetLayer} data-closing={closing || undefined} style={keyboard ? { paddingBottom: keyboard } : undefined} onPointerDown={(event) => { if (event.target === event.currentTarget) close() }}>
+      <div className={styles.menuSheet} role={step === 'menu' ? 'menu' : 'dialog'} aria-label={label}>
+        {step === 'rename' && <form key="rename" className={styles.menuSheetStep} onSubmit={(event) => { event.preventDefault(); save() }}>
+          <h3>폰트 이름</h3>
+          <label className={styles.menuSheetField}>
+            <input value={draft} aria-label="폰트 이름" autoFocus maxLength={40} enterKeyHint="done" placeholder="이름을 적어 주세요"
+              onFocus={(event) => event.currentTarget.select()}
+              onChange={(event) => setDraft(event.currentTarget.value)} />
+            {draft && <button type="button" aria-label="지우기" onClick={(event) => { setDraft(''); (event.currentTarget.previousElementSibling as HTMLInputElement | null)?.focus() }}><X size={14} strokeWidth={3} aria-hidden="true" /></button>}
+          </label>
+          <div className={styles.menuSheetActions}>
+            <button type="button" onClick={close}>취소</button>
+            <button type="submit" data-primary disabled={!canSave}>저장</button>
+          </div>
+        </form>}
+        {step === 'delete' && <div key="delete" className={styles.menuSheetStep}>
+          <h3>이 폰트를 지울까요?</h3>
+          <p>되돌릴 수 없어요.</p>
+          <div className={styles.menuSheetActions}>
+            <button type="button" onClick={() => setStep('menu')}>취소</button>
             <button type="button" data-danger data-testid="dashboard-font-delete-confirm" onClick={() => { close(); onDelete?.() }}>삭제</button>
           </div>
-        </div>
-        : <>
-          <button type="button" role="menuitem" onClick={() => { close(); onRename() }}><PencilLine size={16} aria-hidden="true" />이름 바꾸기</button>
-          <button type="button" role="menuitem" disabled><Copy size={16} aria-hidden="true" />복제</button>
-          <button type="button" role="menuitem" data-danger disabled={!onDelete} data-testid="dashboard-font-delete" onClick={() => setConfirming(true)}><Trash2 size={16} aria-hidden="true" />삭제</button>
+        </div>}
+        {step === 'menu' && <>
+          <button type="button" role="menuitem" onClick={() => setStep('rename')}><PencilLine size={22} aria-hidden="true" />이름 바꾸기</button>
+          <button type="button" role="menuitem" disabled><Copy size={22} aria-hidden="true" />복제</button>
+          <button type="button" role="menuitem" data-danger disabled={!onDelete} data-testid="dashboard-font-delete" onClick={() => setStep('delete')}><Trash2 size={22} aria-hidden="true" />삭제</button>
         </>}
+      </div>
     </div>}
   </>
 }
