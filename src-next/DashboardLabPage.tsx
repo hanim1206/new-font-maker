@@ -137,7 +137,7 @@ function StylePicto({ kind }: { kind: 'weight' | 'slant' | 'roundness' | 'beak' 
 }
 
 function FontCard({ name: initialName, note, active, onRenamed }: { name: string; note: string; active: boolean; onRenamed: (name: string) => void }) {
-  // 카드가 폰트 상태를 다 말한다 — 이름 · 마지막 고침 · 손댄 수. 아래 따로 줄을 두지 않는다.
+  // 카드가 폰트 상태를 다 말한다 — 이름 · 마지막 고침. 아래 따로 줄을 두지 않는다.
   // 카드 버튼은 둘뿐: 다운로드 · `…`. 이름 바꾸기 · 복사 · 삭제(나중엔 히스토리)는 `…` 안에.
   // 추출 버튼은 원형 아이콘. 탭하면 색이 바뀌며 옆으로 자라 `다운로드`가 들어온다(시안에서는 다시 탭하면 돌아간다).
   const [armed, setArmed] = useState(false)
@@ -267,10 +267,10 @@ function AccountMenu() {
   </div>
 }
 
-function SectionHead({ title, count, hint, modified, onClick }: { title: string; count?: number; hint?: string; modified?: number; onClick?: () => void }) {
+function SectionHead({ title, count, hint, onClick }: { title: string; count?: number; hint?: string; onClick?: () => void }) {
   return <button type="button" className={styles.sectionHead} onClick={onClick}>
     <h2>{title}</h2>
-    {count !== undefined && <span>{count}{modified ? ` · 손댄 ${modified}` : ''}</span>}
+    {count !== undefined && <span>{count}</span>}
     {hint && <em>{hint}</em>}
     <ChevronRight size={18} aria-hidden="true" />
   </button>
@@ -376,7 +376,6 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
   }
   const grouping = groupings.find((g) => g.id === groupingId) ?? groupings[0]
   const groups = useMemo(() => grouping.groups(chars, strokeCount), [grouping, chars, jamos]) // eslint-disable-line react-hooks/exhaustive-deps
-  const modified = chars.filter((c) => isJamoModified(type, c)).length
 
   // 판 너비에서 칸 크기를 잰다. 글자마다 (x, y)를 계산해 transform으로 놓는다.
   const board = useRef<HTMLDivElement>(null)
@@ -409,7 +408,7 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
     <header className={styles.homeHead}>
       <button type="button" className={styles.back} aria-label="대시보드" onClick={() => navigate('/dashboard')}><ChevronLeft size={22} aria-hidden="true" /></button>
       <h2>{JAMO_LABEL[type]}</h2>
-      <span>{chars.length}{modified ? ` · 손댄 ${modified}` : ''}</span>
+      <span>{chars.length}</span>
     </header>
     <div className={styles.homeScroll}>
       {groupings.length > 1 && <div className={styles.chips} role="tablist" aria-label="묶기">
@@ -497,7 +496,7 @@ export function DashboardLabPage() {
       <div ref={scroller} className={styles.scroll} onScroll={onScroll}>
         {/* 폰트 카드. 옆으로 밀면 활성 폰트가 바뀌고 아래 전부가 그 폰트로 바뀐다. 카드 자체는 문이 아니다. */}
         <div ref={carousel} className={styles.carousel} onScroll={onCarousel}>
-          <FontCard name={name} note={modified > 0 ? `마지막 고침 · 오늘 · 손댄 자소 ${modified}` : '마지막 고침 · 오늘 · 프리셋 그대로'} active={activeCard === 0} onRenamed={setRenamed} />
+          <FontCard name={name} note={modified > 0 ? '마지막 고침 · 오늘' : '마지막 고침 · 오늘 · 프리셋 그대로'} active={activeCard === 0} onRenamed={setRenamed} />
           {/* 폰트 목록 · 새로 만들기는 `내 폰트`(`/fonts`)가 한다. 다른 마운트라 진짜 이동 — 못 올린 변경은 먼저 올린다. */}
           <button type="button" className={styles.add} aria-label="새 폰트 만들기 · 내 폰트 목록" data-testid="dashboard-font-list" onClick={() => void flushAccountFont().then(() => window.location.assign('/fonts'))}><Plus size={22} /><span>새 폰트</span></button>
         </div>
@@ -533,15 +532,15 @@ export function DashboardLabPage() {
 
             {/* 초·중·종은 요약 줄만. 전체 격자와 묶기는 섹션 홈으로 갔다. 레이아웃 6장은 여기서 바로 에디터로. */}
             <section ref={(el) => { sections.current.choseong = el }}>
-              <SectionHead title="초성" count={CHOSEONG_LIST.length} modified={modifiedBy.choseong} onClick={() => navigate('/dashboard/choseong')} />
+              <SectionHead title="초성" count={CHOSEONG_LIST.length} onClick={() => navigate('/dashboard/choseong')} />
               <JamoPreview type="choseong" chars={CHOSEONG_LIST} />
             </section>
             <section ref={(el) => { sections.current.jungseong = el }}>
-              <SectionHead title="중성" count={JUNGSEONG_LIST.length} modified={modifiedBy.jungseong} onClick={() => navigate('/dashboard/jungseong')} />
+              <SectionHead title="중성" count={JUNGSEONG_LIST.length} onClick={() => navigate('/dashboard/jungseong')} />
               <JamoPreview type="jungseong" chars={JUNGSEONG_LIST} />
             </section>
             <section ref={(el) => { sections.current.jongseong = el }}>
-              <SectionHead title="종성" count={FINALS.length} modified={modifiedBy.jongseong} onClick={() => navigate('/dashboard/jongseong')} />
+              <SectionHead title="종성" count={FINALS.length} onClick={() => navigate('/dashboard/jongseong')} />
               <JamoPreview type="jongseong" chars={FINALS} />
             </section>
           </div>
