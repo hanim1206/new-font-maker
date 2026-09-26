@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Check, ChevronLeft, ChevronRight, Copy, Download, Ellipsis, PencilLine, Plus, ScanSearch, Trash2, UserRound } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, Ellipsis, PencilLine, Plus, ScanSearch, Trash2, UserRound } from 'lucide-react'
 import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../src/data/Hangul'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { useEffectiveGlobalStyle, useGlobalStyleStore } from '../src/stores/globalStyleStore'
@@ -11,7 +11,12 @@ import { groupMatching, sameChars, useJamoGroupStore, type JamoGroup } from '../
 import type { LayoutSchema, Padding, Part } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { AppGlyph } from './AppGlyph'
-import { flushAccountFont } from './accountFontSync'
+import { editedDayText, FONT_LIMIT, nextFontName } from './accountFont'
+import { deleteFont, listFonts, renameFont } from './accountFontApi'
+import type { FontSummary } from './accountFontApi'
+import { accountFontSession, renamedAccountFont } from './accountFontSync'
+import { showAppNotice } from './appNotice'
+import { leaveDeletedFont, openFont, openNewFont } from './fontSwitch'
 import { authGateMode, sessionUser, signOutAndReload } from './betaAuth'
 import { navigate } from './router'
 import { useContextPlacement } from './notoModel'
@@ -181,30 +186,36 @@ function StylePicto({ kind }: { kind: 'weight' | 'slant' | 'roundness' | 'beak' 
   </svg>
 }
 
-function FontCard({ name: initialName, note, active, onRenamed }: { name: string; note: string; active: boolean; onRenamed: (name: string) => void }) {
-  // 카드가 폰트 상태를 다 말한다 — 이름 · 마지막 고침. 아래 따로 줄을 두지 않는다.
-  // 카드 버튼은 둘뿐: 다운로드 · `…`. 이름 바꾸기 · 복사 · 삭제(나중엔 히스토리)는 `…` 안에.
+/**
+ * 지금 폰트 카드. 이름은 머리 알약에 있어 여기선 마지막 고침과 예시 문장만.
+ * 버튼은 둘: `…`(이름 바꾸기 · 복제 · 삭제) · 다운로드. 이름 바꾸기는 카드 맨 위 줄이 잠깐 입력칸이 된다.
+ */
+function FontCard({ name, note, onRename, onDelete }: {
+  name: string
+  note: string
+  onRename: (name: string) => void
+  /** 없으면(계정 폰트를 안 연 랩 화면) 삭제를 흐리게. */
+  onDelete?: () => void
+}) {
   // 추출 버튼은 원형 아이콘. 탭하면 색이 바뀌며 옆으로 자라 `다운로드`가 들어온다(시안에서는 다시 탭하면 돌아간다).
   const [armed, setArmed] = useState(false)
-  const [name, setName] = useState(initialName)
   const [renaming, setRenaming] = useState(false)
-  const commitName = (value: string) => {
-    const next = value.trim()
-    if (next) { setName(next); onRenamed(next) }
+  const commit = (value: string) => {
     setRenaming(false)
+    const next = value.trim()
+    if (next && next !== name) onRename(next)
   }
-  return <article className={styles.card} data-active={active}>
+  return <article className={styles.card}>
     <header>
       {renaming
         ? <input className={styles.nameInput} defaultValue={name} aria-label="폰트 이름" autoFocus maxLength={40}
           onFocus={(event) => event.currentTarget.select()}
-          onBlur={(event) => commitName(event.currentTarget.value)}
+          onBlur={(event) => commit(event.currentTarget.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') event.currentTarget.blur()
             if (event.key === 'Escape') setRenaming(false)
           }} />
-        : <strong>{name}</strong>}
-      <span>{note}</span>
+        : <><strong>{name}</strong><span>{note}</span></>}
     </header>
     <p className={styles.sentence} aria-label={SENTENCE}>
       {SENTENCE.split(' ').map((word, index) => <span key={index} className={styles.word}>
@@ -213,19 +224,19 @@ function FontCard({ name: initialName, note, active, onRenamed }: { name: string
     </p>
     {/* 추출은 폰트의 속성 — 워크스페이스 폰트 탭과 같은 버튼을 카드 안에. 화면 하단엔 두지 않는다. */}
     <footer>
-      <FontCardMenu active={active} onRename={() => setRenaming(true)} />
-      <button type="button" className={styles.download} data-armed={armed || undefined} aria-label="다운로드" tabIndex={active ? 0 : -1} onClick={() => setArmed((value) => !value)}><Download size={18} aria-hidden="true" /><span>다운로드</span></button>
+      <FontCardMenu label="더보기" onRename={() => setRenaming(true)} onDelete={onDelete} />
+      <button type="button" className={styles.download} data-armed={armed || undefined} aria-label="다운로드" onClick={() => setArmed((value) => !value)}><Download size={18} aria-hidden="true" /><span>다운로드</span></button>
     </footer>
   </article>
 }
 
 /**
- * 카드의 `…` 메뉴. 캐러셀이 가로 스크롤이라 카드 밖으로 넘치면 잘린다 — 버튼 자리를 재서 화면에 고정해 띄운다.
- * 바깥 탭 · Esc · 스크롤이면 닫힌다. 복사는 베타 폰트 1개 한도라 흐리게, 삭제는 메뉴 안에서 한 번 더 묻는다. 시안이라 복사 · 삭제는 동작하지 않는다.
+ * 폰트 카드의 `…` 메뉴. 스크롤 영역에서 잘리지 않게 버튼 자리를 재서 화면에 고정해 띄운다.
+ * 바깥 탭 · Esc · 스크롤이면 닫힌다. 복제는 아직 없어 흐리게, 삭제는 메뉴 안에서 한 번 더 묻는다.
  */
 const MENU_WIDTH = 200
 
-function FontCardMenu({ active, onRename }: { active: boolean; onRename: () => void }) {
+function FontCardMenu({ label, onRename, onDelete }: { label: string; onRename: () => void; onDelete?: () => void }) {
   const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null)
   const [confirming, setConfirming] = useState(false)
   const button = useRef<HTMLButtonElement>(null)
@@ -254,20 +265,20 @@ function FontCardMenu({ active, onRename }: { active: boolean; onRename: () => v
     if (rect) setAnchor({ left: Math.min(rect.left, window.innerWidth - MENU_WIDTH - 16), top: rect.bottom + 6 })
   }
   return <>
-    <button ref={button} type="button" className={styles.more} aria-label="더보기" aria-haspopup="menu" aria-expanded={!!anchor} tabIndex={active ? 0 : -1} onClick={toggle}><Ellipsis size={18} aria-hidden="true" /></button>
+    <button ref={button} type="button" className={styles.more} aria-label={label} aria-haspopup="menu" aria-expanded={!!anchor} onClick={toggle}><Ellipsis size={18} aria-hidden="true" /></button>
     {anchor && <div ref={panel} className={styles.cardMenu} role="menu" style={{ left: anchor.left, top: anchor.top }}>
       {confirming
         ? <div className={styles.cardMenuConfirm}>
           <p>이 폰트를 지울까요? 되돌릴 수 없어요.</p>
           <div>
             <button type="button" onClick={() => setConfirming(false)}>취소</button>
-            <button type="button" data-danger onClick={close}>삭제</button>
+            <button type="button" data-danger data-testid="dashboard-font-delete-confirm" onClick={() => { close(); onDelete?.() }}>삭제</button>
           </div>
         </div>
         : <>
           <button type="button" role="menuitem" onClick={() => { close(); onRename() }}><PencilLine size={16} aria-hidden="true" />이름 바꾸기</button>
           <button type="button" role="menuitem" disabled><Copy size={16} aria-hidden="true" />복제</button>
-          <button type="button" role="menuitem" data-danger onClick={() => setConfirming(true)}><Trash2 size={16} aria-hidden="true" />삭제</button>
+          <button type="button" role="menuitem" data-danger disabled={!onDelete} data-testid="dashboard-font-delete" onClick={() => setConfirming(true)}><Trash2 size={16} aria-hidden="true" />삭제</button>
         </>}
     </div>}
   </>
@@ -275,9 +286,9 @@ function FontCardMenu({ active, onRename }: { active: boolean; onRename: () => v
 
 /**
  * 머리 오른쪽 마이페이지. 아이콘 하나, 누르면 아래로 계정 카드 — 아이디 · 요금제 · 폰트 수, 맨 아래 로그아웃.
- * 게이트가 켜져 있으면 실제 친구 아이디를 읽고, 꺼져 있으면 예시 값(그때는 로그아웃 단추도 없다). 요금제 · 폰트 수는 아직 예시.
+ * 게이트가 켜져 있으면 실제 친구 아이디를 읽고, 꺼져 있으면 예시 값(그때는 로그아웃 단추도 없다). 요금제는 아직 예시.
  */
-function AccountMenu() {
+function AccountMenu({ fontCount }: { fontCount: number | null }) {
   const [open, setOpen] = useState(false)
   const [nickname, setNickname] = useState<string | null>(null)
   const holder = useRef<HTMLDivElement>(null)
@@ -304,7 +315,7 @@ function AccountMenu() {
       </div>
       <dl className={styles.accountFacts}>
         <div><dt>요금제</dt><dd>베타 · 무료</dd></div>
-        <div><dt>폰트</dt><dd>1 / 1개</dd></div>
+        <div><dt>폰트</dt><dd>{fontCount ?? '–'} / {FONT_LIMIT}개</dd></div>
         <div><dt>가입</dt><dd>2026. 9. 26.</dd></div>
       </dl>
       {authGateMode() === 'on' && <button type="button" className={styles.signOut} onClick={() => void signOutAndReload()}>로그아웃</button>}
@@ -683,6 +694,113 @@ function GroupSheet({ type, all, group, benchChars, builtinNameOf, onClose, onCr
   </div>
 }
 
+const FONT_SAVE_FAILED = '지금 폰트를 저장하지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요.'
+const fontListFailed = (message: string) => showAppNotice('font-list', { tone: 'error', message, dismissable: true })
+
+/**
+ * 머리 알약 드로어의 폰트 목록과 동작. 만든 순서대로(고르거나 고쳐도 자리가 안 바뀐다).
+ * 바꾸기 · 만들기 · 지금 폰트 지우기는 이름표를 고쳐 대시보드를 다시 연다(`fontSwitch`). 계정 폰트를 안 연 화면(랩)이면 목록 없이 이름만.
+ */
+function useFontList() {
+  const [session] = useState(accountFontSession)
+  const [fonts, setFonts] = useState<FontSummary[] | null>(null)
+  const [nickname, setNickname] = useState<string | null>(null)
+  const [moving, setMoving] = useState(false)
+  useEffect(() => {
+    if (!session) return
+    void listFonts(session.me).then((listed) => { if (listed.ok) setFonts(listed.value) })
+    if (authGateMode() === 'on') void sessionUser().then((user) => setNickname(user?.nickname ?? null)).catch(() => undefined)
+    else setNickname('내 폰트')
+  }, [session])
+
+  const go = async (move: () => Promise<boolean>) => {
+    if (moving) return
+    setMoving(true)
+    if (await move()) return
+    setMoving(false)
+    fontListFailed(FONT_SAVE_FAILED)
+  }
+  return {
+    canList: session !== null,
+    currentId: session?.fontId ?? null,
+    // 만든 순서 그대로. 고르거나 고쳐도 자리가 바뀌지 않는다.
+    fonts: fonts && [...fonts].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    full: (fonts?.length ?? FONT_LIMIT) >= FONT_LIMIT,
+    moving,
+    open: (fontId: string) => { if (session && fontId !== session.fontId) void go(() => openFont(session.me, fontId)) },
+    create: () => {
+      if (!session || !fonts || fonts.length >= FONT_LIMIT) return
+      void go(() => openNewFont(session.me, nextFontName(nickname, fonts.map((font) => font.name))))
+    },
+    /** 카드 `…` 이름 바꾸기. 계정 폰트를 안 연 랩 화면이면 머리 이름만 바꾼다. */
+    renameCurrent: (next: string) => {
+      if (!session) { renamedAccountFont(next); return }
+      void renameFont(session.fontId, next).then((renamed) => {
+        if (!renamed.ok) { fontListFailed('이름을 바꾸지 못했어요. 다시 해 주세요.'); return }
+        renamedAccountFont(next)
+        setFonts((list) => list?.map((font) => font.id === session.fontId ? { ...font, name: next } : font) ?? list)
+      })
+    },
+    /** 카드 `…` 삭제. 지우면 최근 폰트(없으면 새 폰트)로 다시 연다. */
+    removeCurrent: session ? () => {
+      if (moving) return
+      setMoving(true)
+      void deleteFont(session.fontId).then((deleted) => {
+        if (deleted.ok) return leaveDeletedFont(session.me)
+        setMoving(false)
+        fontListFailed('지우지 못했어요. 다시 해 주세요.')
+      })
+    } : undefined,
+  }
+}
+
+type FontList = ReturnType<typeof useFontList>
+
+/**
+ * 머리 알약을 누르면 머리 아래로 내려오는 내 폰트 드로어. 줄을 누르면 그 폰트로, 맨 아래 `새 폰트`. 이름 · 삭제는 카드 `…`.
+ * 머리는 가리지 않는다 — 알약을 다시 누르면 닫힌다.
+ * 지금 폰트 줄만 고친 자소 수를 보인다 — 다른 폰트는 데이터를 받아야 알 수 있다.
+ */
+function FontSheet({ list, modified, top, closing, onClose, onClosed }: {
+  list: FontList
+  modified: number
+  top: number
+  /** 닫히는 중 — 거꾸로 올라가는 애니메이션이 끝나면 `onClosed`. */
+  closing: boolean
+  onClose: () => void
+  onClosed: () => void
+}) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+  const fonts = list.fonts
+  return <div className={styles.fontDrawerLayer} style={{ top }} data-closing={closing || undefined} onClick={onClose}>
+    <div className={styles.fontDrawer} onAnimationEnd={(event) => { if (closing && event.target === event.currentTarget) onClosed() }} role="dialog" aria-label="내 폰트" aria-busy={list.moving || undefined} onClick={(event) => event.stopPropagation()} data-testid="dashboard-font-sheet">
+      {fonts === null
+        ? <p className={styles.fontSheetNote}>불러오는 중…</p>
+        : <ul className={styles.fontRows}>
+          {fonts.map((font) => {
+            const current = font.id === list.currentId
+            const sub = current
+              ? `${modified > 0 ? `고친 자소 ${modified}` : '프리셋 그대로'} · ${editedDayText(font.updatedAt)}`
+              : editedDayText(font.updatedAt)
+            return <li key={font.id} data-current={current || undefined} data-testid="dashboard-font-row">
+              <button type="button" className={styles.fontRowOpen} disabled={list.moving} onClick={() => current ? onClose() : list.open(font.id)}>
+                <strong>{font.name}</strong>
+                <span>{sub}</span>
+              </button>
+              {current && <Check size={20} aria-label="지금 연 폰트" />}
+            </li>
+          })}
+        </ul>}
+      <button type="button" className={styles.fontSheetCreate} disabled={list.moving || list.full} onClick={list.create} data-testid="dashboard-font-create"><Plus size={20} aria-hidden="true" />새 폰트</button>
+      {list.full && <p className={styles.fontSheetNote}>폰트는 {FONT_LIMIT}개까지 만들 수 있어요. 하나를 지우면 새로 만들 수 있어요.</p>}
+    </div>
+  </div>
+}
+
 export function DashboardLabPage() {
   const name = useUIStore((state) => state.currentProjectName) ?? '내 폰트'
   const style = useGlobalStyleStore((state) => state.style)
@@ -692,11 +810,13 @@ export function DashboardLabPage() {
   const modified = modifiedBy.choseong + modifiedBy.jungseong + modifiedBy.jongseong
   const roundness = Math.round((style.strokeStyle?.mode === 'brush' ? style.strokeStyle.roundness ?? 0 : 0) * 100)
 
-  const [activeCard, setActiveCard] = useState(0)
-  // 카드 이름 줄이 머리 뒤로 들어가면 머리 제목이 `내 폰트`에서 폰트 이름으로 바뀐다. 카드에서 바꾼 이름도 따라간다.
-  const [renamed, setRenamed] = useState<string | null>(null)
-  const [compact, setCompact] = useState(false)
-  const carousel = useRef<HTMLDivElement>(null)
+  // 머리 알약 = 지금 폰트 이름(시트에서 바꾼 이름도 따라간다, `renamedAccountFont`). 누르면 내 폰트 시트.
+  const fontList = useFontList()
+  // 닫힐 때도 거꾸로 올라가야 해서 `closing`을 거친 뒤에 뺀다.
+  const [sheet, setSheet] = useState<'closed' | 'open' | 'closing'>('closed')
+  const sheetOpen = sheet === 'open'
+  const closeSheet = () => setSheet((state) => state === 'open' ? 'closing' : state)
+  const head = useRef<HTMLElement>(null)
   const [active, setActive] = useState<SectionId>('style')
   const scroller = useRef<HTMLDivElement>(null)
   const sections = useRef<Partial<Record<SectionId, HTMLElement | null>>>({})
@@ -712,8 +832,6 @@ export function DashboardLabPage() {
       if (element && element.offsetTop <= line) current = id
     }
     setActive(current)
-    const nameRow = carousel.current?.querySelector('article header')
-    if (nameRow) setCompact(nameRow.getBoundingClientRect().bottom <= root.getBoundingClientRect().top)
   }
   const jump = (id: SectionId) => {
     const root = scroller.current
@@ -721,29 +839,23 @@ export function DashboardLabPage() {
     if (!root || !element) return
     root.scrollTo({ top: element.offsetTop - root.offsetTop, behavior: 'smooth' })
   }
-  const onCarousel = (event: React.UIEvent<HTMLDivElement>) => {
-    const track = event.currentTarget
-    const width = track.firstElementChild?.clientWidth ?? 1
-    setActiveCard(Math.round(track.scrollLeft / (width + 10)))
-  }
 
   return <main className={styles.page}>
     <div className={styles.shell}>
-      <header className={styles.head}>
-        {/* 제목 둘을 한 칸에 겹쳐 두고 흐리게 바꾼다. 폰트 이름을 누르면 맨 위 카드로 올라간다. */}
-        <h1 className={styles.title} data-compact={compact || undefined}>
-          <span aria-hidden={compact || undefined}>내 폰트</span>
-          <button type="button" className={styles.titleName} aria-hidden={!compact || undefined} tabIndex={compact ? 0 : -1} onClick={() => scroller.current?.scrollTo({ top: 0, behavior: 'smooth' })}>{renamed ?? name}</button>
+      <header ref={head} className={styles.head}>
+        {/* 회색 알약 = 지금 폰트. 누르면 내 폰트 시트(바꾸기 · 새로 · 이름 · 삭제). 계정 폰트를 안 연 랩 화면이면 이름만. */}
+        <h1 className={styles.title}>
+          <button type="button" className={styles.switcher} disabled={!fontList.canList} aria-haspopup="dialog" aria-expanded={sheetOpen} onClick={() => sheetOpen ? closeSheet() : setSheet('open')} data-testid="dashboard-font-switcher">
+            <span>{name}</span>{fontList.canList && <ChevronDown size={18} aria-hidden="true" data-open={sheetOpen || undefined} />}
+          </button>
         </h1>
-        <AccountMenu />
+        <AccountMenu fontCount={fontList.fonts?.length ?? null} />
       </header>
 
       <div ref={scroller} className={styles.scroll} onScroll={onScroll}>
-        {/* 폰트 카드. 옆으로 밀면 활성 폰트가 바뀌고 아래 전부가 그 폰트로 바뀐다. 카드 자체는 문이 아니다. */}
-        <div ref={carousel} className={styles.carousel} onScroll={onCarousel}>
-          <FontCard name={name} note={modified > 0 ? '마지막 고침 · 오늘' : '마지막 고침 · 오늘 · 프리셋 그대로'} active={activeCard === 0} onRenamed={setRenamed} />
-          {/* 폰트 목록 · 새로 만들기는 `내 폰트`(`/fonts`)가 한다. 다른 마운트라 진짜 이동 — 못 올린 변경은 먼저 올린다. */}
-          <button type="button" className={styles.add} aria-label="새 폰트 만들기 · 내 폰트 목록" data-testid="dashboard-font-list" onClick={() => void flushAccountFont().then(() => window.location.assign('/fonts'))}><Plus size={22} /><span>새 폰트</span></button>
+        {/* 지금 폰트 카드 하나. 다른 폰트는 머리 알약 시트에서. */}
+        <div className={styles.fontCardRow}>
+          <FontCard name={name} note={modified > 0 ? '마지막 고침 · 오늘' : '마지막 고침 · 오늘 · 프리셋 그대로'} onRename={fontList.renameCurrent} onDelete={fontList.removeCurrent} />
         </div>
 
         <div className={styles.body}>
@@ -791,6 +903,7 @@ export function DashboardLabPage() {
           </div>
         </div>
       </div>
+      {sheet !== 'closed' && <FontSheet list={fontList} modified={modified} top={head.current?.offsetHeight ?? 50} closing={sheet === 'closing'} onClose={closeSheet} onClosed={() => setSheet('closed')} />}
     </div>
   </main>
 }

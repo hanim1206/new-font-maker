@@ -5,10 +5,11 @@ import { create } from 'zustand'
  * 새 알림이 필요하면 종류만 늘린다. 저장 실패 토스트(`SaveToast`)와는 따로다 — 이건 앱 전체(내 폰트 · 로그인 화면 포함)에 뜬다.
  */
 
-export type AppNoticeKind = 'conflict' | 'local-copy' | 'update'
+/** `font-list`: 대시보드에서 폰트 바꾸기 · 만들기 · 이름 · 지우기가 실패했다. */
+export type AppNoticeKind = 'conflict' | 'local-copy' | 'font-list' | 'update'
 
 /** 앞이 먼저 보인다. 작업을 잃을 수 있는 것부터. */
-export const NOTICE_ORDER: readonly AppNoticeKind[] = ['conflict', 'local-copy', 'update']
+export const NOTICE_ORDER: readonly AppNoticeKind[] = ['conflict', 'local-copy', 'font-list', 'update']
 
 export interface AppNoticeAction {
   label: string

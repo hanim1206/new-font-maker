@@ -1,15 +1,16 @@
 /* 대시보드 시안. 셸 크기 · 머리 높이는 WorkspaceChrome과 같다. 검정 · 회색만, 상자 안 상자 없음. */
 .page { min-height: 100dvh; overflow: hidden; background: rgb(var(--color-background)); }
 .shell { position: relative; width: min(100%, 480px); height: 100dvh; box-sizing: border-box; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; background: rgb(var(--color-surface)); box-shadow: var(--shadow-md); }
-.head { min-height: 50px; display: flex; align-items: center; justify-content: space-between; padding: max(2px, env(safe-area-inset-top)) 8px 2px 16px; border-bottom: 1px solid rgb(var(--color-border-subtle)); }
+.head { position: relative; z-index: 31; min-height: 50px; display: flex; align-items: center; justify-content: space-between; padding: max(2px, env(safe-area-inset-top)) 8px 2px 16px; background: rgb(var(--color-surface)); }
 .head h1 { margin: 0; font-size: 15px; font-weight: 800; }
-/* 제목 둘(`내 폰트` · 폰트 이름)을 한 칸에 겹친다. 긴 이름은 한 줄에서 `…`. */
-.head .title { flex: 1; min-width: 0; display: grid; }
-.head .title > * { grid-area: 1 / 1; min-width: 0; align-self: center; transition: opacity var(--motion-fast) var(--ease-standard); }
-.head .titleName { min-height: 40px; padding: 0; overflow: hidden; color: rgb(var(--color-foreground)); font: inherit; text-align: left; text-overflow: ellipsis; white-space: nowrap; opacity: 0; pointer-events: none; }
-.head .title > span { pointer-events: none; }
-.head .title[data-compact] > span { opacity: 0; }
-.head .title[data-compact] .titleName { opacity: 1; pointer-events: auto; }
+/* 머리 왼쪽 회색 알약 = 지금 폰트 이름 + 꺾쇠. 누르면 내 폰트 시트. 긴 이름은 한 줄에서 `…`. */
+.head .title { flex: 1; min-width: 0; display: flex; margin-left: -8px; }
+.head .switcher { max-width: 100%; min-height: 36px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px 0 18px; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 15px; font-weight: 500; transition: background-color var(--motion-fast) var(--ease-standard); }
+.head .switcher span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.head .switcher svg { flex: none; color: rgb(var(--color-text-4)); transition: transform var(--motion-normal) var(--ease-standard); }
+.head .switcher svg[data-open] { transform: rotate(180deg); }
+.head .switcher:not(:disabled):active { background: rgb(var(--color-surface-3)); }
+.head .switcher:disabled { background: transparent; padding-left: 8px; }
 .head button { min-height: 40px; padding: 0 10px; border: 0; background: transparent; color: rgb(var(--color-text-4)); font-size: 12px; }
 
 /* 마이페이지. 아이콘 원 하나, 아래로 계정 카드가 내려온다. */
@@ -31,22 +32,19 @@
 .scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
 
 /* 폰트 카드 캐러셀. 스냅 한 장씩, 다음 카드가 조금 보인다. 활성 카드만 또렷하다. */
-.carousel { display: flex; gap: 10px; padding: 14px 16px 14px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; scrollbar-width: none; }
-.carousel::-webkit-scrollbar { display: none; }
-.card { flex: 0 0 82%; scroll-snap-align: start; display: flex; flex-direction: column; gap: 12px; min-height: 148px; padding: 14px 16px; border-radius: 16px; background: rgb(var(--color-surface-2)); opacity: .5; transition: opacity var(--motion-normal) var(--ease-standard); }
-.card[data-active='true'] { opacity: 1; }
-.card header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.card header strong { font-size: 15px; font-weight: 750; }
+.fontCardRow { padding: 14px 16px; }
+.card { display: flex; flex-direction: column; gap: 12px; min-height: 148px; box-sizing: border-box; padding: 14px 16px; border-radius: 16px; background: rgb(var(--color-surface-2)); }
+.card header { display: flex; align-items: baseline; gap: 8px; }
+.card header strong { min-width: 0; overflow: hidden; font-size: 15px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
 .card header span { color: rgb(var(--color-text-4)); font-size: 12px; white-space: nowrap; }
 .sentence { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 10px; line-height: 0; }
 .word { display: inline-flex; white-space: nowrap; }
 .word svg { display: block; }
-.add { flex: 0 0 96px; scroll-snap-align: start; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 16px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-3)); font-size: 12px; font-weight: 700; }
 
 /* 카드 안 추출 버튼. 워크스페이스 폰트 탭의 `OTF 추출`과 같은 생김새. */
 .card footer { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: auto; }
-.nameInput { min-width: 0; flex: 1; margin: -3px 0 -3px -6px; padding: 2px 6px; border: 1px solid rgb(var(--color-primary)); border-radius: 8px; background: rgb(var(--color-surface)); color: inherit; font: inherit; font-size: 15px; font-weight: 750; outline: none; }
 /* `…` 더보기. 다운로드 옆 같은 크기의 원, 색은 옅게 — 주 동작은 다운로드. */
+.nameInput { min-width: 0; flex: 1; margin: -3px 0 -3px -6px; padding: 2px 6px; border: 1px solid rgb(var(--color-primary)); border-radius: 8px; background: rgb(var(--color-surface)); color: inherit; font: inherit; font-size: 15px; font-weight: 750; outline: none; }
 .more { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); }
 .cardMenu { position: fixed; z-index: 30; width: 200px; padding: 6px; border-radius: 14px; background: rgb(var(--color-surface)); border: 1px solid rgb(var(--color-border-subtle)); box-shadow: 0 12px 32px rgb(0 0 0 / .14); display: flex; flex-direction: column; }
 .cardMenu > button { min-height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border: 0; border-radius: 9px; background: none; color: rgb(var(--color-foreground)); font-size: 13px; font-weight: 650; text-align: left; }
@@ -181,9 +179,28 @@
 .toast { position: absolute; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 72px); z-index: 25; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 8px 12px 16px; border-radius: 14px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 600; animation: popIn var(--motion-normal) var(--ease-standard); }
 .toast button { flex: none; min-height: 32px; padding: 0 10px; border: 0; background: transparent; color: inherit; font-size: 13px; font-weight: 800; }
 
+/* 내 폰트 드로어. 머리 바로 아래에서 내려온다(머리는 위에 남는다). 지금 폰트 줄은 회색 면 + ✓, 맨 아래 `새 폰트`. */
+.fontDrawerLayer { position: absolute; inset: 0; z-index: 30; overflow: hidden; background: rgb(0 0 0 / .32); animation: fadeIn var(--motion-normal) var(--ease-standard); }
+.fontDrawer { box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 4px 20px 20px; border-radius: 0 0 20px 20px; background: rgb(var(--color-surface)); animation: drawerDown 520ms cubic-bezier(0.25, 0.8, 0.25, 1); }
+.fontDrawerLayer[data-closing] { animation: fadeOut 360ms var(--ease-standard) forwards; }
+.fontDrawerLayer[data-closing] .fontDrawer { animation: drawerUp 360ms cubic-bezier(0.4, 0, 0.6, 1) forwards; }
+.fontRows { margin: -4px -8px 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.fontRows li { min-height: 64px; display: flex; align-items: center; gap: 2px; padding: 0 14px 0 0; border-radius: 14px; }
+.fontRows li[data-current] { background: rgb(var(--color-surface-2)); }
+.fontRows li > svg { flex: none; color: rgb(var(--color-foreground)); }
+.fontRowOpen { flex: 1; min-width: 0; min-height: 64px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; padding: 0 12px; border: 0; border-radius: 14px; background: transparent; color: rgb(var(--color-foreground)); text-align: left; }
+.fontRowOpen strong { max-width: 100%; overflow: hidden; font-size: 16px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.fontRowOpen span { color: rgb(var(--color-text-4)); font-size: 12.5px; }
+.fontSheetCreate { min-height: 56px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 14px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 16px; font-weight: 750; }
+.fontSheetCreate:disabled { background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-4)); }
+.fontSheetNote { margin: -6px 0 0; color: rgb(var(--color-text-4)); font-size: 12.5px; text-align: center; }
+
 @keyframes fadeIn { from { opacity: 0; } }
 @keyframes popIn { from { opacity: 0; transform: scale(0.6); } }
 @keyframes countUp { from { opacity: 0; transform: translateY(6px); } }
+@keyframes drawerDown { from { transform: translateY(-100%); } to { transform: none; } }
+@keyframes drawerUp { from { transform: none; } to { transform: translateY(-100%); } }
+@keyframes fadeOut { to { opacity: 0; } }
 @keyframes sheetUp { from { transform: translateY(100%); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .home, .board, .groupHead, .homeCard, .benchChips em, .benchClear, .benchGo, .benchCount, .groupMore, .sheetLayer, .sheet, .toast { transition: none; animation: none; } }
 .picto { display: block; width: 52px; height: 52px; }

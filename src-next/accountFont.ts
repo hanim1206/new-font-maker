@@ -111,6 +111,25 @@ export function nextFontName(nickname: string | null | undefined, taken: readonl
   for (let n = 2; ; n += 1) if (!used.has(`${base} ${n}`)) return `${base} ${n}`
 }
 
+/**
+ * 고른 폰트가 없을 때(`home`: 처음 로그인 · 연 폰트를 지움 · 한도에 걸림) 무엇을 열지. 메인 화면 없이 대시보드로 바로 간다.
+ * 폰트가 있으면 가장 최근 것을(사본은 비우고 기록에서 읽게 `fresh`), 없으면 새로 만든다 — 로그인 전 작업이 있으면 그 작업이 첫 폰트.
+ * `fonts`는 최근 고친 순(`listFonts`).
+ */
+export function autoPickOf(
+  stamp: LocalStamp,
+  me: string,
+  fonts: readonly { id: string }[],
+  hasLocal: boolean,
+  nickname: string | null,
+): { clear: boolean; stamp: LocalStamp } {
+  if (fonts.length > 0) return { clear: true, stamp: { owner: me, fontId: fonts[0].id, pending: false, fresh: true } }
+  return {
+    clear: !keepsLocalForNewFont(stamp, 0, hasLocal),
+    stamp: { owner: me, fontId: null, pending: false, create: nextFontName(nickname, []) },
+  }
+}
+
 /** 메인 화면에서 폰트를 새로 만들 때 지금 사본을 그 폰트로 쓸지. 로그인 전에 만든 작업이 있고 계정이 비었을 때만. */
 export function keepsLocalForNewFont(stamp: LocalStamp, liveFontCount: number, hasLocal: boolean): boolean {
   return stamp.owner === null && liveFontCount === 0 && hasLocal

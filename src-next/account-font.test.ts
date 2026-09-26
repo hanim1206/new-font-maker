@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { parseAndMigrateFontData } from '../src/services/fontDataMigration'
 import type { FontData } from '../src/types/database'
 import {
+  autoPickOf,
   clearLocalFont,
   dropForeignCopy,
   editedDayText,
@@ -120,6 +121,16 @@ describe('브라우저 사본 이름표', () => {
     expect(keepsLocalForNewFont(stampOf({}), 1, true)).toBe(false)
     expect(keepsLocalForNewFont(stampOf({ owner: 'a' }), 0, true)).toBe(false)
     expect(keepsLocalForNewFont(stampOf({}), 0, false)).toBe(false)
+  })
+
+  it('고른 폰트가 없으면 최근 폰트를, 없으면 새 폰트를 연다', () => {
+    const fonts = [{ id: 'recent' }, { id: 'old' }]
+    expect(autoPickOf(stampOf({ owner: 'a' }), 'a', fonts, true, '민지')).toEqual({ clear: true, stamp: { owner: 'a', fontId: 'recent', pending: false, fresh: true } })
+    expect(autoPickOf(stampOf({ owner: 'a' }), 'a', [], true, '민지')).toEqual({ clear: true, stamp: { owner: 'a', fontId: null, pending: false, create: '민지' } })
+    // 로그인 전 작업이 있고 계정이 비었으면 그 작업이 첫 폰트 — 사본을 남긴다.
+    expect(autoPickOf(stampOf({}), 'a', [], true, '민지').clear).toBe(false)
+    expect(autoPickOf(stampOf({}), 'a', fonts, true, '민지').clear).toBe(true)
+    expect(autoPickOf(stampOf({}), 'a', [], false, null).stamp.create).toBe('My Font')
   })
 
   it('마지막 고친 날', () => {

@@ -17,6 +17,8 @@ interface LocalFontRecord {
   name: string
   fontData: unknown
   updatedAt: string
+  /** 09-26부터 적는다. 없는 옛 기록은 배열 순서(= 만든 순서)로 대신한다. */
+  createdAt?: string
   deletedAt: string | null
   exportRevision: number
 }
@@ -39,13 +41,15 @@ function writeAll(records: LocalFontRecord[]): ApiResult<null> {
   }
 }
 
-const live = (records: LocalFontRecord[]) => records.filter((record) => record.deletedAt === null)
+const live = <T extends LocalFontRecord>(records: T[]) => records.filter((record) => record.deletedAt === null)
 const now = () => new Date().toISOString()
 const newId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
 
 export async function listFonts(): Promise<ApiResult<FontSummary[]>> {
-  const fonts = live(readAll()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  return { ok: true, value: fonts.map(({ id, name, updatedAt }) => ({ id, name, updatedAt })) }
+  // 배열은 만든 순서로 쌓인다. 옛 기록의 만든 시각은 그 순서를 지키는 아주 이른 시각으로 채운다.
+  const records = readAll().map((record, index) => ({ ...record, createdAt: record.createdAt ?? new Date(index).toISOString() }))
+  const fonts = live(records).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  return { ok: true, value: fonts.map(({ id, name, updatedAt, createdAt }) => ({ id, name, updatedAt, createdAt })) }
 }
 
 export async function fetchFont(fontId: string): Promise<ApiResult<FontRow | null>> {
@@ -56,7 +60,7 @@ export async function fetchFont(fontId: string): Promise<ApiResult<FontRow | nul
 export async function createFont(name: string, fontData: FontData): Promise<ApiResult<{ id: string; updatedAt: string | null }>> {
   const records = readAll()
   if (live(records).length >= LIMIT) return { ok: false, message: 'font-limit', limit: true }
-  const record: LocalFontRecord = { id: newId(), name, fontData, updatedAt: now(), deletedAt: null, exportRevision: 0 }
+  const record: LocalFontRecord = { id: newId(), name, fontData, updatedAt: now(), createdAt: now(), deletedAt: null, exportRevision: 0 }
   const written = writeAll([...records, record])
   return written.ok ? { ok: true, value: { id: record.id, updatedAt: record.updatedAt } } : written
 }

@@ -29,7 +29,7 @@ export type AccountSaveStatus = 'idle' | 'saving' | 'saved' | 'error' | 'conflic
 
 export const useAccountSaveStore = create<{ status: AccountSaveStatus }>(() => ({ status: 'idle' }))
 
-/** `home`이면 메인 화면(`/fonts`)으로 보낸다. 나머지 실패는 화면을 열지 않는다. */
+/** `home`이면 고를 폰트가 없다 — `main.tsx`가 최근 폰트를 고르고(`autoPickOf`) 다시 연다. 나머지 실패는 화면을 열지 않는다. */
 export type AccountStartResult =
   | { ok: true }
   | { ok: false; reason: 'home' }
@@ -61,6 +61,17 @@ export function accountFontName(): string | null {
   return session?.name ?? null
 }
 
+/** 지금 연 폰트의 주인 · id. 대시보드 폰트 카드가 목록에서 지금 폰트를 가린다. 열기 전이면 null. */
+export function accountFontSession(): { me: string; fontId: string } | null {
+  return session ? { me: session.me, fontId: session.fontId } : null
+}
+
+/** 서버에서 이름을 바꾼 뒤 부른다. 머리 · 추출 창 이름이 따라간다. */
+export function renamedAccountFont(name: string): void {
+  if (session) session.name = name
+  useUIStore.setState({ currentProjectName: name })
+}
+
 /** 지금 연 계정 폰트를 서버가 마지막으로 받은 때(ISO). 게이트가 꺼졌거나 아직 안 올렸으면 null. 폰트 탭이 쓴다. */
 export function accountFontUpdatedAt(): string | null {
   return session?.updatedAt ?? null
@@ -87,7 +98,7 @@ export async function startAccountFont(me: string): Promise<AccountStartResult> 
     const name = stamp.create ?? 'My Font'
     const created = await createFont(me, name, collectAccountFontData())
     if (!created.ok) {
-      // 한도에 걸렸으면(다른 기기에서 먼저 만들었을 때) 메인 화면에서 다시 고른다.
+      // 한도에 걸렸으면(다른 기기에서 먼저 만들었을 때) 최근 폰트를 다시 고른다.
       writeStamp(localStorage, { owner: me, fontId: null, pending: false })
       return created.limit ? { ok: false, reason: 'home' } : { ok: false, reason: 'network', message: created.message }
     }
@@ -98,7 +109,7 @@ export async function startAccountFont(me: string): Promise<AccountStartResult> 
   const fetched = await fetchFont(fontId)
   if (!fetched.ok) return { ok: false, reason: 'network', message: fetched.message }
   if (!fetched.value) {
-    // 다른 기기에서 지웠다. 사본은 버리고 메인 화면에서 다시 고른다.
+    // 다른 기기에서 지웠다. 사본은 버리고 최근 폰트를 다시 고른다.
     writeStamp(localStorage, { owner: me, fontId: null, pending: false })
     return { ok: false, reason: 'home' }
   }
@@ -115,7 +126,7 @@ export async function startAccountFont(me: string): Promise<AccountStartResult> 
 }
 
 /**
- * 메인 화면에서 다른 폰트로 가기 전에, 지금 사본에 못 올린 변경이 있으면 올린다.
+ * 대시보드에서 다른 폰트로 가기 전에, 지금 사본에 못 올린 변경이 있으면 올린다.
  * 스토어를 가져오므로(사본을 읽는다) 필요할 때만 부른다. 올렸거나 올릴 게 없으면 true.
  */
 export async function uploadPendingCopy(me: string): Promise<boolean> {
@@ -144,7 +155,7 @@ function markChanged(): void {
   schedule(SERVER_SAVE_IDLE_MS)
 }
 
-/** 못 올린 변경이 있으면 지금 올린다. 탭을 벗어날 때 · 메인 화면으로 갈 때 · 로그아웃 전에 부른다. 다 올라갔으면 true. */
+/** 못 올린 변경이 있으면 지금 올린다. 탭을 벗어날 때 · 다른 폰트로 갈 때 · 로그아웃 전에 부른다. 다 올라갔으면 true. */
 export async function flushAccountFont(): Promise<boolean> {
   if (!session || suspended) return true
   if (timer) { clearTimeout(timer); timer = null }

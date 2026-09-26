@@ -6,7 +6,6 @@
 
 /** 제품 화면. 주소마다 명세 파일이 하나씩 있어야 한다. */
 export const PRODUCT_SCREEN_ROUTES = [
-  '/fonts',
   '/dashboard',
   '/workspace/font',
   '/workspace/font/export',
@@ -33,6 +32,8 @@ export const LAB_SCREEN_ROUTES = [
 /** 화면이 아닌 주소: 다른 화면으로 넘기기만 하거나, 셸 분기용 접두어. */
 export const NON_SCREEN_ROUTES = [
   '/',
+  // 옛 내폰트. 폰트 목록은 대시보드 캐러셀로 옮겼다(09-26) — 들어오면 대시보드로.
+  '/fonts',
   '/workspace',
   '/workspace/review/glyph',
   '/workspace/skeleton',

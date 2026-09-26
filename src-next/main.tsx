@@ -9,7 +9,7 @@ import { LEGACY_CALIBRATION_LAYOUT_PROFILE_V1 } from '../src/data/legacyCalibrat
 import { DEFAULT_LAYOUT_SCHEMAS } from '../src/utils/layoutCalculator'
 import '../src/index.css'
 import { setPersistWriteErrorHandler } from '../src/utils/debouncedStorage'
-import { dropForeignCopy, readStamp, writeStamp } from './accountFont'
+import { autoPickOf, clearLocalFont, dropForeignCopy, editorPlanOf, hasLocalFont, readStamp, writeStamp } from './accountFont'
 import { LOCAL_OWNER } from './localFontApi'
 import { showAppNotice } from './appNotice'
 import { AppErrorBoundary } from './AppErrorBoundary'
@@ -62,8 +62,38 @@ document.addEventListener('dragstart', (event) => {
   event.preventDefault()
 })
 
-/** 메인 화면 `내 폰트`. 게이트가 켜지면 계정, 꺼지면(개발 서버) 이 기기의 목록(`localFontApi`). */
+/** 옛 메인 화면 주소. 폰트 목록은 대시보드 캐러셀로 옮겼다(09-26) — 들어오면 대시보드로 바꿔 적는다. */
 const FONTS_PATH = '/fonts'
+const DASHBOARD_PATH = '/dashboard'
+/** 게이트가 꺼진 개발 서버에서 새 폰트 이름. */
+const LOCAL_NICKNAME = '내 폰트'
+
+/**
+ * 고른 폰트가 없을 때(처음 로그인 · 연 폰트를 지움) 최근 폰트를, 없으면 새로 만들기를 이름표에 적는다(`autoPickOf`).
+ * 스토어를 가져오기 전에 부른다 — 사본을 비운 뒤 스토어가 옛 값을 들고 있으면 새 폰트가 옛 폰트를 베낀다. 목록을 못 받으면 false.
+ */
+async function pickFont(me: string, nickname: string | null): Promise<boolean> {
+  const { listFonts } = await import('./accountFontApi')
+  const listed = await listFonts(me)
+  if (!listed.ok) return false
+  const picked = autoPickOf(readStamp(window.localStorage), me, listed.value, hasLocalFont(window.localStorage), nickname)
+  if (picked.clear) clearLocalFont(window.localStorage)
+  writeStamp(window.localStorage, picked.stamp)
+  return true
+}
+
+/** 열다가 고를 폰트가 사라졌을 때(다른 기기에서 지움 · 한도) 한 번만 새로 고쳐 다시 고른다. 짧은 사이 또 오면 멈춘다. */
+const REPICK_KEY = 'font-maker-repick-at'
+const REPICK_WINDOW_MS = 10_000
+function repickOnce(): boolean {
+  try {
+    const last = Number(window.sessionStorage.getItem(REPICK_KEY) ?? 0)
+    if (Date.now() - last < REPICK_WINDOW_MS) return false
+    window.sessionStorage.setItem(REPICK_KEY, String(Date.now()))
+  } catch { return false }
+  window.location.reload()
+  return true
+}
 
 /**
  * 게이트가 꺼진 개발 서버: 계정 대신 `local`이 주인이다. 아직 이 기기 폰트를 고른 적이 없으면(옛 사본 · 로그인 사본 · 빈 상태)
@@ -77,18 +107,14 @@ function adoptLocalCopy(): void {
 
 /**
  * 로그인 게이트(베타). 로그인 안 됐으면 앱 대신 코드 입력 화면을 띄운다.
- * 들어오면 메인 화면(`/fonts`)부터. 편집 주소를 바로 열거나 새로고침하면 마지막 폰트로 바로 연다.
+ * 들어오면 대시보드부터(마지막 폰트, 없으면 최근 폰트 · 새 폰트). 편집 주소를 바로 열거나 새로고침하면 마지막 폰트로 바로 연다.
  */
 async function gate(): Promise<void> {
+  if (window.location.pathname === FONTS_PATH) window.history.replaceState(null, '', DASHBOARD_PATH)
   const mode = authGateMode()
   if (mode === 'off') {
     adoptLocalCopy()
-    if (window.location.pathname === FONTS_PATH) {
-      const { FontHomePage } = await import('./FontHomePage')
-      show(<FontHomePage me={LOCAL_OWNER} nickname="내 폰트" />)
-      return
-    }
-    return start(LOCAL_OWNER)
+    return start(LOCAL_OWNER, LOCAL_NICKNAME)
   }
   const { AuthMisconfiguredPage, BetaLoginPage } = await import('./BetaLoginPage')
   if (mode === 'misconfigured') {
@@ -97,25 +123,26 @@ async function gate(): Promise<void> {
   }
   const user = await sessionUser()
   if (!user) {
-    show(<BetaLoginPage onSignedIn={() => window.location.assign(FONTS_PATH)} />)
+    show(<BetaLoginPage onSignedIn={() => window.location.assign(DASHBOARD_PATH)} />)
     return
   }
   // 남의 이름표가 붙은 브라우저 사본은 스토어가 읽기 전에 지운다(공용 기기).
   dropForeignCopy(window.localStorage, user.id)
-  if (window.location.pathname === FONTS_PATH) {
-    const { FontHomePage } = await import('./FontHomePage')
-    show(<FontHomePage me={user.id} nickname={user.nickname} />)
-    return
-  }
-  return start(user.id)
+  return start(user.id, user.nickname)
 }
 
 /** 편집 화면을 열기 전에 계정 폰트(게이트 꺼지면 이 기기 폰트)를 불러온다. */
-async function start(me?: string): Promise<void> {
+async function start(me?: string, nickname: string | null = null): Promise<void> {
   // 랩 화면은 개발 서버에서만. 프로덕션 번들에는 랩 청크가 들어가지 않는다.
   if (import.meta.env.DEV) {
     const { showDevLab } = await import('./devLabs')
     if (await showDevLab(show)) return
+  }
+
+  if (me && editorPlanOf(readStamp(window.localStorage), me) === 'home' && !(await pickFont(me, nickname))) {
+    const { AccountFontFailedPage } = await import('./BetaLoginPage')
+    show(<AccountFontFailedPage reason="network" message="폰트 목록을 불러오지 못했어요." />)
+    return
   }
 
   // 같은 폰트는 한 탭에서만. 스토어가 사본을 읽기 전에 막는다.
@@ -155,10 +182,12 @@ async function start(me?: string): Promise<void> {
   const { startAccountFont } = await import('./accountFontSync')
   if (me) {
     const started = await startAccountFont(me)
-    if (!started.ok && started.reason === 'home') { window.location.replace(FONTS_PATH); return }
+    if (!started.ok && started.reason === 'home' && repickOnce()) return
     if (!started.ok) {
       const { AccountFontFailedPage } = await import('./BetaLoginPage')
-      show(<AccountFontFailedPage reason={started.reason} message={started.message} />)
+      show(started.reason === 'home'
+        ? <AccountFontFailedPage reason="network" message="열 폰트를 고르지 못했어요." />
+        : <AccountFontFailedPage reason={started.reason} message={started.message} />)
       return
     }
     // 새로 만든 폰트는 이제 id가 생겼다. 그 이름으로도 잠가야 둘째 탭이 같은 폰트를 알아본다(처음 잠금은 `new`였다).

@@ -12,7 +12,8 @@ const isLocal = () => authGateMode() === 'off'
 
 const TABLE = 'font_projects'
 
-export interface FontSummary { id: string; name: string; updatedAt: string }
+/** 목록은 최근 고친 순(`updatedAt`). 드로어는 만든 순(`createdAt`)으로 다시 줄 세운다. */
+export interface FontSummary { id: string; name: string; updatedAt: string; createdAt: string }
 /** `updatedAt`은 충돌 확인용 표(`saveFont`의 `expectedUpdatedAt`). */
 export interface FontRow { id: string; name: string; fontData: unknown; updatedAt: string | null }
 
@@ -25,12 +26,12 @@ export async function listFonts(me: string): Promise<ApiResult<FontSummary[]>> {
   if (isLocal()) return local.listFonts()
   const { data, error } = await supabase
     .from(TABLE)
-    .select('id, name, updated_at')
+    .select('id, name, updated_at, created_at')
     .eq('user_id', me)
     .is('deleted_at', null)
     .order('updated_at', { ascending: false })
   if (error) return failed(error)
-  return { ok: true, value: (data ?? []).map((row) => ({ id: row.id as string, name: row.name as string, updatedAt: row.updated_at as string })) }
+  return { ok: true, value: (data ?? []).map((row) => ({ id: row.id as string, name: row.name as string, updatedAt: row.updated_at as string, createdAt: row.created_at as string })) }
 }
 
 export async function fetchFont(fontId: string): Promise<ApiResult<FontRow | null>> {
