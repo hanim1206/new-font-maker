@@ -110,7 +110,6 @@
 .home { position: absolute; inset: 0; display: flex; flex-direction: column; background: rgb(var(--color-surface)); }
 .homeHead { min-height: 50px; display: flex; align-items: center; gap: 4px; padding: max(2px, env(safe-area-inset-top)) 12px 2px 4px; border-bottom: 1px solid rgb(var(--color-border-subtle)); }
 .homeHead h2 { margin: 0; font-size: 15px; font-weight: 800; }
-.homeHead span { color: rgb(var(--color-text-5)); font-size: 12px; font-variant-numeric: tabular-nums; }
 .back { width: 40px; min-height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-text-3)); }
 /* 스크롤바 자리는 늘 비워 둔다. 안 그러면 경계 높이에서 스크롤바 → 판 너비 → 칸 크기 → 판 높이가 매 프레임 뒤집힌다. */
 .homeScroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
@@ -126,6 +125,8 @@
 /* 소제목은 단추 — 누르면 그 묶음이 통째로 도마에 오른다. 도마와 같으면 검정. */
 .groupHead { position: absolute; top: 0; left: 8px; height: 44px; display: inline-flex; align-items: center; gap: 10px; padding: 0 8px 8px 4px; border: 0; background: transparent; color: rgb(var(--color-text-3)); font-size: 15px; font-weight: 700; transition: transform var(--motion-slow) var(--ease-standard), color var(--motion-normal) var(--ease-standard); animation: fadeIn var(--motion-normal) var(--ease-standard); }
 .groupHead[aria-checked='true'] { color: rgb(var(--color-foreground)); }
+/* 묶음 글자 수. 이름에 붙여 작게. */
+.groupCount { margin-left: -4px; color: rgb(var(--color-text-5)); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 /* 토스식 원형 체크 — 꺼져도 회색 원에 흰 체크, 켜지면 채운다. */
 .check { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-surface)); transition: background-color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
 .groupHead[aria-checked='true'] .check { background: rgb(var(--color-foreground)); }

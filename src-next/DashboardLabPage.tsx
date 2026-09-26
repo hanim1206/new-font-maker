@@ -506,7 +506,6 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
     <header className={styles.homeHead}>
       <button type="button" className={styles.back} aria-label="대시보드" onClick={() => navigate('/dashboard')}><ChevronLeft size={22} aria-hidden="true" /></button>
       <h2>고칠 {JAMO_LABEL[type]}</h2>
-      <span>{chars.length}</span>
     </header>
     <div className={styles.homeScroll}>
       {groupings.length > 1 && <div className={styles.chips} role="tablist" aria-label="묶기">
@@ -516,7 +515,7 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
         {layout.heads.map(({ label, y }) => {
           const group = groups.find((g) => g.label === label)
           const whole = group ? group.chars.every(onBench) : false
-          return <button key={label} type="button" className={styles.groupHead} style={{ transform: `translateY(${y}px)` }} role="checkbox" aria-checked={whole} onClick={() => group && (whole ? remove : add)(type, group.chars)}><span className={styles.check} aria-hidden="true"><Check size={14} strokeWidth={3} /></span>{label}</button>
+          return <button key={label} type="button" className={styles.groupHead} style={{ transform: `translateY(${y}px)` }} role="checkbox" aria-checked={whole} onClick={() => group && (whole ? remove : add)(type, group.chars)}><span className={styles.check} aria-hidden="true"><Check size={14} strokeWidth={3} /></span>{label}<span className={styles.groupCount}>{group?.chars.length}</span></button>
         })}
         {cell > 0 && chars.map((char) => {
           const shown = layout.cards.has(char)
