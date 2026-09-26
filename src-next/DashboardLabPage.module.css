@@ -77,9 +77,7 @@
 .content section + section { border-top: 1px solid rgb(var(--color-border-subtle)); }
 
 /* 섹션 머리 전체가 문이다. 화살표는 표시일 뿐. 섹션 여백까지 닿고, 얹으면 배경이 켜진다. */
-.sectionHead { width: calc(100% + 16px); min-height: 44px; margin: 0 -8px 2px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-foreground)); text-align: left; cursor: pointer; transition: background-color var(--motion-normal) var(--ease-standard); }
-.sectionHead:hover { background: rgb(var(--color-surface-2)); }
-.sectionHead:active { background: rgb(var(--color-surface-3)); }
+.sectionHead { width: calc(100% + 16px); min-height: 44px; margin: 0 -8px 2px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-foreground)); text-align: left; cursor: pointer; }
 .sectionHead:hover svg { color: rgb(var(--color-foreground)); }
 .sectionHead h2 { margin: 0; font-size: 15px; font-weight: 800; }
 .sectionHead span { color: rgb(var(--color-text-5)); font-size: 12px; font-variant-numeric: tabular-nums; }
