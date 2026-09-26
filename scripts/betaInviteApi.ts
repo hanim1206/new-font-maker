@@ -59,7 +59,13 @@ export function betaInviteApiPlugin(root: string): Plugin {
         if (rejected) return send(response, 403, { error: rejected })
         try {
           if (request.method === 'GET') return send(response, 200, { accounts: await invites().list() })
-          if (request.method !== 'POST') return send(response, 405, { error: 'GET · POST만 받습니다.' })
+          if (request.method === 'PATCH') {
+            const { email, suspended } = await readJson(request) as { email?: string; suspended?: boolean }
+            if (!email || typeof suspended !== 'boolean') return send(response, 400, { error: '정지할 계정이 없습니다.' })
+            await invites().setSuspended(email, suspended)
+            return send(response, 200, { email, suspended })
+          }
+          if (request.method !== 'POST') return send(response, 405, { error: 'GET · POST · PATCH만 받습니다.' })
 
           const body = await readJson(request) as { mode?: BetaIssueMode; nickname?: string }
           const nickname = body.nickname?.trim() ?? ''

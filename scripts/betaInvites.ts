@@ -47,6 +47,8 @@ export interface BetaAccount {
   lastSignInAt: string | null
   /** 이 맥에 남은 코드와 메시지. 모르면 없음. */
   invite?: BetaInvite
+  /** 정지됨 — 로그인 못 한다. 폰트는 그대로라 되살리면 이어서 쓴다. */
+  suspended: boolean
 }
 
 export interface BetaInvite {
@@ -60,6 +62,9 @@ export type BetaIssueMode = 'add' | 'reissue'
 
 const randomBytes = (length: number) => webcrypto.getRandomValues(new Uint8Array(length))
 const nicknameOf = (user: User): string | null => user.user_metadata?.nickname ?? null
+/** 정지 기간. Supabase에 '영구'가 없어 100년으로 둔다. */
+const SUSPEND_DURATION = '876000h'
+const isSuspended = (user: User): boolean => Boolean(user.banned_until && Date.parse(user.banned_until) > Date.now())
 
 /** 계정 이메일 → 마지막으로 준 코드. */
 type CodeBook = Record<string, { nickname: string; code: string; issuedAt: string }>
@@ -121,6 +126,7 @@ export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
         return {
           nickname, email: user.email!, createdAt: user.created_at, lastSignInAt: user.last_sign_in_at ?? null,
           invite: saved ? inviteOf(nickname ?? saved.nickname, saved.code) : undefined,
+          suspended: isSuspended(user),
         }
       })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -158,5 +164,16 @@ export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
     return issued
   }
 
-  return { list, issue }
+  /**
+   * 소프트 삭제. 계정을 정지만 하고 폰트 · 코드는 그대로 둔다 — `suspended: false`로 되살리면 같은 코드로 다시 들어온다.
+   * 이미 로그인한 기기는 지금 토큰이 끝날 때(최대 1시간)까지 쓸 수 있다.
+   */
+  async function setSuspended(email: string, suspended: boolean): Promise<void> {
+    const user = (await allUsers()).find((candidate) => candidate.email === email && isBeta(candidate))
+    if (!user) throw new Error(`없는 베타 계정입니다: ${email}`)
+    const { error } = await admin.updateUserById(user.id, { ban_duration: suspended ? SUSPEND_DURATION : 'none' })
+    if (error) throw new Error(`${nicknameOf(user) ?? email}: ${error.message}`)
+  }
+
+  return { list, issue, setSuspended }
 }

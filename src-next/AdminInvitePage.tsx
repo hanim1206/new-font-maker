@@ -8,13 +8,13 @@ const API = '/api/beta-invites'
 const HEADER = 'x-beta-admin'
 
 interface Invite { nickname: string; code: string; link: string; message: string }
-interface Account { nickname: string | null; email: string; createdAt: string; lastSignInAt: string | null; invite?: Invite }
+interface Account { nickname: string | null; email: string; createdAt: string; lastSignInAt: string | null; invite?: Invite; suspended: boolean }
 type Issued = Invite & { mode: 'add' | 'reissue' }
 
-async function call<T>(init?: { mode: 'add' | 'reissue'; nickname: string }): Promise<T> {
-  const response = await fetch(API, init
-    ? { method: 'POST', headers: { [HEADER]: '1', 'content-type': 'application/json' }, body: JSON.stringify(init) }
-    : { headers: { [HEADER]: '1' } })
+async function call<T>(method: 'GET' | 'POST' | 'PATCH' = 'GET', payload?: unknown): Promise<T> {
+  const response = await fetch(API, payload === undefined
+    ? { method, headers: { [HEADER]: '1' } }
+    : { method, headers: { [HEADER]: '1', 'content-type': 'application/json' }, body: JSON.stringify(payload) })
   const body = await response.json().catch(() => ({ error: `서버가 ${response.status}로 답했습니다.` }))
   if (!response.ok) throw Object.assign(new Error(body.error ?? '실패했습니다.'), { invite: body.invite as Invite | undefined })
   return body as T
@@ -56,13 +56,28 @@ export function AdminInvitePage() {
     setCopied(null)
     setConfirming(null)
     try {
-      const { invite } = await call<{ invite: Invite }>({ mode, nickname: name })
+      const { invite } = await call<{ invite: Invite }>('POST', { mode, nickname: name })
       setIssued({ ...invite, mode })
       if (mode === 'add') setNickname('')
     } catch (error) {
       setFailure((error as Error).message)
       const partial = (error as { invite?: Invite }).invite
       if (partial) setIssued({ ...partial, mode })
+    }
+    setBusy(false)
+    void refresh()
+  }
+
+  /** 소프트 삭제(정지) · 되살리기. 폰트와 코드는 그대로다. */
+  const suspend = async (email: string, suspended: boolean) => {
+    if (busy) return
+    setBusy(true)
+    setFailure('')
+    setConfirming(null)
+    try {
+      await call('PATCH', { email, suspended })
+    } catch (error) {
+      setFailure((error as Error).message)
     }
     setBusy(false)
     void refresh()
@@ -82,6 +97,8 @@ export function AdminInvitePage() {
     }
   }
 
+  const active = accounts?.filter((account) => !account.suspended)
+  const suspended = accounts?.filter((account) => account.suspended)
   const trimmed = nickname.trim()
   const invalid = trimmed !== '' && !isDrawableName(trimmed)
 
@@ -124,38 +141,68 @@ export function AdminInvitePage() {
       </section>}
 
       <section className={styles.list}>
-        <h2>발급한 친구 {accounts ? accounts.length : ''}</h2>
+        <h2>발급한 친구 {active ? active.length : ''}</h2>
         {listError && <p className={styles.failure}>{listError}</p>}
-        {accounts?.length === 0 && <p className={styles.empty}>아직 없어요.</p>}
+        {active?.length === 0 && <p className={styles.empty}>아직 없어요.</p>}
         <ul>
-          {accounts?.map((account) => {
+          {active?.map((account) => {
             const name = account.nickname
+            const confirm = (action: string) => confirming === `${action}:${account.email}`
+            const ask = (action: string) => setConfirming(`${action}:${account.email}`)
+            const drop = () => setConfirming((current) => current?.endsWith(`:${account.email}`) ? null : current)
             return <li key={account.email}>
               <div>
                 <strong>{name ?? '(닉네임 없음)'}</strong>
                 {account.invite ? <code>{account.invite.code}</code> : <em>코드 모름</em>}
                 <span>마지막 로그인 {dateOf(account.lastSignInAt)}</span>
               </div>
-              {account.invite && <button
-                type="button"
-                data-copied={copied === account.email || undefined}
-                onClick={() => void copy(account.email, account.invite!.message)}
-              >
-                {copied === account.email ? '복사함' : '메시지 복사'}
-              </button>}
-              {name && <button
-                type="button"
-                disabled={busy}
-                data-confirming={confirming === name || undefined}
-                onClick={() => confirming === name ? void issue('reissue', name) : setConfirming(name)}
-                onBlur={() => setConfirming((current) => current === name ? null : current)}
-              >
-                {confirming === name ? '옛 코드 끊고 새로' : '새 코드'}
-              </button>}
+              <nav>
+                {account.invite && <button
+                  type="button"
+                  data-copied={copied === account.email || undefined}
+                  onClick={() => void copy(account.email, account.invite!.message)}
+                >
+                  {copied === account.email ? '복사함' : '메시지 복사'}
+                </button>}
+                {name && <button
+                  type="button"
+                  disabled={busy}
+                  data-confirming={confirm('reissue') || undefined}
+                  onClick={() => confirm('reissue') ? void issue('reissue', name) : ask('reissue')}
+                  onBlur={drop}
+                >
+                  {confirm('reissue') ? '옛 코드 끊고 새로' : '새 코드'}
+                </button>}
+                <button
+                  type="button"
+                  disabled={busy}
+                  data-confirming={confirm('suspend') || undefined}
+                  onClick={() => confirm('suspend') ? void suspend(account.email, true) : ask('suspend')}
+                  onBlur={drop}
+                >
+                  {confirm('suspend') ? '로그인 막기' : '정지'}
+                </button>
+              </nav>
             </li>
           })}
         </ul>
       </section>
+
+      {suspended && suspended.length > 0 && <section className={styles.list} data-suspended>
+        <h2>정지한 친구 {suspended.length}</h2>
+        <p className={styles.empty}>로그인만 막았어요. 폰트와 코드는 그대로라 되살리면 같은 코드로 이어서 써요.</p>
+        <ul>
+          {suspended.map((account) => <li key={account.email}>
+            <div>
+              <strong>{account.nickname ?? '(닉네임 없음)'}</strong>
+              <span>마지막 로그인 {dateOf(account.lastSignInAt)}</span>
+            </div>
+            <nav>
+              <button type="button" disabled={busy} onClick={() => void suspend(account.email, false)}>되살리기</button>
+            </nav>
+          </li>)}
+        </ul>
+      </section>}
     </div>
   </main>
 }
