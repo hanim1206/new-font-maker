@@ -103,8 +103,6 @@
 
 /* 대시보드의 자소 요약 줄. 앞 네 장, 4열. */
 .preview { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-/* 카드 바탕은 섹션 홈 카드와 같다. */
-.preview .thumb { background: rgb(var(--color-surface-3)); }
 
 /* 섹션 홈. 셸 위를 덮는 층, 오른쪽에서 밀려온다. 머리 높이는 셸 머리와 같다. */
 .home { position: absolute; inset: 0; display: flex; flex-direction: column; background: rgb(var(--color-surface)); }
