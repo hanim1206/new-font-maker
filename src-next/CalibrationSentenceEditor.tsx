@@ -1,6 +1,7 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref, type RefObject, type TextareaHTMLAttributes } from 'react'
-import { ArrowLeft, Check, Circle, ClipboardPaste, Copy, CopyPlus, Delete, Dices, Download, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, RotateCcw, Settings2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
+import { ArrowLeft, Check, Circle, ClipboardPaste, Copy, Delete, Dices, Download, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, RotateCcw, Settings2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import { create } from 'zustand'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
 import { DevGhostToggle } from './DevGhostToggle'
@@ -356,8 +357,15 @@ function addJamoStroke(jamo: JamoData, selectedStrokeId: string, stroke: StrokeD
   return { ...jamo, strokes: [stroke] }
 }
 
-// 복제한 획이 원본과 겹쳐 안 보이지 않게 조금 비켜 놓는다. 핸들도 절대 좌표라 같이 옮긴다.
-const DUPLICATE_OFFSET = .03
+// 붙여넣은 획이 같은 자리의 획과 겹쳐 안 보이지 않게 조금 비켜 놓는다. 핸들도 절대 좌표라 같이 옮긴다.
+const PASTE_OFFSET = .03
+
+// 획 복사판. 앱 안에서만 들고 다닌다(시스템 클립보드는 안 쓴다). 자소를 바꿔도 남아서 ㅁ에서 복사 → ㅣ에 붙여넣기가 된다.
+const useStrokeClipboard = create<{ stroke: StrokeDataV2 | null }>(() => ({ stroke: null }))
+
+function samePoints(a: StrokeDataV2, b: StrokeDataV2): boolean {
+  return a.points.length === b.points.length && a.points.every((point, index) => Math.hypot(point.x - b.points[index].x, point.y - b.points[index].y) < .005)
+}
 
 function offsetStroke(stroke: StrokeDataV2, id: string, offset: number): StrokeDataV2 {
   const shift = (point: { x: number; y: number }) => ({ ...point, x: point.x + offset, y: point.y + offset })
@@ -908,7 +916,6 @@ function InferenceTrackpad({
   onMultiSelectArmedChange,
   dragApiRef,
   padDragRef,
-  multiSelectArmed = false,
   frameForEdit,
   toolSlot = null,
 }: {
@@ -939,7 +946,6 @@ function InferenceTrackpad({
   /** 캔버스가 여는 조절판 끌기 문. 있으면 획 · 점 · 핸들 이동은 캔버스와 같은 계산으로 간다. */
   padDragRef?: RefObject<PadDragApi | null>
   /** 직접 조작에서 `여러 점` 토글이 켜져 있는지. 상태는 부모가 든다. */
-  multiSelectArmed?: boolean
   /** 도구 단추를 그릴 자리(캔버스 왼쪽 세로 줄). 있으면 단추는 거기로 가고 트랙패드가 가로를 다 쓴다. */
   toolSlot?: HTMLElement | null
 }) {
@@ -1306,12 +1312,25 @@ function InferenceTrackpad({
     onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId, delta: { x: 0, y: 0 } })
     onSelectionChange({ ...selection, kind: 'stroke', strokeId, jamo: after, pointsOpen: false })
   }
-  // 고른 획을 두께·모양 그대로 하나 더 만들어 조금 비켜 놓고, 새 획을 고른다.
-  const duplicateStroke = () => {
+  // 고른 획을 두께·모양 그대로 복사판에 담는다.
+  const clipboardStroke = useStrokeClipboard((state) => state.stroke)
+  const [strokeCopied, setStrokeCopied] = useState(false)
+  const copyStroke = () => {
     if (selection.kind !== 'stroke' || !selectedStroke) return
+    useStrokeClipboard.setState({ stroke: structuredClone(selectedStroke) })
+    setStrokeCopied(true)
+    window.setTimeout(() => setStrokeCopied(false), 1200)
+  }
+  // 지금 자소(고른 것, 없으면 잠긴 것)에 복사한 획을 같은 자리(자소 상자 안 0–1 좌표)로 넣고 새 획을 고른다. 같은 자리에 똑같은 획이 있으면 비켜 놓는다.
+  const pasteStroke = () => {
+    const selection = creationBase
+    if (!selection || !clipboardStroke) return
     const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
     const strokeId = `stroke-${Date.now()}`
-    const after = addJamoStroke(before, selectedStroke.id, offsetStroke(selectedStroke, strokeId, DUPLICATE_OFFSET))
+    const existing = getJamoStrokes(before)
+    let offset = 0
+    while (offset < .3 && existing.some((stroke) => samePoints(stroke, offsetStroke(clipboardStroke, strokeId, offset)))) offset += PASTE_OFFSET
+    const after = addJamoStroke(before, selection.strokeId, offsetStroke(clipboardStroke, strokeId, offset))
     onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId, delta: { x: 0, y: 0 } })
     onSelectionChange({ ...selection, kind: 'stroke', strokeId, jamo: after, pointsOpen: false })
   }
@@ -1364,6 +1383,22 @@ function InferenceTrackpad({
     onCommitJamo(before, after, { kind: selection.kind === 'stroke' ? 'stroke-move' : 'point-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId: selectedStroke.id, ...(selection.kind === 'stroke' ? {} : { pointIndex: selection.pointIndex }), delta: { x: 0, y: 0 } } as RawGlyphEdit)
     onSelectionChange({ ...selection, kind: 'stroke', strokeId: selection.kind === 'stroke' ? getJamoStrokes(after)[0]?.id ?? selectedStroke.id : selectedStroke.id, jamo: after })
   }
+  // ⌘C · ⌘V(Ctrl) = `복사` · `붙여넣기` 단추. 입력칸에서는 글자 복사에 맡긴다.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.isComposing || isTypingTarget(event.target)) return
+      const key = event.key.toLowerCase()
+      if (key === 'c' && selection.kind === 'stroke' && selectedStroke) {
+        event.preventDefault()
+        copyStroke()
+      } else if (key === 'v' && creationBase && clipboardStroke) {
+        event.preventDefault()
+        pasteStroke()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
   // Delete · Backspace = `삭제` 단추. 입력칸에서는 글자 지우기에 맡긴다.
   useEffect(() => {
     if (!canDelete) return
@@ -1404,7 +1439,7 @@ function InferenceTrackpad({
     },
   })
   useEffect(() => {
-    // 직접 조작에서는 `여러 점` 토글이 이 상태를 든다. 조절판에 손가락을 대는 방식은 조절판이 있을 때만.
+    // 조절판에 손가락을 대고 있는 동안 누르는 점이 더해진다. 조절판이 있을 때만(`여러 점` 단추는 뺐다).
     if (direct) return
     onMultiSelectArmedChange(trackpad.visualState.mode === 'pending' && trackpad.visualState.points.length === 1)
   }, [direct, onMultiSelectArmedChange, trackpad.visualState.mode, trackpad.visualState.points.length])
@@ -1451,7 +1486,6 @@ function InferenceTrackpad({
       setAddMenuOpen(false)
       add()
     }
-    const multiSelectButton = editable && <button type="button" onClick={() => onMultiSelectArmedChange(!multiSelectArmed)} aria-pressed={multiSelectArmed} aria-label="꼭짓점 여러 개 고르기"><CopyPlus size={18} aria-hidden="true" /><span>여러 점</span></button>
     const deleteButton = canDelete && <button type="button" onClick={deleteSelection} aria-label={selection.kind === 'stroke' ? '획 삭제' : '꼭짓점 삭제'}><Trash2 size={18} aria-hidden="true" /><span>삭제</span></button>
     const connectButton = mergeTarget && <button type="button" onClick={connectStroke} aria-label="가까운 선 연결"><Link2 size={18} aria-hidden="true" /><span>잇기</span></button>
     const strokeTools = (
@@ -1466,7 +1500,7 @@ function InferenceTrackpad({
           </div>
         </div>}
         {selection.kind === 'stroke' && <>
-          <button type="button" onClick={duplicateStroke} aria-label="획 복제" data-testid="jamo-stroke-duplicate"><Copy size={18} aria-hidden="true" /><span>복제</span></button>
+          <button type="button" onClick={copyStroke} aria-label="획 복사" data-testid="jamo-stroke-copy">{strokeCopied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}<span>{strokeCopied ? '복사함' : '복사'}</span></button>
           {deleteButton}
           {connectButton}
         </>}
@@ -1476,7 +1510,7 @@ function InferenceTrackpad({
           {connectButton}
           {deleteButton}
         </>}
-        {multiSelectButton}
+        {creationBase && clipboardStroke && <button type="button" onClick={pasteStroke} aria-label="획 붙여넣기" data-testid="jamo-stroke-paste"><ClipboardPaste size={18} aria-hidden="true" /><span>붙여넣기</span></button>}
         {creationBase && <button type="button" onClick={() => setResetConfirmOpen(true)} disabled={!canResetJamo} aria-label={`${creationBase.jamo.char} 프리셋으로 초기화`} data-testid="jamo-stroke-reset"><RotateCcw size={18} aria-hidden="true" /><span>초기화</span></button>}
       </div>
     )
@@ -2607,7 +2641,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         onMultiSelectArmedChange={setMultiSelectArmed}
         dragApiRef={directManipulation ? dragApiRef : undefined}
         padDragRef={directManipulation ? padDragRef : undefined}
-        multiSelectArmed={multiSelectArmed}
         frameForEdit={frameForEdit}
         toolSlot={strokeToolSlot}
       />}

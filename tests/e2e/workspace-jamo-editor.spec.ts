@@ -104,6 +104,34 @@ test('획 편집 `원` 버튼은 지금 자모 상자에 닫힌 타원 획을 �
   await page.screenshot({ path: 'test-results/stroke-add-circle.png' })
 })
 
+test('획 편집 `복사`한 획은 다른 자소에 `붙여넣기`로 같은 자리에 들어간다 (ㅁ → ㅣ)', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EB%AF%B8&mode=stroke')
+  const editor = page.getByRole('region', { name: /완성 글자 편집/ })
+  await expect(editor).toBeVisible()
+  const tools = page.getByRole('toolbar', { name: '획 편집 도구' })
+  const strokes = editor.locator('svg [data-editor-hit="stroke"]')
+  const selected = editor.locator('svg [data-editor-hit="stroke"][data-selected="true"]')
+  await expect(strokes.first()).toBeVisible()
+  const before = await strokes.count()
+
+  // 복사한 게 없으면 붙여넣기 단추가 없다.
+  await expect(page.getByTestId('jamo-stroke-paste')).toHaveCount(0)
+  // 첫 획은 ㅁ, 마지막 획은 ㅣ.
+  const pick = async (index: number) => {
+    const hit = strokes.nth(index)
+    for (let tries = 0; tries < 4 && await hit.getAttribute('data-selected') !== 'true'; tries += 1) await hit.dispatchEvent('pointerdown')
+    await expect(hit).toHaveAttribute('data-selected', 'true')
+  }
+  await pick(0)
+  await tools.getByRole('button', { name: '획 복사' }).click()
+  await pick(before - 1)
+  await page.getByTestId('jamo-stroke-paste').click()
+  await expect(strokes).toHaveCount(before + 1)
+  await expect(selected).toHaveCount(1)
+  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
+  await page.screenshot({ path: 'test-results/stroke-copy-paste.png' })
+})
+
 test('ㅇ처럼 이미 꽉 찬 원이 있으면 `원`은 가운데로 작게 넣어 겹치지 않는다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EC%97%BC&mode=stroke')
   const editor = page.getByRole('region', { name: '염 완성 글자 편집' })
@@ -123,7 +151,7 @@ test('ㅇ처럼 이미 꽉 찬 원이 있으면 `원`은 가운데로 작게 넣
   await page.screenshot({ path: 'test-results/stroke-add-circle-ieung.png' })
 })
 
-test('획 편집 `사각`은 닫힌 네 점 획을 넣고, `복제`는 고른 획을 조금 비켜 하나 더 만든다', async ({ page }) => {
+test('획 편집 `사각`은 닫힌 네 점 획을 넣고, 같은 자소에 `복사` → `붙여넣기`하면 조금 비켜 하나 더 만든다', async ({ page }) => {
   await page.goto('/workspace/jamo?mode=stroke')
   const editor = page.getByRole('region', { name: /완성 글자 편집/ })
   await expect(editor).toBeVisible()
@@ -135,8 +163,8 @@ test('획 편집 `사각`은 닫힌 네 점 획을 넣고, `복제`는 고른 �
   await strokes.first().dispatchEvent('pointerdown')
   const before = await strokes.count()
 
-  // 획을 잡으면 복제가 있고, 점에만 쓰는 곡선 · 끊기는 없다.
-  await expect(tools.getByRole('button', { name: '획 복제' })).toBeVisible()
+  // 획을 잡으면 복사가 있고, 점에만 쓰는 곡선 · 끊기는 없다.
+  await expect(tools.getByRole('button', { name: '획 복사' })).toBeVisible()
   await expect(tools.getByRole('button', { name: '곡선화' })).toHaveCount(0)
   await expect(tools.getByRole('button', { name: '선 끊기' })).toHaveCount(0)
 
@@ -153,7 +181,8 @@ test('획 편집 `사각`은 닫힌 네 점 획을 넣고, `복제`는 고른 �
   await expect(selected).toHaveCount(1)
   const square = await selected.boundingBox()
 
-  await tools.getByRole('button', { name: '획 복제' }).click()
+  await tools.getByRole('button', { name: '획 복사' }).click()
+  await tools.getByRole('button', { name: '획 붙여넣기' }).click()
   await expect(strokes).toHaveCount(before + 2)
   const copy = await selected.boundingBox()
   expect(square && copy && Math.abs(copy.width - square.width) < 2 && copy.x > square.x && copy.y > square.y).toBe(true)
@@ -173,7 +202,8 @@ test('획 편집 `초기화`는 한 번 묻고 고친 자소를 프리셋으로 
   // 손대기 전에는 프리셋 그대로라 꺼져 있다.
   await expect(reset).toBeDisabled()
 
-  await tools.getByRole('button', { name: '획 복제' }).click()
+  await tools.getByRole('button', { name: '획 복사' }).click()
+  await tools.getByRole('button', { name: '획 붙여넣기' }).click()
   await expect(strokes).toHaveCount(before + 1)
   await expect(reset).toBeEnabled()
   // 누르면 먼저 묻는다. 취소하면 그대로다.

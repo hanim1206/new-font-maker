@@ -448,12 +448,10 @@ test('획 편집은 캔버스에서 꼭짓점을 직접 끌어 옮기고 Undo �
   const tools = page.getByRole('toolbar', { name: '획 편집 도구' })
   await expect(tools.getByRole('button', { name: '획 추가' })).toBeEnabled()
 
-  // 점을 잡으면 삭제 · 곡선이 켜지고, `여러 점`을 켜 두면 누르는 점이 더해진다.
+  // 점을 잡으면 삭제 · 곡선이 켜진다. `여러 점` 단추는 없다.
   await page.locator('[data-editor-point="hit"]').nth(1).dispatchEvent('pointerdown')
   await expect(tools.getByRole('button', { name: '곡선화' })).toBeEnabled()
-  await tools.getByRole('button', { name: '꼭짓점 여러 개 고르기' }).click()
-  await page.locator('[data-editor-point="hit"]').nth(2).dispatchEvent('pointerdown')
-  await expect(page.getByTestId('jamo-stroke-tools')).toContainText('점 2개 함께')
+  await expect(tools.getByRole('button', { name: '꼭짓점 여러 개 고르기' })).toHaveCount(0)
 })
 
 /**
