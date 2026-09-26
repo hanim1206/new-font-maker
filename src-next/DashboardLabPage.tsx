@@ -7,7 +7,7 @@ import { useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import { useUIStore } from '../src/stores/uiStore'
 import { useWorkbenchStore, workbenchSyllable } from '../src/stores/workbenchStore'
-import type { LayoutSchema, Padding } from '../src/types'
+import type { LayoutSchema, Padding, Part } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { AppGlyph } from './AppGlyph'
 import { flushAccountFont } from './accountFontSync'
@@ -83,6 +83,50 @@ function LayoutThumb({ char, size }: { char: string; size: number }) {
     clipGlyphs={false}
     underlay={box ? <rect x={box.x * 100} y={box.y * 100} width={box.width * 100} height={box.height * 100} fill={PART_COLOR.CH} fillOpacity={0.16} /> : undefined}
   />
+}
+
+/**
+ * 홀자 · 받침 카드. 단독 상자는 정사각에 가까워 ㅏ가 옆으로 퍼지고 받침은 좁아진다 — 대표 글자(아 · 오 · 와 / 악 · 앙) 속 그 자소만 꺼내 그린다.
+ * 창은 1em 그대로 그 자소 상자 가운데에 맞춘다. 그래서 글자 속 가로세로 비율과 크기가 그대로 보인다.
+ */
+const SHOWN_PARTS = { jungseong: ['JU', 'JU_H', 'JU_V'], jongseong: ['JO'] } as const satisfies Record<'jungseong' | 'jongseong', readonly Part[]>
+const HIDDEN_PARTS = { jungseong: { CH: { hidden: true }, JO: { hidden: true } }, jongseong: { CH: { hidden: true }, JU: { hidden: true }, JU_H: { hidden: true }, JU_V: { hidden: true } } } as const
+function InSyllableGlyph({ type, char, size }: { type: 'jungseong' | 'jongseong'; char: string; size: number }) {
+  const choseong = useJamoStore((state) => state.choseong)
+  const jungseong = useJamoStore((state) => state.jungseong)
+  const jongseong = useJamoStore((state) => state.jongseong)
+  const schemas = useLayoutStore((state) => state.layoutSchemas)
+  const globalPadding = useLayoutStore((state) => state.globalPadding)
+  const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
+  const syllable = useMemo(() => decomposeSyllable(workbenchSyllable(type, char), choseong, jungseong, jongseong), [type, char, choseong, jungseong, jongseong])
+  const effectiveStyle = useEffectiveGlobalStyle(syllable.layoutType)
+  const globalStyle = useMemo(() => ({ ...effectiveStyle, slant: 0 }), [effectiveStyle])
+  const schema = withEffectivePadding(schemas[syllable.layoutType], globalPadding, paddingOverrides[syllable.layoutType])
+  const { placement } = useContextPlacement(syllable, schema, globalStyle)
+  const boxes = placement.kind === 'boxes' ? SHOWN_PARTS[type].map((part: Part) => placement.boxes[part]).filter((box) => !!box) : []
+  const viewportBox = boxes.length > 0 ? (() => {
+    const left = Math.min(...boxes.map((box) => box.x))
+    const top = Math.min(...boxes.map((box) => box.y))
+    const right = Math.max(...boxes.map((box) => box.x + box.width))
+    const bottom = Math.max(...boxes.map((box) => box.y + box.height))
+    return { x: (left + right) / 2 - 0.5, y: (top + bottom) / 2 - 0.5, width: 1, height: 1 }
+  })() : undefined
+  return <SvgRenderer
+    syllable={syllable}
+    schema={placement.kind === 'schema' ? placement.schema : undefined}
+    boxes={placement.kind === 'boxes' ? placement.boxes : undefined}
+    size={size}
+    globalStyle={globalStyle}
+    viewportBox={viewportBox}
+    partStyles={HIDDEN_PARTS[type]}
+    overflow="visible"
+    clipGlyphs={false}
+  />
+}
+
+/** 자소 카드 잉크. 첫닿자는 단독으로, 홀자 · 받침은 글자 속 비율로. */
+function JamoGlyph({ type, char, size }: { type: JamoType; char: string; size: number }) {
+  return type === 'choseong' ? <AppGlyph char={char} size={size} upright /> : <InSyllableGlyph type={type} char={char} size={size} />
 }
 
 /**
@@ -295,7 +339,7 @@ function JamoPreview({ type, chars }: { type: JamoType; chars: readonly string[]
   return <ul className={styles.preview}>
     {chars.slice(0, PREVIEW_COUNT).map((char) => <li key={char}>
       <button type="button" className={styles.thumb} aria-label={`${char} 도마에 올리기`} onClick={() => { useWorkbenchStore.getState().place(type, [char]); navigate(`/dashboard/${type}`) }}>
-        <Lazy className={styles.inkSmall}><AppGlyph char={char} size={52} upright /></Lazy>
+        <Lazy className={styles.inkSmall}><JamoGlyph type={type} char={char} size={52} /></Lazy>
       </button>
     </li>)}
   </ul>
@@ -478,7 +522,7 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
           const shown = layout.cards.has(char)
           const at = layout.cards.get(char) ?? lastAt.current.get(char)
           return <button key={char} type="button" className={styles.homeCard} style={{ width: cell, height: cell, transform: at ? `translate(${at.x}px, ${at.y}px)` : undefined }} data-hidden={shown ? undefined : true} aria-hidden={shown ? undefined : true} tabIndex={shown ? undefined : -1} aria-label={`${char} 도마에 ${onBench(char) ? '빼기' : '담기'}`} aria-pressed={onBench(char)} onClick={() => toggle(type, char)}>
-            <span className={styles.inkSmall}><AppGlyph char={char} size={52} upright /></span>
+            <span className={styles.inkSmall}><JamoGlyph type={type} char={char} size={52} /></span>
           </button>
         })}
       </div>

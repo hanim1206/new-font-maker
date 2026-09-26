@@ -131,8 +131,9 @@
 .groupHead[aria-checked='true'] .check { background: rgb(var(--color-foreground)); }
 .groupHead:active .check { transform: scale(0.9); }
 /* 카드 탭 = 담기 · 빼기. 도마에 오른 카드는 테두리가 검정. */
-.homeCard { position: absolute; top: 0; left: 0; display: grid; place-items: center; border: 0; border-radius: 12px; background: rgb(var(--color-surface-3)); transition: transform var(--motion-slow) var(--ease-standard), width var(--motion-slow) var(--ease-standard), height var(--motion-slow) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard); }
+.homeCard { position: absolute; top: 0; left: 0; display: grid; place-items: center; border: 0; border-radius: 12px; background: rgb(var(--color-surface-3)); transition: transform var(--motion-slow) var(--ease-standard), width var(--motion-slow) var(--ease-standard), height var(--motion-slow) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard), opacity var(--motion-normal) var(--ease-standard); }
 /* 바탕은 그대로, 담긴 카드만 잉크가 진해진다. */
+.homeCard[data-hidden] { opacity: 0; pointer-events: none; }
 .homeCard svg { opacity: 0.12; transition: opacity var(--motion-fast) var(--ease-standard); }
 .homeCard[aria-pressed='true'] svg { opacity: 1; }
 
