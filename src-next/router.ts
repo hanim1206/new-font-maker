@@ -21,8 +21,19 @@ const readLocation = (): RouteState => ({
 
 export const useRouteStore = create<RouteState>(() => (typeof window === 'undefined' ? { pathname: '/', key: '/' } : readLocation()))
 
+/** 바로 앞 화면의 경로. 의견을 보낼 때 어디서 왔는지 적는다(계정 페이지는 거쳐 가는 곳이라 건너뛴다). */
+let previousPath: string | null = null
+function moved(): void {
+  const from = useRouteStore.getState().pathname
+  if (!from.startsWith('/account')) previousPath = from
+  useRouteStore.setState(readLocation())
+}
+export function previousPathname(): string | null {
+  return previousPath
+}
+
 if (typeof window !== 'undefined') {
-  window.addEventListener('popstate', () => useRouteStore.setState(readLocation()))
+  window.addEventListener('popstate', moved)
 }
 
 /**
@@ -42,7 +53,7 @@ export function navigate(to: string, options: { replace?: boolean } = {}): void 
   const go = () => {
     if (options.replace) window.history.replaceState(null, '', url)
     else window.history.pushState(null, '', url)
-    useRouteStore.setState(readLocation())
+    moved()
   }
   if (navigationGuard && !options.replace) navigationGuard(go)
   else go()

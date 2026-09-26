@@ -17,7 +17,8 @@ import type { FontSummary } from './accountFontApi'
 import { accountFontSession, renamedAccountFont } from './accountFontSync'
 import { showAppNotice } from './appNotice'
 import { leaveDeletedFont, openFont, openNewFont } from './fontSwitch'
-import { authGateMode, sessionUser, signOutAndReload } from './betaAuth'
+import { authGateMode, sessionUser } from './betaAuth'
+import { useUnseenReply } from './useFeedback'
 import { navigate } from './router'
 import { useContextPlacement } from './notoModel'
 import { PART_COLOR } from './partColors'
@@ -292,43 +293,13 @@ function FontCardMenu({ label, name, onRename, onDelete }: { label: string; name
   </>
 }
 
-/**
- * 머리 오른쪽 마이페이지. 아이콘 하나, 누르면 아래로 계정 카드 — 아이디 · 요금제 · 폰트 수, 맨 아래 로그아웃.
- * 게이트가 켜져 있으면 실제 친구 아이디를 읽고, 꺼져 있으면 예시 값(그때는 로그아웃 단추도 없다). 요금제는 아직 예시.
- */
-function AccountMenu({ fontCount }: { fontCount: number | null }) {
-  const [open, setOpen] = useState(false)
-  const [nickname, setNickname] = useState<string | null>(null)
-  const holder = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (authGateMode() !== 'on') return
-    void sessionUser().then((user) => setNickname(user?.nickname ?? null)).catch(() => undefined)
-  }, [])
-  // 바깥을 누르거나 Esc면 닫는다.
-  useEffect(() => {
-    if (!open) return
-    const onPointer = (event: PointerEvent) => { if (!holder.current?.contains(event.target as Node)) setOpen(false) }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
-    document.addEventListener('pointerdown', onPointer)
-    document.addEventListener('keydown', onKey)
-    return () => { document.removeEventListener('pointerdown', onPointer); document.removeEventListener('keydown', onKey) }
-  }, [open])
-  const id = nickname ?? 'hanim'
-  return <div ref={holder} className={styles.account}>
-    <button type="button" className={styles.avatar} aria-label="마이페이지" aria-expanded={open} onClick={() => setOpen((value) => !value)}><UserRound size={20} aria-hidden="true" /></button>
-    {open && <div className={styles.accountPanel} role="dialog" aria-label="내 계정">
-      <div className={styles.accountWho}>
-        <span className={styles.accountMark} aria-hidden="true">{id.slice(0, 1).toUpperCase()}</span>
-        <div><strong>{id}</strong><span>베타 참여자</span></div>
-      </div>
-      <dl className={styles.accountFacts}>
-        <div><dt>요금제</dt><dd>베타 · 무료</dd></div>
-        <div><dt>폰트</dt><dd>{fontCount ?? '–'} / {FONT_LIMIT}개</dd></div>
-        <div><dt>가입</dt><dd>2026. 9. 26.</dd></div>
-      </dl>
-      {authGateMode() === 'on' && <button type="button" className={styles.signOut} onClick={() => void signOutAndReload()}>로그아웃</button>}
-    </div>}
-  </div>
+/** 머리 오른쪽 마이페이지. 누르면 계정 페이지(`/account`)가 밀려 들어온다. 안 본 한임 답이 있으면 빨간 점. */
+function AccountButton() {
+  const unseen = useUnseenReply()
+  return <button type="button" className={styles.avatar} aria-label="마이페이지" onClick={() => navigate('/account')} data-testid="dashboard-account">
+    <UserRound size={20} aria-hidden="true" />
+    {unseen && <span className={styles.avatarDot} aria-label="새 답장" />}
+  </button>
 }
 
 function SectionHead({ title, count, hint, onClick, testId }: { title: string; count?: number; hint?: string; onClick?: () => void; testId?: string }) {
@@ -875,7 +846,7 @@ export function DashboardLabPage() {
             <span>{fontList.movingTo ?? name}</span>{fontList.canList && <ChevronDown size={18} aria-hidden="true" data-open={sheetOpen || undefined} />}
           </button>
         </h1>
-        <AccountMenu fontCount={fontList.fonts?.length ?? null} />
+        <AccountButton />
       </header>
 
       <div ref={scroller} className={styles.scroll} onScroll={onScroll} onWheel={unpin} onTouchStart={unpin} onPointerDown={unpin} onKeyDown={unpin} data-moving={fontList.movingTo !== null || undefined} aria-busy={fontList.movingTo !== null || undefined}>

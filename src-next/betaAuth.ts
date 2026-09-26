@@ -42,13 +42,13 @@ export async function sessionUserId(): Promise<string | null> {
   return (await sessionUser())?.id ?? null
 }
 
-/** 로그인한 계정 id와 발급할 때 적은 친구 아이디(`user_metadata.nickname`). */
-export async function sessionUser(): Promise<{ id: string; nickname: string | null } | null> {
+/** 로그인한 계정 id와 발급할 때 적은 친구 아이디(`user_metadata.nickname`), 가입 때(계정 페이지). */
+export async function sessionUser(): Promise<{ id: string; nickname: string | null; createdAt: string | null } | null> {
   const { data } = await (await client()).auth.getSession()
   const user = data.session?.user
   if (!user) return null
   const nickname = user.user_metadata?.nickname
-  return { id: user.id, nickname: typeof nickname === 'string' ? nickname : null }
+  return { id: user.id, nickname: typeof nickname === 'string' ? nickname : null, createdAt: user.created_at ?? null }
 }
 
 export type BetaSignInResult = { ok: true } | { ok: false; reason: 'format' | 'wrong' | 'busy' | 'network' }

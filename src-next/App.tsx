@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { navigate, usePathname, useRouteKey } from './router'
+import { AccountPage } from './AccountPage'
 import { DashboardLabPage, JamoHomePage } from './DashboardLabPage'
 import { FontExportDonePage } from './FontExportDonePage'
 import { FontWorkspacePage } from './FontWorkspacePage'
@@ -30,6 +31,8 @@ function Page() {
   if (pathname === '/dashboard') return <DashboardLabPage key={key} />
   // 섹션 홈. 묶기(`?group=`)는 화면이 조용히 고치니 경로로만 연다.
   if (pathname.startsWith('/dashboard/')) return <JamoHomePage key={pathname} />
+  // 계정 페이지 · 한임에게 의견. 대시보드 아바타에서 밀려 들어온다.
+  if (pathname === '/account' || pathname.startsWith('/account/')) return <AccountPage key={pathname} pathname={pathname} />
   if (pathname === '/workspace/font') return <FontWorkspacePage key={key} />
   if (pathname === '/workspace/font/export') return <FontExportDonePage key={key} />
   if (pathname === '/workspace/review' || pathname.startsWith('/workspace/review/')) return <ReviewWorkspacePage key={key} />

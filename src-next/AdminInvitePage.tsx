@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { AdminFeedback } from './AdminFeedback'
 import { isDrawableName } from './betaWelcome'
 import styles from './AdminInvitePage.module.css'
 
@@ -25,7 +26,7 @@ const dateOf = (iso: string | null) => iso
   : '아직'
 
 /**
- * 로컬 관리자 화면. 닉네임 하나 넣으면 계정 · 코드 · 이름 붙은 링크가 한 번에 나오고, 카톡 메시지 한 통으로 복사한다.
+ * 로컬 관리자 화면. 탭 둘 — 베타 초대 · 의견(`AdminFeedback`). 닉네임 하나 넣으면 계정 · 코드 · 이름 붙은 링크가 한 번에 나오고, 카톡 메시지 한 통으로 복사한다.
  * 개발 서버에서만 열린다(`main.tsx`). 발급한 코드는 이 맥 파일에 남아 목록에서 다시 복사한다. 그 전 계정은 코드를 몰라 `새 코드`로.
  */
 export function AdminInvitePage() {
@@ -38,6 +39,9 @@ export function AdminInvitePage() {
   /** 방금 복사한 메시지의 계정 이메일, 위 결과 카드는 `issued`. */
   const [copied, setCopied] = useState<string | null>(null)
   const [confirming, setConfirming] = useState<string | null>(null)
+  const [tab, setTab] = useState<'invite' | 'feedback'>('invite')
+  /** 답장 안 한 의견 수. 탭 옆 빨간 숫자. */
+  const [pending, setPending] = useState(0)
 
   const refresh = useCallback(async () => {
     try {
@@ -105,9 +109,17 @@ export function AdminInvitePage() {
   return <main className={styles.page}>
     <div className={styles.shell} data-testid="admin-invite">
       <header className={styles.head}>
-        <h1>베타 초대</h1>
+        <h1>관리</h1>
         <p>이 맥에서만 열려요. 발급한 코드는 이 맥에 남아요.</p>
       </header>
+      <nav className={styles.tabs} role="tablist" aria-label="관리">
+        <button type="button" role="tab" aria-selected={tab === 'invite'} onClick={() => setTab('invite')}>베타 초대</button>
+        <button type="button" role="tab" aria-selected={tab === 'feedback'} onClick={() => setTab('feedback')} data-testid="admin-feedback-tab">
+          의견{pending > 0 && <em>{pending}</em>}
+        </button>
+      </nav>
+      <AdminFeedback hidden={tab !== 'feedback'} onPending={setPending} />
+      {tab === 'invite' && <>
 
       <form className={styles.issue} onSubmit={submit}>
         <label>
@@ -203,6 +215,7 @@ export function AdminInvitePage() {
           </li>)}
         </ul>
       </section>}
+      </>}
     </div>
   </main>
 }

@@ -15,21 +15,10 @@
 .head .switcher:disabled { background: transparent; padding-left: 8px; }
 .head button { min-height: 40px; padding: 0 10px; border: 0; background: transparent; color: rgb(var(--color-text-4)); font-size: 12px; }
 
-/* 마이페이지. 아이콘 원 하나, 아래로 계정 카드가 내려온다. */
-.account { position: relative; }
-.head .avatar { width: 40px; min-height: 40px; padding: 0; display: grid; place-items: center; border-radius: 999px; color: rgb(var(--color-text-3)); }
-.head .avatar[aria-expanded='true'] { background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); }
-.accountPanel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 20; width: 240px; padding: 14px; border-radius: 16px; background: rgb(var(--color-surface)); border: 1px solid rgb(var(--color-border-subtle)); box-shadow: 0 12px 32px rgb(0 0 0 / .14); display: flex; flex-direction: column; gap: 12px; }
-.accountWho { display: flex; align-items: center; gap: 10px; }
-.accountWho div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.accountWho strong { font-size: 14px; font-weight: 750; overflow: hidden; text-overflow: ellipsis; }
-.accountWho span { color: rgb(var(--color-text-4)); font-size: 12px; }
-.accountMark { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; background: rgb(var(--color-surface-3)); font-size: 14px; font-weight: 800; }
-.accountFacts { margin: 0; padding: 10px 0; border-top: 1px solid rgb(var(--color-border-subtle)); border-bottom: 1px solid rgb(var(--color-border-subtle)); display: flex; flex-direction: column; gap: 6px; }
-.accountFacts div { display: flex; justify-content: space-between; font-size: 12px; }
-.accountFacts dt { color: rgb(var(--color-text-4)); }
-.accountFacts dd { margin: 0; font-weight: 650; }
-.head .signOut { min-height: 40px; width: 100%; border-radius: 10px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 13px; font-weight: 700; }
+/* 마이페이지. 아이콘 원 하나, 누르면 계정 페이지. 안 본 답장은 오른쪽 위 빨간 점. */
+.head .avatar { position: relative; width: 40px; min-height: 40px; padding: 0; display: grid; place-items: center; border-radius: 999px; color: rgb(var(--color-text-3)); }
+.head .avatar:active { background: rgb(var(--color-surface-2)); }
+.avatarDot { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border-radius: 999px; background: rgb(240 68 82); box-shadow: 0 0 0 2px rgb(var(--color-surface)); }
 
 .scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 /* 다른 폰트로 옮겨 가는 중. 판을 흐리고 막는다 — 다시 열리면 `index.html` 뼈대가 이어받는다. */
