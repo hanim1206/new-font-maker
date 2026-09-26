@@ -354,7 +354,7 @@ type Grouping = { id: string; label: string; groups: (chars: readonly string[], 
 const DOUBLE = new Set(['ㄲ', 'ㄸ', 'ㅃ', 'ㅆ', 'ㅉ'])
 const WITH_BBICHIM = new Set(['ㄱ', 'ㄲ', 'ㅅ', 'ㅆ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ'])
 const ROUND = new Set(['ㅇ', 'ㅎ'])
-// `전체`도 소제목을 둔다 — 그래야 전체 선택이 된다. 중성은 묶기가 이것 하나다.
+// `전체`도 소제목을 둔다 — 그래야 전체 선택이 된다.
 const ALL: Grouping = { id: 'all', label: '전체', groups: (chars) => [{ label: '전체', chars: [...chars] }] }
 const BY_STEM: Grouping = {
   id: 'stem', label: '줄기', groups: (chars) => [
@@ -396,11 +396,33 @@ const BY_CLUSTER_HEAD: Grouping = {
     return heads.map((head) => ({ label: `${head} 겹받침`, chars: chars.filter((c) => CLUSTER_FINAL[c] === head) }))
   },
 }
+// 중성. 곁줄기가 뻗는 쪽 — 모양이 닮은 것끼리 모인다. 섞임홀자는 가로 쪽(ㅗ · ㅜ)으로 묶고, ㅢ는 `없음`에 둔다.
+const BY_SIDE_STEM: Grouping = {
+  id: 'side', label: '곁줄기 방향', groups: (chars) => [
+    { label: '오른쪽', members: 'ㅏㅐㅑㅒ' },
+    { label: '왼쪽', members: 'ㅓㅔㅕㅖ' },
+    { label: '위', members: 'ㅗㅛ' },
+    { label: '아래', members: 'ㅜㅠ' },
+    { label: 'ㅗ 섞임', members: 'ㅘㅙㅚ' },
+    { label: 'ㅜ 섞임', members: 'ㅝㅞㅟ' },
+    { label: '곁줄기 없음', members: 'ㅡㅣㅢ' },
+  ].map(({ label, members }) => ({ label, chars: chars.filter((c) => members.includes(c)) })).filter((group) => group.chars.length > 0),
+}
+// 중성. 레이아웃 6칸과 같은 말 — 세로 · 가로 · 섞임홀자.
+const BY_MEDIAL_KIND: Grouping = {
+  id: 'kind', label: '홀자', groups: (chars) => [
+    { label: '세로홀자', members: 'ㅏㅐㅑㅒㅓㅔㅕㅖㅣ' },
+    { label: '가로홀자', members: 'ㅗㅛㅜㅠㅡ' },
+    { label: '섞임홀자', members: 'ㅘㅙㅚㅝㅞㅟㅢ' },
+  ].map(({ label, members }) => ({ label, chars: chars.filter((c) => members.includes(c)) })).filter((group) => group.chars.length > 0),
+}
 const GROUPINGS: Record<JamoType, Grouping[]> = {
   choseong: [ALL, BY_STEM, BY_DOUBLE, BY_STROKES],
-  jungseong: [ALL],
+  jungseong: [ALL, BY_SIDE_STEM, BY_MEDIAL_KIND, BY_STROKES],
   jongseong: [ALL, BY_FINAL_KIND, BY_CLUSTER_HEAD, BY_STROKES],
 }
+// 칩을 안 골랐을 때. 중성은 `전체`보다 곁줄기 방향이 먼저 쓸모 있다.
+const DEFAULT_GROUPING: Record<JamoType, string> = { choseong: 'all', jungseong: 'side', jongseong: 'all' }
 
 const HOME_COLUMNS = 4
 const HOME_GAP = 6
@@ -430,15 +452,16 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
     return jamo ? (jamo.strokes?.length ?? 0) + (jamo.horizontalStrokes?.length ?? 0) + (jamo.verticalStrokes?.length ?? 0) : 0
   }
   const groupings = GROUPINGS[type]
-  const [groupingId, setGroupingIdState] = useState(() => new URLSearchParams(window.location.search).get('group') ?? groupings[0].id)
+  const defaultGrouping = groupings.find((g) => g.id === DEFAULT_GROUPING[type]) ?? groupings[0]
+  const [groupingId, setGroupingIdState] = useState(() => new URLSearchParams(window.location.search).get('group') ?? defaultGrouping.id)
   const setGroupingId = (id: string) => {
     setGroupingIdState(id)
     const url = new URL(window.location.href)
-    if (id === groupings[0].id) url.searchParams.delete('group')
+    if (id === defaultGrouping.id) url.searchParams.delete('group')
     else url.searchParams.set('group', id)
     window.history.replaceState(window.history.state, '', url)
   }
-  const grouping = groupings.find((g) => g.id === groupingId) ?? groupings[0]
+  const grouping = groupings.find((g) => g.id === groupingId) ?? defaultGrouping
   const groups = useMemo(() => grouping.groups(chars, strokeCount), [grouping, chars, jamos]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 판 너비에서 칸 크기를 잰다. 글자마다 (x, y)를 계산해 transform으로 놓는다.
