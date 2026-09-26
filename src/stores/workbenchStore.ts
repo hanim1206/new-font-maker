@@ -16,11 +16,15 @@ interface WorkbenchState {
   type: WorkbenchJamoType | null
   /** ㄱㄴㄷ 순. 묶기 순서를 따르지 않는다(위치 기억). */
   chars: string[]
+  /** 편집기 `‹`가 돌아갈 주소. 섹션 홈에서 들어가면 그 홈(`/dashboard/choseong?group=stem`), 아니면 없음(대시보드). 한 번 쓰면 비운다. */
+  returnTo: string | null
 }
 
 interface WorkbenchActions {
-  /** 도마를 통째로 바꾼다. 비면 지운다. */
-  place: (type: WorkbenchJamoType, chars: readonly string[]) => void
+  /** 도마를 통째로 바꾼다. 비면 지운다. `returnTo`는 편집기에서 돌아갈 곳(편집기로 들고 갈 때만 준다). */
+  place: (type: WorkbenchJamoType, chars: readonly string[], returnTo?: string | null) => void
+  /** 돌아갈 곳을 꺼내고 비운다. */
+  takeReturnTo: () => string | null
   /** 카드 하나 담기 · 빼기. 다른 종류의 자소면 도마를 그 하나로 바꾼다. */
   toggle: (type: WorkbenchJamoType, char: string) => void
   clear: () => void
@@ -55,16 +59,24 @@ export function workbenchJamoOf(type: WorkbenchJamoType, char: string): string |
 
 export const useWorkbenchStore = create<WorkbenchState & WorkbenchActions>()(
   persist(
-    immer((set) => ({
+    immer((set, get) => ({
       type: null,
       chars: [],
+      returnTo: null,
 
-      place: (type, chars) =>
+      place: (type, chars, returnTo) =>
         set((state) => {
           const next = sorted(type, chars)
           state.type = next.length ? type : null
           state.chars = next
+          if (returnTo !== undefined) state.returnTo = returnTo
         }),
+
+      takeReturnTo: () => {
+        const to = get().returnTo
+        if (to !== null) set((state) => { state.returnTo = null })
+        return to
+      },
 
       toggle: (type, char) =>
         set((state) => {
@@ -78,7 +90,7 @@ export const useWorkbenchStore = create<WorkbenchState & WorkbenchActions>()(
           if (!next.length) state.type = null
         }),
 
-      clear: () => set((state) => { state.type = null; state.chars = [] }),
+      clear: () => set((state) => { state.type = null; state.chars = []; state.returnTo = null }),
     })),
     { name: 'font-maker-workbench', version: 1 },
   ),

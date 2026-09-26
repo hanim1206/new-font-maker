@@ -3,6 +3,7 @@ import { ChevronLeft, Redo2, ScanSearch, Shapes, Type, Undo2 } from 'lucide-reac
 import { flushAccountFont, useAccountSaveStore } from '../accountFontSync'
 import { useFontExportStore } from '../fontExportStore'
 import { useUIStore } from '../../src/stores/uiStore'
+import { useWorkbenchStore } from '../../src/stores/workbenchStore'
 import { navigate, onLinkClick } from '../router'
 import { useHistoryShortcuts } from './keyboardShortcuts'
 import { SaveToast } from './SaveToast'
@@ -104,10 +105,13 @@ function ExportNoticeToast() {
   return null
 }
 
-/** 대시보드로(지금 폰트의 한눈 화면). 못 올린 변경은 먼저 올려 본다(못 올려도 사본의 이름표에 남아 다음에 다시 올린다). 같은 마운트라 새로고침 없이 간다. */
+/**
+ * 대시보드로(지금 폰트의 한눈 화면). 섹션 홈에서 도마를 들고 들어왔으면 그 홈으로(묶기 그대로).
+ * 못 올린 변경은 먼저 올려 본다(못 올려도 사본의 이름표에 남아 다음에 다시 올린다). 같은 마운트라 새로고침 없이 간다.
+ */
 async function goToFontHome(): Promise<void> {
   await flushAccountFont()
-  navigate('/dashboard')
+  navigate(useWorkbenchStore.getState().takeReturnTo() ?? '/dashboard')
 }
 
 /** 계정 자동 저장이 실패했을 때만 알린다. 성공은 알리지 않고, 저장 중에도 편집을 막지 않는다. */

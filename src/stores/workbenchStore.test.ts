@@ -22,6 +22,19 @@ describe('도마', () => {
     expect(useWorkbenchStore.getState()).toMatchObject({ type: null, chars: [] })
   })
 
+  it('돌아갈 곳은 편집기로 들고 갈 때만 바뀌고, 한 번 꺼내면 비운다', () => {
+    const store = useWorkbenchStore.getState()
+    store.place('choseong', ['ㄱ', 'ㅅ'], '/dashboard/choseong?group=stem')
+    useWorkbenchStore.getState().toggle('choseong', 'ㅋ')
+    expect(useWorkbenchStore.getState().returnTo).toBe('/dashboard/choseong?group=stem')
+    expect(useWorkbenchStore.getState().takeReturnTo()).toBe('/dashboard/choseong?group=stem')
+    expect(useWorkbenchStore.getState().takeReturnTo()).toBeNull()
+    // 대시보드 카드는 null로 덮는다 — 옛 홈으로 잘못 돌아가지 않는다.
+    useWorkbenchStore.getState().place('choseong', ['ㄱ'], '/dashboard/choseong')
+    useWorkbenchStore.getState().place('choseong', ['ㄴ'], null)
+    expect(useWorkbenchStore.getState().takeReturnTo()).toBeNull()
+  })
+
   it('대표 글자는 초성엔 ㅏ, 홀자엔 ㅇ, 받침엔 아', () => {
     expect(workbenchSyllable('choseong', 'ㄱ')).toBe('가')
     expect(workbenchSyllable('jungseong', 'ㅘ')).toBe('와')

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { navigate, usePathname, useRouteKey } from './router'
-import { DashboardLabPage } from './DashboardLabPage'
+import { DashboardLabPage, JamoHomePage } from './DashboardLabPage'
 import { FontExportDonePage } from './FontExportDonePage'
 import { FontWorkspacePage } from './FontWorkspacePage'
 import { ReviewWorkspacePage } from './ReviewWorkspacePage'
@@ -22,6 +22,8 @@ function Page() {
   const key = useRouteKey()
   if (pathname === '/') return <HomeRedirect key={key} />
   if (pathname === '/dashboard') return <DashboardLabPage key={key} />
+  // 섹션 홈. 묶기(`?group=`)는 화면이 조용히 고치니 경로로만 연다.
+  if (pathname.startsWith('/dashboard/')) return <JamoHomePage key={pathname} />
   if (pathname === '/workspace/font') return <FontWorkspacePage key={key} />
   if (pathname === '/workspace/font/export') return <FontExportDonePage key={key} />
   if (pathname === '/workspace/review' || pathname.startsWith('/workspace/review/')) return <ReviewWorkspacePage key={key} />
