@@ -310,7 +310,7 @@ type Grouping = { id: string; label: string; groups: (chars: readonly string[], 
 const DOUBLE = new Set(['ㄲ', 'ㄸ', 'ㅃ', 'ㅆ', 'ㅉ'])
 const WITH_BBICHIM = new Set(['ㄱ', 'ㄲ', 'ㅅ', 'ㅆ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ'])
 const ROUND = new Set(['ㅇ', 'ㅎ'])
-// `전체`도 소제목을 둔다 — 그래야 전체 선택이 된다. 중성 · 종성은 묶기가 이것 하나다.
+// `전체`도 소제목을 둔다 — 그래야 전체 선택이 된다. 중성은 묶기가 이것 하나다.
 const ALL: Grouping = { id: 'all', label: '전체', groups: (chars) => [{ label: '전체', chars: [...chars] }] }
 const BY_STEM: Grouping = {
   id: 'stem', label: '줄기', groups: (chars) => [
@@ -335,10 +335,30 @@ const BY_STROKES: Grouping = {
     return [...buckets.entries()].sort(([a], [b]) => a - b).map(([n, list]) => ({ label: `${n}획`, chars: list }))
   },
 }
+// 종성. 쌍받침은 ㄲ ㅆ 둘뿐이고, 홑 · 쌍을 합치면 초성에도 있는 자음 — 겹받침만 초성에 없다.
+const DOUBLE_FINAL = new Set(['ㄲ', 'ㅆ'])
+const CLUSTER_FINAL: Record<string, string> = { 'ㄳ': 'ㄱ', 'ㄵ': 'ㄴ', 'ㄶ': 'ㄴ', 'ㄺ': 'ㄹ', 'ㄻ': 'ㄹ', 'ㄼ': 'ㄹ', 'ㄽ': 'ㄹ', 'ㄾ': 'ㄹ', 'ㄿ': 'ㄹ', 'ㅀ': 'ㄹ', 'ㅄ': 'ㅂ' }
+const BY_FINAL_KIND: Grouping = {
+  id: 'kind', label: '홑 · 쌍 · 겹', groups: (chars) => [
+    { label: '홑받침', chars: chars.filter((c) => !DOUBLE_FINAL.has(c) && !CLUSTER_FINAL[c]) },
+    { label: '쌍받침', chars: chars.filter((c) => DOUBLE_FINAL.has(c)) },
+    { label: '겹받침', chars: chars.filter((c) => CLUSTER_FINAL[c]) },
+  ].filter((group) => group.chars.length > 0),
+}
+// 겹받침은 앞 자음(왼쪽 반)이 같은 것끼리. 겹받침 아닌 것도 한 칸에 둬야 전체 선택이 빠짐없다.
+const BY_CLUSTER_HEAD: Grouping = {
+  id: 'head', label: '겹받침 앞 자음', groups: (chars) => {
+    const heads = [...new Set(chars.map((c) => CLUSTER_FINAL[c]).filter(Boolean))]
+    return [
+      ...heads.map((head) => ({ label: `${head} 겹받침`, chars: chars.filter((c) => CLUSTER_FINAL[c] === head) })),
+      { label: '홑 · 쌍받침', chars: chars.filter((c) => !CLUSTER_FINAL[c]) },
+    ].filter((group) => group.chars.length > 0)
+  },
+}
 const GROUPINGS: Record<JamoType, Grouping[]> = {
   choseong: [ALL, BY_STEM, BY_DOUBLE, BY_STROKES],
   jungseong: [ALL],
-  jongseong: [ALL],
+  jongseong: [ALL, BY_FINAL_KIND, BY_CLUSTER_HEAD, BY_STROKES],
 }
 
 const HOME_COLUMNS = 4
