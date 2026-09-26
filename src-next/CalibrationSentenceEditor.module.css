@@ -232,3 +232,10 @@ section.sentence[data-sheet] { flex-basis: var(--sheet-h); height: var(--sheet-h
 .guideRail { stroke: rgb(59 111 214 / .32); stroke-width: .25; stroke-dasharray: 1.2 1.2; pointer-events: none; }
 .snapHitLine { stroke: #f0561e; stroke-width: .5; pointer-events: none; }
 .snapHitChip { position: absolute; z-index: 3; left: 50%; top: 10px; transform: translateX(-50%); padding: 3px 10px; border-radius: 10px; background: #f0561e; color: #fff; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10.5px; font-weight: 700; white-space: nowrap; pointer-events: none; }
+
+/* 도마 칩 줄. 머리 바로 아래 한 줄, 가로 스크롤. 지금 글자의 자소만 검정, 손댄 자소는 모서리에 점. */
+.bench { flex: none; display: flex; gap: 6px; padding: 8px 14px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid rgb(var(--color-border-subtle)); }
+.bench::-webkit-scrollbar { display: none; }
+.bench button { position: relative; flex: none; min-width: 40px; height: 34px; padding: 0 10px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-3)); font-size: 15px; font-weight: 700; transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard); }
+.bench button[aria-selected='true'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+.bench button[data-modified]::after { content: ''; position: absolute; top: 5px; right: 6px; width: 5px; height: 5px; border-radius: 999px; background: currentColor; }

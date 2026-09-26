@@ -1,18 +1,18 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, Copy, Download, Ellipsis, PencilLine, Plus, ScanSearch, Trash2, UserRound } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, Download, Ellipsis, Layers, PencilLine, Plus, ScanSearch, Trash2, UserRound } from 'lucide-react'
 import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../src/data/Hangul'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { useEffectiveGlobalStyle, useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import { useUIStore } from '../src/stores/uiStore'
+import { useWorkbenchStore, workbenchSyllable } from '../src/stores/workbenchStore'
 import type { LayoutSchema, Padding } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { AppGlyph } from './AppGlyph'
 import { authGateMode, sessionUser } from './betaAuth'
 import { useContextPlacement } from './notoModel'
 import { PART_COLOR } from './partColors'
-import { navigate } from './router'
 import styles from './DashboardLabPage.module.css'
 
 /**
@@ -277,12 +277,18 @@ type JamoType = 'choseong' | 'jungseong' | 'jongseong'
 const JAMO_LABEL: Record<JamoType, string> = { choseong: '초성', jungseong: '중성', jongseong: '종성' }
 const PREVIEW_COUNT = 4
 
-/** 대시보드의 자소 줄. 앞 네 장만 보이고, 어디를 눌러도 그 섹션 홈으로 간다(손댄 것 우선은 다음). */
-function JamoPreview({ type, chars, onOpen }: { type: JamoType; chars: readonly string[]; onOpen: () => void }) {
+/** 편집기로. 도마를 그 자소들로 바꾸고 첫 자소의 대표 글자를 연다. 랩은 앱과 다른 마운트라 진짜 이동이다(도마는 저장돼 살아남는다). */
+function openEditor(type: JamoType, chars: readonly string[]) {
+  useWorkbenchStore.getState().place(type, chars)
+  window.location.assign(`/workspace/jamo?char=${encodeURIComponent(workbenchSyllable(type, chars[0]))}`)
+}
+
+/** 대시보드의 자소 줄. 앞 네 장만 보이고(손댄 것 우선은 다음), 카드는 홈을 건너뛰고 그 자소 하나만 도마에 올려 편집기로 간다. 머리(화살표)가 홈이다. */
+function JamoPreview({ type, chars }: { type: JamoType; chars: readonly string[] }) {
   const isJamoModified = useJamoStore((state) => state.isJamoModified)
   return <ul className={styles.preview}>
     {chars.slice(0, PREVIEW_COUNT).map((char) => <li key={char}>
-      <button type="button" className={styles.thumb} aria-label={`${JAMO_LABEL[type]} 홈`} data-modified={isJamoModified(type, char) || undefined} onClick={onOpen}>
+      <button type="button" className={styles.thumb} aria-label={`${char} 편집`} data-modified={isJamoModified(type, char) || undefined} onClick={() => openEditor(type, [char])}>
         <Lazy className={styles.inkSmall}><AppGlyph char={char} size={52} upright /></Lazy>
       </button>
     </li>)}
@@ -336,11 +342,17 @@ const GROUP_GAP = 14
 /**
  * 섹션 홈. 대시보드 위로 오른쪽에서 밀려 들어오는 층. 위는 뒤로 · 제목, 그 아래 묶기 칩 한 줄, 그 아래 4열 판.
  * 카드 19장은 한 번만 만들고(key = 글자) 묶기가 바뀌면 자리만 옮긴다 — 절대좌표 + transform 전환이라 글자를 다시 그리지 않는다.
- * 카드 탭은 자모 에디터로(시안이라 어떤 자모를 열지는 아직 넘기지 않는다).
+ * 카드 탭 = 도마에 담기 · 빼기, 소제목 탭 = 그 묶음을 도마에(교체), 아래 `편집 n` = 도마를 들고 편집기로. 담기 · 빼기는 여기서만 한다.
  */
 function JamoHome({ type, chars, onClose }: { type: JamoType; chars: readonly string[]; onClose: () => void }) {
   const isJamoModified = useJamoStore((state) => state.isJamoModified)
   const jamos = useJamoStore((state) => state[type])
+  const benchType = useWorkbenchStore((state) => state.type)
+  const benchChars = useWorkbenchStore((state) => state.chars)
+  const place = useWorkbenchStore((state) => state.place)
+  const toggle = useWorkbenchStore((state) => state.toggle)
+  const onBench = (char: string) => benchType === type && benchChars.includes(char)
+  const benchCount = benchType === type ? benchChars.length : 0
   const strokeCount = (char: string) => {
     const jamo = jamos[char]
     return jamo ? (jamo.strokes?.length ?? 0) + (jamo.horizontalStrokes?.length ?? 0) + (jamo.verticalStrokes?.length ?? 0) : 0
@@ -395,15 +407,26 @@ function JamoHome({ type, chars, onClose }: { type: JamoType; chars: readonly st
         {groupings.map((g) => <button key={g.id} type="button" role="tab" aria-selected={g.id === grouping.id} onClick={() => setGroupingId(g.id)}>{g.label}</button>)}
       </div>}
       <div ref={board} className={styles.board} style={{ height: layout.height }}>
-        {layout.heads.map(({ label, y }) => <span key={label} className={styles.groupHead} style={{ transform: `translateY(${y}px)` }}>{label}</span>)}
+        {layout.heads.map(({ label, y }) => {
+          const group = groups.find((g) => g.label === label)
+          const whole = group ? group.chars.every(onBench) && benchCount === group.chars.length : false
+          return <button key={label} type="button" className={styles.groupHead} style={{ transform: `translateY(${y}px)` }} aria-pressed={whole} onClick={() => group && place(type, group.chars)}>{label}<Layers size={13} aria-hidden="true" /></button>
+        })}
         {cell > 0 && chars.map((char) => {
           const at = layout.cards.get(char)
-          return <button key={char} type="button" className={styles.homeCard} style={{ width: cell, height: cell, transform: at ? `translate(${at.x}px, ${at.y}px)` : undefined }} aria-label={`${char} 편집`} data-modified={isJamoModified(type, char) || undefined} onClick={() => navigate('/workspace/jamo')}>
+          return <button key={char} type="button" className={styles.homeCard} style={{ width: cell, height: cell, transform: at ? `translate(${at.x}px, ${at.y}px)` : undefined }} aria-label={`${char} 도마에 ${onBench(char) ? '빼기' : '담기'}`} aria-pressed={onBench(char)} data-modified={isJamoModified(type, char) || undefined} onClick={() => toggle(type, char)}>
             <span className={styles.inkSmall}><AppGlyph char={char} size={52} upright /></span>
           </button>
         })}
       </div>
     </div>
+    {/* 도마 상태 · 편집 입구. 도마가 비면 단추도 잠긴다. */}
+    <footer className={styles.bench}>
+      <div className={styles.benchChips} aria-label="도마">
+        {benchCount === 0 ? <em>카드나 묶음을 눌러 도마에 올리세요</em> : benchChars.map((char) => <span key={char}>{char}</span>)}
+      </div>
+      <button type="button" className={styles.benchGo} disabled={benchCount === 0} onClick={() => openEditor(type, benchChars)}>편집 {benchCount}</button>
+    </footer>
   </div>
 }
 
@@ -493,15 +516,15 @@ export function DashboardLabPage() {
             {/* 초·중·종은 요약 줄만. 전체 격자와 묶기는 섹션 홈으로 갔다. 레이아웃 6장은 여기서 바로 에디터로. */}
             <section ref={(el) => { sections.current.choseong = el }}>
               <SectionHead title="초성" count={CHOSEONG_LIST.length} modified={modifiedBy.choseong} onClick={() => setHome('choseong')} />
-              <JamoPreview type="choseong" chars={CHOSEONG_LIST} onOpen={() => setHome('choseong')} />
+              <JamoPreview type="choseong" chars={CHOSEONG_LIST} />
             </section>
             <section ref={(el) => { sections.current.jungseong = el }}>
               <SectionHead title="중성" count={JUNGSEONG_LIST.length} modified={modifiedBy.jungseong} onClick={() => setHome('jungseong')} />
-              <JamoPreview type="jungseong" chars={JUNGSEONG_LIST} onOpen={() => setHome('jungseong')} />
+              <JamoPreview type="jungseong" chars={JUNGSEONG_LIST} />
             </section>
             <section ref={(el) => { sections.current.jongseong = el }}>
               <SectionHead title="종성" count={FINALS.length} modified={modifiedBy.jongseong} onClick={() => setHome('jongseong')} />
-              <JamoPreview type="jongseong" chars={FINALS} onOpen={() => setHome('jongseong')} />
+              <JamoPreview type="jongseong" chars={FINALS} />
             </section>
           </div>
         </div>

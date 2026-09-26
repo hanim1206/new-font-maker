@@ -22,6 +22,7 @@ import { baselineRails } from './notoBaselineRails'
 import { useNotoGlyph } from './useNotoGlyph'
 import { PART_COLOR, PART_LABEL } from './partColors'
 import { getBaseJamo, useJamoStore } from '../src/stores/jamoStore'
+import { useWorkbenchStore, workbenchJamoOf, workbenchSyllable } from '../src/stores/workbenchStore'
 import confirmStyles from './workspace/FontExportDialog.module.css'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import { moveHandle, movePoint, moveStroke, scaleStroke } from '../src/services/editorCommands'
@@ -1758,6 +1759,10 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const [inkGapLimiter, setInkGapLimiter] = useState<CalibrationInkGapViolation | null>(null)
   const [isDirectInputActive, setIsDirectInputActive] = useState(false)
   const [isCustomSentence, setIsCustomSentence] = useState(focus.custom)
+  // 도마. 섹션 홈 · 대시보드가 올려 둔 자소 묶음. 여기서는 전환만 하고 담기 · 빼기는 하지 않는다.
+  const benchType = useWorkbenchStore((state) => state.type)
+  const benchChars = useWorkbenchStore((state) => state.chars)
+  const isJamoModified = useJamoStore((state) => state.isJamoModified)
   const [globalStylePanel, setGlobalStylePanel] = useState<GlobalStylePanel | null>(styleOnly ? 'body' : null)
   const [previewBrush, setPreviewBrush] = useState<StrokeRenderStyle | null>(null)
   const [previewTone, setPreviewTone] = useState<StyleTone | null>(null)
@@ -2606,6 +2611,22 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       {isShapeRuleOpen && selection.kind !== 'none' && <ShapeRulePanel jamo={selection.jamo} selectedStrokeId={selection.kind === 'component' ? null : selection.strokeId} onClose={() => setIsShapeRuleOpen(false)} />}
     </>
   )
+  // 도마 칩 줄. 지금 글자에 든 도마 자소가 검정, 손댄 자소는 점. 탭하면 그 자소의 대표 글자로 바꾼다(문장에 없으면 앞에 붙인다).
+  const benchJamo = benchType ? workbenchJamoOf(benchType, selectedChar) : null
+  const pickBenchJamo = (char: string) => {
+    if (!benchType || char === benchJamo) return
+    const syllable = workbenchSyllable(benchType, char)
+    if (![...sampleSentence].includes(syllable)) {
+      setSampleSentence((sentence) => `${syllable} ${sentence}`)
+      setIsCustomSentence(true)
+    }
+    chooseChar(syllable)
+  }
+  const benchRow = benchType && benchChars.length > 0 && (
+    <div className={styles.bench} role="tablist" aria-label="도마" data-testid="workbench">
+      {benchChars.map((char) => <button key={char} type="button" role="tab" aria-selected={char === benchJamo} data-modified={isJamoModified(benchType, char) || undefined} onClick={() => pickBenchJamo(char)}>{char}</button>)}
+    </div>
+  )
   if (chrome === 'workspace') {
     return (
       <MobileWorkspaceShell
@@ -2618,6 +2639,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
           !styleOnly && selection.kind !== 'none' ? <button type="button" className={styleMode.headerTool} onClick={() => setIsShapeRuleOpen(true)} aria-label="선택 자모 형태 규칙" title="현재 자모의 획과 형태 예절"><ListTree size={18} /></button> : undefined
         }
       >
+        {!styleOnly && benchRow}
         {body}
       </MobileWorkspaceShell>
     )
