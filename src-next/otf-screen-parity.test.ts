@@ -4,6 +4,7 @@ import * as polygonClipping from '../src/services/polygonBoolean'
 import type { MultiPolygon, Ring } from '../src/services/polygonBoolean'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Contour } from '../src/services/strokeToOutline'
+import * as metrics from '../src/services/fontMetrics'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 
 /**
@@ -112,12 +113,12 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
       const tangent = Math.tan(globalStyle.slant * Math.PI / 180)
       const upright = fit.unionOf(screen.regions)
       const mine: MultiPolygon = tangent === 0 ? upright : upright.map((polygon) => polygon.map((ring) => ring.map(([x, y]) => [x - tangent * (y - 0.5), y] as [number, number])))
-      const toInk = (glyph: NonNullable<typeof data>) => otfInk(generator.glyphDataToFontContours(glyph), exportUtils.UPM, exportUtils.ASCENDER, padding.left)
+      const toInk = (glyph: NonNullable<typeof data>) => otfInk(generator.glyphDataToFontContours(glyph), exportUtils.UPM, exportUtils.ASCENDER, metrics.hangulOriginX(padding))
       // 화면이 실제로 그리는 상자(칸 해석 → 공통 ink resolver)와 OTF 데이터의 상자. 원점 이동만 빼면 같은 수여야 한다.
       const screenBoxes = inkResolver.resolveGlyphInkPrimitives({
         syllable, placement: screenPlacement, weightMultiplier: data.weightMultiplier,
         globalLinecap: globalStyle.linecap, globalLinejoin: globalStyle.linejoin, horizontalInkBounds: { min: 0, max: 1 },
-      }).primitives.map((primitive) => primitive.kind === 'centerline' ? { id: primitive.stroke.id, box: { ...primitive.box, x: primitive.box.x - padding.left } } : null)
+      }).primitives.map((primitive) => primitive.kind === 'centerline' ? { id: primitive.stroke.id, box: { ...primitive.box, x: primitive.box.x - metrics.hangulOriginX(padding) } } : null)
       const otfBoxes = data.strokes.map((item) => ({ id: item.stroke.id, box: item.box }))
       // OTF 좌표는 정수 폰트 단위로 반올림된다. 가장자리가 평균 몇 유닛 어긋났는지 = xor 면적 / 잉크 둘레.
       const edgeDriftUnits = (shape: MultiPolygon) => fit.multiPolygonArea(polygonClipping.xor(mine, shape)) / perimeterOf(mine) * exportUtils.UPM
@@ -153,7 +154,8 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
     if (!bar) throw new Error('을의 ㅡ 획을 찾을 수 없습니다.')
     const xs = bar.stroke.points.map((point) => bar.box.x + point.x * bar.box.width)
     const ys = bar.stroke.points.map((point) => bar.box.y + point.y * bar.box.height)
-    const shift = (await import('../src/stores/layoutStore')).useLayoutStore.getState().globalPadding.left
+    // 글리프 원점은 몸통 왼쪽에서 왼 여백만큼 앞(`fontMetrics.hangulOriginX`). 화면 좌표를 OTF 잉크 좌표로 옮길 때 그만큼 뺀다.
+    const shift = metrics.hangulOriginX((await import('../src/stores/layoutStore')).useLayoutStore.getState().globalPadding)
     const midX = (Math.min(...xs) + Math.max(...xs)) / 2 + shift
     const midY = (Math.min(...ys) + Math.max(...ys)) / 2
     const across = inkSpanAt(otf, midX, midY, 'vertical')
@@ -266,7 +268,7 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
         expect(row.screenKind, row.char).toBe('boxes')
         expect(row.otfBoxes, row.char).toEqual(row.screenBoxes)
         expect(row.edgeDrift, row.char).toBeLessThan(1)
-        expect(row.data.advanceWidth, row.char).toBe(600)
+        expect(row.data.advanceWidth, row.char).toBe(metrics.hangulAdvance({ ...before, left: 0.2, right: 0.2 }))
         // 잉크의 가로 범위가 글자 폭 안에 든다(전에는 1000 기준 자리에 그대로 남아 옆 글자와 겹쳤다).
         const xs = row.otf.flatMap((polygon) => polygon[0].map(([x]) => x))
         expect(Math.min(...xs) - 0.2, row.char).toBeGreaterThanOrEqual(-0.02)

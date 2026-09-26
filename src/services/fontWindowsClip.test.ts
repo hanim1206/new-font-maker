@@ -1,6 +1,7 @@
 import * as opentype from 'opentype.js'
 import { describe, expect, it } from 'vitest'
 import { windowsClipMetrics } from './fontGenerator'
+import { WIN_METRICS } from './fontMetrics'
 
 function glyphSpanning(y1: number, y2: number) {
   const path = new opentype.Path()
@@ -13,13 +14,13 @@ function glyphSpanning(y1: number, y2: number) {
 }
 
 describe('윈도우 잘림 높이', () => {
-  it('잉크가 기본 높이 안이면 기본값 880/120', () => {
-    expect(windowsClipMetrics([glyphSpanning(-100, 860)])).toEqual({ usWinAscent: 880, usWinDescent: 120 })
+  it('잉크가 노토 줄 높이 안이면 노토 값(1160/288) — 맥 hhea와 같은 1.448em', () => {
+    expect(windowsClipMetrics([glyphSpanning(-100, 860)])).toEqual({ usWinAscent: WIN_METRICS.ascent, usWinDescent: WIN_METRICS.descent })
   })
 
   it('획을 위아래로 옮겨 넘친 잉크 끝까지 넓힌다', () => {
     const empty = new opentype.Glyph({ name: 'e', advanceWidth: 1000, path: new opentype.Path() })
-    expect(windowsClipMetrics([empty, glyphSpanning(-50, 896.4), glyphSpanning(-189.2, 500)]))
-      .toEqual({ usWinAscent: 897, usWinDescent: 190 })
+    expect(windowsClipMetrics([empty, glyphSpanning(-50, WIN_METRICS.ascent + 16.4), glyphSpanning(-(WIN_METRICS.descent + 69.2), 500)]))
+      .toEqual({ usWinAscent: WIN_METRICS.ascent + 17, usWinDescent: WIN_METRICS.descent + 70 })
   })
 })

@@ -20,15 +20,15 @@ import { stemBeakGroupOf, type StemBeakStyle } from './stemBeak'
 import type { GlobalStyle } from '../stores/globalStyleStore'
 import { decomposeSyllableWithOverrides } from '../utils/hangulUtils'
 import { resolveGlyphInkPrimitives } from './glyphInkResolver'
+import { hangulAdvance, hangulOriginX } from './fontMetrics'
 
 // ===== 상수 =====
 
-export const UPM = 1000
+export { UPM } from './fontMetrics'
+/** 캔버스 위 끝이 놓이는 폰트 y. 글리프 좌표 변환 기준. 줄 높이(hhea)는 `fontMetrics.LINE_METRICS`가 따로 든다. */
 export const ASCENDER = 880
 export const DESCENDER = -120
 export const DEFAULT_ADVANCE_WIDTH = 1000
-export const DEFAULT_SPACE_ADVANCE = 500
-export const DEFAULT_DESIGN_BODY_WIDTH = 0.85
 export const OS2_UNICODE_RANGE_1 = 0x00000001
 export const OS2_UNICODE_RANGE_2 = 0x01100000
 export const OS2_CODE_PAGE_RANGE_1 = 1 << 19
@@ -71,15 +71,6 @@ export type GlyphPlacementResolver = (
   schema: LayoutSchema,
   ends: { linecap: StrokeLinecap; linejoin: StrokeLinejoin },
 ) => GlyphInkPlacement
-
-export function calculateSpaceAdvance(padding: Padding): number {
-  const bodyWidth = 1 - padding.left - padding.right
-  return Math.round(DEFAULT_SPACE_ADVANCE * bodyWidth / DEFAULT_DESIGN_BODY_WIDTH)
-}
-
-export function getCurrentSpaceAdvance(): number {
-  return calculateSpaceAdvance(useLayoutStore.getState().globalPadding)
-}
 
 // ===== 실효 패딩 계산 (layoutStore L128-131 미러링) =====
 
@@ -176,12 +167,11 @@ export function collectGlyphDataWithPlacement(char: string, placementOf?: GlyphP
     horizontalInkBounds: { min: 0, max: 1 },
   })
 
-  // Design Body의 가로폭을 실제 조판 폭으로 사용하고, 좌측 inset을 글리프 원점으로 옮긴다.
-  const bodyWidth = 1 - effectivePadding.left - effectivePadding.right
-  const originX = effectivePadding.left
+  // 글자 폭과 원점은 노토 비율(왼 50 : 몸통 840 : 오른 30, `fontMetrics`). 몸통 왼쪽에서 왼 여백만큼 앞이 원점이다.
+  const originX = hangulOriginX(effectivePadding)
   const outputStrokes = projectCenterlinesToLegacyOtfStrokes(resolvedInk.primitives, originX)
   if (outputStrokes.length === 0) return null
-  const advanceWidth = Math.round(UPM * (bodyWidth + effectiveStyle.letterSpacing))
+  const advanceWidth = hangulAdvance(effectivePadding, effectiveStyle.letterSpacing)
 
   return {
     unicode: code,

@@ -22,8 +22,8 @@ import {
   OS2_CODE_PAGE_RANGE_1,
   OS2_UNICODE_RANGE_1,
   OS2_UNICODE_RANGE_2,
-  getCurrentSpaceAdvance,
 } from './fontExportUtils'
+import { LINE_METRICS, SPACE_ADVANCE, WIN_METRICS } from './fontMetrics'
 import { useGlobalStyleStore } from '../stores/globalStyleStore'
 import type { GlyphData, GlyphPlacementResolver } from './fontExportUtils'
 import { mergeStrokeContourGroupsForCff } from './contourBoolean'
@@ -454,16 +454,17 @@ export function buildFinalRegionPrototypeFontBuffer(
   const identity = createFontIdentity(familyName, 'Regular')
   const glyphs = [
     createNotdefGlyph(),
-    createSpaceGlyph(DEFAULT_ADVANCE_WIDTH / 2),
+    createSpaceGlyph(SPACE_ADVANCE),
     createFinalRegionGlyph(glyphData),
   ]
   const font = new opentype.Font({
     familyName: identity.asciiFamilyName,
     styleName: 'Regular',
     unitsPerEm: UPM,
-    ascender: ASCENDER,
-    descender: DESCENDER,
+    ascender: LINE_METRICS.ascender,
+    descender: LINE_METRICS.descender,
     glyphs,
+    tables: { os2: { sTypoAscender: ASCENDER, sTypoDescender: DESCENDER, sTypoLineGap: 0 } },
   })
   setFontNameRecords(font, familyName, 'Regular', identity)
   return font.toArrayBuffer() as ArrayBuffer
@@ -571,14 +572,14 @@ async function processInChunks<T, R>(
 }
 
 /**
- * 윈도우는 usWinAscent/usWinDescent 밖의 잉크를 잘라 그린다. 획을 위아래로 크게 옮긴 글자도 잘리지 않게
- * 실제 잉크 끝까지 넓힌다. 줄 간격(hhea · typo)은 그대로라 맥과 줄 높이는 바뀌지 않는다.
+ * 윈도우는 usWinAscent/usWinDescent 밖의 잉크를 잘라 그리고, 그 합을 줄 높이로 쓴다. 바닥은 노토(1160 / 288, `WIN_METRICS`)라
+ * 맥(hhea)과 같은 1.448em. 획을 위아래로 크게 옮긴 글자도 잘리지 않게 실제 잉크 끝까지 넓힌다.
  */
 export function windowsClipMetrics(
   glyphs: ReadonlyArray<InstanceType<typeof opentype.Glyph>>,
 ): { usWinAscent: number; usWinDescent: number } {
-  let yMax = ASCENDER
-  let yMin = DESCENDER
+  let yMax: number = WIN_METRICS.ascent
+  let yMin: number = -WIN_METRICS.descent
   for (const glyph of glyphs) {
     if (!glyph.path?.commands.length) continue
     const box = glyph.getBoundingBox()
@@ -642,7 +643,7 @@ export async function generateAndDownloadFont(
     // Phase 2: 글리프 변환 (획 → 윤곽)
     const glyphs: Array<InstanceType<typeof opentype.Glyph>> = [
       createNotdefGlyph(),
-      createSpaceGlyph(getCurrentSpaceAdvance()),
+      createSpaceGlyph(SPACE_ADVANCE),
     ]
 
     // 한 글자가 실패해도 폰트 전체를 버리지 않는다. 그 글자만 빈 글리프로 넣고 알린다(피드백 35).
@@ -681,8 +682,8 @@ export async function generateAndDownloadFont(
       familyName: asciiFamilyName,
       styleName,
       unitsPerEm: UPM,
-      ascender: ASCENDER,
-      descender: DESCENDER,
+      ascender: LINE_METRICS.ascender,
+      descender: LINE_METRICS.descender,
       glyphs: glyphs,
       weightClass: usWeightClass,
       widthClass: 5,       // Normal
@@ -768,7 +769,7 @@ export async function downloadPrototypeFont(
 
     const glyphs = [
       createNotdefGlyph(),
-      createSpaceGlyph(getCurrentSpaceAdvance()),
+      createSpaceGlyph(SPACE_ADVANCE),
       createGlyph(glyphData),
     ]
 
@@ -779,8 +780,8 @@ export async function downloadPrototypeFont(
       familyName: asciiFamilyName,
       styleName: 'Regular',
       unitsPerEm: UPM,
-      ascender: ASCENDER,
-      descender: DESCENDER,
+      ascender: LINE_METRICS.ascender,
+      descender: LINE_METRICS.descender,
       glyphs,
       tables: {
         os2: {

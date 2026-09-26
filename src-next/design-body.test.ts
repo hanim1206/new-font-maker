@@ -31,17 +31,19 @@ describe('Design Body', () => {
       setItem: (key: string, value: string) => memory.set(key, value),
       removeItem: (key: string) => memory.delete(key),
     })
-    const [{ collectGlyphDataForChar }, { useLayoutStore }] = await Promise.all([
+    const [{ collectGlyphDataForChar }, { useLayoutStore }, { hangulAdvance }] = await Promise.all([
       import('../src/services/fontExportUtils'),
       import('../src/stores/layoutStore'),
+      import('../src/services/fontMetrics'),
     ])
     const store = useLayoutStore.getState()
     const original = { ...store.globalPadding }
     try {
       const before = collectGlyphDataForChar('ㄱ')
-      store.setGlobalPadding(designBodyPaddingOfSize(600, 600, DEFAULT_FONT_SPACE))
+      const padding = designBodyPaddingOfSize(600, 600, DEFAULT_FONT_SPACE)
+      store.setGlobalPadding(padding)
       const glyph = collectGlyphDataForChar('ㄱ')
-      expect(glyph?.advanceWidth).toBe(600)
+      expect(glyph?.advanceWidth).toBe(hangulAdvance(padding))
       expect(glyph!.strokes[0].box.width).toBeLessThan(before!.strokes[0].box.width)
       expect(glyph!.strokes[0].box.height).toBeLessThan(before!.strokes[0].box.height)
     } finally {

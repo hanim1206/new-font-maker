@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { StrokeDataV2 } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { strokeToContours } from '../src/services/strokeToOutline'
+import { hangulOriginX } from '../src/services/fontMetrics'
 import type { FontGeneratorOptions } from '../src/services/fontGenerator'
 import baseJamos from '../src/data/baseJamos.json'
 
@@ -124,10 +125,19 @@ describe('OTF 출력 계약', () => {
     expect(OS2_CODE_PAGE_RANGE_1).toBe(1 << 19)
   })
 
-  it('글로벌 Design Body 가로폭 변화율을 스페이스 advance에 적용한다', async () => {
-    const { calculateSpaceAdvance } = await import('../src/services/fontExportUtils')
-    expect(calculateSpaceAdvance({ top: .075, right: .075, bottom: .075, left: .075 })).toBe(500)
-    expect(calculateSpaceAdvance({ top: .075, right: .2025, bottom: .075, left: .2025 })).toBe(350)
+  it('글자 폭 · 원점은 노토 비율(왼 50 : 몸통 840 : 오른 30)이고 몸통 폭에 비례한다', async () => {
+    const metrics = await import('../src/services/fontMetrics')
+    const { REFERENCE_BODY_PADDING } = await import('../src/services/designBodyPlacement')
+    // 기본 몸통(840)이면 노토와 같은 920, 원점은 몸통 왼쪽에서 왼 여백만큼 앞(캔버스 0).
+    expect(metrics.hangulAdvance(REFERENCE_BODY_PADDING)).toBe(metrics.NOTO_HANGUL_ADVANCE)
+    expect(metrics.hangulOriginX(REFERENCE_BODY_PADDING)).toBeCloseTo(0, 9)
+    // 몸통을 반으로 줄이면 폭도 반. 전역 자간은 폭에 더한다.
+    const half = { top: .05, bottom: .04, left: .05, right: 1 - .05 - metrics.NOTO_BODY_WIDTH / metrics.UPM / 2 }
+    expect(metrics.hangulAdvance(half)).toBe(metrics.NOTO_HANGUL_ADVANCE / 2)
+    expect(metrics.hangulOriginX(half)).toBeCloseTo(.05 - metrics.NOTO_LEFT_BEARING / metrics.UPM / 2, 9)
+    expect(metrics.hangulAdvance(half, .1)).toBe(metrics.NOTO_HANGUL_ADVANCE / 2 + 100)
+    // 공백은 몸통을 따르지 않는다.
+    expect(metrics.SPACE_ADVANCE).toBe(220)
   })
 
   it('한글 폰트 이름마다 고유한 PostScript 이름을 만든다', async () => {
@@ -251,7 +261,7 @@ describe('OTF 출력 계약', () => {
       expect(output.effectiveLinejoin).toBe(primitive.effectiveLinejoin)
       expect(primitive.weightMultiplier).toBe(glyph.weightMultiplier)
       expect(output.box).not.toBe(primitive.box)
-      expect(output.box.x).toBeCloseTo(primitive.box.x - effectivePadding.left)
+      expect(output.box.x).toBeCloseTo(primitive.box.x - hangulOriginX(effectivePadding))
       expect(output.box.y).toBe(primitive.box.y)
       expect(output.box.width).toBe(primitive.box.width)
       expect(output.box.height).toBe(primitive.box.height)
