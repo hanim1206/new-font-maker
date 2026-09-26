@@ -436,7 +436,7 @@ const GROUP_GAP = 28
  * 묶기는 주소 `?group=`에 둔다 — 새로고침 · 편집기에서 `‹`로 돌아와도 남는다. 칩을 바꿀 땐 기록을 쌓지 않고 주소만 고친다.
  * 카드 19장은 한 번만 만들고(key = 글자) 묶기가 바뀌면 자리만 옮긴다 — 절대좌표 + transform 전환이라 글자를 다시 그리지 않는다.
  * 카드 탭 = 도마에 담기 · 빼기, 소제목 = 전체 선택 체크(더하기 · 그 묶음만 빼기, 전부 담겼을 때만 ✔),
- * 아래 칩 탭 = 빼기, 휴지통 = 비우기, `편집 n` = 도마를 들고 편집기로. 담기 · 빼기는 여기서만 한다.
+ * 아래 칩 탭 = 빼기, 휴지통 = 비우기, `n개 고치기` = 도마를 들고 편집기로. 담기 · 빼기는 여기서만 한다.
  */
 function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] }) {
   const jamos = useJamoStore((state) => state[type])
@@ -503,20 +503,22 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
     observer.observe(element)
     return () => observer.disconnect()
   }, [])
-  // 도마 칩 줄은 쌓이며 높이가 바뀐다. 안쪽 높이를 재서 바깥에 px로 준다 — auto는 전환이 안 먹는다.
+  // 도마 칩 줄은 한 줄 가로 스크롤. 오른쪽에 가려진 칩이 있으면 끝을 흐린다.
   const benchInner = useRef<HTMLDivElement>(null)
-  const [benchHeight, setBenchHeight] = useState<number | null>(null)
+  const [benchMore, setBenchMore] = useState(false)
   useLayoutEffect(() => {
-    const element = benchInner.current
-    if (!element) return
-    const measure = () => setBenchHeight(element.offsetHeight)
+    const scroller = benchInner.current?.parentElement
+    if (!scroller) return
+    const measure = () => setBenchMore(scroller.scrollLeft + scroller.clientWidth < scroller.scrollWidth - 1)
     measure()
+    scroller.addEventListener('scroll', measure, { passive: true })
     const observer = new ResizeObserver(measure)
-    observer.observe(element)
-    return () => observer.disconnect()
+    observer.observe(scroller)
+    observer.observe(benchInner.current!)
+    return () => { scroller.removeEventListener('scroll', measure); observer.disconnect() }
   }, [])
-  // 칩 움직임. 새 칩은 차례로 떠오르고, 자리가 바뀐 칩은 옛 자리에서 미끄러져 온다(FLIP). 높이 전환과 같은 박자.
-  // 홈에 들어올 때 이미 담긴 칩은 가만히 둔다.
+  // 칩 움직임. 새 칩은 차례로 떠오르고, 자리가 바뀐 칩은 옛 자리에서 미끄러져 온다(FLIP).
+  // 카드 하나를 담아 새 칩이 줄 밖에 붙으면 거기까지 스크롤한다. 묶음으로 여럿 담을 땐 제자리. 홈에 들어올 때 이미 담긴 칩은 가만히 둔다.
   const chipSpots = useRef<Map<string, { x: number; y: number }> | null>(null)
   useLayoutEffect(() => {
     const root = benchInner.current
@@ -524,15 +526,20 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
     const still = chipSpots.current === null || window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const spots = new Map<string, { x: number; y: number }>()
     let fresh = 0
+    let reach = 0
+    let added = 0
     root.querySelectorAll<HTMLElement>('[data-chip]').forEach((chip) => {
       const spot = { x: chip.offsetLeft, y: chip.offsetTop }
       spots.set(chip.dataset.chip!, spot)
+      if (chipSpots.current !== null && !chipSpots.current.has(chip.dataset.chip!) && chip.dataset.chip !== '__group') { added += 1; reach = chip.offsetLeft + chip.offsetWidth }
       if (still) return
       const before = chipSpots.current?.get(chip.dataset.chip!)
       if (!before) chip.animate([{ opacity: 0, transform: 'translateY(8px) scale(0.7)' }, { opacity: 1, transform: 'none' }], { duration: 260, delay: Math.min(fresh++, 12) * 18, easing: 'cubic-bezier(0.2, 0, 0, 1)', fill: 'backwards' })
       else if (before.x !== spot.x || before.y !== spot.y) chip.animate([{ transform: `translate(${before.x - spot.x}px, ${before.y - spot.y}px)` }, { transform: 'none' }], { duration: 260, easing: 'cubic-bezier(0.2, 0, 0, 1)' })
     })
     chipSpots.current = spots
+    const scroller = root.parentElement
+    if (scroller && added === 1 && reach > scroller.scrollLeft + scroller.clientWidth) scroller.scrollTo({ left: reach - scroller.clientWidth, behavior: still ? 'auto' : 'smooth' })
   }, [benchChars, benchType])
   const cell = width > 0 ? (width - HOME_PAD * 2 - HOME_GAP * (HOME_COLUMNS - 1)) / HOME_COLUMNS : 0
   const layout = useMemo(() => {
@@ -588,15 +595,15 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
         </button>)}
       </div>
     </div>
-    {/* 도마 상태 · 편집 입구. 길어지면 칩이 줄바꿈으로 쌓이고, 단추는 오른쪽 아래에 붙는다. 도마가 비면 단추도 잠긴다. */}
+    {/* 도마 상태 · 편집 입구. 칩은 왼쪽 한 줄(넘치면 가로 스크롤), 단추는 오른쪽에 고정. 도마가 비면 단추도 잠긴다. */}
     <footer className={styles.bench}>
-      <div className={styles.benchChips} style={benchHeight === null ? undefined : { height: benchHeight }}><div ref={benchInner} aria-label="도마">
+      <div className={styles.benchChips} data-more={benchMore || undefined}><div ref={benchInner} aria-label="도마">
         {benchCount === 0 ? <em>카드나 묶음을 눌러 도마에 올리세요</em> : benchChars.map((char) => <button key={char} type="button" data-chip={char} aria-label={`${char} 도마에서 빼기`} onClick={() => toggle(type, char)}>{char}</button>)}
         {/* 도마가 이미 있는 묶음과 같으면 그 이름을 칩 끝에 보인다. */}
         {benchGroup && <span key="group" data-chip="__group" className={styles.benchGroupName}>{benchGroup.name}</span>}
       </div></div>
       {benchCount > 0 && <button type="button" className={styles.benchClear} aria-label="도마 비우기" onClick={clear}><Trash2 size={18} aria-hidden="true" /></button>}
-      <button type="button" className={styles.benchGo} disabled={benchCount === 0} onClick={() => openEditor(type, benchChars)}>편집 {benchCount}</button>
+      <button type="button" className={styles.benchGo} disabled={benchCount === 0} onClick={() => openEditor(type, benchChars)}>{/* 숫자가 바뀔 때마다 새로 떠오른다 — key가 바뀌면 애니메이션이 다시 돈다. */}<span key={benchCount} className={styles.benchCount}>{benchCount}</span>개 고치기</button>
     </footer>
     {toast && <div className={styles.toast} role="status">{toast.text}<button type="button" onClick={() => { toast.undo(); setToast(null) }}>되돌리기</button></div>}
     {sheet && <GroupSheet
