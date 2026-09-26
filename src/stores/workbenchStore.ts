@@ -5,7 +5,7 @@ import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../data/Hangul'
 
 /**
  * 도마. 편집기로 들고 들어가는 자소 묶음 — 폰트당 하나, 이름 없음.
- * 섹션 홈에서 묶음을 올리거나 카드로 빼고 넣고, 대시보드 자소 카드는 그 자소 하나만 올린다. 둘 다 들어갈 때 도마를 교체한다.
+ * 섹션 홈에서 묶음을 체크해 더하고 빼거나 카드로 빼고 넣고, 대시보드 자소 카드는 그 자소 하나만 올린다. 둘 다 들어갈 때 도마를 교체한다.
  * 편집기 머리 아래 칩 줄이 이 저장소를 읽고, 칩은 자소 전환만 한다(담기 · 빼기는 홈에서만).
  * 플랜: docs/plans/2026-09-26_섹션-홈과-도마.md
  */
@@ -25,6 +25,10 @@ interface WorkbenchActions {
   place: (type: WorkbenchJamoType, chars: readonly string[], returnTo?: string | null) => void
   /** 돌아갈 곳을 꺼내고 비운다. */
   takeReturnTo: () => string | null
+  /** 묶음 담기(소제목 체크). 도마에 더한다. 다른 종류의 자소면 도마를 그 묶음으로 바꾼다. */
+  add: (type: WorkbenchJamoType, chars: readonly string[]) => void
+  /** 묶음 빼기(소제목 체크 해제). 그 글자들만 빠지고 다른 묶음에서 온 건 남는다. */
+  remove: (type: WorkbenchJamoType, chars: readonly string[]) => void
   /** 카드 하나 담기 · 빼기. 다른 종류의 자소면 도마를 그 하나로 바꾼다. */
   toggle: (type: WorkbenchJamoType, char: string) => void
   clear: () => void
@@ -77,6 +81,20 @@ export const useWorkbenchStore = create<WorkbenchState & WorkbenchActions>()(
         if (to !== null) set((state) => { state.returnTo = null })
         return to
       },
+
+      add: (type, chars) =>
+        set((state) => {
+          const next = sorted(type, state.type === type ? [...state.chars, ...chars] : chars)
+          state.type = next.length ? type : null
+          state.chars = next
+        }),
+
+      remove: (type, chars) =>
+        set((state) => {
+          if (state.type !== type) return
+          state.chars = state.chars.filter((c) => !chars.includes(c))
+          if (!state.chars.length) state.type = null
+        }),
 
       toggle: (type, char) =>
         set((state) => {

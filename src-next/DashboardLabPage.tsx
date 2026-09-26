@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, Copy, Download, Ellipsis, Layers, PencilLine, Plus, ScanSearch, Trash2, UserRound } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Copy, Download, Ellipsis, PencilLine, Plus, ScanSearch, Trash2, UserRound } from 'lucide-react'
 import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../src/data/Hangul'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { useEffectiveGlobalStyle, useGlobalStyleStore } from '../src/stores/globalStyleStore'
@@ -310,7 +310,8 @@ type Grouping = { id: string; label: string; groups: (chars: readonly string[], 
 const DOUBLE = new Set(['ㄲ', 'ㄸ', 'ㅃ', 'ㅆ', 'ㅉ'])
 const WITH_BBICHIM = new Set(['ㄱ', 'ㄲ', 'ㅅ', 'ㅆ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ'])
 const ROUND = new Set(['ㅇ', 'ㅎ'])
-const ALL: Grouping = { id: 'all', label: '전체', groups: (chars) => [{ label: null, chars: [...chars] }] }
+// `전체`도 소제목을 둔다 — 그래야 전체 선택이 된다. 중성 · 종성은 묶기가 이것 하나다.
+const ALL: Grouping = { id: 'all', label: '전체', groups: (chars) => [{ label: '전체', chars: [...chars] }] }
 const BY_STEM: Grouping = {
   id: 'stem', label: '줄기', groups: (chars) => [
     { label: '가로 · 세로줄기만', chars: chars.filter((c) => !WITH_BBICHIM.has(c) && !ROUND.has(c)) },
@@ -343,21 +344,23 @@ const GROUPINGS: Record<JamoType, Grouping[]> = {
 const HOME_COLUMNS = 4
 const HOME_GAP = 6
 const HOME_PAD = 12
-const GROUP_HEAD = 30
-const GROUP_GAP = 14
+const GROUP_HEAD = 44
+const GROUP_GAP = 28
 
 /**
  * 섹션 홈 페이지(`/dashboard/choseong` · `jungseong` · `jongseong`). 위는 뒤로 · 제목, 그 아래 묶기 칩 한 줄, 그 아래 4열 판.
  * 묶기는 주소 `?group=`에 둔다 — 새로고침 · 편집기에서 `‹`로 돌아와도 남는다. 칩을 바꿀 땐 기록을 쌓지 않고 주소만 고친다.
  * 카드 19장은 한 번만 만들고(key = 글자) 묶기가 바뀌면 자리만 옮긴다 — 절대좌표 + transform 전환이라 글자를 다시 그리지 않는다.
- * 카드 탭 = 도마에 담기 · 빼기, 소제목 탭 = 그 묶음을 도마에(교체), 아래 `편집 n` = 도마를 들고 편집기로. 담기 · 빼기는 여기서만 한다.
+ * 카드 탭 = 도마에 담기 · 빼기, 소제목 = 전체 선택 체크(더하기 · 그 묶음만 빼기, 전부 담겼을 때만 ✔),
+ * 아래 칩 탭 = 빼기, 휴지통 = 비우기, `편집 n` = 도마를 들고 편집기로. 담기 · 빼기는 여기서만 한다.
  */
 function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] }) {
-  const isJamoModified = useJamoStore((state) => state.isJamoModified)
   const jamos = useJamoStore((state) => state[type])
   const benchType = useWorkbenchStore((state) => state.type)
   const benchChars = useWorkbenchStore((state) => state.chars)
-  const place = useWorkbenchStore((state) => state.place)
+  const add = useWorkbenchStore((state) => state.add)
+  const remove = useWorkbenchStore((state) => state.remove)
+  const clear = useWorkbenchStore((state) => state.clear)
   const toggle = useWorkbenchStore((state) => state.toggle)
   const onBench = (char: string) => benchType === type && benchChars.includes(char)
   const benchCount = benchType === type ? benchChars.length : 0
@@ -389,6 +392,37 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
     observer.observe(element)
     return () => observer.disconnect()
   }, [])
+  // 도마 칩 줄은 쌓이며 높이가 바뀐다. 안쪽 높이를 재서 바깥에 px로 준다 — auto는 전환이 안 먹는다.
+  const benchInner = useRef<HTMLDivElement>(null)
+  const [benchHeight, setBenchHeight] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    const element = benchInner.current
+    if (!element) return
+    const measure = () => setBenchHeight(element.offsetHeight)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+  // 칩 움직임. 새 칩은 차례로 떠오르고, 자리가 바뀐 칩은 옛 자리에서 미끄러져 온다(FLIP). 높이 전환과 같은 박자.
+  // 홈에 들어올 때 이미 담긴 칩은 가만히 둔다.
+  const chipSpots = useRef<Map<string, { x: number; y: number }> | null>(null)
+  useLayoutEffect(() => {
+    const root = benchInner.current
+    if (!root) return
+    const still = chipSpots.current === null || window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const spots = new Map<string, { x: number; y: number }>()
+    let fresh = 0
+    root.querySelectorAll<HTMLElement>('[data-chip]').forEach((chip) => {
+      const spot = { x: chip.offsetLeft, y: chip.offsetTop }
+      spots.set(chip.dataset.chip!, spot)
+      if (still) return
+      const before = chipSpots.current?.get(chip.dataset.chip!)
+      if (!before) chip.animate([{ opacity: 0, transform: 'translateY(8px) scale(0.7)' }, { opacity: 1, transform: 'none' }], { duration: 260, delay: Math.min(fresh++, 12) * 18, easing: 'cubic-bezier(0.2, 0, 0, 1)', fill: 'backwards' })
+      else if (before.x !== spot.x || before.y !== spot.y) chip.animate([{ transform: `translate(${before.x - spot.x}px, ${before.y - spot.y}px)` }, { transform: 'none' }], { duration: 260, easing: 'cubic-bezier(0.2, 0, 0, 1)' })
+    })
+    chipSpots.current = spots
+  }, [benchChars, benchType])
   const cell = width > 0 ? (width - HOME_PAD * 2 - HOME_GAP * (HOME_COLUMNS - 1)) / HOME_COLUMNS : 0
   const layout = useMemo(() => {
     const cards = new Map<string, { x: number; y: number }>()
@@ -417,22 +451,23 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
       <div ref={board} className={styles.board} style={{ height: layout.height }}>
         {layout.heads.map(({ label, y }) => {
           const group = groups.find((g) => g.label === label)
-          const whole = group ? group.chars.every(onBench) && benchCount === group.chars.length : false
-          return <button key={label} type="button" className={styles.groupHead} style={{ transform: `translateY(${y}px)` }} aria-pressed={whole} onClick={() => group && place(type, group.chars)}>{label}<Layers size={13} aria-hidden="true" /></button>
+          const whole = group ? group.chars.every(onBench) : false
+          return <button key={label} type="button" className={styles.groupHead} style={{ transform: `translateY(${y}px)` }} role="checkbox" aria-checked={whole} onClick={() => group && (whole ? remove : add)(type, group.chars)}><span className={styles.check} aria-hidden="true"><Check size={14} strokeWidth={3} /></span>{label}</button>
         })}
         {cell > 0 && chars.map((char) => {
           const at = layout.cards.get(char)
-          return <button key={char} type="button" className={styles.homeCard} style={{ width: cell, height: cell, transform: at ? `translate(${at.x}px, ${at.y}px)` : undefined }} aria-label={`${char} 도마에 ${onBench(char) ? '빼기' : '담기'}`} aria-pressed={onBench(char)} data-modified={isJamoModified(type, char) || undefined} onClick={() => toggle(type, char)}>
+          return <button key={char} type="button" className={styles.homeCard} style={{ width: cell, height: cell, transform: at ? `translate(${at.x}px, ${at.y}px)` : undefined }} aria-label={`${char} 도마에 ${onBench(char) ? '빼기' : '담기'}`} aria-pressed={onBench(char)} onClick={() => toggle(type, char)}>
             <span className={styles.inkSmall}><AppGlyph char={char} size={52} upright /></span>
           </button>
         })}
       </div>
     </div>
-    {/* 도마 상태 · 편집 입구. 도마가 비면 단추도 잠긴다. */}
+    {/* 도마 상태 · 편집 입구. 길어지면 칩이 줄바꿈으로 쌓이고, 단추는 오른쪽 아래에 붙는다. 도마가 비면 단추도 잠긴다. */}
     <footer className={styles.bench}>
-      <div className={styles.benchChips} aria-label="도마">
-        {benchCount === 0 ? <em>카드나 묶음을 눌러 도마에 올리세요</em> : benchChars.map((char) => <span key={char}>{char}</span>)}
-      </div>
+      <div className={styles.benchChips} style={benchHeight === null ? undefined : { height: benchHeight }}><div ref={benchInner} aria-label="도마">
+        {benchCount === 0 ? <em>카드나 묶음을 눌러 도마에 올리세요</em> : benchChars.map((char) => <button key={char} type="button" data-chip={char} aria-label={`${char} 도마에서 빼기`} onClick={() => toggle(type, char)}>{char}</button>)}
+      </div></div>
+      <button type="button" className={styles.benchClear} aria-label="도마 비우기" disabled={benchCount === 0} onClick={clear}><Trash2 size={18} aria-hidden="true" /></button>
       <button type="button" className={styles.benchGo} disabled={benchCount === 0} onClick={() => openEditor(type, benchChars)}>편집 {benchCount}</button>
     </footer>
   </div>

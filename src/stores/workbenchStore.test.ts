@@ -22,6 +22,22 @@ describe('도마', () => {
     expect(useWorkbenchStore.getState()).toMatchObject({ type: null, chars: [] })
   })
 
+  it('묶음은 더하고 빼며, 빼면 그 묶음 글자만 빠진다', () => {
+    const { add, remove } = useWorkbenchStore.getState()
+    add('choseong', ['ㄲ', 'ㄸ'])
+    add('choseong', ['ㅇ', 'ㅎ'])
+    expect(useWorkbenchStore.getState().chars).toEqual(['ㄲ', 'ㄸ', 'ㅇ', 'ㅎ'])
+    useWorkbenchStore.getState().toggle('choseong', 'ㄸ')
+    remove('choseong', ['ㄲ', 'ㄸ'])
+    expect(useWorkbenchStore.getState().chars).toEqual(['ㅇ', 'ㅎ'])
+    remove('jungseong', ['ㅇ'])
+    expect(useWorkbenchStore.getState().chars).toEqual(['ㅇ', 'ㅎ'])
+    add('jungseong', ['ㅗ'])
+    expect(useWorkbenchStore.getState()).toMatchObject({ type: 'jungseong', chars: ['ㅗ'] })
+    remove('jungseong', ['ㅗ'])
+    expect(useWorkbenchStore.getState()).toMatchObject({ type: null, chars: [] })
+  })
+
   it('돌아갈 곳은 편집기로 들고 갈 때만 바뀌고, 한 번 꺼내면 비운다', () => {
     const store = useWorkbenchStore.getState()
     store.place('choseong', ['ㄱ', 'ㅅ'], '/dashboard/choseong?group=stem')

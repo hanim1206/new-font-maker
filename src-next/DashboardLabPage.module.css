@@ -114,7 +114,7 @@
 .homeScroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
 
 /* 묶기 칩 한 줄. 켜진 칩만 검정. */
-.chips { display: flex; gap: 6px; padding: 12px 12px 14px; overflow-x: auto; scrollbar-width: none; }
+.chips { display: flex; gap: 6px; padding: 12px 12px 20px; overflow-x: auto; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
 .chips button { flex: none; min-height: 34px; padding: 0 13px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 700; transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard); }
 .chips button[aria-selected='true'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
@@ -122,23 +122,29 @@
 /* 판. 카드와 소제목은 전부 절대좌표, 자리는 transform으로 옮긴다. */
 .board { position: relative; transition: height var(--motion-slow) var(--ease-standard); }
 /* 소제목은 단추 — 누르면 그 묶음이 통째로 도마에 오른다. 도마와 같으면 검정. */
-.groupHead { position: absolute; top: 0; left: 8px; height: 30px; display: inline-flex; align-items: center; gap: 4px; padding: 0 6px 4px 4px; border: 0; background: transparent; color: rgb(var(--color-text-4)); font-size: 12px; font-weight: 700; transition: transform var(--motion-slow) var(--ease-standard), color var(--motion-normal) var(--ease-standard); animation: fadeIn var(--motion-normal) var(--ease-standard); }
-.groupHead svg { color: rgb(var(--color-text-6)); }
-.groupHead[aria-pressed='true'] { color: rgb(var(--color-foreground)); }
-.groupHead[aria-pressed='true'] svg { color: rgb(var(--color-foreground)); }
+.groupHead { position: absolute; top: 0; left: 8px; height: 44px; display: inline-flex; align-items: center; gap: 10px; padding: 0 8px 8px 4px; border: 0; background: transparent; color: rgb(var(--color-text-3)); font-size: 15px; font-weight: 700; transition: transform var(--motion-slow) var(--ease-standard), color var(--motion-normal) var(--ease-standard); animation: fadeIn var(--motion-normal) var(--ease-standard); }
+.groupHead[aria-checked='true'] { color: rgb(var(--color-foreground)); }
+/* 토스식 원형 체크 — 꺼져도 회색 원에 흰 체크, 켜지면 채운다. */
+.check { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-surface)); transition: background-color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
+.groupHead[aria-checked='true'] .check { background: rgb(var(--color-foreground)); }
+.groupHead:active .check { transform: scale(0.9); }
 /* 카드 탭 = 담기 · 빼기. 도마에 오른 카드는 테두리가 검정. */
-.homeCard { position: absolute; top: 0; left: 0; display: grid; place-items: center; border: 0; border-radius: 12px; background: rgb(var(--color-surface-2)); box-shadow: inset 0 0 0 0 rgb(var(--color-foreground)); transition: transform var(--motion-slow) var(--ease-standard), width var(--motion-slow) var(--ease-standard), height var(--motion-slow) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard); }
-.homeCard[aria-pressed='true'] { box-shadow: inset 0 0 0 2px rgb(var(--color-foreground)); }
-.homeCard[data-modified]::after { content: ''; position: absolute; top: 8px; right: 8px; width: 6px; height: 6px; border-radius: 999px; background: rgb(var(--color-foreground)); }
+.homeCard { position: absolute; top: 0; left: 0; display: grid; place-items: center; border: 0; border-radius: 12px; background: rgb(var(--color-surface-3)); transition: transform var(--motion-slow) var(--ease-standard), width var(--motion-slow) var(--ease-standard), height var(--motion-slow) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard); }
+/* 바탕은 그대로, 담긴 카드만 잉크가 진해진다. */
+.homeCard svg { opacity: 0.12; transition: opacity var(--motion-fast) var(--ease-standard); }
+.homeCard[aria-pressed='true'] svg { opacity: 1; }
 
 /* 도마 줄. 홈 맨 아래 고정 — 왼쪽은 올라온 자소, 오른쪽은 `편집 n`. */
-.bench { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 12px calc(env(safe-area-inset-bottom) + 10px); border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
-.benchChips { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; }
-.benchChips span { min-width: 26px; height: 26px; display: inline-grid; place-items: center; padding: 0 4px; border-radius: 8px; background: rgb(var(--color-surface-2)); font-size: 13px; font-weight: 700; }
-.benchChips em { color: rgb(var(--color-text-5)); font-size: 12px; font-style: normal; }
+.bench { flex: none; display: flex; align-items: flex-end; gap: 10px; padding: 10px 12px calc(env(safe-area-inset-bottom) + 10px); border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
+.benchChips { flex: 1; min-width: 0; overflow: hidden; transition: height var(--motion-slow) var(--ease-standard); }
+.benchChips > div { position: relative; min-height: 40px; display: flex; flex-wrap: wrap; align-content: center; align-items: center; gap: 4px; }
+.benchChips button { min-width: 26px; height: 26px; display: inline-grid; place-items: center; padding: 0 4px; border: 0; border-radius: 8px; background: rgb(var(--color-surface-2)); color: inherit; font-size: 13px; font-weight: 700; }
+.benchChips em { color: rgb(var(--color-text-5)); font-size: 12px; font-style: normal; animation: fadeIn var(--motion-normal) var(--ease-standard); }
+.benchClear { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-text-4)); }
+.benchClear:disabled { color: rgb(var(--color-text-6)); }
 .benchGo { flex: none; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .benchGo:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
 @keyframes fadeIn { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .home, .board, .groupHead, .homeCard { transition: none; animation: none; } }
+@media (prefers-reduced-motion: reduce) { .home, .board, .groupHead, .homeCard, .benchChips { transition: none; animation: none; } }
 .picto { display: block; width: 52px; height: 52px; }
 .picto svg { display: block; width: 100%; height: 100%; }
