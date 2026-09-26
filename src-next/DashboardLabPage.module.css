@@ -31,7 +31,7 @@
 .accountFacts dd { margin: 0; font-weight: 650; }
 .head .signOut { min-height: 40px; width: 100%; border-radius: 10px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 13px; font-weight: 700; }
 
-.scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 /* 다른 폰트로 옮겨 가는 중. 판을 흐리고 막는다 — 다시 열리면 `index.html` 뼈대가 이어받는다. */
 .scroll[data-moving] { opacity: .35; pointer-events: none; transition: opacity var(--motion-normal) var(--ease-standard); }
 
@@ -82,11 +82,14 @@
 .download[data-armed] { gap: 6px; padding: 0 14px 0 12px; background: rgb(var(--color-primary)); }
 .download[data-armed] span { max-width: 80px; opacity: 1; }
 
-/* 왼쪽 레일 + 내용. 레일은 회색 길 위 흰 알약, 스크롤에 붙어 따라온다. */
-.body { display: flex; align-items: flex-start; border-top: 1px solid rgb(var(--color-border-subtle)); }
-.rail { position: sticky; top: 0; flex: 0 0 92px; display: flex; flex-direction: column; gap: 2px; padding: 10px 6px; background: rgb(var(--color-surface-2)); min-height: calc(100dvh - 50px); }
-.rail button { min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-4)); font-size: 13.5px; font-weight: 700; }
-.railLink { margin-top: 18px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+/* 왼쪽 레일 + 내용. 레일은 회색 길 위 흰 알약, 스크롤에 붙어 따라온다.
+   회색 길은 `.body` 배경이 바닥까지 칠하고, 레일은 버튼 높이만 — 레일이 화면만큼 크면 바닥에서 밀려 올라간다. 바닥 여백도 `.body` 안에. */
+.body { display: flex; align-items: flex-start; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); border-top: 1px solid rgb(var(--color-border-subtle)); background: linear-gradient(to right, rgb(var(--color-surface-2)) 92px, transparent 92px); }
+.rail { position: sticky; top: 0; flex: 0 0 92px; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--space-1); padding: 6px var(--space-2); }
+.rail button { min-height: 38px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-4)); font-size: 13.5px; font-weight: 700; }
+.railLink { position: relative; margin-top: 18px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+/* 섹션 목차와 검수(다른 화면) 사이 회색 선. */
+.railLink::before { content: ''; position: absolute; top: -10px; left: 6px; right: 6px; border-top: 1px solid rgb(var(--color-border)); }
 .rail button[aria-current='true'] { background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); box-shadow: var(--shadow-sm); }
 .content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .content section { padding: 6px 12px 18px; }

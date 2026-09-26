@@ -26,7 +26,7 @@ import styles from './DashboardLabPage.module.css'
 /**
  * 대시보드(`/dashboard`). 지금 연 폰트의 한눈 화면 — 셸 머리 `‹ 내 폰트`가 여기로 오고, 내 폰트 목록에서 폰트를 고르면 여기부터.
  * 2026-09-26 사용자 스케치를 앱 부품 · 토큰으로 옮긴 것. 위는 폰트 카드(지금 폰트 하나 + `새 폰트` → 내 폰트 목록), 아래는 왼쪽 레일(목차 · 스크롤 따라감) + 섹션 다섯.
- * 순서는 원칙 "큰 것부터 작은 것": 스타일 → 레이아웃 → 초성 → 중성 → 종성. 전체 목록이고, 손댄 자소는 점.
+ * 순서: 스타일 → 초성 → 중성 → 종성 → 레이아웃(2026-09-27 사용자 요청으로 레이아웃을 뒤로). 전체 목록이고, 손댄 자소는 점.
  * 초 · 중 · 종은 요약 줄이고 화살표가 섹션 홈, 자소 카드는 그 자소 하나만 도마에 올려 자모 에디터로 간다.
  * 아직 시안인 것: 카드의 이름 바꾸기 · 다운로드 · 메뉴, 스타일 타일 · 레이아웃 카드 탭. 파일 이름은 옛 랩 이름 그대로다.
  */
@@ -34,10 +34,10 @@ import styles from './DashboardLabPage.module.css'
 type SectionId = 'style' | 'layout' | 'choseong' | 'jungseong' | 'jongseong'
 const SECTIONS: { id: SectionId; label: string }[] = [
   { id: 'style', label: '스타일' },
-  { id: 'layout', label: '레이아웃' },
   { id: 'choseong', label: '초성' },
   { id: 'jungseong', label: '중성' },
   { id: 'jongseong', label: '종성' },
+  { id: 'layout', label: '레이아웃' },
 ]
 /** 레이아웃 6칸 대표 글자 — 세로홀자 · 가로홀자 · 섞임홀자 × 받침 유무. */
 const LAYOUT_SAMPLES = ['래', '노', '화', '별', '을', '원'] as const
@@ -839,22 +839,30 @@ export function DashboardLabPage() {
   const scroller = useRef<HTMLDivElement>(null)
   const sections = useRef<Partial<Record<SectionId, HTMLElement | null>>>({})
 
+  // 목차로 뛴 섹션. 뒤쪽 섹션은 짧아서 40% 지점까지 못 올라오니, 손으로 스크롤하기 전까지 누른 것을 켜 둔다.
+  const pinned = useRef<SectionId | null>(null)
+
   // 스크롤 위치에서 지금 섹션을 고른다 — 화면 40% 지점을 덮는 섹션. 머리선 기준이면 긴 섹션이 다음 머리를 지나서도 켜져 있다.
+  // 바닥까지 내리면 마지막 섹션.
   const onScroll = () => {
     const root = scroller.current
-    if (!root) return
+    if (!root || pinned.current) return
     const line = root.offsetTop + root.scrollTop + root.clientHeight * 0.4
     let current: SectionId = 'style'
     for (const { id } of SECTIONS) {
       const element = sections.current[id]
       if (element && element.offsetTop <= line) current = id
     }
+    if (root.scrollTop + root.clientHeight >= root.scrollHeight - 2) current = SECTIONS[SECTIONS.length - 1].id
     setActive(current)
   }
+  const unpin = () => { pinned.current = null }
   const jump = (id: SectionId) => {
     const root = scroller.current
     const element = sections.current[id]
     if (!root || !element) return
+    pinned.current = id
+    setActive(id)
     root.scrollTo({ top: element.offsetTop - root.offsetTop, behavior: 'smooth' })
   }
 
@@ -870,7 +878,7 @@ export function DashboardLabPage() {
         <AccountMenu fontCount={fontList.fonts?.length ?? null} />
       </header>
 
-      <div ref={scroller} className={styles.scroll} onScroll={onScroll} data-moving={fontList.movingTo !== null || undefined} aria-busy={fontList.movingTo !== null || undefined}>
+      <div ref={scroller} className={styles.scroll} onScroll={onScroll} onWheel={unpin} onTouchStart={unpin} onPointerDown={unpin} onKeyDown={unpin} data-moving={fontList.movingTo !== null || undefined} aria-busy={fontList.movingTo !== null || undefined}>
         {/* 지금 폰트 카드 하나. 다른 폰트는 머리 알약 시트에서. */}
         <div className={styles.fontCardRow}>
           <FontCard name={name} note={modified > 0 ? '마지막 고침 · 오늘' : '마지막 고침 · 오늘 · 프리셋 그대로'} onRename={fontList.renameCurrent} onDelete={fontList.removeCurrent} />
@@ -894,17 +902,6 @@ export function DashboardLabPage() {
               </ul>
             </section>
 
-            <section ref={(el) => { sections.current.layout = el }}>
-              <SectionHead title="레이아웃" count={6} onClick={() => navigate('/workspace/jamo')} testId="dashboard-layout" />
-              <ul className={styles.grid}>
-                {LAYOUT_SAMPLES.map((char) => <li key={char}>
-                  <button type="button" className={styles.thumb} aria-label={`${char} 레이아웃`} onClick={() => navigate(`/workspace/jamo?char=${encodeURIComponent(char)}`)}>
-                    <Lazy className={styles.ink}><LayoutThumb char={char} size={72} /></Lazy>
-                  </button>
-                </li>)}
-              </ul>
-            </section>
-
             {/* 초·중·종은 요약 줄만. 전체 격자와 묶기는 섹션 홈으로 갔다. 레이아웃 6장은 여기서 바로 에디터로. */}
             <section ref={(el) => { sections.current.choseong = el }}>
               <SectionHead title="초성" count={CHOSEONG_LIST.length} onClick={() => navigate('/dashboard/choseong')} />
@@ -917,6 +914,17 @@ export function DashboardLabPage() {
             <section ref={(el) => { sections.current.jongseong = el }}>
               <SectionHead title="종성" count={FINALS.length} onClick={() => navigate('/dashboard/jongseong')} />
               <JamoPreview type="jongseong" chars={FINALS} />
+            </section>
+
+            <section ref={(el) => { sections.current.layout = el }}>
+              <SectionHead title="레이아웃" count={6} onClick={() => navigate('/workspace/jamo')} testId="dashboard-layout" />
+              <ul className={styles.grid}>
+                {LAYOUT_SAMPLES.map((char) => <li key={char}>
+                  <button type="button" className={styles.thumb} aria-label={`${char} 레이아웃`} onClick={() => navigate(`/workspace/jamo?char=${encodeURIComponent(char)}`)}>
+                    <Lazy className={styles.ink}><LayoutThumb char={char} size={72} /></Lazy>
+                  </button>
+                </li>)}
+              </ul>
             </section>
           </div>
         </div>
