@@ -92,8 +92,9 @@ export function MobileWorkspaceShell({
 /**
  * 추출이 실패했거나 빈 칸으로 넣은 글자가 있으면 그 자리에서 알린다. 닫을 때까지 남는다.
  * 폰트 화면이 아닌 곳에서 추출이 끝나면 화면을 바꾸지 않고 `완료 페이지 보기`만 준다(획을 만지는 중에 화면이 바뀌면 작업이 끊긴다).
+ * 대시보드 카드의 다운로드도 이 토스트를 같이 쓴다 — 셸 밖이라 안 그러면 실패가 조용히 지나간다.
  */
-function ExportNoticeToast() {
+export function ExportNoticeToast() {
   const notice = useFontExportStore((state) => state.notice)
   const doneElsewhere = useFontExportStore((state) => state.doneElsewhere)
   const dismiss = useFontExportStore((state) => state.dismissNotice)

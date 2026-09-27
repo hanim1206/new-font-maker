@@ -73,3 +73,22 @@ test.fixme('자소 화면에서 끝나면 화면은 안 바뀌고 토스트의 �
   await expect(page).toHaveURL(/\/workspace\/font\/export$/)
   await expect(page.getByTestId('font-export-done')).toBeVisible()
 })
+
+test('대시보드 카드에서 받으면 완료 페이지로 가고, ‹ 내 폰트로 대시보드에 돌아온다', async ({ page }) => {
+  test.setTimeout(240_000)
+  await page.goto('/dashboard')
+  const downloadPromise = page.waitForEvent('download', { timeout: 200_000 })
+  await page.getByTestId('dashboard-font-download').click()
+  await page.getByTestId('dashboard-font-download-name').fill('카드체')
+  await page.getByTestId('dashboard-font-download-confirm').click()
+  await expect(page.getByTestId('dashboard-font-download')).toBeDisabled()
+
+  expect((await downloadPromise).suggestedFilename()).toBe('카드체.otf')
+  await expect(page).toHaveURL(/\/workspace\/font\/export$/, { timeout: 60_000 })
+  await expect(page.getByTestId('font-export-done')).toBeVisible()
+  // 폰트 탭이 아니라 대시보드에서 왔으니 머리 `‹`는 내 폰트로.
+  const back = page.getByTestId('workspace-back')
+  await expect(back).toHaveAttribute('aria-label', '내 폰트(으)로')
+  await back.click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+})

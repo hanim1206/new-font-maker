@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Download } from 'lucide-react'
 import { downloadTTF } from '../src/services/fontGenerator'
 import { fontVersionText } from '../src/services/fontRevision'
-import { FONT_TAB_PATH, useFontExportStore } from './fontExportStore'
+import { DASHBOARD_PATH, FONT_TAB_PATH, useFontExportStore } from './fontExportStore'
 import { navigate, onLinkClick } from './router'
 import { SubtitleTemplate } from './SubtitleTemplate'
 import { MobileWorkspaceShell } from './workspace/WorkspaceChrome'
@@ -10,14 +10,15 @@ import styles from './FontExportDonePage.module.css'
 
 /**
  * 추출 완료 페이지(`/workspace/font/export`). 방금 만든 OTF를 `FontFace`로 등록해 같은 템플릿을 진짜 폰트로 그린다 — "진짜가 됐다".
- * 다시 받기 · 버전 · 파일 크기 · 빠진 글자 · 설치 안내. 폰트 덱 안의 하위 화면이라 머리는 `‹ 폰트`.
+ * 다시 받기 · 버전 · 파일 크기 · 빠진 글자 · 설치 안내. 폰트 덱 안의 하위 화면이라 머리는 `‹ 폰트`, 대시보드에서 받았으면 `‹ 내 폰트`.
  * `lastExport`는 메모리에만 있다. 새로고침이면 폰트 탭으로 넘긴다.
  */
 export function FontExportDonePage() {
   const lastExport = useFontExportStore((state) => state.lastExport)
   useEffect(() => { if (!lastExport) navigate(FONT_TAB_PATH, { replace: true }) }, [lastExport])
   if (!lastExport) return null
-  return <MobileWorkspaceShell activeArea="font" back={{ label: '폰트', href: FONT_TAB_PATH }}>
+  const back = lastExport.from === 'dashboard' ? { label: '내 폰트', href: DASHBOARD_PATH } : { label: '폰트', href: FONT_TAB_PATH }
+  return <MobileWorkspaceShell activeArea="font" back={back}>
     <ExportedFont key={lastExport.at} export={lastExport} />
   </MobileWorkspaceShell>
 }

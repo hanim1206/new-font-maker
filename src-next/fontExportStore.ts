@@ -13,14 +13,25 @@ import { navigate } from './router'
  * OTF 추출 상태. 추출 단추(폰트 탭, 옛 단독 화면)가 어디 있든 같은 상태를 본다.
  * 단추는 `request`로 이름 묻는 창만 열고, 창에서 `confirm`해야 실제 추출이 돈다.
  * 도는 동안은 폰트 탭의 대기 층이 `percent`를 보이고, 끝나면 `lastExport`를 들고 완료 페이지(`/workspace/font/export`)로 간다.
+ * 대시보드 카드에서 받아도 같다 — 거기서도 단추를 보며 기다리므로 완료 페이지로 넘긴다. 그 밖(자소 편집 중)이면 화면을 안 바꾸고 토스트만.
  */
 
 export const FONT_NAME_STORAGE_KEY = 'font-export-family-name-v1'
 export const DEFAULT_FONT_NAME = 'FontMaker'
 export const FONT_TAB_PATH = '/workspace/font'
 export const FONT_EXPORT_DONE_PATH = '/workspace/font/export'
+export const DASHBOARD_PATH = '/dashboard'
 
 export type FontExportStatus = 'idle' | 'exporting' | 'downloaded' | 'failed'
+
+/** 추출이 끝난 순간 어디였나. `font` · `dashboard`는 기다리던 화면이라 완료 페이지로, `elsewhere`는 토스트만. */
+export type ExportOrigin = 'font' | 'dashboard' | 'elsewhere'
+
+export function exportOriginOf(pathname: string): ExportOrigin {
+  if (pathname === FONT_TAB_PATH) return 'font'
+  if (pathname === DASHBOARD_PATH) return 'dashboard'
+  return 'elsewhere'
+}
 
 /** 방금 만든 폰트. 메모리에만 있다 — 새로고침하면 사라지고 완료 페이지는 폰트 탭으로 넘긴다. */
 export interface LastExport {
@@ -31,6 +42,8 @@ export interface LastExport {
   at: number
   skippedChars: string[]
   bytes: ArrayBuffer
+  /** 완료 페이지의 `‹` 가 돌아갈 곳. 대시보드에서 받았으면 내 폰트로. */
+  from: ExportOrigin
 }
 
 /**
@@ -145,22 +158,22 @@ export const useFontExportStore = create<FontExportState & FontExportActions>()(
       },
     })
     const skippedChars = result.skippedChars ?? []
+    // 폰트 탭 · 대시보드에서 기다리고 있었으면 완료 페이지로. 다른 탭이면 화면을 바꾸지 않는다.
+    const origin = typeof window === 'undefined' ? 'elsewhere' : exportOriginOf(window.location.pathname)
     const lastExport: LastExport | null = result.success && result.bytes
-      ? { familyName, fileName: result.fileName ?? `${familyName}.otf`, revision, fileSize: result.fileSize ?? result.bytes.byteLength, at: Date.now(), skippedChars, bytes: result.bytes }
+      ? { familyName, fileName: result.fileName ?? `${familyName}.otf`, revision, fileSize: result.fileSize ?? result.bytes.byteLength, at: Date.now(), skippedChars, bytes: result.bytes, from: origin }
       : null
-    // 폰트 탭에서 기다리고 있었으면 완료 페이지로. 다른 탭이면 화면을 바꾸지 않는다.
-    const onFontTab = typeof window !== 'undefined' && window.location.pathname === FONT_TAB_PATH
     set({
       progress: '',
       percent: result.success ? 100 : 0,
       status: result.success ? 'downloaded' : 'failed',
       error: result.success ? '' : result.error ?? '',
       notice: result.success ? skippedNotice(skippedChars) : `OTF를 만들지 못했어요. ${result.error ?? ''}`.trim(),
-      doneElsewhere: Boolean(lastExport) && !onFontTab,
+      doneElsewhere: Boolean(lastExport) && origin === 'elsewhere',
       schemaFallbackCount: result.schemaFallbackCount ?? 0,
       lastExport: lastExport ?? get().lastExport,
     })
-    if (lastExport && onFontTab) navigate(FONT_EXPORT_DONE_PATH)
+    if (lastExport && origin !== 'elsewhere') navigate(FONT_EXPORT_DONE_PATH)
     window.setTimeout(() => set({ status: 'idle' }), 1800)
   },
 }))

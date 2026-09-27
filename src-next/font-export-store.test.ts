@@ -1,0 +1,67 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+/**
+ * 추출이 끝난 뒤 화면 처리. 폰트 탭 · 대시보드는 완료 페이지로, 그 밖은 토스트만.
+ * 실패는 어디서든 `notice`에 이유를 남긴다 — 대시보드는 이 토스트를 같이 그린다.
+ */
+
+const generate = vi.fn()
+const navigate = vi.fn()
+vi.mock('../src/services/fontGenerator', () => ({ generateAndDownloadFont: (...args: unknown[]) => generate(...args) }))
+vi.mock('./notoModel', () => ({ loadNotoModel: async () => ({}), contextPlacementOf: () => ({ placement: { kind: 'schema' } }) }))
+vi.mock('./accountFontSync', () => ({ accountFontName: () => null, nextExportRevision: async () => 3 }))
+vi.mock('./router', () => ({ navigate: (...args: unknown[]) => navigate(...args) }))
+
+const bytes = new ArrayBuffer(8)
+const success = { success: true, glyphCount: 3, fileSize: 8, bytes, fileName: '꾸불체.otf', skippedChars: [] }
+
+function atPath(pathname: string): void {
+  Object.assign(globalThis, { window: { location: { pathname }, setTimeout: globalThis.setTimeout.bind(globalThis) } })
+}
+
+describe('fontExportStore.confirm', () => {
+  beforeEach(() => { generate.mockReset(); navigate.mockReset() })
+  afterEach(() => { Reflect.deleteProperty(globalThis, 'window') })
+
+  it('경로에 따라 어디서 끝났는지 가른다', async () => {
+    const { exportOriginOf } = await import('./fontExportStore')
+    expect(exportOriginOf('/workspace/font')).toBe('font')
+    expect(exportOriginOf('/dashboard')).toBe('dashboard')
+    expect(exportOriginOf('/workspace/jamo')).toBe('elsewhere')
+  })
+
+  it('대시보드에서 받으면 완료 페이지로 가고 돌아갈 곳은 대시보드다', async () => {
+    const { useFontExportStore, FONT_EXPORT_DONE_PATH } = await import('./fontExportStore')
+    generate.mockResolvedValue(success)
+    atPath('/dashboard')
+    await useFontExportStore.getState().confirm('꾸불체')
+    const state = useFontExportStore.getState()
+    expect(state.status).toBe('downloaded')
+    expect(state.doneElsewhere).toBe(false)
+    expect(state.lastExport?.from).toBe('dashboard')
+    expect(state.lastExport?.revision).toBe(3)
+    expect(navigate).toHaveBeenCalledWith(FONT_EXPORT_DONE_PATH)
+  })
+
+  it('자소 화면에서 끝나면 화면은 안 바꾸고 완료 페이지 보기만 남긴다', async () => {
+    const { useFontExportStore } = await import('./fontExportStore')
+    generate.mockResolvedValue(success)
+    atPath('/workspace/jamo')
+    await useFontExportStore.getState().confirm('꾸불체')
+    expect(useFontExportStore.getState().doneElsewhere).toBe(true)
+    expect(useFontExportStore.getState().lastExport?.from).toBe('elsewhere')
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('실패하면 대시보드에서도 이유를 notice에 남기고 화면을 안 바꾼다', async () => {
+    const { useFontExportStore } = await import('./fontExportStore')
+    generate.mockResolvedValue({ success: false, glyphCount: 0, error: '폰트 생성 실패: 메모리 부족' })
+    atPath('/dashboard')
+    await useFontExportStore.getState().confirm('꾸불체')
+    const state = useFontExportStore.getState()
+    expect(state.status).toBe('failed')
+    expect(state.notice).toBe('OTF를 만들지 못했어요. 폰트 생성 실패: 메모리 부족')
+    expect(state.doneElsewhere).toBe(false)
+    expect(navigate).not.toHaveBeenCalled()
+  })
+})

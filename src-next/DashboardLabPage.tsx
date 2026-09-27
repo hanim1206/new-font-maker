@@ -23,6 +23,7 @@ import { authGateMode, sessionUser } from './betaAuth'
 import { useUnseenReply } from './useFeedback'
 import { navigate } from './router'
 import { useContextPlacement } from './notoModel'
+import { ExportNoticeToast } from './workspace/WorkspaceChrome'
 import { PART_COLOR } from './partColors'
 import { randomSampleSentence } from './sampleSentences'
 import styles from './DashboardLabPage.module.css'
@@ -211,17 +212,16 @@ function useFloatingSheet(onClosed?: () => void) {
 
 /**
  * 카드의 다운로드. 검은 원을 누르면 `…`와 같은 시트가 올라와 폰트 이름을 받고, `다운로드`로 OTF를 만든다(폰트 탭 추출과 같은 가게).
- * 버튼은 검은 원에 아이콘만 — 만드는 동안 도는 아이콘(퍼센트는 이름표에), 끝나면 잠깐 체크. 이 화면에서 받았으니 편집 셸의 `OTF가 나왔어요` 토스트는 치운다.
+ * 버튼은 검은 원에 아이콘만 — 만드는 동안 도는 아이콘(퍼센트는 이름표에). 끝나면 폰트 탭처럼 완료 페이지로 넘어간다.
+ * 실패하면 셸과 같은 토스트로 이유를 보인다 — 이 화면은 편집 셸 밖이라 따로 안 달면 아무 말 없이 끝난다.
  */
 function FontCardDownload() {
   const status = useFontExportStore((state) => state.status)
   const percent = useFontExportStore((state) => state.percent)
   const confirm = useFontExportStore((state) => state.confirm)
-  const dismissNotice = useFontExportStore((state) => state.dismissNotice)
   const [draft, setDraft] = useState('')
   const { open, closing, keyboard, show, close } = useFloatingSheet()
   const exporting = status === 'exporting'
-  useEffect(() => { if (status === 'downloaded') dismissNotice() }, [status, dismissNotice])
   const start = () => {
     let saved = ''
     try { saved = localStorage.getItem(FONT_NAME_STORAGE_KEY)?.trim() ?? '' } catch { /* 없으면 기본 이름 */ }
@@ -236,6 +236,7 @@ function FontCardDownload() {
   }
   const label = exporting ? `다운로드 준비 중 ${percent}%` : status === 'downloaded' ? '받았어요' : status === 'failed' ? '다시 받기' : '다운로드'
   return <>
+    <ExportNoticeToast />
     <button type="button" className={styles.download} data-state={status} aria-label={label} aria-haspopup="dialog" aria-expanded={open} disabled={exporting} onClick={start} data-testid="dashboard-font-download">
       {exporting ? <LoaderCircle className={styles.downloadSpin} size={18} aria-hidden="true" /> : status === 'downloaded' ? <Check size={18} aria-hidden="true" /> : <Download size={18} aria-hidden="true" />}
     </button>
