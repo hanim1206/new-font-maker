@@ -38,7 +38,7 @@ export function MobileWorkspaceShell({
   activeArea: WorkspaceArea
   /** 머리 가운데 이름. 안 넘기면 지금 연 폰트 이름(어느 화면이든 같다). */
   projectName?: string
-  /** 보기만 하는 화면(검수)의 제목. 주면 `‹` 옆에 왼쪽 정렬로 굵게 두고, 편집 기록 단추는 뺀다 — 대시보드 섹션 홈 머리와 같은 생김새. */
+  /** 대시보드에서 들어온 화면의 제목(검수 · 스타일). 주면 `‹` 옆에 왼쪽 정렬로 굵게 둔다 — 대시보드 섹션 홈 머리와 같은 생김새. 편집 기록(`history`)을 안 넘긴 보기 전용 화면은 되돌리기 단추도 뺀다. */
   heading?: string
   history?: WorkspaceHistoryControls
   /** 머리 오른쪽, 되돌리기 앞에 늘 보이는 도구(어느 모드에서든 쓰는 것). */
@@ -69,7 +69,7 @@ export function MobileWorkspaceShell({
             : <div className={styles.projectIdentity}>
               <strong>{title}</strong>
             </div>}
-          {!heading && <div className={styles.headerActions} aria-label="프로젝트 편집 기록">
+          {(!heading || history) && <div className={styles.headerActions} aria-label="프로젝트 편집 기록">
             {tools}
             <button type="button" disabled={!history?.canUndo} onClick={history?.onUndo} aria-label="형태 편집 실행 취소"><Undo2 size={18} /></button>
             <button type="button" disabled={!history?.canRedo} onClick={history?.onRedo} aria-label="형태 편집 다시 실행"><Redo2 size={18} /></button>

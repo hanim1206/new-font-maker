@@ -15,7 +15,8 @@ async function startExport(page: Page, name: string): Promise<void> {
   await page.getByTestId('font-export-confirm').click()
 }
 
-test('폰트 탭: 대기 층에 퍼센트가 오르고, 끝나면 완료 페이지가 진짜 폰트로 템플릿을 그린다', async ({ page }) => {
+// 스타일 화면에서 추출 단추를 뺐다(2026-09-27). 대시보드 다운로드를 대기 층 · 완료 페이지로 잇는 다음 단계에서 그쪽 입구로 되살린다.
+test.fixme('폰트 탭: 대기 층에 퍼센트가 오르고, 끝나면 완료 페이지가 진짜 폰트로 템플릿을 그린다', async ({ page }) => {
   test.setTimeout(240_000)
   await page.goto('/workspace/font')
   const downloadPromise = page.waitForEvent('download', { timeout: 200_000 })
@@ -52,7 +53,7 @@ test('폰트 탭: 대기 층에 퍼센트가 오르고, 끝나면 완료 페이�
   await expect(page).toHaveURL(/\/workspace\/font$/)
 })
 
-test('자소 화면에서 끝나면 화면은 안 바뀌고 토스트의 완료 페이지 보기로 간다', async ({ page }) => {
+test.fixme('자소 화면에서 끝나면 화면은 안 바뀌고 토스트의 완료 페이지 보기로 간다', async ({ page }) => {
   test.setTimeout(240_000)
   await page.goto('/workspace/font')
   const downloadPromise = page.waitForEvent('download', { timeout: 200_000 })

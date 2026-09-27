@@ -82,3 +82,52 @@ section.panel > div::-webkit-scrollbar { display: none; }
 .shapeRow { display: flex; align-items: center; gap: 10px; }
 .shapeRow input { flex: 1 1 auto; min-width: 0; }
 .shapeIcon { flex: 0 0 auto; display: block; box-sizing: border-box; border: 1.5px solid rgb(var(--color-text-4)); border-radius: 2px; }
+
+/* ===== 폰트 탭(스타일 화면): 문장 → 조절 → 아래 탭. `fill`(셸 안)에서만 먹는다, 옛 단독 화면은 그대로 ===== */
+section.strip[data-grown='true'] { flex-basis: 168px; height: 168px; padding-left: 24px; border-bottom: 0; }
+/* 스타일 화면의 문장은 보기 전용이라 고른 글자 밑줄을 그리지 않는다. */
+section.strip[data-grown='true'] .run button::after { display: none; }
+section.panel.fill { border-top: 0; }
+section.panel.fill > div { padding: 4px 24px calc(env(safe-area-inset-bottom) + 12px); gap: 0; }
+/* 설명 글줄은 뺀다 — 무엇을 바꾸는지는 제목과 문장이 보여 준다. */
+.fill [role='tabpanel'] > p { display: none; }
+/* 항목 제목: 왼쪽 회색 이름, 오른쪽 굵은 값. 막대 · 고르기 모두 같은 줄. 고르기는 고른 칸이 값이라 제목만. */
+.fill [role='tabpanel'] h3 { margin: 14px 0 8px; color: rgb(var(--color-text-3)); font-size: 14px; font-weight: 600; }
+.fill [role='tabpanel'] label { padding: 12px 0 2px; gap: 6px; }
+.fill [role='tabpanel'] label > span:first-child { display: flex; align-items: baseline; justify-content: space-between; color: rgb(var(--color-text-3)); font-size: 14px; font-weight: 600; }
+.fill [role='tabpanel'] label > span:first-child output { color: rgb(var(--color-foreground)); font-family: inherit; font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+/* 값이 하나뿐인 탭(네모꼴 · 굵기): 이름 아래 큰 숫자. */
+.fill .weightBox { padding: 18px 0 0; gap: 10px; }
+.fill .weightHead { flex-direction: column; align-items: flex-start; gap: 2px; color: rgb(var(--color-text-3)); font-size: 14px; font-weight: 600; }
+.fill .weightHead output { font-family: inherit; font-size: 34px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+/* 처음 값으로: 조절 바로 아래 옅은 글자. */
+.fill [role='tabpanel'] > button:last-child { margin-top: 12px; color: rgb(var(--color-text-5)); font-size: 13px; text-decoration: none; }
+.fill [role='tabpanel'] > button:last-child:disabled { opacity: .5; }
+
+/* 얇은 채움 막대. 보이는 길은 12px, 위아래 투명 테두리 10px까지 눌린다(손잡이 너비 22px는 `rangeDrag` 계산과 맞춘다). */
+.fill input[type='range'] { box-sizing: content-box; height: 12px; border: 10px solid transparent; border-width: 10px 0; border-radius: 999px; background-clip: padding-box; }
+.fill input[type='range']::-webkit-slider-runnable-track { height: 12px; }
+.fill input[type='range']::-webkit-slider-thumb { width: 22px; height: 12px; border-radius: 0 999px 999px 0; background: rgb(var(--color-foreground)); }
+.fill input[type='range']::-moz-range-track { height: 12px; }
+.fill input[type='range']::-moz-range-progress { height: 12px; border-radius: 999px; }
+.fill input[type='range']::-moz-range-thumb { width: 22px; height: 12px; border-radius: 0 999px 999px 0; background: rgb(var(--color-foreground)); }
+.fill .ticks { margin-top: -6px; }
+
+/* 붓 고르기: 같은 물결을 두 붓으로. 테두리 없이, 고른 쪽만 회색 면. */
+.fill [role='radiogroup'][aria-label='획 끝 모양'] { gap: 8px; }
+.fill [role='radiogroup'][aria-label='획 끝 모양'] button { min-height: 0; display: flex; align-items: center; flex-direction: column; justify-content: center; gap: 6px; padding: 12px 0 10px; border-radius: 16px; color: rgb(var(--color-text-5)); }
+.fill [role='radiogroup'][aria-label='획 끝 모양'] button[aria-checked='true'] { background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); }
+.fill [role='radiogroup'][aria-label='획 끝 모양'] button svg { width: 64px; height: 52px; }
+.fill [role='radiogroup'][aria-label='획 끝 모양'] strong { color: rgb(var(--color-text-4)); font-size: 13px; font-weight: 600; }
+.fill [role='radiogroup'][aria-label='획 끝 모양'] button[aria-checked='true'] strong { color: rgb(var(--color-foreground)); font-weight: 750; }
+
+/* 부리: 없음이면 막대를 숨기고, 각도를 안 쓰는 모양이면 각도만 숨긴다. */
+.fill [data-beak-idle] { display: none; }
+
+/* 아래 탭: 회색 길 위 흰 알약, 그림 위 · 이름 아래. 화면 바닥에 고정 — 스크롤해도 제자리(바깥 줄 전체가 스크롤되므로 sticky는 같이 밀린다). */
+.tabs.dock { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 12px); z-index: 20; width: min(calc(100% - 48px), 432px); box-sizing: border-box; translate: -50% 0; display: flex; gap: 0; padding: 3px; border: 0; border-radius: 16px; background: rgb(var(--color-surface-3)); box-shadow: 0 -12px 24px 8px rgb(var(--color-surface)); }
+.tabs.dock button { flex: 1 1 0; min-height: 72px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; margin: 0; border: 0; border-radius: 13px; color: rgb(var(--color-text-4)); font-size: 13px; font-weight: 600; }
+.tabs.dock button svg { width: 28px; height: 28px; opacity: .45; }
+.tabs.dock button[aria-selected='true'] { background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-weight: 700; box-shadow: 0 1px 3px rgb(0 0 0 / .1); }
+.tabs.dock button[aria-selected='true'] svg { opacity: 1; }
+.fill [role='tabpanel'] { padding-bottom: calc(env(safe-area-inset-bottom) + 108px); }

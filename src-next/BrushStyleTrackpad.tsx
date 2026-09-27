@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import type { BrushTip, StrokeLinecap, StrokeLinejoin, StrokeRenderStyle } from '../src/types'
 import { endRangeDrag, moveRangeDrag, startRangeDrag } from './rangeDrag'
 import { RangeTicks, type RangeTick } from './RangeTicks'
+import { BrushPicto } from './StylePicto'
 import styles from './CalibrationSentenceEditor.module.css'
 
 const TIP_OPTIONS: Array<{ tip: BrushTip; label: string }> = [
@@ -165,7 +166,8 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
     onDraftChange(null)
   }
   const range = (label: string, value: number, min: number, max: number, step: number, update: (value: number) => StrokeRenderStyle, output: string, ticks?: readonly RangeTick[]) => <label className={styles.ruleControl}>
-    <span>{label} {activeValue === label && <output>{output}</output>}</span>
+    {/* 제품 화면은 값을 늘 보인다(제목 오른쪽). 옛 단독 화면은 끄는 동안만. */}
+    <span>{label} {(productOptions || activeValue === label) && <output>{output}</output>}</span>
     <input type="range" min={min} max={max} step={step} value={value}
       onPointerDown={(event) => { begin(label); const next = startRangeDrag(event); if (next !== null && next !== value) preview(update(next)) }}
       onPointerMove={(event) => { const next = moveRangeDrag(event); if (next !== null && next !== value) preview(update(next)) }}
@@ -200,12 +202,15 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
     </div>}
     {current.mode === 'brush' && <>
       {productOptions
-        ? <div className={styles.brushTips} style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }} role="radiogroup" aria-label="획 끝 모양">{END_CHOICES.map((choice) => {
-          const previewStyle: StrokeRenderStyle = { ...current, brush: { ...current.brush, tip: choice.tip } }
-          return <button key={choice.id} type="button" role="radio" aria-checked={endChoice === choice.id} data-end-choice={choice.id} onClick={() => selectEndChoice(choice)}>
-            <span className={styles.brushTipPreview}>{renderPreview(previewStyle, ends)}</span><span className={`${styles.brushTipIcon} ${styles[`brushTipIcon_${choice.tip}`]}`} style={choice.id === 'plain' ? { borderRadius: 3, rotate: '0deg' } : undefined} aria-hidden="true" /><strong>{choice.label}</strong>
-          </button>
-        })}</div>
+        ? <>
+          <h3>붓</h3>
+          {/* 붓은 글자 대신 그 붓으로 그은 물결 하나로 보인다. */}
+          <div className={styles.brushTips} style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }} role="radiogroup" aria-label="획 끝 모양">{END_CHOICES.map((choice) => (
+            <button key={choice.id} type="button" role="radio" aria-checked={endChoice === choice.id} data-end-choice={choice.id} onClick={() => selectEndChoice(choice)}>
+              <BrushPicto flat={choice.tip !== 'round'} /><strong>{choice.label}</strong>
+            </button>
+          ))}</div>
+        </>
         : <div className={styles.brushTips} role="radiogroup" aria-label="붓촉 모양">{TIP_OPTIONS.map(({ tip, label }) => {
         const previewStyle: StrokeRenderStyle = { ...current, brush: { ...current.brush, tip } }
         return <button key={tip} type="button" role="radio" aria-checked={current.brush.tip === tip} onClick={() => selectTip(tip)}>
@@ -213,20 +218,20 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
         </button>
       })}</div>}
       {current.brush.tip !== 'round' && <div className={styles.brushControlGrid}>{range('납작함', aspectRatioToFlatness(current.brush.aspectRatio), 0, 100, 5, (value) => ({ ...current, brush: { ...current.brush, aspectRatio: flatnessToAspectRatio(value) } }), `${aspectRatioToFlatness(current.brush.aspectRatio)}%`, [{ at: 0, text: '0' }, { at: 50, text: '50' }, { at: 100, text: '100' }])}{renderAnglePad()}</div>}
-      {current.brush.tip === 'round' && productOptions && <div className={styles.brushControlGrid} style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', minHeight: 0 }}>
+      {current.brush.tip === 'round' && productOptions && <div className={styles.brushControlGrid} style={{ gridTemplateColumns: 'minmax(0, 1fr)', minHeight: 0, gap: 0 }}>
         {/* 막대는 5 단위로 탁탁 걸린다(09-25 사용자). */}
         {range('바깥 둥글기', roundnessOf(current), 0, 100, 5, (value) => ({ ...current, roundness: value / 100 }), `${roundnessOf(current)}%`, [{ at: 0 }, { at: 50 }, { at: 100, text: '반원' }])}
         {/* 안쪽은 반폭을 넘어 300%까지. 100에 눈금(바깥의 끝). */}
         {range('안쪽 둥글기', innerRoundnessOf(current), 0, 300, 5, (value) => ({ ...current, innerRoundness: value / 100 }), `${innerRoundnessOf(current)}%`, [{ at: 0 }, { at: 100, text: '100' }, { at: 200, text: '200' }, { at: 300, text: '300' }])}
         {/* 안쪽을 따로 정하면 풀린다. `바깥과 같이`로 다시 바깥을 따르게 한다. */}
-        {!innerLinked(current) && <button type="button" className={styles.ruleLinkButton} style={{ gridColumn: 'span 2' }} onClick={() => {
+        {!innerLinked(current) && <button type="button" className={styles.ruleLinkButton} onClick={() => {
           const { innerRoundness: _dropped, ...rest } = current as Extract<StrokeRenderStyle, { mode: 'brush' }>
           void _dropped
           preview(rest); onCommit(committed, rest)
         }}>바깥과 같이</button>}
         {/* 가로·세로 두께 대비. 가운데 0이 같은 굵기, 오른쪽은 세로 굵게 · 가로 얇게. */}
         {/* 세로 굵게(+) 쪽이 훨씬 깊다. 가로 굵게(−)는 −30까지만. 0에 눈금. */}
-        <div style={{ gridColumn: 'span 2' }}>{range('가로·세로 대비', contrastOf(current), -30, 100, 5, (value) => ({ ...current, contrast: value / 100 }), contrastLabel(contrastOf(current)), [{ at: -30, text: '가로' }, { at: 0, text: '같음' }, { at: 25 }, { at: 50, text: '세로' }, { at: 75 }, { at: 100, text: '세로 최대' }])}</div>
+        <div>{range('가로·세로 대비', contrastOf(current), -30, 100, 5, (value) => ({ ...current, contrast: value / 100 }), contrastLabel(contrastOf(current)), [{ at: -30, text: '가로' }, { at: 0, text: '같음' }, { at: 25 }, { at: 50, text: '세로' }, { at: 75 }, { at: 100, text: '세로 최대' }])}</div>
       </div>}
       {current.brush.tip === 'round' && !productOptions && <p className={styles.roundBrushMessage}>원형은 모든 방향에서 같은 굵기로 그려집니다.</p>}
     </>}

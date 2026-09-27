@@ -53,6 +53,7 @@ export function StemBeakControls({ committed, draft, onDraftChange, onCommit, sc
       <button type="button" role="radio" aria-checked={!scope.toGroup} onClick={() => scope.onChange(false)}>전체</button>
       <button type="button" role="radio" aria-checked={scope.toGroup} onClick={() => scope.onChange(true)}>「{scope.groupName}」 {scope.groupSize}자</button>
     </div> : <p><strong>세로줄기의 열린 머리에 한 번에</strong><span>획 데이터는 그대로입니다</span></p>}
+    <h3 className={styles.title}>부리 모양</h3>
     <div className={styles.shapes} role="radiogroup" aria-label="부리 모양">
       <button type="button" role="radio" aria-checked={!beak.enabled} data-beak-shape="none" onClick={() => pick({ enabled: false })}>
         <BeakShapeThumb shape={null} size={beak.size} angle={beak.angle} /><span>없음</span>
@@ -63,9 +64,10 @@ export function StemBeakControls({ committed, draft, onDraftChange, onCommit, sc
         </button>
       ))}
     </div>
-    <div className={styles.sliders}>
+    {/* 끈 막대는 제품 화면(`data-beak-idle`)에서 숨긴다 — 부리가 없으면 둘 다, 각도가 없는 모양이면 각도만. */}
+    <div className={styles.sliders} data-beak-idle={!beak.enabled || undefined}>
       <label><span>크기 <output>{beak.size.toFixed(1)}</output></span><input aria-label="부리 크기" type="range" min={0.5} max={2} step={0.1} value={beak.size} disabled={!beak.enabled} onChange={(event) => preview({ size: Number(event.target.value) })} {...drag('size')} onKeyUp={commit} onBlur={commit} /><RangeTicks min={0.5} max={2} ticks={[{ at: 0.5, text: '0.5' }, { at: 1, text: '1' }, { at: 1.5, text: '1.5' }, { at: 2, text: '2' }]} /></label>
-      <label><span>각도 <output>{beak.angle}°</output></span><input aria-label="부리 각도" type="range" min={-60} max={60} step={5} value={beak.angle} disabled={!beak.enabled || beak.shape !== 'angled'} onChange={(event) => preview({ angle: Number(event.target.value) })} {...drag('angle')} onKeyUp={commit} onBlur={commit} /><RangeTicks min={-60} max={60} ticks={[{ at: -60, text: '−60°' }, { at: -30 }, { at: 0, text: '0°' }, { at: 30 }, { at: 60, text: '60°' }]} /></label>
+      <label data-beak-idle={beak.shape !== 'angled' || undefined}><span>각도 <output>{beak.angle}°</output></span><input aria-label="부리 각도" type="range" min={-60} max={60} step={5} value={beak.angle} disabled={!beak.enabled || beak.shape !== 'angled'} onChange={(event) => preview({ angle: Number(event.target.value) })} {...drag('angle')} onKeyUp={commit} onBlur={commit} /><RangeTicks min={-60} max={60} ticks={[{ at: -60, text: '−60°' }, { at: -30 }, { at: 0, text: '0°' }, { at: 30 }, { at: 60, text: '60°' }]} /></label>
     </div>
     <button type="button" disabled={isDefault} onClick={() => onCommit(committed, { ...DEFAULT_STEM_BEAK })}>부리 처음 값으로</button>
   </div>

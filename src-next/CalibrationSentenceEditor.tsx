@@ -1645,7 +1645,7 @@ function DesignBodyControls({
 
 const DEFAULT_WEIGHT = 400
 /** 글로벌 스타일 공간에서 문장 글자 하나의 크기(px). 평소는 24. */
-const STYLE_SPACE_EM = 140
+const STYLE_SPACE_EM = 112
 const WEIGHT_STOPS = [100, 200, 300, 400, 500, 600, 700, 800, 900]
 
 /** 굵기. 폰트 전체에 한 값이고 100 단위로만 멈춘다. 끄는 동안은 미리보기만, 손을 떼면 적용한다. 기울기는 저장소에 있지만 지금은 화면에 내놓지 않는다. */
@@ -2628,6 +2628,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       <MobileWorkspaceShell
         activeArea={styleOnly ? 'font' : 'jamo'}
         projectName={projectName}
+        heading={styleOnly ? '스타일' : undefined}
         cover={cover}
         history={{ canUndo: history.length > 0, canRedo: future.length > 0, onUndo: undo, onRedo: redo }}
       >

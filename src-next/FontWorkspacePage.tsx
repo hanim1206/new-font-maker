@@ -1,44 +1,52 @@
-import { Check, Download, LoaderCircle, X } from 'lucide-react'
-import { accountFontUpdatedAt } from './accountFontSync'
-import { editedDayText } from './accountFont'
 import { CalibrationSentenceEditor } from './CalibrationSentenceEditor'
+import { useCalibrationProjectStore } from './calibrationProjectStore'
+import { paddingToDesignBody } from './designBody'
 import { useFontExportStore } from './fontExportStore'
 import { SubtitleTemplate } from './SubtitleTemplate'
-import { useUIStore } from '../src/stores/uiStore'
+import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../src/services/designBodyPlacement'
+import { STEM_BEAK_SHAPES } from '../src/services/stemBeak'
+import { useGlobalStyleStore } from '../src/stores/globalStyleStore'
+import { useLayoutStore } from '../src/stores/layoutStore'
 import styles from './FontWorkspacePage.module.css'
 
 /**
- * 폰트 탭(`/workspace/font`). 폰트 덱의 첫 화면 — 이 폰트 하나에 대한 것이 모이는 자리.
- * 위는 이름 · 마지막 고친 날 · OTF 추출, 아래는 글로벌 스타일 공간(문장 표본 + 네모꼴 · 획 스타일 · 굵기 · 부리).
- * 글로벌 스타일은 편집기의 `style` 자리다 — 캔버스 없이 문장 줄이 크게 자라 미리보기를 맡고, 되돌리기는 셸 머리.
- * 추출이 도는 동안은 대기 층이 이 화면을 덮고, 끝나면 완료 페이지로 간다.
+ * 스타일 화면(`/workspace/font`). 대시보드 `스타일`로 들어온다 — 이 폰트 전체의 인상을 고치는 자리.
+ * 머리는 `‹ 스타일`, 그 아래 지금 값 요약, 가운데는 문장 표본, 아래는 조절과 탭(네모꼴 · 획 스타일 · 굵기 · 부리).
+ * 추출은 여기서 하지 않는다(대시보드 폰트 카드의 다운로드). 추출이 도는 동안 이 화면에 오면 대기 층이 덮는다.
  */
 export function FontWorkspacePage() {
-  return <CalibrationSentenceEditor chrome="workspace" space="style" above={<FontIdentity />} cover={<FontExportOverlay />} />
+  return <CalibrationSentenceEditor chrome="workspace" space="style" above={<StyleSummary />} cover={<FontExportOverlay />} />
 }
 
-function FontIdentity() {
-  const name = useUIStore((state) => state.currentProjectName) ?? '새 한글 폰트'
-  const updatedAt = accountFontUpdatedAt()
-  const exportState = useFontExportStore((state) => state.status)
-  const exportProgress = useFontExportStore((state) => state.progress)
-  const requestExport = useFontExportStore((state) => state.request)
-  const exportLabel = exportState === 'exporting' ? `OTF 추출 중: ${exportProgress}` : exportState === 'downloaded' ? 'OTF 추출 완료' : exportState === 'failed' ? 'OTF 추출 실패' : '현재 작업을 OTF로 추출'
-  return <section className={styles.identity} aria-label="폰트 정보" data-testid="font-workspace">
-    <div className={styles.name}>
-      <h1>{name}</h1>
-      {updatedAt && <p>마지막 고침 · {editedDayText(updatedAt)}</p>}
-    </div>
-    <button type="button" className={styles.exportButton} data-export-state={exportState} onClick={requestExport} disabled={exportState === 'exporting'} aria-label={exportLabel} title={exportLabel}>
-      {exportState === 'exporting' ? <LoaderCircle className={styles.exportSpinner} size={18} /> : exportState === 'downloaded' ? <Check size={18} /> : exportState === 'failed' ? <X size={18} /> : <Download size={18} />}
-      <span>OTF 추출</span>
-    </button>
-  </section>
+const BODY_RATIO = REFERENCE_WIDTH / REFERENCE_HEIGHT
+
+/** 머리 바로 아래 지금 값 네 칩(제목 `스타일`은 머리에). 칩은 저장된 값만 읽는다(끄는 중 미리보기는 문장이 보여 준다). */
+function StyleSummary() {
+  const style = useGlobalStyleStore((state) => state.style)
+  const padding = useLayoutStore((state) => state.globalPadding)
+  const fontSpace = useCalibrationProjectStore((state) => state.fontSpace)
+  const body = paddingToDesignBody(padding, fontSpace)
+  const width = Math.round(body.width)
+  const height = Math.round(body.height)
+  const ratio = width / Math.max(height, 1)
+  const bodyLabel = width === Math.round(REFERENCE_WIDTH * 1000) && height === Math.round(REFERENCE_HEIGHT * 1000) ? '노토'
+    : width === height ? '정네모'
+      : ratio < BODY_RATIO ? '길쭉' : '납작'
+  const flatBrush = style.strokeStyle.mode === 'brush' && style.strokeStyle.brush.tip !== 'round'
+  const beak = style.stemBeak?.enabled ? STEM_BEAK_SHAPES.find((shape) => shape.id === style.stemBeak?.shape)?.label.replace(/ 부리$/, '') ?? '있음' : '없음'
+  return <header className={styles.summary} data-testid="font-workspace">
+    <ul aria-label="지금 스타일">
+      <li>네모꼴 <b>{bodyLabel}</b></li>
+      <li>붓 <b>{flatBrush ? '납작' : '일반'}</b></li>
+      <li>굵기 <b>{style.weight}</b></li>
+      <li>부리 <b>{beak}</b></li>
+    </ul>
+  </header>
 }
 
 /**
- * 대기 층. 추출이 도는 동안 폰트 탭의 내용 자리(머리와 탭 사이)를 덮고 퍼센트와 템플릿(내 획으로 그린 자막)을 보인다.
- * 닫기는 없다 — 추출은 취소하지 못한다. 탭으로는 나갈 수 있고 추출은 계속된다. 3단계(파일 조립)는 동기라 99에서 `파일로 묶는 중`으로 선다.
+ * 대기 층. 추출이 도는 동안 스타일 화면의 내용 자리(머리 아래)를 덮고 퍼센트와 템플릿(내 획으로 그린 자막)을 보인다.
+ * 닫기는 없다 — 추출은 취소하지 못한다. 머리 `‹`로는 나갈 수 있고 추출은 계속된다. 3단계(파일 조립)는 동기라 99에서 `파일로 묶는 중`으로 선다.
  */
 function FontExportOverlay() {
   const exporting = useFontExportStore((state) => state.status === 'exporting')

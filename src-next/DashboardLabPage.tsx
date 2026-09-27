@@ -16,6 +16,7 @@ import { createFont, deleteFont, listFonts, renameFont } from './accountFontApi'
 import type { FontSummary } from './accountFontApi'
 import { accountFontName, accountFontSession, collectAccountFontData, renamedAccountFont } from './accountFontSync'
 import { DEFAULT_FONT_NAME, FONT_NAME_STORAGE_KEY, useFontExportStore } from './fontExportStore'
+import { StylePicto } from './StylePicto'
 import { clearAppNotice, showAppNotice } from './appNotice'
 import { leaveDeletedFont, openFont, openNewFont } from './fontSwitch'
 import { authGateMode, sessionUser } from './betaAuth'
@@ -136,57 +137,6 @@ function InSyllableGlyph({ type, char, size }: { type: 'jungseong' | 'jongseong'
 /** 자소 카드 잉크. 첫닿자는 단독으로, 홀자 · 받침은 글자 속 비율로. */
 function JamoGlyph({ type, char, size }: { type: JamoType; char: string; size: number }) {
   return type === 'choseong' ? <AppGlyph char={char} size={size} upright /> : <InSyllableGlyph type={type} char={char} size={size} />
-}
-
-/**
- * 스타일 그림 넷. 값에 따라 변하지 않는 공통 예시 아이콘 — 줄기 하나로 굵기 · 기울기 · 끝 굴림 · 부리가 무엇인지 보인다.
- * 실제 값은 옆의 숫자로만 읽는다. 흐린 선은 기준(가는 · 직립 · 각진 끝)이라 무엇이 변하는 항목인지 읽힌다.
- */
-const PICTO = 52
-const PICTO_STEM = 14
-const PICTO_SLANT = 14
-const PICTO_ROUNDNESS = 0.7
-function StylePicto({ kind }: { kind: 'weight' | 'slant' | 'roundness' | 'beak' }) {
-  const ink = 'rgb(var(--color-foreground))'
-  const ghost = 'rgb(var(--color-text-6))'
-  const stem = PICTO_STEM
-  const cx = PICTO / 2
-  const top = 8
-  const bottom = PICTO - 8
-  if (kind === 'weight') {
-    // 세로줄기 셋 — 왼쪽부터 점점 두꺼워진다. 간격은 같게.
-    const widths = [3, 8, 14]
-    const gap = 7
-    const total = widths.reduce((sum, w) => sum + w, 0) + gap * (widths.length - 1)
-    let x = cx - total / 2
-    return <svg viewBox={`0 0 ${PICTO} ${PICTO}`} aria-hidden="true">
-      {widths.map((w, i) => {
-        const rect = <rect key={i} x={x} y={top} width={w} height={bottom - top} fill={ink} />
-        x += w + gap
-        return rect
-      })}
-    </svg>
-  }
-  if (kind === 'slant') {
-    return <svg viewBox={`0 0 ${PICTO} ${PICTO}`} aria-hidden="true">
-      <rect x={cx - stem / 2} y={top} width={stem} height={bottom - top} fill={ghost} />
-      <rect x={cx - stem / 2} y={top} width={stem} height={bottom - top} fill={ink} transform={`skewX(${-PICTO_SLANT})`} transform-origin={`${cx} ${bottom}`} />
-    </svg>
-  }
-  if (kind === 'roundness') {
-    const length = 34
-    return <svg viewBox={`0 0 ${PICTO} ${PICTO}`} aria-hidden="true">
-      <rect x={cx - length / 2} y={cx - stem / 2} width={length} height={stem} rx={PICTO_ROUNDNESS * stem / 2} fill={ink} />
-    </svg>
-  }
-  // 부리는 줄기 머리의 작은 돌기. 기둥 왼쪽 위에 얹는다.
-  const size = stem * 0.65
-  const rise = Math.tan((25 * Math.PI) / 180) * size
-  const path = `M ${cx - stem / 2 - size} ${top + rise} L ${cx - stem / 2} ${top} L ${cx - stem / 2} ${top + size} Z`
-  return <svg viewBox={`0 0 ${PICTO} ${PICTO}`} aria-hidden="true">
-    <rect x={cx - stem / 2} y={top} width={stem} height={bottom - top} fill={ink} />
-    <path d={path} fill={ink} />
-  </svg>
 }
 
 /**

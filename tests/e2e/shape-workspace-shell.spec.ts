@@ -39,14 +39,25 @@ test('머리는 `‹`(화살표만) · 폰트 이름 · 되돌리기고 햄버�
   await expect(page.getByTestId('workspace-tabs')).toHaveCount(0)
 })
 
-test('폰트 화면의 OTF 추출은 폰트 이름을 물은 뒤 그 이름의 OTF를 받는다', async ({ page }) => {
-  test.setTimeout(180_000)
-  // 폰트 화면 입구는 대시보드 `스타일`.
+test('스타일 화면은 대시보드 `스타일`로 들어오고, 머리 `‹ 스타일` 아래 지금 값을 칩으로 보인다', async ({ page }) => {
   await page.goto('/dashboard')
   await page.getByTestId('dashboard-style').click()
   await expect(page).toHaveURL(/\/workspace\/font$/)
-  // 게이트가 꺼진 dev는 이 기기 폰트 `내 폰트`가 자동으로 만들어져 열린다.
-  await expect(page.getByTestId('font-workspace').getByRole('heading', { level: 1 })).toHaveText('내 폰트')
+  await expect(page.getByRole('heading', { level: 2, name: '스타일' })).toBeVisible()
+  const summary = page.getByTestId('font-workspace')
+  await expect(summary.getByRole('listitem')).toHaveText(['네모꼴 노토', '붓 일반', '굵기 400', '부리 없음'])
+  // 추출은 여기서 하지 않는다 — 대시보드 폰트 카드의 다운로드.
+  await expect(page.getByRole('button', { name: /OTF/ })).toHaveCount(0)
+  await page.getByTestId('workspace-font-home').click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+})
+
+// 스타일 화면에서 추출 단추를 뺐다(2026-09-27). 대시보드 다운로드를 대기 층 · 완료 페이지로 잇는 다음 단계에서 이 흐름을 그쪽 입구로 되살린다.
+test.fixme('폰트 화면의 OTF 추출은 폰트 이름을 물은 뒤 그 이름의 OTF를 받는다', async ({ page }) => {
+  test.setTimeout(180_000)
+  await page.goto('/dashboard')
+  await page.getByTestId('dashboard-style').click()
+  await expect(page).toHaveURL(/\/workspace\/font$/)
 
   // OTF 추출 → 이름 창. 취소하면 아무 일도 없다.
   const dialog = page.getByTestId('font-export-dialog')

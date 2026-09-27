@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-/** 글로벌 스타일: 머리에 늘 보이는 입구, 문장 아래를 다 쓰는 화면, 탭 넷(글자 네모꼴 · 획 스타일 · 굵기 · 부리). */
+/** 글로벌 스타일: 대시보드 `스타일`로 들어오는 화면, 문장 아래를 다 쓰고 탭 넷(네모꼴 · 획 스타일 · 굵기 · 부리)은 화면 아래에 붙는다. */
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -26,7 +26,7 @@ test('폰트 탭이 글로벌 스타일 공간이다 — 늘 열려 있고 닫�
   await expect(page.getByTestId('jamo-layout-mode')).toHaveCount(0)
   await expect(page.getByTestId('focus-canvas')).toHaveCount(0)
   await expect(panel.getByRole('button', { name: '글로벌 스타일 설정 닫기' })).toHaveCount(0)
-  await expect(panel.getByRole('tablist', { name: '글로벌 스타일 항목' }).getByRole('tab')).toHaveText(['글자 네모꼴', '획 스타일', '굵기', '부리'])
+  await expect(panel.getByRole('tablist', { name: '글로벌 스타일 항목' }).getByRole('tab')).toHaveText(['네모꼴', '획 스타일', '굵기', '부리'])
 
   // 하단에 붙은 작은 패널이 아니라 화면 바닥까지 남은 높이를 다 쓴다(하단 탭은 없다).
   const box = await panel.boundingBox()
@@ -123,10 +123,10 @@ test('폰트 탭은 캔버스 없이 문장 줄이 한 줄 그대로 크게 자�
   await goVia(page, '스타일')
   await expect(sentence).toHaveAttribute('data-grown', 'true')
   await expect(page.getByTestId('focus-canvas')).toHaveCount(0)
-  await expect.poll(async () => (await glyph.boundingBox())?.height ?? 0).toBeGreaterThan(130)
+  await expect.poll(async () => (await glyph.boundingBox())?.height ?? 0).toBeGreaterThan(100)
   expect(small?.height ?? 0).toBeLessThan(30)
   // 한 줄이다: 줄 높이가 글자 하나 남짓.
-  expect((await sentence.boundingBox())?.height ?? 0).toBeLessThan(210)
+  expect((await sentence.boundingBox())?.height ?? 0).toBeLessThan(180)
 
   await goVia(page, '레이아웃')
   await expect.poll(async () => (await glyph.boundingBox())?.height ?? 0).toBeLessThan(30)
@@ -143,7 +143,7 @@ test('글자 네모꼴은 막대 하나다: 길쭉 ↔ 노토 비율 ↔ 납작,
   // 길쭉: 세로는 그대로, 가로만 준다. 문장 글자도 같이 좁아진다.
   const glyph = page.getByRole('region', { name: '보정 문장' }).getByRole('button', { name: /^한 편집/ }).locator('svg')
   // 문장이 다 자란 뒤의 폭을 기준으로 잰다.
-  await expect.poll(async () => (await glyph.boundingBox())?.height ?? 0).toBeGreaterThan(130)
+  await expect.poll(async () => (await glyph.boundingBox())?.height ?? 0).toBeGreaterThan(100)
   const before = (await glyph.boundingBox())?.width ?? 0
   await shape.fill('-100')
   await expect(size).toHaveText('500 × 910')
