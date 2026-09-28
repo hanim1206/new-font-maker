@@ -1,16 +1,16 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Dices, Download, Ellipsis, LoaderCircle, PencilLine, Plus, ScanSearch, Trash2, UserRound, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Dices, Download, Ellipsis, LoaderCircle, Minus, PencilLine, Plus, ScanSearch, Trash2, UserRound, X } from 'lucide-react'
 import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../src/data/Hangul'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { useEffectiveGlobalStyle, useGlobalStyleStore } from '../src/stores/globalStyleStore'
-import { useJamoStore } from '../src/stores/jamoStore'
+import { getBaseJamo, useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import { useUIStore } from '../src/stores/uiStore'
 import { useWorkbenchStore, workbenchSyllable } from '../src/stores/workbenchStore'
 import { groupMatching, sameChars, useJamoGroupStore, type JamoGroup } from '../src/stores/jamoGroupStore'
-import type { LayoutSchema, Padding, Part } from '../src/types'
+import type { JamoData, LayoutSchema, Padding, Part } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
-import { jongseongFromChoseong } from '../src/utils/jamoFromChoseong'
+import { jongseongFromChoseong, matchesChoseong } from '../src/utils/jamoFromChoseong'
 import { AppGlyph } from './AppGlyph'
 import { editedDayText, FONT_LIMIT, nextFontName } from './accountFont'
 import { createFont, deleteFont, listFonts, renameFont } from './accountFontApi'
@@ -439,6 +439,18 @@ const GROUPINGS: Record<JamoType, Grouping[]> = {
 // 칩을 안 골랐을 때. 중성은 홀자(레이아웃 6칸과 같은 말), 종성은 홑 · 쌍 · 겹이 `전체`보다 먼저 쓸모 있다.
 const DEFAULT_GROUPING: Record<JamoType, string> = { choseong: 'all', jungseong: 'kind', jongseong: 'kind' }
 
+/**
+ * 받침을 초성 모양으로 켜기 직전 모양. 끄면 여기로 돌아간다(연결이 아니라 복사 + 되돌리기).
+ * 켠 뒤 받침이 복사한 그대로일 때만 쓴다 — 그새 다른 폰트를 열었거나 새로고침했으면 받침 프리셋으로 돌아간다.
+ */
+const BORROWED = new Map<string, { before: JamoData; after: JamoData }>()
+function restoreBorrowed(char: string, current: JamoData): JamoData {
+  const saved = BORROWED.get(char)
+  BORROWED.delete(char)
+  if (saved && JSON.stringify(saved.after) === JSON.stringify(current)) return saved.before
+  return getBaseJamo('jongseong', char) ?? current
+}
+
 const HOME_COLUMNS = 4
 const HOME_GAP = 6
 const HOME_PAD = 12
@@ -499,21 +511,23 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
     setSheet(null)
     setGroupingId('mine')
   }
-  // 받침만: 담긴 것 중 초성에도 있는 자음을 초성 기본 획으로 한 번 복사한다. 손댄 받침도 덮어쓴다(담은 게 곧 고르기) — 대신 되돌리기.
-  const borrowable = type === 'jongseong' ? benchChars.filter((char) => benchType === type && (CHOSEONG_LIST as readonly string[]).includes(char)) : []
-  const borrowChoseong = () => {
+  // 받침만: 담긴 것 중 초성에도 있는 자음을 초성 기본 획으로 켜고 끈다. 켜짐은 저장하지 않고 지금 획에서 잰다 — 편집기에서 받침을 고치면 저절로 꺼진다.
+  const choseongJamos = useJamoStore((state) => state.choseong)
+  const borrowable = type === 'jongseong' && benchType === type ? benchChars.filter((char) => choseongJamos[char] && jamos[char]) : []
+  const borrowedCount = borrowable.filter((char) => matchesChoseong(choseongJamos[char], jamos[char])).length
+  const borrowState = borrowedCount === 0 ? 'off' : borrowedCount === borrowable.length ? 'on' : 'mixed'
+  const toggleBorrow = () => {
     const store = useJamoStore.getState()
-    const before = borrowable.map((char) => [char, store.jongseong[char]] as const)
-    const overwritten = borrowable.filter((char) => store.isJamoModified('jongseong', char)).length
-    for (const [char, jamo] of before) {
-      const choseong = store.choseong[char]
-      if (choseong && jamo) store.updateJongseong(char, jongseongFromChoseong(choseong, jamo))
+    for (const char of borrowable) {
+      const current = store.jongseong[char]
+      if (borrowState === 'on') {
+        store.updateJongseong(char, restoreBorrowed(char, current))
+      } else if (!matchesChoseong(store.choseong[char], current)) {
+        const copied = jongseongFromChoseong(store.choseong[char], current)
+        BORROWED.set(char, { before: current, after: copied })
+        store.updateJongseong(char, copied)
+      }
     }
-    const skipped = benchCount - borrowable.length
-    setToast({
-      text: `${borrowable.length}개 초성 모양으로${overwritten ? ` · 손댄 ${overwritten}개 포함` : ''}${skipped ? ` · 겹받침 ${skipped}개 그대로` : ''}`,
-      undo: () => { for (const [char, jamo] of before) if (jamo) useJamoStore.getState().updateJongseong(char, jamo) },
-    })
   }
   const deleteGroup = (id: string) => {
     const removed = useJamoGroupStore.getState().remove(id)
@@ -635,7 +649,7 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
         {benchGroup && <span key="group" data-chip="__group" className={styles.benchGroupName}>{benchGroup.name}</span>}
       </div></div>
       {benchCount > 0 && <button type="button" className={styles.benchClear} aria-label="도마 비우기" onClick={clear}><Trash2 size={18} aria-hidden="true" /></button>}
-      {borrowable.length > 0 && <button type="button" className={styles.benchBorrow} onClick={borrowChoseong}>초성 모양으로</button>}
+      {borrowable.length > 0 && <button type="button" className={styles.benchBorrow} aria-pressed={borrowState === 'on' ? true : borrowState === 'mixed' ? 'mixed' : false} onClick={toggleBorrow}><span className={styles.check} aria-hidden="true">{borrowState === 'mixed' ? <Minus size={14} strokeWidth={3} /> : <Check size={14} strokeWidth={3} />}</span>초성 모양</button>}
       <button type="button" className={styles.benchGo} disabled={benchCount === 0} onClick={() => openEditor(type, benchChars)}>{/* 숫자가 바뀔 때마다 새로 떠오른다 — key가 바뀌면 애니메이션이 다시 돈다. */}<span key={benchCount} className={styles.benchCount}>{benchCount}</span>개 고치기</button>
     </footer>
     {toast && <div className={styles.toast} role="status">{toast.text}<button type="button" onClick={() => { toast.undo(); setToast(null) }}>되돌리기</button></div>}

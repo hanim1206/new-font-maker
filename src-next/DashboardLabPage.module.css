@@ -157,9 +157,11 @@
 .benchChips button { flex: none; min-width: 36px; height: 36px; display: inline-grid; place-items: center; padding: 0 6px; border: 0; border-radius: 10px; background: rgb(var(--color-surface-2)); color: inherit; font-size: 17px; font-weight: 700; }
 .benchChips em { color: rgb(var(--color-text-5)); font-size: 12px; font-style: normal; white-space: nowrap; animation: fadeIn var(--motion-normal) var(--ease-standard); }
 .benchClear { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-text-6)); animation: popIn var(--motion-normal) var(--ease-standard); }
-/* 받침 도마만. 담긴 것 중 초성에도 있는 자음을 초성 기본 획으로 한 번 복사한다. */
-.benchBorrow { flex: none; min-height: 40px; padding: 0 12px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-2)); color: inherit; font-size: 13px; font-weight: 700; white-space: nowrap; animation: popIn var(--motion-normal) var(--ease-standard); }
-.benchBorrow:active { transform: scale(0.95); }
+/* 받침 도마만. 켜면 담긴 것 중 초성에도 있는 자음이 초성 기본 획, 끄면 켜기 전 모양. 일부만 같으면 ─. */
+.benchBorrow { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px 0 9px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-4)); font-size: 13px; font-weight: 700; white-space: nowrap; transition: color var(--motion-normal) var(--ease-standard); animation: popIn var(--motion-normal) var(--ease-standard); }
+.benchBorrow[aria-pressed='true'], .benchBorrow[aria-pressed='mixed'] { color: rgb(var(--color-foreground)); }
+.benchBorrow[aria-pressed='true'] .check, .benchBorrow[aria-pressed='mixed'] .check { background: rgb(var(--color-foreground)); }
+.benchBorrow:active .check { transform: scale(0.9); }
 .benchGo { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
 .benchGo:not(:disabled):active { transform: scale(0.95); }
 /* 담을 때 숫자만 살짝 튀어 오른다. 잠겼다가 풀릴 땐 단추 색이 번진다. */

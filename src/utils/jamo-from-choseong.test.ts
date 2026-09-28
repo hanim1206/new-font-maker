@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { JamoData } from '../types'
-import { jongseongFromChoseong } from './jamoFromChoseong'
+import { jongseongFromChoseong, matchesChoseong } from './jamoFromChoseong'
 
 const stroke = (id: string, x: number) => ({ id, points: [{ x, y: 0 }, { x, y: 1 }], closed: false, thickness: 0.07 })
 
@@ -36,5 +36,15 @@ describe('받침을 초성 모양으로', () => {
     next.strokes![0].points[0].x = 0.99
     expect(choseong.strokes![0].points[0].x).toBe(0.3)
     expect(choseong.strokes![0].id).toBe('a')
+  })
+
+  it('복사한 뒤엔 초성 모양으로 보고, 받침을 고치면 아니다', () => {
+    const choseong: JamoData = { char: 'ㄱ', type: 'choseong', strokes: [stroke('ㄱ-1', 0.2)], frame: { strokes: [stroke('ㄱ-1', 0.1)] } }
+    const jongseong: JamoData = { char: 'ㄱ', type: 'jongseong', strokes: [stroke('ㄱ종-1', 0.5)] }
+    expect(matchesChoseong(choseong, jongseong)).toBe(false)
+    const copied = jongseongFromChoseong(choseong, jongseong)
+    expect(matchesChoseong(choseong, copied)).toBe(true)
+    const edited = { ...copied, strokes: [stroke('ㄱ종-1', 0.3)] }
+    expect(matchesChoseong(choseong, edited)).toBe(false)
   })
 })

@@ -19,3 +19,14 @@ export function jongseongFromChoseong(choseong: JamoData, jongseong: JamoData): 
   if (choseong.geometryMode) next.geometryMode = choseong.geometryMode
   return next
 }
+
+/** 받침이 이미 초성 모양인가. 한 번 더 복사해도 그대로면 같다고 본다(키 순서는 따지지 않는다). */
+export function matchesChoseong(choseong: JamoData, jongseong: JamoData): boolean {
+  return canonical(jongseongFromChoseong(choseong, jongseong)) === canonical(jongseong)
+}
+
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) => (item && typeof item === 'object' && !Array.isArray(item)
+    ? Object.fromEntries(Object.entries(item as Record<string, unknown>).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)))
+    : item))
+}
