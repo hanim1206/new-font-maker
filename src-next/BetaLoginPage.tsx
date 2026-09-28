@@ -4,6 +4,7 @@ import type { FormEvent } from 'react'
 import { signInWithBetaCode } from './betaAuth'
 import type { BetaSignInResult } from './betaAuth'
 import { welcomeNameOf } from './betaWelcome'
+import { markBetaGuidePending } from './betaGuide'
 import styles from './BetaLoginPage.module.css'
 
 const BetaWelcomeGlyphs = lazy(() => import('./BetaWelcomeGlyphs'))
@@ -42,7 +43,8 @@ export function BetaLoginPage({ onSignedIn }: { onSignedIn: () => void }) {
     setBusy(true)
     setFailure('')
     const result = await signInWithBetaCode(code)
-    if (result.ok) { onSignedIn(); return }
+    // 처음 들어온 사람은 대시보드에서 둘러보기 안내가 뜬다(`BetaGuideSheet`).
+    if (result.ok) { markBetaGuidePending(window.localStorage); onSignedIn(); return }
     setFailure(FAILURE_TEXT[result.reason])
     setBusy(false)
   }

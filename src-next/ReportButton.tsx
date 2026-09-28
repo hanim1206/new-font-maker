@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, MapPin, MessageSquareWarning } from 'lucide-react'
+import { Check, CircleHelp, MapPin, MessageSquareWarning } from 'lucide-react'
 import { FEEDBACK_MAX_LENGTH, REPORT_TAGS, REPORT_TAG_LABEL } from './feedback'
 import type { FeedbackContext, ReportTag } from './feedback'
 import { feedbackContextOf } from './feedbackContext'
 import { sendFeedback } from './feedbackApi'
 import { navigate } from './router'
 import { useMe } from './useFeedback'
+import { BetaGuideSheet } from './BetaGuideSheet'
 import styles from './ReportButton.module.css'
 
 /**
@@ -34,6 +35,8 @@ export function ReportSheet({ context, onClose, initialTag = null, initialDraft 
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)
   const [closing, setClosing] = useState(false)
+  // 판 머리 `둘러보기` — 처음 들어올 때 본 안내를 다시 연다. 열면 제보 판 자리를 안내가 차지하고, 안내를 닫으면 같이 닫힌다.
+  const [guide, setGuide] = useState(false)
   const field = useRef<HTMLTextAreaElement>(null)
   const body = draft.trim()
 
@@ -61,6 +64,8 @@ export function ReportSheet({ context, onClose, initialTag = null, initialDraft 
 
   const where = [context.screen, context.font && `"${context.font}"`, context.device].filter(Boolean) as string[]
 
+  if (guide) return <BetaGuideSheet onClose={onClose} />
+
   return createPortal(<div className={styles.layer} data-closing={closing || undefined} onClick={(event) => { if (event.target === event.currentTarget) close() }}>
     <div className={styles.sheet} role="dialog" aria-modal="true" aria-label="이 화면 제보하기" data-testid="report-sheet">
       {sent
@@ -74,7 +79,10 @@ export function ReportSheet({ context, onClose, initialTag = null, initialDraft 
           </div>
         </div>
         : <form onSubmit={(event) => void submit(event)}>
-          <h3>이 화면 제보하기</h3>
+          <div className={styles.head}>
+            <h3>이 화면 제보하기</h3>
+            <button type="button" className={styles.guide} onClick={() => setGuide(true)} data-testid="report-guide"><CircleHelp size={15} aria-hidden="true" />둘러보기</button>
+          </div>
           <div className={styles.tags} role="radiogroup" aria-label="어떤 제보인가요">
             {REPORT_TAGS.map(({ key, label }) => <button
               key={key}

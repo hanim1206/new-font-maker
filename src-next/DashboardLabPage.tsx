@@ -27,6 +27,8 @@ import { ExportNoticeToast } from './workspace/WorkspaceChrome'
 import { PART_COLOR } from './partColors'
 import { randomSampleSentence } from './sampleSentences'
 import { ReportButton } from './ReportButton'
+import { BetaGuideSheet } from './BetaGuideSheet'
+import { markBetaGuideSeen, shouldShowBetaGuide } from './betaGuide'
 import styles from './DashboardLabPage.module.css'
 
 /**
@@ -848,6 +850,8 @@ export function DashboardLabPage() {
   const sheetOpen = sheet === 'open'
   const closeSheet = () => setSheet((state) => state === 'open' ? 'closing' : state)
   useEffect(() => { if (fontList.movingTo !== null) closeSheet() }, [fontList.movingTo])
+  const [guide, setGuide] = useState(() => shouldShowBetaGuide(window.location.search, window.localStorage))
+  const closeGuide = () => { markBetaGuideSeen(window.localStorage); setGuide(false) }
   const head = useRef<HTMLElement>(null)
   const [active, setActive] = useState<SectionId>('style')
   const scroller = useRef<HTMLDivElement>(null)
@@ -944,6 +948,7 @@ export function DashboardLabPage() {
           </div>
         </div>
       </div>
+      {guide && <BetaGuideSheet onClose={closeGuide} />}
       {sheet !== 'closed' && <FontSheet list={fontList} modified={modified} top={head.current?.offsetHeight ?? 50} closing={sheet === 'closing'} onClose={closeSheet} onClosed={() => setSheet('closed')} />}
     </div>
   </main>
