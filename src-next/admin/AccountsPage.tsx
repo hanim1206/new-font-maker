@@ -6,10 +6,10 @@ import { dateOf } from './adminApi'
 import { IssuedCard } from './IssuedCard'
 import type { Account, BetaInvites } from './useBetaInvites'
 
-/** 계정: 발급한 친구 표. 메시지 다시 복사 · 새 코드 · 정지 · 되살리기. 새 코드와 정지는 한 번 더 눌러야 한다. */
+/** 계정: 발급한 친구 표. 메시지 다시 복사 · 새 코드 · 정지 · 되살리기. 새 코드만 한 번 더 눌러야 한다. */
 export function AccountsPage({ invites }: { invites: BetaInvites }) {
   const { accounts, listError, busy, copied, copy, issue, suspend } = invites
-  /** `reissue:<이메일>` · `suspend:<이메일>` — 한 번 누른 위험 단추. */
+  /** `reissue:<이메일>` — 한 번 누른 새 코드 단추(옛 코드가 끊겨 되돌릴 수 없어 두 번 누른다). 정지는 되살리기가 있어 한 번에. */
   const [confirming, setConfirming] = useState<string | null>(null)
   const active = accounts?.filter((account) => !account.suspended) ?? []
   const suspended = accounts?.filter((account) => account.suspended) ?? []
@@ -17,7 +17,7 @@ export function AccountsPage({ invites }: { invites: BetaInvites }) {
   const row = (account: Account) => {
     const name = account.nickname
     const confirm = (action: string) => confirming === `${action}:${account.email}`
-    const press = (action: 'reissue' | 'suspend', run: () => void) => {
+    const press = (action: 'reissue', run: () => void) => {
       if (!confirm(action)) return setConfirming(`${action}:${account.email}`)
       setConfirming(null)
       run()
@@ -40,11 +40,9 @@ export function AccountsPage({ invites }: { invites: BetaInvites }) {
                 {copied === account.email ? '복사함' : '메시지 복사'}
               </Button>}
               {name && <Button size="sm" variant={confirm('reissue') ? 'destructive' : 'secondary'} disabled={busy} onBlur={drop} onClick={() => press('reissue', () => void issue('reissue', name))}>
-                {confirm('reissue') ? '옛 코드 끊고 새로' : '새 코드'}
+                {confirm('reissue') ? '한 번 더 — 옛 코드 끊김' : '새 코드'}
               </Button>}
-              <Button size="sm" variant={confirm('suspend') ? 'destructive' : 'secondary'} disabled={busy} onBlur={drop} onClick={() => press('suspend', () => void suspend(account.email, true))}>
-                {confirm('suspend') ? '로그인 막기' : '정지'}
-              </Button>
+              <Button size="sm" variant="secondary" disabled={busy} onClick={() => void suspend(account.email, true)}>정지</Button>
             </>}
         </div>
       </TableCell>
