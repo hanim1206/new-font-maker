@@ -10,6 +10,7 @@ import { useWorkbenchStore, workbenchSyllable } from '../src/stores/workbenchSto
 import { groupMatching, sameChars, useJamoGroupStore, type JamoGroup } from '../src/stores/jamoGroupStore'
 import type { LayoutSchema, Padding, Part } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
+import { jongseongFromChoseong } from '../src/utils/jamoFromChoseong'
 import { AppGlyph } from './AppGlyph'
 import { editedDayText, FONT_LIMIT, nextFontName } from './accountFont'
 import { createFont, deleteFont, listFonts, renameFont } from './accountFontApi'
@@ -498,6 +499,22 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
     setSheet(null)
     setGroupingId('mine')
   }
+  // 받침만: 담긴 것 중 초성에도 있는 자음을 초성 기본 획으로 한 번 복사한다. 손댄 받침도 덮어쓴다(담은 게 곧 고르기) — 대신 되돌리기.
+  const borrowable = type === 'jongseong' ? benchChars.filter((char) => benchType === type && (CHOSEONG_LIST as readonly string[]).includes(char)) : []
+  const borrowChoseong = () => {
+    const store = useJamoStore.getState()
+    const before = borrowable.map((char) => [char, store.jongseong[char]] as const)
+    const overwritten = borrowable.filter((char) => store.isJamoModified('jongseong', char)).length
+    for (const [char, jamo] of before) {
+      const choseong = store.choseong[char]
+      if (choseong && jamo) store.updateJongseong(char, jongseongFromChoseong(choseong, jamo))
+    }
+    const skipped = benchCount - borrowable.length
+    setToast({
+      text: `${borrowable.length}개 초성 모양으로${overwritten ? ` · 손댄 ${overwritten}개 포함` : ''}${skipped ? ` · 겹받침 ${skipped}개 그대로` : ''}`,
+      undo: () => { for (const [char, jamo] of before) if (jamo) useJamoStore.getState().updateJongseong(char, jamo) },
+    })
+  }
   const deleteGroup = (id: string) => {
     const removed = useJamoGroupStore.getState().remove(id)
     setSheet(null)
@@ -617,6 +634,7 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
         {/* 도마가 이미 있는 묶음과 같으면 그 이름을 칩 끝에 보인다. */}
         {benchGroup && <span key="group" data-chip="__group" className={styles.benchGroupName}>{benchGroup.name}</span>}
       </div></div>
+      {borrowable.length > 0 && <button type="button" className={styles.benchBorrow} onClick={borrowChoseong}>초성 모양으로</button>}
       {benchCount > 0 && <button type="button" className={styles.benchClear} aria-label="도마 비우기" onClick={clear}><Trash2 size={18} aria-hidden="true" /></button>}
       <button type="button" className={styles.benchGo} disabled={benchCount === 0} onClick={() => openEditor(type, benchChars)}>{/* 숫자가 바뀔 때마다 새로 떠오른다 — key가 바뀌면 애니메이션이 다시 돈다. */}<span key={benchCount} className={styles.benchCount}>{benchCount}</span>개 고치기</button>
     </footer>
