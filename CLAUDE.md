@@ -58,6 +58,7 @@ React 19 + TypeScript 5.8 (strict) + Vite. 상태는 Zustand + Immer. 스타일�
 
 ```bash
 npm run dev            # 개발 서버
+npm run dev:nogate -- --port 4191  # 확인용 서버(로그인 게이트 끔). Playwright·스크린샷 스크립트는 이걸로 띄운다
 npm run build          # tsc -b + vite build
 npm test               # vitest (src, src-next)
 npm run test:e2e       # playwright

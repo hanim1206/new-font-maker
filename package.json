@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:nogate": "VITE_AUTH_GATE=off vite --host 127.0.0.1 --strictPort",
     "reference:lab": "node scripts/reference-lab/start.mjs",
     "font:check": "python3 -B scripts/font-check/check_otf.py",
     "font:sample": "vite-node scripts/font-check/exportSampleOtf.ts",
