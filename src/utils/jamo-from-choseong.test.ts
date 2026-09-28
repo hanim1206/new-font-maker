@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { JamoData } from '../types'
-import { jongseongFromChoseong, matchesChoseong } from './jamoFromChoseong'
+import { CLUSTER_SPLIT, borrowFromChoseong, canBorrowFromChoseong, clusterFromChoseong, jongseongFromChoseong, matchesChoseong } from './jamoFromChoseong'
 
 const stroke = (id: string, x: number) => ({ id, points: [{ x, y: 0 }, { x, y: 1 }], closed: false, thickness: 0.07 })
 
@@ -41,10 +41,54 @@ describe('받침을 초성 모양으로', () => {
   it('복사한 뒤엔 초성 모양으로 보고, 받침을 고치면 아니다', () => {
     const choseong: JamoData = { char: 'ㄱ', type: 'choseong', strokes: [stroke('ㄱ-1', 0.2)], frame: { strokes: [stroke('ㄱ-1', 0.1)] } }
     const jongseong: JamoData = { char: 'ㄱ', type: 'jongseong', strokes: [stroke('ㄱ종-1', 0.5)] }
-    expect(matchesChoseong(choseong, jongseong)).toBe(false)
+    expect(matchesChoseong({ 'ㄱ': choseong }, jongseong)).toBe(false)
     const copied = jongseongFromChoseong(choseong, jongseong)
-    expect(matchesChoseong(choseong, copied)).toBe(true)
+    expect(matchesChoseong({ 'ㄱ': choseong }, copied)).toBe(true)
     const edited = { ...copied, strokes: [stroke('ㄱ종-1', 0.3)] }
-    expect(matchesChoseong(choseong, edited)).toBe(false)
+    expect(matchesChoseong({ 'ㄱ': choseong }, edited)).toBe(false)
+  })
+})
+
+describe('겹받침을 초성 둘로', () => {
+  const front: JamoData = { char: 'ㄱ', type: 'choseong', strokes: [{ id: 'ㄱ-1', points: [{ x: 0, y: 0 }, { x: 1, y: 0, handleOut: { x: 0.5, y: 0.2 } }, { x: 1, y: 1 }], closed: false, thickness: 0.07 }] }
+  const back: JamoData = { char: 'ㅅ', type: 'choseong', strokes: [stroke('ㅅ-left', 0.5), stroke('ㅅ-right', 1)] }
+  const cluster: JamoData = { char: 'ㄳ', type: 'jongseong', strokes: [stroke('ㄳ종-1', 0.2)] }
+
+  it('앞 초성은 왼쪽 구간, 뒤 초성은 오른쪽 구간에 x만 눌러 넣고 id를 받침 꼴로 이어 붙인다', () => {
+    const next = clusterFromChoseong(front, back, cluster)
+    expect(next.strokes!.map((s) => s.id)).toEqual(['ㄳ종-1', 'ㄳ종-2', 'ㄳ종-3'])
+    const { from, to } = CLUSTER_SPLIT.front
+    expect(next.strokes![0].points.map((p) => p.x)).toEqual([from, to, to])
+    expect(next.strokes![0].points.map((p) => p.y)).toEqual([0, 0, 1])
+    expect(next.strokes![0].points[1].handleOut).toEqual({ x: from + 0.5 * (to - from), y: 0.2 })
+    expect(next.strokes![1].points[0].x).toBeCloseTo(CLUSTER_SPLIT.back.from + 0.5 * (CLUSTER_SPLIT.back.to - CLUSTER_SPLIT.back.from))
+    expect(next.strokes![2].points[0].x).toBe(CLUSTER_SPLIT.back.to)
+    expect(next.strokes![0].thickness).toBe(0.07)
+  })
+
+  it('한쪽에만 틀이 있으면 틀 없는 쪽은 그 획을 틀 자리에 넣는다', () => {
+    const framed: JamoData = { ...front, frame: { strokes: [stroke('f', 0.5)] } }
+    const next = clusterFromChoseong(framed, back, cluster)
+    expect(next.frame!.strokes!.map((s) => s.id)).toEqual(['ㄳ종-1', 'ㄳ종-2', 'ㄳ종-3'])
+    expect(next.frame!.strokes![0].points[0].x).toBeCloseTo(0.5 * CLUSTER_SPLIT.front.to)
+    expect(next.frame!.strokes![2].points[0].x).toBe(CLUSTER_SPLIT.back.to)
+    expect(clusterFromChoseong(front, back, cluster).frame).toBeUndefined()
+  })
+
+  it('앞 · 뒤 초성이 둘 다 있어야 가져올 수 있고, 가져온 뒤엔 초성 모양으로 본다', () => {
+    expect(canBorrowFromChoseong({ 'ㄱ': front }, 'ㄳ')).toBe(false)
+    expect(canBorrowFromChoseong({ 'ㄱ': front, 'ㅅ': back }, 'ㄳ')).toBe(true)
+    expect(canBorrowFromChoseong({ 'ㄱ': front, 'ㅅ': back }, 'ㄲ')).toBe(false)
+    expect(borrowFromChoseong({ 'ㄱ': front }, cluster)).toBeNull()
+    const choseongJamos = { 'ㄱ': front, 'ㅅ': back }
+    expect(matchesChoseong(choseongJamos, cluster)).toBe(false)
+    const copied = borrowFromChoseong(choseongJamos, cluster)!
+    expect(copied).toEqual(clusterFromChoseong(front, back, cluster))
+    expect(matchesChoseong(choseongJamos, copied)).toBe(true)
+  })
+
+  it('초성 원본을 건드리지 않는다', () => {
+    clusterFromChoseong(front, back, cluster).strokes![0].points[1].handleOut!.x = 0.99
+    expect(front.strokes![0].points[1].handleOut).toEqual({ x: 0.5, y: 0.2 })
   })
 })
