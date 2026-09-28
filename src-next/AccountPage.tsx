@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { ArrowUp, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowUp, Bug, ChevronLeft, ChevronRight, Eye, Heart, MessageCircle, MessageSquareWarning, Sparkles } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { FONT_LIMIT } from './accountFont'
 import { listFonts } from './accountFontApi'
 import { authGateMode, signOutAndReload } from './betaAuth'
-import { FEEDBACK_MAX_LENGTH, hasUnseenReply, markSeen, readSeen, STATUS_LABEL, threadsOf, whenText } from './feedback'
-import type { FeedbackMessage } from './feedback'
+import { FEEDBACK_MAX_LENGTH, REPORT_TAG_LABEL, hasUnseenReply, markSeen, readSeen, STATUS_LABEL, threadsOf, whenText } from './feedback'
+import type { FeedbackMessage, ReportTag } from './feedback'
 import { feedbackContextOf } from './feedbackContext'
 import { sendFeedback } from './feedbackApi'
 import { useMe, useThreads } from './useFeedback'
@@ -65,31 +66,46 @@ function AccountHome() {
   </Shell>
 }
 
-/** 내가 보낸 의견 목록. 쓰기는 화면 머리의 제보 단추(`ReportButton`)가 한다 — 그 화면 정보가 같이 가게. */
+/** 갈래 태그별 목록 아이콘. 태그가 없는 옛 의견은 말풍선. */
+const TAG_ICON: Record<ReportTag, LucideIcon> = { broken: Bug, odd: Eye, wish: Sparkles, praise: Heart, other: MessageCircle }
+
+/**
+ * 내가 보낸 의견(토스식). 큰 두 줄 제목에 보낸 개수, 옅은 안내 한 줄, 줄마다 갈래 색 아이콘 · 글 · 화면 · 상태.
+ * 쓰기는 화면 머리의 제보 단추(`ReportButton`)가 한다 — 그 화면 정보가 같이 가게.
+ */
 function FeedbackHome() {
   const me = useMe()
   const { threads, failed } = useThreads(me)
   const seen = me ? readSeen(window.localStorage, me.id) : {}
+  const count = threads?.length ?? 0
 
   return <Shell testId="feedback-page">
-    <Bar back="/account" />
+    <Bar back="/account" title="내가 보낸 의견" />
     <div className={styles.body}>
-      <h1>내가 보낸 의견</h1>
-      <p className={styles.sub}>화면 머리의 빨간 제보 단추로 그 화면에 대해 보낼 수 있어요.</p>
-      {threads && threads.length === 0 && <p className={styles.empty} data-testid="feedback-empty">아직 보낸 의견이 없어요.</p>}
-      {(threads?.length ?? 0) > 0 && <section className={styles.threads}>
-        <ul>
-          {threads!.map((thread) => {
-            const unseen = hasUnseenReply(thread, seen)
-            return <li key={thread.id}>
-              <button type="button" onClick={() => navigate(`/account/feedback/${thread.id}`)} data-testid="feedback-thread">
+      <h1 className={styles.mineTitle} data-testid="feedback-count">
+        {count > 0 ? <>지금까지 의견을<br /><em>{count}개</em> 보냈어요</> : <>피드백은<br />언제나 환영해요</>}
+      </h1>
+      <p className={styles.mineHint}>
+        {count > 0 && '피드백은 언제나 환영해요. '}화면 위 <span className={styles.reportIcon} aria-label="제보 단추"><MessageSquareWarning size={12} aria-hidden="true" /></span> 를 누르면 그 화면에 대해 보낼 수 있어요.
+      </p>
+      {count > 0 && <ul className={styles.mine}>
+        {threads!.map((thread) => {
+          const unseen = hasUnseenReply(thread, seen)
+          const tag = thread.first.context?.tag ?? null
+          const Icon = TAG_ICON[tag ?? 'other']
+          return <li key={thread.id}>
+            <button type="button" onClick={() => navigate(`/account/feedback/${thread.id}`)} data-testid="feedback-thread">
+              <span className={styles.mineIcon} data-tag={tag ?? 'other'}><Icon size={20} aria-hidden="true" /></span>
+              <span className={styles.mineText}>
                 <strong>{thread.first.body}</strong>
-                <small data-new={unseen || undefined}>{thread.first.context?.screen ? `${thread.first.context.screen} · ` : ''}{unseen ? '답장 왔어요' : STATUS_LABEL[thread.status]} · {whenText(thread.updatedAt)}</small>
-              </button>
-            </li>
-          })}
-        </ul>
-      </section>}
+                <small>{[thread.first.context?.screen, tag && REPORT_TAG_LABEL[tag], whenText(thread.updatedAt)].filter(Boolean).join(' · ')}</small>
+              </span>
+              <span className={styles.mineState} data-new={unseen || undefined} data-status={thread.status}>{unseen ? '답장 왔어요' : STATUS_LABEL[thread.status]}</span>
+              <ChevronRight size={18} aria-hidden="true" />
+            </button>
+          </li>
+        })}
+      </ul>}
       {failed && <p className={styles.error}>보낸 의견을 불러오지 못했어요.</p>}
     </div>
   </Shell>

@@ -27,14 +27,29 @@
 
 .error { margin: 10px 0 0; color: rgb(190 52 48); font-size: 13px; }
 
-.threads { margin-top: 20px; }
-.empty { margin: 32px 0 0; color: rgb(var(--color-text-5)); font-size: 15px; }
-.threads ul { margin: 0; padding: 0; list-style: none; }
-.threads button { width: 100%; min-height: 64px; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 12px 0; border: 0; background: transparent; color: rgb(var(--color-foreground)); font: inherit; text-align: left; }
-.threads strong { overflow: hidden; font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.threads small { color: rgb(var(--color-text-4)); font-size: 13px; }
+/* 내가 보낸 의견(토스식). 큰 두 줄 제목 · 숫자만 파랑, 옅은 안내 한 줄, 선 없는 줄 목록. */
+.body h1.mineTitle { margin: 12px 0 10px; font-size: 26px; font-weight: 800; line-height: 1.35; letter-spacing: -.02em; }
+.mineTitle em { color: rgb(var(--color-primary)); font-style: normal; }
+.mineHint { margin: 0; color: rgb(var(--color-text-4)); font-size: 15px; line-height: 1.6; word-break: keep-all; }
+.reportIcon { width: 20px; height: 20px; display: inline-grid; place-items: center; margin: 0 1px; vertical-align: -4px; border-radius: 6px; background: rgb(253 236 233); color: rgb(214 50 31); }
+.mine { margin: 28px -12px 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.mine button { width: 100%; min-height: 72px; display: flex; align-items: center; gap: 14px; padding: 12px; border: 0; border-radius: 16px; background: transparent; color: rgb(var(--color-foreground)); font: inherit; text-align: left; transition: background-color var(--motion-fast) var(--ease-standard); }
+.mine button:active { background: rgb(var(--color-surface-2)); }
+.mine button > svg { flex: none; color: rgb(var(--color-text-5)); }
+.mineIcon { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 14px; background: var(--tag-bg); color: var(--tag); }
+.mineIcon[data-tag='broken'] { --tag: rgb(214 50 31); --tag-bg: rgb(253 236 233); }
+.mineIcon[data-tag='odd'] { --tag: rgb(196 100 0); --tag-bg: rgb(255 243 224); }
+.mineIcon[data-tag='wish'] { --tag: rgb(35 88 201); --tag-bg: rgb(232 240 255); }
+.mineIcon[data-tag='praise'] { --tag: rgb(22 128 72); --tag-bg: rgb(228 245 235); }
+.mineIcon[data-tag='other'] { --tag: rgb(var(--color-text-3)); --tag-bg: rgb(var(--color-surface-3)); }
+.mineText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.mineText strong { overflow: hidden; font-size: 16px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.mineText small { overflow: hidden; color: rgb(var(--color-text-4)); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.mineState { flex: none; color: rgb(var(--color-text-5)); font-size: 13px; font-weight: 600; }
+.mineState[data-status='replied'] { color: rgb(var(--color-text-3)); }
+.mineState[data-new] { color: rgb(var(--color-primary)); font-weight: 700; }
+
 /* 새 답장은 굵은 검정. 파랑은 쓰지 않는다. */
-.threads small[data-new] { color: rgb(var(--color-foreground)); font-weight: 700; }
 
 .chat { flex: 1; display: flex; flex-direction: column; gap: 18px; padding: 12px 24px 16px; }
 .message { max-width: 82%; display: flex; flex-direction: column; gap: 6px; }

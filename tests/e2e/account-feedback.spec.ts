@@ -37,7 +37,9 @@ test('머리 제보 단추로 보내면 내가 보낸 의견 · 대화에 뜬다
   await expect(page.getByTestId('feedback-page')).toContainText('내가 보낸 의견')
   await expect(page.getByTestId('feedback-page').locator('textarea')).toHaveCount(0)
   await expect(page.getByTestId('feedback-thread')).toHaveCount(1)
-  await expect(page.getByTestId('feedback-thread')).toContainText('대시보드 · 보냈어요')
+  await expect(page.getByTestId('feedback-count')).toContainText('1개 보냈어요')
+  await expect(page.getByTestId('feedback-thread')).toContainText('대시보드 · 이상해 보여요')
+  await expect(page.getByTestId('feedback-thread')).toContainText('보냈어요')
 
   await page.getByTestId('feedback-thread').click()
   await expect(page.getByTestId('feedback-thread-page')).toContainText('꽤 첫 ㄱ이 ㅗ랑 부딪혀요')
