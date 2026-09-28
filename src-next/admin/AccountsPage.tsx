@@ -6,10 +6,10 @@ import { dateOf } from './adminApi'
 import { IssuedCard } from './IssuedCard'
 import type { Account, BetaInvites } from './useBetaInvites'
 
-/** 계정: 발급한 친구 표. 메시지 다시 복사 · 새 코드 · 정지 · 되살리기. 새 코드만 한 번 더 눌러야 한다. */
+/** 계정: 발급한 친구 표. 메시지 다시 복사 · 새 코드 · 정지 · 되살리기 · 삭제. 새 코드와 삭제는 한 번 더 눌러야 한다. */
 export function AccountsPage({ invites }: { invites: BetaInvites }) {
-  const { accounts, listError, busy, copied, copy, issue, suspend } = invites
-  /** `reissue:<이메일>` — 한 번 누른 새 코드 단추(옛 코드가 끊겨 되돌릴 수 없어 두 번 누른다). 정지는 되살리기가 있어 한 번에. */
+  const { accounts, listError, busy, copied, copy, issue, suspend, remove } = invites
+  /** `reissue:<이메일>` · `remove:<이메일>` — 한 번 누른 새 코드 · 삭제 단추(되돌릴 수 없어 두 번 누른다). 정지는 되살리기가 있어 한 번에. */
   const [confirming, setConfirming] = useState<string | null>(null)
   const active = accounts?.filter((account) => !account.suspended) ?? []
   const suspended = accounts?.filter((account) => account.suspended) ?? []
@@ -17,7 +17,7 @@ export function AccountsPage({ invites }: { invites: BetaInvites }) {
   const row = (account: Account) => {
     const name = account.nickname
     const confirm = (action: string) => confirming === `${action}:${account.email}`
-    const press = (action: 'reissue', run: () => void) => {
+    const press = (action: 'reissue' | 'remove', run: () => void) => {
       if (!confirm(action)) return setConfirming(`${action}:${account.email}`)
       setConfirming(null)
       run()
@@ -34,7 +34,12 @@ export function AccountsPage({ invites }: { invites: BetaInvites }) {
       <TableCell>
         <div className="flex justify-end gap-1.5">
           {account.suspended
-            ? <Button size="sm" variant="secondary" disabled={busy} onClick={() => void suspend(account.email, false)}>되살리기</Button>
+            ? <>
+              <Button size="sm" variant="secondary" disabled={busy} onClick={() => void suspend(account.email, false)}>되살리기</Button>
+              <Button size="sm" variant={confirm('remove') ? 'destructive' : 'secondary'} disabled={busy} onBlur={drop} onClick={() => press('remove', () => void remove(account.email))} data-testid="admin-account-remove">
+                {confirm('remove') ? `한 번 더 — ${name ?? '이 계정'} 폰트까지 지움` : '삭제'}
+              </Button>
+            </>
             : <>
               {account.invite && <Button size="sm" variant={copied === account.email ? 'primary' : 'secondary'} onClick={() => void copy(account.email, account.invite!.message)}>
                 {copied === account.email ? '복사함' : '메시지 복사'}
@@ -54,7 +59,7 @@ export function AccountsPage({ invites }: { invites: BetaInvites }) {
     {invites.issued?.mode === 'reissue' && <div className="max-w-lg"><IssuedCard invites={invites} /></div>}
     {listError && <p className="text-sm text-[rgb(190_52_48)]">{listError}</p>}
     <p className="text-sm text-text-dim-4">
-      {accounts ? `사용 중 ${active.length} · 정지 ${suspended.length}` : '불러오는 중…'} · 정지는 로그인만 막아요. 폰트와 코드는 그대로예요.
+      {accounts ? `사용 중 ${active.length} · 정지 ${suspended.length}` : '불러오는 중…'} · 정지는 로그인만 막아요. 폰트와 코드는 그대로예요. 정지한 계정은 삭제할 수 있고, 폰트와 의견까지 지워져 되살릴 수 없어요.
     </p>
     {accounts && <Table>
       <TableHeader>

@@ -7,7 +7,7 @@ export interface NewRow { nickname: string; memo: string }
 export type Issued = Invite & { mode: 'add' | 'reissue' }
 
 /**
- * 베타 계정 목록 · 발급 · 정지. 초대 화면과 계정 화면이 한 벌을 같이 쓴다 — 계정 화면에서 `새 코드`를 누르면 결과 카드가 거기 뜬다.
+ * 베타 계정 목록 · 발급 · 정지 · 삭제. 초대 화면과 계정 화면이 한 벌을 같이 쓴다 — 계정 화면에서 `새 코드`를 누르면 결과 카드가 거기 뜬다.
  * 발급한 코드는 이 맥 파일(`beta-accounts/`)에 남는다. 그 전 계정은 코드를 몰라 `새 코드`로.
  */
 export function useBetaInvites() {
@@ -84,6 +84,20 @@ export function useBetaInvites() {
     void refresh()
   }
 
+  /** 완전 삭제. 정지한 계정만 서버가 받는다. 폰트 · 의견 · 이 맥의 코드 · 메모까지 없어진다. */
+  const remove = async (email: string) => {
+    if (busy) return
+    setBusy(true)
+    setFailure('')
+    try {
+      await adminCall(BETA_INVITE_API, 'DELETE', { email })
+    } catch (error) {
+      setFailure((error as Error).message)
+    }
+    setBusy(false)
+    void refresh()
+  }
+
   const copy = async (key: string, message: string) => {
     try {
       await navigator.clipboard.writeText(message)
@@ -93,7 +107,7 @@ export function useBetaInvites() {
     }
   }
 
-  return { accounts, listError, busy, failure, issued, copied, issue, issueMany, suspend, copy }
+  return { accounts, listError, busy, failure, issued, copied, issue, issueMany, suspend, remove, copy }
 }
 
 export type BetaInvites = ReturnType<typeof useBetaInvites>

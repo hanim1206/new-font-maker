@@ -6,7 +6,7 @@ export const ADMIN_PATH = '/admin'
 export type Section = 'invite' | 'accounts' | 'feedback' | 'triage'
 export const SECTIONS: { key: Section; label: string; icon: LucideIcon; hint: string }[] = [
   { key: 'invite', label: '초대', icon: Ticket, hint: '닉네임 · 메모를 적어 여러 명 한 번에' },
-  { key: 'accounts', label: '계정', icon: Users, hint: '새 코드 · 정지 · 되살리기' },
+  { key: 'accounts', label: '계정', icon: Users, hint: '새 코드 · 정지 · 되살리기 · 삭제' },
   { key: 'feedback', label: '의견', icon: MessageSquare, hint: '친구가 보낸 의견 읽고 답장' },
   { key: 'triage', label: '선별', icon: Filter, hint: '의견을 묶고 걸러 보드로' },
 ]

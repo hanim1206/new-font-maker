@@ -49,7 +49,7 @@ export interface BetaAccount {
   lastSignInAt: string | null
   /** 이 맥에 남은 코드와 메시지. 모르면 없음. */
   invite?: BetaInvite
-  /** 정지됨 — 로그인 못 한다. 폰트는 그대로라 되살리면 이어서 쓴다. */
+  /** 정지됨 — 로그인 못 한다. 폰트는 그대로라 되살리면 이어서 쓴다. 정지한 계정만 완전 삭제할 수 있다. */
   suspended: boolean
   /** 발급할 때 적은 메모. 없으면 빈 글. */
   memo: string
@@ -68,6 +68,8 @@ const randomBytes = (length: number) => webcrypto.getRandomValues(new Uint8Array
 const nicknameOf = (user: User): string | null => user.user_metadata?.nickname ?? null
 /** 정지 기간. Supabase에 '영구'가 없어 100년으로 둔다. */
 const SUSPEND_DURATION = '876000h'
+/** 친구 폰트 테이블. 계정을 지울 때 먼저 비운다. */
+const FONT_TABLE = 'font_projects'
 const isSuspended = (user: User): boolean => Boolean(user.banned_until && Date.parse(user.banned_until) > Date.now())
 
 /** 계정 이메일 → 마지막으로 준 코드. */
@@ -121,6 +123,19 @@ export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
     memos[email] = memo
     await mkdir(path.dirname(memoFile), { recursive: true })
     await writeFile(memoFile, `${JSON.stringify(memos, null, 2)}\n`, { mode: 0o600 })
+  }
+
+  /** 지운 계정의 코드 · 메모를 이 맥 파일에서도 뺀다. */
+  async function forgetLocal(email: string): Promise<void> {
+    const [book, memos] = await Promise.all([readCodes(), readMemos()])
+    if (email in book) {
+      delete book[email]
+      await writeFile(codeFile, `${JSON.stringify(book, null, 2)}\n`, { mode: 0o600 })
+    }
+    if (email in memos) {
+      delete memos[email]
+      await writeFile(memoFile, `${JSON.stringify(memos, null, 2)}\n`, { mode: 0o600 })
+    }
   }
 
   async function saveCode(email: string, nickname: string, code: string): Promise<void> {
@@ -193,5 +208,22 @@ export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
     if (error) throw new Error(`${nicknameOf(user) ?? email}: ${error.message}`)
   }
 
-  return { list, issue, setSuspended }
+  /**
+   * 완전 삭제. 정지한 계정만 — 정지 다음 단계로만 지운다. 되살릴 수 없다.
+   * 폰트(`font_projects`)를 먼저 지운다. 이 테이블은 마이그레이션 밖에서 만들어 계정 연결 설정을 믿지 않는다.
+   * 의견(`feedback_messages`)은 계정에 `on delete cascade`로 묶여 같이 없어진다. 이 맥의 코드 · 메모도 뺀다.
+   */
+  async function remove(email: string): Promise<void> {
+    const user = (await allUsers()).find((candidate) => candidate.email === email && isBeta(candidate))
+    if (!user) throw new Error(`없는 베타 계정입니다: ${email}`)
+    const name = nicknameOf(user) ?? email
+    if (!isSuspended(user)) throw new Error(`${name}: 정지한 계정만 지울 수 있어요.`)
+    const fonts = await supabase.from(FONT_TABLE).delete().eq('user_id', user.id)
+    if (fonts.error) throw new Error(`${name} 폰트: ${fonts.error.message}`)
+    const { error } = await admin.deleteUser(user.id)
+    if (error) throw new Error(`${name}: ${error.message}`)
+    await forgetLocal(email)
+  }
+
+  return { list, issue, setSuspended, remove }
 }

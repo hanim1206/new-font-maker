@@ -69,7 +69,13 @@ export function betaInviteApiPlugin(root: string): Plugin {
             await service().setSuspended(email, suspended)
             return send(response, 200, { email, suspended })
           }
-          if (request.method !== 'POST') return send(response, 405, { error: 'GET · POST · PATCH만 받습니다.' })
+          if (request.method === 'DELETE') {
+            const { email } = await readJson(request) as { email?: string }
+            if (!email) return send(response, 400, { error: '지울 계정이 없습니다.' })
+            await service().remove(email)
+            return send(response, 200, { email })
+          }
+          if (request.method !== 'POST') return send(response, 405, { error: 'GET · POST · PATCH · DELETE만 받습니다.' })
 
           const body = await readJson(request) as { mode?: BetaIssueMode; nickname?: string; rows?: { nickname?: string; memo?: string }[] }
           // 여러 명 한 번에(초대 표). 한 명이 틀려도 아무도 만들지 않는다.

@@ -14,7 +14,7 @@ export class AdminApiError extends Error {
   }
 }
 
-export async function adminCall<T>(api: string, method: 'GET' | 'POST' | 'PATCH' = 'GET', payload?: unknown): Promise<T> {
+export async function adminCall<T>(api: string, method: 'GET' | 'POST' | 'PATCH' | 'DELETE' = 'GET', payload?: unknown): Promise<T> {
   const response = await fetch(api, payload === undefined
     ? { method, headers: { [HEADER]: '1' } }
     : { method, headers: { [HEADER]: '1', 'content-type': 'application/json' }, body: JSON.stringify(payload) })
