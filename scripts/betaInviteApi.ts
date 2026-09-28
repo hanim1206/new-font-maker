@@ -18,6 +18,10 @@ import type { BetaInvite, BetaIssueMode } from './betaInvites'
 export const BETA_INVITE_API = '/api/beta-invites'
 export const BETA_INVITE_HEADER = 'x-beta-admin'
 
+/** 초대 표 한 번에 발급하는 최대 인원 · 메모 길이. */
+const BATCH_MAX = 30
+const MEMO_MAX_LENGTH = 200
+
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
 
 function send(response: ServerResponse, status: number, body: unknown): void {
@@ -47,7 +51,7 @@ export function rejectReasonOf(request: Pick<IncomingMessage, 'headers'> & { soc
 
 export function betaInviteApiPlugin(root: string): Plugin {
   let mode = 'development'
-  const invites = () => createBetaInvites(betaInviteEnvOf(loadEnv(mode, root, '')), path.join(root, BETA_CODE_FILE))
+  const service = () => createBetaInvites(betaInviteEnvOf(loadEnv(mode, root, '')), path.join(root, BETA_CODE_FILE))
 
   return {
     name: 'beta-invite-api',
@@ -58,25 +62,37 @@ export function betaInviteApiPlugin(root: string): Plugin {
         const rejected = rejectReasonOf(request)
         if (rejected) return send(response, 403, { error: rejected })
         try {
-          if (request.method === 'GET') return send(response, 200, { accounts: await invites().list() })
+          if (request.method === 'GET') return send(response, 200, { accounts: await service().list() })
           if (request.method === 'PATCH') {
             const { email, suspended } = await readJson(request) as { email?: string; suspended?: boolean }
             if (!email || typeof suspended !== 'boolean') return send(response, 400, { error: '정지할 계정이 없습니다.' })
-            await invites().setSuspended(email, suspended)
+            await service().setSuspended(email, suspended)
             return send(response, 200, { email, suspended })
           }
           if (request.method !== 'POST') return send(response, 405, { error: 'GET · POST · PATCH만 받습니다.' })
 
-          const body = await readJson(request) as { mode?: BetaIssueMode; nickname?: string }
+          const body = await readJson(request) as { mode?: BetaIssueMode; nickname?: string; rows?: { nickname?: string; memo?: string }[] }
+          // 여러 명 한 번에(초대 표). 한 명이 틀려도 아무도 만들지 않는다.
+          if (body.mode === 'add' && Array.isArray(body.rows)) {
+            const rows = body.rows.map((row) => ({ nickname: row.nickname?.trim() ?? '', memo: (row.memo ?? '').trim().slice(0, MEMO_MAX_LENGTH) }))
+            if (rows.length === 0 || rows.length > BATCH_MAX) return send(response, 400, { error: `한 번에 1~${BATCH_MAX}명까지 발급합니다.` })
+            const wrong = rows.find((row) => !isDrawableName(row.nickname))
+            if (wrong) return send(response, 400, { error: `닉네임은 한글 1~6자로 넣어 주세요: ${wrong.nickname || '(빈 칸)'}` })
+            const names = rows.map((row) => row.nickname)
+            const twice = names.find((name, index) => names.indexOf(name) !== index)
+            if (twice) return send(response, 400, { error: `같은 닉네임이 두 번 있습니다: ${twice}` })
+            const batch = await service().issue('add', names, undefined, Object.fromEntries(rows.map((row) => [row.nickname, row.memo])))
+            return send(response, 200, { invites: batch })
+          }
           const nickname = body.nickname?.trim() ?? ''
           if (body.mode !== 'add' && body.mode !== 'reissue') return send(response, 400, { error: '발급 방식이 틀렸습니다.' })
           if (body.mode === 'add' && !isDrawableName(nickname)) return send(response, 400, { error: '닉네임은 한글 1~6자로 넣어 주세요.' })
           if (!nickname) return send(response, 400, { error: '닉네임이 없습니다.' })
-          const [invite] = await invites().issue(body.mode, [nickname])
+          const [invite] = await service().issue(body.mode, [nickname])
           return send(response, 200, { invite })
         } catch (error) {
           const issued = (error as { issued?: BetaInvite[] }).issued ?? []
-          return send(response, 500, { error: error instanceof Error ? error.message : String(error), invite: issued[0] })
+          return send(response, 500, { error: error instanceof Error ? error.message : String(error), invite: issued[0], invites: issued })
         }
       })
     },

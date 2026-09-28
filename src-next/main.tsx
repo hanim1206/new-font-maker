@@ -112,10 +112,10 @@ function adoptLocalCopy(): void {
  */
 async function gate(): Promise<void> {
   if (window.location.pathname === FONTS_PATH) window.history.replaceState(null, '', DASHBOARD_PATH)
-  // 베타 초대 관리자 화면. 개발 서버에서만, 로그인과 상관없이(발급 API가 이 맥에서만 받는다). 배포 번들에는 없다.
-  if (import.meta.env.DEV && window.location.pathname === ADMIN_PATH) {
-    const { AdminInvitePage } = await import('./AdminInvitePage')
-    show(<AdminInvitePage />)
+  // 관리자 화면(`/admin/*`). 개발 서버에서만, 로그인과 상관없이(발급 API가 이 맥에서만 받는다). 배포 번들에는 없다.
+  if (import.meta.env.DEV && (window.location.pathname === ADMIN_PATH || window.location.pathname.startsWith(`${ADMIN_PATH}/`))) {
+    const { AdminApp } = await import('./admin/AdminApp')
+    show(<AdminApp />)
     return
   }
   const mode = authGateMode()

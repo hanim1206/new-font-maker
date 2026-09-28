@@ -2,7 +2,7 @@ import tailwindAnimate from 'tailwindcss-animate'
 
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  content: ['./index.html', './src/**/*.{ts,tsx}', './src-next/admin/**/*.{ts,tsx}', './src-next/components/ui/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {

@@ -15,6 +15,8 @@ import { betaCredentialsOf, betaInviteLinkOf, betaInviteMessage, DEFAULT_BETA_EM
 
 /** 발급한 코드를 남기는 파일(레포 기준). `beta-accounts/`는 gitignore. */
 export const BETA_CODE_FILE = 'beta-accounts/codes.json'
+/** 친구마다 한임이 적는 메모(계정 이메일 → 글). 친구 계정 메타데이터에 두면 친구가 자기 토큰으로 읽을 수 있어 이 맥에 둔다. */
+const MEMO_FILE_NAME = 'memos.json'
 
 export interface BetaInviteEnv {
   supabaseUrl: string
@@ -49,6 +51,8 @@ export interface BetaAccount {
   invite?: BetaInvite
   /** 정지됨 — 로그인 못 한다. 폰트는 그대로라 되살리면 이어서 쓴다. */
   suspended: boolean
+  /** 발급할 때 적은 메모. 없으면 빈 글. */
+  memo: string
 }
 
 export interface BetaInvite {
@@ -108,6 +112,17 @@ export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
     try { return JSON.parse(await readFile(codeFile, 'utf8')) as CodeBook } catch { return {} }
   }
 
+  const memoFile = path.join(path.dirname(codeFile), MEMO_FILE_NAME)
+  async function readMemos(): Promise<Record<string, string>> {
+    try { return JSON.parse(await readFile(memoFile, 'utf8')) as Record<string, string> } catch { return {} }
+  }
+  async function saveMemo(email: string, memo: string): Promise<void> {
+    const memos = await readMemos()
+    memos[email] = memo
+    await mkdir(path.dirname(memoFile), { recursive: true })
+    await writeFile(memoFile, `${JSON.stringify(memos, null, 2)}\n`, { mode: 0o600 })
+  }
+
   async function saveCode(email: string, nickname: string, code: string): Promise<void> {
     const book = await readCodes()
     book[email] = { nickname, code, issuedAt: new Date().toISOString() }
@@ -117,7 +132,7 @@ export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
 
   /** 지금 베타 계정. 새로 만든 게 위로. 이 맥에 코드가 남아 있으면 메시지까지. */
   async function list(): Promise<BetaAccount[]> {
-    const [users, book] = await Promise.all([allUsers(), readCodes()])
+    const [users, book, memos] = await Promise.all([allUsers(), readCodes(), readMemos()])
     return users
       .filter(isBeta)
       .map((user) => {
@@ -127,6 +142,7 @@ export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
           nickname, email: user.email!, createdAt: user.created_at, lastSignInAt: user.last_sign_in_at ?? null,
           invite: saved ? inviteOf(nickname ?? saved.nickname, saved.code) : undefined,
           suspended: isSuspended(user),
+          memo: memos[user.email!] ?? '',
         }
       })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -135,8 +151,9 @@ export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
   /**
    * `add`: 닉네임마다 새 계정 + 코드. `reissue`: 코드를 잊었을 때 같은 계정에 새 코드(폰트는 그대로).
    * 하나씩 만들고, 중간에 실패하면 그때까지 만든 것을 `issued`에 담아 던진다 — 만든 코드를 잃지 않게.
+   * `memos`(닉네임 → 메모)는 `add`에서 새 계정과 같이 남긴다.
    */
-  async function issue(mode: BetaIssueMode, nicknames: string[], onIssued?: (invite: BetaInvite) => void): Promise<BetaInvite[]> {
+  async function issue(mode: BetaIssueMode, nicknames: string[], onIssued?: (invite: BetaInvite) => void, memos: Record<string, string> = {}): Promise<BetaInvite[]> {
     const users = await allUsers()
     const betaUsers = users.filter(isBeta)
     const takenEmails = new Set(users.map((user) => user.email).filter((email): email is string => Boolean(email)))
@@ -154,6 +171,7 @@ export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
         if (error) throw new Error(`${nickname}: ${error.message}`)
         takenEmails.add(email)
         await saveCode(email, nickname, code)
+        if (mode === 'add' && memos[nickname]?.trim()) await saveMemo(email, memos[nickname].trim())
         const invite = inviteOf(nickname, code)
         issued.push(invite)
         onIssued?.(invite)
