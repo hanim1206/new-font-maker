@@ -26,3 +26,6 @@ export async function adminCall<T>(api: string, method: 'GET' | 'POST' | 'PATCH'
 export const dateOf = (iso: string | null) => iso
   ? new Date(iso).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   : '아직'
+
+/** 날짜만(`9. 28.`). 보냄 체크처럼 시각이 필요 없는 칸. */
+export const dayOf = (iso: string) => new Date(iso).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })

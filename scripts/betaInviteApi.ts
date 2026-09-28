@@ -64,7 +64,11 @@ export function betaInviteApiPlugin(root: string): Plugin {
         try {
           if (request.method === 'GET') return send(response, 200, { accounts: await service().list() })
           if (request.method === 'PATCH') {
-            const { email, suspended } = await readJson(request) as { email?: string; suspended?: boolean }
+            const { email, suspended, sent } = await readJson(request) as { email?: string; suspended?: boolean; sent?: boolean }
+            if (email && typeof sent === 'boolean') {
+              await service().setSent(email, sent)
+              return send(response, 200, { email, sent })
+            }
             if (!email || typeof suspended !== 'boolean') return send(response, 400, { error: '정지할 계정이 없습니다.' })
             await service().setSuspended(email, suspended)
             return send(response, 200, { email, suspended })

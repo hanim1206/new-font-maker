@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { AdminApiError, BETA_INVITE_API, adminCall } from './adminApi'
 
 export interface Invite { nickname: string; code: string; link: string; message: string }
-export interface Account { nickname: string | null; email: string; createdAt: string; lastSignInAt: string | null; invite?: Invite; suspended: boolean; memo: string }
+export interface Account { nickname: string | null; email: string; createdAt: string; lastSignInAt: string | null; invite?: Invite; suspended: boolean; memo: string; sentAt: string | null }
 export interface NewRow { nickname: string; memo: string }
 export type Issued = Invite & { mode: 'add' | 'reissue' }
 
@@ -98,6 +98,20 @@ export function useBetaInvites() {
     void refresh()
   }
 
+  /** 링크 보냄 체크. 목록을 바로 고쳐 두고 서버에 적는다 — 실패하면 다시 불러와 되돌린다. */
+  const markSent = async (email: string, sent: boolean) => {
+    setFailure('')
+    setAccounts((current) => current?.map((account) => account.email === email
+      ? { ...account, sentAt: sent ? new Date().toISOString() : null }
+      : account) ?? current)
+    try {
+      await adminCall(BETA_INVITE_API, 'PATCH', { email, sent })
+    } catch (error) {
+      setFailure((error as Error).message)
+      void refresh()
+    }
+  }
+
   const copy = async (key: string, message: string) => {
     try {
       await navigator.clipboard.writeText(message)
@@ -107,7 +121,7 @@ export function useBetaInvites() {
     }
   }
 
-  return { accounts, listError, busy, failure, issued, copied, issue, issueMany, suspend, remove, copy }
+  return { accounts, listError, busy, failure, issued, copied, issue, issueMany, suspend, remove, markSent, copy }
 }
 
 export type BetaInvites = ReturnType<typeof useBetaInvites>

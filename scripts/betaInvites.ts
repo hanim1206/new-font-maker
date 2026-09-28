@@ -53,6 +53,8 @@ export interface BetaAccount {
   suspended: boolean
   /** 발급할 때 적은 메모. 없으면 빈 글. */
   memo: string
+  /** 지금 코드의 메시지를 친구에게 보냈다고 체크한 때. 안 보냈으면 null. 새 코드를 주면 풀린다. */
+  sentAt: string | null
 }
 
 export interface BetaInvite {
@@ -72,8 +74,8 @@ const SUSPEND_DURATION = '876000h'
 const FONT_TABLE = 'font_projects'
 const isSuspended = (user: User): boolean => Boolean(user.banned_until && Date.parse(user.banned_until) > Date.now())
 
-/** 계정 이메일 → 마지막으로 준 코드. */
-type CodeBook = Record<string, { nickname: string; code: string; issuedAt: string }>
+/** 계정 이메일 → 마지막으로 준 코드. `sentAt`은 그 코드를 보냈다고 체크한 때 — 새 코드로 줄을 다시 쓰면 없어진다. */
+type CodeBook = Record<string, { nickname: string; code: string; issuedAt: string; sentAt?: string }>
 
 export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
   const supabase = createClient(env.supabaseUrl, env.serviceRoleKey, {
@@ -158,6 +160,7 @@ export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
           invite: saved ? inviteOf(nickname ?? saved.nickname, saved.code) : undefined,
           suspended: isSuspended(user),
           memo: memos[user.email!] ?? '',
+          sentAt: saved?.sentAt ?? null,
         }
       })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -225,5 +228,15 @@ export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
     await forgetLocal(email)
   }
 
-  return { list, issue, setSuspended, remove }
+  /** 링크 보냄 체크 · 풀기. 이 맥에 코드가 남은 계정만 — 코드를 모르면 보낼 메시지도 없다. */
+  async function setSent(email: string, sent: boolean): Promise<void> {
+    const book = await readCodes()
+    const saved = book[email]
+    if (!saved) throw new Error(`코드를 모르는 계정이라 보냄을 적을 수 없어요: ${email}`)
+    if (sent) saved.sentAt = new Date().toISOString()
+    else delete saved.sentAt
+    await writeFile(codeFile, `${JSON.stringify(book, null, 2)}\n`, { mode: 0o600 })
+  }
+
+  return { list, issue, setSuspended, remove, setSent }
 }
