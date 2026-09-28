@@ -82,7 +82,8 @@ test('켜진 상자를 다시 누르면 획 편집으로 가고, 보선을 놓�
   await expect(active).toHaveAttribute('data-part', 'CH')
   await page.mouse.click(box.x + box.width * 0.2, box.y + box.height * 0.2)
   await expect(page.getByTestId('jamo-stroke-tools')).toBeVisible()
-  await expect(page.getByRole('region', { name: '멈 완성 글자 편집' })).toBeVisible()
+  // 첫닿자는 단독 칸으로 먼저 열린다.
+  await expect(page.getByRole('region', { name: 'ㅁ 완성 글자 편집' })).toBeVisible()
 })
 
 test('수치 패널은 없고, 편집 전에도 닿는 글자 줄이 Δ 없이 떠 있다', async ({ page }) => {
@@ -330,9 +331,11 @@ test('자소 탭은 레이아웃으로 열리고, 기준선을 적용하면 문�
 
   await page.getByTestId('review-canvas').locator('[data-edit-part]').first().dispatchEvent('click')
   await expect(page.getByTestId('jamo-layout-mode')).toHaveCount(0)
-  await expect(page.getByRole('region', { name: '멈 완성 글자 편집' })).toBeVisible()
+  // 첫닿자는 단독 칸으로 먼저 열리고, `완료`는 들고 온 음절의 레이아웃으로 돌아간다.
+  await expect(page.getByRole('region', { name: 'ㅁ 완성 글자 편집' })).toBeVisible()
   await page.getByTestId('jamo-stroke-done').click()
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
+  await expect(page.getByTestId('jamo-layout-mode')).toHaveAttribute('aria-label', '멈 레이아웃 수정')
 })
 
 test('옛 검수 글자 화면 주소는 같은 글자의 자소 탭 레이아웃 모드로 넘어간다', async ({ page }) => {
@@ -419,6 +422,15 @@ async function openStrokePoints(page: Page, pick: (paths: string[]) => number = 
   await expect(page.locator('[data-editor-point="visible"]').first()).toBeVisible()
 }
 
+/**
+ * 첫닿자 획 편집은 단독 칸(`ㄱ`)으로 먼저 열린다. 음절 문맥(모델 상자 · 기준선)에서 고치려면 `닿는 글자` 줄에서 그 음절을 누른다.
+ * 줄 맨 앞은 단독 칸, 그 뒤가 들고 온 음절이다.
+ */
+async function openSyllableContext(page: Page, char: string) {
+  await page.getByTestId('touched-glyph-row').locator(`[data-testid="review-propagation-card"][data-char="${char}"] button`).click()
+  await expect(page.getByRole('region', { name: `${char} 완성 글자 편집` })).toBeVisible()
+}
+
 /** 셸 안 획 편집은 조절판 없이 캔버스에서 바로 끈다. 점이 손가락을 따라오고, 한 번 끌기가 기록 한 줄이다. */
 test('획 편집은 캔버스에서 꼭짓점을 직접 끌어 옮기고 Undo 한 번에 돌아온다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EA%B0%81')
@@ -462,6 +474,7 @@ test('획 편집은 캔버스에서 꼭짓점을 직접 끌어 옮기고 Undo �
  */
 test('획을 상자 밖으로 끌어도 다른 획은 제자리고, 틀 다시 맞추기로 꽉 채운다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EA%B0%81&mode=stroke&part=CH')
+  await openSyllableContext(page, '각')
   // 모델 상자가 온 뒤에 잰다. 그 전 첫 렌더는 옛 스키마 상자라 점 자리가 다르다.
   await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
   await openStrokePoints(page)
@@ -501,6 +514,7 @@ test('획을 상자 밖으로 끌어도 다른 획은 제자리고, 틀 다시 �
  */
 test('획을 가로로 끌면 세로로 흔들려도 반듯하게 가고, 기준선에 걸린다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EA%B0%81&mode=stroke&part=CH')
+  await openSyllableContext(page, '각')
   const canvas = page.getByTestId('focus-canvas')
   await expect(canvas).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
   await expect.poll(() => page.locator('[data-testid="stroke-guide-rails"] line').count()).toBeGreaterThan(8)
@@ -540,6 +554,7 @@ test('획을 가로로 끌면 세로로 흔들려도 반듯하게 가고, 기준
 /** 잡은 획 가까이 누르면 다른 획이 아니라 잡은 획의 가장 가까운 꼭짓점이 잡힌다. 꼭짓점 · 곡선 핸들은 보이는 점보다 넓게(약 23px) 눌린다. */
 test('잡은 획의 꼭짓점과 곡선 핸들은 조금 비껴 눌러도 잡힌다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EA%B0%81&mode=stroke&part=CH')
+  await openSyllableContext(page, '각')
   await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
   // 들어올 때 잡혀 있던 것을 빈 곳으로 풀고, 획을 한 번만 누른다.
   await page.getByTestId('focus-canvas').dispatchEvent('pointerdown')
@@ -571,6 +586,7 @@ test('잡은 획의 꼭짓점과 곡선 핸들은 조금 비껴 눌러도 잡힌
 /** 조절판은 캔버스 끌기와 같은 계산이다: px → em(배율 1/3) · 같은 스냅. 자모 상자 크기와 상관없이 60px이면 점이 화면에서 약 20px 간다. */
 test('조절판 끌기는 캔버스의 1/3 배율로 가고, 캔버스와 같은 자리에 걸린다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EA%B0%81&mode=stroke&part=CH')
+  await openSyllableContext(page, '각')
   await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
   await openStrokePoints(page)
   const firstHit = page.locator('[data-editor-point="hit"]').first()
@@ -1332,6 +1348,7 @@ test('닿는 글자 줄만 옆으로 밀리고, 바깥 화면에는 가로 스�
 /** 획 편집에 잠긴 동안 빈 곳을 눌러 선택이 풀려도 부품 상자는 잠긴 자소만 제 색이다. 다른 자소 상자가 켜지지 않는다. */
 test('획 편집 중 빈 곳을 눌러도 잠긴 자소 상자만 켜져 있다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EA%B0%81&mode=stroke&part=CH')
+  await openSyllableContext(page, '각')
   const canvas = page.getByTestId('focus-canvas')
   await expect(canvas).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
   const boxes = page.getByTestId('jamo-part-boxes').locator('g[data-part]')
@@ -1339,4 +1356,35 @@ test('획 편집 중 빈 곳을 눌러도 잠긴 자소 상자만 켜져 있다'
   await expect(page.locator('svg [data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(0)
   await expect(boxes.and(page.locator('[data-active="true"]'))).toHaveCount(1)
   await expect(boxes.and(page.locator('[data-active="true"]'))).toHaveAttribute('data-part', 'CH')
+})
+
+/** 첫닿자 획 편집은 음절이 아니라 단독 칸(`ㄴ`)으로 먼저 열린다. `닿는 글자` 줄 맨 앞이 단독 칸, 그 뒤가 들고 온 음절이다. 단독 칸에서 고친 획은 음절에도 그대로 간다. */
+test('첫닿자 획 편집은 단독 칸으로 열리고, 줄에서 음절로 갔다가 돌아오고, 완료하면 들고 온 음절 레이아웃이다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EB%82%98&mode=stroke&part=CH')
+  const solo = page.getByTestId('touched-glyph-solo')
+  await expect(solo).toHaveAttribute('data-active', 'true', { timeout: 20_000 })
+  await expect(page.getByRole('region', { name: 'ㄴ 완성 글자 편집' })).toBeVisible()
+  // 들어오면 첫 획이 잡혀 있다. 단독 칸에는 옆 자소가 없다.
+  await expect(page.locator('svg [data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(1)
+  await expect(page.getByTestId('focus-canvas')).not.toHaveAttribute('data-placement', 'boxes')
+  // 단독 칸 바로 뒤가 들고 온 음절이다.
+  const firstCard = page.getByTestId('touched-glyph-row').getByTestId('review-propagation-card').first()
+  await expect(firstCard).toHaveAttribute('data-char', '나', { timeout: 20_000 })
+
+  // 단독 칸에서 획을 옮기면 음절 `나`의 ㄴ도 옮겨져 있다.
+  const hit = page.locator('svg [data-editor-hit="stroke"][data-selected="true"]')
+  const before = await hit.getAttribute('d')
+  await page.keyboard.press('Shift+ArrowRight')
+  await expect.poll(() => hit.getAttribute('d')).not.toBe(before)
+  await openSyllableContext(page, '나')
+  await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
+  await expect(solo).not.toHaveAttribute('data-active', 'true')
+  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
+  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeDisabled()
+
+  // 단독 칸으로 돌아오고, `완료`는 들고 온 음절의 레이아웃으로 간다.
+  await solo.locator('button').click()
+  await expect(page.getByRole('region', { name: 'ㄴ 완성 글자 편집' })).toBeVisible()
+  await page.getByTestId('jamo-stroke-done').click()
+  await expect(page.getByTestId('jamo-layout-mode')).toHaveAttribute('aria-label', '나 레이아웃 수정')
 })

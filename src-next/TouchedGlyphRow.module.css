@@ -17,3 +17,7 @@
 .card[data-touched='false'] svg { opacity: .45; }
 /* 글자 이름은 그림이 이미 말한다. 칸 높이를 문장 줄과 맞추려고 화면에서는 숨기고 읽기 도구에만 남긴다. */
 .caption { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* 줄 맨 앞 자소 단독 칸. 밀리지 않고, 가는 세로선으로 음절 칸들과 갈린다. 글자 크기는 옆 칸과 같다(1em + 여백 .08em씩). */
+.lead { flex: 0 0 auto; margin-right: 6px; padding-right: 6px; border-right: 1px solid rgb(var(--color-border-subtle)); }
+.leadGlyph { display: grid; place-items: center; inline-size: calc(var(--row-em) * 1.16); block-size: calc(var(--row-em) * 1.16); }
+.leadGlyph svg { display: block; }

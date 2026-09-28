@@ -4,6 +4,7 @@ import type { CorpusIdentity } from './notoCorpus'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 import { useNotoGlyph } from './useNotoGlyph'
 import { useFitInkStyle } from './useFitInkStyle'
+import { AppGlyph } from './AppGlyph'
 import { layoutTypeOfSyllable } from '../src/utils/hangulUtils'
 import { useLayoutDelta } from './layoutDeltaStore'
 import { useJamoStore } from '../src/stores/jamoStore'
@@ -69,7 +70,7 @@ const TouchedGlyph = memo(function TouchedGlyph({ identity, bundle, edit, ghostV
   </figure>
 })
 
-export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, edit, ghostVisible = true, focus, scope, group, jamos, anyContext, rule, activeChar, onPick }: {
+export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, edit, ghostVisible = true, focus, scope, group, jamos, anyContext, rule, activeChar, onPick, lead, onPickLead }: {
   source: CorpusIdentity
   bundle: NotoPresetModelBundle | null
   edit: PropagationEdit
@@ -91,6 +92,9 @@ export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, e
   activeChar?: string
   /** 글자를 누르면 그 글자를 연다. 없으면 보기만 한다. */
   onPick?: (character: string) => void
+  /** 줄 맨 앞에 붙박이로 서는 자소 단독 칸(획 편집의 첫닿자 `ㄴ`). 줄을 밀어도 제자리다. */
+  lead?: { char: string; active: boolean }
+  onPickLead?: () => void
 }) {
   // 글자·범위·고른 자모가 바뀌면 줄을 새로 만들고 한 묶음으로 돌아간다.
   const rowKey = rule ? `${source.codepoint}:rule:${ruleKey(rule)}` : `${source.codepoint}:${scope}:${group}:${jamos.join('')}:${anyContext ? 'any' : 'one'}`
@@ -113,6 +117,8 @@ export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, e
     }
     return { candidates: list, exhausted: false }
   }, [focus, source, scope, batches, jamos, anyContext, rule])
+  // 단독 칸이 서면 기준 글자(들고 온 음절)도 줄 맨 앞에 둔다. 표본은 기준 글자를 빼고 뽑아서, 단독 칸에서 그 음절로 돌아갈 길이 없어진다.
+  const shown = useMemo(() => lead && !candidates.some((item) => item.codepoint === source.codepoint) ? [source, ...candidates] : candidates, [lead, candidates, source])
   const loadNextBatch = () => { if (!exhausted) setLoaded((current) => (current.rowKey === rowKey ? current.batches : 1) === batches ? { rowKey, batches: batches + 1 } : current) }
   // 줄이 아직 안 찼으면 다음 묶음을 붙인다. 한 번 차면 멈추고 그때부터는 밀어서 더 본다.
   const scroller = useRef<HTMLDivElement>(null)
@@ -123,9 +129,15 @@ export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, e
     if (el.scrollWidth <= el.clientWidth + 1) loadNextBatch()
   })
   return <section className={styles.row} aria-label="닿는 글자" data-testid="touched-glyph-row">
+    {lead && <figure className={`${styles.card} ${styles.lead}`} data-active={lead.active || undefined} data-testid="touched-glyph-solo">
+      <button type="button" aria-current={lead.active || undefined} onClick={onPickLead} aria-label={`${lead.char} 단독으로 열기`}>
+        <span className={styles.leadGlyph}><AppGlyph char={lead.char} size={24} upright /></span>
+      </button>
+      <figcaption className={styles.caption}><b>{lead.char}</b></figcaption>
+    </figure>}
     {/* 범위가 바뀌면 줄을 새로 만들어 맨 앞에서 시작한다. */}
     <div key={rowKey} ref={scroller} className={styles.cards} data-testid="review-propagation-cards" onScroll={(event) => { const el = event.currentTarget; if (el.scrollLeft + el.clientWidth * 2 >= el.scrollWidth) loadNextBatch() }}>
-      {bundle && focus && candidates.map((identity) => <TouchedGlyph key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} ghostVisible={ghostVisible} active={identity.character === activeChar} onPick={onPick} />)}
+      {bundle && focus && shown.map((identity) => <TouchedGlyph key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} ghostVisible={ghostVisible} active={identity.character === activeChar} onPick={onPick} />)}
     </div>
   </section>
 })

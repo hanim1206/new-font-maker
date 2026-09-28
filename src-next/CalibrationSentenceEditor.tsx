@@ -187,6 +187,17 @@ const initialStrokePart = (): MobileEditorPart | null => {
   return params.get('mode') === 'stroke' && (part === 'CH' || part === 'JU' || part === 'JO') ? part : null
 }
 
+/** 첫닿자 단독 칸(`ㄴ`). 호환 자모 자음 하나. */
+function isSoloConsonant(char: string): boolean {
+  const code = char.codePointAt(0) ?? 0
+  return code >= 0x3131 && code <= 0x314e
+}
+/** 음절의 첫닿자 하나. 첫닿자 획 편집은 음절이 아니라 이 글자(단독으로 그린 `ㄴ`)로 먼저 연다 — 변형 카드의 `기본`. 음절이 아니면 null. */
+function soloConsonantOf(char: string): string | null {
+  const code = char.codePointAt(0) ?? 0
+  return code >= 0xac00 && code <= 0xd7a3 ? workbenchJamoOf('choseong', char) : null
+}
+
 function isEditableHangul(char: string): boolean {
   const code = char.codePointAt(0) ?? 0
   const isPrecomposedSyllable = code >= 0xac00 && code <= 0xd7a3
@@ -1725,7 +1736,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     setSheetEm(em)
     try { localStorage.setItem(SENTENCE_SHEET_EM_KEY, String(em)) } catch { /* 못 남겨도 지금 화면은 바뀐다 */ }
   }
-  const [selectedChar, setSelectedChar] = useState(focus.char)
+  // 첫닿자 획 편집으로 열면 음절이 아니라 그 첫닿자 하나가 먼저 뜬다(`닿는 글자` 줄 맨 앞 칸). 들고 온 음절은 줄의 기준으로 남는다.
+  const [soloEntry] = useState(() => chrome === 'workspace' && initialStrokePart() === 'CH' ? soloConsonantOf(focus.char) : null)
+  const [selectedChar, setSelectedChar] = useState(soloEntry ?? focus.char)
   const [selection, setSelection] = useState<Selection>({ kind: 'none' })
   const [selectedPoints, setSelectedPoints] = useState<SelectedPoint[]>([])
   const [multiSelectArmed, setMultiSelectArmed] = useState(false)
@@ -1861,12 +1874,17 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const strokeCardPart = lockedPart ?? (selection.kind !== 'none' ? selection.editorPart : null)
   const strokeCardJamo = strokeCardPart === 'CH' ? syllable.choseong : strokeCardPart === 'JU' ? syllable.jungseong : strokeCardPart === 'JO' ? syllable.jongseong : null
   const strokeCardInk = strokeCardPart && strokeCardJamo ? { part: strokeCardPart, jamo: strokeCardJamo } : null
-  // 획 편집 `닿는 글자` 줄의 범위 자모. 고치는 자리의 자모 하나(`모든 ㅁ 글자`).
-  const strokeRowJamo = layoutAvailable && strokeCardPart ? focusJamoOf(corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00), strokeCardPart) : null
   // 줄에 넘기는 값은 글자·자모가 바뀔 때만 새로 만든다. 끄는 동안 매번 새 객체를 넘기면 줄이 표본을 다시 뽑고 카드를 다 다시 그린다.
-  // 줄에서 다른 글자를 눌러도 줄은 처음 글자 기준 그대로 두고, 누른 칸만 켠다.
-  const [strokeRowAnchor, setStrokeRowAnchor] = useState<string | null>(null)
+  // 줄에서 다른 글자를 눌러도 줄은 처음 글자 기준 그대로 두고, 누른 칸만 켠다. 첫닿자 단독 칸을 여는 동안에도 기준은 음절이다.
+  const [strokeRowAnchor, setStrokeRowAnchor] = useState<string | null>(soloEntry ? focus.char : null)
   const strokeRowChar = strokeRowAnchor ?? selectedChar
+  // 첫닿자 단독 칸(`ㄴ`)을 여는 중. 이 글자엔 레이아웃이 없지만, 획 편집 틀(문장 접힘 · 닿는 글자 줄 · 완료)은 기준 음절로 그대로 선다.
+  const soloOpen = chrome === 'workspace' && editMode === 'stroke' && isSoloConsonant(selectedChar) && strokeRowAnchor !== null && !notoModelError
+  const strokeFrameAvailable = layoutAvailable || soloOpen
+  // 획 편집 `닿는 글자` 줄의 범위 자모. 고치는 자리의 자모 하나(`모든 ㅁ 글자`). 줄의 기준 글자에서 꺼낸다 — 줄의 글자는 모두 같은 자모라 지금 글자와 같다.
+  const strokeRowJamo = strokeFrameAvailable && strokeCardPart ? focusJamoOf(corpusIdentity(strokeRowChar.codePointAt(0) ?? 0xac00), strokeCardPart) : null
+  // 줄 맨 앞에 서는 첫닿자 단독 칸. 첫닿자를 고칠 때만.
+  const soloChar = strokeRowJamo && strokeCardPart === 'CH' ? soloConsonantOf(strokeRowChar) : null
   const strokeRowSource = useMemo(() => corpusIdentity(strokeRowChar.codePointAt(0) ?? 0xac00), [strokeRowChar])
   const strokeRowJamos = useMemo(() => strokeRowJamo ? [strokeRowJamo] : [], [strokeRowJamo])
   const snapStep = fontUnitsToNormalized(grid.snapInterval, fontSpace)
@@ -1890,7 +1908,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   // 셸 안(레이아웃 · 획 편집 둘 다)에서는 문장이 한 줄 가로 스크롤이다(아래 편집부에 세로 자리를 내준다). 고른 글자가 가려져 있으면 가로로만 끌어온다.
   const sentenceCompact = chrome === 'workspace'
   // 획 편집에서는 문장 줄이 위로 접혀 사라지고 `닿는 글자` 줄만 남는다. 그만큼 캔버스와 트랙패드가 커진다.
-  const sentenceCollapsed = chrome === 'workspace' && layoutAvailable && !isLayoutMode && !styleLocksCanvas && !styleSpaceOpen
+  const sentenceCollapsed = chrome === 'workspace' && strokeFrameAvailable && !isLayoutMode && !styleLocksCanvas && !styleSpaceOpen
   const sentenceRef = useRef<HTMLElement>(null)
   useEffect(() => {
     const section = sentenceRef.current
@@ -1955,6 +1973,20 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     setInkGapLimiter(null)
     pickFirstStrokeRef.current = true
   }
+  // 줄 맨 앞 단독 칸을 누르면 음절 문맥을 떠나 첫닿자 하나를 연다. 줄은 기준 음절 그대로.
+  const pickSolo = () => {
+    if (!soloChar || soloChar === selectedChar) return
+    setStrokeRowAnchor((anchor) => anchor ?? selectedChar)
+    setStrokeEntryPart('CH')
+    setSelectedChar(soloChar)
+    setSelection({ kind: 'none' })
+    setSelectedPoints([])
+    setPreviewJamo(null)
+    setPreviewSchema(null)
+    setInkGapLimiter(null)
+    pickFirstStrokeRef.current = true
+  }
+  const soloLead = useMemo(() => soloChar ? { char: soloChar, active: selectedChar === soloChar } : undefined, [soloChar, selectedChar])
   useEffect(() => {
     if (!pickFirstStrokeRef.current || !lockedPart) return
     pickFirstStrokeRef.current = false
@@ -2281,6 +2313,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   }, [escapeActive])
   const chooseEditMode = (mode: EditMode) => {
     setEditMode(mode)
+    // 첫닿자 단독 칸에서 나가면 기준 음절의 레이아웃으로 돌아간다.
+    if (mode === 'layout' && isSoloConsonant(selectedChar) && strokeRowAnchor) setSelectedChar(strokeRowAnchor)
     setStrokeRowAnchor(null)
     setMultiSelectArmed(false)
     setPreviewJamo(null)
@@ -2294,6 +2328,14 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     setSelection(firstStrokeSelectionOf(editorPart) ?? { kind: 'none' })
     setSelectedPoints([])
     chooseEditMode('stroke')
+    // 첫닿자는 단독 칸으로 먼저 연다. 첫 획은 단독 글자가 그려진 다음 그림에서 잡는다.
+    const solo = chrome === 'workspace' && editorPart === 'CH' ? soloConsonantOf(selectedChar) : null
+    if (solo) {
+      setStrokeRowAnchor(selectedChar)
+      setSelectedChar(solo)
+      setSelection({ kind: 'none' })
+      pickFirstStrokeRef.current = true
+    }
   }
   const closeGlobalStyle = () => {
     setPreviewBrush(null)
@@ -2539,8 +2581,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       </section> : <>
       {/* 획 편집에도 같은 자리·같은 높이로 `닿는 글자` 줄이 선다. 범위는 고치는 자모가 든 글자 전부(레이아웃을 안 가린다).
           줄이 두 모드에 다 있어야 `획 고치기`로 오갈 때 캔버스가 안 튄다. */}
-      {chrome === 'workspace' && layoutAvailable && !styleLocksCanvas && strokeRowJamo && strokeCardPart &&
-        <TouchedGlyphRow source={strokeRowSource} bundle={notoBundle} edit={NO_LAYOUT_EDIT} ghostVisible={false} focus={strokeCardPart} scope="jamo" group={strokeCardPart} jamos={strokeRowJamos} anyContext onPick={pickStrokeRowChar} activeChar={selectedChar} />}
+      {chrome === 'workspace' && strokeFrameAvailable && !styleLocksCanvas && strokeRowJamo && strokeCardPart &&
+        <TouchedGlyphRow source={strokeRowSource} bundle={notoBundle} edit={NO_LAYOUT_EDIT} ghostVisible={false} focus={strokeCardPart} scope="jamo" group={strokeCardPart} jamos={strokeRowJamos} anyContext onPick={pickStrokeRowChar} activeChar={selectedChar} lead={soloLead} onPickLead={pickSolo} />}
       {!styleSpaceOpen && <section className={styles.editor} data-chrome={chrome} data-stroke-tools={!globalStylePanel && directManipulation ? true : undefined} aria-label={`${selectedChar} 완성 글자 편집`}>
         {/* 셸 안 획 편집에서는 캔버스 왼쪽에 도구 단추가 세로로 선다(한 칸씩 넘기는 슬라이드). 여섯 칸 표지는 숨긴다 — 닿는 범위는 위 `닿는 글자` 줄이 보여 준다. */}
         <div className={styles.strokeStage}>
@@ -2605,7 +2647,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       />}
       {/* 획 편집은 끄는 즉시 저장된다. `완료`는 저장이 아니라 레이아웃으로 돌아가는 문이다.
           도마를 들고 왔으면 줄이 없다 — 머리 `‹`가 섹션 홈으로 가는 완료이고, 취소는 따로 두지 않는다(되돌리기는 ↶). */}
-      {layoutAvailable && !globalStylePanel && (boxFitIssue || !benchCarried) && <div className={styles.strokeDoneBar}>
+      {strokeFrameAvailable && !globalStylePanel && (boxFitIssue || !benchCarried) && <div className={styles.strokeDoneBar}>
         {boxFitIssue && <p role="status" data-testid="jamo-box-fit-issue">이 획은 모델 상자에 안 맞아 옛 배치로 그립니다 · {boxFitIssue.message}</p>}
         {/* `완료`는 고친 채로, 왼쪽 `뒤로`는 이번에 들어와서 고친 것을 되돌리고 레이아웃으로 나간다(취소). */}
         {!benchCarried && <div className={styles.strokeDoneRow}>
@@ -2641,10 +2683,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       setSampleSentence((sentence) => `${syllable} ${sentence}`)
       setIsCustomSentence(true)
     }
+    // 첫닿자는 단독 칸으로 연다. 대표 음절은 `닿는 글자` 줄의 기준으로.
+    const solo = benchType === 'choseong' ? char : null
     setEditMode('stroke')
     setStrokeEntryPart(benchPart)
-    setStrokeRowAnchor(null)
-    setSelectedChar(syllable)
+    setStrokeRowAnchor(solo ? syllable : null)
+    setSelectedChar(solo ?? syllable)
     setSelection({ kind: 'none' })
     setSelectedPoints([])
     setPreviewJamo(null)

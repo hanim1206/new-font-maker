@@ -69,7 +69,10 @@ test('검수 격자에서 글자를 열면 자소 탭 레이아웃 모드로 그
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible({ timeout: 20_000 })
   // 문장에 없던 글자라 문장 앞에 붙는다.
   await expect(page.getByRole('region', { name: '보정 문장' }).getByRole('button', { name: '염 편집' })).toHaveAttribute('aria-current', 'true')
+  // 첫닿자 획 편집은 단독 칸(ㅇ)으로 먼저 열리고, `닿는 글자` 줄 맨 앞(단독 칸 다음)에 들고 온 음절이 선다.
   await page.getByTestId('review-canvas').locator('[data-edit-part]').first().dispatchEvent('click')
+  await expect(page.getByRole('region', { name: 'ㅇ 완성 글자 편집' })).toBeVisible()
+  await page.getByTestId('touched-glyph-row').locator('[data-testid="review-propagation-card"][data-char="염"] button').click()
   await expect(page.getByRole('region', { name: '염 완성 글자 편집' })).toBeVisible()
 })
 
