@@ -4,6 +4,7 @@ import type { FeedbackContext, FeedbackMessage } from '../src-next/feedback'
 /**
  * 한임 쪽 의견 창구. 로컬 관리자 API(`feedbackAdminApi.ts`)가 쓴다.
  * `service_role` 키로 모든 친구 의견을 읽고, 한임 이름으로 답장하고, 읽음을 적는다 — 이 맥에서만 돈다.
+ * 고치기 · 지우기도 여기서만 한다. 친구 쪽 RLS는 그대로(친구는 고치거나 지우지 못한다).
  */
 
 export interface FeedbackAdminEnv { supabaseUrl: string; serviceRoleKey: string }
@@ -66,5 +67,29 @@ export function createFeedbackAdmin(env: FeedbackAdminEnv) {
     await markRead(threadId)
   }
 
-  return { list, reply, markRead }
+  /** 내 답장 글 고치기. 친구 메시지는 고치지 않는다. */
+  async function editReply(messageId: string, body: string): Promise<void> {
+    const { data, error } = await supabase.from(TABLE).update({ body }).eq('id', messageId).eq('author', 'hanim').select('id')
+    if (error) throw error
+    if (!data?.length) throw new Error('고칠 답장이 없어요. 친구 메시지는 고치지 않아요.')
+  }
+
+  /** 메시지 하나 지우기. 첫 메시지는 대화의 기준(thread_id)이라 대화째 지운다. */
+  async function removeMessage(messageId: string): Promise<void> {
+    const { data, error } = await supabase.from(TABLE).select('id, thread_id').eq('id', messageId).maybeSingle()
+    if (error) throw error
+    if (!data) throw new Error('없는 메시지입니다.')
+    if ((data as { thread_id: string }).thread_id === messageId) throw new Error('첫 메시지는 대화째 지워 주세요.')
+    const removed = await supabase.from(TABLE).delete().eq('id', messageId)
+    if (removed.error) throw removed.error
+  }
+
+  /** 대화 통째 지우기. 친구 메시지 · 답장 모두. */
+  async function removeThread(threadId: string): Promise<void> {
+    const { data, error } = await supabase.from(TABLE).delete().eq('thread_id', threadId).select('id')
+    if (error) throw error
+    if (!data?.length) throw new Error('없는 대화입니다.')
+  }
+
+  return { list, reply, markRead, editReply, removeMessage, removeThread }
 }

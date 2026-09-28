@@ -14,6 +14,7 @@ interface Listed { messages: AdminMessage[]; nicknames: Record<string, string | 
 /**
  * 관리자 의견 화면. 위에 검색 · 상태 · 친구 필터, 새 의견이 위, 누르면 그 자리에서 펼쳐 대화 · 보낸 자리 · 답장 칸.
  * 다른 메뉴에 있어도 목록은 받아 둔다 — 메뉴 옆 숫자(`onPending`)를 채운다.
+ * 펼친 대화에서 내 답장 고치기 · 메시지 지우기 · 대화 지우기. 지우기는 두 번 눌러야 한다(되돌릴 수 없다).
  */
 export function AdminFeedback({ hidden, onPending }: { hidden: boolean; onPending: (count: number) => void }) {
   const [listed, setListed] = useState<Listed | null>(null)
@@ -22,6 +23,10 @@ export function AdminFeedback({ hidden, onPending }: { hidden: boolean; onPendin
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [filter, setFilter] = useState<FeedbackFilter>(EMPTY_FEEDBACK_FILTER)
+  /** 고치는 중인 내 답장. */
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
+  /** 한 번 누른 지우기 단추 — `message:<id>` · `thread:<id>`. */
+  const [confirming, setConfirming] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -61,9 +66,34 @@ export function AdminFeedback({ hidden, onPending }: { hidden: boolean; onPendin
     void refresh()
   }
 
+  /** 고치기 · 지우기. 성공하면 목록을 다시 받는다. 대화를 지우면 접는다. */
+  const change = async (method: 'PATCH' | 'DELETE', payload: { messageId: string; body?: string } | { threadId: string }) => {
+    if (busy) return
+    setBusy(true)
+    setError('')
+    setConfirming(null)
+    try {
+      await adminCall(FEEDBACK_API, method, payload)
+      setEditing(null)
+      if ('threadId' in payload) setOpen(null)
+    } catch (failure) {
+      setError((failure as Error).message)
+    }
+    setBusy(false)
+    void refresh()
+  }
+
+  /** 두 번 눌러야 도는 지우기. 첫 누름은 단추 글만 바꾼다. */
+  const pressRemove = (key: string, run: () => void) => {
+    if (confirming !== key) return setConfirming(key)
+    run()
+  }
+
   const toggle = (id: string) => {
     setOpen((current) => current === id ? null : id)
     setDraft('')
+    setEditing(null)
+    setConfirming(null)
   }
 
   const row = (thread: FeedbackThread) => {
@@ -80,14 +110,44 @@ export function AdminFeedback({ hidden, onPending }: { hidden: boolean; onPendin
       </button>
       {expanded && <div className={styles.feedbackOpen}>
         {thread.messages.length > 1 && <ol className={styles.feedbackChat}>
-          {thread.messages.map((message) => <li key={message.id} data-author={message.author}>
-            <p>{message.body}</p>
-            <small>{message.author === 'hanim' ? '한임 · ' : ''}{whenText(message.createdAt, new Date(), true)}</small>
-          </li>)}
+          {thread.messages.map((message) => {
+            const removeKey = `message:${message.id}`
+            const isFirst = message.id === thread.id
+            if (editing?.id === message.id) return <li key={message.id} data-author={message.author} className={styles.feedbackEditing}>
+              <textarea value={editing.text} aria-label="답장 고치기" onChange={(event) => setEditing({ id: message.id, text: event.target.value })} data-testid="admin-feedback-edit" />
+              <span className={styles.feedbackActions}>
+                <button type="button" onClick={() => setEditing(null)}>취소</button>
+                <button type="button" disabled={busy || !editing.text.trim() || editing.text.trim() === message.body} onClick={() => void change('PATCH', { messageId: message.id, body: editing.text })} data-testid="admin-feedback-edit-save">저장</button>
+              </span>
+            </li>
+            return <li key={message.id} data-author={message.author}>
+              <p>{message.body}</p>
+              <small>
+                {message.author === 'hanim' ? '한임 · ' : ''}{whenText(message.createdAt, new Date(), true)}
+                <span className={styles.feedbackActions}>
+                  {message.author === 'hanim' && <button type="button" disabled={busy} onClick={() => { setConfirming(null); setEditing({ id: message.id, text: message.body }) }} data-testid="admin-feedback-edit-start">고치기</button>}
+                  {!isFirst && <button type="button" disabled={busy} data-confirm={confirming === removeKey || undefined} onBlur={() => setConfirming((current) => current === removeKey ? null : current)} onClick={() => pressRemove(removeKey, () => void change('DELETE', { messageId: message.id }))} data-testid="admin-feedback-remove-message">
+                    {confirming === removeKey ? '한 번 더 — 지움' : '지우기'}
+                  </button>}
+                </span>
+              </small>
+            </li>
+          })}
         </ol>}
         {context && <p className={styles.feedbackMeta}>{context.screen ?? context.path} · {context.device} · 폰트 {context.font ? `"${context.font}"` : '없음'}{context.fontId ? ` (${context.fontId.slice(0, 8)})` : ' (id 없음)'} · {context.path} · {context.build}</p>}
         <textarea value={draft} placeholder="답장" aria-label="답장" onChange={(event) => setDraft(event.target.value)} data-testid="admin-feedback-reply" />
         <nav>
+          <button
+            type="button"
+            className={styles.feedbackDelete}
+            disabled={busy}
+            data-confirm={confirming === `thread:${thread.id}` || undefined}
+            onBlur={() => setConfirming((current) => current === `thread:${thread.id}` ? null : current)}
+            onClick={() => pressRemove(`thread:${thread.id}`, () => void change('DELETE', { threadId: thread.id }))}
+            data-testid="admin-feedback-remove-thread"
+          >
+            {confirming === `thread:${thread.id}` ? `한 번 더 — 대화 ${thread.messages.length}개 지움` : '대화 지우기'}
+          </button>
           {isPending(thread) && <button type="button" disabled={busy} onClick={() => void act('PATCH', thread.id)}>읽음만</button>}
           <button type="button" className={styles.feedbackSend} disabled={busy || !draft.trim()} onClick={() => void act('POST', thread.id)} data-testid="admin-feedback-send">
             {busy ? '보내는 중…' : '답장 보내기'}

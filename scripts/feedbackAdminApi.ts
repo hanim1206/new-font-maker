@@ -48,15 +48,30 @@ export function feedbackAdminApiPlugin(root: string): Plugin {
         if (rejected) return send(response, 403, { error: rejected })
         try {
           if (request.method === 'GET') return send(response, 200, await admin().list())
-          const { threadId, body } = await readJson(request) as { threadId?: string; body?: string }
+          const { threadId, messageId, body } = await readJson(request) as { threadId?: string; messageId?: string; body?: string }
+          const text = body?.trim() ?? ''
+          const tooLong = !text || text.length > REPLY_MAX_LENGTH
+          // 메시지 하나: 답장 고치기(PATCH + body) · 지우기(DELETE).
+          if (messageId && request.method === 'PATCH') {
+            if (tooLong) return send(response, 400, { error: `답장은 1~${REPLY_MAX_LENGTH}자로 써 주세요.` })
+            await admin().editReply(messageId, text)
+            return send(response, 200, { messageId })
+          }
+          if (messageId && request.method === 'DELETE') {
+            await admin().removeMessage(messageId)
+            return send(response, 200, { messageId })
+          }
           if (!threadId) return send(response, 400, { error: '대화가 없습니다.' })
           if (request.method === 'PATCH') {
             await admin().markRead(threadId)
             return send(response, 200, { threadId })
           }
-          if (request.method !== 'POST') return send(response, 405, { error: 'GET · POST · PATCH만 받습니다.' })
-          const text = body?.trim() ?? ''
-          if (!text || text.length > REPLY_MAX_LENGTH) return send(response, 400, { error: `답장은 1~${REPLY_MAX_LENGTH}자로 써 주세요.` })
+          if (request.method === 'DELETE') {
+            await admin().removeThread(threadId)
+            return send(response, 200, { threadId })
+          }
+          if (request.method !== 'POST') return send(response, 405, { error: 'GET · POST · PATCH · DELETE만 받습니다.' })
+          if (tooLong) return send(response, 400, { error: `답장은 1~${REPLY_MAX_LENGTH}자로 써 주세요.` })
           await admin().reply(threadId, text)
           return send(response, 200, { threadId })
         } catch (error) {

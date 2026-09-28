@@ -41,3 +41,14 @@
 .feedbackTag[data-tag='odd'] { background: rgb(255 243 224); color: rgb(196 100 0); }
 .feedbackTag[data-tag='wish'] { background: rgb(232 240 255); color: rgb(35 88 201); }
 .feedbackTag[data-tag='praise'] { background: rgb(228 245 235); color: rgb(22 128 72); }
+
+/* 고치기 · 지우기. 말풍선 아래 작은 글 단추, 지우기는 한 번 누르면 빨갛게. */
+.feedbackActions { display: inline-flex; gap: 10px; margin-left: 10px; }
+.list li.feedbackItem .feedbackChat .feedbackActions button { min-height: 0; padding: 0; border-radius: 0; background: transparent; color: rgb(var(--color-text-4)); font-size: 11.5px; font-weight: 600; }
+.list li.feedbackItem .feedbackChat .feedbackActions button:hover { color: rgb(var(--color-foreground)); }
+.list li.feedbackItem .feedbackChat .feedbackActions button[data-confirm] { color: rgb(214 69 65); }
+.list li.feedbackItem .feedbackChat li.feedbackEditing { align-items: stretch; }
+.feedbackEditing textarea { min-height: 72px; }
+.feedbackEditing .feedbackActions { justify-content: flex-end; margin-left: 0; }
+.list li.feedbackItem .feedbackChat .feedbackEditing .feedbackActions button { font-size: 13px; }
+.list li.feedbackItem .feedbackOpen nav .feedbackDelete[data-confirm] { background: rgb(214 69 65); color: #fff; }
