@@ -39,6 +39,8 @@ import { stemBeakInkGroups } from './stemBeak'
 import type { DeepReadonly } from '../types'
 import type { FinalGlyphInk } from './finalGlyphInk'
 import { projectFinalGlyphInkToFontContours } from './finalGlyphInk'
+import { compactGlyphForCff, replaceCffCharStrings } from './cffCharStrings'
+import type { CompactGlyph } from './cffCharStrings'
 
 // ===== 타입 정의 =====
 
@@ -262,8 +264,9 @@ export function namingOf(identity: FontIdentity, revision = 0): OpenTypeNaming {
 }
 
 /** opentype.js 출력 → iOS 친화 OTF(Unicode cmap · 정리된 name · 스타일 비트 · 버전). 모든 추출 경로가 이 문을 지난다. */
-function packageFont(font: InstanceType<typeof opentype.Font>, identity: FontIdentity, revision = 0): ArrayBuffer {
-  const raw = font.toArrayBuffer() as ArrayBuffer
+function packageFont(font: InstanceType<typeof opentype.Font>, identity: FontIdentity, revision = 0, charStrings?: readonly Uint8Array[]): ArrayBuffer {
+  // 글리프를 `compactGlyphForCff`로 굳혔으면 opentype.js는 대역 윤곽으로 묶고, CharStrings만 진짜 바이트로 갈아 끼운다.
+  const raw = charStrings ? replaceCffCharStrings(font.toArrayBuffer() as ArrayBuffer, charStrings) : font.toArrayBuffer() as ArrayBuffer
   return finalizeOpenTypePackaging(raw, { naming: namingOf(identity, revision), macStyle: styleFlagsOf(identity.styleName), revision })
 }
 
@@ -607,11 +610,17 @@ async function processInChunks<T, R>(
 export function windowsClipMetrics(
   glyphs: ReadonlyArray<InstanceType<typeof opentype.Glyph>>,
 ): { usWinAscent: number; usWinDescent: number } {
+  return windowsClipMetricsOfBoxes(glyphs.map((glyph) => glyph.path?.commands.length ? glyph.getBoundingBox() : null))
+}
+
+/** 잉크 상자로 재는 쪽. 윤곽을 CharString으로 굳힌 뒤에는 이 상자만 남는다. */
+function windowsClipMetricsOfBoxes(
+  boxes: ReadonlyArray<{ y1: number; y2: number } | null>,
+): { usWinAscent: number; usWinDescent: number } {
   let yMax: number = WIN_METRICS.ascent
   let yMin: number = -WIN_METRICS.descent
-  for (const glyph of glyphs) {
-    if (!glyph.path?.commands.length) continue
-    const box = glyph.getBoundingBox()
+  for (const box of boxes) {
+    if (!box) continue
     yMax = Math.max(yMax, box.y2)
     yMin = Math.min(yMin, box.y1)
   }
@@ -706,17 +715,22 @@ export async function generateFontBuffer(
     ]
 
     // 한 글자가 실패해도 폰트 전체를 버리지 않는다. 그 글자만 빈 글리프로 넣고 알린다(피드백 35).
+    // 만들자마자 윤곽을 CharString 바이트로 굳힌다. opentype.js가 윤곽 전체를 숫자 배열로 묶으면 아이폰에서 메모리가 터진다.
     const skippedChars: string[] = []
+    const compacted: CompactGlyph[] = glyphs.map((glyph) => compactGlyphForCff(glyph))
     const hangulGlyphs = await processInChunks(
       glyphDataList,
       (data) => {
+        let glyph: InstanceType<typeof opentype.Glyph>
         try {
-          return createGlyph(data)
+          glyph = createGlyph(data)
         } catch (error) {
           console.error(`글리프 생성 실패, 빈 글리프로 넣음: ${data.char}`, error)
           skippedChars.push(data.char)
-          return createEmptyGlyph(data)
+          glyph = createEmptyGlyph(data)
         }
+        compacted.push(compactGlyphForCff(glyph))
+        return glyph
       },
       100,
       (done, total) => {
@@ -760,7 +774,7 @@ export async function generateFontBuffer(
           ulCodePageRange1: OS2_CODE_PAGE_RANGE_1,
           ulCodePageRange2: 0,
           // Windows 클리핑 메트릭 (양수값, macOS는 hhea 사용하므로 영향 없음)
-          ...windowsClipMetrics(glyphs),
+          ...windowsClipMetricsOfBoxes(compacted.map((entry) => entry.inkBox)),
           sTypoAscender: ASCENDER,
           sTypoDescender: DESCENDER,
           sTypoLineGap: 0,
@@ -773,7 +787,7 @@ export async function generateFontBuffer(
     applyEnglishFontNames(font, identity, revision)
 
     // Phase 4: 묶고 다시 읽어 확인
-    const arrayBuffer = packageFont(font, identity, revision)
+    const arrayBuffer = packageFont(font, identity, revision, compacted.map((entry) => entry.charString))
     const validation = validateOpenTypeForIOS(arrayBuffer)
     if (!validation.ok) console.error('OTF 검사 오류:', summarizeValidation(validation), validation.issues.filter((issue) => issue.severity === 'error'))
     else if (validation.issues.some((issue) => issue.severity === 'warning')) console.warn('OTF 검사 경고:', validation.issues.filter((issue) => issue.severity === 'warning'))
