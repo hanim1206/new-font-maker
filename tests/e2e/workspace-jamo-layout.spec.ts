@@ -568,7 +568,7 @@ test('잡은 획의 꼭짓점과 곡선 핸들은 조금 비껴 눌러도 잡힌
   const centerOf = async (locator: Locator) => { const box = await locator.boundingBox(); if (!box) throw new Error('자리가 없다'); return { x: box.x + box.width / 2, y: box.y + box.height / 2 } }
   const target = await centerOf(catches.nth(1))
   await page.mouse.click(target.x + 10, target.y + 6)
-  const active = page.locator('[data-editor-point="visible"][r="2.8"]')
+  const active = page.locator('[data-editor-point="visible"][r="3.8"]')
   await expect(active).toHaveCount(1)
   const picked = await centerOf(active)
   expect(Math.hypot(picked.x - target.x, picked.y - target.y)).toBeLessThanOrEqual(3)
@@ -592,7 +592,7 @@ test('조절판 끌기는 캔버스의 1/3 배율로 가고, 캔버스와 같은
   const firstHit = page.locator('[data-editor-point="hit"]').first()
   await firstHit.dispatchEvent('pointerdown')
   await firstHit.dispatchEvent('pointerup')
-  const active = page.locator('[data-editor-point="visible"][r="2.8"]')
+  const active = page.locator('[data-editor-point="visible"][r="3.8"]')
   await expect(active).toHaveCount(1)
   const centerX = async () => { const box = await active.boundingBox(); if (!box) throw new Error('잡은 점이 없다'); return box.x + box.width / 2 }
   const before = await centerX()

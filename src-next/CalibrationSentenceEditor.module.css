@@ -128,12 +128,12 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .selectedCenterline { fill: none; stroke: var(--selection-color); stroke-width: calc(.45 * var(--view-unit, 1)); stroke-linecap: round; stroke-linejoin: round; }
 .hoverCenterline { fill: none; stroke: var(--selection-color); stroke-width: calc(.35 * var(--view-unit, 1)); stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
 @media (hover: hover) { .strokeTarget:hover .hoverCenterline { opacity: .75; } }
-.point { fill: #fff; stroke: var(--selection-color); stroke-width: calc(.6 * var(--view-unit, 1)); cursor: pointer; }
-.activePoint { fill: var(--selection-color); stroke: #fff; stroke-width: calc(.7 * var(--view-unit, 1)); cursor: pointer; }
+.point { fill: #fff; stroke: var(--selection-color); stroke-width: calc(.8 * var(--view-unit, 1)); cursor: pointer; }
+.activePoint { fill: var(--selection-color); stroke: #fff; stroke-width: calc(.9 * var(--view-unit, 1)); cursor: pointer; }
 .pointHitTarget { cursor: pointer; }
 .handleLine { stroke: var(--selection-color); stroke-width: calc(.3 * var(--view-unit, 1)); opacity: .8; pointer-events: none; }
-.handle { fill: #fff; stroke: var(--selection-color); stroke-width: calc(.5 * var(--view-unit, 1)); cursor: pointer; }
-.activeHandle { fill: var(--selection-color); stroke: #fff; stroke-width: calc(.6 * var(--view-unit, 1)); cursor: pointer; }
+.handle { fill: #fff; stroke: var(--selection-color); stroke-width: calc(.7 * var(--view-unit, 1)); cursor: pointer; }
+.activeHandle { fill: var(--selection-color); stroke: #fff; stroke-width: calc(.8 * var(--view-unit, 1)); cursor: pointer; }
 .trackpadSection { flex: 0 0 auto; padding: 10px 16px calc(env(safe-area-inset-bottom) + 12px); border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
 .trackpad { position: relative; height: 176px; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 16px; background: rgb(var(--color-surface-2)); touch-action: none; }
 .trackpadDisabled { opacity: .55; }

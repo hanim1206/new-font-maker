@@ -155,8 +155,13 @@ const GAP_STICK_EM = 0.05
 /** 선택 색. 피그마처럼 잉크는 제 색 그대로 두고, 잡은 획은 가는 중심선 + 둘레 상자로 알린다. 옆 자소에 너무 붙은 자소의 획은 경고색. */
 const SELECTION_COLOR = '#0d99ff'
 const SELECTION_WARNING_COLOR = '#e0321a'
-/** 꼭짓점 · 곡선 핸들 눌림 반지름(뷰박스 단위). 330px 캔버스에서 약 23px — 손가락 폭 한 개. 겹치면 누른 자리에서 가장 가까운 것이 잡힌다. */
-const POINT_HIT_RADIUS = 8
+/** 꼭짓점 · 곡선 핸들 눌림 반지름(뷰박스 단위). 330px 캔버스에서 약 29px. 겹치면 누른 자리에서 가장 가까운 것이 잡힌다. */
+const POINT_HIT_RADIUS = 10
+/** 보이는 꼭짓점 반지름 · 핸들 마름모 한 변(뷰박스 단위). 잡은 것은 조금 더 크다. */
+const POINT_RADIUS = 3
+const ACTIVE_POINT_RADIUS = 3.8
+const HANDLE_SIDE = 4.4
+const ACTIVE_HANDLE_SIDE = 5.4
 type PreviewSchema = { layoutType: LayoutType; schema: LayoutSchema }
 /** 폰트 전체 굵기(100–900) · 기울기(도). 끄는 동안은 미리보기, 손을 떼면 저장 + 기록 한 줄. */
 type StyleTone = { weight: number; slant: number }
@@ -794,7 +799,7 @@ function FocusedGlyph({
               || ((selection.kind === 'point' || selection.kind === 'handle') && selection.strokeId === target.stroke.id && selection.pointIndex === pointIndex)
             return <g key={`point-${target.renderPart}-${target.stroke.id}-${pointIndex}`}>
               <circle cx={x} cy={y} r={POINT_HIT_RADIUS * u} fill="transparent" pointerEvents="all" className={styles.pointHitTarget} data-editor-point={shown ? 'hit' : 'catch'} onPointerDown={(event) => pressActiveStroke(event, target, { pointIndex })} />
-              {shown && <circle cx={x} cy={y} r={(active ? 2.8 : 2.1) * u} className={active ? styles.activePoint : styles.point} data-editor-point="visible" pointerEvents="none" />}
+              {shown && <circle cx={x} cy={y} r={(active ? ACTIVE_POINT_RADIUS : POINT_RADIUS) * u} className={active ? styles.activePoint : styles.point} data-editor-point="visible" pointerEvents="none" />}
             </g>
           })
         })}
@@ -814,10 +819,10 @@ function FocusedGlyph({
               // 핸들은 마름모. 꼭짓점(동그라미)과 모양으로 갈린다.
               <rect
                 key={`handle-${target.renderPart}-${handle}`}
-                x={position.x - (active ? 1.9 : 1.5) * u}
-                y={position.y - (active ? 1.9 : 1.5) * u}
-                width={(active ? 3.8 : 3) * u}
-                height={(active ? 3.8 : 3) * u}
+                x={position.x - (active ? ACTIVE_HANDLE_SIDE : HANDLE_SIDE) * u / 2}
+                y={position.y - (active ? ACTIVE_HANDLE_SIDE : HANDLE_SIDE) * u / 2}
+                width={(active ? ACTIVE_HANDLE_SIDE : HANDLE_SIDE) * u}
+                height={(active ? ACTIVE_HANDLE_SIDE : HANDLE_SIDE) * u}
                 transform={`rotate(45 ${position.x} ${position.y})`}
                 className={active ? styles.activeHandle : styles.handle}
                 data-editor-handle={active ? 'active' : 'idle'}
