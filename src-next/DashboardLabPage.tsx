@@ -634,8 +634,8 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
         {/* 도마가 이미 있는 묶음과 같으면 그 이름을 칩 끝에 보인다. */}
         {benchGroup && <span key="group" data-chip="__group" className={styles.benchGroupName}>{benchGroup.name}</span>}
       </div></div>
-      {borrowable.length > 0 && <button type="button" className={styles.benchBorrow} onClick={borrowChoseong}>초성 모양으로</button>}
       {benchCount > 0 && <button type="button" className={styles.benchClear} aria-label="도마 비우기" onClick={clear}><Trash2 size={18} aria-hidden="true" /></button>}
+      {borrowable.length > 0 && <button type="button" className={styles.benchBorrow} onClick={borrowChoseong}>초성 모양으로</button>}
       <button type="button" className={styles.benchGo} disabled={benchCount === 0} onClick={() => openEditor(type, benchChars)}>{/* 숫자가 바뀔 때마다 새로 떠오른다 — key가 바뀌면 애니메이션이 다시 돈다. */}<span key={benchCount} className={styles.benchCount}>{benchCount}</span>개 고치기</button>
     </footer>
     {toast && <div className={styles.toast} role="status">{toast.text}<button type="button" onClick={() => { toast.undo(); setToast(null) }}>되돌리기</button></div>}
