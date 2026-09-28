@@ -10,7 +10,7 @@ import { useWorkbenchStore, workbenchSyllable } from '../src/stores/workbenchSto
 import { groupMatching, sameChars, useJamoGroupStore, type JamoGroup } from '../src/stores/jamoGroupStore'
 import type { JamoData, LayoutSchema, Padding, Part } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
-import { jongseongFromChoseong, matchesChoseong } from '../src/utils/jamoFromChoseong'
+import { borrowFromChoseong, canBorrowFromChoseong, matchesChoseong } from '../src/utils/jamoFromChoseong'
 import { AppGlyph } from './AppGlyph'
 import { editedDayText, FONT_LIMIT, nextFontName } from './accountFont'
 import { createFont, deleteFont, listFonts, renameFont } from './accountFontApi'
@@ -511,10 +511,11 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
     setSheet(null)
     setGroupingId('mine')
   }
-  // 받침만: 담긴 것 중 초성에도 있는 자음을 초성 기본 획으로 켜고 끈다. 켜짐은 저장하지 않고 지금 획에서 잰다 — 편집기에서 받침을 고치면 저절로 꺼진다.
+  // 받침만: 담긴 것을 초성 기본 획으로 켜고 끈다. 홑 · 쌍받침은 같은 초성을 그대로, 겹받침은 앞 · 뒤 초성을 반씩 눌러 넣는다.
+  // 켜짐은 저장하지 않고 지금 획에서 잰다 — 편집기에서 받침을 고치면 저절로 꺼진다.
   const choseongJamos = useJamoStore((state) => state.choseong)
-  const borrowable = type === 'jongseong' && benchType === type ? benchChars.filter((char) => choseongJamos[char] && jamos[char]) : []
-  const borrowedCount = borrowable.filter((char) => matchesChoseong(choseongJamos[char], jamos[char])).length
+  const borrowable = type === 'jongseong' && benchType === type ? benchChars.filter((char) => jamos[char] && canBorrowFromChoseong(choseongJamos, char)) : []
+  const borrowedCount = borrowable.filter((char) => matchesChoseong(choseongJamos, jamos[char])).length
   const borrowState = borrowedCount === 0 ? 'off' : borrowedCount === borrowable.length ? 'on' : 'mixed'
   const toggleBorrow = () => {
     const store = useJamoStore.getState()
@@ -522,8 +523,9 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
       const current = store.jongseong[char]
       if (borrowState === 'on') {
         store.updateJongseong(char, restoreBorrowed(char, current))
-      } else if (!matchesChoseong(store.choseong[char], current)) {
-        const copied = jongseongFromChoseong(store.choseong[char], current)
+      } else if (!matchesChoseong(store.choseong, current)) {
+        const copied = borrowFromChoseong(store.choseong, current)
+        if (!copied) continue
         BORROWED.set(char, { before: current, after: copied })
         store.updateJongseong(char, copied)
       }
