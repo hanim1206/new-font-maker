@@ -2,14 +2,14 @@ import { expect, test } from '@playwright/test'
 
 /**
  * 계정 페이지와 한임에게 의견(게이트 꺼진 개발 서버 — 의견은 이 기기 localStorage).
- * 머리 제보 단추 → 판에서 보내기 → 계정 페이지 → 내가 보낸 의견(목록만) → 대화. 한임 답은 서버(관리자 API)라 여기선 저장소에 직접 넣어 빨간 점만 본다.
+ * 머리 제보 단추 → 판에서 보내기 → 계정 페이지 → 내가 보낸 의견(글 목록, 답이 있으면 토글). 한임 답은 서버(관리자 API)라 여기선 저장소에 직접 넣어 빨간 점만 본다.
  */
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
 })
 
-test('머리 제보 단추로 보내면 내가 보낸 의견 · 대화에 뜬다', async ({ page }) => {
+test('머리 제보 단추로 보내면 내가 보낸 의견에 글 전체가 뜨고, 답이 없으면 토글도 없다', async ({ page }) => {
   await page.goto('/dashboard')
   await page.getByTestId('report-open').click({ timeout: 20_000 })
   const sheet = page.getByTestId('report-sheet')
@@ -39,16 +39,13 @@ test('머리 제보 단추로 보내면 내가 보낸 의견 · 대화에 뜬다
   await expect(page.getByTestId('feedback-thread')).toHaveCount(1)
   await expect(page.getByTestId('feedback-count')).toContainText('1개 보냈어요')
   await expect(page.getByTestId('feedback-thread')).toContainText('대시보드 · 이상해 보여요')
-  await expect(page.getByTestId('feedback-thread')).toContainText('보냈어요')
-
-  await page.getByTestId('feedback-thread').click()
-  await expect(page.getByTestId('feedback-thread-page')).toContainText('꽤 첫 ㄱ이 ㅗ랑 부딪혀요')
-  await page.getByTestId('feedback-reply-draft').fill('꽈도 그래요')
-  await page.getByRole('button', { name: '보내기' }).click()
-  await expect(page.getByTestId('feedback-thread-page')).toContainText('꽈도 그래요')
+  // 대화방이 아니라 글 목록 — 쓴 글 · 보낸 자리가 늘 보이고, 답이 없으면 누를 것도 없다.
+  await expect(page.getByTestId('feedback-thread')).toContainText('꽤 첫 ㄱ이 ㅗ랑 부딪혀요')
+  await expect(page.getByTestId('feedback-reply-toggle')).toHaveCount(0)
+  await expect(page.getByTestId('feedback-page').locator('input, textarea')).toHaveCount(0)
 })
 
-test('안 본 한임 답이 있으면 아바타 · 계정 행에 빨간 점, 대화를 열면 사라진다', async ({ page }) => {
+test('한임 답이 생기면 그 줄에만 답 보기 토글, 안 봤으면 빨간 점, 펼치면 사라진다', async ({ page }) => {
   await page.goto('/dashboard')
   await page.evaluate(() => {
     const at = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString()
@@ -62,11 +59,12 @@ test('안 본 한임 답이 있으면 아바타 · 계정 행에 빨간 점, 대
   await page.getByTestId('dashboard-account').click()
   await expect(page.getByTestId('account-feedback').getByLabel('새 답장')).toBeVisible()
   await page.getByTestId('account-feedback').click()
-  await expect(page.getByTestId('feedback-thread')).toContainText('답장 왔어요')
-  await page.getByTestId('feedback-thread').click()
-  await expect(page.getByTestId('feedback-thread-page')).toContainText('고쳐 볼게요!')
-  await page.getByRole('button', { name: '뒤로' }).click()
-  await expect(page.getByTestId('feedback-thread')).toContainText('답장 있어요')
+  const toggle = page.getByTestId('feedback-reply-toggle')
+  await expect(toggle.getByLabel('새 답장')).toBeVisible()
+  await expect(page.getByTestId('feedback-open')).toHaveCount(0)
+  await toggle.click()
+  await expect(page.getByTestId('feedback-open')).toContainText('고쳐 볼게요!')
+  await expect(toggle.getByLabel('새 답장')).toHaveCount(0)
   await page.getByRole('button', { name: '뒤로' }).click()
   await expect(page.getByTestId('account-feedback').getByLabel('새 답장')).toHaveCount(0)
 })

@@ -1,26 +1,21 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { FormEvent, ReactNode } from 'react'
-import { ArrowUp, Bug, ChevronLeft, ChevronRight, Eye, Heart, MessageCircle, MessageSquareWarning, Sparkles } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
+import { Bug, ChevronDown, ChevronLeft, ChevronRight, Eye, Heart, MessageCircle, MessageSquareWarning, Sparkles } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { FONT_LIMIT } from './accountFont'
 import { listFonts } from './accountFontApi'
 import { authGateMode, signOutAndReload } from './betaAuth'
-import { FEEDBACK_MAX_LENGTH, REPORT_TAG_LABEL, hasUnseenReply, markSeen, readSeen, STATUS_LABEL, threadsOf, whenText } from './feedback'
-import type { FeedbackMessage, ReportTag } from './feedback'
-import { feedbackContextOf } from './feedbackContext'
-import { sendFeedback } from './feedbackApi'
+import { REPORT_TAG_LABEL, hasUnseenReply, markSeen, readSeen, whenText } from './feedback'
+import type { ReportTag } from './feedback'
 import { useMe, useThreads } from './useFeedback'
-import { navigate, previousPathname } from './router'
+import { navigate } from './router'
 import styles from './AccountPage.module.css'
 
 /**
  * 계정 페이지와 한임에게 의견(docs/plans/2026-09-27_계정-페이지와-의견.md). 대시보드 머리 아바타에서 밀려 들어온다.
- * `/account` 계정 · `/account/feedback` 쓰기 + 보낸 목록 · `/account/feedback/<대화 id>` 대화.
+ * `/account` 계정 · `/account/feedback` 내가 보낸 의견(펼침 목록). 쓰기는 머리 제보 단추.
  * 게이트가 꺼진 개발 서버는 계정 대신 `local`이고 의견은 이 기기(localStorage)에 남는다.
  */
-
-/** 보낸 자리. 계정 페이지는 거쳐 가는 곳이라 그 앞 화면을 적는다. */
-const contextNow = () => feedbackContextOf(previousPathname() ?? '/dashboard')
 
 function Bar({ back, title }: { back: string; title?: string }) {
   return <header className={styles.bar}>
@@ -70,14 +65,25 @@ function AccountHome() {
 const TAG_ICON: Record<ReportTag, LucideIcon> = { broken: Bug, odd: Eye, wish: Sparkles, praise: Heart, other: MessageCircle }
 
 /**
- * 내가 보낸 의견(토스식). 큰 두 줄 제목에 보낸 개수, 옅은 안내 한 줄, 줄마다 갈래 색 아이콘 · 글 · 화면 · 상태.
- * 쓰기는 화면 머리의 제보 단추(`ReportButton`)가 한다 — 그 화면 정보가 같이 가게.
+ * 내가 보낸 의견(토스식). 큰 두 줄 제목에 보낸 개수, 옅은 안내 한 줄, 줄마다 갈래 색 아이콘 · 글 · 화면.
+ * 대화방이 아니라 글 목록 — 답을 기다리게 하지 않는다. 쓴 글은 늘 전체가 보이고, 한임 답이 생긴 줄에만 `한임 답 보기` 토글이 생긴다.
+ * `고쳤어요`(해결) 표시는 선별 단계(피드백 42)에서 — 지금 DB에 해결 칸이 없다.
+ * 쓰기는 화면 머리의 제보 단추(`ReportButton`)가 한다. `/account/feedback/<대화 id>`로 오면 그 줄의 답을 펼쳐 둔다(옛 링크).
  */
-function FeedbackHome() {
+function FeedbackHome({ openId = null }: { openId?: string | null }) {
   const me = useMe()
   const { threads, failed } = useThreads(me)
-  const seen = me ? readSeen(window.localStorage, me.id) : {}
+  const [open, setOpen] = useState<string | null>(openId)
+  const [seen, setSeen] = useState(() => me ? readSeen(window.localStorage, me.id) : {})
+  useEffect(() => { if (me) setSeen(readSeen(window.localStorage, me.id)) }, [me])
   const count = threads?.length ?? 0
+
+  // 답을 펼치면 본 것으로 — 아바타 · 계정 행의 빨간 점이 사라진다.
+  useEffect(() => {
+    if (!me || !open) return
+    markSeen(window.localStorage, me.id, open, new Date().toISOString())
+    setSeen(readSeen(window.localStorage, me.id))
+  }, [me, open, threads])
 
   return <Shell testId="feedback-page">
     <Bar back="/account" title="내가 보낸 의견" />
@@ -91,18 +97,29 @@ function FeedbackHome() {
       {count > 0 && <ul className={styles.mine}>
         {threads!.map((thread) => {
           const unseen = hasUnseenReply(thread, seen)
-          const tag = thread.first.context?.tag ?? null
+          const expanded = open === thread.id
+          const context = thread.first.context
+          const tag = context?.tag ?? null
           const Icon = TAG_ICON[tag ?? 'other']
-          return <li key={thread.id}>
-            <button type="button" onClick={() => navigate(`/account/feedback/${thread.id}`)} data-testid="feedback-thread">
-              <span className={styles.mineIcon} data-tag={tag ?? 'other'}><Icon size={20} aria-hidden="true" /></span>
-              <span className={styles.mineText}>
-                <strong>{thread.first.body}</strong>
-                <small>{[thread.first.context?.screen, tag && REPORT_TAG_LABEL[tag], whenText(thread.updatedAt)].filter(Boolean).join(' · ')}</small>
-              </span>
-              <span className={styles.mineState} data-new={unseen || undefined} data-status={thread.status}>{unseen ? '답장 왔어요' : STATUS_LABEL[thread.status]}</span>
-              <ChevronRight size={18} aria-hidden="true" />
-            </button>
+          const mine = thread.messages.filter((message) => message.author === 'friend')
+          const replies = thread.messages.filter((message) => message.author === 'hanim')
+          return <li key={thread.id} data-testid="feedback-thread">
+            <span className={styles.mineIcon} data-tag={tag ?? 'other'}><Icon size={20} aria-hidden="true" /></span>
+            <div className={styles.mineText}>
+              {mine.map((message) => <p key={message.id}>{message.body}</p>)}
+              <small>{[context?.screen, tag && REPORT_TAG_LABEL[tag], whenText(thread.first.createdAt)].filter(Boolean).join(' · ')}</small>
+              {replies.length > 0 && <button type="button" className={styles.mineToggle} aria-expanded={expanded} onClick={() => setOpen(expanded ? null : thread.id)} data-new={unseen || undefined} data-testid="feedback-reply-toggle">
+                <MessageCircle size={14} aria-hidden="true" />한임 답 {expanded ? '접기' : '보기'}
+                {unseen && <span className={styles.mineDot} aria-label="새 답장" />}
+                <ChevronDown size={14} aria-hidden="true" />
+              </button>}
+              {expanded && <div className={styles.mineReplies} data-testid="feedback-open">
+                {replies.map((reply) => <div key={reply.id} className={styles.mineReply}>
+                  <p>{reply.body}</p>
+                  <small>한임 · {whenText(reply.createdAt, new Date(), true)}</small>
+                </div>)}
+              </div>}
+            </div>
           </li>
         })}
       </ul>}
@@ -111,60 +128,9 @@ function FeedbackHome() {
   </Shell>
 }
 
-function FeedbackThreadView({ threadId }: { threadId: string }) {
-  const me = useMe()
-  const { threads, failed, setThreads } = useThreads(me)
-  // `?draft=`로 들어오면 문구를 채워 둔다(추출 완료의 `한임에게 자랑하기`).
-  const [draft, setDraft] = useState(() => new URLSearchParams(window.location.search).get('draft')?.slice(0, FEEDBACK_MAX_LENGTH) ?? '')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const end = useRef<HTMLDivElement>(null)
-  const thread = threads?.find((item) => item.id === threadId) ?? null
-  const count = thread?.messages.length ?? 0
-
-  // 열면 본 것으로 — 빨간 점이 사라진다. 새 말이 오면 맨 아래로.
-  useEffect(() => { if (me && thread) markSeen(window.localStorage, me.id, thread.id, new Date().toISOString()) }, [me, thread])
-  useLayoutEffect(() => { end.current?.scrollIntoView({ block: 'end' }) }, [count])
-  useEffect(() => { if (threads && !thread) navigate('/account/feedback', { replace: true }) }, [threads, thread])
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault()
-    const body = draft.trim()
-    if (!me || !body || busy) return
-    setBusy(true)
-    setError('')
-    const sent = await sendFeedback(me.id, body, contextNow(), threadId)
-    setBusy(false)
-    if (!sent.ok) { setError('보내지 못했어요. 다시 해 주세요.'); return }
-    setDraft('')
-    setThreads((list) => threadsOf([...(list ?? []).flatMap((item) => item.messages), sent.value]))
-  }
-
-  return <Shell testId="feedback-thread-page">
-    <Bar back="/account/feedback" title="보낸 의견" />
-    <div className={styles.chat}>
-      {thread?.messages.map((message: FeedbackMessage) => <div key={message.id} className={styles.message} data-author={message.author}>
-        {message.author === 'hanim' && <span className={styles.who}>한임</span>}
-        <p>{message.body}</p>
-        <small>{whenText(message.createdAt, new Date(), true)}</small>
-      </div>)}
-      {failed && <p className={styles.error}>대화를 불러오지 못했어요.</p>}
-      <div ref={end} />
-    </div>
-    <form className={styles.composer} onSubmit={(event) => void submit(event)}>
-      {error && <p className={styles.error} role="alert">{error}</p>}
-      <div>
-        <input value={draft} maxLength={FEEDBACK_MAX_LENGTH} placeholder="더 보내기" aria-label="더 보내기" onChange={(event) => setDraft(event.target.value)} data-testid="feedback-reply-draft" />
-        <button type="submit" aria-label="보내기" disabled={!draft.trim() || busy}><ArrowUp size={20} aria-hidden="true" /></button>
-      </div>
-    </form>
-  </Shell>
-}
-
 /** `/account` 아래 주소를 나눈다. 모르는 주소는 계정 페이지로. */
 export function AccountPage({ pathname }: { pathname: string }) {
   const parts = pathname.split('/').filter(Boolean)
-  if (parts[1] === 'feedback' && parts[2]) return <FeedbackThreadView threadId={parts[2]} />
-  if (parts[1] === 'feedback') return <FeedbackHome />
+  if (parts[1] === 'feedback') return <FeedbackHome openId={parts[2] ?? null} />
   return <AccountHome />
 }
