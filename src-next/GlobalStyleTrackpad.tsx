@@ -4,12 +4,12 @@ import styles from './CalibrationSentenceEditor.module.css'
 import mode from './GlobalStyleMode.module.css'
 import { StylePicto, type StylePictoKind } from './StylePicto'
 
-export type GlobalStylePanel = 'body' | 'brush' | 'tone' | 'beak'
+export type GlobalStylePanel = 'body' | 'brush' | 'beak'
 
 const TABS: { id: GlobalStylePanel; label: string; short: string; picto: StylePictoKind }[] = [
   { id: 'body', label: '글자 네모꼴', short: '네모꼴', picto: 'body' },
-  { id: 'brush', label: '획 스타일', short: '획 스타일', picto: 'roundness' },
-  { id: 'tone', label: '굵기', short: '굵기', picto: 'weight' },
+  // 굵기 · 대비 · 붓 · 둥글기는 모두 획의 속성이라 한 탭(09-28 사용자).
+  { id: 'brush', label: '획', short: '획', picto: 'weight' },
   { id: 'beak', label: '부리', short: '부리', picto: 'beak' },
 ]
 
@@ -19,7 +19,6 @@ export function GlobalStyleTrackpad({
   onClose,
   bodyControls,
   brushControls,
-  toneControls,
   beakControls,
   fill = false,
   closable = true,
@@ -29,7 +28,6 @@ export function GlobalStyleTrackpad({
   onClose: () => void
   bodyControls: ReactNode
   brushControls: ReactNode
-  toneControls: ReactNode
   beakControls: ReactNode
   /** 셸 안: 하단에 붙은 작은 패널이 아니라 문장 · 캔버스 아래 남은 높이를 다 쓴다. */
   fill?: boolean
@@ -50,7 +48,7 @@ export function GlobalStyleTrackpad({
         </header>}
 
         {closable && tabs}
-        {panel === 'body' ? bodyControls : panel === 'brush' ? brushControls : panel === 'tone' ? toneControls : beakControls}
+        {panel === 'body' ? bodyControls : panel === 'brush' ? brushControls : beakControls}
         {!closable && tabs}
       </div>
     </section>

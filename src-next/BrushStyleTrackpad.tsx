@@ -47,7 +47,7 @@ function clampCutAngle(value: number, preferredSign = 1): number {
 function aspectRatioToFlatness(value: number): number { return Math.round((1 - value) / 0.8 * 100) }
 function flatnessToAspectRatio(value: number): number { return Math.max(0.2, Math.min(1, 1 - value / 100 * 0.8)) }
 
-export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, onClose, renderPreview, embedded = false, productOptions = false, ends }: {
+export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, onClose, renderPreview, embedded = false, productOptions = false, ends, leading }: {
   committed: StrokeRenderStyle
   draft: StrokeRenderStyle | null
   onDraftChange: (style: StrokeRenderStyle | null) => void
@@ -59,6 +59,8 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
   productOptions?: boolean
   /** 지금 저장된 끝 모양. 제품 화면의 `각진 끝 / 둥근 끝`을 가르는 데 쓴다. */
   ends?: StrokeEnds
+  /** 탭 안에서 붓보다 먼저 놓는 조절(`획` 탭의 굵기). */
+  leading?: ReactNode
 }) {
   const current = draft ?? committed
   const beforeRef = useRef<StrokeRenderStyle | null>(null)
@@ -195,7 +197,8 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
     {activeValue === 'angle' && <output>{current.mode === 'angled-area' ? '절단각' : '각도'} {angle > 0 ? '+' : ''}{angle}°</output>}
   </div>
 
-  const controls = <div className={styles.brushControls} role={embedded ? 'tabpanel' : undefined} aria-label={embedded ? '획 스타일' : undefined}>
+  const controls = <div className={styles.brushControls} role={embedded ? 'tabpanel' : undefined} aria-label={embedded ? '획' : undefined}>
+    {leading}
     {/* 제품 화면은 붓촉형만 쓴다(절단 끝 · 레거시는 뺐다, 09-25 사용자). 옛 저장분이 다른 규칙이면 붓촉형으로 돌아올 길만 남긴다. */}
     {(!productOptions || current.mode !== 'brush') && <div className={styles.strokeRuleModes} style={productOptions ? { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' } : undefined} role="radiogroup" aria-label="획 생성 규칙">
       {([['brush', '붓촉형'], ['angled-area', '절단 끝'], ['legacy-snapped-centerline', '레거시 스냅 획']] as const).filter(([mode]) => !productOptions || mode === 'brush' || mode === current.mode).map(([mode, label]) => <button key={mode} type="button" role="radio" aria-checked={current.mode === mode} onClick={() => selectMode(mode)}>{label}</button>)}

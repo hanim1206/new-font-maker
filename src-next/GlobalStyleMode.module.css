@@ -21,12 +21,6 @@ section.fill > div { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y
 .weightBox { display: flex; flex-direction: column; gap: 8px; padding: 6px 0; }
 .weightHead { display: flex; align-items: baseline; justify-content: space-between; font-size: 11px; font-weight: 700; }
 .weightHead output { color: rgb(var(--color-foreground)); font-family: ui-monospace, monospace; font-size: 15px; }
-/* 눈금은 손잡이 중심이 지나는 자리에 맞춘다(손잡이 반폭 11px만큼 안쪽). */
-.ticks { display: flex; justify-content: space-between; padding: 0 11px; }
-.ticks span { position: relative; width: 0; display: flex; justify-content: center; color: rgb(var(--color-text-dim-4)); font-family: ui-monospace, monospace; font-size: 9px; padding-top: 7px; }
-.ticks span::before { content: ''; position: absolute; top: 0; left: -0.5px; width: 1px; height: 5px; background: rgb(var(--color-border-light)); }
-.ticks span[data-on='true'] { color: rgb(var(--color-foreground)); font-weight: 700; }
-.ticks span[data-on='true']::before { background: rgb(var(--color-foreground)); }
 /* 머리의 글로벌 스타일 입구. 눌리는 자리는 44px 그대로 두고, 켜진 표시는 안쪽 34px 면으로만 그려 머리 위아래에 숨 쉴 틈을 둔다.
    되돌리기 · 다시와는 한 묶음이 아니라서 간격과 가는 구분선으로 떼어 놓는다. */
 .headerTool { position: relative; isolation: isolate; margin-right: 13px; }
@@ -111,7 +105,6 @@ section.panel.fill > div { padding: 4px 24px calc(env(safe-area-inset-bottom) + 
 .fill input[type='range']::-moz-range-track { height: 12px; }
 .fill input[type='range']::-moz-range-progress { height: 12px; border-radius: 999px; }
 .fill input[type='range']::-moz-range-thumb { width: 22px; height: 12px; border-radius: 0 999px 999px 0; background: rgb(var(--color-foreground)); }
-.fill .ticks { margin-top: -6px; }
 
 /* 붓 고르기: 같은 물결을 두 붓으로. 테두리 없이, 고른 쪽만 회색 면. */
 .fill [role='radiogroup'][aria-label='획 끝 모양'] { gap: 8px; }

@@ -5,11 +5,11 @@ test.beforeEach(async ({ page }) => {
   await page.evaluate(() => localStorage.clear())
   await page.reload()
   await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
-  await page.getByRole('tab', { name: /획 스타일/ }).click()
+  await page.getByRole('tab', { name: '획', exact: true }).click()
 })
 
 test('절단형 끝처리의 절단각·곡률을 미리보기와 이력에 적용한다', async ({ page }) => {
-  const drawer = page.getByRole('tabpanel', { name: '획 스타일' })
+  const drawer = page.getByRole('tabpanel', { name: '획', exact: true })
   const focusSvg = page.getByRole('region', { name: /완성 글자 편집/ }).locator('svg')
   const before = await focusSvg.innerHTML()
 
@@ -31,7 +31,7 @@ test('절단형 끝처리의 절단각·곡률을 미리보기와 이력에 적�
 
 test('360×667 화면에서 신규 획 규칙 조절판이 넘치지 않는다', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 667 })
-  const drawer = page.getByRole('tabpanel', { name: '획 스타일' })
+  const drawer = page.getByRole('tabpanel', { name: '획', exact: true })
   await drawer.getByRole('radio', { name: '레거시 스냅 획', exact: true }).click()
   const overflow = await page.evaluate(() => ({
     horizontal: document.documentElement.scrollWidth - window.innerWidth,
@@ -43,7 +43,7 @@ test('360×667 화면에서 신규 획 규칙 조절판이 넘치지 않는다',
 
 test('절단형 끝처리로 전체 OTF를 생성하고 다운로드한다', async ({ page }) => {
   test.setTimeout(240_000)
-  await page.getByRole('tabpanel', { name: '획 스타일' }).getByRole('radio', { name: '절단 끝', exact: true }).click()
+  await page.getByRole('tabpanel', { name: '획', exact: true }).getByRole('radio', { name: '절단 끝', exact: true }).click()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: '현재 작업을 OTF로 추출' }).click()
   await page.getByTestId('font-export-confirm').click()
@@ -54,7 +54,7 @@ test('절단형 끝처리로 전체 OTF를 생성하고 다운로드한다', asy
 
 test('레거시 스냅 획을 미리보기·복원·전체 OTF에 적용한다', async ({ page }) => {
   test.setTimeout(240_000)
-  const drawer = page.getByRole('tabpanel', { name: '획 스타일' })
+  const drawer = page.getByRole('tabpanel', { name: '획', exact: true })
   const focusSvg = page.getByRole('region', { name: /완성 글자 편집/ }).locator('svg')
   const before = await focusSvg.innerHTML()
   await drawer.getByRole('radio', { name: '레거시 스냅 획', exact: true }).click()
@@ -65,7 +65,7 @@ test('레거시 스냅 획을 미리보기·복원·전체 OTF에 적용한다',
 
   await page.reload()
   await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
-  await page.getByRole('tab', { name: /획 스타일/ }).click()
+  await page.getByRole('tab', { name: '획', exact: true }).click()
   await expect(page.getByRole('radio', { name: '레거시 스냅 획', exact: true })).toHaveAttribute('aria-checked', 'true')
 
   const downloadPromise = page.waitForEvent('download')

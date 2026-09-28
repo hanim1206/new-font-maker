@@ -1643,13 +1643,12 @@ function DesignBodyControls({
   </div>
 }
 
-const DEFAULT_WEIGHT = 400
 /** 글로벌 스타일 공간에서 문장 글자 하나의 크기(px). 평소는 24. */
 const STYLE_SPACE_EM = 112
 const WEIGHT_STOPS = [100, 200, 300, 400, 500, 600, 700, 800, 900]
 
-/** 굵기. 폰트 전체에 한 값이고 100 단위로만 멈춘다. 끄는 동안은 미리보기만, 손을 떼면 적용한다. 기울기는 저장소에 있지만 지금은 화면에 내놓지 않는다. */
-function StyleToneControls({
+/** 굵기. 폰트 전체에 한 값이고 100 단위로만 멈춘다. 끄는 동안은 미리보기만, 손을 떼면 적용한다. `획` 탭 맨 위에 붓 조절과 같은 막대로 놓인다. 기울기는 저장소에 있지만 지금은 화면에 내놓지 않는다. */
+function StyleWeightRange({
   committed,
   draft,
   onDraftChange,
@@ -1663,17 +1662,14 @@ function StyleToneControls({
   const tone = draft ?? committed
   const commit = () => { if (draft) onCommit(committed, draft) }
   const setWeight = (weight: number | null) => { if (weight !== null && weight !== tone.weight) onDraftChange({ ...tone, weight }) }
-  return <div className={styleMode.weight} role="tabpanel" aria-label="굵기 설정">
-    <p><strong>폰트 전체에 한 값</strong><span>획 모양과 상자는 그대로입니다</span></p>
-    <div className={styleMode.weightBox}>
-      <div className={styleMode.weightHead}><span>굵기</span><output>{tone.weight}</output></div>
-      <input type="range" min="100" max="900" step="100" value={tone.weight} aria-label="굵기" data-testid="style-weight" onChange={(event) => setWeight(Number(event.target.value))}
-        onPointerDown={(event) => setWeight(startRangeDrag(event))} onPointerMove={(event) => setWeight(moveRangeDrag(event))}
-        onPointerUp={(event) => { endRangeDrag(event); commit() }} onPointerCancel={(event) => { endRangeDrag(event); commit() }} onKeyUp={commit} onBlur={commit} />
-      <div className={styleMode.ticks} aria-hidden="true">{WEIGHT_STOPS.map((stop) => <span key={stop} data-on={stop === tone.weight || undefined}>{stop}</span>)}</div>
-    </div>
-    <button type="button" disabled={tone.weight === DEFAULT_WEIGHT} onClick={() => onCommit(committed, { ...committed, weight: DEFAULT_WEIGHT })}>기본 400으로 되돌리기</button>
-  </div>
+  // 다른 획 막대와 같은 생김새: 제목 오른쪽 값, 아래 눈금(100 · 400 · 900만 글씨).
+  return <label className={styles.ruleControl}>
+    <span>굵기 <output>{tone.weight}</output></span>
+    <input type="range" min="100" max="900" step="100" value={tone.weight} aria-label="굵기" data-testid="style-weight" onChange={(event) => setWeight(Number(event.target.value))}
+      onPointerDown={(event) => setWeight(startRangeDrag(event))} onPointerMove={(event) => setWeight(moveRangeDrag(event))}
+      onPointerUp={(event) => { endRangeDrag(event); commit() }} onPointerCancel={(event) => { endRangeDrag(event); commit() }} onKeyUp={commit} onBlur={commit} />
+    <RangeTicks min={100} max={900} ticks={WEIGHT_STOPS.map((at) => ({ at, text: at === 100 || at === 400 || at === 900 ? String(at) : undefined }))} />
+  </label>
 }
 
 export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit', above, cover }: { chrome?: EditorChrome; space?: EditorSpace; above?: ReactNode; cover?: ReactNode } = {}) {
@@ -2535,6 +2531,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
           renderPreview={(strokeStyle, ends) => <Glyph char="한" size={42} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={null} previewSchema={null} layoutHighlight={null} globalStyle={{ ...globalStyle, ...ends, strokeStyle, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : globalStyle.brush }} />}
           embedded
           productOptions={chrome === 'workspace'}
+          leading={<StyleWeightRange committed={{ weight: globalStyle.weight, slant: globalStyle.slant }} draft={previewTone} onDraftChange={setPreviewTone} onCommit={commitTone} />}
         />}
         beakControls={<StemBeakControls
           committed={committedBeak}
@@ -2543,7 +2540,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
           onCommit={commitBeak}
           scope={benchGroup && { groupName: benchGroup.name, groupSize: benchGroup.chars.length, toGroup: beakGroup !== null, onChange: (toGroup) => { draftBeak(null); setBeakToGroup(toGroup) } }}
         />}
-        toneControls={<StyleToneControls committed={{ weight: globalStyle.weight, slant: globalStyle.slant }} draft={previewTone} onDraftChange={setPreviewTone} onCommit={commitTone} />}
       /> : <InferenceTrackpad
         glyph={selectedChar}
         syllable={syllable}

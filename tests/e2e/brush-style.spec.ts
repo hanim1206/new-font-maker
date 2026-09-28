@@ -22,8 +22,8 @@ test('원형·납작형·네모형 붓촉을 전역 미리보기와 이력에 �
 
   await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
   const globalSettings = page.getByRole('region', { name: '글로벌 스타일 설정' })
-  await globalSettings.getByRole('tab', { name: /획 스타일/ }).click()
-  const drawer = globalSettings.getByRole('tabpanel', { name: '획 스타일' })
+  await globalSettings.getByRole('tab', { name: '획', exact: true }).click()
+  const drawer = globalSettings.getByRole('tabpanel', { name: '획', exact: true })
   await expect(drawer).toBeVisible()
   await expect(globalSettings.getByText('글자 전체 인상 설정')).toBeVisible()
   await expect(focusSvg.locator('[data-editor-point]')).toHaveCount(0)
@@ -60,14 +60,14 @@ test('원형·납작형·네모형 붓촉을 전역 미리보기와 이력에 �
 
   await page.reload()
   await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
-  await page.getByRole('region', { name: '글로벌 스타일 설정' }).getByRole('tab', { name: /획 스타일/ }).click()
-  await expect(page.getByRole('tabpanel', { name: '획 스타일' }).getByRole('radio', { name: '납작형', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await page.getByRole('region', { name: '글로벌 스타일 설정' }).getByRole('tab', { name: '획', exact: true }).click()
+  await expect(page.getByRole('tabpanel', { name: '획', exact: true }).getByRole('radio', { name: '납작형', exact: true })).toHaveAttribute('aria-checked', 'true')
 })
 
 test('작은 모바일 화면에서도 획 스타일 조절판이 페이지를 넘치지 않는다', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 667 })
   await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
-  await page.getByRole('tab', { name: /획 스타일/ }).click()
+  await page.getByRole('tab', { name: '획', exact: true }).click()
   await page.getByRole('radio', { name: '네모형', exact: true }).click()
   const overflow = await page.evaluate(() => ({
     horizontal: document.documentElement.scrollWidth - window.innerWidth,
@@ -79,12 +79,14 @@ test('작은 모바일 화면에서도 획 스타일 조절판이 페이지를 �
 
 test('획 스타일 제스처 취소는 미리보기·저장·이력을 시작 상태로 되돌린다', async ({ page }) => {
   await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
-  await page.getByRole('tab', { name: /획 스타일/ }).click()
-  const drawer = page.getByRole('tabpanel', { name: '획 스타일' })
+  await page.getByRole('tab', { name: '획', exact: true }).click()
+  const drawer = page.getByRole('tabpanel', { name: '획', exact: true })
   await drawer.getByRole('radio', { name: '납작형', exact: true }).click()
   await page.waitForTimeout(450)
 
   const angle = drawer.getByRole('slider', { name: '붓촉 각도' })
+  // 굵기 막대가 위에 붙어 각도 패드가 조절판 아래로 내려갔다. 끌기 전에 보이게 한다.
+  await angle.scrollIntoViewIfNeeded()
   const beforeValue = await angle.getAttribute('aria-valuenow')
   const beforeStorage = await page.evaluate(() => localStorage.getItem('font-maker-global-style'))
   const undo = page.getByRole('button', { name: '마지막 편집 되돌리기' })
@@ -111,7 +113,7 @@ test('획 스타일 제스처 취소는 미리보기·저장·이력을 시작 �
 test('네모형 붓촉을 적용한 OTF를 끝까지 생성한다', async ({ page }) => {
   test.setTimeout(240_000)
   await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
-  await page.getByRole('tab', { name: /획 스타일/ }).click()
+  await page.getByRole('tab', { name: '획', exact: true }).click()
   await page.getByRole('radio', { name: '네모형', exact: true }).click()
 
   const downloadPromise = page.waitForEvent('download')

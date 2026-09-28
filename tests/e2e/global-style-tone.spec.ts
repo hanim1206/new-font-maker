@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-/** 글로벌 스타일: 대시보드 `스타일`로 들어오는 화면, 문장 아래를 다 쓰고 탭 넷(네모꼴 · 획 스타일 · 굵기 · 부리)은 화면 아래에 붙는다. */
+/** 글로벌 스타일: 대시보드 `스타일`로 들어오는 화면, 문장 아래를 다 쓰고 탭 셋(네모꼴 · 획 · 부리)은 화면 아래에 붙는다. */
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -26,14 +26,14 @@ test('폰트 탭이 글로벌 스타일 공간이다 — 늘 열려 있고 닫�
   await expect(page.getByTestId('jamo-layout-mode')).toHaveCount(0)
   await expect(page.getByTestId('focus-canvas')).toHaveCount(0)
   await expect(panel.getByRole('button', { name: '글로벌 스타일 설정 닫기' })).toHaveCount(0)
-  await expect(panel.getByRole('tablist', { name: '글로벌 스타일 항목' }).getByRole('tab')).toHaveText(['네모꼴', '획 스타일', '굵기', '부리'])
+  await expect(panel.getByRole('tablist', { name: '글로벌 스타일 항목' }).getByRole('tab')).toHaveText(['네모꼴', '획', '부리'])
 
   // 하단에 붙은 작은 패널이 아니라 화면 바닥까지 남은 높이를 다 쓴다(하단 탭은 없다).
   const box = await panel.boundingBox()
   expect(box && box.y + box.height).toBeGreaterThan(page.viewportSize()!.height - 24)
 
   // 획 스타일: 고르기는 글자에 나오는 결과로 부른다(일반 붓 · 납작 붓). 옛 `각진 끝 / 둥근 끝`은 둥글기 막대가 대신한다.
-  await panel.getByRole('tab', { name: '획 스타일' }).click()
+  await panel.getByRole('tab', { name: '획', exact: true }).click()
   const endChoices = panel.getByRole('radiogroup', { name: '획 끝 모양' }).getByRole('radio')
   await expect(endChoices).toHaveText(['일반 붓', '납작 붓'])
   await expect(panel.getByRole('radio', { name: '일반 붓', exact: true })).toHaveAttribute('aria-checked', 'true')
@@ -84,7 +84,7 @@ test('폰트 탭이 글로벌 스타일 공간이다 — 늘 열려 있고 닫�
 test('굵기는 100 단위로만 멈추고, 끄는 동안은 미리보기 · 손을 떼면 적용 · 되돌리기에 들어간다', async ({ page }) => {
   await page.goto('/workspace/font')
   const panel = page.getByRole('region', { name: '글로벌 스타일 설정' })
-  await panel.getByRole('tab', { name: '굵기' }).click()
+  await panel.getByRole('tab', { name: '획', exact: true }).click()
 
   // 기울기는 지금 내놓지 않는다.
   await expect(panel.getByTestId('style-slant')).toHaveCount(0)
