@@ -11,7 +11,7 @@ export function fontVersionText(revision: number): string {
 const HEAD_TAG = 0x68656164 // 'head'
 const CHECKSUM_MAGIC = 0xb1b0afba
 
-function tableChecksum(view: DataView, offset: number, length: number): number {
+export function tableChecksum(view: DataView, offset: number, length: number): number {
   let sum = 0
   const end = offset + length
   for (let at = offset; at < end; at += 4) {
