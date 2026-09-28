@@ -17,3 +17,6 @@ beta-accounts/
 reference-data/font-guide-calibrations/*.final-component-g2.v1.json
 reference-data/font-guide-calibrations/*.final-component-g3.v1.json
 __pycache__/
+
+# npm run font:sample이 만드는 시험용 OTF
+reference-data/font-check/*.otf

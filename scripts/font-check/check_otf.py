@@ -231,6 +231,49 @@ def check(path: str) -> Report:
     report.add('19 라이선스', 'ok' if names['라이선스']['en'] else 'warn',
                f'라이선스 칸 {"있음" if names["라이선스"]["en"] else "비어 있음 — 19번 결론 뒤 채움"}')
 
+    # iOS · 카카오톡: cmap 플랫폼, 이름 일관성, CFF 이름 (src/services/openTypeValidation.ts와 같은 눈)
+    subtables = {(t.platformID, t.platEncID): t for t in font['cmap'].tables}
+    unicode_tables = [t for (pid, _), t in subtables.items() if pid == 0]
+    windows_tables = [t for (pid, eid), t in subtables.items() if pid == 3 and eid in (1, 10)]
+    if unicode_tables and windows_tables:
+        unicode_map = {}
+        for t in unicode_tables:
+            unicode_map.update(t.cmap)
+        windows_map = {}
+        for t in windows_tables:
+            windows_map.update(t.cmap)
+        agree = unicode_map == windows_map
+        report.add('iOS cmap', 'ok' if agree else 'fail',
+                   f'Unicode 플랫폼 {[(t.platformID, t.platEncID, t.format) for t in unicode_tables]} · Windows {[(t.platformID, t.platEncID, t.format) for t in windows_tables]}'
+                   + (' · 같은 매핑' if agree else ' · 매핑이 다르다'))
+    else:
+        report.add('iOS cmap', 'warn' if windows_tables else 'fail',
+                   f'서브테이블 {sorted(subtables)} — Unicode 플랫폼(0,x) {"없음" if not unicode_tables else "있음"} · Windows(3,1) {"없음" if not windows_tables else "있음"}')
+    bad_unicode_lang = [r for r in font['name'].names if r.platformID == 0 and r.langID not in (0,) and r.langID < 0x8000]
+    if bad_unicode_lang:
+        report.add('iOS name 플랫폼 0', 'warn', f'platform 0 레코드의 languageID가 규격 밖({sorted({r.langID for r in bad_unicode_lang})}) — 0 또는 0x8000+ltag 인덱스여야 한다')
+    family_en, style_en, full_en, ps_en = (names[k]['en'] for k in ('가족', '스타일', '전체', 'PostScript'))
+    ps_mac = font['name'].getName(6, 1, 0, 0)
+    consistent = bool(family_en and style_en and full_en) and full_en in ((family_en, f'{family_en} {style_en}') if style_en == 'Regular' else (f'{family_en} {style_en}',))
+    ps_ok = bool(ps_en) and len(ps_en) <= 63 and all(0x21 <= ord(ch) <= 0x7e for ch in ps_en) and not any(ch in ps_en for ch in '[](){}<>/% ')
+    report.add('iOS 이름 일관성', 'ok' if consistent and ps_ok else 'fail',
+               f'ID4 {full_en!r} {"=" if consistent else "≠"} ID1+ID2 · PS {ps_en!r} {"ASCII-safe" if ps_ok else "규격 밖"}'
+               + ('' if ps_mac else ' · Macintosh(1,0,0) ID6 없음'))
+    if is_cff:
+        cff = font['CFF '].cff
+        top = cff[0]
+        cff_names = {'FontName': cff.fontNames[0], 'FullName': getattr(top, 'FullName', None), 'FamilyName': getattr(top, 'FamilyName', None), 'Weight': getattr(top, 'Weight', None)}
+        mismatch = [k for k, v in (('FontName', ps_en), ('FullName', full_en), ('FamilyName', family_en), ('Weight', style_en)) if cff_names[k] != v]
+        report.add('iOS CFF 이름', 'ok' if not mismatch else ('fail' if 'FontName' in mismatch else 'warn'),
+                   f'{cff_names}' + (f' · name 표와 다름 {mismatch}' if mismatch else ' · name 표와 같음'))
+    mac_bold, sel_bold = bool(font['head'].macStyle & 1), bool(os2.fsSelection & 0x20)
+    name_bold = bool(style_en) and 'bold' in style_en.lower()
+    report.add('iOS 스타일 비트', 'ok' if mac_bold == sel_bold == name_bold else 'warn',
+               f'macStyle bold {mac_bold} · fsSelection bold {sel_bold} · 이름 {style_en!r} · usWeightClass {os2.usWeightClass}')
+    max_adv = max(w for w, _ in font['hmtx'].metrics.values())
+    report.add('iOS 글자 폭', 'ok' if max_adv <= hhea.advanceWidthMax else 'warn',
+               f'hhea.advanceWidthMax {hhea.advanceWidthMax} · hmtx 최대 {max_adv}')
+
     # 1 · 2 OS/2 표시 값
     korean_cp = any(os2.ulCodePageRange1 >> bit & 1 for bit in KOREAN_CODE_PAGE_BITS)
     unicode_bits = (os2.ulUnicodeRange2 << 32) | os2.ulUnicodeRange1

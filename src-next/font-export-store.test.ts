@@ -65,3 +65,21 @@ describe('fontExportStore.confirm', () => {
     expect(navigate).not.toHaveBeenCalled()
   })
 })
+
+describe('추출 뒤 알림 문구', () => {
+  it('파일 검사 오류가 있으면 성공이어도 첫 오류를 notice에 남긴다', async () => {
+    const { successNotice, validationNotice } = await import('./fontExportStore')
+    const broken = {
+      ok: false,
+      issues: [
+        { severity: 'warning' as const, code: 'cmap.unicode-missing', message: 'Unicode cmap 없음' },
+        { severity: 'error' as const, code: 'cff.fontname-mismatch', message: 'CFF FontName이 다릅니다.' },
+      ],
+    } as unknown as import('../src/services/openTypeValidation').OpenTypeValidationReport
+    expect(validationNotice(undefined)).toBeNull()
+    expect(validationNotice({ ...broken, ok: true, issues: [] })).toBeNull()
+    expect(validationNotice(broken)).toBe('폰트는 받았지만 파일 검사에서 오류 1건: CFF FontName이 다릅니다. 설치가 안 되면 이 메시지를 알려 주세요.')
+    expect(successNotice([], undefined)).toBeNull()
+    expect(successNotice(['가'], broken)).toMatch(/^폰트는 받았지만 가: .* 설치가 안 되면 이 메시지를 알려 주세요\.$/)
+  })
+})

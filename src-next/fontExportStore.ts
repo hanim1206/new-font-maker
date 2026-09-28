@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { identityOfSyllable } from '../src/services/contextBoxResolver'
 import type { GlyphPlacementResolver } from '../src/services/fontExportUtils'
 import { generateAndDownloadFont } from '../src/services/fontGenerator'
+import type { OpenTypeValidationReport } from '../src/services/openTypeValidation'
 import { accountFontName, nextExportRevision } from './accountFontSync'
 import { effectiveLayoutDelta, layoutDeltaSnapshot } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
@@ -102,6 +103,18 @@ export function skippedNotice(chars: readonly string[]): string | null {
   return `폰트는 받았지만 ${who}: 모양을 만들지 못해 빈 칸으로 들어갔어요. 획을 고쳐 다시 받아 주세요.`
 }
 
+/** 만든 파일을 iOS 기준으로 다시 읽었을 때 오류가 있으면 알린다. 없으면 null. 자세한 건 콘솔에 찍혀 있다. */
+export function validationNotice(validation: OpenTypeValidationReport | undefined): string | null {
+  if (!validation || validation.ok) return null
+  const errors = validation.issues.filter((issue) => issue.severity === 'error')
+  return `폰트는 받았지만 파일 검사에서 오류 ${errors.length}건: ${errors[0].message} 설치가 안 되면 이 메시지를 알려 주세요.`
+}
+
+/** 성공했을 때 토스트에 보일 말. 빈 글자 알림이 먼저, 그다음 파일 검사 오류. */
+export function successNotice(skippedChars: readonly string[], validation: OpenTypeValidationReport | undefined): string | null {
+  return [skippedNotice(skippedChars), validationNotice(validation)].filter(Boolean).join(' ') || null
+}
+
 const PHASE_ASSEMBLE = '폰트 파일 생성 중...'
 const PHASE_ASSEMBLE_LABEL = '파일로 묶는 중'
 
@@ -176,7 +189,7 @@ export const useFontExportStore = create<FontExportState & FontExportActions>()(
       percent: result.success ? 100 : 0,
       status: result.success ? 'downloaded' : 'failed',
       error: result.success ? '' : result.error ?? '',
-      notice: result.success ? skippedNotice(skippedChars) : `OTF를 만들지 못했어요. ${result.error ?? ''}`.trim(),
+      notice: result.success ? successNotice(skippedChars, result.validation) : `OTF를 만들지 못했어요. ${result.error ?? ''}`.trim(),
       doneElsewhere: Boolean(lastExport) && origin === 'elsewhere',
       schemaFallbackCount: result.schemaFallbackCount ?? 0,
       lastExport: lastExport ?? get().lastExport,

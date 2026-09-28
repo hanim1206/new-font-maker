@@ -1,15 +1,21 @@
 /**
- * opentype.js를 사용한 TTF 폰트 생성 및 다운로드
+ * opentype.js를 사용한 OTF 폰트 생성 및 다운로드
  *
  * 파이프라인:
  * 1. collectGlyphDataWithPlacement() — 스토어에서 글리프 데이터 수집
  * 2. strokeToContours() — 각 획을 윤곽 컨투어로 변환
  * 3. contoursToPath() — 컨투어를 opentype.js Path로 변환
- * 4. opentype.Font — 폰트 조립 + ArrayBuffer → 다운로드
+ * 4. opentype.Font — 폰트 조립 → `openTypePackaging`으로 cmap · name 정리 → `openTypeValidation` 확인 → 다운로드
  */
 // @ts-expect-error opentype.js에 타입 정의 파일 없음
 import * as opentype from 'opentype.js'
-import { fontVersionText, setHeadFontRevision } from './fontRevision'
+import { fontVersionText } from './fontRevision'
+import { createFontIdentity, styleFlagsOf, styleNameForWeight } from './fontIdentity'
+import type { FontIdentity } from './fontIdentity'
+import { WINDOWS_LANGUAGE_KOREAN, finalizeOpenTypePackaging } from './openTypePackaging'
+import type { OpenTypeNaming } from './openTypePackaging'
+import { summarizeValidation, validateOpenTypeForIOS } from './openTypeValidation'
+import type { OpenTypeValidationReport } from './openTypeValidation'
 import { strokeToContours } from './strokeToOutline'
 import type { Contour } from './strokeToOutline'
 import {
@@ -37,9 +43,34 @@ import { projectFinalGlyphInkToFontContours } from './finalGlyphInk'
 // ===== 타입 정의 =====
 
 /** 폰트 생성 옵션 */
+/** 어떤 글자를 넣을지. `hangul-only`가 기본. `compatibility`는 U+0020~U+007E도 `latinSource`에서 받아 넣는다. */
+export type ExportCoverageMode = 'hangul-only' | 'compatibility'
+
+/** compatibility 모드에서 영문 · 숫자 윤곽을 대는 곳. 없는 글자는 null — 자리 채우기 글리프를 지어내지 않는다. */
+export interface LatinGlyphSource {
+  glyphFor(codePoint: number): { advanceWidth: number; contours: Contour[] } | null
+}
+
+export interface ExportCoverageOptions {
+  mode: ExportCoverageMode
+  latinSource?: LatinGlyphSource
+}
+
+/** compatibility 모드에서 실제로 들어간 · 못 채운 ASCII 글자. */
+export interface LatinCoverageResult {
+  requested: number
+  provided: number
+  missing: number[]
+}
+
 export interface FontGeneratorOptions {
   familyName?: string
+  /** name ID 2. 없으면 전역 굵기로 정한다(600 이상 Bold, 아니면 Regular). */
   styleName?: string
+  /** 사용자가 직접 정한 영문 가족 이름. 없으면 `familyName`을 로마자로 옮긴다(`fontIdentity.ts`). */
+  asciiFamilyName?: string
+  /** 글자 범위. 없으면 한글 전용. */
+  coverage?: ExportCoverageOptions
   onProgress?: (completed: number, total: number, phase: string) => void
   /** 자소 상자 출처. 화면과 같은 칸 해석을 넘기면 받은 폰트가 화면과 같아진다. 없으면 스키마. */
   placementOf?: GlyphPlacementResolver
@@ -61,12 +92,16 @@ export interface FontGeneratorResult {
   bytes?: ArrayBuffer
   /** 내려받은 파일 이름(`이름.otf`). */
   fileName?: string
+  /** 파일에 쓴 이름 체계(ASCII 정식 이름 · PostScript 이름 · 한국어 이름). */
+  identity?: FontIdentity
+  /** 만든 파일을 iOS 기준으로 다시 읽어 본 결과. `ok`가 false면 오류가 있다. */
+  validation?: OpenTypeValidationReport
+  /** compatibility 모드에서 ASCII를 얼마나 채웠는지. 한글 전용이면 없다. */
+  latinCoverage?: LatinCoverageResult
 }
 
-export interface FontIdentity {
-  asciiFamilyName: string
-  postScriptName: string
-}
+export type { FontIdentity } from './fontIdentity'
+export { createFontIdentity } from './fontIdentity'
 
 export interface FinalRegionGlyphData {
   unicode: number
@@ -122,45 +157,9 @@ export interface CmapMapping {
 const CMAP_FORMAT_4_MAX_LENGTH = 0xffff
 const CMAP_FORMAT_4_BASE_LENGTH = 16
 const CMAP_FORMAT_4_BYTES_PER_SEGMENT = 8
-const OPTIONAL_FONT_NAME_KEYS = [
-  'trademark',
-  'manufacturer',
-  'designer',
-  'description',
-  'manufacturerURL',
-  'designerURL',
-  'license',
-  'licenseURL',
-] as const
-
 type LocalizedFontName = Record<string, string>
 type PlatformFontNames = Record<string, LocalizedFontName>
 type OpenTypeFontNames = Record<'unicode' | 'macintosh' | 'windows', PlatformFontNames>
-
-function stableNameHash(value: string): string {
-  let hash = 0x811c9dc5
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index)
-    hash = Math.imul(hash, 0x01000193)
-  }
-  return (hash >>> 0).toString(16).toUpperCase().padStart(8, '0')
-}
-
-/** 한글 이름을 보존하면서 OS 설치 충돌이 없는 ASCII/PostScript 식별자를 만든다. */
-export function createFontIdentity(familyName: string, styleName: string): FontIdentity {
-  const trimmedFamily = familyName.trim() || 'FontMaker'
-  const asciiBase = trimmedFamily.replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'FontMaker'
-  const lostCharacters = asciiBase !== trimmedFamily
-  const uniqueFamily = lostCharacters
-    ? `${asciiBase}-${stableNameHash(trimmedFamily)}`
-    : asciiBase
-  const safeStyle = styleName.replace(/[^a-zA-Z0-9-]/g, '') || 'Regular'
-  const postScriptFamily = uniqueFamily.replace(/[^a-zA-Z0-9-]/g, '') || 'FontMaker'
-  return {
-    asciiFamilyName: uniqueFamily,
-    postScriptName: `${postScriptFamily}-${safeStyle}`.slice(0, 63),
-  }
-}
 
 /**
  * format 4 cmap은 길이 필드가 uint16이라 병합 후 segment가 8,189개를 넘을 수 없다.
@@ -209,41 +208,70 @@ export function assertCmapFormat4Capacity(mappings: readonly CmapMapping[]): voi
   }
 }
 
-function setFontNameRecords(
-  font: InstanceType<typeof opentype.Font>,
-  familyName: string,
-  styleName: string,
-  identity: FontIdentity,
-  revision = 0,
-): void {
+/** OS/2 achVendID · name ID 3에 쓰는 4자 제작자 표시. */
+export const FONT_VENDOR_ID = 'FTMK'
+
+/** 인쇄 가능한 ASCII(U+0021~U+007E). compatibility 모드가 채우려는 범위. */
+export const ASCII_PRINTABLE_CODE_POINTS: readonly number[] = Array.from({ length: 0x7e - 0x21 + 1 }, (_, index) => 0x21 + index)
+
+/**
+ * opentype.js 안의 이름은 CFF Top DICT(FontName · FullName · FamilyName · Weight · version)의 출처로만 쓴다.
+ * name 표 자체는 `finalizeOpenTypePackaging`이 다시 쓴다. 그래서 여기엔 ASCII 영문만 넣어 CFF와 name이 같은 값을 갖게 한다.
+ */
+function applyEnglishFontNames(font: InstanceType<typeof opentype.Font>, identity: FontIdentity, revision = 0): void {
   const names = font.names as OpenTypeFontNames
   const version = fontVersionText(revision)
-  const hasKoreanName = familyName !== identity.asciiFamilyName
-  const copyright = `Copyright (c) ${new Date().getFullYear()}`
-  const fullEnglishName = `${identity.asciiFamilyName} ${styleName}`
-  const fullKoreanName = `${familyName} ${styleName}`
-
   for (const platform of ['unicode', 'macintosh', 'windows'] as const) {
-    const platformNames = names[platform]
-    for (const key of OPTIONAL_FONT_NAME_KEYS) delete platformNames[key]
-
-    platformNames.copyright = { en: copyright }
-    platformNames.fontFamily = { en: identity.asciiFamilyName }
-    platformNames.fontSubfamily = { en: styleName }
-    platformNames.uniqueID = { en: `${version};NONE;${identity.postScriptName}` }
-    platformNames.fullName = { en: fullEnglishName }
-    platformNames.version = { en: `Version ${version}` }
-    platformNames.postScriptName = { en: identity.postScriptName }
-    platformNames.preferredFamily = { en: identity.asciiFamilyName }
-    platformNames.preferredSubfamily = { en: styleName }
-
-    // Macintosh name 레코드는 MacRoman이라 한글 번역을 넣지 않는다.
-    if (hasKoreanName && platform !== 'macintosh') {
-      platformNames.fontFamily.ko = familyName
-      platformNames.fullName.ko = fullKoreanName
-      platformNames.preferredFamily.ko = familyName
+    names[platform] = {
+      copyright: { en: copyrightText() },
+      fontFamily: { en: identity.asciiFamilyName },
+      fontSubfamily: { en: identity.styleName },
+      uniqueID: { en: uniqueIdText(identity, revision) },
+      fullName: { en: identity.fullName },
+      version: { en: `Version ${version}` },
+      postScriptName: { en: identity.postScriptName },
+      preferredFamily: { en: identity.asciiFamilyName },
+      preferredSubfamily: { en: identity.styleName },
     }
   }
+}
+
+function copyrightText(): string {
+  return `Copyright (c) ${new Date().getFullYear()}`
+}
+
+/** name ID 3. 버전이 들어가므로 같은 이름으로 다시 받아도 파일마다 다르다 — iOS가 새 파일로 알아본다. */
+function uniqueIdText(identity: FontIdentity, revision = 0): string {
+  return `${fontVersionText(revision)};${FONT_VENDOR_ID};${identity.postScriptName}`
+}
+
+/** name 표에 쓸 값. ID 1 · 2 · 4 · 6과 한국어 localized 이름을 한 출처(`identity`)에서 만든다. */
+export function namingOf(identity: FontIdentity, revision = 0): OpenTypeNaming {
+  return {
+    copyright: copyrightText(),
+    familyName: identity.asciiFamilyName,
+    subfamilyName: identity.styleName,
+    uniqueId: uniqueIdText(identity, revision),
+    fullName: identity.fullName,
+    version: `Version ${fontVersionText(revision)}`,
+    postScriptName: identity.postScriptName,
+    localized: identity.localizedFamilyName && identity.localizedFullName
+      ? [{ windowsLanguageId: WINDOWS_LANGUAGE_KOREAN, familyName: identity.localizedFamilyName, fullName: identity.localizedFullName }]
+      : [],
+  }
+}
+
+/** opentype.js 출력 → iOS 친화 OTF(Unicode cmap · 정리된 name · 스타일 비트 · 버전). 모든 추출 경로가 이 문을 지난다. */
+function packageFont(font: InstanceType<typeof opentype.Font>, identity: FontIdentity, revision = 0): ArrayBuffer {
+  const raw = font.toArrayBuffer() as ArrayBuffer
+  return finalizeOpenTypePackaging(raw, { naming: namingOf(identity, revision), macStyle: styleFlagsOf(identity.styleName), revision })
+}
+
+/** fsSelection: 스타일 이름과 같은 답. Bold면 BOLD(0x20), 아니면 REGULAR(0x40). Italic은 아직 안 만든다. */
+function fsSelectionOf(styleName: string): number {
+  const flags = styleFlagsOf(styleName)
+  const bits = (flags.bold ? 0x0020 : 0) | (flags.italic ? 0x0001 : 0)
+  return bits === 0 ? 0x0040 : bits
 }
 
 // ===== 컨투어 → opentype.js Path 변환 =====
@@ -465,10 +493,10 @@ export function buildFinalRegionPrototypeFontBuffer(
     ascender: LINE_METRICS.ascender,
     descender: LINE_METRICS.descender,
     glyphs,
-    tables: { os2: { sTypoAscender: ASCENDER, sTypoDescender: DESCENDER, sTypoLineGap: 0 } },
+    tables: { os2: { sTypoAscender: ASCENDER, sTypoDescender: DESCENDER, sTypoLineGap: 0, achVendID: FONT_VENDOR_ID } },
   })
-  setFontNameRecords(font, familyName, 'Regular', identity)
-  return font.toArrayBuffer() as ArrayBuffer
+  applyEnglishFontNames(font, identity)
+  return packageFont(font, identity)
 }
 
 /**
@@ -592,26 +620,51 @@ export function windowsClipMetrics(
 
 // ===== 메인 생성 함수 =====
 
+/** compatibility 모드의 영문 · 숫자 글리프. 출처가 없거나 글자를 못 주면 넣지 않는다. */
+function createLatinGlyphs(coverage: ExportCoverageOptions | undefined): { glyphs: Array<InstanceType<typeof opentype.Glyph>>; result?: LatinCoverageResult } {
+  if (!coverage || coverage.mode !== 'compatibility') return { glyphs: [] }
+  const glyphs: Array<InstanceType<typeof opentype.Glyph>> = []
+  const missing: number[] = []
+  for (const codePoint of ASCII_PRINTABLE_CODE_POINTS) {
+    const source = coverage.latinSource?.glyphFor(codePoint) ?? null
+    if (!source) { missing.push(codePoint); continue }
+    glyphs.push(new opentype.Glyph({
+      name: `uni${codePoint.toString(16).toUpperCase().padStart(4, '0')}`,
+      unicode: codePoint,
+      advanceWidth: source.advanceWidth,
+      path: contoursToPath(source.contours),
+    }))
+  }
+  return { glyphs, result: { requested: ASCII_PRINTABLE_CODE_POINTS.length, provided: glyphs.length, missing } }
+}
+
+/** 파일 이름. 사용자가 적은 이름(한글 그대로)에 `.otf`. */
+export function exportFileNameOf(familyName: string): string {
+  const sanitizedName = familyName.replace(/[^a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ\s_-]/g, '').trim() || 'fontmaker'
+  return `${sanitizedName}.otf`
+}
+
 /**
- * TTF 폰트를 생성하고 다운로드
+ * OTF 바이트를 만든다(내려받지 않는다). 테스트 · 스크립트 · 완료 페이지가 같은 파일을 본다.
  *
  * 전체 파이프라인:
  * 1. 스토어에서 전체 글리프 데이터 수집 (11,000+ 글리프)
  * 2. 각 글리프의 획을 윤곽 컨투어로 변환
- * 3. opentype.js 폰트 조립
- * 4. .otf 파일 다운로드
+ * 3. opentype.js 폰트 조립 → `finalizeOpenTypePackaging`(Unicode cmap · name · 스타일 비트 · 버전)
+ * 4. `validateOpenTypeForIOS`로 다시 읽어 확인
  *
  * async로 구현하여 UI 블로킹 방지 (100개씩 청크 처리)
  */
-export async function generateAndDownloadFont(
+export async function generateFontBuffer(
   options: FontGeneratorOptions = {}
 ): Promise<FontGeneratorResult> {
   const {
     familyName = 'FontMaker',
-    styleName = 'Regular',
+    asciiFamilyName,
     onProgress,
     placementOf,
     revision = 0,
+    coverage,
   } = options
 
   try {
@@ -633,11 +686,15 @@ export async function generateAndDownloadFont(
       return { success: false, glyphCount: 0, error: '생성할 글리프가 없습니다.' }
     }
 
+    // 글리프 순서: .notdef · space · (compatibility 모드 ASCII) · 한글. cmap은 이 순서 하나에서 나온다.
+    const latin = createLatinGlyphs(coverage)
+    const hangulFirstIndex = 2 + latin.glyphs.length
     assertCmapFormat4Capacity([
       { codePoint: 0x20, glyphIndex: 1 },
+      ...latin.glyphs.map((glyph, index) => ({ codePoint: glyph.unicode as number, glyphIndex: index + 2 })),
       ...glyphDataList.map((data, index) => ({
         codePoint: data.unicode,
-        glyphIndex: index + 2,
+        glyphIndex: index + hangulFirstIndex,
       })),
     ])
 
@@ -645,6 +702,7 @@ export async function generateAndDownloadFont(
     const glyphs: Array<InstanceType<typeof opentype.Glyph>> = [
       createNotdefGlyph(),
       createSpaceGlyph(SPACE_ADVANCE),
+      ...latin.glyphs,
     ]
 
     // 한 글자가 실패해도 폰트 전체를 버리지 않는다. 그 글자만 빈 글리프로 넣고 알린다(피드백 35).
@@ -671,28 +729,28 @@ export async function generateAndDownloadFont(
     // Phase 3: 폰트 조립
     onProgress?.(0, 1, '폰트 파일 생성 중...')
 
-    // OS 설치 충돌을 피하는 ASCII/PostScript 식별자 생성
-    const identity = createFontIdentity(familyName, styleName)
-    const { asciiFamilyName } = identity
-
-    // 글로벌 스타일에서 weight 가져오기
+    // 글로벌 스타일에서 weight 가져오기. 스타일 이름 · fsSelection · macStyle은 전부 이 하나에서 나온다.
     const styleState = useGlobalStyleStore.getState()
     const usWeightClass = styleState.style.weight || 400
+    const styleName = options.styleName ?? styleNameForWeight(usWeightClass)
+    const identity = createFontIdentity(familyName, styleName, { asciiFamilyName })
+    const fsSelection = fsSelectionOf(identity.styleName)
 
     const font = new opentype.Font({
-      familyName: asciiFamilyName,
-      styleName,
+      familyName: identity.asciiFamilyName,
+      styleName: identity.styleName,
       unitsPerEm: UPM,
       ascender: LINE_METRICS.ascender,
       descender: LINE_METRICS.descender,
       glyphs: glyphs,
-      weightClass: usWeightClass,
+      // opentype.js는 weightClass ≥ 600이면 head.macStyle에 bold를 켠다. 굵기는 OS/2에만 두고 macStyle은 스타일 이름을 따라 packageFont가 맞춘다.
       widthClass: 5,       // Normal
-      fsSelection: usWeightClass >= 700 ? 0x0020 : 0x0040, // BOLD or REGULAR
+      fsSelection,
       tables: {
         os2: {
           usWeightClass,
           usWidthClass: 5,
+          achVendID: FONT_VENDOR_ID,
           // Basic Latin(space) + Hangul Compatibility Jamo(bit 52) + Hangul Syllables(bit 56)
           ulUnicodeRange1: OS2_UNICODE_RANGE_1,
           ulUnicodeRange2: OS2_UNICODE_RANGE_2,
@@ -706,31 +764,31 @@ export async function generateAndDownloadFont(
           sTypoAscender: ASCENDER,
           sTypoDescender: DESCENDER,
           sTypoLineGap: 0,
-          fsSelection: usWeightClass >= 700 ? 0x0020 : 0x0040,
+          fsSelection,
         },
       },
     })
 
-    // name 테이블 설정 (macOS Font Book 유효성 + Windows 호환)
-    setFontNameRecords(font, familyName, styleName, identity, revision)
+    // CFF 이름의 출처. name 표는 packageFont가 같은 identity로 다시 쓴다.
+    applyEnglishFontNames(font, identity, revision)
 
-    // Phase 4: 다운로드
-    const arrayBuffer = font.toArrayBuffer() as ArrayBuffer
-    setHeadFontRevision(arrayBuffer, revision)
-    const fileSize = arrayBuffer.byteLength
-
-    const sanitizedName = familyName.replace(/[^a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ\s_-]/g, '').trim() || 'fontmaker'
-    const fileName = `${sanitizedName}.otf`
-    downloadTTF(arrayBuffer, fileName)
+    // Phase 4: 묶고 다시 읽어 확인
+    const arrayBuffer = packageFont(font, identity, revision)
+    const validation = validateOpenTypeForIOS(arrayBuffer)
+    if (!validation.ok) console.error('OTF 검사 오류:', summarizeValidation(validation), validation.issues.filter((issue) => issue.severity === 'error'))
+    else if (validation.issues.some((issue) => issue.severity === 'warning')) console.warn('OTF 검사 경고:', validation.issues.filter((issue) => issue.severity === 'warning'))
 
     return {
       success: true,
       glyphCount: glyphs.length,
-      fileSize,
+      fileSize: arrayBuffer.byteLength,
       schemaFallbackCount,
       skippedChars,
       bytes: arrayBuffer,
-      fileName,
+      fileName: exportFileNameOf(familyName),
+      identity,
+      validation,
+      latinCoverage: latin.result,
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -741,6 +799,15 @@ export async function generateAndDownloadFont(
       error: `폰트 생성 실패: ${message}`,
     }
   }
+}
+
+/** `generateFontBuffer` + 내려받기. 화면의 추출 단추가 부른다. */
+export async function generateAndDownloadFont(
+  options: FontGeneratorOptions = {}
+): Promise<FontGeneratorResult> {
+  const result = await generateFontBuffer(options)
+  if (result.success && result.bytes) downloadTTF(result.bytes, result.fileName)
+  return result
 }
 
 /**
@@ -775,17 +842,17 @@ export async function downloadPrototypeFont(
     ]
 
     const identity = createFontIdentity(familyName, 'Regular')
-    const { asciiFamilyName } = identity
 
     const font = new opentype.Font({
-      familyName: asciiFamilyName,
-      styleName: 'Regular',
+      familyName: identity.asciiFamilyName,
+      styleName: identity.styleName,
       unitsPerEm: UPM,
       ascender: LINE_METRICS.ascender,
       descender: LINE_METRICS.descender,
       glyphs,
       tables: {
         os2: {
+          achVendID: FONT_VENDOR_ID,
           ulUnicodeRange1: OS2_UNICODE_RANGE_1,
           ulUnicodeRange2: OS2_UNICODE_RANGE_2,
           ulCodePageRange1: OS2_CODE_PAGE_RANGE_1,
@@ -797,15 +864,17 @@ export async function downloadPrototypeFont(
       },
     })
 
-    setFontNameRecords(font, familyName, 'Regular', identity)
+    applyEnglishFontNames(font, identity)
 
-    const arrayBuffer = font.toArrayBuffer() as ArrayBuffer
+    const arrayBuffer = packageFont(font, identity)
     downloadTTF(arrayBuffer, `${familyName}-prototype.otf`)
 
     return {
       success: true,
       glyphCount: glyphs.length,
       fileSize: arrayBuffer.byteLength,
+      identity,
+      validation: validateOpenTypeForIOS(arrayBuffer),
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
