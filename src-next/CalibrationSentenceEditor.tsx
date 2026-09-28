@@ -1,5 +1,5 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref, type RefObject, type TextareaHTMLAttributes } from 'react'
-import { ArrowLeft, Check, Circle, ClipboardPaste, Copy, Delete, Dices, Download, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, RotateCcw, Settings2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
+import { Check, Circle, ClipboardPaste, Copy, Delete, Dices, Download, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, RotateCcw, Settings2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { create } from 'zustand'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
@@ -8,7 +8,6 @@ import { DevGhostToggle } from './DevGhostToggle'
 import { facesToBox, identityOfSyllable } from '../src/services/contextBoxResolver'
 import { contextPlacementOf, useContextPlacement, useNotoModel } from './notoModel'
 import { GlyphLayoutEditor } from './GlyphLayoutEditor'
-import leaveSheetStyles from './GlyphLayoutEditor.module.css'
 import { effectiveLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { useEditHistoryStore } from './editHistoryStore'
@@ -1789,8 +1788,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const [editMode, setEditMode] = useState<EditMode>(initialEditMode)
   // `획 고치기`로 들어온 자소. 획 편집에서 선택을 푼 채 `완료`해도 레이아웃이 이 부품을 다시 켠다.
   const [strokeEntryPart, setStrokeEntryPart] = useState<MobileEditorPart | null>(initialStrokePart)
-  // 획 편집에 들어온 순간의 기록 길이. `뒤로`는 여기까지 되돌린다.
-  const [strokeEntryMark, setStrokeEntryMark] = useState(0)
   const [pendingStrokePart, setPendingStrokePart] = useState<MobileEditorPart | null>(initialStrokePart)
   // Undo/Redo로 저장된 Δ가 바뀌면 레이아웃 편집부를 새로 띄워 세션 편집(절대값)을 버린다.
   const [layoutEpoch, setLayoutEpoch] = useState(0)
@@ -2342,7 +2339,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const editStrokes = (part: Part) => {
     const editorPart: MobileEditorPart = part === 'CH' ? 'CH' : part === 'JO' ? 'JO' : 'JU'
     setStrokeEntryPart(editorPart)
-    setStrokeEntryMark(history.length)
     setSelection(firstStrokeSelectionOf(editorPart) ?? { kind: 'none' })
     setSelectedPoints([])
     chooseEditMode('stroke')
@@ -2371,21 +2367,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     else if (entry.kind === 'beak') { if (entry.groupId) useJamoGroupStore.getState().setStemBeak(entry.groupId, entry.groupBefore); else useGlobalStyleStore.getState().setStemBeak(entry.before) }
     else updateJamo(entry.before)
     if (entry.kind === 'layout' || entry.kind === 'jamo') useCalibrationProjectStore.getState().removeSampleGlyphEdit(entry.edit.id)
-  }
-  // `뒤로`: 이번에 획 편집에 들어와서 한 일을 전부 되돌리고 레이아웃으로 나간다. 되돌린 것은 Redo에 쌓여서 다시 살릴 수 있다.
-  const strokeEditCount = Math.max(0, history.length - strokeEntryMark)
-  const [strokeBackAsk, setStrokeBackAsk] = useState(false)
-  // `뒤로`는 고친 게 있으면 먼저 묻는다. 끄는 즉시 저장되지만 사용자에게 `뒤로`는 버리기다.
-  const askStrokeBack = () => strokeEditCount > 0 ? setStrokeBackAsk(true) : cancelStrokeEdits()
-  const cancelStrokeEdits = () => {
-    setStrokeBackAsk(false)
-    const reverted = history.slice(Math.min(strokeEntryMark, history.length)).reverse()
-    reverted.forEach(revertEntry)
-    if (reverted.length) {
-      setHistory((entries) => entries.slice(0, entries.length - reverted.length))
-      setFuture((entries) => [...entries, ...reverted])
-    }
-    chooseEditMode('layout')
   }
   const undo = () => {
     const entry = history.at(-1)
@@ -2663,27 +2644,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         frameForEdit={frameForEdit}
         toolSlot={strokeToolSlot}
       />}
-      {/* 획 편집은 끄는 즉시 저장된다. `완료`는 저장이 아니라 레이아웃으로 돌아가는 문이다.
-          도마를 들고 왔으면 줄이 없다 — 머리 `‹`가 섹션 홈으로 가는 완료이고, 취소는 따로 두지 않는다(되돌리기는 ↶). */}
-      {strokeFrameAvailable && !globalStylePanel && (boxFitIssue || !benchCarried) && <div className={styles.strokeDoneBar}>
-        {boxFitIssue && <p role="status" data-testid="jamo-box-fit-issue">이 획은 모델 상자에 안 맞아 옛 배치로 그립니다 · {boxFitIssue.message}</p>}
-        {/* `완료`는 고친 채로, 왼쪽 `뒤로`는 이번에 들어와서 고친 것을 되돌리고 레이아웃으로 나간다(취소). */}
-        {!benchCarried && <div className={styles.strokeDoneRow}>
-          <button type="button" className={styles.strokeBack} onClick={askStrokeBack} aria-label="고친 획을 되돌리고 레이아웃으로 돌아가기" title="고친 획을 되돌리고 레이아웃으로" data-testid="jamo-stroke-back"><ArrowLeft size={18} /></button>
-          <button type="button" onClick={() => chooseEditMode('layout')} data-testid="jamo-stroke-done">완료</button>
-        </div>}
-      </div>}
-      {strokeBackAsk && <div className={leaveSheetStyles.leaveBackdrop} onClick={() => setStrokeBackAsk(false)} data-testid="stroke-back-backdrop">
-        <div className={leaveSheetStyles.leaveSheet} role="alertdialog" aria-modal="true" aria-label="저장 안 한 획" onClick={(event) => event.stopPropagation()} data-testid="stroke-back-dialog">
-          <header>
-            <b>고친 획이 아직 저장되지 않았어요</b>
-            <small>{strokeEditCount}번 고침 · 저장하지 않고 나가면 되돌아가요.</small>
-          </header>
-          <div className={leaveSheetStyles.leaveActions}>
-            <button type="button" className={leaveSheetStyles.leaveSave} onClick={() => { setStrokeBackAsk(false); chooseEditMode('layout') }} data-testid="stroke-back-save">저장하고 나가기</button>
-            <button type="button" onClick={cancelStrokeEdits} data-testid="stroke-back-discard">저장하지 않고 나가기</button>
-          </div>
-        </div>
+      {/* 획 편집은 끄는 즉시 저장된다. 레이아웃으로 돌아가는 문은 머리 `‹`(도마를 들고 왔으면 섹션 홈), 되돌리기는 ↶. */}
+      {strokeFrameAvailable && !globalStylePanel && boxFitIssue && <div className={styles.strokeDoneBar}>
+        <p role="status" data-testid="jamo-box-fit-issue">이 획은 모델 상자에 안 맞아 옛 배치로 그립니다 · {boxFitIssue.message}</p>
       </div>}
       </>}
       </div>
@@ -2726,6 +2689,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         projectName={projectName}
         heading={styleOnly ? '스타일' : undefined}
         cover={cover}
+        // 획 편집은 레이아웃 위에 얹힌 층이다. 머리 `‹`가 레이아웃으로 내려가는 문(옛 `완료`). 도마를 들고 왔으면 섹션 홈으로.
+        back={!styleOnly && editMode === 'stroke' && strokeFrameAvailable && !benchCarried ? { label: '레이아웃', onClick: () => chooseEditMode('layout') } : undefined}
         history={{ canUndo: history.length > 0, canRedo: future.length > 0, onUndo: undo, onRedo: redo }}
       >
         {!styleOnly && benchRow}

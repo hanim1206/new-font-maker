@@ -44,8 +44,8 @@ export function MobileWorkspaceShell({
   history?: WorkspaceHistoryControls
   /** 머리 오른쪽, 되돌리기 앞에 늘 보이는 도구(어느 모드에서든 쓰는 것). */
   tools?: ReactNode
-  /** 머리 왼쪽 문. 기본은 위 덱(`내 폰트`). 폰트 덱 안의 하위 화면(추출 완료)은 `‹ 폰트`처럼 제 상위를 준다. */
-  back?: { label: string; href: string }
+  /** 머리 왼쪽 문. 기본은 위 덱(`내 폰트`). 폰트 덱 안의 하위 화면(추출 완료)은 `‹ 폰트`처럼 제 상위를 준다. 같은 화면 안의 얹힌 층(획 편집 → 레이아웃)은 `onClick`. */
+  back?: { label: string; href: string } | { label: string; onClick: () => void }
   /** 머리 아래(내용 자리)만 덮는 층. 추출 대기처럼 내용은 막되 머리 `‹`로는 나갈 수 있어야 하는 것. */
   cover?: ReactNode
 }) {
@@ -58,7 +58,11 @@ export function MobileWorkspaceShell({
       <div className={styles.shell}>
         <header className={styles.projectHeader}>
           {/* 왼쪽은 위 덱으로 나가는 문 — 화살표만, 오른쪽 머리 단추와 같은 생김새. 이름은 읽기용 레이블에만. 오른쪽은 편집 기록. */}
-          {back
+          {back && 'onClick' in back
+            ? <button type="button" className={styles.back} onClick={back.onClick} aria-label={`${back.label}(으)로`} title={back.label} data-testid="workspace-back">
+              <ChevronLeft size={20} aria-hidden="true" />
+            </button>
+            : back
             ? <a className={styles.back} href={back.href} onClick={onLinkClick} aria-label={`${back.label}(으)로`} title={back.label} data-testid="workspace-back">
               <ChevronLeft size={20} aria-hidden="true" />
             </a>

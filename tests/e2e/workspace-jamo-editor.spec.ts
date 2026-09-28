@@ -36,9 +36,8 @@ test('자소 탭 획 편집은 셸 안에서 문장·캔버스·도구 줄을 �
   const trackpadBox = await page.getByTestId('jamo-stroke-tools').boundingBox()
   const bottom = page.viewportSize()?.height ?? 0
   expect(trackpadBox && trackpadBox.y + trackpadBox.height <= bottom + 1).toBe(true)
-  // 도구 줄 아래 `완료`도 화면 안에 들어온다(하단 내비가 없어 바닥이 곧 화면 끝이다).
-  const doneBox = await page.getByTestId('jamo-stroke-done').boundingBox()
-  expect(doneBox && trackpadBox && doneBox.y >= trackpadBox.y + trackpadBox.height - 1 && doneBox.y + doneBox.height <= bottom + 1).toBe(true)
+  // 하단 `완료` 줄은 없다. 레이아웃으로 돌아가는 문은 머리 `‹`.
+  await expect(page.getByTestId('jamo-stroke-done')).toHaveCount(0)
 
   // 획 두 번 눌러 선택(첫 클릭 = 부품, 둘째 = 획).
   const focusSvg = editor.locator('svg')
@@ -56,8 +55,8 @@ test('자소 탭 획 편집은 셸 안에서 문장·캔버스·도구 줄을 �
   await page.mouse.up()
   await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
 
-  // `완료`로 레이아웃에 돌아오면 문장 줄이 다시 내려오고, 거기서 다른 글자를 고르면 그 글자의 레이아웃이다.
-  await page.getByTestId('jamo-stroke-done').click()
+  // 머리 `‹`로 레이아웃에 돌아오면 문장 줄이 다시 내려오고, 거기서 다른 글자를 고르면 그 글자의 레이아웃이다.
+  await page.getByTestId('workspace-back').click()
   await page.getByRole('region', { name: '보정 문장' }).getByRole('button', { name: '별 편집' }).click()
   await expect(page.getByRole('region', { name: '별 레이아웃 수정' })).toBeVisible()
 })
@@ -101,11 +100,10 @@ test('획 편집 `원` 버튼은 지금 자모 상자에 닫힌 타원 획을 �
   await expect(focusSvg.locator('[data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(1)
   await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
 
-  // 단추가 한 줄 늘어도 도구 줄과 `완료`가 화면 안에 들어온다.
+  // 단추가 한 줄 늘어도 도구 줄이 화면 안에 들어온다.
   const tools = await page.getByTestId('jamo-stroke-tools').boundingBox()
-  const done = await page.getByTestId('jamo-stroke-done').boundingBox()
   const bottom = page.viewportSize()?.height ?? 0
-  expect(tools && done && done.y >= tools.y + tools.height - 1 && done.y + done.height <= bottom + 1).toBe(true)
+  expect(tools && tools.y + tools.height <= bottom + 1).toBe(true)
   await page.screenshot({ path: 'test-results/stroke-add-circle.png' })
 })
 
