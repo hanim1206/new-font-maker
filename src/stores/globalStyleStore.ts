@@ -152,6 +152,15 @@ function normalizeGlobalStyle(style: GlobalStyle): GlobalStyle {
   return { ...style, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : brush, strokeStyle, stemBeak: normalizeStemBeak(style.stemBeak) }
 }
 
+/** 저장된 폰트의 스타일 → 스토어에 넣는 값. linecap·linejoin 백필(구형 데이터) + 정규화. 스토어 없이 폰트를 그릴 때(관리자 미리보기)도 쓴다. */
+export function loadedGlobalStyle(style: GlobalStyle): GlobalStyle {
+  return normalizeGlobalStyle({
+    ...style,
+    linecap: style.linecap || DEFAULT_STYLE.linecap,
+    linejoin: style.linejoin || DEFAULT_STYLE.linejoin,
+  })
+}
+
 export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>()(
   persist(
     immer((set, get) => ({
@@ -232,15 +241,7 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
 
       loadFontData: (data) =>
         set((state) => {
-          state.style = { ...data.style }
-          // linecap·linejoin 백필 (구형 데이터 호환)
-          if (!state.style.linecap) {
-            state.style.linecap = DEFAULT_STYLE.linecap
-          }
-          if (!state.style.linejoin) {
-            state.style.linejoin = DEFAULT_STYLE.linejoin
-          }
-          state.style = normalizeGlobalStyle(state.style)
+          state.style = loadedGlobalStyle(data.style)
           state.exclusions = [...data.exclusions]
         }),
 

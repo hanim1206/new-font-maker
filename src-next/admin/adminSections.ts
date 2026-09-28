@@ -16,3 +16,11 @@ export function sectionOf(pathname: string): Section {
   const key = pathname.slice(ADMIN_PATH.length + 1).split('/')[0]
   return SECTIONS.some((section) => section.key === key) ? key as Section : 'invite'
 }
+
+/** `/admin/accounts/<이메일>` → 그 계정(폰트 미리보기). 계정 목록이면 null. */
+export function accountOf(pathname: string): string | null {
+  const [key, email] = pathname.slice(ADMIN_PATH.length + 1).split('/')
+  return key === 'accounts' && email ? decodeURIComponent(email) : null
+}
+
+export const accountPathOf = (email: string) => `${ADMIN_PATH}/accounts/${encodeURIComponent(email)}`

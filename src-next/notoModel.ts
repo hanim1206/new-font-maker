@@ -6,7 +6,8 @@ import type { GlyphInkPlacement } from '../src/services/notoGlyphXor'
 import type { ModelIdentity } from '../src/services/notoVariationModel'
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
 import type { DecomposedSyllable, LayoutSchema } from '../src/types'
-import { useLayoutDelta } from './layoutDeltaStore'
+import { effectiveLayoutDelta, useLayoutDelta } from './layoutDeltaStore'
+import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 
@@ -89,7 +90,7 @@ export function contextPlacementOf(input: {
  * 다시 그릴 때마다 상자 다듬기(글자당 잉크 합치기 여러 번)가 처음부터 돈다 — 문장 11자면 조작 한 번에 수십 ms다(폰에서는 100ms 안팎).
  * 그래서 열쇠는 내용으로 잡는다: 글자 · 자모 객체 셋(저장소의 것이라 안 바뀌면 같은 객체다) · 여백 네 값.
  */
-export function useContextPlacement(syllable: DecomposedSyllable, schema: LayoutSchema, globalStyle: Pick<GlobalStyle, 'linecap' | 'linejoin'>): PlacementResult {
+export function useContextPlacement(syllable: DecomposedSyllable, schema: LayoutSchema, globalStyle: Pick<GlobalStyle, 'linecap' | 'linejoin'>, deltaSource?: LayoutDeltaSnapshot): PlacementResult {
   const { bundle } = useNotoModel()
   const { char, choseong, jungseong, jongseong, layoutType } = syllable
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 내용이 같으면 같은 글자다(위 설명).
@@ -99,7 +100,9 @@ export function useContextPlacement(syllable: DecomposedSyllable, schema: Layout
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 여백은 네 값이 같으면 같다.
   const stablePadding = useMemo(() => padding, [paddingKey])
   const identity = useMemo(() => bundle ? identityOfSyllable(stableSyllable) : null, [bundle, stableSyllable])
-  const delta = useLayoutDelta(identity)
+  const storedDelta = useLayoutDelta(identity)
+  // `deltaSource`를 주면 이 기기 저장소 대신 그 폰트의 Δ를 쓴다(관리자 미리보기).
+  const delta = useMemo(() => deltaSource ? effectiveLayoutDelta(deltaSource, identity) : storedDelta, [deltaSource, identity, storedDelta])
   // 다듬기는 네모꼴과 무관하므로 네모꼴을 끄는 동안에도 다시 돌지 않는다. 얹는 변환만 다시 한다.
   const reference = useMemo(
     () => resolveReferenceBoxes({ bundle, identity, syllable: stableSyllable, ends: { linecap: globalStyle.linecap, linejoin: globalStyle.linejoin }, delta }),

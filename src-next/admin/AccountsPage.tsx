@@ -4,16 +4,19 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { dateOf, dayOf } from './adminApi'
 import { IssuedCard } from './IssuedCard'
+import { isUnsent, visibleAccounts } from './accountFilter'
+import type { AccountFilter } from './accountFilter'
 import type { Account, BetaInvites } from './useBetaInvites'
 
-/** 계정: 발급한 친구 표. 링크 보냄 체크 · 메시지 다시 복사 · 새 코드 · 정지 · 되살리기 · 삭제. 새 코드와 삭제는 한 번 더 눌러야 한다. */
-export function AccountsPage({ invites }: { invites: BetaInvites }) {
+/** 계정: 발급한 친구 표. `전체 · 안 보냄`으로 거른다(고른 칸은 `AdminApp`이 들고 있어 폰트 상세에 다녀와도 남는다). 닉네임을 누르면 그 친구 폰트 미리보기. 링크 보냄 체크 · 메시지 다시 복사 · 새 코드 · 정지 · 되살리기 · 삭제. 새 코드와 삭제는 한 번 더 눌러야 한다. */
+export function AccountsPage({ invites, onOpen, filter, onFilter }: { invites: BetaInvites; onOpen: (email: string) => void; filter: AccountFilter; onFilter: (filter: AccountFilter) => void }) {
   const { accounts, listError, busy, copied, copy, issue, suspend, remove, markSent } = invites
   /** `reissue:<이메일>` · `remove:<이메일>` — 한 번 누른 새 코드 · 삭제 단추(되돌릴 수 없어 두 번 누른다). 정지는 되살리기가 있어 한 번에. */
   const [confirming, setConfirming] = useState<string | null>(null)
   const active = accounts?.filter((account) => !account.suspended) ?? []
   const suspended = accounts?.filter((account) => account.suspended) ?? []
-  const unsent = active.filter((account) => account.invite && !account.sentAt).length
+  const unsent = accounts?.filter(isUnsent).length ?? 0
+  const shown = accounts ? visibleAccounts(accounts, filter) : []
 
   const row = (account: Account) => {
     const name = account.nickname
@@ -25,7 +28,11 @@ export function AccountsPage({ invites }: { invites: BetaInvites }) {
     }
     const drop = () => setConfirming((current) => current?.endsWith(`:${account.email}`) ? null : current)
     return <TableRow key={account.email} className={account.suspended ? 'text-text-dim-4' : undefined}>
-      <TableCell className="font-semibold">{name ?? '(닉네임 없음)'}</TableCell>
+      <TableCell className="font-semibold">
+        <button type="button" className="cursor-pointer underline-offset-4 hover:underline" onClick={() => onOpen(account.email)} title="폰트 보기" data-testid="admin-account-open">
+          {name ?? '(닉네임 없음)'}
+        </button>
+      </TableCell>
       <TableCell>{account.invite
         ? <code className="select-text font-semibold tracking-wider">{account.invite.code}</code>
         : <span className="text-xs text-text-dim-5">코드 모름</span>}</TableCell>
@@ -75,6 +82,16 @@ export function AccountsPage({ invites }: { invites: BetaInvites }) {
     <p className="text-sm text-text-dim-4">
       {accounts ? `사용 중 ${active.length} · 안 보냄 ${unsent} · 정지 ${suspended.length}` : '불러오는 중…'} · 정지는 로그인만 막아요. 폰트와 코드는 그대로예요. 정지한 계정은 삭제할 수 있고, 폰트와 의견까지 지워져 되살릴 수 없어요.
     </p>
+    {accounts && <div className="flex gap-1.5" role="group" aria-label="계정 거르기">
+      {([['all', `전체 ${accounts.length}`], ['unsent', `안 보냄 ${unsent}`]] as const).map(([key, label]) => <Button
+        key={key}
+        size="sm"
+        variant={filter === key ? 'default' : 'secondary'}
+        aria-pressed={filter === key}
+        onClick={() => onFilter(key)}
+        data-testid={`admin-account-filter-${key}`}
+      >{label}</Button>)}
+    </div>}
     {accounts && <Table>
       <TableHeader>
         <TableRow className="hover:bg-transparent">
@@ -88,9 +105,8 @@ export function AccountsPage({ invites }: { invites: BetaInvites }) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {accounts.length === 0 && <TableRow><TableCell colSpan={7} className="text-text-dim-5">아직 없어요.</TableCell></TableRow>}
-        {active.map(row)}
-        {suspended.map(row)}
+        {shown.length === 0 && <TableRow><TableCell colSpan={7} className="text-text-dim-5">{filter === 'unsent' && accounts.length > 0 ? '다 보냈어요.' : '아직 없어요.'}</TableCell></TableRow>}
+        {shown.map(row)}
       </TableBody>
     </Table>}
   </div>

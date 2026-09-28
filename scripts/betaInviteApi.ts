@@ -62,7 +62,12 @@ export function betaInviteApiPlugin(root: string): Plugin {
         const rejected = rejectReasonOf(request)
         if (rejected) return send(response, 403, { error: rejected })
         try {
-          if (request.method === 'GET') return send(response, 200, { accounts: await service().list() })
+          if (request.method === 'GET') {
+            // `?fonts=<이메일>`: 그 친구 폰트(관리자 미리보기). 없으면 계정 목록.
+            const fontsOf = new URL(request.url ?? '/', 'http://admin.local').searchParams.get('fonts')
+            if (fontsOf) return send(response, 200, { fonts: await service().fonts(fontsOf) })
+            return send(response, 200, { accounts: await service().list() })
+          }
           if (request.method === 'PATCH') {
             const { email, suspended, sent } = await readJson(request) as { email?: string; suspended?: boolean; sent?: boolean }
             if (email && typeof sent === 'boolean') {

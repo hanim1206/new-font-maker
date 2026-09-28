@@ -1,14 +1,18 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import type { MouseEvent } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { AccountsPage } from './AccountsPage'
+import type { AccountFilter } from './accountFilter'
 import { AdminFeedback } from './AdminFeedback'
-import { ADMIN_PATH, SECTIONS, sectionOf } from './adminSections'
+import { ADMIN_PATH, SECTIONS, accountOf, accountPathOf, sectionOf } from './adminSections'
 import type { Section } from './adminSections'
 import { InvitePage } from './InvitePage'
 import { TriagePage } from './TriagePage'
 import { useBetaInvites } from './useBetaInvites'
+
+/** 폰트 미리보기는 렌더러 · 노토 모델을 끌고 와서 들어갈 때만 불러온다. */
+const AccountFontsPage = lazy(() => import('./AccountFontsPage').then((module) => ({ default: module.AccountFontsPage })))
 
 /**
  * 관리자 화면(shadcn 사이드바 틀). 왼쪽 메뉴는 늘 열려 있다 — 좁으면 아이콘 아래 이름만.
@@ -16,21 +20,34 @@ import { useBetaInvites } from './useBetaInvites'
  */
 export function AdminApp() {
   const [section, setSection] = useState<Section>(() => sectionOf(window.location.pathname))
+  /** 계정 메뉴에서 연 계정(폰트 미리보기). 목록이면 null. */
+  const [account, setAccount] = useState<string | null>(() => accountOf(window.location.pathname))
+  /** 계정 표 거르기. 폰트 상세에 다녀와도 남게 여기 둔다. */
+  const [accountFilter, setAccountFilter] = useState<AccountFilter>('all')
   /** 답장 안 한 의견 수. */
   const [pending, setPending] = useState(0)
   const invites = useBetaInvites()
 
   useEffect(() => {
-    const onPop = () => setSection(sectionOf(window.location.pathname))
+    const onPop = () => {
+      setSection(sectionOf(window.location.pathname))
+      setAccount(accountOf(window.location.pathname))
+    }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
   const go = (event: MouseEvent, key: Section) => {
     event.preventDefault()
-    if (key === section) return
+    if (key === section && !account) return
     window.history.pushState(null, '', `${ADMIN_PATH}/${key}`)
     setSection(key)
+    setAccount(null)
+  }
+
+  const openAccount = (email: string | null) => {
+    window.history.pushState(null, '', email ? accountPathOf(email) : `${ADMIN_PATH}/accounts`)
+    setAccount(email)
   }
 
   const current = SECTIONS.find((item) => item.key === section)!
@@ -69,7 +86,10 @@ export function AdminApp() {
       </header>
       <main className="flex-1 px-4 pb-10 pt-2 md:px-8">
         {section === 'invite' && <InvitePage invites={invites} />}
-        {section === 'accounts' && <AccountsPage invites={invites} />}
+        {section === 'accounts' && !account && <AccountsPage invites={invites} onOpen={openAccount} filter={accountFilter} onFilter={setAccountFilter} />}
+        {section === 'accounts' && account && <Suspense fallback={<p className="text-sm text-text-dim-4">불러오는 중…</p>}>
+          <AccountFontsPage email={account} account={invites.accounts?.find((item) => item.email === account)} onBack={() => openAccount(null)} />
+        </Suspense>}
         <div className={section === 'feedback' ? 'max-w-2xl' : undefined} data-testid={section === 'feedback' ? 'admin-feedback' : undefined}>
           <AdminFeedback hidden={section !== 'feedback'} onPending={setPending} />
         </div>

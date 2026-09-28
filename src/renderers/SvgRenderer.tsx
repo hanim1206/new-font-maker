@@ -9,6 +9,7 @@ import { resolveGlyphInkPrimitives } from '../services/glyphInkResolver'
 import { needsFilledRenderInk, strokeToRenderInkGroups, verticalWidthFactorOf } from '../services/strokeRenderGeometry'
 import { stemBeakGroupOf, stemBeakInkGroups } from '../services/stemBeak'
 import { useGroupBeakResolver } from '../stores/jamoGroupStore'
+import type { GroupBeakResolver } from '../stores/jamoGroupStore'
 
 // 파트별 스타일 (자모 편집 시 비편집 파트 흐리게 표시 등)
 export interface PartStyle {
@@ -50,6 +51,8 @@ interface SvgRendererProps {
   enableTransition?: boolean
   // 굵기 배율을 직접 준다. 없으면 `globalStyle.weight`에서 계산한다. 실험실(굵기 보정 층)이 노토 곡선을 대 볼 때만 쓴다.
   weightMultiplier?: number
+  // 묶음 부리를 직접 준다. 없으면 이 기기의 묶음 저장소를 읽는다. 남의 폰트를 그릴 때(관리자 미리보기) 내 묶음이 섞이지 않게.
+  groupBeakOf?: GroupBeakResolver
   // SVG ref 전달
   svgRef?: React.RefObject<SVGSVGElement | null>
   // 추가 className (반응형 크기 조절 등)
@@ -81,6 +84,7 @@ export function SvgRenderer({
   clipGlyphs,
   enableTransition = false,
   weightMultiplier: weightMultiplierProp,
+  groupBeakOf: groupBeakOfProp,
   children,
   underlay,
   straightUnderlay,
@@ -119,7 +123,8 @@ export function SvgRenderer({
   const stemBeak = globalStyle?.stemBeak
   const beakRenderStyle = globalStyle?.strokeStyle
   // 사용자 묶음에 부리 값이 있으면 그 자소의 획은 그 값을 쓴다.
-  const groupBeakOf = useGroupBeakResolver()
+  const storedGroupBeakOf = useGroupBeakResolver()
+  const groupBeakOf = groupBeakOfProp ?? storedGroupBeakOf
   const beakPathsById = useMemo(() => {
     const groups = stemBeakInkGroups(centerlines.map((primitive) => ({
       stroke: asLegacyReadonlyStroke(primitive.stroke),

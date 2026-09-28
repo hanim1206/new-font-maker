@@ -66,6 +66,15 @@ export interface BetaInvite {
 
 export type BetaIssueMode = 'add' | 'reissue'
 
+/** 관리자 미리보기용 친구 폰트. 지운 폰트(`deleted_at`)는 뺀다. `fontData`는 검사 전 JSON 그대로. */
+export interface BetaAccountFont {
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+  fontData: unknown
+}
+
 const randomBytes = (length: number) => webcrypto.getRandomValues(new Uint8Array(length))
 const nicknameOf = (user: User): string | null => user.user_metadata?.nickname ?? null
 /** 정지 기간. Supabase에 '영구'가 없어 100년으로 둔다. */
@@ -238,5 +247,25 @@ export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
     await writeFile(codeFile, `${JSON.stringify(book, null, 2)}\n`, { mode: 0o600 })
   }
 
-  return { list, issue, setSuspended, remove, setSent }
+  /** 한 친구의 폰트. 최근 고친 순. 읽기만 한다. */
+  async function fonts(email: string): Promise<BetaAccountFont[]> {
+    const user = (await allUsers()).find((candidate) => candidate.email === email && isBeta(candidate))
+    if (!user) throw new Error(`없는 베타 계정입니다: ${email}`)
+    const { data, error } = await supabase
+      .from(FONT_TABLE)
+      .select('id, name, created_at, updated_at, font_data')
+      .eq('user_id', user.id)
+      .is('deleted_at', null)
+      .order('updated_at', { ascending: false })
+    if (error) throw new Error(`${nicknameOf(user) ?? email} 폰트: ${error.message}`)
+    return (data ?? []).map((row) => ({
+      id: row.id as string,
+      name: row.name as string,
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string,
+      fontData: row.font_data,
+    }))
+  }
+
+  return { list, issue, setSuspended, remove, setSent, fonts }
 }
