@@ -4,6 +4,8 @@ import { expect, test } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
+  // 편집기 문장은 대시보드 예시 문장을 따른다. 이 파일의 글자 기대는 `별을 노래하는 마음으로`에 맞춰 있어 그 문장으로 고정한다.
+  await page.addInitScript(() => { if (!localStorage.getItem('font-maker-sample-sentence')) localStorage.setItem('font-maker-sample-sentence', '별을 노래하는 마음으로') })
 })
 
 test('자소 탭 획 편집은 셸 안에서 문장·캔버스·도구 줄을 보여주고 획을 선택한다', async ({ page }) => {

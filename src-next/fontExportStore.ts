@@ -83,7 +83,7 @@ interface FontExportState {
   dialogOpen: boolean
   /** 창에 미리 채울 폰트 이름. 계정 폰트면 그 이름, 아니면 마지막으로 쓴 이름. */
   familyName: string
-  /** 대시보드 폰트 카드의 예시 문장(주사위로 바뀐다). 메모리에만 — 새로고침이면 첫 문장. */
+  /** 대시보드 폰트 카드의 예시 문장(주사위로 바뀐다). 자소 편집기 문장 시트와 같은 값이고, 이 기기에 남아 새로고침해도 그대로다. */
   sampleSentence: string
 }
 
@@ -128,6 +128,12 @@ export function exportPercent(phaseIndex: number, done: number, total: number): 
   return Math.floor((phaseIndex * 0.5 + share * 0.5) * 99)
 }
 
+const SAMPLE_SENTENCE_STORAGE_KEY = 'font-maker-sample-sentence'
+
+function loadSampleSentence(): string {
+  try { return localStorage.getItem(SAMPLE_SENTENCE_STORAGE_KEY)?.trim() || DEFAULT_SAMPLE_SENTENCE } catch { return DEFAULT_SAMPLE_SENTENCE }
+}
+
 function loadFamilyName(): string {
   try { return localStorage.getItem(FONT_NAME_STORAGE_KEY)?.trim() || DEFAULT_FONT_NAME } catch { return DEFAULT_FONT_NAME }
 }
@@ -143,8 +149,13 @@ export const useFontExportStore = create<FontExportState & FontExportActions>()(
   lastExport: null,
   dialogOpen: false,
   familyName: loadFamilyName(),
-  sampleSentence: DEFAULT_SAMPLE_SENTENCE,
-  setSampleSentence: (sampleSentence) => set({ sampleSentence }),
+  sampleSentence: loadSampleSentence(),
+  // 빈 문장(다 지우고 새로 쓰는 중)은 남기지 않는다. 대시보드 카드가 비지 않게.
+  setSampleSentence: (sampleSentence) => {
+    if (!sampleSentence.trim()) return
+    set({ sampleSentence })
+    try { localStorage.setItem(SAMPLE_SENTENCE_STORAGE_KEY, sampleSentence) } catch { /* 못 남겨도 지금 화면은 바뀐다 */ }
+  },
   request: () => { if (get().status !== 'exporting') set({ dialogOpen: true, familyName: accountFontName() ?? loadFamilyName() }) },
   cancel: () => set({ dialogOpen: false }),
   dismissNotice: () => set({ notice: null, doneElsewhere: false }),

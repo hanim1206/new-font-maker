@@ -31,6 +31,8 @@ const jamoRuleKey = (contextId: string, part: 'CH' | 'JU' | 'JO', jamo: string) 
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
+  // 편집기 문장은 대시보드 예시 문장을 따른다. 이 파일의 글자 기대는 `별을 노래하는 마음으로`에 맞춰 있어 그 문장으로 고정한다.
+  await page.addInitScript(() => { if (!localStorage.getItem('font-maker-sample-sentence')) localStorage.setItem('font-maker-sample-sentence', '별을 노래하는 마음으로') })
 })
 
 /** 캔버스 손잡이를 키보드로 골라 rail을 선택한다. 칩 줄도 자 도구도 없다. 초점은 손잡이에 남아 방향키로 옮긴다. */

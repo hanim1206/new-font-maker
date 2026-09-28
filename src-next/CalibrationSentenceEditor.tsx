@@ -188,15 +188,25 @@ function isEditableHangul(char: string): boolean {
 function initialFocus(): { char: string; sentence: string; custom: boolean } {
   const params = new URLSearchParams(window.location.search)
   const requested = [...(params.get('char') ?? '')][0]
-  const base = SAMPLE_SENTENCES[0]
+  // 대시보드 폰트 카드와 같은 예시 문장. 여기서 바꾸면 대시보드도 바뀐다.
+  const base = useFontExportStore.getState().sampleSentence.trim() || SAMPLE_SENTENCES[0]
   // 그냥 들어오면 문장 첫 글자를 잡는다. 문장에 없는 글자를 포커스한 채 열지 않는다.
   if (!requested || !isEditableHangul(requested)) return { char: [...base].find(isEditableHangul) ?? [...base][0], sentence: base, custom: false }
   if ([...base].includes(requested)) return { char: requested, sentence: base, custom: false }
   return { char: requested, sentence: `${requested} ${base}`, custom: true }
 }
 
-// `문장` 전체 화면의 글자 크기(px).
-const SENTENCE_SHEET_EM = 44
+// `문장` 전체 화면의 글자 크기(px). 왼쪽 세로 막대로 바꾸고, 바꾼 값은 이 기기에 남긴다.
+const SENTENCE_SHEET_EM = 64
+const SENTENCE_SHEET_EM_MIN = 32
+const SENTENCE_SHEET_EM_MAX = 128
+const SENTENCE_SHEET_EM_KEY = 'font-maker-sentence-sheet-em'
+function loadSentenceSheetEm(): number {
+  try {
+    const stored = Number(localStorage.getItem(SENTENCE_SHEET_EM_KEY))
+    return stored >= SENTENCE_SHEET_EM_MIN && stored <= SENTENCE_SHEET_EM_MAX ? stored : SENTENCE_SHEET_EM
+  } catch { return SENTENCE_SHEET_EM }
+}
 
 function tokenizeSentenceLine(line: string): Array<{ text: string; start: number; whitespace: boolean }> {
   const tokens: Array<{ text: string; start: number; whitespace: boolean }> = []
@@ -1694,6 +1704,13 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
   }, [])
   const [sampleSentence, setSampleSentence] = useState<string>(focus.sentence)
+  // 사용자가 문장을 바꾼 자리(주사위 · 입력 · 지우기)만 대시보드 문장에 쓴다. 글자를 골라 앞에 붙인 문장은 쓰지 않는다.
+  const shareSentence = useFontExportStore((state) => state.setSampleSentence)
+  const [sheetEm, setSheetEm] = useState(loadSentenceSheetEm)
+  const changeSheetEm = (em: number) => {
+    setSheetEm(em)
+    try { localStorage.setItem(SENTENCE_SHEET_EM_KEY, String(em)) } catch { /* 못 남겨도 지금 화면은 바뀐다 */ }
+  }
   const [selectedChar, setSelectedChar] = useState(focus.char)
   const [selection, setSelection] = useState<Selection>({ kind: 'none' })
   const [selectedPoints, setSelectedPoints] = useState<SelectedPoint[]>([])
@@ -1971,6 +1988,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const pickSampleSentence = () => {
     const nextSentence = randomSampleSentence(sampleSentence)
     setSampleSentence(nextSentence)
+    shareSentence(nextSentence)
     setIsCustomSentence(false)
     const firstSyllable = [...nextSentence].find(isEditableHangul)
     if (firstSyllable) chooseChar(firstSyllable)
@@ -1990,6 +2008,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   }
   const updateDirectInput = (value: string) => {
     setSampleSentence(value)
+    shareSentence(value)
     setIsCustomSentence(true)
     if (![...value].includes(selectedChar)) {
       const firstSyllable = [...value].find(isEditableHangul)
@@ -2008,7 +2027,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const closeSentenceSheet = () => {
     sheetInputRef.current?.blur()
     // 빈 문장으로 닫으면 작은 줄이 비므로 편집하던 글자 하나를 남긴다.
-    if (!sampleSentence.trim()) setSampleSentence(selectedChar)
+    if (!sampleSentence.trim()) { setSampleSentence(selectedChar); shareSentence(selectedChar) }
     setSentenceSheetOpen(false)
     setSentenceSheetClosing(true)
   }
@@ -2111,6 +2130,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const rollSentence = () => {
     const nextSentence = randomSampleSentence(sampleSentence)
     setSampleSentence(nextSentence)
+    shareSentence(nextSentence)
     setIsCustomSentence(false)
     setSentenceCaret([...nextSentence].length)
   }
@@ -2453,13 +2473,17 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
             ref={sheetInputRef}
             className={styles.sheetInput}
             value={sampleSentence}
-            onValueChange={(value) => { setSampleSentence(value); setIsCustomSentence(true) }}
+            onValueChange={(value) => { setSampleSentence(value); shareSentence(value); setIsCustomSentence(true) }}
             onCaretChange={syncSentenceCaret}
             aria-label="문장 입력"
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
           />
+          {/* 글자 크기: 왼쪽 회색 세로 막대, 위로 올리면 커진다. */}
+          <input type="range" className={styles.sheetSize} min={SENTENCE_SHEET_EM_MIN} max={SENTENCE_SHEET_EM_MAX} step={4} value={sheetEm}
+            onChange={(event) => changeSheetEm(Number(event.target.value))} onClick={(event) => event.stopPropagation()}
+            aria-label="문장 글자 크기" aria-orientation="vertical" data-testid="sentence-sheet-size" />
           {/* 아래 버튼 바. 화면 아래에 떠 있고, 자판이 열리면 자판 위로 올라간다. 누를 때 입력칸 포커스를 뺏지 않아 자판이 닫히지 않는다. */}
           <div className={styles.sentenceSheetBar} style={{ '--keyboard-inset': `${keyboardInset}px` } as CSSProperties} onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.preventDefault()} onMouseDown={(event) => event.preventDefault()}>
             <button type="button" onClick={rollSentence} aria-label="예시 문장 바꾸기" data-testid="sentence-sheet-roll"><Dices size={18} aria-hidden="true" />다른 문장</button>
@@ -2487,7 +2511,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         />
         </>}
         {/* 줄 key는 순번. 문장 글자로 두면 한 글자 칠 때마다 줄 안 글자가 전부 새로 만들어져 움찔거리고 획 맞추기를 처음부터 다시 한다. */}
-        {calibrationLines.map((line, lineIndex) => <div key={lineIndex} className={`${styles.sentenceRun} ${chrome === 'workspace' ? styleMode.run : ''}`} style={{ fontSize: sentenceSheetOpen ? SENTENCE_SHEET_EM : styleSpaceOpen ? STYLE_SPACE_EM : sentenceEm }}>
+        {calibrationLines.map((line, lineIndex) => <div key={lineIndex} className={`${styles.sentenceRun} ${chrome === 'workspace' ? styleMode.run : ''}`} style={{ fontSize: sentenceSheetOpen ? sheetEm : styleSpaceOpen ? STYLE_SPACE_EM : sentenceEm }}>
           {sentenceSheetOpen ? renderSheetRun() : tokenizeSentenceLine(line).map((token) => token.whitespace
             ? [...token.text].map((char, index) => renderSentenceCharacter(char, token.start + index, lineIndex))
             : <span key={`${lineIndex}-word-${token.start}`} className={styles.wordRun}>{[...token.text].map((char, index) => renderSentenceCharacter(char, token.start + index, lineIndex))}</span>

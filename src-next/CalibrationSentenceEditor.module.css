@@ -89,6 +89,18 @@ section.sentence[data-sheet] { flex-basis: var(--sheet-h); height: var(--sheet-h
 @keyframes sentence-bar-in { from { opacity: 0; translate: -50% 8px; } }
 @media (prefers-reduced-motion: reduce) { .sentenceSheetBar { animation: none; transition: none; } }
 /* iOS는 16px 아래 입력칸에 포커스하면 화면을 확대한다. */
+/* 크게 키워 넘치면 글자 줄만 세로로 굴린다(막대 · 닫기는 제자리). 아래 버튼 바에 가리지 않게 끝에 여백. */
+section.sentence[data-sheet] { padding-left: 44px; }
+section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100%; overflow-y: auto; padding-bottom: 96px; scrollbar-width: none; }
+/* 글자를 크게 키우면 한 낱말이 줄보다 길어진다. 그때는 낱말 안에서도 줄을 바꾼다. */
+.sentence[data-sheet] .sentenceRun .wordRun { max-width: 100%; flex-wrap: wrap; block-size: auto; row-gap: 16px; }
+/* 문장 시트 글자 크기: 왼쪽 회색 세로 막대(위 = 크게). 글자 줄은 막대만큼 오른쪽으로 비킨다. */
+.sheetSize { position: absolute; z-index: 2; top: 14px; left: 12px; width: 20px; height: min(280px, calc(100% - 120px)); margin: 0; writing-mode: vertical-lr; direction: rtl; -webkit-appearance: none; appearance: none; background: transparent; cursor: ns-resize; touch-action: none; }
+.sheetSize::-webkit-slider-runnable-track { width: 4px; border-radius: 999px; background: rgb(var(--color-surface-3)); }
+.sheetSize::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-left: -8px; border: 0; border-radius: 50%; background: rgb(var(--color-text-5)); }
+.sheetSize::-moz-range-track { width: 4px; border-radius: 999px; background: rgb(var(--color-surface-3)); }
+.sheetSize::-moz-range-thumb { width: 20px; height: 20px; border: 0; border-radius: 50%; background: rgb(var(--color-text-5)); }
+.sheetSize:focus-visible { outline: 2px solid rgb(var(--color-ring)); outline-offset: 2px; border-radius: 999px; }
 .sheetInput { position: fixed; top: 0; left: 0; width: 1px; height: 1px; padding: 0; overflow: hidden; border: 0; opacity: 0; pointer-events: none; font-size: 16px; }
 /* 커서는 폭이 없다: 옮겨도 글자 사이가 벌어지지 않는다. 선은 그림자로 그린다. */
 .sentence[data-sheet-wrap] .sentenceRun .directInputCaret { width: 0; margin: 0; background: none; box-shadow: 0 0 0 1px rgb(var(--color-primary)); }
