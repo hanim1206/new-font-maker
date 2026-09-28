@@ -9,7 +9,7 @@ import { notoOutlineToInkRegions } from './notoOutlineInk'
 import { medialRoleGeometry } from './notoVariationModel'
 import type { NotoOutline } from './notoOutlineInk'
 import { resolveShapeGlyphInkPrimitives } from './shapeGlyphInkResolver'
-import { fitStrokeStyleOf } from './notoComponentFit'
+import { fitStrokeStyleOf, withStemBeakRegions } from './notoComponentFit'
 import type { FitInkStyle } from './notoComponentFit'
 
 /**
@@ -116,7 +116,7 @@ export function inkOfFit(fit: MedialFitResult, weightMultiplier = 1, style?: Fit
     globalLinecap: style?.linecap ?? 'butt', globalLinejoin: style?.linejoin ?? 'miter',
   })
   if (!primitives.ok) return { ok: false, message: primitives.issues[0]?.message ?? '마스터를 해석할 수 없습니다.' }
-  const ink = materializeFinalGlyphInk(primitives.primitives, fitStrokeStyleOf(style), INK_OPTIONS)
+  const ink = materializeFinalGlyphInk(withStemBeakRegions(primitives.primitives, style), fitStrokeStyleOf(style), INK_OPTIONS)
   return ink.ok ? { ok: true, regions: ink.ink.regions } : { ok: false, message: ink.message }
 }
 

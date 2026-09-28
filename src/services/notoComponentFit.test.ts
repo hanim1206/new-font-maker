@@ -78,6 +78,26 @@ describe('componentBoxFromFaces', () => {
     // fit 자체(상자 · primitive)는 굵기를 모른다.
     expect(fit.fit.primitives.every((primitive) => primitive.weightMultiplier === 1)).toBe(true)
   })
+
+  it('부리는 잉크와 한 면으로 합쳐지고, 묶음 부리가 꺼져 있으면 전역 부리를 이긴다', () => {
+    const BIEUP = (legacyJamos.choseong as Record<string, JamoData>)['ㅂ']
+    const faces = { left: 0.1, right: 0.5, top: 0.15, bottom: 0.79 }
+    const fit = fitNotoComponent({ part: 'CH', jamo: BIEUP, faces, glyphId: 'ㅂ' })
+    expect(fit.ok).toBe(true)
+    if (!fit.ok) return
+    const style = { linecap: 'butt', linejoin: 'miter', strokeStyle: { mode: 'brush', brush: { tip: 'round', aspectRatio: 1, angle: 0 } } } as const
+    const beak = { enabled: true, shape: 'slab', size: 1, angle: 0 } as const
+    const plain = inkOfComponentFit(fit.fit, style)
+    const beaked = inkOfComponentFit(fit.fit, { ...style, stemBeak: beak })
+    const groupOff = inkOfComponentFit(fit.fit, { ...style, stemBeak: beak, beakOf: () => ({ ...beak, enabled: false }) })
+    expect(plain.ok && beaked.ok && groupOff.ok).toBe(true)
+    if (!plain.ok || !beaked.ok || !groupOff.ok) return
+    const left = (regions: typeof plain.regions) => Math.min(...regions.flatMap((region) => region.outer).map((p) => p.x))
+    // ㅂ 왼기둥 머리의 부리가 faces 왼쪽 밖으로 나간다. 합쳐진 면이라 겹친 자리에 구멍이 없다(면 수가 늘지 않는다).
+    expect(left(beaked.regions)).toBeLessThan(faces.left - 0.01)
+    expect(beaked.regions.length).toBe(plain.regions.length)
+    expect(groupOff.regions).toEqual(plain.regions)
+  })
 })
 
 // corpus(.reference-fonts)가 있을 때만: 승인 57자 첫닿자를 실측 박스·모델 박스로 놓고 Noto 첫닿자 고스트와 비교한다.

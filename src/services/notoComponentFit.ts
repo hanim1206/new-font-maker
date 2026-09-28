@@ -1,12 +1,15 @@
 import * as polygonBoolean from './polygonBoolean'
-import type { BoxConfig, DeepReadonly, InkRegion, JamoData, MedialFamily, Part, ResolvedCenterlinePrimitive, ResolvedStrokeInkSource, StrokeDataV2, StrokeRenderStyle } from '../types'
+import type { BoxConfig, DeepReadonly, InkRegion, JamoData, MedialFamily, Part, ResolvedCenterlinePrimitive, ResolvedInkPrimitive, ResolvedInkSource, ResolvedStrokeInkSource, StrokeDataV2, StrokeRenderStyle } from '../types'
 import { strokesForFamily } from '../utils/jamoContextStrokes'
 import { frameJamoOf } from '../utils/jamoFrame'
 import { getStrokeCenterlineBounds } from '../utils/jamoGeometry'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
+import { brushInkGroupsToInkRegions } from './inkGeometry'
 import { multiPolygonArea, unionOf } from './notoFitReport'
 import { notoOutlineToInkRegions } from './notoOutlineInk'
 import type { NotoOutline } from './notoOutlineInk'
+import { stemBeakGroupOf, stemBeakInkGroups, type StemBeakStyle } from './stemBeak'
+import { verticalWidthFactorOf } from './strokeRenderGeometry'
 
 /**
  * 닿자(첫닿자·받침) 2단계-a: 앱의 획(centerline)을 Noto 실측·예측 박스에 맞춰 놓는다.
@@ -40,6 +43,31 @@ export interface FitInkStyle {
   strokeStyle: StrokeRenderStyle
   /** 전역 굵기 배율. 상자(중심선)는 그대로 두고 잉크만 굵게 한다. 없으면 1. */
   weightMultiplier?: number
+  /** 전역 세로줄기 부리. 없거나 꺼져 있으면 부리가 없다(측정·xor은 부리 없이). */
+  stemBeak?: StemBeakStyle
+  /** 사용자 묶음 부리. 자소에 묶음 값이 있으면 전역 부리 대신 그 값을 쓴다. */
+  beakOf?: (source: ResolvedInkSource) => StemBeakStyle | undefined
+}
+
+/**
+ * 세로줄기 부리 면을 region primitive로 덧붙인다. 잉크와 한 번에 합쳐지므로 evenodd로 그려도 구멍이 안 난다.
+ * 화면(`SvgRenderer`) · OTF와 같은 함수 · 같은 묶음 이름표 · 같은 기둥 폭(대비)으로 만든다.
+ */
+export function withStemBeakRegions(primitives: readonly ResolvedInkPrimitive[], style?: FitInkStyle): readonly ResolvedInkPrimitive[] {
+  if (!style?.stemBeak?.enabled && !style?.beakOf) return primitives
+  const renderStyle = fitStrokeStyleOf(style)
+  const centerlines = primitives.filter((primitive): primitive is ResolvedCenterlinePrimitive => primitive.kind === 'centerline')
+  const groups = stemBeakInkGroups(centerlines.map((primitive) => ({
+    stroke: primitive.stroke as StrokeDataV2,
+    box: primitive.box,
+    weightMultiplier: primitive.weightMultiplier * verticalWidthFactorOf(renderStyle),
+    group: stemBeakGroupOf(primitive.source),
+    style: style.beakOf?.(primitive.source),
+  })), style.stemBeak, renderStyle)
+  const beaks = centerlines.flatMap((primitive, index) => brushInkGroupsToInkRegions(groups[index]).map((region, at) => ({
+    kind: 'region' as const, coordinateSpace: 'glyph-normalized' as const, id: `${primitive.id}:beak:${at}`, source: primitive.source, region,
+  })))
+  return beaks.length === 0 ? primitives : [...primitives, ...beaks]
 }
 
 /** brush 모드만 fit 잉크에 쓴다. 면·점 스타일은 일자 끝을 못 만들어 fit 기본으로 돌아간다. */
@@ -180,7 +208,7 @@ export function inkOfComponentFit(fit: ComponentFitResult, style?: FitInkStyle):
   // 굵기는 중심선을 지킨다: fit이 정한 상자는 그대로, 잉크 두께만 전역 배율을 따른다(획 편집 캔버스 · OTF와 같은 방식).
   const weight = style?.weightMultiplier ?? 1
   const primitives = weight === 1 ? fit.primitives : fit.primitives.map((primitive) => ({ ...primitive, weightMultiplier: primitive.weightMultiplier * weight }))
-  const ink = materializeFinalGlyphInk(primitives, fitStrokeStyleOf(style), INK_OPTIONS)
+  const ink = materializeFinalGlyphInk(withStemBeakRegions(primitives, style), fitStrokeStyleOf(style), INK_OPTIONS)
   return ink.ok ? { ok: true, regions: ink.ink.regions } : { ok: false, message: ink.message }
 }
 
