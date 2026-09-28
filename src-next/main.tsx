@@ -19,6 +19,7 @@ import { authGateMode, sessionUser } from './betaAuth'
 import { DevCrashProbe } from './devCrash'
 import { EditLockedPage } from './EditLockedPage'
 import { editLockName, holdEditLock, takeStealRequest } from './editLock'
+import { reportInterruptedExport } from './exportInterrupted'
 import { installErrorLog, isQuotaExceeded, onErrorRecorded, recordError } from './errorLog'
 import { suspendWork } from './workGuard'
 
@@ -55,6 +56,7 @@ setPersistWriteErrorHandler((error) => {
   showLocalCopyNotice()
 })
 watchAppUpdate()
+reportInterruptedExport(window.localStorage)
 
 // 요소 끌어 옮기기(이미지 · 링크 · 선택한 글자)를 앱 전체에서 막는다. 입력칸은 예외. CSS `-webkit-user-drag`가 안 먹는 브라우저(Firefox)용.
 document.addEventListener('dragstart', (event) => {

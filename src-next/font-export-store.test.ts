@@ -53,6 +53,20 @@ describe('fontExportStore.confirm', () => {
     expect(navigate).not.toHaveBeenCalled()
   })
 
+  it('도는 동안만 "추출 중" 표시를 남긴다 — 탭이 죽고 다시 열리면 이걸 보고 알린다', async () => {
+    const { useFontExportStore } = await import('./fontExportStore')
+    const { EXPORT_IN_FLIGHT_KEY } = await import('./exportInterrupted')
+    const memory = new Map<string, string>()
+    vi.stubGlobal('localStorage', { getItem: (key: string) => memory.get(key) ?? null, setItem: (key: string, value: string) => memory.set(key, value), removeItem: (key: string) => memory.delete(key) })
+    let markedWhileRunning = false
+    generate.mockImplementation(async () => { markedWhileRunning = memory.has(EXPORT_IN_FLIGHT_KEY); return success })
+    atPath('/workspace/jamo')
+    await useFontExportStore.getState().confirm('꾸불체')
+    vi.unstubAllGlobals()
+    expect(markedWhileRunning).toBe(true)
+    expect(memory.has(EXPORT_IN_FLIGHT_KEY)).toBe(false)
+  })
+
   it('실패하면 대시보드에서도 이유를 notice에 남기고 화면을 안 바꾼다', async () => {
     const { useFontExportStore } = await import('./fontExportStore')
     generate.mockResolvedValue({ success: false, glyphCount: 0, error: '폰트 생성 실패: 메모리 부족' })
