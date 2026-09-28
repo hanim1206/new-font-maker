@@ -125,15 +125,15 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 /* 획 편집 선택 표시 — 피그마 · 일러스트레이터 관례. 잉크는 제 색 그대로, 선택은 한 가지 파랑으로 모양이 갈린다.
    획 = 가는 중심선(바깥 상자 없음) · 꼭짓점 = 동그라미 · 곡선 핸들 = 마름모. 잡힌 것만 속이 찬다. */
 .focusCanvas { --selection-color: #0d99ff; }
-.selectedCenterline { fill: none; stroke: var(--selection-color); stroke-width: .45; stroke-linecap: round; stroke-linejoin: round; }
-.hoverCenterline { fill: none; stroke: var(--selection-color); stroke-width: .35; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+.selectedCenterline { fill: none; stroke: var(--selection-color); stroke-width: calc(.45 * var(--view-unit, 1)); stroke-linecap: round; stroke-linejoin: round; }
+.hoverCenterline { fill: none; stroke: var(--selection-color); stroke-width: calc(.35 * var(--view-unit, 1)); stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
 @media (hover: hover) { .strokeTarget:hover .hoverCenterline { opacity: .75; } }
-.point { fill: #fff; stroke: var(--selection-color); stroke-width: .6; cursor: pointer; }
-.activePoint { fill: var(--selection-color); stroke: #fff; stroke-width: .7; cursor: pointer; }
+.point { fill: #fff; stroke: var(--selection-color); stroke-width: calc(.6 * var(--view-unit, 1)); cursor: pointer; }
+.activePoint { fill: var(--selection-color); stroke: #fff; stroke-width: calc(.7 * var(--view-unit, 1)); cursor: pointer; }
 .pointHitTarget { cursor: pointer; }
-.handleLine { stroke: var(--selection-color); stroke-width: .3; opacity: .8; pointer-events: none; }
-.handle { fill: #fff; stroke: var(--selection-color); stroke-width: .5; cursor: pointer; }
-.activeHandle { fill: var(--selection-color); stroke: #fff; stroke-width: .6; cursor: pointer; }
+.handleLine { stroke: var(--selection-color); stroke-width: calc(.3 * var(--view-unit, 1)); opacity: .8; pointer-events: none; }
+.handle { fill: #fff; stroke: var(--selection-color); stroke-width: calc(.5 * var(--view-unit, 1)); cursor: pointer; }
+.activeHandle { fill: var(--selection-color); stroke: #fff; stroke-width: calc(.6 * var(--view-unit, 1)); cursor: pointer; }
 .trackpadSection { flex: 0 0 auto; padding: 10px 16px calc(env(safe-area-inset-bottom) + 12px); border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
 .trackpad { position: relative; height: 176px; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 16px; background: rgb(var(--color-surface-2)); touch-action: none; }
 .trackpadDisabled { opacity: .55; }
@@ -249,8 +249,8 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .strokeToolSlot .strokeAddMenu > div { gap: 6px; }
 .strokeWarning { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f0561e; font-size: 10.5px; font-weight: 600; }
 /* 획 편집 캔버스 뒤에 까는 레이아웃 기준선(읽기 전용)과, 끌다 걸린 자리. 걸린 색은 레이아웃과 같은 주황. */
-.guideRail { stroke: rgb(59 111 214 / .32); stroke-width: .25; stroke-dasharray: 1.2 1.2; pointer-events: none; }
-.snapHitLine { stroke: #f0561e; stroke-width: .5; pointer-events: none; }
+.guideRail { stroke: rgb(59 111 214 / .32); stroke-width: calc(.25 * var(--view-unit, 1)); stroke-dasharray: calc(1.2 * var(--view-unit, 1)) calc(1.2 * var(--view-unit, 1)); pointer-events: none; }
+.snapHitLine { stroke: #f0561e; stroke-width: calc(.5 * var(--view-unit, 1)); pointer-events: none; }
 .snapHitChip { position: absolute; z-index: 3; left: 50%; top: 10px; transform: translateX(-50%); padding: 3px 10px; border-radius: 10px; background: #f0561e; color: #fff; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10.5px; font-weight: 700; white-space: nowrap; pointer-events: none; }
 
 /* 도마 칩 줄. 머리 바로 아래 한 줄, 가로 스크롤. 지금 글자의 자소만 검정, 손댄 자소는 모서리에 점. */

@@ -104,6 +104,16 @@ export type EditorSpace = 'edit' | 'style'
 const VIEW_BOX_SIZE = 100
 /** 검수 캔버스와 같은 여백. 글자 칸(0–1) 밖 0.08씩 더 보여 라벨·튀어나온 획이 잘리지 않는다. */
 const CANVAS_VIEWPORT = { x: -0.08, y: -0.08, width: 1.16, height: 1.16 }
+/** 자소 단독(`ㄴ`)을 열면 캔버스가 그 자소 잉크에 맞춰 당겨진다. 잉크 긴 변에 이만큼씩 여백을 둔다. 글자 크기(저장값)는 그대로, 보기만 확대다. */
+const SOLO_VIEW_MARGIN = 0.28
+
+/** 자소 하나만 있는 글자면 그 잉크 상자에 맞춘 정사각 보기 창. 아니면 글자판 전체. 판보다 크게 물러나지는 않는다. */
+function canvasViewportFor(syllable: DecomposedSyllable, inkBoxes: Partial<Record<Part, BoxConfig>>): BoxConfig {
+  const box = syllable.choseong && !syllable.jungseong && !syllable.jongseong ? inkBoxes.CH : undefined
+  if (!box) return CANVAS_VIEWPORT
+  const side = Math.min(CANVAS_VIEWPORT.width, Math.max(box.width, box.height) * (1 + SOLO_VIEW_MARGIN * 2))
+  return { x: box.x + box.width / 2 - side / 2, y: box.y + box.height / 2 - side / 2, width: side, height: side }
+}
 
 const LAYOUT_LABELS: Record<LayoutType, string> = {
   'choseong-only': '초성 단독',
@@ -347,14 +357,14 @@ function layoutAreaLabel(part: MobileEditorPart): string {
 }
 
 /** 부품 상자. 검수 캔버스 GhostCanvas와 같은 색·농도·라벨. 선택 부품만 제 색, 나머지는 옅게. 선택이 없으면 전부 제 색(획 편집에 잠긴 동안은 잠긴 자소만). */
-function PartBoxes({ boxes, activePart }: { boxes: Partial<Record<Part, BoxConfig>>; activePart: MobileEditorPart | null }) {
+function PartBoxes({ boxes, activePart, unit = 1 }: { boxes: Partial<Record<Part, BoxConfig>>; activePart: MobileEditorPart | null; unit?: number }) {
   return <g aria-hidden="true" data-testid="jamo-part-boxes">
     {(Object.entries(boxes) as [Part, BoxConfig][]).map(([part, box]) => {
       const active = !activePart || editorPartOf(part) === activePart
       const color = PART_COLOR[part]
       return <g key={part} data-part={part} data-active={active}>
-        <rect x={box.x * VIEW_BOX_SIZE} y={box.y * VIEW_BOX_SIZE} width={box.width * VIEW_BOX_SIZE} height={box.height * VIEW_BOX_SIZE} fill={color} fillOpacity={active ? 0.24 : 0.07} stroke={color} strokeOpacity={active ? 0.85 : 0.25} strokeWidth={active ? 0.4 : 0.3} />
-        <text x={box.x * VIEW_BOX_SIZE + 0.8} y={box.y * VIEW_BOX_SIZE - 0.8} fontSize={2.4} fontWeight={600} fill={color} fillOpacity={active ? 0.9 : 0.35} className={styles.partBoxLabel}>{PART_LABEL[part]}</text>
+        <rect x={box.x * VIEW_BOX_SIZE} y={box.y * VIEW_BOX_SIZE} width={box.width * VIEW_BOX_SIZE} height={box.height * VIEW_BOX_SIZE} fill={color} fillOpacity={active ? 0.24 : 0.07} stroke={color} strokeOpacity={active ? 0.85 : 0.25} strokeWidth={(active ? 0.4 : 0.3) * unit} />
+        <text x={box.x * VIEW_BOX_SIZE + 0.8 * unit} y={box.y * VIEW_BOX_SIZE - 0.8 * unit} fontSize={2.4 * unit} fontWeight={600} fill={color} fillOpacity={active ? 0.9 : 0.35} className={styles.partBoxLabel}>{PART_LABEL[part]}</text>
       </g>
     })}
   </g>
@@ -518,6 +528,9 @@ function FocusedGlyph({
   const inkBoxes = useMemo(() => placement.kind === 'boxes' && resolution
     ? Object.fromEntries(resolution.parts.map((part) => [part.part, facesToBox(part.faces)])) as Partial<Record<Part, BoxConfig>>
     : boxes, [placement, resolution, boxes])
+  // 보기 창. 자소 단독이면 그 잉크에 맞춰 당긴다. `u`는 판 전체 보기에서 뷰박스 1이 지금 뷰박스 몇인지 — 점 · 선 굵기를 화면에서 같은 크기로 두는 데 곱한다.
+  const viewport = useMemo(() => canvasViewportFor(syllable, inkBoxes), [syllable, inkBoxes])
+  const u = viewport.width / CANVAS_VIEWPORT.width
   // Noto 고스트: 표시·비교 전용. 잉크에 안 섞인다. 켬/끔은 기기에 기억한다.
   const [ghostVisible, setGhostVisible] = useState(loadGhostVisible)
   const { ghost, error: ghostError } = useNotoGhost(char, ghostVisible)
@@ -538,6 +551,7 @@ function FocusedGlyph({
     ? Object.fromEntries((['CH', 'JU', 'JU_H', 'JU_V', 'JO'] as Part[]).filter((part) => editorPartOf(part) !== lockedPart).map((part) => [part, { opacity: LOCKED_OUT_OPACITY }])) as Partial<Record<Part, { opacity: number }>>
     : undefined, [lockedPart])
   const canvasStyle = {
+    '--view-unit': u,
     '--construction-band-size': `${GRID_SYSTEM_2_UNIT * GRID_SYSTEM_2_STROKE_UNITS * 100}%`,
   } as CSSProperties
   // 눈금·글자몸 상자는 SVG 안에 그린다. 검수 캔버스처럼 글자 칸 밖 여백(-0.08)까지 보이고 라벨이 잘리지 않는다.
@@ -591,7 +605,7 @@ function FocusedGlyph({
         if (distance < best.distance) best = { pointIndex: selection.pointIndex, handle, distance }
       }
     }
-    if (best.distance > POINT_HIT_RADIUS) best = { ...pressed, distance: 0 }
+    if (best.distance > POINT_HIT_RADIUS * u) best = { ...pressed, distance: 0 }
     const component = componentFor(char, target.editorPart, target.jamo)
     const picked = target.stroke.points[best.pointIndex]
     if (best.handle && (selection.kind === 'point' || selection.kind === 'handle')) {
@@ -636,7 +650,7 @@ function FocusedGlyph({
     const api = dragApiRef?.current
     const canvas = canvasRef.current
     if (!api || !canvas) return
-    const emPerPx = CANVAS_VIEWPORT.width / canvas.getBoundingClientRect().width * gain
+    const emPerPx = viewport.width / canvas.getBoundingClientRect().width * gain
     const uprightDx = dx + Math.tan(globalStyle.slant * Math.PI / 180) * dy
     const snapped = snapStrokeDrag({ anchors: state.anchors, requested: { x: uprightDx * emPerPx, y: dy * emPerPx }, candidates: state.candidates })
     setSnapHits((current) => current?.x?.value === snapped.hits.x?.value && current?.y?.value === snapped.hits.y?.value && current?.x?.label === snapped.hits.x?.label && current?.y?.label === snapped.hits.y?.label ? current : snapped.hits)
@@ -688,20 +702,20 @@ function FocusedGlyph({
   return (
     <div ref={canvasRef} className={styles.focusCanvas} style={canvasStyle} data-testid="focus-canvas" data-pinch-lock data-placement={placement.kind} data-direct={dragApiRef ? true : undefined} data-gap-warning={gapWarningParts.length ? true : undefined} onPointerDown={() => onSelect({ kind: 'none' })} onPointerMove={moveDrag} onPointerUp={(event) => endDrag(event, false)} onPointerCancel={(event) => endDrag(event, true)}>
       {globalStyle.strokeStyle.mode === 'legacy-snapped-centerline' && <span className={styles.constructionGrid} aria-hidden="true" data-construction-grid="legacy-snapped-centerline" />}
-      <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} size={340} viewportBox={CANVAS_VIEWPORT} className={styles.focusSvg} partStyles={partStyles} globalStyle={globalStyle} straightUnderlay={<>
+      <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} size={340} viewportBox={viewport} className={styles.focusSvg} partStyles={partStyles} globalStyle={globalStyle} straightUnderlay={<>
         {/* 검수 캔버스(GhostCanvas)와 같은 깔개: 흰 칸 → 1/16 잔선·1/4 굵은선 눈금 → 칸 테두리 → 글자몸 → 기준선(0.88) → 부품 상자 → Noto 고스트. 전부 잉크 아래. */}
         {/* 글자가 기울어도 자리의 기준(눈금 · 글자몸 · 기준선 · 부품 상자)은 곧게 둔다. Noto 고스트만 잉크와 같이 기운다. */}
         <defs>
-          <pattern id="jamo-grid-fine" width={minorStep} height={minorStep} patternUnits="userSpaceOnUse"><path d={`M${minorStep} 0V${minorStep}H0`} fill="none" stroke="rgb(218 223 230 / .7)" strokeWidth={0.2} /></pattern>
-          <pattern id="jamo-grid-coarse" width={majorStep} height={majorStep} patternUnits="userSpaceOnUse"><path d={`M${majorStep} 0V${majorStep}H0`} fill="none" stroke="rgb(196 203 212 / .8)" strokeWidth={0.3} /></pattern>
+          <pattern id="jamo-grid-fine" width={minorStep} height={minorStep} patternUnits="userSpaceOnUse"><path d={`M${minorStep} 0V${minorStep}H0`} fill="none" stroke="rgb(218 223 230 / .7)" strokeWidth={0.2 * u} /></pattern>
+          <pattern id="jamo-grid-coarse" width={majorStep} height={majorStep} patternUnits="userSpaceOnUse"><path d={`M${majorStep} 0V${majorStep}H0`} fill="none" stroke="rgb(196 203 212 / .8)" strokeWidth={0.3 * u} /></pattern>
         </defs>
         <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill="#fff" />
         <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill="url(#jamo-grid-fine)" data-testid="jamo-grid" />
         <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill="url(#jamo-grid-coarse)" />
-        <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill="none" stroke="rgb(196 203 212)" strokeWidth={0.4} />
-        <rect x={body.x} y={body.y} width={body.width} height={body.height} fill="none" stroke="rgb(59 111 214 / .18)" strokeWidth={0.3} data-testid="jamo-design-body" />
-        <line x1={-6} x2={102} y1={88} y2={88} stroke="#a6a297" strokeWidth={0.3} />
-        <PartBoxes boxes={inkBoxes} activePart={selectedPart ?? lockedPart} />
+        <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill="none" stroke="rgb(196 203 212)" strokeWidth={0.4 * u} />
+        <rect x={body.x} y={body.y} width={body.width} height={body.height} fill="none" stroke="rgb(59 111 214 / .18)" strokeWidth={0.3 * u} data-testid="jamo-design-body" />
+        <line x1={-6} x2={102} y1={88} y2={88} stroke="#a6a297" strokeWidth={0.3 * u} />
+        <PartBoxes boxes={inkBoxes} activePart={selectedPart ?? lockedPart} unit={u} />
         {/* 레이아웃의 기준선을 읽기 전용으로 옅게 깐다. 획을 끌면 여기에 걸린다. */}
         {guideRails.length > 0 && <g aria-hidden="true" data-testid="stroke-guide-rails">
           {guideRails.map((rail) => rail.axis === 'x'
@@ -730,7 +744,7 @@ function FocusedGlyph({
             d={path}
             fill="none"
             stroke="transparent"
-            strokeWidth={Math.max(12, target.stroke.thickness * VIEW_BOX_SIZE + 8)}
+            strokeWidth={Math.max(12 * u, target.stroke.thickness * VIEW_BOX_SIZE + 8 * u)}
             pointerEvents="stroke"
             data-editor-hit="stroke"
             data-selected={selectedStrokeId === target.stroke.id ? 'true' : undefined}
@@ -768,8 +782,8 @@ function FocusedGlyph({
             const active = selectedPoints.some((point) => point.strokeId === target.stroke.id && point.pointIndex === pointIndex)
               || ((selection.kind === 'point' || selection.kind === 'handle') && selection.strokeId === target.stroke.id && selection.pointIndex === pointIndex)
             return <g key={`point-${target.renderPart}-${target.stroke.id}-${pointIndex}`}>
-              <circle cx={x} cy={y} r={POINT_HIT_RADIUS} fill="transparent" pointerEvents="all" className={styles.pointHitTarget} data-editor-point={shown ? 'hit' : 'catch'} onPointerDown={(event) => pressActiveStroke(event, target, { pointIndex })} />
-              {shown && <circle cx={x} cy={y} r={active ? 2.8 : 2.1} className={active ? styles.activePoint : styles.point} data-editor-point="visible" pointerEvents="none" />}
+              <circle cx={x} cy={y} r={POINT_HIT_RADIUS * u} fill="transparent" pointerEvents="all" className={styles.pointHitTarget} data-editor-point={shown ? 'hit' : 'catch'} onPointerDown={(event) => pressActiveStroke(event, target, { pointIndex })} />
+              {shown && <circle cx={x} cy={y} r={(active ? 2.8 : 2.1) * u} className={active ? styles.activePoint : styles.point} data-editor-point="visible" pointerEvents="none" />}
             </g>
           })
         })}
@@ -785,14 +799,14 @@ function FocusedGlyph({
             return [
               <line key={`handle-line-${target.renderPart}-${handle}`} x1={anchor.x} y1={anchor.y} x2={position.x} y2={position.y} className={styles.handleLine} />,
               // 핸들 눌림 영역은 꼭짓점과 같은 크기. 겹치면 누른 자리에서 가까운 쪽이 잡힌다.
-              <circle key={`handle-hit-${target.renderPart}-${handle}`} cx={position.x} cy={position.y} r={POINT_HIT_RADIUS} fill="transparent" pointerEvents="all" className={styles.pointHitTarget} data-editor-handle-hit={handle} onPointerDown={(event) => pressActiveStroke(event, target, { pointIndex: selection.pointIndex, handle })} />,
+              <circle key={`handle-hit-${target.renderPart}-${handle}`} cx={position.x} cy={position.y} r={POINT_HIT_RADIUS * u} fill="transparent" pointerEvents="all" className={styles.pointHitTarget} data-editor-handle-hit={handle} onPointerDown={(event) => pressActiveStroke(event, target, { pointIndex: selection.pointIndex, handle })} />,
               // 핸들은 마름모. 꼭짓점(동그라미)과 모양으로 갈린다.
               <rect
                 key={`handle-${target.renderPart}-${handle}`}
-                x={position.x - (active ? 1.9 : 1.5)}
-                y={position.y - (active ? 1.9 : 1.5)}
-                width={active ? 3.8 : 3}
-                height={active ? 3.8 : 3}
+                x={position.x - (active ? 1.9 : 1.5) * u}
+                y={position.y - (active ? 1.9 : 1.5) * u}
+                width={(active ? 3.8 : 3) * u}
+                height={(active ? 3.8 : 3) * u}
                 transform={`rotate(45 ${position.x} ${position.y})`}
                 className={active ? styles.activeHandle : styles.handle}
                 data-editor-handle={active ? 'active' : 'idle'}
