@@ -962,7 +962,7 @@ function InferenceTrackpad({
   )
   const canDelete = selection.kind === 'point' || selection.kind === 'handle'
     ? Boolean(selectedStroke && selectedStroke.points.length > 2)
-    : Boolean(selectedStroke && selectedJamo && getJamoStrokes(selectedJamo).length > 1)
+    : Boolean(selectedStroke && selectedJamo)
 
   const context = {
     cho: syllable.choseong?.char ?? '',
@@ -1349,7 +1349,9 @@ function InferenceTrackpad({
       ? updateJamoStroke(before, selectedStroke.id, (stroke) => ({ ...stroke, points: stroke.points.filter((_, index) => index !== selection.pointIndex) }))
       : updateJamoStroke(before, selectedStroke.id, () => null)
     onCommitJamo(before, after, { kind: selection.kind === 'stroke' ? 'stroke-move' : 'point-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId: selectedStroke.id, ...(selection.kind === 'stroke' ? {} : { pointIndex: selection.pointIndex }), delta: { x: 0, y: 0 } } as RawGlyphEdit)
-    onSelectionChange({ ...selection, kind: 'stroke', strokeId: selection.kind === 'stroke' ? getJamoStrokes(after)[0]?.id ?? selectedStroke.id : selectedStroke.id, jamo: after })
+    // 마지막 획까지 지울 수 있다. 남은 획이 없으면 선택을 푼다.
+    const nextStrokeId = selection.kind === 'stroke' ? getJamoStrokes(after)[0]?.id : selectedStroke.id
+    onSelectionChange(nextStrokeId ? { ...selection, kind: 'stroke', strokeId: nextStrokeId, jamo: after } : { kind: 'none' })
   }
   // ⌘C · ⌘V(Ctrl) = `복사` · `붙여넣기` 단추. 입력칸에서는 글자 복사에 맡긴다.
   useEffect(() => {
@@ -1866,6 +1868,17 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     const boxes = placement.kind === 'boxes' ? placement.boxes : focusedBoxes
     const target = getRenderedStrokeTargets(syllable, boxes).find((item) => item.editorPart === part)
     return target ? { kind: 'stroke', component: componentFor(selectedChar, part, target.jamo), editorPart: part, renderPart: target.renderPart, jamo: target.jamo, strokeId: target.stroke.id, box: target.box } : null
+  }
+  // 넣기 도구(추가 · 원 · 붙여넣기)의 기댈 곳. 획을 다 지운 자소는 잡을 첫 획이 없어, 빈 자소와 그 상자로 선다.
+  const creationSelectionOf = (part: MobileEditorPart): Selection | null => {
+    const first = firstStrokeSelectionOf(part)
+    if (first) return first
+    const jamo = part === 'CH' ? syllable.choseong : part === 'JU' ? syllable.jungseong : syllable.jongseong
+    const boxes = placement.kind === 'boxes' ? placement.boxes : focusedBoxes
+    const renderPart: Part | undefined = part === 'JU' ? (['JU', 'JU_H', 'JU_V'] as const).find((item) => boxes[item]) : part
+    const box = renderPart ? boxes[renderPart] : undefined
+    if (!jamo || !renderPart || !box || getJamoStrokes(jamo).length > 0) return null
+    return { kind: 'stroke', component: componentFor(selectedChar, part, jamo), editorPart: part, renderPart, jamo, strokeId: '', box }
   }
   // 주소로 바로 연 획 편집(`&mode=stroke&part=`)은 첫 렌더에서 한 번 그 자소의 첫 획을 잡는다.
   if (pendingStrokePart) {
@@ -2629,7 +2642,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         glyph={selectedChar}
         syllable={syllable}
         selection={selection}
-        creationSelection={lockedPart && selection.kind === 'none' ? firstStrokeSelectionOf(lockedPart) : null}
+        creationSelection={lockedPart && selection.kind === 'none' ? creationSelectionOf(lockedPart) : null}
         selectedPoints={selectedPoints}
         layoutType={syllable.layoutType}
         schema={effectiveSchema}
