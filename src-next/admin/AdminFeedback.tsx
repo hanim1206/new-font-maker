@@ -1,20 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import { threadsOf, whenText } from '../feedback'
-import type { FeedbackMessage, FeedbackThread } from '../feedback'
+import type { FeedbackThread } from '../feedback'
+import { Search } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { FEEDBACK_API, adminCall } from './adminApi'
+import { EMPTY_FEEDBACK_FILTER, FEEDBACK_FILTER_LABEL, isPending, matchesFeedback, userOf } from './feedbackFilter'
+import type { AdminMessage, FeedbackFilter, FeedbackFilterStatus } from './feedbackFilter'
 import styles from './AdminFeedback.module.css'
 
-type AdminMessage = FeedbackMessage & { userId: string }
 interface Listed { messages: AdminMessage[]; nicknames: Record<string, string | null> }
 
-/** 새 의견: 마지막 말이 친구 것이고 아직 안 읽었다. 답장하거나 `읽음만`을 누르면 지난 의견으로 간다. */
-const isPending = (thread: FeedbackThread) => {
-  const last = thread.messages.at(-1)!
-  return last.author === 'friend' && thread.messages.some((message) => message.author === 'friend' && !message.readAt)
-}
-
 /**
- * 관리자 의견 화면. 새 의견이 위, 누르면 그 자리에서 펼쳐 대화 · 보낸 자리 · 답장 칸.
+ * 관리자 의견 화면. 위에 검색 · 상태 · 친구 필터, 새 의견이 위, 누르면 그 자리에서 펼쳐 대화 · 보낸 자리 · 답장 칸.
  * 다른 메뉴에 있어도 목록은 받아 둔다 — 메뉴 옆 숫자(`onPending`)를 채운다.
  */
 export function AdminFeedback({ hidden, onPending }: { hidden: boolean; onPending: (count: number) => void }) {
@@ -23,6 +20,7 @@ export function AdminFeedback({ hidden, onPending }: { hidden: boolean; onPendin
   const [open, setOpen] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
+  const [filter, setFilter] = useState<FeedbackFilter>(EMPTY_FEEDBACK_FILTER)
 
   const refresh = useCallback(async () => {
     try {
@@ -35,11 +33,17 @@ export function AdminFeedback({ hidden, onPending }: { hidden: boolean; onPendin
   useEffect(() => { void refresh() }, [refresh])
 
   const threads = listed ? threadsOf(listed.messages) : null
-  const pending = threads?.filter(isPending) ?? []
-  const past = threads?.filter((thread) => !isPending(thread)) ?? []
-  useEffect(() => { onPending(pending.length) }, [onPending, pending.length])
+  const pendingCount = threads?.filter(isPending).length ?? 0
+  useEffect(() => { onPending(pendingCount) }, [onPending, pendingCount])
 
-  const nameOf = (thread: FeedbackThread) => listed?.nicknames[(thread.first as AdminMessage).userId] ?? '(닉네임 없음)'
+  const nameOf = (thread: FeedbackThread) => listed?.nicknames[userOf(thread)] ?? '(닉네임 없음)'
+  const shown = threads?.filter((thread) => matchesFeedback(thread, filter, listed?.nicknames[userOf(thread)] ?? null)) ?? []
+  const pending = shown.filter(isPending)
+  const past = shown.filter((thread) => !isPending(thread))
+  const filtering = filter.status !== 'all' || filter.friend !== 'all' || filter.query.trim() !== ''
+  /** 의견을 보낸 친구(필터 목록). */
+  const friends = [...new Set(threads?.map(userOf) ?? [])].map((id) => ({ id, name: listed?.nicknames[id] ?? '(닉네임 없음)' }))
+  const countOf = (status: FeedbackFilterStatus) => threads?.filter((thread) => matchesFeedback(thread, { ...filter, status }, listed?.nicknames[userOf(thread)] ?? null)).length ?? 0
 
   const act = async (method: 'POST' | 'PATCH', threadId: string) => {
     if (busy) return
@@ -90,12 +94,52 @@ export function AdminFeedback({ hidden, onPending }: { hidden: boolean; onPendin
 
   if (hidden) return null
   return <>
+    <div className="mb-4 flex flex-col gap-2.5">
+      <label className="relative block">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-dim-5" />
+        <input
+          type="search"
+          value={filter.query}
+          onChange={(event) => setFilter((current) => ({ ...current, query: event.target.value }))}
+          placeholder="글 · 닉네임 · 폰트 · 기기로 찾기"
+          aria-label="의견 검색"
+          className="h-10 w-full rounded-md border border-border bg-surface pl-9 pr-3 text-sm text-foreground placeholder:text-text-dim-5 focus:outline-none focus:ring-2 focus:ring-ring/30"
+          data-testid="admin-feedback-search"
+        />
+      </label>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {(Object.keys(FEEDBACK_FILTER_LABEL) as FeedbackFilterStatus[]).map((status) => <button
+          key={status}
+          type="button"
+          onClick={() => setFilter((current) => ({ ...current, status }))}
+          aria-pressed={filter.status === status}
+          className={cn(
+            'h-8 rounded-full px-3 text-xs font-semibold transition-colors',
+            filter.status === status ? 'bg-foreground text-surface' : 'bg-surface-3 text-text-dim-3 hover:bg-surface-4'
+          )}
+          data-testid={`admin-feedback-filter-${status}`}
+        >
+          {FEEDBACK_FILTER_LABEL[status]} <span className="tabular-nums opacity-60">{countOf(status)}</span>
+        </button>)}
+        <select
+          value={filter.friend}
+          onChange={(event) => setFilter((current) => ({ ...current, friend: event.target.value }))}
+          aria-label="친구"
+          className="h-8 rounded-full border-0 bg-surface-3 px-3 text-xs font-semibold text-text-dim-3 focus:outline-none focus:ring-2 focus:ring-ring/30"
+        >
+          <option value="all">친구 전체</option>
+          {friends.map((friend) => <option key={friend.id} value={friend.id}>{friend.name}</option>)}
+        </select>
+        {filtering && <button type="button" onClick={() => setFilter(EMPTY_FEEDBACK_FILTER)} className="h-8 px-2 text-xs font-semibold text-text-dim-4 hover:text-foreground">초기화</button>}
+      </div>
+    </div>
     {error && <p className={styles.failure} role="alert">{error}</p>}
-    <section className={styles.list}>
-      <h2>새 의견 {threads ? pending.length : ''}</h2>
-      {threads && pending.length === 0 && <p className={styles.empty}>다 읽었어요.</p>}
+    {threads && shown.length === 0 && <p className={styles.empty}>{filtering ? '맞는 의견이 없어요.' : '아직 의견이 없어요.'}</p>}
+    {pending.length > 0 && <section className={styles.list}>
+      <h2>새 의견 {pending.length}</h2>
       <ul>{pending.map(row)}</ul>
-    </section>
+    </section>}
+    {threads && !filtering && pending.length === 0 && shown.length > 0 && <p className={styles.empty}>새 의견은 다 읽었어요.</p>}
     {past.length > 0 && <section className={styles.list}>
       <h2>지난 의견 {past.length}</h2>
       <ul>{past.map(row)}</ul>
