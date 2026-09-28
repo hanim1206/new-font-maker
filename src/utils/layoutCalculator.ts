@@ -2,6 +2,7 @@ import type { LayoutSchema, BoxConfig, Part, Padding, LayoutType, PartOverride, 
 import { resolveGapInsets } from './layoutGapUtils'
 import { applyComponentPlacementProfile } from '../data/componentPlacementProfiles'
 import { constrainUpwardHorizontalJungseong } from '../data/jamoMorphology'
+import { NOTO_SOLO_CONSONANT_BOX, isLegacyReferenceBody, mapBoxToDesignBody } from '../services/designBodyPlacement'
 
 /** 음절 컨텍스트 (calculateBoxes에 전달 시 레이아웃 오버라이드 해석에 사용) */
 export interface SyllableContext {
@@ -110,6 +111,11 @@ export function calculateBoxes(
   context?: SyllableContext,
 ): Partial<Record<Part, BoxConfig>> {
   const designBodyPadding = schema.designBodyPadding
+  // 첫닿자 단독은 옛 스키마(사방 .225) 대신 노토 호환 자모 크기로 선다. 몸통에 늘려 붙이면 음절보다 커진다.
+  // 옛 850 틀(사방 .075)은 옛 좌표를 동결한 fixture만 쓰므로 옛 해석 그대로 둔다.
+  if (designBodyPadding && schema.id === 'choseong-only' && !isLegacyReferenceBody(designBodyPadding)) {
+    return { CH: mapBoxToDesignBody(NOTO_SOLO_CONSONANT_BOX, designBodyPadding) }
+  }
   const calculationSchema = designBodyPadding
     ? { ...schema, padding: DESIGN_BODY_BASE_PADDING, designBodyPadding: undefined }
     : schema

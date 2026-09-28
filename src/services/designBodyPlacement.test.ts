@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { LEGACY_REFERENCE_BODY_PADDING, mapBoxToDesignBody, mapFacesToDesignBody, normalizeReferencePadding, REFERENCE_BODY_PADDING } from './designBodyPlacement'
+import { calculateBoxes, DEFAULT_LAYOUT_SCHEMAS } from '../utils/layoutCalculator'
+import { LEGACY_REFERENCE_BODY_PADDING, mapBoxToDesignBody, mapFacesToDesignBody, normalizeReferencePadding, NOTO_SOLO_CONSONANT_BOX, REFERENCE_BODY_PADDING } from './designBodyPlacement'
 
 describe('네모꼴을 바꾸면 모델 상자도 같이 옮겨진다', () => {
   // 기준 틀(왼 0.05 ~ 오른 0.89) 전폭 상자
@@ -33,5 +34,25 @@ describe('네모꼴을 바꾸면 모델 상자도 같이 옮겨진다', () => {
     const mapped = mapFacesToDesignBody({ left: 0.47, right: 0.47, top: 0.505, bottom: 0.505 }, { top: 0.1, bottom: 0.3, left: 0.25, right: 0.05 })
     expect(mapped.left).toBeCloseTo(0.25 + 0.7 / 2, 9)
     expect(mapped.top).toBeCloseTo(0.1 + 0.6 / 2, 9)
+  })
+})
+
+describe('첫닿자 단독(ㄷ)은 노토 호환 자모 크기로 선다', () => {
+  const soloSchema = (padding: typeof REFERENCE_BODY_PADDING) => ({ ...DEFAULT_LAYOUT_SCHEMAS['choseong-only'], padding, designBodyPadding: padding })
+
+  it('기본 네모꼴에서는 노토 상자 그대로다 — 음절 몸통보다 한참 작다', () => {
+    expect(calculateBoxes(soloSchema({ ...REFERENCE_BODY_PADDING })).CH).toEqual(NOTO_SOLO_CONSONANT_BOX)
+    expect(NOTO_SOLO_CONSONANT_BOX.width).toBeLessThan(0.5)
+    expect(NOTO_SOLO_CONSONANT_BOX.height).toBeLessThan(0.4)
+  })
+
+  it('네모꼴을 좁히면 같이 좁아진다', () => {
+    const narrow = calculateBoxes(soloSchema({ ...REFERENCE_BODY_PADDING, left: 0.2, right: 0.2 })).CH!
+    expect(narrow.width).toBeLessThan(NOTO_SOLO_CONSONANT_BOX.width)
+    expect(narrow.height).toBeCloseTo(NOTO_SOLO_CONSONANT_BOX.height, 9)
+  })
+
+  it('옛 850 틀(사방 .075) 입력은 옛 스키마 해석 그대로다', () => {
+    expect(calculateBoxes(soloSchema({ ...LEGACY_REFERENCE_BODY_PADDING })).CH!.width).toBeCloseTo(0.7, 9)
   })
 })

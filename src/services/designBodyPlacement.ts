@@ -10,6 +10,13 @@ import type { BoxConfig, Padding } from '../types'
 export const REFERENCE_BODY_PADDING: Padding = { top: 0.05, bottom: 0.04, left: 0.05, right: 0.11 }
 export const LEGACY_REFERENCE_BODY_PADDING: Padding = { top: 0.075, bottom: 0.075, left: 0.075, right: 0.075 }
 
+/**
+ * 첫닿자 단독(`ㄷ`, `choseong-only`)의 중심선 상자. 기준 틀 좌표다.
+ * 노토 산스 KR 호환 자모 ㄱ ㄴ ㄷ ㅁ 잉크(x 190~750, y 142~594, 폭 920 칸)에서 획 반 두께(≈.03)만큼 안으로 들였다.
+ * 잉크로 치면 x .20~.74 · y .29~.74 — 음절 몸통보다 한참 작고 가운데보다 살짝 아래다.
+ */
+export const NOTO_SOLO_CONSONANT_BOX: BoxConfig = { x: 0.23, y: 0.32, width: 0.48, height: 0.39 }
+
 const EPSILON = 1e-9
 const SIDES = ['top', 'bottom', 'left', 'right'] as const
 export const REFERENCE_WIDTH = 1 - REFERENCE_BODY_PADDING.left - REFERENCE_BODY_PADDING.right
@@ -20,6 +27,11 @@ const samePadding = (a: Padding, b: Padding) => SIDES.every((side) => Math.abs(a
 export function isReferenceBody(padding: Padding | undefined): boolean {
   if (!padding) return true
   return samePadding(padding, REFERENCE_BODY_PADDING)
+}
+
+/** 옛 기본 네모꼴(사방 0.075) 그대로인가. 앱은 읽을 때 새 기본으로 바꾸고 크기 막대로도 못 만든다 — 옛 좌표 기준 fixture만 이 틀로 온다. */
+export function isLegacyReferenceBody(padding: Padding): boolean {
+  return samePadding(padding, LEGACY_REFERENCE_BODY_PADDING)
 }
 
 /** 옛 기본 네모꼴(사방 0.075)로 저장된 여백은 "기본"이라는 뜻이므로 새 기본으로 읽는다. 그 외는 그대로. */
