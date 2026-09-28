@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { resolveContextBoxes } from '../src/services/contextBoxResolver'
 import type { BoxConfig, JamoData, MedialFamily, Part, StrokeDataV2 } from '../src/types'
-import { medialFamilyOf, strokesForFamily } from '../src/utils/jamoContextStrokes'
+import { medialFamilyOf, strokesForFamily, wholeJamoStrokes } from '../src/utils/jamoContextStrokes'
 import { pointsToSvgD } from '../src/utils/pathUtils'
 import { effectiveLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import { corpusIdentity } from './notoCorpus'
@@ -46,7 +46,7 @@ function inkStrokesOf(ink: LayoutContextInk, contextId: string, parts: LayoutCon
   }
   if (medialFamilyOf(ink.jamo.char) !== family) return []
   const whole = boxOf('JU')
-  if (whole) return (ink.jamo.strokes ?? []).map((stroke) => ({ stroke, box: whole }))
+  if (whole) return wholeJamoStrokes(ink.jamo).map((stroke) => ({ stroke, box: whole }))
   return (['JU_H', 'JU_V'] as const).flatMap((part) => {
     const box = boxOf(part)
     const strokes = part === 'JU_H' ? ink.jamo.horizontalStrokes : ink.jamo.verticalStrokes

@@ -1,5 +1,5 @@
 import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../data/Hangul'
-import { adoptFamilyStrokes, familyOfSyllable } from '../utils/jamoContextStrokes'
+import { adoptFamilyStrokes, familyOfSyllable, wholeJamoStrokes } from '../utils/jamoContextStrokes'
 import type {
   BoxConfig,
   DecomposedSyllable,
@@ -294,11 +294,12 @@ export function getRenderedStrokeTargets(
   const cho = syllable.choseong ? adoptFamilyStrokes(syllable.choseong, family) : null
   const jong = syllable.jongseong ? adoptFamilyStrokes(syllable.jongseong, family) : null
   const result = [
-    ...targets('CH', 'CH', cho, cho?.strokes, boxes.CH),
-    ...targets('JO', 'JO', jong, jong?.strokes, boxes.JO),
+    ...targets('CH', 'CH', cho, cho ? wholeJamoStrokes(cho) : undefined, boxes.CH),
+    ...targets('JO', 'JO', jong, jong ? wholeJamoStrokes(jong) : undefined, boxes.JO),
   ]
+  // 통째 상자(섞임홀자가 아님). ㅒ · ㅖ처럼 획을 세로부 칸에만 둔 홀자도 겨냥한다.
   if (boxes.JU && syllable.jungseong) {
-    result.push(...targets('JU', 'JU', syllable.jungseong, syllable.jungseong.strokes, boxes.JU))
+    result.push(...targets('JU', 'JU', syllable.jungseong, wholeJamoStrokes(syllable.jungseong), boxes.JU))
   } else if (syllable.jungseong) {
     result.push(
       ...targets(

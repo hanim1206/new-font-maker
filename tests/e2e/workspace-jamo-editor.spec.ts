@@ -258,6 +258,28 @@ test('획 편집 `초기화`는 한 번 묻고 고친 자소를 프리셋으로 
   await expect(strokes).toHaveCount(before + 1)
 })
 
+test('획을 세로부 칸에만 둔 ㅒ · ㅖ도 획 편집에서 획을 고른다', async ({ page }) => {
+  // 베타 제보(09-28): ㅒ · ㅖ는 그려지는데 획 편집에서 누를 획이 없었다. 둘만 획을 `verticalStrokes`에 둔다.
+  for (const char of ['얘', '예']) {
+    await page.goto(`/workspace/jamo?char=${encodeURIComponent(char)}&mode=stroke&part=JU`)
+    const editor = page.getByRole('region', { name: /완성 글자 편집/ })
+    await expect(editor).toBeVisible()
+    // 홀자가 잠긴 채 열린다. 눌리는 획은 홀자 네 획.
+    const strokes = editor.locator('svg [data-editor-hit="stroke"]')
+    await expect(strokes, char).toHaveCount(4)
+    const hit = strokes.last()
+    for (let tries = 0; tries < 4 && await hit.getAttribute('data-selected') !== 'true'; tries += 1) await hit.dispatchEvent('pointerdown')
+    await expect(hit, char).toHaveAttribute('data-selected', 'true')
+    // 트랙패드로 옮기면 저장된다(실행 취소가 켜진다).
+    const pad = await page.getByTestId('jamo-stroke-trackpad').boundingBox()
+    await page.mouse.move(pad!.x + 100, pad!.y + pad!.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(pad!.x + 130, pad!.y + pad!.height / 2, { steps: 6 })
+    await page.mouse.up()
+    await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
+  }
+})
+
 test('트랙패드 왼쪽 크기 막대를 올리면 고른 자소가 통째로 커지고, 손을 떼면 손잡이가 가운데로 돌아온다', async ({ page }) => {
   await page.goto('/workspace/jamo?mode=stroke')
   const editor = page.getByRole('region', { name: /완성 글자 편집/ })

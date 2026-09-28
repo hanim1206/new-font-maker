@@ -21,6 +21,15 @@ export function strokesForFamily<T extends DeepReadonly<JamoData> | JamoData>(ja
   return (variant && variant.length ? variant : jamo.strokes) as T['strokes']
 }
 
+/**
+ * 상자 하나에 통째로 놓이는 자소의 획. 기본 획(`strokes`)에 획이 있으면 그것, 비었으면 세로부 · 가로부 차례(그리기 `selectGeneralChannels`와 같다).
+ * ㅒ · ㅖ는 섞임홀자가 아닌데 획을 `verticalStrokes`에만 둔다. 기본 획만 읽으면 그리기엔 보이는데 편집기 · 카드에선 빈 글자가 된다.
+ */
+export function wholeJamoStrokes(jamo: JamoData): StrokeDataV2[] {
+  if (jamo.strokes && jamo.strokes.length > 0) return jamo.strokes
+  return [...(jamo.verticalStrokes ?? []), ...(jamo.horizontalStrokes ?? [])]
+}
+
 /** 편집용: 현재 문맥의 변형을 기본 획으로 올리고 변형 목록은 지운다. 변형이 없으면 그대로(복제). */
 export function adoptFamilyStrokes(jamo: JamoData, family: MedialFamily | null | undefined): JamoData {
   const clone = structuredClone(jamo)
