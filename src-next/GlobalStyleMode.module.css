@@ -130,4 +130,5 @@ section.panel.fill > div { padding: 4px 24px calc(env(safe-area-inset-bottom) + 
 .tabs.dock button svg { width: 28px; height: 28px; opacity: .45; }
 .tabs.dock button[aria-selected='true'] { background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-weight: 700; box-shadow: 0 1px 3px rgb(0 0 0 / .1); }
 .tabs.dock button[aria-selected='true'] svg { opacity: 1; }
-.fill [role='tabpanel'] { padding-bottom: calc(env(safe-area-inset-bottom) + 108px); }
+/* 탭 내용은 줄어들지 않는다 — 줄면 넘친 막대가 도크 자리(아래 여백) 밖으로 나가 스크롤로도 못 닿는다(낮은 창의 획 스타일). */
+.fill [role='tabpanel'] { flex: 0 0 auto; padding-bottom: calc(env(safe-area-inset-bottom) + 108px); }
