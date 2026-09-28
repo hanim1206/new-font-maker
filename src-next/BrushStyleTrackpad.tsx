@@ -194,7 +194,7 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
     <span className={styles.brushAngleGuide} style={{ rotate: `${angle}deg` }} aria-hidden="true" />
     {current.mode === 'angled-area' && <span className={styles.brushAngleDeadZone} aria-hidden="true" />}
     <span className={styles.brushAnglePuck} style={{ width: 72, height: current.mode === 'angled-area' ? 8 : 22, rotate: `${angle}deg` }} aria-hidden="true" />
-    {activeValue === 'angle' && <output>{current.mode === 'angled-area' ? '절단각' : '각도'} {angle > 0 ? '+' : ''}{angle}°</output>}
+    {activeValue === 'angle' && !productOptions && <output>{current.mode === 'angled-area' ? '절단각' : '각도'} {angle > 0 ? '+' : ''}{angle}°</output>}
   </div>
 
   const controls = <div className={styles.brushControls} role={embedded ? 'tabpanel' : undefined} aria-label={embedded ? '획' : undefined}>
@@ -220,18 +220,32 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
           <span className={styles.brushTipPreview}>{renderPreview(previewStyle)}</span><span className={`${styles.brushTipIcon} ${styles[`brushTipIcon_${tip}`]}`} aria-hidden="true" /><strong>{label}</strong>
         </button>
       })}</div>}
-      {current.brush.tip !== 'round' && <div className={styles.brushControlGrid}>{range('납작함', aspectRatioToFlatness(current.brush.aspectRatio), 0, 100, 5, (value) => ({ ...current, brush: { ...current.brush, aspectRatio: flatnessToAspectRatio(value) } }), `${aspectRatioToFlatness(current.brush.aspectRatio)}%`, [{ at: 0, text: '0' }, { at: 50, text: '50' }, { at: 100, text: '100' }])}{renderAnglePad()}</div>}
+      {current.brush.tip !== 'round' && (() => {
+        const flatness = range('납작함', aspectRatioToFlatness(current.brush.aspectRatio), 0, 100, 5, (value) => ({ ...current, brush: { ...current.brush, aspectRatio: flatnessToAspectRatio(value) } }), `${aspectRatioToFlatness(current.brush.aspectRatio)}%`, [{ at: 0, text: '0' }, { at: 50, text: '50' }, { at: 100, text: '100' }])
+        // 제품 화면은 일반 붓처럼 한 줄에 하나씩 쌓는다. 각도판도 막대와 같은 제목 · 값 줄을 단다.
+        return productOptions
+          ? <div className={styles.brushControlGrid} style={{ gridTemplateColumns: 'minmax(0, 1fr)', minHeight: 0, gap: 0 }}>
+            {flatness}
+            <div className={styles.ruleControl} data-style-row><span>각도 <output>{angle > 0 ? '+' : ''}{angle}°</output></span>{renderAnglePad()}</div>
+          </div>
+          : <div className={styles.brushControlGrid}>{flatness}{renderAnglePad()}</div>
+      })()}
       {current.brush.tip === 'round' && productOptions && <div className={styles.brushControlGrid} style={{ gridTemplateColumns: 'minmax(0, 1fr)', minHeight: 0, gap: 0 }}>
         {/* 막대는 5 단위로 탁탁 걸린다(09-25 사용자). */}
-        {range('바깥 둥글기', roundnessOf(current), 0, 100, 5, (value) => ({ ...current, roundness: value / 100 }), `${roundnessOf(current)}%`, [{ at: 0 }, { at: 50 }, { at: 100, text: '반원' }])}
-        {/* 안쪽은 반폭을 넘어 300%까지. 100에 눈금(바깥의 끝). */}
-        {range('안쪽 둥글기', innerRoundnessOf(current), 0, 300, 5, (value) => ({ ...current, innerRoundness: value / 100 }), `${innerRoundnessOf(current)}%`, [{ at: 0 }, { at: 100, text: '100' }, { at: 200, text: '200' }, { at: 300, text: '300' }])}
-        {/* 안쪽을 따로 정하면 풀린다. `바깥과 같이`로 다시 바깥을 따르게 한다. */}
-        {!innerLinked(current) && <button type="button" className={styles.ruleLinkButton} onClick={() => {
-          const { innerRoundness: _dropped, ...rest } = current as Extract<StrokeRenderStyle, { mode: 'brush' }>
-          void _dropped
-          preview(rest); onCommit(committed, rest)
-        }}>바깥과 같이</button>}
+        {/* 바깥 · 안쪽은 한 쌍이라 나란히 둔다. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', alignItems: 'start', columnGap: 16 }}>
+          {range('바깥 둥글기', roundnessOf(current), 0, 100, 5, (value) => ({ ...current, roundness: value / 100 }), `${roundnessOf(current)}%`, [{ at: 0 }, { at: 50 }, { at: 100, text: '반원' }])}
+          {/* 안쪽은 반폭을 넘어 300%까지. 100에 눈금(바깥의 끝). */}
+          <div>
+            {range('안쪽 둥글기', innerRoundnessOf(current), 0, 300, 5, (value) => ({ ...current, innerRoundness: value / 100 }), `${innerRoundnessOf(current)}%`, [{ at: 0 }, { at: 100, text: '100' }, { at: 200, text: '200' }, { at: 300, text: '300' }])}
+            {/* 안쪽을 따로 정하면 풀린다. `바깥과 같이`로 다시 바깥을 따르게 한다 — 안쪽 막대 바로 아래 작은 글자로. */}
+            {!innerLinked(current) && <button type="button" className={styles.ruleLinkButton} data-link-inner onClick={() => {
+              const { innerRoundness: _dropped, ...rest } = current as Extract<StrokeRenderStyle, { mode: 'brush' }>
+              void _dropped
+              preview(rest); onCommit(committed, rest)
+            }}>바깥과 같이</button>}
+          </div>
+        </div>
         {/* 가로·세로 두께 대비. 가운데 0이 같은 굵기, 오른쪽은 세로 굵게 · 가로 얇게. */}
         {/* 세로 굵게(+) 쪽이 훨씬 깊다. 가로 굵게(−)는 −30까지만. 0에 눈금. */}
         <div>{range('가로·세로 대비', contrastOf(current), -30, 100, 5, (value) => ({ ...current, contrast: value / 100 }), contrastLabel(contrastOf(current)), [{ at: -30, text: '가로' }, { at: 0, text: '같음' }, { at: 25 }, { at: 50, text: '세로' }, { at: 75 }, { at: 100, text: '세로 최대' }])}</div>

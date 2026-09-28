@@ -37,7 +37,7 @@ section.panel > div::-webkit-scrollbar { display: none; }
 .panel header span { color: rgb(var(--color-text-5)); }
 .panel header button { border: 0; background: transparent; color: rgb(var(--color-text-4)); }
 .panel [role='tabpanel'] > p strong { font-weight: 600; color: rgb(var(--color-text-3)); }
-.panel [role='tabpanel'] label { border: 0; border-radius: 0; background: transparent; padding: 8px 0 4px; gap: 8px; font-size: 12px; font-weight: 600; }
+.panel [role='tabpanel'] :is(label, [data-style-row]) { border: 0; border-radius: 0; background: transparent; padding: 8px 0 4px; gap: 8px; font-size: 12px; font-weight: 600; }
 .panel [role='tabpanel'] > div { column-gap: 16px; }
 .panel [role='tabpanel'] output { color: rgb(var(--color-foreground)); font-size: 13px; }
 /* 되돌리기: 덜 중요한 동작이라 밑줄 글자로 */
@@ -86,10 +86,10 @@ section.panel.fill > div { padding: 4px 24px calc(env(safe-area-inset-bottom) + 
 /* 설명 글줄은 뺀다 — 무엇을 바꾸는지는 제목과 문장이 보여 준다. */
 .fill [role='tabpanel'] > p { display: none; }
 /* 항목 제목: 왼쪽 회색 이름, 오른쪽 굵은 값. 막대 · 고르기 모두 같은 줄. 고르기는 고른 칸이 값이라 제목만. */
-.fill [role='tabpanel'] h3 { margin: 14px 0 8px; color: rgb(var(--color-text-3)); font-size: 14px; font-weight: 600; }
-.fill [role='tabpanel'] label { padding: 12px 0 2px; gap: 6px; }
-.fill [role='tabpanel'] label > span:first-child { display: flex; align-items: baseline; justify-content: space-between; color: rgb(var(--color-text-3)); font-size: 14px; font-weight: 600; }
-.fill [role='tabpanel'] label > span:first-child output { color: rgb(var(--color-foreground)); font-family: inherit; font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.fill [role='tabpanel'] h3 { margin: 28px 0 10px; color: rgb(var(--color-text-3)); font-size: 14px; font-weight: 600; }
+.fill [role='tabpanel'] :is(label, [data-style-row]) { padding: 24px 0 2px; gap: 8px; }
+.fill [role='tabpanel'] :is(label, [data-style-row]) > span:first-child { display: flex; align-items: baseline; justify-content: space-between; color: rgb(var(--color-text-3)); font-size: 14px; font-weight: 600; }
+.fill [role='tabpanel'] :is(label, [data-style-row]) > span:first-child output { color: rgb(var(--color-foreground)); font-family: inherit; font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
 /* 값이 하나뿐인 탭(네모꼴 · 굵기): 이름 아래 큰 숫자. */
 .fill .weightBox { padding: 18px 0 0; gap: 10px; }
 .fill .weightHead { flex-direction: column; align-items: flex-start; gap: 2px; color: rgb(var(--color-text-3)); font-size: 14px; font-weight: 600; }
@@ -116,6 +116,10 @@ section.panel.fill > div { padding: 4px 24px calc(env(safe-area-inset-bottom) + 
 
 /* 부리: 없음이면 막대를 숨기고, 각도를 안 쓰는 모양이면 각도만 숨긴다. */
 .fill [data-beak-idle] { display: none; }
+/* `바깥과 같이`: 안쪽 막대 아래 오른쪽 끝, 테두리 없는 작은 글자. */
+.fill [data-link-inner] { display: block; min-height: 32px; margin: 2px 0 0 auto; padding: 0; border: 0; background: transparent; color: rgb(var(--color-text-4)); font-size: 12px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+/* 각도판: 막대와 같은 제목 줄 아래 전폭. 높이는 낮게. */
+.fill [data-style-row] [role='slider'] { min-height: 112px; }
 
 /* 아래 탭: 회색 길 위 흰 알약, 그림 위 · 이름 아래. 화면 바닥에 고정 — 스크롤해도 제자리(바깥 줄 전체가 스크롤되므로 sticky는 같이 밀린다). */
 .tabs.dock { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 12px); z-index: 20; width: min(calc(100% - 48px), 432px); box-sizing: border-box; translate: -50% 0; display: flex; gap: 0; padding: 3px; border: 0; border-radius: 16px; background: rgb(var(--color-surface-3)); box-shadow: 0 -12px 24px 8px rgb(var(--color-surface)); }
