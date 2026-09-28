@@ -56,7 +56,7 @@ function AccountHome() {
       </dl>
       <div className={styles.band} />
       <button type="button" className={styles.link} onClick={() => navigate('/account/feedback')} data-testid="account-feedback">
-        <strong>한임에게 의견 보내기</strong>
+        <strong>내가 보낸 의견</strong>
         {unseen && <span className={styles.dot} aria-label="새 답장" />}
         <ChevronRight size={20} aria-hidden="true" />
       </button>
@@ -65,48 +65,26 @@ function AccountHome() {
   </Shell>
 }
 
+/** 내가 보낸 의견 목록. 쓰기는 화면 머리의 제보 단추(`ReportButton`)가 한다 — 그 화면 정보가 같이 가게. */
 function FeedbackHome() {
   const me = useMe()
-  const { threads, failed, setThreads } = useThreads(me)
-  // `?draft=`로 들어오면 문구를 채워 둔다(추출 완료의 `한임에게 자랑하기`).
-  const [draft, setDraft] = useState(() => new URLSearchParams(window.location.search).get('draft')?.slice(0, FEEDBACK_MAX_LENGTH) ?? '')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const body = draft.trim()
+  const { threads, failed } = useThreads(me)
   const seen = me ? readSeen(window.localStorage, me.id) : {}
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault()
-    if (!me || !body || busy) return
-    setBusy(true)
-    setError('')
-    const sent = await sendFeedback(me.id, body, contextNow())
-    setBusy(false)
-    if (!sent.ok) { setError('보내지 못했어요. 잠시 뒤 다시 해 주세요.'); return }
-    setDraft('')
-    setThreads((list) => threadsOf([...(list ?? []).flatMap((thread) => thread.messages), sent.value]))
-  }
 
   return <Shell testId="feedback-page">
     <Bar back="/account" />
     <div className={styles.body}>
-      <h1>한임에게</h1>
-      <p className={styles.sub}>불편한 점, 바라는 점 뭐든 좋아요.</p>
-      <form className={styles.compose} onSubmit={(event) => void submit(event)}>
-        <textarea value={draft} maxLength={FEEDBACK_MAX_LENGTH} placeholder="ㄲ이 좀 뚱뚱해 보여요" aria-label="의견" onChange={(event) => setDraft(event.target.value)} data-testid="feedback-draft" />
-        <small>보던 화면 주소 · 폰트 이름 · 기기가 같이 가요.</small>
-        {error && <p className={styles.error} role="alert">{error}</p>}
-        <button type="submit" disabled={!body || busy} data-testid="feedback-send">{busy ? '보내는 중…' : '보내기'}</button>
-      </form>
+      <h1>내가 보낸 의견</h1>
+      <p className={styles.sub}>화면 머리의 빨간 제보 단추로 그 화면에 대해 보낼 수 있어요.</p>
+      {threads && threads.length === 0 && <p className={styles.empty} data-testid="feedback-empty">아직 보낸 의견이 없어요.</p>}
       {(threads?.length ?? 0) > 0 && <section className={styles.threads}>
-        <h3>보낸 의견</h3>
         <ul>
           {threads!.map((thread) => {
             const unseen = hasUnseenReply(thread, seen)
             return <li key={thread.id}>
               <button type="button" onClick={() => navigate(`/account/feedback/${thread.id}`)} data-testid="feedback-thread">
                 <strong>{thread.first.body}</strong>
-                <small data-new={unseen || undefined}>{unseen ? '답장 왔어요' : STATUS_LABEL[thread.status]} · {whenText(thread.updatedAt)}</small>
+                <small data-new={unseen || undefined}>{thread.first.context?.screen ? `${thread.first.context.screen} · ` : ''}{unseen ? '답장 왔어요' : STATUS_LABEL[thread.status]} · {whenText(thread.updatedAt)}</small>
               </button>
             </li>
           })}

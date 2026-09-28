@@ -4,13 +4,15 @@ import { Download, Heart } from 'lucide-react'
 import { downloadTTF } from '../src/services/fontGenerator'
 import { fontVersionText } from '../src/services/fontRevision'
 import { DASHBOARD_PATH, FONT_TAB_PATH, useFontExportStore } from './fontExportStore'
+import { feedbackContextOf } from './feedbackContext'
+import { ReportSheet } from './ReportButton'
 import { navigate, onLinkClick } from './router'
 import { MobileWorkspaceShell } from './workspace/WorkspaceChrome'
 import styles from './FontExportDonePage.module.css'
 
 /**
  * 추출 완료 페이지(`/workspace/font/export`). 방금 만든 OTF를 `FontFace`로 등록해 내 글자를 진짜 폰트로 크게 보여 준다 — "진짜가 됐다".
- * 이름 첫 글자 하나 크게 · 대시보드 카드에서 주사위로 고른 문장 · 가나다 줄, 아래 `다시 받기` · `한임에게 자랑하기`(의견 쓰기, 문구를 채워 둔다). 빠진 글자가 있으면 그 목록.
+ * 이름 첫 글자 하나 크게 · 대시보드 카드에서 주사위로 고른 문장 · 가나다 줄, 아래 `다시 받기` · `한임에게 자랑하기`(제보 판을 `잘했어요` + 문구로 연다). 빠진 글자가 있으면 그 목록.
  * 설치 안내는 뺐다(나중에). 폰트 덱 안의 하위 화면이라 머리는 `‹ 폰트`, 대시보드에서 받았으면 `‹ 내 폰트`.
  * `lastExport`는 메모리에만 있다. 새로고침이면 폰트 탭으로 넘긴다.
  */
@@ -51,7 +53,7 @@ function ExportedFont({ export: done }: { export: NonNullable<ReturnType<typeof 
   }, [faceName, done.bytes])
   const version = fontVersionText(done.revision)
   const mb = (done.fileSize / (1024 * 1024)).toFixed(1)
-  const brag = () => navigate(`/account/feedback?draft=${encodeURIComponent(`${done.familyName} ${version} 만들었어요!`)}`)
+  const [bragging, setBragging] = useState(false)
   return <section className={styles.screen} aria-label="추출 완료" data-testid="font-export-done" data-font-loaded={face === 'ready' || undefined} data-font-state={face}>
     <div className={styles.content} style={face === 'ready' ? { '--specimen-font': `'${faceName}', sans-serif` } as CSSProperties : undefined}>
       <header className={styles.hero}>
@@ -69,7 +71,8 @@ function ExportedFont({ export: done }: { export: NonNullable<ReturnType<typeof 
     </div>
     <footer className={styles.actions}>
       <button type="button" className={styles.again} onClick={() => downloadTTF(done.bytes, done.fileName)} data-testid="font-export-redownload"><Download size={18} aria-hidden="true" />다시 받기</button>
-      <button type="button" className={styles.brag} onClick={brag} data-testid="font-export-brag"><Heart size={18} aria-hidden="true" />한임에게 자랑하기</button>
+      <button type="button" className={styles.brag} onClick={() => setBragging(true)} data-testid="font-export-brag"><Heart size={18} aria-hidden="true" />한임에게 자랑하기</button>
     </footer>
+    {bragging && <ReportSheet context={feedbackContextOf(window.location.pathname)} initialTag="praise" initialDraft={`${done.familyName} ${version} 만들었어요!`} onClose={() => setBragging(false)} />}
   </section>
 }

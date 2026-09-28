@@ -21,14 +21,15 @@ export function ReportButton({ className }: { className?: string }) {
     <button type="button" className={`${styles.trigger} ${className ?? ''}`} aria-label="이 화면 제보하기" title="이 화면 제보하기" onClick={() => setContext(feedbackContextOf(window.location.pathname))} data-testid="report-open">
       <MessageSquareWarning size={16} aria-hidden="true" />
     </button>
-    {context && createPortal(<ReportSheet context={context} onClose={() => setContext(null)} />, document.body)}
+    {context && <ReportSheet context={context} onClose={() => setContext(null)} />}
   </>
 }
 
-function ReportSheet({ context, onClose }: { context: FeedbackContext; onClose: () => void }) {
+/** 제보 판. 머리 단추 말고도 연다 — 폰트 완성의 `한임에게 자랑하기`는 `잘했어요` + 문구를 채워 연다. */
+export function ReportSheet({ context, onClose, initialTag = null, initialDraft = '' }: { context: FeedbackContext; onClose: () => void; initialTag?: ReportTag | null; initialDraft?: string }) {
   const me = useMe()
-  const [tag, setTag] = useState<ReportTag | null>(null)
-  const [draft, setDraft] = useState('')
+  const [tag, setTag] = useState<ReportTag | null>(initialTag)
+  const [draft, setDraft] = useState(initialDraft.slice(0, FEEDBACK_MAX_LENGTH))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)
@@ -60,7 +61,7 @@ function ReportSheet({ context, onClose }: { context: FeedbackContext; onClose: 
 
   const where = [context.screen, context.font && `"${context.font}"`, context.device].filter(Boolean) as string[]
 
-  return <div className={styles.layer} data-closing={closing || undefined} onClick={(event) => { if (event.target === event.currentTarget) close() }}>
+  return createPortal(<div className={styles.layer} data-closing={closing || undefined} onClick={(event) => { if (event.target === event.currentTarget) close() }}>
     <div className={styles.sheet} role="dialog" aria-modal="true" aria-label="이 화면 제보하기" data-testid="report-sheet">
       {sent
         ? <div className={styles.done}>
@@ -107,7 +108,7 @@ function ReportSheet({ context, onClose }: { context: FeedbackContext; onClose: 
           </div>
         </form>}
     </div>
-  </div>
+  </div>, document.body)
 }
 
 const PLACEHOLDER: Record<ReportTag, string> = {
