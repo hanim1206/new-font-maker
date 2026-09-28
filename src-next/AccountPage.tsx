@@ -76,7 +76,8 @@ function AccountHome() {
 function FeedbackHome() {
   const me = useMe()
   const { threads, failed, setThreads } = useThreads(me)
-  const [draft, setDraft] = useState('')
+  // `?draft=`로 들어오면 문구를 채워 둔다(추출 완료의 `한임에게 자랑하기`).
+  const [draft, setDraft] = useState(() => new URLSearchParams(window.location.search).get('draft')?.slice(0, FEEDBACK_MAX_LENGTH) ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const body = draft.trim()
@@ -127,7 +128,8 @@ function FeedbackHome() {
 function FeedbackThreadView({ threadId }: { threadId: string }) {
   const me = useMe()
   const { threads, failed, setThreads } = useThreads(me)
-  const [draft, setDraft] = useState('')
+  // `?draft=`로 들어오면 문구를 채워 둔다(추출 완료의 `한임에게 자랑하기`).
+  const [draft, setDraft] = useState(() => new URLSearchParams(window.location.search).get('draft')?.slice(0, FEEDBACK_MAX_LENGTH) ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const end = useRef<HTMLDivElement>(null)

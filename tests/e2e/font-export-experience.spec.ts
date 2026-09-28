@@ -33,13 +33,11 @@ test.fixme('폰트 탭: 대기 층에 퍼센트가 오르고, 끝나면 완료 �
   await expect(page).toHaveURL(/\/workspace\/font\/export$/, { timeout: 60_000 })
   const done = page.getByTestId('font-export-done')
   await expect(done).toBeVisible()
-  await expect(done.getByRole('heading', { level: 1 })).toHaveText('진짜 폰트가 됐어요')
+  await expect(done.getByRole('heading', { level: 1 })).toHaveText('대기체')
   await expect(done).toHaveAttribute('data-font-loaded', 'true', { timeout: 20_000 })
-  await expect(done.getByTestId('subtitle-template')).toHaveAttribute('data-mode', 'font')
   // 브라우저에 등록된 이름은 버전이 붙는다.
   expect(await page.evaluate(() => document.fonts.check("16px '대기체-1.001'") || [...document.fonts].some((face) => face.family.startsWith('대기체-')))).toBe(true)
   await expect(done).toContainText('1.00')
-  await expect(done).toContainText('iPhone')
 
   // 다시 받기 = 같은 파일.
   const again = page.waitForEvent('download')
@@ -91,4 +89,27 @@ test('대시보드 카드에서 받으면 완료 페이지로 가고, ‹ 내 �
   await expect(back).toHaveAttribute('aria-label', '내 폰트(으)로')
   await back.click()
   await expect(page).toHaveURL(/\/dashboard$/)
+})
+
+test('완료 페이지의 한임에게 자랑하기는 의견 쓰기로 가고 문구를 채워 둔다', async ({ page }) => {
+  test.setTimeout(240_000)
+  await page.goto('/dashboard')
+  // 주사위로 바꾼 카드 문장이 완료 페이지에 그대로 온다.
+  await page.getByRole('button', { name: '예시 문장 바꾸기' }).click()
+  const sentence = await page.locator('article p[aria-label]').first().getAttribute('aria-label')
+  expect(sentence).not.toBe('포도밭에 햇살이 쏟아졌다')
+  const downloadPromise = page.waitForEvent('download', { timeout: 200_000 })
+  await page.getByTestId('dashboard-font-download').click()
+  await page.getByTestId('dashboard-font-download-name').fill('자랑체')
+  await page.getByTestId('dashboard-font-download-confirm').click()
+  await downloadPromise
+  const done = page.getByTestId('font-export-done')
+  await expect(done).toBeVisible({ timeout: 60_000 })
+  await expect(done.getByRole('heading', { level: 1 })).toHaveText('자랑체')
+  await expect(done).toHaveAttribute('data-font-loaded', 'true', { timeout: 20_000 })
+  await expect(done).toContainText(sentence!)
+
+  await done.getByTestId('font-export-brag').click()
+  await expect(page).toHaveURL(/\/account\/feedback\?draft=/)
+  await expect(page.getByTestId('feedback-draft')).toHaveValue(/^자랑체 1\.\d+ 만들었어요!$/)
 })

@@ -82,6 +82,9 @@ export const SAMPLE_SENTENCES = [
   '뜨거운 여름밤 잠 못 드는 뻐꾸기',
 ] as const
 
+/** 대시보드 폰트 카드가 처음 열릴 때 문장. */
+export const DEFAULT_SAMPLE_SENTENCE = '포도밭에 햇살이 쏟아졌다'
+
 /** 지금 문장만 빼고 하나를 고른다. */
 export function randomSampleSentence(current: string) {
   const candidates = SAMPLE_SENTENCES.filter((sentence) => sentence !== current)

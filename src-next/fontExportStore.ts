@@ -8,6 +8,7 @@ import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { contextPlacementOf, loadNotoModel } from './notoModel'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 import { navigate } from './router'
+import { DEFAULT_SAMPLE_SENTENCE } from './sampleSentences'
 
 /**
  * OTF 추출 상태. 추출 단추(폰트 탭, 옛 단독 화면)가 어디 있든 같은 상태를 본다.
@@ -44,6 +45,8 @@ export interface LastExport {
   bytes: ArrayBuffer
   /** 완료 페이지의 `‹` 가 돌아갈 곳. 대시보드에서 받았으면 내 폰트로. */
   from: ExportOrigin
+  /** 받을 때 대시보드 카드에 떠 있던 예시 문장. 완료 페이지가 진짜 폰트로 다시 쓴다. */
+  sample: string
 }
 
 /**
@@ -79,6 +82,8 @@ interface FontExportState {
   dialogOpen: boolean
   /** 창에 미리 채울 폰트 이름. 계정 폰트면 그 이름, 아니면 마지막으로 쓴 이름. */
   familyName: string
+  /** 대시보드 폰트 카드의 예시 문장(주사위로 바뀐다). 메모리에만 — 새로고침이면 첫 문장. */
+  sampleSentence: string
 }
 
 interface FontExportActions {
@@ -86,6 +91,7 @@ interface FontExportActions {
   cancel: () => void
   dismissNotice: () => void
   confirm: (familyName: string) => Promise<void>
+  setSampleSentence: (sentence: string) => void
 }
 
 /** 빈 글리프로 넣은 글자 알림. 없으면 null. */
@@ -124,6 +130,8 @@ export const useFontExportStore = create<FontExportState & FontExportActions>()(
   lastExport: null,
   dialogOpen: false,
   familyName: loadFamilyName(),
+  sampleSentence: DEFAULT_SAMPLE_SENTENCE,
+  setSampleSentence: (sampleSentence) => set({ sampleSentence }),
   request: () => { if (get().status !== 'exporting') set({ dialogOpen: true, familyName: accountFontName() ?? loadFamilyName() }) },
   cancel: () => set({ dialogOpen: false }),
   dismissNotice: () => set({ notice: null, doneElsewhere: false }),
@@ -161,7 +169,7 @@ export const useFontExportStore = create<FontExportState & FontExportActions>()(
     // 폰트 탭 · 대시보드에서 기다리고 있었으면 완료 페이지로. 다른 탭이면 화면을 바꾸지 않는다.
     const origin = typeof window === 'undefined' ? 'elsewhere' : exportOriginOf(window.location.pathname)
     const lastExport: LastExport | null = result.success && result.bytes
-      ? { familyName, fileName: result.fileName ?? `${familyName}.otf`, revision, fileSize: result.fileSize ?? result.bytes.byteLength, at: Date.now(), skippedChars, bytes: result.bytes, from: origin }
+      ? { familyName, fileName: result.fileName ?? `${familyName}.otf`, revision, fileSize: result.fileSize ?? result.bytes.byteLength, at: Date.now(), skippedChars, bytes: result.bytes, from: origin, sample: get().sampleSentence }
       : null
     set({
       progress: '',

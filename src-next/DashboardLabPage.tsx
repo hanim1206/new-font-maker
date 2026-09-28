@@ -46,7 +46,6 @@ const SECTIONS: { id: SectionId; label: string }[] = [
 ]
 /** 레이아웃 6칸 대표 글자 — 세로홀자 · 가로홀자 · 섞임홀자 × 받침 유무. */
 const LAYOUT_SAMPLES = ['래', '노', '화', '별', '을', '원'] as const
-const SENTENCE = '포도밭에 햇살이 쏟아졌다'
 const FINALS = JONGSEONG_LIST.filter((char) => char !== '')
 
 const isHangul = (char: string) => { const code = char.codePointAt(0) ?? 0; return code >= 0xac00 && code <= 0xd7a3 }
@@ -155,7 +154,9 @@ function FontCard({ name, note, onRename, onDuplicate, onDelete }: {
   /** 없으면(계정 폰트를 안 연 랩 화면) 삭제를 흐리게. */
   onDelete?: () => void
 }) {
-  const [sentence, setSentence] = useState(SENTENCE)
+  // 문장은 추출 상점에 둔다 — 여기서 받으면 완료 페이지가 같은 문장을 진짜 폰트로 쓴다.
+  const sentence = useFontExportStore((state) => state.sampleSentence)
+  const setSentence = useFontExportStore((state) => state.setSampleSentence)
   return <article className={styles.card}>
     <header>
       <strong>{name}</strong><span>{note}</span>
