@@ -86,7 +86,7 @@ function FeedbackHome() {
         {count > 0 ? <>지금까지 의견을<br /><em>{count}개</em> 보냈어요</> : <>피드백은<br />언제나 환영해요</>}
       </h1>
       <p className={styles.mineHint}>
-        {count > 0 && '피드백은 언제나 환영해요. '}화면 위 <span className={styles.reportIcon} aria-label="제보 단추"><MessageSquareWarning size={12} aria-hidden="true" /></span> 를 누르면 그 화면에 대해 보낼 수 있어요.
+        {count > 0 && <>피드백은 언제나 환영해요.<br /></>}화면 위 <span className={styles.reportIcon} aria-label="제보 단추"><MessageSquareWarning size={12} aria-hidden="true" /></span> 를 누르면 그 화면에 대해 보낼 수 있어요.
       </p>
       {count > 0 && <ul className={styles.mine}>
         {threads!.map((thread) => {
