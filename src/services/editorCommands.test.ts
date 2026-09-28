@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { JamoData } from '../types'
-import { moveHandle, movePoint, moveStroke, scaleStroke } from './editorCommands'
+import { moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStroke } from './editorCommands'
 
 const baseJamo: JamoData = {
   char: 'ㄱ',
@@ -138,5 +138,44 @@ describe('scaleStroke', () => {
 
   it('100% 요청은 변경을 만들지 않는다', () => {
     expect(scaleStroke(baseJamo, 'ㄱ-1', { x: 1, y: 1 }).changed).toBe(false)
+  })
+})
+
+describe('scaleJamoStrokes', () => {
+  const twoChannels: JamoData = {
+    char: 'ㅘ',
+    type: 'jungseong',
+    horizontalStrokes: [{ id: 'h', points: [{ x: 0.2, y: 0.8 }, { x: 0.6, y: 0.8 }], closed: false, thickness: 0.07 }],
+    verticalStrokes: [{ id: 'v', points: [{ x: 0.8, y: 0.2 }, { x: 0.8, y: 0.8 }], closed: false, thickness: 0.07 }],
+  }
+
+  it('자소 전체를 중심선 범위 가운데를 기준으로 키우고 두께는 그대로 둔다', () => {
+    const scaled = scaleJamoStrokes(baseJamo, 1.5)
+    const stroke = scaled.strokes![0]
+    expect(stroke.points[0].x).toBeCloseTo(0.05)
+    expect(stroke.points[0].y).toBeCloseTo(0.05)
+    expect(stroke.points[2].x).toBeCloseTo(0.95)
+    expect(stroke.points[2].y).toBeCloseTo(0.95)
+    expect(stroke.points[1].handleOut!.x).toBeCloseTo(1.025)
+    expect(stroke.thickness).toBe(0.07)
+    expect(baseJamo.strokes![0].points[0].x).toBe(0.2)
+  })
+
+  it('가로 · 세로 채널을 한 가운데로 함께 키운다(이음새가 안 벌어진다)', () => {
+    const scaled = scaleJamoStrokes(twoChannels, 2)
+    expect(scaled.horizontalStrokes![0].points[1]).toMatchObject({ x: expect.closeTo(0.7), y: expect.closeTo(1.1) })
+    expect(scaled.verticalStrokes![0].points[1]).toMatchObject({ x: expect.closeTo(1.1), y: expect.closeTo(1.1) })
+  })
+
+  it('상자 밖으로 넘쳐도 막지 않고, 틀은 건드리지 않는다', () => {
+    const framed: JamoData = { ...baseJamo, frame: { strokes: structuredClone(baseJamo.strokes) } }
+    const scaled = scaleJamoStrokes(framed, 2)
+    expect(scaled.strokes![0].points[0].x).toBeCloseTo(-0.1)
+    expect(scaled.frame!.strokes![0].points[0].x).toBe(0.2)
+  })
+
+  it('배율 1이나 잘못된 배율이면 그대로 돌려준다', () => {
+    expect(scaleJamoStrokes(baseJamo, 1)).toEqual(baseJamo)
+    expect(scaleJamoStrokes(baseJamo, 0)).toEqual(baseJamo)
   })
 })

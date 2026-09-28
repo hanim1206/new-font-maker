@@ -257,3 +257,42 @@ test('획 편집 `초기화`는 한 번 묻고 고친 자소를 프리셋으로 
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
   await expect(strokes).toHaveCount(before + 1)
 })
+
+test('트랙패드 왼쪽 크기 막대를 올리면 고른 자소가 통째로 커지고, 손을 떼면 손잡이가 가운데로 돌아온다', async ({ page }) => {
+  await page.goto('/workspace/jamo?mode=stroke')
+  const editor = page.getByRole('region', { name: /완성 글자 편집/ })
+  const focusSvg = editor.locator('svg')
+  const strokeHit = focusSvg.locator('[data-editor-hit="stroke"]').first()
+  await strokeHit.dispatchEvent('pointerdown')
+  await strokeHit.dispatchEvent('pointerdown')
+  await expect(focusSvg.locator('[data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(1)
+
+  const slider = page.getByTestId('jamo-scale-slider')
+  await expect(slider).toBeVisible()
+  await expect(slider).toHaveAttribute('aria-disabled', 'false')
+  // 중심선 크기(getBBox)로 잰다. 화면 상자는 겨냥용 굵기가 얹혀 비율이 흐려진다.
+  const centerlines = () => focusSvg.locator('[data-editor-hit="stroke"]').evaluateAll((elements) => elements.map((element) => {
+    const box = (element as SVGGraphicsElement).getBBox()
+    return { width: box.width, height: box.height }
+  }))
+  const before = await centerlines()
+  const track = await slider.boundingBox()
+  expect(track).toBeTruthy()
+
+  // 가운데에서 위로 끝까지 = 130%. 끄는 동안 배율이 보인다.
+  await page.mouse.move(track!.x + track!.width / 2, track!.y + track!.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(track!.x + track!.width / 2, track!.y - 20, { steps: 8 })
+  await expect(slider).toHaveAttribute('aria-valuenow', '130')
+  await expect(slider.locator('output')).toHaveText('130%')
+  await page.mouse.up()
+
+  // 놓으면 저장되고(실행 취소 켜짐) 손잡이는 가운데(100%)로 돌아온다.
+  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
+  await expect(slider).toHaveAttribute('aria-valuenow', '100')
+  // 고른 자소(첫 자소의 두 획)는 1.3배, 다른 자소 획은 그대로. 굵기는 안 바뀐다.
+  const after = await centerlines()
+  expect(after[0].width).toBeCloseTo(before[0].width * 1.3, 1)
+  expect(after[0].height).toBeCloseTo(before[0].height * 1.3, 1)
+  expect(after.slice(2)).toEqual(before.slice(2))
+})

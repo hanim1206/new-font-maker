@@ -27,7 +27,8 @@ import { useWorkbenchStore, workbenchJamoOf, workbenchSyllable } from '../src/st
 import { groupMatching, useJamoGroupStore } from '../src/stores/jamoGroupStore'
 import confirmStyles from './workspace/FontExportDialog.module.css'
 import { useLayoutStore } from '../src/stores/layoutStore'
-import { moveHandle, movePoint, moveStroke, scaleStroke } from '../src/services/editorCommands'
+import { moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStroke } from '../src/services/editorCommands'
+import { JamoScaleSlider } from './JamoScaleSlider'
 import { scaleLayoutParts, translateLayoutParts } from '../src/services/layoutProfileCommands'
 import { getRenderedStrokeTargets } from '../src/services/mobileEditorContext'
 import { LayoutContextCards } from './LayoutContextCards'
@@ -1352,6 +1353,29 @@ function InferenceTrackpad({
     const nextStrokeId = selection.kind === 'stroke' ? getJamoStrokes(after)[0]?.id : selectedStroke.id
     onSelectionChange(nextStrokeId ? { ...selection, kind: 'stroke', strokeId: nextStrokeId, jamo: after } : { kind: 'none' })
   }
+  // 트랙패드 왼쪽 크기 막대. 지금 자소(고른 것, 없으면 잠긴 것)를 통째로 키운다. 두께는 전역 굵기 그대로.
+  // 넘친 만큼은 상자 밖으로 그대로 나가야 하므로 문맥 간격 되당김을 얹지 않는다(`pastGapLimit`).
+  const scaleSource = useRef<JamoData | null>(null)
+  const beginJamoScale = () => {
+    const base = creationBase
+    scaleSource.current = base ? structuredClone(adoptFamilyStrokes(getJamo(base.jamo.type, base.jamo.char) ?? base.jamo, familyOfSyllable(syllable))) : null
+  }
+  const changeJamoScale = (factor: number) => {
+    const source = scaleSource.current
+    if (!source) return
+    onPreviewJamo({ type: source.type, char: source.char, data: scaleJamoStrokes(source, factor), baseline: source, pastGapLimit: true })
+  }
+  const commitJamoScale = (factor: number) => {
+    const source = scaleSource.current
+    const base = creationBase
+    scaleSource.current = null
+    if (!source || !base) return onPreviewJamo(null)
+    onCommitJamo(source, scaleJamoStrokes(source, factor), { kind: 'stroke-scale', glyph, component: base.component, jamoType: source.type, strokeId: base.strokeId, scale: { x: factor, y: factor } }, { pastGapLimit: true })
+  }
+  const cancelJamoScale = () => {
+    scaleSource.current = null
+    onPreviewJamo(null)
+  }
   // ⌘C · ⌘V(Ctrl) = `복사` · `붙여넣기` 단추. 입력칸에서는 글자 복사에 맡긴다.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1492,6 +1516,7 @@ function InferenceTrackpad({
         <button type="button" hidden onClick={resetFrame} disabled={!liveJamo?.frame} data-testid="jamo-frame-reset">틀 다시 맞추기</button>
         {/* 트랙패드가 남는 세로를 다 먹고, 도구 단추는 그 오른쪽에 2열로 선다(단추 줄이 차지하던 세로를 트랙패드에 준다). */}
         <div className={styles.strokeWorkRow}>
+          <JamoScaleSlider disabled={!creationBase} onStart={beginJamoScale} onChange={changeJamoScale} onCommit={commitJamoScale} onCancel={cancelJamoScale} />
           {/* 섬세한 편집용 조절판. 손가락이 글자를 가리지 않고, 1px이 1u라 캔버스 끌기보다 잘게 옮긴다. */}
           <div
             {...trackpad.handlers}

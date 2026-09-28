@@ -222,6 +222,35 @@ export function scaleStroke(
   return { jamo, scale, changed: true, lockedAxes }
 }
 
+/**
+ * 자소 전체를 같은 비율로 키우고 줄인다. 모든 채널의 점 · 핸들을 중심선 범위의 가운데를 기준으로 옮기고, 두께는 그대로 둔다.
+ * 상자 경계로 막지 않는다 — 틀이 상자를 붙잡으니 넘친 만큼 상자 밖으로 나간다.
+ */
+export function scaleJamoStrokes(source: JamoData, factor: number): JamoData {
+  const jamo = cloneJamoData(source)
+  const strokes = [
+    ...(jamo.strokes ?? []),
+    ...(jamo.horizontalStrokes ?? []),
+    ...(jamo.verticalStrokes ?? []),
+    ...Object.values(jamo.contextStrokes ?? {}).flatMap((variant) => variant ?? []),
+  ]
+  const points = strokes.flatMap((stroke) => stroke.points)
+  if (!points.length || !Number.isFinite(factor) || factor <= 0 || Math.abs(factor - 1) < EPSILON) return jamo
+  const xs = points.map((point) => point.x)
+  const ys = points.map((point) => point.y)
+  const center = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 }
+  const transform = (point: { x: number; y: number }) => {
+    point.x = center.x + (point.x - center.x) * factor
+    point.y = center.y + (point.y - center.y) * factor
+  }
+  for (const point of points) {
+    transform(point)
+    if (point.handleIn) transform(point.handleIn)
+    if (point.handleOut) transform(point.handleOut)
+  }
+  return jamo
+}
+
 export function formatMoveSummary(delta: StrokeMoveDelta): string {
   const horizontal = Math.abs(delta.x) < EPSILON
     ? ''
