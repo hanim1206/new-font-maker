@@ -13,13 +13,13 @@ import styles from './ReportButton.module.css'
 /**
  * 머리의 제보 단추(마이페이지 왼쪽). 누르면 그 자리에서 아래 판이 올라와 "이 화면"에 대해 쓴다.
  * 판 맨 위에 누른 화면 · 폰트 · 기기를 태그로 박아 두고(친구는 못 고친다) 갈래 태그를 하나 고른다.
- * 모양은 머리마다 달라 `className`을 받는다.
+ * 크기는 머리마다 달라 `className`을 받고, 색(연한 빨강 바탕 · 빨간 아이콘) · 둥글기는 여기서 덮는다.
  */
 export function ReportButton({ className }: { className?: string }) {
   const [context, setContext] = useState<FeedbackContext | null>(null)
   return <>
-    <button type="button" className={className} aria-label="이 화면 제보하기" title="이 화면 제보하기" onClick={() => setContext(feedbackContextOf(window.location.pathname))} data-testid="report-open">
-      <MessageSquareWarning size={20} aria-hidden="true" />
+    <button type="button" className={`${styles.trigger} ${className ?? ''}`} aria-label="이 화면 제보하기" title="이 화면 제보하기" onClick={() => setContext(feedbackContextOf(window.location.pathname))} data-testid="report-open">
+      <MessageSquareWarning size={16} aria-hidden="true" />
     </button>
     {context && createPortal(<ReportSheet context={context} onClose={() => setContext(null)} />, document.body)}
   </>

@@ -1,3 +1,7 @@
+/* 머리 단추. 머리마다 단추 규칙(투명 바탕 · 회색 아이콘)이 있어 두 번 적어 이긴다. */
+button.trigger.trigger { width: 32px; height: 32px; min-height: 32px; padding: 0; display: grid; place-items: center; align-self: center; border: 0; background: rgb(253 236 233); color: rgb(214 50 31); border-radius: 10px; }
+button.trigger.trigger:active { background: rgb(250 214 208); }
+
 /* 제보 판. 대시보드 더보기 판(`menuSheet`)과 같은 둥근 떠 있는 판. */
 .layer { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center; background: rgb(0 0 0 / .36); animation: fadeIn var(--motion-normal) var(--ease-standard); }
 .layer[data-closing] { animation: fadeOut 240ms var(--ease-standard) forwards; }
