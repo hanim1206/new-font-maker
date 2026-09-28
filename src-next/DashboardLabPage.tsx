@@ -26,6 +26,7 @@ import { useContextPlacement } from './notoModel'
 import { ExportNoticeToast } from './workspace/WorkspaceChrome'
 import { PART_COLOR } from './partColors'
 import { randomSampleSentence } from './sampleSentences'
+import { ReportButton } from './ReportButton'
 import styles from './DashboardLabPage.module.css'
 
 /**
@@ -578,6 +579,7 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
     <header className={styles.homeHead}>
       <button type="button" className={styles.back} aria-label="대시보드" onClick={() => navigate('/dashboard')}><ChevronLeft size={22} aria-hidden="true" /></button>
       <h2>고칠 {JAMO_LABEL[type]}</h2>
+      <ReportButton className={styles.homeReport} />
     </header>
     <div className={styles.homeScroll} data-locked={sheet ? true : undefined}>
       <div className={styles.chips} role="tablist" aria-label="묶기">
@@ -887,6 +889,7 @@ export function DashboardLabPage() {
             <span>{fontList.movingTo ?? name}</span>{fontList.canList && <ChevronDown size={18} aria-hidden="true" data-open={sheetOpen || undefined} />}
           </button>
         </h1>
+        <ReportButton className={styles.avatar} />
         <AccountButton />
       </header>
 

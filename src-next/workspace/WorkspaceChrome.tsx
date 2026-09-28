@@ -7,6 +7,7 @@ import { useWorkbenchStore } from '../../src/stores/workbenchStore'
 import { navigate, onLinkClick } from '../router'
 import { useHistoryShortcuts } from './keyboardShortcuts'
 import { SaveToast } from './SaveToast'
+import { ReportButton } from '../ReportButton'
 import styles from './WorkspaceChrome.module.css'
 
 /** 폰트 덱의 화면 셋. 하단 탭은 없다 — 입구는 대시보드(스타일 · 레이아웃 · 섹션 홈 · 검수)가 맡는다. */
@@ -69,11 +70,15 @@ export function MobileWorkspaceShell({
             : <div className={styles.projectIdentity}>
               <strong>{title}</strong>
             </div>}
-          {(!heading || history) && <div className={styles.headerActions} aria-label="프로젝트 편집 기록">
+          {/* 제보는 모든 머리에. 편집 기록을 안 넘긴 보기 전용 화면(검수 · 완성)은 되돌리기만 뺀다. */}
+          <div className={styles.headerActions} aria-label="머리 도구">
             {tools}
-            <button type="button" disabled={!history?.canUndo} onClick={history?.onUndo} aria-label="형태 편집 실행 취소"><Undo2 size={18} /></button>
-            <button type="button" disabled={!history?.canRedo} onClick={history?.onRedo} aria-label="형태 편집 다시 실행"><Redo2 size={18} /></button>
-          </div>}
+            <ReportButton />
+            {(!heading || history) && <>
+              <button type="button" disabled={!history?.canUndo} onClick={history?.onUndo} aria-label="형태 편집 실행 취소"><Undo2 size={18} /></button>
+              <button type="button" disabled={!history?.canRedo} onClick={history?.onRedo} aria-label="형태 편집 다시 실행"><Redo2 size={18} /></button>
+            </>}
+          </div>
         </header>
 
         {/* 내용 자리. 머리 아래를 다 쓰고, `cover`가 이 자리만 덮는다. */}

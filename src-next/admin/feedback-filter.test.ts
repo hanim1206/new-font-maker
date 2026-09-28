@@ -36,3 +36,10 @@ describe('의견 검색 · 필터', () => {
     expect(matchesFeedback(readOnly, { ...EMPTY_FEEDBACK_FILTER, friend: 'u2' }, null)).toBe(true)
   })
 })
+
+describe('제보 판 태그 검색', () => {
+  const [reported] = threadsOf([message('d', 'd', 'friend', 'ㄲ이 뚱뚱해요', { context: { path: '/workspace/review', screen: '검수', tag: 'odd', font: null, fontId: 'f1', device: 'Mac · Chrome', build: 'x' } })])
+  it('화면 이름 · 갈래 태그로도 찾는다', () => {
+    expect(matchesFeedback(reported, { ...EMPTY_FEEDBACK_FILTER, query: '검수 이상해' }, null)).toBe(true)
+  })
+})

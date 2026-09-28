@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { ArrowUp, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useUIStore } from '../src/stores/uiStore'
 import { FONT_LIMIT } from './accountFont'
 import { listFonts } from './accountFontApi'
 import { authGateMode, signOutAndReload } from './betaAuth'
-import { deviceOf, FEEDBACK_MAX_LENGTH, hasUnseenReply, markSeen, readSeen, STATUS_LABEL, threadsOf, whenText } from './feedback'
-import type { FeedbackContext, FeedbackMessage } from './feedback'
+import { FEEDBACK_MAX_LENGTH, hasUnseenReply, markSeen, readSeen, STATUS_LABEL, threadsOf, whenText } from './feedback'
+import type { FeedbackMessage } from './feedback'
+import { feedbackContextOf } from './feedbackContext'
 import { sendFeedback } from './feedbackApi'
 import { useMe, useThreads } from './useFeedback'
 import { navigate, previousPathname } from './router'
@@ -18,16 +18,8 @@ import styles from './AccountPage.module.css'
  * 게이트가 꺼진 개발 서버는 계정 대신 `local`이고 의견은 이 기기(localStorage)에 남는다.
  */
 
-/** 보낸 자리. 계정 페이지는 거쳐 가는 곳이라 그 앞 화면을 적는다. 빌드는 진입 번들 이름(해시)으로 가린다. */
-function contextNow(): FeedbackContext {
-  const entry = document.querySelector<HTMLScriptElement>('script[type="module"][src*="/assets/"]')?.src
-  return {
-    path: previousPathname() ?? '/dashboard',
-    font: useUIStore.getState().currentProjectName,
-    device: deviceOf(navigator.userAgent),
-    build: entry ? entry.split('/').pop()!.replace(/\.js$/, '') : 'dev',
-  }
-}
+/** 보낸 자리. 계정 페이지는 거쳐 가는 곳이라 그 앞 화면을 적는다. */
+const contextNow = () => feedbackContextOf(previousPathname() ?? '/dashboard')
 
 function Bar({ back, title }: { back: string; title?: string }) {
   return <header className={styles.bar}>

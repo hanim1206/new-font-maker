@@ -1,3 +1,4 @@
+import { REPORT_TAG_LABEL } from '../feedback'
 import type { FeedbackMessage, FeedbackThread } from '../feedback'
 
 export type AdminMessage = FeedbackMessage & { userId: string }
@@ -17,7 +18,7 @@ export const isPending = (thread: FeedbackThread) => {
 
 export const userOf = (thread: FeedbackThread) => (thread.first as AdminMessage).userId
 
-/** 검색어는 대화 글 · 친구 닉네임 · 보낸 자리(폰트 · 화면 · 기기)에서 찾는다. 띄어 쓴 말은 모두 들어 있어야 한다. */
+/** 검색어는 대화 글 · 친구 닉네임 · 보낸 자리(폰트 · 경로 · 화면 이름 · 기기 · 갈래 태그)에서 찾는다. 띄어 쓴 말은 모두 들어 있어야 한다. */
 export function matchesFeedback(thread: FeedbackThread, filter: FeedbackFilter, nickname: string | null): boolean {
   if (filter.friend !== 'all' && userOf(thread) !== filter.friend) return false
   if (filter.status === 'pending' && !isPending(thread)) return false
@@ -27,7 +28,10 @@ export function matchesFeedback(thread: FeedbackThread, filter: FeedbackFilter, 
   if (words.length === 0) return true
   const haystack = [
     nickname ?? '',
-    ...thread.messages.flatMap((message) => [message.body, message.context?.font ?? '', message.context?.path ?? '', message.context?.device ?? '']),
+    ...thread.messages.flatMap((message) => [
+      message.body, message.context?.font ?? '', message.context?.path ?? '', message.context?.device ?? '',
+      message.context?.screen ?? '', message.context?.tag ? REPORT_TAG_LABEL[message.context.tag] : '',
+    ]),
   ].join('\n').toLowerCase()
   return words.every((word) => haystack.includes(word))
 }

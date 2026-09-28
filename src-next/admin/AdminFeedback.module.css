@@ -34,3 +34,10 @@
 .feedbackChat p { max-width: 85%; margin: 0; padding: 8px 12px; border-radius: 14px; background: rgb(var(--color-surface)); font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .feedbackChat li[data-author='hanim'] p { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 .feedbackChat small { color: rgb(var(--color-text-5)); font-size: 11.5px; }
+
+/* 제보 판에서 온 의견: 화면 이름 · 갈래 태그(제보 판과 같은 글자색). */
+.feedbackScreen, .feedbackTag { padding: 1px 8px; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-2)); font-size: 11.5px; font-style: normal; font-weight: 700; }
+.feedbackTag[data-tag='broken'] { background: rgb(253 236 233); color: rgb(214 50 31); }
+.feedbackTag[data-tag='odd'] { background: rgb(255 243 224); color: rgb(196 100 0); }
+.feedbackTag[data-tag='wish'] { background: rgb(232 240 255); color: rgb(35 88 201); }
+.feedbackTag[data-tag='praise'] { background: rgb(228 245 235); color: rgb(22 128 72); }

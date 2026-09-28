@@ -5,8 +5,48 @@
 
 export type FeedbackAuthor = 'friend' | 'hanim'
 
-/** 보낸 자리. 한임이 상황을 다시 그려 보는 데 쓴다. */
-export interface FeedbackContext { path: string; font: string | null; device: string; build: string }
+/** 제보 태그. 친구가 판에서 하나 고른다(안 골라도 된다). 글자색으로 갈래를 바로 알아보게. */
+export type ReportTag = 'broken' | 'odd' | 'wish' | 'praise' | 'other'
+export const REPORT_TAGS: { key: ReportTag; label: string }[] = [
+  { key: 'broken', label: '안 돼요' },
+  { key: 'odd', label: '이상해 보여요' },
+  { key: 'wish', label: '이러면 좋겠어요' },
+  { key: 'praise', label: '잘했어요' },
+  { key: 'other', label: '기타' },
+]
+export const REPORT_TAG_LABEL = Object.fromEntries(REPORT_TAGS.map((tag) => [tag.key, tag.label])) as Record<ReportTag, string>
+
+/**
+ * 보낸 자리. 한임이 상황을 다시 그려 보는 데 쓴다.
+ * `fontId` · `screen` · `tag`는 09-28부터 — 그 전 의견에는 없다. `fontId`는 그 친구의 어느 폰트인지(재현 화면이 연다).
+ */
+export interface FeedbackContext {
+  path: string
+  font: string | null
+  device: string
+  build: string
+  fontId?: string | null
+  /** 화면 이름(`screenOf`). */
+  screen?: string
+  tag?: ReportTag | null
+}
+
+const JAMO_SCREEN: Record<string, string> = { choseong: '초성', jungseong: '중성', jongseong: '종성' }
+
+/** 경로 → 친구가 읽는 화면 이름. 제보 판 맨 위 태그와 관리자 목록에 쓴다. */
+export function screenOf(pathname: string): string {
+  const path = pathname.replace(/\/+$/, '') || '/'
+  if (path === '/') return '문장 보정'
+  if (path === '/dashboard' || path === '/fonts') return '대시보드'
+  if (path.startsWith('/dashboard/')) return `고칠 ${JAMO_SCREEN[path.split('/')[2]] ?? '자소'}`
+  if (path === '/workspace/font/export') return '폰트 완성'
+  if (path === '/workspace/font') return '스타일'
+  if (path.startsWith('/workspace/review')) return '검수'
+  if (path.startsWith('/workspace/jamo')) return '자소 편집'
+  if (path.startsWith('/workspace')) return '편집'
+  if (path.startsWith('/account')) return '마이페이지'
+  return path
+}
 
 export interface FeedbackMessage {
   id: string

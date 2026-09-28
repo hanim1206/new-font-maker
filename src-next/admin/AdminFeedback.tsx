@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { threadsOf, whenText } from '../feedback'
+import { REPORT_TAG_LABEL } from '../feedback'
 import type { FeedbackThread } from '../feedback'
 import { Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -70,7 +71,11 @@ export function AdminFeedback({ hidden, onPending }: { hidden: boolean; onPendin
     const context = [...thread.messages].reverse().find((message) => message.author === 'friend')?.context
     return <li key={thread.id} className={styles.feedbackItem} data-past={!isPending(thread) || undefined}>
       <button type="button" className={styles.feedbackHead} aria-expanded={expanded} onClick={() => toggle(thread.id)} data-testid="admin-feedback-thread">
-        <span><strong>{nameOf(thread)}</strong>{whenText(thread.updatedAt, new Date(), true)}{thread.status === 'replied' && ' · 답장함'}</span>
+        <span>
+          <strong>{nameOf(thread)}</strong>{whenText(thread.updatedAt, new Date(), true)}{thread.status === 'replied' && ' · 답장함'}
+          {thread.first.context?.screen && <em className={styles.feedbackScreen}>{thread.first.context.screen}</em>}
+          {thread.first.context?.tag && <em className={styles.feedbackTag} data-tag={thread.first.context.tag}>{REPORT_TAG_LABEL[thread.first.context.tag]}</em>}
+        </span>
         <p>{thread.first.body}</p>
       </button>
       {expanded && <div className={styles.feedbackOpen}>
@@ -80,7 +85,7 @@ export function AdminFeedback({ hidden, onPending }: { hidden: boolean; onPendin
             <small>{message.author === 'hanim' ? '한임 · ' : ''}{whenText(message.createdAt, new Date(), true)}</small>
           </li>)}
         </ol>}
-        {context && <p className={styles.feedbackMeta}>{context.device} · 폰트 {context.font ? `"${context.font}"` : '없음'} · {context.path} · {context.build}</p>}
+        {context && <p className={styles.feedbackMeta}>{context.screen ?? context.path} · {context.device} · 폰트 {context.font ? `"${context.font}"` : '없음'}{context.fontId ? ` (${context.fontId.slice(0, 8)})` : ' (id 없음)'} · {context.path} · {context.build}</p>}
         <textarea value={draft} placeholder="답장" aria-label="답장" onChange={(event) => setDraft(event.target.value)} data-testid="admin-feedback-reply" />
         <nav>
           {isPending(thread) && <button type="button" disabled={busy} onClick={() => void act('PATCH', thread.id)}>읽음만</button>}
