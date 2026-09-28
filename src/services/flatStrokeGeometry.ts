@@ -1,6 +1,7 @@
 import type { BoxConfig, StrokeDataV2, StrokeLinecap, StrokeLinejoin } from '../types'
 import { flattenStrokeCenterlineWithAnchors } from './brushGeometry'
 import type { BrushContour, BrushInkGroup, BrushPoint } from './brushGeometry'
+import { flatGroupsOverlap, inflateFlatCenterline } from './flatStrokeSelfOverlap'
 
 /**
  * 끝이 일자인 획(butt·square 캡, miter·bevel 조인)을 면으로 만든다.
@@ -451,7 +452,11 @@ export function strokeToFlatInkGroups(
     // 안쪽은 반폭을 넘어서도 굴린다(최대 3배). 이웃 변 길이 한도(45%)에 걸려 자연히 멈춘다.
     ? { radius: Math.min(1, Math.max(0, roundness)) * thickness / 2, innerRadius: Math.min(INNER_ROUNDNESS_MAX, Math.max(0, inner)) * thickness / 2, anchors: anchorIndices }
     : undefined
-  return polylineToFlatInkGroups(points, stroke.closed, thickness, cap, join, roundVertices, rounding, contrast !== 0 ? contrastWidthOf(contrast) : undefined, curvedSegments)
+  const groups = polylineToFlatInkGroups(points, stroke.closed, thickness, cap, join, roundVertices, rounding, contrast !== 0 ? contrastWidthOf(contrast) : undefined, curvedSegments)
+  // 곡선이 반폭보다 급하게 꺾여 윤곽이 스스로 겹치면 쐐기가 뚫리고 최종 잉크가 그 획을 거부한다. 그때만 Clipper2 오프셋으로 다시 만든다.
+  if (!flatGroupsOverlap(groups)) return groups
+  const inflated = inflateFlatCenterline(points, stroke.closed, thickness, cap, join, rounding !== undefined)
+  return inflated.length ? inflated : groups
 }
 
 /** 대비 +1(세로 굵게)에서 세로 반폭이 느는 비율과 가로 반폭이 주는 비율. 1.8 : 0.55 ≈ 3.3 : 1. 세로 굵게 쪽이 훨씬 깊다(09-25 사용자). */
