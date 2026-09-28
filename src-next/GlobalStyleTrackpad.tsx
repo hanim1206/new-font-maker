@@ -12,6 +12,11 @@ const TABS: { id: GlobalStylePanel; label: string; short: string; picto: StylePi
   { id: 'brush', label: '획', short: '획', picto: 'weight' },
   { id: 'beak', label: '부리', short: '부리', picto: 'beak' },
 ]
+/**
+ * 스타일 화면에서 잠근 탭. 네모꼴은 문장 · OTF만 따르고 레이아웃 캔버스 · 카드 · 보선은 아직 모른다 —
+ * 바꾸면 편집 화면과 어긋나서 플랜이 끝날 때까지 막는다(09-28 사용자). 이미 바꾼 값은 그대로 둔다. 옛 단독 화면은 그대로.
+ */
+const LOCKED: readonly GlobalStylePanel[] = ['body']
 
 export function GlobalStyleTrackpad({
   panel,
@@ -34,9 +39,12 @@ export function GlobalStyleTrackpad({
   /** 폰트 탭처럼 패널이 화면 자체인 곳은 닫기가 없다. 그런 곳은 머리 글줄도 없고, 탭이 화면 아래에 그림과 함께 붙는다. */
   closable?: boolean
 }) {
+  const locked = (id: GlobalStylePanel) => !closable && LOCKED.includes(id)
+  // 잠긴 탭으로 열리면(기본 탭 · 옛 상태) 첫 번째 열린 탭을 보인다.
+  const shown = locked(panel) ? TABS.find((tab) => !locked(tab.id))!.id : panel
   const tabs = <div className={`${mode.tabs} ${closable ? '' : mode.dock}`} role="tablist" aria-label="글로벌 스타일 항목">
-    {TABS.map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={panel === tab.id} onClick={() => onPanelChange(tab.id)}>
-      {closable ? tab.label : <><StylePicto kind={tab.picto} /><span>{tab.short}</span></>}
+    {TABS.map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={shown === tab.id} disabled={locked(tab.id)} data-locked={locked(tab.id) || undefined} onClick={() => onPanelChange(tab.id)}>
+      {closable ? tab.label : <><StylePicto kind={tab.picto} /><span>{tab.short}</span>{locked(tab.id) && <small>개발 중이에요</small>}</>}
     </button>)}
   </div>
   return (
@@ -48,7 +56,7 @@ export function GlobalStyleTrackpad({
         </header>}
 
         {closable && tabs}
-        {panel === 'body' ? bodyControls : panel === 'brush' ? brushControls : beakControls}
+        {shown === 'body' ? bodyControls : shown === 'brush' ? brushControls : beakControls}
         {!closable && tabs}
       </div>
     </section>

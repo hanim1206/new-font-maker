@@ -127,5 +127,9 @@ section.panel.fill > div { padding: 4px 24px calc(env(safe-area-inset-bottom) + 
 .tabs.dock button svg { width: 28px; height: 28px; opacity: .45; }
 .tabs.dock button[aria-selected='true'] { background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-weight: 700; box-shadow: 0 1px 3px rgb(0 0 0 / .1); }
 .tabs.dock button[aria-selected='true'] svg { opacity: 1; }
+/* 잠긴 탭(개발 중): 흐리게, 이름 아래 작은 안내. */
+.tabs.dock button[data-locked] { color: rgb(var(--color-text-6)); cursor: not-allowed; }
+.tabs.dock button[data-locked] svg { opacity: .25; }
+.tabs.dock button small { color: rgb(var(--color-text-5)); font-size: 10px; font-weight: 500; line-height: 1; }
 /* 탭 내용은 줄어들지 않는다 — 줄면 넘친 막대가 도크 자리(아래 여백) 밖으로 나가 스크롤로도 못 닿는다(낮은 창의 획 스타일). */
 .fill [role='tabpanel'] { flex: 0 0 auto; padding-bottom: calc(env(safe-area-inset-bottom) + 108px); }

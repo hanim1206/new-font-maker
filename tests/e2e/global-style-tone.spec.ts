@@ -26,7 +26,11 @@ test('폰트 탭이 글로벌 스타일 공간이다 — 늘 열려 있고 닫�
   await expect(page.getByTestId('jamo-layout-mode')).toHaveCount(0)
   await expect(page.getByTestId('focus-canvas')).toHaveCount(0)
   await expect(panel.getByRole('button', { name: '글로벌 스타일 설정 닫기' })).toHaveCount(0)
-  await expect(panel.getByRole('tablist', { name: '글로벌 스타일 항목' }).getByRole('tab')).toHaveText(['네모꼴', '획', '부리'])
+  const tabs = panel.getByRole('tablist', { name: '글로벌 스타일 항목' }).getByRole('tab')
+  await expect(tabs).toHaveText(['네모꼴개발 중이에요', '획', '부리'])
+  // 네모꼴은 잠겨 있다(레이아웃 캔버스가 아직 네모꼴을 모른다). 첫 화면은 `획`.
+  await expect(tabs.first()).toBeDisabled()
+  await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true')
 
   // 하단에 붙은 작은 패널이 아니라 화면 바닥까지 남은 높이를 다 쓴다(하단 탭은 없다).
   const box = await panel.boundingBox()
@@ -132,7 +136,8 @@ test('폰트 탭은 캔버스 없이 문장 줄이 한 줄 그대로 크게 자�
   await expect.poll(async () => (await glyph.boundingBox())?.height ?? 0).toBeLessThan(30)
 })
 
-test('글자 네모꼴은 막대 하나다: 길쭉 ↔ 노토 비율 ↔ 납작, 0점 근처에서 걸린다', async ({ page }) => {
+// 네모꼴 탭은 잠겨 있다(09-28). 레이아웃 캔버스 · 카드 · 보선이 네모꼴을 따르게 되면 푼다.
+test.fixme('글자 네모꼴은 막대 하나다: 길쭉 ↔ 노토 비율 ↔ 납작, 0점 근처에서 걸린다', async ({ page }) => {
   await page.goto(`/workspace/font?char=${encodeURIComponent('한')}`)
   const panel = page.getByRole('tabpanel', { name: '글자 네모꼴 설정' })
   await expect(panel.locator('input[type="range"]')).toHaveCount(1)
