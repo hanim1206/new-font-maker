@@ -117,7 +117,7 @@ export function renderMedialPart(part: MedialFitPart, railsEm?: Readonly<Record<
   const rendered: RenderedMedialPart = { slot: { ...placed.fit.slot }, railErrors: [] }
   if (part.jamo && part.medialJamo) {
     // 앱 획을 slot 네 변에 맞춘다. 못 맞추면(고친 획이 칸보다 큼 등) 상자만 남기고 이유를 돌려준다 — rail 자리는 여전히 유효.
-    const fitted = fitPartStrokes({ part: part.part, jamo: part.jamo, faces: boxToFaces(placed.fit.slot), glyphId: 'layout-editor', medialJamo: part.medialJamo, ends: style })
+    const fitted = fitPartStrokes({ part: part.part, jamo: part.jamo, faces: boxToFaces(placed.fit.slot), glyphId: 'layout-editor', medialJamo: part.medialJamo, ends: style, medialFit: placed.fit })
     const ink = fitted.ok ? inkOfComponentFit(fitted.fit, style) : fitted
     if (fitted.ok && ink.ok) { rendered.path = finalGlyphInkToSvgPath({ regions: ink.regions }, 1); rendered.inkBox = { ...fitted.fit.box } }
     else rendered.message = ink.ok ? undefined : ink.message

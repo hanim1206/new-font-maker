@@ -1,8 +1,10 @@
-import type { BoxConfig, DecomposedSyllable, DeepReadonly, JamoData, Part, StrokeLinecap, StrokeLinejoin } from '../types'
+import type { BoxConfig, DecomposedSyllable, DeepReadonly, JamoData, Part, StrokeDataV2, StrokeLinecap, StrokeLinejoin } from '../types'
 import { fitNotoComponent } from './notoComponentFit'
 import type { ComponentFaces, ComponentFitOutcome } from './notoComponentFit'
 import { medialInputFromPrediction } from './notoFitReport'
 import { applyMedialDelta } from './medialRailDelta'
+import { stemRailTargets } from './medialStemRails'
+import { placeStemStroke } from './stemBend'
 import type { SemanticDelta } from './medialRailDelta'
 import { applyRailEdits, applySlotFacesDelta, fitNotoMedialMaster, splitMixedMedialRoles } from './notoMedialMasterFit'
 import type { MedialFitInput, MedialFitResult } from './notoMedialMasterFit'
@@ -226,8 +228,18 @@ function jamoForPart(syllable: DeepReadonly<DecomposedSyllable> | undefined, par
  * 부품 하나의 앱 획을 네 변에 맞춘다. 칸 해석(문장 줄·획 편집)과 레이아웃 편집기가 **같은 호출**을 써서 캔버스 잉크 = 글자 잉크가 된다.
  * 홀자도 닿자와 같은 규칙이다. 혼합 홀자는 part가 가로부·세로부 획을 가른다.
  */
-export function fitPartStrokes(input: { part: Part; jamo: DeepReadonly<JamoData>; faces: ContextFaces; glyphId: string; medialJamo: string; ends?: StrokeEnds }): ComponentFitOutcome {
-  return fitNotoComponent({ part: input.part, jamo: input.jamo, channel: CHANNEL_OF[input.part], family: medialFamilyOf(input.medialJamo), faces: input.faces, glyphId: `${input.glyphId}:${input.part}`, globalLinecap: input.ends?.linecap, globalLinejoin: input.ends?.linejoin })
+export function fitPartStrokes(input: { part: Part; jamo: DeepReadonly<JamoData>; faces: ContextFaces; glyphId: string; medialJamo: string; ends?: StrokeEnds; medialFit?: MedialFitResult }): ComponentFitOutcome {
+  const fitted = fitNotoComponent({ part: input.part, jamo: input.jamo, channel: CHANNEL_OF[input.part], family: medialFamilyOf(input.medialJamo), faces: input.faces, glyphId: `${input.glyphId}:${input.part}`, globalLinecap: input.ends?.linecap, globalLinejoin: input.ends?.linejoin })
+  if (!fitted.ok || !input.medialFit || input.part === 'CH' || input.part === 'JO') return fitted
+  // 홀자: 이름 있는 줄기는 세로 끝점 · 높이를 보선에서 받고 휨은 em 그대로 — 글자 잉크(`resolveGlyphInkPrimitives`)와 같은 배치를 지난다.
+  const stems = stemRailTargets(input.medialJamo, input.part, input.medialFit, fitted.fit.box)
+  const box: BoxConfig = Object.keys(stems).length ? { ...fitted.fit.box, stems } : fitted.fit.box
+  const jamo = input.jamo as JamoData
+  const primitives = fitted.fit.primitives.map((primitive) => {
+    const placed = placeStemStroke(jamo, primitive.stroke as StrokeDataV2, box, primitive.source.channel === 'strokes' ? undefined : primitive.source.channel)
+    return { ...primitive, stroke: placed.stroke, box: { ...placed.box } }
+  })
+  return { ok: true, fit: { ...fitted.fit, primitives } }
 }
 
 /** 네 변 → 앱 획을 놓을 상자. 획이 있으면 잉크가 네 변에 닿도록 두께만큼 안쪽으로 다듬는다. */
@@ -279,5 +291,12 @@ export function resolveContextBoxes(input: {
 
   const boxes: Partial<Record<Part, BoxConfig>> = {}
   for (const part of parts) boxes[part.part] = { ...part.box }
+  // 홀자 이름 있는 줄기는 세로 끝점 · 높이를 보선에서 받는다. 칸 안 비율로 실어 렌더러 · 편집기가 같은 칸에서 읽는다.
+  for (const group of medial) {
+    const box = boxes[group.part]
+    if (!group.fit || !box) continue
+    const stems = stemRailTargets(identity.medialJamo, group.part, group.fit, box)
+    if (Object.keys(stems).length) boxes[group.part] = { ...box, stems }
+  }
   return { identity, parts, medial, issues, complete: issues.length === 0, boxes }
 }

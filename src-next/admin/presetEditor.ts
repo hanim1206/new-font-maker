@@ -115,13 +115,15 @@ function boxesOf(model: ContextModel, identity: ModelIdentity): number[] {
   const { boxes } = resolveContextBoxes({ identity, model })
   return Object.keys(boxes).sort().flatMap((part) => {
     const box = boxes[part as keyof typeof boxes]!
-    return [box.x, box.y, box.width, box.height]
+    // 홀자 줄기 목표(칸 안 비율)도 같이 본다. 안쪽 세로 보선은 칸 대신 이걸 바꾼다.
+    const stems = Object.keys(box.stems ?? {}).sort().flatMap((id) => [box.stems![id].top ?? 0, box.stems![id].bottom ?? 0, box.stems![id].center ?? 0])
+    return [box.x, box.y, box.width, box.height, ...stems]
   })
 }
 
 /**
  * 끌면 이 글자의 상자가 실제로 바뀌는 선만. 대푯값을 조금 흔들어 상자를 다시 풀어 본다.
- * 홀자 잉크는 앱 획을 홀자 칸 하나에 맞춰 그려서, 칸 안쪽 줄기 자리(ㅏ 곁줄기 높이 · ㅗ 짧은기둥 가로 자리 등)는 지금 잉크에 닿지 않는다.
+ * 홀자 이름 있는 줄기의 세로 끝점 · 높이(ㅏ 곁줄기 높이 등)는 보선에서 받아 잉크에 닿는다. 가로 자리(ㅗ 짧은기둥 가로 자리 등)는 아직 안 닿는다.
  * 그런 선을 띄우면 끌어도 획이 그대로라 캔버스에서 뺀다(표에는 남는다).
  */
 export function liveHandles(model: ContextModel, identity: ModelIdentity, handles: readonly PresetHandle[]): PresetHandle[] {
