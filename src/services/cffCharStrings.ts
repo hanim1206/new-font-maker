@@ -238,24 +238,29 @@ function readDict(bytes: Uint8Array, start: number, end: number): Map<number, Di
   return entries
 }
 
+const OP_CHARSET = 15
+const OP_ENCODING = 16
 const OP_CHARSTRINGS = 17
 const OP_PRIVATE = 18
 
 /**
- * opentype.js가 만든 CFF 표에서 CharStrings INDEX를 `charStrings`로 바꾼다.
- * opentype.js 배치(… charset · CharStrings · Private DICT로 끝)를 전제로 하고, 아니면 멈춘다.
- * Private 오프셋은 5바이트 정수(29)로 쓰여 있어 자리 길이가 바뀌지 않는다.
+ * opentype.js가 만든 CFF 표에서 CharStrings INDEX를 `charStrings`로, 빈 Global Subr INDEX를 `globalSubrs`로 바꾼다.
+ * opentype.js 배치(… Global Subr · charset · CharStrings · Private DICT로 끝)를 전제로 하고, 아니면 멈춘다.
+ * Top DICT 오프셋은 5바이트 정수(29)로 쓰여 있어 값만 바꿔도 자리 길이가 그대로다.
  */
-export function replaceCffTableCharStrings(cff: Uint8Array, charStrings: readonly Uint8Array[]): Uint8Array {
+export function replaceCffTableCharStrings(cff: Uint8Array, charStrings: readonly Uint8Array[], globalSubrs: readonly Uint8Array[] = []): Uint8Array {
   const headerSize = cff[2]
   const nameIndex = readIndex(cff, headerSize, false)
   const topDictIndex = readIndex(cff, nameIndex.end)
   if (topDictIndex.count !== 1) throw new Error('CFF Top DICT가 하나여야 합니다.')
+  const stringIndex = readIndex(cff, topDictIndex.end, false)
+  const globalSubrIndex = readIndex(cff, stringIndex.end, false)
   const [dictStart, dictEnd] = topDictIndex.items[0]
   const dict = readDict(cff, dictStart, dictEnd)
-  const charStringsOffset = dict.get(OP_CHARSTRINGS)?.[0]?.value
+  const charStringsOperand = dict.get(OP_CHARSTRINGS)?.[0]
   const privateOperands = dict.get(OP_PRIVATE)
-  if (charStringsOffset === undefined || !privateOperands || privateOperands.length !== 2) throw new Error('CFF Top DICT에 CharStrings · Private 자리가 없습니다.')
+  if (charStringsOperand === undefined || !privateOperands || privateOperands.length !== 2) throw new Error('CFF Top DICT에 CharStrings · Private 자리가 없습니다.')
+  const charStringsOffset = charStringsOperand.value
   const [privateSize, privateOffset] = privateOperands
   if (privateOffset.length !== 5) throw new Error('CFF Private 오프셋이 5바이트 정수가 아닙니다.')
 
@@ -265,27 +270,47 @@ export function replaceCffTableCharStrings(cff: Uint8Array, charStrings: readonl
     throw new Error('CFF 배치가 예상(CharStrings 뒤에 Private DICT로 끝)과 다릅니다.')
   }
 
+  // Global Subr INDEX: 비어 있던 자리(2바이트)를 갈아 끼우면 뒤따르는 구조가 모두 그만큼 밀린다.
+  const oldGlobalSubrs = cff.subarray(stringIndex.end, globalSubrIndex.end)
+  if (globalSubrs.length > 0 && globalSubrIndex.count !== 0) throw new Error('CFF에 이미 전역 서브루틴이 있습니다.')
+  const newGlobalSubrs = globalSubrs.length > 0 ? writeIndex(globalSubrs) : oldGlobalSubrs
+  const shift = newGlobalSubrs.length - oldGlobalSubrs.length
+  const shifted: DictOperand[] = [charStringsOperand]
+  for (const op of [OP_CHARSET, OP_ENCODING]) {
+    const operand = dict.get(op)?.[0]
+    // 0 · 1은 미리 정한 charset · encoding 번호라 오프셋이 아니다.
+    if (operand && operand.value > 1) shifted.push(operand)
+  }
+  if (shift !== 0 && shifted.some((operand) => operand.length !== 5)) throw new Error('CFF Top DICT 오프셋이 5바이트 정수가 아닙니다.')
+
   const index = writeIndex(charStrings)
   const privateDict = cff.subarray(privateOffset.value, privateOffset.value + privateSize.value)
-  const out = new Uint8Array(charStringsOffset + index.length + privateDict.length)
-  out.set(cff.subarray(0, charStringsOffset), 0)
-  out.set(index, charStringsOffset)
-  out.set(privateDict, charStringsOffset + index.length)
-  const newPrivateOffset = charStringsOffset + index.length
-  const at = privateOffset.at
-  out[at] = 29
-  out[at + 1] = (newPrivateOffset >> 24) & 255
-  out[at + 2] = (newPrivateOffset >> 16) & 255
-  out[at + 3] = (newPrivateOffset >> 8) & 255
-  out[at + 4] = newPrivateOffset & 255
+  const head = cff.slice(0, stringIndex.end)
+  const middle = cff.subarray(globalSubrIndex.end, charStringsOffset)
+  const out = new Uint8Array(head.length + newGlobalSubrs.length + middle.length + index.length + privateDict.length)
+  out.set(head, 0)
+  out.set(newGlobalSubrs, head.length)
+  out.set(middle, head.length + newGlobalSubrs.length)
+  const newCharStringsOffset = charStringsOffset + shift
+  out.set(index, newCharStringsOffset)
+  out.set(privateDict, newCharStringsOffset + index.length)
+  const writeInt32 = (at: number, value: number) => {
+    out[at] = 29
+    out[at + 1] = (value >> 24) & 255
+    out[at + 2] = (value >> 16) & 255
+    out[at + 3] = (value >> 8) & 255
+    out[at + 4] = value & 255
+  }
+  if (shift !== 0) for (const operand of shifted) writeInt32(operand.at, operand.value + shift)
+  writeInt32(privateOffset.at, newCharStringsOffset + index.length)
   return out
 }
 
-/** sfnt 파일의 `CFF ` 표를 진짜 CharStrings로 바꿔 다시 묶는다. 체크섬도 다시 맞춘다. */
-export function replaceCffCharStrings(buffer: ArrayBuffer, charStrings: readonly Uint8Array[]): ArrayBuffer {
+/** sfnt 파일의 `CFF ` 표를 진짜 CharStrings(와 전역 서브루틴)로 바꿔 다시 묶는다. 체크섬도 다시 맞춘다. */
+export function replaceCffCharStrings(buffer: ArrayBuffer, charStrings: readonly Uint8Array[], globalSubrs: readonly Uint8Array[] = []): ArrayBuffer {
   const file = readSfnt(buffer)
   const cff = file.tables.find((table) => table.tag === 'CFF ')
   if (!cff) throw new Error('CFF 표가 없습니다.')
-  cff.data = replaceCffTableCharStrings(cff.data, charStrings)
+  cff.data = replaceCffTableCharStrings(cff.data, charStrings, globalSubrs)
   return writeSfnt(file)
 }

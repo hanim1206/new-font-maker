@@ -40,6 +40,7 @@ import type { DeepReadonly } from '../types'
 import type { FinalGlyphInk } from './finalGlyphInk'
 import { projectFinalGlyphInkToFontContours } from './finalGlyphInk'
 import { compactGlyphForCff, replaceCffCharStrings } from './cffCharStrings'
+import { subroutinizeForExport } from './cffSubroutinizeRunner'
 import type { CompactGlyph } from './cffCharStrings'
 
 // ===== 타입 정의 =====
@@ -264,9 +265,14 @@ export function namingOf(identity: FontIdentity, revision = 0): OpenTypeNaming {
 }
 
 /** opentype.js 출력 → iOS 친화 OTF(Unicode cmap · 정리된 name · 스타일 비트 · 버전). 모든 추출 경로가 이 문을 지난다. */
-function packageFont(font: InstanceType<typeof opentype.Font>, identity: FontIdentity, revision = 0, charStrings?: readonly Uint8Array[]): ArrayBuffer {
-  // 글리프를 `compactGlyphForCff`로 굳혔으면 opentype.js는 대역 윤곽으로 묶고, CharStrings만 진짜 바이트로 갈아 끼운다.
-  const raw = charStrings ? replaceCffCharStrings(font.toArrayBuffer() as ArrayBuffer, charStrings) : font.toArrayBuffer() as ArrayBuffer
+function packageFont(
+  font: InstanceType<typeof opentype.Font>,
+  identity: FontIdentity,
+  revision = 0,
+  cff?: { charStrings: readonly Uint8Array[]; globalSubrs: readonly Uint8Array[] },
+): ArrayBuffer {
+  // 글리프를 `compactGlyphForCff`로 굳혔으면 opentype.js는 대역 윤곽으로 묶고, CharStrings(와 전역 서브루틴)만 진짜 바이트로 갈아 끼운다.
+  const raw = cff ? replaceCffCharStrings(font.toArrayBuffer() as ArrayBuffer, cff.charStrings, cff.globalSubrs) : font.toArrayBuffer() as ArrayBuffer
   return finalizeOpenTypePackaging(raw, { naming: namingOf(identity, revision), macStyle: styleFlagsOf(identity.styleName), revision })
 }
 
@@ -740,8 +746,9 @@ export async function generateFontBuffer(
 
     glyphs.push(...hangulGlyphs)
 
-    // Phase 3: 폰트 조립
+    // Phase 3: 폰트 조립. 서브루틴(파일 줄이기)은 Worker에서 조립과 같이 돈다.
     onProgress?.(0, 1, '폰트 파일 생성 중...')
+    const subroutinized = subroutinizeForExport(compacted.map((entry) => entry.charString))
 
     // 글로벌 스타일에서 weight 가져오기. 스타일 이름 · fsSelection · macStyle은 전부 이 하나에서 나온다.
     const styleState = useGlobalStyleStore.getState()
@@ -787,7 +794,7 @@ export async function generateFontBuffer(
     applyEnglishFontNames(font, identity, revision)
 
     // Phase 4: 묶고 다시 읽어 확인
-    const arrayBuffer = packageFont(font, identity, revision, compacted.map((entry) => entry.charString))
+    const arrayBuffer = packageFont(font, identity, revision, await subroutinized)
     const validation = validateOpenTypeForIOS(arrayBuffer)
     if (!validation.ok) console.error('OTF 검사 오류:', summarizeValidation(validation), validation.issues.filter((issue) => issue.severity === 'error'))
     else if (validation.issues.some((issue) => issue.severity === 'warning')) console.warn('OTF 검사 경고:', validation.issues.filter((issue) => issue.severity === 'warning'))
