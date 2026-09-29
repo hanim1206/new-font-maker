@@ -41,7 +41,7 @@ describe('줄기 역할 갈래', () => {
     expect(boundStrokesOf(o, both).find((item) => item.stroke.id === 'ㅗ-2')!.follows).toBe(true)
   })
 
-  it('짧은기둥의 축은 보에 닿는 끝 → 빈 끝이다: 같은 마스터면 솟음 · 내림의 빈 끝 쪽 휨이 같은 크기로 보를 사이에 두고 거울처럼 온다', () => {
+  it('짧은기둥의 축은 보에 닿는 끝 → 빈 끝이다: 같은 마스터면 솟음 · 내림이 보를 사이에 두고 거울 — 빈 끝이 같은 쪽(오른 · 왼)으로 휜다', () => {
     expect(axisReversed(jung['ㅗ'], jung['ㅗ'].strokes!, jung['ㅗ'].strokes!.find((item) => item.id === 'ㅗ-1')!)).toBe(true)
     expect(axisReversed(jung['ㅜ'], jung['ㅜ'].strokes!, jung['ㅜ'].strokes!.find((item) => item.id === 'ㅜ-2')!)).toBe(false)
     const masters = { jjalbeungidung: bend('jjalbeungidung') }
@@ -60,6 +60,43 @@ describe('줄기 역할 갈래', () => {
     expect(up.along).toBeCloseTo(0.7, 9)
     expect(down.along).toBeCloseTo(0.7, 9)
     expect(Math.abs(up.x)).toBeCloseTo(0.03, 9)
-    expect(up.x).toBeCloseTo(-down.x, 9)
+    expect(up.x).toBeCloseTo(down.x, 9)
+  })
+
+  it('곁줄기는 오른 · 왼 × 하나 · 섞임 · 둘(위 · 아래)로 나뉜다', () => {
+    expect({
+      ㅏ: nameOf('ㅏ', 'ㅏ-2'), ㅘ: nameOf('ㅘ', 'ㅘ-4'), ㅑ위: nameOf('ㅑ', 'ㅑ-2'), ㅑ아래: nameOf('ㅑ', 'ㅑ-3'),
+      ㅓ: nameOf('ㅓ', 'ㅓ-2'), ㅔ: nameOf('ㅔ', 'ㅔ-2'), ㅝ: nameOf('ㅝ', 'ㅝ-4'), ㅞ: nameOf('ㅞ', 'ㅞ-4'),
+      ㅕ위: nameOf('ㅕ', 'ㅕ-2'), ㅕ아래: nameOf('ㅕ', 'ㅕ-3'), ㅖ위: nameOf('ㅖ', 'ㅖ-2'), ㅖ아래: nameOf('ㅖ', 'ㅖ-3'),
+    }).toEqual({
+      ㅏ: 'gyeotjulgi.right', ㅘ: 'gyeotjulgi.right.mixed', ㅑ위: 'gyeotjulgi.right.pair.upper', ㅑ아래: 'gyeotjulgi.right.pair.lower',
+      ㅓ: 'gyeotjulgi.left', ㅔ: 'gyeotjulgi.left', ㅝ: 'gyeotjulgi.left.mixed', ㅞ: 'gyeotjulgi.left.mixed',
+      ㅕ위: 'gyeotjulgi.left.pair.upper', ㅕ아래: 'gyeotjulgi.left.pair.lower', ㅖ위: 'gyeotjulgi.left.pair.upper', ㅖ아래: 'gyeotjulgi.left.pair.lower',
+    })
+    // 둘의 위만 그리면 ㅑ ㅕ ㅖ의 위 곁줄기만 휜다.
+    const upperOnly = { 'gyeotjulgi.right.pair.upper': bend('gyeotjulgi.right.pair.upper'), 'gyeotjulgi.left.pair.upper': bend('gyeotjulgi.left.pair.upper') }
+    expect(['ㅑ-2', 'ㅕ-2', 'ㅖ-2'].map((id) => curvedAfter(upperOnly, id.split('-')[0], id))).toEqual([true, true, true])
+    expect(['ㅑ-3', 'ㅕ-3', 'ㅖ-3', 'ㅏ-2', 'ㅓ-2'].map((id) => curvedAfter(upperOnly, id.split('-')[0], id))).toEqual([false, false, false, false, false])
+  })
+
+  it('곁줄기의 축은 기둥에 닿는 끝 → 빈 끝이다: 같은 마스터면 ㅏ와 ㅓ가 기둥을 사이에 두고 거울 — 빈 끝이 같은 쪽(위 · 아래)으로 휜다', () => {
+    const reversed = (char: string, id: string) => axisReversed(jung[char], jung[char][channelOf(jung[char], id)]!, jung[char][channelOf(jung[char], id)]!.find((item) => item.id === id)!)
+    expect([reversed('ㅏ', 'ㅏ-2'), reversed('ㅘ', 'ㅘ-4'), reversed('ㅓ', 'ㅓ-2'), reversed('ㅔ', 'ㅔ-2'), reversed('ㅝ', 'ㅝ-4')]).toEqual([false, false, true, true, true])
+    const masters = { gyeotjulgi: bend('gyeotjulgi') }
+    const freeEnd = (char: string, id: string) => {
+      const next = applyMaster(jung[char], {}, masters)!
+      const stroke = next.strokes!.find((item) => item.id === id)!
+      const box = stemReferenceBox(char, 'strokes', stroke)
+      const handle = stroke.points.flatMap((point) => [point.handleIn, point.handleOut]).find(Boolean)!
+      const [start, end] = [stroke.points[0], stroke.points[stroke.points.length - 1]]
+      const joint = char === 'ㅓ' ? end : start
+      return { y: (handle.y - joint.y) * box.height, along: Math.abs(handle.x - joint.x) / Math.abs(end.x - start.x) }
+    }
+    const right = freeEnd('ㅏ', 'ㅏ-2')
+    const left = freeEnd('ㅓ', 'ㅓ-2')
+    expect(right.along).toBeCloseTo(0.7, 9)
+    expect(left.along).toBeCloseTo(0.7, 9)
+    expect(Math.abs(right.y)).toBeCloseTo(0.03, 9)
+    expect(right.y).toBeCloseTo(left.y, 9)
   })
 })

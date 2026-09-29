@@ -17,11 +17,15 @@ import { grammarOf, STEM_NAME_LABEL, type StemName } from './strokeGrammar'
  */
 export type StemMasterName = Exclude<StemName, 'deotjulgi' | 'kkokji'>
   | 'gidung.inner'
+  | 'gyeotjulgi.right' | 'gyeotjulgi.right.mixed' | 'gyeotjulgi.right.pair' | 'gyeotjulgi.right.pair.upper' | 'gyeotjulgi.right.pair.lower'
+  | 'gyeotjulgi.left' | 'gyeotjulgi.left.mixed' | 'gyeotjulgi.left.pair' | 'gyeotjulgi.left.pair.upper' | 'gyeotjulgi.left.pair.lower'
   | 'jjalbeungidung.up' | 'jjalbeungidung.down'
   | 'bo.up' | 'bo.up.mixed' | 'bo.down' | 'bo.down.mixed' | 'bo.none' | 'bo.none.mixed'
 
 export const STEM_MASTER_NAMES: readonly StemMasterName[] = [
-  'gidung', 'gidung.inner', 'gyeotjulgi',
+  'gidung', 'gidung.inner',
+  'gyeotjulgi', 'gyeotjulgi.right', 'gyeotjulgi.right.mixed', 'gyeotjulgi.right.pair', 'gyeotjulgi.right.pair.upper', 'gyeotjulgi.right.pair.lower',
+  'gyeotjulgi.left', 'gyeotjulgi.left.mixed', 'gyeotjulgi.left.pair', 'gyeotjulgi.left.pair.upper', 'gyeotjulgi.left.pair.lower',
   'jjalbeungidung', 'jjalbeungidung.up', 'jjalbeungidung.down',
   'bo', 'bo.up', 'bo.up.mixed', 'bo.down', 'bo.down.mixed', 'bo.none', 'bo.none.mixed',
   'geolchim',
@@ -30,6 +34,16 @@ export const STEM_MASTER_NAMES: readonly StemMasterName[] = [
 /** 갈래 → 부모. 갈래 마스터가 없으면 부모를 거슬러 올라가 처음 있는 마스터를 따른다. */
 const PARENT: Partial<Record<StemMasterName, StemMasterName>> = {
   'gidung.inner': 'gidung',
+  'gyeotjulgi.right': 'gyeotjulgi',
+  'gyeotjulgi.right.mixed': 'gyeotjulgi.right',
+  'gyeotjulgi.right.pair': 'gyeotjulgi.right',
+  'gyeotjulgi.right.pair.upper': 'gyeotjulgi.right.pair',
+  'gyeotjulgi.right.pair.lower': 'gyeotjulgi.right.pair',
+  'gyeotjulgi.left': 'gyeotjulgi',
+  'gyeotjulgi.left.mixed': 'gyeotjulgi.left',
+  'gyeotjulgi.left.pair': 'gyeotjulgi.left',
+  'gyeotjulgi.left.pair.upper': 'gyeotjulgi.left.pair',
+  'gyeotjulgi.left.pair.lower': 'gyeotjulgi.left.pair',
   'jjalbeungidung.up': 'jjalbeungidung',
   'jjalbeungidung.down': 'jjalbeungidung',
   'bo.up': 'bo',
@@ -54,6 +68,16 @@ export const STEM_MASTER_LABEL: Readonly<Record<StemMasterName, string>> = {
   gidung: STEM_NAME_LABEL.gidung,
   'gidung.inner': '기둥.안쪽',
   gyeotjulgi: STEM_NAME_LABEL.gyeotjulgi,
+  'gyeotjulgi.right': '곁줄기.오른',
+  'gyeotjulgi.right.mixed': '곁줄기.오른.섞임',
+  'gyeotjulgi.right.pair': '곁줄기.오른.둘',
+  'gyeotjulgi.right.pair.upper': '곁줄기.오른.둘.위',
+  'gyeotjulgi.right.pair.lower': '곁줄기.오른.둘.아래',
+  'gyeotjulgi.left': '곁줄기.왼',
+  'gyeotjulgi.left.mixed': '곁줄기.왼.섞임',
+  'gyeotjulgi.left.pair': '곁줄기.왼.둘',
+  'gyeotjulgi.left.pair.upper': '곁줄기.왼.둘.위',
+  'gyeotjulgi.left.pair.lower': '곁줄기.왼.둘.아래',
   jjalbeungidung: STEM_NAME_LABEL.jjalbeungidung,
   'jjalbeungidung.up': '짧은기둥.솟음',
   'jjalbeungidung.down': '짧은기둥.내림',
@@ -72,6 +96,16 @@ export const STEM_MASTER_SAMPLE: Readonly<Record<StemMasterName, { char: string;
   gidung: { char: 'ㅏ', strokeId: 'ㅏ-1' },
   'gidung.inner': { char: 'ㅐ', strokeId: 'ㅐ-1' },
   gyeotjulgi: { char: 'ㅏ', strokeId: 'ㅏ-2' },
+  'gyeotjulgi.right': { char: 'ㅏ', strokeId: 'ㅏ-2' },
+  'gyeotjulgi.right.mixed': { char: 'ㅘ', strokeId: 'ㅘ-4' },
+  'gyeotjulgi.right.pair': { char: 'ㅑ', strokeId: 'ㅑ-2' },
+  'gyeotjulgi.right.pair.upper': { char: 'ㅑ', strokeId: 'ㅑ-2' },
+  'gyeotjulgi.right.pair.lower': { char: 'ㅑ', strokeId: 'ㅑ-3' },
+  'gyeotjulgi.left': { char: 'ㅓ', strokeId: 'ㅓ-2' },
+  'gyeotjulgi.left.mixed': { char: 'ㅝ', strokeId: 'ㅝ-4' },
+  'gyeotjulgi.left.pair': { char: 'ㅕ', strokeId: 'ㅕ-2' },
+  'gyeotjulgi.left.pair.upper': { char: 'ㅕ', strokeId: 'ㅕ-2' },
+  'gyeotjulgi.left.pair.lower': { char: 'ㅕ', strokeId: 'ㅕ-3' },
   jjalbeungidung: { char: 'ㅗ', strokeId: 'ㅗ-1' },
   'jjalbeungidung.up': { char: 'ㅗ', strokeId: 'ㅗ-1' },
   'jjalbeungidung.down': { char: 'ㅜ', strokeId: 'ㅜ-2' },
@@ -89,6 +123,8 @@ export const STEM_MASTER_SAMPLE: Readonly<Record<StemMasterName, { char: string;
 const RISING = new Set(['ㅗ', 'ㅛ', 'ㅘ', 'ㅙ', 'ㅚ'])
 const HANGING = new Set(['ㅜ', 'ㅠ', 'ㅝ', 'ㅞ', 'ㅟ'])
 const MIXED = new Set(['ㅘ', 'ㅙ', 'ㅚ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅢ'])
+/** 곁줄기가 기둥에서 오른쪽으로 뻗는 홀자. 나머지(ㅓ ㅕ ㅔ ㅖ ㅝ ㅞ)는 왼쪽. */
+const RIGHTWARD = new Set(['ㅏ', 'ㅑ', 'ㅘ'])
 
 export interface AxisPoint {
   /** 시작 0 → 끝 1 */
@@ -205,6 +241,17 @@ export function masterNameOf(jamo: Pick<JamoData, 'type' | 'char'>, channelStrok
       if (leftmost.id === strokeId) return 'gidung.inner'
     }
   }
+  if (name === 'gyeotjulgi') {
+    const side = RIGHTWARD.has(jamo.char) ? 'right' : 'left'
+    const pair = channelStrokes.filter((stroke) => table[stroke.id] === 'gyeotjulgi' && stroke.points.length >= 2)
+    if (pair.length > 1) {
+      const middle = (stroke: StrokeDataV2) => (stroke.points[0].y + stroke.points[stroke.points.length - 1].y) / 2
+      const self = pair.find((stroke) => stroke.id === strokeId)
+      const upper = self && pair.every((other) => other === self || middle(self) <= middle(other))
+      return `gyeotjulgi.${side}.pair.${upper ? 'upper' : 'lower'}` as StemMasterName
+    }
+    return `gyeotjulgi.${side}${MIXED.has(jamo.char) ? '.mixed' : ''}` as StemMasterName
+  }
   if (name === 'jjalbeungidung') {
     if (RISING.has(jamo.char)) return 'jjalbeungidung.up'
     if (HANGING.has(jamo.char)) return 'jjalbeungidung.down'
@@ -225,14 +272,17 @@ function distanceToSegment(point: { x: number; y: number }, a: { x: number; y: n
 }
 
 /**
- * 짧은기둥의 축은 보에 닿는 끝 → 빈 끝이다. 솟는 짧은기둥(위 → 아래로 그려져 끝이 보에 닿음)은 획 방향과 반대라 뒤집는다.
- * 그래서 솟음 · 내림에 같은 마스터를 주면 빈 끝 쪽 모양이 서로 맞는다. 다른 줄기는 획 방향 그대로.
+ * 곁가지 줄기의 축은 몸에 닿는 끝 → 빈 끝이다. 짧은기둥은 보에, 곁줄기는 기둥에 닿는다.
+ * 솟는 짧은기둥(위 → 아래로 그려져 끝이 보에 닿음)이나 ㅓ의 곁줄기(왼 → 오른으로 그려져 끝이 기둥에 닿음)는 획 방향과 반대라 뒤집는다.
+ * 뒤집을 때 휨 방향도 같이 뒤집어(`mirroredMaster`) 솟음 · 내림, 오른 · 왼에 같은 마스터를 주면 몸을 사이에 두고 거울처럼 휜다. 다른 줄기는 획 방향 그대로.
  */
 export function axisReversed(jamo: Pick<JamoData, 'type' | 'char'>, channelStrokes: readonly StrokeDataV2[], stroke: StrokeDataV2): boolean {
   const name = masterNameOf(jamo, channelStrokes, stroke.id)
-  if (!name || !isUnder(name, 'jjalbeungidung') || stroke.points.length < 2) return false
+  if (!name || stroke.points.length < 2) return false
+  const body: StemName | null = isUnder(name, 'jjalbeungidung') ? 'bo' : isUnder(name, 'gyeotjulgi') ? 'gidung' : null
+  if (!body) return false
   const table = grammarOf(jamo.type, jamo.char)
-  const bars = channelStrokes.filter((item) => table[item.id] === 'bo' && item.points.length >= 2)
+  const bars = channelStrokes.filter((item) => table[item.id] === body && item.points.length >= 2)
   if (bars.length === 0) return false
   const gap = (point: { x: number; y: number }) => Math.min(...bars.map((bar) => distanceToSegment(point, bar.points[0], bar.points[bar.points.length - 1])))
   return gap(stroke.points[stroke.points.length - 1]) < gap(stroke.points[0])
@@ -250,12 +300,29 @@ export function reverseStroke(stroke: StrokeDataV2): StrokeDataV2 {
   }
 }
 
-/** 축 방향을 따진 인스턴스 · 따름 판정. */
+/**
+ * 수직 오프셋을 뒤집은 마스터. 축을 뒤집으면 `o`의 기준(진행 방향 오른쪽)도 같이 돌아가 180° 돌린 모양이 된다.
+ * `o`까지 뒤집어야 몸(기둥 · 보)을 사이에 둔 거울이 된다 — ㅏ의 곁줄기 끝이 위로 휘면 ㅓ도 위로, ㅗ의 짧은기둥이 오른쪽으로 휘면 ㅜ도 오른쪽.
+ */
+export function mirroredMaster(master: StemMaster): StemMaster {
+  const flip = (point: { t: number; o: number }) => ({ t: point.t, o: -point.o })
+  return {
+    ...master,
+    points: master.points.map((point) => ({
+      ...point,
+      o: -point.o,
+      ...(point.handleIn ? { handleIn: flip(point.handleIn) } : {}),
+      ...(point.handleOut ? { handleOut: flip(point.handleOut) } : {}),
+    })),
+  }
+}
+
+/** 축 방향을 따진 인스턴스 · 따름 판정. 뒤집힌 축은 거울 마스터로 놓는다. */
 function orientedInstance(stroke: StrokeDataV2, master: StemMaster, box: BoxEm, reversed: boolean): StrokeDataV2 {
-  return reversed ? reverseStroke(instanceOf(reverseStroke(stroke), master, box)) : instanceOf(stroke, master, box)
+  return reversed ? reverseStroke(instanceOf(reverseStroke(stroke), mirroredMaster(master), box)) : instanceOf(stroke, master, box)
 }
 function orientedFollows(stroke: StrokeDataV2, master: StemMaster, box: BoxEm, reversed: boolean): boolean {
-  return followsMaster(reversed ? reverseStroke(stroke) : stroke, master, box)
+  return reversed ? followsMaster(reverseStroke(stroke), mirroredMaster(master), box) : followsMaster(stroke, master, box)
 }
 
 /** 마스터를 이 획의 시작점 · 끝점 사이에 놓는다. 끝점은 그대로, 사이 모양만 마스터. */

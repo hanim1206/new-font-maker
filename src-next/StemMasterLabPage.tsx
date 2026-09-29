@@ -10,6 +10,7 @@ import {
   isUnder,
   masterOf,
   medialBoxEmOf,
+  mirroredMaster,
   reverseStroke,
   stemReferenceBox,
   straightMaster,
@@ -97,7 +98,11 @@ function MasterCanvas({ name, final, draft, onDraft, onCommit }: {
   const strokes = jamo[channel] ?? []
   const stored = strokes.find((stroke) => stroke.id === sample.strokeId)
   // 짧은기둥은 보에 닿는 끝 → 빈 끝이 축이다. 캔버스도 그 방향으로 놓아 마스터의 시작 핸들이 닿는 끝 쪽에 온다.
-  const target = stored && axisReversed(jamo, strokes, stored) ? reverseStroke(stored) : stored
+  const reversed = Boolean(stored && axisReversed(jamo, strokes, stored))
+  const target = stored && reversed ? reverseStroke(stored) : stored
+  // 뒤집힌 축은 거울 마스터로 놓인다(`orientedInstance`). 캔버스도 같게 보여 주고, 끈 자리는 거울을 풀어 적는다.
+  const view = (shape: StemMaster) => reversed ? mirroredMaster(shape) : shape
+  const unview = (axis: { t: number; o: number }) => reversed ? { t: axis.t, o: -axis.o } : axis
   const box = stored ? stemReferenceBox(sample.char, channel, stored, final) : medialBoxEmOf(sample.char, channel, final)
   const master = draft ?? masterOf(masters, name)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -113,7 +118,7 @@ function MasterCanvas({ name, final, draft, onDraft, onCommit }: {
   const strokeWidth = 0.07 * EM_PX
 
   if (!target) return null
-  const shown = draft ? instanceOf(target, draft, box) : target
+  const shown = draft ? instanceOf(target, view(draft), box) : target
   const straight = { ...target, points: [target.points[0], target.points[target.points.length - 1]] }
 
   const toBox = (event: ReactPointerEvent<SVGElement>) => {
@@ -134,11 +139,11 @@ function MasterCanvas({ name, final, draft, onDraft, onCommit }: {
   }
   const onPointerMove = (event: ReactPointerEvent<SVGCircleElement>) => {
     if (!dragging.current) return
-    onDraft(masterWith(dragging.current, toAxis(toBox(event), straight, box)))
+    onDraft(masterWith(dragging.current, unview(toAxis(toBox(event), straight, box))))
   }
   const onPointerUp = (event: ReactPointerEvent<SVGCircleElement>) => {
     if (!dragging.current) return
-    const next = masterWith(dragging.current, toAxis(toBox(event), straight, box))
+    const next = masterWith(dragging.current, unview(toAxis(toBox(event), straight, box)))
     dragging.current = null
     onDraft(null)
     onCommit(next)
