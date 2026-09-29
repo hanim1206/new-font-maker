@@ -1,5 +1,6 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,7 +19,7 @@ import { presetPreviewFont } from '../previewFont'
 import type { PreviewFont } from '../previewFont'
 import { DEFAULT_SAMPLE_SENTENCE } from '../sampleSentences'
 import { BETA_INVITE_API, HOUSE_PRESET_API, adminCall, dateOf } from './adminApi'
-import { PRESET_LAYOUTS, fromView, handlesOf, identityOfChar, predictionOf, representativeFor, targetLabel, toView } from './presetEditor'
+import { PRESET_LAYOUTS, fromView, handlesOf, identityOfChar, liveHandles, predictionOf, representativeFor, targetLabel, toView } from './presetEditor'
 import type { PresetHandle } from './presetEditor'
 
 /**
@@ -47,10 +48,11 @@ const signed = (value: number) => `${value > 0 ? '+' : ''}${Math.round(value)}`
 interface DragStart { target: string; axis: 'x' | 'y'; representative: number; predicted: number; pointerId: number }
 
 /** 큰 캔버스: 초안 잉크 + 노토 고스트 + 끌 수 있는 선. */
-function PresetCanvas({ font, char, bundle, selected, onSelect, onMove }: {
+function PresetCanvas({ font, char, bundle, notoBundle, selected, onSelect, onMove }: {
   font: PreviewFont
   char: string
   bundle: NotoPresetModelBundle
+  notoBundle: NotoPresetModelBundle
   selected: string | null
   onSelect: (target: string) => void
   onMove: (target: string, representative: number) => void
@@ -60,7 +62,14 @@ function PresetCanvas({ font, char, bundle, selected, onSelect, onMove }: {
   const { ghost } = useNotoGhost(char, true)
   const overlay = useRef<SVGSVGElement>(null)
   const drag = useRef<DragStart | null>(null)
-  const handles = useMemo(() => identity ? handlesOf(model, identity.contextId, identity.medialJamo) : [], [model, identity])
+  // 끌 수 있는 선은 글자 구조로 정해진다 — 노토 모델로 한 번 재고, 끄는 동안(초안이 바뀌는 동안) 다시 재지 않는다.
+  const handles = useMemo(() => {
+    if (!identity || !notoBundle) return []
+    const notoModel = notoBundle.model as unknown as VariationModel
+    const live = liveHandles({ model: notoModel, thickness: notoBundle.thickness }, identity, handlesOf(notoModel, identity.contextId, identity.medialJamo))
+    // 겹치면 뒤에 그린 선이 잡힌다. 닿자 상자 변을 홀자 줄기보다 뒤에 그린다.
+    return [...live].sort((a, b) => Number(a.part !== 'medial') - Number(b.part !== 'medial'))
+  }, [notoBundle, char]) // eslint-disable-line react-hooks/exhaustive-deps -- identity는 글자에서 나온다.
 
   if (!identity) return null
   const layer = identity.contextId
@@ -293,7 +302,7 @@ export function PresetPage() {
 
     <section className="flex flex-col gap-5 lg:flex-row">
       <div className="flex flex-col gap-3">
-        <PresetCanvas font={font} char={char} bundle={draftBundle} selected={selected} onSelect={setSelected} onMove={(target, value) => setValue(target, layer, value)} />
+        <PresetCanvas font={font} char={char} bundle={draftBundle} notoBundle={noto} selected={selected} onSelect={setSelected} onMove={(target, value) => setValue(target, layer, value)} />
         <div className="flex flex-wrap gap-1" aria-label="대표 글자">
           {[...layout.samples].map((sample) => <button key={sample} type="button" onClick={() => setChar(sample)}
             className={`rounded-md p-0.5 ${sample === char ? 'bg-surface-3 ring-1 ring-foreground/40' : 'hover:bg-surface-2'}`} aria-pressed={sample === char} data-testid={`preset-sample-${sample}`}>
@@ -312,9 +321,19 @@ export function PresetPage() {
                 <Button size="sm" variant="ghost" onClick={() => setValue(selected, layer, selectedNoto)}>노토값</Button>
               </span>
             </>
-            : <span className="text-text-dim-4">캔버스의 선이나 표의 줄을 고르세요. 점선은 닿자 상자 변, 실선은 홀자 줄기 자리예요.</span>}
+            : <span className="text-text-dim-4">캔버스의 선을 고르세요. 점선은 닿자 상자 변, 실선은 홀자 칸을 정하는 줄기예요.</span>}
         </div>
-        <RepresentativeTable layer={layer} draft={draft} noto={notoModel} selected={selected} onSelect={setSelected} onSet={(target, value) => setValue(target, layer, value)} />
+        {/* 대푯값 표는 평소 접어 둔다. 캔버스에서 끄는 게 주 조작이다. */}
+        <details className="group rounded-lg border border-border-subtle" data-testid="preset-representatives-fold">
+          <summary className="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-sm text-text-dim-3 hover:text-foreground">
+            <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
+            수치 표
+            <span className="text-xs text-text-dim-5">이 레이아웃 대푯값 · 노토와 비교</span>
+          </summary>
+          <div className="px-3 pb-3">
+            <RepresentativeTable layer={layer} draft={draft} noto={notoModel} selected={selected} onSelect={setSelected} onSet={(target, value) => setValue(target, layer, value)} />
+          </div>
+        </details>
       </div>
     </section>
 

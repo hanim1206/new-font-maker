@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest'
 import type { VariationModel } from '../../src/services/notoVariationModel'
 import { houseSaveProblemOf } from '../../scripts/housePresetApi'
 import { houseLayoutFromNoto } from '../../src/services/houseLayoutModel'
-import { PRESET_LAYOUTS, handlesOf, identityOfChar, predictionOf, representativeFor, targetLabel } from './presetEditor'
+import { PRESET_LAYOUTS, handlesOf, identityOfChar, liveHandles, predictionOf, representativeFor, targetLabel } from './presetEditor'
 
-const noto = (JSON.parse(readFileSync('public/noto-preset/model.json', 'utf8')) as { model: VariationModel }).model
+const bundle = JSON.parse(readFileSync('public/noto-preset/model.json', 'utf8')) as { model: VariationModel; thickness: Record<string, Record<string, number>> }
+const noto = bundle.model
 
 describe('프리셋 편집 규칙', () => {
   it('레이아웃마다 대표 글자 8자는 모두 그 문맥 칸에 든다', () => {
@@ -39,6 +40,18 @@ describe('프리셋 편집 규칙', () => {
     expect(right.find((handle) => handle.target === 'medial.outerPillar.face')?.axis).toBe('x')
     // 가(ㅏ)에는 기둥 하나와 곁줄기 하나만.
     expect(handlesOf(noto, 'right', 'ㅏ').filter((handle) => handle.part === 'medial').map((handle) => handle.target).sort()).toEqual(['medial.outerPillar.face', 'medial.primaryBeam.face'])
+  })
+
+  it('캔버스엔 끌면 상자가 바뀌는 선만 — 홀자 칸 안쪽 줄기 자리는 뺀다', () => {
+    const live = (char: string) => {
+      const identity = identityOfChar(char)!
+      return liveHandles(bundle, identity, handlesOf(noto, identity.contextId, identity.medialJamo)).map((handle) => handle.target)
+    }
+    const ga = live('가')
+    expect(ga).toEqual(expect.arrayContaining(['initial.roleFaces.left', 'initial.roleFaces.right', 'initial.roleFaces.top', 'initial.roleFaces.bottom', 'medial.outerPillar.face']))
+    expect(ga).not.toContain('medial.primaryBeam.face')
+    expect(live('고')).not.toContain('medial.baseStem.face')
+    expect(live('곡')).toEqual(expect.arrayContaining(['initial.roleFaces.bottom', 'final.roleFaces.bottom', 'medial.primaryBeam.face']))
   })
 
   it('선을 옮긴 만큼 대푯값이 움직인다', () => {

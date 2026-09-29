@@ -2,6 +2,8 @@
  * 관리자 `프리셋` 메뉴의 규칙 부분. 화면(`PresetPage.tsx`)과 테스트가 같이 쓴다.
  * 끌 수 있는 것은 레이아웃 대푯값 중 **자리**를 정하는 값(닿자 상자 네 변, 홀자 줄기의 자리)뿐이다. 길이 값(`spanFrom` · `spanTo` · `visibleLength`)은 표로만 본다.
  */
+import { resolveContextBoxes } from '../../src/services/contextBoxResolver'
+import type { ContextModel } from '../../src/services/contextBoxResolver'
 import { MEDIAL_ROLE_SETS, modelIdentityOf, predictNotoTarget } from '../../src/services/notoVariationModel'
 import type { ModelIdentity, VariationModel } from '../../src/services/notoVariationModel'
 
@@ -104,4 +106,40 @@ export const fromView = (value: number) => value * 10
  */
 export function representativeFor(currentRepresentative: number, currentPredicted: number, nextPredicted: number): number {
   return currentRepresentative + (nextPredicted - currentPredicted)
+}
+
+/** 흔들어 볼 크기(1000u). */
+const PROBE_UNITS = 12
+
+function boxesOf(model: ContextModel, identity: ModelIdentity): number[] {
+  const { boxes } = resolveContextBoxes({ identity, model })
+  return Object.keys(boxes).sort().flatMap((part) => {
+    const box = boxes[part as keyof typeof boxes]!
+    return [box.x, box.y, box.width, box.height]
+  })
+}
+
+/**
+ * 끌면 이 글자의 상자가 실제로 바뀌는 선만. 대푯값을 조금 흔들어 상자를 다시 풀어 본다.
+ * 홀자 잉크는 앱 획을 홀자 칸 하나에 맞춰 그려서, 칸 안쪽 줄기 자리(ㅏ 곁줄기 높이 · ㅗ 짧은기둥 가로 자리 등)는 지금 잉크에 닿지 않는다.
+ * 그런 선을 띄우면 끌어도 획이 그대로라 캔버스에서 뺀다(표에는 남는다).
+ */
+export function liveHandles(model: ContextModel, identity: ModelIdentity, handles: readonly PresetHandle[]): PresetHandle[] {
+  const base = boxesOf(model, identity)
+  return handles.filter((handle) => {
+    const layer = model.model.targets[handle.target]?.layers[identity.contextId]
+    if (!layer) return false
+    const probe: ContextModel = {
+      ...model,
+      model: {
+        ...model.model,
+        targets: {
+          ...model.model.targets,
+          [handle.target]: { layers: { ...model.model.targets[handle.target].layers, [identity.contextId]: { ...layer, representative: layer.representative + PROBE_UNITS } } },
+        },
+      },
+    }
+    const moved = boxesOf(probe, identity)
+    return moved.length !== base.length || moved.some((value, index) => Math.abs(value - base[index]) > 1e-6)
+  })
 }
