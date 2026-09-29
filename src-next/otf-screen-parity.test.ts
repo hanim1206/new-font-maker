@@ -315,6 +315,35 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
     }
   })
 
+  it('G2 — 홀자 줄기 마스터 다섯을 휘어도 OTF가 화면과 같은 상자 · 같은 윤곽이다', async () => {
+    const { measure } = await setup()
+    const { useStemMasterStore } = await import('../src/stores/stemMasterStore')
+    const chars = [...SENTENCE, ...HOLDOUT, '예', '요', '웨', '얘']
+    const straight = Object.fromEntries(chars.map((char) => [char, measure(char)]))
+    const bend = { t: 0.4, o: 0.03 }
+    const names = ['gidung', 'gyeotjulgi', 'jjalbeungidung', 'bo', 'geolchim'] as const
+    for (const name of names) useStemMasterStore.getState().setMaster({ name, points: [{ t: 0, o: 0, handleOut: bend }, { t: 1, o: 0, handleIn: { t: 0.7, o: -0.01 } }] })
+    try {
+      const rows = chars.map((char) => ({ char, ...measure(char) }))
+      console.info(rows.map((row) => `${row.char} 마스터 · 모델 ${(row.modelXor * 100).toFixed(3)}% · 가장자리 ${row.edgeDrift.toFixed(2)}유닛`).join('\n'))
+      for (const row of rows) {
+        expect(row.otfBoxes, row.char).toEqual(row.screenBoxes)
+        expect(row.edgeDrift, row.char).toBeLessThan(1)
+        expect(row.modelXor, row.char).toBeLessThan(0.015)
+      }
+      // 마스터는 모양만 바꾸고 상자는 그대로 둔다(틀로 굳힌 곧은 획이 상자를 정한다).
+      for (const row of rows) expect(row.otfBoxes, row.char).toEqual(straight[row.char].otfBoxes)
+      const moved = rows.filter((row) => fit(row.otf, straight[row.char].otf) > 0.01).map((row) => row.char)
+      expect(moved.length).toBeGreaterThan(chars.length / 2)
+    } finally {
+      for (const name of names) useStemMasterStore.getState().resetMaster(name)
+    }
+    function fit(a: MultiPolygon, b: MultiPolygon) {
+      const area = (shape: MultiPolygon) => shape.reduce((sum, polygon) => sum + Math.abs(polygon[0].reduce((acc, [x, y], i, ring) => { const [nx, ny] = ring[(i + 1) % ring.length]; return acc + x * ny - nx * y }, 0)) / 2, 0)
+      return area(polygonClipping.xor(a, b)) / area(b)
+    }
+  })
+
   it('독립 자모는 모델 대상이 아니라 옛 스키마 출력과 같다', async () => {
     const { measure } = await setup()
     for (const char of ['ㄱ', 'ㅎ', 'ㅙ']) {
