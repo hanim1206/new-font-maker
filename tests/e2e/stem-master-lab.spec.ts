@@ -140,11 +140,17 @@ test.describe('홀자 줄기 마스터 랩', () => {
     for (const [role, char] of [['bo.up.mixed', 'ㅘ'], ['bo.down.single', 'ㅜ'], ['bo.none.single', 'ㅡ']]) await expect(card(page, role, char), char).toHaveAttribute('data-curved', 'false')
   })
 
-  test('편집기에서 고친 획의 카드를 빼고 반영하면 그 획은 고치기 전 모양으로 돌아가고, 남긴 형제만 휜다', async ({ page }) => {
+  test('고친 획 카드는 뺄 수 없다 — 카드를 눌러도, 묶음 머리를 꺼도 남고 머리는 ─가 된다', async ({ page }) => {
     await bend(page, 'ㅏ-1', 40)
-    await group(page, 'gidung.outer.single').locator('button[data-char="ㅏ"]').click()
+    const edited = group(page, 'gidung.outer.single').locator('button[data-char="ㅏ"]')
+    // 잠긴 카드는 aria-disabled라 클릭 이벤트를 직접 보낸다.
+    await edited.dispatchEvent('click')
+    await expect(edited).toHaveAttribute('aria-pressed', 'true')
+    await groupCheck(page, 'gidung.outer.single').click()
+    await expect(edited).toHaveAttribute('aria-pressed', 'true')
+    await expect(groupCheck(page, 'gidung.outer.single')).toHaveAttribute('aria-checked', 'mixed')
     await page.getByTestId('apply').click()
-    await expect(card(page, 'gidung.outer.single', 'ㅏ')).toHaveAttribute('data-curved', 'false')
-    await expect(card(page, 'gidung.outer.single', 'ㅕ')).toHaveAttribute('data-curved', 'true')
+    await expect(card(page, 'gidung.outer.single', 'ㅏ')).toHaveAttribute('data-curved', 'true')
+    await expect(card(page, 'gidung.outer.single', 'ㅕ')).toHaveAttribute('data-curved', 'false')
   })
 })

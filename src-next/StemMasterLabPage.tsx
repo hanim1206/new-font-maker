@@ -1,4 +1,4 @@
-import { Check, Minus } from 'lucide-react'
+import { Check, Lock, Minus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { JUNGSEONG_LIST } from '../src/data/Hangul'
 import { useJamoStore } from '../src/stores/jamoStore'
@@ -53,10 +53,15 @@ const ACTIVE_STROKE_COLOR = '#d9480f'
 /** 이 줄기에 귀속된 획 하나(홀자 · 채널 · 획)와 그 갈래(잎 이름 · 질문 답). */
 interface StemEntry { char: string; channel: JamoChannel; strokeId: string; name: StemMasterName; values: Record<string, string>; follows: boolean; curved: boolean }
 
-/** 줄기 안 갈래(잎) 순서 — 질문 보기 순서대로(바깥 → 안, 단일 → 섞임). */
+/**
+ * 줄기 안 갈래(잎) 순서 — 단일 · 섞임을 먼저 가르고, 그 안에서 질문 보기 순서대로.
+ * 기둥은 바깥 단일 → 안 단일 → 바깥 섞임 → 안 섞임.
+ */
 function leafRank(base: StemBase, name: StemMasterName): number[] {
   const values = facetValuesOf(name)
-  return STEM_FACETS[base].map((facet) => facet.options.findIndex((option) => option.value === values[facet.key]))
+  const facets = STEM_FACETS[base]
+  const ordered = [...facets.filter((facet) => facet.key === 'kind'), ...facets.filter((facet) => facet.key !== 'kind')]
+  return ordered.map((facet) => facet.options.findIndex((option) => option.value === values[facet.key]))
 }
 const byLeafRank = (base: StemBase) => (a: StemMasterName, b: StemMasterName) => {
   const ra = leafRank(base, a)
@@ -98,7 +103,7 @@ function SiblingCard({ entry, marked, editing, onEdit }: { entry: StemEntry; mar
 /**
  * 반영 고르기. 줄기를 고친 뒤 "어디까지 반영할까요?" — 갈래(잎) 묶음을 한 번에 다 보이고, 처음엔 전부 골라져 있다.
  * 도마 고르기처럼 묶음 머리 체크는 묶음 전체, 카드는 획 하나를 켜고 끈다. 카드는 그 획만 주황, 나머지는 옅게.
- * 뺀 카드의 획은 지금 모양 그대로 남아 `풀림`이 된다. 카드는 반영하면 될 모양(`preview`)으로 그린다 — 켜면 휘고 끄면 돌아간다.
+ * 뺀 카드의 획은 지금 모양 그대로 남아 `풀림`이 된다. 고친 획 카드는 모양의 출처라 뺄 수 없다(묶음 머리를 꺼도 남는다). 카드는 반영하면 될 모양(`preview`)으로 그린다 — 켜면 휘고 끄면 돌아간다.
  */
 function ApplyGroups({ base, entries, picked, preview, editedKey, onToggle, onApply, onCancel }: {
   base: StemBase
@@ -135,12 +140,13 @@ function ApplyGroups({ base, entries, picked, preview, editedKey, onToggle, onAp
                 {inLeaf.map((entry) => {
                   const key = keyOf(entry)
                   const pressed = picked.has(key)
+                  const locked = editedKey === key
                   // 글자는 검정, 이 카드의 획만 주황. 뺀 카드는 카드째 흐려진다(도마와 같게).
                   const color = (source: ResolvedStrokeInkSource) => source.jamoId === entry.char && source.strokeId === entry.strokeId ? ACTIVE_STROKE_COLOR : undefined
                   return (
-                    <button key={key} type="button" className={styles.applyCard} data-char={entry.char} aria-pressed={pressed} aria-label={`${entry.char} ${stemMasterLabel(leaf)} ${pressed ? '빼기' : '담기'}`} onClick={() => onToggle([key], !pressed)}>
+                    <button key={key} type="button" className={styles.applyCard} data-char={entry.char} data-locked={locked || undefined} aria-pressed={pressed} aria-disabled={locked || undefined} aria-label={locked ? `${entry.char} ${stemMasterLabel(leaf)} 고친 획(늘 반영)` : `${entry.char} ${stemMasterLabel(leaf)} ${pressed ? '빼기' : '담기'}`} onClick={() => { if (!locked) onToggle([key], !pressed) }}>
                       <AppGlyph char={sampleSyllable(entry.char, 'open')} size={52} strokeColorOf={color} jungseongOverride={preview} />
-                      {editedKey === key && <em>고친 획</em>}
+                      {locked && <em><Lock size={10} strokeWidth={3} aria-hidden="true" />고친 획</em>}
                     </button>
                   )
                 })}
@@ -253,7 +259,7 @@ export function StemMasterLabPage() {
 
   const entries = useMemo(() => entriesOf(jungseong, masters, base), [jungseong, masters, base])
   const editing = entries.find((entry) => keyOf(entry) === editingKey) ?? entries.find((entry) => entry.char === session.char) ?? null
-  const leaves = [...new Set(entries.map((entry) => entry.name))]
+  const leaves = [...new Set(entries.map((entry) => entry.name))].sort(byLeafRank(base))
   const selected = asking ? picked : null
   const released = entries.filter((entry) => !entry.follows).length
 
@@ -312,7 +318,7 @@ export function StemMasterLabPage() {
     const next = new Set(current)
     for (const key of keys) {
       if (on) next.add(key)
-      else next.delete(key)
+      else if (key !== editedKey) next.delete(key)
     }
     return next
   })
