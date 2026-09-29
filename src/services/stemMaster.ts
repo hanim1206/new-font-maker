@@ -84,14 +84,23 @@ const MIN_BOX_EM = 0.001
  */
 const THIN_BOX_EM = 0.05
 
+/**
+ * 칸 표의 항목. 표는 그리는 부위(통째 JU → `strokes`)로 모았다. ㅒ · ㅖ처럼 통째 칸에 그리면서 획은 `verticalStrokes`에 둔 홀자는
+ * 그 채널 항목이 없으니 통째 칸(`strokes`)을 쓴다.
+ */
+function boxEntryOf(char: string, channel: JamoChannel) {
+  const entries = BOX_TABLE[char]
+  return entries?.[channel] ?? (entries && !entries.horizontalStrokes && !entries.verticalStrokes ? entries.strokes : undefined)
+}
+
 /** 이 홀자 채널이 칸 표에 있는가. 없으면 `medialBoxEmOf`가 1×1을 돌려준다. */
 export function hasMedialBoxEm(char: string, channel: JamoChannel): boolean {
-  return Boolean(BOX_TABLE[char]?.[channel])
+  return Boolean(boxEntryOf(char, channel))
 }
 
 /** 이 홀자 채널의 평균 칸. `final`을 안 주면 받침 없음 · 있음의 평균. 표에 없으면 1×1. */
 export function medialBoxEmOf(char: string, channel: JamoChannel, final?: 'open' | 'closed'): BoxEm {
-  const entry = BOX_TABLE[char]?.[channel]
+  const entry = boxEntryOf(char, channel)
   if (!entry) return { width: 1, height: 1 }
   const box = final ? entry[final] : { width: (entry.open.width + entry.closed.width) / 2, height: (entry.open.height + entry.closed.height) / 2 }
   return { width: Math.max(box.width, MIN_BOX_EM), height: Math.max(box.height, MIN_BOX_EM) }

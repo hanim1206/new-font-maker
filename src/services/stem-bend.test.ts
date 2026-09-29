@@ -89,6 +89,19 @@ describe('홀자 줄기 휨은 칸이 바뀌어도 em 그대로', () => {
     }
   })
 
+  it('ㅒ · ㅖ(통째 칸에 그리고 획은 세로 채널)의 두 기둥도 ㅐ와 같은 em만큼 휜다', () => {
+    const bentBy = (char: string, id: string) => {
+      const jamo = withInstance(char, id, bent)
+      const stroke = strokeOf(jamo, id)
+      const placed = placeStemStroke(jamo, stroke, at(medialBoxEmOf(char, 'strokes', 'open')))
+      return emOf(placed, placed.stroke.points[0].handleOut!).x - emOf(placed, placed.stroke.points[0]).x
+    }
+    expect(bentBy('ㅐ', 'ㅐ-3')).toBeCloseTo(0.03, 9)
+    for (const [char, ids] of [['ㅒ', ['ㅒ-1', 'ㅒ-4']], ['ㅖ', ['ㅖ-1', 'ㅖ-4']]] as const) {
+      for (const id of ids) if (baseJungseong[char] && strokeOf(baseJungseong[char], id)) expect(bentBy(char, id), id).toBeCloseTo(0.03, 9)
+    }
+  })
+
   it('이름 없는 획 · 닿자는 대상이 아니다', () => {
     const a = withInstance('ㅏ', 'ㅏ-2', bow)
     const free: StrokeDataV2 = { id: 'free', points: [{ x: 0, y: 0, handleOut: { x: 0.5, y: 0.2 } }, { x: 1, y: 0 }], closed: false, thickness: 0.07 }
