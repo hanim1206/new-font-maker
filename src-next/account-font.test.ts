@@ -115,6 +115,17 @@ describe('브라우저 사본 이름표', () => {
     expect(storageValues.size).toBe(0)
   })
 
+  it('다른 계정이 로그인하면 충돌 백업과 사용자 묶음도 지우고, 같은 계정이면 남긴다', () => {
+    writeStamp(storage, stampOf({ owner: 'a' }))
+    storage.setItem(CONFLICT_BACKUP_KEY, '{}')
+    storage.setItem('font-maker-jamo-groups', '{}')
+    expect(dropForeignCopy(storage, 'a')).toBe(false)
+    expect(storage.getItem('font-maker-jamo-groups')).toBe('{}')
+
+    expect(dropForeignCopy(storage, 'b')).toBe(true)
+    expect(storageValues.size).toBe(0)
+  })
+
   it('망가진 이름표는 주인 없음으로 읽는다', () => {
     storage.setItem(LOCAL_STAMP_KEY, '{oops')
     expect(readStamp(storage)).toEqual(stampOf({}))

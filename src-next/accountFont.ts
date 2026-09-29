@@ -18,7 +18,7 @@ export const LOCAL_FONT_KEYS = [
 ] as const
 
 /**
- * 폰트를 옮길 때는 남기고 로그아웃할 때만 지우는 키. 폰트 모양이 담겨 다음 사람에게 남기면 안 된다.
+ * 폰트를 옮길 때는 남기고 로그아웃하거나 계정이 바뀔 때만 지우는 키. 폰트 모양이 담겨 다음 사람에게 남기면 안 된다.
  * 충돌 백업(`CONFLICT_BACKUP_KEY`)은 폰트 전체 JSON, 사용자 묶음은 서버에 안 올라가는 묶음 부리 값.
  */
 export const SIGN_OUT_KEYS = [
@@ -77,7 +77,7 @@ export function clearLocalFont(storage: Storage): void {
   storage.removeItem(LOCAL_STAMP_KEY)
 }
 
-/** 로그아웃할 때 브라우저 사본과 함께 `SIGN_OUT_KEYS`도 지운다. 이름표도 지운다. */
+/** 로그아웃하거나 계정이 바뀔 때 브라우저 사본과 함께 `SIGN_OUT_KEYS`도 지운다. 이름표도 지운다. */
 export function clearSignedOutCopy(storage: Storage): void {
   clearLocalFont(storage)
   for (const key of SIGN_OUT_KEYS) storage.removeItem(key)
@@ -87,7 +87,7 @@ export function clearSignedOutCopy(storage: Storage): void {
 export function dropForeignCopy(storage: Storage, me: string): boolean {
   const { owner } = readStamp(storage)
   if (owner === null || owner === me) return false
-  clearLocalFont(storage)
+  clearSignedOutCopy(storage)
   return true
 }
 
