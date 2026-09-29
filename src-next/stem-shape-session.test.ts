@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { useJamoStore } from '../src/stores/jamoStore'
-import { boundStrokesOf } from '../src/services/stemMaster'
+import { applyMaster, boundStrokesOf, masterFromStroke } from '../src/services/stemMaster'
 import type { JamoData } from '../src/types'
 import { defaultPicked, keyOf, revertedFollowers, shapeAskOf } from './stemShapeSession'
 
@@ -57,5 +57,34 @@ describe('줄기 모양 반영 칸', () => {
     expect(revertedFollowers(both, base, ask, picked)['ㅖ']).toBeUndefined()
     picked.delete(key('ㅔ', INNER))
     expect(revertedFollowers(both, base, ask, picked)).toEqual({})
+  })
+})
+
+describe('빈 끝 기울기 = 모양', () => {
+  it('기본 홀자의 이름 있는 줄기는 곧은 마스터를 전부 따른다(빈 끝 축으로 바꿔도)', () => {
+    for (const jamo of Object.values(base)) expect(boundStrokesOf(jamo, {}).every((item) => item.follows)).toBe(true)
+  })
+
+  it('ㅏ 곁줄기 빈 끝을 올리면 ㅑ · ㅓ의 빈 끝도 위로 같은 em만큼, 붙은 끝은 그대로', () => {
+    const { channel, stroke } = idOf('ㅏ', 'gyeotjulgi.right.one.single')
+    const lifted = { ...stroke, points: stroke.points.map((point, index) => index === stroke.points.length - 1 ? { ...point, y: point.y - 0.1 } : point) }
+    const a = { ...base['ㅏ'], [channel]: base['ㅏ'][channel]!.map((item) => item.id === stroke.id ? lifted : item) }
+    const master = masterFromStroke(a, channel, stroke.id)!
+    expect(master.points[master.points.length - 1].o).toBeGreaterThan(0)
+    const masters = Object.fromEntries(['gyeotjulgi.right.upper.single', 'gyeotjulgi.left.one.single'].map((name) => [name, { ...master, name }]))
+    const ya = applyMaster(base['ㅑ'], {}, masters)!
+    const eo = applyMaster(base['ㅓ'], {}, masters)!
+    const yaUpper = ya.strokes!.find((item) => item.id === idOf('ㅑ', 'gyeotjulgi.right.upper.single').stroke.id)!
+    const yaBefore = idOf('ㅑ', 'gyeotjulgi.right.upper.single').stroke
+    // ㅑ 위 곁줄기: 붙은 끝(시작) 그대로, 빈 끝(끝) 위로.
+    expect(yaUpper.points[0]).toEqual(yaBefore.points[0])
+    expect(yaUpper.points[1].y).toBeLessThan(yaBefore.points[1].y)
+    // ㅓ 곁줄기는 거꾸로 그려져 빈 끝이 시작점이다 — 그쪽이 위로, 기둥에 붙은 끝은 그대로.
+    const eoStroke = eo.strokes!.find((item) => item.id === idOf('ㅓ', 'gyeotjulgi.left.one.single').stroke.id)!
+    const eoBefore = idOf('ㅓ', 'gyeotjulgi.left.one.single').stroke
+    expect(eoStroke.points[0].y).toBeLessThan(eoBefore.points[0].y)
+    expect(eoStroke.points[1]).toEqual(eoBefore.points[1])
+    // 받은 획은 새 마스터를 따른다.
+    expect(boundStrokesOf(eo, masters).find((item) => item.stroke.id === eoStroke.id)!.follows).toBe(true)
   })
 })

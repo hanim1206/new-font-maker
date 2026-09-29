@@ -55,7 +55,7 @@
 .shapeHead { display: flex; align-items: center; gap: 14px; padding: 6px 8px 12px; }
 .shapeDiff { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 12px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
 .shapeTitle { min-width: 0; }
-.shapeTitle h3 { font-size: 15px; font-weight: 700; }
+.shapeTitle h3 { font-size: 15px; font-weight: 700; word-break: keep-all; }
 .shapeTitle p { margin-top: 2px; color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 600; }
 .shapeTitle .applyApartCount { color: #d9480f; font-weight: 700; }
 /* 다른 갈래는 꺼진 채 보인다 — 받을 획만 진한 회색, 나머지 옅게, 점선 없음(따로가 아니라 아직 안 받은 것). 켜면 그 획이 주황. */

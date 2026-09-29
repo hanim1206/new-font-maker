@@ -297,3 +297,27 @@ test('기둥을 휘면 같은 갈래 글자가 다 퍼진 채 뜨고, 툭 친 �
   await expect.poll(() => jungseongOf(page, 'ㅑ'), { timeout: 5_000 }).not.toBe(yaBefore)
   expect(await jungseongOf(page, 'ㅓ')).toBe(eoBefore)
 })
+
+test('곁줄기 빈 끝을 올리면(기울기) 켠 다른 곁줄기도 같은 쪽으로 기운다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EC%95%84&mode=stroke&part=JU')
+  await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
+  const hit = page.locator('[data-editor-hit="stroke"][data-stroke-id="ㅏ-2"]')
+  for (let tap = 0; tap < 2; tap += 1) { await hit.dispatchEvent('pointerdown'); await hit.dispatchEvent('pointerup') }
+  const points = page.locator('[data-editor-point="hit"]')
+  await points.last().dispatchEvent('pointerdown')
+  await points.last().dispatchEvent('pointerup')
+  await page.keyboard.press('Shift+ArrowUp')
+  await page.keyboard.press('Shift+ArrowUp')
+  await expect.poll(() => jungseongOf(page, 'ㅓ'), { timeout: 5_000 }).not.toBe('null')
+  await page.getByTestId('workspace-back').click()
+  const sheet = page.getByTestId('stem-rail-apply')
+  await expect(sheet.getByTestId('stem-shape-section')).toHaveAttribute('data-leaf', /^gyeotjulgi\.right\.one/)
+  await sheet.locator('[data-kind="shape"][data-extra][data-char="ㅓ"]').click()
+  // ㅓ 곁줄기의 빈 끝(왼쪽, 첫 점)이 올라가고 기둥에 붙은 끝은 그대로.
+  const eoStroke = async () => JSON.parse(await jungseongOf(page, 'ㅓ')).strokes.find((stroke: { id: string }) => stroke.id === 'ㅓ-2').points as { x: number; y: number }[]
+  const before = await eoStroke()
+  await page.getByTestId('stem-rail-apply-go').click()
+  await expect(sheet).toHaveCount(0)
+  await expect.poll(async () => (await eoStroke())[0].y, { timeout: 5_000 }).toBeLessThan(before[0].y)
+  expect((await eoStroke())[1]).toEqual(before[1])
+})
