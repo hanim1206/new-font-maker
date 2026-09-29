@@ -1,5 +1,5 @@
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref, type RefObject, type TextareaHTMLAttributes } from 'react'
-import { Check, Circle, ClipboardPaste, Copy, Delete, Dices, Download, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, RotateCcw, Settings2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
+import { Check, Circle, ClipboardPaste, Copy, Dices, Download, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, RotateCcw, Settings2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { create } from 'zustand'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
@@ -97,6 +97,9 @@ import { endRangeDrag, moveRangeDrag, startRangeDrag } from './rangeDrag'
 import { DEFAULT_STEM_BEAK, type StemBeakStyle } from '../src/services/stemBeak'
 import styleMode from './GlobalStyleMode.module.css'
 import { GlobalStyleTrackpad, type GlobalStylePanel } from './GlobalStyleTrackpad'
+import { SentenceTextarea } from './SentenceTextarea'
+import { SentenceSheetControls, SentenceSheetRun } from './SentenceSheet'
+import { copyText, useSentenceSheet } from './sentenceSheetState'
 import { GRID_SYSTEM_2_STROKE_UNITS, GRID_SYSTEM_2_UNIT } from '../src/services/gridSystem2Geometry'
 import { ShapeRulePanel } from './ShapeRulePanel'
 import { isDeleteKey, isTypingTarget } from './workspace/keyboardShortcuts'
@@ -248,18 +251,6 @@ function initialFocus(): { char: string; sentence: string; custom: boolean } {
   return { char: requested, sentence: `${requested} ${base}`, custom: true }
 }
 
-// `문장` 전체 화면의 글자 크기(px). 왼쪽 세로 막대로 바꾸고, 바꾼 값은 이 기기에 남긴다.
-const SENTENCE_SHEET_EM = 64
-const SENTENCE_SHEET_EM_MIN = 32
-const SENTENCE_SHEET_EM_MAX = 128
-const SENTENCE_SHEET_EM_KEY = 'font-maker-sentence-sheet-em'
-function loadSentenceSheetEm(): number {
-  try {
-    const stored = Number(localStorage.getItem(SENTENCE_SHEET_EM_KEY))
-    return stored >= SENTENCE_SHEET_EM_MIN && stored <= SENTENCE_SHEET_EM_MAX ? stored : SENTENCE_SHEET_EM
-  } catch { return SENTENCE_SHEET_EM }
-}
-
 function tokenizeSentenceLine(line: string): Array<{ text: string; start: number; whitespace: boolean }> {
   const tokens: Array<{ text: string; start: number; whitespace: boolean }> = []
   for (const char of [...line]) {
@@ -271,22 +262,6 @@ function tokenizeSentenceLine(line: string): Array<{ text: string; start: number
   return tokens
 }
 
-async function copyText(text: string): Promise<void> {
-  if (navigator.clipboard && window.isSecureContext) {
-    await navigator.clipboard.writeText(text)
-    return
-  }
-  const textarea = document.createElement('textarea')
-  textarea.value = text
-  textarea.setAttribute('readonly', '')
-  textarea.style.position = 'fixed'
-  textarea.style.opacity = '0'
-  document.body.appendChild(textarea)
-  textarea.select()
-  const copied = document.execCommand('copy')
-  textarea.remove()
-  if (!copied) throw new Error('clipboard copy failed')
-}
 
 function withPreviewJamo(syllable: DecomposedSyllable, preview: PreviewJamo | null): DecomposedSyllable {
   if (!preview) return syllable
@@ -438,38 +413,6 @@ function LayoutAreaBoxes({
       />
     })}
   </g>
-}
-
-/**
- * 문장 입력칸. 칸 안 글자는 바로 바뀌고, 문장 그림(글자마다 획 맞추기 · 커서)은 전환으로 뒤따른다 — 치는 동안 입력이 막히지 않는다.
- * 늦게 돌아오는 내 값은 무시하고, 밖에서 바꾼 값(주사위 · 전체 삭제)만 칸에 받는다.
- */
-function SentenceTextarea({ value, onValueChange, onCaretChange, ref, ...rest }: Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange' | 'onSelect'> & {
-  value: string
-  onValueChange: (value: string) => void
-  onCaretChange?: (input: HTMLTextAreaElement) => void
-  ref?: Ref<HTMLTextAreaElement>
-}) {
-  const [draft, setDraft] = useState(value)
-  const sent = useRef<string[]>([])
-  useEffect(() => {
-    const index = sent.current.indexOf(value)
-    if (index >= 0) { sent.current = sent.current.slice(index + 1); return }
-    sent.current = []
-    setDraft(value)
-  }, [value])
-  return <textarea
-    {...rest}
-    ref={ref}
-    value={draft}
-    onChange={(event) => {
-      const input = event.target
-      setDraft(input.value)
-      sent.current.push(input.value)
-      startTransition(() => { onValueChange(input.value); onCaretChange?.(input) })
-    }}
-    onSelect={(event) => { const input = event.currentTarget; startTransition(() => onCaretChange?.(input)) }}
-  />
 }
 
 function Glyph({
@@ -1824,11 +1767,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const [sampleSentence, setSampleSentence] = useState<string>(focus.sentence)
   // 사용자가 문장을 바꾼 자리(주사위 · 입력 · 지우기)만 대시보드 문장에 쓴다. 글자를 골라 앞에 붙인 문장은 쓰지 않는다.
   const shareSentence = useFontExportStore((state) => state.setSampleSentence)
-  const [sheetEm, setSheetEm] = useState(loadSentenceSheetEm)
-  const changeSheetEm = (em: number) => {
-    setSheetEm(em)
-    try { localStorage.setItem(SENTENCE_SHEET_EM_KEY, String(em)) } catch { /* 못 남겨도 지금 화면은 바뀐다 */ }
-  }
   // 첫닿자 획 편집으로 열면 음절이 아니라 그 첫닿자 하나가 먼저 뜬다(`닿는 글자` 줄 맨 앞 칸). 들고 온 음절은 줄의 기준으로 남는다.
   const [soloEntry] = useState(() => chrome === 'workspace' && initialStrokePart() === 'CH' ? soloConsonantOf(focus.char) : null)
   const [selectedChar, setSelectedChar] = useState(soloEntry ?? focus.char)
@@ -1862,7 +1800,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const benchChars = useWorkbenchStore((state) => state.chars)
   // 섹션 홈 `편집 n`으로 들어왔는지. 돌아갈 곳(`returnTo`)이 있을 때만 — 레이아웃 카드로 들어오면 도마가 남아 있어도 아니다.
   const benchCarried = useWorkbenchStore((state) => state.type !== null && state.chars.length > 0 && state.returnTo !== null)
-  const [globalStylePanel, setGlobalStylePanel] = useState<GlobalStylePanel | null>(styleOnly ? 'body' : null)
+  // 대시보드 스타일 칸이 `?panel=beak`처럼 열 탭을 준다. 없으면 네모꼴(잠겨 있어 획 탭이 보인다).
+  const [globalStylePanel, setGlobalStylePanel] = useState<GlobalStylePanel | null>(() => {
+    if (!styleOnly) return null
+    const asked = new URLSearchParams(window.location.search).get('panel')
+    return asked === 'brush' || asked === 'beak' ? asked : 'body'
+  })
   const [previewBrush, setPreviewBrush] = useState<StrokeRenderStyle | null>(null)
   const [previewTone, setPreviewTone] = useState<StyleTone | null>(null)
   const [previewBeak, setPreviewBeak] = useState<StemBeakStyle | null>(null)
@@ -1882,17 +1825,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const [appliedScope, setAppliedScope] = useState<readonly ScopeRule[]>([])
   useEffect(() => { setAppliedScope([]) }, [selectedChar])
   const directInputRef = useRef<HTMLTextAreaElement>(null)
-  // 셸 안의 `문장` 전체 화면. 커서 자리는 글자 수(코드 포인트)로 센다.
-  const [sentenceSheetOpen, setSentenceSheetOpen] = useState(false)
-  // 줄어드는 동안만 true. 그동안은 여러 줄 그대로 줄어들고, 끝나면 한 줄로 돌아간다.
-  const [sentenceSheetClosing, setSentenceSheetClosing] = useState(false)
-  // 펼친 문장 줄의 높이(px). 열 때 편집부 자리 전체를 재서 그만큼 자란다.
-  const [sentenceSheetHeight, setSentenceSheetHeight] = useState(0)
-  const [sentenceCaret, setSentenceCaret] = useState(0)
-  // 고른 범위의 끝(글자 수). 커서만 있으면 `sentenceCaret`과 같다. 입력칸이 안 보이므로 범위는 문장 줄에 칠해 보인다.
-  const [sentenceSelectionEnd, setSentenceSelectionEnd] = useState(0)
-  const [sentenceCopied, setSentenceCopied] = useState(false)
-  const sheetInputRef = useRef<HTMLTextAreaElement>(null)
   const isGlobalStyleOpen = globalStylePanel !== null
   const isBrushStyleOpen = globalStylePanel === 'brush'
   // 셸 안에서는 글로벌 스타일을 연 동안 캔버스가 보기 전용이다(어느 탭이든, 어느 모드에서 열었든). 옛 단독 화면은 전처럼 획 스타일 탭에서만 잠근다.
@@ -2164,125 +2096,25 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       if (firstSyllable) chooseChar(firstSyllable)
     }
   }
-  // `문장` 전체 화면: 문장만 바꾸고 편집하던 글자는 그대로 둔다(문장에서 빠져도).
-  const openSentenceSheet = () => {
-    const area = sentenceRef.current?.parentElement
-    if (area) { area.scrollTop = 0; setSentenceSheetHeight(area.clientHeight) }
-    if (sentenceRef.current) sentenceRef.current.scrollLeft = 0
-    setSentenceCaret([...sampleSentence].length)
-    setSentenceSheetClosing(false)
-    setSentenceSheetOpen(true)
-  }
-  const closeSentenceSheet = () => {
-    sheetInputRef.current?.blur()
+  // 셸 안의 `문장` 전체 화면: 문장만 바꾸고 편집하던 글자는 그대로 둔다(문장에서 빠져도). 대시보드 카드와 같은 부품.
+  const sentenceSheet = useSentenceSheet({
+    sentence: sampleSentence,
+    rootRef: sentenceRef,
+    // 편집부 자리 전체를 재서 그만큼 자란다.
+    measureHeight: () => {
+      const area = sentenceRef.current?.parentElement
+      if (sentenceRef.current) sentenceRef.current.scrollLeft = 0
+      if (!area) return null
+      area.scrollTop = 0
+      return area.clientHeight
+    },
+    onType: (value) => { setSampleSentence(value); shareSentence(value); setIsCustomSentence(true) },
+    onRoll: (next) => { setSampleSentence(next); shareSentence(next); setIsCustomSentence(false) },
+    onClear: () => { setSampleSentence(''); setIsCustomSentence(true) },
     // 빈 문장으로 닫으면 작은 줄이 비므로 편집하던 글자 하나를 남긴다.
-    if (!sampleSentence.trim()) { setSampleSentence(selectedChar); shareSentence(selectedChar) }
-    setSentenceSheetOpen(false)
-    setSentenceSheetClosing(true)
-  }
-  // 펼친 동안 아래 버튼 바가 자판 위로 뜨게 자판 높이를 잰다(보이는 화면 아래 끝 ~ 창 아래 끝).
-  const [keyboardInset, setKeyboardInset] = useState(0)
-  useEffect(() => {
-    const viewport = window.visualViewport
-    if (!sentenceSheetOpen || !viewport) return
-    const measure = () => setKeyboardInset(Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop)))
-    measure()
-    viewport.addEventListener('resize', measure)
-    viewport.addEventListener('scroll', measure)
-    return () => {
-      viewport.removeEventListener('resize', measure)
-      viewport.removeEventListener('scroll', measure)
-      setKeyboardInset(0)
-    }
-  }, [sentenceSheetOpen])
-  // 줄어드는 시간(--motion-slow)이 지나면 한 줄로 돌아간다.
-  useEffect(() => {
-    if (!sentenceSheetClosing) return
-    const timer = window.setTimeout(() => setSentenceSheetClosing(false), 260)
-    return () => window.clearTimeout(timer)
-  }, [sentenceSheetClosing])
-  const placeSentenceCaret = (index: number) => {
-    setSentenceCaret(index)
-    const input = sheetInputRef.current
-    if (!input) return
-    // 누른 그 손길 안에서 포커스해야 폰 자판이 열린다.
-    input.focus({ preventScroll: true })
-    const offset = [...input.value].slice(0, index).join('').length
-    input.setSelectionRange(offset, offset)
-    setSentenceSelectionEnd(index)
-  }
-  const syncSentenceCaret = (input: HTMLTextAreaElement) => {
-    setSentenceCaret([...input.value.slice(0, input.selectionStart ?? input.value.length)].length)
-    setSentenceSelectionEnd([...input.value.slice(0, input.selectionEnd ?? input.value.length)].length)
-  }
-  // 마우스로 쓰는 화면에서는 펼치자마자 입력칸에 커서를 둔다(⌘V · ⌘A가 바로 먹게). 폰은 누를 때까지 자판을 안 연다.
-  useEffect(() => {
-    if (!sentenceSheetOpen || !window.matchMedia?.('(pointer: fine)').matches) return
-    placeSentenceCaret([...sampleSentence].length)
-  // 펼칠 때 한 번만.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sentenceSheetOpen])
-  // 고른 범위를 문장 줄 글자에 칠한다. 글자 그림은 입력칸과 따로라 DOM 표시로 얹는다.
-  useEffect(() => {
-    const root = sentenceRef.current
-    if (!root) return
-    const from = Math.min(sentenceCaret, sentenceSelectionEnd)
-    const to = Math.max(sentenceCaret, sentenceSelectionEnd)
-    root.querySelectorAll<HTMLElement>('[data-char-index]').forEach((element) => {
-      const index = Number(element.dataset.charIndex)
-      element.toggleAttribute('data-sheet-selected', sentenceSheetOpen && index >= from && index < to)
-    })
-  }, [sentenceSheetOpen, sentenceCaret, sentenceSelectionEnd, sampleSentence])
-  // 고른 범위가 있으면 그것만, 없으면 문장 전체를 복사한다.
-  const copySentence = () => {
-    const input = sheetInputRef.current
-    const wasFocused = Boolean(input && document.activeElement === input)
-    const text = input && input.selectionStart !== input.selectionEnd ? input.value.slice(input.selectionStart, input.selectionEnd) : sampleSentence
-    void copyText(text)
-      .then(() => { setSentenceCopied(true); window.setTimeout(() => setSentenceCopied(false), 1200) })
-      .catch(() => {})
-      .finally(() => { if (wasFocused) input?.focus({ preventScroll: true }) })
-  }
-  // 커서 자리에(고른 범위가 있으면 그 자리를 바꿔) 붙인다. 폰은 입력칸을 길게 누를 수 없어 이 단추가 붙여넣기 길이다.
-  const pasteSentence = () => {
-    const input = sheetInputRef.current
-    if (!input || !navigator.clipboard?.readText) return
-    if (document.activeElement !== input) {
-      input.focus({ preventScroll: true })
-      input.setSelectionRange(input.value.length, input.value.length)
-    }
-    void navigator.clipboard.readText().then((text) => {
-      if (!text) return
-      input.focus({ preventScroll: true })
-      // 브라우저 입력으로 넣어야 ⌘Z로 되돌릴 수 있다. 안 되는 브라우저는 직접 넣고 입력 이벤트를 쏜다.
-      if (!document.execCommand('insertText', false, text)) {
-        input.setRangeText(text, input.selectionStart, input.selectionEnd, 'end')
-        input.dispatchEvent(new Event('input', { bubbles: true }))
-      }
-    }).catch(() => {})
-  }
-  // 글자를 누르면 가까운 쪽 가장자리, 빈 곳을 누르면 문장 끝.
-  const pickSentenceCaret = (event: ReactMouseEvent<HTMLElement>) => {
-    if (!sentenceSheetOpen) return
-    const target = (event.target as HTMLElement).closest<HTMLElement>('[data-char-index]')
-    if (!target) return placeSentenceCaret([...sampleSentence].length)
-    const index = Number(target.dataset.charIndex)
-    const rect = target.getBoundingClientRect()
-    placeSentenceCaret(event.clientX < rect.left + rect.width / 2 ? index : index + 1)
-  }
-  const clearSentence = () => {
-    setSampleSentence('')
-    setIsCustomSentence(true)
-    placeSentenceCaret(0)
-  }
-  // 주사위는 비우지 않고 새 문장으로 바꾼다. 값이 바뀌면 입력칸 커서는 저절로 끝으로 간다.
-  const rollSentence = () => {
-    const nextSentence = randomSampleSentence(sampleSentence)
-    setSampleSentence(nextSentence)
-    shareSentence(nextSentence)
-    setIsCustomSentence(false)
-    setSentenceCaret([...nextSentence].length)
-  }
+    onClose: () => { if (!sampleSentence.trim()) { setSampleSentence(selectedChar); shareSentence(selectedChar) } },
+  })
+  const { open: sentenceSheetOpen, closing: sentenceSheetClosing, height: sentenceSheetHeight, em: sheetEm, openSheet: openSentenceSheet, closeSheet: closeSentenceSheet, pickCaret: pickSentenceCaret } = sentenceSheet
   const previewJamoWithContextSafety = (preview: PreviewJamo | null) => {
     if (!preview) {
       setPreviewJamo(null)
@@ -2737,27 +2569,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       </>}
     </nav>
   )
-  // 펼친 문장 줄의 글자들. 글자를 누르면 그 자리에 커서, 빈 곳은 끝. 편집은 열지 않는다.
-  const renderSheetRun = () => {
-    const chars = [...sampleSentence]
-    const caret = (key: string) => <span key={key} className={styles.directInputCaret} aria-hidden="true" data-testid="sentence-sheet-caret" />
-    const withCaret = (char: string, index: number) => index === sentenceCaret ? [caret(`caret-${index}`), renderSentenceCharacter(char, index, 0, true)] : [renderSentenceCharacter(char, index, 0, true)]
-    return <>
-      {/* 단어와 뒤 공백을 한 덩어리로 묶어 줄이 바뀔 때 공백이 다음 줄 앞에 서지 않게 한다. 엔터(\n)는 줄을 끊는다. */}
-      {chars.reduce<({ kind: 'word'; start: number; text: string } | { kind: 'break'; index: number })[]>((groups, char, index) => {
-        const last = groups.at(-1)
-        if (char === '\n') groups.push({ kind: 'break', index })
-        else if (last?.kind === 'word' && (/\s/u.test(char) || !/\s$/u.test(last.text))) last.text += char
-        else groups.push({ kind: 'word', start: index, text: char })
-        return groups
-      }, []).map((group, groupIndex, groups) => group.kind === 'break'
-        // 빈 줄(엔터 두 번 · 맨 앞 엔터)도 한 줄 높이를 차지하게 폭 없는 버팀목을 세운다.
-        ? [(groupIndex === 0 || groups[groupIndex - 1].kind === 'break') && <span key={`empty-${group.index}`} className={styles.emptyLine} aria-hidden="true" />, group.index === sentenceCaret && caret(`caret-${group.index}`), <span key={`break-${group.index}`} className={styles.lineBreak} aria-hidden="true" />]
-        : <span key={`word-${group.start}`} className={styles.wordRun}>{[...group.text].flatMap((char, index) => withCaret(char, group.start + index))}</span>)}
-      {sentenceCaret >= chars.length && caret('caret-end')}
-      {chars.length === 0 && <span className={styles.sentenceSheetHint}>고칠 글자가 든 문장을 적어 보세요</span>}
-    </>
-  }
   const body = (
     <>
       {/* 문장 줄부터 편집부까지 한 덩어리. 레이아웃 모드에서만 세로로 밀린다 — `내 문장`이 위로 빠지고 `닿는 글자` 줄이 그 자리에 붙는다.
@@ -2770,30 +2581,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         <div className={styles.sentenceActions}>
           <button type="button" className={styles.sentenceOpen} onClick={(event) => { event.stopPropagation(); if (sentenceSheetOpen) closeSentenceSheet(); else openSentenceSheet() }} aria-label={sentenceSheetOpen ? '문장 접기' : '문장 크게 보기 · 바꾸기'} aria-expanded={sentenceSheetOpen} title={sentenceSheetOpen ? '문장 접기' : '문장 크게 보기 · 바꾸기'} data-testid="sentence-sheet-toggle">{sentenceSheetOpen ? <X size={19} aria-hidden="true" /> : <ZoomIn size={19} aria-hidden="true" />}</button>
         </div>
-        {sentenceSheetOpen && <>
-          <SentenceTextarea
-            ref={sheetInputRef}
-            className={styles.sheetInput}
-            value={sampleSentence}
-            onValueChange={(value) => { setSampleSentence(value); shareSentence(value); setIsCustomSentence(true) }}
-            onCaretChange={syncSentenceCaret}
-            aria-label="문장 입력"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-          />
-          {/* 글자 크기: 왼쪽 회색 세로 막대, 위로 올리면 커진다. */}
-          <input type="range" className={styles.sheetSize} min={SENTENCE_SHEET_EM_MIN} max={SENTENCE_SHEET_EM_MAX} step={4} value={sheetEm}
-            onChange={(event) => changeSheetEm(Number(event.target.value))} onClick={(event) => event.stopPropagation()}
-            aria-label="문장 글자 크기" aria-orientation="vertical" data-testid="sentence-sheet-size" />
-          {/* 아래 버튼 바. 화면 아래에 떠 있고, 자판이 열리면 자판 위로 올라간다. 누를 때 입력칸 포커스를 뺏지 않아 자판이 닫히지 않는다. */}
-          <div className={styles.sentenceSheetBar} style={{ '--keyboard-inset': `${keyboardInset}px` } as CSSProperties} onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.preventDefault()} onMouseDown={(event) => event.preventDefault()}>
-            <button type="button" onClick={rollSentence} aria-label="예시 문장 바꾸기" data-testid="sentence-sheet-roll"><Dices size={18} aria-hidden="true" />다른 문장</button>
-            <button type="button" onClick={clearSentence} disabled={sampleSentence.length === 0} aria-label="문장 전체 삭제" data-testid="sentence-sheet-clear"><Delete size={18} aria-hidden="true" />전체 삭제</button>
-            <button type="button" className={styles.sentenceSheetIcon} onClick={copySentence} disabled={sampleSentence.length === 0} aria-label={sentenceCopied ? '복사함' : '문장 복사'} title="복사" data-testid="sentence-sheet-copy">{sentenceCopied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}</button>
-            <button type="button" className={styles.sentenceSheetIcon} onClick={pasteSentence} aria-label="붙여넣기" title="붙여넣기" data-testid="sentence-sheet-paste"><ClipboardPaste size={18} aria-hidden="true" /></button>
-          </div>
-        </>}
+        <SentenceSheetControls sheet={sentenceSheet} />
         </> : <>
         <div className={styles.sentenceActions}>
           <button type="button" onClick={pickSampleSentence} aria-label="예시 문장 무작위 선택" title="예시 문장 바꾸기"><Dices size={19} aria-hidden="true" /></button>
@@ -2813,8 +2601,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         />
         </>}
         {/* 줄 key는 순번. 문장 글자로 두면 한 글자 칠 때마다 줄 안 글자가 전부 새로 만들어져 움찔거리고 획 맞추기를 처음부터 다시 한다. */}
-        {calibrationLines.map((line, lineIndex) => <div key={lineIndex} className={`${styles.sentenceRun} ${chrome === 'workspace' ? styleMode.run : ''}`} style={{ fontSize: sentenceSheetOpen ? sheetEm : styleSpaceOpen ? STYLE_SPACE_EM : sentenceEm }}>
-          {sentenceSheetOpen ? renderSheetRun() : tokenizeSentenceLine(line).map((token) => token.whitespace
+        {calibrationLines.map((line, lineIndex) => <div key={`${lineIndex}-${sentenceSheet.rolled}`} className={`${styles.sentenceRun} ${chrome === 'workspace' ? styleMode.run : ''} ${sentenceSheet.rolled > 0 ? styles.sentenceRolled : ''}`} style={{ fontSize: sentenceSheetOpen ? sheetEm : styleSpaceOpen ? STYLE_SPACE_EM : sentenceEm }}>
+          {sentenceSheetOpen ? <SentenceSheetRun sheet={sentenceSheet} renderChar={(char, index) => renderSentenceCharacter(char, index, 0, true)} /> : tokenizeSentenceLine(line).map((token) => token.whitespace
             ? [...token.text].map((char, index) => renderSentenceCharacter(char, token.start + index, lineIndex))
             : <span key={`${lineIndex}-word-${token.start}`} className={styles.wordRun}>{[...token.text].map((char, index) => renderSentenceCharacter(char, token.start + index, lineIndex))}</span>
           )}
