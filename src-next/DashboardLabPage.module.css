@@ -20,26 +20,53 @@
 .head .avatar:active { background: rgb(var(--color-surface-2)); }
 .avatarDot { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border-radius: 999px; background: rgb(240 68 82); box-shadow: 0 0 0 2px rgb(var(--color-surface)); }
 
-.scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+/* 스크롤바 자리는 늘 비워 둔다 — 카드를 펼치는 동안 판을 잠그면 스크롤바가 빠져 폭이 바뀌고, 닫을 때 카드가 튄다. */
+.scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 /* 다른 폰트로 옮겨 가는 중. 판을 흐리고 막는다 — 다시 열리면 `index.html` 뼈대가 이어받는다. */
 .scroll[data-moving] { opacity: .35; pointer-events: none; transition: opacity var(--motion-normal) var(--ease-standard); }
 
 /* 폰트 카드 캐러셀. 스냅 한 장씩, 다음 카드가 조금 보인다. 활성 카드만 또렷하다. */
 .fontCardRow { padding: 14px 16px; }
-.card { display: flex; flex-direction: column; gap: 12px; min-height: 148px; box-sizing: border-box; padding: 14px 16px; border-radius: 16px; background: rgb(var(--color-surface-2)); }
-.card header { display: flex; align-items: baseline; gap: 8px; }
+.card { position: relative; display: flex; flex-direction: column; gap: 12px; min-height: 148px; box-sizing: border-box; padding: 14px 16px; border-radius: 16px; background: rgb(var(--color-surface-2)); }
+.card header { display: flex; align-items: baseline; gap: 8px; padding-right: 32px; }
 .card header strong { min-width: 0; overflow: hidden; font-size: 15px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
-.card header span { color: rgb(var(--color-text-4)); font-size: 12px; white-space: nowrap; }
-.sentence { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 10px; line-height: 0; }
-.word { display: inline-flex; white-space: nowrap; }
-.word svg { display: block; }
+/* 주사위는 카드 머리 줄 오른쪽 — 문장을 바꾸는 단추라 문장 바로 위에. */
+.cardDice { position: absolute; top: 7px; right: 6px; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-4)); transition: background var(--motion-fast) var(--ease-standard), opacity var(--motion-slow) var(--ease-standard); }
+.cardDice:active { background: rgb(var(--color-foreground) / .07); }
+/* 카드 문장 줄. 편집기 문장 줄(`.sentence` · 펼침 규칙)을 그대로 쓴다. 접힌 모양만 카드에 맞춘다: 여러 줄로 감기고 바탕 · 밑줄 없음. 누르면 펼친다. */
+.card:not([data-sheet-wrap]) section.sentence { flex: none; height: auto; margin: 0 -16px; padding: 0 16px; overflow: visible; border-bottom: 0; background: transparent; cursor: text; }
+/* 늘 두 줄 높이(1em = 34px). 넘치는 글자는 끊고 `…`를 붙인다(TSX). */
+.card:not([data-sheet-wrap]) .sentenceText { flex: 1 1 auto; row-gap: 6px; height: calc(2em + 6px); overflow: hidden; }
+.card:not([data-sheet-wrap]) section.sentence:active .sentenceText { opacity: .6; }
+/* 펼침: 카드째(회색 바탕까지) 지금 자리에 떠서 머리 아래 판 전체로 자라고 흰 바탕 · 각진 모서리가 된다(편집기 펼친 줄과 같은 화면).
+   카드 머리 · 주사위 · 아래 버튼은 흐려지며 빠진다. 접으면 대역 카드(`.cardGhost`) 자리 · 크기로 줄어든다. */
+.card[data-sheet-wrap] { position: absolute; z-index: 30; top: var(--from-top); left: var(--from-left); width: var(--from-w); height: var(--from-h); min-height: 0; padding: 0; overflow: hidden; transition: top var(--motion-slow) var(--ease-standard), left var(--motion-slow) var(--ease-standard), width var(--motion-slow) var(--ease-standard), height var(--motion-slow) var(--ease-standard), border-radius var(--motion-slow) var(--ease-standard), background var(--motion-slow) var(--ease-standard); }
+.card[data-sheet] { top: var(--area-top); left: 0; width: 100%; height: var(--sheet-h); border-radius: 0; background: rgb(var(--color-surface)); }
+.card[data-sheet-wrap] > header { position: absolute; top: 14px; left: 16px; right: 16px; transition: opacity var(--motion-slow) var(--ease-standard); }
+.card[data-sheet-wrap] > footer { position: absolute; right: 16px; bottom: 14px; left: 16px; transition: opacity var(--motion-slow) var(--ease-standard); }
+.card[data-sheet] > header, .card[data-sheet] > footer, .card[data-sheet] > .cardDice { opacity: 0; pointer-events: none; }
+/* 문장 줄은 카드를 다 채운다. 접히는 동안은 카드 안 자리(머리 아래 · 버튼 위), 펼치면 편집기 자리(위 10 · 왼쪽 막대 44). */
+.card[data-sheet-wrap] section.sentence { position: absolute; inset: 0; height: auto; margin: 0; padding: calc(26px + var(--head-h)) 16px calc(26px + var(--foot-h)); border-bottom: 0; background: transparent; transition: padding var(--motion-slow) var(--ease-standard); }
+.card[data-sheet] section.sentence { padding: 10px 0 0 44px; }
+.card[data-sheet-wrap]:not([data-sheet]) .sentenceText { padding-right: 0; row-gap: 6px; }
+/* 글자 줄 오른쪽 여백(0 ↔ 48)도 카드 폭 · 글자 크기와 같은 속도로 — 하나만 먼저 바뀌면 중간에 줄이 한 번 더 꺾였다 풀린다. */
+.card[data-sheet-wrap] .sentenceText { transition: font-size var(--motion-slow) var(--ease-standard), padding-right var(--motion-slow) var(--ease-standard); }
+.card[data-sheet-wrap]:not([data-sheet]) .sentenceText > * { margin-bottom: 0; }
+/* 닫기(X)는 편집기 펼친 줄과 같은 자리: 윗줄 44px 가운데, 오른쪽 10px. 펼칠 때 나타난다. */
+.card section.sentence > .sheetClose { top: 4px; right: 10px; translate: none; animation: fadeIn var(--motion-slow) var(--ease-standard); }
+@media (prefers-reduced-motion: reduce) { .card[data-sheet-wrap], .card[data-sheet-wrap] > header, .card[data-sheet-wrap] > footer, .card[data-sheet-wrap] section.sentence, .card[data-sheet-wrap] .sentenceText, .card section.sentence > .sheetClose { transition: none; animation: none; } }
+.card[data-sheet-snap], .card[data-sheet-snap] * { transition: none !important; }
+.cardGhost { visibility: hidden; }
+.ghostButton { width: 40px; height: 40px; }
+/* 펼친 동안 판을 굴리지 않는다. */
+.scroll:has(.card[data-sheet-wrap]) { overflow: hidden; }
+.sentenceGlyph { display: inline-flex; overflow: visible; line-height: 0; }
+.sentenceGlyph svg { flex: none; margin-left: calc(var(--bearing) * -1em); }
 
 /* 카드 안 추출 버튼. 워크스페이스 폰트 탭의 `OTF 추출`과 같은 생김새. */
 .card footer { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: auto; }
 /* `…` 더보기. 다운로드 옆 같은 크기의 원, 색은 옅게 — 주 동작은 다운로드. */
 .more { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); }
-/* 주사위만 왼쪽 끝으로. */
-.roll { margin-right: auto; }
 /* 카드 `…` 시트. 화면 아래에 좌우 12px 띄워 뜨고, 뒤는 머리까지 어둡게. 셸 너비(480)를 넘지 않는다. */
 .menuSheetLayer { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; background: rgb(0 0 0 / .36); transition: padding-bottom var(--motion-normal) var(--ease-standard); animation: fadeIn var(--motion-normal) var(--ease-standard); }
 .menuSheet { width: min(100%, 480px); box-sizing: border-box; margin: 0 12px calc(env(safe-area-inset-bottom) + 12px); padding: 10px; border-radius: 28px; background: rgb(var(--color-surface)); display: flex; flex-direction: column; animation: sheetUp 360ms cubic-bezier(0.32, 0.72, 0, 1); }
@@ -96,7 +123,12 @@
 
 /* 스타일 타일 넷. 글자 하나에 값 하나. */
 .tiles { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.tiles li { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0 8px; border-radius: 12px; background: rgb(var(--color-surface-2)); }
+.tiles li { display: flex; }
+/* 칸 전체가 버튼. 값 옆 `›`로 누를 수 있다는 걸 보인다. */
+.tile { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0 8px; border: 0; border-radius: 12px; background: rgb(var(--color-surface-2)); color: inherit; font: inherit; cursor: pointer; }
+.tile:active { background: rgb(var(--color-surface-3)); }
+.tile strong { display: inline-flex; align-items: center; gap: 1px; }
+.tileGo { margin-right: -8px; color: rgb(var(--color-text-4)); }
 .tiles em { color: rgb(var(--color-text-4)); font-size: 11px; font-style: normal; }
 .tiles strong { font-size: 12.5px; font-weight: 750; font-variant-numeric: tabular-nums; }
 
