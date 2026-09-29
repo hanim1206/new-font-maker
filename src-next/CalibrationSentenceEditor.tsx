@@ -28,6 +28,7 @@ import { groupMatching, useJamoGroupStore } from '../src/stores/jamoGroupStore'
 import confirmStyles from './workspace/FontExportDialog.module.css'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import { moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStroke } from '../src/services/editorCommands'
+import { storedStemDelta } from '../src/services/stemBend'
 import { JamoScaleSlider } from './JamoScaleSlider'
 import { scaleLayoutParts, translateLayoutParts } from '../src/services/layoutProfileCommands'
 import { getRenderedStrokeTargets } from '../src/services/mobileEditorContext'
@@ -1081,8 +1082,15 @@ function InferenceTrackpad({
       updateInkGapLimiter(safeFactor < 0.9999 ? schemaInkGapViolation(createCandidate(1)) : null)
       onPreviewSchema({ layoutType, schema: next })
     } else if (selection.kind !== 'none' && startJamo.current) {
+      // 화면의 홀자 줄기는 받침 있는 칸에서도 em 휨을 지켜 놓여 있다(`placeStemStroke`). 끝점이 아닌 점 · 핸들의 이동량은 저장 좌표로 되돌린다.
+      const toStored = (movement: StrokeMoveDelta): StrokeMoveDelta => {
+        if (selection.kind !== 'point' && selection.kind !== 'handle') return movement
+        const stroke = getJamoStrokes(startJamo.current!).find((item) => item.id === selection.strokeId)
+        if (!stroke || selection.kind === 'point' && (selection.pointIndex === 0 || selection.pointIndex === stroke.points.length - 1)) return movement
+        return storedStemDelta(startJamo.current!, stroke, selection.box, movement)
+      }
       const createCandidate = (factor: number) => {
-        const movementAtFactor = { x: normalized.x * factor, y: normalized.y * factor }
+        const movementAtFactor = toStored({ x: normalized.x * factor, y: normalized.y * factor })
         const moved = selection.kind === 'stroke'
           ? moveStroke(startJamo.current!, selection.strokeId, movementAtFactor, editBounds(startJamo.current!), moveGridStep())
           : selection.kind === 'point'

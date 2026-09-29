@@ -12,6 +12,7 @@ import type {
 import { classifyJungseong } from '../utils/hangulUtils'
 import { COMPOUND_JONGSEONG } from '../utils/jamoLinkUtils'
 import { getJamoRenderBox } from '../utils/jamoGeometry'
+import { placeStemStroke } from './stemBend'
 
 const CHOSEONG_CAROUSEL = [
   'ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ',
@@ -282,7 +283,8 @@ function targets(
 ): RenderedStrokeTarget[] {
   if (!jamo || !strokes || !box) return []
   const renderedBox = getJamoRenderBox(jamo, strokes, box)
-  return strokes.map((stroke) => ({ editorPart, renderPart, jamo, stroke, box: renderedBox }))
+  // 홀자 줄기는 화면(`resolveGlyphInkPrimitives`)과 같이 이 칸에서도 받침 없는 칸의 em 휨을 지켜 보여 준다.
+  return strokes.map((stroke) => ({ editorPart, renderPart, jamo, stroke: editorPart === 'JU' ? placeStemStroke(jamo, stroke, renderedBox) : stroke, box: renderedBox }))
 }
 
 export function getRenderedStrokeTargets(

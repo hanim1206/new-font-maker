@@ -15,6 +15,7 @@ import { resolveSyllableContextualInkSafety } from '../utils/contextualInkSafety
 import { getJamoRenderBox } from '../utils/jamoGeometry'
 import { calculateBoxes } from '../utils/layoutCalculator'
 import { familyOfSyllable, strokesForFamily } from '../utils/jamoContextStrokes'
+import { placeStemStroke } from './stemBend'
 
 const DEFAULT_HORIZONTAL_INK_BOUNDS = { min: 0, max: 1 } as const
 
@@ -164,7 +165,8 @@ function resolvePartPrimitives(
       coordinateSpace: 'stroke-local-with-glyph-box',
       id: primitiveId(source),
       source,
-      stroke,
+      // 홀자 줄기는 이 칸에서도 받침 없는 칸의 em 휨을 지킨다(곧은 획은 그대로).
+      stroke: part === 'CH' || part === 'JO' ? stroke : placeStemStroke(selected.jamo, stroke, box, channel),
       box: { ...box },
       weightMultiplier: input.weightMultiplier,
       effectiveLinecap: stroke.linecap ?? input.globalLinecap ?? 'round',

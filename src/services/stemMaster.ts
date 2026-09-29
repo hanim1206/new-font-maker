@@ -84,6 +84,11 @@ const MIN_BOX_EM = 0.001
  */
 const THIN_BOX_EM = 0.05
 
+/** 이 홀자 채널이 칸 표에 있는가. 없으면 `medialBoxEmOf`가 1×1을 돌려준다. */
+export function hasMedialBoxEm(char: string, channel: JamoChannel): boolean {
+  return Boolean(BOX_TABLE[char]?.[channel])
+}
+
 /** 이 홀자 채널의 평균 칸. `final`을 안 주면 받침 없음 · 있음의 평균. 표에 없으면 1×1. */
 export function medialBoxEmOf(char: string, channel: JamoChannel, final?: 'open' | 'closed'): BoxEm {
   const entry = BOX_TABLE[char]?.[channel]
@@ -169,7 +174,7 @@ export function boundStrokesOf(jamo: JamoData, masters: StemMasters): BoundStrok
     return strokes.flatMap((stroke) => {
       const name = masterNameOf(jamo, strokes, stroke.id)
       if (!name) return []
-      const box = medialBoxEmOf(jamo.char, channel)
+      const box = medialBoxEmOf(jamo.char, channel, 'open')
       const blocked = thinBox(stroke, box)
       return [{ channel, stroke, name, follows: !blocked && followsMaster(stroke, masterOf(masters, name), box), blocked }]
     })
@@ -186,7 +191,7 @@ export function applyMaster(jamo: JamoData, before: StemMasters, after: StemMast
   for (const channel of JAMO_CHANNELS) {
     const strokes = jamo[channel]
     if (!strokes) continue
-    const box = medialBoxEmOf(jamo.char, channel)
+    const box = medialBoxEmOf(jamo.char, channel, 'open')
     const rewritten = strokes.map((stroke) => {
       const name = masterNameOf(jamo, strokes, stroke.id)
       if (!name || thinBox(stroke, box)) return stroke
@@ -209,7 +214,7 @@ export function refollow(jamo: JamoData, masters: StemMasters, channel: JamoChan
   if (!strokes) return null
   const name = masterNameOf(jamo, strokes, strokeId)
   if (!name) return null
-  const box = medialBoxEmOf(jamo.char, channel)
+  const box = medialBoxEmOf(jamo.char, channel, 'open')
   const master = masterOf(masters, name)
   const index = strokes.findIndex((stroke) => stroke.id === strokeId)
   if (index < 0 || thinBox(strokes[index], box) || followsMaster(strokes[index], master, box)) return null

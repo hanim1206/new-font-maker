@@ -109,10 +109,10 @@ describe('마스터 바꾸기와 다시 따르기', () => {
     const released = { ...curved, strokes: curved.strokes!.map((stroke, index) => index === 2 ? { ...stroke, points: [{ x: 1, y: 0 }, { x: 0.9, y: 1 }] } : stroke) }
     const flatter: StemMaster = { name: 'gidung', points: [{ t: 0, o: 0, handleOut: { t: 0.4, o: 0.01 } }, { t: 1, o: 0 }] }
     const next = applyMaster(released, { gidung: bent }, { gidung: flatter })!
-    expect(next.strokes![0].points[0].handleOut!.x).toBeCloseTo(0.01 / medialBoxEmOf('ㅐ', 'strokes').width)
+    expect(next.strokes![0].points[0].handleOut!.x).toBeCloseTo(0.01 / medialBoxEmOf('ㅐ', 'strokes', 'open').width)
     expect(next.strokes![2]).toBe(released.strokes![2])
     const back = refollow(next, { gidung: flatter }, 'strokes', 'ㅐ-3')!
-    expect(followsMaster(back.strokes![2], flatter, medialBoxEmOf('ㅐ', 'strokes'))).toBe(true)
+    expect(followsMaster(back.strokes![2], flatter, medialBoxEmOf('ㅐ', 'strokes', 'open'))).toBe(true)
     expect(refollow(back, { gidung: flatter }, 'strokes', 'ㅐ-3')).toBeNull()
   })
 
@@ -125,9 +125,9 @@ describe('마스터 바꾸기와 다시 따르기', () => {
 describe('G1 홀드아웃', () => {
   it('곁줄기 마스터: ㅏ의 긴 곁줄기와 ㅔ의 짧은 곁줄기가 같은 em만큼 휜다', () => {
     const bow: StemMaster = { name: 'gyeotjulgi', points: [{ t: 0, o: 0, handleOut: { t: 0.5, o: 0.02 } }, { t: 1, o: 0 }] }
-    const a = instanceOf(line('ㅏ-2', [0, 0.5], [1, 0.5]), bow, medialBoxEmOf('ㅏ', 'strokes'))
-    const e = instanceOf(line('ㅔ-2', [0, 0.5], [0.5, 0.5]), bow, medialBoxEmOf('ㅔ', 'strokes'))
-    const liftEm = (stroke: StrokeDataV2, char: string) => (0.5 - stroke.points[0].handleOut!.y) * medialBoxEmOf(char, 'strokes').height
+    const a = instanceOf(line('ㅏ-2', [0, 0.5], [1, 0.5]), bow, medialBoxEmOf('ㅏ', 'strokes', 'open'))
+    const e = instanceOf(line('ㅔ-2', [0, 0.5], [0.5, 0.5]), bow, medialBoxEmOf('ㅔ', 'strokes', 'open'))
+    const liftEm = (stroke: StrokeDataV2, char: string) => (0.5 - stroke.points[0].handleOut!.y) * medialBoxEmOf(char, 'strokes', 'open').height
     expect(liftEm(a, 'ㅏ')).toBeCloseTo(0.02, 5)
     expect(liftEm(e, 'ㅔ')).toBeCloseTo(0.02, 5)
     // 축 방향 자리는 길이에 비례한다(몸통만 늘이기).
