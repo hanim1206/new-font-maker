@@ -32,5 +32,18 @@
       "mcp__Claude_Preview__preview_start",
       "mcp__Claude_in_Chrome__tabs_context_mcp"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r \".tool_input.command // empty\" | grep -Eq \"(^|[;&|[:space:]])git[[:space:]]+(add[[:space:]]+(-A|--all|\\.)([[:space:]]|$)|commit[[:space:]]+-[a-zA-Z]*a[a-zA-Z]*([[:space:]]|$))\" && { echo \"막음: 병렬 세션이 도는 레포라 git add -A / git add . / git commit -a 금지. 경로 지정이나 헝크 선별로 스테이징할 것.\" >&2; exit 2; } || exit 0"
+          }
+        ]
+      }
+    ]
   }
 }
