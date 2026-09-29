@@ -38,6 +38,12 @@ export async function showDevLab(show: (node: ReactNode) => void): Promise<boole
     return true
   }
 
+  if (path === '/stem-master-lab') {
+    const { StemMasterLabPage } = await import('./StemMasterLabPage')
+    show(<StemMasterLabPage />)
+    return true
+  }
+
   if (path === '/preset-candidate-lab') {
     const { PresetCandidateLabPage } = await import('./PresetCandidateLabPage')
     show(<PresetCandidateLabPage />)

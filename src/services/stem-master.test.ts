@@ -1,0 +1,123 @@
+import { describe, expect, it } from 'vitest'
+import type { JamoData, StrokeDataV2 } from '../types'
+import { applyMaster, boundStrokesOf, followsMaster, instanceOf, masterNameOf, masterOf, medialBoxEmOf, refollow, straightMaster, thinBox, type StemMaster } from './stemMaster'
+
+const line = (id: string, from: [number, number], to: [number, number]): StrokeDataV2 => ({ id, points: [{ x: from[0], y: from[1] }, { x: to[0], y: to[1] }], closed: false, thickness: 0.07 })
+const bent: StemMaster = { name: 'gidung', points: [{ t: 0, o: 0, handleOut: { t: 0.4, o: 0.03 } }, { t: 1, o: 0, handleIn: { t: 0.7, o: -0.01 } }] }
+const SQUARE = { width: 1, height: 1 }
+
+describe('마스터 → 인스턴스', () => {
+  it('곧은 마스터는 획을 그대로 둔다', () => {
+    const stroke = line('ㅣ-1', [0, 0], [0, 1])
+    expect(instanceOf(stroke, straightMaster('gidung'), SQUARE).points).toEqual(stroke.points)
+    expect(followsMaster(stroke, straightMaster('gidung'), SQUARE)).toBe(true)
+  })
+
+  it('휜 마스터는 끝점을 두고 사이 핸들만 오프셋만큼 옮긴다 — 위→아래 기둥은 +o가 오른쪽', () => {
+    const next = instanceOf(line('ㅣ-1', [0.5, 0], [0.5, 1]), bent, SQUARE)
+    expect(next.points[0]).toMatchObject({ x: 0.5, y: 0 })
+    expect(next.points[1]).toMatchObject({ x: 0.5, y: 1 })
+    expect(next.points[0].handleOut!.x).toBeCloseTo(0.53)
+    expect(next.points[0].handleOut!.y).toBeCloseTo(0.4)
+    expect(next.points[1].handleIn!.x).toBeCloseTo(0.49)
+  })
+
+  it('오프셋은 상자가 아니라 글자 폭 기준이라 좁은 상자에서 상자 좌표로는 더 크게 휜다', () => {
+    const wide = instanceOf(line('a', [0, 0], [0, 1]), bent, { width: 0.2, height: 0.9 })
+    const narrow = instanceOf(line('a', [0, 0], [0, 1]), bent, { width: 0.1, height: 0.9 })
+    expect(wide.points[0].handleOut!.x).toBeCloseTo(0.15)
+    expect(narrow.points[0].handleOut!.x).toBeCloseTo(0.3)
+  })
+
+  it('가로줄기는 수직이 y다 — 왼→오른 보는 +o가 위', () => {
+    const next = instanceOf(line('ㅡ-1', [0, 0.5], [1, 0.5]), { ...bent, name: 'bo' }, { width: 0.75, height: 0.2 })
+    expect(next.points[0].handleOut!.y).toBeCloseTo(0.5 - 0.03 / 0.2)
+    expect(next.points[0].handleOut!.x).toBeCloseTo(0.4)
+  })
+
+  it('따름 판정: 인스턴스와 같으면 따르고, 점을 옮기면 풀린다', () => {
+    const stroke = instanceOf(line('a', [0, 0], [0, 1]), bent, SQUARE)
+    expect(followsMaster(stroke, bent, SQUARE)).toBe(true)
+    expect(followsMaster(stroke, straightMaster('gidung'), SQUARE)).toBe(false)
+    const moved = { ...stroke, points: [stroke.points[0], { ...stroke.points[1], handleIn: { x: 0.2, y: 0.7 } }] }
+    expect(followsMaster(moved, bent, SQUARE)).toBe(false)
+  })
+})
+
+describe('이름과 표', () => {
+  const ae: JamoData = { char: 'ㅐ', type: 'jungseong', strokes: [line('ㅐ-1', [0, 0], [0, 1]), line('ㅐ-2', [0, 0.5], [1, 0.5]), line('ㅐ-3', [1, 0], [1, 1])] }
+  const a: JamoData = { char: 'ㅏ', type: 'jungseong', strokes: [line('ㅏ-1', [0, 0], [0, 1]), line('ㅏ-2', [0, 0.5], [1, 0.5])] }
+
+  it('기둥이 둘이면 왼쪽이 기둥.안쪽, 하나면 기둥', () => {
+    expect(masterNameOf(ae, ae.strokes!, 'ㅐ-1')).toBe('gidung.inner')
+    expect(masterNameOf(ae, ae.strokes!, 'ㅐ-3')).toBe('gidung')
+    expect(masterNameOf(ae, ae.strokes!, 'ㅐ-2')).toBe('geolchim')
+    expect(masterNameOf(a, a.strokes!, 'ㅏ-1')).toBe('gidung')
+    expect(masterNameOf(a, a.strokes!, 'stroke-123')).toBeNull()
+  })
+
+  it('기둥.안쪽 마스터가 없으면 기둥을 따르고, 있으면 제 것', () => {
+    expect(masterOf({ gidung: bent }, 'gidung.inner').points).toEqual(bent.points)
+    const inner: StemMaster = { name: 'gidung.inner', points: [{ t: 0, o: 0 }, { t: 1, o: 0 }] }
+    expect(masterOf({ gidung: bent, 'gidung.inner': inner }, 'gidung.inner')).toBe(inner)
+    expect(masterOf({}, 'bo')).toEqual(straightMaster('bo'))
+  })
+
+  it('칸 표: 받침 없음 · 있음 · 평균, 두께 0인 변은 바닥값', () => {
+    expect(medialBoxEmOf('ㅏ', 'strokes', 'open').height).toBeGreaterThan(medialBoxEmOf('ㅏ', 'strokes', 'closed').height)
+    const mean = medialBoxEmOf('ㅏ', 'strokes')
+    expect(mean.width).toBeCloseTo((medialBoxEmOf('ㅏ', 'strokes', 'open').width + medialBoxEmOf('ㅏ', 'strokes', 'closed').width) / 2)
+    expect(medialBoxEmOf('ㅡ', 'strokes').height).toBeGreaterThan(0)
+    expect(medialBoxEmOf('ㅘ', 'verticalStrokes').width).toBeLessThan(medialBoxEmOf('ㅘ', 'horizontalStrokes').width)
+    expect(medialBoxEmOf('없음', 'strokes')).toEqual({ width: 1, height: 1 })
+  })
+
+  it('귀속 획 목록과 따름', () => {
+    const bound = boundStrokesOf(ae, {})
+    expect(bound.map((item) => [item.stroke.id, item.name, item.follows])).toEqual([['ㅐ-1', 'gidung.inner', true], ['ㅐ-2', 'geolchim', true], ['ㅐ-3', 'gidung', true]])
+  })
+
+  it('상자가 두께보다 얇은 채널(ㅣ · ㅡ · ㅢ)은 막혀서 마스터를 안 따르고 안 바뀐다', () => {
+    const i: JamoData = { char: 'ㅣ', type: 'jungseong', strokes: [line('ㅣ-1', [0, 0], [0, 1])] }
+    const eu: JamoData = { char: 'ㅡ', type: 'jungseong', strokes: [line('ㅡ-1', [0, 0], [1, 0])] }
+    const ui: JamoData = { char: 'ㅢ', type: 'jungseong', horizontalStrokes: [line('ㅢ-1', [0, 0], [1, 0])], verticalStrokes: [line('ㅢ-2', [0, 0], [0, 1])] }
+    expect(thinBox(i.strokes![0], medialBoxEmOf('ㅣ', 'strokes'))).toBe(true)
+    expect(thinBox(line('ㅏ-1', [0, 0], [0, 1]), medialBoxEmOf('ㅏ', 'strokes'))).toBe(false)
+    expect(boundStrokesOf(i, {}).map((item) => [item.blocked, item.follows])).toEqual([[true, false]])
+    expect(boundStrokesOf(ui, {}).every((item) => item.blocked)).toBe(true)
+    expect(applyMaster(i, {}, { gidung: bent })).toBeNull()
+    expect(applyMaster(eu, {}, { bo: bent })).toBeNull()
+    expect(applyMaster(ui, {}, { gidung: bent, bo: bent })).toBeNull()
+    expect(refollow(i, { gidung: bent }, 'strokes', 'ㅣ-1')).toBeNull()
+  })
+})
+
+describe('마스터 바꾸기와 다시 따르기', () => {
+  const ae: JamoData = { char: 'ㅐ', type: 'jungseong', strokes: [line('ㅐ-1', [0, 0], [0, 1]), line('ㅐ-2', [0, 0.5], [1, 0.5]), line('ㅐ-3', [1, 0], [1, 1])] }
+
+  it('기둥을 휘면 따르던 기둥 둘이 같이 휘고 걸침은 그대로', () => {
+    const next = applyMaster(ae, {}, { gidung: bent })!
+    expect(next).not.toBeNull()
+    expect(next.strokes![0].points[0].handleOut).toBeDefined()
+    expect(next.strokes![2].points[0].handleOut).toBeDefined()
+    expect(next.strokes![1]).toBe(ae.strokes![1])
+    expect(boundStrokesOf(next, { gidung: bent }).every((item) => item.follows)).toBe(true)
+  })
+
+  it('풀린 획은 마스터를 다시 바꿔도 그대로이고, 다시 따르기로 붙는다', () => {
+    const curved = applyMaster(ae, {}, { gidung: bent })!
+    const released = { ...curved, strokes: curved.strokes!.map((stroke, index) => index === 2 ? { ...stroke, points: [{ x: 1, y: 0 }, { x: 0.9, y: 1 }] } : stroke) }
+    const flatter: StemMaster = { name: 'gidung', points: [{ t: 0, o: 0, handleOut: { t: 0.4, o: 0.01 } }, { t: 1, o: 0 }] }
+    const next = applyMaster(released, { gidung: bent }, { gidung: flatter })!
+    expect(next.strokes![0].points[0].handleOut!.x).toBeCloseTo(0.01 / medialBoxEmOf('ㅐ', 'strokes').width)
+    expect(next.strokes![2]).toBe(released.strokes![2])
+    const back = refollow(next, { gidung: flatter }, 'strokes', 'ㅐ-3')!
+    expect(followsMaster(back.strokes![2], flatter, medialBoxEmOf('ㅐ', 'strokes'))).toBe(true)
+    expect(refollow(back, { gidung: flatter }, 'strokes', 'ㅐ-3')).toBeNull()
+  })
+
+  it('바뀐 획이 없으면 null', () => {
+    expect(applyMaster(ae, {}, {})).toBeNull()
+    expect(applyMaster(ae, {}, { bo: bent })).toBeNull()
+  })
+})

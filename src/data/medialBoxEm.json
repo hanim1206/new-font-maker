@@ -1,0 +1,327 @@
+{
+  "note": "홀자 채널 상자의 평균 폭 · 높이(em). open = 받침 없음, closed = 받침 있음. medial-box-census.test.ts가 만든다.",
+  "box": {
+    "ㅏ": {
+      "strokes": {
+        "open": {
+          "width": 0.1944,
+          "height": 0.9047
+        },
+        "closed": {
+          "width": 0.1756,
+          "height": 0.5152
+        }
+      }
+    },
+    "ㅐ": {
+      "strokes": {
+        "open": {
+          "width": 0.2023,
+          "height": 0.9043
+        },
+        "closed": {
+          "width": 0.2003,
+          "height": 0.5184
+        }
+      }
+    },
+    "ㅑ": {
+      "strokes": {
+        "open": {
+          "width": 0.1909,
+          "height": 0.9047
+        },
+        "closed": {
+          "width": 0.177,
+          "height": 0.5134
+        }
+      }
+    },
+    "ㅒ": {
+      "strokes": {
+        "open": {
+          "width": 0.2028,
+          "height": 0.907
+        },
+        "closed": {
+          "width": 0.2011,
+          "height": 0.5169
+        }
+      }
+    },
+    "ㅓ": {
+      "strokes": {
+        "open": {
+          "width": 0.2407,
+          "height": 0.9051
+        },
+        "closed": {
+          "width": 0.2372,
+          "height": 0.5143
+        }
+      }
+    },
+    "ㅔ": {
+      "strokes": {
+        "open": {
+          "width": 0.3615,
+          "height": 0.9043
+        },
+        "closed": {
+          "width": 0.3473,
+          "height": 0.5186
+        }
+      }
+    },
+    "ㅕ": {
+      "strokes": {
+        "open": {
+          "width": 0.2338,
+          "height": 0.9047
+        },
+        "closed": {
+          "width": 0.2376,
+          "height": 0.5174
+        }
+      }
+    },
+    "ㅖ": {
+      "strokes": {
+        "open": {
+          "width": 0.3606,
+          "height": 0.9047
+        },
+        "closed": {
+          "width": 0.3411,
+          "height": 0.5199
+        }
+      }
+    },
+    "ㅗ": {
+      "strokes": {
+        "open": {
+          "width": 0.8194,
+          "height": 0.2536
+        },
+        "closed": {
+          "width": 0.8179,
+          "height": 0.1477
+        }
+      }
+    },
+    "ㅘ": {
+      "horizontalStrokes": {
+        "open": {
+          "width": 0.6269,
+          "height": 0.2229
+        },
+        "closed": {
+          "width": 0.6245,
+          "height": 0.1565
+        }
+      },
+      "verticalStrokes": {
+        "open": {
+          "width": 0.2005,
+          "height": 0.9043
+        },
+        "closed": {
+          "width": 0.1857,
+          "height": 0.5422
+        }
+      }
+    },
+    "ㅙ": {
+      "horizontalStrokes": {
+        "open": {
+          "width": 0.5236,
+          "height": 0.2198
+        },
+        "closed": {
+          "width": 0.5123,
+          "height": 0.1513
+        }
+      },
+      "verticalStrokes": {
+        "open": {
+          "width": 0.1948,
+          "height": 0.9043
+        },
+        "closed": {
+          "width": 0.1946,
+          "height": 0.5412
+        }
+      }
+    },
+    "ㅚ": {
+      "horizontalStrokes": {
+        "open": {
+          "width": 0.6558,
+          "height": 0.223
+        },
+        "closed": {
+          "width": 0.6435,
+          "height": 0.1526
+        }
+      },
+      "verticalStrokes": {
+        "open": {
+          "width": 0.0127,
+          "height": 0.9059
+        },
+        "closed": {
+          "width": 0.0127,
+          "height": 0.5394
+        }
+      }
+    },
+    "ㅛ": {
+      "strokes": {
+        "open": {
+          "width": 0.8194,
+          "height": 0.2527
+        },
+        "closed": {
+          "width": 0.8179,
+          "height": 0.1509
+        }
+      }
+    },
+    "ㅜ": {
+      "strokes": {
+        "open": {
+          "width": 0.819,
+          "height": 0.3558
+        },
+        "closed": {
+          "width": 0.8179,
+          "height": 0.151
+        }
+      }
+    },
+    "ㅝ": {
+      "horizontalStrokes": {
+        "open": {
+          "width": 0.6565,
+          "height": 0.4358
+        },
+        "closed": {
+          "width": 0.6415,
+          "height": 0.1964
+        }
+      },
+      "verticalStrokes": {
+        "open": {
+          "width": 0.5098,
+          "height": 0.9047
+        },
+        "closed": {
+          "width": 0.4783,
+          "height": 0.5724
+        }
+      }
+    },
+    "ㅞ": {
+      "horizontalStrokes": {
+        "open": {
+          "width": 0.5247,
+          "height": 0.415
+        },
+        "closed": {
+          "width": 0.5273,
+          "height": 0.2021
+        }
+      },
+      "verticalStrokes": {
+        "open": {
+          "width": 0.3833,
+          "height": 0.9047
+        },
+        "closed": {
+          "width": 0.3715,
+          "height": 0.5733
+        }
+      }
+    },
+    "ㅟ": {
+      "horizontalStrokes": {
+        "open": {
+          "width": 0.6613,
+          "height": 0.3482
+        },
+        "closed": {
+          "width": 0.6507,
+          "height": 0.1666
+        }
+      },
+      "verticalStrokes": {
+        "open": {
+          "width": 0.0133,
+          "height": 0.9047
+        },
+        "closed": {
+          "width": 0.0133,
+          "height": 0.5455
+        }
+      }
+    },
+    "ㅠ": {
+      "strokes": {
+        "open": {
+          "width": 0.819,
+          "height": 0.3551
+        },
+        "closed": {
+          "width": 0.8179,
+          "height": 0.1643
+        }
+      }
+    },
+    "ㅡ": {
+      "strokes": {
+        "open": {
+          "width": 0.7494,
+          "height": 0
+        },
+        "closed": {
+          "width": 0.7479,
+          "height": 0
+        }
+      }
+    },
+    "ㅢ": {
+      "horizontalStrokes": {
+        "open": {
+          "width": 0.5827,
+          "height": 0
+        },
+        "closed": {
+          "width": 0.5672,
+          "height": 0
+        }
+      },
+      "verticalStrokes": {
+        "open": {
+          "width": 0.0133,
+          "height": 0.9049
+        },
+        "closed": {
+          "width": 0.0133,
+          "height": 0.5395
+        }
+      }
+    },
+    "ㅣ": {
+      "strokes": {
+        "open": {
+          "width": 0.0133,
+          "height": 0.9047
+        },
+        "closed": {
+          "width": 0.0133,
+          "height": 0.5106
+        }
+      }
+    }
+  }
+}

@@ -24,6 +24,7 @@ export const LAB_SCREEN_ROUTES = [
   '/reference-lab',
   '/reference-group-lab',
   '/stroke-grammar-lab',
+  '/stem-master-lab',
   '/preset-candidate-lab',
   '/font-guide-lab',
   '/five-guide-lab',

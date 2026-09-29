@@ -12,6 +12,7 @@ const LAB_NAMES: Record<string, string> = {
   '/reference-lab': '레퍼런스',
   '/reference-group-lab': '레퍼런스 묶음',
   '/stroke-grammar-lab': '획 문법',
+  '/stem-master-lab': '줄기 마스터',
   '/preset-candidate-lab': '프리셋 후보',
   '/font-guide-lab': '기준선(Font Guide)',
   '/five-guide-lab': '다섯 보선',
