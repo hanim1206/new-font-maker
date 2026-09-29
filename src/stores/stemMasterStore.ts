@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-import { applyMaster, refollow as refollowStroke, type JamoChannel, type StemMaster, type StemMasterName, type StemMasters } from '../services/stemMaster'
+import { applyMaster, boundStrokesOf, refollow as refollowStroke, type JamoChannel, type StemMaster, type StemMasterName, type StemMasters } from '../services/stemMaster'
+import type { JamoData } from '../types'
 import { withFrameFrom } from '../utils/jamoFrame'
 import { useJamoStore } from './jamoStore'
 
@@ -24,6 +25,8 @@ interface StemMasterActions {
   resetMaster: (name: StemMasterName) => void
   /** 풀린 획 하나를 다시 마스터에 붙인다. */
   refollow: (char: string, channel: JamoChannel, strokeId: string) => void
+  /** 이 이름의 풀린 획을 전부 다시 붙인다. */
+  refollowAll: (name: StemMasterName) => void
 }
 
 function propagate(before: StemMasters, after: StemMasters): void {
@@ -61,6 +64,19 @@ export const useStemMasterStore = create<StemMasterState & StemMasterActions>()(
         if (!jamo) return
         const next = refollowStroke(jamo, get().masters, channel, strokeId)
         if (next) jamoStore.updateJungseong(char, withFrameFrom(next, jamo))
+      },
+
+      refollowAll: (name) => {
+        const jamoStore = useJamoStore.getState()
+        const masters = get().masters
+        for (const [char, jamo] of Object.entries(jamoStore.jungseong)) {
+          let next: JamoData = jamo
+          for (const item of boundStrokesOf(jamo, masters)) {
+            if (item.name !== name || item.follows) continue
+            next = refollowStroke(next, masters, item.channel, item.stroke.id) ?? next
+          }
+          if (next !== jamo) jamoStore.updateJungseong(char, withFrameFrom(next, jamo))
+        }
       },
     })),
     { name: 'font-maker-stem-masters', partialize: (state) => ({ masters: state.masters }) },

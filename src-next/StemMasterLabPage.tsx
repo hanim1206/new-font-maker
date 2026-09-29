@@ -214,13 +214,18 @@ export function StemMasterLabPage() {
     [jungseong, masters, name],
   )
   const own = Boolean(masters[name])
+  const refollowAll = useStemMasterStore((state) => state.refollowAll)
+  const released = useMemo(
+    () => JUNGSEONG_LIST.reduce((sum, char) => sum + (jungseong[char] ? boundStrokesOf(jungseong[char], masters).filter((item) => item.name === name && !item.follows).length : 0), 0),
+    [jungseong, masters, name],
+  )
 
   return (
     <main className={styles.page} data-testid="stem-master-lab">
       <header className={styles.hero}>
         <span>Stem Master Lab</span>
         <h1>홀자 줄기 마스터</h1>
-        <p>줄기를 한 곳에서 그리면 같은 이름의 형제 획이 전부 따라온다. 핸들 둘을 끌어 휘게 그린다. 상자가 두께보다 얇은 채널(ㅣ · ㅡ, ㅚ ㅟ ㅢ의 세로부)은 이번엔 제외다. <strong>여기서 그리면 진짜 자모 획이 바뀐다</strong> — 문장 줄 · 카드 · OTF에도 나온다. 자소 편집에서 획을 만지면 그 획만 풀린다.</p>
+        <p>줄기를 한 곳에서 그리면 같은 이름의 형제 획이 전부 따라온다. 핸들 둘을 끌어 휘게 그린다. 상자가 두께 0인 채널(ㅣ · ㅡ, ㅚ ㅟ ㅢ의 세로부)은 휠 방향만 ㅏ 칸 폭 · ㅗ 칸 높이를 빌려 휜다. <strong>여기서 그리면 진짜 자모 획이 바뀐다</strong> — 문장 줄 · 카드 · OTF에도 나온다. 자소 편집에서 획을 만지면 그 획만 풀린다.</p>
         <div className={styles.names} role="radiogroup" aria-label="마스터">
           {STEM_MASTER_NAMES.map((item) => (
             <button key={item} type="button" role="radio" aria-checked={name === item} data-master={item} onClick={() => { setDraft(null); setName(item) }}>
@@ -248,6 +253,7 @@ export function StemMasterLabPage() {
 
       <section className={styles.siblings} aria-label="형제">
         <h2>형제 <small>{siblings.length}</small></h2>
+        {released > 0 && <button type="button" data-testid="refollow-all" onClick={() => refollowAll(name)}>풀린 획 {released}개 모두 다시 따르기</button>}
         <div className={styles.siblingGrid} data-testid="siblings">
           {siblings.map((char) => <SiblingCard key={char} char={char} name={name} />)}
         </div>

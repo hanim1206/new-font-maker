@@ -57,4 +57,25 @@ describe('줄기 마스터 스토어', () => {
     expect(useJamoStore.getState().jungseong['ㅕ'].strokes![0].points).toHaveLength(2)
     expect(useJamoStore.getState().jungseong['ㅕ'].strokes![0].points[0].handleOut).toBeUndefined()
   })
+
+  it('풀린 획 모두 다시 따르기는 그 이름의 풀린 획만 붙인다(안쪽 기둥)', async () => {
+    const { useJamoStore } = await import('./jamoStore')
+    const { useStemMasterStore } = await import('./stemMasterStore')
+    const store = useStemMasterStore.getState()
+    store.setMaster(bent)
+    const release = (char: string, index: number) => {
+      const jamo = useJamoStore.getState().jungseong[char]
+      const channel = jamo.strokes ? 'strokes' : 'verticalStrokes'
+      const strokes = [...jamo[channel]!]
+      strokes[index] = { ...strokes[index], points: strokes[index].points.map((point, at) => at === 0 ? { ...point, handleOut: { x: point.x + 0.3, y: 0.2 } } : point) }
+      useJamoStore.getState().updateJungseong(char, { ...jamo, [channel]: strokes })
+    }
+    release('ㅐ', 0)
+    release('ㅒ', 0)
+    release('ㅏ', 0)
+    const innerOf = () => ['ㅐ', 'ㅒ', 'ㅏ'].map((char) => boundStrokesOf(useJamoStore.getState().jungseong[char], { gidung: bent })[0])
+    expect(innerOf().map((item) => [item.name, item.follows])).toEqual([['gidung.inner', false], ['gidung.inner', false], ['gidung', false]])
+    store.refollowAll('gidung.inner')
+    expect(innerOf().map((item) => item.follows)).toEqual([true, true, false])
+  })
 })
