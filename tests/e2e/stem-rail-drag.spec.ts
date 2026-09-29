@@ -162,12 +162,32 @@ test('안 기둥 아래 끝점을 올리면 그 끝 보선만 움직이고, 기�
   if (stored) expect(stored.at(-1).y).toBe(1)
 })
 
+test('줄기를 한 번 탭하면 끝 표시가 뜨고, 막대를 끌면 점을 안 펼쳐도 그 끝 보선이 움직인다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EC%95%A0&mode=stroke&part=JU')
+  await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
+  // 들어오면 첫 획이 이미 잡혀 있다. 다른 획을 거쳐 한 번 탭한 상태(점 안 펼침)로 만든다.
+  await selectStroke(page, 'ㅐ-3')
+  await selectStroke(page, 'ㅐ-1')
+  await expect(page.locator('[data-stem-mark="rail"]')).toHaveCount(2)
+  await expect(page.locator('[data-editor-point="hit"]')).toHaveCount(0)
+  await expect(page.locator('[data-editor-point="visible"]')).toHaveCount(0)
+  const bottom = page.locator('[data-stem-mark="rail"][data-rail-key="innerPillar.end"] [data-stem-mark-hit]')
+  await bottom.dispatchEvent('pointerdown')
+  // 누르면 점이 펼쳐지며 막대 눌림 영역은 빠진다. 손은 캔버스가 잡고 있어 거기서 뗀다.
+  await page.getByTestId('focus-canvas').dispatchEvent('pointerup')
+  await expect(page.locator('[data-stem-mark][data-rail-key="innerPillar.end"]')).toHaveAttribute('data-active', 'true')
+  await page.keyboard.press('Shift+ArrowUp')
+  await expect.poll(async () => (await rules(page))[RIGHT_OPEN]?.medial?.JU?.['innerPillar.end'] ?? 0).toBeLessThan(0)
+  expect((await rules(page))[RIGHT_OPEN]?.medial?.JU?.['innerPillar.start']).toBeUndefined()
+})
+
 test('칸 테두리(바깥 기둥 끝)는 획 편집에서 세로로 잠기고, 밀면 레이아웃에서 옮기라고 알린다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EC%95%84&mode=stroke&part=JU')
   await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
   await pickBottomEnd(page, 'ㅏ-1')
-  // 테두리 보선은 점선으로 흐리게.
-  await expect(page.locator('[data-testid="stem-rail-guides"] line[data-border]')).toHaveCount(2)
+  // 테두리 끝은 찬 점, 테두리 보선은 길게 안 그린다.
+  await expect(page.locator('[data-stem-mark="locked"]')).toHaveCount(2)
+  await expect(page.locator('[data-testid="stem-rail-guides"]')).toHaveCount(0)
   const before = await strokePath(page, 'ㅏ-1')
   await page.keyboard.press('Shift+ArrowDown')
   await page.keyboard.press('Shift+ArrowDown')

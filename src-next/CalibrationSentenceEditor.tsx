@@ -170,6 +170,9 @@ const POINT_HIT_RADIUS = 10
 /** 보이는 꼭짓점 반지름 · 핸들 마름모 한 변(뷰박스 단위). 잡은 것은 조금 더 크다. */
 const POINT_RADIUS = 3
 const ACTIVE_POINT_RADIUS = 3.8
+/** 보선에 매인 줄기 끝 막대(가로로 누운 알약)의 폭 · 높이(뷰박스 단위). */
+const RAIL_MARK_WIDTH = 7
+const RAIL_MARK_HEIGHT = 2.6
 const HANDLE_SIDE = 4.4
 const ACTIVE_HANDLE_SIDE = 5.4
 type PreviewSchema = { layoutType: LayoutType; schema: LayoutSchema }
@@ -512,16 +515,24 @@ function FocusedGlyph({
     jong: syllable.jongseong?.char ?? '',
   }), [placement, schema, syllable])
   const targets = useMemo(() => getRenderedStrokeTargets(syllable, boxes), [boxes, syllable])
-  // 고른 홀자 줄기의 보선. 세로로 끌면 저장 획이 아니라 이 선이 움직인다 — 레이아웃 편집처럼 칸 밖까지 길게 그려 보선인 줄 보이게 한다.
-  // 칸 테두리에 매인 끝은 여기서 못 옮겨 점선으로 흐리게.
+  // 고른 홀자 줄기의 보선과 끝 표시. 세로로 끌면 저장 획이 아니라 보선이 움직인다 — 안쪽 보선은 레이아웃 편집처럼 칸 밖까지 길게 그린다.
+  // 끝 표시: 보선에 매인 끝은 막대(보선 따라 세로로 미끄러짐), 칸 테두리에 매인 끝은 찬 점(획 편집에선 세로로 잠김). 테두리 보선은 길게 안 그린다 — 찬 점이 잠김을 말하고, 칸 변은 부품 상자로 보인다.
   const stemGuides = useMemo(() => {
-    if (!dragApiRef || placement.kind !== 'boxes' || (selection.kind !== 'stroke' && selection.kind !== 'point')) return []
+    if (!dragApiRef || placement.kind !== 'boxes' || (selection.kind !== 'stroke' && selection.kind !== 'point' && selection.kind !== 'handle')) return []
     const target = targets.find((item) => item.stroke.id === selection.strokeId && item.editorPart === 'JU')
     if (!target || target.stroke.points.length < 2) return []
-    const first = absolutePoint(target.stroke.points[0], target.box).y
-    const last = absolutePoint(target.stroke.points[target.stroke.points.length - 1], target.box).y
+    const lastIndex = target.stroke.points.length - 1
+    const first = absolutePoint(target.stroke.points[0], target.box)
+    const last = absolutePoint(target.stroke.points[lastIndex], target.box)
+    const topIndex = first.y <= last.y ? 0 : lastIndex
     return stemRailGuides({ jamo: target.jamo, stroke: target.stroke, part: target.renderPart, box: placement.boxes[target.renderPart] })
-      .map((guide) => ({ ...guide, y: guide.end === 'center' ? (first + last) / 2 : guide.end === 'top' ? Math.min(first, last) : Math.max(first, last) }))
+      .map((guide) => {
+        // 가로 줄기 높이는 가운데에, 기둥 끝은 그 끝점에. `pointIndex`가 없으면 줄기 통째(높이)다.
+        if (guide.end === 'center') return { ...guide, target, x: (first.x + last.x) / 2, y: (first.y + last.y) / 2, pointIndex: null }
+        const pointIndex = guide.end === 'top' ? topIndex : lastIndex - topIndex
+        const at = pointIndex === 0 ? first : last
+        return { ...guide, target, x: at.x, y: at.y, pointIndex }
+      })
   }, [dragApiRef, placement, selection, targets])
   // 화면에 보이는 부품 상자는 레이아웃 모드와 같은 잉크 바깥면이다. 획을 놓는 `boxes`는 두께 절반만큼 안쪽인 중심선 상자라 그대로 그리면 잉크가 상자를 뚫고 나온다.
   const inkBoxes = useMemo(() => placement.kind === 'boxes' && resolution
@@ -621,6 +632,13 @@ function FocusedGlyph({
     } else {
       startDrag(event, target.box, strokeBodyAnchors(target.stroke, target.box), { strokeId: target.stroke.id }, () => onPointSelect(pointSelection))
     }
+  }
+  // 줄기 끝 표시를 누름 = 그 끝점을 바로 잡는다. 점이 안 펼쳐진 획이어도 몸통 끌기로 새지 않는다.
+  const pressStemEnd = (event: ReactPointerEvent<SVGElement>, target: (typeof targets)[number], pointIndex: number) => {
+    event.stopPropagation()
+    const component = componentFor(char, target.editorPart, target.jamo)
+    onPointSelect({ kind: 'point', component, editorPart: target.editorPart, renderPart: target.renderPart, jamo: target.jamo, strokeId: target.stroke.id, pointIndex, box: target.box })
+    startDrag(event, target.box, pointAnchors(target.stroke.points[pointIndex], target.box), { strokeId: target.stroke.id, pointIndex })
   }
   const startDrag = (event: ReactPointerEvent<SVGElement>, box: BoxConfig, anchors: SnapAnchors, dragged: { strokeId: string; pointIndex?: number }, onTap?: () => void) => {
     // 끌기가 없는 화면은 누르기가 곧 탭이다.
@@ -724,8 +742,8 @@ function FocusedGlyph({
       </>} underlay={<>
         {ghostVisible && ghost && <path d={ghost.path} transform={designBodySvgTransform(schema.padding, VIEW_BOX_SIZE)} className={styles.notoGhost} fillRule="evenodd" data-testid="noto-ghost" />}
       </>}>
-        {stemGuides.length > 0 && <g aria-hidden="true" pointerEvents="none" data-testid="stem-rail-guides">
-          {stemGuides.map((guide) => <line key={guide.key} x1={-6} x2={106} y1={guide.y} y2={guide.y} stroke={PART_COLOR.JU} strokeWidth={0.4 * u} strokeOpacity={guide.border ? 0.45 : 1} strokeDasharray={guide.border ? `${2 * u} ${1.2 * u}` : undefined} data-rail-key={guide.key} data-border={guide.border || undefined} />)}
+        {stemGuides.some((guide) => !guide.border) && <g aria-hidden="true" pointerEvents="none" data-testid="stem-rail-guides">
+          {stemGuides.filter((guide) => !guide.border).map((guide) => <line key={guide.key} x1={-6} x2={106} y1={guide.y} y2={guide.y} stroke={PART_COLOR.JU} strokeWidth={0.4 * u} data-rail-key={guide.key} />)}
         </g>}
         {targets.map((target) => {
           // 잠긴 동안 다른 자소는 눌리지 않는다. 잠긴 자소의 획은 자소 통째 선택을 거치지 않고 바로 잡힌다.
@@ -786,7 +804,7 @@ function FocusedGlyph({
               || ((selection.kind === 'point' || selection.kind === 'handle') && selection.strokeId === target.stroke.id && selection.pointIndex === pointIndex)
             return <g key={`point-${target.renderPart}-${target.stroke.id}-${pointIndex}`}>
               <circle cx={x} cy={y} r={POINT_HIT_RADIUS * u} fill="transparent" pointerEvents="all" className={styles.pointHitTarget} data-editor-point={shown ? 'hit' : 'catch'} onPointerDown={(event) => pressActiveStroke(event, target, { pointIndex })} />
-              {shown && <circle cx={x} cy={y} r={(active ? ACTIVE_POINT_RADIUS : POINT_RADIUS) * u} className={active ? styles.activePoint : styles.point} data-editor-point="visible" pointerEvents="none" />}
+              {shown && !stemGuides.some((guide) => guide.target === target && guide.pointIndex === pointIndex) && <circle cx={x} cy={y} r={(active ? ACTIVE_POINT_RADIUS : POINT_RADIUS) * u} className={active ? styles.activePoint : styles.point} data-editor-point="visible" pointerEvents="none" />}
             </g>
           })
         })}
@@ -817,6 +835,19 @@ function FocusedGlyph({
               />,
             ]
           })
+        })}
+        {/* 줄기 끝 표시. 막대 = 보선에 매인 끝(세로로 끌면 보선이 움직인다), 찬 점 = 칸 테두리에 매인 끝(세로 잠김, 가로 · 모양은 그대로).
+            획을 잡기만 한 때도 뜨고, 누르면 점을 펼치지 않아도 바로 그 끝이 잡힌다. 가로 줄기 가운데 막대는 표시만 — 누름은 획 몸통이 받는다(통째 세로 = 높이). */}
+        {stemGuides.map((guide) => {
+          const { target, pointIndex } = guide
+          const active = pointIndex !== null && (selection.kind === 'point' || selection.kind === 'handle') && selection.strokeId === target.stroke.id && selection.pointIndex === pointIndex
+          const shown = target.stroke.id === pointsOpenStrokeId
+          return <g key={`stem-mark-${guide.key}`} className={styles.strokeTarget} style={{ '--selection-color': gapWarningParts.includes(target.editorPart) ? SELECTION_WARNING_COLOR : SELECTION_COLOR } as CSSProperties} data-stem-mark={guide.border ? 'locked' : 'rail'} data-rail-key={guide.key} data-active={active || undefined}>
+            {guide.border
+              ? <circle cx={guide.x} cy={guide.y} r={(active ? ACTIVE_POINT_RADIUS : POINT_RADIUS) * u} className={active ? styles.activeLockedMark : styles.lockedMark} pointerEvents="none" />
+              : <rect x={guide.x - RAIL_MARK_WIDTH * u / 2} y={guide.y - RAIL_MARK_HEIGHT * u / 2} width={RAIL_MARK_WIDTH * u} height={RAIL_MARK_HEIGHT * u} rx={RAIL_MARK_HEIGHT * u / 2} className={active ? styles.activeRailMark : styles.railMark} pointerEvents="none" />}
+            {pointIndex !== null && !shown && <circle cx={guide.x} cy={guide.y} r={POINT_HIT_RADIUS * u} fill="transparent" pointerEvents="all" className={styles.pointHitTarget} data-stem-mark-hit={guide.border ? 'locked' : 'rail'} onPointerDown={(event) => pressStemEnd(event, target, pointIndex)} />}
+          </g>
         })}
         {/* 걸린 자리. 레이아웃처럼 주황 선으로 보인다. `처음 자리`는 선을 안 긋는다 — 끄는 내내 떠 있어서 시끄럽다. */}
         {snapHits && (['x', 'y'] as const).map((axis) => {
