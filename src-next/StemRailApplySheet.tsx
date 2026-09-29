@@ -13,11 +13,11 @@ const sampleOf = (contextId: string, medial: string) => String.fromCodePoint(cor
 
 /**
  * 획 편집에서 줄기 끝을 끌어 보선을 옮긴 뒤 나갈 때 한 번 띄운다. 보선은 끄는 순간 이미 이 레이아웃 전체에 저장돼 있어서,
- * 이 창은 막는 문이 아니라 좁히는 창이다 — `완료`든 바깥 누르기든 Esc든 지금 고른 대로 반영하고 나간다(취소 없음, 되돌리기는 ↶).
+ * 이 창은 좁히는 창이다 — 반영하고 나가는 길은 `완료` 하나다(고친 카드만 남아도 `완료`). `취소` · 바깥 누르기 · Esc는 나가지 않고 획 편집으로 돌아간다(다음에 나갈 때 다시 묻는다).
  * 묶음 = 레이아웃 칸(머리 체크 = 칸 전체), 카드 = 그 칸에서 같은 역할을 가진 홀자. 처음엔 전부 골라져 있고, 고친 홀자는 뺄 수 없다.
  * 카드는 지금(이미 옮긴) 모양이고, 뺀 카드는 흐려진다. 뺀 홀자만 `이 자모만` 층의 반대 Δ로 제자리에 남는다.
  */
-export function StemRailApplySheet({ groups, picked, onToggle, shape, onDone }: {
+export function StemRailApplySheet({ groups, picked, onToggle, shape, onDone, onCancel, onDiscard }: {
   groups: readonly StemRailGroup[]
   picked: ReadonlySet<string>
   onToggle: (keys: readonly string[], on: boolean) => void
@@ -25,14 +25,14 @@ export function StemRailApplySheet({ groups, picked, onToggle, shape, onDone }: 
   shape?: { ask: ShapeAsk; picked: ReadonlySet<string>; preview: Readonly<Record<string, JamoData>>; onToggle: (keys: readonly string[], on: boolean) => void }
   /** 닫기 = 고른 대로 반영하고 나가기. */
   onDone: () => void
+  /** 취소 = 나가지 않고 획 편집으로 돌아가기. */
+  onCancel: () => void
+  /** 자리 버리기 = 이번에 옮긴 보선을 들어오기 전 자리로(모양은 그대로). 자리 칸이 있을 때만 보인다. */
+  onDiscard: () => void
 }) {
-  const chars = [...new Set([
-    ...(shape ? shape.ask.entries.filter((entry) => shape.picked.has(keyOf(entry))).map((entry) => entry.char) : []),
-    ...groups.flatMap((group) => group.medials.filter((medial) => picked.has(railCardKey(group.contextId, medial)))),
-  ])]
   const leaves = shape ? [...new Set(shape.ask.entries.map((entry) => entry.name))].sort(byLeafRank(shape.ask.base)) : []
   return (
-    <div className={styles.modalLayer} onPointerDown={(event) => { if (event.target === event.currentTarget) onDone() }} onKeyDown={(event) => { if (event.key === 'Escape') onDone() }}>
+    <div className={styles.modalLayer} onPointerDown={(event) => { if (event.target === event.currentTarget) onCancel() }} onKeyDown={(event) => { if (event.key === 'Escape') onCancel() }}>
       <section className={styles.applySheet} role="dialog" aria-modal="true" aria-label="보선 반영 범위" data-testid="stem-rail-apply">
         <header className={styles.applyHead}>
           <h2>{shape ? `${STEM_NAME_LABEL[shape.ask.base]}을 고쳤어요. 어디까지 반영할까요?` : '줄기 자리를 옮겼어요. 뺄 홀자가 있으면 눌러 주세요'}</h2>
@@ -59,7 +59,7 @@ export function StemRailApplySheet({ groups, picked, onToggle, shape, onDone }: 
                     return (
                       <button key={key} type="button" className={styles.applyCard} data-char={entry.char} data-kind="shape" data-locked={locked || undefined} aria-pressed={pressed} aria-disabled={locked || undefined} aria-label={locked ? `${entry.char} ${stemMasterLabel(leaf)} 고친 획(늘 반영)` : `${entry.char} ${stemMasterLabel(leaf)} ${pressed ? '빼기' : '담기'}`} onClick={() => { if (!locked) shape.onToggle([key], !pressed) }}>
                         <AppGlyph char={sampleSyllable(entry.char, 'open')} size={52} strokeColorOf={color} jungseongOverride={shape.preview} />
-                        {locked && <em><Lock size={10} strokeWidth={3} aria-hidden="true" />고친 획</em>}
+                        {locked && <Lock className={styles.applyLock} size={14} strokeWidth={2.5} aria-hidden="true" />}
                       </button>
                     )
                   })}
@@ -87,7 +87,7 @@ export function StemRailApplySheet({ groups, picked, onToggle, shape, onDone }: 
                     return (
                       <button key={key} type="button" className={styles.applyCard} data-char={medial} data-kind="rail" data-locked={locked || undefined} aria-pressed={pressed} aria-disabled={locked || undefined} aria-label={locked ? `${medial} 고친 홀자(늘 반영)` : `${medial} ${pressed ? '빼기' : '담기'}`} onClick={() => { if (!locked) onToggle([key], !pressed) }}>
                         <AppGlyph char={sampleOf(group.contextId, medial)} size={52} />
-                        {locked && <em><Lock size={10} strokeWidth={3} aria-hidden="true" />고친 홀자</em>}
+                        {locked && <Lock className={styles.applyLock} size={14} strokeWidth={2.5} aria-hidden="true" />}
                       </button>
                     )
                   })}
@@ -97,7 +97,9 @@ export function StemRailApplySheet({ groups, picked, onToggle, shape, onDone }: 
           })}
         </div>
         <footer className={styles.applyFoot}>
-          <p aria-label="반영되는 홀자"><span data-testid="stem-rail-apply-count">{chars.length}</span>개 홀자 · {chars.join(' ')}</p>
+          {groups.length > 0 && <button type="button" className={styles.applyDiscard} data-testid="stem-rail-apply-discard" onClick={onDiscard}>자리 버리기</button>}
+          <span className={styles.applySpacer} />
+          <button type="button" className={styles.applyCancel} data-testid="stem-rail-apply-cancel" onClick={onCancel}>취소</button>
           <button type="button" className={styles.applyGo} data-testid="stem-rail-apply-go" onClick={onDone} autoFocus>완료</button>
         </footer>
       </section>

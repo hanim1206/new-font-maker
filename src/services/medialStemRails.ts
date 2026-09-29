@@ -134,17 +134,55 @@ export function stemEndsFor(jamo: Pick<JamoData, 'type' | 'char'>, stroke: Strok
 /** 보에 매달린 쪽(아래에서 올라오는 짧은기둥)이 위쪽 끝인 홀자. 나머지 짧은기둥은 아래 끝이 보에 붙는다. */
 const STEM_JOINED_TOP = 'ㅜㅠㅝㅞㅟ'
 
-/** 획 편집에서 줄기를 끌 때 세로 이동이 옮기는 보선(획 역할 키). 빈 목록이면 세로로는 안 움직인다(짧은기둥의 붙은 끝). */
+/** 획 편집에서 줄기를 끌 때 세로 이동이 옮기는 보선(획 역할 키). 빈 목록이면 세로로는 안 움직인다(짧은기둥의 붙은 끝 · 칸 테두리). */
 export interface StemRailDrag {
   part: MedialPart
   keys: string[]
+  /** 칸 테두리에 매인 끝이라 세로로 잠겼다. 칸 끝은 레이아웃 편집에서만 옮긴다. */
+  border?: boolean
+}
+
+/** 보 중심이 칸 끝(0 · 1)에 있다고 보는 거리(칸 안 비율). 앱 획 두께와 모델 두께가 조금 달라 딱 0 · 1은 아니다(기본 폰트 최대 0.011). */
+const BORDER_TOLERANCE = 0.015
+
+/**
+ * 줄기의 이 끝이 칸 테두리인가 — 끌면 홀자 칸 네 변이 바뀌는 끝. 획 편집에서는 세로로 잠근다.
+ * 기둥 끝은 칸 변에 매이면 목표가 없다(`stemRailTargets`가 안 싣는다). 안 기둥 끝은 칸 끝 가까이(0.02~)에 있어도 목표가 있어 테두리가 아니다.
+ * 보는 칸을 만들면(ㅗ ㅜ ㅡ) 중심 목표가 칸 끝에 있다. 칸이 얇아 목표가 없는 홀자(ㅡ · ㅢ 가로부)는 칸이 곧 줄기라 테두리다.
+ */
+export function stemEndOnBorder(box: BoxConfig | undefined, strokeId: string, end: 'top' | 'bottom' | 'center'): boolean {
+  const value = box?.stems?.[strokeId]?.[end]
+  if (value === undefined) return true
+  return end === 'center' && (value <= BORDER_TOLERANCE || value >= 1 - BORDER_TOLERANCE)
+}
+
+const endOfKey = (key: string): 'top' | 'bottom' | 'center' => key.endsWith('.center') ? 'center' : key.endsWith('.start') ? 'top' : 'bottom'
+
+/** 획 편집 캔버스에 길게 그릴 이 줄기의 보선: 끌면 움직이는 끝(짧은기둥의 붙은 끝은 빼고)과 그 끝이 테두리인지. */
+export function stemRailGuides(input: { jamo: Pick<JamoData, 'type' | 'char'>; stroke: StrokeDataV2; part: Part; box?: BoxConfig }): { key: string; end: 'top' | 'bottom' | 'center'; border: boolean }[] {
+  const { jamo, stroke } = input
+  if (jamo.type !== 'jungseong' || stroke.points.length < 2) return []
+  const entry = MEDIAL_STEM_ROLES[jamo.char]?.[stroke.id]
+  if (!entry || entry[0] !== input.part) return []
+  const [, role] = entry
+  const keys = role.endsWith('Beam') ? [`${role}.center`]
+    : SHORT_STEMS.has(role) ? [`${role}.${STEM_JOINED_TOP.includes(jamo.char) ? 'end' : 'start'}`]
+    : [`${role}.start`, `${role}.end`]
+  return keys.map((key) => ({ key, end: endOfKey(key), border: stemEndOnBorder(input.box, stroke.id, endOfKey(key)) }))
 }
 
 /**
- * 이 끌기의 세로 이동이 보선이 되는가. 이름 있는 줄기의 세로 끝(기둥 위 · 아래 끝, 짧은기둥의 빈 끝)이나
+ * 이 끌기의 세로 이동이 보선이 되는가. `box`(놓인 홀자 칸)를 주면 칸 테두리에 매인 끝은 세로로 잠근다. 이름 있는 줄기의 세로 끝(기둥 위 · 아래 끝, 짧은기둥의 빈 끝)이나
  * 가로 줄기 통째 끌기가 대상이다. 가로 이동, 꺾인 점, 핸들, 짧은기둥 통째 끌기, 가로 줄기 끝점은 null — 지금처럼 획 모양을 고친다.
  */
-export function stemRailDragOf(input: { jamo: Pick<JamoData, 'type' | 'char'>; stroke: StrokeDataV2; kind: 'stroke' | 'point' | 'handle'; pointIndex?: number; part: Part }): StemRailDrag | null {
+export function stemRailDragOf(input: { jamo: Pick<JamoData, 'type' | 'char'>; stroke: StrokeDataV2; kind: 'stroke' | 'point' | 'handle'; pointIndex?: number; part: Part; box?: BoxConfig }): StemRailDrag | null {
+  const drag = railDragOf(input)
+  // 칸 테두리에 매인 끝이 하나라도 있으면 세로로 잠근다(기둥 통째 끌기도). 칸 끝은 레이아웃 편집에서만.
+  if (drag && input.box && drag.keys.some((key) => stemEndOnBorder(input.box, input.stroke.id, endOfKey(key)))) return { part: drag.part, keys: [], border: true }
+  return drag
+}
+
+function railDragOf(input: { jamo: Pick<JamoData, 'type' | 'char'>; stroke: StrokeDataV2; kind: 'stroke' | 'point' | 'handle'; pointIndex?: number; part: Part }): StemRailDrag | null {
   const { jamo, stroke, kind } = input
   if (jamo.type !== 'jungseong' || kind === 'handle') return null
   const entry = MEDIAL_STEM_ROLES[jamo.char]?.[stroke.id]

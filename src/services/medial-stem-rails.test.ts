@@ -11,7 +11,7 @@ import { mapBoxToDesignBody } from './designBodyPlacement'
 import { materializeFinalGlyphInk, projectFinalGlyphInkToFontContours } from './finalGlyphInk'
 import { resolveGlyphInkPrimitives } from './glyphInkResolver'
 import { weightToMultiplier } from '../utils/globalStyleUtils'
-import { MEDIAL_STEM_ROLES, stemEndsFor } from './medialStemRails'
+import { MEDIAL_STEM_ROLES, stemEndOnBorder, stemEndsFor, stemRailDragOf, stemRailGuides } from './medialStemRails'
 import { MEDIAL_ROLE_SETS } from './notoVariationModel'
 import { placeStemStroke } from './stemBend'
 import { grammarOf } from './strokeGrammar'
@@ -234,5 +234,32 @@ describe.skipIf(!existsSync(CORPUS))('홀자 줄기 끝점 = 보선 — G1 홀�
     expect(final.ok).toBe(true)
     if (!final.ok) return
     expect(projectFinalGlyphInkToFontContours(final.ink, { upm: 1000, ascender: 880, slant: 12 }).length).toBeGreaterThan(0)
+  })
+})
+
+describe('칸 테두리 = 획 편집에서 세로 잠금', () => {
+  const box: BoxConfig = { x: 0.6, y: 0.1, width: 0.2, height: 0.8 }
+  const stroke = (char: string, id: string) => { const jamo = JUNGSEONG_MAP[char]; return [...(jamo.strokes ?? []), ...(jamo.horizontalStrokes ?? []), ...(jamo.verticalStrokes ?? [])].find((item) => item.id === id)! }
+  const jamo = (char: string) => ({ type: 'jungseong' as const, char })
+
+  it('바깥 기둥 끝(목표 없음)은 잠기고, 곁줄기(칸 안)는 보선을 옮긴다', () => {
+    const withStems = { ...box, stems: { 'ㅏ-2': { center: 0.44 } } }
+    expect(stemRailDragOf({ jamo: jamo('ㅏ'), stroke: stroke('ㅏ', 'ㅏ-1'), kind: 'point', pointIndex: 1, part: 'JU', box: withStems })).toEqual({ part: 'JU', keys: [], border: true })
+    expect(stemRailDragOf({ jamo: jamo('ㅏ'), stroke: stroke('ㅏ', 'ㅏ-1'), kind: 'stroke', part: 'JU', box: withStems })).toEqual({ part: 'JU', keys: [], border: true })
+    expect(stemRailDragOf({ jamo: jamo('ㅏ'), stroke: stroke('ㅏ', 'ㅏ-2'), kind: 'stroke', part: 'JU', box: withStems })).toEqual({ part: 'JU', keys: ['primaryBeam.center'] })
+  })
+
+  it('칸을 만드는 보(ㅗ, 중심이 칸 끝)는 잠기고, 안 기둥 끝은 칸 끝 가까이여도 옮긴다', () => {
+    expect(stemEndOnBorder({ ...box, stems: { 'ㅗ-2': { center: 1.006 } } }, 'ㅗ-2', 'center')).toBe(true)
+    expect(stemEndOnBorder({ ...box, stems: { 'ㅜ-1': { center: -0.008 } } }, 'ㅜ-1', 'center')).toBe(true)
+    expect(stemEndOnBorder({ ...box, stems: { 'ㅐ-1': { top: 0.02, bottom: 0.95 } } }, 'ㅐ-1', 'top')).toBe(false)
+  })
+
+  it('캔버스에 그릴 보선: 기둥은 두 끝, 곁줄기는 중심, 짧은기둥은 빈 끝만', () => {
+    const stems = { ...box, stems: { 'ㅐ-1': { top: 0.02, bottom: 0.95 }, 'ㅐ-2': { center: 0.44 } } }
+    expect(stemRailGuides({ jamo: jamo('ㅐ'), stroke: stroke('ㅐ', 'ㅐ-1'), part: 'JU', box: stems }).map((guide) => [guide.key, guide.border])).toEqual([['innerPillar.start', false], ['innerPillar.end', false]])
+    expect(stemRailGuides({ jamo: jamo('ㅐ'), stroke: stroke('ㅐ', 'ㅐ-3'), part: 'JU', box: stems }).map((guide) => guide.border)).toEqual([true, true])
+    expect(stemRailGuides({ jamo: jamo('ㅗ'), stroke: stroke('ㅗ', 'ㅗ-1'), part: 'JU', box }).map((guide) => guide.key)).toEqual(['baseStem.start'])
+    expect(stemRailGuides({ jamo: jamo('ㅜ'), stroke: stroke('ㅜ', 'ㅜ-2'), part: 'JU', box }).map((guide) => guide.key)).toEqual(['baseStem.end'])
   })
 })

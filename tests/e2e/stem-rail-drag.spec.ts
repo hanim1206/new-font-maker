@@ -57,9 +57,9 @@ test('나갈 때 반영 고르기가 뜨고, ㅐ를 빼면 ㅐ만 이 자모만 
   // 같은 역할(가운데 가로)을 쓰는 오른쪽 홀자 넷. 고친 ㅏ는 뺄 수 없다.
   await expect(sheet.locator('[data-char]')).toHaveCount(4)
   await expect(sheet.locator('[data-char="ㅏ"]')).toHaveAttribute('aria-disabled', 'true')
-  await expect(page.getByTestId('stem-rail-apply-count')).toHaveText('4')
+  await expect(sheet.locator('[data-kind="rail"][aria-pressed="true"]')).toHaveCount(4)
   await sheet.getByRole('button', { name: 'ㅐ 빼기' }).click()
-  await expect(page.getByTestId('stem-rail-apply-count')).toHaveText('3')
+  await expect(sheet.locator('[data-kind="rail"][aria-pressed="true"]')).toHaveCount(3)
   // 빼는 순간 반대 Δ가 얹혀 카드 · 캔버스가 ㅐ를 이전 자리로 보인다. 다시 담으면 걷힌다.
   await expect.poll(() => beamDelta(page, `${RIGHT_OPEN}|m=ㅐ`)).toBeCloseTo(-moved, 9)
   await sheet.getByRole('button', { name: 'ㅐ 담기' }).click()
@@ -73,7 +73,7 @@ test('나갈 때 반영 고르기가 뜨고, ㅐ를 빼면 ㅐ만 이 자모만 
   expect(await beamDelta(page, `${RIGHT_OPEN}|m=ㅐ`)).toBeCloseTo(-moved, 9)
 })
 
-test('창은 막지 않는다 — 바깥을 누르면 고른 대로(전부) 반영하고 나가고, 되돌려서 옮긴 게 없으면 안 뜬다', async ({ page }) => {
+test('취소 · 바깥 · Esc는 획 편집에 남고, 완료만 고른 대로 반영하고 나가고, 되돌려서 옮긴 게 없으면 안 뜬다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EC%95%84&mode=stroke&part=JU')
   await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
   await selectStroke(page, 'ㅏ-2')
@@ -83,9 +83,26 @@ test('창은 막지 않는다 — 바깥을 누르면 고른 대로(전부) 반�
   await page.getByTestId('workspace-back').click()
   const sheet = page.getByTestId('stem-rail-apply')
   await expect(sheet).toBeVisible()
-  await expect(sheet.getByRole('button', { name: '취소' })).toHaveCount(0)
-  // 바깥(어두운 막)을 누르면 나간다. 뺀 곳이 없으니 이 레이아웃 Δ만 남는다.
+  // 취소는 나가지 않고 획 편집에 남는다. 옮긴 보선은 그대로고, 다시 나가면 또 묻는다.
+  await sheet.getByTestId('stem-rail-apply-cancel').click()
+  await expect(sheet).toHaveCount(0)
+  await expect(page.getByTestId('jamo-layout-mode')).toHaveCount(0)
+  await expect(page.getByTestId('focus-canvas')).toBeVisible()
+  expect(await beamDelta(page)).toBeCloseTo(moved, 9)
+  await page.getByTestId('workspace-back').click()
+  await expect(sheet).toBeVisible()
+  // 바깥(어두운 막) · Esc도 취소와 같다 — 획 편집에 남는다.
   await page.mouse.click(5, 5)
+  await expect(sheet).toHaveCount(0)
+  await expect(page.getByTestId('jamo-layout-mode')).toHaveCount(0)
+  await page.getByTestId('workspace-back').click()
+  await expect(sheet).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(sheet).toHaveCount(0)
+  await expect(page.getByTestId('jamo-layout-mode')).toHaveCount(0)
+  // 나가는 길은 `완료` 하나. 뺀 곳이 없으니 이 레이아웃 Δ만 남는다.
+  await page.getByTestId('workspace-back').click()
+  await sheet.getByTestId('stem-rail-apply-go').click()
   await expect(sheet).toHaveCount(0)
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
   expect(await beamDelta(page)).toBeCloseTo(moved, 9)
@@ -102,24 +119,64 @@ test('창은 막지 않는다 — 바깥을 누르면 고른 대로(전부) 반�
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
 })
 
-test('기둥 아래 끝점을 내리면 기둥 끝 보선만 움직이고, 기둥 획은 그대로다(곱해지지 않는다)', async ({ page }) => {
+test('자리 버리기는 옮긴 보선을 들어오기 전으로 돌리고, 모양을 안 고쳤으면 그대로 나간다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EC%95%84&mode=stroke&part=JU')
   await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
-  const hit = page.locator('[data-editor-hit="stroke"][data-stroke-id="ㅏ-1"]')
+  await selectStroke(page, 'ㅏ-2')
+  await page.keyboard.press('Shift+ArrowUp')
+  await expect.poll(() => beamDelta(page)).toBeLessThan(0)
+  await page.getByTestId('workspace-back').click()
+  const sheet = page.getByTestId('stem-rail-apply')
+  await sheet.getByRole('button', { name: 'ㅐ 빼기' }).click()
+  await sheet.getByTestId('stem-rail-apply-discard').click()
+  await expect(sheet).toHaveCount(0)
+  await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
+  expect(await beamDelta(page)).toBeCloseTo(0, 9)
+  expect(await beamDelta(page, `${RIGHT_OPEN}|m=ㅐ`)).toBeCloseTo(0, 9)
+})
+
+/** 획을 두 번 눌러 점을 펼치고 아래 끝(cy가 큰 점)을 잡는다. */
+async function pickBottomEnd(page: Page, id: string) {
+  const hit = page.locator(`[data-editor-hit="stroke"][data-stroke-id="${id}"]`)
   for (let tap = 0; tap < 2; tap += 1) { await hit.dispatchEvent('pointerdown'); await hit.dispatchEvent('pointerup') }
   const points = page.locator('[data-editor-point="hit"]')
   await expect(points.first()).toBeAttached()
-  // 아래 끝 = cy가 큰 점.
   const ys = await points.evaluateAll((els) => els.map((el) => Number(el.getAttribute('cy'))))
   const bottom = points.nth(ys.indexOf(Math.max(...ys)))
   await bottom.dispatchEvent('pointerdown')
   await bottom.dispatchEvent('pointerup')
-  await page.keyboard.press('Shift+ArrowDown')
-  await expect.poll(async () => (await rules(page))[RIGHT_OPEN]?.medial?.JU?.['outerPillar.end'] ?? 0).toBeGreaterThan(0)
+}
+
+test('안 기둥 아래 끝점을 올리면 그 끝 보선만 움직이고, 기둥 획은 그대로다(곱해지지 않는다)', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EC%95%A0&mode=stroke&part=JU')
+  await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
+  await pickBottomEnd(page, 'ㅐ-1')
+  // 안쪽 보선은 칸 밖까지 긴 실선으로 보인다.
+  await expect(page.locator('[data-testid="stem-rail-guides"] line:not([data-border])')).toHaveCount(2)
+  await page.keyboard.press('Shift+ArrowUp')
+  await expect.poll(async () => (await rules(page))[RIGHT_OPEN]?.medial?.JU?.['innerPillar.end'] ?? 0).toBeLessThan(0)
   expect((await rules(page))[RIGHT_OPEN]?.medial?.JU?.['primaryBeam.center']).toBeUndefined()
+  expect((await rules(page))[RIGHT_OPEN]?.medial?.JU?.['outerPillar.end']).toBeUndefined()
   await page.waitForTimeout(1500)
-  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('font-maker-jamo-data') ?? '{}').state?.jungseong?.['ㅏ']?.strokes?.[0]?.points ?? null)
+  const stored = await page.evaluate(() => (JSON.parse(localStorage.getItem('font-maker-jamo-data') ?? '{}').state?.jungseong?.['ㅐ']?.strokes ?? []).find((stroke: { id: string }) => stroke.id === 'ㅐ-1')?.points ?? null)
   if (stored) expect(stored.at(-1).y).toBe(1)
+})
+
+test('칸 테두리(바깥 기둥 끝)는 획 편집에서 세로로 잠기고, 밀면 레이아웃에서 옮기라고 알린다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EC%95%84&mode=stroke&part=JU')
+  await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
+  await pickBottomEnd(page, 'ㅏ-1')
+  // 테두리 보선은 점선으로 흐리게.
+  await expect(page.locator('[data-testid="stem-rail-guides"] line[data-border]')).toHaveCount(2)
+  const before = await strokePath(page, 'ㅏ-1')
+  await page.keyboard.press('Shift+ArrowDown')
+  await page.keyboard.press('Shift+ArrowDown')
+  await expect(page.getByTestId('stem-rail-border-hint')).toBeVisible()
+  expect((await rules(page))[RIGHT_OPEN]?.medial?.JU?.['outerPillar.end']).toBeUndefined()
+  expect(await strokePath(page, 'ㅏ-1')).toBe(before)
+  // 나갈 때 옮긴 보선이 없으니 창도 안 뜬다.
+  await page.getByTestId('workspace-back').click()
+  await expect(page.getByTestId('stem-rail-apply')).toHaveCount(0)
 })
 
 test('도마를 들고 온 획 편집도 머리 ‹(내 폰트)로 나갈 때 묻고, 닫은 뒤에 나간다', async ({ page }) => {

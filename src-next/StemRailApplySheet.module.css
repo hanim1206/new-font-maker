@@ -19,15 +19,18 @@
 .applyCard { position: relative; aspect-ratio: 1; display: grid; place-items: center; border: 0; border-radius: 12px; background: rgb(var(--color-surface-3)); transition: background-color var(--motion-fast) var(--ease-standard); }
 .applyCard svg { opacity: .12; transition: opacity var(--motion-fast) var(--ease-standard); }
 .applyCard[aria-pressed='true'] svg { opacity: 1; }
-.applyCard[data-locked] { cursor: default; box-shadow: inset 0 0 0 2px #d9480f; }
-.applyCard em { position: absolute; top: 4px; right: 4px; display: inline-flex; align-items: center; gap: 2px; padding: 1px 6px; border-radius: 999px; background: #fff4e6; color: #d9480f; font-size: 10px; font-style: normal; font-weight: 800; white-space: nowrap; }
+/* 고친 카드(늘 반영)는 도마 카드 그대로에 구석 자물쇠만. 말 · 색 테두리는 안 둔다. */
+.applyCard[data-locked] { cursor: default; }
+.applyCard svg.applyLock { position: absolute; top: 8px; right: 8px; opacity: 1; color: rgb(var(--color-text-5)); }
 .applyFoot { flex: none; display: flex; align-items: center; gap: 4px; padding: 10px 12px 12px; border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
-.applyFoot p { flex: 1; min-width: 0; margin: 0 6px 0 8px; overflow: hidden; color: rgb(var(--color-text-3)); font-size: 15px; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; }
-.applyFoot p em { color: rgb(var(--color-text-5)); font-size: 12px; font-style: normal; }
+/* 자리 버리기는 `완료`에서 먼 왼쪽 글자 단추. 잘못 눌러도 ↶ 한 번이라 확인 창은 없다. */
+.applyDiscard { flex: none; min-height: 40px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-text-3)); font-size: 14px; font-weight: 700; transition: background-color var(--motion-fast) var(--ease-standard); }
+.applyDiscard:active { background: rgb(var(--color-surface-3)); }
+.applySpacer { flex: 1; }
 .applyGo { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; transition: transform var(--motion-fast) var(--ease-standard); }
+.applyCancel { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); font-size: 13px; font-weight: 700; transition: transform var(--motion-fast) var(--ease-standard); }
+.applyCancel:active { transform: scale(.95); }
 .applyGo:not(:disabled):active { transform: scale(.95); }
 .applyGo:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
 .applyGo span { display: inline-block; margin-right: 1px; }
 .applySection { margin: 18px 8px 0; color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 700; }
-/* 뺀 카드도 이전 자리가 보이게 조금만 흐린다(랩보다 진하게). */
-.applyCard[aria-pressed='false'] svg { opacity: .4; }
