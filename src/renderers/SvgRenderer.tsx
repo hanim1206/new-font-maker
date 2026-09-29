@@ -1,5 +1,5 @@
 import { useMemo, useId, type ReactNode } from 'react'
-import type { DecomposedSyllable, BoxConfig, Part, ResolvedCenterlinePrimitive, StrokeDataV2, LayoutSchema } from '../types'
+import type { DecomposedSyllable, BoxConfig, Part, ResolvedCenterlinePrimitive, ResolvedStrokeInkSource, StrokeDataV2, LayoutSchema } from '../types'
 import { PART_COLORS } from '../constants/editorColors'
 import { pointsToSvgD } from '../utils/pathUtils'
 import { weightToMultiplier } from '../utils/globalStyleUtils'
@@ -53,6 +53,8 @@ interface SvgRendererProps {
   weightMultiplier?: number
   // 묶음 부리를 직접 준다. 없으면 이 기기의 묶음 저장소를 읽는다. 남의 폰트를 그릴 때(관리자 미리보기) 내 묶음이 섞이지 않게.
   groupBeakOf?: GroupBeakResolver
+  // 획 하나만 다른 색으로(랩 강조용). undefined면 부위 색.
+  strokeColorOf?: (source: ResolvedStrokeInkSource) => string | undefined
   // SVG ref 전달
   svgRef?: React.RefObject<SVGSVGElement | null>
   // 추가 className (반응형 크기 조절 등)
@@ -85,6 +87,7 @@ export function SvgRenderer({
   enableTransition = false,
   weightMultiplier: weightMultiplierProp,
   groupBeakOf: groupBeakOfProp,
+  strokeColorOf,
   children,
   underlay,
   straightUnderlay,
@@ -225,7 +228,7 @@ export function SvgRenderer({
 
     return (
       <g key={part} opacity={partOpacity}>
-        {partPrimitives.map((primitive) => renderPrimitive(primitive, partColor))}
+        {partPrimitives.map((primitive) => renderPrimitive(primitive, strokeColorOf?.(primitive.source) ?? partColor))}
       </g>
     )
   }

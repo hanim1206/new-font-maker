@@ -17,7 +17,7 @@ import {
   type StemMaster,
   type StemMasterName,
 } from '../src/services/stemMaster'
-import type { AnchorPoint, StrokeDataV2 } from '../src/types'
+import type { AnchorPoint, ResolvedStrokeInkSource, StrokeDataV2 } from '../src/types'
 import { AppGlyph } from './AppGlyph'
 import styles from './StemMasterLabPage.module.css'
 
@@ -171,6 +171,9 @@ function MasterCanvas({ name, final, draft, onDraft, onCommit }: {
   )
 }
 
+/** 캔버스의 `.target`과 같은 색. */
+const ACTIVE_STROKE_COLOR = '#d9480f'
+
 /** 형제 카드 하나. 대표 글자 둘(받침 없음 · 있음)과 이 마스터에 귀속된 획의 따름 여부. */
 function SiblingCard({ char, name }: { char: string; name: StemMasterName }) {
   const jamo = useJamoStore((state) => state.jungseong[char])
@@ -181,11 +184,14 @@ function SiblingCard({ char, name }: { char: string; name: StemMasterName }) {
   const blocked = bound.every((item) => item.blocked)
   const follows = !blocked && bound.every((item) => item.follows || item.blocked)
   const curved = bound.some((item) => item.stroke.points.some((point) => point.handleIn || point.handleOut))
+  // 지금 고른 줄기를 캔버스와 같은 색으로.
+  const activeIds = new Set(bound.map((item) => item.stroke.id))
+  const activeColor = (source: ResolvedStrokeInkSource) => source.jamoId === char && activeIds.has(source.strokeId) ? ACTIVE_STROKE_COLOR : undefined
   return (
     <article className={styles.sibling} data-char={char} data-follow={blocked ? 'blocked' : follows} data-curved={curved}>
       <h3>{char}</h3>
       <div className={styles.siblingGlyphs}>
-        {FINALS.map((final) => <AppGlyph key={final.id} char={sampleSyllable(char, final.id)} size={72} />)}
+        {FINALS.map((final) => <AppGlyph key={final.id} char={sampleSyllable(char, final.id)} size={72} strokeColorOf={activeColor} />)}
       </div>
       <ul>
         {bound.map((item) => (

@@ -3,7 +3,7 @@ import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { useEffectiveGlobalStyle } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
-import type { LayoutSchema, Padding } from '../src/types'
+import type { LayoutSchema, Padding, ResolvedStrokeInkSource } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { useContextPlacement } from './notoModel'
 
@@ -21,7 +21,7 @@ function withEffectivePadding(
  * 자소 탭 카드와 검수 격자가 같이 쓴다. 글자별 Noto 윤곽은 받지 않는다.
  * `upright`면 전역 기울기를 빼고 그린다 — 검수 격자 · 범위 고르기처럼 레이아웃(직각 상자)을 보는 화면용. 굵기는 그대로 따른다.
  */
-export function AppGlyph({ char, size, className, upright = false }: { char: string; size: number; className?: string; upright?: boolean }) {
+export function AppGlyph({ char, size, className, upright = false, strokeColorOf }: { char: string; size: number; className?: string; upright?: boolean; strokeColorOf?: (source: ResolvedStrokeInkSource) => string | undefined }) {
   const choseong = useJamoStore((state) => state.choseong)
   const jungseong = useJamoStore((state) => state.jungseong)
   const jongseong = useJamoStore((state) => state.jongseong)
@@ -51,6 +51,7 @@ export function AppGlyph({ char, size, className, upright = false }: { char: str
       globalStyle={globalStyle}
       overflow="visible"
       clipGlyphs={false}
+      strokeColorOf={strokeColorOf}
     />
   )
 }
