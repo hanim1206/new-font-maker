@@ -32,7 +32,7 @@ import { storedStemDelta } from '../src/services/stemBend'
 import { stemRailDragOf, stemRailGuides, type StemRailDrag } from '../src/services/medialStemRails'
 import { exclusionDeltas, railCardKey, stemRailGroups, type StemRailEdit, type StemRailGroup } from './stemRailSession'
 import { StemRailApplySheet } from './StemRailApplySheet'
-import { keyOf as shapeKeyOf, pickedLeaves, revertedUnpicked, shapeAskOf, shapePreview, type ShapeAsk } from './stemShapeSession'
+import { defaultPicked, editedKeysOf, lockedKeys, pickedMasters, revertedFollowers, shapeAskOf, shapePreview, type ShapeAsk } from './stemShapeSession'
 import { useStemMasterStore } from '../src/stores/stemMasterStore'
 import type { StemMasters } from '../src/services/stemMaster'
 import { JamoScaleSlider } from './JamoScaleSlider'
@@ -2315,20 +2315,23 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const [railAsk, setRailAsk] = useState<{ groups: StemRailGroup[]; picked: Set<string>; then: () => void; before: LayoutDeltaSnapshot; shape?: { ask: ShapeAsk; picked: Set<string> } } | null>(null)
   // 획 편집을 연 때의 홀자. 나갈 때 견줘 고친 줄기 모양을 찾는다(줄기 마스터 랩과 같은 계산).
   const [shapeSnapshot, setShapeSnapshot] = useState(() => useJamoStore.getState().jungseong)
+  // 연 뒤 쌓인 기록의 시작. 같은 갈래를 여럿 고쳤을 때 마지막에 고친 획을 기준으로 삼으려고 고친 차례를 여기서부터 센다.
+  const [shapeSessionStart, setShapeSessionStart] = useState(() => useEditHistoryStore.getState().history.length)
+  const shapeEditOrder = () => history.slice(shapeSessionStart).flatMap((entry) => entry.kind === 'jamo' && entry.jamoType === 'jungseong' ? editedKeysOf(entry.before, entry.after) : [])
   const stemMasters = useStemMasterStore((state) => state.masters)
   const shapePreviewMap = useMemo(() => railAsk?.shape ? shapePreview(railAsk.shape.ask, railAsk.shape.picked, jungseong, shapeSnapshot, stemMasters) : {}, [railAsk, jungseong, shapeSnapshot, stemMasters])
   const railGroupsOfSession = () => stemRailGroups(history.slice(railSessionStart).flatMap((entry) => entry.kind === 'jamo' && entry.layoutDelta ? [entry.layoutDelta.rail] : entry.kind === 'layoutDelta' && entry.rail ? [entry.rail] : []))
   // 획 편집에서 나가는 모든 길(머리 ‹ · 내 폰트 · 다른 글자)이 여기를 지난다. 옮긴 보선이 있으면 창을 띄우고, 닫은 뒤 나간다.
   const askRailThen = (go: () => void) => {
     const groups = editMode === 'stroke' ? railGroupsOfSession() : []
-    const shape = editMode === 'stroke' ? shapeAskOf(useJamoStore.getState().jungseong, shapeSnapshot, useStemMasterStore.getState().masters) : null
+    const shape = editMode === 'stroke' ? shapeAskOf(useJamoStore.getState().jungseong, shapeSnapshot, useStemMasterStore.getState().masters, shapeEditOrder()) : null
     if (groups.length === 0 && !shape) { go(); return }
     setRailAsk({
       groups,
       picked: new Set(groups.flatMap((group) => group.medials.map((medial) => railCardKey(group.contextId, medial)))),
       then: go,
       before: layoutDeltaSnapshot(),
-      shape: shape ? { ask: shape, picked: new Set(shape.entries.map(shapeKeyOf)) } : undefined,
+      shape: shape ? { ask: shape, picked: defaultPicked(shape) } : undefined,
     })
   }
   // 창이 열린 동안 뺀 홀자의 반대 Δ를 저장소에 바로 얹는다 — 카드 · 캔버스 · 문장이 뺀 홀자를 이전 자리로 보인다. 닫으면 이 상태가 그대로 반영이다.
@@ -2344,16 +2347,17 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const toggleShapeAsk = (keys: readonly string[], on: boolean) => setRailAsk((current) => {
     if (!current?.shape) return current
     const picked = new Set(current.shape.picked)
-    for (const key of keys) { if (on) picked.add(key); else if (key !== current.shape.ask.editedKey) picked.delete(key) }
+    const locked = lockedKeys(current.shape.ask)
+    for (const key of keys) { if (on) picked.add(key); else if (!locked.has(key)) picked.delete(key) }
     return { ...current, shape: { ...current.shape, picked } }
   })
-  // 줄기 모양 반영: 고른 카드가 든 갈래에 모양을 적고, 뺀 획은 풀림(지금 모양), 뺀 카드 중 고친 획은 고치기 전으로. 되돌리기 한 줄.
+  // 줄기 모양 반영: 칸마다 고른 카드가 든 갈래에 그 칸의 모양을 적고, 뺀 획은 풀림(지금 모양). 기준 아닌 고친 획이 켜져 있으면 고치기 전으로 돌려 기준을 따르게 한다. 되돌리기 한 줄.
   const applyShapeAsk = (shape: { ask: ShapeAsk; picked: Set<string> }) => {
     const jamo = useJamoStore.getState()
     const jamoBefore = jamo.jungseong
     const mastersBefore = useStemMasterStore.getState().masters
-    for (const [char, next] of Object.entries(revertedUnpicked(jamoBefore, shapeSnapshot, shape.ask.changed, shape.picked))) jamo.updateJungseong(char, next)
-    useStemMasterStore.getState().setMasters(pickedLeaves(shape.ask.entries, shape.picked).map((name) => ({ ...shape.ask.master, name })), (char, strokeId) => !shape.picked.has(`${char}:${strokeId}`))
+    for (const [char, next] of Object.entries(revertedFollowers(jamoBefore, shapeSnapshot, shape.ask, shape.picked))) jamo.updateJungseong(char, next)
+    useStemMasterStore.getState().setMasters(pickedMasters(shape.ask, shape.picked), (char, strokeId) => !shape.picked.has(`${char}:${strokeId}`))
     const jamoAfter = useJamoStore.getState().jungseong
     const changedChars = Object.keys(jamoAfter).filter((char) => jamoAfter[char] !== jamoBefore[char])
     if (changedChars.length === 0 && mastersBefore === useStemMasterStore.getState().masters) return
@@ -2372,6 +2376,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     // 이번 획 편집은 끝났다. 다시 들어올 때(`editStrokes`) 새로 센다.
     setRailSessionStart(Number.MAX_SAFE_INTEGER)
     setShapeSnapshot(useJamoStore.getState().jungseong)
+    setShapeSessionStart(Number.MAX_SAFE_INTEGER)
     railAsk.then()
   }
   // 자리 버리기 = 이번 획 편집에서 옮긴 보선만 들어오기 전 자리로. 줄기 모양은 안 건드린다. 기록 한 줄이라 ↶로 되살린다.
@@ -2391,6 +2396,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     setRailAsk(null)
     setRailSessionStart(Number.MAX_SAFE_INTEGER)
     setShapeSnapshot(useJamoStore.getState().jungseong)
+    setShapeSessionStart(Number.MAX_SAFE_INTEGER)
     railAsk.then()
   }
   // 취소 = 창만 닫고 획 편집에 남는다. 창이 얹은 반대 Δ를 걷어 연 때로 돌리고, 나가기(`then`)는 안 한다. 다음에 나갈 때 다시 묻는다.
@@ -2451,6 +2457,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     setStrokeEntryPart(editorPart)
     setRailSessionStart(history.length)
     setShapeSnapshot(useJamoStore.getState().jungseong)
+    setShapeSessionStart(history.length)
     setSelection(firstStrokeSelectionOf(editorPart) ?? { kind: 'none' })
     setSelectedPoints([])
     chooseEditMode('stroke')
@@ -2769,7 +2776,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       >
         {!styleOnly && benchRow}
         {body}
-        {railAsk && <StemRailApplySheet groups={railAsk.groups} picked={railAsk.picked} onToggle={toggleRailAsk} onDone={applyRailAsk} onCancel={cancelRailAsk} onDiscard={discardRailAsk} shape={railAsk.shape ? { ...railAsk.shape, preview: shapePreviewMap, onToggle: toggleShapeAsk } : undefined} />}
+        {railAsk && <StemRailApplySheet groups={railAsk.groups} picked={railAsk.picked} onToggle={toggleRailAsk} onDone={applyRailAsk} onCancel={cancelRailAsk} onDiscard={discardRailAsk} shape={railAsk.shape ? { ...railAsk.shape, preview: shapePreviewMap, before: shapeSnapshot, onToggle: toggleShapeAsk } : undefined} />}
       </MobileWorkspaceShell>
     )
   }
