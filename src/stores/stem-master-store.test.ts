@@ -78,4 +78,20 @@ describe('줄기 마스터 스토어', () => {
     store.refollowAll('gidung.inner')
     expect(innerOf().map((item) => item.follows)).toEqual([true, true, false])
   })
+
+  it('전체 리셋은 마스터를 지우고 풀린 줄기까지 곧게 되돌린다(끝점은 그대로)', async () => {
+    const { useJamoStore } = await import('./jamoStore')
+    const { useStemMasterStore } = await import('./stemMasterStore')
+    const store = useStemMasterStore.getState()
+    store.setMaster(bent)
+    const a = useJamoStore.getState().jungseong['ㅏ']
+    useJamoStore.getState().updateJungseong('ㅏ', { ...a, strokes: [{ ...a.strokes![0], points: [{ x: 0, y: 0, handleOut: { x: 0.4, y: 0.3 } }, { x: 0.1, y: 1 }] }, a.strokes![1]] })
+    store.resetAll()
+    expect(useStemMasterStore.getState().masters).toEqual({})
+    const jung = useJamoStore.getState().jungseong
+    expect(jung['ㅏ'].strokes![0].points).toEqual([{ x: 0, y: 0 }, { x: 0.1, y: 1 }])
+    for (const char of ['ㅐ', 'ㅒ', 'ㅘ', 'ㅣ']) {
+      expect(boundStrokesOf(jung[char], {}).every((item) => item.follows && item.stroke.points.every((point) => !point.handleIn && !point.handleOut)), char).toBe(true)
+    }
+  })
 })

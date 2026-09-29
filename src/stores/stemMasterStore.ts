@@ -27,6 +27,8 @@ interface StemMasterActions {
   refollow: (char: string, channel: JamoChannel, strokeId: string) => void
   /** 이 이름의 풀린 획을 전부 다시 붙인다. */
   refollowAll: (name: StemMasterName) => void
+  /** 마스터를 전부 지우고, 이름 있는 홀자 줄기를 풀린 것까지 전부 곧게(끝점은 그대로) 되돌린다. */
+  resetAll: () => void
 }
 
 function propagate(before: StemMasters, after: StemMasters): void {
@@ -74,6 +76,18 @@ export const useStemMasterStore = create<StemMasterState & StemMasterActions>()(
           for (const item of boundStrokesOf(jamo, masters)) {
             if (item.name !== name || item.follows) continue
             next = refollowStroke(next, masters, item.channel, item.stroke.id) ?? next
+          }
+          if (next !== jamo) jamoStore.updateJungseong(char, withFrameFrom(next, jamo))
+        }
+      },
+
+      resetAll: () => {
+        set((state) => { state.masters = {} })
+        const jamoStore = useJamoStore.getState()
+        for (const [char, jamo] of Object.entries(jamoStore.jungseong)) {
+          let next: JamoData = jamo
+          for (const item of boundStrokesOf(jamo, {})) {
+            if (!item.follows) next = refollowStroke(next, {}, item.channel, item.stroke.id) ?? next
           }
           if (next !== jamo) jamoStore.updateJungseong(char, withFrameFrom(next, jamo))
         }

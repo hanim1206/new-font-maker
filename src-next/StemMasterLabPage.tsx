@@ -215,6 +215,7 @@ export function StemMasterLabPage() {
   )
   const own = Boolean(masters[name])
   const refollowAll = useStemMasterStore((state) => state.refollowAll)
+  const resetAll = useStemMasterStore((state) => state.resetAll)
   const released = useMemo(
     () => JUNGSEONG_LIST.reduce((sum, char) => sum + (jungseong[char] ? boundStrokesOf(jungseong[char], masters).filter((item) => item.name === name && !item.follows).length : 0), 0),
     [jungseong, masters, name],
@@ -233,6 +234,7 @@ export function StemMasterLabPage() {
             </button>
           ))}
         </div>
+        <button type="button" className={styles.reset} data-testid="reset-all" onClick={() => { setDraft(null); resetAll() }}>전체 리셋 — 마스터를 지우고 줄기를 전부 곧게</button>
       </header>
 
       <section className={styles.editor} aria-label="마스터 편집">
