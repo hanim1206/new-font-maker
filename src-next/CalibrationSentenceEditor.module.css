@@ -254,3 +254,7 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .bench::-webkit-scrollbar { display: none; }
 .bench button { position: relative; flex: none; min-width: 40px; height: 34px; padding: 0 10px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-3)); font-size: 15px; font-weight: 700; transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard); }
 .bench button[aria-selected='true'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+/* 주사위로 문장을 바꾸면 새 문장이 아래에서 살짝 올라오며 나타난다(편집기 · 대시보드 공용). */
+.sentenceRolled { animation: sentence-roll-in 280ms var(--ease-standard); }
+@keyframes sentence-roll-in { from { opacity: 0; translate: 0 10px; } }
+@media (prefers-reduced-motion: reduce) { .sentenceRolled { animation: none; } }
