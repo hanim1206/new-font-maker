@@ -17,6 +17,15 @@ export const LOCAL_FONT_KEYS = [
   'font-maker-editor-v2-history',
 ] as const
 
+/**
+ * 폰트를 옮길 때는 남기고 로그아웃할 때만 지우는 키. 폰트 모양이 담겨 다음 사람에게 남기면 안 된다.
+ * 충돌 백업(`CONFLICT_BACKUP_KEY`)은 폰트 전체 JSON, 사용자 묶음은 서버에 안 올라가는 묶음 부리 값.
+ */
+export const SIGN_OUT_KEYS = [
+  'font-maker-conflict-backup-v1',
+  'font-maker-jamo-groups',
+] as const
+
 export const LOCAL_STAMP_KEY = 'font-maker-account-owner-v1'
 
 /** 계정당 지우지 않은 폰트 수 한도. DB 트리거(`limit_font_projects_per_user`)와 같은 숫자. */
@@ -66,6 +75,12 @@ export function hasLocalFont(storage: Storage): boolean {
 export function clearLocalFont(storage: Storage): void {
   for (const key of LOCAL_FONT_KEYS) storage.removeItem(key)
   storage.removeItem(LOCAL_STAMP_KEY)
+}
+
+/** 로그아웃할 때 브라우저 사본과 함께 `SIGN_OUT_KEYS`도 지운다. 이름표도 지운다. */
+export function clearSignedOutCopy(storage: Storage): void {
+  clearLocalFont(storage)
+  for (const key of SIGN_OUT_KEYS) storage.removeItem(key)
 }
 
 /** 남의 이름표가 붙은 사본이면 지운다. 지웠으면 true. 스토어를 가져오기 전에 부른다. */

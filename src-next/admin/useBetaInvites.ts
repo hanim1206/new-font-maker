@@ -7,7 +7,7 @@ export interface NewRow { nickname: string; memo: string }
 export type Issued = Invite & { mode: 'add' | 'reissue' }
 
 /**
- * 베타 계정 목록 · 발급 · 정지 · 삭제. 초대 화면과 계정 화면이 한 벌을 같이 쓴다 — 계정 화면에서 `새 코드`를 누르면 결과 카드가 거기 뜬다.
+ * 베타 계정 목록 · 발급 · 정지 · 삭제. 계정 화면과 그 안의 초대 패널이 한 벌을 같이 쓴다 — `새 코드`를 누르면 결과 창이 뜬다.
  * 발급한 코드는 이 맥 파일(`beta-accounts/`)에 남는다. 그 전 계정은 코드를 몰라 `새 코드`로.
  */
 export function useBetaInvites() {
@@ -121,7 +121,27 @@ export function useBetaInvites() {
     }
   }
 
-  return { accounts, listError, busy, failure, issued, copied, issue, issueMany, suspend, remove, markSent, copy }
+  /** 친구 정보 고치기(닉네임 · 메모). 성공하면 true, 실패하면 까닭을 `failure`에. 끝나면 목록을 다시 받는다. */
+  const updateProfile = async (email: string, patch: { nickname?: string; memo?: string }): Promise<boolean> => {
+    if (busy) return false
+    setBusy(true)
+    setFailure('')
+    let ok = false
+    try {
+      await adminCall(BETA_INVITE_API, 'PATCH', { email, ...patch })
+      ok = true
+    } catch (error) {
+      setFailure((error as Error).message)
+    }
+    setBusy(false)
+    await refresh()
+    return ok
+  }
+
+  /** 새 코드 결과 창을 닫는다. */
+  const dismissIssued = () => setIssued(null)
+
+  return { accounts, listError, busy, failure, issued, copied, issue, issueMany, suspend, remove, markSent, updateProfile, copy, dismissIssued }
 }
 
 export type BetaInvites = ReturnType<typeof useBetaInvites>

@@ -4,7 +4,8 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 /** shadcn Button. 색은 앱 토큰(`src/index.css`)을 쓴다. */
-const buttonVariants = cva(
+// eslint-disable-next-line react-refresh/only-export-components -- 확인 창 단추가 같은 모양을 쓴다
+export const buttonVariants = cva(
   'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-colors cursor-pointer disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {

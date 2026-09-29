@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import path from 'node:path'
 import { loadEnv } from 'vite'
 import type { Plugin } from 'vite'
+import { MEMO_MAX_LENGTH, nicknameProblemOf } from '../src-next/admin/accountProfile'
 import { isDrawableName } from '../src-next/betaWelcome'
 import { BETA_CODE_FILE, betaInviteEnvOf, createBetaInvites } from './betaInvites'
 import type { BetaInvite, BetaIssueMode } from './betaInvites'
@@ -18,9 +19,8 @@ import type { BetaInvite, BetaIssueMode } from './betaInvites'
 export const BETA_INVITE_API = '/api/beta-invites'
 export const BETA_INVITE_HEADER = 'x-beta-admin'
 
-/** 초대 표 한 번에 발급하는 최대 인원 · 메모 길이. */
+/** 초대 표 한 번에 발급하는 최대 인원. */
 const BATCH_MAX = 30
-const MEMO_MAX_LENGTH = 200
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
 
@@ -69,7 +69,20 @@ export function betaInviteApiPlugin(root: string): Plugin {
             return send(response, 200, { accounts: await service().list() })
           }
           if (request.method === 'PATCH') {
-            const { email, suspended, sent } = await readJson(request) as { email?: string; suspended?: boolean; sent?: boolean }
+            const { email, suspended, sent, nickname, memo } = await readJson(request) as { email?: string; suspended?: boolean; sent?: boolean; nickname?: string; memo?: string }
+            // 친구 정보 고치기(닉네임 · 메모). 둘 중 하나만 와도 된다.
+            if (email && (typeof nickname === 'string' || typeof memo === 'string')) {
+              if (typeof nickname === 'string') {
+                const accounts = await service().list()
+                const problem = nicknameProblemOf(nickname, accounts.filter((account) => account.email !== email).map((account) => account.nickname))
+                if (problem) return send(response, 400, { error: `${problem}: ${nickname.trim() || '(빈 칸)'}` })
+              }
+              await service().updateProfile(email, {
+                nickname: typeof nickname === 'string' ? nickname : undefined,
+                memo: typeof memo === 'string' ? memo : undefined,
+              })
+              return send(response, 200, { email })
+            }
             if (email && typeof sent === 'boolean') {
               await service().setSent(email, sent)
               return send(response, 200, { email, sent })

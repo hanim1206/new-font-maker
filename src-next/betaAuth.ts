@@ -81,9 +81,9 @@ export async function signOutAndReload(): Promise<void> {
   // 편집 화면이면 지금 폰트를, 메인 화면이면 사본에 남은 변경을 올린다.
   const saved = await flushAccountFont() && (!me || await uploadPendingCopy(me))
   if (!saved && !window.confirm('아직 저장하지 못한 변경이 있어요. 로그아웃하면 이 변경은 사라져요. 그래도 로그아웃할까요?')) return
-  const { clearLocalFont, writeStamp } = await import('./accountFont')
+  const { clearSignedOutCopy, writeStamp } = await import('./accountFont')
   await (await client()).auth.signOut()
-  clearLocalFont(window.localStorage)
+  clearSignedOutCopy(window.localStorage)
   // 이름표는 남긴다. 새로고침 직전에 늦게 써진 스토어 값이 있어도 주인 없는 사본이 되지 않아, 다음 사람 계정으로 올라가지 않는다.
   if (me) writeStamp(window.localStorage, { owner: me, fontId: null, pending: false })
   window.location.reload()

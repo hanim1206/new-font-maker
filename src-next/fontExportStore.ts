@@ -9,6 +9,7 @@ import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { contextPlacementOf, loadNotoModel } from './notoModel'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 import { navigate } from './router'
+import { clearExportMark, markExportStarted } from './exportInterrupted'
 import { DEFAULT_SAMPLE_SENTENCE } from './sampleSentences'
 
 /**
@@ -164,48 +165,62 @@ export const useFontExportStore = create<FontExportState & FontExportActions>()(
     const familyName = name.trim() || DEFAULT_FONT_NAME
     try { localStorage.setItem(FONT_NAME_STORAGE_KEY, familyName) } catch { /* 저장 못 해도 추출은 된다 */ }
     set({ dialogOpen: false, familyName, status: 'exporting', progress: '준비 중...', percent: 0, error: '', notice: null, doneElsewhere: false })
-    // 모델을 못 읽으면 멈춘다. 조용히 스키마로 떨어지면 받은 폰트가 화면과 달라진다.
-    let placementOf: GlyphPlacementResolver
+    // 도중에 탭이 죽으면(아이폰 메모리) 다시 열 때 알린다. 어떻게 끝나든 지운다.
+    const storage = typeof localStorage === 'undefined' ? null : localStorage
+    if (storage) markExportStarted(storage)
     try {
-      placementOf = await exportPlacementResolver()
-    } catch (failure) {
-      const reason = failure instanceof Error ? failure.message : String(failure)
-      const error = `Noto 모델을 읽지 못해 추출을 멈췄습니다: ${reason}`
-      set({ progress: '', percent: 0, status: 'failed', error, notice: `OTF를 만들지 못했어요. ${error}` })
-      window.setTimeout(() => set({ status: 'idle' }), 1800)
-      return
+      await runExport(familyName)
+    } finally {
+      if (storage) clearExportMark(storage)
     }
-    // 받을 때마다 파일 버전을 올린다. 같은 이름으로 다시 설치해도 OS가 새 파일로 알아본다.
-    const revision = await nextExportRevision()
-    // 단계는 글이 바뀔 때 하나씩 센다(수집 → 변환 → 조립).
-    let phaseIndex = -1
-    let lastPhase = ''
-    const result = await generateAndDownloadFont({
-      familyName,
-      placementOf,
-      revision,
-      onProgress: (done, total, phase) => {
-        if (phase !== lastPhase) { lastPhase = phase; phaseIndex += 1 }
-        set({ progress: phase === PHASE_ASSEMBLE ? PHASE_ASSEMBLE_LABEL : phase, percent: exportPercent(phaseIndex, done, total) })
-      },
-    })
-    const skippedChars = result.skippedChars ?? []
-    // 폰트 탭 · 대시보드에서 기다리고 있었으면 완료 페이지로. 다른 탭이면 화면을 바꾸지 않는다.
-    const origin = typeof window === 'undefined' ? 'elsewhere' : exportOriginOf(window.location.pathname)
-    const lastExport: LastExport | null = result.success && result.bytes
-      ? { familyName, fileName: result.fileName ?? `${familyName}.otf`, revision, fileSize: result.fileSize ?? result.bytes.byteLength, at: Date.now(), skippedChars, bytes: result.bytes, from: origin, sample: get().sampleSentence }
-      : null
-    set({
-      progress: '',
-      percent: result.success ? 100 : 0,
-      status: result.success ? 'downloaded' : 'failed',
-      error: result.success ? '' : result.error ?? '',
-      notice: result.success ? successNotice(skippedChars, result.validation) : `OTF를 만들지 못했어요. ${result.error ?? ''}`.trim(),
-      doneElsewhere: Boolean(lastExport) && origin === 'elsewhere',
-      schemaFallbackCount: result.schemaFallbackCount ?? 0,
-      lastExport: lastExport ?? get().lastExport,
-    })
-    if (lastExport && origin !== 'elsewhere') navigate(FONT_EXPORT_DONE_PATH)
-    window.setTimeout(() => set({ status: 'idle' }), 1800)
   },
 }))
+
+/** `confirm`의 본체. 이름 창을 닫고 `exporting`으로 바꾼 뒤 부른다. */
+async function runExport(familyName: string): Promise<void> {
+  const set = useFontExportStore.setState
+  const get = useFontExportStore.getState
+  // 모델을 못 읽으면 멈춘다. 조용히 스키마로 떨어지면 받은 폰트가 화면과 달라진다.
+  let placementOf: GlyphPlacementResolver
+  try {
+    placementOf = await exportPlacementResolver()
+  } catch (failure) {
+    const reason = failure instanceof Error ? failure.message : String(failure)
+    const error = `Noto 모델을 읽지 못해 추출을 멈췄습니다: ${reason}`
+    set({ progress: '', percent: 0, status: 'failed', error, notice: `OTF를 만들지 못했어요. ${error}` })
+    window.setTimeout(() => set({ status: 'idle' }), 1800)
+    return
+  }
+  // 받을 때마다 파일 버전을 올린다. 같은 이름으로 다시 설치해도 OS가 새 파일로 알아본다.
+  const revision = await nextExportRevision()
+  // 단계는 글이 바뀔 때 하나씩 센다(수집 → 변환 → 조립).
+  let phaseIndex = -1
+  let lastPhase = ''
+  const result = await generateAndDownloadFont({
+    familyName,
+    placementOf,
+    revision,
+    onProgress: (done, total, phase) => {
+      if (phase !== lastPhase) { lastPhase = phase; phaseIndex += 1 }
+      set({ progress: phase === PHASE_ASSEMBLE ? PHASE_ASSEMBLE_LABEL : phase, percent: exportPercent(phaseIndex, done, total) })
+    },
+  })
+  const skippedChars = result.skippedChars ?? []
+  // 폰트 탭 · 대시보드에서 기다리고 있었으면 완료 페이지로. 다른 탭이면 화면을 바꾸지 않는다.
+  const origin = typeof window === 'undefined' ? 'elsewhere' : exportOriginOf(window.location.pathname)
+  const lastExport: LastExport | null = result.success && result.bytes
+    ? { familyName, fileName: result.fileName ?? `${familyName}.otf`, revision, fileSize: result.fileSize ?? result.bytes.byteLength, at: Date.now(), skippedChars, bytes: result.bytes, from: origin, sample: get().sampleSentence }
+    : null
+  set({
+    progress: '',
+    percent: result.success ? 100 : 0,
+    status: result.success ? 'downloaded' : 'failed',
+    error: result.success ? '' : result.error ?? '',
+    notice: result.success ? successNotice(skippedChars, result.validation) : `OTF를 만들지 못했어요. ${result.error ?? ''}`.trim(),
+    doneElsewhere: Boolean(lastExport) && origin === 'elsewhere',
+    schemaFallbackCount: result.schemaFallbackCount ?? 0,
+    lastExport: lastExport ?? get().lastExport,
+  })
+  if (lastExport && origin !== 'elsewhere') navigate(FONT_EXPORT_DONE_PATH)
+  window.setTimeout(() => set({ status: 'idle' }), 1800)
+}

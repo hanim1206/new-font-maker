@@ -4,6 +4,7 @@ import type { FontData } from '../src/types/database'
 import {
   autoPickOf,
   clearLocalFont,
+  clearSignedOutCopy,
   dropForeignCopy,
   editedDayText,
   editorPlanOf,
@@ -99,6 +100,19 @@ describe('브라우저 사본 이름표', () => {
     storage.setItem('font-maker-jamo-data', '{}')
     expect(dropForeignCopy(storage, 'b')).toBe(false)
     expect(storage.getItem('font-maker-jamo-data')).toBe('{}')
+  })
+
+  it('로그아웃은 충돌 백업과 사용자 묶음까지 지우고, 폰트 옮기기는 남긴다', () => {
+    storage.setItem('font-maker-jamo-data', '{}')
+    storage.setItem(CONFLICT_BACKUP_KEY, '{}')
+    storage.setItem('font-maker-jamo-groups', '{}')
+    clearLocalFont(storage)
+    expect(storage.getItem('font-maker-jamo-data')).toBeNull()
+    expect(storage.getItem(CONFLICT_BACKUP_KEY)).toBe('{}')
+    expect(storage.getItem('font-maker-jamo-groups')).toBe('{}')
+
+    clearSignedOutCopy(storage)
+    expect(storageValues.size).toBe(0)
   })
 
   it('망가진 이름표는 주인 없음으로 읽는다', () => {

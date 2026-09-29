@@ -131,8 +131,10 @@ export function materializeFinalGlyphInk(
     }
     // 끝·꺾임이 둥글지 않은 중심선은 붓 tip 방식으로 못 만든다. brush 모드에서만 일자 stroker로 대신한다.
     // 전역 둥글기가 있으면 끝 모양과 상관없이 일자 stroker가 모서리를 굴린다(화면 · OTF와 같은 함수).
-    const rounded = hasRoundness(strokeStyle as StrokeRenderStyle)
-    const flat = rounded || primitive.effectiveLinecap !== 'round' || primitive.effectiveLinejoin !== 'round'
+    // 납작·네모 붓촉은 붓촉이 끝을 만든다. 끝 모양과 상관없이 붓촉으로 긋는다(`strokeToRenderInkGroups`와 같은 분기).
+    const shapedTip = strokeStyle.mode === 'brush' && strokeStyle.brush.tip !== 'round'
+    const rounded = !shapedTip && hasRoundness(strokeStyle as StrokeRenderStyle)
+    const flat = !shapedTip && (rounded || primitive.effectiveLinecap !== 'round' || primitive.effectiveLinejoin !== 'round')
     if (flat && strokeStyle.mode !== 'brush') {
       return {
         ok: false,

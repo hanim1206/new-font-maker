@@ -19,6 +19,7 @@ import { authGateMode, sessionUser } from './betaAuth'
 import { DevCrashProbe } from './devCrash'
 import { EditLockedPage } from './EditLockedPage'
 import { editLockName, holdEditLock, takeStealRequest } from './editLock'
+import { reportInterruptedExport } from './exportInterrupted'
 import { installErrorLog, isQuotaExceeded, onErrorRecorded, recordError } from './errorLog'
 import { suspendWork } from './workGuard'
 
@@ -55,6 +56,7 @@ setPersistWriteErrorHandler((error) => {
   showLocalCopyNotice()
 })
 watchAppUpdate()
+reportInterruptedExport(window.localStorage)
 
 // 요소 끌어 옮기기(이미지 · 링크 · 선택한 글자)를 앱 전체에서 막는다. 입력칸은 예외. CSS `-webkit-user-drag`가 안 먹는 브라우저(Firefox)용.
 document.addEventListener('dragstart', (event) => {
@@ -66,6 +68,7 @@ document.addEventListener('dragstart', (event) => {
 const FONTS_PATH = '/fonts'
 const DASHBOARD_PATH = '/dashboard'
 const ADMIN_PATH = '/admin'
+const isAdminPath = (pathname: string) => pathname === ADMIN_PATH || pathname.startsWith(`${ADMIN_PATH}/`)
 /** 게이트가 꺼진 개발 서버에서 새 폰트 이름. */
 const LOCAL_NICKNAME = '내 폰트'
 
@@ -113,7 +116,7 @@ function adoptLocalCopy(): void {
 async function gate(): Promise<void> {
   if (window.location.pathname === FONTS_PATH) window.history.replaceState(null, '', DASHBOARD_PATH)
   // 관리자 화면(`/admin/*`). 개발 서버에서만, 로그인과 상관없이(발급 API가 이 맥에서만 받는다). 배포 번들에는 없다.
-  if (import.meta.env.DEV && (window.location.pathname === ADMIN_PATH || window.location.pathname.startsWith(`${ADMIN_PATH}/`))) {
+  if (import.meta.env.DEV && isAdminPath(window.location.pathname)) {
     const { AdminApp } = await import('./admin/AdminApp')
     show(<AdminApp />)
     return
@@ -212,4 +215,5 @@ async function start(me?: string, nickname: string | null = null): Promise<void>
 void gate()
 
 // 개발 서버에서만 화면 명세 버튼을 붙인다. 배포 빌드에서는 이 분기와 버튼 코드가 통째로 빠진다. `VITE_SCREEN_SPEC=off`로 끌 수 있다.
-if (import.meta.env.DEV && import.meta.env.VITE_SCREEN_SPEC !== 'off') void import('./mountScreenSpecButton').then(({ mountScreenSpecButton }) => mountScreenSpecButton())
+// 관리자 화면은 명세가 없고, 오른쪽 아래 버튼이 패널 단추를 가려서 뺀다.
+if (import.meta.env.DEV && import.meta.env.VITE_SCREEN_SPEC !== 'off' && !isAdminPath(window.location.pathname)) void import('./mountScreenSpecButton').then(({ mountScreenSpecButton }) => mountScreenSpecButton())
