@@ -15,7 +15,7 @@
 .applyCheck { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-surface)); transition: background-color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
 .applyGroupHead[aria-checked='true'] .applyCheck, .applyGroupHead[aria-checked='mixed'] .applyCheck { background: rgb(var(--color-foreground)); }
 .applyGroupHead:active .applyCheck { transform: scale(.9); }
-.applyCards { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; padding: 0 8px; }
+.applyCards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 0 8px; }
 .applyCard { position: relative; aspect-ratio: 1; display: grid; place-items: center; border: 0; border-radius: 12px; background: rgb(var(--color-surface-3)); transition: background-color var(--motion-fast) var(--ease-standard); }
 .applyCard svg { opacity: .12; transition: opacity var(--motion-fast) var(--ease-standard); }
 .applyCard[aria-pressed='true'] svg { opacity: 1; }
@@ -24,8 +24,10 @@
 .applyFoot { flex: none; display: flex; align-items: center; gap: 4px; padding: 10px 12px 12px; border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
 .applyFoot p { flex: 1; min-width: 0; margin: 0 6px 0 8px; overflow: hidden; color: rgb(var(--color-text-3)); font-size: 15px; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; }
 .applyFoot p em { color: rgb(var(--color-text-5)); font-size: 12px; font-style: normal; }
-.applyCancel { flex: none; min-height: 40px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-text-4)); font-size: 13px; font-weight: 700; }
 .applyGo { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; transition: transform var(--motion-fast) var(--ease-standard); }
 .applyGo:not(:disabled):active { transform: scale(.95); }
 .applyGo:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
 .applyGo span { display: inline-block; margin-right: 1px; }
+.applySection { margin: 18px 8px 0; color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 700; }
+/* 뺀 카드도 이전 자리가 보이게 조금만 흐린다(랩보다 진하게). */
+.applyCard[aria-pressed='false'] svg { opacity: .4; }

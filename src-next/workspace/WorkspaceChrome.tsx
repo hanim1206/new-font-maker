@@ -33,6 +33,7 @@ export function MobileWorkspaceShell({
   back,
   cover,
   heading,
+  beforeLeave,
 }: {
   children: ReactNode
   /** 어느 화면인지. 탭은 없어졌지만 부르는 쪽이 이름표로 준다. */
@@ -48,25 +49,28 @@ export function MobileWorkspaceShell({
   back?: { label: string; href: string } | { label: string; onClick: () => void }
   /** 머리 아래(내용 자리)만 덮는 층. 추출 대기처럼 내용은 막되 머리 `‹`로는 나갈 수 있어야 하는 것. */
   cover?: ReactNode
+  /** 머리 `‹`로 나가기 전에 부르는 문. 주면 나가는 일(`go`)을 넘기고, 부르는 쪽이 물은 뒤 `go`를 부른다(획 편집의 반영 고르기). */
+  beforeLeave?: (go: () => void) => void
 }) {
   const openedName = useUIStore((state) => state.currentProjectName)
   const title = projectName ?? openedName ?? '새 한글 폰트'
   // ⌘Z · ⇧⌘Z는 머리의 되돌리기 · 다시 실행 단추와 같은 일.
   useHistoryShortcuts(history)
+  const leave = (go: () => void) => { if (beforeLeave) beforeLeave(go); else go() }
   return (
     <main className={styles.page}>
       <div className={styles.shell}>
         <header className={styles.projectHeader}>
           {/* 왼쪽은 위 덱으로 나가는 문 — 화살표만, 오른쪽 머리 단추와 같은 생김새. 이름은 읽기용 레이블에만. 오른쪽은 편집 기록. */}
           {back && 'onClick' in back
-            ? <button type="button" className={styles.back} onClick={back.onClick} aria-label={`${back.label}(으)로`} title={back.label} data-testid="workspace-back">
+            ? <button type="button" className={styles.back} onClick={() => leave(back.onClick)} aria-label={`${back.label}(으)로`} title={back.label} data-testid="workspace-back">
               <ChevronLeft size={20} aria-hidden="true" />
             </button>
             : back
-            ? <a className={styles.back} href={back.href} onClick={onLinkClick} aria-label={`${back.label}(으)로`} title={back.label} data-testid="workspace-back">
+            ? <a className={styles.back} href={back.href} onClick={(event) => { if (!beforeLeave) { onLinkClick(event); return } event.preventDefault(); leave(() => navigate(back.href)) }} aria-label={`${back.label}(으)로`} title={back.label} data-testid="workspace-back">
               <ChevronLeft size={20} aria-hidden="true" />
             </a>
-            : <button type="button" className={styles.back} onClick={() => void goToFontHome()} aria-label="내 폰트로" title="내 폰트" data-testid="workspace-font-home">
+            : <button type="button" className={styles.back} onClick={() => leave(() => void goToFontHome())} aria-label="내 폰트로" title="내 폰트" data-testid="workspace-font-home">
               <ChevronLeft size={20} aria-hidden="true" />
             </button>}
           {heading
