@@ -59,7 +59,6 @@ test('레거시 스냅 획을 미리보기·복원·전체 OTF에 적용한다',
   const before = await focusSvg.innerHTML()
   await drawer.getByRole('radio', { name: '레거시 스냅 획', exact: true }).click()
   await expect(drawer.getByText('25-unit 스냅 · 75-unit 획 · 35° 절단')).toBeVisible()
-  await expect(drawer.getByRole('link', { name: '형태 그리드 편집 열기' })).toHaveAttribute('href', '/grid-lab')
   await expect(page.locator('[data-construction-grid="legacy-snapped-centerline"]')).toBeVisible()
   await expect.poll(() => focusSvg.innerHTML()).not.toBe(before)
 

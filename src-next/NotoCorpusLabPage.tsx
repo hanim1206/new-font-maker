@@ -173,7 +173,7 @@ export function NotoCorpusLabPage() {
   }
 
   return <main className={styles.page} data-testid="noto-corpus-lab">
-    <header className={styles.hero}><div><span className={styles.eyebrow}>NOTO SANS KR · 추출에서 프리셋까지</span><h1>얼마나 뽑았고,<br />어디까지 확인했나.</h1><p>자동 추출 후보와 사람이 확인한 기준선은 다릅니다.<br />글자 상세 아래에서 승인 입력 57자의 마스터와 기준선 편집을 비교할 수 있습니다.</p></div><nav><a href="/font-guide-lab?font=noto-sans-kr">기준선 조율 랩</a><a href="/preset-candidate-lab">기존 프리셋 비교 실험</a><button type="button" onClick={() => setRefresh((value) => value + 1)}>최신 집계 다시 읽기</button></nav></header>
+    <header className={styles.hero}><div><span className={styles.eyebrow}>NOTO SANS KR · 추출에서 프리셋까지</span><h1>얼마나 뽑았고,<br />어디까지 확인했나.</h1><p>자동 추출 후보와 사람이 확인한 기준선은 다릅니다.<br />글자 상세 아래에서 승인 입력 57자의 마스터와 기준선 편집을 비교할 수 있습니다.</p></div><nav><a href="/font-guide-lab?font=noto-sans-kr">기준선 조율 랩</a><button type="button" onClick={() => setRefresh((value) => value + 1)}>최신 집계 다시 읽기</button></nav></header>
     {error && <p role="alert" className={styles.alert}>{error}</p>}
     {!snapshot ? <p className={styles.notice}>로컬 추출 보고서를 읽는 중입니다.</p> : <>
       <section className={styles.scopeBar}><div><strong>분모 선택</strong><button type="button" aria-pressed={scope === 'all'} onClick={() => setScope('all')}>현대 한글 전체 11,172자</button><button type="button" aria-pressed={scope === 'no-final'} onClick={showNoFinal}>무받침 399자</button></div><small>보고서 시각 {new Date(snapshot.updatedAt).toLocaleString('ko-KR')}</small></section>

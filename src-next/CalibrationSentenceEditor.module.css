@@ -185,7 +185,6 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .constructionRuleMessage strong { color: rgb(var(--color-primary-dark)); font-size: 12px; }
 .constructionRuleMessage span { font-size: 10px; font-weight: 700; }
 .constructionRuleMessage small { color: rgb(var(--color-text-dim-4)); font-size: 9px; }
-.constructionRuleLink { min-height: 30px; display: inline-flex; align-items: center; justify-content: center; padding: 0 12px; border-radius: 8px; background: rgb(var(--color-primary)); color: rgb(var(--color-primary-foreground)); font-size: 10px; font-weight: 800; text-decoration: none; }
 .constructionGrid { position: absolute; z-index: 0; inset: 0; opacity: .42; background-image: repeating-linear-gradient(35deg, transparent 0 calc(var(--construction-band-size) - 1px), rgb(var(--color-primary) / .22) calc(var(--construction-band-size) - 1px) var(--construction-band-size)); pointer-events: none; }
 .brushAnglePad { position: relative; min-height: 104px; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background-color: rgb(var(--color-surface)); background-image: linear-gradient(rgb(var(--color-border-subtle) / .65) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--color-border-subtle) / .65) 1px, transparent 1px); background-size: 20px 20px; touch-action: none; user-select: none; }
 .brushAnglePad::before, .brushAnglePad::after { content: ''; position: absolute; background: rgb(var(--color-primary) / .18); pointer-events: none; }

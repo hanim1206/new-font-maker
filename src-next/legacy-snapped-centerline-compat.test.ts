@@ -1,9 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { readFileSync } from 'node:fs'
 import type { StrokeDataV2 } from '../src/types'
 
 const STORAGE_KEY = 'font-maker-global-style'
-const GRID_LAB_STORAGE_KEY = 'font-maker-grid-system-2-lab-v1'
 const legacyStyle = {
   slant: 0,
   weight: 400,
@@ -89,11 +87,5 @@ describe('레거시 격자 중심선 mode 호환', () => {
     expect(renderer.strokeToRenderInkGroups(stroke, box, 1, oldStyle)).toEqual(
       renderer.strokeToRenderInkGroups(stroke, box, 1, canonicalStyle),
     )
-  })
-
-  it('Grid Lab은 기존 저장 키와 별도 프로젝트 모델을 계속 사용한다', () => {
-    const source = readFileSync(new URL('./GridSystem2LabPage.tsx', import.meta.url), 'utf8')
-    expect(source).toContain(`const STORAGE_KEY = '${GRID_LAB_STORAGE_KEY}'`)
-    expect(source).not.toContain('legacy-snapped-centerline')
   })
 })
