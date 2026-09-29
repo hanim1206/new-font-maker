@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import type { JamoData } from '../types'
-import { applyMaster, axisReversed, boundStrokesOf, JAMO_CHANNELS, masterNameOf, masterOf, stemReferenceBox, type StemMaster, type StemMasters } from './stemMaster'
+import { applyMaster, axisReversed, boundStrokesOf, JAMO_CHANNELS, masterFromStroke, masterNameOf, masterOf, stemReferenceBox, type StemMaster, type StemMasters } from './stemMaster'
 
 const jung = (baseJamos as unknown as { jungseong: Record<string, JamoData> }).jungseong
 const bend = (name: StemMaster['name'], o = 0.03): StemMaster => ({ name, points: [{ t: 0, o: 0 }, { t: 1, o: 0, handleIn: { t: 0.7, o } }] })
@@ -98,5 +98,33 @@ describe('줄기 역할 갈래', () => {
     expect(left.along).toBeCloseTo(0.7, 9)
     expect(Math.abs(right.y)).toBeCloseTo(0.03, 9)
     expect(right.y).toBeCloseTo(left.y, 9)
+  })
+})
+
+describe('고친 획 → 마스터', () => {
+  const near = (a: StemMaster, b: StemMaster) => {
+    expect(a.points.length).toBe(b.points.length)
+    a.points.forEach((point, index) => {
+      const other = b.points[index]
+      for (const key of ['handleIn', 'handleOut'] as const) {
+        expect(Boolean(point[key])).toBe(Boolean(other[key]))
+        if (point[key]) {
+          expect(point[key]!.t).toBeCloseTo(other[key]!.t, 6)
+          expect(point[key]!.o).toBeCloseTo(other[key]!.o, 6)
+        }
+      }
+    })
+  }
+  it('마스터를 놓은 획을 다시 읽으면 같은 마스터다 — 곧은 축 · 뒤집힌 축(ㅓ 곁줄기 · ㅗ 짧은기둥) 모두', () => {
+    for (const [char, id] of [['ㅏ', 'ㅏ-1'], ['ㅓ', 'ㅓ-2'], ['ㅗ', 'ㅗ-1'], ['ㅣ', 'ㅣ-1']] as const) {
+      const name = nameOf(char, id)!
+      expect(axisReversed(jung[char], jung[char][channelOf(jung[char], id)]!, jung[char][channelOf(jung[char], id)]!.find((stroke) => stroke.id === id)!), char).toBe(char === 'ㅓ' || char === 'ㅗ')
+      const master = { ...bend(name), points: [{ t: 0, o: 0, handleOut: { t: 0.3, o: -0.01 } }, { t: 1, o: 0, handleIn: { t: 0.7, o: 0.03 } }] }
+      const next = applyMaster(jung[char], {}, { [name]: master })!
+      near(masterFromStroke(next, channelOf(next, id), id)!, master)
+    }
+  })
+  it('이름 없는 획은 null', () => {
+    expect(masterFromStroke(jung['ㅏ'], 'strokes', '없음')).toBeNull()
   })
 })

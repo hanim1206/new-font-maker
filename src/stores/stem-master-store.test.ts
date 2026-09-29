@@ -38,6 +38,20 @@ describe('줄기 마스터 스토어', () => {
     expect(jung['ㅚ'].verticalStrokes![0].points[0].handleOut).toBeDefined()
   })
 
+  it('반영 고르기에서 뺀 획은 따르고 있어도 안 옮기고 풀림으로 남는다', async () => {
+    const { useJamoStore } = await import('./jamoStore')
+    const { useStemMasterStore } = await import('./stemMasterStore')
+    const before = useJamoStore.getState().jungseong['ㅕ'].strokes![0]
+    useStemMasterStore.getState().setMasters([{ ...bent, name: 'gidung.outer.single' }], (char) => char === 'ㅕ')
+    const jung = useJamoStore.getState().jungseong
+    const masters = useStemMasterStore.getState().masters
+    expect(jung['ㅏ'].strokes![0].points[0].handleOut).toBeDefined()
+    expect(jung['ㅕ'].strokes![0]).toEqual(before)
+    const pillarOf = (char: string) => boundStrokesOf(jung[char], masters).find((item) => item.name === 'gidung.outer.single')!
+    expect(pillarOf('ㅏ').follows).toBe(true)
+    expect(pillarOf('ㅕ').follows).toBe(false)
+  })
+
   it('풀린 획은 마스터를 다시 바꿔도 그대로, 다시 따르기로 붙고, 지우면 곧아진다', async () => {
     const { useJamoStore } = await import('./jamoStore')
     const { useStemMasterStore } = await import('./stemMasterStore')

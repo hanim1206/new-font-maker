@@ -348,7 +348,7 @@ export function boundStrokesOf(jamo: JamoData, masters: StemMasters): BoundStrok
  * 마스터 하나를 바꿨을 때 이 홀자를 다시 쓴다. 바뀌기 전 마스터를 따르던 획만 새 마스터로 옮기고, 풀린 획은 그대로.
  * 바뀐 획이 없으면 null. `기둥.안쪽` 마스터가 따로 없으면 안쪽 기둥도 기둥을 따라 같이 바뀐다.
  */
-export function applyMaster(jamo: JamoData, before: StemMasters, after: StemMasters): JamoData | null {
+export function applyMaster(jamo: JamoData, before: StemMasters, after: StemMasters, keep?: (strokeId: string) => boolean): JamoData | null {
   let changed = false
   const next: JamoData = { ...jamo }
   for (const channel of JAMO_CHANNELS) {
@@ -356,7 +356,7 @@ export function applyMaster(jamo: JamoData, before: StemMasters, after: StemMast
     if (!strokes) continue
     const rewritten = strokes.map((stroke) => {
       const name = masterNameOf(jamo, strokes, stroke.id)
-      if (!name) return stroke
+      if (!name || keep?.(stroke.id)) return stroke
       const box = stemReferenceBox(jamo.char, channel, stroke)
       const reversed = axisReversed(jamo, strokes, stroke)
       const previous = masterOf(before, name)
@@ -370,6 +370,41 @@ export function applyMaster(jamo: JamoData, before: StemMasters, after: StemMast
     next[channel] = rewritten
   }
   return changed ? next : null
+}
+
+/**
+ * 자모에서 고친 획 하나를 마스터로 읽는다(`instanceOf`의 역). 편집기에서 고친 모양을 형제에게 반영할 때 쓴다.
+ * 끝점 사이 축(t)과 기준 칸 em의 수직 오프셋(o)으로 재고, 뒤집힌 축이면 거울을 풀어 적는다. 이름 없는 획이면 null.
+ */
+export function masterFromStroke(jamo: JamoData, channel: JamoChannel, strokeId: string): StemMaster | null {
+  const strokes = jamo[channel]
+  const stroke = strokes?.find((item) => item.id === strokeId)
+  if (!strokes || !stroke || stroke.points.length < 2) return null
+  const name = masterNameOf(jamo, strokes, strokeId)
+  if (!name) return null
+  const box = stemReferenceBox(jamo.char, channel, stroke)
+  const reversed = axisReversed(jamo, strokes, stroke)
+  const oriented = reversed ? reverseStroke(stroke) : stroke
+  const start = oriented.points[0]
+  const end = oriented.points[oriented.points.length - 1]
+  const uxEm = (end.x - start.x) * box.width
+  const uyEm = (end.y - start.y) * box.height
+  const length = Math.hypot(uxEm, uyEm) || 1
+  const toAxis = (point: { x: number; y: number }) => {
+    const dxEm = (point.x - start.x) * box.width
+    const dyEm = (point.y - start.y) * box.height
+    return { t: (dxEm * uxEm + dyEm * uyEm) / (length * length), o: (dxEm * uyEm - dyEm * uxEm) / length }
+  }
+  const last = oriented.points.length - 1
+  const master: StemMaster = {
+    name,
+    points: oriented.points.map((point, index) => ({
+      ...(index === 0 ? { t: 0, o: 0 } : index === last ? { t: 1, o: 0 } : toAxis(point)),
+      ...(point.handleIn ? { handleIn: toAxis(point.handleIn) } : {}),
+      ...(point.handleOut ? { handleOut: toAxis(point.handleOut) } : {}),
+    })),
+  }
+  return reversed ? mirroredMaster(master) : master
 }
 
 /** 풀린 획 하나를 다시 마스터에 붙인다. 이미 따르면 null. */
