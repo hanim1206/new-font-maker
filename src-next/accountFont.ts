@@ -13,6 +13,8 @@ export const LOCAL_FONT_KEYS = [
   'font-maker-global-style',
   'font-maker-shape-system-v1',
   'noto-layout-delta-v1',
+  // 폰트의 프리셋 버전(`fontPresetStore`). 비우면 새 폰트 기본값으로 돌아간다.
+  'font-maker-font-preset',
   // 되돌리기 기록도 그 폰트 것이라 주인이 바뀌면 같이 지운다.
   'font-maker-editor-v2-history',
 ] as const

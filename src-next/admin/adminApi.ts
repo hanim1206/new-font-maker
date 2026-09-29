@@ -4,6 +4,8 @@
  */
 export const BETA_INVITE_API = '/api/beta-invites'
 export const FEEDBACK_API = '/api/feedback'
+/** 하우스 레이아웃 파일 저장(`scripts/housePresetApi.ts`). */
+export const HOUSE_PRESET_API = '/api/house-preset'
 const HEADER = 'x-beta-admin'
 
 export class AdminApiError extends Error {

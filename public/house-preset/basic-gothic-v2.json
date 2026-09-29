@@ -1,0 +1,245 @@
+{
+  "schema": "house-layout-model-v1",
+  "preset": "basic-gothic-v2",
+  "updatedAt": "2026-09-29T00:00:00.000Z",
+  "effectsSource": "noto-measured",
+  "representatives": {
+    "final.roleFaces.bottom": {
+      "bottom-final": 956.479,
+      "mixed-final": 956.275,
+      "right-final": 955.876
+    },
+    "final.roleFaces.left": {
+      "bottom-final": 124.734,
+      "mixed-final": 152.64,
+      "right-final": 156.285
+    },
+    "final.roleFaces.right": {
+      "bottom-final": 787.381,
+      "mixed-final": 812.265,
+      "right-final": 815.699
+    },
+    "final.roleFaces.top": {
+      "bottom-final": 605.167,
+      "mixed-final": 620.726,
+      "right-final": 591.641
+    },
+    "initial.roleFaces.bottom": {
+      "bottom": 575.36,
+      "bottom-final": 404.38,
+      "mixed": 524.85,
+      "mixed-final": 405.108,
+      "right": 753.821,
+      "right-final": 528.971
+    },
+    "initial.roleFaces.left": {
+      "bottom": 125.74,
+      "bottom-final": 132.3,
+      "mixed": 99.69,
+      "mixed-final": 106.86,
+      "right": 72.93,
+      "right-final": 70.622
+    },
+    "initial.roleFaces.right": {
+      "bottom": 786.721,
+      "bottom-final": 770.451,
+      "mixed": 578.51,
+      "mixed-final": 576.069,
+      "right": 559.801,
+      "right-final": 541.562
+    },
+    "initial.roleFaces.top": {
+      "bottom": 127.719,
+      "bottom-final": 78.31,
+      "mixed": 134.64,
+      "mixed-final": 96.03,
+      "right": 140.74,
+      "right-final": 103.359
+    },
+    "medial.baseStem.face": {
+      "bottom": 498.546,
+      "bottom-final": 493.811,
+      "mixed": 372.596,
+      "mixed-final": 372.868
+    },
+    "medial.baseStem.spanFrom": {
+      "bottom": 588.62,
+      "bottom-final": 430.959,
+      "mixed": 530.695,
+      "mixed-final": 407.94
+    },
+    "medial.baseStem.spanTo": {
+      "bottom": 878.585,
+      "bottom-final": 583.448,
+      "mixed": 805.615,
+      "mixed-final": 568.432
+    },
+    "medial.baseStem.visibleLength": {
+      "bottom": 256.449,
+      "bottom-final": 102.776,
+      "mixed": 233.82,
+      "mixed-final": 111.248
+    },
+    "medial.innerPillar.face": {
+      "mixed": 638.391,
+      "mixed-final": 642.262,
+      "right": 628.49,
+      "right-final": 627.943
+    },
+    "medial.innerPillar.spanFrom": {
+      "mixed": 72.899,
+      "mixed-final": 69.192,
+      "right": 73.094,
+      "right-final": 70.69
+    },
+    "medial.innerPillar.spanTo": {
+      "mixed": 910.661,
+      "mixed-final": 592.363,
+      "right": 912.016,
+      "right-final": 546.979
+    },
+    "medial.innerPillar.visibleLength": {
+      "mixed": 802.956,
+      "mixed-final": 488.701,
+      "right": 803.591,
+      "right-final": 441.664
+    },
+    "medial.leftStem.face": {
+      "bottom": 347.681,
+      "bottom-final": 348.928
+    },
+    "medial.leftStem.spanFrom": {
+      "bottom": 574.26,
+      "bottom-final": 424.214
+    },
+    "medial.leftStem.spanTo": {
+      "bottom": 880.564,
+      "bottom-final": 583.701
+    },
+    "medial.leftStem.visibleLength": {
+      "bottom": 264.704,
+      "bottom-final": 108.886
+    },
+    "medial.lowerBeam.face": {
+      "mixed": 680.725,
+      "mixed-final": 501.271,
+      "right": 531.204,
+      "right-final": 361.457
+    },
+    "medial.lowerBeam.spanFrom": {
+      "mixed": 220.26,
+      "mixed-final": 232.816,
+      "right": 556.241,
+      "right-final": 554.555
+    },
+    "medial.lowerBeam.spanTo": {
+      "mixed": 603.934,
+      "mixed-final": 622.992,
+      "right": 762.595,
+      "right-final": 758.799
+    },
+    "medial.lowerBeam.visibleLength": {
+      "mixed": 108.775,
+      "mixed-final": 101.424,
+      "right": 136.997,
+      "right-final": 128.276
+    },
+    "medial.outerPillar.face": {
+      "mixed": 790.961,
+      "mixed-final": 784.521,
+      "right": 794.401,
+      "right-final": 790.761
+    },
+    "medial.outerPillar.spanFrom": {
+      "mixed": 53.47,
+      "mixed-final": 53.69,
+      "right": 53.08,
+      "right-final": 53.69
+    },
+    "medial.outerPillar.spanTo": {
+      "mixed": 958.14,
+      "mixed-final": 600.004,
+      "right": 957.92,
+      "right-final": 571.968
+    },
+    "medial.outerPillar.visibleLength": {
+      "mixed": 904.45,
+      "mixed-final": 545.28,
+      "right": 904.45,
+      "right-final": 518.304
+    },
+    "medial.primaryBeam.face": {
+      "bottom": 768.719,
+      "bottom-final": 470.129,
+      "mixed": 681.349,
+      "mixed-final": 476.527,
+      "right": 403.141,
+      "right-final": 269.196
+    },
+    "medial.primaryBeam.spanFrom": {
+      "bottom": 50.03,
+      "bottom-final": 42.71,
+      "mixed": 52.13,
+      "mixed-final": 50.57,
+      "right": 557.545,
+      "right-final": 556.505
+    },
+    "medial.primaryBeam.spanTo": {
+      "bottom": 869.75,
+      "bottom-final": 862.431,
+      "mixed": 652.08,
+      "mixed-final": 639.26,
+      "right": 758.715,
+      "right-final": 757.344
+    },
+    "medial.primaryBeam.visibleLength": {
+      "bottom": 817.77,
+      "bottom-final": 817.77,
+      "mixed": 58.639,
+      "mixed-final": 25.688,
+      "right": 139.634,
+      "right-final": 129.065
+    },
+    "medial.rightStem.face": {
+      "bottom": 652.141,
+      "bottom-final": 639.836
+    },
+    "medial.rightStem.spanFrom": {
+      "bottom": 574.455,
+      "bottom-final": 423.638
+    },
+    "medial.rightStem.spanTo": {
+      "bottom": 880.76,
+      "bottom-final": 584.165
+    },
+    "medial.rightStem.visibleLength": {
+      "bottom": 264.704,
+      "bottom-final": 106.724
+    },
+    "medial.upperBeam.face": {
+      "mixed": 475.14,
+      "mixed-final": 357.355,
+      "right": 284.564,
+      "right-final": 183.065
+    },
+    "medial.upperBeam.spanFrom": {
+      "mixed": 323,
+      "mixed-final": 325.837,
+      "right": 560.134,
+      "right-final": 552.44
+    },
+    "medial.upperBeam.spanTo": {
+      "mixed": 704.405,
+      "mixed-final": 707.083,
+      "right": 763.505,
+      "right-final": 758.165
+    },
+    "medial.upperBeam.visibleLength": {
+      "mixed": 77.456,
+      "mixed-final": 74.416,
+      "right": 136.134,
+      "right-final": 127.906
+    }
+  },
+  "authored": []
+}

@@ -6,6 +6,7 @@ import { notoCorpusApiPlugin } from './scripts/reference-lab/notoCorpusApi'
 import { notoPresetApiPlugin } from './scripts/reference-lab/notoPresetApi'
 import { betaInviteApiPlugin } from './scripts/betaInviteApi'
 import { feedbackAdminApiPlugin } from './scripts/feedbackAdminApi'
+import { housePresetApiPlugin } from './scripts/housePresetApi'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -17,6 +18,8 @@ export default defineConfig({
     betaInviteApiPlugin(fileURLToPath(new URL('.', import.meta.url))),
     // 같은 화면의 의견 탭(한임 답장). 개발 서버에만 붙는다.
     feedbackAdminApiPlugin(fileURLToPath(new URL('.', import.meta.url))),
+    // 관리자 `프리셋` 메뉴가 하우스 레이아웃 파일을 저장한다. 개발 서버에만 붙는다.
+    housePresetApiPlugin(fileURLToPath(new URL('.', import.meta.url))),
     VitePWA({
       // 편집 중에 저절로 바뀌지 않게. 새 버전은 알림(`appUpdate.ts`) 뒤 사용자가 새로고침한다.
       registerType: 'prompt',

@@ -6,11 +6,11 @@ import { useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import { useShapeSystemStore } from '../src/stores/shapeSystemStore'
 import { useUIStore } from '../src/stores/uiStore'
-import { DEFAULT_FONT_PRESET } from '../src/types/database'
 import type { FontData } from '../src/types/database'
 import { editorPlanOf, openPlanOf, readStamp, writeStamp } from './accountFont'
 import { bumpExportRevision, createFont, fetchFont, saveFont } from './accountFontApi'
 import { clearAppNotice, showAppNotice } from './appNotice'
+import { useFontPresetStore } from './fontPresetStore'
 import { useLayoutDeltaStore } from './layoutDeltaStore'
 import { registerWorkGuard } from './workGuard'
 
@@ -35,10 +35,13 @@ export type AccountStartResult =
   | { ok: false; reason: 'home' }
   | { ok: false; reason: 'network' | 'invalid-font'; message: string }
 
-/** 스토어 다섯 → 저장할 JSON. 레이아웃 조정은 `src-next` 스토어라 브릿지 밖에서 붙인다. */
+/**
+ * 스토어 다섯 → 저장할 JSON. 레이아웃 조정은 `src-next` 스토어라 브릿지 밖에서 붙인다.
+ * 프리셋 버전은 연 폰트의 값을 그대로 쓴다. 기본값으로 덮으면 기본이 v2로 바뀌는 순간 기존 폰트가 다음 저장에서 v2로 넘어간다.
+ */
 export function collectAccountFontData(): FontData {
   const data = collectFontData()
-  data.preset = DEFAULT_FONT_PRESET
+  data.preset = useFontPresetStore.getState().preset
   const rules = useLayoutDeltaStore.getState().rules
   if (Object.keys(rules).length > 0) data.layoutDelta = { rules: structuredClone(rules) }
   return data
@@ -48,6 +51,7 @@ function applyAccountFontData(value: unknown): { ok: true } | { ok: false; messa
   const applied = applyFontData(value)
   if (!applied.ok) return { ok: false, message: applied.error.message }
   useLayoutDeltaStore.getState().restore({ rules: applied.data.layoutDelta?.rules ?? {} })
+  useFontPresetStore.getState().setPreset(applied.data.preset)
   return { ok: true }
 }
 
@@ -96,6 +100,8 @@ export async function startAccountFont(me: string): Promise<AccountStartResult> 
 
   if (plan === 'create') {
     const name = stamp.create ?? 'My Font'
+    // 새 폰트만 기본 버전을 받는다.
+    useFontPresetStore.getState().resetToDefault()
     const created = await createFont(me, name, collectAccountFontData())
     if (!created.ok) {
       // 한도에 걸렸으면(다른 기기에서 먼저 만들었을 때) 최근 폰트를 다시 고른다.

@@ -292,6 +292,33 @@ describe('계정 폰트 열기 · 자동 저장', () => {
     expect(await startAccountFont('me')).toEqual({ ok: false, reason: 'home' })
   })
 
+  it('저장은 연 폰트의 프리셋 버전을 덮지 않는다(v2 폰트는 v2로 남는다)', async () => {
+    const { useFontPresetStore } = await import('./fontPresetStore')
+    writeStamp(storage, stampOf({ owner: 'me', fontId: 'f2' }))
+    serverFont = { id: 'f2', name: 'v2 폰트', font_data: { ...structuredClone(baseFont), preset: 'basic-gothic-v2' } }
+    expect(await startAccountFont('me')).toEqual({ ok: true })
+    expect(useFontPresetStore.getState().preset).toBe('basic-gothic-v2')
+    expect(collectAccountFontData().preset).toBe('basic-gothic-v2')
+
+    // 칸이 없는 옛 폰트는 v1으로 읽고 v1으로 저장한다.
+    resetAccountFontForTest()
+    const legacy: Partial<FontData> = structuredClone(baseFont)
+    delete legacy.preset
+    writeStamp(storage, stampOf({ owner: 'me', fontId: 'f1' }))
+    serverFont = { id: 'f1', name: '옛 폰트', font_data: legacy }
+    expect(await startAccountFont('me')).toEqual({ ok: true })
+    expect(collectAccountFontData().preset).toBe('basic-gothic')
+  })
+
+  it('새 폰트만 기본 버전을 받는다 — 앞서 연 폰트가 v2여도', async () => {
+    const { useFontPresetStore } = await import('./fontPresetStore')
+    useFontPresetStore.getState().setPreset('basic-gothic-v2')
+    writeStamp(storage, stampOf({ owner: 'me', create: '새 폰트' }))
+    expect(await startAccountFont('me')).toEqual({ ok: true })
+    expect(calls.find((call) => call.op === 'insert')?.payload).toMatchObject({ font_data: { preset: 'basic-gothic' } })
+    expect(useFontPresetStore.getState().preset).toBe('basic-gothic')
+  })
+
   it('내 사본에 못 올린 변경이 있으면 서버 값 대신 사본을 올린다', async () => {
     serverFont = { id: 'f1', name: 'test1', font_data: structuredClone(baseFont) }
     useLayoutDeltaStore.getState().restore(DELTA)

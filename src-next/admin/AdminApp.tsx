@@ -20,6 +20,8 @@ import { useBetaInvites } from './useBetaInvites'
 
 /** 폰트 미리보기는 렌더러 · 노토 모델을 끌고 와서 들어갈 때만 불러온다. */
 const AccountFontsPage = lazy(() => import('./AccountFontsPage').then((module) => ({ default: module.AccountFontsPage })))
+/** 프리셋 편집도 렌더러 · 노토 모델을 끌고 온다. */
+const PresetPage = lazy(() => import('./PresetPage').then((module) => ({ default: module.PresetPage })))
 
 function AdminSidebar({ section, lab, pending, onGo, onLab }: {
   section: Section
@@ -154,6 +156,7 @@ export function AdminApp() {
         </Suspense>}
         <AdminFeedback hidden={section !== 'feedback'} onPending={setPending} />
         {section === 'triage' && <TriagePage />}
+        {section === 'preset' && <Suspense fallback={<p className="text-sm text-text-dim-4">불러오는 중…</p>}><PresetPage /></Suspense>}
         {section === 'labs' && !lab && <LabsList onOpen={openLab} />}
         {section === 'labs' && lab && <LabFrame lab={lab} />}
       </main>

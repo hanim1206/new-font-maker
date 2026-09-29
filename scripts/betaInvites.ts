@@ -296,5 +296,20 @@ export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
     }))
   }
 
-  return { list, issue, setSuspended, remove, setSent, updateProfile, fonts }
+  /** 지우지 않은 폰트 전부의 프리셋 버전 수. 칸이 없는 옛 폰트는 v1(`basic-gothic`)로 센다. 관리자 `프리셋` 메뉴 머리. */
+  async function presetCounts(): Promise<Record<string, number>> {
+    const { data, error } = await supabase
+      .from(FONT_TABLE)
+      .select('preset:font_data->>preset')
+      .is('deleted_at', null)
+    if (error) throw new Error(`프리셋 수: ${error.message}`)
+    const counts: Record<string, number> = {}
+    for (const row of (data ?? []) as { preset: string | null }[]) {
+      const preset = row.preset ?? 'basic-gothic'
+      counts[preset] = (counts[preset] ?? 0) + 1
+    }
+    return counts
+  }
+
+  return { list, issue, setSuspended, remove, setSent, updateProfile, fonts, presetCounts }
 }

@@ -1,9 +1,13 @@
-import { normalizeReferencePadding } from '../src/services/designBodyPlacement'
+import { normalizeReferencePadding, REFERENCE_BODY_PADDING } from '../src/services/designBodyPlacement'
 import { parseAndMigrateFontData } from '../src/services/fontDataMigration'
-import { loadedGlobalStyle } from '../src/stores/globalStyleStore'
+import baseJamos from '../src/data/baseJamos.json'
+import { DEFAULT_STYLE, loadedGlobalStyle } from '../src/stores/globalStyleStore'
+import { DEFAULT_LAYOUT_SCHEMAS } from '../src/utils/layoutCalculator'
 import type { GlobalStyle, GlobalStyleExclusion } from '../src/stores/globalStyleStore'
 import type { JamoData, LayoutSchema, LayoutType, Padding } from '../src/types'
 import { migrateJamoData, needsMigration } from '../src/utils/strokeMigration'
+import { NOTO_FONT_PRESET } from '../src/types/database'
+import type { FontPresetId } from '../src/types/database'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 
 /**
@@ -20,6 +24,8 @@ export interface PreviewFont {
   style: GlobalStyle
   exclusions: GlobalStyleExclusion[]
   delta: LayoutDeltaSnapshot
+  /** 폰트의 프리셋 버전. 미리보기는 이 버전 모델로 그린다. */
+  preset: FontPresetId
 }
 
 const migratedMap = (map: Record<string, JamoData>): Record<string, JamoData> => {
@@ -46,6 +52,28 @@ export function previewFontOf(value: unknown): { ok: true; font: PreviewFont } |
       style: loadedGlobalStyle(data.globalStyle.style),
       exclusions: [...data.globalStyle.exclusions],
       delta: { rules: structuredClone(data.layoutDelta?.rules ?? {}) },
+      preset: data.preset ?? NOTO_FONT_PRESET,
     },
+  }
+}
+
+/**
+ * 기본 프리셋 그대로의 폰트(기본 자소 획 · 기본 틀 · 기본 스타일, 조정 없음). 관리자 `프리셋` 메뉴가 쓴다.
+ * 이 기기의 내 폰트 사본을 읽지 않는다 — 관리자 화면의 사본은 아무 폰트일 수 있다.
+ */
+export function presetPreviewFont(preset: FontPresetId): PreviewFont {
+  return {
+    jamo: {
+      choseong: migratedMap(baseJamos.choseong as Record<string, JamoData>),
+      jungseong: migratedMap(baseJamos.jungseong as Record<string, JamoData>),
+      jongseong: migratedMap(baseJamos.jongseong as Record<string, JamoData>),
+    },
+    layoutSchemas: structuredClone(DEFAULT_LAYOUT_SCHEMAS),
+    globalPadding: { ...REFERENCE_BODY_PADDING },
+    paddingOverrides: {},
+    style: loadedGlobalStyle(DEFAULT_STYLE),
+    exclusions: [],
+    delta: { rules: {} },
+    preset,
   }
 }

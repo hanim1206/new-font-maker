@@ -64,8 +64,11 @@ export function betaInviteApiPlugin(root: string): Plugin {
         try {
           if (request.method === 'GET') {
             // `?fonts=<이메일>`: 그 친구 폰트(관리자 미리보기). 없으면 계정 목록.
-            const fontsOf = new URL(request.url ?? '/', 'http://admin.local').searchParams.get('fonts')
+            const params = new URL(request.url ?? '/', 'http://admin.local').searchParams
+            const fontsOf = params.get('fonts')
             if (fontsOf) return send(response, 200, { fonts: await service().fonts(fontsOf) })
+            // `?presets=1`: 폰트 프리셋 버전별 수(관리자 `프리셋` 메뉴).
+            if (params.get('presets')) return send(response, 200, { counts: await service().presetCounts() })
             return send(response, 200, { accounts: await service().list() })
           }
           if (request.method === 'PATCH') {

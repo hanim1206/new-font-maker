@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { NOTO_FONT_PRESET } from '../../src/types/database'
 import { FontDataGlyph } from '../fontDataGlyph'
+import { FONT_PRESET_LABEL } from '../fontPresetStore'
 import { previewFontOf } from '../previewFont'
 import { SAMPLE_SENTENCES } from '../sampleSentences'
 import { BETA_INVITE_API, adminCall, dateOf, dayOf } from './adminApi'
@@ -17,18 +19,28 @@ interface AccountFont { id: string; name: string; createdAt: string; updatedAt: 
 const GLYPH_SIZE = 44
 const isSyllable = (char: string) => char >= '가' && char <= '힣'
 
-/** 한 폰트 카드. 이름 · 고친 때 · 미리보기 문장. 폰트 JSON이 틀리면 까닭만 적는다. */
+/**
+ * 한 폰트 카드. 이름 · 프리셋 버전 · 고친 때 · 미리보기 문장. 폰트 JSON이 틀리면 까닭만 적는다.
+ * 미리보기는 그 폰트의 버전 모델로 그린다. v1 폰트는 `v2로 보기`로 같은 폰트를 v2 모델로 그려 볼 수 있다(저장 안 함, 옮길지 판단용).
+ */
 function FontCard({ font, text }: { font: AccountFont; text: string }) {
   const prepared = useMemo(() => previewFontOf(font.fontData), [font.fontData])
+  const [asV2, setAsV2] = useState(false)
+  const preset = prepared.ok ? prepared.font.preset : null
+  const model = asV2 ? 'basic-gothic-v2' as const : undefined
   return <section className="flex flex-col gap-3 rounded-lg bg-surface-2 p-4" data-testid="admin-account-font">
-    <div className="flex items-baseline gap-2">
+    <div className="flex flex-wrap items-baseline gap-2">
       <strong className="text-base font-bold">{font.name}</strong>
+      {preset && <Badge variant={preset === NOTO_FONT_PRESET ? 'muted' : 'default'} data-testid="admin-account-font-preset">{FONT_PRESET_LABEL[preset]}</Badge>}
       <span className="text-xs text-text-dim-4">고친 때 {dateOf(font.updatedAt)} · 만든 때 {dateOf(font.createdAt)}</span>
+      {preset === NOTO_FONT_PRESET && <Button size="sm" variant={asV2 ? 'default' : 'ghost'} className="ml-auto h-7" aria-pressed={asV2} onClick={() => setAsV2(!asV2)} data-testid="admin-account-font-as-v2">
+        v2로 보기
+      </Button>}
     </div>
     {prepared.ok
       ? <p className="flex flex-wrap items-center gap-y-2 text-text-dim-4" aria-label={`${font.name} 미리보기`}>
         {[...text].map((char, at) => isSyllable(char)
-          ? <FontDataGlyph key={at} font={prepared.font} char={char} size={GLYPH_SIZE} />
+          ? <FontDataGlyph key={at} font={prepared.font} char={char} size={GLYPH_SIZE} model={model} />
           : <span key={at} className="inline-block text-2xl" style={{ minWidth: char === ' ' ? GLYPH_SIZE / 3 : undefined }}>{char}</span>)}
       </p>
       : <p className="text-sm text-[rgb(190_52_48)]">폰트를 읽지 못했어요: {prepared.message}</p>}

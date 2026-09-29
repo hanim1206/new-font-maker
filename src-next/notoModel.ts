@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { create } from 'zustand'
 import { identityOfSyllable, resolveContextBoxes } from '../src/services/contextBoxResolver'
 import type { ContextBoxDelta, ContextBoxResolution } from '../src/services/contextBoxResolver'
 import { isReferenceBody, mapBoxToDesignBody, mapFacesToDesignBody } from '../src/services/designBodyPlacement'
@@ -6,6 +7,11 @@ import type { GlyphInkPlacement } from '../src/services/notoGlyphXor'
 import type { ModelIdentity } from '../src/services/notoVariationModel'
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
 import type { DecomposedSyllable, LayoutSchema } from '../src/types'
+import { NOTO_FONT_PRESET } from '../src/types/database'
+import type { FontPresetId } from '../src/types/database'
+import { houseLayoutFile, isHouseLayoutModel, withHouseRepresentatives } from '../src/services/houseLayoutModel'
+import type { HouseLayoutModel } from '../src/services/houseLayoutModel'
+import { useFontPresetStore } from './fontPresetStore'
 import { effectiveLayoutDelta, useLayoutDelta } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
@@ -17,28 +23,69 @@ import type { NotoPresetModelBundle } from './notoPresetGlyphs'
  * 아니면 호출자가 split/padding 스키마로 돌아간다.
  */
 
-let shared: Promise<NotoPresetModelBundle> | undefined
-function sharedModel(): Promise<NotoPresetModelBundle> {
-  shared ??= notoPresetGlyphs.model().catch((error: unknown) => { shared = undefined; throw error })
-  return shared
+/** 버전별로 한 번씩 읽는다. v1 = 노토 모델 그대로, 그 밖 = 노토 모델에 하우스 대푯값을 끼운 것. */
+const shared = new Map<FontPresetId, Promise<NotoPresetModelBundle>>()
+function sharedModel(preset: FontPresetId): Promise<NotoPresetModelBundle> {
+  let pending = shared.get(preset)
+  if (!pending) {
+    pending = buildModel(preset).catch((error: unknown) => { shared.delete(preset); throw error })
+    shared.set(preset, pending)
+  }
+  return pending
 }
 
-export function useNotoModel(): { bundle: NotoPresetModelBundle | null; error: string } {
-  const [state, setState] = useState<{ bundle: NotoPresetModelBundle | null; error: string }>({ bundle: null, error: '' })
+async function buildModel(preset: FontPresetId): Promise<NotoPresetModelBundle> {
+  const noto = await notoPresetGlyphs.model()
+  if (preset === NOTO_FONT_PRESET) return noto
+  return withHouseLayout(noto, await fetchHouseLayout(preset))
+}
+
+/** 하우스 파일. 관리자가 고치면 바로 보여야 해서 HTTP 캐시를 다시 확인한다(파일이 작다). */
+export async function fetchHouseLayout(preset: FontPresetId): Promise<HouseLayoutModel> {
+  const response = await fetch(`${import.meta.env.BASE_URL}${houseLayoutFile(preset)}`, { cache: 'no-cache' })
+  if (!response.ok) throw new Error(`프리셋 ${preset} 파일을 읽지 못했습니다(${response.status}).`)
+  const value: unknown = await response.json()
+  if (!isHouseLayoutModel(value) || value.preset !== preset) throw new Error(`프리셋 ${preset} 파일 형식이 다릅니다.`)
+  return value
+}
+
+/** 노토 묶음에 하우스 대푯값을 끼운다. 두께 · 효과 · 짝 칸은 노토 것. */
+export function withHouseLayout(noto: NotoPresetModelBundle, house: HouseLayoutModel): NotoPresetModelBundle {
+  return { ...noto, model: withHouseRepresentatives(noto.model, house) as NotoPresetModelBundle['model'] }
+}
+
+/** 관리자가 하우스 파일을 저장한 뒤 부른다. 이 탭의 그 버전 모델을 새 값으로 바꾸고 구독자를 다시 그린다. */
+export function replaceHouseModel(preset: FontPresetId, bundle: NotoPresetModelBundle): void {
+  shared.set(preset, Promise.resolve(bundle))
+  useModelRevision.setState((state) => ({ revision: state.revision + 1 }))
+}
+const useModelRevision = create<{ revision: number }>(() => ({ revision: 0 }))
+
+/** 모델 출처: 없으면 연 폰트의 버전, 버전 id면 그 버전, 묶음이면 그 묶음(관리자 초안). */
+export type ModelSource = FontPresetId | NotoPresetModelBundle | undefined
+
+export function useNotoModel(source?: ModelSource): { bundle: NotoPresetModelBundle | null; error: string } {
+  const active = useFontPresetStore((state) => state.preset)
+  const revision = useModelRevision((state) => state.revision)
+  const direct = typeof source === 'object' ? source : null
+  const preset = typeof source === 'string' ? source : active
+  const [state, setState] = useState<{ preset: FontPresetId | null; bundle: NotoPresetModelBundle | null; error: string }>({ preset: null, bundle: null, error: '' })
   useEffect(() => {
+    if (direct) return
     let alive = true
-    sharedModel()
-      .then((bundle) => { if (alive) setState({ bundle, error: '' }) })
-      .catch((failure: Error) => { if (alive) setState({ bundle: null, error: failure.message }) })
+    sharedModel(preset)
+      .then((bundle) => { if (alive) setState({ preset, bundle, error: '' }) })
+      .catch((failure: Error) => { if (alive) setState({ preset, bundle: null, error: failure.message }) })
     return () => { alive = false }
-  }, [])
-  return state
+  }, [direct, preset, revision])
+  if (direct) return { bundle: direct, error: '' }
+  return state.preset === preset ? { bundle: state.bundle, error: state.error } : { bundle: null, error: '' }
 }
 
 export type GlyphPlacement = GlyphInkPlacement
 
-/** 모델 묶음을 기다린다. OTF 추출처럼 훅 밖에서 화면과 같은 상자가 필요한 곳이 쓴다. */
-export const loadNotoModel = (): Promise<NotoPresetModelBundle> => sharedModel()
+/** 모델 묶음을 기다린다. OTF 추출처럼 훅 밖에서 화면과 같은 상자가 필요한 곳이 쓴다. 버전을 안 주면 연 폰트의 버전. */
+export const loadNotoModel = (preset: FontPresetId = useFontPresetStore.getState().preset): Promise<NotoPresetModelBundle> => sharedModel(preset)
 
 /** 무거운 쪽: 모델 상자를 풀고 획에 맞춰 다듬는다(잉크 합치기 여러 번). 기본 네모꼴(850) 기준 좌표이고 네모꼴 여백과는 무관하다. */
 function resolveReferenceBoxes(input: {
@@ -90,8 +137,8 @@ export function contextPlacementOf(input: {
  * 다시 그릴 때마다 상자 다듬기(글자당 잉크 합치기 여러 번)가 처음부터 돈다 — 문장 11자면 조작 한 번에 수십 ms다(폰에서는 100ms 안팎).
  * 그래서 열쇠는 내용으로 잡는다: 글자 · 자모 객체 셋(저장소의 것이라 안 바뀌면 같은 객체다) · 여백 네 값.
  */
-export function useContextPlacement(syllable: DecomposedSyllable, schema: LayoutSchema, globalStyle: Pick<GlobalStyle, 'linecap' | 'linejoin'>, deltaSource?: LayoutDeltaSnapshot): PlacementResult {
-  const { bundle } = useNotoModel()
+export function useContextPlacement(syllable: DecomposedSyllable, schema: LayoutSchema, globalStyle: Pick<GlobalStyle, 'linecap' | 'linejoin'>, deltaSource?: LayoutDeltaSnapshot, modelSource?: ModelSource): PlacementResult {
+  const { bundle } = useNotoModel(modelSource)
   const { char, choseong, jungseong, jongseong, layoutType } = syllable
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 내용이 같으면 같은 글자다(위 설명).
   const stableSyllable = useMemo(() => syllable, [char, choseong, jungseong, jongseong, layoutType])

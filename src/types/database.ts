@@ -38,10 +38,17 @@ export const FONT_DATA_V1_3_VERSION = '1.3.0' as const
 export const FONT_DATA_V1_4_VERSION = '1.4.0' as const
 export const FONT_DATA_VERSION = '1.5.0' as const
 
-/** 폰트가 어느 기본 폰트에서 시작했는지. 저장 칸과 화면에는 우리 이름만 쓴다. */
-export const FONT_PRESET_IDS = ['basic-gothic'] as const
+/**
+ * 폰트가 어느 기본 폰트에서 시작했는지. 저장 칸과 화면에는 우리 이름만 쓴다.
+ * 폰트마다 만들 때 한 번 박고 저장할 때 덮지 않는다 — 기본값이 바뀌어도 기존 폰트는 제 버전 모델로 그린다.
+ * `basic-gothic` = v1(노토 레이아웃 모델), `basic-gothic-v2` = 관리자 `프리셋`에서 고친 대푯값 모델.
+ */
+export const FONT_PRESET_IDS = ['basic-gothic', 'basic-gothic-v2'] as const
 export type FontPresetId = (typeof FONT_PRESET_IDS)[number]
+/** 새 폰트가 받는 버전. v2 출시 = 이 줄을 바꾸는 커밋(사용자 승인). */
 export const DEFAULT_FONT_PRESET: FontPresetId = 'basic-gothic'
+/** 노토 모델을 그대로 쓰는 버전. 동결. */
+export const NOTO_FONT_PRESET: FontPresetId = 'basic-gothic'
 
 /** 사용자 레이아웃 조정(`noto-layout-delta-v1`). 범위 규칙식 키 → Δ. 1.5부터 저장한다. */
 export interface FontLayoutDelta {
