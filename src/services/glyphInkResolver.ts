@@ -151,7 +151,9 @@ function resolvePartPrimitives(
     input.horizontalInkBounds ?? DEFAULT_HORIZONTAL_INK_BOUNDS,
   )
 
-  return selected.sources.map(({ stroke, channel }) => {
+  return selected.sources.map(({ stroke: stored, channel }) => {
+    // 홀자 줄기는 이 칸에서도 받침 없는 칸의 em 휨을 지킨다. 곧은 획은 획도 칸도 그대로.
+    const { stroke, box: placedBox } = part === 'CH' || part === 'JO' ? { stroke: stored, box } : placeStemStroke(selected.jamo, stored, box, channel)
     const source: ResolvedStrokeInkSource = {
       kind: 'stroke',
       glyphId,
@@ -165,9 +167,8 @@ function resolvePartPrimitives(
       coordinateSpace: 'stroke-local-with-glyph-box',
       id: primitiveId(source),
       source,
-      // 홀자 줄기는 이 칸에서도 받침 없는 칸의 em 휨을 지킨다(곧은 획은 그대로).
-      stroke: part === 'CH' || part === 'JO' ? stroke : placeStemStroke(selected.jamo, stroke, box, channel),
-      box: { ...box },
+      stroke,
+      box: { ...placedBox },
       weightMultiplier: input.weightMultiplier,
       effectiveLinecap: stroke.linecap ?? input.globalLinecap ?? 'round',
       effectiveLinejoin: stroke.linejoin ?? input.globalLinejoin ?? 'round',

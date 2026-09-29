@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { JamoData, StrokeDataV2 } from '../types'
-import { applyMaster, boundStrokesOf, followsMaster, instanceOf, masterNameOf, masterOf, medialBoxEmOf, refollow, straightMaster, thinBox, type StemMaster } from './stemMaster'
+import { applyMaster, boundStrokesOf, followsMaster, instanceOf, masterNameOf, masterOf, medialBoxEmOf, refollow, stemReferenceBox, straightMaster, thinBox, type StemMaster } from './stemMaster'
 
 const line = (id: string, from: [number, number], to: [number, number]): StrokeDataV2 => ({ id, points: [{ x: from[0], y: from[1] }, { x: to[0], y: to[1] }], closed: false, thickness: 0.07 })
 const bent: StemMaster = { name: 'gidung', points: [{ t: 0, o: 0, handleOut: { t: 0.4, o: 0.03 } }, { t: 1, o: 0, handleIn: { t: 0.7, o: -0.01 } }] }
@@ -77,18 +77,23 @@ describe('이름과 표', () => {
     expect(bound.map((item) => [item.stroke.id, item.name, item.follows])).toEqual([['ㅐ-1', 'gidung.inner', true], ['ㅐ-2', 'geolchim', true], ['ㅐ-3', 'gidung', true]])
   })
 
-  it('상자가 두께보다 얇은 채널(ㅣ · ㅡ · ㅢ)은 막혀서 마스터를 안 따르고 안 바뀐다', () => {
-    const i: JamoData = { char: 'ㅣ', type: 'jungseong', strokes: [line('ㅣ-1', [0, 0], [0, 1])] }
-    const eu: JamoData = { char: 'ㅡ', type: 'jungseong', strokes: [line('ㅡ-1', [0, 0], [1, 0])] }
-    const ui: JamoData = { char: 'ㅢ', type: 'jungseong', horizontalStrokes: [line('ㅢ-1', [0, 0], [1, 0])], verticalStrokes: [line('ㅢ-2', [0, 0], [0, 1])] }
+  it('상자가 두께보다 얇은 채널(ㅣ · ㅡ · ㅢ)도 따른다 — 휠 방향의 변만 ㅏ 칸 폭 · ㅗ 칸 높이를 빌린다', () => {
+    const i: JamoData = { char: 'ㅣ', type: 'jungseong', strokes: [line('ㅣ-1', [0.5, 0], [0.5, 1])] }
+    const eu: JamoData = { char: 'ㅡ', type: 'jungseong', strokes: [line('ㅡ-1', [0, 0.5], [1, 0.5])] }
+    const ui: JamoData = { char: 'ㅢ', type: 'jungseong', horizontalStrokes: [line('ㅢ-1', [0, 0.5], [1, 0.5])], verticalStrokes: [line('ㅢ-2', [0.5, 0], [0.5, 1])] }
     expect(thinBox(i.strokes![0], medialBoxEmOf('ㅣ', 'strokes'))).toBe(true)
     expect(thinBox(line('ㅏ-1', [0, 0], [0, 1]), medialBoxEmOf('ㅏ', 'strokes'))).toBe(false)
-    expect(boundStrokesOf(i, {}).map((item) => [item.blocked, item.follows])).toEqual([[true, false]])
-    expect(boundStrokesOf(ui, {}).every((item) => item.blocked)).toBe(true)
-    expect(applyMaster(i, {}, { gidung: bent })).toBeNull()
-    expect(applyMaster(eu, {}, { bo: bent })).toBeNull()
-    expect(applyMaster(ui, {}, { gidung: bent, bo: bent })).toBeNull()
-    expect(refollow(i, { gidung: bent }, 'strokes', 'ㅣ-1')).toBeNull()
+    const iReference = stemReferenceBox('ㅣ', 'strokes', i.strokes![0])
+    expect(iReference.width).toBeCloseTo(medialBoxEmOf('ㅏ', 'strokes', 'open').width)
+    expect(iReference.height).toBeCloseTo(medialBoxEmOf('ㅣ', 'strokes', 'open').height)
+    expect(stemReferenceBox('ㅡ', 'strokes', eu.strokes![0]).height).toBeCloseTo(medialBoxEmOf('ㅗ', 'strokes', 'open').height)
+    expect(boundStrokesOf(i, {}).map((item) => [item.blocked, item.follows])).toEqual([[false, true]])
+    const bentI = applyMaster(i, {}, { gidung: bent })!
+    // 휨 0.03em = ㅏ 칸 폭 비율로 적힌다.
+    expect(bentI.strokes![0].points[0].handleOut!.x - 0.5).toBeCloseTo(0.03 / iReference.width)
+    expect(boundStrokesOf(bentI, { gidung: bent })[0].follows).toBe(true)
+    expect(applyMaster(eu, {}, { bo: bent })).not.toBeNull()
+    expect(applyMaster(ui, {}, { gidung: bent, bo: bent })!.verticalStrokes![0].points[0].handleOut).toBeDefined()
   })
 })
 

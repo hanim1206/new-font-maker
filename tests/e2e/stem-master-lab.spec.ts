@@ -7,7 +7,7 @@ test.describe('홀자 줄기 마스터 랩', () => {
     const siblings = page.getByTestId('siblings')
     await expect(siblings.locator('article[data-char="ㅏ"]')).toHaveAttribute('data-curved', 'false')
     await expect(siblings.locator('article[data-char="ㅘ"]')).toHaveAttribute('data-follow', 'true')
-    await expect(siblings.locator('article[data-char="ㅣ"]')).toHaveAttribute('data-follow', 'blocked')
+    await expect(siblings.locator('article[data-char="ㅣ"]')).toHaveAttribute('data-follow', 'true')
 
     const canvas = page.getByTestId('master-canvas-open')
     const handle = canvas.getByTestId('master-handle-handleOut')
@@ -24,7 +24,7 @@ test.describe('홀자 줄기 마스터 랩', () => {
       await expect(card, char).toHaveAttribute('data-follow', 'true')
     }
 
-    await expect(siblings.locator('article[data-char="ㅣ"]')).toHaveAttribute('data-curved', 'false')
+    for (const char of ['ㅣ', 'ㅚ', 'ㅢ']) await expect(siblings.locator(`article[data-char="${char}"]`), char).toHaveAttribute('data-curved', 'true')
 
     await page.getByRole('button', { name: '곧게' }).click()
     await expect(siblings.locator('article[data-char="ㅏ"]')).toHaveAttribute('data-curved', 'false')

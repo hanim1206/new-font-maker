@@ -79,8 +79,8 @@ const BOX_TABLE = (medialBoxEm as { box: BoxTable }).box
 /** 상자 한 변이 이보다 작으면 이 값으로 본다 — 줄기 하나짜리(ㅣ · ㅡ)의 상자는 두께가 0이라 나눗셈이 안 된다. */
 const MIN_BOX_EM = 0.001
 /**
- * 오프셋을 받을 수직 방향의 상자 변이 이보다 얇으면 마스터를 못 따른다. em 오프셋이 상자 좌표로 수십 배가 되고, 렌더의 상자 맞춤도 그 폭을 그대로 안 써서 글자가 무너진다.
- * ㅣ · ㅡ와 ㅚ ㅟ ㅢ의 세로부(폭 0.013em) · ㅢ 가로부(높이 0)가 여기 걸린다. 렌더 단계에서 em으로 직접 놓는 길은 플랜 미결정.
+ * 휠 방향의 상자 변이 이보다 얇으면 칸 비율로 휨을 적을 수 없다(폭 0에 가까운 칸).
+ * ㅣ · ㅡ와 ㅚ ㅟ ㅢ의 세로부(폭 0.013em) · ㅢ 가로부(높이 0)가 여기 걸리고, 그 변은 `stemReferenceBox`가 빌린다.
  */
 const THIN_BOX_EM = 0.05
 
@@ -97,13 +97,30 @@ export function medialBoxEmOf(char: string, channel: JamoChannel, final?: 'open'
   return { width: Math.max(box.width, MIN_BOX_EM), height: Math.max(box.height, MIN_BOX_EM) }
 }
 
-/** 이 획이 휠 방향(축의 수직)의 상자 변이 두께보다 얇은가. 얇으면 마스터를 못 따른다. */
+/**
+ * 이 획의 휨을 재는 기준 칸(em). 받침 없는 칸이고, 휠 방향의 변이 얇으면(ㅣ · ㅡ · ㅚ ㅟ ㅢ의 한 줄기 채널) 그 변만 빌린다 —
+ * 세로 줄기는 ㅏ 칸의 폭, 가로 줄기는 ㅗ 칸의 높이. 칸 비율로 적힌 휨이 이 칸에서 em이 된다.
+ */
+export function stemReferenceBox(char: string, channel: JamoChannel, stroke: StrokeDataV2): BoxEm {
+  const open = medialBoxEmOf(char, channel, 'open')
+  if (!thinBox(stroke, open)) return open
+  return isVerticalIn(stroke, open)
+    ? { width: medialBoxEmOf('ㅏ', 'strokes', 'open').width, height: open.height }
+    : { width: open.width, height: medialBoxEmOf('ㅗ', 'strokes', 'open').height }
+}
+
+function isVerticalIn(stroke: StrokeDataV2, box: BoxEm): boolean {
+  const start = stroke.points[0]
+  const end = stroke.points[stroke.points.length - 1]
+  return Math.abs((end.y - start.y) * box.height) >= Math.abs((end.x - start.x) * box.width)
+}
+
+/** 이 획이 휠 방향(축의 수직)의 상자 변이 두께보다 얇은가. 얇으면 `stemReferenceBox`가 그 변을 빌린다. */
 export function thinBox(stroke: StrokeDataV2, box: BoxEm): boolean {
   const start = stroke.points[0]
   const end = stroke.points[stroke.points.length - 1]
   if (!start || !end) return true
-  const vertical = Math.abs((end.y - start.y) * box.height) >= Math.abs((end.x - start.x) * box.width)
-  return (vertical ? box.width : box.height) < THIN_BOX_EM
+  return (isVerticalIn(stroke, box) ? box.width : box.height) < THIN_BOX_EM
 }
 
 /**
@@ -163,7 +180,7 @@ export interface BoundStroke {
   stroke: StrokeDataV2
   name: StemMasterName
   follows: boolean
-  /** 상자가 두께보다 얇아 이번엔 못 따르는 획. `follows`는 false. */
+  /** 예전엔 얇은 상자를 뺐다. 이제는 기준 칸이 그 변을 빌려 늘 false. */
   blocked: boolean
 }
 
@@ -174,9 +191,8 @@ export function boundStrokesOf(jamo: JamoData, masters: StemMasters): BoundStrok
     return strokes.flatMap((stroke) => {
       const name = masterNameOf(jamo, strokes, stroke.id)
       if (!name) return []
-      const box = medialBoxEmOf(jamo.char, channel, 'open')
-      const blocked = thinBox(stroke, box)
-      return [{ channel, stroke, name, follows: !blocked && followsMaster(stroke, masterOf(masters, name), box), blocked }]
+      const box = stemReferenceBox(jamo.char, channel, stroke)
+      return [{ channel, stroke, name, follows: followsMaster(stroke, masterOf(masters, name), box), blocked: false }]
     })
   })
 }
@@ -191,10 +207,10 @@ export function applyMaster(jamo: JamoData, before: StemMasters, after: StemMast
   for (const channel of JAMO_CHANNELS) {
     const strokes = jamo[channel]
     if (!strokes) continue
-    const box = medialBoxEmOf(jamo.char, channel, 'open')
     const rewritten = strokes.map((stroke) => {
       const name = masterNameOf(jamo, strokes, stroke.id)
-      if (!name || thinBox(stroke, box)) return stroke
+      if (!name) return stroke
+      const box = stemReferenceBox(jamo.char, channel, stroke)
       const previous = masterOf(before, name)
       const current = masterOf(after, name)
       if (previous === current || !followsMaster(stroke, previous, box)) return stroke
@@ -214,10 +230,11 @@ export function refollow(jamo: JamoData, masters: StemMasters, channel: JamoChan
   if (!strokes) return null
   const name = masterNameOf(jamo, strokes, strokeId)
   if (!name) return null
-  const box = medialBoxEmOf(jamo.char, channel, 'open')
   const master = masterOf(masters, name)
   const index = strokes.findIndex((stroke) => stroke.id === strokeId)
-  if (index < 0 || thinBox(strokes[index], box) || followsMaster(strokes[index], master, box)) return null
+  if (index < 0) return null
+  const box = stemReferenceBox(jamo.char, channel, strokes[index])
+  if (followsMaster(strokes[index], master, box)) return null
   const rewritten = [...strokes]
   rewritten[index] = instanceOf(strokes[index], master, box)
   return { ...jamo, [channel]: rewritten }

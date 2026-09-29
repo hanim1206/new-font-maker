@@ -33,10 +33,9 @@ describe('줄기 마스터 스토어', () => {
     expect(jung['ㅏ'].frame?.strokes).toEqual(before.strokes)
     expect(jung['ㅏ'].strokes![1]).toEqual(before.strokes![1])
     expect(jung['ㅗ'].strokes![0].points[0].handleOut).toBeUndefined()
-    // 상자가 두께 0인 ㅣ · ㅚ 세로부는 그대로.
-    expect(jung['ㅣ'].strokes![0].points[0].handleOut).toBeUndefined()
-    expect(jung['ㅚ'].verticalStrokes![0].points[0].handleOut).toBeUndefined()
-    expect(jung['ㅣ'].frame).toBeUndefined()
+    // 상자가 두께 0인 ㅣ · ㅚ 세로부도 따른다(휠 방향의 변은 ㅏ 칸 폭을 빌린다).
+    expect(jung['ㅣ'].strokes![0].points[0].handleOut).toBeDefined()
+    expect(jung['ㅚ'].verticalStrokes![0].points[0].handleOut).toBeDefined()
   })
 
   it('풀린 획은 마스터를 다시 바꿔도 그대로, 다시 따르기로 붙고, 지우면 곧아진다', async () => {

@@ -1082,12 +1082,12 @@ function InferenceTrackpad({
       updateInkGapLimiter(safeFactor < 0.9999 ? schemaInkGapViolation(createCandidate(1)) : null)
       onPreviewSchema({ layoutType, schema: next })
     } else if (selection.kind !== 'none' && startJamo.current) {
-      // 화면의 홀자 줄기는 받침 있는 칸에서도 em 휨을 지켜 놓여 있다(`placeStemStroke`). 끝점이 아닌 점 · 핸들의 이동량은 저장 좌표로 되돌린다.
+      // 화면의 홀자 줄기는 받침 있는 칸에서도 em 휨을 지켜 놓여 있다(`placeStemStroke`). 놓인 칸에서 끈 이동량을 저장 좌표로 되돌린다.
       const toStored = (movement: StrokeMoveDelta): StrokeMoveDelta => {
-        if (selection.kind !== 'point' && selection.kind !== 'handle') return movement
         const stroke = getJamoStrokes(startJamo.current!).find((item) => item.id === selection.strokeId)
-        if (!stroke || selection.kind === 'point' && (selection.pointIndex === 0 || selection.pointIndex === stroke.points.length - 1)) return movement
-        return storedStemDelta(startJamo.current!, stroke, selection.box, movement)
+        if (!stroke) return movement
+        const endpoint = selection.kind === 'point' && (selection.pointIndex === 0 || selection.pointIndex === stroke.points.length - 1)
+        return storedStemDelta(startJamo.current!, stroke, selection.box, movement, selection.kind === 'stroke' || endpoint ? 'rigid' : 'bend')
       }
       const createCandidate = (factor: number) => {
         const movementAtFactor = toStored({ x: normalized.x * factor, y: normalized.y * factor })

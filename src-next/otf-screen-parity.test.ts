@@ -332,7 +332,15 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
         expect(row.modelXor, row.char).toBeLessThan(0.015)
       }
       // 마스터는 모양만 바꾸고 상자는 그대로 둔다(틀로 굳힌 곧은 획이 상자를 정한다).
-      for (const row of rows) expect(row.otfBoxes, row.char).toEqual(straight[row.char].otfBoxes)
+      // 두께 0인 칸(ㅣ · ㅡ · ㅚ ㅟ ㅢ의 한 줄기)만 휠 방향 변이 넓어진다 — 가운데와 축 방향 변은 그대로.
+      for (const row of rows) row.otfBoxes.forEach((item, index) => {
+        const was = straight[row.char].otfBoxes[index]
+        expect(item.id, row.char).toBe(was.id)
+        const same = (a: number, b: number) => Math.abs(a - b) < 1e-9
+        const widenedX = same(item.box.y, was.box.y) && same(item.box.height, was.box.height) && same(item.box.x + item.box.width / 2, was.box.x + was.box.width / 2) && was.box.width < 0.05
+        const widenedY = same(item.box.x, was.box.x) && same(item.box.width, was.box.width) && same(item.box.y + item.box.height / 2, was.box.y + was.box.height / 2) && was.box.height < 0.05
+        if (!widenedX && !widenedY) expect(item.box, `${row.char} ${item.id}`).toEqual(was.box)
+      })
       const moved = rows.filter((row) => fit(row.otf, straight[row.char].otf) > 0.01).map((row) => row.char)
       expect(moved.length).toBeGreaterThan(chars.length / 2)
     } finally {

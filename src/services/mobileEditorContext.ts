@@ -284,7 +284,7 @@ function targets(
   if (!jamo || !strokes || !box) return []
   const renderedBox = getJamoRenderBox(jamo, strokes, box)
   // 홀자 줄기는 화면(`resolveGlyphInkPrimitives`)과 같이 이 칸에서도 받침 없는 칸의 em 휨을 지켜 보여 준다.
-  return strokes.map((stroke) => ({ editorPart, renderPart, jamo, stroke: editorPart === 'JU' ? placeStemStroke(jamo, stroke, renderedBox) : stroke, box: renderedBox }))
+  return strokes.map((stroke) => ({ editorPart, renderPart, jamo, ...(editorPart === 'JU' ? placeStemStroke(jamo, stroke, renderedBox) : { stroke, box: renderedBox }) }))
 }
 
 export function getRenderedStrokeTargets(
