@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { isDrawableName } from '../betaWelcome'
+import { MEMO_MAX_LENGTH, nicknameProblemOf } from './accountProfile'
 import type { BetaInvites, NewRow } from './useBetaInvites'
 
 type Draft = NewRow & { key: number }
@@ -32,9 +32,9 @@ export function InviteSheet({ invites, open, onOpenChange, onIssued }: {
   const filled = drafts.filter((draft) => draft.nickname.trim() || draft.memo.trim())
   const problemOf = (draft: Draft): string | null => {
     const name = draft.nickname.trim()
-    if (!name) return draft.memo.trim() ? '닉네임을 적어 주세요' : null
-    if (!isDrawableName(name)) return '한글 1~6자'
-    if (taken.has(name)) return '이미 있는 닉네임'
+    if (!name && !draft.memo.trim()) return null
+    const problem = nicknameProblemOf(name, taken)
+    if (problem) return problem
     if (drafts.filter((other) => other.nickname.trim() === name).length > 1) return '표에 두 번'
     return null
   }
@@ -124,7 +124,7 @@ export function InviteSheet({ invites, open, onOpenChange, onIssued }: {
                     onChange={(event) => update(draft.key, { memo: event.target.value })}
                     onKeyDown={(event) => enter(draft.key, event)}
                     placeholder="어떻게 아는 사이 · 기기 · 부탁할 것"
-                    maxLength={200}
+                    maxLength={MEMO_MAX_LENGTH}
                     autoComplete="off"
                     aria-label="메모"
                     data-testid="admin-invite-memo"

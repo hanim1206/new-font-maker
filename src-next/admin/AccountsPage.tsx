@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
+import type { MouseEvent } from 'react'
 import { getCoreRowModel, getPaginationRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
-import type { ColumnDef, Updater } from '@tanstack/react-table'
+import type { ColumnDef, Table as TableInstance, Updater } from '@tanstack/react-table'
 import { Ban, Check, Copy, Eye, KeyRound, MoreHorizontal, Plus, RotateCcw, Search, Trash2 } from 'lucide-react'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -26,9 +27,115 @@ type Confirm = { kind: 'reissue' | 'remove'; account: Account }
 
 const byTime = (iso: string | null) => iso ? Date.parse(iso) : 0
 const nameOf = (account: Account) => account.nickname ?? '(닉네임 없음)'
+/** 줄을 누르면 상세로 가는데, 복사 · 보냄 체크 · 메뉴 칸은 제 일만 한다. 메뉴는 포털이어도 React 이벤트가 여기로 올라온다. */
+const stopRow = (event: MouseEvent) => event.stopPropagation()
+
+/** 줄 동작 · 방금 상태. 컬럼은 모듈에 한 벌만 두고(다시 그릴 때 셀이 새로 붙어 열린 메뉴가 닫히지 않게) 이것을 표 `meta`로 넘긴다. */
+interface AccountsMeta {
+  onOpen: (email: string) => void
+  fresh: readonly string[]
+  copied: string | null
+  busy: boolean
+  copy: BetaInvites['copy']
+  markSent: BetaInvites['markSent']
+  suspend: BetaInvites['suspend']
+  ask: (confirm: Confirm) => void
+}
+const metaOf = (table: TableInstance<Account>) => table.options.meta as AccountsMeta
+
+const ACCOUNT_COLUMNS: ColumnDef<Account>[] = [
+  {
+    id: 'nickname',
+    accessorFn: (account) => account.nickname ?? '',
+    sortingFn: (a, b) => (a.original.nickname ?? '').localeCompare(b.original.nickname ?? '', 'ko'),
+    header: ({ column }) => <SortableHeader column={column}>닉네임</SortableHeader>,
+    cell: ({ row: { original: account }, table }) => <div className="flex items-center gap-2">
+      <button type="button" className="cursor-pointer font-semibold underline-offset-4 hover:underline" onClick={(event) => { event.stopPropagation(); metaOf(table).onOpen(account.email) }} title="상세 보기" data-testid="admin-account-open">
+        {nameOf(account)}
+      </button>
+      {metaOf(table).fresh.includes(account.nickname ?? '') && <Badge className="bg-primary-light text-primary-dark">새로</Badge>}
+    </div>,
+  },
+  {
+    id: 'code',
+    header: '코드',
+    cell: ({ row: { original: account } }) => account.invite
+      ? <code className="select-text font-semibold tracking-wider">{account.invite.code}</code>
+      : <span className="text-xs text-text-dim-5">코드 모름</span>,
+  },
+  {
+    id: 'memo',
+    header: '메모',
+    meta: { className: 'max-w-[16rem]' },
+    cell: ({ row: { original: account } }) => account.memo
+      ? <span className="block truncate text-text-dim-3" title={account.memo}>{account.memo}</span>
+      : <span className="text-text-dim-5">—</span>,
+  },
+  {
+    id: 'sent',
+    accessorFn: (account) => byTime(account.sentAt),
+    header: ({ column }) => <SortableHeader column={column}>초대 메시지</SortableHeader>,
+    cell: ({ row: { original: account }, table }) => {
+      if (!account.invite) return <span className="text-text-dim-5">—</span>
+      const { copied, copy, markSent } = metaOf(table)
+      return <div className="flex w-fit items-center gap-2" onClick={stopRow}>
+        {!account.suspended && <Button
+          size="icon"
+          variant="outline"
+          className={cn('size-8', copied === account.email && 'border-primary text-primary')}
+          onClick={() => void copy(account.email, account.invite!.message)}
+          aria-label={`${nameOf(account)} 초대 메시지 복사`}
+          title={copied === account.email ? '복사함' : '초대 메시지 복사'}
+          data-testid="admin-account-copy"
+        >
+          {copied === account.email ? <Check /> : <Copy />}
+        </Button>}
+        <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-text-dim-3">
+          <Checkbox
+            checked={Boolean(account.sentAt)}
+            onCheckedChange={(checked) => void markSent(account.email, checked === true)}
+            aria-label={`${nameOf(account)} 링크 보냄`}
+            data-testid="admin-account-sent"
+          />
+          {account.sentAt ? `${dayOf(account.sentAt)} 보냄` : '안 보냄'}
+        </label>
+      </div>
+    },
+  },
+  {
+    id: 'lastSignIn',
+    accessorFn: (account) => byTime(account.lastSignInAt),
+    sortDescFirst: true,
+    header: ({ column }) => <SortableHeader column={column}>마지막 로그인</SortableHeader>,
+    cell: ({ row: { original: account } }) => <span className="text-text-dim-4">{dateOf(account.lastSignInAt)}</span>,
+  },
+  {
+    id: 'actions',
+    meta: { className: 'w-12 text-right' },
+    cell: ({ row: { original: account }, table }) => {
+      const { onOpen, busy, suspend, ask } = metaOf(table)
+      return <div className="inline-flex" onClick={stopRow}><DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="icon" variant="ghost" className="size-8" aria-label={`${nameOf(account)} 관리`} data-testid="admin-account-menu"><MoreHorizontal /></Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => onOpen(account.email)}><Eye />상세 · 수정</DropdownMenuItem>
+          {!account.suspended && account.nickname && <DropdownMenuItem disabled={busy} onSelect={() => ask({ kind: 'reissue', account })}><KeyRound />새 코드</DropdownMenuItem>}
+          <DropdownMenuSeparator />
+          {account.suspended
+            ? <>
+              <DropdownMenuItem disabled={busy} onSelect={() => void suspend(account.email, false)}><RotateCcw />되살리기</DropdownMenuItem>
+              <DropdownMenuItem variant="destructive" disabled={busy} onSelect={() => ask({ kind: 'remove', account })} data-testid="admin-account-remove"><Trash2 />삭제</DropdownMenuItem>
+            </>
+            : <DropdownMenuItem disabled={busy} onSelect={() => void suspend(account.email, true)} data-testid="admin-account-suspend"><Ban />정지</DropdownMenuItem>}
+        </DropdownMenuContent>
+      </DropdownMenu></div>
+    },
+  },
+]
 
 /**
- * 계정: 초대한 친구 표(초대 화면을 합쳤다). 위에 상태 탭 · 검색 · `초대하기`, 아래 쪽 넘기기.
+ * 계정: 초대한 친구 표(초대 화면을 합쳤다). 위에 상태 탭 · 검색 · `초대하기`, 아래 쪽 넘기기. 줄을 누르면 상세(정보 고치기 · 폰트).
  * 초대 메시지 칸에서 복사하고 보냄 체크. 줄 끝 `⋯`에 폰트 보기 · 새 코드 · 정지 · 되살리기 · 삭제.
  * 새 코드와 삭제는 확인 창을 거친다(되돌릴 수 없다). 보기 상태는 `AdminApp`이 들고 있어 폰트 상세에 다녀와도 남는다.
  */
@@ -58,97 +165,11 @@ export function AccountsPage({ invites, onOpen, view, onView }: {
     onView({ status: 'unsent', query: '', sorting: [], pagination: { ...view.pagination, pageIndex: 0 } })
   }
 
-  const columns: ColumnDef<Account>[] = [
-    {
-      id: 'nickname',
-      accessorFn: (account) => account.nickname ?? '',
-      sortingFn: (a, b) => (a.original.nickname ?? '').localeCompare(b.original.nickname ?? '', 'ko'),
-      header: ({ column }) => <SortableHeader column={column}>닉네임</SortableHeader>,
-      cell: ({ row: { original: account } }) => <div className="flex items-center gap-2">
-        <button type="button" className="cursor-pointer font-semibold underline-offset-4 hover:underline" onClick={() => onOpen(account.email)} title="폰트 보기" data-testid="admin-account-open">
-          {nameOf(account)}
-        </button>
-        {fresh.includes(account.nickname ?? '') && <Badge className="bg-primary-light text-primary-dark">새로</Badge>}
-      </div>,
-    },
-    {
-      id: 'code',
-      header: '코드',
-      cell: ({ row: { original: account } }) => account.invite
-        ? <code className="select-text font-semibold tracking-wider">{account.invite.code}</code>
-        : <span className="text-xs text-text-dim-5">코드 모름</span>,
-    },
-    {
-      id: 'memo',
-      header: '메모',
-      meta: { className: 'max-w-[16rem]' },
-      cell: ({ row: { original: account } }) => account.memo
-        ? <span className="block truncate text-text-dim-3" title={account.memo}>{account.memo}</span>
-        : <span className="text-text-dim-5">—</span>,
-    },
-    {
-      id: 'sent',
-      accessorFn: (account) => byTime(account.sentAt),
-      header: ({ column }) => <SortableHeader column={column}>초대 메시지</SortableHeader>,
-      cell: ({ row: { original: account } }) => {
-        if (!account.invite) return <span className="text-text-dim-5">—</span>
-        const label = `${nameOf(account)} 링크 보냄`
-        return <div className="flex items-center gap-2">
-          {!account.suspended && <Button
-            size="icon"
-            variant="outline"
-            className={cn('size-8', copied === account.email && 'border-primary text-primary')}
-            onClick={() => void copy(account.email, account.invite!.message)}
-            aria-label={`${nameOf(account)} 초대 메시지 복사`}
-            title={copied === account.email ? '복사함' : '초대 메시지 복사'}
-            data-testid="admin-account-copy"
-          >
-            {copied === account.email ? <Check /> : <Copy />}
-          </Button>}
-          <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-text-dim-3">
-            <Checkbox
-              checked={Boolean(account.sentAt)}
-              onCheckedChange={(checked) => void markSent(account.email, checked === true)}
-              aria-label={label}
-              data-testid="admin-account-sent"
-            />
-            {account.sentAt ? `${dayOf(account.sentAt)} 보냄` : '안 보냄'}
-          </label>
-        </div>
-      },
-    },
-    {
-      id: 'lastSignIn',
-      accessorFn: (account) => byTime(account.lastSignInAt),
-      sortDescFirst: true,
-      header: ({ column }) => <SortableHeader column={column}>마지막 로그인</SortableHeader>,
-      cell: ({ row: { original: account } }) => <span className="text-text-dim-4">{dateOf(account.lastSignInAt)}</span>,
-    },
-    {
-      id: 'actions',
-      meta: { className: 'w-12 text-right' },
-      cell: ({ row: { original: account } }) => <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button size="icon" variant="ghost" className="size-8" aria-label={`${nameOf(account)} 관리`} data-testid="admin-account-menu"><MoreHorizontal /></Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => onOpen(account.email)}><Eye />폰트 보기</DropdownMenuItem>
-          {!account.suspended && account.nickname && <DropdownMenuItem disabled={busy} onSelect={() => setConfirm({ kind: 'reissue', account })}><KeyRound />새 코드</DropdownMenuItem>}
-          <DropdownMenuSeparator />
-          {account.suspended
-            ? <>
-              <DropdownMenuItem disabled={busy} onSelect={() => void suspend(account.email, false)}><RotateCcw />되살리기</DropdownMenuItem>
-              <DropdownMenuItem variant="destructive" disabled={busy} onSelect={() => setConfirm({ kind: 'remove', account })} data-testid="admin-account-remove"><Trash2 />삭제</DropdownMenuItem>
-            </>
-            : <DropdownMenuItem disabled={busy} onSelect={() => void suspend(account.email, true)} data-testid="admin-account-suspend"><Ban />정지</DropdownMenuItem>}
-        </DropdownMenuContent>
-      </DropdownMenu>,
-    },
-  ]
 
   const table = useReactTable({
     data,
-    columns,
+    columns: ACCOUNT_COLUMNS,
+    meta: { onOpen, fresh, copied, busy, copy, markSent, suspend, ask: setConfirm } satisfies AccountsMeta,
     state: { sorting: view.sorting, pagination: view.pagination },
     onSortingChange: apply('sorting'),
     onPaginationChange: apply('pagination'),
@@ -210,6 +231,7 @@ export function AccountsPage({ invites, onOpen, view, onView }: {
     {accounts && <>
       <DataTable
         table={table}
+        onRowClick={(account) => onOpen(account.email)}
         empty={view.query ? '맞는 계정이 없어요.' : view.status === 'unsent' && accounts.length > 0 ? '다 보냈어요.' : '아직 없어요.'}
         rowProps={(row) => ({
           className: cn(row.original.suspended && 'text-text-dim-4', fresh.includes(row.original.nickname ?? '') && 'bg-primary-light/50 hover:bg-primary-light/60'),

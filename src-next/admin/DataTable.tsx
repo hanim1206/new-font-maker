@@ -15,7 +15,7 @@ declare module '@tanstack/react-table' {
   }
 }
 
-/** shadcn 데이터 표. TanStack 표를 받아 그린다 — 거르기 · 정렬 · 쪽 나누기는 부르는 쪽 표가 한다. */
+/** shadcn 데이터 표. TanStack 표를 받아 그린다 — 거르기 · 정렬 · 쪽 나누기는 부르는 쪽 표가 한다. 줄 누르기는 글자를 긁어 고른 때는 무시한다(코드 복사). */
 export function DataTable<T>({ table, empty, onRowClick, rowProps }: {
   table: TableInstance<T>
   empty: ReactNode
@@ -42,7 +42,7 @@ export function DataTable<T>({ table, empty, onRowClick, rowProps }: {
             key={row.id}
             {...extra}
             className={cn(onRowClick && 'cursor-pointer', extra.className)}
-            onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+            onClick={onRowClick ? () => { if (!window.getSelection()?.toString()) onRowClick(row.original) } : undefined}
           >
             {row.getVisibleCells().map((cell) => <TableCell key={cell.id} className={cell.column.columnDef.meta?.className}>
               {flexRender(cell.column.columnDef.cell, cell.getContext())}

@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 import type { User } from '@supabase/supabase-js'
+import { MEMO_MAX_LENGTH, nicknameProblemOf } from '../src-next/admin/accountProfile'
 import { betaCredentialsOf, betaInviteLinkOf, betaInviteMessage, DEFAULT_BETA_EMAIL_DOMAIN, generateBetaCode } from '../src-next/betaCode'
 
 /**
@@ -129,9 +130,11 @@ export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
   async function readMemos(): Promise<Record<string, string>> {
     try { return JSON.parse(await readFile(memoFile, 'utf8')) as Record<string, string> } catch { return {} }
   }
+  /** 빈 메모는 줄을 지운다. */
   async function saveMemo(email: string, memo: string): Promise<void> {
     const memos = await readMemos()
-    memos[email] = memo
+    if (memo) memos[email] = memo
+    else delete memos[email]
     await mkdir(path.dirname(memoFile), { recursive: true })
     await writeFile(memoFile, `${JSON.stringify(memos, null, 2)}\n`, { mode: 0o600 })
   }
@@ -247,6 +250,32 @@ export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
     await writeFile(codeFile, `${JSON.stringify(book, null, 2)}\n`, { mode: 0o600 })
   }
 
+  /**
+   * 관리자가 고치는 친구 정보. 닉네임은 계정 메타데이터(친구 앱의 이름 · 인사), 메모는 이 맥 파일.
+   * 닉네임은 한글 1~6자이고 다른 베타 계정과 겹치면 안 된다. 이 맥 코드 장부의 이름도 같이 바꾼다.
+   * 친구 앱은 로그인 토큰에 든 이름을 읽어서, 이미 들어와 있는 친구는 토큰이 새로 나올 때(최대 1시간) 바뀐 이름이 보인다.
+   */
+  async function updateProfile(email: string, patch: { nickname?: string; memo?: string }): Promise<void> {
+    const users = (await allUsers()).filter(isBeta)
+    const user = users.find((candidate) => candidate.email === email)
+    if (!user) throw new Error(`없는 베타 계정입니다: ${email}`)
+    if (patch.nickname !== undefined) {
+      const nickname = patch.nickname.trim()
+      const problem = nicknameProblemOf(nickname, users.filter((other) => other.id !== user.id).map(nicknameOf))
+      if (problem) throw new Error(`${problem}: ${nickname || '(빈 칸)'}`)
+      if (nickname !== nicknameOf(user)) {
+        const { error } = await admin.updateUserById(user.id, { user_metadata: { ...user.user_metadata, nickname } })
+        if (error) throw new Error(`${nicknameOf(user) ?? email}: ${error.message}`)
+        const book = await readCodes()
+        if (book[email]) {
+          book[email].nickname = nickname
+          await writeFile(codeFile, `${JSON.stringify(book, null, 2)}\n`, { mode: 0o600 })
+        }
+      }
+    }
+    if (patch.memo !== undefined) await saveMemo(email, patch.memo.trim().slice(0, MEMO_MAX_LENGTH))
+  }
+
   /** 한 친구의 폰트. 최근 고친 순. 읽기만 한다. */
   async function fonts(email: string): Promise<BetaAccountFont[]> {
     const user = (await allUsers()).find((candidate) => candidate.email === email && isBeta(candidate))
@@ -267,5 +296,5 @@ export function createBetaInvites(env: BetaInviteEnv, codeFile: string) {
     }))
   }
 
-  return { list, issue, setSuspended, remove, setSent, fonts }
+  return { list, issue, setSuspended, remove, setSent, updateProfile, fonts }
 }

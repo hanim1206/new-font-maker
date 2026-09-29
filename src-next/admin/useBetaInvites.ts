@@ -121,10 +121,27 @@ export function useBetaInvites() {
     }
   }
 
+  /** 친구 정보 고치기(닉네임 · 메모). 성공하면 true, 실패하면 까닭을 `failure`에. 끝나면 목록을 다시 받는다. */
+  const updateProfile = async (email: string, patch: { nickname?: string; memo?: string }): Promise<boolean> => {
+    if (busy) return false
+    setBusy(true)
+    setFailure('')
+    let ok = false
+    try {
+      await adminCall(BETA_INVITE_API, 'PATCH', { email, ...patch })
+      ok = true
+    } catch (error) {
+      setFailure((error as Error).message)
+    }
+    setBusy(false)
+    await refresh()
+    return ok
+  }
+
   /** 새 코드 결과 창을 닫는다. */
   const dismissIssued = () => setIssued(null)
 
-  return { accounts, listError, busy, failure, issued, copied, issue, issueMany, suspend, remove, markSent, copy, dismissIssued }
+  return { accounts, listError, busy, failure, issued, copied, issue, issueMany, suspend, remove, markSent, updateProfile, copy, dismissIssued }
 }
 
 export type BetaInvites = ReturnType<typeof useBetaInvites>

@@ -109,7 +109,7 @@ export function AdminApp() {
       <main className="flex-1 px-4 pb-10 pt-2 md:px-6">
         {section === 'accounts' && !account && <AccountsPage invites={invites} onOpen={openAccount} view={accountsView} onView={setAccountsView} />}
         {section === 'accounts' && account && <Suspense fallback={<p className="text-sm text-text-dim-4">불러오는 중…</p>}>
-          <AccountFontsPage email={account} account={invites.accounts?.find((item) => item.email === account)} onBack={() => openAccount(null)} />
+          <AccountFontsPage email={account} invites={invites} onBack={() => openAccount(null)} />
         </Suspense>}
         <AdminFeedback hidden={section !== 'feedback'} onPending={setPending} />
         {section === 'triage' && <TriagePage />}
