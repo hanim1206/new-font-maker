@@ -242,7 +242,8 @@ function ApplyQuestions({ base, entries, picks, editing, onPick, onApply, onCanc
   const selected = filterEntries(entries, facets, picks)
   const chars = uniqueChars(selected)
   return (
-    <section className={styles.questions} aria-label="반영 범위" data-testid="apply-questions">
+    <div className={styles.modalLayer} onPointerDown={(event) => { if (event.target === event.currentTarget) onCancel() }} onKeyDown={(event) => { if (event.key === 'Escape') onCancel() }}>
+    <section className={styles.questions} role="dialog" aria-modal="true" aria-label="반영 범위" data-testid="apply-questions">
       <header>
         <h2>{STEM_NAME_LABEL[base]}을 고쳤어요. 어디까지 반영할까요?</h2>
         <p>바뀌는 홀자 <strong data-testid="apply-count">{chars.length}</strong> · {chars.join(' ')}</p>
@@ -277,9 +278,10 @@ function ApplyQuestions({ base, entries, picks, editing, onPick, onApply, onCanc
       })}
       <footer>
         <button type="button" className={styles.reset} onClick={onCancel}>취소</button>
-        <button type="button" className={styles.apply} data-testid="apply" disabled={selected.length === 0} onClick={onApply}>{chars.length}개 홀자에 반영</button>
+        <button type="button" className={styles.apply} data-testid="apply" disabled={selected.length === 0} onClick={onApply} autoFocus>{chars.length}개 홀자에 반영</button>
       </footer>
     </section>
+    </div>
   )
 }
 
@@ -358,9 +360,8 @@ export function StemMasterLabPage() {
           )}
           <aside className={styles.side}>
             <h2>{editing ? `${editing.char} · ${stemMasterLabel(editing.name)}` : STEM_NAME_LABEL[base]}</h2>
-            <p>{pending ? '고친 모양 — 아래에서 반영할 곳을 고른다.' : editing && isStraight(masterOf(masters, editing.name)) ? '곧다 — 핸들을 끌어 고친다.' : '휘어 있다 — 핸들을 끌어 고친다.'}</p>
+            <p>{pending ? '고친 모양 — 반영할 곳을 고른다.' : editing && isStraight(masterOf(masters, editing.name)) ? '곧다 — 핸들을 끌어 고친다.' : '휘어 있다 — 핸들을 끌어 고친다.'}</p>
             <button type="button" className={styles.reset} disabled={Boolean(pending) || !editing || isStraight(masterOf(masters, editing.name))} onClick={() => editing && startEdit(straightMaster(editing.name))}>곧게 고치기</button>
-            {pending && <ApplyQuestions base={base} entries={entries} picks={picks} editing={editing} onPick={pick} onApply={apply} onCancel={cancel} />}
           </aside>
         </section>
 
@@ -384,6 +385,7 @@ export function StemMasterLabPage() {
           </div>
         </section>
       </div>
+      {pending && <ApplyQuestions base={base} entries={entries} picks={picks} editing={editing} onPick={pick} onApply={apply} onCancel={cancel} />}
     </main>
   )
 }
