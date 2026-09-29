@@ -8,13 +8,17 @@ import { betaInviteApiPlugin } from './scripts/betaInviteApi'
 import { feedbackAdminApiPlugin } from './scripts/feedbackAdminApi'
 import { housePresetApiPlugin } from './scripts/housePresetApi'
 import { announcementAdminApiPlugin } from './scripts/announcementAdminApi'
+import { sharedCheckoutPath } from './scripts/sharedCheckoutPath'
+
+// git에 없는 Noto 코퍼스. 워크트리에서는 메인 체크아웃 것을 쓴다.
+const guideCorpus = sharedCheckoutPath(fileURLToPath(new URL('.', import.meta.url)), '.reference-fonts/guide-corpus')
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
-    notoCorpusApiPlugin(fileURLToPath(new URL('./.reference-fonts/guide-corpus', import.meta.url))),
-    notoPresetApiPlugin(fileURLToPath(new URL('./.reference-fonts/guide-corpus', import.meta.url))),
+    notoCorpusApiPlugin(guideCorpus),
+    notoPresetApiPlugin(guideCorpus),
     // 로컬 관리자 화면(`/admin`)의 베타 계정 발급. 개발 서버에만 붙는다.
     betaInviteApiPlugin(fileURLToPath(new URL('.', import.meta.url))),
     // 같은 화면의 의견 탭(한임 답장). 개발 서버에만 붙는다.
