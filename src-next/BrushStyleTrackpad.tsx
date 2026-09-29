@@ -256,8 +256,6 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
     {current.mode === 'legacy-snapped-centerline' && <div className={styles.constructionRuleMessage}>
       <strong>레거시 격자 중심선</strong>
       <span>25-unit 스냅 · 75-unit 획 · 35° 절단</span>
-      <small>형태 그리드 Grid Lab과 다른 기존 렌더 실험입니다.</small>
-      <a className={styles.constructionRuleLink} href="/grid-lab">형태 그리드 편집 열기</a>
     </div>}
     {current.mode === 'dot-pattern' && <div className={styles.constructionRuleMessage}><strong>점 반복 · 보류</strong><span>규칙과 교차부 품질을 다시 설계한 뒤 재개합니다.</span></div>}
   </div>

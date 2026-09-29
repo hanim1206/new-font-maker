@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { accountOf, accountPathOf, canonicalPathOf, sectionOf } from './adminSections'
+import { accountOf, accountPathOf, canonicalPathOf, labOf, labPathOf, sectionOf } from './adminSections'
 
 describe('관리자 주소 → 메뉴', () => {
   it('/admin은 계정', () => expect(sectionOf('/admin')).toBe('accounts'))
@@ -35,5 +35,24 @@ describe('계정 상세 주소', () => {
     expect(accountOf('/admin/accounts')).toBeNull()
     expect(accountOf('/admin/accounts/')).toBeNull()
     expect(accountOf('/admin/feedback/abcd@beta.example')).toBeNull()
+  })
+})
+
+describe('실험실 주소', () => {
+  it('/admin/labs/<랩>은 실험실 메뉴의 그 랩', () => {
+    expect(sectionOf('/admin/labs/weight-lab')).toBe('labs')
+    expect(labOf('/admin/labs/weight-lab')?.route).toBe('/weight-lab')
+    expect(canonicalPathOf('/admin/labs/weight-lab')).toBeNull()
+  })
+  it('목록 · 모르는 랩은 랩 없음, 모르는 랩은 목록 주소로', () => {
+    expect(labOf('/admin/labs')).toBeNull()
+    expect(labOf('/admin/labs/nope')).toBeNull()
+    expect(canonicalPathOf('/admin/labs/nope')).toBe('/admin/labs')
+    expect(canonicalPathOf('/admin/labs')).toBeNull()
+  })
+  it('랩 주소로 돌아간다', () => {
+    const lab = labOf('/admin/labs/stroke-grammar-lab')
+    expect(labPathOf(lab)).toBe('/admin/labs/stroke-grammar-lab')
+    expect(labPathOf(null)).toBe('/admin/labs')
   })
 })

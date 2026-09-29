@@ -8,12 +8,6 @@ import type { ReactNode } from 'react'
 export async function showDevLab(show: (node: ReactNode) => void): Promise<boolean> {
   const path = window.location.pathname
 
-  if (path === '/global-style-preview') {
-    const { GlobalStylePreviewPage } = await import('./GlobalStylePreviewPage')
-    show(<GlobalStylePreviewPage />)
-    return true
-  }
-
   if (path === '/noto-corpus-lab') {
     const { NotoCorpusLabPage } = await import('./NotoCorpusLabPage')
     show(<NotoCorpusLabPage />)
@@ -44,12 +38,6 @@ export async function showDevLab(show: (node: ReactNode) => void): Promise<boole
     return true
   }
 
-  if (path === '/preset-candidate-lab') {
-    const { PresetCandidateLabPage } = await import('./PresetCandidateLabPage')
-    show(<PresetCandidateLabPage />)
-    return true
-  }
-
   if (path === '/font-guide-lab') {
     const params = new URLSearchParams(window.location.search)
     if (params.get('section') === 'medial') {
@@ -67,12 +55,6 @@ export async function showDevLab(show: (node: ReactNode) => void): Promise<boole
     window.history.replaceState(null, '', `/font-guide-lab?${params.toString()}`)
     const { FontGuideLabPage } = await import('./FontGuideLabPage')
     show(<FontGuideLabPage />)
-    return true
-  }
-
-  if (path === '/five-guide-lab') {
-    const { FiveGuideLabPage } = await import('./FiveGuideLabPage')
-    show(<FiveGuideLabPage />)
     return true
   }
 

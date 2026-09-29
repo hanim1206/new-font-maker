@@ -16,18 +16,13 @@ export const PRODUCT_SCREEN_ROUTES = [
 /** 랩. 개발 서버에서만 열린다(`devLabs.tsx` · `devPages.tsx`). 명세는 있어도 되고 없어도 된다. */
 export const LAB_SCREEN_ROUTES = [
   '/calibration',
-  '/global-style-preview',
-  '/grid-lab',
-  '/rule-lab',
   '/weight-lab',
   '/noto-corpus-lab',
   '/reference-lab',
   '/reference-group-lab',
   '/stroke-grammar-lab',
   '/stem-master-lab',
-  '/preset-candidate-lab',
   '/font-guide-lab',
-  '/five-guide-lab',
 ] as const
 
 /** 화면이 아닌 주소: 다른 화면으로 넘기기만 하거나, 셸 분기용 접두어. */
@@ -42,4 +37,6 @@ export const NON_SCREEN_ROUTES = [
   '/workspace/jamo/master',
   '/workspace/jamo/result',
   '/medial-guide-lab',
+  // 관리자 화면 접두어(`/admin/*`). 명세 없는 개발용 틀이고, 실험실도 여기(`/admin/labs/<랩>`)에서 연다.
+  '/admin',
 ] as const
