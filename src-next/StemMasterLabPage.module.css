@@ -64,3 +64,18 @@
 .sibling[data-picked='true'] { border-color: rgb(var(--color-foreground)); }
 .sibling[data-picked='false'] .siblingGlyphs svg { opacity: .25; }
 .siblingGlyphs svg { transition: opacity var(--motion-fast) var(--ease-standard); }
+
+/* 한눈에: 왼쪽 캔버스(따라 내려옴) · 오른쪽 갈래 카드 묶음. 좁으면 위아래로. */
+.hero { width: min(1680px, 100%); }
+.workspace { width: min(1680px, 100%); margin-inline: auto; display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.workspace .editor, .workspace .siblings { width: auto; margin: 0; }
+.workspace .editor { position: sticky; top: 16px; grid-template-columns: minmax(0, 1fr); }
+.workspace .siblings h2 { margin-top: 0; }
+.workspace .siblingGrid { grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); }
+.workspace .roleGroup:first-of-type { margin-top: 8px; }
+@media (max-width: 1100px) { .workspace { grid-template-columns: minmax(0, 1fr); } .workspace .editor { position: static; } }
+/* 갈래 묶음도 옆으로 흐른다 — 카드 수만큼 폭을 차지. */
+.roleGroups { display: flex; flex-wrap: wrap; gap: 4px 24px; align-items: flex-start; }
+.roleGroups .roleGroup { flex: 0 1 auto; min-width: 0; }
+.roleGroups .siblingGrid { display: flex; flex-wrap: wrap; gap: 10px; }
+.roleGroups .sibling { width: 168px; }

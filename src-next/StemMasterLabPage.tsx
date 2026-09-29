@@ -299,6 +299,7 @@ export function StemMasterLabPage() {
         <button type="button" className={styles.reset} data-testid="reset-all" onClick={() => { setDraft(null); resetAll() }}>전체 리셋 — 마스터를 지우고 줄기를 전부 곧게</button>
       </header>
 
+      <div className={styles.workspace}>
       <section className={styles.editor} aria-label="마스터 편집">
         <div className={styles.canvases}>
           {FINALS.map((final) => <MasterCanvas key={`${primary}-${final.id}`} name={primary} final={final.id} draft={draft} onDraft={setDraft} onCommit={(shape) => writeRoles(roles, picked, shape)} />)}
@@ -318,7 +319,7 @@ export function StemMasterLabPage() {
       <section className={styles.siblings} aria-label="형제">
         <h2>형제 <small>{groups.reduce((sum, group) => sum + group.chars.length, 0)}</small></h2>
         {released > 0 && <button type="button" data-testid="refollow-all" onClick={() => picked.forEach((role) => refollowAll(role))}>풀린 획 {released}개 모두 다시 따르기</button>}
-        <div data-testid="siblings">
+        <div className={styles.roleGroups} data-testid="siblings">
           {groups.map(({ role, chars }) => {
             const on = picked.includes(role)
             return (
@@ -336,6 +337,7 @@ export function StemMasterLabPage() {
           })}
         </div>
       </section>
+      </div>
     </main>
   )
 }
