@@ -13,16 +13,16 @@ const curvedAfter = (masters: StemMasters, char: string, id: string) => {
 }
 
 describe('줄기 역할 갈래', () => {
-  it('짧은기둥은 솟음 · 내림, 보는 솟음 · 내림 · 홀로 × 섞임으로 나뉜다', () => {
-    expect([nameOf('ㅗ', 'ㅗ-1'), nameOf('ㅛ', 'ㅛ-1'), nameOf('ㅛ', 'ㅛ-2'), nameOf('ㅘ', 'ㅘ-1')]).toEqual(Array(4).fill('jjalbeungidung.up'))
-    expect([nameOf('ㅜ', 'ㅜ-2'), nameOf('ㅠ', 'ㅠ-2'), nameOf('ㅝ', 'ㅝ-2'), nameOf('ㅟ', 'ㅟ-2')]).toEqual(Array(4).fill('jjalbeungidung.down'))
+  it('짧은기둥은 솟음 · 내림 × 하나 · 둘 × 단일 · 섞임, 보는 솟음 · 내림 · 없음 × 단일 · 섞임으로 나뉜다', () => {
+    expect([nameOf('ㅗ', 'ㅗ-1'), nameOf('ㅛ', 'ㅛ-1'), nameOf('ㅛ', 'ㅛ-2'), nameOf('ㅘ', 'ㅘ-1')]).toEqual(['jjalbeungidung.up.one.single', 'jjalbeungidung.up.pair.single', 'jjalbeungidung.up.pair.single', 'jjalbeungidung.up.one.mixed'])
+    expect([nameOf('ㅜ', 'ㅜ-2'), nameOf('ㅠ', 'ㅠ-2'), nameOf('ㅝ', 'ㅝ-2'), nameOf('ㅟ', 'ㅟ-2')]).toEqual(['jjalbeungidung.down.one.single', 'jjalbeungidung.down.pair.single', 'jjalbeungidung.down.one.mixed', 'jjalbeungidung.down.one.mixed'])
     expect({
       ㅗ: nameOf('ㅗ', 'ㅗ-2'), ㅘ: nameOf('ㅘ', 'ㅘ-2'), ㅚ: nameOf('ㅚ', 'ㅚ-2'), ㅜ: nameOf('ㅜ', 'ㅜ-1'),
       ㅝ: nameOf('ㅝ', 'ㅝ-1'), ㅟ: nameOf('ㅟ', 'ㅟ-1'), ㅡ: nameOf('ㅡ', 'ㅡ-1'), ㅢ: nameOf('ㅢ', 'ㅢ-1'),
-    }).toEqual({ ㅗ: 'bo.up', ㅘ: 'bo.up.mixed', ㅚ: 'bo.up.mixed', ㅜ: 'bo.down', ㅝ: 'bo.down.mixed', ㅟ: 'bo.down.mixed', ㅡ: 'bo.none', ㅢ: 'bo.none.mixed' })
+    }).toEqual({ ㅗ: 'bo.up.single', ㅘ: 'bo.up.mixed', ㅚ: 'bo.up.mixed', ㅜ: 'bo.down.single', ㅝ: 'bo.down.mixed', ㅟ: 'bo.down.mixed', ㅡ: 'bo.none.single', ㅢ: 'bo.none.mixed' })
   })
 
-  it('갈래 마스터가 없으면 부모를 거슬러 따른다(보.솟음.섞임 → 보.솟음 → 보)', () => {
+  it('갈래 마스터가 없으면 부모를 거슬러 따른다(bo.up.mixed → bo.up → bo)', () => {
     const bo = bend('bo')
     expect(masterOf({ bo }, 'bo.up.mixed').points).toEqual(bo.points)
     const up = bend('bo.up', -0.02)
@@ -63,18 +63,18 @@ describe('줄기 역할 갈래', () => {
     expect(up.x).toBeCloseTo(down.x, 9)
   })
 
-  it('곁줄기는 오른 · 왼 × 하나 · 섞임 · 둘(위 · 아래)로 나뉜다', () => {
+  it('곁줄기는 오른 · 왼 × 하나 · 둘 위 · 둘 아래 × 단일 · 섞임으로 나뉜다', () => {
     expect({
       ㅏ: nameOf('ㅏ', 'ㅏ-2'), ㅘ: nameOf('ㅘ', 'ㅘ-4'), ㅑ위: nameOf('ㅑ', 'ㅑ-2'), ㅑ아래: nameOf('ㅑ', 'ㅑ-3'),
       ㅓ: nameOf('ㅓ', 'ㅓ-2'), ㅔ: nameOf('ㅔ', 'ㅔ-2'), ㅝ: nameOf('ㅝ', 'ㅝ-4'), ㅞ: nameOf('ㅞ', 'ㅞ-4'),
       ㅕ위: nameOf('ㅕ', 'ㅕ-2'), ㅕ아래: nameOf('ㅕ', 'ㅕ-3'), ㅖ위: nameOf('ㅖ', 'ㅖ-2'), ㅖ아래: nameOf('ㅖ', 'ㅖ-3'),
     }).toEqual({
-      ㅏ: 'gyeotjulgi.right', ㅘ: 'gyeotjulgi.right.mixed', ㅑ위: 'gyeotjulgi.right.pair.upper', ㅑ아래: 'gyeotjulgi.right.pair.lower',
-      ㅓ: 'gyeotjulgi.left', ㅔ: 'gyeotjulgi.left', ㅝ: 'gyeotjulgi.left.mixed', ㅞ: 'gyeotjulgi.left.mixed',
-      ㅕ위: 'gyeotjulgi.left.pair.upper', ㅕ아래: 'gyeotjulgi.left.pair.lower', ㅖ위: 'gyeotjulgi.left.pair.upper', ㅖ아래: 'gyeotjulgi.left.pair.lower',
+      ㅏ: 'gyeotjulgi.right.one.single', ㅘ: 'gyeotjulgi.right.one.mixed', ㅑ위: 'gyeotjulgi.right.upper.single', ㅑ아래: 'gyeotjulgi.right.lower.single',
+      ㅓ: 'gyeotjulgi.left.one.single', ㅔ: 'gyeotjulgi.left.one.single', ㅝ: 'gyeotjulgi.left.one.mixed', ㅞ: 'gyeotjulgi.left.one.mixed',
+      ㅕ위: 'gyeotjulgi.left.upper.single', ㅕ아래: 'gyeotjulgi.left.lower.single', ㅖ위: 'gyeotjulgi.left.upper.single', ㅖ아래: 'gyeotjulgi.left.lower.single',
     })
     // 둘의 위만 그리면 ㅑ ㅕ ㅖ의 위 곁줄기만 휜다.
-    const upperOnly = { 'gyeotjulgi.right.pair.upper': bend('gyeotjulgi.right.pair.upper'), 'gyeotjulgi.left.pair.upper': bend('gyeotjulgi.left.pair.upper') }
+    const upperOnly = { 'gyeotjulgi.right.upper': bend('gyeotjulgi.right.upper'), 'gyeotjulgi.left.upper': bend('gyeotjulgi.left.upper') }
     expect(['ㅑ-2', 'ㅕ-2', 'ㅖ-2'].map((id) => curvedAfter(upperOnly, id.split('-')[0], id))).toEqual([true, true, true])
     expect(['ㅑ-3', 'ㅕ-3', 'ㅖ-3', 'ㅏ-2', 'ㅓ-2'].map((id) => curvedAfter(upperOnly, id.split('-')[0], id))).toEqual([false, false, false, false, false])
   })

@@ -25,7 +25,7 @@ describe('줄기 마스터 스토어', () => {
     const jung = useJamoStore.getState().jungseong
     for (const char of ['ㅏ', 'ㅕ', 'ㅐ', 'ㅑ']) {
       expect(jung[char].strokes![0].points[0].handleOut, char).toBeDefined()
-      expect(boundStrokesOf(jung[char], { gidung: bent }).filter((item) => item.name === 'gidung' || item.name === 'gidung.inner').every((item) => item.follows), char).toBe(true)
+      expect(boundStrokesOf(jung[char], { gidung: bent }).filter((item) => item.name.startsWith('gidung.')).every((item) => item.follows), char).toBe(true)
     }
     expect(jung['ㅘ'].verticalStrokes![0].points[0].handleOut).toBeDefined()
     expect(jung['ㅙ'].verticalStrokes![0].points[0].handleOut).toBeDefined()
@@ -74,7 +74,7 @@ describe('줄기 마스터 스토어', () => {
     release('ㅒ', 0)
     release('ㅏ', 0)
     const innerOf = () => ['ㅐ', 'ㅒ', 'ㅏ'].map((char) => boundStrokesOf(useJamoStore.getState().jungseong[char], { gidung: bent })[0])
-    expect(innerOf().map((item) => [item.name, item.follows])).toEqual([['gidung.inner', false], ['gidung.inner', false], ['gidung', false]])
+    expect(innerOf().map((item) => [item.name, item.follows])).toEqual([['gidung.inner.single', false], ['gidung.inner.single', false], ['gidung.outer.single', false]])
     store.refollowAll('gidung.inner')
     expect(innerOf().map((item) => item.follows)).toEqual([true, true, false])
   })

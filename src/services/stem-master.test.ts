@@ -48,11 +48,11 @@ describe('이름과 표', () => {
   const ae: JamoData = { char: 'ㅐ', type: 'jungseong', strokes: [line('ㅐ-1', [0, 0], [0, 1]), line('ㅐ-2', [0, 0.5], [1, 0.5]), line('ㅐ-3', [1, 0], [1, 1])] }
   const a: JamoData = { char: 'ㅏ', type: 'jungseong', strokes: [line('ㅏ-1', [0, 0], [0, 1]), line('ㅏ-2', [0, 0.5], [1, 0.5])] }
 
-  it('기둥이 둘이면 왼쪽이 기둥.안쪽, 하나면 기둥', () => {
-    expect(masterNameOf(ae, ae.strokes!, 'ㅐ-1')).toBe('gidung.inner')
-    expect(masterNameOf(ae, ae.strokes!, 'ㅐ-3')).toBe('gidung')
+  it('기둥이 둘이면 왼쪽이 안 기둥, 하나면 바깥 기둥(갈래 이름 = 줄기 · 질문 답)', () => {
+    expect(masterNameOf(ae, ae.strokes!, 'ㅐ-1')).toBe('gidung.inner.single')
+    expect(masterNameOf(ae, ae.strokes!, 'ㅐ-3')).toBe('gidung.outer.single')
     expect(masterNameOf(ae, ae.strokes!, 'ㅐ-2')).toBe('geolchim')
-    expect(masterNameOf(a, a.strokes!, 'ㅏ-1')).toBe('gidung')
+    expect(masterNameOf(a, a.strokes!, 'ㅏ-1')).toBe('gidung.outer.single')
     expect(masterNameOf(a, a.strokes!, 'stroke-123')).toBeNull()
   })
 
@@ -74,7 +74,7 @@ describe('이름과 표', () => {
 
   it('귀속 획 목록과 따름', () => {
     const bound = boundStrokesOf(ae, {})
-    expect(bound.map((item) => [item.stroke.id, item.name, item.follows])).toEqual([['ㅐ-1', 'gidung.inner', true], ['ㅐ-2', 'geolchim', true], ['ㅐ-3', 'gidung', true]])
+    expect(bound.map((item) => [item.stroke.id, item.name, item.follows])).toEqual([['ㅐ-1', 'gidung.inner.single', true], ['ㅐ-2', 'geolchim', true], ['ㅐ-3', 'gidung.outer.single', true]])
   })
 
   it('상자가 두께보다 얇은 채널(ㅣ · ㅡ · ㅢ)도 따른다 — 휠 방향의 변만 ㅏ 칸 폭 · ㅗ 칸 높이를 빌린다', () => {

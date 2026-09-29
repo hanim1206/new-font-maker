@@ -11,112 +11,79 @@ import { grammarOf, STEM_NAME_LABEL, type StemName } from './strokeGrammar'
  * 플랜: docs/plans/2026-09-29_홀자-줄기-마스터.md
  */
 
+/** 마스터가 있는 줄기 이름. 덧줄기 · 꼭지는 마스터가 없다. */
+export type StemBase = Exclude<StemName, 'deotjulgi' | 'kkokji'>
+
+export const STEM_BASES: readonly StemBase[] = ['gidung', 'gyeotjulgi', 'jjalbeungidung', 'bo', 'geolchim']
+
 /**
- * 마스터 이름. 줄기 이름 아래에 역할 갈래가 있다 — 따로 그리지 않은 갈래는 부모를 따르고, 그리면 갈라진다(`기둥.안쪽`과 같은 방식).
- * 짧은기둥은 보에서 위로 솟는지 아래로 내리는지, 보는 그 짧은기둥을 받치는지 · 매다는지 · 없는지와 섞임홀자 세로부와 만나는지로 나눈다.
+ * 같은 줄기라도 대조군에 따라 역할이 다르다. 역할을 질문(갈래 기준) 몇 개로 나눈다 — 반영할 때 이 질문을 차례로 물어 좁힌다.
+ * 질문 순서가 곧 이름 순서다.
  */
-export type StemMasterName = Exclude<StemName, 'deotjulgi' | 'kkokji'>
-  | 'gidung.inner'
-  | 'gyeotjulgi.right' | 'gyeotjulgi.right.mixed' | 'gyeotjulgi.right.pair' | 'gyeotjulgi.right.pair.upper' | 'gyeotjulgi.right.pair.lower'
-  | 'gyeotjulgi.left' | 'gyeotjulgi.left.mixed' | 'gyeotjulgi.left.pair' | 'gyeotjulgi.left.pair.upper' | 'gyeotjulgi.left.pair.lower'
-  | 'jjalbeungidung.up' | 'jjalbeungidung.down'
-  | 'bo.up' | 'bo.up.mixed' | 'bo.down' | 'bo.down.mixed' | 'bo.none' | 'bo.none.mixed'
+export interface StemFacet {
+  key: string
+  /** 반영 질문 */
+  question: string
+  options: readonly { value: string; label: string }[]
+}
 
-export const STEM_MASTER_NAMES: readonly StemMasterName[] = [
-  'gidung', 'gidung.inner',
-  'gyeotjulgi', 'gyeotjulgi.right', 'gyeotjulgi.right.mixed', 'gyeotjulgi.right.pair', 'gyeotjulgi.right.pair.upper', 'gyeotjulgi.right.pair.lower',
-  'gyeotjulgi.left', 'gyeotjulgi.left.mixed', 'gyeotjulgi.left.pair', 'gyeotjulgi.left.pair.upper', 'gyeotjulgi.left.pair.lower',
-  'jjalbeungidung', 'jjalbeungidung.up', 'jjalbeungidung.down',
-  'bo', 'bo.up', 'bo.up.mixed', 'bo.down', 'bo.down.mixed', 'bo.none', 'bo.none.mixed',
-  'geolchim',
-]
+const KIND: StemFacet = { key: 'kind', question: '어떤 홀자?', options: [{ value: 'single', label: '단일' }, { value: 'mixed', label: '섞임' }] }
 
-/** 갈래 → 부모. 갈래 마스터가 없으면 부모를 거슬러 올라가 처음 있는 마스터를 따른다. */
-const PARENT: Partial<Record<StemMasterName, StemMasterName>> = {
-  'gidung.inner': 'gidung',
-  'gyeotjulgi.right': 'gyeotjulgi',
-  'gyeotjulgi.right.mixed': 'gyeotjulgi.right',
-  'gyeotjulgi.right.pair': 'gyeotjulgi.right',
-  'gyeotjulgi.right.pair.upper': 'gyeotjulgi.right.pair',
-  'gyeotjulgi.right.pair.lower': 'gyeotjulgi.right.pair',
-  'gyeotjulgi.left': 'gyeotjulgi',
-  'gyeotjulgi.left.mixed': 'gyeotjulgi.left',
-  'gyeotjulgi.left.pair': 'gyeotjulgi.left',
-  'gyeotjulgi.left.pair.upper': 'gyeotjulgi.left.pair',
-  'gyeotjulgi.left.pair.lower': 'gyeotjulgi.left.pair',
-  'jjalbeungidung.up': 'jjalbeungidung',
-  'jjalbeungidung.down': 'jjalbeungidung',
-  'bo.up': 'bo',
-  'bo.up.mixed': 'bo.up',
-  'bo.down': 'bo',
-  'bo.down.mixed': 'bo.down',
-  'bo.none': 'bo',
-  'bo.none.mixed': 'bo.none',
+export const STEM_FACETS: Readonly<Record<StemBase, readonly StemFacet[]>> = {
+  gidung: [
+    { key: 'side', question: '어느 기둥?', options: [{ value: 'outer', label: '바깥' }, { value: 'inner', label: '안' }] },
+    KIND,
+  ],
+  gyeotjulgi: [
+    { key: 'side', question: '어느 쪽으로 뻗나?', options: [{ value: 'right', label: '오른' }, { value: 'left', label: '왼' }] },
+    { key: 'count', question: '몇 개?', options: [{ value: 'one', label: '하나' }, { value: 'upper', label: '둘 · 위' }, { value: 'lower', label: '둘 · 아래' }] },
+    KIND,
+  ],
+  jjalbeungidung: [
+    { key: 'dir', question: '보에서 어느 쪽?', options: [{ value: 'up', label: '솟음' }, { value: 'down', label: '내림' }] },
+    { key: 'count', question: '몇 개?', options: [{ value: 'one', label: '하나' }, { value: 'pair', label: '둘' }] },
+    KIND,
+  ],
+  bo: [
+    { key: 'role', question: '짧은기둥은?', options: [{ value: 'up', label: '솟음 받침' }, { value: 'down', label: '내림 매닮' }, { value: 'none', label: '없음' }] },
+    KIND,
+  ],
+  geolchim: [],
+}
+
+/**
+ * 마스터 이름 = 줄기 + 질문 답을 순서대로 이은 것(`gidung.inner.mixed`). 가장 잘게 나눈 갈래(잎)가 획이 따르는 이름이고,
+ * 앞쪽만 있는 이름(`gidung.inner`, `gidung`)은 부모다. 잎 마스터가 없으면 부모를 거슬러 올라가 처음 있는 것을 따른다.
+ */
+export type StemMasterName = string
+
+export function baseOf(name: StemMasterName): StemBase {
+  return name.split('.')[0] as StemBase
 }
 
 export function parentOf(name: StemMasterName): StemMasterName | null {
-  return PARENT[name] ?? null
+  const at = name.lastIndexOf('.')
+  return at < 0 ? null : name.slice(0, at)
 }
 
 /** `name`이 `ancestor` 자신이거나 그 갈래인가. */
 export function isUnder(name: StemMasterName, ancestor: StemMasterName): boolean {
-  for (let at: StemMasterName | null = name; at; at = parentOf(at)) if (at === ancestor) return true
-  return false
+  return name === ancestor || name.startsWith(`${ancestor}.`)
 }
 
-export const STEM_MASTER_LABEL: Readonly<Record<StemMasterName, string>> = {
-  gidung: STEM_NAME_LABEL.gidung,
-  'gidung.inner': '기둥.안쪽',
-  gyeotjulgi: STEM_NAME_LABEL.gyeotjulgi,
-  'gyeotjulgi.right': '곁줄기.오른',
-  'gyeotjulgi.right.mixed': '곁줄기.오른.섞임',
-  'gyeotjulgi.right.pair': '곁줄기.오른.둘',
-  'gyeotjulgi.right.pair.upper': '곁줄기.오른.둘.위',
-  'gyeotjulgi.right.pair.lower': '곁줄기.오른.둘.아래',
-  'gyeotjulgi.left': '곁줄기.왼',
-  'gyeotjulgi.left.mixed': '곁줄기.왼.섞임',
-  'gyeotjulgi.left.pair': '곁줄기.왼.둘',
-  'gyeotjulgi.left.pair.upper': '곁줄기.왼.둘.위',
-  'gyeotjulgi.left.pair.lower': '곁줄기.왼.둘.아래',
-  jjalbeungidung: STEM_NAME_LABEL.jjalbeungidung,
-  'jjalbeungidung.up': '짧은기둥.솟음',
-  'jjalbeungidung.down': '짧은기둥.내림',
-  bo: STEM_NAME_LABEL.bo,
-  'bo.up': '보.솟음',
-  'bo.up.mixed': '보.솟음.섞임',
-  'bo.down': '보.내림',
-  'bo.down.mixed': '보.내림.섞임',
-  'bo.none': '보.홀로',
-  'bo.none.mixed': '보.홀로.섞임',
-  geolchim: STEM_NAME_LABEL.geolchim,
+/** 이름의 질문 답. 앞쪽만 있는 이름이면 뒤 질문은 비어 있다. */
+export function facetValuesOf(name: StemMasterName): Record<string, string> {
+  const [base, ...values] = name.split('.')
+  const facets = STEM_FACETS[base as StemBase] ?? []
+  return Object.fromEntries(values.map((value, index) => [facets[index]?.key ?? String(index), value]))
 }
 
-/** 마스터 편집 캔버스에 놓을 대표 홀자와 그 안의 마스터 획. */
-export const STEM_MASTER_SAMPLE: Readonly<Record<StemMasterName, { char: string; strokeId: string }>> = {
-  gidung: { char: 'ㅏ', strokeId: 'ㅏ-1' },
-  'gidung.inner': { char: 'ㅐ', strokeId: 'ㅐ-1' },
-  gyeotjulgi: { char: 'ㅏ', strokeId: 'ㅏ-2' },
-  'gyeotjulgi.right': { char: 'ㅏ', strokeId: 'ㅏ-2' },
-  'gyeotjulgi.right.mixed': { char: 'ㅘ', strokeId: 'ㅘ-4' },
-  'gyeotjulgi.right.pair': { char: 'ㅑ', strokeId: 'ㅑ-2' },
-  'gyeotjulgi.right.pair.upper': { char: 'ㅑ', strokeId: 'ㅑ-2' },
-  'gyeotjulgi.right.pair.lower': { char: 'ㅑ', strokeId: 'ㅑ-3' },
-  'gyeotjulgi.left': { char: 'ㅓ', strokeId: 'ㅓ-2' },
-  'gyeotjulgi.left.mixed': { char: 'ㅝ', strokeId: 'ㅝ-4' },
-  'gyeotjulgi.left.pair': { char: 'ㅕ', strokeId: 'ㅕ-2' },
-  'gyeotjulgi.left.pair.upper': { char: 'ㅕ', strokeId: 'ㅕ-2' },
-  'gyeotjulgi.left.pair.lower': { char: 'ㅕ', strokeId: 'ㅕ-3' },
-  jjalbeungidung: { char: 'ㅗ', strokeId: 'ㅗ-1' },
-  'jjalbeungidung.up': { char: 'ㅗ', strokeId: 'ㅗ-1' },
-  'jjalbeungidung.down': { char: 'ㅜ', strokeId: 'ㅜ-2' },
-  bo: { char: 'ㅗ', strokeId: 'ㅗ-2' },
-  'bo.up': { char: 'ㅗ', strokeId: 'ㅗ-2' },
-  'bo.up.mixed': { char: 'ㅘ', strokeId: 'ㅘ-2' },
-  'bo.down': { char: 'ㅜ', strokeId: 'ㅜ-1' },
-  'bo.down.mixed': { char: 'ㅝ', strokeId: 'ㅝ-1' },
-  'bo.none': { char: 'ㅡ', strokeId: 'ㅡ-1' },
-  'bo.none.mixed': { char: 'ㅢ', strokeId: 'ㅢ-1' },
-  geolchim: { char: 'ㅐ', strokeId: 'ㅐ-2' },
+/** 사람이 읽는 이름. `기둥 · 안 · 섞임` */
+export function stemMasterLabel(name: StemMasterName): string {
+  const [base, ...values] = name.split('.')
+  const facets = STEM_FACETS[base as StemBase] ?? []
+  const parts = values.map((value, index) => facets[index]?.options.find((option) => option.value === value)?.label ?? value)
+  return [STEM_NAME_LABEL[base as StemBase] ?? base, ...parts].join(' · ')
 }
 
 /** 짧은기둥이 보에서 위로 솟는 홀자 · 아래로 내리는 홀자 · 섞임홀자(오른쪽 세로부가 있어 보가 짧다). */
@@ -226,41 +193,36 @@ export function thinBox(stroke: StrokeDataV2, box: BoxEm): boolean {
 }
 
 /**
- * 이 획이 따를 마스터 이름(가장 좁은 갈래). 획 문법 이름에서 시작해 ㅐ ㅔ ㅒ ㅖ처럼 기둥이 둘인 채널의 왼쪽 기둥은 `기둥.안쪽`,
- * 짧은기둥은 솟음 · 내림, 보는 솟음 · 내림 · 홀로와 섞임으로 나눈다.
+ * 이 획이 따를 마스터 이름(잎). 획 문법 이름에 질문 답을 잇는다 — 기둥은 바깥 · 안(기둥이 둘인 채널의 왼쪽) × 단일 · 섞임,
+ * 곁줄기는 오른 · 왼 × 하나 · 둘의 위 · 아래 × 단일 · 섞임, 짧은기둥은 솟음 · 내림 × 하나 · 둘 × 단일 · 섞임, 보는 솟음 받침 · 내림 매닮 · 없음 × 단일 · 섞임.
  * 덧줄기 · 꼭지처럼 마스터가 없는 이름, 이름 없는 획, 자유 획은 null.
  */
 export function masterNameOf(jamo: Pick<JamoData, 'type' | 'char'>, channelStrokes: readonly StrokeDataV2[], strokeId: string): StemMasterName | null {
   const table = grammarOf(jamo.type, jamo.char)
-  const name = table[strokeId]
-  if (!name || !(STEM_MASTER_NAMES as readonly string[]).includes(name)) return null
-  if (name === 'gidung') {
-    const pillars = channelStrokes.filter((stroke) => table[stroke.id] === 'gidung')
-    if (pillars.length > 1) {
-      const leftmost = pillars.reduce((a, b) => (a.points[0].x < b.points[0].x ? a : b))
-      if (leftmost.id === strokeId) return 'gidung.inner'
-    }
+  const base = table[strokeId]
+  if (!base || !(STEM_BASES as readonly string[]).includes(base)) return null
+  const kind = MIXED.has(jamo.char) ? 'mixed' : 'single'
+  const same = channelStrokes.filter((stroke) => table[stroke.id] === base && stroke.points.length >= 2)
+  const self = same.find((stroke) => stroke.id === strokeId)
+  if (base === 'gidung') {
+    const leftmost = same.length > 1 ? same.reduce((a, b) => (a.points[0].x < b.points[0].x ? a : b)) : null
+    return `gidung.${leftmost?.id === strokeId ? 'inner' : 'outer'}.${kind}`
   }
-  if (name === 'gyeotjulgi') {
+  if (base === 'gyeotjulgi') {
     const side = RIGHTWARD.has(jamo.char) ? 'right' : 'left'
-    const pair = channelStrokes.filter((stroke) => table[stroke.id] === 'gyeotjulgi' && stroke.points.length >= 2)
-    if (pair.length > 1) {
-      const middle = (stroke: StrokeDataV2) => (stroke.points[0].y + stroke.points[stroke.points.length - 1].y) / 2
-      const self = pair.find((stroke) => stroke.id === strokeId)
-      const upper = self && pair.every((other) => other === self || middle(self) <= middle(other))
-      return `gyeotjulgi.${side}.pair.${upper ? 'upper' : 'lower'}` as StemMasterName
-    }
-    return `gyeotjulgi.${side}${MIXED.has(jamo.char) ? '.mixed' : ''}` as StemMasterName
+    const middle = (stroke: StrokeDataV2) => (stroke.points[0].y + stroke.points[stroke.points.length - 1].y) / 2
+    const count = same.length < 2 || !self ? 'one' : same.every((other) => other === self || middle(self) <= middle(other)) ? 'upper' : 'lower'
+    return `gyeotjulgi.${side}.${count}.${kind}`
   }
-  if (name === 'jjalbeungidung') {
-    if (RISING.has(jamo.char)) return 'jjalbeungidung.up'
-    if (HANGING.has(jamo.char)) return 'jjalbeungidung.down'
+  if (base === 'jjalbeungidung') {
+    const dir = HANGING.has(jamo.char) ? 'down' : 'up'
+    return `jjalbeungidung.${dir}.${same.length > 1 ? 'pair' : 'one'}.${kind}`
   }
-  if (name === 'bo') {
+  if (base === 'bo') {
     const role = RISING.has(jamo.char) ? 'up' : HANGING.has(jamo.char) ? 'down' : 'none'
-    return `bo.${role}${MIXED.has(jamo.char) ? '.mixed' : ''}` as StemMasterName
+    return `bo.${role}.${kind}`
   }
-  return name as StemMasterName
+  return base
 }
 
 function distanceToSegment(point: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number {
