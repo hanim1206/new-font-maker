@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { FontDataGlyph } from '../fontDataGlyph'
 import { previewFontOf } from '../previewFont'
 import { SAMPLE_SENTENCES } from '../sampleSentences'
@@ -54,8 +55,7 @@ export function AccountFontsPage({ email, account, onBack }: { email: string; ac
     </div>
     <label className="flex max-w-md flex-col gap-1.5 text-sm text-text-dim-3">
       미리보기 문장
-      <input
-        className="h-9 w-full rounded-md border border-border bg-surface px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
+      <Input
         value={text}
         onChange={(event) => setText(event.target.value)}
         maxLength={40}
