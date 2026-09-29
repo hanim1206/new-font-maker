@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Dices, Download, Ellipsis, LoaderCircle, Minus, PencilLine, Plus, ScanSearch, Trash2, UserRound, X } from 'lucide-react'
 import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../src/data/Hangul'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
@@ -27,18 +27,25 @@ import { useContextPlacement } from './notoModel'
 import { ExportNoticeToast } from './workspace/WorkspaceChrome'
 import { PART_COLOR } from './partColors'
 import { randomSampleSentence } from './sampleSentences'
+import { SentenceSheetControls, SentenceSheetRun } from './SentenceSheet'
+import { useSentenceSheet } from './sentenceSheetState'
+import { hangulBodyWidth, UPM } from '../src/services/fontMetrics'
+import { useCalibrationProjectStore } from './calibrationProjectStore'
 import { ReportButton } from './ReportButton'
 import { AnnouncementSpot } from './AnnouncementSpot'
 import { BetaGuideSheet } from './BetaGuideSheet'
 import { markBetaGuideSeen, shouldShowBetaGuide } from './betaGuide'
 import styles from './DashboardLabPage.module.css'
+// 카드 문장 줄은 편집기 문장 줄과 같은 생김새 · 동작이다.
+import editorStyles from './CalibrationSentenceEditor.module.css'
+import styleMode from './GlobalStyleMode.module.css'
 
 /**
  * 대시보드(`/dashboard`). 지금 연 폰트의 한눈 화면 — 셸 머리 `‹ 내 폰트`가 여기로 오고, 내 폰트 목록에서 폰트를 고르면 여기부터.
  * 2026-09-26 사용자 스케치를 앱 부품 · 토큰으로 옮긴 것. 위는 폰트 카드(지금 폰트 하나 + `새 폰트` → 내 폰트 목록), 아래는 왼쪽 레일(목차 · 스크롤 따라감) + 섹션 다섯.
  * 순서: 스타일 → 초성 → 중성 → 종성 → 레이아웃(2026-09-27 사용자 요청으로 레이아웃을 뒤로). 전체 목록이고, 손댄 자소는 점.
  * 초 · 중 · 종은 요약 줄이고 화살표가 섹션 홈, 자소 카드는 그 자소 하나만 도마에 올려 자모 에디터로 간다.
- * 아직 없는 것: `…`의 복제, 스타일 타일 하나하나의 탭(머리 `›`만 폰트 탭으로). 파일 이름은 옛 랩 이름 그대로다.
+ * 아직 없는 것: `…`의 복제. 파일 이름은 옛 랩 이름 그대로다.
  */
 
 type SectionId = 'style' | 'layout' | 'choseong' | 'jungseong' | 'jongseong'
@@ -52,6 +59,26 @@ const SECTIONS: { id: SectionId; label: string }[] = [
 /** 레이아웃 6칸 대표 글자 — 세로홀자 · 가로홀자 · 섞임홀자 × 받침 유무. */
 const LAYOUT_SAMPLES = ['래', '노', '화', '별', '을', '원'] as const
 const FINALS = JONGSEONG_LIST.filter((char) => char !== '')
+/** 초성은 홑자음 먼저, 쌍자음은 뒤에 — ㄱㄴㄷ 순서가 익숙하다(09-29 베타 의견). 조합용 `CHOSEONG_LIST` 순서는 그대로 둔다. */
+const CHOSEONG_ORDER = [...CHOSEONG_LIST.filter((char) => !'ㄲㄸㅃㅆㅉ'.includes(char)), ...'ㄲㄸㅃㅆㅉ']
+
+/** 카드 문장 글자 크기(px). 펼치면 편집기 문장 줄과 같은 크기(왼쪽 막대)로 자란다. */
+const SENTENCE_EM = 34
+/** 카드 문장 줄 사이(px). 두 줄 높이 = 34 × 2 + 6. */
+const SENTENCE_ROW_GAP = 6
+/** 낱말과 공백 덩어리로 나눈다(낱말은 줄이 바뀌어도 안 쪼개진다). 편집기 문장 줄과 같은 규칙. */
+function tokenize(line: string): { text: string; start: number; whitespace: boolean }[] {
+  const tokens: { text: string; start: number; whitespace: boolean }[] = []
+  let start = 0
+  for (const char of [...line]) {
+    const whitespace = /\s/u.test(char)
+    const previous = tokens.at(-1)
+    if (previous && previous.whitespace === whitespace) previous.text += char
+    else tokens.push({ text: char, start, whitespace })
+    start += 1
+  }
+  return tokens
+}
 
 const isHangul = (char: string) => { const code = char.codePointAt(0) ?? 0; return code >= 0xac00 && code <= 0xd7a3 }
 
@@ -145,14 +172,13 @@ function JamoGlyph({ type, char, size }: { type: JamoType; char: string; size: n
 }
 
 /**
- * 지금 폰트 카드. 이름은 머리 알약에 있어 여기선 마지막 고침과 예시 문장만.
+ * 지금 폰트 카드. 머리엔 이름만(마지막 고침 · 프리셋 문구는 뺐다 — 09-29 사용자), 아래는 예시 문장.
  * 왼쪽 아래 주사위는 예시 문장을 문장 보정의 문장 목록에서 하나 뽑아 바꾼다.
  * 오른쪽 버튼은 둘: `…`(이름 바꾸기 · 복제 · 삭제) · 다운로드. 이름 바꾸기 · 삭제 확인은 `…` 시트 안에서 한다.
  * 다운로드도 같은 시트가 올라와 폰트 이름(설치 이름 · 파일 이름)을 받고 OTF를 만든다.
  */
-function FontCard({ name, note, onRename, onDuplicate, onDelete }: {
+function FontCard({ name, onRename, onDuplicate, onDelete }: {
   name: string
-  note: string
   onRename: (name: string) => void
   /** 없으면(한도가 찼거나 랩 화면) 복제를 흐리게. */
   onDuplicate?: () => void
@@ -162,22 +188,137 @@ function FontCard({ name, note, onRename, onDuplicate, onDelete }: {
   // 문장은 추출 상점에 둔다 — 여기서 받으면 완료 페이지가 같은 문장을 진짜 폰트로 쓴다.
   const sentence = useFontExportStore((state) => state.sampleSentence)
   const setSentence = useFontExportStore((state) => state.setSampleSentence)
-  return <article className={styles.card}>
+  // 돋보기로 펼치는 문장 줄. 편집기 문장 줄과 같은 부품(동작 · 애니메이션 · 버튼 바)이고, 문장은 같은 상점이라 편집기 · 완료 페이지에도 그대로 간다.
+  // 상점은 빈 문장을 안 받으므로, 펼친 동안의 글자는 여기 둔다.
+  const [draft, setDraft] = useState(sentence)
+  // 카드 주사위로 바꾼 횟수. 펼친 줄의 `다른 문장`과 같은 애니메이션을 건다.
+  const [cardRolled, setCardRolled] = useState(0)
+  useEffect(() => setDraft(sentence), [sentence])
+  const box = useRef<HTMLElement>(null)
+  const card = useRef<HTMLElement>(null)
+  // 펼친 동안 카드 자리를 지키는 안 보이는 대역 카드. 접힐 때 돌아갈 자리 · 크기를 여기서 잰다(그새 문장이 바뀌어도 맞게).
+  const ghost = useRef<HTMLElement>(null)
+  const placeCard = (rect: DOMRect) => {
+    const article = card.current
+    const frame = article?.closest<HTMLElement>('[data-dashboard-scroll]')?.parentElement?.getBoundingClientRect()
+    if (!article || !frame) return
+    article.style.setProperty('--from-top', `${rect.top - frame.top}px`)
+    article.style.setProperty('--from-left', `${rect.left - frame.left}px`)
+    article.style.setProperty('--from-w', `${rect.width}px`)
+    article.style.setProperty('--from-h', `${rect.height}px`)
+  }
+  const sheet = useSentenceSheet({
+    sentence: draft,
+    rootRef: box,
+    // 편집기처럼 머리 아래 판 전체를 덮는다. 카드째(바탕까지) 지금 자리에 먼저 띄우고 거기서 판 크기로 자란다.
+    measureHeight: () => {
+      const article = card.current
+      const scroller = article?.closest<HTMLElement>('[data-dashboard-scroll]')
+      const shell = scroller?.parentElement
+      if (!article || !scroller || !shell) return null
+      scroller.scrollTop = 0
+      const area = scroller.getBoundingClientRect()
+      article.style.setProperty('--head-h', `${article.querySelector('header')?.offsetHeight ?? 0}px`)
+      article.style.setProperty('--foot-h', `${article.querySelector('footer')?.offsetHeight ?? 0}px`)
+      article.style.setProperty('--area-top', `${area.top - shell.getBoundingClientRect().top}px`)
+      placeCard(article.getBoundingClientRect())
+      // 뜨는 순간(카드 자리 그대로)은 애니메이션 없이 박는다. 안 그러면 문장 칸 여백 · 돋보기가 0에서부터 움직여 한 번 튄다.
+      article.setAttribute('data-sheet-snap', '')
+      article.setAttribute('data-sheet-wrap', '')
+      void article.offsetHeight
+      article.removeAttribute('data-sheet-snap')
+      return Math.round(area.height)
+    },
+    onType: (value) => { setDraft(value); setSentence(value) },
+    onRoll: (next) => { setDraft(next); setSentence(next) },
+    onClear: () => setDraft(''),
+    // 빈 문장으로 닫으면 마지막 문장으로 돌아간다(편집기는 편집하던 글자를 남기는데, 대시보드엔 그 글자가 없다).
+    onClose: () => { if (!draft.trim()) setDraft(sentence) },
+  })
+  // 글자 폭은 편집기 문장 줄과 같은 계산: 한글은 그 글자 레이아웃의 몸통 폭(여백 뺀 만큼), 공백은 폰트 공백 폭을 몸통 비율로.
+  const choseong = useJamoStore((state) => state.choseong)
+  const jungseong = useJamoStore((state) => state.jungseong)
+  const jongseong = useJamoStore((state) => state.jongseong)
+  const globalPadding = useLayoutStore((state) => state.globalPadding)
+  const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
+  const metricsSpace = useCalibrationProjectStore((state) => state.metrics.spaceAdvance)
+  const spaceAdvance = `${Math.round(metricsSpace * hangulBodyWidth(globalPadding) / .85) / UPM}em`
+  const renderChar = (char: string, index: number) => {
+    if (!isHangul(char)) return <span key={index} className={/\s/u.test(char) ? editorStyles.spaceGlyph : editorStyles.punctuationGlyph} style={/\s/u.test(char) ? { inlineSize: spaceAdvance } : undefined} data-char-index={index} aria-label={/\s/u.test(char) ? '공백' : char}>{char}</span>
+    const padding = { ...globalPadding, ...paddingOverrides[decomposeSyllable(char, choseong, jungseong, jongseong).layoutType] }
+    // 그림은 1em 네모 그대로 두고 몸통만 보이게 왼쪽 여백만큼 당긴다(편집기 글자 칸과 같은 자리).
+    return <span key={index} className={styles.sentenceGlyph} style={{ inlineSize: `${Math.round(hangulBodyWidth(padding) * UPM) / UPM}em`, '--bearing': padding.left } as CSSProperties} data-char-index={index}><AppGlyph char={char} size={64} /></span>
+  }
+  const wrapped = sheet.open || sheet.closing
+  // 카드 문장은 늘 두 줄 높이. 넘치면 넘친 글자 앞에서 끊고 `…`(주사위를 눌러도 카드 높이가 안 바뀐다 — 09-29 사용자).
+  // 끊는 자리는 그려 보고 잰다: 두 줄 아래로 떨어진 첫 글자에서 한 칸 더 빼고, 그래도 넘치면 한 칸씩 더 뺀다.
+  const run = useRef<HTMLDivElement>(null)
+  const [runWidth, setRunWidth] = useState(0)
+  useEffect(() => {
+    const element = run.current
+    if (!element) return
+    const observer = new ResizeObserver(([entry]) => setRunWidth(Math.round(entry.contentRect.width)))
+    observer.observe(element)
+    return () => observer.disconnect()
+  // 주사위로 굴리면 글자 줄이 새로 붙는다(애니메이션 key).
+  }, [sheet.rolled, cardRolled])
+  const [cut, setCut] = useState<{ text: string; width: number; limit: number } | null>(null)
+  const limit = cut && cut.text === draft && cut.width === runWidth ? cut.limit : null
+  useLayoutEffect(() => {
+    const element = run.current
+    if (wrapped || !element) return
+    const bottom = element.getBoundingClientRect().top + SENTENCE_EM * 2 + SENTENCE_ROW_GAP + 1
+    const over = [...element.children].flatMap((child) => child.matches('[data-char-index], [data-ellipsis]') ? [child] : [...child.children])
+      .find((child) => child.getBoundingClientRect().bottom > bottom) as HTMLElement | undefined
+    if (!over) return
+    const next = limit ?? Number(over.dataset.charIndex ?? [...draft].length)
+    setCut({ text: draft, width: runWidth, limit: Math.max(0, next - 1) })
+  }, [wrapped, limit, draft, runWidth])
+  const closedRun = () => {
+    const shown = limit === null ? draft : [...draft].slice(0, limit).join('').trimEnd()
+    return [...tokenize(shown).map((token) => token.whitespace
+      ? [...token.text].map((char, at) => renderChar(char, token.start + at))
+      : <span key={`word-${token.start}`} className={editorStyles.wordRun}>{[...token.text].map((char, at) => renderChar(char, token.start + at))}</span>),
+    limit !== null && <span key="ellipsis" className={editorStyles.punctuationGlyph} data-ellipsis aria-hidden="true">…</span>]
+  }
+  // 접히기 시작하면 대역 카드 자리로 돌아간다.
+  useLayoutEffect(() => {
+    if (sheet.closing && ghost.current) placeCard(ghost.current.getBoundingClientRect())
+  }, [sheet.closing])
+  return <>
+  {wrapped && <article ref={ghost} className={`${styles.card} ${styles.cardGhost}`} aria-hidden="true" inert>
+    <header><strong>{name}</strong></header>
+    <section className={`${editorStyles.sentence} ${styleMode.strip} ${styles.sentence}`}>
+      <div className={`${editorStyles.sentenceRun} ${styleMode.run}`} style={{ fontSize: SENTENCE_EM }}>{closedRun()}</div>
+    </section>
+    <footer><span className={styles.ghostButton} /></footer>
+  </article>}
+  <article ref={card} className={styles.card} data-sheet={sheet.open || undefined} data-sheet-wrap={wrapped || undefined} style={{ '--sheet-h': `${sheet.height}px` } as CSSProperties}>
     <header>
-      <strong>{name}</strong><span>{note}</span>
+      <strong>{name}</strong>
     </header>
-    <p className={styles.sentence} aria-label={sentence}>
-      {sentence.split(' ').map((word, index) => <span key={index} className={styles.word}>
-        {[...word].map((char, at) => isHangul(char) ? <AppGlyph key={at} char={char} size={34} /> : <span key={at}>{char}</span>)}
-      </span>)}
-    </p>
+    {/* 주사위: 문장을 바꾸는 단추라 문장 바로 위(머리 줄 오른쪽). */}
+    <button type="button" className={styles.cardDice} aria-label="예시 문장 바꾸기" onClick={() => { setSentence(randomSampleSentence(sentence)); setCardRolled((count) => count + 1) }} data-testid="dashboard-sentence-roll"><Dices size={19} aria-hidden="true" /></button>
+    {/* 문장을 누르면 펼친다(돋보기 없이 — 09-29 사용자). 펼친 뒤 누르면 그 자리에 커서. */}
+    <section ref={box} className={`${editorStyles.sentence} ${styleMode.strip} ${styles.sentence}`} data-sheet={sheet.open || undefined} data-sheet-wrap={wrapped || undefined}
+      onClick={sheet.open ? sheet.pickCaret : wrapped ? undefined : () => sheet.openSheet()}
+      onKeyDown={wrapped ? undefined : (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); sheet.openSheet() } }}
+      role={wrapped ? undefined : 'button'} tabIndex={wrapped ? undefined : 0} aria-label={wrapped ? draft : `${draft} — 눌러서 크게 보기 · 바꾸기`} data-testid="dashboard-sentence">
+      {sheet.open && <div className={`${editorStyles.sentenceActions} ${styles.sheetClose}`}>
+        <button type="button" className={editorStyles.sentenceOpen} onClick={(event) => { event.stopPropagation(); sheet.closeSheet() }} aria-label="문장 접기" title="문장 접기" data-testid="dashboard-sentence-close"><X size={19} aria-hidden="true" /></button>
+      </div>}
+      <SentenceSheetControls sheet={sheet} />
+      <div ref={run} key={sheet.rolled + cardRolled} className={`${editorStyles.sentenceRun} ${styleMode.run} ${styles.sentenceText} ${sheet.rolled + cardRolled > 0 ? editorStyles.sentenceRolled : ''}`} style={{ fontSize: sheet.open ? sheet.em : SENTENCE_EM }}>
+        {sheet.open ? <SentenceSheetRun sheet={sheet} renderChar={renderChar} /> : closedRun()}
+      </div>
+    </section>
     {/* 추출은 폰트의 속성 — 워크스페이스 폰트 탭과 같은 버튼을 카드 안에. 화면 하단엔 두지 않는다. */}
     <footer>
-      <button type="button" className={`${styles.more} ${styles.roll}`} aria-label="예시 문장 바꾸기" onClick={() => setSentence(randomSampleSentence(sentence))}><Dices size={18} aria-hidden="true" /></button>
       <FontCardMenu label="더보기" name={name} onRename={onRename} onDuplicate={onDuplicate} onDelete={onDelete} />
       <FontCardDownload />
     </footer>
   </article>
+  </>
 }
 
 /**
@@ -334,6 +475,15 @@ function SectionHead({ title, count, hint, onClick, testId }: { title: string; c
     {hint && <em>{hint}</em>}
     <ChevronRight size={18} aria-hidden="true" />
   </button>
+}
+
+/** 스타일 칸 하나. 누르면 스타일 화면의 그 탭으로 — 값만 보여 주는 칸처럼 보이지 않게 값 옆에 `›`(09-29 베타 의견). */
+function StyleTile({ kind, label, value, panel = 'brush' }: { kind: 'weight' | 'slant' | 'roundness' | 'beak'; label: string; value: string; panel?: 'brush' | 'beak' }) {
+  return <li>
+    <button type="button" className={styles.tile} aria-label={`${label} ${value} 고치기`} onClick={() => navigate(`/workspace/font?panel=${panel}`)} data-testid={`dashboard-style-${kind}`}>
+      <span className={styles.picto}><StylePicto kind={kind} /></span><em>{label}</em><strong>{value}<ChevronRight className={styles.tileGo} size={13} strokeWidth={2.4} aria-hidden="true" /></strong>
+    </button>
+  </li>
 }
 
 type JamoType = 'choseong' | 'jungseong' | 'jongseong'
@@ -932,10 +1082,10 @@ export function DashboardLabPage() {
         <AccountButton />
       </header>
 
-      <div ref={scroller} className={styles.scroll} onScroll={onScroll} onWheel={unpin} onTouchStart={unpin} onPointerDown={unpin} onKeyDown={unpin} data-moving={fontList.movingTo !== null || undefined} aria-busy={fontList.movingTo !== null || undefined}>
+      <div ref={scroller} className={styles.scroll} data-dashboard-scroll onScroll={onScroll} onWheel={unpin} onTouchStart={unpin} onPointerDown={unpin} onKeyDown={unpin} data-moving={fontList.movingTo !== null || undefined} aria-busy={fontList.movingTo !== null || undefined}>
         {/* 지금 폰트 카드 하나. 다른 폰트는 머리 알약 시트에서. */}
         <div className={styles.fontCardRow}>
-          <FontCard name={name} note={modified > 0 ? '마지막 고침 · 오늘' : '마지막 고침 · 오늘 · 프리셋 그대로'} onRename={fontList.renameCurrent} onDuplicate={fontList.duplicateCurrent} onDelete={fontList.removeCurrent} />
+          <FontCard name={name} onRename={fontList.renameCurrent} onDuplicate={fontList.duplicateCurrent} onDelete={fontList.removeCurrent} />
         </div>
 
         <div className={styles.body}>
@@ -949,17 +1099,17 @@ export function DashboardLabPage() {
             <section ref={(el) => { sections.current.style = el }}>
               <SectionHead title="스타일" hint="이 폰트 전체" onClick={() => navigate('/workspace/font')} testId="dashboard-style" />
               <ul className={styles.tiles}>
-                <li><span className={styles.picto}><StylePicto kind="weight" /></span><em>굵기</em><strong>{style.weight}</strong></li>
-                <li><span className={styles.picto}><StylePicto kind="slant" /></span><em>기울기</em><strong>{style.slant}°</strong></li>
-                <li><span className={styles.picto}><StylePicto kind="roundness" /></span><em>둥글기</em><strong>{roundness}%</strong></li>
-                <li><span className={styles.picto}><StylePicto kind="beak" /></span><em>부리</em><strong>{style.stemBeak?.enabled ? '있음' : '없음'}</strong></li>
+                <StyleTile kind="weight" label="굵기" value={String(style.weight)} />
+                <StyleTile kind="slant" label="기울기" value={`${style.slant}°`} />
+                <StyleTile kind="roundness" label="둥글기" value={`${roundness}%`} />
+                <StyleTile kind="beak" label="부리" value={style.stemBeak?.enabled ? '있음' : '없음'} panel="beak" />
               </ul>
             </section>
 
             {/* 초·중·종은 요약 줄만. 전체 격자와 묶기는 섹션 홈으로 갔다. 레이아웃 6장은 여기서 바로 에디터로. */}
             <section ref={(el) => { sections.current.choseong = el }}>
               <SectionHead title="초성" count={CHOSEONG_LIST.length} onClick={() => navigate('/dashboard/choseong')} />
-              <JamoPreview type="choseong" chars={CHOSEONG_LIST} />
+              <JamoPreview type="choseong" chars={CHOSEONG_ORDER} />
             </section>
             <section ref={(el) => { sections.current.jungseong = el }}>
               <SectionHead title="중성" count={JUNGSEONG_LIST.length} onClick={() => navigate('/dashboard/jungseong')} />
@@ -991,7 +1141,7 @@ export function DashboardLabPage() {
   </main>
 }
 
-const JAMO_CHARS: Record<JamoType, readonly string[]> = { choseong: CHOSEONG_LIST, jungseong: JUNGSEONG_LIST, jongseong: FINALS }
+const JAMO_CHARS: Record<JamoType, readonly string[]> = { choseong: CHOSEONG_ORDER, jungseong: JUNGSEONG_LIST, jongseong: FINALS }
 
 /** 섹션 홈 주소(`/dashboard/<종류>`). 모르는 종류면 대시보드로 넘긴다. */
 export function JamoHomePage() {
