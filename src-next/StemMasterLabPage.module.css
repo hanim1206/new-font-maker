@@ -79,3 +79,15 @@
 .roleGroups .roleGroup { flex: 0 1 auto; min-width: 0; }
 .roleGroups .siblingGrid { display: flex; flex-wrap: wrap; gap: 10px; }
 .roleGroups .sibling { width: 168px; }
+/* 오른쪽이 카드 3열(3 × 168 + 간격)을 담는 한 옆에 둔다. 왼쪽 캔버스가 먼저 줄어든다. */
+.workspace { grid-template-columns: minmax(300px, 560px) minmax(528px, 1fr); }
+.workspace .canvases { flex-wrap: nowrap; }
+.workspace .canvas { flex: 1 1 0; min-width: 0; }
+@media (max-width: 1100px) { .workspace { grid-template-columns: minmax(300px, 560px) minmax(528px, 1fr); } .workspace .editor { position: sticky; } }
+@media (max-width: 920px) { .workspace { grid-template-columns: minmax(0, 1fr); } .workspace .editor { position: static; } }
+/* 왼쪽이 좁으면 캔버스 둘을 위아래로 쌓아 폭을 다 쓴다. */
+.workspace .canvases { flex-wrap: wrap; }
+.workspace .canvas { flex: 1 1 240px; }
+/* 따라 내려오는 왼쪽이 화면보다 길면 그 안에서 스크롤한다(아래 버튼이 가려지지 않게). */
+.workspace .editor { max-height: calc(100dvh - 32px); overflow-y: auto; }
+@media (max-width: 920px) { .workspace .editor { max-height: none; overflow: visible; } }
