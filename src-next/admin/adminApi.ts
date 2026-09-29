@@ -6,6 +6,8 @@ export const BETA_INVITE_API = '/api/beta-invites'
 export const FEEDBACK_API = '/api/feedback'
 /** 하우스 레이아웃 파일 저장(`scripts/housePresetApi.ts`). */
 export const HOUSE_PRESET_API = '/api/house-preset'
+/** 공지 만들기 · 게시(`scripts/announcementAdminApi.ts`). */
+export const ANNOUNCEMENT_API = '/api/announcements'
 const HEADER = 'x-beta-admin'
 
 export class AdminApiError extends Error {
@@ -20,6 +22,14 @@ export async function adminCall<T>(api: string, method: 'GET' | 'POST' | 'PATCH'
   const response = await fetch(api, payload === undefined
     ? { method, headers: { [HEADER]: '1' } }
     : { method, headers: { [HEADER]: '1', 'content-type': 'application/json' }, body: JSON.stringify(payload) })
+  const body = await response.json().catch(() => ({ error: `서버가 ${response.status}로 답했습니다.` }))
+  if (!response.ok) throw new AdminApiError(body.error ?? '실패했습니다.', body)
+  return body as T
+}
+
+/** 파일 하나를 본문 그대로 올린다(JSON이 아니다). 공지 이미지 → `{ url }`. */
+export async function adminUpload<T>(api: string, file: File): Promise<T> {
+  const response = await fetch(api, { method: 'POST', headers: { [HEADER]: '1', 'content-type': file.type }, body: file })
   const body = await response.json().catch(() => ({ error: `서버가 ${response.status}로 답했습니다.` }))
   if (!response.ok) throw new AdminApiError(body.error ?? '실패했습니다.', body)
   return body as T

@@ -7,6 +7,7 @@ describe('관리자 주소 → 메뉴', () => {
     expect(sectionOf('/admin/accounts')).toBe('accounts')
     expect(sectionOf('/admin/feedback')).toBe('feedback')
     expect(sectionOf('/admin/triage/')).toBe('triage')
+    expect(sectionOf('/admin/announcements')).toBe('announcements')
   })
   it('옛 초대 주소 · 모르는 메뉴는 계정', () => {
     expect(sectionOf('/admin/invite')).toBe('accounts')

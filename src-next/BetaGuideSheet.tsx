@@ -1,6 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import styles from './BetaGuideSheet.module.css'
+import { SlideSheet } from './SlideSheet'
 
 /** 화면 그림은 `public/beta-guide/`의 실제 앱 캡처(390×520, 2배). 화면이 바뀌면 다시 찍는다. */
 const STEPS: { image: string; title: string; body: string; bottom?: true }[] = [
@@ -14,69 +12,12 @@ const STEPS: { image: string; title: string; body: string; bottom?: true }[] = [
 
 const imageSrc = (name: string) => `/beta-guide/${name}.jpg`
 
-/** 옆으로 이만큼 넘게 밀면 다음 · 이전 장. */
-const SWIPE_PX = 40
+const SLIDES = STEPS.map(({ image, title, body, bottom }) => ({ image: imageSrc(image), title, body, bottom, alt: `${title} 화면` }))
 
 /**
  * 처음 들어온 베타 테스터 안내. 대시보드 위에 아래 판으로 뜨고, 섹션마다 실제 화면 한 장 + 설명 두 줄.
- * 판 밖을 눌러도 안 닫힌다(실수로 넘기지 않게) — 첫 장 `건너뛰기`, 마지막 장 `시작하기`, Esc로만 닫는다.
- * `×`는 두지 않는다 — 캡처 속 머리 단추와 겹쳐 앱 단추처럼 보였다.
+ * 넘김 · 닫기 규칙은 공지와 같은 판(`SlideSheet`) — 첫 장 `건너뛰기`, 마지막 장 `시작하기`, Esc로만 닫는다.
  */
 export function BetaGuideSheet({ onClose }: { onClose: () => void }) {
-  const [index, setIndex] = useState(0)
-  const [closing, setClosing] = useState(false)
-  const swipeFrom = useRef<number | null>(null)
-  const last = index === STEPS.length - 1
-  const step = STEPS[index]
-
-  const close = () => {
-    if (closing) return
-    setClosing(true)
-    window.setTimeout(onClose, 240)
-  }
-  const move = (delta: number) => setIndex((value) => Math.min(STEPS.length - 1, Math.max(0, value + delta)))
-
-  // 넘길 때 그림이 늦게 뜨지 않게 다 미리 받아 둔다.
-  useEffect(() => { for (const { image } of STEPS) new Image().src = imageSrc(image) }, [])
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') close()
-      else if (event.key === 'ArrowRight') move(1)
-      else if (event.key === 'ArrowLeft') move(-1)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  })
-
-  return createPortal(<div className={styles.layer} data-closing={closing || undefined}>
-    <div className={styles.sheet} role="dialog" aria-modal="true" aria-label="한글 폰트 메이커 둘러보기" data-testid="beta-guide">
-      <div
-        className={styles.frame}
-        onPointerDown={(event) => { swipeFrom.current = event.clientX }}
-        onPointerUp={(event) => {
-          const from = swipeFrom.current
-          swipeFrom.current = null
-          if (from === null) return
-          const dx = event.clientX - from
-          if (Math.abs(dx) >= SWIPE_PX) move(dx < 0 ? 1 : -1)
-        }}
-        onPointerCancel={() => { swipeFrom.current = null }}
-      >
-        <img key={step.image} data-bottom={step.bottom} src={imageSrc(step.image)} alt={`${step.title} 화면`} draggable={false} />
-      </div>
-      <div className={styles.dots} aria-hidden="true">
-        {STEPS.map(({ image }, order) => <span key={image} data-on={order === index || undefined} />)}
-      </div>
-      <div key={index} className={styles.text} aria-live="polite">
-        <h3>{step.title}</h3>
-        <p>{step.body}</p>
-      </div>
-      <div className={styles.actions}>
-        {index === 0
-          ? <button type="button" onClick={close} data-testid="beta-guide-skip">건너뛰기</button>
-          : <button type="button" onClick={() => move(-1)} data-testid="beta-guide-prev">이전</button>}
-        <button type="button" data-primary onClick={() => last ? close() : move(1)} data-testid="beta-guide-next">{last ? '시작하기' : '다음'}</button>
-      </div>
-    </div>
-  </div>, document.body)
+  return <SlideSheet slides={SLIDES} label="한글 폰트 메이커 둘러보기" testId="beta-guide" firstLabel="건너뛰기" lastLabel="시작하기" onClose={onClose} />
 }

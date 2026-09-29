@@ -10,6 +10,7 @@ import { AccountsPage } from './AccountsPage'
 import { INITIAL_ACCOUNTS_VIEW } from './accountFilter'
 import type { AccountsView } from './accountFilter'
 import { AdminFeedback } from './AdminFeedback'
+import { AnnouncementsPage } from './AnnouncementsPage'
 import { ADMIN_PATH, SECTIONS, accountOf, accountPathOf, canonicalPathOf, labOf, labPathOf, sectionOf } from './adminSections'
 import type { Section } from './adminSections'
 import { LABS } from '../labCatalog'
@@ -156,6 +157,7 @@ export function AdminApp() {
         </Suspense>}
         <AdminFeedback hidden={section !== 'feedback'} onPending={setPending} />
         {section === 'triage' && <TriagePage />}
+        {section === 'announcements' && <AnnouncementsPage />}
         {section === 'preset' && <Suspense fallback={<p className="text-sm text-text-dim-4">불러오는 중…</p>}><PresetPage /></Suspense>}
         {section === 'labs' && !lab && <LabsList onOpen={openLab} />}
         {section === 'labs' && lab && <LabFrame lab={lab} />}

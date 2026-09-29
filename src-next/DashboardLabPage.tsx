@@ -28,6 +28,7 @@ import { ExportNoticeToast } from './workspace/WorkspaceChrome'
 import { PART_COLOR } from './partColors'
 import { randomSampleSentence } from './sampleSentences'
 import { ReportButton } from './ReportButton'
+import { AnnouncementSpot } from './AnnouncementSpot'
 import { BetaGuideSheet } from './BetaGuideSheet'
 import { markBetaGuideSeen, shouldShowBetaGuide } from './betaGuide'
 import styles from './DashboardLabPage.module.css'
@@ -983,6 +984,8 @@ export function DashboardLabPage() {
         </div>
       </div>
       {guide && <BetaGuideSheet onClose={closeGuide} />}
+      {/* 둘러보기가 먼저. 닫은 뒤에 공지. */}
+      <AnnouncementSpot place="dashboard" paused={guide} />
       {sheet !== 'closed' && <FontSheet list={fontList} modified={modified} top={head.current?.offsetHeight ?? 50} closing={sheet === 'closing'} onClose={closeSheet} onClosed={() => setSheet('closed')} />}
     </div>
   </main>
