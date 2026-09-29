@@ -37,6 +37,7 @@
 .siblingGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 12px; }
 .sibling { min-width: 0; padding: 12px; border: 1px solid rgb(var(--color-border-subtle)); border-radius: 14px; background: white; }
 .sibling[data-follow='false'] { border-color: #f59f00; }
+.sibling[data-follow='false'][data-picked='true'] { border-color: #f59f00; }
 .sibling[data-follow='blocked'] { opacity: .6; }
 .sibling li strong[data-follow='blocked'] { color: rgb(var(--color-text-4)); }
 .sibling h3 { font-size: 18px; }
@@ -49,3 +50,17 @@
 .sibling li strong { color: #2b8a3e; font-weight: 800; }
 .sibling li strong[data-follow='false'] { color: #e67700; }
 .sibling li button { margin-left: auto; min-height: 24px; padding: 0 8px; border: 1px solid rgb(var(--color-border)); border-radius: 999px; background: white; font-size: 11px; font-weight: 750; }
+
+/* 갈래 묶음 — 도마 고르기처럼 머리(체크)나 카드를 누르면 그 갈래를 고르거나 뺀다. 안 고른 갈래는 잉크가 흐리다. */
+.roleGroup { margin-top: 18px; }
+.roleHead { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 4px; border: 0; background: transparent; color: rgb(var(--color-foreground)); font-size: 15px; font-weight: 800; }
+.roleHead small { color: rgb(var(--color-text-4)); font-size: 12px; font-weight: 700; }
+.roleHead em { padding: 1px 7px; border-radius: 999px; background: #fff4e6; color: #d9480f; font-size: 11px; font-style: normal; font-weight: 800; }
+.check { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 999px; background: rgb(var(--color-surface-3)); color: white; font-size: 12px; transition: background-color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
+.roleHead[aria-checked='true'] .check { background: rgb(var(--color-foreground)); }
+.roleHead:active .check { transform: scale(.9); }
+.roleGroup .siblingGrid { margin-top: 6px; }
+.siblingPick { display: block; width: 100%; padding: 0; border: 0; background: transparent; text-align: left; }
+.sibling[data-picked='true'] { border-color: rgb(var(--color-foreground)); }
+.sibling[data-picked='false'] .siblingGlyphs svg { opacity: .25; }
+.siblingGlyphs svg { transition: opacity var(--motion-fast) var(--ease-standard); }

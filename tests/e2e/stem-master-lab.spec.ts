@@ -4,7 +4,7 @@ test.describe('홀자 줄기 마스터 랩', () => {
   test('기둥 마스터의 핸들을 끌면 형제 기둥이 전부 휘고, 곧게 하면 돌아온다', async ({ page }) => {
     await page.goto('/stem-master-lab')
     await expect(page.getByTestId('stem-master-lab')).toBeVisible()
-    const siblings = page.getByTestId('siblings')
+    const siblings = page.getByTestId('siblings').locator('[data-role="gidung"]')
     await expect(siblings.locator('article[data-char="ㅏ"]')).toHaveAttribute('data-curved', 'false')
     await expect(siblings.locator('article[data-char="ㅘ"]')).toHaveAttribute('data-follow', 'true')
     await expect(siblings.locator('article[data-char="ㅣ"]')).toHaveAttribute('data-follow', 'true')
@@ -26,14 +26,13 @@ test.describe('홀자 줄기 마스터 랩', () => {
 
     for (const char of ['ㅣ', 'ㅚ', 'ㅢ']) await expect(siblings.locator(`article[data-char="${char}"]`), char).toHaveAttribute('data-curved', 'true')
 
-    await page.getByRole('button', { name: '곧게' }).click()
+    await page.getByRole('button', { name: '고른 갈래 곧게' }).click()
     await expect(siblings.locator('article[data-char="ㅏ"]')).toHaveAttribute('data-curved', 'false')
     await expect(canvas.getByTestId('master-stroke')).toHaveAttribute('data-curved', 'false')
   })
 
   test('G1: 안쪽 기둥은 따로 그리면 갈라지고, 자소 편집에서 점 하나를 만진 획은 풀려서 남으며, 다시 따르기로 붙는다', async ({ page }) => {
     await page.goto('/stem-master-lab')
-    const siblings = page.getByTestId('siblings')
     const bend = async (dx: number) => {
       const handle = page.getByTestId('master-canvas-open').getByTestId('master-handle-handleOut')
       const box = (await handle.boundingBox())!
@@ -42,18 +41,25 @@ test.describe('홀자 줄기 마스터 랩', () => {
       await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2, { steps: 6 })
       await page.mouse.up()
     }
-    // 기둥을 휘면 ㅐ의 안쪽 기둥도 같이 휜다(따로 그리기 전).
+    // 기둥을 휘면(갈래 둘 다 고른 채) ㅐ의 안쪽 기둥도 같이 휜다.
     await bend(30)
-    await page.getByRole('radio', { name: /기둥\.안쪽/ }).click()
-    const ae = siblings.locator('article[data-char="ㅐ"]')
-    await expect(ae).toHaveAttribute('data-curved', 'true')
-    await expect(ae).toHaveAttribute('data-follow', 'true')
-    // 안쪽 기둥을 따로(반대로) 그리면 갈라진다 — 기둥 쪽 ㅐ-3은 그대로 따른다.
+    const inner = page.getByTestId('siblings').locator('[data-role="gidung.inner"] article[data-char="ㅐ"]')
+    const outer = page.getByTestId('siblings').locator('[data-role="gidung"] article[data-char="ㅐ"]')
+    await expect(inner).toHaveAttribute('data-curved', 'true')
+    await expect(inner).toHaveAttribute('data-follow', 'true')
+    // 바깥 기둥 갈래를 빼면 바깥은 기본 획(곧게)으로, 안쪽은 휜 채 남는다. 안쪽만 반대로 그리면 갈라진다.
+    await page.getByRole('checkbox', { name: /기둥\.바깥/ }).click()
+    await expect(outer).toHaveAttribute('data-picked', 'false')
+    await expect(outer).toHaveAttribute('data-curved', 'false')
+    await expect(inner).toHaveAttribute('data-curved', 'true')
     await bend(-40)
-    await expect(ae).toHaveAttribute('data-follow', 'true')
-    await expect(page.getByRole('button', { name: '기둥을 따르게' })).toBeEnabled()
-    await page.getByRole('radio', { name: /^기둥( ●)?$/ }).click()
-    await expect(siblings.locator('article[data-char="ㅐ"]')).toHaveAttribute('data-follow', 'true')
+    await expect(inner).toHaveAttribute('data-follow', 'true')
+    await expect(outer).toHaveAttribute('data-follow', 'true')
+    await expect(outer).toHaveAttribute('data-curved', 'false')
+    // 카드를 눌러 다시 고르면 지금 모양이 바깥에도 적용된다.
+    await outer.getByRole('button', { name: /고르기/ }).click()
+    await expect(outer).toHaveAttribute('data-picked', 'true')
+    await expect(outer).toHaveAttribute('data-curved', 'true')
 
     // 자소 편집(아 · 중성)에서 ㅏ-1 기둥의 점 하나만 옮긴다 → 풀림. 획을 통째로 옮기면 끝점과 핸들이 같이 가서 여전히 따름이다.
     await page.goto('/workspace/jamo?char=%EC%95%84&mode=stroke&part=JU')
@@ -78,14 +84,40 @@ test.describe('홀자 줄기 마스터 랩', () => {
     await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
 
     await page.goto('/stem-master-lab')
-    const a = page.getByTestId('siblings').locator('article[data-char="ㅏ"]')
+    const a = page.getByTestId('siblings').locator('[data-role="gidung"] article[data-char="ㅏ"]')
     await expect(a).toHaveAttribute('data-follow', 'false')
-    await expect(page.getByTestId('siblings').locator('article[data-char="ㅕ"]')).toHaveAttribute('data-follow', 'true')
+    await expect(page.getByTestId('siblings').locator('[data-role="gidung"] article[data-char="ㅕ"]')).toHaveAttribute('data-follow', 'true')
     // 마스터를 다시 바꿔도 풀린 ㅏ는 그대로고, 형제는 따라간다.
     await bend(-10)
     await expect(a).toHaveAttribute('data-follow', 'false')
-    await expect(page.getByTestId('siblings').locator('article[data-char="ㅕ"]')).toHaveAttribute('data-follow', 'true')
+    await expect(page.getByTestId('siblings').locator('[data-role="gidung"] article[data-char="ㅕ"]')).toHaveAttribute('data-follow', 'true')
     await a.getByRole('button', { name: '다시 따르기' }).click()
     await expect(a).toHaveAttribute('data-follow', 'true')
+  })
+
+  test('보는 갈래 여섯으로 나뉘고, 보.솟음만 고르고 그리면 ㅗ ㅛ의 보만 휜다', async ({ page }) => {
+    await page.goto('/stem-master-lab')
+    await page.getByTestId('reset-all').click()
+    await page.getByRole('radio', { name: /^보/ }).click()
+    const groups = page.getByTestId('siblings').locator('[data-role]')
+    await expect(groups).toHaveCount(6)
+    for (const role of ['bo.up.mixed', 'bo.down', 'bo.down.mixed', 'bo.none', 'bo.none.mixed']) await page.locator(`[data-role="${role}"] [role="checkbox"]`).click()
+    const handle = page.getByTestId('master-canvas-open').getByTestId('master-handle-handleOut')
+    await handle.scrollIntoViewIfNeeded()
+    const box = (await handle.boundingBox())!
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 30, { steps: 6 })
+    await page.mouse.up()
+    for (const char of ['ㅗ', 'ㅛ']) await expect(page.locator(`[data-role="bo.up"] article[data-char="${char}"]`), char).toHaveAttribute('data-curved', 'true')
+    for (const [role, char] of [['bo.up.mixed', 'ㅘ'], ['bo.down', 'ㅜ'], ['bo.none', 'ㅡ']]) await expect(page.locator(`[data-role="${role}"] article[data-char="${char}"]`), char).toHaveAttribute('data-curved', 'false')
+    // 체크하면 지금 모양이 그 갈래에 적용되고, 해제하면 기본 획(곧게)으로 돌아간다.
+    const hanging = page.locator('[data-role="bo.down"] article[data-char="ㅜ"]')
+    await page.locator('[data-role="bo.down"] [role="checkbox"]').click()
+    await expect(hanging).toHaveAttribute('data-curved', 'true')
+    await page.locator('[data-role="bo.down"] [role="checkbox"]').click()
+    await expect(hanging).toHaveAttribute('data-curved', 'false')
+    await expect(page.locator('[data-role="bo.up"] article[data-char="ㅗ"]')).toHaveAttribute('data-curved', 'true')
+    await page.getByTestId('reset-all').click()
   })
 })

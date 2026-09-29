@@ -3,11 +3,16 @@ import { JUNGSEONG_LIST } from '../src/data/Hangul'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { useStemMasterStore } from '../src/stores/stemMasterStore'
 import {
+  axisReversed,
   boundStrokesOf,
   instanceOf,
   isStraight,
+  isUnder,
   masterOf,
   medialBoxEmOf,
+  reverseStroke,
+  stemReferenceBox,
+  straightMaster,
   STEM_MASTER_LABEL,
   STEM_MASTER_NAMES,
   STEM_MASTER_SAMPLE,
@@ -89,9 +94,11 @@ function MasterCanvas({ name, final, draft, onDraft, onCommit }: {
   const jamo = useJamoStore((state) => state.jungseong[sample.char])
   const masters = useStemMasterStore((state) => state.masters)
   const channel = channelOfStroke(sample.strokeId, jamo)
-  const box = medialBoxEmOf(sample.char, channel, final)
   const strokes = jamo[channel] ?? []
-  const target = strokes.find((stroke) => stroke.id === sample.strokeId)
+  const stored = strokes.find((stroke) => stroke.id === sample.strokeId)
+  // 짧은기둥은 보에 닿는 끝 → 빈 끝이 축이다. 캔버스도 그 방향으로 놓아 마스터의 시작 핸들이 닿는 끝 쪽에 온다.
+  const target = stored && axisReversed(jamo, strokes, stored) ? reverseStroke(stored) : stored
+  const box = stored ? stemReferenceBox(sample.char, channel, stored, final) : medialBoxEmOf(sample.char, channel, final)
   const master = draft ?? masterOf(masters, name)
   const svgRef = useRef<SVGSVGElement>(null)
   const dragging = useRef<Handle | null>(null)
@@ -174,32 +181,40 @@ function MasterCanvas({ name, final, draft, onDraft, onCommit }: {
 /** 캔버스의 `.target`과 같은 색. */
 const ACTIVE_STROKE_COLOR = '#d9480f'
 
-/** 형제 카드 하나. 대표 글자 둘(받침 없음 · 있음)과 이 마스터에 귀속된 획의 따름 여부. */
-function SiblingCard({ char, name }: { char: string; name: StemMasterName }) {
+/** 위 탭은 줄기 이름. 갈래(역할)는 아래 형제 묶음에서 고른다. */
+const BASES: readonly StemMasterName[] = ['gidung', 'gyeotjulgi', 'jjalbeungidung', 'bo', 'geolchim']
+
+/** 갈래 묶음 머리 이름. 줄기 이름 그대로인 갈래(기둥의 바깥 기둥)는 따로 부른다. */
+const ROLE_LABEL: Partial<Record<StemMasterName, string>> = { gidung: '기둥.바깥' }
+const roleLabel = (role: StemMasterName) => ROLE_LABEL[role] ?? STEM_MASTER_LABEL[role]
+
+/** 형제 카드 하나. 대표 글자 둘(받침 없음 · 있음)과 이 갈래에 귀속된 획의 따름 여부. 글자를 누르면 이 갈래를 고르거나 뺀다. */
+function SiblingCard({ char, role, picked, onToggle }: { char: string; role: StemMasterName; picked: boolean; onToggle: () => void }) {
   const jamo = useJamoStore((state) => state.jungseong[char])
   const masters = useStemMasterStore((state) => state.masters)
   const refollow = useStemMasterStore((state) => state.refollow)
-  const bound = boundStrokesOf(jamo, masters).filter((item) => item.name === name)
+  const bound = boundStrokesOf(jamo, masters).filter((item) => item.name === role)
   if (bound.length === 0) return null
-  const blocked = bound.every((item) => item.blocked)
-  const follows = !blocked && bound.every((item) => item.follows || item.blocked)
+  const follows = bound.every((item) => item.follows)
   const curved = bound.some((item) => item.stroke.points.some((point) => point.handleIn || point.handleOut))
-  // 지금 고른 줄기를 캔버스와 같은 색으로.
+  // 고른 갈래의 줄기만 캔버스와 같은 색으로.
   const activeIds = new Set(bound.map((item) => item.stroke.id))
-  const activeColor = (source: ResolvedStrokeInkSource) => source.jamoId === char && activeIds.has(source.strokeId) ? ACTIVE_STROKE_COLOR : undefined
+  const activeColor = (source: ResolvedStrokeInkSource) => picked && source.jamoId === char && activeIds.has(source.strokeId) ? ACTIVE_STROKE_COLOR : undefined
   return (
-    <article className={styles.sibling} data-char={char} data-follow={blocked ? 'blocked' : follows} data-curved={curved}>
-      <h3>{char}</h3>
-      <div className={styles.siblingGlyphs}>
-        {FINALS.map((final) => <AppGlyph key={final.id} char={sampleSyllable(char, final.id)} size={72} strokeColorOf={activeColor} />)}
-      </div>
+    <article className={styles.sibling} data-char={char} data-follow={follows} data-curved={curved} data-picked={picked}>
+      <button type="button" className={styles.siblingPick} aria-pressed={picked} aria-label={`${char} ${roleLabel(role)} ${picked ? '빼기' : '고르기'}`} onClick={onToggle}>
+        <h3>{char}</h3>
+        <span className={styles.siblingGlyphs}>
+          {FINALS.map((final) => <AppGlyph key={final.id} char={sampleSyllable(char, final.id)} size={72} strokeColorOf={activeColor} />)}
+        </span>
+      </button>
       <ul>
         {bound.map((item) => (
           <li key={item.stroke.id}>
             <code>{item.stroke.id}</code>
             {CHANNEL_LABEL[item.channel] && <small>{CHANNEL_LABEL[item.channel]}</small>}
-            <strong data-follow={item.blocked ? 'blocked' : item.follows}>{item.blocked ? '제외 · 상자 두께 0' : item.follows ? '따름' : '풀림'}</strong>
-            {!item.follows && !item.blocked && <button type="button" onClick={() => refollow(char, item.channel, item.stroke.id)}>다시 따르기</button>}
+            <strong data-follow={item.follows}>{item.follows ? '따름' : '풀림'}</strong>
+            {!item.follows && <button type="button" onClick={() => refollow(char, item.channel, item.stroke.id)}>다시 따르기</button>}
           </li>
         ))}
       </ul>
@@ -207,36 +222,77 @@ function SiblingCard({ char, name }: { char: string; name: StemMasterName }) {
   )
 }
 
+/**
+ * 고른 갈래에만 마스터를 쓴다. 쓰는 갈래 아래에 안 고른 갈래가 부모를 따르고 있으면(예: 바깥 기둥만 고르면 안쪽 기둥) 먼저 지금 모양으로 굳혀 같이 안 움직이게 한다.
+ */
+function writeRoles(roles: readonly StemMasterName[], picked: readonly StemMasterName[], shape: StemMaster) {
+  const store = useStemMasterStore.getState()
+  for (const role of picked) {
+    for (const child of roles) {
+      if (child !== role && !picked.includes(child) && isUnder(child, role) && !useStemMasterStore.getState().masters[child]) {
+        store.setMaster({ ...masterOf(useStemMasterStore.getState().masters, child), name: child })
+      }
+    }
+    store.setMaster({ ...shape, name: role })
+  }
+}
+
 export function StemMasterLabPage() {
-  const [name, setName] = useState<StemMasterName>('gidung')
+  const [base, setBase] = useState<StemMasterName>('gidung')
+  const [unpicked, setUnpicked] = useState<ReadonlySet<StemMasterName>>(new Set())
   const [draft, setDraft] = useState<StemMaster | null>(null)
   const masters = useStemMasterStore((state) => state.masters)
-  const setMaster = useStemMasterStore((state) => state.setMaster)
-  const resetMaster = useStemMasterStore((state) => state.resetMaster)
   const jungseong = useJamoStore((state) => state.jungseong)
-  const master = masterOf(masters, name)
-  const siblings = useMemo(
-    () => JUNGSEONG_LIST.filter((char) => jungseong[char] && boundStrokesOf(jungseong[char], masters).some((item) => item.name === name)),
-    [jungseong, masters, name],
-  )
-  const own = Boolean(masters[name])
   const refollowAll = useStemMasterStore((state) => state.refollowAll)
   const resetAll = useStemMasterStore((state) => state.resetAll)
+  /** 이 줄기의 갈래와 갈래마다 형제 홀자. 획이 실제로 있는 갈래만. */
+  const groups = useMemo(() => {
+    const byRole = new Map<StemMasterName, string[]>()
+    for (const char of JUNGSEONG_LIST) {
+      if (!jungseong[char]) continue
+      for (const item of boundStrokesOf(jungseong[char], masters)) {
+        if (!isUnder(item.name, base)) continue
+        const chars = byRole.get(item.name) ?? []
+        if (!chars.includes(char)) chars.push(char)
+        byRole.set(item.name, chars)
+      }
+    }
+    return STEM_MASTER_NAMES.filter((role) => byRole.has(role)).map((role) => ({ role, chars: byRole.get(role)! }))
+  }, [jungseong, masters, base])
+  const roles = groups.map((group) => group.role)
+  const picked = roles.filter((role) => !unpicked.has(role))
+  const primary = picked[0] ?? roles[0] ?? base
+  const master = masterOf(masters, primary)
   const released = useMemo(
-    () => JUNGSEONG_LIST.reduce((sum, char) => sum + (jungseong[char] ? boundStrokesOf(jungseong[char], masters).filter((item) => item.name === name && !item.follows).length : 0), 0),
-    [jungseong, masters, name],
+    () => JUNGSEONG_LIST.reduce((sum, char) => sum + (jungseong[char] ? boundStrokesOf(jungseong[char], masters).filter((item) => picked.includes(item.name) && !item.follows).length : 0), 0),
+    [jungseong, masters, picked],
   )
+  // 체크 = 지금 그린 모양을 그 갈래에 적용, 해제 = 그 갈래는 기본 획(곧게)으로 돌아간다. 하나는 늘 고른 채로 둔다.
+  const toggle = (role: StemMasterName) => {
+    const turningOff = !unpicked.has(role)
+    if (turningOff && picked.length === 1) return
+    setDraft(null)
+    const shape = masterOf(useStemMasterStore.getState().masters, primary)
+    writeRoles(roles, [role], turningOff ? straightMaster(role) : shape)
+    setUnpicked((current) => {
+      const next = new Set(current)
+      if (turningOff) next.add(role)
+      else next.delete(role)
+      return next
+    })
+  }
+  const allStraight = picked.every((role) => isStraight(masterOf(masters, role)))
 
   return (
     <main className={styles.page} data-testid="stem-master-lab">
       <header className={styles.hero}>
         <span>Stem Master Lab</span>
         <h1>홀자 줄기 마스터</h1>
-        <p>줄기를 한 곳에서 그리면 같은 이름의 형제 획이 전부 따라온다. 핸들 둘을 끌어 휘게 그린다. 상자가 두께 0인 채널(ㅣ · ㅡ, ㅚ ㅟ ㅢ의 세로부)은 휠 방향만 ㅏ 칸 폭 · ㅗ 칸 높이를 빌려 휜다. <strong>여기서 그리면 진짜 자모 획이 바뀐다</strong> — 문장 줄 · 카드 · OTF에도 나온다. 자소 편집에서 획을 만지면 그 획만 풀린다.</p>
-        <div className={styles.names} role="radiogroup" aria-label="마스터">
-          {STEM_MASTER_NAMES.map((item) => (
-            <button key={item} type="button" role="radio" aria-checked={name === item} data-master={item} onClick={() => { setDraft(null); setName(item) }}>
-              {STEM_MASTER_LABEL[item]}{masters[item] && !isStraight(masters[item]!) ? ' ●' : ''}
+        <p>줄기를 한 곳에서 그리면 같은 이름의 형제 획이 따라온다. 핸들 둘을 끌어 휘게 그린다. 같은 줄기라도 역할이 다른 갈래(솟는 짧은기둥 · 내리는 짧은기둥, 섞임홀자의 보 등)는 아래 형제 묶음에서 골라 그 갈래에만 반영한다. <strong>여기서 그리면 진짜 자모 획이 바뀐다</strong> — 문장 줄 · 카드 · OTF에도 나온다. 자소 편집에서 획을 만지면 그 획만 풀린다.</p>
+        <div className={styles.names} role="radiogroup" aria-label="줄기">
+          {BASES.map((item) => (
+            <button key={item} type="button" role="radio" aria-checked={base === item} data-master={item} onClick={() => { setDraft(null); setUnpicked(new Set()); setBase(item) }}>
+              {STEM_MASTER_LABEL[item]}{STEM_MASTER_NAMES.some((name) => isUnder(name, item) && masters[name] && !isStraight(masters[name]!)) ? ' ●' : ''}
             </button>
           ))}
         </div>
@@ -245,25 +301,39 @@ export function StemMasterLabPage() {
 
       <section className={styles.editor} aria-label="마스터 편집">
         <div className={styles.canvases}>
-          {FINALS.map((final) => <MasterCanvas key={`${name}-${final.id}`} name={name} final={final.id} draft={draft} onDraft={setDraft} onCommit={setMaster} />)}
+          {FINALS.map((final) => <MasterCanvas key={`${primary}-${final.id}`} name={primary} final={final.id} draft={draft} onDraft={setDraft} onCommit={(shape) => writeRoles(roles, picked, shape)} />)}
         </div>
         <aside className={styles.side}>
-          <h2>{STEM_MASTER_LABEL[name]}</h2>
-          <p>{name === 'gidung.inner' && !own ? '따로 그리지 않아 기둥을 따르고 있다. 핸들을 끌면 갈라진다.' : isStraight(master) ? '곧다 — 프리셋 그대로.' : '휘어 있다.'}</p>
+          <h2>{picked.length === roles.length ? `${STEM_MASTER_LABEL[base]} 전부` : picked.map(roleLabel).join(' · ')}</h2>
+          <p>{picked.length === roles.length ? '갈래를 다 골랐다 — 그리면 전부 같이 바뀐다.' : `고른 갈래 ${picked.length}개에만 반영한다. 캔버스는 ${roleLabel(primary)}.`}</p>
           <dl>
             {master.points.map((point, index) => (
               <div key={index}><dt>{index === 0 ? '시작' : '끝'}</dt><dd>{point.handleOut ? `→ t ${point.handleOut.t.toFixed(2)} · o ${point.handleOut.o.toFixed(3)}` : point.handleIn ? `← t ${point.handleIn.t.toFixed(2)} · o ${point.handleIn.o.toFixed(3)}` : '핸들 없음'}</dd></div>
             ))}
           </dl>
-          <button type="button" className={styles.reset} disabled={!own} onClick={() => resetMaster(name)}>{name === 'gidung.inner' ? '기둥을 따르게' : '곧게'}</button>
+          <button type="button" className={styles.reset} disabled={allStraight} onClick={() => writeRoles(roles, picked, straightMaster(primary))}>고른 갈래 곧게</button>
         </aside>
       </section>
 
       <section className={styles.siblings} aria-label="형제">
-        <h2>형제 <small>{siblings.length}</small></h2>
-        {released > 0 && <button type="button" data-testid="refollow-all" onClick={() => refollowAll(name)}>풀린 획 {released}개 모두 다시 따르기</button>}
-        <div className={styles.siblingGrid} data-testid="siblings">
-          {siblings.map((char) => <SiblingCard key={char} char={char} name={name} />)}
+        <h2>형제 <small>{groups.reduce((sum, group) => sum + group.chars.length, 0)}</small></h2>
+        {released > 0 && <button type="button" data-testid="refollow-all" onClick={() => picked.forEach((role) => refollowAll(role))}>풀린 획 {released}개 모두 다시 따르기</button>}
+        <div data-testid="siblings">
+          {groups.map(({ role, chars }) => {
+            const on = picked.includes(role)
+            return (
+              <div key={role} className={styles.roleGroup} data-role={role} data-picked={on}>
+                <button type="button" className={styles.roleHead} role="checkbox" aria-checked={on} onClick={() => toggle(role)}>
+                  <span className={styles.check} aria-hidden="true">✓</span>
+                  {roleLabel(role)} <small>{chars.length}</small>
+                  {masters[role] && !isStraight(masters[role]!) && <em>휨</em>}
+                </button>
+                <div className={styles.siblingGrid}>
+                  {chars.map((char) => <SiblingCard key={char} char={char} role={role} picked={on} onToggle={() => toggle(role)} />)}
+                </div>
+              </div>
+            )
+          })}
         </div>
       </section>
     </main>

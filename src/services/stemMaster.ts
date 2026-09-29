@@ -11,28 +11,84 @@ import { grammarOf, STEM_NAME_LABEL, type StemName } from './strokeGrammar'
  * 플랜: docs/plans/2026-09-29_홀자-줄기-마스터.md
  */
 
-export type StemMasterName = Exclude<StemName, 'deotjulgi' | 'kkokji'> | 'gidung.inner'
+/**
+ * 마스터 이름. 줄기 이름 아래에 역할 갈래가 있다 — 따로 그리지 않은 갈래는 부모를 따르고, 그리면 갈라진다(`기둥.안쪽`과 같은 방식).
+ * 짧은기둥은 보에서 위로 솟는지 아래로 내리는지, 보는 그 짧은기둥을 받치는지 · 매다는지 · 없는지와 섞임홀자 세로부와 만나는지로 나눈다.
+ */
+export type StemMasterName = Exclude<StemName, 'deotjulgi' | 'kkokji'>
+  | 'gidung.inner'
+  | 'jjalbeungidung.up' | 'jjalbeungidung.down'
+  | 'bo.up' | 'bo.up.mixed' | 'bo.down' | 'bo.down.mixed' | 'bo.none' | 'bo.none.mixed'
 
-export const STEM_MASTER_NAMES: readonly StemMasterName[] = ['gidung', 'gidung.inner', 'gyeotjulgi', 'jjalbeungidung', 'bo', 'geolchim']
+export const STEM_MASTER_NAMES: readonly StemMasterName[] = [
+  'gidung', 'gidung.inner', 'gyeotjulgi',
+  'jjalbeungidung', 'jjalbeungidung.up', 'jjalbeungidung.down',
+  'bo', 'bo.up', 'bo.up.mixed', 'bo.down', 'bo.down.mixed', 'bo.none', 'bo.none.mixed',
+  'geolchim',
+]
+
+/** 갈래 → 부모. 갈래 마스터가 없으면 부모를 거슬러 올라가 처음 있는 마스터를 따른다. */
+const PARENT: Partial<Record<StemMasterName, StemMasterName>> = {
+  'gidung.inner': 'gidung',
+  'jjalbeungidung.up': 'jjalbeungidung',
+  'jjalbeungidung.down': 'jjalbeungidung',
+  'bo.up': 'bo',
+  'bo.up.mixed': 'bo.up',
+  'bo.down': 'bo',
+  'bo.down.mixed': 'bo.down',
+  'bo.none': 'bo',
+  'bo.none.mixed': 'bo.none',
+}
+
+export function parentOf(name: StemMasterName): StemMasterName | null {
+  return PARENT[name] ?? null
+}
+
+/** `name`이 `ancestor` 자신이거나 그 갈래인가. */
+export function isUnder(name: StemMasterName, ancestor: StemMasterName): boolean {
+  for (let at: StemMasterName | null = name; at; at = parentOf(at)) if (at === ancestor) return true
+  return false
+}
 
 export const STEM_MASTER_LABEL: Readonly<Record<StemMasterName, string>> = {
   gidung: STEM_NAME_LABEL.gidung,
   'gidung.inner': '기둥.안쪽',
   gyeotjulgi: STEM_NAME_LABEL.gyeotjulgi,
   jjalbeungidung: STEM_NAME_LABEL.jjalbeungidung,
+  'jjalbeungidung.up': '짧은기둥.솟음',
+  'jjalbeungidung.down': '짧은기둥.내림',
   bo: STEM_NAME_LABEL.bo,
+  'bo.up': '보.솟음',
+  'bo.up.mixed': '보.솟음.섞임',
+  'bo.down': '보.내림',
+  'bo.down.mixed': '보.내림.섞임',
+  'bo.none': '보.홀로',
+  'bo.none.mixed': '보.홀로.섞임',
   geolchim: STEM_NAME_LABEL.geolchim,
 }
 
-/** 마스터 편집 캔버스에 놓을 대표 홀자와 그 안의 마스터 획. ㅣ · ㅡ는 상자가 두께 0이라 대표로 못 쓴다(아래 `thinBox`). */
+/** 마스터 편집 캔버스에 놓을 대표 홀자와 그 안의 마스터 획. */
 export const STEM_MASTER_SAMPLE: Readonly<Record<StemMasterName, { char: string; strokeId: string }>> = {
   gidung: { char: 'ㅏ', strokeId: 'ㅏ-1' },
   'gidung.inner': { char: 'ㅐ', strokeId: 'ㅐ-1' },
   gyeotjulgi: { char: 'ㅏ', strokeId: 'ㅏ-2' },
   jjalbeungidung: { char: 'ㅗ', strokeId: 'ㅗ-1' },
+  'jjalbeungidung.up': { char: 'ㅗ', strokeId: 'ㅗ-1' },
+  'jjalbeungidung.down': { char: 'ㅜ', strokeId: 'ㅜ-2' },
   bo: { char: 'ㅗ', strokeId: 'ㅗ-2' },
+  'bo.up': { char: 'ㅗ', strokeId: 'ㅗ-2' },
+  'bo.up.mixed': { char: 'ㅘ', strokeId: 'ㅘ-2' },
+  'bo.down': { char: 'ㅜ', strokeId: 'ㅜ-1' },
+  'bo.down.mixed': { char: 'ㅝ', strokeId: 'ㅝ-1' },
+  'bo.none': { char: 'ㅡ', strokeId: 'ㅡ-1' },
+  'bo.none.mixed': { char: 'ㅢ', strokeId: 'ㅢ-1' },
   geolchim: { char: 'ㅐ', strokeId: 'ㅐ-2' },
 }
+
+/** 짧은기둥이 보에서 위로 솟는 홀자 · 아래로 내리는 홀자 · 섞임홀자(오른쪽 세로부가 있어 보가 짧다). */
+const RISING = new Set(['ㅗ', 'ㅛ', 'ㅘ', 'ㅙ', 'ㅚ'])
+const HANGING = new Set(['ㅜ', 'ㅠ', 'ㅝ', 'ㅞ', 'ㅟ'])
+const MIXED = new Set(['ㅘ', 'ㅙ', 'ㅚ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅢ'])
 
 export interface AxisPoint {
   /** 시작 0 → 끝 1 */
@@ -60,11 +116,12 @@ export function isStraight(master: StemMaster): boolean {
   return master.points.length === 2 && master.points.every((point) => point.o === 0 && !point.handleIn && !point.handleOut)
 }
 
-/** 마스터가 없거나 `기둥.안쪽`이 따로 없으면 기둥을 따른다. */
+/** 이 이름의 마스터. 따로 없으면 부모를 거슬러 올라가 처음 있는 것(`기둥.안쪽` → 기둥, `보.솟음.섞임` → 보.솟음 → 보). 끝까지 없으면 곧다. */
 export function masterOf(masters: StemMasters, name: StemMasterName): StemMaster {
-  const own = masters[name]
-  if (own) return own
-  if (name === 'gidung.inner' && masters.gidung) return { ...masters.gidung, name }
+  for (let at: StemMasterName | null = name; at; at = parentOf(at)) {
+    const own = masters[at]
+    if (own) return at === name ? own : { ...own, name }
+  }
   return straightMaster(name)
 }
 
@@ -110,12 +167,12 @@ export function medialBoxEmOf(char: string, channel: JamoChannel, final?: 'open'
  * 이 획의 휨을 재는 기준 칸(em). 받침 없는 칸이고, 휠 방향의 변이 얇으면(ㅣ · ㅡ · ㅚ ㅟ ㅢ의 한 줄기 채널) 그 변만 빌린다 —
  * 세로 줄기는 ㅏ 칸의 폭, 가로 줄기는 ㅗ 칸의 높이. 칸 비율로 적힌 휨이 이 칸에서 em이 된다.
  */
-export function stemReferenceBox(char: string, channel: JamoChannel, stroke: StrokeDataV2): BoxEm {
-  const open = medialBoxEmOf(char, channel, 'open')
-  if (!thinBox(stroke, open)) return open
-  return isVerticalIn(stroke, open)
-    ? { width: medialBoxEmOf('ㅏ', 'strokes', 'open').width, height: open.height }
-    : { width: open.width, height: medialBoxEmOf('ㅗ', 'strokes', 'open').height }
+export function stemReferenceBox(char: string, channel: JamoChannel, stroke: StrokeDataV2, final: 'open' | 'closed' = 'open'): BoxEm {
+  const box = medialBoxEmOf(char, channel, final)
+  if (!thinBox(stroke, box)) return box
+  return isVerticalIn(stroke, box)
+    ? { width: medialBoxEmOf('ㅏ', 'strokes', 'open').width, height: box.height }
+    : { width: box.width, height: medialBoxEmOf('ㅗ', 'strokes', 'open').height }
 }
 
 function isVerticalIn(stroke: StrokeDataV2, box: BoxEm): boolean {
@@ -133,7 +190,8 @@ export function thinBox(stroke: StrokeDataV2, box: BoxEm): boolean {
 }
 
 /**
- * 이 획이 따를 마스터 이름. 획 문법 이름 그대로이고, ㅐ ㅔ ㅒ ㅖ처럼 기둥이 둘인 채널의 왼쪽 기둥은 `기둥.안쪽`.
+ * 이 획이 따를 마스터 이름(가장 좁은 갈래). 획 문법 이름에서 시작해 ㅐ ㅔ ㅒ ㅖ처럼 기둥이 둘인 채널의 왼쪽 기둥은 `기둥.안쪽`,
+ * 짧은기둥은 솟음 · 내림, 보는 솟음 · 내림 · 홀로와 섞임으로 나눈다.
  * 덧줄기 · 꼭지처럼 마스터가 없는 이름, 이름 없는 획, 자유 획은 null.
  */
 export function masterNameOf(jamo: Pick<JamoData, 'type' | 'char'>, channelStrokes: readonly StrokeDataV2[], strokeId: string): StemMasterName | null {
@@ -147,7 +205,57 @@ export function masterNameOf(jamo: Pick<JamoData, 'type' | 'char'>, channelStrok
       if (leftmost.id === strokeId) return 'gidung.inner'
     }
   }
+  if (name === 'jjalbeungidung') {
+    if (RISING.has(jamo.char)) return 'jjalbeungidung.up'
+    if (HANGING.has(jamo.char)) return 'jjalbeungidung.down'
+  }
+  if (name === 'bo') {
+    const role = RISING.has(jamo.char) ? 'up' : HANGING.has(jamo.char) ? 'down' : 'none'
+    return `bo.${role}${MIXED.has(jamo.char) ? '.mixed' : ''}` as StemMasterName
+  }
   return name as StemMasterName
+}
+
+function distanceToSegment(point: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const lengthSquared = dx * dx + dy * dy
+  const t = lengthSquared === 0 ? 0 : Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared))
+  return Math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy))
+}
+
+/**
+ * 짧은기둥의 축은 보에 닿는 끝 → 빈 끝이다. 솟는 짧은기둥(위 → 아래로 그려져 끝이 보에 닿음)은 획 방향과 반대라 뒤집는다.
+ * 그래서 솟음 · 내림에 같은 마스터를 주면 빈 끝 쪽 모양이 서로 맞는다. 다른 줄기는 획 방향 그대로.
+ */
+export function axisReversed(jamo: Pick<JamoData, 'type' | 'char'>, channelStrokes: readonly StrokeDataV2[], stroke: StrokeDataV2): boolean {
+  const name = masterNameOf(jamo, channelStrokes, stroke.id)
+  if (!name || !isUnder(name, 'jjalbeungidung') || stroke.points.length < 2) return false
+  const table = grammarOf(jamo.type, jamo.char)
+  const bars = channelStrokes.filter((item) => table[item.id] === 'bo' && item.points.length >= 2)
+  if (bars.length === 0) return false
+  const gap = (point: { x: number; y: number }) => Math.min(...bars.map((bar) => distanceToSegment(point, bar.points[0], bar.points[bar.points.length - 1])))
+  return gap(stroke.points[stroke.points.length - 1]) < gap(stroke.points[0])
+}
+
+/** 획을 거꾸로(점 순서와 핸들 방향을 뒤집는다). 모양은 같다. */
+export function reverseStroke(stroke: StrokeDataV2): StrokeDataV2 {
+  return {
+    ...stroke,
+    points: [...stroke.points].reverse().map(({ handleIn, handleOut, ...point }) => ({
+      ...point,
+      ...(handleOut ? { handleIn: handleOut } : {}),
+      ...(handleIn ? { handleOut: handleIn } : {}),
+    })),
+  }
+}
+
+/** 축 방향을 따진 인스턴스 · 따름 판정. */
+function orientedInstance(stroke: StrokeDataV2, master: StemMaster, box: BoxEm, reversed: boolean): StrokeDataV2 {
+  return reversed ? reverseStroke(instanceOf(reverseStroke(stroke), master, box)) : instanceOf(stroke, master, box)
+}
+function orientedFollows(stroke: StrokeDataV2, master: StemMaster, box: BoxEm, reversed: boolean): boolean {
+  return followsMaster(reversed ? reverseStroke(stroke) : stroke, master, box)
 }
 
 /** 마스터를 이 획의 시작점 · 끝점 사이에 놓는다. 끝점은 그대로, 사이 모양만 마스터. */
@@ -201,7 +309,8 @@ export function boundStrokesOf(jamo: JamoData, masters: StemMasters): BoundStrok
       const name = masterNameOf(jamo, strokes, stroke.id)
       if (!name) return []
       const box = stemReferenceBox(jamo.char, channel, stroke)
-      return [{ channel, stroke, name, follows: followsMaster(stroke, masterOf(masters, name), box), blocked: false }]
+      const reversed = axisReversed(jamo, strokes, stroke)
+      return [{ channel, stroke, name, follows: orientedFollows(stroke, masterOf(masters, name), box, reversed), blocked: false }]
     })
   })
 }
@@ -220,11 +329,12 @@ export function applyMaster(jamo: JamoData, before: StemMasters, after: StemMast
       const name = masterNameOf(jamo, strokes, stroke.id)
       if (!name) return stroke
       const box = stemReferenceBox(jamo.char, channel, stroke)
+      const reversed = axisReversed(jamo, strokes, stroke)
       const previous = masterOf(before, name)
       const current = masterOf(after, name)
-      if (previous === current || !followsMaster(stroke, previous, box)) return stroke
-      const instance = instanceOf(stroke, current, box)
-      if (followsMaster(stroke, current, box)) return stroke
+      if (previous === current || !orientedFollows(stroke, previous, box, reversed)) return stroke
+      const instance = orientedInstance(stroke, current, box, reversed)
+      if (orientedFollows(stroke, current, box, reversed)) return stroke
       changed = true
       return instance
     })
@@ -243,8 +353,9 @@ export function refollow(jamo: JamoData, masters: StemMasters, channel: JamoChan
   const index = strokes.findIndex((stroke) => stroke.id === strokeId)
   if (index < 0) return null
   const box = stemReferenceBox(jamo.char, channel, strokes[index])
-  if (followsMaster(strokes[index], master, box)) return null
+  const reversed = axisReversed(jamo, strokes, strokes[index])
+  if (orientedFollows(strokes[index], master, box, reversed)) return null
   const rewritten = [...strokes]
-  rewritten[index] = instanceOf(strokes[index], master, box)
+  rewritten[index] = orientedInstance(strokes[index], master, box, reversed)
   return { ...jamo, [channel]: rewritten }
 }

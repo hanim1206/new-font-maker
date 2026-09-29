@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-import { applyMaster, boundStrokesOf, refollow as refollowStroke, type JamoChannel, type StemMaster, type StemMasterName, type StemMasters } from '../services/stemMaster'
+import { applyMaster, boundStrokesOf, isUnder, refollow as refollowStroke, type JamoChannel, type StemMaster, type StemMasterName, type StemMasters } from '../services/stemMaster'
 import type { JamoData } from '../types'
 import { withFrameFrom } from '../utils/jamoFrame'
 import { useJamoStore } from './jamoStore'
@@ -25,7 +25,7 @@ interface StemMasterActions {
   resetMaster: (name: StemMasterName) => void
   /** 풀린 획 하나를 다시 마스터에 붙인다. */
   refollow: (char: string, channel: JamoChannel, strokeId: string) => void
-  /** 이 이름의 풀린 획을 전부 다시 붙인다. */
+  /** 이 이름(과 그 갈래)의 풀린 획을 전부 다시 붙인다. */
   refollowAll: (name: StemMasterName) => void
   /** 마스터를 전부 지우고, 이름 있는 홀자 줄기를 풀린 것까지 전부 곧게(끝점은 그대로) 되돌린다. */
   resetAll: () => void
@@ -74,7 +74,7 @@ export const useStemMasterStore = create<StemMasterState & StemMasterActions>()(
         for (const [char, jamo] of Object.entries(jamoStore.jungseong)) {
           let next: JamoData = jamo
           for (const item of boundStrokesOf(jamo, masters)) {
-            if (item.name !== name || item.follows) continue
+            if (!isUnder(item.name, name) || item.follows) continue
             next = refollowStroke(next, masters, item.channel, item.stroke.id) ?? next
           }
           if (next !== jamo) jamoStore.updateJungseong(char, withFrameFrom(next, jamo))
