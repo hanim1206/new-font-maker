@@ -399,6 +399,8 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
     return true
   }
   // 스냅 후보 = 같은 축의 Noto 실측선 + 다른 부품의 rail. 같은 부품 rail은 겹치면 순서 위반이라 뺀다.
+  // 닿자 세로 변을 끌면 홀자 가로 줄기의 비어 있는 중심선 끝에 걸린다(`딱 붙음`). 중심선이라 굵기를 바꿔도 안 튀어나온다.
+  const stemEndCandidates = useMemo(() => rendered.flatMap((part, partIndex) => (part.stemEndsX ?? []).map((value, index) => ({ id: `stemEnd:${partIndex}:${index}`, label: `${glyph.identity.medialJamo} 가로 줄기 끝`, axis: 'x' as const, value }))), [rendered, glyph])
   const snapCandidatesFor = (target: EditableRail) => [
     ...measured.map((rail) => ({ id: rail.id, label: rail.label, axis: rail.axis, value: rail.value })),
     ...editable.filter((rail) => rail.id !== target.id && !(rail.partIndex === target.partIndex && rail.id.startsWith('c') === target.id.startsWith('c'))).map((rail) => ({ id: rail.id, label: rail.label, axis: rail.axis, value: rail.value })),
@@ -418,7 +420,10 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
     // 고정한 변을 다시 옮기면 더하기로 돌아간다.
     unfixRail(id)
     if (options?.snap) {
-      const snapped = snapRail({ value: next, original: target.original, axis: target.axis, candidates: snapCandidatesFor(target) })
+      const plain = snapRail({ value: next, original: target.original, axis: target.axis, candidates: snapCandidatesFor(target) })
+      // 닿자 세로 변이 홀자 가로 줄기의 비어 있는 중심선 끝에 닿았나. 처음 자리 반경 안이라도 끝에 닿으면 그쪽이다(`딱 붙음`).
+      const stemEnd = target.id.startsWith('c') && target.axis === 'x' ? snapRail({ value: next, original: Number.POSITIVE_INFINITY, axis: 'x', candidates: stemEndCandidates, radius: { grid: 0 } }) : null
+      const snapped = stemEnd?.hit ? { ...stemEnd, hit: { ...stemEnd.hit, label: `${target.label} · ${stemEnd.hit.label}`, touch: true } } : plain
       const snapPlace = snapped.hit ? placeOf(target, snapped.value) : null
       if (snapped.hit && typeof snapPlace === 'function') {
         snapPlace()
@@ -456,6 +461,7 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
         {FIX_RAIL_ENABLED && rail && rail.kind === 'face' && (fixable
           ? <button type="button" className={styles.canvasFix} data-snapped={!!snapHit || undefined} onClick={fixRail} data-testid="review-fix-rail">이 자리에 맞추기</button>
           : <span className={styles.canvasFixed} data-testid="review-fixed-rail">{rail.label} = {Math.round(rail.value * 1000)} · 고정</span>)}
+        {snapHit?.touch && <span className={styles.touchChip} role="status" data-testid="review-touch-chip">{snapHit.label} 딱 붙음</span>}
         {/* 자 도구는 없다. 캔버스 안에서 끌기·방향키(1u · Shift 10u)로 옮기고, 경고는 캔버스 위에 겹쳐 높이가 안 흔들린다. 되돌리기는 셸 머리. */}
         {(error || inkIssue) && <p className={styles.canvasWarning} role="alert" data-testid="review-canvas-warning">{error || `홀자 획이 상자에 안 맞습니다 · ${inkIssue}`}</p>}
         </div>

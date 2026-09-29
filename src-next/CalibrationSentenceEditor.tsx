@@ -15,7 +15,7 @@ import { newLayoutEntry } from './layoutEntry'
 import { adoptFamilyStrokes, familyOfSyllable } from '../src/utils/jamoContextStrokes'
 import { withFrameFrom, withoutFrame } from '../src/utils/jamoFrame'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
-import { faceSnapCandidates, pointAnchors, snapStrokeDrag, strokeBodyAnchors, strokeSnapCandidates, withoutOwnCandidates } from './strokeSnap'
+import { faceSnapCandidates, horizontalStrokeEndsX, pointAnchors, snapStrokeDrag, strokeBodyAnchors, strokeSnapCandidates, withoutOwnCandidates } from './strokeSnap'
 import type { SnapAnchors } from './strokeSnap'
 import type { SnapCandidate, SnapHit } from './railSnap'
 import { baselineRails } from './notoBaselineRails'
@@ -578,7 +578,13 @@ function FocusedGlyph({
   const strokeCandidates = useMemo(() => strokeSnapCandidates(targets.map((target) => ({ strokeId: target.stroke.id, label: `${target.jamo.char} 획`, stroke: target.stroke, box: target.box }))), [targets])
   const [snapHits, setSnapHits] = useState<{ x: SnapHit | null; y: SnapHit | null } | null>(null)
   // 이름표에는 기준선 · 획 · 격자만 올린다. `처음 자리`는 끄는 내내 걸려 있어서 뺀다.
-  const snapHitLabels = snapHits ? [snapHits.x, snapHits.y].filter((hit): hit is SnapHit => Boolean(hit) && hit!.kind !== 'model').map((hit) => hit.label).filter((label, index, labels) => labels.indexOf(label) === index) : []
+  const snapHitLabels = snapHits ? [snapHits.x, snapHits.y].filter((hit): hit is SnapHit => Boolean(hit) && hit!.kind !== 'model').map((hit) => hit.touch ? `${hit.label}에 딱 붙음` : hit.label).filter((label, index, labels) => labels.indexOf(label) === index) : []
+  // 홀자 가로 줄기를 끌면 다른 칸 세로 변(잉크 바깥면)이 `딱 붙음` 후보가 된다 — 레이아웃 편집에서 닿자 세로 변을 끌 때와 같은 규칙. 닻이 중심선이라 굵기를 바꿔도 안 튀어나온다.
+  const withTouch = (candidates: SnapCandidate[], strokeId: string) => {
+    const target = targets.find((item) => item.stroke.id === strokeId)
+    if (!target || target.editorPart !== 'JU' || horizontalStrokeEndsX([{ stroke: target.stroke, box: target.box }]).length === 0) return candidates
+    return candidates.map((candidate) => candidate.axis === 'x' && candidate.id.startsWith('face:') && !/^face:JU(_H|_V)?:/.test(candidate.id) ? { ...candidate, touch: true } : candidate)
+  }
   // 누른 자리에서 가장 가까운 꼭짓점. 좌표는 누른 요소의 화면 변환을 거꾸로 돌려 얻는다 — 글자가 기울어도 맞는다.
   const nearestPoint = (event: ReactPointerEvent<SVGElement>, stroke: StrokeDataV2, box: BoxConfig): { index: number; distance: number } => {
     const matrix = (event.currentTarget as SVGGraphicsElement).getScreenCTM()
@@ -644,7 +650,7 @@ function FocusedGlyph({
     // 끌기가 없는 화면은 누르기가 곧 탭이다.
     if (!dragApiRef || !canvasRef.current) { onTap?.(); return }
     // 닻과 후보는 누른 순간의 자리로 굳힌다. 끄는 동안 자기 자신에게 걸리지 않게 자기 후보는 뺀다.
-    drag.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, box, started: false, anchors, candidates: withoutOwnCandidates([...guideRails, ...strokeCandidates], dragged), onTap }
+    drag.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, box, started: false, anchors, candidates: withTouch(withoutOwnCandidates([...guideRails, ...strokeCandidates], dragged), dragged.strokeId), onTap }
     canvasRef.current.setPointerCapture(event.pointerId)
   }
   const moveDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -684,7 +690,7 @@ function FocusedGlyph({
     if (selection.kind !== 'stroke' && !handlePoint) return false
     const anchors = handlePoint ? pointAnchors(handlePoint, target.box) : strokeBodyAnchors(target.stroke, target.box)
     const dragged = selection.kind === 'stroke' ? { strokeId: target.stroke.id } : { strokeId: target.stroke.id, pointIndex: selection.pointIndex }
-    padDrag.current = { box: target.box, anchors, candidates: withoutOwnCandidates([...guideRails, ...strokeCandidates], dragged) }
+    padDrag.current = { box: target.box, anchors, candidates: withTouch(withoutOwnCandidates([...guideRails, ...strokeCandidates], dragged), dragged.strokeId) }
     dragApiRef.current.begin()
     return true
   }

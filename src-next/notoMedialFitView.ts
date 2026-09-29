@@ -9,6 +9,7 @@ import type { DeepReadonly, JamoData } from '../src/types'
 import { applyRailEdits, applySlotFacesDelta, boundRailRoles, fitRailAxis } from '../src/services/notoMedialMasterFit'
 import type { FitRailKey, MedialFitInput, MedialFitResult, MedialRoleMeasurement, SlotFacesDelta } from '../src/services/notoMedialMasterFit'
 import { medialLimitIssue } from '../src/services/railLimits'
+import { horizontalStrokeEndsX } from './strokeSnap'
 import { selectNotoOutlineContours } from '../src/services/notoOutlineInk'
 import type { NotoOutline } from '../src/services/notoOutlineInk'
 import type { BoxConfig } from '../src/types'
@@ -54,6 +55,8 @@ export interface RenderedMedialPart {
   slot?: BoxConfig
   /** 앱 획을 slot에 맞춰 다듬은 중심선 상자. 칸 해석의 `boxes[part]`와 같은 값. */
   inkBox?: BoxConfig
+  /** 가로 줄기 중심선 끝 x(em). 칸 변을 끌 때 이 끝이 다른 칸 세로 기준선에 닿으면 건다. */
+  stemEndsX?: number[]
   xorRatio?: number
   inkRatio?: number
   railErrors: RailError[]
@@ -124,7 +127,7 @@ export function renderMedialPart(part: MedialFitPart, railsEm?: Readonly<Record<
     // 앱 획을 slot 네 변에 맞춘다. 못 맞추면(고친 획이 칸보다 큼 등) 상자만 남기고 이유를 돌려준다 — rail 자리는 여전히 유효.
     const fitted = fitPartStrokes({ part: part.part, jamo: part.jamo, faces: boxToFaces(placed.fit.slot), glyphId: 'layout-editor', medialJamo: part.medialJamo, ends: style, medialFit: placed.fit })
     const ink = fitted.ok ? inkOfComponentFit(fitted.fit, style) : fitted
-    if (fitted.ok && ink.ok) { rendered.path = finalGlyphInkToSvgPath({ regions: ink.regions }, 1); rendered.inkBox = { ...fitted.fit.box } }
+    if (fitted.ok && ink.ok) { rendered.path = finalGlyphInkToSvgPath({ regions: ink.regions }, 1); rendered.inkBox = { ...fitted.fit.box }; rendered.stemEndsX = horizontalStrokeEndsX(fitted.fit.primitives) }
     else rendered.message = ink.ok ? undefined : ink.message
   } else {
     const ink = inkOfFit(placed.fit, style?.weightMultiplier ?? 1, style)
