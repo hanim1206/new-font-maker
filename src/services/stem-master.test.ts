@@ -121,3 +121,45 @@ describe('마스터 바꾸기와 다시 따르기', () => {
     expect(applyMaster(ae, {}, { bo: bent })).toBeNull()
   })
 })
+
+describe('G1 홀드아웃', () => {
+  it('곁줄기 마스터: ㅏ의 긴 곁줄기와 ㅔ의 짧은 곁줄기가 같은 em만큼 휜다', () => {
+    const bow: StemMaster = { name: 'gyeotjulgi', points: [{ t: 0, o: 0, handleOut: { t: 0.5, o: 0.02 } }, { t: 1, o: 0 }] }
+    const a = instanceOf(line('ㅏ-2', [0, 0.5], [1, 0.5]), bow, medialBoxEmOf('ㅏ', 'strokes'))
+    const e = instanceOf(line('ㅔ-2', [0, 0.5], [0.5, 0.5]), bow, medialBoxEmOf('ㅔ', 'strokes'))
+    const liftEm = (stroke: StrokeDataV2, char: string) => (0.5 - stroke.points[0].handleOut!.y) * medialBoxEmOf(char, 'strokes').height
+    expect(liftEm(a, 'ㅏ')).toBeCloseTo(0.02, 5)
+    expect(liftEm(e, 'ㅔ')).toBeCloseTo(0.02, 5)
+    // 축 방향 자리는 길이에 비례한다(몸통만 늘이기).
+    expect(a.points[0].handleOut!.x).toBeCloseTo(0.5)
+    expect(e.points[0].handleOut!.x).toBeCloseTo(0.25)
+  })
+
+  it('짧은기둥 마스터: ㅛ의 짧은기둥 둘이 같이 휜다', () => {
+    const yo: JamoData = { char: 'ㅛ', type: 'jungseong', strokes: [line('ㅛ-1', [0.3, 0], [0.3, 1]), line('ㅛ-2', [0.7, 0], [0.7, 1]), line('ㅛ-3', [0, 1], [1, 1])] }
+    const next = applyMaster(yo, {}, { jjalbeungidung: { ...bent, name: 'jjalbeungidung' } })!
+    expect(next.strokes![0].points[0].handleOut).toBeDefined()
+    expect(next.strokes![1].points[0].handleOut).toBeDefined()
+    expect(next.strokes![2]).toBe(yo.strokes![2])
+  })
+
+  it('기둥.안쪽: 따로 그리기 전엔 기둥을 따르고, 따로 그리면 갈라지고, 지우면 다시 기둥', () => {
+    const ae: JamoData = { char: 'ㅐ', type: 'jungseong', strokes: [line('ㅐ-1', [0, 0], [0, 1]), line('ㅐ-2', [0, 0.5], [1, 0.5]), line('ㅐ-3', [1, 0], [1, 1])] }
+    const withGidung = applyMaster(ae, {}, { gidung: bent })!
+    expect(withGidung.strokes![0].points[0].handleOut!.x - 0).toBeCloseTo(withGidung.strokes![2].points[0].handleOut!.x - 1)
+    const inner: StemMaster = { name: 'gidung.inner', points: [{ t: 0, o: 0 }, { t: 1, o: 0 }] }
+    const split = applyMaster(withGidung, { gidung: bent }, { gidung: bent, 'gidung.inner': inner })!
+    expect(split.strokes![0].points[0].handleOut).toBeUndefined()
+    expect(split.strokes![2]).toBe(withGidung.strokes![2])
+    const merged = applyMaster(split, { gidung: bent, 'gidung.inner': inner }, { gidung: bent })!
+    expect(merged.strokes![0].points[0].handleOut).toBeDefined()
+    expect(boundStrokesOf(merged, { gidung: bent }).every((item) => item.follows)).toBe(true)
+  })
+
+  it('마스터가 하나도 없으면 어떤 홀자도 안 바뀐다', () => {
+    const a: JamoData = { char: 'ㅏ', type: 'jungseong', strokes: [line('ㅏ-1', [0, 0], [0, 1]), line('ㅏ-2', [0, 0.5], [1, 0.5])] }
+    expect(applyMaster(a, {}, {})).toBeNull()
+    expect(boundStrokesOf(a, {}).every((item) => item.follows)).toBe(true)
+  })
+})
+

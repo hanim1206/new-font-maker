@@ -763,6 +763,7 @@ function FocusedGlyph({
             strokeWidth={Math.max(12 * u, target.stroke.thickness * VIEW_BOX_SIZE + 8 * u)}
             pointerEvents="stroke"
             data-editor-hit="stroke"
+            data-stroke-id={target.stroke.id}
             data-selected={selectedStrokeId === target.stroke.id ? 'true' : undefined}
             onPointerDown={(event) => {
               event.stopPropagation()
