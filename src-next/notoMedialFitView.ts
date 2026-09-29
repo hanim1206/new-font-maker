@@ -8,6 +8,7 @@ import { useJamoStore } from '../src/stores/jamoStore'
 import type { DeepReadonly, JamoData } from '../src/types'
 import { applyRailEdits, applySlotFacesDelta, boundRailRoles, fitRailAxis } from '../src/services/notoMedialMasterFit'
 import type { FitRailKey, MedialFitInput, MedialFitResult, MedialRoleMeasurement, SlotFacesDelta } from '../src/services/notoMedialMasterFit'
+import { medialLimitIssue } from '../src/services/railLimits'
 import { selectNotoOutlineContours } from '../src/services/notoOutlineInk'
 import type { NotoOutline } from '../src/services/notoOutlineInk'
 import type { BoxConfig } from '../src/types'
@@ -108,12 +109,16 @@ export function fitMedialForGlyph(input: {
   return unresolvable ? { parts: [], message: parts[0].message } : { parts }
 }
 
-/** rail 값(em, 없으면 모델 값)으로 획을 놓고 잉크·비교 수치를 낸다. */
-/** rail 값으로 홀자 fit을 다시 놓고 잉크·슬롯·오차를 만든다. style은 화면용 끝 모양(글로벌 스타일). 측정은 style과 무관하게 일자 끝 기준. */
-export function renderMedialPart(part: MedialFitPart, railsEm?: Readonly<Record<string, number>>, style?: FitInkStyle): RenderedMedialPart {
+/**
+ * rail 값으로 홀자 fit을 다시 놓고 잉크·슬롯·오차를 만든다. style은 화면용 끝 모양(글로벌 스타일). 측정은 style과 무관하게 일자 끝 기준.
+ * `limitBase`가 있으면 보선 한계(글자 몸 · 순서 · 두께 간격)를 그 fit 기준으로 보고, 넘으면 slot 없이 이유만 돌려준다.
+ */
+export function renderMedialPart(part: MedialFitPart, railsEm?: Readonly<Record<string, number>>, style?: FitInkStyle, limitBase?: MedialFitResult): RenderedMedialPart {
   if (!part.fit) return { railErrors: [], message: part.message }
   const placed = railsEm ? applyRailEdits(part.fit, railsEm) : { ok: true as const, fit: part.fit }
   if (!placed.ok) return { railErrors: [], message: placed.message }
+  const limit = limitBase ? medialLimitIssue(limitBase, placed.fit) : null
+  if (limit) return { railErrors: [], message: limit }
   const rendered: RenderedMedialPart = { slot: { ...placed.fit.slot }, railErrors: [] }
   if (part.jamo && part.medialJamo) {
     // 앱 획을 slot 네 변에 맞춘다. 못 맞추면(고친 획이 칸보다 큼 등) 상자만 남기고 이유를 돌려준다 — rail 자리는 여전히 유효.

@@ -106,11 +106,12 @@ describe.skipIf(!existsSync(CORPUS))('홀자 줄기 끝점 = 보선 — G0 대�
     expect(moved.stem('ㅏ-1')).toEqual(base.stem('ㅏ-1'))
   })
 
-  it('아: 기둥 아래 끝을 30u 내리면 기둥만 길어지고 곁줄기는 제자리다', async () => {
+  // 아래로 늘리는 쪽은 글자 몸(노토 몸통) 아래 끝까지 2u뿐이라 보선 한계에서 멈춘다 — 줄이는 쪽으로 본다.
+  it('아: 기둥 아래 끝을 30u 올리면 기둥만 짧아지고 곁줄기는 제자리다', async () => {
     const base = await render('아')
-    const moved = await render('아', { medial: { JU: { 'outerPillar.end': 0.03 } } })
+    const moved = await render('아', { medial: { JU: { 'outerPillar.end': -0.03 } } })
     expect(moved.stem('ㅏ-1').top).toBeCloseTo(base.stem('ㅏ-1').top, 6)
-    expect(moved.stem('ㅏ-1').bottom - base.stem('ㅏ-1').bottom).toBeCloseTo(0.03, 3)
+    expect(moved.stem('ㅏ-1').bottom - base.stem('ㅏ-1').bottom).toBeCloseTo(-0.03, 3)
     expect(moved.stem('ㅏ-2').mid).toBeCloseTo(base.stem('ㅏ-2').mid, 6)
   })
 

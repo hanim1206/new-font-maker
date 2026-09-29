@@ -8,6 +8,7 @@ import { placeStemStroke } from './stemBend'
 import type { SemanticDelta } from './medialRailDelta'
 import { applyRailEdits, applySlotFacesDelta, fitNotoMedialMaster, splitMixedMedialRoles } from './notoMedialMasterFit'
 import type { MedialFitInput, MedialFitResult } from './notoMedialMasterFit'
+import { bodyAround, furthestValid, medialLimitIssue } from './railLimits'
 import { MEDIAL_ROLE_SETS, modelIdentityOf, predictNotoTarget } from './notoVariationModel'
 import { medialFamilyOf } from '../utils/jamoContextStrokes'
 import type { ModelIdentity, VariationModel } from './notoVariationModel'
@@ -61,7 +62,7 @@ export function addFaceDelta(base: FaceDelta | undefined, extra: FaceDelta | und
  * - `faces`: 네 변 Δ(`FaceDelta`: 더하기 또는 고정). 닿자(CH·JO)는 상자에 그대로 얹고, 홀자(JU·JU_H·JU_V)는 잉크 상자 변이라 rail을 축별 아핀으로 다시 놓는다(두께 고정, `applySlotFacesDelta`).
  * - `medial`: 홀자 part별 획 역할 중심 rail 오프셋(em, `primaryBeam.center` 같은 키). 모델 rail에 얹어 fit을 다시 놓으므로 slot이 따라온다. 더하기만.
  * 홀자는 상자 변 Δ를 먼저, 중심 rail Δ를 그 위에 얹는다.
- * 순서·간격 위반으로 다시 놓지 못하는 글자는 Δ를 받지 않고 모델 rail 그대로다(클램프 = 자동 예외).
+ * 한계(글자 몸 · 순서 · 두께 간격, `railLimits`)를 넘는 Δ는 버리지 않고 경계까지 줄여 얹는다 — 튀어 나간 저장값도 경계에서 멈춰 보인다.
  */
 export interface ContextBoxDelta {
   faces?: Partial<Record<Part, FacesDelta>>
@@ -144,9 +145,14 @@ export function boxToFaces(box: BoxConfig): ContextFaces {
   return { left: box.x, right: box.x + box.width, top: box.y, bottom: box.y + box.height }
 }
 
+/** 닿자 네 변에 Δ를 얹는다. 글자 몸 밖으로 나가는 변은 몸 경계에서 멈춘다(모델이 이미 밖이면 그 자리까지). */
 function withDelta(faces: ContextFaces, delta?: FacesDelta): ContextFaces {
   if (!delta) return { ...faces }
-  return { left: faceWithDelta(faces.left, delta.left), right: faceWithDelta(faces.right, delta.right), top: faceWithDelta(faces.top, delta.top), bottom: faceWithDelta(faces.bottom, delta.bottom) }
+  const body = bodyAround(faces)
+  const clamp = (value: number, side: keyof ContextFaces) => side === 'left' || side === 'right' ? Math.min(Math.max(value, body.left), body.right) : Math.min(Math.max(value, body.top), body.bottom)
+  const moved = {} as ContextFaces
+  for (const side of SIDES) moved[side] = clamp(faceWithDelta(faces[side], delta[side]), side)
+  return moved
 }
 
 /** 앱 음절에서 모델 신원을 만든다. 자모 하나짜리(초성만·중성만)는 문맥 칸이 없어 null. */
@@ -173,9 +179,14 @@ export function medialPartGroups(medialJamo: string): { part: ContextMedialPart[
 
 /**
  * 모델 rail로 홀자 획 마스터를 fit한다. 검수 화면과 칸 해석이 같은 fit을 쓴다.
- * 홀자 Δ가 있으면 획 역할 키로 rail에 얹어 다시 놓는다. 못 놓으면(순서·간격 위반) 모델 rail 그대로.
+ * 홀자 Δ가 있으면 획 역할 키로 rail에 얹어 다시 놓는다. 한계(글자 몸 · 순서 · 두께 간격)를 넘는 Δ는 경계까지 줄인다.
  */
 export function fitContextMedial(identity: ModelIdentity, model: ContextModel, medialDelta?: ContextBoxDelta['medial'], facesDelta?: ContextBoxDelta['faces']): ContextMedialPart[] {
+  return fitContextMedialBase(identity, model).map((group) => group.fit ? { ...group, fit: limitMedialFit(group.fit, facesDelta?.[group.part], medialDelta?.[group.part]).fit } : group)
+}
+
+/** Δ 없는 모델 fit. 한계(순서 · 간격 · 몸 밖 허용)의 기준이다. */
+function fitContextMedialBase(identity: ModelIdentity, model: ContextModel): ContextMedialPart[] {
   const groups = medialPartGroups(identity.medialJamo)
   if (!groups) return [{ part: 'JU', role: 'JU_VERTICAL', roleIds: [], message: `${identity.medialJamo}의 역할 구성이 없습니다.` }]
   const thickness = model.thickness[identity.medialJamo]
@@ -186,25 +197,72 @@ export function fitContextMedial(identity: ModelIdentity, model: ContextModel, m
     if (!made.ok) return { ...group, message: made.message }
     const fit = fitNotoMedialMaster(made.input)
     if (!fit.ok) return { ...group, message: fit.message }
-    return { ...group, fit: withMedialDelta(withSlotFacesDelta(fit.fit, facesDelta?.[group.part]), medialDelta?.[group.part]) }
+    return { ...group, fit: fit.fit }
   })
 }
 
-/** 홀자 상자 변 Δ. 닿자와 달리 상자만 미는 게 아니라 rail을 다시 놓아 fit의 slot이 따라오게 한다. 못 놓으면 그대로. */
-function withSlotFacesDelta(fit: MedialFitResult, delta?: FacesDelta): MedialFitResult {
+/**
+ * 모델 fit에 홀자 Δ를 한계 안에서 얹는다(`railLimits`). 상자 변 Δ를 먼저, 획 역할 Δ를 그 위에 — 값마다 차례로, 한계를 넘는 값은 경계까지 줄인다.
+ * 상자 변 Δ는 닿자와 달리 상자만 미는 게 아니라 rail을 다시 놓아 fit의 slot이 따라오게 한다.
+ * `faced`는 상자 변까지 얹은 fit, `medial`은 실제로 얹힌 획 역할 Δ(줄인 뒤).
+ */
+function limitMedialFit(base: MedialFitResult, facesDelta?: FacesDelta, medialDelta?: SemanticDelta): { fit: MedialFitResult; faced: MedialFitResult; medial: SemanticDelta } {
   // 고정은 지금 slot 변 기준 오프셋으로 풀어 아핀에 넘긴다.
-  const offsets = facesOffsets(boxToFaces(fit.slot), delta)
-  if (!SIDES.some((side) => Math.abs(offsets[side] ?? 0) > 1e-12)) return fit
-  const moved = applySlotFacesDelta(fit, offsets)
-  return moved.ok ? moved.fit : fit
+  const offsets = facesOffsets(boxToFaces(base.slot), facesDelta)
+  const placeFaces = (next: Partial<ContextFaces>): MedialFitResult | null => {
+    if (!SIDES.some((side) => Math.abs(next[side] ?? 0) > 1e-12)) return base
+    const moved = applySlotFacesDelta(base, next)
+    return moved.ok && !medialLimitIssue(base, moved.fit) ? moved.fit : null
+  }
+  const faces: Partial<ContextFaces> = {}
+  for (const side of SIDES) {
+    const want = offsets[side] ?? 0
+    if (Math.abs(want) <= 1e-12) continue
+    const share = furthestValid(0, 1, (value) => placeFaces({ ...faces, [side]: want * value }) !== null)
+    if (share > 0) faces[side] = want * share
+  }
+  const faced = placeFaces(faces) ?? base
+  const medial: SemanticDelta = {}
+  const placeRails = (delta: SemanticDelta) => placeMedialDelta(base, faced, delta)
+  for (const [key, want] of Object.entries(medialDelta ?? {}) as [keyof SemanticDelta, number | undefined][]) {
+    if (want === undefined || Math.abs(want) <= 1e-12) continue
+    const share = furthestValid(0, 1, (value) => placeRails({ ...medial, [key]: want * value }) !== null)
+    if (share > 0) medial[key] = want * share
+  }
+  return { fit: placeRails(medial) ?? faced, faced, medial }
 }
 
-function withMedialDelta(fit: MedialFitResult, delta?: SemanticDelta): MedialFitResult {
-  if (!delta) return fit
-  const applied = applyMedialDelta(fit, delta)
-  if (applied.applied === 0) return fit
-  const moved = applyRailEdits(fit, applied.rails)
-  return moved.ok ? moved.fit : fit
+/** 획 역할 Δ를 얹어 다시 놓은 fit. 한계를 넘거나 못 놓으면 null. 얹을 획이 없으면 그대로. */
+function placeMedialDelta(base: MedialFitResult, faced: MedialFitResult, delta: SemanticDelta): MedialFitResult | null {
+  const applied = applyMedialDelta(faced, delta)
+  if (applied.applied === 0) return faced
+  const moved = applyRailEdits(faced, applied.rails)
+  return moved.ok && !medialLimitIssue(base, moved.fit) ? moved.fit : null
+}
+
+/** 한 번에 이만큼(em)까지 본다. 글자 몸보다 크면 된다. */
+const DRAG_REACH = 1
+
+/**
+ * 획 편집 끌기: 이 글자에서 보선 키 묶음(`keys`)에 더할 수 있는 범위(em). 지금 얹힌 Δ(`delta`, 이 글자의 모든 층 합)에서 출발한다.
+ * 저장 Δ가 이미 한계를 넘어 있으면 그 넘친 만큼을 빼고 준다 — 끄는 순간 경계로 돌아와 죽은 구간이 없다.
+ * 풀 수 없는 글자면 null(한계 없이 둔다).
+ */
+export function medialDragRange(input: { identity: ModelIdentity; model: ContextModel; delta?: ContextBoxDelta; part: MedialPart; keys: readonly string[] }): { low: number; high: number } | null {
+  const group = fitContextMedialBase(input.identity, input.model).find((item) => item.part === input.part)
+  if (!group?.fit || !input.keys.length) return null
+  const raw = input.delta?.medial?.[input.part] ?? {}
+  const limited = limitMedialFit(group.fit, input.delta?.faces?.[input.part], raw)
+  const shifted = (value: number) => {
+    const delta: SemanticDelta = { ...limited.medial }
+    for (const key of input.keys as (keyof SemanticDelta)[]) delta[key] = (limited.medial[key] ?? 0) + value
+    return placeMedialDelta(group.fit!, limited.faced, delta) !== null
+  }
+  const high = furthestValid(0, DRAG_REACH, shifted)
+  const low = furthestValid(0, -DRAG_REACH, shifted)
+  // 넘친 만큼(저장 − 얹힌 것)은 키마다 다를 수 있다. 모든 키가 한계 안에 드는 범위.
+  const excess = input.keys.map((key) => (raw[key as keyof SemanticDelta] ?? 0) - (limited.medial[key as keyof SemanticDelta] ?? 0))
+  return { low: Math.max(...excess.map((value) => low - value)), high: Math.min(...excess.map((value) => high - value)) }
 }
 
 /** 모델이 예측한 닿자 네 변(em). 이 문맥에 예측이 없으면 null. */
