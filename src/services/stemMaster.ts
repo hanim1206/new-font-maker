@@ -1,5 +1,6 @@
 import medialBoxEm from '../data/medialBoxEm.json'
 import type { AnchorPoint, JamoData, StrokeDataV2 } from '../types'
+import { attachGapOf, attachmentOf, withAttachedEndX } from './stemAttach'
 import { grammarOf, STEM_NAME_LABEL, type StemName } from './strokeGrammar'
 
 /**
@@ -106,6 +107,8 @@ export interface StemMaster {
   name: StemMasterName
   /** 첫 점은 t 0, 마지막 점은 t 1. */
   points: AxisPoint[]
+  /** 곁줄기만. 붙은 끝이 기둥 중심선에서 떨어진 틈(글자 폭 em, 기본 획 기준 차이). 없으면 0 — 붙어 있다. */
+  gap?: number
 }
 
 export type StemMasters = Partial<Record<StemMasterName, StemMaster>>
@@ -116,7 +119,7 @@ export function straightMaster(name: StemMasterName): StemMaster {
 }
 
 export function isStraight(master: StemMaster): boolean {
-  return master.points.length === 2 && master.points.every((point) => point.o === 0 && !point.handleIn && !point.handleOut)
+  return master.points.length === 2 && master.points.every((point) => point.o === 0 && !point.handleIn && !point.handleOut) && !master.gap
 }
 
 /** 이 이름의 마스터. 따로 없으면 부모를 거슬러 올라가 처음 있는 것(`기둥.안쪽` → 기둥, `보.솟음.섞임` → 보.솟음 → 보). 끝까지 없으면 곧다. */
@@ -268,13 +271,39 @@ const FOLLOW_TOLERANCE = 0.002
 /** 이 획이 마스터를 따르고 있는가. 인스턴스를 다시 만들어도 같으면 따르는 것이고, 다르면 자모에서 손댄(풀린) 획이다. */
 export function followsMaster(stroke: StrokeDataV2, master: StemMaster, box: BoxEm, axis?: StemAxis | null): boolean {
   if (stroke.points.length < 2) return false
-  const expected = instanceOf(stroke, master, box, axis)
+  return matchesInstance(stroke, instanceOf(stroke, master, box, axis))
+}
+
+function matchesInstance(stroke: StrokeDataV2, expected: StrokeDataV2): boolean {
   if (expected.points.length !== stroke.points.length) return false
   const near = (a?: { x: number; y: number }, b?: { x: number; y: number }) => (!a && !b) || (!!a && !!b && Math.abs(a.x - b.x) <= FOLLOW_TOLERANCE && Math.abs(a.y - b.y) <= FOLLOW_TOLERANCE)
   return expected.points.every((point, index) => {
     const actual = stroke.points[index]
     return near(point, actual) && near(point.handleIn, actual.handleIn) && near(point.handleOut, actual.handleOut)
   })
+}
+
+/** 곁줄기면 붙은 끝을 마스터의 틈만큼 기둥 시작점에서 띄운 저장 획. 곁줄기가 아니면 그대로. 인스턴스는 이 틀 위에 놓인다. */
+function framedForMaster(jamo: JamoData, strokes: readonly StrokeDataV2[], stroke: StrokeDataV2, master: StemMaster, box: BoxEm): StrokeDataV2 {
+  const attachment = attachmentOf(jamo, stroke.id)
+  if (!attachment) return stroke
+  const pillar = strokes.find((item) => item.id === attachment.pillarId)
+  if (!pillar || pillar.points.length < 1 || box.width <= 0) return stroke
+  return withAttachedEndX(stroke, attachment, pillar.points[0].x + attachment.baseOffset + (master.gap ?? 0) / box.width)
+}
+
+/** 이 홀자 안에서 획 하나를 마스터 인스턴스로. 곁줄기는 붙은 끝의 틈까지 마스터를 따른다. */
+export function instanceInJamo(jamo: JamoData, channel: JamoChannel, stroke: StrokeDataV2, master: StemMaster): StrokeDataV2 {
+  const strokes = jamo[channel] ?? []
+  const box = stemReferenceBox(jamo.char, channel, stroke)
+  const axis = stemAxisOf(masterNameOf(jamo, strokes, stroke.id) ?? master.name)
+  return instanceOf(framedForMaster(jamo, strokes, stroke, master, box), master, box, axis)
+}
+
+/** 이 홀자 안에서 획이 마스터를 따르는가(`followsMaster` + 곁줄기 틈). */
+export function followsInJamo(jamo: JamoData, channel: JamoChannel, stroke: StrokeDataV2, master: StemMaster): boolean {
+  if (stroke.points.length < 2) return false
+  return matchesInstance(stroke, instanceInJamo(jamo, channel, stroke, master))
 }
 
 export interface BoundStroke {
@@ -293,8 +322,7 @@ export function boundStrokesOf(jamo: JamoData, masters: StemMasters): BoundStrok
     return strokes.flatMap((stroke) => {
       const name = masterNameOf(jamo, strokes, stroke.id)
       if (!name) return []
-      const box = stemReferenceBox(jamo.char, channel, stroke)
-      return [{ channel, stroke, name, follows: followsMaster(stroke, masterOf(masters, name), box, stemAxisOf(name)), blocked: false }]
+      return [{ channel, stroke, name, follows: followsInJamo(jamo, channel, stroke, masterOf(masters, name)), blocked: false }]
     })
   })
 }
@@ -312,15 +340,12 @@ export function applyMaster(jamo: JamoData, before: StemMasters, after: StemMast
     const rewritten = strokes.map((stroke) => {
       const name = masterNameOf(jamo, strokes, stroke.id)
       if (!name || keep?.(stroke.id)) return stroke
-      const box = stemReferenceBox(jamo.char, channel, stroke)
       const previous = masterOf(before, name)
       const current = masterOf(after, name)
-      const axis = stemAxisOf(name)
-      if (previous === current || !followsMaster(stroke, previous, box, axis)) return stroke
-      const instance = instanceOf(stroke, current, box, axis)
-      if (followsMaster(stroke, current, box, axis)) return stroke
+      if (previous === current || !followsInJamo(jamo, channel, stroke, previous)) return stroke
+      if (followsInJamo(jamo, channel, stroke, current)) return stroke
       changed = true
-      return instance
+      return instanceInJamo(jamo, channel, stroke, current)
     })
     next[channel] = rewritten
   }
@@ -350,6 +375,10 @@ export function masterFromStroke(jamo: JamoData, channel: JamoChannel, strokeId:
     return { t: (dxEm * uxEm + dyEm * uyEm) / (length * length), o: (dxEm * uyEm - dyEm * uxEm) / length }
   }
   const last = stroke.points.length - 1
+  // 곁줄기는 붙은 끝이 기둥에서 떨어진 틈도 모양이다(글자 폭 em).
+  const attachment = attachmentOf(jamo, strokeId)
+  const gap = attachment ? attachGapOf(strokes, stroke, attachment) : null
+  const gapEm = gap === null ? 0 : gap * box.width
   return {
     name,
     points: stroke.points.map((point, index) => ({
@@ -358,6 +387,7 @@ export function masterFromStroke(jamo: JamoData, channel: JamoChannel, strokeId:
       ...(point.handleIn ? { handleIn: toAxis(point.handleIn) } : {}),
       ...(point.handleOut ? { handleOut: toAxis(point.handleOut) } : {}),
     })),
+    ...(Math.abs(gapEm) > 1e-9 ? { gap: gapEm } : {}),
   }
 }
 
@@ -370,10 +400,8 @@ export function refollow(jamo: JamoData, masters: StemMasters, channel: JamoChan
   const master = masterOf(masters, name)
   const index = strokes.findIndex((stroke) => stroke.id === strokeId)
   if (index < 0) return null
-  const box = stemReferenceBox(jamo.char, channel, strokes[index])
-  const axis = stemAxisOf(name)
-  if (followsMaster(strokes[index], master, box, axis)) return null
+  if (followsInJamo(jamo, channel, strokes[index], master)) return null
   const rewritten = [...strokes]
-  rewritten[index] = instanceOf(strokes[index], master, box, axis)
+  rewritten[index] = instanceInJamo(jamo, channel, strokes[index], master)
   return { ...jamo, [channel]: rewritten }
 }

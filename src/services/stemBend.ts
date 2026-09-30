@@ -1,5 +1,6 @@
 import type { BoxConfig, JamoData, StrokeDataV2 } from '../types'
 import { stemEndsFor } from './medialStemRails'
+import { attachedIndexOf, attachGapOf, attachmentOf, centerlineXAtY, withAttachedEndX } from './stemAttach'
 import { hasMedialBoxEm, JAMO_CHANNELS, masterNameOf, stemReferenceBox, thinBox, type JamoChannel } from './stemMaster'
 
 /**
@@ -89,10 +90,13 @@ function bendFrameOf(jamo: JamoData, stroke: StrokeDataV2, box: BoxConfig, chann
   }
 }
 
-/** 저장된 획을 이 칸에 놓는다. 대상이 아니거나, 곧고 끝점도 제자리인 획이면 같은 획 · 같은 칸을 그대로 돌려준다. */
+/**
+ * 저장된 획을 이 칸에 놓는다. 대상이 아니거나, 곧고 끝점도 제자리인 획이면 같은 획 · 같은 칸을 그대로 돌려준다.
+ * 곁줄기는 마지막에 붙은 끝을 기둥의 놓인 중심선에 붙인다(`attachToPillar`).
+ */
 export function placeStemStroke(jamo: JamoData, stroke: StrokeDataV2, box: BoxConfig, channel?: JamoChannel): { stroke: StrokeDataV2; box: BoxConfig } {
   const frame = bendFrameOf(jamo, stroke, box, channel)
-  if (!frame || (frame.straight && !frame.ends)) return { stroke, box }
+  if (!frame || (frame.straight && !frame.ends)) return attachToPillar(jamo, stroke, { stroke, box }, box, channel)
   const last = stroke.points.length - 1
   const endpoint = (index: number) => index === 0 ? frame.ends!.start : frame.ends!.end
   const points = stroke.points.map((point, index) => ({
@@ -103,7 +107,35 @@ export function placeStemStroke(jamo: JamoData, stroke: StrokeDataV2, box: BoxCo
     ...(point.handleOut ? { handleOut: frame.place(point.handleOut) } : {}),
   }))
   if (frame.box !== box) receivedBoxOf.set(frame.box, box)
-  return { stroke: { ...stroke, points }, box: frame.box }
+  return attachToPillar(jamo, stroke, { stroke: { ...stroke, points }, box: frame.box }, box, channel)
+}
+
+const THIN = 1e-6
+
+/**
+ * 곁줄기의 붙은 끝을 그 높이에서 기둥의 놓인 중심선(휨 · 기울기 포함) 위에 붙인다.
+ * 저장 획의 틈(기둥 시작점 x 기준, 기본 획과의 차이)은 기준 칸 em으로 읽어 이 칸에서도 같은 em만큼 띄운다.
+ * 기둥이 곧고 틈이 0이면 자리가 그대로라 같은 획을 돌려준다 — 기본 폰트는 픽셀까지 같다.
+ */
+function attachToPillar(jamo: JamoData, stored: StrokeDataV2, placed: { stroke: StrokeDataV2; box: BoxConfig }, received: BoxConfig, channelHint?: JamoChannel): { stroke: StrokeDataV2; box: BoxConfig } {
+  const attachment = attachmentOf(jamo, stored.id)
+  if (!attachment) return placed
+  const channel = channelHint && jamo[channelHint]?.some((item) => item.id === stored.id) ? channelHint : channelOf(jamo, stored.id)
+  const strokes = channel ? jamo[channel] : undefined
+  const pillar = strokes?.find((item) => item.id === attachment.pillarId)
+  if (!channel || !strokes || !pillar || pillar.points.length < 2 || placed.box.width < THIN || placed.box.height < THIN) return placed
+  const gap = attachGapOf(strokes, stored, attachment)
+  if (gap === null) return placed
+  const placedPillar = placeStemStroke(jamo, pillar, received, channel)
+  if (placedPillar.box.width < THIN || placedPillar.box.height < THIN) return placed
+  const point = placed.stroke.points[attachedIndexOf(placed.stroke, attachment)]
+  const yEm = placed.box.y + point.y * placed.box.height
+  const pillarX = centerlineXAtY(placedPillar.stroke, (yEm - placedPillar.box.y) / placedPillar.box.height)
+  if (pillarX === null) return placed
+  const pillarXEm = placedPillar.box.x + pillarX * placedPillar.box.width
+  const gapEm = gap * stemReferenceBox(jamo.char, channel, stored).width
+  const x = (pillarXEm - placed.box.x) / placed.box.width + attachment.baseOffset + gapEm / placed.box.width
+  return { stroke: withAttachedEndX(placed.stroke, attachment, x), box: placed.box }
 }
 
 /**
