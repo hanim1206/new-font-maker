@@ -1,6 +1,6 @@
 import medialBoxEm from '../data/medialBoxEm.json'
 import type { AnchorPoint, JamoData, StrokeDataV2 } from '../types'
-import { attachGapOf, attachmentOf, withAttachedEndX } from './stemAttach'
+import { attachedXOf, attachGapOf, attachmentOf, withAttachedEndX } from './stemAttach'
 import { grammarOf, STEM_NAME_LABEL, type StemName } from './strokeGrammar'
 
 /**
@@ -107,7 +107,7 @@ export interface StemMaster {
   name: StemMasterName
   /** 첫 점은 t 0, 마지막 점은 t 1. */
   points: AxisPoint[]
-  /** 곁줄기만. 붙은 끝이 기둥 중심선에서 떨어진 틈(글자 폭 em, 기본 획 기준 차이). 없으면 0 — 붙어 있다. */
+  /** 곁줄기만. 붙은 끝이 기둥 중심선에서 빈 끝 쪽으로 떨어진 틈(글자 폭 em, 기본 획 기준 차이). 없으면 0 — 붙어 있다. */
   gap?: number
 }
 
@@ -289,7 +289,7 @@ function framedForMaster(jamo: JamoData, strokes: readonly StrokeDataV2[], strok
   if (!attachment) return stroke
   const pillar = strokes.find((item) => item.id === attachment.pillarId)
   if (!pillar || pillar.points.length < 1 || box.width <= 0) return stroke
-  return withAttachedEndX(stroke, attachment, pillar.points[0].x + attachment.baseOffset + (master.gap ?? 0) / box.width)
+  return withAttachedEndX(stroke, attachment, attachedXOf(pillar.points[0].x, attachment, (master.gap ?? 0) / box.width))
 }
 
 /** 이 홀자 안에서 획 하나를 마스터 인스턴스로. 곁줄기는 붙은 끝의 틈까지 마스터를 따른다. */

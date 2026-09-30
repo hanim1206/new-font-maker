@@ -1,6 +1,6 @@
 import type { BoxConfig, JamoData, StrokeDataV2 } from '../types'
 import { stemEndsFor } from './medialStemRails'
-import { attachedIndexOf, attachGapOf, attachmentOf, centerlineXAtY, withAttachedEndX } from './stemAttach'
+import { attachedIndexOf, attachedXOf, attachGapOf, attachmentOf, centerlineXAtY, withAttachedEndX } from './stemAttach'
 import { hasMedialBoxEm, JAMO_CHANNELS, masterNameOf, stemReferenceBox, thinBox, type JamoChannel } from './stemMaster'
 
 /**
@@ -134,7 +134,7 @@ function attachToPillar(jamo: JamoData, stored: StrokeDataV2, placed: { stroke: 
   if (pillarX === null) return placed
   const pillarXEm = placedPillar.box.x + pillarX * placedPillar.box.width
   const gapEm = gap * stemReferenceBox(jamo.char, channel, stored).width
-  const x = (pillarXEm - placed.box.x) / placed.box.width + attachment.baseOffset + gapEm / placed.box.width
+  const x = attachedXOf((pillarXEm - placed.box.x) / placed.box.width, attachment, gapEm / placed.box.width)
   return { stroke: withAttachedEndX(placed.stroke, attachment, x), box: placed.box }
 }
 

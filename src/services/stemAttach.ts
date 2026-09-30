@@ -25,8 +25,10 @@ export interface SideAttachment {
   pillarId: string
   /** 곁줄기의 어느 끝이 기둥에 붙나. */
   end: 'start' | 'end'
-  /** 기본 획에서 붙은 끝이 기둥 시작점 x에서 떨어진 만큼(칸 비율). 거의 0이고 ㅘ 세로부만 0.04 — 기본 폰트를 그대로 두려고 남긴다. */
+  /** 기본 획에서 붙은 끝이 기둥 시작점 x에서 떨어진 만큼(칸 비율, x 그대로). 거의 0이고 ㅘ 세로부만 0.04 — 기본 폰트를 그대로 두려고 남긴다. */
   baseOffset: number
+  /** 기둥에서 빈 끝으로 가는 x 방향. 오른쪽으로 뻗는 ㅏ 계열 +1, 왼쪽으로 뻗는 ㅓ 계열 −1. 틈은 이 방향이 +다. */
+  away: 1 | -1
 }
 
 const EPSILON = 1e-9
@@ -49,20 +51,24 @@ export function attachmentOf(jamo: Pick<JamoData, 'type' | 'char'>, strokeId: st
   const first = side.points[0]
   const last = side.points[side.points.length - 1]
   const end = Math.abs(first.x - pillarX) <= Math.abs(last.x - pillarX) ? 'start' : 'end'
-  return { pillarId, end, baseOffset: (end === 'start' ? first : last).x - pillarX }
+  const free = end === 'start' ? last : first
+  return { pillarId, end, baseOffset: (end === 'start' ? first : last).x - pillarX, away: free.x >= pillarX ? 1 : -1 }
 }
 
 export const attachedIndexOf = (stroke: Pick<StrokeDataV2, 'points'>, attachment: SideAttachment) => attachment.end === 'start' ? 0 : stroke.points.length - 1
 
 /**
- * 저장 좌표에서 곁줄기 붙은 끝이 기둥 시작점 x에서 떨어진 틈(칸 비율). 기본 획의 어긋남은 뺀다 — 기본 획은 0.
+ * 저장 좌표에서 곁줄기 붙은 끝이 기둥 시작점 x에서 떨어진 틈(칸 비율). 기둥에서 빈 끝 쪽으로 멀어지면 +, 기본 획의 어긋남은 뺀다 — 기본 획은 0.
  * 기둥의 휨 · 기울기는 시작점에서 뻗은 축에 대한 모양이라 여기 안 들어간다. 그래서 기둥을 휘어도 곁줄기는 따르는 채다.
  */
 export function attachGapOf(strokes: readonly StrokeDataV2[], stroke: StrokeDataV2, attachment: SideAttachment): number | null {
   const pillar = strokes.find((item) => item.id === attachment.pillarId)
   if (!pillar || pillar.points.length < 1) return null
-  return stroke.points[attachedIndexOf(stroke, attachment)].x - pillar.points[0].x - attachment.baseOffset
+  return (stroke.points[attachedIndexOf(stroke, attachment)].x - pillar.points[0].x - attachment.baseOffset) * attachment.away
 }
+
+/** 틈(칸 비율, 빈 끝 쪽 +)을 받았을 때 붙은 끝이 놓일 x. `pillarX`는 기둥 시작점(저장) 또는 그 높이의 놓인 중심선. */
+export const attachedXOf = (pillarX: number, attachment: SideAttachment, gap: number) => pillarX + attachment.baseOffset + gap * attachment.away
 
 /** 붙은 끝의 x를 옮긴 획. 붙은 끝에 달린 손잡이도 같이 간다. 같은 자리면 같은 획. */
 export function withAttachedEndX(stroke: StrokeDataV2, attachment: SideAttachment, x: number): StrokeDataV2 {

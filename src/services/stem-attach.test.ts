@@ -73,7 +73,10 @@ describe('D0 대응표 — 곁줄기는 기둥에 붙는다', () => {
     expect(attachmentOf(baseJungseong['ㅐ'], 'ㅐ-2')).toBeNull()
   })
 
-  it('빈 끝이 오른쪽(ㅏ)이면 시작점이, 왼쪽(ㅓ · ㅔ · ㅝ)이면 끝점이 붙은 끝이다', () => {
+  it('빈 끝이 오른쪽(ㅏ)이면 시작점이, 왼쪽(ㅓ · ㅔ · ㅝ)이면 끝점이 붙은 끝이고, 틈의 + 방향은 빈 끝 쪽이다', () => {
+    expect(attachmentOf(baseJungseong['ㅏ'], 'ㅏ-2')!.away).toBe(1)
+    expect(attachmentOf(baseJungseong['ㅓ'], 'ㅓ-2')!.away).toBe(-1)
+    expect(attachmentOf(baseJungseong['ㅘ'], 'ㅘ-4')!.away).toBe(1)
     expect(attachmentOf(baseJungseong['ㅏ'], 'ㅏ-2')!.end).toBe('start')
     expect(attachmentOf(baseJungseong['ㅓ'], 'ㅓ-2')!.end).toBe('end')
     expect(attachmentOf(baseJungseong['ㅔ'], 'ㅔ-2')!.end).toBe('end')
@@ -166,7 +169,10 @@ describe('G0 틈 — 뗀 만큼은 em 차이로 형제에 간다', () => {
       const side = strokeOf(after, sideId)
       const end = side.points[attachment.end === 'start' ? 0 : side.points.length - 1]
       const ref = stemReferenceBox(char, channel, side).width
-      expect(end.x - strokeOf(after, pillarId).points[0].x - attachment.baseOffset, `${char} 틈`).toBeCloseTo(master.gap! / ref, 9)
+      // 틈은 빈 끝 쪽(+). 왼쪽으로 뻗는 ㅓ ㅔ ㅞ는 붙은 끝이 기둥 왼쪽으로 떨어져 짧아진다 — 기둥을 뚫고 오른쪽으로 가지 않는다.
+      expect(attachment.away, `${char} 방향`).toBe(-1)
+      expect((end.x - strokeOf(after, pillarId).points[0].x - attachment.baseOffset) * attachment.away, `${char} 틈`).toBeCloseTo(master.gap! / ref, 9)
+      expect(end.x, `${char} 기둥 왼쪽`).toBeLessThan(strokeOf(after, pillarId).points[0].x)
       // 빈 끝은 그대로 — 길이는 보선이 정한다.
       const free = side.points[attachment.end === 'start' ? side.points.length - 1 : 0]
       const baseFree = strokeOf(before, sideId).points[attachment.end === 'start' ? side.points.length - 1 : 0]
@@ -184,5 +190,15 @@ describe('G0 틈 — 뗀 만큼은 em 차이로 형제에 간다', () => {
         expect(boundStrokesOf(jamo, {}).find((item) => item.stroke.id === sideId)!.follows, `${char} ${sideId}`).toBe(true)
       }
     }
+  })
+})
+
+describe('G0 틈 — 놓을 때도 빈 끝 쪽으로 떨어진다', () => {
+  it('ㅓ에 틈이 있으면 놓인 붙은 끝이 기둥 중심선 왼쪽에 온다', () => {
+    const eo = withGap('ㅓ', 'ㅓ-2', -0.1)
+    const box = at(medialBoxEmOf('ㅓ', 'strokes', 'open'))
+    const { endEm, pillarXEm } = attachedAndPillar(eo, 'ㅓ-2', box)
+    expect(endEm.x).toBeLessThan(pillarXEm)
+    expect(pillarXEm - endEm.x).toBeCloseTo(0.1 * stemReferenceBox('ㅓ', 'strokes', strokeOf(eo, 'ㅓ-2')).width, 9)
   })
 })
