@@ -11,7 +11,7 @@ import styles from './StemSpreadSheet.module.css'
  * 줄기 모양 전파 창. 획 편집에서 획을 잡고 `전파`를 누르면 그 획 하나를 기준으로 뜬다 — 도마 섹션 홈과 같은 판.
  * 카드 = 홀자 하나(기둥이면 16장), 카드 안 자리 = 같은 홀자 안에서 갈리는 줄기(바깥 · 안). 카드는 절대 배치 + transform이라 묶기를 바꾸면 제자리로 미끄러진다.
  * 탭 = 묶는 축(`전체` + 줄기 질문 + 줄기 수). 묶음 머리 `○○ 모두` 체크 = 그 묶음의 줄기 전부, 머리 옆 자리 토글 = 켜진 카드들의 그 자리(꺼진 카드는 안 켠다).
- * 카드 탭 = 낱개 — 자리가 둘이면 첫 자리 → 둘 다 → 끔, 우상단 점 둘이 어느 자리가 켜졌는지 보인다. 기준 획의 홀자는 잠긴다. 뺀 획은 지금 모양 그대로(풀림).
+ * 카드 탭 = 낱개 — 자리가 둘이면 첫 자리 → 둘 다 → 끔, 우상단 점 둘이 어느 자리가 켜졌는지 보인다. 카드 잉크는 검정(주황은 머리의 기준 획만). 기준 획의 홀자는 잠긴다. 뺀 획은 지금 모양 그대로(풀림).
  * `취소` · 바깥 누르기 · Esc는 창만 닫고 획 편집에 남는다. `n자 받기`가 반영.
  */
 
@@ -191,10 +191,10 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
               const spot = layout.at.get(card.char) ?? lastAt.current.get(card.char)
               const on = cardOn(card)
               const onSlots = card.slots.filter((slot) => slotOn(card, slot))
-              const color = (source: ResolvedStrokeInkSource) => source.jamoId === card.char && picked.has(`${card.char}:${source.strokeId}`) ? ACTIVE_STROKE_COLOR : undefined
               return (
                 <button key={card.char} type="button" className={styles.card} style={{ width: cell, height: cell, transform: spot ? `translate(${spot.x}px, ${spot.y}px)` : undefined }} data-char={card.char} data-kind="shape" data-hidden={shown ? undefined : true} aria-hidden={shown ? undefined : true} tabIndex={shown ? undefined : -1} data-locked={card.locked || undefined} data-slots={onSlots.join(' ') || undefined} aria-pressed={on} aria-disabled={card.locked || undefined} aria-label={card.locked ? `${card.char} 고친 홀자(늘 반영)` : `${card.char} ${on ? (onSlots.length === card.slots.length ? '빼기' : '다음 자리도') : '담기'}`} onClick={() => tapCard(card)}>
-                  <AppGlyph char={sampleSyllable(card.char, 'open')} size={Math.round(cell * 0.72)} strokeColorOf={color} jungseongOverride={preview} />
+                  {/* 카드 잉크는 검정 그대로(주황은 머리의 기준 획만). 어느 자리가 켜졌는지는 우상단 점이 말한다. */}
+                  <AppGlyph char={sampleSyllable(card.char, 'open')} size={Math.round(cell * 0.62)} jungseongOverride={preview} />
                   {card.locked && <Lock className={styles.lock} size={14} strokeWidth={2.5} aria-hidden="true" />}
                   {/* 자리가 둘 이상인 카드는 우상단에 자리마다 점 하나 — 켜진 자리만 주황. 기둥은 글자 자리대로 안 점이 왼쪽, 바깥 점이 오른쪽. */}
                   {card.slots.length > 1 && <span className={styles.dots} aria-hidden="true">{(slotFacet === 'side' ? [...card.slots].reverse() : card.slots).map((slot) => <i key={slot} data-on={slotOn(card, slot) || undefined} />)}</span>}

@@ -41,14 +41,15 @@
 /* 카드 = 홀자 하나. 켜진 획은 주황, 꺼진 카드는 잉크가 흐리다(도마 미선택). */
 .card { position: absolute; top: 0; left: 0; display: grid; place-items: center; border: 0; border-radius: 12px; background: rgb(var(--color-surface-3)); transition: transform var(--motion-slow) var(--ease-standard), width var(--motion-slow) var(--ease-standard), height var(--motion-slow) var(--ease-standard), opacity var(--motion-normal) var(--ease-standard); }
 .card[data-hidden] { opacity: 0; pointer-events: none; }
-.card > svg:first-child { opacity: .12; transition: opacity var(--motion-fast) var(--ease-standard); }
+/* 글자는 점 · 자물쇠와 안 겹치게 조금 작고 살짝 아래. */
+.card > svg:first-child { opacity: .12; transform: translateY(6%); transition: opacity var(--motion-fast) var(--ease-standard); }
 .card[aria-pressed='true'] > svg:first-child { opacity: 1; }
 /* 고친 홀자(늘 반영)는 도마 카드 그대로에 구석 자물쇠만. */
 .card[data-locked] { cursor: default; }
 .lock { position: absolute; top: 8px; left: 8px; color: rgb(var(--color-text-5)); }
 /* 자리가 둘 이상인 카드는 우상단에 자리마다 점 하나(순서 = 질문 보기 순서). 켜진 자리만 주황, 나머지 회색. */
-.dots { position: absolute; top: 9px; right: 9px; display: inline-flex; gap: 4px; }
-.dots i { width: 7px; height: 7px; border-radius: 999px; background: rgb(var(--color-text-5) / .45); transition: background-color var(--motion-fast) var(--ease-standard); }
+.dots { position: absolute; top: 8px; right: 8px; display: inline-flex; gap: 3px; }
+.dots i { width: 5px; height: 5px; border-radius: 999px; background: rgb(var(--color-text-5) / .45); transition: background-color var(--motion-fast) var(--ease-standard); }
 .dots i[data-on] { background: #d9480f; }
 .card[aria-pressed='false'] .dots { opacity: .5; }
 
