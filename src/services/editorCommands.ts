@@ -167,18 +167,33 @@ export function scaleStroke(
   bounds: NormalizedBounds = { minX: 0, maxX: 1, minY: 0, maxY: 1 },
   gridStep?: number
 ): ScaleStrokeResult {
+  return scaleStrokes(source, [strokeId], requestedScale, bounds, gridStep)
+}
+
+/**
+ * 획 여럿을 한 덩어리로 키우고 줄인다(획 묶음). 묶인 획 전체 범위의 가운데를 기준으로, 길이가 없는 축은 잠근다.
+ * 획 하나면 `scaleStroke`와 같다.
+ */
+export function scaleStrokes(
+  source: JamoData,
+  strokeIds: readonly string[],
+  requestedScale: StrokeScale,
+  bounds: NormalizedBounds = { minX: 0, maxX: 1, minY: 0, maxY: 1 },
+  gridStep?: number
+): ScaleStrokeResult {
   const jamo = cloneJamoData(source)
-  const stroke = [
+  const strokes = [
     ...(jamo.strokes ?? []),
     ...(jamo.horizontalStrokes ?? []),
     ...(jamo.verticalStrokes ?? []),
-  ].find((item) => item.id === strokeId)
-  if (!stroke || stroke.points.length === 0) {
+  ].filter((item) => strokeIds.includes(item.id))
+  const allPoints = strokes.flatMap((item) => item.points)
+  if (allPoints.length === 0) {
     return { jamo, scale: { x: 1, y: 1 }, changed: false, lockedAxes: { x: true, y: true } }
   }
 
-  const xs = stroke.points.map((point) => point.x)
-  const ys = stroke.points.map((point) => point.y)
+  const xs = allPoints.map((point) => point.x)
+  const ys = allPoints.map((point) => point.y)
   const minX = Math.min(...xs)
   const maxX = Math.max(...xs)
   const minY = Math.min(...ys)
@@ -214,7 +229,7 @@ export function scaleStroke(
     point.x = center.x + (point.x - center.x) * scale.x
     point.y = center.y + (point.y - center.y) * scale.y
   }
-  stroke.points.forEach((point) => {
+  allPoints.forEach((point) => {
     transform(point)
     if (point.handleIn) transform(point.handleIn)
     if (point.handleOut) transform(point.handleOut)
@@ -249,6 +264,53 @@ export function scaleJamoStrokes(source: JamoData, factor: number): JamoData {
     if (point.handleOut) transform(point.handleOut)
   }
   return jamo
+}
+
+/**
+ * 자소 전체를 통째로 옮긴다. 모든 채널의 점 · 핸들을 같은 만큼. 상자 경계로 막지 않는다(자소 통째 크기와 같다).
+ */
+export function translateJamoStrokes(source: JamoData, delta: StrokeMoveDelta): JamoData {
+  const jamo = cloneJamoData(source)
+  if (Math.abs(delta.x) < EPSILON && Math.abs(delta.y) < EPSILON) return jamo
+  const strokes = [
+    ...(jamo.strokes ?? []),
+    ...(jamo.horizontalStrokes ?? []),
+    ...(jamo.verticalStrokes ?? []),
+    ...Object.values(jamo.contextStrokes ?? {}).flatMap((variant) => variant ?? []),
+  ]
+  const shift = (point: { x: number; y: number }) => {
+    point.x += delta.x
+    point.y += delta.y
+  }
+  for (const point of strokes.flatMap((stroke) => stroke.points)) {
+    shift(point)
+    if (point.handleIn) shift(point.handleIn)
+    if (point.handleOut) shift(point.handleOut)
+  }
+  return jamo
+}
+
+/** 자소 통째 이동이 파트 상자 정가운데에 붙는 반경(상자 좌표 0–1). */
+export const WHOLE_JAMO_CENTER_SNAP = 0.025
+
+/**
+ * 자소 통째 이동을 파트 상자 정가운데(0.5)에 붙인다. 중심선 범위의 가운데가 반경 안에 들면 그 축만 딱 맞춘다(가로 · 세로 따로).
+ * `centerOf`는 옮기기 전 자소의 중심선 범위 가운데.
+ */
+export function snapWholeJamoDelta(center: { x: number; y: number }, delta: StrokeMoveDelta, radius = WHOLE_JAMO_CENTER_SNAP): { delta: StrokeMoveDelta; centered: { x: boolean; y: boolean } } {
+  const axis = (from: number, requested: number) => Math.abs(from + requested - 0.5) <= radius ? { value: 0.5 - from, hit: true } : { value: requested, hit: false }
+  const x = axis(center.x, delta.x)
+  const y = axis(center.y, delta.y)
+  return { delta: { x: x.value, y: y.value }, centered: { x: x.hit, y: y.hit } }
+}
+
+/** 자소 중심선 범위(모든 채널 점)의 가운데. 점이 없으면 상자 가운데. */
+export function jamoCenterlineCenter(source: JamoData): { x: number; y: number } {
+  const points = [...(source.strokes ?? []), ...(source.horizontalStrokes ?? []), ...(source.verticalStrokes ?? [])].flatMap((stroke) => stroke.points)
+  if (!points.length) return { x: 0.5, y: 0.5 }
+  const xs = points.map((point) => point.x)
+  const ys = points.map((point) => point.y)
+  return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 }
 }
 
 export function formatMoveSummary(delta: StrokeMoveDelta): string {

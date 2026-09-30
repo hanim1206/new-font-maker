@@ -16,7 +16,7 @@ import { adoptFamilyStrokes, familyOfSyllable } from '../src/utils/jamoContextSt
 import { DOUBLE_SPLIT, doubleFromSingle } from '../src/utils/jamoFromChoseong'
 import { withFrameFrom, withoutFrame } from '../src/utils/jamoFrame'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
-import { faceSnapCandidates, horizontalStrokeEndsX, pointAnchors, snapStrokeDrag, strokeBodyAnchors, strokeSnapCandidates, withoutOwnCandidates } from './strokeSnap'
+import { faceSnapCandidates, horizontalStrokeEndsX, jamoVertexCandidates, pointAnchors, snapStrokeDrag, strokeBodyAnchors, strokeSnapCandidates, withoutOwnCandidates } from './strokeSnap'
 import type { SnapAnchors } from './strokeSnap'
 import type { SnapCandidate, SnapHit } from './railSnap'
 import { baselineRails } from './notoBaselineRails'
@@ -28,7 +28,7 @@ import { useWorkbenchStore, workbenchJamoOf, workbenchSyllable } from '../src/st
 import { groupMatching, useJamoGroupStore } from '../src/stores/jamoGroupStore'
 import confirmStyles from './workspace/FontExportDialog.module.css'
 import { useLayoutStore } from '../src/stores/layoutStore'
-import { moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStroke } from '../src/services/editorCommands'
+import { jamoCenterlineCenter, moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStrokes, snapWholeJamoDelta, translateJamoStrokes } from '../src/services/editorCommands'
 import { storedStemDelta } from '../src/services/stemBend'
 import { stemRailGuides } from '../src/services/medialStemRails'
 import { StemSpreadSheet } from './StemSpreadSheet'
@@ -187,7 +187,9 @@ export type HistoryEntry =
       afterOverrides: LayoutSchema['userPartOverrides']
       edit: SampleGlyphEdit
     }
-  | { kind: 'jamo'; jamoType: JamoData['type']; char: string; before: JamoData; after: JamoData; edit: SampleGlyphEdit }
+  // 획 편집 끌기.
+  // `picked`: 이 편집을 할 때 잡혀 있던 선택(획 · 점 묶음 · 획 묶음 · 자소 전체). 되돌리기 · 다시 하기가 되살린다 — 선택 자체는 기록 단위가 아니다.
+  | { kind: 'jamo'; jamoType: JamoData['type']; char: string; before: JamoData; after: JamoData; edit: SampleGlyphEdit; picked?: PickedSelection }
   | { kind: 'brush'; before: StrokeRenderStyle; after: StrokeRenderStyle; ends?: { before: StrokeEnds; after: StrokeEnds } }
   | { kind: 'tone'; before: StyleTone; after: StyleTone }
   // `groupId`가 있으면 사용자 묶음의 부리. `groupBefore`는 되돌릴 값(없으면 전역을 따르던 상태).
@@ -197,6 +199,8 @@ export type HistoryEntry =
   // 획 편집에서 나갈 때 줄기 모양을 형제에 반영했다. 마스터와 바뀐 홀자 앞뒤를 통째로 든다.
   | { kind: 'stemShape'; mastersBefore: StemMasters; mastersAfter: StemMasters; jamoBefore: Record<string, JamoData>; jamoAfter: Record<string, JamoData> }
 
+/** 편집할 때의 선택. 되돌리기가 그대로 되살린다. */
+type PickedSelection = { selection: Selection; points: SelectedPoint[]; strokes: string[] }
 
 
 /** 자소 탭 편집 모드. 획 = 점·획·자소 형태, 레이아웃 = 기준선으로 배치(Δ 저장). */
@@ -351,6 +355,7 @@ function roleRenderParts(part: MobileEditorPart, boxes: Partial<Record<Part, Box
 }
 
 const NO_PARTS: readonly MobileEditorPart[] = []
+const NO_STROKES: readonly string[] = []
 const editorPartOf = (part: Part): MobileEditorPart => part === 'CH' ? 'CH' : part === 'JO' ? 'JO' : 'JU'
 /** `획 고치기`로 잠긴 동안 고치지 않는 자소의 잉크 농도. */
 const LOCKED_OUT_OPACITY = 0.22
@@ -458,6 +463,9 @@ function FocusedGlyph({
   schema,
   selection,
   selectedPoints,
+  selectedStrokes = NO_STROKES,
+  wholeJamoCentered = null,
+  multiSelectArmed = false,
   onSelect,
   onPointSelect,
   lockedPart = null,
@@ -483,6 +491,12 @@ function FocusedGlyph({
   gapWarningParts?: readonly MobileEditorPart[]
   onSelect: (selection: Selection) => void
   selectedPoints: SelectedPoint[]
+  /** 획 묶음. 둘 이상이면 묶인 획이 모두 잡힌 획처럼 중심선으로 보인다. */
+  selectedStrokes?: readonly string[]
+  /** 자소 통째 이동이 파트 상자 정가운데에 붙은 축. 그 축에 가운데 선을 긋는다. */
+  wholeJamoCentered?: { x: boolean; y: boolean } | null
+  /** 조절판에 손가락이 하나 닿아 있다. 그동안 캔버스 누르기는 무조건 획 묶음 넣고 빼기다 — 점 고르기 · 끌기 · 빈 곳 풀기는 안 한다. */
+  multiSelectArmed?: boolean
   onPointSelect: (selection: Extract<Selection, { kind: 'point' }>) => void
   fontSpace: { unitsPerEm: number }
   grid: { majorDivisions: number; minorInterval: number }
@@ -558,6 +572,15 @@ function FocusedGlyph({
     ...(resolution ? faceSnapCandidates(resolution.parts) : []),
   ], [dragApiRef, notoGlyph, resolution])
   const strokeCandidates = useMemo(() => strokeSnapCandidates(targets.map((target) => ({ strokeId: target.stroke.id, label: `${target.jamo.char} 획`, stroke: target.stroke, box: target.box }))), [targets])
+  // 끌기 후보: 같은 자소의 꼭짓점 · 대칭 자리가 먼저, 그다음 기준선 · 상자 변 · 다른 획 끝, 그다음 격자.
+  const dragCandidates = (dragged: { strokeId: string; pointIndex?: number }): SnapCandidate[] => {
+    const own = targets.find((target) => target.stroke.id === dragged.strokeId)
+    const sameJamo = own ? targets.filter((target) => target.editorPart === own.editorPart && target.jamo.type === own.jamo.type && target.jamo.char === own.jamo.char) : []
+    return [
+      ...jamoVertexCandidates(sameJamo.map((target) => ({ strokeId: target.stroke.id, label: target.jamo.char, stroke: target.stroke, box: target.box })), dragged),
+      ...withoutOwnCandidates([...guideRails, ...strokeCandidates], dragged),
+    ]
+  }
   const [snapHits, setSnapHits] = useState<{ x: SnapHit | null; y: SnapHit | null } | null>(null)
   // 이름표에는 기준선 · 획 · 격자만 올린다. `처음 자리`는 끄는 내내 걸려 있어서 뺀다.
   const snapHitLabels = snapHits ? [snapHits.x, snapHits.y].filter((hit): hit is SnapHit => Boolean(hit) && hit!.kind !== 'model').map((hit) => hit.touch ? `${hit.label}에 딱 붙음` : hit.label).filter((label, index, labels) => labels.indexOf(label) === index) : []
@@ -583,6 +606,11 @@ function FocusedGlyph({
   // `pressed`: 누른 눌림 영역의 주인. 누른 자리가 어느 영역에도 안 들면(좌표 없는 합성 이벤트 등) 그대로 잡는다.
   const pressActiveStroke = (event: ReactPointerEvent<SVGElement>, target: (typeof targets)[number], pressed: { pointIndex: number; handle?: 'in' | 'out' }) => {
     event.stopPropagation()
+    // 조절판을 누른 동안은 점 · 핸들 자리를 눌러도 그 획을 묶음에 넣고 뺀다.
+    if (multiSelectArmed) {
+      onSelect({ kind: 'stroke', component: componentFor(char, target.editorPart, target.jamo), editorPart: target.editorPart, renderPart: target.renderPart, jamo: target.jamo, strokeId: target.stroke.id, box: target.box })
+      return
+    }
     const matrix = (event.currentTarget as SVGGraphicsElement).getScreenCTM()
     const at = matrix ? new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()) : null
     const distanceTo = (point: { x: number; y: number }) => {
@@ -632,7 +660,7 @@ function FocusedGlyph({
     // 끌기가 없는 화면은 누르기가 곧 탭이다.
     if (!dragApiRef || !canvasRef.current) { onTap?.(); return }
     // 닻과 후보는 누른 순간의 자리로 굳힌다. 끄는 동안 자기 자신에게 걸리지 않게 자기 후보는 뺀다.
-    drag.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, box, started: false, anchors, candidates: withTouch(withoutOwnCandidates([...guideRails, ...strokeCandidates], dragged), dragged.strokeId), onTap }
+    drag.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, box, started: false, anchors, candidates: withTouch(dragCandidates(dragged), dragged.strokeId), onTap }
     canvasRef.current.setPointerCapture(event.pointerId)
   }
   const moveDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -672,7 +700,7 @@ function FocusedGlyph({
     if (selection.kind !== 'stroke' && !handlePoint) return false
     const anchors = handlePoint ? pointAnchors(handlePoint, target.box) : strokeBodyAnchors(target.stroke, target.box)
     const dragged = selection.kind === 'stroke' ? { strokeId: target.stroke.id } : { strokeId: target.stroke.id, pointIndex: selection.pointIndex }
-    padDrag.current = { box: target.box, anchors, candidates: withTouch(withoutOwnCandidates([...guideRails, ...strokeCandidates], dragged), dragged.strokeId) }
+    padDrag.current = { box: target.box, anchors, candidates: withTouch(dragCandidates(dragged), dragged.strokeId) }
     dragApiRef.current.begin()
     return true
   }
@@ -705,7 +733,7 @@ function FocusedGlyph({
   const body = { x: designBody.x / fontSpace.unitsPerEm * VIEW_BOX_SIZE, y: designBody.y / fontSpace.unitsPerEm * VIEW_BOX_SIZE, width: designBody.width / fontSpace.unitsPerEm * VIEW_BOX_SIZE, height: designBody.height / fontSpace.unitsPerEm * VIEW_BOX_SIZE }
 
   return (
-    <div ref={canvasRef} className={styles.focusCanvas} style={canvasStyle} data-testid="focus-canvas" data-pinch-lock data-placement={placement.kind} data-direct={dragApiRef ? true : undefined} data-gap-warning={gapWarningParts.length ? true : undefined} onPointerDown={() => onSelect({ kind: 'none' })} onPointerMove={moveDrag} onPointerUp={(event) => endDrag(event, false)} onPointerCancel={(event) => endDrag(event, true)}>
+    <div ref={canvasRef} className={styles.focusCanvas} style={canvasStyle} data-testid="focus-canvas" data-pinch-lock data-placement={placement.kind} data-direct={dragApiRef ? true : undefined} data-gap-warning={gapWarningParts.length ? true : undefined} onPointerDown={() => { if (!multiSelectArmed) onSelect({ kind: 'none' }) }} onPointerMove={moveDrag} onPointerUp={(event) => endDrag(event, false)} onPointerCancel={(event) => endDrag(event, true)}>
       {globalStyle.strokeStyle.mode === 'legacy-snapped-centerline' && <span className={styles.constructionGrid} aria-hidden="true" data-construction-grid="legacy-snapped-centerline" />}
       <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} size={340} viewportBox={viewport} className={styles.focusSvg} partStyles={partStyles} globalStyle={globalStyle} straightUnderlay={<>
         {/* 검수 캔버스(GhostCanvas)와 같은 깔개: 흰 칸 → 1/16 잔선·1/4 굵은선 눈금 → 칸 테두리 → 글자몸 → 기준선(0.88) → 부품 상자 → Noto 고스트. 전부 잉크 아래. */}
@@ -745,9 +773,12 @@ function FocusedGlyph({
           const warning = gapWarningParts.includes(target.editorPart)
           const pointsOpen = pointsOpenStrokeId === target.stroke.id
           return <g key={`hit-${target.renderPart}-${target.stroke.id}`} className={styles.strokeTarget} style={{ '--selection-color': warning ? SELECTION_WARNING_COLOR : SELECTION_COLOR } as CSSProperties}>
-          {isSelected
+          {isSelected || (selectedStrokes.length > 1 && selectedStrokes.includes(target.stroke.id))
             ? <path d={path} className={styles.selectedCenterline} pointerEvents="none" data-active-stroke={warning ? 'warning' : 'active'} />
-            : <path d={path} className={styles.hoverCenterline} pointerEvents="none" />}
+            // 아무것도 안 골랐으면 잠긴 자소 전체가 잡힌 상태다(두 손가락 = 통째 크기, 한 손가락 = 통째 이동). 옅은 중심선으로 보인다.
+            : selection.kind === 'none' && lockedPart !== null && target.editorPart === lockedPart
+              ? <path d={path} className={styles.wholeCenterline} pointerEvents="none" data-whole-jamo="true" />
+              : <path d={path} className={styles.hoverCenterline} pointerEvents="none" />}
           <path
             d={path}
             fill="none"
@@ -761,6 +792,8 @@ function FocusedGlyph({
               event.stopPropagation()
               if (sameComponent) {
                 const strokeSelection = { kind: 'stroke', component, editorPart: target.editorPart, renderPart: target.renderPart, jamo: target.jamo, strokeId: target.stroke.id, box: target.box } as const
+                // 조절판을 누른 동안은 묶음에 넣고 빼기만. 끌기 · 점 펼치기는 안 한다.
+                if (multiSelectArmed) return onSelect(strokeSelection)
                 const anchors = strokeBodyAnchors(target.stroke, target.box)
                 if (pointsOpen) {
                   // 점이 펼쳐진 획의 몸통: 점 선택만 풀고 펼친 채로 둔다. 끌면 획째 옮긴다.
@@ -846,8 +879,21 @@ function FocusedGlyph({
             ? <line key={axis} x1={at} x2={at} y1={-8} y2={108} className={styles.snapHitLine} data-testid="stroke-snap-hit" data-axis="x" />
             : <line key={axis} x1={-8} x2={108} y1={at} y2={at} className={styles.snapHitLine} data-testid="stroke-snap-hit" data-axis="y" />
         })}
+        {/* 자소 통째 이동이 파트 상자 정가운데에 붙었다. 스냅 선과 같은 모양으로 가운데를 긋는다. */}
+        {wholeJamoCentered && lockedPart && (() => {
+          const box = targets.find((target) => target.editorPart === lockedPart)?.box
+          if (!box) return null
+          const cx = (box.x + box.width / 2) * VIEW_BOX_SIZE
+          const cy = (box.y + box.height / 2) * VIEW_BOX_SIZE
+          return <>
+            {wholeJamoCentered.x && <line x1={cx} x2={cx} y1={-8} y2={108} className={styles.snapHitLine} data-testid="whole-jamo-center" data-axis="x" />}
+            {wholeJamoCentered.y && <line x1={-8} x2={108} y1={cy} y2={cy} className={styles.snapHitLine} data-testid="whole-jamo-center" data-axis="y" />}
+          </>
+        })()}
       </SvgRenderer>
-      {snapHitLabels.length > 0 && <span className={styles.snapHitChip} data-testid="stroke-snap-chip">{snapHitLabels.join(' · ')}</span>}
+      {wholeJamoCentered
+        ? <span className={styles.snapHitChip} data-testid="stroke-snap-chip">파트 가운데</span>
+        : snapHitLabels.length > 0 && <span className={styles.snapHitChip} data-testid="stroke-snap-chip">{snapHitLabels.join(' · ')}</span>}
       <span className={styles.focusChar} aria-hidden="true">{char} · {fontSpace.unitsPerEm} UPM</span>
       <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="noto-ghost-toggle">
         {ghostVisible && comparison && ('xorRatio' in comparison
@@ -865,6 +911,8 @@ function InferenceTrackpad({
   selection,
   creationSelection = null,
   selectedPoints,
+  selectedStrokes,
+  onWholeJamoCenteredChange,
   layoutType,
   schema,
   snapStep,
@@ -891,6 +939,10 @@ function InferenceTrackpad({
   /** 아무것도 안 잡혔을 때 넣기 도구(추가 · 원)가 기댈 자리. 획 편집에 잠긴 자소의 첫 획. */
   creationSelection?: Selection | null
   selectedPoints: SelectedPoint[]
+  /** 획 묶음. 둘 이상이면 잡은 획을 끌 때 묶인 획이 같이 움직인다. */
+  selectedStrokes: readonly string[]
+  /** 자소 통째 이동이 파트 상자 정가운데에 붙은 축(없으면 null). 캔버스가 가운데 선을 긋는다. */
+  onWholeJamoCenteredChange?: (centered: { x: boolean; y: boolean } | null) => void
   layoutType: LayoutType
   schema: LayoutSchema
   snapStep: number
@@ -1003,6 +1055,17 @@ function InferenceTrackpad({
   const editBounds = (source: JamoData) => selection.kind === 'none' || selection.kind === 'component'
     ? CALIBRATION_FREEFORM_BOUNDS
     : calibrationEditBounds(selection.box, getJamoStrokes(source), weightToMultiplier(useGlobalStyleStore.getState().style.weight))
+  // 잡은 획을 옮긴다. 획 묶음이면 잡은 획의 이동(경계 · 눈금 반영)만큼 묶인 획도 같이.
+  const moveSelectedStrokes = (source: JamoData, requested: StrokeMoveDelta) => {
+    if (selection.kind !== 'stroke') return null
+    const first = moveStroke(source, selection.strokeId, requested, editBounds(source), moveGridStep())
+    if (selectedStrokes.length < 2) return first
+    let jamo = first.jamo
+    for (const strokeId of selectedStrokes) {
+      if (strokeId !== selection.strokeId) jamo = moveStroke(jamo, strokeId, first.delta, CALIBRATION_FREEFORM_BOUNDS).jamo
+    }
+    return { ...first, jamo }
+  }
   const moveSelectedPoints = (source: JamoData, requested: StrokeMoveDelta) => {
     if (selection.kind !== 'point' || selectedPoints.length < 2) {
       return selection.kind === 'point'
@@ -1101,7 +1164,7 @@ function InferenceTrackpad({
       const createCandidate = (factor: number) => {
         const movementAtFactor = toStored({ x: strokeMove.x * factor, y: strokeMove.y * factor })
         const moved = selection.kind === 'stroke'
-          ? moveStroke(startJamo.current!, selection.strokeId, movementAtFactor, editBounds(startJamo.current!), moveGridStep())
+          ? moveSelectedStrokes(startJamo.current!, movementAtFactor)
           : selection.kind === 'point'
             ? moveSelectedPoints(startJamo.current!, movementAtFactor)
             : selection.kind === 'handle'
@@ -1171,7 +1234,7 @@ function InferenceTrackpad({
         x: 1 + (nextScale.x - 1) * factor,
         y: 1 + (nextScale.y - 1) * factor,
       })
-      const createCandidate = (factor: number) => scaleStroke(startJamo.current!, selection.strokeId, scaleAtFactor(factor), editBounds(startJamo.current!))
+      const createCandidate = (factor: number) => scaleStrokes(startJamo.current!, selectedStrokes.length > 1 ? selectedStrokes : [selection.strokeId], scaleAtFactor(factor), editBounds(startJamo.current!))
       const safeFactor = findMaximumSafeEditFactor((factor) => !jamoInkGapViolation(createCandidate(factor).jamo))
       const result = createCandidate(safeFactor)
       currentJamo.current = result.jamo
@@ -1438,36 +1501,76 @@ function InferenceTrackpad({
 
   // 조절판 이동이 캔버스 끌기 계산(px → em · 같은 스냅)으로 가는 중인지. 셸 안의 획 · 점 · 핸들만 그렇고, 자소 통째 · 옛 화면은 옛 계산이다.
   const padRouted = useRef(false)
+  // 아무것도 안 골랐으면 잠긴 자소 전체가 잡힌 상태다: 두 손가락은 통째로 키우고(왼쪽 크기 막대와 같은 계산, 가로 · 세로 같은 비율), 한 손가락은 통째로 옮긴다.
+  const wholeJamoPinch = selection.kind === 'none' && Boolean(creationBase)
+  const wholeJamoFactor = useRef(1)
+  const wholeJamoMove = useRef<{ source: JamoData; center: { x: number; y: number }; delta: StrokeMoveDelta } | null>(null)
+  const beginWholeJamoMove = () => {
+    const base = creationBase
+    const source = base ? structuredClone(adoptFamilyStrokes(getJamo(base.jamo.type, base.jamo.char) ?? base.jamo, familyOfSyllable(syllable))) : null
+    wholeJamoMove.current = source ? { source, center: jamoCenterlineCenter(source), delta: { x: 0, y: 0 } } : null
+  }
+  const changeWholeJamoMove = (movement: StrokeMoveDelta) => {
+    const state = wholeJamoMove.current
+    if (!state) return
+    // 눈금에 붙이고, 파트 상자 정가운데 가까이면 가운데에 먼저 붙인다(09-30 사용자).
+    const gridded = { x: Math.round(movement.x * .001 / snapStep) * snapStep, y: Math.round(movement.y * .001 / snapStep) * snapStep }
+    const snapped = snapWholeJamoDelta(state.center, gridded)
+    state.delta = snapped.delta
+    onWholeJamoCenteredChange?.(snapped.centered.x || snapped.centered.y ? snapped.centered : null)
+    onPreviewJamo({ type: state.source.type, char: state.source.char, data: translateJamoStrokes(state.source, state.delta), baseline: state.source, pastGapLimit: true })
+  }
+  const commitWholeJamoMove = () => {
+    const state = wholeJamoMove.current
+    const base = creationBase
+    wholeJamoMove.current = null
+    onWholeJamoCenteredChange?.(null)
+    if (!state || !base) return onPreviewJamo(null)
+    onCommitJamo(state.source, translateJamoStrokes(state.source, state.delta), { kind: 'stroke-move', glyph, component: base.component, jamoType: state.source.type, strokeId: base.strokeId, delta: state.delta }, { pastGapLimit: true })
+  }
   const trackpad = useUnifiedTrackpad({
-    enabled: selection.kind !== 'none',
-    scaleEnabled: selection.kind === 'component' || selection.kind === 'stroke',
+    enabled: selection.kind !== 'none' || wholeJamoPinch,
+    scaleEnabled: selection.kind === 'component' || selection.kind === 'stroke' || wholeJamoPinch,
     moveDeadzone: direct ? DRAG_THRESHOLD_PX : undefined,
     onMoveStart: () => {
+      if (wholeJamoPinch) return beginWholeJamoMove()
       padRouted.current = Boolean(direct && padDragRef?.current?.begin())
       if (padRouted.current) return
       padMove.current = true
       beginMove()
     },
-    onMoveChange: (movement) => padRouted.current ? padDragRef?.current?.move(movement.x, movement.y) : changeMove(movement),
+    onMoveChange: (movement) => wholeJamoPinch ? changeWholeJamoMove(movement) : padRouted.current ? padDragRef?.current?.move(movement.x, movement.y) : changeMove(movement),
     onMoveCommit: () => {
+      if (wholeJamoPinch) return commitWholeJamoMove()
       if (!padRouted.current) return commitMove()
       padRouted.current = false
       padDragRef?.current?.end(false)
     },
-    onScaleStart: beginScale,
-    onScaleChange: changeScale,
-    onScaleCommit: commitScale,
+    onScaleStart: () => {
+      if (!wholeJamoPinch) return beginScale()
+      wholeJamoFactor.current = 1
+      beginJamoScale()
+    },
+    onScaleChange: (relative, axis) => {
+      if (!wholeJamoPinch) return changeScale(relative, axis)
+      wholeJamoFactor.current = Math.min(2, Math.max(.5, axis === 'x' ? relative.x : relative.y))
+      changeJamoScale(wholeJamoFactor.current)
+    },
+    onScaleCommit: () => wholeJamoPinch ? commitJamoScale(wholeJamoFactor.current) : commitScale(),
     onCancel: () => {
+      if (wholeJamoPinch) {
+        wholeJamoMove.current = null
+        return cancelJamoScale()
+      }
       if (!padRouted.current) return cancel()
       padRouted.current = false
       padDragRef?.current?.end(true)
     },
   })
   useEffect(() => {
-    // 조절판에 손가락을 대고 있는 동안 누르는 점이 더해진다. 조절판이 있을 때만(`여러 점` 단추는 뺐다).
-    if (direct) return
+    // 조절판에 손가락을 대고 있는 동안 누르는 점 · 획이 더해진다(`여러 점` 단추는 뺐다). 셸(캔버스 직접 끌기)에도 조절판이 돌아와서 같이 쓴다.
     onMultiSelectArmedChange(trackpad.visualState.mode === 'pending' && trackpad.visualState.points.length === 1)
-  }, [direct, onMultiSelectArmedChange, trackpad.visualState.mode, trackpad.visualState.points.length])
+  }, [onMultiSelectArmedChange, trackpad.visualState.mode, trackpad.visualState.points.length])
   // 캔버스 끌기는 늘 지금 선택을 아는 최신 계산을 불러야 한다.
   useEffect(() => {
     if (!dragApiRef) return
@@ -1493,6 +1596,21 @@ function InferenceTrackpad({
     const editable = selection.kind === 'stroke' || selection.kind === 'point' || selection.kind === 'handle'
     const onPoint = selection.kind === 'point' || selection.kind === 'handle'
     // 조작 안내 문구는 두지 않는다. 여러 점·간격 경고처럼 지금 상태가 바뀐 것만 알린다.
+    // 두 손가락으로 늘어나는 축. 획 하나는 길이가 있는 축만(가로획은 세로가 잠긴다 — `scaleStroke`의 잠긴 축), 자소 전체는 둘 다 같은 비율.
+    const stretchAxes = wholeJamoPinch
+      ? { x: true, y: true }
+      : selection.kind === 'stroke' && selectedStroke
+        ? (() => {
+          // 획 묶음이면 묶인 획 전체 범위로(한 덩어리로 늘어난다).
+          const group = selectedStrokes.length > 1 ? getJamoStrokes(selection.jamo).filter((stroke) => selectedStrokes.includes(stroke.id)) : [selectedStroke]
+          const xs = group.flatMap((stroke) => stroke.points.map((point) => point.x))
+          const ys = group.flatMap((stroke) => stroke.points.map((point) => point.y))
+          return { x: Math.max(...xs) - Math.min(...xs) > 1e-6, y: Math.max(...ys) - Math.min(...ys) > 1e-6 }
+        })()
+        : { x: false, y: false }
+    const scaling = trackpad.visualState.mode === 'scale'
+    // 늘리는 중에 진하게 켤 길. 잠긴 축으로 벌리면 켜지 않는다. 자소 전체는 벌린 축과 상관없이 둘 다라 켜진 채(둘 다 옅게) 둔다.
+    const scaleLaneAxis = wholeJamoPinch ? null : trackpad.visualState.axis && stretchAxes[trackpad.visualState.axis] ? trackpad.visualState.axis : null
     const directLabel = [
       selectedPoints.length > 1 ? `점 ${selectedPoints.length}개 함께` : '',
       inkGapLimiter ? pastGapLimit.current ? `${inkGapLimiter.char}에서 옆 자소에 너무 붙음` : `${inkGapLimiter.char}에서 최소 간격 · 더 끌면 넘어감` : '',
@@ -1555,14 +1673,17 @@ function InferenceTrackpad({
           {/* 섬세한 편집용 조절판. 손가락이 글자를 가리지 않고, 1px이 1u라 캔버스 끌기보다 잘게 옮긴다. */}
           <div
             {...trackpad.handlers}
-            className={`${legacyTrackpadStyles.trackpad} ${styles.trackpad} ${styles.strokeTrackpad} ${selection.kind === 'none' ? styles.trackpadDisabled : ''}`}
+            className={`${legacyTrackpadStyles.trackpad} ${styles.trackpad} ${styles.strokeTrackpad} ${selection.kind === 'none' && !wholeJamoPinch ? styles.trackpadDisabled : ''} ${scaling ? legacyTrackpadStyles.scaleActive : ''} ${scaling && scaleLaneAxis === 'x' ? legacyTrackpadStyles.scaleAxisX : scaling && scaleLaneAxis === 'y' ? legacyTrackpadStyles.scaleAxisY : ''}`}
+            data-scaling={scaling || undefined}
+            data-whole={wholeJamoPinch || undefined}
             role="group"
             aria-label="선택한 획을 잘게 옮기는 트랙패드"
             aria-disabled={selection.kind === 'none'}
             data-testid="jamo-stroke-trackpad"
           >
-            <span className={legacyTrackpadStyles.horizontalLane} aria-hidden="true" />
-            <span className={legacyTrackpadStyles.verticalLane} aria-hidden="true" />
+            {/* 가운데 길: 두 손가락으로 늘어나는 방향. 획 하나면 길이 방향만(가로획 = 가로), 자소 전체면 둘 다. 늘리는 중엔 늘리는 쪽이 진해진다. */}
+            <span className={`${legacyTrackpadStyles.horizontalLane} ${stretchAxes.x ? styles.laneHint : ''}`} aria-hidden="true" data-lane="x" data-stretch={stretchAxes.x || undefined} />
+            <span className={`${legacyTrackpadStyles.verticalLane} ${stretchAxes.y ? styles.laneHint : ''}`} aria-hidden="true" data-lane="y" data-stretch={stretchAxes.y || undefined} />
             {trackpad.visualState.points.map((point, index) => <span key={index} className={legacyTrackpadStyles.pinchPoint} style={{ left: point.x, top: point.y }} aria-hidden="true" />)}
           </div>
           {!toolSlot && strokeTools}
@@ -1802,6 +1923,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const [selectedChar, setSelectedChar] = useState(soloEntry ?? focus.char)
   const [selection, setSelection] = useState<Selection>({ kind: 'none' })
   const [selectedPoints, setSelectedPoints] = useState<SelectedPoint[]>([])
+  // 획 묶음(여러 획 함께 이동). 둘 이상일 때만 묶음이다. 점 묶음(`selectedPoints`)과 따로 — 획 묶음은 점을 안 띄운다.
+  const [selectedStrokes, setSelectedStrokes] = useState<string[]>([])
+  const [wholeJamoCentered, setWholeJamoCentered] = useState<{ x: boolean; y: boolean } | null>(null)
   const [multiSelectArmed, setMultiSelectArmed] = useState(false)
   // 캔버스 왼쪽 도구 줄. 단추는 트랙패드 컴포넌트가 들고 이 자리에 그린다.
   const [strokeToolSlot, setStrokeToolSlot] = useState<HTMLDivElement | null>(null)
@@ -2019,6 +2143,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     setSelectedChar(char)
     setSelection({ kind: 'none' })
     setSelectedPoints([])
+    setSelectedStrokes([])
     setPreviewJamo(null)
     setPreviewSchema(null)
     setInkGapLimiter(null)
@@ -2033,6 +2158,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     setSelectedChar(char)
     setSelection({ kind: 'none' })
     setSelectedPoints([])
+    setSelectedStrokes([])
     setPreviewJamo(null)
     setPreviewSchema(null)
     setInkGapLimiter(null)
@@ -2046,6 +2172,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     setSelectedChar(soloChar)
     setSelection({ kind: 'none' })
     setSelectedPoints([])
+    setSelectedStrokes([])
     setPreviewJamo(null)
     setPreviewSchema(null)
     setInkGapLimiter(null)
@@ -2065,6 +2192,33 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     if (lockedPart && requested.kind !== 'none' && requested.editorPart !== lockedPart) return
     // 모델 상자로 그리는 글자는 자소를 통째로 옮겨도(옛 스키마 저장) 글자에 안 닿는다. 자소를 누르면 통째 선택 대신 그 첫 획을 잡는다 — 자리는 레이아웃에서 고친다.
     if (schemaMoveLocked && nextSelection.kind === 'component') nextSelection = firstStrokeSelectionOf(nextSelection.editorPart) ?? nextSelection
+    const current = selection.kind === 'stroke' || selection.kind === 'point' || selection.kind === 'handle' ? selection : null
+    const sameJamo = Boolean(current && nextSelection.kind === 'stroke' && current.editorPart === nextSelection.editorPart
+      && current.jamo.type === nextSelection.jamo.type && current.jamo.char === nextSelection.jamo.char)
+    if (nextSelection.kind === 'stroke' && current && sameJamo) {
+      // 조절판에 손가락을 댄 채(여러 개 고르기) 같은 자소의 다른 획을 누르면 획 묶음에 더한다. 묶음은 점 없이 중심선으로만 보인다.
+      if (multiSelectArmed) {
+        const base = selectedStrokes.length > 0 ? selectedStrokes : [current.strokeId]
+        setSelectedPoints([])
+        // 이미 묶인 획을 누르면 뺀다(피그마 shift+클릭처럼). 하나 남으면 그 획 하나를 잡은 상태로.
+        if (base.includes(nextSelection.strokeId)) {
+          const rest = base.filter((strokeId) => strokeId !== nextSelection.strokeId)
+          if (rest.length === 0) return
+          setSelectedStrokes(rest.length > 1 ? rest : [])
+          setSelection({ ...nextSelection, strokeId: current.strokeId === nextSelection.strokeId ? rest[0] : current.strokeId })
+          return
+        }
+        setSelectedStrokes([...base, nextSelection.strokeId])
+        setSelection(nextSelection)
+        return
+      }
+      // 묶음에 든 획을 누르면 묶음을 그대로 둔다(피그마처럼) — 그대로 끌면 다 같이 움직인다. 푸는 건 빈 곳.
+      if (selectedStrokes.length > 1 && selectedStrokes.includes(nextSelection.strokeId)) {
+        setSelection(nextSelection)
+        return
+      }
+    }
+    setSelectedStrokes([])
     setSelection(nextSelection)
     if (nextSelection.kind === 'point' || nextSelection.kind === 'handle') {
       setSelectedPoints([{ strokeId: nextSelection.strokeId, pointIndex: nextSelection.pointIndex }])
@@ -2074,9 +2228,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   }
   const selectPointFromCanvas = (nextSelection: Extract<Selection, { kind: 'point' }>) => {
     setSelection(nextSelection)
+    setSelectedStrokes([])
     const nextPoint = { strokeId: nextSelection.strokeId, pointIndex: nextSelection.pointIndex }
+    // 피그마처럼: 이미 고른 묶음 안의 점을 누르면 묶음을 그대로 둔다 — 그대로 끌면 다 같이 움직인다. 푸는 건 빈 곳.
+    const inGroup = selectedPoints.length > 1 && selectedPoints.some((point) => point.strokeId === nextPoint.strokeId && point.pointIndex === nextPoint.pointIndex)
     if (!multiSelectArmed) {
-      setSelectedPoints([nextPoint])
+      if (!inGroup) setSelectedPoints([nextPoint])
       return
     }
     const currentJamo = selection.kind === 'stroke' || selection.kind === 'point' || selection.kind === 'handle'
@@ -2092,6 +2249,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   }
   const handleTrackpadSelectionChange = (nextSelection: Selection) => {
     setSelection(nextSelection)
+    setSelectedStrokes([])
     if (nextSelection.kind === 'stroke' || nextSelection.kind === 'component' || nextSelection.kind === 'none') {
       setSelectedPoints([])
     }
@@ -2168,7 +2326,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     const framedAfter = options?.unframed ? withoutFrame(after) : frameForEdit(after)
     const safeAfter = options?.pastGapLimit ? withoutInkSafety(framedAfter) : withContextualInkSafety(storedBefore, before, framedAfter, minimumInkGap)
     const edit = createSampleGlyphEdit(raw)
-    setHistory((entries) => [...entries, { kind: 'jamo', jamoType: before.type, char: before.char, before: storedBefore, after: safeAfter, edit }])
+    setHistory((entries) => [...entries, { kind: 'jamo', jamoType: before.type, char: before.char, before: storedBefore, after: safeAfter, edit, picked: { selection, points: selectedPoints, strokes: selectedStrokes } }])
     setFuture([])
     useCalibrationProjectStore.getState().addSampleGlyphEdit(edit)
     updateJamo(safeAfter)
@@ -2316,6 +2474,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       if (event.key !== 'Escape' || event.isComposing || isTypingTarget(event.target)) return
       setSelection({ kind: 'none' })
       setSelectedPoints([])
+      setSelectedStrokes([])
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -2335,6 +2494,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     setStrokeEntryPart(editorPart)
     setSelection(firstStrokeSelectionOf(editorPart) ?? { kind: 'none' })
     setSelectedPoints([])
+    setSelectedStrokes([])
     chooseEditMode('stroke')
     // 첫닿자는 단독 칸으로 먼저 연다. 첫 획은 단독 글자가 그려진 다음 그림에서 잡는다.
     const solo = chrome === 'workspace' && editorPart === 'CH' ? soloConsonantOf(selectedChar) : null
@@ -2363,6 +2523,32 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     else updateJamo(entry.before)
     if (entry.kind === 'layout' || entry.kind === 'jamo') useCalibrationProjectStore.getState().removeSampleGlyphEdit(entry.edit.id)
   }
+  // 되돌리기 · 다시 하기 뒤의 선택: 그 편집 때 잡혀 있던 것. 되살린 모양에 그 획이 없거나 기록에 선택이 없으면 잠긴 자소의 첫 획(없으면 빈 선택).
+  const restorePicked = (entry: HistoryEntry, jamo: JamoData) => {
+    const picked = entry.kind === 'jamo' ? entry.picked : undefined
+    const strokes = getJamoStrokes(jamo)
+    const ids = new Set(strokes.map((stroke) => stroke.id))
+    if (picked?.selection.kind === 'none' && lockedPart) {
+      setSelection({ kind: 'none' })
+      setSelectedPoints([])
+      setSelectedStrokes([])
+      return
+    }
+    if (picked && (picked.selection.kind === 'stroke' || picked.selection.kind === 'point' || picked.selection.kind === 'handle') && ids.has(picked.selection.strokeId)) {
+      const pointCount = strokes.find((stroke) => stroke.id === (picked.selection as { strokeId: string }).strokeId)?.points.length ?? 0
+      const restored = picked.selection.kind !== 'stroke' && picked.selection.pointIndex >= pointCount
+        ? { ...picked.selection, kind: 'stroke' as const, jamo }
+        : { ...picked.selection, jamo }
+      setSelection(restored as Selection)
+      setSelectedPoints(picked.points.filter((point) => ids.has(point.strokeId) && point.pointIndex < (strokes.find((stroke) => stroke.id === point.strokeId)?.points.length ?? 0)))
+      setSelectedStrokes(picked.strokes.filter((strokeId) => ids.has(strokeId)))
+      return
+    }
+    // 획 편집에 잠긴 동안은 빈 선택으로 떨어뜨리지 않는다 — 도구 줄이 다 꺼져 버린다.
+    setSelection(lockedPart ? firstStrokeSelectionOf(lockedPart) ?? { kind: 'none' } : { kind: 'none' })
+    setSelectedPoints([])
+    setSelectedStrokes([])
+  }
   const undo = () => {
     const entry = history.at(-1)
     if (!entry) return
@@ -2371,9 +2557,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     setFuture((entries) => [...entries, entry])
     setPreviewJamo(null)
     setPreviewSchema(null)
-    // 획 편집에 잠긴 동안은 빈 선택으로 떨어뜨리지 않는다 — 도구 줄이 다 꺼져 버린다.
-    setSelection(lockedPart ? firstStrokeSelectionOf(lockedPart) ?? { kind: 'none' } : { kind: 'none' })
-    setSelectedPoints([])
+    if (entry.kind === 'jamo') restorePicked(entry, entry.before)
+    else {
+      setSelection(lockedPart ? firstStrokeSelectionOf(lockedPart) ?? { kind: 'none' } : { kind: 'none' })
+      setSelectedPoints([])
+      setSelectedStrokes([])
+    }
   }
   const redo = () => {
     const entry = future.at(-1)
@@ -2390,9 +2579,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     if (entry.kind === 'layout' || entry.kind === 'jamo') useCalibrationProjectStore.getState().addSampleGlyphEdit(entry.edit)
     setPreviewJamo(null)
     setPreviewSchema(null)
-    // 획 편집에 잠긴 동안은 빈 선택으로 떨어뜨리지 않는다 — 도구 줄이 다 꺼져 버린다.
-    setSelection(lockedPart ? firstStrokeSelectionOf(lockedPart) ?? { kind: 'none' } : { kind: 'none' })
-    setSelectedPoints([])
+    if (entry.kind === 'jamo') restorePicked(entry, entry.after)
+    else {
+      setSelection(lockedPart ? firstStrokeSelectionOf(lockedPart) ?? { kind: 'none' } : { kind: 'none' })
+      setSelectedPoints([])
+      setSelectedStrokes([])
+    }
   }
   const copyAnalysisValues = async () => {
     const currentJamos = useJamoStore.getState()
@@ -2541,7 +2733,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
           ? <div ref={setStrokeToolSlot} className={styles.strokeToolSlot} data-testid="jamo-stroke-tool-slot" />
           : chrome === 'workspace' && layoutAvailable && !styleLocksCanvas && <LayoutContextCards activeContextId={corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00).contextId} allActive={false} ink={strokeCardInk ?? undefined} />}
         <div className={styles.focusArea}>
-        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={styleLocksCanvas ? { kind: 'none' } : selection} onSelect={styleLocksCanvas ? () => {} : selectFromCanvas} selectedPoints={styleLocksCanvas ? [] : selectedPoints} onPointSelect={styleLocksCanvas ? () => {} : selectPointFromCanvas} lockedPart={styleLocksCanvas ? null : lockedPart} dragApiRef={directManipulation && !styleLocksCanvas ? dragApiRef : undefined} padDragRef={directManipulation && !styleLocksCanvas ? padDragRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
+        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={styleLocksCanvas ? { kind: 'none' } : selection} onSelect={styleLocksCanvas ? () => {} : selectFromCanvas} selectedPoints={styleLocksCanvas ? [] : selectedPoints} selectedStrokes={styleLocksCanvas ? [] : selectedStrokes} multiSelectArmed={!styleLocksCanvas && multiSelectArmed} wholeJamoCentered={styleLocksCanvas ? null : wholeJamoCentered} onPointSelect={styleLocksCanvas ? () => {} : selectPointFromCanvas} lockedPart={styleLocksCanvas ? null : lockedPart} dragApiRef={directManipulation && !styleLocksCanvas ? dragApiRef : undefined} padDragRef={directManipulation && !styleLocksCanvas ? padDragRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
         </div>
         </div>
       </section>}
@@ -2577,6 +2769,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         selection={selection}
         creationSelection={lockedPart && selection.kind === 'none' ? creationSelectionOf(lockedPart) : null}
         selectedPoints={selectedPoints}
+        selectedStrokes={selectedStrokes}
+        onWholeJamoCenteredChange={setWholeJamoCentered}
         layoutType={syllable.layoutType}
         schema={effectiveSchema}
         snapStep={snapStep}
@@ -2625,6 +2819,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     setSelectedChar(solo ?? syllable)
     setSelection({ kind: 'none' })
     setSelectedPoints([])
+    setSelectedStrokes([])
     setPreviewJamo(null)
     setPreviewSchema(null)
     setInkGapLimiter(null)

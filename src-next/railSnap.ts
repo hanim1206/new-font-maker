@@ -4,8 +4,8 @@
  * 값은 em(0~1). 반경도 em이라 캔버스 330px 기준 0.01 ≈ 3px.
  */
 
-/** `touch`: 걸리면 `딱 붙음`. 처음 자리보다 세다. */
-export interface SnapCandidate { id: string; label: string; axis: 'x' | 'y'; value: number; touch?: boolean }
+/** `touch`: 걸리면 `딱 붙음`. 처음 자리보다 세다. `rank`: 반경 안에 여럿이면 낮은 것이 먼저 이긴다(없으면 1). 같으면 가까운 것. 획 편집의 같은 자소 꼭짓점 · 대칭 자리가 0. */
+export interface SnapCandidate { id: string; label: string; axis: 'x' | 'y'; value: number; touch?: boolean; rank?: number }
 export type SnapKind = 'model' | 'rail' | 'grid'
 /** `touch`: 닿자 세로 변이 홀자 가로 줄기의 중심선 끝에 닿아 걸렸다 — 캔버스에 `딱 붙음`을 띄운다. */
 export interface SnapHit { kind: SnapKind; label: string; id?: string; value: number; touch?: boolean }
@@ -43,7 +43,9 @@ export function snapRail(input: {
     if (candidate.axis !== axis) continue
     const distance = Math.abs(candidate.value - value)
     if (distance > radius.rail) continue
-    if (!best || distance < Math.abs(best.value - value)) best = candidate
+    const rank = candidate.rank ?? 1
+    const bestRank = best ? best.rank ?? 1 : Infinity
+    if (!best || rank < bestRank || (rank === bestRank && distance < Math.abs(best.value - value))) best = candidate
   }
   if (best) return { value: best.value, hit: { kind: 'rail', label: best.label, id: best.id, value: best.value } }
   const grid = nearestGrid(value)

@@ -132,3 +132,22 @@ export function horizontalStrokeEndsX(sources: readonly { stroke: DeepReadonly<S
   })
   return horizontal.flatMap(({ first, last }) => [first, last].filter((point) => !joined(point)).map((point) => point.x))
 }
+
+/**
+ * 끄는 획이 든 자소의 꼭짓점과 그 대칭 자리. 다른 후보보다 먼저 이긴다(`rank` 0) — 같은 자소 안에서 점끼리 줄 맞추기 · 좌우 · 상하 대칭 맞추기(09-29 사용자).
+ * 대칭은 자소 상자 가운데를 축으로 뒤집은 자리(ㅁ 오른쪽 기둥 ↔ 왼쪽 기둥). 몸통을 끌면 그 획 점은 빼고, 점을 끌면 그 점만 뺀다.
+ * id는 `vertex:<획>:p<번호>` · `mirror:<획>:p<번호>`.
+ */
+export function jamoVertexCandidates(sources: readonly SnapStrokeSource[], dragged: { strokeId: string; pointIndex?: number }): SnapCandidate[] {
+  return sources.flatMap(({ strokeId, label, stroke, box }) => stroke.points.flatMap((point, index) => {
+    if (strokeId === dragged.strokeId && (dragged.pointIndex === undefined || dragged.pointIndex === index)) return []
+    const em = emPoint(point, box)
+    const mirror = emPoint({ x: 1 - point.x, y: 1 - point.y }, box)
+    return [
+      { id: `vertex:${strokeId}:p${index}`, label: `${label} 점`, axis: 'x' as const, value: em.x, rank: 0 },
+      { id: `vertex:${strokeId}:p${index}`, label: `${label} 점`, axis: 'y' as const, value: em.y, rank: 0 },
+      { id: `mirror:${strokeId}:p${index}`, label: `${label} 대칭`, axis: 'x' as const, value: mirror.x, rank: 0 },
+      { id: `mirror:${strokeId}:p${index}`, label: `${label} 대칭`, axis: 'y' as const, value: mirror.y, rank: 0 },
+    ]
+  }))
+}

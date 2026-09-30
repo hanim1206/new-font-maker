@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { JamoData } from '../types'
-import { moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStroke } from './editorCommands'
+import { jamoCenterlineCenter, moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStroke, scaleStrokes, snapWholeJamoDelta, translateJamoStrokes } from './editorCommands'
 
 const baseJamo: JamoData = {
   char: 'ㄱ',
@@ -177,5 +177,54 @@ describe('scaleJamoStrokes', () => {
   it('배율 1이나 잘못된 배율이면 그대로 돌려준다', () => {
     expect(scaleJamoStrokes(baseJamo, 1)).toEqual(baseJamo)
     expect(scaleJamoStrokes(baseJamo, 0)).toEqual(baseJamo)
+  })
+})
+
+describe('translateJamoStrokes', () => {
+  it('모든 채널의 점 · 핸들을 같은 만큼 옮기고 원본은 두며, 상자 밖으로도 간다', () => {
+    const source: JamoData = {
+      char: 'ㄱ', type: 'choseong',
+      strokes: [{ id: 'a', points: [{ x: 0.9, y: 0.1, handleOut: { x: 0.95, y: 0.2 } }, { x: 0.9, y: 0.9 }], closed: false, thickness: 0.07 }],
+      contextStrokes: { bottom: [{ id: 'a', points: [{ x: 0.5, y: 0.5 }], closed: false, thickness: 0.07 }] },
+    }
+    const moved = translateJamoStrokes(source, { x: 0.2, y: -0.05 })
+    const [first] = moved.strokes![0].points
+    expect([first.x, first.y, first.handleOut!.x, first.handleOut!.y].map((value) => Number(value.toFixed(6)))).toEqual([1.1, 0.05, 1.15, 0.15])
+    const variant = moved.contextStrokes!.bottom![0].points[0]
+    expect([variant.x, variant.y].map((value) => Number(value.toFixed(6)))).toEqual([0.7, 0.45])
+    expect(source.strokes![0].points[0].x).toBe(0.9)
+  })
+})
+
+describe('자소 통째 이동의 가운데 스냅', () => {
+  it('중심선 범위 가운데가 상자 정가운데 반경 안이면 그 축만 딱 붙인다', () => {
+    const center = jamoCenterlineCenter({ char: 'ㄱ', type: 'choseong', strokes: [{ id: 'a', points: [{ x: 0.1, y: 0.2 }, { x: 0.7, y: 0.9 }], closed: false, thickness: 0.07 }] })
+    expect(center.x).toBeCloseTo(0.4)
+    expect(center.y).toBeCloseTo(0.55)
+    // x는 0.4 + 0.09 = 0.49 → 붙어서 0.1, y는 0.55 + 0.1 = 0.65 → 멀어서 그대로
+    const snapped = snapWholeJamoDelta(center, { x: 0.09, y: 0.1 })
+    expect(snapped.delta.x).toBeCloseTo(0.1)
+    expect(snapped.delta.y).toBe(0.1)
+    expect(snapped.centered).toEqual({ x: true, y: false })
+  })
+})
+
+describe('scaleStrokes', () => {
+  it('묶인 획을 전체 범위 가운데를 기준으로 한 덩어리로 늘린다(가로획 둘은 세로가 잠긴다)', () => {
+    const source: JamoData = {
+      char: 'ㄲ', type: 'choseong',
+      strokes: [
+        { id: 'top', points: [{ x: 0.2, y: 0.2 }, { x: 0.4, y: 0.2 }], closed: false, thickness: 0.07 },
+        { id: 'bottom', points: [{ x: 0.6, y: 0.8 }, { x: 0.8, y: 0.8 }], closed: false, thickness: 0.07 },
+        { id: 'other', points: [{ x: 0.5, y: 0.5 }, { x: 0.5, y: 0.6 }], closed: false, thickness: 0.07 },
+      ],
+    }
+    const result = scaleStrokes(source, ['top', 'bottom'], { x: 1.5, y: 1 })
+    // 범위 0.2–0.8, 가운데 0.5 → 0.2는 0.05, 0.8은 0.95
+    const xsOf = (id: string) => result.jamo.strokes!.find((stroke) => stroke.id === id)!.points.map((point) => Number(point.x.toFixed(6)))
+    expect(xsOf('top')).toEqual([0.05, 0.35])
+    expect(xsOf('bottom')).toEqual([0.65, 0.95])
+    expect(xsOf('other')).toEqual([0.5, 0.5])
+    expect(result.lockedAxes).toEqual({ x: false, y: false })
   })
 })
