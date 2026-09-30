@@ -216,10 +216,11 @@ test('기둥을 휘면 바깥 기둥 16자가 다 켜진 채 뜨고, 툭 친 글
   await expect(ae).toHaveAttribute('aria-pressed', 'false')
   await ae.click()
   await expect(ae).toHaveAttribute('data-slots', 'outer')
-  // 묶음 머리 옆 `안` 토글 = 전체의 안 기둥. 머리 체크 = 묶음 줄기 전부.
+  // 묶음 머리 옆 `안` 토글 = 켜진 카드들의 안 기둥. 꺼진 ㅓ는 안 켜진다. 머리 체크 = 묶음 줄기 전부.
   const group = sheet.locator('[data-testid="stem-spread-group"][data-group="all"]')
   await group.getByRole('button', { name: '안' }).click()
   await expect(sheet.locator('[data-kind="shape"][data-char="ㅔ"]')).toHaveAttribute('data-slots', 'outer inner')
+  await expect(eo).toHaveAttribute('aria-pressed', 'false')
   await group.getByRole('button', { name: '안' }).click()
   await expect(sheet.locator('[data-kind="shape"][data-char="ㅔ"]')).toHaveAttribute('data-slots', 'outer')
   await expect(group.getByRole('checkbox')).toHaveAttribute('aria-checked', 'mixed')

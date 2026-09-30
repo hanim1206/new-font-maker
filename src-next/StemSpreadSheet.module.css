@@ -36,6 +36,7 @@
 .slots { flex: none; display: inline-flex; gap: 4px; }
 .slot { min-height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-4)); font-size: 12px; font-weight: 700; transition: background-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard); }
 .slot[aria-pressed='true'] { background: #fff4e6; color: #d9480f; }
+.slot:disabled { opacity: .4; }
 
 /* 카드 = 홀자 하나. 켜진 획은 주황, 꺼진 카드는 잉크가 흐리다(도마 미선택). */
 .card { position: absolute; top: 0; left: 0; display: grid; place-items: center; border: 0; border-radius: 12px; background: rgb(var(--color-surface-3)); transition: transform var(--motion-slow) var(--ease-standard), width var(--motion-slow) var(--ease-standard), height var(--motion-slow) var(--ease-standard), opacity var(--motion-normal) var(--ease-standard); }
