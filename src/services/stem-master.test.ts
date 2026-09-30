@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { JamoData, StrokeDataV2 } from '../types'
-import { applyMaster, boundStrokesOf, followsMaster, instanceOf, masterNameOf, masterOf, medialBoxEmOf, refollow, stemReferenceBox, straightMaster, thinBox, type StemMaster } from './stemMaster'
+import { applyMaster, boundStrokesOf, followsInJamo, followsMaster, instanceOf, masterNameOf, masterOf, medialBoxEmOf, refollow, stemReferenceBox, straightMaster, thinBox, type StemMaster } from './stemMaster'
 
 const line = (id: string, from: [number, number], to: [number, number]): StrokeDataV2 => ({ id, points: [{ x: from[0], y: from[1] }, { x: to[0], y: to[1] }], closed: false, thickness: 0.07 })
 const bent: StemMaster = { name: 'gidung', points: [{ t: 0, o: 0, handleOut: { t: 0.4, o: 0.03 } }, { t: 1, o: 0, handleIn: { t: 0.7, o: -0.01 } }] }
@@ -168,3 +168,20 @@ describe('G1 홀드아웃', () => {
   })
 })
 
+describe('반영 창에서 고른 획', () => {
+  it('keep이 있으면 고른 획은 풀렸어도 덮이고, 뺀 획만 지금 모양으로 남는다', () => {
+    const ae: JamoData = { type: 'jungseong', char: 'ㅐ', strokes: [line('ㅐ-1', [0, 0], [0, 1]), line('ㅐ-2', [0, 0.5], [0.5, 0.5]), line('ㅐ-3', [0.5, 0], [0.5, 1])] }
+    const released = { ...ae, strokes: [{ ...ae.strokes![0], points: [{ x: 0, y: 0 }, { x: 0.1, y: 1 }] }, ae.strokes![1], ae.strokes![2]] }
+    // 마스터만 고치면 풀린 안 기둥은 그대로.
+    const plain = applyMaster(released, {}, { gidung: bent })!
+    expect(plain.strokes![0].points[1]).toEqual({ x: 0.1, y: 1 })
+    // 반영 창에서 골랐으면(keep이 빼지 않음) 풀린 획도 덮인다.
+    const picked = applyMaster(released, {}, { gidung: bent }, () => false)!
+    expect(followsInJamo(picked, 'strokes', picked.strokes![0], bent)).toBe(true)
+    expect(followsInJamo(picked, 'strokes', picked.strokes![2], bent)).toBe(true)
+    // 뺀 획은 그대로.
+    const kept = applyMaster(released, {}, { gidung: bent }, (id) => id === 'ㅐ-1')!
+    expect(kept.strokes![0].points[1]).toEqual({ x: 0.1, y: 1 })
+    expect(followsInJamo(kept, 'strokes', kept.strokes![2], bent)).toBe(true)
+  })
+})

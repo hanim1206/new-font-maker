@@ -38,7 +38,7 @@ interface StemMasterActions {
 
 /**
  * 마스터를 before → after로 바꿨을 때 바뀌는 홀자만 새 자모로 돌려준다(스토어에 쓰지 않음).
- * 반영 고르기 카드의 미리보기와 실제 반영이 같은 함수를 쓴다.
+ * 반영 고르기 카드의 미리보기와 실제 반영이 같은 함수를 쓴다. `keep`이 있으면 고른(안 뺀) 획은 풀렸어도 덮는다.
  */
 export function propagatedJungseong(
   jungseong: Readonly<Record<string, JamoData>>,

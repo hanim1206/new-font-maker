@@ -2413,11 +2413,10 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const shapePreviewMap = useMemo(() => shapeAsk ? shapePreview(shapeAsk.ask, shapeAsk.picked, jungseong, stemMasters) : {}, [shapeAsk, jungseong, stemMasters])
   // 창 머리의 `전` = 기준 획이 지금 마스터를 따르는 모양(형제가 지금 가진 모양).
   const shapeBeforeMap = useMemo(() => shapeAsk ? beforeSpreadJamo(jungseong, stemMasters, shapeAsk.ask) : {}, [shapeAsk, jungseong, stemMasters])
-  // 잡은 획이 이름 있는 홀자 줄기이고 모양이 갈래 마스터와 다르면 `전파`가 뜬다(연 뒤 고쳤든, 예전에 따로 둔 풀림이든).
+  // 잡은 획이 이름 있는 홀자 줄기이고 형제 중 하나라도 모양이 다르면 `전파`가 뜬다 — 곧은 기본 획도 이미 고친 형제에 퍼뜨릴 수 있다.
   const spreadTarget = useMemo(() => {
     if (editMode !== 'stroke' || selection.kind === 'none' || selection.kind === 'component' || selection.jamo.type !== 'jungseong') return null
-    const jamo = jungseong[selection.jamo.char]
-    return jamo && spreadableStem(jamo, selection.strokeId, stemMasters) ? { char: selection.jamo.char, strokeId: selection.strokeId } : null
+    return spreadableStem(jungseong, selection.jamo.char, selection.strokeId, stemMasters) ? { char: selection.jamo.char, strokeId: selection.strokeId } : null
   }, [editMode, selection, jungseong, stemMasters])
   const openSpread = () => {
     if (!spreadTarget) return

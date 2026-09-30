@@ -328,8 +328,9 @@ export function boundStrokesOf(jamo: JamoData, masters: StemMasters): BoundStrok
 }
 
 /**
- * 마스터 하나를 바꿨을 때 이 홀자를 다시 쓴다. 바뀌기 전 마스터를 따르던 획만 새 마스터로 옮기고, 풀린 획은 그대로.
- * 바뀐 획이 없으면 null. `기둥.안쪽` 마스터가 따로 없으면 안쪽 기둥도 기둥을 따라 같이 바뀐다.
+ * 마스터 하나를 바꿨을 때 이 홀자를 다시 쓴다. 바뀐 획이 없으면 null. `기둥.안쪽` 마스터가 따로 없으면 안쪽 기둥도 기둥을 따라 같이 바뀐다.
+ * `keep`이 없으면(마스터만 고침) 바뀌기 전 마스터를 따르던 획만 옮기고 풀린 획은 그대로.
+ * `keep`이 있으면(반영 창에서 카드를 골랐다) 고른 획은 풀렸어도 덮는다 — 모양 복사. 뺀 획(`keep`)만 지금 모양으로 남는다.
  */
 export function applyMaster(jamo: JamoData, before: StemMasters, after: StemMasters, keep?: (strokeId: string) => boolean): JamoData | null {
   let changed = false
@@ -342,7 +343,7 @@ export function applyMaster(jamo: JamoData, before: StemMasters, after: StemMast
       if (!name || keep?.(stroke.id)) return stroke
       const previous = masterOf(before, name)
       const current = masterOf(after, name)
-      if (previous === current || !followsInJamo(jamo, channel, stroke, previous)) return stroke
+      if (previous === current || (!keep && !followsInJamo(jamo, channel, stroke, previous))) return stroke
       if (followsInJamo(jamo, channel, stroke, current)) return stroke
       changed = true
       return instanceInJamo(jamo, channel, stroke, current)

@@ -126,14 +126,20 @@ export function namedStemOf(jamo: JamoData, strokeId: string): { channel: JamoCh
 }
 
 /**
- * 이 획을 형제에 퍼뜨릴 수 있나 — 이름 있는 줄기이고, 그 모양이 지금 갈래 마스터와 다를 때(연 뒤 고쳤든, 예전에 따로 둔 풀림이든).
- * 마스터와 같은 획엔 `전파`가 안 뜬다.
+ * 이 획을 형제에 퍼뜨릴 수 있나 — 이름 있는 줄기이고, 같은 줄기의 형제 중 하나라도 이 획과 모양이 다를 때.
+ * 마스터와 같은지는 안 본다 — 곧은 기본 기둥도 이미 고친 형제에 퍼뜨려 되돌릴 수 있다(모양 복사). 형제가 전부 같으면 퍼뜨릴 게 없어 안 뜬다.
  */
-export function spreadableStem(jamo: JamoData, strokeId: string, masters: StemMasters): boolean {
-  const stem = namedStemOf(jamo, strokeId)
-  if (!stem) return false
+export function spreadableStem(jungseong: Readonly<Record<string, JamoData>>, char: string, strokeId: string, masters: StemMasters): boolean {
+  const jamo = jungseong[char]
+  const stem = jamo ? namedStemOf(jamo, strokeId) : null
+  if (!jamo || !stem) return false
   const shape = masterFromStroke(jamo, stem.channel, strokeId)
-  return !!shape && !sameMaster(shape, masterOf(masters, stem.name))
+  if (!shape) return false
+  return entriesOf(jungseong, masters, baseOf(stem.name)).some((entry) => {
+    if (entry.char === char && entry.strokeId === strokeId) return false
+    const sibling = masterFromStroke(jungseong[entry.char], entry.channel, entry.strokeId)
+    return !!sibling && !sameMaster(sibling, shape)
+  })
 }
 
 /** 획 하나를 기준으로 묻는다(`전파` 단추). `entries`는 같은 갈래, `extras`는 같은 줄기의 다른 갈래. 이름 없는 획이면 null. */

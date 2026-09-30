@@ -116,9 +116,12 @@ test.describe('홀자 줄기 마스터 랩', () => {
     const a = card(page, 'gidung.outer.single', 'ㅏ')
     await expect(a).toHaveAttribute('data-follow', 'false')
     await expect(card(page, 'gidung.outer.single', 'ㅕ')).toHaveAttribute('data-follow', 'true')
-    // 마스터를 다시 바꿔도 풀린 ㅏ는 그대로고, 형제는 따라간다.
+    // 풀린 ㅏ도 반영 창에 `따로 고침`으로 켜져 있다(기본 켜짐). 카드를 빼야 그대로고, 형제는 따라간다.
     await openCard(page, 'gidung.outer.single', 'ㅕ')
     await bend(page, 'ㅕ-1', -20)
+    await expect(shapeCard(page, 'ㅏ').getByTestId('stem-spread-released')).toBeVisible()
+    await shapeCard(page, 'ㅏ').click()
+    await expect(shapeCard(page, 'ㅏ')).toHaveAttribute('aria-pressed', 'false')
     await apply(page)
     await expect(a).toHaveAttribute('data-follow', 'false')
     await expect(card(page, 'gidung.outer.single', 'ㅕ')).toHaveAttribute('data-follow', 'true')

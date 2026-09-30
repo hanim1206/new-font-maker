@@ -132,10 +132,15 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
     if (keys.length === 0) return
     toggle(keys, !keys.every((key) => picked.has(key)))
   }
+  // 묶음 머리의 수 · 체크는 잠긴 카드(이 자소, 늘 켜짐)를 빼고 센다 — 형제 몇 자에 가는지만.
+  const others = (cards: readonly Card[]) => cards.filter((card) => !card.locked)
   const stateOf = (cards: readonly Card[]) => {
-    const on = cards.filter(cardOn).length
-    return on === cards.length ? 'true' : on === 0 ? 'false' : 'mixed'
+    const rest = others(cards)
+    const on = rest.filter(cardOn).length
+    return on === rest.length ? 'true' : on === 0 ? 'false' : 'mixed'
   }
+  // 이미 따로 고친(풀린) 형제 — 켜 두면 이 모양으로 덮인다. 기본은 켜짐, 사용자가 직접 뺀다.
+  const released = (card: Card) => card.entries.some((entry) => !entry.follows)
 
   // 판 폭을 재서 칸 크기를 정한다. 카드 · 소제목은 절대좌표 + transform — 묶기를 바꾸면 미끄러진다(도마 섹션 홈과 같음).
   const board = useRef<HTMLDivElement>(null)
@@ -193,7 +198,7 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
                 <div key={group.id} className={styles.groupRow} style={{ transform: `translateY(${group.y}px)` }} data-testid="stem-spread-group" data-group={group.id}>
                   <button type="button" className={styles.groupHead} role="checkbox" aria-checked={state} onClick={() => toggleGroup(group.cards)}>
                     <span className={styles.check} aria-hidden="true">{state === 'mixed' ? <span className={styles.dash} /> : <Check size={14} strokeWidth={3} />}</span>
-                    {group.label}<span className={styles.groupCount}>{group.cards.filter(cardOn).length}/{group.cards.length}</span>
+                    {group.label}<span className={styles.groupCount}>{others(group.cards).filter(cardOn).length}/{others(group.cards).length}</span>
                   </button>
                   {/* 자리 토글 — 묶음 전체의 그 자리. 자리가 없는 줄기(걸침 · 보)엔 안 뜬다. */}
                   {slotLabels.length > 0 && <span className={styles.slots}>
@@ -215,6 +220,7 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
                   {/* 카드 잉크는 검정(주황은 머리의 기준 획만). 방금 켜진 획만 주황으로 번쩍였다가 돌아온다. 어느 자리가 켜졌는지는 우상단 점이 말한다. */}
                   <AppGlyph char={sampleSyllable(card.char, 'open')} size={Math.round(cell * 0.62)} strokeColorOf={flashColor(card.char)} jungseongOverride={preview} />
                   {card.locked && <Lock className={styles.lock} size={14} strokeWidth={2.5} aria-hidden="true" />}
+                  {!card.locked && released(card) && <span className={styles.released} data-testid="stem-spread-released">따로 고침</span>}
                   {/* 자리가 둘 이상인 카드는 우상단에 자리마다 점 하나 — 켜진 자리만 주황. 기둥은 글자 자리대로 안 점이 왼쪽, 바깥 점이 오른쪽. */}
                   {card.slots.length > 1 && <span className={styles.dots} aria-hidden="true">{(slotFacet === 'side' ? [...card.slots].reverse() : card.slots).map((slot) => <i key={slot} data-on={slotOn(card, slot) || undefined} />)}</span>}
                 </button>

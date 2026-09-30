@@ -55,14 +55,20 @@ describe('전파 물음', () => {
 })
 
 describe('전파 단추 조건', () => {
-  it('마스터와 같은 획(기본 폰트)엔 안 뜨고, 휜 획엔 뜬다', () => {
+  it('형제가 전부 같은 모양(기본 폰트)이면 안 뜨고, 휜 획엔 뜬다', () => {
     const { stroke } = idOf('ㅏ', OUTER)
-    expect(spreadableStem(base['ㅏ'], stroke.id, {})).toBe(false)
-    expect(spreadableStem(bend(base, 'ㅏ', OUTER, 0.05)['ㅏ'], stroke.id, {})).toBe(true)
+    expect(spreadableStem(base, 'ㅏ', stroke.id, {})).toBe(false)
+    expect(spreadableStem(bend(base, 'ㅏ', OUTER, 0.05), 'ㅏ', stroke.id, {})).toBe(true)
+  })
+
+  it('곧은 기본 기둥도 형제가 고쳐져 있으면 뜬다 — 이미 고친 형제에 되돌려 퍼뜨릴 수 있다', () => {
+    const { stroke } = idOf('ㅏ', OUTER)
+    const eoBent = bend(base, 'ㅓ', OUTER, 0.05)
+    expect(spreadableStem(eoBent, 'ㅏ', stroke.id, {})).toBe(true)
   })
 
   it('이름 없는 획엔 안 뜬다', () => {
-    expect(spreadableStem(base['ㅏ'], 'no-such-stroke', {})).toBe(false)
+    expect(spreadableStem(base, 'ㅏ', 'no-such-stroke', {})).toBe(false)
   })
 })
 
@@ -100,7 +106,7 @@ describe('자리만 옮긴 획', () => {
     const { channel, stroke } = idOf('ㅏ', 'gyeotjulgi.right.one.single')
     const moved = { ...stroke, points: stroke.points.map((point) => ({ ...point, y: point.y - 0.1 })) }
     const a = { ...base['ㅏ'], [channel]: base['ㅏ'][channel]!.map((item) => item.id === stroke.id ? moved : item) }
-    expect(spreadableStem(a, stroke.id, {})).toBe(false)
+    expect(spreadableStem({ ...base, ㅏ: a }, 'ㅏ', stroke.id, {})).toBe(false)
   })
 })
 
