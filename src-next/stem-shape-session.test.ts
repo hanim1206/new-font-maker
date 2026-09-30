@@ -46,9 +46,11 @@ describe('전파 물음', () => {
     expect(pickedMasters(ask, outerOnly).map((master) => master.name).sort()).toEqual(['gidung.outer.mixed', 'gidung.outer.single'])
   })
 
-  it('곁줄기의 자리 질문은 `count`(ㅑ에 위 · 아래 둘), 보 · 걸침은 자리 질문이 없다', () => {
+  it('자리 질문은 기둥의 바깥 · 안뿐 — 곁줄기 둘짜리(ㅑ)는 같이 가니 자리가 없고, 보 · 걸침도 없다', () => {
     const gyeot = shapeAskForStroke(base, {}, 'ㅑ', idOf('ㅑ', 'gyeotjulgi.right.upper.single').stroke.id)!
-    expect(slotFacetOf(askEntries(gyeot))).toBe('count')
+    expect(slotFacetOf(askEntries(gyeot))).toBeNull()
+    const yo = shapeAskForStroke(base, {}, 'ㅛ', idOf('ㅛ', 'jjalbeungidung.up.pair.single').stroke.id)!
+    expect(slotFacetOf(askEntries(yo))).toBeNull()
     const bo = shapeAskForStroke(base, {}, 'ㅗ', idOf('ㅗ', 'bo.up.single').stroke.id)!
     expect(slotFacetOf(askEntries(bo))).toBeNull()
   })

@@ -152,15 +152,16 @@ export function shapeAskForStroke(jungseong: Readonly<Record<string, JamoData>>,
 export const askEntries = (ask: ShapeAsk): StemEntry[] => ask.sections.flatMap((section) => [...section.entries, ...section.extras])
 
 /**
- * 자리 = 같은 홀자 안에서 갈리는 질문(기둥이면 `side` 바깥 · 안, 곁줄기면 `count` 하나 · 둘 위 · 둘 아래).
- * 홀자 하나에 답이 둘 이상인 질문이 있으면 그것, 없으면 null(카드마다 자리 하나).
+ * 자리 = 같은 홀자 안에서 따로 고를 수 있는 질문. 기둥의 `side`(바깥 · 안)뿐이다 — ㅐ ㅔ의 안 기둥은 바깥과 다르게 그리는 일이 흔하다.
+ * 곁줄기 · 짧은기둥의 둘짜리(`count`)는 나란한 두 획이라 늘 같이 간다(사용자 결정 09-30) — 자리가 아니고 카드 하나로 켜고 끈다.
+ * 홀자 하나에 답이 둘 이상이면 그것, 없으면 null(카드마다 자리 하나).
  */
 export function slotFacetOf(entries: readonly StemEntry[]): string | null {
   const byChar = new Map<string, StemEntry[]>()
   for (const entry of entries) byChar.set(entry.char, [...(byChar.get(entry.char) ?? []), entry])
   const base = entries[0] ? baseOf(entries[0].name) : null
   for (const facet of base ? STEM_FACETS[base] : []) {
-    if (facet.key === 'kind') continue
+    if (facet.key !== 'side') continue
     for (const own of byChar.values()) if (new Set(own.map((entry) => entry.values[facet.key])).size > 1) return facet.key
   }
   return null

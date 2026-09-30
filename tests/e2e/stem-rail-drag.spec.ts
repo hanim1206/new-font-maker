@@ -174,14 +174,19 @@ async function bendAndSpread(page: Page, strokeId: string, key: 'Shift+ArrowUp' 
   return sheet
 }
 
-test('곁줄기를 휘면 같은 자리(하나짜리 ㅏ ㅓ ㅘ ㅝ)가 켜진 채 뜨고, ㅑ 같은 둘짜리는 꺼진 채 — 받기 뒤 ↶로 돌아온다', async ({ page }) => {
+test('곁줄기를 휘면 아홉 자가 다 켜진 채 뜨고(둘짜리 ㅑ도 카드 하나 · 자리 칩 없음), ㅑ를 빼면 ㅑ만 그대로 — 받기 뒤 ↶로 돌아온다', async ({ page }) => {
   const sheet = await bendAndSpread(page, 'ㅏ-2', 'Shift+ArrowUp')
   await expect(sheet.getByRole('tab', { name: '전체' })).toHaveAttribute('aria-selected', 'true')
+  await expect(sheet.getByRole('tab', { name: '곁줄기 수' })).toHaveCount(0)
   // 전 → 후 두 글자.
   await expect(sheet.getByLabel('ㅏ 고치기 전과 뒤').locator('[data-diff]')).toHaveCount(2)
   await expect(sheet.locator('[data-kind="shape"][data-char="ㅏ"]')).toHaveAttribute('aria-disabled', 'true')
   await expect(sheet.locator('[data-kind="shape"][data-char="ㅓ"]')).toHaveAttribute('aria-pressed', 'true')
-  await expect(sheet.locator('[data-kind="shape"][data-char="ㅑ"]')).toHaveAttribute('aria-pressed', 'false')
+  const ya = sheet.locator('[data-kind="shape"][data-char="ㅑ"]')
+  await expect(ya).toHaveAttribute('aria-pressed', 'true')
+  await expect(sheet.locator('[data-testid="stem-spread-group"][data-group="all"]').getByRole('button', { name: /둘/ })).toHaveCount(0)
+  await ya.click()
+  await expect(ya).toHaveAttribute('aria-pressed', 'false')
   const eoBefore = await jungseongOf(page, 'ㅓ')
   const yaBefore = await jungseongOf(page, 'ㅑ')
   await page.getByTestId('stem-rail-apply-go').click()

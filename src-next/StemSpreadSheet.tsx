@@ -10,7 +10,7 @@ import styles from './StemSpreadSheet.module.css'
 /**
  * 줄기 모양 전파 창. 획 편집에서 획을 잡고 `전파`를 누르면 그 획 하나를 기준으로 뜬다 — 도마 섹션 홈과 같은 판.
  * 카드 = 홀자 하나(기둥이면 16장), 카드 안 자리 = 같은 홀자 안에서 갈리는 줄기(바깥 · 안). 카드는 절대 배치 + transform이라 묶기를 바꾸면 제자리로 미끄러진다.
- * 탭 = 묶는 축(`전체` + 줄기 질문 + 줄기 수). 묶음 머리 `○○ 모두` 체크 = 묶음 획 전부 일괄 켜기 · 끄기, 머리 옆 자리 토글 = 묶음의 그 자리 열 전부(언제나 누를 수 있다)(꺼진 카드는 안 켠다).
+ * 탭 = 묶는 축(`전체` + 줄기 질문 + 기둥 수). 묶음 머리 `○○ 모두` 체크 = 묶음 획 전부 일괄 켜기 · 끄기, 머리 옆 자리 토글(기둥의 바깥 · 안만) = 묶음의 그 자리 열 전부(언제나 누를 수 있다)(꺼진 카드는 안 켠다).
  * 카드 탭 = 낱개 — 자리가 둘이면 첫 자리 → 둘 다 → 끔, 우상단 점 둘이 어느 자리가 켜졌는지 보인다. 카드 잉크는 검정(주황은 머리의 기준 획만). 기준 획의 홀자는 잠긴다. 뺀 획은 지금 모양 그대로(풀림).
  * `취소` · 바깥 누르기 · Esc는 창만 닫고 획 편집에 남는다. `n자 받기`가 반영.
  */
@@ -44,14 +44,15 @@ function slotsOf(entries: readonly StemEntry[], base: StemBase, slotFacet: strin
 }
 
 /**
- * 묶는 축. `전체` 하나, 자리가 아닌 질문마다 하나(답이 둘 이상 나올 때만), 카드마다 자리 수가 다르면 `줄기 수`.
+ * 묶는 축. `전체` 하나, 자리가 아닌 질문마다 하나(답이 둘 이상 나올 때만), 기둥처럼 카드마다 자리 수가 다르면 `줄기 수`.
+ * 곁줄기 · 짧은기둥의 `몇 개?`(`count`)는 축이 아니다 — 둘짜리는 카드 하나로 같이 간다.
  * 묶음 순서는 질문 보기 순서, 답이 없는 카드는 그 축에서 숨는다(`전체`에서 다 보인다).
  */
 function axesOf(cards: readonly Card[], base: StemBase, slotFacet: string | null): Axis[] {
   const label = STEM_NAME_LABEL[base]
   const axes: Axis[] = [{ id: 'all', label: '전체', groups: [{ id: 'all', label: `${label} 전체`, cards: [...cards] }] }]
   for (const facet of STEM_FACETS[base]) {
-    if (facet.key === slotFacet) continue
+    if (facet.key === slotFacet || facet.key === 'count') continue
     const groups = facet.options
       .map((option) => ({ id: `${facet.key}:${option.value}`, label: `${optionLabel(base, facet.key, option.value)} 모두`, cards: cards.filter((card) => card.entries.some((entry) => entry.values[facet.key] === option.value)) }))
       .filter((group) => group.cards.length > 0)
