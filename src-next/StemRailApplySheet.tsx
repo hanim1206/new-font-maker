@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { ArrowRight, Lock } from 'lucide-react'
 import { AppGlyph } from './AppGlyph'
 import { ACTIVE_STROKE_COLOR, byLeafRank, keyOf, sampleSyllable, type ShapeAsk, type StemEntry } from './stemShapeSession'
@@ -31,8 +30,8 @@ const EXTRA_REST_COLOR = '#d1d6db'
 
 /**
  * 획 편집에서 줄기 모양(휨 · 기울기)을 고친 뒤 나갈 때 한 번 띄운다. 묻지 않고 규칙대로 퍼진 결과를 보여 주고, 예외만 끈다.
- * 칸 = 고친 갈래 하나, 머리에 기준 획의 전(`before`) → 후. 카드 = 홀자 하나. 같은 갈래는 처음부터 따름이고 툭 치면 그 홀자만 `따로`(지금 모양 그대로 · 풀림),
- * 다시 치거나 알림의 `다시 따르기`로 붙는다. 같은 줄기의 다른 갈래는 `다른 ○○에도` 아래 꺼진 채 보이고, 켜면 그 칸의 모양을 받는다.
+ * 칸 = 고친 갈래 하나, 머리에 기준 획의 전(`before`) → 후. 카드 = 홀자 하나. 같은 갈래는 처음부터 켜져 있고 툭 치면 꺼진다(지금 모양 그대로 · 풀림) — 도마 미선택처럼 흐려질 뿐 표식은 없다.
+ * 같은 줄기의 다른 갈래는 `다른 ○○에도` 아래 꺼진 채 보이고, 켜면 그 칸의 모양을 받는다.
  * 카드는 반영하면 될 모양(`preview`)으로 그린다. 반영하고 나가는 길은 `완료` 하나, `취소` · 바깥 누르기 · Esc는 나가지 않고 획 편집으로 돌아간다.
  * 줄기 자리(보선)는 여기서 다루지 않는다 — 보선은 레이아웃 편집에서만 옮기고, 획 편집에서 옮긴 자리는 그 홀자에만 남는다.
  */
@@ -48,28 +47,24 @@ export function StemRailApplySheet({ ask, picked, preview, before, onToggle, onD
   onCancel: () => void
 }) {
   const shape = { ask, picked, preview, before, onToggle }
-  // 방금 따로 둔 카드(칸 갈래 + 홀자). 알림에 `다시 따르기`를 띄운다.
-  const [apart, setApart] = useState<{ leaf: string; char: string } | null>(null)
   const sections = shape.ask.sections.map((section) => ({ section, cards: cardsOf(section.entries, section.leaf, section.editedKey), extras: cardsOf(section.extras, section.leaf, '') }))
   const on = (card: ShapeCard) => card.keys.some((key) => shape.picked.has(key))
-  const apartCard = apart ? sections.find(({ section }) => section.leaf === apart.leaf)?.cards.find((card) => card.char === apart.char && !on(card)) : undefined
-  const setCard = (leaf: string, card: ShapeCard, follow: boolean, extra = false) => {
+  const setCard = (card: ShapeCard, follow: boolean) => {
     if (card.locked) return
     shape.onToggle(card.keys, follow)
-    if (!extra) setApart(follow ? null : { leaf, char: card.char })
   }
   return (
-    <div className={styles.modalLayer} onPointerDown={(event) => { if (event.target === event.currentTarget) onCancel() }} onKeyDown={(event) => { if (event.key === 'Escape') onCancel() }}>
-      <section className={styles.applySheet} role="dialog" aria-modal="true" aria-label="보선 반영 범위" data-testid="stem-rail-apply" data-toast={apartCard ? true : undefined}>
+    <div className={styles.modalLayer} onPointerDown={(event) => { if (event.target === event.currentTarget) onCancel() }} onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); onCancel() } }}>
+      <section className={styles.applySheet} role="dialog" aria-modal="true" aria-label="보선 반영 범위" data-testid="stem-rail-apply">
         <header className={styles.applyHead}>
           <h2>고친 획이 퍼졌어요</h2>
-          <p className={styles.applyHint}>마음에 안 드는 글자를 툭 치면 그 글자만 따로예요</p>
+          <p className={styles.applyHint}>마음에 안 드는 글자를 툭 치면 그 글자는 빠져요</p>
         </header>
         <div className={styles.applyScroll}>
           {sections.map(({ section, cards, extras }) => {
             const [editedChar, editedStroke] = section.editedKey.split(':')
             const mark = (color: string) => (source: ResolvedStrokeInkSource) => source.jamoId === editedChar && source.strokeId === editedStroke ? color : undefined
-            const apartCount = cards.filter((card) => !on(card)).length
+            const onCount = cards.filter(on).length
             return (
               <div key={section.leaf} className={styles.shapeSection} data-leaf={section.leaf} data-testid="stem-shape-section">
                 <div className={styles.shapeHead}>
@@ -80,7 +75,7 @@ export function StemRailApplySheet({ ask, picked, preview, before, onToggle, onD
                   </div>
                   <div className={styles.shapeTitle}>
                     <h3>{stemMasterLabel(section.leaf)}</h3>
-                    <p data-testid="stem-shape-count">{cards.length - apartCount}자에 퍼졌어요{apartCount > 0 && <span className={styles.applyApartCount}> · 따로 {apartCount}</span>}</p>
+                    <p data-testid="stem-shape-count">{onCount}자에 퍼졌어요</p>
                   </div>
                 </div>
                 <div className={styles.applyCards}>
@@ -88,10 +83,9 @@ export function StemRailApplySheet({ ask, picked, preview, before, onToggle, onD
                     const follows = on(card)
                     const color = (source: ResolvedStrokeInkSource) => follows && source.jamoId === card.char && card.keys.includes(`${card.char}:${source.strokeId}`) ? ACTIVE_STROKE_COLOR : undefined
                     return (
-                      <button key={card.char} type="button" className={styles.applyCard} data-char={card.char} data-kind="shape" data-apart={follows ? undefined : true} data-locked={card.locked || undefined} aria-pressed={follows} aria-disabled={card.locked || undefined} aria-label={card.locked ? `${card.char} 고친 홀자(늘 따름)` : `${card.char} ${follows ? '따로 두기' : '다시 따르기'}`} onClick={() => setCard(section.leaf, card, !follows)}>
+                      <button key={card.char} type="button" className={styles.applyCard} data-char={card.char} data-kind="shape" data-locked={card.locked || undefined} aria-pressed={follows} aria-disabled={card.locked || undefined} aria-label={card.locked ? `${card.char} 고친 홀자(늘 반영)` : `${card.char} ${follows ? '빼기' : '담기'}`} onClick={() => setCard(card, !follows)}>
                         <AppGlyph char={sampleSyllable(card.char, 'open')} size={52} strokeColorOf={color} jungseongOverride={shape.preview} />
                         {card.locked && <Lock className={styles.applyLock} size={14} strokeWidth={2.5} aria-hidden="true" />}
-                        {!follows && <span className={styles.applyApartTag}>{card.char} · <b>따로</b></span>}
                       </button>
                     )
                   })}
@@ -109,7 +103,7 @@ export function StemRailApplySheet({ ask, picked, preview, before, onToggle, onD
                           return target ? EXTRA_TARGET_COLOR : EXTRA_REST_COLOR
                         }
                         return (
-                          <button key={card.char} type="button" className={styles.applyCard} data-char={card.char} data-kind="shape" data-extra aria-pressed={pressed} aria-label={`${card.char} ${pressed ? '빼기' : '이 모양 받기'}`} onClick={() => setCard(section.leaf, card, !pressed, true)}>
+                          <button key={card.char} type="button" className={styles.applyCard} data-char={card.char} data-kind="shape" data-extra aria-pressed={pressed} aria-label={`${card.char} ${pressed ? '빼기' : '이 모양 받기'}`} onClick={() => setCard(card, !pressed)}>
                             <AppGlyph char={sampleSyllable(card.char, 'open')} size={52} strokeColorOf={color} jungseongOverride={shape.preview} />
                           </button>
                         )
@@ -121,12 +115,6 @@ export function StemRailApplySheet({ ask, picked, preview, before, onToggle, onD
             )
           })}
         </div>
-        {apartCard && (
-          <div className={styles.applyToast} role="status" data-testid="stem-shape-apart-toast">
-            <span>{apartCard.char}는 따로 두었어요 · 지금 모양 그대로</span>
-            <button type="button" onClick={() => { if (apart) setCard(apart.leaf, apartCard, true) }}>다시 따르기</button>
-          </div>
-        )}
         <footer className={styles.applyFoot}>
           <span className={styles.applySpacer} />
           <button type="button" className={styles.applyCancel} data-testid="stem-rail-apply-cancel" onClick={onCancel}>취소</button>

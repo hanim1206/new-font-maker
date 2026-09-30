@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test'
 
 /**
  * 획 편집의 홀자 줄기. 자리(보선)는 레이아웃 편집에서만 옮긴다 — 획 편집에서 줄기를 세로로 옮기면 그 홀자의 저장 획이 바뀌고(보선 위에 얹히는 차이) 보선 Δ는 안 생긴다.
- * 모양(휨 · 기울기)을 고치면 머리 `‹`로 나갈 때 한 번 반영 창이 뜬다 — 같은 갈래는 다 퍼진 채, 툭 친 글자만 따로. 자리만 옮겼으면 묻지 않는다.
+ * 모양(휨 · 기울기)을 고치면 그 획을 잡았을 때 도구 줄 맨 아래 `전파`가 뜨고, 누르면 그 획 하나를 기준으로 반영 창이 뜬다 — 같은 갈래는 다 퍼진 채, 툭 친 글자만 따로.
+ * 나갈 때 · 다른 글자로 갈 때는 묻지 않는다. 자리만 옮겼으면(모양 그대로) `전파`가 안 뜬다.
  * 플랜: docs/plans/2026-09-29_홀자-줄기-끝점-보선.md
  */
 
@@ -52,13 +53,14 @@ test('곁줄기를 세로로 옮기면 저장 획이 바뀌고 보선 Δ는 안 
   await expect.poll(() => strokePath(page, 'ㅏ-2')).toBe(pathBefore)
 })
 
-test('자리만 옮기고 나가면 묻지 않고 바로 나간다', async ({ page }) => {
+test('자리만 옮기면 `전파`가 안 뜨고, 나가면 묻지 않고 바로 나간다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EC%95%84&mode=stroke&part=JU')
   await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
   const pathBefore = await strokePath(page, 'ㅏ-2')
   await selectStroke(page, 'ㅏ-2')
   await page.keyboard.press('Shift+ArrowUp')
   await expect.poll(() => strokePath(page, 'ㅏ-2')).not.toBe(pathBefore)
+  await expect(page.getByTestId('jamo-stroke-spread')).toHaveCount(0)
   await page.getByTestId('workspace-back').click()
   await expect(page.getByTestId('stem-rail-apply')).toHaveCount(0)
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
@@ -99,27 +101,31 @@ test('줄기를 한 번 탭하면 끝 표시가 뜨고, 막대를 누르면 점�
   expect(await anyMedialDelta(page)).toBe(false)
 })
 
-test('취소 · 바깥 · Esc는 획 편집에 남고, 완료만 반영하고 나간다', async ({ page }) => {
-  const sheet = await bendAndLeave(page, 'ㅏ-2', 'Shift+ArrowUp')
+test('취소 · 바깥 · Esc는 창만 닫고, 완료는 반영하고 획 편집에 남는다 — 나갈 땐 안 묻는다', async ({ page }) => {
+  const sheet = await bendAndSpread(page, 'ㅏ-2', 'Shift+ArrowUp')
   await sheet.getByTestId('stem-rail-apply-cancel').click()
   await expect(sheet).toHaveCount(0)
   await expect(page.getByTestId('jamo-layout-mode')).toHaveCount(0)
-  await page.getByTestId('workspace-back').click()
+  await page.getByTestId('jamo-stroke-spread').click()
   await expect(sheet).toBeVisible()
   await page.mouse.click(5, 5)
   await expect(sheet).toHaveCount(0)
-  await page.getByTestId('workspace-back').click()
+  await page.getByTestId('jamo-stroke-spread').click()
   await expect(sheet).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(sheet).toHaveCount(0)
-  await expect(page.getByTestId('jamo-layout-mode')).toHaveCount(0)
-  await page.getByTestId('workspace-back').click()
+  await page.getByTestId('jamo-stroke-spread').click()
   await sheet.getByTestId('stem-rail-apply-go').click()
+  await expect(sheet).toHaveCount(0)
+  await expect(page.getByTestId('jamo-layout-mode')).toHaveCount(0)
+  // 퍼뜨린 뒤엔 마스터와 같아 `전파`가 사라진다. 나가면 묻지 않는다.
+  await expect(page.getByTestId('jamo-stroke-spread')).toHaveCount(0)
+  await page.getByTestId('workspace-back').click()
   await expect(sheet).toHaveCount(0)
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
 })
 
-test('도마를 들고 온 획 편집도 머리 ‹(내 폰트)로 나갈 때 묻고, 닫은 뒤에 나간다', async ({ page }) => {
+test('도마를 들고 온 획 편집에서 모양을 고치면 `전파`가 뜨고, 머리 ‹(내 폰트)로 나갈 땐 묻지 않는다', async ({ page }) => {
   await page.addInitScript(() => {
     if (sessionStorage.getItem('bench-seeded')) return
     sessionStorage.setItem('bench-seeded', '1')
@@ -138,17 +144,14 @@ test('도마를 들고 온 획 편집도 머리 ‹(내 폰트)로 나갈 때 �
   await handle.dispatchEvent('pointerdown')
   await handle.dispatchEvent('pointerup')
   await page.keyboard.press('Shift+ArrowUp')
+  await expect(page.getByTestId('jamo-stroke-spread')).toBeVisible()
   await page.getByTestId('workspace-font-home').click()
-  const sheet = page.getByTestId('stem-rail-apply')
-  await expect(sheet).toBeVisible()
-  await expect(page).toHaveURL(/\/workspace\/jamo/)
-  await page.getByTestId('stem-rail-apply-go').click()
-  await expect(sheet).toHaveCount(0)
+  await expect(page.getByTestId('stem-rail-apply')).toHaveCount(0)
   await expect(page).not.toHaveURL(/\/workspace\/jamo/)
 })
 
-/** 아 · 중성 획 편집에서 그 획의 마지막 점을 곡선화하고 핸들을 밀어 휜 뒤 머리 ‹로 나간다. */
-async function bendAndLeave(page: Page, strokeId: string, key: 'Shift+ArrowUp' | 'Shift+ArrowRight') {
+/** 아 · 중성 획 편집에서 그 획의 마지막 점을 곡선화하고 핸들을 밀어 휜 뒤 `전파`를 누른다. */
+async function bendAndSpread(page: Page, strokeId: string, key: 'Shift+ArrowUp' | 'Shift+ArrowRight') {
   await page.goto('/workspace/jamo?char=%EC%95%84&mode=stroke&part=JU')
   await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
   const hit = page.locator(`[data-editor-hit="stroke"][data-stroke-id="${strokeId}"]`)
@@ -162,16 +165,16 @@ async function bendAndLeave(page: Page, strokeId: string, key: 'Shift+ArrowUp' |
   await handle.dispatchEvent('pointerup')
   await page.keyboard.press(key)
   await page.keyboard.press(key)
-  // 자모 저장은 늦춰 쓴다 — 고친 뒤 저장된 상태에서 나간다.
+  // 자모 저장은 늦춰 쓴다 — 고친 뒤 저장된 상태에서 연다.
   await expect.poll(() => jungseongOf(page, 'ㅓ'), { timeout: 5_000 }).not.toBe('null')
-  await page.getByTestId('workspace-back').click()
+  await page.getByTestId('jamo-stroke-spread').click()
   const sheet = page.getByTestId('stem-rail-apply')
   await expect(sheet).toBeVisible()
   return sheet
 }
 
 test('곁줄기를 휘면 같은 갈래(ㅏ)만 켜지고, 다른 곁줄기는 꺼진 채 보여 켠 것만 받는다(↶로 돌아온다)', async ({ page }) => {
-  const sheet = await bendAndLeave(page, 'ㅏ-2', 'Shift+ArrowUp')
+  const sheet = await bendAndSpread(page, 'ㅏ-2', 'Shift+ArrowUp')
   const section = sheet.getByTestId('stem-shape-section')
   await expect(section).toHaveCount(1)
   await expect(section).toHaveAttribute('data-leaf', /^gyeotjulgi\.right\.one/)
@@ -183,13 +186,11 @@ test('곁줄기를 휘면 같은 갈래(ㅏ)만 켜지고, 다른 곁줄기는 �
   await expect(eo).toHaveAttribute('aria-pressed', 'false')
   await eo.click()
   await expect(eo).toHaveAttribute('aria-pressed', 'true')
-  // 다른 갈래를 켜고 끄는 건 `따로`가 아니다 — 알림 없음.
-  await expect(sheet.getByTestId('stem-shape-apart-toast')).toHaveCount(0)
   const eoBefore = await jungseongOf(page, 'ㅓ')
   const yaBefore = await jungseongOf(page, 'ㅑ')
   await page.getByTestId('stem-rail-apply-go').click()
   await expect(sheet).toHaveCount(0)
-  await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
+  await expect(page.getByTestId('jamo-layout-mode')).toHaveCount(0)
   await expect.poll(() => jungseongOf(page, 'ㅓ'), { timeout: 5_000 }).not.toBe(eoBefore)
   expect(await jungseongOf(page, 'ㅑ')).toBe(yaBefore)
   const masters = () => page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('font-maker-stem-masters') ?? '{}').state?.masters ?? {}))
@@ -198,21 +199,21 @@ test('곁줄기를 휘면 같은 갈래(ㅏ)만 켜지고, 다른 곁줄기는 �
   await expect.poll(masters).toEqual([])
 })
 
-test('기둥을 휘면 같은 갈래 글자가 다 퍼진 채 뜨고, 툭 친 글자만 따로 둔다', async ({ page }) => {
-  const sheet = await bendAndLeave(page, 'ㅏ-1', 'Shift+ArrowRight')
+test('기둥을 휘면 같은 갈래 글자가 다 퍼진 채 뜨고, 툭 친 글자만 빠진다', async ({ page }) => {
+  const sheet = await bendAndSpread(page, 'ㅏ-1', 'Shift+ArrowRight')
   const own = sheet.locator('[data-kind="shape"]:not([data-extra])')
   const count = await own.count()
   expect(count).toBeGreaterThan(1)
   await expect(sheet.locator('[data-kind="shape"]:not([data-extra])[aria-pressed="false"]')).toHaveCount(0)
   await expect(sheet.getByTestId('stem-shape-count').first()).toHaveText(`${count}자에 퍼졌어요`)
-  // ㅓ를 툭 → ㅓ만 따로, 알림의 `다시 따르기`로 붙고, 다시 툭 쳐서 따로 둔 채 반영.
+  // ㅓ를 툭 → ㅓ만 빠진다(흐려질 뿐 표식 · 알림 없음). 다시 툭 치면 돌아오고, 다시 빼서 반영.
   const eo = sheet.locator('[data-kind="shape"]:not([data-extra])[data-char="ㅓ"]')
   await eo.click()
-  await expect(eo).toHaveAttribute('data-apart', 'true')
-  await expect(sheet.getByTestId('stem-shape-count').first()).toHaveText(`${count - 1}자에 퍼졌어요 · 따로 1`)
-  await sheet.getByTestId('stem-shape-apart-toast').getByRole('button', { name: '다시 따르기' }).click()
-  await expect(eo).not.toHaveAttribute('data-apart', 'true')
+  await expect(eo).toHaveAttribute('aria-pressed', 'false')
+  await expect(sheet.getByTestId('stem-shape-count').first()).toHaveText(`${count - 1}자에 퍼졌어요`)
   await expect(sheet.getByTestId('stem-shape-apart-toast')).toHaveCount(0)
+  await eo.click()
+  await expect(eo).toHaveAttribute('aria-pressed', 'true')
   await eo.click()
   const eoBefore = await jungseongOf(page, 'ㅓ')
   const yaBefore = await jungseongOf(page, 'ㅑ')
@@ -233,7 +234,7 @@ test('곁줄기 끝을 올리면(기울기) 켠 다른 곁줄기도 같은 방�
   await page.keyboard.press('Shift+ArrowUp')
   await page.keyboard.press('Shift+ArrowUp')
   await expect.poll(() => jungseongOf(page, 'ㅓ'), { timeout: 5_000 }).not.toBe('null')
-  await page.getByTestId('workspace-back').click()
+  await page.getByTestId('jamo-stroke-spread').click()
   const sheet = page.getByTestId('stem-rail-apply')
   await expect(sheet.getByTestId('stem-shape-section')).toHaveAttribute('data-leaf', /^gyeotjulgi\.right\.one/)
   await sheet.locator('[data-kind="shape"][data-extra][data-char="ㅓ"]').click()

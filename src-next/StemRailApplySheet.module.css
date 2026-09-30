@@ -35,20 +35,8 @@
 .applyGo span { display: inline-block; margin-right: 1px; }
 .applySection { margin: 18px 8px 0; color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 700; }
 
-/* 줄기 모양 = 결과 보고 예외만 끄기. 같은 갈래 카드는 처음부터 켜져 있고(따름), 툭 친 카드만 점선 · 흐린 잉크 · `ㅑ · 따로`. */
+/* 줄기 모양 = 결과 보고 예외만 끄기. 같은 갈래 카드는 처음부터 켜져 있고, 툭 친 카드는 도마 미선택처럼 흐려질 뿐이다. */
 .applyHint { margin-top: 4px; color: rgb(var(--color-text-3)); font-size: 13px; }
-.applyCard[data-apart] { outline: 1.5px dashed rgb(var(--color-text-5)); outline-offset: -1.5px; }
-.applyCard[data-apart] svg { opacity: .3; }
-.applyApartTag { position: absolute; bottom: 6px; left: 0; right: 0; color: rgb(var(--color-text-3)); font-size: 11px; font-weight: 600; text-align: center; }
-.applyApartTag b { color: #d9480f; font-weight: 700; }
-/* 알림은 아래 줄 위에 겹쳐 띄운다 — 흐름에 넣으면 창이 커져 위로 튄다. */
-.applyToast { position: absolute; left: 12px; right: 12px; bottom: 73px; z-index: 1; display: flex; align-items: center; gap: 12px; box-shadow: 0 8px 24px rgb(15 23 42 / .24); padding: 10px 10px 10px 16px; border-radius: 14px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 600; animation: fadeIn var(--motion-normal, 200ms) var(--ease-standard, ease); }
-.applyToast span { flex: 1; min-width: 0; }
-.applyToast button { flex: none; min-height: 32px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; color: inherit; font-size: 13px; font-weight: 800; }
-.applyToast button:active { background: rgb(255 255 255 / .12); }
-/* 알림이 떠 있으면 마지막 줄 카드를 알림 위까지 올려 볼 수 있게. */
-.applySheet[data-toast] .applyScroll { padding-bottom: 76px; }
-@media (prefers-reduced-motion: reduce) { .applyToast { animation: none; } }
 
 /* 칸 = 고친 갈래 하나. 머리에 기준 획 전 → 후, 옆에 갈래 이름과 퍼진 수. */
 .shapeSection + .shapeSection { margin-top: 18px; padding-top: 14px; border-top: 1px solid rgb(var(--color-border-subtle)); }
@@ -57,7 +45,6 @@
 .shapeTitle { min-width: 0; }
 .shapeTitle h3 { font-size: 15px; font-weight: 700; word-break: keep-all; }
 .shapeTitle p { margin-top: 2px; color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 600; }
-.shapeTitle .applyApartCount { color: #d9480f; font-weight: 700; }
 /* 다른 갈래는 꺼진 채 보인다 — 받을 획만 진한 회색, 나머지 옅게, 점선 없음(따로가 아니라 아직 안 받은 것). 켜면 그 획이 주황. */
 .shapeExtraHead { margin: 16px 8px 8px; color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 700; }
 .applyCard[data-extra] svg { opacity: 1; }

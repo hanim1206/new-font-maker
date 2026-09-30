@@ -130,7 +130,7 @@ test.describe('홀자 줄기 마스터 랩', () => {
     await expect(a).toHaveAttribute('data-follow', 'true')
   })
 
-  test('보를 고치고 카드로 좁힌다: 솟음 · 단일 갈래에서 ㅛ를 따로 두면 ㅗ만 휘고 ㅛ는 풀림으로 남는다', async ({ page }) => {
+  test('보를 고치고 카드로 좁힌다: 솟음 · 단일 갈래에서 ㅛ를 빼면 ㅗ만 휘고 ㅛ는 풀림으로 남는다', async ({ page }) => {
     await page.getByRole('radio', { name: /^보/ }).click()
     await openCard(page, 'bo.up.single', 'ㅗ')
     await bend(page, 'ㅗ-2', 0, -40)
@@ -138,11 +138,11 @@ test.describe('홀자 줄기 마스터 랩', () => {
     await expect(page.getByTestId('stem-shape-section')).toHaveCount(1)
     await expect(section(page, 'bo.up.single').getByTestId('stem-shape-count')).toHaveText('2자에 퍼졌어요')
     for (const char of ['ㅘ', 'ㅜ', 'ㅡ']) await expect(extraCard(page, 'bo.up.single', char)).toHaveAttribute('aria-pressed', 'false')
-    // ㅛ만 툭 쳐서 따로 → 알림에 `다시 따르기`.
+    // ㅛ만 툭 쳐서 뺀다 — 흐려질 뿐 알림 없음.
     await shapeCard(page, 'bo.up.single', 'ㅛ').click()
-    await expect(shapeCard(page, 'bo.up.single', 'ㅛ')).toHaveAttribute('data-apart', 'true')
-    await expect(page.getByTestId('stem-shape-apart-toast')).toContainText('ㅛ는 따로 두었어요')
-    await expect(section(page, 'bo.up.single').getByTestId('stem-shape-count')).toHaveText('1자에 퍼졌어요 · 따로 1')
+    await expect(shapeCard(page, 'bo.up.single', 'ㅛ')).toHaveAttribute('aria-pressed', 'false')
+    await expect(page.getByTestId('stem-shape-apart-toast')).toHaveCount(0)
+    await expect(section(page, 'bo.up.single').getByTestId('stem-shape-count')).toHaveText('1자에 퍼졌어요')
     await apply(page)
     await expect(card(page, 'bo.up.single', 'ㅗ')).toHaveAttribute('data-curved', 'true')
     await expect(card(page, 'bo.up.single', 'ㅛ')).toHaveAttribute('data-curved', 'false')
@@ -150,7 +150,7 @@ test.describe('홀자 줄기 마스터 랩', () => {
     for (const [role, char] of [['bo.up.mixed', 'ㅘ'], ['bo.down.single', 'ㅜ'], ['bo.none.single', 'ㅡ']]) await expect(card(page, role, char), char).toHaveAttribute('data-curved', 'false')
   })
 
-  test('고친 홀자 카드는 따로 둘 수 없고 잠긴다 — 다른 홀자를 따로 두면 그 홀자만 안 바뀐다', async ({ page }) => {
+  test('고친 홀자 카드는 뺄 수 없고 잠긴다 — 다른 홀자를 빼면 그 홀자만 안 바뀐다', async ({ page }) => {
     await bend(page, 'ㅏ-1', 40)
     const edited = shapeCard(page, 'gidung.outer.single', 'ㅏ')
     await expect(edited).toHaveAttribute('data-locked', 'true')
@@ -158,7 +158,7 @@ test.describe('홀자 줄기 마스터 랩', () => {
     await edited.dispatchEvent('click')
     await expect(edited).toHaveAttribute('aria-pressed', 'true')
     await shapeCard(page, 'gidung.outer.single', 'ㅕ').click()
-    await expect(shapeCard(page, 'gidung.outer.single', 'ㅕ')).toHaveAttribute('data-apart', 'true')
+    await expect(shapeCard(page, 'gidung.outer.single', 'ㅕ')).toHaveAttribute('aria-pressed', 'false')
     await apply(page)
     await expect(card(page, 'gidung.outer.single', 'ㅏ')).toHaveAttribute('data-curved', 'true')
     await expect(card(page, 'gidung.outer.single', 'ㅕ')).toHaveAttribute('data-curved', 'false')

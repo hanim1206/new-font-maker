@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
-import { Check, Circle, ClipboardPaste, Copy, Dices, Download, Import, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, RotateCcw, Settings2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
+import { Check, Circle, ClipboardPaste, Copy, Dices, Download, Import, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, RotateCcw, Settings2, Share2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { create } from 'zustand'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
@@ -32,7 +32,7 @@ import { moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStroke } from
 import { storedStemDelta } from '../src/services/stemBend'
 import { stemRailGuides } from '../src/services/medialStemRails'
 import { StemRailApplySheet } from './StemRailApplySheet'
-import { defaultPicked, editedKeysOf, lockedKeys, pickedMasters, revertedFollowers, shapeAskOf, shapePreview, type ShapeAsk } from './stemShapeSession'
+import { beforeSpreadJamo, defaultPicked, lockedKeys, pickedMasters, revertedFollowers, shapeAskForStroke, shapePreview, spreadableStem, type ShapeAsk } from './stemShapeSession'
 import { useStemMasterStore } from '../src/stores/stemMasterStore'
 import type { StemMasters } from '../src/services/stemMaster'
 import { JamoScaleSlider } from './JamoScaleSlider'
@@ -883,6 +883,7 @@ function InferenceTrackpad({
   padDragRef,
   frameForEdit,
   toolSlot = null,
+  onSpread = null,
 }: {
   glyph: string
   syllable: DecomposedSyllable
@@ -913,6 +914,8 @@ function InferenceTrackpad({
   /** 직접 조작에서 `여러 점` 토글이 켜져 있는지. 상태는 부모가 든다. */
   /** 도구 단추를 그릴 자리(캔버스 왼쪽 세로 줄). 있으면 단추는 거기로 가고 트랙패드가 가로를 다 쓴다. */
   toolSlot?: HTMLElement | null
+  /** 잡은 획이 형제에 퍼뜨릴 수 있는 홀자 줄기면 도구 줄 맨 아래 `전파`. 누르면 그 획 하나를 기준으로 반영 창이 뜬다. */
+  onSpread?: (() => void) | null
 }) {
   const direct = Boolean(dragApiRef)
   // 지금 끄는 손이 조절판인지. 셸 안에서도 조절판을 함께 두므로(섬세한 편집) 캔버스 끌기와 구분한다.
@@ -1536,6 +1539,8 @@ function InferenceTrackpad({
         {creationBase && clipboardStrokes.length > 0 && <button type="button" onClick={pasteStroke} aria-label="획 붙여넣기" data-testid="jamo-stroke-paste"><ClipboardPaste size={18} aria-hidden="true" /><span>붙여넣기</span></button>}
         {creationBase && doubleSplit && <button type="button" onClick={takeSingle} aria-label={`${doubleSplit.single} 모양 가져오기`} data-testid="jamo-stroke-take-single"><Import size={18} aria-hidden="true" /><span>{doubleSplit.single} 모양</span></button>}
         {creationBase && <button type="button" onClick={() => setResetConfirmOpen(true)} disabled={!canResetJamo} aria-label={`${creationBase.jamo.char} 프리셋으로 초기화`} data-testid="jamo-stroke-reset"><RotateCcw size={18} aria-hidden="true" /><span>초기화</span></button>}
+        {/* 맨 아래 주황 단추. 잡은 홀자 줄기의 모양(휨 · 기울기)을 같은 갈래 형제에 퍼뜨린다 — 모양이 마스터와 다를 때만 뜬다. */}
+        {onSpread && <button type="button" className={styles.strokeToolSpread} onClick={onSpread} aria-label="이 획 모양을 형제에 전파" data-testid="jamo-stroke-spread"><Share2 size={18} aria-hidden="true" /><span>전파</span></button>}
       </div>
     )
     return (
@@ -2005,8 +2010,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     return contexts
   }, [calibrationLines, choseong, effectiveSchema, globalPadding, jungseong, jongseong, measuresOnScreenBoxes, paddingOverrides, schemas, screenBoxesOf, selectedChar, syllable])
 
-  // 떠나기 전 묻기. 획 편집에서 줄기 모양을 고쳤으면 반영 창을 거치고, 아니면 바로 간다.
-  const chooseChar = (char: string) => askShapeThen(() => switchChar(char))
+  // 글자 바꾸기. 획 편집에서 고친 줄기 모양은 그 홀자에만 남는다 — 형제에 퍼뜨리는 건 `전파` 단추뿐이라 나갈 때 묻지 않는다.
+  const chooseChar = (char: string) => switchChar(char)
   const switchChar = (char: string) => {
     // 글자를 바꾸면 기본 상태(레이아웃)로 돌아간다.
     if (chrome === 'workspace') { setEditMode('layout'); setStrokeEntryPart(null) }
@@ -2240,20 +2245,22 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     setHistory((entries) => [...entries, { kind: 'layoutDelta', before, after }])
     setFuture([])
   }
-  // 획 편집에서 나갈 때(머리 ‹ · 내 폰트 · 다른 글자) 한 번 띄우는 줄기 모양 반영 창. `then`은 창을 닫은 뒤 이어 할 나가기.
-  const [shapeAsk, setShapeAsk] = useState<{ ask: ShapeAsk; picked: Set<string>; then: () => void } | null>(null)
-  // 획 편집을 연 때의 홀자. 나갈 때 견줘 고친 줄기 모양을 찾는다(줄기 마스터 랩과 같은 계산).
-  const [shapeSnapshot, setShapeSnapshot] = useState(() => useJamoStore.getState().jungseong)
-  // 연 뒤 쌓인 기록의 시작. 같은 갈래를 여럿 고쳤을 때 마지막에 고친 획을 기준으로 삼으려고 고친 차례를 여기서부터 센다.
-  const [shapeSessionStart, setShapeSessionStart] = useState(() => useEditHistoryStore.getState().history.length)
-  const shapeEditOrder = () => history.slice(shapeSessionStart).flatMap((entry) => entry.kind === 'jamo' && entry.jamoType === 'jungseong' ? editedKeysOf(entry.before, entry.after) : [])
+  // 줄기 모양 반영 창. 획을 잡고 `전파`를 누르면 그 획 하나를 기준으로 뜬다(도구 줄 맨 아래 주황 단추). 나갈 때 · 다른 글자로 갈 때는 묻지 않는다.
+  const [shapeAsk, setShapeAsk] = useState<{ ask: ShapeAsk; picked: Set<string> } | null>(null)
   const stemMasters = useStemMasterStore((state) => state.masters)
-  const shapePreviewMap = useMemo(() => shapeAsk ? shapePreview(shapeAsk.ask, shapeAsk.picked, jungseong, shapeSnapshot, stemMasters) : {}, [shapeAsk, jungseong, shapeSnapshot, stemMasters])
-  // 줄기 모양(휨 · 기울기)을 고쳤으면 창을 띄우고, 닫은 뒤 나간다. 자리만 옮겼으면(모양 그대로) 묻지 않고 나간다 — 자리는 그 홀자에만 남는다.
-  const askShapeThen = (go: () => void) => {
-    const shape = editMode === 'stroke' ? shapeAskOf(useJamoStore.getState().jungseong, shapeSnapshot, useStemMasterStore.getState().masters, shapeEditOrder()) : null
-    if (!shape) { go(); return }
-    setShapeAsk({ ask: shape, picked: defaultPicked(shape), then: go })
+  const shapePreviewMap = useMemo(() => shapeAsk ? shapePreview(shapeAsk.ask, shapeAsk.picked, jungseong, {}, stemMasters) : {}, [shapeAsk, jungseong, stemMasters])
+  // 창 머리의 `전` = 기준 획이 지금 마스터를 따르는 모양(형제가 지금 가진 모양).
+  const shapeBeforeMap = useMemo(() => shapeAsk ? beforeSpreadJamo(jungseong, stemMasters, shapeAsk.ask) : {}, [shapeAsk, jungseong, stemMasters])
+  // 잡은 획이 이름 있는 홀자 줄기이고 모양이 갈래 마스터와 다르면 `전파`가 뜬다(연 뒤 고쳤든, 예전에 따로 둔 풀림이든).
+  const spreadTarget = useMemo(() => {
+    if (editMode !== 'stroke' || selection.kind === 'none' || selection.kind === 'component' || selection.jamo.type !== 'jungseong') return null
+    const jamo = jungseong[selection.jamo.char]
+    return jamo && spreadableStem(jamo, selection.strokeId, stemMasters) ? { char: selection.jamo.char, strokeId: selection.strokeId } : null
+  }, [editMode, selection, jungseong, stemMasters])
+  const openSpread = () => {
+    if (!spreadTarget) return
+    const ask = shapeAskForStroke(useJamoStore.getState().jungseong, useStemMasterStore.getState().masters, spreadTarget.char, spreadTarget.strokeId)
+    if (ask) setShapeAsk({ ask, picked: defaultPicked(ask) })
   }
   const toggleShapeAsk = (keys: readonly string[], on: boolean) => setShapeAsk((current) => {
     if (!current) return current
@@ -2262,13 +2269,13 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     for (const key of keys) { if (on) picked.add(key); else if (!locked.has(key)) picked.delete(key) }
     return { ...current, picked }
   })
-  // 줄기 모양 반영: 칸마다 고른 카드가 든 갈래에 그 칸의 모양을 적고, 뺀 획은 풀림(지금 모양). 기준 아닌 고친 획이 켜져 있으면 고치기 전으로 돌려 기준을 따르게 한다. 되돌리기 한 줄.
+  // 전파: 고른 카드가 든 갈래에 이 획의 모양을 적고, 따로 둔 획은 풀림(지금 모양). 되돌리기 한 줄. 창을 닫고 획 편집에 남는다.
   const applyShapeAsk = () => {
     if (!shapeAsk) return
     const jamo = useJamoStore.getState()
     const jamoBefore = jamo.jungseong
     const mastersBefore = useStemMasterStore.getState().masters
-    for (const [char, next] of Object.entries(revertedFollowers(jamoBefore, shapeSnapshot, shapeAsk.ask, shapeAsk.picked))) jamo.updateJungseong(char, next)
+    for (const [char, next] of Object.entries(revertedFollowers(jamoBefore, {}, shapeAsk.ask, shapeAsk.picked))) jamo.updateJungseong(char, next)
     useStemMasterStore.getState().setMasters(pickedMasters(shapeAsk.ask, shapeAsk.picked), (char, strokeId) => !shapeAsk.picked.has(`${char}:${strokeId}`))
     const jamoAfter = useJamoStore.getState().jungseong
     const changedChars = Object.keys(jamoAfter).filter((char) => jamoAfter[char] !== jamoBefore[char])
@@ -2280,12 +2287,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       setFuture([])
     }
     setShapeAsk(null)
-    // 이번 획 편집은 끝났다. 다시 들어올 때(`editStrokes`) 새로 센다.
-    setShapeSnapshot(useJamoStore.getState().jungseong)
-    setShapeSessionStart(Number.MAX_SAFE_INTEGER)
-    shapeAsk.then()
   }
-  // 취소 = 창만 닫고 획 편집에 남는다. 나가기(`then`)는 안 한다. 다음에 나갈 때 다시 묻는다.
+  // 취소 = 창만 닫고 획 편집에 남는다.
   const cancelShapeAsk = () => setShapeAsk(null)
   // 방향키: 잡은 획 · 점 · 핸들을 눈금 한 칸(Shift는 네 칸) 옮긴다. 끌기와 같은 계산 · 같은 기록 한 줄.
   const nudgeActive = directManipulation && !isLayoutMode && !globalStylePanel && selection.kind !== 'none' && selection.kind !== 'component'
@@ -2307,7 +2310,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [nudgeActive, snapStep])
   // Esc = 빈 곳 누르기(획 · 점 · 핸들을 다 푼다). 레이아웃 모드의 켠 상자는 그대로 둔다.
-  const escapeActive = !isLayoutMode && !globalStylePanel && selection.kind !== 'none'
+  // 반영 창이 떠 있으면 Esc는 창이 받는다 — 잡은 획을 풀지 않는다(풀면 `전파`가 사라진다).
+  const escapeActive = !isLayoutMode && !globalStylePanel && selection.kind !== 'none' && !shapeAsk
   useEffect(() => {
     if (!escapeActive) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -2331,8 +2335,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const editStrokes = (part: Part) => {
     const editorPart: MobileEditorPart = part === 'CH' ? 'CH' : part === 'JO' ? 'JO' : 'JU'
     setStrokeEntryPart(editorPart)
-    setShapeSnapshot(useJamoStore.getState().jungseong)
-    setShapeSessionStart(history.length)
     setSelection(firstStrokeSelectionOf(editorPart) ?? { kind: 'none' })
     setSelectedPoints([])
     chooseEditMode('stroke')
@@ -2595,6 +2597,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         padDragRef={directManipulation ? padDragRef : undefined}
         frameForEdit={frameForEdit}
         toolSlot={strokeToolSlot}
+        onSpread={spreadTarget ? openSpread : null}
       />}
       {/* 획 편집은 끄는 즉시 저장된다. 레이아웃으로 돌아가는 문은 머리 `‹`(도마를 들고 왔으면 섹션 홈), 되돌리기는 ↶. */}
       {strokeFrameAvailable && !globalStylePanel && boxFitIssue && <div className={styles.strokeDoneBar}>
@@ -2644,11 +2647,10 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         // 획 편집은 레이아웃 위에 얹힌 층이다. 머리 `‹`가 레이아웃으로 내려가는 문(옛 `완료`). 도마를 들고 왔으면 섹션 홈으로.
         back={!styleOnly && editMode === 'stroke' && strokeFrameAvailable && !benchCarried ? { label: '레이아웃', onClick: () => chooseEditMode('layout') } : undefined}
         history={{ canUndo: history.length > 0, canRedo: future.length > 0, onUndo: undo, onRedo: redo }}
-        beforeLeave={askShapeThen}
       >
         {!styleOnly && benchRow}
         {body}
-        {shapeAsk && <StemRailApplySheet ask={shapeAsk.ask} picked={shapeAsk.picked} preview={shapePreviewMap} before={shapeSnapshot} onToggle={toggleShapeAsk} onDone={applyShapeAsk} onCancel={cancelShapeAsk} />}
+        {shapeAsk && <StemRailApplySheet ask={shapeAsk.ask} picked={shapeAsk.picked} preview={shapePreviewMap} before={shapeBeforeMap} onToggle={toggleShapeAsk} onDone={applyShapeAsk} onCancel={cancelShapeAsk} />}
       </MobileWorkspaceShell>
     )
   }

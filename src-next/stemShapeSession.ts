@@ -4,9 +4,14 @@ import {
   baseOf,
   boundStrokesOf,
   facetValuesOf,
+  instanceOf,
   isUnder,
   JAMO_CHANNELS,
   masterFromStroke,
+  masterNameOf,
+  masterOf,
+  stemAxisOf,
+  stemReferenceBox,
   STEM_FACETS,
   type JamoChannel,
   type StemBase,
@@ -146,6 +151,61 @@ export function shapeAskOf(
 }
 
 const STEM_BASE_ORDER = Object.keys(STEM_FACETS) as StemBase[]
+
+/** 획 하나의 줄기 이름과 채널. 이름 없는 획이면 null. */
+export function namedStemOf(jamo: JamoData, strokeId: string): { channel: JamoChannel; name: StemMasterName } | null {
+  for (const channel of JAMO_CHANNELS) {
+    const strokes = jamo[channel]
+    if (!strokes?.some((stroke) => stroke.id === strokeId)) continue
+    const name = masterNameOf(jamo, strokes, strokeId)
+    return name ? { channel, name } : null
+  }
+  return null
+}
+
+/**
+ * 이 획을 형제에 퍼뜨릴 수 있나 — 이름 있는 줄기이고, 그 모양이 지금 갈래 마스터와 다를 때(연 뒤 고쳤든, 예전에 따로 둔 풀림이든).
+ * 마스터와 같은 획엔 `전파`가 안 뜬다.
+ */
+export function spreadableStem(jamo: JamoData, strokeId: string, masters: StemMasters): boolean {
+  const stem = namedStemOf(jamo, strokeId)
+  if (!stem) return false
+  const shape = masterFromStroke(jamo, stem.channel, strokeId)
+  return !!shape && !sameMaster(shape, masterOf(masters, stem.name))
+}
+
+/**
+ * 획 하나를 기준으로 묻는다(`전파` 단추). 칸은 그 획의 갈래 하나, 같은 줄기의 다른 갈래는 `다른 ○○에도`로 꺼진 채.
+ * 세션 없이 그 획의 지금 모양이 마스터라 `changed`는 비어 있다 — 같은 갈래에서 따로 고친 다른 획은 풀림 그대로 남는다.
+ */
+export function shapeAskForStroke(jungseong: Readonly<Record<string, JamoData>>, masters: StemMasters, char: string, strokeId: string): ShapeAsk | null {
+  const jamo = jungseong[char]
+  const stem = jamo ? namedStemOf(jamo, strokeId) : null
+  if (!jamo || !stem) return null
+  const master = masterFromStroke(jamo, stem.channel, strokeId)
+  if (!master) return null
+  const all = entriesOf(jungseong, masters, baseOf(stem.name))
+  return {
+    sections: [{ leaf: stem.name, master: { ...master, name: stem.name }, editedKey: `${char}:${strokeId}`, channel: stem.channel, entries: all.filter((entry) => entry.name === stem.name), extras: all.filter((entry) => entry.name !== stem.name) }],
+    changed: [],
+  }
+}
+
+/** 창 머리의 `전`: 기준 획이 지금 갈래 마스터를 따르는 모양(퍼뜨리기 전 형제가 가진 모양). */
+export function beforeSpreadJamo(jungseong: Readonly<Record<string, JamoData>>, masters: StemMasters, ask: ShapeAsk): Record<string, JamoData> {
+  const before: Record<string, JamoData> = {}
+  for (const section of ask.sections) {
+    const [char, strokeId] = section.editedKey.split(':')
+    const jamo = jungseong[char]
+    const strokes = jamo?.[section.channel]
+    const stroke = strokes?.find((item) => item.id === strokeId)
+    if (!jamo || !strokes || !stroke) continue
+    const current = masterOf(masters, section.leaf)
+    const instance = instanceOf(stroke, current, stemReferenceBox(char, section.channel, stroke), stemAxisOf(section.leaf))
+    before[char] = { ...jamo, [section.channel]: strokes.map((item) => (item.id === strokeId ? instance : item)) }
+  }
+  return before
+}
 
 const SAME_MASTER_TOLERANCE = 1e-6
 /** 두 마스터가 같은 모양인가(점 · 핸들의 t · o가 다 같다). */
