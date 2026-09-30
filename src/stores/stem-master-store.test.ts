@@ -93,7 +93,7 @@ describe('줄기 마스터 스토어', () => {
     expect(innerOf().map((item) => item.follows)).toEqual([true, true, false])
   })
 
-  it('전체 리셋은 마스터를 지우고 풀린 줄기까지 곧게 되돌린다(끝점은 그대로)', async () => {
+  it('전체 리셋은 마스터를 지우고 풀린 줄기까지 곧게 되돌린다(축 방향 길이는 그대로, 기울기는 풀림)', async () => {
     const { useJamoStore } = await import('./jamoStore')
     const { useStemMasterStore } = await import('./stemMasterStore')
     const store = useStemMasterStore.getState()
@@ -103,7 +103,8 @@ describe('줄기 마스터 스토어', () => {
     store.resetAll()
     expect(useStemMasterStore.getState().masters).toEqual({})
     const jung = useJamoStore.getState().jungseong
-    expect(jung['ㅏ'].strokes![0].points).toEqual([{ x: 0, y: 0 }, { x: 0.1, y: 1 }])
+    // 기둥의 축은 세로 — 옆으로 기운 끝(x 0.1)은 모양이라 곧게 되돌리면 시작점 x로 돌아온다.
+    expect(jung['ㅏ'].strokes![0].points).toEqual([{ x: 0, y: 0 }, { x: 0, y: 1 }])
     for (const char of ['ㅐ', 'ㅒ', 'ㅘ', 'ㅣ']) {
       expect(boundStrokesOf(jung[char], {}).every((item) => item.follows && item.stroke.points.every((point) => !point.handleIn && !point.handleOut)), char).toBe(true)
     }

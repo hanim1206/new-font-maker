@@ -225,90 +225,28 @@ export function masterNameOf(jamo: Pick<JamoData, 'type' | 'char'>, channelStrok
   return base
 }
 
-function distanceToSegment(point: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number {
-  const dx = b.x - a.x
-  const dy = b.y - a.y
-  const lengthSquared = dx * dx + dy * dy
-  const t = lengthSquared === 0 ? 0 : Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared))
-  return Math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy))
+/**
+ * 줄기의 축 방향. 축은 끝점끼리 잇는 선이 아니라 시작점에서 줄기 방향(가로줄기 = 가로, 세로줄기 = 세로)으로 뻗는 선이다.
+ * 줄기의 자리 · 길이는 보선이 정하지만 한쪽 끝만 따로 위아래로 잡는 보선은 없어서, 끝을 옮긴 기울기는 모양이다 — 끝점의 수직 오프셋을 마스터에 담는다.
+ * 이름 있는 줄기는 전부 축이 있다(기본 획은 모두 정확히 수평 · 수직이라 곧은 마스터를 그대로 따른다).
+ */
+export type StemAxis = 'x' | 'y'
+export function stemAxisOf(name: StemMasterName): StemAxis {
+  return isUnder(name, 'gyeotjulgi') || isUnder(name, 'bo') || isUnder(name, 'geolchim') ? 'x' : 'y'
+}
+
+/** 축의 끝. 획의 끝점을 시작점에서 줄기 방향으로 뻗은 선 위로 내린 자리(기울기를 뺀 자리). 축이 없으면 끝점 그대로. */
+function axisEndOf(start: { x: number; y: number }, end: { x: number; y: number }, axis?: StemAxis | null) {
+  return axis === 'x' ? { x: end.x, y: start.y } : axis === 'y' ? { x: start.x, y: end.y } : end
 }
 
 /**
- * 곁가지 줄기의 축은 몸에 닿는 끝 → 빈 끝이다. 짧은기둥은 보에, 곁줄기는 기둥에 닿는다.
- * 솟는 짧은기둥(위 → 아래로 그려져 끝이 보에 닿음)이나 ㅓ의 곁줄기(왼 → 오른으로 그려져 끝이 기둥에 닿음)는 획 방향과 반대라 뒤집는다.
- * 뒤집을 때 휨 방향도 같이 뒤집어(`mirroredMaster`) 솟음 · 내림, 오른 · 왼에 같은 마스터를 주면 몸을 사이에 두고 거울처럼 휜다. 다른 줄기는 획 방향 그대로.
+ * 마스터를 이 획의 시작점에서 줄기 방향으로 놓는다. 시작점 · 축 방향 길이는 그대로, 사이 모양과 끝점의 수직 자리(기울기)는 마스터.
+ * 축은 획이 그려진 방향 그대로다 — 거울을 안 쓴다. ㅏ의 곁줄기를 ㅓ에 놓으면 같은 방향으로 옮겨 놓은 모양이 된다(빈 끝이 반대편이어도).
  */
-export function axisReversed(jamo: Pick<JamoData, 'type' | 'char'>, channelStrokes: readonly StrokeDataV2[], stroke: StrokeDataV2): boolean {
-  const name = masterNameOf(jamo, channelStrokes, stroke.id)
-  if (!name || stroke.points.length < 2) return false
-  const body: StemName | null = isUnder(name, 'jjalbeungidung') ? 'bo' : isUnder(name, 'gyeotjulgi') ? 'gidung' : null
-  if (!body) return false
-  const table = grammarOf(jamo.type, jamo.char)
-  const bars = channelStrokes.filter((item) => table[item.id] === body && item.points.length >= 2)
-  if (bars.length === 0) return false
-  const gap = (point: { x: number; y: number }) => Math.min(...bars.map((bar) => distanceToSegment(point, bar.points[0], bar.points[bar.points.length - 1])))
-  return gap(stroke.points[stroke.points.length - 1]) < gap(stroke.points[0])
-}
-
-/** 획을 거꾸로(점 순서와 핸들 방향을 뒤집는다). 모양은 같다. */
-export function reverseStroke(stroke: StrokeDataV2): StrokeDataV2 {
-  return {
-    ...stroke,
-    points: [...stroke.points].reverse().map(({ handleIn, handleOut, ...point }) => ({
-      ...point,
-      ...(handleOut ? { handleIn: handleOut } : {}),
-      ...(handleIn ? { handleOut: handleIn } : {}),
-    })),
-  }
-}
-
-/**
- * 수직 오프셋을 뒤집은 마스터. 축을 뒤집으면 `o`의 기준(진행 방향 오른쪽)도 같이 돌아가 180° 돌린 모양이 된다.
- * `o`까지 뒤집어야 몸(기둥 · 보)을 사이에 둔 거울이 된다 — ㅏ의 곁줄기 끝이 위로 휘면 ㅓ도 위로, ㅗ의 짧은기둥이 오른쪽으로 휘면 ㅜ도 오른쪽.
- */
-export function mirroredMaster(master: StemMaster): StemMaster {
-  const flip = (point: { t: number; o: number }) => ({ t: point.t, o: -point.o })
-  return {
-    ...master,
-    points: master.points.map((point) => ({
-      ...point,
-      o: -point.o,
-      ...(point.handleIn ? { handleIn: flip(point.handleIn) } : {}),
-      ...(point.handleOut ? { handleOut: flip(point.handleOut) } : {}),
-    })),
-  }
-}
-
-/**
- * 빈 끝이 있는 줄기(곁줄기 · 짧은기둥)의 축 방향. 붙은 끝은 보선이 잡지만 빈 끝의 수직 자리는 잡는 보선이 없어,
- * 빈 끝을 옮긴 기울기는 모양이다 — 축을 끝점끼리 잇지 않고 줄기 방향(곁줄기 = 가로, 짧은기둥 = 세로)으로 두고, 빈 끝의 수직 오프셋을 마스터에 담는다.
- * 나머지 줄기는 두 끝이 다 보선에 매여 null(축 = 끝점을 잇는 선).
- */
-export type FreeEnd = 'x' | 'y'
-export function freeEndOf(name: StemMasterName): FreeEnd | null {
-  return isUnder(name, 'gyeotjulgi') ? 'x' : isUnder(name, 'jjalbeungidung') ? 'y' : null
-}
-
-/** 축의 끝. 빈 끝 줄기는 빈 끝을 줄기 방향 선 위로 내린 자리(기울기를 뺀 자리), 아니면 획의 끝점. */
-function axisEndOf(start: { x: number; y: number }, end: { x: number; y: number }, free?: FreeEnd | null) {
-  return free === 'x' ? { x: end.x, y: start.y } : free === 'y' ? { x: start.x, y: end.y } : end
-}
-
-/** 축 방향을 따진 인스턴스 · 따름 판정. 뒤집힌 축은 거울 마스터로 놓는다. */
-function orientedInstance(stroke: StrokeDataV2, master: StemMaster, box: BoxEm, reversed: boolean, free?: FreeEnd | null): StrokeDataV2 {
-  return reversed ? reverseStroke(instanceOf(reverseStroke(stroke), mirroredMaster(master), box, free)) : instanceOf(stroke, master, box, free)
-}
-function orientedFollows(stroke: StrokeDataV2, master: StemMaster, box: BoxEm, reversed: boolean, free?: FreeEnd | null): boolean {
-  return reversed ? followsMaster(reverseStroke(stroke), mirroredMaster(master), box, free) : followsMaster(stroke, master, box, free)
-}
-
-/**
- * 마스터를 이 획의 시작점 · 끝점 사이에 놓는다. 시작점은 그대로, 사이 모양은 마스터.
- * 끝점도 그대로다 — 단 빈 끝 줄기(`free`)는 축을 줄기 방향으로 두고 끝점의 수직 자리도 마스터(마지막 점의 `o`)가 정한다. 축 방향 길이는 그대로.
- */
-export function instanceOf(stroke: StrokeDataV2, master: StemMaster, box: BoxEm, free?: FreeEnd | null): StrokeDataV2 {
+export function instanceOf(stroke: StrokeDataV2, master: StemMaster, box: BoxEm, axis?: StemAxis | null): StrokeDataV2 {
   const start = stroke.points[0]
-  const end = axisEndOf(start, stroke.points[stroke.points.length - 1], free)
+  const end = axisEndOf(start, stroke.points[stroke.points.length - 1], axis)
   const dx = end.x - start.x
   const dy = end.y - start.y
   // 수직 방향은 글자 좌표(em)에서 재고 상자 좌표로 돌려놓는다. 상자가 좁아도 같은 em만큼 휜다.
@@ -328,9 +266,9 @@ export function instanceOf(stroke: StrokeDataV2, master: StemMaster, box: BoxEm,
 const FOLLOW_TOLERANCE = 0.002
 
 /** 이 획이 마스터를 따르고 있는가. 인스턴스를 다시 만들어도 같으면 따르는 것이고, 다르면 자모에서 손댄(풀린) 획이다. */
-export function followsMaster(stroke: StrokeDataV2, master: StemMaster, box: BoxEm, free?: FreeEnd | null): boolean {
+export function followsMaster(stroke: StrokeDataV2, master: StemMaster, box: BoxEm, axis?: StemAxis | null): boolean {
   if (stroke.points.length < 2) return false
-  const expected = instanceOf(stroke, master, box, free)
+  const expected = instanceOf(stroke, master, box, axis)
   if (expected.points.length !== stroke.points.length) return false
   const near = (a?: { x: number; y: number }, b?: { x: number; y: number }) => (!a && !b) || (!!a && !!b && Math.abs(a.x - b.x) <= FOLLOW_TOLERANCE && Math.abs(a.y - b.y) <= FOLLOW_TOLERANCE)
   return expected.points.every((point, index) => {
@@ -356,8 +294,7 @@ export function boundStrokesOf(jamo: JamoData, masters: StemMasters): BoundStrok
       const name = masterNameOf(jamo, strokes, stroke.id)
       if (!name) return []
       const box = stemReferenceBox(jamo.char, channel, stroke)
-      const reversed = axisReversed(jamo, strokes, stroke)
-      return [{ channel, stroke, name, follows: orientedFollows(stroke, masterOf(masters, name), box, reversed, freeEndOf(name)), blocked: false }]
+      return [{ channel, stroke, name, follows: followsMaster(stroke, masterOf(masters, name), box, stemAxisOf(name)), blocked: false }]
     })
   })
 }
@@ -376,13 +313,12 @@ export function applyMaster(jamo: JamoData, before: StemMasters, after: StemMast
       const name = masterNameOf(jamo, strokes, stroke.id)
       if (!name || keep?.(stroke.id)) return stroke
       const box = stemReferenceBox(jamo.char, channel, stroke)
-      const reversed = axisReversed(jamo, strokes, stroke)
       const previous = masterOf(before, name)
       const current = masterOf(after, name)
-      const free = freeEndOf(name)
-      if (previous === current || !orientedFollows(stroke, previous, box, reversed, free)) return stroke
-      const instance = orientedInstance(stroke, current, box, reversed, free)
-      if (orientedFollows(stroke, current, box, reversed, free)) return stroke
+      const axis = stemAxisOf(name)
+      if (previous === current || !followsMaster(stroke, previous, box, axis)) return stroke
+      const instance = instanceOf(stroke, current, box, axis)
+      if (followsMaster(stroke, current, box, axis)) return stroke
       changed = true
       return instance
     })
@@ -393,7 +329,7 @@ export function applyMaster(jamo: JamoData, before: StemMasters, after: StemMast
 
 /**
  * 자모에서 고친 획 하나를 마스터로 읽는다(`instanceOf`의 역). 편집기에서 고친 모양을 형제에게 반영할 때 쓴다.
- * 끝점 사이 축(t)과 기준 칸 em의 수직 오프셋(o)으로 재고, 뒤집힌 축이면 거울을 풀어 적는다. 빈 끝 줄기는 축이 줄기 방향이라 빈 끝의 기울기도 담긴다. 이름 없는 획이면 null.
+ * 시작점에서 줄기 방향으로 뻗은 축(t)과 기준 칸 em의 수직 오프셋(o)으로 잰다. 끝점의 오프셋(기울기)도 담긴다. 이름 없는 획이면 null.
  */
 export function masterFromStroke(jamo: JamoData, channel: JamoChannel, strokeId: string): StemMaster | null {
   const strokes = jamo[channel]
@@ -402,11 +338,9 @@ export function masterFromStroke(jamo: JamoData, channel: JamoChannel, strokeId:
   const name = masterNameOf(jamo, strokes, strokeId)
   if (!name) return null
   const box = stemReferenceBox(jamo.char, channel, stroke)
-  const reversed = axisReversed(jamo, strokes, stroke)
-  const oriented = reversed ? reverseStroke(stroke) : stroke
-  const free = freeEndOf(name)
-  const start = oriented.points[0]
-  const end = axisEndOf(start, oriented.points[oriented.points.length - 1], free)
+  const axis = stemAxisOf(name)
+  const start = stroke.points[0]
+  const end = axisEndOf(start, stroke.points[stroke.points.length - 1], axis)
   const uxEm = (end.x - start.x) * box.width
   const uyEm = (end.y - start.y) * box.height
   const length = Math.hypot(uxEm, uyEm) || 1
@@ -415,17 +349,16 @@ export function masterFromStroke(jamo: JamoData, channel: JamoChannel, strokeId:
     const dyEm = (point.y - start.y) * box.height
     return { t: (dxEm * uxEm + dyEm * uyEm) / (length * length), o: (dxEm * uyEm - dyEm * uxEm) / length }
   }
-  const last = oriented.points.length - 1
-  const master: StemMaster = {
+  const last = stroke.points.length - 1
+  return {
     name,
-    points: oriented.points.map((point, index) => ({
-      // 빈 끝 줄기는 끝점의 수직 자리(기울기)도 모양으로 담는다.
-      ...(index === 0 ? { t: 0, o: 0 } : index === last ? { t: 1, o: free ? toAxis(point).o : 0 } : toAxis(point)),
+    points: stroke.points.map((point, index) => ({
+      // 끝점의 수직 자리(기울기)도 모양으로 담는다.
+      ...(index === 0 ? { t: 0, o: 0 } : index === last ? { t: 1, o: toAxis(point).o } : toAxis(point)),
       ...(point.handleIn ? { handleIn: toAxis(point.handleIn) } : {}),
       ...(point.handleOut ? { handleOut: toAxis(point.handleOut) } : {}),
     })),
   }
-  return reversed ? mirroredMaster(master) : master
 }
 
 /** 풀린 획 하나를 다시 마스터에 붙인다. 이미 따르면 null. */
@@ -438,10 +371,9 @@ export function refollow(jamo: JamoData, masters: StemMasters, channel: JamoChan
   const index = strokes.findIndex((stroke) => stroke.id === strokeId)
   if (index < 0) return null
   const box = stemReferenceBox(jamo.char, channel, strokes[index])
-  const reversed = axisReversed(jamo, strokes, strokes[index])
-  const free = freeEndOf(name)
-  if (orientedFollows(strokes[index], master, box, reversed, free)) return null
+  const axis = stemAxisOf(name)
+  if (followsMaster(strokes[index], master, box, axis)) return null
   const rewritten = [...strokes]
-  rewritten[index] = orientedInstance(strokes[index], master, box, reversed, free)
+  rewritten[index] = instanceOf(strokes[index], master, box, axis)
   return { ...jamo, [channel]: rewritten }
 }

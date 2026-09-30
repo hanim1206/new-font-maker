@@ -60,12 +60,12 @@ describe('줄기 모양 반영 칸', () => {
   })
 })
 
-describe('빈 끝 기울기 = 모양', () => {
-  it('기본 홀자의 이름 있는 줄기는 곧은 마스터를 전부 따른다(빈 끝 축으로 바꿔도)', () => {
+describe('기울기 = 모양', () => {
+  it('기본 홀자의 이름 있는 줄기는 곧은 마스터를 전부 따른다(줄기 방향 축으로 바꿔도)', () => {
     for (const jamo of Object.values(base)) expect(boundStrokesOf(jamo, {}).every((item) => item.follows)).toBe(true)
   })
 
-  it('ㅏ 곁줄기 빈 끝을 올리면 ㅑ · ㅓ의 빈 끝도 위로 같은 em만큼, 붙은 끝은 그대로', () => {
+  it('ㅏ 곁줄기 끝을 올리면 ㅑ · ㅓ도 같은 방향으로 기운다 — 시작점은 그대로, 끝점이 위로', () => {
     const { channel, stroke } = idOf('ㅏ', 'gyeotjulgi.right.one.single')
     const lifted = { ...stroke, points: stroke.points.map((point, index) => index === stroke.points.length - 1 ? { ...point, y: point.y - 0.1 } : point) }
     const a = { ...base['ㅏ'], [channel]: base['ㅏ'][channel]!.map((item) => item.id === stroke.id ? lifted : item) }
@@ -79,12 +79,39 @@ describe('빈 끝 기울기 = 모양', () => {
     // ㅑ 위 곁줄기: 붙은 끝(시작) 그대로, 빈 끝(끝) 위로.
     expect(yaUpper.points[0]).toEqual(yaBefore.points[0])
     expect(yaUpper.points[1].y).toBeLessThan(yaBefore.points[1].y)
-    // ㅓ 곁줄기는 거꾸로 그려져 빈 끝이 시작점이다 — 그쪽이 위로, 기둥에 붙은 끝은 그대로.
+    // ㅓ 곁줄기도 그려진 방향(왼 → 오른) 그대로 — 시작점(빈 끝) 그대로, 끝점(기둥 쪽)이 위로. 거울이 아니라 같은 방향.
     const eoStroke = eo.strokes!.find((item) => item.id === idOf('ㅓ', 'gyeotjulgi.left.one.single').stroke.id)!
     const eoBefore = idOf('ㅓ', 'gyeotjulgi.left.one.single').stroke
-    expect(eoStroke.points[0].y).toBeLessThan(eoBefore.points[0].y)
-    expect(eoStroke.points[1]).toEqual(eoBefore.points[1])
+    expect(eoStroke.points[0]).toEqual(eoBefore.points[0])
+    expect(eoStroke.points[1].y).toBeLessThan(eoBefore.points[1].y)
     // 받은 획은 새 마스터를 따른다.
     expect(boundStrokesOf(eo, masters).find((item) => item.stroke.id === eoStroke.id)!.follows).toBe(true)
+  })
+})
+
+describe('자리만 옮긴 획', () => {
+  it('획을 통째로 옮기기만 하면(모양 그대로) 물을 게 없다', () => {
+    const { channel, stroke } = idOf('ㅏ', 'gyeotjulgi.right.one.single')
+    const moved = { ...stroke, points: stroke.points.map((point) => ({ ...point, y: point.y - 0.1 })) }
+    const a = { ...base['ㅏ'], [channel]: base['ㅏ'][channel]!.map((item) => item.id === stroke.id ? moved : item) }
+    expect(shapeAskOf({ ...base, 'ㅏ': a }, base, {})).toBeNull()
+  })
+})
+
+describe('걸침 기울기', () => {
+  it('ㅐ 걸침 끝을 올리면 ㅒ · ㅙ 걸침도 같은 방향으로 기운다', () => {
+    const LEAF = 'geolchim'
+    const { channel, stroke } = idOf('ㅐ', LEAF)
+    const lifted = { ...stroke, points: stroke.points.map((point, index) => index === stroke.points.length - 1 ? { ...point, y: point.y - 0.05 } : point) }
+    const ae = { ...base['ㅐ'], [channel]: base['ㅐ'][channel]!.map((item) => item.id === stroke.id ? lifted : item) }
+    const master = masterFromStroke(ae, channel, stroke.id)!
+    expect(master.points[master.points.length - 1].o).toBeGreaterThan(0)
+    for (const char of ['ㅒ', 'ㅙ']) {
+      const target = boundStrokesOf(base[char], {}).find((item) => item.name === LEAF)!
+      const next = applyMaster(base[char], {}, { [LEAF]: master })!
+      const after = next[target.channel]!.find((item) => item.id === target.stroke.id)!
+      expect(after.points[0], char).toEqual(target.stroke.points[0])
+      expect(after.points[1].y, char).toBeLessThan(target.stroke.points[1].y)
+    }
   })
 })

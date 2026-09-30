@@ -112,7 +112,12 @@ export function shapeAskOf(
   masters: StemMasters,
   order: readonly string[] = [],
 ): ShapeAsk | null {
-  const changed = changedStems(jungseong, snapshot, masters)
+  // 자리만 옮긴 획(마스터로 읽으면 연 때와 같은 모양)은 모양이 아니라 그 홀자의 자리 차이 — 묻지 않는다.
+  const changed = changedStems(jungseong, snapshot, masters).filter((item) => {
+    const before = snapshot[item.char] ? masterFromStroke(snapshot[item.char], item.channel, item.stroke.id) : null
+    const after = masterFromStroke(jungseong[item.char], item.channel, item.stroke.id)
+    return !before || !after || !sameMaster(before, after)
+  })
   if (changed.length === 0) return null
   const when = (item: ChangedStem) => order.lastIndexOf(`${item.char}:${item.stroke.id}`)
   // 갈래마다 마지막에 고친 획.
@@ -141,6 +146,14 @@ export function shapeAskOf(
 }
 
 const STEM_BASE_ORDER = Object.keys(STEM_FACETS) as StemBase[]
+
+const SAME_MASTER_TOLERANCE = 1e-6
+/** 두 마스터가 같은 모양인가(점 · 핸들의 t · o가 다 같다). */
+export function sameMaster(a: StemMaster, b: StemMaster): boolean {
+  if (a.points.length !== b.points.length) return false
+  const near = (x?: { t: number; o: number }, y?: { t: number; o: number }) => (!x && !y) || (!!x && !!y && Math.abs(x.t - y.t) <= SAME_MASTER_TOLERANCE && Math.abs(x.o - y.o) <= SAME_MASTER_TOLERANCE)
+  return a.points.every((point, index) => near(point, b.points[index]) && near(point.handleIn, b.points[index].handleIn) && near(point.handleOut, b.points[index].handleOut))
+}
 
 /** 처음 켜 둘 카드: 고친 갈래의 획 전부. 다른 갈래는 꺼 둔다. */
 export const defaultPicked = (ask: ShapeAsk) => new Set(ask.sections.flatMap((section) => section.entries.map(keyOf)))

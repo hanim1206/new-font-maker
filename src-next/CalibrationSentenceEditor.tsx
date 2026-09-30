@@ -5,10 +5,10 @@ import { create } from 'zustand'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
 import { DevGhostToggle } from './DevGhostToggle'
-import { facesToBox, identityOfSyllable, medialDragRange } from '../src/services/contextBoxResolver'
+import { facesToBox, identityOfSyllable } from '../src/services/contextBoxResolver'
 import { contextPlacementOf, useContextPlacement, useNotoModel } from './notoModel'
 import { GlyphLayoutEditor } from './GlyphLayoutEditor'
-import { effectiveLayoutDelta, layoutDeltaSnapshot, useLayoutDeltaStore } from './layoutDeltaStore'
+import { effectiveLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { useEditHistoryStore } from './editHistoryStore'
 import { newLayoutEntry } from './layoutEntry'
@@ -29,8 +29,7 @@ import confirmStyles from './workspace/FontExportDialog.module.css'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import { moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStroke } from '../src/services/editorCommands'
 import { storedStemDelta } from '../src/services/stemBend'
-import { stemRailDragOf, stemRailGuides, type StemRailDrag } from '../src/services/medialStemRails'
-import { exclusionDeltas, railCardKey, stemRailGroups, type StemRailEdit, type StemRailGroup } from './stemRailSession'
+import { stemRailGuides } from '../src/services/medialStemRails'
 import { StemRailApplySheet } from './StemRailApplySheet'
 import { defaultPicked, editedKeysOf, lockedKeys, pickedMasters, revertedFollowers, shapeAskOf, shapePreview, type ShapeAsk } from './stemShapeSession'
 import { useStemMasterStore } from '../src/stores/stemMasterStore'
@@ -42,7 +41,7 @@ import { LayoutContextCards } from './LayoutContextCards'
 import { corpusIdentity } from './notoCorpus'
 import { TouchedGlyphRow } from './TouchedGlyphRow'
 import { focusJamoOf, NO_LAYOUT_EDIT } from './reviewPropagation'
-import { matchesRule, ruleOfContext } from './scopeRule'
+import { matchesRule } from './scopeRule'
 import type { ScopeRule } from './scopeRule'
 import { useUnifiedTrackpad } from '../src/features/mobile-editor/useUnifiedTrackpad'
 import { calculateBoxes } from '../src/utils/layoutCalculator'
@@ -187,32 +186,17 @@ export type HistoryEntry =
       afterOverrides: LayoutSchema['userPartOverrides']
       edit: SampleGlyphEdit
     }
-  // 획 편집 끌기. 줄기 끝의 세로 이동이 보선이 되면(`stemRail`) 같은 한 줄에 배치 Δ 앞뒤를 싣는다.
-  | { kind: 'jamo'; jamoType: JamoData['type']; char: string; before: JamoData; after: JamoData; edit: SampleGlyphEdit; layoutDelta?: StemRailCommit }
+  | { kind: 'jamo'; jamoType: JamoData['type']; char: string; before: JamoData; after: JamoData; edit: SampleGlyphEdit }
   | { kind: 'brush'; before: StrokeRenderStyle; after: StrokeRenderStyle; ends?: { before: StrokeEnds; after: StrokeEnds } }
   | { kind: 'tone'; before: StyleTone; after: StyleTone }
   // `groupId`가 있으면 사용자 묶음의 부리. `groupBefore`는 되돌릴 값(없으면 전역을 따르던 상태).
   | { kind: 'beak'; before: StemBeakStyle; after: StemBeakStyle; groupId?: string; groupBefore?: StemBeakStyle }
   // 레이아웃 모드에서 적용·지운 배치 Δ. 저장소 앞뒤를 통째로 든다.
-  // `rail`이 있으면 획 편집에서 줄기 끝을 끌어 옮긴 보선이다 — 나갈 때 반영 고르기가 이걸 모은다.
-  | { kind: 'layoutDelta'; before: LayoutDeltaSnapshot; after: LayoutDeltaSnapshot; rail?: StemRailEdit }
+  | { kind: 'layoutDelta'; before: LayoutDeltaSnapshot; after: LayoutDeltaSnapshot }
   // 획 편집에서 나갈 때 줄기 모양을 형제에 반영했다. 마스터와 바뀐 홀자 앞뒤를 통째로 든다.
   | { kind: 'stemShape'; mastersBefore: StemMasters; mastersAfter: StemMasters; jamoBefore: Record<string, JamoData>; jamoAfter: Record<string, JamoData> }
 
-/** 줄기 끝 끌기 한 번이 바꾼 배치 Δ 앞뒤와 그 끌기. */
-type StemRailCommit = { before: LayoutDeltaSnapshot; after: LayoutDeltaSnapshot; rail: StemRailEdit }
-/** 획 편집 끌기에서 줄기 끝의 세로 이동을 보선(이 레이아웃 Δ)으로 돌리는 문. 부모가 저장소를 든다. */
-/** 테두리 끝을 이만큼(em) 넘게 세로로 밀면 칩을 띄운다. 가로로 끌다 손이 조금 흔들린 건 안 알린다. */
-const BORDER_HINT_EM = 0.012
 
-interface StemRailApi {
-  dragOf: (selection: Selection, stroke: StrokeDataV2) => StemRailDrag | null
-  /** 끄는 중. 끌기 시작 전 저장소에 이 em만큼 얹어 미리 보인다. */
-  preview: (drag: StemRailDrag, deltaEm: number) => void
-  /** 놓을 때. 옮긴 게 있으면 기록에 실을 값. */
-  finish: () => StemRailCommit | null
-  cancel: () => void
-}
 
 /** 자소 탭 편집 모드. 획 = 점·획·자소 형태, 레이아웃 = 기준선으로 배치(Δ 저장). */
 type EditMode = 'stroke' | 'layout'
@@ -483,13 +467,10 @@ function FocusedGlyph({
   grid,
   designBody,
   globalStyle,
-  railHint = false,
 }: {
   char: string
   syllable: DecomposedSyllable
   schema: LayoutSchema
-  /** 칸 테두리에 매인 줄기 끝을 세로로 밀었다 — `칸 끝은 레이아웃에서 옮겨요` 칩을 띄운다. */
-  railHint?: boolean
   selection: Selection
   /** `획 고치기`로 들어온 자소. 이 자소의 획만 잡히고 나머지는 흐리게 그린다. */
   lockedPart?: MobileEditorPart | null
@@ -842,8 +823,8 @@ function FocusedGlyph({
             ]
           })
         })}
-        {/* 줄기 끝 표시. 막대 = 보선에 매인 끝(세로로 끌면 보선이 움직인다), 찬 점 = 칸 테두리에 매인 끝(세로 잠김, 가로 · 모양은 그대로).
-            획을 잡기만 한 때도 뜨고, 누르면 점을 펼치지 않아도 바로 그 끝이 잡힌다. 가로 줄기 가운데 막대는 표시만 — 누름은 획 몸통이 받는다(통째 세로 = 높이). */}
+        {/* 줄기 끝 표시. 막대 = 안쪽 보선에 매인 끝, 찬 점 = 칸 테두리에 매인 끝. 어느 쪽이든 끌면 그 홀자의 저장 획이 바뀐다(보선 위에 얹히는 차이) — 보선은 레이아웃 편집에서만 옮긴다.
+            획을 잡기만 한 때도 뜨고, 누르면 점을 펼치지 않아도 바로 그 끝이 잡힌다. 가로 줄기 가운데 막대는 표시만 — 누름은 획 몸통이 받는다. */}
         {stemGuides.map((guide) => {
           const { target, pointIndex } = guide
           const active = pointIndex !== null && (selection.kind === 'point' || selection.kind === 'handle') && selection.strokeId === target.stroke.id && selection.pointIndex === pointIndex
@@ -865,9 +846,7 @@ function FocusedGlyph({
             : <line key={axis} x1={-8} x2={108} y1={at} y2={at} className={styles.snapHitLine} data-testid="stroke-snap-hit" data-axis="y" />
         })}
       </SvgRenderer>
-      {railHint
-        ? <span className={styles.railHintChip} role="status" data-testid="stem-rail-border-hint">칸 끝은 레이아웃에서 옮겨요</span>
-        : snapHitLabels.length > 0 && <span className={styles.snapHitChip} data-testid="stroke-snap-chip">{snapHitLabels.join(' · ')}</span>}
+      {snapHitLabels.length > 0 && <span className={styles.snapHitChip} data-testid="stroke-snap-chip">{snapHitLabels.join(' · ')}</span>}
       <span className={styles.focusChar} aria-hidden="true">{char} · {fontSpace.unitsPerEm} UPM</span>
       <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="noto-ghost-toggle">
         {ghostVisible && comparison && ('xorRatio' in comparison
@@ -903,7 +882,6 @@ function InferenceTrackpad({
   padDragRef,
   frameForEdit,
   toolSlot = null,
-  stemRail,
 }: {
   glyph: string
   syllable: DecomposedSyllable
@@ -919,7 +897,7 @@ function InferenceTrackpad({
   collisionContexts: CalibrationInkGapContext[]
   onPreviewJamo: (preview: PreviewJamo | null) => void
   onPreviewSchema: (preview: PreviewSchema | null) => void
-  onCommitJamo: (before: JamoData, after: JamoData, raw: RawGlyphEdit, options?: { unframed?: boolean; pastGapLimit?: boolean; layoutDelta?: StemRailCommit | null }) => void
+  onCommitJamo: (before: JamoData, after: JamoData, raw: RawGlyphEdit, options?: { unframed?: boolean; pastGapLimit?: boolean }) => void
   /** 고치는 중의 자모에 기준 틀을 굳혀 돌려준다. 끄는 동안의 간격 계산이 놓은 뒤와 같은 배치를 보게 한다. */
   frameForEdit?: (jamo: JamoData) => JamoData
   onCommitSchema: (before: LayoutSchema, after: LayoutSchema, raw: RawGlyphEdit) => void
@@ -934,8 +912,6 @@ function InferenceTrackpad({
   /** 직접 조작에서 `여러 점` 토글이 켜져 있는지. 상태는 부모가 든다. */
   /** 도구 단추를 그릴 자리(캔버스 왼쪽 세로 줄). 있으면 단추는 거기로 가고 트랙패드가 가로를 다 쓴다. */
   toolSlot?: HTMLElement | null
-  /** 줄기 끝 끌기 → 보선. 없으면 세로 이동도 획 모양을 고친다(모델 상자가 없는 화면). */
-  stemRail?: StemRailApi
 }) {
   const direct = Boolean(dragApiRef)
   // 지금 끄는 손이 조절판인지. 셸 안에서도 조절판을 함께 두므로(섬세한 편집) 캔버스 끌기와 구분한다.
@@ -1062,7 +1038,6 @@ function InferenceTrackpad({
 
   const beginMove = () => {
     pastGapLimit.current = false
-    stemRail?.cancel()
     setDelta({ x: 0, y: 0 })
     updateInkGapLimiter(null)
     if (selection.kind === 'component') {
@@ -1110,10 +1085,8 @@ function InferenceTrackpad({
       updateInkGapLimiter(safeFactor < 0.9999 ? schemaInkGapViolation(createCandidate(1)) : null)
       onPreviewSchema({ layoutType, schema: next })
     } else if (selection.kind !== 'none' && startJamo.current) {
-      // 이름 있는 줄기의 세로 끝(또는 가로 줄기 통째)을 끌면 세로 이동은 보선이 된다 — 저장 획은 가로만 바뀐다.
-      const railStroke = getJamoStrokes(startJamo.current).find((item) => item.id === selection.strokeId)
-      const railDrag = stemRail && railStroke && !(selection.kind === 'point' && selectedPoints.length > 1) ? stemRail.dragOf(selection, railStroke) : null
-      const strokeMove = railDrag ? { x: normalized.x, y: 0 } : normalized
+      // 이름 있는 줄기도 세로 이동이 저장 획에 남는다 — 보선 자리 위에 얹히는 이 홀자의 차이. 보선은 레이아웃 편집에서만 옮긴다.
+      const strokeMove = normalized
       // 화면의 홀자 줄기는 받침 있는 칸에서도 em 휨을 지켜 놓여 있다(`placeStemStroke`). 놓인 칸에서 끈 이동량을 저장 좌표로 되돌린다.
       const toStored = (movement: StrokeMoveDelta): StrokeMoveDelta => {
         const stroke = getJamoStrokes(startJamo.current!).find((item) => item.id === selection.strokeId)
@@ -1150,7 +1123,6 @@ function InferenceTrackpad({
       currentDelta.current = result.delta
       updateInkGapLimiter(limited && requested ? jamoInkGapViolation(requested.jamo) : null)
       onPreviewJamo({ type: selection.jamo.type, char: selection.jamo.char, data: result.jamo, baseline: startJamo.current, pastGapLimit: past })
-      if (railDrag) stemRail!.preview(railDrag, normalized.y * selection.box.height)
     }
   }
   const commitMove = () => {
@@ -1167,7 +1139,7 @@ function InferenceTrackpad({
           : selection.kind === 'handle'
             ? { kind: 'handle-move', ...common, pointIndex: selection.pointIndex, handle: selection.handle }
             : { kind: 'stroke-move', ...common }
-      onCommitJamo(startJamo.current, currentJamo.current, raw, { pastGapLimit: pastGapLimit.current, layoutDelta: stemRail?.finish() ?? null })
+      onCommitJamo(startJamo.current, currentJamo.current, raw, { pastGapLimit: pastGapLimit.current })
       pastGapLimit.current = false
     }
   }
@@ -2017,8 +1989,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     return contexts
   }, [calibrationLines, choseong, effectiveSchema, globalPadding, jungseong, jongseong, measuresOnScreenBoxes, paddingOverrides, schemas, screenBoxesOf, selectedChar, syllable])
 
-  // 레이아웃 편집기가 걸어 두는 `떠나기 전 묻기`. 저장 안 한 보선이 있으면 편집기가 묻고, 편집기가 없으면 바로 간다.
-  const chooseChar = (char: string) => askRailThen(() => switchChar(char))
+  // 떠나기 전 묻기. 획 편집에서 줄기 모양을 고쳤으면 반영 창을 거치고, 아니면 바로 간다.
+  const chooseChar = (char: string) => askShapeThen(() => switchChar(char))
   const switchChar = (char: string) => {
     // 글자를 바꾸면 기본 상태(레이아웃)로 돌아간다.
     if (chrome === 'workspace') { setEditMode('layout'); setStrokeEntryPart(null) }
@@ -2168,25 +2140,14 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const frameForEdit = (jamo: JamoData): JamoData => withFrameFrom(jamo, adoptFamilyStrokes(getJamo(jamo.type, jamo.char) ?? jamo, familyOfSyllable(syllable)))
   // 문맥 안전 보정(글자마다 부딪히면 변화량을 줄여 그리는 자동 되당김)을 뗀다. 사용자가 걸림을 밀고 넘어갔다는 건 붙여도 좋다는 뜻이라, 그 자모는 그린 대로 나온다.
   const withoutInkSafety = (jamo: JamoData): JamoData => { const next = { ...jamo }; delete next.contextualInkSafety; return next }
-  const commitJamo = (before: JamoData, after: JamoData, raw: RawGlyphEdit, options?: { unframed?: boolean; pastGapLimit?: boolean; layoutDelta?: StemRailCommit | null }) => {
-    const layoutDelta = options?.layoutDelta ?? undefined
-    // 줄기 끝을 세로로만 끌면 획 좌표는 그대로다. 끌기가 붙인 기준 틀 · 문맥 안전만 달라도 획은 안 바뀐 것으로 본다.
-    const strokesUnchanged = layoutDelta && JSON.stringify(getJamoStrokes(before)) === JSON.stringify(getJamoStrokes(after))
-    if (strokesUnchanged || JSON.stringify(before) === JSON.stringify(after)) {
-      // 줄기 끝을 세로로만 끌었다: 획은 그대로, 보선만 옮겼다.
-      if (layoutDelta) {
-        setHistory((entries) => [...entries, { kind: 'layoutDelta', before: layoutDelta.before, after: layoutDelta.after, rail: layoutDelta.rail }])
-        setFuture([])
-        setPreviewJamo(null)
-      }
-      return
-    }
+  const commitJamo = (before: JamoData, after: JamoData, raw: RawGlyphEdit, options?: { unframed?: boolean; pastGapLimit?: boolean }) => {
+    if (JSON.stringify(before) === JSON.stringify(after)) return
     const storedBefore = structuredClone(getJamo(before.type, before.char) ?? before)
     // `틀 다시 맞추기`만 틀 없이 저장한다. 되돌리기는 기록의 `before`(틀이 없던 때)로 돌아가므로 틀도 같이 사라진다.
     const framedAfter = options?.unframed ? withoutFrame(after) : frameForEdit(after)
     const safeAfter = options?.pastGapLimit ? withoutInkSafety(framedAfter) : withContextualInkSafety(storedBefore, before, framedAfter, minimumInkGap)
     const edit = createSampleGlyphEdit(raw)
-    setHistory((entries) => [...entries, { kind: 'jamo', jamoType: before.type, char: before.char, before: storedBefore, after: safeAfter, edit, layoutDelta }])
+    setHistory((entries) => [...entries, { kind: 'jamo', jamoType: before.type, char: before.char, before: storedBefore, after: safeAfter, edit }])
     setFuture([])
     useCalibrationProjectStore.getState().addSampleGlyphEdit(edit)
     updateJamo(safeAfter)
@@ -2263,154 +2224,53 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     setHistory((entries) => [...entries, { kind: 'layoutDelta', before, after }])
     setFuture([])
   }
-  // 줄기 끝 끌기 → 보선(홀자 줄기 끝점 = 보선, G1). 끄는 동안 저장소에 이 레이아웃 Δ를 얹어 미리 보이고, 놓을 때 기록 한 줄에 싣는다.
-  // `range`는 끌기를 시작할 때 한 번 잰 한계(보선 한계 — 글자 몸 · 순서 · 두께 간격). 넘으면 경계에서 멈춘다.
-  // `칸 끝은 레이아웃에서 옮겨요` 칩. 테두리에 매인 끝을 세로로 밀 때 잠깐 뜬다.
-  const [railHint, setRailHint] = useState(false)
-  const railHintTimer = useRef<number | undefined>(undefined)
-  const showRailHint = () => {
-    setRailHint(true)
-    window.clearTimeout(railHintTimer.current)
-    railHintTimer.current = window.setTimeout(() => setRailHint(false), 2400)
-  }
-  useEffect(() => () => window.clearTimeout(railHintTimer.current), [])
-  const railDragRef = useRef<{ before: LayoutDeltaSnapshot; drag: StemRailDrag; delta: number; range: { low: number; high: number } | null } | null>(null)
-  // 완성 음절만. 첫닿자 단독 칸(`ㄴ`)은 레이아웃이 없다.
-  const railCodepoint = selectedChar.codePointAt(0) ?? 0
-  const railIdentity = railCodepoint >= 0xac00 && railCodepoint <= 0xd7a3 ? corpusIdentity(railCodepoint) : null
-  const stemRailApi: StemRailApi | undefined = chrome === 'workspace' && placement.kind === 'boxes' && railIdentity ? {
-    dragOf: (target, stroke) => target.kind === 'stroke' || target.kind === 'point' || target.kind === 'handle'
-      ? target.editorPart === 'JU' ? stemRailDragOf({ jamo: target.jamo, stroke, kind: target.kind, pointIndex: target.kind === 'stroke' ? undefined : target.pointIndex, part: target.renderPart, box: placement.boxes[target.renderPart] }) : null
-      : null,
-    preview: (drag, delta) => {
-      const store = useLayoutDeltaStore.getState()
-      if (!railDragRef.current) {
-        const before = layoutDeltaSnapshot()
-        const range = notoBundle && drag.keys.length ? medialDragRange({ identity: railIdentity, model: notoBundle, delta: effectiveLayoutDelta(before, railIdentity), part: drag.part, keys: drag.keys }) : null
-        railDragRef.current = { before, drag, delta: 0, range }
-      }
-      // 칸 테두리는 세로로 잠겨 있다. 세로로 밀면 칸 끝은 레이아웃에서 옮긴다고 알린다.
-      if (drag.border && Math.abs(delta) > BORDER_HINT_EM) showRailHint()
-      const range = railDragRef.current.range
-      if (range) delta = Math.min(Math.max(delta, range.low), range.high)
-      railDragRef.current.delta = delta
-      store.restore(railDragRef.current.before)
-      if (drag.keys.length && Math.abs(delta) > 1e-12) store.apply(ruleOfContext(railIdentity.contextId), { medial: { [drag.part]: Object.fromEntries(drag.keys.map((key) => [key, delta])) } })
-    },
-    finish: () => {
-      const current = railDragRef.current
-      railDragRef.current = null
-      if (!current) return null
-      if (!current.drag.keys.length || Math.abs(current.delta) < 1e-12) { useLayoutDeltaStore.getState().restore(current.before); return null }
-      return { before: current.before, after: layoutDeltaSnapshot(), rail: { contextId: railIdentity.contextId, medialJamo: railIdentity.medialJamo, part: current.drag.part, keys: current.drag.keys, delta: current.delta } }
-    },
-    cancel: () => {
-      if (railDragRef.current) useLayoutDeltaStore.getState().restore(railDragRef.current.before)
-      railDragRef.current = null
-    },
-  } : undefined
-  // 이번 획 편집에서 옮긴 보선. 기록에서 다시 읽어 되돌린 끌기는 빠진다. 나갈 때(머리 ‹) 한 번 좁히는 창을 띄운다 — 닫으면 고른 대로 반영하고 나간다(막지 않는다).
-  const [railSessionStart, setRailSessionStart] = useState(() => useEditHistoryStore.getState().history.length)
-  // `then`은 창을 닫은 뒤 이어 할 나가기(레이아웃으로 · 내 폰트로 · 다른 글자로).
-  const [railAsk, setRailAsk] = useState<{ groups: StemRailGroup[]; picked: Set<string>; then: () => void; before: LayoutDeltaSnapshot; shape?: { ask: ShapeAsk; picked: Set<string> } } | null>(null)
+  // 획 편집에서 나갈 때(머리 ‹ · 내 폰트 · 다른 글자) 한 번 띄우는 줄기 모양 반영 창. `then`은 창을 닫은 뒤 이어 할 나가기.
+  const [shapeAsk, setShapeAsk] = useState<{ ask: ShapeAsk; picked: Set<string>; then: () => void } | null>(null)
   // 획 편집을 연 때의 홀자. 나갈 때 견줘 고친 줄기 모양을 찾는다(줄기 마스터 랩과 같은 계산).
   const [shapeSnapshot, setShapeSnapshot] = useState(() => useJamoStore.getState().jungseong)
   // 연 뒤 쌓인 기록의 시작. 같은 갈래를 여럿 고쳤을 때 마지막에 고친 획을 기준으로 삼으려고 고친 차례를 여기서부터 센다.
   const [shapeSessionStart, setShapeSessionStart] = useState(() => useEditHistoryStore.getState().history.length)
   const shapeEditOrder = () => history.slice(shapeSessionStart).flatMap((entry) => entry.kind === 'jamo' && entry.jamoType === 'jungseong' ? editedKeysOf(entry.before, entry.after) : [])
   const stemMasters = useStemMasterStore((state) => state.masters)
-  const shapePreviewMap = useMemo(() => railAsk?.shape ? shapePreview(railAsk.shape.ask, railAsk.shape.picked, jungseong, shapeSnapshot, stemMasters) : {}, [railAsk, jungseong, shapeSnapshot, stemMasters])
-  const railGroupsOfSession = () => stemRailGroups(history.slice(railSessionStart).flatMap((entry) => entry.kind === 'jamo' && entry.layoutDelta ? [entry.layoutDelta.rail] : entry.kind === 'layoutDelta' && entry.rail ? [entry.rail] : []))
-  // 획 편집에서 나가는 모든 길(머리 ‹ · 내 폰트 · 다른 글자)이 여기를 지난다. 옮긴 보선이 있으면 창을 띄우고, 닫은 뒤 나간다.
-  const askRailThen = (go: () => void) => {
-    const groups = editMode === 'stroke' ? railGroupsOfSession() : []
+  const shapePreviewMap = useMemo(() => shapeAsk ? shapePreview(shapeAsk.ask, shapeAsk.picked, jungseong, shapeSnapshot, stemMasters) : {}, [shapeAsk, jungseong, shapeSnapshot, stemMasters])
+  // 줄기 모양(휨 · 기울기)을 고쳤으면 창을 띄우고, 닫은 뒤 나간다. 자리만 옮겼으면(모양 그대로) 묻지 않고 나간다 — 자리는 그 홀자에만 남는다.
+  const askShapeThen = (go: () => void) => {
     const shape = editMode === 'stroke' ? shapeAskOf(useJamoStore.getState().jungseong, shapeSnapshot, useStemMasterStore.getState().masters, shapeEditOrder()) : null
-    if (groups.length === 0 && !shape) { go(); return }
-    setRailAsk({
-      groups,
-      picked: new Set(groups.flatMap((group) => group.medials.map((medial) => railCardKey(group.contextId, medial)))),
-      then: go,
-      before: layoutDeltaSnapshot(),
-      shape: shape ? { ask: shape, picked: defaultPicked(shape) } : undefined,
-    })
+    if (!shape) { go(); return }
+    setShapeAsk({ ask: shape, picked: defaultPicked(shape), then: go })
   }
-  // 창이 열린 동안 뺀 홀자의 반대 Δ를 저장소에 바로 얹는다 — 카드 · 캔버스 · 문장이 뺀 홀자를 이전 자리로 보인다. 닫으면 이 상태가 그대로 반영이다.
-  useEffect(() => {
-    if (!railAsk || railAsk.groups.length === 0) return
-    const store = useLayoutDeltaStore.getState()
-    store.restore(railAsk.before)
-    for (const group of railAsk.groups) {
-      const excluded = group.medials.filter((medial) => !railAsk.picked.has(railCardKey(group.contextId, medial)))
-      for (const { rule, delta } of exclusionDeltas(group, excluded)) store.apply(rule, delta)
-    }
-  }, [railAsk])
-  const toggleShapeAsk = (keys: readonly string[], on: boolean) => setRailAsk((current) => {
-    if (!current?.shape) return current
-    const picked = new Set(current.shape.picked)
-    const locked = lockedKeys(current.shape.ask)
+  const toggleShapeAsk = (keys: readonly string[], on: boolean) => setShapeAsk((current) => {
+    if (!current) return current
+    const picked = new Set(current.picked)
+    const locked = lockedKeys(current.ask)
     for (const key of keys) { if (on) picked.add(key); else if (!locked.has(key)) picked.delete(key) }
-    return { ...current, shape: { ...current.shape, picked } }
+    return { ...current, picked }
   })
   // 줄기 모양 반영: 칸마다 고른 카드가 든 갈래에 그 칸의 모양을 적고, 뺀 획은 풀림(지금 모양). 기준 아닌 고친 획이 켜져 있으면 고치기 전으로 돌려 기준을 따르게 한다. 되돌리기 한 줄.
-  const applyShapeAsk = (shape: { ask: ShapeAsk; picked: Set<string> }) => {
+  const applyShapeAsk = () => {
+    if (!shapeAsk) return
     const jamo = useJamoStore.getState()
     const jamoBefore = jamo.jungseong
     const mastersBefore = useStemMasterStore.getState().masters
-    for (const [char, next] of Object.entries(revertedFollowers(jamoBefore, shapeSnapshot, shape.ask, shape.picked))) jamo.updateJungseong(char, next)
-    useStemMasterStore.getState().setMasters(pickedMasters(shape.ask, shape.picked), (char, strokeId) => !shape.picked.has(`${char}:${strokeId}`))
+    for (const [char, next] of Object.entries(revertedFollowers(jamoBefore, shapeSnapshot, shapeAsk.ask, shapeAsk.picked))) jamo.updateJungseong(char, next)
+    useStemMasterStore.getState().setMasters(pickedMasters(shapeAsk.ask, shapeAsk.picked), (char, strokeId) => !shapeAsk.picked.has(`${char}:${strokeId}`))
     const jamoAfter = useJamoStore.getState().jungseong
     const changedChars = Object.keys(jamoAfter).filter((char) => jamoAfter[char] !== jamoBefore[char])
-    if (changedChars.length === 0 && mastersBefore === useStemMasterStore.getState().masters) return
-    setHistory((entries) => [...entries, {
-      kind: 'stemShape', mastersBefore, mastersAfter: useStemMasterStore.getState().masters,
-      jamoBefore: Object.fromEntries(changedChars.map((char) => [char, jamoBefore[char]])), jamoAfter: Object.fromEntries(changedChars.map((char) => [char, jamoAfter[char]])),
-    }])
-    setFuture([])
-  }
-  const applyRailAsk = () => {
-    if (!railAsk) return
-    if (railAsk.shape) applyShapeAsk(railAsk.shape)
-    // 뺀 홀자의 반대 Δ는 창이 열린 동안 이미 얹혀 있다. 연 때와 지금의 차이가 기록 한 줄이다.
-    commitLayoutDelta(railAsk.before, layoutDeltaSnapshot())
-    setRailAsk(null)
-    // 이번 획 편집은 끝났다. 다시 들어올 때(`editStrokes`) 새로 센다.
-    setRailSessionStart(Number.MAX_SAFE_INTEGER)
-    setShapeSnapshot(useJamoStore.getState().jungseong)
-    setShapeSessionStart(Number.MAX_SAFE_INTEGER)
-    railAsk.then()
-  }
-  // 자리 버리기 = 이번 획 편집에서 옮긴 보선만 들어오기 전 자리로. 줄기 모양은 안 건드린다. 기록 한 줄이라 ↶로 되살린다.
-  // 모양을 안 고쳤으면 물을 게 없으니 그대로 나간다. 고쳤으면 창은 모양 칸만 남긴다.
-  const discardRailAsk = () => {
-    if (!railAsk || railAsk.groups.length === 0) return
-    const store = useLayoutDeltaStore.getState()
-    store.restore(railAsk.before)
-    for (const group of railAsk.groups) {
-      const medial = Object.fromEntries(Object.entries(group.medial).map(([part, rails]) => [part, Object.fromEntries(Object.entries(rails!).map(([key, value]) => [key, -value]))]))
-      store.apply(ruleOfContext(group.contextId), { medial })
+    if (changedChars.length > 0 || mastersBefore !== useStemMasterStore.getState().masters) {
+      setHistory((entries) => [...entries, {
+        kind: 'stemShape', mastersBefore, mastersAfter: useStemMasterStore.getState().masters,
+        jamoBefore: Object.fromEntries(changedChars.map((char) => [char, jamoBefore[char]])), jamoAfter: Object.fromEntries(changedChars.map((char) => [char, jamoAfter[char]])),
+      }])
+      setFuture([])
     }
-    commitLayoutDelta(railAsk.before, layoutDeltaSnapshot())
-    // 버린 끌기는 이번 편집에서 센 적 없는 것으로 — 창을 취소하고 다시 나가도 자리 칸이 안 뜬다.
-    setRailSessionStart(history.length + 1)
-    if (railAsk.shape) { setRailAsk({ ...railAsk, groups: [], picked: new Set(), before: layoutDeltaSnapshot() }); return }
-    setRailAsk(null)
-    setRailSessionStart(Number.MAX_SAFE_INTEGER)
+    setShapeAsk(null)
+    // 이번 획 편집은 끝났다. 다시 들어올 때(`editStrokes`) 새로 센다.
     setShapeSnapshot(useJamoStore.getState().jungseong)
     setShapeSessionStart(Number.MAX_SAFE_INTEGER)
-    railAsk.then()
+    shapeAsk.then()
   }
-  // 취소 = 창만 닫고 획 편집에 남는다. 창이 얹은 반대 Δ를 걷어 연 때로 돌리고, 나가기(`then`)는 안 한다. 다음에 나갈 때 다시 묻는다.
-  const cancelRailAsk = () => {
-    if (!railAsk) return
-    if (railAsk.groups.length) useLayoutDeltaStore.getState().restore(railAsk.before)
-    setRailAsk(null)
-  }
-  const toggleRailAsk = (keys: readonly string[], on: boolean) => setRailAsk((current) => {
-    if (!current) return current
-    const picked = new Set(current.picked)
-    for (const key of keys) { if (on) picked.add(key); else picked.delete(key) }
-    return { ...current, picked }
-  })
+  // 취소 = 창만 닫고 획 편집에 남는다. 나가기(`then`)는 안 한다. 다음에 나갈 때 다시 묻는다.
+  const cancelShapeAsk = () => setShapeAsk(null)
   // 방향키: 잡은 획 · 점 · 핸들을 눈금 한 칸(Shift는 네 칸) 옮긴다. 끌기와 같은 계산 · 같은 기록 한 줄.
   const nudgeActive = directManipulation && !isLayoutMode && !globalStylePanel && selection.kind !== 'none' && selection.kind !== 'component'
   useEffect(() => {
@@ -2455,7 +2315,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const editStrokes = (part: Part) => {
     const editorPart: MobileEditorPart = part === 'CH' ? 'CH' : part === 'JO' ? 'JO' : 'JU'
     setStrokeEntryPart(editorPart)
-    setRailSessionStart(history.length)
     setShapeSnapshot(useJamoStore.getState().jungseong)
     setShapeSessionStart(history.length)
     setSelection(firstStrokeSelectionOf(editorPart) ?? { kind: 'none' })
@@ -2486,7 +2345,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     else if (entry.kind === 'tone') applyTone(entry.before)
     else if (entry.kind === 'beak') { if (entry.groupId) useJamoGroupStore.getState().setStemBeak(entry.groupId, entry.groupBefore); else useGlobalStyleStore.getState().setStemBeak(entry.before) }
     else updateJamo(entry.before)
-    if (entry.kind === 'jamo' && entry.layoutDelta) useLayoutDeltaStore.getState().restore(entry.layoutDelta.before)
     if (entry.kind === 'layout' || entry.kind === 'jamo') useCalibrationProjectStore.getState().removeSampleGlyphEdit(entry.edit.id)
   }
   const undo = () => {
@@ -2511,7 +2369,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     else if (entry.kind === 'tone') applyTone(entry.after)
     else if (entry.kind === 'beak') { if (entry.groupId) useJamoGroupStore.getState().setStemBeak(entry.groupId, entry.after); else useGlobalStyleStore.getState().setStemBeak(entry.after) }
     else updateJamo(entry.after)
-    if (entry.kind === 'jamo' && entry.layoutDelta) useLayoutDeltaStore.getState().restore(entry.layoutDelta.after)
     setFuture((entries) => entries.slice(0, -1))
     setHistory((entries) => [...entries, entry])
     if (entry.kind === 'layout' || entry.kind === 'jamo') useCalibrationProjectStore.getState().addSampleGlyphEdit(entry.edit)
@@ -2668,7 +2525,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
           ? <div ref={setStrokeToolSlot} className={styles.strokeToolSlot} data-testid="jamo-stroke-tool-slot" />
           : chrome === 'workspace' && layoutAvailable && !styleLocksCanvas && <LayoutContextCards activeContextId={corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00).contextId} allActive={false} ink={strokeCardInk ?? undefined} />}
         <div className={styles.focusArea}>
-        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={styleLocksCanvas ? { kind: 'none' } : selection} onSelect={styleLocksCanvas ? () => {} : selectFromCanvas} selectedPoints={styleLocksCanvas ? [] : selectedPoints} onPointSelect={styleLocksCanvas ? () => {} : selectPointFromCanvas} lockedPart={styleLocksCanvas ? null : lockedPart} dragApiRef={directManipulation && !styleLocksCanvas ? dragApiRef : undefined} padDragRef={directManipulation && !styleLocksCanvas ? padDragRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} railHint={railHint} />
+        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={styleLocksCanvas ? { kind: 'none' } : selection} onSelect={styleLocksCanvas ? () => {} : selectFromCanvas} selectedPoints={styleLocksCanvas ? [] : selectedPoints} onPointSelect={styleLocksCanvas ? () => {} : selectPointFromCanvas} lockedPart={styleLocksCanvas ? null : lockedPart} dragApiRef={directManipulation && !styleLocksCanvas ? dragApiRef : undefined} padDragRef={directManipulation && !styleLocksCanvas ? padDragRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
         </div>
         </div>
       </section>}
@@ -2722,7 +2579,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         padDragRef={directManipulation ? padDragRef : undefined}
         frameForEdit={frameForEdit}
         toolSlot={strokeToolSlot}
-        stemRail={stemRailApi}
       />}
       {/* 획 편집은 끄는 즉시 저장된다. 레이아웃으로 돌아가는 문은 머리 `‹`(도마를 들고 왔으면 섹션 홈), 되돌리기는 ↶. */}
       {strokeFrameAvailable && !globalStylePanel && boxFitIssue && <div className={styles.strokeDoneBar}>
@@ -2772,11 +2628,11 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         // 획 편집은 레이아웃 위에 얹힌 층이다. 머리 `‹`가 레이아웃으로 내려가는 문(옛 `완료`). 도마를 들고 왔으면 섹션 홈으로.
         back={!styleOnly && editMode === 'stroke' && strokeFrameAvailable && !benchCarried ? { label: '레이아웃', onClick: () => chooseEditMode('layout') } : undefined}
         history={{ canUndo: history.length > 0, canRedo: future.length > 0, onUndo: undo, onRedo: redo }}
-        beforeLeave={askRailThen}
+        beforeLeave={askShapeThen}
       >
         {!styleOnly && benchRow}
         {body}
-        {railAsk && <StemRailApplySheet groups={railAsk.groups} picked={railAsk.picked} onToggle={toggleRailAsk} onDone={applyRailAsk} onCancel={cancelRailAsk} onDiscard={discardRailAsk} shape={railAsk.shape ? { ...railAsk.shape, preview: shapePreviewMap, before: shapeSnapshot, onToggle: toggleShapeAsk } : undefined} />}
+        {shapeAsk && <StemRailApplySheet ask={shapeAsk.ask} picked={shapeAsk.picked} preview={shapePreviewMap} before={shapeSnapshot} onToggle={toggleShapeAsk} onDone={applyShapeAsk} onCancel={cancelShapeAsk} />}
       </MobileWorkspaceShell>
     )
   }
