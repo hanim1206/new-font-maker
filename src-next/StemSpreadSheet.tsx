@@ -10,7 +10,7 @@ import styles from './StemSpreadSheet.module.css'
 /**
  * 줄기 모양 전파 창. 획 편집에서 획을 잡고 `전파`를 누르면 그 획 하나를 기준으로 뜬다 — 도마 섹션 홈과 같은 판.
  * 카드 = 홀자 하나(기둥이면 16장), 카드 안 자리 = 같은 홀자 안에서 갈리는 줄기(바깥 · 안). 카드는 절대 배치 + transform이라 묶기를 바꾸면 제자리로 미끄러진다.
- * 탭 = 묶는 축(`전체` + 줄기 질문 + 줄기 수). 묶음 머리 `○○ 모두` 체크 = 그 묶음의 줄기 전부, 머리 옆 자리 토글 = 켜진 카드들의 그 자리(꺼진 카드는 안 켠다).
+ * 탭 = 묶는 축(`전체` + 줄기 질문 + 줄기 수). 묶음 머리 `○○ 모두` 체크 = 카드 전체 선택 · 해제(자리와 무관), 머리 옆 자리 토글 = 켜진 카드들의 그 자리(꺼진 카드는 안 켠다).
  * 카드 탭 = 낱개 — 자리가 둘이면 첫 자리 → 둘 다 → 끔, 우상단 점 둘이 어느 자리가 켜졌는지 보인다. 카드 잉크는 검정(주황은 머리의 기준 획만). 기준 획의 홀자는 잠긴다. 뺀 획은 지금 모양 그대로(풀림).
  * `취소` · 바깥 누르기 · Esc는 창만 닫고 획 편집에 남는다. `n자 받기`가 반영.
  */
@@ -116,9 +116,15 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
       toggle(slotEntries(card, next).map(keyOf), true)
     }
   }
+  // 묶음 머리 체크 = 카드 단위 전체 선택 · 해제(자리와 무관). 켤 때 자리는 지금 켜진 카드들이 쓰는 자리를 따르고, 켜진 카드가 없으면 기준 획의 자리.
+  const editedSlot = (() => { const edited = entries.find((entry) => keyOf(entry) === section.editedKey); return edited ? slotOf(edited, slotFacet) : '' })()
   const toggleGroup = (cards: readonly Card[]) => {
-    const keys = cards.flatMap((card) => card.entries.map(keyOf))
-    toggle(keys, !keys.every((key) => picked.has(key)))
+    const off = cards.filter((card) => !cardOn(card))
+    if (off.length === 0) { toggle(cards.flatMap((card) => card.entries.map(keyOf)), false); return }
+    const onCards = cards.filter(cardOn)
+    const slots = new Set(onCards.flatMap((card) => card.slots.filter((slot) => slotOn(card, slot))))
+    if (slots.size === 0) slots.add(editedSlot)
+    toggle(off.flatMap((card) => card.slots.filter((slot) => slots.has(slot)).flatMap((slot) => slotEntries(card, slot).map(keyOf))), true)
   }
   // 자리 토글은 켜진 카드 안에서만 — 꺼진 카드를 켜지 않는다. `안`을 끄면 바깥만 남고, 둘 다 끄면 카드가 꺼진다.
   const toggleSlot = (cards: readonly Card[], slot: string) => {
@@ -126,9 +132,9 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
     if (keys.length === 0) return
     toggle(keys, !keys.every((key) => picked.has(key)))
   }
-  const stateOf = (keys: readonly string[]) => {
-    const on = keys.filter((key) => picked.has(key)).length
-    return on === keys.length ? 'true' : on === 0 ? 'false' : 'mixed'
+  const stateOf = (cards: readonly Card[]) => {
+    const on = cards.filter(cardOn).length
+    return on === cards.length ? 'true' : on === 0 ? 'false' : 'mixed'
   }
 
   // 판 폭을 재서 칸 크기를 정한다. 카드 · 소제목은 절대좌표 + transform — 묶기를 바꾸면 미끄러진다(도마 섹션 홈과 같음).
@@ -182,13 +188,12 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
         <div className={styles.scroll}>
           <div ref={board} className={styles.board} style={{ height: layout.height }}>
             {cell > 0 && layout.heads.map((group) => {
-              const keys = group.cards.flatMap((card) => card.entries.map(keyOf))
-              const state = stateOf(keys)
+              const state = stateOf(group.cards)
               return (
                 <div key={group.id} className={styles.groupRow} style={{ transform: `translateY(${group.y}px)` }} data-testid="stem-spread-group" data-group={group.id}>
                   <button type="button" className={styles.groupHead} role="checkbox" aria-checked={state} onClick={() => toggleGroup(group.cards)}>
                     <span className={styles.check} aria-hidden="true">{state === 'mixed' ? <span className={styles.dash} /> : <Check size={14} strokeWidth={3} />}</span>
-                    {group.label}<span className={styles.groupCount}>{keys.filter((key) => picked.has(key)).length}/{keys.length}</span>
+                    {group.label}<span className={styles.groupCount}>{group.cards.filter(cardOn).length}/{group.cards.length}</span>
                   </button>
                   {/* 자리 토글 — 묶음 전체의 그 자리. 자리가 없는 줄기(걸침 · 보)엔 안 뜬다. */}
                   {slotLabels.length > 0 && <span className={styles.slots}>

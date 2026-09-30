@@ -223,7 +223,17 @@ test('기둥을 휘면 바깥 기둥 16자가 다 켜진 채 뜨고, 툭 친 글
   await expect(eo).toHaveAttribute('aria-pressed', 'false')
   await group.getByRole('button', { name: '안' }).click()
   await expect(sheet.locator('[data-kind="shape"][data-char="ㅔ"]')).toHaveAttribute('data-slots', 'outer')
+  // 머리 체크 = 카드 전체(자리와 무관). ㅓ가 꺼져 있어 ─, 누르면 ㅓ가 바깥으로 켜지고, 다시 누르면 다 꺼진다.
   await expect(group.getByRole('checkbox')).toHaveAttribute('aria-checked', 'mixed')
+  await group.getByRole('checkbox').click()
+  await expect(eo).toHaveAttribute('aria-pressed', 'true')
+  await expect(eo).toHaveAttribute('data-slots', 'outer')
+  await expect(group.getByRole('checkbox')).toHaveAttribute('aria-checked', 'true')
+  await group.getByRole('checkbox').click()
+  await expect(sheet.locator('[data-kind="shape"][aria-pressed="true"]')).toHaveCount(1)
+  await group.getByRole('checkbox').click()
+  await expect(sheet.getByTestId('stem-spread-count')).toHaveText('16')
+  await eo.click()
   // 단일 · 섞임 축으로 바꿔도 켠 상태는 그대로다.
   await sheet.getByRole('tab', { name: '단일 · 섞임' }).click()
   await expect(sheet.locator('[data-testid="stem-spread-group"]')).toHaveCount(2)
