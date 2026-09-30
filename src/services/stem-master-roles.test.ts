@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import type { JamoData } from '../types'
-import { applyMaster, axisReversed, boundStrokesOf, JAMO_CHANNELS, masterFromStroke, masterNameOf, masterOf, stemReferenceBox, type StemMaster, type StemMasters } from './stemMaster'
+import { applyMaster, boundStrokesOf, JAMO_CHANNELS, masterFromStroke, masterNameOf, masterOf, stemReferenceBox, type StemMaster, type StemMasters } from './stemMaster'
 
 const jung = (baseJamos as unknown as { jungseong: Record<string, JamoData> }).jungseong
 const bend = (name: StemMaster['name'], o = 0.03): StemMaster => ({ name, points: [{ t: 0, o: 0 }, { t: 1, o: 0, handleIn: { t: 0.7, o } }] })
@@ -41,22 +41,19 @@ describe('줄기 역할 갈래', () => {
     expect(boundStrokesOf(o, both).find((item) => item.stroke.id === 'ㅗ-2')!.follows).toBe(true)
   })
 
-  it('짧은기둥의 축은 보에 닿는 끝 → 빈 끝이다: 같은 마스터면 솟음 · 내림이 보를 사이에 두고 거울 — 빈 끝이 같은 쪽(오른 · 왼)으로 휜다', () => {
-    expect(axisReversed(jung['ㅗ'], jung['ㅗ'].strokes!, jung['ㅗ'].strokes!.find((item) => item.id === 'ㅗ-1')!)).toBe(true)
-    expect(axisReversed(jung['ㅜ'], jung['ㅜ'].strokes!, jung['ㅜ'].strokes!.find((item) => item.id === 'ㅜ-2')!)).toBe(false)
+  it('짧은기둥은 그려진 방향 그대로 놓는다: 같은 마스터면 ㅗ · ㅜ가 같은 쪽으로 같은 자리에서 휜다(거울 아님)', () => {
     const masters = { jjalbeungidung: bend('jjalbeungidung') }
-    const freeEndBend = (char: string, id: string) => {
+    const bendOf = (char: string, id: string) => {
       const next = applyMaster(jung[char], {}, masters)!
       const stroke = next.strokes!.find((item) => item.id === id)!
       const box = stemReferenceBox(char, 'strokes', stroke)
-      // 빈 끝 쪽 핸들(마스터 t 0.7)의 x 휨(em)과, 그 핸들이 보에서 떨어진 정도(축 비율).
       const handle = stroke.points.flatMap((point) => [point.handleIn, point.handleOut]).find(Boolean)!
       const [start, end] = [stroke.points[0], stroke.points[stroke.points.length - 1]]
-      const joint = char === 'ㅗ' ? end : start
-      return { x: (handle.x - joint.x) * box.width, along: Math.abs(handle.y - joint.y) / Math.abs(end.y - start.y) }
+      // 시작점(그려진 방향의 처음)에서 잰 x 휨(em)과 축 비율.
+      return { x: (handle.x - start.x) * box.width, along: Math.abs(handle.y - start.y) / Math.abs(end.y - start.y) }
     }
-    const up = freeEndBend('ㅗ', 'ㅗ-1')
-    const down = freeEndBend('ㅜ', 'ㅜ-2')
+    const up = bendOf('ㅗ', 'ㅗ-1')
+    const down = bendOf('ㅜ', 'ㅜ-2')
     expect(up.along).toBeCloseTo(0.7, 9)
     expect(down.along).toBeCloseTo(0.7, 9)
     expect(Math.abs(up.x)).toBeCloseTo(0.03, 9)
@@ -79,21 +76,18 @@ describe('줄기 역할 갈래', () => {
     expect(['ㅑ-3', 'ㅕ-3', 'ㅖ-3', 'ㅏ-2', 'ㅓ-2'].map((id) => curvedAfter(upperOnly, id.split('-')[0], id))).toEqual([false, false, false, false, false])
   })
 
-  it('곁줄기의 축은 기둥에 닿는 끝 → 빈 끝이다: 같은 마스터면 ㅏ와 ㅓ가 기둥을 사이에 두고 거울 — 빈 끝이 같은 쪽(위 · 아래)으로 휜다', () => {
-    const reversed = (char: string, id: string) => axisReversed(jung[char], jung[char][channelOf(jung[char], id)]!, jung[char][channelOf(jung[char], id)]!.find((item) => item.id === id)!)
-    expect([reversed('ㅏ', 'ㅏ-2'), reversed('ㅘ', 'ㅘ-4'), reversed('ㅓ', 'ㅓ-2'), reversed('ㅔ', 'ㅔ-2'), reversed('ㅝ', 'ㅝ-4')]).toEqual([false, false, true, true, true])
+  it('곁줄기도 그려진 방향 그대로: 같은 마스터면 ㅏ와 ㅓ가 같은 쪽 · 같은 자리에서 휜다(거울 아님)', () => {
     const masters = { gyeotjulgi: bend('gyeotjulgi') }
-    const freeEnd = (char: string, id: string) => {
+    const bendOf = (char: string, id: string) => {
       const next = applyMaster(jung[char], {}, masters)!
       const stroke = next.strokes!.find((item) => item.id === id)!
       const box = stemReferenceBox(char, 'strokes', stroke)
       const handle = stroke.points.flatMap((point) => [point.handleIn, point.handleOut]).find(Boolean)!
       const [start, end] = [stroke.points[0], stroke.points[stroke.points.length - 1]]
-      const joint = char === 'ㅓ' ? end : start
-      return { y: (handle.y - joint.y) * box.height, along: Math.abs(handle.x - joint.x) / Math.abs(end.x - start.x) }
+      return { y: (handle.y - start.y) * box.height, along: Math.abs(handle.x - start.x) / Math.abs(end.x - start.x) }
     }
-    const right = freeEnd('ㅏ', 'ㅏ-2')
-    const left = freeEnd('ㅓ', 'ㅓ-2')
+    const right = bendOf('ㅏ', 'ㅏ-2')
+    const left = bendOf('ㅓ', 'ㅓ-2')
     expect(right.along).toBeCloseTo(0.7, 9)
     expect(left.along).toBeCloseTo(0.7, 9)
     expect(Math.abs(right.y)).toBeCloseTo(0.03, 9)
@@ -115,10 +109,9 @@ describe('고친 획 → 마스터', () => {
       }
     })
   }
-  it('마스터를 놓은 획을 다시 읽으면 같은 마스터다 — 곧은 축 · 뒤집힌 축(ㅓ 곁줄기 · ㅗ 짧은기둥) 모두', () => {
+  it('마스터를 놓은 획을 다시 읽으면 같은 마스터다 — 기둥 · 곁줄기 · 짧은기둥 · ㅣ', () => {
     for (const [char, id] of [['ㅏ', 'ㅏ-1'], ['ㅓ', 'ㅓ-2'], ['ㅗ', 'ㅗ-1'], ['ㅣ', 'ㅣ-1']] as const) {
       const name = nameOf(char, id)!
-      expect(axisReversed(jung[char], jung[char][channelOf(jung[char], id)]!, jung[char][channelOf(jung[char], id)]!.find((stroke) => stroke.id === id)!), char).toBe(char === 'ㅓ' || char === 'ㅗ')
       const master = { ...bend(name), points: [{ t: 0, o: 0, handleOut: { t: 0.3, o: -0.01 } }, { t: 1, o: 0, handleIn: { t: 0.7, o: 0.03 } }] }
       const next = applyMaster(jung[char], {}, { [name]: master })!
       near(masterFromStroke(next, channelOf(next, id), id)!, master)

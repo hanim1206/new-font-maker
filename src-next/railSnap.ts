@@ -4,10 +4,11 @@
  * 값은 em(0~1). 반경도 em이라 캔버스 330px 기준 0.01 ≈ 3px.
  */
 
-/** `rank`: 반경 안에 여럿이면 낮은 것이 먼저 이긴다(없으면 1). 같으면 가까운 것. 획 편집의 같은 자소 꼭짓점 · 대칭 자리가 0. */
-export interface SnapCandidate { id: string; label: string; axis: 'x' | 'y'; value: number; rank?: number }
+/** `touch`: 걸리면 `딱 붙음`. 처음 자리보다 세다. `rank`: 반경 안에 여럿이면 낮은 것이 먼저 이긴다(없으면 1). 같으면 가까운 것. 획 편집의 같은 자소 꼭짓점 · 대칭 자리가 0. */
+export interface SnapCandidate { id: string; label: string; axis: 'x' | 'y'; value: number; touch?: boolean; rank?: number }
 export type SnapKind = 'model' | 'rail' | 'grid'
-export interface SnapHit { kind: SnapKind; label: string; id?: string; value: number }
+/** `touch`: 닿자 세로 변이 홀자 가로 줄기의 중심선 끝에 닿아 걸렸다 — 캔버스에 `딱 붙음`을 띄운다. */
+export interface SnapHit { kind: SnapKind; label: string; id?: string; value: number; touch?: boolean }
 export interface SnapResult { value: number; hit: SnapHit | null }
 
 export interface SnapRadius { model: number; rail: number; grid: number }
@@ -51,3 +52,4 @@ export function snapRail(input: {
   if (grid && Math.abs(grid.value - value) <= radius.grid) return { value: grid.value, hit: { kind: 'grid', label: grid.label, value: grid.value } }
   return { value, hit: null }
 }
+

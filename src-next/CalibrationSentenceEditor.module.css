@@ -136,6 +136,11 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .handleLine { stroke: var(--selection-color); stroke-width: calc(.3 * var(--view-unit, 1)); opacity: .8; pointer-events: none; }
 .handle { fill: #fff; stroke: var(--selection-color); stroke-width: calc(.7 * var(--view-unit, 1)); cursor: pointer; }
 .activeHandle { fill: var(--selection-color); stroke: #fff; stroke-width: calc(.8 * var(--view-unit, 1)); cursor: pointer; }
+/* 줄기 끝 표시. 막대 = 보선에 매인 끝, 찬 점 = 칸 테두리에 매인 끝(획 편집에선 세로 잠김). */
+.railMark { fill: #fff; stroke: var(--selection-color); stroke-width: calc(.8 * var(--view-unit, 1)); }
+.activeRailMark { fill: var(--selection-color); stroke: #fff; stroke-width: calc(.9 * var(--view-unit, 1)); }
+.lockedMark { fill: #212529; stroke: #fff; stroke-width: calc(.8 * var(--view-unit, 1)); }
+.activeLockedMark { fill: #212529; stroke: var(--selection-color); stroke-width: calc(1 * var(--view-unit, 1)); }
 .trackpadSection { flex: 0 0 auto; padding: 10px 16px calc(env(safe-area-inset-bottom) + 12px); border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
 .trackpad { position: relative; height: 176px; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 16px; background: rgb(var(--color-surface-2)); touch-action: none; }
 .trackpadDisabled { opacity: .55; }
@@ -241,6 +246,9 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .strokeToolSlot .strokeToolRow button svg { width: 19px; height: 19px; color: rgb(var(--color-text-1)); }
 .strokeToolSlot .strokeToolRow button:disabled { opacity: .4; }
 .strokeToolSlot .strokeToolRow button[aria-expanded='true'], .strokeToolSlot .strokeToolRow button[aria-pressed='true'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+/* `전파` — 도구 줄 맨 아래, 반영 창의 주황(고친 획 색)으로. 다른 도구와 갈린다. */
+.strokeToolRow .strokeToolSpread, .strokeToolSlot .strokeToolRow .strokeToolSpread { margin-top: auto; border: 0; background: #fff4e6; color: #d9480f; }
+.strokeToolSlot .strokeToolRow .strokeToolSpread svg { color: #d9480f; }
 .strokeToolSlot .strokeToolRow button[aria-expanded='true'] svg, .strokeToolSlot .strokeToolRow button[aria-pressed='true'] svg { color: inherit; }
 /* 펼친 선 · 원 · 사각은 흰 바탕 + 회색 테로 `추가` 밑에 딸린 것임을 보인다. */
 .strokeToolSlot .strokeToolRow .strokeAddItem { background: rgb(var(--color-surface)); box-shadow: inset 0 0 0 1.5px rgb(var(--color-surface-3)); }

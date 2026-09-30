@@ -1,6 +1,6 @@
-import type { BoxConfig, Part, StrokeDataV2 } from '../src/types'
+import type { BoxConfig, DeepReadonly, Part, StrokeDataV2 } from '../src/types'
 import { PART_LABEL } from './partColors'
-import { snapRail } from './railSnap'
+import { DEFAULT_SNAP_RADIUS, snapRail } from './railSnap'
 import type { SnapCandidate, SnapHit } from './railSnap'
 
 /**
@@ -16,6 +16,17 @@ const KIND_RANK: Record<SnapHit['kind'], number> = { model: 0, rail: 1, grid: 2 
 const STRAIGHT_EPSILON = 1e-6
 
 function snapAxis(axis: 'x' | 'y', anchors: readonly number[], requested: number, candidates: readonly SnapCandidate[]): { delta: number; hit: SnapHit | null } {
+  // `딱 붙음` 후보(홀자 가로 줄기 끝 ↔ 다른 칸 세로 변)가 먼저다. 처음 자리 반경 안이어도 닿으면 그쪽.
+  let touch: { delta: number; hit: SnapHit; shift: number } | null = null
+  for (const anchor of anchors) {
+    for (const candidate of candidates) {
+      if (!candidate.touch || candidate.axis !== axis) continue
+      const shift = Math.abs(candidate.value - (anchor + requested))
+      if (shift > DEFAULT_SNAP_RADIUS.rail || (touch && shift >= touch.shift)) continue
+      touch = { delta: candidate.value - anchor, hit: { kind: 'rail', label: candidate.label, id: candidate.id, value: candidate.value, touch: true }, shift }
+    }
+  }
+  if (touch) return { delta: touch.delta, hit: touch.hit }
   let best: { delta: number; hit: SnapHit; shift: number } | null = null
   for (const anchor of anchors) {
     const result = snapRail({ value: anchor + requested, original: anchor, axis, candidates })
@@ -99,6 +110,27 @@ export function withoutOwnCandidates(candidates: readonly SnapCandidate[], dragg
     if (dragged.pointIndex === undefined) return false
     return candidate.id !== `${own}center` && candidate.id !== `${own}p${dragged.pointIndex}`
   })
+}
+
+/** 이만큼(em) 안에 세로 줄기 중심선이 지나가면 그 끝은 기둥에 묻힌 끝이다. */
+const JOINED_END_EM = 0.03
+
+/**
+ * 가로 줄기(곁줄기 · 보 · 걸침 등)의 비어 있는 중심선 끝 x(em). 기둥에 붙은 끝(세로 줄기가 그 자리를 지나감)은 뺀다.
+ * 휜 획도 두 끝이 가로로 놓였으면 넣는다. 잉크 겉이 아니라 중심선이라 굵기를 바꿔도 이 자리는 그대로다.
+ */
+export function horizontalStrokeEndsX(sources: readonly { stroke: DeepReadonly<StrokeDataV2>; box: BoxConfig }[]): number[] {
+  const ends = sources.flatMap(({ stroke, box }) => {
+    if (stroke.closed || stroke.points.length < 2) return []
+    return [{ first: emPoint(stroke.points[0], box), last: emPoint(stroke.points[stroke.points.length - 1], box) }]
+  })
+  const horizontal = ends.filter(({ first, last }) => Math.abs(last.y - first.y) <= Math.abs(last.x - first.x) * 0.3)
+  const vertical = ends.filter(({ first, last }) => Math.abs(last.x - first.x) < Math.abs(last.y - first.y) * 0.3)
+  const joined = (point: { x: number; y: number }) => vertical.some(({ first, last }) => {
+    const t = (point.y - first.y) / (last.y - first.y)
+    return t >= -0.05 && t <= 1.05 && Math.abs(first.x + (last.x - first.x) * t - point.x) < JOINED_END_EM
+  })
+  return horizontal.flatMap(({ first, last }) => [first, last].filter((point) => !joined(point)).map((point) => point.x))
 }
 
 /**
