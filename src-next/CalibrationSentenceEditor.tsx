@@ -31,8 +31,8 @@ import { useLayoutStore } from '../src/stores/layoutStore'
 import { moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStroke } from '../src/services/editorCommands'
 import { storedStemDelta } from '../src/services/stemBend'
 import { stemRailGuides } from '../src/services/medialStemRails'
-import { StemRailApplySheet } from './StemRailApplySheet'
-import { beforeSpreadJamo, defaultPicked, lockedKeys, pickedMasters, revertedFollowers, shapeAskForStroke, shapePreview, spreadableStem, type ShapeAsk } from './stemShapeSession'
+import { StemSpreadSheet } from './StemSpreadSheet'
+import { beforeSpreadJamo, defaultPicked, lockedKeys, pickedMasters, shapeAskForStroke, shapePreview, spreadableStem, type ShapeAsk } from './stemShapeSession'
 import { useStemMasterStore } from '../src/stores/stemMasterStore'
 import type { StemMasters } from '../src/services/stemMaster'
 import { JamoScaleSlider } from './JamoScaleSlider'
@@ -2248,7 +2248,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   // 줄기 모양 반영 창. 획을 잡고 `전파`를 누르면 그 획 하나를 기준으로 뜬다(도구 줄 맨 아래 주황 단추). 나갈 때 · 다른 글자로 갈 때는 묻지 않는다.
   const [shapeAsk, setShapeAsk] = useState<{ ask: ShapeAsk; picked: Set<string> } | null>(null)
   const stemMasters = useStemMasterStore((state) => state.masters)
-  const shapePreviewMap = useMemo(() => shapeAsk ? shapePreview(shapeAsk.ask, shapeAsk.picked, jungseong, {}, stemMasters) : {}, [shapeAsk, jungseong, stemMasters])
+  const shapePreviewMap = useMemo(() => shapeAsk ? shapePreview(shapeAsk.ask, shapeAsk.picked, jungseong, stemMasters) : {}, [shapeAsk, jungseong, stemMasters])
   // 창 머리의 `전` = 기준 획이 지금 마스터를 따르는 모양(형제가 지금 가진 모양).
   const shapeBeforeMap = useMemo(() => shapeAsk ? beforeSpreadJamo(jungseong, stemMasters, shapeAsk.ask) : {}, [shapeAsk, jungseong, stemMasters])
   // 잡은 획이 이름 있는 홀자 줄기이고 모양이 갈래 마스터와 다르면 `전파`가 뜬다(연 뒤 고쳤든, 예전에 따로 둔 풀림이든).
@@ -2269,13 +2269,11 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     for (const key of keys) { if (on) picked.add(key); else if (!locked.has(key)) picked.delete(key) }
     return { ...current, picked }
   })
-  // 전파: 고른 카드가 든 갈래에 이 획의 모양을 적고, 따로 둔 획은 풀림(지금 모양). 되돌리기 한 줄. 창을 닫고 획 편집에 남는다.
+  // 전파: 고른 획이 든 갈래에 이 획의 모양을 적고, 뺀 획은 풀림(지금 모양). 되돌리기 한 줄. 창을 닫고 획 편집에 남는다.
   const applyShapeAsk = () => {
     if (!shapeAsk) return
-    const jamo = useJamoStore.getState()
-    const jamoBefore = jamo.jungseong
+    const jamoBefore = useJamoStore.getState().jungseong
     const mastersBefore = useStemMasterStore.getState().masters
-    for (const [char, next] of Object.entries(revertedFollowers(jamoBefore, {}, shapeAsk.ask, shapeAsk.picked))) jamo.updateJungseong(char, next)
     useStemMasterStore.getState().setMasters(pickedMasters(shapeAsk.ask, shapeAsk.picked), (char, strokeId) => !shapeAsk.picked.has(`${char}:${strokeId}`))
     const jamoAfter = useJamoStore.getState().jungseong
     const changedChars = Object.keys(jamoAfter).filter((char) => jamoAfter[char] !== jamoBefore[char])
@@ -2650,7 +2648,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       >
         {!styleOnly && benchRow}
         {body}
-        {shapeAsk && <StemRailApplySheet ask={shapeAsk.ask} picked={shapeAsk.picked} preview={shapePreviewMap} before={shapeBeforeMap} onToggle={toggleShapeAsk} onDone={applyShapeAsk} onCancel={cancelShapeAsk} />}
+        {shapeAsk && <StemSpreadSheet ask={shapeAsk.ask} picked={shapeAsk.picked} preview={shapePreviewMap} before={shapeBeforeMap} onToggle={toggleShapeAsk} onDone={applyShapeAsk} onCancel={cancelShapeAsk} />}
       </MobileWorkspaceShell>
     )
   }

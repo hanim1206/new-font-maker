@@ -6,19 +6,19 @@ import { baseOf, isStraight, isUnder, masterOf, straightMaster, STEM_BASES, stem
 import { STEM_NAME_LABEL } from '../src/services/strokeGrammar'
 import type { JamoData, ResolvedStrokeInkSource } from '../src/types'
 import { AppGlyph } from './AppGlyph'
-import { StemRailApplySheet } from './StemRailApplySheet'
+import { StemSpreadSheet } from './StemSpreadSheet'
 import {
   ACTIVE_STROKE_COLOR,
+  beforeSpreadJamo,
   byLeafRank,
+  changedStems,
   defaultPicked,
-  editedKeysOf,
   entriesOf,
   keyOf,
   lockedKeys,
   pickedMasters,
-  revertedFollowers,
   sampleSyllable,
-  shapeAskOf,
+  shapeAskForStroke,
   shapePreview,
   uniqueChars,
   type ShapeAsk,
@@ -33,8 +33,8 @@ import { useEditHistoryStore } from './editHistoryStore'
 import styles from './StemMasterLabPage.module.css'
 
 /**
- * 홀자 줄기 마스터 랩. 앱의 자소 획 편집기로 홀자 획을 고치고, `저장`하면 앱 획 편집과 같은 반영 창(`StemRailApplySheet` · 계산은 `stemShapeSession`)이 뜬다 —
- * 같은 갈래만 기본으로 퍼진 결과를 보이고 예외만 따로 둔다. 편집기는 앱과 같아서 고친 획은 바로 자모에 적힌다. `되돌리기`는 연 때의 모양으로 돌린다.
+ * 홀자 줄기 마스터 랩. 앱의 자소 획 편집기로 홀자 획을 고치고, `저장`하면 앱 획 편집의 `전파`와 같은 창(`StemSpreadSheet` · 계산은 `stemShapeSession`)이
+ * 연 뒤 처음 고친 획을 기준으로 뜬다. 편집기는 앱과 같아서 고친 획은 바로 자모에 적힌다. `되돌리기`는 연 때의 모양으로 돌린다.
  * 플랜: docs/plans/2026-09-29_홀자-줄기-마스터.md
  */
 
@@ -110,7 +110,6 @@ export function StemMasterLabPage() {
   const setMasters = useStemMasterStore((state) => state.setMasters)
   const masters = useStemMasterStore((state) => state.masters)
   const jungseong = useJamoStore((state) => state.jungseong)
-  const history = useEditHistoryStore((state) => state.history)
   const refollowAll = useStemMasterStore((state) => state.refollowAll)
   const resetAll = useStemMasterStore((state) => state.resetAll)
 
@@ -119,18 +118,16 @@ export function StemMasterLabPage() {
   const leaves = [...new Set(entries.map((entry) => entry.name))].sort(byLeafRank(base))
   const released = entries.filter((entry) => !entry.follows).length
 
-  // 편집기에서 고친 줄기 모양 — 연 때와 견줘 물을 것(앱 획 편집과 같은 계산). 자리만 옮긴 획은 안 묻는다.
-  const editOrder = useMemo(() => history.slice(session.historyLength).flatMap((entry) => entry.kind === 'jamo' && entry.jamoType === 'jungseong' ? editedKeysOf(entry.before, entry.after) : []), [history, session.historyLength])
-  const shapeAsk = useMemo(() => shapeAskOf(jungseong, session.snapshot, masters, editOrder), [jungseong, session.snapshot, masters, editOrder])
-  // `곧게 고치기`: 고르는 획의 갈래를 곧은 마스터로 묻는다. 고친 획은 없으니 `changed`는 빈 채.
+  // 편집기에서 고친 줄기 — 연 때와 견줘 처음 달라진 이름 있는 획이 기준(앱 `전파`는 잡은 획이 기준).
+  const edited = useMemo(() => changedStems(jungseong, session.snapshot, masters)[0] ?? null, [jungseong, session.snapshot, masters])
+  const shapeAsk = useMemo(() => edited ? shapeAskForStroke(jungseong, masters, edited.char, edited.stroke.id) : null, [edited, jungseong, masters])
+  // `곧게 고치기`: 고르는 획의 갈래를 곧은 마스터로 묻는다.
   const straightAsk = useMemo((): ShapeAsk | null => {
     if (!straight || !editing) return null
     const all = entriesOf(jungseong, masters, baseOf(editing.name))
-    return { sections: [{ leaf: editing.name, master: straightMaster(editing.name), editedKey: keyOf(editing), channel: editing.channel, entries: all.filter((entry) => entry.name === editing.name), extras: all.filter((entry) => entry.name !== editing.name) }], changed: [] }
+    return { sections: [{ leaf: editing.name, master: straightMaster(editing.name), editedKey: keyOf(editing), channel: editing.channel, entries: all.filter((entry) => entry.name === editing.name), extras: all.filter((entry) => entry.name !== editing.name) }] }
   }, [straight, editing, jungseong, masters])
   const pending = straightAsk ?? shapeAsk
-  const edited = shapeAsk?.sections[0] ?? null
-  const editedChar = edited?.editedKey.split(':')[0] ?? null
 
   const open = (char: string) => {
     setStraight(false)
@@ -154,18 +151,17 @@ export function StemMasterLabPage() {
     setAsking(null)
     setSession(openSession(session.char, session.key + 1))
   }
-  // 반영: 칸마다 고른 카드가 든 갈래에 그 칸의 모양을 적고, 따로 둔 획은 풀림(지금 모양). 기준 아닌 고친 획이 켜져 있으면 고치기 전으로 돌린다 — 앱 획 편집과 같다.
+  // 반영: 고른 획이 든 갈래에 기준 획의 모양을 적고, 뺀 획은 풀림(지금 모양) — 앱 획 편집과 같다.
   const apply = () => {
     if (!asking) return
-    const jamo = useJamoStore.getState()
-    for (const [char, next] of Object.entries(revertedFollowers(jamo.jungseong, session.snapshot, asking.ask, asking.picked))) jamo.updateJungseong(char, next)
     setMasters(pickedMasters(asking.ask, asking.picked), (char, strokeId) => !asking.picked.has(`${char}:${strokeId}`))
     setStraight(false)
     setAsking(null)
     // 반영한 모양이 새 기준 — 이어서 고치면 여기서부터 잰다.
     setSession((current) => openSession(current.char, current.key))
   }
-  const preview = useMemo(() => asking ? shapePreview(asking.ask, asking.picked, jungseong, session.snapshot, masters) : {}, [asking, jungseong, session.snapshot, masters])
+  const preview = useMemo(() => asking ? shapePreview(asking.ask, asking.picked, jungseong, masters) : {}, [asking, jungseong, masters])
+  const before = useMemo(() => asking ? beforeSpreadJamo(jungseong, masters, asking.ask) : {}, [asking, jungseong, masters])
   const toggle = (keys: readonly string[], on: boolean) => setAsking((current) => {
     if (!current) return current
     const picked = new Set(current.picked)
@@ -195,8 +191,8 @@ export function StemMasterLabPage() {
       <div className={styles.workspace}>
         <section className={styles.editor} aria-label="획 편집">
           <aside className={styles.side}>
-            <h2>{edited && editedChar ? `${editedChar} · ${stemMasterLabel(edited.leaf)}` : editing ? `${editing.char} · ${stemMasterLabel(editing.name)}` : session.char}</h2>
-            <p>{straight ? '곧게 — 저장해서 반영할 곳을 고른다.' : edited ? `고친 획 — 저장하면 이 모양을 형제에게 반영할지 묻는다.${shapeAsk && shapeAsk.sections.length > 1 ? ` (고친 갈래 ${shapeAsk.sections.length}개)` : ''}` : '앱 편집기에서 획을 고친다. 고치면 저장이 켜진다.'}</p>
+            <h2>{edited ? `${edited.char} · ${stemMasterLabel(edited.name)}` : editing ? `${editing.char} · ${stemMasterLabel(editing.name)}` : session.char}</h2>
+            <p>{straight ? '곧게 — 저장해서 반영할 곳을 고른다.' : edited ? '고친 획 — 저장하면 이 모양을 형제에게 퍼뜨릴지 묻는다.' : '앱 편집기에서 획을 고친다. 고치면 저장이 켜진다.'}</p>
             <div className={styles.saveBar}>
               <button type="button" className={styles.reset} disabled={Boolean(pending) || !editing || isStraight(masterOf(masters, editing.name))} onClick={() => editing && setStraight(true)}>곧게 고치기</button>
               <button type="button" className={styles.reset} data-testid="revert" disabled={!pending} onClick={revert}>되돌리기</button>
@@ -230,7 +226,7 @@ export function StemMasterLabPage() {
           </div>
         </section>
       </div>
-      {asking && <StemRailApplySheet ask={asking.ask} picked={asking.picked} preview={preview} before={session.snapshot} onToggle={toggle} onDone={apply} onCancel={() => setAsking(null)} />}
+      {asking && <StemSpreadSheet ask={asking.ask} picked={asking.picked} preview={preview} before={before} onToggle={toggle} onDone={apply} onCancel={() => setAsking(null)} />}
     </main>
   )
 }

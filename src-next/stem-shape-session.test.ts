@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { applyMaster, boundStrokesOf, masterFromStroke } from '../src/services/stemMaster'
 import type { JamoData } from '../src/types'
-import { defaultPicked, keyOf, revertedFollowers, shapeAskOf } from './stemShapeSession'
+import { askEntries, defaultPicked, keyOf, lockedKeys, pickedMasters, shapeAskForStroke, slotFacetOf, slotOf, spreadableStem } from './stemShapeSession'
 
-/** 반영 창의 칸 나누기 — 같은 갈래만 기본으로 켜고, 같은 갈래를 여럿 고치면 마지막 획이 기준. 플랜: docs/plans/2026-09-29_홀자-줄기-끝점-보선.md */
+/** 전파 물음 — 잡은 획 하나가 기준, 기본 켜짐은 같은 자리 전부(단일 · 섞임 안 가름). 플랜: docs/plans/2026-09-29_홀자-줄기-끝점-보선.md */
 const base = useJamoStore.getState().jungseong
 const idOf = (char: string, leaf: string) => boundStrokesOf(base[char], {}).find((item) => item.name === leaf)!
 /** 그 획의 첫 점에 핸들을 달아 휜다. */
@@ -18,45 +18,51 @@ const key = (char: string, leaf: string) => `${char}:${idOf(char, leaf).stroke.i
 const INNER = 'gidung.inner.single'
 const OUTER = 'gidung.outer.single'
 
-describe('줄기 모양 반영 칸', () => {
-  it('ㅔ 안 기둥을 고치면 안 기둥 갈래(ㅐ ㅒ ㅔ ㅖ)만 켜지고, 다른 기둥 갈래는 꺼진 채 같은 칸에 붙는다', () => {
-    const ask = shapeAskOf(bend(base, 'ㅔ', INNER, 0.05), base, {})!
+describe('전파 물음', () => {
+  it('ㅔ 안 기둥을 고치면 자리 질문은 `side`, 기본 켜짐은 안 기둥 전부(단일 ㅐ ㅒ ㅔ ㅖ + 섞임 ㅙ ㅞ), 바깥 기둥은 꺼진 채', () => {
+    const jungseong = bend(base, 'ㅔ', INNER, 0.05)
+    const ask = shapeAskForStroke(jungseong, {}, 'ㅔ', idOf('ㅔ', INNER).stroke.id)!
     expect(ask.sections).toHaveLength(1)
-    const [section] = ask.sections
-    expect(section.leaf).toBe(INNER)
-    expect(section.editedKey).toBe(key('ㅔ', INNER))
-    expect([...new Set(section.entries.map((entry) => entry.char))].sort()).toEqual(['ㅐ', 'ㅒ', 'ㅔ', 'ㅖ'])
-    expect(section.extras.some((entry) => entry.name === OUTER)).toBe(true)
+    expect(ask.sections[0].leaf).toBe(INNER)
+    expect(ask.sections[0].editedKey).toBe(key('ㅔ', INNER))
+    const entries = askEntries(ask)
+    expect(slotFacetOf(entries)).toBe('side')
     const picked = defaultPicked(ask)
-    expect(section.entries.every((entry) => picked.has(keyOf(entry)))).toBe(true)
-    expect(section.extras.some((entry) => picked.has(keyOf(entry)))).toBe(false)
+    const onChars = [...new Set(entries.filter((entry) => picked.has(keyOf(entry))).map((entry) => entry.char))].sort()
+    expect(onChars).toEqual(['ㅐ', 'ㅒ', 'ㅔ', 'ㅖ', 'ㅙ', 'ㅞ'].sort())
+    expect(entries.filter((entry) => picked.has(keyOf(entry))).every((entry) => slotOf(entry, 'side') === 'inner')).toBe(true)
+    expect(entries.some((entry) => slotOf(entry, 'side') === 'outer' && picked.has(keyOf(entry)))).toBe(false)
+    expect(lockedKeys(ask).has(key('ㅔ', INNER))).toBe(true)
   })
 
-  it('같은 갈래를 둘 고치면 마지막에 고친 획이 기준', () => {
-    const both = bend(bend(base, 'ㅔ', INNER, 0.05), 'ㅖ', INNER, -0.05)
-    expect(shapeAskOf(both, base, {}, [key('ㅔ', INNER), key('ㅖ', INNER)])!.sections[0].editedKey).toBe(key('ㅖ', INNER))
-    expect(shapeAskOf(both, base, {}, [key('ㅖ', INNER), key('ㅔ', INNER)])!.sections[0].editedKey).toBe(key('ㅔ', INNER))
-  })
-
-  it('ㅔ 두 기둥을 다 고치면 칸이 둘이고, 안 고친 갈래는 나중에 고친 칸에만 붙는다', () => {
-    const both = bend(bend(base, 'ㅔ', INNER, 0.05), 'ㅔ', OUTER, -0.05)
-    const ask = shapeAskOf(both, base, {}, [key('ㅔ', OUTER), key('ㅔ', INNER)])!
-    expect(ask.sections.map((section) => section.leaf).sort()).toEqual([INNER, OUTER].sort())
-    const inner = ask.sections.find((section) => section.leaf === INNER)!
-    const outer = ask.sections.find((section) => section.leaf === OUTER)!
-    expect(inner.extras.length).toBeGreaterThan(0)
-    expect(outer.extras).toEqual([])
-    expect(inner.extras.some((entry) => entry.name === INNER || entry.name === OUTER)).toBe(false)
-  })
-
-  it('기준 아닌 고친 획은 켜져 있으면 고치기 전으로 돌리고, 따로면 고친 모양 그대로', () => {
-    const both = bend(bend(base, 'ㅔ', INNER, 0.05), 'ㅖ', INNER, -0.05)
-    const ask = shapeAskOf(both, base, {}, [key('ㅔ', INNER), key('ㅖ', INNER)])!
+  it('ㅏ 바깥 기둥을 고치면 바깥 16자가 켜지고, 안 기둥 카드를 켜면 안 갈래에도 같은 모양이 적힌다', () => {
+    const jungseong = bend(base, 'ㅏ', OUTER, 0.05)
+    const ask = shapeAskForStroke(jungseong, {}, 'ㅏ', idOf('ㅏ', OUTER).stroke.id)!
+    const entries = askEntries(ask)
     const picked = defaultPicked(ask)
-    expect(revertedFollowers(both, base, ask, picked)['ㅔ']).toBeDefined()
-    expect(revertedFollowers(both, base, ask, picked)['ㅖ']).toBeUndefined()
-    picked.delete(key('ㅔ', INNER))
-    expect(revertedFollowers(both, base, ask, picked)).toEqual({})
+    expect(new Set(entries.filter((entry) => picked.has(keyOf(entry))).map((entry) => entry.char)).size).toBe(16)
+    expect(pickedMasters(ask, picked).map((master) => master.name).sort()).toEqual(['gidung.outer.mixed', 'gidung.outer.single'])
+    const withInner = new Set([...picked, ...entries.filter((entry) => entry.name === INNER).map(keyOf)])
+    expect(pickedMasters(ask, withInner).map((master) => master.name)).toContain(INNER)
+  })
+
+  it('곁줄기의 자리 질문은 `count`(ㅑ에 위 · 아래 둘), 보 · 걸침은 자리 질문이 없다', () => {
+    const gyeot = shapeAskForStroke(base, {}, 'ㅑ', idOf('ㅑ', 'gyeotjulgi.right.upper.single').stroke.id)!
+    expect(slotFacetOf(askEntries(gyeot))).toBe('count')
+    const bo = shapeAskForStroke(base, {}, 'ㅗ', idOf('ㅗ', 'bo.up.single').stroke.id)!
+    expect(slotFacetOf(askEntries(bo))).toBeNull()
+  })
+})
+
+describe('전파 단추 조건', () => {
+  it('마스터와 같은 획(기본 폰트)엔 안 뜨고, 휜 획엔 뜬다', () => {
+    const { stroke } = idOf('ㅏ', OUTER)
+    expect(spreadableStem(base['ㅏ'], stroke.id, {})).toBe(false)
+    expect(spreadableStem(bend(base, 'ㅏ', OUTER, 0.05)['ㅏ'], stroke.id, {})).toBe(true)
+  })
+
+  it('이름 없는 획엔 안 뜬다', () => {
+    expect(spreadableStem(base['ㅏ'], 'no-such-stroke', {})).toBe(false)
   })
 })
 
@@ -90,11 +96,11 @@ describe('기울기 = 모양', () => {
 })
 
 describe('자리만 옮긴 획', () => {
-  it('획을 통째로 옮기기만 하면(모양 그대로) 물을 게 없다', () => {
+  it('획을 통째로 옮기기만 하면(모양 그대로) 전파가 안 뜬다', () => {
     const { channel, stroke } = idOf('ㅏ', 'gyeotjulgi.right.one.single')
     const moved = { ...stroke, points: stroke.points.map((point) => ({ ...point, y: point.y - 0.1 })) }
     const a = { ...base['ㅏ'], [channel]: base['ㅏ'][channel]!.map((item) => item.id === stroke.id ? moved : item) }
-    expect(shapeAskOf({ ...base, 'ㅏ': a }, base, {})).toBeNull()
+    expect(spreadableStem(a, stroke.id, {})).toBe(false)
   })
 })
 
