@@ -33,6 +33,19 @@ function withGap(char: string, strokeId: string, dx: number): JamoData {
   })
   return jamo
 }
+/** 곁줄기 빈 끝의 x를 저장 좌표에서 옮긴 자모. */
+function withReach(char: string, strokeId: string, dx: number): JamoData {
+  const jamo = structuredClone(baseJungseong[char])
+  const channel = channelOf(jamo, strokeId)
+  const attachment = attachmentOf(jamo, strokeId)!
+  jamo[channel] = jamo[channel]!.map((stroke) => {
+    if (stroke.id !== strokeId) return stroke
+    const index = attachment.end === 'start' ? stroke.points.length - 1 : 0
+    const points = stroke.points.map((point, at) => at === index ? { ...point, x: point.x + dx * attachment.away } : point)
+    return { ...stroke, points }
+  })
+  return jamo
+}
 const emOf = (placed: { box: BoxConfig }, point: { x: number; y: number }) => ({ x: placed.box.x + point.x * placed.box.width, y: placed.box.y + point.y * placed.box.height })
 /** 놓인 곁줄기의 붙은 끝과, 그 높이에서 놓인 기둥 중심선의 x(em). */
 function attachedAndPillar(jamo: JamoData, sideId: string, box: BoxConfig) {
@@ -181,12 +194,42 @@ describe('G0 틈 — 뗀 만큼은 em 차이로 형제에 간다', () => {
     }
   })
 
-  it('틈 0인 마스터는 gap을 안 담고, 기본 곁줄기는 전부 따른다', () => {
+  it('아에서 빈 끝을 당겨 줄이면 마스터에 길이 Δ(em, 짧아짐 −)가 담기고, 어 · 와도 빈 끝이 기둥 쪽으로 같은 em만큼 당겨진다 — 붙은 끝은 그대로', () => {
+    const a = withReach('ㅏ', 'ㅏ-2', -0.1)
+    const master = masterFromStroke(a, 'strokes', 'ㅏ-2')!
+    const refA = stemReferenceBox('ㅏ', 'strokes', strokeOf(a, 'ㅏ-2')).width
+    expect(master.reach).toBeCloseTo(-0.1 * refA, 9)
+    expect(master.gap).toBeUndefined()
+    expect(followsInJamo(a, 'strokes', strokeOf(a, 'ㅏ-2'), master)).toBe(true)
+    expect(followsInJamo(a, 'strokes', strokeOf(a, 'ㅏ-2'), { name: master.name, points: master.points })).toBe(false)
+    for (const [char, sideId, pillarId] of [['ㅓ', 'ㅓ-2', 'ㅓ-1'], ['ㅘ', 'ㅘ-4', 'ㅘ-3'], ['ㅔ', 'ㅔ-2', 'ㅔ-1']] as const) {
+      const before = baseJungseong[char]
+      const after = applyMaster(before, {}, { gyeotjulgi: { ...master, name: 'gyeotjulgi' } })!
+      expect(after, char).not.toBeNull()
+      const channel = channelOf(after, sideId)
+      const attachment = attachmentOf(after, sideId)!
+      const side = strokeOf(after, sideId)
+      const ref = stemReferenceBox(char, channel, side).width
+      const free = side.points[attachment.end === 'start' ? side.points.length - 1 : 0]
+      const baseFree = strokeOf(before, sideId).points[attachment.end === 'start' ? side.points.length - 1 : 0]
+      // 빈 끝이 기둥 쪽으로 같은 em만큼(짧아짐).
+      expect((free.x - baseFree.x) * attachment.away, `${char} 길이`).toBeCloseTo(-0.1 * refA / ref, 9)
+      const pillarX = strokeOf(after, pillarId).points[0].x
+      expect(Math.abs(free.x - pillarX), `${char} 짧아짐`).toBeLessThan(Math.abs(baseFree.x - pillarX))
+      // 붙은 끝은 기둥에 그대로.
+      const attached = side.points[attachment.end === 'start' ? 0 : side.points.length - 1]
+      expect(attached.x, `${char} 붙은 끝`).toBeCloseTo(pillarX + attachment.baseOffset, 12)
+      expect(followsInJamo(after, channel, side, master), `${char} 따름`).toBe(true)
+    }
+  })
+
+  it('틈 0 · 길이 Δ 0인 마스터는 gap · reach를 안 담고, 기본 곁줄기는 전부 따른다', () => {
     for (const [char, pairs] of Object.entries(SIDE_STROKE_PILLARS)) {
       const jamo = baseJungseong[char]
       for (const sideId of Object.keys(pairs)) {
         const master = masterFromStroke(jamo, channelOf(jamo, sideId), sideId)!
         expect(master.gap, `${char} ${sideId}`).toBeUndefined()
+        expect(master.reach, `${char} ${sideId}`).toBeUndefined()
         expect(boundStrokesOf(jamo, {}).find((item) => item.stroke.id === sideId)!.follows, `${char} ${sideId}`).toBe(true)
       }
     }

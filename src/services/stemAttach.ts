@@ -27,8 +27,10 @@ export interface SideAttachment {
   end: 'start' | 'end'
   /** 기본 획에서 붙은 끝이 기둥 시작점 x에서 떨어진 만큼(칸 비율, x 그대로). 거의 0이고 ㅘ 세로부만 0.04 — 기본 폰트를 그대로 두려고 남긴다. */
   baseOffset: number
-  /** 기둥에서 빈 끝으로 가는 x 방향. 오른쪽으로 뻗는 ㅏ 계열 +1, 왼쪽으로 뻗는 ㅓ 계열 −1. 틈은 이 방향이 +다. */
+  /** 기둥에서 빈 끝으로 가는 x 방향. 오른쪽으로 뻗는 ㅏ 계열 +1, 왼쪽으로 뻗는 ㅓ 계열 −1. 틈 · 길이는 이 방향이 +다. */
   away: 1 | -1
+  /** 기본 획의 빈 끝 x(칸 비율). 길이 Δ는 여기서 잰다 — 기본 획은 0. */
+  baseFreeX: number
 }
 
 const EPSILON = 1e-9
@@ -52,10 +54,17 @@ export function attachmentOf(jamo: Pick<JamoData, 'type' | 'char'>, strokeId: st
   const last = side.points[side.points.length - 1]
   const end = Math.abs(first.x - pillarX) <= Math.abs(last.x - pillarX) ? 'start' : 'end'
   const free = end === 'start' ? last : first
-  return { pillarId, end, baseOffset: (end === 'start' ? first : last).x - pillarX, away: free.x >= pillarX ? 1 : -1 }
+  return { pillarId, end, baseOffset: (end === 'start' ? first : last).x - pillarX, away: free.x >= pillarX ? 1 : -1, baseFreeX: free.x }
 }
 
 export const attachedIndexOf = (stroke: Pick<StrokeDataV2, 'points'>, attachment: SideAttachment) => attachment.end === 'start' ? 0 : stroke.points.length - 1
+export const freeIndexOf = (stroke: Pick<StrokeDataV2, 'points'>, attachment: SideAttachment) => attachment.end === 'start' ? stroke.points.length - 1 : 0
+
+/** 저장 좌표에서 빈 끝이 기본 획의 빈 끝에서 옮겨진 길이 Δ(칸 비율). 기둥에서 멀어지면(길어지면) +. 기본 획은 0. */
+export const reachOf = (stroke: StrokeDataV2, attachment: SideAttachment) => (stroke.points[freeIndexOf(stroke, attachment)].x - attachment.baseFreeX) * attachment.away
+
+/** 길이 Δ(칸 비율, 길어짐 +)를 받았을 때 빈 끝이 놓일 x. */
+export const freeXOf = (attachment: SideAttachment, reach: number) => attachment.baseFreeX + reach * attachment.away
 
 /**
  * 저장 좌표에서 곁줄기 붙은 끝이 기둥 시작점 x에서 떨어진 틈(칸 비율). 기둥에서 빈 끝 쪽으로 멀어지면 +, 기본 획의 어긋남은 뺀다 — 기본 획은 0.
@@ -71,9 +80,14 @@ export function attachGapOf(strokes: readonly StrokeDataV2[], stroke: StrokeData
 export const attachedXOf = (pillarX: number, attachment: SideAttachment, gap: number) => pillarX + attachment.baseOffset + gap * attachment.away
 
 /** 붙은 끝의 x를 옮긴 획. 붙은 끝에 달린 손잡이도 같이 간다. 같은 자리면 같은 획. */
-export function withAttachedEndX(stroke: StrokeDataV2, attachment: SideAttachment, x: number): StrokeDataV2 {
-  const index = attachedIndexOf(stroke, attachment)
+export const withAttachedEndX = (stroke: StrokeDataV2, attachment: SideAttachment, x: number) => withPointX(stroke, attachedIndexOf(stroke, attachment), x)
+/** 빈 끝의 x를 옮긴 획. */
+export const withFreeEndX = (stroke: StrokeDataV2, attachment: SideAttachment, x: number) => withPointX(stroke, freeIndexOf(stroke, attachment), x)
+
+/** 점 하나의 x를 옮긴 획. 그 점의 손잡이도 같이 간다. 같은 자리면 같은 획. */
+export function withPointX(stroke: StrokeDataV2, index: number, x: number): StrokeDataV2 {
   const point = stroke.points[index]
+  if (!point) return stroke
   const dx = x - point.x
   if (Math.abs(dx) < EPSILON) return stroke
   const moved: AnchorPoint = {
