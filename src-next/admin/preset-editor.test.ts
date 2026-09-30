@@ -42,14 +42,14 @@ describe('프리셋 편집 규칙', () => {
     expect(handlesOf(noto, 'right', 'ㅏ').filter((handle) => handle.part === 'medial').map((handle) => handle.target).sort()).toEqual(['medial.outerPillar.face', 'medial.primaryBeam.face'])
   })
 
-  it('캔버스엔 끌면 상자가 바뀌는 선만 — 홀자 칸 안쪽 줄기 자리는 뺀다', () => {
+  it('캔버스엔 끌면 잉크가 바뀌는 선만 — 홀자 안쪽 세로 자리(곁줄기 높이)는 띄우고 가로 자리는 뺀다', () => {
     const live = (char: string) => {
       const identity = identityOfChar(char)!
       return liveHandles(bundle, identity, handlesOf(noto, identity.contextId, identity.medialJamo)).map((handle) => handle.target)
     }
     const ga = live('가')
-    expect(ga).toEqual(expect.arrayContaining(['initial.roleFaces.left', 'initial.roleFaces.right', 'initial.roleFaces.top', 'initial.roleFaces.bottom', 'medial.outerPillar.face']))
-    expect(ga).not.toContain('medial.primaryBeam.face')
+    // 곁줄기 높이는 보선에서 받는다(홀자 줄기 끝점 = 보선).
+    expect(ga).toEqual(expect.arrayContaining(['initial.roleFaces.left', 'initial.roleFaces.right', 'initial.roleFaces.top', 'initial.roleFaces.bottom', 'medial.outerPillar.face', 'medial.primaryBeam.face']))
     expect(live('고')).not.toContain('medial.baseStem.face')
     expect(live('곡')).toEqual(expect.arrayContaining(['initial.roleFaces.bottom', 'final.roleFaces.bottom', 'medial.primaryBeam.face']))
   })

@@ -169,6 +169,17 @@ export interface BoxConfig {
   y: number
   width: number // 0~1 상대 크기
   height: number
+  /** 홀자 칸만: 이름 있는 줄기의 세로 목표(획 id → 칸 안 비율). 칸 해석이 보선에서 채운다(`medialStemRails.ts`). */
+  stems?: Readonly<Record<string, StemRailTarget>>
+}
+
+/** 홀자 줄기 하나의 세로 목표(칸 안 비율, 0 = 칸 위). 세로 줄기는 위 · 아래 끝, 가로 줄기는 높이. 빈 값은 저장 좌표 그대로. */
+export interface StemRailTarget {
+  top?: number
+  bottom?: number
+  center?: number
+  /** 짧은기둥이 보에 붙은 끝. 이 끝은 저장 획이 옮겨져 있어도 늘 보 가운데다(따로 끌 수 없다). */
+  joined?: 'top' | 'bottom'
 }
 
 // ===== Split 기반 레이아웃 시스템 =====

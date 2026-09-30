@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { JamoData } from '../types'
-import { CLUSTER_SPLIT, borrowFromChoseong, canBorrowFromChoseong, clusterFromChoseong, jongseongFromChoseong, matchesChoseong } from './jamoFromChoseong'
+import { CLUSTER_SPLIT, DOUBLE_SPLIT, borrowFromChoseong, canBorrowFromChoseong, clusterFromChoseong, doubleFromSingle, jongseongFromChoseong, matchesChoseong } from './jamoFromChoseong'
 
 const stroke = (id: string, x: number) => ({ id, points: [{ x, y: 0 }, { x, y: 1 }], closed: false, thickness: 0.07 })
 
@@ -90,5 +90,32 @@ describe('겹받침을 초성 둘로', () => {
   it('초성 원본을 건드리지 않는다', () => {
     clusterFromChoseong(front, back, cluster).strokes![0].points[1].handleOut!.x = 0.99
     expect(front.strokes![0].points[1].handleOut).toEqual({ x: 0.5, y: 0.2 })
+  })
+})
+
+describe('쌍자음 초성을 홑자음 둘로', () => {
+  const single: JamoData = { char: 'ㄱ', type: 'choseong', strokes: [stroke('ㄱ-1', 0), stroke('ㄱ-2', 1)], frame: { strokes: [stroke('ㄱ-1', 0.5)] } }
+  const double: JamoData = { char: 'ㄲ', type: 'choseong', strokes: [stroke('ㄲ-1', 0.1), stroke('ㄲ-3', 0.7)], contextualInkSafety: { origin: {}, minimumGap: 0.01 } }
+
+  it('홑자음 획을 앞 · 뒤 구간에 x만 눌러 두 번 넣고, id는 초성 꼴로 이어 붙인다', () => {
+    const next = doubleFromSingle(single, double)!
+    const { front, back } = DOUBLE_SPLIT['ㄲ']
+    expect(next.type).toBe('choseong')
+    expect(next.strokes!.map((s) => s.id)).toEqual(['ㄲ-1', 'ㄲ-2', 'ㄲ-3', 'ㄲ-4'])
+    expect(next.strokes!.map((s) => s.points[0].x)).toEqual([front.from, front.to, back.from, back.to])
+    expect(next.strokes!.every((s) => s.thickness === 0.07)).toBe(true)
+    expect(next.frame!.strokes!.map((s) => s.id)).toEqual(['ㄲ-1', 'ㄲ-2'])
+    expect(next.contextualInkSafety).toBeUndefined()
+  })
+
+  it('짝이 아닌 홑자음이나 쌍자음이 아닌 자소는 null', () => {
+    expect(doubleFromSingle({ ...single, char: 'ㄷ' }, double)).toBeNull()
+    expect(doubleFromSingle(single, { ...double, char: 'ㄱ' })).toBeNull()
+  })
+
+  it('홑자음 원본을 건드리지 않는다', () => {
+    const before = structuredClone(single)
+    doubleFromSingle(single, double)
+    expect(single).toEqual(before)
   })
 })

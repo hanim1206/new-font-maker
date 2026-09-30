@@ -8,6 +8,7 @@ import { editableComponentRailsOf, fitComponentsForGlyph, renderComponentPart } 
 import type { ComponentFaces } from '../src/services/notoComponentFit'
 import type { SlotFacesDelta } from '../src/services/notoMedialMasterFit'
 import { resolveContextBoxes } from '../src/services/contextBoxResolver'
+import { faceLimitIssue, furthestValid } from '../src/services/railLimits'
 import type { BoxConfig, Part } from '../src/types'
 import { editableRailsOf, editableSlotRailsOf, fitMedialForGlyph, renderMedialPart, withSlotFaces } from './notoMedialFitView'
 import type { EditableRail } from './notoMedialFitView'
@@ -355,17 +356,18 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
   // 끄는 동안은 미리보기, 손을 떼면 저장. 방향키는 한 번에 한 저장.
   const [dragging, setDragging] = useState(false)
 
-  // 값 하나를 놓아 본다. 순서·간격 위반이면 false, 호출자는 마지막 유효값을 지킨다.
-  const tryPlace = (target: EditableRail, value: number): true | string => {
+  // 값 하나를 놓아 본다. 한계(글자 몸 · 순서 · 두께 간격, `railLimits`)를 넘으면 이유를 돌려준다. 놓을 수 있으면 저장하는 함수를 준다.
+  const placeOf = (target: EditableRail, value: number): (() => void) | string => {
     const rounded = target.original + Math.round((value - target.original) * 1000) / 1000
     if (target.id.startsWith('c')) {
       const part = componentParts[target.partIndex]
       if (!part?.faces) return '박스가 없습니다.'
       const proposed = { ...(facesByPart[target.partIndex] ?? part.faces), [target.role]: rounded } as ComponentFaces
+      const limit = faceLimitIssue(part.faces, proposed)
+      if (limit) return limit
       const check = renderComponentPart(part, proposed)
       if (!check.path) return check.message ?? '박스 변을 그 자리에 둘 수 없습니다.'
-      setFacesByPart((current) => { const copy = [...current]; copy[target.partIndex] = proposed; return copy })
-      return true
+      return () => setFacesByPart((current) => { const copy = [...current]; copy[target.partIndex] = proposed; return copy })
     }
     if (target.id.startsWith('s')) {
       const base = fitView?.parts[target.partIndex]
@@ -373,18 +375,27 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
       const proposed: SlotFacesDelta = { ...slotDeltaByPart[target.partIndex], [target.role]: rounded - target.original }
       const moved = withSlotFaces(base, proposed)
       if (!moved.ok) return moved.message
-      const check = renderMedialPart(moved.part, railsWithDelta(moved.part.fit?.railsEm, railDeltaByPart[target.partIndex]))
+      const check = renderMedialPart(moved.part, railsWithDelta(moved.part.fit?.railsEm, railDeltaByPart[target.partIndex]), undefined, base.fit)
       // 유효성은 rail 자리(slot)로 본다. 앱 획이 그 칸에 안 맞는 건 배치를 막을 이유가 아니다.
       if (!check.slot) return check.message ?? '홀자 상자를 그 자리에 둘 수 없습니다.'
-      setSlotDeltaByPart((current) => { const copy = [...current]; copy[target.partIndex] = proposed; return copy })
-      return true
+      return () => setSlotDeltaByPart((current) => { const copy = [...current]; copy[target.partIndex] = proposed; return copy })
     }
     const part = slotParts[target.partIndex]
     if (!part?.fit) return '획 마스터가 없습니다.'
     const proposed: Record<string, number> = { ...railDeltaByPart[target.partIndex], [target.role]: rounded - part.fit.railsEm[target.role] }
-    const check = renderMedialPart(part, railsWithDelta(part.fit.railsEm, proposed))
+    const check = renderMedialPart(part, railsWithDelta(part.fit.railsEm, proposed), undefined, fitView?.parts[target.partIndex]?.fit)
     if (!check.slot) return check.message ?? '기준선을 그 자리에 둘 수 없습니다.'
-    setRailDeltaByPart((current) => { const copy = [...current]; copy[target.partIndex] = proposed; return copy })
+    return () => setRailDeltaByPart((current) => { const copy = [...current]; copy[target.partIndex] = proposed; return copy })
+  }
+  // 한계를 넘는 값은 경계까지 줄여 놓는다 — 빨리 끌어도 경계에서 멈춘다. 지금 자리부터 못 놓으면(이미 한계 밖) 이유를 돌려준다.
+  const tryPlace = (target: EditableRail, value: number): true | string => {
+    let placed = placeOf(target, value)
+    if (typeof placed === 'string' && typeof placeOf(target, target.value) !== 'string') {
+      const limited = furthestValid(target.value, value, (candidate) => typeof placeOf(target, candidate) !== 'string', 1e-4)
+      if (Math.abs(limited - target.value) > 1e-9) placed = placeOf(target, limited)
+    }
+    if (typeof placed === 'string') return placed
+    placed()
     return true
   }
   // 스냅 후보 = 같은 축의 Noto 실측선 + 다른 부품의 rail. 같은 부품 rail은 겹치면 순서 위반이라 뺀다.
@@ -408,7 +419,9 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
     unfixRail(id)
     if (options?.snap) {
       const snapped = snapRail({ value: next, original: target.original, axis: target.axis, candidates: snapCandidatesFor(target) })
-      if (snapped.hit && tryPlace(target, snapped.value) === true) {
+      const snapPlace = snapped.hit ? placeOf(target, snapped.value) : null
+      if (snapped.hit && typeof snapPlace === 'function') {
+        snapPlace()
         setError('')
         if (snapped.hit.kind !== snapHit?.kind || snapped.hit.id !== snapHit?.id || snapped.hit.value !== snapHit?.value) navigator.vibrate?.(8)
         setSnapHit(snapped.hit)

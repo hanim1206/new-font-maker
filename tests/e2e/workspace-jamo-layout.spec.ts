@@ -299,13 +299,13 @@ test.fixme('배치 Δ를 적용하면 저장되어 새로 열어도 rail이 그 
 })
 
 /** ㅓ의 보 중심은 slot 경계를 안 밀어 앱 글자에 안 닿는다. 그런 배치 rail은 보이기만 하고 손잡이가 없다. */
-test('옮겨도 글자에 안 닿는 배치 rail은 잠겨 있다', async ({ page }) => {
+test('곁줄기 높이 보선은 잉크에 닿아 잠기지 않는다(홀자 줄기 끝점 = 보선)', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   const canvas = page.getByTestId('review-canvas')
   await selectMedialBox(page)
-  await expect(canvas.locator('[data-locked="true"]')).not.toHaveCount(0)
-  await expect(canvas.getByRole('button', { name: '보 중심 선택' })).toHaveCount(0)
+  await expect(canvas.locator('[data-locked="true"]')).toHaveCount(0)
+  await expect(canvas.getByRole('button', { name: '보 중심 선택' })).toHaveCount(1)
   await expect(canvas.getByRole('button', { name: '바깥기둥 중심 선택' })).toHaveCount(1)
 })
 
@@ -639,20 +639,20 @@ test('획을 옆 자소 쪽으로 끌면 최소 간격에서 한 번 걸리고, 
   const y = start.y + start.height / 2
   const tools = page.getByTestId('jamo-stroke-tools')
 
-  // 36u를 청하면 여유(17u, 눈금 5u → 20u)에서 붙들린다.
+  // 72u를 청하면 여유(64u, 눈금 5u → 65u)에서 붙들린다. 곁줄기가 보선 높이(ㅅ 다리가 벌어진 곳)에 서서 여유가 넓다.
   await page.mouse.move(startX, y)
   await page.mouse.down()
-  await page.mouse.move(startX - 10, y, { steps: 5 })
-  expect(Math.round((startX - await centerX()) * unitsPerPx)).toBeLessThanOrEqual(22)
+  await page.mouse.move(startX - 20, y, { steps: 5 })
+  expect(Math.round((startX - await centerX()) * unitsPerPx)).toBeLessThanOrEqual(67)
   await expect(tools).toContainText('더 끌면 넘어감')
   await expect(canvas).not.toHaveAttribute('data-gap-warning', 'true')
   // 더 끌면 풀려서 손가락을 따라온다.
-  await page.mouse.move(startX - 40, y, { steps: 8 })
-  expect(Math.round((startX - await centerX()) * unitsPerPx)).toBeGreaterThan(120)
+  await page.mouse.move(startX - 50, y, { steps: 8 })
+  expect(Math.round((startX - await centerX()) * unitsPerPx)).toBeGreaterThan(150)
   await expect(tools).toContainText('옆 자소에 너무 붙음')
   await page.mouse.up()
   // 놓은 뒤에도 되당겨지지 않고, 캔버스가 경고한다. Undo하면 경고도 사라진다.
-  expect(Math.round((startX - await centerX()) * unitsPerPx)).toBeGreaterThan(120)
+  expect(Math.round((startX - await centerX()) * unitsPerPx)).toBeGreaterThan(150)
   await expect(canvas).toHaveAttribute('data-gap-warning', 'true')
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
   await expect(canvas).not.toHaveAttribute('data-gap-warning', 'true')

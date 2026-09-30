@@ -59,7 +59,9 @@ export function designBodyScale(padding: Padding): { x: number; y: number } {
 export function mapBoxToDesignBody(box: BoxConfig, padding: Padding | undefined): BoxConfig {
   if (!padding || isReferenceBody(padding)) return box
   const scale = designBodyScale(padding)
+  // 칸 안 비율로 적힌 것(홀자 줄기 목표 `stems`)은 칸을 통째로 옮기는 이 변환을 지나도 그대로라 같이 싣는다.
   return {
+    ...box,
     x: padding.left + (box.x - REFERENCE_BODY_PADDING.left) * scale.x,
     y: padding.top + (box.y - REFERENCE_BODY_PADDING.top) * scale.y,
     width: box.width * scale.x,

@@ -7,6 +7,7 @@ import { DEFAULT_STYLE } from '../stores/globalStyleStore'
 import { decomposeSyllable } from '../utils/hangulUtils'
 import { addContextBoxDelta, addFaceDelta, facesOffsets, hasContextBoxDelta, identityOfSyllable, medialPartGroups, predictComponentFaces, resolveContextBoxes } from './contextBoxResolver'
 import { fitNotoComponent, inkOfComponentFit } from './notoComponentFit'
+import { GLYPH_BODY } from './railLimits'
 import { createUserPreset01 } from '../../src-next/userPreset01'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
 import { resolveGlyphInkPrimitives } from './glyphInkResolver'
@@ -112,12 +113,12 @@ describe.skipIf(!existsSync(CORPUS))('칸 해석 — 모델', () => {
     const syllable = decompose('가')
     const identity = identityOfSyllable(syllable)!
     const base = resolveContextBoxes({ identity, model })
-    const moved = resolveContextBoxes({ identity, model, delta: { faces: { CH: { left: -0.02 }, JU: { bottom: 0.01 } } } })
+    const moved = resolveContextBoxes({ identity, model, delta: { faces: { CH: { left: -0.02 }, JU: { bottom: -0.01 } } } })
     const ch = (r: typeof base) => r.parts.find((p) => p.part === 'CH')!.faces
     const ju = (r: typeof base) => r.parts.find((p) => p.part === 'JU')!.faces
     expect(ch(moved).left).toBeCloseTo(ch(base).left - 0.02, 9)
     expect(ch(moved).right).toBeCloseTo(ch(base).right, 9)
-    expect(ju(moved).bottom).toBeCloseTo(ju(base).bottom + 0.01, 9)
+    expect(ju(moved).bottom).toBeCloseTo(ju(base).bottom - 0.01, 9)
     // 획 없이 풀면 상자 = 네 변 그대로.
     expect(base.parts.every((p) => !p.fitted)).toBe(true)
     expect(base.boxes.CH).toEqual({ x: ch(base).left, y: ch(base).top, width: ch(base).right - ch(base).left, height: ch(base).bottom - ch(base).top })
@@ -167,15 +168,19 @@ describe.skipIf(!existsSync(CORPUS))('칸 해석 — 모델', () => {
     expect(moved.boxes.JU!.width).toBeLessThan(base.boxes.JU!.width)
   })
 
-  it('가: 홀자 Δ가 순서를 뒤집으면 그 글자는 Δ를 받지 않고 모델 rail 그대로다(자동 예외)', async () => {
+  it('가: 홀자 Δ가 한계(글자 몸 · 순서)를 넘으면 버리지 않고 경계까지 줄여 얹는다', async () => {
     const model = await bundle
     const syllable = decompose('가')
     const identity = identityOfSyllable(syllable)!
     const base = resolveContextBoxes({ identity, model, syllable })
-    // 기둥 중심을 보 끝(outer-right) 너머로 보내면 보의 시작 > 끝이라 다시 놓지 못한다.
-    const broken = resolveContextBoxes({ identity, model, syllable, delta: { medial: { JU: { 'outerPillar.center': 0.5 } } } })
-    expect(broken.complete).toBe(true)
-    expect(broken.medial.find((m) => m.part === 'JU')!.fit!.railsEm).toEqual(base.medial.find((m) => m.part === 'JU')!.fit!.railsEm)
+    // 기둥 중심을 보 끝(outer-right) 너머로 보내면 순서가 뒤집히고 글자 몸 밖이다 — 그 앞에서 멈춘다.
+    const limited = resolveContextBoxes({ identity, model, syllable, delta: { medial: { JU: { 'outerPillar.center': 0.5 } } } })
+    expect(limited.complete).toBe(true)
+    const fit = limited.medial.find((m) => m.part === 'JU')!.fit!
+    const baseFit = base.medial.find((m) => m.part === 'JU')!.fit!
+    expect(fit.railsEm['center-x']).toBeGreaterThan(baseFit.railsEm['center-x'] + 0.01)
+    expect(fit.slot.x + fit.slot.width).toBeLessThanOrEqual(GLYPH_BODY.right + 1e-6)
+    expect(fit.railsEm['center-x']).toBeLessThan(fit.railsEm['outer-right'])
     // 이 글자에 없는 획 역할 키(ㅏ에 안기둥 없음)도 그냥 건너뛴다.
     const missing = resolveContextBoxes({ identity, model, syllable, delta: { medial: { JU: { 'innerPillar.center': 0.05 } } } })
     expect(missing.boxes).toEqual(base.boxes)

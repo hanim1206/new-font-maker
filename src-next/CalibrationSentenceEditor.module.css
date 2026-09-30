@@ -248,6 +248,7 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .guideRail { stroke: rgb(59 111 214 / .32); stroke-width: calc(.25 * var(--view-unit, 1)); stroke-dasharray: calc(1.2 * var(--view-unit, 1)) calc(1.2 * var(--view-unit, 1)); pointer-events: none; }
 .snapHitLine { stroke: #f0561e; stroke-width: calc(.5 * var(--view-unit, 1)); pointer-events: none; }
 .snapHitChip { position: absolute; z-index: 3; left: 50%; top: 10px; transform: translateX(-50%); padding: 3px 10px; border-radius: 10px; background: #f0561e; color: #fff; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10.5px; font-weight: 700; white-space: nowrap; pointer-events: none; }
+.railHintChip { position: absolute; z-index: 3; left: 50%; top: 10px; transform: translateX(-50%); padding: 5px 12px; border-radius: 999px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 12px; font-weight: 700; white-space: nowrap; pointer-events: none; }
 
 /* 도마 칩 줄. 머리 바로 아래 한 줄, 가로 스크롤. 지금 글자의 자소만 검정, 손댄 자소는 모서리에 점. */
 .bench { flex: none; display: flex; gap: 6px; padding: 8px 14px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid rgb(var(--color-border-subtle)); }

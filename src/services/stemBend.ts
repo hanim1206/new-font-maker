@@ -1,4 +1,5 @@
 import type { BoxConfig, JamoData, StrokeDataV2 } from '../types'
+import { stemEndsFor } from './medialStemRails'
 import { hasMedialBoxEm, JAMO_CHANNELS, masterNameOf, stemReferenceBox, thinBox, type JamoChannel } from './stemMaster'
 
 /**
@@ -26,6 +27,8 @@ interface BendFrame {
   unplaceEm: (em: Vec) => Vec
   /** 휨이 하나도 없는 획(곧은 획) */
   straight: boolean
+  /** 보선에서 받은 끝점(받은 칸 비율). 없으면 저장 끝점 제자리. */
+  ends: { start: Vec; end: Vec } | null
 }
 
 function channelOf(jamo: JamoData, strokeId: string): JamoChannel | null {
@@ -34,22 +37,27 @@ function channelOf(jamo: JamoData, strokeId: string): JamoChannel | null {
 
 function bendFrameOf(jamo: JamoData, stroke: StrokeDataV2, box: BoxConfig, channelHint?: JamoChannel): BendFrame | null {
   if (jamo.type !== 'jungseong' || stroke.points.length < 2) return null
+  // 끝점이 보선에서 오면(`medialStemRails`) 새 끝점 사이에 놓는다. 저장 끝점은 모양을 읽는 축으로만 쓴다.
+  const ends = stemEndsFor(jamo, stroke, box)
   const channel = channelHint && jamo[channelHint]?.some((item) => item.id === stroke.id) ? channelHint : channelOf(jamo, stroke.id)
-  if (!channel || !hasMedialBoxEm(jamo.char, channel)) return null
-  if (!masterNameOf(jamo, jamo[channel] ?? [], stroke.id)) return null
-  const reference = stemReferenceBox(jamo.char, channel, stroke)
+  const named = Boolean(channel && hasMedialBoxEm(jamo.char, channel) && masterNameOf(jamo, jamo[channel!] ?? [], stroke.id))
+  if (!named && !ends) return null
+  // 휨을 재는 기준 칸. 마스터 대상이 아니면(표에 칸이 없는 채널) 받은 칸 그대로 — 모양이 칸 비율 그대로 따라간다.
+  const reference = named ? stemReferenceBox(jamo.char, channel!, stroke) : { width: box.width, height: box.height }
 
   const start = stroke.points[0]
   const end = stroke.points[stroke.points.length - 1]
+  const placedStart = ends?.start ?? start
+  const placedEnd = ends?.end ?? end
   const axis = { x: end.x - start.x, y: end.y - start.y }
   const refAxis = { x: axis.x * reference.width, y: axis.y * reference.height }
   const refLength = Math.hypot(refAxis.x, refAxis.y)
-  const emAxis = { x: axis.x * box.width, y: axis.y * box.height }
+  const emAxis = { x: (placedEnd.x - placedStart.x) * box.width, y: (placedEnd.y - placedStart.y) * box.height }
   const emLength = Math.hypot(emAxis.x, emAxis.y)
   if (refLength < EPSILON || emLength < EPSILON) return null
 
   // 두께 0인 변은 기준 칸만큼 넓힌다(가운데 기준).
-  const placed: BoxConfig = !thinBox(stroke, box) ? box : Math.abs(emAxis.y) >= Math.abs(emAxis.x)
+  const placed: BoxConfig = !named || !thinBox(stroke, box) ? box : Math.abs(emAxis.y) >= Math.abs(emAxis.x)
     ? { ...box, x: box.x + box.width / 2 - reference.width / 2, width: reference.width }
     : { ...box, y: box.y + box.height / 2 - reference.height / 2, height: reference.height }
 
@@ -62,7 +70,7 @@ function bendFrameOf(jamo: JamoData, stroke: StrokeDataV2, box: BoxConfig, chann
     const { t, n } = split(offset)
     return { x: t * emAxis.x - n * emAxis.y / emLength, y: t * emAxis.y + n * emAxis.x / emLength }
   }
-  const origin = { x: box.x + start.x * box.width, y: box.y + start.y * box.height }
+  const origin = { x: box.x + placedStart.x * box.width, y: box.y + placedStart.y * box.height }
   const ex = emOffset({ x: 1, y: 0 })
   const ey = emOffset({ x: 0, y: 1 })
   const determinant = ex.x * ey.y - ey.x * ex.y
@@ -77,18 +85,20 @@ function bendFrameOf(jamo: JamoData, stroke: StrokeDataV2, box: BoxConfig, chann
       y: (-ex.y * em.x + ex.x * em.y) / determinant,
     },
     straight: stroke.points.every((point) => [point, point.handleIn, point.handleOut].every((item) => !item || Math.abs(split({ x: item.x - start.x, y: item.y - start.y }).n) < EPSILON)),
+    ends: ends ?? null,
   }
 }
 
-/** 저장된 획을 이 칸에 놓는다. 대상이 아니거나 곧은 획이면 같은 획 · 같은 칸을 그대로 돌려준다. */
+/** 저장된 획을 이 칸에 놓는다. 대상이 아니거나, 곧고 끝점도 제자리인 획이면 같은 획 · 같은 칸을 그대로 돌려준다. */
 export function placeStemStroke(jamo: JamoData, stroke: StrokeDataV2, box: BoxConfig, channel?: JamoChannel): { stroke: StrokeDataV2; box: BoxConfig } {
   const frame = bendFrameOf(jamo, stroke, box, channel)
-  if (!frame || frame.straight) return { stroke, box }
+  if (!frame || (frame.straight && !frame.ends)) return { stroke, box }
   const last = stroke.points.length - 1
+  const endpoint = (index: number) => index === 0 ? frame.ends!.start : frame.ends!.end
   const points = stroke.points.map((point, index) => ({
     ...point,
-    // 끝점은 제자리다. 칸이 그대로면 계산 오차 없이 원래 값을 둔다.
-    ...(frame.box === box && (index === 0 || index === last) ? { x: point.x, y: point.y } : frame.place(point)),
+    // 끝점: 보선 목표가 있으면 거기, 없으면 제자리. 칸이 그대로면 계산 오차 없이 그 값을 둔다.
+    ...(frame.box === box && (index === 0 || index === last) ? (frame.ends ? endpoint(index) : { x: point.x, y: point.y }) : frame.place(point)),
     ...(point.handleIn ? { handleIn: frame.place(point.handleIn) } : {}),
     ...(point.handleOut ? { handleOut: frame.place(point.handleOut) } : {}),
   }))

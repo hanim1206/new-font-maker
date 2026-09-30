@@ -108,11 +108,16 @@ export function propagationEditOf(input: { editable: readonly EditableRail[]; me
 const PROBE = 0.001
 const sameBoxes = (a: Partial<Record<Part, BoxConfig>>, b: Partial<Record<Part, BoxConfig>>) => (Object.keys({ ...a, ...b }) as Part[]).every((part) => {
   const left = a[part]; const right = b[part]
-  return !!left && !!right && (['x', 'y', 'width', 'height'] as const).every((key) => Math.abs(left[key] - right[key]) <= EPSILON)
+  return !!left && !!right && (['x', 'y', 'width', 'height'] as const).every((key) => Math.abs(left[key] - right[key]) <= EPSILON) && sameStems(left, right)
 })
+/** 홀자 줄기 목표(칸 안 비율)도 같나. 안쪽 보선은 칸은 그대로 두고 이것만 바꾼다. */
+const sameStems = (a: BoxConfig, b: BoxConfig) => {
+  const ids = new Set([...Object.keys(a.stems ?? {}), ...Object.keys(b.stems ?? {})])
+  return [...ids].every((id) => (['top', 'bottom', 'center'] as const).every((key) => Math.abs((a.stems?.[id]?.[key] ?? 0) - (b.stems?.[id]?.[key] ?? 0)) <= EPSILON))
+}
 
 /**
- * 옮겨도 글자에 안 닿는 배치 rail. 앱 렌더러는 홀자를 slot 상자에 스케일해 그리므로, slot 경계를 안 미는 안쪽 중심 rail은 상자를 못 바꾼다.
+ * 옮겨도 글자에 안 닿는 배치 rail. 이름 있는 줄기는 세로 끝점 · 높이를 보선에서 받아(`medialStemRails`) 안쪽 세로 rail도 잉크에 닿는다. 가로 자리 rail은 아직 slot 경계를 안 밀면 못 닿는다.
  * 규칙을 따로 두지 않고 1u를 양쪽으로 얹어 칸 해석을 다시 돌려 본다. 둘 다 상자가 그대로면 안 닿는 rail이다(한쪽만 막히면 순서 클램프일 수 있다).
  * 닿자 네 변은 상자 자체라 늘 닿고, 시작·끝 rail은 배치가 아니라 여기서 안 본다.
  */
