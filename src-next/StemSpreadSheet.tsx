@@ -11,7 +11,7 @@ import styles from './StemSpreadSheet.module.css'
  * 줄기 모양 전파 창. 획 편집에서 획을 잡고 `전파`를 누르면 그 획 하나를 기준으로 뜬다 — 도마 섹션 홈과 같은 판.
  * 카드 = 홀자 하나(기둥이면 16장), 카드 안 자리 = 같은 홀자 안에서 갈리는 줄기(바깥 · 안). 카드는 절대 배치 + transform이라 묶기를 바꾸면 제자리로 미끄러진다.
  * 탭 = 묶는 축(`전체` + 줄기 질문 + 줄기 수). 묶음 머리 `○○ 모두` 체크 = 그 묶음의 줄기 전부, 머리 옆 자리 토글 = 켜진 카드들의 그 자리(꺼진 카드는 안 켠다).
- * 카드 탭 = 낱개 — 자리가 둘이면 첫 자리 → 둘 다 → 끔. 기준 획의 홀자는 잠긴다. 뺀 획은 지금 모양 그대로(풀림).
+ * 카드 탭 = 낱개 — 자리가 둘이면 첫 자리 → 둘 다 → 끔, 우상단 점 둘이 어느 자리가 켜졌는지 보인다. 기준 획의 홀자는 잠긴다. 뺀 획은 지금 모양 그대로(풀림).
  * `취소` · 바깥 누르기 · Esc는 창만 닫고 획 편집에 남는다. `n자 받기`가 반영.
  */
 
@@ -158,8 +158,8 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
             <span data-diff="after"><AppGlyph char={sampleSyllable(editedChar, 'open')} size={44} strokeColorOf={mark(ACTIVE_STROKE_COLOR)} /></span>
           </div>
           <div className={styles.title}>
-            <h2>{STEM_NAME_LABEL[base]} 모양을 퍼뜨릴 범위를 선택해주세요</h2>
-            <p>퍼뜨린 뒤 모양이에요 · 묶음 머리는 한꺼번에, 글자는 툭 쳐서</p>
+            <h2>{STEM_NAME_LABEL[base]} 모양을 퍼뜨릴까요?</h2>
+            <p>{STEM_NAME_LABEL[base]} 모양을 퍼뜨릴 범위를 선택해주세요</p>
           </div>
         </header>
         <div className={styles.tabs} role="tablist" aria-label="묶기">
@@ -192,12 +192,12 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
               const on = cardOn(card)
               const onSlots = card.slots.filter((slot) => slotOn(card, slot))
               const color = (source: ResolvedStrokeInkSource) => source.jamoId === card.char && picked.has(`${card.char}:${source.strokeId}`) ? ACTIVE_STROKE_COLOR : undefined
-              const tag = card.slots.length > 1 && on ? (onSlots.length === card.slots.length ? '둘 다' : onSlots.map((slot) => slotLabels.find((option) => option.value === slot)?.label ?? slot).join(' · ')) : ''
               return (
                 <button key={card.char} type="button" className={styles.card} style={{ width: cell, height: cell, transform: spot ? `translate(${spot.x}px, ${spot.y}px)` : undefined }} data-char={card.char} data-kind="shape" data-hidden={shown ? undefined : true} aria-hidden={shown ? undefined : true} tabIndex={shown ? undefined : -1} data-locked={card.locked || undefined} data-slots={onSlots.join(' ') || undefined} aria-pressed={on} aria-disabled={card.locked || undefined} aria-label={card.locked ? `${card.char} 고친 홀자(늘 반영)` : `${card.char} ${on ? (onSlots.length === card.slots.length ? '빼기' : '다음 자리도') : '담기'}`} onClick={() => tapCard(card)}>
                   <AppGlyph char={sampleSyllable(card.char, 'open')} size={Math.round(cell * 0.72)} strokeColorOf={color} jungseongOverride={preview} />
                   {card.locked && <Lock className={styles.lock} size={14} strokeWidth={2.5} aria-hidden="true" />}
-                  {tag && <em className={styles.tag}>{tag}</em>}
+                  {/* 자리가 둘 이상인 카드는 우상단에 자리마다 점 하나 — 켜진 자리만 주황. */}
+                  {card.slots.length > 1 && <span className={styles.dots} aria-hidden="true">{card.slots.map((slot) => <i key={slot} data-on={slotOn(card, slot) || undefined} />)}</span>}
                 </button>
               )
             })}

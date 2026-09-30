@@ -45,9 +45,12 @@
 .card[aria-pressed='true'] > svg:first-child { opacity: 1; }
 /* 고친 홀자(늘 반영)는 도마 카드 그대로에 구석 자물쇠만. */
 .card[data-locked] { cursor: default; }
-.lock { position: absolute; top: 8px; right: 8px; color: rgb(var(--color-text-5)); }
-/* 자리가 둘인 카드는 구석에 켜진 자리 이름(`바깥` · `둘 다` · `안`). */
-.tag { position: absolute; top: 6px; left: 8px; color: #d9480f; font-size: 10px; font-style: normal; font-weight: 800; }
+.lock { position: absolute; top: 8px; left: 8px; color: rgb(var(--color-text-5)); }
+/* 자리가 둘 이상인 카드는 우상단에 자리마다 점 하나(순서 = 질문 보기 순서). 켜진 자리만 주황, 나머지 회색. */
+.dots { position: absolute; top: 9px; right: 9px; display: inline-flex; gap: 4px; }
+.dots i { width: 7px; height: 7px; border-radius: 999px; background: rgb(var(--color-text-5) / .45); transition: background-color var(--motion-fast) var(--ease-standard); }
+.dots i[data-on] { background: #d9480f; }
+.card[aria-pressed='false'] .dots { opacity: .5; }
 
 .foot { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 4px; padding: 10px 12px 12px; border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
 .cancel { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); font-size: 13px; font-weight: 700; transition: transform var(--motion-fast) var(--ease-standard); }
