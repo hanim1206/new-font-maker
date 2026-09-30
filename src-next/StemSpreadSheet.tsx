@@ -196,8 +196,8 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
                 <button key={card.char} type="button" className={styles.card} style={{ width: cell, height: cell, transform: spot ? `translate(${spot.x}px, ${spot.y}px)` : undefined }} data-char={card.char} data-kind="shape" data-hidden={shown ? undefined : true} aria-hidden={shown ? undefined : true} tabIndex={shown ? undefined : -1} data-locked={card.locked || undefined} data-slots={onSlots.join(' ') || undefined} aria-pressed={on} aria-disabled={card.locked || undefined} aria-label={card.locked ? `${card.char} 고친 홀자(늘 반영)` : `${card.char} ${on ? (onSlots.length === card.slots.length ? '빼기' : '다음 자리도') : '담기'}`} onClick={() => tapCard(card)}>
                   <AppGlyph char={sampleSyllable(card.char, 'open')} size={Math.round(cell * 0.72)} strokeColorOf={color} jungseongOverride={preview} />
                   {card.locked && <Lock className={styles.lock} size={14} strokeWidth={2.5} aria-hidden="true" />}
-                  {/* 자리가 둘 이상인 카드는 우상단에 자리마다 점 하나 — 켜진 자리만 주황. */}
-                  {card.slots.length > 1 && <span className={styles.dots} aria-hidden="true">{card.slots.map((slot) => <i key={slot} data-on={slotOn(card, slot) || undefined} />)}</span>}
+                  {/* 자리가 둘 이상인 카드는 우상단에 자리마다 점 하나 — 켜진 자리만 주황. 기둥은 글자 자리대로 안 점이 왼쪽, 바깥 점이 오른쪽. */}
+                  {card.slots.length > 1 && <span className={styles.dots} aria-hidden="true">{(slotFacet === 'side' ? [...card.slots].reverse() : card.slots).map((slot) => <i key={slot} data-on={slotOn(card, slot) || undefined} />)}</span>}
                 </button>
               )
             })}
