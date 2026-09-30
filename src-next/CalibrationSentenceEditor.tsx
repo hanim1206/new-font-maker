@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
-import { Check, Circle, ClipboardPaste, Copy, Dices, Download, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, RotateCcw, Settings2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
+import { Check, Circle, ClipboardPaste, Copy, Dices, Download, Import, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, RotateCcw, Settings2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { create } from 'zustand'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
@@ -13,6 +13,7 @@ import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { useEditHistoryStore } from './editHistoryStore'
 import { newLayoutEntry } from './layoutEntry'
 import { adoptFamilyStrokes, familyOfSyllable } from '../src/utils/jamoContextStrokes'
+import { DOUBLE_SPLIT, doubleFromSingle } from '../src/utils/jamoFromChoseong'
 import { withFrameFrom, withoutFrame } from '../src/utils/jamoFrame'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
 import { faceSnapCandidates, horizontalStrokeEndsX, pointAnchors, snapStrokeDrag, strokeBodyAnchors, strokeSnapCandidates, withoutOwnCandidates } from './strokeSnap'
@@ -1330,6 +1331,20 @@ function InferenceTrackpad({
     onCommitJamo(before, resetBase, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId: firstStrokeId, delta: { x: 0, y: 0 } }, { unframed: true, pastGapLimit: true })
     onSelectionChange({ ...selection, kind: 'stroke', strokeId: firstStrokeId, jamo: resetBase, pointsOpen: false })
   }
+  // 쌍자음 초성이면 홑자음 초성을 앞 · 뒤 두 번 가져온다(ㄱ → ㄲ). 지금 모음 계열 변형 그대로, 지금 쌍자음 획은 다 바뀐다(되돌리기로 되살림).
+  const doubleSplit = creationBase?.jamo.type === 'choseong' ? DOUBLE_SPLIT[creationBase.jamo.char] : undefined
+  const takeSingle = () => {
+    const selection = creationBase
+    const single = doubleSplit ? getJamo('choseong', doubleSplit.single) : undefined
+    if (!selection || !single) return
+    const family = familyOfSyllable(syllable)
+    const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, family))
+    const after = doubleFromSingle(adoptFamilyStrokes(single, family), before)
+    const firstStrokeId = after?.strokes?.[0]?.id
+    if (!after || !firstStrokeId) return
+    onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId: firstStrokeId, delta: { x: 0, y: 0 } })
+    onSelectionChange({ ...selection, kind: 'stroke', strokeId: firstStrokeId, jamo: after, pointsOpen: false })
+  }
   const connectStroke = () => {
     if ((selection.kind !== 'stroke' && selection.kind !== 'point' && selection.kind !== 'handle') || !selectedStroke || !mergeTarget) return
     const merged = mergeStrokes(selectedStroke, mergeTarget)
@@ -1519,6 +1534,7 @@ function InferenceTrackpad({
         </>}
         {selection.kind !== 'stroke' && wholeJamoSource && <button type="button" onClick={copyStroke} aria-label={`${wholeJamoSource.char} 획 모두 복사`} data-testid="jamo-strokes-copy-all">{strokeCopied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}<span>{strokeCopied ? '복사함' : '복사'}</span></button>}
         {creationBase && clipboardStrokes.length > 0 && <button type="button" onClick={pasteStroke} aria-label="획 붙여넣기" data-testid="jamo-stroke-paste"><ClipboardPaste size={18} aria-hidden="true" /><span>붙여넣기</span></button>}
+        {creationBase && doubleSplit && <button type="button" onClick={takeSingle} aria-label={`${doubleSplit.single} 모양 가져오기`} data-testid="jamo-stroke-take-single"><Import size={18} aria-hidden="true" /><span>{doubleSplit.single} 모양</span></button>}
         {creationBase && <button type="button" onClick={() => setResetConfirmOpen(true)} disabled={!canResetJamo} aria-label={`${creationBase.jamo.char} 프리셋으로 초기화`} data-testid="jamo-stroke-reset"><RotateCcw size={18} aria-hidden="true" /><span>초기화</span></button>}
       </div>
     )

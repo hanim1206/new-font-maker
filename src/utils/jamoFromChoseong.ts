@@ -17,7 +17,7 @@ export const CLUSTER_SPLIT = { front: { from: 0, to: 0.42 }, back: { from: 0.52,
  * 틀(`frame`)은 초성 것을 따른다. 틀은 그 획의 좌표 공간이라 획과 같이 옮겨야 상자 맞춤이 초성과 같다.
  */
 export function jongseongFromChoseong(choseong: JamoData, jongseong: JamoData): JamoData {
-  return assemble(jongseong, [{ choseong, from: 0, to: 1 }])
+  return assemble(jongseong, [{ choseong, from: 0, to: 1 }], '종')
 }
 
 /**
@@ -26,7 +26,28 @@ export function jongseongFromChoseong(choseong: JamoData, jongseong: JamoData): 
  * 틀은 둘 중 하나라도 있으면 만든다 — 틀이 없는 쪽은 그 획이 곧 틀이므로 획을 같은 자리에 넣는다.
  */
 export function clusterFromChoseong(front: JamoData, back: JamoData, jongseong: JamoData): JamoData {
-  return assemble(jongseong, [{ choseong: front, ...CLUSTER_SPLIT.front }, { choseong: back, ...CLUSTER_SPLIT.back }])
+  return assemble(jongseong, [{ choseong: front, ...CLUSTER_SPLIT.front }, { choseong: back, ...CLUSTER_SPLIT.back }], '종')
+}
+
+/**
+ * 쌍자음 초성의 앞 · 뒤 홑자음이 차지하는 x 구간. 노토 프리셋 쌍자음에서 잰 값을 반올림했다(글자마다 다르다 — ㄸ은 좁게 붙고 ㄲ은 벌어진다).
+ */
+export const DOUBLE_SPLIT: Record<string, { single: string; front: { from: number; to: number }; back: { from: number; to: number } }> = {
+  'ㄲ': { single: 'ㄱ', front: { from: 0, to: 0.37 }, back: { from: 0.6, to: 0.98 } },
+  'ㄸ': { single: 'ㄷ', front: { from: 0.01, to: 0.56 }, back: { from: 0.59, to: 1 } },
+  'ㅃ': { single: 'ㅂ', front: { from: 0, to: 0.42 }, back: { from: 0.61, to: 1 } },
+  'ㅆ': { single: 'ㅅ', front: { from: 0, to: 0.52 }, back: { from: 0.5, to: 1 } },
+  'ㅉ': { single: 'ㅈ', front: { from: 0.02, to: 0.47 }, back: { from: 0.48, to: 0.98 } },
+}
+
+/**
+ * 쌍자음 초성을 홑자음 둘로(ㄱ → ㄲ). 누른 순간 한 번 복사한다 — 이후 홑자음을 고쳐도 따라가지 않는다(받침 `초성 모양`과 같다).
+ * 홑자음은 부르는 쪽이 지금 모음 계열 변형으로 골라 넘긴다. x만 눌러 넣고 두께는 그대로.
+ */
+export function doubleFromSingle(single: JamoData, double: JamoData): JamoData | null {
+  const split = DOUBLE_SPLIT[double.char]
+  if (!split || single.char !== split.single) return null
+  return assemble(double, [{ choseong: single, ...split.front }, { choseong: single, ...split.back }], '')
 }
 
 /** 이 받침을 초성에서 가져올 수 있는가. 홑 · 쌍받침은 같은 초성이, 겹받침은 앞 · 뒤 초성이 둘 다 있어야 한다. */
@@ -50,9 +71,10 @@ export function matchesChoseong(choseongJamos: Record<string, JamoData>, jongseo
   return copied !== null && canonical(copied) === canonical(jongseong)
 }
 
-function assemble(jongseong: JamoData, placements: Placement[]): JamoData {
+/** `mark`는 획 id의 꼴 표시: 받침은 `종`(ㄱ종-1), 초성은 빈 값(ㄲ-1). */
+function assemble(jongseong: JamoData, placements: Placement[], mark: string): JamoData {
   const strokes = placements.flatMap(({ choseong, from, to }) => placed(choseong.strokes ?? [], from, to))
-  const next: JamoData = { ...jongseong, strokes: renamed(strokes, jongseong.char) }
+  const next: JamoData = { ...jongseong, strokes: renamed(strokes, jongseong.char, mark) }
   delete next.contextStrokes
   delete next.horizontalStrokes
   delete next.verticalStrokes
@@ -61,15 +83,15 @@ function assemble(jongseong: JamoData, placements: Placement[]): JamoData {
   delete next.geometryMode
   if (placements.some(({ choseong }) => choseong.frame?.strokes)) {
     const frameStrokes = placements.flatMap(({ choseong, from, to }) => placed(choseong.frame?.strokes ?? choseong.strokes ?? [], from, to))
-    next.frame = { strokes: renamed(frameStrokes, jongseong.char) }
+    next.frame = { strokes: renamed(frameStrokes, jongseong.char, mark) }
   }
   const geometryMode = placements.find(({ choseong }) => choseong.geometryMode)?.choseong.geometryMode
   if (geometryMode) next.geometryMode = geometryMode
   return next
 }
 
-function renamed(strokes: StrokeDataV2[], char: string): StrokeDataV2[] {
-  return strokes.map((stroke, index) => ({ ...stroke, id: `${char}종-${index + 1}` }))
+function renamed(strokes: StrokeDataV2[], char: string, mark: string): StrokeDataV2[] {
+  return strokes.map((stroke, index) => ({ ...stroke, id: `${char}${mark}-${index + 1}` }))
 }
 
 /** 획을 복사해 x를 `from`–`to` 구간으로 누른다. 0–1 전체면 그대로 복사다. */

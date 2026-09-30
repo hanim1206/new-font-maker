@@ -27,25 +27,37 @@ export function mergeStrokes(strokeA: StrokeDataV2, strokeB: StrokeDataV2): Stro
   // 가장 가까운 쌍 선택
   const best = pairs.reduce((min, p) => p.dist < min.dist ? p : min, pairs[0])
 
-  const pointsA = best.aReverse ? [...strokeA.points].reverse() : [...strokeA.points]
-  const pointsB = best.bReverse ? [...strokeB.points].reverse() : [...strokeB.points]
+  // 뒤집을 때는 점마다 들어오는 · 나가는 손잡이도 서로 바꾼다 — 안 바꾸면 손잡이가 엉뚱한 구간에 붙어 곡선이 펴진다.
+  const pointsA = best.aReverse ? reversedPoints(strokeA.points) : structuredClone(strokeA.points)
+  const pointsB = best.bReverse ? reversedPoints(strokeB.points) : structuredClone(strokeB.points)
 
-  // 연결점: A의 마지막과 B의 첫 번째의 중간점
-  const connectionPt = pointsA[pointsA.length - 1]
-
-  // B의 첫 번째 점이 연결점과 거의 같으면 제거
-  const bStartDist = dist2d(connectionPt, pointsB[0])
-  const bPoints = bStartDist < 0.05 ? pointsB.slice(1) : pointsB
+  // 이음매: A의 마지막 점. B의 첫 점이 거의 같은 자리면 지우되, 그 점이 B 쪽으로 뻗던 손잡이는 이음매 점에 옮겨 단다.
+  const joint = pointsA[pointsA.length - 1]
+  const bStartDist = dist2d(joint, pointsB[0])
+  const dropsBStart = bStartDist < 0.05
+  if (dropsBStart && pointsB[0].handleOut) joint.handleOut = pointsB[0].handleOut
+  const bPoints = dropsBStart ? pointsB.slice(1) : pointsB
 
   const mergedPoints: AnchorPoint[] = [...pointsA, ...bPoints]
 
+  // 끝 모양 · 꺾임 같은 획 설정은 A 것을 그대로 둔다. 가로 · 세로 같은 이름표는 합치면 맞지 않아 뺀다.
   return {
+    ...strokeA,
     id: strokeA.id,
     points: mergedPoints,
     closed: false,
     thickness: (strokeA.thickness + strokeB.thickness) / 2,
     label: undefined,
   }
+}
+
+/** 점 순서를 거꾸로. 점마다 `handleIn` ↔ `handleOut`을 바꾼다. */
+function reversedPoints(points: AnchorPoint[]): AnchorPoint[] {
+  return structuredClone(points).reverse().map(({ handleIn, handleOut, ...point }) => ({
+    ...point,
+    ...(handleOut ? { handleIn: handleOut } : {}),
+    ...(handleIn ? { handleOut: handleIn } : {}),
+  }))
 }
 
 /**
