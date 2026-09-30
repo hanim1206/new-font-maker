@@ -40,7 +40,7 @@ import { JamoScaleSlider } from './JamoScaleSlider'
 import { scaleLayoutParts, translateLayoutParts } from '../src/services/layoutProfileCommands'
 import { getRenderedStrokeTargets } from '../src/services/mobileEditorContext'
 import { LayoutContextCards } from './LayoutContextCards'
-import { corpusIdentity } from './notoCorpus'
+import { corpusIdentity, corpusIdentityOf } from './notoCorpus'
 import { TouchedGlyphRow } from './TouchedGlyphRow'
 import { focusJamoOf, NO_LAYOUT_EDIT } from './reviewPropagation'
 import { matchesRule } from './scopeRule'
@@ -2077,7 +2077,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const strokeRowJamo = strokeFrameAvailable && strokeCardPart ? focusJamoOf(corpusIdentity(strokeRowChar.codePointAt(0) ?? 0xac00), strokeCardPart) : null
   // 줄 맨 앞에 서는 첫닿자 단독 칸. 첫닿자를 고칠 때만.
   const soloChar = strokeRowJamo && strokeCardPart === 'CH' ? soloConsonantOf(strokeRowChar) : null
-  const strokeRowSource = useMemo(() => corpusIdentity(strokeRowChar.codePointAt(0) ?? 0xac00), [strokeRowChar])
+  // 줄의 기준 글자가 홑자모(`ㄱ` 단독 칸)면 코퍼스 신원이 없다 — 그때는 줄이 안 서므로(`strokeRowJamo` null) `가`로 채워 두기만 한다. 던지면 화면이 통째로 죽는다.
+  const strokeRowSource = useMemo(() => corpusIdentityOf(strokeRowChar) ?? corpusIdentity(0xac00), [strokeRowChar])
   const strokeRowJamos = useMemo(() => strokeRowJamo ? [strokeRowJamo] : [], [strokeRowJamo])
   const snapStep = fontUnitsToNormalized(grid.snapInterval, fontSpace)
   const minimumInkGap = fontUnitsToNormalized(grid.minorInterval, fontSpace)
@@ -2647,9 +2648,10 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       isSafetyAdjusted = hasSafety && resolveSyllableContextualInkSafety(previewed, screenBoxesOf(previewed, contextSchema)).limitedParts.length > 0
     }
     // 방금 적용한 범위에 든 글자. 적용이 어디까지 닿았는지 문장에서 바로 보인다.
-    const isScopeApplied = appliedScope.length > 0 && isEditableHangul(char) && (() => {
-      const identity = corpusIdentity(char.codePointAt(0) ?? 0)
-      return appliedScope.some((rule) => matchesRule(rule, identity))
+    // 범위 규칙은 완성형 음절에만 맞는다. 문장에 든 홑자모(`ㄱ`)는 신원이 없으니 표시하지 않는다(던지면 문장 줄이 통째로 죽는다).
+    const isScopeApplied = appliedScope.length > 0 && (() => {
+      const identity = corpusIdentityOf(char)
+      return identity !== null && appliedScope.some((rule) => matchesRule(rule, identity))
     })()
     return isEditableHangul(char)
       ? inSheet

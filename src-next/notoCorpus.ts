@@ -68,6 +68,15 @@ export interface CorpusDetail { schema: 'noto-corpus-detail-v1'; identity: Corpu
 export interface CorpusReview { verdict: 'approved' | 'rejected'; note: string; reviewedAt: string }
 export type CorpusReviews = Record<string, CorpusReview>
 
+/** 완성형 음절(가~힣)의 코드포인트인가. 홑자모(`ㄱ` · `ㅏ`) · 한글 아닌 글자는 false. */
+export const isCorpusCodepoint = (codepoint: number) => Number.isInteger(codepoint) && codepoint >= 0xac00 && codepoint < 0xac00 + CORPUS_TOTAL
+
+/** 글자 하나의 코퍼스 신원. 완성형 음절이 아니면(홑자모 · 빈 문자열 · 기호) null — 던지지 않는다. 문장에 든 글자를 셀 때 이걸 쓴다. */
+export function corpusIdentityOf(char: string): CorpusIdentity | null {
+  const codepoint = char.codePointAt(0)
+  return codepoint !== undefined && isCorpusCodepoint(codepoint) ? corpusIdentity(codepoint) : null
+}
+
 export function corpusIdentity(codepoint: number): CorpusIdentity {
   const offset = codepoint - 0xac00
   if (!Number.isInteger(offset) || offset < 0 || offset >= CORPUS_TOTAL) throw new Error('현대 한글 범위가 아닙니다.')
