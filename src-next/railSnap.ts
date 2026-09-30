@@ -4,7 +4,8 @@
  * 값은 em(0~1). 반경도 em이라 캔버스 330px 기준 0.01 ≈ 3px.
  */
 
-export interface SnapCandidate { id: string; label: string; axis: 'x' | 'y'; value: number }
+/** `rank`: 반경 안에 여럿이면 낮은 것이 먼저 이긴다(없으면 1). 같으면 가까운 것. 획 편집의 같은 자소 꼭짓점 · 대칭 자리가 0. */
+export interface SnapCandidate { id: string; label: string; axis: 'x' | 'y'; value: number; rank?: number }
 export type SnapKind = 'model' | 'rail' | 'grid'
 export interface SnapHit { kind: SnapKind; label: string; id?: string; value: number }
 export interface SnapResult { value: number; hit: SnapHit | null }
@@ -41,7 +42,9 @@ export function snapRail(input: {
     if (candidate.axis !== axis) continue
     const distance = Math.abs(candidate.value - value)
     if (distance > radius.rail) continue
-    if (!best || distance < Math.abs(best.value - value)) best = candidate
+    const rank = candidate.rank ?? 1
+    const bestRank = best ? best.rank ?? 1 : Infinity
+    if (!best || rank < bestRank || (rank === bestRank && distance < Math.abs(best.value - value))) best = candidate
   }
   if (best) return { value: best.value, hit: { kind: 'rail', label: best.label, id: best.id, value: best.value } }
   const grid = nearestGrid(value)

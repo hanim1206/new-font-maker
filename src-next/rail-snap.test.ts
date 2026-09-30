@@ -34,3 +34,13 @@ describe('snapRail', () => {
     expect(snapRail({ value: 1.03, original: 0.6, axis: 'x', candidates: [] }).hit).toBeNull()
   })
 })
+
+describe('후보 순위', () => {
+  it('반경 안에 여럿이면 rank가 낮은 것이 가까운 것보다 먼저 이긴다', () => {
+    const ranked: SnapCandidate[] = [
+      { id: 'near', label: '가까운 기준선', axis: 'x', value: 0.502 },
+      { id: 'vertex', label: '같은 자소 점', axis: 'x', value: 0.51, rank: 0 },
+    ]
+    expect(snapRail({ value: 0.5, original: 0.3, axis: 'x', candidates: ranked }).hit?.id).toBe('vertex')
+  })
+})

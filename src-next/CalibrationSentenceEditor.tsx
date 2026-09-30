@@ -16,7 +16,7 @@ import { adoptFamilyStrokes, familyOfSyllable } from '../src/utils/jamoContextSt
 import { DOUBLE_SPLIT, doubleFromSingle } from '../src/utils/jamoFromChoseong'
 import { withFrameFrom, withoutFrame } from '../src/utils/jamoFrame'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
-import { faceSnapCandidates, pointAnchors, snapStrokeDrag, strokeBodyAnchors, strokeSnapCandidates, withoutOwnCandidates } from './strokeSnap'
+import { faceSnapCandidates, jamoVertexCandidates, pointAnchors, snapStrokeDrag, strokeBodyAnchors, strokeSnapCandidates, withoutOwnCandidates } from './strokeSnap'
 import type { SnapAnchors } from './strokeSnap'
 import type { SnapCandidate, SnapHit } from './railSnap'
 import { baselineRails } from './notoBaselineRails'
@@ -566,6 +566,15 @@ function FocusedGlyph({
     ...(resolution ? faceSnapCandidates(resolution.parts) : []),
   ], [dragApiRef, notoGlyph, resolution])
   const strokeCandidates = useMemo(() => strokeSnapCandidates(targets.map((target) => ({ strokeId: target.stroke.id, label: `${target.jamo.char} 획`, stroke: target.stroke, box: target.box }))), [targets])
+  // 끌기 후보: 같은 자소의 꼭짓점 · 대칭 자리가 먼저, 그다음 기준선 · 상자 변 · 다른 획 끝, 그다음 격자.
+  const dragCandidates = (dragged: { strokeId: string; pointIndex?: number }): SnapCandidate[] => {
+    const own = targets.find((target) => target.stroke.id === dragged.strokeId)
+    const sameJamo = own ? targets.filter((target) => target.editorPart === own.editorPart && target.jamo.type === own.jamo.type && target.jamo.char === own.jamo.char) : []
+    return [
+      ...jamoVertexCandidates(sameJamo.map((target) => ({ strokeId: target.stroke.id, label: target.jamo.char, stroke: target.stroke, box: target.box })), dragged),
+      ...withoutOwnCandidates([...guideRails, ...strokeCandidates], dragged),
+    ]
+  }
   const [snapHits, setSnapHits] = useState<{ x: SnapHit | null; y: SnapHit | null } | null>(null)
   // 이름표에는 기준선 · 획 · 격자만 올린다. `처음 자리`는 끄는 내내 걸려 있어서 뺀다.
   const snapHitLabels = snapHits ? [snapHits.x, snapHits.y].filter((hit): hit is SnapHit => Boolean(hit) && hit!.kind !== 'model').map((hit) => hit.label).filter((label, index, labels) => labels.indexOf(label) === index) : []
@@ -627,7 +636,7 @@ function FocusedGlyph({
     // 끌기가 없는 화면은 누르기가 곧 탭이다.
     if (!dragApiRef || !canvasRef.current) { onTap?.(); return }
     // 닻과 후보는 누른 순간의 자리로 굳힌다. 끄는 동안 자기 자신에게 걸리지 않게 자기 후보는 뺀다.
-    drag.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, box, started: false, anchors, candidates: withoutOwnCandidates([...guideRails, ...strokeCandidates], dragged), onTap }
+    drag.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, box, started: false, anchors, candidates: dragCandidates(dragged), onTap }
     canvasRef.current.setPointerCapture(event.pointerId)
   }
   const moveDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -667,7 +676,7 @@ function FocusedGlyph({
     if (selection.kind !== 'stroke' && !handlePoint) return false
     const anchors = handlePoint ? pointAnchors(handlePoint, target.box) : strokeBodyAnchors(target.stroke, target.box)
     const dragged = selection.kind === 'stroke' ? { strokeId: target.stroke.id } : { strokeId: target.stroke.id, pointIndex: selection.pointIndex }
-    padDrag.current = { box: target.box, anchors, candidates: withoutOwnCandidates([...guideRails, ...strokeCandidates], dragged) }
+    padDrag.current = { box: target.box, anchors, candidates: dragCandidates(dragged) }
     dragApiRef.current.begin()
     return true
   }
