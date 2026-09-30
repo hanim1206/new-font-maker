@@ -53,14 +53,15 @@ test('곁줄기를 세로로 옮기면 저장 획이 바뀌고 보선 Δ는 안 
   await expect.poll(() => strokePath(page, 'ㅏ-2')).toBe(pathBefore)
 })
 
-test('자리만 옮기면 `전파`가 안 뜨고, 나가면 묻지 않고 바로 나간다', async ({ page }) => {
+test('이름 있는 줄기를 잡으면 자리만 옮겨도 `전파`가 뜨고, 나가면 묻지 않고 바로 나간다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EC%95%84&mode=stroke&part=JU')
   await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
   const pathBefore = await strokePath(page, 'ㅏ-2')
   await selectStroke(page, 'ㅏ-2')
+  await expect(page.getByTestId('jamo-stroke-spread')).toBeVisible()
   await page.keyboard.press('Shift+ArrowUp')
   await expect.poll(() => strokePath(page, 'ㅏ-2')).not.toBe(pathBefore)
-  await expect(page.getByTestId('jamo-stroke-spread')).toHaveCount(0)
+  await expect(page.getByTestId('jamo-stroke-spread')).toBeVisible()
   await page.getByTestId('workspace-back').click()
   await expect(page.getByTestId('stem-rail-apply')).toHaveCount(0)
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()

@@ -55,20 +55,15 @@ describe('전파 물음', () => {
 })
 
 describe('전파 단추 조건', () => {
-  it('형제가 전부 같은 모양(기본 폰트)이면 안 뜨고, 휜 획엔 뜬다', () => {
+  it('이름 있는 홀자 줄기면 기본 폰트에서도, 휜 획에서도 뜬다 — 곧은 기둥으로 이미 고친 형제를 되돌릴 수 있다', () => {
     const { stroke } = idOf('ㅏ', OUTER)
-    expect(spreadableStem(base, 'ㅏ', stroke.id, {})).toBe(false)
-    expect(spreadableStem(bend(base, 'ㅏ', OUTER, 0.05), 'ㅏ', stroke.id, {})).toBe(true)
-  })
-
-  it('곧은 기본 기둥도 형제가 고쳐져 있으면 뜬다 — 이미 고친 형제에 되돌려 퍼뜨릴 수 있다', () => {
-    const { stroke } = idOf('ㅏ', OUTER)
-    const eoBent = bend(base, 'ㅓ', OUTER, 0.05)
-    expect(spreadableStem(eoBent, 'ㅏ', stroke.id, {})).toBe(true)
+    expect(spreadableStem(base, 'ㅏ', stroke.id)).toBe(true)
+    expect(spreadableStem(bend(base, 'ㅏ', OUTER, 0.05), 'ㅏ', stroke.id)).toBe(true)
+    expect(spreadableStem(bend(base, 'ㅓ', OUTER, 0.05), 'ㅏ', stroke.id)).toBe(true)
   })
 
   it('이름 없는 획엔 안 뜬다', () => {
-    expect(spreadableStem(base, 'ㅏ', 'no-such-stroke', {})).toBe(false)
+    expect(spreadableStem(base, 'ㅏ', 'no-such-stroke')).toBe(false)
   })
 })
 
@@ -102,11 +97,13 @@ describe('기울기 = 모양', () => {
 })
 
 describe('자리만 옮긴 획', () => {
-  it('획을 통째로 옮기기만 하면(모양 그대로) 전파가 안 뜬다', () => {
+  it('획을 통째로 옮기기만 하면 모양은 그대로다 — 전파는 뜨지만 읽은 마스터가 곧은 마스터와 같아 형제는 안 바뀐다', () => {
     const { channel, stroke } = idOf('ㅏ', 'gyeotjulgi.right.one.single')
     const moved = { ...stroke, points: stroke.points.map((point) => ({ ...point, y: point.y - 0.1 })) }
     const a = { ...base['ㅏ'], [channel]: base['ㅏ'][channel]!.map((item) => item.id === stroke.id ? moved : item) }
-    expect(spreadableStem({ ...base, ㅏ: a }, 'ㅏ', stroke.id, {})).toBe(false)
+    expect(spreadableStem({ ...base, ㅏ: a }, 'ㅏ', stroke.id)).toBe(true)
+    const master = masterFromStroke(a, channel, stroke.id)!
+    expect(applyMaster(base['ㅓ'], {}, { gyeotjulgi: { ...master, name: 'gyeotjulgi' } })).toBeNull()
   })
 })
 
