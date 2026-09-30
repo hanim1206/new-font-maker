@@ -207,22 +207,22 @@ test('기둥을 휘면 바깥 기둥 16자가 다 켜진 채 뜨고, 툭 친 글
   await eo.click()
   await expect(eo).toHaveAttribute('aria-pressed', 'true')
   await eo.click()
-  // 기둥 둘짜리 ㅐ는 바깥만 → 둘 다 → 끔.
+  // 기둥 둘짜리 ㅐ는 처음부터 둘 다 → 끔 → 바깥만 → 둘 다.
   const ae = sheet.locator('[data-kind="shape"][data-char="ㅐ"]')
-  await expect(ae).toHaveAttribute('data-slots', 'outer')
-  await ae.click()
   await expect(ae).toHaveAttribute('data-slots', 'outer inner')
   await ae.click()
   await expect(ae).toHaveAttribute('aria-pressed', 'false')
   await ae.click()
   await expect(ae).toHaveAttribute('data-slots', 'outer')
-  // 묶음 머리 옆 `안` 토글 = 켜진 카드들의 안 기둥. 꺼진 ㅓ는 안 켜진다. 머리 체크 = 묶음 줄기 전부.
+  await ae.click()
+  await expect(ae).toHaveAttribute('data-slots', 'outer inner')
+  // 묶음 머리 옆 `안` 토글 = 켜진 카드들의 안 기둥(처음엔 다 켜져 있어 끄고, 다시 켠다). 꺼진 ㅓ는 안 켜진다. 머리 체크 = 묶음 줄기 전부.
   const group = sheet.locator('[data-testid="stem-spread-group"][data-group="all"]')
   await group.getByRole('button', { name: '안' }).click()
-  await expect(sheet.locator('[data-kind="shape"][data-char="ㅔ"]')).toHaveAttribute('data-slots', 'outer inner')
+  await expect(sheet.locator('[data-kind="shape"][data-char="ㅔ"]')).toHaveAttribute('data-slots', 'outer')
   await expect(eo).toHaveAttribute('aria-pressed', 'false')
   await group.getByRole('button', { name: '안' }).click()
-  await expect(sheet.locator('[data-kind="shape"][data-char="ㅔ"]')).toHaveAttribute('data-slots', 'outer')
+  await expect(sheet.locator('[data-kind="shape"][data-char="ㅔ"]')).toHaveAttribute('data-slots', 'outer inner')
   // 머리 체크 = 카드 전체(자리와 무관). ㅓ가 꺼져 있어 ─, 누르면 ㅓ가 바깥으로 켜지고, 다시 누르면 다 꺼진다.
   await expect(group.getByRole('checkbox')).toHaveAttribute('aria-checked', 'mixed')
   await group.getByRole('checkbox').click()

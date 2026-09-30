@@ -77,11 +77,14 @@ test.describe('홀자 줄기 마스터 랩', () => {
     const outer = card(page, 'gidung.outer.single', 'ㅐ')
     await expect(inner).toHaveAttribute('data-curved', 'false')
     await expect(outer).toHaveAttribute('data-curved', 'true')
-    // ㅐ의 안 기둥을 고쳐 반영 → 기본이 같은 자리(안 기둥)만이라 바깥은 앞의 모양으로 남는다(둘 다 따름).
+    // ㅐ의 안 기둥을 고쳐 반영 → 기본은 안 · 바깥 다 켜짐. 바깥을 빼서 안 기둥만 받으면 바깥은 앞의 모양으로 남는다(둘 다 따름).
     await openCard(page, 'gidung.inner.single', 'ㅐ')
     const innerId = (await inner.getAttribute('data-stroke'))!
     await bend(page, innerId, -25)
-    await expect(page.getByTestId('stem-spread-count')).toHaveText('6')
+    await expect(page.getByTestId('stem-spread-count')).toHaveText('16')
+    await expect(shapeCard(page, 'ㅐ')).toHaveAttribute('data-slots', 'outer inner')
+    await expect(shapeCard(page, 'ㅏ')).toHaveAttribute('aria-pressed', 'true')
+    await page.getByTestId('stem-rail-apply').locator('[data-testid="stem-spread-group"][data-group="all"]').getByRole('button', { name: '바깥' }).click()
     await expect(shapeCard(page, 'ㅐ')).toHaveAttribute('data-slots', 'inner')
     await expect(shapeCard(page, 'ㅏ')).toHaveAttribute('aria-pressed', 'false')
     await apply(page)

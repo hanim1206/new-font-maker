@@ -4,7 +4,7 @@ import { applyMaster, boundStrokesOf, masterFromStroke } from '../src/services/s
 import type { JamoData } from '../src/types'
 import { askEntries, defaultPicked, keyOf, lockedKeys, pickedMasters, shapeAskForStroke, slotFacetOf, slotOf, spreadableStem } from './stemShapeSession'
 
-/** 전파 물음 — 잡은 획 하나가 기준, 기본 켜짐은 같은 자리 전부(단일 · 섞임 안 가름). 플랜: docs/plans/2026-09-29_홀자-줄기-끝점-보선.md */
+/** 전파 물음 — 잡은 획 하나가 기준, 기본 켜짐은 이 줄기 전부(안 · 바깥, 단일 · 섞임). 플랜: docs/plans/2026-09-29_홀자-줄기-끝점-보선.md */
 const base = useJamoStore.getState().jungseong
 const idOf = (char: string, leaf: string) => boundStrokesOf(base[char], {}).find((item) => item.name === leaf)!
 /** 그 획의 첫 점에 핸들을 달아 휜다. */
@@ -19,7 +19,7 @@ const INNER = 'gidung.inner.single'
 const OUTER = 'gidung.outer.single'
 
 describe('전파 물음', () => {
-  it('ㅔ 안 기둥을 고치면 자리 질문은 `side`, 기본 켜짐은 안 기둥 전부(단일 ㅐ ㅒ ㅔ ㅖ + 섞임 ㅙ ㅞ), 바깥 기둥은 꺼진 채', () => {
+  it('ㅔ 안 기둥을 고치면 자리 질문은 `side`, 기본 켜짐은 안 · 바깥 기둥 전부', () => {
     const jungseong = bend(base, 'ㅔ', INNER, 0.05)
     const ask = shapeAskForStroke(jungseong, {}, 'ㅔ', idOf('ㅔ', INNER).stroke.id)!
     expect(ask.sections).toHaveLength(1)
@@ -28,22 +28,22 @@ describe('전파 물음', () => {
     const entries = askEntries(ask)
     expect(slotFacetOf(entries)).toBe('side')
     const picked = defaultPicked(ask)
-    const onChars = [...new Set(entries.filter((entry) => picked.has(keyOf(entry))).map((entry) => entry.char))].sort()
-    expect(onChars).toEqual(['ㅐ', 'ㅒ', 'ㅔ', 'ㅖ', 'ㅙ', 'ㅞ'].sort())
-    expect(entries.filter((entry) => picked.has(keyOf(entry))).every((entry) => slotOf(entry, 'side') === 'inner')).toBe(true)
-    expect(entries.some((entry) => slotOf(entry, 'side') === 'outer' && picked.has(keyOf(entry)))).toBe(false)
+    expect(entries.every((entry) => picked.has(keyOf(entry)))).toBe(true)
+    const onChars = [...new Set(entries.map((entry) => entry.char))]
+    expect(onChars).toHaveLength(16)
+    expect(entries.filter((entry) => slotOf(entry, 'side') === 'inner').map((entry) => entry.char).sort()).toEqual(['ㅐ', 'ㅒ', 'ㅔ', 'ㅖ', 'ㅙ', 'ㅞ'].sort())
     expect(lockedKeys(ask).has(key('ㅔ', INNER))).toBe(true)
   })
 
-  it('ㅏ 바깥 기둥을 고치면 바깥 16자가 켜지고, 안 기둥 카드를 켜면 안 갈래에도 같은 모양이 적힌다', () => {
+  it('ㅏ 바깥 기둥을 고치면 16자가 안 · 바깥 다 켜져 모든 갈래에 같은 모양이 적히고, 안 기둥을 빼면 바깥 갈래만 남는다', () => {
     const jungseong = bend(base, 'ㅏ', OUTER, 0.05)
     const ask = shapeAskForStroke(jungseong, {}, 'ㅏ', idOf('ㅏ', OUTER).stroke.id)!
     const entries = askEntries(ask)
     const picked = defaultPicked(ask)
     expect(new Set(entries.filter((entry) => picked.has(keyOf(entry))).map((entry) => entry.char)).size).toBe(16)
-    expect(pickedMasters(ask, picked).map((master) => master.name).sort()).toEqual(['gidung.outer.mixed', 'gidung.outer.single'])
-    const withInner = new Set([...picked, ...entries.filter((entry) => entry.name === INNER).map(keyOf)])
-    expect(pickedMasters(ask, withInner).map((master) => master.name)).toContain(INNER)
+    expect(pickedMasters(ask, picked).map((master) => master.name)).toContain(INNER)
+    const outerOnly = new Set([...picked].filter((key) => !entries.some((entry) => keyOf(entry) === key && entry.name.startsWith('gidung.inner'))))
+    expect(pickedMasters(ask, outerOnly).map((master) => master.name).sort()).toEqual(['gidung.outer.mixed', 'gidung.outer.single'])
   })
 
   it('곁줄기의 자리 질문은 `count`(ㅑ에 위 · 아래 둘), 보 · 걸침은 자리 질문이 없다', () => {

@@ -88,7 +88,7 @@ export function entriesOf(jungseong: Readonly<Record<string, JamoData>>, masters
 
 /**
  * 전파 물음 하나 = 기준 획 하나. `leaf`는 그 획의 갈래, `master`는 그 획을 읽은 모양.
- * `entries`는 같은 갈래의 획(같은 자리의 기본 켜짐은 `defaultPicked`가 자리 기준으로 다시 잰다), `extras`는 같은 줄기의 나머지 갈래 획.
+ * `entries`는 같은 갈래의 획, `extras`는 같은 줄기의 나머지 갈래 획. 기본 켜짐은 둘 다(`defaultPicked`).
  */
 export interface ShapeSection {
   leaf: StemMasterName
@@ -176,17 +176,9 @@ export function slotFacetOf(entries: readonly StemEntry[]): string | null {
 /** 획의 자리 값. 자리 질문이 없으면 ''. */
 export const slotOf = (entry: StemEntry, slotFacet: string | null) => (slotFacet ? entry.values[slotFacet] ?? '' : '')
 
-/** 처음 켜 둘 획: 고친 획과 같은 자리 전부(단일 · 섞임을 안 가른다). 자리 질문이 없으면 이 줄기 획 전부. */
+/** 처음 켜 둘 획: 이 줄기의 획 전부 — 안 · 바깥, 단일 · 섞임, 풀린 것까지(사용자 결정 09-30). 다 따라온 걸 보고 사용자가 뺀다. */
 export function defaultPicked(ask: ShapeAsk): Set<string> {
-  const entries = askEntries(ask)
-  const facet = slotFacetOf(entries)
-  const picked = new Set<string>()
-  for (const section of ask.sections) {
-    const edited = entries.find((entry) => keyOf(entry) === section.editedKey)
-    const slot = edited ? slotOf(edited, facet) : ''
-    for (const entry of entries) if (slotOf(entry, facet) === slot) picked.add(keyOf(entry))
-  }
-  return picked
+  return new Set(askEntries(ask).map(keyOf))
 }
 
 /** 뺄 수 없는 획(기준 획). */
