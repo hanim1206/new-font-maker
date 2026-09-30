@@ -1,6 +1,6 @@
 import medialBoxEm from '../data/medialBoxEm.json'
 import type { AnchorPoint, JamoData, StrokeDataV2 } from '../types'
-import { attachedXOf, attachGapOf, attachmentOf, freeXOf, reachOf, withAttachedEndX, withFreeEndX } from './stemAttach'
+import { attachedXOf, attachmentOf, endGapOf, endIndexOf, freeXOf, reachOf, withPointX } from './stemAttach'
 import { grammarOf, STEM_NAME_LABEL, type StemName } from './strokeGrammar'
 
 /**
@@ -107,8 +107,10 @@ export interface StemMaster {
   name: StemMasterName
   /** 첫 점은 t 0, 마지막 점은 t 1. */
   points: AxisPoint[]
-  /** 곁줄기만. 붙은 끝이 기둥 중심선에서 빈 끝 쪽으로 떨어진 틈(글자 폭 em, 기본 획 기준 차이). 없으면 0 — 붙어 있다. */
+  /** 곁줄기 · 걸침. 붙은 끝(걸침은 시작점 쪽)이 기둥 중심선에서 획 안쪽으로 떨어진 틈(글자 폭 em, 기본 획 기준 차이). 없으면 0 — 붙어 있다. */
   gap?: number
+  /** 걸침만. 끝점 쪽 붙은 끝의 틈(글자 폭 em, 안쪽 +). 없으면 0. */
+  gapEnd?: number
   /** 곁줄기만. 빈 끝이 기본 획의 빈 끝에서 옮겨진 길이 Δ(글자 폭 em, 길어짐 +). 없으면 0. */
   reach?: number
 }
@@ -121,7 +123,7 @@ export function straightMaster(name: StemMasterName): StemMaster {
 }
 
 export function isStraight(master: StemMaster): boolean {
-  return master.points.length === 2 && master.points.every((point) => point.o === 0 && !point.handleIn && !point.handleOut) && !master.gap && !master.reach
+  return master.points.length === 2 && master.points.every((point) => point.o === 0 && !point.handleIn && !point.handleOut) && !master.gap && !master.gapEnd && !master.reach
 }
 
 /** 이 이름의 마스터. 따로 없으면 부모를 거슬러 올라가 처음 있는 것(`기둥.안쪽` → 기둥, `보.솟음.섞임` → 보.솟음 → 보). 끝까지 없으면 곧다. */
@@ -285,14 +287,19 @@ function matchesInstance(stroke: StrokeDataV2, expected: StrokeDataV2): boolean 
   })
 }
 
-/** 곁줄기면 붙은 끝을 마스터의 틈만큼 기둥 시작점에서 띄우고, 빈 끝을 길이 Δ만큼 옮긴 저장 획. 곁줄기가 아니면 그대로. 인스턴스는 이 틀 위에 놓인다. */
+/** 곁줄기 · 걸침이면 붙은 끝을 마스터의 틈만큼 기둥 시작점에서 띄우고, 빈 끝을 길이 Δ만큼 옮긴 저장 획. 아니면 그대로. 인스턴스는 이 틀 위에 놓인다. */
 function framedForMaster(jamo: JamoData, strokes: readonly StrokeDataV2[], stroke: StrokeDataV2, master: StemMaster, box: BoxEm): StrokeDataV2 {
   const attachment = attachmentOf(jamo, stroke.id)
-  if (!attachment) return stroke
-  const pillar = strokes.find((item) => item.id === attachment.pillarId)
-  if (!pillar || pillar.points.length < 1 || box.width <= 0) return stroke
-  const attached = withAttachedEndX(stroke, attachment, attachedXOf(pillar.points[0].x, attachment, (master.gap ?? 0) / box.width))
-  return withFreeEndX(attached, attachment, freeXOf(attachment, (master.reach ?? 0) / box.width))
+  if (!attachment || box.width <= 0) return stroke
+  let framed = stroke
+  attachment.ends.forEach((end, order) => {
+    const pillar = strokes.find((item) => item.id === end.pillarId)
+    if (!pillar || pillar.points.length < 1) return
+    const gap = (order === 0 ? master.gap : master.gapEnd) ?? 0
+    framed = withPointX(framed, endIndexOf(framed, end.end), attachedXOf(pillar.points[0].x, end, gap / box.width))
+  })
+  const freeX = freeXOf(attachment, (master.reach ?? 0) / box.width)
+  return freeX === null || !attachment.free ? framed : withPointX(framed, endIndexOf(framed, attachment.free.end), freeX)
 }
 
 /** 이 홀자 안에서 획 하나를 마스터 인스턴스로. 곁줄기는 붙은 끝의 틈까지 마스터를 따른다. */
@@ -379,10 +386,11 @@ export function masterFromStroke(jamo: JamoData, channel: JamoChannel, strokeId:
     return { t: (dxEm * uxEm + dyEm * uyEm) / (length * length), o: (dxEm * uyEm - dyEm * uxEm) / length }
   }
   const last = stroke.points.length - 1
-  // 곁줄기는 붙은 끝이 기둥에서 떨어진 틈과 빈 끝의 길이 Δ도 모양이다(글자 폭 em).
+  // 곁줄기 · 걸침은 붙은 끝이 기둥에서 떨어진 틈과 빈 끝의 길이 Δ도 모양이다(글자 폭 em).
   const attachment = attachmentOf(jamo, strokeId)
-  const gap = attachment ? attachGapOf(strokes, stroke, attachment) : null
-  const gapEm = gap === null ? 0 : gap * box.width
+  const gapOf = (order: number) => { const end = attachment?.ends[order]; const gap = end ? endGapOf(strokes, stroke, end) : null; return gap === null ? 0 : gap * box.width }
+  const gapEm = gapOf(0)
+  const gapEndEm = gapOf(1)
   const reachEm = attachment ? reachOf(stroke, attachment) * box.width : 0
   return {
     name,
@@ -393,6 +401,7 @@ export function masterFromStroke(jamo: JamoData, channel: JamoChannel, strokeId:
       ...(point.handleOut ? { handleOut: toAxis(point.handleOut) } : {}),
     })),
     ...(Math.abs(gapEm) > 1e-9 ? { gap: gapEm } : {}),
+    ...(Math.abs(gapEndEm) > 1e-9 ? { gapEnd: gapEndEm } : {}),
     ...(Math.abs(reachEm) > 1e-9 ? { reach: reachEm } : {}),
   }
 }

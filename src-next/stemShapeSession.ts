@@ -110,6 +110,7 @@ export function sameMaster(a: StemMaster, b: StemMaster): boolean {
   if (a.points.length !== b.points.length) return false
   // 곁줄기의 틈(기둥에서 뗀 만큼)과 빈 끝 길이 Δ도 모양이다.
   if (Math.abs((a.gap ?? 0) - (b.gap ?? 0)) > SAME_MASTER_TOLERANCE) return false
+  if (Math.abs((a.gapEnd ?? 0) - (b.gapEnd ?? 0)) > SAME_MASTER_TOLERANCE) return false
   if (Math.abs((a.reach ?? 0) - (b.reach ?? 0)) > SAME_MASTER_TOLERANCE) return false
   const near = (x?: { t: number; o: number }, y?: { t: number; o: number }) => (!x && !y) || (!!x && !!y && Math.abs(x.t - y.t) <= SAME_MASTER_TOLERANCE && Math.abs(x.o - y.o) <= SAME_MASTER_TOLERANCE)
   return a.points.every((point, index) => near(point, b.points[index]) && near(point.handleIn, b.points[index].handleIn) && near(point.handleOut, b.points[index].handleOut))

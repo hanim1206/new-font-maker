@@ -2,14 +2,15 @@ import { JUNGSEONG_MAP } from '../data/Hangul'
 import type { AnchorPoint, JamoData, StrokeDataV2 } from '../types'
 
 /**
- * 곁줄기의 붙은 끝은 기둥을 따른다.
- * 저장 획에서 곁줄기 붙은 끝의 자리는 "기둥 시작점 x + 기본 획의 어긋남 + 틈"이고, 놓을 때는 그 높이에서 기둥의 놓인 중심선(휨 · 기울기 포함) 위에 붙는다.
- * 틈은 글자 폭 em으로 잰 차이라 형제에 같은 만큼 간다(줄기 마스터의 `gap`).
+ * 곁줄기 · 걸침의 붙은 끝은 기둥을 따른다.
+ * 저장 획에서 붙은 끝의 자리는 "기둥 시작점 x + 기본 획의 어긋남 + 틈"이고, 놓을 때는 그 높이에서 기둥의 놓인 중심선(휨 · 기울기 포함) 위에 붙는다.
+ * 곁줄기는 한 끝이 붙고 한 끝이 비어 있다(틈 `gap` · 빈 끝 길이 Δ `reach`). 걸침은 양 끝이 다 붙는다(틈 `gap` · `gapEnd`).
+ * 틈 · 길이는 글자 폭 em으로 잰 차이라 형제에 같은 만큼 간다(줄기 마스터).
  * 플랜: docs/plans/2026-09-30_곁줄기-붙은-끝은-기둥을-따른다.md
  */
 
-/** 곁줄기 → 붙는 기둥. 에 · 예 · 웨는 안쪽 기둥(D0 대응표). */
-export const SIDE_STROKE_PILLARS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+/** 곁줄기 → 붙는 기둥 하나, 걸침 → 붙는 기둥 둘. 에 · 예 · 웨는 안쪽 기둥(D0 대응표). */
+export const STEM_PILLARS: Readonly<Record<string, Readonly<Record<string, string | readonly [string, string]>>>> = {
   ㅏ: { 'ㅏ-2': 'ㅏ-1' },
   ㅑ: { 'ㅑ-2': 'ㅑ-1', 'ㅑ-3': 'ㅑ-1' },
   ㅓ: { 'ㅓ-2': 'ㅓ-1' },
@@ -19,18 +20,28 @@ export const SIDE_STROKE_PILLARS: Readonly<Record<string, Readonly<Record<string
   ㅘ: { 'ㅘ-4': 'ㅘ-3' },
   ㅝ: { 'ㅝ-4': 'ㅝ-3' },
   ㅞ: { 'ㅞ-4': 'ㅞ-3' },
+  ㅐ: { 'ㅐ-2': ['ㅐ-1', 'ㅐ-3'] },
+  ㅒ: { 'ㅒ-2': ['ㅒ-1', 'ㅒ-4'], 'ㅒ-3': ['ㅒ-1', 'ㅒ-4'] },
+  ㅙ: { 'ㅙ-4': ['ㅙ-3', 'ㅙ-5'] },
 }
 
-export interface SideAttachment {
+export type StrokeEnd = 'start' | 'end'
+
+export interface EndAttachment {
+  /** 획의 어느 끝인가. */
+  end: StrokeEnd
   pillarId: string
-  /** 곁줄기의 어느 끝이 기둥에 붙나. */
-  end: 'start' | 'end'
-  /** 기본 획에서 붙은 끝이 기둥 시작점 x에서 떨어진 만큼(칸 비율, x 그대로). 거의 0이고 ㅘ 세로부만 0.04 — 기본 폰트를 그대로 두려고 남긴다. */
+  /** 기본 획에서 이 끝이 기둥 시작점 x에서 떨어진 만큼(칸 비율, x 그대로). 거의 0이고 ㅘ · ㅙ 세로부만 ±0.04 — 기본 폰트를 그대로 두려고 남긴다. */
   baseOffset: number
-  /** 기둥에서 빈 끝으로 가는 x 방향. 오른쪽으로 뻗는 ㅏ 계열 +1, 왼쪽으로 뻗는 ㅓ 계열 −1. 틈 · 길이는 이 방향이 +다. */
+  /** 기둥에서 획 안쪽(반대 끝)으로 가는 x 방향. 틈은 이 방향이 +다. */
   away: 1 | -1
-  /** 기본 획의 빈 끝 x(칸 비율). 길이 Δ는 여기서 잰다 — 기본 획은 0. */
-  baseFreeX: number
+}
+
+export interface StemAttachment {
+  /** 붙은 끝. 곁줄기는 하나, 걸침은 둘(시작점 쪽 먼저). */
+  ends: readonly EndAttachment[]
+  /** 빈 끝(곁줄기만). `baseFreeX`는 기본 획의 빈 끝 x, `away`는 기둥에서 빈 끝으로 가는 방향 — 길이 Δ는 이 방향이 +(길어짐). */
+  free: { end: StrokeEnd; baseFreeX: number; away: 1 | -1 } | null
 }
 
 const EPSILON = 1e-9
@@ -41,48 +52,54 @@ function baseStrokeOf(char: string, strokeId: string): StrokeDataV2 | null {
   return [...(base.strokes ?? []), ...(base.horizontalStrokes ?? []), ...(base.verticalStrokes ?? [])].find((stroke) => stroke.id === strokeId) ?? null
 }
 
-/** 이 획이 기둥에 붙는 곁줄기면 붙임 정보, 아니면 null. */
-export function attachmentOf(jamo: Pick<JamoData, 'type' | 'char'>, strokeId: string): SideAttachment | null {
+export const endIndexOf = (stroke: Pick<StrokeDataV2, 'points'>, end: StrokeEnd) => end === 'start' ? 0 : stroke.points.length - 1
+const otherEnd = (end: StrokeEnd): StrokeEnd => end === 'start' ? 'end' : 'start'
+
+/** 이 획이 기둥에 붙는 곁줄기 · 걸침이면 붙임 정보, 아니면 null. */
+export function attachmentOf(jamo: Pick<JamoData, 'type' | 'char'>, strokeId: string): StemAttachment | null {
   if (jamo.type !== 'jungseong') return null
-  const pillarId = SIDE_STROKE_PILLARS[jamo.char]?.[strokeId]
-  if (!pillarId) return null
-  const side = baseStrokeOf(jamo.char, strokeId)
-  const pillar = baseStrokeOf(jamo.char, pillarId)
-  if (!side || !pillar || side.points.length < 2 || pillar.points.length < 1) return null
-  const pillarX = pillar.points[0].x
-  const first = side.points[0]
-  const last = side.points[side.points.length - 1]
-  const end = Math.abs(first.x - pillarX) <= Math.abs(last.x - pillarX) ? 'start' : 'end'
-  const free = end === 'start' ? last : first
-  return { pillarId, end, baseOffset: (end === 'start' ? first : last).x - pillarX, away: free.x >= pillarX ? 1 : -1, baseFreeX: free.x }
+  const pillars = STEM_PILLARS[jamo.char]?.[strokeId]
+  if (!pillars) return null
+  const stroke = baseStrokeOf(jamo.char, strokeId)
+  if (!stroke || stroke.points.length < 2) return null
+  const first = stroke.points[0]
+  const last = stroke.points[stroke.points.length - 1]
+  const ends: EndAttachment[] = []
+  for (const pillarId of typeof pillars === 'string' ? [pillars] : pillars) {
+    const pillar = baseStrokeOf(jamo.char, pillarId)
+    if (!pillar || pillar.points.length < 1) return null
+    const pillarX = pillar.points[0].x
+    const end: StrokeEnd = Math.abs(first.x - pillarX) <= Math.abs(last.x - pillarX) ? 'start' : 'end'
+    if (ends.some((item) => item.end === end)) return null
+    const own = end === 'start' ? first : last
+    const other = end === 'start' ? last : first
+    ends.push({ end, pillarId, baseOffset: own.x - pillarX, away: other.x >= pillarX ? 1 : -1 })
+  }
+  ends.sort((a, b) => (a.end === 'start' ? 0 : 1) - (b.end === 'start' ? 0 : 1))
+  const freeEnd = ends.length === 1 ? otherEnd(ends[0].end) : null
+  const free = freeEnd ? { end: freeEnd, baseFreeX: (freeEnd === 'start' ? first : last).x, away: ends[0].away } : null
+  return { ends, free }
 }
-
-export const attachedIndexOf = (stroke: Pick<StrokeDataV2, 'points'>, attachment: SideAttachment) => attachment.end === 'start' ? 0 : stroke.points.length - 1
-export const freeIndexOf = (stroke: Pick<StrokeDataV2, 'points'>, attachment: SideAttachment) => attachment.end === 'start' ? stroke.points.length - 1 : 0
-
-/** 저장 좌표에서 빈 끝이 기본 획의 빈 끝에서 옮겨진 길이 Δ(칸 비율). 기둥에서 멀어지면(길어지면) +. 기본 획은 0. */
-export const reachOf = (stroke: StrokeDataV2, attachment: SideAttachment) => (stroke.points[freeIndexOf(stroke, attachment)].x - attachment.baseFreeX) * attachment.away
-
-/** 길이 Δ(칸 비율, 길어짐 +)를 받았을 때 빈 끝이 놓일 x. */
-export const freeXOf = (attachment: SideAttachment, reach: number) => attachment.baseFreeX + reach * attachment.away
 
 /**
- * 저장 좌표에서 곁줄기 붙은 끝이 기둥 시작점 x에서 떨어진 틈(칸 비율). 기둥에서 빈 끝 쪽으로 멀어지면 +, 기본 획의 어긋남은 뺀다 — 기본 획은 0.
+ * 저장 좌표에서 붙은 끝 하나가 기둥 시작점 x에서 떨어진 틈(칸 비율). 기둥에서 획 안쪽으로 멀어지면 +, 기본 획의 어긋남은 뺀다 — 기본 획은 0.
  * 기둥의 휨 · 기울기는 시작점에서 뻗은 축에 대한 모양이라 여기 안 들어간다. 그래서 기둥을 휘어도 곁줄기는 따르는 채다.
  */
-export function attachGapOf(strokes: readonly StrokeDataV2[], stroke: StrokeDataV2, attachment: SideAttachment): number | null {
+export function endGapOf(strokes: readonly StrokeDataV2[], stroke: StrokeDataV2, attachment: EndAttachment): number | null {
   const pillar = strokes.find((item) => item.id === attachment.pillarId)
   if (!pillar || pillar.points.length < 1) return null
-  return (stroke.points[attachedIndexOf(stroke, attachment)].x - pillar.points[0].x - attachment.baseOffset) * attachment.away
+  return (stroke.points[endIndexOf(stroke, attachment.end)].x - pillar.points[0].x - attachment.baseOffset) * attachment.away
 }
 
-/** 틈(칸 비율, 빈 끝 쪽 +)을 받았을 때 붙은 끝이 놓일 x. `pillarX`는 기둥 시작점(저장) 또는 그 높이의 놓인 중심선. */
-export const attachedXOf = (pillarX: number, attachment: SideAttachment, gap: number) => pillarX + attachment.baseOffset + gap * attachment.away
+/** 틈(칸 비율, 안쪽 +)을 받았을 때 붙은 끝이 놓일 x. `pillarX`는 기둥 시작점(저장) 또는 그 높이의 놓인 중심선. */
+export const attachedXOf = (pillarX: number, attachment: EndAttachment, gap: number) => pillarX + attachment.baseOffset + gap * attachment.away
 
-/** 붙은 끝의 x를 옮긴 획. 붙은 끝에 달린 손잡이도 같이 간다. 같은 자리면 같은 획. */
-export const withAttachedEndX = (stroke: StrokeDataV2, attachment: SideAttachment, x: number) => withPointX(stroke, attachedIndexOf(stroke, attachment), x)
-/** 빈 끝의 x를 옮긴 획. */
-export const withFreeEndX = (stroke: StrokeDataV2, attachment: SideAttachment, x: number) => withPointX(stroke, freeIndexOf(stroke, attachment), x)
+/** 저장 좌표에서 빈 끝이 기본 획의 빈 끝에서 옮겨진 길이 Δ(칸 비율). 기둥에서 멀어지면(길어지면) +. 빈 끝이 없으면 0. */
+export const reachOf = (stroke: StrokeDataV2, attachment: StemAttachment) =>
+  attachment.free ? (stroke.points[endIndexOf(stroke, attachment.free.end)].x - attachment.free.baseFreeX) * attachment.free.away : 0
+
+/** 길이 Δ(칸 비율, 길어짐 +)를 받았을 때 빈 끝이 놓일 x. 빈 끝이 없으면 null. */
+export const freeXOf = (attachment: StemAttachment, reach: number) => attachment.free ? attachment.free.baseFreeX + reach * attachment.free.away : null
 
 /** 점 하나의 x를 옮긴 획. 그 점의 손잡이도 같이 간다. 같은 자리면 같은 획. */
 export function withPointX(stroke: StrokeDataV2, index: number, x: number): StrokeDataV2 {
