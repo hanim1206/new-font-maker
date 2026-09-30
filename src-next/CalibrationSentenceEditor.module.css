@@ -127,6 +127,8 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .focusCanvas { --selection-color: #0d99ff; }
 .selectedCenterline { fill: none; stroke: var(--selection-color); stroke-width: calc(.45 * var(--view-unit, 1)); stroke-linecap: round; stroke-linejoin: round; }
 .hoverCenterline { fill: none; stroke: var(--selection-color); stroke-width: calc(.35 * var(--view-unit, 1)); stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+/* 아무것도 안 골랐을 때: 잠긴 자소 전체가 잡힌 상태. 잡은 획보다 옅게. */
+.wholeCenterline { fill: none; stroke: var(--selection-color); stroke-width: calc(.35 * var(--view-unit, 1)); stroke-linecap: round; stroke-linejoin: round; opacity: .45; }
 @media (hover: hover) { .strokeTarget:hover .hoverCenterline { opacity: .75; } }
 .point { fill: #fff; stroke: var(--selection-color); stroke-width: calc(.8 * var(--view-unit, 1)); cursor: pointer; }
 .activePoint { fill: var(--selection-color); stroke: #fff; stroke-width: calc(.9 * var(--view-unit, 1)); cursor: pointer; }
@@ -259,3 +261,8 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .sentenceRolled { animation: sentence-roll-in 280ms var(--ease-standard); }
 @keyframes sentence-roll-in { from { opacity: 0; translate: 0 10px; } }
 @media (prefers-reduced-motion: reduce) { .sentenceRolled { animation: none; } }
+/* 트랙패드 가운데 길: 두 손가락으로 늘어나는 방향을 평소에도 옅게. 늘리는 중엔 옛 트랙패드 규칙(`scaleAxisX/Y`)이 진하게 켠다. */
+.strokeTrackpad:not([data-scaling]) .laneHint { opacity: .42; }
+.strokeTrackpad[data-whole][data-scaling] .laneHint { opacity: 1; background: rgb(var(--color-primary) / .2); }
+/* 안 늘어나는 쪽 길(가로획의 세로)은 늘리는 중에도 끈다 — 잠긴 방향으로 벌려도 켜지면 늘어나는 줄 안다. */
+.strokeTrackpad[data-scaling] span[data-lane]:not([data-stretch]) { opacity: 0; }
