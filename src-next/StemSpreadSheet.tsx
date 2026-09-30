@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, Check, Lock } from 'lucide-react'
 import { AppGlyph } from './AppGlyph'
 import { ACTIVE_STROKE_COLOR, askEntries, keyOf, lockedKeys, sampleSyllable, slotFacetOf, slotOf, type ShapeAsk, type StemEntry } from './stemShapeSession'
@@ -20,6 +20,8 @@ const GAP = 6
 const PAD = 8
 const GROUP_HEAD = 44
 const GROUP_GAP = 24
+/** 켜진 획이 주황으로 머무는 시간. 그 뒤 CSS `fill` 전환으로 검정에 돌아온다. */
+const FLASH_MS = 180
 
 /** 고치기 전 모양에서 기준 획을 칠하는 색(주황 = 고친 뒤). */
 const BEFORE_STROKE_COLOR = '#8b95a1'
@@ -89,6 +91,17 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
   const axis = axes.find((item) => item.id === axisId) ?? axes[0]
   const slotLabels = useMemo(() => slotFacet ? (STEM_FACETS[base].find((facet) => facet.key === slotFacet)?.options ?? []) : [], [base, slotFacet])
 
+  // 켜지는 순간의 획은 주황으로 번쩍였다가 검정으로 돌아온다(`fill` 전환은 CSS). 열 때 이미 켜진 획은 안 번쩍인다.
+  const [flash, setFlash] = useState<ReadonlySet<string>>(() => new Set())
+  const flashTimer = useRef<number | null>(null)
+  useEffect(() => () => { if (flashTimer.current !== null) window.clearTimeout(flashTimer.current) }, [])
+  const toggle = (keys: readonly string[], on: boolean) => {
+    onToggle(keys, on)
+    if (!on) return
+    setFlash((current) => new Set([...current, ...keys]))
+    if (flashTimer.current !== null) window.clearTimeout(flashTimer.current)
+    flashTimer.current = window.setTimeout(() => { flashTimer.current = null; setFlash(new Set()) }, FLASH_MS)
+  }
   const isOn = (entry: StemEntry) => picked.has(keyOf(entry))
   const cardOn = (card: Card) => card.entries.some(isOn)
   const slotEntries = (card: Card, slot: string) => card.entries.filter((entry) => slotOf(entry, slotFacet) === slot)
@@ -97,21 +110,21 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
   const tapCard = (card: Card) => {
     if (card.locked) return
     const on = card.slots.filter((slot) => slotOn(card, slot))
-    if (on.length === card.slots.length) onToggle(card.entries.map(keyOf), false)
+    if (on.length === card.slots.length) toggle(card.entries.map(keyOf), false)
     else {
       const next = card.slots.find((slot) => !slotOn(card, slot))!
-      onToggle(slotEntries(card, next).map(keyOf), true)
+      toggle(slotEntries(card, next).map(keyOf), true)
     }
   }
   const toggleGroup = (cards: readonly Card[]) => {
     const keys = cards.flatMap((card) => card.entries.map(keyOf))
-    onToggle(keys, !keys.every((key) => picked.has(key)))
+    toggle(keys, !keys.every((key) => picked.has(key)))
   }
   // 자리 토글은 켜진 카드 안에서만 — 꺼진 카드를 켜지 않는다. `안`을 끄면 바깥만 남고, 둘 다 끄면 카드가 꺼진다.
   const toggleSlot = (cards: readonly Card[], slot: string) => {
     const keys = cards.filter(cardOn).flatMap((card) => slotEntries(card, slot).map(keyOf))
     if (keys.length === 0) return
-    onToggle(keys, !keys.every((key) => picked.has(key)))
+    toggle(keys, !keys.every((key) => picked.has(key)))
   }
   const stateOf = (keys: readonly string[]) => {
     const on = keys.filter((key) => picked.has(key)).length
@@ -146,6 +159,7 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
   const lastAt = useRef(new Map<string, { x: number; y: number }>())
   useLayoutEffect(() => { for (const [char, spot] of layout.at) lastAt.current.set(char, spot) }, [layout])
 
+  const flashColor = (char: string) => (source: ResolvedStrokeInkSource) => source.jamoId === char && flash.has(`${char}:${source.strokeId}`) ? ACTIVE_STROKE_COLOR : undefined
   const total = new Set(entries.filter(isOn).map((entry) => entry.char)).size
   const mark = (color: string) => (source: ResolvedStrokeInkSource) => source.jamoId === editedChar && source.strokeId === editedStroke ? color : undefined
   return (
@@ -193,8 +207,8 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
               const onSlots = card.slots.filter((slot) => slotOn(card, slot))
               return (
                 <button key={card.char} type="button" className={styles.card} style={{ width: cell, height: cell, transform: spot ? `translate(${spot.x}px, ${spot.y}px)` : undefined }} data-char={card.char} data-kind="shape" data-hidden={shown ? undefined : true} aria-hidden={shown ? undefined : true} tabIndex={shown ? undefined : -1} data-locked={card.locked || undefined} data-slots={onSlots.join(' ') || undefined} aria-pressed={on} aria-disabled={card.locked || undefined} aria-label={card.locked ? `${card.char} 고친 홀자(늘 반영)` : `${card.char} ${on ? (onSlots.length === card.slots.length ? '빼기' : '다음 자리도') : '담기'}`} onClick={() => tapCard(card)}>
-                  {/* 카드 잉크는 검정 그대로(주황은 머리의 기준 획만). 어느 자리가 켜졌는지는 우상단 점이 말한다. */}
-                  <AppGlyph char={sampleSyllable(card.char, 'open')} size={Math.round(cell * 0.62)} jungseongOverride={preview} />
+                  {/* 카드 잉크는 검정(주황은 머리의 기준 획만). 방금 켜진 획만 주황으로 번쩍였다가 돌아온다. 어느 자리가 켜졌는지는 우상단 점이 말한다. */}
+                  <AppGlyph char={sampleSyllable(card.char, 'open')} size={Math.round(cell * 0.62)} strokeColorOf={flashColor(card.char)} jungseongOverride={preview} />
                   {card.locked && <Lock className={styles.lock} size={14} strokeWidth={2.5} aria-hidden="true" />}
                   {/* 자리가 둘 이상인 카드는 우상단에 자리마다 점 하나 — 켜진 자리만 주황. 기둥은 글자 자리대로 안 점이 왼쪽, 바깥 점이 오른쪽. */}
                   {card.slots.length > 1 && <span className={styles.dots} aria-hidden="true">{(slotFacet === 'side' ? [...card.slots].reverse() : card.slots).map((slot) => <i key={slot} data-on={slotOn(card, slot) || undefined} />)}</span>}

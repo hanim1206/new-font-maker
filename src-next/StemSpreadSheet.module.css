@@ -44,6 +44,8 @@
 /* 글자는 점 · 자물쇠와 안 겹치게 조금 작고 살짝 아래. */
 .card > svg:first-child { opacity: .12; transform: translateY(6%); transition: opacity var(--motion-fast) var(--ease-standard); }
 .card[aria-pressed='true'] > svg:first-child { opacity: 1; }
+/* 켜지는 순간 주황 → 검정. 잉크 색은 fill 전환. */
+.card > svg:first-child path { transition: fill 480ms var(--ease-standard), stroke 480ms var(--ease-standard); }
 /* 고친 홀자(늘 반영)는 도마 카드 그대로에 구석 자물쇠만. */
 .card[data-locked] { cursor: default; }
 .lock { position: absolute; top: 8px; left: 8px; color: rgb(var(--color-text-5)); }
