@@ -216,7 +216,7 @@ test('기둥을 휘면 바깥 기둥 16자가 다 켜진 채 뜨고, 툭 친 글
   await expect(ae).toHaveAttribute('data-slots', 'outer')
   await ae.click()
   await expect(ae).toHaveAttribute('data-slots', 'outer inner')
-  // 묶음 머리 옆 `안` 토글 = 켜진 카드들의 안 기둥(처음엔 다 켜져 있어 끄고, 다시 켠다). 꺼진 ㅓ는 안 켜진다. 머리 체크 = 묶음 줄기 전부.
+  // 묶음 머리 옆 `안` 토글 = 묶음의 안 기둥 열 전부(처음엔 다 켜져 있어 끄고, 다시 켠다). 안 기둥이 없는 ㅓ는 그대로 꺼진 채. 머리 체크 = 묶음 줄기 전부.
   const group = sheet.locator('[data-testid="stem-spread-group"][data-group="all"]')
   await group.getByRole('button', { name: '안' }).click()
   await expect(sheet.locator('[data-kind="shape"][data-char="ㅔ"]')).toHaveAttribute('data-slots', 'outer')
