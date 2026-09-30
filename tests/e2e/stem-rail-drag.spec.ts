@@ -224,7 +224,7 @@ test('기둥을 휘면 바깥 기둥 16자가 다 켜진 채 뜨고, 툭 친 글
   await expect(eo).toHaveAttribute('aria-pressed', 'false')
   await group.getByRole('button', { name: '안' }).click()
   await expect(sheet.locator('[data-kind="shape"][data-char="ㅔ"]')).toHaveAttribute('data-slots', 'outer inner')
-  // 머리 체크 = 카드 전체(자리와 무관). ㅓ가 꺼져 있어 ─, 누르면 ㅓ가 바깥으로 켜지고, 다시 누르면 다 꺼진다.
+  // 머리 체크 = 묶음 획 전부 일괄. ㅓ가 꺼져 있어 ─, 누르면 다 켜지고(ㅓ는 바깥뿐), 다시 누르면 다 꺼진다.
   await expect(group.getByRole('checkbox')).toHaveAttribute('aria-checked', 'mixed')
   await group.getByRole('checkbox').click()
   await expect(eo).toHaveAttribute('aria-pressed', 'true')

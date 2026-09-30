@@ -10,7 +10,7 @@ import styles from './StemSpreadSheet.module.css'
 /**
  * 줄기 모양 전파 창. 획 편집에서 획을 잡고 `전파`를 누르면 그 획 하나를 기준으로 뜬다 — 도마 섹션 홈과 같은 판.
  * 카드 = 홀자 하나(기둥이면 16장), 카드 안 자리 = 같은 홀자 안에서 갈리는 줄기(바깥 · 안). 카드는 절대 배치 + transform이라 묶기를 바꾸면 제자리로 미끄러진다.
- * 탭 = 묶는 축(`전체` + 줄기 질문 + 줄기 수). 묶음 머리 `○○ 모두` 체크 = 카드 전체 선택 · 해제(자리와 무관), 머리 옆 자리 토글 = 묶음의 그 자리 열 전부(언제나 누를 수 있다)(꺼진 카드는 안 켠다).
+ * 탭 = 묶는 축(`전체` + 줄기 질문 + 줄기 수). 묶음 머리 `○○ 모두` 체크 = 묶음 획 전부 일괄 켜기 · 끄기, 머리 옆 자리 토글 = 묶음의 그 자리 열 전부(언제나 누를 수 있다)(꺼진 카드는 안 켠다).
  * 카드 탭 = 낱개 — 자리가 둘이면 첫 자리 → 둘 다 → 끔, 우상단 점 둘이 어느 자리가 켜졌는지 보인다. 카드 잉크는 검정(주황은 머리의 기준 획만). 기준 획의 홀자는 잠긴다. 뺀 획은 지금 모양 그대로(풀림).
  * `취소` · 바깥 누르기 · Esc는 창만 닫고 획 편집에 남는다. `n자 받기`가 반영.
  */
@@ -116,15 +116,11 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
       toggle(slotEntries(card, next).map(keyOf), true)
     }
   }
-  // 묶음 머리 체크 = 카드 단위 전체 선택 · 해제(자리와 무관). 켤 때 자리는 지금 켜진 카드들이 쓰는 자리를 따르고, 켜진 카드가 없으면 기준 획의 자리.
-  const editedSlot = (() => { const edited = entries.find((entry) => keyOf(entry) === section.editedKey); return edited ? slotOf(edited, slotFacet) : '' })()
+  // 묶음 머리 체크 = 묶음의 획 전부 일괄 켜기 · 끄기(자리 · 카드 상태와 무관). 다 켜져 있으면 끄고, 하나라도 빠져 있으면 다 켠다. 잠긴 카드(이 자소)는 늘 켜짐.
   const toggleGroup = (cards: readonly Card[]) => {
-    const off = cards.filter((card) => !cardOn(card))
-    if (off.length === 0) { toggle(cards.flatMap((card) => card.entries.map(keyOf)), false); return }
-    const onCards = cards.filter(cardOn)
-    const slots = new Set(onCards.flatMap((card) => card.slots.filter((slot) => slotOn(card, slot))))
-    if (slots.size === 0) slots.add(editedSlot)
-    toggle(off.flatMap((card) => card.slots.filter((slot) => slots.has(slot)).flatMap((slot) => slotEntries(card, slot).map(keyOf))), true)
+    const keys = others(cards).flatMap((card) => card.entries.map(keyOf))
+    if (keys.length === 0) return
+    toggle(keys, !keys.every((key) => picked.has(key)))
   }
   // 자리 토글 = 묶음의 그 자리 열 전부. 꺼진 카드도 그 자리로 켜진다. 다 켜져 있으면 끈다 — `안`을 끄면 바깥만 남고, 둘 다 끄면 카드가 꺼진다.
   const slotKeys = (cards: readonly Card[], slot: string) => cards.flatMap((card) => slotEntries(card, slot).map(keyOf))
@@ -133,12 +129,12 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
     if (keys.length === 0) return
     toggle(keys, !keys.every((key) => picked.has(key)))
   }
-  // 묶음 머리의 수 · 체크는 잠긴 카드(이 자소, 늘 켜짐)를 빼고 센다 — 형제 몇 자에 가는지만.
+  // 묶음 머리의 수는 잠긴 카드(이 자소, 늘 켜짐)를 빼고 센다 — 형제 몇 자에 가는지만. 체크는 획 단위: 다 켜짐 ✓, 하나라도 빠짐 ─, 다 꺼짐 빈칸.
   const others = (cards: readonly Card[]) => cards.filter((card) => !card.locked)
   const stateOf = (cards: readonly Card[]) => {
-    const rest = others(cards)
-    const on = rest.filter(cardOn).length
-    return on === rest.length ? 'true' : on === 0 ? 'false' : 'mixed'
+    const keys = others(cards).flatMap((card) => card.entries.map(keyOf))
+    const on = keys.filter((key) => picked.has(key)).length
+    return on === keys.length ? 'true' : on === 0 ? 'false' : 'mixed'
   }
   // 이미 따로 고친(풀린) 형제 — 켜 두면 이 모양으로 덮인다. 기본은 켜짐, 사용자가 직접 뺀다.
   const released = (card: Card) => card.entries.some((entry) => !entry.follows)
