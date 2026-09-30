@@ -107,6 +107,15 @@ export function grammarOf(type: JamoType, char: string): Readonly<Record<string,
   return TABLE[type]?.[char] ?? {}
 }
 
+/**
+ * 두 획을 하나로 이을 때 남길 획 id. 문법 표에 있는 쪽을 살린다 — 새로 그린 획을 잡고 기둥에 이어도 기둥 이름표가 남아 `전파`가 뜬다.
+ * 둘 다 표에 있거나 둘 다 없으면 잡고 있던 획.
+ */
+export function survivingStrokeId(type: JamoType, char: string, selectedId: string, otherId: string): string {
+  const table = grammarOf(type, char)
+  return selectedId in table || !(otherId in table) ? selectedId : otherId
+}
+
 const CHANNELS = ['strokes', 'horizontalStrokes', 'verticalStrokes'] as const
 
 export function describeJamoStrokes(jamo: JamoData, options: DescribeOptions = {}): StrokeDescription[] {

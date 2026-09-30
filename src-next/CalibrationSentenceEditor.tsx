@@ -35,6 +35,7 @@ import { StemSpreadSheet } from './StemSpreadSheet'
 import { beforeSpreadJamo, defaultPicked, lockedKeys, pickedMasters, shapeAskForStroke, shapePreview, spreadableStem, type ShapeAsk } from './stemShapeSession'
 import { useStemMasterStore } from '../src/stores/stemMasterStore'
 import type { StemMasters } from '../src/services/stemMaster'
+import { survivingStrokeId } from '../src/services/strokeGrammar'
 import { JamoScaleSlider } from './JamoScaleSlider'
 import { scaleLayoutParts, translateLayoutParts } from '../src/services/layoutProfileCommands'
 import { getRenderedStrokeTargets } from '../src/services/mobileEditorContext'
@@ -1413,12 +1414,15 @@ function InferenceTrackpad({
   }
   const connectStroke = () => {
     if ((selection.kind !== 'stroke' && selection.kind !== 'point' && selection.kind !== 'handle') || !selectedStroke || !mergeTarget) return
-    const merged = mergeStrokes(selectedStroke, mergeTarget)
+    // 문법 표에 있는 획을 바탕으로 잇는다 — 새로 그린 조각을 잡고 기둥에 이어도 기둥 id와 설정이 남아 `전파`가 뜬다.
+    const keepId = survivingStrokeId(selection.jamo.type, selection.jamo.char, selectedStroke.id, mergeTarget.id)
+    const [kept, other] = keepId === selectedStroke.id ? [selectedStroke, mergeTarget] : [mergeTarget, selectedStroke]
+    const merged = mergeStrokes(kept, other)
     if (!merged) return
     const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
-    const after = updateJamoStroke(updateJamoStroke(before, selectedStroke.id, () => merged), mergeTarget.id, () => null)
-    onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId: selectedStroke.id, delta: { x: 0, y: 0 } })
-    onSelectionChange({ ...selection, kind: 'stroke', strokeId: selectedStroke.id, jamo: after })
+    const after = updateJamoStroke(updateJamoStroke(before, keepId, () => merged), other.id, () => null)
+    onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId: keepId, delta: { x: 0, y: 0 } })
+    onSelectionChange({ ...selection, kind: 'stroke', strokeId: keepId, jamo: after })
   }
   const disconnectStroke = () => {
     if ((selection.kind !== 'point' && selection.kind !== 'handle') || !selectedStroke || !canDisconnect) return

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import grammar from '../data/strokeGrammar.json'
 import type { JamoData, StrokeDataV2 } from '../types'
-import { describeJamoStrokes, grammarOf, type JamoType, type StemName, type StrokeDescription } from './strokeGrammar'
+import { describeJamoStrokes, grammarOf, survivingStrokeId, type JamoType, type StemName, type StrokeDescription } from './strokeGrammar'
 
 const TYPES: readonly JamoType[] = ['choseong', 'jungseong', 'jongseong']
 const presets = baseJamos as unknown as Record<JamoType, Record<string, JamoData>>
@@ -164,5 +164,18 @@ describe('획 문법 G2 전수', () => {
         expect(shapes(stroke), `${char} ${stroke.strokeId}`).toEqual([expected])
       }
     }
+  })
+})
+
+describe('잇기가 남기는 획 id', () => {
+  it('새로 그린 조각을 잡고 기둥에 이어도 기둥 id가 남는다', () => {
+    expect(survivingStrokeId('jungseong', 'ㅏ', 'stroke-1700000000000', 'ㅏ-1')).toBe('ㅏ-1')
+  })
+  it('기둥을 잡고 새 조각에 이으면 그대로 기둥 id', () => {
+    expect(survivingStrokeId('jungseong', 'ㅏ', 'ㅏ-1', 'stroke-1700000000000')).toBe('ㅏ-1')
+  })
+  it('둘 다 표에 있으면 잡고 있던 획, 둘 다 없으면 잡고 있던 획', () => {
+    expect(survivingStrokeId('jungseong', 'ㅏ', 'ㅏ-2', 'ㅏ-1')).toBe('ㅏ-2')
+    expect(survivingStrokeId('jungseong', 'ㅏ', 'stroke-a', 'stroke-b')).toBe('stroke-a')
   })
 })
