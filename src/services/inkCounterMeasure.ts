@@ -62,7 +62,12 @@ export function withCounterKeep(data: GlyphData, floor: CounterFloor, horizontal
   if (betweenOpening > 0) {
     const parts = [...new Set(data.strokes.map(jamoOfStroke))]
     const between = betweenKeepScales(data.strokes, data.strokes.map((item) => parts.indexOf(jamoOfStroke(item))), data.weightMultiplier, stemScaleOf(data.strokeStyle), horizontalShare, betweenOpening)
-    strokes = strokes.map((item, index) => scaleStrokeThickness(item, between[index]))
+    // 층을 겹쳐도(자소 배율 × 자소 사이) 획이 굵기 400보다 얇아지지는 않게 — 배율 × 그 획의 성장은 1을 안 깬다.
+    strokes = strokes.map((item, index) => {
+      const growth = strokeGrowthOf(strokeVerticalness(item.stroke, item.box), data.weightMultiplier, horizontalShare)
+      const jamoScale = scales.get(jamoOfStroke(item)) ?? 1
+      return scaleStrokeThickness(item, Math.max(between[index], growth > 0 ? 1 / (growth * jamoScale) : between[index]))
+    })
   }
   return { data: { ...shaped, strokes }, scales }
 }
