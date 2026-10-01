@@ -41,10 +41,10 @@ const STEPS: Step[] = [
     result: '글자마다 |세로 차| + |가로 차| + |속공간 차| × 0.5 + |상자 밀림 차| × 0.3/100u의 가중 합, 전체는 중앙값. 지금 제품 0.22 · B′ + ×1.5는 0.62. 막힘 개수는 점수 밖 — 노토 900을 같은 자로 잰 값과 견주는 상대 지표로 따로 본다.',
   },
   {
-    id: 'fit900', title: '900 맞추기', state: 'now', stateLabel: '눈 ② 둘째 판',
+    id: 'fit900', title: '900 맞추기', state: 'now', stateLabel: '눈 ② 셋째 판(마지막)',
     question: '어느 900이 더 좋은가 (눈 ② 월드컵)',
-    result: '격자 65조합 1등(노토식: 가로 ×1.88 · 하한선 0.5 · 바닥 0.95, 오차 0.20)과 눈 고름(B′ + ×1.5)을 첫 판에 붙였다 — 사용자: 가독성으로 눈 고름 승, 다만 자소 간 굵기 차이가 커서 안 예쁘다. 둘째 판 = 그 위에 바닥만 올린다(없음 0.55 · 0.8 = 0.68 · 0.9 = 0.76, 노토 띠 0.75).',
-    decision: '사용자 10-01 눈 ② 첫 판: 노토 따라가기보다 가독성(열림) — 눈 고름 승.',
+    result: '첫 판: 가독성으로 눈 고름(B′ + ×1.5)이 노토식(오차 0.20)을 이김. 둘째 판: 바닥 0.8(굵기 띠 0.55 → 0.68, 막힘 +42). 셋째 판 = 자소 사이 임시판(마주 본 획만 덜 굵게) 켬/끔 — 닿음 2,508 → 1,688 · 막힘 538 → 383 · 검기 55.1 → 50.7%.',
+    decision: '사용자 10-01: 첫 판 노토 따라가기보다 가독성 · 둘째 판 바닥 0.8(재투표).',
   },
   {
     id: 'pattern', title: '패턴 100 · 중간', state: 'wait', stateLabel: '대기',
@@ -115,23 +115,22 @@ const HORIZONTAL_SHARES = [
  * 답은 채팅으로 받는다 — 선택지를 누르면 답 문장이 복사된다. 물을 게 없으면 `null`.
  */
 /** `floorRatio`: 선택지 그림을 그릴 하한선 비율. `undefined`면 그림 없이 글만. */
-interface QuestionOption { label: string; detail: string; recommended?: boolean; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number }
+interface QuestionOption { label: string; detail: string; recommended?: boolean; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; between?: number }
 /** `compare`가 있으면 그 조건들을 위에 줄줄이 그리고, 선택지는 그림 없는 답 단추(하나 고르기)다. 없으면 선택지끼리 이상형 월드컵. */
 interface Question { id: string; step: StepId; title: string; body: string; options: QuestionOption[]; compare?: { label: string; condition: Omit<Condition, 'padding' | 'weight'> }[] }
 /**
- * 눈 ② 둘째 판 — 바닥(자소 배율 하한). 첫 판(10-01)은 가독성으로 B′ + ×1.5가 숫자 맞춤(노토식)을 이겼다.
- * 남은 불만 = 자소 간 굵기 들쑥날쑥(호 ×1.1 ~ 포 ×1.96). 열림은 그대로 두고 바닥만 올려 본다.
- * 숫자(840 · 900): 바닥 없음 = 막힘 496 · 검기 54.0% · 띠 0.55 / 0.8 = 538 · 55.1% · 0.68 / 0.9 = 815 · 56.2% · 0.76(노토 0.75).
+ * 눈 ② 셋째 판(마지막) — 자소 사이 임시판 켬/끔. 첫 판: 가독성으로 B′ + ×1.5 승(노토식 탈락). 둘째 판: 바닥 0.8.
+ * ④ = 이웃 자소를 마주 본 획만 덜 굵게(`betweenKeepScales`). 숫자(840 · 900, 바닥 0.8 위):
+ * 자소 사이 닿음 2,508 → 1,688 · 막힘 538 → 383 · 검기 55.1 → 50.7%.
  */
 const FIT900_QUESTION: Question = {
-  id: 'fit900-floor-2026-10-01',
+  id: 'fit900-between-2026-10-01',
   step: 'fit900',
-  title: '자소 굵기 바닥 — 어느 쪽이 나아요?',
-  body: 'B′ + 가로 ×1.5 위에서, 하한선 때문에 깎이는 자소를 이 값 아래로 안 깎는다. 높을수록 한 글자 안 굵기가 고르고(예쁨), 대신 빽빽한 자소 속공간이 조금 닫힌다(막힘 ↑).',
+  title: '자소 사이 보정 — 켜는 게 나아요?',
+  body: '지금 결정(B′ + 가로 ×1.5 + 바닥 0.8) 위에서, 이웃 자소와 마주 보는 획만 더 덜 굵게 해 자소 사이가 붙는 것을 줄인다. 대신 그 획들이 조금 얇아져 글자가 밝아진다.',
   options: [
-    { label: '바닥 0.8', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.526, minScale: 0.8, recommended: true, detail: '균형. 막힘 496 → 538, 굵기 띠 0.55 → 0.68.' },
-    { label: '바닥 0.9', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.526, minScale: 0.9, detail: '노토만큼 고름(띠 0.76). 막힘 496 → 815.' },
-    { label: '바닥 없음', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.526, detail: '첫 판 우승 그대로. 가장 열려 있지만 호 ×1.1 ~ 포 ×1.96으로 들쑥날쑥.' },
+    { label: '자소 사이 켬', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.526, minScale: 0.8, between: 0.25, recommended: true, detail: '닿음 2,508 → 1,688 · 막힘 538 → 383 · 검기 55.1 → 50.7%.' },
+    { label: '끔 (둘째 판 그대로)', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.526, minScale: 0.8, detail: '바닥 0.8까지만. 자소끼리 붙는 건 그대로 둔다.' },
   ],
 }
 const QUESTION: Question | null = FIT900_QUESTION
@@ -235,7 +234,7 @@ const pathOf = (paths: PathsD) => paths.map((path) => `M${path.map((p) => `${p.x
 /** 글자 하나를 그 조건으로 재 둔 것. */
 interface Measured { ink: GlyphInk; verdict: InkVerdict; scales?: Map<string, number> }
 /** `horizontalShare`: ③ 가로줄기가 받는 두께 몫(하한선보다 먼저 얹는다). */
-type Condition = { padding: Padding; weight: number; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number }
+type Condition = { padding: Padding; weight: number; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; between?: number }
 
 /** 모델 상자 해석기. 레이아웃 Δ가 바뀌면 다시 만든다. */
 function usePlacementResolver(): GlyphPlacementResolver | null {
@@ -262,7 +261,7 @@ function measureOf(resolver: GlyphPlacementResolver, char: string, condition: Co
   const data = collectGlyphDataWithPlacement(char, resolver, { padding: condition.padding, weight: condition.weight })
   if (!data) return null
   const share = condition.horizontalShare ?? 1
-  const kept = condition.floorRatio === undefined ? undefined : withCounterKeep(data, { fixed: FLOOR_FIXED, ratio: condition.floorRatio, horizontalRatio: condition.horizontalRatio }, share, condition.minScale)
+  const kept = condition.floorRatio === undefined ? undefined : withCounterKeep(data, { fixed: FLOOR_FIXED, ratio: condition.floorRatio, horizontalRatio: condition.horizontalRatio }, share, condition.minScale, condition.between)
   const ink = measureGlyphInk(kept?.data ?? withHorizontalShare(data, share))
   return { ink, verdict: judgeGlyphInk(ink, reference), scales: kept?.scales }
 }
@@ -451,14 +450,14 @@ type Picks = Record<string, string>
 const BASE_LABEL = '지금'
 
 /** 한 조건의 글자 그림: 회색도 문장 + 막히기 쉬운 글자, 둘 다 검정(사용자 10-01: 검정이 잘 보인다). 글자를 누르면 "이 글자는 이 카드가 낫다"로 고른다. */
-function ConditionPreview({ context, label, floorRatio, horizontalRatio, horizontalShare, minScale, size, picks, onPick }: { context: PreviewContext; label: string; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; size: number; picks: Picks; onPick: (char: string, label: string) => void }) {
+function ConditionPreview({ context, label, floorRatio, horizontalRatio, horizontalShare, minScale, between, size, picks, onPick }: { context: PreviewContext; label: string; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; between?: number; size: number; picks: Picks; onPick: (char: string, label: string) => void }) {
   const { resolver, padding, weight, version } = context
   const inks = useMemo(() => ({
-    gray: GRAY_SENTENCE.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale }, undefined)),
-    dense: QUESTION_CHARS.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale }, undefined)),
+    gray: GRAY_SENTENCE.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale, between }, undefined)),
+    dense: QUESTION_CHARS.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale, between }, undefined)),
   }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [resolver, padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale, ...version])
+  [resolver, padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale, between, ...version])
   const glyph = (char: string, ink: Measured | null, index: number, kind: 'plain' | 'solid') => ink && (
     <button key={index} type="button" className={styles.pickGlyph} aria-pressed={picks[char] === label} aria-label={`${char} — ${label}이 낫다`} onClick={() => onPick(char, label)}>
       <InkGlyph ink={ink.ink} size={size} plain={kind === 'plain'} solid={kind === 'solid'} />
@@ -533,7 +532,7 @@ function CupPair({ question, context, left, right }: { question: Question; conte
   const chars = useMemo(() => [...new Set([...GRAY_SENTENCE, ...CHARS, ...QUESTION_CHARS])], [])
   const inks = useMemo(() => [left, right].map((index) => {
     const option = question.options[index]
-    return chars.map((char) => measureOf(resolver, char, { padding, weight, floorRatio: option.floorRatio, horizontalRatio: option.horizontalRatio, horizontalShare: option.horizontalShare, minScale: option.minScale }, undefined))
+    return chars.map((char) => measureOf(resolver, char, { padding, weight, floorRatio: option.floorRatio, horizontalRatio: option.horizontalRatio, horizontalShare: option.horizontalShare, minScale: option.minScale, between: option.between }, undefined))
   }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [question, left, right, resolver, padding, weight, ...version])
@@ -643,7 +642,7 @@ function QuestionCard({ question, context, picks, onPick, cup, onCup, popup = fa
         {question.options.map((option) => (
           <div key={option.label} className={styles.askOption} data-rec={option.recommended || undefined}>
             <b>{option.label}{option.recommended ? ' · 추천' : ''}</b>
-            {context && (option.floorRatio !== undefined || option.horizontalShare !== undefined) && <ConditionPreview context={context} label={option.label} floorRatio={option.floorRatio} horizontalRatio={option.horizontalRatio} horizontalShare={option.horizontalShare} minScale={option.minScale} size={size} picks={picks} onPick={onPick} />}
+            {context && (option.floorRatio !== undefined || option.horizontalShare !== undefined) && <ConditionPreview context={context} label={option.label} floorRatio={option.floorRatio} horizontalRatio={option.horizontalRatio} horizontalShare={option.horizontalShare} minScale={option.minScale} between={option.between} size={size} picks={picks} onPick={onPick} />}
             <small>{option.detail}</small>
             <button type="button" onClick={() => answer(option.label)}>이걸로 통째로</button>
           </div>

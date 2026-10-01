@@ -226,3 +226,42 @@ export function counterKeepScale(
 export function scaleStrokeThickness<T extends { stroke: StrokeDataV2 }>(item: T, scale: number): T {
   return scale === 1 ? item : { ...item, stroke: { ...item.stroke, thickness: item.stroke.thickness * scale } }
 }
+
+/**
+ * 자소 사이 지키기(4단계 임시판) — 이웃 자소를 마주 본 획만 덜 굵게. 획 단위 배율(1 이하)을 돌려준다.
+ * 틈은 늘 굵기 400 모양에서 고르고, 원래 붙여 그린 쌍(틈 ≤ 두께 × `MIN_GAP_RATIO`)은 놓아 준다 — 자소 안 셈과 같은 원칙.
+ * 지킬 틈 = 굵어진 두께 × `opening`(측정의 `닿음` 기준과 같은 1/4). 마주 봄 = 20° 안 나란함 — 빗금 ↔ 기둥은 임시판 밖.
+ * 자소 안과 달리 자소 전체가 아니라 닿는 그 획만 얇아진다(ㅣ 기둥이 받침 때문에 통째로 얇아지는 것은 감수 — 임시판).
+ */
+export function betweenKeepScales(
+  strokes: readonly CounterKeepStroke[],
+  partOf: readonly number[],
+  weightMultiplier: number,
+  stemScale = 1,
+  horizontalShare = 1,
+  opening = MIN_GAP_RATIO,
+): number[] {
+  const scales = strokes.map(() => 1)
+  if (!(weightMultiplier > 1) || strokes.length === 0) return scales
+  const segments = segmentsOf(strokes, stemScale, weightMultiplier, horizontalShare)
+  const thickness = strokes.map((item) => item.stroke.thickness).sort((a, b) => a - b)[Math.floor(strokes.length / 2)]
+  const minGap = thickness * MIN_GAP_RATIO
+  const required = opening * thickness * weightMultiplier
+  for (let i = 0; i < segments.length; i += 1) {
+    for (let j = i + 1; j < segments.length; j += 1) {
+      const p = segments[i]
+      const q = segments[j]
+      if (partOf[p.stroke] === partOf[q.stroke] || !parallel(p, q)) continue
+      const { distance } = nearestBetween(p, q)
+      const halves = p.half + q.half
+      const gap = distance - halves
+      if (gap <= minGap) continue
+      // 배율 c에서 틈 = 거리 − c × 목표 반 두께 합 ≥ 지킬 틈. 굵기 400보다 얇게는 안 한다(400에서 이미 좁던 쌍은 여기서 멈춘다).
+      const grown = p.grown + q.grown
+      const c = Math.min(1, Math.max((distance - required) / grown, halves / grown))
+      if (c < scales[p.stroke]) scales[p.stroke] = c
+      if (c < scales[q.stroke]) scales[q.stroke] = c
+    }
+  }
+  return scales
+}

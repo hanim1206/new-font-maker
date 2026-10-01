@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BoxConfig, StrokeDataV2 } from '../types'
-import { counterKeepScale } from './counterKeep'
+import { betweenKeepScales, counterKeepScale } from './counterKeep'
 
 const BOX: BoxConfig = { x: 0, y: 0, width: 1, height: 1 }
 const line = (id: string, points: [number, number][], thickness = 0.07, closed = false): { stroke: StrokeDataV2; box: BoxConfig } => ({
@@ -97,5 +97,32 @@ describe('속공간 지키기 — 자소 굵기 배율', () => {
   it('원래 붙여 그린 틈(두께의 1/4 아래)은 안 지킨다', () => {
     const tight = [line('a', [[0.2, 0.5], [0.8, 0.5]]), line('b', [[0.2, 0.585], [0.8, 0.585]])]
     expect(counterKeepScale(tight, 1.95)).toBe(1)
+  })
+})
+
+describe('자소 사이 지키기 — 마주 본 획만 (4단계 임시판)', () => {
+  it('이웃 자소의 나란한 기둥 둘은 틈의 1/4이 남을 만큼만 굵어진다', () => {
+    // 중심선 간격 0.154, 굵기 400 틈 = 0.084 > minGap 0.0175. 지킬 틈 = 0.25 × 0.07 × 1.95 = 0.0341.
+    const strokes = [line('a', [[0.3, 0.1], [0.3, 0.9]]), line('b', [[0.454, 0.1], [0.454, 0.9]])]
+    const scales = betweenKeepScales(strokes, [0, 1], 1.95)
+    expect(scales[0]).toBeCloseTo((0.154 - 0.0341) / (0.07 * 1.95), 3)
+    expect(scales[0]).toBe(scales[1])
+  })
+
+  it('같은 자소 안이거나 원래 붙여 그린 쌍은 그대로', () => {
+    const strokes = [line('a', [[0.3, 0.1], [0.3, 0.9]]), line('b', [[0.454, 0.1], [0.454, 0.9]])]
+    expect(betweenKeepScales(strokes, [0, 0], 1.95)).toEqual([1, 1])
+    const touching = [line('a', [[0.3, 0.1], [0.3, 0.9]]), line('b', [[0.385, 0.1], [0.385, 0.9]])]
+    expect(betweenKeepScales(touching, [0, 1], 1.95)).toEqual([1, 1])
+  })
+
+  it('넉넉한 틈과 굵기 400 이하는 그대로, 400보다 얇게는 안 간다', () => {
+    const wide = [line('a', [[0.2, 0.1], [0.2, 0.9]]), line('b', [[0.7, 0.1], [0.7, 0.9]])]
+    expect(betweenKeepScales(wide, [0, 1], 1.95)).toEqual([1, 1])
+    const strokes = [line('a', [[0.3, 0.1], [0.3, 0.9]]), line('b', [[0.454, 0.1], [0.454, 0.9]])]
+    expect(betweenKeepScales(strokes, [0, 1], 1)).toEqual([1, 1])
+    // 아주 굵어도(×3) 배율 × 굵기 배수가 1(= 굵기 400 두께) 아래로 내려가지 않는다.
+    const extreme = betweenKeepScales(strokes, [0, 1], 3)
+    expect(extreme[0] * 3).toBeGreaterThanOrEqual(1)
   })
 })
