@@ -11,6 +11,7 @@ import { useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import type { Padding } from '../src/types'
 import notoOutlines from './counterLabNoto.json'
+import weightProbeLab from './weightProbeLab.json'
 import { exportPlacementResolver } from './fontExportStore'
 import { useLayoutDeltaStore } from './layoutDeltaStore'
 import { PART_COLOR } from './partColors'
@@ -22,12 +23,40 @@ import styles from './CounterProgressMap.module.css'
  * 단계 내용은 `STEPS` 한 곳에 적는다 — 플랜 진행 기록을 고칠 때 같이 고친다.
  */
 
-type StepId = 'measure' | 'floor' | 'horizontal' | 'between' | 'split' | 'table'
+type StepId = 'ruler' | 'error' | 'fit900' | 'pattern' | 'gate' | 'measure' | 'floor' | 'horizontal' | 'between' | 'split' | 'table'
 type StepState = 'done' | 'now' | 'partial' | 'wait'
 interface Step { id: StepId; title: string; state: StepState; stateLabel: string; question: string; result: string; decision?: string }
 
-/** 10-01 다시 짬: 최소 속공간 하한선을 먼저, 손잡이는 하나씩. 옛 `기준선 밀기 → 덜 굵게`는 뒤집혔다. */
+/** 10-01 두 번째 다시 짬(역추론): 참고 폰트 100 · 900을 같은 자로 재서 손잡이 값을 숫자로 맞춘다. 눈 검증은 세 번(① 자 · ② 900 월드컵 · ③ 굵기 막대). */
 const STEPS: Step[] = [
+  {
+    id: 'ruler', title: '같은 자', state: 'now', stateLabel: '눈 ① 대기',
+    question: '프로브가 줄기를 제대로 짚었나 (눈 ①)',
+    result: '참고 폰트 측정과 같은 프로브(상자 비율 자리 다섯 줄)를 우리 윤곽에도 돌렸다. 지금 제품 900 = 세로 ×1.95 — 노토 ×1.95와 같다. 두께는 이미 노토인데 속공간 처리가 다르다. B′ + 가로 ×1.5는 노토보다 많이 얇다: 하한선 걸린 자소가 ×1.1~1.3(노토는 1.84~2.0), 꺾인 획(ㅁ · ㄷ · ㄹ)의 세로 부분도 ×1.6으로 끌려 내려간다.',
+  },
+  {
+    id: 'error', title: '오차 하나', state: 'wait', stateLabel: '대기',
+    question: '참고 폰트와의 차이를 점수 하나로 어떻게 접을까',
+    result: '글자마다 두께 · 속공간 · 상자 밀림 · 검기의 차이를 가중 합. 막힘 개수는 0 목표가 아니라 노토 900을 같은 자로 잰 값과 견주는 상대 지표로 바꾼다(지금 기준이면 노토 900의 ㅃ · ㅈ · ㅅ도 막힘이라).',
+  },
+  {
+    id: 'fit900', title: '900 맞추기', state: 'wait', stateLabel: '눈 ②',
+    question: '어느 900이 더 좋은가 (눈 ② 월드컵)',
+    result: '손잡이(가로 몫 · 하한선 · 바닥 · 자소 사이 임시판)를 격자로 훑어 점수가 가장 낮은 값을 찾는다. 월드컵 첫 판 = 숫자로 맞춘 900 대 눈으로 고른 900(B′ + ×1.5) — 노토를 따를지 취향을 남길지 이 한 판으로 정한다.',
+  },
+  {
+    id: 'pattern', title: '패턴 100 · 중간', state: 'wait', stateLabel: '대기',
+    question: '400 · 900에서 나온 값이 다른 굵기도 설명하나',
+    result: '손잡이 값을 굵기의 함수로 놓고 100으로 바깥을 확인한다. 300 · 500 · 700은 맞추는 데 쓰지 않고 예측 검증용으로 남긴다. 다른 폰트에 다시 쓰는 부분이 여기다.',
+  },
+  {
+    id: 'gate', title: '통과선 · 제품', state: 'wait', stateLabel: '눈 ③',
+    question: '제품 굵기 막대에서 튀는 굵기가 있나 (눈 ③)',
+    result: '남긴 글자 · 중간 굵기 오차가 통과선 아래일 때만 제품 화면에 붙인다. 그 뒤 네모꼴 범위와 굵기 한계를 표로 정한다.',
+  },
+]
+/** 역추론으로 바뀌기 전 손잡이 단계(10-01 뒤집힘). 결정과 그림은 그대로 두고 아래 보관함에서 연다. */
+const LEGACY_STEPS: Step[] = [
   {
     id: 'measure', title: '재는 법', state: 'done', stateLabel: '닫힘 · 10-01',
     question: '표가 눈으로 본 것과 맞나',
@@ -47,9 +76,9 @@ const STEPS: Step[] = [
     decision: '사용자 10-01 이상형 월드컵: ×1.5 > ×1.95, ×1.3 > ×1.7, 결승 ×1.5 > ×1.3.',
   },
   {
-    id: 'between', title: '자소 사이', state: 'now', stateLabel: '다음',
+    id: 'between', title: '자소 사이', state: 'wait', stateLabel: '③ 임시판으로',
     question: '굵어질 때 이웃 자소 쪽으로 어떻게 자라게',
-    result: '굵기 900에서 자소 사이 닿음 3,415자 — 셋 가운데 가장 크다. 후보: 이웃을 마주 본 획만 덜 굵게 / 칸 변을 지키고 안쪽으로 / 칸끼리 자리 나누기.',
+    result: '굵기 900에서 자소 사이 닿음 3,415자 — 셋 가운데 가장 크다. 역추론에서는 임시판(이웃을 마주 본 획만 덜 굵게)으로 900을 먼저 완성한다.',
   },
   {
     id: 'split', title: '바깥 · 안 분배', state: 'wait', stateLabel: '필요할 때만',
@@ -63,6 +92,7 @@ const STEPS: Step[] = [
   },
 ]
 const OPEN_QUESTIONS = [
+  '가로 ×1.5가 획 단위 눕기 평균이라 꺾인 획(ㅁ · ㄷ · ㄹ)의 세로 부분까지 ×1.6으로 얇아진다(ㅣ는 ×1.95) — 역추론에서 토막 단위로 바꿀지.',
   '네모꼴 보정(세로줄기만 얇게, 폰트 전체)과 합칠지 — ③ 가로줄기 비율과 같이 본다.',
   '자소마다 굵기가 달라 한 글자 안에서 들쑥날쑥해 보이나 — 공통 문장 줄로 본다.',
   '얇아진 획이 칸 변에서 떨어지는 만큼 — 처음엔 안 맞추고 잰다.',
@@ -662,8 +692,84 @@ function HorizontalPanel({ resolver, references, padding, weight, version }: { r
 
 const Pending = ({ text }: { text: string }) => <p className={styles.pendingNote}>{text}</p>
 
+/** ① 같은 자 그림 데이터(`build_weight_probe_lab.py`가 만든 `weightProbeLab.json`). */
+interface ProbeCell { box: { left: number; top: number; right: number; bottom: number }; probes: Record<'horizontal' | 'vertical', { position: number; intervals: [number, number][] }[]>; component: string; rest?: string; full?: string }
+interface ProbeSide { weights: Record<string, ProbeCell | null>; vertical900: number | null; horizontal900: number | null }
+const PROBE_LAB = weightProbeLab as unknown as { weights: string[]; pooled900: Record<string, { ours: number | null; reference: number | null }>; characters: Record<string, { ours: ProbeSide; reference: ProbeSide }> }
+/** pooled 표에서 보여 줄 항목과 한글 이름. */
+const PROBE_POOLED_LABELS: [string, string][] = [
+  ['verticalThicknessRatio', '세로줄기 두께 ×'], ['horizontalThicknessRatio', '가로줄기 두께 ×'],
+  ['counterRatioAcrossX', '속공간(좌우) ×'], ['counterRatioAcrossY', '속공간(위아래) ×'],
+  ['outerEdgeGrowthShare', '바깥 변 몫'], ['boxWidthRatio', '상자 너비 ×'], ['boxHeightRatio', '상자 높이 ×'],
+]
+
+/** 윤곽 위에 프로브 선(파랑)과 그 선이 읽은 잉크 구간(빨강)을 긋는다. 좌표는 JSON과 같은 y-아래 틀이라 그대로 그린다. */
+function ProbeGlyph({ cell, size }: { cell: ProbeCell; size: number }) {
+  const pad = 30
+  return (
+    <svg viewBox="0 0 1000 1000" width={size} height={size} className={styles.glyph}>
+      {cell.full && <path d={cell.full} fill="#e4e1d8" />}
+      {cell.rest && <path d={cell.rest} fill="#e4e1d8" />}
+      <path d={cell.component} fill="#b9b4a6" />
+      {cell.probes.horizontal.map((row) => <g key={`h${row.position}`}>
+        <line x1={cell.box.left - pad} x2={cell.box.right + pad} y1={row.position} y2={row.position} stroke="#2f6fd6" strokeWidth={2.5} />
+        {row.intervals.map(([start, end], index) => <line key={index} x1={start} x2={end} y1={row.position} y2={row.position} stroke="#d64545" strokeWidth={10} />)}
+      </g>)}
+      {cell.probes.vertical.map((row) => <g key={`v${row.position}`}>
+        <line y1={cell.box.top - pad} y2={cell.box.bottom + pad} x1={row.position} x2={row.position} stroke="#2f6fd6" strokeWidth={2.5} />
+        {row.intervals.map(([start, end], index) => <line key={index} y1={start} y2={end} x1={row.position} x2={row.position} stroke="#d64545" strokeWidth={10} />)}
+      </g>)}
+    </svg>
+  )
+}
+
+/** ① 같은 자 — 눈 ①: 프로브(파랑 선)가 읽은 구간(빨강)이 줄기를 짚었는지 본다. */
+function ProbePanel() {
+  const chars = Object.keys(PROBE_LAB.characters)
+  const [copied, setCopied] = useState<string | null>(null)
+  const answer = (text: string, note: string) => { void navigator.clipboard?.writeText(text).then(() => setCopied(note), () => setCopied(note)) }
+  const fmt = (value: number | null | undefined) => value == null ? '−' : value.toFixed(2)
+  return (
+    <>
+      <div className={styles.ask} role="region" aria-label="AI가 묻는 것" data-testid="counter-ruler-question">
+        <span className={styles.askTag}>질문 · 답해 주세요 (눈 ①)</span>
+        <strong>파란 선이 지나간 자리의 빨간 구간이 줄기(잉크)를 제대로 짚고 있나요?</strong>
+        <p>빨간 구간이 잉크 밖을 짚거나, 줄기를 건너뛴 칸이 있으면 `아니오`를 누르고 채팅에 그 글자를 적어 주세요. 꺾인 곳 · 동그라미를 지나는 선은 구간이 길어도 됩니다(숫자 쪽에서 거릅니다).</p>
+        <div className={styles.askChoices}>
+          <button type="button" data-rec onClick={() => answer('눈 ① 같은 자: 프로브가 제자리를 짚었다 (예)', '예')}>예 — 제자리를 짚었다</button>
+          <button type="button" onClick={() => answer('눈 ① 같은 자: 아니오 — 이상한 칸: ', '아니오')}>아니오 — 이상한 칸이 있다</button>
+        </div>
+        <div className={styles.askFoot}><span>{copied ? `“${copied}” 복사했어요. 채팅에 붙여 넣어 주세요.` : '하나를 누르면 답이 복사돼요.'}</span></div>
+      </div>
+      <p className={styles.look}><b>볼 것:</b> 파랑 = 프로브 선(첫닿자 상자의 20 · 35 · 50 · 65 · 80% 자리), 빨강 = 그 선이 읽은 잉크 구간. 구간 폭이 곧 줄기 두께, 구간 사이가 속공간이다. 양쪽(우리 · 노토)이 같은 자리를 짚어야 숫자를 견줄 수 있다.</p>
+      <div className={styles.scroll}>
+        <table className={styles.grid}>
+          <thead><tr><th />{PROBE_LAB.weights.map((weight) => <th key={`o${weight}`}>우리 {weight}</th>)}{PROBE_LAB.weights.map((weight) => <th key={`r${weight}`}>노토 {weight}</th>)}<th>세로 · 가로 ×900<br /><small>우리 / 노토 (거른 뒤)</small></th></tr></thead>
+          <tbody>{chars.map((char) => {
+            const row = PROBE_LAB.characters[char]
+            return (
+              <tr key={char}>
+                <th>{char}</th>
+                {PROBE_LAB.weights.map((weight) => <td key={`o${weight}`}>{row.ours.weights[weight] && <ProbeGlyph cell={row.ours.weights[weight]!} size={130} />}</td>)}
+                {PROBE_LAB.weights.map((weight) => <td key={`r${weight}`}>{row.reference.weights[weight] && <ProbeGlyph cell={row.reference.weights[weight]!} size={130} />}</td>)}
+                <td><small>{fmt(row.ours.vertical900)} / {fmt(row.reference.vertical900)}<br />{fmt(row.ours.horizontal900)} / {fmt(row.reference.horizontal900)}</small></td>
+              </tr>
+            )
+          })}</tbody>
+        </table>
+      </div>
+      <h3>굵기 900 ÷ 400 — 전체 중앙값 (우리 지금 제품 · 노토, 같은 자)</h3>
+      <Table head={['항목', '우리', '노토']} rows={PROBE_POOLED_LABELS.map(([key, label]) => {
+        const row = PROBE_LAB.pooled900[key]
+        return [label, fmt(row?.ours), fmt(row?.reference)]
+      })} />
+      <p className={styles.look}>읽기: 세로 ×1.95 = 노토와 같다. 가로도 ×1.96 대 ×1.88 — 두께 자체는 이미 노토인데, 노토는 빽빽한 자소만 조금 덜 굵게(ㅃ 1.84) 그리고 속공간이 실처럼 남는다. B′ + 가로 ×1.5를 얹으면 우리는 세로 ×1.69 · 하한선 걸린 자소 ×1.1~1.3으로 노토보다 많이 얇다 — 이 틈을 ③ 900 맞추기가 숫자로 줄인다.</p>
+    </>
+  )
+}
+
 export function CounterProgressMap() {
-  const [selected, setSelected] = useState<StepId>(() => STEPS.find((step) => step.state === 'now')?.id ?? 'measure')
+  const [selected, setSelected] = useState<StepId>(() => STEPS.find((step) => step.state === 'now')?.id ?? 'ruler')
   const padding = useLayoutStore((state) => state.globalPadding)
   const storedWeight = useGlobalStyleStore((state) => state.style.weight)
   const weight = storedWeight > 400 ? storedWeight : FALLBACK_WEIGHT
@@ -671,7 +777,7 @@ export function CounterProgressMap() {
   const resolver = usePlacementResolver()
   const version = useFontVersion()
   const references = useReferences(resolver, version)
-  const step = STEPS.find((item) => item.id === selected)!
+  const step = [...STEPS, ...LEGACY_STEPS].find((item) => item.id === selected)!
   const [picks, setPicks] = useState<Picks>({})
   const [cup, setCup] = useState<Cup>(() => startCup(QUESTION?.options.length ?? 0))
   // 같은 카드를 다시 누르면 고른 걸 푼다.
@@ -723,15 +829,34 @@ export function CounterProgressMap() {
         </div>
         {resolver && <GraySentence resolver={resolver} padding={padding} weight={weight} candidates={grayCandidatesOf(selected)} version={version} />}
         {(selected === 'floor' || selected === 'horizontal' || selected === 'split') && <p className={styles.condition}>그림 조건: 가로 {width} · 굵기 {weight}{storedWeight <= 400 ? ` (지금 굵기 ${storedWeight}는 볼 게 없어 ${FALLBACK_WEIGHT}로 그림)` : ''} — 위 막대로 바꾼다.</p>}
-        {selected === 'table' ? <LimitsPanel />
+        {selected === 'ruler' ? <ProbePanel />
+          : selected === 'error' ? <Pending text="아직 안 함. ① 자가 확인되면 글자마다 두께 · 속공간 · 상자 밀림 · 검기 차이를 점수 하나로 접는다." />
+          : selected === 'fit900' ? <Pending text="아직 안 함. ② 점수가 생기면 손잡이를 격자로 훑어 900을 맞추고, 월드컵(숫자 맞춤 대 B′ + ×1.5)으로 묻는다." />
+          : selected === 'pattern' ? <Pending text="아직 안 함. ③에서 900이 정해지면 100으로 바깥을 확인하고, 중간 굵기는 예측 검증용으로 남긴다." />
+          : selected === 'gate' ? <Pending text="아직 안 함. 통과선 아래로 들어오면 제품 굵기 막대로 확인한다(눈 ③)." />
+          : selected === 'table' ? <LimitsPanel />
           : selected === 'horizontal' && !resolver ? <p className={styles.condition}>모델 불러오는 중…</p>
             : selected === 'horizontal' && resolver ? <HorizontalPanel resolver={resolver} references={references} padding={padding} weight={weight} version={version} />
-            : selected === 'between' ? <Pending text="아직 안 함. 후보 셋 가운데 하나를 고르기 전에, ①의 그림에서 `사이` 글씨가 붙은 칸을 본다." />
+            : selected === 'between' ? <Pending text="역추론에서는 임시판(이웃을 마주 본 획만 덜 굵게)으로 들어간다. ①의 그림에서 `사이` 글씨가 붙은 칸을 본다." />
               : !resolver ? <p className={styles.condition}>모델 불러오는 중…</p>
                 : selected === 'measure' ? <MeasurePanel resolver={resolver} references={references} version={version} />
                   : selected === 'split' ? <PushPanel resolver={resolver} padding={padding} weight={weight} version={version} />
                     : <FloorPanel resolver={resolver} references={references} padding={padding} weight={weight} version={version} />}
       </div>
+
+      <details className={styles.open}>
+        <summary>지난 손잡이 단계 (10-01 뒤집힘 전 — 결정은 그대로, 그림 보관)</summary>
+        <ol className={styles.steps}>
+          {LEGACY_STEPS.map((item, index) => (
+            <li key={item.id}>
+              <button type="button" aria-pressed={item.id === selected} data-state={item.state} onClick={() => setSelected(item.id)} data-testid={`counter-step-${item.id}`}>
+                <span className={styles.stepTop}><em>{index + 1}</em><strong>{item.title}</strong><small>{item.stateLabel}</small></span>
+                <span className={styles.question}>판단 · {item.question}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </details>
 
       <details className={styles.open}>
         <summary>미결정 {OPEN_QUESTIONS.length}</summary>
