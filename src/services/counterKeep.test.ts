@@ -21,25 +21,45 @@ describe('속공간 지키기 — 자소 굵기 배율', () => {
     expect(counterKeepScale([line('i', [[0.5, 0.05], [0.5, 0.95]])], 1.95)).toBe(1)
   })
 
-  it('빽빽한 가로줄기는 틈의 절반이 남을 만큼만 굵어진다', () => {
-    // 한계 k = (0.084 + 0.07 − 0.5 × 0.084) / 0.07 = 1.6 → 1.95 대신 1.6.
+  it('빽빽한 가로줄기는 하한선이 남을 만큼만 굵어진다', () => {
+    // 하한선 = max(0.024, 0.25 × 0.07 × 1.95) = 0.034. 한계 k = (0.154 − 0.034) / 0.07 = 1.71.
     const scale = counterKeepScale(tieut, 1.95)
-    expect(scale * 1.95).toBeCloseTo(1.6, 3)
-    // 남는 틈 = 0.154 − 1.6 × 0.07 = 0.042 = 굵기 400 틈의 절반.
-    expect(0.154 - scale * 1.95 * 0.07).toBeCloseTo(0.042, 3)
+    expect(0.154 - scale * 1.95 * 0.07).toBeCloseTo(0.25 * 0.07 * 1.95, 4)
+  })
+
+  it('고정 u가 비율보다 크면 고정 u를 지킨다', () => {
+    const scale = counterKeepScale(tieut, 1.95, { fixed: 0.05, ratio: 0.25 })
+    expect(0.154 - scale * 1.95 * 0.07).toBeCloseTo(0.05, 4)
   })
 
   it('넉넉하면 다 굵어진다', () => {
     expect(counterKeepScale(tieut, 1.3)).toBe(1)
   })
 
-  it('남길 몫을 키우면 덜 굵어진다', () => {
-    expect(counterKeepScale(tieut, 1.95, 0.7)).toBeLessThan(counterKeepScale(tieut, 1.95, 0.3))
+  it('가로줄기 사이 비율을 따로 주면 가로줄기 틈은 그 하한선을 쓴다', () => {
+    const scale = counterKeepScale(tieut, 1.95, { fixed: 0.024, ratio: 0.5, horizontalRatio: 0.25 })
+    expect(0.154 - scale * 1.95 * 0.07).toBeCloseTo(0.25 * 0.07 * 1.95, 4)
+  })
+
+  it('동그라미 윗부분과 보 사이(ㅎ)는 쌓인 가로줄기가 아니다', () => {
+    // ㅎ: 보 아래 작은 ㅇ. 동그라미 토막은 짧아 가로줄기 비율을 안 쓴다 — 두 하한선이 같은 결과.
+    const hieut = [line('beam', [[0.2, 0.3], [0.8, 0.3]]), circle(0.5, 0.55, 0.15)]
+    expect(counterKeepScale(hieut, 1.95, { fixed: 0.024, ratio: 0.5, horizontalRatio: 0.25 })).toBeCloseTo(counterKeepScale(hieut, 1.95, { fixed: 0.024, ratio: 0.5 }), 6)
+  })
+
+  it('하한선을 올리면 덜 굵어진다', () => {
+    expect(counterKeepScale(tieut, 1.95, { fixed: 0.024, ratio: 0.5 })).toBeLessThan(counterKeepScale(tieut, 1.95, { fixed: 0.024, ratio: 0.25 }))
+  })
+
+  it('굵기 400에서 이미 하한선보다 좁던 틈은 놓아 준다', () => {
+    // 틈 0.03(30u) < 하한선 0.034 → 안 지킨다. 남길 몫 방식이면 자소 전체가 얇아졌다(ㅆ).
+    const narrow = [line('a', [[0.2, 0.5], [0.8, 0.5]]), line('b', [[0.2, 0.6], [0.8, 0.6]])]
+    expect(counterKeepScale(narrow, 1.95)).toBe(1)
   })
 
   it('한 획으로 그린 ㄹ도 가로줄기 사이를 지킨다', () => {
     const rieul = [line('r', [[0.2, 0.1], [0.8, 0.1], [0.8, 0.254], [0.2, 0.254], [0.2, 0.408], [0.8, 0.408]])]
-    expect(counterKeepScale(rieul, 1.95) * 1.95).toBeCloseTo(1.6, 3)
+    expect(counterKeepScale(rieul, 1.95)).toBeCloseTo(counterKeepScale(tieut, 1.95), 4)
   })
 
   it('ㅇ 둘레의 이웃 토막은 틈으로 안 본다', () => {
@@ -48,6 +68,18 @@ describe('속공간 지키기 — 자소 굵기 배율', () => {
     // 작은 ㅇ은 안쪽 지름을 지킨다.
     const small = counterKeepScale([circle(0.5, 0.5, 0.08)], 1.95)
     expect(small).toBeLessThan(1)
+  })
+
+  it('ㅅ 두 다리처럼 이음 자리에서 벌어지는 쐐기는 틈으로 안 본다', () => {
+    // 꼭대기에서 만나 곡선으로 벌어지는 두 획. 틈이 0부터 연속이라 지키면 자소 전체가 굵기 400에 묶인다.
+    const leg = (id: string, side: number) => line(id, Array.from({ length: 16 }, (_, i): [number, number] => [0.5 + side * 0.3 * Math.sin(i / 15 * Math.PI / 2), 0.2 + 0.6 * i / 15]))
+    expect(counterKeepScale([leg('l', -1), leg('r', 1)], 1.95)).toBe(1)
+  })
+
+  it('엇갈린 두 다리(ㅆ 안쪽 X)는 틈으로 안 본다', () => {
+    const left = line('l', [[0.4, 0.2], [0.6, 0.8]])
+    const right = line('r', [[0.6, 0.2], [0.4, 0.8]])
+    expect(counterKeepScale([left, right], 1.95)).toBe(1)
   })
 
   it('원래 붙여 그린 틈(두께의 1/4 아래)은 안 지킨다', () => {

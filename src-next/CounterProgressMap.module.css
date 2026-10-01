@@ -53,6 +53,36 @@ b[data-kind='touch'] { color: #7f8c8d; }
 .open summary { color: rgb(var(--color-text-2)); cursor: pointer; }
 .open ul { margin: 6px 0 0; padding-left: 18px; color: rgb(var(--color-text-2)); line-height: 1.6; }
 
+/* AI가 묻는 것. 눈에 띄게 — 지도 맨 위 카드 + 처음 한 번 팝업. */
+.ask, .askPopup { display: grid; gap: 8px; padding: 14px 16px; border: 2px solid #e0a800; border-radius: 12px; background: #fff8d6; color: #3d2f00; }
+.ask { margin-bottom: 12px; animation: askPulse 1.6s ease-in-out 3; }
+.ask strong, .askPopup strong { font-size: 16px; }
+.ask p, .askPopup p { margin: 0; font-size: 13px; line-height: 1.55; }
+.askTag { justify-self: start; padding: 2px 8px; border-radius: 99px; background: #e0a800; color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+.askOptions { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+.askBase { display: grid; gap: 4px; padding: 8px 10px; border-radius: 9px; background: #fff; }
+.askBase small { color: #6b5a1e; font-size: 12px; }
+.preview { display: grid; gap: 2px; overflow-x: auto; }
+.preview > span { display: flex; align-items: center; }
+.preview em { flex: 0 0 40px; color: #6b5a1e; font-size: 11px; font-style: normal; font-weight: 700; }
+.ask .askLegend, .askPopup .askLegend { color: #6b5a1e; font-size: 12px; }
+.preview .glyph { border-radius: 0; }
+.askOption { display: grid; gap: 4px; padding: 10px; border: 1px solid #e8cf7a; border-radius: 9px; background: #fff; color: #3d2f00; }
+.askOption[data-rec] { border: 2px solid #e0a800; }
+.askOption > button { justify-self: start; min-height: 26px; padding: 0 10px; border: 1px solid #e8cf7a; border-radius: 6px; background: #fffdf2; color: #6b5a1e; font-size: 11px; cursor: pointer; }
+.pickGlyph { flex: 0 0 auto; padding: 0; border: 2px solid transparent; border-radius: 4px; background: none; line-height: 0; cursor: pointer; }
+.pickGlyph:hover { border-color: #e8cf7a; }
+.pickGlyph[aria-pressed='true'] { border-color: #e0a800; background: #fff3c4; }
+.askOptions b { font-size: 14px; }
+.askOptions small { color: #6b5a1e; font-size: 12px; line-height: 1.45; }
+.askFoot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: #6b5a1e; }
+.askFoot span { flex: 1 1 240px; }
+.askFoot button { min-height: 30px; padding: 0 12px; border: 1px solid #c99a00; border-radius: 7px; background: #fff; color: #3d2f00; font-size: 12px; font-weight: 700; cursor: pointer; }
+.askBackdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgb(0 0 0 / .45); }
+.askPopup { width: min(960px, 100%); max-height: calc(100dvh - 32px); overflow: auto; box-shadow: 0 20px 60px rgb(0 0 0 / .3); }
+.steps button[data-asking] { border-color: #e0a800; box-shadow: inset 0 0 0 2px #e0a800; }
+@keyframes askPulse { 50% { box-shadow: 0 0 0 6px rgb(224 168 0 / .25); } }
+
 /* 공통 회색도 문장 줄. */
 .gray { display: grid; gap: 4px; padding: 10px; border-radius: 8px; background: #fff; }
 .grayHead { color: rgb(var(--color-text-3)); font-size: 11px; font-weight: 700; }

@@ -1,6 +1,7 @@
 import { areaPathsD, differenceD, EndType, FillRule, inflatePathsD, intersectD, isPositiveD, JoinType, unionD } from 'clipper2-ts'
 import type { PathsD } from 'clipper2-ts'
 import { counterKeepScale, scaleStrokeThickness } from './counterKeep'
+import type { CounterFloor } from './counterKeep'
 import type { GlyphData } from './fontExportUtils'
 import { glyphDataToFontContours } from './fontGenerator'
 import { stemScaleOf } from './strokeRenderGeometry'
@@ -45,10 +46,10 @@ export const jamoOf = (part: string) => part.startsWith('JU') ? 'JU' : part
 const jamoOfStroke = (item: GlyphData['strokes'][number]) => jamoOf((item.beakGroup ?? '').split(':')[0])
 
 /** 자소마다 `counterKeepScale`만큼 획 두께를 줄인 글리프 데이터와, 자소별 배율. 섞임홀자는 한 자소로 묶는다. */
-export function withCounterKeep(data: GlyphData, keep: number): { data: GlyphData; scales: Map<string, number> } {
+export function withCounterKeep(data: GlyphData, floor: CounterFloor): { data: GlyphData; scales: Map<string, number> } {
   const scales = new Map<string, number>()
   for (const part of new Set(data.strokes.map(jamoOfStroke))) {
-    scales.set(part, counterKeepScale(data.strokes.filter((item) => jamoOfStroke(item) === part), data.weightMultiplier, keep, stemScaleOf(data.strokeStyle)))
+    scales.set(part, counterKeepScale(data.strokes.filter((item) => jamoOfStroke(item) === part), data.weightMultiplier, floor, stemScaleOf(data.strokeStyle)))
   }
   return { data: { ...data, strokes: data.strokes.map((item) => scaleStrokeThickness(item, scales.get(jamoOfStroke(item)) ?? 1)) }, scales }
 }

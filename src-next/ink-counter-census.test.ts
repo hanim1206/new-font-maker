@@ -4,6 +4,7 @@ import { areaPathsD } from 'clipper2-ts'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { judgeGlyphInk, measureGlyphInk, OPENING_RATIO, REF_OPENING, referenceOfGlyph, shrinkPaths, withCounterKeep } from '../src/services/inkCounterMeasure'
 import type { GlyphInk, GlyphReference } from '../src/services/inkCounterMeasure'
+import { DEFAULT_COUNTER_FLOOR } from '../src/services/counterKeep'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 
 /**
@@ -27,8 +28,8 @@ const listOf = (value: string | undefined, fallback: number[]) => value ? value.
 const WIDTHS = listOf(process.env.CENSUS_WIDTHS, [840, 720, 600])
 const WEIGHTS = listOf(process.env.CENSUS_WEIGHTS, [400, 600, 700, 900])
 const STRIDE = Number(process.env.CENSUS_STRIDE ?? 3)
-/** `CENSUS_KEEP=0.5`: 속공간 지키기(2단계)를 이 남길 몫으로 미리 얹어 잰다. 없으면 지금 제품 그대로. */
-const KEEP = process.env.CENSUS_KEEP ? Number(process.env.CENSUS_KEEP) : undefined
+/** `CENSUS_FLOOR=24,0.5,0.25`: 최소 속공간 하한선(고정 u, 두께 비율, 쌓인 가로줄기 비율 — 셋째는 없어도 됨)을 미리 얹어 잰다. 없으면 지금 제품 그대로. */
+const FLOOR = process.env.CENSUS_FLOOR ? (([fixed, ratio, horizontalRatio]) => ({ fixed: fixed / 1000, ratio, horizontalRatio }))(process.env.CENSUS_FLOOR.split(',').map(Number)) : undefined
 
 describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜 잉크 조합표', () => {
   beforeAll(() => {
@@ -50,7 +51,7 @@ describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜
     const measure = (char: string): GlyphInk | null => {
       const collected = exportUtils.collectGlyphDataWithPlacement(char, placementOf)
       if (!collected) return null
-      return measureGlyphInk(KEEP === undefined ? collected : withCounterKeep(collected, KEEP).data)
+      return measureGlyphInk(FLOOR === undefined ? collected : withCounterKeep(collected, FLOOR).data)
     }
     const setCondition = (width: number, weight: number) => {
       layout.useLayoutStore.getState().setGlobalPadding(placement.designBodyPaddingForSize(width, BODY_H, FONT_SPACE))
@@ -74,11 +75,11 @@ describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜
       return `<figure><svg viewBox="0 0 1000 1000" width="160" height="160" style="background:#fff"><g transform="matrix(1 0 0 -1 0 880)">${d}</g></svg><figcaption>${label}</figcaption></figure>`
     }
 
-    // `CENSUS_SCALES=이,쏟`: 굵기 900 · 남길 몫 0.5에서 자소별 굵기 배율.
+    // `CENSUS_SCALES=이,쏟`: 굵기 900 · 기본 하한선에서 자소별 굵기 배율.
     for (const char of process.env.CENSUS_SCALES?.split(',') ?? []) {
       setCondition(840, 900)
       const data = exportUtils.collectGlyphDataWithPlacement(char, placementOf)!
-      const kept = withCounterKeep(data, 0.5).data
+      const kept = withCounterKeep(data, DEFAULT_COUNTER_FLOOR).data
       const scaleOf = new Map<string, number>()
       data.strokes.forEach((item, index) => scaleOf.set(item.stroke.id, kept.strokes[index].stroke.thickness / item.stroke.thickness))
       console.info(`SCALES ${char} ${[...scaleOf].map(([id, value]) => `${id} ${value.toFixed(3)}`).join(' · ')}`)
@@ -142,7 +143,7 @@ describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜
       console.info(JSON.stringify(row))
     }
     if (sheet.length) writeFileSync(process.env.CENSUS_SHEET_OUT ?? '/tmp/ink-sheet.html', `<!doctype html><meta charset=utf-8><style>body{display:flex;flex-wrap:wrap;gap:6px;font:11px sans-serif;background:#eee}figure{margin:0;width:160px}</style>${sheet.join('')}`)
-    writeFileSync(process.env.CENSUS_OUT ?? '/tmp/ink-counter.json', JSON.stringify({ chars: chars.length, keep: KEEP ?? null, openingRatio: OPENING_RATIO, refOpening: REF_OPENING, table, watch, perChar }))
+    writeFileSync(process.env.CENSUS_OUT ?? '/tmp/ink-counter.json', JSON.stringify({ chars: chars.length, floor: FLOOR ?? null, openingRatio: OPENING_RATIO, refOpening: REF_OPENING, table, watch, perChar }))
     console.info(JSON.stringify(watch, null, 1))
     expect(table).toHaveLength(WIDTHS.length * WEIGHTS.length)
   }, 3_600_000)
