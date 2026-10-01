@@ -16,7 +16,7 @@ import type { NotoPresetModelBundle } from './notoPresetGlyphs'
  *   WEIGHT_PROBE=1 npx vitest run --dir src-next weight-probe-contours
  * - `PROBE_OUT`: 출력 JSON 경로(기본 /tmp/weight-probe-contours.json)
  * - `PROBE_WEIGHTS`: 쉼표 굵기 목록(기본 100,400,900 — 기준 400 필수)
- * - `PROBE_FLOOR=24,0.5,0.25` · `PROBE_HSHARE=0.526` · `PROBE_MINSCALE=0.9`: 손잡이를 얹은 변형을 내보낸다(전수 테스트와 같은 뜻)
+ * - `PROBE_FLOOR=24,0.5,0.25` · `PROBE_HSHARE=0.526` · `PROBE_MINSCALE=0.9` · `PROBE_BETWEEN=0.25`: 손잡이를 얹은 변형을 내보낸다(전수 테스트와 같은 뜻)
  */
 
 const MODEL = JSON.parse(readFileSync(fileURLToPath(new URL('../public/noto-preset/model.json', import.meta.url)), 'utf8')) as NotoPresetModelBundle
@@ -34,6 +34,7 @@ const syllableOf = (initial: string, medial: string) =>
 const WEIGHTS = (process.env.PROBE_WEIGHTS ?? '100,400,900').split(',').map(Number)
 const HSHARE = process.env.PROBE_HSHARE ? Number(process.env.PROBE_HSHARE) : undefined
 const MIN_SCALE = process.env.PROBE_MINSCALE ? Number(process.env.PROBE_MINSCALE) : 0
+const BETWEEN = process.env.PROBE_BETWEEN ? Number(process.env.PROBE_BETWEEN) : 0
 const FLOOR = process.env.PROBE_FLOOR ? (([fixed, ratio, horizontalRatio]) => ({ fixed: fixed / 1000, ratio, horizontalRatio }))(process.env.PROBE_FLOOR.split(',').map(Number)) : undefined
 
 describe.skipIf(!process.env.WEIGHT_PROBE)('속공간 지키기 — 같은 자용 윤곽 내보내기', () => {
@@ -56,7 +57,7 @@ describe.skipIf(!process.env.WEIGHT_PROBE)('속공간 지키기 — 같은 자�
       style.useGlobalStyleStore.getState().updateStyle('weight', weight)
       const collected = exportUtils.collectGlyphDataWithPlacement(char, placementOf)
       if (!collected) return null
-      const data = FLOOR === undefined ? withHorizontalShare(collected, HSHARE ?? 1) : withCounterKeep(collected, FLOOR, HSHARE, MIN_SCALE).data
+      const data = FLOOR === undefined ? withHorizontalShare(collected, HSHARE ?? 1) : withCounterKeep(collected, FLOOR, HSHARE, MIN_SCALE, BETWEEN).data
       const out: Record<string, number[][][]> = {}
       for (const part of new Set(data.strokes.map((item) => jamoOf((item.beakGroup ?? '').split(':')[0])))) {
         const strokes = data.strokes.filter((item) => jamoOf((item.beakGroup ?? '').split(':')[0]) === part)
@@ -88,6 +89,7 @@ describe.skipIf(!process.env.WEIGHT_PROBE)('속공간 지키기 — 같은 자�
       floor: FLOOR ?? null,
       horizontalShare: HSHARE ?? null,
       minScale: MIN_SCALE || null,
+      between: BETWEEN || null,
       characters,
     }))
     console.info(`PROBE_OUT ${out} (${Object.keys(characters).length}자 × ${WEIGHTS.length}굵기)`)
