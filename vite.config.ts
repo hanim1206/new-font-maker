@@ -89,9 +89,17 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src-next', import.meta.url)),
     },
   },
+  // 레포 안 워크트리(`.claude/worktrees/*`)의 html · tsconfig를 보면, 다른 세션이 워크트리를 만들 때마다
+  // 의존성을 다시 묶어 열린 탭에 React가 두 벌 섞인다(Invalid hook call). 앱 입구만 훑고 워크트리는 안 본다.
+  optimizeDeps: {
+    entries: ['index.html'],
+  },
   server: {
     host: true, // 네트워크에서 접근 가능하도록 설정
     port: 5173, // 기본 포트 (필요시 변경 가능)
+    watch: {
+      ignored: ['**/.claude/**', '**/.codex/**'],
+    },
     proxy: {
       '/api/reference': {
         target: 'http://127.0.0.1:8765',
