@@ -266,6 +266,56 @@ export function scaleJamoStrokes(source: JamoData, factor: number): JamoData {
   return jamo
 }
 
+/** 획 하나가 놓인 상자에서의 편집 한계(상자 좌표)를 준다. 모르는 획이면 undefined — 그 획은 한계를 안 본다. */
+export type StrokeBoundsOf = (strokeId: string) => NormalizedBounds | undefined
+
+const renderedStrokesOf = (jamo: JamoData) => [...(jamo.strokes ?? []), ...(jamo.horizontalStrokes ?? []), ...(jamo.verticalStrokes ?? [])]
+
+/**
+ * 자소 통째 크기 배율을 글자 칸 안에 가둔다. 자소 상자는 넘어도 되지만(틀이 상자를 붙잡는다) 글자 칸 밖으로는 못 나간다.
+ * 키울 때만 줄인다 — 어느 점이든 한계에 먼저 닿는 배율에서 멈춘다(가로 · 세로 같은 비율이라 하나로 정해진다).
+ * 기준 가운데는 `scaleJamoStrokes`와 같다.
+ */
+export function limitJamoScaleFactor(source: JamoData, factor: number, boundsOf: StrokeBoundsOf): number {
+  if (!Number.isFinite(factor) || factor <= 1) return factor
+  const all = [...renderedStrokesOf(source), ...Object.values(source.contextStrokes ?? {}).flatMap((variant) => variant ?? [])].flatMap((stroke) => stroke.points)
+  if (!all.length) return factor
+  const xs = all.map((point) => point.x)
+  const ys = all.map((point) => point.y)
+  const center = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 }
+  let limit = factor
+  const reach = (value: number, centerValue: number, min: number, max: number) => {
+    const distance = value - centerValue
+    if (distance > EPSILON) limit = Math.min(limit, (max - centerValue) / distance)
+    else if (distance < -EPSILON) limit = Math.min(limit, (centerValue - min) / -distance)
+  }
+  for (const stroke of renderedStrokesOf(source)) {
+    const bounds = boundsOf(stroke.id)
+    if (!bounds) continue
+    for (const point of stroke.points) {
+      reach(point.x, center.x, bounds.minX, bounds.maxX)
+      reach(point.y, center.y, bounds.minY, bounds.maxY)
+    }
+  }
+  return Math.max(1, limit)
+}
+
+/** 자소 통째 이동을 글자 칸 안에 가둔다. 어느 점이든 한계에 닿는 만큼까지만 간다(가로 · 세로 따로). */
+export function limitJamoMoveDelta(source: JamoData, delta: StrokeMoveDelta, boundsOf: StrokeBoundsOf): StrokeMoveDelta {
+  let lowX = -Infinity; let highX = Infinity; let lowY = -Infinity; let highY = Infinity
+  for (const stroke of renderedStrokesOf(source)) {
+    const bounds = boundsOf(stroke.id)
+    if (!bounds) continue
+    for (const point of stroke.points) {
+      lowX = Math.max(lowX, bounds.minX - point.x); highX = Math.min(highX, bounds.maxX - point.x)
+      lowY = Math.max(lowY, bounds.minY - point.y); highY = Math.min(highY, bounds.maxY - point.y)
+    }
+  }
+  // 한계는 지금 점을 품고 있어 낮은 쪽은 0 이하, 높은 쪽은 0 이상이다.
+  const clamp = (value: number, low: number, high: number) => Math.min(Math.max(value, Math.min(low, 0)), Math.max(high, 0))
+  return { x: clamp(delta.x, lowX, highX), y: clamp(delta.y, lowY, highY) }
+}
+
 /**
  * 자소 전체를 통째로 옮긴다. 모든 채널의 점 · 핸들을 같은 만큼. 상자 경계로 막지 않는다(자소 통째 크기와 같다).
  */

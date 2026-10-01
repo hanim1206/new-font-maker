@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { JamoData } from '../types'
-import { jamoCenterlineCenter, moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStroke, scaleStrokes, snapWholeJamoDelta, translateJamoStrokes } from './editorCommands'
+import { jamoCenterlineCenter, limitJamoMoveDelta, limitJamoScaleFactor, moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStroke, scaleStrokes, snapWholeJamoDelta, translateJamoStrokes } from './editorCommands'
 
 const baseJamo: JamoData = {
   char: 'ㄱ',
@@ -226,5 +226,37 @@ describe('scaleStrokes', () => {
     expect(xsOf('bottom')).toEqual([0.65, 0.95])
     expect(xsOf('other')).toEqual([0.5, 0.5])
     expect(result.lockedAxes).toEqual({ x: false, y: false })
+  })
+})
+
+describe('자소 통째 크기 · 이동은 글자 칸 안에서 멈춘다', () => {
+  const square: JamoData = {
+    char: 'ㅁ', type: 'choseong',
+    strokes: [
+      { id: 'a', points: [{ x: 0.2, y: 0.2 }, { x: 0.8, y: 0.2 }], closed: false, thickness: 0.07 },
+      { id: 'b', points: [{ x: 0.2, y: 0.2 }, { x: 0.2, y: 0.6 }], closed: false, thickness: 0.07 },
+    ],
+  }
+  // 가운데는 (0.5, 0.4). 위쪽 한계가 가장 가깝다: 0.2 → 0.1까지 = 배율 1.5.
+  const bounds = { minX: -0.4, maxX: 1.4, minY: 0.1, maxY: 1.2 }
+  const boundsOf = () => bounds
+
+  it('키우면 한계에 먼저 닿는 점에서 멈추고, 가로 · 세로는 같은 비율 그대로다', () => {
+    expect(limitJamoScaleFactor(square, 2, boundsOf)).toBeCloseTo(1.5, 9)
+    expect(limitJamoScaleFactor(square, 1.2, boundsOf)).toBe(1.2)
+    const scaled = scaleJamoStrokes(square, limitJamoScaleFactor(square, 2, boundsOf))
+    expect(Math.min(...scaled.strokes!.flatMap((stroke) => stroke.points.map((point) => point.y)))).toBeCloseTo(0.1, 9)
+  })
+
+  it('줄이는 쪽과 한계를 모르는 획은 막지 않고, 이미 한계에 있으면 안 커진다', () => {
+    expect(limitJamoScaleFactor(square, 0.5, boundsOf)).toBe(0.5)
+    expect(limitJamoScaleFactor(square, 2, () => undefined)).toBe(2)
+    expect(limitJamoScaleFactor(square, 2, () => ({ ...bounds, minY: 0.2 }))).toBe(1)
+  })
+
+  it('통째 이동도 어느 점이든 한계에 닿는 만큼까지만 간다(가로 · 세로 따로)', () => {
+    expect(limitJamoMoveDelta(square, { x: 0.1, y: -0.3 }, boundsOf)).toEqual({ x: 0.1, y: expect.closeTo(-0.1, 9) })
+    expect(limitJamoMoveDelta(square, { x: 2, y: 2 }, boundsOf)).toEqual({ x: expect.closeTo(0.6, 9), y: expect.closeTo(0.6, 9) })
+    expect(limitJamoMoveDelta(square, { x: 2, y: 2 }, () => undefined)).toEqual({ x: 2, y: 2 })
   })
 })

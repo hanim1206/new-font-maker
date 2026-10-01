@@ -318,3 +318,38 @@ test('트랙패드 왼쪽 크기 막대를 올리면 고른 자소가 통째로 
   expect(after[0].height).toBeCloseTo(before[0].height * 1.3, 1)
   expect(after.slice(2)).toEqual(before.slice(2))
 })
+
+test('자소를 두 손가락으로 통째로 키워도 획이 글자 칸 밖으로 나가지 않고, 가로 · 세로 같은 비율로 멈춘다', async ({ page }) => {
+  test.setTimeout(120_000)
+  for (const [syllable, part] of [['오', 'CH'], ['한', 'JO']] as const) {
+    await page.goto(`/workspace/jamo?char=${encodeURIComponent(syllable)}&mode=stroke&part=${part}`)
+    const strokes = page.locator('[data-editor-hit="stroke"]')
+    await expect(strokes.first()).toBeAttached({ timeout: 60_000 })
+    // 첫닿자는 단독 칸으로 열린다. 줄에서 그 음절을 눌러 글자 안에서 본다.
+    if (part === 'CH') await page.locator(`[data-testid="review-propagation-card"][data-char="${syllable}"] [data-testid="review-propagation-open"]`).first().click()
+    await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
+    const box = () => strokes.first().evaluate((element) => { const b = (element as SVGGraphicsElement).getBBox(); return { left: b.x, right: b.x + b.width, top: b.y, bottom: b.y + b.height, width: b.width, height: b.height } })
+    const before = await box()
+    // 빈 곳을 눌러 선택을 풀면 잠긴 자소 전체가 잡힌다.
+    const canvas = (await page.getByTestId('focus-canvas').boundingBox())!
+    await page.touchscreen.tap(canvas.x + 6, canvas.y + 6)
+    const pad = page.locator('[role="group"][aria-label*="트랙패드"]')
+    await expect(pad).toHaveAttribute('data-whole', 'true')
+    // 조절판에서 두 손가락을 크게 벌린다(두 배까지 요청).
+    const area = (await pad.boundingBox())!
+    const center = { x: area.x + area.width / 2, y: area.y + area.height / 2 }
+    const client = await page.context().newCDPSession(page)
+    const fingers = (gap: number) => [{ x: center.x - gap, y: center.y, id: 1 }, { x: center.x + gap, y: center.y, id: 2 }]
+    await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: fingers(30) })
+    for (let step = 1; step <= 10; step += 1) await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: fingers(30 + 12 * step) })
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await expect.poll(async () => (await box()).width, { message: syllable }).toBeGreaterThan(before.width * 1.05)
+    const after = await box()
+    // 글자 칸은 0–100, 중심선은 두께 절반(3.5) 안쪽까지. 전에는 위아래로 칸 밖(−5 · 101.6)까지 나갔다.
+    expect(after.left, syllable).toBeGreaterThanOrEqual(3.5 - 0.01)
+    expect(after.right, syllable).toBeLessThanOrEqual(96.5 + 0.01)
+    expect(after.top, syllable).toBeGreaterThanOrEqual(3.5 - 0.01)
+    expect(after.bottom, syllable).toBeLessThanOrEqual(96.5 + 0.01)
+    expect(after.width / before.width, syllable).toBeCloseTo(after.height / before.height, 2)
+  }
+})

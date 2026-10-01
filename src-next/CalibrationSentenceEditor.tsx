@@ -28,7 +28,7 @@ import { useWorkbenchStore, workbenchJamoOf, workbenchSyllable } from '../src/st
 import { groupMatching, useJamoGroupStore } from '../src/stores/jamoGroupStore'
 import confirmStyles from './workspace/FontExportDialog.module.css'
 import { useLayoutStore } from '../src/stores/layoutStore'
-import { jamoCenterlineCenter, moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStrokes, snapWholeJamoDelta, translateJamoStrokes } from '../src/services/editorCommands'
+import { jamoCenterlineCenter, limitJamoMoveDelta, limitJamoScaleFactor, moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStrokes, snapWholeJamoDelta, translateJamoStrokes, type StrokeBoundsOf } from '../src/services/editorCommands'
 import { stemEditBox, storedStemDelta } from '../src/services/stemBend'
 import { stemRailGuides } from '../src/services/medialStemRails'
 import { StemSpreadSheet } from './StemSpreadSheet'
@@ -912,6 +912,7 @@ function InferenceTrackpad({
   syllable,
   selection,
   creationSelection = null,
+  strokeBoxes,
   selectedPoints,
   selectedStrokes,
   onWholeJamoCenteredChange,
@@ -940,6 +941,8 @@ function InferenceTrackpad({
   selection: Selection
   /** 아무것도 안 잡혔을 때 넣기 도구(추가 · 원)가 기댈 자리. 획 편집에 잠긴 자소의 첫 획. */
   creationSelection?: Selection | null
+  /** 이 글자의 획마다 지금 놓인 상자. 자소를 통째로 키우거나 옮길 때 글자 칸 밖으로 못 나가게 재는 데 쓴다. */
+  strokeBoxes?: readonly { editorPart: MobileEditorPart; strokeId: string; box: BoxConfig }[]
   selectedPoints: SelectedPoint[]
   /** 획 묶음. 둘 이상이면 잡은 획을 끌 때 묶인 획이 같이 움직인다. */
   selectedStrokes: readonly string[]
@@ -1457,21 +1460,37 @@ function InferenceTrackpad({
   }
   // 트랙패드 왼쪽 크기 막대. 지금 자소(고른 것, 없으면 잠긴 것)를 통째로 키운다. 두께는 전역 굵기 그대로.
   // 넘친 만큼은 상자 밖으로 그대로 나가야 하므로 문맥 간격 되당김을 얹지 않는다(`pastGapLimit`).
+  // 자소 상자는 넘어도 글자 칸은 못 넘는다. 시작할 때 획마다 놓인 상자에서 한계를 재 두고(끄는 동안 상자가 흔들려도 같다), 닿는 배율 · 거리에서 멈춘다.
+  const wholeJamoBounds = useRef<StrokeBoundsOf>(() => undefined)
+  const captureWholeJamoBounds = (source: JamoData | null, editorPart: MobileEditorPart | undefined) => {
+    const weight = weightToMultiplier(useGlobalStyleStore.getState().style.weight)
+    const placed = (strokeBoxes ?? []).filter((item) => item.editorPart === editorPart)
+    const strokes = source ? getJamoStrokes(source) : []
+    const table = new Map(placed.map((item) => {
+      // 같은 상자에 놓인 획끼리 한계를 잰다(섞임홀자는 가로부 · 세로부 상자가 다르다).
+      const together = strokes.filter((stroke) => placed.some((other) => other.strokeId === stroke.id && other.box === item.box))
+      return [item.strokeId, calibrationEditBounds(item.box, together, weight)] as const
+    }))
+    wholeJamoBounds.current = (strokeId) => table.get(strokeId)
+  }
   const scaleSource = useRef<JamoData | null>(null)
   const beginJamoScale = () => {
     const base = creationBase
     scaleSource.current = base ? structuredClone(adoptFamilyStrokes(getJamo(base.jamo.type, base.jamo.char) ?? base.jamo, familyOfSyllable(syllable))) : null
+    captureWholeJamoBounds(scaleSource.current, base?.editorPart)
   }
-  const changeJamoScale = (factor: number) => {
+  const changeJamoScale = (requested: number) => {
     const source = scaleSource.current
     if (!source) return
+    const factor = limitJamoScaleFactor(source, requested, wholeJamoBounds.current)
     onPreviewJamo({ type: source.type, char: source.char, data: scaleJamoStrokes(source, factor), baseline: source, pastGapLimit: true })
   }
-  const commitJamoScale = (factor: number) => {
+  const commitJamoScale = (requested: number) => {
     const source = scaleSource.current
     const base = creationBase
     scaleSource.current = null
     if (!source || !base) return onPreviewJamo(null)
+    const factor = limitJamoScaleFactor(source, requested, wholeJamoBounds.current)
     onCommitJamo(source, scaleJamoStrokes(source, factor), { kind: 'stroke-scale', glyph, component: base.component, jamoType: source.type, strokeId: base.strokeId, scale: { x: factor, y: factor } }, { pastGapLimit: true })
   }
   const cancelJamoScale = () => {
@@ -1516,6 +1535,7 @@ function InferenceTrackpad({
     const base = creationBase
     const source = base ? structuredClone(adoptFamilyStrokes(getJamo(base.jamo.type, base.jamo.char) ?? base.jamo, familyOfSyllable(syllable))) : null
     wholeJamoMove.current = source ? { source, center: jamoCenterlineCenter(source), delta: { x: 0, y: 0 } } : null
+    captureWholeJamoBounds(source, base?.editorPart)
   }
   const changeWholeJamoMove = (movement: StrokeMoveDelta) => {
     const state = wholeJamoMove.current
@@ -1523,7 +1543,7 @@ function InferenceTrackpad({
     // 눈금에 붙이고, 파트 상자 정가운데 가까이면 가운데에 먼저 붙인다(09-30 사용자).
     const gridded = { x: Math.round(movement.x * .001 / snapStep) * snapStep, y: Math.round(movement.y * .001 / snapStep) * snapStep }
     const snapped = snapWholeJamoDelta(state.center, gridded)
-    state.delta = snapped.delta
+    state.delta = limitJamoMoveDelta(state.source, snapped.delta, wholeJamoBounds.current)
     onWholeJamoCenteredChange?.(snapped.centered.x || snapped.centered.y ? snapped.centered : null)
     onPreviewJamo({ type: state.source.type, char: state.source.char, data: translateJamoStrokes(state.source, state.delta), baseline: state.source, pastGapLimit: true })
   }
@@ -2774,6 +2794,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         syllable={syllable}
         selection={selection}
         creationSelection={lockedPart && selection.kind === 'none' ? creationSelectionOf(lockedPart) : null}
+        strokeBoxes={getRenderedStrokeTargets(syllable, placement.kind === 'boxes' ? placement.boxes : focusedBoxes).map((target) => ({ editorPart: target.editorPart, strokeId: target.stroke.id, box: target.box }))}
         selectedPoints={selectedPoints}
         selectedStrokes={selectedStrokes}
         onWholeJamoCenteredChange={setWholeJamoCentered}
