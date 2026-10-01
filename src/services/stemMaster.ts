@@ -1,6 +1,6 @@
 import medialBoxEm from '../data/medialBoxEm.json'
 import type { AnchorPoint, JamoData, StrokeDataV2 } from '../types'
-import { attachedXOf, attachmentOf, endGapOf, endIndexOf, freeXOf, reachOf, withPointX } from './stemAttach'
+import { attachedXOf, attachmentOf, beamAttachmentOf, beamGapOf, beamReachOf, endGapOf, endIndexOf, freeXOf, reachOf, withPointX, withPointY, type BeamAttachment } from './stemAttach'
 import { grammarOf, STEM_NAME_LABEL, type StemName } from './strokeGrammar'
 
 /**
@@ -107,11 +107,14 @@ export interface StemMaster {
   name: StemMasterName
   /** 첫 점은 t 0, 마지막 점은 t 1. */
   points: AxisPoint[]
-  /** 곁줄기 · 걸침. 붙은 끝(걸침은 시작점 쪽)이 기둥 중심선에서 획 안쪽으로 떨어진 틈(글자 폭 em, 기본 획 기준 차이). 없으면 0 — 붙어 있다. */
+  /**
+   * 곁줄기 · 걸침. 붙은 끝(걸침은 시작점 쪽)이 기둥 중심선에서 획 안쪽으로 떨어진 틈(글자 폭 em, 기본 획 기준 차이). 없으면 0 — 붙어 있다.
+   * 짧은기둥이면 붙은 끝이 보 가운데에서 줄기 몸 쪽으로 떨어진 틈(세로 em). 음수면 보를 뚫고 나간다.
+   */
   gap?: number
   /** 걸침만. 끝점 쪽 붙은 끝의 틈(글자 폭 em, 안쪽 +). 없으면 0. */
   gapEnd?: number
-  /** 곁줄기만. 빈 끝이 기본 획의 빈 끝에서 옮겨진 길이 Δ(글자 폭 em, 길어짐 +). 없으면 0. */
+  /** 곁줄기 · 짧은기둥. 빈 끝이 기본 획의 빈 끝에서 옮겨진 길이 Δ(곁줄기는 가로, 짧은기둥은 세로 em, 길어짐 +). 없으면 0. */
   reach?: number
 }
 
@@ -287,8 +290,24 @@ function matchesInstance(stroke: StrokeDataV2, expected: StrokeDataV2): boolean 
   })
 }
 
-/** 곁줄기 · 걸침이면 붙은 끝을 마스터의 틈만큼 기둥 시작점에서 띄우고, 빈 끝을 길이 Δ만큼 옮긴 저장 획. 아니면 그대로. 인스턴스는 이 틀 위에 놓인다. */
+/** 이 짧은기둥이 보에 붙는 꼴. 짧은기둥이 아니면 null. 솟는 짧은기둥(ㅗ 계열)은 아래 끝이, 내리는 짧은기둥(ㅜ 계열)은 위 끝이 보에 붙는다. */
+function shortStemAttachmentOf(jamo: JamoData, strokes: readonly StrokeDataV2[], strokeId: string): BeamAttachment | null {
+  const name = masterNameOf(jamo, strokes, strokeId)
+  if (!name || !isUnder(name, 'jjalbeungidung')) return null
+  return beamAttachmentOf(jamo, strokeId, facetValuesOf(name).dir === 'down' ? 'top' : 'bottom')
+}
+
+/**
+ * 곁줄기 · 걸침이면 붙은 끝을 마스터의 틈만큼 기둥 시작점에서 띄우고, 빈 끝을 길이 Δ만큼 옮긴 저장 획.
+ * 짧은기둥이면 붙은 끝을 틈만큼 보에서 띄우고(세로), 빈 끝을 길이 Δ만큼 옮긴다. 아니면 그대로. 인스턴스는 이 틀 위에 놓인다.
+ */
 function framedForMaster(jamo: JamoData, strokes: readonly StrokeDataV2[], stroke: StrokeDataV2, master: StemMaster, box: BoxEm): StrokeDataV2 {
+  const beam = shortStemAttachmentOf(jamo, strokes, stroke.id)
+  if (beam) {
+    if (box.height <= 0) return stroke
+    const joined = withPointY(stroke, endIndexOf(stroke, beam.joined), beam.baseJoinedY + ((master.gap ?? 0) / box.height) * beam.away)
+    return withPointY(joined, endIndexOf(joined, beam.free), beam.baseFreeY + ((master.reach ?? 0) / box.height) * beam.away)
+  }
   const attachment = attachmentOf(jamo, stroke.id)
   if (!attachment || box.width <= 0) return stroke
   let framed = stroke
@@ -388,10 +407,12 @@ export function masterFromStroke(jamo: JamoData, channel: JamoChannel, strokeId:
   const last = stroke.points.length - 1
   // 곁줄기 · 걸침은 붙은 끝이 기둥에서 떨어진 틈과 빈 끝의 길이 Δ도 모양이다(글자 폭 em).
   const attachment = attachmentOf(jamo, strokeId)
+  // 짧은기둥은 붙은 끝이 보에서 떨어진 틈과 빈 끝의 길이 Δ가 모양이다(세로 em).
+  const beam = shortStemAttachmentOf(jamo, strokes, strokeId)
   const gapOf = (order: number) => { const end = attachment?.ends[order]; const gap = end ? endGapOf(strokes, stroke, end) : null; return gap === null ? 0 : gap * box.width }
-  const gapEm = gapOf(0)
+  const gapEm = beam ? beamGapOf(stroke, beam) * box.height : gapOf(0)
   const gapEndEm = gapOf(1)
-  const reachEm = attachment ? reachOf(stroke, attachment) * box.width : 0
+  const reachEm = beam ? beamReachOf(stroke, beam) * box.height : attachment ? reachOf(stroke, attachment) * box.width : 0
   return {
     name,
     points: stroke.points.map((point, index) => ({

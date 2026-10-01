@@ -4,14 +4,12 @@ import {
   baseOf,
   boundStrokesOf,
   facetValuesOf,
-  instanceOf,
+  instanceInJamo,
   isUnder,
   JAMO_CHANNELS,
   masterFromStroke,
   masterNameOf,
   masterOf,
-  stemAxisOf,
-  stemReferenceBox,
   STEM_FACETS,
   type JamoChannel,
   type StemBase,
@@ -204,7 +202,8 @@ export function beforeSpreadJamo(jungseong: Readonly<Record<string, JamoData>>, 
     const stroke = strokes?.find((item) => item.id === strokeId)
     if (!jamo || !strokes || !stroke) continue
     const current = masterOf(masters, section.leaf)
-    const instance = instanceOf(stroke, current, stemReferenceBox(char, section.channel, stroke), stemAxisOf(section.leaf))
+    // 틈 · 빈 끝 길이까지 지금 마스터대로 놓는다(곁줄기 · 걸침 · 짧은기둥).
+    const instance = instanceInJamo(jamo, section.channel, stroke, current)
     before[char] = { ...jamo, [section.channel]: strokes.map((item) => (item.id === strokeId ? instance : item)) }
   }
   return before

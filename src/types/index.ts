@@ -178,7 +178,7 @@ export interface StemRailTarget {
   top?: number
   bottom?: number
   center?: number
-  /** 짧은기둥이 보에 붙은 끝. 이 끝은 저장 획이 옮겨져 있어도 늘 보 가운데다(따로 끌 수 없다). */
+  /** 짧은기둥이 보에 붙은 끝. 이 끝의 목표는 늘 보 가운데고, 저장 획이 옮겨진 만큼(틈)이 그 위에 얹힌다. */
   joined?: 'top' | 'bottom'
   /** 짧은기둥의 가로 자리가 모델 자리에서 옮겨진 만큼(칸 폭 비율, 오른쪽 +). 레이아웃에서 그 보선을 끌었을 때만 있다. */
   dx?: number
