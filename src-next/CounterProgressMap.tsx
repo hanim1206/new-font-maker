@@ -41,13 +41,13 @@ const STEPS: Step[] = [
     result: '글자마다 |세로 차| + |가로 차| + |속공간 차| × 0.5 + |상자 밀림 차| × 0.3/100u의 가중 합, 전체는 중앙값. 지금 제품 0.22 · B′ + ×1.5는 0.62. 막힘 개수는 점수 밖 — 노토 900을 같은 자로 잰 값과 견주는 상대 지표로 따로 본다.',
   },
   {
-    id: 'fit900', title: '900 맞추기', state: 'now', stateLabel: '눈 ② 셋째 판(마지막)',
+    id: 'fit900', title: '900 맞추기', state: 'done', stateLabel: '닫힘 · 10-01 눈 ②',
     question: '어느 900이 더 좋은가 (눈 ② 월드컵)',
-    result: '첫 판: 가독성으로 눈 고름(B′ + ×1.5)이 노토식(오차 0.20)을 이김. 둘째 판: 바닥 0.8(굵기 띠 0.55 → 0.68, 막힘 +42). 셋째 판 = 자소 사이 임시판(마주 본 획만 덜 굵게) 켬/끔 — 닿음 2,508 → 1,688 · 막힘 538 → 383 · 검기 55.1 → 50.7%.',
-    decision: '사용자 10-01: 첫 판 노토 따라가기보다 가독성 · 둘째 판 바닥 0.8(재투표).',
+    result: '세 판으로 닫힘. 900 = 하한선 B′ + 가로 ×1.5 + 자소 바닥 0.8 + 자소 사이 켬(마주 본 획만, 틈 = 두께 1/4). 840 · 900 닿음 2,508 → 1,688 · 막힘 538 → 383 · 검기 50.7%.',
+    decision: '사용자 10-01 눈 ②: 노토식 탈락(가독성) → 바닥 0.8(재투표) → 자소 사이 켬.',
   },
   {
-    id: 'pattern', title: '패턴 100 · 중간', state: 'wait', stateLabel: '대기',
+    id: 'pattern', title: '패턴 100 · 중간', state: 'now', stateLabel: '지금',
     question: '400 · 900에서 나온 값이 다른 굵기도 설명하나',
     result: '손잡이 값을 굵기의 함수로 놓고 100으로 바깥을 확인한다. 300 · 500 · 700은 맞추는 데 쓰지 않고 예측 검증용으로 남긴다. 다른 폰트에 다시 쓰는 부분이 여기다.',
   },
@@ -133,7 +133,9 @@ const FIT900_QUESTION: Question = {
     { label: '끔 (둘째 판 그대로)', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.526, minScale: 0.8, detail: '바닥 0.8까지만. 자소끼리 붙는 건 그대로 둔다.' },
   ],
 }
-const QUESTION: Question | null = FIT900_QUESTION
+/** 눈 ② 끝(세 판) — 질문 내림. 다음 질문은 눈 ③(제품 굵기 막대) 차례에 올린다. */
+const QUESTION: Question | null = null
+void FIT900_QUESTION
 const QUESTION_SEEN_KEY = 'counter-lab-question-seen'
 /** 질문 그림에 같이 그리는 빽빽한 글자(자소별 색). */
 const QUESTION_CHARS = ['빼', '를', '쏟', '한', '갰']
