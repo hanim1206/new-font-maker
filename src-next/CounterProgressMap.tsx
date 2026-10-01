@@ -41,9 +41,10 @@ const STEPS: Step[] = [
     result: '글자마다 |세로 차| + |가로 차| + |속공간 차| × 0.5 + |상자 밀림 차| × 0.3/100u의 가중 합, 전체는 중앙값. 지금 제품 0.22 · B′ + ×1.5는 0.62. 막힘 개수는 점수 밖 — 노토 900을 같은 자로 잰 값과 견주는 상대 지표로 따로 본다.',
   },
   {
-    id: 'fit900', title: '900 맞추기', state: 'now', stateLabel: '눈 ② 대기',
+    id: 'fit900', title: '900 맞추기', state: 'now', stateLabel: '눈 ② 둘째 판',
     question: '어느 900이 더 좋은가 (눈 ② 월드컵)',
-    result: '손잡이 65조합(가로 몫 5 × 하한선 4 × 바닥 4)을 격자로 훑었다. 1등 = 가로 ×1.88(몫 0.93) · 하한선 0.5 · 바닥 0.95, 오차 0.20 — 지금 제품(0.22)보다 노토에 가깝고 속공간은 노토보다 열려 있다(0.70 대 0.61). 월드컵 첫 판 = 이 숫자 맞춤 대 눈으로 고른 B′ + ×1.5.',
+    result: '격자 65조합 1등(노토식: 가로 ×1.88 · 하한선 0.5 · 바닥 0.95, 오차 0.20)과 눈 고름(B′ + ×1.5)을 첫 판에 붙였다 — 사용자: 가독성으로 눈 고름 승, 다만 자소 간 굵기 차이가 커서 안 예쁘다. 둘째 판 = 그 위에 바닥만 올린다(없음 0.55 · 0.8 = 0.68 · 0.9 = 0.76, 노토 띠 0.75).',
+    decision: '사용자 10-01 눈 ② 첫 판: 노토 따라가기보다 가독성(열림) — 눈 고름 승.',
   },
   {
     id: 'pattern', title: '패턴 100 · 중간', state: 'wait', stateLabel: '대기',
@@ -118,17 +119,19 @@ interface QuestionOption { label: string; detail: string; recommended?: boolean;
 /** `compare`가 있으면 그 조건들을 위에 줄줄이 그리고, 선택지는 그림 없는 답 단추(하나 고르기)다. 없으면 선택지끼리 이상형 월드컵. */
 interface Question { id: string; step: StepId; title: string; body: string; options: QuestionOption[]; compare?: { label: string; condition: Omit<Condition, 'padding' | 'weight'> }[] }
 /**
- * 눈 ② — 900 맞추기 월드컵. 첫 판이자 결승: 숫자로 맞춘 900 대 앞서 눈으로 고른 900(B′ + ×1.5).
- * 노토를 따를지 취향을 남길지 이 한 판으로 정한다(플랜 10-01 역추론).
+ * 눈 ② 둘째 판 — 바닥(자소 배율 하한). 첫 판(10-01)은 가독성으로 B′ + ×1.5가 숫자 맞춤(노토식)을 이겼다.
+ * 남은 불만 = 자소 간 굵기 들쑥날쑥(호 ×1.1 ~ 포 ×1.96). 열림은 그대로 두고 바닥만 올려 본다.
+ * 숫자(840 · 900): 바닥 없음 = 막힘 496 · 검기 54.0% · 띠 0.55 / 0.8 = 538 · 55.1% · 0.68 / 0.9 = 815 · 56.2% · 0.76(노토 0.75).
  */
 const FIT900_QUESTION: Question = {
-  id: 'fit900-2026-10-01',
+  id: 'fit900-floor-2026-10-01',
   step: 'fit900',
-  title: '굵기 900 — 어느 쪽이 나아요?',
-  body: '손잡이 65조합을 노토 900과의 오차로 훑어, 가장 가까운 것(숫자 맞춤)과 앞서 눈으로 고른 것(B′ + 가로 ×1.5)을 붙입니다.',
+  title: '자소 굵기 바닥 — 어느 쪽이 나아요?',
+  body: 'B′ + 가로 ×1.5 위에서, 하한선 때문에 깎이는 자소를 이 값 아래로 안 깎는다. 높을수록 한 글자 안 굵기가 고르고(예쁨), 대신 빽빽한 자소 속공간이 조금 닫힌다(막힘 ↑).',
   options: [
-    { label: '숫자 맞춤', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.93, minScale: 0.95, recommended: true, detail: '가로 ×1.88 · 하한선 0.5 · 바닥 0.95. 노토 900과 오차 0.20(지금 제품 0.22보다 가깝다), 속공간은 노토보다 열려 있음(0.70 대 0.61).' },
-    { label: '눈 고름 (B′ + ×1.5)', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.526, detail: '앞서 월드컵으로 고른 것. 더 밝다(검기 54%). 노토 900보다 많이 얇다(오차 0.62, 하한선 걸린 자소 ×1.1~1.3).' },
+    { label: '바닥 0.8', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.526, minScale: 0.8, recommended: true, detail: '균형. 막힘 496 → 538, 굵기 띠 0.55 → 0.68.' },
+    { label: '바닥 0.9', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.526, minScale: 0.9, detail: '노토만큼 고름(띠 0.76). 막힘 496 → 815.' },
+    { label: '바닥 없음', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.526, detail: '첫 판 우승 그대로. 가장 열려 있지만 호 ×1.1 ~ 포 ×1.96으로 들쑥날쑥.' },
   ],
 }
 const QUESTION: Question | null = FIT900_QUESTION
