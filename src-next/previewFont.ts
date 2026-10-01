@@ -1,4 +1,4 @@
-import { normalizeReferencePadding, REFERENCE_BODY_PADDING } from '../src/services/designBodyPlacement'
+import { REFERENCE_BODY_PADDING } from '../src/services/designBodyPlacement'
 import { parseAndMigrateFontData } from '../src/services/fontDataMigration'
 import baseJamos from '../src/data/baseJamos.json'
 import { DEFAULT_STYLE, loadedGlobalStyle } from '../src/stores/globalStyleStore'
@@ -13,7 +13,7 @@ import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 /**
  * 저장된 폰트 JSON 하나로 글자를 그린다. 스토어에 넣지 않는다.
  * 관리자 화면이 친구 폰트를 볼 때 쓴다 — 스토어는 localStorage에 저장되므로 넣으면 이 기기의 내 폰트 사본을 덮는다.
- * 값은 스토어의 `loadFontData`가 하는 손질(옛 획 이전 · 여백 정규화 · 끝 모양 백필)을 똑같이 거친다. 그리는 길은 `AppGlyph`와 같다.
+ * 값은 스토어의 `loadFontData`가 하는 손질(옛 획 이전 · 끝 모양 백필, 여백 정규화는 `parseAndMigrateFontData`)을 똑같이 거친다. 그리는 길은 `AppGlyph`와 같다.
  * 묶음 부리는 이 기기에만 저장되고 서버 폰트에 없어서 빈 묶음으로 그린다.
  */
 export interface PreviewFont {
@@ -47,7 +47,7 @@ export function previewFontOf(value: unknown): { ok: true; font: PreviewFont } |
         jongseong: migratedMap(data.jamoData.jongseong),
       },
       layoutSchemas: structuredClone(data.layoutSchemas),
-      globalPadding: normalizeReferencePadding({ ...data.globalPadding }),
+      globalPadding: { ...data.globalPadding },
       paddingOverrides: structuredClone(data.paddingOverrides),
       style: loadedGlobalStyle(data.globalStyle.style),
       exclusions: [...data.globalStyle.exclusions],

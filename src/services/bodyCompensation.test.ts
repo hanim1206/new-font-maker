@@ -115,3 +115,18 @@ describe('폰트 데이터의 자동 보정 끔', () => {
     expect(parseAndMigrateFontData(broken).ok).toBe(false)
   })
 })
+
+describe('옛 기본 네모꼴(사방 0.075) 환산', () => {
+  it('읽는 입구(`parseAndMigrateFontData`) 한 곳에서 새 기본으로 바뀌고, 다른 여백은 그대로다', async () => {
+    const { collectFontData } = await import('./fontDataBridge')
+    const saved = collectFontData()
+    const legacy = { ...saved, globalPadding: { top: 0.075, bottom: 0.075, left: 0.075, right: 0.075 } }
+    const parsed = parseAndMigrateFontData(legacy)
+    expect(parsed.ok && parsed.data.globalPadding).toEqual(REFERENCE_BODY_PADDING)
+    // 저장 · 복제 · 스토어 · 미리보기가 모두 이 결과를 받으므로, 원본 객체는 건드리지 않는다.
+    expect(legacy.globalPadding.left).toBe(0.075)
+    const custom = { top: 0.05, bottom: 0.04, left: 0.1, right: 0.2 }
+    const kept = parseAndMigrateFontData({ ...saved, globalPadding: custom })
+    expect(kept.ok && kept.data.globalPadding).toEqual(custom)
+  })
+})

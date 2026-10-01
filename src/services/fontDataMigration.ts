@@ -15,6 +15,7 @@ import {
   validateFontDataPayload,
 } from './fontDataPayloadValidation'
 import { withThinStemsInEm } from '../utils/thinStemMigration'
+import { normalizeReferencePadding } from './designBodyPlacement'
 
 export type FontDataParseIssueCode =
   | 'invalid-root'
@@ -212,6 +213,8 @@ export function parseAndMigrateFontData(value: unknown): FontDataParseResult {
   // 높이 0인 칸의 보를 백만 배로 저장하던 때의 값(2026-09-30 ~ 10-01)을 예전에 보이던 모양 그대로 옮겨 적는다.
   // 여기가 유일한 입구라 편집기 · 미리보기 · 추출이 같은 값을 받는다. 고칠 것이 없으면 그대로다.
   data.jamoData = { ...data.jamoData, jungseong: withThinStemsInEm(data.jamoData.jungseong) }
+  // 옛 기본 네모꼴(사방 0.075)로 저장된 여백은 "기본"이라는 뜻이라 새 기본으로 읽는다. 스토어 · 미리보기 · 복제 · 저장이 같은 값을 받는다.
+  data.globalPadding = normalizeReferencePadding({ ...data.globalPadding })
 
   return value.version === FONT_DATA_VERSION
     ? { ok: true, data }

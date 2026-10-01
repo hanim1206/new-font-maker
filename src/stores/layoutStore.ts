@@ -417,7 +417,8 @@ export const useLayoutStore = create<LayoutState & LayoutActions>()(
       loadFontData: (data) =>
         set((state) => {
           state.layoutSchemas = deepClone(data.layoutSchemas)
-          state.globalPadding = normalizeReferencePadding({ ...data.globalPadding })
+          // 옛 0.075 환산은 `parseAndMigrateFontData`가 이미 했다(서버 · 파일에서 오는 값의 유일한 입구).
+          state.globalPadding = { ...data.globalPadding }
           state.paddingOverrides = deepClone(data.paddingOverrides)
           syncAllConfigs(state)
         }),
