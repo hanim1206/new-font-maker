@@ -27,7 +27,7 @@ import { getBaseJamo, useJamoStore } from '../src/stores/jamoStore'
 import { useWorkbenchStore, workbenchJamoOf, workbenchSyllable } from '../src/stores/workbenchStore'
 import { groupMatching, useJamoGroupStore } from '../src/stores/jamoGroupStore'
 import confirmStyles from './workspace/FontExportDialog.module.css'
-import { useLayoutStore } from '../src/stores/layoutStore'
+import { mergeLayoutPadding, useLayoutStore } from '../src/stores/layoutStore'
 import { jamoCenterlineCenter, limitJamoMoveDelta, limitJamoScaleFactor, moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStrokes, snapWholeJamoDelta, translateJamoStrokes, type StrokeBoundsOf } from '../src/services/editorCommands'
 import { stemEditBox, storedStemDelta } from '../src/services/stemBend'
 import { stemRailGuides } from '../src/services/medialStemRails'
@@ -89,7 +89,7 @@ import {
 import { resolveSyllableContextualInkSafety, withContextualInkSafety } from '../src/utils/contextualInkSafety'
 import { designBodyPaddingOfSize, paddingToDesignBody } from './designBody'
 import { useFontExportStore } from './fontExportStore'
-import { useGlobalStyleStore, type GlobalStyle } from '../src/stores/globalStyleStore'
+import { resolveEffectiveStyle, useGlobalStyleStore, type GlobalStyle } from '../src/stores/globalStyleStore'
 import { BrushStyleTrackpad, type StrokeEnds } from './BrushStyleTrackpad'
 import { RangeTicks } from './RangeTicks'
 import { StemBeakControls } from './StemBeakControls'
@@ -439,7 +439,7 @@ function Glyph({
   const schema = previewSchema?.layoutType === decomposed.layoutType
     ? previewSchema.schema
     : schemas[decomposed.layoutType]
-  const effectivePadding = { ...globalPadding, ...paddingOverrides[decomposed.layoutType] }
+  const effectivePadding = mergeLayoutPadding(globalPadding, paddingOverrides, decomposed.layoutType)
   const effectiveSchema = { ...schema, padding: effectivePadding, designBodyPadding: effectivePadding }
   const viewportBox = {
     x: effectiveSchema.padding.left,
@@ -449,8 +449,9 @@ function Glyph({
   }
   // 네모꼴 자동 보정은 이 글자 레이아웃의 네모꼴에서 나온다(`getEffectiveStyle`과 같은 길). 받는 `globalStyle`은 미리보기를 얹은 저장값이다.
   const paddingKey = `${effectivePadding.left}|${effectivePadding.right}|${effectivePadding.top}|${effectivePadding.bottom}`
+  const exclusions = useGlobalStyleStore((state) => state.exclusions)
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 여백은 네 값이 같으면 같다.
-  const renderStyle = useMemo(() => withBodyCompensation(globalStyle, effectivePadding), [globalStyle, paddingKey])
+  const renderStyle = useMemo(() => resolveEffectiveStyle(globalStyle, exclusions, decomposed.layoutType, effectivePadding), [globalStyle, exclusions, decomposed.layoutType, paddingKey])
   // 배치는 칸 해석 함수(모델 상자)가 우선, 못 풀면 스키마.
   const { placement } = useContextPlacement(decomposed, effectiveSchema, renderStyle)
   const boxes = layoutHighlight?.layoutType === decomposed.layoutType
@@ -1939,6 +1940,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const globalPadding = useLayoutStore((state) => state.globalPadding)
   const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
   const globalStyle = useGlobalStyleStore((state) => state.style)
+  const exclusions = useGlobalStyleStore((state) => state.exclusions)
   const fontSpace = useCalibrationProjectStore((state) => state.fontSpace)
   const grid = useCalibrationProjectStore((state) => state.grid)
   const metrics = useCalibrationProjectStore((state) => state.metrics)
@@ -2050,10 +2052,10 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     if (chrome !== 'workspace' || !notoBundle) return legacy()
     const identity = identityOfSyllable(target)
     // 네모꼴 자동 보정의 세로줄기 배율도 같이 넘긴다 — 화면이 글자를 놓는 상자와 같아야 한다.
-    const stemScale = stemScaleOf(withBodyCompensation(previewGlobalStyle, schema.padding).strokeStyle)
+    const stemScale = stemScaleOf(resolveEffectiveStyle(previewGlobalStyle, exclusions, target.layoutType, schema.padding).strokeStyle)
     const { placement } = contextPlacementOf({ bundle: notoBundle, identity, syllable: target, schema, ends: { ...previewEnds, stemScale }, delta: effectiveLayoutDelta({ rules: layoutDeltaRules }, identity) })
     return placement.kind === 'boxes' ? placement.boxes : legacy()
-  }, [chrome, notoBundle, previewEnds, previewGlobalStyle, layoutDeltaRules])
+  }, [chrome, notoBundle, previewEnds, previewGlobalStyle, exclusions, layoutDeltaRules])
   const measuresOnScreenBoxes = chrome === 'workspace' && Boolean(notoBundle)
   const syllable = useMemo(
     () => resolveSyllableContextualInkSafety(previewedSyllable, screenBoxesOf(previewedSyllable, effectiveSchema)).syllable,
@@ -2061,7 +2063,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   )
   // 레이아웃 모드는 글자가 모델 상자로 그려질 때만 뜻이 있다. 그때는 옛 경로(자소 통째 이동 → 스키마)가 글자에 안 닿으므로 셸 안에서는 끈다.
   // 고치는 글자의 실효 스타일. 미리보기를 얹은 저장값에 이 레이아웃 네모꼴의 자동 보정을 얹는다(`getEffectiveStyle`과 같은 길).
-  const focusedGlobalStyle = useMemo(() => withBodyCompensation(previewGlobalStyle, effectiveSchema.padding), [previewGlobalStyle, effectiveSchema.padding])
+  const focusedGlobalStyle = useMemo(() => resolveEffectiveStyle(previewGlobalStyle, exclusions, syllable.layoutType, effectiveSchema.padding), [previewGlobalStyle, exclusions, syllable.layoutType, effectiveSchema.padding])
   const { placement, resolution: placementResolution } = useContextPlacement(syllable, effectiveSchema, focusedGlobalStyle)
   // 레이아웃 모드는 모델이 있으면 열린다. 지금 획이 모델 상자에 맞는지(`placement.kind`)에 매지 않는다 —
   // 획을 고치다 맞춤이 깨지면(ㅡ를 곡선으로 → 상자가 획 두께보다 작음) 나가는 문(`완료`)까지 사라져 갇힌다.

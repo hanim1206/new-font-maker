@@ -11,12 +11,11 @@
  */
 import type {
   BoxConfig, BrushStyle, DecomposedSyllable, GlyphInkPlacement, LayoutSchema, Padding, ResolvedInkPrimitive,
-  StrokeDataV2, StrokeLinecap, StrokeLinejoin, StrokeRenderStyle, LayoutType,
+  StrokeDataV2, StrokeLinecap, StrokeLinejoin, StrokeRenderStyle,
 } from '../types'
 import { useJamoStore } from '../stores/jamoStore'
-import { useLayoutStore } from '../stores/layoutStore'
-import { effectiveStyleOf, useGlobalStyleStore, weightToMultiplier } from '../stores/globalStyleStore'
-import { withBodyCompensation } from './bodyCompensation'
+import { mergeLayoutPadding, useLayoutStore } from '../stores/layoutStore'
+import { resolveEffectiveStyle, useGlobalStyleStore, weightToMultiplier } from '../stores/globalStyleStore'
 import { groupBeakResolverOf, useJamoGroupStore, type GroupBeakResolver } from '../stores/jamoGroupStore'
 import { stemBeakGroupOf, type StemBeakStyle } from './stemBeak'
 import type { GlobalStyle } from '../stores/globalStyleStore'
@@ -77,18 +76,6 @@ export type GlyphPlacementResolver = (
   /** `stemScale`: 네모꼴 자동 보정의 세로줄기 배율. 사용자 네모꼴에서 상자를 다듬을 때 쓴다. */
   ends: { linecap: StrokeLinecap; linejoin: StrokeLinejoin; stemScale?: number },
 ) => GlyphInkPlacement
-
-// ===== 실효 패딩 계산 (layoutStore L128-131 미러링) =====
-
-function computeEffectivePadding(
-  globalPadding: Padding,
-  paddingOverrides: Partial<Record<LayoutType, Partial<Padding>>>,
-  layoutType: LayoutType
-): Padding {
-  const override = paddingOverrides[layoutType]
-  if (!override) return { ...globalPadding }
-  return { ...globalPadding, ...override }
-}
 
 /** 읽기 전용 공통 primitive를 기존 OTF facade로 무복사 연결한다. */
 function projectCenterlinesToLegacyOtfStrokes(
@@ -157,15 +144,18 @@ export function collectGlyphDataWithPlacement(char: string, placementOf?: GlyphP
 
   // 실효 패딩을 포함한 스키마를 공통 resolver에 전달한다.
   const schema = layoutState.layoutSchemas[layoutType]
-  const effectivePadding = computeEffectivePadding(
+  const effectivePadding = mergeLayoutPadding(
     condition?.padding ?? layoutState.globalPadding,
     layoutState.paddingOverrides,
     layoutType
   )
-  // 실효 글로벌 스타일 (레이아웃별 제외 적용). 조건이 있으면 그 굵기 · 패딩으로 같은 해석을 다시 한다.
-  const effectiveStyle: GlobalStyle = condition
-    ? withBodyCompensation(effectiveStyleOf({ ...styleState.style, weight: condition.weight ?? styleState.style.weight }, styleState.exclusions, layoutType), effectivePadding)
-    : styleState.getEffectiveStyle(layoutType)
+  // 실효 글로벌 스타일. 화면과 같은 입구(`resolveEffectiveStyle`)를 지나고, 조건이 있으면 그 굵기로 같은 해석을 한다.
+  const effectiveStyle: GlobalStyle = resolveEffectiveStyle(
+    condition?.weight === undefined ? styleState.style : { ...styleState.style, weight: condition.weight },
+    styleState.exclusions,
+    layoutType,
+    effectivePadding,
+  )
   const schemaWithPadding = { ...schema, padding: effectivePadding, designBodyPadding: effectivePadding }
   const weightMultiplier = weightToMultiplier(effectiveStyle.weight)
   // Design Body/advance와 Ink Bounds를 분리한다. 편집한 돌출 획을 Body에

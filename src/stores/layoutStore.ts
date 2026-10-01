@@ -145,11 +145,17 @@ interface LayoutActions {
   getLayoutConfig: (layoutType: LayoutType) => LayoutConfig
 }
 
+/**
+ * 한 레이아웃에 실제로 먹는 네모꼴 여백(폰트 전체 + 레이아웃별 덮어쓰기). 화면 · 문장 · 저장된 폰트 미리보기 · OTF가 모두 이 함수로 합친다.
+ */
+export function mergeLayoutPadding(globalPadding: Padding, paddingOverrides: Partial<Record<LayoutType, Partial<Padding>>>, layoutType: LayoutType): Padding {
+  const override = paddingOverrides[layoutType]
+  return override ? { ...globalPadding, ...override } : { ...globalPadding }
+}
+
 // 실효 패딩 계산 (글로벌 + 오버라이드 머지)
 function computeEffectivePadding(state: LayoutState, layoutType: LayoutType): Padding {
-  const override = state.paddingOverrides[layoutType]
-  if (!override) return { ...state.globalPadding }
-  return { ...state.globalPadding, ...override }
+  return mergeLayoutPadding(state.globalPadding, state.paddingOverrides, layoutType)
 }
 
 // 스키마에서 계산된 boxes로 config 동기화 (글로벌 패딩 적용)

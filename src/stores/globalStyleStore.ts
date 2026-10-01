@@ -2,11 +2,11 @@ import { useMemo } from 'react'
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { persist } from 'zustand/middleware'
-import type { BrushStyle, LayoutType, StrokeLinecap, StrokeLinejoin, StrokeRenderStyle } from '../types'
+import type { BrushStyle, LayoutType, Padding, StrokeLinecap, StrokeLinejoin, StrokeRenderStyle } from '../types'
 import { DEFAULT_STEM_BEAK, normalizeStemBeak, type StemBeakStyle } from '../services/stemBeak'
 import { INNER_ROUNDNESS_MAX } from '../services/flatStrokeGeometry'
 import { withBodyCompensation } from '../services/bodyCompensation'
-import { useLayoutStore } from './layoutStore'
+import { mergeLayoutPadding, useLayoutStore } from './layoutStore'
 
 export { weightToMultiplier } from '../utils/globalStyleUtils'
 
@@ -107,6 +107,15 @@ export function effectiveStyleOf(style: GlobalStyle, exclusions: readonly Global
     ;(effective as any)[prop] = DEFAULT_STYLE[prop]
   }
   return effective
+}
+
+/**
+ * 한 글자(레이아웃)를 그릴 때 실제로 쓰는 스타일: 제외 규칙을 걷고 그 레이아웃 네모꼴의 자동 보정을 얹는다.
+ * 화면 · 문장 · 저장된 폰트 미리보기 · OTF 추출이 모두 이 입구 하나를 지난다. 굵기 · 네모꼴에서 나오는 새 보정도 여기에 얹는다.
+ * `style`은 저장값 그대로든 미리보기를 얹은 값이든 된다.
+ */
+export function resolveEffectiveStyle(style: GlobalStyle, exclusions: readonly GlobalStyleExclusion[], layoutType: LayoutType, padding: Padding | undefined): GlobalStyle {
+  return withBodyCompensation(effectiveStyleOf(style, exclusions, layoutType), padding)
 }
 
 export function normalizeBrushStyle(value: Partial<BrushStyle> | undefined): BrushStyle {
@@ -247,7 +256,8 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
 
       getEffectiveStyle: (layoutType) => {
         const { style, exclusions } = get()
-        return { ...withBodyCompensation(effectiveStyleOf(style, exclusions, layoutType), effectivePaddingOf(useLayoutStore.getState(), layoutType)) }
+        const { globalPadding, paddingOverrides } = useLayoutStore.getState()
+        return { ...resolveEffectiveStyle(style, exclusions, layoutType, mergeLayoutPadding(globalPadding, paddingOverrides, layoutType)) }
       },
 
       resetStyle: () =>
@@ -305,16 +315,11 @@ export function useEffectiveGlobalStyle(layoutType: LayoutType): GlobalStyle {
   const exclusions = useGlobalStyleStore((state) => state.exclusions)
   // 네모꼴 자동 보정은 이 레이아웃의 네모꼴(폰트 전체 + 레이아웃별)에서 나온다.
   const globalPadding = useLayoutStore((state) => state.globalPadding)
-  const paddingOverride = useLayoutStore((state) => state.paddingOverrides[layoutType])
+  const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
   return useMemo(
-    () => withBodyCompensation(effectiveStyleOf(style, exclusions, layoutType), paddingOverride ? { ...globalPadding, ...paddingOverride } : globalPadding),
-    [style, exclusions, layoutType, globalPadding, paddingOverride],
+    () => resolveEffectiveStyle(style, exclusions, layoutType, mergeLayoutPadding(globalPadding, paddingOverrides, layoutType)),
+    [style, exclusions, layoutType, globalPadding, paddingOverrides],
   )
-}
-
-function effectivePaddingOf(layout: Pick<ReturnType<typeof useLayoutStore.getState>, 'globalPadding' | 'paddingOverrides'>, layoutType: LayoutType) {
-  const override = layout.paddingOverrides[layoutType]
-  return override ? { ...layout.globalPadding, ...override } : layout.globalPadding
 }
 
 /**
