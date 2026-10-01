@@ -15,6 +15,7 @@ const LAB_NAMES: Record<LabRoute, string> = {
   '/stem-master-lab': '줄기 마스터',
   '/font-guide-lab': '기준선(Font Guide)',
   '/spectrum-lab': '성격 스펙트럼',
+  '/design-body-lab': '네모꼴',
 }
 
 export interface LabEntry {

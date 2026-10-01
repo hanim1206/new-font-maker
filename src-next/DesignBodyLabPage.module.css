@@ -1,0 +1,49 @@
+.page { min-height: 100dvh; padding: 28px; background: rgb(var(--color-background)); color: rgb(var(--color-foreground)); }
+.header, .controls, .compare, .zoom, .editor { width: min(1100px, 100%); margin-inline: auto; }
+.header { display: grid; gap: 3px; margin-bottom: 18px; }
+.header span { color: rgb(var(--color-primary)); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.header h1 { font-size: clamp(24px, 4vw, 38px); line-height: 1.1; }
+.header p { max-width: 760px; color: rgb(var(--color-text-3)); font-size: 13px; }
+
+.controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 16px; margin-bottom: 12px; padding: 12px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); }
+.slider { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: 10px; font-size: 13px; }
+.wide { grid-column: span 2; grid-template-columns: 130px minmax(0, 1fr); }
+.slider strong { font-variant-numeric: tabular-nums; }
+.slider input { width: 100%; }
+.presets { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.note { margin-left: 8px; color: rgb(var(--color-text-3)); font-size: 12px; }
+.presets button { min-height: 30px; padding: 0 10px; border: 1px solid rgb(var(--color-border)); border-radius: 7px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-2)); font-size: 12px; font-variant-numeric: tabular-nums; }
+.presets button[aria-pressed='true'] { border-color: rgb(var(--color-foreground)); color: rgb(var(--color-foreground)); font-weight: 700; }
+.toggle { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+.toggle small { color: rgb(var(--color-text-3)); font-size: 12px; }
+.field { grid-column: 1 / -1; display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: 10px; font-size: 13px; }
+.field input { min-height: 34px; padding: 0 10px; border: 1px solid rgb(var(--color-border)); border-radius: 7px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-size: 15px; }
+
+.compare { display: grid; gap: 6px; margin-bottom: 12px; padding: 14px; overflow-x: auto; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); }
+.row { display: grid; grid-template-columns: 96px max-content; align-items: center; gap: 10px; }
+.rowLabel { display: grid; gap: 1px; color: rgb(var(--color-text-3)); font-size: 12px; }
+.rowLabel small { font-size: 11px; font-variant-numeric: tabular-nums; }
+.row[data-product] .rowLabel { color: rgb(var(--color-foreground)); font-weight: 700; }
+.row[data-product] .rowLabel small { font-weight: 400; }
+.sentence { display: flex; align-items: center; gap: 0; }
+
+.zoom { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; margin-bottom: 12px; padding: 14px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); }
+.zoom figure { display: grid; gap: 6px; margin: 0; }
+.zoom figcaption { color: rgb(var(--color-text-3)); font-size: 12px; }
+.zoom figure[data-product] figcaption { color: rgb(var(--color-foreground)); font-weight: 700; }
+.zoomGlyph { border-radius: 8px; background: #fff; line-height: 0; }
+.zoomHelp { flex: 1 1 220px; align-self: center; color: rgb(var(--color-text-2)); font-size: 13px; line-height: 1.6; }
+.sentence button { flex: 0 0 auto; box-sizing: content-box; padding: 0; border: 0; border-bottom: 2px solid transparent; background: none; line-height: 0; text-align: left; }
+.sentence button > span { display: block; width: max-content; }
+.sentence button[aria-pressed='true'] { border-bottom-color: rgb(var(--color-primary)); }
+
+.editor { padding: 12px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); }
+.editorHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+.editorHead span { display: flex; gap: 14px; }
+.editorHead a { color: rgb(var(--color-primary)); }
+
+@media (max-width: 900px) {
+  .page { padding: 16px; }
+  .controls { grid-template-columns: 1fr; }
+  .wide { grid-column: auto; }
+}

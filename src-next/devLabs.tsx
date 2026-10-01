@@ -55,6 +55,12 @@ export async function showDevLab(show: (node: ReactNode) => void): Promise<boole
     return true
   }
 
+  if (path === '/design-body-lab') {
+    const { DesignBodyLabPage } = await import('./DesignBodyLabPage')
+    show(<DesignBodyLabPage />)
+    return true
+  }
+
   if (path === '/medial-guide-lab') {
     const params = new URLSearchParams(window.location.search)
     params.set('section', 'initial')
