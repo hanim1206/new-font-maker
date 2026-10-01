@@ -65,7 +65,13 @@ describe('글자 칸 끝 경계', () => {
     const bounds = calibrationEditBounds(box, strokes)
     const moved = movePoint(jamo, 'ㅏ-1', 0, { x: 0, y: 5 }, bounds)
     const [first] = moved.jamo.strokes?.[0].points ?? []
-    expect(box.y + first.y * box.height).toBeCloseTo(0.965)
+    // 이 점은 아래로 0.1 나간 핸들을 달고 있다. 핸들이 먼저 칸 끝에 닿고 점은 그만큼 안쪽에서 멈춘다.
+    expect(box.y + first.handleOut!.y * box.height).toBeCloseTo(0.965)
+    expect(first.handleOut!.y - first.y).toBeCloseTo(0.1)
+    // 핸들이 없는 점은 칸 끝까지 간다.
+    const plain: JamoData = { ...jamo, strokes: [{ ...strokes[0], points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] }] }
+    const [bare] = movePoint(plain, 'ㅏ-1', 0, { x: 0, y: 5 }, calibrationEditBounds(box, plain.strokes ?? [])).jamo.strokes?.[0].points ?? []
+    expect(box.y + bare.y * box.height).toBeCloseTo(0.965)
   })
 
   it('이미 칸 밖에 있는 점은 가로 · 세로 모두 그 자리까지 허용한다', () => {

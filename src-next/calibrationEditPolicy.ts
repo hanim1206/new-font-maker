@@ -23,7 +23,8 @@ export function calibrationEditBounds(
 ): NormalizedBounds {
   if (!strokes.length || !(box.width > 0) || !(box.height > 0)) return CALIBRATION_FREEFORM_BOUNDS
   const halfThickness = Math.max(...strokes.map((stroke) => stroke.thickness), 0) * weightMultiplier / 2
-  const points = strokes.flatMap((stroke) => stroke.points)
+  // 지금 이미 한계 밖에 있는 점 · 핸들은 그 자리까지 한계를 넓혀 준다(더 나가지는 못한다). 핸들도 한계를 본다.
+  const points = strokes.flatMap((stroke) => stroke.points).flatMap((point) => [point, ...(point.handleIn ? [point.handleIn] : []), ...(point.handleOut ? [point.handleOut] : [])])
   const xs = points.map((point) => point.x)
   const ys = points.map((point) => point.y)
   return {

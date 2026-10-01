@@ -1057,9 +1057,13 @@ function InferenceTrackpad({
     onInkGapLimitChange(violation)
   }
   // 가로는 글자 칸 끝에서 멈춘다. 넘기면 그리는 단계가 자모 전체를 반대쪽으로 밀어 넣는다.
-  const editBounds = (source: JamoData) => selection.kind === 'none' || selection.kind === 'component'
-    ? CALIBRATION_FREEFORM_BOUNDS
-    : calibrationEditBounds(selection.box, getJamoStrokes(source), weightToMultiplier(useGlobalStyleStore.getState().style.weight))
+  // 얇은 칸의 줄기(ㅡ · ㅣ)는 저장 좌표가 넓힌 칸 비율이다. 한계도 그 칸에서 재야 글자 칸 끝에서 멈춘다 — 받은 칸(두께 0)으로 재면 한계가 없는 것과 같다.
+  const editBounds = (source: JamoData) => {
+    if (selection.kind === 'none' || selection.kind === 'component') return CALIBRATION_FREEFORM_BOUNDS
+    const strokes = getJamoStrokes(source)
+    const stroke = strokes.find((item) => item.id === selection.strokeId)
+    return calibrationEditBounds(stroke ? stemEditBox(source, stroke, selection.box) : selection.box, strokes, weightToMultiplier(useGlobalStyleStore.getState().style.weight))
+  }
   // 잡은 획을 옮긴다. 획 묶음이면 잡은 획의 이동(경계 · 눈금 반영)만큼 묶인 획도 같이.
   const moveSelectedStrokes = (source: JamoData, requested: StrokeMoveDelta) => {
     if (selection.kind !== 'stroke') return null
@@ -1469,7 +1473,9 @@ function InferenceTrackpad({
     const table = new Map(placed.map((item) => {
       // 같은 상자에 놓인 획끼리 한계를 잰다(섞임홀자는 가로부 · 세로부 상자가 다르다).
       const together = strokes.filter((stroke) => placed.some((other) => other.strokeId === stroke.id && other.box === item.box))
-      return [item.strokeId, calibrationEditBounds(item.box, together, weight)] as const
+      const own = strokes.find((stroke) => stroke.id === item.strokeId)
+      // 얇은 칸의 줄기는 넓힌 칸에서 잰다(저장 좌표가 그 칸 비율이다).
+      return [item.strokeId, calibrationEditBounds(source && own ? stemEditBox(source, own, item.box) : item.box, together, weight)] as const
     }))
     wholeJamoBounds.current = (strokeId) => table.get(strokeId)
   }

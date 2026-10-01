@@ -29,12 +29,20 @@ describe('moveStroke', () => {
     expect(baseJamo.strokes?.[0].points[0]).toMatchObject({ x: 0.2, y: 0.2 })
   })
 
-  it('앵커가 자모 박스 밖으로 나가지 않도록 이동량을 제한한다', () => {
+  it('점도 곡선 핸들도 한계 밖으로 나가지 않도록 이동량을 제한한다', () => {
     const result = moveStroke(baseJamo, 'ㄱ-1', { x: 0.9, y: -0.9 })
-    expect(result.delta.x).toBeCloseTo(0.2)
+    // 가로는 핸들(0.85)이 점(0.8)보다 먼저 한계에 닿는다 — 핸들이 딸려 나가면 캔버스 밖에서 가려져 못 잡는다.
+    expect(result.delta.x).toBeCloseTo(0.15)
     expect(result.delta.y).toBeCloseTo(-0.2)
-    expect(Math.max(...(result.jamo.strokes?.[0].points.map((point) => point.x) ?? []))).toBeCloseTo(1)
+    expect(result.jamo.strokes?.[0].points[1].handleOut?.x).toBeCloseTo(1)
+    expect(Math.max(...(result.jamo.strokes?.[0].points.map((point) => point.x) ?? []))).toBeCloseTo(0.95)
     expect(Math.min(...(result.jamo.strokes?.[0].points.map((point) => point.y) ?? []))).toBeCloseTo(0)
+  })
+
+  it('점 하나를 옮길 때도 딸려 가는 핸들이 한계에서 멈춘다', () => {
+    const result = movePoint(baseJamo, 'ㄱ-1', 1, { x: 0.9, y: 0 })
+    expect(result.delta.x).toBeCloseTo(0.15)
+    expect(result.jamo.strokes?.[0].points[1].handleOut?.x).toBeCloseTo(1)
   })
 
   it('존재하지 않는 획은 변경하지 않는다', () => {
@@ -122,8 +130,10 @@ describe('scaleStroke', () => {
 
   it('비율 범위와 이동 경계를 제한하고 지정 단위로 스냅한다', () => {
     const result = scaleStroke(baseJamo, 'ㄱ-1', { x: 3.91, y: 0.263 }, { minX: 0, maxX: 1, minY: 0, maxY: 1 }, 0.025)
-    expect(result.scale.x).toBeCloseTo(1.65)
+    // 가로는 핸들(0.85)이 한계에 닿는 배율(0.5 ÷ 0.35 = 1.428…)을 눈금에 내려 맞춘다.
+    expect(result.scale.x).toBeCloseTo(1.425)
     expect(result.scale.y).toBeCloseTo(0.275)
+    expect(result.jamo.strokes![0].points[1].handleOut!.x).toBeLessThanOrEqual(1)
     expect(Math.min(...result.jamo.strokes![0].points.map((point) => point.x))).toBeGreaterThanOrEqual(0)
     expect(Math.max(...result.jamo.strokes![0].points.map((point) => point.x))).toBeLessThanOrEqual(1)
   })
