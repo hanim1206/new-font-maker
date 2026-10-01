@@ -4,7 +4,7 @@ import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../src/data/Hangu
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { useEffectiveGlobalStyle, useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import { getBaseJamo, useJamoStore } from '../src/stores/jamoStore'
-import { useLayoutStore } from '../src/stores/layoutStore'
+import { mergeLayoutPadding, mergePadding, useLayoutStore } from '../src/stores/layoutStore'
 import { useUIStore } from '../src/stores/uiStore'
 import { useWorkbenchStore, workbenchSyllable } from '../src/stores/workbenchStore'
 import { groupMatching, sameChars, useJamoGroupStore, type JamoGroup } from '../src/stores/jamoGroupStore'
@@ -97,7 +97,7 @@ function Lazy({ children, className }: { children: ReactNode; className?: string
 }
 
 function withEffectivePadding(schema: LayoutSchema, globalPadding: Padding, override: Partial<Padding> | undefined): LayoutSchema {
-  const padding = { ...globalPadding, ...override }
+  const padding = mergePadding(globalPadding, override)
   return { ...schema, padding, designBodyPadding: padding }
 }
 
@@ -245,7 +245,7 @@ function FontCard({ name, onRename, onDuplicate, onDelete }: {
   const spaceAdvance = `${Math.round(metricsSpace * hangulBodyWidth(globalPadding) / .85) / UPM}em`
   const renderChar = (char: string, index: number) => {
     if (!isHangul(char)) return <span key={index} className={/\s/u.test(char) ? editorStyles.spaceGlyph : editorStyles.punctuationGlyph} style={/\s/u.test(char) ? { inlineSize: spaceAdvance } : undefined} data-char-index={index} aria-label={/\s/u.test(char) ? '공백' : char}>{char}</span>
-    const padding = { ...globalPadding, ...paddingOverrides[decomposeSyllable(char, choseong, jungseong, jongseong).layoutType] }
+    const padding = mergeLayoutPadding(globalPadding, paddingOverrides, decomposeSyllable(char, choseong, jungseong, jongseong).layoutType)
     // 그림은 1em 네모 그대로 두고 몸통만 보이게 왼쪽 여백만큼 당긴다(편집기 글자 칸과 같은 자리).
     return <span key={index} className={styles.sentenceGlyph} style={{ inlineSize: `${Math.round(hangulBodyWidth(padding) * UPM) / UPM}em`, '--bearing': padding.left } as CSSProperties} data-char-index={index}><AppGlyph char={char} size={64} /></span>
   }

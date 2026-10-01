@@ -21,14 +21,14 @@ import { stemBeakGroupOf, type StemBeakStyle } from './stemBeak'
 import type { GlobalStyle } from '../stores/globalStyleStore'
 import { decomposeSyllableWithOverrides } from '../utils/hangulUtils'
 import { resolveGlyphInkPrimitives } from './glyphInkResolver'
-import { hangulAdvance, hangulOriginX } from './fontMetrics'
+import { BASELINE_Y, hangulAdvance, hangulOriginX } from './fontMetrics'
 import { stemScaleOf } from './strokeRenderGeometry'
 
 // ===== 상수 =====
 
 export { UPM } from './fontMetrics'
-/** 캔버스 위 끝이 놓이는 폰트 y. 글리프 좌표 변환 기준. 줄 높이(hhea)는 `fontMetrics.LINE_METRICS`가 따로 든다. */
-export const ASCENDER = 880
+/** 캔버스 위 끝이 놓이는 폰트 y. 글리프 좌표 변환 기준. 값은 `fontMetrics.BASELINE_Y` 한 곳에서 온다. */
+export const ASCENDER = BASELINE_Y
 export const DESCENDER = -120
 export const DEFAULT_ADVANCE_WIDTH = 1000
 export const OS2_UNICODE_RANGE_1 = 0x00000001

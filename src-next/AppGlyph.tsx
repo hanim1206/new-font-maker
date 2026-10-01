@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { useEffectiveGlobalStyle } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
-import { useLayoutStore } from '../src/stores/layoutStore'
+import { mergePadding, useLayoutStore } from '../src/stores/layoutStore'
 import type { JamoData, LayoutSchema, Padding, ResolvedStrokeInkSource } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { useContextPlacement } from './notoModel'
@@ -12,7 +12,7 @@ function withEffectivePadding(
   globalPadding: Padding,
   override: Partial<Padding> | undefined,
 ): LayoutSchema {
-  const padding = { ...globalPadding, ...override }
+  const padding = mergePadding(globalPadding, override)
   return { ...schema, padding, designBodyPadding: padding }
 }
 

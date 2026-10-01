@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock3, Grid2X2, History, LockKeyhole, RotateCcw, Undo2 } from 'lucide-react'
 import { SvgRenderer } from '../../renderers/SvgRenderer'
 import { useJamoStore } from '../../stores/jamoStore'
-import { useLayoutStore } from '../../stores/layoutStore'
+import { mergeLayoutPadding, mergePadding, useLayoutStore } from '../../stores/layoutStore'
 import { useMobileEditorStore } from '../../stores/mobileEditorStore'
 import { useEditorHistoryStore } from '../../stores/editorHistoryStore'
 import { calculateBoxes, calculateRawBoxes } from '../../utils/layoutCalculator'
@@ -102,7 +102,7 @@ function StaticGlyph({ syllableChar }: { syllableChar: string }) {
   const globalPadding = useLayoutStore((state) => state.globalPadding)
   const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
   const syllable = decomposeSyllable(syllableChar, choseong, jungseong, jongseong)
-  const schema = withEffectivePadding(layoutSchemas[syllable.layoutType], { ...globalPadding, ...paddingOverrides[syllable.layoutType] })
+  const schema = withEffectivePadding(layoutSchemas[syllable.layoutType], mergeLayoutPadding(globalPadding, paddingOverrides, syllable.layoutType))
   return <GlyphPreview syllableChar={syllableChar} activePart="CH" schema={schema} selection={{ kind: 'none' }} highlightActivePart={false} />
 }
 
@@ -927,7 +927,7 @@ function BaseJamoContextCards({ jamo, previewJamo, activePart }: { jamo: JamoDat
     <div className={styles.baseContextCards}>
       {layouts.map((layoutType) => {
         const sample = getSampleSyllableForLayout(layoutType, jamo.type, jamo.char)
-        const schema = withEffectivePadding(layoutSchemas[layoutType], { ...globalPadding, ...paddingOverrides[layoutType] })
+        const schema = withEffectivePadding(layoutSchemas[layoutType], mergeLayoutPadding(globalPadding, paddingOverrides, layoutType))
         return <article key={layoutType} className={styles.baseContextCard} title={LAYOUT_LABELS[layoutType]}><div><GlyphPreview syllableChar={sample} previewJamo={previewJamo ?? jamo} activePart={activePart} schema={schema} selection={{ kind: 'none' }} highlightActivePart={false} /></div><span>{sample}</span></article>
       })}
     </div>
@@ -969,7 +969,7 @@ function BaseJamoPage({ jamo, originalPart }: { jamo: JamoData; originalPart: Mo
   const rawSchema = useLayoutStore((state) => state.layoutSchemas[layoutType])
   const globalPadding = useLayoutStore((state) => state.globalPadding)
   const paddingOverride = useLayoutStore((state) => state.paddingOverrides[layoutType])
-  const schema = useMemo(() => jamo.type === 'jungseong' ? rawSchema : withEffectivePadding(rawSchema, { ...globalPadding, ...paddingOverride }), [globalPadding, jamo.type, paddingOverride, rawSchema])
+  const schema = useMemo(() => jamo.type === 'jungseong' ? rawSchema : withEffectivePadding(rawSchema, mergePadding(globalPadding, paddingOverride)), [globalPadding, jamo.type, paddingOverride, rawSchema])
   const visualPart: MobileEditorPart = jamo.type === 'jungseong' ? 'JU' : 'CH'
   const visualJamo = useMemo(() => jamo.type === 'jongseong' ? { ...jamo, type: 'choseong' as const } : jamo, [jamo])
   const displayPreview = previewJamo ? (jamo.type === 'jongseong' ? { ...previewJamo, type: 'choseong' as const } : previewJamo) : visualJamo
@@ -1268,7 +1268,7 @@ function ComparePage() {
   if (!entry) return <HistoryPage />
   const fallbackLayoutType = decomposeSyllable(entry.syllable, choseong, jungseong, jongseong).layoutType
   const layoutType = entry.layoutType ?? fallbackLayoutType
-  const effectivePadding = { ...globalPadding, ...paddingOverrides[layoutType] }
+  const effectivePadding = mergeLayoutPadding(globalPadding, paddingOverrides, layoutType)
   const currentSchema = withEffectivePadding(layoutSchemas[layoutType], effectivePadding)
   const beforeSchema = entry.targetKind === 'layout' && entry.layoutBefore ? withEffectivePadding(entry.layoutBefore, effectivePadding) : currentSchema
   const currentJamo = getJamo(entry.jamoType, entry.jamoChar) ?? entry.after
@@ -1313,7 +1313,7 @@ export function MobileEditorV2Page() {
   const rawSchema = useLayoutStore((state) => state.layoutSchemas[layoutType])
   const globalPadding = useLayoutStore((state) => state.globalPadding)
   const paddingOverride = useLayoutStore((state) => state.paddingOverrides[layoutType])
-  const effectivePadding = useMemo(() => ({ ...globalPadding, ...paddingOverride }), [globalPadding, paddingOverride])
+  const effectivePadding = useMemo(() => (mergePadding(globalPadding, paddingOverride)), [globalPadding, paddingOverride])
   const confirmedSchema = useMemo(() => withEffectivePadding(rawSchema, effectivePadding), [effectivePadding, rawSchema])
   const displaySchema = useMemo(() => withEffectivePadding(previewSchema ?? rawSchema, effectivePadding), [effectivePadding, previewSchema, rawSchema])
   const chars = getSyllableJamoChars(activeSyllable)

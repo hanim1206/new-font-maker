@@ -27,7 +27,7 @@ import { getBaseJamo, useJamoStore } from '../src/stores/jamoStore'
 import { useWorkbenchStore, workbenchJamoOf, workbenchSyllable } from '../src/stores/workbenchStore'
 import { groupMatching, useJamoGroupStore } from '../src/stores/jamoGroupStore'
 import confirmStyles from './workspace/FontExportDialog.module.css'
-import { mergeLayoutPadding, useLayoutStore } from '../src/stores/layoutStore'
+import { mergeLayoutPadding, mergePadding, useLayoutStore } from '../src/stores/layoutStore'
 import { jamoCenterlineCenter, limitJamoMoveDelta, limitJamoScaleFactor, moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStrokes, snapWholeJamoDelta, translateJamoStrokes, type StrokeBoundsOf } from '../src/services/editorCommands'
 import { stemEditBox, storedStemDelta } from '../src/services/stemBend'
 import { stemRailGuides } from '../src/services/medialStemRails'
@@ -1855,7 +1855,7 @@ function DesignBodyControls({
   const removePaddingOverride = useLayoutStore((state) => state.removePaddingOverride)
   const [scope, setScope] = useState<'font' | 'layout'>(layoutOverride ? 'layout' : 'font')
   const usesLayoutOverride = scope === 'layout' && !!layoutOverride
-  const padding = usesLayoutOverride ? { ...globalPadding, ...layoutOverride } : globalPadding
+  const padding = usesLayoutOverride ? mergePadding(globalPadding, layoutOverride) : globalPadding
   const body = paddingToDesignBody(padding, fontSpace)
 
   const updateBody = (dimension: 'width' | 'height', value: number) => {
@@ -2033,7 +2033,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const baseSchema = schemas[previewedSyllable.layoutType]
   const displayedSchema = previewSchema?.layoutType === previewedSyllable.layoutType ? previewSchema.schema : baseSchema
   const effectiveSchema = useMemo(() => {
-    const padding = { ...globalPadding, ...paddingOverrides[previewedSyllable.layoutType] }
+    const padding = mergeLayoutPadding(globalPadding, paddingOverrides, previewedSyllable.layoutType)
     return { ...displayedSchema, padding, designBodyPadding: padding }
   }, [displayedSchema, globalPadding, paddingOverrides, previewedSyllable.layoutType])
   const designBody = useMemo(() => paddingToDesignBody(effectiveSchema.padding, fontSpace), [effectiveSchema.padding, fontSpace])
@@ -2155,7 +2155,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       if (!isEditableHangul(char)) return []
       const decomposed = decomposeSyllable(char, choseong, jungseong, jongseong)
       const base = schemas[decomposed.layoutType]
-      const padding = { ...globalPadding, ...paddingOverrides[decomposed.layoutType] }
+      const padding = mergeLayoutPadding(globalPadding, paddingOverrides, decomposed.layoutType)
       const schema = { ...base, padding, designBodyPadding: padding }
       // 셸 안: 화면과 같은 상자로 잰다. 상자 풀기(자소 맞춤)는 비싸서 미루고, 간격 검사가 그 자모가 든 글자에서만 부른다.
       if (measuresOnScreenBoxes) return [{ id: `sentence-${lineIndex}-${charIndex}`, char, syllable: decomposed, schema, boxesOf: (target: DecomposedSyllable) => screenBoxesOf(target, schema) }]
@@ -2662,7 +2662,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       ? decomposeSyllable(char, choseong, jungseong, jongseong)
       : null
     const layoutPadding = decomposedForMetrics
-      ? { ...globalPadding, ...paddingOverrides[decomposedForMetrics.layoutType] }
+      ? mergeLayoutPadding(globalPadding, paddingOverrides, decomposedForMetrics.layoutType)
       : null
     const hangulAdvance = layoutPadding
       ? Math.round((1 - layoutPadding.left - layoutPadding.right) * fontSpace.unitsPerEm)
@@ -2679,7 +2679,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     if (isEditableHangul(char)) {
       const previewed = withPreviewJamo(decomposeSyllable(char, choseong, jungseong, jongseong), previewJamo)
       const contextBase = schemas[previewed.layoutType]
-      const padding = { ...globalPadding, ...paddingOverrides[previewed.layoutType] }
+      const padding = mergeLayoutPadding(globalPadding, paddingOverrides, previewed.layoutType)
       const contextSchema = { ...contextBase, padding, designBodyPadding: padding }
       // 보정할 것이 있는 글자(고친 자모가 든 글자)에서만 상자를 푼다. 상자는 화면과 같은 것.
       const hasSafety = [previewed.choseong, previewed.jungseong, previewed.jongseong].some((jamo) => jamo?.contextualInkSafety)

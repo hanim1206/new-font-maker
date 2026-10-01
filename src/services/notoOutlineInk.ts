@@ -1,4 +1,5 @@
 import type { DeepReadonly, InkPoint, InkRegion, InkRing } from '../types'
+import { BASELINE_Y, UPM } from './fontMetrics'
 
 /**
  * Noto 실측 윤곽(reference-lab export)의 폰트 단위 operations를 InkRegion 모양의 폴리곤으로 편다.
@@ -29,8 +30,8 @@ export type NotoOutlineInkResult =
   | { ok: true; regions: InkRegion[] }
   | { ok: false; message: string }
 
-/** notoBoundMaster·OTF ascender(880/1000)와 같은 세로 기준. */
-export const NOTO_OUTLINE_ASCENDER = 0.88
+/** notoBoundMaster·OTF ascender와 같은 세로 기준(`fontMetrics.BASELINE_Y`/UPM = 0.88). */
+export const NOTO_OUTLINE_ASCENDER = BASELINE_Y / UPM
 export const DEFAULT_NOTO_OUTLINE_INK_OPTIONS: NotoOutlineInkOptions = { maxCurveErrorFontUnits: 0.5 }
 
 type Affine = readonly [number, number, number, number, number, number]

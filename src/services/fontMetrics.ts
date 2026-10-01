@@ -8,6 +8,8 @@ import type { Padding } from '../types'
  * 추출기만 쓴다. 문장 줄(`CalibrationSentenceEditor`)이 같은 함수를 부르는 건 후속.
  */
 export const UPM = 1000
+/** 글리프 좌표의 밑선(baseline) y = OTF ascender. 모델 · 노토 윤곽 · 추출이 같은 세로 기준을 쓴다(880/1000). 줄 높이(hhea)는 `LINE_METRICS`가 따로 든다. */
+export const BASELINE_Y = 880
 
 export const NOTO_HANGUL_ADVANCE = 920
 export const NOTO_BODY_WIDTH = 840

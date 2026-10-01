@@ -8,6 +8,7 @@ import type {
 } from '../types'
 import { decomposeSyllable } from '../utils/hangulUtils'
 import { resolveGlyphInkPrimitives } from './glyphInkResolver'
+import { BASELINE_Y, UPM } from './fontMetrics'
 import { strokeToContours } from './strokeToOutline'
 
 export interface PresetJointJamoMaps {
@@ -36,8 +37,7 @@ export interface PresetJointInkMeasurement {
   }
 }
 
-const UPM = 1000
-const ASCENDER = 880
+const ASCENDER = BASELINE_Y
 const EPSILON = 1e-9
 
 function include(bounds: PresetInkBounds, x: number, y: number): void {

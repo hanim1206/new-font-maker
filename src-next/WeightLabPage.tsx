@@ -4,7 +4,7 @@ import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { useEffectiveGlobalStyle, type GlobalStyle } from '../src/stores/globalStyleStore'
 import { legacyWeightToMultiplier } from '../src/utils/globalStyleUtils'
 import { useJamoStore } from '../src/stores/jamoStore'
-import { useLayoutStore } from '../src/stores/layoutStore'
+import { mergePadding, useLayoutStore } from '../src/stores/layoutStore'
 import type { BoxConfig, LayoutSchema, Padding, Part } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { useContextPlacement, useNotoModel } from './notoModel'
@@ -32,7 +32,7 @@ const GLYPH_SIZE = 280
 type Mode = 'naive' | 'corrected'
 
 function withEffectivePadding(schema: LayoutSchema, globalPadding: Padding, override: Partial<Padding> | undefined): LayoutSchema {
-  const padding = { ...globalPadding, ...override }
+  const padding = mergePadding(globalPadding, override)
   return { ...schema, padding, designBodyPadding: padding }
 }
 

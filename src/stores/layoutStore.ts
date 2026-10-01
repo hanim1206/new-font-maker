@@ -149,7 +149,11 @@ interface LayoutActions {
  * 한 레이아웃에 실제로 먹는 네모꼴 여백(폰트 전체 + 레이아웃별 덮어쓰기). 화면 · 문장 · 저장된 폰트 미리보기 · OTF가 모두 이 함수로 합친다.
  */
 export function mergeLayoutPadding(globalPadding: Padding, paddingOverrides: Partial<Record<LayoutType, Partial<Padding>>>, layoutType: LayoutType): Padding {
-  const override = paddingOverrides[layoutType]
+  return mergePadding(globalPadding, paddingOverrides[layoutType])
+}
+
+/** 이미 고른 덮어쓰기 하나(없을 수도 있다)를 폰트 전체 여백에 얹는다. 합치는 방법은 이것 하나다. */
+export function mergePadding(globalPadding: Padding, override?: Partial<Padding>): Padding {
   return override ? { ...globalPadding, ...override } : { ...globalPadding }
 }
 
