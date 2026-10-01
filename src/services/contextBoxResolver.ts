@@ -109,6 +109,8 @@ export interface ContextMedialPart {
   roleIds: readonly string[]
   /** 모델 rail 그대로의 fit. 검수 화면 rail 편집의 출발점. */
   fit?: MedialFitResult
+  /** 상자 변 Δ까지만 얹고 보선 Δ는 안 얹은 fit. 짧은기둥 가로 자리 보선이 얼마나 옮겨졌는지 재는 기준이다. */
+  base?: MedialFitResult
   message?: string
 }
 
@@ -183,7 +185,11 @@ export function medialPartGroups(medialJamo: string): { part: ContextMedialPart[
  * 홀자 Δ가 있으면 획 역할 키로 rail에 얹어 다시 놓는다. 한계(글자 몸 · 순서 · 두께 간격)를 넘는 Δ는 경계까지 줄인다.
  */
 export function fitContextMedial(identity: ModelIdentity, model: ContextModel, medialDelta?: ContextBoxDelta['medial'], facesDelta?: ContextBoxDelta['faces']): ContextMedialPart[] {
-  return fitContextMedialBase(identity, model).map((group) => group.fit ? { ...group, fit: limitMedialFit(group.fit, facesDelta?.[group.part], medialDelta?.[group.part]).fit } : group)
+  return fitContextMedialBase(identity, model).map((group) => {
+    if (!group.fit) return group
+    const limited = limitMedialFit(group.fit, facesDelta?.[group.part], medialDelta?.[group.part])
+    return { ...group, fit: limited.fit, base: limited.faced }
+  })
 }
 
 /** Δ 없는 모델 fit. 한계(순서 · 간격 · 몸 밖 허용)의 기준이다. */
@@ -198,7 +204,7 @@ function fitContextMedialBase(identity: ModelIdentity, model: ContextModel): Con
     if (!made.ok) return { ...group, message: made.message }
     const fit = fitNotoMedialMaster(made.input)
     if (!fit.ok) return { ...group, message: fit.message }
-    return { ...group, fit: fit.fit }
+    return { ...group, fit: fit.fit, base: fit.fit }
   })
 }
 
@@ -293,7 +299,7 @@ function jamoForPart(syllable: DeepReadonly<DecomposedSyllable> | undefined, par
  * `primitives`는 렌더러와 같은 칸 끝 안전 보정까지 지난 그림 재료다(`weightMultiplier`는 그 보정만 본다). 받는 `faces` · `medialFit`은 늘 기준 틀 em이다.
  * 네모꼴 자동 보정으로 세로줄기가 얇아졌으면(`ends.stemScale`) 그 두께로 다듬는다 — 얇아진 잉크가 변에 닿게.
  */
-export function fitPartStrokes(input: { part: Part; jamo: DeepReadonly<JamoData>; faces: ContextFaces; glyphId: string; medialJamo: string; ends?: StrokeEnds; medialFit?: MedialFitResult; body?: Padding; weightMultiplier?: number }): ComponentFitOutcome {
+export function fitPartStrokes(input: { part: Part; jamo: DeepReadonly<JamoData>; faces: ContextFaces; glyphId: string; medialJamo: string; ends?: StrokeEnds; medialFit?: MedialFitResult; medialBase?: MedialFitResult; body?: Padding; weightMultiplier?: number }): ComponentFitOutcome {
   const body = input.body && !isReferenceBody(input.body) ? input.body : undefined
   const faces = body ? mapFacesToDesignBody(input.faces, body) : input.faces
   const stemScale = body ? input.ends?.stemScale ?? 1 : 1
@@ -309,7 +315,8 @@ export function fitPartStrokes(input: { part: Part; jamo: DeepReadonly<JamoData>
   // 홀자: 이름 있는 줄기는 세로 끝점 · 높이를 보선에서 받고 휨은 em 그대로 — 글자 잉크(`resolveGlyphInkPrimitives`)와 같은 배치를 지난다.
   // 보선은 기준 틀 em이라 사용자 네모꼴에서는 같은 자리로 옮겨 읽는다.
   const medialFit = body ? { ...input.medialFit, railsEm: railsInDesignBody(input.medialFit.railsEm, body) } : input.medialFit
-  const stems = stemRailTargets(input.medialJamo, input.part, medialFit, fitted.fit.box)
+  // 기준 보선(`medialBase`)은 칸 안 비율로만 읽혀 네모꼴을 옮겨도 그대로다.
+  const stems = stemRailTargets(input.medialJamo, input.part, medialFit, fitted.fit.box, input.medialBase)
   const box: BoxConfig = Object.keys(stems).length ? { ...fitted.fit.box, stems } : fitted.fit.box
   const placedIn = drawnBox(box)
   const primitives = fitted.fit.primitives.map((primitive) => {
@@ -383,7 +390,7 @@ export function resolveContextBoxes(input: {
   for (const group of medial) {
     const box = boxes[group.part]
     if (!group.fit || !box) continue
-    const stems = stemRailTargets(identity.medialJamo, group.part, group.fit, box)
+    const stems = stemRailTargets(identity.medialJamo, group.part, group.fit, box, group.base)
     if (Object.keys(stems).length) boxes[group.part] = { ...box, stems }
   }
   return { identity, parts, medial, issues, complete: issues.length === 0, boxes }
@@ -403,8 +410,8 @@ export function resolveInDesignBody(reference: ContextBoxResolution, input: { sy
     const faces = mapFacesToDesignBody(part.faces, padding)
     const jamo = part.fitted ? jamoForPart(input.syllable, part.part) : null
     if (!jamo) return { ...part, faces, box: mapBoxToDesignBody(reference.boxes[part.part] ?? part.box, padding) }
-    const medialFit = reference.medial.find((group) => group.part === part.part)?.fit
-    const fit = fitPartStrokes({ part: part.part, jamo, faces: part.faces, glyphId, medialJamo: reference.identity.medialJamo, ends: input.ends, medialFit, body: padding })
+    const group = reference.medial.find((item) => item.part === part.part)
+    const fit = fitPartStrokes({ part: part.part, jamo, faces: part.faces, glyphId, medialJamo: reference.identity.medialJamo, ends: input.ends, medialFit: group?.fit, medialBase: group?.base, body: padding })
     return fit.ok ? { ...part, faces, box: fit.fit.box } : { ...part, faces, box: mapBoxToDesignBody(reference.boxes[part.part] ?? part.box, padding) }
   })
   const boxes: Partial<Record<Part, BoxConfig>> = {}

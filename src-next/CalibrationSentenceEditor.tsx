@@ -28,8 +28,8 @@ import { useWorkbenchStore, workbenchJamoOf, workbenchSyllable } from '../src/st
 import { groupMatching, useJamoGroupStore } from '../src/stores/jamoGroupStore'
 import confirmStyles from './workspace/FontExportDialog.module.css'
 import { useLayoutStore } from '../src/stores/layoutStore'
-import { jamoCenterlineCenter, moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStrokes, snapWholeJamoDelta, translateJamoStrokes } from '../src/services/editorCommands'
-import { storedStemDelta } from '../src/services/stemBend'
+import { jamoCenterlineCenter, limitJamoMoveDelta, limitJamoScaleFactor, moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStrokes, snapWholeJamoDelta, translateJamoStrokes, type StrokeBoundsOf } from '../src/services/editorCommands'
+import { stemEditBox, storedStemDelta } from '../src/services/stemBend'
 import { stemRailGuides } from '../src/services/medialStemRails'
 import { StemSpreadSheet } from './StemSpreadSheet'
 import { beforeSpreadJamo, defaultPicked, lockedKeys, pickedMasters, shapeAskForStroke, shapePreview, spreadableStem, type ShapeAsk } from './stemShapeSession'
@@ -150,7 +150,8 @@ type Selection =
   | { kind: 'handle'; component: GlyphComponentIdentity; editorPart: MobileEditorPart; renderPart: Part; jamo: JamoData; strokeId: string; pointIndex: number; handle: 'in' | 'out'; box: BoxConfig }
 
 /** 캔버스 직접 끌기가 조절판과 같은 이동 계산을 쓰게 하는 문. `change`의 단위는 조절판과 같다(1 = 상자 좌표 0.001). */
-type StrokeDragApi = { begin: () => void; change: (movement: StrokeMoveDelta) => void; commit: () => void; cancel: () => void }
+/** `shownBox`는 이동량을 비율로 나눈 칸(끌기를 시작할 때 그 획이 놓인 칸). 안 주면 선택이 기억한 칸. */
+type StrokeDragApi = { begin: () => void; change: (movement: StrokeMoveDelta, shownBox?: BoxConfig) => void; commit: () => void; cancel: () => void }
 /** 끌기로 치는 최소 거리(px). 이보다 짧으면 누르기다. 조절판도 같은 문턱을 쓴다. */
 const DRAG_THRESHOLD_PX = 3
 /**
@@ -695,7 +696,7 @@ function FocusedGlyph({
     const uprightDx = dx + Math.tan(globalStyle.slant * Math.PI / 180) * dy
     const snapped = snapStrokeDrag({ anchors: state.anchors, requested: { x: uprightDx * emPerPx, y: dy * emPerPx }, candidates: state.candidates })
     setSnapHits((current) => current?.x?.value === snapped.hits.x?.value && current?.y?.value === snapped.hits.y?.value && current?.x?.label === snapped.hits.x?.label && current?.y?.label === snapped.hits.y?.label ? current : snapped.hits)
-    api.change({ x: snapped.delta.x / state.box.width / 0.001, y: snapped.delta.y / state.box.height / 0.001 })
+    api.change({ x: snapped.delta.x / state.box.width / 0.001, y: snapped.delta.y / state.box.height / 0.001 }, state.box)
   }
   // 조절판 끌기: 잡은 획 · 점 · 핸들의 닻과 후보를 캔버스 끌기와 똑같이 굳히고, 같은 스냅으로 옮긴다.
   const padDrag = useRef<{ box: BoxConfig; anchors: SnapAnchors; candidates: SnapCandidate[] } | null>(null)
@@ -918,6 +919,7 @@ function InferenceTrackpad({
   syllable,
   selection,
   creationSelection = null,
+  strokeBoxes,
   selectedPoints,
   selectedStrokes,
   onWholeJamoCenteredChange,
@@ -946,6 +948,8 @@ function InferenceTrackpad({
   selection: Selection
   /** 아무것도 안 잡혔을 때 넣기 도구(추가 · 원)가 기댈 자리. 획 편집에 잠긴 자소의 첫 획. */
   creationSelection?: Selection | null
+  /** 이 글자의 획마다 지금 놓인 상자. 자소를 통째로 키우거나 옮길 때 글자 칸 밖으로 못 나가게 재는 데 쓴다. */
+  strokeBoxes?: readonly { editorPart: MobileEditorPart; strokeId: string; box: BoxConfig }[]
   selectedPoints: SelectedPoint[]
   /** 획 묶음. 둘 이상이면 잡은 획을 끌 때 묶인 획이 같이 움직인다. */
   selectedStrokes: readonly string[]
@@ -1060,9 +1064,13 @@ function InferenceTrackpad({
     onInkGapLimitChange(violation)
   }
   // 가로는 글자 칸 끝에서 멈춘다. 넘기면 그리는 단계가 자모 전체를 반대쪽으로 밀어 넣는다.
-  const editBounds = (source: JamoData) => selection.kind === 'none' || selection.kind === 'component'
-    ? CALIBRATION_FREEFORM_BOUNDS
-    : calibrationEditBounds(selection.box, getJamoStrokes(source), weightToMultiplier(useGlobalStyleStore.getState().style.weight))
+  // 얇은 칸의 줄기(ㅡ · ㅣ)는 저장 좌표가 넓힌 칸 비율이다. 한계도 그 칸에서 재야 글자 칸 끝에서 멈춘다 — 받은 칸(두께 0)으로 재면 한계가 없는 것과 같다.
+  const editBounds = (source: JamoData) => {
+    if (selection.kind === 'none' || selection.kind === 'component') return CALIBRATION_FREEFORM_BOUNDS
+    const strokes = getJamoStrokes(source)
+    const stroke = strokes.find((item) => item.id === selection.strokeId)
+    return calibrationEditBounds(stroke ? stemEditBox(source, stroke, selection.box) : selection.box, strokes, weightToMultiplier(useGlobalStyleStore.getState().style.weight))
+  }
   // 잡은 획을 옮긴다. 획 묶음이면 잡은 획의 이동(경계 · 눈금 반영)만큼 묶인 획도 같이.
   const moveSelectedStrokes = (source: JamoData, requested: StrokeMoveDelta) => {
     if (selection.kind !== 'stroke') return null
@@ -1138,7 +1146,7 @@ function InferenceTrackpad({
       currentJamo.current = latest
     }
   }
-  const changeMove = (movement: StrokeMoveDelta) => {
+  const changeMove = (movement: StrokeMoveDelta, shownBox?: BoxConfig) => {
     // 캔버스 끌기는 em 기준으로 이미 스냅해서 넘긴다(레이아웃과 같은 규칙). 여기서 상자 좌표 눈금에 한 번 더 붙이면 걸린 자리가 어긋난다.
     const normalized = !padMove.current ? { x: movement.x * .001, y: movement.y * .001 } : {
       x: Math.round(movement.x * .001 / snapStep) * snapStep,
@@ -1163,11 +1171,13 @@ function InferenceTrackpad({
       // 이름 있는 줄기도 세로 이동이 저장 획에 남는다 — 보선 자리 위에 얹히는 이 홀자의 차이. 보선은 레이아웃 편집에서만 옮긴다.
       const strokeMove = normalized
       // 화면의 홀자 줄기는 받침 있는 칸에서도 em 휨을 지켜 놓여 있다(`placeStemStroke`). 놓인 칸에서 끈 이동량을 저장 좌표로 되돌린다.
+      // 얇은 칸의 줄기는 기울이는 순간 놓인 칸이 넓어진다. 선택이 기억한 칸이 아니라 이동량을 나눈 바로 그 칸으로 되돌려야 한다.
+      // 방향키 · 조절판은 칸 눈금으로 센다. 얇은 칸이면 넓힌 칸의 눈금이다.
       const toStored = (movement: StrokeMoveDelta): StrokeMoveDelta => {
         const stroke = getJamoStrokes(startJamo.current!).find((item) => item.id === selection.strokeId)
         if (!stroke) return movement
         const endpoint = selection.kind === 'point' && (selection.pointIndex === 0 || selection.pointIndex === stroke.points.length - 1)
-        return storedStemDelta(startJamo.current!, stroke, selection.box, movement, selection.kind === 'stroke' || endpoint ? 'rigid' : 'bend')
+        return storedStemDelta(startJamo.current!, stroke, shownBox ?? stemEditBox(startJamo.current!, stroke, selection.box), movement, selection.kind === 'stroke' || endpoint ? 'rigid' : 'bend')
       }
       const createCandidate = (factor: number) => {
         const movementAtFactor = toStored({ x: strokeMove.x * factor, y: strokeMove.y * factor })
@@ -1461,21 +1471,39 @@ function InferenceTrackpad({
   }
   // 트랙패드 왼쪽 크기 막대. 지금 자소(고른 것, 없으면 잠긴 것)를 통째로 키운다. 두께는 전역 굵기 그대로.
   // 넘친 만큼은 상자 밖으로 그대로 나가야 하므로 문맥 간격 되당김을 얹지 않는다(`pastGapLimit`).
+  // 자소 상자는 넘어도 글자 칸은 못 넘는다. 시작할 때 획마다 놓인 상자에서 한계를 재 두고(끄는 동안 상자가 흔들려도 같다), 닿는 배율 · 거리에서 멈춘다.
+  const wholeJamoBounds = useRef<StrokeBoundsOf>(() => undefined)
+  const captureWholeJamoBounds = (source: JamoData | null, editorPart: MobileEditorPart | undefined) => {
+    const weight = weightToMultiplier(useGlobalStyleStore.getState().style.weight)
+    const placed = (strokeBoxes ?? []).filter((item) => item.editorPart === editorPart)
+    const strokes = source ? getJamoStrokes(source) : []
+    const table = new Map(placed.map((item) => {
+      // 같은 상자에 놓인 획끼리 한계를 잰다(섞임홀자는 가로부 · 세로부 상자가 다르다).
+      const together = strokes.filter((stroke) => placed.some((other) => other.strokeId === stroke.id && other.box === item.box))
+      const own = strokes.find((stroke) => stroke.id === item.strokeId)
+      // 얇은 칸의 줄기는 넓힌 칸에서 잰다(저장 좌표가 그 칸 비율이다).
+      return [item.strokeId, calibrationEditBounds(source && own ? stemEditBox(source, own, item.box) : item.box, together, weight)] as const
+    }))
+    wholeJamoBounds.current = (strokeId) => table.get(strokeId)
+  }
   const scaleSource = useRef<JamoData | null>(null)
   const beginJamoScale = () => {
     const base = creationBase
     scaleSource.current = base ? structuredClone(adoptFamilyStrokes(getJamo(base.jamo.type, base.jamo.char) ?? base.jamo, familyOfSyllable(syllable))) : null
+    captureWholeJamoBounds(scaleSource.current, base?.editorPart)
   }
-  const changeJamoScale = (factor: number) => {
+  const changeJamoScale = (requested: number) => {
     const source = scaleSource.current
     if (!source) return
+    const factor = limitJamoScaleFactor(source, requested, wholeJamoBounds.current)
     onPreviewJamo({ type: source.type, char: source.char, data: scaleJamoStrokes(source, factor), baseline: source, pastGapLimit: true })
   }
-  const commitJamoScale = (factor: number) => {
+  const commitJamoScale = (requested: number) => {
     const source = scaleSource.current
     const base = creationBase
     scaleSource.current = null
     if (!source || !base) return onPreviewJamo(null)
+    const factor = limitJamoScaleFactor(source, requested, wholeJamoBounds.current)
     onCommitJamo(source, scaleJamoStrokes(source, factor), { kind: 'stroke-scale', glyph, component: base.component, jamoType: source.type, strokeId: base.strokeId, scale: { x: factor, y: factor } }, { pastGapLimit: true })
   }
   const cancelJamoScale = () => {
@@ -1520,6 +1548,7 @@ function InferenceTrackpad({
     const base = creationBase
     const source = base ? structuredClone(adoptFamilyStrokes(getJamo(base.jamo.type, base.jamo.char) ?? base.jamo, familyOfSyllable(syllable))) : null
     wholeJamoMove.current = source ? { source, center: jamoCenterlineCenter(source), delta: { x: 0, y: 0 } } : null
+    captureWholeJamoBounds(source, base?.editorPart)
   }
   const changeWholeJamoMove = (movement: StrokeMoveDelta) => {
     const state = wholeJamoMove.current
@@ -1527,7 +1556,7 @@ function InferenceTrackpad({
     // 눈금에 붙이고, 파트 상자 정가운데 가까이면 가운데에 먼저 붙인다(09-30 사용자).
     const gridded = { x: Math.round(movement.x * .001 / snapStep) * snapStep, y: Math.round(movement.y * .001 / snapStep) * snapStep }
     const snapped = snapWholeJamoDelta(state.center, gridded)
-    state.delta = snapped.delta
+    state.delta = limitJamoMoveDelta(state.source, snapped.delta, wholeJamoBounds.current)
     onWholeJamoCenteredChange?.(snapped.centered.x || snapped.centered.y ? snapped.centered : null)
     onPreviewJamo({ type: state.source.type, char: state.source.char, data: translateJamoStrokes(state.source, state.delta), baseline: state.source, pastGapLimit: true })
   }
@@ -2780,6 +2809,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         syllable={syllable}
         selection={selection}
         creationSelection={lockedPart && selection.kind === 'none' ? creationSelectionOf(lockedPart) : null}
+        strokeBoxes={getRenderedStrokeTargets(syllable, placement.kind === 'boxes' ? placement.boxes : focusedBoxes).map((target) => ({ editorPart: target.editorPart, strokeId: target.stroke.id, box: target.box }))}
         selectedPoints={selectedPoints}
         selectedStrokes={selectedStrokes}
         onWholeJamoCenteredChange={setWholeJamoCentered}

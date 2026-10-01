@@ -20,6 +20,14 @@ export function cloneJamoData(jamo: JamoData): JamoData {
   return structuredClone(jamo)
 }
 
+type Vec = { x: number; y: number }
+/**
+ * 점과 그 곡선 핸들. 한계는 핸들까지 본다 — 점만 보면 점 · 획을 옮기거나 키울 때 핸들이 딸려 나가 글자 칸 밖에서 가려지고(못 잡는다) 곡선이 칸을 넘는다.
+ * 핸들을 직접 끌 때(`moveHandle`)는 전부터 한계 안에서 멈췄다.
+ */
+const withHandles = (points: readonly { x: number; y: number; handleIn?: Vec; handleOut?: Vec }[]): Vec[] =>
+  points.flatMap((point) => [point, ...(point.handleIn ? [point.handleIn] : []), ...(point.handleOut ? [point.handleOut] : [])])
+
 export function moveStroke(
   source: JamoData,
   strokeId: string,
@@ -37,10 +45,11 @@ export function moveStroke(
     return { jamo, delta: { x: 0, y: 0 }, changed: false }
   }
 
-  const minX = Math.min(...stroke.points.map((point) => point.x))
-  const maxX = Math.max(...stroke.points.map((point) => point.x))
-  const minY = Math.min(...stroke.points.map((point) => point.y))
-  const maxY = Math.max(...stroke.points.map((point) => point.y))
+  const extent = withHandles(stroke.points)
+  const minX = Math.min(...extent.map((point) => point.x))
+  const maxX = Math.max(...extent.map((point) => point.x))
+  const minY = Math.min(...extent.map((point) => point.y))
+  const maxY = Math.max(...extent.map((point) => point.y))
   const clampAxis = (
     anchor: number,
     requestedDelta: number,
@@ -99,15 +108,17 @@ export function movePoint(
   const point = stroke?.points[pointIndex]
   if (!point) return { jamo, delta: { x: 0, y: 0 }, changed: false }
 
-  const snap = (value: number, delta: number, min: number, max: number): number => {
-    const clamped = Math.max(min - value, Math.min(max - value, delta))
+  // 점을 옮기면 핸들도 같이 간다. 점과 핸들 어느 것도 한계를 넘지 않는 만큼만 간다.
+  const extent = withHandles([point])
+  const snap = (value: number, delta: number, low: number, high: number): number => {
+    const clamped = Math.max(low, Math.min(high, delta))
     if (!gridStep || gridStep <= 0 || Math.abs(clamped) < EPSILON) return clamped
     const snapped = Math.round((value + clamped) / gridStep) * gridStep - value
-    return Math.max(min - value, Math.min(max - value, snapped))
+    return Math.max(low, Math.min(high, snapped))
   }
   const delta = {
-    x: snap(point.x, requested.x, bounds.minX, bounds.maxX),
-    y: snap(point.y, requested.y, bounds.minY, bounds.maxY),
+    x: snap(point.x, requested.x, bounds.minX - Math.min(...extent.map((item) => item.x)), bounds.maxX - Math.max(...extent.map((item) => item.x))),
+    y: snap(point.y, requested.y, bounds.minY - Math.min(...extent.map((item) => item.y)), bounds.maxY - Math.max(...extent.map((item) => item.y))),
   }
   if (Math.abs(delta.x) < EPSILON && Math.abs(delta.y) < EPSILON) {
     return { jamo, delta: { x: 0, y: 0 }, changed: false }
@@ -217,9 +228,11 @@ export function scaleStrokes(
       : maximum
     return Math.max(0.25, Math.min(snappedMaximum, snap(requested)))
   }
+  // 가운데 · 잠긴 축은 점으로 정하고, 한계에 닿는 배율은 핸들까지 본다.
+  const extent = withHandles(allPoints)
   const scale = {
-    x: limitAxis(requestedScale.x, center.x, minX, maxX, bounds.minX, bounds.maxX, lockedAxes.x),
-    y: limitAxis(requestedScale.y, center.y, minY, maxY, bounds.minY, bounds.maxY, lockedAxes.y),
+    x: limitAxis(requestedScale.x, center.x, Math.min(...extent.map((point) => point.x)), Math.max(...extent.map((point) => point.x)), bounds.minX, bounds.maxX, lockedAxes.x),
+    y: limitAxis(requestedScale.y, center.y, Math.min(...extent.map((point) => point.y)), Math.max(...extent.map((point) => point.y)), bounds.minY, bounds.maxY, lockedAxes.y),
   }
   if (Math.abs(scale.x - 1) < EPSILON && Math.abs(scale.y - 1) < EPSILON) {
     return { jamo, scale: { x: 1, y: 1 }, changed: false, lockedAxes }
@@ -264,6 +277,56 @@ export function scaleJamoStrokes(source: JamoData, factor: number): JamoData {
     if (point.handleOut) transform(point.handleOut)
   }
   return jamo
+}
+
+/** 획 하나가 놓인 상자에서의 편집 한계(상자 좌표)를 준다. 모르는 획이면 undefined — 그 획은 한계를 안 본다. */
+export type StrokeBoundsOf = (strokeId: string) => NormalizedBounds | undefined
+
+const renderedStrokesOf = (jamo: JamoData) => [...(jamo.strokes ?? []), ...(jamo.horizontalStrokes ?? []), ...(jamo.verticalStrokes ?? [])]
+
+/**
+ * 자소 통째 크기 배율을 글자 칸 안에 가둔다. 자소 상자는 넘어도 되지만(틀이 상자를 붙잡는다) 글자 칸 밖으로는 못 나간다.
+ * 키울 때만 줄인다 — 어느 점이든 한계에 먼저 닿는 배율에서 멈춘다(가로 · 세로 같은 비율이라 하나로 정해진다).
+ * 기준 가운데는 `scaleJamoStrokes`와 같다.
+ */
+export function limitJamoScaleFactor(source: JamoData, factor: number, boundsOf: StrokeBoundsOf): number {
+  if (!Number.isFinite(factor) || factor <= 1) return factor
+  const all = [...renderedStrokesOf(source), ...Object.values(source.contextStrokes ?? {}).flatMap((variant) => variant ?? [])].flatMap((stroke) => stroke.points)
+  if (!all.length) return factor
+  const xs = all.map((point) => point.x)
+  const ys = all.map((point) => point.y)
+  const center = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 }
+  let limit = factor
+  const reach = (value: number, centerValue: number, min: number, max: number) => {
+    const distance = value - centerValue
+    if (distance > EPSILON) limit = Math.min(limit, (max - centerValue) / distance)
+    else if (distance < -EPSILON) limit = Math.min(limit, (centerValue - min) / -distance)
+  }
+  for (const stroke of renderedStrokesOf(source)) {
+    const bounds = boundsOf(stroke.id)
+    if (!bounds) continue
+    for (const point of withHandles(stroke.points)) {
+      reach(point.x, center.x, bounds.minX, bounds.maxX)
+      reach(point.y, center.y, bounds.minY, bounds.maxY)
+    }
+  }
+  return Math.max(1, limit)
+}
+
+/** 자소 통째 이동을 글자 칸 안에 가둔다. 어느 점이든 한계에 닿는 만큼까지만 간다(가로 · 세로 따로). */
+export function limitJamoMoveDelta(source: JamoData, delta: StrokeMoveDelta, boundsOf: StrokeBoundsOf): StrokeMoveDelta {
+  let lowX = -Infinity; let highX = Infinity; let lowY = -Infinity; let highY = Infinity
+  for (const stroke of renderedStrokesOf(source)) {
+    const bounds = boundsOf(stroke.id)
+    if (!bounds) continue
+    for (const point of withHandles(stroke.points)) {
+      lowX = Math.max(lowX, bounds.minX - point.x); highX = Math.min(highX, bounds.maxX - point.x)
+      lowY = Math.max(lowY, bounds.minY - point.y); highY = Math.min(highY, bounds.maxY - point.y)
+    }
+  }
+  // 한계는 지금 점을 품고 있어 낮은 쪽은 0 이하, 높은 쪽은 0 이상이다.
+  const clamp = (value: number, low: number, high: number) => Math.min(Math.max(value, Math.min(low, 0)), Math.max(high, 0))
+  return { x: clamp(delta.x, lowX, highX), y: clamp(delta.y, lowY, highY) }
 }
 
 /**

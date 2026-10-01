@@ -116,7 +116,7 @@ function boxesOf(model: ContextModel, identity: ModelIdentity): number[] {
   return Object.keys(boxes).sort().flatMap((part) => {
     const box = boxes[part as keyof typeof boxes]!
     // 홀자 줄기 목표(칸 안 비율)도 같이 본다. 안쪽 세로 보선은 칸 대신 이걸 바꾼다.
-    const stems = Object.keys(box.stems ?? {}).sort().flatMap((id) => [box.stems![id].top ?? 0, box.stems![id].bottom ?? 0, box.stems![id].center ?? 0])
+    const stems = Object.keys(box.stems ?? {}).sort().flatMap((id) => [box.stems![id].top ?? 0, box.stems![id].bottom ?? 0, box.stems![id].center ?? 0, box.stems![id].dx ?? 0])
     return [box.x, box.y, box.width, box.height, ...stems]
   })
 }

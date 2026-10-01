@@ -46,7 +46,7 @@ export interface StemAttachment {
 
 const EPSILON = 1e-9
 
-function baseStrokeOf(char: string, strokeId: string): StrokeDataV2 | null {
+export function baseStrokeOf(char: string, strokeId: string): StrokeDataV2 | null {
   const base = JUNGSEONG_MAP[char]
   if (!base) return null
   return [...(base.strokes ?? []), ...(base.horizontalStrokes ?? []), ...(base.verticalStrokes ?? [])].find((stroke) => stroke.id === strokeId) ?? null
@@ -112,6 +112,58 @@ export function withPointX(stroke: StrokeDataV2, index: number, x: number): Stro
     x,
     ...(point.handleIn ? { handleIn: { x: point.handleIn.x + dx, y: point.handleIn.y } } : {}),
     ...(point.handleOut ? { handleOut: { x: point.handleOut.x + dx, y: point.handleOut.y } } : {}),
+  }
+  const points = [...stroke.points]
+  points[index] = moved
+  return { ...stroke, points }
+}
+
+/**
+ * 짧은기둥은 한 끝이 보에 붙고 한 끝이 비어 있다. 붙은 끝이 보에서 줄기 몸 쪽으로 떨어진 틈과 빈 끝의 길이 Δ는
+ * 기본 획과의 세로 차이로 잰다 — 놓을 때 보 가운데 · 보선 위에 그 차이만큼 얹힌다(`medialStemRails.stemEndsFor`).
+ */
+export interface BeamAttachment {
+  joined: StrokeEnd
+  free: StrokeEnd
+  /** 기본 획의 붙은 끝 · 빈 끝 y(칸 비율). */
+  baseJoinedY: number
+  baseFreeY: number
+  /** 보에서 빈 끝으로 가는 세로 방향. 틈(보에서 떨어짐)도 길이 Δ(길어짐)도 이 방향이 +다. */
+  away: 1 | -1
+}
+
+/** 이 짧은기둥이 보에 붙는 꼴. `joinedSide`는 붙은 끝이 위인가 아래인가(솟는 짧은기둥은 아래 끝이 보에 붙는다). */
+export function beamAttachmentOf(jamo: Pick<JamoData, 'type' | 'char'>, strokeId: string, joinedSide: 'top' | 'bottom'): BeamAttachment | null {
+  if (jamo.type !== 'jungseong') return null
+  const stroke = baseStrokeOf(jamo.char, strokeId)
+  if (!stroke || stroke.points.length < 2) return null
+  const first = stroke.points[0]
+  const last = stroke.points[stroke.points.length - 1]
+  if (Math.abs(first.y - last.y) < EPSILON) return null
+  const firstIsTop = first.y < last.y
+  const joined: StrokeEnd = (joinedSide === 'top') === firstIsTop ? 'start' : 'end'
+  const joinedPoint = joined === 'start' ? first : last
+  const freePoint = joined === 'start' ? last : first
+  return { joined, free: otherEnd(joined), baseJoinedY: joinedPoint.y, baseFreeY: freePoint.y, away: freePoint.y > joinedPoint.y ? 1 : -1 }
+}
+
+/** 저장 좌표에서 붙은 끝이 보에서 떨어진 틈(칸 비율, 줄기 몸 쪽 +). 기본 획은 0. 음수면 보를 뚫고 나간 것이다. */
+export const beamGapOf = (stroke: StrokeDataV2, attachment: BeamAttachment) => (stroke.points[endIndexOf(stroke, attachment.joined)].y - attachment.baseJoinedY) * attachment.away
+
+/** 저장 좌표에서 빈 끝이 기본 획의 빈 끝에서 옮겨진 길이 Δ(칸 비율, 길어짐 +). */
+export const beamReachOf = (stroke: StrokeDataV2, attachment: BeamAttachment) => (stroke.points[endIndexOf(stroke, attachment.free)].y - attachment.baseFreeY) * attachment.away
+
+/** 점 하나의 y를 옮긴 획. 그 점의 손잡이도 같이 간다. 같은 자리면 같은 획. */
+export function withPointY(stroke: StrokeDataV2, index: number, y: number): StrokeDataV2 {
+  const point = stroke.points[index]
+  if (!point) return stroke
+  const dy = y - point.y
+  if (Math.abs(dy) < EPSILON) return stroke
+  const moved: AnchorPoint = {
+    ...point,
+    y,
+    ...(point.handleIn ? { handleIn: { x: point.handleIn.x, y: point.handleIn.y + dy } } : {}),
+    ...(point.handleOut ? { handleOut: { x: point.handleOut.x, y: point.handleOut.y + dy } } : {}),
   }
   const points = [...stroke.points]
   points[index] = moved

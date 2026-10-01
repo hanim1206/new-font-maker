@@ -274,3 +274,84 @@ test('곁줄기 끝을 올리면(기울기) 켜진 다른 곁줄기도 같은 �
   await expect.poll(async () => (await eoStroke())[1].y, { timeout: 5_000 }).toBeLessThan(before[1].y)
   expect((await eoStroke())[0]).toEqual(before[0])
 })
+
+test('높이 0인 칸의 보(의)를 기울여 퍼뜨리면 형제 보도 같은 만큼만 기운다 — 세로로 터지지 않는다', async ({ page }) => {
+  const pointsOf = async (char: string, channel: string, id: string) => JSON.parse(await jungseongOf(page, char))?.[channel]?.find((stroke: { id: string }) => stroke.id === id)?.points as { x: number; y: number }[] | undefined
+  await page.goto('/workspace/jamo?char=%EC%9D%98&mode=stroke&part=JU')
+  await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
+  const hit = page.locator('[data-editor-hit="stroke"][data-stroke-id="ㅢ-1"]')
+  for (let tap = 0; tap < 2; tap += 1) { await hit.dispatchEvent('pointerdown'); await hit.dispatchEvent('pointerup') }
+  const points = page.locator('[data-editor-point="hit"]')
+  await points.last().dispatchEvent('pointerdown')
+  await points.last().dispatchEvent('pointerup')
+  const before = await strokePath(page, 'ㅢ-1')
+  // 손으로 끝점을 위로 끈다(방향키가 아니라 끌기 — 끈 거리를 칸 높이로 나누는 길이 터졌었다).
+  const grip = (await points.last().boundingBox())!
+  const from = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 }
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(from.x, from.y - 8, { steps: 4 })
+  await page.mouse.move(from.x, from.y - 16, { steps: 4 })
+  await page.mouse.up()
+  // 화면의 보가 기울고, 저장값은 넓힌 칸 비율이라 작다(예전엔 칸 높이 0으로 나눠 백만 배였다).
+  await expect.poll(() => strokePath(page, 'ㅢ-1')).not.toBe(before)
+  await expect.poll(async () => (await pointsOf('ㅢ', 'horizontalStrokes', 'ㅢ-1'))?.[1].y ?? 0.5, { timeout: 5_000 }).toBeLessThan(0.5)
+  const own = (await pointsOf('ㅢ', 'horizontalStrokes', 'ㅢ-1'))!
+  const lift = own[0].y - own[1].y
+  expect(lift).toBeGreaterThan(0.01)
+  expect(lift).toBeLessThan(1)
+  await page.getByTestId('jamo-stroke-spread').click()
+  const sheet = page.getByTestId('stem-rail-apply')
+  await expect(sheet.locator('[data-kind="shape"][data-char="ㅗ"]')).toHaveAttribute('aria-pressed', 'true')
+  // 카드의 글자가 카드 밖으로 뻗지 않는다 — 형제 보가 세로로 터지면 잉크가 카드보다 훨씬 길어진다.
+  const card = sheet.locator('[data-kind="shape"][data-char="ㅗ"]')
+  const cardBox = (await card.boundingBox())!
+  const inkBox = (await card.locator('svg').first().evaluate((svg) => { const box = (svg as SVGSVGElement).getBBox(); const rect = svg.getBoundingClientRect(); const scale = rect.height / (svg as SVGSVGElement).viewBox.baseVal.height; return { height: box.height * scale } }))
+  expect(inkBox.height).toBeLessThan(cardBox.height)
+  if (process.env.STEM_SPREAD_SHOT) await sheet.screenshot({ path: process.env.STEM_SPREAD_SHOT })
+  await page.getByTestId('stem-rail-apply-go').click()
+  await expect(sheet).toHaveCount(0)
+  // ㅗ 칸 높이가 곧 넓힌 칸 높이라 ㅗ 보의 끝점도 같은 비율만큼 올라간다.
+  await expect.poll(async () => (await storedPoints(page, 'ㅗ', 'ㅗ-2'))?.[1].y ?? 1, { timeout: 5_000 }).toBeLessThan(1)
+  const o = (await storedPoints(page, 'ㅗ', 'ㅗ-2'))!
+  expect(o[0].y - o[1].y).toBeCloseTo(lift, 6)
+})
+
+test('짧은기둥의 붙은 끝을 끌면 보에서 떨어지고, 전파하면 형제 짧은기둥도 같은 만큼 보에서 떨어진다', async ({ page }) => {
+  const ysOf = (d: string | null) => [...(d ?? '').matchAll(/[ML] -?[\d.]+ (-?[\d.]+)/g)].map((match) => Number(match[1]))
+  await page.goto('/workspace/jamo?char=%EC%98%A4&mode=stroke&part=JU')
+  await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
+  const beamBefore = await strokePath(page, 'ㅗ-2')
+  const [topBefore, bottomBefore] = ysOf(await strokePath(page, 'ㅗ-1')).sort((a, b) => a - b)
+  // 붙은 끝(아래 점)을 잡아 위로 끈다.
+  await selectStroke(page, 'ㅗ-2')
+  await pickBottomEnd(page, 'ㅗ-1')
+  const points = page.locator('[data-editor-point="hit"]')
+  const cys = await points.evaluateAll((els) => els.map((el) => Number(el.getAttribute('cy'))))
+  const grip = (await points.nth(cys.indexOf(Math.max(...cys))).boundingBox())!
+  const from = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 }
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(from.x, from.y - 6, { steps: 3 })
+  await page.mouse.move(from.x, from.y - 14, { steps: 4 })
+  await page.mouse.up()
+  // 아래 끝이 보에서 떨어지고, 위 끝과 보는 그대로다.
+  await expect.poll(async () => Math.max(...ysOf(await strokePath(page, 'ㅗ-1')))).toBeLessThan(bottomBefore - 1)
+  expect(Math.min(...ysOf(await strokePath(page, 'ㅗ-1')))).toBeCloseTo(topBefore, 4)
+  expect(await strokePath(page, 'ㅗ-2')).toBe(beamBefore)
+  await expect.poll(async () => (await storedPoints(page, 'ㅗ', 'ㅗ-1'))?.[1].y ?? 1, { timeout: 5_000 }).toBeLessThan(1)
+  const lifted = 1 - (await storedPoints(page, 'ㅗ', 'ㅗ-1'))![1].y
+
+  await page.getByTestId('jamo-stroke-spread').click()
+  const sheet = page.getByTestId('stem-rail-apply')
+  await expect(sheet.locator('[data-kind="shape"][data-char="ㅜ"]')).toHaveAttribute('aria-pressed', 'true')
+  if (process.env.STEM_SPREAD_SHOT) await sheet.screenshot({ path: process.env.STEM_SPREAD_SHOT })
+  await page.getByTestId('stem-rail-apply-go').click()
+  await expect(sheet).toHaveCount(0)
+  // ㅛ는 아래 끝이 같은 비율만큼 올라가고(칸 높이가 같다), ㅜ는 붙은 끝이 위라 위 끝이 내려간다.
+  await expect.poll(async () => (await storedPoints(page, 'ㅛ', 'ㅛ-1'))?.[1].y ?? 1, { timeout: 5_000 }).toBeLessThan(1)
+  expect(1 - (await storedPoints(page, 'ㅛ', 'ㅛ-1'))![1].y).toBeCloseTo(lifted, 2)
+  const u = (await storedPoints(page, 'ㅜ', 'ㅜ-2'))!
+  expect(u[0].y).toBeGreaterThan(0.01)
+  expect(u[1].y).toBeCloseTo(1, 6)
+})

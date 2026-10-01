@@ -9,8 +9,10 @@ import type { MedialFitResult } from './notoMedialMasterFit'
  * 칸 안 비율이라 네모꼴 변환처럼 칸을 통째로 옮기는 선형 변환을 지나도 그대로 맞는다.
  *
  * - 바깥 변(칸 위 · 아래)에 매인 끝은 목표를 안 싣는다. 칸이 그 변을 따라가니 지금처럼 칸이 끝을 끈다.
- * - 짧은기둥이 보에 붙은 끝은 모델이 어느 보선에 맸든 늘 보 가운데를 따른다(D0 결정).
- * - 이번 범위는 세로만. 가로 자리는 저장 좌표 그대로다.
+ * - 짧은기둥이 보에 붙은 끝은 모델이 어느 보선에 맸든 보 가운데를 따른다(D0 결정). 획 편집으로 그 끝을 옮긴 만큼은 보 가운데 위에 얹힌다 —
+ *   보에서 떼거나 보를 뚫을 수 있고, 보를 옮기면 그 틈째 따라온다(10-01 결정, 틈은 줄기 마스터로 형제에 퍼진다).
+ * - 가로 자리는 저장 좌표 그대로다. 짧은기둥만 예외 — 레이아웃에서 그 가로 자리 보선을 끌면 끈 만큼(Δ) 옆으로 간다.
+ *   보선의 자리 자체가 아니라 모델 자리에서 옮겨진 만큼만 얹으므로, 보선을 안 끈 폰트는 그대로다.
  *
  * 플랜: docs/plans/2026-09-29_홀자-줄기-끝점-보선.md
  */
@@ -49,11 +51,18 @@ const OUTER_Y: ReadonlySet<string> = new Set(['outer-top', 'outer-bottom'])
 /** 칸 높이가 이보다 얇으면(ㅡ · ㅢ 가로부) 칸 안 비율로 높이를 못 적는다. 칸이 곧 줄기 자리다. */
 const THIN_BOX = 1e-3
 const EPSILON = 1e-9
+/** 가로 자리 Δ가 이보다 작으면(0.01u) 계산 잡음으로 본다 — slot 변만 옮긴 폰트의 짧은기둥이 흔들리지 않는다. */
+const DX_NOISE = 1e-5
 
-/** 이 홀자 칸에 실을 줄기별 세로 목표(칸 안 비율). 목표가 하나도 없으면 빈 표. */
-export function stemRailTargets(medialJamo: string, part: Part, fit: Pick<MedialFitResult, 'railsEm' | 'bindings'>, box: BoxConfig): Record<string, StemRailTarget> {
+/**
+ * 이 홀자 칸에 실을 줄기별 목표(칸 안 비율). 목표가 하나도 없으면 빈 표.
+ * `base`는 보선 Δ를 얹기 전 fit(상자 변 Δ까지만) — 있으면 짧은기둥의 가로 자리 보선이 slot 안에서 옮겨진 만큼을 `dx`로 싣는다.
+ */
+export function stemRailTargets(medialJamo: string, part: Part, fit: Pick<MedialFitResult, 'railsEm' | 'bindings' | 'slot'>, box: BoxConfig, base?: Pick<MedialFitResult, 'railsEm' | 'slot'>): Record<string, StemRailTarget> {
   const roles = MEDIAL_STEM_ROLES[medialJamo]
   if (!roles || box.height < THIN_BOX) return {}
+  // 보선이 slot 안에서 놓인 비율. slot 네 변을 옮기면 보선도 같이 가므로 이 비율은 그대로고, 보선만 끌면 바뀐다.
+  const inSlot = (source: Pick<MedialFitResult, 'railsEm' | 'slot'>, railKey: string) => (source.railsEm[railKey] - source.slot.x) / source.slot.width
   const local = (railKey: string) => OUTER_Y.has(railKey) ? undefined : (fit.railsEm[railKey] - box.y) / box.height
   const beams = fit.bindings.filter((binding) => binding.orientation === 'horizontal')
   const targets: Record<string, StemRailTarget> = {}
@@ -75,6 +84,10 @@ export function stemRailTargets(medialJamo: string, part: Part, fit: Pick<Medial
         const joined = local(beams[0].centerRail)
         if (topGap <= bottomGap) { target.top = joined; target.joined = 'top' }
         else { target.bottom = joined; target.joined = 'bottom' }
+      }
+      if (SHORT_STEMS.has(role) && base && base !== fit && box.width > THIN_BOX && fit.slot.width > THIN_BOX && base.slot.width > THIN_BOX) {
+        const moved = (inSlot(fit, binding.centerRail) - inSlot(base, binding.centerRail)) * fit.slot.width
+        if (Number.isFinite(moved) && Math.abs(moved) > DX_NOISE) target.dx = moved / box.width
       }
     }
     const entries = Object.entries(target).filter(([, value]) => typeof value === 'string' || (value !== undefined && Number.isFinite(value)))
@@ -116,19 +129,12 @@ export function stemEndsFor(jamo: Pick<JamoData, 'type' | 'char'>, stroke: Strok
   }
   const start = stroke.points[0]
   const end = stroke.points[last]
-  let startY = start.y + startShift
-  let endY = end.y + endShift
-  // 보에 붙은 끝은 저장 획이 옮겨져 있어도 보 가운데에 둔다.
-  if (target.joined) {
-    const startIsTop = baseStart.y <= baseEnd.y
-    const joinedY = target.joined === 'top' ? target.top : target.bottom
-    if (joinedY !== undefined) {
-      if ((target.joined === 'top') === startIsTop) startY = joinedY
-      else endY = joinedY
-    }
-  }
-  if (Math.abs(startY - start.y) < EPSILON && Math.abs(endY - end.y) < EPSILON) return null
-  return { start: { x: start.x, y: startY }, end: { x: end.x, y: endY } }
+  // 보에 붙은 끝도 다른 끝과 같다 — 목표(보 가운데) 위에 저장 획이 기본 획에서 옮겨진 만큼(틈)을 얹는다.
+  const startY = start.y + startShift
+  const endY = end.y + endShift
+  const dx = target.dx ?? 0
+  if (Math.abs(startY - start.y) < EPSILON && Math.abs(endY - end.y) < EPSILON && Math.abs(dx) < EPSILON) return null
+  return { start: { x: start.x + dx, y: startY }, end: { x: end.x + dx, y: endY } }
 }
 
 /** 보에 매달린 쪽(아래에서 올라오는 짧은기둥)이 위쪽 끝인 홀자. 나머지 짧은기둥은 아래 끝이 보에 붙는다. */
@@ -158,7 +164,7 @@ export function stemEndOnBorder(box: BoxConfig | undefined, strokeId: string, en
 
 const endOfKey = (key: string): 'top' | 'bottom' | 'center' => key.endsWith('.center') ? 'center' : key.endsWith('.start') ? 'top' : 'bottom'
 
-/** 획 편집 캔버스에 길게 그릴 이 줄기의 보선: 끌면 움직이는 끝(짧은기둥의 붙은 끝은 빼고)과 그 끝이 테두리인지. */
+/** 획 편집 캔버스에 길게 그릴 이 줄기의 보선: 보선에 매인 끝(짧은기둥의 붙은 끝은 보에 매여 있어 빼고)과 그 끝이 테두리인지. */
 export function stemRailGuides(input: { jamo: Pick<JamoData, 'type' | 'char'>; stroke: StrokeDataV2; part: Part; box?: BoxConfig }): { key: string; end: 'top' | 'bottom' | 'center'; border: boolean }[] {
   const { jamo, stroke } = input
   if (jamo.type !== 'jungseong' || stroke.points.length < 2) return []

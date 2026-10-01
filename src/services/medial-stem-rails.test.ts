@@ -6,6 +6,7 @@ import { CHOSEONG_MAP, JONGSEONG_MAP, JUNGSEONG_MAP } from '../data/Hangul'
 import { DEFAULT_STYLE } from '../stores/globalStyleStore'
 import type { BoxConfig, JamoData, Part, StrokeDataV2 } from '../types'
 import { decomposeSyllable } from '../utils/hangulUtils'
+import { withFrameFrom } from '../utils/jamoFrame'
 import { boxToFaces, fitPartStrokes, identityOfSyllable, medialPartGroups, resolveContextBoxes, resolveInDesignBody, type ContextBoxDelta } from './contextBoxResolver'
 import { mapBoxToDesignBody } from './designBodyPlacement'
 import { materializeFinalGlyphInk, projectFinalGlyphInkToFontContours } from './finalGlyphInk'
@@ -80,9 +81,11 @@ describe.skipIf(!existsSync(CORPUS))('홀자 줄기 끝점 = 보선 — G0 대�
   const decompose = (char: string) => decomposeSyllable(char, CHOSEONG_MAP, JUNGSEONG_MAP, JONGSEONG_MAP)
 
   /** 한 글자를 칸 해석 → 잉크 해석까지 돌려 줄기 중심선의 위 · 아래 · 가운데 높이(em)를 잰다. */
-  async function render(char: string, delta?: ContextBoxDelta) {
+  async function render(char: string, delta?: ContextBoxDelta, editMedial?: (jamo: JamoData) => JamoData) {
     const model = await bundle
-    const syllable = decompose(char)
+    const decomposed = decompose(char)
+    // 틀을 굳혀야 고친 획이 칸을 다시 채우지 않는다(획 편집이 하는 일).
+    const syllable = editMedial && decomposed.jungseong ? { ...decomposed, jungseong: withFrameFrom(editMedial(decomposed.jungseong), decomposed.jungseong) } : decomposed
     const resolved = resolveContextBoxes({ identity: identityOfSyllable(syllable)!, model, syllable, ends: ENDS, delta })
     expect(resolved.complete).toBe(true)
     const ink = resolveGlyphInkPrimitives({ syllable, placement: { kind: 'boxes', boxes: resolved.boxes }, weightMultiplier: 1, globalLinecap: ENDS.linecap, globalLinejoin: ENDS.linejoin })
@@ -91,12 +94,34 @@ describe.skipIf(!existsSync(CORPUS))('홀자 줄기 끝점 = 보선 — G0 대�
       const ys = primitive.stroke.points.map((p) => primitive.box.y + p.y * primitive.box.height)
       return { top: Math.min(...ys), bottom: Math.max(...ys), mid: (ys[0] + ys[ys.length - 1]) / 2 }
     }
+    /** 줄기 중심선 두 끝의 가로 자리(em). */
+    const stemX = (id: string) => {
+      const primitive = ink.primitives.find((item) => item.source.strokeId === id)!
+      return [primitive.stroke.points[0], primitive.stroke.points[primitive.stroke.points.length - 1]].map((p) => primitive.box.x + p.x * primitive.box.width)
+    }
     const railOf = (part: Part, role: string, kind: 'centerRail' | 'fromRail' | 'toRail' = 'centerRail') => {
       const fit = resolved.medial.find((group) => group.part === part)!.fit!
       return fit.railsEm[fit.bindings.find((binding) => binding.roleId === role)![kind]]
     }
-    return { stem, railOf, resolved, syllable }
+    return { stem, stemX, railOf, resolved, syllable }
   }
+
+  it.each([['오', 'JU', 'baseStem', 'ㅗ-1', 'ㅗ-2'], ['우', 'JU', 'baseStem', 'ㅜ-2', 'ㅜ-1'], ['왜', 'JU_H', 'baseStem', 'ㅙ-1', 'ㅙ-2'], ['요', 'JU', 'leftStem', 'ㅛ-1', 'ㅛ-3'], ['유', 'JU', 'rightStem', 'ㅠ-3', 'ㅠ-1']] as const)('%s: 짧은기둥 가로 자리 보선을 20u 옮기면 짧은기둥만 20u 옆으로 가고, 안 옮긴 폰트는 그대로다', async (char, part, role, stemId, beamId) => {
+    const base = await render(char)
+    // 보선을 안 끌면 가로 목표가 없다 — 저장 좌표 그대로.
+    expect(base.resolved.boxes[part]!.stems?.[stemId]?.dx).toBeUndefined()
+    for (const step of [0.02, -0.02]) {
+      const moved = await render(char, { medial: { [part]: { [`${role}.center`]: step } } })
+      moved.stemX(stemId).forEach((x, index) => expect(x - base.stemX(stemId)[index]).toBeCloseTo(step, 6))
+      expect(moved.stemX(beamId)).toEqual(base.stemX(beamId))
+      expect(moved.stem(beamId)).toEqual(base.stem(beamId))
+      expect(moved.stem(stemId).top).toBeCloseTo(base.stem(stemId).top, 6)
+      expect(moved.stem(stemId).bottom).toBeCloseTo(base.stem(stemId).bottom, 6)
+    }
+    // 홀자 상자 변만 옮기면 짧은기둥은 칸을 따라갈 뿐 가로 목표는 안 생긴다.
+    const faced = await render(char, { faces: { [part]: { left: -0.02, right: 0.02 } } })
+    expect(faced.resolved.boxes[part]!.stems?.[stemId]?.dx).toBeUndefined()
+  })
 
   it('아: 기본에서 곁줄기가 보선 높이에 서고, 곁줄기 보선을 80u 올리면 곁줄기만 80u 올라간다', async () => {
     const base = await render('아')
@@ -121,6 +146,34 @@ describe.skipIf(!existsSync(CORPUS))('홀자 줄기 끝점 = 보선 — G0 대�
     expect(moved.stem('ㅗ-2').mid - base.stem('ㅗ-2').mid).toBeCloseTo(-0.03, 3)
     expect(moved.stem('ㅗ-1').bottom).toBeCloseTo(moved.stem('ㅗ-2').mid, 6)
     expect(moved.stem('ㅗ-1').top).toBeCloseTo(base.stem('ㅗ-1').top, 6)
+  })
+
+  it.each([['오', 'JU', 'ㅗ-1', 'ㅗ-2', 'bottom'], ['우', 'JU', 'ㅜ-2', 'ㅜ-1', 'top'], ['왜', 'JU_H', 'ㅙ-1', 'ㅙ-2', 'bottom']] as const)('%s: 획 편집으로 짧은기둥의 붙은 끝을 옮기면 보 가운데에서 그만큼 떨어지고, 보를 옮겨도 그 틈째 따라온다', async (char, part, stemId, beamId, joined) => {
+    const base = await render(char)
+    expect(base.stem(stemId)[joined]).toBeCloseTo(base.stem(beamId).mid, 6)
+    // 붙은 끝을 줄기 몸 쪽으로 칸 높이의 10% 옮긴 저장 획.
+    const lift = joined === 'bottom' ? -0.1 : 0.1
+    const edit = (jamo: JamoData): JamoData => {
+      const channel = jamo.horizontalStrokes?.some((item) => item.id === stemId) ? 'horizontalStrokes' : 'strokes'
+      return { ...jamo, [channel]: jamo[channel]!.map((stroke) => {
+        if (stroke.id !== stemId) return stroke
+        const last = stroke.points.length - 1
+        const joinedIndex = (stroke.points[0].y > stroke.points[last].y) === (joined === 'bottom') ? 0 : last
+        return { ...stroke, points: stroke.points.map((point, index) => index === joinedIndex ? { ...point, y: point.y + lift } : point) }
+      }) }
+    }
+    const detached = await render(char, undefined, edit)
+    const boxHeight = detached.resolved.boxes[part]!.height
+    expect(detached.stem(stemId)[joined] - detached.stem(beamId).mid).toBeCloseTo(lift * boxHeight, 6)
+    // 빈 끝과 보는 그대로.
+    const free = joined === 'bottom' ? 'top' : 'bottom'
+    expect(detached.stem(stemId)[free]).toBeCloseTo(base.stem(stemId)[free], 6)
+    expect(detached.stem(beamId)).toEqual(base.stem(beamId))
+    // 보를 옮기면 틈을 지킨 채 따라온다.
+    const role = MEDIAL_STEM_ROLES[detached.syllable.jungseong!.char][beamId][1]
+    const moved = await render(char, { medial: { [part]: { [`${role}.center`]: joined === 'bottom' ? -0.02 : 0.02 } } }, edit)
+    expect(moved.stem(beamId).mid).not.toBeCloseTo(base.stem(beamId).mid, 4)
+    expect(moved.stem(stemId)[joined] - moved.stem(beamId).mid).toBeCloseTo(lift * moved.resolved.boxes[part]!.height, 6)
   })
 
   it('와: 섞임 세로부 곁줄기 보선과 가로부 보 보선이 각자 잉크를 끈다', async () => {
@@ -174,8 +227,8 @@ describe.skipIf(!existsSync(CORPUS))('홀자 줄기 끝점 = 보선 — G0 대�
     const glyph = resolveGlyphInkPrimitives({ syllable, placement: { kind: 'boxes', boxes: inBody.boxes }, weightMultiplier: weight, globalLinecap: ENDS.linecap, globalLinejoin: ENDS.linejoin })
     const em = (item: { stroke: StrokeDataV2; box: BoxConfig }) => item.stroke.points.map((p) => [item.box.x + p.x * item.box.width, item.box.y + p.y * item.box.height])
     const jobs = [
-      ...resolved.medial.map((group) => ({ part: group.part as Part, jamo: syllable.jungseong!, faces: boxToFaces(group.fit!.slot), medialFit: group.fit })),
-      ...resolved.parts.filter((part) => part.part === 'CH' || part.part === 'JO').map((part) => ({ part: part.part, jamo: (part.part === 'CH' ? syllable.choseong : syllable.jongseong)!, faces: part.faces, medialFit: undefined })),
+      ...resolved.medial.map((group) => ({ part: group.part as Part, jamo: syllable.jungseong!, faces: boxToFaces(group.fit!.slot), medialFit: group.fit, medialBase: group.base })),
+      ...resolved.parts.filter((part) => part.part === 'CH' || part.part === 'JO').map((part) => ({ part: part.part, jamo: (part.part === 'CH' ? syllable.choseong : syllable.jongseong)!, faces: part.faces, medialFit: undefined, medialBase: undefined })),
     ]
     let compared = 0
     for (const job of jobs) {

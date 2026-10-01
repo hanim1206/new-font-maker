@@ -318,3 +318,89 @@ test('트랙패드 왼쪽 크기 막대를 올리면 고른 자소가 통째로 
   expect(after[0].height).toBeCloseTo(before[0].height * 1.3, 1)
   expect(after.slice(2)).toEqual(before.slice(2))
 })
+
+test('자소를 두 손가락으로 통째로 키워도 획이 글자 칸 밖으로 나가지 않고, 가로 · 세로 같은 비율로 멈춘다', async ({ page }) => {
+  test.setTimeout(120_000)
+  for (const [syllable, part] of [['오', 'CH'], ['한', 'JO']] as const) {
+    await page.goto(`/workspace/jamo?char=${encodeURIComponent(syllable)}&mode=stroke&part=${part}`)
+    const strokes = page.locator('[data-editor-hit="stroke"]')
+    await expect(strokes.first()).toBeAttached({ timeout: 60_000 })
+    // 첫닿자는 단독 칸으로 열린다. 줄에서 그 음절을 눌러 글자 안에서 본다.
+    if (part === 'CH') await page.locator(`[data-testid="review-propagation-card"][data-char="${syllable}"] [data-testid="review-propagation-open"]`).first().click()
+    await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
+    const box = () => strokes.first().evaluate((element) => { const b = (element as SVGGraphicsElement).getBBox(); return { left: b.x, right: b.x + b.width, top: b.y, bottom: b.y + b.height, width: b.width, height: b.height } })
+    const before = await box()
+    // 빈 곳을 눌러 선택을 풀면 잠긴 자소 전체가 잡힌다.
+    const canvas = (await page.getByTestId('focus-canvas').boundingBox())!
+    await page.touchscreen.tap(canvas.x + 6, canvas.y + 6)
+    const pad = page.locator('[role="group"][aria-label*="트랙패드"]')
+    await expect(pad).toHaveAttribute('data-whole', 'true')
+    // 조절판에서 두 손가락을 크게 벌린다(두 배까지 요청).
+    const area = (await pad.boundingBox())!
+    const center = { x: area.x + area.width / 2, y: area.y + area.height / 2 }
+    const client = await page.context().newCDPSession(page)
+    const fingers = (gap: number) => [{ x: center.x - gap, y: center.y, id: 1 }, { x: center.x + gap, y: center.y, id: 2 }]
+    await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: fingers(30) })
+    for (let step = 1; step <= 10; step += 1) await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: fingers(30 + 12 * step) })
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await expect.poll(async () => (await box()).width, { message: syllable }).toBeGreaterThan(before.width * 1.05)
+    const after = await box()
+    // 글자 칸은 0–100, 중심선은 두께 절반(3.5) 안쪽까지. 전에는 위아래로 칸 밖(−5 · 101.6)까지 나갔다.
+    expect(after.left, syllable).toBeGreaterThanOrEqual(3.5 - 0.01)
+    expect(after.right, syllable).toBeLessThanOrEqual(96.5 + 0.01)
+    expect(after.top, syllable).toBeGreaterThanOrEqual(3.5 - 0.01)
+    expect(after.bottom, syllable).toBeLessThanOrEqual(96.5 + 0.01)
+    expect(after.width / before.width, syllable).toBeCloseTo(after.height / before.height, 2)
+  }
+})
+
+test('캔버스에서 획 · 점을 멀리 끌어도 글자 칸 밖으로 나가지 않는다 — 얇은 칸의 ㅡ · ㅣ와 곡선 핸들까지', async ({ page }) => {
+  test.setTimeout(120_000)
+  const open = async (syllable: string, part: string, inSyllable = false) => {
+    await page.goto(`/workspace/jamo?char=${encodeURIComponent(syllable)}&mode=stroke&part=${part}`)
+    await expect(page.locator('[data-editor-hit="stroke"]').first()).toBeAttached({ timeout: 60_000 })
+    if (inSyllable) await page.locator(`[data-testid="review-propagation-card"][data-char="${syllable}"] [data-testid="review-propagation-open"]`).first().click()
+    await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
+  }
+  const boxOf = (id: string) => page.locator(`[data-editor-hit="stroke"][data-stroke-id="${id}"]`).evaluate((element) => { const b = (element as SVGGraphicsElement).getBBox(); return { left: b.x, right: b.x + b.width, top: b.y, bottom: b.y + b.height } })
+  const drag = async (from: { x: number; y: number }, dx: number, dy: number) => {
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    for (let step = 1; step <= 8; step += 1) await page.mouse.move(from.x + dx * step / 8, from.y + dy * step / 8)
+    await page.mouse.up()
+  }
+  const centerOf = async (selector: string, nth = 0) => { const b = (await page.locator(selector).nth(nth).boundingBox())!; return { x: b.x + b.width / 2, y: b.y + b.height / 2 } }
+  // 글자 칸은 0–100, 중심선은 두께 절반(3.5) 안쪽까지.
+  const inside = (box: { left: number; right: number; top: number; bottom: number }, label: string) => {
+    expect(box.left, label).toBeGreaterThanOrEqual(3.49)
+    expect(box.right, label).toBeLessThanOrEqual(96.51)
+    expect(box.top, label).toBeGreaterThanOrEqual(3.49)
+    expect(box.bottom, label).toBeLessThanOrEqual(96.51)
+  }
+
+  // 얇은 칸의 줄기: 저장 좌표가 넓힌 칸 비율이라 한계도 그 칸에서 재야 멈춘다(전에는 위로 −25, 왼쪽으로 −16까지 나갔다).
+  for (const [syllable, id] of [['으', 'ㅡ-1'], ['이', 'ㅣ-1']] as const) {
+    await open(syllable, 'JU')
+    const before = await boxOf(id)
+    await drag(await centerOf(`[data-editor-hit="stroke"][data-stroke-id="${id}"]`), -260, -300)
+    await expect.poll(async () => JSON.stringify(await boxOf(id)), { message: syllable }).not.toBe(JSON.stringify(before))
+    inside(await boxOf(id), `${syllable} ↖`)
+    await drag(await centerOf(`[data-editor-hit="stroke"][data-stroke-id="${id}"]`), 500, 600)
+    inside(await boxOf(id), `${syllable} ↘`)
+  }
+
+  // 곡선의 점을 구석으로 끌면 딸려 가는 핸들이 칸 끝에서 멈춘다. 핸들이 칸 밖으로 나가면 캔버스에 가려져 못 잡는다.
+  await open('오', 'CH', true)
+  const hit = page.locator('[data-editor-hit="stroke"][data-stroke-id="ㅇ-circle"]')
+  for (let tap = 0; tap < 2; tap += 1) { await hit.dispatchEvent('pointerdown'); await hit.dispatchEvent('pointerup') }
+  const points = page.locator('[data-editor-point="hit"]')
+  await expect(points).toHaveCount(4)
+  const corner = await centerOf('[data-editor-point="hit"]', 3)
+  await page.mouse.click(corner.x, corner.y)
+  await expect(page.locator('[data-editor-handle-hit]')).toHaveCount(2)
+  await drag(corner, 300, -400)
+  const handles = await page.locator('[data-editor-handle-hit]').evaluateAll((elements) => elements.map((element) => ({ x: Number(element.getAttribute('cx')), y: Number(element.getAttribute('cy')) })))
+  expect(handles).toHaveLength(2)
+  for (const handle of handles) inside({ left: handle.x, right: handle.x, top: handle.y, bottom: handle.y }, '핸들')
+  inside(await boxOf('ㅇ-circle'), 'ㅇ 잉크')
+})

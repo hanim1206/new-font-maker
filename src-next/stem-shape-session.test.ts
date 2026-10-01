@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { useJamoStore } from '../src/stores/jamoStore'
-import { applyMaster, boundStrokesOf, masterFromStroke } from '../src/services/stemMaster'
+import { applyMaster, boundStrokesOf, masterFromStroke, stemReferenceBox } from '../src/services/stemMaster'
 import type { JamoData } from '../src/types'
 import { askEntries, defaultPicked, keyOf, lockedKeys, pickedMasters, shapeAskForStroke, slotFacetOf, slotOf, spreadableStem } from './stemShapeSession'
 
@@ -124,5 +124,72 @@ describe('걸침 기울기', () => {
       expect(after.points[0], char).toEqual(target.stroke.points[0])
       expect(after.points[1].y, char).toBeLessThan(target.stroke.points[1].y)
     }
+  })
+})
+
+describe('짧은기둥을 보에서 뗀 틈 = 모양', () => {
+  const UP = 'jjalbeungidung.up.one.single'
+  const refHeight = (char: string, leaf: string) => { const { channel, stroke } = idOf(char, leaf); return stemReferenceBox(char, channel, stroke).height }
+  /** 그 짧은기둥의 두 끝 y를 옮긴 홀자. */
+  const shifted = (char: string, leaf: string, by: { top?: number; bottom?: number }): JamoData => {
+    const { channel, stroke } = idOf(char, leaf)
+    const topIndex = stroke.points[0].y < stroke.points[stroke.points.length - 1].y ? 0 : stroke.points.length - 1
+    const next = { ...stroke, points: stroke.points.map((point, index) => index === topIndex ? { ...point, y: point.y + (by.top ?? 0) } : index === 0 || index === stroke.points.length - 1 ? { ...point, y: point.y + (by.bottom ?? 0) } : point) }
+    return { ...base[char], [channel]: base[char][channel]!.map((item) => item.id === stroke.id ? next : item) }
+  }
+  const ys = (jamo: JamoData, id: string) => { const stroke = [...(jamo.strokes ?? []), ...(jamo.horizontalStrokes ?? [])].find((item) => item.id === id)!; return [stroke.points[0].y, stroke.points[stroke.points.length - 1].y].sort((a, b) => a - b) as [number, number] }
+
+  it('ㅗ 짧은기둥의 붙은 끝(아래)을 올리면 틈이 마스터에 담기고, ㅛ는 아래 끝이 · ㅜ는 위 끝이 같은 em만큼 보에서 떨어진다', () => {
+    const o = shifted('ㅗ', UP, { bottom: -0.2 })
+    const { channel, stroke } = idOf('ㅗ', UP)
+    const master = masterFromStroke(o, channel, stroke.id)!
+    const gapEm = 0.2 * refHeight('ㅗ', UP)
+    expect(master.gap).toBeCloseTo(gapEm, 9)
+    expect(master.reach ?? 0).toBeCloseTo(0, 9)
+    // 고친 획은 자기 마스터를 따른다.
+    expect(boundStrokesOf(o, { [UP]: master }).find((item) => item.stroke.id === stroke.id)!.follows).toBe(true)
+    // 솟는 형제(ㅛ 둘): 아래 끝이 올라가고 위 끝은 그대로.
+    const PAIR = 'jjalbeungidung.up.pair.single'
+    const yo = applyMaster(base['ㅛ'], {}, { [PAIR]: { ...master, name: PAIR } })!
+    for (const item of boundStrokesOf(base['ㅛ'], {}).filter((entry) => entry.name === PAIR)) {
+      const [topBefore, bottomBefore] = ys(base['ㅛ'], item.stroke.id)
+      const [topAfter, bottomAfter] = ys(yo, item.stroke.id)
+      expect(topAfter).toBeCloseTo(topBefore, 9)
+      expect((bottomBefore - bottomAfter) * refHeight('ㅛ', PAIR)).toBeCloseTo(gapEm, 9)
+    }
+    // 내리는 형제(ㅜ): 붙은 끝이 위라 위 끝이 내려간다 — 거울이 아니라 "보에서 떨어짐"이 같다.
+    const DOWN = 'jjalbeungidung.down.one.single'
+    const u = applyMaster(base['ㅜ'], {}, { [DOWN]: { ...master, name: DOWN } })!
+    const uId = idOf('ㅜ', DOWN).stroke.id
+    expect((ys(u, uId)[0] - ys(base['ㅜ'], uId)[0]) * refHeight('ㅜ', DOWN)).toBeCloseTo(gapEm, 9)
+    expect(ys(u, uId)[1]).toBeCloseTo(ys(base['ㅜ'], uId)[1], 9)
+    expect(boundStrokesOf(u, { [DOWN]: { ...master, name: DOWN } }).find((item) => item.stroke.id === uId)!.follows).toBe(true)
+  })
+
+  it('짧은기둥을 통째로 위로 옮기면 틈과 길이 Δ가 같이 담겨 형제도 길이 그대로 통째로 옮겨진다', () => {
+    const o = shifted('ㅗ', UP, { top: -0.1, bottom: -0.1 })
+    const { channel, stroke } = idOf('ㅗ', UP)
+    const master = masterFromStroke(o, channel, stroke.id)!
+    expect(master.gap).toBeCloseTo(0.1 * refHeight('ㅗ', UP), 9)
+    expect(master.reach).toBeCloseTo(0.1 * refHeight('ㅗ', UP), 9)
+    const DOWN = 'jjalbeungidung.down.one.single'
+    const u = applyMaster(base['ㅜ'], {}, { [DOWN]: { ...master, name: DOWN } })!
+    const uId = idOf('ㅜ', DOWN).stroke.id
+    const [topBefore, bottomBefore] = ys(base['ㅜ'], uId)
+    const [topAfter, bottomAfter] = ys(u, uId)
+    // ㅜ는 보 아래로 내려 매달리니 통째로 아래로 간다.
+    expect(topAfter - topBefore).toBeCloseTo(bottomAfter - bottomBefore, 9)
+    expect((topAfter - topBefore) * refHeight('ㅜ', DOWN)).toBeCloseTo(0.1 * refHeight('ㅗ', UP), 9)
+  })
+
+  it('보를 뚫고 나간 끝(음수 틈)도 그대로 퍼진다', () => {
+    const o = shifted('ㅗ', UP, { bottom: 0.15 })
+    const { channel, stroke } = idOf('ㅗ', UP)
+    const master = masterFromStroke(o, channel, stroke.id)!
+    expect(master.gap).toBeCloseTo(-0.15 * refHeight('ㅗ', UP), 9)
+    const MIXED = 'jjalbeungidung.up.one.mixed'
+    const wa = applyMaster(base['ㅘ'], {}, { [MIXED]: { ...master, name: MIXED } })!
+    const waId = idOf('ㅘ', MIXED).stroke.id
+    expect(ys(wa, waId)[1]).toBeGreaterThan(ys(base['ㅘ'], waId)[1])
   })
 })

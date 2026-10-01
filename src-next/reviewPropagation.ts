@@ -113,11 +113,11 @@ const sameBoxes = (a: Partial<Record<Part, BoxConfig>>, b: Partial<Record<Part, 
 /** 홀자 줄기 목표(칸 안 비율)도 같나. 안쪽 보선은 칸은 그대로 두고 이것만 바꾼다. */
 const sameStems = (a: BoxConfig, b: BoxConfig) => {
   const ids = new Set([...Object.keys(a.stems ?? {}), ...Object.keys(b.stems ?? {})])
-  return [...ids].every((id) => (['top', 'bottom', 'center'] as const).every((key) => Math.abs((a.stems?.[id]?.[key] ?? 0) - (b.stems?.[id]?.[key] ?? 0)) <= EPSILON))
+  return [...ids].every((id) => (['top', 'bottom', 'center', 'dx'] as const).every((key) => Math.abs((a.stems?.[id]?.[key] ?? 0) - (b.stems?.[id]?.[key] ?? 0)) <= EPSILON))
 }
 
 /**
- * 옮겨도 글자에 안 닿는 배치 rail. 이름 있는 줄기는 세로 끝점 · 높이를 보선에서 받아(`medialStemRails`) 안쪽 세로 rail도 잉크에 닿는다. 가로 자리 rail은 아직 slot 경계를 안 밀면 못 닿는다.
+ * 옮겨도 글자에 안 닿는 배치 rail. 이름 있는 줄기는 세로 끝점 · 높이를 보선에서 받아(`medialStemRails`) 안쪽 세로 rail도 잉크에 닿는다. 가로 자리 rail은 짧은기둥만 닿고(끈 만큼 옆으로), 나머지는 slot 경계를 안 밀면 못 닿는다.
  * 규칙을 따로 두지 않고 1u를 양쪽으로 얹어 칸 해석을 다시 돌려 본다. 둘 다 상자가 그대로면 안 닿는 rail이다(한쪽만 막히면 순서 클램프일 수 있다).
  * 닿자 네 변은 상자 자체라 늘 닿고, 시작·끝 rail은 배치가 아니라 여기서 안 본다.
  */

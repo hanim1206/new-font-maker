@@ -14,6 +14,7 @@ import {
   canonicalizeLegacyFontPayload,
   validateFontDataPayload,
 } from './fontDataPayloadValidation'
+import { withThinStemsInEm } from '../utils/thinStemMigration'
 
 export type FontDataParseIssueCode =
   | 'invalid-root'
@@ -208,6 +209,9 @@ export function parseAndMigrateFontData(value: unknown): FontDataParseResult {
   }
   delete (data as FontData & { shapeSystem?: unknown }).shapeSystem
   if (shapeSystem) data.shapeSystem = shapeSystem
+  // 높이 0인 칸의 보를 백만 배로 저장하던 때의 값(2026-09-30 ~ 10-01)을 예전에 보이던 모양 그대로 옮겨 적는다.
+  // 여기가 유일한 입구라 편집기 · 미리보기 · 추출이 같은 값을 받는다. 고칠 것이 없으면 그대로다.
+  data.jamoData = { ...data.jamoData, jungseong: withThinStemsInEm(data.jamoData.jungseong) }
 
   return value.version === FONT_DATA_VERSION
     ? { ok: true, data }

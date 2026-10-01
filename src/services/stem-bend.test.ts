@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import type { BoxConfig, JamoData, StrokeDataV2 } from '../types'
-import { placeStemStroke, storedStemDelta } from './stemBend'
-import { instanceOf, JAMO_CHANNELS, medialBoxEmOf, stemReferenceBox, type StemMaster } from './stemMaster'
+import { placeStemStroke, stemEditBox, storedStemDelta } from './stemBend'
+import { instanceInJamo, instanceOf, isStraight, JAMO_CHANNELS, masterFromStroke, medialBoxEmOf, stemReferenceBox, type StemMaster } from './stemMaster'
 
 const baseJungseong = (baseJamos as unknown as { jungseong: Record<string, JamoData> }).jungseong
 const bow: StemMaster = { name: 'gyeotjulgi', points: [{ t: 0, o: 0, handleOut: { t: 0.35, o: 0.02 } }, { t: 1, o: 0, handleIn: { t: 0.65, o: 0.02 } }] }
@@ -89,6 +89,61 @@ describe('홀자 줄기 휨은 칸이 바뀌어도 em 그대로', () => {
     }
   })
 
+  it('두께 0인 칸의 끝점을 끈 만큼 그대로 기울고, 그 기울기를 읽은 마스터가 형제에 같은 em으로 간다(의 보 → 오 보, 이 기둥 → 아 기둥)', () => {
+    // 실제 화면의 칸: ㅡ · ㅢ 가로부는 높이 1e-6, ㅣ는 폭 0.0133.
+    for (const [char, id, sibling, siblingId, thin] of [['ㅢ', 'ㅢ-1', 'ㅗ', 'ㅗ-2', { width: 0.575, height: 1e-6 }], ['ㅡ', 'ㅡ-1', 'ㅜ', 'ㅜ-1', { width: 0.75, height: 1e-6 }], ['ㅣ', 'ㅣ-1', 'ㅏ', 'ㅏ-1', { width: 0.0133, height: 0.905 }]] as const) {
+      const jamo = structuredClone(baseJungseong[char])
+      const channel = JAMO_CHANNELS.find((item) => jamo[item]?.some((stroke) => stroke.id === id))!
+      const stroke = strokeOf(jamo, id)
+      const box = at(thin)
+      const vertical = char === 'ㅣ'
+      // 곧은 획은 받은 칸 그대로 보인다. 그 칸에서 끝점을 0.02em 끈다(가로줄기는 위로, 세로줄기는 오른쪽으로).
+      const shown = placeStemStroke(jamo, stroke, box)
+      expect(shown.box, char).toBe(box)
+      const dragEm = vertical ? { x: 0.02, y: 0 } : { x: 0, y: -0.02 }
+      const stored = storedStemDelta(jamo, stroke, shown.box, { x: dragEm.x / shown.box.width, y: dragEm.y / shown.box.height }, 'rigid')
+      const end = stroke.points.at(-1)!
+      const tilted: StrokeDataV2 = { ...stroke, points: [stroke.points[0], { ...end, x: end.x + stored.x, y: end.y + stored.y }] }
+      const edited: JamoData = { ...jamo, [channel]: jamo[channel]!.map((item) => item.id === id ? tilted : item) }
+      // 저장값은 넓힌 칸 비율이라 작다(백만 배가 아니다).
+      expect(Math.abs(vertical ? stored.x : stored.y), char).toBeLessThan(0.2)
+      // 받침 없는 칸 · 다른 크기의 칸 어디서도 끝점이 0.02em 옮겨져 있고 시작점은 제자리다.
+      for (const other of [box, at({ width: thin.width * 0.9, height: thin.height })]) {
+        const placed = placeStemStroke(edited, tilted, other)
+        const flat = placeStemStroke(jamo, stroke, other)
+        const moved = (index: number) => { const a = emOf(placed, placed.stroke.points.at(index)!); const b = emOf(flat, flat.stroke.points.at(index)!); return { x: a.x - b.x, y: a.y - b.y } }
+        expect(moved(-1).x, char).toBeCloseTo(dragEm.x, 9)
+        expect(moved(-1).y, char).toBeCloseTo(dragEm.y, 9)
+        expect(moved(0).x, char).toBeCloseTo(0, 9)
+        expect(moved(0).y, char).toBeCloseTo(0, 9)
+      }
+      // 이어서 넓힌 칸에서 한 번 더 끌어도 끈 만큼만 간다.
+      const again = placeStemStroke(edited, tilted, box)
+      const more = storedStemDelta(edited, tilted, again.box, { x: dragEm.x / again.box.width, y: dragEm.y / again.box.height }, 'rigid')
+      expect(vertical ? more.x : more.y, char).toBeCloseTo(vertical ? stored.x : stored.y, 9)
+      // 그 기울기를 마스터로 읽어 형제(두꺼운 칸)에 놓으면 같은 0.02em이다.
+      const master = masterFromStroke(edited, channel, id)!
+      const brother = baseJungseong[sibling]
+      const brotherChannel = JAMO_CHANNELS.find((item) => brother[item]?.some((item) => item.id === siblingId))!
+      const instance = instanceInJamo(brother, brotherChannel, strokeOf(brother, siblingId), master)
+      const size = stemReferenceBox(sibling, brotherChannel, strokeOf(brother, siblingId))
+      const lean = vertical ? (instance.points.at(-1)!.x - instance.points[0].x) * size.width : (instance.points.at(-1)!.y - instance.points[0].y) * size.height
+      expect(lean, `${char} → ${sibling}`).toBeCloseTo(vertical ? 0.02 : -0.02, 9)
+    }
+  })
+
+  it('두께 0인 칸의 획을 통째로 옮겨도 옮긴 만큼 보이고, 모양은 그대로라 마스터는 곧다', () => {
+    const jamo = structuredClone(baseJungseong['ㅡ'])
+    const stroke = strokeOf(jamo, 'ㅡ-1')
+    const box = at({ width: 0.75, height: 1e-6 })
+    const stored = storedStemDelta(jamo, stroke, box, { x: 0, y: 0.03 / box.height }, 'rigid')
+    const lowered: StrokeDataV2 = { ...stroke, points: stroke.points.map((point) => ({ ...point, y: point.y + stored.y })) }
+    const edited: JamoData = { ...jamo, strokes: [lowered] }
+    const placed = placeStemStroke(edited, lowered, box)
+    for (const index of [0, -1]) expect(emOf(placed, placed.stroke.points.at(index)!).y - (box.y + 0.5 * box.height)).toBeCloseTo(0.03, 9)
+    expect(isStraight(masterFromStroke(edited, 'strokes', 'ㅡ-1')!)).toBe(true)
+  })
+
   it('ㅒ · ㅖ(통째 칸에 그리고 획은 세로 채널)의 두 기둥도 ㅐ와 같은 em만큼 휜다', () => {
     const bentBy = (char: string, id: string) => {
       const jamo = withInstance(char, id, bent)
@@ -108,5 +163,25 @@ describe('홀자 줄기 휨은 칸이 바뀌어도 em 그대로', () => {
     expect(placeStemStroke({ ...a, strokes: [...a.strokes!, free] }, free, CLOSED).stroke).toBe(free)
     const stroke = strokeOf(a, 'ㅏ-2')
     expect(placeStemStroke({ ...a, type: 'choseong' }, stroke, CLOSED).stroke).toBe(stroke)
+  })
+})
+
+describe('눈금으로 세는 이동(방향키 · 조절판)', () => {
+  it('두께 0인 칸의 줄기는 넓힌 칸의 눈금으로 센다 — 선택이 얇은 칸을 기억하든 넓힌 칸을 기억하든 같다', () => {
+    const jamo = structuredClone(baseJungseong['ㅡ'])
+    const stroke = strokeOf(jamo, 'ㅡ-1')
+    const thin = at({ width: 0.75, height: 1e-6 })
+    const wide = stemEditBox(jamo, stroke, thin)
+    expect(wide.height).toBeCloseTo(stemReferenceBox('ㅡ', 'strokes', stroke).height, 9)
+    expect(storedStemDelta(jamo, stroke, wide, { x: 0, y: -0.1 }, 'rigid').y).toBeCloseTo(-0.1, 9)
+    // 기울인 뒤 놓인 칸(넓힌 칸)을 기억한 선택에서도 같은 칸이 나온다.
+    const tilted: StrokeDataV2 = { ...stroke, points: [stroke.points[0], { ...stroke.points[1], y: 0.4 }] }
+    const edited: JamoData = { ...jamo, strokes: [tilted] }
+    const shown = placeStemStroke(edited, tilted, thin)
+    expect(stemEditBox(edited, tilted, shown.box).height).toBeCloseTo(wide.height, 9)
+    expect(stemEditBox(edited, tilted, thin).height).toBeCloseTo(wide.height, 9)
+    // 두꺼운 칸은 받은 칸 그대로.
+    const a = baseJungseong['ㅏ']
+    expect(stemEditBox(a, strokeOf(a, 'ㅏ-2'), OPEN)).toBe(OPEN)
   })
 })
