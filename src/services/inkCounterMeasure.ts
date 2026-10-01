@@ -48,11 +48,13 @@ const jamoOfStroke = (item: GlyphData['strokes'][number]) => jamoOf((item.beakGr
 /**
  * 자소마다 `counterKeepScale`만큼 획 두께를 줄인 글리프 데이터와, 자소별 배율. 섞임홀자는 한 자소로 묶는다.
  * `horizontalShare`를 주면 가로줄기를 덜 굵게 한 뒤에 배율을 얹는다 — 지킬 틈은 늘 원래(굵기 400) 모양에서 고른다.
+ * `minScale`: 자소 배율 바닥(0이면 없음).
  */
-export function withCounterKeep(data: GlyphData, floor: CounterFloor, horizontalShare = 1): { data: GlyphData; scales: Map<string, number> } {
+export function withCounterKeep(data: GlyphData, floor: CounterFloor, horizontalShare = 1, minScale = 0): { data: GlyphData; scales: Map<string, number> } {
   const scales = new Map<string, number>()
   for (const part of new Set(data.strokes.map(jamoOfStroke))) {
-    scales.set(part, counterKeepScale(data.strokes.filter((item) => jamoOfStroke(item) === part), data.weightMultiplier, floor, stemScaleOf(data.strokeStyle), horizontalShare))
+    // `minScale`: 자소 배율 바닥 — 한 글자 안 자소 굵기가 너무 갈리지 않게(뷁의 ㅂ 1.0 · ㅞ 0.72, 빼의 ㅃ 0.65).
+    scales.set(part, Math.max(minScale, counterKeepScale(data.strokes.filter((item) => jamoOfStroke(item) === part), data.weightMultiplier, floor, stemScaleOf(data.strokeStyle), horizontalShare)))
   }
   const shaped = withHorizontalShare(data, horizontalShare)
   return { data: { ...shaped, strokes: shaped.strokes.map((item) => scaleStrokeThickness(item, scales.get(jamoOfStroke(item)) ?? 1)) }, scales }

@@ -83,10 +83,25 @@ const HORIZONTAL_SHARES = [
  * 답은 채팅으로 받는다 — 선택지를 누르면 답 문장이 복사된다. 물을 게 없으면 `null`.
  */
 /** `floorRatio`: 선택지 그림을 그릴 하한선 비율. `undefined`면 그림 없이 글만. */
-interface QuestionOption { label: string; detail: string; recommended?: boolean; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number }
-interface Question { id: string; step: StepId; title: string; body: string; options: QuestionOption[] }
-/** ④ 후보가 그려지기 전까지는 물을 게 없다. */
-const QUESTION: Question | null = null
+interface QuestionOption { label: string; detail: string; recommended?: boolean; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number }
+/** `compare`가 있으면 그 조건들을 위에 줄줄이 그리고, 선택지는 그림 없는 답 단추(하나 고르기)다. 없으면 선택지끼리 이상형 월드컵. */
+interface Question { id: string; step: StepId; title: string; body: string; options: QuestionOption[]; compare?: { label: string; condition: Omit<Condition, 'padding' | 'weight'> }[] }
+/** ②+③ 결정. 이 위에 자소 배율 바닥만 바꿔 본다. */
+const DECIDED = { ...FLOOR_DECIDED, horizontalShare: 0.526 } as const
+/** 바닥 질문은 내렸다(10-01 사용자: 다른 손잡이를 다 켠 완성 글자로 봐야 고를 수 있다). ④ 임시판을 만든 뒤 다시 묻는다. */
+const FLOOR_SCALE_READY = false
+const MIN_SCALE_QUESTION: Question = {
+  id: 'min-scale-2026-10-01',
+  step: 'floor',
+  title: '자소 굵기 바닥 — 어느 쪽이 나아요?',
+  body: '②+③ 위에서, 하한선 때문에 덜 굵어지는 자소를 이 값 아래로는 안 깎는다. 높을수록 자소 굵기가 고르고, 대신 ㅃ 같은 곳 속공간이 좁아진다.',
+  options: [
+    { label: '바닥 없음', ...DECIDED, detail: '지금. 뷁 ㅂ 1.00 · ㅞ 0.72, 빼 ㅃ 0.65.' },
+    { label: '바닥 0.8', ...DECIDED, minScale: 0.8, detail: '자소를 0.8 아래로 안 깎는다.', recommended: true },
+    { label: '바닥 0.9', ...DECIDED, minScale: 0.9, detail: '거의 고르게. 속공간은 노토처럼 좁아진다.' },
+  ],
+}
+const QUESTION: Question | null = FLOOR_SCALE_READY ? MIN_SCALE_QUESTION : null
 const QUESTION_SEEN_KEY = 'counter-lab-question-seen'
 /** 질문 그림에 같이 그리는 빽빽한 글자(자소별 색). */
 const QUESTION_CHARS = ['빼', '를', '쏟', '한', '갰']
@@ -187,7 +202,7 @@ const pathOf = (paths: PathsD) => paths.map((path) => `M${path.map((p) => `${p.x
 /** 글자 하나를 그 조건으로 재 둔 것. */
 interface Measured { ink: GlyphInk; verdict: InkVerdict; scales?: Map<string, number> }
 /** `horizontalShare`: ③ 가로줄기가 받는 두께 몫(하한선보다 먼저 얹는다). */
-type Condition = { padding: Padding; weight: number; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number }
+type Condition = { padding: Padding; weight: number; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number }
 
 /** 모델 상자 해석기. 레이아웃 Δ가 바뀌면 다시 만든다. */
 function usePlacementResolver(): GlyphPlacementResolver | null {
@@ -214,7 +229,7 @@ function measureOf(resolver: GlyphPlacementResolver, char: string, condition: Co
   const data = collectGlyphDataWithPlacement(char, resolver, { padding: condition.padding, weight: condition.weight })
   if (!data) return null
   const share = condition.horizontalShare ?? 1
-  const kept = condition.floorRatio === undefined ? undefined : withCounterKeep(data, { fixed: FLOOR_FIXED, ratio: condition.floorRatio, horizontalRatio: condition.horizontalRatio }, share)
+  const kept = condition.floorRatio === undefined ? undefined : withCounterKeep(data, { fixed: FLOOR_FIXED, ratio: condition.floorRatio, horizontalRatio: condition.horizontalRatio }, share, condition.minScale)
   const ink = measureGlyphInk(kept?.data ?? withHorizontalShare(data, share))
   return { ink, verdict: judgeGlyphInk(ink, reference), scales: kept?.scales }
 }
@@ -403,14 +418,14 @@ type Picks = Record<string, string>
 const BASE_LABEL = '지금'
 
 /** 한 조건의 글자 그림: 회색도 문장 + 막히기 쉬운 글자, 둘 다 검정(사용자 10-01: 검정이 잘 보인다). 글자를 누르면 "이 글자는 이 카드가 낫다"로 고른다. */
-function ConditionPreview({ context, label, floorRatio, horizontalRatio, horizontalShare, size, picks, onPick }: { context: PreviewContext; label: string; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; size: number; picks: Picks; onPick: (char: string, label: string) => void }) {
+function ConditionPreview({ context, label, floorRatio, horizontalRatio, horizontalShare, minScale, size, picks, onPick }: { context: PreviewContext; label: string; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; size: number; picks: Picks; onPick: (char: string, label: string) => void }) {
   const { resolver, padding, weight, version } = context
   const inks = useMemo(() => ({
-    gray: GRAY_SENTENCE.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare }, undefined)),
-    dense: QUESTION_CHARS.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare }, undefined)),
+    gray: GRAY_SENTENCE.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale }, undefined)),
+    dense: QUESTION_CHARS.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale }, undefined)),
   }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [resolver, padding, weight, floorRatio, horizontalRatio, horizontalShare, ...version])
+  [resolver, padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale, ...version])
   const glyph = (char: string, ink: Measured | null, index: number, kind: 'plain' | 'solid') => ink && (
     <button key={index} type="button" className={styles.pickGlyph} aria-pressed={picks[char] === label} aria-label={`${char} — ${label}이 낫다`} onClick={() => onPick(char, label)}>
       <InkGlyph ink={ink.ink} size={size} plain={kind === 'plain'} solid={kind === 'solid'} />
@@ -485,7 +500,7 @@ function CupPair({ question, context, left, right }: { question: Question; conte
   const chars = useMemo(() => [...new Set([...GRAY_SENTENCE, ...CHARS, ...QUESTION_CHARS])], [])
   const inks = useMemo(() => [left, right].map((index) => {
     const option = question.options[index]
-    return chars.map((char) => measureOf(resolver, char, { padding, weight, floorRatio: option.floorRatio, horizontalRatio: option.horizontalRatio, horizontalShare: option.horizontalShare }, undefined))
+    return chars.map((char) => measureOf(resolver, char, { padding, weight, floorRatio: option.floorRatio, horizontalRatio: option.horizontalRatio, horizontalShare: option.horizontalShare, minScale: option.minScale }, undefined))
   }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [question, left, right, resolver, padding, weight, ...version])
@@ -569,7 +584,7 @@ function QuestionCard({ question, context, picks, onPick, cup, onCup, popup = fa
   const chars = [...new Set([...GRAY_SENTENCE, ...QUESTION_CHARS])]
   const picked = chars.filter((char) => picks[char])
   const summary = picked.map((char) => `${char} ${picks[char]}`).join(' · ')
-  const hasPreview = context && question.options.some((option) => option.floorRatio !== undefined || option.horizontalShare !== undefined)
+  const hasPreview = context && !question.compare && question.options.some((option) => option.floorRatio !== undefined || option.horizontalShare !== undefined)
   const card = (
     <div className={popup ? styles.askPopup : styles.ask} role={popup ? 'dialog' : 'region'} aria-modal={popup || undefined} aria-label="AI가 묻는 것" data-testid={popup ? 'counter-question-popup' : 'counter-question'}>
       <span className={styles.askTag}>질문 · 답해 주세요</span>
@@ -577,23 +592,32 @@ function QuestionCard({ question, context, picks, onPick, cup, onCup, popup = fa
       {hasPreview && !showAll && context && <CupView question={question} context={context} cup={cup} onCup={onCup} onCopy={copy} copied={copied} />}
       {hasPreview && <button type="button" className={styles.cupToggle} onClick={() => setShowAll(!showAll)}>{showAll ? '← 둘씩 고르기로' : '후보 전부 한꺼번에 보기'}</button>}
       {(showAll || !hasPreview) && <p>{question.body}</p>}
+      {question.compare && context && <div className={styles.askBase}>
+        {question.compare.map((row) => <div key={row.label} className={styles.askCompareRow}>
+          <b>{row.label}</b>
+          <ConditionPreview context={context} label={row.label} {...row.condition} size={popup ? 60 : 44} picks={{}} onPick={() => undefined} />
+        </div>)}
+      </div>}
+      {question.compare && <div className={styles.askChoices}>
+        {question.options.map((option) => <button key={option.label} type="button" data-rec={option.recommended || undefined} onClick={() => answer(option.label)}>{option.label}{option.recommended ? ' · 추천' : ''}</button>)}
+      </div>}
       {showAll && hasPreview && <p className={styles.askLegend}><b>글자마다 고르기:</b> 카드마다 괜찮은 글자가 달라도 된다. 글자마다 가장 나은 카드의 그 글자를 누른다(같은 글자는 한 카드만). 다 고르면 아래 <b>고른 것 복사</b>. <b>회색도</b> = 빽빽한 · 성긴 글자를 섞은 문장(진하기가 고른가), <b>속공간</b> = 막히기 쉬운 글자(흰 틈이 살아 있나).</p>}
       {showAll && hasPreview && <div className={styles.askBase}>
         <small>{BASE_LABEL} · 보정 없음 (가로 {Math.round((1 - context.padding.left - context.padding.right) * 1000)} · 굵기 {context.weight})</small>
         <ConditionPreview context={context} label={BASE_LABEL} size={size} picks={picks} onPick={onPick} />
       </div>}
-      {(showAll || !hasPreview) && <div className={styles.askOptions}>
+      {(showAll || !hasPreview) && !question.compare && <div className={styles.askOptions}>
         {question.options.map((option) => (
           <div key={option.label} className={styles.askOption} data-rec={option.recommended || undefined}>
             <b>{option.label}{option.recommended ? ' · 추천' : ''}</b>
-            {context && (option.floorRatio !== undefined || option.horizontalShare !== undefined) && <ConditionPreview context={context} label={option.label} floorRatio={option.floorRatio} horizontalRatio={option.horizontalRatio} horizontalShare={option.horizontalShare} size={size} picks={picks} onPick={onPick} />}
+            {context && (option.floorRatio !== undefined || option.horizontalShare !== undefined) && <ConditionPreview context={context} label={option.label} floorRatio={option.floorRatio} horizontalRatio={option.horizontalRatio} horizontalShare={option.horizontalShare} minScale={option.minScale} size={size} picks={picks} onPick={onPick} />}
             <small>{option.detail}</small>
             <button type="button" onClick={() => answer(option.label)}>이걸로 통째로</button>
           </div>
         ))}
       </div>}
       <div className={styles.askFoot}>
-        <span>{!showAll && hasPreview ? '' : copied ? `“${copied}” 복사했어요. 채팅에 붙여 넣어 주세요.` : picked.length ? `고른 것 ${picked.length}/${chars.length}: ${summary}` : '글자를 눌러 고르거나, 카드 하나를 통째로 고르세요.'}</span>
+        <span>{question.compare ? (copied ? `“${copied}” 복사했어요. 채팅에 붙여 넣어 주세요.` : '하나를 누르면 답이 복사돼요. 채팅에 붙여 넣어 주세요.') : !showAll && hasPreview ? '' : copied ? `“${copied}” 복사했어요. 채팅에 붙여 넣어 주세요.` : picked.length ? `고른 것 ${picked.length}/${chars.length}: ${summary}` : '글자를 눌러 고르거나, 카드 하나를 통째로 고르세요.'}</span>
         {picked.length > 0 && <button type="button" data-testid="counter-question-copy" onClick={() => copy(`${question.title.replace(/\?$/, '')} — 글자별: ${summary}`, `글자별 ${picked.length}자`)}>고른 것 복사</button>}
         <button type="button" onClick={() => { onShow(); onClose?.() }}>그림 보며 고르기</button>
         {popup && <button type="button" onClick={onClose}>닫기</button>}

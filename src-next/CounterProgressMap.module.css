@@ -101,6 +101,12 @@ b[data-kind='touch'] { color: #7f8c8d; }
 .lightboxModes button { min-height: 34px; padding: 0 16px; border: 0; background: #fff; color: #3d2f00; font-size: 13px; font-weight: 700; cursor: pointer; }
 .lightboxModes button + button { border-left: 1px solid #c99a00; }
 .lightboxModes button[aria-pressed='true'] { background: #3d2f00; color: #fff8d6; }
+.askCompareRow { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; gap: 8px; }
+.askCompareRow > b { color: #6b5a1e; font-size: 13px; }
+.askChoices { display: flex; flex-wrap: wrap; gap: 8px; }
+.askChoices button { min-height: 44px; padding: 0 18px; border: 2px solid #e8cf7a; border-radius: 10px; background: #fff; color: #3d2f00; font-size: 14px; font-weight: 800; cursor: pointer; }
+.askChoices button[data-rec] { border-color: #e0a800; }
+.askChoices button:hover { background: #fff3c4; }
 .cupToggle { justify-self: start; padding: 0; border: 0; background: none; color: #6b5a1e; font-size: 12px; text-decoration: underline; cursor: pointer; }
 
 /* 공통 회색도 문장 줄. */
