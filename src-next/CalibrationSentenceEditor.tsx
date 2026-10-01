@@ -29,7 +29,7 @@ import { groupMatching, useJamoGroupStore } from '../src/stores/jamoGroupStore'
 import confirmStyles from './workspace/FontExportDialog.module.css'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import { jamoCenterlineCenter, moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStrokes, snapWholeJamoDelta, translateJamoStrokes } from '../src/services/editorCommands'
-import { storedStemDelta } from '../src/services/stemBend'
+import { stemEditBox, storedStemDelta } from '../src/services/stemBend'
 import { stemRailGuides } from '../src/services/medialStemRails'
 import { StemSpreadSheet } from './StemSpreadSheet'
 import { beforeSpreadJamo, defaultPicked, lockedKeys, pickedMasters, shapeAskForStroke, shapePreview, spreadableStem, type ShapeAsk } from './stemShapeSession'
@@ -148,7 +148,8 @@ type Selection =
   | { kind: 'handle'; component: GlyphComponentIdentity; editorPart: MobileEditorPart; renderPart: Part; jamo: JamoData; strokeId: string; pointIndex: number; handle: 'in' | 'out'; box: BoxConfig }
 
 /** 캔버스 직접 끌기가 조절판과 같은 이동 계산을 쓰게 하는 문. `change`의 단위는 조절판과 같다(1 = 상자 좌표 0.001). */
-type StrokeDragApi = { begin: () => void; change: (movement: StrokeMoveDelta) => void; commit: () => void; cancel: () => void }
+/** `shownBox`는 이동량을 비율로 나눈 칸(끌기를 시작할 때 그 획이 놓인 칸). 안 주면 선택이 기억한 칸. */
+type StrokeDragApi = { begin: () => void; change: (movement: StrokeMoveDelta, shownBox?: BoxConfig) => void; commit: () => void; cancel: () => void }
 /** 끌기로 치는 최소 거리(px). 이보다 짧으면 누르기다. 조절판도 같은 문턱을 쓴다. */
 const DRAG_THRESHOLD_PX = 3
 /**
@@ -688,7 +689,7 @@ function FocusedGlyph({
     const uprightDx = dx + Math.tan(globalStyle.slant * Math.PI / 180) * dy
     const snapped = snapStrokeDrag({ anchors: state.anchors, requested: { x: uprightDx * emPerPx, y: dy * emPerPx }, candidates: state.candidates })
     setSnapHits((current) => current?.x?.value === snapped.hits.x?.value && current?.y?.value === snapped.hits.y?.value && current?.x?.label === snapped.hits.x?.label && current?.y?.label === snapped.hits.y?.label ? current : snapped.hits)
-    api.change({ x: snapped.delta.x / state.box.width / 0.001, y: snapped.delta.y / state.box.height / 0.001 })
+    api.change({ x: snapped.delta.x / state.box.width / 0.001, y: snapped.delta.y / state.box.height / 0.001 }, state.box)
   }
   // 조절판 끌기: 잡은 획 · 점 · 핸들의 닻과 후보를 캔버스 끌기와 똑같이 굳히고, 같은 스냅으로 옮긴다.
   const padDrag = useRef<{ box: BoxConfig; anchors: SnapAnchors; candidates: SnapCandidate[] } | null>(null)
@@ -1131,7 +1132,7 @@ function InferenceTrackpad({
       currentJamo.current = latest
     }
   }
-  const changeMove = (movement: StrokeMoveDelta) => {
+  const changeMove = (movement: StrokeMoveDelta, shownBox?: BoxConfig) => {
     // 캔버스 끌기는 em 기준으로 이미 스냅해서 넘긴다(레이아웃과 같은 규칙). 여기서 상자 좌표 눈금에 한 번 더 붙이면 걸린 자리가 어긋난다.
     const normalized = !padMove.current ? { x: movement.x * .001, y: movement.y * .001 } : {
       x: Math.round(movement.x * .001 / snapStep) * snapStep,
@@ -1156,11 +1157,13 @@ function InferenceTrackpad({
       // 이름 있는 줄기도 세로 이동이 저장 획에 남는다 — 보선 자리 위에 얹히는 이 홀자의 차이. 보선은 레이아웃 편집에서만 옮긴다.
       const strokeMove = normalized
       // 화면의 홀자 줄기는 받침 있는 칸에서도 em 휨을 지켜 놓여 있다(`placeStemStroke`). 놓인 칸에서 끈 이동량을 저장 좌표로 되돌린다.
+      // 얇은 칸의 줄기는 기울이는 순간 놓인 칸이 넓어진다. 선택이 기억한 칸이 아니라 이동량을 나눈 바로 그 칸으로 되돌려야 한다.
+      // 방향키 · 조절판은 칸 눈금으로 센다. 얇은 칸이면 넓힌 칸의 눈금이다.
       const toStored = (movement: StrokeMoveDelta): StrokeMoveDelta => {
         const stroke = getJamoStrokes(startJamo.current!).find((item) => item.id === selection.strokeId)
         if (!stroke) return movement
         const endpoint = selection.kind === 'point' && (selection.pointIndex === 0 || selection.pointIndex === stroke.points.length - 1)
-        return storedStemDelta(startJamo.current!, stroke, selection.box, movement, selection.kind === 'stroke' || endpoint ? 'rigid' : 'bend')
+        return storedStemDelta(startJamo.current!, stroke, shownBox ?? stemEditBox(startJamo.current!, stroke, selection.box), movement, selection.kind === 'stroke' || endpoint ? 'rigid' : 'bend')
       }
       const createCandidate = (factor: number) => {
         const movementAtFactor = toStored({ x: strokeMove.x * factor, y: strokeMove.y * factor })

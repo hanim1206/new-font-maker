@@ -3,6 +3,7 @@ import { immer } from 'zustand/middleware/immer'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { JamoData, JamoOverride, Padding } from '../types'
 import { migrateJamoData, needsMigration } from '../utils/strokeMigration'
+import { withThinStemsInEm } from '../utils/thinStemMigration'
 import baseJamos from '../data/baseJamos.json'
 import { createDebouncedStorage } from '../utils/debouncedStorage'
 
@@ -362,7 +363,8 @@ export const useJamoStore = create<JamoState & JamoActions>()(
           if (mapNeedsMigration(jo)) jo = migrateMap(jo)
 
           state.choseong = ch as typeof state.choseong
-          state.jungseong = ju as typeof state.jungseong
+          // 높이 0인 칸에서 백만 배로 저장된 보 기울기를 넓힌 칸 비율로 옮겨 적는다.
+          state.jungseong = withThinStemsInEm(ju) as typeof state.jungseong
           state.jongseong = jo as typeof state.jongseong
         }),
 
@@ -394,6 +396,9 @@ export const useJamoStore = create<JamoState & JamoActions>()(
             if (needsJu) state.jungseong = migrateMap(state.jungseong) as typeof state.jungseong
             if (needsJo) state.jongseong = migrateMap(state.jongseong) as typeof state.jongseong
           }
+          // 높이 0인 칸에서 백만 배로 저장된 보 기울기를 넓힌 칸 비율로 옮겨 적는다. 고칠 것이 있을 때만 바꾼다.
+          const thinFixed = withThinStemsInEm(state.jungseong)
+          if (thinFixed !== state.jungseong) state.jungseong = thinFixed
 
           state.setHydrated()
         }
