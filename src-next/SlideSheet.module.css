@@ -16,6 +16,9 @@
 .dots span { width: 6px; height: 6px; border-radius: 999px; background: rgb(var(--color-surface-4)); transition: width var(--motion-normal) var(--ease-standard), background var(--motion-normal) var(--ease-standard); }
 .dots span[data-on] { width: 18px; background: rgb(var(--color-foreground)); }
 
+/* 머리말은 장을 넘겨도 그대로 — 바뀌는 글(`.text`)만 다시 떠오른다. */
+.copy { display: flex; flex-direction: column; gap: 6px; }
+.eyebrow { padding: 0 4px; color: rgb(var(--color-primary)); font-size: 13px; font-weight: 700; line-height: 1.4; word-break: keep-all; }
 .text { display: flex; flex-direction: column; gap: 6px; padding: 0 4px; min-height: 96px; animation: fadeIn var(--motion-slow) var(--ease-standard); }
 .text h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
 .text p { margin: 0; white-space: pre-line; color: rgb(var(--color-text-3)); font-size: 15px; line-height: 1.55; word-break: keep-all; }

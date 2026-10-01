@@ -256,7 +256,7 @@ export function AnnouncementsPage() {
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <section className="flex min-w-0 flex-col gap-6">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="공지 이름" hint="목록에만 보여요">
+          <Field label="공지 이름" hint="팝업 장 제목 위에 작게 보여요">
             <Input
               value={draft.title}
               maxLength={ANNOUNCEMENT_LIMITS.title}
@@ -311,6 +311,7 @@ export function AnnouncementsPage() {
             inline
             slides={draft.slides.map((slide, order) => ({ ...slide, title: slide.title || `${order + 1}번째 장` }))}
             label={draft.title || '공지 미리보기'}
+            eyebrow={draft.title.trim() || undefined}
             testId="announcement-preview"
             firstLabel="닫기"
             lastLabel="확인"
