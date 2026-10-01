@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import { AppGlyph } from './AppGlyph'
+import { useDevNotoSwap } from './devNotoSwap'
 import { allCorpusRows, CORPUS_TOTAL } from './notoCorpus'
 import type { CorpusRow, CorpusSnapshot } from './notoCorpus'
 import { NotoCorpusMatrix } from './NotoCorpusMatrix'
@@ -51,13 +53,27 @@ function observeCell(element: Element, onVisible: () => void): () => void {
   return () => { visibleCallbacks.delete(element); cellObserver?.unobserve(element) }
 }
 
+/** 개발 전용 — 같은 칸 크기에 노토 산스 KR(지금 굵기)로 그 글자를 그린다. 눈 ③에서 우리 굵기 처리와 견주는 용도. */
+function DevNotoCell({ char }: { char: string }) {
+  const weight = useGlobalStyleStore((state) => state.style.weight)
+  return (
+    <span
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: CELL_GLYPH_SIZE, height: CELL_GLYPH_SIZE,
+        fontFamily: "'Noto Sans KR', sans-serif", fontWeight: weight, fontSize: CELL_GLYPH_SIZE * 0.92, lineHeight: 1,
+      }}
+    >{char}</span>
+  )
+}
+
 function LazyCellGlyph({ char }: { char: string }) {
   const holder = useRef<HTMLSpanElement>(null)
   const [visible, setVisible] = useState(false)
+  const notoSwap = useDevNotoSwap((state) => state.on)
   useEffect(() => holder.current && !visible ? observeCell(holder.current, () => setVisible(true)) : undefined, [visible])
-  return visible
-    ? <AppGlyph char={char} size={CELL_GLYPH_SIZE} upright />
-    : <span ref={holder} className={styles.cellHolder} aria-hidden="true" />
+  if (!visible) return <span ref={holder} className={styles.cellHolder} aria-hidden="true" />
+  return import.meta.env.DEV && notoSwap ? <DevNotoCell char={char} /> : <AppGlyph char={char} size={CELL_GLYPH_SIZE} upright />
 }
 
 const renderCell = (row: CorpusRow) => <LazyCellGlyph char={row.identity.character} />
