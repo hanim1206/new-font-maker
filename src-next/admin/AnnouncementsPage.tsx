@@ -312,6 +312,7 @@ export function AnnouncementsPage() {
             slides={draft.slides.map((slide, order) => ({ ...slide, title: slide.title || `${order + 1}번째 장` }))}
             label={draft.title || '공지 미리보기'}
             eyebrow={draft.title.trim() || undefined}
+            centered
             testId="announcement-preview"
             firstLabel="닫기"
             lastLabel="확인"

@@ -11,6 +11,7 @@
 .frame { overflow: hidden; border-radius: 20px; background: rgb(var(--color-surface-2)); box-shadow: inset 0 0 0 1px rgb(var(--color-border-subtle)); aspect-ratio: 3 / 4; max-height: 48vh; touch-action: pan-y; user-select: none; }
 .frame img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; animation: fadeIn var(--motion-slow) var(--ease-standard); pointer-events: none; }
 .frame img[data-bottom] { object-position: bottom; }
+.frame img[data-center] { object-position: center; }
 
 .dots { display: flex; justify-content: center; gap: 6px; }
 .dots span { width: 6px; height: 6px; border-radius: 999px; background: rgb(var(--color-surface-4)); transition: width var(--motion-normal) var(--ease-standard), background var(--motion-normal) var(--ease-standard); }
