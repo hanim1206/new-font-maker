@@ -6,7 +6,7 @@ import { CHOSEONG_MAP, JONGSEONG_MAP, JUNGSEONG_MAP } from '../data/Hangul'
 import { decomposeSyllable } from '../utils/hangulUtils'
 import { identityOfSyllable, medialDragRange, resolveContextBoxes, type ContextBoxDelta, type MedialPart } from './contextBoxResolver'
 import { applyRailEdits } from './notoMedialMasterFit'
-import { furthestValid, GLYPH_BODY, medialLimitIssue } from './railLimits'
+import { faceLimitIssue, furthestValid, GLYPH_BODY, limitFaces, medialLimitIssue } from './railLimits'
 
 const CORPUS = path.resolve(__dirname, '../../.reference-fonts/guide-corpus')
 
@@ -90,6 +90,17 @@ describe.skipIf(!existsSync(CORPUS))('보선 한계 — 글자 몸 · 순서 · 
     const ch = moved.resolved.parts.find((part) => part.part === 'CH')!.faces
     expect(ch.top).toBeCloseTo(GLYPH_BODY.top, 9)
     expect(ch.left).toBeCloseTo(GLYPH_BODY.left, 9)
+  })
+
+  it('닿자 변을 크게 밀어도 변이 뒤집히기 직전에서 멈춘다 — 편집기 한계(faceLimitIssue)와 같은 경계', () => {
+    const model = { left: 0.2, right: 0.5, top: 0.2, bottom: 0.5 }
+    const moved = limitFaces(model, { ...model, left: 0.9 })
+    expect(moved.left).toBeLessThan(moved.right)
+    expect(faceLimitIssue(model, moved)).toBeNull()
+    // 몸 경계는 값 그대로 닿는다.
+    expect(limitFaces(model, { ...model, top: -0.5 }).top).toBe(GLYPH_BODY.top)
+    // 한계 안이면 그대로.
+    expect(limitFaces(model, { ...model, left: 0.25 })).toEqual({ ...model, left: 0.25 })
   })
 
   it('획 편집 끌기 범위: 기둥 아래 끝은 글자 몸 아래까지만 내려간다', async () => {

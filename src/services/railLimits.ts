@@ -48,6 +48,22 @@ export function faceLimitIssue(model: ComponentFaces, moved: ComponentFaces): st
 }
 
 /**
+ * 닿자 상자 네 변을 `want`까지 옮기되 `faceLimitIssue`를 넘기 직전에서 멈춘다(변마다 차례로). `model`은 Δ 없는 모델 변.
+ * 실제 글자 계산 · 전파 카드가 같이 쓴다 — 편집기가 못 놓는 자리는 어느 화면에서도 같은 경계에서 멈춘다.
+ */
+export function limitFaces(model: ComponentFaces, want: ComponentFaces): ComponentFaces {
+  // 글자 몸 경계는 값 그대로 자르고(정확히 경계에 닿는다), 변이 뒤집히는 한계만 찾아 줄인다.
+  const body = bodyAround(model)
+  const clamp = (value: number, low: number, high: number) => Math.min(Math.max(value, low), high)
+  const target: ComponentFaces = { left: clamp(want.left, body.left, body.right), right: clamp(want.right, body.left, body.right), top: clamp(want.top, body.top, body.bottom), bottom: clamp(want.bottom, body.top, body.bottom) }
+  const moved = { ...model }
+  for (const side of ['left', 'right', 'top', 'bottom'] as const) {
+    moved[side] = furthestValid(model[side], target[side], (value) => faceLimitIssue(model, { ...moved, [side]: value }) === null)
+  }
+  return moved
+}
+
+/**
  * 홀자 fit의 한계. `base`는 Δ 전 fit(순서 · 간격의 기준), `moved`는 Δ를 얹어 다시 놓은 fit(`applyRailEdits` 결과).
  * 순서 · 간격은 서로 닿을 수 있는 보선 쌍만 본다 — 나란한 두 획의 중심, 획 중심과 그 축을 가로지르는 획의 끝, 한 획의 두 끝.
  * 서로 다른 기둥의 끝끼리(계의 안 · 바깥 기둥 아래 끝)는 잉크가 안 만나 보지 않는다. 간격은 그 쌍에 든 획의 두께다.

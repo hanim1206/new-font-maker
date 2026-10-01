@@ -9,7 +9,7 @@ import { placeStemStroke } from './stemBend'
 import type { SemanticDelta } from './medialRailDelta'
 import { applyRailEdits, applySlotFacesDelta, fitNotoMedialMaster, fitRailAxis, splitMixedMedialRoles } from './notoMedialMasterFit'
 import type { MedialFitInput, MedialFitResult } from './notoMedialMasterFit'
-import { bodyAround, furthestValid, medialLimitIssue } from './railLimits'
+import { furthestValid, limitFaces, medialLimitIssue } from './railLimits'
 import { MEDIAL_ROLE_SETS, modelIdentityOf, predictNotoTarget } from './notoVariationModel'
 import { medialFamilyOf } from '../utils/jamoContextStrokes'
 import type { ModelIdentity, VariationModel } from './notoVariationModel'
@@ -148,14 +148,13 @@ export function boxToFaces(box: BoxConfig): ContextFaces {
   return { left: box.x, right: box.x + box.width, top: box.y, bottom: box.y + box.height }
 }
 
-/** 닿자 네 변에 Δ를 얹는다. 글자 몸 밖으로 나가는 변은 몸 경계에서 멈춘다(모델이 이미 밖이면 그 자리까지). */
-function withDelta(faces: ContextFaces, delta?: FacesDelta): ContextFaces {
+/**
+ * 닿자 네 변에 Δ를 얹는다. 한계(`railLimits.limitFaces`: 글자 몸 안 · 변이 안 뒤집힘)에서 멈춘다(모델이 이미 몸 밖이면 그 자리까지).
+ * 칸 해석과 전파 카드가 같이 쓴다.
+ */
+export function facesWithDelta(faces: ContextFaces, delta?: FacesDelta): ContextFaces {
   if (!delta) return { ...faces }
-  const body = bodyAround(faces)
-  const clamp = (value: number, side: keyof ContextFaces) => side === 'left' || side === 'right' ? Math.min(Math.max(value, body.left), body.right) : Math.min(Math.max(value, body.top), body.bottom)
-  const moved = {} as ContextFaces
-  for (const side of SIDES) moved[side] = clamp(faceWithDelta(faces[side], delta[side]), side)
-  return moved
+  return limitFaces(faces, { left: faceWithDelta(faces.left, delta.left), right: faceWithDelta(faces.right, delta.right), top: faceWithDelta(faces.top, delta.top), bottom: faceWithDelta(faces.bottom, delta.bottom) })
 }
 
 /** 앱 음절에서 모델 신원을 만든다. 자모 하나짜리(초성만·중성만)는 문맥 칸이 없어 null. */
@@ -213,7 +212,7 @@ function fitContextMedialBase(identity: ModelIdentity, model: ContextModel): Con
  * 상자 변 Δ는 닿자와 달리 상자만 미는 게 아니라 rail을 다시 놓아 fit의 slot이 따라오게 한다.
  * `faced`는 상자 변까지 얹은 fit, `medial`은 실제로 얹힌 획 역할 Δ(줄인 뒤).
  */
-function limitMedialFit(base: MedialFitResult, facesDelta?: FacesDelta, medialDelta?: SemanticDelta): { fit: MedialFitResult; faced: MedialFitResult; medial: SemanticDelta } {
+export function limitMedialFit(base: MedialFitResult, facesDelta?: FacesDelta, medialDelta?: SemanticDelta): { fit: MedialFitResult; faced: MedialFitResult; medial: SemanticDelta } {
   // 고정은 지금 slot 변 기준 오프셋으로 풀어 아핀에 넘긴다.
   const offsets = facesOffsets(boxToFaces(base.slot), facesDelta)
   const placeFaces = (next: Partial<ContextFaces>): MedialFitResult | null => {
@@ -363,7 +362,7 @@ export function resolveContextBoxes(input: {
   const issues: ContextBoxResolution['issues'] = []
   // 닿자 변 Δ는 여기서 상자에 얹는다. 홀자 변 Δ는 fit 단계에서 이미 slot에 들어가 있어 다시 얹지 않는다.
   const place = (part: Part, faces: ContextFaces, facesDelta?: FacesDelta) => {
-    const placed = placePart(part, withDelta(faces, facesDelta), syllable, glyphId, identity.medialJamo, input.ends)
+    const placed = placePart(part, facesWithDelta(faces, facesDelta), syllable, glyphId, identity.medialJamo, input.ends)
     if (typeof placed === 'string') issues.push({ part, message: placed })
     else parts.push(placed)
   }

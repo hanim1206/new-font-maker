@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createNotoPresetReader } from '../scripts/reference-lab/notoPresetApi'
-import { boxToFaces, facesOffsets, resolveContextBoxes } from '../src/services/contextBoxResolver'
+import { addContextBoxDelta, boxToFaces, facesOffsets, resolveContextBoxes } from '../src/services/contextBoxResolver'
 import type { ContextBoxDelta } from '../src/services/contextBoxResolver'
 import { notoOutlineGhostPath } from '../src/services/notoOutlineInk'
 import { fitComponentsForGlyph, renderComponentPart } from './notoComponentFitView'
@@ -9,12 +9,13 @@ import { fitMedialForGlyph, renderMedialPart, withSlotFaces } from './notoMedial
 import type { NotoPresetGlyph, NotoPresetModelBundle } from './notoPresetGlyphs'
 import { propagationCardBaseOf, propagationCardViewOf } from './propagationCardView'
 import type { PropagationCardBox } from './propagationCardView'
-import { applyFacesDelta, applyMedialDelta } from './reviewPropagation'
+import { applyFacesDelta, applyMedialDelta, layoutDeltaOf } from './reviewPropagation'
 import type { PropagationEdit } from './reviewPropagation'
 
 /**
  * 카드 계산을 "글자당 한 번"과 "끄는 동안"으로 나눠도 그림은 글자 하나 안 달라야 한다.
  * `legacyView`는 나누기 전 카드가 한 번에 하던 계산 그대로다. 고치지 않는다 — 기준이다.
+ * 단, 한계(`railLimits`)를 넘는 홀자 Δ는 예외다. 옛 카드는 통째로 버렸지만 실제 글자는 경계까지 줄여 그리므로, 카드도 실제 글자(`resolveContextBoxes`)와 같아야 한다(`OVER_LIMIT`).
  */
 
 const CORPUS = path.resolve(__dirname, '../.reference-fonts/guide-corpus')
@@ -62,6 +63,20 @@ function legacyView(glyph: NotoPresetGlyph, bundle: NotoPresetModelBundle, edit:
   return { ghost: 'path' in ghost ? ghost.path : null, after, before, boxes, skipped, touched }
 }
 
+/** 한계를 넘는 홀자 Δ. 옛 계산이 아니라 실제 글자 계산과 견준다. */
+const OVER_LIMIT = new Set(['홀자 중심 못 놓는 Δ', '홀자 상자 못 놓는 Δ'])
+
+/** 카드가 그린 홀자 상자가 실제 글자(저장 Δ + 편집 Δ를 한 번에 푼 칸)의 홀자 상자 중 하나와 같다. */
+function expectMedialBoxesMatchResolver(split: ReturnType<typeof propagationCardViewOf>, glyph: NotoPresetGlyph, bundle: NotoPresetModelBundle, edit: PropagationEdit, savedDelta: ContextBoxDelta | undefined, label: string) {
+  const resolved = resolveContextBoxes({ identity: glyph.identity, model: bundle, delta: addContextBoxDelta(savedDelta, layoutDeltaOf(edit)) })
+  const real = (['JU', 'JU_H', 'JU_V'] as const).flatMap((part) => resolved.boxes[part] ? [resolved.boxes[part]!] : [])
+  for (const { kind, box } of split.boxes) {
+    if (kind !== 'medial') continue
+    const match = real.some((one) => (['x', 'y', 'width', 'height'] as const).every((key) => Math.abs(one[key] - box[key]) < 1e-6))
+    expect(match, `${label}: 카드 홀자 상자 ${JSON.stringify(box)}가 실제 ${JSON.stringify(real)}에 없다`).toBe(true)
+  }
+}
+
 const NO_EDIT: PropagationEdit = { layout: { medial: {}, component: {}, slot: {} } }
 const MEDIAL_KEYS = ['JU', 'JU_H', 'JU_V'] as const
 const allMedial = <T,>(value: T) => Object.fromEntries(MEDIAL_KEYS.map((key) => [key, value])) as Record<(typeof MEDIAL_KEYS)[number], T>
@@ -102,7 +117,8 @@ describe('닿는 글자 카드 계산 나누기', () => {
       const base = propagationCardBaseOf({ glyph, identity: glyph.identity, bundle })
       for (const [name, edit] of Object.entries(editsFor(glyph, bundle))) {
         const split = propagationCardViewOf(base, edit)
-        expect(split, `${char} ${name}`).toEqual(legacyView(glyph, bundle, edit))
+        if (OVER_LIMIT.has(name)) expectMedialBoxesMatchResolver(split, glyph, bundle, edit, undefined, `${char} ${name}`)
+        else expect(split, `${char} ${name}`).toEqual(legacyView(glyph, bundle, edit))
         touchedSomewhere += split.touched
         skippedSomewhere += split.skipped
       }
@@ -117,7 +133,11 @@ describe('닿는 글자 카드 계산 나누기', () => {
     const glyph = (await reader.glyph('멈'.codePointAt(0)!))!
     const savedDelta: ContextBoxDelta = { faces: { CH: { left: 0.015 }, JO: { top: -0.01 } }, medial: {} }
     const base = propagationCardBaseOf({ glyph, identity: glyph.identity, bundle, savedDelta })
-    for (const [name, edit] of Object.entries(editsFor(glyph, bundle))) expect(propagationCardViewOf(base, edit), name).toEqual(legacyView(glyph, bundle, edit, savedDelta))
+    for (const [name, edit] of Object.entries(editsFor(glyph, bundle))) {
+      const split = propagationCardViewOf(base, edit)
+      if (OVER_LIMIT.has(name)) expectMedialBoxesMatchResolver(split, glyph, bundle, edit, savedDelta, name)
+      else expect(split, name).toEqual(legacyView(glyph, bundle, edit, savedDelta))
+    }
   })
 
   it('편집을 되돌리면 Δ 없는 그림으로 돌아온다 — 밑계산이 편집에 물들지 않는다', async () => {

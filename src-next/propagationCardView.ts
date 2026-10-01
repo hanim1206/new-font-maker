@@ -1,4 +1,4 @@
-import { boxToFaces, facesOffsets, resolveContextBoxes } from '../src/services/contextBoxResolver'
+import { facesWithDelta, limitMedialFit, resolveContextBoxes } from '../src/services/contextBoxResolver'
 import type { ContextBoxDelta } from '../src/services/contextBoxResolver'
 import type { FitInkStyle } from '../src/services/notoComponentFit'
 import { notoOutlineGhostPath } from '../src/services/notoOutlineInk'
@@ -7,10 +7,10 @@ import type { BoxConfig, Padding } from '../src/types'
 import type { CorpusIdentity } from './notoCorpus'
 import { fitComponentsForGlyph, renderComponentPart } from './notoComponentFitView'
 import type { ComponentFitPart } from './notoComponentFitView'
-import { fitMedialForGlyph, renderMedialPart, withSlotFaces } from './notoMedialFitView'
+import { fitMedialForGlyph, renderMedialPart } from './notoMedialFitView'
 import type { MedialFitPart } from './notoMedialFitView'
 import type { NotoPresetGlyph, NotoPresetModelBundle } from './notoPresetGlyphs'
-import { applyFacesDelta, applyMedialDelta } from './reviewPropagation'
+import { applyMedialDelta } from './reviewPropagation'
 import type { PropagationEdit } from './reviewPropagation'
 
 /**
@@ -68,21 +68,19 @@ export function propagationCardViewOf(base: PropagationCardBase, edit: Propagati
   let skipped = 0
   let touched = 0
   for (const { part: modelPart, basePath } of base.medial) {
-    // 홀자 상자 변 Δ. 칸 해석과 같은 순서로 rail Δ보다 먼저 얹는다. 못 놓는 글자는 Δ를 안 받는다.
-    // 고정은 이 글자의 slot 변 기준 오프셋으로 풀어 아핀에 넘긴다(칸 해석과 같은 규칙).
-    const slotDelta = modelPart.fit ? facesOffsets(boxToFaces(modelPart.fit.slot), edit.layout.slot[modelPart.part]) : undefined
-    const slotMoved = withSlotFaces(modelPart, slotDelta)
-    const part = slotMoved.ok ? slotMoved.part : modelPart
-    const slotTouched = slotMoved.ok && part !== modelPart
-    if (slotDelta && !slotMoved.ok) skipped += 1
-    // 중심 rail Δ는 em 그대로.
-    const delta = part.fit ? edit.layout.medial[part.part] : undefined
-    const applied = delta && part.fit ? applyMedialDelta(part.fit, delta) : null
-    if (applied) skipped += applied.skipped
-    if (!slotTouched && !(applied && applied.applied > 0)) { if (basePath) after.push(basePath); continue }
-    const moved = renderMedialPart(part, applied && applied.applied > 0 ? applied.rails : undefined, inkStyle)
-    // rail을 못 놓으면(slot 없음) 이 글자는 Δ를 못 받는다(클램프 = 자동 예외). 앱 획이 칸에 안 맞는 건(잉크 없음) Δ 문제가 아니라 상자만 보인다.
-    if (!moved.slot) { if (basePath) after.push(basePath); skipped += applied?.applied ?? 0; continue }
+    // 칸 해석과 같은 함수(`limitMedialFit`)로 놓는다: 상자 변 Δ를 먼저, 중심 rail Δ를 그 위에, 한계(글자 몸 · 순서 · 두께 간격)를 넘는 값은 경계까지 줄인다.
+    // 그래서 카드의 after가 적용한 뒤 실제 글자와 같다.
+    const slotDelta = edit.layout.slot[modelPart.part]
+    const railDelta = modelPart.fit ? edit.layout.medial[modelPart.part] : undefined
+    if (!modelPart.fit || (!slotDelta && !railDelta)) { if (basePath) after.push(basePath); continue }
+    const requested = railDelta ? applyMedialDelta(modelPart.fit, railDelta) : null
+    if (requested) skipped += requested.skipped
+    const limited = limitMedialFit(modelPart.fit, slotDelta, railDelta)
+    // 한 칸도 못 옮겼으면(상자가 두께보다 좁아짐 등) 이 글자는 Δ를 못 받는다 = 자동 예외.
+    if (limited.fit === modelPart.fit) { if (slotDelta || (requested && requested.applied > 0)) skipped += Math.max(1, requested?.applied ?? 0); if (basePath) after.push(basePath); continue }
+    const moved = renderMedialPart({ ...modelPart, fit: limited.fit }, undefined, inkStyle)
+    // 앱 획이 칸에 안 맞는 건(잉크 없음) Δ 문제가 아니라 상자만 보인다.
+    if (!moved.slot) { if (basePath) after.push(basePath); skipped += 1; continue }
     touched += 1
     if (moved.path) after.push(moved.path)
     if (basePath) before.push(basePath)
@@ -91,7 +89,8 @@ export function propagationCardViewOf(base: PropagationCardBase, edit: Propagati
   for (const { part, basePath } of base.components) {
     const delta = edit.layout.component[part.part]
     if (!delta || !part.faces) { if (basePath) after.push(basePath); continue }
-    const moved = renderComponentPart(part, applyFacesDelta(part.faces, delta), inkStyle)
+    // 칸 해석과 같은 함수(`facesWithDelta`) — 글자 몸 안 · 변이 안 뒤집히는 경계에서 멈춘다.
+    const moved = renderComponentPart(part, facesWithDelta(part.faces, delta), inkStyle)
     if (!moved.path) { if (basePath) after.push(basePath); skipped += 1; continue }
     touched += 1
     after.push(moved.path)
