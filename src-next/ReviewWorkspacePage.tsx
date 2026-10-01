@@ -61,7 +61,8 @@ function DevNotoCell({ char }: { char: string }) {
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         width: CELL_GLYPH_SIZE, height: CELL_GLYPH_SIZE,
-        fontFamily: "'Noto Sans KR', sans-serif", fontWeight: weight, fontSize: CELL_GLYPH_SIZE * 0.92, lineHeight: 1,
+        // 우리 칸은 em(1000u) 전체를 칸 크기에 그린다 — 노토도 em = 칸 크기로 둬야 몸통(840 × 910)이 같은 크기다.
+        fontFamily: "'Noto Sans KR', sans-serif", fontWeight: weight, fontSize: CELL_GLYPH_SIZE, lineHeight: 1,
       }}
     >{char}</span>
   )
