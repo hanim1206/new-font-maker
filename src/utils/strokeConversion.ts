@@ -117,17 +117,3 @@ export function isLegacyStroke(stroke: unknown): stroke is LegacyStrokeData {
     typeof (stroke as Record<string, unknown>).direction === 'string'
   )
 }
-
-/**
- * 레거시 획 배열을 새 형식으로 마이그레이션합니다.
- * 이미 새 형식이면 그대로 반환합니다.
- */
-export function migrateStrokes(strokes: unknown[]): StrokeDataV2[] {
-  return strokes.map((stroke) => {
-    if (isLegacyStroke(stroke)) {
-      return convertLegacyStroke(stroke)
-    }
-    // 이미 새 형식이면 그대로 반환
-    return stroke as StrokeDataV2
-  })
-}

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { JamoData, JamoOverride, Padding } from '../types'
-import { migrateJamoData, needsMigration } from '../utils/strokeMigration'
+import { migrateJamoMap } from '../utils/strokeMigration'
 import { withThinStemsInEm } from '../utils/thinStemMigration'
 import baseJamos from '../data/baseJamos.json'
 import { createDebouncedStorage } from '../utils/debouncedStorage'
@@ -141,29 +141,6 @@ interface JamoActions {
 // 깊은 복사 헬퍼 (JSON 기반)
 function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj))
-}
-
-// 자모 맵에 구형 스트로크가 있는지 확인
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapNeedsMigration(jamoMap: Record<string, any>): boolean {
-  for (const jamo of Object.values(jamoMap)) {
-    const allStrokes = [
-      ...(jamo.strokes || []),
-      ...(jamo.horizontalStrokes || []),
-      ...(jamo.verticalStrokes || []),
-    ]
-    if (allStrokes.some(needsMigration)) return true
-  }
-  return false
-}
-
-// 자모 맵 전체 마이그레이션
-function migrateMap(jamoMap: Record<string, JamoData>): Record<string, JamoData> {
-  const result: Record<string, JamoData> = {}
-  for (const [key, jamo] of Object.entries(jamoMap)) {
-    result[key] = migrateJamoData(jamo)
-  }
-  return result
 }
 
 // baseJamos.json에서 초기 데이터 로드. 기본 프리셋 = Noto 고스트에 맞춘 골격(skeletonFit) 그대로.
@@ -353,19 +330,10 @@ export const useJamoStore = create<JamoState & JamoActions>()(
 
       loadFontData: (data) =>
         set((state) => {
-          // 구형 스트로크 마이그레이션 체크
-          let ch = deepClone(data.choseong)
-          let ju = deepClone(data.jungseong)
-          let jo = deepClone(data.jongseong)
-
-          if (mapNeedsMigration(ch)) ch = migrateMap(ch)
-          if (mapNeedsMigration(ju)) ju = migrateMap(ju)
-          if (mapNeedsMigration(jo)) jo = migrateMap(jo)
-
-          state.choseong = ch as typeof state.choseong
-          // 높이 0인 칸에서 백만 배로 저장된 보 기울기를 넓힌 칸 비율로 옮겨 적는다.
-          state.jungseong = withThinStemsInEm(ju) as typeof state.jungseong
-          state.jongseong = jo as typeof state.jongseong
+          // 옛 획 이전 · 얇은 칸 환산은 `parseAndMigrateFontData`가 이미 했다(서버 · 파일 폰트의 유일한 입구). 여기서는 복사해 넣기만 한다.
+          state.choseong = deepClone(data.choseong) as typeof state.choseong
+          state.jungseong = deepClone(data.jungseong) as typeof state.jungseong
+          state.jongseong = deepClone(data.jongseong) as typeof state.jongseong
         }),
 
       setHydrated: () => set({ _hydrated: true }),
@@ -386,15 +354,14 @@ export const useJamoStore = create<JamoState & JamoActions>()(
         }
         if (state) {
           // localStorage에서 불러온 데이터에 구형 스트로크가 있으면 마이그레이션
-          const needsCh = mapNeedsMigration(state.choseong)
-          const needsJu = mapNeedsMigration(state.jungseong)
-          const needsJo = mapNeedsMigration(state.jongseong)
-
-          if (needsCh || needsJu || needsJo) {
+          const choseong = migrateJamoMap(state.choseong)
+          const jungseong = migrateJamoMap(state.jungseong)
+          const jongseong = migrateJamoMap(state.jongseong)
+          if (choseong !== state.choseong || jungseong !== state.jungseong || jongseong !== state.jongseong) {
             console.log('[jamoStore] 구형 스트로크 감지 — 자동 마이그레이션 실행')
-            if (needsCh) state.choseong = migrateMap(state.choseong) as typeof state.choseong
-            if (needsJu) state.jungseong = migrateMap(state.jungseong) as typeof state.jungseong
-            if (needsJo) state.jongseong = migrateMap(state.jongseong) as typeof state.jongseong
+            state.choseong = choseong
+            state.jungseong = jungseong
+            state.jongseong = jongseong
           }
           // 높이 0인 칸에서 백만 배로 저장된 보 기울기를 넓힌 칸 비율로 옮겨 적는다. 고칠 것이 있을 때만 바꾼다.
           const thinFixed = withThinStemsInEm(state.jungseong)

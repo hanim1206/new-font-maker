@@ -115,6 +115,16 @@ export function migrateJamoData(jamo: JamoData): JamoData {
 }
 
 /**
+ * 자모 맵 하나를 마이그레이션. 옛 획이 하나도 없으면 같은 객체를 그대로 돌려준다(메모 · 변경 감지가 안 깨진다).
+ * 서버 · 파일 폰트는 `parseAndMigrateFontData`가, localStorage 복원은 `jamoStore`가 이 함수 하나로 옮긴다.
+ */
+export function migrateJamoMap<T extends Record<string, JamoData>>(map: T): T {
+  const needs = Object.values(map).some((jamo) => [...(jamo.strokes ?? []), ...(jamo.horizontalStrokes ?? []), ...(jamo.verticalStrokes ?? [])].some(needsMigration))
+  if (!needs) return map
+  return Object.fromEntries(Object.entries(map).map(([key, jamo]) => [key, migrateJamoData(jamo)])) as T
+}
+
+/**
  * 0.025 그리드에 스냅 + 소수점 정리
  */
 function round(value: number): number {

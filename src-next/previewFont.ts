@@ -1,11 +1,11 @@
 import { REFERENCE_BODY_PADDING } from '../src/services/designBodyPlacement'
 import { parseAndMigrateFontData } from '../src/services/fontDataMigration'
+import { migrateJamoMap } from '../src/utils/strokeMigration'
 import baseJamos from '../src/data/baseJamos.json'
 import { DEFAULT_STYLE, loadedGlobalStyle } from '../src/stores/globalStyleStore'
 import { DEFAULT_LAYOUT_SCHEMAS } from '../src/utils/layoutCalculator'
 import type { GlobalStyle, GlobalStyleExclusion } from '../src/stores/globalStyleStore'
 import type { JamoData, LayoutSchema, LayoutType, Padding } from '../src/types'
-import { migrateJamoData, needsMigration } from '../src/utils/strokeMigration'
 import { NOTO_FONT_PRESET } from '../src/types/database'
 import type { FontPresetId } from '../src/types/database'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
@@ -28,12 +28,6 @@ export interface PreviewFont {
   preset: FontPresetId
 }
 
-const migratedMap = (map: Record<string, JamoData>): Record<string, JamoData> => {
-  const cloned = structuredClone(map)
-  const needs = Object.values(cloned).some((jamo) => [...(jamo.strokes ?? []), ...(jamo.horizontalStrokes ?? []), ...(jamo.verticalStrokes ?? [])].some(needsMigration))
-  return needs ? Object.fromEntries(Object.entries(cloned).map(([key, jamo]) => [key, migrateJamoData(jamo)])) : cloned
-}
-
 export function previewFontOf(value: unknown): { ok: true; font: PreviewFont } | { ok: false; message: string } {
   const parsed = parseAndMigrateFontData(value)
   if (!parsed.ok) return { ok: false, message: parsed.issues.map(({ path, code }) => `${path}:${code}`).join(', ') }
@@ -42,9 +36,10 @@ export function previewFontOf(value: unknown): { ok: true; font: PreviewFont } |
     ok: true,
     font: {
       jamo: {
-        choseong: migratedMap(data.jamoData.choseong),
-        jungseong: migratedMap(data.jamoData.jungseong),
-        jongseong: migratedMap(data.jamoData.jongseong),
+        // 옛 획 이전 · 얇은 칸 환산은 `parseAndMigrateFontData`가 이미 했다.
+        choseong: structuredClone(data.jamoData.choseong),
+        jungseong: structuredClone(data.jamoData.jungseong),
+        jongseong: structuredClone(data.jamoData.jongseong),
       },
       layoutSchemas: structuredClone(data.layoutSchemas),
       globalPadding: { ...data.globalPadding },
@@ -64,9 +59,9 @@ export function previewFontOf(value: unknown): { ok: true; font: PreviewFont } |
 export function presetPreviewFont(preset: FontPresetId): PreviewFont {
   return {
     jamo: {
-      choseong: migratedMap(baseJamos.choseong as Record<string, JamoData>),
-      jungseong: migratedMap(baseJamos.jungseong as Record<string, JamoData>),
-      jongseong: migratedMap(baseJamos.jongseong as Record<string, JamoData>),
+      choseong: migrateJamoMap(structuredClone(baseJamos.choseong) as Record<string, JamoData>),
+      jungseong: migrateJamoMap(structuredClone(baseJamos.jungseong) as Record<string, JamoData>),
+      jongseong: migrateJamoMap(structuredClone(baseJamos.jongseong) as Record<string, JamoData>),
     },
     layoutSchemas: structuredClone(DEFAULT_LAYOUT_SCHEMAS),
     globalPadding: { ...REFERENCE_BODY_PADDING },
