@@ -53,18 +53,17 @@ function observeCell(element: Element, onVisible: () => void): () => void {
   return () => { visibleCallbacks.delete(element); cellObserver?.unobserve(element) }
 }
 
-/** 개발 전용 — 같은 칸 크기에 노토 산스 KR(지금 굵기)로 그 글자를 그린다. 눈 ③에서 우리 굵기 처리와 견주는 용도. */
+/**
+ * 개발 전용 — 노토 산스 KR(지금 굵기)로 그 글자를 그린다. 눈 ③에서 우리 굵기 처리와 견주는 용도.
+ * 우리 칸(SvgRenderer)과 같은 꼴의 SVG(viewBox 100 = em, 기준선 88)에 텍스트로 얹어,
+ * 셀 CSS가 SVG를 늘려도 같은 배율 · 같은 자리로 겹친다.
+ */
 function DevNotoCell({ char }: { char: string }) {
   const weight = useGlobalStyleStore((state) => state.style.weight)
   return (
-    <span
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: CELL_GLYPH_SIZE, height: CELL_GLYPH_SIZE,
-        // 우리 칸은 em(1000u) 전체를 칸 크기에 그린다 — 노토도 em = 칸 크기로 둬야 몸통(840 × 910)이 같은 크기다.
-        fontFamily: "'Noto Sans KR', sans-serif", fontWeight: weight, fontSize: CELL_GLYPH_SIZE, lineHeight: 1,
-      }}
-    >{char}</span>
+    <svg viewBox="0 0 100 100" width={CELL_GLYPH_SIZE} height={CELL_GLYPH_SIZE} aria-hidden="true">
+      <text x="0" y="88" fontFamily="'Noto Sans KR', sans-serif" fontWeight={weight} fontSize="100">{char}</text>
+    </svg>
   )
 }
 
