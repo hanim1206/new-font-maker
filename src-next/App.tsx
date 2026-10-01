@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react'
+import { useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import { navigate, usePathname, useRouteKey } from './router'
 import { AccountPage } from './AccountPage'
 import { DashboardLabPage, JamoHomePage } from './DashboardLabPage'
@@ -63,7 +64,28 @@ function usePinchLock(): void {
   }, [])
 }
 
+/** 개발 서버 전용 — 눈 ③ 확인용으로 우상단에 속공간 자동 보정 토글을 고정한다. 프로덕션 빌드에서는 분기가 사라진다. */
+function DevCounterKeepToggle() {
+  const on = useGlobalStyleStore((state) => state.style.counterKeep !== false)
+  const setCounterKeep = useGlobalStyleStore((state) => state.setCounterKeep)
+  return (
+    <button
+      type="button"
+      data-testid="dev-counter-keep"
+      onClick={() => setCounterKeep(!on)}
+      style={{
+        position: 'fixed', top: 10, right: 10, zIndex: 9999,
+        padding: '6px 10px', borderRadius: 8, border: '1px solid #c9c2a6',
+        background: on ? '#1a1a1a' : '#fff', color: on ? '#fff' : '#1a1a1a',
+        font: '12px/1.2 inherit', cursor: 'pointer', opacity: 0.9,
+      }}
+    >
+      자동 보정 {on ? '켬' : '끔'}
+    </button>
+  )
+}
+
 export default function App() {
   usePinchLock()
-  return <><Page /><FontExportDialog /></>
+  return <><Page /><FontExportDialog />{import.meta.env.DEV && <DevCounterKeepToggle />}</>
 }
