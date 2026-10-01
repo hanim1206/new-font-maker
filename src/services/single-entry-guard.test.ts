@@ -51,6 +51,13 @@ describe('공용 입구 가드', () => {
     expect(defined).toEqual(['src/utils/strokeMigration.ts'])
   })
 
+  it('문장 줄의 글자 칸 · 띄어쓰기는 추출 폰트와 같은 `fontMetrics`에서 온다', () => {
+    // 옛 식(몸통 폭 × 1000, 띄어쓰기를 몸통 비율로)이 다시 생기면 문장 화면과 추출 폰트의 글자 간격이 어긋난다.
+    expect(offenders(/metrics\.spaceAdvance\s*\*/, [])).toEqual([])
+    expect(offenders(/\*\s*\.85\b/, [])).toEqual([])
+    expect(offenders(/\(1 - \w+\.left - \w+\.right\) \* fontSpace\.unitsPerEm/, [])).toEqual([])
+  })
+
   it('글리프 밑선 880은 `fontMetrics.BASELINE_Y` 한 곳에서 온다', () => {
     // 글자 안내선 실험실의 880은 그 실험실이 동결한 계약 값이라 제품 밑선과 별개다.
     expect(offenders(/\b(ASCENDER|BASELINE_Y)\s*=\s*880\b/, ['src/services/fontMetrics.ts', 'src-next/FontGuideLabPage.tsx'])).toEqual([])

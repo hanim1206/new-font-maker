@@ -28,6 +28,7 @@ import { useWorkbenchStore, workbenchJamoOf, workbenchSyllable } from '../src/st
 import { groupMatching, useJamoGroupStore } from '../src/stores/jamoGroupStore'
 import confirmStyles from './workspace/FontExportDialog.module.css'
 import { mergeLayoutPadding, mergePadding, useLayoutStore } from '../src/stores/layoutStore'
+import { hangulAdvance as fontMetricsAdvance, hangulLeftBearing, SPACE_ADVANCE } from '../src/services/fontMetrics'
 import { jamoCenterlineCenter, limitJamoMoveDelta, limitJamoScaleFactor, moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStrokes, snapWholeJamoDelta, translateJamoStrokes, type StrokeBoundsOf } from '../src/services/editorCommands'
 import { stemEditBox, storedStemDelta } from '../src/services/stemBend'
 import { stemRailGuides } from '../src/services/medialStemRails'
@@ -2664,12 +2665,10 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     const layoutPadding = decomposedForMetrics
       ? mergeLayoutPadding(globalPadding, paddingOverrides, decomposedForMetrics.layoutType)
       : null
-    const hangulAdvance = layoutPadding
-      ? Math.round((1 - layoutPadding.left - layoutPadding.right) * fontSpace.unitsPerEm)
-      : metrics.hangulAdvance
-    const globalBodyWidth = 1 - globalPadding.left - globalPadding.right
-    const spaceAdvance = Math.round(metrics.spaceAdvance * globalBodyWidth / .85)
-    const advance = advanceForCharacter(char, metrics, hangulAdvance, spaceAdvance)
+    // 글자 칸 · 띄어쓰기는 추출 폰트와 같은 값(`fontMetrics`)이다. 몸통은 칸 안에서 왼 여백만큼 안쪽에 앉는다.
+    const hangulAdvance = layoutPadding ? fontMetricsAdvance(layoutPadding, previewGlobalStyle.letterSpacing) : metrics.hangulAdvance
+    const advance = advanceForCharacter(char, metrics, hangulAdvance, SPACE_ADVANCE)
+    const bearing = layoutPadding ? `${hangulLeftBearing(layoutPadding)}em` : undefined
     const width = `${advance / fontSpace.unitsPerEm}em`
     const layoutHighlight = !isBrushStyleOpen && selection.kind === 'component'
       ? { layoutType: syllable.layoutType, parts: selection.renderParts, source: char === selectedChar }
@@ -2693,10 +2692,10 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     })()
     return isEditableHangul(char)
       ? inSheet
-        ? <button key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width }} type="button" tabIndex={-1} data-char-index={charIndex} aria-label={`${char} 앞뒤에 커서 두기`}>
+        ? <button key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width, paddingInlineStart: bearing }} type="button" tabIndex={-1} data-char-index={charIndex} aria-label={`${char} 앞뒤에 커서 두기`}>
             <Glyph char={char} size={sentenceEm} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={previewJamo} previewSchema={previewSchema} layoutHighlight={null} globalStyle={previewGlobalStyle} />
           </button>
-        : <button key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width }} type="button" aria-current={char === selectedChar ? 'true' : undefined} data-ink-gap-limiter={inkGapLimiter?.id === contextId ? 'true' : undefined} data-ink-safety-adjusted={isSafetyAdjusted ? 'true' : undefined} data-layout-applied={isScopeApplied ? 'true' : undefined} aria-label={`${char} 편집${isSafetyAdjusted ? ', 충돌 안전 보정됨' : ''}`} onClick={() => chooseChar(char)}>
+        : <button key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width, paddingInlineStart: bearing }} type="button" aria-current={char === selectedChar ? 'true' : undefined} data-ink-gap-limiter={inkGapLimiter?.id === contextId ? 'true' : undefined} data-ink-safety-adjusted={isSafetyAdjusted ? 'true' : undefined} data-layout-applied={isScopeApplied ? 'true' : undefined} aria-label={`${char} 편집${isSafetyAdjusted ? ', 충돌 안전 보정됨' : ''}`} onClick={() => chooseChar(char)}>
           <Glyph char={char} size={sentenceEm} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={previewJamo} previewSchema={previewSchema} layoutHighlight={layoutHighlight} globalStyle={previewGlobalStyle} />
         </button>
       : <span key={`${lineIndex}-${char}-${charIndex}`} data-char-index={inSheet ? charIndex : undefined} className={/\s/u.test(char) ? styles.spaceGlyph : styles.punctuationGlyph} style={{ inlineSize: width }} aria-label={/\s/u.test(char) ? '공백' : char}>{char}</span>

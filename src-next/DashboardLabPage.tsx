@@ -29,8 +29,7 @@ import { PART_COLOR } from './partColors'
 import { randomSampleSentence } from './sampleSentences'
 import { SentenceSheetControls, SentenceSheetRun } from './SentenceSheet'
 import { useSentenceSheet } from './sentenceSheetState'
-import { hangulBodyWidth, UPM } from '../src/services/fontMetrics'
-import { useCalibrationProjectStore } from './calibrationProjectStore'
+import { hangulAdvance, hangulOriginX, SPACE_ADVANCE, UPM } from '../src/services/fontMetrics'
 import { ReportButton } from './ReportButton'
 import { AnnouncementSpot } from './AnnouncementSpot'
 import { BetaGuideSheet } from './BetaGuideSheet'
@@ -235,19 +234,19 @@ function FontCard({ name, onRename, onDuplicate, onDelete }: {
     // 빈 문장으로 닫으면 마지막 문장으로 돌아간다(편집기는 편집하던 글자를 남기는데, 대시보드엔 그 글자가 없다).
     onClose: () => { if (!draft.trim()) setDraft(sentence) },
   })
-  // 글자 폭은 편집기 문장 줄과 같은 계산: 한글은 그 글자 레이아웃의 몸통 폭(여백 뺀 만큼), 공백은 폰트 공백 폭을 몸통 비율로.
+  // 글자 폭은 편집기 문장 줄과 같은 계산(`fontMetrics`): 추출 폰트와 같은 글자 칸 · 띄어쓰기. 몸통은 칸 안에서 왼 여백만큼 안쪽에 앉는다.
   const choseong = useJamoStore((state) => state.choseong)
   const jungseong = useJamoStore((state) => state.jungseong)
   const jongseong = useJamoStore((state) => state.jongseong)
   const globalPadding = useLayoutStore((state) => state.globalPadding)
   const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
-  const metricsSpace = useCalibrationProjectStore((state) => state.metrics.spaceAdvance)
-  const spaceAdvance = `${Math.round(metricsSpace * hangulBodyWidth(globalPadding) / .85) / UPM}em`
+  const letterSpacing = useGlobalStyleStore((state) => state.style.letterSpacing)
+  const spaceAdvance = `${SPACE_ADVANCE / UPM}em`
   const renderChar = (char: string, index: number) => {
     if (!isHangul(char)) return <span key={index} className={/\s/u.test(char) ? editorStyles.spaceGlyph : editorStyles.punctuationGlyph} style={/\s/u.test(char) ? { inlineSize: spaceAdvance } : undefined} data-char-index={index} aria-label={/\s/u.test(char) ? '공백' : char}>{char}</span>
     const padding = mergeLayoutPadding(globalPadding, paddingOverrides, decomposeSyllable(char, choseong, jungseong, jongseong).layoutType)
     // 그림은 1em 네모 그대로 두고 몸통만 보이게 왼쪽 여백만큼 당긴다(편집기 글자 칸과 같은 자리).
-    return <span key={index} className={styles.sentenceGlyph} style={{ inlineSize: `${Math.round(hangulBodyWidth(padding) * UPM) / UPM}em`, '--bearing': padding.left } as CSSProperties} data-char-index={index}><AppGlyph char={char} size={64} /></span>
+    return <span key={index} className={styles.sentenceGlyph} style={{ inlineSize: `${hangulAdvance(padding, letterSpacing) / UPM}em`, '--bearing': hangulOriginX(padding) } as CSSProperties} data-char-index={index}><AppGlyph char={char} size={64} /></span>
   }
   const wrapped = sheet.open || sheet.closing
   // 카드 문장은 늘 두 줄 높이. 넘치면 넘친 글자 앞에서 끊고 `…`(주사위를 눌러도 카드 높이가 안 바뀐다 — 09-29 사용자).
