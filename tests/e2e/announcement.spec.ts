@@ -30,8 +30,11 @@ test('대시보드 공지 — 두 장을 넘기고 확인하면 다음 공지, �
   ])
   const sheet = page.getByTestId('announcement')
   await expect(sheet.getByRole('heading')).toHaveText('붓 크기')
+  // 공지 이름은 장 제목 위 머리말 — 장을 넘겨도 그대로다.
+  await expect(page.getByTestId('announcement-eyebrow')).toHaveText('first')
   await page.getByTestId('announcement-next').click()
   await expect(sheet.getByRole('heading')).toHaveText('트랙패드')
+  await expect(page.getByTestId('announcement-eyebrow')).toHaveText('first')
   await page.getByTestId('announcement-next').click()
   await expect(sheet.getByRole('heading')).toHaveText('두 번째 공지')
   await page.getByTestId('announcement-skip').click()

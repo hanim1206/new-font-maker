@@ -13,10 +13,12 @@ const SWIPE_PX = 40
  * 판 밖을 눌러도 안 닫힌다(실수로 넘기지 않게) — 첫 장 왼쪽 단추, 마지막 장 오른쪽 단추, Esc로만 닫는다.
  * `×`는 두지 않는다 — 캡처 속 머리 단추와 겹쳐 앱 단추처럼 보였다.
  * `inline`이면 깔개 없이 그 자리에 판만 그린다(관리자 미리보기). 닫으면 첫 장으로 돌아간다.
+ * `eyebrow`는 장 제목 위의 작은 머리말 — 장을 넘겨도 그대로 있다(공지 이름).
  */
-export function SlideSheet({ slides, label, testId, firstLabel, lastLabel, onClose, inline }: {
+export function SlideSheet({ slides, label, eyebrow, testId, firstLabel, lastLabel, onClose, inline }: {
   slides: SlideSheetSlide[]
   label: string
+  eyebrow?: string
   testId: string
   /** 첫 장 왼쪽 단추(닫기). 둘째 장부터는 `이전`. */
   firstLabel: string
@@ -78,9 +80,12 @@ export function SlideSheet({ slides, label, testId, firstLabel, lastLabel, onClo
     {slides.length > 1 && <div className={styles.dots} aria-hidden="true">
       {slides.map((_, order) => <span key={order} data-on={order === at || undefined} />)}
     </div>}
-    <div key={at} className={styles.text} aria-live="polite">
-      <h3>{slide.title}</h3>
-      {slide.body && <p>{slide.body}</p>}
+    <div className={styles.copy}>
+      {eyebrow && <span className={styles.eyebrow} data-testid={`${testId}-eyebrow`}>{eyebrow}</span>}
+      <div key={at} className={styles.text} aria-live="polite">
+        <h3>{slide.title}</h3>
+        {slide.body && <p>{slide.body}</p>}
+      </div>
     </div>
     <div className={styles.actions}>
       {at === 0
