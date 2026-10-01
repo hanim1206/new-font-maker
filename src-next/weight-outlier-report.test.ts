@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, it, vi } from 'vitest'
 import {
   betweenKeepScales, counterKeepScale, strokeGrowthOf, strokeVerticalness,
-  DEFAULT_BETWEEN_OPENING, DEFAULT_COUNTER_FLOOR, DEFAULT_COUNTER_MINSCALE, DEFAULT_HORIZONTAL_SHARE, DEFAULT_TOTAL_MINSCALE, jamoOfPart,
+  DEFAULT_BETWEEN_OPENING, DEFAULT_COUNTER_FLOOR, DEFAULT_TOTAL_MINSCALE, jamoOfPart,
 } from '../src/services/counterKeep'
 import { stemScaleOf } from '../src/services/strokeRenderGeometry'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
@@ -24,9 +24,11 @@ const FONT_SPACE = { width: 1000, height: 1000 }
 const WEIGHT = Number(process.env.OUTLIER_WEIGHT ?? 900)
 const STRIDE = Number(process.env.OUTLIER_STRIDE ?? 1)
 const OUT = process.env.OUTLIER_OUT ?? '/tmp/weight-outliers.json'
-/** 자소 사이 깎임의 바닥 후보. `OUTLIER_TOTAL_MIN`: 합성(자소 × 자소 사이) 바닥 — 기본은 제품 값(10-02 결정 0.8), 0을 주면 바닥 없음. */
+/** 손잡이 — 기본은 제품 값(10-02 뒤집힘: 가로 몫 1 · 자소 바닥 끔 · 사이 0.25 · 합성 바닥 0.8). 옛 조합은 env로 되살린다. */
 const BETWEEN_MIN = Number(process.env.OUTLIER_BETWEEN_MIN ?? 0)
 const TOTAL_MIN = Number(process.env.OUTLIER_TOTAL_MIN ?? DEFAULT_TOTAL_MINSCALE)
+const HSHARE = Number(process.env.OUTLIER_HSHARE ?? 1)
+const MINSCALE = Number(process.env.OUTLIER_MINSCALE ?? 1)
 
 describe.skipIf(!process.env.WEIGHT_OUTLIERS)('속공간 지키기 — 튀는 글자 골라내기', () => {
   beforeAll(() => {
@@ -59,11 +61,11 @@ describe.skipIf(!process.env.WEIGHT_OUTLIERS)('속공간 지키기 — 튀는 �
       const stemScale = stemScaleOf(data.strokeStyle)
       const parted = data.strokes.map((item) => ({ stroke: item.stroke, box: item.box, part: jamoOfPart((item.beakGroup ?? '').split(':')[0]) }))
       const parts = [...new Set(parted.map((item) => item.part))]
-      const jamoScaleOf = new Map(parts.map((part) => [part, Math.max(DEFAULT_COUNTER_MINSCALE, counterKeepScale(parted.filter((item) => item.part === part), k, DEFAULT_COUNTER_FLOOR, stemScale, DEFAULT_HORIZONTAL_SHARE))]))
-      const between = betweenKeepScales(parted, parted.map((item) => parts.indexOf(item.part)), k, stemScale, DEFAULT_HORIZONTAL_SHARE, DEFAULT_BETWEEN_OPENING, BETWEEN_MIN)
+      const jamoScaleOf = new Map(parts.map((part) => [part, Math.max(MINSCALE, counterKeepScale(parted.filter((item) => item.part === part), k, DEFAULT_COUNTER_FLOOR, stemScale, HSHARE))]))
+      const between = betweenKeepScales(parted, parted.map((item) => parts.indexOf(item.part)), k, stemScale, HSHARE, DEFAULT_BETWEEN_OPENING, BETWEEN_MIN)
       const strokes = parted.map((item, index): StrokeRow => {
         const vertical = strokeVerticalness(item.stroke, item.box)
-        const growth = strokeGrowthOf(vertical, k, DEFAULT_HORIZONTAL_SHARE)
+        const growth = strokeGrowthOf(vertical, k, HSHARE)
         const jamoScale = jamoScaleOf.get(item.part) ?? 1
         let clamped = Math.max(between[index], growth > 0 ? 1 / (growth * jamoScale) : between[index])
         // 합성 바닥 후보 — 제품 셈(counterKeepStrokeFactors)의 totalMinScale과 같은 뜻.
@@ -86,7 +88,7 @@ describe.skipIf(!process.env.WEIGHT_OUTLIERS)('속공간 지키기 — 튀는 �
 
     // 원인 묶음: 가장 눌린 획 기준 — 어느 자소의 어느 획이, 어느 층(자소 사이 깎임 / 자소 바닥) 때문에 눌렸나.
     const worstStrokeOf = (row: CharRow) => row.strokes.reduce((a, b) => (b.ratio < a.ratio ? b : a))
-    const causeOf = (stroke: StrokeRow) => (stroke.between < stroke.jamoScale ? '자소 사이 깎임' : stroke.jamoScale <= DEFAULT_COUNTER_MINSCALE + 1e-9 ? '자소 바닥(0.8)' : '자소 하한선')
+    const causeOf = (stroke: StrokeRow) => (stroke.between < stroke.jamoScale ? '자소 사이 깎임' : stroke.jamoScale <= MINSCALE + 1e-9 ? '자소 바닥(0.8)' : '자소 하한선')
     const clusters = new Map<string, { count: number; chars: string[] }>()
     const FLAG = 0.75
     const flagged = sorted.filter((row) => row.minRatio < FLAG)

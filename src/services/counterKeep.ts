@@ -310,9 +310,12 @@ export function counterKeepStrokeFactors(
     for (const part of parts) partScales.set(part, 1)
     return { factors, partScales }
   }
+  // 제품 기본(10-02 눈 ③ 뒤집힘): 자소 안 층(하한선 · 가로 몫 · 자소 바닥)은 끈다 — 무보정이 참고 폰트와 더 비슷했고
+  // 하한선이 벌린 획 사이 갭이 너무 컸다. 남는 것은 자소끼리 만나는 곳만 떼는 자소 사이 층 + 합성 바닥.
+  // 옛 결정값(B′ · 0.526 · 0.8)은 `DEFAULT_*` 상수로 남아 실험실 손잡이로만 쓴다.
   const floor = options.floor ?? DEFAULT_COUNTER_FLOOR
-  const horizontalShare = options.horizontalShare ?? DEFAULT_HORIZONTAL_SHARE
-  const minScale = options.minScale ?? DEFAULT_COUNTER_MINSCALE
+  const horizontalShare = options.horizontalShare ?? 1
+  const minScale = options.minScale ?? 1
   const betweenOpening = options.betweenOpening ?? DEFAULT_BETWEEN_OPENING
   for (const part of parts) {
     // 지킬 틈은 늘 굵기 400 모양에서 고른다. `minScale`: 자소 배율 바닥 — 한 글자 안 자소 굵기가 너무 갈리지 않게.
