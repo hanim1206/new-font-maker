@@ -34,6 +34,8 @@ export const DEFAULT_HORIZONTAL_SHARE = 0.526
 export const DEFAULT_COUNTER_MINSCALE = 0.8
 /** 기본 자소 사이 틈(10-01 사용자 결정, 눈 ② 셋째 판): 이웃 자소를 마주 본 획은 굵어진 두께 × 이만큼 틈을 남긴다. */
 export const DEFAULT_BETWEEN_OPENING = 0.25
+/** 기본 합성 바닥(10-02 사용자 결정, 눈 ③ 첫 판): 자소 배율 × 자소 사이 깎임이 이 아래로 못 간다 — 한 획만 400 두께까지 눌리는 튀는 글자를 막는다. */
+export const DEFAULT_TOTAL_MINSCALE = 0.8
 /** 섞임홀자의 가로부 · 세로부(`JU_H` · `JU_V`)는 속공간 셈에서 한 자소다. */
 export const jamoOfPart = (part: string) => part.startsWith('JU') ? 'JU' : part
 /** 굵기 400에서 이보다 좁은 틈(두께 대비)은 원래 붙여 그린 것으로 보고 안 지킨다 — 측정의 `닿음` 기준과 같다. */
@@ -328,7 +330,7 @@ export function counterKeepStrokeFactors(
     const clamped = between ? Math.max(between[index], growth > 0 ? 1 / (growth * jamoScale) : between[index]) : 1
     // 합성 바닥: 두 층을 합친 깎임이 `totalMinScale` 아래로 못 가게 — 한 획만 끝까지 눌리는 것을 막는다.
     // 바닥이 없으면 곱 순서를 기존 그대로 둬 부동소수점까지 같게 유지한다.
-    const total = options.totalMinScale ?? 0
+    const total = options.totalMinScale ?? DEFAULT_TOTAL_MINSCALE
     factors[index] = total > 0 && jamoScale * clamped < total ? shared * total : shared * jamoScale * clamped
   })
   return { factors, partScales }

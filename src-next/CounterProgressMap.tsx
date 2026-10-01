@@ -54,7 +54,8 @@ const STEPS: Step[] = [
   {
     id: 'gate', title: '통과선 · 제품', state: 'now', stateLabel: '눈 ③',
     question: '제품 굵기 막대에서 튀는 굵기가 있나 (눈 ③)',
-    result: '제품에 붙었다(10-02): 모든 화면 · OTF가 같은 입구에서 두께를 굽고, 스위치는 굵기 막대 아래 `자동 보정`(기본 켜짐, 400 이하는 그대로). 남은 확인 = 눈 ③ 굵기 막대 훑기, 그 뒤 네모꼴 범위와 굵기 한계 표.',
+    result: '제품에 붙었다(10-02): 모든 화면 · OTF가 같은 입구에서 두께를 굽고, 스위치는 굵기 막대 아래 `자동 보정`(기본 켜짐, 400 이하는 그대로). 첫 훑기 "튀는 글자 많음" → 자동 골라내기(weight-outlier-report)로 원인 확인, 합성 바닥 0.8 채택(튀는 글자 6,011 → 0자). 남은 확인 = 굵기 막대 다시 훑기, 그 뒤 네모꼴 범위와 굵기 한계 표.',
+    decision: '사용자 10-02 눈 ③ 첫 판: 바닥 0.8 > 지금 그대로.',
   },
 ]
 /** 역추론으로 바뀌기 전 손잡이 단계(10-01 뒤집힘). 결정과 그림은 그대로 두고 아래 보관함에서 연다. */
@@ -139,7 +140,7 @@ const FIT900_QUESTION: Question = {
  * 후보 = 합성 바닥 0.8(자소 배율 × 자소 사이 깎임이 0.8 아래 금지): 걸림 0자, 띠 중앙 0.65 → 0.74(노토 0.75).
  * 값 비용(840 · 900): 닿음 1,697 → 1,976 · 막힘 381 → 464 · 검기 50.9 → 52.9%.
  */
-const QUESTION: Question | null = {
+const GATE_TOTAL_MIN_QUESTION: Question = {
   id: 'gate-total-min-2026-10-02',
   step: 'gate',
   title: '얇아짐 바닥 0.8 — 튀는 글자를 막을까요?',
@@ -149,7 +150,10 @@ const QUESTION: Question | null = {
     { label: '지금 그대로', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.526, minScale: 0.8, between: 0.25, detail: '닿음 1,697 · 막힘 381 · 검기 50.9% — 대신 눌린 획이 400 두께까지 내려간다(제 목표의 51%).' },
   ],
 }
+/** 눈 ③ 첫 판 닫힘(10-02 사용자: 바닥 0.8) — 제품 기본값 `DEFAULT_TOTAL_MINSCALE`. 남은 것 = 굵기 막대 다시 훑기. */
+const QUESTION: Question | null = null
 void FIT900_QUESTION
+void GATE_TOTAL_MIN_QUESTION
 const QUESTION_SEEN_KEY = 'counter-lab-question-seen'
 /** 질문 그림에 같이 그리는 빽빽한 글자(자소별 색). 눈 ③ 판은 눌린 획이 또렷한 글자로. */
 const QUESTION_CHARS = ['곇', '궨', '긼', '빼', '한']

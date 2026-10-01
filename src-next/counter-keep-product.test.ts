@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { withCounterKeep } from '../src/services/inkCounterMeasure'
-import { DEFAULT_BETWEEN_OPENING, DEFAULT_COUNTER_FLOOR, DEFAULT_COUNTER_MINSCALE, DEFAULT_HORIZONTAL_SHARE } from '../src/services/counterKeep'
+import { DEFAULT_BETWEEN_OPENING, DEFAULT_COUNTER_FLOOR, DEFAULT_COUNTER_MINSCALE, DEFAULT_HORIZONTAL_SHARE, DEFAULT_TOTAL_MINSCALE } from '../src/services/counterKeep'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 
 /**
@@ -43,7 +43,7 @@ describe('속공간 지키기 — 제품 입구', () => {
       // 굵기 900: 기본(켜짐) = 보정 끈 수집에 실험실 셈을 얹은 것. 상자가 원점만큼 평행이동해 있어 소수점 오차만 허용한다.
       const on900 = collect(char, 900)!
       const off900 = collect(char, 900, false)!
-      const kept = withCounterKeep(off900, DEFAULT_COUNTER_FLOOR, DEFAULT_HORIZONTAL_SHARE, DEFAULT_COUNTER_MINSCALE, DEFAULT_BETWEEN_OPENING).data
+      const kept = withCounterKeep(off900, DEFAULT_COUNTER_FLOOR, DEFAULT_HORIZONTAL_SHARE, DEFAULT_COUNTER_MINSCALE, DEFAULT_BETWEEN_OPENING, 0, DEFAULT_TOTAL_MINSCALE).data
       expect(on900.strokes.length).toBe(kept.strokes.length)
       on900.strokes.forEach((item, index) => expect(item.stroke.thickness).toBeCloseTo(kept.strokes[index].stroke.thickness, 12))
       // 빽빽한 표본이라 적어도 한 획은 얇아져 있어야 한다.

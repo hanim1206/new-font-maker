@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, it, vi } from 'vitest'
 import {
   betweenKeepScales, counterKeepScale, strokeGrowthOf, strokeVerticalness,
-  DEFAULT_BETWEEN_OPENING, DEFAULT_COUNTER_FLOOR, DEFAULT_COUNTER_MINSCALE, DEFAULT_HORIZONTAL_SHARE, jamoOfPart,
+  DEFAULT_BETWEEN_OPENING, DEFAULT_COUNTER_FLOOR, DEFAULT_COUNTER_MINSCALE, DEFAULT_HORIZONTAL_SHARE, DEFAULT_TOTAL_MINSCALE, jamoOfPart,
 } from '../src/services/counterKeep'
 import { stemScaleOf } from '../src/services/strokeRenderGeometry'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
@@ -24,9 +24,9 @@ const FONT_SPACE = { width: 1000, height: 1000 }
 const WEIGHT = Number(process.env.OUTLIER_WEIGHT ?? 900)
 const STRIDE = Number(process.env.OUTLIER_STRIDE ?? 1)
 const OUT = process.env.OUTLIER_OUT ?? '/tmp/weight-outliers.json'
-/** 자소 사이 깎임의 바닥 후보(기본 0 = 지금 제품). `OUTLIER_TOTAL_MIN`: 합성(자소 × 자소 사이) 바닥 후보. */
+/** 자소 사이 깎임의 바닥 후보. `OUTLIER_TOTAL_MIN`: 합성(자소 × 자소 사이) 바닥 — 기본은 제품 값(10-02 결정 0.8), 0을 주면 바닥 없음. */
 const BETWEEN_MIN = Number(process.env.OUTLIER_BETWEEN_MIN ?? 0)
-const TOTAL_MIN = Number(process.env.OUTLIER_TOTAL_MIN ?? 0)
+const TOTAL_MIN = Number(process.env.OUTLIER_TOTAL_MIN ?? DEFAULT_TOTAL_MINSCALE)
 
 describe.skipIf(!process.env.WEIGHT_OUTLIERS)('속공간 지키기 — 튀는 글자 골라내기', () => {
   beforeAll(() => {
