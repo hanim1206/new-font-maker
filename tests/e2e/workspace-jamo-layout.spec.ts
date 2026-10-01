@@ -309,6 +309,39 @@ test('곁줄기 높이 보선은 잉크에 닿아 잠기지 않는다(홀자 줄
   await expect(canvas.getByRole('button', { name: '바깥기둥 중심 선택' })).toHaveCount(1)
 })
 
+/** 짧은기둥 가로 자리 보선은 slot 경계를 안 밀지만 끈 만큼 짧은기둥이 옆으로 간다. `글자에 안 닿음`으로 잠기지 않는다(제보: 왜의 ㅗ 세로 부분이 안 옮겨짐). */
+test('왜의 짧은기둥 가로 자리 보선은 잠기지 않고, 옮기면 짧은기둥만 그만큼 옆으로 간다', async ({ page }) => {
+  const KEY = 'noto-layout-delta-v1'
+  const strokeD = (id: string) => page.locator(`[data-editor-hit="stroke"][data-stroke-id="${id}"]`).getAttribute('d')
+  const xsOf = (d: string | null) => [...(d ?? '').matchAll(/[ML] (-?[\d.]+) /g)].map((match) => Number(match[1]))
+  // 고치기 전 획 편집 화면의 자리.
+  await page.goto('/workspace/jamo?char=%EC%99%9C&mode=stroke&part=JU')
+  await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
+  const stemBefore = xsOf(await strokeD('ㅙ-1'))
+  const beamBefore = await strokeD('ㅙ-2')
+
+  await page.goto('/workspace/jamo?char=%EC%99%9C&mode=layout')
+  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
+  const canvas = page.getByTestId('review-canvas')
+  await selectMedialBox(page)
+  await expect(canvas.locator('[data-locked="true"]')).toHaveCount(0)
+  const ink = canvas.getByTestId('review-fit-ink').first()
+  const inkBefore = await ink.getAttribute('d')
+  await selectRail(page, '가로부 줄기 중심')
+  await page.keyboard.press('Shift+ArrowRight')
+  // 레이아웃 캔버스의 잉크가 바로 바뀌고, 이 레이아웃의 Δ로 저장된다.
+  await expect.poll(() => ink.getAttribute('d')).not.toBe(inkBefore)
+  await expect.poll(async () => Object.values((await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '{}').state?.rules ?? {}, KEY)) as Record<string, { medial?: { JU_H?: Record<string, number> } }>).map((rule) => rule.medial?.JU_H?.['baseStem.center']).find((value) => value !== undefined), { timeout: 5_000 }).toBeCloseTo(0.01, 9)
+
+  // 글자 잉크(획 편집 화면)에서도 짧은기둥만 0.01em(1u × 4칸 = 캔버스 1) 오른쪽으로 가 있고 보는 그대로다.
+  await page.goto('/workspace/jamo?char=%EC%99%9C&mode=stroke&part=JU')
+  await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
+  const stemAfter = xsOf(await strokeD('ㅙ-1'))
+  expect(stemAfter).toHaveLength(2)
+  stemAfter.forEach((x, index) => expect(x - stemBefore[index]).toBeCloseTo(1, 4))
+  expect(await strokeD('ㅙ-2')).toBe(beamBefore)
+})
+
 test('자소 탭은 레이아웃으로 열리고, 기준선을 적용하면 문장 줄 글자가 바뀌고 Undo로 돌아오고, 획 고치기 · 완료로 오간다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88')
   // 세그먼트 전환은 없다. 기본이 레이아웃이다.

@@ -91,12 +91,34 @@ describe.skipIf(!existsSync(CORPUS))('홀자 줄기 끝점 = 보선 — G0 대�
       const ys = primitive.stroke.points.map((p) => primitive.box.y + p.y * primitive.box.height)
       return { top: Math.min(...ys), bottom: Math.max(...ys), mid: (ys[0] + ys[ys.length - 1]) / 2 }
     }
+    /** 줄기 중심선 두 끝의 가로 자리(em). */
+    const stemX = (id: string) => {
+      const primitive = ink.primitives.find((item) => item.source.strokeId === id)!
+      return [primitive.stroke.points[0], primitive.stroke.points[primitive.stroke.points.length - 1]].map((p) => primitive.box.x + p.x * primitive.box.width)
+    }
     const railOf = (part: Part, role: string, kind: 'centerRail' | 'fromRail' | 'toRail' = 'centerRail') => {
       const fit = resolved.medial.find((group) => group.part === part)!.fit!
       return fit.railsEm[fit.bindings.find((binding) => binding.roleId === role)![kind]]
     }
-    return { stem, railOf, resolved, syllable }
+    return { stem, stemX, railOf, resolved, syllable }
   }
+
+  it.each([['오', 'JU', 'baseStem', 'ㅗ-1', 'ㅗ-2'], ['우', 'JU', 'baseStem', 'ㅜ-2', 'ㅜ-1'], ['왜', 'JU_H', 'baseStem', 'ㅙ-1', 'ㅙ-2'], ['요', 'JU', 'leftStem', 'ㅛ-1', 'ㅛ-3'], ['유', 'JU', 'rightStem', 'ㅠ-3', 'ㅠ-1']] as const)('%s: 짧은기둥 가로 자리 보선을 20u 옮기면 짧은기둥만 20u 옆으로 가고, 안 옮긴 폰트는 그대로다', async (char, part, role, stemId, beamId) => {
+    const base = await render(char)
+    // 보선을 안 끌면 가로 목표가 없다 — 저장 좌표 그대로.
+    expect(base.resolved.boxes[part]!.stems?.[stemId]?.dx).toBeUndefined()
+    for (const step of [0.02, -0.02]) {
+      const moved = await render(char, { medial: { [part]: { [`${role}.center`]: step } } })
+      moved.stemX(stemId).forEach((x, index) => expect(x - base.stemX(stemId)[index]).toBeCloseTo(step, 6))
+      expect(moved.stemX(beamId)).toEqual(base.stemX(beamId))
+      expect(moved.stem(beamId)).toEqual(base.stem(beamId))
+      expect(moved.stem(stemId).top).toBeCloseTo(base.stem(stemId).top, 6)
+      expect(moved.stem(stemId).bottom).toBeCloseTo(base.stem(stemId).bottom, 6)
+    }
+    // 홀자 상자 변만 옮기면 짧은기둥은 칸을 따라갈 뿐 가로 목표는 안 생긴다.
+    const faced = await render(char, { faces: { [part]: { left: -0.02, right: 0.02 } } })
+    expect(faced.resolved.boxes[part]!.stems?.[stemId]?.dx).toBeUndefined()
+  })
 
   it('아: 기본에서 곁줄기가 보선 높이에 서고, 곁줄기 보선을 80u 올리면 곁줄기만 80u 올라간다', async () => {
     const base = await render('아')

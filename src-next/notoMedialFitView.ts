@@ -33,6 +33,8 @@ export interface MedialFitPart {
   roleIds: readonly string[]
   /** 모델 rail 그대로의 fit. 편집의 출발점. */
   fit?: MedialFitResult
+  /** 보선 Δ를 안 얹은 fit(상자 변 Δ까지만). 짧은기둥 가로 자리 Δ를 재는 기준(칸 해석과 같은 값). */
+  base?: MedialFitResult
   /** 앱 홀자 획과 그 홀자. 있으면 화면 잉크를 이 획으로 그린다(없으면 획 마스터 잉크 — 앱 밖 테스트용). */
   jamo?: DeepReadonly<JamoData>
   medialJamo?: string
@@ -101,7 +103,7 @@ export function fitMedialForGlyph(input: {
   const medialJamo = input.context.identity.medialJamo
   const jamo = useJamoStore.getState().jungseong[medialJamo]
   const parts: MedialFitPart[] = input.context.medial.map((group) => {
-    const part: MedialFitPart = { part: group.part, role: group.role, roleIds: group.roleIds, fit: group.fit, message: group.message, jamo, medialJamo }
+    const part: MedialFitPart = { part: group.part, role: group.role, roleIds: group.roleIds, fit: group.fit, base: group.base, message: group.message, jamo, medialJamo }
     if (group.fit && approved) {
       part.ghostOutline = selectNotoOutlineContours(input.outline, approved.contourIds(group.roleIds))
       part.reference = Object.fromEntries(Object.entries(approved.measurements).filter(([roleId]) => group.roleIds.includes(roleId)))
@@ -125,7 +127,7 @@ export function renderMedialPart(part: MedialFitPart, railsEm?: Readonly<Record<
   const rendered: RenderedMedialPart = { slot: { ...placed.fit.slot }, railErrors: [] }
   if (part.jamo && part.medialJamo) {
     // 앱 획을 slot 네 변에 맞춘다. 못 맞추면(고친 획이 칸보다 큼 등) 상자만 남기고 이유를 돌려준다 — rail 자리는 여전히 유효.
-    const fitted = fitPartStrokes({ part: part.part, jamo: part.jamo, faces: boxToFaces(placed.fit.slot), glyphId: 'layout-editor', medialJamo: part.medialJamo, ends: style, medialFit: placed.fit })
+    const fitted = fitPartStrokes({ part: part.part, jamo: part.jamo, faces: boxToFaces(placed.fit.slot), glyphId: 'layout-editor', medialJamo: part.medialJamo, ends: style, medialFit: placed.fit, medialBase: part.base })
     const ink = fitted.ok ? inkOfComponentFit(fitted.fit, style) : fitted
     if (fitted.ok && ink.ok) { rendered.path = finalGlyphInkToSvgPath({ regions: ink.regions }, 1); rendered.inkBox = { ...fitted.fit.box }; rendered.stemEndsX = horizontalStrokeEndsX(fitted.fit.primitives) }
     else rendered.message = ink.ok ? undefined : ink.message
@@ -153,7 +155,9 @@ const hasSlotDelta = (delta?: SlotFacesDelta) => !!delta && SLOT_SIDES.some((sid
 export function withSlotFaces(part: MedialFitPart, delta?: SlotFacesDelta): { ok: true; part: MedialFitPart } | { ok: false; message: string } {
   if (!part.fit || !hasSlotDelta(delta)) return { ok: true, part }
   const moved = applySlotFacesDelta(part.fit, delta!)
-  return moved.ok ? { ok: true, part: { ...part, fit: moved.fit } } : { ok: false, message: moved.message }
+  // 기준 fit도 같은 변 Δ를 받아야 slot이 같아 보선 Δ만 남는다.
+  const movedBase = part.base ? applySlotFacesDelta(part.base, delta!) : null
+  return moved.ok ? { ok: true, part: { ...part, fit: moved.fit, base: movedBase?.ok ? movedBase.fit : part.base } } : { ok: false, message: moved.message }
 }
 
 /**

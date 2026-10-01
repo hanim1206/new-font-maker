@@ -108,6 +108,8 @@ export interface ContextMedialPart {
   roleIds: readonly string[]
   /** 모델 rail 그대로의 fit. 검수 화면 rail 편집의 출발점. */
   fit?: MedialFitResult
+  /** 상자 변 Δ까지만 얹고 보선 Δ는 안 얹은 fit. 짧은기둥 가로 자리 보선이 얼마나 옮겨졌는지 재는 기준이다. */
+  base?: MedialFitResult
   message?: string
 }
 
@@ -182,7 +184,11 @@ export function medialPartGroups(medialJamo: string): { part: ContextMedialPart[
  * 홀자 Δ가 있으면 획 역할 키로 rail에 얹어 다시 놓는다. 한계(글자 몸 · 순서 · 두께 간격)를 넘는 Δ는 경계까지 줄인다.
  */
 export function fitContextMedial(identity: ModelIdentity, model: ContextModel, medialDelta?: ContextBoxDelta['medial'], facesDelta?: ContextBoxDelta['faces']): ContextMedialPart[] {
-  return fitContextMedialBase(identity, model).map((group) => group.fit ? { ...group, fit: limitMedialFit(group.fit, facesDelta?.[group.part], medialDelta?.[group.part]).fit } : group)
+  return fitContextMedialBase(identity, model).map((group) => {
+    if (!group.fit) return group
+    const limited = limitMedialFit(group.fit, facesDelta?.[group.part], medialDelta?.[group.part])
+    return { ...group, fit: limited.fit, base: limited.faced }
+  })
 }
 
 /** Δ 없는 모델 fit. 한계(순서 · 간격 · 몸 밖 허용)의 기준이다. */
@@ -197,7 +203,7 @@ function fitContextMedialBase(identity: ModelIdentity, model: ContextModel): Con
     if (!made.ok) return { ...group, message: made.message }
     const fit = fitNotoMedialMaster(made.input)
     if (!fit.ok) return { ...group, message: fit.message }
-    return { ...group, fit: fit.fit }
+    return { ...group, fit: fit.fit, base: fit.fit }
   })
 }
 
@@ -286,11 +292,11 @@ function jamoForPart(syllable: DeepReadonly<DecomposedSyllable> | undefined, par
  * 부품 하나의 앱 획을 네 변에 맞춘다. 칸 해석(문장 줄·획 편집)과 레이아웃 편집기가 **같은 호출**을 써서 캔버스 잉크 = 글자 잉크가 된다.
  * 홀자도 닿자와 같은 규칙이다. 혼합 홀자는 part가 가로부·세로부 획을 가른다.
  */
-export function fitPartStrokes(input: { part: Part; jamo: DeepReadonly<JamoData>; faces: ContextFaces; glyphId: string; medialJamo: string; ends?: StrokeEnds; medialFit?: MedialFitResult }): ComponentFitOutcome {
+export function fitPartStrokes(input: { part: Part; jamo: DeepReadonly<JamoData>; faces: ContextFaces; glyphId: string; medialJamo: string; ends?: StrokeEnds; medialFit?: MedialFitResult; medialBase?: MedialFitResult }): ComponentFitOutcome {
   const fitted = fitNotoComponent({ part: input.part, jamo: input.jamo, channel: CHANNEL_OF[input.part], family: medialFamilyOf(input.medialJamo), faces: input.faces, glyphId: `${input.glyphId}:${input.part}`, globalLinecap: input.ends?.linecap, globalLinejoin: input.ends?.linejoin })
   if (!fitted.ok || !input.medialFit || input.part === 'CH' || input.part === 'JO') return fitted
   // 홀자: 이름 있는 줄기는 세로 끝점 · 높이를 보선에서 받고 휨은 em 그대로 — 글자 잉크(`resolveGlyphInkPrimitives`)와 같은 배치를 지난다.
-  const stems = stemRailTargets(input.medialJamo, input.part, input.medialFit, fitted.fit.box)
+  const stems = stemRailTargets(input.medialJamo, input.part, input.medialFit, fitted.fit.box, input.medialBase)
   const box: BoxConfig = Object.keys(stems).length ? { ...fitted.fit.box, stems } : fitted.fit.box
   const jamo = input.jamo as JamoData
   const primitives = fitted.fit.primitives.map((primitive) => {
@@ -353,7 +359,7 @@ export function resolveContextBoxes(input: {
   for (const group of medial) {
     const box = boxes[group.part]
     if (!group.fit || !box) continue
-    const stems = stemRailTargets(identity.medialJamo, group.part, group.fit, box)
+    const stems = stemRailTargets(identity.medialJamo, group.part, group.fit, box, group.base)
     if (Object.keys(stems).length) boxes[group.part] = { ...box, stems }
   }
   return { identity, parts, medial, issues, complete: issues.length === 0, boxes }
