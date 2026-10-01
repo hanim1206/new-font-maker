@@ -26,6 +26,8 @@ export interface FontGlobalStyle {
   stemBeak?: { enabled: boolean; shape: 'angled' | 'slab' | 'round' | 'bar' | 'flare'; size: number; angle: number }
   /** 네모꼴 자동 굵기 보정. 껐을 때만 `false`가 온다 — 없으면 켜짐. */
   autoCompensation?: boolean
+  /** 속공간 지키기(굵기 자동 보정). 껐을 때만 `false`가 온다 — 없으면 켜짐. */
+  counterKeep?: boolean
 }
 
 export interface FontGlobalStyleExclusion {

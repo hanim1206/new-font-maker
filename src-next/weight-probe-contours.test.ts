@@ -55,7 +55,8 @@ describe.skipIf(!process.env.WEIGHT_PROBE)('속공간 지키기 — 같은 자�
     // 자소별 잉크(1000 단위 · y-down · 기준선 880). 획 겹침은 합쳐 참고 폰트 윤곽과 같은 "채워진 면"으로 만든다.
     const partInk = (char: string, weight: number) => {
       style.useGlobalStyleStore.getState().updateStyle('weight', weight)
-      const collected = exportUtils.collectGlyphDataWithPlacement(char, placementOf)
+      // 층은 아래서 손으로 얹는다 — 제품 속공간 지키기는 꺼서 이중 적용을 막는다.
+      const collected = exportUtils.collectGlyphDataWithPlacement(char, placementOf, { counterKeep: false })
       if (!collected) return null
       const data = FLOOR === undefined ? withHorizontalShare(collected, HSHARE ?? 1) : withCounterKeep(collected, FLOOR, HSHARE, MIN_SCALE, BETWEEN).data
       const out: Record<string, number[][][]> = {}

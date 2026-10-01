@@ -15,6 +15,7 @@ import { resolveSyllableContextualInkSafety } from '../utils/contextualInkSafety
 import { getJamoRenderBox } from '../utils/jamoGeometry'
 import { calculateBoxes } from '../utils/layoutCalculator'
 import { familyOfSyllable, strokesForFamily } from '../utils/jamoContextStrokes'
+import { counterKeepStrokeFactors, jamoOfPart } from './counterKeep'
 import { placeStemStroke } from './stemBend'
 
 const DEFAULT_HORIZONTAL_INK_BOUNDS = { min: 0, max: 1 } as const
@@ -187,9 +188,22 @@ export function resolveGlyphInkPrimitives(
   const safety = resolveSyllableContextualInkSafety(input.syllable, boxes)
   const renderOrder = getRenderOrder(safety.syllable.layoutType)
   const glyphId = input.syllable.char
-  const primitives = renderOrder.flatMap((part) => (
+  let primitives = renderOrder.flatMap((part) => (
     resolvePartPrimitives(glyphId, part, safety.syllable, boxes, input)
   ))
+
+  // 속공간 지키기: 굵기 400 초과에서 자소별로 획 두께를 덜 굵게 해 속공간 · 자소 사이 틈을 남긴다.
+  // 상자는 원래 두께로 이미 놓였고 여기서는 두께만 굽는다 — 화면 · 부리 · OTF가 전부 이 두께를 그대로 쓴다.
+  if (input.counterKeep && input.weightMultiplier > 1 && primitives.length > 0) {
+    const { factors } = counterKeepStrokeFactors(
+      primitives.map((primitive) => ({ stroke: primitive.stroke as StrokeDataV2, box: primitive.box as BoxConfig, part: jamoOfPart(primitive.source.part) })),
+      input.weightMultiplier,
+      input.counterKeep.stemScale,
+    )
+    primitives = primitives.map((primitive, index) => (
+      factors[index] === 1 ? primitive : { ...primitive, stroke: { ...primitive.stroke, thickness: primitive.stroke.thickness * factors[index] } }
+    ))
+  }
 
   return {
     boxes,

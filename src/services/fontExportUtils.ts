@@ -114,8 +114,9 @@ export function collectGlyphDataForChar(char: string): GlyphData | null {
 /**
  * 저장된 값 대신 잠깐 그려 볼 조건. 스토어는 안 건드린다 — 실험실이 가로 × 굵기 여러 칸을 한 화면에 그릴 때 쓴다.
  * `padding`은 폰트 전체 패딩(레이아웃별 덮어쓰기는 그대로 얹힌다).
+ * `counterKeep`: 속공간 지키기 강제(끄기/켜기). 없으면 실효 스타일을 따른다 — 손으로 층을 얹는 실험실은 `false`로 꺼야 이중 적용이 안 된다.
  */
-export interface GlyphDataCondition { padding?: Padding; weight?: number }
+export interface GlyphDataCondition { padding?: Padding; weight?: number; counterKeep?: boolean }
 
 /** `collectGlyphDataForChar`에 상자 출처만 바꿔 끼운 것. 나머지 해석(패딩·스타일·원점·폭)은 같다. */
 export function collectGlyphDataWithPlacement(char: string, placementOf?: GlyphPlacementResolver, condition?: GlyphDataCondition): GlyphData | null {
@@ -170,6 +171,10 @@ export function collectGlyphDataWithPlacement(char: string, placementOf?: GlyphP
     globalLinecap: effectiveStyle.linecap,
     globalLinejoin: effectiveStyle.linejoin,
     horizontalInkBounds: { min: 0, max: 1 },
+    // 속공간 지키기 — 화면(SvgRenderer)과 같은 조건으로 켠다. 실험실은 조건으로 끈다.
+    counterKeep: (condition?.counterKeep ?? effectiveStyle.counterKeep !== false)
+      ? { stemScale: stemScaleOf(effectiveStyle.strokeStyle) }
+      : undefined,
   })
 
   // 글자 폭과 원점은 노토 비율(왼 50 : 몸통 840 : 오른 30, `fontMetrics`). 몸통 왼쪽에서 왼 여백만큼 앞이 원점이다.

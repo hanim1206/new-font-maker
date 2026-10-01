@@ -30,6 +30,12 @@ export interface CounterFloor {
 export const DEFAULT_COUNTER_FLOOR: CounterFloor = { fixed: 0.024, ratio: 0.5, horizontalRatio: 0.25 }
 /** 기본 가로줄기 몫(10-01 사용자 결정, 이상형 월드컵 우승): 굵기 900에서 가로줄기 ×1.5(세로줄기는 ×1.95 그대로). */
 export const DEFAULT_HORIZONTAL_SHARE = 0.526
+/** 기본 자소 배율 바닥(10-01 사용자 결정, 눈 ② 둘째 판): 한 글자 안 자소 굵기가 이보다 갈리지 않게. */
+export const DEFAULT_COUNTER_MINSCALE = 0.8
+/** 기본 자소 사이 틈(10-01 사용자 결정, 눈 ② 셋째 판): 이웃 자소를 마주 본 획은 굵어진 두께 × 이만큼 틈을 남긴다. */
+export const DEFAULT_BETWEEN_OPENING = 0.25
+/** 섞임홀자의 가로부 · 세로부(`JU_H` · `JU_V`)는 속공간 셈에서 한 자소다. */
+export const jamoOfPart = (part: string) => part.startsWith('JU') ? 'JU' : part
 /** 굵기 400에서 이보다 좁은 틈(두께 대비)은 원래 붙여 그린 것으로 보고 안 지킨다 — 측정의 `닿음` 기준과 같다. */
 const MIN_GAP_RATIO = 0.25
 
@@ -264,4 +270,57 @@ export function betweenKeepScales(
     }
   }
   return scales
+}
+
+/** 자소까지 아는 획: 속공간 지키기 세 층(가로 몫 · 자소 안 · 자소 사이)을 한 번에 셈하는 입력. */
+export interface PartedCounterKeepStroke extends CounterKeepStroke { part: string }
+
+export interface CounterKeepOptions {
+  floor?: CounterFloor
+  horizontalShare?: number
+  minScale?: number
+  betweenOpening?: number
+}
+
+/**
+ * 속공간 지키기 전 층을 합친 획별 두께 배율(저장 두께 대비, 기하는 여기에 다시 굵기 배율 k를 곱한다).
+ * 획 i의 배율 = (가로 몫 성장 ÷ k) × 자소 배율(하한선, 바닥 이상) × 자소 사이 배율.
+ * 층을 겹쳐도 획이 굵기 400보다 얇아지지 않게 배율 × 그 획의 성장 ≥ 1로 조인다.
+ * 굵기 400 이하(k ≤ 1)는 전부 1. 기본 손잡이 = 10-01 눈 ② 확정값(`DEFAULT_*`).
+ * 모든 화면 · OTF · 실험실이 이 셈 하나를 쓴다 — 실험실 쪽 입구는 `withCounterKeep`(inkCounterMeasure.ts).
+ */
+export function counterKeepStrokeFactors(
+  strokes: readonly PartedCounterKeepStroke[],
+  weightMultiplier: number,
+  stemScale = 1,
+  options: CounterKeepOptions = {},
+): { factors: number[]; partScales: Map<string, number> } {
+  const partScales = new Map<string, number>()
+  const factors = strokes.map(() => 1)
+  const parts = [...new Set(strokes.map((item) => item.part))]
+  if (!(weightMultiplier > 1) || strokes.length === 0) {
+    for (const part of parts) partScales.set(part, 1)
+    return { factors, partScales }
+  }
+  const floor = options.floor ?? DEFAULT_COUNTER_FLOOR
+  const horizontalShare = options.horizontalShare ?? DEFAULT_HORIZONTAL_SHARE
+  const minScale = options.minScale ?? DEFAULT_COUNTER_MINSCALE
+  const betweenOpening = options.betweenOpening ?? DEFAULT_BETWEEN_OPENING
+  for (const part of parts) {
+    // 지킬 틈은 늘 굵기 400 모양에서 고른다. `minScale`: 자소 배율 바닥 — 한 글자 안 자소 굵기가 너무 갈리지 않게.
+    partScales.set(part, Math.max(minScale, counterKeepScale(strokes.filter((item) => item.part === part), weightMultiplier, floor, stemScale, horizontalShare)))
+  }
+  const between = betweenOpening > 0
+    ? betweenKeepScales(strokes, strokes.map((item) => parts.indexOf(item.part)), weightMultiplier, stemScale, horizontalShare, betweenOpening)
+    : undefined
+  strokes.forEach((item, index) => {
+    const growth = strokeGrowthOf(horizontalShare === 1 ? 1 : strokeVerticalness(item.stroke, item.box), weightMultiplier, horizontalShare)
+    const jamoScale = partScales.get(item.part) ?? 1
+    // 몫 1이면 성장 = k라 나눗셈 없이 1 — 부동소수점까지 기존 경로와 같게.
+    let factor = (horizontalShare === 1 ? 1 : growth / weightMultiplier) * jamoScale
+    // 층을 겹쳐도(자소 배율 × 자소 사이) 획이 굵기 400보다 얇아지지는 않게 — 배율 × 그 획의 성장은 1을 안 깬다.
+    if (between) factor *= Math.max(between[index], growth > 0 ? 1 / (growth * jamoScale) : between[index])
+    factors[index] = factor
+  })
+  return { factors, partScales }
 }

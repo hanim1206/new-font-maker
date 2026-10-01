@@ -1922,14 +1922,24 @@ function StyleWeightRange({
   const tone = draft ?? committed
   const commit = () => { if (draft) onCommit(committed, draft) }
   const setWeight = (weight: number | null) => { if (weight !== null && weight !== tone.weight) onDraftChange({ ...tone, weight }) }
+  // 속공간 지키기(굵기 자동 보정): 굵게 할 때 빽빽한 자소부터 덜 굵게 한다. 400 이하에서는 아무것도 안 바꾼다.
+  const keepOn = useGlobalStyleStore((state) => state.style.counterKeep !== false)
+  const setCounterKeep = useGlobalStyleStore((state) => state.setCounterKeep)
   // 다른 획 막대와 같은 생김새: 제목 오른쪽 값, 아래 눈금(100 · 400 · 900만 글씨).
-  return <label className={styles.ruleControl}>
-    <span>굵기 <output>{tone.weight}</output></span>
-    <input type="range" min="100" max="900" step="100" value={tone.weight} aria-label="굵기" data-testid="style-weight" onChange={(event) => setWeight(Number(event.target.value))}
-      onPointerDown={(event) => setWeight(startRangeDrag(event))} onPointerMove={(event) => setWeight(moveRangeDrag(event))}
-      onPointerUp={(event) => { endRangeDrag(event); commit() }} onPointerCancel={(event) => { endRangeDrag(event); commit() }} onKeyUp={commit} onBlur={commit} />
-    <RangeTicks min={100} max={900} ticks={WEIGHT_STOPS.map((at) => ({ at, text: at === 100 || at === 400 || at === 900 ? String(at) : undefined }))} />
-  </label>
+  return <>
+    <label className={styles.ruleControl}>
+      <span>굵기 <output>{tone.weight}</output></span>
+      <input type="range" min="100" max="900" step="100" value={tone.weight} aria-label="굵기" data-testid="style-weight" onChange={(event) => setWeight(Number(event.target.value))}
+        onPointerDown={(event) => setWeight(startRangeDrag(event))} onPointerMove={(event) => setWeight(moveRangeDrag(event))}
+        onPointerUp={(event) => { endRangeDrag(event); commit() }} onPointerCancel={(event) => { endRangeDrag(event); commit() }} onKeyUp={commit} onBlur={commit} />
+      <RangeTicks min={100} max={900} ticks={WEIGHT_STOPS.map((at) => ({ at, text: at === 100 || at === 400 || at === 900 ? String(at) : undefined }))} />
+    </label>
+    <label className={styleMode.autoRow}>
+      <input type="checkbox" checked={keepOn} onChange={(event) => setCounterKeep(event.target.checked)} data-testid="style-weight-auto" />
+      <span>자동 보정</span>
+      <output data-testid="style-weight-auto-amount">{keepOn ? '굵게 하면 속공간을 지켜요' : '꺼 두었어요'}</output>
+    </label>
+  </>
 }
 
 export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit', above, cover }: { chrome?: EditorChrome; space?: EditorSpace; above?: ReactNode; cover?: ReactNode } = {}) {

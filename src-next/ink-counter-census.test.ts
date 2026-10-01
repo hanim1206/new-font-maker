@@ -54,7 +54,8 @@ describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜
     for (const char of [...WATCH, ...(process.env.CENSUS_SHEET?.split(',') ?? [])]) if (!chars.includes(char)) chars.push(char)
 
     const measure = (char: string): GlyphInk | null => {
-      const collected = exportUtils.collectGlyphDataWithPlacement(char, placementOf)
+      // 층은 이 테스트가 손으로 얹는다 — 제품 속공간 지키기는 꺼서 이중 적용을 막는다.
+      const collected = exportUtils.collectGlyphDataWithPlacement(char, placementOf, { counterKeep: false })
       if (!collected) return null
       return measureGlyphInk(FLOOR === undefined ? withHorizontalShare(collected, HSHARE ?? 1) : withCounterKeep(collected, FLOOR, HSHARE, MIN_SCALE, BETWEEN).data)
     }
@@ -83,7 +84,7 @@ describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜
     // `CENSUS_SCALES=이,쏟`: 굵기 900 · 기본 하한선에서 자소별 굵기 배율.
     for (const char of process.env.CENSUS_SCALES?.split(',') ?? []) {
       setCondition(840, 900)
-      const data = exportUtils.collectGlyphDataWithPlacement(char, placementOf)!
+      const data = exportUtils.collectGlyphDataWithPlacement(char, placementOf, { counterKeep: false })!
       const kept = withCounterKeep(data, DEFAULT_COUNTER_FLOOR).data
       const scaleOf = new Map<string, number>()
       data.strokes.forEach((item, index) => scaleOf.set(item.stroke.id, kept.strokes[index].stroke.thickness / item.stroke.thickness))
@@ -104,7 +105,7 @@ describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜
         console.info(`OPENINGS ${char} ${width}x${weight} ${item.part}: ${widths.join(' ')}`)
       }
       console.info(`OPENINGS ${char} ${width}x${weight} 획 닿음: ${measure(char)?.inner.join(' ')}`)
-      const data = exportUtils.collectGlyphDataWithPlacement(char, placementOf)
+      const data = exportUtils.collectGlyphDataWithPlacement(char, placementOf, { counterKeep: false })
       for (const item of data?.strokes ?? []) console.info(`OPENINGS ${char} ${width}x${weight} ${item.stroke.id} 두께 ${Math.round(item.stroke.thickness * data!.weightMultiplier * 1000)} ${JSON.stringify(item.stroke.points.map((p) => [Math.round((item.box.x + p.x * item.box.width) * 1000), Math.round((item.box.y + p.y * item.box.height) * 1000)]))}`)
     }
 

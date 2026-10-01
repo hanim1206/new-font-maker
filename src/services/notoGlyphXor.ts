@@ -8,6 +8,7 @@ import type { ContextBoxDelta, ContextModel } from './contextBoxResolver'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
 import { resolveGlyphInkPrimitives } from './glyphInkResolver'
 import { multiPolygonArea, unionOf } from './notoFitReport'
+import { stemScaleOf } from './strokeRenderGeometry'
 import { notoOutlineToInkRegions } from './notoOutlineInk'
 import type { NotoOutline } from './notoOutlineInk'
 
@@ -39,6 +40,8 @@ export function appGlyphInkRegions(syllable: DecomposedSyllable, placement: Glyp
     weightMultiplier: weightToMultiplier(globalStyle.weight),
     globalLinecap: globalStyle.linecap, globalLinejoin: globalStyle.linejoin,
     horizontalInkBounds: HORIZONTAL_INK_BOUNDS,
+    // 속공간 지키기 — 화면(SvgRenderer) · OTF와 같은 스위치.
+    counterKeep: globalStyle.counterKeep !== false ? { stemScale: stemScaleOf(globalStyle.strokeStyle) } : undefined,
   })
   if (!resolved.primitives.length) return { ok: false, message: '앱 획이 없습니다.' }
   const ink = materializeFinalGlyphInk(resolved.primitives, globalStyle.strokeStyle, INK_OPTIONS)

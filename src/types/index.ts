@@ -540,6 +540,11 @@ export interface ResolveGlyphInkInput {
   globalLinecap?: StrokeLinecap
   globalLinejoin?: StrokeLinejoin
   horizontalInkBounds?: Readonly<{ min: number; max: number }>
+  /**
+   * 속공간 지키기(굵기 자동 보정). 주면 굵기 400 초과에서 자소별로 획 두께를 덜 굵게 한다(`counterKeep.ts`).
+   * `stemScale`: 실효 스타일의 세로줄기 배율(네모꼴 자동 보정) — 틈을 잴 때 쓴다.
+   */
+  counterKeep?: Readonly<{ stemScale: number }>
 }
 
 export interface ResolvedGlyphInkResult<

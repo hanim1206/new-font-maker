@@ -24,6 +24,8 @@ export interface GlobalStyle {
   stemBeak?: StemBeakStyle // 세로줄기 열린 머리에 얹는 부리. 없으면 꺼짐(옛 저장분)
   /** 네모꼴 자동 굵기 보정. 껐을 때만 `false`를 둔다 — 없으면 켜짐(기본). */
   autoCompensation?: boolean
+  /** 속공간 지키기(굵기 자동 보정). 굵기 400 초과에서 빽빽한 자소부터 덜 굵게 한다. 껐을 때만 `false` — 없으면 켜짐(기본). */
+  counterKeep?: boolean
 }
 
 // 숫자 속성만 (updateStyle에서 사용)
@@ -54,6 +56,8 @@ interface GlobalStyleActions {
   setStemBeak: (value: Partial<StemBeakStyle>) => void
   /** 네모꼴 자동 굵기 보정을 켜고 끈다. 켜짐이 기본이라 켜면 키를 지운다. */
   setAutoCompensation: (on: boolean) => void
+  /** 속공간 지키기를 켜고 끈다. 켜짐이 기본이라 켜면 키를 지운다. */
+  setCounterKeep: (on: boolean) => void
 
   // 제외 규칙 관리
   addExclusion: (property: keyof GlobalStyle, layoutType: LayoutType) => void
@@ -169,6 +173,8 @@ function normalizeGlobalStyle(style: GlobalStyle): GlobalStyle {
   // 켜짐이 기본이라 `false`만 남긴다. 옛 저장분과 같은 모양.
   if (style.autoCompensation === false) normalized.autoCompensation = false
   else delete normalized.autoCompensation
+  if (style.counterKeep === false) normalized.counterKeep = false
+  else delete normalized.counterKeep
   return normalized
 }
 
@@ -226,6 +232,12 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
         set((state) => {
           if (on) delete state.style.autoCompensation
           else state.style.autoCompensation = false
+        }),
+
+      setCounterKeep: (on) =>
+        set((state) => {
+          if (on) delete state.style.counterKeep
+          else state.style.counterKeep = false
         }),
 
       addExclusion: (property, layoutType) =>

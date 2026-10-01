@@ -6,7 +6,7 @@ import { weightToMultiplier } from '../utils/globalStyleUtils'
 import type { GlobalStyle } from '../stores/globalStyleStore'
 import { brushInkGroupsToSvgPaths, strokeToBrushInkGroups } from '../services/brushGeometry'
 import { resolveGlyphInkPrimitives } from '../services/glyphInkResolver'
-import { needsFilledRenderInk, strokeToRenderInkGroups, verticalWidthFactorOf } from '../services/strokeRenderGeometry'
+import { needsFilledRenderInk, stemScaleOf, strokeToRenderInkGroups, verticalWidthFactorOf } from '../services/strokeRenderGeometry'
 import { stemBeakGroupOf, stemBeakInkGroups } from '../services/stemBeak'
 import { useGroupBeakResolver } from '../stores/jamoGroupStore'
 import type { GroupBeakResolver } from '../stores/jamoGroupStore'
@@ -102,6 +102,9 @@ export function SvgRenderer({
   // 글로벌 스타일 값 (기본값 적용)
   const slant = globalStyle?.slant ?? 0
   const weightMultiplier = weightMultiplierProp ?? (globalStyle ? weightToMultiplier(globalStyle.weight) : 1.0)
+  // 속공간 지키기 — 실효 스타일의 스위치. 기본 켜짐, 굵기 400 이하는 resolver가 아무것도 안 바꾼다.
+  const counterKeepOn = !!globalStyle && globalStyle.counterKeep !== false
+  const counterKeepStemScale = stemScaleOf(globalStyle?.strokeStyle)
   const resolvedInk = useMemo(() => resolveGlyphInkPrimitives({
     syllable,
     placement: schema
@@ -113,7 +116,8 @@ export function SvgRenderer({
     // viewportBox는 조판 창의 크기일 뿐 잉크를 다시 맞추는 경계가 아니다.
     // Design Body보다 돌출된 획도 편집기와 같은 형태로 보여야 한다.
     horizontalInkBounds: HORIZONTAL_INK_BOUNDS,
-  }), [boxesProp, globalStyle?.linecap, globalStyle?.linejoin, schema, syllable, weightMultiplier])
+    counterKeep: counterKeepOn ? { stemScale: counterKeepStemScale } : undefined,
+  }), [boxesProp, globalStyle?.linecap, globalStyle?.linejoin, schema, syllable, weightMultiplier, counterKeepOn, counterKeepStemScale])
   const centerlines = useMemo(() => resolvedInk.primitives.map((primitive) => {
     if (primitive.kind !== 'centerline') {
       throw new Error(`SvgRenderer가 지원하지 않는 잉크 primitive입니다: ${primitive.kind}`)

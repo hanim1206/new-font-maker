@@ -47,14 +47,14 @@ const STEPS: Step[] = [
     decision: '사용자 10-01 눈 ②: 노토식 탈락(가독성) → 바닥 0.8(재투표) → 자소 사이 켬.',
   },
   {
-    id: 'pattern', title: '패턴 100 · 중간', state: 'now', stateLabel: '지금',
+    id: 'pattern', title: '패턴 100 · 중간', state: 'done', stateLabel: '닫힘 · 10-01',
     question: '400 · 900에서 나온 값이 다른 굵기도 설명하나',
-    result: '손잡이 값을 굵기의 함수로 놓고 100으로 바깥을 확인한다. 300 · 500 · 700은 맞추는 데 쓰지 않고 예측 검증용으로 남긴다. 다른 폰트에 다시 쓰는 부분이 여기다.',
+    result: '최종 손잡이로 400 = 기준과 동일(0 · 0 · 35.5%), 600 · 700 · 900이 매끈하게 늘고 턱 없음(900 닿음 1,697 · 막힘 381 · 검기 50.9%). 100은 모든 층이 꺼져 지금과 같다. 조합표(가로 3 × 굵기 4)도 전부 지금 제품보다 좋아짐 — G2 닫힘.',
   },
   {
-    id: 'gate', title: '통과선 · 제품', state: 'wait', stateLabel: '눈 ③',
+    id: 'gate', title: '통과선 · 제품', state: 'now', stateLabel: '눈 ③',
     question: '제품 굵기 막대에서 튀는 굵기가 있나 (눈 ③)',
-    result: '남긴 글자 · 중간 굵기 오차가 통과선 아래일 때만 제품 화면에 붙인다. 그 뒤 네모꼴 범위와 굵기 한계를 표로 정한다.',
+    result: '제품에 붙었다(10-02): 모든 화면 · OTF가 같은 입구에서 두께를 굽고, 스위치는 굵기 막대 아래 `자동 보정`(기본 켜짐, 400 이하는 그대로). 남은 확인 = 눈 ③ 굵기 막대 훑기, 그 뒤 네모꼴 범위와 굵기 한계 표.',
   },
 ]
 /** 역추론으로 바뀌기 전 손잡이 단계(10-01 뒤집힘). 결정과 그림은 그대로 두고 아래 보관함에서 연다. */
@@ -260,7 +260,8 @@ function useFontVersion(): unknown[] {
 }
 
 function measureOf(resolver: GlyphPlacementResolver, char: string, condition: Condition, reference: GlyphReference | undefined): Measured | null {
-  const data = collectGlyphDataWithPlacement(char, resolver, { padding: condition.padding, weight: condition.weight })
+  // 층은 조건이 손으로 얹는다 — 제품 속공간 지키기는 꺼서 이중 적용을 막는다.
+  const data = collectGlyphDataWithPlacement(char, resolver, { padding: condition.padding, weight: condition.weight, counterKeep: false })
   if (!data) return null
   const share = condition.horizontalShare ?? 1
   const kept = condition.floorRatio === undefined ? undefined : withCounterKeep(data, { fixed: FLOOR_FIXED, ratio: condition.floorRatio, horizontalRatio: condition.horizontalRatio }, share, condition.minScale, condition.between)

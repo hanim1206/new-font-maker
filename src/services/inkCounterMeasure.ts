@@ -1,6 +1,6 @@
 import { areaPathsD, differenceD, EndType, FillRule, inflatePathsD, intersectD, isPositiveD, JoinType, unionD } from 'clipper2-ts'
 import type { PathsD } from 'clipper2-ts'
-import { betweenKeepScales, counterKeepScale, scaleStrokeThickness, strokeGrowthOf, strokeVerticalness } from './counterKeep'
+import { counterKeepStrokeFactors, jamoOfPart, scaleStrokeThickness, strokeGrowthOf, strokeVerticalness } from './counterKeep'
 import type { CounterFloor } from './counterKeep'
 import type { GlyphData } from './fontExportUtils'
 import { glyphDataToFontContours } from './fontGenerator'
@@ -42,34 +42,24 @@ export type InkVerdict = { touch: string[]; closed: string[]; split: string[] }
 type StrokeInk = { part: string; key: string; ink: PathsD }
 
 /** 섞임홀자의 가로부 · 세로부(`JU_H` · `JU_V`)는 한 자소로 본다. */
-export const jamoOf = (part: string) => part.startsWith('JU') ? 'JU' : part
+export const jamoOf = jamoOfPart
 const jamoOfStroke = (item: GlyphData['strokes'][number]) => jamoOf((item.beakGroup ?? '').split(':')[0])
 
 /**
- * 자소마다 `counterKeepScale`만큼 획 두께를 줄인 글리프 데이터와, 자소별 배율. 섞임홀자는 한 자소로 묶는다.
+ * 자소마다 속공간 배율만큼 획 두께를 줄인 글리프 데이터와, 자소별 배율. 섞임홀자는 한 자소로 묶는다.
+ * 셈은 제품과 같은 `counterKeepStrokeFactors`(counterKeep.ts) 하나다 — 실험실은 손잡이를 바꿔 끼우려고 이 겉면을 쓴다.
  * `horizontalShare`를 주면 가로줄기를 덜 굵게 한 뒤에 배율을 얹는다 — 지킬 틈은 늘 원래(굵기 400) 모양에서 고른다.
  * `minScale`: 자소 배율 바닥(0이면 없음).
  * `betweenOpening`: 4단계 임시판 — 이웃 자소를 마주 본 획만 추가로 덜 굵게(측정의 닿음 기준과 같은 0.25 권장, 0이면 끔).
  */
 export function withCounterKeep(data: GlyphData, floor: CounterFloor, horizontalShare = 1, minScale = 0, betweenOpening = 0): { data: GlyphData; scales: Map<string, number> } {
-  const scales = new Map<string, number>()
-  for (const part of new Set(data.strokes.map(jamoOfStroke))) {
-    // `minScale`: 자소 배율 바닥 — 한 글자 안 자소 굵기가 너무 갈리지 않게(뷁의 ㅂ 1.0 · ㅞ 0.72, 빼의 ㅃ 0.65).
-    scales.set(part, Math.max(minScale, counterKeepScale(data.strokes.filter((item) => jamoOfStroke(item) === part), data.weightMultiplier, floor, stemScaleOf(data.strokeStyle), horizontalShare)))
-  }
-  const shaped = withHorizontalShare(data, horizontalShare)
-  let strokes = shaped.strokes.map((item) => scaleStrokeThickness(item, scales.get(jamoOfStroke(item)) ?? 1))
-  if (betweenOpening > 0) {
-    const parts = [...new Set(data.strokes.map(jamoOfStroke))]
-    const between = betweenKeepScales(data.strokes, data.strokes.map((item) => parts.indexOf(jamoOfStroke(item))), data.weightMultiplier, stemScaleOf(data.strokeStyle), horizontalShare, betweenOpening)
-    // 층을 겹쳐도(자소 배율 × 자소 사이) 획이 굵기 400보다 얇아지지는 않게 — 배율 × 그 획의 성장은 1을 안 깬다.
-    strokes = strokes.map((item, index) => {
-      const growth = strokeGrowthOf(strokeVerticalness(item.stroke, item.box), data.weightMultiplier, horizontalShare)
-      const jamoScale = scales.get(jamoOfStroke(item)) ?? 1
-      return scaleStrokeThickness(item, Math.max(between[index], growth > 0 ? 1 / (growth * jamoScale) : between[index]))
-    })
-  }
-  return { data: { ...shaped, strokes }, scales }
+  const { factors, partScales } = counterKeepStrokeFactors(
+    data.strokes.map((item) => ({ stroke: item.stroke, box: item.box, part: jamoOfStroke(item) })),
+    data.weightMultiplier,
+    stemScaleOf(data.strokeStyle),
+    { floor, horizontalShare, minScale, betweenOpening },
+  )
+  return { data: { ...data, strokes: data.strokes.map((item, index) => scaleStrokeThickness(item, factors[index])) }, scales: partScales }
 }
 
 /**
