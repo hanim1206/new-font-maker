@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url'
 /**
  * 앱과 같은 파이프라인으로 기본 스토어 상태의 OTF를 파일로 만든다. 브라우저 없이 iOS 검사 · fontTools 대조용.
  *
- *     npx vite-node scripts/font-check/exportSampleOtf.ts [출력 경로] [--name 꾸불체] [--ascii Kkubul] [--revision 1]
+ *     npx vite-node scripts/font-check/exportSampleOtf.ts [출력 경로] [--name 꾸불체] [--ascii Kkubul] [--revision 1] [--font-data 폰트데이터.json]
+ * `--font-data`는 `font_projects.font_data` 값(또는 그 행의 JSON 배열)을 앱처럼 스토어에 적용한 뒤 추출한다.
  *
  * 기본 출력은 `reference-data/font-check/샘플.otf`. 끝에 `validateOpenTypeForIOS` 결과를 찍는다.
  */
@@ -39,6 +40,18 @@ const [{ generateFontBuffer }, exportStore, deltaStore, validation] = await Prom
   import('../../src-next/layoutDeltaStore'),
   import('../../src/services/openTypeValidation'),
 ])
+const fontDataPath = argValue('--font-data')
+if (fontDataPath) {
+  const raw = JSON.parse(readFileSync(path.resolve(fontDataPath), 'utf8'))
+  const value = Array.isArray(raw) ? raw[0].font_data : raw.font_data ?? raw
+  const [{ applyFontData }, { useLayoutDeltaStore }] = await Promise.all([
+    import('../../src/services/fontDataBridge'),
+    import('../../src-next/layoutDeltaStore'),
+  ])
+  const applied = applyFontData(value)
+  if (!applied.ok) throw new Error(`폰트 데이터 적용 실패: ${applied.error.message}`)
+  useLayoutDeltaStore.getState().restore({ rules: applied.data.layoutDelta?.rules ?? {} })
+}
 const model = JSON.parse(readFileSync(path.join(ROOT, 'public', 'noto-preset', 'model.json'), 'utf8'))
 const placementOf = exportStore.placementResolverOf(model, deltaStore.layoutDeltaSnapshot())
 

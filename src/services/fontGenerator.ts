@@ -682,6 +682,11 @@ export async function generateFontBuffer(
     coverage,
   } = options
 
+  // 단계별 걸린 시간(ms). 느린 폰트(손글씨체 등)의 병목을 콘솔에서 바로 보려고 끝에 한 줄로 찍는다.
+  const clock = performance.now()
+  const marks: Array<[string, number]> = []
+  const mark = (label: string): void => { marks.push([label, Math.round(performance.now() - clock)]) }
+
   try {
     // Phase 1: 글리프 데이터 수집
     onProgress?.(0, 1, '글리프 데이터 수집 중...')
@@ -693,6 +698,7 @@ export async function generateFontBuffer(
       placementOf ? 100 : 2000,
       (done, total) => onProgress?.(done, total, '글리프 데이터 수집 중...'),
     )).filter((data): data is GlyphData => data !== null)
+    mark('수집')
     const schemaFallbackCount = placementOf
       ? glyphDataList.filter((data) => data.unicode >= 0xAC00 && data.placementKind === 'schema').length
       : undefined
@@ -745,6 +751,7 @@ export async function generateFontBuffer(
     )
 
     glyphs.push(...hangulGlyphs)
+    mark('윤곽 변환')
 
     // Phase 3: 폰트 조립. 서브루틴(파일 줄이기)은 Worker에서 조립과 같이 돈다.
     onProgress?.(0, 1, '폰트 파일 생성 중...')
@@ -794,8 +801,14 @@ export async function generateFontBuffer(
     applyEnglishFontNames(font, identity, revision)
 
     // Phase 4: 묶고 다시 읽어 확인
-    const arrayBuffer = packageFont(font, identity, revision, await subroutinized)
+    mark('폰트 객체 조립')
+    const subroutines = await subroutinized
+    mark('서브루틴 대기')
+    const arrayBuffer = packageFont(font, identity, revision, subroutines)
+    mark('패키징')
     const validation = validateOpenTypeForIOS(arrayBuffer)
+    mark('검사')
+    console.info('[OTF 추출 시간 누적 ms]', Object.fromEntries(marks))
     if (!validation.ok) console.error('OTF 검사 오류:', summarizeValidation(validation), validation.issues.filter((issue) => issue.severity === 'error'))
     else if (validation.issues.some((issue) => issue.severity === 'warning')) console.warn('OTF 검사 경고:', validation.issues.filter((issue) => issue.severity === 'warning'))
 

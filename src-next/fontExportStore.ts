@@ -119,6 +119,11 @@ export function successNotice(skippedChars: readonly string[], validation: OpenT
 const PHASE_ASSEMBLE = '폰트 파일 생성 중...'
 const PHASE_ASSEMBLE_LABEL = '파일로 묶는 중'
 
+/** 조립 단계는 퍼센트가 99에서 선다. 점이 많은 폰트(손글씨체)는 이 단계만 30초 넘게 걸려서, 멈춘 게 아님을 경과 초로 보인다. */
+export function assembleLabel(elapsedSeconds: number): string {
+  return elapsedSeconds < 3 ? PHASE_ASSEMBLE_LABEL : `${PHASE_ASSEMBLE_LABEL} · ${elapsedSeconds}초 (큰 폰트는 1분쯤 걸려요)`
+}
+
 /**
  * 진행률 한 숫자. 추출기는 단계마다 `done/total`을 0부터 다시 세므로 단계에 자리를 준다 —
  * 1단계(상자 풀기) 0~50, 2단계(윤곽 변환) 50~99, 3단계(파일 조립)는 동기라 99에서 선다.
@@ -196,15 +201,21 @@ async function runExport(familyName: string): Promise<void> {
   // 단계는 글이 바뀔 때 하나씩 센다(수집 → 변환 → 조립).
   let phaseIndex = -1
   let lastPhase = ''
+  let assembleTimer: number | null = null
+  const stopAssembleTimer = () => { if (assembleTimer !== null) { window.clearInterval(assembleTimer); assembleTimer = null } }
   const result = await generateAndDownloadFont({
     familyName,
     placementOf,
     revision,
     onProgress: (done, total, phase) => {
       if (phase !== lastPhase) { lastPhase = phase; phaseIndex += 1 }
+      if (phase === PHASE_ASSEMBLE && assembleTimer === null) {
+        const startedAt = Date.now()
+        assembleTimer = window.setInterval(() => set({ progress: assembleLabel(Math.floor((Date.now() - startedAt) / 1000)) }), 1000)
+      }
       set({ progress: phase === PHASE_ASSEMBLE ? PHASE_ASSEMBLE_LABEL : phase, percent: exportPercent(phaseIndex, done, total) })
     },
-  })
+  }).finally(stopAssembleTimer)
   const skippedChars = result.skippedChars ?? []
   // 폰트 탭 · 대시보드에서 기다리고 있었으면 완료 페이지로. 다른 탭이면 화면을 바꾸지 않는다.
   const origin = typeof window === 'undefined' ? 'elsewhere' : exportOriginOf(window.location.pathname)
