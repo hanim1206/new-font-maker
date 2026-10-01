@@ -34,6 +34,9 @@ const HSHARE = process.env.CENSUS_HSHARE ? Number(process.env.CENSUS_HSHARE) : u
 /** `CENSUS_MINSCALE=0.95`: 자소 배율 바닥(역추론 후보). `CENSUS_BETWEEN=0.25`: 자소 사이 임시판(마주 본 획만 덜 굵게). */
 const MIN_SCALE = process.env.CENSUS_MINSCALE ? Number(process.env.CENSUS_MINSCALE) : 0
 const BETWEEN = process.env.CENSUS_BETWEEN ? Number(process.env.CENSUS_BETWEEN) : 0
+/** `CENSUS_BETWEEN_MIN=0.8`: 자소 사이 깎임의 바닥. `CENSUS_TOTAL_MIN=0.8`: 합성(자소 × 자소 사이) 바닥(눈 ③ 후보). */
+const BETWEEN_MIN = process.env.CENSUS_BETWEEN_MIN ? Number(process.env.CENSUS_BETWEEN_MIN) : 0
+const TOTAL_MIN = process.env.CENSUS_TOTAL_MIN ? Number(process.env.CENSUS_TOTAL_MIN) : 0
 const FLOOR = process.env.CENSUS_FLOOR ? (([fixed, ratio, horizontalRatio]) => ({ fixed: fixed / 1000, ratio, horizontalRatio }))(process.env.CENSUS_FLOOR.split(',').map(Number)) : undefined
 
 describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜 잉크 조합표', () => {
@@ -57,7 +60,7 @@ describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜
       // 층은 이 테스트가 손으로 얹는다 — 제품 속공간 지키기는 꺼서 이중 적용을 막는다.
       const collected = exportUtils.collectGlyphDataWithPlacement(char, placementOf, { counterKeep: false })
       if (!collected) return null
-      return measureGlyphInk(FLOOR === undefined ? withHorizontalShare(collected, HSHARE ?? 1) : withCounterKeep(collected, FLOOR, HSHARE, MIN_SCALE, BETWEEN).data)
+      return measureGlyphInk(FLOOR === undefined ? withHorizontalShare(collected, HSHARE ?? 1) : withCounterKeep(collected, FLOOR, HSHARE, MIN_SCALE, BETWEEN, BETWEEN_MIN, TOTAL_MIN).data)
     }
     const setCondition = (width: number, weight: number) => {
       layout.useLayoutStore.getState().setGlobalPadding(placement.designBodyPaddingForSize(width, BODY_H, FONT_SPACE))

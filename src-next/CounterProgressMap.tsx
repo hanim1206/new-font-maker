@@ -115,7 +115,7 @@ const HORIZONTAL_SHARES = [
  * 답은 채팅으로 받는다 — 선택지를 누르면 답 문장이 복사된다. 물을 게 없으면 `null`.
  */
 /** `floorRatio`: 선택지 그림을 그릴 하한선 비율. `undefined`면 그림 없이 글만. */
-interface QuestionOption { label: string; detail: string; recommended?: boolean; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; between?: number }
+interface QuestionOption { label: string; detail: string; recommended?: boolean; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; between?: number; totalMin?: number }
 /** `compare`가 있으면 그 조건들을 위에 줄줄이 그리고, 선택지는 그림 없는 답 단추(하나 고르기)다. 없으면 선택지끼리 이상형 월드컵. */
 interface Question { id: string; step: StepId; title: string; body: string; options: QuestionOption[]; compare?: { label: string; condition: Omit<Condition, 'padding' | 'weight'> }[] }
 /**
@@ -133,12 +133,26 @@ const FIT900_QUESTION: Question = {
     { label: '끔 (둘째 판 그대로)', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.526, minScale: 0.8, detail: '바닥 0.8까지만. 자소끼리 붙는 건 그대로 둔다.' },
   ],
 }
-/** 눈 ② 끝(세 판) — 질문 내림. 다음 질문은 눈 ③(제품 굵기 막대) 차례에 올린다. */
-const QUESTION: Question | null = null
+/**
+ * 눈 ③ 첫 판 — 사용자 "튀는 글자 많음"(10-02). 전수 자동 골라내기(`weight-outlier-report`) 결과:
+ * 자소 사이 깎임이 획 단위라 받침과 한 점만 마주 봐도 홀자 기둥 · 곁줄기가 400 두께 바닥(제 목표의 51%)까지 눌린다 — 6,011자.
+ * 후보 = 합성 바닥 0.8(자소 배율 × 자소 사이 깎임이 0.8 아래 금지): 걸림 0자, 띠 중앙 0.65 → 0.74(노토 0.75).
+ * 값 비용(840 · 900): 닿음 1,697 → 1,976 · 막힘 381 → 464 · 검기 50.9 → 52.9%.
+ */
+const QUESTION: Question | null = {
+  id: 'gate-total-min-2026-10-02',
+  step: 'gate',
+  title: '얇아짐 바닥 0.8 — 튀는 글자를 막을까요?',
+  body: '지금은 받침과 마주 본 홀자 획이 통째로 400 두께까지 얇아져 튀는 글자가 많다(곇 · 궨 · 긼 따위 6,011자). 바닥 0.8을 주면 어떤 획도 제 목표 굵기의 80% 아래로 안 내려간다. 대신 자소 사이가 붙는 곳이 조금 늘고(닿음 +279) 글자가 2%p 진해진다.',
+  options: [
+    { label: '바닥 0.8', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.526, minScale: 0.8, between: 0.25, totalMin: 0.8, recommended: true, detail: '튀는 글자 6,011 → 0자 · 띠 중앙 0.74(노토 0.75) · 닿음 1,976 · 막힘 464 · 검기 52.9%.' },
+    { label: '지금 그대로', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.526, minScale: 0.8, between: 0.25, detail: '닿음 1,697 · 막힘 381 · 검기 50.9% — 대신 눌린 획이 400 두께까지 내려간다(제 목표의 51%).' },
+  ],
+}
 void FIT900_QUESTION
 const QUESTION_SEEN_KEY = 'counter-lab-question-seen'
-/** 질문 그림에 같이 그리는 빽빽한 글자(자소별 색). */
-const QUESTION_CHARS = ['빼', '를', '쏟', '한', '갰']
+/** 질문 그림에 같이 그리는 빽빽한 글자(자소별 색). 눈 ③ 판은 눌린 획이 또렷한 글자로. */
+const QUESTION_CHARS = ['곇', '궨', '긼', '빼', '한']
 
 /** 모든 단계 공통 확인 문장. 밀도 차이가 큰 글자를 섞어 전체 농도(회색도)가 고른지 본다. */
 const GRAY_SENTENCE = ['뷁', '를', '빼', '쫓', '이']
@@ -236,7 +250,7 @@ const pathOf = (paths: PathsD) => paths.map((path) => `M${path.map((p) => `${p.x
 /** 글자 하나를 그 조건으로 재 둔 것. */
 interface Measured { ink: GlyphInk; verdict: InkVerdict; scales?: Map<string, number> }
 /** `horizontalShare`: ③ 가로줄기가 받는 두께 몫(하한선보다 먼저 얹는다). */
-type Condition = { padding: Padding; weight: number; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; between?: number }
+type Condition = { padding: Padding; weight: number; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; between?: number; totalMin?: number }
 
 /** 모델 상자 해석기. 레이아웃 Δ가 바뀌면 다시 만든다. */
 function usePlacementResolver(): GlyphPlacementResolver | null {
@@ -264,7 +278,7 @@ function measureOf(resolver: GlyphPlacementResolver, char: string, condition: Co
   const data = collectGlyphDataWithPlacement(char, resolver, { padding: condition.padding, weight: condition.weight, counterKeep: false })
   if (!data) return null
   const share = condition.horizontalShare ?? 1
-  const kept = condition.floorRatio === undefined ? undefined : withCounterKeep(data, { fixed: FLOOR_FIXED, ratio: condition.floorRatio, horizontalRatio: condition.horizontalRatio }, share, condition.minScale, condition.between)
+  const kept = condition.floorRatio === undefined ? undefined : withCounterKeep(data, { fixed: FLOOR_FIXED, ratio: condition.floorRatio, horizontalRatio: condition.horizontalRatio }, share, condition.minScale, condition.between, 0, condition.totalMin)
   const ink = measureGlyphInk(kept?.data ?? withHorizontalShare(data, share))
   return { ink, verdict: judgeGlyphInk(ink, reference), scales: kept?.scales }
 }
@@ -453,11 +467,11 @@ type Picks = Record<string, string>
 const BASE_LABEL = '지금'
 
 /** 한 조건의 글자 그림: 회색도 문장 + 막히기 쉬운 글자, 둘 다 검정(사용자 10-01: 검정이 잘 보인다). 글자를 누르면 "이 글자는 이 카드가 낫다"로 고른다. */
-function ConditionPreview({ context, label, floorRatio, horizontalRatio, horizontalShare, minScale, between, size, picks, onPick }: { context: PreviewContext; label: string; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; between?: number; size: number; picks: Picks; onPick: (char: string, label: string) => void }) {
+function ConditionPreview({ context, label, floorRatio, horizontalRatio, horizontalShare, minScale, between, totalMin, size, picks, onPick }: { context: PreviewContext; label: string; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; between?: number; totalMin?: number; size: number; picks: Picks; onPick: (char: string, label: string) => void }) {
   const { resolver, padding, weight, version } = context
   const inks = useMemo(() => ({
-    gray: GRAY_SENTENCE.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale, between }, undefined)),
-    dense: QUESTION_CHARS.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale, between }, undefined)),
+    gray: GRAY_SENTENCE.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale, between, totalMin }, undefined)),
+    dense: QUESTION_CHARS.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale, between, totalMin }, undefined)),
   }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [resolver, padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale, between, ...version])
@@ -535,7 +549,7 @@ function CupPair({ question, context, left, right }: { question: Question; conte
   const chars = useMemo(() => [...new Set([...GRAY_SENTENCE, ...CHARS, ...QUESTION_CHARS])], [])
   const inks = useMemo(() => [left, right].map((index) => {
     const option = question.options[index]
-    return chars.map((char) => measureOf(resolver, char, { padding, weight, floorRatio: option.floorRatio, horizontalRatio: option.horizontalRatio, horizontalShare: option.horizontalShare, minScale: option.minScale, between: option.between }, undefined))
+    return chars.map((char) => measureOf(resolver, char, { padding, weight, floorRatio: option.floorRatio, horizontalRatio: option.horizontalRatio, horizontalShare: option.horizontalShare, minScale: option.minScale, between: option.between, totalMin: option.totalMin }, undefined))
   }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [question, left, right, resolver, padding, weight, ...version])
@@ -645,7 +659,7 @@ function QuestionCard({ question, context, picks, onPick, cup, onCup, popup = fa
         {question.options.map((option) => (
           <div key={option.label} className={styles.askOption} data-rec={option.recommended || undefined}>
             <b>{option.label}{option.recommended ? ' · 추천' : ''}</b>
-            {context && (option.floorRatio !== undefined || option.horizontalShare !== undefined) && <ConditionPreview context={context} label={option.label} floorRatio={option.floorRatio} horizontalRatio={option.horizontalRatio} horizontalShare={option.horizontalShare} minScale={option.minScale} between={option.between} size={size} picks={picks} onPick={onPick} />}
+            {context && (option.floorRatio !== undefined || option.horizontalShare !== undefined) && <ConditionPreview context={context} label={option.label} floorRatio={option.floorRatio} horizontalRatio={option.horizontalRatio} horizontalShare={option.horizontalShare} minScale={option.minScale} between={option.between} totalMin={option.totalMin} size={size} picks={picks} onPick={onPick} />}
             <small>{option.detail}</small>
             <button type="button" onClick={() => answer(option.label)}>이걸로 통째로</button>
           </div>

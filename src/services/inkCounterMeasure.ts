@@ -52,12 +52,12 @@ const jamoOfStroke = (item: GlyphData['strokes'][number]) => jamoOf((item.beakGr
  * `minScale`: 자소 배율 바닥(0이면 없음).
  * `betweenOpening`: 4단계 임시판 — 이웃 자소를 마주 본 획만 추가로 덜 굵게(측정의 닿음 기준과 같은 0.25 권장, 0이면 끔).
  */
-export function withCounterKeep(data: GlyphData, floor: CounterFloor, horizontalShare = 1, minScale = 0, betweenOpening = 0): { data: GlyphData; scales: Map<string, number> } {
+export function withCounterKeep(data: GlyphData, floor: CounterFloor, horizontalShare = 1, minScale = 0, betweenOpening = 0, betweenMinScale = 0, totalMinScale = 0): { data: GlyphData; scales: Map<string, number> } {
   const { factors, partScales } = counterKeepStrokeFactors(
     data.strokes.map((item) => ({ stroke: item.stroke, box: item.box, part: jamoOfStroke(item) })),
     data.weightMultiplier,
     stemScaleOf(data.strokeStyle),
-    { floor, horizontalShare, minScale, betweenOpening },
+    { floor, horizontalShare, minScale, betweenOpening, betweenMinScale, totalMinScale },
   )
   return { data: { ...data, strokes: data.strokes.map((item, index) => scaleStrokeThickness(item, factors[index])) }, scales: partScales }
 }

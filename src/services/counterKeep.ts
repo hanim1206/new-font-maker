@@ -246,6 +246,7 @@ export function betweenKeepScales(
   stemScale = 1,
   horizontalShare = 1,
   opening = MIN_GAP_RATIO,
+  minScale = 0,
 ): number[] {
   const scales = strokes.map(() => 1)
   if (!(weightMultiplier > 1) || strokes.length === 0) return scales
@@ -263,8 +264,9 @@ export function betweenKeepScales(
       const gap = distance - halves
       if (gap <= minGap) continue
       // 배율 c에서 틈 = 거리 − c × 목표 반 두께 합 ≥ 지킬 틈. 굵기 400보다 얇게는 안 한다(400에서 이미 좁던 쌍은 여기서 멈춘다).
+      // `minScale`: 깎임 바닥 — 한 점이 마주 봤다고 획 전체가 끝까지 눌리지 않게(그 아래로 못 깎은 틈은 좁은 채 남는다).
       const grown = p.grown + q.grown
-      const c = Math.min(1, Math.max((distance - required) / grown, halves / grown))
+      const c = Math.max(minScale, Math.min(1, Math.max((distance - required) / grown, halves / grown)))
       if (c < scales[p.stroke]) scales[p.stroke] = c
       if (c < scales[q.stroke]) scales[q.stroke] = c
     }
@@ -280,6 +282,10 @@ export interface CounterKeepOptions {
   horizontalShare?: number
   minScale?: number
   betweenOpening?: number
+  /** 자소 사이 깎임의 바닥(0 = 지금처럼 400 두께까지). 눈 ③ 후보 — 제품 기본은 아직 0. */
+  betweenMinScale?: number
+  /** 합성 바닥: 자소 배율 × 자소 사이 깎임이 이 아래로 못 가게(0 = 없음). 눈 ③ 후보 — 층이 겹쳐도 획이 제 목표의 이 비율은 지킨다. */
+  totalMinScale?: number
 }
 
 /**
@@ -311,16 +317,19 @@ export function counterKeepStrokeFactors(
     partScales.set(part, Math.max(minScale, counterKeepScale(strokes.filter((item) => item.part === part), weightMultiplier, floor, stemScale, horizontalShare)))
   }
   const between = betweenOpening > 0
-    ? betweenKeepScales(strokes, strokes.map((item) => parts.indexOf(item.part)), weightMultiplier, stemScale, horizontalShare, betweenOpening)
+    ? betweenKeepScales(strokes, strokes.map((item) => parts.indexOf(item.part)), weightMultiplier, stemScale, horizontalShare, betweenOpening, options.betweenMinScale ?? 0)
     : undefined
   strokes.forEach((item, index) => {
     const growth = strokeGrowthOf(horizontalShare === 1 ? 1 : strokeVerticalness(item.stroke, item.box), weightMultiplier, horizontalShare)
     const jamoScale = partScales.get(item.part) ?? 1
     // 몫 1이면 성장 = k라 나눗셈 없이 1 — 부동소수점까지 기존 경로와 같게.
-    let factor = (horizontalShare === 1 ? 1 : growth / weightMultiplier) * jamoScale
+    const shared = horizontalShare === 1 ? 1 : growth / weightMultiplier
     // 층을 겹쳐도(자소 배율 × 자소 사이) 획이 굵기 400보다 얇아지지는 않게 — 배율 × 그 획의 성장은 1을 안 깬다.
-    if (between) factor *= Math.max(between[index], growth > 0 ? 1 / (growth * jamoScale) : between[index])
-    factors[index] = factor
+    const clamped = between ? Math.max(between[index], growth > 0 ? 1 / (growth * jamoScale) : between[index]) : 1
+    // 합성 바닥: 두 층을 합친 깎임이 `totalMinScale` 아래로 못 가게 — 한 획만 끝까지 눌리는 것을 막는다.
+    // 바닥이 없으면 곱 순서를 기존 그대로 둬 부동소수점까지 같게 유지한다.
+    const total = options.totalMinScale ?? 0
+    factors[index] = total > 0 && jamoScale * clamped < total ? shared * total : shared * jamoScale * clamped
   })
   return { factors, partScales }
 }
