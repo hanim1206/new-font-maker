@@ -30,19 +30,20 @@ interface Step { id: StepId; title: string; state: StepState; stateLabel: string
 /** 10-01 두 번째 다시 짬(역추론): 참고 폰트 100 · 900을 같은 자로 재서 손잡이 값을 숫자로 맞춘다. 눈 검증은 세 번(① 자 · ② 900 월드컵 · ③ 굵기 막대). */
 const STEPS: Step[] = [
   {
-    id: 'ruler', title: '같은 자', state: 'now', stateLabel: '눈 ① 대기',
+    id: 'ruler', title: '같은 자', state: 'done', stateLabel: '닫힘 · 10-01 눈 ①',
     question: '프로브가 줄기를 제대로 짚었나 (눈 ①)',
     result: '참고 폰트 측정과 같은 프로브(상자 비율 자리 다섯 줄)를 우리 윤곽에도 돌렸다. 지금 제품 900 = 세로 ×1.95 — 노토 ×1.95와 같다. 두께는 이미 노토인데 속공간 처리가 다르다. B′ + 가로 ×1.5는 노토보다 많이 얇다: 하한선 걸린 자소가 ×1.1~1.3(노토는 1.84~2.0), 꺾인 획(ㅁ · ㄷ · ㄹ)의 세로 부분도 ×1.6으로 끌려 내려간다.',
+    decision: '사용자 10-01 눈 ①: 프로브가 제자리를 짚었다.',
   },
   {
-    id: 'error', title: '오차 하나', state: 'wait', stateLabel: '대기',
+    id: 'error', title: '오차 하나', state: 'done', stateLabel: '닫힘 · 10-01',
     question: '참고 폰트와의 차이를 점수 하나로 어떻게 접을까',
-    result: '글자마다 두께 · 속공간 · 상자 밀림 · 검기의 차이를 가중 합. 막힘 개수는 0 목표가 아니라 노토 900을 같은 자로 잰 값과 견주는 상대 지표로 바꾼다(지금 기준이면 노토 900의 ㅃ · ㅈ · ㅅ도 막힘이라).',
+    result: '글자마다 |세로 차| + |가로 차| + |속공간 차| × 0.5 + |상자 밀림 차| × 0.3/100u의 가중 합, 전체는 중앙값. 지금 제품 0.22 · B′ + ×1.5는 0.62. 막힘 개수는 점수 밖 — 노토 900을 같은 자로 잰 값과 견주는 상대 지표로 따로 본다.',
   },
   {
-    id: 'fit900', title: '900 맞추기', state: 'wait', stateLabel: '눈 ②',
+    id: 'fit900', title: '900 맞추기', state: 'now', stateLabel: '눈 ② 대기',
     question: '어느 900이 더 좋은가 (눈 ② 월드컵)',
-    result: '손잡이(가로 몫 · 하한선 · 바닥 · 자소 사이 임시판)를 격자로 훑어 점수가 가장 낮은 값을 찾는다. 월드컵 첫 판 = 숫자로 맞춘 900 대 눈으로 고른 900(B′ + ×1.5) — 노토를 따를지 취향을 남길지 이 한 판으로 정한다.',
+    result: '손잡이 65조합(가로 몫 5 × 하한선 4 × 바닥 4)을 격자로 훑었다. 1등 = 가로 ×1.88(몫 0.93) · 하한선 0.5 · 바닥 0.95, 오차 0.20 — 지금 제품(0.22)보다 노토에 가깝고 속공간은 노토보다 열려 있다(0.70 대 0.61). 월드컵 첫 판 = 이 숫자 맞춤 대 눈으로 고른 B′ + ×1.5.',
   },
   {
     id: 'pattern', title: '패턴 100 · 중간', state: 'wait', stateLabel: '대기',
@@ -116,22 +117,21 @@ const HORIZONTAL_SHARES = [
 interface QuestionOption { label: string; detail: string; recommended?: boolean; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number }
 /** `compare`가 있으면 그 조건들을 위에 줄줄이 그리고, 선택지는 그림 없는 답 단추(하나 고르기)다. 없으면 선택지끼리 이상형 월드컵. */
 interface Question { id: string; step: StepId; title: string; body: string; options: QuestionOption[]; compare?: { label: string; condition: Omit<Condition, 'padding' | 'weight'> }[] }
-/** ②+③ 결정. 이 위에 자소 배율 바닥만 바꿔 본다. */
-const DECIDED = { ...FLOOR_DECIDED, horizontalShare: 0.526 } as const
-/** 바닥 질문은 내렸다(10-01 사용자: 다른 손잡이를 다 켠 완성 글자로 봐야 고를 수 있다). ④ 임시판을 만든 뒤 다시 묻는다. */
-const FLOOR_SCALE_READY = false
-const MIN_SCALE_QUESTION: Question = {
-  id: 'min-scale-2026-10-01',
-  step: 'floor',
-  title: '자소 굵기 바닥 — 어느 쪽이 나아요?',
-  body: '②+③ 위에서, 하한선 때문에 덜 굵어지는 자소를 이 값 아래로는 안 깎는다. 높을수록 자소 굵기가 고르고, 대신 ㅃ 같은 곳 속공간이 좁아진다.',
+/**
+ * 눈 ② — 900 맞추기 월드컵. 첫 판이자 결승: 숫자로 맞춘 900 대 앞서 눈으로 고른 900(B′ + ×1.5).
+ * 노토를 따를지 취향을 남길지 이 한 판으로 정한다(플랜 10-01 역추론).
+ */
+const FIT900_QUESTION: Question = {
+  id: 'fit900-2026-10-01',
+  step: 'fit900',
+  title: '굵기 900 — 어느 쪽이 나아요?',
+  body: '손잡이 65조합을 노토 900과의 오차로 훑어, 가장 가까운 것(숫자 맞춤)과 앞서 눈으로 고른 것(B′ + 가로 ×1.5)을 붙입니다.',
   options: [
-    { label: '바닥 없음', ...DECIDED, detail: '지금. 뷁 ㅂ 1.00 · ㅞ 0.72, 빼 ㅃ 0.65.' },
-    { label: '바닥 0.8', ...DECIDED, minScale: 0.8, detail: '자소를 0.8 아래로 안 깎는다.', recommended: true },
-    { label: '바닥 0.9', ...DECIDED, minScale: 0.9, detail: '거의 고르게. 속공간은 노토처럼 좁아진다.' },
+    { label: '숫자 맞춤', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.93, minScale: 0.95, recommended: true, detail: '가로 ×1.88 · 하한선 0.5 · 바닥 0.95. 노토 900과 오차 0.20(지금 제품 0.22보다 가깝다), 속공간은 노토보다 열려 있음(0.70 대 0.61).' },
+    { label: '눈 고름 (B′ + ×1.5)', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.526, detail: '앞서 월드컵으로 고른 것. 더 밝다(검기 54%). 노토 900보다 많이 얇다(오차 0.62, 하한선 걸린 자소 ×1.1~1.3).' },
   ],
 }
-const QUESTION: Question | null = FLOOR_SCALE_READY ? MIN_SCALE_QUESTION : null
+const QUESTION: Question | null = FIT900_QUESTION
 const QUESTION_SEEN_KEY = 'counter-lab-question-seen'
 /** 질문 그림에 같이 그리는 빽빽한 글자(자소별 색). */
 const QUESTION_CHARS = ['빼', '를', '쏟', '한', '갰']

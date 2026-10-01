@@ -30,6 +30,10 @@ STEM_BASE_MAX = 150.0
 # 배율이 이보다 크면 400과 900이 서로 다른 것을 짚은 프로브다(줄기는 많아야 ×2.2 안팎).
 # 예: ㅌ의 빈 줄 자리가 900에서 굵어진 가로줄기 안으로 들어가 구간이 줄기 길이가 된 것(×4~5).
 RATIO_MAX = 3.0
+# 오차 점수 가중치 — 글자마다 참고 폰트와의 차이를 점수 하나로 접는다(플랜 `오차 하나` 단계).
+# 두께가 핵심(각 1), 속공간은 두께의 결과라 절반, 상자 밀림은 u라 100u = 0.3으로 환산.
+# 검기는 두께 둘이 이미 담고 있어 따로 안 센다. 막힘 개수는 점수 밖 — 노토 900 상대 지표로 따로 본다.
+SCORE_WEIGHTS = {"vertical": 1.0, "horizontal": 1.0, "counter": 0.5, "boxGrow": 0.3 / 100.0}
 
 
 def load(path: Path) -> Dict[str, Any]:
@@ -74,6 +78,34 @@ def character_row(entry: Dict[str, Any], weight: str, base_weight: str = "400") 
         "horizontal": median_of(horizontal),
         "counter": median_of(counters),
         "boxGrow": round((shift["right"] - shift["left"]) + (shift["bottom"] - shift["top"]), 1),
+    }
+
+
+def score_of(per_character: Dict[str, Any]) -> Dict[str, Any]:
+    """글자마다 항목 차이의 가중 합 → 전체는 중앙값(한두 글자 측정 사고에 안 휘둘리게)과 나쁜 글자 목록."""
+    rows: Dict[str, float] = {}
+    item_values: Dict[str, List[float]] = {key: [] for key in SCORE_WEIGHTS}
+    for character, row in per_character.items():
+        total = 0.0
+        counted = 0
+        for key, weight in SCORE_WEIGHTS.items():
+            mine = row["ours"].get(key)
+            theirs = row["reference"].get(key)
+            if mine is None or theirs is None:
+                continue
+            delta = abs(mine - theirs)
+            item_values[key].append(delta)
+            total += delta * weight
+            counted += 1
+        if counted:
+            rows[character] = round(total, 4)
+    ordered = sorted(rows.items(), key=lambda item: -item[1])
+    return {
+        "median": median_of(list(rows.values())),
+        "mean": round(sum(rows.values()) / len(rows), 4) if rows else None,
+        "perItemMedian": {key: median_of(values) for key, values in item_values.items()},
+        "worst": [{"char": character, "score": value} for character, value in ordered[:5]],
+        "perCharacter": rows,
     }
 
 
@@ -132,13 +164,18 @@ def main() -> None:
             "-" if row["deltaHorizontal"] is None else f"{row['deltaHorizontal']:+.2f}",
             fmt(mine["counter"]), fmt(theirs["counter"]), mine["boxGrow"], theirs["boxGrow"]))
 
+    score = score_of(per_character)
+    print(f"\n== 오차 점수 (굵기 {weight}, 낮을수록 참고 폰트에 가깝다) ==")
+    print(f"중앙값 {score['median']} · 평균 {score['mean']} · 항목 중앙값 " + " ".join(f"{key} {value}" for key, value in score["perItemMedian"].items()))
+    print("나쁜 글자: " + ", ".join(f"{row['char']} {row['score']}" for row in score["worst"]))
+
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         with args.output.open("w", encoding="utf-8") as target:
             json.dump({
                 "schema": "weight-offsets-compare-v1",
                 "ours": str(args.ours), "reference": str(args.reference), "weight": weight,
-                "pooled": pooled_rows, "perCharacter": per_character,
+                "score": score, "pooled": pooled_rows, "perCharacter": per_character,
             }, target, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 

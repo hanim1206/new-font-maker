@@ -31,6 +31,8 @@ const STRIDE = Number(process.env.CENSUS_STRIDE ?? 3)
 /** `CENSUS_FLOOR=24,0.5,0.25`: 최소 속공간 하한선(고정 u, 두께 비율, 쌓인 가로줄기 비율 — 셋째는 없어도 됨)을 미리 얹어 잰다. 없으면 지금 제품 그대로. */
 /** `CENSUS_HSHARE=0.8`: 가로줄기가 받는 두께 몫(3단계 후보)을 하한선보다 먼저 얹는다. */
 const HSHARE = process.env.CENSUS_HSHARE ? Number(process.env.CENSUS_HSHARE) : undefined
+/** `CENSUS_MINSCALE=0.95`: 자소 배율 바닥(역추론 후보). */
+const MIN_SCALE = process.env.CENSUS_MINSCALE ? Number(process.env.CENSUS_MINSCALE) : 0
 const FLOOR = process.env.CENSUS_FLOOR ? (([fixed, ratio, horizontalRatio]) => ({ fixed: fixed / 1000, ratio, horizontalRatio }))(process.env.CENSUS_FLOOR.split(',').map(Number)) : undefined
 
 describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜 잉크 조합표', () => {
@@ -53,7 +55,7 @@ describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜
     const measure = (char: string): GlyphInk | null => {
       const collected = exportUtils.collectGlyphDataWithPlacement(char, placementOf)
       if (!collected) return null
-      return measureGlyphInk(FLOOR === undefined ? withHorizontalShare(collected, HSHARE ?? 1) : withCounterKeep(collected, FLOOR, HSHARE).data)
+      return measureGlyphInk(FLOOR === undefined ? withHorizontalShare(collected, HSHARE ?? 1) : withCounterKeep(collected, FLOOR, HSHARE, MIN_SCALE).data)
     }
     const setCondition = (width: number, weight: number) => {
       layout.useLayoutStore.getState().setGlobalPadding(placement.designBodyPaddingForSize(width, BODY_H, FONT_SPACE))
