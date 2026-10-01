@@ -14,11 +14,13 @@ const SWIPE_PX = 40
  * `×`는 두지 않는다 — 캡처 속 머리 단추와 겹쳐 앱 단추처럼 보였다.
  * `inline`이면 깔개 없이 그 자리에 판만 그린다(관리자 미리보기). 닫으면 첫 장으로 돌아간다.
  * `eyebrow`는 장 제목 위의 작은 머리말 — 장을 넘겨도 그대로 있다(공지 이름).
+ * `centered`면 그림이 틀보다 길 때 위가 아니라 가운데를 맞춘다(공지 — 위아래를 같이 덜어 낸다).
  */
-export function SlideSheet({ slides, label, eyebrow, testId, firstLabel, lastLabel, onClose, inline }: {
+export function SlideSheet({ slides, label, eyebrow, centered, testId, firstLabel, lastLabel, onClose, inline }: {
   slides: SlideSheetSlide[]
   label: string
   eyebrow?: string
+  centered?: boolean
   testId: string
   /** 첫 장 왼쪽 단추(닫기). 둘째 장부터는 `이전`. */
   firstLabel: string
@@ -75,7 +77,7 @@ export function SlideSheet({ slides, label, eyebrow, testId, firstLabel, lastLab
       }}
       onPointerCancel={() => { swipeFrom.current = null }}
     >
-      <img key={slide.image} data-bottom={slide.bottom} src={slide.image} alt={slide.alt ?? slide.title} draggable={false} />
+      <img key={slide.image} data-bottom={slide.bottom} data-center={centered || undefined} src={slide.image} alt={slide.alt ?? slide.title} draggable={false} />
     </div>}
     {slides.length > 1 && <div className={styles.dots} aria-hidden="true">
       {slides.map((_, order) => <span key={order} data-on={order === at || undefined} />)}

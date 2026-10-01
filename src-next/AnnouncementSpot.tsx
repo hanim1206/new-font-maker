@@ -48,6 +48,7 @@ export function AnnouncementSpot({ place, paused = false }: { place: Announcemen
     slides={next.slides}
     label={next.title}
     eyebrow={next.title}
+    centered
     testId="announcement"
     firstLabel="닫기"
     lastLabel="확인"
