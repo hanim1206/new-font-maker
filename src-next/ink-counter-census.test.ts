@@ -1,21 +1,14 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { areaPathsD, differenceD, EndType, FillRule, inflatePathsD, intersectD, isPositiveD, JoinType, unionD } from 'clipper2-ts'
-import type { PathsD } from 'clipper2-ts'
+import { areaPathsD } from 'clipper2-ts'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { counterKeepScale, scaleStrokeThickness } from '../src/services/counterKeep'
-import type { GlyphData } from '../src/services/fontExportUtils'
-import { stemScaleOf } from '../src/services/strokeRenderGeometry'
+import { judgeGlyphInk, measureGlyphInk, OPENING_RATIO, REF_OPENING, referenceOfGlyph, shrinkPaths, withCounterKeep } from '../src/services/inkCounterMeasure'
+import type { GlyphInk, GlyphReference } from '../src/services/inkCounterMeasure'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 
 /**
  * 속공간 지키기 1단계 — 진짜 잉크로 재는 조합표. 플랜 `docs/plans/2026-10-01_속공간-지키기.md`.
- * 추출과 같은 윤곽(`glyphDataToFontContours`)을 자소마다 따로 만들어 Clipper로 잰다. 단위는 u(1000 = 1em).
- * - 닿음: 기본 가로 · 굵기 400에서 안 닿던 자소 쌍의 잉크 틈이 틈 기준보다 좁아진 글자. 원래 닿게 그린 쌍(`딱 붙음`)은 안 센다.
- * - 막힘: 자소 안 속공간이 막힌 글자. 속공간 = 그 자소 잉크의 볼록 껍질 − 잉크의 흰 덩어리(닫힌 ㅁ · ㅇ, 열린 ㄹ 홈 · ㅃ 기둥 사이 · ㅅ 다리 사이).
- *   기준(기본 가로 · 굵기 400)에서 `REF_OPENING` 넘게 열린 속공간마다 한가운데를 지금 잉크 자리로 옮겨, 거기 틈 기준(`OPENING_RATIO` × 획 두께) 넘게 열린 흰 곳이 하나도 안 걸리면 막힘.
- *   개수로 견주지 않는다 — 가로를 좁히면 ㅆ 두 ㅅ 다리 밑이 하나로 이어져 수가 줄기도 한다(막힌 게 아님).
- * - 자소 안 닿음: 같은 자소 안에서 기준에 안 닿던 획 둘의 틈이 틈 기준보다 좁아진 글자(한의 ㅎ 꼭지 ↔ 보, ㅝ의 ㅜ ↔ ㅓ, ㄳ의 ㄱ ↔ ㅅ).
+ * 재는 셈(닿음 · 막힘 · 자소 안 닿음)은 `src/services/inkCounterMeasure.ts`에 있다 — 네모꼴 실험실의 진행 지도와 같은 셈이다.
  * - 검기: 잉크 넓이 ÷ 네모꼴 넓이.
  * 오래 걸려서 환경 변수가 있을 때만 돈다:
  *   INK_COUNTER_CENSUS=1 CENSUS_OUT=/tmp/ink-counter.json npx vitest run src-next/ink-counter-census.test.ts
@@ -27,15 +20,6 @@ import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 const MODEL = JSON.parse(readFileSync(fileURLToPath(new URL('../public/noto-preset/model.json', import.meta.url)), 'utf8')) as NotoPresetModelBundle
 const FONT_SPACE = { width: 1000, height: 1000 }
 const BODY_H = 910
-/**
- * 틈이 획 두께의 이만큼보다 좁으면 막힘 · 닿음으로 본다(굵기 400 = 17.5u, 900 = 34u).
- * 굵을수록 같은 틈도 좁아 보인다 — 밭 · 굵기 900의 ㅌ 받침은 틈 13 · 17u인데 붙어 보인다(2026-10-01 사용자 확인, 고정 10u에서 바꿈).
- */
-const OPENING_RATIO = 0.25
-/** 기준에서 이보다 넓게 열린 속공간만 막힘을 센다(u). 원래 좁던 홈(ㅀ 안 11u 틈 등)이 조금 줄어든 것은 안 센다. */
-const REF_OPENING = 24
-/** 이보다 작게 겹치면 닿음으로 안 센다(u²). 윤곽 반올림 잡음. */
-const TOUCH_AREA = 1
 /** 사용자가 굵기 900에서 덩어리로 본 글자 + 대조군. 표본에 없어도 늘 잰다. */
 const WATCH = ['빼', '를', '뷁', '이', '한', '웨', '쏟', '밭']
 
@@ -46,100 +30,6 @@ const STRIDE = Number(process.env.CENSUS_STRIDE ?? 3)
 /** `CENSUS_KEEP=0.5`: 속공간 지키기(2단계)를 이 남길 몫으로 미리 얹어 잰다. 없으면 지금 제품 그대로. */
 const KEEP = process.env.CENSUS_KEEP ? Number(process.env.CENSUS_KEEP) : undefined
 
-type Contour = { x: number; y: number }[]
-type Vec = { x: number; y: number }
-type Bounds = { left: number; right: number; top: number; bottom: number }
-/** `open`: 흰 곳을 틈 기준의 반만큼 깎고 남은 조각들. */
-type PartInk = { part: string; ink: PathsD; area: number; bounds: Bounds; white: PathsD[]; open: PathsD[] }
-type GlyphInk = { parts: PartInk[]; touching: string[]; inner: string[]; area: number }
-/** 기준에서 잰 자소 하나. `cores`: 넉넉히 열린 속공간의 한가운데. */
-type PartReference = { bounds: Bounds; cores: PathsD[] }
-/** 획 하나의 잉크. `key` = 자소/획 id. */
-type StrokeInk = { part: string; key: string; ink: PathsD }
-
-/** 섞임홀자의 가로부 · 세로부(`JU_H` · `JU_V`)는 한 자소로 본다. */
-const jamoOf = (part: string) => part.startsWith('JU') ? 'JU' : part
-
-/** 자소마다 `counterKeepScale`만큼 획 두께를 줄인 글리프 데이터. 섞임홀자는 한 자소로 묶는다. */
-function withCounterKeep(data: GlyphData, keep: number): GlyphData {
-  const partOf = (item: GlyphData['strokes'][number]) => jamoOf((item.beakGroup ?? '').split(':')[0])
-  const scales = new Map<string, number>()
-  for (const part of new Set(data.strokes.map(partOf))) {
-    scales.set(part, counterKeepScale(data.strokes.filter((item) => partOf(item) === part), data.weightMultiplier, keep, stemScaleOf(data.strokeStyle)))
-  }
-  return { ...data, strokes: data.strokes.map((item) => scaleStrokeThickness(item, scales.get(partOf(item)) ?? 1)) }
-}
-
-/** 볼록 껍질(모노톤 체인). */
-function hullOf(paths: PathsD): PathsD[number] {
-  const points = paths.flat().map((p) => ({ x: p.x, y: p.y })).sort((a, b) => a.x - b.x || a.y - b.y)
-  const cross = (o: Vec, a: Vec, b: Vec) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
-  const half = (list: Vec[]) => {
-    const out: Vec[] = []
-    for (const p of list) {
-      while (out.length >= 2 && cross(out[out.length - 2], out[out.length - 1], p) <= 0) out.pop()
-      out.push(p)
-    }
-    out.pop()
-    return out
-  }
-  return [...half(points), ...half([...points].reverse())]
-}
-
-const shrink = (paths: PathsD, by: number): PathsD => inflatePathsD(paths, -by / 2, JoinType.Miter, EndType.Polygon).filter((path) => path.length >= 3)
-const piecesOf = (paths: PathsD): PathsD[] => paths.filter(isPositiveD).map((path) => [path])
-const overlaps = (a: PathsD, b: PathsD) => areaPathsD(intersectD(a, b, FillRule.NonZero)) > TOUCH_AREA
-/** 틈이 `opening`보다 좁으면 닿은 것으로 본다(굵기 900의 ㅝ: ㅓ 곁줄기 윗면이 ㅜ 보 아랫면에 0u로 맞붙어 겹친 넓이는 0이다). */
-const grow = (paths: PathsD, opening: number): PathsD => inflatePathsD(paths, opening / 2, JoinType.Round, EndType.Polygon)
-
-function boundsOf(paths: PathsD): Bounds {
-  const xs = paths.flat().map((p) => p.x)
-  const ys = paths.flat().map((p) => p.y)
-  return { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) }
-}
-
-/** 기준 자소의 자리를 지금 자소 잉크 상자로 옮긴다(가로 · 세로 따로 비례). */
-function mapInto(paths: PathsD, from: Bounds, to: Bounds): PathsD {
-  const sx = (to.right - to.left) / Math.max(1, from.right - from.left)
-  const sy = (to.bottom - to.top) / Math.max(1, from.bottom - from.top)
-  return paths.map((path) => path.map((p) => ({ x: to.left + (p.x - from.left) * sx, y: to.top + (p.y - from.top) * sy })))
-}
-
-function glyphInkOf(contoursOf: (part: string) => Contour[], parts: string[], strokes: StrokeInk[], opening: number): GlyphInk {
-  const measured = parts.map((part): PartInk => {
-    const ink = unionD(contoursOf(part), FillRule.NonZero)
-    if (ink.length === 0) return { part, ink, area: 0, bounds: { left: 0, right: 0, top: 0, bottom: 0 }, white: [], open: [] }
-    const white = piecesOf(differenceD([hullOf(ink)], ink, FillRule.NonZero))
-    return { part, ink, area: areaPathsD(ink), bounds: boundsOf(ink), white, open: white.flatMap((piece) => piecesOf(shrink(piece, opening))) }
-  })
-  const touching: string[] = []
-  for (let i = 0; i < measured.length; i += 1) for (let j = i + 1; j < measured.length; j += 1) {
-    if (overlaps(grow(measured[i].ink, opening), grow(measured[j].ink, opening))) touching.push(`${measured[i].part}-${measured[j].part}`)
-  }
-  const near = strokes.map((stroke) => grow(stroke.ink, opening))
-  const inner: string[] = []
-  for (let i = 0; i < strokes.length; i += 1) for (let j = i + 1; j < strokes.length; j += 1) {
-    if (strokes[i].part === strokes[j].part && overlaps(near[i], near[j])) inner.push(`${strokes[i].key}|${strokes[j].key}`)
-  }
-  const area = areaPathsD(unionD(measured.flatMap((item) => item.ink), FillRule.NonZero))
-  return { parts: measured, touching, inner, area }
-}
-
-function referenceOf(item: PartInk): PartReference {
-  return {
-    bounds: item.bounds,
-    cores: item.white.map((piece) => shrink(piece, REF_OPENING)).filter((core) => core.length > 0),
-  }
-}
-
-/** 기준 속공간 가운데 지금 막힌 것이 있나. */
-function isClosed(item: PartInk, reference: PartReference): boolean {
-  return reference.cores.some((core) => {
-    const moved = mapInto(core, reference.bounds, item.bounds)
-    return !item.open.some((piece) => overlaps(moved, piece))
-  })
-}
-
 describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜 잉크 조합표', () => {
   beforeAll(() => {
     const memory = new Map<string, string>()
@@ -148,8 +38,8 @@ describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜
   afterAll(() => { vi.unstubAllGlobals() })
 
   it('가로 × 굵기', async () => {
-    const [exportUtils, generator, deltaStore, exportStore, layout, style, placement] = await Promise.all([
-      import('../src/services/fontExportUtils'), import('../src/services/fontGenerator'), import('./layoutDeltaStore'), import('./fontExportStore'),
+    const [exportUtils, deltaStore, exportStore, layout, style, placement] = await Promise.all([
+      import('../src/services/fontExportUtils'), import('./layoutDeltaStore'), import('./fontExportStore'),
       import('../src/stores/layoutStore'), import('../src/stores/globalStyleStore'), import('../src/services/designBodyPlacement'),
     ])
     const placementOf = exportStore.placementResolverOf(MODEL, deltaStore.layoutDeltaSnapshot())
@@ -160,13 +50,7 @@ describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜
     const measure = (char: string): GlyphInk | null => {
       const collected = exportUtils.collectGlyphDataWithPlacement(char, placementOf)
       if (!collected) return null
-      const data = KEEP === undefined ? collected : withCounterKeep(collected, KEEP)
-      const jamo = (item: (typeof data.strokes)[number]) => jamoOf((item.beakGroup ?? '').split(':')[0])
-      const parts = [...new Set(data.strokes.map(jamo))]
-      const strokes = data.strokes.map((item): StrokeInk => ({ part: jamo(item), key: `${jamo(item)}/${item.stroke.id}`, ink: unionD(generator.glyphDataToFontContours({ ...data, strokes: [item] }), FillRule.NonZero) }))
-      const thickness = data.strokes.map((item) => item.stroke.thickness).sort((a, b) => a - b)[Math.floor(data.strokes.length / 2)]
-      const opening = thickness * data.weightMultiplier * 1000 * OPENING_RATIO
-      return glyphInkOf((part) => generator.glyphDataToFontContours({ ...data, strokes: data.strokes.filter((item) => jamo(item) === part) }), parts, strokes, opening)
+      return measureGlyphInk(KEEP === undefined ? collected : withCounterKeep(collected, KEEP).data)
     }
     const setCondition = (width: number, weight: number) => {
       layout.useLayoutStore.getState().setGlobalPadding(placement.designBodyPaddingForSize(width, BODY_H, FONT_SPACE))
@@ -175,10 +59,10 @@ describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜
 
     // 기준: 기본 가로 · 굵기 400. 자소별 속공간과, 원래 닿아 있는 자소 쌍(`딱 붙음` — 며의 ㅕ 곁줄기가 ㅁ 기둥에 박힌 것 등).
     setCondition(840, 400)
-    const reference = new Map<string, { parts: Map<string, PartReference>; touching: Set<string>; inner: Set<string> }>()
+    const reference = new Map<string, GlyphReference>()
     for (const char of chars) {
       const ink = measure(char)
-      if (ink) reference.set(char, { parts: new Map(ink.parts.map((item) => [item.part, referenceOf(item)])), touching: new Set(ink.touching), inner: new Set(ink.inner) })
+      if (ink) reference.set(char, referenceOfGlyph(ink))
     }
 
     // `CENSUS_SHEET=갰,빼 CENSUS_SHEET_OUT=/tmp/sheet.html`: 그 글자들을 조건마다 자소별 색으로 그린 한 장(눈으로 맞춰 보기).
@@ -194,7 +78,7 @@ describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜
     for (const char of process.env.CENSUS_SCALES?.split(',') ?? []) {
       setCondition(840, 900)
       const data = exportUtils.collectGlyphDataWithPlacement(char, placementOf)!
-      const kept = withCounterKeep(data, 0.5)
+      const kept = withCounterKeep(data, 0.5).data
       const scaleOf = new Map<string, number>()
       data.strokes.forEach((item, index) => scaleOf.set(item.stroke.id, kept.strokes[index].stroke.thickness / item.stroke.thickness))
       console.info(`SCALES ${char} ${[...scaleOf].map(([id, value]) => `${id} ${value.toFixed(3)}`).join(' · ')}`)
@@ -208,7 +92,7 @@ describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜
         const widths = item.white.map((piece) => {
           let lo = 0
           let hi = 400
-          for (let step = 0; step < 12; step += 1) { const mid = (lo + hi) / 2; if (shrink(piece, mid).length) lo = mid; else hi = mid }
+          for (let step = 0; step < 12; step += 1) { const mid = (lo + hi) / 2; if (shrinkPaths(piece, mid).length) lo = mid; else hi = mid }
           return `${Math.round(lo)}u(${Math.round(areaPathsD(piece))})`
         })
         console.info(`OPENINGS ${char} ${width}x${weight} ${item.part}: ${widths.join(' ')}`)
@@ -237,10 +121,7 @@ describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜
       for (const char of chars) {
         const ink = measure(char)
         if (!ink) continue
-        const before = reference.get(char)
-        const lost = ink.parts.filter((item) => { const partReference = before?.parts.get(item.part); return partReference ? isClosed(item, partReference) : false }).map((item) => item.part)
-        const split = [...new Set(ink.inner.filter((pair) => !before?.inner.has(pair)))]
-        const touch = ink.touching.filter((pair) => !before?.touching.has(pair))
+        const { touch, closed: lost, split } = judgeGlyphInk(ink, reference.get(char))
         if (touch.length) touched += 1
         if (lost.length) closed += 1
         if (split.length) splitCount += 1
