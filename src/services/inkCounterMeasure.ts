@@ -1,6 +1,6 @@
 import { areaPathsD, differenceD, EndType, FillRule, inflatePathsD, intersectD, isPositiveD, JoinType, unionD } from 'clipper2-ts'
 import type { PathsD } from 'clipper2-ts'
-import { counterKeepScale, scaleStrokeThickness } from './counterKeep'
+import { counterKeepScale, scaleStrokeThickness, strokeGrowthOf, strokeVerticalness } from './counterKeep'
 import type { CounterFloor } from './counterKeep'
 import type { GlyphData } from './fontExportUtils'
 import { glyphDataToFontContours } from './fontGenerator'
@@ -45,13 +45,31 @@ type StrokeInk = { part: string; key: string; ink: PathsD }
 export const jamoOf = (part: string) => part.startsWith('JU') ? 'JU' : part
 const jamoOfStroke = (item: GlyphData['strokes'][number]) => jamoOf((item.beakGroup ?? '').split(':')[0])
 
-/** 자소마다 `counterKeepScale`만큼 획 두께를 줄인 글리프 데이터와, 자소별 배율. 섞임홀자는 한 자소로 묶는다. */
-export function withCounterKeep(data: GlyphData, floor: CounterFloor): { data: GlyphData; scales: Map<string, number> } {
+/**
+ * 자소마다 `counterKeepScale`만큼 획 두께를 줄인 글리프 데이터와, 자소별 배율. 섞임홀자는 한 자소로 묶는다.
+ * `horizontalShare`를 주면 가로줄기를 덜 굵게 한 뒤에 배율을 얹는다 — 지킬 틈은 늘 원래(굵기 400) 모양에서 고른다.
+ */
+export function withCounterKeep(data: GlyphData, floor: CounterFloor, horizontalShare = 1): { data: GlyphData; scales: Map<string, number> } {
   const scales = new Map<string, number>()
   for (const part of new Set(data.strokes.map(jamoOfStroke))) {
-    scales.set(part, counterKeepScale(data.strokes.filter((item) => jamoOfStroke(item) === part), data.weightMultiplier, floor, stemScaleOf(data.strokeStyle)))
+    scales.set(part, counterKeepScale(data.strokes.filter((item) => jamoOfStroke(item) === part), data.weightMultiplier, floor, stemScaleOf(data.strokeStyle), horizontalShare))
   }
-  return { data: { ...data, strokes: data.strokes.map((item) => scaleStrokeThickness(item, scales.get(jamoOfStroke(item)) ?? 1)) }, scales }
+  const shaped = withHorizontalShare(data, horizontalShare)
+  return { data: { ...shaped, strokes: shaped.strokes.map((item) => scaleStrokeThickness(item, scales.get(jamoOfStroke(item)) ?? 1)) }, scales }
+}
+
+/**
+ * 가로줄기를 세로줄기보다 덜 굵게(속공간 지키기 3단계 후보). `share` = 400 대비 늘어난 두께 가운데 가로줄기가 받는 몫(1 = 지금).
+ * 획마다 누운 만큼(`strokeVerticalness`) 두께를 줄인다 — 붓 모양과 상관없이 먹는다(10-01: 세로줄기 배율로 싣던 첫 판은 둥근 붓에서만 먹어 네모붓 폰트에서 후보가 똑같았다).
+ * 굵기 400 이하는 그대로.
+ */
+export function withHorizontalShare(data: GlyphData, share: number): GlyphData {
+  const k = data.weightMultiplier
+  if (!(k > 1) || share === 1) return data
+  return {
+    ...data,
+    strokes: data.strokes.map((item) => scaleStrokeThickness(item, strokeGrowthOf(strokeVerticalness(item.stroke, item.box), k, share) / k)),
+  }
 }
 
 /** 볼록 껍질(모노톤 체인). */

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FillRule, unionD } from 'clipper2-ts'
+import { areaPathsD, differenceD, FillRule, intersectD, unionD } from 'clipper2-ts'
 import type { PathsD } from 'clipper2-ts'
 import { designBodyPaddingForSize, REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../src/services/designBodyPlacement'
 import { collectGlyphDataWithPlacement } from '../src/services/fontExportUtils'
 import type { GlyphPlacementResolver } from '../src/services/fontExportUtils'
-import { judgeGlyphInk, measureGlyphInk, referenceOfGlyph, withCounterKeep } from '../src/services/inkCounterMeasure'
+import { judgeGlyphInk, measureGlyphInk, referenceOfGlyph, withCounterKeep, withHorizontalShare } from '../src/services/inkCounterMeasure'
 import type { GlyphInk, GlyphReference, InkVerdict } from '../src/services/inkCounterMeasure'
 import { useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
@@ -35,18 +35,19 @@ const STEPS: Step[] = [
     decision: '틈 기준을 고정 10u에서 획 두께의 1/4로(밭 · 받침 ㅌ이 붙어 보여서).',
   },
   {
-    id: 'floor', title: '최소 속공간', state: 'now', stateLabel: '고르기 대기',
+    id: 'floor', title: '최소 속공간', state: 'done', stateLabel: '닫힘 · 10-01',
     question: '하한선 — 두께의 몇 배를 남길까',
-    result: '하한선 = max(24u, 굵어진 두께 × 비율). 하한선 아래로 가는 자소만 자동으로 덜 굵다. 지키는 틈은 나란하거나 마주 본 두 줄기 사이뿐이고, 굵기 400에서 이미 하한선보다 좁던 틈 · 벌어진 쐐기(ㅆ 안쪽 X)는 놓아 준다(노토도 ㅅ을 3u까지 좁힌다). 대신 갰의 ㅆ · 많의 ㄶ은 막힌다. 아래는 비율 0.25 · 0.35 · 0.5 — 굵기 900에서 34 · 48 · 68u. 아직 실험실에만 있고 제품 화면에는 안 붙었다.',
-    decision: '사용자 10-01: 벌어진 쐐기는 놓아 준다(ㅆ을 굵게, 속공간은 막혀도). 그 전에 뒤집힘: 기준선 밀기 먼저 → 하한선 먼저.',
+    result: 'B′: 하한선 = max(24u, 굵어진 두께 × 0.5), 쌓인 가로줄기 틈(ㄹ · ㅌ)만 × 0.25. 하한선 아래로 가는 자소만 덜 굵다. 원래 좁던 틈과 벌어진 쐐기(ㅅ 다리 · ㅆ 안쪽 X)는 놓아 준다. 840 · 900 막힘 2,289 → 1,307자, 검기 65.4 → 59.2%. 실험실에만 있고 제품 화면엔 안 붙었다.',
+    decision: '사용자 10-01: 글자별로 골라 를은 B′(쌓인 가로줄기만 낮게), 나머지는 0.5 — 쐐기는 놓아 준다.',
   },
   {
-    id: 'horizontal', title: '가로줄기 비율', state: 'wait', stateLabel: '대기',
+    id: 'horizontal', title: '가로줄기 비율', state: 'done', stateLabel: '닫힘 · 10-01',
     question: '굵을수록 가로줄기를 얼마나 덜 굵게',
-    result: '노토 900: 세로줄기 ×1.95, 가로줄기 ×1.88. 앱은 둘 다 ×1.95. 가로줄기가 쌓이는 ㅌ · 를에 먹는다. 닫을 때 ② 문장 줄을 한 번 다시 본다(확인만).',
+    result: '굵기 900에서 가로줄기 ×1.5(세로줄기 ×1.95 그대로) — 획마다 누운 만큼 덜 굵게, 붓 모양 상관없이. ② B′와 합쳐 840 · 900 막힘 2,289 → 496자, 검기 65.4 → 54.0%(둥근 붓 기준). 를 · 밭 · 한의 ㅎ이 열린다. 실험실에만 있고 제품 화면엔 안 붙었다.',
+    decision: '사용자 10-01 이상형 월드컵: ×1.5 > ×1.95, ×1.3 > ×1.7, 결승 ×1.5 > ×1.3.',
   },
   {
-    id: 'between', title: '자소 사이', state: 'wait', stateLabel: '대기',
+    id: 'between', title: '자소 사이', state: 'now', stateLabel: '다음',
     question: '굵어질 때 이웃 자소 쪽으로 어떻게 자라게',
     result: '굵기 900에서 자소 사이 닿음 3,415자 — 셋 가운데 가장 크다. 후보: 이웃을 마주 본 획만 덜 굵게 / 칸 변을 지키고 안쪽으로 / 칸끼리 자리 나누기.',
   },
@@ -67,23 +68,25 @@ const OPEN_QUESTIONS = [
   '얇아진 획이 칸 변에서 떨어지는 만큼 — 처음엔 안 맞추고 잰다.',
   '제품에 붙이기 전에 실효 스타일 입구를 한 곳으로 모으는 일(다른 세션)이 먼저다.',
 ]
+/** ② 결정(B′): 하한선 0.5, 쌓인 가로줄기 틈 0.25. ③부터는 이걸 깔고 본다. */
+const FLOOR_DECIDED = { floorRatio: 0.5, horizontalRatio: 0.25 } as const
+/** ③ 가로줄기 후보: 400 대비 늘어난 두께 가운데 가로줄기가 받는 몫. 이름은 굵기 900에서의 가로줄기 배율(세로줄기는 ×1.95 그대로). */
+// 노토(×1.88)는 지금(×1.95)과 5u 차이라 눈으로 안 갈렸다(10-01 사용자 "두 개 똑같음") — 눈에 보이는 간격(20~30u)으로 잡는다.
+const HORIZONTAL_SHARES = [
+  { share: 0.737, label: '가로 ×1.7' },
+  { share: 0.526, label: '가로 ×1.5' },
+  { share: 0.316, label: '가로 ×1.3' },
+]
+
 /**
  * 지금 사용자에게 묻는 것 하나. 실험실을 열면 질문 id마다 한 번 팝업으로 뜨고, 닫아도 지도 맨 위 카드로 남는다.
  * 답은 채팅으로 받는다 — 선택지를 누르면 답 문장이 복사된다. 물을 게 없으면 `null`.
  */
 /** `floorRatio`: 선택지 그림을 그릴 하한선 비율. `undefined`면 그림 없이 글만. */
-interface QuestionOption { label: string; detail: string; recommended?: boolean; floorRatio?: number; horizontalRatio?: number }
+interface QuestionOption { label: string; detail: string; recommended?: boolean; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number }
 interface Question { id: string; step: StepId; title: string; body: string; options: QuestionOption[] }
-const QUESTION: Question | null = {
-  id: 'floor-ratio-stacked-2026-10-01',
-  step: 'floor',
-  title: '② 최소 속공간 — B′로 정할까요?',
-  body: '고르신 것: 를은 B, 한은 A가 낫고 나머지는 비슷, 뷁은 다 별로. B가 한을 나쁘게 한 까닭은 ㅎ의 보 ↔ 동그라미 윗부분까지 "가로줄기 틈"으로 낮게 잡았기 때문입니다. B′는 낮은 하한선(0.25)을 곧은 가로줄기가 길게 겹쳐 쌓인 틈(ㄹ · ㅌ)에만 씁니다 — 를은 B처럼, 한은 A처럼 나와야 합니다. 를 · 한을 두 카드에서 견줘 주세요.',
-  options: [
-    { label: 'A. 0.5 하나', floorRatio: 0.5, detail: '한이 나았던 것. 를의 첫닿자 ㄹ이 놓여 막히고 받침 ㄹ은 ×0.53까지 얇다. 840 · 900 막힘 1,160자 · 검기 57.7%.' },
-    { label: 'B′. 0.5 + 쌓인 가로줄기 틈 0.25', floorRatio: 0.5, horizontalRatio: 0.25, detail: '를은 B, 한은 A와 똑같다(ㅎ 배율 1.00). ㄹ ×0.70 · 0.72, 밭의 ㅌ ×0.63 → 0.88로 덜 얇다. 840 · 900 막힘 1,307자 · 검기 59.2%(조금 더 진하다).', recommended: true },
-  ],
-}
+/** ④ 후보가 그려지기 전까지는 물을 게 없다. */
+const QUESTION: Question | null = null
 const QUESTION_SEEN_KEY = 'counter-lab-question-seen'
 /** 질문 그림에 같이 그리는 빽빽한 글자(자소별 색). */
 const QUESTION_CHARS = ['빼', '를', '쏟', '한', '갰']
@@ -128,6 +131,14 @@ const FLOOR_WEDGE_ROWS: string[][] = [
   ['840 · 700', '3,019 · 935 · 55.2%', '2,323 · 149 · 49.1%', '2,168 · 79 · 48.4%', '2,002 · 208 · 47.7%'],
   ['840 · 900', '3,579 · 2,289 · 65.4%', '2,972 · 478 · 53.7%', '2,861 · 346 · 53.0%', '2,696 · 489 · 51.6%'],
   ['600 · 900', '3,561 · 2,231 · 65.2%', '2,922 · 689 · 53.3%', '2,875 · 416 · 52.0%', '2,697 · 482 · 51.1%'],
+]
+/** ③ 가로줄기 후보 전수(B′ 깔고, 10-01 main 병합 뒤, 기본 폰트 = 둥근 붓). 칸 = 하나라도 · 속공간 막힘 · 검기. */
+const HORIZONTAL_HEAD = ['가로 · 굵기', 'B′만 (×1.95)', ...HORIZONTAL_SHARES.map((item) => item.label)]
+const HORIZONTAL_ROWS: string[][] = [
+  ['840 · 600', '1,921 · 386 · 48.9%', '1,629 · 248 · 47.0%', '1,425 · 165 · 45.4%', '1,258 · 134 · 43.8%'],
+  ['840 · 700', '2,815 · 677 · 53.3%', '2,325 · 386 · 50.9%', '1,967 · 245 · 48.8%', '1,674 · 148 · 46.7%'],
+  ['840 · 900', '3,443 · 1,307 · 59.2%', '3,229 · 752 · 56.5%', '2,910 · 496 · 54.0%', '2,552 · 277 · 51.2%'],
+  ['600 · 900', '3,387 · 1,273 · 58.0%', '3,186 · 884 · 55.5%', '2,981 · 758 · 53.3%', '2,703 · 547 · 50.9%'],
 ]
 /** 옛 방식 — 원래 속공간의 몇 %를 남김(10-01 뒤집힘 전). 칸 = 하나라도 · 속공간 막힘 · 검기. */
 const KEEP_HEAD = ['가로 · 굵기', '지금', '남길 몫 0.3', '0.5', '0.7']
@@ -175,7 +186,8 @@ const pathOf = (paths: PathsD) => paths.map((path) => `M${path.map((p) => `${p.x
 
 /** 글자 하나를 그 조건으로 재 둔 것. */
 interface Measured { ink: GlyphInk; verdict: InkVerdict; scales?: Map<string, number> }
-type Condition = { padding: Padding; weight: number; floorRatio?: number; horizontalRatio?: number }
+/** `horizontalShare`: ③ 가로줄기가 받는 두께 몫(하한선보다 먼저 얹는다). */
+type Condition = { padding: Padding; weight: number; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number }
 
 /** 모델 상자 해석기. 레이아웃 Δ가 바뀌면 다시 만든다. */
 function usePlacementResolver(): GlyphPlacementResolver | null {
@@ -201,8 +213,9 @@ function useFontVersion(): unknown[] {
 function measureOf(resolver: GlyphPlacementResolver, char: string, condition: Condition, reference: GlyphReference | undefined): Measured | null {
   const data = collectGlyphDataWithPlacement(char, resolver, { padding: condition.padding, weight: condition.weight })
   if (!data) return null
-  const kept = condition.floorRatio === undefined ? undefined : withCounterKeep(data, { fixed: FLOOR_FIXED, ratio: condition.floorRatio, horizontalRatio: condition.horizontalRatio })
-  const ink = measureGlyphInk(kept?.data ?? data)
+  const share = condition.horizontalShare ?? 1
+  const kept = condition.floorRatio === undefined ? undefined : withCounterKeep(data, { fixed: FLOOR_FIXED, ratio: condition.floorRatio, horizontalRatio: condition.horizontalRatio }, share)
+  const ink = measureGlyphInk(kept?.data ?? withHorizontalShare(data, share))
   return { ink, verdict: judgeGlyphInk(ink, reference), scales: kept?.scales }
 }
 
@@ -361,14 +374,16 @@ function LimitsPanel() {
 }
 
 /** 공통 문장 줄. 굵기 400과 지금 굵기를 검게 나란히 — 단계가 붙을 때마다 줄이 는다. */
-function GraySentence({ resolver, padding, weight, floorRatios = [], version }: { resolver: GlyphPlacementResolver; padding: Padding; weight: number; floorRatios?: number[]; version: unknown[] }) {
-  const conditions: { label: string; weight: number; floorRatio?: number }[] = [
+/** 회색도 줄에 더 그릴 후보 하나. */
+interface GrayCandidate { label: string; condition: Omit<Condition, 'padding' | 'weight'> }
+function GraySentence({ resolver, padding, weight, candidates = [], version }: { resolver: GlyphPlacementResolver; padding: Padding; weight: number; candidates?: GrayCandidate[]; version: unknown[] }) {
+  const conditions: { label: string; weight: number; condition?: GrayCandidate['condition'] }[] = [
     { label: '굵기 400', weight: 400 }, { label: `지금 ${weight}`, weight },
-    ...floorRatios.map((ratio) => ({ label: floorLabel(ratio), weight, floorRatio: ratio })),
+    ...candidates.map((item) => ({ label: item.label, weight, condition: item.condition })),
   ]
-  const rows = useMemo(() => conditions.map((row) => ({ ...row, inks: GRAY_SENTENCE.map((char) => measureOf(resolver, char, { padding, weight: row.weight, floorRatio: row.floorRatio }, undefined)) })),
+  const rows = useMemo(() => conditions.map((row) => ({ ...row, inks: GRAY_SENTENCE.map((char) => measureOf(resolver, char, { padding, weight: row.weight, ...row.condition }, undefined)) })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [resolver, padding, weight, floorRatios.join(), ...version])
+    [resolver, padding, weight, candidates.map((item) => item.label).join(), ...version])
   return (
     <div className={styles.gray} data-testid="counter-gray">
       <span className={styles.grayHead}>회색도 · 모든 단계 공통</span>
@@ -388,14 +403,14 @@ type Picks = Record<string, string>
 const BASE_LABEL = '지금'
 
 /** 한 조건의 글자 그림: 회색도 문장 + 막히기 쉬운 글자, 둘 다 검정(사용자 10-01: 검정이 잘 보인다). 글자를 누르면 "이 글자는 이 카드가 낫다"로 고른다. */
-function ConditionPreview({ context, label, floorRatio, horizontalRatio, size, picks, onPick }: { context: PreviewContext; label: string; floorRatio?: number; horizontalRatio?: number; size: number; picks: Picks; onPick: (char: string, label: string) => void }) {
+function ConditionPreview({ context, label, floorRatio, horizontalRatio, horizontalShare, size, picks, onPick }: { context: PreviewContext; label: string; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; size: number; picks: Picks; onPick: (char: string, label: string) => void }) {
   const { resolver, padding, weight, version } = context
   const inks = useMemo(() => ({
-    gray: GRAY_SENTENCE.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio }, undefined)),
-    dense: QUESTION_CHARS.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio }, undefined)),
+    gray: GRAY_SENTENCE.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare }, undefined)),
+    dense: QUESTION_CHARS.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare }, undefined)),
   }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [resolver, padding, weight, floorRatio, horizontalRatio, ...version])
+  [resolver, padding, weight, floorRatio, horizontalRatio, horizontalShare, ...version])
   const glyph = (char: string, ink: Measured | null, index: number, kind: 'plain' | 'solid') => ink && (
     <button key={index} type="button" className={styles.pickGlyph} aria-pressed={picks[char] === label} aria-label={`${char} — ${label}이 낫다`} onClick={() => onPick(char, label)}>
       <InkGlyph ink={ink.ink} size={size} plain={kind === 'plain'} solid={kind === 'solid'} />
@@ -409,38 +424,176 @@ function ConditionPreview({ context, label, floorRatio, horizontalRatio, size, p
   )
 }
 
+/** 월드컵 한 판의 기록. */
+interface CupMatch { left: number; right: number; winner: number; tie: boolean }
+/** 이상형 월드컵: 후보 둘씩 붙여 이긴 쪽이 올라간다. 팝업과 지도 위 카드가 같은 진행을 본다. */
+interface Cup { round: number[]; next: number[]; at: number; log: CupMatch[]; champion: number | null }
+const startCup = (count: number): Cup => advanceCup({ round: Array.from({ length: count }, (_, index) => index), next: [], at: 0, log: [], champion: null })
+/** 짝이 없는 마지막 후보는 그냥 올라가고, 판이 끝나면 다음 판을 연다. */
+function advanceCup(cup: Cup): Cup {
+  let { round, next, at } = cup
+  for (;;) {
+    if (at + 1 < round.length) return { ...cup, round, next, at }
+    if (at < round.length) next = [...next, round[at]]
+    if (next.length <= 1) return { ...cup, round, next, at: round.length, champion: next[0] ?? null }
+    round = next
+    next = []
+    at = 0
+  }
+}
+
+/** 두 그림이 서로 다른 넓이(u²) — 합친 넓이 − 겹친 넓이. */
+function differenceArea(a: Measured | null, b: Measured | null): number {
+  if (!a || !b) return 0
+  const inkA = unionD(a.ink.parts.flatMap((part) => part.ink), FillRule.NonZero)
+  const inkB = unionD(b.ink.parts.flatMap((part) => part.ink), FillRule.NonZero)
+  return areaPathsD(unionD([...inkA, ...inkB], FillRule.NonZero)) - areaPathsD(intersectD(inkA, inkB, FillRule.NonZero))
+}
+/** 월드컵에서 크게 보여 줄 글자 수 — 가장 많이 달라진 것부터. */
+const CUP_TOP = 4
+
+/** 라이트박스 보기: 왼쪽만 · 겹쳐 · 오른쪽만. */
+type LightboxMode = 'left' | 'both' | 'right'
+const LIGHTBOX_LEFT = '#2f6fd6'
+const LIGHTBOX_RIGHT = '#d64545'
+
+/**
+ * 두 후보를 한 자리에 포갠 글자. 겹쳐 볼 때는 같은 곳 = 연한 회색, 왼쪽에만 있는 곳 = 진한 파랑, 오른쪽에만 = 진한 빨강(차이만 진하게).
+ * 한쪽만 볼 때는 검정.
+ */
+function LightboxGlyph({ left, right, mode, size }: { left: Measured | null; right: Measured | null; mode: LightboxMode; size: number }) {
+  const inkOf = (measured: Measured | null): PathsD => measured ? unionD(measured.ink.parts.flatMap((part) => part.ink), FillRule.NonZero) : []
+  const shapes = useMemo(() => {
+    const a = inkOf(left)
+    const b = inkOf(right)
+    return { a, b, common: intersectD(a, b, FillRule.NonZero), onlyA: differenceD(a, b, FillRule.NonZero), onlyB: differenceD(b, a, FillRule.NonZero) }
+  }, [left, right])
+  return (
+    <svg viewBox="0 -880 1000 1000" width={size} height={size} className={styles.glyph}>
+      <g transform="scale(1,-1)">
+        {mode === 'both'
+          ? <><path d={pathOf(shapes.common)} fill="#c9c5bb" /><path d={pathOf(shapes.onlyA)} fill={LIGHTBOX_LEFT} /><path d={pathOf(shapes.onlyB)} fill={LIGHTBOX_RIGHT} /></>
+          : <path d={pathOf(mode === 'left' ? shapes.a : shapes.b)} fill="#111" />}
+      </g>
+    </svg>
+  )
+}
+
+/** 두 후보 견주기(라이트박스): 같은 자리에 포개고 위 장을 껐다 켰다. 위엔 회색도 문장, 아래엔 가장 많이 달라진 글자 넷. */
+function CupPair({ question, context, left, right }: { question: Question; context: PreviewContext; left: number; right: number }) {
+  const { resolver, padding, weight, version } = context
+  const chars = useMemo(() => [...new Set([...GRAY_SENTENCE, ...CHARS, ...QUESTION_CHARS])], [])
+  const inks = useMemo(() => [left, right].map((index) => {
+    const option = question.options[index]
+    return chars.map((char) => measureOf(resolver, char, { padding, weight, floorRatio: option.floorRatio, horizontalRatio: option.horizontalRatio, horizontalShare: option.horizontalShare }, undefined))
+  }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [question, left, right, resolver, padding, weight, ...version])
+  const top = useMemo(() => chars.map((char, index) => ({ char, index, area: differenceArea(inks[0][index], inks[1][index]) }))
+    .filter((item) => item.area > 1).sort((a, b) => b.area - a.area).slice(0, CUP_TOP), [chars, inks])
+  const [mode, setMode] = useState<LightboxMode>('both')
+  // 스페이스를 누르고 있으면 오른쪽, 떼면 왼쪽 — 껐다 켰다.
+  useEffect(() => {
+    const down = (event: KeyboardEvent) => { if (event.code === 'Space') { event.preventDefault(); setMode('right') } }
+    const up = (event: KeyboardEvent) => { if (event.code === 'Space') { event.preventDefault(); setMode('left') } }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up) }
+  }, [])
+  const glyph = (index: number, size: number) => <LightboxGlyph key={index} left={inks[0][index]} right={inks[1][index]} mode={mode} size={size} />
+  return (
+    <>
+      <p className={styles.askLegend}>라이트박스: 두 후보를 같은 자리에 포갭니다. <b>겹쳐</b>에서 회색 = 둘이 같은 곳, <b style={{ color: LIGHTBOX_LEFT }}>파랑</b> = 왼쪽만 굵은 곳, <b style={{ color: LIGHTBOX_RIGHT }}>빨강</b> = 오른쪽만 굵은 곳. <b>스페이스를 누르고 있으면 오른쪽, 떼면 왼쪽</b>(껐다 켰다). 아래 큰 글자 = 가장 많이 달라진 {top.length}자{top.length ? ` (${top.map((item) => item.char).join(' ')})` : ''}.</p>
+      <span className={styles.lightboxModes} role="group" aria-label="라이트박스">
+        {(['left', 'both', 'right'] as const).map((item) => <button key={item} type="button" aria-pressed={mode === item} onClick={() => setMode(item)} data-testid={`counter-lightbox-${item}`}>{item === 'left' ? '왼쪽' : item === 'right' ? '오른쪽' : '겹쳐'}</button>)}
+      </span>
+      <div className={styles.cupSide}>
+        <span className={styles.cupName}>{mode === 'both' ? '겹쳐 — 회색 같음 · 파랑 왼쪽만 · 빨강 오른쪽만' : mode === 'left' ? '왼쪽' : '오른쪽'}</span>
+        <span className={styles.cupRow}>{GRAY_SENTENCE.map((char) => glyph(chars.indexOf(char), 64))}</span>
+        <span className={styles.cupRow}>{top.map(({ index }) => glyph(index, 150))}</span>
+      </div>
+    </>
+  )
+}
+
+/** 월드컵 진행 화면. 이름은 끝날 때까지 가린다. */
+function CupView({ question, context, cup, onCup, onCopy, copied }: { question: Question; context: PreviewContext; cup: Cup; onCup: (cup: Cup) => void; onCopy: (text: string, note: string) => void; copied: string | null }) {
+  const total = question.options.length
+  const recommended = question.options.findIndex((option) => option.recommended)
+  const pick = (winner: number, tie: boolean) => {
+    const [left, right] = [cup.round[cup.at], cup.round[cup.at + 1]]
+    onCup(advanceCup({ ...cup, next: [...cup.next, winner], at: cup.at + 2, log: [...cup.log, { left, right, winner, tie }] }))
+  }
+  const labelOf = (index: number) => question.options[index].label
+  if (cup.champion !== null) {
+    const log = cup.log.map((match) => `${labelOf(match.winner)} > ${labelOf(match.winner === match.left ? match.right : match.left)}${match.tie ? '(비슷)' : ''}`).join(', ')
+    const text = `${question.title.replace(/\?$/, '')}: 월드컵 우승 ${labelOf(cup.champion)} (${log})`
+    return (
+      <div className={styles.cupDone}>
+        <span>우승</span>
+        <strong>{labelOf(cup.champion)}</strong>
+        <small>{question.options[cup.champion].detail}</small>
+        <small>{log}</small>
+        <span className={styles.cupActions}>
+          <button type="button" data-testid="counter-cup-copy" onClick={() => onCopy(text, '월드컵 결과')}>결과 복사</button>
+          <button type="button" onClick={() => onCup(startCup(total))}>다시 하기</button>
+          {copied && <small>복사했어요. 채팅에 붙여 넣어 주세요.</small>}
+        </span>
+      </div>
+    )
+  }
+  const left = cup.round[cup.at]
+  const right = cup.round[cup.at + 1]
+  const tieWinner = left === recommended || right === recommended ? recommended : left
+  const stage = cup.round.length <= 2 ? '결승' : `${cup.round.length}강 ${cup.at / 2 + 1}/${Math.floor(cup.round.length / 2)}`
+  return (
+    <div className={styles.cup} data-testid="counter-cup">
+      <span className={styles.cupStage}>이상형 월드컵 · {stage} — 둘 중 나은 쪽을 고르세요</span>
+      <CupPair question={question} context={context} left={left} right={right} />
+      <span className={styles.cupActions}>
+        <button type="button" data-testid="counter-cup-left" onClick={() => pick(left, false)}>← 왼쪽이 낫다</button>
+        <button type="button" onClick={() => pick(tieWinner, true)}>차이 모르겠다</button>
+        <button type="button" data-testid="counter-cup-right" onClick={() => pick(right, false)}>오른쪽이 낫다 →</button>
+      </span>
+    </div>
+  )
+}
+
 /** 질문 카드. `popup`이면 화면 가운데 덮개로 띄운다. 선택지마다 그 조건의 글자 그림을 붙이고, 글자 하나하나를 고를 수 있다. */
-function QuestionCard({ question, context, picks, onPick, popup = false, onShow, onClose }: { question: Question; context: PreviewContext | null; picks: Picks; onPick: (char: string, label: string) => void; popup?: boolean; onShow: () => void; onClose?: () => void }) {
+function QuestionCard({ question, context, picks, onPick, cup, onCup, popup = false, onShow, onClose }: { question: Question; context: PreviewContext | null; picks: Picks; onPick: (char: string, label: string) => void; cup: Cup; onCup: (cup: Cup) => void; popup?: boolean; onShow: () => void; onClose?: () => void }) {
   const size = popup ? 46 : 38
+  const [showAll, setShowAll] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const copy = (text: string, note: string) => { void navigator.clipboard?.writeText(text).then(() => setCopied(note), () => setCopied(note)) }
   const answer = (label: string) => copy(`${question.title.replace(/\?$/, '')}: ${label}`, label)
   const chars = [...new Set([...GRAY_SENTENCE, ...QUESTION_CHARS])]
   const picked = chars.filter((char) => picks[char])
   const summary = picked.map((char) => `${char} ${picks[char]}`).join(' · ')
-  const hasPreview = context && question.options.some((option) => option.floorRatio !== undefined)
+  const hasPreview = context && question.options.some((option) => option.floorRatio !== undefined || option.horizontalShare !== undefined)
   const card = (
     <div className={popup ? styles.askPopup : styles.ask} role={popup ? 'dialog' : 'region'} aria-modal={popup || undefined} aria-label="AI가 묻는 것" data-testid={popup ? 'counter-question-popup' : 'counter-question'}>
       <span className={styles.askTag}>질문 · 답해 주세요</span>
       <strong>{question.title}</strong>
-      <p>{question.body}</p>
-      {hasPreview && <p className={styles.askLegend}><b>글자마다 고르기:</b> 카드마다 괜찮은 글자가 달라도 된다. 글자마다 가장 나은 카드의 그 글자를 누른다(같은 글자는 한 카드만). 다 고르면 아래 <b>고른 것 복사</b>. <b>회색도</b> = 빽빽한 · 성긴 글자를 섞은 문장(진하기가 고른가), <b>속공간</b> = 막히기 쉬운 글자(흰 틈이 살아 있나).</p>}
-      {hasPreview && <div className={styles.askBase}>
+      {hasPreview && !showAll && context && <CupView question={question} context={context} cup={cup} onCup={onCup} onCopy={copy} copied={copied} />}
+      {hasPreview && <button type="button" className={styles.cupToggle} onClick={() => setShowAll(!showAll)}>{showAll ? '← 둘씩 고르기로' : '후보 전부 한꺼번에 보기'}</button>}
+      {(showAll || !hasPreview) && <p>{question.body}</p>}
+      {showAll && hasPreview && <p className={styles.askLegend}><b>글자마다 고르기:</b> 카드마다 괜찮은 글자가 달라도 된다. 글자마다 가장 나은 카드의 그 글자를 누른다(같은 글자는 한 카드만). 다 고르면 아래 <b>고른 것 복사</b>. <b>회색도</b> = 빽빽한 · 성긴 글자를 섞은 문장(진하기가 고른가), <b>속공간</b> = 막히기 쉬운 글자(흰 틈이 살아 있나).</p>}
+      {showAll && hasPreview && <div className={styles.askBase}>
         <small>{BASE_LABEL} · 보정 없음 (가로 {Math.round((1 - context.padding.left - context.padding.right) * 1000)} · 굵기 {context.weight})</small>
         <ConditionPreview context={context} label={BASE_LABEL} size={size} picks={picks} onPick={onPick} />
       </div>}
-      <div className={styles.askOptions}>
+      {(showAll || !hasPreview) && <div className={styles.askOptions}>
         {question.options.map((option) => (
           <div key={option.label} className={styles.askOption} data-rec={option.recommended || undefined}>
             <b>{option.label}{option.recommended ? ' · 추천' : ''}</b>
-            {context && option.floorRatio !== undefined && <ConditionPreview context={context} label={option.label} floorRatio={option.floorRatio} horizontalRatio={option.horizontalRatio} size={size} picks={picks} onPick={onPick} />}
+            {context && (option.floorRatio !== undefined || option.horizontalShare !== undefined) && <ConditionPreview context={context} label={option.label} floorRatio={option.floorRatio} horizontalRatio={option.horizontalRatio} horizontalShare={option.horizontalShare} size={size} picks={picks} onPick={onPick} />}
             <small>{option.detail}</small>
             <button type="button" onClick={() => answer(option.label)}>이걸로 통째로</button>
           </div>
         ))}
-      </div>
+      </div>}
       <div className={styles.askFoot}>
-        <span>{copied ? `“${copied}” 복사했어요. 채팅에 붙여 넣어 주세요.` : picked.length ? `고른 것 ${picked.length}/${chars.length}: ${summary}` : '글자를 눌러 고르거나, 카드 하나를 통째로 고르세요.'}</span>
+        <span>{!showAll && hasPreview ? '' : copied ? `“${copied}” 복사했어요. 채팅에 붙여 넣어 주세요.` : picked.length ? `고른 것 ${picked.length}/${chars.length}: ${summary}` : '글자를 눌러 고르거나, 카드 하나를 통째로 고르세요.'}</span>
         {picked.length > 0 && <button type="button" data-testid="counter-question-copy" onClick={() => copy(`${question.title.replace(/\?$/, '')} — 글자별: ${summary}`, `글자별 ${picked.length}자`)}>고른 것 복사</button>}
         <button type="button" onClick={() => { onShow(); onClose?.() }}>그림 보며 고르기</button>
         {popup && <button type="button" onClick={onClose}>닫기</button>}
@@ -448,6 +601,39 @@ function QuestionCard({ question, context, picks, onPick, popup = false, onShow,
     </div>
   )
   return popup ? <div className={styles.askBackdrop} onClick={(event) => { if (event.target === event.currentTarget) onClose?.() }}>{card}</div> : card
+}
+
+/** 단계마다 회색도 줄에 더 그릴 후보. */
+function grayCandidatesOf(step: StepId): GrayCandidate[] {
+  if (step === 'floor') return [{ label: 'B′ (결정)', condition: FLOOR_DECIDED }]
+  if (step === 'horizontal') return [{ label: 'B′만', condition: FLOOR_DECIDED }, ...HORIZONTAL_SHARES.map((item) => ({ label: item.label, condition: { ...FLOOR_DECIDED, horizontalShare: item.share } }))]
+  return []
+}
+
+/** ③ 가로줄기 후보별. ② B′를 깐다. 숫자 = 하한선 때문에 덜 굵어진 자소 배율. */
+function HorizontalPanel({ resolver, references, padding, weight, version }: { resolver: GlyphPlacementResolver; references: Map<string, GlyphReference>; padding: Padding; weight: number; version: unknown[] }) {
+  const columns: { label: string; condition: Omit<Condition, 'padding' | 'weight'> }[] = [
+    { label: '지금(보정 없음)', condition: {} },
+    { label: 'B′만', condition: FLOOR_DECIDED },
+    ...HORIZONTAL_SHARES.map((item) => ({ label: item.label, condition: { ...FLOOR_DECIDED, horizontalShare: item.share } })),
+  ]
+  const cells = useMemo(() => CHARS.map((char) => columns.map(({ condition }) => measureOf(resolver, char, { padding, weight, ...condition }, references.get(char)))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [resolver, references, padding, weight, ...version])
+  return (
+    <>
+      <p className={styles.look}><b>볼 것:</b> 가로줄기가 쌓인 를 · 밭 · 뷁의 흰 틈이 살아나는지, 가로줄기만 너무 가늘어 세로 줄무늬처럼 보이지 않는지. 숫자 = 하한선 때문에 더 덜 굵어진 자소 배율(가로줄기를 덜 굵게 하면 이 숫자가 1로 돌아온다).</p>
+      <Legend />
+      <div className={styles.scroll}>
+        <table className={styles.grid}>
+          <thead><tr><th />{columns.map(({ label }) => <th key={label}>{label}</th>)}</tr></thead>
+          <tbody>{CHARS.map((char, row) => <tr key={char}><th>{char}</th>{cells[row].map((cell, column) => <td key={column}>{cell && <><InkGlyph ink={cell.ink} size={100} /><Verdict char={char} verdict={cell.verdict} scales={cell.scales} /></>}</td>)}</tr>)}</tbody>
+        </table>
+      </div>
+      <h3>전수 — 하나라도 · 속공간 막힘 · 검기 (② B′ 깔고)</h3>
+      <Table head={HORIZONTAL_HEAD} rows={HORIZONTAL_ROWS} />
+    </>
+  )
 }
 
 const Pending = ({ text }: { text: string }) => <p className={styles.pendingNote}>{text}</p>
@@ -463,6 +649,7 @@ export function CounterProgressMap() {
   const references = useReferences(resolver, version)
   const step = STEPS.find((item) => item.id === selected)!
   const [picks, setPicks] = useState<Picks>({})
+  const [cup, setCup] = useState<Cup>(() => startCup(QUESTION?.options.length ?? 0))
   // 같은 카드를 다시 누르면 고른 걸 푼다.
   const pick = (char: string, label: string) => setPicks((current) => {
     const next = { ...current }
@@ -492,8 +679,8 @@ export function CounterProgressMap() {
         <strong>속공간 지키기 · 진행 지도</strong>
         <span>굵기를 올려도 빽빽한 자소의 속공간이 남게 한다. 칸을 누르면 그 단계의 확인 그림이 열린다.</span>
       </div>
-      {QUESTION && <QuestionCard question={QUESTION} context={previewContext} picks={picks} onPick={pick} onShow={showQuestionStep} />}
-      {QUESTION && popupOpen && <QuestionCard question={QUESTION} context={previewContext} picks={picks} onPick={pick} popup onShow={showQuestionStep} onClose={closePopup} />}
+      {QUESTION && <QuestionCard question={QUESTION} context={previewContext} picks={picks} onPick={pick} cup={cup} onCup={setCup} onShow={showQuestionStep} />}
+      {QUESTION && popupOpen && <QuestionCard question={QUESTION} context={previewContext} picks={picks} onPick={pick} cup={cup} onCup={setCup} popup onShow={showQuestionStep} onClose={closePopup} />}
       <ol className={styles.steps}>
         {STEPS.map((item, index) => (
           <li key={item.id}>
@@ -510,10 +697,11 @@ export function CounterProgressMap() {
           <p>{step.result}</p>
           {step.decision && <p className={styles.decision}>{step.decision}</p>}
         </div>
-        {resolver && <GraySentence resolver={resolver} padding={padding} weight={weight} floorRatios={selected === 'floor' ? FLOOR_RATIOS : []} version={version} />}
-        {(selected === 'floor' || selected === 'split') && <p className={styles.condition}>그림 조건: 가로 {width} · 굵기 {weight}{storedWeight <= 400 ? ` (지금 굵기 ${storedWeight}는 볼 게 없어 ${FALLBACK_WEIGHT}로 그림)` : ''} — 위 막대로 바꾼다.</p>}
+        {resolver && <GraySentence resolver={resolver} padding={padding} weight={weight} candidates={grayCandidatesOf(selected)} version={version} />}
+        {(selected === 'floor' || selected === 'horizontal' || selected === 'split') && <p className={styles.condition}>그림 조건: 가로 {width} · 굵기 {weight}{storedWeight <= 400 ? ` (지금 굵기 ${storedWeight}는 볼 게 없어 ${FALLBACK_WEIGHT}로 그림)` : ''} — 위 막대로 바꾼다.</p>}
         {selected === 'table' ? <LimitsPanel />
-          : selected === 'horizontal' ? <Pending text="아직 안 함. ② 하한선이 닫히면 가로줄기 배율 하나를 막대로 붙여 그림을 연다." />
+          : selected === 'horizontal' && !resolver ? <p className={styles.condition}>모델 불러오는 중…</p>
+            : selected === 'horizontal' && resolver ? <HorizontalPanel resolver={resolver} references={references} padding={padding} weight={weight} version={version} />
             : selected === 'between' ? <Pending text="아직 안 함. 후보 셋 가운데 하나를 고르기 전에, ①의 그림에서 `사이` 글씨가 붙은 칸을 본다." />
               : !resolver ? <p className={styles.condition}>모델 불러오는 중…</p>
                 : selected === 'measure' ? <MeasurePanel resolver={resolver} references={references} version={version} />

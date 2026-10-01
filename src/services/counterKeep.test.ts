@@ -23,7 +23,7 @@ describe('속공간 지키기 — 자소 굵기 배율', () => {
 
   it('빽빽한 가로줄기는 하한선이 남을 만큼만 굵어진다', () => {
     // 하한선 = max(0.024, 0.25 × 0.07 × 1.95) = 0.034. 한계 k = (0.154 − 0.034) / 0.07 = 1.71.
-    const scale = counterKeepScale(tieut, 1.95)
+    const scale = counterKeepScale(tieut, 1.95, { fixed: 0.024, ratio: 0.25 })
     expect(0.154 - scale * 1.95 * 0.07).toBeCloseTo(0.25 * 0.07 * 1.95, 4)
   })
 
@@ -47,6 +47,17 @@ describe('속공간 지키기 — 자소 굵기 배율', () => {
     expect(counterKeepScale(hieut, 1.95, { fixed: 0.024, ratio: 0.5, horizontalRatio: 0.25 })).toBeCloseTo(counterKeepScale(hieut, 1.95, { fixed: 0.024, ratio: 0.5 }), 6)
   })
 
+  it('가로줄기를 덜 굵게 하면 하한선 때문에 덜 굵어질 몫이 준다', () => {
+    const floor = { fixed: 0.024, ratio: 0.25 }
+    // 가로 몫 0.6: 가로줄기 반 두께가 0.035 × 1.57로만 자라 틈이 넉넉하다.
+    expect(counterKeepScale(tieut, 1.95, floor, 1, 0.6)).toBeGreaterThan(counterKeepScale(tieut, 1.95, floor))
+  })
+
+  it('가로 몫이 낮아도 굵기 400에서 놓아 준 좁은 틈은 그대로 놓아 준다', () => {
+    const narrow = [line('a', [[0.2, 0.5], [0.8, 0.5]]), line('b', [[0.2, 0.6], [0.8, 0.6]])]
+    expect(counterKeepScale(narrow, 1.95, { fixed: 0.024, ratio: 0.25 }, 1, 0.6)).toBe(1)
+  })
+
   it('하한선을 올리면 덜 굵어진다', () => {
     expect(counterKeepScale(tieut, 1.95, { fixed: 0.024, ratio: 0.5 })).toBeLessThan(counterKeepScale(tieut, 1.95, { fixed: 0.024, ratio: 0.25 }))
   })
@@ -54,11 +65,12 @@ describe('속공간 지키기 — 자소 굵기 배율', () => {
   it('굵기 400에서 이미 하한선보다 좁던 틈은 놓아 준다', () => {
     // 틈 0.03(30u) < 하한선 0.034 → 안 지킨다. 남길 몫 방식이면 자소 전체가 얇아졌다(ㅆ).
     const narrow = [line('a', [[0.2, 0.5], [0.8, 0.5]]), line('b', [[0.2, 0.6], [0.8, 0.6]])]
-    expect(counterKeepScale(narrow, 1.95)).toBe(1)
+    expect(counterKeepScale(narrow, 1.95, { fixed: 0.024, ratio: 0.25 })).toBe(1)
   })
 
   it('한 획으로 그린 ㄹ도 가로줄기 사이를 지킨다', () => {
     const rieul = [line('r', [[0.2, 0.1], [0.8, 0.1], [0.8, 0.254], [0.2, 0.254], [0.2, 0.408], [0.8, 0.408]])]
+    expect(counterKeepScale(rieul, 1.95)).toBeLessThan(1)
     expect(counterKeepScale(rieul, 1.95)).toBeCloseTo(counterKeepScale(tieut, 1.95), 4)
   })
 

@@ -26,13 +26,16 @@ export interface CounterFloor {
    */
   horizontalRatio?: number
 }
-/** 기본 하한선: 24u, 두께의 1/4(굵기 900 = 34u). 1단계 측정의 막힘 기준과 같다. 값은 2단계에서 사용자가 고른다. */
-export const DEFAULT_COUNTER_FLOOR: CounterFloor = { fixed: 0.024, ratio: 0.25 }
+/** 기본 하한선(10-01 사용자 결정 B′): 24u, 두께의 0.5(굵기 900 = 68u), 쌓인 가로줄기 틈만 0.25(34u). */
+export const DEFAULT_COUNTER_FLOOR: CounterFloor = { fixed: 0.024, ratio: 0.5, horizontalRatio: 0.25 }
+/** 기본 가로줄기 몫(10-01 사용자 결정, 이상형 월드컵 우승): 굵기 900에서 가로줄기 ×1.5(세로줄기는 ×1.95 그대로). */
+export const DEFAULT_HORIZONTAL_SHARE = 0.526
 /** 굵기 400에서 이보다 좁은 틈(두께 대비)은 원래 붙여 그린 것으로 보고 안 지킨다 — 측정의 `닿음` 기준과 같다. */
 const MIN_GAP_RATIO = 0.25
 
 /** `start` · `end`: 획 처음부터 잰 길이(토막 시작 · 끝). `total` · `closed`: 그 획 전체 길이와 닫힘. */
-interface Segment { ax: number; ay: number; bx: number; by: number; half: number; stroke: number; start: number; end: number; total: number; closed: boolean }
+/** `half`: 굵기 400 반 두께. `grown`: 목표 굵기에서의 반 두께(가로줄기 몫까지 든다, 자소 배율 전). */
+interface Segment { ax: number; ay: number; bx: number; by: number; half: number; grown: number; stroke: number; start: number; end: number; total: number; closed: boolean }
 export interface CounterKeepStroke { stroke: StrokeDataV2; box: BoxConfig }
 
 /** 세로에 가까울수록 `stemScale`만큼 얇다(일자 stroker의 방향별 두께와 같은 sin² 섞기). */
@@ -42,10 +45,35 @@ function halfWidthOf(thickness: number, dx: number, dy: number, stemScale: numbe
   return thickness / 2 * (1 + (stemScale - 1) * sin2)
 }
 
-function segmentsOf(strokes: readonly CounterKeepStroke[], stemScale: number): Segment[] {
+/** 획이 얼마나 세로로 섰나(0 = 가로줄기, 1 = 세로줄기). 토막 길이로 가중한 sin² 평균. ㅇ 같은 곡선은 0.5 언저리. */
+export function strokeVerticalness(stroke: StrokeDataV2, box: BoxConfig): number {
+  const points = flattenStrokeCenterline(stroke, box)
+  let total = 0
+  let vertical = 0
+  for (let at = 1; at < points.length; at += 1) {
+    const dx = points[at].x - points[at - 1].x
+    const dy = points[at].y - points[at - 1].y
+    const length = Math.hypot(dx, dy)
+    total += length
+    if (length > 0) vertical += length * (dy / length) ** 2
+  }
+  return total > 0 ? vertical / total : 0
+}
+
+/**
+ * 굵기 k에서 획 하나의 두께 배율(400 대비). 세로로 선 획은 k, 누운 획은 1 + (k − 1) × 가로 몫, 사이는 서 있는 만큼 섞는다.
+ * 획 단위라 붓 모양(둥근 붓 · 네모붓)과 상관없이 먹는다.
+ */
+export function strokeGrowthOf(verticalness: number, k: number, horizontalShare: number): number {
+  const horizontal = 1 + (k - 1) * horizontalShare
+  return horizontal + (k - horizontal) * verticalness
+}
+
+function segmentsOf(strokes: readonly CounterKeepStroke[], stemScale: number, k = 1, horizontalShare = 1): Segment[] {
   const out: Segment[] = []
   strokes.forEach(({ stroke, box }, strokeIndex) => {
     const points = flattenStrokeCenterline(stroke, box)
+    const growth = strokeGrowthOf(horizontalShare === 1 ? 1 : strokeVerticalness(stroke, box), k, horizontalShare)
     const own: Segment[] = []
     let walked = 0
     for (let at = 1; at < points.length; at += 1) {
@@ -53,7 +81,7 @@ function segmentsOf(strokes: readonly CounterKeepStroke[], stemScale: number): S
       const b = points[at]
       const length = Math.hypot(b.x - a.x, b.y - a.y)
       if (length === 0) continue
-      own.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, half: halfWidthOf(stroke.thickness, b.x - a.x, b.y - a.y, stemScale), stroke: strokeIndex, start: walked, end: walked + length, total: 0, closed: Boolean(stroke.closed) })
+      own.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, half: halfWidthOf(stroke.thickness, b.x - a.x, b.y - a.y, stemScale), grown: halfWidthOf(stroke.thickness, b.x - a.x, b.y - a.y, stemScale) * growth, stroke: strokeIndex, start: walked, end: walked + length, total: 0, closed: Boolean(stroke.closed) })
       walked += length
     }
     for (const segment of own) out.push({ ...segment, total: walked })
@@ -143,7 +171,9 @@ function stackedHorizontal(p: Segment, q: Segment, minOverlap: number): boolean 
 }
 
 /**
- * 자소 하나의 굵기 배율 보정. 획 두께에 `weightMultiplier × 이 값`을 곱하면 지킬 틈마다 하한선이 남는다.
+ * 자소 하나의 굵기 배율 보정. 목표 굵기의 두께(가로줄기 몫까지 얹은 것)에 이 값을 곱하면 지킬 틈마다 하한선이 남는다.
+ * 틈은 늘 굵기 400 모양(`strokes` · `stemScale` 그대로)에서 고른다 — 가로줄기를 덜 굵게 한 두께로 고르면 원래 좁던 틈이 넓어 보여 다시 지켜진다(ㅎ이 ×0.58로 얇아졌다).
+ * `horizontalShare`: 400 대비 늘어난 두께 가운데 가로줄기가 받는 몫(3단계, 1 = 세로줄기와 같다).
  * `weightMultiplier ≤ 1`이거나 지킬 틈이 없으면 1.
  */
 export function counterKeepScale(
@@ -151,9 +181,10 @@ export function counterKeepScale(
   weightMultiplier: number,
   floor: CounterFloor = DEFAULT_COUNTER_FLOOR,
   stemScale = 1,
+  horizontalShare = 1,
 ): number {
   if (!(weightMultiplier > 1) || strokes.length === 0) return 1
-  const segments = segmentsOf(strokes, stemScale)
+  const segments = segmentsOf(strokes, stemScale, weightMultiplier, horizontalShare)
   const thickness = strokes.map((item) => item.stroke.thickness).sort((a, b) => a - b)[Math.floor(strokes.length / 2)]
   const minGap = thickness * MIN_GAP_RATIO
   const requiredOf = (p: Segment, q: Segment) => counterFloorAt(floor, thickness, weightMultiplier, floor.horizontalRatio !== undefined && stackedHorizontal(p, q, thickness * 2))
@@ -169,7 +200,7 @@ export function counterKeepScale(
     if ((joints.get(key)?.distance ?? Infinity) <= pair.distance) continue
     joints.set(key, { x: (pair.pointP.x + pair.pointQ.x) / 2, y: (pair.pointP.y + pair.pointQ.y) / 2, distance: pair.distance })
   }
-  let limit = weightMultiplier
+  let scale = 1
   for (const { p, q, distance, atP, atQ, pointP, pointQ } of pairs) {
     const halves = p.half + q.half
     const gap = distance - halves
@@ -184,10 +215,11 @@ export function counterKeepScale(
     // 이어진 두 획이 이음 자리에서 벌어지는 쐐기(ㅅ 두 다리)도 같다 — 틈이 0부터 연속이라, 지키면 하한선이 몇이든 자소 전체가 굵기 400에 묶인다.
     const joint = p.stroke === q.stroke ? undefined : joints.get(`${p.stroke}:${q.stroke}`)
     if (joint && !facing(p, q) && distance >= 0.5 * (Math.hypot(pointP.x - joint.x, pointP.y - joint.y) + Math.hypot(pointQ.x - joint.x, pointQ.y - joint.y))) continue
-    // 굵기 k에서 틈 = 거리 − k × 반 두께 합. 이게 하한선 아래로 안 가게.
-    limit = Math.min(limit, (distance - required) / halves)
+    // 자소 배율 c에서 틈 = 거리 − c × 목표 반 두께 합. 이게 하한선 아래로 안 가게. 굵기 400보다 얇게는 안 한다.
+    const grown = p.grown + q.grown
+    scale = Math.min(scale, Math.max((distance - required) / grown, halves / grown))
   }
-  return Math.min(1, Math.max(1, limit) / weightMultiplier)
+  return scale
 }
 
 /** 획 묶음의 두께를 배율대로 바꾼 사본. 배율이 1이면 받은 획 그대로. */

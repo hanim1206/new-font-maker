@@ -83,6 +83,26 @@ b[data-kind='touch'] { color: #7f8c8d; }
 .steps button[data-asking] { border-color: #e0a800; box-shadow: inset 0 0 0 2px #e0a800; }
 @keyframes askPulse { 50% { box-shadow: 0 0 0 6px rgb(224 168 0 / .25); } }
 
+/* 이상형 월드컵. 두 후보만, 이름은 끝날 때까지 가린다. */
+.cup { display: grid; gap: 10px; }
+.cupStage { justify-self: start; padding: 4px 10px; border-radius: 8px; background: #3d2f00; color: #fff8d6; font-size: 13px; font-weight: 800; }
+.cupSide { display: grid; gap: 6px; align-content: start; padding: 10px; border: 1px solid #e8cf7a; border-radius: 10px; background: #fff; overflow-x: auto; }
+.cupName { color: #6b5a1e; font-size: 12px; font-weight: 800; }
+.cupRow { display: flex; flex-wrap: wrap; }
+.cupRow .glyph { border-radius: 0; }
+.cupActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
+.cupActions button { min-height: 40px; padding: 0 18px; border: 2px solid #e0a800; border-radius: 9px; background: #fff; color: #3d2f00; font-size: 14px; font-weight: 800; cursor: pointer; }
+.cupActions button:hover { background: #fff3c4; }
+.cupDone { display: grid; gap: 6px; justify-items: center; padding: 16px; border-radius: 10px; background: #fff; text-align: center; }
+.cupDone > span:first-child { color: #6b5a1e; font-size: 12px; font-weight: 800; }
+.cupDone strong { font-size: 22px; }
+.cupDone small { color: #6b5a1e; font-size: 12px; }
+.lightboxModes { display: inline-flex; justify-self: start; border: 1px solid #c99a00; border-radius: 8px; overflow: hidden; }
+.lightboxModes button { min-height: 34px; padding: 0 16px; border: 0; background: #fff; color: #3d2f00; font-size: 13px; font-weight: 700; cursor: pointer; }
+.lightboxModes button + button { border-left: 1px solid #c99a00; }
+.lightboxModes button[aria-pressed='true'] { background: #3d2f00; color: #fff8d6; }
+.cupToggle { justify-self: start; padding: 0; border: 0; background: none; color: #6b5a1e; font-size: 12px; text-decoration: underline; cursor: pointer; }
+
 /* 공통 회색도 문장 줄. */
 .gray { display: grid; gap: 4px; padding: 10px; border-radius: 8px; background: #fff; }
 .grayHead { color: rgb(var(--color-text-3)); font-size: 11px; font-weight: 700; }
