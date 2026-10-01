@@ -15,7 +15,8 @@ import type {
 } from '../types'
 import { useJamoStore } from '../stores/jamoStore'
 import { useLayoutStore } from '../stores/layoutStore'
-import { useGlobalStyleStore, weightToMultiplier } from '../stores/globalStyleStore'
+import { effectiveStyleOf, useGlobalStyleStore, weightToMultiplier } from '../stores/globalStyleStore'
+import { withBodyCompensation } from './bodyCompensation'
 import { groupBeakResolverOf, useJamoGroupStore, type GroupBeakResolver } from '../stores/jamoGroupStore'
 import { stemBeakGroupOf, type StemBeakStyle } from './stemBeak'
 import type { GlobalStyle } from '../stores/globalStyleStore'
@@ -123,8 +124,14 @@ export function collectGlyphDataForChar(char: string): GlyphData | null {
   return collectGlyphDataWithPlacement(char)
 }
 
+/**
+ * 저장된 값 대신 잠깐 그려 볼 조건. 스토어는 안 건드린다 — 실험실이 가로 × 굵기 여러 칸을 한 화면에 그릴 때 쓴다.
+ * `padding`은 폰트 전체 패딩(레이아웃별 덮어쓰기는 그대로 얹힌다).
+ */
+export interface GlyphDataCondition { padding?: Padding; weight?: number }
+
 /** `collectGlyphDataForChar`에 상자 출처만 바꿔 끼운 것. 나머지 해석(패딩·스타일·원점·폭)은 같다. */
-export function collectGlyphDataWithPlacement(char: string, placementOf?: GlyphPlacementResolver): GlyphData | null {
+export function collectGlyphDataWithPlacement(char: string, placementOf?: GlyphPlacementResolver, condition?: GlyphDataCondition): GlyphData | null {
   const code = char.charCodeAt(0)
 
   // 범위 체크
@@ -148,16 +155,17 @@ export function collectGlyphDataWithPlacement(char: string, placementOf?: GlyphP
 
   const layoutType = syllable.layoutType
 
-  // 실효 글로벌 스타일 (레이아웃별 제외 적용)
-  const effectiveStyle: GlobalStyle = styleState.getEffectiveStyle(layoutType)
-
   // 실효 패딩을 포함한 스키마를 공통 resolver에 전달한다.
   const schema = layoutState.layoutSchemas[layoutType]
   const effectivePadding = computeEffectivePadding(
-    layoutState.globalPadding,
+    condition?.padding ?? layoutState.globalPadding,
     layoutState.paddingOverrides,
     layoutType
   )
+  // 실효 글로벌 스타일 (레이아웃별 제외 적용). 조건이 있으면 그 굵기 · 패딩으로 같은 해석을 다시 한다.
+  const effectiveStyle: GlobalStyle = condition
+    ? withBodyCompensation(effectiveStyleOf({ ...styleState.style, weight: condition.weight ?? styleState.style.weight }, styleState.exclusions, layoutType), effectivePadding)
+    : styleState.getEffectiveStyle(layoutType)
   const schemaWithPadding = { ...schema, padding: effectivePadding, designBodyPadding: effectivePadding }
   const weightMultiplier = weightToMultiplier(effectiveStyle.weight)
   // Design Body/advance와 Ink Bounds를 분리한다. 편집한 돌출 획을 Body에

@@ -1,0 +1,59 @@
+.map { width: min(1100px, 100%); margin: 0 auto 12px; padding: 14px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); }
+.mapHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 10px; font-size: 13px; }
+.mapHead strong { font-size: 15px; }
+.mapHead span { color: rgb(var(--color-text-3)); }
+
+/* 단계 지도. 칸 사이 화살표가 순서다. */
+.steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin: 0 0 12px; padding: 0; list-style: none; }
+.steps li { position: relative; display: flex; }
+.steps li + li::before { content: '→'; position: absolute; top: 50%; left: -15px; transform: translateY(-50%); color: rgb(var(--color-text-3)); font-size: 13px; }
+.steps button { display: grid; flex: 1; align-content: start; gap: 6px; padding: 10px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); text-align: left; }
+.steps button[aria-pressed='true'] { border-color: rgb(var(--color-foreground)); box-shadow: inset 0 0 0 1px rgb(var(--color-foreground)); }
+.stepTop { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.stepTop em { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; background: rgb(var(--color-border)); font-size: 12px; font-style: normal; font-weight: 800; }
+.stepTop strong { font-size: 14px; }
+.stepTop small { padding: 1px 7px; border-radius: 99px; background: rgb(var(--color-border)); color: rgb(var(--color-text-2)); font-size: 11px; }
+.steps button[data-state='done'] em { background: #2f9a6a; color: #fff; }
+.steps button[data-state='done'] small { background: #e3f3ea; color: #1f6e4a; }
+.steps button[data-state='now'] em { background: rgb(var(--color-primary)); color: #fff; }
+.steps button[data-state='now'] small { background: rgb(var(--color-primary)); color: #fff; font-weight: 700; }
+.steps button[data-state='partial'] small { background: #fff3d6; color: #8a5a00; }
+.question { color: rgb(var(--color-text-2)); font-size: 12px; line-height: 1.45; }
+
+.panel { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid rgb(var(--color-border)); }
+.panel h3 { margin: 6px 0 0; font-size: 13px; }
+.summary { display: grid; gap: 4px; font-size: 13px; line-height: 1.55; }
+.summary p { margin: 0; }
+.decision { color: rgb(var(--color-text-2)); }
+.decision::before { content: '결정 · '; font-weight: 700; }
+.condition, .look { margin: 0; color: rgb(var(--color-text-2)); font-size: 12px; }
+.legend { margin: 0; color: rgb(var(--color-text-3)); font-size: 12px; line-height: 1.5; }
+
+.scroll { overflow-x: auto; }
+.grid { border-collapse: separate; border-spacing: 4px; }
+.grid th { padding: 2px 4px; color: rgb(var(--color-text-2)); font-size: 11px; font-weight: 600; line-height: 1.3; white-space: nowrap; }
+.grid tbody th { font-size: 18px; color: rgb(var(--color-foreground)); }
+.grid td { vertical-align: top; }
+.grid [data-rec] { background: #fff8d6; }
+.grid th[data-rec] { color: #8a5a00; }
+.glyph { display: block; border-radius: 6px; background: #fff; }
+.pending { width: 120px; height: 120px; border: 1px dashed rgb(var(--color-border)); border-radius: 6px; color: rgb(var(--color-text-3)); font-size: 12px; text-align: center; vertical-align: middle !important; }
+.verdict { display: grid; gap: 1px; max-width: 110px; min-height: 2.4em; padding-top: 2px; font-size: 11px; line-height: 1.3; }
+.verdict span { color: rgb(var(--color-text-3)); font-variant-numeric: tabular-nums; }
+b[data-kind='closed'] { color: #c0392b; }
+b[data-kind='split'] { color: #d35400; }
+b[data-kind='touch'] { color: #7f8c8d; }
+
+.table { width: auto; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.table th, .table td { padding: 4px 8px; border-bottom: 1px solid rgb(var(--color-border)); text-align: right; white-space: nowrap; }
+.table th:first-child { text-align: left; }
+.table thead th { color: rgb(var(--color-text-3)); font-weight: 600; }
+
+.open { margin-top: 10px; font-size: 12px; }
+.open summary { color: rgb(var(--color-text-2)); cursor: pointer; }
+.open ul { margin: 6px 0 0; padding-left: 18px; color: rgb(var(--color-text-2)); line-height: 1.6; }
+
+@media (max-width: 900px) {
+  .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .steps li:nth-child(3)::before { display: none; }
+}

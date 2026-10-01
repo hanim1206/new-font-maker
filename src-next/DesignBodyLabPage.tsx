@@ -8,6 +8,7 @@ import { useJamoStore } from '../src/stores/jamoStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import type { ResolvedStrokeInkSource } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
+import { CounterProgressMap } from './CounterProgressMap'
 import { GlyphLayoutEditor } from './GlyphLayoutEditor'
 import { useContextPlacement } from './notoModel'
 import { PART_COLOR } from './partColors'
@@ -137,6 +138,9 @@ export function DesignBodyLabPage() {
           <input value={sentence} onChange={(event) => setSentence(event.target.value)} />
         </label>
       </section>
+
+      {/* 속공간 지키기 진행 지도. 가로 · 굵기는 위 막대를 그대로 쓴다. */}
+      <CounterProgressMap />
 
       {/* 보정 세기별 문장. 기본 가로 · 넓힌 가로에서는 네 줄이 같다. 문장은 뽑은 폰트와 같은 글자 폭으로 놓는다. */}
       <section className={styles.compare} aria-label="보정 세기별 문장" data-testid="body-lab-sentence">
