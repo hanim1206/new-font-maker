@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
 import styles from './CalibrationSentenceEditor.module.css'
 import mode from './GlobalStyleMode.module.css'
+import { DEV_TOOLS_ENABLED } from './devTools'
 import { StylePicto, type StylePictoKind } from './StylePicto'
 
 export type GlobalStylePanel = 'body' | 'brush' | 'beak'
@@ -13,10 +14,11 @@ const TABS: { id: GlobalStylePanel; label: string; short: string; picto: StylePi
   { id: 'beak', label: '부리', short: '부리', picto: 'beak' },
 ]
 /**
- * 스타일 화면에서 잠근 탭. 지금은 없다 — 네모꼴은 09-28에 잠갔다가 편집 화면이 네모꼴을 따르게 된 뒤 풀었다(플랜 `2026-10-01_네모꼴-열기`).
- * 다시 잠글 탭이 생기면 여기에 넣는다(`개발 중이에요` 표시 · 누를 수 없음).
+ * 스타일 화면에서 잠근 탭(`개발 중이에요` 표시 · 누를 수 없음). 네모꼴은 편집 화면이 네모꼴을 따르게 된 뒤(`2026-10-01_네모꼴-열기`) 풀었지만,
+ * 속공간 지키기까지 끝나기 전에는 배포 빌드에서 사용자에게 열지 않는다(10-01 다시 잠금). 개발 서버 · e2e는 열려 있다.
+ * 풀 때는 이 줄을 `[]`로 되돌린다.
  */
-const LOCKED: readonly GlobalStylePanel[] = []
+const LOCKED: readonly GlobalStylePanel[] = DEV_TOOLS_ENABLED ? [] : ['body']
 
 export function GlobalStyleTrackpad({
   panel,
