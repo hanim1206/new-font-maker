@@ -75,6 +75,11 @@ section.panel > div::-webkit-scrollbar { display: none; }
 /* 네모꼴 막대: 양 끝에 길쭉한 틀 · 납작한 틀 그림 */
 .shapeRow { display: flex; align-items: center; gap: 10px; }
 .shapeRow input { flex: 1 1 auto; min-width: 0; }
+.bodyNote { color: rgb(var(--color-text-dim-4)); font-size: 11px; }
+.autoRow { display: flex; align-items: center; gap: 8px; min-height: 32px; color: rgb(var(--color-text-3)); font-size: 12px; }
+.autoRow input { width: 16px; height: 16px; flex: 0 0 auto; accent-color: rgb(var(--color-foreground)); }
+.autoRow span { color: rgb(var(--color-foreground)); font-weight: 700; }
+.autoRow output { margin-left: auto; font-variant-numeric: tabular-nums; }
 .shapeIcon { flex: 0 0 auto; display: block; box-sizing: border-box; border: 1.5px solid rgb(var(--color-text-4)); border-radius: 2px; }
 
 /* ===== 폰트 탭(스타일 화면): 문장 → 조절 → 아래 탭. `fill`(셸 안)에서만 먹는다, 옛 단독 화면은 그대로 ===== */

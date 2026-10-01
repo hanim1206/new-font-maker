@@ -24,6 +24,8 @@ export interface FontGlobalStyle {
   strokeStyle: StrokeRenderStyle
   /** 세로줄기 부리. 나중에 생긴 값이라 옛 저장분에는 없다. */
   stemBeak?: { enabled: boolean; shape: 'angled' | 'slab' | 'round' | 'bar' | 'flare'; size: number; angle: number }
+  /** 네모꼴 자동 굵기 보정. 껐을 때만 `false`가 온다 — 없으면 켜짐. */
+  autoCompensation?: boolean
 }
 
 export interface FontGlobalStyleExclusion {

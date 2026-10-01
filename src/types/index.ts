@@ -388,6 +388,11 @@ export interface BrushStrokeRenderStyle {
   innerRoundness?: number
   /** 가로·세로 두께 대비. −1 ~ 1, + 는 세로 굵게 · 가로 얇게. 없거나 0이면 한 굵기. 둥근 붓촉에서만 뜻이 있다. */
   contrast?: number
+  /**
+   * 세로줄기 굵기 배율. 네모꼴 자동 보정(`bodyCompensation.ts`)이 실효 스타일에만 얹는 값이라 **저장하지 않는다**(정규화가 걷어 낸다).
+   * 없거나 1이면 보정 없음. 가로줄기는 그대로, 사선 · 곡선은 방향에 따라 그 사이다.
+   */
+  stemScale?: number
 }
 
 export interface AngledAreaStrokeRenderStyle {

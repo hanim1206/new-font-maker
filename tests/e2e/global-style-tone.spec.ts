@@ -27,9 +27,9 @@ test('폰트 탭이 글로벌 스타일 공간이다 — 늘 열려 있고 닫�
   await expect(page.getByTestId('focus-canvas')).toHaveCount(0)
   await expect(panel.getByRole('button', { name: '글로벌 스타일 설정 닫기' })).toHaveCount(0)
   const tabs = panel.getByRole('tablist', { name: '글로벌 스타일 항목' }).getByRole('tab')
-  await expect(tabs).toHaveText(['네모꼴개발 중이에요', '획', '부리'])
-  // 네모꼴은 잠겨 있다(레이아웃 캔버스가 아직 네모꼴을 모른다). 첫 화면은 `획`.
-  await expect(tabs.first()).toBeDisabled()
+  await expect(tabs).toHaveText(['네모꼴', '획', '부리'])
+  // 네모꼴 탭은 열려 있다(10-01). 첫 화면은 굵기가 있는 `획` 그대로.
+  await expect(tabs.first()).toBeEnabled()
   await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true')
 
   // 하단에 붙은 작은 패널이 아니라 화면 바닥까지 남은 높이를 다 쓴다(하단 탭은 없다).
@@ -136,34 +136,41 @@ test('폰트 탭은 캔버스 없이 문장 줄이 한 줄 그대로 크게 자�
   await expect.poll(async () => (await glyph.boundingBox())?.height ?? 0).toBeLessThan(30)
 })
 
-// 네모꼴 탭은 잠겨 있다(09-28). 레이아웃 캔버스 · 카드 · 보선이 네모꼴을 따르게 되면 푼다.
-test.fixme('글자 네모꼴은 막대 하나다: 길쭉 ↔ 노토 비율 ↔ 납작, 0점 근처에서 걸린다', async ({ page }) => {
+// 네모꼴은 가로만 바꾼다(세로 고정). 범위는 기본 가로의 86 ~ 106%, 기본 근처에서 걸린다. 좁히면 자동 보정이 세로줄기를 얇게 한다.
+test('글자 네모꼴은 막대 하나다: 좁게 ↔ 기본 ↔ 넓게, 좁히면 자동 보정이 얼마나 얇게 했는지 뜬다', async ({ page }) => {
   await page.goto(`/workspace/font?char=${encodeURIComponent('한')}`)
+  await page.getByRole('tablist', { name: '글로벌 스타일 항목' }).getByRole('tab', { name: '네모꼴' }).click()
   const panel = page.getByRole('tabpanel', { name: '글자 네모꼴 설정' })
   await expect(panel.locator('input[type="range"]')).toHaveCount(1)
   const shape = panel.getByTestId('style-body-shape')
   const size = panel.getByTestId('style-body-size')
-  await expect(size).toHaveText('840 × 910')
+  const amount = panel.getByTestId('style-body-auto-amount')
+  await expect(size).toHaveText('100%')
+  await expect(amount).toHaveText('좁힐 때만 얇게 해요')
 
-  // 길쭉: 세로는 그대로, 가로만 준다. 문장 글자도 같이 좁아진다.
+  // 좁게: 세로는 그대로, 가로만 준다. 문장 글자도 같이 좁아지고 세로줄기가 얇아진다.
   const glyph = page.getByRole('region', { name: '보정 문장' }).getByRole('button', { name: /^한 편집/ }).locator('svg')
   // 문장이 다 자란 뒤의 폭을 기준으로 잰다.
   await expect.poll(async () => (await glyph.boundingBox())?.height ?? 0).toBeGreaterThan(100)
   const before = (await glyph.boundingBox())?.width ?? 0
-  await shape.fill('-100')
-  await expect(size).toHaveText('500 × 910')
-  await expect.poll(async () => (await glyph.boundingBox())?.width ?? 0).toBeLessThan(before * 0.7)
+  await shape.fill('86')
+  await expect(size).toHaveText('86%')
+  await expect.poll(async () => (await glyph.boundingBox())?.width ?? 0).toBeLessThan(before * 0.9)
+  await expect(amount).toHaveText('세로줄기 −7%')
+  // 끄면 보정이 빠진다.
+  await panel.getByTestId('style-body-auto').uncheck()
+  await expect(amount).toHaveText('꺼 두었어요')
+  await panel.getByTestId('style-body-auto').check()
 
-  // 납작: 가로가 글자 칸 끝(1000)에 닿은 뒤에는 세로가 준다.
-  await shape.fill('28')
-  await expect(size).toHaveText('1000 × 910')
-  await shape.fill('100')
-  await expect(size).toHaveText('1000 × 500')
+  // 넓게: 106%가 끝이다.
+  await shape.fill('106')
+  await expect(size).toHaveText('106%')
+  await expect(amount).toHaveText('좁힐 때만 얇게 해요')
 
-  // 0점(노토 비율) 근처는 0점으로 걸린다.
-  await shape.fill('3')
-  await expect(size).toHaveText('840 × 910')
-  await expect(shape).toHaveValue('0')
+  // 기본(100%) 근처는 기본으로 걸린다.
+  await shape.fill('101')
+  await expect(size).toHaveText('100%')
+  await expect(shape).toHaveValue('100')
 })
 
 test('기울어진 글자: 잉크 · 핸들만 기울고 눈금은 곧으며, 점을 세로로 끌어도 손가락 아래에 있다', async ({ page }) => {

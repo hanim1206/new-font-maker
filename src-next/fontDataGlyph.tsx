@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
+import { withBodyCompensation } from '../src/services/bodyCompensation'
 import { effectiveStyleOf } from '../src/stores/globalStyleStore'
 import { groupBeakResolverOf } from '../src/stores/jamoGroupStore'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
@@ -15,8 +16,11 @@ const NO_GROUPS = groupBeakResolverOf([])
 export function FontDataGlyph({ font, char, size, className, model, underlay, children }: { font: PreviewFont; char: string; size: number; className?: string; model?: ModelSource; underlay?: ReactNode; children?: ReactNode }) {
   const { choseong, jungseong, jongseong } = font.jamo
   const syllable = useMemo(() => decomposeSyllable(char, choseong, jungseong, jongseong), [char, choseong, jungseong, jongseong])
-  const globalStyle = useMemo(() => effectiveStyleOf(font.style, font.exclusions, syllable.layoutType), [font.style, font.exclusions, syllable.layoutType])
   const padding = { ...font.globalPadding, ...font.paddingOverrides[syllable.layoutType] }
+  // 네모꼴 자동 보정은 그 폰트의 네모꼴에서 나온다(`getEffectiveStyle`과 같은 길).
+  const paddingKey = `${padding.left}|${padding.right}|${padding.top}|${padding.bottom}`
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 여백은 네 값이 같으면 같다.
+  const globalStyle = useMemo(() => withBodyCompensation(effectiveStyleOf(font.style, font.exclusions, syllable.layoutType), padding), [font.style, font.exclusions, syllable.layoutType, paddingKey])
   const schema = { ...font.layoutSchemas[syllable.layoutType], padding, designBodyPadding: padding }
   const { placement } = useContextPlacement(syllable, schema, globalStyle, font.delta, model ?? font.preset)
 

@@ -444,6 +444,7 @@ export function strokeToFlatInkGroups(
   roundness = 0,
   innerRoundness?: number,
   contrast = 0,
+  stemScale = 1,
 ): BrushInkGroup[] {
   const { points, anchorIndices, curvedSegments } = flattenStrokeCenterlineWithAnchors(stroke, box)
   const thickness = Math.max(stroke.thickness * weightMultiplier, 0.001)
@@ -452,7 +453,7 @@ export function strokeToFlatInkGroups(
     // 안쪽은 반폭을 넘어서도 굴린다(최대 3배). 이웃 변 길이 한도(45%)에 걸려 자연히 멈춘다.
     ? { radius: Math.min(1, Math.max(0, roundness)) * thickness / 2, innerRadius: Math.min(INNER_ROUNDNESS_MAX, Math.max(0, inner)) * thickness / 2, anchors: anchorIndices }
     : undefined
-  const groups = polylineToFlatInkGroups(points, stroke.closed, thickness, cap, join, roundVertices, rounding, contrast !== 0 ? contrastWidthOf(contrast) : undefined, curvedSegments)
+  const groups = polylineToFlatInkGroups(points, stroke.closed, thickness, cap, join, roundVertices, rounding, directionalWidthOf(contrast, stemScale, stemScale !== 1 ? gentleCurveDirection(points, stroke.closed, curvedSegments) : null), curvedSegments)
   // 곡선이 반폭보다 급하게 꺾여 윤곽이 스스로 겹치면 쐐기가 뚫리고 최종 잉크가 그 획을 거부한다. 그때만 Clipper2 오프셋으로 다시 만든다.
   if (!flatGroupsOverlap(groups)) return groups
   const inflated = inflateFlatCenterline(points, stroke.closed, thickness, cap, join, rounding !== undefined)
@@ -466,6 +467,44 @@ const CONTRAST_HORIZONTAL_LOSS = 0.45
 const CONTRAST_REVERSE = 0.5
 /** 곡선(ㅇ · ㅎ의 ㅇ · ㅅ의 삐침)은 대비를 이만큼만 받는다. 직선처럼 다 받으면 ㅇ이 붓글씨처럼 뒤틀린다(09-25 사용자). */
 const CONTRAST_ON_CURVES = 0.5
+
+/**
+ * 세로줄기 배율의 토막별 배율. 세로 토막은 `stemScale`, 가로 토막은 1, 사선 · 곡선은 sin²θ로 그 사이를 잇는다(각진 곳 없이 매끈하다).
+ * 대비와 달리 곡선에서도 덜지 않는다 — ㅇ의 옆구리도 기둥만큼 얇아져야 좁은 칸에서 속이 안 막힌다.
+ * `gentleCurve`(완만한 열린 곡선의 양 끝을 잇는 방향)를 주면 곡선 토막은 그 방향 하나로 본다 — ㅅ의 삐침 · 내림이 위는 얇고 발끝은 굵게 갈라지지 않고 고르게 얇아진다.
+ */
+export function stemScaleWidthOf(stemScale: number, gentleCurve?: BrushPoint | null): FlatWidthOf {
+  const factorOf = (direction: BrushPoint) => {
+    const length = Math.hypot(direction.x, direction.y)
+    if (length <= EPSILON) return 1
+    return 1 + (direction.y / length) ** 2 * (stemScale - 1)
+  }
+  const curveFactor = gentleCurve ? factorOf(gentleCurve) : null
+  return (direction, curved) => curved && curveFactor !== null ? curveFactor : factorOf(direction)
+}
+
+/** 처음 토막과 마지막 토막의 방향 차가 이보다 작으면 완만한 곡선이다(cos 50°). ㅅ의 삐침은 40° 안팎, 굽은 획(ㄱ을 굴린 것)은 90°라 빠진다. */
+const GENTLE_CURVE_MIN_COS = Math.cos(50 * Math.PI / 180)
+
+/**
+ * 완만한 열린 곡선이면 양 끝을 잇는 방향, 아니면 null. 닫힌 획(ㅇ)과 크게 굽은 획은 토막마다 제 방향으로 봐야 해서 빠진다.
+ */
+function gentleCurveDirection(points: readonly BrushPoint[], closed: boolean, curvedSegments?: ReadonlySet<number>): BrushPoint | null {
+  if (closed || points.length < 3 || !curvedSegments || curvedSegments.size === 0) return null
+  const first = unit(points[0], points[1])
+  const last = unit(points[points.length - 2], points[points.length - 1])
+  const chord = unit(points[0], points[points.length - 1])
+  if (!first || !last || !chord) return null
+  return first.x * last.x + first.y * last.y >= GENTLE_CURVE_MIN_COS ? chord : null
+}
+
+/** 대비와 세로줄기 배율을 곱한 방향별 배율. 둘 다 없으면 undefined(한 굵기). */
+function directionalWidthOf(contrast: number, stemScale: number, gentleCurve?: BrushPoint | null): FlatWidthOf | undefined {
+  const byContrast = contrast !== 0 ? contrastWidthOf(contrast) : undefined
+  const byStem = stemScale !== 1 ? stemScaleWidthOf(stemScale, gentleCurve) : undefined
+  if (byContrast && byStem) return (direction, curved) => byContrast(direction, curved) * byStem(direction, curved)
+  return byContrast ?? byStem
+}
 
 /**
  * 가로·세로 두께 대비의 토막별 배율. `contrast` −1 ~ 1, + 는 세로 굵게 · 가로 얇게.

@@ -51,41 +51,46 @@ export function faceLimitIssue(model: ComponentFaces, moved: ComponentFaces): st
  * 홀자 fit의 한계. `base`는 Δ 전 fit(순서 · 간격의 기준), `moved`는 Δ를 얹어 다시 놓은 fit(`applyRailEdits` 결과).
  * 순서 · 간격은 서로 닿을 수 있는 보선 쌍만 본다 — 나란한 두 획의 중심, 획 중심과 그 축을 가로지르는 획의 끝, 한 획의 두 끝.
  * 서로 다른 기둥의 끝끼리(계의 안 · 바깥 기둥 아래 끝)는 잉크가 안 만나 보지 않는다. 간격은 그 쌍에 든 획의 두께다.
+ * 보선 값은 기준 틀 em이다. 사용자 네모꼴이 기준과 다르면 `bodyScale`(축마다 기준 1em이 화면에서 몇 em인지)을 준다 —
+ * 두께는 네모꼴을 따라 줄지 않으니, 화면에서 두께만큼 떨어지려면 기준 틀에서는 `두께 ÷ 배율`만큼 떨어져야 한다.
  * 통과하면 null, 아니면 이유.
  */
-export function medialLimitIssue(base: MedialFitResult, moved: MedialFitResult): string | null {
+export function medialLimitIssue(base: MedialFitResult, moved: MedialFitResult, bodyScale?: { x: number; y: number }): string | null {
   const slot = (fit: MedialFitResult): ComponentFaces => ({ left: fit.slot.x, right: fit.slot.x + fit.slot.width, top: fit.slot.y, bottom: fit.slot.y + fit.slot.height })
   if (!facesInside(slot(moved), bodyAround(slot(base)))) return '글자 몸 밖으로 나갈 수 없습니다.'
-  for (const [first, second, thickness] of limitPairs(base)) {
+  for (const [first, second, thickness, axis] of limitPairs(base)) {
     if (!(first in moved.railsEm) || !(second in moved.railsEm)) continue
     const baseGap = base.railsEm[second] - base.railsEm[first]
     // 모델이 같은 자리에 둔 쌍(보에 붙은 끝 등)은 순서가 없다 — 겹침만 막을 이유가 없다.
     if (baseGap <= TIE) continue
     const gap = moved.railsEm[second] - moved.railsEm[first]
-    if (gap < Math.min(baseGap, thickness) - EPSILON) return gap < 0 ? `${first}와 ${second}의 순서가 뒤집힙니다.` : `${first}와 ${second} 사이가 두께보다 좁습니다.`
+    if (gap < Math.min(baseGap, thickness / (bodyScale?.[axis] ?? 1)) - EPSILON) return gap < 0 ? `${first}와 ${second}의 순서가 뒤집힙니다.` : `${first}와 ${second} 사이가 두께보다 좁습니다.`
   }
   return null
 }
 
-/** 서로 닿을 수 있는 보선 쌍(모델 자리 순서로 앞 · 뒤)과 지켜야 할 두께. */
-function limitPairs(base: MedialFitResult): [string, string, number][] {
-  const pairs = new Map<string, [string, string, number]>()
-  const add = (a: string, b: string, thickness: number) => {
+/** 서로 닿을 수 있는 보선 쌍(모델 자리 순서로 앞 · 뒤)과 지켜야 할 두께, 그 쌍이 놓인 축. */
+function limitPairs(base: MedialFitResult): [string, string, number, 'x' | 'y'][] {
+  const pairs = new Map<string, [string, string, number, 'x' | 'y']>()
+  const add = (a: string, b: string, thickness: number, axis: 'x' | 'y') => {
     if (a === b) return
     const [first, second] = base.railsEm[a] <= base.railsEm[b] ? [a, b] : [b, a]
     const key = `${first}|${second}`
     const current = pairs.get(key)
-    if (!current || current[2] < thickness) pairs.set(key, [first, second, thickness])
+    if (!current || current[2] < thickness) pairs.set(key, [first, second, thickness, axis])
   }
   const bindings = base.bindings
   for (const one of bindings) {
-    add(one.fromRail, one.toRail, one.thickness)
+    // 세로 획은 중심이 가로 자리(x), 두 끝이 세로 자리(y)다. 가로 획은 거꾸로.
+    const centerAxis = one.orientation === 'vertical' ? 'x' : 'y'
+    const lengthAxis = one.orientation === 'vertical' ? 'y' : 'x'
+    add(one.fromRail, one.toRail, one.thickness, lengthAxis)
     for (const other of bindings) {
       if (other === one) continue
       // 나란한 두 획(두 보 · 두 기둥)의 중심.
-      if (other.orientation === one.orientation) add(one.centerRail, other.centerRail, Math.max(one.thickness, other.thickness))
+      if (other.orientation === one.orientation) add(one.centerRail, other.centerRail, Math.max(one.thickness, other.thickness), centerAxis)
       // 한 획의 중심과 가로지르는 획의 두 끝(곁줄기 높이 ↔ 기둥 위 · 아래 끝).
-      else { add(one.centerRail, other.fromRail, one.thickness); add(one.centerRail, other.toRail, one.thickness) }
+      else { add(one.centerRail, other.fromRail, one.thickness, centerAxis); add(one.centerRail, other.toRail, one.thickness, centerAxis) }
     }
   }
   return [...pairs.values()]

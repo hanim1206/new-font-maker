@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 import { resolveContextBoxes } from '../src/services/contextBoxResolver'
+import { mapBoxToDesignBody } from '../src/services/designBodyPlacement'
+import { layoutTypeOfSyllable } from '../src/utils/hangulUtils'
 import type { Part } from '../src/types'
 import { effectiveLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import { corpusIdentity } from './notoCorpus'
@@ -7,6 +9,7 @@ import { useNotoModel } from './notoModel'
 import { PART_COLOR } from './partColors'
 import { layoutSampleCharOf } from './reviewPropagation'
 import { contextIdOfRule } from './scopePicker'
+import { useDesignBodyPaddingOf } from './useDesignBody'
 import type { ScopeRule } from './scopeRule'
 
 /**
@@ -30,12 +33,15 @@ export function ScopeThumbnail({ rule, contextId, size = 28 }: { rule: ScopeRule
   const { bundle } = useNotoModel()
   const rules = useLayoutDeltaStore((state) => state.rules)
   const target = contextIdOfRule(rule, contextId)
+  // 사용자 네모꼴을 따른다 — 캔버스 · 문장과 같은 비례.
+  const bodyOf = useDesignBodyPaddingOf()
   const boxes = useMemo(() => {
     if (!bundle) return []
     const identity = corpusIdentity(layoutSampleCharOf(target).codePointAt(0)!)
     const resolved = resolveContextBoxes({ identity, model: bundle, delta: effectiveLayoutDelta({ rules }, identity) }).boxes
-    return PART_ORDER.flatMap((part) => resolved[part] ? [{ part, box: resolved[part]! }] : [])
-  }, [bundle, rules, target])
+    const body = bodyOf(layoutTypeOfSyllable(identity.medialJamo, identity.finalJamo !== null))
+    return PART_ORDER.flatMap((part) => resolved[part] ? [{ part, box: mapBoxToDesignBody(resolved[part]!, body) }] : [])
+  }, [bundle, rules, target, bodyOf])
   const strong = strongPartsOf(rule)
   return <svg width={size} height={size} viewBox={VIEW_BOX} role="img" aria-hidden="true" data-testid="scope-thumbnail" data-context={target} style={{ borderRadius: 4, background: '#fff', flex: '0 0 auto' }}>
     {boxes.map(({ part, box }) => strong.has(part)

@@ -22,6 +22,7 @@ import type { GlobalStyle } from '../stores/globalStyleStore'
 import { decomposeSyllableWithOverrides } from '../utils/hangulUtils'
 import { resolveGlyphInkPrimitives } from './glyphInkResolver'
 import { hangulAdvance, hangulOriginX } from './fontMetrics'
+import { stemScaleOf } from './strokeRenderGeometry'
 
 // ===== 상수 =====
 
@@ -72,7 +73,8 @@ export interface GlyphData {
 export type GlyphPlacementResolver = (
   syllable: DecomposedSyllable,
   schema: LayoutSchema,
-  ends: { linecap: StrokeLinecap; linejoin: StrokeLinejoin },
+  /** `stemScale`: 네모꼴 자동 보정의 세로줄기 배율. 사용자 네모꼴에서 상자를 다듬을 때 쓴다. */
+  ends: { linecap: StrokeLinecap; linejoin: StrokeLinejoin; stemScale?: number },
 ) => GlyphInkPlacement
 
 // ===== 실효 패딩 계산 (layoutStore L128-131 미러링) =====
@@ -161,7 +163,7 @@ export function collectGlyphDataWithPlacement(char: string, placementOf?: GlyphP
   // Design Body/advance와 Ink Bounds를 분리한다. 편집한 돌출 획을 Body에
   // 다시 맞춰 축소하지 않고 화면과 같은 EM 경계 안에서 출력한다.
   const placement: GlyphInkPlacement = placementOf
-    ? placementOf(syllable, schemaWithPadding, { linecap: effectiveStyle.linecap, linejoin: effectiveStyle.linejoin })
+    ? placementOf(syllable, schemaWithPadding, { linecap: effectiveStyle.linecap, linejoin: effectiveStyle.linejoin, stemScale: stemScaleOf(effectiveStyle.strokeStyle) })
     : { kind: 'schema', schema: schemaWithPadding }
   const resolvedInk = resolveGlyphInkPrimitives({
     syllable,

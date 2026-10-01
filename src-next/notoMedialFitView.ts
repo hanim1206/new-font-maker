@@ -5,10 +5,12 @@ import { inkOfComponentFit } from '../src/services/notoComponentFit'
 import type { FitInkStyle } from '../src/services/notoComponentFit'
 import { boxToFaces, fitPartStrokes } from '../src/services/contextBoxResolver'
 import { useJamoStore } from '../src/stores/jamoStore'
-import type { DeepReadonly, JamoData } from '../src/types'
+import type { DeepReadonly, JamoData, Padding } from '../src/types'
+import { designBodyAxis, designBodyScale, isReferenceBody } from '../src/services/designBodyPlacement'
 import { applyRailEdits, applySlotFacesDelta, boundRailRoles, fitRailAxis } from '../src/services/notoMedialMasterFit'
 import type { FitRailKey, MedialFitInput, MedialFitResult, MedialRoleMeasurement, SlotFacesDelta } from '../src/services/notoMedialMasterFit'
 import { medialLimitIssue } from '../src/services/railLimits'
+import { stemScaleOf } from '../src/services/strokeRenderGeometry'
 import { horizontalStrokeEndsX } from './strokeSnap'
 import { selectNotoOutlineContours } from '../src/services/notoOutlineInk'
 import type { NotoOutline } from '../src/services/notoOutlineInk'
@@ -36,6 +38,8 @@ export interface MedialFitPart {
   /** 앱 홀자 획과 그 홀자. 있으면 화면 잉크를 이 획으로 그린다(없으면 획 마스터 잉크 — 앱 밖 테스트용). */
   jamo?: DeepReadonly<JamoData>
   medialJamo?: string
+  /** 사용자 네모꼴 여백. 있으면 앱 획을 그 네모꼴에 옮긴 칸에 맞춰 그린다(문장 줄과 같은 글자). slot · rail · 스냅 자리 같은 숫자는 기준 틀 em 그대로다. */
+  body?: Padding
   /** 승인 측정이 있을 때만: 비교 대상 고스트와 기준 측정. */
   ghostOutline?: NotoOutline
   reference?: Record<string, MedialRoleMeasurement>
@@ -49,13 +53,15 @@ export interface MedialFitView {
 }
 
 export interface RenderedMedialPart {
-  /** 화면 잉크. 앱 획이 slot에 안 맞으면 없다(`slot`은 있고 `message`에 이유). */
+  /** 화면 잉크. 사용자 네모꼴 좌표다(나머지 숫자는 기준 틀 em). 앱 획이 slot에 안 맞으면 없다(`slot`은 있고 `message`에 이유). */
   path?: string
   /** rail을 놓은 뒤의 홀자 잉크 박스(em). 화면에서 기준선 상자로 칠한다. 있으면 rail 자리 자체는 유효하다. */
   slot?: BoxConfig
-  /** 앱 획을 slot에 맞춰 다듬은 중심선 상자. 칸 해석의 `boxes[part]`와 같은 값. */
+  /** 앱 획을 slot에 맞춰 다듬은 중심선 상자. 글자 배치의 `boxes[part]`와 같은 값(사용자 네모꼴이면 그 좌표). */
   inkBox?: BoxConfig
-  /** 가로 줄기 중심선 끝 x(em). 칸 변을 끌 때 이 끝이 다른 칸 세로 기준선에 닿으면 건다. */
+  /** 그려진 세로줄기의 두께(em). 칸 안 중심선이 사용자 네모꼴에서 어디로 가는지 셈할 때 쓴다. */
+  thickness?: number
+  /** 가로 줄기 중심선 끝 x(기준 틀 em). 칸 변을 끌 때 이 끝이 다른 칸 세로 기준선에 닿으면 건다. */
   stemEndsX?: number[]
   xorRatio?: number
   inkRatio?: number
@@ -96,12 +102,14 @@ export function fitMedialForGlyph(input: {
   context: ContextBoxResolution
   outline: NotoOutline
   approved: ApprovedNotoInput | null
+  /** 사용자 네모꼴 여백. 주면 화면 잉크가 그 안에 그려진다. */
+  body?: Padding
 }): MedialFitView {
   const approved = approvedMedialOf(input.approved)
   const medialJamo = input.context.identity.medialJamo
   const jamo = useJamoStore.getState().jungseong[medialJamo]
   const parts: MedialFitPart[] = input.context.medial.map((group) => {
-    const part: MedialFitPart = { part: group.part, role: group.role, roleIds: group.roleIds, fit: group.fit, message: group.message, jamo, medialJamo }
+    const part: MedialFitPart = { part: group.part, role: group.role, roleIds: group.roleIds, fit: group.fit, message: group.message, jamo, medialJamo, body: input.body }
     if (group.fit && approved) {
       part.ghostOutline = selectNotoOutlineContours(input.outline, approved.contourIds(group.roleIds))
       part.reference = Object.fromEntries(Object.entries(approved.measurements).filter(([roleId]) => group.roleIds.includes(roleId)))
@@ -120,14 +128,22 @@ export function renderMedialPart(part: MedialFitPart, railsEm?: Readonly<Record<
   if (!part.fit) return { railErrors: [], message: part.message }
   const placed = railsEm ? applyRailEdits(part.fit, railsEm) : { ok: true as const, fit: part.fit }
   if (!placed.ok) return { railErrors: [], message: placed.message }
-  const limit = limitBase ? medialLimitIssue(limitBase, placed.fit) : null
+  const limit = limitBase ? medialLimitIssue(limitBase, placed.fit, part.body && !isReferenceBody(part.body) ? designBodyScale(part.body) : undefined) : null
   if (limit) return { railErrors: [], message: limit }
   const rendered: RenderedMedialPart = { slot: { ...placed.fit.slot }, railErrors: [] }
   if (part.jamo && part.medialJamo) {
     // 앱 획을 slot 네 변에 맞춘다. 못 맞추면(고친 획이 칸보다 큼 등) 상자만 남기고 이유를 돌려준다 — rail 자리는 여전히 유효.
-    const fitted = fitPartStrokes({ part: part.part, jamo: part.jamo, faces: boxToFaces(placed.fit.slot), glyphId: 'layout-editor', medialJamo: part.medialJamo, ends: style, medialFit: placed.fit })
+    const fitted = fitPartStrokes({ part: part.part, jamo: part.jamo, faces: boxToFaces(placed.fit.slot), glyphId: 'layout-editor', medialJamo: part.medialJamo, ends: style && { linecap: style.linecap, linejoin: style.linejoin, stemScale: stemScaleOf(style.strokeStyle) }, medialFit: placed.fit, body: part.body, weightMultiplier: style?.weightMultiplier })
     const ink = fitted.ok ? inkOfComponentFit(fitted.fit, style) : fitted
-    if (fitted.ok && ink.ok) { rendered.path = finalGlyphInkToSvgPath({ regions: ink.regions }, 1); rendered.inkBox = { ...fitted.fit.box }; rendered.stemEndsX = horizontalStrokeEndsX(fitted.fit.primitives) }
+    if (fitted.ok && ink.ok) {
+      rendered.path = finalGlyphInkToSvgPath({ regions: ink.regions }, 1)
+      rendered.inkBox = { ...fitted.fit.box }
+      // 세로줄기는 네모꼴 자동 보정만큼 얇다.
+      rendered.thickness = fitted.fit.thickness * stemScaleOf(style?.strokeStyle)
+      // 줄기 끝은 그려진 자리(사용자 네모꼴)에서 재고 기준 틀 em으로 되돌린다 — 스냅이 기준 틀에서 돈다.
+      const bodyX = designBodyAxis(part.body, 'x')
+      rendered.stemEndsX = horizontalStrokeEndsX(fitted.fit.primitives).map(bodyX.from)
+    }
     else rendered.message = ink.ok ? undefined : ink.message
   } else {
     const ink = inkOfFit(placed.fit, style?.weightMultiplier ?? 1, style)

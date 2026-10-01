@@ -98,8 +98,9 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
       if (!data || !legacy) throw new Error(`${char} 출력 데이터 없음`)
       const jamos = jamo.useJamoStore.getState()
       const layouts = layout.useLayoutStore.getState()
-      const globalStyle = style.useGlobalStyleStore.getState().style
       const syllable = hangul.decomposeSyllable(char, jamos.choseong, jamos.jungseong, jamos.jongseong)
+      // 화면은 실효 스타일로 그린다(`AppGlyph`의 `useEffectiveGlobalStyle`) — 네모꼴 자동 보정이 여기서 얹힌다.
+      const globalStyle = style.useGlobalStyleStore.getState().getEffectiveStyle(syllable.layoutType)
       const padding = { ...layouts.globalPadding, ...layouts.paddingOverrides[syllable.layoutType] }
       const schema = { ...layouts.layoutSchemas[syllable.layoutType], padding, designBodyPadding: padding }
       const identity = resolver.identityOfSyllable(syllable)

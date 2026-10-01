@@ -55,6 +55,39 @@ export function designBodyScale(padding: Padding): { x: number; y: number } {
   return { x: (1 - padding.left - padding.right) / REFERENCE_WIDTH, y: (1 - padding.top - padding.bottom) / REFERENCE_HEIGHT }
 }
 
+/** 한 축의 기준 틀 좌표 ↔ 사용자 네모꼴 좌표. `scale`은 기준 1em이 사용자 네모꼴에서 몇 em인지. */
+export interface DesignBodyAxis { scale: number; to: (value: number) => number; from: (value: number) => number }
+
+const SAME = (value: number) => value
+const REFERENCE_AXIS: DesignBodyAxis = { scale: 1, to: SAME, from: SAME }
+
+/**
+ * 편집기의 숫자(보선 · Δ · 스냅 후보)는 기준 틀 em 그대로 두고, 그릴 때 `to`, 손가락 자리를 읽을 때 `from`으로 옮긴다.
+ * 기본 네모꼴이면 값을 그대로 돌려준다(곱셈 한 번도 안 거친다).
+ */
+export function designBodyAxis(padding: Padding | undefined, axis: 'x' | 'y'): DesignBodyAxis {
+  if (!padding || isReferenceBody(padding)) return REFERENCE_AXIS
+  const scale = designBodyScale(padding)[axis]
+  const origin = axis === 'x' ? padding.left : padding.top
+  const reference = axis === 'x' ? REFERENCE_BODY_PADDING.left : REFERENCE_BODY_PADDING.top
+  return { scale, to: (value) => origin + (value - reference) * scale, from: (value) => reference + (value - origin) / scale }
+}
+
+/**
+ * 칸 안 줄기 중심선의 자리 옮기기. 칸의 두 변(`lo` · `hi`, 기준 틀 em 잉크 바깥면)은 네모꼴 비율로 옮겨지지만 두께는 그대로라,
+ * 중심선은 변에서 반 두께 들어간 안쪽 상자끼리 비례로 옮겨진다 — 칸 끝에 선 기둥은 옮긴 뒤에도 변에서 반 두께 자리다.
+ * 칸이 두께뿐이면(ㅣ) 가운데에 둔다. 그릴 때만 쓴다(`from`은 없다).
+ */
+export function designBodyStemCenter(lo: number, hi: number, thickness: number, axis: DesignBodyAxis): (value: number) => number {
+  if (axis.scale === 1 && axis.to === SAME) return SAME
+  const bodyLo = axis.to(lo)
+  const bodyHi = axis.to(hi)
+  const inner = hi - lo - thickness
+  const bodyInner = bodyHi - bodyLo - thickness
+  if (inner <= EPSILON || bodyInner <= EPSILON) return (value) => (bodyLo + bodyHi) / 2 + (value - (lo + hi) / 2)
+  return (value) => bodyLo + thickness / 2 + (value - lo - thickness / 2) * bodyInner / inner
+}
+
 /** 기준 틀 안의 상자를 사용자 네모꼴 안의 같은 비율 자리로 옮긴다. */
 export function mapBoxToDesignBody(box: BoxConfig, padding: Padding | undefined): BoxConfig {
   if (!padding || isReferenceBody(padding)) return box

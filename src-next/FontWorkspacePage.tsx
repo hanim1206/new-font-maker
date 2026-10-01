@@ -18,7 +18,6 @@ export function FontWorkspacePage() {
   return <CalibrationSentenceEditor chrome="workspace" space="style" above={<StyleSummary />} cover={<FontExportOverlay />} />
 }
 
-const BODY_RATIO = REFERENCE_WIDTH / REFERENCE_HEIGHT
 
 /** 머리 바로 아래 지금 값 네 칩(제목 `스타일`은 머리에). 칩은 저장된 값만 읽는다(끄는 중 미리보기는 문장이 보여 준다). */
 function StyleSummary() {
@@ -28,10 +27,11 @@ function StyleSummary() {
   const body = paddingToDesignBody(padding, fontSpace)
   const width = Math.round(body.width)
   const height = Math.round(body.height)
-  const ratio = width / Math.max(height, 1)
-  const bodyLabel = width === Math.round(REFERENCE_WIDTH * 1000) && height === Math.round(REFERENCE_HEIGHT * 1000) ? '노토'
-    : width === height ? '정네모'
-      : ratio < BODY_RATIO ? '길쭉' : '납작'
+  // 네모꼴은 가로만 바꾼다. 기본 가로 대비 %로 읽는다. 옛 화면에서 세로를 바꾼 폰트는 가로 × 세로를 그대로 보인다.
+  const baseWidth = Math.round(REFERENCE_WIDTH * 1000)
+  const bodyLabel = height !== Math.round(REFERENCE_HEIGHT * 1000) ? `${width} × ${height}`
+    : width === baseWidth ? '기본'
+      : `${Math.round(width / baseWidth * 100)}%`
   const flatBrush = style.strokeStyle.mode === 'brush' && style.strokeStyle.brush.tip !== 'round'
   const beak = style.stemBeak?.enabled ? STEM_BEAK_SHAPES.find((shape) => shape.id === style.stemBeak?.shape)?.label.replace(/ 부리$/, '') ?? '있음' : '없음'
   return <header className={styles.summary} data-testid="font-workspace">

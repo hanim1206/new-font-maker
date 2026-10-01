@@ -4,6 +4,7 @@ import type { CorpusIdentity } from './notoCorpus'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 import { useNotoGlyph } from './useNotoGlyph'
 import { useFitInkStyle } from './useFitInkStyle'
+import { useDesignBodyPadding } from './useDesignBody'
 import { AppGlyph } from './AppGlyph'
 import { layoutTypeOfSyllable } from '../src/utils/hangulUtils'
 import { useLayoutDelta } from './layoutDeltaStore'
@@ -37,7 +38,10 @@ const BOX_COLOR: Record<PropagationCardBox['kind'], string> = { medial: '#3b6fd6
 // 카드마다 props가 그대로면 다시 그리지 않는다. 획을 끄는 동안 부모가 매 움직임 다시 그려도 카드는 쉰다.
 const TouchedGlyph = memo(function TouchedGlyph({ identity, bundle, edit, ghostVisible, active = false, onPick }: { identity: CorpusIdentity; bundle: NotoPresetModelBundle; edit: PropagationEdit; ghostVisible: boolean; active?: boolean; onPick?: (character: string) => void }) {
   const { glyph, error } = useNotoGlyph(identity.codepoint)
-  const inkStyle = useFitInkStyle(layoutTypeOfSyllable(identity.medialJamo, identity.finalJamo !== null))
+  const layoutType = layoutTypeOfSyllable(identity.medialJamo, identity.finalJamo !== null)
+  const inkStyle = useFitInkStyle(layoutType)
+  // 사용자 네모꼴. 문장 줄 · 캔버스와 같은 글자가 되게 카드도 그 안에 그린다.
+  const body = useDesignBodyPadding(layoutType)
   // 이 글자에 이미 저장된 Δ 위에 지금 편집 Δ를 얹는다. 렌더러가 보는 상자와 같은 출발점.
   const savedDelta = useLayoutDelta(identity)
   // 보선을 끄는 동안 움직임마다 칸 수만큼 도는 길이라 둘로 나눈다(`propagationCardView.ts`).
@@ -47,7 +51,7 @@ const TouchedGlyph = memo(function TouchedGlyph({ identity, bundle, edit, ghostV
   const medialStrokes = useJamoStore((state) => state.jungseong[identity.medialJamo])
   const finalStrokes = useJamoStore((state) => identity.finalJamo ? state.jongseong[identity.finalJamo] : undefined)
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 획 셋은 계산 안에서 스토어로 읽힌다. 바뀌면 다시 그리라는 신호로만 둔다.
-  const base = useMemo(() => glyph ? propagationCardBaseOf({ glyph, identity, bundle, savedDelta, inkStyle }) : null, [glyph, identity, bundle, savedDelta, inkStyle, initialStrokes, medialStrokes, finalStrokes])
+  const base = useMemo(() => glyph ? propagationCardBaseOf({ glyph, identity, bundle, savedDelta, inkStyle, body }) : null, [glyph, identity, bundle, savedDelta, inkStyle, body, initialStrokes, medialStrokes, finalStrokes])
   const view = useMemo(() => base ? propagationCardViewOf(base, edit, inkStyle) : null, [base, edit, inkStyle])
   // Δ가 아직 없으면 그냥 내 획. '안 닿음' 표시도, 흐리게도 안 한다.
   const live = hasLayoutEdit(edit)
@@ -57,7 +61,7 @@ const TouchedGlyph = memo(function TouchedGlyph({ identity, bundle, edit, ghostV
     <button type="button" disabled={!onPick || live} aria-current={active || undefined} onClick={() => onPick?.(identity.character)} aria-label={`${identity.character} 열기${note ? `, ${note}` : ''}`} title={note || undefined} data-testid="review-propagation-open">
     <svg viewBox={VIEW_BOX} role="img" aria-label={`${identity.character} 미리보기`}>
       {view?.boxes.map((item, index) => <rect key={index} x={item.box.x} y={item.box.y} width={item.box.width} height={item.box.height} fill={BOX_COLOR[item.kind]} fillOpacity=".12" stroke={BOX_COLOR[item.kind]} strokeOpacity=".5" strokeWidth=".004" />)}
-      {ghostVisible && view?.ghost && <path d={view.ghost} fill="#3a3a36" fillOpacity=".35" fillRule="evenodd" data-testid="review-propagation-ghost" />}
+      {ghostVisible && view?.ghost && <path d={view.ghost} transform={view.ghostTransform} fill="#3a3a36" fillOpacity=".35" fillRule="evenodd" data-testid="review-propagation-ghost" />}
       {view?.after.map((path, index) => <path key={index} d={path} fill="#111" fillRule="evenodd" />)}
       {view?.before.map((path, index) => <path key={`b${index}`} d={path} fill="none" stroke="#f0561e" strokeWidth=".006" strokeDasharray=".012 .008" />)}
     </svg>

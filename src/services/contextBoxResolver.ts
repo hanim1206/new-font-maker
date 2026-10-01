@@ -1,12 +1,13 @@
-import type { BoxConfig, DecomposedSyllable, DeepReadonly, JamoData, Part, StrokeDataV2, StrokeLinecap, StrokeLinejoin } from '../types'
-import { fitNotoComponent } from './notoComponentFit'
+import type { BoxConfig, DecomposedSyllable, DeepReadonly, JamoData, Padding, Part, StrokeDataV2, StrokeLinecap, StrokeLinejoin } from '../types'
+import { designBodyAxis, isReferenceBody, mapBoxToDesignBody, mapFacesToDesignBody } from './designBodyPlacement'
+import { fitNotoComponent, glyphCellBoxOf } from './notoComponentFit'
 import type { ComponentFaces, ComponentFitOutcome } from './notoComponentFit'
 import { medialInputFromPrediction } from './notoFitReport'
 import { applyMedialDelta } from './medialRailDelta'
 import { stemRailTargets } from './medialStemRails'
 import { placeStemStroke } from './stemBend'
 import type { SemanticDelta } from './medialRailDelta'
-import { applyRailEdits, applySlotFacesDelta, fitNotoMedialMaster, splitMixedMedialRoles } from './notoMedialMasterFit'
+import { applyRailEdits, applySlotFacesDelta, fitNotoMedialMaster, fitRailAxis, splitMixedMedialRoles } from './notoMedialMasterFit'
 import type { MedialFitInput, MedialFitResult } from './notoMedialMasterFit'
 import { bodyAround, furthestValid, medialLimitIssue } from './railLimits'
 import { MEDIAL_ROLE_SETS, modelIdentityOf, predictNotoTarget } from './notoVariationModel'
@@ -285,19 +286,42 @@ function jamoForPart(syllable: DeepReadonly<DecomposedSyllable> | undefined, par
 /**
  * 부품 하나의 앱 획을 네 변에 맞춘다. 칸 해석(문장 줄·획 편집)과 레이아웃 편집기가 **같은 호출**을 써서 캔버스 잉크 = 글자 잉크가 된다.
  * 홀자도 닿자와 같은 규칙이다. 혼합 홀자는 part가 가로부·세로부 획을 가른다.
+ *
+ * `body`(사용자 네모꼴 여백)를 주면 **사용자 네모꼴에서** 맞춘다: 네 변(잉크 바깥면)을 먼저 옮기고 그 안에서 두께만큼 다듬는다.
+ * 두께는 네모꼴을 따라 줄지 않으니, 다듬은 뒤에 줄이면 자소 사이 틈이 두께만큼 더 먹힌다 — 그래서 순서가 이쪽이다.
+ * 그때 돌려주는 fit은 전부 사용자 네모꼴 좌표다(`faces` · `box` · `primitives`). `box`는 렌더러가 받는 상자(줄기 목표 포함)이고,
+ * `primitives`는 렌더러와 같은 칸 끝 안전 보정까지 지난 그림 재료다(`weightMultiplier`는 그 보정만 본다). 받는 `faces` · `medialFit`은 늘 기준 틀 em이다.
+ * 네모꼴 자동 보정으로 세로줄기가 얇아졌으면(`ends.stemScale`) 그 두께로 다듬는다 — 얇아진 잉크가 변에 닿게.
  */
-export function fitPartStrokes(input: { part: Part; jamo: DeepReadonly<JamoData>; faces: ContextFaces; glyphId: string; medialJamo: string; ends?: StrokeEnds; medialFit?: MedialFitResult }): ComponentFitOutcome {
-  const fitted = fitNotoComponent({ part: input.part, jamo: input.jamo, channel: CHANNEL_OF[input.part], family: medialFamilyOf(input.medialJamo), faces: input.faces, glyphId: `${input.glyphId}:${input.part}`, globalLinecap: input.ends?.linecap, globalLinejoin: input.ends?.linejoin })
-  if (!fitted.ok || !input.medialFit || input.part === 'CH' || input.part === 'JO') return fitted
-  // 홀자: 이름 있는 줄기는 세로 끝점 · 높이를 보선에서 받고 휨은 em 그대로 — 글자 잉크(`resolveGlyphInkPrimitives`)와 같은 배치를 지난다.
-  const stems = stemRailTargets(input.medialJamo, input.part, input.medialFit, fitted.fit.box)
-  const box: BoxConfig = Object.keys(stems).length ? { ...fitted.fit.box, stems } : fitted.fit.box
+export function fitPartStrokes(input: { part: Part; jamo: DeepReadonly<JamoData>; faces: ContextFaces; glyphId: string; medialJamo: string; ends?: StrokeEnds; medialFit?: MedialFitResult; body?: Padding; weightMultiplier?: number }): ComponentFitOutcome {
+  const body = input.body && !isReferenceBody(input.body) ? input.body : undefined
+  const faces = body ? mapFacesToDesignBody(input.faces, body) : input.faces
+  const stemScale = body ? input.ends?.stemScale ?? 1 : 1
+  const fitted = fitNotoComponent({ part: input.part, jamo: input.jamo, channel: CHANNEL_OF[input.part], family: medialFamilyOf(input.medialJamo), faces, glyphId: `${input.glyphId}:${input.part}`, globalLinecap: input.ends?.linecap, globalLinejoin: input.ends?.linejoin, strokeStyle: stemScale !== 1 ? { ...STEM_SCALED_FIT_STYLE, stemScale } : undefined })
+  if (!fitted.ok) return fitted
   const jamo = input.jamo as JamoData
+  const drawnBox = (box: BoxConfig) => body ? glyphCellBoxOf(box, jamo, fitted.fit.primitives.map((primitive) => primitive.stroke as StrokeDataV2), input.weightMultiplier) : box
+  if (!input.medialFit || input.part === 'CH' || input.part === 'JO') {
+    if (!body) return fitted
+    const box = drawnBox(fitted.fit.box)
+    return { ok: true, fit: { ...fitted.fit, primitives: fitted.fit.primitives.map((primitive) => ({ ...primitive, box: { ...box } })) } }
+  }
+  // 홀자: 이름 있는 줄기는 세로 끝점 · 높이를 보선에서 받고 휨은 em 그대로 — 글자 잉크(`resolveGlyphInkPrimitives`)와 같은 배치를 지난다.
+  // 보선은 기준 틀 em이라 사용자 네모꼴에서는 같은 자리로 옮겨 읽는다.
+  const medialFit = body ? { ...input.medialFit, railsEm: railsInDesignBody(input.medialFit.railsEm, body) } : input.medialFit
+  const stems = stemRailTargets(input.medialJamo, input.part, medialFit, fitted.fit.box)
+  const box: BoxConfig = Object.keys(stems).length ? { ...fitted.fit.box, stems } : fitted.fit.box
+  const placedIn = drawnBox(box)
   const primitives = fitted.fit.primitives.map((primitive) => {
-    const placed = placeStemStroke(jamo, primitive.stroke as StrokeDataV2, box, primitive.source.channel === 'strokes' ? undefined : primitive.source.channel)
+    const placed = placeStemStroke(jamo, primitive.stroke as StrokeDataV2, placedIn, primitive.source.channel === 'strokes' ? undefined : primitive.source.channel)
     return { ...primitive, stroke: placed.stroke, box: { ...placed.box } }
   })
-  return { ok: true, fit: { ...fitted.fit, primitives } }
+  return { ok: true, fit: body ? { ...fitted.fit, box, primitives } : { ...fitted.fit, primitives } }
+}
+
+function railsInDesignBody(railsEm: Readonly<Record<string, number>>, body: Padding): Record<string, number> {
+  const axis = { x: designBodyAxis(body, 'x'), y: designBodyAxis(body, 'y') }
+  return Object.fromEntries(Object.entries(railsEm).map(([key, value]) => [key, axis[fitRailAxis(key)].to(value)]))
 }
 
 /** 네 변 → 앱 획을 놓을 상자. 획이 있으면 잉크가 네 변에 닿도록 두께만큼 안쪽으로 다듬는다. */
@@ -309,8 +333,14 @@ function placePart(part: Part, faces: ContextFaces, syllable: DeepReadonly<Decom
   return { part, faces, box: fit.fit.box, fitted: true }
 }
 
-/** 렌더러가 쓸 전역 캡·조인. 둥근 끝이면 잉크가 끝에서 두께/2 더 나가므로 상자 다듬기에 반영한다. */
-export interface StrokeEnds { linecap?: StrokeLinecap; linejoin?: StrokeLinejoin }
+/**
+ * 렌더러가 쓸 전역 캡·조인. 둥근 끝이면 잉크가 끝에서 두께/2 더 나가므로 상자 다듬기에 반영한다.
+ * `stemScale`은 네모꼴 자동 보정의 세로줄기 배율이다(사용자 네모꼴에서 다듬을 때만 본다). 없으면 1.
+ */
+export interface StrokeEnds { linecap?: StrokeLinecap; linejoin?: StrokeLinejoin; stemScale?: number }
+
+/** 세로줄기 배율로 다듬을 때의 잉크 스타일. 배율 말고는 fit 기본(둥근 붓촉 = 일자 stroker)과 같다. */
+const STEM_SCALED_FIT_STYLE = { mode: 'brush' as const, brush: { tip: 'round' as const, aspectRatio: 1, angle: 0 } }
 
 export function resolveContextBoxes(input: {
   identity: ModelIdentity
@@ -357,4 +387,27 @@ export function resolveContextBoxes(input: {
     if (Object.keys(stems).length) boxes[group.part] = { ...box, stems }
   }
   return { identity, parts, medial, issues, complete: issues.length === 0, boxes }
+}
+
+/**
+ * 기준 틀에서 푼 칸을 사용자 네모꼴로 옮긴다. 부품마다 잉크 바깥면을 먼저 옮기고, 그 안에서 앱 획을 다시 맞춘다(`fitPartStrokes`의 `body`).
+ * 자소 사이 틈이 네모꼴 비율대로만 줄고, 잉크가 네모꼴 안에 든다. 보선 · Δ(`medial`의 fit)는 기준 틀 em 그대로 둔다.
+ * 사용자 네모꼴이 획 두께보다 좁아 못 맞추는 부품은 기준 틀에서 다듬은 상자를 그대로 옮긴다(잉크가 변을 넘는다).
+ * 기본 네모꼴이면 받은 것을 그대로 돌려준다.
+ */
+export function resolveInDesignBody(reference: ContextBoxResolution, input: { syllable?: DeepReadonly<DecomposedSyllable>; ends?: StrokeEnds; padding: Padding | undefined }): ContextBoxResolution {
+  const { padding } = input
+  if (!padding || isReferenceBody(padding)) return reference
+  const glyphId = input.syllable?.char ?? `${reference.identity.initialJamo}${reference.identity.medialJamo}${reference.identity.finalJamo ?? ''}`
+  const parts = reference.parts.map((part): ContextPartBox => {
+    const faces = mapFacesToDesignBody(part.faces, padding)
+    const jamo = part.fitted ? jamoForPart(input.syllable, part.part) : null
+    if (!jamo) return { ...part, faces, box: mapBoxToDesignBody(reference.boxes[part.part] ?? part.box, padding) }
+    const medialFit = reference.medial.find((group) => group.part === part.part)?.fit
+    const fit = fitPartStrokes({ part: part.part, jamo, faces: part.faces, glyphId, medialJamo: reference.identity.medialJamo, ends: input.ends, medialFit, body: padding })
+    return fit.ok ? { ...part, faces, box: fit.fit.box } : { ...part, faces, box: mapBoxToDesignBody(reference.boxes[part.part] ?? part.box, padding) }
+  })
+  const boxes: Partial<Record<Part, BoxConfig>> = {}
+  for (const part of parts) boxes[part.part] = { ...part.box }
+  return { ...reference, parts, boxes }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { calculateBoxes, DEFAULT_LAYOUT_SCHEMAS } from '../utils/layoutCalculator'
-import { LEGACY_REFERENCE_BODY_PADDING, mapBoxToDesignBody, mapFacesToDesignBody, normalizeReferencePadding, NOTO_SOLO_CONSONANT_BOX, REFERENCE_BODY_PADDING } from './designBodyPlacement'
+import { designBodyAxis, LEGACY_REFERENCE_BODY_PADDING, mapBoxToDesignBody, mapFacesToDesignBody, normalizeReferencePadding, NOTO_SOLO_CONSONANT_BOX, REFERENCE_BODY_PADDING } from './designBodyPlacement'
 
 describe('네모꼴을 바꾸면 모델 상자도 같이 옮겨진다', () => {
   // 기준 틀(왼 0.05 ~ 오른 0.89) 전폭 상자
@@ -34,6 +34,33 @@ describe('네모꼴을 바꾸면 모델 상자도 같이 옮겨진다', () => {
     const mapped = mapFacesToDesignBody({ left: 0.47, right: 0.47, top: 0.505, bottom: 0.505 }, { top: 0.1, bottom: 0.3, left: 0.25, right: 0.05 })
     expect(mapped.left).toBeCloseTo(0.25 + 0.7 / 2, 9)
     expect(mapped.top).toBeCloseTo(0.1 + 0.6 / 2, 9)
+  })
+})
+
+describe('편집기 좌표 옮기기(기준 틀 em ↔ 사용자 네모꼴)', () => {
+  const narrow = { ...REFERENCE_BODY_PADDING, left: 0.2, right: 0.2 }
+
+  it('기본 네모꼴이면 값을 그대로 돌려준다', () => {
+    for (const padding of [undefined, { ...REFERENCE_BODY_PADDING }]) {
+      const axis = designBodyAxis(padding, 'x')
+      expect(axis.scale).toBe(1)
+      expect(axis.to(0.3217)).toBe(0.3217)
+      expect(axis.from(0.3217)).toBe(0.3217)
+    }
+  })
+
+  it('상자 옮기기와 같은 자리로 가고, 되돌리면 제자리다', () => {
+    const box = { x: 0.3, y: 0.2, width: 0.25, height: 0.4 }
+    const mapped = mapBoxToDesignBody(box, narrow)
+    const x = designBodyAxis(narrow, 'x')
+    const y = designBodyAxis(narrow, 'y')
+    expect(x.to(box.x)).toBeCloseTo(mapped.x, 12)
+    expect(x.to(box.x + box.width)).toBeCloseTo(mapped.x + mapped.width, 12)
+    expect(x.scale).toBeCloseTo(0.6 / 0.84, 12)
+    expect(x.from(x.to(0.4321))).toBeCloseTo(0.4321, 12)
+    // 세로는 안 바꿨다.
+    expect(y.scale).toBe(1)
+    expect(y.to(box.y)).toBeCloseTo(box.y, 12)
   })
 })
 

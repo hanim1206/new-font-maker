@@ -2,7 +2,8 @@ import { boxToFaces, facesOffsets, resolveContextBoxes } from '../src/services/c
 import type { ContextBoxDelta } from '../src/services/contextBoxResolver'
 import type { FitInkStyle } from '../src/services/notoComponentFit'
 import { notoOutlineGhostPath } from '../src/services/notoOutlineInk'
-import type { BoxConfig } from '../src/types'
+import { designBodySvgTransform, mapBoxToDesignBody } from '../src/services/designBodyPlacement'
+import type { BoxConfig, Padding } from '../src/types'
 import type { CorpusIdentity } from './notoCorpus'
 import { fitComponentsForGlyph, renderComponentPart } from './notoComponentFitView'
 import type { ComponentFitPart } from './notoComponentFitView'
@@ -23,13 +24,17 @@ export interface PropagationCardBox { kind: 'medial' | 'component'; box: BoxConf
 
 export interface PropagationCardBase {
   ghost: string | null
+  /** 사용자 네모꼴 여백. 기본 네모꼴이면 없다. 잉크는 이 네모꼴 안에 그려지고, 고스트 · 상자는 그릴 때 옮긴다. */
+  body?: Padding
   medial: { part: MedialFitPart; basePath?: string }[]
   components: { part: ComponentFitPart; basePath?: string }[]
 }
 
 export interface PropagationCardView {
-  /** Noto 고스트(회색). */
+  /** Noto 고스트(회색). 기준 틀 좌표라 `ghostTransform`으로 옮겨 그린다. */
   ghost: string | null
+  /** 고스트를 사용자 네모꼴로 옮기는 SVG transform. 기본 네모꼴이면 없다. */
+  ghostTransform?: string
   /** Δ를 얹은 내 획(검정). Δ가 안 닿은 부품은 Δ 없는 획 그대로. */
   after: string[]
   /** Δ가 닿은 부품의 Δ 전 획(주황 점선). */
@@ -41,15 +46,16 @@ export interface PropagationCardView {
   touched: number
 }
 
-export function propagationCardBaseOf(input: { glyph: NotoPresetGlyph; identity: CorpusIdentity; bundle: NotoPresetModelBundle; savedDelta?: ContextBoxDelta; inkStyle?: FitInkStyle }): PropagationCardBase {
-  const { glyph, identity, bundle, savedDelta, inkStyle } = input
+export function propagationCardBaseOf(input: { glyph: NotoPresetGlyph; identity: CorpusIdentity; bundle: NotoPresetModelBundle; savedDelta?: ContextBoxDelta; inkStyle?: FitInkStyle; body?: Padding }): PropagationCardBase {
+  const { glyph, identity, bundle, savedDelta, inkStyle, body } = input
   const ghost = notoOutlineGhostPath(glyph.outline)
   // 이 글자에 이미 저장된 Δ까지 얹은 상자가 출발점. 렌더러가 보는 상자와 같다.
   const context = resolveContextBoxes({ identity, model: bundle, delta: savedDelta })
-  const medialView = fitMedialForGlyph({ context, outline: glyph.outline, approved: null })
-  const componentParts = fitComponentsForGlyph({ context, outline: glyph.outline, approved: null })
+  const medialView = fitMedialForGlyph({ context, outline: glyph.outline, approved: null, body })
+  const componentParts = fitComponentsForGlyph({ context, outline: glyph.outline, approved: null, body })
   return {
     ghost: 'path' in ghost ? ghost.path : null,
+    body,
     medial: medialView.parts.map((part) => ({ part, basePath: renderMedialPart(part, undefined, inkStyle).path })),
     components: componentParts.map((part) => ({ part, basePath: renderComponentPart(part, undefined, inkStyle).path })),
   }
@@ -80,7 +86,7 @@ export function propagationCardViewOf(base: PropagationCardBase, edit: Propagati
     touched += 1
     if (moved.path) after.push(moved.path)
     if (basePath) before.push(basePath)
-    boxes.push({ kind: 'medial', box: moved.slot })
+    boxes.push({ kind: 'medial', box: mapBoxToDesignBody(moved.slot, base.body) })
   }
   for (const { part, basePath } of base.components) {
     const delta = edit.layout.component[part.part]
@@ -90,7 +96,7 @@ export function propagationCardViewOf(base: PropagationCardBase, edit: Propagati
     touched += 1
     after.push(moved.path)
     if (basePath) before.push(basePath)
-    if (moved.faces) boxes.push({ kind: 'component', box: { x: moved.faces.left, y: moved.faces.top, width: moved.faces.right - moved.faces.left, height: moved.faces.bottom - moved.faces.top } })
+    if (moved.faces) boxes.push({ kind: 'component', box: mapBoxToDesignBody({ x: moved.faces.left, y: moved.faces.top, width: moved.faces.right - moved.faces.left, height: moved.faces.bottom - moved.faces.top }, base.body) })
   }
-  return { ghost: base.ghost, after, before, boxes, skipped, touched }
+  return { ghost: base.ghost, ghostTransform: designBodySvgTransform(base.body, 1), after, before, boxes, skipped, touched }
 }

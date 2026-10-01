@@ -5,7 +5,8 @@ import { createNotoPresetReader } from '../../scripts/reference-lab/notoPresetAp
 import { CHOSEONG_MAP, JONGSEONG_MAP, JUNGSEONG_MAP } from '../data/Hangul'
 import { decomposeSyllable } from '../utils/hangulUtils'
 import { identityOfSyllable, medialDragRange, resolveContextBoxes, type ContextBoxDelta, type MedialPart } from './contextBoxResolver'
-import { furthestValid, GLYPH_BODY } from './railLimits'
+import { applyRailEdits } from './notoMedialMasterFit'
+import { furthestValid, GLYPH_BODY, medialLimitIssue } from './railLimits'
 
 const CORPUS = path.resolve(__dirname, '../../.reference-fonts/guide-corpus')
 
@@ -54,6 +55,21 @@ describe.skipIf(!existsSync(CORPUS))('보선 한계 — 글자 몸 · 순서 · 
     const moved = await resolve('아', { medial: { JU: { 'primaryBeam.center': -0.8 } } })
     const gap = moved.rail('primaryBeam', 'centerRail') - moved.rail('outerPillar', 'fromRail')
     expect(gap).toBeCloseTo(Math.min(base.rail('primaryBeam', 'centerRail') - base.rail('outerPillar', 'fromRail'), base.thickness('primaryBeam')), 3)
+  })
+
+  it('아: 네모꼴을 세로로 줄이면 곁줄기와 기둥 끝 사이를 기준 틀에서 그만큼 더 벌려야 한다(화면에서 두께만큼)', async () => {
+    const base = await resolve('아')
+    const fit = base.fit()
+    const binding = fit.bindings.find((item) => item.roleId === 'primaryBeam')!
+    const pillarTop = base.rail('outerPillar', 'fromRail')
+    // 곁줄기를 기둥 위 끝에서 두께의 1.2배 자리에 둔다. 기본 네모꼴이면 통과, 세로가 0.6배면 화면 간격이 두께의 0.72배라 막힌다.
+    const moved = applyRailEdits(fit, { ...fit.railsEm, [binding.centerRail]: pillarTop + binding.thickness * 1.2 })
+    expect(moved.ok).toBe(true)
+    if (!moved.ok) return
+    expect(medialLimitIssue(fit, moved.fit)).toBeNull()
+    expect(medialLimitIssue(fit, moved.fit, { x: 1, y: 1 })).toBeNull()
+    expect(medialLimitIssue(fit, moved.fit, { x: 0.6, y: 1 })).toBeNull()
+    expect(medialLimitIssue(fit, moved.fit, { x: 1, y: 0.6 })).toMatch(/두께보다 좁습니다/)
   })
 
   it('야: 윗 곁줄기를 아래로 한없이 내려도 아랫 곁줄기와 두께만큼 떨어진다', async () => {

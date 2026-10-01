@@ -2,7 +2,7 @@ import * as polygonBoolean from './polygonBoolean'
 import type { BoxConfig, DeepReadonly, InkRegion, JamoData, MedialFamily, Part, ResolvedCenterlinePrimitive, ResolvedInkPrimitive, ResolvedInkSource, ResolvedStrokeInkSource, StrokeDataV2, StrokeRenderStyle } from '../types'
 import { strokesForFamily } from '../utils/jamoContextStrokes'
 import { frameJamoOf } from '../utils/jamoFrame'
-import { getStrokeCenterlineBounds } from '../utils/jamoGeometry'
+import { getJamoRenderBox, getStrokeCenterlineBounds } from '../utils/jamoGeometry'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
 import { brushInkGroupsToInkRegions } from './inkGeometry'
 import { multiPolygonArea, unionOf } from './notoFitReport'
@@ -81,6 +81,14 @@ export interface ComponentFitResult {
   box: BoxConfig
   thickness: number
   primitives: ResolvedCenterlinePrimitive<ResolvedStrokeInkSource>[]
+}
+
+/**
+ * 획을 놓을 상자에 글자 렌더러(`resolveGlyphInkPrimitives`)의 칸 끝 안전 보정을 지나게 한다 — 잉크가 글자 칸 가로 끝(0~1em)을 넘지 않게 좁힌다.
+ * 기본 네모꼴에서는 여백이 있어 안 걸린다. 사용자 네모꼴이 칸 끝에 닿을 때 캔버스가 문장 줄과 같은 글자가 되게 쓴다.
+ */
+export function glyphCellBoxOf(box: BoxConfig, jamo: DeepReadonly<JamoData>, strokes: readonly StrokeDataV2[], weightMultiplier = 1): BoxConfig {
+  return getJamoRenderBox(jamo as JamoData, strokes as StrokeDataV2[], box, weightMultiplier)
 }
 
 export type ComponentFitOutcome = { ok: true; fit: ComponentFitResult } | { ok: false; message: string }

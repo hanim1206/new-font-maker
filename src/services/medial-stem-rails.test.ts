@@ -6,7 +6,7 @@ import { CHOSEONG_MAP, JONGSEONG_MAP, JUNGSEONG_MAP } from '../data/Hangul'
 import { DEFAULT_STYLE } from '../stores/globalStyleStore'
 import type { BoxConfig, JamoData, Part, StrokeDataV2 } from '../types'
 import { decomposeSyllable } from '../utils/hangulUtils'
-import { boxToFaces, fitPartStrokes, identityOfSyllable, medialPartGroups, resolveContextBoxes, type ContextBoxDelta } from './contextBoxResolver'
+import { boxToFaces, fitPartStrokes, identityOfSyllable, medialPartGroups, resolveContextBoxes, resolveInDesignBody, type ContextBoxDelta } from './contextBoxResolver'
 import { mapBoxToDesignBody } from './designBodyPlacement'
 import { materializeFinalGlyphInk, projectFinalGlyphInkToFontContours } from './finalGlyphInk'
 import { resolveGlyphInkPrimitives } from './glyphInkResolver'
@@ -153,6 +153,113 @@ describe.skipIf(!existsSync(CORPUS))('홀자 줄기 끝점 = 보선 — G0 대�
         })
       }
     }
+  })
+
+  // 네모꼴을 바꾼 폰트: 레이아웃 캔버스 · 카드의 잉크가 문장 줄(칸 변을 옮긴 뒤 그 안에서 획을 맞춤)과 같은 자리여야 한다.
+  // 넓힌 네모꼴(글자 칸 끝까지)은 렌더러의 칸 끝 안전 보정이 걸린다 — 캔버스도 같이 지나야 한다. 굵기 배율도 그 보정에 든다.
+  it.each([
+    ['한', { top: 0.05, bottom: 0.04, left: 0.125, right: 0.275 }, 1, 1],
+    ['와', { top: 0.05, bottom: 0.04, left: 0.125, right: 0.275 }, 1, 1],
+    ['웬', { top: 0.2, bottom: 0.1, left: 0, right: 0 }, 1, 1],
+    ['든', { top: 0.2, bottom: 0.1, left: 0, right: 0 }, 2, 1],
+    // 네모꼴 자동 보정으로 세로줄기가 얇아진 채(배율 0.845)로도 같다.
+    ['빼', { top: 0.05, bottom: 0.04, left: 0.125, right: 0.275 }, 1, 0.845],
+    ['왠', { top: 0.05, bottom: 0.04, left: 0.125, right: 0.275 }, 1, 0.845],
+  ] as const)('%s: 사용자 네모꼴에서도 캔버스 잉크 = 글자 잉크', async (char, padding, weight, stemScale) => {
+    const model = await bundle
+    const syllable = decompose(char)
+    const ends = { ...ENDS, stemScale }
+    const resolved = resolveContextBoxes({ identity: identityOfSyllable(syllable)!, model, syllable, ends: ENDS })
+    const inBody = resolveInDesignBody(resolved, { syllable, ends, padding })
+    const glyph = resolveGlyphInkPrimitives({ syllable, placement: { kind: 'boxes', boxes: inBody.boxes }, weightMultiplier: weight, globalLinecap: ENDS.linecap, globalLinejoin: ENDS.linejoin })
+    const em = (item: { stroke: StrokeDataV2; box: BoxConfig }) => item.stroke.points.map((p) => [item.box.x + p.x * item.box.width, item.box.y + p.y * item.box.height])
+    const jobs = [
+      ...resolved.medial.map((group) => ({ part: group.part as Part, jamo: syllable.jungseong!, faces: boxToFaces(group.fit!.slot), medialFit: group.fit })),
+      ...resolved.parts.filter((part) => part.part === 'CH' || part.part === 'JO').map((part) => ({ part: part.part, jamo: (part.part === 'CH' ? syllable.choseong : syllable.jongseong)!, faces: part.faces, medialFit: undefined })),
+    ]
+    let compared = 0
+    for (const job of jobs) {
+      const canvas = fitPartStrokes({ ...job, glyphId: 'layout-editor', medialJamo: syllable.jungseong!.char, ends, body: padding, weightMultiplier: weight })
+      expect(canvas.ok).toBe(true)
+      if (!canvas.ok) continue
+      for (const primitive of canvas.fit.primitives) {
+        const same = glyph.primitives.find((item) => item.source.part === primitive.source.part && item.source.strokeId === primitive.source.strokeId)!
+        em(primitive).forEach(([x, y], index) => {
+          expect(x).toBeCloseTo(em(same)[index][0], 6)
+          expect(y).toBeCloseTo(em(same)[index][1], 6)
+        })
+        compared += 1
+      }
+    }
+    expect(compared).toBe(glyph.primitives.length)
+  })
+
+  // 줄이는 순서: 잉크 바깥면을 먼저 옮기고 그 안에서 두께를 다듬는다. 자소 사이 틈이 네모꼴 비율대로만 준다(두께만큼 더 먹히지 않는다).
+  it('빼 · 한: 가로 600에서 자소의 잉크 바깥면이 기준 틀 변을 그대로 옮긴 자리에 닿고, 잉크가 네모꼴 안에 든다', async () => {
+    const model = await bundle
+    const padding = { top: 0.05, bottom: 0.04, left: 0.125, right: 0.275 }
+    const scale = 0.6 / 0.84
+    for (const char of ['빼', '한']) {
+      const syllable = decompose(char)
+      const resolved = resolveContextBoxes({ identity: identityOfSyllable(syllable)!, model, syllable, ends: ENDS })
+      const inBody = resolveInDesignBody(resolved, { syllable, ends: ENDS, padding })
+      const glyph = resolveGlyphInkPrimitives({ syllable, placement: { kind: 'boxes', boxes: inBody.boxes }, weightMultiplier: 1, globalLinecap: ENDS.linecap, globalLinejoin: ENDS.linejoin })
+      const ink = materializeFinalGlyphInk(glyph.primitives, DEFAULT_STYLE.strokeStyle, { unitsPerEm: 1000, maxCurveErrorFontUnits: 0.5 })
+      expect(ink.ok).toBe(true)
+      if (!ink.ok) continue
+      // 부품별 잉크의 좌우 끝.
+      const span = (part: Part) => {
+        const xs = glyph.primitives.filter((item) => item.source.part === part).flatMap((item) => {
+          const half = item.stroke.thickness * item.weightMultiplier / 2
+          return item.stroke.points.flatMap((p) => [item.box.x + p.x * item.box.width - half, item.box.x + p.x * item.box.width + half])
+        })
+        return { left: Math.min(...xs), right: Math.max(...xs) }
+      }
+      for (const part of resolved.parts) {
+        const moved = inBody.parts.find((item) => item.part === part.part)!
+        // 변은 그대로 옮긴 자리.
+        expect(moved.faces.left).toBeCloseTo(padding.left + (part.faces.left - 0.05) * scale, 9)
+        expect(moved.faces.right).toBeCloseTo(padding.left + (part.faces.right - 0.05) * scale, 9)
+        // 세로 줄기가 서는 변에서는 잉크(중심선 ± 반 두께)가 그 변을 넘지 않는다.
+        expect(span(part.part).left).toBeGreaterThan(moved.faces.left - 0.036)
+        expect(span(part.part).right).toBeLessThan(moved.faces.right + 0.036)
+      }
+      // 첫닿자 ↔ 홀자 사이 틈이 비율대로다(예전 순서면 `틈 × 비율 − 두께 × (1 − 비율)`로 0 가까이 간다).
+      const initial = resolved.parts.find((part) => part.part === 'CH')!
+      const medial = resolved.parts.find((part) => part.part === 'JU')!
+      const gapBefore = medial.faces.left - initial.faces.right
+      const movedInitial = inBody.parts.find((part) => part.part === 'CH')!
+      const movedMedial = inBody.parts.find((part) => part.part === 'JU')!
+      expect(movedMedial.faces.left - movedInitial.faces.right).toBeCloseTo(gapBefore * scale, 9)
+      // 글자 잉크 전체가 사용자 네모꼴(왼 125 ~ 오른 725) 안.
+      const xs = ink.ink.regions.flatMap((region) => region.outer.map((point) => point.x))
+      expect(Math.min(...xs)).toBeGreaterThan(padding.left - 0.002)
+      expect(Math.max(...xs)).toBeLessThan(1 - padding.right + 0.002)
+    }
+  })
+
+  // 자동 보정: 세로줄기가 얇아져도 그 두께로 다듬어 잉크가 변에 닿는다. 배율을 안 알려 주면 얇아진 만큼 변에서 떨어진다.
+  it('빼: 세로줄기 배율 0.8로 그려도 첫닿자 잉크가 옮긴 변에 닿는다', async () => {
+    const model = await bundle
+    const padding = { top: 0.05, bottom: 0.04, left: 0.125, right: 0.275 }
+    const syllable = decompose('빼')
+    const resolved = resolveContextBoxes({ identity: identityOfSyllable(syllable)!, model, syllable, ends: ENDS })
+    const style = { ...DEFAULT_STYLE.strokeStyle, stemScale: 0.8 }
+    const inkSpan = (stemScale: number | undefined) => {
+      const inBody = resolveInDesignBody(resolved, { syllable, ends: { ...ENDS, stemScale }, padding })
+      const glyph = resolveGlyphInkPrimitives({ syllable, placement: { kind: 'boxes', boxes: inBody.boxes }, weightMultiplier: 1, globalLinecap: ENDS.linecap, globalLinejoin: ENDS.linejoin })
+      const ink = materializeFinalGlyphInk(glyph.primitives.filter((item) => item.source.part === 'CH'), style, { unitsPerEm: 1000, maxCurveErrorFontUnits: 0.5 })
+      if (!ink.ok) throw new Error(ink.message)
+      const xs = ink.ink.regions.flatMap((region) => region.outer.map((point) => point.x))
+      return { left: Math.min(...xs), right: Math.max(...xs), faces: inBody.parts.find((part) => part.part === 'CH')!.faces }
+    }
+    const fitted = inkSpan(0.8)
+    expect(fitted.left).toBeCloseTo(fitted.faces.left, 3)
+    expect(fitted.right).toBeCloseTo(fitted.faces.right, 3)
+    // ㅃ의 양 끝은 기둥이다. 배율 없이 다듬으면 얇아진 반 두께(35u × 0.2 = 7u)만큼 안으로 떨어진다.
+    const loose = inkSpan(undefined)
+    expect(loose.left - loose.faces.left).toBeCloseTo(0.007, 3)
+    expect(loose.faces.right - loose.right).toBeCloseTo(0.007, 3)
   })
 
   it.each(['구', '규', '귀', '후', '굔'])('%s: 짧은기둥이 보에 붙은 끝은 모델 rail과 상관없이 보 가운데다', async (char) => {

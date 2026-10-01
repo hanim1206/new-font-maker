@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
-import { identityOfSyllable, resolveContextBoxes } from '../src/services/contextBoxResolver'
+import { identityOfSyllable, resolveContextBoxes, resolveInDesignBody } from '../src/services/contextBoxResolver'
 import type { ContextBoxDelta, ContextBoxResolution } from '../src/services/contextBoxResolver'
-import { isReferenceBody, mapBoxToDesignBody, mapFacesToDesignBody } from '../src/services/designBodyPlacement'
 import type { GlyphInkPlacement } from '../src/services/notoGlyphXor'
+import { stemScaleOf } from '../src/services/strokeRenderGeometry'
 import type { ModelIdentity } from '../src/services/notoVariationModel'
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
 import type { DecomposedSyllable, LayoutSchema } from '../src/types'
@@ -99,10 +99,19 @@ function resolveReferenceBoxes(input: {
   return identity && bundle ? resolveContextBoxes({ identity, model: bundle, syllable, ends: { linecap: ends.linecap, linejoin: ends.linejoin }, delta }) : null
 }
 
-/** 가벼운 쪽: 모델 상자와 레이아웃 Δ는 기본 네모꼴 기준이라, 사용자 네모꼴은 맨 끝에 한 번 얹는다(선형 변환). 화면과 OTF가 여기를 같이 지나므로 둘이 안 갈라진다. */
-function resolvePlacementBoxes(reference: ContextBoxResolution | null, padding: LayoutSchema['padding'] | undefined): { reference: ContextBoxResolution | null; resolution: ContextBoxResolution | null } {
-  return { reference, resolution: reference && !isReferenceBody(padding) ? inDesignBody(reference, padding) : reference }
+/**
+ * 모델 상자와 레이아웃 Δ는 기본 네모꼴 기준이라, 사용자 네모꼴은 맨 끝에 한 번 얹는다. 화면과 OTF가 여기를 같이 지나므로 둘이 안 갈라진다.
+ * 기본 네모꼴이면 아무것도 안 한다. 아니면 부품마다 잉크 바깥면을 옮긴 뒤 획을 다시 맞춘다(`resolveInDesignBody`) — 글자당 부품 수만큼 맞춤이 한 번 더 돈다.
+ */
+function resolvePlacementBoxes(reference: ContextBoxResolution | null, padding: LayoutSchema['padding'] | undefined, syllable: DecomposedSyllable, ends: PlacementEnds): { reference: ContextBoxResolution | null; resolution: ContextBoxResolution | null } {
+  return { reference, resolution: reference ? resolveInDesignBody(reference, { syllable, ends: { linecap: ends.linecap, linejoin: ends.linejoin, stemScale: ends.stemScale ?? stemScaleOf(ends.strokeStyle) }, padding }) : reference }
 }
+
+/**
+ * 배치가 보는 스타일 조각. 네모꼴 자동 보정의 세로줄기 배율은 사용자 네모꼴에서 상자를 다듬을 때 쓴다.
+ * 실효 스타일을 통째로 넘기면 `strokeStyle`에서 읽고, 조각만 넘길 때는 `stemScale`로 준다. 둘 다 없으면 1.
+ */
+type PlacementEnds = Pick<GlobalStyle, 'linecap' | 'linejoin'> & { stemScale?: number; strokeStyle?: GlobalStyle['strokeStyle'] }
 
 type PlacementResult = { placement: GlyphPlacement; resolution: ContextBoxResolution | null; referencePlacement: GlyphPlacement }
 
@@ -122,10 +131,10 @@ export function contextPlacementOf(input: {
   identity: ModelIdentity | null
   syllable: DecomposedSyllable
   schema: LayoutSchema
-  ends: Pick<GlobalStyle, 'linecap' | 'linejoin'>
+  ends: PlacementEnds
   delta: ContextBoxDelta | undefined
 }): PlacementResult {
-  return placementResultOf(resolvePlacementBoxes(resolveReferenceBoxes(input), input.schema.padding), input.schema)
+  return placementResultOf(resolvePlacementBoxes(resolveReferenceBoxes(input), input.schema.padding, input.syllable, input.ends), input.schema)
 }
 
 /**
@@ -137,7 +146,7 @@ export function contextPlacementOf(input: {
  * 다시 그릴 때마다 상자 다듬기(글자당 잉크 합치기 여러 번)가 처음부터 돈다 — 문장 11자면 조작 한 번에 수십 ms다(폰에서는 100ms 안팎).
  * 그래서 열쇠는 내용으로 잡는다: 글자 · 자모 객체 셋(저장소의 것이라 안 바뀌면 같은 객체다) · 여백 네 값.
  */
-export function useContextPlacement(syllable: DecomposedSyllable, schema: LayoutSchema, globalStyle: Pick<GlobalStyle, 'linecap' | 'linejoin'>, deltaSource?: LayoutDeltaSnapshot, modelSource?: ModelSource): PlacementResult {
+export function useContextPlacement(syllable: DecomposedSyllable, schema: LayoutSchema, globalStyle: Pick<GlobalStyle, 'linecap' | 'linejoin'> & Partial<Pick<GlobalStyle, 'strokeStyle'>>, deltaSource?: LayoutDeltaSnapshot, modelSource?: ModelSource): PlacementResult {
   const { bundle } = useNotoModel(modelSource)
   const { char, choseong, jungseong, jongseong, layoutType } = syllable
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 내용이 같으면 같은 글자다(위 설명).
@@ -150,22 +159,15 @@ export function useContextPlacement(syllable: DecomposedSyllable, schema: Layout
   const storedDelta = useLayoutDelta(identity)
   // `deltaSource`를 주면 이 기기 저장소 대신 그 폰트의 Δ를 쓴다(관리자 미리보기).
   const delta = useMemo(() => deltaSource ? effectiveLayoutDelta(deltaSource, identity) : storedDelta, [deltaSource, identity, storedDelta])
-  // 다듬기는 네모꼴과 무관하므로 네모꼴을 끄는 동안에도 다시 돌지 않는다. 얹는 변환만 다시 한다.
+  // 기준 틀에서 푸는 일(모델 · Δ · 다듬기)은 네모꼴과 무관해서 네모꼴을 끄는 동안 다시 돌지 않는다. 사용자 네모꼴에 다시 맞추는 일만 돈다.
   const reference = useMemo(
     () => resolveReferenceBoxes({ bundle, identity, syllable: stableSyllable, ends: { linecap: globalStyle.linecap, linejoin: globalStyle.linejoin }, delta }),
     [bundle, identity, stableSyllable, globalStyle.linecap, globalStyle.linejoin, delta],
   )
-  const resolved = useMemo(() => resolvePlacementBoxes(reference, stablePadding), [reference, stablePadding])
+  const stemScale = stemScaleOf(globalStyle.strokeStyle)
+  const resolved = useMemo(() => resolvePlacementBoxes(reference, stablePadding, stableSyllable, { linecap: globalStyle.linecap, linejoin: globalStyle.linejoin, stemScale }), [reference, stablePadding, stableSyllable, globalStyle.linecap, globalStyle.linejoin, stemScale])
   // 상자로 풀렸으면 스키마는 결과에 안 들어간다. 스키마 객체가 렌더마다 새것이어도 결과 객체는 그대로다.
   const schemaIfNeeded = resolved.resolution?.complete && resolved.reference ? null : schema
   return useMemo(() => placementResultOf(resolved, schemaIfNeeded ?? schema), [resolved, schemaIfNeeded]) // eslint-disable-line react-hooks/exhaustive-deps
-}
-
-function inDesignBody(resolution: ContextBoxResolution, padding: LayoutSchema['padding']): ContextBoxResolution {
-  return {
-    ...resolution,
-    parts: resolution.parts.map((part) => ({ ...part, faces: mapFacesToDesignBody(part.faces, padding), box: mapBoxToDesignBody(part.box, padding) })),
-    boxes: Object.fromEntries(Object.entries(resolution.boxes).map(([part, box]) => [part, mapBoxToDesignBody(box, padding)])) as ContextBoxResolution['boxes'],
-  }
 }
 

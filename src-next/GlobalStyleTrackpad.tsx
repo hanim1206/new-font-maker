@@ -13,10 +13,10 @@ const TABS: { id: GlobalStylePanel; label: string; short: string; picto: StylePi
   { id: 'beak', label: '부리', short: '부리', picto: 'beak' },
 ]
 /**
- * 스타일 화면에서 잠근 탭. 네모꼴은 문장 · OTF만 따르고 레이아웃 캔버스 · 카드 · 보선은 아직 모른다 —
- * 바꾸면 편집 화면과 어긋나서 플랜이 끝날 때까지 막는다(09-28 사용자). 이미 바꾼 값은 그대로 둔다. 옛 단독 화면은 그대로.
+ * 스타일 화면에서 잠근 탭. 지금은 없다 — 네모꼴은 09-28에 잠갔다가 편집 화면이 네모꼴을 따르게 된 뒤 풀었다(플랜 `2026-10-01_네모꼴-열기`).
+ * 다시 잠글 탭이 생기면 여기에 넣는다(`개발 중이에요` 표시 · 누를 수 없음).
  */
-const LOCKED: readonly GlobalStylePanel[] = ['body']
+const LOCKED: readonly GlobalStylePanel[] = []
 
 export function GlobalStyleTrackpad({
   panel,

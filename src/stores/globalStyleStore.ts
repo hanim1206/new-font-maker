@@ -5,6 +5,8 @@ import { persist } from 'zustand/middleware'
 import type { BrushStyle, LayoutType, StrokeLinecap, StrokeLinejoin, StrokeRenderStyle } from '../types'
 import { DEFAULT_STEM_BEAK, normalizeStemBeak, type StemBeakStyle } from '../services/stemBeak'
 import { INNER_ROUNDNESS_MAX } from '../services/flatStrokeGeometry'
+import { withBodyCompensation } from '../services/bodyCompensation'
+import { useLayoutStore } from './layoutStore'
 
 export { weightToMultiplier } from '../utils/globalStyleUtils'
 
@@ -20,6 +22,8 @@ export interface GlobalStyle {
   brush: BrushStyle       // 폰트 전체에 적용하는 붓촉
   strokeStyle: StrokeRenderStyle // 중심선을 최종 윤곽으로 바꾸는 공통 규칙
   stemBeak?: StemBeakStyle // 세로줄기 열린 머리에 얹는 부리. 없으면 꺼짐(옛 저장분)
+  /** 네모꼴 자동 굵기 보정. 껐을 때만 `false`를 둔다 — 없으면 켜짐(기본). */
+  autoCompensation?: boolean
 }
 
 // 숫자 속성만 (updateStyle에서 사용)
@@ -48,6 +52,8 @@ interface GlobalStyleActions {
   setBrushStyle: (value: BrushStyle) => void
   setStrokeRenderStyle: (value: StrokeRenderStyle) => void
   setStemBeak: (value: Partial<StemBeakStyle>) => void
+  /** 네모꼴 자동 굵기 보정을 켜고 끈다. 켜짐이 기본이라 켜면 키를 지운다. */
+  setAutoCompensation: (on: boolean) => void
 
   // 제외 규칙 관리
   addExclusion: (property: keyof GlobalStyle, layoutType: LayoutType) => void
@@ -88,6 +94,7 @@ export const DEFAULT_STYLE: GlobalStyle = {
 /**
  * 한 레이아웃에 실제로 먹는 전역 스타일. 전역 값을 읽는 모든 곳이 이 길 하나를 거친다.
  * 제외 규칙이 없으면 같은 객체를 그대로 돌려준다(메모가 안 깨진다).
+ * 네모꼴 자동 보정은 네모꼴을 알아야 해서 여기가 아니라 `getEffectiveStyle` · `useEffectiveGlobalStyle`이 얹는다(`withBodyCompensation`).
  */
 export function effectiveStyleOf(style: GlobalStyle, exclusions: readonly GlobalStyleExclusion[], layoutType: LayoutType): GlobalStyle {
   const excluded = exclusions.filter((exclusion) => exclusion.layoutType === layoutType)
@@ -149,7 +156,11 @@ export function normalizeStrokeRenderStyle(
 function normalizeGlobalStyle(style: GlobalStyle): GlobalStyle {
   const brush = normalizeBrushStyle(style.brush)
   const strokeStyle = normalizeStrokeRenderStyle(style.strokeStyle, brush)
-  return { ...style, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : brush, strokeStyle, stemBeak: normalizeStemBeak(style.stemBeak) }
+  const normalized: GlobalStyle = { ...style, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : brush, strokeStyle, stemBeak: normalizeStemBeak(style.stemBeak) }
+  // 켜짐이 기본이라 `false`만 남긴다. 옛 저장분과 같은 모양.
+  if (style.autoCompensation === false) normalized.autoCompensation = false
+  else delete normalized.autoCompensation
+  return normalized
 }
 
 /** 저장된 폰트의 스타일 → 스토어에 넣는 값. linecap·linejoin 백필(구형 데이터) + 정규화. 스토어 없이 폰트를 그릴 때(관리자 미리보기)도 쓴다. */
@@ -202,6 +213,12 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
           state.style.stemBeak = normalizeStemBeak({ ...DEFAULT_STEM_BEAK, ...state.style.stemBeak, ...value })
         }),
 
+      setAutoCompensation: (on) =>
+        set((state) => {
+          if (on) delete state.style.autoCompensation
+          else state.style.autoCompensation = false
+        }),
+
       addExclusion: (property, layoutType) =>
         set((state) => {
           // 중복 방지
@@ -230,7 +247,7 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
 
       getEffectiveStyle: (layoutType) => {
         const { style, exclusions } = get()
-        return { ...effectiveStyleOf(style, exclusions, layoutType) }
+        return { ...withBodyCompensation(effectiveStyleOf(style, exclusions, layoutType), effectivePaddingOf(useLayoutStore.getState(), layoutType)) }
       },
 
       resetStyle: () =>
@@ -286,7 +303,18 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
 export function useEffectiveGlobalStyle(layoutType: LayoutType): GlobalStyle {
   const style = useGlobalStyleStore((state) => state.style)
   const exclusions = useGlobalStyleStore((state) => state.exclusions)
-  return useMemo(() => effectiveStyleOf(style, exclusions, layoutType), [style, exclusions, layoutType])
+  // 네모꼴 자동 보정은 이 레이아웃의 네모꼴(폰트 전체 + 레이아웃별)에서 나온다.
+  const globalPadding = useLayoutStore((state) => state.globalPadding)
+  const paddingOverride = useLayoutStore((state) => state.paddingOverrides[layoutType])
+  return useMemo(
+    () => withBodyCompensation(effectiveStyleOf(style, exclusions, layoutType), paddingOverride ? { ...globalPadding, ...paddingOverride } : globalPadding),
+    [style, exclusions, layoutType, globalPadding, paddingOverride],
+  )
+}
+
+function effectivePaddingOf(layout: Pick<ReturnType<typeof useLayoutStore.getState>, 'globalPadding' | 'paddingOverrides'>, layoutType: LayoutType) {
+  const override = layout.paddingOverrides[layoutType]
+  return override ? { ...layout.globalPadding, ...override } : layout.globalPadding
 }
 
 /**

@@ -93,7 +93,9 @@ import { useGlobalStyleStore, type GlobalStyle } from '../src/stores/globalStyle
 import { BrushStyleTrackpad, type StrokeEnds } from './BrushStyleTrackpad'
 import { RangeTicks } from './RangeTicks'
 import { StemBeakControls } from './StemBeakControls'
-import { designBodySvgTransform, REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../src/services/designBodyPlacement'
+import { designBodyAxis, designBodySvgTransform, REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../src/services/designBodyPlacement'
+import { withBodyCompensation } from '../src/services/bodyCompensation'
+import { stemScaleOf } from '../src/services/strokeRenderGeometry'
 import { endRangeDrag, moveRangeDrag, startRangeDrag } from './rangeDrag'
 import { DEFAULT_STEM_BEAK, type StemBeakStyle } from '../src/services/stemBeak'
 import styleMode from './GlobalStyleMode.module.css'
@@ -444,8 +446,12 @@ function Glyph({
     width: 1 - effectiveSchema.padding.left - effectiveSchema.padding.right,
     height: 1,
   }
+  // 네모꼴 자동 보정은 이 글자 레이아웃의 네모꼴에서 나온다(`getEffectiveStyle`과 같은 길). 받는 `globalStyle`은 미리보기를 얹은 저장값이다.
+  const paddingKey = `${effectivePadding.left}|${effectivePadding.right}|${effectivePadding.top}|${effectivePadding.bottom}`
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 여백은 네 값이 같으면 같다.
+  const renderStyle = useMemo(() => withBodyCompensation(globalStyle, effectivePadding), [globalStyle, paddingKey])
   // 배치는 칸 해석 함수(모델 상자)가 우선, 못 풀면 스키마.
-  const { placement } = useContextPlacement(decomposed, effectiveSchema, globalStyle)
+  const { placement } = useContextPlacement(decomposed, effectiveSchema, renderStyle)
   const boxes = layoutHighlight?.layoutType === decomposed.layoutType
     ? placement.kind === 'boxes' ? placement.boxes : calculateBoxes(effectiveSchema, {
       cho: decomposed.choseong?.char ?? '',
@@ -453,7 +459,7 @@ function Glyph({
       jong: decomposed.jongseong?.char ?? '',
     })
     : null
-  return <SvgRenderer syllable={decomposed} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} viewportBox={viewportBox} size={size} overflow="visible" clipGlyphs={false} globalStyle={globalStyle}>
+  return <SvgRenderer syllable={decomposed} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} viewportBox={viewportBox} size={size} overflow="visible" clipGlyphs={false} globalStyle={renderStyle}>
     {boxes && layoutHighlight && <LayoutAreaBoxes boxes={boxes} parts={layoutHighlight.parts} emphasis={layoutHighlight.source ? 'source' : 'affected'} />}
   </SvgRenderer>
 }
@@ -568,10 +574,11 @@ function FocusedGlyph({
   const drag = useRef<{ pointerId: number; startX: number; startY: number; box: BoxConfig; started: boolean; anchors: SnapAnchors; candidates: SnapCandidate[]; onTap?: () => void } | null>(null)
   // 스냅: 레이아웃의 기준선 스냅과 같은 규칙(처음 자리 → 기준선 · 상자 변 · 다른 획 → 격자), 축마다 따로. 후보는 이 글자의 Noto 기준선 + 부품 상자 네 변 + 같은 글자 안 획의 중심선 · 끝.
   const { glyph: notoGlyph } = useNotoGlyph(char.codePointAt(0) ?? 0xac00)
+  // 노토 기준선은 기준 틀 좌표라 사용자 네모꼴로 옮긴다. 부품 상자 변(`resolution`)은 이미 옮겨져 온다.
   const guideRails = useMemo<SnapCandidate[]>(() => !dragApiRef ? [] : [
-    ...(notoGlyph ? baselineRails(notoGlyph) : []),
+    ...(notoGlyph ? baselineRails(notoGlyph).map((rail) => ({ ...rail, value: designBodyAxis(schema.padding, rail.axis).to(rail.value) })) : []),
     ...(resolution ? faceSnapCandidates(resolution.parts) : []),
-  ], [dragApiRef, notoGlyph, resolution])
+  ], [dragApiRef, notoGlyph, resolution, schema.padding])
   const strokeCandidates = useMemo(() => strokeSnapCandidates(targets.map((target) => ({ strokeId: target.stroke.id, label: `${target.jamo.char} 획`, stroke: target.stroke, box: target.box }))), [targets])
   // 끌기 후보: 같은 자소의 꼭짓점 · 대칭 자리가 먼저, 그다음 기준선 · 상자 변 · 다른 획 끝, 그다음 격자.
   const dragCandidates = (dragged: { strokeId: string; pointIndex?: number }): SnapCandidate[] => {
@@ -1743,67 +1750,63 @@ function InferenceTrackpad({
 }
 
 /**
- * 제품 화면의 네모꼴: 막대 하나(길쭉 ↔ 노토 비율 ↔ 납작). 고르는 건 장평 하나뿐이라 가로 · 세로를 따로 두지 않는다.
- * 0점은 기본 네모꼴 = 노토 몸통(840 × 910, 세로가 김). 정네모(W = H)는 막대 오른쪽의 한 지점이다.
- * 왼쪽은 세로를 둔 채 가로를 줄이고(500까지), 오른쪽은 가로를 글자 칸 끝(1000)까지 늘린 뒤 세로를 줄인다(500까지).
+ * 제품 화면의 네모꼴: 막대 하나, 가로만(좁게 ↔ 기본 ↔ 넓게). 세로는 노토 몸통 높이에 고정이다(2026-10-01 사용자 결정).
+ * 읽기는 기본 가로(840) 대비 % — 가변 폰트의 폭 축과 같다.
+ * 범위는 속공간이 안 막히는 86%부터, 글자 칸 끝 안전 보정이 안 걸리는 106%까지다(플랜 `2026-10-01_네모꼴-열기` 4단계 전수). 속공간 지키기가 들어오면 넓힌다.
  */
 const BODY_W = Math.round(REFERENCE_WIDTH * 1000)
 const BODY_H = Math.round(REFERENCE_HEIGHT * 1000)
-const BODY_MIN = 500
-const BODY_MAX = 1000
-/** 막대는 −100(가장 길쭉) ~ 0(노토 비율) ~ 100(가장 납작). 0점이 막대 한가운데에 오게 양쪽을 따로 편다. */
-const BODY_SHAPE_LIMIT = 100
-const BODY_SHAPE_STICKY = 4
-const TALL_SPAN = BODY_W - BODY_MIN
-const FLAT_SPAN = (BODY_MAX - BODY_W) + (BODY_H - BODY_MIN)
-const roundTo5 = (value: number) => Math.round(value / 5) * 5
-
-function bodyOfShape(shape: number): { width: number; height: number } {
-  if (shape <= 0) return { width: roundTo5(BODY_W + shape / BODY_SHAPE_LIMIT * TALL_SPAN), height: BODY_H }
-  const amount = shape / BODY_SHAPE_LIMIT * FLAT_SPAN
-  const widen = Math.min(amount, BODY_MAX - BODY_W)
-  return { width: roundTo5(BODY_W + widen), height: roundTo5(BODY_H - (amount - widen)) }
-}
-
-/** 저장된 가로 · 세로를 막대 자리로 읽는다. 옛 화면에서 둘을 따로 맞춘 값은 비율만 읽어 보여 주고, 막대를 움직이기 전에는 값을 안 건드린다. */
-function shapeOfBody(width: number, height: number): number {
-  const ratio = width / Math.max(height, 1)
-  if (ratio <= BODY_W / BODY_H) return Math.round((ratio * BODY_H - BODY_W) / TALL_SPAN * BODY_SHAPE_LIMIT)
-  const amount = ratio <= BODY_MAX / BODY_H ? ratio * BODY_H - BODY_W : (BODY_MAX - BODY_W) + (BODY_H - BODY_MAX / ratio)
-  return Math.round(amount / FLAT_SPAN * BODY_SHAPE_LIMIT)
-}
+const BODY_PERCENT_MIN = 86
+const BODY_PERCENT_MAX = 106
+/** 기본(100%) 근처에서는 탁 걸린다. */
+const BODY_PERCENT_STICKY = 1
+const percentOfWidth = (width: number) => Math.round(width / BODY_W * 100)
 
 function DesignBodyShapeControls({ fontSpace }: { fontSpace: { unitsPerEm: number; width: number; height: number } }) {
   const globalPadding = useLayoutStore((state) => state.globalPadding)
   const setGlobalPadding = useLayoutStore((state) => state.setGlobalPadding)
   const resetGlobalPadding = useLayoutStore((state) => state.resetGlobalPadding)
+  const style = useGlobalStyleStore((state) => state.style)
+  const setAutoCompensation = useGlobalStyleStore((state) => state.setAutoCompensation)
   const body = paddingToDesignBody(globalPadding, fontSpace)
-  const shape = Math.max(-BODY_SHAPE_LIMIT, Math.min(BODY_SHAPE_LIMIT, shapeOfBody(body.width, body.height)))
-  const isReference = Math.round(body.width) === BODY_W && Math.round(body.height) === BODY_H
-  const isSquare = Math.round(body.width) === Math.round(body.height)
-  // 노토 비율(0점) 근처에서는 탁 걸린다.
-  const setShape = (value: number | null) => {
+  const width = Math.round(body.width)
+  const height = Math.round(body.height)
+  const percent = percentOfWidth(width)
+  const shown = Math.max(BODY_PERCENT_MIN, Math.min(BODY_PERCENT_MAX, percent))
+  const isReference = width === BODY_W && height === BODY_H
+  // 옛 화면에서 세로를 바꿨거나 범위 밖으로 저장된 폰트. 막대를 움직이기 전에는 값을 안 건드린다.
+  const outside = height !== BODY_H || percent !== shown
+  const setPercent = (value: number | null) => {
     if (value === null) return
-    const next = Math.abs(value) <= BODY_SHAPE_STICKY ? 0 : value
-    if (next === shape && !(next === 0 && !isReference)) return
-    const target = bodyOfShape(next)
-    setGlobalPadding(designBodyPaddingOfSize(target.width, target.height, fontSpace))
+    const next = Math.abs(value - 100) <= BODY_PERCENT_STICKY ? 100 : Math.max(BODY_PERCENT_MIN, Math.min(BODY_PERCENT_MAX, Math.round(value)))
+    if (next === percent && height === BODY_H) return
+    setGlobalPadding(designBodyPaddingOfSize(next === 100 ? BODY_W : Math.round(BODY_W * next / 100), BODY_H, fontSpace))
   }
+  // 자동 보정: 좁히면 세로줄기만 얇아진다. 저장된 굵기는 그대로고 여기서는 얼마나 보정했는지만 보여 준다.
+  const autoOn = style.autoCompensation !== false
+  const thinned = Math.round((1 - stemScaleOf(withBodyCompensation({ ...style, autoCompensation: undefined }, globalPadding).strokeStyle)) * 100)
+  const autoText = !autoOn ? '꺼 두었어요' : thinned > 0 ? `세로줄기 −${thinned}%` : percent >= 100 ? '좁힐 때만 얇게 해요' : '이 붓에서는 못 해요'
   return <div className={styleMode.weight} role="tabpanel" aria-label="글자 네모꼴 설정">
-    <p><strong>글자가 들어가는 틀의 모양</strong><span>틀을 바꾸면 글자도 같이 바뀝니다</span></p>
+    <p><strong>글자가 들어가는 틀의 가로</strong><span>틀을 바꾸면 글자도 같이 바뀝니다</span></p>
     <div className={styleMode.weightBox}>
-      <div className={styleMode.weightHead}><span>{isReference ? '노토 비율' : isSquare ? '정네모' : shape < 0 ? '길쭉하게' : '납작하게'}</span><output data-testid="style-body-size">{Math.round(body.width)} × {Math.round(body.height)}</output></div>
+      <div className={styleMode.weightHead}><span>{isReference ? '기본' : percent < 100 ? '좁게' : percent > 100 ? '넓게' : '기본 가로'}</span><output data-testid="style-body-size">{percent}%</output></div>
       <div className={styleMode.shapeRow}>
         <span className={styleMode.shapeIcon} style={{ width: 12, height: 20 }} aria-hidden="true" />
         <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <input type="range" min={-BODY_SHAPE_LIMIT} max={BODY_SHAPE_LIMIT} step="1" value={shape} aria-label="네모꼴 모양" data-testid="style-body-shape" onChange={(event) => setShape(Number(event.target.value))}
-            onPointerDown={(event) => setShape(startRangeDrag(event))} onPointerMove={(event) => setShape(moveRangeDrag(event))} onPointerUp={endRangeDrag} onPointerCancel={endRangeDrag} />
-          <RangeTicks min={-BODY_SHAPE_LIMIT} max={BODY_SHAPE_LIMIT} ticks={[{ at: -BODY_SHAPE_LIMIT, text: '길쭉' }, { at: -50 }, { at: 0, text: '정네모' }, { at: 50 }, { at: BODY_SHAPE_LIMIT, text: '납작' }]} />
+          <input type="range" min={BODY_PERCENT_MIN} max={BODY_PERCENT_MAX} step="1" value={shown} aria-label="네모꼴 가로" data-testid="style-body-shape" onChange={(event) => setPercent(Number(event.target.value))}
+            onPointerDown={(event) => setPercent(startRangeDrag(event))} onPointerMove={(event) => setPercent(moveRangeDrag(event))} onPointerUp={endRangeDrag} onPointerCancel={endRangeDrag} />
+          <RangeTicks min={BODY_PERCENT_MIN} max={BODY_PERCENT_MAX} ticks={[{ at: BODY_PERCENT_MIN, text: '좁게' }, { at: 100, text: '기본' }, { at: BODY_PERCENT_MAX, text: '넓게' }]} />
         </span>
-        <span className={styleMode.shapeIcon} style={{ width: 22, height: 12 }} aria-hidden="true" />
+        <span className={styleMode.shapeIcon} style={{ width: 18, height: 20 }} aria-hidden="true" />
       </div>
+      {outside && <small className={styleMode.bodyNote} data-testid="style-body-outside">지금 값({width} × {height})은 막대 범위 밖이에요. 막대를 움직이면 범위 안으로 들어와요.</small>}
     </div>
-    <button type="button" disabled={isReference} onClick={resetGlobalPadding}>노토 몸통 {BODY_W} × {BODY_H}으로 되돌리기</button>
+    <label className={styleMode.autoRow}>
+      <input type="checkbox" checked={autoOn} onChange={(event) => setAutoCompensation(event.target.checked)} data-testid="style-body-auto" />
+      <span>자동 보정</span>
+      <output data-testid="style-body-auto-amount">{autoText}</output>
+    </label>
+    <button type="button" disabled={isReference} onClick={resetGlobalPadding}>기본 가로로 되돌리기</button>
   </div>
 }
 
@@ -1958,11 +1961,11 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const benchChars = useWorkbenchStore((state) => state.chars)
   // 섹션 홈 `편집 n`으로 들어왔는지. 돌아갈 곳(`returnTo`)이 있을 때만 — 레이아웃 카드로 들어오면 도마가 남아 있어도 아니다.
   const benchCarried = useWorkbenchStore((state) => state.type !== null && state.chars.length > 0 && state.returnTo !== null)
-  // 대시보드 스타일 칸이 `?panel=beak`처럼 열 탭을 준다. 없으면 네모꼴(잠겨 있어 획 탭이 보인다).
+  // 대시보드 스타일 칸이 `?panel=beak`처럼 열 탭을 준다. 없으면 획(굵기가 있는 탭 — 네모꼴이 잠겨 있던 동안 첫 화면이던 그대로).
   const [globalStylePanel, setGlobalStylePanel] = useState<GlobalStylePanel | null>(() => {
     if (!styleOnly) return null
     const asked = new URLSearchParams(window.location.search).get('panel')
-    return asked === 'brush' || asked === 'beak' ? asked : 'body'
+    return asked === 'body' || asked === 'beak' ? asked : 'brush'
   })
   const [previewBrush, setPreviewBrush] = useState<StrokeRenderStyle | null>(null)
   const [previewTone, setPreviewTone] = useState<StyleTone | null>(null)
@@ -2017,16 +2020,20 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     const legacy = () => calculateBoxes(schema, { cho: target.choseong?.char ?? '', jung: target.jungseong?.char ?? '', jong: target.jongseong?.char ?? '' })
     if (chrome !== 'workspace' || !notoBundle) return legacy()
     const identity = identityOfSyllable(target)
-    const { placement } = contextPlacementOf({ bundle: notoBundle, identity, syllable: target, schema, ends: previewEnds, delta: effectiveLayoutDelta({ rules: layoutDeltaRules }, identity) })
+    // 네모꼴 자동 보정의 세로줄기 배율도 같이 넘긴다 — 화면이 글자를 놓는 상자와 같아야 한다.
+    const stemScale = stemScaleOf(withBodyCompensation(previewGlobalStyle, schema.padding).strokeStyle)
+    const { placement } = contextPlacementOf({ bundle: notoBundle, identity, syllable: target, schema, ends: { ...previewEnds, stemScale }, delta: effectiveLayoutDelta({ rules: layoutDeltaRules }, identity) })
     return placement.kind === 'boxes' ? placement.boxes : legacy()
-  }, [chrome, notoBundle, previewEnds, layoutDeltaRules])
+  }, [chrome, notoBundle, previewEnds, previewGlobalStyle, layoutDeltaRules])
   const measuresOnScreenBoxes = chrome === 'workspace' && Boolean(notoBundle)
   const syllable = useMemo(
     () => resolveSyllableContextualInkSafety(previewedSyllable, screenBoxesOf(previewedSyllable, effectiveSchema)).syllable,
     [effectiveSchema, previewedSyllable, screenBoxesOf],
   )
   // 레이아웃 모드는 글자가 모델 상자로 그려질 때만 뜻이 있다. 그때는 옛 경로(자소 통째 이동 → 스키마)가 글자에 안 닿으므로 셸 안에서는 끈다.
-  const { placement, resolution: placementResolution } = useContextPlacement(syllable, effectiveSchema, previewGlobalStyle)
+  // 고치는 글자의 실효 스타일. 미리보기를 얹은 저장값에 이 레이아웃 네모꼴의 자동 보정을 얹는다(`getEffectiveStyle`과 같은 길).
+  const focusedGlobalStyle = useMemo(() => withBodyCompensation(previewGlobalStyle, effectiveSchema.padding), [previewGlobalStyle, effectiveSchema.padding])
+  const { placement, resolution: placementResolution } = useContextPlacement(syllable, effectiveSchema, focusedGlobalStyle)
   // 레이아웃 모드는 모델이 있으면 열린다. 지금 획이 모델 상자에 맞는지(`placement.kind`)에 매지 않는다 —
   // 획을 고치다 맞춤이 깨지면(ㅡ를 곡선으로 → 상자가 획 두께보다 작음) 나가는 문(`완료`)까지 사라져 갇힌다.
   const layoutAvailable = chrome === 'workspace' && isEditableHangul(selectedChar) && (selectedChar.codePointAt(0) ?? 0) >= 0xac00 && !notoModelError
@@ -2665,7 +2672,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   }
   // 셸 안에서는 도구 줄이 없다(출력은 폰트 탭, 형태 규칙은 머리, 실행취소 · 다시실행은 셸 머리). 아래 줄은 옛 단독 화면 것.
   const menuLabel = (text: string) => chrome === 'workspace' ? <em>{text}</em> : null
-  const toggleGlobalStyle = () => { if (isGlobalStyleOpen) closeGlobalStyle(); else { if (sentenceSheetOpen) closeSentenceSheet(); setGlobalStylePanel('body') } }
+  const toggleGlobalStyle = () => { if (isGlobalStyleOpen) closeGlobalStyle(); else { if (sentenceSheetOpen) closeSentenceSheet(); setGlobalStylePanel(chrome === 'workspace' ? 'brush' : 'body') } }
   const actions = (
     <nav aria-label="폰트 추출 및 편집 기록">
       <button type="button" className={styles.exportButton} data-export-state={exportState} onClick={exportCurrentFont} disabled={exportState === 'exporting'} aria-label={exportState === 'exporting' ? `OTF 추출 중: ${exportProgress}` : exportState === 'downloaded' ? 'OTF 추출 완료' : exportState === 'failed' ? 'OTF 추출 실패' : '현재 작업을 OTF로 추출'} title={exportState === 'exporting' ? exportProgress : '현재 작업을 OTF로 추출'}>
@@ -2738,7 +2745,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
           ? <div ref={setStrokeToolSlot} className={styles.strokeToolSlot} data-testid="jamo-stroke-tool-slot" />
           : chrome === 'workspace' && layoutAvailable && !styleLocksCanvas && <LayoutContextCards activeContextId={corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00).contextId} allActive={false} ink={strokeCardInk ?? undefined} />}
         <div className={styles.focusArea}>
-        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={styleLocksCanvas ? { kind: 'none' } : selection} onSelect={styleLocksCanvas ? () => {} : selectFromCanvas} selectedPoints={styleLocksCanvas ? [] : selectedPoints} selectedStrokes={styleLocksCanvas ? [] : selectedStrokes} multiSelectArmed={!styleLocksCanvas && multiSelectArmed} wholeJamoCentered={styleLocksCanvas ? null : wholeJamoCentered} onPointSelect={styleLocksCanvas ? () => {} : selectPointFromCanvas} lockedPart={styleLocksCanvas ? null : lockedPart} dragApiRef={directManipulation && !styleLocksCanvas ? dragApiRef : undefined} padDragRef={directManipulation && !styleLocksCanvas ? padDragRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={previewGlobalStyle} />
+        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={styleLocksCanvas ? { kind: 'none' } : selection} onSelect={styleLocksCanvas ? () => {} : selectFromCanvas} selectedPoints={styleLocksCanvas ? [] : selectedPoints} selectedStrokes={styleLocksCanvas ? [] : selectedStrokes} multiSelectArmed={!styleLocksCanvas && multiSelectArmed} wholeJamoCentered={styleLocksCanvas ? null : wholeJamoCentered} onPointSelect={styleLocksCanvas ? () => {} : selectPointFromCanvas} lockedPart={styleLocksCanvas ? null : lockedPart} dragApiRef={directManipulation && !styleLocksCanvas ? dragApiRef : undefined} padDragRef={directManipulation && !styleLocksCanvas ? padDragRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={focusedGlobalStyle} />
         </div>
         </div>
       </section>}
