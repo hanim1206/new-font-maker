@@ -92,6 +92,7 @@ export function DesignBodyLabPage() {
   const [sentence, setSentence] = useState(DEFAULT_SENTENCE)
   const chars = useMemo(() => [...sentence], [sentence])
   const [picked, setPicked] = useState('한')
+  const [pastOpen, setPastOpen] = useState(false)
   const shown = isSyllable(picked) ? picked : chars.find(isSyllable) ?? '한'
   const encoded = encodeURIComponent(shown)
   // 뽑은 폰트와 같은 글자 폭 · 원점으로 놓는다 — 자간까지 실제와 같게 본다.
@@ -133,43 +134,49 @@ export function DesignBodyLabPage() {
           <span>자동 보정{autoOn ? thinnedBy('auto') > 0 ? ` · 세로줄기 −${thinnedBy('auto')}%` : ' · 지금은 보정할 게 없어요' : ' 끔'}</span>
           <small>제품과 아래 레이아웃 편집에 먹는 값. 폰트에 저장된다.</small>
         </label>
-        <label className={styles.field}>
-          <span>문장</span>
-          <input value={sentence} onChange={(event) => setSentence(event.target.value)} />
-        </label>
       </section>
 
       {/* 속공간 지키기 진행 지도. 가로 · 굵기는 위 막대를 그대로 쓴다. */}
       <CounterProgressMap />
 
-      {/* 보정 세기별 문장. 기본 가로 · 넓힌 가로에서는 네 줄이 같다. 문장은 뽑은 폰트와 같은 글자 폭으로 놓는다. */}
-      <section className={styles.compare} aria-label="보정 세기별 문장" data-testid="body-lab-sentence">
-        {STRENGTHS.map((item) => <div key={item.label} className={styles.row} data-product={item.exponent === 'auto' || undefined}>
-          <span className={styles.rowLabel}>{rowLabel(item)}<small>{thinnedBy(item.exponent) > 0 ? `세로줄기 −${thinnedBy(item.exponent)}%` : '그대로'}</small></span>
-          <div className={styles.sentence}>{sentenceRow(item.exponent)}</div>
-        </div>)}
-        {same && <p className={styles.note}>기본 가로에서는 네 줄이 같아요. 가로를 좁혀 보세요.</p>}
-      </section>
+      {/* 지난 플랜 `네모꼴 열기`의 확인 화면. G3(사용자가 막대를 돌려 범위 · 보정량을 정함) 대기라 남겨 두고 접는다. 펼칠 때만 그린다. */}
+      <details className={styles.past} onToggle={(event) => setPastOpen(event.currentTarget.open)} data-testid="body-lab-past">
+        <summary>네모꼴 열기 · 확인 대기 <small>세로줄기 보정 세기 비교 · 크게 보기 · 레이아웃 편집</small></summary>
+        {pastOpen && <>
+          <label className={`${styles.field} ${styles.pastField}`}>
+            <span>문장</span>
+            <input value={sentence} onChange={(event) => setSentence(event.target.value)} />
+          </label>
+          {/* 보정 세기별 문장. 기본 가로 · 넓힌 가로에서는 네 줄이 같다. 문장은 뽑은 폰트와 같은 글자 폭으로 놓는다. */}
+          <section className={styles.compare} aria-label="보정 세기별 문장" data-testid="body-lab-sentence">
+            {STRENGTHS.map((item) => <div key={item.label} className={styles.row} data-product={item.exponent === 'auto' || undefined}>
+              <span className={styles.rowLabel}>{rowLabel(item)}<small>{thinnedBy(item.exponent) > 0 ? `세로줄기 −${thinnedBy(item.exponent)}%` : '그대로'}</small></span>
+              <div className={styles.sentence}>{sentenceRow(item.exponent)}</div>
+            </div>)}
+            {same && <p className={styles.note}>기본 가로에서는 네 줄이 같아요. 가로를 좁혀 보세요.</p>}
+          </section>
 
-      {/* 고른 글자를 크게. 자소마다 색을 달리해 자소 사이 틈과 자소 안 속공간이 보인다. */}
-      <section className={styles.zoom} aria-label={`${shown} 크게 보기`} data-testid="body-lab-zoom">
-        {STRENGTHS.map((item) => <figure key={item.label} data-product={item.exponent === 'auto' || undefined}>
-          <div className={styles.zoomGlyph} style={{ width: ZOOM_EM, height: ZOOM_EM }}><LabGlyph char={shown} size={ZOOM_EM} exponent={item.exponent} colored /></div>
-          <figcaption>{rowLabel(item)}</figcaption>
-        </figure>)}
-        <p className={styles.zoomHelp}><b>볼 곳:</b> 같은 색 안의 흰 속공간(ㅃ · ㅐ의 기둥 사이)이 살아 있는지, 세로줄기가 가로줄기보다 너무 가늘어 보이지 않는지. 초록 = 첫닿자, 파랑 = 홀자, 보라 = 받침.</p>
-      </section>
+          {/* 고른 글자를 크게. 자소마다 색을 달리해 자소 사이 틈과 자소 안 속공간이 보인다. */}
+          <section className={styles.zoom} aria-label={`${shown} 크게 보기`} data-testid="body-lab-zoom">
+            {STRENGTHS.map((item) => <figure key={item.label} data-product={item.exponent === 'auto' || undefined}>
+              <div className={styles.zoomGlyph} style={{ width: ZOOM_EM, height: ZOOM_EM }}><LabGlyph char={shown} size={ZOOM_EM} exponent={item.exponent} colored /></div>
+              <figcaption>{rowLabel(item)}</figcaption>
+            </figure>)}
+            <p className={styles.zoomHelp}><b>볼 곳:</b> 같은 색 안의 흰 속공간(ㅃ · ㅐ의 기둥 사이)이 살아 있는지, 세로줄기가 가로줄기보다 너무 가늘어 보이지 않는지. 초록 = 첫닿자, 파랑 = 홀자, 보라 = 받침.</p>
+          </section>
 
-      <section className={styles.editor}>
-        <div className={styles.editorHead}>
-          <strong>레이아웃 편집 · {shown}</strong>
-          <span>
-            <a href={`/workspace/jamo?char=${encoded}`}>제품 화면에서 열기</a>
-            <a href={`/workspace/jamo?mode=stroke&char=${encoded}`}>획 편집으로 열기</a>
-          </span>
-        </div>
-        <GlyphLayoutEditor key={shown} codepoint={shown.codePointAt(0)!} onPickCharacter={setPicked} />
-      </section>
+          <section className={styles.editor}>
+            <div className={styles.editorHead}>
+              <strong>레이아웃 편집 · {shown}</strong>
+              <span>
+                <a href={`/workspace/jamo?char=${encoded}`}>제품 화면에서 열기</a>
+                <a href={`/workspace/jamo?mode=stroke&char=${encoded}`}>획 편집으로 열기</a>
+              </span>
+            </div>
+            <GlyphLayoutEditor key={shown} codepoint={shown.codePointAt(0)!} onPickCharacter={setPicked} />
+          </section>
+        </>}
+      </details>
     </main>
   )
 }

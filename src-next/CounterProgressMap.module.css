@@ -44,7 +44,7 @@ b[data-kind='closed'] { color: #c0392b; }
 b[data-kind='split'] { color: #d35400; }
 b[data-kind='touch'] { color: #7f8c8d; }
 
-.table { width: auto; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.table { justify-self: start; width: auto; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
 .table th, .table td { padding: 4px 8px; border-bottom: 1px solid rgb(var(--color-border)); text-align: right; white-space: nowrap; }
 .table th:first-child { text-align: left; }
 .table thead th { color: rgb(var(--color-text-3)); font-weight: 600; }

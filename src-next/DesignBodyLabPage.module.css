@@ -47,3 +47,10 @@
   .controls { grid-template-columns: 1fr; }
   .wide { grid-column: auto; }
 }
+
+/* 지난 플랜 확인 화면 접기. */
+.past { width: min(1100px, 100%); margin: 0 auto 12px; }
+.past > summary { padding: 10px 14px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-2)); font-size: 13px; cursor: pointer; }
+.past > summary small { margin-left: 8px; color: rgb(var(--color-text-3)); font-size: 12px; }
+.past[open] > summary { margin-bottom: 12px; }
+.pastField { width: min(1100px, 100%); margin: 0 auto 12px; }
