@@ -9,9 +9,12 @@ import { feedbackAdminApiPlugin } from './scripts/feedbackAdminApi'
 import { housePresetApiPlugin } from './scripts/housePresetApi'
 import { announcementAdminApiPlugin } from './scripts/announcementAdminApi'
 import { sharedCheckoutPath } from './scripts/sharedCheckoutPath'
+import { spectrumFontApiPlugin } from './scripts/spectrumFontApi'
 
 // git에 없는 Noto 코퍼스. 워크트리에서는 메인 체크아웃 것을 쓴다.
 const guideCorpus = sharedCheckoutPath(fileURLToPath(new URL('.', import.meta.url)), '.reference-fonts/guide-corpus')
+// 성격 스펙트럼 실험실의 참고 폰트들. 역시 git에 없다.
+const referenceFonts = sharedCheckoutPath(fileURLToPath(new URL('.', import.meta.url)), '.reference-fonts')
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -19,6 +22,7 @@ export default defineConfig({
     react(),
     notoCorpusApiPlugin(guideCorpus),
     notoPresetApiPlugin(guideCorpus),
+    spectrumFontApiPlugin(referenceFonts),
     // 로컬 관리자 화면(`/admin`)의 베타 계정 발급. 개발 서버에만 붙는다.
     betaInviteApiPlugin(fileURLToPath(new URL('.', import.meta.url))),
     // 같은 화면의 의견 탭(한임 답장). 개발 서버에만 붙는다.

@@ -14,6 +14,7 @@ const LAB_NAMES: Record<LabRoute, string> = {
   '/stroke-grammar-lab': '획 문법',
   '/stem-master-lab': '줄기 마스터',
   '/font-guide-lab': '기준선(Font Guide)',
+  '/spectrum-lab': '성격 스펙트럼',
 }
 
 export interface LabEntry {
