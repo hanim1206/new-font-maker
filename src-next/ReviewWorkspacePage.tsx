@@ -74,7 +74,14 @@ function LazyCellGlyph({ char }: { char: string }) {
   const notoSwap = useDevNotoSwap((state) => state.on)
   useEffect(() => holder.current && !visible ? observeCell(holder.current, () => setVisible(true)) : undefined, [visible])
   if (!visible) return <span ref={holder} className={styles.cellHolder} aria-hidden="true" />
-  return import.meta.env.DEV && notoSwap ? <DevNotoCell char={char} /> : <AppGlyph char={char} size={CELL_GLYPH_SIZE} upright />
+  // 노토 비교는 우리 칸을 숨기기만 한다 — 언마운트하면 되돌릴 때 전부 다시 계산해 토글이 느리다.
+  const swapped = import.meta.env.DEV && notoSwap
+  return (
+    <>
+      <span style={swapped ? { display: 'none' } : undefined}><AppGlyph char={char} size={CELL_GLYPH_SIZE} upright /></span>
+      {swapped && <DevNotoCell char={char} />}
+    </>
+  )
 }
 
 const renderCell = (row: CorpusRow) => <LazyCellGlyph char={row.identity.character} />

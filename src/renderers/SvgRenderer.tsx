@@ -105,19 +105,31 @@ export function SvgRenderer({
   // 속공간 지키기 — 실효 스타일의 스위치. 기본 켜짐, 굵기 400 이하는 resolver가 아무것도 안 바꾼다.
   const counterKeepOn = !!globalStyle && globalStyle.counterKeep !== false
   const counterKeepStemScale = stemScaleOf(globalStyle?.strokeStyle)
-  const resolvedInk = useMemo(() => resolveGlyphInkPrimitives({
-    syllable,
-    placement: schema
-      ? { kind: 'schema', schema }
-      : { kind: 'boxes', boxes: boxesProp ?? {} },
-    weightMultiplier,
-    globalLinecap: globalStyle?.linecap,
-    globalLinejoin: globalStyle?.linejoin,
-    // viewportBox는 조판 창의 크기일 뿐 잉크를 다시 맞추는 경계가 아니다.
-    // Design Body보다 돌출된 획도 편집기와 같은 형태로 보여야 한다.
-    horizontalInkBounds: HORIZONTAL_INK_BOUNDS,
-    counterKeep: counterKeepOn ? { stemScale: counterKeepStemScale } : undefined,
-  }), [boxesProp, globalStyle?.linecap, globalStyle?.linejoin, schema, syllable, weightMultiplier, counterKeepOn, counterKeepStemScale])
+  // 스위치 켬/끔 두 벌을 들고 있는다 — 자동 보정을 껐다 켜며 견줄 때 한 번 계산한 쪽은 바로 돌아온다.
+  // 나머지 입력이 바뀌면 통째로 새 캐시라 묵은 값이 남지 않는다.
+  const counterKeepVariants = useMemo(
+    () => new Map<boolean, ReturnType<typeof resolveGlyphInkPrimitives>>(),
+    [boxesProp, globalStyle?.linecap, globalStyle?.linejoin, schema, syllable, weightMultiplier, counterKeepStemScale],
+  )
+  const resolvedInk = useMemo(() => {
+    const cached = counterKeepVariants.get(counterKeepOn)
+    if (cached) return cached
+    const resolved = resolveGlyphInkPrimitives({
+      syllable,
+      placement: schema
+        ? { kind: 'schema', schema }
+        : { kind: 'boxes', boxes: boxesProp ?? {} },
+      weightMultiplier,
+      globalLinecap: globalStyle?.linecap,
+      globalLinejoin: globalStyle?.linejoin,
+      // viewportBox는 조판 창의 크기일 뿐 잉크를 다시 맞추는 경계가 아니다.
+      // Design Body보다 돌출된 획도 편집기와 같은 형태로 보여야 한다.
+      horizontalInkBounds: HORIZONTAL_INK_BOUNDS,
+      counterKeep: counterKeepOn ? { stemScale: counterKeepStemScale } : undefined,
+    })
+    counterKeepVariants.set(counterKeepOn, resolved)
+    return resolved
+  }, [counterKeepVariants, boxesProp, globalStyle?.linecap, globalStyle?.linejoin, schema, syllable, weightMultiplier, counterKeepOn, counterKeepStemScale])
   const centerlines = useMemo(() => resolvedInk.primitives.map((primitive) => {
     if (primitive.kind !== 'centerline') {
       throw new Error(`SvgRenderer가 지원하지 않는 잉크 primitive입니다: ${primitive.kind}`)
