@@ -1,62 +1,54 @@
-/* 계정 페이지 · 한임에게 의견. 대시보드와 같은 480 흰 판. 선 · 카드 없이 여백과 회색 띠로 나눈다. 검정 · 회색만(빨간 점 하나). */
+/* 계정 페이지 · 한임에게 의견. 대시보드와 같은 480 흰 판. 선 · 카드 없이 여백과 회색 띠로 나눈다. 검정 · 회색만(빨간 점 하나).
+   단추 생김새는 공용 `Button`이 정한다. 여기는 배치와 토큰만. */
 .page { min-height: 100dvh; background: rgb(var(--color-background)); color: rgb(var(--color-foreground)); }
 .shell { width: min(100%, 480px); min-height: 100dvh; box-sizing: border-box; margin: 0 auto; display: flex; flex-direction: column; background: rgb(var(--color-surface)); box-shadow: var(--shadow-md); }
 
 .bar { position: sticky; top: 0; z-index: 2; min-height: 56px; display: flex; align-items: center; gap: 2px; padding: max(0px, env(safe-area-inset-top)) 8px 0; background: rgb(var(--color-surface)); }
-.bar h2 { margin: 0; font-size: 17px; font-weight: 700; }
-.back { width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-foreground)); }
-.back:active { background: rgb(var(--color-surface-2)); }
+.bar h2 { margin: 0; font-size: var(--font-18); font-weight: var(--weight-bold); }
 
 .body { flex: 1; display: flex; flex-direction: column; padding: 8px 24px max(24px, env(safe-area-inset-bottom)); }
-.body h1 { margin: 8px 0 4px; font-size: 26px; font-weight: 800; letter-spacing: -.01em; overflow-wrap: anywhere; }
-.sub { margin: 0; color: rgb(var(--color-text-4)); font-size: 15px; }
+.body h1 { margin: 8px 0 4px; font-size: var(--font-28); font-weight: var(--weight-heavy); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.sub { margin: 0; color: rgb(var(--color-text-4)); font-size: var(--font-14); }
 
 .facts { margin: 36px 0 12px; display: flex; flex-direction: column; }
-.facts div { min-height: 56px; display: flex; align-items: center; justify-content: space-between; font-size: 16px; }
+.facts div { min-height: 56px; display: flex; align-items: center; justify-content: space-between; font-size: var(--font-16); }
 .facts dt { color: rgb(var(--color-text-3)); }
-.facts dd { margin: 0; font-weight: 650; }
+.facts dd { margin: 0; font-weight: var(--weight-bold); }
 
 .band { height: 12px; margin: 0 -24px 12px; background: rgb(var(--color-surface-2)); }
-.link { min-height: 56px; display: flex; align-items: center; gap: 8px; padding: 0; border: 0; background: transparent; color: rgb(var(--color-foreground)); font: inherit; text-align: left; }
-.link strong { flex: 1; font-size: 16px; font-weight: 700; }
+.link strong { flex: 1; font-weight: var(--weight-bold); }
 .link svg { color: rgb(var(--color-text-5)); }
-.dot { width: 6px; height: 6px; border-radius: 999px; background: rgb(240 68 82); }
+.dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: rgb(var(--color-destructive)); }
 
-.signOut { margin-top: auto; align-self: center; min-height: 44px; padding: 0 16px; border: 0; background: transparent; color: rgb(var(--color-text-4)); font-size: 14px; }
+.signOut { margin-top: auto; align-self: center; }
 
-
-.error { margin: 10px 0 0; color: rgb(190 52 48); font-size: 13px; }
+.error { margin: 10px 0 0; color: rgb(var(--color-destructive-dark)); font-size: var(--font-13); }
 
 /* 내가 보낸 의견(토스식). 큰 두 줄 제목 · 숫자만 파랑, 옅은 안내 한 줄, 선 없는 줄 목록. */
-.body h1.mineTitle { margin: 12px 0 10px; font-size: 26px; font-weight: 800; line-height: 1.35; letter-spacing: -.02em; }
+.body h1.mineTitle { margin: 12px 0 10px; font-size: var(--font-28); font-weight: var(--weight-heavy); line-height: 1.35; letter-spacing: -.02em; }
 .mineTitle em { color: rgb(var(--color-primary)); font-style: normal; }
-.mineHint { margin: 0; color: rgb(var(--color-text-4)); font-size: 15px; line-height: 1.6; word-break: keep-all; }
-.reportIcon { width: 20px; height: 20px; display: inline-grid; place-items: center; margin: 0 1px; vertical-align: -4px; border-radius: 6px; background: rgb(253 236 233); color: rgb(214 50 31); }
+.mineHint { margin: 0; color: rgb(var(--color-text-4)); font-size: var(--font-14); line-height: 1.6; word-break: keep-all; }
+.reportIcon { width: 20px; height: 20px; display: inline-grid; place-items: center; margin: 0 1px; vertical-align: -4px; border-radius: var(--radius-sm); background: rgb(var(--color-destructive-soft)); color: rgb(var(--color-destructive)); }
 .mine { margin: 28px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 24px; }
 .mine li { display: flex; align-items: flex-start; gap: 14px; }
-.mineIcon { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 14px; background: var(--tag-bg); color: var(--tag); }
-.mineIcon[data-tag='broken'] { --tag: rgb(214 50 31); --tag-bg: rgb(253 236 233); }
-.mineIcon[data-tag='odd'] { --tag: rgb(196 100 0); --tag-bg: rgb(255 243 224); }
-.mineIcon[data-tag='wish'] { --tag: rgb(35 88 201); --tag-bg: rgb(232 240 255); }
-.mineIcon[data-tag='praise'] { --tag: rgb(22 128 72); --tag-bg: rgb(228 245 235); }
+.mineIcon { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: var(--radius-lg); background: var(--tag-bg); color: var(--tag); }
+.mineIcon[data-tag='broken'] { --tag: rgb(var(--color-destructive)); --tag-bg: rgb(var(--color-destructive-soft)); }
+.mineIcon[data-tag='odd'] { --tag: rgb(var(--color-warning)); --tag-bg: rgb(var(--color-warning-soft)); }
+.mineIcon[data-tag='wish'] { --tag: rgb(var(--color-primary-dark)); --tag-bg: rgb(var(--color-primary-light)); }
+.mineIcon[data-tag='praise'] { --tag: rgb(var(--color-success)); --tag-bg: rgb(var(--color-success-soft)); }
 .mineIcon[data-tag='other'] { --tag: rgb(var(--color-text-3)); --tag-bg: rgb(var(--color-surface-3)); }
 /* 쓴 글은 자르지 않는다. 이어 보낸 글은 문단으로. */
 .mineText { flex: 1; min-width: 0; padding-top: 2px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
-.mineText > p { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
-.mineText > small { color: rgb(var(--color-text-4)); font-size: 13px; }
-/* 한임 답이 생긴 줄에만. 안 본 답이면 파란 글씨 + 점. */
-.mineToggle { min-height: 32px; margin-top: 6px; display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-2)); font: inherit; font-size: 13px; font-weight: 700; }
-.mineToggle[data-new] { background: rgb(var(--color-primary-light)); color: rgb(var(--color-primary)); }
+.mineText > p { margin: 0; font-size: var(--font-16); font-weight: var(--weight-semibold); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.mineText > small { color: rgb(var(--color-text-4)); font-size: var(--font-13); }
+/* 한임 답이 생긴 줄에만. 안 본 답이면 주색 알약(`data-highlight`) + 점. 끝 화살표만 여기서. */
+.mineToggle { margin-top: 6px; }
 .mineToggle > svg:last-child { color: rgb(var(--color-text-5)); transition: transform var(--motion-normal) var(--ease-standard); }
-.mineToggle[data-new] > svg:last-child { color: inherit; }
+.mineToggle[data-highlight] > svg:last-child { color: inherit; }
 .mineToggle[aria-expanded='true'] > svg:last-child { transform: rotate(180deg); }
-.mineDot { width: 6px; height: 6px; border-radius: 999px; background: rgb(240 68 82); }
-.mineReplies { width: 100%; margin-top: 4px; display: flex; flex-direction: column; gap: 8px; animation: openIn 200ms cubic-bezier(0.2, 0, 0, 1); }
-.mineReply { padding: 12px 14px; border-radius: 14px; background: rgb(var(--color-surface-2)); display: flex; flex-direction: column; gap: 4px; }
-.mineReply p { margin: 0; font-size: 15px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
-.mineReply small { color: rgb(var(--color-text-5)); font-size: 12px; }
+.mineDot { width: 6px; height: 6px; border-radius: var(--radius-full); background: rgb(var(--color-destructive)); }
+.mineReplies { width: 100%; margin-top: 4px; display: flex; flex-direction: column; gap: 8px; animation: openIn var(--motion-normal) var(--ease-standard); }
+.mineReply { padding: 12px 14px; border-radius: var(--radius-lg); background: rgb(var(--color-surface-2)); display: flex; flex-direction: column; gap: 4px; }
+.mineReply p { margin: 0; font-size: var(--font-14); line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.mineReply small { color: rgb(var(--color-text-5)); font-size: var(--font-12); }
 @keyframes openIn { from { opacity: 0; transform: translateY(-4px); } }
-
-/* 새 답장은 굵은 검정. 파랑은 쓰지 않는다. */
-
-

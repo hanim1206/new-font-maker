@@ -8,6 +8,7 @@ import { authGateMode, signOutAndReload } from './betaAuth'
 import { REPORT_TAG_LABEL, hasUnseenReply, markSeen, readSeen, whenText } from './feedback'
 import type { ReportTag } from './feedback'
 import { useMe, useThreads } from './useFeedback'
+import { Button } from './components/ui/button'
 import { navigate } from './router'
 import styles from './AccountPage.module.css'
 
@@ -19,7 +20,7 @@ import styles from './AccountPage.module.css'
 
 function Bar({ back, title }: { back: string; title?: string }) {
   return <header className={styles.bar}>
-    <button type="button" className={styles.back} aria-label="뒤로" onClick={() => navigate(back)}><ChevronLeft size={24} aria-hidden="true" /></button>
+    <Button variant="plain" size="icon-lg" aria-label="뒤로" onClick={() => navigate(back)}><ChevronLeft aria-hidden="true" /></Button>
     {title && <h2>{title}</h2>}
   </header>
 }
@@ -51,12 +52,12 @@ function AccountHome() {
         <div><dt>가입</dt><dd>{joined}</dd></div>
       </dl>
       <div className={styles.band} />
-      <button type="button" className={styles.link} onClick={() => navigate('/account/feedback')} data-testid="account-feedback">
+      <Button variant="plain" size="row" className={styles.link} onClick={() => navigate('/account/feedback')} data-testid="account-feedback">
         <strong>내가 보낸 의견</strong>
         {unseen && <span className={styles.dot} aria-label="새 답장" />}
-        <ChevronRight size={20} aria-hidden="true" />
-      </button>
-      {authGateMode() === 'on' && <button type="button" className={styles.signOut} onClick={() => void signOutAndReload()}>로그아웃</button>}
+        <ChevronRight aria-hidden="true" />
+      </Button>
+      {authGateMode() === 'on' && <Button variant="quiet" size="lg" className={styles.signOut} onClick={() => void signOutAndReload()}>로그아웃</Button>}
     </div>
   </Shell>
 }
@@ -108,11 +109,11 @@ function FeedbackHome({ openId = null }: { openId?: string | null }) {
             <div className={styles.mineText}>
               {mine.map((message) => <p key={message.id}>{message.body}</p>)}
               <small>{[context?.screen, tag && REPORT_TAG_LABEL[tag], whenText(thread.first.createdAt)].filter(Boolean).join(' · ')}</small>
-              {replies.length > 0 && <button type="button" className={styles.mineToggle} aria-expanded={expanded} onClick={() => setOpen(expanded ? null : thread.id)} data-new={unseen || undefined} data-testid="feedback-reply-toggle">
-                <MessageCircle size={14} aria-hidden="true" />한임 답 {expanded ? '접기' : '보기'}
+              {replies.length > 0 && <Button variant="soft" size="sm" className={styles.mineToggle} aria-expanded={expanded} onClick={() => setOpen(expanded ? null : thread.id)} data-highlight={unseen || undefined} data-testid="feedback-reply-toggle">
+                <MessageCircle aria-hidden="true" />한임 답 {expanded ? '접기' : '보기'}
                 {unseen && <span className={styles.mineDot} aria-label="새 답장" />}
-                <ChevronDown size={14} aria-hidden="true" />
-              </button>}
+                <ChevronDown aria-hidden="true" />
+              </Button>}
               {expanded && <div className={styles.mineReplies} data-testid="feedback-open">
                 {replies.map((reply) => <div key={reply.id} className={styles.mineReply}>
                   <p>{reply.body}</p>
