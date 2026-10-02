@@ -11,20 +11,16 @@ section.strip[data-grown='true'] .run button::after { bottom: -8px; height: 3px;
 @media (prefers-reduced-motion: reduce) { section.strip, .run { transition: none; } }
 section.fill { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 section.fill > div { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; }
-/* 탭: 글자만, 고른 것에 밑줄 */
-.tabs { display: flex; gap: 18px; border-bottom: 1px solid rgb(var(--color-border-subtle)); }
-.tabs button { flex: 0 0 auto; min-height: 44px; padding: 0; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 0; background: transparent; color: rgb(var(--color-text-5)); font-size: 13px; font-weight: 600; }
-.tabs button[aria-selected='true'] { color: rgb(var(--color-foreground)); border-bottom-color: rgb(var(--color-foreground)); }
 .weight { min-height: 0; display: flex; flex: 1; flex-direction: column; gap: 6px; }
-.weight > p { min-height: 25px; margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: rgb(var(--color-text-dim-4)); font-size: 10px; }
+.weight > p { min-height: 25px; margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--font-10); }
 .weight > p strong { color: rgb(var(--color-foreground)); }
 .weightBox { display: flex; flex-direction: column; gap: 8px; padding: 6px 0; }
-.weightHead { display: flex; align-items: baseline; justify-content: space-between; font-size: 11px; font-weight: 700; }
-.weightHead output { color: rgb(var(--color-foreground)); font-family: ui-monospace, monospace; font-size: 15px; }
+.weightHead { display: flex; align-items: baseline; justify-content: space-between; font-size: var(--font-11); font-weight: var(--weight-bold); }
+.weightHead output { color: rgb(var(--color-foreground)); font-family: ui-monospace, monospace; font-size: var(--font-16); }
 /* 머리의 글로벌 스타일 입구. 눌리는 자리는 44px 그대로 두고, 켜진 표시는 안쪽 34px 면으로만 그려 머리 위아래에 숨 쉴 틈을 둔다.
    되돌리기 · 다시와는 한 묶음이 아니라서 간격과 가는 구분선으로 떼어 놓는다. */
 .headerTool { position: relative; isolation: isolate; margin-right: 13px; }
-.headerTool::before { content: ''; position: absolute; z-index: -1; inset: 5px; border-radius: 10px; background: transparent; transition: background var(--motion-fast) var(--ease-standard); }
+.headerTool::before { content: ''; position: absolute; z-index: -1; inset: 5px; border-radius: var(--radius-md); background: transparent; transition: background var(--motion-fast) var(--ease-standard); }
 .headerTool::after { content: ''; position: absolute; top: 14px; right: -8px; bottom: 14px; width: 1px; background: rgb(var(--color-border)); }
 .headerTool[data-active='true'] { color: rgb(var(--color-primary)) !important; }
 .headerTool[data-active='true']::before { background: rgb(var(--color-primary-light) / .7); }
@@ -33,41 +29,17 @@ section.fill > div { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y
 section.panel { padding: 0; }
 section.panel > div { border: 0; border-radius: 0; background: rgb(var(--color-surface)); padding: 10px 16px calc(env(safe-area-inset-bottom) + 16px); gap: 12px; scrollbar-width: none; }
 section.panel > div::-webkit-scrollbar { display: none; }
-.panel header strong { font-size: 15px; }
+.panel header strong { font-size: var(--font-16); }
 .panel header span { color: rgb(var(--color-text-5)); }
-.panel header button { border: 0; background: transparent; color: rgb(var(--color-text-4)); }
-.panel [role='tabpanel'] > p strong { font-weight: 600; color: rgb(var(--color-text-3)); }
-.panel [role='tabpanel'] :is(label, [data-style-row]) { border: 0; border-radius: 0; background: transparent; padding: 8px 0 4px; gap: 8px; font-size: 12px; font-weight: 600; }
+.panel [role='tabpanel'] > p strong { font-weight: var(--weight-semibold); color: rgb(var(--color-text-3)); }
 .panel [role='tabpanel'] > div { column-gap: 16px; }
-.panel [role='tabpanel'] output { color: rgb(var(--color-foreground)); font-size: 13px; }
-/* 되돌리기: 덜 중요한 동작이라 밑줄 글자로 */
-.panel [role='tabpanel'] > button:last-child { width: 100%; min-height: 44px; margin-top: auto; border: 0; background: transparent; color: rgb(var(--color-text-4)); font-size: 12px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
-.panel [role='tabpanel'] > button:last-child:disabled { opacity: .45; text-decoration: none; }
-/* 범위 고르기: 회색 길 위의 흰 알약 */
-.panel [role='tabpanel'] > [role='tablist'] { gap: 2px; padding: 2px; border-radius: 9px; background: rgb(var(--color-surface-3)); }
-.panel [role='tabpanel'] > [role='tablist'] button { min-height: 32px; border-radius: 7px; font-size: 11px; font-weight: 600; color: rgb(var(--color-text-4)); background: transparent; box-shadow: none; }
-.panel [role='tabpanel'] > [role='tablist'] button[aria-selected='true'] { background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); box-shadow: 0 1px 2px rgb(15 23 42 / .12); }
+/* 범위 고르기(옛 단독 화면의 네모꼴 범위): 회색 길 위의 흰 알약. 단추는 아직 날 것 — 문장 편집기 단계에서 `ChoiceGroup segment`로 옮긴다. */
+.panel [role='tabpanel'] > [role='tablist'] { gap: 2px; padding: 2px; border-radius: var(--radius-md); background: rgb(var(--color-surface-3)); }
+.panel [role='tabpanel'] > [role='tablist'] button { min-height: 32px; border-radius: var(--radius-sm); font-size: var(--font-11); font-weight: var(--weight-semibold); color: rgb(var(--color-text-4)); background: transparent; box-shadow: none; }
+.panel [role='tabpanel'] > [role='tablist'] button[aria-selected='true'] { background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); box-shadow: var(--shadow-sm); }
 
-/* ===== 슬라이더: 손잡이 없는 채움 막대 ===== */
-.panel input[type='range'] { -webkit-appearance: none; appearance: none; width: 100%; height: 34px; margin: 0; border-radius: 10px; overflow: hidden; background: rgb(var(--color-surface-3)); cursor: ew-resize; touch-action: none; }
-.panel input[type='range']::-webkit-slider-runnable-track { height: 34px; background: transparent; }
-/* 손잡이 왼쪽으로 긴 그림자를 깔아 지나온 쪽을 채운다(입력의 overflow: hidden이 밖을 자른다). */
-.panel input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 34px; border: 0; border-radius: 0 10px 10px 0; background: linear-gradient(#fff, #fff) center / 3px 16px no-repeat, rgb(var(--color-foreground)); box-shadow: -1000px 0 0 1000px rgb(var(--color-foreground)); }
-.panel input[type='range']::-moz-range-track { height: 34px; background: transparent; }
-.panel input[type='range']::-moz-range-progress { height: 34px; background: rgb(var(--color-foreground)); }
-.panel input[type='range']::-moz-range-thumb { width: 22px; height: 34px; border: 0; border-radius: 0 10px 10px 0; background: linear-gradient(#fff, #fff) center / 3px 16px no-repeat, rgb(var(--color-foreground)); }
-.panel input[type='range']:focus-visible { outline: 2px solid rgb(var(--color-ring)); outline-offset: 2px; }
-.panel input[type='range']:disabled { opacity: .35; cursor: default; }
-
-/* ===== 획 스타일 탭: 같은 말투(테두리 없이, 고른 것만 옅은 면, 파랑 없음) ===== */
-.panel [role='radiogroup'][aria-label='획 생성 규칙'] { gap: 2px; padding: 2px; border-radius: 9px; background: rgb(var(--color-surface-3)); }
-.panel [role='radiogroup'][aria-label='획 생성 규칙'] button { min-height: 32px; border: 0; border-radius: 7px; background: transparent; color: rgb(var(--color-text-4)); font-size: 11px; font-weight: 600; }
-.panel [role='radiogroup'][aria-label='획 생성 규칙'] button[aria-checked='true'] { background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); box-shadow: 0 1px 2px rgb(15 23 42 / .12); }
-.panel [role='radiogroup'][aria-label='획 끝 모양'] button,
-.panel [role='radiogroup'][aria-label='붓촉 모양'] button { border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-4)); box-shadow: none; }
-.panel [role='radiogroup'][aria-label='획 끝 모양'] button[aria-checked='true'],
-.panel [role='radiogroup'][aria-label='붓촉 모양'] button[aria-checked='true'] { background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); box-shadow: none; }
-.panel [role='slider'] { border: 0; border-radius: 10px; background-color: rgb(var(--color-surface-3)); }
+/* ===== 각도판 ===== */
+.panel [role='slider'] { border: 0; border-radius: var(--radius-md); background-color: rgb(var(--color-surface-3)); }
 .panel [role='slider']::before, .panel [role='slider']::after { background: rgb(var(--color-text-6) / .5); }
 .panel [role='slider'] > span[aria-hidden='true']:last-of-type { background: rgb(var(--color-foreground)); }
 .panel [role='tabpanel'] > p:only-of-type, .panel [role='tabpanel'] p[class*='roundBrushMessage'] { border-color: rgb(var(--color-border-subtle)); }
@@ -75,12 +47,13 @@ section.panel > div::-webkit-scrollbar { display: none; }
 /* 네모꼴 막대: 양 끝에 길쭉한 틀 · 납작한 틀 그림 */
 .shapeRow { display: flex; align-items: center; gap: 10px; }
 .shapeRow input { flex: 1 1 auto; min-width: 0; }
-.bodyNote { color: rgb(var(--color-text-dim-4)); font-size: 11px; }
-.autoRow { display: flex; align-items: center; gap: 8px; min-height: 32px; color: rgb(var(--color-text-3)); font-size: 12px; }
-.autoRow input { width: 16px; height: 16px; flex: 0 0 auto; accent-color: rgb(var(--color-foreground)); }
-.autoRow span { color: rgb(var(--color-foreground)); font-weight: 700; }
-.autoRow output { margin-left: auto; font-variant-numeric: tabular-nums; }
-.shapeIcon { flex: 0 0 auto; display: block; box-sizing: border-box; border: 1.5px solid rgb(var(--color-text-4)); border-radius: 2px; }
+.bodyNote { font-size: var(--font-11); }
+/* 자동 보정 줄. 체크는 공용 `Checkbox tone="ink"`. */
+.autoRow { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 8px 0 4px; color: rgb(var(--color-text-3)); font-size: var(--font-12); font-weight: var(--weight-semibold); }
+.fill .autoRow { padding: 24px 0 2px; }
+.autoRow > span { color: rgb(var(--color-foreground)); font-weight: var(--weight-bold); }
+.autoRow output { margin-left: auto; color: rgb(var(--color-foreground)); font-size: var(--font-13); font-variant-numeric: tabular-nums; }
+.shapeIcon { flex: 0 0 auto; display: block; box-sizing: border-box; border: 1.5px solid rgb(var(--color-text-4)); border-radius: var(--radius-xs); }
 
 /* ===== 폰트 탭(스타일 화면): 문장 → 조절 → 아래 탭. `fill`(셸 안)에서만 먹는다, 옛 단독 화면은 그대로 ===== */
 section.strip[data-grown='true'] { flex-basis: 168px; height: 168px; padding-left: 24px; border-bottom: 0; }
@@ -91,50 +64,17 @@ section.panel.fill > div { padding: 4px 24px calc(env(safe-area-inset-bottom) + 
 /* 설명 글줄은 뺀다 — 무엇을 바꾸는지는 제목과 문장이 보여 준다. */
 .fill [role='tabpanel'] > p { display: none; }
 /* 항목 제목: 왼쪽 회색 이름, 오른쪽 굵은 값. 막대 · 고르기 모두 같은 줄. 고르기는 고른 칸이 값이라 제목만. */
-.fill [role='tabpanel'] h3 { margin: 28px 0 10px; color: rgb(var(--color-text-3)); font-size: 14px; font-weight: 600; }
-.fill [role='tabpanel'] :is(label, [data-style-row]) { padding: 24px 0 2px; gap: 8px; }
-.fill [role='tabpanel'] :is(label, [data-style-row]) > span:first-child { display: flex; align-items: baseline; justify-content: space-between; color: rgb(var(--color-text-3)); font-size: 14px; font-weight: 600; }
-.fill [role='tabpanel'] :is(label, [data-style-row]) > span:first-child output { color: rgb(var(--color-foreground)); font-family: inherit; font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.fill [role='tabpanel'] h3 { margin: 28px 0 10px; color: rgb(var(--color-text-3)); font-size: var(--font-14); font-weight: var(--weight-semibold); }
 /* 값이 하나뿐인 탭(네모꼴 · 굵기): 이름 아래 큰 숫자. */
 .fill .weightBox { padding: 18px 0 0; gap: 10px; }
-.fill .weightHead { flex-direction: column; align-items: flex-start; gap: 2px; color: rgb(var(--color-text-3)); font-size: 14px; font-weight: 600; }
-.fill .weightHead output { font-family: inherit; font-size: 34px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-/* 처음 값으로: 조절 바로 아래 옅은 글자. */
-.fill [role='tabpanel'] > button:last-child { margin-top: 12px; color: rgb(var(--color-text-5)); font-size: 13px; text-decoration: none; }
-.fill [role='tabpanel'] > button:last-child:disabled { opacity: .5; }
-
-/* 얇은 채움 막대. 보이는 길은 12px, 위아래 투명 테두리 10px까지 눌린다(손잡이 너비 22px는 `rangeDrag` 계산과 맞춘다). */
-.fill input[type='range'] { box-sizing: content-box; height: 12px; border: 10px solid transparent; border-width: 10px 0; border-radius: 999px; background-clip: padding-box; }
-.fill input[type='range']::-webkit-slider-runnable-track { height: 12px; }
-.fill input[type='range']::-webkit-slider-thumb { width: 22px; height: 12px; border-radius: 0 999px 999px 0; background: rgb(var(--color-foreground)); }
-.fill input[type='range']::-moz-range-track { height: 12px; }
-.fill input[type='range']::-moz-range-progress { height: 12px; border-radius: 999px; }
-.fill input[type='range']::-moz-range-thumb { width: 22px; height: 12px; border-radius: 0 999px 999px 0; background: rgb(var(--color-foreground)); }
-
-/* 붓 고르기: 같은 물결을 두 붓으로. 테두리 없이, 고른 쪽만 회색 면. */
-.fill [role='radiogroup'][aria-label='획 끝 모양'] { gap: 8px; }
-.fill [role='radiogroup'][aria-label='획 끝 모양'] button { min-height: 0; display: flex; align-items: center; flex-direction: column; justify-content: center; gap: 6px; padding: 12px 0 10px; border-radius: 16px; color: rgb(var(--color-text-5)); }
-.fill [role='radiogroup'][aria-label='획 끝 모양'] button[aria-checked='true'] { background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); }
-.fill [role='radiogroup'][aria-label='획 끝 모양'] button svg { width: 64px; height: 52px; }
-.fill [role='radiogroup'][aria-label='획 끝 모양'] strong { color: rgb(var(--color-text-4)); font-size: 13px; font-weight: 600; }
-.fill [role='radiogroup'][aria-label='획 끝 모양'] button[aria-checked='true'] strong { color: rgb(var(--color-foreground)); font-weight: 750; }
+/* 큰 숫자 34px는 글자 단계 밖 — 견본 숫자로 남겨 두고 G2에서 정한다. */
+.fill .weightHead { flex-direction: column; align-items: flex-start; gap: 2px; color: rgb(var(--color-text-3)); font-size: var(--font-14); font-weight: var(--weight-semibold); }
+.fill .weightHead output { font-family: inherit; font-size: 34px; font-weight: var(--weight-heavy); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 
 /* 부리: 없음이면 막대를 숨기고, 각도를 안 쓰는 모양이면 각도만 숨긴다. */
 .fill [data-beak-idle] { display: none; }
-/* `바깥과 같이`: 안쪽 막대 아래 오른쪽 끝, 테두리 없는 작은 글자. */
-.fill [data-link-inner] { display: block; min-height: 32px; margin: 2px 0 0 auto; padding: 0; border: 0; background: transparent; color: rgb(var(--color-text-4)); font-size: 12px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 /* 각도판: 막대와 같은 제목 줄 아래 전폭. 높이는 낮게. */
 .fill [data-style-row] [role='slider'] { min-height: 112px; }
 
-/* 아래 탭: 회색 길 위 흰 알약, 그림 위 · 이름 아래. 화면 바닥에 고정 — 스크롤해도 제자리(바깥 줄 전체가 스크롤되므로 sticky는 같이 밀린다). */
-.tabs.dock { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 12px); z-index: 20; width: min(calc(100% - 48px), 432px); box-sizing: border-box; translate: -50% 0; display: flex; gap: 0; padding: 3px; border: 0; border-radius: 16px; background: rgb(var(--color-surface-3)); box-shadow: 0 -12px 24px 8px rgb(var(--color-surface)); }
-.tabs.dock button { flex: 1 1 0; min-height: 72px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; margin: 0; border: 0; border-radius: 13px; color: rgb(var(--color-text-4)); font-size: 13px; font-weight: 600; }
-.tabs.dock button svg { width: 28px; height: 28px; opacity: .45; }
-.tabs.dock button[aria-selected='true'] { background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-weight: 700; box-shadow: 0 1px 3px rgb(0 0 0 / .1); }
-.tabs.dock button[aria-selected='true'] svg { opacity: 1; }
-/* 잠긴 탭(개발 중): 흐리게, 이름 아래 작은 안내. */
-.tabs.dock button[data-locked] { color: rgb(var(--color-text-6)); cursor: not-allowed; }
-.tabs.dock button[data-locked] svg { opacity: .25; }
-.tabs.dock button small { color: rgb(var(--color-text-5)); font-size: 10px; font-weight: 500; line-height: 1; }
-/* 탭 내용은 줄어들지 않는다 — 줄면 넘친 막대가 도크 자리(아래 여백) 밖으로 나가 스크롤로도 못 닿는다(낮은 창의 획 스타일). */
+/* 탭 내용은 줄어들지 않는다 — 줄면 넘친 막대가 도크 자리(아래 여백) 밖으로 나가 스크롤로도 못 닿는다(낮은 창의 획 스타일). 아래 탭 생김새는 공용 `Tabs dock`. */
 .fill [role='tabpanel'] { flex: 0 0 auto; padding-bottom: calc(env(safe-area-inset-bottom) + 108px); }

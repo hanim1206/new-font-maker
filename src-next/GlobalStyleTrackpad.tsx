@@ -4,6 +4,8 @@ import styles from './CalibrationSentenceEditor.module.css'
 import mode from './GlobalStyleMode.module.css'
 import { DEV_TOOLS_ENABLED } from './devTools'
 import { StylePicto, type StylePictoKind } from './StylePicto'
+import { Button } from './components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs'
 
 export type GlobalStylePanel = 'body' | 'brush' | 'beak'
 
@@ -44,17 +46,19 @@ export function GlobalStyleTrackpad({
   const locked = (id: GlobalStylePanel) => !closable && LOCKED.includes(id)
   // 잠긴 탭으로 열리면(기본 탭 · 옛 상태) 첫 번째 열린 탭을 보인다.
   const shown = locked(panel) ? TABS.find((tab) => !locked(tab.id))!.id : panel
-  const tabs = <div className={`${mode.tabs} ${closable ? '' : mode.dock}`} role="tablist" aria-label="글로벌 스타일 항목">
-    {TABS.map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={shown === tab.id} disabled={locked(tab.id)} data-locked={locked(tab.id) || undefined} onClick={() => onPanelChange(tab.id)}>
-      {closable ? tab.label : <><StylePicto kind={tab.picto} /><span>{tab.short}</span>{locked(tab.id) && <small>개발 중이에요</small>}</>}
-    </button>)}
-  </div>
+  const tabs = <Tabs value={shown} onValueChange={(value) => onPanelChange(value as GlobalStylePanel)}>
+    <TabsList variant={closable ? 'underline' : 'dock'} aria-label="글로벌 스타일 항목">
+      {TABS.map((tab) => <TabsTrigger key={tab.id} value={tab.id} disabled={locked(tab.id)} data-locked={locked(tab.id) || undefined}>
+        {closable ? tab.label : <><StylePicto kind={tab.picto} /><span>{tab.short}</span>{locked(tab.id) && <small>개발 중이에요</small>}</>}
+      </TabsTrigger>)}
+    </TabsList>
+  </Tabs>
   return (
     <section className={`${styles.brushSection} ${mode.panel} ${fill ? mode.fill : ''}`} aria-label="글로벌 스타일 설정">
       <div className={styles.brushDrawer}>
         {closable && <header className={styles.brushHeader}>
           <div><strong>글로벌 스타일</strong><span>글자 전체 인상 설정</span></div>
-          <button type="button" onClick={onClose} aria-label="글로벌 스타일 설정 닫기"><X size={17} /></button>
+          <Button variant="quiet" size="icon" onClick={onClose} aria-label="글로벌 스타일 설정 닫기"><X /></Button>
         </header>}
 
         {closable && tabs}

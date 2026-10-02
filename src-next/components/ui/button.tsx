@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 /**
  * shadcn Button. 색 · 크기는 앱 토큰(`src/index.css`)만 쓴다. 화면에서 `className`으로는 배치(여백 · 너비)만 바꾼다.
- * 우리 것: `plain`(투명 · 글자색 그대로) · `quiet`(투명 · 옅은 글자) · `soft`(옅은 알약, `data-highlight`면 주색) / `icon-lg`(44 둥근 아이콘) · `row`(목록 줄).
+ * 우리 것: `plain`(투명 · 글자색 그대로) · `quiet`(투명 · 옅은 글자) · `link`(밑줄 글자) · `faint`(더 옅은 글자, 되돌리기) · `soft`(옅은 알약, `data-highlight`면 주색) / `icon-lg`(44 둥근 아이콘) · `row`(목록 줄).
  */
 // eslint-disable-next-line react-refresh/only-export-components -- 확인 창 단추가 같은 모양을 쓴다
 export const buttonVariants = cva(
@@ -21,6 +21,8 @@ export const buttonVariants = cva(
         destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive-dark',
         plain: 'bg-transparent text-foreground active:bg-surface-2',
         quiet: 'bg-transparent font-normal text-text-dim-4',
+        link: 'bg-transparent font-semibold text-text-dim-4 underline underline-offset-[3px]',
+        faint: 'bg-transparent font-medium text-text-dim-5',
         soft: 'rounded-full bg-surface-2 font-bold text-text-dim-2 data-[highlight]:bg-primary-light data-[highlight]:text-primary',
       },
       size: {

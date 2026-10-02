@@ -4,6 +4,9 @@ import type { StrokeDataV2 } from '../src/types'
 import { endRangeDrag, moveRangeDrag, startRangeDrag } from './rangeDrag'
 import { RangeTicks } from './RangeTicks'
 import styles from './StemBeakControls.module.css'
+import { Button } from './components/ui/button'
+import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
+import { Field, RangeBar } from './components/ui/range'
 
 const UNIT_BOX = { x: 0, y: 0, width: 1, height: 1 }
 /** 모양 고르기 버튼의 그림. 실제 부리 함수로 그리므로 버튼에서 본 모양이 그대로 글자에 나온다. */
@@ -49,26 +52,26 @@ export function StemBeakControls({ committed, draft, onDraftChange, onCommit, sc
   }
   const isDefault = !committed.enabled && committed.shape === DEFAULT_STEM_BEAK.shape && committed.size === DEFAULT_STEM_BEAK.size && committed.angle === DEFAULT_STEM_BEAK.angle
   return <div className={styles.controls} role="tabpanel" aria-label="부리 설정">
-    {scope ? <div className={styles.scope} role="radiogroup" aria-label="부리 적용 범위">
-      <button type="button" role="radio" aria-checked={!scope.toGroup} onClick={() => scope.onChange(false)}>전체</button>
-      <button type="button" role="radio" aria-checked={scope.toGroup} onClick={() => scope.onChange(true)}>「{scope.groupName}」 {scope.groupSize}자</button>
-    </div> : <p><strong>세로줄기의 열린 머리에 한 번에</strong><span>획 데이터는 그대로입니다</span></p>}
+    {scope ? <ChoiceGroup variant="pill" aria-label="부리 적용 범위">
+      <ChoiceItem checked={!scope.toGroup} onClick={() => scope.onChange(false)}>전체</ChoiceItem>
+      <ChoiceItem checked={scope.toGroup} onClick={() => scope.onChange(true)}>「{scope.groupName}」 {scope.groupSize}자</ChoiceItem>
+    </ChoiceGroup> : <p><strong>세로줄기의 열린 머리에 한 번에</strong><span>획 데이터는 그대로입니다</span></p>}
     <h3 className={styles.title}>부리 모양</h3>
-    <div className={styles.shapes} role="radiogroup" aria-label="부리 모양">
-      <button type="button" role="radio" aria-checked={!beak.enabled} data-beak-shape="none" onClick={() => pick({ enabled: false })}>
+    <ChoiceGroup variant="tile" size="sm" className="grid grid-cols-6 gap-[5px]" aria-label="부리 모양">
+      <ChoiceItem checked={!beak.enabled} data-beak-shape="none" onClick={() => pick({ enabled: false })}>
         <BeakShapeThumb shape={null} size={beak.size} angle={beak.angle} /><span>없음</span>
-      </button>
+      </ChoiceItem>
       {STEM_BEAK_SHAPES.map(({ id, label, note }) => (
-        <button key={id} type="button" role="radio" aria-checked={beak.enabled && beak.shape === id} title={note} data-beak-shape={id} onClick={() => pick({ enabled: true, shape: id })}>
+        <ChoiceItem key={id} checked={beak.enabled && beak.shape === id} title={note} data-beak-shape={id} onClick={() => pick({ enabled: true, shape: id })}>
           <BeakShapeThumb shape={id} size={beak.size} angle={beak.angle} /><span>{label}</span>
-        </button>
+        </ChoiceItem>
       ))}
-    </div>
+    </ChoiceGroup>
     {/* 끈 막대는 제품 화면(`data-beak-idle`)에서 숨긴다 — 부리가 없으면 둘 다, 각도가 없는 모양이면 각도만. */}
     <div className={styles.sliders} data-beak-idle={!beak.enabled || undefined}>
-      <label><span>크기 <output>{beak.size.toFixed(1)}</output></span><input aria-label="부리 크기" type="range" min={0.5} max={2} step={0.1} value={beak.size} disabled={!beak.enabled} onChange={(event) => preview({ size: Number(event.target.value) })} {...drag('size')} onKeyUp={commit} onBlur={commit} /><RangeTicks min={0.5} max={2} ticks={[{ at: 0.5, text: '0.5' }, { at: 1, text: '1' }, { at: 1.5, text: '1.5' }, { at: 2, text: '2' }]} /></label>
-      <label data-beak-idle={beak.shape !== 'angled' || undefined}><span>각도 <output>{beak.angle}°</output></span><input aria-label="부리 각도" type="range" min={-60} max={60} step={5} value={beak.angle} disabled={!beak.enabled || beak.shape !== 'angled'} onChange={(event) => preview({ angle: Number(event.target.value) })} {...drag('angle')} onKeyUp={commit} onBlur={commit} /><RangeTicks min={-60} max={60} ticks={[{ at: -60, text: '−60°' }, { at: -30 }, { at: 0, text: '0°' }, { at: 30 }, { at: 60, text: '60°' }]} /></label>
+      <Field label="크기" value={beak.size.toFixed(1)}><RangeBar aria-label="부리 크기" min={0.5} max={2} step={0.1} value={beak.size} disabled={!beak.enabled} onChange={(event) => preview({ size: Number(event.target.value) })} {...drag('size')} onKeyUp={commit} onBlur={commit} /><RangeTicks min={0.5} max={2} ticks={[{ at: 0.5, text: '0.5' }, { at: 1, text: '1' }, { at: 1.5, text: '1.5' }, { at: 2, text: '2' }]} /></Field>
+      <Field label="각도" value={`${beak.angle}°`} data-beak-idle={beak.shape !== 'angled' || undefined}><RangeBar aria-label="부리 각도" min={-60} max={60} step={5} value={beak.angle} disabled={!beak.enabled || beak.shape !== 'angled'} onChange={(event) => preview({ angle: Number(event.target.value) })} {...drag('angle')} onKeyUp={commit} onBlur={commit} /><RangeTicks min={-60} max={60} ticks={[{ at: -60, text: '−60°' }, { at: -30 }, { at: 0, text: '0°' }, { at: 30 }, { at: 60, text: '60°' }]} /></Field>
     </div>
-    <button type="button" disabled={isDefault} onClick={() => onCommit(committed, { ...DEFAULT_STEM_BEAK })}>부리 처음 값으로</button>
+    <Button variant="faint" size="sm" className="mt-3 h-11 w-full" disabled={isDefault} onClick={() => onCommit(committed, { ...DEFAULT_STEM_BEAK })}>부리 처음 값으로</Button>
   </div>
 }

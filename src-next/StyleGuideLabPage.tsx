@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, MessageCircle, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, MessageCircle, Plus, Square, Columns3, Type } from 'lucide-react'
 import { Button } from './components/ui/button'
 import type { ButtonProps } from './components/ui/button'
+import { Checkbox } from './components/ui/checkbox'
+import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
+import { Field, RangeBar } from './components/ui/range'
+import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs'
+import { RangeTicks } from './RangeTicks'
 import { applyThemePreview, readThemePreview, writeThemePreview } from './themePreview'
 import type { ThemePreview } from './themePreview'
 
@@ -33,7 +38,7 @@ const RADII = ['xs', 'sm', 'md', 'lg', 'xl', 'full']
 const SHADOWS = ['sm', 'md', 'overlay']
 const SPACES = [1, 2, 3, 4, 5, 6]
 
-const VARIANTS: NonNullable<ButtonProps['variant']>[] = ['default', 'primary', 'secondary', 'outline', 'ghost', 'destructive', 'plain', 'quiet', 'soft']
+const VARIANTS: NonNullable<ButtonProps['variant']>[] = ['default', 'primary', 'secondary', 'outline', 'ghost', 'destructive', 'plain', 'quiet', 'link', 'faint', 'soft']
 const SIZES: NonNullable<ButtonProps['size']>[] = ['sm', 'default', 'lg', 'icon', 'icon-lg']
 
 function Section({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
@@ -147,7 +152,7 @@ export function StyleGuideLabPage() {
           </div>)}</div>
         </Section>
 
-        <Section title="단추 Button" note="강조 × 크기. 아래 셋(plain · quiet · soft)과 크기 icon-lg · row는 우리 것 — 계정 화면에서 더했다(10-03 승인).">
+        <Section title="단추 Button" note="강조 × 크기. plain · quiet · soft와 크기 icon-lg · row는 계정 화면(G0), link · faint는 글로벌 스타일(G1)에서 더했다.">
           <div className="overflow-x-auto">
             <table className="border-separate border-spacing-x-3 border-spacing-y-2 text-left">
               <thead><tr>
@@ -175,7 +180,19 @@ export function StyleGuideLabPage() {
           </div>
         </Section>
 
-        <Section title="다음 부품" note="3단계에서 하나씩: 시트 · 대화상자 → 탭 · 묶음 단추 → 카드 → 칩 · 토글 → 막대 → 입력 → 토스트 · 알림.">
+        <Section title="탭 Tabs" note="default(관리자) · underline · dock(글로벌 스타일 아래 탭 — 여기선 화면 바닥 고정을 풀어 그렸다).">
+          <GuideTabs />
+        </Section>
+
+        <Section title="고르기 ChoiceGroup" note="radiogroup. tile(그림 + 이름, 크기 default · sm) · segment(회색 길 위 흰 알약) · pill(고른 것만 검정).">
+          <GuideChoices />
+        </Section>
+
+        <Section title="항목 · 막대 Field · RangeBar · Checkbox" note="이름 왼쪽 · 값 오른쪽, 아래 채움 막대와 눈금. 체크는 tone primary · ink.">
+          <GuideFields />
+        </Section>
+
+        <Section title="다음 부품" note="시트 · 대화상자 → 카드 → 칩 · 토글 → 입력 → 토스트 · 알림.">
           <p className="text-13 text-text-dim-4">아직 없음.</p>
         </Section>
       </div>
@@ -186,4 +203,54 @@ export function StyleGuideLabPage() {
       </aside>
     </div>
   </main>
+}
+
+function GuideTabs() {
+  const [tab, setTab] = useState('brush')
+  const items = [['body', '네모꼴', Square], ['brush', '획', Columns3], ['beak', '부리', Type]] as const
+  return <div className="flex flex-col gap-5">
+    {(['default', 'underline'] as const).map((variant) => <Tabs key={variant} value={tab} onValueChange={setTab}>
+      <TabsList variant={variant} aria-label={`탭 ${variant}`}>{items.map(([id, label]) => <TabsTrigger key={id} value={id}>{label}</TabsTrigger>)}</TabsList>
+    </Tabs>)}
+    <Tabs value={tab} onValueChange={setTab}>
+      <TabsList variant="dock" aria-label="탭 dock" className="static w-[400px] translate-x-0">
+        {items.map(([id, label, Icon]) => <TabsTrigger key={id} value={id} disabled={id === 'body'}><Icon aria-hidden="true" /><span>{label}</span>{id === 'body' && <small>개발 중이에요</small>}</TabsTrigger>)}
+      </TabsList>
+    </Tabs>
+  </div>
+}
+
+function GuideChoices() {
+  const [tile, setTile] = useState('a')
+  const [seg, setSeg] = useState('a')
+  return <div className="flex max-w-xl flex-col gap-5">
+    <ChoiceGroup variant="tile" className="grid grid-cols-2 gap-2" aria-label="tile">
+      {['a', 'b'].map((id) => <ChoiceItem key={id} checked={tile === id} onClick={() => setTile(id)}><Columns3 className="h-[52px] w-16" aria-hidden="true" /><strong>{id === 'a' ? '일반 붓' : '납작 붓'}</strong></ChoiceItem>)}
+    </ChoiceGroup>
+    <ChoiceGroup variant="tile" size="sm" className="grid grid-cols-6 gap-[5px]" aria-label="tile sm">
+      {['a', 'b', 'c', 'd', 'e', 'f'].map((id) => <ChoiceItem key={id} checked={tile === id} onClick={() => setTile(id)}><svg viewBox="0 0 100 100" aria-hidden="true"><rect x="46" y="30" width="20" height="80" /></svg><span>모양 {id}</span></ChoiceItem>)}
+    </ChoiceGroup>
+    <ChoiceGroup variant="segment" aria-label="segment">
+      {['a', 'b', 'c'].map((id) => <ChoiceItem key={id} checked={seg === id} onClick={() => setSeg(id)}>{`칸 ${id}`}</ChoiceItem>)}
+    </ChoiceGroup>
+    <ChoiceGroup variant="pill" aria-label="pill">
+      {['a', 'b'].map((id) => <ChoiceItem key={id} checked={seg === id} onClick={() => setSeg(id)}>{id === 'a' ? '전체' : '「묶음」 12자'}</ChoiceItem>)}
+    </ChoiceGroup>
+  </div>
+}
+
+function GuideFields() {
+  const [weight, setWeight] = useState(400)
+  const [on, setOn] = useState(true)
+  return <div className="flex max-w-md flex-col">
+    <Field label="굵기" value={weight}>
+      <RangeBar min={100} max={900} step={100} value={weight} onChange={(event) => setWeight(Number(event.target.value))} />
+      <RangeTicks min={100} max={900} ticks={[100, 200, 300, 400, 500, 600, 700, 800, 900].map((at) => ({ at, text: at === 100 || at === 400 || at === 900 ? String(at) : undefined }))} />
+    </Field>
+    <Field label="꺼진 막대" value="–"><RangeBar min={0} max={100} value={30} disabled readOnly /></Field>
+    <div className="flex items-center gap-6 pt-6">
+      <label className="flex items-center gap-2 text-13 font-semibold"><Checkbox checked={on} onCheckedChange={(checked) => setOn(checked === true)} />primary</label>
+      <label className="flex items-center gap-2 text-13 font-semibold"><Checkbox tone="ink" checked={on} onCheckedChange={(checked) => setOn(checked === true)} />ink</label>
+    </div>
+  </div>
 }

@@ -5,6 +5,9 @@ import { endRangeDrag, moveRangeDrag, startRangeDrag } from './rangeDrag'
 import { RangeTicks, type RangeTick } from './RangeTicks'
 import { BrushPicto } from './StylePicto'
 import styles from './CalibrationSentenceEditor.module.css'
+import { Button } from './components/ui/button'
+import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
+import { Field, RangeBar } from './components/ui/range'
 
 const TIP_OPTIONS: Array<{ tip: BrushTip; label: string }> = [
   { tip: 'round', label: '원형' }, { tip: 'ellipse', label: '납작형' }, { tip: 'rectangle', label: '네모형' },
@@ -167,16 +170,15 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
     setActiveValue(null)
     onDraftChange(null)
   }
-  const range = (label: string, value: number, min: number, max: number, step: number, update: (value: number) => StrokeRenderStyle, output: string, ticks?: readonly RangeTick[]) => <label className={styles.ruleControl}>
+  const range = (label: string, value: number, min: number, max: number, step: number, update: (value: number) => StrokeRenderStyle, output: string, ticks?: readonly RangeTick[]) => <Field label={label} value={productOptions || activeValue === label ? output : undefined}>
     {/* 제품 화면은 값을 늘 보인다(제목 오른쪽). 옛 단독 화면은 끄는 동안만. */}
-    <span>{label} {(productOptions || activeValue === label) && <output>{output}</output>}</span>
-    <input type="range" min={min} max={max} step={step} value={value}
+    <RangeBar min={min} max={max} step={step} value={value}
       onPointerDown={(event) => { begin(label); const next = startRangeDrag(event); if (next !== null && next !== value) preview(update(next)) }}
       onPointerMove={(event) => { const next = moveRangeDrag(event); if (next !== null && next !== value) preview(update(next)) }}
       onChange={(event) => { begin(label); preview(update(Number(event.target.value))) }} onPointerUp={(event) => { endRangeDrag(event); finish() }} onPointerCancel={(event) => { endRangeDrag(event); cancel() }}
       onKeyDown={(event) => handleRangeKeys(event, label)} onKeyUp={finish} aria-label={label === '납작함' ? '붓촉 납작함' : label} data-testid={label === '바깥 둥글기' ? 'style-roundness' : label === '안쪽 둥글기' ? 'style-inner-roundness' : label === '가로·세로 대비' ? 'style-contrast' : undefined} />
     {ticks && <RangeTicks min={min} max={max} ticks={ticks} />}
-  </label>
+  </Field>
   const angle = current.mode === 'angled-area' ? current.cutAngle : current.mode === 'brush' ? current.brush.angle : 0
   const angleLimit = current.mode === 'angled-area' ? 60 : 90
   const renderAnglePad = () => <div className={styles.brushAnglePad} role="slider" tabIndex={0} aria-label={current.mode === 'angled-area' ? '절단각' : '붓촉 각도'}
@@ -200,33 +202,33 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
   const controls = <div className={styles.brushControls} role={embedded ? 'tabpanel' : undefined} aria-label={embedded ? '획' : undefined}>
     {leading}
     {/* 제품 화면은 붓촉형만 쓴다(절단 끝 · 레거시는 뺐다, 09-25 사용자). 옛 저장분이 다른 규칙이면 붓촉형으로 돌아올 길만 남긴다. */}
-    {(!productOptions || current.mode !== 'brush') && <div className={styles.strokeRuleModes} style={productOptions ? { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' } : undefined} role="radiogroup" aria-label="획 생성 규칙">
-      {([['brush', '붓촉형'], ['angled-area', '절단 끝'], ['legacy-snapped-centerline', '레거시 스냅 획']] as const).filter(([mode]) => !productOptions || mode === 'brush' || mode === current.mode).map(([mode, label]) => <button key={mode} type="button" role="radio" aria-checked={current.mode === mode} onClick={() => selectMode(mode)}>{label}</button>)}
-    </div>}
+    {(!productOptions || current.mode !== 'brush') && <ChoiceGroup variant="segment" aria-label="획 생성 규칙">
+      {([['brush', '붓촉형'], ['angled-area', '절단 끝'], ['legacy-snapped-centerline', '레거시 스냅 획']] as const).filter(([mode]) => !productOptions || mode === 'brush' || mode === current.mode).map(([mode, label]) => <ChoiceItem key={mode} checked={current.mode === mode} onClick={() => selectMode(mode)}>{label}</ChoiceItem>)}
+    </ChoiceGroup>}
     {current.mode === 'brush' && <>
       {productOptions
         ? <>
           <h3>붓</h3>
           {/* 붓은 글자 대신 그 붓으로 그은 물결 하나로 보인다. */}
-          <div className={styles.brushTips} style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }} role="radiogroup" aria-label="획 끝 모양">{END_CHOICES.map((choice) => (
-            <button key={choice.id} type="button" role="radio" aria-checked={endChoice === choice.id} data-end-choice={choice.id} onClick={() => selectEndChoice(choice)}>
+          <ChoiceGroup variant="tile" className="grid grid-cols-2 gap-2" aria-label="획 끝 모양">{END_CHOICES.map((choice) => (
+            <ChoiceItem key={choice.id} checked={endChoice === choice.id} data-end-choice={choice.id} onClick={() => selectEndChoice(choice)} className="[&_svg]:h-[52px] [&_svg]:w-16">
               <BrushPicto flat={choice.tip !== 'round'} /><strong>{choice.label}</strong>
-            </button>
-          ))}</div>
+            </ChoiceItem>
+          ))}</ChoiceGroup>
         </>
-        : <div className={styles.brushTips} role="radiogroup" aria-label="붓촉 모양">{TIP_OPTIONS.map(({ tip, label }) => {
+        : <ChoiceGroup variant="tile" className="grid grid-cols-3 gap-1.5" aria-label="붓촉 모양">{TIP_OPTIONS.map(({ tip, label }) => {
         const previewStyle: StrokeRenderStyle = { ...current, brush: { ...current.brush, tip } }
-        return <button key={tip} type="button" role="radio" aria-checked={current.brush.tip === tip} onClick={() => selectTip(tip)}>
+        return <ChoiceItem key={tip} checked={current.brush.tip === tip} onClick={() => selectTip(tip)}>
           <span className={styles.brushTipPreview}>{renderPreview(previewStyle)}</span><span className={`${styles.brushTipIcon} ${styles[`brushTipIcon_${tip}`]}`} aria-hidden="true" /><strong>{label}</strong>
-        </button>
-      })}</div>}
+        </ChoiceItem>
+      })}</ChoiceGroup>}
       {current.brush.tip !== 'round' && (() => {
         const flatness = range('납작함', aspectRatioToFlatness(current.brush.aspectRatio), 0, 100, 5, (value) => ({ ...current, brush: { ...current.brush, aspectRatio: flatnessToAspectRatio(value) } }), `${aspectRatioToFlatness(current.brush.aspectRatio)}%`, [{ at: 0, text: '0' }, { at: 50, text: '50' }, { at: 100, text: '100' }])
         // 제품 화면은 일반 붓처럼 한 줄에 하나씩 쌓는다. 각도판도 막대와 같은 제목 · 값 줄을 단다.
         return productOptions
           ? <div className={styles.brushControlGrid} style={{ gridTemplateColumns: 'minmax(0, 1fr)', minHeight: 0, gap: 0 }}>
             {flatness}
-            <div className={styles.ruleControl} data-style-row><span>각도 <output>{angle > 0 ? '+' : ''}{angle}°</output></span>{renderAnglePad()}</div>
+            <Field as="div" label="각도" value={`${angle > 0 ? '+' : ''}${angle}°`} data-style-row>{renderAnglePad()}</Field>
           </div>
           : <div className={styles.brushControlGrid}>{flatness}{renderAnglePad()}</div>
       })()}
@@ -239,11 +241,11 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
           <div>
             {range('안쪽 둥글기', innerRoundnessOf(current), 0, 300, 5, (value) => ({ ...current, innerRoundness: value / 100 }), `${innerRoundnessOf(current)}%`, [{ at: 0 }, { at: 100, text: '100' }, { at: 200, text: '200' }, { at: 300, text: '300' }])}
             {/* 안쪽을 따로 정하면 풀린다. `바깥과 같이`로 다시 바깥을 따르게 한다 — 안쪽 막대 바로 아래 작은 글자로. */}
-            {!innerLinked(current) && <button type="button" className={styles.ruleLinkButton} data-link-inner onClick={() => {
+            {!innerLinked(current) && <Button variant="link" size="sm" className="ml-auto mt-0.5 flex w-fit px-0" data-link-inner onClick={() => {
               const { innerRoundness: _dropped, ...rest } = current as Extract<StrokeRenderStyle, { mode: 'brush' }>
               void _dropped
               preview(rest); onCommit(committed, rest)
-            }}>바깥과 같이</button>}
+            }}>바깥과 같이</Button>}
           </div>
         </div>
         {/* 가로·세로 두께 대비. 가운데 0이 같은 굵기, 오른쪽은 세로 굵게 · 가로 얇게. */}
@@ -260,5 +262,5 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
     {current.mode === 'dot-pattern' && <div className={styles.constructionRuleMessage}><strong>점 반복 · 보류</strong><span>규칙과 교차부 품질을 다시 설계한 뒤 재개합니다.</span></div>}
   </div>
   if (embedded) return controls
-  return <section className={styles.brushSection} aria-label="획 스타일"><div className={styles.brushDrawer}><header className={styles.brushHeader}><div><strong>획 스타일</strong><span>폰트 전체에 적용</span></div><button type="button" onClick={onClose} aria-label="획 스타일 닫기"><X size={17} /></button></header>{controls}</div></section>
+  return <section className={styles.brushSection} aria-label="획 스타일"><div className={styles.brushDrawer}><header className={styles.brushHeader}><div><strong>획 스타일</strong><span>폰트 전체에 적용</span></div><Button variant="quiet" size="icon" onClick={onClose} aria-label="획 스타일 닫기"><X /></Button></header>{controls}</div></section>
 }

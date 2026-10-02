@@ -100,6 +100,9 @@ import { stemScaleOf } from '../src/services/strokeRenderGeometry'
 import { endRangeDrag, moveRangeDrag, startRangeDrag } from './rangeDrag'
 import { DEFAULT_STEM_BEAK, type StemBeakStyle } from '../src/services/stemBeak'
 import styleMode from './GlobalStyleMode.module.css'
+import { Button } from './components/ui/button'
+import { Checkbox } from './components/ui/checkbox'
+import { Field, RangeBar } from './components/ui/range'
 import { GlobalStyleTrackpad, type GlobalStylePanel } from './GlobalStyleTrackpad'
 import { SentenceTextarea } from './SentenceTextarea'
 import { SentenceSheetControls, SentenceSheetRun } from './SentenceSheet'
@@ -1824,7 +1827,7 @@ function DesignBodyShapeControls({ fontSpace }: { fontSpace: { unitsPerEm: numbe
       <div className={styleMode.shapeRow}>
         <span className={styleMode.shapeIcon} style={{ width: 12, height: 20 }} aria-hidden="true" />
         <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <input type="range" min={BODY_PERCENT_MIN} max={BODY_PERCENT_MAX} step="1" value={shown} aria-label="네모꼴 가로" data-testid="style-body-shape" onChange={(event) => setPercent(Number(event.target.value))}
+          <RangeBar min={BODY_PERCENT_MIN} max={BODY_PERCENT_MAX} step="1" value={shown} aria-label="네모꼴 가로" data-testid="style-body-shape" onChange={(event) => setPercent(Number(event.target.value))}
             onPointerDown={(event) => setPercent(startRangeDrag(event))} onPointerMove={(event) => setPercent(moveRangeDrag(event))} onPointerUp={endRangeDrag} onPointerCancel={endRangeDrag} />
           <RangeTicks min={BODY_PERCENT_MIN} max={BODY_PERCENT_MAX} ticks={[{ at: BODY_PERCENT_MIN, text: '좁게' }, { at: 100, text: '기본' }, { at: BODY_PERCENT_MAX, text: '넓게' }]} />
         </span>
@@ -1833,11 +1836,11 @@ function DesignBodyShapeControls({ fontSpace }: { fontSpace: { unitsPerEm: numbe
       {outside && <small className={styleMode.bodyNote} data-testid="style-body-outside">지금 값({width} × {height})은 막대 범위 밖이에요. 막대를 움직이면 범위 안으로 들어와요.</small>}
     </div>
     <label className={styleMode.autoRow}>
-      <input type="checkbox" checked={autoOn} onChange={(event) => setAutoCompensation(event.target.checked)} data-testid="style-body-auto" />
+      <Checkbox tone="ink" checked={autoOn} onCheckedChange={(checked) => setAutoCompensation(checked === true)} data-testid="style-body-auto" />
       <span>자동 보정</span>
       <output data-testid="style-body-auto-amount">{autoText}</output>
     </label>
-    <button type="button" disabled={isReference} onClick={resetGlobalPadding}>기본 가로로 되돌리기</button>
+    <Button variant="faint" size="sm" className="mt-3 h-11 w-full" disabled={isReference} onClick={resetGlobalPadding}>기본 가로로 되돌리기</Button>
   </div>
 }
 
@@ -1927,15 +1930,14 @@ function StyleWeightRange({
   const setCounterKeep = useGlobalStyleStore((state) => state.setCounterKeep)
   // 다른 획 막대와 같은 생김새: 제목 오른쪽 값, 아래 눈금(100 · 400 · 900만 글씨).
   return <>
-    <label className={styles.ruleControl}>
-      <span>굵기 <output>{tone.weight}</output></span>
-      <input type="range" min="100" max="900" step="100" value={tone.weight} aria-label="굵기" data-testid="style-weight" onChange={(event) => setWeight(Number(event.target.value))}
+    <Field label="굵기" value={tone.weight}>
+      <RangeBar min="100" max="900" step="100" value={tone.weight} aria-label="굵기" data-testid="style-weight" onChange={(event) => setWeight(Number(event.target.value))}
         onPointerDown={(event) => setWeight(startRangeDrag(event))} onPointerMove={(event) => setWeight(moveRangeDrag(event))}
         onPointerUp={(event) => { endRangeDrag(event); commit() }} onPointerCancel={(event) => { endRangeDrag(event); commit() }} onKeyUp={commit} onBlur={commit} />
       <RangeTicks min={100} max={900} ticks={WEIGHT_STOPS.map((at) => ({ at, text: at === 100 || at === 400 || at === 900 ? String(at) : undefined }))} />
-    </label>
+    </Field>
     <label className={styleMode.autoRow}>
-      <input type="checkbox" checked={keepOn} onChange={(event) => setCounterKeep(event.target.checked)} data-testid="style-weight-auto" />
+      <Checkbox tone="ink" checked={keepOn} onCheckedChange={(checked) => setCounterKeep(checked === true)} data-testid="style-weight-auto" />
       <span>자동 보정</span>
       <output data-testid="style-weight-auto-amount">{keepOn ? '굵게 하면 속공간을 지켜요' : '꺼 두었어요'}</output>
     </label>
