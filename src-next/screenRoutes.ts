@@ -25,6 +25,7 @@ export const LAB_SCREEN_ROUTES = [
   '/font-guide-lab',
   '/spectrum-lab',
   '/design-body-lab',
+  '/style-guide',
 ] as const
 
 /** 화면이 아닌 주소: 다른 화면으로 넘기기만 하거나, 셸 분기용 접두어. */

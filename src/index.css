@@ -3,43 +3,135 @@
 @tailwind utilities;
 
 @layer base {
+  /*
+   * 토큰 세 층(docs/plans/2026-10-03_스타일-공통화.md).
+   * 1층 원색 팔레트(--palette-*) — 값만 있다. 화면은 직접 쓰지 않는다.
+   * 2층 의미 색(--color-*) — 바탕 · 글자 · 테두리 · 주색 · 위험. 테마(data-theme)는 이 층만 갈아 끼운다.
+   * 3층 편집 색(--color-edit-*) — 캔버스 안 선택 · 영역 · 고스트 · 격자. 테마가 바뀌어도 그대로.
+   * 색 값은 `R G B` 세 숫자라서 `rgb(var(--color-x) / .5)`처럼 투명도를 붙여 쓴다.
+   */
   :root {
     color-scheme: light;
 
-    /* 2차 개발 기본 테마: 차가운 흰색 바탕 + 선명한 중성색 */
-    --color-background: 247 248 250;
-    --color-foreground: 24 27 31;
-    --color-surface: 255 255 255;
-    --color-surface-2: 248 249 251;
-    --color-surface-3: 240 243 246;
-    --color-surface-4: 231 235 240;
-    --color-surface-hover: 242 245 248;
+    /* 1층 원색 팔레트 */
+    --palette-white: 255 255 255;
+    --palette-gray-25: 248 249 251;
+    --palette-gray-50: 247 248 250;
+    --palette-gray-75: 242 245 248;
+    --palette-gray-100: 240 243 246;
+    --palette-gray-150: 235 238 242;
+    --palette-gray-200: 231 235 240;
+    --palette-gray-250: 218 223 230;
+    --palette-gray-275: 211 217 225;
+    --palette-gray-300: 202 209 218;
+    --palette-gray-350: 196 203 212;
+    --palette-gray-400: 166 173 182;
+    --palette-gray-500: 139 147 157;
+    --palette-gray-600: 112 120 131;
+    --palette-gray-700: 88 97 109;
+    --palette-gray-800: 65 72 82;
+    --palette-gray-850: 43 48 55;
+    --palette-gray-900: 24 27 31;
+    --palette-blue-50: 232 240 255;
+    --palette-blue-500: 47 111 237;
+    --palette-blue-600: 35 88 201;
+    --palette-red-50: 253 236 233;
+    --palette-red-500: 214 69 65;
+    --palette-red-600: 190 52 48;
+    --palette-green-50: 228 245 235;
+    --palette-green-600: 22 128 72;
+    --palette-amber-50: 255 243 224;
+    --palette-amber-600: 196 100 0;
+    --palette-orange-500: 240 86 30;
+    --palette-orange-600: 234 88 12;
+    --palette-ink-green: 47 154 106;
+    --palette-ink-blue: 59 111 214;
+    --palette-ink-violet: 139 92 246;
+    --palette-stone-300: 201 197 187;
+    --palette-stone-400: 166 162 151;
+    --palette-stone-800: 58 58 54;
 
-    --color-border: 218 223 230;
-    --color-border-light: 202 209 218;
-    --color-border-lighter: 211 217 225;
-    --color-border-subtle: 235 238 242;
+    /* 2층 의미 색 — shadcn 표준 이름 */
+    --color-background: var(--palette-gray-50);
+    --color-foreground: var(--palette-gray-900);
+    --color-card: var(--palette-white);
+    --color-card-foreground: var(--color-foreground);
+    --color-popover: var(--palette-white);
+    --color-popover-foreground: var(--color-foreground);
+    --color-primary: var(--palette-blue-500);
+    --color-primary-foreground: var(--palette-white);
+    --color-secondary: var(--palette-gray-100);
+    --color-secondary-foreground: var(--palette-gray-800);
+    --color-muted: var(--palette-gray-100);
+    --color-muted-foreground: var(--palette-gray-600);
+    --color-accent: var(--palette-gray-75);
+    --color-accent-foreground: var(--color-foreground);
+    --color-destructive: var(--palette-red-500);
+    --color-destructive-foreground: var(--palette-white);
+    --color-border: var(--palette-gray-250);
+    --color-input: var(--palette-gray-250);
+    --color-ring: var(--color-primary);
 
-    --color-primary: 47 111 237;
-    --color-primary-dark: 35 88 201;
-    --color-primary-light: 232 240 255;
-    --color-primary-foreground: 255 255 255;
-    --color-editor-point-selected: 234 88 12;
-    --color-ring: 47 111 237;
+    /* 2층 의미 색 — 우리 것. 주색의 진한 · 옅은 짝은 주색을 바꿀 때 같이 바꾼다(스타일가이드가 계산). */
+    --color-primary-dark: var(--palette-blue-600);
+    --color-primary-light: var(--palette-blue-50);
+    --color-destructive-dark: var(--palette-red-600);
+    --color-destructive-soft: var(--palette-red-50);
+    --color-success: var(--palette-green-600);
+    --color-success-soft: var(--palette-green-50);
+    --color-warning: var(--palette-amber-600);
+    --color-warning-soft: var(--palette-amber-50);
+    --color-surface: var(--palette-white);
+    --color-surface-2: var(--palette-gray-25);
+    --color-surface-3: var(--palette-gray-100);
+    --color-surface-4: var(--palette-gray-200);
+    --color-surface-hover: var(--palette-gray-75);
+    --color-border-light: var(--palette-gray-300);
+    --color-border-lighter: var(--palette-gray-275);
+    --color-border-subtle: var(--palette-gray-150);
+    --color-text-1: var(--palette-gray-850);
+    --color-text-2: var(--palette-gray-800);
+    --color-text-3: var(--palette-gray-700);
+    --color-text-4: var(--palette-gray-600);
+    --color-text-5: var(--palette-gray-500);
+    --color-text-6: var(--palette-gray-400);
 
-    --color-muted: 112 120 131;
-    --color-muted-foreground: 88 97 109;
-    --color-text-1: 43 48 55;
-    --color-text-2: 65 72 82;
-    --color-text-3: 88 97 109;
-    --color-text-4: 112 120 131;
-    --color-text-5: 139 147 157;
-    --color-text-6: 166 173 182;
+    /* 3층 편집 색. 보선 · 띠(edit-rail)는 4단계에서 캔버스 색을 조사하고 더한다. */
+    --color-edit-select: var(--palette-orange-500);
+    --color-editor-point-selected: var(--palette-orange-600);
+    --color-edit-slot-ch: var(--palette-ink-green);
+    --color-edit-slot-ju: var(--palette-ink-blue);
+    --color-edit-slot-jo: var(--palette-ink-violet);
+    --color-edit-slot-off: var(--palette-stone-300);
+    --color-edit-ghost: var(--palette-stone-800);
+    --color-edit-guide: var(--palette-gray-350);
+    --color-edit-baseline: var(--palette-stone-400);
 
+    /* 단계 — 글자 크기. 20 위는 머리글(24 · 28)만. 글자 견본(큰 한글)은 단계 밖. */
+    --font-10: 10px;
+    --font-11: 11px;
+    --font-12: 12px;
+    --font-13: 13px;
+    --font-14: 14px;
+    --font-16: 16px;
+    --font-18: 18px;
+    --font-20: 20px;
+    --font-24: 24px;
+    --font-28: 28px;
+
+    /* 단계 — 굵기 */
+    --weight-medium: 500;
+    --weight-semibold: 600;
+    --weight-bold: 700;
+    --weight-heavy: 800;
+
+    /* 단계 — 모서리 4 · 6 · 10 · 14 · 18 · 둥근 끝 */
+    --radius-xs: 4px;
     --radius-sm: 6px;
     --radius-md: 10px;
     --radius-lg: 14px;
     --radius-xl: 18px;
+    --radius-full: 999px;
 
     --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.05);
     --shadow-md: 0 8px 24px rgb(15 23 42 / 0.08);
@@ -57,6 +149,11 @@
     --space-5: 20px;
     --space-6: 24px;
     --touch-target: 44px;
+  }
+
+  /* 다크 테마 틀. 값은 5단계에서 채운다 — 의미 색만 덮고 편집 색은 그대로 둔다. */
+  :root[data-theme='dark'] {
+    color-scheme: dark;
   }
 
   /* 전역 리셋 */
@@ -115,7 +212,7 @@
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgb(var(--color-muted));
+    background: rgb(var(--color-text-4));
   }
 
   /* 선택 색상 */

@@ -2,14 +2,52 @@ import tailwindAnimate from 'tailwindcss-animate'
 
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{ts,tsx}', './src-next/admin/**/*.{ts,tsx}', './src-next/components/ui/**/*.{ts,tsx}'],
+  // 제품 화면도 Tailwind 클래스를 쓴다(스타일 공통화). 색 · 크기는 `src/index.css` 토큰만 가리킨다.
+  content: ['./index.html', './src/**/*.{ts,tsx}', './src-next/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
         background: 'rgb(var(--color-background) / <alpha-value>)',
         foreground: 'rgb(var(--color-foreground) / <alpha-value>)',
         border: 'rgb(var(--color-border) / <alpha-value>)',
+        input: 'rgb(var(--color-input) / <alpha-value>)',
         ring: 'rgb(var(--color-ring) / <alpha-value>)',
+        card: {
+          DEFAULT: 'rgb(var(--color-card) / <alpha-value>)',
+          foreground: 'rgb(var(--color-card-foreground) / <alpha-value>)',
+        },
+        popover: {
+          DEFAULT: 'rgb(var(--color-popover) / <alpha-value>)',
+          foreground: 'rgb(var(--color-popover-foreground) / <alpha-value>)',
+        },
+        secondary: {
+          DEFAULT: 'rgb(var(--color-secondary) / <alpha-value>)',
+          foreground: 'rgb(var(--color-secondary-foreground) / <alpha-value>)',
+        },
+        destructive: {
+          DEFAULT: 'rgb(var(--color-destructive) / <alpha-value>)',
+          foreground: 'rgb(var(--color-destructive-foreground) / <alpha-value>)',
+          dark: 'rgb(var(--color-destructive-dark) / <alpha-value>)',
+          soft: 'rgb(var(--color-destructive-soft) / <alpha-value>)',
+        },
+        success: {
+          DEFAULT: 'rgb(var(--color-success) / <alpha-value>)',
+          soft: 'rgb(var(--color-success-soft) / <alpha-value>)',
+        },
+        warning: {
+          DEFAULT: 'rgb(var(--color-warning) / <alpha-value>)',
+          soft: 'rgb(var(--color-warning-soft) / <alpha-value>)',
+        },
+        edit: {
+          select: 'rgb(var(--color-edit-select) / <alpha-value>)',
+          'slot-ch': 'rgb(var(--color-edit-slot-ch) / <alpha-value>)',
+          'slot-ju': 'rgb(var(--color-edit-slot-ju) / <alpha-value>)',
+          'slot-jo': 'rgb(var(--color-edit-slot-jo) / <alpha-value>)',
+          'slot-off': 'rgb(var(--color-edit-slot-off) / <alpha-value>)',
+          ghost: 'rgb(var(--color-edit-ghost) / <alpha-value>)',
+          guide: 'rgb(var(--color-edit-guide) / <alpha-value>)',
+          baseline: 'rgb(var(--color-edit-baseline) / <alpha-value>)',
+        },
         surface: {
           DEFAULT: 'rgb(var(--color-surface) / <alpha-value>)',
           2: 'rgb(var(--color-surface-2) / <alpha-value>)',
@@ -23,7 +61,10 @@ export default {
           light: 'rgb(var(--color-primary-light) / <alpha-value>)',
           foreground: 'rgb(var(--color-primary-foreground) / <alpha-value>)',
         },
+        // shadcn `accent`(옅은 hover 바탕). 아래 날 색 묶음은 죽은 `src/components/`만 쓴다 — 지우면서 같이 뺀다.
         accent: {
+          DEFAULT: 'rgb(var(--color-accent) / <alpha-value>)',
+          foreground: 'rgb(var(--color-accent-foreground) / <alpha-value>)',
           blue: '#2a5cb8',
           'blue-hover': '#3a6cc8',
           'blue-light': '#4a9eff',
@@ -86,26 +127,45 @@ export default {
         mono: ['SF Mono', 'Monaco', 'Menlo', 'Consolas', 'monospace'],
       },
       borderRadius: {
+        xs: 'var(--radius-xs)',
         sm: 'var(--radius-sm)',
         DEFAULT: 'var(--radius-sm)',
         md: 'var(--radius-md)',
         lg: 'var(--radius-lg)',
         xl: 'var(--radius-xl)',
+        full: 'var(--radius-full)',
       },
       boxShadow: {
         sm: 'var(--shadow-sm)',
         md: 'var(--shadow-md)',
         overlay: 'var(--shadow-overlay)',
       },
+      // 글자 크기 단계(`--font-*`). 옛 rem 이름은 가까운 단계로 모았다(0.85rem → 14 등).
       fontSize: {
-        'micro': '0.65rem',
-        'xs': '0.75rem',
-        'sm': '0.85rem',
-        'base': '0.9rem',
-        'lg': '1rem',
-        'xl': '1.1rem',
-        '2xl': '1.3rem',
-        '3xl': '1.5rem',
+        '10': 'var(--font-10)',
+        '11': 'var(--font-11)',
+        '12': 'var(--font-12)',
+        '13': 'var(--font-13)',
+        '14': 'var(--font-14)',
+        '16': 'var(--font-16)',
+        '18': 'var(--font-18)',
+        '20': 'var(--font-20)',
+        '24': 'var(--font-24)',
+        '28': 'var(--font-28)',
+        'micro': 'var(--font-10)',
+        'xs': 'var(--font-12)',
+        'sm': 'var(--font-14)',
+        'base': 'var(--font-14)',
+        'lg': 'var(--font-16)',
+        'xl': 'var(--font-18)',
+        '2xl': 'var(--font-20)',
+        '3xl': 'var(--font-24)',
+      },
+      fontWeight: {
+        medium: 'var(--weight-medium)',
+        semibold: 'var(--weight-semibold)',
+        bold: 'var(--weight-bold)',
+        extrabold: 'var(--weight-heavy)',
       },
       spacing: {
         'safe-t': 'env(safe-area-inset-top)',
