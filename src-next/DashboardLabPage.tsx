@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Dices, Download, Ellipsis, LoaderCircle, Minus, PencilLine, Plus, ScanSearch, Trash2, UserRound, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Dices, Download, Ellipsis, Minus, PencilLine, Plus, ScanSearch, Trash2, UserRound, X } from 'lucide-react'
 import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../src/data/Hangul'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { useEffectiveGlobalStyle, useGlobalStyleStore } from '../src/stores/globalStyleStore'
@@ -383,9 +383,15 @@ function FontCardDownload() {
   const label = exporting ? `다운로드 준비 중 ${percent}%` : status === 'downloaded' ? '받았어요' : status === 'failed' ? '다시 받기' : '다운로드'
   return <>
     <ExportNoticeToast />
-    <button type="button" className={styles.download} data-state={status} aria-label={label} aria-haspopup="dialog" aria-expanded={open} disabled={exporting} onClick={start} data-testid="dashboard-font-download">
-      {exporting ? <LoaderCircle className={styles.downloadSpin} size={18} aria-hidden="true" /> : status === 'downloaded' ? <Check size={18} aria-hidden="true" /> : <Download size={18} aria-hidden="true" />}
-    </button>
+    {/* 추출 입구가 대시보드뿐이라 이 버튼이 진행 표시의 전부다 — 만드는 동안 원 둘레가 진행만큼 차오르고 안에 퍼센트가 보인다. */}
+    <span className={styles.downloadWrap}>
+      {exporting && <span className={styles.downloadRing} style={{ ['--p' as string]: percent }} aria-hidden="true" />}
+      <button type="button" className={styles.download} data-state={status} aria-label={label} aria-haspopup="dialog" aria-expanded={open} disabled={exporting} onClick={start} data-testid="dashboard-font-download">
+        {exporting
+          ? <span className={styles.downloadPct}>{percent}%</span>
+          : status === 'downloaded' ? <Check size={18} aria-hidden="true" /> : <Download size={18} aria-hidden="true" />}
+      </button>
+    </span>
     {open && <div className={styles.menuSheetLayer} data-closing={closing || undefined} style={keyboard ? { paddingBottom: keyboard } : undefined} onPointerDown={(event) => { if (event.target === event.currentTarget) close() }}>
       <div className={styles.menuSheet} role="dialog" aria-label="폰트 다운로드">
         <form className={styles.menuSheetStep} onSubmit={(event) => { event.preventDefault(); submit() }}>

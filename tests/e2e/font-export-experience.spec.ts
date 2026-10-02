@@ -96,8 +96,11 @@ test('완료 페이지의 한임에게 자랑하기는 제보 판을 잘했어�
   await page.goto('/dashboard')
   // 주사위로 바꾼 카드 문장이 완료 페이지에 그대로 온다.
   await page.getByRole('button', { name: '예시 문장 바꾸기' }).click()
-  const sentence = await page.locator('article p[aria-label]').first().getAttribute('aria-label')
+  // 문장 카드가 `section`으로 바뀌어(19516b8) 옛 `article p[aria-label]` 셀렉터가 낡았다. 라벨 뒤 안내 꼬리는 뗀다.
+  const sentenceLabel = await page.getByTestId('dashboard-sentence').getAttribute('aria-label')
+  const sentence = sentenceLabel?.split(' — ')[0] ?? ''
   expect(sentence).not.toBe('포도밭에 햇살이 쏟아졌다')
+  expect(sentence.length).toBeGreaterThan(0)
   const downloadPromise = page.waitForEvent('download', { timeout: 200_000 })
   await page.getByTestId('dashboard-font-download').click()
   await page.getByTestId('dashboard-font-download-name').fill('자랑체')

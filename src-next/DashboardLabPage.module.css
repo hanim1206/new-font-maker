@@ -98,7 +98,6 @@
 .download { width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 999px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); transition: transform var(--motion-fast) var(--ease-standard); }
 .download:disabled { opacity: 1; }
 .download:not(:disabled):active { transform: scale(0.94); }
-.downloadSpin { animation: spin 900ms linear infinite; }
 
 /* 왼쪽 레일 + 내용. 레일은 회색 길 위 흰 알약, 스크롤에 붙어 따라온다.
    회색 길은 `.body` 배경이 바닥까지 칠하고, 레일은 버튼 높이만 — 레일이 화면만큼 크면 바닥에서 밀려 올라간다. 바닥 여백도 `.body` 안에. */
@@ -252,10 +251,14 @@
 @keyframes drawerDown { from { transform: translateY(-100%); } to { transform: none; } }
 @keyframes drawerUp { from { transform: none; } to { transform: translateY(-100%); } }
 @keyframes fadeOut { to { opacity: 0; } }
-@keyframes spin { to { transform: rotate(360deg); } }
 @keyframes sheetUp { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes stepIn { from { opacity: 0; transform: translateY(6px); } }
 @keyframes sheetDown { from { transform: none; } to { transform: translateY(calc(100% + 24px)); } }
 @media (prefers-reduced-motion: reduce) { .home, .board, .groupHead, .homeCard, .benchChips em, .benchClear, .benchBorrow, .benchGo, .benchCount, .groupMore, .sheetLayer, .sheet, .menuSheetLayer, .menuSheet, .menuSheetStep, .menuSheetField button, .menuSheetActions button, .toast { transition: none; animation: none; } }
 .picto { display: block; width: 52px; height: 52px; }
 .picto svg { display: block; width: 100%; height: 100%; }
+
+/* 받기 진행 — 원 둘레가 진행만큼 차오르고 안에 퍼센트. 추출 입구가 대시보드뿐이라 이 버튼이 진행 표시의 전부다. */
+.downloadWrap { position: relative; display: grid; place-items: center; }
+.downloadRing { position: absolute; inset: -5px; border-radius: 999px; pointer-events: none; background: conic-gradient(rgb(var(--color-foreground)) calc(var(--p) * 1%), rgb(var(--color-foreground) / 0.18) 0); -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)); mask: radial-gradient(closest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)); }
+.downloadPct { font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
