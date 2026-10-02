@@ -34,7 +34,7 @@
 .mineIcon { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: var(--radius-lg); background: var(--tag-bg); color: var(--tag); }
 .mineIcon[data-tag='broken'] { --tag: rgb(var(--color-destructive)); --tag-bg: rgb(var(--color-destructive-soft)); }
 .mineIcon[data-tag='odd'] { --tag: rgb(var(--color-warning)); --tag-bg: rgb(var(--color-warning-soft)); }
-.mineIcon[data-tag='wish'] { --tag: rgb(var(--color-primary-dark)); --tag-bg: rgb(var(--color-primary-light)); }
+.mineIcon[data-tag='wish'] { --tag: rgb(var(--color-info)); --tag-bg: rgb(var(--color-info-soft)); }
 .mineIcon[data-tag='praise'] { --tag: rgb(var(--color-success)); --tag-bg: rgb(var(--color-success-soft)); }
 .mineIcon[data-tag='other'] { --tag: rgb(var(--color-text-3)); --tag-bg: rgb(var(--color-surface-3)); }
 /* 쓴 글은 자르지 않는다. 이어 보낸 글은 문단으로. */

@@ -22,7 +22,7 @@ const PRIMARY_CHOICES: { label: string; hex: string | null }[] = [
 const SEMANTIC = [
   'background', 'foreground', 'card', 'popover', 'primary', 'primary-foreground', 'primary-dark', 'primary-light',
   'secondary', 'secondary-foreground', 'muted', 'muted-foreground', 'accent', 'destructive', 'destructive-dark', 'destructive-soft',
-  'success', 'success-soft', 'warning', 'warning-soft', 'border', 'input', 'ring',
+  'info', 'info-soft', 'success', 'success-soft', 'warning', 'warning-soft', 'border', 'input', 'ring',
   'surface', 'surface-2', 'surface-3', 'surface-4', 'surface-hover', 'border-light', 'border-lighter', 'border-subtle',
   'text-1', 'text-2', 'text-3', 'text-4', 'text-5', 'text-6',
 ]
@@ -147,7 +147,7 @@ export function StyleGuideLabPage() {
           </div>)}</div>
         </Section>
 
-        <Section title="단추 Button" note="강조 × 크기. 아래 셋(plain · quiet · soft)과 크기 icon-lg · row는 우리 것 — 계정 화면에서 더했다.">
+        <Section title="단추 Button" note="강조 × 크기. 아래 셋(plain · quiet · soft)과 크기 icon-lg · row는 우리 것 — 계정 화면에서 더했다(10-03 승인).">
           <div className="overflow-x-auto">
             <table className="border-separate border-spacing-x-3 border-spacing-y-2 text-left">
               <thead><tr>

@@ -30,6 +30,10 @@ export default {
           dark: 'rgb(var(--color-destructive-dark) / <alpha-value>)',
           soft: 'rgb(var(--color-destructive-soft) / <alpha-value>)',
         },
+        info: {
+          DEFAULT: 'rgb(var(--color-info) / <alpha-value>)',
+          soft: 'rgb(var(--color-info-soft) / <alpha-value>)',
+        },
         success: {
           DEFAULT: 'rgb(var(--color-success) / <alpha-value>)',
           soft: 'rgb(var(--color-success-soft) / <alpha-value>)',

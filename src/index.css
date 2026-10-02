@@ -77,6 +77,9 @@
     --color-primary-light: var(--palette-blue-50);
     --color-destructive-dark: var(--palette-red-600);
     --color-destructive-soft: var(--palette-red-50);
+    /* 정보 파랑. 주색과 따로 — 주색을 바꿔도 그대로(의견 `이러면 좋겠어요` 태그). */
+    --color-info: var(--palette-blue-600);
+    --color-info-soft: var(--palette-blue-50);
     --color-success: var(--palette-green-600);
     --color-success-soft: var(--palette-green-50);
     --color-warning: var(--palette-amber-600);
