@@ -32,7 +32,7 @@ const SEMANTIC = [
   'text-1', 'text-2', 'text-3', 'text-4', 'text-5', 'text-6',
 ]
 const EDIT = ['edit-select', 'editor-point-selected', 'edit-slot-ch', 'edit-slot-ju', 'edit-slot-jo', 'edit-slot-off', 'edit-ghost', 'edit-guide', 'edit-baseline']
-const FONT_STEPS = [10, 11, 12, 13, 14, 16, 18, 20, 24, 28]
+const FONT_STEPS = [10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 36]
 const WEIGHTS: [string, string][] = [['medium', '500'], ['semibold', '600'], ['bold', '700'], ['heavy', '800']]
 const RADII = ['xs', 'sm', 'md', 'lg', 'xl', 'full']
 const SHADOWS = ['sm', 'md', 'overlay']
@@ -123,7 +123,7 @@ export function StyleGuideLabPage() {
           <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{EDIT.map((name) => <Swatch key={name} name={name} />)}</div>
         </Section>
 
-        <Section title="글자 크기" note="20 위는 머리글(24 · 28)만. 큰 한글 견본은 단계 밖.">
+        <Section title="글자 크기" note="20 위는 머리글(24 · 28)과 큰 숫자(36)만. 큰 한글 견본은 단계 밖.">
           <div className="flex flex-col gap-2">{FONT_STEPS.map((size) => <div key={size} className="flex items-baseline gap-4">
             <code className="w-16 shrink-0 text-12 text-text-dim-5">--font-{size}</code>
             <span style={{ fontSize: `var(--font-${size})` }}>다람쥐 헌 쳇바퀴에 타고파 Aa 123</span>

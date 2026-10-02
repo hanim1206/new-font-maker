@@ -98,7 +98,7 @@
 }
 
 .quickPickerRole {
-  color: rgb(var(--color-text-dim-3));
+  color: rgb(var(--color-text-3));
   font-size: 11px;
   font-weight: 700;
   text-align: center;
@@ -114,7 +114,7 @@
 
 .quickPickerCandidate {
   min-width: 0;
-  color: rgb(var(--color-text-dim-5));
+  color: rgb(var(--color-text-5));
   font-size: 13px;
   font-weight: 650;
   text-align: center;
@@ -124,7 +124,7 @@
 }
 
 .quickPickerCandidateNear {
-  color: rgb(var(--color-text-dim-2));
+  color: rgb(var(--color-text-2));
   transform: scale(1.04);
 }
 
@@ -160,7 +160,7 @@
   top: 50%;
   z-index: 2;
   transform: translateY(-50%);
-  color: rgb(var(--color-text-dim-2));
+  color: rgb(var(--color-text-2));
 }
 
 .sideArrowLeft {
@@ -182,7 +182,7 @@
   height: 34px;
   align-items: center;
   overflow: hidden;
-  color: rgb(var(--color-text-dim-3));
+  color: rgb(var(--color-text-3));
   font-size: 13px;
   white-space: nowrap;
 }
@@ -234,7 +234,7 @@
 
 .compositionJamoCard span,
 .compositionLayoutCard span {
-  color: rgb(var(--color-text-dim-3));
+  color: rgb(var(--color-text-3));
   font-size: 10px;
   font-weight: 600;
 }
@@ -264,7 +264,7 @@
 .compositionLayoutCard:disabled {
   border-color: rgb(var(--color-border-subtle));
   background: rgb(var(--color-surface-2));
-  color: rgb(var(--color-text-dim-5));
+  color: rgb(var(--color-text-5));
 }
 
 .overrideSummary {
@@ -273,7 +273,7 @@
   border: 1px solid rgb(var(--color-border-subtle));
   border-radius: 12px;
   background: rgb(var(--color-surface-2));
-  color: rgb(var(--color-text-dim-3));
+  color: rgb(var(--color-text-3));
   font-size: 12px;
 }
 
@@ -365,7 +365,7 @@
 }
 
 .baseContextCard > span {
-  color: rgb(var(--color-text-dim-3));
+  color: rgb(var(--color-text-3));
   font-size: 9px;
   font-weight: 700;
 }
@@ -381,7 +381,7 @@
 }
 
 .layoutScope span {
-  color: rgb(var(--color-text-dim-3));
+  color: rgb(var(--color-text-3));
   font-size: 12px;
 }
 
@@ -570,7 +570,7 @@
 }
 
 .layoutContextHeader span {
-  color: rgb(var(--color-text-dim-3));
+  color: rgb(var(--color-text-3));
   font-size: 11px;
 }
 
@@ -596,7 +596,7 @@
   border: 1px solid rgb(var(--color-border-subtle));
   border-radius: 10px;
   background: rgb(var(--color-surface));
-  color: rgb(var(--color-text-dim-3));
+  color: rgb(var(--color-text-3));
   text-align: center;
 }
 
@@ -696,7 +696,7 @@
 
 .layoutUndoButton:disabled {
   border-color: rgb(var(--color-border-subtle));
-  color: rgb(var(--color-text-dim-5));
+  color: rgb(var(--color-text-5));
 }
 
 .gapControlPanel {
@@ -734,17 +734,17 @@
   min-height: 44px;
   align-items: center;
   gap: 5px;
-  color: rgb(var(--color-text-dim-3));
+  color: rgb(var(--color-text-3));
   font-size: 12px;
 }
 
 .gapControlHeader button:disabled {
-  color: rgb(var(--color-text-dim-6));
+  color: rgb(var(--color-text-6));
 }
 
 .gapLockHint {
   margin-top: 10px;
-  color: rgb(var(--color-text-dim-3));
+  color: rgb(var(--color-text-3));
   font-size: 12px;
   text-align: center;
 }
@@ -772,7 +772,7 @@
   height: 8px;
   transform: translateY(-50%);
   border-radius: 999px;
-  background: linear-gradient(90deg, rgb(var(--color-text-dim-5) / 0.28), rgb(var(--color-primary) / 0.28));
+  background: linear-gradient(90deg, rgb(var(--color-text-5) / 0.28), rgb(var(--color-primary) / 0.28));
 }
 
 .compactGapThumb {
@@ -800,7 +800,7 @@
 .compactGapLabelLeft,
 .compactGapLabelRight {
   z-index: 3;
-  color: rgb(var(--color-text-dim-3));
+  color: rgb(var(--color-text-3));
   font-size: 11px;
   font-weight: 650;
 }
@@ -828,11 +828,11 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  border: 1px solid rgb(var(--color-text-dim-5));
+  border: 1px solid rgb(var(--color-text-5));
   border-radius: 999px;
   padding: 0 12px;
   background: rgb(var(--color-surface) / 0.94);
-  color: rgb(var(--color-text-dim-3));
+  color: rgb(var(--color-text-3));
   font-size: 12px;
   font-weight: 600;
   box-shadow: var(--shadow-sm);
@@ -840,11 +840,11 @@
 
 .trackpadUndoButton:disabled {
   border-color: rgb(var(--color-border-subtle));
-  color: rgb(var(--color-text-dim-6));
+  color: rgb(var(--color-text-6));
 }
 
 .selectionPathButton:disabled {
-  color: rgb(var(--color-text-dim-5));
+  color: rgb(var(--color-text-5));
 }
 
 .selectionPathCurrent {
@@ -858,7 +858,7 @@
 
 .selectionPathSeparator {
   flex: 0 0 auto;
-  color: rgb(var(--color-text-dim-5));
+  color: rgb(var(--color-text-5));
 }
 
 .trackpad {
@@ -902,7 +902,7 @@
   flex-direction: column;
   gap: 1px;
   border-radius: 9px;
-  color: rgb(var(--color-text-dim-2));
+  color: rgb(var(--color-text-2));
   font-size: 9px;
   font-weight: 700;
 }
@@ -913,7 +913,7 @@
 }
 
 .strokeToolRail button:disabled {
-  color: rgb(var(--color-text-dim-6));
+  color: rgb(var(--color-text-6));
   opacity: 0.5;
 }
 
@@ -998,10 +998,10 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  border: 1px solid rgb(var(--color-text-dim-5));
+  border: 1px solid rgb(var(--color-text-5));
   border-radius: 10px;
   background: rgb(var(--color-surface) / 0.94);
-  color: rgb(var(--color-text-dim-3));
+  color: rgb(var(--color-text-3));
   font-size: 11px;
   font-weight: 600;
   box-shadow: var(--shadow-sm);

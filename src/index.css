@@ -110,7 +110,7 @@
     --color-edit-guide: var(--palette-gray-350);
     --color-edit-baseline: var(--palette-stone-400);
 
-    /* 단계 — 글자 크기. 20 위는 머리글(24 · 28)만. 글자 견본(큰 한글)은 단계 밖. */
+    /* 단계 — 글자 크기. 20 위는 머리글(24 · 28)과 큰 숫자(36)만. 글자 견본(큰 한글)은 단계 밖. */
     --font-10: 10px;
     --font-11: 11px;
     --font-12: 12px;
@@ -121,6 +121,7 @@
     --font-20: 20px;
     --font-24: 24px;
     --font-28: 28px;
+    --font-36: 36px;
 
     /* 단계 — 굵기 */
     --weight-medium: 500;

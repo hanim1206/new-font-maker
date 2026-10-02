@@ -9,13 +9,13 @@
 /* 캔버스 크기는 레이아웃 캔버스(330)와 같다. 남는 세로는 트랙패드가 먹는다. 고정 높이 330 = 머리 · 닿는 글자 줄 · `완료` 196 + 트랙패드 줄 최소(단추 세 칸) 134 — 이보다 낮은 화면에서만 캔버스가 줄어든다. 끄는 동안 화면이 같이 밀리지 않게 터치는 캔버스가 다 받는다. */
 .editor[data-chrome='workspace'] .focusCanvas { width: min(100%, 330px, max(180px, calc(100dvh - 330px))); touch-action: none; }
 .header div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.header div span { color: rgb(var(--color-text-dim-4)); font-size: 9px; font-weight: 750; letter-spacing: .12em; }
+.header div span { color: rgb(var(--color-text-4)); font-size: 9px; font-weight: 750; letter-spacing: .12em; }
 .header strong { font-size: 14px; line-height: 1.18; }
 .header nav { display: flex; gap: 4px; }
 .header button { position: relative; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 10px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); }
 .header button[hidden] { display: none; }
 .header button span { position: absolute; top: 4px; right: 4px; min-width: 15px; height: 15px; border-radius: 999px; background: rgb(var(--color-primary)); color: white; font-size: 9px; line-height: 15px; }
-.header button:disabled { color: rgb(var(--color-text-dim-5)); opacity: .55; }
+.header button:disabled { color: rgb(var(--color-text-5)); opacity: .55; }
 .header button[data-active='true'] { color: rgb(var(--color-primary)); background: rgb(var(--color-primary-light) / .65); }
 .header .copyButton[data-copy-state='copied'] { color: rgb(var(--color-primary)); background: rgb(var(--color-primary-light) / .65); }
 .header .copyButton[data-copy-state='failed'] { color: #b24d3d; }
@@ -24,11 +24,11 @@
 .exportSpinner { animation: export-spinner 1s linear infinite; }
 @keyframes export-spinner { to { rotate: 1turn; } }
 .bodyControls { min-height: 0; display: flex; flex: 1; flex-direction: column; gap: 6px; }
-.bodyControls > p { min-height: 25px; margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: rgb(var(--color-text-dim-3)); font-size: 10px; }
+.bodyControls > p { min-height: 25px; margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: rgb(var(--color-text-3)); font-size: 10px; }
 .bodyControls > p strong { min-width: 0; overflow: hidden; color: rgb(var(--color-foreground)); text-overflow: ellipsis; white-space: nowrap; }
-.bodyControls > p span { flex: 0 0 auto; color: rgb(var(--color-text-dim-4)); }
+.bodyControls > p span { flex: 0 0 auto; color: rgb(var(--color-text-4)); }
 .bodyScope { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border-radius: 10px; background: rgb(var(--color-surface)); }
-.bodyScope button { min-height: 34px; border: 0; border-radius: 8px; background: transparent; color: rgb(var(--color-text-dim-3)); font-size: 12px; font-weight: 700; }
+.bodyScope button { min-height: 34px; border: 0; border-radius: 8px; background: transparent; color: rgb(var(--color-text-3)); font-size: 12px; font-weight: 700; }
 .bodyScope button[aria-selected='true'] { background: rgb(var(--color-primary-light) / .62); color: rgb(var(--color-primary-dark)); box-shadow: var(--shadow-sm); }
 .bodyDimensionGrid { min-height: 70px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .bodyDimensionGrid label { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 8px 10px; border: 1px solid rgb(var(--color-border-subtle)); border-radius: 11px; background: rgb(var(--color-surface)); font-size: 11px; font-weight: 700; }
@@ -120,7 +120,7 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .layoutAreaBoxFocused { fill-opacity: .1; stroke-width: 1.5; stroke-opacity: .9; }
 .layoutAreaBoxSource { fill-opacity: .16; stroke-width: 1.5; stroke-opacity: 1; }
 .layoutAreaBoxAffected { fill-opacity: .07; stroke-width: 1; stroke-opacity: .58; }
-.focusChar { position: absolute; z-index: 2; right: 14px; bottom: 12px; color: rgb(var(--color-text-dim-5)); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 700; pointer-events: none; }
+.focusChar { position: absolute; z-index: 2; right: 14px; bottom: 12px; color: rgb(var(--color-text-5)); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 700; pointer-events: none; }
 .partBoxLabel { font-family: ui-monospace, 'SF Mono', Menlo, monospace; pointer-events: none; }
 /* 획 편집 선택 표시 — 피그마 · 일러스트레이터 관례. 잉크는 제 색 그대로, 선택은 한 가지 파랑으로 모양이 갈린다.
    획 = 가는 중심선(바깥 상자 없음) · 꼭짓점 = 동그라미 · 곡선 핸들 = 마름모. 잡힌 것만 속이 찬다. */
@@ -144,24 +144,24 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .trackpadSection { flex: 0 0 auto; padding: 10px 16px calc(env(safe-area-inset-bottom) + 12px); border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
 .trackpad { position: relative; height: 176px; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 16px; background: rgb(var(--color-surface-2)); touch-action: none; }
 .trackpadDisabled { opacity: .55; }
-.trackpadLabel { position: absolute; z-index: 2; top: 12px; left: 12px; padding: 5px 8px; border-radius: 7px; background: rgb(var(--color-surface) / .9); color: rgb(var(--color-text-dim-3)); font-size: 10px; font-weight: 650; }
-.trackpadValue { position: absolute; z-index: 2; right: 12px; bottom: 10px; padding: 4px 7px; border-radius: 6px; background: rgb(var(--color-surface) / .9); color: rgb(var(--color-text-dim-3)); font-family: ui-monospace, monospace; font-size: 10px; }
+.trackpadLabel { position: absolute; z-index: 2; top: 12px; left: 12px; padding: 5px 8px; border-radius: 7px; background: rgb(var(--color-surface) / .9); color: rgb(var(--color-text-3)); font-size: 10px; font-weight: 650; }
+.trackpadValue { position: absolute; z-index: 2; right: 12px; bottom: 10px; padding: 4px 7px; border-radius: 6px; background: rgb(var(--color-surface) / .9); color: rgb(var(--color-text-3)); font-family: ui-monospace, monospace; font-size: 10px; }
 .brushSection { flex: 0 0 auto; padding: 7px 12px calc(env(safe-area-inset-bottom) + 9px); border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
 .brushDrawer { display: flex; min-height: 252px; max-height: 282px; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid rgb(var(--color-border)); border-radius: 16px; background: rgb(var(--color-surface-2)); }
 .brushHeader { display: flex; min-height: 30px; align-items: center; justify-content: space-between; }
 .brushHeader > div { display: flex; align-items: baseline; gap: 7px; }
 .brushHeader strong { font-size: 13px; }
-.brushHeader span { color: rgb(var(--color-text-dim-4)); font-size: 10px; }
-.brushHeader button { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-2)); }
+.brushHeader span { color: rgb(var(--color-text-4)); font-size: 10px; }
+.brushHeader button { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-2)); }
 .globalStyleTabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.globalStyleTabs button { min-width: 0; min-height: 42px; display: flex; align-items: center; gap: 8px; padding: 6px 9px; border: 1px solid rgb(var(--color-border)); border-radius: 11px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); text-align: left; }
+.globalStyleTabs button { min-width: 0; min-height: 42px; display: flex; align-items: center; gap: 8px; padding: 6px 9px; border: 1px solid rgb(var(--color-border)); border-radius: 11px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-3)); text-align: left; }
 .globalStyleTabs button[aria-selected='true'] { border-color: rgb(var(--color-primary)); color: rgb(var(--color-primary-dark)); background: rgb(var(--color-primary-light) / .55); }
 .globalStyleTabs button > span { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .globalStyleTabs strong { font-size: 11px; }
-.globalStyleTabs small { overflow: hidden; color: rgb(var(--color-text-dim-4)); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.globalStyleTabs small { overflow: hidden; color: rgb(var(--color-text-4)); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .brushControls { min-height: 0; display: flex; flex: 1; flex-direction: column; gap: 6px; }
 .strokeRuleModes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
-.strokeRuleModes button { min-height: 27px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 10px; font-weight: 700; }
+.strokeRuleModes button { min-height: 27px; border: 1px solid rgb(var(--color-border)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-3)); font-size: 10px; font-weight: 700; }
 .strokeRuleModes button[aria-checked='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary-light) / .55); color: rgb(var(--color-primary-dark)); }
 .brushTips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .brushTips button { position: relative; min-width: 0; min-height: 62px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: 1fr auto; align-items: center; gap: 1px 4px; padding: 5px 7px; border: 1px solid rgb(var(--color-border)); border-radius: 11px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); }
@@ -175,23 +175,23 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .brushTipIcon_rectangle { height: 10px; border-radius: 2px; }
 .brushControlGrid { min-height: 104px; display: grid; grid-template-columns: minmax(0, .8fr) minmax(150px, 1.2fr); gap: 8px; }
 .flatnessControl { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 10px; border: 1px solid rgb(var(--color-border-subtle)); border-radius: 12px; background: rgb(var(--color-surface)); }
-.flatnessControl > span { display: flex; justify-content: space-between; color: rgb(var(--color-text-dim-2)); font-size: 11px; font-weight: 700; }
+.flatnessControl > span { display: flex; justify-content: space-between; color: rgb(var(--color-text-2)); font-size: 11px; font-weight: 700; }
 .flatnessControl output { color: rgb(var(--color-primary-dark)); font-family: ui-monospace, monospace; }
 .flatnessControl input { width: 100%; accent-color: rgb(var(--color-primary)); }
 .ruleControlGrid { min-height: 104px; display: grid; grid-template-columns: minmax(150px, 1.2fr) minmax(0, .8fr); gap: 8px; }
 .ruleControl { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 8px; border: 1px solid rgb(var(--color-border-subtle)); border-radius: 11px; background: rgb(var(--color-surface)); }
-.ruleControl > span { display: flex; justify-content: space-between; color: rgb(var(--color-text-dim-2)); font-size: 10px; font-weight: 700; }
+.ruleControl > span { display: flex; justify-content: space-between; color: rgb(var(--color-text-2)); font-size: 10px; font-weight: 700; }
 .ruleControl output { color: rgb(var(--color-primary-dark)); font-family: ui-monospace, monospace; }
 .ruleControl input { width: 100%; accent-color: rgb(var(--color-primary)); }
-.ruleLinkButton { min-height: 24px; padding: 0 8px; border: 1px solid rgb(var(--color-border-subtle)); border-radius: 8px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-2)); font-size: 10px; font-weight: 700; }
+.ruleLinkButton { min-height: 24px; padding: 0 8px; border: 1px solid rgb(var(--color-border-subtle)); border-radius: 8px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-2)); font-size: 10px; font-weight: 700; }
 .dotControlGrid { min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; overflow-y: auto; }
 .dotControlGrid .ruleControl { min-height: 46px; padding-block: 5px; gap: 4px; }
-.ruleToggle { min-height: 34px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid rgb(var(--color-border-subtle)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-2)); font-size: 10px; font-weight: 700; }
+.ruleToggle { min-height: 34px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid rgb(var(--color-border-subtle)); border-radius: 9px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-2)); font-size: 10px; font-weight: 700; }
 .ruleToggle input { accent-color: rgb(var(--color-primary)); }
-.constructionRuleMessage { min-height: 104px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px; border: 1px solid rgb(var(--color-primary) / .28); border-radius: 12px; background: rgb(var(--color-primary-light) / .28); color: rgb(var(--color-text-dim-2)); text-align: center; }
+.constructionRuleMessage { min-height: 104px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px; border: 1px solid rgb(var(--color-primary) / .28); border-radius: 12px; background: rgb(var(--color-primary-light) / .28); color: rgb(var(--color-text-2)); text-align: center; }
 .constructionRuleMessage strong { color: rgb(var(--color-primary-dark)); font-size: 12px; }
 .constructionRuleMessage span { font-size: 10px; font-weight: 700; }
-.constructionRuleMessage small { color: rgb(var(--color-text-dim-4)); font-size: 9px; }
+.constructionRuleMessage small { color: rgb(var(--color-text-4)); font-size: 9px; }
 .constructionGrid { position: absolute; z-index: 0; inset: 0; opacity: .42; background-image: repeating-linear-gradient(35deg, transparent 0 calc(var(--construction-band-size) - 1px), rgb(var(--color-primary) / .22) calc(var(--construction-band-size) - 1px) var(--construction-band-size)); pointer-events: none; }
 .brushAnglePad { position: relative; min-height: 104px; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background-color: rgb(var(--color-surface)); background-image: linear-gradient(rgb(var(--color-border-subtle) / .65) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--color-border-subtle) / .65) 1px, transparent 1px); background-size: 20px 20px; touch-action: none; user-select: none; }
 .brushAnglePad::before, .brushAnglePad::after { content: ''; position: absolute; background: rgb(var(--color-primary) / .18); pointer-events: none; }
@@ -201,8 +201,8 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .brushAngleDeadZone { position: absolute; inset: 0 calc(50% - 13px); border-inline: 1px dashed rgb(var(--color-border)); background: rgb(var(--color-border-subtle) / .38); pointer-events: none; }
 .brushAnglePuck { position: absolute; z-index: 2; top: 50%; left: 50%; translate: -50% -50%; border: 2px solid rgb(var(--color-surface)); border-radius: 999px; background: rgb(var(--color-primary)); box-shadow: var(--shadow-sm); pointer-events: none; }
 .brushAnglePuckRectangle { border-radius: 3px; }
-.brushAnglePad output { position: absolute; z-index: 3; right: 7px; bottom: 6px; padding: 3px 6px; border-radius: 6px; background: rgb(var(--color-surface) / .9); color: rgb(var(--color-text-dim-2)); font-family: ui-monospace, monospace; font-size: 10px; }
-.roundBrushMessage { min-height: 104px; margin: 0; display: grid; place-items: center; border: 1px dashed rgb(var(--color-border)); border-radius: 12px; color: rgb(var(--color-text-dim-4)); font-size: 11px; text-align: center; }
+.brushAnglePad output { position: absolute; z-index: 3; right: 7px; bottom: 6px; padding: 3px 6px; border-radius: 6px; background: rgb(var(--color-surface) / .9); color: rgb(var(--color-text-2)); font-family: ui-monospace, monospace; font-size: 10px; }
+.roundBrushMessage { min-height: 104px; margin: 0; display: grid; place-items: center; border: 1px dashed rgb(var(--color-border)); border-radius: 12px; color: rgb(var(--color-text-4)); font-size: 11px; text-align: center; }
 @media (max-height: 720px) { .focusCanvas { width: min(54dvh, 278px); } }
 @media (max-height: 720px) { .brushSection { padding-top: 4px; padding-bottom: calc(env(safe-area-inset-bottom) + 6px); } .brushDrawer { min-height: 212px; gap: 4px; padding: 6px; } .brushHeader { min-height: 27px; } .brushHeader button { width: 28px; height: 28px; } .globalStyleTabs button { min-height: 34px; padding-block: 4px; } .globalStyleTabs small { display: none; } .brushControls { gap: 4px; } .brushControlGrid, .ruleControlGrid, .brushAnglePad, .roundBrushMessage { min-height: 70px; } .brushTips button { min-height: 48px; } .brushTipPreview { height: 24px; } .strokeRuleModes button { min-height: 23px; } .bodyScope button { min-height: 28px; } .bodyControls { gap: 4px; } .bodyDimensionGrid { min-height: 52px; } .bodyDimensionGrid label { gap: 4px; padding-block: 5px; } .bodyReset { min-height: 28px; } }
 

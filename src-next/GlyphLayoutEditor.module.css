@@ -1,5 +1,5 @@
 .editor { display: flex; flex-direction: column; }
-.status { padding: 8px 14px; color: rgb(var(--color-text-dim-4)); font-size: 12px; }
+.status { padding: 8px 14px; color: rgb(var(--color-text-4)); font-size: 12px; }
 .status[data-state='error'] { color: rgb(var(--color-danger, 214 50 31)); }
 
 
@@ -12,7 +12,7 @@
 .canvas line { pointer-events: stroke; }
 .canvas text { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: 600; pointer-events: none; }
 /* 변 고정. 캔버스 위쪽 가운데, 스냅 표지 바로 아래. 탁 걸린 자리면 주황으로 켜진다. */
-.canvasFix { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); min-height: 30px; padding: 4px 12px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface) / .96); color: rgb(var(--color-text-dim-3)); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+.canvasFix { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); min-height: 30px; padding: 4px 12px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface) / .96); color: rgb(var(--color-text-3)); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
 .canvasFix[data-snapped='true'] { border-color: #f0561e; color: #f0561e; }
 .canvasFixed { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); padding: 4px 12px; border-radius: 12px; background: #f0561e; color: #fff; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
 /* 가로 줄기 끝이 다른 칸 세로 기준선에 딱 닿아 걸렸다. 획 편집의 걸림 칩과 같은 주황. */
@@ -76,7 +76,7 @@
 .leaveSheet { width: min(100%, 480px); box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 16px 16px calc(env(safe-area-inset-bottom) + 16px); border-radius: 18px 18px 0 0; background: rgb(var(--color-surface)); box-shadow: 0 -8px 28px rgb(20 24 31 / .18); }
 .leaveSheet header { display: flex; flex-direction: column; gap: 2px; }
 .leaveSheet header b { font-size: 13px; font-weight: 700; }
-.leaveSheet header small { color: rgb(var(--color-text-dim-4)); font-size: 10.5px; line-height: 1.35; }
+.leaveSheet header small { color: rgb(var(--color-text-4)); font-size: 10.5px; line-height: 1.35; }
 .leaveActions { display: flex; flex-direction: column; gap: 8px; }
 .leaveActions button { min-height: 44px; border: 0; border-radius: 10px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 13px; font-weight: 700; }
 .leaveActions .leaveSave { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
@@ -85,4 +85,4 @@
   .leaveSheet { border-radius: 18px; padding-bottom: 16px; }
 }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.strokeCta button:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-dim-4)); }
+.strokeCta button:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-4)); }

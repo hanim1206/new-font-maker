@@ -156,6 +156,7 @@ export default {
         '20': 'var(--font-20)',
         '24': 'var(--font-24)',
         '28': 'var(--font-28)',
+        '36': 'var(--font-36)',
         'micro': 'var(--font-10)',
         'xs': 'var(--font-12)',
         'sm': 'var(--font-14)',

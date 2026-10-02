@@ -67,9 +67,8 @@ section.panel.fill > div { padding: 4px 24px calc(env(safe-area-inset-bottom) + 
 .fill [role='tabpanel'] h3 { margin: 28px 0 10px; color: rgb(var(--color-text-3)); font-size: var(--font-14); font-weight: var(--weight-semibold); }
 /* 값이 하나뿐인 탭(네모꼴 · 굵기): 이름 아래 큰 숫자. */
 .fill .weightBox { padding: 18px 0 0; gap: 10px; }
-/* 큰 숫자 34px는 글자 단계 밖 — 견본 숫자로 남겨 두고 G2에서 정한다. */
 .fill .weightHead { flex-direction: column; align-items: flex-start; gap: 2px; color: rgb(var(--color-text-3)); font-size: var(--font-14); font-weight: var(--weight-semibold); }
-.fill .weightHead output { font-family: inherit; font-size: 34px; font-weight: var(--weight-heavy); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.fill .weightHead output { font-family: inherit; font-size: var(--font-36); font-weight: var(--weight-heavy); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 
 /* 부리: 없음이면 막대를 숨기고, 각도를 안 쓰는 모양이면 각도만 숨긴다. */
 .fill [data-beak-idle] { display: none; }
