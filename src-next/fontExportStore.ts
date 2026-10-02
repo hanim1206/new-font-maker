@@ -1,7 +1,12 @@
 import { create } from 'zustand'
 import { identityOfSyllable } from '../src/services/contextBoxResolver'
 import type { GlyphPlacementResolver } from '../src/services/fontExportUtils'
+import { EXPORT_SIMPLIFY_EPSILON } from '../src/services/contourSimplify'
+import { collectFontData } from '../src/services/fontDataBridge'
+import { parallelHangulPortables } from '../src/services/fontExportParallel'
+import { allExportChars } from '../src/services/fontExportUtils'
 import { generateAndDownloadFont } from '../src/services/fontGenerator'
+import type { PortableHangulGlyph } from '../src/services/fontGenerator'
 import type { OpenTypeValidationReport } from '../src/services/openTypeValidation'
 import { accountFontName, nextExportRevision } from './accountFontSync'
 import { effectiveLayoutDelta, layoutDeltaSnapshot } from './layoutDeltaStore'
@@ -187,8 +192,12 @@ async function runExport(familyName: string): Promise<void> {
   const get = useFontExportStore.getState
   // 모델을 못 읽으면 멈춘다. 조용히 스키마로 떨어지면 받은 폰트가 화면과 달라진다.
   let placementOf: GlyphPlacementResolver
+  let parallelSources: { bundle: NotoPresetModelBundle; deltas: LayoutDeltaSnapshot } | null = null
   try {
-    placementOf = await exportPlacementResolver()
+    const bundle = await loadNotoModel()
+    const deltas = layoutDeltaSnapshot()
+    placementOf = placementResolverOf(bundle, deltas)
+    parallelSources = { bundle, deltas }
   } catch (failure) {
     const reason = failure instanceof Error ? failure.message : String(failure)
     const error = `Noto 모델을 읽지 못해 추출을 멈췄습니다: ${reason}`
@@ -203,18 +212,47 @@ async function runExport(familyName: string): Promise<void> {
   let lastPhase = ''
   let assembleTimer: number | null = null
   const stopAssembleTimer = () => { if (assembleTimer !== null) { window.clearInterval(assembleTimer); assembleTimer = null } }
+  const reportProgress = (done: number, total: number, phase: string) => {
+    if (phase !== lastPhase) { lastPhase = phase; phaseIndex += 1 }
+    if (phase === PHASE_ASSEMBLE && assembleTimer === null) {
+      const startedAt = Date.now()
+      assembleTimer = window.setInterval(() => set({ progress: assembleLabel(Math.floor((Date.now() - startedAt) / 1000)) }), 1000)
+    }
+    set({ progress: phase === PHASE_ASSEMBLE ? PHASE_ASSEMBLE_LABEL : phase, percent: exportPercent(phaseIndex, done, total) })
+  }
+
+  // 수집 · 변환을 Worker 풀에 나눈다. 못 돌리면 null — 지금 직렬 경로 그대로(플랜 2026-10-02 워커 병렬).
+  // Worker는 글자마다 수집 + 변환을 한 번에 돌므로, 진행 단계는 비중(수집 0.6)으로 나눠 보인다.
+  let portables: PortableHangulGlyph[] | null = null
+  if (parallelSources) {
+    const COLLECT_SHARE = 0.6
+    try {
+      portables = await parallelHangulPortables({
+        chars: allExportChars(),
+        fontData: collectFontData(),
+        deltaSnapshot: parallelSources.deltas,
+        bundle: parallelSources.bundle,
+        simplifyEpsilon: EXPORT_SIMPLIFY_EPSILON,
+        onProgress: (done, total) => {
+          const collectTotal = Math.max(1, Math.round(total * COLLECT_SHARE))
+          if (done < collectTotal) reportProgress(done, collectTotal, '글리프 데이터 수집 중...')
+          else reportProgress(done - collectTotal, Math.max(1, total - collectTotal), '글리프 윤곽 변환 중...')
+        },
+      })
+    } catch (failure) {
+      console.warn('병렬 추출 준비 실패, 직렬로 폴백:', failure)
+      portables = null
+    }
+  }
+
   const result = await generateAndDownloadFont({
     familyName,
     placementOf,
     revision,
-    onProgress: (done, total, phase) => {
-      if (phase !== lastPhase) { lastPhase = phase; phaseIndex += 1 }
-      if (phase === PHASE_ASSEMBLE && assembleTimer === null) {
-        const startedAt = Date.now()
-        assembleTimer = window.setInterval(() => set({ progress: assembleLabel(Math.floor((Date.now() - startedAt) / 1000)) }), 1000)
-      }
-      set({ progress: phase === PHASE_ASSEMBLE ? PHASE_ASSEMBLE_LABEL : phase, percent: exportPercent(phaseIndex, done, total) })
-    },
+    // 합친 뒤 윤곽 점 줄이기 — 붓·둥글기 폰트의 추출 시간·파일을 줄인다(G0·G1 닫힘).
+    simplifyEpsilon: EXPORT_SIMPLIFY_EPSILON,
+    hangulPortables: portables ?? undefined,
+    onProgress: reportProgress,
   }).finally(stopAssembleTimer)
   const skippedChars = result.skippedChars ?? []
   // 폰트 탭 · 대시보드에서 기다리고 있었으면 완료 페이지로. 다른 탭이면 화면을 바꾸지 않는다.
