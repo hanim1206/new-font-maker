@@ -116,6 +116,23 @@ describe('폰트 데이터의 자동 보정 끔', () => {
   })
 })
 
+describe('폰트 데이터의 속공간 지키기 끔', () => {
+  it('없으면 켜짐, `false`는 읽고 쓸 때 남는다. 다른 값은 거른다', async () => {
+    const { useGlobalStyleStore } = await import('../stores/globalStyleStore')
+    const { collectFontData } = await import('./fontDataBridge')
+    useGlobalStyleStore.getState().setCounterKeep(false)
+    const off = collectFontData()
+    expect(off.globalStyle.style.counterKeep).toBe(false)
+    expect(parseAndMigrateFontData(off).ok).toBe(true)
+    useGlobalStyleStore.getState().setCounterKeep(true)
+    const on = collectFontData()
+    expect('counterKeep' in on.globalStyle.style).toBe(false)
+    const broken = structuredClone(off) as unknown as { globalStyle: { style: Record<string, unknown> } }
+    broken.globalStyle.style.counterKeep = 'no'
+    expect(parseAndMigrateFontData(broken).ok).toBe(false)
+  })
+})
+
 describe('옛 기본 네모꼴(사방 0.075) 환산', () => {
   it('읽는 입구(`parseAndMigrateFontData`) 한 곳에서 새 기본으로 바뀌고, 다른 여백은 그대로다', async () => {
     const { collectFontData } = await import('./fontDataBridge')

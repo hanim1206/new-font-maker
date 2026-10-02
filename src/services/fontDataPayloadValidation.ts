@@ -474,10 +474,12 @@ function validateGlobalStyle(value: unknown, issues: FontPayloadValidationIssue[
     const path = '$.globalStyle.style'
     const keys = ['slant', 'weight', 'letterSpacing', 'linecap', 'linejoin', 'brush', 'strokeStyle']
     // 부리는 나중에 생긴 값이라 없어도 된다(옛 저장분).
-    exactKeys(style, [...keys, 'stemBeak', 'autoCompensation'], keys, path, issues)
+    exactKeys(style, [...keys, 'stemBeak', 'autoCompensation', 'counterKeep'], keys, path, issues)
     if (style.stemBeak !== undefined) validateStemBeak(style.stemBeak, `${path}.stemBeak`, issues)
     // 네모꼴 자동 보정은 껐을 때만 `false`로 남는다.
     if (style.autoCompensation !== undefined && typeof style.autoCompensation !== 'boolean') push(issues, 'invalid-field', `${path}.autoCompensation`, 'autoCompensation은 boolean이어야 합니다.')
+    // 속공간 지키기도 껐을 때만 `false`로 남는다.
+    if (style.counterKeep !== undefined && typeof style.counterKeep !== 'boolean') push(issues, 'invalid-field', `${path}.counterKeep`, 'counterKeep은 boolean이어야 합니다.')
     for (const key of ['slant', 'weight', 'letterSpacing']) finite(style[key], `${path}.${key}`, issues)
     if (!['round', 'butt', 'square'].includes(String(style.linecap))) push(issues, 'invalid-field', `${path}.linecap`, 'linecap이 유효하지 않습니다.')
     if (!['miter', 'round', 'bevel'].includes(String(style.linejoin))) push(issues, 'invalid-field', `${path}.linejoin`, 'linejoin이 유효하지 않습니다.')
