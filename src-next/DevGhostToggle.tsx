@@ -24,6 +24,6 @@ export function DevStickyToggle({ pressed, onToggle, testId, label, icon, childr
 }
 
 /** `Noto 고스트` 토글. 자소 탭의 획 편집과 레이아웃 편집이 같이 쓴다(둘은 동시에 안 뜬다). 켬/끔 기억은 호출자 몫이다. */
-export function DevGhostToggle({ pressed, onToggle, testId, children }: { pressed: boolean; onToggle: () => void; testId: string; children?: ReactNode }) {
-  return <DevStickyToggle pressed={pressed} onToggle={onToggle} testId={testId} label="Noto 고스트" icon={<Ghost size={18} />}>{children}</DevStickyToggle>
+export function DevGhostToggle({ pressed, onToggle, testId, children, panel }: { pressed: boolean; onToggle: () => void; testId: string; children?: ReactNode; panel?: ReactNode }) {
+  return <DevStickyToggle pressed={pressed} onToggle={onToggle} testId={testId} label="Noto 고스트" icon={<Ghost size={18} />} panel={panel}>{children}</DevStickyToggle>
 }

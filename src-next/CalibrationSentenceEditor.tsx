@@ -5,6 +5,8 @@ import { create } from 'zustand'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
 import { DevGhostToggle } from './DevGhostToggle'
+import { ensureDevNotoFont } from './devNotoSwap'
+import { DEV_TOOLS_ENABLED } from './devTools'
 import { facesToBox, identityOfSyllable } from '../src/services/contextBoxResolver'
 import { contextPlacementOf, useContextPlacement, useNotoModel } from './notoModel'
 import { GlyphLayoutEditor } from './GlyphLayoutEditor'
@@ -550,6 +552,9 @@ function FocusedGlyph({
   // Noto 고스트: 표시·비교 전용. 잉크에 안 섞인다. 켬/끔은 기기에 기억한다.
   const [ghostVisible, setGhostVisible] = useState(loadGhostVisible)
   const { ghost, error: ghostError } = useNotoGhost(char, ghostVisible)
+  // 굵기 400이 아니면 추출 윤곽(400) 대신 노토 가변 글꼴 텍스트로 지금 굵기 고스트를 그린다. xor 비교는 400 윤곽 기준이라 그동안 숨긴다.
+  const weightGhost = ghostVisible && globalStyle.weight !== 400
+  useEffect(() => { if (weightGhost) ensureDevNotoFont() }, [weightGhost])
   // Noto 고스트는 기준 틀(기본 네모꼴) 좌표다. 견줄 때는 네모꼴을 얹기 전 자리끼리 견주고, 그릴 때는 고스트를 같은 변환으로 옮긴다.
   const comparison = useGhostComparison(ghost, syllable, referencePlacement, globalStyle)
   const toggleGhost = () => setGhostVisible((current) => { saveGhostVisible(!current); return !current })
@@ -561,11 +566,16 @@ function FocusedGlyph({
   const pointsOpenStrokeId = (selection.kind === 'stroke' && selection.pointsOpen) || selection.kind === 'point' || selection.kind === 'handle'
     ? selection.strokeId
     : null
+  // 고스트 패널의 `내 획 숨김` — 내 잉크를 전부 숨기고 노토 고스트만 남겨 견준다(개발용, 세션 한정).
+  const [inkHidden, setInkHidden] = useState(false)
   // 검수 캔버스와 같은 규칙: 잉크는 전부 제 색, 어느 부품을 잡았는지는 부품 상자 농도로만 보인다.
   // `획 고치기`로 들어왔을 때만 다르다 — 고치는 자소만 제 색이고 나머지는 흐리다. 글자는 제자리 그대로다.
-  const partStyles = useMemo(() => lockedPart
-    ? Object.fromEntries((['CH', 'JU', 'JU_H', 'JU_V', 'JO'] as Part[]).filter((part) => editorPartOf(part) !== lockedPart).map((part) => [part, { opacity: LOCKED_OUT_OPACITY }])) as Partial<Record<Part, { opacity: number }>>
-    : undefined, [lockedPart])
+  const partStyles = useMemo(() => {
+    if (inkHidden && ghostVisible) return Object.fromEntries((['CH', 'JU', 'JU_H', 'JU_V', 'JO'] as Part[]).map((part) => [part, { opacity: 0 }])) as Partial<Record<Part, { opacity: number }>>
+    return lockedPart
+      ? Object.fromEntries((['CH', 'JU', 'JU_H', 'JU_V', 'JO'] as Part[]).filter((part) => editorPartOf(part) !== lockedPart).map((part) => [part, { opacity: LOCKED_OUT_OPACITY }])) as Partial<Record<Part, { opacity: number }>>
+      : undefined
+  }, [lockedPart, inkHidden, ghostVisible])
   const canvasStyle = {
     '--view-unit': u,
     '--construction-band-size': `${GRID_SYSTEM_2_UNIT * GRID_SYSTEM_2_STROKE_UNITS * 100}%`,
@@ -617,8 +627,8 @@ function FocusedGlyph({
   // `pressed`: 누른 눌림 영역의 주인. 누른 자리가 어느 영역에도 안 들면(좌표 없는 합성 이벤트 등) 그대로 잡는다.
   const pressActiveStroke = (event: ReactPointerEvent<SVGElement>, target: (typeof targets)[number], pressed: { pointIndex: number; handle?: 'in' | 'out' }) => {
     event.stopPropagation()
-    // 조절판을 누른 동안은 점 · 핸들 자리를 눌러도 그 획을 묶음에 넣고 뺀다.
-    if (multiSelectArmed) {
+    // 조절판을 누른 동안은 점 · 핸들 자리를 눌러도 그 획을 묶음에 넣고 뺀다. PC Shift는 점이 펼쳐져 있으면 점 묶음이 먼저다(아래).
+    if (multiSelectArmed && !event.shiftKey) {
       onSelect({ kind: 'stroke', component: componentFor(char, target.editorPart, target.jamo), editorPart: target.editorPart, renderPart: target.renderPart, jamo: target.jamo, strokeId: target.stroke.id, box: target.box })
       return
     }
@@ -645,6 +655,16 @@ function FocusedGlyph({
     if (best.distance > POINT_HIT_RADIUS * u) best = { ...pressed, distance: 0 }
     const component = componentFor(char, target.editorPart, target.jamo)
     const picked = target.stroke.points[best.pointIndex]
+    // Shift 묶음(PC): 펼쳐진 점을 눌렀으면 그 점을 점 묶음에 넣고 뺀다. 핸들 자리거나 점이 안 펼쳐졌으면 획 묶음.
+    if (multiSelectArmed && event.shiftKey) {
+      const shown = pointsOpenStrokeId === target.stroke.id || selectedPoints.some((point) => point.strokeId === target.stroke.id)
+      if (shown && !best.handle) {
+        onPointSelect({ kind: 'point', component, editorPart: target.editorPart, renderPart: target.renderPart, jamo: target.jamo, strokeId: target.stroke.id, pointIndex: best.pointIndex, box: target.box })
+        return
+      }
+      onSelect({ kind: 'stroke', component, editorPart: target.editorPart, renderPart: target.renderPart, jamo: target.jamo, strokeId: target.stroke.id, box: target.box })
+      return
+    }
     if (best.handle && (selection.kind === 'point' || selection.kind === 'handle')) {
       const handlePoint = best.handle === 'in' ? picked.handleIn! : picked.handleOut!
       onSelect({ ...selection, kind: 'handle', handle: best.handle })
@@ -767,7 +787,9 @@ function FocusedGlyph({
             : <line key={rail.id} x1={-6} x2={106} y1={rail.value * VIEW_BOX_SIZE} y2={rail.value * VIEW_BOX_SIZE} className={styles.guideRail} />)}
         </g>}
       </>} underlay={<>
-        {ghostVisible && ghost && <path d={ghost.path} transform={designBodySvgTransform(schema.padding, VIEW_BOX_SIZE)} className={styles.notoGhost} fillRule="evenodd" data-testid="noto-ghost" />}
+        {ghostVisible && (weightGhost
+          ? <text x={0} y={88} fontFamily="'Noto Sans KR', sans-serif" fontWeight={globalStyle.weight} fontSize={100} transform={designBodySvgTransform(schema.padding, VIEW_BOX_SIZE)} className={styles.notoGhost} data-testid="noto-ghost">{char}</text>
+          : ghost && <path d={ghost.path} transform={designBodySvgTransform(schema.padding, VIEW_BOX_SIZE)} className={styles.notoGhost} fillRule="evenodd" data-testid="noto-ghost" />)}
       </>}>
         {stemGuides.some((guide) => !guide.border) && <g aria-hidden="true" pointerEvents="none" data-testid="stem-rail-guides">
           {stemGuides.filter((guide) => !guide.border).map((guide) => <line key={guide.key} x1={-6} x2={106} y1={guide.y} y2={guide.y} stroke={PART_COLOR.JU} strokeWidth={0.4 * u} data-rail-key={guide.key} />)}
@@ -906,11 +928,16 @@ function FocusedGlyph({
         ? <span className={styles.snapHitChip} data-testid="stroke-snap-chip">파트 가운데</span>
         : snapHitLabels.length > 0 && <span className={styles.snapHitChip} data-testid="stroke-snap-chip">{snapHitLabels.join(' · ')}</span>}
       <span className={styles.focusChar} aria-hidden="true">{char} · {fontSpace.unitsPerEm} UPM</span>
-      <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="noto-ghost-toggle">
-        {ghostVisible && comparison && ('xorRatio' in comparison
+      <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="noto-ghost-toggle" panel={
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, whiteSpace: 'nowrap' }}>
+          <input type="checkbox" checked={inkHidden} onChange={(event) => setInkHidden(event.target.checked)} data-testid="dev-ink-hidden" />내 획 숨김
+        </label>
+      }>
+        {weightGhost && <strong data-testid="noto-ghost-weight">노토 {globalStyle.weight}</strong>}
+        {ghostVisible && !weightGhost && comparison && ('xorRatio' in comparison
           ? <strong data-testid="noto-ghost-xor">xor {(comparison.xorRatio * 100).toFixed(0)}%</strong>
           : <small>{comparison.message}</small>)}
-        {ghostVisible && ghostError && <small>{ghostError}</small>}
+        {ghostVisible && !weightGhost && ghostError && <small>{ghostError}</small>}
       </DevGhostToggle>
     </div>
   )
@@ -1471,6 +1498,14 @@ function InferenceTrackpad({
     const nextStrokeId = selection.kind === 'stroke' ? getJamoStrokes(after)[0]?.id : selectedStroke.id
     onSelectionChange(nextStrokeId ? { ...selection, kind: 'stroke', strokeId: nextStrokeId, jamo: after } : { kind: 'none' })
   }
+  // 개발용 — 잡은 획의 저장 두께를 5%씩 바꾼다. 노토 900 맞추기 실험에서 "어느 획을 얼마나 얇게 했나"가 저장값 차이로 남는다.
+  const scaleStrokeThickness = (factor: number) => {
+    if ((selection.kind !== 'stroke' && selection.kind !== 'point' && selection.kind !== 'handle') || !selectedStroke) return
+    const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
+    const after = updateJamoStroke(before, selectedStroke.id, (stroke) => ({ ...stroke, thickness: Math.min(0.3, Math.max(0.01, stroke.thickness * factor)) }))
+    onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId: selectedStroke.id, delta: { x: 0, y: 0 } })
+    onSelectionChange({ ...selection, jamo: after })
+  }
   // 트랙패드 왼쪽 크기 막대. 지금 자소(고른 것, 없으면 잠긴 것)를 통째로 키운다. 두께는 전역 굵기 그대로.
   // 넘친 만큼은 상자 밖으로 그대로 나가야 하므로 문맥 간격 되당김을 얹지 않는다(`pastGapLimit`).
   // 자소 상자는 넘어도 글자 칸은 못 넘는다. 시작할 때 획마다 놓인 상자에서 한계를 재 두고(끄는 동안 상자가 흔들려도 같다), 닿는 배율 · 거리에서 멈춘다.
@@ -1688,6 +1723,10 @@ function InferenceTrackpad({
           <button type="button" onClick={copyStroke} aria-label="획 복사" data-testid="jamo-stroke-copy">{strokeCopied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}<span>{strokeCopied ? '복사함' : '복사'}</span></button>
           {deleteButton}
           {connectButton}
+          {DEV_TOOLS_ENABLED && selectedStroke && <>
+            <button type="button" onClick={() => scaleStrokeThickness(1 / 1.05)} aria-label="획 두께 5% 얇게 (개발용)" data-testid="dev-stroke-thinner"><Minus size={18} aria-hidden="true" /><span>얇게</span></button>
+            <button type="button" onClick={() => scaleStrokeThickness(1.05)} aria-label="획 두께 5% 굵게 (개발용)" data-testid="dev-stroke-thicker"><Plus size={18} aria-hidden="true" /><span>{Math.round(selectedStroke.thickness * 1000)}u</span></button>
+          </>}
         </>}
         {onPoint && <>
           <button type="button" onClick={toggleCurve} aria-label={selectedPointHasCurve ? '직선화' : '곡선화'}><Spline size={18} aria-hidden="true" /><span>{selectedPointHasCurve ? '직선' : '곡선'}</span></button>
@@ -1976,6 +2015,17 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const [selectedStrokes, setSelectedStrokes] = useState<string[]>([])
   const [wholeJamoCentered, setWholeJamoCentered] = useState<{ x: boolean; y: boolean } | null>(null)
   const [multiSelectArmed, setMultiSelectArmed] = useState(false)
+  // PC: Shift를 누른 동안은 조절판에 손가락을 댄 것과 같다(획 · 점 묶음 넣고 빼기, 피그마 shift+클릭). 창을 떠나면 푼다.
+  const [shiftArmed, setShiftArmed] = useState(false)
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => { if (event.key === 'Shift') setShiftArmed(event.type === 'keydown') }
+    const clear = () => setShiftArmed(false)
+    window.addEventListener('keydown', key)
+    window.addEventListener('keyup', key)
+    window.addEventListener('blur', clear)
+    return () => { window.removeEventListener('keydown', key); window.removeEventListener('keyup', key); window.removeEventListener('blur', clear) }
+  }, [])
+  const multiArmed = multiSelectArmed || shiftArmed
   // 캔버스 왼쪽 도구 줄. 단추는 트랙패드 컴포넌트가 들고 이 자리에 그린다.
   const [strokeToolSlot, setStrokeToolSlot] = useState<HTMLDivElement | null>(null)
   // 셸 안에서는 조절판 없이 캔버스에서 바로 끈다. 이동 계산은 도구 줄 컴포넌트(`InferenceTrackpad`)가 들고 이 ref로 캔버스에 내준다.
@@ -2002,7 +2052,6 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const benchType = useWorkbenchStore((state) => state.type)
   const benchChars = useWorkbenchStore((state) => state.chars)
   // 섹션 홈 `편집 n`으로 들어왔는지. 돌아갈 곳(`returnTo`)이 있을 때만 — 레이아웃 카드로 들어오면 도마가 남아 있어도 아니다.
-  const benchCarried = useWorkbenchStore((state) => state.type !== null && state.chars.length > 0 && state.returnTo !== null)
   // 대시보드 스타일 칸이 `?panel=beak`처럼 열 탭을 준다. 없으면 획(굵기가 있는 탭 — 네모꼴이 잠겨 있던 동안 첫 화면이던 그대로).
   const [globalStylePanel, setGlobalStylePanel] = useState<GlobalStylePanel | null>(() => {
     if (!styleOnly) return null
@@ -2251,7 +2300,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       && current.jamo.type === nextSelection.jamo.type && current.jamo.char === nextSelection.jamo.char)
     if (nextSelection.kind === 'stroke' && current && sameJamo) {
       // 조절판에 손가락을 댄 채(여러 개 고르기) 같은 자소의 다른 획을 누르면 획 묶음에 더한다. 묶음은 점 없이 중심선으로만 보인다.
-      if (multiSelectArmed) {
+      if (multiArmed) {
         const base = selectedStrokes.length > 0 ? selectedStrokes : [current.strokeId]
         setSelectedPoints([])
         // 이미 묶인 획을 누르면 뺀다(피그마 shift+클릭처럼). 하나 남으면 그 획 하나를 잡은 상태로.
@@ -2286,7 +2335,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     const nextPoint = { strokeId: nextSelection.strokeId, pointIndex: nextSelection.pointIndex }
     // 피그마처럼: 이미 고른 묶음 안의 점을 누르면 묶음을 그대로 둔다 — 그대로 끌면 다 같이 움직인다. 푸는 건 빈 곳.
     const inGroup = selectedPoints.length > 1 && selectedPoints.some((point) => point.strokeId === nextPoint.strokeId && point.pointIndex === nextPoint.pointIndex)
-    if (!multiSelectArmed) {
+    if (!multiArmed) {
       if (!inGroup) setSelectedPoints([nextPoint])
       return
     }
@@ -2785,7 +2834,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
           ? <div ref={setStrokeToolSlot} className={styles.strokeToolSlot} data-testid="jamo-stroke-tool-slot" />
           : chrome === 'workspace' && layoutAvailable && !styleLocksCanvas && <LayoutContextCards activeContextId={corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00).contextId} allActive={false} ink={strokeCardInk ?? undefined} />}
         <div className={styles.focusArea}>
-        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={styleLocksCanvas ? { kind: 'none' } : selection} onSelect={styleLocksCanvas ? () => {} : selectFromCanvas} selectedPoints={styleLocksCanvas ? [] : selectedPoints} selectedStrokes={styleLocksCanvas ? [] : selectedStrokes} multiSelectArmed={!styleLocksCanvas && multiSelectArmed} wholeJamoCentered={styleLocksCanvas ? null : wholeJamoCentered} onPointSelect={styleLocksCanvas ? () => {} : selectPointFromCanvas} lockedPart={styleLocksCanvas ? null : lockedPart} dragApiRef={directManipulation && !styleLocksCanvas ? dragApiRef : undefined} padDragRef={directManipulation && !styleLocksCanvas ? padDragRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={focusedGlobalStyle} />
+        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={styleLocksCanvas ? { kind: 'none' } : selection} onSelect={styleLocksCanvas ? () => {} : selectFromCanvas} selectedPoints={styleLocksCanvas ? [] : selectedPoints} selectedStrokes={styleLocksCanvas ? [] : selectedStrokes} multiSelectArmed={!styleLocksCanvas && multiArmed} wholeJamoCentered={styleLocksCanvas ? null : wholeJamoCentered} onPointSelect={styleLocksCanvas ? () => {} : selectPointFromCanvas} lockedPart={styleLocksCanvas ? null : lockedPart} dragApiRef={directManipulation && !styleLocksCanvas ? dragApiRef : undefined} padDragRef={directManipulation && !styleLocksCanvas ? padDragRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={focusedGlobalStyle} />
         </div>
         </div>
       </section>}
@@ -2891,7 +2940,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         heading={styleOnly ? '스타일' : undefined}
         cover={cover}
         // 획 편집은 레이아웃 위에 얹힌 층이다. 머리 `‹`가 레이아웃으로 내려가는 문(옛 `완료`). 도마를 들고 왔으면 섹션 홈으로.
-        back={!styleOnly && editMode === 'stroke' && strokeFrameAvailable && !benchCarried ? { label: '레이아웃', onClick: () => chooseEditMode('layout') } : undefined}
+        back={!styleOnly && editMode === 'stroke' && strokeFrameAvailable ? { label: '레이아웃', onClick: () => chooseEditMode('layout') } : undefined}
         history={{ canUndo: history.length > 0, canRedo: future.length > 0, onUndo: undo, onRedo: redo }}
       >
         {!styleOnly && benchRow}
