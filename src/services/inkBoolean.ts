@@ -95,9 +95,11 @@ function inkRingToPolygonRing(source: readonly InkPoint[], options: InkBooleanOp
   }
   if (ring.length >= 3) {
     assertFiniteRing(ring, label)
-    if (!isSimpleRing(ring, options)) {
-      if (!options.resolveSelfIntersections) throw new Error(`${label}에 self-intersection이 있어 Boolean을 수행할 수 없습니다.`)
+    if (options.resolveSelfIntersections) {
+      // 어차피 union(NonZero)이 겹침을 푼다. 점 수 제곱으로 도는 검사를 생략하고 항상 union을 거친다(추출 경로 병목, 플랜 2026-10-02).
       flags.selfIntersecting = true
+    } else if (!isSimpleRing(ring, options)) {
+      throw new Error(`${label}에 self-intersection이 있어 Boolean을 수행할 수 없습니다.`)
     }
   }
   return ring

@@ -56,7 +56,8 @@ const model = JSON.parse(readFileSync(path.join(ROOT, 'public', 'noto-preset', '
 const placementOf = exportStore.placementResolverOf(model, deltaStore.layoutDeltaSnapshot())
 
 const started = performance.now()
-const result = await generateFontBuffer({ familyName, asciiFamilyName, placementOf, revision })
+const { EXPORT_SIMPLIFY_EPSILON } = await import('../../src/services/contourSimplify')
+const result = await generateFontBuffer({ familyName, asciiFamilyName, placementOf, revision, simplifyEpsilon: EXPORT_SIMPLIFY_EPSILON })
 if (!result.success || !result.bytes) throw new Error(result.error ?? '추출 실패')
 await mkdir(path.dirname(outPath), { recursive: true })
 await writeFile(outPath, Buffer.from(result.bytes))

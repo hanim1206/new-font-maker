@@ -114,7 +114,17 @@ describe('CFF 컨투어 정규화와 겹침 제거', () => {
   it('레거시 CFF facade는 중복점으로 퇴화한 선행 링 뒤의 첫 유효 링을 유지한다', () => {
     const degenerate = contour([[0, 0], [0.0000001, 0], [0, 0.0000001]])
     const valid = contour([[0, 0], [0, 100], [100, 100], [100, 0]])
-    expect(mergeStrokeContourGroupsForCff([[degenerate, valid]])).toEqual([valid])
+    // OTF 경로는 이제 항상 union을 지나므로(링 검사 생략, 2026-10-02) 시작점이 회전될 수 있다. 모양 · 방향으로 비교한다.
+    const rotateToSmallest = (ring: Contour): Contour => {
+      let start = 0
+      for (let i = 1; i < ring.length; i++) {
+        if (ring[i].x < ring[start].x || (ring[i].x === ring[start].x && ring[i].y < ring[start].y)) start = i
+      }
+      return [...ring.slice(start), ...ring.slice(0, start)]
+    }
+    const merged = mergeStrokeContourGroupsForCff([[degenerate, valid]])
+    expect(merged).toHaveLength(1)
+    expect(rotateToSmallest(merged[0])).toEqual(rotateToSmallest(valid))
   })
 
   it('실제 ㅂ의 세로·가로 획 교차부를 채운다', async () => {

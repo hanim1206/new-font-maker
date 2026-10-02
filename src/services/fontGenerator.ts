@@ -33,6 +33,7 @@ import { LINE_METRICS, SPACE_ADVANCE, WIN_METRICS } from './fontMetrics'
 import { useGlobalStyleStore } from '../stores/globalStyleStore'
 import type { GlyphData, GlyphPlacementResolver } from './fontExportUtils'
 import { mergeStrokeContourGroupsForCff } from './contourBoolean'
+import { simplifyMergedContours } from './contourSimplify'
 import { brushInkGroupsToFontContours, strokeToBrushInkGroups } from './brushGeometry'
 import { needsFilledRenderInk, strokeToRenderInkGroups, verticalWidthFactorOf } from './strokeRenderGeometry'
 import { stemBeakInkGroups } from './stemBeak'
@@ -79,6 +80,13 @@ export interface FontGeneratorOptions {
   placementOf?: GlyphPlacementResolver
   /** 이 폰트를 몇 번째 받는지. 파일 버전이 `1.00n`이 된다(`fontRevision.ts`). 없으면 1.000. */
   revision?: number
+  /** 합친 뒤 윤곽 단순화 허용오차(1000 UPM 단위, `contourSimplify.ts`). 없으면 단순화하지 않는다. 승인 전 측정용. */
+  simplifyEpsilon?: number
+  /**
+   * 미리 굳힌 한글 운반형(병렬 추출, 플랜 2026-10-02). 주면 수집 · 변환 단계를 건너뛰고 조립부터 한다.
+   * `allExportChars()` 순서여야 cmap이 직렬 추출과 같다.
+   */
+  hangulPortables?: readonly PortableHangulGlyph[]
 }
 
 /** 폰트 생성 결과 */
@@ -373,7 +381,7 @@ function contoursToPath(contours: Contour[]): InstanceType<typeof opentype.Path>
  * GlyphData → OTF에 들어가는 최종 컨투어(폰트 좌표, 획 겹침 합친 뒤).
  * 화면 잉크와 맞는지 재는 테스트가 같은 값을 보도록 따로 뺐다.
  */
-export function glyphDataToFontContours(glyphData: GlyphData): Contour[] {
+export function glyphDataToFontContours(glyphData: GlyphData, simplifyEpsilon?: number): Contour[] {
   // CFF 1은 겹친 컨투어를 even-odd로 상쇄하므로 획별 잉크 묶음을 유지한다.
   const contourGroups: Contour[][] = []
 
@@ -418,6 +426,7 @@ export function glyphDataToFontContours(glyphData: GlyphData): Contour[] {
   })), glyphData.stemBeak, glyphData.strokeStyle)
   contourGroups.push(...brushInkGroupsToFontContours(beakGroups.flat(), UPM, ASCENDER, glyphData.slant))
 
+  // 합치기 전에는 단순화하지 않는다 — 살짝 닿는 획이 떨어져 윤곽 개수가 바뀐다(G1에서 확인, 10-02). 합친 뒤에만 ε를 쓴다.
   let mergedContours: Contour[]
   try {
     mergedContours = mergeStrokeContourGroupsForCff(contourGroups)
@@ -425,7 +434,7 @@ export function glyphDataToFontContours(glyphData: GlyphData): Contour[] {
     const reason = error instanceof Error ? error.message : String(error)
     throw new Error(`${glyphData.char}(U+${glyphData.unicode.toString(16).toUpperCase()}) 컨투어 합치기 실패: ${reason}`)
   }
-  return mergedContours
+  return simplifyEpsilon ? simplifyMergedContours(mergedContours, simplifyEpsilon) : mergedContours
 }
 
 /**
@@ -433,8 +442,9 @@ export function glyphDataToFontContours(glyphData: GlyphData): Contour[] {
  */
 function createGlyph(
   glyphData: GlyphData,
+  simplifyEpsilon?: number,
 ): InstanceType<typeof opentype.Glyph> {
-  const mergedContours = glyphDataToFontContours(glyphData)
+  const mergedContours = glyphDataToFontContours(glyphData, simplifyEpsilon)
 
   // 겹침이 제거된 컨투어 → opentype.js Path
   const path = contoursToPath(mergedContours)
@@ -458,6 +468,73 @@ function createEmptyGlyph(glyphData: GlyphData): InstanceType<typeof opentype.Gl
     unicode: glyphData.unicode,
     advanceWidth: glyphData.advanceWidth,
     path: new opentype.Path(),
+  })
+}
+
+// ===== 병렬 추출 운반형 (플랜 2026-10-02 추출 워커 병렬) =====
+
+/** Worker · 자식 프로세스가 글자 하나를 수집 → 윤곽 → CharString까지 굳혀 나르는 형태. 구조 복제(postMessage)로 넘어간다. */
+export interface PortableHangulGlyph {
+  unicode: number
+  char: string
+  advanceWidth: number
+  charString: Uint8Array
+  inkBox: { y1: number; y2: number } | null
+  /** opentype.js getMetrics 대역 두 점(`compactGlyphForCff`의 stub). 윤곽 없으면 null. */
+  stub: { x1: number; y1: number; x2: number; y2: number } | null
+  /** 윤곽 생성이 실패해 빈 글리프로 넣었다. */
+  skipped: boolean
+  /** `placementOf`를 줬는데도 스키마 상자로 떨어졌다. */
+  schemaFallback: boolean
+}
+
+/** 글자 하나를 수집부터 CharString까지. 직렬 경로(createGlyph → compactGlyphForCff)와 같은 코드가 돌아 결과 바이트가 같다. */
+export function portableHangulGlyphOf(
+  char: string,
+  placementOf: GlyphPlacementResolver | undefined,
+  simplifyEpsilon?: number,
+): PortableHangulGlyph | null {
+  const data = collectGlyphDataWithPlacement(char, placementOf)
+  if (!data) return null
+  let glyph: InstanceType<typeof opentype.Glyph>
+  let skipped = false
+  try {
+    glyph = createGlyph(data, simplifyEpsilon)
+  } catch (error) {
+    console.error(`글리프 생성 실패, 빈 글리프로 넣음: ${data.char}`, error)
+    skipped = true
+    glyph = createEmptyGlyph(data)
+  }
+  const compact = compactGlyphForCff(glyph)
+  const commands = (glyph.path as InstanceType<typeof opentype.Path>).commands as Array<{ type: string; x?: number; y?: number }>
+  const stub = commands.length >= 2 && commands[0].type === 'M' && commands[1].type === 'L'
+    ? { x1: commands[0].x ?? 0, y1: commands[0].y ?? 0, x2: commands[1].x ?? 0, y2: commands[1].y ?? 0 }
+    : null
+  return {
+    unicode: data.unicode,
+    char: data.char,
+    advanceWidth: data.advanceWidth,
+    charString: compact.charString,
+    inkBox: compact.inkBox,
+    stub,
+    skipped,
+    schemaFallback: data.unicode >= 0xAC00 && data.placementKind === 'schema',
+  }
+}
+
+/** 운반형 → 조립용 글리프. 대역 윤곽(stub)까지 직렬 경로와 같게 복원한다. */
+function glyphOfPortable(portable: PortableHangulGlyph): InstanceType<typeof opentype.Glyph> {
+  const path = new opentype.Path()
+  if (portable.stub) {
+    path.moveTo(portable.stub.x1, portable.stub.y1)
+    path.lineTo(portable.stub.x2, portable.stub.y2)
+  }
+  const unicodeHex = portable.unicode.toString(16).toUpperCase().padStart(4, '0')
+  return new opentype.Glyph({
+    name: `uni${unicodeHex}`,
+    unicode: portable.unicode,
+    advanceWidth: portable.advanceWidth,
+    path,
   })
 }
 
@@ -680,6 +757,8 @@ export async function generateFontBuffer(
     placementOf,
     revision = 0,
     coverage,
+    simplifyEpsilon,
+    hangulPortables,
   } = options
 
   // 단계별 걸린 시간(ms). 느린 폰트(손글씨체 등)의 병목을 콘솔에서 바로 보려고 끝에 한 줄로 찍는다.
@@ -688,11 +767,12 @@ export async function generateFontBuffer(
   const mark = (label: string): void => { marks.push([label, Math.round(performance.now() - clock)]) }
 
   try {
-    // Phase 1: 글리프 데이터 수집
-    onProgress?.(0, 1, '글리프 데이터 수집 중...')
+    // Phase 1: 글리프 데이터 수집. 운반형이 오면 호출자(병렬 러너)가 이미 수집 · 변환 진행을 보고했다.
+    if (!hangulPortables) onProgress?.(0, 1, '글리프 데이터 수집 중...')
 
     // 모델 상자는 글자마다 획을 칸에 맞추느라 전수에 십여 초가 걸린다. 나눠 돌려 진행 표시가 멈추지 않게 한다.
-    const glyphDataList = (await processInChunks(
+    // 운반형이 오면(병렬 추출) Worker가 수집을 이미 했으므로 건너뛴다.
+    const glyphDataList = hangulPortables ? [] : (await processInChunks(
       allExportChars(),
       (char) => collectGlyphDataWithPlacement(char, placementOf),
       placementOf ? 100 : 2000,
@@ -700,10 +780,15 @@ export async function generateFontBuffer(
     )).filter((data): data is GlyphData => data !== null)
     mark('수집')
     const schemaFallbackCount = placementOf
-      ? glyphDataList.filter((data) => data.unicode >= 0xAC00 && data.placementKind === 'schema').length
+      ? (hangulPortables
+        ? hangulPortables.filter((portable) => portable.schemaFallback).length
+        : glyphDataList.filter((data) => data.unicode >= 0xAC00 && data.placementKind === 'schema').length)
       : undefined
 
-    if (glyphDataList.length === 0) {
+    const hangulCodePoints = hangulPortables
+      ? hangulPortables.map((portable) => portable.unicode)
+      : glyphDataList.map((data) => data.unicode)
+    if (hangulCodePoints.length === 0) {
       return { success: false, glyphCount: 0, error: '생성할 글리프가 없습니다.' }
     }
 
@@ -713,8 +798,8 @@ export async function generateFontBuffer(
     assertCmapFormat4Capacity([
       { codePoint: 0x20, glyphIndex: 1 },
       ...latin.glyphs.map((glyph, index) => ({ codePoint: glyph.unicode as number, glyphIndex: index + 2 })),
-      ...glyphDataList.map((data, index) => ({
-        codePoint: data.unicode,
+      ...hangulCodePoints.map((codePoint, index) => ({
+        codePoint,
         glyphIndex: index + hangulFirstIndex,
       })),
     ])
@@ -730,25 +815,31 @@ export async function generateFontBuffer(
     // 만들자마자 윤곽을 CharString 바이트로 굳힌다. opentype.js가 윤곽 전체를 숫자 배열로 묶으면 아이폰에서 메모리가 터진다.
     const skippedChars: string[] = []
     const compacted: CompactGlyph[] = glyphs.map((glyph) => compactGlyphForCff(glyph))
-    const hangulGlyphs = await processInChunks(
-      glyphDataList,
-      (data) => {
-        let glyph: InstanceType<typeof opentype.Glyph>
-        try {
-          glyph = createGlyph(data)
-        } catch (error) {
-          console.error(`글리프 생성 실패, 빈 글리프로 넣음: ${data.char}`, error)
-          skippedChars.push(data.char)
-          glyph = createEmptyGlyph(data)
+    const hangulGlyphs = hangulPortables
+      ? hangulPortables.map((portable) => {
+        if (portable.skipped) skippedChars.push(portable.char)
+        compacted.push({ charString: portable.charString, inkBox: portable.inkBox })
+        return glyphOfPortable(portable)
+      })
+      : await processInChunks(
+        glyphDataList,
+        (data) => {
+          let glyph: InstanceType<typeof opentype.Glyph>
+          try {
+            glyph = createGlyph(data, simplifyEpsilon)
+          } catch (error) {
+            console.error(`글리프 생성 실패, 빈 글리프로 넣음: ${data.char}`, error)
+            skippedChars.push(data.char)
+            glyph = createEmptyGlyph(data)
+          }
+          compacted.push(compactGlyphForCff(glyph))
+          return glyph
+        },
+        100,
+        (done, total) => {
+          onProgress?.(done, total, '글리프 윤곽 변환 중...')
         }
-        compacted.push(compactGlyphForCff(glyph))
-        return glyph
-      },
-      100,
-      (done, total) => {
-        onProgress?.(done, total, '글리프 윤곽 변환 중...')
-      }
-    )
+      )
 
     glyphs.push(...hangulGlyphs)
     mark('윤곽 변환')
