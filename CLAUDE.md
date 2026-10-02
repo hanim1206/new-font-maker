@@ -68,7 +68,7 @@ npm run reference:noto # Noto 코퍼스 추출
 ```
 
 구조:
-- `src-next/` — 실제 앱 엔트리(`index.html` → `src-next/main.tsx`). 화면과 라우트: `/` 문장 보정, `/workspace/*` 형태 셸, `/workspace/review/*` 검수, `/grid-lab` `/rule-lab` 등 랩.
+- `src-next/` — 실제 앱 엔트리(`index.html` → `src-next/main.tsx`). 화면과 라우트: `/dashboard` 대시보드(`/`는 여기로 넘긴다), `/workspace/*` 형태 셸, `/workspace/review/*` 검수, `/workspace/font` 폰트. 실험실은 개발 서버 전용이고 관리자 `실험실` 메뉴(`/admin/labs/<랩>`)에서 연다. 주소 목록은 `src-next/screenRoutes.ts`.
 - `src/` — `services/` `stores/` `types/` `data/` `utils/` `renderers/`는 공용이고 `src-next`가 가져다 쓴다. `src/components/`의 옛 3컬럼 편집기는 라우팅에서 빠진 죽은 코드다(삭제 예정, 확장 금지).
 - `scripts/reference-lab/` — Python 추출기·검증기·서버. `reference-data/` — 관측값·승인 입력·캐시.
 - `docs/` — 위 문서 규칙.
@@ -89,6 +89,9 @@ npm run reference:noto # Noto 코퍼스 추출
 
 ## 일하는 습관
 
+- 답은 결론 한 문장부터. 그다음은 사용자가 정할 것만 적고, 없으면 생략한다. 근거와 과정은 `자세히`라고 할 때만 푼다. 기본 다섯 줄 안쪽.
+- 결정은 객관식으로 묻고 추천을 맨 앞에 둔다. 긴 내용은 플랜 문서에 두고 대화에는 요약만 남긴다.
+- 글로 길게 설명할 것은 실험실 화면으로 보여 준다.
 - 해석이 갈릴 수 있는 UI 요청은 구현 전에 이해한 것을 한 문단으로 되짚고 확인받는다.
 - 검증 중 본 이상한 것은 사소해도 전부 보고한다. 내 작업과 무관해 보여도 말한다.
 - 작업 중 테스트는 단위 테스트와 바꾼 곳 e2e 스펙 하나만. 넓은 회귀는 커밋 직전 한 번. 실험실은 타입 검사 + 스크린샷 하나로 끝.
