@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Circle, CircleCheck, CircleMinus, CircleX, LoaderCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { ChoiceGroup, ChoiceItem } from '@/components/ui/choice-group'
@@ -50,7 +50,8 @@ function NoteLine({ file }: { file: string }) {
 }
 
 function ItemRow({ item, showFile, showNote }: { item: TestRunItem; showFile?: boolean; showNote?: boolean }) {
-  return <li className="flex flex-col gap-0.5 py-1.5" data-status={item.status}>
+  // 도는 줄은 파란 바탕으로 켠다.
+  return <li className={`-mx-2 flex flex-col gap-0.5 rounded-md px-2 py-1.5 transition-colors ${item.status === 'running' ? 'bg-info-soft' : ''}`} data-status={item.status}>
     <div className="flex items-center gap-2 text-sm">
       <StatusIcon status={item.status} />
       <span className={item.status === 'running' ? 'min-w-0 flex-1 font-semibold' : 'min-w-0 flex-1'}>
@@ -147,6 +148,19 @@ export function TestsPage() {
   const [picked, setPicked] = useState<Partial<Record<TestKind, string>>>({})
   /** 종류마다 마지막 실행 · 마지막 전체 중 무엇을 보나. 기본은 마지막 실행. */
   const [slot, setSlot] = useState<Partial<Record<TestKind, 'last' | 'full'>>>({})
+
+  /** 마지막으로 따라간 실행. 새 실행이 시작되면 그 탭 · 워크트리로 옮겨 간다(한 실행에 한 번만 — 그 뒤엔 사용자가 고른 탭을 둔다). */
+  const followed = useRef<string | null>(null)
+  useEffect(() => {
+    const live = runs?.find((run) => run.slot === 'last' && runStateOf(run) === 'running')
+    if (!live) return
+    const key = `${live.worktree}:${live.kind}:${live.startedAt}`
+    if (followed.current === key) return
+    followed.current = key
+    setKind(live.kind)
+    setPicked((prev) => ({ ...prev, [live.kind]: live.worktree }))
+    setSlot((prev) => ({ ...prev, [live.kind]: 'last' }))
+  }, [runs])
 
   useEffect(() => {
     let stopped = false
