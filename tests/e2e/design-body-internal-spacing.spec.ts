@@ -13,7 +13,10 @@ test('에의 ㅔ 가로점은 네모꼴 축소 비율을 따라 유지된다', a
     if (!glyphBox || !armBox) throw new Error('에 또는 ㅔ 가로점의 화면 경계를 찾지 못했습니다.')
     return armBox.width / glyphBox.width
   }
-  const before = await ratio()
+  // 문장을 바꾸면 글자도 300ms쯤 뒤 한 번 더 그려진다. 부하가 크면 더 늦어 첫 값을 바로 재면 그 사이 값이 잡힌다 — 두 번 연달아 같을 때까지 기다린다.
+  let last = Number.NaN
+  await expect.poll(async () => { const now = await ratio(); const same = Math.abs(now - last) < 1e-6; last = now; return same }, { intervals: [400] }).toBe(true)
+  const before = last
   const glyphWidth = (await glyphButton.boundingBox())?.width ?? 0
 
   await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
@@ -21,7 +24,7 @@ test('에의 ㅔ 가로점은 네모꼴 축소 비율을 따라 유지된다', a
   await settings.locator('label').filter({ hasText: '가로' }).locator('input').fill('600')
   // 칸 폭이 먼저 줄고, 획은 300ms쯤 뒤 한 번 더 그려져야 자리를 잡는다. 바로 재면 그 사이 값(.12)이 잡힌다.
   await expect.poll(async () => (await glyphButton.boundingBox())?.width ?? 0).toBeLessThan(glyphWidth * .8)
-  await expect.poll(ratio).toBeCloseTo(before, 1)
+  await expect.poll(ratio, { timeout: 15_000 }).toBeCloseTo(before, 1)
   expect(await ratio()).toBeGreaterThan(.15)
 })
 

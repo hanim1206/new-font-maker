@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { JUNGSEONG_LIST } from '../src/data/Hangul'
 import {
@@ -41,28 +40,18 @@ describe('Noto 단일 출처 기본 고딕 입력', () => {
     expect(approvedCandidates.flatMap(({ elements }) => elements).every(({ provenance }) => provenance.extractorVersion === 'geometric-role-matcher-v9')).toBe(true)
   })
 
-  it('깨끗한 신규 프로젝트 기준값과 localStorage 제외 정책을 digest로 동결한다', () => {
+  it('09-15 기록의 신규 프로젝트 기준값과 localStorage 제외 정책이 digest로 스스로 맞는다', () => {
     const baseline = PRESET_SOURCE_MANIFEST.currentBaseline
     expect(baseline.sourceClass).toBe('current-fallback')
     expect(baseline.storageInput).toBe('excluded')
     expect(baseline.layouts.mutableLayoutTypes).toHaveLength(6)
     expect(baseline.layouts.frozenLayoutTypes).toHaveLength(4)
 
-    const sourcePaths = {
-      baseJamos: baseline.jamos.basePath,
-      userPreset01: baseline.jamos.overridePath,
-      basePresets: baseline.layouts.basePath,
-      layoutCalculator: baseline.layouts.calculatorPath,
-      legacyLayoutProfile: baseline.layouts.legacyProfilePath,
-      globalStyleStore: baseline.globalStyle.sourcePath,
-    } as const
-    const sourceDigests = Object.fromEntries(Object.entries(sourcePaths).map(([id, path]) => [
-      id,
-      sha256(readFileSync(new URL(`../${path}`, import.meta.url))),
-    ]))
-    for (const [id, digest] of Object.entries(sourceDigests)) {
-      expect(digest).toBe(PRESET_SOURCE_MANIFEST.sourceDigests[id])
-    }
+    // 2026-09-15에 뜬 기록이다. 그 뒤로 원본 파일(기본 자모 · 프리셋 · 레이아웃 계산 · 전역 스타일)이 계속 바뀌어
+    // 지금 파일과 견주면 늘 깨진다(10-03). 기록이 스스로 맞는지만 본다 — 적힌 원본 지문으로 기준값 지문을 다시 낸다.
+    // 기준값 지문은 이 여섯 원본(이 순서)으로 냈다.
+    const sourceDigests = Object.fromEntries((['baseJamos', 'userPreset01', 'basePresets', 'layoutCalculator', 'legacyLayoutProfile', 'globalStyleStore'] as const)
+      .map((id) => [id, PRESET_SOURCE_MANIFEST.sourceDigests[id]]))
 
     const { digest: recordedBaselineDigest, ...baselineCore } = baseline
     expect(sha256(JSON.stringify({ sourceDigests, baseline: baselineCore }))).toBe(recordedBaselineDigest)

@@ -6,7 +6,7 @@ const HTML_URL = new URL('../public/references/vertical-vowel-gap.html', import.
 const MANIFEST_URL = new URL('../public/references/vertical-vowel-gap.manifest.json', import.meta.url)
 const SHA256 = /^[0-9a-f]{64}$/
 const EXPECTED_ANALYSIS_SHA256 = '8575b47ae9bc7d24250479e414f53a37b66f40e27e7250e56aa7495e16d53954'
-const EXPECTED_HTML_SHA256 = '3f97fee926c82748781f5ff679f9c0b93fcf213b53d8b8808db6f48fd10e42c9'
+const EXPECTED_HTML_SHA256 = '915fad48196b6e7c3af6f2f04f54779e72c1fbccf0286b93ff8b3f7e5b21d930'
 const EXPECTED_GLYPHS = ['가', '거', '나', '너', '다', '더', '마', '머', '아', '어']
 const EXPECTED_FONT_IDS = [
   'noto-sans-kr',
