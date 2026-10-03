@@ -196,10 +196,41 @@ export function counterKeepScale(
   const thickness = strokes.map((item) => item.stroke.thickness).sort((a, b) => a - b)[Math.floor(strokes.length / 2)]
   const minGap = thickness * MIN_GAP_RATIO
   const requiredOf = (p: Segment, q: Segment) => counterFloorAt(floor, thickness, weightMultiplier, floor.horizontalRatio !== undefined && stackedHorizontal(p, q, thickness * 2))
-  const pairs: ({ p: Segment; q: Segment } & Nearest)[] = []
+  let scale = 1
+  for (const { p, q, distance } of counterGapPairs(segments, minGap)) {
+    const halves = p.half + q.half
+    // 굵기 400에서 이미 하한선보다 좁던 틈은 안 지킨다.
+    const required = requiredOf(p, q)
+    if (distance - halves <= required) continue
+    // 자소 배율 c에서 틈 = 거리 − c × 목표 반 두께 합. 이게 하한선 아래로 안 가게. 굵기 400보다 얇게는 안 한다.
+    const grown = p.grown + q.grown
+    scale = Math.min(scale, Math.max((distance - required) / grown, halves / grown))
+  }
+  return scale
+}
+
+type GapPair = { p: Segment; q: Segment } & Nearest
+
+/**
+ * 속공간을 이루는 틈 선별 — 지키기(깎기)와 벌리기가 같은 거름망을 쓴다.
+ * 남는 것: 나란하거나 마주 본 두 토막 사이, 굵기 400 틈이 `minGap`을 넘는 것.
+ * 빠지는 것: 원래 붙여 그린 틈, 벌어진 쐐기(ㅆ 엇갈린 X · ㅈ 다리), 한 획 굽은 길의 이웃 토막(ㅇ 둘레),
+ * 이어진 두 획이 이음 자리에서 벌어지는 쐐기(ㅅ 두 다리 — 틈이 0부터 연속이라 지키면 자소가 400에 묶인다).
+ */
+function counterGapPairs(segments: Segment[], minGap: number): GapPair[] {
+  return counterGapFilter(allSegmentPairs(segments), minGap)
+}
+
+/** 모든 토막 쌍과 가장 가까운 자리. 벌리기의 보호 제약도 이 원본을 쓴다. */
+function allSegmentPairs(segments: Segment[]): GapPair[] {
+  const pairs: GapPair[] = []
   for (let i = 0; i < segments.length; i += 1) {
     for (let j = i + 1; j < segments.length; j += 1) pairs.push({ p: segments[i], q: segments[j], ...nearestBetween(segments[i], segments[j]) })
   }
+  return pairs
+}
+
+function counterGapFilter(pairs: GapPair[], minGap: number): GapPair[] {
   // 서로 이어진 두 획의 이음 자리(잉크가 겹치는 가장 가까운 곳). ㅅ 두 다리 꼭대기, ㅁ 모서리.
   const joints = new Map<string, { x: number; y: number; distance: number }>()
   for (const pair of pairs) {
@@ -208,26 +239,154 @@ export function counterKeepScale(
     if ((joints.get(key)?.distance ?? Infinity) <= pair.distance) continue
     joints.set(key, { x: (pair.pointP.x + pair.pointQ.x) / 2, y: (pair.pointP.y + pair.pointQ.y) / 2, distance: pair.distance })
   }
-  let scale = 1
-  for (const { p, q, distance, atP, atQ, pointP, pointQ } of pairs) {
-    const halves = p.half + q.half
-    const gap = distance - halves
-    // 원래 붙여 그린 틈, 굵기 400에서 이미 하한선보다 좁던 틈은 안 지킨다.
-    const required = requiredOf(p, q)
-    if (gap <= minGap || gap <= required) continue
-    // 벌어진 두 토막 사이(ㅆ 안쪽 두 다리가 엇갈린 X, ㅈ · ㅊ 다리)는 속공간이 아니다 — 굵어지면 쐐기 끝이 조금 물러날 뿐이다.
-    if (!parallel(p, q)) continue
-    // 한 획 안에서 덜 돌았는데 곧 닿는 토막은 굽은 길의 이웃이다 — 틈이 아니다(ㅇ 둘레의 이웃 토막).
-    // 되돌아와 마주 보는 토막(ㄹ 위 · 가운데 가로줄기, ㅇ 맞은편)이나 크게 돌아 다시 나란한 토막(ㄹ 위 · 아래)은 틈이다.
-    if (p.stroke === q.stroke && !facing(p, q) && distance >= 0.5 * alongStroke(atP, atQ, p)) continue
-    // 이어진 두 획이 이음 자리에서 벌어지는 쐐기(ㅅ 두 다리)도 같다 — 틈이 0부터 연속이라, 지키면 하한선이 몇이든 자소 전체가 굵기 400에 묶인다.
+  return pairs.filter(({ p, q, distance, atP, atQ, pointP, pointQ }) => {
+    if (distance - (p.half + q.half) <= minGap) return false
+    if (!parallel(p, q)) return false
+    if (p.stroke === q.stroke && !facing(p, q) && distance >= 0.5 * alongStroke(atP, atQ, p)) return false
     const joint = p.stroke === q.stroke ? undefined : joints.get(`${p.stroke}:${q.stroke}`)
-    if (joint && !facing(p, q) && distance >= 0.5 * (Math.hypot(pointP.x - joint.x, pointP.y - joint.y) + Math.hypot(pointQ.x - joint.x, pointQ.y - joint.y))) continue
-    // 자소 배율 c에서 틈 = 거리 − c × 목표 반 두께 합. 이게 하한선 아래로 안 가게. 굵기 400보다 얇게는 안 한다.
-    const grown = p.grown + q.grown
-    scale = Math.min(scale, Math.max((distance - required) / grown, halves / grown))
+    if (joint && !facing(p, q) && distance >= 0.5 * (Math.hypot(pointP.x - joint.x, pointP.y - joint.y) + Math.hypot(pointQ.x - joint.x, pointQ.y - joint.y))) return false
+    return true
+  })
+}
+
+export interface GapOpeningOptions {
+  /** 벌릴 바닥 — 굵어진 두께(틈 양쪽 평균)의 비율. 참고 폰트 역추론 값 0.25(`weight-gap-rule.v1`, 900 재현 오차 6u). */
+  opening?: number
+  /** 자소 사이 틈도 벌린다(플랜 단계 3). 기본은 자소 안만(단계 2). */
+  betweenParts?: boolean
+  /** 획 하나가 움직일 수 있는 최대 거리(글자 칸 단위). 참고 폰트 실측 20~35u — 기본 0.04. */
+  maxShift?: number
+  /**
+   * 축별 이동 상한 = 자소 상자 크기 × 이 비율. 작은 받침 · 겹닿자 칸에서 절대 상한(40u)이 상자의 20%에 달해
+   * 글자꼴이 망가졌다(뷁의 ㅂ 가로줄기가 227u 상자에서 40u 올라가 ㅁ처럼 — 10-02 눈 ② 첫 판 기각 사유). 기본 0.06.
+   */
+  maxShiftFraction?: number
+}
+
+/**
+ * 속공간 벌리기 층 — 좁은 틈만 획 중심을 옮겨 벌린다. 플랜 `docs/plans/2026-10-02_속공간-벌리기-층.md` 2단계.
+ *
+ * 참고 폰트 역추론(G0): 두께는 안 깎고, 그냥 두면 바닥(= 0.25 × 굵어진 두께) 아래로 갈 틈만
+ * 양쪽 획이 반반으로 틈에서 멀어진다. 넉넉한 틈은 손 안 대고, 쐐기 · 원래 붙여 그린 틈은 예외.
+ * 틈 선별은 깎기와 같은 거름망(`counterGapPairs`), 틈은 늘 굵기 400 모양에서 고른다.
+ *
+ * 획은 통째로 움직인다(중심선 이동 — 두께 고정 모델과 충돌 없음). 한 획 안의 틈(ㅇ · ㅁ 속)은 이동으로 못 벌려 안 다룬다.
+ * 중심선은 자소 상자(그 자소 획 상자들의 합) 밖으로 못 나간다 — 바깥 여유가 없으면 그 틈은 남는다(`unresolved`, 깎기의 몫).
+ * 여러 틈이 한 획을 서로 반대로 밀면 반복 풀기로 남는 여유만큼 나눈다. 굵기 400 이하는 아무것도 안 바꾼다.
+ *
+ * 반환 `shifts`: 획마다 (x, y) 이동(글자 칸 단위, 0 = 그대로). `unresolved`: 바닥까지 못 벌린 틈 수.
+ */
+export function gapOpeningShifts(
+  strokes: readonly PartedCounterKeepStroke[],
+  weightMultiplier: number,
+  stemScale = 1,
+  options: GapOpeningOptions = {},
+): { shifts: { x: number; y: number }[]; unresolved: number } {
+  const shifts = strokes.map(() => ({ x: 0, y: 0 }))
+  if (!(weightMultiplier > 1) || strokes.length < 2) return { shifts, unresolved: 0 }
+  const segments = segmentsOf(strokes, stemScale, weightMultiplier, 1)
+  const thickness = strokes.map((item) => item.stroke.thickness).sort((a, b) => a - b)[Math.floor(strokes.length / 2)]
+  const opening = options.opening ?? DEFAULT_BETWEEN_OPENING
+  const parts = strokes.map((item) => jamoOfPart(item.part))
+  const rawPairs = allSegmentPairs(segments).filter((gap) => gap.p.stroke !== gap.q.stroke && gap.distance > 0)
+  // 벌릴 틈: 깎기와 같은 거름망(나란함 · 쐐기 제외)을 지나고, 범위(자소 안 / 사이) 안인 것.
+  const gaps = counterGapFilter(rawPairs, thickness * MIN_GAP_RATIO).filter((gap) =>
+    options.betweenParts || parts[gap.p.stroke] === parts[gap.q.stroke])
+  if (gaps.length === 0) return { shifts, unresolved: 0 }
+  // 보호할 틈: 겹치지 않은 모든 획 쌍 — 나란하지 않아도(ㅎ 보 ↔ 동그라미), 다른 자소여도, 원래 붙다시피인 쌍(ㅎ 꼭지 ↔ 보)도.
+  // 한 틈을 벌리려는 이동이 이런 쌍을 시작 관계보다 가깝게 만들면 안 된다 — 글자꼴은 획 사이 관계가 정한다.
+  const guards = rawPairs
+  // 중심선이 자소 상자 밖으로 못 나가게 — 획마다 네 방향 여유를 잰다.
+  const partBox = new Map<string, { left: number; right: number; top: number; bottom: number }>()
+  strokes.forEach((item, index) => {
+    const box = partBox.get(parts[index]) ?? { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity }
+    partBox.set(parts[index], {
+      left: Math.min(box.left, item.box.x), right: Math.max(box.right, item.box.x + item.box.width),
+      top: Math.min(box.top, item.box.y), bottom: Math.max(box.bottom, item.box.y + item.box.height),
+    })
+  })
+  const centerBounds = strokes.map(() => ({ left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity }))
+  for (const segment of segments) {
+    const bounds = centerBounds[segment.stroke]
+    bounds.left = Math.min(bounds.left, segment.ax, segment.bx)
+    bounds.right = Math.max(bounds.right, segment.ax, segment.bx)
+    bounds.top = Math.min(bounds.top, segment.ay, segment.by)
+    bounds.bottom = Math.max(bounds.bottom, segment.ay, segment.by)
   }
-  return scale
+  // 이동 상한: 절대값(40u)과 자소 상자 비율 중 작은 쪽 — 작은 받침 칸에서 획이 상자의 20%씩 밀려 글자꼴이 망가지지 않게.
+  const maxShift = options.maxShift ?? 0.04
+  const fraction = options.maxShiftFraction ?? 0.06
+  const room = strokes.map((_, index) => {
+    const box = partBox.get(parts[index])!
+    const bounds = centerBounds[index]
+    const capX = Math.min(maxShift, fraction * (box.right - box.left))
+    const capY = Math.min(maxShift, fraction * (box.bottom - box.top))
+    return {
+      left: Math.min(capX, Math.max(0, bounds.left - box.left)), right: Math.min(capX, Math.max(0, box.right - bounds.right)),
+      up: Math.min(capY, Math.max(0, bounds.top - box.top)), down: Math.min(capY, Math.max(0, box.bottom - bounds.bottom)),
+    }
+  })
+  // 제약 = 보호 쌍 전부. `floor`(하드) = 그냥 둔 값: **어떤 획 쌍도 그냥 둔 것보다 가까워지지 않는다** — 벌리기는 공짜 자리만 쓴다.
+  // 조금이라도 양보를 허용하면(바닥 × 1.5, 기존의 30% 따위) "좁음" 문턱(같은 0.25 × 두께)에 걸친 ㅎ류가 계속 경계선을 넘었다.
+  // 참고 폰트도 한 속공간을 눌러 다른 속공간을 벌지 않는다(이동은 바깥쪽 · 상자 성장). 글자꼴은 획 사이 관계가 정한다.
+  // `target`(소프트, 벌릴 틈만): 바닥까지 벌린다.
+  const openable = new Set(gaps)
+  const constraints = guards.map((gap) => {
+    const base = gap.distance - gap.p.grown - gap.q.grown
+    const required = opening * (gap.p.grown + gap.q.grown)
+    return {
+      i: gap.p.stroke, j: gap.q.stroke,
+      nx: (gap.pointQ.x - gap.pointP.x) / gap.distance, ny: (gap.pointQ.y - gap.pointP.y) / gap.distance,
+      base, required, floor: base, target: openable.has(gap) ? required : undefined,
+    }
+  })
+  const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value))
+  const gapNowOf = (c: (typeof constraints)[number]) =>
+    c.base + (shifts[c.j].x - shifts[c.i].x) * c.nx + (shifts[c.j].y - shifts[c.i].y) * c.ny
+  const apply = (push: { x: number; y: number }[]) => strokes.forEach((_, index) => {
+    // `|| 0`: 여유가 0일 때 clamp가 `-0`을 돌려주는 것을 0으로.
+    shifts[index].x = clamp(shifts[index].x + push[index].x, -room[index].left, room[index].right) || 0
+    shifts[index].y = clamp(shifts[index].y + push[index].y, -room[index].up, room[index].down) || 0
+  })
+  // 소프트 한 걸음 → 하드 복원 수렴(사영). 힘 비율로 섞으면 소프트 결핍이 큰 곳에서 평형이 보호선을 뚫는다
+  // (갛 600: 보가 동그라미 틈을 벌리려고 꼭지 틈 33u를 11u까지 눌렀다) — 복원을 끝까지 돌려 하드가 늘 이기게 한다.
+  for (let iteration = 0; iteration < 24; iteration += 1) {
+    const push = strokes.map(() => ({ x: 0, y: 0 }))
+    let moved = false
+    for (const c of constraints) {
+      if (c.target === undefined) continue
+      const soft = c.target - gapNowOf(c)
+      if (soft <= 1e-6) continue
+      // 반반 · 조금씩 — 한 획에 여러 틈이 겹쳐도 안 튀게.
+      const step = soft / 16
+      push[c.i].x -= c.nx * step
+      push[c.i].y -= c.ny * step
+      push[c.j].x += c.nx * step
+      push[c.j].y += c.ny * step
+      moved = true
+    }
+    if (moved) apply(push)
+    for (let repair = 0; repair < 8; repair += 1) {
+      const fix = strokes.map(() => ({ x: 0, y: 0 }))
+      let violated = false
+      for (const c of constraints) {
+        const hard = c.floor - gapNowOf(c)
+        if (hard <= 1e-6) continue
+        const step = hard / 4
+        fix[c.i].x -= c.nx * step
+        fix[c.i].y -= c.ny * step
+        fix[c.j].x += c.nx * step
+        fix[c.j].y += c.ny * step
+        violated = true
+      }
+      if (!violated) break
+      apply(fix)
+      moved = true
+    }
+    if (!moved) break
+  }
+  const unresolved = constraints.filter((c) => c.target !== undefined && c.target - gapNowOf(c) > 0.25 * c.target).length
+  return { shifts, unresolved }
 }
 
 /** 획 묶음의 두께를 배율대로 바꾼 사본. 배율이 1이면 받은 획 그대로. */

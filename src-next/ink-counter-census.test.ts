@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { areaPathsD } from 'clipper2-ts'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { judgeGlyphInk, measureGlyphInk, OPENING_RATIO, REF_OPENING, referenceOfGlyph, shrinkPaths, withCounterKeep, withHorizontalShare } from '../src/services/inkCounterMeasure'
+import { judgeGlyphInk, measureGlyphInk, OPENING_RATIO, REF_OPENING, referenceOfGlyph, shrinkPaths, withCounterKeep, withGapOpening, withHorizontalShare, withStrokeShifts } from '../src/services/inkCounterMeasure'
 import type { GlyphInk, GlyphReference } from '../src/services/inkCounterMeasure'
 import { DEFAULT_COUNTER_FLOOR } from '../src/services/counterKeep'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
@@ -38,6 +38,9 @@ const BETWEEN = process.env.CENSUS_BETWEEN ? Number(process.env.CENSUS_BETWEEN) 
 const BETWEEN_MIN = process.env.CENSUS_BETWEEN_MIN ? Number(process.env.CENSUS_BETWEEN_MIN) : 0
 const TOTAL_MIN = process.env.CENSUS_TOTAL_MIN ? Number(process.env.CENSUS_TOTAL_MIN) : 0
 const FLOOR = process.env.CENSUS_FLOOR ? (([fixed, ratio, horizontalRatio]) => ({ fixed: fixed / 1000, ratio, horizontalRatio }))(process.env.CENSUS_FLOOR.split(',').map(Number)) : undefined
+/** `CENSUS_OPEN=0.25`: 벌리기 층(2026-10-02 플랜 2단계) — 좁은 틈만 획 중심을 옮겨 벌린 뒤에 깎기 층을 얹는다. `CENSUS_OPEN_BETWEEN=1`: 자소 사이 틈도(3단계). */
+const OPEN = process.env.CENSUS_OPEN ? Number(process.env.CENSUS_OPEN) : 0
+const OPEN_BETWEEN = process.env.CENSUS_OPEN_BETWEEN === '1'
 
 describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜 잉크 조합표', () => {
   beforeAll(() => {
@@ -60,11 +63,28 @@ describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜
       // 층은 이 테스트가 손으로 얹는다 — 제품 속공간 지키기는 꺼서 이중 적용을 막는다.
       const collected = exportUtils.collectGlyphDataWithPlacement(char, placementOf, { counterKeep: false })
       if (!collected) return null
-      return measureGlyphInk(FLOOR === undefined ? withHorizontalShare(collected, HSHARE ?? 1) : withCounterKeep(collected, FLOOR, HSHARE, MIN_SCALE, BETWEEN, BETWEEN_MIN, TOTAL_MIN).data)
+      // 벌리기 먼저(중심 이동), 깎기는 벌린 뒤 남은 자리에만 얹는다.
+      const opened = OPEN > 0 ? withGapOpening(collected, OPEN, OPEN_BETWEEN).data : collected
+      return measureGlyphInk(FLOOR === undefined ? withHorizontalShare(opened, HSHARE ?? 1) : withCounterKeep(opened, FLOOR, HSHARE, MIN_SCALE, BETWEEN, BETWEEN_MIN, TOTAL_MIN).data)
     }
     const setCondition = (width: number, weight: number) => {
       layout.useLayoutStore.getState().setGlobalPadding(placement.designBodyPaddingForSize(width, BODY_H, FONT_SPACE))
       style.useGlobalStyleStore.getState().updateStyle('weight', weight)
+    }
+    /**
+     * 견줄 기준. 벌리기 층이 켜지면 "벌린 뼈대 기준" — 그 굵기에서 계산한 이동을 400 모양에 똑같이 적용해 다시 잰다.
+     * 획 이동이 자소 상자를 늘리면 기준 속공간의 상자 비례 옮김이 어긋나(갛 ㅎ: 틈이 97u로 합쳐져 넓어졌는데 막힘으로 셈) 생기는 허위 막힘을 막는다.
+     */
+    const referenceFor = (char: string, width: number, weight: number, baseline: Map<string, GlyphReference>): GlyphReference | undefined => {
+      if (!(OPEN > 0) || weight <= 400) return baseline.get(char)
+      const bold = exportUtils.collectGlyphDataWithPlacement(char, placementOf, { counterKeep: false })
+      if (!bold) return baseline.get(char)
+      const { shifts } = withGapOpening(bold, OPEN, OPEN_BETWEEN)
+      setCondition(width, 400)
+      const thin = exportUtils.collectGlyphDataWithPlacement(char, placementOf, { counterKeep: false })
+      setCondition(width, weight)
+      if (!thin || thin.strokes.length !== shifts.length) return baseline.get(char)
+      return referenceOfGlyph(measureGlyphInk(withStrokeShifts(thin, shifts)))
     }
 
     // 기준: 기본 가로 · 굵기 400. 자소별 속공간과, 원래 닿아 있는 자소 쌍(`딱 붙음` — 며의 ㅕ 곁줄기가 ㅁ 기둥에 박힌 것 등).
@@ -131,7 +151,7 @@ describe.skipIf(!process.env.INK_COUNTER_CENSUS)('속공간 지키기 — 진짜
       for (const char of chars) {
         const ink = measure(char)
         if (!ink) continue
-        const { touch, closed: lost, split } = judgeGlyphInk(ink, reference.get(char))
+        const { touch, closed: lost, split } = judgeGlyphInk(ink, referenceFor(char, width, weight, reference))
         if (touch.length) touched += 1
         if (lost.length) closed += 1
         if (split.length) splitCount += 1

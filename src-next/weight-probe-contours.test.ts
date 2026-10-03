@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { FillRule, unionD } from 'clipper2-ts'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { glyphDataToFontContours } from '../src/services/fontGenerator'
-import { jamoOf, withCounterKeep, withHorizontalShare } from '../src/services/inkCounterMeasure'
+import { jamoOf, withCounterKeep, withGapOpening, withHorizontalShare } from '../src/services/inkCounterMeasure'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 
 /**
@@ -35,7 +35,11 @@ const WEIGHTS = (process.env.PROBE_WEIGHTS ?? '100,400,900').split(',').map(Numb
 const HSHARE = process.env.PROBE_HSHARE ? Number(process.env.PROBE_HSHARE) : undefined
 const MIN_SCALE = process.env.PROBE_MINSCALE ? Number(process.env.PROBE_MINSCALE) : 0
 const BETWEEN = process.env.PROBE_BETWEEN ? Number(process.env.PROBE_BETWEEN) : 0
+/** `PROBE_TOTAL_MIN=0.8`: 합성 바닥(제품 기본과 같은 뜻). */
+const TOTAL_MIN = process.env.PROBE_TOTAL_MIN ? Number(process.env.PROBE_TOTAL_MIN) : 0
 const FLOOR = process.env.PROBE_FLOOR ? (([fixed, ratio, horizontalRatio]) => ({ fixed: fixed / 1000, ratio, horizontalRatio }))(process.env.PROBE_FLOOR.split(',').map(Number)) : undefined
+/** `PROBE_OPEN=0.25`: 벌리기 층(2026-10-02 플랜) — 좁은 틈만 획 중심 이동을 깎기보다 먼저 얹는다. */
+const OPEN = process.env.PROBE_OPEN ? Number(process.env.PROBE_OPEN) : 0
 
 describe.skipIf(!process.env.WEIGHT_PROBE)('속공간 지키기 — 같은 자용 윤곽 내보내기', () => {
   beforeAll(() => {
@@ -58,7 +62,8 @@ describe.skipIf(!process.env.WEIGHT_PROBE)('속공간 지키기 — 같은 자�
       // 층은 아래서 손으로 얹는다 — 제품 속공간 지키기는 꺼서 이중 적용을 막는다.
       const collected = exportUtils.collectGlyphDataWithPlacement(char, placementOf, { counterKeep: false })
       if (!collected) return null
-      const data = FLOOR === undefined ? withHorizontalShare(collected, HSHARE ?? 1) : withCounterKeep(collected, FLOOR, HSHARE, MIN_SCALE, BETWEEN).data
+      const opened = OPEN > 0 ? withGapOpening(collected, OPEN).data : collected
+      const data = FLOOR === undefined ? withHorizontalShare(opened, HSHARE ?? 1) : withCounterKeep(opened, FLOOR, HSHARE, MIN_SCALE, BETWEEN, 0, TOTAL_MIN).data
       const out: Record<string, number[][][]> = {}
       for (const part of new Set(data.strokes.map((item) => jamoOf((item.beakGroup ?? '').split(':')[0])))) {
         const strokes = data.strokes.filter((item) => jamoOf((item.beakGroup ?? '').split(':')[0]) === part)

@@ -1,6 +1,6 @@
 import { areaPathsD, differenceD, EndType, FillRule, inflatePathsD, intersectD, isPositiveD, JoinType, unionD } from 'clipper2-ts'
 import type { PathsD } from 'clipper2-ts'
-import { counterKeepStrokeFactors, jamoOfPart, scaleStrokeThickness, strokeGrowthOf, strokeVerticalness } from './counterKeep'
+import { counterKeepStrokeFactors, gapOpeningShifts, jamoOfPart, scaleStrokeThickness, strokeGrowthOf, strokeVerticalness } from './counterKeep'
 import type { CounterFloor } from './counterKeep'
 import type { GlyphData } from './fontExportUtils'
 import { glyphDataToFontContours } from './fontGenerator'
@@ -60,6 +60,32 @@ export function withCounterKeep(data: GlyphData, floor: CounterFloor, horizontal
     { floor, horizontalShare, minScale, betweenOpening, betweenMinScale, totalMinScale },
   )
   return { data: { ...data, strokes: data.strokes.map((item, index) => scaleStrokeThickness(item, factors[index])) }, scales: partScales }
+}
+
+/**
+ * 속공간 벌리기 층(2026-10-02 플랜 2단계) — 좁은 틈만 획 중심을 옮겨 벌린 글리프 데이터.
+ * 셈은 `gapOpeningShifts`(counterKeep.ts) 하나다. 이동은 획 상자 자리(`box.x · y`)에 얹는다 — 두께는 안 바뀐다.
+ * `betweenParts`: 자소 사이 틈도 벌린다(3단계). `unresolved`: 바닥까지 못 벌린 틈 수(깎기의 몫).
+ * `shifts`: 획별 이동 — 전수의 "벌린 뼈대 기준"(같은 이동을 400 모양에 적용해 기준을 다시 재기)이 쓴다.
+ */
+export function withGapOpening(data: GlyphData, opening = OPENING_RATIO, betweenParts = false): { data: GlyphData; shifts: { x: number; y: number }[]; unresolved: number } {
+  const { shifts, unresolved } = gapOpeningShifts(
+    data.strokes.map((item) => ({ stroke: item.stroke, box: item.box, part: jamoOfStroke(item) })),
+    data.weightMultiplier,
+    stemScaleOf(data.strokeStyle),
+    { opening, betweenParts },
+  )
+  return { data: withStrokeShifts(data, shifts), shifts, unresolved }
+}
+
+/** 획 상자 자리에 이동을 얹은 사본. 이동이 전부 0이면 받은 획 그대로. */
+export function withStrokeShifts(data: GlyphData, shifts: readonly { x: number; y: number }[]): GlyphData {
+  return {
+    ...data,
+    strokes: data.strokes.map((item, index) => !shifts[index] || (shifts[index].x === 0 && shifts[index].y === 0)
+      ? item
+      : { ...item, box: { ...item.box, x: item.box.x + shifts[index].x, y: item.box.y + shifts[index].y } }),
+  }
 }
 
 /**

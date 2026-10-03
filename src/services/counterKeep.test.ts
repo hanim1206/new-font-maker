@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BoxConfig, StrokeDataV2 } from '../types'
-import { betweenKeepScales, counterKeepScale } from './counterKeep'
+import { betweenKeepScales, counterKeepScale, gapOpeningShifts } from './counterKeep'
 
 const BOX: BoxConfig = { x: 0, y: 0, width: 1, height: 1 }
 const line = (id: string, points: [number, number][], thickness = 0.07, closed = false): { stroke: StrokeDataV2; box: BoxConfig } => ({
@@ -124,5 +124,66 @@ describe('자소 사이 지키기 — 마주 본 획만 (4단계 임시판)', ()
     // 아주 굵어도(×3) 배율 × 굵기 배수가 1(= 굵기 400 두께) 아래로 내려가지 않는다.
     const extreme = betweenKeepScales(strokes, [0, 1], 3)
     expect(extreme[0] * 3).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('속공간 벌리기 — 좁은 틈만 획 중심 이동 (2026-10-02 플랜 2단계)', () => {
+  const parted = (part: string, item: ReturnType<typeof line>) => ({ ...item, part })
+
+  it('굵기 400 이하는 아무것도 안 움직인다', () => {
+    const stems = [parted('CH', line('a', [[0.42, 0.1], [0.42, 0.9]])), parted('CH', line('b', [[0.58, 0.1], [0.58, 0.9]]))]
+    expect(gapOpeningShifts(stems, 1).shifts).toEqual([{ x: 0, y: 0 }, { x: 0, y: 0 }])
+    expect(gapOpeningShifts(stems, 0.7).shifts).toEqual([{ x: 0, y: 0 }, { x: 0, y: 0 }])
+  })
+
+  it('눌린 틈은 양쪽 획이 반반으로 멀어져 바닥(두께의 1/4)이 남는다', () => {
+    // 중심 간격 0.16, 굵기 900 두께 합 0.1365 → 그냥 두면 틈 0.0235 < 바닥 0.0341. 모자람 0.0106을 반반.
+    const stems = [parted('CH', line('a', [[0.42, 0.1], [0.42, 0.9]])), parted('CH', line('b', [[0.58, 0.1], [0.58, 0.9]]))]
+    const { shifts, unresolved } = gapOpeningShifts(stems, 1.95)
+    expect(shifts[0].x).toBeCloseTo(-0.0053, 3)
+    expect(shifts[1].x).toBeCloseTo(0.0053, 3)
+    expect(shifts[0].y).toBe(0)
+    expect(0.16 + shifts[1].x - shifts[0].x - 0.1365).toBeCloseTo(0.25 * 0.1365, 3)
+    expect(unresolved).toBe(0)
+  })
+
+  it('넉넉한 틈은 손 안 댄다', () => {
+    const stems = [parted('CH', line('a', [[0.25, 0.1], [0.25, 0.9]])), parted('CH', line('b', [[0.75, 0.1], [0.75, 0.9]]))]
+    expect(gapOpeningShifts(stems, 1.95).shifts).toEqual([{ x: 0, y: 0 }, { x: 0, y: 0 }])
+  })
+
+  it('쐐기(ㅅ 두 다리)는 안 벌린다', () => {
+    const leg = (id: string, side: number) => line(id, Array.from({ length: 16 }, (_, i): [number, number] => [0.5 + side * 0.3 * Math.sin(i / 15 * Math.PI / 2), 0.2 + 0.6 * i / 15]))
+    const { shifts } = gapOpeningShifts([parted('CH', leg('l', -1)), parted('CH', leg('r', 1))], 1.95)
+    expect(shifts).toEqual([{ x: 0, y: 0 }, { x: 0, y: 0 }])
+  })
+
+  it('중심선이 자소 상자 밖으로 못 나가면 그 틈은 남는다(깎기의 몫)', () => {
+    // 두 기둥의 중심선이 상자 양 끝에 딱 붙어 바깥 여유가 0 — 못 벌리고 unresolved로 센다.
+    const box = { x: 0.4, y: 0, width: 0.2, height: 1 }
+    const flush = (id: string, x: number) => ({ box, stroke: { id, points: [{ x, y: 0.1 }, { x, y: 0.9 }], closed: false, thickness: 0.1 } as StrokeDataV2, part: 'CH' })
+    const { shifts, unresolved } = gapOpeningShifts([flush('a', 0), flush('b', 1)], 1.95)
+    expect(shifts).toEqual([{ x: 0, y: 0 }, { x: 0, y: 0 }])
+    expect(unresolved).toBe(1)
+  })
+
+  it('작은 자소 상자에서는 이동이 상자 비율(6%)로 묶인다 — 글자꼴 지키기', () => {
+    // 받침 ㅂ 꼴: 높이 0.2 상자 → 축 상한 0.012. 모자람이 커도 그 이상 안 민다(뷁의 ㅂ이 ㅁ 되는 것 방지).
+    const box = { x: 0.2, y: 0.7, width: 0.6, height: 0.2 }
+    const bar = (id: string, y: number) => ({ box, stroke: { id, points: [{ x: 0.1, y }, { x: 0.9, y }], closed: false, thickness: 0.07 } as StrokeDataV2, part: 'JO' })
+    const { shifts, unresolved } = gapOpeningShifts([bar('a', 0.25), bar('b', 0.75)], 1.95)
+    expect(Math.abs(shifts[0].y)).toBeLessThanOrEqual(0.012 + 1e-9)
+    expect(Math.abs(shifts[1].y)).toBeLessThanOrEqual(0.012 + 1e-9)
+    expect(Math.abs(shifts[0].y)).toBeGreaterThan(0)
+    expect(unresolved).toBe(1)
+  })
+
+  it('자소 사이 틈은 betweenParts를 켰을 때만 벌린다', () => {
+    // 홀자 보 아래 받침 가로줄기 — 중심 간격 0.16, 굵기 900이면 바닥 0.0341이 안 남는다.
+    const beams = [parted('JU', line('a', [[0.2, 0.5], [0.8, 0.5]])), parted('JO', line('b', [[0.2, 0.66], [0.8, 0.66]]))]
+    expect(gapOpeningShifts(beams, 1.95).shifts).toEqual([{ x: 0, y: 0 }, { x: 0, y: 0 }])
+    const { shifts } = gapOpeningShifts(beams, 1.95, 1, { betweenParts: true })
+    expect(shifts[0].y).toBeCloseTo(-0.0053, 3)
+    expect(shifts[1].y).toBeCloseTo(0.0053, 3)
   })
 })

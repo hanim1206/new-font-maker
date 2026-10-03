@@ -4,7 +4,7 @@ import type { PathsD } from 'clipper2-ts'
 import { designBodyPaddingForSize, REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../src/services/designBodyPlacement'
 import { collectGlyphDataWithPlacement } from '../src/services/fontExportUtils'
 import type { GlyphPlacementResolver } from '../src/services/fontExportUtils'
-import { judgeGlyphInk, measureGlyphInk, referenceOfGlyph, withCounterKeep, withHorizontalShare } from '../src/services/inkCounterMeasure'
+import { judgeGlyphInk, measureGlyphInk, referenceOfGlyph, withCounterKeep, withGapOpening, withHorizontalShare } from '../src/services/inkCounterMeasure'
 import type { GlyphInk, GlyphReference, InkVerdict } from '../src/services/inkCounterMeasure'
 import { useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
@@ -23,12 +23,45 @@ import styles from './CounterProgressMap.module.css'
  * 단계 내용은 `STEPS` 한 곳에 적는다 — 플랜 진행 기록을 고칠 때 같이 고친다.
  */
 
-type StepId = 'ruler' | 'error' | 'fit900' | 'pattern' | 'gate' | 'measure' | 'floor' | 'horizontal' | 'between' | 'split' | 'table'
+type StepId = 'rule' | 'open' | 'openBetween' | 'openPattern' | 'openGate' | 'ruler' | 'error' | 'fit900' | 'pattern' | 'gate' | 'measure' | 'floor' | 'horizontal' | 'between' | 'split' | 'table'
 type StepState = 'done' | 'now' | 'partial' | 'wait'
 interface Step { id: StepId; title: string; state: StepState; stateLabel: string; question: string; result: string; decision?: string }
 
-/** 10-01 두 번째 다시 짬(역추론): 참고 폰트 100 · 900을 같은 자로 재서 손잡이 값을 숫자로 맞춘다. 눈 검증은 세 번(① 자 · ② 900 월드컵 · ③ 굵기 막대). */
+/**
+ * 10-02 세 번째 다시 짬(벌리기): 플랜 `2026-10-02_속공간-벌리기-층.md`. 참고 폰트는 두께를 안 깎고
+ * 좁은 틈만 획 중심을 옮겨 벌린다 — 벌리기가 본체, 깎기(떼기)는 벌릴 자리 없을 때 보조.
+ * 눈 검증 셋: ① 라이트박스 · ② 900 월드컵 · ③ 굵기 막대.
+ */
 const STEPS: Step[] = [
+  {
+    id: 'rule', title: '규칙 하나', state: 'done', stateLabel: '닫힘 · 10-02 G0',
+    question: '참고 폰트의 "벌리기"를 숫자 규칙으로 재현할 수 있나',
+    result: '규칙: 실제 틈 = max(중심 고정 예측, 0.25 × 굵어진 두께), 양쪽 획 반반 이동, 쐐기 예외, 넉넉한 틈은 손 안 댐. 노토 400 → 900 눌린 틈 재현 오차 6.0u(무규칙 39.6u, 측정 잡음 11.3u). 바닥 비율 0.2 · 0.25 · 0.3 중 0.25가 전 굵기 최소 — 우리 틈 기준 0.25와 같은 자리. `extract_gap_rule.py`.',
+  },
+  {
+    id: 'open', title: '벌리기 층', state: 'now', stateLabel: '눈 ② 둘째 판',
+    question: '과벌림을 고친 벌리기를 켜는 게 나은가 (눈 ② 월드컵)',
+    result: '`gapOpeningShifts`: 깎기와 같은 거름망으로 틈을 고르고, 눌린 틈만 양쪽 획을 반반 이동. 첫 판(10-02, 지금 제품 승) 기각 사유 = 과벌림(뷁의 ㅂ 가로줄기가 227u 상자에서 40u 이동 → ㅁ처럼). 고침: 이동 상한 = 자소 상자의 6%, 엄격 보호 = 어떤 획 쌍도 그냥 둔 것보다 가까워지지 않음(공짜 자리만 쓴다). 두께는 안 깎아 검기 그대로.',
+    decision: '사용자 10-02 눈 ② 첫 판: 지금 제품 승 — "너무 벌어져서 글자 자체가 망가지는 건 고쳐야" → 고쳐서 재도전.',
+  },
+  {
+    id: 'openBetween', title: '자소 사이', state: 'done', stateLabel: '기각 · 10-02 AI',
+    question: '자소 사이 틈도 벌릴까',
+    result: '기각. 상자가 고정이라 자소 사이는 벌릴 자리가 구조적으로 없다 — 이웃을 피해 밀면 제 속공간이 눌린다(840 · 900: 닿음 −174 대신 막힘 1,656 → 1,851의 나쁜 거래, 보호 제약을 넣어도 남음). 자소 사이는 지금 떼기(깎기)를 유지하고, 벌리기는 자소 안만.',
+  },
+  {
+    id: 'openPattern', title: '패턴', state: 'partial', stateLabel: '840 확인 · 조합표 대기',
+    question: '400 이하 동일 · 중간 굵기가 매끈한가',
+    result: '400 = 기준과 동일(이동 0, 단위 테스트 보장). 840, 고친 판(제품 → 벌리기, 닿음 · 안닿음 · 막힘 합): 600 = 1,306 → 1,257, 700 = 1,873 → 1,825, 900 = 2,665 → 2,563 · 막힘만 900 = 1,845 → 1,699. 600 막힘 +17은 경계선 출렁임(풀림 73 · 새막힘 82) — 합계로는 개선. 가로 3 × 굵기 4 조합표는 눈 ② 채택 뒤(G2).',
+  },
+  {
+    id: 'openGate', title: '통과선 · 제품', state: 'wait', stateLabel: 'G3 대기',
+    question: '제품 굵기 막대에서 튀는 굵기가 있나 (눈 ③)',
+    result: '눈 ② 채택 뒤 제품 부착(같은 `counterKeep` 입구) → 굵기 막대 훑기 → 네모꼴 범위 · 굵기 한계 표.',
+  },
+]
+/** 10-01 역추론 플랜의 단계(닫힘). 결정과 그림은 그대로 두고 아래 보관함에서 연다. */
+const FIT_STEPS: Step[] = [
   {
     id: 'ruler', title: '같은 자', state: 'done', stateLabel: '닫힘 · 10-01 눈 ①',
     question: '프로브가 줄기를 제대로 짚었나 (눈 ①)',
@@ -52,7 +85,7 @@ const STEPS: Step[] = [
     result: '최종 손잡이로 400 = 기준과 동일(0 · 0 · 35.5%), 600 · 700 · 900이 매끈하게 늘고 턱 없음(900 닿음 1,697 · 막힘 381 · 검기 50.9%). 100은 모든 층이 꺼져 지금과 같다. 조합표(가로 3 × 굵기 4)도 전부 지금 제품보다 좋아짐 — G2 닫힘.',
   },
   {
-    id: 'gate', title: '통과선 · 제품', state: 'now', stateLabel: '눈 ③',
+    id: 'gate', title: '통과선 · 제품', state: 'wait', stateLabel: '눈 ③ → 벌리기 플랜으로',
     question: '제품 굵기 막대에서 튀는 굵기가 있나 (눈 ③)',
     result: '제품에 붙었다(10-02): 모든 화면 · OTF가 같은 입구에서 두께를 굽고, 스위치는 굵기 막대 아래 `자동 보정`(기본 켜짐, 400 이하는 그대로). 첫 훑기 "튀는 글자 많음" → 자동 골라내기(weight-outlier-report)로 원인 확인, 합성 바닥 0.8 채택(튀는 글자 6,011 → 0자). 남은 확인 = 굵기 막대 다시 훑기, 그 뒤 네모꼴 범위와 굵기 한계 표.',
     decision: '사용자 10-02 눈 ③ 첫 판: 바닥 0.8 > 지금 그대로.',
@@ -103,6 +136,10 @@ const OPEN_QUESTIONS = [
 ]
 /** ② 결정(B′): 하한선 0.5, 쌓인 가로줄기 틈 0.25. ③부터는 이걸 깔고 본다. */
 const FLOOR_DECIDED = { floorRatio: 0.5, horizontalRatio: 0.25 } as const
+/** 지금 제품(10-02): 무보정 두께 + 자소 사이 떼기 0.25 + 합성 바닥 0.8. `minScale: 1` = 자소 안 층 끔. */
+const PRODUCT_CONDITION = { floorRatio: 0.5, horizontalRatio: 0.25, minScale: 1, between: 0.25, totalMin: 0.8 } as const
+/** 벌리기 후보(2026-10-02 플랜): 제품 층 위에 자소 안 벌리기 0.25. */
+const OPEN_CONDITION = { ...PRODUCT_CONDITION, open: 0.25 } as const
 /** ③ 가로줄기 후보: 400 대비 늘어난 두께 가운데 가로줄기가 받는 몫. 이름은 굵기 900에서의 가로줄기 배율(세로줄기는 ×1.95 그대로). */
 // 노토(×1.88)는 지금(×1.95)과 5u 차이라 눈으로 안 갈렸다(10-01 사용자 "두 개 똑같음") — 눈에 보이는 간격(20~30u)으로 잡는다.
 const HORIZONTAL_SHARES = [
@@ -116,7 +153,7 @@ const HORIZONTAL_SHARES = [
  * 답은 채팅으로 받는다 — 선택지를 누르면 답 문장이 복사된다. 물을 게 없으면 `null`.
  */
 /** `floorRatio`: 선택지 그림을 그릴 하한선 비율. `undefined`면 그림 없이 글만. */
-interface QuestionOption { label: string; detail: string; recommended?: boolean; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; between?: number; totalMin?: number }
+interface QuestionOption { label: string; detail: string; recommended?: boolean; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; between?: number; totalMin?: number; open?: number; openBetween?: boolean }
 /** `compare`가 있으면 그 조건들을 위에 줄줄이 그리고, 선택지는 그림 없는 답 단추(하나 고르기)다. 없으면 선택지끼리 이상형 월드컵. */
 interface Question { id: string; step: StepId; title: string; body: string; options: QuestionOption[]; compare?: { label: string; condition: Omit<Condition, 'padding' | 'weight'> }[] }
 /**
@@ -150,13 +187,27 @@ const GATE_TOTAL_MIN_QUESTION: Question = {
     { label: '지금 그대로', floorRatio: 0.5, horizontalRatio: 0.25, horizontalShare: 0.526, minScale: 0.8, between: 0.25, detail: '닿음 1,697 · 막힘 381 · 검기 50.9% — 대신 눌린 획이 400 두께까지 내려간다(제 목표의 51%).' },
   ],
 }
-/** 눈 ③ 첫 판 닫힘(10-02 사용자: 바닥 0.8) — 제품 기본값 `DEFAULT_TOTAL_MINSCALE`. 남은 것 = 굵기 막대 다시 훑기. */
-const QUESTION: Question | null = null
+/**
+ * 벌리기 플랜(2026-10-02) 눈 ② 둘째 판 — 첫 판(v1)은 지금 제품 승: 획이 최대 40u 통째로 움직여 글자꼴이 망가졌다(뷁의 ㅂ이 ㅁ으로).
+ * 고친 것 둘: ① 이동 상한 = 자소 상자의 6%(뷁 ㅂ 40 → 14u), ② 엄격 보호 = 어떤 획 쌍도 그냥 둔 것보다 가까워지지 않는다(공짜 자리만 쓴다).
+ * 자소 사이 벌리기는 기각(10-02 AI): 상자 고정이라 벌릴 자리가 구조적으로 없다 — 사이는 지금 떼기 유지.
+ */
+const OPEN900_QUESTION: Question = {
+  id: 'open900-capped-2026-10-02',
+  step: 'open',
+  title: '좁은 틈 벌리기(고친 판) — 이제 켜도 돼요?',
+  body: '첫 판에서 망가뜨렸던 과벌림을 고쳤다: 획 이동은 자소 상자의 6%까지(뷁의 ㅂ 가로줄기 40 → 14u), 어떤 획 사이도 그냥 둔 것보다 가까워지지 않는다. 두께는 안 깎아 진하기 그대로.',
+  options: [
+    { label: '벌리기 켬 (고친 판)', ...OPEN_CONDITION, recommended: true, detail: '840 · 900: 막힘 1,845 → 1,699 · 자소 사이 닿음 −78 · 자소 안 닿음 −167 · 검기 그대로. 뷁 · 한이 망가지는지 꼭 봐 주세요.' },
+    { label: '지금 제품 (떼기만)', ...PRODUCT_CONDITION, detail: '무보정 두께 + 자소 사이 떼기 + 합성 바닥 0.8. 막힘 1,845.' },
+  ],
+}
+const QUESTION: Question | null = OPEN900_QUESTION
 void FIT900_QUESTION
 void GATE_TOTAL_MIN_QUESTION
 const QUESTION_SEEN_KEY = 'counter-lab-question-seen'
-/** 질문 그림에 같이 그리는 빽빽한 글자(자소별 색). 눈 ③ 판은 눌린 획이 또렷한 글자로. */
-const QUESTION_CHARS = ['곇', '궨', '긼', '빼', '한']
+/** 질문 그림에 같이 그리는 빽빽한 글자(자소별 색). 벌리기 둘째 판: 첫 판에서 망가졌던 글자(뷁 ㅂ · 한 ㅎ)를 꼭 본다. */
+const QUESTION_CHARS = ['빼', '뷁', '넓', '긼', '한']
 
 /** 모든 단계 공통 확인 문장. 밀도 차이가 큰 글자를 섞어 전체 농도(회색도)가 고른지 본다. */
 const GRAY_SENTENCE = ['뷁', '를', '빼', '쫓', '이']
@@ -253,8 +304,8 @@ const pathOf = (paths: PathsD) => paths.map((path) => `M${path.map((p) => `${p.x
 
 /** 글자 하나를 그 조건으로 재 둔 것. */
 interface Measured { ink: GlyphInk; verdict: InkVerdict; scales?: Map<string, number> }
-/** `horizontalShare`: ③ 가로줄기가 받는 두께 몫(하한선보다 먼저 얹는다). */
-type Condition = { padding: Padding; weight: number; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; between?: number; totalMin?: number }
+/** `horizontalShare`: ③ 가로줄기가 받는 두께 몫(하한선보다 먼저 얹는다). `open`: 벌리기 층(2026-10-02 플랜) — 좁은 틈만 획 중심 이동, `openBetween`이면 자소 사이도. */
+type Condition = { padding: Padding; weight: number; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; between?: number; totalMin?: number; open?: number; openBetween?: boolean }
 
 /** 모델 상자 해석기. 레이아웃 Δ가 바뀌면 다시 만든다. */
 function usePlacementResolver(): GlyphPlacementResolver | null {
@@ -279,8 +330,10 @@ function useFontVersion(): unknown[] {
 
 function measureOf(resolver: GlyphPlacementResolver, char: string, condition: Condition, reference: GlyphReference | undefined): Measured | null {
   // 층은 조건이 손으로 얹는다 — 제품 속공간 지키기는 꺼서 이중 적용을 막는다.
-  const data = collectGlyphDataWithPlacement(char, resolver, { padding: condition.padding, weight: condition.weight, counterKeep: false })
-  if (!data) return null
+  const collected = collectGlyphDataWithPlacement(char, resolver, { padding: condition.padding, weight: condition.weight, counterKeep: false })
+  if (!collected) return null
+  // 벌리기 먼저(중심 이동), 깎기 층은 벌린 뒤 남은 자리에만 얹는다 — 전수 테스트와 같은 순서.
+  const data = condition.open ? withGapOpening(collected, condition.open, condition.openBetween).data : collected
   const share = condition.horizontalShare ?? 1
   const kept = condition.floorRatio === undefined ? undefined : withCounterKeep(data, { fixed: FLOOR_FIXED, ratio: condition.floorRatio, horizontalRatio: condition.horizontalRatio }, share, condition.minScale, condition.between, 0, condition.totalMin)
   const ink = measureGlyphInk(kept?.data ?? withHorizontalShare(data, share))
@@ -471,14 +524,14 @@ type Picks = Record<string, string>
 const BASE_LABEL = '지금'
 
 /** 한 조건의 글자 그림: 회색도 문장 + 막히기 쉬운 글자, 둘 다 검정(사용자 10-01: 검정이 잘 보인다). 글자를 누르면 "이 글자는 이 카드가 낫다"로 고른다. */
-function ConditionPreview({ context, label, floorRatio, horizontalRatio, horizontalShare, minScale, between, totalMin, size, picks, onPick }: { context: PreviewContext; label: string; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; between?: number; totalMin?: number; size: number; picks: Picks; onPick: (char: string, label: string) => void }) {
+function ConditionPreview({ context, label, floorRatio, horizontalRatio, horizontalShare, minScale, between, totalMin, open, openBetween, size, picks, onPick }: { context: PreviewContext; label: string; floorRatio?: number; horizontalRatio?: number; horizontalShare?: number; minScale?: number; between?: number; totalMin?: number; open?: number; openBetween?: boolean; size: number; picks: Picks; onPick: (char: string, label: string) => void }) {
   const { resolver, padding, weight, version } = context
   const inks = useMemo(() => ({
-    gray: GRAY_SENTENCE.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale, between, totalMin }, undefined)),
-    dense: QUESTION_CHARS.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale, between, totalMin }, undefined)),
+    gray: GRAY_SENTENCE.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale, between, totalMin, open, openBetween }, undefined)),
+    dense: QUESTION_CHARS.map((char) => measureOf(resolver, char, { padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale, between, totalMin, open, openBetween }, undefined)),
   }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [resolver, padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale, between, ...version])
+  [resolver, padding, weight, floorRatio, horizontalRatio, horizontalShare, minScale, between, open, openBetween, ...version])
   const glyph = (char: string, ink: Measured | null, index: number, kind: 'plain' | 'solid') => ink && (
     <button key={index} type="button" className={styles.pickGlyph} aria-pressed={picks[char] === label} aria-label={`${char} — ${label}이 낫다`} onClick={() => onPick(char, label)}>
       <InkGlyph ink={ink.ink} size={size} plain={kind === 'plain'} solid={kind === 'solid'} />
@@ -553,7 +606,7 @@ function CupPair({ question, context, left, right }: { question: Question; conte
   const chars = useMemo(() => [...new Set([...GRAY_SENTENCE, ...CHARS, ...QUESTION_CHARS])], [])
   const inks = useMemo(() => [left, right].map((index) => {
     const option = question.options[index]
-    return chars.map((char) => measureOf(resolver, char, { padding, weight, floorRatio: option.floorRatio, horizontalRatio: option.horizontalRatio, horizontalShare: option.horizontalShare, minScale: option.minScale, between: option.between, totalMin: option.totalMin }, undefined))
+    return chars.map((char) => measureOf(resolver, char, { padding, weight, floorRatio: option.floorRatio, horizontalRatio: option.horizontalRatio, horizontalShare: option.horizontalShare, minScale: option.minScale, between: option.between, totalMin: option.totalMin, open: option.open, openBetween: option.openBetween }, undefined))
   }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [question, left, right, resolver, padding, weight, ...version])
@@ -637,7 +690,7 @@ function QuestionCard({ question, context, picks, onPick, cup, onCup, popup = fa
   const chars = [...new Set([...GRAY_SENTENCE, ...QUESTION_CHARS])]
   const picked = chars.filter((char) => picks[char])
   const summary = picked.map((char) => `${char} ${picks[char]}`).join(' · ')
-  const hasPreview = context && !question.compare && question.options.some((option) => option.floorRatio !== undefined || option.horizontalShare !== undefined)
+  const hasPreview = context && !question.compare && question.options.some((option) => option.floorRatio !== undefined || option.horizontalShare !== undefined || option.open !== undefined)
   const card = (
     <div className={popup ? styles.askPopup : styles.ask} role={popup ? 'dialog' : 'region'} aria-modal={popup || undefined} aria-label="AI가 묻는 것" data-testid={popup ? 'counter-question-popup' : 'counter-question'}>
       <span className={styles.askTag}>질문 · 답해 주세요</span>
@@ -663,7 +716,7 @@ function QuestionCard({ question, context, picks, onPick, cup, onCup, popup = fa
         {question.options.map((option) => (
           <div key={option.label} className={styles.askOption} data-rec={option.recommended || undefined}>
             <b>{option.label}{option.recommended ? ' · 추천' : ''}</b>
-            {context && (option.floorRatio !== undefined || option.horizontalShare !== undefined) && <ConditionPreview context={context} label={option.label} floorRatio={option.floorRatio} horizontalRatio={option.horizontalRatio} horizontalShare={option.horizontalShare} minScale={option.minScale} between={option.between} totalMin={option.totalMin} size={size} picks={picks} onPick={onPick} />}
+            {context && (option.floorRatio !== undefined || option.horizontalShare !== undefined || option.open !== undefined) && <ConditionPreview context={context} label={option.label} floorRatio={option.floorRatio} horizontalRatio={option.horizontalRatio} horizontalShare={option.horizontalShare} minScale={option.minScale} between={option.between} totalMin={option.totalMin} open={option.open} openBetween={option.openBetween} size={size} picks={picks} onPick={onPick} />}
             <small>{option.detail}</small>
             <button type="button" onClick={() => answer(option.label)}>이걸로 통째로</button>
           </div>
@@ -682,6 +735,7 @@ function QuestionCard({ question, context, picks, onPick, cup, onCup, popup = fa
 
 /** 단계마다 회색도 줄에 더 그릴 후보. */
 function grayCandidatesOf(step: StepId): GrayCandidate[] {
+  if (step === 'open') return [{ label: '지금 제품', condition: PRODUCT_CONDITION }, { label: '벌리기 켬', condition: OPEN_CONDITION }]
   if (step === 'floor') return [{ label: 'B′ (결정)', condition: FLOOR_DECIDED }]
   if (step === 'horizontal') return [{ label: 'B′만', condition: FLOOR_DECIDED }, ...HORIZONTAL_SHARES.map((item) => ({ label: item.label, condition: { ...FLOOR_DECIDED, horizontalShare: item.share } }))]
   return []
@@ -792,7 +846,7 @@ function ProbePanel() {
 }
 
 export function CounterProgressMap() {
-  const [selected, setSelected] = useState<StepId>(() => STEPS.find((step) => step.state === 'now')?.id ?? 'ruler')
+  const [selected, setSelected] = useState<StepId>(() => STEPS.find((step) => step.state === 'now')?.id ?? 'rule')
   const padding = useLayoutStore((state) => state.globalPadding)
   const storedWeight = useGlobalStyleStore((state) => state.style.weight)
   const weight = storedWeight > 400 ? storedWeight : FALLBACK_WEIGHT
@@ -800,7 +854,7 @@ export function CounterProgressMap() {
   const resolver = usePlacementResolver()
   const version = useFontVersion()
   const references = useReferences(resolver, version)
-  const step = [...STEPS, ...LEGACY_STEPS].find((item) => item.id === selected)!
+  const step = [...STEPS, ...FIT_STEPS, ...LEGACY_STEPS].find((item) => item.id === selected)!
   const [picks, setPicks] = useState<Picks>({})
   const [cup, setCup] = useState<Cup>(() => startCup(QUESTION?.options.length ?? 0))
   // 같은 카드를 다시 누르면 고른 걸 푼다.
@@ -852,7 +906,12 @@ export function CounterProgressMap() {
         </div>
         {resolver && <GraySentence resolver={resolver} padding={padding} weight={weight} candidates={grayCandidatesOf(selected)} version={version} />}
         {(selected === 'floor' || selected === 'horizontal' || selected === 'split') && <p className={styles.condition}>그림 조건: 가로 {width} · 굵기 {weight}{storedWeight <= 400 ? ` (지금 굵기 ${storedWeight}는 볼 게 없어 ${FALLBACK_WEIGHT}로 그림)` : ''} — 위 막대로 바꾼다.</p>}
-        {selected === 'ruler' ? <ProbePanel />
+        {selected === 'rule' ? <Pending text="확인 그림은 숫자다 — 노토 400에 규칙을 적용해 900 눌린 틈을 예측하면 오차 6.0u(무규칙 39.6u). `python3 scripts/reference-lab/extract_gap_rule.py`로 다시 본다." />
+          : selected === 'open' ? <Pending text="위 질문 카드의 라이트박스(눈 ①)와 월드컵(눈 ②)으로 본다. 회색도 문장 줄에도 두 후보가 같이 그려져 있다." />
+          : selected === 'openBetween' ? <Pending text="기각 근거는 전수 숫자 — 자소 사이까지 벌리면 840 · 900 막힘 1,618 → 1,857(보호 제약 전 2,102). 떼기(깎기)가 사이를 맡는다." />
+          : selected === 'openPattern' ? <Pending text="400 = 기준과 점 하나까지 동일. 600 · 700 · 900 전수는 진행 기록의 표를 본다." />
+          : selected === 'openGate' ? <Pending text="눈 ② 채택 뒤 제품에 붙이고 굵기 막대를 훑는다(눈 ③). 그 뒤 네모꼴 범위 · 굵기 한계 표." />
+          : selected === 'ruler' ? <ProbePanel />
           : selected === 'error' ? <Pending text="아직 안 함. ① 자가 확인되면 글자마다 두께 · 속공간 · 상자 밀림 · 검기 차이를 점수 하나로 접는다." />
           : selected === 'fit900' ? <Pending text="아직 안 함. ② 점수가 생기면 손잡이를 격자로 훑어 900을 맞추고, 월드컵(숫자 맞춤 대 B′ + ×1.5)으로 묻는다." />
           : selected === 'pattern' ? <Pending text="아직 안 함. ③에서 900이 정해지면 100으로 바깥을 확인하고, 중간 굵기는 예측 검증용으로 남긴다." />
@@ -866,6 +925,20 @@ export function CounterProgressMap() {
                   : selected === 'split' ? <PushPanel resolver={resolver} padding={padding} weight={weight} version={version} />
                     : <FloorPanel resolver={resolver} references={references} padding={padding} weight={weight} version={version} />}
       </div>
+
+      <details className={styles.open}>
+        <summary>역추론 단계 (10-01 플랜 — 닫힘, 결정과 그림 보관)</summary>
+        <ol className={styles.steps}>
+          {FIT_STEPS.map((item, index) => (
+            <li key={item.id}>
+              <button type="button" aria-pressed={item.id === selected} data-state={item.state} onClick={() => setSelected(item.id)} data-testid={`counter-step-${item.id}`}>
+                <span className={styles.stepTop}><em>{index + 1}</em><strong>{item.title}</strong><small>{item.stateLabel}</small></span>
+                <span className={styles.question}>판단 · {item.question}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </details>
 
       <details className={styles.open}>
         <summary>지난 손잡이 단계 (10-01 뒤집힘 전 — 결정은 그대로, 그림 보관)</summary>
