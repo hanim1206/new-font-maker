@@ -15,12 +15,13 @@ export default class TestRunPlaywrightReporter implements Reporter {
     return false
   }
 
-  onBegin(config: FullConfig, suite: Suite) {
+  onBegin(_config: FullConfig, suite: Suite) {
     if (process.argv.includes('--list')) return
     const kind = process.env.TEST_RUN_KIND === 'smoke' ? 'smoke' : 'e2e'
     this.run = openTestRun(kind, suite.allTests().map((test) => ({
       id: test.id,
-      file: path.relative(config.rootDir, test.location.file),
+      // 레포 기준 경로(단위 테스트와 같게). 화면은 파일 이름만 보인다.
+      file: path.relative(process.cwd(), test.location.file),
       // ['', 프로젝트, 파일, …describe, 제목]
       title: test.titlePath().slice(3).join(' › ') || test.title,
     })), { full: kind === 'smoke' || isFullRun(process.argv.slice(2)) })

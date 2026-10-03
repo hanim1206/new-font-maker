@@ -5,6 +5,7 @@ import { ChoiceGroup, ChoiceItem } from '@/components/ui/choice-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TEST_RUNS_API, adminCall } from './adminApi'
+import { noteTextOf } from './testNotes'
 import { TEST_KINDS, elapsedText, groupsOf, runStateOf, summaryOf } from './testRunModel'
 import type { ItemStatus, RunState, TestKind, TestRunItem, TestRunView } from './testRunModel'
 
@@ -30,7 +31,7 @@ function StatusIcon({ status }: { status: ItemStatus }) {
 }
 
 function ItemRow({ item, showFile }: { item: TestRunItem; showFile?: boolean }) {
-  return <li className="flex flex-col gap-1 py-1.5" data-status={item.status}>
+  return <li className="flex flex-col gap-1 py-1.5" data-status={item.status} title={noteTextOf(item.file)}>
     <div className="flex items-center gap-2 text-sm">
       <StatusIcon status={item.status} />
       <span className={item.status === 'running' ? 'min-w-0 flex-1 font-semibold' : 'min-w-0 flex-1'}>
@@ -87,9 +88,9 @@ function RunPanel({ run, others, onPick }: { run: TestRunView; others: TestRunVi
         // 단위 테스트는 갈래마다 접어 두고, 도는 중 · 실패만 펼친다. 누르면 접고 편다.
         const open = run.kind !== 'unit' || failed || busy
         return <details key={group.name} open={open} className="rounded-lg bg-surface-2 px-3.5 py-2">
-          <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
+          <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold" title={run.kind === 'unit' ? undefined : noteTextOf(group.name)}>
             {failed ? <StatusIcon status="failed" /> : busy ? <StatusIcon status="running" /> : done === group.items.length ? <StatusIcon status="passed" /> : <StatusIcon status="pending" />}
-            {run.kind === 'unit' ? <span className="min-w-0 flex-1 truncate">{group.name}</span> : <code className="min-w-0 flex-1 truncate">{group.name}</code>}
+            {run.kind === 'unit' ? <span className="min-w-0 flex-1 truncate">{group.name}</span> : <code className="min-w-0 flex-1 truncate">{group.name.split('/').pop()}</code>}
             <span className="shrink-0 text-xs font-normal tabular-nums text-text-dim-5">{done} / {group.items.length}</span>
           </summary>
           <ul className="mt-1 flex flex-col">{group.items.map((item) => <ItemRow key={item.id} item={item} showFile={run.kind === 'unit'} />)}</ul>
