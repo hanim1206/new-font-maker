@@ -32,7 +32,7 @@ export default defineConfig({
     // 관리자 `공지` 메뉴(만들기 · 게시 · 이미지 올리기). 개발 서버에만 붙는다.
     announcementAdminApiPlugin(fileURLToPath(new URL('.', import.meta.url))),
     VitePWA({
-      // 편집 중에 저절로 바뀌지 않게. 새 버전은 알림(`appUpdate.ts`) 뒤 사용자가 새로고침한다.
+      // 편집 중에 저절로 바뀌지 않게. 새 버전은 안전한 순간(탭 가림 · 화면 옮김)에 `appUpdate.ts`가 저장 뒤 바꾼다.
       registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {

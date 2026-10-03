@@ -68,3 +68,20 @@ test('같은 폰트는 한 탭에서만: 둘째 탭은 안내, `여기서 열기
   await third.goto(EDITOR)
   await editorReady(third)
 })
+
+test('새 버전은 알림 없이 탭이 가려질 때 저장한 뒤 바뀐다(플랜 `2026-10-03_새-버전-조용히-적용` G0)', async ({ page }) => {
+  await page.goto(`${EDITOR}?fakeUpdate=1`)
+  await editorReady(page)
+  await expect(page.getByTestId('app-notice')).toHaveCount(0)
+  expect(await page.evaluate(() => sessionStorage.getItem('font-maker:fake-update-applied'))).toBeNull()
+
+  // 다른 앱으로 간 척: 탭 가림.
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await expect(page).toHaveURL(new RegExp(`${EDITOR}$`))
+  await editorReady(page)
+  expect(await page.evaluate(() => sessionStorage.getItem('font-maker:fake-update-applied'))).not.toBeNull()
+  await expect(page.getByTestId('app-notice')).toHaveCount(0)
+})
