@@ -6,6 +6,7 @@ import { BUTTON_SIZES, BUTTON_VARIANTS, Button } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { NoticeIcon } from './components/ui/notice-icon'
+import { Pressable } from './components/ui/pressable'
 import { Field, RangeBar } from './components/ui/range'
 import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs'
 import { RangeTicks } from './RangeTicks'
@@ -32,6 +33,7 @@ export const LIBRARY_GROUPS: LibraryGroup[] = [
   { id: 'range', label: '막대', section: '부품', note: '조절 항목과 채움 막대.' },
   { id: 'checkbox', label: '체크', section: '부품', note: '켬 · 끔.' },
   { id: 'notice', label: '알림', section: '부품', note: '화면 아래 알림과 저장 토스트.' },
+  { id: 'pressable', label: '누르는 덩어리', section: '부품', note: '카드 · 글자 칸 · 목록 줄 · 특수 단추. 공용 생김새 없이 화면 CSS가 그린다 — 통일 후보.' },
 ]
 
 export interface LibraryItem {
@@ -231,6 +233,30 @@ export function libraryItems(): LibraryItem[] {
     { id: 'checkbox.primary', group: '체크', title: '주색 체크', note: 'shadcn 기본 체크. 지금 앱 화면에서는 안 쓴다.', selector: '[data-slot="checkbox"][data-tone="primary"]', screens: [], story: () => <DemoCheckbox tone="primary" /> },
     { id: 'notice.bar', group: '알림', title: '어두운 막대(단추 하나)', note: '토스식. 왼쪽 동그라미 아이콘, 파란 글자 단추. 오류도 바탕은 그대로 아이콘만 빨강. 저장 토스트도 같은 막대.', selector: '[data-testid="app-notice"]', screens: [{ name: '대시보드에 띄우기', route: '/dashboard', show: 'notice-bar' }], story: () => <DemoNotice card={false} /> },
     { id: 'notice.card', group: '알림', title: '흰 카드(단추 둘)', note: '하단 드로어를 줄인 카드. 큰 단추 검정 · 회색.', selector: '[data-testid="app-notice"]', screens: [{ name: '대시보드에 띄우기', route: '/dashboard', show: 'notice-card' }], story: () => <DemoNotice card /> },
+    { id: 'pressable.block', group: '누르는 덩어리', title: 'Pressable', note: '브라우저 단추 생김새만 지운 것. 모양은 쓰는 화면의 CSS가 토큰으로 그린다. 대시보드 카드 · 자모 칸 · 도구 줄 · 문장 글자 등 140곳쯤.', selector: '[data-slot="pressable"]', screens: [{ name: '대시보드', route: '/dashboard' }, { name: '자소', route: '/workspace/jamo' }], story: () => <Samples items={[
+      { label: '예: 자모 칸(대시보드)', node: <Pressable className="grid size-16 place-items-center rounded-lg bg-surface-2 text-28">ㄱ</Pressable> },
+      { label: '예: 목록 줄', node: <Pressable className="w-56 rounded-md px-3 py-2 text-left text-14 hover:bg-surface-2">내 폰트 2</Pressable> },
+    ]} /> },
   )
   return items
+}
+
+/** 미리보기에서 누른 요소 → 라이브러리 항목 번호들(단추는 크기 · 강조 둘). 공용 부품이 아니면 빈 배열. */
+export function itemIdsOfElement(element: Element | null): string[] {
+  const slot = element?.closest('[data-slot], [data-testid="app-notice"]')
+  if (!slot) return []
+  if (slot.getAttribute('data-testid') === 'app-notice') return [slot.getAttribute('data-layout') === 'card' ? 'notice.card' : 'notice.bar']
+  const kind = slot.getAttribute('data-slot')
+  const variant = slot.getAttribute('data-variant')
+  if (kind === 'button') return [`button.size.${slot.getAttribute('data-size') ?? 'default'}`, `button.variant.${variant ?? 'default'}`]
+  if (kind === 'tabs') return [`tabs.${variant ?? 'default'}`]
+  if (kind === 'choice-group') return [variant === 'tile' ? (slot.getAttribute('data-size') === 'sm' ? 'choice.tile-sm' : 'choice.tile') : `choice.${variant}`]
+  if (kind === 'range-bar' || kind === 'field') return ['range.field']
+  if (kind === 'checkbox') return [`checkbox.${slot.getAttribute('data-tone') ?? 'primary'}`]
+  if (kind === 'pressable') {
+    // 알림 막대 안의 글자 단추는 알림으로 본다.
+    const notice = slot.closest('[data-testid="app-notice"]')
+    return notice ? itemIdsOfElement(notice) : ['pressable.block']
+  }
+  return []
 }

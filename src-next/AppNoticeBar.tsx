@@ -20,7 +20,7 @@ export function AppNoticeBar() {
   const card = actions.length >= 2
   const close = notice.dismissable && <Pressable type="button" className={styles.close} onClick={() => dismissAppNotice(kind)} aria-label="알림 닫기"><X aria-hidden="true" /></Pressable>
   return (
-    <div className={card ? styles.card : styles.bar} data-tone={notice.tone} data-kind={kind} role={notice.tone === 'error' ? 'alert' : 'status'} data-testid="app-notice">
+    <div className={card ? styles.card : styles.bar} data-tone={notice.tone} data-kind={kind} data-layout={card ? 'card' : 'bar'} role={notice.tone === 'error' ? 'alert' : 'status'} data-testid="app-notice">
       <NoticeIcon tone={notice.tone} className={styles.icon} />
       <span className={styles.message}>{notice.message}</span>
       {card

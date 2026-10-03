@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, ChevronRight, Copy } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Copy, MousePointerClick, X } from 'lucide-react'
 import { Button } from './components/ui/button'
-import { FILE_SCREEN, LIBRARY_GROUPS, libraryItems } from './styleLibrary'
+import { FILE_SCREEN, LIBRARY_GROUPS, itemIdsOfElement, libraryItems } from './styleLibrary'
 import type { LibraryGroup, LibraryItem, LibraryScreen } from './styleLibrary'
 import { applyThemePreview, readThemePreview, writeThemePreview } from './themePreview'
 import type { ThemePreview } from './themePreview'
@@ -81,7 +81,13 @@ export function StyleGuideLabPage() {
   const groupOf = (entry: LibraryItem) => LIBRARY_GROUPS.find((group) => group.label === entry.group)!
   const currentGroup = viewGroup ?? groupOf(item)
   const [openGroup, setOpenGroup] = useState<string | null>(currentGroup.id)
-  const select = (id: string) => { setSelectedId(id); window.history.replaceState(null, '', `#${id}`) }
+  const select = (id: string) => {
+    setSelectedId(id)
+    window.history.replaceState(null, '', `#${id}`)
+    // 항목을 열면 왼쪽 목록도 그 묶음을 펼친다(칩 · 카드에서 왔을 때).
+    const entry = items.find((candidate) => candidate.id === id)
+    if (entry) setOpenGroup(groupOf(entry).id)
+  }
   const pickGroup = (group: LibraryGroup) => {
     // 이미 보고 있는 묶음을 다시 누르면 접기만 한다.
     if (viewGroup?.id === group.id && openGroup === group.id) { setOpenGroup(null); return }
@@ -126,24 +132,66 @@ export function StyleGuideLabPage() {
     }
     setFound(screen.hint ? `안 보여요 — ${screen.hint}` : '이 화면에서 지금은 안 보여요')
   }, [])
-  const go = (screen: LibraryScreen) => {
+  const go = (screen: LibraryScreen, selector = item.selector) => {
     if (!screen.route) return
     const token = Date.now()
-    pending.current = { screen, selector: item.selector, token }
+    pending.current = { screen, selector, token }
     setFound('찾는 중…')
-    const sameRoute = frame.current?.contentWindow?.location.pathname + (frame.current?.contentWindow?.location.search ?? '') === screen.route
-    if (sameRoute) void findIn(screen, item.selector, token)
+    const location = frame.current?.contentWindow?.location
+    const sameRoute = location && location.pathname + location.search === screen.route
+    if (sameRoute) void findIn(screen, selector, token)
+    else if (frameSrc === screen.route && frame.current?.contentWindow) frame.current.contentWindow.location.assign(screen.route)
     else setFrameSrc(screen.route)
   }
+
+  // 미리보기에서 누른 부품 → 왼쪽 위에 칩으로 쌓는다(최근 것 먼저, 10개). 앱은 원래대로 동작한다.
+  const [steps, setSteps] = useState<{ key: number; ids: string[]; route: string }[]>([])
+  const watchClicks = () => {
+    const doc = frame.current?.contentDocument
+    if (!doc || doc.documentElement.dataset.styleGuideWatch) return
+    doc.documentElement.dataset.styleGuideWatch = '1'
+    doc.addEventListener('click', (event) => {
+      const ids = itemIdsOfElement(event.target as Element)
+      if (!ids.length) return
+      const win = frame.current?.contentWindow
+      const route = win ? win.location.pathname + win.location.search : frameSrc
+      // 시간 순으로 오른쪽에 붙인다. 같은 것을 다시 누르면 맨 뒤로 옮긴다.
+      setSteps((list) => [...list.filter((step) => step.ids.join() !== ids.join() || step.route !== route), { key: Date.now(), ids, route }].slice(-10))
+    }, true)
+  }
+  const openStep = (id: string, route: string) => {
+    const entry = items.find((candidate) => candidate.id === id)
+    if (!entry) return
+    select(id)
+    go({ name: '누른 화면', route }, entry.selector)
+  }
+  const titleOf = (id: string) => items.find((entry) => entry.id === id)?.title ?? id
+
   const onFrameLoad = () => {
+    watchClicks()
     const job = pending.current
     if (job) window.setTimeout(() => void findIn(job.screen, job.selector, job.token), 600)
   }
-  useEffect(() => { setFound(null); pending.current = null }, [selectedId])
+  // 앱 안에서 화면을 옮겨도(같은 문서 · pushState) 클릭 감시는 그대로다. 새 문서가 뜨면 load에서 다시 붙인다.
+  useEffect(() => { setFound(null) }, [selectedId])
 
   const screens = screensOf(item, usage)
 
-  return <main className="grid h-dvh grid-cols-[220px_minmax(0,1fr)_420px] bg-background text-foreground" data-testid="style-guide-lab">
+  return <main className="grid h-dvh grid-cols-[220px_minmax(0,1fr)_420px] grid-rows-[auto_minmax(0,1fr)] bg-background text-foreground" data-testid="style-guide-lab">
+    <div className="col-span-2 flex min-h-[52px] items-center gap-2 overflow-x-auto border-b border-border-subtle bg-surface px-4 py-2" data-testid="style-guide-steps">
+      <MousePointerClick className="size-4 shrink-0 text-text-dim-5" aria-hidden="true" ref={(node) => { node?.parentElement?.scrollTo({ left: node.parentElement.scrollWidth }) }} />
+      {steps.length === 0
+        ? <span className="text-12 text-text-dim-5">오른쪽 미리보기에서 부품을 누르면 여기에 무엇인지 쌓인다</span>
+        : <>{steps.map((step, index) => <span key={step.key} className="flex shrink-0 items-center gap-1">
+          {index > 0 && <span className="text-text-dim-6">›</span>}
+          <span className="flex items-center overflow-hidden rounded-full border border-border bg-card text-12 font-semibold">
+            {step.ids.map((id, part) => <button key={id} type="button" onClick={() => openStep(id, step.route)} title={`${id} · ${step.route}`}
+              className={`px-2.5 py-1 hover:bg-surface-3 ${part > 0 ? 'border-l border-border-subtle' : ''} ${!viewGroup && item.id === id ? 'bg-foreground text-surface hover:bg-foreground' : ''}`}>{titleOf(id)}</button>)}
+          </span>
+        </span>)}
+          <Button type="button" variant="ghost" size="sm" className="ml-auto shrink-0" onClick={() => setSteps([])}><X aria-hidden="true" />비우기</Button>
+        </>}
+    </div>
     <nav className="flex min-h-0 flex-col gap-5 overflow-y-auto border-r border-border-subtle bg-surface px-3 py-5" aria-label="부품 목록">
       <div className="px-2"><h1 className="text-18 font-extrabold">스타일가이드</h1><p className="text-12 text-text-dim-5">보기 전용 · 번호로 말해 주세요</p></div>
       {(['토큰', '부품'] as const).map((section) => <div key={section} className="flex flex-col gap-0.5">
@@ -213,7 +261,7 @@ export function StyleGuideLabPage() {
       </div>}
     </section>
 
-    <aside className="flex min-h-0 flex-col items-center gap-2 border-l border-border-subtle bg-surface-3 px-4 py-5">
+    <aside className="row-span-2 row-start-1 col-start-3 flex min-h-0 flex-col items-center gap-2 border-l border-border-subtle bg-surface-3 px-4 py-5">
       <span className="text-12 font-semibold text-text-dim-4">미리보기 · <code>{frameSrc}</code></span>
       <iframe ref={frame} src={frameSrc} onLoad={onFrameLoad} title="미리보기" className="w-[390px] flex-1 rounded-xl border border-border bg-card shadow-md" data-testid="style-guide-preview" />
     </aside>

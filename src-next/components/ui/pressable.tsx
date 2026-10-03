@@ -9,6 +9,7 @@ export const Pressable = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAtt
   <button
     ref={ref}
     type={type}
+    data-slot="pressable"
     className={cn('cursor-pointer appearance-none border-0 bg-transparent p-0 text-inherit [font:inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-default', className)}
     {...props}
   />
