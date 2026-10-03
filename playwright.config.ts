@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process'
 import { defineConfig, devices } from '@playwright/test'
 import { acquireE2eLock } from './scripts/e2e-lock.mjs'
+import { listener } from './scripts/worktree-port.mjs'
 
 // 같은 워크트리의 e2e는 차례로 돈다(서버 · 결과 폴더를 같이 쓴다). 워커와 `--list`는 잠그지 않는다.
 if (!process.env.TEST_WORKER_INDEX && !process.argv.includes('--list')) acquireE2eLock()
@@ -10,6 +11,15 @@ if (!process.env.TEST_WORKER_INDEX && !process.argv.includes('--list')) acquireE
 const port = Number(process.env.E2E_PORT || execSync('node scripts/worktree-port.mjs', { encoding: 'utf8' }).trim())
 process.env.E2E_PORT = String(port)
 const origin = `http://127.0.0.1:${port}`
+
+// 떠 있는 서버를 다시 쓰기 전에 이 워크트리에서 띄운 것인지 본다. 다른 폴더 서버면 그 코드로 테스트하게 되니 멈춘다.
+if (!process.env.TEST_WORKER_INDEX) {
+  const root = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim()
+  const on = listener(port)
+  if (on && on.cwd !== root) {
+    throw new Error(`[e2e] 포트 ${port}를 다른 폴더 서버가 쓰고 있다: ${on.cwd} (pid ${on.pid}). 이 워크트리: ${root}. 그 서버를 끄거나 셸의 E2E_PORT를 지운다.`)
+  }
+}
 
 export default defineConfig({
   testDir: './tests/e2e',

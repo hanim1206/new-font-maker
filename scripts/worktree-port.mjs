@@ -46,7 +46,7 @@ export function worktreePort(root = git('rev-parse --show-toplevel')) {
   return port
 }
 
-function listener(port) {
+export function listener(port) {
   try {
     const pid = execSync(`lsof -nP -iTCP:${port} -sTCP:LISTEN -t`, { encoding: 'utf8' }).trim().split('\n')[0]
     if (!pid) return null
