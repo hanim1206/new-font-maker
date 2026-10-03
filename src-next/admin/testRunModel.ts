@@ -64,21 +64,41 @@ export function runStateOf(run: TestRunView): RunState {
 }
 
 export interface ItemGroup {
-  /** 단위 테스트는 폴더, e2e · 스모크는 스펙 파일. */
+  /** 단위 테스트는 갈래, e2e · 스모크는 스펙 파일. */
   name: string
   items: TestRunItem[]
 }
 
-/** 목록을 묶는다. 처음 나온 순서를 지킨다. */
+/**
+ * 단위 테스트 갈래. 파일 경로를 위에서부터 맞춰 처음 걸리는 갈래로 간다(순서가 중요하다).
+ * 새 테스트가 어디에도 안 걸리면 `기타`로 보인다 — 그때 여기 규칙을 하나 더한다.
+ */
+export const UNIT_CATEGORIES: { name: string; pattern: RegExp }[] = [
+  { name: '지킴이', pattern: /style-guard|single-entry-guard|screen-spec/ },
+  { name: '실험 고정 자료', pattern: /fixture|census|candidate-cache|gold-model|snapshot|calibration|reference-lab|rule-lab|weight-outlier|weight-probe|vertical-vowel-gap|baseline|legacy|candidate-model|candidate-artifact|layout-profile|five-guide/i },
+  { name: '계정 · 베타 · 앱', pattern: /admin\/|account|beta|announce|appUpdate|app-safety|feedback|report-screen|preview-font|theme-preview|edit-colors/ },
+  { name: '출력(OTF)', pattern: /otf|font-|cff|openType|contour|fontWindows|fontRevision|fontIdentity|export|cmap|ink-consumers|rendering-contract/i },
+  { name: '노토 프리셋 · 측정', pattern: /noto|preset|house-layout|corpus|medial-guide/i },
+  { name: '편집 동작 · 저장소', pattern: /stores\/|editor|keyboard|snap|smartGuide|strokeEdit|strokeMigration|thinStem|jamoFrame|jamo-from|debounced|workbench|mobile|Trackpad|scope|propagation|stem-shape-session|Override/i },
+  { name: '레이아웃 · 칸 · 보선', pattern: /layout|grid|rail|context|partGrid|padding|component-fit|closed-bottom|design-?body|ink-gap|medial|jamoConstruction|role|baseMaster|shapeSystem|shapeOutput|literature/i },
+  { name: '그리기 엔진', pattern: /stroke|brush|ink|centerline|stem|counter|body|skeleton|glyph|geometry|beak|weight/i },
+]
+
+export function unitCategoryOf(file: string): string {
+  return UNIT_CATEGORIES.find((category) => category.pattern.test(file))?.name ?? '기타'
+}
+
+/** 목록을 묶는다. 단위 테스트는 갈래 순서, e2e · 스모크는 처음 나온 순서. */
 export function groupsOf(run: TestRun): ItemGroup[] {
   const groups = new Map<string, TestRunItem[]>()
+  if (run.kind === 'unit') for (const { name } of [...UNIT_CATEGORIES, { name: '기타' }]) groups.set(name, [])
   for (const item of run.items) {
-    const name = run.kind === 'unit' ? item.file.slice(0, Math.max(0, item.file.lastIndexOf('/'))) || '.' : item.file
+    const name = run.kind === 'unit' ? unitCategoryOf(item.file) : item.file
     const list = groups.get(name)
     if (list) list.push(item)
     else groups.set(name, [item])
   }
-  return [...groups].map(([name, items]) => ({ name, items }))
+  return [...groups].filter(([, items]) => items.length).map(([name, items]) => ({ name, items }))
 }
 
 /** 걸린 시간 `m:ss`. */

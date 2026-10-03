@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { elapsedText, errorExcerpt, groupsOf, runStateOf, summaryOf } from './testRunModel'
+import { elapsedText, errorExcerpt, groupsOf, runStateOf, summaryOf, unitCategoryOf } from './testRunModel'
 import type { TestRunItem, TestRunView } from './testRunModel'
 
 const item = (file: string, status: TestRunItem['status']): TestRunItem => ({ id: `${file}:${status}`, file, title: file, status })
@@ -23,10 +23,17 @@ describe('테스트 실행 기록', () => {
     expect(summary).toEqual({ total: 5, done: 3, passed: 1, failed: 1, skipped: 1 })
   })
 
-  it('단위 테스트는 폴더로, e2e는 스펙 파일로 묶고 처음 나온 순서를 지킨다', () => {
-    const items = [item('src/b/x.test.ts', 'passed'), item('src/a/y.test.ts', 'passed'), item('src/b/z.test.ts', 'passed')]
-    expect(groupsOf(run({ items })).map((group) => [group.name, group.items.length])).toEqual([['src/b', 2], ['src/a', 1]])
-    expect(groupsOf(run({ kind: 'e2e', items })).map((group) => group.name)).toEqual(['src/b/x.test.ts', 'src/a/y.test.ts', 'src/b/z.test.ts'])
+  it('단위 테스트는 갈래 순서로, e2e는 스펙 파일로 처음 나온 순서대로 묶는다', () => {
+    const items = [item('src/services/cffSubroutinize.test.ts', 'passed'), item('src-next/style-guard.test.ts', 'passed'), item('src/services/fontRevision.test.ts', 'passed')]
+    expect(groupsOf(run({ items })).map((group) => [group.name, group.items.length])).toEqual([['지킴이', 1], ['출력(OTF)', 2]])
+    expect(groupsOf(run({ kind: 'e2e', items })).map((group) => group.name)).toEqual(items.map((one) => one.file))
+  })
+
+  it('갈래는 경로 규칙에서 처음 걸리는 것, 아무것도 안 걸리면 기타', () => {
+    expect(unitCategoryOf('src-next/medial-guide-g0-fixture.test.ts')).toBe('실험 고정 자료')
+    expect(unitCategoryOf('src/stores/workbenchStore.test.ts')).toBe('편집 동작 · 저장소')
+    expect(unitCategoryOf('src/services/notoModelFit.test.ts')).toBe('노토 프리셋 · 측정')
+    expect(unitCategoryOf('src/zzz/unknown.test.ts')).toBe('기타')
   })
 
   it('걸린 시간은 m:ss, 실패 메시지는 색 코드를 빼고 앞 줄만', () => {

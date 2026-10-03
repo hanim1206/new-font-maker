@@ -7,7 +7,7 @@ import { openTestRun } from './testRunStore'
 import type { TestRunRecorder } from './testRunStore'
 
 /**
- * vitest 실행을 관리자 `테스트` 메뉴용 기록으로 남긴다(항목 = 테스트 파일 하나). 기본 출력은 그대로 두고 덧붙인다(`vite.config.ts`).
+ * vitest 실행을 관리자 `테스트` 메뉴용 기록으로 남긴다(항목 = 테스트 파일 하나, 이름 = 맨 위 describe). 기본 출력은 그대로 두고 덧붙인다(`vite.config.ts`).
  * 파일을 모으면 도는 중, 파일 결과가 오면 통과 · 실패, 끝나면 실패 메시지를 채운다.
  */
 export default class TestRunVitestReporter implements Reporter {
@@ -27,7 +27,11 @@ export default class TestRunVitestReporter implements Reporter {
   }
 
   onCollected(files: File[] = []) {
-    for (const file of files) if (!file.result?.state || file.result.state === 'run') this.run?.update(file.filepath, { status: 'running' })
+    for (const file of files) {
+      // 이름은 파일 맨 위 describe(한글). 없으면 파일 이름 그대로.
+      const title = file.tasks.find((task) => task.type === 'suite')?.name
+      this.run?.update(file.filepath, { ...(title ? { title } : {}), ...(!file.result?.state || file.result.state === 'run' ? { status: 'running' as const } : {}) })
+    }
   }
 
   onTaskUpdate(packs: TaskResultPack[]) {

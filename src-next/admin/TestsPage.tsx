@@ -28,12 +28,16 @@ function StatusIcon({ status }: { status: ItemStatus }) {
   return <Circle className={`${className} text-text-dim-6`} aria-label="대기" />
 }
 
-function ItemRow({ item }: { item: TestRunItem }) {
+function ItemRow({ item, showFile }: { item: TestRunItem; showFile?: boolean }) {
   return <li className="flex flex-col gap-1 py-1.5" data-status={item.status}>
     <div className="flex items-center gap-2 text-sm">
       <StatusIcon status={item.status} />
-      <span className={item.status === 'running' ? 'min-w-0 flex-1 font-semibold' : 'min-w-0 flex-1'}>{item.title}</span>
-      {item.durationMs !== undefined && item.status !== 'running' && <span className="shrink-0 text-xs tabular-nums text-text-dim-5">{(item.durationMs / 1000).toFixed(1)}초</span>}
+      <span className={item.status === 'running' ? 'min-w-0 flex-1 font-semibold' : 'min-w-0 flex-1'}>
+        {item.title}
+        {showFile && <code className="ml-2 text-xs font-normal text-text-dim-5">{item.file.split('/').pop()}</code>}
+      </span>
+      {/* 0.1초 안쪽은 `0.0초`만 늘어서 뺀다. */}
+      {item.durationMs !== undefined && item.durationMs >= 100 && item.status !== 'running' && <span className="shrink-0 text-xs tabular-nums text-text-dim-5">{(item.durationMs / 1000).toFixed(1)}초</span>}
     </div>
     {item.error && <pre className="ml-6 overflow-x-auto whitespace-pre-wrap rounded-md bg-destructive-soft px-3 py-2 text-xs leading-relaxed text-destructive">{item.error}</pre>}
   </li>
@@ -79,15 +83,15 @@ function RunPanel({ run, others, onPick }: { run: TestRunView; others: TestRunVi
         const done = group.items.filter((item) => item.status !== 'pending' && item.status !== 'running').length
         const failed = group.items.some((item) => item.status === 'failed')
         const busy = group.items.some((item) => item.status === 'running')
-        // 단위 테스트는 폴더가 많아 접어 두고, 도는 중 · 실패만 펼친다.
+        // 단위 테스트는 갈래마다 접어 두고, 도는 중 · 실패만 펼친다. 누르면 접고 편다.
         const open = run.kind !== 'unit' || failed || busy
         return <details key={group.name} open={open} className="rounded-lg bg-surface-2 px-3.5 py-2">
           <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
             {failed ? <StatusIcon status="failed" /> : busy ? <StatusIcon status="running" /> : done === group.items.length ? <StatusIcon status="passed" /> : <StatusIcon status="pending" />}
-            <code className="min-w-0 flex-1 truncate">{group.name}</code>
+            {run.kind === 'unit' ? <span className="min-w-0 flex-1 truncate">{group.name}</span> : <code className="min-w-0 flex-1 truncate">{group.name}</code>}
             <span className="shrink-0 text-xs font-normal tabular-nums text-text-dim-5">{done} / {group.items.length}</span>
           </summary>
-          <ul className="mt-1 flex flex-col">{group.items.map((item) => <ItemRow key={item.id} item={item} />)}</ul>
+          <ul className="mt-1 flex flex-col">{group.items.map((item) => <ItemRow key={item.id} item={item} showFile={run.kind === 'unit'} />)}</ul>
         </details>
       })}
     </div>}
