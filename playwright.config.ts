@@ -1,5 +1,9 @@
 import { execSync } from 'node:child_process'
 import { defineConfig, devices } from '@playwright/test'
+import { acquireE2eLock } from './scripts/e2e-lock.mjs'
+
+// 같은 워크트리의 e2e는 차례로 돈다(서버 · 결과 폴더를 같이 쓴다). 워커와 `--list`는 잠그지 않는다.
+if (!process.env.TEST_WORKER_INDEX && !process.argv.includes('--list')) acquireE2eLock()
 
 // 워크트리마다 고정 포트(`scripts/worktree-port.mjs`). 다른 워크트리 서버를 빌려 쓰지 않게 한다.
 // 워커는 설정을 다시 읽으므로 처음 잰 번호를 환경 변수로 물려준다(워커 안에선 스크립트가 빈 값을 낸다).

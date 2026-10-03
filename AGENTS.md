@@ -62,7 +62,8 @@ npm run dev:here       # 확인용 서버(로그인 게이트 끔). 워크트리
 npm run where          # 워크트리 · 브랜치 · 주소 · 켜짐 표
 npm run build          # tsc -b + vite build
 npm test               # vitest (src, src-next)
-npm run test:e2e       # playwright
+npm run test:e2e       # playwright 전체(실험실 스펙 빼고, 넣으려면 E2E_LABS=1)
+npm run test:smoke     # 스모크 묶음(제품 큰 길 9개, 1~2분)
 npm run lint
 npm run reference:lab  # 레퍼런스 랩 서버
 npm run reference:noto # Noto 코퍼스 추출
@@ -96,6 +97,7 @@ npm run reference:noto # Noto 코퍼스 추출
 - 글로 길게 설명할 것은 실험실 화면으로 보여 준다.
 - 해석이 갈릴 수 있는 UI 요청은 구현 전에 이해한 것을 한 문단으로 되짚고 확인받는다.
 - 검증 중 본 이상한 것은 사소해도 전부 보고한다. 내 작업과 무관해 보여도 말한다.
-- 작업 중 테스트는 단위 테스트와 바꾼 곳 e2e 스펙 하나만. 넓은 회귀는 커밋 직전 한 번. 실험실은 타입 검사 + 스크린샷 하나로 끝.
+- 테스트는 브랜치를 옮길 때 묶는다. 작업 중 = 바꾼 곳 단위 테스트(끌기 · 탭 · SVG 이벤트 순서를 바꿨으면 그 e2e 스펙 하나). 피처 → dev 합치기 직전 = 그 기능 e2e 스펙 + `npm test` 전체. dev에 합친 직후 = `npm run test:smoke`. dev → main 직전 = `npm test` + `npm run test:e2e` 전체. 실험실은 타입 검사 + 스크린샷 하나로 끝.
+- 확인용 서버와 e2e는 워크트리 고정 포트(`npm run dev:here` · `npm run where`). 사용자에게 확인을 부탁할 땐 그 주소와 누를 곳을 준다.
 - 5분 넘는 테스트는 예상 시간을 먼저 말한다. HEAD 기준 비교는 요청할 때만 하고, 먼저 실패한 스펙만 다시 돌린다.
 - 푸시는 된다(`gh` 로그인 완료). 전체 스테이징(add -A, add ., commit -a)은 훅이 막는다. 경로 지정이나 헝크 선별로 스테이징한다.
