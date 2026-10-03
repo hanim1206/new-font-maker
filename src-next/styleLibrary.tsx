@@ -19,6 +19,21 @@ import { RangeTicks } from './RangeTicks'
 /** 미리보기로 갈 화면. `show`가 있으면 그 화면에서 부품을 띄우는 동작(알림처럼 주소만으로 안 보이는 것). */
 export interface LibraryScreen { name: string; route: string; hint?: string; show?: 'notice-bar' | 'notice-card' }
 
+/** 목록의 묶음. 위 칸(토큰 · 부품) 아래 접히는 묶음 하나. 누르면 그 묶음 한눈 보기. */
+export interface LibraryGroup { id: string; label: string; section: '토큰' | '부품'; note: string }
+export const LIBRARY_GROUPS: LibraryGroup[] = [
+  { id: 'color', label: '색', section: '토큰', note: '의미 색(테마가 바꾸는 층)과 편집 색(캔버스).' },
+  { id: 'type', label: '글자', section: '토큰', note: '글자 크기 단계와 굵기.' },
+  { id: 'shape', label: '모양', section: '토큰', note: '모서리와 그림자.' },
+  { id: 'button-variant', label: '단추 · 강조', section: '부품', note: '단추의 색 · 글자. 크기와 따로 고른다.' },
+  { id: 'button-size', label: '단추 · 크기', section: '부품', note: '단추의 높이 · 여백 · 모서리.' },
+  { id: 'tabs', label: '탭', section: '부품', note: '화면 안에서 칸을 바꾸는 탭.' },
+  { id: 'choice', label: '고르기', section: '부품', note: '하나만 고르는 칸 묶음.' },
+  { id: 'range', label: '막대', section: '부품', note: '조절 항목과 채움 막대.' },
+  { id: 'checkbox', label: '체크', section: '부품', note: '켬 · 끔.' },
+  { id: 'notice', label: '알림', section: '부품', note: '화면 아래 알림과 저장 토스트.' },
+]
+
 export interface LibraryItem {
   id: string
   group: string
