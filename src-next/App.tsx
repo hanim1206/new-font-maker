@@ -93,5 +93,6 @@ function DevToggles() {
 
 export default function App() {
   usePinchLock()
-  return <><Page /><FontExportDialog />{import.meta.env.DEV && <DevToggles />}</>
+  // 자동화 브라우저(e2e)에선 숨긴다 — 우상단 고정이라 머리 단추 클릭을 가린다.
+  return <><Page /><FontExportDialog />{import.meta.env.DEV && !navigator.webdriver && <DevToggles />}</>
 }
