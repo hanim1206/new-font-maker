@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, ChevronRight, Copy, LayoutGrid, MousePointerClick, PanelRightClose, PanelRightOpen, X } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import { Check, ChevronDown, ChevronRight, Copy, LayoutGrid, Maximize, Minus, MousePointerClick, PanelRightClose, PanelRightOpen, Plus, X } from 'lucide-react'
 import { Button } from './components/ui/button'
 import { FILE_SCREEN, LIBRARY_GROUPS, itemIdsOfElement, libraryItems } from './styleLibrary'
 import type { LibraryGroup, LibraryItem, LibraryScreen } from './styleLibrary'
@@ -58,6 +59,123 @@ function ensureFlashStyle(doc: Document) {
 const visible = (element: Element) => {
   const rect = element.getBoundingClientRect()
   return rect.width > 0 && rect.height > 0 && getComputedStyle(element).visibility !== 'hidden'
+}
+
+const MIN_SCALE = 0.2
+const MAX_SCALE = 3
+const clampScale = (scale: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale))
+
+/**
+ * 전체 대지 판. Figma처럼 — 트랙패드 두 손가락 = 이동, 오므리기(또는 ⌘/Ctrl + 휠) = 확대 · 축소(손가락 아래를 기준으로),
+ * 빈 곳을 끌면 이동, ⌘/Ctrl + `+` `-` `0`(100%) `1`(맞춤). 왼쪽 아래 확대 손잡이.
+ */
+function BoardCanvas({ children }: { children: ReactNode }) {
+  const box = useRef<HTMLDivElement>(null)
+  const content = useRef<HTMLDivElement>(null)
+  const [view, setView] = useState({ x: 0, y: 0, scale: 0.7 })
+  const viewRef = useRef(view)
+  viewRef.current = view
+
+  /** 판 위 한 점(px, py — 판 기준)을 제자리에 두고 배율을 바꾼다. */
+  const zoomAt = useCallback((next: number, px: number, py: number) => {
+    setView((current) => {
+      const scale = clampScale(next)
+      const k = scale / current.scale
+      return { scale, x: px - (px - current.x) * k, y: py - (py - current.y) * k }
+    })
+  }, [])
+  const zoomCenter = useCallback((next: number) => {
+    const rect = box.current?.getBoundingClientRect()
+    if (rect) zoomAt(next, rect.width / 2, rect.height / 2)
+  }, [zoomAt])
+  const fit = useCallback(() => {
+    const rect = box.current?.getBoundingClientRect()
+    const el = content.current
+    if (!rect || !el) return
+    const scale = clampScale(Math.min(rect.width / el.offsetWidth, rect.height / el.offsetHeight, 1))
+    setView({ scale, x: Math.max(0, (rect.width - el.offsetWidth * scale) / 2), y: 0 })
+  }, [])
+  // 처음엔 가로를 맞춘다(너무 작아지면 50%).
+  useLayoutEffect(() => {
+    const rect = box.current?.getBoundingClientRect()
+    const el = content.current
+    if (rect && el) setView({ x: 0, y: 0, scale: clampScale(Math.max(0.5, Math.min(1, rect.width / el.offsetWidth))) })
+  }, [])
+
+  useEffect(() => {
+    const el = box.current
+    if (!el) return
+    // 휠은 passive가 아니어야 브라우저 확대 · 뒤로 가기를 막을 수 있다.
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      const rect = el.getBoundingClientRect()
+      if (event.ctrlKey || event.metaKey) zoomAt(viewRef.current.scale * Math.exp(-Math.max(-24, Math.min(24, event.deltaY)) * 0.01), event.clientX - rect.left, event.clientY - rect.top)
+      else setView((current) => ({ ...current, x: current.x - event.deltaX, y: current.y - event.deltaY }))
+    }
+    // 사파리 트랙패드 오므리기.
+    let gestureStart = 1
+    const onGestureStart = (event: Event) => { event.preventDefault(); gestureStart = viewRef.current.scale }
+    const onGestureChange = (event: Event) => {
+      event.preventDefault()
+      const gesture = event as Event & { scale: number; clientX: number; clientY: number }
+      const rect = el.getBoundingClientRect()
+      zoomAt(gestureStart * gesture.scale, gesture.clientX - rect.left, gesture.clientY - rect.top)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('gesturestart', onGestureStart)
+    el.addEventListener('gesturechange', onGestureChange)
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('gesturestart', onGestureStart)
+      el.removeEventListener('gesturechange', onGestureChange)
+    }
+  }, [zoomAt])
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey)) return
+      const scale = viewRef.current.scale
+      if (event.key === '=' || event.key === '+') { event.preventDefault(); zoomCenter(scale * 1.25) }
+      else if (event.key === '-') { event.preventDefault(); zoomCenter(scale / 1.25) }
+      else if (event.key === '0') { event.preventDefault(); zoomCenter(1) }
+      else if (event.key === '1') { event.preventDefault(); fit() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zoomCenter, fit])
+
+  // 빈 곳(판 · 묶음 사이)을 끌면 이동. 프레임 안 부품은 그대로 눌린다.
+  const drag = useRef<{ id: number; x: number; y: number } | null>(null)
+  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement
+    if (target.closest('[data-board-item], button')) return
+    drag.current = { id: event.pointerId, x: event.clientX - view.x, y: event.clientY - view.y }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+  const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = drag.current
+    if (!start || start.id !== event.pointerId) return
+    setView((current) => ({ ...current, x: event.clientX - start.x, y: event.clientY - start.y }))
+  }
+  const endDrag = () => { drag.current = null }
+
+  const dot = 16 * view.scale
+  return <div className="relative min-h-0 flex-1 overflow-hidden bg-surface-3" data-testid="style-guide-board">
+    <div ref={box} className="absolute inset-0 cursor-grab touch-none active:cursor-grabbing"
+      style={{ backgroundImage: 'radial-gradient(rgb(var(--color-border)) 1px, transparent 1px)', backgroundSize: `${dot}px ${dot}px`, backgroundPosition: `${view.x}px ${view.y}px` }}
+      onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}>
+      <div ref={content} className="w-max origin-top-left cursor-auto" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}>
+        {children}
+      </div>
+    </div>
+    <div className="absolute bottom-4 left-4 flex items-center gap-1 rounded-full border border-border bg-surface p-1 shadow-md">
+      <Button type="button" variant="ghost" size="icon" className="size-8 rounded-full" aria-label="축소" onClick={() => zoomCenter(view.scale / 1.25)}><Minus aria-hidden="true" /></Button>
+      <button type="button" className="min-w-[52px] text-13 font-semibold tabular-nums" onClick={() => zoomCenter(1)} title="100%로 (⌘0)" data-testid="style-guide-zoom">{Math.round(view.scale * 100)}%</button>
+      <Button type="button" variant="ghost" size="icon" className="size-8 rounded-full" aria-label="확대" onClick={() => zoomCenter(view.scale * 1.25)}><Plus aria-hidden="true" /></Button>
+      <Button type="button" variant="ghost" size="icon" className="size-8 rounded-full" aria-label="화면에 맞춤" title="화면에 맞춤 (⌘1)" onClick={fit}><Maximize aria-hidden="true" /></Button>
+      <span className="pl-1 pr-3 text-11 text-text-dim-5">두 손가락 이동 · 오므려 확대 · 빈 곳 끌기</span>
+    </div>
+  </div>
 }
 
 export function StyleGuideLabPage() {
@@ -232,8 +350,7 @@ export function StyleGuideLabPage() {
         <span className="text-text-dim-5">이 브라우저에만 · 미리보기 화면에도 덮인다</span>
       </div>
 
-      {viewBoard ? <div className="min-h-0 flex-1 overflow-auto bg-surface-3 [background-image:radial-gradient(rgb(var(--color-border))_1px,transparent_1px)] [background-size:16px_16px]" data-testid="style-guide-board">
-        {/* 전체 대지: 묶음마다 한 줄, 부품 프레임을 가로로. 가로 · 세로로 스크롤. 프레임 이름을 누르면 그 항목. */}
+      {viewBoard ? <BoardCanvas>
         <div className="flex w-max flex-col gap-12 p-10">
           {LIBRARY_GROUPS.map((group) => <section key={group.id} className="flex flex-col gap-3">
             <button type="button" onClick={() => pickGroup(group)} className="w-fit text-left hover:underline">
@@ -250,7 +367,7 @@ export function StyleGuideLabPage() {
             </div>
           </section>)}
         </div>
-      </div> : viewGroup ? <div className="flex flex-col gap-6 px-8 py-8">
+      </BoardCanvas> : viewGroup ? <div className="flex flex-col gap-6 px-8 py-8">
         <header className="flex flex-col gap-2">
           <span className="text-12 font-bold text-text-dim-5">{viewGroup.section}</span>
           <h2 className="text-28 font-extrabold">{viewGroup.label}</h2>
