@@ -123,7 +123,10 @@ export function withCatalog(kind: TestKind, catalog: CatalogEntry[], items: Test
   if (kind === 'e2e') {
     const ran = new Set(items.map((item) => item.file))
     const missing = catalog.filter((entry) => !ran.has(entry.file)).map((entry) => ({ id: entry.file, file: entry.file, title: '', status: 'none' as const }))
-    return [...items, ...missing].sort((a, b) => a.file.localeCompare(b.file))
+    // 목록(설명 표) 순서대로. 목록에 없는 파일은 끝에.
+    const rank = new Map(catalog.map((entry, index) => [entry.file, index]))
+    const rankOf = (file: string) => rank.get(file) ?? catalog.length
+    return [...items, ...missing].sort((a, b) => rankOf(a.file) - rankOf(b.file))
   }
   const keyOf = (entry: CatalogEntry) => kind === 'unit' ? entry.file : entry.title
   const byKey = new Map(items.map((item) => [keyOf(item), item]))

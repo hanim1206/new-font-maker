@@ -5,7 +5,7 @@ import { ChoiceGroup, ChoiceItem } from '@/components/ui/choice-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TEST_RUNS_API, adminCall } from './adminApi'
-import { TEST_NOTES, UNIT_SUBGROUP_ORDER } from './testNotes'
+import { E2E_GROUP_ORDER, TEST_NOTES, UNIT_SUBGROUP_ORDER } from './testNotes'
 import SMOKE_LIST from '../../scripts/smoke-list.json'
 import { TEST_KINDS, elapsedText, groupsOf, runStateOf, summaryOf, withCatalog } from './testRunModel'
 import type { CatalogEntry, ItemStatus, RunState, TestKind, TestRunItem, TestRunView } from './testRunModel'
@@ -120,8 +120,7 @@ function subgroupsOf(category: string, items: TestRunItem[]): { name: string; it
 function TestList({ kind, items }: { kind: TestKind; items: TestRunItem[] }) {
   // 스모크는 파일마다 하나라 묶지 않고 제목 아홉 줄 그대로.
   if (kind === 'smoke') return <ul className="flex flex-col rounded-lg bg-surface-2 px-3.5 py-1">{items.map((item) => <ItemRow key={item.id} item={item} showNote />)}</ul>
-  return <div className="flex flex-col gap-1.5">
-    {groupsOf({ kind, items }).map((group) => {
+  const renderGroup = (group: { name: string; items: TestRunItem[] }) => {
       // e2e에서 한 번도 안 돌린 파일은 제목 없는 빈 줄 하나뿐이다.
       const tests = group.items.filter((item) => item.title)
       const done = tests.filter((item) => item.status !== 'none' && item.status !== 'pending' && item.status !== 'running').length
@@ -132,7 +131,7 @@ function TestList({ kind, items }: { kind: TestKind; items: TestRunItem[] }) {
         <summary className="flex cursor-pointer flex-col gap-0.5 text-sm font-semibold">
           <span className="flex items-center gap-2">
             <StatusIcon status={status} />
-            <span className="min-w-0 flex-1 truncate">{kind === 'unit' ? group.name : group.name.split('/').pop()?.replace(/\.spec\.ts$/, '')}</span>
+            <span className="min-w-0 flex-1 truncate">{kind === 'unit' ? group.name : TEST_NOTES[group.name]?.[0] ?? group.name.split('/').pop()}</span>
             <span className="shrink-0 text-xs font-normal tabular-nums text-text-dim-5">{kind === 'unit' ? `${group.items.length}개` : tests.length ? `${done} / ${tests.length}` : '안 돌림'}</span>
           </span>
           {kind === 'e2e' && <NoteLine file={group.name} />}
@@ -143,7 +142,17 @@ function TestList({ kind, items }: { kind: TestKind; items: TestRunItem[] }) {
         </div>)}
         {kind !== 'unit' && tests.length > 0 && <ul className="mt-1 flex flex-col">{tests.map((item) => <ItemRow key={item.id} item={item} />)}</ul>}
       </details>
-    })}
+  }
+  const groups = groupsOf({ kind, items })
+  if (kind === 'unit') return <div className="flex flex-col gap-1.5">{groups.map(renderGroup)}</div>
+  // e2e: 갈래 제목 아래 스펙 파일들(제품 흐름 순서, 실험실은 끝). 갈래 표에 없는 파일은 끝에.
+  const sectionOf = (file: string) => TEST_NOTES[file]?.[3] ?? ''
+  const sections = [...E2E_GROUP_ORDER, ''].map((name) => ({ name, groups: groups.filter((group) => (E2E_GROUP_ORDER.includes(sectionOf(group.name)) ? sectionOf(group.name) : '') === name) }))
+  return <div className="flex flex-col gap-4">
+    {sections.filter((section) => section.groups.length).map((section) => <section key={section.name} className="flex flex-col gap-1.5">
+      <h3 className="text-xs font-bold text-text-dim-4">{section.name || '기타'} <span className="font-normal text-text-dim-6">{section.groups.length}</span></h3>
+      {section.groups.map(renderGroup)}
+    </section>)}
   </div>
 }
 
@@ -223,7 +232,7 @@ export function TestsPage() {
       // 마지막 실행이 곧 전체 실행이면 고를 게 없다.
       const choosable = full && full.startedAt !== last.startedAt
       // 기본: 도는 중이면 그 실행, 아니면 마지막 전체(파일 몇 개만 돌린 기록이 전체를 가리지 않게).
-      const shown = slot[key] ?? (runStateOf(last) === 'running' ? 'last' : 'full')
+      const shown = slot[key] ?? (last && runStateOf(last) === 'running' ? 'last' : 'full')
       const run = choosable && shown === 'full' ? full : last
       return <TabsContent key={key} value={key} className="flex max-w-3xl flex-col gap-3">
         {choosable && <ChoiceGroup variant="segment" aria-label="볼 실행" className="w-64">
