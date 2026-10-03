@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, MessageCircle, Plus, Square, Columns3, Type } from 'lucide-react'
+import { Square, Columns3, Type } from 'lucide-react'
 import { Button } from './components/ui/button'
-import type { ButtonProps } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { Field, RangeBar } from './components/ui/range'
 import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs'
 import { RangeTicks } from './RangeTicks'
+import { ReviewCard, ReviewSummary, buttonReviewItems, matchesFilter, statusOfItem, useStyleReview } from './StyleReviewBoard'
+import type { ReviewFilter } from './StyleReviewBoard'
 import { applyThemePreview, readThemePreview, writeThemePreview } from './themePreview'
 import type { ThemePreview } from './themePreview'
 
@@ -38,8 +39,6 @@ const RADII = ['xs', 'sm', 'md', 'lg', 'xl', 'full']
 const SHADOWS = ['sm', 'md', 'overlay']
 const SPACES = [1, 2, 3, 4, 5, 6]
 
-const VARIANTS: NonNullable<ButtonProps['variant']>[] = ['default', 'primary', 'secondary', 'outline', 'ghost', 'destructive', 'plain', 'quiet', 'link', 'faint', 'soft']
-const SIZES: NonNullable<ButtonProps['size']>[] = ['sm', 'default', 'lg', 'icon', 'icon-lg']
 
 function Section({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
   return <section className="flex flex-col gap-3 border-t border-border-subtle pt-6">
@@ -97,6 +96,9 @@ function ThemeHandles({ preview, onChange }: { preview: ThemePreview; onChange: 
 
 export function StyleGuideLabPage() {
   const [preview, setPreview] = useState<ThemePreview>(() => readThemePreview(window.localStorage))
+  const reviewState = useStyleReview()
+  const [filter, setFilter] = useState<ReviewFilter>('all')
+  const buttonItems = buttonReviewItems(reviewState.usage)
   // 미리보기가 바뀌면 견본 값을 다시 읽는다.
   const [, setTick] = useState(0)
   useEffect(() => {
@@ -114,6 +116,24 @@ export function StyleGuideLabPage() {
         </header>
 
         <ThemeHandles preview={preview} onChange={setPreview} />
+
+        <div className="flex flex-col gap-2 rounded-lg bg-card p-4 shadow-sm">
+          <span className="text-13 font-semibold text-text-dim-3">검토 — 볼 것부터 보고 OK나 요청을 남기면 된다</span>
+          <ReviewSummary statuses={buttonItems.map((item) => statusOfItem(reviewState.review, item))} filter={filter} onFilter={setFilter} />
+        </div>
+
+        <Section title="단추 Button" note="강조 12 · 크기 11. 카드마다 OK나 요청을 남기면 src-next/style-review.json에 저장되고, 고친 항목은 다시 `볼 것`으로 돌아온다.">
+          {reviewState.error && <p className="text-13 text-destructive">{reviewState.error}</p>}
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
+            {buttonItems.filter((item) => matchesFilter(statusOfItem(reviewState.review, item), filter)).map((item) => <ReviewCard
+              key={item.id}
+              {...item}
+              status={statusOfItem(reviewState.review, item)}
+              record={reviewState.review.items[item.id]}
+              onMark={(change) => reviewState.mark(item.id, change)}
+            />)}
+          </div>
+        </Section>
 
         <Section title="의미 색" note="화면은 이 층만 쓴다. 테마가 바꾸는 층. 앞쪽이 shadcn 표준 이름.">
           <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{SEMANTIC.map((name) => <Swatch key={name} name={name} />)}</div>
@@ -152,33 +172,6 @@ export function StyleGuideLabPage() {
           </div>)}</div>
         </Section>
 
-        <Section title="단추 Button" note="강조 × 크기. plain · quiet · soft와 크기 icon-lg · row는 계정 화면(G0), link · faint는 글로벌 스타일(G1)에서 더했다.">
-          <div className="overflow-x-auto">
-            <table className="border-separate border-spacing-x-3 border-spacing-y-2 text-left">
-              <thead><tr>
-                <th className="text-12 font-semibold text-text-dim-5">강조 \ 크기</th>
-                {SIZES.map((size) => <th key={size} className="text-12 font-semibold text-text-dim-5">{size}</th>)}
-                <th className="text-12 font-semibold text-text-dim-5">disabled</th>
-              </tr></thead>
-              <tbody>{VARIANTS.map((variant) => <tr key={variant}>
-                <th className="pr-2 text-13 font-semibold"><code>{variant}</code></th>
-                {SIZES.map((size) => <td key={size}>
-                  {size.startsWith('icon')
-                    ? <Button variant={variant} size={size} aria-label="더하기"><Plus aria-hidden="true" /></Button>
-                    : <Button variant={variant} size={size}>{size === 'sm' ? <><MessageCircle aria-hidden="true" />답 보기</> : '저장'}</Button>}
-                </td>)}
-                <td><Button variant={variant} disabled>저장</Button></td>
-              </tr>)}</tbody>
-            </table>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button variant="soft" size="sm" data-highlight><MessageCircle aria-hidden="true" />soft · data-highlight</Button>
-            <Button variant="plain" size="icon-lg" aria-label="뒤로"><ChevronLeft aria-hidden="true" /></Button>
-          </div>
-          <div className="w-80 rounded-lg bg-card px-4">
-            <Button variant="plain" size="row"><strong className="flex-1">plain · row (목록 줄)</strong><ChevronRight className="text-text-dim-5" aria-hidden="true" /></Button>
-          </div>
-        </Section>
 
         <Section title="탭 Tabs" note="default(관리자) · underline · dock(글로벌 스타일 아래 탭 — 여기선 화면 바닥 고정을 풀어 그렸다).">
           <GuideTabs />

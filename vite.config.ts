@@ -6,6 +6,7 @@ import { notoCorpusApiPlugin } from './scripts/reference-lab/notoCorpusApi'
 import { notoPresetApiPlugin } from './scripts/reference-lab/notoPresetApi'
 import { betaInviteApiPlugin } from './scripts/betaInviteApi'
 import { feedbackAdminApiPlugin } from './scripts/feedbackAdminApi'
+import { styleReviewApiPlugin } from './scripts/styleReviewApi'
 import { housePresetApiPlugin } from './scripts/housePresetApi'
 import { announcementAdminApiPlugin } from './scripts/announcementAdminApi'
 import { sharedCheckoutPath } from './scripts/sharedCheckoutPath'
@@ -31,6 +32,8 @@ export default defineConfig({
     housePresetApiPlugin(fileURLToPath(new URL('.', import.meta.url))),
     // 관리자 `공지` 메뉴(만들기 · 게시 · 이미지 올리기). 개발 서버에만 붙는다.
     announcementAdminApiPlugin(fileURLToPath(new URL('.', import.meta.url))),
+    // 스타일가이드 검토판(`/style-guide`)의 확정 · 요청 기록(`src-next/style-review.json`). 개발 서버에만 붙는다.
+    styleReviewApiPlugin(fileURLToPath(new URL('.', import.meta.url))),
     VitePWA({
       // 편집 중에 저절로 바뀌지 않게. 새 버전은 알림(`appUpdate.ts`) 뒤 사용자가 새로고침한다.
       registerType: 'prompt',
