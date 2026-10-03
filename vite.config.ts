@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -11,6 +12,7 @@ import { housePresetApiPlugin } from './scripts/housePresetApi'
 import { announcementAdminApiPlugin } from './scripts/announcementAdminApi'
 import { sharedCheckoutPath } from './scripts/sharedCheckoutPath'
 import { spectrumFontApiPlugin } from './scripts/spectrumFontApi'
+import { testRunApiPlugin } from './scripts/testRunApi'
 
 // git에 없는 Noto 코퍼스. 워크트리에서는 메인 체크아웃 것을 쓴다.
 const guideCorpus = sharedCheckoutPath(fileURLToPath(new URL('.', import.meta.url)), '.reference-fonts/guide-corpus')
@@ -34,6 +36,8 @@ export default defineConfig({
     announcementAdminApiPlugin(fileURLToPath(new URL('.', import.meta.url))),
     // 스타일가이드 라이브러리(`/style-guide`)가 부품이 쓰이는 곳을 묻는다(읽기만). 개발 서버에만 붙는다.
     styleLibraryApiPlugin(fileURLToPath(new URL('.', import.meta.url))),
+    // 관리자 `테스트` 메뉴가 테스트 실행 기록(`.git/test-runs/`)을 읽는다(읽기만). 개발 서버에만 붙는다.
+    testRunApiPlugin(fileURLToPath(new URL('.', import.meta.url))),
     VitePWA({
       // 편집 중에 저절로 바뀌지 않게. 새 버전은 안전한 순간(탭 가림 · 화면 옮김)에 `appUpdate.ts`가 저장 뒤 바꾼다.
       registerType: 'prompt',
@@ -94,6 +98,10 @@ export default defineConfig({
   },
   // 레포 안 워크트리(`.claude/worktrees/*`)의 html · tsconfig를 보면, 다른 세션이 워크트리를 만들 때마다
   // 의존성을 다시 묶어 열린 탭에 React가 두 벌 섞인다(Invalid hook call). 앱 입구만 훑고 워크트리는 안 본다.
+  test: {
+    // 기본 출력에 덧붙여 관리자 `테스트` 메뉴용 기록을 쓴다(`.git/test-runs/`).
+    reporters: ['default', './scripts/testRuns/vitestReporter.ts'],
+  },
   optimizeDeps: {
     entries: ['index.html'],
   },

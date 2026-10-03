@@ -1,4 +1,4 @@
-import { Filter, FlaskConical, Megaphone, MessageSquare, SquareDashed, Users } from 'lucide-react'
+import { Filter, FlaskConical, ListChecks, Megaphone, MessageSquare, SquareDashed, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { labBySlug } from '../labCatalog'
 import type { LabEntry } from '../labCatalog'
@@ -6,13 +6,14 @@ import type { LabEntry } from '../labCatalog'
 export const ADMIN_PATH = '/admin'
 
 /** 초대는 계정 화면에 합쳤다(`초대하기` 패널). 옛 `/admin/invite` 주소는 계정으로 간다. */
-export type Section = 'accounts' | 'feedback' | 'triage' | 'announcements' | 'preset' | 'labs'
+export type Section = 'accounts' | 'feedback' | 'triage' | 'announcements' | 'preset' | 'tests' | 'labs'
 export const SECTIONS: { key: Section; label: string; icon: LucideIcon; hint: string }[] = [
   { key: 'accounts', label: '계정', icon: Users, hint: '초대 · 보냄 체크 · 새 코드 · 정지 · 삭제' },
   { key: 'feedback', label: '의견', icon: MessageSquare, hint: '친구가 보낸 의견 읽고 답장' },
   { key: 'triage', label: '선별', icon: Filter, hint: '의견을 묶고 걸러 보드로' },
   { key: 'announcements', label: '공지', icon: Megaphone, hint: '업데이트 팝업 만들기 · 미리보기 · 게시' },
   { key: 'preset', label: '프리셋', icon: SquareDashed, hint: '프리셋 v2 레이아웃 대푯값 고치기 · v1과 비교' },
+  { key: 'tests', label: '테스트', icon: ListChecks, hint: '단위 · 스모크 · e2e가 지금 어디까지 돌았는지' },
   { key: 'labs', label: '실험실', icon: FlaskConical, hint: '개발용 실험 화면. 고르면 이 안에서 열려요' },
 ]
 

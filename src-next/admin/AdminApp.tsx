@@ -16,6 +16,7 @@ import type { Section } from './adminSections'
 import { LABS } from '../labCatalog'
 import type { LabEntry } from '../labCatalog'
 import { LabFrame, LabNewTabLink, LabsList } from './LabsPage'
+import { TestsPage } from './TestsPage'
 import { TriagePage } from './TriagePage'
 import { useBetaInvites } from './useBetaInvites'
 
@@ -159,6 +160,7 @@ export function AdminApp() {
         {section === 'triage' && <TriagePage />}
         {section === 'announcements' && <AnnouncementsPage />}
         {section === 'preset' && <Suspense fallback={<p className="text-sm text-text-dim-4">불러오는 중…</p>}><PresetPage /></Suspense>}
+        {section === 'tests' && <TestsPage />}
         {section === 'labs' && !lab && <LabsList onOpen={openLab} />}
         {section === 'labs' && lab && <LabFrame lab={lab} />}
       </main>

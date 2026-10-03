@@ -8,6 +8,8 @@ export const FEEDBACK_API = '/api/feedback'
 export const HOUSE_PRESET_API = '/api/house-preset'
 /** 공지 만들기 · 게시(`scripts/announcementAdminApi.ts`). */
 export const ANNOUNCEMENT_API = '/api/announcements'
+/** 테스트 실행 기록 읽기(`scripts/testRunApi.ts`). */
+export const TEST_RUNS_API = '/api/test-runs'
 const HEADER = 'x-beta-admin'
 
 export class AdminApiError extends Error {

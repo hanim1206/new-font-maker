@@ -28,5 +28,6 @@ if (missing.length) {
   process.exit(1)
 }
 
-const result = spawnSync('npx', [...args, ...process.argv.slice(2)], { stdio: 'inherit' })
+// 관리자 `테스트` 메뉴가 e2e 전체와 따로 보이게 스모크라고 표시한다.
+const result = spawnSync('npx', [...args, ...process.argv.slice(2)], { stdio: 'inherit', env: { ...process.env, TEST_RUN_KIND: 'smoke' } })
 process.exit(result.status ?? 1)
