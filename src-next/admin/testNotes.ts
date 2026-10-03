@@ -236,9 +236,3 @@ export const TEST_NOTES: Record<string, readonly [check: string, purpose: string
   'tests/e2e/workspace-jamo-layout.spec.ts': ['자소 화면 레이아웃에서 보선을 옮기고 저장 · 되돌리기 · 획 편집 오가기가 맞게 도는지 봄', '레이아웃 편집 흐름 지키기'],
   'tests/e2e/workspace-routing.spec.ts': ['자소와 검수 화면을 오가도 앱을 새로 안 불러오고 되돌리기 기록과 보선 저장이 남는지 봄', '화면을 옮겨도 작업이 이어지게'],
 }
-
-/** 호버에 띄울 글. 설명이 없으면 undefined(호버 없음). */
-export function noteTextOf(file: string): string | undefined {
-  const note = TEST_NOTES[file]
-  return note && `검사: ${note[0]}\n목적: ${note[1]}`
-}

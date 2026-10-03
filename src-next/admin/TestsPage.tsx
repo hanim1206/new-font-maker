@@ -5,7 +5,7 @@ import { ChoiceGroup, ChoiceItem } from '@/components/ui/choice-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TEST_RUNS_API, adminCall } from './adminApi'
-import { noteTextOf } from './testNotes'
+import { TEST_NOTES } from './testNotes'
 import { TEST_KINDS, elapsedText, groupsOf, runStateOf, summaryOf } from './testRunModel'
 import type { ItemStatus, RunState, TestKind, TestRunItem, TestRunView } from './testRunModel'
 
@@ -30,9 +30,20 @@ function StatusIcon({ status }: { status: ItemStatus }) {
   return <Circle className={`${className} text-text-dim-6`} aria-label="대기" />
 }
 
+/** 마우스를 올리면 바로 뜨는 검사 · 목적 말풍선. 부모에 `group relative`가 있어야 한다. */
+function NoteBubble({ file }: { file: string }) {
+  const note = TEST_NOTES[file]
+  if (!note) return null
+  return <span className="pointer-events-none absolute left-6 top-full z-20 mt-1 hidden w-max max-w-md flex-col gap-0.5 rounded-md bg-inverse px-3 py-2 text-xs font-normal leading-relaxed text-inverse-foreground shadow-md group-hover:flex" role="tooltip">
+    <span><strong className="mr-1.5">검사</strong>{note[0]}</span>
+    <span><strong className="mr-1.5">목적</strong>{note[1]}</span>
+  </span>
+}
+
 function ItemRow({ item, showFile }: { item: TestRunItem; showFile?: boolean }) {
-  return <li className="flex flex-col gap-1 py-1.5" data-status={item.status} title={noteTextOf(item.file)}>
-    <div className="flex items-center gap-2 text-sm">
+  return <li className="flex flex-col gap-1 py-1.5" data-status={item.status}>
+    <div className="group relative flex items-center gap-2 text-sm">
+      <NoteBubble file={item.file} />
       <StatusIcon status={item.status} />
       <span className={item.status === 'running' ? 'min-w-0 flex-1 font-semibold' : 'min-w-0 flex-1'}>
         {item.title}
@@ -88,7 +99,8 @@ function RunPanel({ run, others, onPick }: { run: TestRunView; others: TestRunVi
         // 단위 테스트는 갈래마다 접어 두고, 도는 중 · 실패만 펼친다. 누르면 접고 편다.
         const open = run.kind !== 'unit' || failed || busy
         return <details key={group.name} open={open} className="rounded-lg bg-surface-2 px-3.5 py-2">
-          <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold" title={run.kind === 'unit' ? undefined : noteTextOf(group.name)}>
+          <summary className="group relative flex cursor-pointer items-center gap-2 text-sm font-semibold">
+            {run.kind !== 'unit' && <NoteBubble file={group.name} />}
             {failed ? <StatusIcon status="failed" /> : busy ? <StatusIcon status="running" /> : done === group.items.length ? <StatusIcon status="passed" /> : <StatusIcon status="pending" />}
             {run.kind === 'unit' ? <span className="min-w-0 flex-1 truncate">{group.name}</span> : <code className="min-w-0 flex-1 truncate">{group.name.split('/').pop()}</code>}
             <span className="shrink-0 text-xs font-normal tabular-nums text-text-dim-5">{done} / {group.items.length}</span>
