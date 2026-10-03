@@ -52,26 +52,28 @@ describe('신규 보정 화면 자유 편집 경계', () => {
 describe('글자 칸 끝 경계', () => {
   const box = { x: 0.1, y: 0.1, width: 0.4, height: 0.4 }
   const strokes = jamo.strokes ?? []
+  // 45° 대각 획은 두께 절반이 두 축에 1/√2씩 나뉘어 든다.
+  const diagonalMargin = 0.035 / Math.SQRT2
 
-  it('점을 칸 왼쪽 밖으로 끌면 칸 끝(두께 절반 안쪽)에서 멈추고 다른 점은 그대로다', () => {
+  it('점을 칸 왼쪽 밖으로 끌면 잉크가 칸 끝에 닿는 자리에서 멈추고 다른 점은 그대로다', () => {
     const bounds = calibrationEditBounds(box, strokes)
     const moved = movePoint(jamo, 'ㅏ-1', 0, { x: -2, y: 0 }, bounds)
     const [first, second] = moved.jamo.strokes?.[0].points ?? []
-    expect(box.x + first.x * box.width).toBeCloseTo(0.035)
+    expect(box.x + first.x * box.width).toBeCloseTo(diagonalMargin)
     expect(second).toMatchObject({ x: 1, y: 1 })
   })
 
-  it('점을 칸 아래 밖으로 끌면 세로도 칸 끝(두께 절반 안쪽)에서 멈춘다', () => {
+  it('점을 칸 아래 밖으로 끌면 세로도 잉크가 칸 끝에 닿는 자리에서 멈춘다', () => {
     const bounds = calibrationEditBounds(box, strokes)
     const moved = movePoint(jamo, 'ㅏ-1', 0, { x: 0, y: 5 }, bounds)
     const [first] = moved.jamo.strokes?.[0].points ?? []
     // 이 점은 아래로 0.1 나간 핸들을 달고 있다. 핸들이 먼저 칸 끝에 닿고 점은 그만큼 안쪽에서 멈춘다.
-    expect(box.y + first.handleOut!.y * box.height).toBeCloseTo(0.965)
+    expect(box.y + first.handleOut!.y * box.height).toBeCloseTo(1 - diagonalMargin)
     expect(first.handleOut!.y - first.y).toBeCloseTo(0.1)
     // 핸들이 없는 점은 칸 끝까지 간다.
     const plain: JamoData = { ...jamo, strokes: [{ ...strokes[0], points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] }] }
     const [bare] = movePoint(plain, 'ㅏ-1', 0, { x: 0, y: 5 }, calibrationEditBounds(box, plain.strokes ?? [])).jamo.strokes?.[0].points ?? []
-    expect(box.y + bare.y * box.height).toBeCloseTo(0.965)
+    expect(box.y + bare.y * box.height).toBeCloseTo(1 - diagonalMargin)
   })
 
   it('이미 칸 밖에 있는 점은 가로 · 세로 모두 그 자리까지 허용한다', () => {
@@ -84,6 +86,25 @@ describe('글자 칸 끝 경계', () => {
 
   it('굵기 배율만큼 끝이 더 안쪽이다', () => {
     const heavy = calibrationEditBounds(box, strokes, 2)
-    expect(box.x + heavy.minX * box.width).toBeCloseTo(0.07)
+    expect(box.x + heavy.minX * box.width).toBeCloseTo(diagonalMargin * 2)
+  })
+
+  it('보(가로 획)는 끝점이 칸 끝까지 가고, 위아래로만 두께 절반 안쪽이다', () => {
+    const beam: JamoData = { ...jamo, strokes: [{ id: 'ㅜ-보', points: [{ x: 0, y: 0.5 }, { x: 1, y: 0.5 }], closed: false, thickness: 0.08 }] }
+    const bounds = calibrationEditBounds(box, beam.strokes ?? [], 1.9502)
+    // 잉크는 진행 방향으로 안 나간다 — 중심선 끝이 글자 칸 끝(0 · 1)까지 간다. 굵은 굵기(900)에서도 같다.
+    expect(box.x + bounds.minX * box.width).toBeCloseTo(0)
+    expect(box.x + bounds.maxX * box.width).toBeCloseTo(1)
+    // 위아래는 잉크 두께 절반(두께 × 배율 ÷ 2)만큼 안쪽에서 멈춘다.
+    expect(box.y + bounds.minY * box.height).toBeCloseTo((0.08 * 1.9502) / 2)
+    expect(box.y + bounds.maxY * box.height).toBeCloseTo(1 - (0.08 * 1.9502) / 2)
+  })
+
+  it('기둥(세로 획)은 좌우로만 두께 절반 안쪽이고 위아래는 칸 끝까지 간다', () => {
+    const stem: JamoData = { ...jamo, strokes: [{ id: 'ㅣ-기둥', points: [{ x: 0.5, y: 0 }, { x: 0.5, y: 1 }], closed: false, thickness: 0.08 }] }
+    const bounds = calibrationEditBounds(box, stem.strokes ?? [], 1.9502)
+    expect(box.y + bounds.minY * box.height).toBeCloseTo(0)
+    expect(box.y + bounds.maxY * box.height).toBeCloseTo(1)
+    expect(box.x + bounds.minX * box.width).toBeCloseTo((0.08 * 1.9502) / 2)
   })
 })

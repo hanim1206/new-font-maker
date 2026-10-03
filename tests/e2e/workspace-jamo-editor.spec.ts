@@ -370,23 +370,35 @@ test('캔버스에서 획 · 점을 멀리 끌어도 글자 칸 밖으로 나가
     await page.mouse.up()
   }
   const centerOf = async (selector: string, nth = 0) => { const b = (await page.locator(selector).nth(nth).boundingBox())!; return { x: b.x + b.width / 2, y: b.y + b.height / 2 } }
-  // 글자 칸은 0–100, 중심선은 두께 절반(3.5) 안쪽까지.
-  const inside = (box: { left: number; right: number; top: number; bottom: number }, label: string) => {
-    expect(box.left, label).toBeGreaterThanOrEqual(3.49)
-    expect(box.right, label).toBeLessThanOrEqual(96.51)
-    expect(box.top, label).toBeGreaterThanOrEqual(3.49)
-    expect(box.bottom, label).toBeLessThanOrEqual(96.51)
+  // 글자 칸은 0–100. 두께는 획 방향과 직각으로만 퍼지니, 그 축만 두께 절반(3.5) 안쪽이고 진행 방향은 칸 끝(0 · 100)까지 간다.
+  const inside = (box: { left: number; right: number; top: number; bottom: number }, label: string, margin = { x: 3.5, y: 3.5 }) => {
+    expect(box.left, label).toBeGreaterThanOrEqual(margin.x - 0.01)
+    expect(box.right, label).toBeLessThanOrEqual(100 - margin.x + 0.01)
+    expect(box.top, label).toBeGreaterThanOrEqual(margin.y - 0.01)
+    expect(box.bottom, label).toBeLessThanOrEqual(100 - margin.y + 0.01)
   }
 
   // 얇은 칸의 줄기: 저장 좌표가 넓힌 칸 비율이라 한계도 그 칸에서 재야 멈춘다(전에는 위로 −25, 왼쪽으로 −16까지 나갔다).
-  for (const [syllable, id] of [['으', 'ㅡ-1'], ['이', 'ㅣ-1']] as const) {
+  // ㅡ는 가로가 진행 방향(가로 여유 0), ㅣ는 세로가 진행 방향(세로 여유 0).
+  for (const [syllable, id, margin] of [['으', 'ㅡ-1', { x: 0, y: 3.5 }], ['이', 'ㅣ-1', { x: 3.5, y: 0 }]] as const) {
     await open(syllable, 'JU')
     const before = await boxOf(id)
     await drag(await centerOf(`[data-editor-hit="stroke"][data-stroke-id="${id}"]`), -260, -300)
     await expect.poll(async () => JSON.stringify(await boxOf(id)), { message: syllable }).not.toBe(JSON.stringify(before))
-    inside(await boxOf(id), `${syllable} ↖`)
+    inside(await boxOf(id), `${syllable} ↖`, margin)
     await drag(await centerOf(`[data-editor-hit="stroke"][data-stroke-id="${id}"]`), 500, 600)
-    inside(await boxOf(id), `${syllable} ↘`)
+    inside(await boxOf(id), `${syllable} ↘`, margin)
+    // 진행 방향으로는 두께 여유 없이 칸 끝(0 · 100) 가까이 닿는다 — 굵은 굵기에서 노토가 잉크를 두는 자리까지 편집하는 길.
+    // ㅡ의 가로 끝자리는 보선(fit rail)이 쥐고 있어 획 편집에서 안 움직인다. 그래서 ㅣ의 세로로만 본다.
+    // 대각으로 끌면 다른 자소와의 간격 붙잡기가 두 축을 같이 멈추니, 진행 축만 두 번 끌어서 본다.
+    if (id === 'ㅣ-1') {
+      for (let pull = 0; pull < 2; pull += 1) await drag(await centerOf(`[data-editor-hit="stroke"][data-stroke-id="${id}"]`), 0, -320)
+      expect((await boxOf(id)).top, `${syllable} 칸 머리`).toBeLessThanOrEqual(1)
+      for (let pull = 0; pull < 3; pull += 1) await drag(await centerOf(`[data-editor-hit="stroke"][data-stroke-id="${id}"]`), 0, 320)
+      const nearEnd = await boxOf(id)
+      expect(nearEnd.bottom, `${syllable} 칸 끝`).toBeGreaterThanOrEqual(99)
+      inside(nearEnd, `${syllable} 칸 끝 뒤`, margin)
+    }
   }
 
   // 곡선의 점을 구석으로 끌면 딸려 가는 핸들이 칸 끝에서 멈춘다. 핸들이 칸 밖으로 나가면 캔버스에 가려져 못 잡는다.
