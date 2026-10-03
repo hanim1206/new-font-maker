@@ -4,10 +4,6 @@
 .card header { display: flex; flex-direction: column; gap: 6px; }
 .card h1 { margin: 0; font-size: var(--font-20); font-weight: var(--weight-heavy); }
 .card header p { margin: 0; color: rgb(var(--color-text-4)); font-size: var(--font-13); line-height: 1.5; }
-.primary, .secondary { min-height: 48px; border-radius: var(--radius-md); font-size: var(--font-16); font-weight: var(--weight-bold); }
-.primary { border: 0; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
-.secondary { border: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); }
-.primary:disabled, .secondary:disabled { opacity: .45; }
 .note { margin: 0; color: rgb(var(--color-text-4)); font-size: var(--font-12); line-height: 1.5; }
 .details { color: rgb(var(--color-text-4)); font-size: var(--font-12); }
 .details summary { min-height: 32px; display: flex; align-items: center; cursor: pointer; }

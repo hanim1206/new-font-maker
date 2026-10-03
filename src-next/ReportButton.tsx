@@ -10,6 +10,7 @@ import { navigate } from './router'
 import { useMe } from './useFeedback'
 import { BetaGuideSheet } from './BetaGuideSheet'
 import { Pressable } from './components/ui/pressable'
+import { Button } from './components/ui/button'
 import styles from './ReportButton.module.css'
 
 /**
@@ -75,8 +76,8 @@ export function ReportSheet({ context, onClose, initialTag = null, initialDraft 
           <h3>보냈어요</h3>
           <p>한임이 읽고 답하면 마이페이지에 빨간 점이 떠요.</p>
           <div className={styles.actions}>
-            <Pressable type="button" onClick={() => { close(); navigate('/account/feedback') }}>보낸 의견 보기</Pressable>
-            <Pressable type="button" data-primary onClick={close}>닫기</Pressable>
+            <Button type="button" size="sheet" variant="secondary" className={styles.minor} onClick={() => { close(); navigate('/account/feedback') }}>보낸 의견 보기</Button>
+            <Button type="button" size="sheet" variant="default" className={styles.major} onClick={close}>닫기</Button>
           </div>
         </div>
         : <form onSubmit={(event) => void submit(event)}>
@@ -112,8 +113,8 @@ export function ReportSheet({ context, onClose, initialTag = null, initialDraft 
           </div>
           {error && <p className={styles.error} role="alert">{error}</p>}
           <div className={styles.actions}>
-            <Pressable type="button" onClick={close}>취소</Pressable>
-            <Pressable type="submit" data-primary disabled={!body || busy || !me} data-testid="report-send">{busy ? '보내는 중…' : '보내기'}</Pressable>
+            <Button type="button" size="sheet" variant="secondary" className={styles.minor} onClick={close}>취소</Button>
+            <Button type="submit" size="sheet" variant="default" className={styles.major} disabled={!body || busy || !me} data-testid="report-send">{busy ? '보내는 중…' : '보내기'}</Button>
           </div>
         </form>}
     </div>

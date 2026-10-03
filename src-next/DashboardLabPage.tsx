@@ -35,6 +35,7 @@ import { AnnouncementSpot } from './AnnouncementSpot'
 import { BetaGuideSheet } from './BetaGuideSheet'
 import { markBetaGuideSeen, shouldShowBetaGuide } from './betaGuide'
 import { Pressable } from './components/ui/pressable'
+import { Button } from './components/ui/button'
 import styles from './DashboardLabPage.module.css'
 // 카드 문장 줄은 편집기 문장 줄과 같은 생김새 · 동작이다.
 import editorStyles from './CalibrationSentenceEditor.module.css'
@@ -387,11 +388,11 @@ function FontCardDownload() {
     {/* 추출 입구가 대시보드뿐이라 이 버튼이 진행 표시의 전부다 — 만드는 동안 원 둘레가 진행만큼 차오르고 안에 퍼센트가 보인다. */}
     <span className={styles.downloadWrap}>
       {exporting && <span className={styles.downloadRing} style={{ ['--p' as string]: percent }} aria-hidden="true" />}
-      <Pressable type="button" className={styles.download} data-state={status} aria-label={label} aria-haspopup="dialog" aria-expanded={open} disabled={exporting} onClick={start} data-testid="dashboard-font-download">
+      <Button type="button" size="icon-md" variant="default" className={styles.download} data-state={status} aria-label={label} aria-haspopup="dialog" aria-expanded={open} disabled={exporting} onClick={start} data-testid="dashboard-font-download">
         {exporting
           ? <span className={styles.downloadPct}>{percent}%</span>
           : status === 'downloaded' ? <Check size={18} aria-hidden="true" /> : <Download size={18} aria-hidden="true" />}
-      </Pressable>
+      </Button>
     </span>
     {open && <div className={styles.menuSheetLayer} data-closing={closing || undefined} style={keyboard ? { paddingBottom: keyboard } : undefined} onPointerDown={(event) => { if (event.target === event.currentTarget) close() }}>
       <div className={styles.menuSheet} role="dialog" aria-label="폰트 다운로드">
@@ -405,8 +406,8 @@ function FontCardDownload() {
             {draft && <Pressable type="button" aria-label="지우기" onClick={(event) => { setDraft(''); (event.currentTarget.previousElementSibling as HTMLInputElement | null)?.focus() }}><X size={14} strokeWidth={3} aria-hidden="true" /></Pressable>}
           </label>
           <div className={styles.menuSheetActions}>
-            <Pressable type="button" onClick={close}>취소</Pressable>
-            <Pressable type="submit" data-primary disabled={!next} data-testid="dashboard-font-download-confirm">다운로드</Pressable>
+            <Button type="button" size="sheet" variant="secondary" onClick={close}>취소</Button>
+            <Button type="submit" size="sheet" variant="default" data-primary disabled={!next} data-testid="dashboard-font-download-confirm">다운로드</Button>
           </div>
         </form>
       </div>
@@ -431,7 +432,7 @@ function FontCardMenu({ label, name, onRename, onDuplicate, onDelete }: { label:
     close()
   }
   return <>
-    <Pressable type="button" className={styles.more} aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => { setDraft(name); show() }}><Ellipsis size={18} aria-hidden="true" /></Pressable>
+    <Button type="button" size="icon-md" variant="secondary" aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => { setDraft(name); show() }}><Ellipsis size={18} aria-hidden="true" /></Button>
     {open && <div className={styles.menuSheetLayer} data-closing={closing || undefined} style={keyboard ? { paddingBottom: keyboard } : undefined} onPointerDown={(event) => { if (event.target === event.currentTarget) close() }}>
       <div className={styles.menuSheet} role={step === 'menu' ? 'menu' : 'dialog'} aria-label={label}>
         {step === 'rename' && <form key="rename" className={styles.menuSheetStep} onSubmit={(event) => { event.preventDefault(); save() }}>
@@ -443,16 +444,16 @@ function FontCardMenu({ label, name, onRename, onDuplicate, onDelete }: { label:
             {draft && <Pressable type="button" aria-label="지우기" onClick={(event) => { setDraft(''); (event.currentTarget.previousElementSibling as HTMLInputElement | null)?.focus() }}><X size={14} strokeWidth={3} aria-hidden="true" /></Pressable>}
           </label>
           <div className={styles.menuSheetActions}>
-            <Pressable type="button" onClick={close}>취소</Pressable>
-            <Pressable type="submit" data-primary disabled={!canSave}>저장</Pressable>
+            <Button type="button" size="sheet" variant="secondary" onClick={close}>취소</Button>
+            <Button type="submit" size="sheet" variant="default" data-primary disabled={!canSave}>저장</Button>
           </div>
         </form>}
         {step === 'delete' && <div key="delete" className={styles.menuSheetStep}>
           <h3>이 폰트를 지울까요?</h3>
           <p>되돌릴 수 없어요.</p>
           <div className={styles.menuSheetActions}>
-            <Pressable type="button" onClick={() => setStep('menu')}>취소</Pressable>
-            <Pressable type="button" data-danger data-testid="dashboard-font-delete-confirm" onClick={() => { close(); onDelete?.() }}>삭제</Pressable>
+            <Button type="button" size="sheet" variant="secondary" onClick={() => setStep('menu')}>취소</Button>
+            <Button type="button" size="sheet" variant="destructive" data-danger data-testid="dashboard-font-delete-confirm" onClick={() => { close(); onDelete?.() }}>삭제</Button>
           </div>
         </div>}
         {step === 'menu' && <>
@@ -468,10 +469,10 @@ function FontCardMenu({ label, name, onRename, onDuplicate, onDelete }: { label:
 /** 머리 오른쪽 마이페이지. 누르면 계정 페이지(`/account`)가 밀려 들어온다. 안 본 한임 답이 있으면 빨간 점. */
 function AccountButton() {
   const unseen = useUnseenReply()
-  return <Pressable type="button" className={styles.avatar} aria-label="마이페이지" onClick={() => navigate('/account')} data-testid="dashboard-account">
+  return <Button type="button" size="icon-md" variant="plain" className="relative" aria-label="마이페이지" onClick={() => navigate('/account')} data-testid="dashboard-account">
     <UserRound size={20} aria-hidden="true" />
     {unseen && <span className={styles.avatarDot} aria-label="새 답장" />}
-  </Pressable>
+  </Button>
 }
 
 function SectionHead({ title, count, hint, onClick, testId }: { title: string; count?: number; hint?: string; onClick?: () => void; testId?: string }) {
@@ -769,13 +770,13 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
 
   return <div className={styles.home} data-testid="jamo-home" data-type={type}>
     <header className={styles.homeHead}>
-      <Pressable type="button" className={styles.back} aria-label="대시보드" onClick={() => navigate('/dashboard')}><ChevronLeft size={22} aria-hidden="true" /></Pressable>
+      <Button type="button" size="icon-md" variant="plain" aria-label="대시보드" onClick={() => navigate('/dashboard')}><ChevronLeft size={22} aria-hidden="true" /></Button>
       <h2>고칠 {JAMO_LABEL[type]}</h2>
       <ReportButton className={styles.homeReport} />
     </header>
     <div className={styles.homeScroll} data-locked={sheet ? true : undefined}>
       <div className={styles.chips} role="tablist" aria-label="묶기">
-        {groupings.map((g) => <Pressable key={g.id} type="button" role="tab" aria-selected={g.id === grouping.id} onClick={() => setGroupingId(g.id)}>{g.label}</Pressable>)}
+        {groupings.map((g) => <Button key={g.id} type="button" variant="chip" size="chip" className={styles.chip} role="tab" aria-selected={g.id === grouping.id} onClick={() => setGroupingId(g.id)}>{g.label}</Button>)}
         {/* 묶음 만들기. 늘 켜져 있다 — 시트 판에서 글자를 고르고, 도마에 담긴 게 있으면 미리 켜 둔다. */}
         <Pressable type="button" className={styles.chipAdd} aria-label="묶음 만들기" onClick={() => setSheet({ kind: 'create' })}><Plus size={18} aria-hidden="true" /></Pressable>
       </div>
@@ -807,7 +808,7 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
         {/* 도마가 이미 있는 묶음과 같으면 그 이름을 칩 끝에 보인다. */}
         {benchGroup && <span key="group" data-chip="__group" className={styles.benchGroupName}>{benchGroup.name}</span>}
       </div></div>
-      {benchCount > 0 && <Pressable type="button" className={styles.benchClear} aria-label="도마 비우기" onClick={clear}><Trash2 size={18} aria-hidden="true" /></Pressable>}
+      {benchCount > 0 && <Button type="button" size="icon-md" variant="faint" className={styles.benchClear} aria-label="도마 비우기" onClick={clear}><Trash2 size={18} aria-hidden="true" /></Button>}
       {borrowable.length > 0 && <Pressable type="button" className={styles.benchBorrow} aria-pressed={borrowState === 'on' ? true : borrowState === 'mixed' ? 'mixed' : false} onClick={toggleBorrow}><span className={styles.check} aria-hidden="true">{borrowState === 'mixed' ? <Minus size={14} strokeWidth={3} /> : <Check size={14} strokeWidth={3} />}</span>초성 모양</Pressable>}
       <Pressable type="button" className={styles.benchGo} disabled={benchCount === 0} onClick={() => openEditor(type, benchChars)}>{/* 숫자가 바뀔 때마다 새로 떠오른다 — key가 바뀌면 애니메이션이 다시 돈다. */}<span key={benchCount} className={styles.benchCount}>{benchCount}</span>개 고치기</Pressable>
     </footer>
@@ -882,7 +883,7 @@ function GroupSheet({ type, all, group, benchChars, builtinNameOf, onClose, onCr
       </div>
       <div className={styles.sheetActions}>
         {group && <Pressable type="button" className={styles.sheetDelete} onClick={() => onDelete(group.id)}>지우기</Pressable>}
-        <Pressable type="submit" className={styles.sheetSave} disabled={!name.trim() || draft.length === 0}>저장</Pressable>
+        <Button type="submit" size="sheet" variant="default" className={styles.sheetSave} disabled={!name.trim() || draft.length === 0}>저장</Button>
       </div>
     </form>
   </div>

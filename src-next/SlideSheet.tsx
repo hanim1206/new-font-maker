@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Pressable } from './components/ui/pressable'
+import { Button } from './components/ui/button'
 import styles from './SlideSheet.module.css'
 
 /** 한 장 = 그림 한 장 + 제목 + 짧은 본문. 그림이 없으면 글만. */
@@ -92,9 +92,9 @@ export function SlideSheet({ slides, label, eyebrow, centered, testId, firstLabe
     </div>
     <div className={styles.actions}>
       {at === 0
-        ? <Pressable type="button" onClick={close} data-testid={`${testId}-skip`}>{firstLabel}</Pressable>
-        : <Pressable type="button" onClick={() => move(-1)} data-testid={`${testId}-prev`}>이전</Pressable>}
-      <Pressable type="button" data-primary onClick={() => last ? close() : move(1)} data-testid={`${testId}-next`}>{last ? lastLabel : '다음'}</Pressable>
+        ? <Button type="button" size="sheet" variant="secondary" className={styles.minor} onClick={close} data-testid={`${testId}-skip`}>{firstLabel}</Button>
+        : <Button type="button" size="sheet" variant="secondary" className={styles.minor} onClick={() => move(-1)} data-testid={`${testId}-prev`}>이전</Button>}
+      <Button type="button" size="sheet" variant="default" className={styles.major} onClick={() => last ? close() : move(1)} data-testid={`${testId}-next`}>{last ? lastLabel : '다음'}</Button>
     </div>
   </div>
 

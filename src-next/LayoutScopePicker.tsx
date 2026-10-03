@@ -8,6 +8,7 @@ import type { ScopeSets } from './scopePicker'
 import { familyOfContext, finalOfContext, isEmptyRule, ruleGlyphCount, ruleKey, ruleName } from './scopeRule'
 import type { RuleJamoPart, ScopeRule } from './scopeRule'
 import { Pressable } from './components/ui/pressable'
+import { Button } from './components/ui/button'
 import styles from './LayoutScopePicker.module.css'
 
 /**
@@ -115,10 +116,10 @@ export function LayoutScopePicker({ source, rule, deltaLine, part, railRole, con
 
       {/* 어떻게 고를지 한 줄. `직접 선택`이 기본이고, 추천을 켜면 아래 줄은 그 규칙을 비추기만 한다(흐려진다). */}
       <div className={styles.chips} role="group" aria-label="범위 고르는 법">
-        <Pressable className={styles.manual} data-testid="scope-picker-chip" data-chip="manual" aria-pressed={chipOn === null} onClick={dropChip}>직접 선택</Pressable>
-        {chips.map((chip) => <Pressable key={chip.id} data-testid="scope-picker-chip" data-chip={chip.id} aria-pressed={chipOn === chip.id} onClick={() => pickChip(chip)}>
+        <Button type="button" variant="chip" size="chip-sm" className={`${styles.chip} ${styles.manual}`} data-testid="scope-picker-chip" data-chip="manual" aria-pressed={chipOn === null} onClick={dropChip}>직접 선택</Button>
+        {chips.map((chip) => <Button key={chip.id} type="button" variant="chip" size="chip-sm" className={styles.chip} data-testid="scope-picker-chip" data-chip={chip.id} aria-pressed={chipOn === chip.id} onClick={() => pickChip(chip)}>
           {chip.label} <em>{chip.count.toLocaleString()}</em>
-        </Pressable>)}
+        </Button>)}
       </div>
 
       <div className={styles.axes} data-dim={chipOn !== null || undefined}>
@@ -139,8 +140,8 @@ export function LayoutScopePicker({ source, rule, deltaLine, part, railRole, con
       </div>
 
       <footer className={styles.foot}>
-        <Pressable className={styles.cancel} onClick={onCancel} data-testid="scope-picker-cancel">취소</Pressable>
-        <Pressable className={styles.confirm} disabled={count === 0 || (!allowUnchanged && ruleKey(current) === ruleKey(rule))} onClick={() => onConfirm(current)} data-testid="scope-picker-confirm">{confirmLabel}</Pressable>
+        <Button type="button" size="sheet" variant="outline" className={styles.cancel} onClick={onCancel} data-testid="scope-picker-cancel">취소</Button>
+        <Button type="button" size="sheet" variant="default" className={styles.confirm} disabled={count === 0 || (!allowUnchanged && ruleKey(current) === ruleKey(rule))} onClick={() => onConfirm(current)} data-testid="scope-picker-confirm">{confirmLabel}</Button>
       </footer>
     </div>
   </div>

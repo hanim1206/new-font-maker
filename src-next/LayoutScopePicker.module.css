@@ -14,9 +14,8 @@
 .chips { flex: 0 0 auto; display: flex; align-items: center; gap: 5px; padding-bottom: 14px; overflow-x: auto; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
 .manual { position: sticky; left: 0; z-index: 1; box-shadow: 8px 0 8px -6px rgb(var(--color-surface)); }
-.chips button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; height: 27px; padding: 0 9px; border: 0; border-radius: var(--radius-sm); background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-2)); font-size: var(--font-11); font-weight: var(--weight-bold); white-space: nowrap; }
+.chip { flex: 0 0 auto; }
 .chips button em { color: rgb(var(--color-text-5)); font-size: var(--font-10); font-style: normal; font-variant-numeric: tabular-nums; }
-.chips button[aria-pressed='true'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 .chips button[aria-pressed='true'] em { color: rgb(var(--color-surface) / .65); }
 
 /* 축 줄 셋. 규칙식이 목록 셋이라 화면도 줄 셋이다. 위 한 줄과는 선으로 가른다 — 고르는 법과 고른 값은 다른 층이다. */
@@ -50,7 +49,5 @@
 .samples small { flex: 0 0 auto; color: rgb(var(--color-text-5)); font-size: var(--font-11); }
 
 .foot { flex: 0 0 auto; display: flex; gap: 8px; padding-top: 8px; }
-.foot button { min-height: 46px; text-align: center; border-radius: var(--radius-lg); font-size: var(--font-13); font-weight: var(--weight-heavy); }
-.cancel { flex: 0 0 96px; border: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); }
-.confirm { flex: 1 1 auto; border: 0; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
-.confirm:disabled { opacity: .4; }
+.cancel { flex: 0 0 96px; }
+.confirm { flex: 1 1 auto; }

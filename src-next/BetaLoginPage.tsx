@@ -6,7 +6,7 @@ import type { BetaSignInResult } from './betaAuth'
 import { welcomeNameOf } from './betaWelcome'
 import { markBetaGuidePending } from './betaGuide'
 import styles from './BetaLoginPage.module.css'
-import { Pressable } from './components/ui/pressable'
+import { Button } from './components/ui/button'
 
 const BetaWelcomeGlyphs = lazy(() => import('./BetaWelcomeGlyphs'))
 
@@ -82,7 +82,7 @@ export function BetaLoginPage({ onSignedIn }: { onSignedIn: () => void }) {
           />
         </label>
         {failure ? <small id="beta-login-failure" role="alert" data-testid="beta-login-failure">{failure}</small> : null}
-        <Pressable type="submit" className="text-center" {...revealStep(4)} disabled={busy || code.trim() === ''} data-testid="beta-login-submit">{busy ? '확인 중…' : '들어가기'}</Pressable>
+        <Button type="submit" size="block" variant="default" className={styles.submit} {...revealStep(4)} disabled={busy || code.trim() === ''} data-testid="beta-login-submit">{busy ? '확인 중…' : '들어가기'}</Button>
       </div>
     </form>
   </main>
@@ -110,7 +110,7 @@ export function AccountFontFailedPage({ reason, message }: { reason: 'network' |
           ? '인터넷 연결을 확인하고 다시 시도해 주세요.'
           : '저장된 폰트를 읽을 수 없어요. 초대한 사람에게 알려 주세요. 폰트는 서버에 그대로 있어요.'}</p>
       </header>
-      <Pressable type="button" className="text-center" onClick={() => window.location.reload()}>다시 시도</Pressable>
+      <Button type="button" size="block" variant="default" onClick={() => window.location.reload()}>다시 시도</Button>
       <footer>{message}</footer>
     </div>
   </main>

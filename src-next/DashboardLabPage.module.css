@@ -13,9 +13,8 @@
 /* 드로어가 열리면 알약 면은 빠진다 — 이름과 꺾쇠만 드로어 위에 남는다. */
 .head .switcher[aria-expanded='true'] { background: transparent; }
 .head .switcher:disabled { background: transparent; padding-left: 8px; }
-.head button { min-height: 40px; padding: 0 10px; border: 0; background: transparent; color: rgb(var(--color-text-4)); font-size: var(--font-12); }
 
-/* 마이페이지. 아이콘 원 하나, 누르면 계정 페이지. 안 본 답장은 오른쪽 위 빨간 점. */
+/* 제보 단추 자리(생김새는 ReportButton이 덮는다). 마이페이지는 `Button` icon-md · plain, 안 본 답장은 오른쪽 위 빨간 점. */
 .head .avatar { position: relative; width: 40px; min-height: 40px; padding: 0; display: grid; place-items: center; border-radius: var(--radius-full); color: rgb(var(--color-text-3)); }
 .head .avatar:active { background: rgb(var(--color-surface-2)); }
 .avatarDot { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border-radius: var(--radius-full); background: rgb(var(--color-destructive)); box-shadow: 0 0 0 2px rgb(var(--color-surface)); }
@@ -65,8 +64,6 @@
 
 /* 카드 안 추출 버튼. 워크스페이스 폰트 탭의 `OTF 추출`과 같은 생김새. */
 .card footer { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: auto; }
-/* `…` 더보기. 다운로드 옆 같은 크기의 원, 색은 옅게 — 주 동작은 다운로드. */
-.more { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); }
 /* 카드 `…` 시트. 화면 아래에 좌우 12px 띄워 뜨고, 뒤는 머리까지 어둡게. 셸 너비(480)를 넘지 않는다. */
 .menuSheetLayer { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; background: rgb(var(--color-scrim) / .36); transition: padding-bottom var(--motion-normal) var(--ease-standard); animation: fadeIn var(--motion-normal) var(--ease-standard); }
 .menuSheet { width: min(100%, 480px); box-sizing: border-box; margin: 0 12px calc(env(safe-area-inset-bottom) + 12px); padding: 10px; border-radius: var(--radius-xl); background: rgb(var(--color-surface)); display: flex; flex-direction: column; animation: sheetUp 360ms cubic-bezier(0.32, 0.72, 0, 1); }
@@ -78,7 +75,7 @@
 .menuSheet > button:not(:disabled):active { background: rgb(var(--color-surface-2)); }
 .menuSheet > button:disabled { color: rgb(var(--color-text-5)); }
 .menuSheet > button small { margin-left: auto; color: rgb(var(--color-text-5)); font-size: var(--font-13); font-weight: var(--weight-medium); }
-.menuSheet [data-danger] { color: rgb(var(--color-destructive)); }
+.menuSheet > button[data-danger] { color: rgb(var(--color-destructive)); }
 .menuSheet > button[data-danger] svg { color: inherit; }
 /* 시트 안 둘째 화면(이름 바꾸기 · 삭제 확인). 제목 · 내용 · 아래 큰 단추 둘. 바뀔 때 살짝 떠오른다. */
 .menuSheetStep { margin: 0; padding: 4px 6px 2px; display: flex; flex-direction: column; gap: 8px; animation: stepIn 220ms cubic-bezier(0.2, 0, 0, 1); }
@@ -89,15 +86,12 @@
 .menuSheetField input::placeholder { color: rgb(var(--color-text-5)); font-weight: var(--weight-medium); }
 .menuSheetField button { position: absolute; right: 12px; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-text-5) / .45); color: rgb(var(--color-surface)); animation: popIn var(--motion-normal) var(--ease-standard); }
 .menuSheetActions { margin-top: 16px; display: flex; gap: 8px; }
-.menuSheetActions button { flex: 1; text-align: center; min-height: 56px; border: 0; border-radius: var(--radius-xl); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: var(--font-18); font-weight: var(--weight-bold); transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
-.menuSheetActions button:not(:disabled):active { transform: scale(0.97); }
-.menuSheetActions button[data-primary] { flex: 2; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
-.menuSheetActions button[data-primary]:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
-.menuSheetActions button[data-danger] { flex: 2; background: rgb(var(--color-destructive)); color: rgb(var(--color-inverse-foreground)); }
-/* 원 하나(40px). 탭하면 색이 바뀌고 오른쪽으로 자라며 글자가 들어온다 — 있던 요소가 제자리에서 자라는 전환. */
-.download { width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); transition: transform var(--motion-fast) var(--ease-standard); }
-.download:disabled { opacity: 1; }
-.download:not(:disabled):active { transform: scale(0.94); }
+/* 아래 큰 단추 둘은 `Button` sheet. 여기선 폭만 — 주 동작(data-primary · data-danger)이 두 배. */
+.menuSheetActions > * { flex: 1; }
+.menuSheetActions > [data-primary], .menuSheetActions > [data-danger] { flex: 2; }
+/* 다운로드 원(`Button` icon-md). 받는 동안은 잠겨도 흐리지 않는다 — 안의 퍼센트와 둘레 진행이 보여야 한다. */
+/* 내보내는 동안(비활성)에도 검정 원 그대로 — 둘레 진행 링과 퍼센트가 보여야 한다. */
+.downloadWrap .download:disabled { opacity: 1; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 
 /* 왼쪽 레일 + 내용. 레일은 회색 길 위 흰 알약, 스크롤에 붙어 따라온다.
    회색 길은 `.body` 배경이 바닥까지 칠하고, 레일은 버튼 높이만 — 레일이 화면만큼 크면 바닥에서 밀려 올라간다. 바닥 여백도 `.body` 안에. */
@@ -149,17 +143,15 @@
 .homeHead h2 { margin: 0; font-size: var(--font-16); font-weight: var(--weight-heavy); }
 .homeReport { width: 40px; min-height: 40px; margin-left: auto; padding: 0; display: grid; place-items: center; border: 0; border-radius: var(--radius-full); background: none; color: rgb(var(--color-text-3)); }
 .homeReport:active { background: rgb(var(--color-surface-2)); }
-.back { width: 40px; min-height: 40px; display: grid; place-items: center; border: 0; border-radius: var(--radius-full); background: transparent; color: rgb(var(--color-text-3)); }
 /* 스크롤바 자리는 늘 비워 둔다. 안 그러면 경계 높이에서 스크롤바 → 판 너비 → 칸 크기 → 판 높이가 매 프레임 뒤집힌다. */
 .homeScroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
 
 /* 묶기 칩 한 줄. 켜진 칩만 검정. */
 .chips { display: flex; gap: 6px; padding: 12px 12px 20px; overflow-x: auto; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
-.chips button { flex: none; min-height: 34px; padding: 0 13px; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-3)); font-size: var(--font-13); font-weight: var(--weight-bold); transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard); }
-.chips button[aria-selected='true'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+.chip { flex: none; }
 /* 칩 줄 끝 `+` — 묶음 만들기. 칩과 같은 높이의 동그라미. */
-.chips .chipAdd { width: 34px; padding: 0; display: grid; place-items: center; background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); }
+.chips .chipAdd { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: var(--radius-full); background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); }
 
 /* 판. 카드와 소제목은 전부 절대좌표, 자리는 transform으로 옮긴다. */
 .board { position: relative; transition: height var(--motion-slow) var(--ease-standard); }
@@ -187,7 +179,7 @@
 .benchChips > div { position: relative; width: max-content; min-height: 40px; display: flex; align-items: center; gap: 6px; }
 .benchChips button { flex: none; min-width: 36px; height: 36px; display: inline-grid; place-items: center; padding: 0 6px; border: 0; border-radius: var(--radius-md); background: rgb(var(--color-surface-2)); color: inherit; font-size: var(--font-18); font-weight: var(--weight-bold); }
 .benchChips em { color: rgb(var(--color-text-5)); font-size: var(--font-12); font-style: normal; white-space: nowrap; animation: fadeIn var(--motion-normal) var(--ease-standard); }
-.benchClear { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: var(--radius-full); background: transparent; color: rgb(var(--color-text-6)); animation: popIn var(--motion-normal) var(--ease-standard); }
+.benchClear { flex: none; animation: popIn var(--motion-normal) var(--ease-standard); }
 /* 받침 도마만. 켜면 담긴 것 중 초성에도 있는 자음이 초성 기본 획, 끄면 켜기 전 모양. 일부만 같으면 ─. */
 .benchBorrow { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px 0 9px; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-4)); font-size: var(--font-13); font-weight: var(--weight-bold); white-space: nowrap; transition: color var(--motion-normal) var(--ease-standard); animation: popIn var(--motion-normal) var(--ease-standard); }
 .benchBorrow[aria-pressed='true'], .benchBorrow[aria-pressed='mixed'] { color: rgb(var(--color-foreground)); }
@@ -224,8 +216,7 @@
 .sheetDiff[data-empty] { color: rgb(var(--color-destructive)); }
 .sheetActions { display: flex; gap: 8px; }
 .sheetDelete { flex: none; min-height: 52px; padding: 0 18px; border: 0; border-radius: var(--radius-lg); background: transparent; color: rgb(var(--color-text-4)); font-size: var(--font-16); font-weight: var(--weight-bold); }
-.sheetSave { flex: 1; text-align: center; min-height: 52px; border: 0; border-radius: var(--radius-lg); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: var(--font-16); font-weight: var(--weight-heavy); }
-.sheetSave:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
+.sheetSave { flex: 1; }
 .toast { position: absolute; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 72px); z-index: 25; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 8px 12px 16px; border-radius: var(--radius-lg); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: var(--font-13); font-weight: var(--weight-semibold); animation: popIn var(--motion-normal) var(--ease-standard); }
 .toast button { flex: none; min-height: 32px; padding: 0 10px; border: 0; background: transparent; color: inherit; font-size: var(--font-13); font-weight: var(--weight-heavy); }
 
