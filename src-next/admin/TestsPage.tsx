@@ -158,7 +158,7 @@ export function TestsPage() {
   const [kind, setKind] = useState<TestKind | null>(null)
   /** 종류마다 고른 워크트리. 없으면 가장 최근 것. */
   const [picked, setPicked] = useState<Partial<Record<TestKind, string>>>({})
-  /** 종류마다 마지막 실행 · 마지막 전체 중 무엇을 보나. 기본은 마지막 실행. */
+  /** 종류마다 마지막 실행 · 마지막 전체 중 무엇을 보나. 고르기 전엔 도는 중이면 마지막 실행, 아니면 마지막 전체. */
   const [slot, setSlot] = useState<Partial<Record<TestKind, 'last' | 'full'>>>({})
 
   /** 마지막으로 따라간 실행. 새 실행이 시작되면 그 탭 · 워크트리로 옮겨 간다(한 실행에 한 번만 — 그 뒤엔 사용자가 고른 탭을 둔다). */
@@ -171,7 +171,8 @@ export function TestsPage() {
     followed.current = key
     setKind(live.kind)
     setPicked((prev) => ({ ...prev, [live.kind]: live.worktree }))
-    setSlot((prev) => ({ ...prev, [live.kind]: 'last' }))
+    // 고른 칸을 비워 기본으로: 도는 동안은 이 실행, 끝나면 마지막 전체.
+    setSlot((prev) => ({ ...prev, [live.kind]: undefined }))
   }, [runs])
 
   useEffect(() => {
@@ -221,7 +222,9 @@ export function TestsPage() {
       const full = last && runs.find((run) => run.kind === key && run.slot === 'full' && run.worktree === last.worktree)
       // 마지막 실행이 곧 전체 실행이면 고를 게 없다.
       const choosable = full && full.startedAt !== last.startedAt
-      const run = choosable && slot[key] === 'full' ? full : last
+      // 기본: 도는 중이면 그 실행, 아니면 마지막 전체(파일 몇 개만 돌린 기록이 전체를 가리지 않게).
+      const shown = slot[key] ?? (runStateOf(last) === 'running' ? 'last' : 'full')
+      const run = choosable && shown === 'full' ? full : last
       return <TabsContent key={key} value={key} className="flex max-w-3xl flex-col gap-3">
         {choosable && <ChoiceGroup variant="segment" aria-label="볼 실행" className="w-64">
           <ChoiceItem checked={run === last} onClick={() => setSlot((prev) => ({ ...prev, [key]: 'last' }))}>마지막 실행 · {last.items.length}개</ChoiceItem>
