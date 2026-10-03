@@ -1,5 +1,4 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import { ensureDevNotoFont, useDevNotoSwap } from './devNotoSwap'
 import { navigate, usePathname, useRouteKey } from './router'
 import { AccountPage } from './AccountPage'
@@ -68,12 +67,10 @@ function usePinchLock(): void {
 
 /**
  * 개발 서버 전용 — 눈 ③ 확인용 우상단 고정 버튼 줄. 프로덕션 빌드에서는 분기가 사라진다.
- * `자동 보정`: 속공간 지키기 켬/끔(모든 화면). `노토로`: 검수 격자 글자를 노토 산스(같은 굵기)로 교체 — 검수 경로에서만 보인다.
+ * `노토로`: 검수 격자 글자를 노토 산스(같은 굵기)로 교체 — 검수 경로에서만 보인다.
  */
 function DevToggles() {
   const pathname = usePathname()
-  const on = useGlobalStyleStore((state) => state.style.counterKeep !== false)
-  const setCounterKeep = useGlobalStyleStore((state) => state.setCounterKeep)
   const notoOn = useDevNotoSwap((state) => state.on)
   const toggleNoto = useDevNotoSwap((state) => state.toggle)
   useEffect(() => { if (notoOn) ensureDevNotoFont() }, [notoOn])
@@ -84,9 +81,6 @@ function DevToggles() {
           노토로 {notoOn ? '켬' : '끔'}
         </Button>
       )}
-      <Button variant={on ? 'default' : 'outline'} size="sm" data-testid="dev-counter-keep" onClick={() => setCounterKeep(!on)}>
-        자동 보정 {on ? '켬' : '끔'}
-      </Button>
     </span>
   )
 }

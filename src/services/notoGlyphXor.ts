@@ -1,4 +1,5 @@
 import * as polygonBoolean from './polygonBoolean'
+import { isCounterKeepOn } from '../stores/globalStyleStore'
 import type { GlobalStyle } from '../stores/globalStyleStore'
 import type { BoxConfig, DecomposedSyllable, DeepReadonly, InkRegion, JamoData, LayoutSchema, LayoutType, Part } from '../types'
 import { weightToMultiplier } from '../utils/globalStyleUtils'
@@ -41,7 +42,7 @@ export function appGlyphInkRegions(syllable: DecomposedSyllable, placement: Glyp
     globalLinecap: globalStyle.linecap, globalLinejoin: globalStyle.linejoin,
     horizontalInkBounds: HORIZONTAL_INK_BOUNDS,
     // 속공간 지키기 — 화면(SvgRenderer) · OTF와 같은 스위치.
-    counterKeep: globalStyle.counterKeep !== false ? { stemScale: stemScaleOf(globalStyle.strokeStyle) } : undefined,
+    counterKeep: isCounterKeepOn(globalStyle) ? { stemScale: stemScaleOf(globalStyle.strokeStyle) } : undefined,
   })
   if (!resolved.primitives.length) return { ok: false, message: '앱 획이 없습니다.' }
   const ink = materializeFinalGlyphInk(resolved.primitives, globalStyle.strokeStyle, INK_OPTIONS)

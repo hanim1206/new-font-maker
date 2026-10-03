@@ -21,13 +21,16 @@ describe('속공간 지키기 — 제품 입구', () => {
   })
   afterAll(() => { vi.unstubAllGlobals() })
 
-  it('기본 켜짐이 실험실 셈과 같은 두께를 낸다, 굵기 400 이하는 그대로', async () => {
+  it('켜면 실험실 셈과 같은 두께를 낸다, 굵기 400 이하는 그대로', async () => {
     const [exportUtils, deltaStore, exportStore, layout, style, placement] = await Promise.all([
       import('../src/services/fontExportUtils'), import('./layoutDeltaStore'), import('./fontExportStore'),
       import('../src/stores/layoutStore'), import('../src/stores/globalStyleStore'), import('../src/services/designBodyPlacement'),
     ])
     const placementOf = exportStore.placementResolverOf(MODEL, deltaStore.layoutDeltaSnapshot())
     layout.useLayoutStore.getState().setGlobalPadding(placement.designBodyPaddingForSize(840, 910, FONT_SPACE))
+    // 기본은 꺼짐(10-03, 개발 중). 이 테스트는 켠 상태의 셈을 본다.
+    expect(style.isCounterKeepOn(style.useGlobalStyleStore.getState().style)).toBe(false)
+    style.useGlobalStyleStore.getState().setCounterKeep(true)
 
     const collect = (char: string, weight: number, counterKeep?: boolean) => {
       style.useGlobalStyleStore.getState().updateStyle('weight', weight)
@@ -42,7 +45,7 @@ describe('속공간 지키기 — 제품 입구', () => {
       const off400 = collect(char, 400, false)!
       on400.strokes.forEach((item, index) => expect(item.stroke.thickness).toBe(off400.strokes[index].stroke.thickness))
 
-      // 굵기 900: 기본(켜짐) = 보정 끈 수집에 실험실 셈(제품 손잡이)을 얹은 것. 상자가 원점만큼 평행이동해 있어 소수점 오차만 허용한다.
+      // 굵기 900: 켜짐 = 보정 끈 수집에 실험실 셈(제품 손잡이)을 얹은 것. 상자가 원점만큼 평행이동해 있어 소수점 오차만 허용한다.
       const on900 = collect(char, 900)!
       const off900 = collect(char, 900, false)!
       const kept = withCounterKeep(off900, DEFAULT_COUNTER_FLOOR, 1, 1, DEFAULT_BETWEEN_OPENING, 0, DEFAULT_TOTAL_MINSCALE).data
@@ -58,6 +61,5 @@ describe('속공간 지키기 — 제품 입구', () => {
     const offByStore = collect('빼', 900)!
     const offByCondition = collect('빼', 900, false)!
     offByStore.strokes.forEach((item, index) => expect(item.stroke.thickness).toBe(offByCondition.strokes[index].stroke.thickness))
-    style.useGlobalStyleStore.getState().setCounterKeep(true)
   })
 })

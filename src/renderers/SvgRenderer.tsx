@@ -3,6 +3,7 @@ import type { DecomposedSyllable, BoxConfig, Part, ResolvedCenterlinePrimitive, 
 import { PART_COLORS } from '../constants/editorColors'
 import { pointsToSvgD } from '../utils/pathUtils'
 import { weightToMultiplier } from '../utils/globalStyleUtils'
+import { isCounterKeepOn } from '../stores/globalStyleStore'
 import type { GlobalStyle } from '../stores/globalStyleStore'
 import { brushInkGroupsToSvgPaths, strokeToBrushInkGroups } from '../services/brushGeometry'
 import { resolveGlyphInkPrimitives } from '../services/glyphInkResolver'
@@ -102,8 +103,8 @@ export function SvgRenderer({
   // 글로벌 스타일 값 (기본값 적용)
   const slant = globalStyle?.slant ?? 0
   const weightMultiplier = weightMultiplierProp ?? (globalStyle ? weightToMultiplier(globalStyle.weight) : 1.0)
-  // 속공간 지키기 — 실효 스타일의 스위치. 기본 켜짐, 굵기 400 이하는 resolver가 아무것도 안 바꾼다.
-  const counterKeepOn = !!globalStyle && globalStyle.counterKeep !== false
+  // 속공간 지키기 — 실효 스타일의 스위치. 기본 꺼짐, 굵기 400 이하는 resolver가 아무것도 안 바꾼다.
+  const counterKeepOn = isCounterKeepOn(globalStyle)
   const counterKeepStemScale = stemScaleOf(globalStyle?.strokeStyle)
   // 스위치 켬/끔 두 벌을 들고 있는다 — 자동 보정을 껐다 켜며 견줄 때 한 번 계산한 쪽은 바로 돌아온다.
   // 나머지 입력이 바뀌면 통째로 새 캐시라 묵은 값이 남지 않는다.

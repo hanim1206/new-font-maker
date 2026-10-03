@@ -10,7 +10,7 @@ import { brushInkGroupsToSvgPaths, strokeToBrushInkGroups } from '../src/service
 import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
 import { stemScaleOf } from '../src/services/strokeRenderGeometry'
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
-import { weightToMultiplier } from '../src/stores/globalStyleStore'
+import { isCounterKeepOn, weightToMultiplier } from '../src/stores/globalStyleStore'
 import type {
   AnchorPoint,
   BoxConfig,
@@ -131,8 +131,8 @@ describe('SvgRenderer 공통 잉크 소비 계약', () => {
       globalLinecap: style.linecap,
       globalLinejoin: style.linejoin,
       horizontalInkBounds: { min: 0, max: 1 },
-      // 속공간 지키기 — SvgRenderer와 같은 스위치(기본 켜짐, 400 초과에서만 두께를 바꾼다).
-      counterKeep: { stemScale: stemScaleOf(style.strokeStyle) },
+      // 속공간 지키기 — SvgRenderer와 같은 스위치(기본 꺼짐, 켜도 400 초과에서만 두께를 바꾼다).
+      counterKeep: isCounterKeepOn(style) ? { stemScale: stemScaleOf(style.strokeStyle) } : undefined,
     })
     const expected = resolved.primitives.map((primitive) => {
       if (primitive.kind !== 'centerline') {
@@ -342,7 +342,7 @@ describe('SvgRenderer 공통 잉크 소비 계약', () => {
       globalLinejoin: style.linejoin,
       horizontalInkBounds: { min: 0, max: 1 },
       // 속공간 지키기 — SvgRenderer와 같은 스위치.
-      counterKeep: { stemScale: stemScaleOf(style.strokeStyle) },
+      counterKeep: isCounterKeepOn(style) ? { stemScale: stemScaleOf(style.strokeStyle) } : undefined,
     })
     const centerlines = resolved.primitives.map((primitive) => {
       if (primitive.kind !== 'centerline') throw new Error('중심선 resolver 계약이 아닙니다.')

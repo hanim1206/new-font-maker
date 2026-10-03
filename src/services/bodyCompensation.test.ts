@@ -117,17 +117,20 @@ describe('폰트 데이터의 자동 보정 끔', () => {
 })
 
 describe('폰트 데이터의 속공간 지키기 끔', () => {
-  it('없으면 켜짐, `false`는 읽고 쓸 때 남는다. 다른 값은 거른다', async () => {
-    const { useGlobalStyleStore } = await import('../stores/globalStyleStore')
+  it('없으면 꺼짐, `true`는 읽고 쓸 때 남는다. 옛 `false`는 꺼짐으로 읽고, 다른 값은 거른다', async () => {
+    const { isCounterKeepOn, loadedGlobalStyle, useGlobalStyleStore } = await import('../stores/globalStyleStore')
     const { collectFontData } = await import('./fontDataBridge')
-    useGlobalStyleStore.getState().setCounterKeep(false)
-    const off = collectFontData()
-    expect(off.globalStyle.style.counterKeep).toBe(false)
-    expect(parseAndMigrateFontData(off).ok).toBe(true)
     useGlobalStyleStore.getState().setCounterKeep(true)
     const on = collectFontData()
-    expect('counterKeep' in on.globalStyle.style).toBe(false)
-    const broken = structuredClone(off) as unknown as { globalStyle: { style: Record<string, unknown> } }
+    expect(on.globalStyle.style.counterKeep).toBe(true)
+    expect(parseAndMigrateFontData(on).ok).toBe(true)
+    useGlobalStyleStore.getState().setCounterKeep(false)
+    const off = collectFontData()
+    expect('counterKeep' in off.globalStyle.style).toBe(false)
+    const legacy = loadedGlobalStyle({ ...off.globalStyle.style, counterKeep: false })
+    expect('counterKeep' in legacy).toBe(false)
+    expect(isCounterKeepOn(legacy)).toBe(false)
+    const broken = structuredClone(on) as unknown as { globalStyle: { style: Record<string, unknown> } }
     broken.globalStyle.style.counterKeep = 'no'
     expect(parseAndMigrateFontData(broken).ok).toBe(false)
   })

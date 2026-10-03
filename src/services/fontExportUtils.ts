@@ -15,7 +15,7 @@ import type {
 } from '../types'
 import { useJamoStore } from '../stores/jamoStore'
 import { mergeLayoutPadding, useLayoutStore } from '../stores/layoutStore'
-import { resolveEffectiveStyle, useGlobalStyleStore, weightToMultiplier } from '../stores/globalStyleStore'
+import { isCounterKeepOn, resolveEffectiveStyle, useGlobalStyleStore, weightToMultiplier } from '../stores/globalStyleStore'
 import { groupBeakResolverOf, useJamoGroupStore, type GroupBeakResolver } from '../stores/jamoGroupStore'
 import { stemBeakGroupOf, type StemBeakStyle } from './stemBeak'
 import type { GlobalStyle } from '../stores/globalStyleStore'
@@ -172,7 +172,7 @@ export function collectGlyphDataWithPlacement(char: string, placementOf?: GlyphP
     globalLinejoin: effectiveStyle.linejoin,
     horizontalInkBounds: { min: 0, max: 1 },
     // 속공간 지키기 — 화면(SvgRenderer)과 같은 조건으로 켠다. 실험실은 조건으로 끈다.
-    counterKeep: (condition?.counterKeep ?? effectiveStyle.counterKeep !== false)
+    counterKeep: (condition?.counterKeep ?? isCounterKeepOn(effectiveStyle))
       ? { stemScale: stemScaleOf(effectiveStyle.strokeStyle) }
       : undefined,
   })
