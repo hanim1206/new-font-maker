@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Circle, CircleCheck, CircleMinus, CircleX, LoaderCircle } from 'lucide-react'
+import { ChevronRight, Circle, CircleCheck, CircleMinus, CircleX, LoaderCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { ChoiceGroup, ChoiceItem } from '@/components/ui/choice-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -127,12 +127,14 @@ function TestList({ kind, items }: { kind: TestKind; items: TestRunItem[] }) {
       const status = groupStatusOf(group.items)
       // 단위 테스트는 갈래마다 접어 두고 도는 중 · 실패만 펼친다. e2e는 파일마다 접어 둔다. 누르면 접고 편다.
       const open = status === 'failed' || status === 'running'
-      return <details key={group.name} open={open} className="rounded-lg bg-surface-2 px-3.5 py-2">
-        <summary className="flex cursor-pointer flex-col gap-0.5 text-sm font-semibold">
+      return <details key={group.name} open={open} className="group/fold rounded-lg bg-surface-2 px-3.5 py-2">
+        <summary className="-mx-2 flex cursor-pointer list-none flex-col gap-0.5 rounded-md px-2 py-0.5 text-sm font-semibold transition-colors hover:bg-surface-3 [&::-webkit-details-marker]:hidden">
           <span className="flex items-center gap-2">
             <StatusIcon status={status} />
             <span className="min-w-0 flex-1 truncate">{kind === 'unit' ? group.name : TEST_NOTES[group.name]?.[0] ?? group.name.split('/').pop()}</span>
             <span className="shrink-0 text-xs font-normal tabular-nums text-text-dim-5">{kind === 'unit' ? `${group.items.length}개` : tests.length ? `${done} / ${tests.length}` : '안 돌림'}</span>
+            {/* 접고 펴는 줄이라는 표시. 펼치면 아래로 돈다. */}
+            <ChevronRight className="size-4 shrink-0 text-text-dim-5 transition-transform group-open/fold:rotate-90" aria-hidden />
           </span>
           {kind === 'e2e' && <NoteLine file={group.name} />}
         </summary>
