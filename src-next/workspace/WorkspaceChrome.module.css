@@ -21,6 +21,3 @@
   .back span { display: none; }
 }
 
-@media (min-width: 720px) {
-  .shell { width: min(100%, 1120px); }
-}
