@@ -55,6 +55,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({ className, variant, size, asChild = false, ...props }, ref) => {
   const Comp = asChild ? Slot : 'button'
-  return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
+  // data-slot · data-variant · data-size: 스타일가이드 미리보기가 화면에서 이 단추를 찾는 표시. 생김새와 무관.
+  return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} data-slot="button" data-variant={variant ?? 'default'} data-size={size ?? 'default'} {...props} />
 })
 Button.displayName = 'Button'

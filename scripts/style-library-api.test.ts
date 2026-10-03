@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { fileURLToPath } from 'node:url'
-import { scanButtonUsage } from './styleReviewApi'
+import { scanButtonUsage } from './styleLibraryApi'
 
-describe('검토판 단추 쓰임 세기', () => {
+describe('스타일가이드 라이브러리 — 단추 쓰임 세기', () => {
   it('제품 코드의 Button을 강조 · 크기별로 센다', async () => {
     const usage = await scanButtonUsage(fileURLToPath(new URL('..', import.meta.url)))
     expect(usage.size.sheet?.length ?? 0).toBeGreaterThan(5)

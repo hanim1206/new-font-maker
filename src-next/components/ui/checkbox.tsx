@@ -25,6 +25,8 @@ export const Checkbox = React.forwardRef<
   <CheckboxPrimitive.Root
     ref={ref}
     className={cn(checkboxVariants({ tone }), className)}
+    data-slot="checkbox"
+    data-tone={tone ?? 'primary'}
     {...props}
   >
     <CheckboxPrimitive.Indicator className="flex items-center justify-center text-current">

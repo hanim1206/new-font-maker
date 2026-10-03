@@ -48,7 +48,7 @@ const ChoiceContext = React.createContext<ChoiceVariants>({})
 
 export function ChoiceGroup({ variant, size, className, ...props }: React.HTMLAttributes<HTMLDivElement> & ChoiceVariants & { 'aria-label': string }) {
   return <ChoiceContext.Provider value={{ variant, size }}>
-    <div role="radiogroup" className={cn(groupVariants({ variant }), className)} {...props} />
+    <div role="radiogroup" className={cn(groupVariants({ variant }), className)} data-slot="choice-group" data-variant={variant ?? 'tile'} data-size={size ?? 'default'} {...props} />
   </ChoiceContext.Provider>
 }
 

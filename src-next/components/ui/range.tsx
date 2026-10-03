@@ -15,7 +15,7 @@ export function Field({ label, value, as = 'label', className, children, ...prop
   children: React.ReactNode
 } & Omit<React.HTMLAttributes<HTMLElement>, 'children'>) {
   const Comp = as
-  return <Comp className={cn('flex min-w-0 flex-col gap-2 pb-0.5 pt-6', className)} {...props}>
+  return <Comp className={cn('flex min-w-0 flex-col gap-2 pb-0.5 pt-6', className)} data-slot="field" {...props}>
     <span className="flex items-baseline justify-between text-14 font-semibold text-text-dim-3">
       {label}{value !== undefined && value !== null && <output className="text-18 font-extrabold tabular-nums text-foreground">{value}</output>}
     </span>
@@ -28,6 +28,7 @@ export const RangeBar = React.forwardRef<HTMLInputElement, Omit<React.InputHTMLA
   <input
     ref={ref}
     type="range"
+    data-slot="range-bar"
     className={cn(
       'm-0 box-content h-3 w-full cursor-ew-resize touch-none appearance-none overflow-hidden rounded-full border-y-[10px] border-transparent bg-surface-3 bg-clip-padding',
       'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-default disabled:opacity-35',

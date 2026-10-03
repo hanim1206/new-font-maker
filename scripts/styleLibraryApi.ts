@@ -1,20 +1,16 @@
-import { readFile, readdir, writeFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
-import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import { rejectReasonOf } from './betaInviteApi'
-import { EMPTY_REVIEW, applyReview, isReviewFile, serializeReview, type ReviewFile, type ReviewMark } from '../src-next/styleReview'
 
 /**
- * 스타일가이드 검토판(`/style-guide`)의 기록 읽기 · 쓰기. 개발 서버에만 붙는다(`apply: 'serve'`).
- * 기록은 `src-next/style-review.json` — 커밋한다. AI는 같은 파일을 읽고 요청을 처리한다.
- * GET은 기록과 함께 공용 단추가 어디서 쓰이는지(강조 · 크기별 파일:줄)를 코드에서 세어 돌려준다.
+ * 스타일가이드 라이브러리(`/style-guide`)가 부품이 어디서 쓰이는지 묻는 곳. 읽기만 한다. 개발 서버에만 붙는다(`apply: 'serve'`).
+ * 공용 단추가 강조 · 크기별로 어느 파일 몇째 줄에서 쓰이는지 코드에서 센다. 화면은 파일을 화면 주소로 바꿔 보여 준다.
  * 문지기는 관리자 API와 같다(`rejectReasonOf` — 이 맥 · 전용 헤더 · 같은 출처).
  */
 
-export const STYLE_REVIEW_API = '/api/style-review'
-export const STYLE_REVIEW_FILE = 'src-next/style-review.json'
-const BODY_LIMIT = 20_000
+export const STYLE_LIBRARY_API = '/api/style-library'
 
 function send(response: ServerResponse, status: number, body: unknown): void {
   response.statusCode = status
@@ -23,21 +19,7 @@ function send(response: ServerResponse, status: number, body: unknown): void {
   response.end(JSON.stringify(body))
 }
 
-async function readJson(request: IncomingMessage): Promise<unknown> {
-  let raw = ''
-  for await (const chunk of request) {
-    raw += chunk
-    if (raw.length > BODY_LIMIT) throw new Error('요청이 너무 큽니다.')
-  }
-  return JSON.parse(raw || '{}')
-}
 
-async function readReview(root: string): Promise<ReviewFile> {
-  try {
-    const value = JSON.parse(await readFile(path.join(root, STYLE_REVIEW_FILE), 'utf8')) as unknown
-    return isReviewFile(value) ? value : EMPTY_REVIEW
-  } catch { return EMPTY_REVIEW }
-}
 
 export interface ButtonUse { file: string; line: number }
 export interface ButtonUsage { variant: Record<string, ButtonUse[]>; size: Record<string, ButtonUse[]> }
@@ -74,7 +56,7 @@ export async function scanButtonUsage(root: string): Promise<ButtonUsage> {
   const walk = async (dir: string): Promise<string[]> => (await Promise.all((await readdir(dir, { withFileTypes: true })).map((entry) => {
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) return entry.name === 'ui' ? [] : walk(full)
-    return /\.tsx$/.test(entry.name) && !/\.test\.tsx$/.test(entry.name) && !['StyleGuideLabPage.tsx', 'StyleReviewBoard.tsx'].includes(entry.name) ? [full] : []
+    return /\.tsx$/.test(entry.name) && !/\.test\.tsx$/.test(entry.name) && !['StyleGuideLabPage.tsx', 'styleLibrary.tsx'].includes(entry.name) ? [full] : []
   }))).flat()
   for (const file of await walk(path.join(root, 'src-next'))) {
     const text = await readFile(file, 'utf8')
@@ -88,24 +70,17 @@ export async function scanButtonUsage(root: string): Promise<ButtonUsage> {
   return usage
 }
 
-export function styleReviewApiPlugin(root: string): Plugin {
+export function styleLibraryApiPlugin(root: string): Plugin {
   return {
-    name: 'style-review-api',
+    name: 'style-library-api',
     apply: 'serve',
     configureServer(server) {
-      server.middlewares.use(STYLE_REVIEW_API, async (request, response) => {
+      server.middlewares.use(STYLE_LIBRARY_API, async (request, response) => {
         const rejected = rejectReasonOf(request)
         if (rejected) return send(response, 403, { error: rejected })
+        if (request.method !== 'GET') return send(response, 405, { error: 'GET만 받습니다.' })
         try {
-          if (request.method === 'GET') return send(response, 200, { review: await readReview(root), usage: { button: await scanButtonUsage(root) } })
-          if (request.method !== 'POST') return send(response, 405, { error: 'GET · POST만 받습니다.' })
-          const { id, mark, fingerprint, note } = await readJson(request) as { id?: string; mark?: ReviewMark | null; fingerprint?: string; note?: string }
-          if (!id || !/^[\w.-]+$/.test(id)) return send(response, 400, { error: '항목 번호가 없습니다.' })
-          if (mark !== null && mark !== 'ok' && mark !== 'request') return send(response, 400, { error: 'mark는 ok · request · null' })
-          if (mark && !fingerprint) return send(response, 400, { error: '지문이 없습니다.' })
-          const next = applyReview(await readReview(root), id, mark ? { mark, fingerprint: fingerprint!, note, at: new Date().toISOString().slice(0, 10) } : null)
-          await writeFile(path.join(root, STYLE_REVIEW_FILE), serializeReview(next))
-          return send(response, 200, { review: next })
+          return send(response, 200, { button: await scanButtonUsage(root) })
         } catch (error) {
           return send(response, 500, { error: error instanceof Error ? error.message : String(error) })
         }

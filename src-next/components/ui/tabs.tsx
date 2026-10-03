@@ -42,7 +42,7 @@ export const TabsList = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List> & VariantProps<typeof listVariants>
 >(({ className, variant, ...props }, ref) => (
   <TabsVariantContext.Provider value={variant ?? 'default'}>
-    <TabsPrimitive.List ref={ref} className={cn(listVariants({ variant }), className)} {...props} />
+    <TabsPrimitive.List ref={ref} className={cn(listVariants({ variant }), className)} data-slot="tabs" data-variant={variant ?? 'default'} {...props} />
   </TabsVariantContext.Provider>
 ))
 TabsList.displayName = TabsPrimitive.List.displayName
