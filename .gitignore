@@ -18,5 +18,13 @@ reference-data/font-guide-calibrations/*.final-component-g2.v1.json
 reference-data/font-guide-calibrations/*.final-component-g3.v1.json
 __pycache__/
 
-# npm run font:sample이 만드는 시험용 OTF
-reference-data/font-check/*.otf
+# npm run font:sample이 만드는 시험용 OTF · 압축본
+reference-data/font-check/
+
+# 굵기 900 손 디자인 실험 산출물(폰트 JSON · 변환 스크립트 · 시트 그림) — 플랜 `2026-10-02_속공간-벌리기-층`
+reference-data/manual-900/
+# 참고 폰트 틈 규칙 역추론 결과(scripts/reference-lab/extract_gap_rule.py로 재생성)
+reference-data/weight-gap-rule.v1.json
+
+# Codex 로컬 설정
+.codex/
