@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, ChevronRight, Copy, MousePointerClick, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Copy, LayoutGrid, MousePointerClick, PanelRightClose, PanelRightOpen, X } from 'lucide-react'
 import { Button } from './components/ui/button'
 import { FILE_SCREEN, LIBRARY_GROUPS, itemIdsOfElement, libraryItems } from './styleLibrary'
 import type { LibraryGroup, LibraryItem, LibraryScreen } from './styleLibrary'
@@ -74,13 +74,14 @@ export function StyleGuideLabPage() {
   // 보는 것: 묶음 한눈 보기(`#group.<id>`) 또는 항목 하나(`#<번호>`).
   const [selectedId, setSelectedId] = useState(() => {
     const hash = idOfHash()
-    return items.some((item) => item.id === hash) || LIBRARY_GROUPS.some((group) => `group.${group.id}` === hash) ? hash : 'group.button-variant'
+    return hash === 'board' || items.some((item) => item.id === hash) || LIBRARY_GROUPS.some((group) => `group.${group.id}` === hash) ? hash : 'board'
   })
+  const viewBoard = selectedId === 'board'
   const viewGroup = LIBRARY_GROUPS.find((group) => `group.${group.id}` === selectedId) ?? null
-  const item = viewGroup ? items[0] : items.find((entry) => entry.id === selectedId) ?? items[0]
+  const item = viewGroup || viewBoard ? items[0] : items.find((entry) => entry.id === selectedId) ?? items[0]
   const groupOf = (entry: LibraryItem) => LIBRARY_GROUPS.find((group) => group.label === entry.group)!
   const currentGroup = viewGroup ?? groupOf(item)
-  const [openGroup, setOpenGroup] = useState<string | null>(currentGroup.id)
+  const [openGroup, setOpenGroup] = useState<string | null>(viewBoard ? null : currentGroup.id)
   const select = (id: string) => {
     setSelectedId(id)
     window.history.replaceState(null, '', `#${id}`)
@@ -134,6 +135,7 @@ export function StyleGuideLabPage() {
   }, [])
   const go = (screen: LibraryScreen, selector = item.selector) => {
     if (!screen.route) return
+    setPreviewOpen(true)
     const token = Date.now()
     pending.current = { screen, selector, token }
     setFound('찾는 중…')
@@ -145,6 +147,8 @@ export function StyleGuideLabPage() {
   }
 
   // 미리보기에서 누른 부품 → 왼쪽 위에 칩으로 쌓는다(최근 것 먼저, 10개). 앱은 원래대로 동작한다.
+  // 미리보기 접기 — 대지를 넓게 볼 때. 접어도 iframe은 남겨 두어 누른 칩이 그대로 쌓인다.
+  const [previewOpen, setPreviewOpen] = useState(true)
   const [steps, setSteps] = useState<{ key: number; ids: string[]; route: string }[]>([])
   const watchClicks = () => {
     const doc = frame.current?.contentDocument
@@ -177,7 +181,7 @@ export function StyleGuideLabPage() {
 
   const screens = screensOf(item, usage)
 
-  return <main className="grid h-dvh grid-cols-[220px_minmax(0,1fr)_420px] grid-rows-[auto_minmax(0,1fr)] bg-background text-foreground" data-testid="style-guide-lab">
+  return <main className={`grid h-dvh grid-rows-[auto_minmax(0,1fr)] ${previewOpen ? 'grid-cols-[220px_minmax(0,1fr)_420px]' : 'grid-cols-[220px_minmax(0,1fr)_48px]'} bg-background text-foreground`} data-testid="style-guide-lab">
     <div className="col-span-2 flex min-h-[52px] items-center gap-2 overflow-x-auto border-b border-border-subtle bg-surface px-4 py-2" data-testid="style-guide-steps">
       <MousePointerClick className="size-4 shrink-0 text-text-dim-5" aria-hidden="true" ref={(node) => { node?.parentElement?.scrollTo({ left: node.parentElement.scrollWidth }) }} />
       {steps.length === 0
@@ -186,7 +190,7 @@ export function StyleGuideLabPage() {
           {index > 0 && <span className="text-text-dim-6">›</span>}
           <span className="flex items-center overflow-hidden rounded-full border border-border bg-card text-12 font-semibold">
             {step.ids.map((id, part) => <button key={id} type="button" onClick={() => openStep(id, step.route)} title={`${id} · ${step.route}`}
-              className={`px-2.5 py-1 hover:bg-surface-3 ${part > 0 ? 'border-l border-border-subtle' : ''} ${!viewGroup && item.id === id ? 'bg-foreground text-surface hover:bg-foreground' : ''}`}>{titleOf(id)}</button>)}
+              className={`px-2.5 py-1 hover:bg-surface-3 ${part > 0 ? 'border-l border-border-subtle' : ''} ${!viewGroup && !viewBoard && item.id === id ? 'bg-foreground text-surface hover:bg-foreground' : ''}`}>{titleOf(id)}</button>)}
           </span>
         </span>)}
           <Button type="button" variant="ghost" size="sm" className="ml-auto shrink-0" onClick={() => setSteps([])}><X aria-hidden="true" />비우기</Button>
@@ -194,6 +198,10 @@ export function StyleGuideLabPage() {
     </div>
     <nav className="flex min-h-0 flex-col gap-5 overflow-y-auto border-r border-border-subtle bg-surface px-3 py-5" aria-label="부품 목록">
       <div className="px-2"><h1 className="text-18 font-extrabold">스타일가이드</h1><p className="text-12 text-text-dim-5">보기 전용 · 번호로 말해 주세요</p></div>
+      <button type="button" onClick={() => { select('board'); setOpenGroup(null) }} aria-current={viewBoard || undefined}
+        className="-mt-1 flex items-center gap-2 rounded-sm px-2 py-1.5 text-left text-14 font-semibold hover:bg-surface-3 aria-[current]:bg-foreground aria-[current]:text-surface" data-testid="style-guide-board-link">
+        <LayoutGrid className="size-4" aria-hidden="true" />전체 대지
+      </button>
       {(['토큰', '부품'] as const).map((section) => <div key={section} className="flex flex-col gap-0.5">
         <span className="px-2 pb-1 text-11 font-bold text-text-dim-5">{section}</span>
         {LIBRARY_GROUPS.filter((group) => group.section === section).map((group) => {
@@ -206,7 +214,7 @@ export function StyleGuideLabPage() {
               <span className="flex-1">{group.label}</span><span className="text-12 font-normal text-text-dim-5">{members.length}</span>
             </button>
             {open && <div className="ml-[15px] flex flex-col gap-0.5 border-l border-border-subtle py-0.5 pl-2">
-              {members.map((entry) => <button key={entry.id} type="button" onClick={() => select(entry.id)} aria-current={(!viewGroup && entry.id === item.id) || undefined}
+              {members.map((entry) => <button key={entry.id} type="button" onClick={() => select(entry.id)} aria-current={(!viewGroup && !viewBoard && entry.id === item.id) || undefined}
                 className="rounded-sm px-2 py-1 text-left text-13 text-text-dim-3 hover:bg-surface-3 aria-[current]:bg-foreground aria-[current]:font-semibold aria-[current]:text-surface">{entry.title}</button>)}
             </div>}
           </div>
@@ -224,7 +232,25 @@ export function StyleGuideLabPage() {
         <span className="text-text-dim-5">이 브라우저에만 · 미리보기 화면에도 덮인다</span>
       </div>
 
-      {viewGroup ? <div className="flex flex-col gap-6 px-8 py-8">
+      {viewBoard ? <div className="min-h-0 flex-1 overflow-auto bg-surface-3 [background-image:radial-gradient(rgb(var(--color-border))_1px,transparent_1px)] [background-size:16px_16px]" data-testid="style-guide-board">
+        {/* 전체 대지: 묶음마다 한 줄, 부품 프레임을 가로로. 가로 · 세로로 스크롤. 프레임 이름을 누르면 그 항목. */}
+        <div className="flex w-max flex-col gap-12 p-10">
+          {LIBRARY_GROUPS.map((group) => <section key={group.id} className="flex flex-col gap-3">
+            <button type="button" onClick={() => pickGroup(group)} className="w-fit text-left hover:underline">
+              <span className="text-12 font-bold text-text-dim-5">{group.section}</span>
+              <h2 className="text-24 font-extrabold">{group.label}</h2>
+            </button>
+            <div className="flex items-start gap-5">
+              {items.filter((entry) => entry.group === group.label).map((entry) => <div key={entry.id} className={`flex shrink-0 flex-col gap-2 ${group.id === 'color' ? 'w-[640px]' : group.id === 'type' ? 'w-[520px]' : 'w-max max-w-[560px]'}`} data-board-item={entry.id}>
+                <button type="button" onClick={() => select(entry.id)} className="flex w-fit items-baseline gap-2 text-left hover:underline">
+                  <strong className="text-13">{entry.title}</strong><code className="text-11 text-text-dim-5">{entry.id}</code>
+                </button>
+                <div className="rounded-lg border border-border-subtle bg-surface p-5 shadow-sm">{entry.story()}</div>
+              </div>)}
+            </div>
+          </section>)}
+        </div>
+      </div> : viewGroup ? <div className="flex flex-col gap-6 px-8 py-8">
         <header className="flex flex-col gap-2">
           <span className="text-12 font-bold text-text-dim-5">{viewGroup.section}</span>
           <h2 className="text-28 font-extrabold">{viewGroup.label}</h2>
@@ -261,9 +287,14 @@ export function StyleGuideLabPage() {
       </div>}
     </section>
 
-    <aside className="row-span-2 row-start-1 col-start-3 flex min-h-0 flex-col items-center gap-2 border-l border-border-subtle bg-surface-3 px-4 py-5">
-      <span className="text-12 font-semibold text-text-dim-4">미리보기 · <code>{frameSrc}</code></span>
-      <iframe ref={frame} src={frameSrc} onLoad={onFrameLoad} title="미리보기" className="w-[390px] flex-1 rounded-xl border border-border bg-card shadow-md" data-testid="style-guide-preview" />
+    <aside className={`row-span-2 row-start-1 col-start-3 flex min-h-0 flex-col items-center gap-2 border-l border-border-subtle bg-surface-3 py-5 ${previewOpen ? 'px-4' : 'px-1'}`}>
+      <div className="flex w-full items-center justify-center gap-1">
+        {previewOpen && <span className="text-12 font-semibold text-text-dim-4">미리보기 · <code>{frameSrc}</code></span>}
+        <Button type="button" variant="ghost" size="icon" className={previewOpen ? 'ml-auto' : ''} onClick={() => setPreviewOpen((open) => !open)} aria-label={previewOpen ? '미리보기 접기' : '미리보기 펴기'} title={previewOpen ? '미리보기 접기' : '미리보기 펴기'}>
+          {previewOpen ? <PanelRightClose aria-hidden="true" /> : <PanelRightOpen aria-hidden="true" />}
+        </Button>
+      </div>
+      <iframe ref={frame} src={frameSrc} onLoad={onFrameLoad} title="미리보기" className={previewOpen ? 'w-[390px] flex-1 rounded-xl border border-border bg-card shadow-md' : 'pointer-events-none h-px w-px opacity-0'} data-testid="style-guide-preview" />
     </aside>
   </main>
 }
