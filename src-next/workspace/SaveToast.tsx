@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import styles from './SaveToast.module.css'
+import { NoticeIcon } from '../components/ui/notice-icon'
 import { Pressable } from '../components/ui/pressable'
 
 /**
@@ -26,9 +27,10 @@ export function SaveToast({
       role={tone === 'error' ? 'alert' : 'status'}
       data-testid="save-toast"
     >
+      {tone !== 'saving' && <NoticeIcon tone={tone === 'error' ? 'error' : 'done'} className={styles.icon} />}
       <span>{message}</span>
       {action && <Pressable type="button" className={styles.action} onClick={action.onClick}>{action.label}</Pressable>}
-      {onDismiss && <Pressable type="button" onClick={onDismiss} aria-label="알림 닫기"><X size={15} /></Pressable>}
+      {onDismiss && <Pressable type="button" className={styles.close} onClick={onDismiss} aria-label="알림 닫기"><X aria-hidden="true" /></Pressable>}
     </div>
   )
 }

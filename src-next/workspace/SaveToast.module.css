@@ -1,39 +1,33 @@
-/* 화면 아래 가운데. 접힌 정밀 조절 드로어(손잡이 54px) 바로 위에 앉아 손잡이를 가리지 않는다. */
+/* 화면 아래 가운데. 접힌 정밀 조절 드로어(손잡이 54px) 바로 위에 앉아 손잡이를 가리지 않는다. 알림 막대(단추 하나)와 같은 토스식 어두운 막대. */
 .toast {
   position: fixed;
   z-index: 70;
   bottom: calc(68px + env(safe-area-inset-bottom));
   left: 50%;
-  max-width: min(92vw, 360px);
+  width: max-content;
+  max-width: min(calc(100vw - 32px), 420px);
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 6px 6px 14px;
+  gap: 10px;
+  padding: 12px 6px 12px 16px;
   transform: translateX(-50%);
-  border-radius: var(--radius-lg);
-  background: rgb(var(--color-inverse) / .92);
+  border-radius: var(--radius-xl);
+  background: rgb(var(--color-inverse) / .96);
   box-shadow: 0 10px 28px rgb(var(--color-scrim) / .24);
   color: rgb(var(--color-inverse-foreground));
-  font-size: var(--font-12);
+  font-size: var(--font-14);
   font-weight: var(--weight-semibold);
   animation: save-toast-in .16s ease-out;
 }
-.toast[data-tone='error'] { background: rgb(var(--color-destructive-dark)); }
-.toast[data-tone='done'] { background: rgb(var(--color-primary)); }
-/* 글 단추. 닫기와 같은 높이, 글이 있어 폭은 내용대로. */
-.toast button.action { width: auto; padding: 0 12px; font-size: var(--font-12); font-weight: var(--weight-bold); white-space: nowrap; }
-.toast span { min-width: 0; }
-/* 레포의 44px 터치 규격을 토스트 닫기에도 지킨다. */
-.toast button {
-  flex: 0 0 auto;
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: rgb(var(--color-inverse-foreground) / .16);
-  color: inherit;
-}
+.toast:not(:has(button)) { padding-right: 18px; }
+.icon { flex: none; width: 22px; height: 22px; color: rgb(var(--color-primary-light)); }
+.toast[data-tone='error'] .icon { color: rgb(var(--color-destructive)); }
+.toast[data-tone='done'] .icon { color: rgb(var(--color-success)); }
+.toast span { min-width: 0; line-height: 1.4; word-break: keep-all; }
+.action { flex: none; min-height: 40px; padding: 0 10px; border-radius: var(--radius-md); color: color-mix(in srgb, rgb(var(--color-primary)) 55%, rgb(var(--color-inverse-foreground))); font-weight: var(--weight-bold); white-space: nowrap; }
+.action:active { background: rgb(var(--color-inverse-foreground) / .1); }
+.close { flex: none; width: 36px; height: 40px; display: grid; place-items: center; border-radius: var(--radius-md); color: rgb(var(--color-inverse-foreground) / .55); }
+.close svg { width: 16px; height: 16px; }
 @keyframes save-toast-in { from { opacity: 0; transform: translate(-50%, 6px); } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
