@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.clear())
+  // 편집기 문장은 대시보드 예시 문장을 따른다. 이 파일의 글자 기대는 `별을 노래하는 마음으로`에 맞춰 있어 그 문장으로 고정한다.
+  await page.addInitScript(() => localStorage.setItem('font-maker-sample-sentence', '별을 노래하는 마음으로'))
   await page.goto('/calibration')
 })
 
@@ -23,7 +25,7 @@ test('폰트 전체와 현재 레이아웃의 네모꼴을 따로 조절한다',
   await expect.poll(async () => (await sentenceButton.boundingBox())?.width ?? 0).toBeGreaterThan(beforeAdvance?.width ?? 0)
 
   await settings.getByRole('tab', { name: '현재 레이아웃' }).click()
-  await expect(settings.getByText('초성·혼합중성만 별도 적용')).toBeVisible()
+  await expect(settings.getByText('초성·세로중성·종성만 별도 적용')).toBeVisible()
   await settings.locator('label').filter({ hasText: '세로' }).locator('input').fill('800')
   await expect(settings.getByText('800', { exact: true })).toBeVisible()
 

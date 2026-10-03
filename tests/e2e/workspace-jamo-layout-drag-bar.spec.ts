@@ -44,7 +44,7 @@ test('보선을 끄는 동안은 저장하지 않고, 손을 떼면 켠 옵션�
   await expect(stored).toHaveCount(0)
 })
 
-test('보선을 캔버스 밖까지 끌어도 글자 칸(0–1em) 안에서 멈춘다', async ({ page }) => {
+test('보선을 캔버스 밖까지 끌어도 글자 몸(노토 몸통) 안에서 멈춘다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   const canvas = page.getByTestId('review-canvas')
@@ -56,7 +56,8 @@ test('보선을 캔버스 밖까지 끌어도 글자 칸(0–1em) 안에서 멈�
   await page.mouse.move(pxOf(x1), y)
   await page.mouse.down()
   await page.mouse.move(pxOf(x1) - 300 / DRAG_GAIN, y, { steps: 12 })
-  expect(Number(await handle.getAttribute('x1'))).toBeCloseTo(0, 3)
+  // 왼쪽으로는 글자 몸 왼끝(노토 몸통 여백 50u = 0.05em, `railLimits` GLYPH_BODY)에서 멈춘다.
+  expect(Number(await handle.getAttribute('x1'))).toBeCloseTo(0.05, 2)
   await page.mouse.move(pxOf(x1) + 600 / DRAG_GAIN, y, { steps: 24 })
   // 오른쪽으로는 같은 부품의 오른변에 막히거나 칸 끝(1em)에서 멈춘다.
   expect(Number(await handle.getAttribute('x1'))).toBeLessThanOrEqual(1)

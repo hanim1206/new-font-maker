@@ -22,8 +22,7 @@ describe('snapRail', () => {
     const other = snapRail({ value: 0.392, original: 0.6, axis: 'y', candidates: [candidates[0]] })
     expect(other.hit?.kind).not.toBe('rail')
   })
-  // 임시(2026-10-02): railSnap.ts `GRID_SNAP_ENABLED = false` 동안 격자 스냅이 꺼져 있다. flag를 되살릴 때 skip을 푼다.
-  it.skip('기준선도 없으면 1/16 격자에, 1/4 자리면 굵은선 이름으로', () => {
+  it('기준선도 없으면 1/16 격자에, 1/4 자리면 굵은선 이름으로', () => {
     expect(snapRail({ value: 0.255, original: 0.6, axis: 'x', candidates: [] })).toMatchObject({ value: 0.25, hit: { kind: 'grid', label: '격자 1/4' } })
     expect(snapRail({ value: 0.31, original: 0.6, axis: 'x', candidates: [] })).toMatchObject({ value: 0.3125, hit: { kind: 'grid', label: '격자 1/16' } })
   })

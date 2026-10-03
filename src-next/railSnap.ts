@@ -19,9 +19,6 @@ const FINE = 1 / 16
 const COARSE = 1 / 4
 const EPSILON = 1e-9
 
-/** 임시(2026-10-02, 사용자 요청): 노토 900 수동 맞추기 작업 동안 격자(1/16 · 1/4) 스냅만 끈다. 처음 자리 · 기준선 · 딱 붙음은 그대로. 되살리려면 true. */
-const GRID_SNAP_ENABLED = false
-
 function nearestGrid(value: number): { value: number; label: string } | null {
   const snapped = Math.round(value / FINE) * FINE
   if (snapped < -EPSILON || snapped > 1 + EPSILON) return null
@@ -51,7 +48,7 @@ export function snapRail(input: {
     if (!best || rank < bestRank || (rank === bestRank && distance < Math.abs(best.value - value))) best = candidate
   }
   if (best) return { value: best.value, hit: { kind: 'rail', label: best.label, id: best.id, value: best.value } }
-  const grid = GRID_SNAP_ENABLED ? nearestGrid(value) : null
+  const grid = nearestGrid(value)
   if (grid && Math.abs(grid.value - value) <= radius.grid) return { value: grid.value, hit: { kind: 'grid', label: grid.label, value: grid.value } }
   return { value, hit: null }
 }

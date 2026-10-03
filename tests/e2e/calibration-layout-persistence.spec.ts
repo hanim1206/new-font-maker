@@ -49,6 +49,8 @@ test('Calibration 레이아웃 제스처를 canonical 저장·Undo·Redo·재접
     }
   }, { layoutKey: LAYOUT_KEY })
   await page.goto('/calibration')
+  // 처음 열 때 저장소가 한 번 다시 써진다(디바운스 300ms). 화면이 다 뜬 뒤 그 쓰기가 지나가고 나서 센다.
+  await expect(page.getByRole('button', { name: '보정 문장 직접 입력' })).toBeVisible({ timeout: 20_000 })
   await page.waitForTimeout(450)
   await resetLayoutWriteCount(page)
 

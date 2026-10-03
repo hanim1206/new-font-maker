@@ -82,8 +82,12 @@ test('네모꼴 가로 600: 방향키 한 번은 화면의 1u이고, 저장되�
 test('네모꼴 가로 600: 자동 보정으로 세로줄기만 얇아지고, 끄면 원래 두께다', async ({ page }) => {
   await setBody(page, 600, 910)
   await page.goto('/design-body-lab')
-  // 네모꼴 열기 확인 화면은 접혀 있다(속공간 진행 지도 아래).
-  await page.getByTestId('body-lab-past').locator('summary').click()
+  // 속공간 진행 지도가 아직 안 본 질문을 팝업으로 띄우면 덮인다. 닫고 간다.
+  await expect(page.getByTestId('counter-map')).toBeVisible()
+  const popup = page.getByTestId('counter-question-popup')
+  if (await popup.count()) await popup.getByRole('button', { name: '닫기' }).click()
+  // 네모꼴 열기 확인 화면은 접혀 있다(속공간 진행 지도 아래). 위 지도가 그리는 동안 높이가 흔들려 누르기가 빗나가므로 직접 편다.
+  await page.getByTestId('body-lab-past').evaluate((details) => { (details as HTMLDetailsElement).open = true })
   await expect(page.getByTestId('review-canvas')).toBeVisible({ timeout: 60_000 })
   // 레이아웃 편집을 `이`로 연다. ㅣ 기둥의 잉크 폭이 곧 세로줄기 두께다.
   await page.getByRole('textbox', { name: '문장' }).fill('이')

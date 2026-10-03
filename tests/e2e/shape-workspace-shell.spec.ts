@@ -45,7 +45,7 @@ test('스타일 화면은 대시보드 `스타일`로 들어오고, 머리 `‹ 
   await expect(page).toHaveURL(/\/workspace\/font$/)
   await expect(page.getByRole('heading', { level: 2, name: '스타일' })).toBeVisible()
   const summary = page.getByTestId('font-workspace')
-  await expect(summary.getByRole('listitem')).toHaveText(['네모꼴 노토', '붓 일반', '굵기 400', '부리 없음'])
+  await expect(summary.getByRole('listitem')).toHaveText(['네모꼴 기본', '붓 일반', '굵기 400', '부리 없음'])
   // 추출은 여기서 하지 않는다 — 대시보드 폰트 카드의 다운로드.
   await expect(page.getByRole('button', { name: /OTF/ })).toHaveCount(0)
   await page.getByTestId('workspace-font-home').click()

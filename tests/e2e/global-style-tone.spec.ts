@@ -4,6 +4,8 @@ import { expect, test, type Page } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
+  // 편집기 문장은 대시보드 예시 문장을 따른다. 이 파일의 글자 기대는 `별을 노래하는 마음으로`에 맞춰 있어 그 문장으로 고정한다.
+  await page.addInitScript(() => { if (!localStorage.getItem('font-maker-sample-sentence')) localStorage.setItem('font-maker-sample-sentence', '별을 노래하는 마음으로') })
 })
 
 const storedStyle = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('font-maker-global-style') ?? '{}').state?.style)
@@ -174,10 +176,12 @@ test('글자 네모꼴은 막대 하나다: 좁게 ↔ 기본 ↔ 넓게, 좁히
 })
 
 test('기울어진 글자: 잉크 · 핸들만 기울고 눈금은 곧으며, 점을 세로로 끌어도 손가락 아래에 있다', async ({ page }) => {
-  await page.goto(`/workspace/jamo?mode=stroke&char=${encodeURIComponent('한')}`)
+  const strokeUrl = `/workspace/jamo?mode=stroke&char=${encodeURIComponent('한')}`
+  await page.goto(strokeUrl)
   await expect(page.getByTestId('focus-canvas').locator('svg')).toBeVisible()
   await setStoredStyle(page, { slant: 12 })
-  await page.reload()
+  // 열고 나면 주소에서 글자 · 모드를 지운다(`23b0c1a`). 새로고침 대신 같은 주소로 다시 연다.
+  await page.goto(strokeUrl)
   const svg = page.getByTestId('focus-canvas').locator('svg')
   await expect(svg).toBeVisible()
 

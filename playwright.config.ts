@@ -9,6 +9,8 @@ const origin = `http://127.0.0.1:${port}`
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // 실험실 스펙은 넓은 회귀에서 뺀다(실험실은 타입 검사 + 스크린샷이 규칙). 돌리려면 `E2E_LABS=1`.
+  testIgnore: process.env.E2E_LABS ? [] : ['**/*-lab.spec.ts', '**/admin-labs.spec.ts'],
   fullyParallel: false,
   reporter: 'line',
   use: {

@@ -14,31 +14,36 @@ test('에의 ㅔ 가로점은 네모꼴 축소 비율을 따라 유지된다', a
     return armBox.width / glyphBox.width
   }
   const before = await ratio()
+  const glyphWidth = (await glyphButton.boundingBox())?.width ?? 0
 
   await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
   const settings = page.getByRole('tabpanel', { name: '글자 네모꼴 설정' })
   await settings.locator('label').filter({ hasText: '가로' }).locator('input').fill('600')
-  const after = await ratio()
-
-  expect(after).toBeCloseTo(before, 1)
-  expect(after).toBeGreaterThan(.2)
+  // 칸 폭이 먼저 줄고, 획은 300ms쯤 뒤 한 번 더 그려져야 자리를 잡는다. 바로 재면 그 사이 값(.12)이 잡힌다.
+  await expect.poll(async () => (await glyphButton.boundingBox())?.width ?? 0).toBeLessThan(glyphWidth * .8)
+  await expect.poll(ratio).toBeCloseTo(before, 1)
+  expect(await ratio()).toBeGreaterThan(.15)
 })
 
-test('글로벌 가로폭을 줄이면 예시 문장의 띄어쓰기도 함께 줄어든다', async ({ page }) => {
+// 2026-10-02 `a4b2ddc`부터 문장 줄은 추출 폰트와 같은 값으로 그린다. 공백은 220 고정이고 몸통을 따르지 않는다(`fontMetrics.ts`). 글자 칸만 몸통 폭에 비례해 줄어든다.
+test('글로벌 가로폭을 줄이면 글자 칸은 줄고 띄어쓰기는 220 그대로다', async ({ page }) => {
   await page.addInitScript(() => localStorage.clear())
   await page.goto('/calibration')
   await page.getByRole('button', { name: '보정 문장 직접 입력' }).click()
   await page.getByRole('textbox', { name: '보정 문장 직접 입력' }).fill('가 나')
 
   const space = page.getByLabel('공백')
+  const glyph = page.getByRole('button', { name: /^가 편집/ })
   const before = await space.boundingBox()
-  if (!before) throw new Error('공백의 화면 경계를 찾지 못했습니다.')
+  const glyphBefore = await glyph.boundingBox()
+  if (!before || !glyphBefore) throw new Error('공백 또는 가의 화면 경계를 찾지 못했습니다.')
 
   await page.getByRole('button', { name: '글로벌 스타일 설정' }).click()
   const settings = page.getByRole('tabpanel', { name: '글자 네모꼴 설정' })
   await settings.locator('label').filter({ hasText: '가로' }).locator('input').fill('595')
+  await expect.poll(async () => ((await glyph.boundingBox())?.width ?? 0) / glyphBefore.width).toBeCloseTo(595 / 840, 1)
   const after = await space.boundingBox()
   if (!after) throw new Error('변경된 공백의 화면 경계를 찾지 못했습니다.')
 
-  expect(after.width / before.width).toBeCloseTo(.7, 1)
+  expect(after.width / before.width).toBeCloseTo(1, 2)
 })

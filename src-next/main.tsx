@@ -20,6 +20,7 @@ import { DevCrashProbe } from './devCrash'
 import { EditLockedPage } from './EditLockedPage'
 import { editLockName, holdEditLock, takeStealRequest } from './editLock'
 import { reportInterruptedExport } from './exportInterrupted'
+import { navigate } from './router'
 import { installErrorLog, isQuotaExceeded, onErrorRecorded, recordError } from './errorLog'
 import { suspendWork } from './workGuard'
 
@@ -114,7 +115,8 @@ function adoptLocalCopy(): void {
  * 들어오면 대시보드부터(마지막 폰트, 없으면 최근 폰트 · 새 폰트). 편집 주소를 바로 열거나 새로고침하면 마지막 폰트로 바로 연다.
  */
 async function gate(): Promise<void> {
-  if (window.location.pathname === FONTS_PATH) window.history.replaceState(null, '', DASHBOARD_PATH)
+  // 라우터 스토어는 이 파일을 읽을 때 옛 주소를 이미 들었다. 그냥 `replaceState`하면 화면은 `/fonts`로 남는다(개발 서버는 옛 문장 보정으로 샌다).
+  if (window.location.pathname === FONTS_PATH) navigate(DASHBOARD_PATH, { replace: true })
   // 관리자 화면(`/admin/*`). 개발 서버에서만, 로그인과 상관없이(발급 API가 이 맥에서만 받는다). 배포 번들에는 없다.
   if (import.meta.env.DEV && isAdminPath(window.location.pathname)) {
     const { AdminApp } = await import('./admin/AdminApp')

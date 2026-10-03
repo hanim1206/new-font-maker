@@ -15,8 +15,8 @@
         "x2": 915,
         "y2": 844
       },
-      "commandCount": 168,
-      "commandsSha256": "64ce5b37fe42997fd34b13300c1896c8c024900ff6a27b50cf2aa830a61b48e4"
+      "commandCount": 97,
+      "commandsSha256": "42187a1ab47921e68745ddb849e65595926d51fda74fc7eda02b1a39be862ab8"
     }
   },
   "rectangle": {
@@ -55,8 +55,8 @@
         "x2": 926,
         "y2": 849
       },
-      "commandCount": 98,
-      "commandsSha256": "730f455cb1a8fb629499bd487d4e3e398cf8bd8a530838b0282950ad40ac3e16"
+      "commandCount": 60,
+      "commandsSha256": "821c29e6e41208907d0a611e58302a17250a9c102c284258ce9b4bc87a0e7b70"
     }
   }
 }

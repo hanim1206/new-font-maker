@@ -775,7 +775,7 @@ test('홀자 상자 변을 옮겨 적용하면 ㅣ 글자도 문장 줄에서 �
   await expect(resetButton(page)).toHaveCount(0)
 })
 
-test('ㅏ의 홀자 오른변을 밀면 보가 길어지고 기둥 두께는 그대로다', async ({ page }) => {
+test('ㅏ의 홀자 오른변을 당기면 보가 짧아지고 기둥 두께는 그대로다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EA%B0%80&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   // 안 켠 부품 상자는 칠하지 않아 그림 rect가 없다. 늘 있는 누름 상자로 읽는다(같은 자리).
@@ -784,8 +784,9 @@ test('ㅏ의 홀자 오른변을 밀면 보가 길어지고 기둥 두께는 그
   const width = Number(await medialBox.getAttribute('width'))
   await selectMedialBox(page)
   await selectRail(page, '홀자 오른변')
-  await page.keyboard.press('Shift+ArrowRight')
-  await expect.poll(async () => Number(await medialBox.getAttribute('width'))).toBeCloseTo(width + 0.01, 6)
+  // 가의 ㅏ는 오른변이 이미 글자 몸 오른끝(노토 몸통, `railLimits`) 바로 앞이라 더 밀 수 없다 — 안쪽으로 당겨 본다.
+  await page.keyboard.press('Shift+ArrowLeft')
+  await expect.poll(async () => Number(await medialBox.getAttribute('width'))).toBeCloseTo(width - 0.01, 6)
   expect(Number(await medialBox.getAttribute('x'))).toBeCloseTo(x, 6)
   await expect(storedOption(page).first()).toBeVisible()
 })

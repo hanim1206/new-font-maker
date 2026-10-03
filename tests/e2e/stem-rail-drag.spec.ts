@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test'
 /**
  * 획 편집의 홀자 줄기. 자리(보선)는 레이아웃 편집에서만 옮긴다 — 획 편집에서 줄기를 세로로 옮기면 그 홀자의 저장 획이 바뀌고(보선 위에 얹히는 차이) 보선 Δ는 안 생긴다.
  * 모양(휨 · 기울기)을 고치면 그 획을 잡았을 때 도구 줄 맨 아래 `전파`가 뜨고, 누르면 그 획 하나를 기준으로 전파 창(도마식 판)이 뜬다 — 같은 자리는 다 켜진 채, 툭 친 글자만 빠진다.
- * 나갈 때 · 다른 글자로 갈 때는 묻지 않는다. 자리만 옮겼으면(모양 그대로) `전파`가 안 뜬다.
+ * 나갈 때 · 다른 글자로 갈 때는 묻지 않는다. 이름 있는 줄기를 잡으면 `전파`는 언제나 뜬다(cae9f3f).
  * 플랜: docs/plans/2026-09-29_홀자-줄기-끝점-보선.md
  */
 
@@ -119,14 +119,14 @@ test('취소 · 바깥 · Esc는 창만 닫고, 완료는 반영하고 획 편�
   await sheet.getByTestId('stem-rail-apply-go').click()
   await expect(sheet).toHaveCount(0)
   await expect(page.getByTestId('jamo-layout-mode')).toHaveCount(0)
-  // 퍼뜨린 뒤엔 마스터와 같아 `전파`가 사라진다. 나가면 묻지 않는다.
-  await expect(page.getByTestId('jamo-stroke-spread')).toHaveCount(0)
+  // 이름 있는 줄기를 잡고 있으면 퍼뜨린 뒤에도 `전파`는 그대로 뜬다(cae9f3f). 나가면 묻지 않는다.
+  await expect(page.getByTestId('jamo-stroke-spread')).toBeVisible()
   await page.getByTestId('workspace-back').click()
   await expect(sheet).toHaveCount(0)
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
 })
 
-test('도마를 들고 온 획 편집에서 모양을 고치면 `전파`가 뜨고, 머리 ‹(내 폰트)로 나갈 땐 묻지 않는다', async ({ page }) => {
+test('도마를 들고 온 획 편집에서 모양을 고치면 `전파`가 뜨고, 머리 ‹(레이아웃)로 나갈 땐 묻지 않는다', async ({ page }) => {
   await page.addInitScript(() => {
     if (sessionStorage.getItem('bench-seeded')) return
     sessionStorage.setItem('bench-seeded', '1')
@@ -134,7 +134,8 @@ test('도마를 들고 온 획 편집에서 모양을 고치면 `전파`가 뜨�
   })
   await page.goto('/workspace/jamo?char=%EC%95%84&mode=stroke&part=JU')
   await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
-  await expect(page.getByTestId('workspace-font-home')).toBeVisible()
+  // 도마로 들어와도 획 편집 머리 ‹는 레이아웃 편집으로 간다(c59e753).
+  await expect(page.getByTestId('workspace-back')).toBeVisible()
   const hit = page.locator('[data-editor-hit="stroke"][data-stroke-id="ㅏ-2"]')
   for (let tap = 0; tap < 2; tap += 1) { await hit.dispatchEvent('pointerdown'); await hit.dispatchEvent('pointerup') }
   const points = page.locator('[data-editor-point="hit"]')
@@ -146,9 +147,9 @@ test('도마를 들고 온 획 편집에서 모양을 고치면 `전파`가 뜨�
   await handle.dispatchEvent('pointerup')
   await page.keyboard.press('Shift+ArrowUp')
   await expect(page.getByTestId('jamo-stroke-spread')).toBeVisible()
-  await page.getByTestId('workspace-font-home').click()
+  await page.getByTestId('workspace-back').click()
   await expect(page.getByTestId('stem-rail-apply')).toHaveCount(0)
-  await expect(page).not.toHaveURL(/\/workspace\/jamo/)
+  await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
 })
 
 /** 아 · 중성 획 편집에서 그 획의 마지막 점을 곡선화하고 핸들을 밀어 휜 뒤 `전파`를 누른다. */
