@@ -1,22 +1,22 @@
 /* 줄기 모양 전파 창. 도마 섹션 홈(`DashboardLabPage.module.css`)과 같은 판 — 탭 칩, 소제목 체크, 절대 배치 카드. */
-.modalLayer { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgb(15 23 42 / .32); animation: fadeIn var(--motion-normal, 200ms) var(--ease-standard, ease); }
+.modalLayer { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgb(var(--color-scrim) / .32); animation: fadeIn var(--motion-normal, 200ms) var(--ease-standard, ease); }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .modalLayer { animation: none; } .board, .card, .groupRow { transition: none; } }
 
-.sheet { position: relative; width: min(560px, 100%); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; overflow: hidden; border-radius: 20px; background: rgb(var(--color-surface)); box-shadow: 0 24px 60px rgb(15 23 42 / .28); }
+.sheet { position: relative; width: min(560px, 100%); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; overflow: hidden; border-radius: var(--radius-xl); background: rgb(var(--color-surface)); box-shadow: 0 24px 60px rgb(var(--color-scrim) / .28); }
 
 /* 머리: 기준 획 전 → 후, 옆에 물음. */
 .head { flex: none; display: flex; align-items: center; gap: 14px; padding: 18px 20px 6px; }
-.diff { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 12px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
+.diff { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: var(--radius-lg); background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
 .diff > span { display: grid; }
 .title { min-width: 0; }
-.title h2 { font-size: 17px; font-weight: 800; letter-spacing: -.02em; word-break: keep-all; }
-.title p { margin-top: 2px; color: rgb(var(--color-text-3)); font-size: 12.5px; }
+.title h2 { font-size: var(--font-18); font-weight: var(--weight-heavy); letter-spacing: -.02em; word-break: keep-all; }
+.title p { margin-top: 2px; color: rgb(var(--color-text-3)); font-size: var(--font-13); }
 
 /* 묶는 축 칩. 도마 섹션 홈의 칩과 같다. */
 .tabs { flex: none; display: flex; gap: 6px; padding: 8px 12px 10px; overflow-x: auto; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
-.tabs button { flex: none; min-height: 34px; padding: 0 13px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 700; transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard); }
+.tabs button { flex: none; min-height: 34px; padding: 0 13px; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-3)); font-size: var(--font-13); font-weight: var(--weight-bold); transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard); }
 .tabs button[aria-selected='true'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 
 .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 4px 16px; }
@@ -25,20 +25,20 @@
 
 /* 소제목 줄: 왼쪽 `○○ 모두` 체크(묶음 줄기 전부), 오른쪽 자리 토글(묶음 전체의 그 자리). */
 .groupRow { position: absolute; top: 0; left: 0; right: 0; height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; transition: transform var(--motion-slow) var(--ease-standard); animation: fadeIn var(--motion-normal) var(--ease-standard); }
-.groupHead { display: inline-flex; align-items: center; gap: 10px; min-width: 0; height: 36px; padding: 0 8px 0 4px; border: 0; background: transparent; color: rgb(var(--color-text-3)); font-size: 15px; font-weight: 700; white-space: nowrap; transition: color var(--motion-normal) var(--ease-standard); }
+.groupHead { display: inline-flex; align-items: center; gap: 10px; min-width: 0; height: 36px; padding: 0 8px 0 4px; border: 0; background: transparent; color: rgb(var(--color-text-3)); font-size: var(--font-16); font-weight: var(--weight-bold); white-space: nowrap; transition: color var(--motion-normal) var(--ease-standard); }
 .groupHead[aria-checked='true'], .groupHead[aria-checked='mixed'] { color: rgb(var(--color-foreground)); }
-.groupCount { margin-left: -4px; color: rgb(var(--color-text-5)); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.groupCount { margin-left: -4px; color: rgb(var(--color-text-5)); font-size: var(--font-13); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
 /* 토스식 원형 체크 — 꺼져도 회색 원에 흰 체크, 켜지면 채운다. 일부면 ─. */
-.check { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-surface)); transition: background-color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
+.check { width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--radius-full); background: rgb(var(--color-surface-3)); color: rgb(var(--color-surface)); transition: background-color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
 .groupHead[aria-checked='true'] .check, .groupHead[aria-checked='mixed'] .check { background: rgb(var(--color-foreground)); }
 .groupHead:active .check { transform: scale(0.9); }
-.dash { width: 9px; height: 2.5px; border-radius: 2px; background: currentColor; }
+.dash { width: 9px; height: 2.5px; border-radius: var(--radius-xs); background: currentColor; }
 .slots { flex: none; display: inline-flex; gap: 4px; }
-.slot { min-height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-4)); font-size: 12px; font-weight: 700; transition: background-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard); }
-.slot[aria-pressed='true'] { background: #fff4e6; color: #d9480f; }
+.slot { min-height: 28px; padding: 0 10px; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-4)); font-size: var(--font-12); font-weight: var(--weight-bold); transition: background-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard); }
+.slot[aria-pressed='true'] { background: rgb(var(--color-warning-soft)); color: rgb(var(--color-edit-select)); }
 
 /* 카드 = 홀자 하나. 켜진 획은 주황, 꺼진 카드는 잉크가 흐리다(도마 미선택). */
-.card { position: absolute; top: 0; left: 0; display: grid; place-items: center; border: 0; border-radius: 12px; background: rgb(var(--color-surface-3)); transition: transform var(--motion-slow) var(--ease-standard), width var(--motion-slow) var(--ease-standard), height var(--motion-slow) var(--ease-standard), opacity var(--motion-normal) var(--ease-standard); }
+.card { position: absolute; top: 0; left: 0; display: grid; place-items: center; border: 0; border-radius: var(--radius-lg); background: rgb(var(--color-surface-3)); transition: transform var(--motion-slow) var(--ease-standard), width var(--motion-slow) var(--ease-standard), height var(--motion-slow) var(--ease-standard), opacity var(--motion-normal) var(--ease-standard); }
 .card[data-hidden] { opacity: 0; pointer-events: none; }
 /* 글자는 점 · 자물쇠와 안 겹치게 조금 작고 살짝 아래. */
 .card > svg:first-child { opacity: .12; transform: translateY(6%); transition: opacity var(--motion-fast) var(--ease-standard); }
@@ -49,16 +49,16 @@
 .card[data-locked] { cursor: default; }
 .lock { position: absolute; top: 8px; left: 8px; color: rgb(var(--color-text-5)); }
 /* 따로 고친 형제 — 켜 두면 덮인다는 표시 */
-.released { position: absolute; bottom: 6px; left: 8px; font-size: 10px; font-weight: 600; line-height: 1; color: rgb(var(--color-text-5)); }
-.card[aria-pressed='true'] .released { color: rgb(var(--color-accent, 217 72 15)); }
+.released { position: absolute; bottom: 6px; left: 8px; font-size: var(--font-10); font-weight: var(--weight-semibold); line-height: 1; color: rgb(var(--color-text-5)); }
+.card[aria-pressed='true'] .released { color: rgb(var(--color-edit-select)); }
 /* 자리가 둘 이상인 카드는 우상단에 자리마다 점 하나(순서 = 질문 보기 순서). 켜진 자리만 주황, 나머지 회색. */
 .dots { position: absolute; top: 8px; right: 8px; display: inline-flex; gap: 3px; }
-.dots i { width: 5px; height: 5px; border-radius: 999px; background: rgb(var(--color-text-5) / .45); transition: background-color var(--motion-fast) var(--ease-standard); }
-.dots i[data-on] { background: #d9480f; }
+.dots i { width: 5px; height: 5px; border-radius: var(--radius-full); background: rgb(var(--color-text-5) / .45); transition: background-color var(--motion-fast) var(--ease-standard); }
+.dots i[data-on] { background: rgb(var(--color-edit-select)); }
 .card[aria-pressed='false'] .dots { opacity: .5; }
 
 .foot { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 4px; padding: 10px 12px 12px; border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
-.cancel { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); font-size: 13px; font-weight: 700; transition: transform var(--motion-fast) var(--ease-standard); }
+.cancel { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); font-size: var(--font-13); font-weight: var(--weight-bold); transition: transform var(--motion-fast) var(--ease-standard); }
 .cancel:active { transform: scale(.95); }
-.go { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; transition: transform var(--motion-fast) var(--ease-standard); }
+.go { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: var(--font-13); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; transition: transform var(--motion-fast) var(--ease-standard); }
 .go:active { transform: scale(.95); }

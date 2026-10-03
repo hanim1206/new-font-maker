@@ -17,6 +17,8 @@ import { ruleKey } from './scopeRule'
 import type { ScopeRule } from './scopeRule'
 import type { PropagationEdit, PropagationScope } from './reviewPropagation'
 import type { OverrideGroup } from './layoutOverrides'
+import { EDIT_COLOR } from './editColors'
+import { Pressable } from './components/ui/pressable'
 import styles from './TouchedGlyphRow.module.css'
 
 /**
@@ -33,7 +35,7 @@ const CARD_COUNT = 8
 /** 폭을 채우려고 자동으로 붙이는 묶음 수 한도. 넓은 화면에서 끝없이 붙지 않게. */
 const FILL_LIMIT = 8
 
-const BOX_COLOR: Record<PropagationCardBox['kind'], string> = { medial: '#3b6fd6', component: '#2f9a6a' }
+const BOX_COLOR: Record<PropagationCardBox['kind'], string> = { medial: EDIT_COLOR.editSlotJu, component: EDIT_COLOR.editSlotCh }
 
 // 카드마다 props가 그대로면 다시 그리지 않는다. 획을 끄는 동안 부모가 매 움직임 다시 그려도 카드는 쉰다.
 const TouchedGlyph = memo(function TouchedGlyph({ identity, bundle, edit, ghostVisible, active = false, onPick }: { identity: CorpusIdentity; bundle: NotoPresetModelBundle; edit: PropagationEdit; ghostVisible: boolean; active?: boolean; onPick?: (character: string) => void }) {
@@ -58,14 +60,14 @@ const TouchedGlyph = memo(function TouchedGlyph({ identity, bundle, edit, ghostV
   const note = !view ? (error || '읽는 중') : !live ? '' : view.touched === 0 ? 'Δ 안 닿음' : view.skipped > 0 ? '일부 Δ 미적용' : ''
   return <figure className={styles.card} data-testid="review-propagation-card" data-char={identity.character} data-touched={view && live ? view.touched > 0 : undefined} data-active={active || undefined}>
     {/* 칸 그림이 곧 버튼이다. 문장 줄의 글자를 누르는 것과 같은 동작. */}
-    <button type="button" disabled={!onPick || live} aria-current={active || undefined} onClick={() => onPick?.(identity.character)} aria-label={`${identity.character} 열기${note ? `, ${note}` : ''}`} title={note || undefined} data-testid="review-propagation-open">
+    <Pressable disabled={!onPick || live} aria-current={active || undefined} onClick={() => onPick?.(identity.character)} aria-label={`${identity.character} 열기${note ? `, ${note}` : ''}`} title={note || undefined} data-testid="review-propagation-open">
     <svg viewBox={VIEW_BOX} role="img" aria-label={`${identity.character} 미리보기`}>
       {view?.boxes.map((item, index) => <rect key={index} x={item.box.x} y={item.box.y} width={item.box.width} height={item.box.height} fill={BOX_COLOR[item.kind]} fillOpacity=".12" stroke={BOX_COLOR[item.kind]} strokeOpacity=".5" strokeWidth=".004" />)}
-      {ghostVisible && view?.ghost && <path d={view.ghost} transform={view.ghostTransform} fill="#3a3a36" fillOpacity=".35" fillRule="evenodd" data-testid="review-propagation-ghost" />}
-      {view?.after.map((path, index) => <path key={index} d={path} fill="#111" fillRule="evenodd" />)}
-      {view?.before.map((path, index) => <path key={`b${index}`} d={path} fill="none" stroke="#f0561e" strokeWidth=".006" strokeDasharray=".012 .008" />)}
+      {ghostVisible && view?.ghost && <path d={view.ghost} transform={view.ghostTransform} fill={EDIT_COLOR.editGhost} fillOpacity=".35" fillRule="evenodd" data-testid="review-propagation-ghost" />}
+      {view?.after.map((path, index) => <path key={index} d={path} fill={EDIT_COLOR.foreground} fillRule="evenodd" />)}
+      {view?.before.map((path, index) => <path key={`b${index}`} d={path} fill="none" stroke={EDIT_COLOR.editSelect} strokeWidth=".006" strokeDasharray=".012 .008" />)}
     </svg>
-    </button>
+    </Pressable>
     {/* 글자 이름은 그림이 이미 말한다. 칸 높이를 문장 줄과 맞추려고 글씨는 화면에서 숨기고 읽기 도구에만 남긴다. */}
     <figcaption className={styles.caption}>
       <b>{identity.character}</b>
@@ -134,9 +136,9 @@ export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, e
   })
   return <section className={styles.row} aria-label="닿는 글자" data-testid="touched-glyph-row">
     {lead && <figure className={`${styles.card} ${styles.lead}`} data-active={lead.active || undefined} data-testid="touched-glyph-solo">
-      <button type="button" aria-current={lead.active || undefined} onClick={onPickLead} aria-label={`${lead.char} 단독으로 열기`}>
+      <Pressable aria-current={lead.active || undefined} onClick={onPickLead} aria-label={`${lead.char} 단독으로 열기`}>
         <span className={styles.leadGlyph}><AppGlyph char={lead.char} size={24} upright /></span>
-      </button>
+      </Pressable>
       <figcaption className={styles.caption}><b>{lead.char}</b></figcaption>
     </figure>}
     {/* 범위가 바뀌면 줄을 새로 만들어 맨 앞에서 시작한다. */}

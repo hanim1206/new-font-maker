@@ -8,6 +8,7 @@ import { navigate, onLinkClick } from '../router'
 import { useHistoryShortcuts } from './keyboardShortcuts'
 import { SaveToast } from './SaveToast'
 import { ReportButton } from '../ReportButton'
+import { Pressable } from '../components/ui/pressable'
 import styles from './WorkspaceChrome.module.css'
 
 /** 폰트 덱의 화면 셋. 하단 탭은 없다 — 입구는 대시보드(스타일 · 레이아웃 · 섹션 홈 · 검수)가 맡는다. */
@@ -63,16 +64,16 @@ export function MobileWorkspaceShell({
         <header className={styles.projectHeader}>
           {/* 왼쪽은 위 덱으로 나가는 문 — 화살표만, 오른쪽 머리 단추와 같은 생김새. 이름은 읽기용 레이블에만. 오른쪽은 편집 기록. */}
           {back && 'onClick' in back
-            ? <button type="button" className={styles.back} onClick={() => leave(back.onClick)} aria-label={`${back.label}(으)로`} title={back.label} data-testid="workspace-back">
+            ? <Pressable type="button" className={styles.back} onClick={() => leave(back.onClick)} aria-label={`${back.label}(으)로`} title={back.label} data-testid="workspace-back">
               <ChevronLeft size={20} aria-hidden="true" />
-            </button>
+            </Pressable>
             : back
             ? <a className={styles.back} href={back.href} onClick={(event) => { if (!beforeLeave) { onLinkClick(event); return } event.preventDefault(); leave(() => navigate(back.href)) }} aria-label={`${back.label}(으)로`} title={back.label} data-testid="workspace-back">
               <ChevronLeft size={20} aria-hidden="true" />
             </a>
-            : <button type="button" className={styles.back} onClick={() => leave(() => void goToFontHome())} aria-label="내 폰트로" title="내 폰트" data-testid="workspace-font-home">
+            : <Pressable type="button" className={styles.back} onClick={() => leave(() => void goToFontHome())} aria-label="내 폰트로" title="내 폰트" data-testid="workspace-font-home">
               <ChevronLeft size={20} aria-hidden="true" />
-            </button>}
+            </Pressable>}
           {heading
             ? <h2 className={styles.heading}>{heading}</h2>
             : <div className={styles.projectIdentity}>
@@ -83,8 +84,8 @@ export function MobileWorkspaceShell({
             {tools}
             <ReportButton />
             {(!heading || history) && <>
-              <button type="button" disabled={!history?.canUndo} onClick={history?.onUndo} aria-label="형태 편집 실행 취소"><Undo2 size={18} /></button>
-              <button type="button" disabled={!history?.canRedo} onClick={history?.onRedo} aria-label="형태 편집 다시 실행"><Redo2 size={18} /></button>
+              <Pressable type="button" disabled={!history?.canUndo} onClick={history?.onUndo} aria-label="형태 편집 실행 취소"><Undo2 size={18} /></Pressable>
+              <Pressable type="button" disabled={!history?.canRedo} onClick={history?.onRedo} aria-label="형태 편집 다시 실행"><Redo2 size={18} /></Pressable>
             </>}
           </div>
         </header>

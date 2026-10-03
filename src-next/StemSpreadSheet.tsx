@@ -5,6 +5,8 @@ import { ACTIVE_STROKE_COLOR, askEntries, keyOf, lockedKeys, sampleSyllable, slo
 import { baseOf, STEM_FACETS, type StemBase } from '../src/services/stemMaster'
 import { STEM_NAME_LABEL } from '../src/services/strokeGrammar'
 import type { JamoData, ResolvedStrokeInkSource } from '../src/types'
+import { EDIT_COLOR } from './editColors'
+import { Pressable } from './components/ui/pressable'
 import styles from './StemSpreadSheet.module.css'
 
 /**
@@ -24,7 +26,7 @@ const GROUP_GAP = 24
 const FLASH_MS = 180
 
 /** 고치기 전 모양에서 기준 획을 칠하는 색(주황 = 고친 뒤). */
-const BEFORE_STROKE_COLOR = '#8b95a1'
+const BEFORE_STROKE_COLOR = EDIT_COLOR.text5
 
 interface Card { char: string; entries: StemEntry[]; slots: string[]; locked: boolean }
 interface Axis { id: string; label: string; groups: { id: string; label: string; cards: Card[] }[] }
@@ -186,7 +188,7 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
           </div>
         </header>
         <div className={styles.tabs} role="tablist" aria-label="묶기">
-          {axes.map((item) => <button key={item.id} type="button" role="tab" aria-selected={item.id === axis.id} onClick={() => setAxisId(item.id)}>{item.label}</button>)}
+          {axes.map((item) => <Pressable key={item.id} role="tab" aria-selected={item.id === axis.id} onClick={() => setAxisId(item.id)}>{item.label}</Pressable>)}
         </div>
         <div className={styles.scroll}>
           <div ref={board} className={styles.board} style={{ height: layout.height }}>
@@ -194,15 +196,15 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
               const state = stateOf(group.cards)
               return (
                 <div key={group.id} className={styles.groupRow} style={{ transform: `translateY(${group.y}px)` }} data-testid="stem-spread-group" data-group={group.id}>
-                  <button type="button" className={styles.groupHead} role="checkbox" aria-checked={state} onClick={() => toggleGroup(group.cards)}>
+                  <Pressable className={styles.groupHead} role="checkbox" aria-checked={state} onClick={() => toggleGroup(group.cards)}>
                     <span className={styles.check} aria-hidden="true">{state === 'mixed' ? <span className={styles.dash} /> : <Check size={14} strokeWidth={3} />}</span>
                     {group.label}<span className={styles.groupCount}>{others(group.cards).filter(cardOn).length}/{others(group.cards).length}</span>
-                  </button>
+                  </Pressable>
                   {/* 자리 토글 — 묶음 전체의 그 자리 열. 꺼진 카드도 켠다. 자리가 없는 줄기(걸침 · 보)엔 안 뜬다. */}
                   {slotLabels.length > 0 && <span className={styles.slots}>
                     {slotLabels.filter((option) => group.cards.some((card) => card.slots.includes(option.value))).map((option) => {
                       const keys = slotKeys(group.cards, option.value)
-                      return <button key={option.value} type="button" className={styles.slot} aria-pressed={keys.length > 0 && keys.every((key) => picked.has(key))} onClick={() => toggleSlot(group.cards, option.value)}>{option.label}</button>
+                      return <Pressable key={option.value} className={styles.slot} aria-pressed={keys.length > 0 && keys.every((key) => picked.has(key))} onClick={() => toggleSlot(group.cards, option.value)}>{option.label}</Pressable>
                     })}
                   </span>}
                 </div>
@@ -214,21 +216,21 @@ export function StemSpreadSheet({ ask, picked, preview, before, onToggle, onDone
               const on = cardOn(card)
               const onSlots = card.slots.filter((slot) => slotOn(card, slot))
               return (
-                <button key={card.char} type="button" className={styles.card} style={{ width: cell, height: cell, transform: spot ? `translate(${spot.x}px, ${spot.y}px)` : undefined }} data-char={card.char} data-kind="shape" data-hidden={shown ? undefined : true} aria-hidden={shown ? undefined : true} tabIndex={shown ? undefined : -1} data-locked={card.locked || undefined} data-slots={onSlots.join(' ') || undefined} aria-pressed={on} aria-disabled={card.locked || undefined} aria-label={card.locked ? `${card.char} 고친 홀자(늘 반영)` : `${card.char} ${on ? (onSlots.length === card.slots.length ? '빼기' : '다음 자리도') : '담기'}`} onClick={() => tapCard(card)}>
+                <Pressable key={card.char} className={styles.card} style={{ width: cell, height: cell, transform: spot ? `translate(${spot.x}px, ${spot.y}px)` : undefined }} data-char={card.char} data-kind="shape" data-hidden={shown ? undefined : true} aria-hidden={shown ? undefined : true} tabIndex={shown ? undefined : -1} data-locked={card.locked || undefined} data-slots={onSlots.join(' ') || undefined} aria-pressed={on} aria-disabled={card.locked || undefined} aria-label={card.locked ? `${card.char} 고친 홀자(늘 반영)` : `${card.char} ${on ? (onSlots.length === card.slots.length ? '빼기' : '다음 자리도') : '담기'}`} onClick={() => tapCard(card)}>
                   {/* 카드 잉크는 검정(주황은 머리의 기준 획만). 방금 켜진 획만 주황으로 번쩍였다가 돌아온다. 어느 자리가 켜졌는지는 우상단 점이 말한다. */}
                   <AppGlyph char={sampleSyllable(card.char, 'open')} size={Math.round(cell * 0.62)} strokeColorOf={flashColor(card.char)} jungseongOverride={preview} />
                   {card.locked && <Lock className={styles.lock} size={14} strokeWidth={2.5} aria-hidden="true" />}
                   {!card.locked && released(card) && <span className={styles.released} data-testid="stem-spread-released">따로 고침</span>}
                   {/* 자리가 둘 이상인 카드는 우상단에 자리마다 점 하나 — 켜진 자리만 주황. 기둥은 글자 자리대로 안 점이 왼쪽, 바깥 점이 오른쪽. */}
                   {card.slots.length > 1 && <span className={styles.dots} aria-hidden="true">{(slotFacet === 'side' ? [...card.slots].reverse() : card.slots).map((slot) => <i key={slot} data-on={slotOn(card, slot) || undefined} />)}</span>}
-                </button>
+                </Pressable>
               )
             })}
           </div>
         </div>
         <footer className={styles.foot}>
-          <button type="button" className={styles.cancel} data-testid="stem-rail-apply-cancel" onClick={onCancel}>취소</button>
-          <button type="button" className={styles.go} data-testid="stem-rail-apply-go" onClick={onDone} autoFocus><span data-testid="stem-spread-count">{total}</span>자 받기</button>
+          <Pressable className={styles.cancel} data-testid="stem-rail-apply-cancel" onClick={onCancel}>취소</Pressable>
+          <Pressable className={styles.go} data-testid="stem-rail-apply-go" onClick={onDone} autoFocus><span data-testid="stem-spread-count">{total}</span>자 받기</Pressable>
         </footer>
       </section>
     </div>

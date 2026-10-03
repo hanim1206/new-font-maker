@@ -9,6 +9,8 @@ import { sendFeedback } from './feedbackApi'
 import { navigate } from './router'
 import { useMe } from './useFeedback'
 import { BetaGuideSheet } from './BetaGuideSheet'
+import { Pressable } from './components/ui/pressable'
+import { Button } from './components/ui/button'
 import styles from './ReportButton.module.css'
 
 /**
@@ -19,9 +21,9 @@ import styles from './ReportButton.module.css'
 export function ReportButton({ className }: { className?: string }) {
   const [context, setContext] = useState<FeedbackContext | null>(null)
   return <>
-    <button type="button" className={`${styles.trigger} ${className ?? ''}`} aria-label="이 화면 제보하기" title="이 화면 제보하기" onClick={() => setContext(feedbackContextOf(window.location.pathname))} data-testid="report-open">
+    <Pressable type="button" className={`${styles.trigger} ${className ?? ''}`} aria-label="이 화면 제보하기" title="이 화면 제보하기" onClick={() => setContext(feedbackContextOf(window.location.pathname))} data-testid="report-open">
       <MessageSquareWarning size={16} aria-hidden="true" />
-    </button>
+    </Pressable>
     {context && <ReportSheet context={context} onClose={() => setContext(null)} />}
   </>
 }
@@ -74,17 +76,17 @@ export function ReportSheet({ context, onClose, initialTag = null, initialDraft 
           <h3>보냈어요</h3>
           <p>한임이 읽고 답하면 마이페이지에 빨간 점이 떠요.</p>
           <div className={styles.actions}>
-            <button type="button" onClick={() => { close(); navigate('/account/feedback') }}>보낸 의견 보기</button>
-            <button type="button" data-primary onClick={close}>닫기</button>
+            <Button type="button" size="sheet" variant="secondary" className={styles.minor} onClick={() => { close(); navigate('/account/feedback') }}>보낸 의견 보기</Button>
+            <Button type="button" size="sheet" variant="default" className={styles.major} onClick={close}>닫기</Button>
           </div>
         </div>
         : <form onSubmit={(event) => void submit(event)}>
           <div className={styles.head}>
             <h3>이 화면 제보하기</h3>
-            <button type="button" className={styles.guide} onClick={() => setGuide(true)} data-testid="report-guide"><CircleHelp size={15} aria-hidden="true" />둘러보기</button>
+            <Pressable type="button" className={styles.guide} onClick={() => setGuide(true)} data-testid="report-guide"><CircleHelp size={15} aria-hidden="true" />둘러보기</Pressable>
           </div>
           <div className={styles.tags} role="radiogroup" aria-label="어떤 제보인가요">
-            {REPORT_TAGS.map(({ key, label }) => <button
+            {REPORT_TAGS.map(({ key, label }) => <Pressable
               key={key}
               type="button"
               role="radio"
@@ -92,7 +94,7 @@ export function ReportSheet({ context, onClose, initialTag = null, initialDraft 
               data-tag={key}
               onClick={() => { setTag((current) => current === key ? null : key); field.current?.focus() }}
               data-testid={`report-tag-${key}`}
-            >{label}</button>)}
+            >{label}</Pressable>)}
           </div>
           <div className={styles.field}>
             <div className={styles.fieldTags} aria-label="보낼 때 같이 가는 정보" data-testid="report-context">
@@ -111,8 +113,8 @@ export function ReportSheet({ context, onClose, initialTag = null, initialDraft 
           </div>
           {error && <p className={styles.error} role="alert">{error}</p>}
           <div className={styles.actions}>
-            <button type="button" onClick={close}>취소</button>
-            <button type="submit" data-primary disabled={!body || busy || !me} data-testid="report-send">{busy ? '보내는 중…' : '보내기'}</button>
+            <Button type="button" size="sheet" variant="secondary" className={styles.minor} onClick={close}>취소</Button>
+            <Button type="submit" size="sheet" variant="default" className={styles.major} disabled={!body || busy || !me} data-testid="report-send">{busy ? '보내는 중…' : '보내기'}</Button>
           </div>
         </form>}
     </div>

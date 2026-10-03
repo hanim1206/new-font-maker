@@ -2,6 +2,7 @@ import { type CSSProperties, type ReactNode } from 'react'
 import { Check, ClipboardPaste, Copy, Delete, Dices } from 'lucide-react'
 import { SENTENCE_SHEET_EM_MAX, SENTENCE_SHEET_EM_MIN, type SentenceSheetState } from './sentenceSheetState'
 import { SentenceTextarea } from './SentenceTextarea'
+import { Pressable } from './components/ui/pressable'
 // 펼친 문장 줄의 생김새는 편집기 것 하나를 편집기 · 대시보드가 같이 쓴다(09-29 사용자: 두 곳 동작이 같아야 한다). 상태는 `sentenceSheetState.ts`.
 import styles from './CalibrationSentenceEditor.module.css'
 
@@ -27,10 +28,10 @@ export function SentenceSheetControls({ sheet }: { sheet: SentenceSheetState }) 
       aria-label="문장 글자 크기" aria-orientation="vertical" data-testid="sentence-sheet-size" />
     {/* 아래 버튼 바. 화면 아래에 떠 있고, 자판이 열리면 자판 위로 올라간다. 누를 때 입력칸 포커스를 뺏지 않아 자판이 닫히지 않는다. */}
     <div className={styles.sentenceSheetBar} style={{ '--keyboard-inset': `${sheet.keyboardInset}px` } as CSSProperties} onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.preventDefault()} onMouseDown={(event) => event.preventDefault()}>
-      <button type="button" onClick={sheet.roll} aria-label="예시 문장 바꾸기" data-testid="sentence-sheet-roll"><Dices size={18} aria-hidden="true" />다른 문장</button>
-      <button type="button" onClick={sheet.clear} disabled={empty} aria-label="문장 전체 삭제" data-testid="sentence-sheet-clear"><Delete size={18} aria-hidden="true" />전체 삭제</button>
-      <button type="button" className={styles.sentenceSheetIcon} onClick={sheet.copy} disabled={empty} aria-label={sheet.copied ? '복사함' : '문장 복사'} title="복사" data-testid="sentence-sheet-copy">{sheet.copied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}</button>
-      <button type="button" className={styles.sentenceSheetIcon} onClick={sheet.paste} aria-label="붙여넣기" title="붙여넣기" data-testid="sentence-sheet-paste"><ClipboardPaste size={18} aria-hidden="true" /></button>
+      <Pressable type="button" onClick={sheet.roll} aria-label="예시 문장 바꾸기" data-testid="sentence-sheet-roll"><Dices size={18} aria-hidden="true" />다른 문장</Pressable>
+      <Pressable type="button" onClick={sheet.clear} disabled={empty} aria-label="문장 전체 삭제" data-testid="sentence-sheet-clear"><Delete size={18} aria-hidden="true" />전체 삭제</Pressable>
+      <Pressable type="button" className={styles.sentenceSheetIcon} onClick={sheet.copy} disabled={empty} aria-label={sheet.copied ? '복사함' : '문장 복사'} title="복사" data-testid="sentence-sheet-copy">{sheet.copied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}</Pressable>
+      <Pressable type="button" className={styles.sentenceSheetIcon} onClick={sheet.paste} aria-label="붙여넣기" title="붙여넣기" data-testid="sentence-sheet-paste"><ClipboardPaste size={18} aria-hidden="true" /></Pressable>
     </div>
   </>
 }

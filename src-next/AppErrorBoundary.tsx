@@ -2,6 +2,7 @@ import { Component, useState } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import { recentErrors, recordError } from './errorLog'
 import styles from './SafetyScreen.module.css'
+import { Button } from './components/ui/button'
 import { downloadWorkBackup, flushWork } from './workGuard'
 
 /**
@@ -58,11 +59,11 @@ export function AppErrorScreen() {
           <h1>문제가 생겼어요</h1>
           <p>화면을 그리다 멈췄어요. 작업은 이 기기와 계정에 남아 있어요. 걱정되면 먼저 백업을 받아 두세요.</p>
         </header>
-        <button type="button" className={styles.secondary} onClick={takeBackup} data-testid="app-error-backup">작업 백업 받기</button>
+        <Button type="button" size="block" variant="outline" onClick={takeBackup} data-testid="app-error-backup">작업 백업 받기</Button>
         {backup === 'done' && <p className={styles.note}>백업 파일을 받았어요.</p>}
         {backup === 'raw' && <p className={styles.note}>백업 파일을 받았어요(브라우저에 남은 원본 그대로).</p>}
         {backup === 'failed' && <p className={styles.note}>백업을 만들지 못했어요. 이 화면을 캡처해 초대한 사람에게 보내 주세요.</p>}
-        <button type="button" className={styles.primary} onClick={() => void reload()} disabled={reloading} data-testid="app-error-reload">다시 불러오기</button>
+        <Button type="button" size="block" variant="default" onClick={() => void reload()} disabled={reloading} data-testid="app-error-reload">다시 불러오기</Button>
         <details className={styles.details}>
           <summary>자세히</summary>
           <pre data-testid="app-error-details">{details || '기록 없음'}</pre>

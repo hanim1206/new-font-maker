@@ -34,6 +34,8 @@ import { ReportButton } from './ReportButton'
 import { AnnouncementSpot } from './AnnouncementSpot'
 import { BetaGuideSheet } from './BetaGuideSheet'
 import { markBetaGuideSeen, shouldShowBetaGuide } from './betaGuide'
+import { Pressable } from './components/ui/pressable'
+import { Button } from './components/ui/button'
 import styles from './DashboardLabPage.module.css'
 // 카드 문장 줄은 편집기 문장 줄과 같은 생김새 · 동작이다.
 import editorStyles from './CalibrationSentenceEditor.module.css'
@@ -297,14 +299,14 @@ function FontCard({ name, onRename, onDuplicate, onDelete }: {
       <strong>{name}</strong>
     </header>
     {/* 주사위: 문장을 바꾸는 단추라 문장 바로 위(머리 줄 오른쪽). */}
-    <button type="button" className={styles.cardDice} aria-label="예시 문장 바꾸기" onClick={() => { setSentence(randomSampleSentence(sentence)); setCardRolled((count) => count + 1) }} data-testid="dashboard-sentence-roll"><Dices size={19} aria-hidden="true" /></button>
+    <Pressable type="button" className={styles.cardDice} aria-label="예시 문장 바꾸기" onClick={() => { setSentence(randomSampleSentence(sentence)); setCardRolled((count) => count + 1) }} data-testid="dashboard-sentence-roll"><Dices size={19} aria-hidden="true" /></Pressable>
     {/* 문장을 누르면 펼친다(돋보기 없이 — 09-29 사용자). 펼친 뒤 누르면 그 자리에 커서. */}
     <section ref={box} className={`${editorStyles.sentence} ${styleMode.strip} ${styles.sentence}`} data-sheet={sheet.open || undefined} data-sheet-wrap={wrapped || undefined}
       onClick={sheet.open ? sheet.pickCaret : wrapped ? undefined : () => sheet.openSheet()}
       onKeyDown={wrapped ? undefined : (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); sheet.openSheet() } }}
       role={wrapped ? undefined : 'button'} tabIndex={wrapped ? undefined : 0} aria-label={wrapped ? draft : `${draft} — 눌러서 크게 보기 · 바꾸기`} data-testid="dashboard-sentence">
       {sheet.open && <div className={`${editorStyles.sentenceActions} ${styles.sheetClose}`}>
-        <button type="button" className={editorStyles.sentenceOpen} onClick={(event) => { event.stopPropagation(); sheet.closeSheet() }} aria-label="문장 접기" title="문장 접기" data-testid="dashboard-sentence-close"><X size={19} aria-hidden="true" /></button>
+        <Pressable type="button" className={editorStyles.sentenceOpen} onClick={(event) => { event.stopPropagation(); sheet.closeSheet() }} aria-label="문장 접기" title="문장 접기" data-testid="dashboard-sentence-close"><X size={19} aria-hidden="true" /></Pressable>
       </div>}
       <SentenceSheetControls sheet={sheet} />
       <div ref={run} key={sheet.rolled + cardRolled} className={`${editorStyles.sentenceRun} ${styleMode.run} ${styles.sentenceText} ${sheet.rolled + cardRolled > 0 ? editorStyles.sentenceRolled : ''}`} style={{ fontSize: sheet.open ? sheet.em : SENTENCE_EM }}>
@@ -386,11 +388,11 @@ function FontCardDownload() {
     {/* 추출 입구가 대시보드뿐이라 이 버튼이 진행 표시의 전부다 — 만드는 동안 원 둘레가 진행만큼 차오르고 안에 퍼센트가 보인다. */}
     <span className={styles.downloadWrap}>
       {exporting && <span className={styles.downloadRing} style={{ ['--p' as string]: percent }} aria-hidden="true" />}
-      <button type="button" className={styles.download} data-state={status} aria-label={label} aria-haspopup="dialog" aria-expanded={open} disabled={exporting} onClick={start} data-testid="dashboard-font-download">
+      <Button type="button" size="icon-md" variant="default" className={styles.download} data-state={status} aria-label={label} aria-haspopup="dialog" aria-expanded={open} disabled={exporting} onClick={start} data-testid="dashboard-font-download">
         {exporting
           ? <span className={styles.downloadPct}>{percent}%</span>
           : status === 'downloaded' ? <Check size={18} aria-hidden="true" /> : <Download size={18} aria-hidden="true" />}
-      </button>
+      </Button>
     </span>
     {open && <div className={styles.menuSheetLayer} data-closing={closing || undefined} style={keyboard ? { paddingBottom: keyboard } : undefined} onPointerDown={(event) => { if (event.target === event.currentTarget) close() }}>
       <div className={styles.menuSheet} role="dialog" aria-label="폰트 다운로드">
@@ -401,11 +403,11 @@ function FontCardDownload() {
             <input value={draft} aria-label="폰트 이름" autoFocus maxLength={40} enterKeyHint="go" placeholder="이름을 적어 주세요" data-testid="dashboard-font-download-name"
               onFocus={(event) => event.currentTarget.select()}
               onChange={(event) => setDraft(event.currentTarget.value)} />
-            {draft && <button type="button" aria-label="지우기" onClick={(event) => { setDraft(''); (event.currentTarget.previousElementSibling as HTMLInputElement | null)?.focus() }}><X size={14} strokeWidth={3} aria-hidden="true" /></button>}
+            {draft && <Pressable type="button" aria-label="지우기" onClick={(event) => { setDraft(''); (event.currentTarget.previousElementSibling as HTMLInputElement | null)?.focus() }}><X size={14} strokeWidth={3} aria-hidden="true" /></Pressable>}
           </label>
           <div className={styles.menuSheetActions}>
-            <button type="button" onClick={close}>취소</button>
-            <button type="submit" data-primary disabled={!next} data-testid="dashboard-font-download-confirm">다운로드</button>
+            <Button type="button" size="sheet" variant="secondary" onClick={close}>취소</Button>
+            <Button type="submit" size="sheet" variant="default" data-primary disabled={!next} data-testid="dashboard-font-download-confirm">다운로드</Button>
           </div>
         </form>
       </div>
@@ -430,7 +432,7 @@ function FontCardMenu({ label, name, onRename, onDuplicate, onDelete }: { label:
     close()
   }
   return <>
-    <button type="button" className={styles.more} aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => { setDraft(name); show() }}><Ellipsis size={18} aria-hidden="true" /></button>
+    <Button type="button" size="icon-md" variant="secondary" aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => { setDraft(name); show() }}><Ellipsis size={18} aria-hidden="true" /></Button>
     {open && <div className={styles.menuSheetLayer} data-closing={closing || undefined} style={keyboard ? { paddingBottom: keyboard } : undefined} onPointerDown={(event) => { if (event.target === event.currentTarget) close() }}>
       <div className={styles.menuSheet} role={step === 'menu' ? 'menu' : 'dialog'} aria-label={label}>
         {step === 'rename' && <form key="rename" className={styles.menuSheetStep} onSubmit={(event) => { event.preventDefault(); save() }}>
@@ -439,25 +441,25 @@ function FontCardMenu({ label, name, onRename, onDuplicate, onDelete }: { label:
             <input value={draft} aria-label="폰트 이름" autoFocus maxLength={40} enterKeyHint="done" placeholder="이름을 적어 주세요"
               onFocus={(event) => event.currentTarget.select()}
               onChange={(event) => setDraft(event.currentTarget.value)} />
-            {draft && <button type="button" aria-label="지우기" onClick={(event) => { setDraft(''); (event.currentTarget.previousElementSibling as HTMLInputElement | null)?.focus() }}><X size={14} strokeWidth={3} aria-hidden="true" /></button>}
+            {draft && <Pressable type="button" aria-label="지우기" onClick={(event) => { setDraft(''); (event.currentTarget.previousElementSibling as HTMLInputElement | null)?.focus() }}><X size={14} strokeWidth={3} aria-hidden="true" /></Pressable>}
           </label>
           <div className={styles.menuSheetActions}>
-            <button type="button" onClick={close}>취소</button>
-            <button type="submit" data-primary disabled={!canSave}>저장</button>
+            <Button type="button" size="sheet" variant="secondary" onClick={close}>취소</Button>
+            <Button type="submit" size="sheet" variant="default" data-primary disabled={!canSave}>저장</Button>
           </div>
         </form>}
         {step === 'delete' && <div key="delete" className={styles.menuSheetStep}>
           <h3>이 폰트를 지울까요?</h3>
           <p>되돌릴 수 없어요.</p>
           <div className={styles.menuSheetActions}>
-            <button type="button" onClick={() => setStep('menu')}>취소</button>
-            <button type="button" data-danger data-testid="dashboard-font-delete-confirm" onClick={() => { close(); onDelete?.() }}>삭제</button>
+            <Button type="button" size="sheet" variant="secondary" onClick={() => setStep('menu')}>취소</Button>
+            <Button type="button" size="sheet" variant="destructive" data-danger data-testid="dashboard-font-delete-confirm" onClick={() => { close(); onDelete?.() }}>삭제</Button>
           </div>
         </div>}
         {step === 'menu' && <>
-          <button type="button" role="menuitem" onClick={() => setStep('rename')}><PencilLine size={22} aria-hidden="true" />이름 바꾸기</button>
-          <button type="button" role="menuitem" disabled={!onDuplicate} data-testid="dashboard-font-duplicate" onClick={() => { close(); onDuplicate?.() }}><Copy size={22} aria-hidden="true" />복제{!onDuplicate && <small>폰트 {FONT_LIMIT}개가 다 찼어요</small>}</button>
-          <button type="button" role="menuitem" data-danger disabled={!onDelete} data-testid="dashboard-font-delete" onClick={() => setStep('delete')}><Trash2 size={22} aria-hidden="true" />삭제</button>
+          <Pressable type="button" role="menuitem" onClick={() => setStep('rename')}><PencilLine size={22} aria-hidden="true" />이름 바꾸기</Pressable>
+          <Pressable type="button" role="menuitem" disabled={!onDuplicate} data-testid="dashboard-font-duplicate" onClick={() => { close(); onDuplicate?.() }}><Copy size={22} aria-hidden="true" />복제{!onDuplicate && <small>폰트 {FONT_LIMIT}개가 다 찼어요</small>}</Pressable>
+          <Pressable type="button" role="menuitem" data-danger disabled={!onDelete} data-testid="dashboard-font-delete" onClick={() => setStep('delete')}><Trash2 size={22} aria-hidden="true" />삭제</Pressable>
         </>}
       </div>
     </div>}
@@ -467,27 +469,27 @@ function FontCardMenu({ label, name, onRename, onDuplicate, onDelete }: { label:
 /** 머리 오른쪽 마이페이지. 누르면 계정 페이지(`/account`)가 밀려 들어온다. 안 본 한임 답이 있으면 빨간 점. */
 function AccountButton() {
   const unseen = useUnseenReply()
-  return <button type="button" className={styles.avatar} aria-label="마이페이지" onClick={() => navigate('/account')} data-testid="dashboard-account">
+  return <Button type="button" size="icon-md" variant="plain" className="relative" aria-label="마이페이지" onClick={() => navigate('/account')} data-testid="dashboard-account">
     <UserRound size={20} aria-hidden="true" />
     {unseen && <span className={styles.avatarDot} aria-label="새 답장" />}
-  </button>
+  </Button>
 }
 
 function SectionHead({ title, count, hint, onClick, testId }: { title: string; count?: number; hint?: string; onClick?: () => void; testId?: string }) {
-  return <button type="button" className={styles.sectionHead} onClick={onClick} data-testid={testId}>
+  return <Pressable type="button" className={styles.sectionHead} onClick={onClick} data-testid={testId}>
     <h2>{title}</h2>
     {count !== undefined && <span>{count}</span>}
     {hint && <em>{hint}</em>}
     <ChevronRight size={18} aria-hidden="true" />
-  </button>
+  </Pressable>
 }
 
 /** 스타일 칸 하나. 누르면 스타일 화면의 그 탭으로 — 값만 보여 주는 칸처럼 보이지 않게 값 옆에 `›`(09-29 베타 의견). */
 function StyleTile({ kind, label, value, panel = 'brush' }: { kind: 'weight' | 'slant' | 'roundness' | 'beak'; label: string; value: string; panel?: 'brush' | 'beak' }) {
   return <li>
-    <button type="button" className={styles.tile} aria-label={`${label} ${value} 고치기`} onClick={() => navigate(`/workspace/font?panel=${panel}`)} data-testid={`dashboard-style-${kind}`}>
+    <Pressable type="button" className={styles.tile} aria-label={`${label} ${value} 고치기`} onClick={() => navigate(`/workspace/font?panel=${panel}`)} data-testid={`dashboard-style-${kind}`}>
       <span className={styles.picto}><StylePicto kind={kind} /></span><em>{label}</em><strong>{value}<ChevronRight className={styles.tileGo} size={13} strokeWidth={2.4} aria-hidden="true" /></strong>
-    </button>
+    </Pressable>
   </li>
 }
 
@@ -509,9 +511,9 @@ function openEditor(type: JamoType, chars: readonly string[]) {
 function JamoPreview({ type, chars }: { type: JamoType; chars: readonly string[] }) {
   return <ul className={styles.preview}>
     {chars.slice(0, PREVIEW_COUNT).map((char) => <li key={char}>
-      <button type="button" className={styles.thumb} aria-label={`${char} 도마에 올리기`} onClick={() => { useWorkbenchStore.getState().place(type, [char]); navigate(`/dashboard/${type}`) }}>
+      <Pressable type="button" className={styles.thumb} aria-label={`${char} 도마에 올리기`} onClick={() => { useWorkbenchStore.getState().place(type, [char]); navigate(`/dashboard/${type}`) }}>
         <Lazy className={styles.inkSmall}><JamoGlyph type={type} char={char} size={52} /></Lazy>
-      </button>
+      </Pressable>
     </li>)}
   </ul>
 }
@@ -768,49 +770,49 @@ function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] })
 
   return <div className={styles.home} data-testid="jamo-home" data-type={type}>
     <header className={styles.homeHead}>
-      <button type="button" className={styles.back} aria-label="대시보드" onClick={() => navigate('/dashboard')}><ChevronLeft size={22} aria-hidden="true" /></button>
+      <Button type="button" size="icon-md" variant="plain" aria-label="대시보드" onClick={() => navigate('/dashboard')}><ChevronLeft size={22} aria-hidden="true" /></Button>
       <h2>고칠 {JAMO_LABEL[type]}</h2>
       <ReportButton className={styles.homeReport} />
     </header>
     <div className={styles.homeScroll} data-locked={sheet ? true : undefined}>
       <div className={styles.chips} role="tablist" aria-label="묶기">
-        {groupings.map((g) => <button key={g.id} type="button" role="tab" aria-selected={g.id === grouping.id} onClick={() => setGroupingId(g.id)}>{g.label}</button>)}
+        {groupings.map((g) => <Button key={g.id} type="button" variant="chip" size="chip" className={styles.chip} role="tab" aria-selected={g.id === grouping.id} onClick={() => setGroupingId(g.id)}>{g.label}</Button>)}
         {/* 묶음 만들기. 늘 켜져 있다 — 시트 판에서 글자를 고르고, 도마에 담긴 게 있으면 미리 켜 둔다. */}
-        <button type="button" className={styles.chipAdd} aria-label="묶음 만들기" onClick={() => setSheet({ kind: 'create' })}><Plus size={18} aria-hidden="true" /></button>
+        <Pressable type="button" className={styles.chipAdd} aria-label="묶음 만들기" onClick={() => setSheet({ kind: 'create' })}><Plus size={18} aria-hidden="true" /></Pressable>
       </div>
       <div ref={board} className={styles.board} style={{ height: layout.height }}>
         {/* 소제목도 칸 크기를 잰 뒤에 놓는다 — 먼저 놓으면 칸 0 자리에서 제자리로 미끄러져 내려온다. */}
         {cell > 0 && layout.heads.map(({ key, group, y }) => {
           const whole = group.chars.every(onBench)
           return [
-            <button key={key} type="button" className={styles.groupHead} style={{ transform: `translateY(${y}px)` }} role="checkbox" aria-checked={whole} onClick={() => (whole ? remove : add)(type, group.chars)}><span className={styles.check} aria-hidden="true"><Check size={14} strokeWidth={3} /></span>{group.label}<span className={styles.groupCount}>{group.chars.length}</span></button>,
-            group.id && <button key={`${key}:more`} type="button" className={styles.groupMore} style={{ transform: `translateY(${y}px)` }} aria-label={`${group.label} 고치기`} onClick={() => setSheet({ kind: 'edit', id: group.id! })}><Ellipsis size={18} aria-hidden="true" /></button>,
+            <Pressable key={key} type="button" className={styles.groupHead} style={{ transform: `translateY(${y}px)` }} role="checkbox" aria-checked={whole} onClick={() => (whole ? remove : add)(type, group.chars)}><span className={styles.check} aria-hidden="true"><Check size={14} strokeWidth={3} /></span>{group.label}<span className={styles.groupCount}>{group.chars.length}</span></Pressable>,
+            group.id && <Pressable key={`${key}:more`} type="button" className={styles.groupMore} style={{ transform: `translateY(${y}px)` }} aria-label={`${group.label} 고치기`} onClick={() => setSheet({ kind: 'edit', id: group.id! })}><Ellipsis size={18} aria-hidden="true" /></Pressable>,
           ]
         })}
         {cell > 0 && chars.map((char) => {
           const shown = layout.cards.has(char)
           const at = layout.cards.get(char) ?? lastAt.current.get(char)
-          return <button key={char} type="button" className={styles.homeCard} style={{ width: cell, height: cell, transform: at ? `translate(${at.x}px, ${at.y}px)` : undefined }} data-hidden={shown ? undefined : true} aria-hidden={shown ? undefined : true} tabIndex={shown ? undefined : -1} aria-label={`${char} 도마에 ${onBench(char) ? '빼기' : '담기'}`} aria-pressed={onBench(char)} onClick={() => toggle(type, char)}>
+          return <Pressable key={char} type="button" className={styles.homeCard} style={{ width: cell, height: cell, transform: at ? `translate(${at.x}px, ${at.y}px)` : undefined }} data-hidden={shown ? undefined : true} aria-hidden={shown ? undefined : true} tabIndex={shown ? undefined : -1} aria-label={`${char} 도마에 ${onBench(char) ? '빼기' : '담기'}`} aria-pressed={onBench(char)} onClick={() => toggle(type, char)}>
             <span className={styles.inkSmall}><JamoGlyph type={type} char={char} size={52} /></span>
-          </button>
+          </Pressable>
         })}
-        {cell > 0 && layout.extras.map(({ key, char, x, y }) => <button key={key} type="button" className={styles.homeCard} style={{ width: cell, height: cell, transform: `translate(${x}px, ${y}px)` }} aria-label={`${char} 도마에 ${onBench(char) ? '빼기' : '담기'}`} aria-pressed={onBench(char)} onClick={() => toggle(type, char)}>
+        {cell > 0 && layout.extras.map(({ key, char, x, y }) => <Pressable key={key} type="button" className={styles.homeCard} style={{ width: cell, height: cell, transform: `translate(${x}px, ${y}px)` }} aria-label={`${char} 도마에 ${onBench(char) ? '빼기' : '담기'}`} aria-pressed={onBench(char)} onClick={() => toggle(type, char)}>
           <span className={styles.inkSmall}><JamoGlyph type={type} char={char} size={52} /></span>
-        </button>)}
+        </Pressable>)}
       </div>
     </div>
     {/* 도마 상태 · 편집 입구. 칩은 왼쪽 한 줄(넘치면 가로 스크롤), 단추는 오른쪽에 고정. 도마가 비면 단추도 잠긴다. */}
     <footer className={styles.bench}>
       <div className={styles.benchChips} data-more={benchMore || undefined}><div ref={benchInner} aria-label="도마">
-        {benchCount === 0 ? <em>카드나 묶음을 눌러 도마에 올리세요</em> : benchChars.map((char) => <button key={char} type="button" data-chip={char} aria-label={`${char} 도마에서 빼기`} onClick={() => toggle(type, char)}>{char}</button>)}
+        {benchCount === 0 ? <em>카드나 묶음을 눌러 도마에 올리세요</em> : benchChars.map((char) => <Pressable key={char} type="button" data-chip={char} aria-label={`${char} 도마에서 빼기`} onClick={() => toggle(type, char)}>{char}</Pressable>)}
         {/* 도마가 이미 있는 묶음과 같으면 그 이름을 칩 끝에 보인다. */}
         {benchGroup && <span key="group" data-chip="__group" className={styles.benchGroupName}>{benchGroup.name}</span>}
       </div></div>
-      {benchCount > 0 && <button type="button" className={styles.benchClear} aria-label="도마 비우기" onClick={clear}><Trash2 size={18} aria-hidden="true" /></button>}
-      {borrowable.length > 0 && <button type="button" className={styles.benchBorrow} aria-pressed={borrowState === 'on' ? true : borrowState === 'mixed' ? 'mixed' : false} onClick={toggleBorrow}><span className={styles.check} aria-hidden="true">{borrowState === 'mixed' ? <Minus size={14} strokeWidth={3} /> : <Check size={14} strokeWidth={3} />}</span>초성 모양</button>}
-      <button type="button" className={styles.benchGo} disabled={benchCount === 0} onClick={() => openEditor(type, benchChars)}>{/* 숫자가 바뀔 때마다 새로 떠오른다 — key가 바뀌면 애니메이션이 다시 돈다. */}<span key={benchCount} className={styles.benchCount}>{benchCount}</span>개 고치기</button>
+      {benchCount > 0 && <Button type="button" size="icon-md" variant="faint" className={styles.benchClear} aria-label="도마 비우기" onClick={clear}><Trash2 size={18} aria-hidden="true" /></Button>}
+      {borrowable.length > 0 && <Pressable type="button" className={styles.benchBorrow} aria-pressed={borrowState === 'on' ? true : borrowState === 'mixed' ? 'mixed' : false} onClick={toggleBorrow}><span className={styles.check} aria-hidden="true">{borrowState === 'mixed' ? <Minus size={14} strokeWidth={3} /> : <Check size={14} strokeWidth={3} />}</span>초성 모양</Pressable>}
+      <Pressable type="button" className={styles.benchGo} disabled={benchCount === 0} onClick={() => openEditor(type, benchChars)}>{/* 숫자가 바뀔 때마다 새로 떠오른다 — key가 바뀌면 애니메이션이 다시 돈다. */}<span key={benchCount} className={styles.benchCount}>{benchCount}</span>개 고치기</Pressable>
     </footer>
-    {toast && <div className={styles.toast} role="status">{toast.text}<button type="button" onClick={() => { toast.undo(); setToast(null) }}>되돌리기</button></div>}
+    {toast && <div className={styles.toast} role="status">{toast.text}<Pressable type="button" onClick={() => { toast.undo(); setToast(null) }}>되돌리기</Pressable></div>}
     {sheet && <GroupSheet
       type={type}
       all={chars}
@@ -869,9 +871,9 @@ function GroupSheet({ type, all, group, benchChars, builtinNameOf, onClose, onCr
       <div className={styles.sheetField}>
         <span>글자 <b>{draft.length}자</b></span>
         <div className={styles.sheetGrid} role="group" aria-label="묶음 글자">
-          {all.map((char) => <button key={char} type="button" aria-pressed={draft.includes(char)} aria-label={`${char} ${draft.includes(char) ? '빼기' : '넣기'}`} onClick={() => toggleDraft(char)}>
+          {all.map((char) => <Pressable key={char} type="button" aria-pressed={draft.includes(char)} aria-label={`${char} ${draft.includes(char) ? '빼기' : '넣기'}`} onClick={() => toggleDraft(char)}>
             <JamoGlyph type={type} char={char} size={22} />
-          </button>)}
+          </Pressable>)}
         </div>
         <em className={styles.sheetDiff} data-empty={draft.length === 0 || undefined}>{draft.length === 0
           ? (group ? '글자를 하나 이상 남겨 주세요 · 묶음을 없애려면 지우기' : '')
@@ -880,8 +882,8 @@ function GroupSheet({ type, all, group, benchChars, builtinNameOf, onClose, onCr
             : ''}</em>
       </div>
       <div className={styles.sheetActions}>
-        {group && <button type="button" className={styles.sheetDelete} onClick={() => onDelete(group.id)}>지우기</button>}
-        <button type="submit" className={styles.sheetSave} disabled={!name.trim() || draft.length === 0}>저장</button>
+        {group && <Pressable type="button" className={styles.sheetDelete} onClick={() => onDelete(group.id)}>지우기</Pressable>}
+        <Button type="submit" size="sheet" variant="default" className={styles.sheetSave} disabled={!name.trim() || draft.length === 0}>저장</Button>
       </div>
     </form>
   </div>
@@ -1010,15 +1012,15 @@ function FontSheet({ list, modified, top, closing, onClose, onClosed }: {
               ? `${modified > 0 ? `고친 자소 ${modified}` : '프리셋 그대로'} · ${editedDayText(font.updatedAt)}`
               : editedDayText(font.updatedAt)
             return <li key={font.id} data-current={current || undefined} data-testid="dashboard-font-row">
-              <button type="button" className={styles.fontRowOpen} disabled={list.moving} onClick={() => current ? onClose() : list.open(font.id)}>
+              <Pressable type="button" className={styles.fontRowOpen} disabled={list.moving} onClick={() => current ? onClose() : list.open(font.id)}>
                 <strong>{font.name}</strong>
                 <span>{sub}</span>
-              </button>
+              </Pressable>
               {current && <Check size={20} aria-label="지금 연 폰트" />}
             </li>
           })}
         </ul>}
-      <button type="button" className={styles.fontSheetCreate} disabled={list.moving || list.full} onClick={list.create} data-testid="dashboard-font-create"><Plus size={20} aria-hidden="true" />새 폰트</button>
+      <Pressable type="button" className={styles.fontSheetCreate} disabled={list.moving || list.full} onClick={list.create} data-testid="dashboard-font-create"><Plus size={20} aria-hidden="true" />새 폰트</Pressable>
       {list.full && <p className={styles.fontSheetNote}>폰트는 {FONT_LIMIT}개까지 만들 수 있어요. 하나를 지우면 새로 만들 수 있어요.</p>}
     </div>
   </div>
@@ -1079,9 +1081,9 @@ export function DashboardLabPage() {
       <header ref={head} className={styles.head}>
         {/* 회색 알약 = 지금 폰트. 누르면 내 폰트 시트(바꾸기 · 새로 · 이름 · 삭제). 계정 폰트를 안 연 랩 화면이면 이름만. */}
         <h1 className={styles.title}>
-          <button type="button" className={styles.switcher} disabled={!fontList.canList} aria-haspopup="dialog" aria-expanded={sheetOpen} onClick={() => sheetOpen ? closeSheet() : setSheet('open')} data-testid="dashboard-font-switcher">
+          <Pressable type="button" className={styles.switcher} disabled={!fontList.canList} aria-haspopup="dialog" aria-expanded={sheetOpen} onClick={() => sheetOpen ? closeSheet() : setSheet('open')} data-testid="dashboard-font-switcher">
             <span>{fontList.movingTo ?? name}</span>{fontList.canList && <ChevronDown size={18} aria-hidden="true" data-open={sheetOpen || undefined} />}
-          </button>
+          </Pressable>
         </h1>
         <ReportButton className={styles.avatar} />
         <AccountButton />
@@ -1095,9 +1097,9 @@ export function DashboardLabPage() {
 
         <div className={styles.body}>
           <nav className={styles.rail} aria-label="목차">
-            {SECTIONS.map(({ id, label }) => <button key={id} type="button" aria-current={active === id ? 'true' : undefined} onClick={() => jump(id)}>{label}</button>)}
+            {SECTIONS.map(({ id, label }) => <Pressable key={id} type="button" aria-current={active === id ? 'true' : undefined} onClick={() => jump(id)}>{label}</Pressable>)}
             {/* 검수는 섹션이 아니라 다른 화면(격자). 틈을 두고 따로. */}
-            <button type="button" className={styles.railLink} onClick={() => navigate('/workspace/review')} data-testid="dashboard-review"><ScanSearch size={16} aria-hidden="true" />검수</button>
+            <Pressable type="button" className={styles.railLink} onClick={() => navigate('/workspace/review')} data-testid="dashboard-review"><ScanSearch size={16} aria-hidden="true" />검수</Pressable>
           </nav>
 
           <div className={styles.content}>
@@ -1129,9 +1131,9 @@ export function DashboardLabPage() {
               <SectionHead title="레이아웃" count={6} onClick={() => navigate('/workspace/jamo')} testId="dashboard-layout" />
               <ul className={styles.grid}>
                 {LAYOUT_SAMPLES.map((char) => <li key={char}>
-                  <button type="button" className={styles.thumb} aria-label={`${char} 레이아웃`} onClick={() => navigate(`/workspace/jamo?char=${encodeURIComponent(char)}`)}>
+                  <Pressable type="button" className={styles.thumb} aria-label={`${char} 레이아웃`} onClick={() => navigate(`/workspace/jamo?char=${encodeURIComponent(char)}`)}>
                     <Lazy className={styles.ink}><LayoutThumb char={char} size={72} /></Lazy>
-                  </button>
+                  </Pressable>
                 </li>)}
               </ul>
             </section>

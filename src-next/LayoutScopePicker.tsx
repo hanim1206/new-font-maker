@@ -7,6 +7,8 @@ import { axisAllOn, axisOn, MEDIAL_FAMILY_ITEMS, ruleOfSets, ruleSamples, scopeC
 import type { ScopeSets } from './scopePicker'
 import { familyOfContext, finalOfContext, isEmptyRule, ruleGlyphCount, ruleKey, ruleName } from './scopeRule'
 import type { RuleJamoPart, ScopeRule } from './scopeRule'
+import { Pressable } from './components/ui/pressable'
+import { Button } from './components/ui/button'
 import styles from './LayoutScopePicker.module.css'
 
 /**
@@ -40,10 +42,10 @@ function AxisRow({ label, axis, items, sets, keep, onToggle, onAll }: {
   // 전부 켜지면 줄을 한 덩어리 검정 띠로 깐다(버튼 사이 틈까지) — `전부`가 낱낱이 아니라 통째로 읽히게.
   return <div className={styles.axis} data-axis={axis} data-all={on === items.length || undefined}>
     <span className={styles.axisLabel}>{label}<small data-testid="scope-axis-count">{on === items.length ? '전체' : `${on}개`}</small></span>
-    <button type="button" className={styles.all} aria-pressed={axisAllOn(sets, axis, items)} data-testid="scope-axis-all" onClick={() => onAll(axis, items, keep)}>전체</button>
+    <Pressable className={styles.all} aria-pressed={axisAllOn(sets, axis, items)} data-testid="scope-axis-all" onClick={() => onAll(axis, items, keep)}>전체</Pressable>
     <div className={styles.jamos} role="group" aria-label={`${label} 고르기`}>
-      {items.map((item) => <button key={item ?? 'none'} type="button" data-testid="scope-axis-jamo" data-jamo={item ?? 'none'}
-        aria-pressed={axisOn(sets, axis, item)} onClick={() => onToggle(axis, item)}>{item ?? '없음'}</button>)}
+      {items.map((item) => <Pressable key={item ?? 'none'} data-testid="scope-axis-jamo" data-jamo={item ?? 'none'}
+        aria-pressed={axisOn(sets, axis, item)} onClick={() => onToggle(axis, item)}>{item ?? '없음'}</Pressable>)}
     </div>
   </div>
 }
@@ -114,10 +116,10 @@ export function LayoutScopePicker({ source, rule, deltaLine, part, railRole, con
 
       {/* 어떻게 고를지 한 줄. `직접 선택`이 기본이고, 추천을 켜면 아래 줄은 그 규칙을 비추기만 한다(흐려진다). */}
       <div className={styles.chips} role="group" aria-label="범위 고르는 법">
-        <button type="button" className={styles.manual} data-testid="scope-picker-chip" data-chip="manual" aria-pressed={chipOn === null} onClick={dropChip}>직접 선택</button>
-        {chips.map((chip) => <button key={chip.id} type="button" data-testid="scope-picker-chip" data-chip={chip.id} aria-pressed={chipOn === chip.id} onClick={() => pickChip(chip)}>
+        <Button type="button" variant="chip" size="chip-sm" className={`${styles.chip} ${styles.manual}`} data-testid="scope-picker-chip" data-chip="manual" aria-pressed={chipOn === null} onClick={dropChip}>직접 선택</Button>
+        {chips.map((chip) => <Button key={chip.id} type="button" variant="chip" size="chip-sm" className={styles.chip} data-testid="scope-picker-chip" data-chip={chip.id} aria-pressed={chipOn === chip.id} onClick={() => pickChip(chip)}>
           {chip.label} <em>{chip.count.toLocaleString()}</em>
-        </button>)}
+        </Button>)}
       </div>
 
       <div className={styles.axes} data-dim={chipOn !== null || undefined}>
@@ -138,8 +140,8 @@ export function LayoutScopePicker({ source, rule, deltaLine, part, railRole, con
       </div>
 
       <footer className={styles.foot}>
-        <button type="button" className={styles.cancel} onClick={onCancel} data-testid="scope-picker-cancel">취소</button>
-        <button type="button" className={styles.confirm} disabled={count === 0 || (!allowUnchanged && ruleKey(current) === ruleKey(rule))} onClick={() => onConfirm(current)} data-testid="scope-picker-confirm">{confirmLabel}</button>
+        <Button type="button" size="sheet" variant="outline" className={styles.cancel} onClick={onCancel} data-testid="scope-picker-cancel">취소</Button>
+        <Button type="button" size="sheet" variant="default" className={styles.confirm} disabled={count === 0 || (!allowUnchanged && ruleKey(current) === ruleKey(rule))} onClick={() => onConfirm(current)} data-testid="scope-picker-confirm">{confirmLabel}</Button>
       </footer>
     </div>
   </div>

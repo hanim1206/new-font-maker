@@ -102,6 +102,11 @@ import { stemScaleOf } from '../src/services/strokeRenderGeometry'
 import { endRangeDrag, moveRangeDrag, startRangeDrag } from './rangeDrag'
 import { DEFAULT_STEM_BEAK, type StemBeakStyle } from '../src/services/stemBeak'
 import styleMode from './GlobalStyleMode.module.css'
+import { EDIT_COLOR } from './editColors'
+import { Button } from './components/ui/button'
+import { Pressable } from './components/ui/pressable'
+import { Checkbox } from './components/ui/checkbox'
+import { Field, RangeBar } from './components/ui/range'
 import { GlobalStyleTrackpad, type GlobalStylePanel } from './GlobalStyleTrackpad'
 import { SentenceTextarea } from './SentenceTextarea'
 import { SentenceSheetControls, SentenceSheetRun } from './SentenceSheet'
@@ -170,8 +175,8 @@ type PreviewJamo = { type: JamoData['type']; char: string; data: JamoData; basel
 /** 최소 잉크 간격에 걸린 자리에서 이만큼(em) 더 끌어야 넘어간다. 한 번 "탁" 걸리는 세기. */
 const GAP_STICK_EM = 0.05
 /** 선택 색. 피그마처럼 잉크는 제 색 그대로 두고, 잡은 획은 가는 중심선 + 둘레 상자로 알린다. 옆 자소에 너무 붙은 자소의 획은 경고색. */
-const SELECTION_COLOR = '#0d99ff'
-const SELECTION_WARNING_COLOR = '#e0321a'
+const SELECTION_COLOR = EDIT_COLOR.editHandle
+const SELECTION_WARNING_COLOR = EDIT_COLOR.destructive
 /** 꼭짓점 · 곡선 핸들 눌림 반지름(뷰박스 단위). 330px 캔버스에서 약 29px. 겹치면 누른 자리에서 가장 가까운 것이 잡힌다. */
 const POINT_HIT_RADIUS = 10
 /** 보이는 꼭짓점 반지름 · 핸들 마름모 한 변(뷰박스 단위). 잡은 것은 조금 더 크다. */
@@ -770,15 +775,15 @@ function FocusedGlyph({
         {/* 검수 캔버스(GhostCanvas)와 같은 깔개: 흰 칸 → 1/16 잔선·1/4 굵은선 눈금 → 칸 테두리 → 글자몸 → 기준선(0.88) → 부품 상자 → Noto 고스트. 전부 잉크 아래. */}
         {/* 글자가 기울어도 자리의 기준(눈금 · 글자몸 · 기준선 · 부품 상자)은 곧게 둔다. Noto 고스트만 잉크와 같이 기운다. */}
         <defs>
-          <pattern id="jamo-grid-fine" width={minorStep} height={minorStep} patternUnits="userSpaceOnUse"><path d={`M${minorStep} 0V${minorStep}H0`} fill="none" stroke="rgb(218 223 230 / .7)" strokeWidth={0.2 * u} /></pattern>
-          <pattern id="jamo-grid-coarse" width={majorStep} height={majorStep} patternUnits="userSpaceOnUse"><path d={`M${majorStep} 0V${majorStep}H0`} fill="none" stroke="rgb(196 203 212 / .8)" strokeWidth={0.3 * u} /></pattern>
+          <pattern id="jamo-grid-fine" width={minorStep} height={minorStep} patternUnits="userSpaceOnUse"><path d={`M${minorStep} 0V${minorStep}H0`} fill="none" stroke={EDIT_COLOR.border} strokeOpacity={0.7} strokeWidth={0.2 * u} /></pattern>
+          <pattern id="jamo-grid-coarse" width={majorStep} height={majorStep} patternUnits="userSpaceOnUse"><path d={`M${majorStep} 0V${majorStep}H0`} fill="none" stroke={EDIT_COLOR.editGuide} strokeOpacity={0.8} strokeWidth={0.3 * u} /></pattern>
         </defs>
-        <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill="#fff" />
+        <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill={EDIT_COLOR.surface} />
         <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill="url(#jamo-grid-fine)" data-testid="jamo-grid" />
         <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill="url(#jamo-grid-coarse)" />
-        <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill="none" stroke="rgb(196 203 212)" strokeWidth={0.4 * u} />
-        <rect x={body.x} y={body.y} width={body.width} height={body.height} fill="none" stroke="rgb(59 111 214 / .18)" strokeWidth={0.3 * u} data-testid="jamo-design-body" />
-        <line x1={-6} x2={102} y1={88} y2={88} stroke="#a6a297" strokeWidth={0.3 * u} />
+        <rect x={0} y={0} width={VIEW_BOX_SIZE} height={VIEW_BOX_SIZE} fill="none" stroke={EDIT_COLOR.editGuide} strokeWidth={0.4 * u} />
+        <rect x={body.x} y={body.y} width={body.width} height={body.height} fill="none" stroke={EDIT_COLOR.editSlotJu} strokeOpacity={0.18} strokeWidth={0.3 * u} data-testid="jamo-design-body" />
+        <line x1={-6} x2={102} y1={88} y2={88} stroke={EDIT_COLOR.editBaseline} strokeWidth={0.3 * u} />
         <PartBoxes boxes={inkBoxes} activePart={selectedPart ?? lockedPart} unit={u} />
         {/* 레이아웃의 기준선을 읽기 전용으로 옅게 깐다. 획을 끌면 여기에 걸린다. */}
         {guideRails.length > 0 && <g aria-hidden="true" data-testid="stroke-guide-rails">
@@ -1707,40 +1712,40 @@ function InferenceTrackpad({
       setAddMenuOpen(false)
       add()
     }
-    const deleteButton = canDelete && <button type="button" onClick={deleteSelection} aria-label={selection.kind === 'stroke' ? '획 삭제' : '꼭짓점 삭제'}><Trash2 size={18} aria-hidden="true" /><span>삭제</span></button>
-    const connectButton = mergeTarget && <button type="button" onClick={connectStroke} aria-label="가까운 선 연결"><Link2 size={18} aria-hidden="true" /><span>잇기</span></button>
+    const deleteButton = canDelete && <Pressable type="button" onClick={deleteSelection} aria-label={selection.kind === 'stroke' ? '획 삭제' : '꼭짓점 삭제'}><Trash2 size={18} aria-hidden="true" /><span>삭제</span></Pressable>
+    const connectButton = mergeTarget && <Pressable type="button" onClick={connectStroke} aria-label="가까운 선 연결"><Link2 size={18} aria-hidden="true" /><span>잇기</span></Pressable>
     const strokeTools = (
       <div className={styles.strokeToolRow} role="toolbar" aria-label="획 편집 도구">
-        <button type="button" onClick={() => setAddMenuOpen((open) => !open)} disabled={!creationBase} aria-expanded={addMenuOpen && Boolean(creationBase)} aria-label="획 추가"><Plus size={18} aria-hidden="true" /><span>추가</span></button>
+        <Pressable type="button" onClick={() => setAddMenuOpen((open) => !open)} disabled={!creationBase} aria-expanded={addMenuOpen && Boolean(creationBase)} aria-label="획 추가"><Plus size={18} aria-hidden="true" /><span>추가</span></Pressable>
         {/* 늘 그려 두고 높이만 0 ↔ 제 높이로 굴린다. 글로벌 스타일을 열 때처럼 `추가`는 제자리, 아래 단추만 스르륵 밀려난다. */}
         {creationBase && <div className={styles.strokeAddMenu} data-open={addMenuOpen} inert={!addMenuOpen}>
           <div>
-            <button type="button" className={styles.strokeAddItem} onClick={() => pickAdd(addStroke)} aria-label="선 추가"><Minus size={18} aria-hidden="true" /><span>선</span></button>
-            <button type="button" className={styles.strokeAddItem} onClick={() => pickAdd(() => addClosedShape('circle'))} aria-label="원 넣기" data-testid="jamo-stroke-add-circle"><Circle size={18} aria-hidden="true" /><span>원</span></button>
-            <button type="button" className={styles.strokeAddItem} onClick={() => pickAdd(() => addClosedShape('square'))} aria-label="사각 넣기" data-testid="jamo-stroke-add-square"><Square size={18} aria-hidden="true" /><span>사각</span></button>
+            <Pressable type="button" className={styles.strokeAddItem} onClick={() => pickAdd(addStroke)} aria-label="선 추가"><Minus size={18} aria-hidden="true" /><span>선</span></Pressable>
+            <Pressable type="button" className={styles.strokeAddItem} onClick={() => pickAdd(() => addClosedShape('circle'))} aria-label="원 넣기" data-testid="jamo-stroke-add-circle"><Circle size={18} aria-hidden="true" /><span>원</span></Pressable>
+            <Pressable type="button" className={styles.strokeAddItem} onClick={() => pickAdd(() => addClosedShape('square'))} aria-label="사각 넣기" data-testid="jamo-stroke-add-square"><Square size={18} aria-hidden="true" /><span>사각</span></Pressable>
           </div>
         </div>}
         {selection.kind === 'stroke' && <>
-          <button type="button" onClick={copyStroke} aria-label="획 복사" data-testid="jamo-stroke-copy">{strokeCopied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}<span>{strokeCopied ? '복사함' : '복사'}</span></button>
+          <Pressable type="button" onClick={copyStroke} aria-label="획 복사" data-testid="jamo-stroke-copy">{strokeCopied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}<span>{strokeCopied ? '복사함' : '복사'}</span></Pressable>
           {deleteButton}
           {connectButton}
           {DEV_TOOLS_ENABLED && selectedStroke && <>
-            <button type="button" onClick={() => scaleStrokeThickness(1 / 1.05)} aria-label="획 두께 5% 얇게 (개발용)" data-testid="dev-stroke-thinner"><Minus size={18} aria-hidden="true" /><span>얇게</span></button>
-            <button type="button" onClick={() => scaleStrokeThickness(1.05)} aria-label="획 두께 5% 굵게 (개발용)" data-testid="dev-stroke-thicker"><Plus size={18} aria-hidden="true" /><span>{Math.round(selectedStroke.thickness * 1000)}u</span></button>
+            <Pressable type="button" onClick={() => scaleStrokeThickness(1 / 1.05)} aria-label="획 두께 5% 얇게 (개발용)" data-testid="dev-stroke-thinner"><Minus size={18} aria-hidden="true" /><span>얇게</span></Pressable>
+            <Pressable type="button" onClick={() => scaleStrokeThickness(1.05)} aria-label="획 두께 5% 굵게 (개발용)" data-testid="dev-stroke-thicker"><Plus size={18} aria-hidden="true" /><span>{Math.round(selectedStroke.thickness * 1000)}u</span></Pressable>
           </>}
         </>}
         {onPoint && <>
-          <button type="button" onClick={toggleCurve} aria-label={selectedPointHasCurve ? '직선화' : '곡선화'}><Spline size={18} aria-hidden="true" /><span>{selectedPointHasCurve ? '직선' : '곡선'}</span></button>
-          {canDisconnect && <button type="button" onClick={disconnectStroke} aria-label="선 끊기"><Unlink size={18} aria-hidden="true" /><span>끊기</span></button>}
+          <Pressable type="button" onClick={toggleCurve} aria-label={selectedPointHasCurve ? '직선화' : '곡선화'}><Spline size={18} aria-hidden="true" /><span>{selectedPointHasCurve ? '직선' : '곡선'}</span></Pressable>
+          {canDisconnect && <Pressable type="button" onClick={disconnectStroke} aria-label="선 끊기"><Unlink size={18} aria-hidden="true" /><span>끊기</span></Pressable>}
           {connectButton}
           {deleteButton}
         </>}
-        {selection.kind !== 'stroke' && wholeJamoSource && <button type="button" onClick={copyStroke} aria-label={`${wholeJamoSource.char} 획 모두 복사`} data-testid="jamo-strokes-copy-all">{strokeCopied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}<span>{strokeCopied ? '복사함' : '복사'}</span></button>}
-        {creationBase && clipboardStrokes.length > 0 && <button type="button" onClick={pasteStroke} aria-label="획 붙여넣기" data-testid="jamo-stroke-paste"><ClipboardPaste size={18} aria-hidden="true" /><span>붙여넣기</span></button>}
-        {creationBase && doubleSplit && <button type="button" onClick={takeSingle} aria-label={`${doubleSplit.single} 모양 가져오기`} data-testid="jamo-stroke-take-single"><Import size={18} aria-hidden="true" /><span>{doubleSplit.single} 모양</span></button>}
-        {creationBase && <button type="button" onClick={() => setResetConfirmOpen(true)} disabled={!canResetJamo} aria-label={`${creationBase.jamo.char} 프리셋으로 초기화`} data-testid="jamo-stroke-reset"><RotateCcw size={18} aria-hidden="true" /><span>초기화</span></button>}
+        {selection.kind !== 'stroke' && wholeJamoSource && <Pressable type="button" onClick={copyStroke} aria-label={`${wholeJamoSource.char} 획 모두 복사`} data-testid="jamo-strokes-copy-all">{strokeCopied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}<span>{strokeCopied ? '복사함' : '복사'}</span></Pressable>}
+        {creationBase && clipboardStrokes.length > 0 && <Pressable type="button" onClick={pasteStroke} aria-label="획 붙여넣기" data-testid="jamo-stroke-paste"><ClipboardPaste size={18} aria-hidden="true" /><span>붙여넣기</span></Pressable>}
+        {creationBase && doubleSplit && <Pressable type="button" onClick={takeSingle} aria-label={`${doubleSplit.single} 모양 가져오기`} data-testid="jamo-stroke-take-single"><Import size={18} aria-hidden="true" /><span>{doubleSplit.single} 모양</span></Pressable>}
+        {creationBase && <Pressable type="button" onClick={() => setResetConfirmOpen(true)} disabled={!canResetJamo} aria-label={`${creationBase.jamo.char} 프리셋으로 초기화`} data-testid="jamo-stroke-reset"><RotateCcw size={18} aria-hidden="true" /><span>초기화</span></Pressable>}
         {/* 맨 아래 주황 단추. 잡은 홀자 줄기의 모양(휨 · 기울기)을 같은 갈래 형제에 퍼뜨린다 — 모양이 마스터와 다를 때만 뜬다. */}
-        {onSpread && <button type="button" className={styles.strokeToolSpread} onClick={onSpread} aria-label="이 획 모양을 형제에 전파" data-testid="jamo-stroke-spread"><Share2 size={18} aria-hidden="true" /><span>전파</span></button>}
+        {onSpread && <Pressable type="button" className={styles.strokeToolSpread} onClick={onSpread} aria-label="이 획 모양을 형제에 전파" data-testid="jamo-stroke-spread"><Share2 size={18} aria-hidden="true" /><span>전파</span></Pressable>}
       </div>
     )
     return (
@@ -1748,7 +1753,7 @@ function InferenceTrackpad({
         {/* 경고만 한 줄. 알릴 게 없으면 줄을 접는다 — 늘어나고 줄어드는 건 트랙패드라 캔버스는 안 흔들린다. */}
         {directLabel && <p className={styles.strokeWarning}>{directLabel}</p>}
         {/* `틀 다시 맞추기`는 일단 숨긴다(기능은 남겨 둔다). */}
-        <button type="button" hidden onClick={resetFrame} disabled={!liveJamo?.frame} data-testid="jamo-frame-reset">틀 다시 맞추기</button>
+        <Pressable type="button" hidden onClick={resetFrame} disabled={!liveJamo?.frame} data-testid="jamo-frame-reset">틀 다시 맞추기</Pressable>
         {/* 트랙패드가 남는 세로를 다 먹고, 도구 단추는 그 오른쪽에 2열로 선다(단추 줄이 차지하던 세로를 트랙패드에 준다). */}
         <div className={styles.strokeWorkRow}>
           <JamoScaleSlider disabled={!creationBase} onStart={beginJamoScale} onChange={changeJamoScale} onCommit={commitJamoScale} onCancel={cancelJamoScale} />
@@ -1779,8 +1784,8 @@ function InferenceTrackpad({
                 <small>이 자소에서 고친 획이 모두 사라지고 처음 프리셋 모양으로 돌아가요. 실행 취소로 되살릴 수 있어요.</small>
               </header>
               <div className={confirmStyles.actions}>
-                <button type="button" onClick={() => setResetConfirmOpen(false)}>취소</button>
-                <button type="submit" onClick={resetJamo} autoFocus data-testid="jamo-stroke-reset-ok">되돌리기</button>
+                <Pressable type="button" onClick={() => setResetConfirmOpen(false)}>취소</Pressable>
+                <Pressable type="submit" onClick={resetJamo} autoFocus data-testid="jamo-stroke-reset-ok">되돌리기</Pressable>
               </div>
             </div>
           </div>,
@@ -1864,7 +1869,7 @@ function DesignBodyShapeControls({ fontSpace }: { fontSpace: { unitsPerEm: numbe
       <div className={styleMode.shapeRow}>
         <span className={styleMode.shapeIcon} style={{ width: 12, height: 20 }} aria-hidden="true" />
         <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <input type="range" min={BODY_PERCENT_MIN} max={BODY_PERCENT_MAX} step="1" value={shown} aria-label="네모꼴 가로" data-testid="style-body-shape" onChange={(event) => setPercent(Number(event.target.value))}
+          <RangeBar min={BODY_PERCENT_MIN} max={BODY_PERCENT_MAX} step="1" value={shown} aria-label="네모꼴 가로" data-testid="style-body-shape" onChange={(event) => setPercent(Number(event.target.value))}
             onPointerDown={(event) => setPercent(startRangeDrag(event))} onPointerMove={(event) => setPercent(moveRangeDrag(event))} onPointerUp={endRangeDrag} onPointerCancel={endRangeDrag} />
           <RangeTicks min={BODY_PERCENT_MIN} max={BODY_PERCENT_MAX} ticks={[{ at: BODY_PERCENT_MIN, text: '좁게' }, { at: 100, text: '기본' }, { at: BODY_PERCENT_MAX, text: '넓게' }]} />
         </span>
@@ -1873,11 +1878,11 @@ function DesignBodyShapeControls({ fontSpace }: { fontSpace: { unitsPerEm: numbe
       {outside && <small className={styleMode.bodyNote} data-testid="style-body-outside">지금 값({width} × {height})은 막대 범위 밖이에요. 막대를 움직이면 범위 안으로 들어와요.</small>}
     </div>
     <label className={styleMode.autoRow}>
-      <input type="checkbox" checked={autoOn} onChange={(event) => setAutoCompensation(event.target.checked)} data-testid="style-body-auto" />
+      <Checkbox tone="ink" checked={autoOn} onCheckedChange={(checked) => setAutoCompensation(checked === true)} data-testid="style-body-auto" />
       <span>자동 보정</span>
       <output data-testid="style-body-auto-amount">{autoText}</output>
     </label>
-    <button type="button" disabled={isReference} onClick={resetGlobalPadding}>기본 가로로 되돌리기</button>
+    <Button variant="faint" size="sm" className="mt-3 h-11 w-full" disabled={isReference} onClick={resetGlobalPadding}>기본 가로로 되돌리기</Button>
   </div>
 }
 
@@ -1931,15 +1936,15 @@ function DesignBodyControls({
 
   return <div className={styles.bodyControls} role="tabpanel" aria-label="글자 네모꼴 설정">
     <div className={styles.bodyScope} role="tablist" aria-label="네모꼴 적용 범위">
-      <button type="button" role="tab" aria-selected={scope === 'font'} onClick={() => setScope('font')}>폰트 전체</button>
-      <button type="button" role="tab" aria-selected={scope === 'layout'} onClick={selectLayoutScope}>현재 레이아웃</button>
+      <Pressable type="button" role="tab" aria-selected={scope === 'font'} onClick={() => setScope('font')}>폰트 전체</Pressable>
+      <Pressable type="button" role="tab" aria-selected={scope === 'layout'} onClick={selectLayoutScope}>현재 레이아웃</Pressable>
     </div>
     <p><strong>{scope === 'font' ? '모든 레이아웃의 기본 네모꼴' : `${LAYOUT_LABELS[layoutType]}만 별도 적용`}</strong><span>Font Space {fontSpace.unitsPerEm}은 고정됩니다</span></p>
     <div className={styles.bodyDimensionGrid}>
       <label><span>가로 <output>{Math.round(body.width)}</output></span><input type="range" min="500" max="1000" step="5" value={Math.round(body.width)} onChange={(event) => updateBody('width', Number(event.target.value))} {...dragBody('width')} /></label>
       <label><span>세로 <output>{Math.round(body.height)}</output></span><input type="range" min="500" max="1000" step="5" value={Math.round(body.height)} onChange={(event) => updateBody('height', Number(event.target.value))} {...dragBody('height')} /></label>
     </div>
-    <button type="button" className={styles.bodyReset} disabled={scope === 'layout' ? !layoutOverride : body.width === BODY_W && body.height === BODY_H} onClick={() => scope === 'layout' ? removePaddingOverride(layoutType) : resetGlobalPadding()}>{scope === 'layout' ? '폰트 전체 설정 따르기' : '기본 840 × 910으로 되돌리기'}</button>
+    <Pressable type="button" className={styles.bodyReset} disabled={scope === 'layout' ? !layoutOverride : body.width === BODY_W && body.height === BODY_H} onClick={() => scope === 'layout' ? removePaddingOverride(layoutType) : resetGlobalPadding()}>{scope === 'layout' ? '폰트 전체 설정 따르기' : '기본 840 × 910으로 되돌리기'}</Pressable>
   </div>
 }
 
@@ -1967,15 +1972,14 @@ function StyleWeightRange({
   const setCounterKeep = useGlobalStyleStore((state) => state.setCounterKeep)
   // 다른 획 막대와 같은 생김새: 제목 오른쪽 값, 아래 눈금(100 · 400 · 900만 글씨).
   return <>
-    <label className={styles.ruleControl}>
-      <span>굵기 <output>{tone.weight}</output></span>
-      <input type="range" min="100" max="900" step="100" value={tone.weight} aria-label="굵기" data-testid="style-weight" onChange={(event) => setWeight(Number(event.target.value))}
+    <Field label="굵기" value={tone.weight}>
+      <RangeBar min="100" max="900" step="100" value={tone.weight} aria-label="굵기" data-testid="style-weight" onChange={(event) => setWeight(Number(event.target.value))}
         onPointerDown={(event) => setWeight(startRangeDrag(event))} onPointerMove={(event) => setWeight(moveRangeDrag(event))}
         onPointerUp={(event) => { endRangeDrag(event); commit() }} onPointerCancel={(event) => { endRangeDrag(event); commit() }} onKeyUp={commit} onBlur={commit} />
       <RangeTicks min={100} max={900} ticks={WEIGHT_STOPS.map((at) => ({ at, text: at === 100 || at === 400 || at === 900 ? String(at) : undefined }))} />
-    </label>
+    </Field>
     <label className={styleMode.autoRow}>
-      <input type="checkbox" checked={keepOn} onChange={(event) => setCounterKeep(event.target.checked)} data-testid="style-weight-auto" />
+      <Checkbox tone="ink" checked={keepOn} onCheckedChange={(checked) => setCounterKeep(checked === true)} data-testid="style-weight-auto" />
       <span>자동 보정</span>
       <output data-testid="style-weight-auto-amount">{keepOn ? '굵게 하면 속공간을 지켜요' : '꺼 두었어요'}</output>
     </label>
@@ -2752,12 +2756,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     })()
     return isEditableHangul(char)
       ? inSheet
-        ? <button key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width, paddingInlineStart: bearing }} type="button" tabIndex={-1} data-char-index={charIndex} aria-label={`${char} 앞뒤에 커서 두기`}>
+        ? <Pressable key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width, paddingInlineStart: bearing }} type="button" tabIndex={-1} data-char-index={charIndex} aria-label={`${char} 앞뒤에 커서 두기`}>
             <Glyph char={char} size={sentenceEm} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={previewJamo} previewSchema={previewSchema} layoutHighlight={null} globalStyle={previewGlobalStyle} />
-          </button>
-        : <button key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width, paddingInlineStart: bearing }} type="button" aria-current={char === selectedChar ? 'true' : undefined} data-ink-gap-limiter={inkGapLimiter?.id === contextId ? 'true' : undefined} data-ink-safety-adjusted={isSafetyAdjusted ? 'true' : undefined} data-layout-applied={isScopeApplied ? 'true' : undefined} aria-label={`${char} 편집${isSafetyAdjusted ? ', 충돌 안전 보정됨' : ''}`} onClick={() => chooseChar(char)}>
+          </Pressable>
+        : <Pressable key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width, paddingInlineStart: bearing }} type="button" aria-current={char === selectedChar ? 'true' : undefined} data-ink-gap-limiter={inkGapLimiter?.id === contextId ? 'true' : undefined} data-ink-safety-adjusted={isSafetyAdjusted ? 'true' : undefined} data-layout-applied={isScopeApplied ? 'true' : undefined} aria-label={`${char} 편집${isSafetyAdjusted ? ', 충돌 안전 보정됨' : ''}`} onClick={() => chooseChar(char)}>
           <Glyph char={char} size={sentenceEm} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={previewJamo} previewSchema={previewSchema} layoutHighlight={layoutHighlight} globalStyle={previewGlobalStyle} />
-        </button>
+        </Pressable>
       : <span key={`${lineIndex}-${char}-${charIndex}`} data-char-index={inSheet ? charIndex : undefined} className={/\s/u.test(char) ? styles.spaceGlyph : styles.punctuationGlyph} style={{ inlineSize: width }} aria-label={/\s/u.test(char) ? '공백' : char}>{char}</span>
   }
   // 셸 안에서는 도구 줄이 없다(출력은 폰트 탭, 형태 규칙은 머리, 실행취소 · 다시실행은 셸 머리). 아래 줄은 옛 단독 화면 것.
@@ -2765,18 +2769,18 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const toggleGlobalStyle = () => { if (isGlobalStyleOpen) closeGlobalStyle(); else { if (sentenceSheetOpen) closeSentenceSheet(); setGlobalStylePanel(chrome === 'workspace' ? 'brush' : 'body') } }
   const actions = (
     <nav aria-label="폰트 추출 및 편집 기록">
-      <button type="button" className={styles.exportButton} data-export-state={exportState} onClick={exportCurrentFont} disabled={exportState === 'exporting'} aria-label={exportState === 'exporting' ? `OTF 추출 중: ${exportProgress}` : exportState === 'downloaded' ? 'OTF 추출 완료' : exportState === 'failed' ? 'OTF 추출 실패' : '현재 작업을 OTF로 추출'} title={exportState === 'exporting' ? exportProgress : '현재 작업을 OTF로 추출'}>
+      <Pressable type="button" className={styles.exportButton} data-export-state={exportState} onClick={exportCurrentFont} disabled={exportState === 'exporting'} aria-label={exportState === 'exporting' ? `OTF 추출 중: ${exportProgress}` : exportState === 'downloaded' ? 'OTF 추출 완료' : exportState === 'failed' ? 'OTF 추출 실패' : '현재 작업을 OTF로 추출'} title={exportState === 'exporting' ? exportProgress : '현재 작업을 OTF로 추출'}>
         {exportState === 'exporting' ? <LoaderCircle className={styles.exportSpinner} size={18} /> : exportState === 'downloaded' ? <Check size={18} /> : exportState === 'failed' ? <X size={18} /> : <Download size={18} />}
         {menuLabel('OTF 추출')}
-      </button>
-      <button hidden type="button" className={styles.copyButton} data-copy-state={copyState} onClick={copyAnalysisValues} aria-label={copyState === 'copied' ? '분석용 값 복사됨' : copyState === 'failed' ? '분석용 값 복사 실패' : '분석용 값 복사'} title="분석용 값 복사">
+      </Pressable>
+      <Pressable hidden type="button" className={styles.copyButton} data-copy-state={copyState} onClick={copyAnalysisValues} aria-label={copyState === 'copied' ? '분석용 값 복사됨' : copyState === 'failed' ? '분석용 값 복사 실패' : '분석용 값 복사'} title="분석용 값 복사">
         {copyState === 'copied' ? <Check size={18} /> : <Copy size={18} />}
-      </button>
-      <button type="button" disabled={selection.kind === 'none'} onClick={() => setIsShapeRuleOpen(true)} aria-label="선택 자모 형태 규칙" title="현재 자모의 획과 형태 예절"><ListTree size={18} />{menuLabel('형태 규칙')}</button>
-      {chrome === 'standalone' && <button type="button" data-active={isGlobalStyleOpen || undefined} onClick={toggleGlobalStyle} aria-label="글로벌 스타일 설정" title="글자 네모꼴과 획 스타일"><Settings2 size={18} />{menuLabel('네모꼴 · 획 스타일')}</button>}
+      </Pressable>
+      <Pressable type="button" disabled={selection.kind === 'none'} onClick={() => setIsShapeRuleOpen(true)} aria-label="선택 자모 형태 규칙" title="현재 자모의 획과 형태 예절"><ListTree size={18} />{menuLabel('형태 규칙')}</Pressable>
+      {chrome === 'standalone' && <Pressable type="button" data-active={isGlobalStyleOpen || undefined} onClick={toggleGlobalStyle} aria-label="글로벌 스타일 설정" title="글자 네모꼴과 획 스타일"><Settings2 size={18} />{menuLabel('네모꼴 · 획 스타일')}</Pressable>}
       {chrome === 'standalone' && <>
-        <button type="button" onClick={undo} disabled={history.length === 0} aria-label="마지막 편집 되돌리기"><Undo2 size={18} />{history.length > 0 && <span>{history.length}</span>}</button>
-        <button type="button" onClick={redo} disabled={future.length === 0} aria-label="되돌린 편집 다시 실행"><Redo2 size={18} /></button>
+        <Pressable type="button" onClick={undo} disabled={history.length === 0} aria-label="마지막 편집 되돌리기"><Undo2 size={18} />{history.length > 0 && <span>{history.length}</span>}</Pressable>
+        <Pressable type="button" onClick={redo} disabled={future.length === 0} aria-label="되돌린 편집 다시 실행"><Redo2 size={18} /></Pressable>
       </>}
     </nav>
   )
@@ -2790,13 +2794,13 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         {/* 셸 안에서는 돋보기 하나. 누르면 문장 줄이 그 자리에서 펼쳐지고, 같은 자리의 닫기로 접힌다. 문장 바꾸기(주사위 · 직접 입력)는 펼친 줄에서 한다. */}
         {chrome === 'workspace' ? <>
         <div className={styles.sentenceActions}>
-          <button type="button" className={styles.sentenceOpen} onClick={(event) => { event.stopPropagation(); if (sentenceSheetOpen) closeSentenceSheet(); else openSentenceSheet() }} aria-label={sentenceSheetOpen ? '문장 접기' : '문장 크게 보기 · 바꾸기'} aria-expanded={sentenceSheetOpen} title={sentenceSheetOpen ? '문장 접기' : '문장 크게 보기 · 바꾸기'} data-testid="sentence-sheet-toggle">{sentenceSheetOpen ? <X size={19} aria-hidden="true" /> : <ZoomIn size={19} aria-hidden="true" />}</button>
+          <Pressable type="button" className={styles.sentenceOpen} onClick={(event) => { event.stopPropagation(); if (sentenceSheetOpen) closeSentenceSheet(); else openSentenceSheet() }} aria-label={sentenceSheetOpen ? '문장 접기' : '문장 크게 보기 · 바꾸기'} aria-expanded={sentenceSheetOpen} title={sentenceSheetOpen ? '문장 접기' : '문장 크게 보기 · 바꾸기'} data-testid="sentence-sheet-toggle">{sentenceSheetOpen ? <X size={19} aria-hidden="true" /> : <ZoomIn size={19} aria-hidden="true" />}</Pressable>
         </div>
         <SentenceSheetControls sheet={sentenceSheet} />
         </> : <>
         <div className={styles.sentenceActions}>
-          <button type="button" onClick={pickSampleSentence} aria-label="예시 문장 무작위 선택" title="예시 문장 바꾸기"><Dices size={19} aria-hidden="true" /></button>
-          <button type="button" data-active={isDirectInputActive || undefined} onClick={startDirectInput} aria-label="보정 문장 직접 입력" title="직접 입력"><TextCursorInput size={19} aria-hidden="true" /></button>
+          <Pressable type="button" onClick={pickSampleSentence} aria-label="예시 문장 무작위 선택" title="예시 문장 바꾸기"><Dices size={19} aria-hidden="true" /></Pressable>
+          <Pressable type="button" data-active={isDirectInputActive || undefined} onClick={startDirectInput} aria-label="보정 문장 직접 입력" title="직접 입력"><TextCursorInput size={19} aria-hidden="true" /></Pressable>
         </div>
         <SentenceTextarea
           ref={directInputRef}
@@ -2930,7 +2934,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   }
   const benchRow = benchType && benchChars.length > 0 && editMode === 'stroke' && (
     <div className={styles.bench} role="tablist" aria-label="도마" data-testid="workbench">
-      {benchChars.map((char) => <button key={char} type="button" role="tab" aria-selected={char === benchJamo} onClick={() => pickBenchJamo(char)}>{char}</button>)}
+      {benchChars.map((char) => <Pressable key={char} type="button" role="tab" aria-selected={char === benchJamo} onClick={() => pickBenchJamo(char)}>{char}</Pressable>)}
     </div>
   )
   if (chrome === 'workspace') {

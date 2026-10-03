@@ -33,7 +33,7 @@ export const DropdownMenuItem = React.forwardRef<
     ref={ref}
     className={cn(
       'relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-surface-3 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-text-dim-4',
-      variant === 'destructive' && 'text-[rgb(214_69_65)] focus:bg-[rgb(253_236_233)] [&_svg]:text-current',
+      variant === 'destructive' && 'text-destructive focus:bg-destructive-soft [&_svg]:text-current',
       className
     )}
     {...props}

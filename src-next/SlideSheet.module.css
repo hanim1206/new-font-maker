@@ -1,32 +1,32 @@
 /* 제보 판(`ReportButton.module.css`)과 같은 둥근 판. 폰에서도 화면 정가운데. 둘러보기 · 공지가 같이 쓴다. */
-.layer { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; padding: 12px; background: rgb(0 0 0 / .36); animation: fadeIn var(--motion-normal) var(--ease-standard); }
+.layer { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; padding: 12px; background: rgb(var(--color-scrim) / .36); animation: fadeIn var(--motion-normal) var(--ease-standard); }
 .layer[data-closing] { animation: fadeOut 240ms var(--ease-standard) forwards; }
-.sheet { width: min(100%, 420px); box-sizing: border-box; max-height: 100%; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; border-radius: 28px; background: rgb(var(--color-surface)); animation: popIn 320ms cubic-bezier(0.32, 0.72, 0, 1); }
+.sheet { width: min(100%, 420px); box-sizing: border-box; max-height: 100%; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; border-radius: var(--radius-xl); background: rgb(var(--color-surface)); animation: popIn 320ms cubic-bezier(0.32, 0.72, 0, 1); }
 .layer[data-closing] .sheet { animation: popOut 200ms var(--ease-standard) forwards; }
 /* 관리자 미리보기: 깔개 없이 그 자리에. */
-.sheet[data-inline] { animation: none; box-shadow: 0 1px 3px rgb(0 0 0 / .08), 0 0 0 1px rgb(var(--color-border-subtle)); }
+.sheet[data-inline] { animation: none; box-shadow: 0 1px 3px rgb(var(--color-scrim) / .08), 0 0 0 1px rgb(var(--color-border-subtle)); }
 
 
 /* 실제 화면 한 장. 캡처는 3:4 — 낮은 화면에선 높이를 줄이고 위를 맞춘다. */
-.frame { overflow: hidden; border-radius: 20px; background: rgb(var(--color-surface-2)); box-shadow: inset 0 0 0 1px rgb(var(--color-border-subtle)); aspect-ratio: 3 / 4; max-height: 48vh; touch-action: pan-y; user-select: none; }
+.frame { overflow: hidden; border-radius: var(--radius-xl); background: rgb(var(--color-surface-2)); box-shadow: inset 0 0 0 1px rgb(var(--color-border-subtle)); aspect-ratio: 3 / 4; max-height: 48vh; touch-action: pan-y; user-select: none; }
 .frame img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; animation: fadeIn var(--motion-slow) var(--ease-standard); pointer-events: none; }
 .frame img[data-bottom] { object-position: bottom; }
 .frame img[data-center] { object-position: center; }
 
 .dots { display: flex; justify-content: center; gap: 6px; }
-.dots span { width: 6px; height: 6px; border-radius: 999px; background: rgb(var(--color-surface-4)); transition: width var(--motion-normal) var(--ease-standard), background var(--motion-normal) var(--ease-standard); }
+.dots span { width: 6px; height: 6px; border-radius: var(--radius-full); background: rgb(var(--color-surface-4)); transition: width var(--motion-normal) var(--ease-standard), background var(--motion-normal) var(--ease-standard); }
 .dots span[data-on] { width: 18px; background: rgb(var(--color-foreground)); }
 
 /* 머리말은 장을 넘겨도 그대로 — 바뀌는 글(`.text`)만 다시 떠오른다. */
 .copy { display: flex; flex-direction: column; gap: 6px; }
-.eyebrow { padding: 0 4px; color: rgb(var(--color-primary)); font-size: 13px; font-weight: 700; line-height: 1.4; word-break: keep-all; }
+.eyebrow { padding: 0 4px; color: rgb(var(--color-primary)); font-size: var(--font-13); font-weight: var(--weight-bold); line-height: 1.4; word-break: keep-all; }
 .text { display: flex; flex-direction: column; gap: 6px; padding: 0 4px; min-height: 96px; animation: fadeIn var(--motion-slow) var(--ease-standard); }
-.text h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
-.text p { margin: 0; white-space: pre-line; color: rgb(var(--color-text-3)); font-size: 15px; line-height: 1.55; word-break: keep-all; }
+.text h3 { margin: 0; font-size: var(--font-18); font-weight: var(--weight-bold); letter-spacing: -0.01em; }
+.text p { margin: 0; white-space: pre-line; color: rgb(var(--color-text-3)); font-size: var(--font-16); line-height: 1.55; word-break: keep-all; }
 
 .actions { display: flex; gap: 8px; }
-.actions button { flex: 1; min-height: 52px; border: 0; border-radius: 16px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-2)); font-size: 16px; font-weight: 700; }
-.actions button[data-primary] { flex: 2; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+.minor { flex: 1; }
+.major { flex: 2; }
 
 @keyframes fadeIn { from { opacity: 0; } }
 @keyframes fadeOut { to { opacity: 0; } }

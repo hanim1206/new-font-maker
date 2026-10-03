@@ -17,6 +17,7 @@ import {
   type StemMasterName,
   type StemMasters,
 } from '../src/services/stemMaster'
+import { EDIT_COLOR } from './editColors'
 import type { JamoData } from '../src/types'
 
 /**
@@ -29,7 +30,7 @@ import type { JamoData } from '../src/types'
 export interface StemEntry { char: string; channel: JamoChannel; strokeId: string; name: StemMasterName; values: Record<string, string>; follows: boolean; curved: boolean }
 
 /** 형제 카드 · 반영 창에서 그 획을 칠하는 색. */
-export const ACTIVE_STROKE_COLOR = '#d9480f'
+export const ACTIVE_STROKE_COLOR = EDIT_COLOR.editSelect
 
 /** 대표 글자: ㅇ + 홀자 (+ 받침 ㅇ). */
 export function sampleSyllable(jung: string, final: 'open' | 'closed'): string {

@@ -54,7 +54,7 @@ AI가 만드는 플랜·명세·실행 기록·측정 결과는 **옵시디언�
 
 ## 코드베이스
 
-React 19 + TypeScript 5.8 (strict) + Vite. 상태는 Zustand + Immer. 스타일은 CSS Modules. 테스트는 Vitest(`npm test`)와 Playwright(`npm run test:e2e`). 기준선 추출·코퍼스 분석은 `scripts/reference-lab/` Python.
+React 19 + TypeScript 5.8 (strict) + Vite. 상태는 Zustand + Immer. 스타일은 토큰(`src/index.css`) + 공용 부품(`src-next/components/ui`, shadcn + Tailwind), 화면 배치만 CSS Modules. 실험실 `/style-guide`에서 본다. 테스트는 Vitest(`npm test`)와 Playwright(`npm run test:e2e`). 기준선 추출·코퍼스 분석은 `scripts/reference-lab/` Python.
 
 ```bash
 npm run dev            # 개발 서버
@@ -76,6 +76,7 @@ npm run reference:noto # Noto 코퍼스 추출
 ## 컨벤션
 
 - 코드 식별자는 영문, UI 레이블·주석·문서는 한글.
+- 제품 화면에 날 색 · 날 `<button>` · 단계 밖 글자 크기 · 모서리 · 굵기를 쓰지 않는다(`style-guard.test.ts`가 막는다). 색은 의미 색 · 편집 색 토큰, 단추는 `Button`, 내용 덩어리는 `Pressable`. 캔버스 SVG 속성 색은 `editColors.ts`.
 - 모든 좌표는 0–1 정규화. `StrokeData`는 구별된 유니온, `isPathStroke()`로 좁힌다.
 - Zustand는 `set(state => { state.x = y })` 패턴. State와 Actions 인터페이스 분리.
 - 커밋은 `COMMIT_CONVENTION.md`: `<type>(<scope>): <한글 제목>`. AI 워터마크·Co-Author 금지.

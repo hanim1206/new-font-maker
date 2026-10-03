@@ -4,16 +4,16 @@
 .deltaRow { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .deltaRow .deltas { flex: 1 1 auto; min-width: 0; padding: 4px 0 0; }
 /* 자모 고르기 시트. 아래에서 올라오고 바깥을 누르면 닫힌다. */
-.sheetBackdrop { position: fixed; z-index: 100; inset: 0; display: flex; align-items: flex-end; justify-content: center; background: rgb(20 24 31 / .28); }
-.sheet { width: min(100%, 480px); box-sizing: border-box; padding: 12px 16px calc(env(safe-area-inset-bottom) + 16px); border-radius: 18px 18px 0 0; background: rgb(var(--color-surface)); box-shadow: 0 -8px 28px rgb(20 24 31 / .18); }
+.sheetBackdrop { position: fixed; z-index: 100; inset: 0; display: flex; align-items: flex-end; justify-content: center; background: rgb(var(--color-scrim) / .28); }
+.sheet { width: min(100%, 480px); box-sizing: border-box; padding: 12px 16px calc(env(safe-area-inset-bottom) + 16px); border-radius: var(--radius-xl) var(--radius-xl) 0 0; background: rgb(var(--color-surface)); box-shadow: 0 -8px 28px rgb(var(--color-scrim) / .18); }
 .sheet header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 10px; }
 .sheet header span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.sheet header b { font-size: 13px; font-weight: 700; }
-.sheet header small { color: rgb(var(--color-text-dim-4)); font-size: 10.5px; line-height: 1.35; }
-.sheet header button { flex: 0 0 auto; min-height: 36px; padding: 0 16px; border: 0; border-radius: 10px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 12px; font-weight: 700; }
+.sheet header b { font-size: var(--font-13); font-weight: var(--weight-bold); }
+.sheet header small { color: rgb(var(--color-text-4)); font-size: var(--font-11); line-height: 1.35; }
+.sheet header button { flex: 0 0 auto; min-height: 36px; padding: 0 16px; border: 0; border-radius: var(--radius-md); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: var(--font-12); font-weight: var(--weight-bold); }
 .jamos { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
-.jamos button { min-height: 44px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); color: rgb(var(--color-text-dim-3)); font-size: 16px; font-weight: 700; }
+.jamos button { min-height: 44px; border: 1px solid rgb(var(--color-border)); border-radius: var(--radius-md); background: rgb(var(--color-surface)); color: rgb(var(--color-text-3)); font-size: var(--font-16); font-weight: var(--weight-bold); }
 .jamos button[aria-pressed='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary-light)); color: rgb(var(--color-primary-dark)); }
-.jamos button:disabled { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary)); color: #fff; opacity: 1; }
-.deltas { min-height: 24px; display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 8px 0 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 600; color: rgb(var(--color-primary-dark)); }
-.deltas i { margin-right: 4px; color: rgb(var(--color-text-dim-4)); font-style: normal; font-weight: 500; }
+.jamos button:disabled { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary)); color: rgb(var(--color-inverse-foreground)); opacity: 1; }
+.deltas { min-height: 24px; display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 8px 0 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: var(--font-11); font-weight: var(--weight-semibold); color: rgb(var(--color-primary-dark)); }
+.deltas i { margin-right: 4px; color: rgb(var(--color-text-4)); font-style: normal; font-weight: var(--weight-medium); }
