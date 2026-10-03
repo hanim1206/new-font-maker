@@ -14,6 +14,13 @@ import type { CatalogEntry, ItemStatus, RunState, TestKind, TestRunItem, TestRun
 const POLL_RUNNING_MS = 2000
 const POLL_IDLE_MS = 10000
 
+/** 탭 아래 설명: 무엇이고 언제 도나. */
+const KIND_GUIDE: Record<TestKind, { what: string; when: string }> = {
+  unit: { what: '화면 없이 계산 하나하나를 따로 확인함. 1~2분', when: '코드를 고칠 때마다 고친 곳만 · dev에 합치기 직전과 main에 올리기 직전엔 전체' },
+  smoke: { what: '실제 브라우저로 제품의 큰 길 9개만 빠르게 눌러 봄. 1분 안팎', when: '공용 계산 · 저장 코드를 고쳤을 때 · dev에 합친 직후 · dev · main에 올릴 때 자동으로(실패하면 올리기를 막음)' },
+  e2e: { what: '실제 브라우저로 화면을 눌러 보는 전체 검사. 실험실은 빠짐. 몇 분 걸림', when: '끌기 · 탭 동작을 고쳤을 때 그 화면 것 하나 · 기능을 dev에 합치기 직전 그 기능 것 · main에 올리기 직전엔 전체' },
+}
+
 /** 돌린 기록과 상관없이 늘 보이는 전체 목록. 단위 · e2e는 설명 표(`testNotes.ts`), 스모크는 스모크 목록. */
 const NOTE_ENTRIES = Object.entries(TEST_NOTES).map(([file, [title]]) => ({ file, title }))
 const CATALOG: Record<TestKind, CatalogEntry[]> = {
@@ -128,7 +135,7 @@ function TestList({ kind, items }: { kind: TestKind; items: TestRunItem[] }) {
       // 단위 테스트는 갈래마다 접어 두고 도는 중 · 실패만 펼친다. e2e는 파일마다 접어 둔다. 누르면 접고 편다.
       const open = status === 'failed' || status === 'running'
       return <details key={group.name} open={open} className="group/fold rounded-lg bg-surface-2 px-3.5 py-2">
-        <summary className="-mx-2 flex cursor-pointer list-none flex-col gap-0.5 rounded-md px-2 py-0.5 text-sm font-semibold transition-colors hover:bg-surface-3 [&::-webkit-details-marker]:hidden">
+        <summary className="-mx-2 flex cursor-pointer list-none flex-col gap-0.5 rounded-md px-2 py-1 text-16 font-bold transition-colors hover:bg-surface-3 [&::-webkit-details-marker]:hidden">
           <span className="flex items-center gap-2">
             <StatusIcon status={status} />
             <span className="min-w-0 flex-1 truncate">{kind === 'unit' ? group.name : TEST_NOTES[group.name]?.[0] ?? group.name.split('/').pop()}</span>
@@ -138,11 +145,14 @@ function TestList({ kind, items }: { kind: TestKind; items: TestRunItem[] }) {
           </span>
           {kind === 'e2e' && <NoteLine file={group.name} />}
         </summary>
-        {kind === 'unit' && subgroupsOf(group.name, tests).map((sub) => <div key={sub.name} className="mt-2 first:mt-1">
+        {/* 펼친 내용은 제목보다 한 칸 안쪽, 왼쪽 선으로 제목 아래 것임을 보인다. */}
+        {tests.length > 0 && <div className="mb-1 ml-2 mt-1.5 border-l border-border-subtle pl-4">
+        {kind === 'unit' && subgroupsOf(group.name, tests).map((sub) => <div key={sub.name} className="mt-3 first:mt-0">
           {sub.name && <h3 className="mb-0.5 text-xs font-bold text-text-dim-4">{sub.name} <span className="font-normal text-text-dim-6">{sub.items.length}</span></h3>}
           <ul className="flex flex-col">{sub.items.map((item) => <ItemRow key={item.id} item={item} showFile showNote />)}</ul>
         </div>)}
-        {kind !== 'unit' && tests.length > 0 && <ul className="mt-1 flex flex-col">{tests.map((item) => <ItemRow key={item.id} item={item} />)}</ul>}
+        {kind !== 'unit' && <ul className="flex flex-col">{tests.map((item) => <ItemRow key={item.id} item={item} />)}</ul>}
+        </div>}
       </details>
   }
   const groups = groupsOf({ kind, items })
@@ -237,6 +247,10 @@ export function TestsPage() {
       const shown = slot[key] ?? (last && runStateOf(last) === 'running' ? 'last' : 'full')
       const run = choosable && shown === 'full' ? full : last
       return <TabsContent key={key} value={key} className="flex max-w-3xl flex-col gap-3">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 rounded-lg bg-surface-2 px-3.5 py-2.5 text-xs leading-relaxed text-text-dim-3">
+          <dt className="font-bold">무엇</dt><dd>{KIND_GUIDE[key].what}</dd>
+          <dt className="font-bold">언제</dt><dd>{KIND_GUIDE[key].when}</dd>
+        </dl>
         {choosable && <ChoiceGroup variant="segment" aria-label="볼 실행" className="w-64">
           <ChoiceItem checked={run === last} onClick={() => setSlot((prev) => ({ ...prev, [key]: 'last' }))}>마지막 실행 · {last.items.length}개</ChoiceItem>
           <ChoiceItem checked={run === full} onClick={() => setSlot((prev) => ({ ...prev, [key]: 'full' }))}>마지막 전체 · {full.items.length}개</ChoiceItem>
