@@ -35,6 +35,8 @@ import { useFitInkStyle } from './useFitInkStyle'
 import { useDesignBodyPadding } from './useDesignBody'
 import { layoutTypeOfSyllable } from '../src/utils/hangulUtils'
 import { INACTIVE_PART_COLOR, PART_COLOR } from './partColors'
+import { EDIT_COLOR } from './editColors'
+import { Pressable } from './components/ui/pressable'
 import styles from './GlyphLayoutEditor.module.css'
 
 /**
@@ -65,7 +67,7 @@ interface FitBox { id: string; kind: 'medial' | 'component'; part: Part; label: 
 
 /** 부품 색. 상자·rail·라벨이 같은 색을 쓴다. 첫닿자 초록, 홀자 파랑, 받침 보라. 선택·스냅은 주황. */
 const INACTIVE_COLOR = INACTIVE_PART_COLOR
-const ACCENT = '#f0561e'
+const ACCENT = EDIT_COLOR.editSelect
 /** `이 자리에 맞추기`. 2026-09-24 사용자 요청으로 일단 끈다. 켜면 버튼과 `고정` 표지가 돌아온다. */
 const FIX_RAIL_ENABLED = false
 /** Noto 실측선 id 앞머리 → 부품. 혼합 홀자의 가로부·세로부는 둘 다 홀자 탭에 속한다. */
@@ -202,17 +204,17 @@ function GhostCanvas({ ghost, ghostChar, ghostVisible = true, inkHidden = false,
   return <svg className={styles.canvas} viewBox={VIEW_BOX} role="img" aria-label={label} data-testid="review-canvas" data-pinch-lock data-snap={snapHit?.kind} data-held={selectedRail} onPointerDownCapture={releaseHold}>
     <defs>
       {/* 자소 원형 캔버스와 같은 눈금: 1/16 잔선 + 1/4 굵은선 */}
-      <pattern id="review-grid-fine" width=".0625" height=".0625" patternUnits="userSpaceOnUse"><path d="M.0625 0V.0625H0" fill="none" stroke="rgb(218 223 230 / .7)" strokeWidth=".002" /></pattern>
-      <pattern id="review-grid-coarse" width=".25" height=".25" patternUnits="userSpaceOnUse"><path d="M.25 0V.25H0" fill="none" stroke="rgb(196 203 212 / .8)" strokeWidth=".003" /></pattern>
+      <pattern id="review-grid-fine" width=".0625" height=".0625" patternUnits="userSpaceOnUse"><path d="M.0625 0V.0625H0" fill="none" stroke={EDIT_COLOR.border} strokeOpacity={0.7} strokeWidth=".002" /></pattern>
+      <pattern id="review-grid-coarse" width=".25" height=".25" patternUnits="userSpaceOnUse"><path d="M.25 0V.25H0" fill="none" stroke={EDIT_COLOR.editGuide} strokeOpacity={0.8} strokeWidth=".003" /></pattern>
     </defs>
-    <rect x="0" y="0" width="1" height="1" fill="#fff" />
+    <rect x="0" y="0" width="1" height="1" fill={EDIT_COLOR.surface} />
     {/* 격자 · 글자몸 테두리 · Noto 실측선 · 다른 부품 보선은 끄는 동안에만 깐다(맞출 자리). 평소엔 켠 부품 보선과 베이스라인만. */}
     {dragging && <>
       <rect x="0" y="0" width="1" height="1" fill="url(#review-grid-fine)" data-testid="review-grid" />
       <rect x="0" y="0" width="1" height="1" fill="url(#review-grid-coarse)" />
-      <rect x="0" y="0" width="1" height="1" fill="none" stroke="rgb(196 203 212)" strokeWidth=".004" />
+      <rect x="0" y="0" width="1" height="1" fill="none" stroke={EDIT_COLOR.editGuide} strokeWidth=".004" />
     </>}
-    <path d="M-.06 .88H1.02" stroke="#a6a297" strokeWidth=".003" />
+    <path d="M-.06 .88H1.02" stroke={EDIT_COLOR.editBaseline} strokeWidth=".003" />
     {/* 부품 상자. 획보다 아래, 고스트보다 아래. rail과 같은 부품 색. */}
     {boxes.map((item) => {
       const active = !activePart || samePartGroup(item.part, activePart)
@@ -226,10 +228,10 @@ function GhostCanvas({ ghost, ghostChar, ghostVisible = true, inkHidden = false,
     })}
     {/* Noto 고스트. 잉크가 아니라 비교용이라 반투명으로 깐다. 검정 획 아래에 두어 벗어난 곳만 회색으로 보인다. */}
     {ghostVisible && (weightGhost
-      ? <text x="0" y=".88" fontFamily="'Noto Sans KR', sans-serif" fontWeight={ghostWeight} fontSize="1" transform={designBodySvgTransform(body, 1)} fill="#3a3a36" fillOpacity=".55" data-testid="review-ghost">{ghostChar}</text>
-      : <path d={ghost} transform={designBodySvgTransform(body, 1)} fill="#3a3a36" fillOpacity=".55" fillRule="evenodd" data-testid="review-ghost" />)}
-    {!(inkHidden && ghostVisible) && overlays.map((path, index) => <path key={index} d={path} fill="#1a1a1a" fillRule="evenodd" data-testid="review-fit-ink" />)}
-    {!(inkHidden && ghostVisible) && componentOverlays.map((path, index) => <path key={`c${index}`} d={path} fill="#1a1a1a" fillRule="evenodd" data-testid="review-component-ink" />)}
+      ? <text x="0" y=".88" fontFamily="'Noto Sans KR', sans-serif" fontWeight={ghostWeight} fontSize="1" transform={designBodySvgTransform(body, 1)} fill={EDIT_COLOR.editGhost} fillOpacity=".55" data-testid="review-ghost">{ghostChar}</text>
+      : <path d={ghost} transform={designBodySvgTransform(body, 1)} fill={EDIT_COLOR.editGhost} fillOpacity=".55" fillRule="evenodd" data-testid="review-ghost" />)}
+    {!(inkHidden && ghostVisible) && overlays.map((path, index) => <path key={index} d={path} fill={EDIT_COLOR.foreground} fillRule="evenodd" data-testid="review-fit-ink" />)}
+    {!(inkHidden && ghostVisible) && componentOverlays.map((path, index) => <path key={`c${index}`} d={path} fill={EDIT_COLOR.foreground} fillRule="evenodd" data-testid="review-component-ink" />)}
     {/* Δ 띠. 켠 영역에서 옮긴 rail 전부: 기준값 자리와 지금 자리 사이를 주황 단색으로 칠한다. 선택을 풀어도 남는다. 잉크 위에 얹어 옮긴 구간이 바로 보인다.
         길이는 그 rail의 영역 상자 안으로만 — 캔버스 끝까지 그으면 다른 영역까지 덮는다. 상자가 없으면 캔버스 끝까지. */}
     {showDelta && editable.filter((rail) => rail.touched && (!activePart || samePartGroup(rail.part, activePart)) && Math.abs(rail.value - rail.baseline) > 1e-9).map((rail) => {
@@ -514,7 +516,7 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
         } />
         {/* 변 rail을 잡으면 `이 자리에 맞추기`. 누르면 범위 안 글자가 전부 이 자리(em)에 모인다. 탁 걸린 자리면 주황 테두리. 고정 뒤엔 `= 자리` 표지. */}
         {FIX_RAIL_ENABLED && rail && rail.kind === 'face' && (fixable
-          ? <button type="button" className={styles.canvasFix} data-snapped={!!snapHit || undefined} onClick={fixRail} data-testid="review-fix-rail">이 자리에 맞추기</button>
+          ? <Pressable type="button" className={styles.canvasFix} data-snapped={!!snapHit || undefined} onClick={fixRail} data-testid="review-fix-rail">이 자리에 맞추기</Pressable>
           : <span className={styles.canvasFixed} data-testid="review-fixed-rail">{rail.label} = {Math.round(rail.value * 1000)} · 고정</span>)}
         {snapHit?.touch && <span className={styles.touchChip} role="status" data-testid="review-touch-chip">{snapHit.label} 딱 붙음</span>}
         {/* 자 도구는 없다. 캔버스 안에서 끌기·방향키(1u · Shift 10u)로 옮기고, 경고는 캔버스 위에 겹쳐 높이가 안 흔들린다. 되돌리기는 셸 머리. */}

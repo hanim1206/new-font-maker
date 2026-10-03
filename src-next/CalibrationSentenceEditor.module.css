@@ -35,7 +35,7 @@
 .bodyDimensionGrid label span { display: flex; justify-content: space-between; }
 .bodyDimensionGrid output { color: rgb(var(--color-primary-dark)); font-family: ui-monospace, monospace; }
 .bodyDimensionGrid input { width: 100%; accent-color: rgb(var(--color-primary)); }
-.bodyReset { width: 100%; min-height: 32px; border: 1px solid rgb(var(--color-border)); border-radius: var(--radius-md); background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-size: var(--font-11); font-weight: var(--weight-bold); }
+.bodyControls .bodyReset { width: 100%; min-height: 32px; border: 1px solid rgb(var(--color-border)); border-radius: var(--radius-md); background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-size: var(--font-11); font-weight: var(--weight-bold); }
 .bodyReset:disabled { opacity: .45; }
 .sentence { position: relative; box-sizing: border-box; flex: 0 0 104px; height: 104px; display: flex; align-items: flex-start; padding: 8px 56px 8px 12px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; border-bottom: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface-3)); }
 .sentence::-webkit-scrollbar { display: none; }
@@ -204,7 +204,7 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .brushAnglePad output { position: absolute; z-index: 3; right: 7px; bottom: 6px; padding: 3px 6px; border-radius: var(--radius-sm); background: rgb(var(--color-surface) / .9); color: rgb(var(--color-text-2)); font-family: ui-monospace, monospace; font-size: var(--font-10); }
 .roundBrushMessage { min-height: 104px; margin: 0; display: grid; place-items: center; border: 1px dashed rgb(var(--color-border)); border-radius: var(--radius-lg); color: rgb(var(--color-text-4)); font-size: var(--font-11); text-align: center; }
 @media (max-height: 720px) { .focusCanvas { width: min(54dvh, 278px); } }
-@media (max-height: 720px) { .brushSection { padding-top: 4px; padding-bottom: calc(env(safe-area-inset-bottom) + 6px); } .brushDrawer { min-height: 212px; gap: 4px; padding: 6px; } .brushHeader { min-height: 27px; } .brushHeader button { width: 28px; height: 28px; } .globalStyleTabs button { min-height: 34px; padding-block: 4px; } .globalStyleTabs small { display: none; } .brushControls { gap: 4px; } .brushControlGrid, .ruleControlGrid, .brushAnglePad, .roundBrushMessage { min-height: 70px; } .brushTips button { min-height: 48px; } .brushTipPreview { height: 24px; } .strokeRuleModes button { min-height: 23px; } .bodyScope button { min-height: 28px; } .bodyControls { gap: 4px; } .bodyDimensionGrid { min-height: 52px; } .bodyDimensionGrid label { gap: 4px; padding-block: 5px; } .bodyReset { min-height: 28px; } }
+@media (max-height: 720px) { .brushSection { padding-top: 4px; padding-bottom: calc(env(safe-area-inset-bottom) + 6px); } .brushDrawer { min-height: 212px; gap: 4px; padding: 6px; } .brushHeader { min-height: 27px; } .brushHeader button { width: 28px; height: 28px; } .globalStyleTabs button { min-height: 34px; padding-block: 4px; } .globalStyleTabs small { display: none; } .brushControls { gap: 4px; } .brushControlGrid, .ruleControlGrid, .brushAnglePad, .roundBrushMessage { min-height: 70px; } .brushTips button { min-height: 48px; } .brushTipPreview { height: 24px; } .strokeRuleModes button { min-height: 23px; } .bodyScope button { min-height: 28px; } .bodyControls { gap: 4px; } .bodyDimensionGrid { min-height: 52px; } .bodyDimensionGrid label { gap: 4px; padding-block: 5px; } .bodyControls .bodyReset { min-height: 28px; } }
 
 /* Noto 고스트: 잉크 아래 회색 비교용(검수 캔버스와 같은 농도). */
 .notoGhost { fill: rgb(var(--color-edit-ghost)); fill-opacity: .55; }
@@ -274,3 +274,6 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .strokeTrackpad[data-whole][data-scaling] .laneHint { opacity: 1; background: rgb(var(--color-primary) / .2); }
 /* 안 늘어나는 쪽 길(가로획의 세로)은 늘리는 중에도 끈다 — 잠긴 방향으로 벌려도 켜지면 늘어나는 줄 안다. */
 .strokeTrackpad[data-scaling] span[data-lane]:not([data-stretch]) { opacity: 0; }
+
+/* 문장 줄 글자는 고른 글자를 밑줄로 보인다 — 공용 Pressable의 포커스 테두리는 숨긴다(box-shadow는 안전 표시가 쓴다). */
+.sentenceRun button { --tw-ring-color: transparent; }

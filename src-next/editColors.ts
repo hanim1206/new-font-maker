@@ -16,6 +16,8 @@ export const EDIT_COLOR = {
   /** 캔버스 글자 잉크 · 손잡이 테두리. */
   foreground: '#181b1f',
   surface: '#ffffff',
+  /** 캔버스 잔 눈금(투명도는 쓰는 곳이 붙인다). */
+  border: '#dadfe6',
   /** 바꾸기 전 획(옅은 회색). */
   text5: '#8b939d',
   destructive: '#d64541',

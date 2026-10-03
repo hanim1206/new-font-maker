@@ -12,7 +12,7 @@
 .canvas line { pointer-events: stroke; }
 .canvas text { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: var(--weight-semibold); pointer-events: none; }
 /* 변 고정. 캔버스 위쪽 가운데, 스냅 표지 바로 아래. 탁 걸린 자리면 주황으로 켜진다. */
-.canvasFix { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); min-height: 30px; padding: 4px 12px; border: 1px solid rgb(var(--color-border)); border-radius: var(--radius-lg); background: rgb(var(--color-surface) / .96); color: rgb(var(--color-text-3)); font-size: var(--font-11); font-weight: var(--weight-bold); white-space: nowrap; }
+button.canvasFix { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); min-height: 30px; padding: 4px 12px; border: 1px solid rgb(var(--color-border)); border-radius: var(--radius-lg); background: rgb(var(--color-surface) / .96); color: rgb(var(--color-text-3)); font-size: var(--font-11); font-weight: var(--weight-bold); white-space: nowrap; }
 .canvasFix[data-snapped='true'] { border-color: rgb(var(--color-edit-select)); color: rgb(var(--color-edit-select)); }
 .canvasFixed { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); padding: 4px 12px; border-radius: var(--radius-lg); background: rgb(var(--color-edit-select)); color: rgb(var(--color-inverse-foreground)); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: var(--font-11); font-weight: var(--weight-bold); white-space: nowrap; }
 /* 가로 줄기 끝이 다른 칸 세로 기준선에 딱 닿아 걸렸다. 획 편집의 걸림 칩과 같은 주황. */
