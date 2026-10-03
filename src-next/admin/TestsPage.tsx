@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Circle, CircleCheck, CircleMinus, CircleX, LoaderCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { ChoiceGroup, ChoiceItem } from '@/components/ui/choice-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TEST_RUNS_API, adminCall } from './adminApi'
@@ -109,6 +110,8 @@ export function TestsPage() {
   const [kind, setKind] = useState<TestKind | null>(null)
   /** 종류마다 고른 워크트리. 없으면 가장 최근 것. */
   const [picked, setPicked] = useState<Partial<Record<TestKind, string>>>({})
+  /** 종류마다 마지막 실행 · 마지막 전체 중 무엇을 보나. 기본은 마지막 실행. */
+  const [slot, setSlot] = useState<Partial<Record<TestKind, 'last' | 'full'>>>({})
 
   useEffect(() => {
     let stopped = false
@@ -138,8 +141,8 @@ export function TestsPage() {
   if (!runs) return <p className="text-sm text-text-dim-4">불러오는 중…</p>
   if (!runs.length) return <p className="text-sm text-text-dim-4" data-testid="admin-tests-empty">아직 기록이 없어요. 테스트가 한 번 돌면 여기 생겨요.</p>
 
-  const active = kind ?? runs[0].kind
-  const runsOf = (key: TestKind) => runs.filter((run) => run.kind === key)
+  const active = kind ?? runs.find((run) => run.slot === 'last')?.kind ?? runs[0].kind
+  const runsOf = (key: TestKind) => runs.filter((run) => run.kind === key && run.slot === 'last')
 
   return <Tabs value={active} onValueChange={(value) => setKind(value as TestKind)} className="flex flex-col gap-4" data-testid="admin-tests">
     <TabsList className="self-start">
@@ -154,8 +157,16 @@ export function TestsPage() {
     </TabsList>
     {TEST_KINDS.map(({ key }) => {
       const list = runsOf(key)
-      const run = list.find((item) => item.worktree === picked[key]) ?? list[0]
-      return <TabsContent key={key} value={key}>
+      const last = list.find((item) => item.worktree === picked[key]) ?? list[0]
+      const full = last && runs.find((run) => run.kind === key && run.slot === 'full' && run.worktree === last.worktree)
+      // 마지막 실행이 곧 전체 실행이면 고를 게 없다.
+      const choosable = full && full.startedAt !== last.startedAt
+      const run = choosable && slot[key] === 'full' ? full : last
+      return <TabsContent key={key} value={key} className="flex flex-col gap-3">
+        {choosable && <ChoiceGroup variant="segment" aria-label="볼 실행" className="w-64">
+          <ChoiceItem checked={run === last} onClick={() => setSlot((prev) => ({ ...prev, [key]: 'last' }))}>마지막 실행 · {last.items.length}개</ChoiceItem>
+          <ChoiceItem checked={run === full} onClick={() => setSlot((prev) => ({ ...prev, [key]: 'full' }))}>마지막 전체 · {full.items.length}개</ChoiceItem>
+        </ChoiceGroup>}
         {run && <RunPanel run={run} others={list} onPick={(worktree) => setPicked((prev) => ({ ...prev, [key]: worktree }))} />}
       </TabsContent>
     })}

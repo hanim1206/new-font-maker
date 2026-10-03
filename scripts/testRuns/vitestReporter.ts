@@ -3,7 +3,7 @@ import type { File, Task, TaskResultPack } from 'vitest'
 import type { Vitest } from 'vitest/node'
 import type { Reporter } from 'vitest/reporters'
 import { errorExcerpt } from '../../src-next/admin/testRunModel'
-import { openTestRun } from './testRunStore'
+import { isFullRun, openTestRun } from './testRunStore'
 import type { TestRunRecorder } from './testRunStore'
 
 /**
@@ -23,7 +23,8 @@ export default class TestRunVitestReporter implements Reporter {
   }
 
   onPathsCollected(paths: string[] = []) {
-    this.run = openTestRun('unit', paths.map((file) => ({ id: file, file: this.relative(file), title: path.basename(file) })))
+    const full = isFullRun(process.argv.slice(2)) && !this.ctx?.config.testNamePattern
+    this.run = openTestRun('unit', paths.map((file) => ({ id: file, file: this.relative(file), title: path.basename(file) })), { full })
   }
 
   onCollected(files: File[] = []) {

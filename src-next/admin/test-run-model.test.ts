@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { elapsedText, errorExcerpt, groupsOf, runStateOf, summaryOf, unitCategoryOf } from './testRunModel'
+import { elapsedText, errorExcerpt, groupsOf, runFileName, runStateOf, slotOfFileName, summaryOf, unitCategoryOf } from './testRunModel'
 import type { TestRunItem, TestRunView } from './testRunModel'
 
 const item = (file: string, status: TestRunItem['status']): TestRunItem => ({ id: `${file}:${status}`, file, title: file, status })
 const run = (patch: Partial<TestRunView>): TestRunView => ({
-  kind: 'unit', worktree: 'w', branch: 'dev', pid: 1, startedAt: 0, alive: true, items: [], ...patch,
+  kind: 'unit', worktree: 'w', branch: 'dev', pid: 1, startedAt: 0, full: false, slot: 'last', alive: true, items: [], ...patch,
 })
 
 describe('테스트 실행 기록', () => {
@@ -40,5 +40,12 @@ describe('테스트 실행 기록', () => {
     expect(elapsedText(65_400)).toBe('1:05')
     const esc = String.fromCharCode(27)
     expect(errorExcerpt(`${esc}[31m빨강${esc}[39m\n둘\n셋`, 2)).toBe('빨강\n둘')
+  })
+
+  it('기록 파일은 워크트리 · 종류마다 마지막 실행과 마지막 전체 둘, 이름으로 칸을 안다', () => {
+    expect(runFileName('dev', 'unit')).toBe('dev.unit.json')
+    expect(runFileName('dev', 'unit', 'full')).toBe('dev.unit.full.json')
+    expect(slotOfFileName('dev.unit.full.json')).toBe('full')
+    expect(slotOfFileName('dev.unit.json')).toBe('last')
   })
 })

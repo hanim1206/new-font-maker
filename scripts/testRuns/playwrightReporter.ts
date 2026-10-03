@@ -1,12 +1,12 @@
 import path from 'node:path'
 import type { FullConfig, Reporter, Suite, TestCase, TestResult } from '@playwright/test/reporter'
 import { errorExcerpt } from '../../src-next/admin/testRunModel'
-import { openTestRun } from './testRunStore'
+import { isFullRun, openTestRun } from './testRunStore'
 import type { TestRunRecorder } from './testRunStore'
 
 /**
  * playwright 실행을 관리자 `테스트` 메뉴용 기록으로 남긴다(항목 = 테스트 하나). `line` 출력은 그대로 두고 덧붙인다.
- * 스모크 묶음은 `scripts/e2e-smoke.mjs`가 `TEST_RUN_KIND=smoke`를 붙여 부른다. `--list`는 돌리지 않으니 기록하지 않는다.
+ * 스모크 묶음은 늘 전체로 친다. `scripts/e2e-smoke.mjs`가 `TEST_RUN_KIND=smoke`를 붙여 부른다. `--list`는 돌리지 않으니 기록하지 않는다.
  */
 export default class TestRunPlaywrightReporter implements Reporter {
   private run: TestRunRecorder | null = null
@@ -23,7 +23,7 @@ export default class TestRunPlaywrightReporter implements Reporter {
       file: path.relative(config.rootDir, test.location.file),
       // ['', 프로젝트, 파일, …describe, 제목]
       title: test.titlePath().slice(3).join(' › ') || test.title,
-    })))
+    })), { full: kind === 'smoke' || isFullRun(process.argv.slice(2)) })
   }
 
   onTestBegin(test: TestCase) {

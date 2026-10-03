@@ -2,6 +2,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
+import { slotOfFileName } from '../src-next/admin/testRunModel'
 import type { TestRun, TestRunView } from '../src-next/admin/testRunModel'
 import { rejectReasonOf } from './betaInviteApi'
 import { testRunDir } from './testRuns/testRunStore'
@@ -35,7 +36,8 @@ export async function readTestRuns(dir: string): Promise<TestRunView[]> {
   const runs = await Promise.all(names.filter((name) => name.endsWith('.json')).map(async (name) => {
     try {
       const run = JSON.parse(await readFile(path.join(dir, name), 'utf8')) as TestRun
-      return { ...run, alive: run.finishedAt === undefined && isAlive(run.pid) }
+      // 이 기능 전 기록은 `full`이 없다.
+      return { ...run, full: run.full ?? false, slot: slotOfFileName(name), alive: run.finishedAt === undefined && isAlive(run.pid) }
     } catch {
       return null // 쓰는 중이거나 깨진 파일은 건너뛴다.
     }

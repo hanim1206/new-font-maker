@@ -34,12 +34,16 @@ export interface TestRun {
   pid: number
   startedAt: number
   finishedAt?: number
+  /** 거르지 않고 전부 돌린 실행(`npm test` · `test:e2e` · 스모크). 파일 몇 개만 돌린 건 false. */
+  full: boolean
   items: TestRunItem[]
 }
 
 /** 서버가 내줄 때 붙이는 것: 쓰던 프로세스가 아직 살아 있나. */
 export interface TestRunView extends TestRun {
   alive: boolean
+  /** 어느 칸에서 읽었나: 마지막 실행 · 마지막 전체 실행. */
+  slot: 'last' | 'full'
 }
 
 export interface RunSummary {
@@ -114,5 +118,6 @@ export function errorExcerpt(message: string, lines = 8): string {
   return kept.join('\n').trimEnd()
 }
 
-/** 기록 파일 이름. 워크트리 · 종류마다 마지막 실행 하나. */
-export const runFileName = (worktree: string, kind: TestKind) => `${worktree}.${kind}.json`
+/** 기록 파일 이름. 워크트리 · 종류마다 마지막 실행 하나와 마지막 전체 실행 하나. */
+export const runFileName = (worktree: string, kind: TestKind, slot: 'last' | 'full' = 'last') => `${worktree}.${kind}${slot === 'full' ? '.full' : ''}.json`
+export const slotOfFileName = (name: string): 'last' | 'full' => name.endsWith('.full.json') ? 'full' : 'last'

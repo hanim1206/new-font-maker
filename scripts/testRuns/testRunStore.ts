@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs'
+import { mkdirSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { runFileName } from '../../src-next/admin/testRunModel'
 import type { TestKind, TestRun, TestRunItem } from '../../src-next/admin/testRunModel'
@@ -21,8 +21,30 @@ export interface TestRunRecorder {
   finish(): void
 }
 
-export function openTestRun(kind: TestKind, items: Omit<TestRunItem, 'status'>[], cwd = process.cwd()): TestRunRecorder {
+/** 고르는 옵션(이름 · 파일 거르기). 이게 있으면 전체 실행이 아니다. */
+const FILTER_FLAGS = /^(-t|--testNamePattern|-g|--grep|--grep-invert|--last-failed|--only-changed|--changed|--shard|--project)(=|$)/
+
+/**
+ * 거르지 않은 실행인가. 명령 뒤 글자가 전부 있는 폴더(`vitest run src src-next`)이거나 없으면 전체.
+ * 파일 · 부분 이름 · 모르는 값이 하나라도 있으면 전체가 아니라고 본다(헷갈리면 전체 칸을 안 덮는 쪽).
+ */
+export function isFullRun(args: string[], cwd = process.cwd()): boolean {
+  const [first, ...rest] = args
+  const tokens = ['run', 'test', 'watch'].includes(first) ? rest : args
+  if (first === 'related') return false
+  return tokens.every((token) => {
+    if (token.startsWith('-')) return !FILTER_FLAGS.test(token)
+    try {
+      return statSync(path.resolve(cwd, token)).isDirectory()
+    } catch {
+      return false
+    }
+  })
+}
+
+export function openTestRun(kind: TestKind, items: Omit<TestRunItem, 'status'>[], { full, cwd = process.cwd() }: { full: boolean; cwd?: string }): TestRunRecorder {
   let file: string | null = null
+  let fullFile: string | null = null
   let run: TestRun | null = null
   try {
     const root = git(['rev-parse', '--show-toplevel'], cwd)
@@ -34,22 +56,29 @@ export function openTestRun(kind: TestKind, items: Omit<TestRunItem, 'status'>[]
       branch: git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd),
       pid: process.pid,
       startedAt: Date.now(),
+      full,
       items: items.map((item) => ({ ...item, status: 'pending' })),
     }
     file = path.join(dir, runFileName(run.worktree, kind))
+    // 전체 실행은 `마지막 전체` 칸에도 쓴다. 파일 몇 개만 돌려도 이 칸은 남는다.
+    if (full) fullFile = path.join(dir, runFileName(run.worktree, kind, 'full'))
   } catch (error) {
     console.warn(`[test-runs] 기록을 못 엽니다: ${error instanceof Error ? error.message : error}`)
   }
   const byId = new Map(run?.items.map((item) => [item.id, item]))
 
   const write = () => {
-    if (!file || !run) return
-    try {
-      const tmp = `${file}.${process.pid}.tmp`
-      writeFileSync(tmp, JSON.stringify(run))
-      renameSync(tmp, file)
-    } catch {
-      // 기록 못 해도 테스트는 계속한다.
+    if (!run) return
+    const text = JSON.stringify(run)
+    for (const target of [file, fullFile]) {
+      if (!target) continue
+      try {
+        const tmp = `${target}.${process.pid}.tmp`
+        writeFileSync(tmp, text)
+        renameSync(tmp, target)
+      } catch {
+        // 기록 못 해도 테스트는 계속한다.
+      }
     }
   }
   write()
