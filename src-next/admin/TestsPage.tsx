@@ -148,7 +148,7 @@ function TestList({ kind, items }: { kind: TestKind; items: TestRunItem[] }) {
         {/* 펼친 내용은 제목보다 한 칸 안쪽, 왼쪽 선으로 제목 아래 것임을 보인다. */}
         {tests.length > 0 && <div className="mb-1 ml-2 mt-1.5 border-l border-border-subtle pl-4">
         {kind === 'unit' && subgroupsOf(group.name, tests).map((sub) => <div key={sub.name} className="mt-3 first:mt-0">
-          {sub.name && <h3 className="mb-0.5 text-xs font-bold text-text-dim-4">{sub.name} <span className="font-normal text-text-dim-6">{sub.items.length}</span></h3>}
+          {sub.name && <h3 className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-surface-3 px-2.5 py-0.5 text-xs font-bold text-text-dim-2">{sub.name} <span className="font-normal text-text-dim-5">{sub.items.length}</span></h3>}
           <ul className="flex flex-col">{sub.items.map((item) => <ItemRow key={item.id} item={item} showFile showNote />)}</ul>
         </div>)}
         {kind !== 'unit' && <ul className="flex flex-col">{tests.map((item) => <ItemRow key={item.id} item={item} />)}</ul>}
@@ -162,7 +162,7 @@ function TestList({ kind, items }: { kind: TestKind; items: TestRunItem[] }) {
   const sections = [...E2E_GROUP_ORDER, ''].map((name) => ({ name, groups: groups.filter((group) => (E2E_GROUP_ORDER.includes(sectionOf(group.name)) ? sectionOf(group.name) : '') === name) }))
   return <div className="flex flex-col gap-4">
     {sections.filter((section) => section.groups.length).map((section) => <section key={section.name} className="flex flex-col gap-1.5">
-      <h3 className="text-xs font-bold text-text-dim-4">{section.name || '기타'} <span className="font-normal text-text-dim-6">{section.groups.length}</span></h3>
+      <h3 className="inline-flex w-fit items-center gap-1 rounded-full bg-surface-3 px-2.5 py-0.5 text-xs font-bold text-text-dim-2">{section.name || '기타'} <span className="font-normal text-text-dim-5">{section.groups.length}</span></h3>
       {section.groups.map(renderGroup)}
     </section>)}
   </div>
