@@ -238,7 +238,7 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .strokeTrackpad { flex: 1 1 auto; min-width: 0; height: auto; border-radius: var(--radius-lg); }
 .strokeToolRow button[aria-pressed='true'] { border-color: rgb(var(--color-primary)); background: rgb(var(--color-primary) / .12); color: rgb(var(--color-primary)); }
 /* 캔버스 왼쪽 도구 줄. `contain: size`로 제 높이를 안 내세워 캔버스 높이만큼만 보이고, 넘치는 단추는 한 칸씩 스냅으로 넘긴다(관성으로 여러 칸 튀지 않게 `always`). 위아래 끝은 흐려서 더 있다는 걸 알린다. */
-.strokeToolSlot { flex: 0 0 48px; align-self: stretch; min-height: 0; contain: size; overflow-y: auto; overscroll-behavior: contain; scroll-snap-type: y mandatory; scrollbar-width: none; mask-image: linear-gradient(to bottom, transparent 0, black 10px, black calc(100% - 18px), transparent 100%); }
+.strokeToolSlot { flex: 0 0 var(--canvas-side-column); align-self: stretch; min-height: 0; contain: size; overflow-y: auto; overscroll-behavior: contain; scroll-snap-type: y mandatory; scrollbar-width: none; mask-image: linear-gradient(to bottom, transparent 0, black 10px, black calc(100% - 18px), transparent 100%); }
 .strokeToolSlot::-webkit-scrollbar { display: none; }
 .strokeToolSlot .strokeToolRow { display: flex; flex-direction: column; gap: 6px; padding: 4px 0 12px; }
 /* 테두리 없는 회색 타일. 켜진 단추(펼친 `추가`)만 검정으로 뒤집는다. */
