@@ -4,9 +4,30 @@
 # 작업 트리에 커밋 안 된 변경(다른 세션 것 포함)이 있으면, 푸시하는 커밋만 임시 워크트리에 꺼내 돌린다.
 set -uo pipefail
 
+ZERO=0000000000000000000000000000000000000000
+
+# 클라우드 세션(자동 개선 루프)은 `claude/…` 브랜치에만 올린다. 지우기와 `claude/main` 되감기도 막는다.
+# Claude 쪽 훅(`scripts/claude-cloud/guard-push.mjs`)은 세션이 뜰 때의 브랜치 설정으로 굳어서, git 쪽에 한 겹 더 둔다.
+if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
+  refs=$(cat)
+  while read -r local_ref local_sha remote_ref remote_sha; do
+    [ -z "$remote_ref" ] && continue
+    case "$remote_ref" in
+      refs/heads/claude/*) ;;
+      *) echo "[pre-push] 자율 모드는 claude/… 브랜치에만 푸시한다: ${remote_ref#refs/heads/} 막음" >&2; exit 1 ;;
+    esac
+    if [ "$local_sha" = "$ZERO" ]; then
+      echo "[pre-push] 브랜치를 지우는 푸시는 사람이 한다: ${remote_ref#refs/heads/} 막음" >&2; exit 1
+    fi
+    if [ "$remote_ref" = "refs/heads/claude/main" ] && [ "$remote_sha" != "$ZERO" ] && ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+      echo "[pre-push] claude/main은 되감지 않는다(강제 푸시 막음)" >&2; exit 1
+    fi
+  done <<< "$refs"
+  exec <<< "$refs"
+fi
+
 [ "${SKIP_SMOKE:-}" = "1" ] && { echo "[pre-push] SKIP_SMOKE=1 — 스모크 건너뜀"; exit 0; }
 
-ZERO=0000000000000000000000000000000000000000
 target=""
 while read -r local_ref local_sha remote_ref remote_sha; do
   case "$remote_ref" in refs/heads/dev|refs/heads/main|refs/heads/claude/main) ;; *) continue ;; esac
