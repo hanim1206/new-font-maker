@@ -13,7 +13,7 @@ export const SECTIONS: { key: Section; label: string; icon: LucideIcon; hint: st
   { key: 'triage', label: '선별', icon: Filter, hint: '의견을 묶고 걸러 보드로' },
   { key: 'announcements', label: '공지', icon: Megaphone, hint: '업데이트 팝업 만들기 · 미리보기 · 게시' },
   { key: 'preset', label: '프리셋', icon: SquareDashed, hint: '프리셋 v2 레이아웃 대푯값 고치기 · v1과 비교' },
-  { key: 'tests', label: '테스트', icon: ListChecks, hint: '단위 · 스모크 · e2e가 지금 어디까지 돌았는지' },
+  { key: 'tests', label: '테스트', icon: ListChecks, hint: '전체 테스트가 무엇을 검사하는지 · 지금 어디까지 돌았는지' },
   { key: 'labs', label: '실험실', icon: FlaskConical, hint: '개발용 실험 화면. 고르면 이 안에서 열려요' },
 ]
 

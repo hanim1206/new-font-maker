@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { elapsedText, errorExcerpt, groupsOf, runFileName, runStateOf, slotOfFileName, summaryOf, unitCategoryOf } from './testRunModel'
+import { elapsedText, errorExcerpt, groupsOf, runFileName, runStateOf, slotOfFileName, summaryOf, unitCategoryOf, withCatalog } from './testRunModel'
 import type { TestRunItem, TestRunView } from './testRunModel'
 
 const item = (file: string, status: TestRunItem['status']): TestRunItem => ({ id: `${file}:${status}`, file, title: file, status })
@@ -47,5 +47,20 @@ describe('테스트 실행 기록', () => {
     expect(runFileName('dev', 'unit', 'full')).toBe('dev.unit.full.json')
     expect(slotOfFileName('dev.unit.full.json')).toBe('full')
     expect(slotOfFileName('dev.unit.json')).toBe('last')
+  })
+
+  it('전체 목록 위에 기록을 겹친다 — 없으면 안 돌림, 목록에 없는 기록은 끝에', () => {
+    const catalog = [{ file: 'a.test.ts', title: '가' }, { file: 'b.test.ts', title: '나' }]
+    const merged = withCatalog('unit', catalog, [item('b.test.ts', 'failed'), item('new.test.ts', 'passed')])
+    expect(merged.map((one) => [one.title, one.status])).toEqual([['가', 'none'], ['나', 'failed'], ['new.test.ts', 'passed']])
+  })
+
+  it('e2e는 기록(테스트 단위)을 두고, 한 번도 안 돈 파일만 빈 줄로 붙인다', () => {
+    const catalog = [{ file: 'tests/e2e/a.spec.ts', title: 'a' }, { file: 'tests/e2e/b.spec.ts', title: 'b' }]
+    const ran = { ...item('tests/e2e/a.spec.ts', 'passed'), title: '첫 테스트' }
+    expect(withCatalog('e2e', catalog, [ran]).map((one) => [one.file, one.title, one.status])).toEqual([
+      ['tests/e2e/a.spec.ts', '첫 테스트', 'passed'],
+      ['tests/e2e/b.spec.ts', '', 'none'],
+    ])
   })
 })

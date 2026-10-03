@@ -4,7 +4,8 @@
  */
 
 export type TestKind = 'unit' | 'smoke' | 'e2e'
-export type ItemStatus = 'pending' | 'running' | 'passed' | 'failed' | 'skipped'
+/** `none` = 목록에는 있는데 이번 기록에 없음(안 돌림). 화면에서만 쓴다. */
+export type ItemStatus = 'none' | 'pending' | 'running' | 'passed' | 'failed' | 'skipped'
 /** 실행 하나의 상태. `stopped` = 끝 표시 없이 프로세스가 사라짐(중간에 끊김). */
 export type RunState = 'running' | 'passed' | 'failed' | 'stopped'
 
@@ -93,7 +94,7 @@ export function unitCategoryOf(file: string): string {
 }
 
 /** 목록을 묶는다. 단위 테스트는 갈래 순서, e2e · 스모크는 처음 나온 순서. */
-export function groupsOf(run: TestRun): ItemGroup[] {
+export function groupsOf(run: Pick<TestRun, 'kind' | 'items'>): ItemGroup[] {
   const groups = new Map<string, TestRunItem[]>()
   if (run.kind === 'unit') for (const { name } of [...UNIT_CATEGORIES, { name: '기타' }]) groups.set(name, [])
   for (const item of run.items) {
@@ -103,6 +104,32 @@ export function groupsOf(run: TestRun): ItemGroup[] {
     else groups.set(name, [item])
   }
   return [...groups].filter(([, items]) => items.length).map(([name, items]) => ({ name, items }))
+}
+
+/** 목록 한 줄(돌린 기록과 상관없이 늘 있는 것). */
+export interface CatalogEntry {
+  file: string
+  title: string
+}
+
+/**
+ * 전체 목록 위에 기록을 겹친다. 기록에 있으면 그 상태, 없으면 `none`(안 돌림). 목록에 없는 기록(새 테스트)은 끝에 붙인다.
+ * 단위는 파일로, 스모크는 제목으로 맞춘다. e2e는 목록이 파일 단위라 기록(테스트 단위)을 그대로 두고, 기록이 하나도 없는 파일만 빈 줄로 붙인다.
+ */
+export function withCatalog(kind: TestKind, catalog: CatalogEntry[], items: TestRunItem[] = []): TestRunItem[] {
+  if (kind === 'e2e') {
+    const ran = new Set(items.map((item) => item.file))
+    const missing = catalog.filter((entry) => !ran.has(entry.file)).map((entry) => ({ id: entry.file, file: entry.file, title: '', status: 'none' as const }))
+    return [...items, ...missing].sort((a, b) => a.file.localeCompare(b.file))
+  }
+  const keyOf = (entry: CatalogEntry) => kind === 'unit' ? entry.file : entry.title
+  const byKey = new Map(items.map((item) => [keyOf(item), item]))
+  const merged = catalog.map((entry): TestRunItem => {
+    const item = byKey.get(keyOf(entry))
+    byKey.delete(keyOf(entry))
+    return item ? { ...item, title: entry.title } : { id: keyOf(entry), ...entry, status: 'none' }
+  })
+  return [...merged, ...byKey.values()]
 }
 
 /** 걸린 시간 `m:ss`. */
