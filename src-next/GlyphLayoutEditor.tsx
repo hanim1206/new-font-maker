@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { notoOutlineGhostPath } from '../src/services/notoOutlineInk'
 import { DevGhostToggle } from './DevGhostToggle'
+import { ensureDevNotoFont } from './devNotoSwap'
 import { DEV_TOOLS_ENABLED } from './devTools'
+import { useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import { approvedInputFor } from './notoApprovedIndex'
 import { editableComponentRailsOf, fitComponentsForGlyph, renderComponentPart } from './notoComponentFitView'
 import type { ComponentFaces } from '../src/services/notoComponentFit'
@@ -79,10 +81,14 @@ type CanvasRail = EditableRail & { part: Part; locked?: boolean; baseline: numbe
 // 방향키 → 축 방향 부호. 가로 위치(x)는 좌우, 세로 위치(y)는 상하(아래가 +).
 const nudgeOf = (key: string, axis: 'x' | 'y'): number => axis === 'x' ? (key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0) : (key === 'ArrowDown' ? 1 : key === 'ArrowUp' ? -1 : 0)
 
-function GhostCanvas({ ghost, ghostVisible = true, body, measured, editable = [], activePart, selectedRail, snappedRail, snapHit, showDelta = true, onSelectRail, onDragRail, onDragState, onNudgeRail, onSelectPart, onEditPart, editLocked = false, onReleaseRail, label, overlays = [], componentOverlays = [], boxes = [] }: {
+function GhostCanvas({ ghost, ghostChar, ghostVisible = true, inkHidden = false, body, measured, editable = [], activePart, selectedRail, snappedRail, snapHit, showDelta = true, onSelectRail, onDragRail, onDragState, onNudgeRail, onSelectPart, onEditPart, editLocked = false, onReleaseRail, label, overlays = [], componentOverlays = [], boxes = [] }: {
   ghost: string
+  /** 고스트 글자. 굵기 400이 아니면 추출 윤곽(400) 대신 노토 가변 글꼴 텍스트로 지금 굵기를 그린다. */
+  ghostChar?: string
   /** Noto 고스트를 끄면 내 획만 남아 어느 획을 바꿀지 보인다. */
   ghostVisible?: boolean
+  /** 내 잉크를 숨기고 고스트만 남긴다(개발용 `내 획 숨김`). */
+  inkHidden?: boolean
   /**
    * 사용자 네모꼴 여백. 기본 네모꼴이면 없다. 받는 값(보선 · 상자 · 실측선)은 전부 기준 틀 em이고,
    * 여기서 그릴 때만 사용자 네모꼴 자리로 옮긴다 — 문장 줄과 같은 글자가 된다. 잉크(`overlays`)는 이미 옮겨져 온다.
@@ -126,6 +132,10 @@ function GhostCanvas({ ghost, ghostVisible = true, body, measured, editable = []
 }) {
   const gesture = useRef<{ pointerId: number; id: string; axis: 'x' | 'y'; start: number; startValue: number } | null>(null)
   const bodyAxis = useMemo(() => ({ x: designBodyAxis(body, 'x'), y: designBodyAxis(body, 'y') }), [body])
+  // 굵기 400이 아니면 노토 가변 글꼴 텍스트 고스트(지금 굵기)로 바꿔 그린다. 윤곽 고스트는 400 추출분이라 굵은 작업의 기준이 못 된다.
+  const ghostWeight = useGlobalStyleStore((state) => state.style.weight)
+  const weightGhost = ghostVisible && ghostChar !== undefined && ghostWeight !== 400
+  useEffect(() => { if (weightGhost) ensureDevNotoFont() }, [weightGhost])
   /** 기준 틀 em → 화면 자리. */
   const at = (axis: 'x' | 'y', value: number) => bodyAxis[axis].to(value)
   /** 편집 보선의 화면 자리. 줄기 중심선은 제 옮기기를 쓴다. */
@@ -215,9 +225,11 @@ function GhostCanvas({ ghost, ghostVisible = true, body, measured, editable = []
       </g>
     })}
     {/* Noto 고스트. 잉크가 아니라 비교용이라 반투명으로 깐다. 검정 획 아래에 두어 벗어난 곳만 회색으로 보인다. */}
-    {ghostVisible && <path d={ghost} transform={designBodySvgTransform(body, 1)} fill="#3a3a36" fillOpacity=".55" fillRule="evenodd" data-testid="review-ghost" />}
-    {overlays.map((path, index) => <path key={index} d={path} fill="#1a1a1a" fillRule="evenodd" data-testid="review-fit-ink" />)}
-    {componentOverlays.map((path, index) => <path key={`c${index}`} d={path} fill="#1a1a1a" fillRule="evenodd" data-testid="review-component-ink" />)}
+    {ghostVisible && (weightGhost
+      ? <text x="0" y=".88" fontFamily="'Noto Sans KR', sans-serif" fontWeight={ghostWeight} fontSize="1" transform={designBodySvgTransform(body, 1)} fill="#3a3a36" fillOpacity=".55" data-testid="review-ghost">{ghostChar}</text>
+      : <path d={ghost} transform={designBodySvgTransform(body, 1)} fill="#3a3a36" fillOpacity=".55" fillRule="evenodd" data-testid="review-ghost" />)}
+    {!(inkHidden && ghostVisible) && overlays.map((path, index) => <path key={index} d={path} fill="#1a1a1a" fillRule="evenodd" data-testid="review-fit-ink" />)}
+    {!(inkHidden && ghostVisible) && componentOverlays.map((path, index) => <path key={`c${index}`} d={path} fill="#1a1a1a" fillRule="evenodd" data-testid="review-component-ink" />)}
     {/* Δ 띠. 켠 영역에서 옮긴 rail 전부: 기준값 자리와 지금 자리 사이를 주황 단색으로 칠한다. 선택을 풀어도 남는다. 잉크 위에 얹어 옮긴 구간이 바로 보인다.
         길이는 그 rail의 영역 상자 안으로만 — 캔버스 끝까지 그으면 다른 영역까지 덮는다. 상자가 없으면 캔버스 끝까지. */}
     {showDelta && editable.filter((rail) => rail.touched && (!activePart || samePartGroup(rail.part, activePart)) && Math.abs(rail.value - rail.baseline) > 1e-9).map((rail) => {
@@ -357,6 +369,8 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
   ], [rendered, fitView, componentRendered, componentParts, glyph])
   const [ghostVisible, setGhostVisible] = useState(readGhostVisible)
   const toggleGhost = () => setGhostVisible((current) => { writeGhostVisible(!current); return !current })
+  // 고스트 패널의 `내 획 숨김` — 내 잉크를 숨기고 노토 고스트만 남겨 견준다(개발용, 세션 한정). 획 편집 캔버스와 같은 도구.
+  const [inkHidden, setInkHidden] = useState(false)
   // 켤 수 있는 부품. rail이 전부 보이면 잡기 어려워 한 부품씩 켠다. 캔버스의 부품 상자를 눌러 고르고, 기본은 첫닿자.
   const parts = useMemo<Part[]>(() => [
     ...(componentParts.some((part) => part.part === 'CH' && part.faces) ? ['CH' as Part] : []),
@@ -492,8 +506,12 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
         {/* 캔버스 왼쪽 세로 표지. 여섯 칸 중 지금 고치는 칸을 켜기만 한다 — 범위는 아래 옵션 스택에서 고른다. */}
         <LayoutContextCards activeContextId={glyph.identity.contextId} allActive={selection.scope === 'all'} />
         <div className={styles.canvasArea}>
-        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostVisible={ghostVisible} body={body} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail && rail.id === selectedRail ? rail.id : undefined} snappedRail={snapHit?.id} snapHit={snapHit} onSelectRail={(id) => { if (id !== rail?.id) setSnapHit(null); setSelectedRail(id); setError('') }} onReleaseRail={() => { setSelectedRail(undefined); setSnapHit(null) }} onSelectPart={selectPart} onEditPart={onEditStrokes ? (part) => { if (editCount === 0) onEditStrokes(part) } : undefined} editLocked={editCount > 0} onDragRail={(id, value) => changeRail(id, value, { snap: true })} onDragState={setDragging} onNudgeRail={(id, delta) => { const target = editable.find((item) => item.id === id); if (target) changeRail(id, target.value + delta / bodyAxis[target.axis].scale) }} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
-        <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="review-ghost-toggle" />
+        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostChar={glyph.identity.character} ghostVisible={ghostVisible} inkHidden={inkHidden} body={body} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail && rail.id === selectedRail ? rail.id : undefined} snappedRail={snapHit?.id} snapHit={snapHit} onSelectRail={(id) => { if (id !== rail?.id) setSnapHit(null); setSelectedRail(id); setError('') }} onReleaseRail={() => { setSelectedRail(undefined); setSnapHit(null) }} onSelectPart={selectPart} onEditPart={onEditStrokes ? (part) => { if (editCount === 0) onEditStrokes(part) } : undefined} editLocked={editCount > 0} onDragRail={(id, value) => changeRail(id, value, { snap: true })} onDragState={setDragging} onNudgeRail={(id, delta) => { const target = editable.find((item) => item.id === id); if (target) changeRail(id, target.value + delta / bodyAxis[target.axis].scale) }} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
+        <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="review-ghost-toggle" panel={
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, whiteSpace: 'nowrap' }}>
+            <input type="checkbox" checked={inkHidden} onChange={(event) => setInkHidden(event.target.checked)} data-testid="dev-ink-hidden" />내 획 숨김
+          </label>
+        } />
         {/* 변 rail을 잡으면 `이 자리에 맞추기`. 누르면 범위 안 글자가 전부 이 자리(em)에 모인다. 탁 걸린 자리면 주황 테두리. 고정 뒤엔 `= 자리` 표지. */}
         {FIX_RAIL_ENABLED && rail && rail.kind === 'face' && (fixable
           ? <button type="button" className={styles.canvasFix} data-snapped={!!snapHit || undefined} onClick={fixRail} data-testid="review-fix-rail">이 자리에 맞추기</button>
