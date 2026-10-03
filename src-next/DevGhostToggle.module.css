@@ -14,4 +14,4 @@
 @media (min-width: 640px) { .panel { top: auto; right: 66px; bottom: 66px; } }
 .toggle strong, .toggle small { padding: 3px 7px; border: 1px solid rgb(var(--color-border)); border-radius: 8px; background: rgb(var(--color-surface)); box-shadow: 0 4px 14px rgb(15 23 42 / .16); white-space: nowrap; }
 .toggle strong { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 700; color: rgb(var(--color-primary-dark)); }
-.toggle small { max-width: 160px; overflow: hidden; color: rgb(var(--color-danger, 214 50 31)); font-size: 9px; text-overflow: ellipsis; }
+.toggle small { max-width: 160px; overflow: hidden; color: rgb(var(--color-destructive)); font-size: 9px; text-overflow: ellipsis; }

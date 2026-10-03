@@ -35,7 +35,7 @@
 /* 자모가 적은 줄(홀자 5개)은 띠가 내용만큼만이어야 한다 — 남는 폭까지 검정이면 빈 띠가 길어진다. */
 .jamos { flex: 0 1 auto; min-width: 0; display: flex; gap: 3px; overflow-x: auto; scrollbar-width: none; }
 .jamos::-webkit-scrollbar { display: none; }
-.jamos button { flex: 0 0 auto; min-width: 30px; height: 30px; padding: 0 4px; border: 0; border-radius: var(--radius-md); background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); font-size: var(--font-14); font-weight: var(--weight-semibold); }
+.jamos button { flex: 0 0 auto; min-width: 30px; height: 30px; padding: 0 4px; text-align: center; border: 0; border-radius: var(--radius-md); background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); font-size: var(--font-14); font-weight: var(--weight-semibold); }
 .jamos button[aria-pressed='true'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-weight: var(--weight-heavy); }
 /* 전부 켜진 줄은 낱낱의 알약이 아니라 띠 하나다. 바탕을 줄에 깔고 버튼은 비운다. */
 .axis[data-all] .jamos { border-radius: var(--radius-md); background: rgb(var(--color-foreground)); }
@@ -50,7 +50,7 @@
 .samples small { flex: 0 0 auto; color: rgb(var(--color-text-5)); font-size: var(--font-11); }
 
 .foot { flex: 0 0 auto; display: flex; gap: 8px; padding-top: 8px; }
-.foot button { min-height: 46px; border-radius: var(--radius-lg); font-size: var(--font-13); font-weight: var(--weight-heavy); }
+.foot button { min-height: 46px; text-align: center; border-radius: var(--radius-lg); font-size: var(--font-13); font-weight: var(--weight-heavy); }
 .cancel { flex: 0 0 96px; border: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); }
 .confirm { flex: 1 1 auto; border: 0; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 .confirm:disabled { opacity: .4; }

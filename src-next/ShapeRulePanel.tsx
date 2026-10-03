@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import type { JamoData, StrokeDataV2 } from '../src/types'
 import { pointsToSvgD } from '../src/utils/pathUtils'
 import { analyzeTerminal, directionOf, terminalTangentPoints, writingTerminalAngle, writingTerminalSides, type ApplicationScope, type TerminalSide } from './ruleLabMetadata'
+import { Pressable } from './components/ui/pressable'
 import styles from './ShapeRulePanel.module.css'
 
 const STORAGE_KEY = 'font-maker-shape-rules-v3'
@@ -112,7 +113,7 @@ export function ShapeRulePanel({ jamo, selectedStrokeId, onClose }: { jamo: Jamo
 
   return <div className={styles.backdrop} role="dialog" aria-modal="true" aria-label={`${jamo.char} 형태 규칙`}>
     <section className={styles.panel}>
-      <header><div><span>현재 에디터 데이터</span><h2>{jamo.char} 형태 규칙</h2><p>방향과 연결은 현재 좌표에서 자동 계산됩니다.</p></div><button type="button" onClick={onClose} aria-label="형태 규칙 닫기"><X size={19} /></button></header>
+      <header><div><span>현재 에디터 데이터</span><h2>{jamo.char} 형태 규칙</h2><p>방향과 연결은 현재 좌표에서 자동 계산됩니다.</p></div><Pressable onClick={onClose} aria-label="형태 규칙 닫기"><X size={19} /></Pressable></header>
       <div className={styles.workspace}>
         <section className={styles.canvasCard} aria-label={`${jamo.char} 현재 획`}>
           <svg viewBox="0 0 1000 1000" role="img" aria-label={`${jamo.char} 실제 편집 데이터`}>
@@ -142,10 +143,10 @@ export function ShapeRulePanel({ jamo, selectedStrokeId, onClose }: { jamo: Jamo
           {activeRuleKey && <div className={styles.featureControls} aria-label="선택 끝점 형태 기능">
             <strong>{activeRole === 'start' ? '시작점' : '끝점'} 형태 선택</strong>
             <><div className={styles.featureChoices}>
-              <button type="button" aria-pressed={activeRule.feature === 'none'} onClick={() => updateRule(activeRuleKey, { feature: 'none' })}><i data-style="none" />형태 없음</button>
-              <button type="button" aria-pressed={activeRule.feature === 'buri' && activeRule.buriStyle === 'round'} onClick={() => updateRule(activeRuleKey, { feature: 'buri', buriStyle: 'round' })}><i data-style="round" />원형 부리</button>
-              <button type="button" aria-pressed={activeRule.feature === 'buri' && activeRule.buriStyle === 'square'} onClick={() => updateRule(activeRuleKey, { feature: 'buri', buriStyle: 'square' })}><i data-style="square" />사각 부리</button>
-              <button type="button" aria-pressed={activeRule.feature === 'buri' && activeRule.buriStyle === 'angled'} onClick={() => updateRule(activeRuleKey, { feature: 'buri', buriStyle: 'angled' })}><i data-style="angled" />각진 부리</button>
+              <Pressable aria-pressed={activeRule.feature === 'none'} onClick={() => updateRule(activeRuleKey, { feature: 'none' })}><i data-style="none" />형태 없음</Pressable>
+              <Pressable aria-pressed={activeRule.feature === 'buri' && activeRule.buriStyle === 'round'} onClick={() => updateRule(activeRuleKey, { feature: 'buri', buriStyle: 'round' })}><i data-style="round" />원형 부리</Pressable>
+              <Pressable aria-pressed={activeRule.feature === 'buri' && activeRule.buriStyle === 'square'} onClick={() => updateRule(activeRuleKey, { feature: 'buri', buriStyle: 'square' })}><i data-style="square" />사각 부리</Pressable>
+              <Pressable aria-pressed={activeRule.feature === 'buri' && activeRule.buriStyle === 'angled'} onClick={() => updateRule(activeRuleKey, { feature: 'buri', buriStyle: 'angled' })}><i data-style="angled" />각진 부리</Pressable>
             </div>{activeRule.feature === 'buri' && <div className={styles.featureSliders}><label><span>크기 <output>{activeRule.size.toFixed(1)}</output></span><input aria-label="부리 크기" type="range" min="0.5" max="2" step="0.1" value={activeRule.size} onChange={(event) => updateRule(activeRuleKey, { size: Number(event.target.value) })} /></label>{activeRule.buriStyle !== 'round' && <label><span>각도 <output>{activeRule.angle}°</output></span><input aria-label="부리 각도" type="range" min="-60" max="60" step="5" value={activeRule.angle} onChange={(event) => updateRule(activeRuleKey, { angle: Number(event.target.value) })} /></label>}</div>}</>
           </div>}
           <div className={styles.tableScroll}><table>
@@ -174,7 +175,7 @@ export function ShapeRulePanel({ jamo, selectedStrokeId, onClose }: { jamo: Jamo
           </table></div>
         </section>
       </div>
-      <footer><span>규칙은 획 ID에 저장되고, 형상 정보는 패널을 열 때 다시 계산됩니다.</span><button type="button" onClick={onClose}>완료</button></footer>
+      <footer><span>규칙은 획 ID에 저장되고, 형상 정보는 패널을 열 때 다시 계산됩니다.</span><Pressable onClick={onClose}>완료</Pressable></footer>
     </section>
   </div>
 }

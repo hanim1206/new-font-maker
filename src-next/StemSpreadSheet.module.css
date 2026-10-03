@@ -50,7 +50,7 @@
 .lock { position: absolute; top: 8px; left: 8px; color: rgb(var(--color-text-5)); }
 /* 따로 고친 형제 — 켜 두면 덮인다는 표시 */
 .released { position: absolute; bottom: 6px; left: 8px; font-size: var(--font-10); font-weight: var(--weight-semibold); line-height: 1; color: rgb(var(--color-text-5)); }
-.card[aria-pressed='true'] .released { color: rgb(var(--color-accent, 217 72 15)); }
+.card[aria-pressed='true'] .released { color: rgb(var(--color-edit-select)); }
 /* 자리가 둘 이상인 카드는 우상단에 자리마다 점 하나(순서 = 질문 보기 순서). 켜진 자리만 주황, 나머지 회색. */
 .dots { position: absolute; top: 8px; right: 8px; display: inline-flex; gap: 3px; }
 .dots i { width: 5px; height: 5px; border-radius: var(--radius-full); background: rgb(var(--color-text-5) / .45); transition: background-color var(--motion-fast) var(--ease-standard); }

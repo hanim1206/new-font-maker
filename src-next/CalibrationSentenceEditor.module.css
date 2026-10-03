@@ -14,7 +14,7 @@
 .header nav { display: flex; gap: 4px; }
 .header button { position: relative; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: var(--radius-md); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); }
 .header button[hidden] { display: none; }
-.header button span { position: absolute; top: 4px; right: 4px; min-width: 15px; height: 15px; border-radius: var(--radius-full); background: rgb(var(--color-primary)); color: white; font-size: var(--font-10); line-height: 15px; }
+.header button span { position: absolute; top: 4px; right: 4px; min-width: 15px; height: 15px; border-radius: var(--radius-full); background: rgb(var(--color-primary)); color: rgb(var(--color-primary-foreground)); font-size: var(--font-10); line-height: 15px; }
 .header button:disabled { color: rgb(var(--color-text-5)); opacity: .55; }
 .header button[data-active='true'] { color: rgb(var(--color-primary)); background: rgb(var(--color-primary-light) / .65); }
 .header .copyButton[data-copy-state='copied'] { color: rgb(var(--color-primary)); background: rgb(var(--color-primary-light) / .65); }
@@ -217,7 +217,7 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .layoutMode { flex: 1 0 auto; }
 /* 획 편집의 나가는 문. 트랙패드 아래 한 줄. */
 .strokeDoneBar { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 16px calc(env(safe-area-inset-bottom) + 10px); background: rgb(var(--color-surface)); }
-.strokeDoneBar p { margin: 0; color: rgb(var(--color-danger, 214 50 31)); font-size: var(--font-11); font-weight: var(--weight-semibold); text-align: center; }
+.strokeDoneBar p { margin: 0; color: rgb(var(--color-destructive)); font-size: var(--font-11); font-weight: var(--weight-semibold); text-align: center; }
 /* 셸 안 획 편집의 도구 줄. 조절판 자리를 대신한다 — 옮기기는 캔버스에서 직접 한다. */
 /* 획 편집 도구 줄 아래에서는 캔버스가 제 크기만 차지하고, 남는 세로는 트랙패드가 가져간다. */
 .editor[data-chrome='workspace'][data-stroke-tools] { flex: 0 0 auto; }

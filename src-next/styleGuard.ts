@@ -49,6 +49,10 @@ const FONT_STEPS = new Set([10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 36])
 const RADIUS_STEPS = new Set([0, 4, 6, 10, 14, 18, 999, 9999])
 const WEIGHT_STEPS = new Set([400, 500, 600, 700, 800])
 const ALLOW = /style-guard:\s*allow/
+/** 없는 토큰이면 대체값이 그대로 보인다 — 색 토큰에는 대체값을 달지 않는다. */
+const FALLBACK = /var\(--color-[\w-]+\s*,/
+/** 이름 색. 마스크(알파만 씀)의 black은 괜찮다. */
+const NAMED = /(?:^|[;{\s])(?:color|background(?:-color)?|fill|stroke|border(?:-color)?|outline-color):\s*(?:white|black)\b/
 const COLOR = /#[0-9a-fA-F]{3,8}\b|\brgba?\(\s*\d|\bhsla?\(\s*\d/
 
 export function scan(files = productFiles()): Finding[] {
@@ -62,7 +66,7 @@ export function scan(files = productFiles()): Finding[] {
       const line = index + 1
       const push = (kind: Finding['kind']) => findings.push({ file: rel, line, kind, text: text.trim().slice(0, 160) })
       // 색: 토큰(`var(--…)`)을 거치지 않은 값. `rgb(var(--x) / .5)`는 토큰이라 괜찮다.
-      if (COLOR.test(text.replace(/rgba?\(\s*var\([^)]*\)[^)]*\)/g, ''))) push('color')
+      if (COLOR.test(text.replace(/rgba?\(\s*var\([^)]*\)[^)]*\)/g, '')) || FALLBACK.test(text) || (css && NAMED.test(text))) push('color')
       if (!css && /<button[\s>]/.test(text)) push('button')
       if (css) {
         for (const m of text.matchAll(/font-size:\s*([\d.]+)px/g)) if (!FONT_STEPS.has(Number(m[1]))) push('font-size')

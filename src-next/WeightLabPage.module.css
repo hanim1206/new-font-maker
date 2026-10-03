@@ -14,7 +14,7 @@
 .slider strong { font-variant-numeric: tabular-nums; }
 .slider input { width: 100%; }
 .status { color: rgb(var(--color-text-3)); font-size: 12px; }
-.status[data-state='error'] { color: rgb(var(--color-danger, 180 40 40)); }
+.status[data-state='error'] { color: rgb(var(--color-destructive)); }
 .toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgb(var(--color-text-2)); }
 
 .panels { width: min(1320px, 100%); margin: 0 auto 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }

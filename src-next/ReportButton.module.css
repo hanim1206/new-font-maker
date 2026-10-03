@@ -35,7 +35,7 @@ button.trigger.trigger:active { background: rgb(var(--color-destructive) / .2); 
 
 .error { margin: 0; padding: 0 4px; color: rgb(var(--color-destructive-dark)); font-size: var(--font-13); }
 .actions { display: flex; gap: 8px; }
-.actions button { flex: 1; min-height: 52px; border: 0; border-radius: var(--radius-xl); background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-2)); font-size: var(--font-16); font-weight: var(--weight-bold); }
+.actions button { flex: 1; min-height: 52px; text-align: center; border: 0; border-radius: var(--radius-xl); background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-2)); font-size: var(--font-16); font-weight: var(--weight-bold); }
 .actions button[data-primary] { flex: 2; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 .actions button:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
 

@@ -4,6 +4,7 @@ import { Table2 } from 'lucide-react'
 import { DevStickyToggle } from './DevGhostToggle'
 import { CELL_STATUS_LABEL, CORPUS_INITIALS, corpusCellStatus, corpusCodepoint, corpusIdentity, corpusPartStatus, PART_STAGES, STAGE_LABEL } from './notoCorpus'
 import type { CorpusCellStatus, CorpusReviews, CorpusRow } from './notoCorpus'
+import { Pressable } from './components/ui/pressable'
 import styles from './NotoCorpusMatrix.module.css'
 
 type Axis = 'initial' | 'medial' | 'final'
@@ -111,9 +112,9 @@ export function NotoCorpusMatrix({ rows, reviews, selected, onSelect, onOpen, is
     {!showStatus && !noFinal && <DevStickyToggle pressed={pivotOpen} onToggle={() => setPivotOpen((open) => !open)} testId="corpus-pivot-toggle" label="축 배치" icon={<Table2 size={18} />} panel={pivotSelect} />}
     {showStatus && <div className={styles.toolbar}>
       {noFinal ? <p className={styles.scopeNote}>무받침 범위는 행 홀자 × 열 첫닿자 한 장으로 봅니다.</p> : pivotSelect}
-      <div className={styles.segment} role="group" aria-label="칸 크기"><button type="button" aria-pressed={!large} onClick={() => setLarge(false)}>보통</button><button type="button" aria-pressed={large} onClick={() => setLarge(true)}>크게 · 자모 점</button></div>
+      <div className={styles.segment} role="group" aria-label="칸 크기"><Pressable type="button" aria-pressed={!large} onClick={() => setLarge(false)}>보통</Pressable><Pressable type="button" aria-pressed={large} onClick={() => setLarge(true)}>크게 · 자모 점</Pressable></div>
     </div>}
-    {!noFinal && <div className={styles.tabs} role="group" aria-label={`${AXES[pivot.sheet].label} 시트`}>{sheets.map(({ value, total, counts }) => <button key={value ?? 'none'} type="button" aria-pressed={value === sheet} title={showStatus ? `${jamoLabel(value)} · 문제 ${issueCount(counts)}칸` : jamoLabel(value)} onClick={() => selectAlong(pivot.sheet, value)}><span>{jamoLabel(value)}</span>{showStatus && <StatusBar counts={counts} total={total} />}</button>)}</div>}
+    {!noFinal && <div className={styles.tabs} role="group" aria-label={`${AXES[pivot.sheet].label} 시트`}>{sheets.map(({ value, total, counts }) => <Pressable key={value ?? 'none'} type="button" aria-pressed={value === sheet} title={showStatus ? `${jamoLabel(value)} · 문제 ${issueCount(counts)}칸` : jamoLabel(value)} onClick={() => selectAlong(pivot.sheet, value)}><span>{jamoLabel(value)}</span>{showStatus && <StatusBar counts={counts} total={total} />}</Pressable>)}</div>}
     {showStatus && <div className={styles.summary}>
       <strong>{`${noFinal ? '무받침' : `${AXES[pivot.sheet].label} ${jamoLabel(sheet)} 시트`} · ${rowItems.length * colItems.length}자`}</strong>
       <div className={styles.legend}>{LEGEND_ORDER.map((status) => <span key={status}><i className={styles[status]} />{CELL_STATUS_LABEL[status]} {sheetCounts[status]}</span>)}</div>
@@ -145,13 +146,13 @@ export function NotoCorpusMatrix({ rows, reviews, selected, onSelect, onOpen, is
               const row = rows[codepoint - 0xac00]
               const status = statusAt(codepoint)
               return <td key={codepoint} className={colGroupStarts.has(colItems[colIndex]) ? styles.colGroupStart : ''}>
-                <button type="button" className={`${styles.cell} ${showStatus ? styles[status] : styles.plain}`} data-testid="corpus-cell" data-codepoint={codepoint} data-status={showStatus ? status : undefined} data-context={showStatus ? undefined : row.identity.contextId} data-dimmed={!isHighlighted(row)} aria-pressed={codepoint === selected} tabIndex={codepoint === selected ? 0 : -1} aria-label={showStatus ? `${row.identity.character} · ${CELL_STATUS_LABEL[status]}` : `${row.identity.character} 열기`} onClick={() => (onOpen ?? onSelect)(codepoint)}>
+                <Pressable type="button" className={`${styles.cell} ${showStatus ? styles[status] : styles.plain}`} data-testid="corpus-cell" data-codepoint={codepoint} data-status={showStatus ? status : undefined} data-context={showStatus ? undefined : row.identity.contextId} data-dimmed={!isHighlighted(row)} aria-pressed={codepoint === selected} tabIndex={codepoint === selected ? 0 : -1} aria-label={showStatus ? `${row.identity.character} · ${CELL_STATUS_LABEL[status]}` : `${row.identity.character} 열기`} onClick={() => (onOpen ?? onSelect)(codepoint)}>
                   {renderCell ? renderCell(row) : <strong>{row.identity.character}</strong>}
                   {large && showStatus && <span className={styles.dots}>{PART_STAGES.map((stage) => {
                     const part = corpusPartStatus(row, stage, reviews)
                     return <i key={stage} className={part === 'not-applicable' ? styles.notApplicable : ''} style={part === 'not-applicable' ? undefined : { background: `var(--${part}-dot)` }} title={`${STAGE_LABEL[stage]} · ${part === 'not-applicable' ? '해당 없음' : CELL_STATUS_LABEL[part]}`} />
                   })}</span>}
-                </button>
+                </Pressable>
               </td>
             })}
           </tr>

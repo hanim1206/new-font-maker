@@ -9,6 +9,7 @@ import { ReportSheet } from './ReportButton'
 import { navigate, onLinkClick } from './router'
 import { MobileWorkspaceShell } from './workspace/WorkspaceChrome'
 import styles from './FontExportDonePage.module.css'
+import { Pressable } from './components/ui/pressable'
 
 /**
  * 추출 완료 페이지(`/workspace/font/export`). 방금 만든 OTF를 `FontFace`로 등록해 내 글자를 진짜 폰트로 크게 보여 준다 — "진짜가 됐다".
@@ -70,8 +71,8 @@ function ExportedFont({ export: done }: { export: NonNullable<ReturnType<typeof 
       </section>}
     </div>
     <footer className={styles.actions}>
-      <button type="button" className={styles.again} onClick={() => downloadTTF(done.bytes, done.fileName)} data-testid="font-export-redownload"><Download size={18} aria-hidden="true" />다시 받기</button>
-      <button type="button" className={styles.brag} onClick={() => setBragging(true)} data-testid="font-export-brag"><Heart size={18} aria-hidden="true" />한임에게 자랑하기</button>
+      <Pressable type="button" className={styles.again} onClick={() => downloadTTF(done.bytes, done.fileName)} data-testid="font-export-redownload"><Download size={18} aria-hidden="true" />다시 받기</Pressable>
+      <Pressable type="button" className={styles.brag} onClick={() => setBragging(true)} data-testid="font-export-brag"><Heart size={18} aria-hidden="true" />한임에게 자랑하기</Pressable>
     </footer>
     {bragging && <ReportSheet context={feedbackContextOf(window.location.pathname)} initialTag="praise" initialDraft={`${done.familyName} ${version} 만들었어요!`} onClose={() => setBragging(false)} />}
   </section>

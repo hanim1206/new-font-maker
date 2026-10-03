@@ -8,6 +8,7 @@ import { PART_GROUP_LABEL } from './reviewPropagation'
 import { ScopeThumbnail } from './ScopeThumbnail'
 import { compareBreadth, familyOfContext, finalOfContext, isEmptyRule, jamoPhrase, matchesRule, ruleGlyphCount, ruleKey, ruleName } from './scopeRule'
 import type { RuleJamoPart, ScopeRule } from './scopeRule'
+import { Pressable } from './components/ui/pressable'
 import styles from './LayoutOptionStack.module.css'
 
 /**
@@ -97,7 +98,7 @@ export function LayoutOptionStack({ source, slots, selectedKey, baseKey, onAdd, 
       data-kind={locked ? 'all' : jamo ? 'jamo' : 'layer'} data-base={base || undefined}
       data-jamo={jamo?.jamo} data-group={jamo ? PART_OF_RULE_KEY[jamo.part] : undefined}
       data-selected={on || undefined} data-stored={delta ? 'true' : undefined}>
-      <button type="button" className={styles.body} data-testid="layout-override-select" aria-label={name} aria-pressed={locked ? undefined : on} disabled={locked} onClick={() => onSelect(rule)}>
+      <Pressable className={styles.body} data-testid="layout-override-select" aria-label={name} aria-pressed={locked ? undefined : on} disabled={locked} onClick={() => onSelect(rule)}>
         {/* 앞머리 라디오 = 지금 범위. 옛 `전체`는 고를 수 없어 라디오가 없다. */}
         {!locked && <span className={styles.radio} data-on={on || undefined} aria-hidden="true">{on && <CheckIcon />}</span>}
         {/* 머리 그림 = 그 규칙의 몬드리안. 범위 고르기 화면 머리와 같은 그림이다. */}
@@ -132,16 +133,16 @@ export function LayoutOptionStack({ source, slots, selectedKey, baseKey, onAdd, 
               </>}
           </small>
         </span>
-      </button>
+      </Pressable>
       {/* 연필 = 범위 고르기 화면(이 범위를 다시 집는다), × = 지우기. 둘 다 켠 박스에만 선다. */}
-      {on && !locked && onOpenScope && <button type="button" className={styles.tool} aria-label={`${name} 범위 고치기`} onClick={() => onOpenScope(rule)} data-testid="layout-override-more"><PencilIcon /></button>}
-      {on && removable && <button type="button" className={styles.tool} aria-label={`${name} 오버라이드 지우기`} onClick={() => onRemove(rule)} data-testid="layout-override-remove"><CloseIcon /></button>}
+      {on && !locked && onOpenScope && <Pressable className={styles.tool} aria-label={`${name} 범위 고치기`} onClick={() => onOpenScope(rule)} data-testid="layout-override-more"><PencilIcon /></Pressable>}
+      {on && removable && <Pressable className={styles.tool} aria-label={`${name} 오버라이드 지우기`} onClick={() => onRemove(rule)} data-testid="layout-override-remove"><CloseIcon /></Pressable>}
     </li>
   }
 
   return <section className={styles.stack} aria-label="배치 적용 범위" data-testid="layout-option-stack">
     {/* 옵션 하나 = 범위 하나. 빈 범위로 만들어 두고 켜서 고친다. 박스와 같은 폭으로 맨 위에 선다. */}
-    <button type="button" className={styles.add} onClick={onAdd} data-testid="layout-option-add"><span aria-hidden="true">+</span> 옵션 추가</button>
+    <Pressable className={styles.add} onClick={onAdd} data-testid="layout-option-add"><span aria-hidden="true">+</span> 옵션 추가</Pressable>
     {narrowed.length > 0 && <ul className={styles.list}>{narrowed.map((entry) => renderEntry(entry, false))}</ul>}
     {narrowed.length > 0 && <div className={styles.floorLabel} aria-hidden="true">기본</div>}
     <ul className={styles.floor}>{floor.map((entry) => renderEntry(entry, true))}</ul>

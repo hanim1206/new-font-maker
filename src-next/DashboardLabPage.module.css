@@ -78,7 +78,7 @@
 .menuSheet > button:not(:disabled):active { background: rgb(var(--color-surface-2)); }
 .menuSheet > button:disabled { color: rgb(var(--color-text-5)); }
 .menuSheet > button small { margin-left: auto; color: rgb(var(--color-text-5)); font-size: var(--font-13); font-weight: var(--weight-medium); }
-.menuSheet [data-danger] { color: rgb(var(--color-danger, 214 50 31)); }
+.menuSheet [data-danger] { color: rgb(var(--color-destructive)); }
 .menuSheet > button[data-danger] svg { color: inherit; }
 /* 시트 안 둘째 화면(이름 바꾸기 · 삭제 확인). 제목 · 내용 · 아래 큰 단추 둘. 바뀔 때 살짝 떠오른다. */
 .menuSheetStep { margin: 0; padding: 4px 6px 2px; display: flex; flex-direction: column; gap: 8px; animation: stepIn 220ms cubic-bezier(0.2, 0, 0, 1); }
@@ -89,11 +89,11 @@
 .menuSheetField input::placeholder { color: rgb(var(--color-text-5)); font-weight: var(--weight-medium); }
 .menuSheetField button { position: absolute; right: 12px; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-text-5) / .45); color: rgb(var(--color-surface)); animation: popIn var(--motion-normal) var(--ease-standard); }
 .menuSheetActions { margin-top: 16px; display: flex; gap: 8px; }
-.menuSheetActions button { flex: 1; min-height: 56px; border: 0; border-radius: var(--radius-xl); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: var(--font-18); font-weight: var(--weight-bold); transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
+.menuSheetActions button { flex: 1; text-align: center; min-height: 56px; border: 0; border-radius: var(--radius-xl); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: var(--font-18); font-weight: var(--weight-bold); transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
 .menuSheetActions button:not(:disabled):active { transform: scale(0.97); }
 .menuSheetActions button[data-primary] { flex: 2; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 .menuSheetActions button[data-primary]:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
-.menuSheetActions button[data-danger] { flex: 2; background: rgb(var(--color-danger, 214 50 31)); color: rgb(var(--color-inverse-foreground)); }
+.menuSheetActions button[data-danger] { flex: 2; background: rgb(var(--color-destructive)); color: rgb(var(--color-inverse-foreground)); }
 /* 원 하나(40px). 탭하면 색이 바뀌고 오른쪽으로 자라며 글자가 들어온다 — 있던 요소가 제자리에서 자라는 전환. */
 .download { width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); transition: transform var(--motion-fast) var(--ease-standard); }
 .download:disabled { opacity: 1; }
@@ -103,7 +103,7 @@
    회색 길은 `.body` 배경이 바닥까지 칠하고, 레일은 버튼 높이만 — 레일이 화면만큼 크면 바닥에서 밀려 올라간다. 바닥 여백도 `.body` 안에. */
 .body { display: flex; align-items: flex-start; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); border-top: 1px solid rgb(var(--color-border-subtle)); background: linear-gradient(to right, rgb(var(--color-surface-2)) 92px, transparent 92px); }
 .rail { position: sticky; top: 0; flex: 0 0 92px; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--space-1); padding: 6px var(--space-2); }
-.rail button { min-height: 38px; border: 0; border-radius: var(--radius-md); background: transparent; color: rgb(var(--color-text-4)); font-size: var(--font-14); font-weight: var(--weight-bold); }
+.rail button { min-height: 38px; text-align: center; border: 0; border-radius: var(--radius-md); background: transparent; color: rgb(var(--color-text-4)); font-size: var(--font-14); font-weight: var(--weight-bold); }
 .railLink { position: relative; margin-top: 18px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 /* 섹션 목차와 검수(다른 화면) 사이 회색 선. */
 .railLink::before { content: ''; position: absolute; top: -10px; left: 6px; right: 6px; border-top: 1px solid rgb(var(--color-border)); }
@@ -221,10 +221,10 @@
 .sheetGrid button[aria-pressed='true'] { background: rgb(var(--color-surface-3)); }
 .sheetGrid button[aria-pressed='true'] svg { opacity: 1; }
 .sheetDiff { min-height: 18px; color: rgb(var(--color-text-4)); font-size: var(--font-12); font-style: normal; font-weight: var(--weight-semibold); }
-.sheetDiff[data-empty] { color: rgb(var(--color-danger, 220 38 38)); }
+.sheetDiff[data-empty] { color: rgb(var(--color-destructive)); }
 .sheetActions { display: flex; gap: 8px; }
 .sheetDelete { flex: none; min-height: 52px; padding: 0 18px; border: 0; border-radius: var(--radius-lg); background: transparent; color: rgb(var(--color-text-4)); font-size: var(--font-16); font-weight: var(--weight-bold); }
-.sheetSave { flex: 1; min-height: 52px; border: 0; border-radius: var(--radius-lg); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: var(--font-16); font-weight: var(--weight-heavy); }
+.sheetSave { flex: 1; text-align: center; min-height: 52px; border: 0; border-radius: var(--radius-lg); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: var(--font-16); font-weight: var(--weight-heavy); }
 .sheetSave:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
 .toast { position: absolute; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 72px); z-index: 25; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 8px 12px 16px; border-radius: var(--radius-lg); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: var(--font-13); font-weight: var(--weight-semibold); animation: popIn var(--motion-normal) var(--ease-standard); }
 .toast button { flex: none; min-height: 32px; padding: 0 10px; border: 0; background: transparent; color: inherit; font-size: var(--font-13); font-weight: var(--weight-heavy); }

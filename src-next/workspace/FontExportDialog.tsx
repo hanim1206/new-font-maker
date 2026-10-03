@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { DEFAULT_FONT_NAME, useFontExportStore } from '../fontExportStore'
 import styles from './FontExportDialog.module.css'
+import { Pressable } from '../components/ui/pressable'
 
 /** 추출 전에 폰트 이름을 한 번 묻는 창. 앱에 하나만 둔다(`App`). */
 export function FontExportDialog() {
@@ -33,8 +34,8 @@ function FontExportForm() {
       {lastError ? <small role="alert" data-testid="font-export-error">지난 추출 실패: {lastError}</small> : null}
       <input type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder={DEFAULT_FONT_NAME} maxLength={40} autoFocus onFocus={(event) => event.target.select()} aria-label="폰트 이름" data-testid="font-export-name" />
       <div className={styles.actions}>
-        <button type="button" onClick={cancel}>취소</button>
-        <button type="submit" data-testid="font-export-confirm">OTF 추출</button>
+        <Pressable type="button" className="text-center" onClick={cancel}>취소</Pressable>
+        <Pressable type="submit" className="text-center" data-testid="font-export-confirm">OTF 추출</Pressable>
       </div>
     </form>
   </div>

@@ -14,7 +14,7 @@
 .toggles { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; font-size: 13px; color: rgb(var(--color-text-2)); }
 .toggles label { display: flex; align-items: center; gap: 6px; }
 .status { color: rgb(var(--color-text-3)); font-size: 12px; font-variant-numeric: tabular-nums; }
-.status[data-state='error'] { color: rgb(var(--color-danger, 180 40 40)); }
+.status[data-state='error'] { color: rgb(var(--color-destructive)); }
 
 .rows { width: min(1320px, 100%); margin: 0 auto; display: grid; gap: 8px; }
 .row { display: grid; grid-template-columns: 160px minmax(0, 1fr); align-items: start; gap: 16px; padding: 12px 14px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); }

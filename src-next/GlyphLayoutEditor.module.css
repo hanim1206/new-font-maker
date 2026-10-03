@@ -1,6 +1,6 @@
 .editor { display: flex; flex-direction: column; }
 .status { padding: 8px 14px; color: rgb(var(--color-text-4)); font-size: var(--font-12); }
-.status[data-state='error'] { color: rgb(var(--color-danger, 214 50 31)); }
+.status[data-state='error'] { color: rgb(var(--color-destructive)); }
 
 
 /* 캔버스 왼쪽에 레이아웃 여섯 칸 표지가 세로로 선다. 캔버스 위 겹치는 표지(`canvasFix` 등)는 표지 띠가 아니라 캔버스를 기준으로 놓는다. */
@@ -17,7 +17,7 @@
 .canvasFixed { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); padding: 4px 12px; border-radius: var(--radius-lg); background: rgb(var(--color-edit-select)); color: rgb(var(--color-inverse-foreground)); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: var(--font-11); font-weight: var(--weight-bold); white-space: nowrap; }
 /* 가로 줄기 끝이 다른 칸 세로 기준선에 딱 닿아 걸렸다. 획 편집의 걸림 칩과 같은 주황. */
 .touchChip { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); padding: 3px 10px; border-radius: var(--radius-md); background: rgb(var(--color-edit-select)); color: rgb(var(--color-inverse-foreground)); font-size: var(--font-11); font-weight: var(--weight-bold); white-space: nowrap; pointer-events: none; }
-.canvasWarning { position: absolute; right: 14px; bottom: 12px; max-width: 58%; margin: 0; padding: 4px 10px; border-radius: var(--radius-md); background: rgb(var(--color-surface) / .92); color: rgb(var(--color-danger, 214 50 31)); font-size: var(--font-11); font-weight: var(--weight-semibold); text-align: right; }
+.canvasWarning { position: absolute; right: 14px; bottom: 12px; max-width: 58%; margin: 0; padding: 4px 10px; border-radius: var(--radius-md); background: rgb(var(--color-surface) / .92); color: rgb(var(--color-destructive)); font-size: var(--font-11); font-weight: var(--weight-semibold); text-align: right; }
 .railButton { cursor: pointer; outline: none; }
 .railButton:focus-visible { stroke: rgb(var(--color-primary) / .18); }
 /* 활성 rail 호버·포커스: 선이 굵어지고 후광이 켜진다. 선택된 rail은 이미 굵고 후광이 있다. */
@@ -37,7 +37,7 @@
 .railLabel { opacity: 0; paint-order: stroke; stroke: rgb(var(--color-surface)); stroke-width: .012; stroke-linejoin: round; pointer-events: none; }
 .rail:hover .railLabel, .rail:has(.railButton:focus-visible) .railLabel { opacity: 1; }
 .rail[data-selected] .railLabel { font-weight: var(--weight-heavy); }
-.warning { padding: 6px 14px; color: rgb(var(--color-danger, 214 50 31)); font-size: var(--font-11); }
+.warning { padding: 6px 14px; color: rgb(var(--color-destructive)); font-size: var(--font-11); }
 
 /* Δ 수치는 띠 여백에 항상. 흰 테두리로 격자 위에서 읽힌다. */
 .deltaLabel { paint-order: stroke; stroke: rgb(var(--color-surface)); stroke-width: .012; stroke-linejoin: round; font-weight: var(--weight-heavy); pointer-events: none; }

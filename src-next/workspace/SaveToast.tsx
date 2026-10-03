@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import styles from './SaveToast.module.css'
+import { Pressable } from '../components/ui/pressable'
 
 /**
  * 화면 아래 가운데 토스트. 저장 상태는 머리에 두지 않고 여기서만 알린다.
@@ -26,8 +27,8 @@ export function SaveToast({
       data-testid="save-toast"
     >
       <span>{message}</span>
-      {action && <button type="button" className={styles.action} onClick={action.onClick}>{action.label}</button>}
-      {onDismiss && <button type="button" onClick={onDismiss} aria-label="알림 닫기"><X size={15} /></button>}
+      {action && <Pressable type="button" className={styles.action} onClick={action.onClick}>{action.label}</Pressable>}
+      {onDismiss && <Pressable type="button" onClick={onDismiss} aria-label="알림 닫기"><X size={15} /></Pressable>}
     </div>
   )
 }
