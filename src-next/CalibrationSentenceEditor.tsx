@@ -31,7 +31,7 @@ import { groupMatching, useJamoGroupStore } from '../src/stores/jamoGroupStore'
 import confirmStyles from './workspace/FontExportDialog.module.css'
 import { mergeLayoutPadding, mergePadding, useLayoutStore } from '../src/stores/layoutStore'
 import { hangulAdvance as fontMetricsAdvance, hangulLeftBearing, SPACE_ADVANCE } from '../src/services/fontMetrics'
-import { jamoCenterlineCenter, limitJamoMoveDelta, limitJamoScaleFactor, moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStrokes, snapWholeJamoDelta, translateJamoStrokes, type StrokeBoundsOf } from '../src/services/editorCommands'
+import { jamoCenterlineCenter, limitJamoMoveDelta, limitJamoScale, moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStrokes, snapWholeJamoDelta, translateJamoStrokes, type StrokeBoundsOf } from '../src/services/editorCommands'
 import { stemEditBox, storedStemDelta } from '../src/services/stemBend'
 import { stemRailGuides } from '../src/services/medialStemRails'
 import { StemSpreadSheet } from './StemSpreadSheet'
@@ -1515,6 +1515,7 @@ function InferenceTrackpad({
   // 트랙패드 왼쪽 크기 막대. 지금 자소(고른 것, 없으면 잠긴 것)를 통째로 키운다. 두께는 전역 굵기 그대로.
   // 넘친 만큼은 상자 밖으로 그대로 나가야 하므로 문맥 간격 되당김을 얹지 않는다(`pastGapLimit`).
   // 자소 상자는 넘어도 글자 칸은 못 넘는다. 시작할 때 획마다 놓인 상자에서 한계를 재 두고(끄는 동안 상자가 흔들려도 같다), 닿는 배율 · 거리에서 멈춘다.
+  // 키우다 한쪽이 칸 끝에 닿으면 그쪽을 붙잡고 반대쪽으로 더 키운다(`limitJamoScale`).
   const wholeJamoBounds = useRef<StrokeBoundsOf>(() => undefined)
   const captureWholeJamoBounds = (source: JamoData | null, editorPart: MobileEditorPart | undefined) => {
     const weight = weightToMultiplier(useGlobalStyleStore.getState().style.weight)
@@ -1535,19 +1536,21 @@ function InferenceTrackpad({
     scaleSource.current = base ? structuredClone(adoptFamilyStrokes(getJamo(base.jamo.type, base.jamo.char) ?? base.jamo, familyOfSyllable(syllable))) : null
     captureWholeJamoBounds(scaleSource.current, base?.editorPart)
   }
+  // 실제로 쓴 배율을 돌려준다 — 크기 막대가 요청이 아니라 커진 만큼을 보인다.
   const changeJamoScale = (requested: number) => {
     const source = scaleSource.current
-    if (!source) return
-    const factor = limitJamoScaleFactor(source, requested, wholeJamoBounds.current)
-    onPreviewJamo({ type: source.type, char: source.char, data: scaleJamoStrokes(source, factor), baseline: source, pastGapLimit: true })
+    if (!source) return requested
+    const { factor, shift } = limitJamoScale(source, requested, wholeJamoBounds.current)
+    onPreviewJamo({ type: source.type, char: source.char, data: scaleJamoStrokes(source, factor, shift), baseline: source, pastGapLimit: true })
+    return factor
   }
   const commitJamoScale = (requested: number) => {
     const source = scaleSource.current
     const base = creationBase
     scaleSource.current = null
     if (!source || !base) return onPreviewJamo(null)
-    const factor = limitJamoScaleFactor(source, requested, wholeJamoBounds.current)
-    onCommitJamo(source, scaleJamoStrokes(source, factor), { kind: 'stroke-scale', glyph, component: base.component, jamoType: source.type, strokeId: base.strokeId, scale: { x: factor, y: factor } }, { pastGapLimit: true })
+    const { factor, shift } = limitJamoScale(source, requested, wholeJamoBounds.current)
+    onCommitJamo(source, scaleJamoStrokes(source, factor, shift), { kind: 'stroke-scale', glyph, component: base.component, jamoType: source.type, strokeId: base.strokeId, scale: { x: factor, y: factor } }, { pastGapLimit: true })
   }
   const cancelJamoScale = () => {
     scaleSource.current = null
