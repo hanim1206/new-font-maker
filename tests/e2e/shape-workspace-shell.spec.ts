@@ -51,37 +51,3 @@ test('스타일 화면은 대시보드 `스타일`로 들어오고, 머리 `‹ 
   await page.getByTestId('workspace-font-home').click()
   await expect(page).toHaveURL(/\/dashboard$/)
 })
-
-// 스타일 화면에서 추출 단추를 뺐다(2026-09-27). 대시보드 다운로드를 대기 층 · 완료 페이지로 잇는 다음 단계에서 이 흐름을 그쪽 입구로 되살린다.
-test.fixme('폰트 화면의 OTF 추출은 폰트 이름을 물은 뒤 그 이름의 OTF를 받는다', async ({ page }) => {
-  test.setTimeout(180_000)
-  await page.goto('/dashboard')
-  await page.getByTestId('dashboard-style').click()
-  await expect(page).toHaveURL(/\/workspace\/font$/)
-
-  // OTF 추출 → 이름 창. 취소하면 아무 일도 없다.
-  const dialog = page.getByTestId('font-export-dialog')
-  const exportButton = page.getByTestId('font-workspace').getByRole('button', { name: /OTF/ })
-  await exportButton.click()
-  await expect(page.getByTestId('font-export-name')).toHaveValue('내 폰트')
-  await dialog.getByRole('button', { name: '취소' }).click()
-  await expect(dialog).toHaveCount(0)
-
-  // 이름을 넣고 추출하면 파일 이름이 그 이름이고, 다음에 열 때 기억한다. 도는 동안 대기 층, 끝나면 완료 페이지.
-  await exportButton.click()
-  await page.getByTestId('font-export-name').fill('한임체')
-  const downloadPromise = page.waitForEvent('download', { timeout: 170_000 })
-  await page.getByTestId('font-export-confirm').click()
-  await expect(dialog).toHaveCount(0)
-  await expect(page.getByTestId('font-export-overlay')).toBeVisible()
-  expect((await downloadPromise).suggestedFilename()).toBe('한임체.otf')
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('font-export-family-name-v1'))).toBe('한임체')
-  await expect(page).toHaveURL(/\/workspace\/font\/export$/)
-  await expect(page.getByTestId('font-export-done')).toBeVisible()
-
-  // 완료 페이지의 `‹`는 폰트 화면으로, 거기 `‹`는 대시보드로.
-  await page.getByTestId('workspace-back').click()
-  await expect(page).toHaveURL(/\/workspace\/font$/)
-  await page.getByTestId('workspace-font-home').click()
-  await expect(page).toHaveURL(/\/dashboard$/)
-})
