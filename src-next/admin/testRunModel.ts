@@ -89,21 +89,25 @@ export const UNIT_CATEGORIES: { name: string; pattern: RegExp }[] = [
   { name: '그리기 엔진', pattern: /stroke|brush|ink|centerline|stem|counter|body|skeleton|glyph|geometry|beak|weight/i },
 ]
 
+/** 화면에 보이는 갈래 순서: 제품 흐름(그리기 → 배치 → 편집 → 출력 → 계정 · 앱 → 참고 폰트 → 실험 자료 → 지킴이). 맞추는 순서(위)와 따로다. */
+export const UNIT_CATEGORY_DISPLAY_ORDER = ['그리기 엔진', '레이아웃 · 칸 · 보선', '편집 동작 · 저장소', '출력(OTF)', '계정 · 베타 · 앱', '노토 프리셋 · 측정', '실험 고정 자료', '지킴이', '기타']
+
 export function unitCategoryOf(file: string): string {
   return UNIT_CATEGORIES.find((category) => category.pattern.test(file))?.name ?? '기타'
 }
 
-/** 목록을 묶는다. 단위 테스트는 갈래 순서, e2e · 스모크는 처음 나온 순서. */
+/** 목록을 묶는다. 단위 테스트는 제품 흐름 갈래 순서 · 갈래 안은 이름 가나다순, e2e · 스모크는 처음 나온 순서. */
 export function groupsOf(run: Pick<TestRun, 'kind' | 'items'>): ItemGroup[] {
   const groups = new Map<string, TestRunItem[]>()
-  if (run.kind === 'unit') for (const { name } of [...UNIT_CATEGORIES, { name: '기타' }]) groups.set(name, [])
+  if (run.kind === 'unit') for (const name of UNIT_CATEGORY_DISPLAY_ORDER) groups.set(name, [])
   for (const item of run.items) {
     const name = run.kind === 'unit' ? unitCategoryOf(item.file) : item.file
     const list = groups.get(name)
     if (list) list.push(item)
     else groups.set(name, [item])
   }
-  return [...groups].filter(([, items]) => items.length).map(([name, items]) => ({ name, items }))
+  const sorted = (items: TestRunItem[]) => run.kind === 'unit' ? [...items].sort((a, b) => a.title.localeCompare(b.title, 'ko')) : items
+  return [...groups].filter(([, items]) => items.length).map(([name, items]) => ({ name, items: sorted(items) }))
 }
 
 /** 목록 한 줄(돌린 기록과 상관없이 늘 있는 것). */

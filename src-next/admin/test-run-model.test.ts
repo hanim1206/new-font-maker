@@ -23,9 +23,11 @@ describe('테스트 실행 기록', () => {
     expect(summary).toEqual({ total: 5, done: 3, passed: 1, failed: 1, skipped: 1 })
   })
 
-  it('단위 테스트는 갈래 순서로, e2e는 스펙 파일로 처음 나온 순서대로 묶는다', () => {
-    const items = [item('src/services/cffSubroutinize.test.ts', 'passed'), item('src-next/style-guard.test.ts', 'passed'), item('src/services/fontRevision.test.ts', 'passed')]
-    expect(groupsOf(run({ items })).map((group) => [group.name, group.items.length])).toEqual([['지킴이', 1], ['출력(OTF)', 2]])
+  it('단위 테스트는 제품 흐름 갈래 순서 · 갈래 안 가나다순, e2e는 스펙 파일로 처음 나온 순서대로 묶는다', () => {
+    const items = [item('src/services/fontRevision.test.ts', 'passed'), item('src-next/style-guard.test.ts', 'passed'), item('src/services/cffSubroutinize.test.ts', 'passed')]
+    items[0].title = '추출 버전'
+    items[2].title = '서브루틴'
+    expect(groupsOf(run({ items })).map((group) => [group.name, group.items.map((one) => one.title)])).toEqual([['출력(OTF)', ['서브루틴', '추출 버전']], ['지킴이', ['src-next/style-guard.test.ts']]])
     expect(groupsOf(run({ kind: 'e2e', items })).map((group) => group.name)).toEqual(items.map((one) => one.file))
   })
 
