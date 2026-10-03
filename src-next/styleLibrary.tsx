@@ -64,14 +64,6 @@ export const FILE_SCREEN: Record<string, LibraryScreen> = {
   'src-next/ReportButton.tsx': { name: '제보 시트', route: '/dashboard', hint: '머리의 빨간 제보 단추를 누른다' },
   'src-next/SlideSheet.tsx': { name: '안내 시트', route: '/dashboard', hint: '제보 시트의 `둘러보기`' },
   'src-next/StemBeakControls.tsx': { name: '스타일 · 부리 탭', route: '/workspace/font', hint: '아래 `부리` 탭을 누른다' },
-  'src-next/admin/AccountFontsPage.tsx': { name: '관리자 · 계정 폰트', route: '/admin/accounts' },
-  'src-next/admin/AccountsPage.tsx': { name: '관리자 · 계정', route: '/admin/accounts' },
-  'src-next/admin/AdminFeedback.tsx': { name: '관리자 · 의견', route: '/admin/feedback' },
-  'src-next/admin/AnnouncementsPage.tsx': { name: '관리자 · 공지', route: '/admin/announcements' },
-  'src-next/admin/DataTable.tsx': { name: '관리자 · 표', route: '/admin/accounts' },
-  'src-next/admin/InviteSheet.tsx': { name: '관리자 · 초대', route: '/admin/accounts', hint: '`초대하기`를 누른다' },
-  'src-next/admin/IssuedDialog.tsx': { name: '관리자 · 발급 창', route: '/admin/accounts', hint: '초대를 발급하면' },
-  'src-next/admin/PresetPage.tsx': { name: '관리자 · 프리셋', route: '/admin/preset' },
 }
 
 function Samples({ items }: { items: { label: string; node: ReactNode }[] }) {
@@ -104,10 +96,10 @@ const EDIT = ['edit-select', 'edit-handle', 'editor-point-selected', 'edit-slot-
 
 const VARIANT_INFO: Record<keyof typeof BUTTON_VARIANTS, [string, string]> = {
   default: ['검정', '가장 강한 할 일. 시트 아래 오른쪽 · 다운로드 · 저장. 비활성은 회색 바탕.'],
-  primary: ['주색', '주색을 쓰는 할 일. 지금 제품 화면에서는 안 쓰고 관리자에서만.'],
+  primary: ['주색', '주색을 쓰는 할 일. 지금 앱 화면에서는 안 쓴다.'],
   secondary: ['회색', '취소 · 덜 중요한 할 일. 시트 아래 왼쪽.'],
   outline: ['테두리', '흰 바탕에 테두리. 오류 화면 백업 · 범위 고르기 취소.'],
-  ghost: ['옅은 글자 + 누르면 회색', '관리자 도구 줄.'],
+  ghost: ['옅은 글자 + 누르면 회색', '가벼운 도구 단추. 지금 앱 화면에서는 안 쓴다.'],
   destructive: ['빨강', '지우기처럼 되돌릴 수 없는 일.'],
   plain: ['투명 · 검정 글자', '뒤로 · 계정 · 목록 줄.'],
   quiet: ['투명 · 옅은 글자', '로그아웃 · 닫기처럼 눈에 안 띄어야 하는 것.'],
@@ -229,14 +221,14 @@ export function libraryItems(): LibraryItem[] {
   items.push(
     { id: 'tabs.dock', group: '탭', title: '아래 탭(dock)', note: '스타일 화면 바닥에 붙은 탭. 그림 위 · 이름 아래, 잠긴 탭은 작은 안내.', selector: '[data-slot="tabs"][data-variant="dock"]', screens: [{ name: '스타일', route: '/workspace/font' }], story: () => <DemoTabs variant="dock" /> },
     { id: 'tabs.underline', group: '탭', title: '밑줄 탭', note: '옛 단독 글로벌 스타일 화면.', selector: '[data-slot="tabs"][data-variant="underline"]', screens: [], story: () => <DemoTabs variant="underline" /> },
-    { id: 'tabs.default', group: '탭', title: '알약 탭', note: '관리자 화면.', selector: '[data-slot="tabs"][data-variant="default"]', screens: [{ name: '관리자 · 계정', route: '/admin/accounts' }, { name: '관리자 · 의견', route: '/admin/feedback' }], story: () => <DemoTabs variant="default" /> },
+    { id: 'tabs.default', group: '탭', title: '알약 탭', note: 'shadcn 기본 탭. 지금 앱 화면에서는 안 쓴다.', selector: '[data-slot="tabs"][data-variant="default"]', screens: [], story: () => <DemoTabs variant="default" /> },
     { id: 'choice.tile', group: '고르기', title: '그림 칸', note: '붓 고르기. 고르면 옅은 회색 면, 이름 굵게.', selector: '[data-slot="choice-group"][data-variant="tile"][data-size="default"]', screens: [{ name: '스타일 · 획 탭', route: '/workspace/font' }], story: () => <DemoChoice variant="tile" /> },
     { id: 'choice.tile-sm', group: '고르기', title: '작은 그림 칸', note: '부리 모양 여섯.', selector: '[data-slot="choice-group"][data-variant="tile"][data-size="sm"]', screens: [{ name: '스타일 · 부리 탭', route: '/workspace/font', hint: '아래 `부리` 탭을 누른다' }], story: () => <DemoChoice variant="tile" size="sm" /> },
     { id: 'choice.segment', group: '고르기', title: '회색 길 위 흰 알약', note: '옛 단독 화면의 획 생성 규칙.', selector: '[data-slot="choice-group"][data-variant="segment"]', screens: [], story: () => <DemoChoice variant="segment" /> },
     { id: 'choice.pill', group: '고르기', title: '검정 알약', note: '부리 적용 범위(도마에 묶음이 있을 때).', selector: '[data-slot="choice-group"][data-variant="pill"]', screens: [{ name: '스타일 · 부리 탭', route: '/workspace/font', hint: '도마에 사용자 묶음이 있을 때만' }], story: () => <DemoChoice variant="pill" /> },
     { id: 'range.field', group: '막대', title: '항목 + 채움 막대', note: '이름 왼쪽 · 값 오른쪽, 아래 얇은 채움 막대와 눈금. 글자 칸 아무 데나 눌러도 그 값으로 간다.', selector: '[data-slot="range-bar"]', screens: [{ name: '스타일 · 획 탭', route: '/workspace/font' }], story: () => <DemoRange /> },
     { id: 'checkbox.ink', group: '체크', title: '검정 체크', note: '파랑을 안 쓰는 화면(스타일)의 자동 보정.', selector: '[data-slot="checkbox"][data-tone="ink"]', screens: [{ name: '스타일 · 획 탭', route: '/workspace/font' }], story: () => <DemoCheckbox tone="ink" /> },
-    { id: 'checkbox.primary', group: '체크', title: '주색 체크', note: '관리자 표.', selector: '[data-slot="checkbox"][data-tone="primary"]', screens: [{ name: '관리자 · 계정', route: '/admin/accounts' }], story: () => <DemoCheckbox tone="primary" /> },
+    { id: 'checkbox.primary', group: '체크', title: '주색 체크', note: 'shadcn 기본 체크. 지금 앱 화면에서는 안 쓴다.', selector: '[data-slot="checkbox"][data-tone="primary"]', screens: [], story: () => <DemoCheckbox tone="primary" /> },
     { id: 'notice.bar', group: '알림', title: '어두운 막대(단추 하나)', note: '토스식. 왼쪽 동그라미 아이콘, 파란 글자 단추. 오류도 바탕은 그대로 아이콘만 빨강. 저장 토스트도 같은 막대.', selector: '[data-testid="app-notice"]', screens: [{ name: '대시보드에 띄우기', route: '/dashboard', show: 'notice-bar' }], story: () => <DemoNotice card={false} /> },
     { id: 'notice.card', group: '알림', title: '흰 카드(단추 둘)', note: '하단 드로어를 줄인 카드. 큰 단추 검정 · 회색.', selector: '[data-testid="app-notice"]', screens: [{ name: '대시보드에 띄우기', route: '/dashboard', show: 'notice-card' }], story: () => <DemoNotice card /> },
   )

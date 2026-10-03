@@ -6,7 +6,7 @@ import { rejectReasonOf } from './betaInviteApi'
 
 /**
  * 스타일가이드 라이브러리(`/style-guide`)가 부품이 어디서 쓰이는지 묻는 곳. 읽기만 한다. 개발 서버에만 붙는다(`apply: 'serve'`).
- * 공용 단추가 강조 · 크기별로 어느 파일 몇째 줄에서 쓰이는지 코드에서 센다. 화면은 파일을 화면 주소로 바꿔 보여 준다.
+ * 공용 단추가 강조 · 크기별로 앱 화면의 어느 파일 몇째 줄에서 쓰이는지 코드에서 센다(관리자 화면은 뺀다). 화면은 파일을 화면 주소로 바꿔 보여 준다.
  * 문지기는 관리자 API와 같다(`rejectReasonOf` — 이 맥 · 전용 헤더 · 같은 출처).
  */
 
@@ -55,7 +55,8 @@ export async function scanButtonUsage(root: string): Promise<ButtonUsage> {
   const usage: ButtonUsage = { variant: {}, size: {} }
   const walk = async (dir: string): Promise<string[]> => (await Promise.all((await readdir(dir, { withFileTypes: true })).map((entry) => {
     const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) return entry.name === 'ui' ? [] : walk(full)
+    // 공용 부품 폴더와 관리자 화면은 뺀다 — 쓰는 곳은 앱 화면만 본다(10-03 사용자).
+    if (entry.isDirectory()) return entry.name === 'ui' || entry.name === 'admin' ? [] : walk(full)
     return /\.tsx$/.test(entry.name) && !/\.test\.tsx$/.test(entry.name) && !['StyleGuideLabPage.tsx', 'styleLibrary.tsx'].includes(entry.name) ? [full] : []
   }))).flat()
   for (const file of await walk(path.join(root, 'src-next'))) {

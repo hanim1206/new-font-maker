@@ -204,7 +204,7 @@ export function StyleGuideLabPage() {
         <div className="flex flex-col gap-2">
           <h3 className="text-14 font-bold">쓰는 화면</h3>
           {screens.length === 0
-            ? <p className="text-13 text-text-dim-4">{item.selector ? '제품 화면에서 아직 안 쓴다.' : '토큰 — 모든 화면이 쓴다.'}</p>
+            ? <p className="text-13 text-text-dim-4">{item.selector ? '앱 화면에서 아직 안 쓴다.' : '토큰 — 모든 화면이 쓴다.'}</p>
             : <div className="flex flex-wrap gap-2">{screens.map((screen) => <Button key={screen.name} type="button" variant="outline" size="sm" disabled={!screen.route} onClick={() => go(screen)} title={screen.hint}>
               {screen.name}{'count' in screen && screen.count ? <span className="text-text-dim-5">{screen.count}</span> : null}
             </Button>)}</div>}
