@@ -7,13 +7,15 @@ import { identityOfSyllable, resolveContextBoxes } from '../src/services/context
 import type { NotoOutline } from '../src/services/notoOutlineInk'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { editableRailsOf, fitMedialForGlyph, renderMedialPart } from './notoMedialFitView'
+import { sharedCheckoutPath } from '../scripts/sharedCheckoutPath'
 
 /**
  * 레이아웃 편집기의 홀자 잉크는 획 마스터 fit이 아니라 앱 획이다. 문장 줄과 같은 호출(`fitPartStrokes`)로 slot 네 변에 맞춘다.
  * 그래서 캔버스의 홀자 중심선 상자 = 칸 해석의 `boxes[part]`, 획 편집에서 고친 홀자가 레이아웃에도 보인다.
  */
 
-const CORPUS = path.resolve(__dirname, '../.reference-fonts/guide-corpus')
+// 워크트리엔 코퍼스가 없어서 메인 체크아웃 것을 빌린다(개발 서버와 같은 길). 거기도 없으면 건너뛴다.
+const CORPUS = sharedCheckoutPath(path.resolve(__dirname, '..'), '.reference-fonts/guide-corpus', () => {})
 const decompose = (char: string) => decomposeSyllable(char, CHOSEONG_MAP, JUNGSEONG_MAP, JONGSEONG_MAP)
 const NO_OUTLINE = {} as NotoOutline
 

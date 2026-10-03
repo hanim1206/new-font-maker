@@ -10,10 +10,12 @@ import {
   notoPresetChunkFile, notoPresetChunkIndex, resolveNotoPresetSource,
 } from './notoPresetGlyphs'
 import type { FetchJson, NotoPresetGlyphChunk } from './notoPresetGlyphs'
+import { sharedCheckoutPath } from '../scripts/sharedCheckoutPath'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const STATIC = path.join(ROOT, 'public/noto-preset')
-const CORPUS = path.join(ROOT, '.reference-fonts/guide-corpus')
+// 워크트리엔 코퍼스가 없어서 메인 체크아웃 것을 빌린다(개발 서버와 같은 길). 거기도 없으면 건너뛴다.
+const CORPUS = sharedCheckoutPath(path.resolve(__dirname, '..'), '.reference-fonts/guide-corpus', () => {})
 const readStatic = <T,>(file: string) => JSON.parse(readFileSync(path.join(STATIC, file), 'utf8')) as T
 
 const STAGE_KEYS = { outline: 'o'.repeat(8), initial: 'i', medial: 'm', final: 'f' }

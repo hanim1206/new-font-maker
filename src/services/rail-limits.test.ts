@@ -7,8 +7,10 @@ import { decomposeSyllable } from '../utils/hangulUtils'
 import { identityOfSyllable, medialDragRange, resolveContextBoxes, type ContextBoxDelta, type MedialPart } from './contextBoxResolver'
 import { applyRailEdits } from './notoMedialMasterFit'
 import { faceLimitIssue, furthestValid, GLYPH_BODY, limitFaces, medialLimitIssue } from './railLimits'
+import { sharedCheckoutPath } from '../../scripts/sharedCheckoutPath'
 
-const CORPUS = path.resolve(__dirname, '../../.reference-fonts/guide-corpus')
+// 워크트리엔 코퍼스가 없어서 메인 체크아웃 것을 빌린다(개발 서버와 같은 길). 거기도 없으면 건너뛴다.
+const CORPUS = sharedCheckoutPath(path.resolve(__dirname, '../..'), '.reference-fonts/guide-corpus', () => {})
 
 describe('furthestValid', () => {
   it('끝이 한계 안이면 그대로, 밖이면 경계까지', () => {

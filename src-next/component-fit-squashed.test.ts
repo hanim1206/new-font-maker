@@ -4,12 +4,14 @@ import { describe, expect, it } from 'vitest'
 import { createNotoPresetReader } from '../scripts/reference-lab/notoPresetApi'
 import { resolveContextBoxes } from '../src/services/contextBoxResolver'
 import { fitComponentsForGlyph, renderComponentPart } from './notoComponentFitView'
+import { sharedCheckoutPath } from '../scripts/sharedCheckoutPath'
 
 /**
  * 2026-09-24 아이폰에서 보선을 끌다 앱이 통째로 멈췄다. `가` 첫닿자 윗변을 내리면 닿는 글자 `싸`의
  * `ㅆ` 상자가 납작해지고, 잉크를 합치던 polygon-clipping이 끝나지 않았다. 이제 Clipper2가 합친다.
  */
-const CORPUS = path.resolve(__dirname, '../.reference-fonts/guide-corpus')
+// 워크트리엔 코퍼스가 없어서 메인 체크아웃 것을 빌린다(개발 서버와 같은 길). 거기도 없으면 건너뛴다.
+const CORPUS = sharedCheckoutPath(path.resolve(__dirname, '..'), '.reference-fonts/guide-corpus', () => {})
 
 // corpus(.reference-fonts)가 있을 때만 돈다.
 describe.skipIf(!existsSync(CORPUS))('납작한 닿자 상자', () => {

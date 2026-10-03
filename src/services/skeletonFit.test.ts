@@ -9,8 +9,10 @@ import { buildSkeletonSample, fitSkeleton, fitSkeletonMultiStart, meanXor, skele
 import type { SkeletonSample } from './skeletonFit'
 import type { JamoData } from '../types'
 import legacyJamos from '../data/fixtures/baseJamosLegacy2026-02.json'
+import { sharedCheckoutPath } from '../../scripts/sharedCheckoutPath'
 
-const CORPUS = path.resolve(__dirname, '../../.reference-fonts/guide-corpus')
+// 워크트리엔 코퍼스가 없어서 메인 체크아웃 것을 빌린다(개발 서버와 같은 길). 거기도 없으면 건너뛴다.
+const CORPUS = sharedCheckoutPath(path.resolve(__dirname, '../..'), '.reference-fonts/guide-corpus', () => {})
 const RUN = existsSync(CORPUS) ? createNotoPresetReader(CORPUS) : null
 
 describe('골격 다듬기 — 파라미터', () => {

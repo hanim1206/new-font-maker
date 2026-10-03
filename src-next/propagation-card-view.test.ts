@@ -12,6 +12,7 @@ import { propagationCardBaseOf, propagationCardViewOf } from './propagationCardV
 import type { PropagationCardBox } from './propagationCardView'
 import { applyFacesDelta, applyMedialDelta, layoutDeltaOf } from './reviewPropagation'
 import type { PropagationEdit } from './reviewPropagation'
+import { sharedCheckoutPath } from '../scripts/sharedCheckoutPath'
 
 /**
  * 카드 계산을 "글자당 한 번"과 "끄는 동안"으로 나눠도 그림은 글자 하나 안 달라야 한다.
@@ -19,7 +20,8 @@ import type { PropagationEdit } from './reviewPropagation'
  * 단, 한계(`railLimits`)를 넘는 홀자 Δ는 예외다. 옛 카드는 통째로 버렸지만 실제 글자는 경계까지 줄여 그리므로, 카드도 실제 글자(`resolveContextBoxes`)와 같아야 한다(`OVER_LIMIT`).
  */
 
-const CORPUS = path.resolve(__dirname, '../.reference-fonts/guide-corpus')
+// 워크트리엔 코퍼스가 없어서 메인 체크아웃 것을 빌린다(개발 서버와 같은 길). 거기도 없으면 건너뛴다.
+const CORPUS = sharedCheckoutPath(path.resolve(__dirname, '..'), '.reference-fonts/guide-corpus', () => {})
 
 function legacyView(glyph: NotoPresetGlyph, bundle: NotoPresetModelBundle, edit: PropagationEdit, savedDelta?: ContextBoxDelta) {
   const identity = glyph.identity

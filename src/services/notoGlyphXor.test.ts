@@ -8,6 +8,7 @@ import { DEFAULT_STYLE } from '../stores/globalStyleStore'
 import { DEFAULT_LAYOUT_SCHEMAS } from '../utils/layoutCalculator'
 import { glyphXorAgainstNoto } from './notoGlyphXor'
 import type { NotoOutline } from './notoOutlineInk'
+import { sharedCheckoutPath } from '../../scripts/sharedCheckoutPath'
 
 const JAMO_MAPS = { choseong: CHOSEONG_MAP, jungseong: JUNGSEONG_MAP, jongseong: JONGSEONG_MAP }
 
@@ -28,7 +29,8 @@ describe('glyphXorAgainstNoto', () => {
 })
 
 // 전수 리포트는 무겁다(11,172자). NOTO_XOR_REPORT=1 일 때만 돌리고 corpus analysis/에 쓴다.
-const CORPUS = path.resolve(__dirname, '../../.reference-fonts/guide-corpus')
+// 워크트리엔 코퍼스가 없어서 메인 체크아웃 것을 빌린다(개발 서버와 같은 길). 거기도 없으면 건너뛴다.
+const CORPUS = sharedCheckoutPath(path.resolve(__dirname, '../..'), '.reference-fonts/guide-corpus', () => {})
 function locateExport(): { run: string; file: string } | null {
   if (!process.env.NOTO_XOR_REPORT || !existsSync(CORPUS)) return null
   for (const run of readdirSync(CORPUS).filter((name) => /^[a-f0-9]{24}$/.test(name))) {

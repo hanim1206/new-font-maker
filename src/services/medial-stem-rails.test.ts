@@ -16,8 +16,10 @@ import { MEDIAL_STEM_ROLES, stemEndOnBorder, stemEndsFor, stemRailDragOf, stemRa
 import { MEDIAL_ROLE_SETS } from './notoVariationModel'
 import { placeStemStroke } from './stemBend'
 import { grammarOf } from './strokeGrammar'
+import { sharedCheckoutPath } from '../../scripts/sharedCheckoutPath'
 
-const CORPUS = path.resolve(__dirname, '../../.reference-fonts/guide-corpus')
+// 워크트리엔 코퍼스가 없어서 메인 체크아웃 것을 빌린다(개발 서버와 같은 길). 거기도 없으면 건너뛴다.
+const CORPUS = sharedCheckoutPath(path.resolve(__dirname, '../..'), '.reference-fonts/guide-corpus', () => {})
 const MEDIALS = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
 const ENDS = { linecap: DEFAULT_STYLE.linecap, linejoin: DEFAULT_STYLE.linejoin }
 const SHORT_STEMS = ['baseStem', 'leftStem', 'rightStem']
@@ -121,7 +123,7 @@ describe.skipIf(!existsSync(CORPUS))('홀자 줄기 끝점 = 보선 — G0 대�
     // 홀자 상자 변만 옮기면 짧은기둥은 칸을 따라갈 뿐 가로 목표는 안 생긴다.
     const faced = await render(char, { faces: { [part]: { left: -0.02, right: 0.02 } } })
     expect(faced.resolved.boxes[part]!.stems?.[stemId]?.dx).toBeUndefined()
-  })
+  }, 30_000) // 실제 모델로 글자를 셋씩 그려서 전체 테스트와 같이 돌면 5초를 넘는다.
 
   it('아: 기본에서 곁줄기가 보선 높이에 서고, 곁줄기 보선을 80u 올리면 곁줄기만 80u 올라간다', async () => {
     const base = await render('아')

@@ -10,6 +10,7 @@ import { selectNotoOutlineContours } from './notoOutlineInk'
 import type { NotoOutline } from './notoOutlineInk'
 import { isVariationModel, MEDIAL_ROLE_SETS, predictNotoTarget } from './notoVariationModel'
 import type { VariationModel } from './notoVariationModel'
+import { sharedCheckoutPath } from '../../scripts/sharedCheckoutPath'
 
 /**
  * 변화량 모델 예측 rail로 홀자 획 마스터를 fit해 승인 실측·Noto 고스트와 비교한다.
@@ -25,7 +26,8 @@ interface ApprovedCase {
 }
 interface ThicknessFile { characters: Record<string, { medialRoles?: Record<string, { thickness: number | null }> }> }
 
-const CORPUS = path.resolve(__dirname, '../../.reference-fonts/guide-corpus')
+// 워크트리엔 코퍼스가 없어서 메인 체크아웃 것을 빌린다(개발 서버와 같은 길). 거기도 없으면 건너뛴다.
+const CORPUS = sharedCheckoutPath(path.resolve(__dirname, '../..'), '.reference-fonts/guide-corpus', () => {})
 function locate(): { run: string; model: VariationModel; thickness: ThicknessFile } | null {
   if (!existsSync(CORPUS)) return null
   for (const run of readdirSync(CORPUS).filter((name) => /^[a-f0-9]{24}$/.test(name))) {

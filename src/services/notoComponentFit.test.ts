@@ -12,6 +12,7 @@ import { isVariationModel, predictNotoTarget } from './notoVariationModel'
 import type { VariationModel } from './notoVariationModel'
 import { selectNotoOutlineContours } from './notoOutlineInk'
 import type { NotoOutline } from './notoOutlineInk'
+import { sharedCheckoutPath } from '../../scripts/sharedCheckoutPath'
 
 interface ApprovedCase {
   identity: { character: string; codepoint: number; initialJamo: string; medialJamo: string; finalJamo: string | null; contextId: string }
@@ -101,7 +102,8 @@ describe('componentBoxFromFaces', () => {
 })
 
 // corpus(.reference-fonts)가 있을 때만: 승인 57자 첫닿자를 실측 박스·모델 박스로 놓고 Noto 첫닿자 고스트와 비교한다.
-const CORPUS = path.resolve(__dirname, '../../.reference-fonts/guide-corpus')
+// 워크트리엔 코퍼스가 없어서 메인 체크아웃 것을 빌린다(개발 서버와 같은 길). 거기도 없으면 건너뛴다.
+const CORPUS = sharedCheckoutPath(path.resolve(__dirname, '../..'), '.reference-fonts/guide-corpus', () => {})
 function locateModel(): { run: string; model: VariationModel } | null {
   if (!existsSync(CORPUS)) return null
   for (const run of readdirSync(CORPUS).filter((name) => /^[a-f0-9]{24}$/.test(name))) {

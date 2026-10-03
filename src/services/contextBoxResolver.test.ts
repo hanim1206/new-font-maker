@@ -12,8 +12,10 @@ import { createUserPreset01 } from '../../src-next/userPreset01'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
 import { resolveGlyphInkPrimitives } from './glyphInkResolver'
 import { modelIdentityOf } from './notoVariationModel'
+import { sharedCheckoutPath } from '../../scripts/sharedCheckoutPath'
 
-const CORPUS = path.resolve(__dirname, '../../.reference-fonts/guide-corpus')
+// 워크트리엔 코퍼스가 없어서 메인 체크아웃 것을 빌린다(개발 서버와 같은 길). 거기도 없으면 건너뛴다.
+const CORPUS = sharedCheckoutPath(path.resolve(__dirname, '../..'), '.reference-fonts/guide-corpus', () => {})
 const decompose = (char: string) => decomposeSyllable(char, CHOSEONG_MAP, JUNGSEONG_MAP, JONGSEONG_MAP)
 
 describe('칸 해석 함수', () => {
