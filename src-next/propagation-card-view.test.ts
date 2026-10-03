@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createNotoPresetReader } from '../scripts/reference-lab/notoPresetApi'
@@ -81,7 +82,8 @@ const NO_EDIT: PropagationEdit = { layout: { medial: {}, component: {}, slot: {}
 const MEDIAL_KEYS = ['JU', 'JU_H', 'JU_V'] as const
 const allMedial = <T,>(value: T) => Object.fromEntries(MEDIAL_KEYS.map((key) => [key, value])) as Record<(typeof MEDIAL_KEYS)[number], T>
 
-describe('닿는 글자 카드 계산 나누기', () => {
+// corpus(.reference-fonts)가 있을 때만 돈다.
+describe.skipIf(!existsSync(CORPUS))('닿는 글자 카드 계산 나누기', () => {
   const reader = createNotoPresetReader(CORPUS)
   // 받친글자 · 섞임모임 · 겹받침 · 세로모임까지 여섯 칸을 고루.
   const CHARS = ['각', '봐', '멈', '을', '노', '과', '값', '왠']

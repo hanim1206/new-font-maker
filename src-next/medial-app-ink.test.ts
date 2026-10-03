@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createNotoPresetReader } from '../scripts/reference-lab/notoPresetApi'
@@ -16,8 +17,12 @@ const CORPUS = path.resolve(__dirname, '../.reference-fonts/guide-corpus')
 const decompose = (char: string) => decomposeSyllable(char, CHOSEONG_MAP, JUNGSEONG_MAP, JONGSEONG_MAP)
 const NO_OUTLINE = {} as NotoOutline
 
-describe('레이아웃 편집기 홀자 = 앱 획', () => {
-  const bundle = createNotoPresetReader(CORPUS).model()
+// corpus(.reference-fonts)가 있을 때만 돈다. 건너뛸 때도 이 본문은 한 번 불리므로 모델은 있을 때만 읽는다.
+const HAS_CORPUS = existsSync(CORPUS)
+
+describe.skipIf(!HAS_CORPUS)('레이아웃 편집기 홀자 = 앱 획', () => {
+  const bundle = HAS_CORPUS ? createNotoPresetReader(CORPUS).model() : Promise.reject(new Error('corpus 없음'))
+  bundle.catch(() => {})
   const viewOf = async (char: string) => {
     const model = await bundle
     const syllable = decompose(char)
