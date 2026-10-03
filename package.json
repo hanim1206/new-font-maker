@@ -20,6 +20,7 @@
     "test": "vitest run src src-next",
     "test:e2e": "playwright test",
     "test:smoke": "node scripts/e2e-smoke.mjs",
+    "prepare": "git config core.hooksPath .githooks || true",
     "beta:accounts": "vite-node scripts/beta-accounts.ts",
     "jamo:groups:docs": "node scripts/jamo-groups-docs.mjs"
   },

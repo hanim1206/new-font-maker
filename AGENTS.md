@@ -136,6 +136,7 @@ npm run reference:noto # Noto 코퍼스 추출
 
 무엇을 단위 테스트로 덮나 — `services/` · `utils/`의 순수 로직을 추가하거나 고치면 단위 테스트를 같이 쓴다. 특히 좌표 정규화, `isPathStroke()` 분기, 섞임홀자 가로·세로 분리.
 
+- dev · main 푸시는 `.githooks/pre-push`가 스모크를 돌려 실패하면 막는다(문서만 바뀐 푸시는 건너뜀, 작업 트리가 더러우면 푸시하는 커밋만 임시 워크트리에서). 급할 때만 `git push --no-verify`.
 - 확인용 서버와 e2e는 워크트리 고정 포트(`npm run dev:here` · `npm run where`). 사용자에게 확인을 부탁할 땐 그 주소와 누를 곳을 준다.
 - 5분 넘는 테스트는 예상 시간을 먼저 말한다. HEAD 기준 비교는 요청할 때만 하고, 먼저 실패한 스펙만 다시 돌린다.
 
