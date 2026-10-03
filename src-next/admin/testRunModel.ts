@@ -96,7 +96,7 @@ export function unitCategoryOf(file: string): string {
   return UNIT_CATEGORIES.find((category) => category.pattern.test(file))?.name ?? '기타'
 }
 
-/** 목록을 묶는다. 단위 테스트는 제품 흐름 갈래 순서 · 갈래 안은 이름 가나다순, e2e · 스모크는 처음 나온 순서. */
+/** 목록을 묶는다. 단위 테스트는 제품 흐름 갈래 순서, 갈래 안 · e2e · 스모크는 들어온 순서(설명 표 순서). */
 export function groupsOf(run: Pick<TestRun, 'kind' | 'items'>): ItemGroup[] {
   const groups = new Map<string, TestRunItem[]>()
   if (run.kind === 'unit') for (const name of UNIT_CATEGORY_DISPLAY_ORDER) groups.set(name, [])
@@ -106,8 +106,7 @@ export function groupsOf(run: Pick<TestRun, 'kind' | 'items'>): ItemGroup[] {
     if (list) list.push(item)
     else groups.set(name, [item])
   }
-  const sorted = (items: TestRunItem[]) => run.kind === 'unit' ? [...items].sort((a, b) => a.title.localeCompare(b.title, 'ko')) : items
-  return [...groups].filter(([, items]) => items.length).map(([name, items]) => ({ name, items: sorted(items) }))
+  return [...groups].filter(([, items]) => items.length).map(([name, items]) => ({ name, items }))
 }
 
 /** 목록 한 줄(돌린 기록과 상관없이 늘 있는 것). */

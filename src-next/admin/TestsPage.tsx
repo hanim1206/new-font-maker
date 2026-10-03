@@ -5,7 +5,7 @@ import { ChoiceGroup, ChoiceItem } from '@/components/ui/choice-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TEST_RUNS_API, adminCall } from './adminApi'
-import { TEST_NOTES } from './testNotes'
+import { TEST_NOTES, UNIT_SUBGROUP_ORDER } from './testNotes'
 import SMOKE_LIST from '../../scripts/smoke-list.json'
 import { TEST_KINDS, elapsedText, groupsOf, runStateOf, summaryOf, withCatalog } from './testRunModel'
 import type { CatalogEntry, ItemStatus, RunState, TestKind, TestRunItem, TestRunView } from './testRunModel'
@@ -108,6 +108,14 @@ function groupStatusOf(items: TestRunItem[]): ItemStatus {
   return 'pending'
 }
 
+/** 단위 테스트 갈래 하나를 소묶음으로 나눈다(흐름 순서). 소묶음 표에 없는 것은 끝에 이름 없이. */
+function subgroupsOf(category: string, items: TestRunItem[]): { name: string; items: TestRunItem[] }[] {
+  const order = UNIT_SUBGROUP_ORDER[category] ?? []
+  const named = order.map((name) => ({ name, items: items.filter((item) => TEST_NOTES[item.file]?.[3] === name) }))
+  const rest = items.filter((item) => !order.includes(TEST_NOTES[item.file]?.[3] ?? ''))
+  return [...named, { name: '', items: rest }].filter((sub) => sub.items.length)
+}
+
 /** 전체 목록. 기록이 있으면 상태를 겹쳐 보인다. */
 function TestList({ kind, items }: { kind: TestKind; items: TestRunItem[] }) {
   // 스모크는 파일마다 하나라 묶지 않고 제목 아홉 줄 그대로.
@@ -129,7 +137,11 @@ function TestList({ kind, items }: { kind: TestKind; items: TestRunItem[] }) {
           </span>
           {kind === 'e2e' && <NoteLine file={group.name} />}
         </summary>
-        {tests.length > 0 && <ul className="mt-1 flex flex-col">{tests.map((item) => <ItemRow key={item.id} item={item} showFile={kind === 'unit'} showNote={kind === 'unit'} />)}</ul>}
+        {kind === 'unit' && subgroupsOf(group.name, tests).map((sub) => <div key={sub.name} className="mt-2 first:mt-1">
+          {sub.name && <h3 className="mb-0.5 text-xs font-bold text-text-dim-4">{sub.name} <span className="font-normal text-text-dim-6">{sub.items.length}</span></h3>}
+          <ul className="flex flex-col">{sub.items.map((item) => <ItemRow key={item.id} item={item} showFile showNote />)}</ul>
+        </div>)}
+        {kind !== 'unit' && tests.length > 0 && <ul className="mt-1 flex flex-col">{tests.map((item) => <ItemRow key={item.id} item={item} />)}</ul>}
       </details>
     })}
   </div>
