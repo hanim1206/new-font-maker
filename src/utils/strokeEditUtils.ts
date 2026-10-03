@@ -2,8 +2,8 @@ import type { StrokeDataV2, AnchorPoint } from '../types'
 
 /**
  * 두 획을 합칩니다.
- * 첫 번째 획의 끝점과 두 번째 획의 시작점이 가까우면 연결합니다.
- * 가장 가까운 끝점 쌍을 찾아 자동으로 방향을 결정합니다.
+ * 가장 가까운 끝점 쌍을 찾아 잇습니다. 첫 번째 획(남는 획)은 그려진 방향 그대로이고,
+ * 두 번째 획을 그 앞이나 뒤에 붙입니다(필요하면 두 번째 획만 뒤집습니다).
  *
  * @returns 합쳐진 새 stroke, 또는 합칠 수 없으면 null
  */
@@ -16,29 +16,36 @@ export function mergeStrokes(strokeA: StrokeDataV2, strokeB: StrokeDataV2): Stro
   const bFirst = strokeB.points[0]
   const bLast = strokeB.points[strokeB.points.length - 1]
 
-  // 4가지 끝점 쌍의 거리 계산
+  // 4가지 끝점 쌍의 거리 계산. A는 늘 그려진 방향 그대로 두고 B만 뒤집는다 — A가 남는 획(기둥 등)이라
+  // A를 뒤집으면 시작 · 끝이 바뀌어, 첫 점에서 재는 줄기 모양이 형제에 위아래 거꾸로 퍼진다.
   const pairs = [
-    { dist: dist2d(aLast, bFirst), aReverse: false, bReverse: false },   // A끝→B시작
-    { dist: dist2d(aLast, bLast), aReverse: false, bReverse: true },     // A끝→B끝
-    { dist: dist2d(aFirst, bFirst), aReverse: true, bReverse: false },   // A시작→B시작
-    { dist: dist2d(aFirst, bLast), aReverse: true, bReverse: true },     // A시작→B끝
+    { dist: dist2d(aLast, bFirst), bFirstSide: false, bReverse: false },  // A끝→B시작: A + B
+    { dist: dist2d(aLast, bLast), bFirstSide: false, bReverse: true },    // A끝→B끝: A + 뒤집은 B
+    { dist: dist2d(aFirst, bFirst), bFirstSide: true, bReverse: true },   // A시작→B시작: 뒤집은 B + A
+    { dist: dist2d(aFirst, bLast), bFirstSide: true, bReverse: false },   // A시작→B끝: B + A
   ]
 
   // 가장 가까운 쌍 선택
   const best = pairs.reduce((min, p) => p.dist < min.dist ? p : min, pairs[0])
 
   // 뒤집을 때는 점마다 들어오는 · 나가는 손잡이도 서로 바꾼다 — 안 바꾸면 손잡이가 엉뚱한 구간에 붙어 곡선이 펴진다.
-  const pointsA = best.aReverse ? reversedPoints(strokeA.points) : structuredClone(strokeA.points)
+  const pointsA = structuredClone(strokeA.points)
   const pointsB = best.bReverse ? reversedPoints(strokeB.points) : structuredClone(strokeB.points)
 
-  // 이음매: A의 마지막 점. B의 첫 점이 거의 같은 자리면 지우되, 그 점이 B 쪽으로 뻗던 손잡이는 이음매 점에 옮겨 단다.
-  const joint = pointsA[pointsA.length - 1]
-  const bStartDist = dist2d(joint, pointsB[0])
-  const dropsBStart = bStartDist < 0.05
-  if (dropsBStart && pointsB[0].handleOut) joint.handleOut = pointsB[0].handleOut
-  const bPoints = dropsBStart ? pointsB.slice(1) : pointsB
-
-  const mergedPoints: AnchorPoint[] = [...pointsA, ...bPoints]
+  let mergedPoints: AnchorPoint[]
+  if (!best.bFirstSide) {
+    // 이음매: A의 마지막 점. B의 첫 점이 거의 같은 자리면 지우되, 그 점이 B 쪽으로 뻗던 손잡이는 이음매 점에 옮겨 단다.
+    const joint = pointsA[pointsA.length - 1]
+    const dropsB = dist2d(joint, pointsB[0]) < 0.05
+    if (dropsB && pointsB[0].handleOut) joint.handleOut = pointsB[0].handleOut
+    mergedPoints = [...pointsA, ...(dropsB ? pointsB.slice(1) : pointsB)]
+  } else {
+    // 이음매: A의 첫 점. B의 마지막 점이 거의 같은 자리면 지우되, 그 점으로 들어오던 손잡이는 이음매 점에 옮겨 단다.
+    const joint = pointsA[0]
+    const dropsB = dist2d(joint, pointsB[pointsB.length - 1]) < 0.05
+    if (dropsB && pointsB[pointsB.length - 1].handleIn) joint.handleIn = pointsB[pointsB.length - 1].handleIn
+    mergedPoints = [...(dropsB ? pointsB.slice(0, -1) : pointsB), ...pointsA]
+  }
 
   // 끝 모양 · 꺾임 같은 획 설정은 A 것을 그대로 둔다. 가로 · 세로 같은 이름표는 합치면 맞지 않아 뺀다.
   return {

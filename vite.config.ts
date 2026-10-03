@@ -1,4 +1,4 @@
-/// <reference types="vitest" />
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -98,10 +98,6 @@ export default defineConfig({
   },
   // 레포 안 워크트리(`.claude/worktrees/*`)의 html · tsconfig를 보면, 다른 세션이 워크트리를 만들 때마다
   // 의존성을 다시 묶어 열린 탭에 React가 두 벌 섞인다(Invalid hook call). 앱 입구만 훑고 워크트리는 안 본다.
-  test: {
-    // 기본 출력에 덧붙여 관리자 `테스트` 메뉴용 기록을 쓴다(`.git/test-runs/`).
-    reporters: ['default', './scripts/testRuns/vitestReporter.ts'],
-  },
   optimizeDeps: {
     entries: ['index.html'],
   },
@@ -117,5 +113,12 @@ export default defineConfig({
         changeOrigin: false,
       },
     },
+  },
+  test: {
+    // 레포 안 워크트리(`.claude/worktrees/*`)의 테스트는 다른 브랜치 코드다. 안 빼면 `npm test`가 그것까지 모아
+    // 남의 실패가 내 실패로 보이고 몇 배 느려진다(10-03에 1122개 중 934개가 남의 것).
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.claude/**', '**/.codex/**'],
+    // 기본 출력에 덧붙여 관리자 `테스트` 메뉴용 기록을 쓴다(`.git/test-runs/`).
+    reporters: ['default', './scripts/testRuns/vitestReporter.ts'],
   },
 })

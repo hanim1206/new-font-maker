@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import type { StrokeDataV2 } from '../types'
+import baseJamos from '../data/baseJamos.json'
+import { instanceInJamo, masterFromStroke } from '../services/stemMaster'
+import type { JamoData, StrokeDataV2 } from '../types'
 import { mergeStrokes, splitStroke } from './strokeEditUtils'
+
+const strokeById = (jamo: JamoData, id: string) => jamo.strokes!.find((stroke) => stroke.id === id)!
 
 describe('splitStroke', () => {
   it('분리된 두 획이 연결점과 곡선 손잡이 객체를 공유하지 않는다', () => {
@@ -72,3 +76,41 @@ describe('mergeStrokes', () => {
     expect(curveA).toEqual(before)
   })
 })
+
+describe('잇기는 남는 획의 방향을 지킨다', () => {
+  const pillar: StrokeDataV2 = { id: 'ㅕ-1', points: [{ x: 1, y: 0 }, { x: 1, y: 1 }], closed: false, thickness: 0.07, label: 'vertical' }
+
+  it('기둥 위 끝에 이어도 기둥은 위 → 아래 그대로, 조각은 앞에 붙는다', () => {
+    // 조각을 기둥 위 끝 쪽으로 그렸다(끝이 기둥 위 끝).
+    const piece: StrokeDataV2 = { id: 'n', points: [{ x: 0.85, y: 0.1, handleOut: { x: 0.9, y: 0.02 } }, { x: 1, y: 0, handleIn: { x: 0.95, y: 0 } }], closed: false, thickness: 0.07 }
+    const merged = mergeStrokes(pillar, piece)!
+    expect(merged.points.map(({ x, y }) => ({ x, y }))).toEqual([{ x: 0.85, y: 0.1 }, { x: 1, y: 0 }, { x: 1, y: 1 }])
+    // 이음매에는 조각에서 들어오던 손잡이가 남는다.
+    expect(merged.points[1].handleIn).toEqual({ x: 0.95, y: 0 })
+    expect(merged.points[0].handleOut).toEqual({ x: 0.9, y: 0.02 })
+  })
+
+  it('조각을 기둥 쪽에서 밖으로 그려도(시작이 기둥 위 끝) 조각만 뒤집어 앞에 붙인다', () => {
+    const piece: StrokeDataV2 = { id: 'n', points: [{ x: 1, y: 0 }, { x: 0.85, y: 0.1 }], closed: false, thickness: 0.07 }
+    const merged = mergeStrokes(pillar, piece)!
+    expect(merged.points.map(({ x, y }) => ({ x, y }))).toEqual([{ x: 0.85, y: 0.1 }, { x: 1, y: 0 }, { x: 1, y: 1 }])
+  })
+
+  it('잇기 → 전파: ㅕ 기둥 위에 이은 꺾임이 ㅓ 기둥에도 위에 놓인다(위아래 거꾸로 안 감)', () => {
+    const jung = (baseJamos as unknown as { jungseong: Record<string, JamoData> }).jungseong
+    const yeo = structuredClone(jung['ㅕ'])
+    const piece: StrokeDataV2 = { id: 'n', points: [{ x: 0.85, y: 0.1 }, { x: 1, y: 0 }], closed: false, thickness: 0.07 }
+    const merged = mergeStrokes(strokeById(yeo, 'ㅕ-1'), piece)!
+    const edited: JamoData = { ...yeo, strokes: yeo.strokes!.map((stroke) => stroke.id === 'ㅕ-1' ? merged : stroke) }
+    const master = masterFromStroke(edited, 'strokes', 'ㅕ-1')!
+    const eo = structuredClone(jung['ㅓ'])
+    const placed = instanceInJamo(eo, 'strokes', strokeById(eo, 'ㅓ-1'), master)
+    const [tip, corner, foot] = placed.points
+    // 꺾임은 기둥 위 끝에 있다: 꺾임 끝은 꺾이는 점 왼쪽 아래로 짧게, 기둥은 꺾이는 점에서 길게 내려간다.
+    expect(tip.x).toBeLessThan(corner.x)
+    expect(tip.y - corner.y).toBeGreaterThan(0)
+    expect(tip.y - corner.y).toBeLessThan(0.2)
+    expect(foot.y - corner.y).toBeGreaterThan(0.5)
+  })
+})
+
