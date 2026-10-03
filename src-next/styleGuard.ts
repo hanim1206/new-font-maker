@@ -15,7 +15,7 @@ const SRC = join(ROOT, 'src-next')
 /** 여기서 그래프를 끊는다 — 개발 서버 전용이거나 관리자 화면. */
 /** 토큰 거울(SVG 속성용 값). `edit-colors.test.ts`가 `src/index.css`와 맞춘다. */
 const TOKEN_MIRRORS = [/\/editColors\.ts$/]
-const CUT = [/\/devLabs\.tsx$/, /\/devPages\.tsx$/, /\/admin\//, /\/mountScreenSpecButton/, /\/ScreenSpecButton/, /\/devCrash\.tsx$/, /\/DevGhostToggle/, /\/components\/ui\//]
+const CUT = [/\/devLabs\.tsx$/, /\/devPages\.tsx$/, /\/admin\//, /\/devCrash\.tsx$/, /\/DevGhostToggle/, /\/components\/ui\//]
 
 function resolveImport(from: string, spec: string): string | null {
   const base = spec.startsWith('@/') ? join(SRC, spec.slice(2)) : spec.startsWith('.') ? resolve(dirname(from), spec) : null

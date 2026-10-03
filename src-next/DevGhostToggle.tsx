@@ -5,7 +5,7 @@ import { DEV_TOOLS_ENABLED } from './devTools'
 import styles from './DevGhostToggle.module.css'
 
 /**
- * 개발용 스티키 토글. 배포 빌드에서는 아무것도 안 그린다. 캔버스 밖, 화면 명세 플로팅 버튼(`ScreenSpecButton`) 바로 위에 같은 모양으로 띄운다.
+ * 개발용 스티키 토글. 배포 빌드에서는 아무것도 안 그린다. 캔버스 밖 오른쪽 가장자리에 띄운다.
  * `children`은 버튼 옆 표지(짧은 글), `panel`은 켰을 때 옆에 뜨는 도구(select 같은 입력)다.
  * body로 포털해도 React 이벤트는 부모로 올라가므로 pointerdown을 막아 캔버스 선택 해제를 피한다.
  */
