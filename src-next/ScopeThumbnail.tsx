@@ -43,7 +43,7 @@ export function ScopeThumbnail({ rule, contextId, size = 28 }: { rule: ScopeRule
     return PART_ORDER.flatMap((part) => resolved[part] ? [{ part, box: mapBoxToDesignBody(resolved[part]!, body) }] : [])
   }, [bundle, rules, target, bodyOf])
   const strong = strongPartsOf(rule)
-  return <svg width={size} height={size} viewBox={VIEW_BOX} role="img" aria-hidden="true" data-testid="scope-thumbnail" data-context={target} style={{ borderRadius: 4, background: '#fff', flex: '0 0 auto' }}>
+  return <svg width={size} height={size} viewBox={VIEW_BOX} role="img" aria-hidden="true" data-testid="scope-thumbnail" data-context={target} style={{ borderRadius: 'var(--radius-xs)', background: 'rgb(var(--color-surface))', flex: '0 0 auto' }}>
     {boxes.map(({ part, box }) => strong.has(part)
       ? <rect key={part} x={box.x} y={box.y} width={box.width} height={box.height} fill={PART_COLOR[part]} />
       : <rect key={part} x={box.x} y={box.y} width={box.width} height={box.height} fill={PART_COLOR[part]} fillOpacity={0.14} stroke={PART_COLOR[part]} strokeWidth={1.25} vectorEffect="non-scaling-stroke" />)}

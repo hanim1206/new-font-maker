@@ -42,7 +42,13 @@ export default {
           DEFAULT: 'rgb(var(--color-warning) / <alpha-value>)',
           soft: 'rgb(var(--color-warning-soft) / <alpha-value>)',
         },
+        inverse: {
+          DEFAULT: 'rgb(var(--color-inverse) / <alpha-value>)',
+          foreground: 'rgb(var(--color-inverse-foreground) / <alpha-value>)',
+        },
+        scrim: 'rgb(var(--color-scrim) / <alpha-value>)',
         edit: {
+          handle: 'rgb(var(--color-edit-handle) / <alpha-value>)',
           select: 'rgb(var(--color-edit-select) / <alpha-value>)',
           'slot-ch': 'rgb(var(--color-edit-slot-ch) / <alpha-value>)',
           'slot-ju': 'rgb(var(--color-edit-slot-ju) / <alpha-value>)',

@@ -8,6 +8,7 @@ import { FontExportDonePage } from './FontExportDonePage'
 import { FontWorkspacePage } from './FontWorkspacePage'
 import { ReviewWorkspacePage } from './ReviewWorkspacePage'
 import { ShapeWorkspacePage } from './ShapeWorkspacePage'
+import { Button } from './components/ui/button'
 import { FontExportDialog } from './workspace/FontExportDialog'
 
 /**
@@ -65,12 +66,6 @@ function usePinchLock(): void {
   }, [])
 }
 
-const devButtonStyle = (on: boolean): React.CSSProperties => ({
-  padding: '6px 10px', borderRadius: 8, border: '1px solid #c9c2a6',
-  background: on ? '#1a1a1a' : '#fff', color: on ? '#fff' : '#1a1a1a',
-  font: '12px/1.2 inherit', cursor: 'pointer', opacity: 0.9,
-})
-
 /**
  * 개발 서버 전용 — 눈 ③ 확인용 우상단 고정 버튼 줄. 프로덕션 빌드에서는 분기가 사라진다.
  * `자동 보정`: 속공간 지키기 켬/끔(모든 화면). `노토로`: 검수 격자 글자를 노토 산스(같은 굵기)로 교체 — 검수 경로에서만 보인다.
@@ -85,13 +80,13 @@ function DevToggles() {
   return (
     <span style={{ position: 'fixed', top: 10, right: 10, zIndex: 9999, display: 'flex', gap: 6 }}>
       {pathname.startsWith('/workspace/review') && (
-        <button type="button" data-testid="dev-noto-swap" onClick={toggleNoto} style={devButtonStyle(notoOn)}>
+        <Button variant={notoOn ? 'default' : 'outline'} size="sm" data-testid="dev-noto-swap" onClick={toggleNoto}>
           노토로 {notoOn ? '켬' : '끔'}
-        </button>
+        </Button>
       )}
-      <button type="button" data-testid="dev-counter-keep" onClick={() => setCounterKeep(!on)} style={devButtonStyle(on)}>
+      <Button variant={on ? 'default' : 'outline'} size="sm" data-testid="dev-counter-keep" onClick={() => setCounterKeep(!on)}>
         자동 보정 {on ? '켬' : '끔'}
-      </button>
+      </Button>
     </span>
   )
 }

@@ -1,18 +1,18 @@
 .page { min-height: 100dvh; box-sizing: border-box; display: flex; align-items: center; justify-content: center; padding: 24px 16px calc(env(safe-area-inset-bottom) + 24px); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); }
-.card { width: min(100%, 400px); box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 24px 20px; border-radius: 18px; background: rgb(var(--color-surface)); box-shadow: 0 8px 28px rgb(20 24 31 / .1); }
+.card { width: min(100%, 400px); box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 24px 20px; border-radius: var(--radius-xl); background: rgb(var(--color-surface)); box-shadow: 0 8px 28px rgb(var(--color-scrim) / .1); }
 .card header { display: flex; flex-direction: column; gap: 6px; }
-.card h1 { margin: 0; font-size: 20px; font-weight: 800; }
-.card header p { margin: 0; color: rgb(var(--color-text-4)); font-size: 13px; line-height: 1.5; }
+.card h1 { margin: 0; font-size: var(--font-20); font-weight: var(--weight-heavy); }
+.card header p { margin: 0; color: rgb(var(--color-text-4)); font-size: var(--font-13); line-height: 1.5; }
 .card label { display: flex; flex-direction: column; gap: 6px; }
-.card label span { font-size: 12px; font-weight: 700; }
-.card input { min-height: 48px; box-sizing: border-box; padding: 0 14px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 18px; letter-spacing: .08em; text-transform: uppercase; }
+.card label span { font-size: var(--font-12); font-weight: var(--weight-bold); }
+.card input { min-height: 48px; box-sizing: border-box; padding: 0 14px; border: 1px solid rgb(var(--color-border)); border-radius: var(--radius-md); background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--font-18); letter-spacing: .08em; text-transform: uppercase; }
 .card input::placeholder { color: rgb(var(--color-text-4) / .5); }
 .card input:focus { outline: 2px solid rgb(var(--color-primary) / .5); outline-offset: 1px; }
-.card input[aria-invalid='true'] { border-color: rgb(214 69 65); }
-.card small { color: rgb(190 52 48); font-size: 12.5px; }
-.card button { min-height: 48px; border: 0; border-radius: 10px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 15px; font-weight: 700; }
+.card input[aria-invalid='true'] { border-color: rgb(var(--color-destructive)); }
+.card small { color: rgb(var(--color-destructive-dark)); font-size: var(--font-13); }
+.card button { min-height: 48px; border: 0; border-radius: var(--radius-md); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: var(--font-16); font-weight: var(--weight-bold); }
 .card button:disabled { opacity: .45; }
-.card footer { color: rgb(var(--color-text-4)); font-size: 11.5px; text-align: center; }
+.card footer { color: rgb(var(--color-text-4)); font-size: var(--font-12); text-align: center; }
 
 /* 로그인 화면. 대시보드 셸과 같은 480 흰 판, 머리 줄 없음. 위는 앱 글자로 인사, 폼은 엄지 자리(아래). 검정 · 회색, 이름만 primary. */
 .loginPage { min-height: 100dvh; background: rgb(var(--color-background)); color: rgb(var(--color-foreground)); }
@@ -37,14 +37,14 @@
 .name path { stroke: currentColor; }
 .form { display: flex; flex-direction: column; padding: 0 16px calc(env(safe-area-inset-bottom) + 20px); }
 .lead { margin: 44px 0 0; display: flex; flex-direction: column; gap: 2px; word-break: keep-all; }
-.lead strong { margin-bottom: 8px; font-size: 17px; font-weight: 800; line-height: 1.45; }
-.lead span { color: rgb(var(--color-text-3)); font-size: 14px; line-height: 1.5; }
+.lead strong { margin-bottom: 8px; font-size: var(--font-18); font-weight: var(--weight-heavy); line-height: 1.45; }
+.lead span { color: rgb(var(--color-text-3)); font-size: var(--font-14); line-height: 1.5; }
 .form label { display: flex; flex-direction: column; gap: 8px; }
-.form label span { color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 700; }
-.form input { min-height: 52px; box-sizing: border-box; padding: 0 14px; border: 0; border-radius: 12px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font: inherit; font-size: 17px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.form label span { color: rgb(var(--color-text-3)); font-size: var(--font-13); font-weight: var(--weight-bold); }
+.form input { min-height: 52px; box-sizing: border-box; padding: 0 14px; border: 0; border-radius: var(--radius-lg); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font: inherit; font-size: var(--font-18); font-weight: var(--weight-bold); letter-spacing: .14em; text-transform: uppercase; }
 .form input::placeholder { color: rgb(var(--color-text-5)); }
 .form input:focus { outline: none; background: rgb(var(--color-surface)); box-shadow: inset 0 0 0 1.5px rgb(var(--color-foreground)); }
-.form input[aria-invalid='true'] { box-shadow: inset 0 0 0 1.5px rgb(214 69 65); }
-.form small { margin-top: 8px; color: rgb(190 52 48); font-size: 12.5px; }
-.form button { min-height: 52px; margin-top: 12px; border: 0; border-radius: 999px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 15px; font-weight: 700; }
+.form input[aria-invalid='true'] { box-shadow: inset 0 0 0 1.5px rgb(var(--color-destructive)); }
+.form small { margin-top: 8px; color: rgb(var(--color-destructive-dark)); font-size: var(--font-13); }
+.form button { min-height: 52px; margin-top: 12px; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: var(--font-16); font-weight: var(--weight-bold); }
 .form button:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-4)); }

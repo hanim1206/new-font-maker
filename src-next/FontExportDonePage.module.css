@@ -3,21 +3,21 @@
 .content { display: flex; flex-direction: column; }
 /* 읽는 동안 견본(글자 · 문장)만 가린다. 이름 · 버전은 기본 글꼴로 남는다. */
 .screen[data-font-state='loading'] .heroChar, .screen[data-font-state='loading'] .line, .screen[data-font-state='loading'] .abc { visibility: hidden; }
-.hero { margin: 14px 16px 0; padding: 28px 16px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; border-radius: 20px; background: rgb(var(--color-surface-2)); }
+.hero { margin: 14px 16px 0; padding: 28px 16px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; border-radius: var(--radius-xl); background: rgb(var(--color-surface-2)); }
 /* 견본 셋만 방금 만든 폰트로(`--specimen-font`). */
 .heroChar, .line, .abc { font-family: var(--specimen-font, inherit); }
-.heroChar { font-size: 176px; line-height: 1; }
-.hero h1 { max-width: 100%; margin: 0; overflow: hidden; font-size: 17px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-.hero p { margin: -6px 0 0; color: rgb(var(--color-text-4)); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.line { margin: 0; padding: 22px 20px 0; font-size: 30px; line-height: 1.3; }
-.abc { margin: 0; padding: 12px 20px 0; color: rgb(var(--color-text-3)); font-size: 22px; letter-spacing: .04em; }
+.heroChar { font-size: 176px; line-height: 1; } /* style-guard: allow 글자 견본 */
+.hero h1 { max-width: 100%; margin: 0; overflow: hidden; font-size: var(--font-18); font-weight: var(--weight-heavy); text-overflow: ellipsis; white-space: nowrap; }
+.hero p { margin: -6px 0 0; color: rgb(var(--color-text-4)); font-size: var(--font-12); font-weight: var(--weight-medium); font-variant-numeric: tabular-nums; }
+.line { margin: 0; padding: 22px 20px 0; font-size: var(--font-28); line-height: 1.3; }
+.abc { margin: 0; padding: 12px 20px 0; color: rgb(var(--color-text-3)); font-size: var(--font-24); letter-spacing: .04em; }
 .skipped { margin: 22px 16px 0; display: flex; flex-direction: column; gap: 6px; }
-.skipped h2 { margin: 0; font-size: 13px; font-weight: 700; color: rgb(190 52 48); }
-.skipped p { margin: 0; color: rgb(var(--color-text-4)); font-size: 12px; }
+.skipped h2 { margin: 0; font-size: var(--font-13); font-weight: var(--weight-bold); color: rgb(var(--color-destructive-dark)); }
+.skipped p { margin: 0; color: rgb(var(--color-text-4)); font-size: var(--font-12); }
 .skipped ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; }
-.skipped a { min-width: 40px; min-height: 40px; display: grid; place-items: center; border-radius: 10px; background: rgb(var(--color-surface-2)); color: inherit; font-size: 18px; font-weight: 700; text-decoration: none; }
+.skipped a { min-width: 40px; min-height: 40px; display: grid; place-items: center; border-radius: var(--radius-md); background: rgb(var(--color-surface-2)); color: inherit; font-size: var(--font-18); font-weight: var(--weight-bold); text-decoration: none; }
 .actions { position: sticky; bottom: 0; margin-top: auto; display: flex; gap: 8px; padding: 24px 16px calc(env(safe-area-inset-bottom) + 16px); background: linear-gradient(to bottom, rgb(var(--color-surface) / 0), rgb(var(--color-surface)) 30%); }
-.actions button { min-height: 56px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 16px; font-size: 17px; font-weight: 700; transition: transform var(--motion-fast) var(--ease-standard); }
+.actions button { min-height: 56px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: var(--radius-xl); font-size: var(--font-18); font-weight: var(--weight-bold); transition: transform var(--motion-fast) var(--ease-standard); }
 .actions button:active { transform: scale(0.97); }
 .again { flex: 1.3; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); }
 .brag { flex: 2; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }

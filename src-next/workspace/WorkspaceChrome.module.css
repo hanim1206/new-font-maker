@@ -2,18 +2,18 @@
 .shell { position: relative; width: min(100%, 480px); height: 100dvh; box-sizing: border-box; margin: 0 auto; padding-bottom: env(safe-area-inset-bottom); display: flex; flex-direction: column; overflow: hidden; background: rgb(var(--color-surface)); box-shadow: var(--shadow-md); }
 .projectHeader { min-height: 50px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px; padding: max(2px, env(safe-area-inset-top)) 10px 2px 8px; }
 .projectIdentity { min-width: 0; display: flex; flex-direction: column; align-items: center; }
-.heading { min-width: 0; margin: 0; overflow: hidden; font-size: 17px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-.projectIdentity strong { max-width: 100%; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.heading { min-width: 0; margin: 0; overflow: hidden; font-size: var(--font-18); font-weight: var(--weight-heavy); text-overflow: ellipsis; white-space: nowrap; }
+.projectIdentity strong { max-width: 100%; overflow: hidden; font-size: var(--font-13); text-overflow: ellipsis; white-space: nowrap; }
 /* `‹ 내 폰트` — 위 덱으로 나가는 문. 글자가 있어 어디로 가는지 읽힌다. */
 /* 뒤로 = 화살표만. 대시보드 카드의 `…`와 같은 40px 원. */
 /* 뒤로도 오른쪽 머리 단추와 같은 생김새 — 44px, 바탕 없음, 흐린 글자색. */
-.back { width: 44px; height: 44px; box-sizing: border-box; text-decoration: none; display: grid; place-items: center; padding: 0; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-3)); }
+.back { width: 44px; height: 44px; box-sizing: border-box; text-decoration: none; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-md); background: transparent; color: rgb(var(--color-text-3)); }
 .headerActions { display: flex; gap: 3px; }
 .body { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 /* 덮개 자리는 늘 있지만 비어 있으면 손을 통과시킨다. 덮개가 그려질 때만 그 덮개가 받는다. */
 .cover { position: absolute; z-index: 30; inset: 0; pointer-events: none; }
 .cover > * { pointer-events: auto; }
-.headerActions button { width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-3)); }
+.headerActions button { width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: var(--radius-md); background: transparent; color: rgb(var(--color-text-3)); }
 .headerActions button:disabled { opacity: .34; }
 
 @media (max-width: 380px) {

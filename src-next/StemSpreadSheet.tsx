@@ -5,6 +5,7 @@ import { ACTIVE_STROKE_COLOR, askEntries, keyOf, lockedKeys, sampleSyllable, slo
 import { baseOf, STEM_FACETS, type StemBase } from '../src/services/stemMaster'
 import { STEM_NAME_LABEL } from '../src/services/strokeGrammar'
 import type { JamoData, ResolvedStrokeInkSource } from '../src/types'
+import { EDIT_COLOR } from './editColors'
 import styles from './StemSpreadSheet.module.css'
 
 /**
@@ -24,7 +25,7 @@ const GROUP_GAP = 24
 const FLASH_MS = 180
 
 /** 고치기 전 모양에서 기준 획을 칠하는 색(주황 = 고친 뒤). */
-const BEFORE_STROKE_COLOR = '#8b95a1'
+const BEFORE_STROKE_COLOR = EDIT_COLOR.text5
 
 interface Card { char: string; entries: StemEntry[]; slots: string[]; locked: boolean }
 interface Axis { id: string; label: string; groups: { id: string; label: string; cards: Card[] }[] }

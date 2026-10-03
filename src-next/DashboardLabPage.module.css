@@ -2,10 +2,10 @@
 .page { min-height: 100dvh; overflow: hidden; background: rgb(var(--color-background)); }
 .shell { position: relative; width: min(100%, 480px); height: 100dvh; box-sizing: border-box; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; background: rgb(var(--color-surface)); box-shadow: var(--shadow-md); }
 .head { position: relative; z-index: 31; min-height: 50px; display: flex; align-items: center; justify-content: space-between; padding: max(2px, env(safe-area-inset-top)) 8px 2px 16px; background: rgb(var(--color-surface)); }
-.head h1 { margin: 0; font-size: 15px; font-weight: 800; }
+.head h1 { margin: 0; font-size: var(--font-16); font-weight: var(--weight-heavy); }
 /* 머리 왼쪽 회색 알약 = 지금 폰트 이름 + 꺾쇠. 누르면 내 폰트 시트. 긴 이름은 한 줄에서 `…`. */
 .head .title { flex: 1; min-width: 0; display: flex; margin-left: -8px; }
-.head .switcher { max-width: 100%; min-height: 36px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px 0 18px; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 15px; font-weight: 600; transition: background-color var(--motion-fast) var(--ease-standard); }
+.head .switcher { max-width: 100%; min-height: 36px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px 0 18px; border-radius: var(--radius-full); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: var(--font-16); font-weight: var(--weight-semibold); transition: background-color var(--motion-fast) var(--ease-standard); }
 .head .switcher span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .head .switcher svg { flex: none; color: rgb(var(--color-text-4)); transition: transform var(--motion-normal) var(--ease-standard); }
 .head .switcher svg[data-open] { transform: rotate(180deg); }
@@ -13,12 +13,12 @@
 /* 드로어가 열리면 알약 면은 빠진다 — 이름과 꺾쇠만 드로어 위에 남는다. */
 .head .switcher[aria-expanded='true'] { background: transparent; }
 .head .switcher:disabled { background: transparent; padding-left: 8px; }
-.head button { min-height: 40px; padding: 0 10px; border: 0; background: transparent; color: rgb(var(--color-text-4)); font-size: 12px; }
+.head button { min-height: 40px; padding: 0 10px; border: 0; background: transparent; color: rgb(var(--color-text-4)); font-size: var(--font-12); }
 
 /* 마이페이지. 아이콘 원 하나, 누르면 계정 페이지. 안 본 답장은 오른쪽 위 빨간 점. */
-.head .avatar { position: relative; width: 40px; min-height: 40px; padding: 0; display: grid; place-items: center; border-radius: 999px; color: rgb(var(--color-text-3)); }
+.head .avatar { position: relative; width: 40px; min-height: 40px; padding: 0; display: grid; place-items: center; border-radius: var(--radius-full); color: rgb(var(--color-text-3)); }
 .head .avatar:active { background: rgb(var(--color-surface-2)); }
-.avatarDot { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border-radius: 999px; background: rgb(240 68 82); box-shadow: 0 0 0 2px rgb(var(--color-surface)); }
+.avatarDot { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border-radius: var(--radius-full); background: rgb(var(--color-destructive)); box-shadow: 0 0 0 2px rgb(var(--color-surface)); }
 
 /* 스크롤바 자리는 늘 비워 둔다 — 카드를 펼치는 동안 판을 잠그면 스크롤바가 빠져 폭이 바뀌고, 닫을 때 카드가 튄다. */
 .scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
@@ -27,11 +27,11 @@
 
 /* 폰트 카드 캐러셀. 스냅 한 장씩, 다음 카드가 조금 보인다. 활성 카드만 또렷하다. */
 .fontCardRow { padding: 14px 16px; }
-.card { position: relative; display: flex; flex-direction: column; gap: 12px; min-height: 148px; box-sizing: border-box; padding: 14px 16px; border-radius: 16px; background: rgb(var(--color-surface-2)); }
+.card { position: relative; display: flex; flex-direction: column; gap: 12px; min-height: 148px; box-sizing: border-box; padding: 14px 16px; border-radius: var(--radius-xl); background: rgb(var(--color-surface-2)); }
 .card header { display: flex; align-items: baseline; gap: 8px; padding-right: 32px; }
-.card header strong { min-width: 0; overflow: hidden; font-size: 15px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.card header strong { min-width: 0; overflow: hidden; font-size: var(--font-16); font-weight: var(--weight-heavy); text-overflow: ellipsis; white-space: nowrap; }
 /* 주사위는 카드 머리 줄 오른쪽 — 문장을 바꾸는 단추라 문장 바로 위에. */
-.cardDice { position: absolute; top: 7px; right: 6px; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-4)); transition: background var(--motion-fast) var(--ease-standard), opacity var(--motion-slow) var(--ease-standard); }
+.cardDice { position: absolute; top: 7px; right: 6px; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: var(--radius-md); background: transparent; color: rgb(var(--color-text-4)); transition: background var(--motion-fast) var(--ease-standard), opacity var(--motion-slow) var(--ease-standard); }
 .cardDice:active { background: rgb(var(--color-foreground) / .07); }
 /* 카드 문장 줄. 편집기 문장 줄(`.sentence` · 펼침 규칙)을 그대로 쓴다. 접힌 모양만 카드에 맞춘다: 여러 줄로 감기고 바탕 · 밑줄 없음. 누르면 펼친다. */
 .card:not([data-sheet-wrap]) section.sentence { flex: none; height: auto; margin: 0 -16px; padding: 0 16px; overflow: visible; border-bottom: 0; background: transparent; cursor: text; }
@@ -66,36 +66,36 @@
 /* 카드 안 추출 버튼. 워크스페이스 폰트 탭의 `OTF 추출`과 같은 생김새. */
 .card footer { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: auto; }
 /* `…` 더보기. 다운로드 옆 같은 크기의 원, 색은 옅게 — 주 동작은 다운로드. */
-.more { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); }
+.more { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); }
 /* 카드 `…` 시트. 화면 아래에 좌우 12px 띄워 뜨고, 뒤는 머리까지 어둡게. 셸 너비(480)를 넘지 않는다. */
-.menuSheetLayer { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; background: rgb(0 0 0 / .36); transition: padding-bottom var(--motion-normal) var(--ease-standard); animation: fadeIn var(--motion-normal) var(--ease-standard); }
-.menuSheet { width: min(100%, 480px); box-sizing: border-box; margin: 0 12px calc(env(safe-area-inset-bottom) + 12px); padding: 10px; border-radius: 28px; background: rgb(var(--color-surface)); display: flex; flex-direction: column; animation: sheetUp 360ms cubic-bezier(0.32, 0.72, 0, 1); }
-.menuSheet::before { content: ''; width: 36px; height: 4px; margin: 2px auto 10px; border-radius: 999px; background: rgb(var(--color-surface-3)); }
+.menuSheetLayer { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; background: rgb(var(--color-scrim) / .36); transition: padding-bottom var(--motion-normal) var(--ease-standard); animation: fadeIn var(--motion-normal) var(--ease-standard); }
+.menuSheet { width: min(100%, 480px); box-sizing: border-box; margin: 0 12px calc(env(safe-area-inset-bottom) + 12px); padding: 10px; border-radius: var(--radius-xl); background: rgb(var(--color-surface)); display: flex; flex-direction: column; animation: sheetUp 360ms cubic-bezier(0.32, 0.72, 0, 1); }
+.menuSheet::before { content: ''; width: 36px; height: 4px; margin: 2px auto 10px; border-radius: var(--radius-full); background: rgb(var(--color-surface-3)); }
 .menuSheetLayer[data-closing] { animation: fadeOut 260ms var(--ease-standard) forwards; }
 .menuSheetLayer[data-closing] .menuSheet { animation: sheetDown 260ms cubic-bezier(0.4, 0, 0.6, 1) forwards; }
-.menuSheet > button { min-height: 58px; display: flex; align-items: center; gap: 14px; padding: 0 16px; border: 0; border-radius: 16px; background: none; color: rgb(var(--color-foreground)); font-size: 17px; font-weight: 600; text-align: left; }
+.menuSheet > button { min-height: 58px; display: flex; align-items: center; gap: 14px; padding: 0 16px; border: 0; border-radius: var(--radius-xl); background: none; color: rgb(var(--color-foreground)); font-size: var(--font-18); font-weight: var(--weight-semibold); text-align: left; }
 .menuSheet > button svg { flex: none; color: rgb(var(--color-text-4)); }
 .menuSheet > button:not(:disabled):active { background: rgb(var(--color-surface-2)); }
 .menuSheet > button:disabled { color: rgb(var(--color-text-5)); }
-.menuSheet > button small { margin-left: auto; color: rgb(var(--color-text-5)); font-size: 13px; font-weight: 500; }
+.menuSheet > button small { margin-left: auto; color: rgb(var(--color-text-5)); font-size: var(--font-13); font-weight: var(--weight-medium); }
 .menuSheet [data-danger] { color: rgb(var(--color-danger, 214 50 31)); }
 .menuSheet > button[data-danger] svg { color: inherit; }
 /* 시트 안 둘째 화면(이름 바꾸기 · 삭제 확인). 제목 · 내용 · 아래 큰 단추 둘. 바뀔 때 살짝 떠오른다. */
 .menuSheetStep { margin: 0; padding: 4px 6px 2px; display: flex; flex-direction: column; gap: 8px; animation: stepIn 220ms cubic-bezier(0.2, 0, 0, 1); }
-.menuSheetStep h3 { margin: 0; padding: 0 10px; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
-.menuSheetStep p { margin: 0; padding: 0 10px; color: rgb(var(--color-text-4)); font-size: 15px; }
+.menuSheetStep h3 { margin: 0; padding: 0 10px; font-size: var(--font-20); font-weight: var(--weight-bold); letter-spacing: -0.01em; }
+.menuSheetStep p { margin: 0; padding: 0 10px; color: rgb(var(--color-text-4)); font-size: var(--font-16); }
 .menuSheetField { position: relative; margin-top: 10px; display: flex; align-items: center; }
-.menuSheetField input { width: 100%; min-height: 56px; box-sizing: border-box; padding: 0 48px 0 16px; border: 0; border-radius: 16px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font: inherit; font-size: 18px; font-weight: 600; outline: none; caret-color: rgb(var(--color-foreground)); }
-.menuSheetField input::placeholder { color: rgb(var(--color-text-5)); font-weight: 500; }
-.menuSheetField button { position: absolute; right: 12px; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 999px; background: rgb(var(--color-text-5) / .45); color: rgb(var(--color-surface)); animation: popIn var(--motion-normal) var(--ease-standard); }
+.menuSheetField input { width: 100%; min-height: 56px; box-sizing: border-box; padding: 0 48px 0 16px; border: 0; border-radius: var(--radius-xl); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font: inherit; font-size: var(--font-18); font-weight: var(--weight-semibold); outline: none; caret-color: rgb(var(--color-foreground)); }
+.menuSheetField input::placeholder { color: rgb(var(--color-text-5)); font-weight: var(--weight-medium); }
+.menuSheetField button { position: absolute; right: 12px; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-text-5) / .45); color: rgb(var(--color-surface)); animation: popIn var(--motion-normal) var(--ease-standard); }
 .menuSheetActions { margin-top: 16px; display: flex; gap: 8px; }
-.menuSheetActions button { flex: 1; min-height: 56px; border: 0; border-radius: 16px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 17px; font-weight: 700; transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
+.menuSheetActions button { flex: 1; min-height: 56px; border: 0; border-radius: var(--radius-xl); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: var(--font-18); font-weight: var(--weight-bold); transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
 .menuSheetActions button:not(:disabled):active { transform: scale(0.97); }
 .menuSheetActions button[data-primary] { flex: 2; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 .menuSheetActions button[data-primary]:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
-.menuSheetActions button[data-danger] { flex: 2; background: rgb(var(--color-danger, 214 50 31)); color: #fff; }
+.menuSheetActions button[data-danger] { flex: 2; background: rgb(var(--color-danger, 214 50 31)); color: rgb(var(--color-inverse-foreground)); }
 /* 원 하나(40px). 탭하면 색이 바뀌고 오른쪽으로 자라며 글자가 들어온다 — 있던 요소가 제자리에서 자라는 전환. */
-.download { width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 999px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); transition: transform var(--motion-fast) var(--ease-standard); }
+.download { width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); transition: transform var(--motion-fast) var(--ease-standard); }
 .download:disabled { opacity: 1; }
 .download:not(:disabled):active { transform: scale(0.94); }
 
@@ -103,7 +103,7 @@
    회색 길은 `.body` 배경이 바닥까지 칠하고, 레일은 버튼 높이만 — 레일이 화면만큼 크면 바닥에서 밀려 올라간다. 바닥 여백도 `.body` 안에. */
 .body { display: flex; align-items: flex-start; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); border-top: 1px solid rgb(var(--color-border-subtle)); background: linear-gradient(to right, rgb(var(--color-surface-2)) 92px, transparent 92px); }
 .rail { position: sticky; top: 0; flex: 0 0 92px; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--space-1); padding: 6px var(--space-2); }
-.rail button { min-height: 38px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-text-4)); font-size: 13.5px; font-weight: 700; }
+.rail button { min-height: 38px; border: 0; border-radius: var(--radius-md); background: transparent; color: rgb(var(--color-text-4)); font-size: var(--font-14); font-weight: var(--weight-bold); }
 .railLink { position: relative; margin-top: 18px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 /* 섹션 목차와 검수(다른 화면) 사이 회색 선. */
 .railLink::before { content: ''; position: absolute; top: -10px; left: 6px; right: 6px; border-top: 1px solid rgb(var(--color-border)); }
@@ -113,27 +113,27 @@
 .content section + section { border-top: 1px solid rgb(var(--color-border-subtle)); }
 
 /* 섹션 머리 전체가 문이다. 화살표는 표시일 뿐. 섹션 여백까지 닿고, 얹으면 배경이 켜진다. */
-.sectionHead { width: calc(100% + 16px); min-height: 44px; margin: 0 -8px 2px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: rgb(var(--color-foreground)); text-align: left; cursor: pointer; }
+.sectionHead { width: calc(100% + 16px); min-height: 44px; margin: 0 -8px 2px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border: 0; border-radius: var(--radius-md); background: transparent; color: rgb(var(--color-foreground)); text-align: left; cursor: pointer; }
 .sectionHead:hover svg { color: rgb(var(--color-foreground)); }
-.sectionHead h2 { margin: 0; font-size: 15px; font-weight: 800; }
-.sectionHead span { color: rgb(var(--color-text-5)); font-size: 12px; font-variant-numeric: tabular-nums; }
-.sectionHead em { color: rgb(var(--color-text-5)); font-size: 12px; font-style: normal; }
+.sectionHead h2 { margin: 0; font-size: var(--font-16); font-weight: var(--weight-heavy); }
+.sectionHead span { color: rgb(var(--color-text-5)); font-size: var(--font-12); font-variant-numeric: tabular-nums; }
+.sectionHead em { color: rgb(var(--color-text-5)); font-size: var(--font-12); font-style: normal; }
 .sectionHead svg { margin-left: auto; color: rgb(var(--color-text-5)); }
 
 /* 스타일 타일 넷. 글자 하나에 값 하나. */
 .tiles { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .tiles li { display: flex; }
 /* 칸 전체가 버튼. 값 옆 `›`로 누를 수 있다는 걸 보인다. */
-.tile { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0 8px; border: 0; border-radius: 12px; background: rgb(var(--color-surface-2)); color: inherit; font: inherit; cursor: pointer; }
+.tile { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0 8px; border: 0; border-radius: var(--radius-lg); background: rgb(var(--color-surface-2)); color: inherit; font: inherit; cursor: pointer; }
 .tile:active { background: rgb(var(--color-surface-3)); }
 .tile strong { display: inline-flex; align-items: center; gap: 1px; }
 .tileGo { margin-right: -8px; color: rgb(var(--color-text-4)); }
-.tiles em { color: rgb(var(--color-text-4)); font-size: 11px; font-style: normal; }
-.tiles strong { font-size: 12.5px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.tiles em { color: rgb(var(--color-text-4)); font-size: var(--font-11); font-style: normal; }
+.tiles strong { font-size: var(--font-13); font-weight: var(--weight-heavy); font-variant-numeric: tabular-nums; }
 
 /* 글자 격자 3열. 칸은 평평한 면, 손댄 칸은 모서리에 점. */
 .grid { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.thumb { position: relative; width: 100%; aspect-ratio: 1; display: grid; place-items: center; border: 0; border-radius: 12px; background: rgb(var(--color-surface-2)); }
+.thumb { position: relative; width: 100%; aspect-ratio: 1; display: grid; place-items: center; border: 0; border-radius: var(--radius-lg); background: rgb(var(--color-surface-2)); }
 .ink { display: block; width: 72px; height: 72px; }
 .ink svg { display: block; width: 100%; height: 100%; }
 /* 자소 카드 잉크는 칸의 54% — 대시보드 줄(좁은 칸)과 섹션 홈(넓은 칸)에서 같은 비율로 보인다. */
@@ -146,17 +146,17 @@
 /* 섹션 홈. 셸 위를 덮는 층, 오른쪽에서 밀려온다. 머리 높이는 셸 머리와 같다. */
 .home { position: absolute; inset: 0; display: flex; flex-direction: column; background: rgb(var(--color-surface)); }
 .homeHead { min-height: 50px; display: flex; align-items: center; gap: 4px; padding: max(2px, env(safe-area-inset-top)) 12px 2px 4px; }
-.homeHead h2 { margin: 0; font-size: 15px; font-weight: 800; }
-.homeReport { width: 40px; min-height: 40px; margin-left: auto; padding: 0; display: grid; place-items: center; border: 0; border-radius: 999px; background: none; color: rgb(var(--color-text-3)); }
+.homeHead h2 { margin: 0; font-size: var(--font-16); font-weight: var(--weight-heavy); }
+.homeReport { width: 40px; min-height: 40px; margin-left: auto; padding: 0; display: grid; place-items: center; border: 0; border-radius: var(--radius-full); background: none; color: rgb(var(--color-text-3)); }
 .homeReport:active { background: rgb(var(--color-surface-2)); }
-.back { width: 40px; min-height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-text-3)); }
+.back { width: 40px; min-height: 40px; display: grid; place-items: center; border: 0; border-radius: var(--radius-full); background: transparent; color: rgb(var(--color-text-3)); }
 /* 스크롤바 자리는 늘 비워 둔다. 안 그러면 경계 높이에서 스크롤바 → 판 너비 → 칸 크기 → 판 높이가 매 프레임 뒤집힌다. */
 .homeScroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
 
 /* 묶기 칩 한 줄. 켜진 칩만 검정. */
 .chips { display: flex; gap: 6px; padding: 12px 12px 20px; overflow-x: auto; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
-.chips button { flex: none; min-height: 34px; padding: 0 13px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-3)); font-size: 13px; font-weight: 700; transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard); }
+.chips button { flex: none; min-height: 34px; padding: 0 13px; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-3)); font-size: var(--font-13); font-weight: var(--weight-bold); transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard); }
 .chips button[aria-selected='true'] { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 /* 칩 줄 끝 `+` — 묶음 만들기. 칩과 같은 높이의 동그라미. */
 .chips .chipAdd { width: 34px; padding: 0; display: grid; place-items: center; background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); }
@@ -164,16 +164,16 @@
 /* 판. 카드와 소제목은 전부 절대좌표, 자리는 transform으로 옮긴다. */
 .board { position: relative; transition: height var(--motion-slow) var(--ease-standard); }
 /* 소제목은 단추 — 누르면 그 묶음이 통째로 도마에 오른다. 도마와 같으면 검정. */
-.groupHead { position: absolute; top: 0; left: 8px; height: 44px; display: inline-flex; align-items: center; gap: 10px; padding: 0 8px 8px 4px; border: 0; background: transparent; color: rgb(var(--color-text-3)); font-size: 15px; font-weight: 700; transition: transform var(--motion-slow) var(--ease-standard), color var(--motion-normal) var(--ease-standard); animation: fadeIn var(--motion-normal) var(--ease-standard); }
+.groupHead { position: absolute; top: 0; left: 8px; height: 44px; display: inline-flex; align-items: center; gap: 10px; padding: 0 8px 8px 4px; border: 0; background: transparent; color: rgb(var(--color-text-3)); font-size: var(--font-16); font-weight: var(--weight-bold); transition: transform var(--motion-slow) var(--ease-standard), color var(--motion-normal) var(--ease-standard); animation: fadeIn var(--motion-normal) var(--ease-standard); }
 .groupHead[aria-checked='true'] { color: rgb(var(--color-foreground)); }
 /* 묶음 글자 수. 이름에 붙여 작게. */
-.groupCount { margin-left: -4px; color: rgb(var(--color-text-5)); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.groupCount { margin-left: -4px; color: rgb(var(--color-text-5)); font-size: var(--font-13); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
 /* 토스식 원형 체크 — 꺼져도 회색 원에 흰 체크, 켜지면 채운다. */
-.check { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-surface)); transition: background-color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
+.check { width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--radius-full); background: rgb(var(--color-surface-3)); color: rgb(var(--color-surface)); transition: background-color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
 .groupHead[aria-checked='true'] .check { background: rgb(var(--color-foreground)); }
 .groupHead:active .check { transform: scale(0.9); }
 /* 카드 탭 = 담기 · 빼기. 도마에 오른 카드는 테두리가 검정. */
-.homeCard { position: absolute; top: 0; left: 0; display: grid; place-items: center; border: 0; border-radius: 12px; background: rgb(var(--color-surface-3)); transition: transform var(--motion-slow) var(--ease-standard), width var(--motion-slow) var(--ease-standard), height var(--motion-slow) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard), opacity var(--motion-normal) var(--ease-standard); }
+.homeCard { position: absolute; top: 0; left: 0; display: grid; place-items: center; border: 0; border-radius: var(--radius-lg); background: rgb(var(--color-surface-3)); transition: transform var(--motion-slow) var(--ease-standard), width var(--motion-slow) var(--ease-standard), height var(--motion-slow) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard), opacity var(--motion-normal) var(--ease-standard); }
 /* 바탕은 그대로, 담긴 카드만 잉크가 진해진다. */
 .homeCard[data-hidden] { opacity: 0; pointer-events: none; }
 .homeCard svg { opacity: 0.12; transition: opacity var(--motion-fast) var(--ease-standard); }
@@ -183,67 +183,67 @@
 .bench { flex: none; display: flex; align-items: center; gap: 4px; padding: 10px 12px calc(env(safe-area-inset-bottom) + 10px); border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
 .benchChips { flex: 1; min-width: 0; margin-right: 6px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
 .benchChips::-webkit-scrollbar { display: none; }
-.benchChips[data-more] { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+.benchChips[data-more] { -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent); mask-image: linear-gradient(to right, black calc(100% - 28px), transparent); }
 .benchChips > div { position: relative; width: max-content; min-height: 40px; display: flex; align-items: center; gap: 6px; }
-.benchChips button { flex: none; min-width: 36px; height: 36px; display: inline-grid; place-items: center; padding: 0 6px; border: 0; border-radius: 10px; background: rgb(var(--color-surface-2)); color: inherit; font-size: 17px; font-weight: 700; }
-.benchChips em { color: rgb(var(--color-text-5)); font-size: 12px; font-style: normal; white-space: nowrap; animation: fadeIn var(--motion-normal) var(--ease-standard); }
-.benchClear { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-text-6)); animation: popIn var(--motion-normal) var(--ease-standard); }
+.benchChips button { flex: none; min-width: 36px; height: 36px; display: inline-grid; place-items: center; padding: 0 6px; border: 0; border-radius: var(--radius-md); background: rgb(var(--color-surface-2)); color: inherit; font-size: var(--font-18); font-weight: var(--weight-bold); }
+.benchChips em { color: rgb(var(--color-text-5)); font-size: var(--font-12); font-style: normal; white-space: nowrap; animation: fadeIn var(--motion-normal) var(--ease-standard); }
+.benchClear { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: var(--radius-full); background: transparent; color: rgb(var(--color-text-6)); animation: popIn var(--motion-normal) var(--ease-standard); }
 /* 받침 도마만. 켜면 담긴 것 중 초성에도 있는 자음이 초성 기본 획, 끄면 켜기 전 모양. 일부만 같으면 ─. */
-.benchBorrow { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px 0 9px; border: 0; border-radius: 999px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-4)); font-size: 13px; font-weight: 700; white-space: nowrap; transition: color var(--motion-normal) var(--ease-standard); animation: popIn var(--motion-normal) var(--ease-standard); }
+.benchBorrow { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px 0 9px; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-4)); font-size: var(--font-13); font-weight: var(--weight-bold); white-space: nowrap; transition: color var(--motion-normal) var(--ease-standard); animation: popIn var(--motion-normal) var(--ease-standard); }
 .benchBorrow[aria-pressed='true'], .benchBorrow[aria-pressed='mixed'] { color: rgb(var(--color-foreground)); }
 .benchBorrow[aria-pressed='true'] .check, .benchBorrow[aria-pressed='mixed'] .check { background: rgb(var(--color-foreground)); }
 .benchBorrow:active .check { transform: scale(0.9); }
-.benchGo { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
+.benchGo { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border: 0; border-radius: var(--radius-full); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: var(--font-13); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; transition: background-color var(--motion-normal) var(--ease-standard), color var(--motion-normal) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
 .benchGo:not(:disabled):active { transform: scale(0.95); }
 /* 담을 때 숫자만 살짝 튀어 오른다. 잠겼다가 풀릴 땐 단추 색이 번진다. */
 .benchCount { display: inline-block; margin-right: 1px; animation: countUp 240ms cubic-bezier(0.2, 0, 0, 1); }
 .benchGo:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
-.groupMore { position: absolute; top: 0; right: 8px; width: 40px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 999px; background: transparent; color: rgb(var(--color-text-5)); transition: transform var(--motion-slow) var(--ease-standard); animation: fadeIn var(--motion-normal) var(--ease-standard); }
-.benchGroupName { flex: none; white-space: nowrap; height: 36px; display: inline-flex; align-items: center; padding: 0 4px; color: rgb(var(--color-text-4)); font-size: 12px; font-weight: 700; }
+.groupMore { position: absolute; top: 0; right: 8px; width: 40px; height: 36px; display: grid; place-items: center; border: 0; border-radius: var(--radius-full); background: transparent; color: rgb(var(--color-text-5)); transition: transform var(--motion-slow) var(--ease-standard); animation: fadeIn var(--motion-normal) var(--ease-standard); }
+.benchGroupName { flex: none; white-space: nowrap; height: 36px; display: inline-flex; align-items: center; padding: 0 4px; color: rgb(var(--color-text-4)); font-size: var(--font-12); font-weight: var(--weight-bold); }
 
 /* 묶음 바텀시트. 섹션 홈 위에 깔리고 바깥을 누르면 닫힌다. */
-.sheetLayer { position: absolute; inset: 0; z-index: 30; display: flex; align-items: flex-end; background: rgb(0 0 0 / .32); animation: fadeIn var(--motion-normal) var(--ease-standard); }
-.sheet { width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 22px 20px calc(env(safe-area-inset-bottom) + 16px); border-radius: 20px 20px 0 0; background: rgb(var(--color-surface)); animation: sheetUp 360ms cubic-bezier(0.32, 0.72, 0, 1); }
+.sheetLayer { position: absolute; inset: 0; z-index: 30; display: flex; align-items: flex-end; background: rgb(var(--color-scrim) / .32); animation: fadeIn var(--motion-normal) var(--ease-standard); }
+.sheet { width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 22px 20px calc(env(safe-area-inset-bottom) + 16px); border-radius: var(--radius-xl) var(--radius-xl) 0 0; background: rgb(var(--color-surface)); animation: sheetUp 360ms cubic-bezier(0.32, 0.72, 0, 1); }
 /* 시트가 열린 동안 뒤 판은 멈춘다. */
 .homeScroll[data-locked] { overflow: hidden; }
-.sheet h3 { margin: 0; font-size: 19px; font-weight: 800; }
-.sheet > p { margin: -6px 0 0; display: flex; gap: 8px; color: rgb(var(--color-text-3)); font-size: 14px; font-weight: 700; }
-.sheet > p span { color: rgb(var(--color-text-5)); font-weight: 600; }
+.sheet h3 { margin: 0; font-size: var(--font-20); font-weight: var(--weight-heavy); }
+.sheet > p { margin: -6px 0 0; display: flex; gap: 8px; color: rgb(var(--color-text-3)); font-size: var(--font-14); font-weight: var(--weight-bold); }
+.sheet > p span { color: rgb(var(--color-text-5)); font-weight: var(--weight-semibold); }
 .sheetField { display: flex; flex-direction: column; gap: 6px; }
-.sheetField span { color: rgb(var(--color-text-4)); font-size: 12px; font-weight: 600; }
-.sheetField input { min-height: 48px; padding: 0 14px; border: 0; border-radius: 12px; background: rgb(var(--color-surface-2)); color: inherit; font: inherit; font-size: 16px; font-weight: 700; outline: none; }
+.sheetField span { color: rgb(var(--color-text-4)); font-size: var(--font-12); font-weight: var(--weight-semibold); }
+.sheetField input { min-height: 48px; padding: 0 14px; border: 0; border-radius: var(--radius-lg); background: rgb(var(--color-surface-2)); color: inherit; font: inherit; font-size: var(--font-16); font-weight: var(--weight-bold); outline: none; }
 .sheetField input:focus { box-shadow: inset 0 0 0 2px rgb(var(--color-foreground)); }
-.sheetField b { margin-left: 4px; color: rgb(var(--color-foreground)); font-weight: 700; }
+.sheetField b { margin-left: 4px; color: rgb(var(--color-foreground)); font-weight: var(--weight-bold); }
 /* 묶음 고치기 판. 홈 카드처럼 안 든 글자는 흐리고 든 글자는 진하다. */
 .sheetGrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
-.sheetGrid button { aspect-ratio: 1; display: grid; place-items: center; padding: 0; border: 0; border-radius: 10px; background: rgb(var(--color-surface-2)); transition: background-color var(--motion-fast) var(--ease-standard); }
+.sheetGrid button { aspect-ratio: 1; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-md); background: rgb(var(--color-surface-2)); transition: background-color var(--motion-fast) var(--ease-standard); }
 .sheetGrid button svg { opacity: 0.18; transition: opacity var(--motion-fast) var(--ease-standard); }
 .sheetGrid button[aria-pressed='true'] { background: rgb(var(--color-surface-3)); }
 .sheetGrid button[aria-pressed='true'] svg { opacity: 1; }
-.sheetDiff { min-height: 18px; color: rgb(var(--color-text-4)); font-size: 12px; font-style: normal; font-weight: 600; }
+.sheetDiff { min-height: 18px; color: rgb(var(--color-text-4)); font-size: var(--font-12); font-style: normal; font-weight: var(--weight-semibold); }
 .sheetDiff[data-empty] { color: rgb(var(--color-danger, 220 38 38)); }
 .sheetActions { display: flex; gap: 8px; }
-.sheetDelete { flex: none; min-height: 52px; padding: 0 18px; border: 0; border-radius: 14px; background: transparent; color: rgb(var(--color-text-4)); font-size: 15px; font-weight: 700; }
-.sheetSave { flex: 1; min-height: 52px; border: 0; border-radius: 14px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 16px; font-weight: 750; }
+.sheetDelete { flex: none; min-height: 52px; padding: 0 18px; border: 0; border-radius: var(--radius-lg); background: transparent; color: rgb(var(--color-text-4)); font-size: var(--font-16); font-weight: var(--weight-bold); }
+.sheetSave { flex: 1; min-height: 52px; border: 0; border-radius: var(--radius-lg); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: var(--font-16); font-weight: var(--weight-heavy); }
 .sheetSave:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-5)); }
-.toast { position: absolute; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 72px); z-index: 25; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 8px 12px 16px; border-radius: 14px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 600; animation: popIn var(--motion-normal) var(--ease-standard); }
-.toast button { flex: none; min-height: 32px; padding: 0 10px; border: 0; background: transparent; color: inherit; font-size: 13px; font-weight: 800; }
+.toast { position: absolute; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 72px); z-index: 25; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 8px 12px 16px; border-radius: var(--radius-lg); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: var(--font-13); font-weight: var(--weight-semibold); animation: popIn var(--motion-normal) var(--ease-standard); }
+.toast button { flex: none; min-height: 32px; padding: 0 10px; border: 0; background: transparent; color: inherit; font-size: var(--font-13); font-weight: var(--weight-heavy); }
 
 /* 내 폰트 드로어. 머리 바로 아래에서 내려온다(머리는 위에 남는다). 지금 폰트 줄은 회색 면 + ✓, 맨 아래 `새 폰트`. */
-.fontDrawerLayer { position: absolute; inset: 0; z-index: 30; overflow: hidden; background: rgb(0 0 0 / .32); animation: fadeIn var(--motion-normal) var(--ease-standard); }
-.fontDrawer { box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 4px 20px 20px; border-radius: 0 0 20px 20px; background: rgb(var(--color-surface)); animation: drawerDown 520ms cubic-bezier(0.25, 0.8, 0.25, 1); }
+.fontDrawerLayer { position: absolute; inset: 0; z-index: 30; overflow: hidden; background: rgb(var(--color-scrim) / .32); animation: fadeIn var(--motion-normal) var(--ease-standard); }
+.fontDrawer { box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 4px 20px 20px; border-radius: 0 0 var(--radius-xl) var(--radius-xl); background: rgb(var(--color-surface)); animation: drawerDown 520ms cubic-bezier(0.25, 0.8, 0.25, 1); }
 .fontDrawerLayer[data-closing] { animation: fadeOut 360ms var(--ease-standard) forwards; }
 .fontDrawerLayer[data-closing] .fontDrawer { animation: drawerUp 360ms cubic-bezier(0.4, 0, 0.6, 1) forwards; }
 .fontRows { margin: -4px -8px 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
-.fontRows li { min-height: 64px; display: flex; align-items: center; gap: 2px; padding: 0 14px 0 0; border-radius: 14px; }
+.fontRows li { min-height: 64px; display: flex; align-items: center; gap: 2px; padding: 0 14px 0 0; border-radius: var(--radius-lg); }
 .fontRows li[data-current] { background: rgb(var(--color-surface-2)); }
 .fontRows li > svg { flex: none; color: rgb(var(--color-foreground)); }
-.fontRowOpen { flex: 1; min-width: 0; min-height: 64px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; padding: 0 12px; border: 0; border-radius: 14px; background: transparent; color: rgb(var(--color-foreground)); text-align: left; }
-.fontRowOpen strong { max-width: 100%; overflow: hidden; font-size: 16px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
-.fontRowOpen span { color: rgb(var(--color-text-4)); font-size: 12.5px; }
-.fontSheetCreate { min-height: 56px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 14px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 16px; font-weight: 750; }
+.fontRowOpen { flex: 1; min-width: 0; min-height: 64px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; padding: 0 12px; border: 0; border-radius: var(--radius-lg); background: transparent; color: rgb(var(--color-foreground)); text-align: left; }
+.fontRowOpen strong { max-width: 100%; overflow: hidden; font-size: var(--font-16); font-weight: var(--weight-heavy); text-overflow: ellipsis; white-space: nowrap; }
+.fontRowOpen span { color: rgb(var(--color-text-4)); font-size: var(--font-13); }
+.fontSheetCreate { min-height: 56px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: var(--radius-lg); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: var(--font-16); font-weight: var(--weight-heavy); }
 .fontSheetCreate:disabled { background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-4)); }
-.fontSheetNote { margin: -6px 0 0; color: rgb(var(--color-text-4)); font-size: 12.5px; text-align: center; }
+.fontSheetNote { margin: -6px 0 0; color: rgb(var(--color-text-4)); font-size: var(--font-13); text-align: center; }
 
 @keyframes fadeIn { from { opacity: 0; } }
 @keyframes popIn { from { opacity: 0; transform: scale(0.6); } }
@@ -260,5 +260,5 @@
 
 /* 받기 진행 — 원 둘레가 진행만큼 차오르고 안에 퍼센트. 추출 입구가 대시보드뿐이라 이 버튼이 진행 표시의 전부다. */
 .downloadWrap { position: relative; display: grid; place-items: center; }
-.downloadRing { position: absolute; inset: -5px; border-radius: 999px; pointer-events: none; background: conic-gradient(rgb(var(--color-foreground)) calc(var(--p) * 1%), rgb(var(--color-foreground) / 0.18) 0); -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)); mask: radial-gradient(closest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)); }
-.downloadPct { font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.downloadRing { position: absolute; inset: -5px; border-radius: var(--radius-full); pointer-events: none; background: conic-gradient(rgb(var(--color-foreground)) calc(var(--p) * 1%), rgb(var(--color-foreground) / 0.18) 0); -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 3px), black calc(100% - 2.5px)); mask: radial-gradient(closest-side, transparent calc(100% - 3px), black calc(100% - 2.5px)); }
+.downloadPct { font-size: var(--font-11); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }

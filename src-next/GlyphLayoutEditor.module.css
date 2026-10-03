@@ -1,5 +1,5 @@
 .editor { display: flex; flex-direction: column; }
-.status { padding: 8px 14px; color: rgb(var(--color-text-4)); font-size: 12px; }
+.status { padding: 8px 14px; color: rgb(var(--color-text-4)); font-size: var(--font-12); }
 .status[data-state='error'] { color: rgb(var(--color-danger, 214 50 31)); }
 
 
@@ -7,17 +7,17 @@
 .canvasSection { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 14px; }
 .canvasArea { position: relative; flex: 1 1 auto; min-width: 0; }
 /* 드래그 중 브라우저 선택 하이라이트(파란 배경)와 스크롤 제스처를 막는다. */
-.canvas { position: relative; width: min(100%, 330px); aspect-ratio: 1; margin: 0 auto; display: block; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: 20px; background: #fff; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; -webkit-tap-highlight-color: transparent; }
+.canvas { position: relative; width: min(100%, 330px); aspect-ratio: 1; margin: 0 auto; display: block; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: var(--radius-xl); background: rgb(var(--color-surface)); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; -webkit-tap-highlight-color: transparent; }
 .canvas * { user-select: none; -webkit-user-select: none; }
 .canvas line { pointer-events: stroke; }
-.canvas text { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: 600; pointer-events: none; }
+.canvas text { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: var(--weight-semibold); pointer-events: none; }
 /* 변 고정. 캔버스 위쪽 가운데, 스냅 표지 바로 아래. 탁 걸린 자리면 주황으로 켜진다. */
-.canvasFix { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); min-height: 30px; padding: 4px 12px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface) / .96); color: rgb(var(--color-text-3)); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
-.canvasFix[data-snapped='true'] { border-color: #f0561e; color: #f0561e; }
-.canvasFixed { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); padding: 4px 12px; border-radius: 12px; background: #f0561e; color: #fff; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+.canvasFix { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); min-height: 30px; padding: 4px 12px; border: 1px solid rgb(var(--color-border)); border-radius: var(--radius-lg); background: rgb(var(--color-surface) / .96); color: rgb(var(--color-text-3)); font-size: var(--font-11); font-weight: var(--weight-bold); white-space: nowrap; }
+.canvasFix[data-snapped='true'] { border-color: rgb(var(--color-edit-select)); color: rgb(var(--color-edit-select)); }
+.canvasFixed { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); padding: 4px 12px; border-radius: var(--radius-lg); background: rgb(var(--color-edit-select)); color: rgb(var(--color-inverse-foreground)); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: var(--font-11); font-weight: var(--weight-bold); white-space: nowrap; }
 /* 가로 줄기 끝이 다른 칸 세로 기준선에 딱 닿아 걸렸다. 획 편집의 걸림 칩과 같은 주황. */
-.touchChip { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); padding: 3px 10px; border-radius: 10px; background: #f0561e; color: #fff; font-size: 10.5px; font-weight: 700; white-space: nowrap; pointer-events: none; }
-.canvasWarning { position: absolute; right: 14px; bottom: 12px; max-width: 58%; margin: 0; padding: 4px 10px; border-radius: 10px; background: rgb(var(--color-surface) / .92); color: rgb(var(--color-danger, 214 50 31)); font-size: 10.5px; font-weight: 600; text-align: right; }
+.touchChip { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); padding: 3px 10px; border-radius: var(--radius-md); background: rgb(var(--color-edit-select)); color: rgb(var(--color-inverse-foreground)); font-size: var(--font-11); font-weight: var(--weight-bold); white-space: nowrap; pointer-events: none; }
+.canvasWarning { position: absolute; right: 14px; bottom: 12px; max-width: 58%; margin: 0; padding: 4px 10px; border-radius: var(--radius-md); background: rgb(var(--color-surface) / .92); color: rgb(var(--color-danger, 214 50 31)); font-size: var(--font-11); font-weight: var(--weight-semibold); text-align: right; }
 .railButton { cursor: pointer; outline: none; }
 .railButton:focus-visible { stroke: rgb(var(--color-primary) / .18); }
 /* 활성 rail 호버·포커스: 선이 굵어지고 후광이 켜진다. 선택된 rail은 이미 굵고 후광이 있다. */
@@ -34,13 +34,13 @@
 .rail[data-dragging] .railHalo, .rail[data-dragging]:hover[data-selected] .railHalo { stroke-opacity: 0; }
 .railHit { pointer-events: stroke; }
 /* 라벨은 여백 띠에 숨어 있다가 호버·포커스 때만 뜬다. 흰 테두리로 격자 위에서도 읽힌다. */
-.railLabel { opacity: 0; paint-order: stroke; stroke: #fff; stroke-width: .012; stroke-linejoin: round; pointer-events: none; }
+.railLabel { opacity: 0; paint-order: stroke; stroke: rgb(var(--color-surface)); stroke-width: .012; stroke-linejoin: round; pointer-events: none; }
 .rail:hover .railLabel, .rail:has(.railButton:focus-visible) .railLabel { opacity: 1; }
-.rail[data-selected] .railLabel { font-weight: 800; }
-.warning { padding: 6px 14px; color: rgb(var(--color-danger, 214 50 31)); font-size: 11px; }
+.rail[data-selected] .railLabel { font-weight: var(--weight-heavy); }
+.warning { padding: 6px 14px; color: rgb(var(--color-danger, 214 50 31)); font-size: var(--font-11); }
 
 /* Δ 수치는 띠 여백에 항상. 흰 테두리로 격자 위에서 읽힌다. */
-.deltaLabel { paint-order: stroke; stroke: #fff; stroke-width: .012; stroke-linejoin: round; font-weight: 800; pointer-events: none; }
+.deltaLabel { paint-order: stroke; stroke: rgb(var(--color-surface)); stroke-width: .012; stroke-linejoin: round; font-weight: var(--weight-heavy); pointer-events: none; }
 .railButton { cursor: grab; outline: none; }
 .railButton:active { cursor: grabbing; }
 /* 부품 고르기 히트 상자. 비활성 상자는 손가락 커서, 활성 상자는 rail 잡기 위해 기본 커서. 포커스는 옅은 테두리로. */
@@ -62,27 +62,27 @@
 /* 레이아웃 → 획 CTA. 스크롤되는 레이아웃 영역 바닥에 붙어 전파 카드 위로 늘 보인다. */
 .strokeCta { position: sticky; bottom: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 14px; border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface) / .96); }
 .ctaRow { display: flex; gap: 8px; width: min(100%, 420px); }
-.strokeCta button { flex: 1 1 auto; min-width: 0; min-height: 44px; border: 0; border-radius: 12px; background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.strokeCta button { flex: 1 1 auto; min-width: 0; min-height: 44px; border: 0; border-radius: var(--radius-lg); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); font-size: var(--font-13); font-weight: var(--weight-bold); white-space: nowrap; }
 /* 저장 버튼 둘. 주 버튼은 신규(파랑), 선택 옵션은 보조(회색). 아랫줄에 저장될 범위와 글자 수. */
 .strokeCta .applyCta, .strokeCta .newCta { display: flex; flex: 1 1 0; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 0 6px; line-height: 1.15; }
-.strokeCta .applyCta small, .strokeCta .newCta small { max-width: 100%; overflow: hidden; font-size: 10.5px; font-weight: 500; font-variant-numeric: tabular-nums; opacity: .72; text-overflow: ellipsis; white-space: nowrap; }
+.strokeCta .applyCta small, .strokeCta .newCta small { max-width: 100%; overflow: hidden; font-size: var(--font-11); font-weight: var(--weight-medium); font-variant-numeric: tabular-nums; opacity: .72; text-overflow: ellipsis; white-space: nowrap; }
 .strokeCta .applyCta { background: rgb(var(--color-surface-3)); color: rgb(var(--color-foreground)); }
-.strokeCta .newCta { background: rgb(var(--color-primary)); color: #fff; }
+.strokeCta .newCta { background: rgb(var(--color-primary)); color: rgb(var(--color-inverse-foreground)); }
 /* 복원 = 정사각 아이콘 버튼. 바뀐 보선 수는 모서리 숫자. */
-.strokeCta .resetCta { position: relative; flex: 0 0 44px; display: grid; place-items: center; width: 44px; padding: 0; border: 1px solid #f0561e; background: rgb(var(--color-surface)); color: #f0561e; }
-.resetCta em { position: absolute; top: -5px; right: -5px; display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #f0561e; color: #fff; font-size: 10px; font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+.strokeCta .resetCta { position: relative; flex: 0 0 44px; display: grid; place-items: center; width: 44px; padding: 0; border: 1px solid rgb(var(--color-edit-select)); background: rgb(var(--color-surface)); color: rgb(var(--color-edit-select)); }
+.resetCta em { position: absolute; top: -5px; right: -5px; display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--radius-full); background: rgb(var(--color-edit-select)); color: rgb(var(--color-inverse-foreground)); font-size: var(--font-10); font-style: normal; font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; line-height: 1; }
 /* 저장 안 한 보선을 두고 떠날 때 묻는 창. 폰트 이름 창과 같은 바닥 시트. */
-.leaveBackdrop { position: fixed; z-index: 100; inset: 0; display: flex; align-items: flex-end; justify-content: center; background: rgb(20 24 31 / .28); }
-.leaveSheet { width: min(100%, 480px); box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 16px 16px calc(env(safe-area-inset-bottom) + 16px); border-radius: 18px 18px 0 0; background: rgb(var(--color-surface)); box-shadow: 0 -8px 28px rgb(20 24 31 / .18); }
+.leaveBackdrop { position: fixed; z-index: 100; inset: 0; display: flex; align-items: flex-end; justify-content: center; background: rgb(var(--color-scrim) / .28); }
+.leaveSheet { width: min(100%, 480px); box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 16px 16px calc(env(safe-area-inset-bottom) + 16px); border-radius: var(--radius-xl) var(--radius-xl) 0 0; background: rgb(var(--color-surface)); box-shadow: 0 -8px 28px rgb(var(--color-scrim) / .18); }
 .leaveSheet header { display: flex; flex-direction: column; gap: 2px; }
-.leaveSheet header b { font-size: 13px; font-weight: 700; }
-.leaveSheet header small { color: rgb(var(--color-text-4)); font-size: 10.5px; line-height: 1.35; }
+.leaveSheet header b { font-size: var(--font-13); font-weight: var(--weight-bold); }
+.leaveSheet header small { color: rgb(var(--color-text-4)); font-size: var(--font-11); line-height: 1.35; }
 .leaveActions { display: flex; flex-direction: column; gap: 8px; }
-.leaveActions button { min-height: 44px; border: 0; border-radius: 10px; background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: 13px; font-weight: 700; }
+.leaveActions button { min-height: 44px; border: 0; border-radius: var(--radius-md); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: var(--font-13); font-weight: var(--weight-bold); }
 .leaveActions .leaveSave { background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
 @media (min-width: 720px) {
   .leaveBackdrop { align-items: center; }
-  .leaveSheet { border-radius: 18px; padding-bottom: 16px; }
+  .leaveSheet { border-radius: var(--radius-xl); padding-bottom: 16px; }
 }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .strokeCta button:disabled { background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-4)); }

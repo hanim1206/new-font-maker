@@ -10,18 +10,18 @@
   gap: 8px;
   padding: 6px 6px 6px 14px;
   transform: translateX(-50%);
-  border-radius: 13px;
-  background: rgb(24 28 35 / .92);
-  box-shadow: 0 10px 28px rgb(20 24 31 / .24);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
+  border-radius: var(--radius-lg);
+  background: rgb(var(--color-inverse) / .92);
+  box-shadow: 0 10px 28px rgb(var(--color-scrim) / .24);
+  color: rgb(var(--color-inverse-foreground));
+  font-size: var(--font-12);
+  font-weight: var(--weight-semibold);
   animation: save-toast-in .16s ease-out;
 }
-.toast[data-tone='error'] { background: #b24d3d; }
+.toast[data-tone='error'] { background: rgb(var(--color-destructive-dark)); }
 .toast[data-tone='done'] { background: rgb(var(--color-primary)); }
 /* 글 단추. 닫기와 같은 높이, 글이 있어 폭은 내용대로. */
-.toast button.action { width: auto; padding: 0 12px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.toast button.action { width: auto; padding: 0 12px; font-size: var(--font-12); font-weight: var(--weight-bold); white-space: nowrap; }
 .toast span { min-width: 0; }
 /* 레포의 44px 터치 규격을 토스트 닫기에도 지킨다. */
 .toast button {
@@ -31,8 +31,8 @@
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 10px;
-  background: rgb(255 255 255 / .16);
+  border-radius: var(--radius-md);
+  background: rgb(var(--color-inverse-foreground) / .16);
   color: inherit;
 }
 @keyframes save-toast-in { from { opacity: 0; transform: translate(-50%, 6px); } }
