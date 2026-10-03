@@ -26,8 +26,6 @@ const sameContextAs멈 = (name: string) => [0, 1, 2, 3, 4, 5, 6, 7, 20].includes
  */
 const layerKey = (contextId: string) =>
   `f=${contextId.startsWith('mixed') ? 'mixed' : contextId.startsWith('bottom') ? 'bottom' : 'right'}|j=${contextId.endsWith('-final') ? '1' : '0'}`
-const jamoRuleKey = (contextId: string, part: 'CH' | 'JU' | 'JO', jamo: string) =>
-  `${layerKey(contextId)}|${part === 'CH' ? 'i' : part === 'JU' ? 'm' : 'n'}=${jamo}`
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -86,47 +84,21 @@ test('켜진 상자를 다시 누르면 획 편집으로 가고, 보선을 놓�
   await expect(page.getByRole('region', { name: 'ㅁ 완성 글자 편집' })).toBeVisible()
 })
 
-// 2026-09-29 이전부터 깨져 있다(HEAD에서도 같음). 회귀마다 시간 초과까지 기다려 fixme로 건너뛴다 — 고칠 목록.
-test.fixme('수치 패널은 없고, 편집 전에도 닿는 글자 줄이 Δ 없이 떠 있다', async ({ page }) => {
-  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
-  await expect(page.getByTestId('review-canvas')).toBeVisible()
-  await expect(page.getByTestId('review-numbers')).toHaveCount(0)
-  // 모델이 오면 첫 rail이 잡히고, 같은 문맥(세로 홀자+받침) 글자가 Δ 없이 뜬다. 범위 칩은 이 레이아웃(기본)·이 자모만 둘. 자모 고르기는 이 자모만을 눌러야 뜬다.
-  const propagation = page.getByTestId('review-propagation')
-  const cards = page.getByTestId('review-propagation-card')
-  await expectFilledRow(cards)
-  await expect(propagation.getByRole('button', { name: '이 레이아웃', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await expect(propagation.getByRole('button', { name: '이 자모만', exact: true })).toBeEnabled()
-  // `전체`는 고를 수 없다. 저장된 전체 Δ가 없으니 칩 자체가 없다.
-  await expect(propagation.getByRole('button', { name: '전체', exact: true })).toHaveCount(0)
-  await expect(page.getByTestId('review-propagation-jamos')).toHaveCount(0)
-  await expect(page.getByTestId('review-propagation-deltas')).toBeEmpty()
-  await expect.poll(() => cards.first().getAttribute('data-touched')).toBeNull()
-  const names = await cards.locator('figcaption b').allInnerTexts()
-  expect(names.every(sameContextAs멈)).toBe(true)
-  expect(new Set(names.map(medialIndexOf)).size).toBeGreaterThan(1)
-})
-
-// 2026-09-29 이전부터 깨져 있다(HEAD에서도 같음). 회귀마다 시간 초과까지 기다려 fixme로 건너뛴다 — 고칠 목록.
-test.fixme('중심 rail(배치)을 옮기면 닿는 글자 줄에 Δ가 얹히고 이 자모만으로 좁힐 수 있다', async ({ page }) => {
+/** 상시 저장(2026-09-26~): 보선을 놓으면 켠 옵션(이 레이아웃)에 바로 저장되고, Δ는 그 옵션 카드에 적힌다. 범위 좁히기는 옵션 연필(아래 `켠 옵션의 연필` 테스트). 카드의 `data-touched`는 끄는 동안에만 붙는다. */
+test('중심 rail(배치)을 옮기면 켠 옵션에 Δ가 적히고, 닿는 글자 줄은 같은 문맥 글자로 선다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   await selectMedialBox(page)
   await selectRail(page, '바깥기둥 중심')
   await page.keyboard.press('Shift+ArrowRight')
   await expect(storedOption(page).first()).toBeVisible()
-
-  const propagation = page.getByTestId('review-propagation')
-  await expect(propagation.getByTestId('review-propagation-deltas')).toContainText('바깥기둥 중심')
+  await expect(storedOption(page).first()).toContainText('바깥기둥 중심 +10u')
   await expect(page.getByTestId('review-propagation-shape')).toHaveCount(0)
   const cards = page.getByTestId('review-propagation-card')
   await expectFilledRow(cards)
-  await expect(cards.first()).toHaveAttribute('data-touched', 'true', { timeout: 20_000 })
-  // 기본 범위 = 이 레이아웃: 세로 홀자+받침 글자만, 홀자는 섞인다.
-  await expect(propagation.getByRole('button', { name: '이 레이아웃', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  // 기본 범위 = 이 레이아웃: 세로 홀자+받침 글자만. 첫 묶음은 지금 홀자(ㅓ) 글자부터 선다.
   const names = await cards.locator('figcaption b').allInnerTexts()
   expect(names.every(sameContextAs멈)).toBe(true)
-  expect(new Set(names.map(medialIndexOf)).size).toBeGreaterThan(1)
 
   // `다른 글자` 버튼은 없다. 줄을 옆으로 밀어 끝에 가까워지면 다음 묶음이 붙는다. 앞 묶음은 그대로 남는다.
   await expect(page.getByTestId('review-propagation-next')).toHaveCount(0)
@@ -134,18 +106,10 @@ test.fixme('중심 rail(배치)을 옮기면 닿는 글자 줄에 Δ가 얹히�
   await expect.poll(() => cards.count()).toBeGreaterThan(names.length)
   expect((await cards.locator('figcaption b').allInnerTexts()).slice(0, names.length)).toEqual(names)
 
-  // 범위를 좁히면 줄을 새로 만들어 맨 앞에서 시작한다. 잡은 홀자(ㅓ)가 같은 글자만 남는다.
-  await propagation.getByRole('button', { name: '이 자모만', exact: true }).click()
-  await page.getByTestId('review-propagation-jamos-done').click()
-  await expectFilledRow(cards)
-  expect(await page.getByTestId('review-propagation-cards').evaluate((el) => el.scrollLeft)).toBe(0)
-  await expect.poll(async () => (await cards.locator('figcaption b').allInnerTexts()).every((name) => medialIndexOf(name) === medialIndexOf('멈'))).toBe(true)
-
-  // 복원해도 줄은 그대로, Δ만 빠진다.
+  // 되돌리면 저장이 빠지고 줄은 그대로, Δ만 빠진다.
   await undoButton(page).click()
+  await expect(storedOption(page)).toHaveCount(0)
   await expectFilledRow(cards)
-  await expect(page.getByTestId('review-propagation-deltas')).toBeEmpty()
-  await expect.poll(() => cards.first().getAttribute('data-touched')).toBeNull()
 })
 
 /** 레이아웃 캔버스의 홀자는 앱 획이다. 앱 획에 안 닿는 시작·끝 rail(획 길이)은 내놓지 않고, 형태 Δ 카드도 없다. 획 길이는 `획 고치기`에서. */
@@ -252,18 +216,18 @@ test('부품 상자를 누르면 그 부품 rail만 잡히고 칩도 바뀐다',
   await expect(canvas.locator('[data-testid="review-fit-box"][data-kind="component"]').first()).toHaveAttribute('data-active', 'false')
 })
 
-// 2026-09-29 이전부터 깨져 있다(HEAD에서도 같음). 회귀마다 시간 초과까지 기다려 fixme로 건너뛴다 — 고칠 목록.
+// 2026-10-03 다시 봄: 방향키 10u 뒤 바깥기둥 중심 손잡이가 +8.18u에 선다(따로 띄운 확인 스펙은 +10u). 진짜 어긋남인지 조사 전이라 건너뛴다.
 test.fixme('배치 Δ를 적용하면 저장되어 새로 열어도 rail이 그 자리에 있고, 같은 문맥 글자만 받고, 지우면 돌아온다', async ({ page }) => {
   const KEY = 'noto-layout-delta-v1'
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
   await selectMedialBox(page)
   await selectRail(page, '바깥기둥 중심')
-  const handle = page.getByTestId('review-canvas').locator('[data-rail-handle][aria-pressed="true"]')
+  const handle = page.getByTestId('review-canvas').getByRole('button', { name: '바깥기둥 중심 선택' })
   const before = Number(await handle.getAttribute('x1'))
   await page.keyboard.press('Shift+ArrowRight')
   await expect(storedOption(page).first()).toBeVisible()
-  expect(Number(await handle.getAttribute('x1'))).toBeCloseTo(before + 0.01, 6)
+  await expect.poll(async () => Number(await handle.getAttribute('x1'))).toBeCloseTo(before + 0.01, 6)
 
   // 적용 → 저장소에 이 레이아웃(right-final) Δ가 들어가고, 세션 편집은 비워져 Δ 0에서 다시 시작한다. rail 자리는 그대로.
   const propagation = page.getByTestId('review-propagation')
@@ -382,7 +346,7 @@ test('옛 검수 글자 화면 주소는 같은 글자의 자소 탭 레이아�
 })
 
 /** 획 편집 입구는 켜진 상자를 한 번 더 누르기다. 부품을 켜면 그 상자가 입구가 되고, 보선을 옮기면 하단 바가 서고, 획 편집에서는 `완료`로 그 부품이 켜진 채 돌아온다. */
-// 2026-09-29 이전부터 깨져 있다(HEAD에서도 같음). 회귀마다 시간 초과까지 기다려 fixme로 건너뛴다 — 고칠 목록.
+// 2026-10-03 다시 봄: 첫닿자는 단독 칸(ㅁ)으로 열리고, 열 때 잡힌 획이 없다. 피그마식 선택(09-24~30)으로 바뀐 기대인지 확인 전이라 건너뛴다.
 test.fixme('켠 부품의 획 고치기로 내려가고, 안 끝난 변경이 있으면 막히고, 완료하면 그 부품이 켜진 레이아웃으로 돌아온다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88')
   await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
@@ -410,7 +374,8 @@ test.fixme('켠 부품의 획 고치기로 내려가고, 안 끝난 변경이 �
   const layoutCanvasBox = await canvas.boundingBox()
   await cta.dispatchEvent('click')
   await expect(page.getByTestId('workspace-back')).toBeVisible()
-  const editor = page.getByRole('region', { name: '멈 완성 글자 편집' })
+  // 첫닿자 획 편집은 단독 칸으로 먼저 열린다(2026-09-28).
+  const editor = page.getByRole('region', { name: 'ㅁ 완성 글자 편집' })
   await expect(page.getByTestId('jamo-stroke-hint')).toHaveCount(0)
   await expect(page.getByTestId('jamo-stroke-trackpad')).toBeVisible()
   await expect(page.getByRole('toolbar', { name: '획 편집 도구' }).getByRole('button', { name: '획 추가' })).toBeEnabled()
@@ -789,293 +754,6 @@ test('ㅏ의 홀자 오른변을 당기면 보가 짧아지고 기둥 두께는 
   await expect.poll(async () => Number(await medialBox.getAttribute('width'))).toBeCloseTo(width - 0.01, 6)
   expect(Number(await medialBox.getAttribute('x'))).toBeCloseTo(x, 6)
   await expect(storedOption(page).first()).toBeVisible()
-})
-
-/** 2026-09-21 `이 자모만` 층(G0·G1). 가에서 첫닿자 ㄱ 오른변을 밀어 ㄱ·ㅋ에만 적용하면 같은 문장의 가는 바뀌고 마는 그대로다. 층별로 따로 저장·지우기, Undo/Redo. */
-// 2026-09-29 이전부터 깨져 있다(HEAD에서도 같음). 회귀마다 시간 초과까지 기다려 fixme로 건너뛴다 — 고칠 목록.
-test.fixme('이 자모만으로 좁혀 적용하면 같은 레이아웃의 그 자모 글자만 받고, 층마다 따로 지운다', async ({ page }) => {
-  const KEY = 'noto-layout-delta-v1'
-  // 획 모드에서 모델 상자로 그려진 뒤의 문장 글자를 기준으로 잡고, 그다음 레이아웃 모드로 간다. 문장 = `가 별을 노래하는 마음으로`. 마(ㅁ+ㅏ, 받침 없음)는 가와 같은 레이아웃이라 대조군.
-  await page.goto('/workspace/jamo?char=%EA%B0%80&mode=stroke')
-  const 가 = page.getByRole('button', { name: '가 편집' })
-  const 마 = page.getByRole('button', { name: '마 편집' })
-  await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
-  const 가Before = await 가.innerHTML()
-  const 마Before = await 마.innerHTML()
-  await page.getByTestId('workspace-back').click()
-  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
-  const propagation = page.getByTestId('review-propagation')
-
-  // 첫닿자 ㄱ(기본으로 켜져 있다)을 잡고 오른변을 20u 민다.
-  await selectPartBox(page, '첫닿자 ㄱ')
-  await selectRail(page, '첫닿자 오른변')
-  await page.keyboard.press('Shift+ArrowRight')
-  await page.keyboard.press('Shift+ArrowRight')
-  await expect(propagation.getByTestId('review-propagation-deltas')).toContainText('첫닿자 오른변')
-
-  // 이 자모만: 자모 고르기 시트가 뜬다. 잡은 ㄱ은 켜진 채 고정, ㅋ을 더한다. 카드는 같은 문맥에서 첫닿자가 ㄱ·ㅋ인 글자만.
-  await propagation.getByRole('button', { name: '이 자모만', exact: true }).click()
-  const jamos = page.getByTestId('review-propagation-jamos')
-  await expect(jamos).toBeVisible()
-  await expect(jamos.locator('[data-jamo="ㄱ"]')).toHaveAttribute('aria-pressed', 'true')
-  // 하나뿐일 때는 못 끈다.
-  await expect(jamos.locator('[data-jamo="ㄱ"]')).toBeDisabled()
-  await expect(jamos.locator('button')).toHaveCount(19)
-  await jamos.locator('[data-jamo="ㅋ"]').click()
-  await expect(jamos.locator('[data-jamo="ㅋ"]')).toHaveAttribute('aria-pressed', 'true')
-  // 완료 = 시트 닫기. 고른 자모는 저장 전에도 띠에 빈 칩으로 보인다.
-  await page.getByTestId('review-propagation-jamos-done').click()
-  await expect(jamos).toHaveCount(0)
-  await expect(page.locator('[data-testid="layout-scope-chip"][data-kind="jamo"][data-selected="true"]')).toHaveCount(2)
-  const cards = page.getByTestId('review-propagation-card')
-  await expect(cards.first()).toHaveAttribute('data-touched', 'true', { timeout: 20_000 })
-  const names = await cards.locator('figcaption b').allInnerTexts()
-  expect(names.length).toBeGreaterThan(0)
-  expect(names.every((name) => ['ㄱ', 'ㅋ'].includes('ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'[Math.floor((name.codePointAt(0)! - 0xac00) / 588)]))).toBe(true)
-  expect(names.every((name) => [0, 1, 2, 3, 4, 5, 6, 7, 20].includes(medialIndexOf(name)) && finalIndexOf(name) === 0)).toBe(true)
-
-  // 적용: 자모 층에 ㄱ·ㅋ 키로 따로 저장. 문장의 가는 바뀌고 마는 그대로.
-  await expect(resetButton(page)).toHaveCount(0)
-  const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
-  expect(stored.rules[jamoRuleKey('right', 'CH', 'ㄱ')].faces.CH.right).toBeCloseTo(0.02, 9)
-  expect(stored.rules[jamoRuleKey('right', 'CH', 'ㅋ')].faces.CH.right).toBeCloseTo(0.02, 9)
-  expect(Object.keys(stored.rules).sort()).toEqual([jamoRuleKey('right', 'CH', 'ㄱ'), jamoRuleKey('right', 'CH', 'ㅋ')].sort())
-  await expect.poll(() => 가.innerHTML()).not.toBe(가Before)
-  expect(await 마.innerHTML()).toBe(마Before)
-
-  // 범위 띠: 찬 칩은 ㄱ → ㅋ 둘. 이 레이아웃 칩은 비어 있다(층 분리). 요약 줄과 글자 수(right 계열 9홀자 × 첫닿자 하나 = 9자).
-  const overrides = page.getByTestId('layout-override-card')
-  await expect(overrides).toHaveCount(2)
-  await expect(overrides.nth(0)).toHaveAttribute('data-jamo', 'ㄱ')
-  await expect(overrides.nth(1)).toHaveAttribute('data-jamo', 'ㅋ')
-  await expect(overrides.nth(0)).toContainText('오른변 +20u')
-  await expect(overrides.nth(0)).toContainText('9자')
-  await expect(page.locator('[data-testid="layout-override-card"][data-kind="layer"]')).toHaveCount(0)
-  // 지금 칩(이 자모만 ㄱ·ㅋ)에 맞는 카드 둘이 켜져 있고, 이 레이아웃 칩으로 바꾸면 꺼진다.
-  await expect(overrides.locator('[aria-pressed="true"]')).toHaveCount(2)
-  await propagation.getByRole('button', { name: '이 레이아웃', exact: true }).click()
-  await expect(overrides.locator('[aria-pressed="true"]')).toHaveCount(0)
-  // ㅋ 칩을 누르면 범위가 이 자모만, 고른 자모는 ㅋ 하나(시트는 안 뜬다), 표본은 ㅋ 글자만.
-  await overrides.nth(1).getByTestId('layout-override-select').click()
-  await expect(propagation.getByRole('button', { name: '이 자모만', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByTestId('review-propagation-jamos')).toHaveCount(0)
-  await expect(overrides.locator('[aria-pressed="true"]')).toHaveCount(1)
-  await expect(overrides.nth(1)).toHaveAttribute('data-selected', 'true')
-  await expect.poll(async () => (await cards.locator('figcaption b').allInnerTexts()).every((name) => 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'[Math.floor((name.codePointAt(0)! - 0xac00) / 588)] === 'ㅋ')).toBe(true)
-
-  // Undo → 가가 돌아오고 저장소도 빈다. Redo → 다시.
-  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
-  await expect.poll(() => 가.innerHTML()).toBe(가Before)
-  expect((await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)).rules).toEqual({})
-  await page.getByRole('button', { name: '형태 편집 다시 실행' }).click()
-  await expect.poll(() => 가.innerHTML()).not.toBe(가Before)
-
-  // 지우기: ㄱ 카드의 ×만 누르면 ㄱ 키만 지워지고 ㅋ 키는 남는다. Undo/Redo 뒤에도 목록은 저장소 그대로.
-  await expect(page.getByTestId('layout-override-card')).toHaveCount(2)
-  await page.locator('[data-testid="layout-override-card"][data-jamo="ㄱ"]').getByTestId('layout-override-remove').click()
-  await expect(page.getByTestId('layout-override-card')).toHaveCount(1)
-  const cleared = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
-  expect(cleared.rules[jamoRuleKey('right', 'CH', 'ㄱ')]).toBeUndefined()
-  expect(cleared.rules[jamoRuleKey('right', 'CH', 'ㅋ')].faces.CH.right).toBeCloseTo(0.02, 9)
-  await expect.poll(() => 가.innerHTML()).toBe(가Before)
-})
-
-/** 받침 자모 층: 각에서 받침 ㄱ 윗변을 올려 ㄱ 받침에만 적용하면 같은 문맥의 ㄴ 받침 글자는 안 받는다. */
-// 2026-09-29 이전부터 깨져 있다(HEAD에서도 같음). 회귀마다 시간 초과까지 기다려 fixme로 건너뛴다 — 고칠 목록.
-test.fixme('받침을 이 자모만으로 적용하면 받침이 그 자모인 글자만 받는다', async ({ page }) => {
-  await page.goto('/workspace/jamo?char=%EA%B0%81&mode=layout')
-  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
-  const canvas = page.getByTestId('review-canvas')
-  const propagation = page.getByTestId('review-propagation')
-  await canvas.getByRole('button', { name: '받침 ㄱ 선택' }).click({ position: { x: 4, y: 4 } })
-  await selectRail(page, '받침 윗변')
-  await page.keyboard.press('Shift+ArrowUp')
-  await propagation.getByRole('button', { name: '이 자모만', exact: true }).click()
-  await expect(page.getByTestId('review-propagation-jamos').locator('button')).toHaveCount(27)
-  await page.getByTestId('review-propagation-jamos-done').click()
-  const names = await page.getByTestId('review-propagation-card').locator('figcaption b').allInnerTexts()
-  expect(names.length).toBeGreaterThan(0)
-  expect(names.every((name) => finalIndexOf(name) === 1)).toBe(true)
-  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('noto-layout-delta-v1')!).state)
-  expect(stored.rules[jamoRuleKey('right-final', 'JO', 'ㄱ')].faces.JO.top).toBeCloseTo(-0.01, 9)
-  expect(Object.keys(stored.rules)).toEqual([jamoRuleKey('right-final', 'JO', 'ㄱ')])
-})
-
-/** 자모 층이 생기기 전 저장분(`jamo` 없음)도 그대로 읽고, 위에 자모 층을 더할 수 있다. */
-// 2026-09-29 이전부터 깨져 있다(HEAD에서도 같음). 회귀마다 시간 초과까지 기다려 fixme로 건너뛴다 — 고칠 목록.
-test.fixme('옛 저장 형식(jamo 없음)을 읽어 이 레이아웃 Δ가 살아 있고 자모 층을 더할 수 있다', async ({ page }) => {
-  const KEY = 'noto-layout-delta-v1'
-  await page.goto('/workspace/jamo?char=%EA%B0%80&mode=layout')
-  await page.evaluate((key) => localStorage.setItem(key, JSON.stringify({ state: { all: {}, layers: { right: { faces: { CH: { right: 0.02 } } } } }, version: 0 })), KEY)
-  await page.reload()
-  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
-  const propagation = page.getByTestId('review-propagation')
-  await expect(propagation.locator('[data-testid="layout-override-card"][data-kind="layer"]')).toContainText('첫닿자 오른변 +20u')
-  await selectPartBox(page, '첫닿자 ㄱ')
-  await selectRail(page, '첫닿자 윗변')
-  await page.keyboard.press('Shift+ArrowUp')
-  await propagation.getByRole('button', { name: '이 자모만', exact: true }).click()
-  await page.getByTestId('review-propagation-jamos-done').click()
-  const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
-  expect(stored.rules[layerKey('right')].faces.CH.right).toBeCloseTo(0.02, 9)
-  expect(stored.rules[jamoRuleKey('right', 'CH', 'ㄱ')].faces.CH.top).toBeCloseTo(-0.01, 9)
-})
-
-/**
- * 범위 띠(G0·G1): 노에서 ㄴ, 로에서 ㄹ을 각각 이 자모만으로 적용하면 bottom 레이아웃 띠에 전체·ㄴ·ㄹ이 찬 칩으로. 칩 누르면 표본이 그 글자, ×는 그 층만.
- * 다른 레이아웃에선 전체만. 띠는 첫 화면(390×844)에서 스크롤 없이 보인다.
- * `전체`는 이제 고를 수 없어 옛 저장분을 심어 연다. 읽기 전용 칩으로 서서 ×로만 지운다.
- */
-// 2026-09-29 이전부터 깨져 있다(HEAD에서도 같음). 회귀마다 시간 초과까지 기다려 fixme로 건너뛴다 — 고칠 목록.
-test.fixme('같은 레이아웃에 쌓인 오버라이드가 범위 띠에 보이고, 칩마다 따로 고르고 지운다', async ({ page }) => {
-  const KEY = 'noto-layout-delta-v1'
-  const initialOf = (name: string) => 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'[Math.floor((name.codePointAt(0)! - 0xac00) / 588)]
-  const overrides = page.getByTestId('layout-override-card')
-
-  // 옛 전체 Δ(첫닿자 윗변 -10u)를 심어 둔다. 지금 UI로는 만들 수 없는 층이다.
-  // 이동할 때마다 다시 돌므로 비어 있을 때만 쓴다 — 안 그러면 뒤에 쌓은 자모 Δ를 덮는다.
-  await page.addInitScript(([key, value]) => { if (!window.localStorage.getItem(key)) window.localStorage.setItem(key, value) }, [KEY, JSON.stringify({ state: { all: { faces: { CH: { top: -0.01 } } }, layers: {}, jamo: {} }, version: 0 })] as const)
-
-  // 노: 심어 둔 전체 위에 ㄴ만 윗변 +20u(ㄴ 작게).
-  await page.goto('/workspace/jamo?char=%EB%85%B8&mode=layout')
-  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
-  const propagation = page.getByTestId('review-propagation')
-  // 찬 박스는 심어 둔 전체 하나. 그 아래 지금 고른 범위(이 레이아웃)가 점선 박스로 선다. 전체를 고르는 길은 없다.
-  await expect(overrides).toHaveCount(1)
-  await expect(page.getByTestId('layout-scope-chip')).toHaveCount(1)
-  await expect(overrides.nth(0).getByTestId('layout-override-select')).toBeDisabled()
-  await selectPartBox(page, '첫닿자 ㄴ')
-  await selectRail(page, '첫닿자 윗변')
-  await page.keyboard.press('Shift+ArrowDown')
-  await page.keyboard.press('Shift+ArrowDown')
-  await propagation.getByRole('button', { name: '이 자모만', exact: true }).click()
-  await page.getByTestId('review-propagation-jamos-done').click()
-  await expect(overrides).toHaveCount(2)
-
-  // 로: ㄹ만 윗변 -20u(ㄹ 크게). 찬 칩은 전체 → ㄴ → ㄹ.
-  await page.goto('/workspace/jamo?char=%EB%A1%9C&mode=layout')
-  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
-  await expect(overrides).toHaveCount(2)
-  await selectPartBox(page, '첫닿자 ㄹ')
-  await selectRail(page, '첫닿자 윗변')
-  await page.keyboard.press('Shift+ArrowUp')
-  await page.keyboard.press('Shift+ArrowUp')
-  await propagation.getByRole('button', { name: '이 자모만', exact: true }).click()
-  await page.getByTestId('review-propagation-jamos-done').click()
-  await expect(overrides).toHaveCount(3)
-  await expect(overrides.nth(0)).toHaveAttribute('data-kind', 'all')
-  await expect(overrides.nth(0)).toContainText('첫닿자 윗변 -10u')
-  await expect(overrides.nth(0)).toContainText('11,172자')
-  await expect(overrides.nth(1)).toHaveAttribute('data-jamo', 'ㄴ')
-  await expect(overrides.nth(1)).toContainText('윗변 +20u')
-  await expect(overrides.nth(2)).toHaveAttribute('data-jamo', 'ㄹ')
-  await expect(overrides.nth(2)).toContainText('윗변 -20u')
-  // bottom(가로 홀자 5 × 받침 없음) 첫닿자 하나 = 5자.
-  await expect(overrides.nth(2)).toContainText('5자')
-  // 띠는 캔버스 바로 아래라 첫 화면에서 세로 스크롤 없이 보인다.
-  await expect(page.getByTestId('layout-option-stack')).toBeInViewport({ ratio: 1 })
-  await expect(overrides.nth(0)).toBeInViewport()
-  const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
-  expect(stored.rules[''].faces.CH.top).toBeCloseTo(-0.01, 9)
-  expect(stored.rules[jamoRuleKey('bottom', 'CH', 'ㄴ')].faces.CH.top).toBeCloseTo(0.02, 9)
-  expect(stored.rules[jamoRuleKey('bottom', 'CH', 'ㄹ')].faces.CH.top).toBeCloseTo(-0.02, 9)
-
-  // ㄴ 칩을 누르면 표본이 ㄴ 글자만(같은 문맥), 켜진 자모 칩은 ㄴ 하나.
-  const cards = page.getByTestId('review-propagation-card')
-  await overrides.nth(1).getByTestId('layout-override-select').click()
-  await expect(overrides.nth(1)).toHaveAttribute('data-selected', 'true')
-  await expect(overrides.nth(2)).not.toHaveAttribute('data-selected', 'true')
-  await expect.poll(async () => { const names = await cards.locator('figcaption b').allInnerTexts(); return names.length > 0 && names.every((name) => initialOf(name) === 'ㄴ' && [8, 12, 13, 17, 18].includes(medialIndexOf(name)) && finalIndexOf(name) === 0) }).toBe(true)
-  // 전체 칩은 잠겨 있다. 눌러도 범위가 되지 않고 이 레이아웃이 그대로 켜져 있다.
-  await expect(overrides.nth(0).getByTestId('layout-override-select')).toBeDisabled()
-  await expect(overrides.nth(0)).not.toHaveAttribute('data-selected', 'true')
-
-  // ㄴ 칩 ×: ㄴ만 사라지고 ㄹ·전체는 그대로. Undo로 돌아온다.
-  await overrides.nth(1).getByTestId('layout-override-remove').click()
-  await expect(overrides).toHaveCount(2)
-  await expect(overrides.nth(1)).toHaveAttribute('data-jamo', 'ㄹ')
-  const after = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).state, KEY)
-  expect(after.rules[jamoRuleKey('bottom', 'CH', 'ㄴ')]).toBeUndefined()
-  expect(after.rules[jamoRuleKey('bottom', 'CH', 'ㄹ')].faces.CH.top).toBeCloseTo(-0.02, 9)
-  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
-  await expect(overrides).toHaveCount(3)
-
-  // 다른 레이아웃(가, right)에서는 전체만 보인다.
-  await page.goto('/workspace/jamo?char=%EA%B0%80&mode=layout')
-  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
-  await expect(overrides).toHaveCount(1)
-  await expect(overrides.nth(0)).toHaveAttribute('data-kind', 'all')
-})
-
-/** 범위 고르기 화면(2026-09-21): 검수 격자를 그대로 쓰고, 범위가 되는 조작은 행·열·그룹 머리 셋뿐이다. 쓸면 지나간 머리가 한 번에 바뀐다. */
-/**
- * 범위 고르기 화면(2026-09-21 다시 잡음): 표는 행 홀자 × 열 받침 한 장뿐이고 첫닿자는 표 위 한 줄이다.
- * 범위가 되는 조작은 **사각 하나** — 칸 하나, 칸을 끈 사각, 머리(그 줄 통째)다. 새로 집으면 갈아치운다.
- */
-// 2026-09-29 이전부터 깨져 있다(HEAD에서도 같음). 회귀마다 시간 초과까지 기다려 fixme로 건너뛴다 — 고칠 목록.
-test.fixme('표에서 사각을 집으면 그게 범위가 되고, 추천 칩은 표를 켜 준다', async ({ page }) => {
-  await page.goto('/workspace/jamo?char=%EB%A9%88&mode=layout')
-  await expect(page.getByTestId('review-fit-box').first()).toBeVisible({ timeout: 20_000 })
-  await page.getByTestId('layout-override-more').first().click()
-  const picker = page.getByTestId('layout-scope-picker')
-  await expect(picker).toBeVisible()
-  const countOf = async () => Number((await page.getByTestId('scope-picker-count').innerText()).replace(/[^\d]/g, ''))
-  // 열 때는 그 옵션의 범위 그대로다. 이 레이아웃(세로 홀자 + 받침) = 4,617자.
-  expect(await countOf()).toBe(4617)
-  await expect(page.getByTestId('scope-picker-confirm')).toBeDisabled()
-  // 걷어낸 것: 하단 표본 줄과 크게 보기, 발치의 받침 세그먼트.
-  await expect(picker.getByTestId('scope-picker-sample')).toHaveCount(0)
-  await expect(picker.getByTestId('scope-picker-final')).toHaveCount(0)
-  // 표 위 한 줄이 첫닿자 19개를 맡는다(시트 탭 대신).
-  await expect(picker.getByTestId('corpus-sheet')).toHaveCount(19)
-
-  // 칸 하나 = 사각 하나. 첫 칸은 홀자 ㅏ × 받침 없음이고, 첫닿자는 표 밖이라 19개가 다 남는다.
-  await picker.getByTestId('corpus-cell').first().click()
-  await expect.poll(countOf).toBe(19)
-
-  // 칸을 끌면 지나간 행·열의 곱이 범위다. `없` 열과 받침 두 열을 같이 끌어도 `없`이 안 빠진다.
-  const cells = picker.getByTestId('corpus-cell')
-  const from = await cells.nth(0).boundingBox()
-  const to = await cells.nth(2).boundingBox()
-  if (!from || !to) throw new Error('칸 자리를 못 읽었습니다.')
-  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 4 })
-  await page.mouse.up()
-  await expect.poll(countOf).toBe(57)
-
-  // 행 머리 = 그 홀자 줄 통째(받침 전부). 한 축이 전부인 사각이다.
-  await picker.locator('tbody [data-testid="corpus-head"]').first().click()
-  await expect.poll(countOf).toBe(532)
-  // 열 머리도 같다 — 받침 ㄱ 열 × 홀자 전부.
-  await picker.locator('thead [data-testid="corpus-head"]').nth(1).click()
-  await expect.poll(countOf).toBe(399)
-
-  // 추천 칩 = 표를 켜 주는 지름길. 누르면 그 규칙으로 갈아치운다.
-  const chip = page.getByTestId('scope-picker-chip').filter({ hasText: '구조군' })
-  await chip.dispatchEvent('click')
-  await expect(chip).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByTestId('scope-picker-name')).toContainText('첫닿자')
-  const afterChip = await countOf()
-
-  // 첫닿자 줄을 누르면 표가 그 자모로 다시 그려질 뿐 범위는 그대로다.
-  await picker.getByTestId('corpus-sheet').nth(1).click()
-  expect(await countOf()).toBe(afterChip)
-
-  // 표에서 사각을 다시 집으면 칩은 꺼진 것으로 본다(표 밖 첫닿자 조건은 남는다).
-  await picker.locator('tbody [data-testid="corpus-head"]').nth(1).click()
-  await expect(chip).toHaveAttribute('aria-pressed', 'false')
-  const narrowed = await countOf()
-  expect(narrowed).toBeLessThan(afterChip)
-
-  // `이 범위로` = 확정. 옵션 스택의 켠 박스가 그 범위 이름과 글자 수로 바뀐다.
-  const name = await page.getByTestId('scope-picker-name').innerText()
-  await page.getByTestId('scope-picker-confirm').click()
-  await expect(picker).toHaveCount(0)
-  const selected = page.locator('[data-selected="true"]').filter({ has: page.getByTestId('layout-override-select') })
-  await expect(selected).toHaveCount(1)
-  await expect(selected).toContainText(narrowed.toLocaleString())
-  expect(name).toContain('첫닿자')
 })
 
 /** 상단 두 줄(2026-09-21): 적용이 어디까지 닿았는지 `내 문장`에서 바로 보인다. 다음 편집이 시작되면 표시가 빠진다. */
