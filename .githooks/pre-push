@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dev · main에 푸시하기 전에 스모크 묶음(npm run test:smoke)을 돌리고, 실패하면 푸시를 막는다.
+# dev · main · claude/main에 푸시하기 전에 스모크 묶음(npm run test:smoke)을 돌리고, 실패하면 푸시를 막는다.
 # 문서(.md · docs/)만 바뀐 푸시는 건너뛴다. 급할 때는 `git push --no-verify` 또는 `SKIP_SMOKE=1 git push`.
 # 작업 트리에 커밋 안 된 변경(다른 세션 것 포함)이 있으면, 푸시하는 커밋만 임시 워크트리에 꺼내 돌린다.
 set -uo pipefail
@@ -9,7 +9,7 @@ set -uo pipefail
 ZERO=0000000000000000000000000000000000000000
 target=""
 while read -r local_ref local_sha remote_ref remote_sha; do
-  case "$remote_ref" in refs/heads/dev|refs/heads/main) ;; *) continue ;; esac
+  case "$remote_ref" in refs/heads/dev|refs/heads/main|refs/heads/claude/main) ;; *) continue ;; esac
   [ "$local_sha" = "$ZERO" ] && continue
   if [ "$remote_sha" = "$ZERO" ] || ! git cat-file -e "$remote_sha" 2>/dev/null; then
     changed=$(git diff --name-only "$local_sha~1" "$local_sha" 2>/dev/null || echo "?")

@@ -32,7 +32,8 @@ export default defineConfig({
     baseURL: origin,
     ...devices['iPhone 13'],
     browserName: 'chromium',
-    channel: 'chrome',
+    // 크롬이 없는 곳(클라우드 세션)은 `E2E_CHANNEL=chromium`으로 Playwright 내장 브라우저를 쓴다.
+    channel: process.env.E2E_CHANNEL || 'chrome',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

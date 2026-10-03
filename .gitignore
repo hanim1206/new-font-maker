@@ -6,6 +6,9 @@ dist/
 .vercel
 .claude/*
 !.claude/skills/
+# 클라우드 세션(자동 개선 루프)이 읽는 것 — 플랜 `2026-10-03_자동-개선-루프-세팅`
+!.claude/agents/
+!.claude/settings.json
 test-results/
 playwright-report/
 .reference-fonts/
