@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dev · main · claude/main에 푸시하기 전에 스모크 묶음(npm run test:smoke)을 돌리고, 실패하면 푸시를 막는다.
+# dev · claude/main에 푸시하기 전에 스모크 묶음(npm run test:smoke)을, main에는 단위 전체 + e2e 전체(약 5분)를 돌리고, 실패하면 푸시를 막는다.
 # 문서(.md · docs/)만 바뀐 푸시는 건너뛴다. 급할 때는 `git push --no-verify` 또는 `SKIP_SMOKE=1 git push`.
 # 작업 트리에 커밋 안 된 변경(다른 세션 것 포함)이 있으면, 푸시하는 커밋만 임시 워크트리에 꺼내 돌린다.
 set -uo pipefail
@@ -26,9 +26,16 @@ if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
   exec <<< "$refs"
 fi
 
+# Fork 같은 GUI 앱은 셸 설정을 안 읽어 nvm의 npm을 못 찾는다.
+if ! command -v npm >/dev/null 2>&1 && [ -s "$HOME/.nvm/nvm.sh" ]; then
+  # nvm.sh는 빈 변수를 읽어서 `set -u`를 잠깐 푼다. 표준 입력(푸시 목록)도 건드리지 않게 막는다.
+  set +u; . "$HOME/.nvm/nvm.sh" </dev/null >/dev/null 2>&1; set -u
+fi
+
 [ "${SKIP_SMOKE:-}" = "1" ] && { echo "[pre-push] SKIP_SMOKE=1 — 스모크 건너뜀"; exit 0; }
 
 target=""
+branch=""
 while read -r local_ref local_sha remote_ref remote_sha; do
   case "$remote_ref" in refs/heads/dev|refs/heads/main|refs/heads/claude/main) ;; *) continue ;; esac
   [ "$local_sha" = "$ZERO" ] && continue
@@ -42,9 +49,20 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     echo "[pre-push] ${remote_ref#refs/heads/}: 문서만 바뀜 — 스모크 건너뜀"
     continue
   fi
+  # 한 번에 여러 브랜치를 올리면 main 쪽(더 넓은 검사)을 고른다.
+  [ "$branch" = "main" ] && continue
   target="$local_sha"
   branch="${remote_ref#refs/heads/}"
 done
+
+# main은 dev → main 직전 검사(단위 전체 + e2e 전체), 나머지는 스모크.
+if [ "$branch" = "main" ]; then
+  suite="npm test && npm run -s test:e2e"
+  label="단위 + e2e 전체"
+else
+  suite="npm run -s test:smoke"
+  label="스모크"
+fi
 
 [ -z "$target" ] && exit 0
 
@@ -53,24 +71,24 @@ head=$(git rev-parse HEAD)
 dirty=$(git -C "$root" status --porcelain --untracked-files=no)
 
 if [ "$target" = "$head" ] && [ -z "$dirty" ]; then
-  echo "[pre-push] $branch 푸시 전 스모크 — 이 워크트리에서"
-  (cd "$root" && npm run -s test:smoke)
+  echo "[pre-push] $branch 푸시 전 $label — 이 워크트리에서"
+  (cd "$root" && eval "$suite")
   status=$?
 else
   tmp="$root/.claude/worktrees/pre-push-$(git rev-parse --short "$target")-$$"
-  echo "[pre-push] $branch 푸시 전 스모크 — 작업 트리에 다른 변경이 있어 푸시하는 커밋만 임시 워크트리에서"
+  echo "[pre-push] $branch 푸시 전 $label — 작업 트리에 다른 변경이 있어 푸시하는 커밋만 임시 워크트리에서"
   git worktree add -q --detach "$tmp" "$target" || exit 1
   common=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
   for link in node_modules .reference-fonts .env .env.local; do
     [ -e "$common/$link" ] && ln -s "$common/$link" "$tmp/$link"
   done
-  (cd "$tmp" && npm run -s test:smoke)
+  (cd "$tmp" && eval "$suite")
   status=$?
   git worktree remove --force "$tmp" >/dev/null 2>&1
 fi
 
 if [ $status -ne 0 ]; then
-  echo "[pre-push] 스모크 실패 — 푸시를 막았다. 고치고 다시 푸시하거나, 급하면 git push --no-verify" >&2
+  echo "[pre-push] $label 실패 — 푸시를 막았다. 고치고 다시 푸시하거나, 급하면 git push --no-verify" >&2
   exit 1
 fi
-echo "[pre-push] 스모크 통과"
+echo "[pre-push] $label 통과"
