@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import path from 'node:path'
 import { loadEnv } from 'vite'
+import { sharedEnvDir } from './sharedCheckoutPath'
 import type { Plugin } from 'vite'
 import { MEMO_MAX_LENGTH, nicknameProblemOf } from '../src-next/admin/accountProfile'
 import { isDrawableName } from '../src-next/betaWelcome'
@@ -51,7 +52,7 @@ export function rejectReasonOf(request: Pick<IncomingMessage, 'headers'> & { soc
 
 export function betaInviteApiPlugin(root: string): Plugin {
   let mode = 'development'
-  const service = () => createBetaInvites(betaInviteEnvOf(loadEnv(mode, root, '')), path.join(root, BETA_CODE_FILE))
+  const service = () => createBetaInvites(betaInviteEnvOf(loadEnv(mode, sharedEnvDir(root), '')), path.join(root, BETA_CODE_FILE))
 
   return {
     name: 'beta-invite-api',

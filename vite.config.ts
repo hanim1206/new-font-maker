@@ -10,7 +10,7 @@ import { feedbackAdminApiPlugin } from './scripts/feedbackAdminApi'
 import { styleLibraryApiPlugin } from './scripts/styleLibraryApi'
 import { housePresetApiPlugin } from './scripts/housePresetApi'
 import { announcementAdminApiPlugin } from './scripts/announcementAdminApi'
-import { sharedCheckoutPath } from './scripts/sharedCheckoutPath'
+import { sharedCheckoutPath, sharedEnvDir } from './scripts/sharedCheckoutPath'
 import { spectrumFontApiPlugin } from './scripts/spectrumFontApi'
 import { testRunApiPlugin } from './scripts/testRunApi'
 
@@ -21,6 +21,8 @@ const referenceFonts = sharedCheckoutPath(fileURLToPath(new URL('.', import.meta
 
 // https://vite.dev/config/
 export default defineConfig({
+  // 워크트리에 `.env`가 없으면 메인 체크아웃 것을 읽는다(개발 서버 · 단위 테스트 모두).
+  envDir: sharedEnvDir(fileURLToPath(new URL('.', import.meta.url))),
   plugins: [
     react(),
     notoCorpusApiPlugin(guideCorpus),

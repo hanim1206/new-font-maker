@@ -20,3 +20,11 @@ export function sharedCheckoutPath(root: string, relative: string, warn: (messag
   warn(`[dev] ${relative}가 없습니다. 이 폴더를 읽는 개발 서버 API는 503을 냅니다. 메인 체크아웃에 받아 두세요.`)
   return local
 }
+
+/**
+ * `.env`가 있는 폴더. 새 워크트리에는 `.env`가 없어 계정 · 저장 테스트와 관리자 API가 빈 설정으로 돈다(피드백 58).
+ * 여기에 없으면 메인 체크아웃의 것을 쓴다. 어디에도 없으면(클라우드 · CI) 조용히 이 폴더를 준다 — 설정 없이 도는 게 정상인 곳이다.
+ */
+export function sharedEnvDir(root: string): string {
+  return path.dirname(sharedCheckoutPath(root, '.env', () => {}))
+}

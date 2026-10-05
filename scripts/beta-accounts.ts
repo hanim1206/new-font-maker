@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { BETA_CODE_FILE, betaInviteEnvOf, createBetaInvites } from './betaInvites'
+import { sharedEnvDir } from './sharedCheckoutPath'
 import type { BetaInvite } from './betaInvites'
 
 /**
@@ -22,7 +23,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const OUTPUT_DIRECTORY = path.join(ROOT, 'beta-accounts')
 
 async function main(): Promise<void> {
-  const envFile = path.join(ROOT, '.env')
+  const envFile = path.join(sharedEnvDir(ROOT), '.env')
   if (existsSync(envFile)) process.loadEnvFile(envFile)
   const [command, ...nicknames] = process.argv.slice(2)
 
