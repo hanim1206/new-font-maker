@@ -21,6 +21,9 @@ import styles from './PenLabPage.module.css'
 const VIEW = 1000
 const BOX: BoxConfig = { x: 0, y: 0, width: 1, height: 1 }
 const THICKNESS = 0.07
+/** 상자 바깥 여백(viewBox 단위). 잉크가 칸 끝에서 두께/2만큼 나가므로 그만큼 보여 준다. */
+const PAD = Math.ceil(THICKNESS / 2 * VIEW) + 5
+const VIEWBOX = `${-PAD} ${-PAD} ${VIEW + PAD * 2} ${VIEW + PAD * 2}`
 const toUnits = (value: number) => (value * VIEW).toFixed(1)
 
 type Epsilon = typeof PEN_FIT_EPSILON_CANDIDATES[number]
@@ -45,7 +48,8 @@ const GRID = Array.from({ length: 9 }, (_, i) => ((i + 1) / 10) * VIEW)
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
 
 function toBox(rect: DOMRect, clientX: number, clientY: number): PenPoint {
-  return { x: clamp01((clientX - rect.left) / rect.width), y: clamp01((clientY - rect.top) / rect.height) }
+  const span = VIEW + PAD * 2
+  return { x: clamp01(((clientX - rect.left) / rect.width * span - PAD) / VIEW), y: clamp01(((clientY - rect.top) / rect.height * span - PAD) / VIEW) }
 }
 
 function pointOf(event: ReactPointerEvent<SVGSVGElement>): PenPoint {
@@ -73,8 +77,9 @@ function channelsOf(jamo: JamoData | undefined): Channel[] {
 
 const rawPath = (raw: PenPoint[]) => raw.map((point, i) => `${i === 0 ? 'M' : 'L'}${(point.x * VIEW).toFixed(1)} ${(point.y * VIEW).toFixed(1)}`).join(' ')
 
+/** 상자 바탕 · 테두리 · 눈금. viewBox가 상자보다 넓어 잉크가 칸 밖으로 나간 만큼도 보인다. */
 function Grid() {
-  return <>{GRID.map((at) => <g key={at} stroke={EDIT_COLOR.border} strokeWidth={1}><line x1={at} y1={0} x2={at} y2={VIEW} /><line x1={0} y1={at} x2={VIEW} y2={at} /></g>)}</>
+  return <><rect x={-PAD} y={-PAD} width={VIEW + PAD * 2} height={VIEW + PAD * 2} fill={EDIT_COLOR.surface} /><rect width={VIEW} height={VIEW} fill="none" stroke={EDIT_COLOR.border} strokeWidth={2} />{GRID.map((at) => <g key={at} stroke={EDIT_COLOR.border} strokeWidth={1}><line x1={at} y1={0} x2={at} y2={VIEW} /><line x1={0} y1={at} x2={VIEW} y2={at} /></g>)}</>
 }
 
 export function PenLabPage() {
@@ -196,9 +201,8 @@ export function PenLabPage() {
 
     <div className={styles.boards}>
       <figure className={`${styles.board} ${styles.drawBoard}`}>
-        <svg ref={canvasRef} viewBox={`0 0 ${VIEW} ${VIEW}`} className={styles.canvas} data-testid="pen-lab-canvas"
+        <svg ref={canvasRef} viewBox={VIEWBOX} className={styles.canvas} data-testid="pen-lab-canvas"
           onPointerDown={begin} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish}>
-          <rect width={VIEW} height={VIEW} fill={EDIT_COLOR.surface} />
           <Grid />
           {ghost && presets.map((preset) => <path key={preset.id} d={pointsToSvgD(preset.points, preset.closed, BOX, VIEW)} fill="none" stroke={EDIT_COLOR.editGuide} strokeWidth={preset.thickness * VIEW} strokeLinecap="round" strokeLinejoin="round" opacity={0.6} />)}
           {strokes.map((raw, i) => <path key={i} d={rawPath(raw)} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />)}
@@ -208,8 +212,7 @@ export function PenLabPage() {
       </figure>
 
       <figure className={styles.board}>
-        <svg viewBox={`0 0 ${VIEW} ${VIEW}`} className={styles.result} data-testid="pen-lab-fitted">
-          <rect width={VIEW} height={VIEW} fill={EDIT_COLOR.surface} />
+        <svg viewBox={VIEWBOX} className={styles.result} data-testid="pen-lab-fitted">
           <Grid />
           {adopted.strokes.map((stroke) => {
             const isFree = stroke.id.startsWith('pen-')

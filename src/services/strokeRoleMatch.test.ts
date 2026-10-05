@@ -122,6 +122,19 @@ describe('그린 획에 역할 붙이기', () => {
     expect(fit.points[1].y).toBeCloseTo(1, 6)
   })
 
+  it('꽉 채우기 범위는 곡선이 앵커 밖으로 불룩한 만큼까지 센다', () => {
+    // 앵커는 y .5에 둘뿐이지만 핸들이 위로 솟아 곡선은 y ≈ .2까지 간다
+    const arch: StrokeDataV2 = { id: 'a', closed: false, thickness: .07, points: [
+      { x: .1, y: .5, handleOut: { x: .3, y: .1 } },
+      { x: .9, y: .5, handleIn: { x: .7, y: .1 } },
+    ] }
+    const [fit] = fitStrokesToPresetBounds([arch], [stroke('p', [[0, 0], [1, 0], [1, 1]])])
+    // 곡선 꼭대기(≈.2)가 0으로, 앵커(.5)가 1로 — 앵커만 재면 앵커가 0과 1에 붙어 꼭대기가 상자 밖으로 나갔을 것
+    const top = Math.min(...[0, .25, .5, .75, 1].map((t) => { const u = 1 - t; const a = fit.points[0], b = fit.points[1]; return u * u * u * a.y + 3 * u * u * t * a.handleOut!.y + 3 * u * t * t * b.handleIn!.y + t * t * t * b.y }))
+    expect(top).toBeGreaterThanOrEqual(-1e-6)
+    expect(fit.points[0].y).toBeCloseTo(1, 6)
+  })
+
   it('closeIfNear는 끝이 멀거나 점이 적으면 null', () => {
     expect(closeIfNear(stroke('a', [[0, 0], [1, 0], [1, 1]]), .07)).toBeNull()
     expect(closeIfNear(stroke('a', [[0, 0], [1, 0], [1, 1], [0, .5]]), .07)).toBeNull()

@@ -151,9 +151,31 @@ export function matchStrokeRoles(drawn: readonly StrokeDataV2[], presets: readon
 
 interface Bounds { minX: number; maxX: number; minY: number; maxY: number }
 
-function boundsOf(strokes: readonly Pick<StrokeDataV2, 'points'>[]): Bounds | null {
+/** 중심선을 점으로 편다 — 곡선이 앵커 밖으로 불룩한 만큼까지 범위에 넣기 위해. */
+function flattenCenterline(stroke: Pick<StrokeDataV2, 'points' | 'closed'>, steps = 16): { x: number; y: number }[] {
+  const points = stroke.points
+  const out: { x: number; y: number }[] = []
+  const count = stroke.closed ? points.length : points.length - 1
+  for (let i = 0; i < count; i++) {
+    const a = points[i]
+    const b = points[(i + 1) % points.length]
+    out.push({ x: a.x, y: a.y })
+    if (!a.handleOut || !b.handleIn) continue
+    for (let s = 1; s < steps; s++) {
+      const t = s / steps, u = 1 - t
+      const w0 = u * u * u, w1 = 3 * u * u * t, w2 = 3 * u * t * t, w3 = t * t * t
+      out.push({ x: w0 * a.x + w1 * a.handleOut.x + w2 * b.handleIn.x + w3 * b.x, y: w0 * a.y + w1 * a.handleOut.y + w2 * b.handleIn.y + w3 * b.y })
+    }
+  }
+  const last = points[points.length - 1]
+  if (last) out.push({ x: last.x, y: last.y })
+  return out
+}
+
+/** 중심선 범위(두께는 안 더한다 — 엔진이 칸을 잴 때 중심선 범위에 두께/2를 바깥으로 더하므로 프리셋과 같은 잣대다). */
+function boundsOf(strokes: readonly Pick<StrokeDataV2, 'points' | 'closed'>[]): Bounds | null {
   const bounds: Bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
-  for (const stroke of strokes) for (const point of stroke.points) {
+  for (const stroke of strokes) for (const point of flattenCenterline(stroke)) {
     bounds.minX = Math.min(bounds.minX, point.x); bounds.maxX = Math.max(bounds.maxX, point.x)
     bounds.minY = Math.min(bounds.minY, point.y); bounds.maxY = Math.max(bounds.maxY, point.y)
   }
