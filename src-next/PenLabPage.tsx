@@ -11,7 +11,7 @@ import styles from './PenLabPage.module.css'
 /**
  * 펜 그리기 실험실. 플랜 `docs/plans/2026-10-05_펜으로-획-그리기.md`의 G0 · G1 화면이다.
  * 빈 자모 상자에 펜(또는 마우스)으로 긋고, 왼쪽은 그은 점 그대로, 오른쪽은 `fitPenStroke`가 만든 획을 겹쳐 본다.
- * 허용오차 `ε` 후보 셋의 앵커 수 · 최대 이탈을 획마다 표로 낸다. 손가락은 그리지 않는다(스크롤용).
+ * 허용오차 `ε` 후보 셋의 앵커 수 · 최대 이탈을 획마다 표로 낸다. 펜 · 손가락 · 마우스 전부 긋는다.
  * 저장하지 않고 제품 값도 안 바꾼다. `점 복사`는 G1 녹화용 — 그은 점을 JSON으로 복사한다.
  */
 
@@ -31,9 +31,15 @@ interface Fitted {
 
 const GRID = Array.from({ length: 9 }, (_, i) => ((i + 1) / 10) * VIEW)
 
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
+
+/** 화면 좌표 → 상자 0–1. 캡처 중 상자 밖으로 끌면 가장자리에 붙인다. */
+function toBox(rect: DOMRect, clientX: number, clientY: number): PenPoint {
+  return { x: clamp01((clientX - rect.left) / rect.width), y: clamp01((clientY - rect.top) / rect.height) }
+}
+
 function pointOf(event: ReactPointerEvent<SVGSVGElement>): PenPoint {
-  const rect = event.currentTarget.getBoundingClientRect()
-  return { x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height }
+  return toBox(event.currentTarget.getBoundingClientRect(), event.clientX, event.clientY)
 }
 
 /** 펜은 한 프레임에 여러 점을 보낸다 — 합쳐진 이벤트를 풀어 떨림까지 그대로 받는다. */
@@ -42,7 +48,7 @@ function pointsOf(event: ReactPointerEvent<SVGSVGElement>): PenPoint[] {
   const native = event.nativeEvent as globalThis.PointerEvent & { getCoalescedEvents?: () => globalThis.PointerEvent[] }
   const events = native.getCoalescedEvents?.() ?? []
   if (events.length === 0) return [pointOf(event)]
-  return events.map((item) => ({ x: (item.clientX - rect.left) / rect.width, y: (item.clientY - rect.top) / rect.height }))
+  return events.map((item) => toBox(rect, item.clientX, item.clientY))
 }
 
 export function PenLabPage() {
@@ -51,6 +57,8 @@ export function PenLabPage() {
   const [epsilon, setEpsilon] = useState<Epsilon>(PEN_FIT_EPSILON)
   const [copied, setCopied] = useState(false)
   const drawing = useRef<PenPoint[] | null>(null)
+  /** 지금 긋는 포인터. 다른 손가락이 닿아도 이 획에 섞이지 않는다. */
+  const activePointer = useRef<number | null>(null)
 
   const fitted = useMemo<Fitted[]>(() => strokes.map((raw, index) => ({
     raw,
@@ -58,18 +66,23 @@ export function PenLabPage() {
   })), [strokes])
 
   const begin = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (event.pointerType === 'touch' || event.button !== 0) return
+    // 펜 · 손가락 · 마우스 전부 긋는다(10-05 사용자 결정 — 폰에서는 손가락뿐이다). 마우스는 왼쪽 단추만.
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    if (activePointer.current !== null) return
     event.currentTarget.setPointerCapture(event.pointerId)
+    activePointer.current = event.pointerId
     drawing.current = [pointOf(event)]
     setCurrent(drawing.current)
     setCopied(false)
   }
   const move = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (!drawing.current) return
+    if (!drawing.current || event.pointerId !== activePointer.current) return
     drawing.current = [...drawing.current, ...pointsOf(event)]
     setCurrent(drawing.current)
   }
-  const finish = () => {
+  const finish = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (event.pointerId !== activePointer.current) return
+    activePointer.current = null
     const raw = drawing.current
     drawing.current = null
     setCurrent(null)
@@ -91,7 +104,7 @@ export function PenLabPage() {
     <header className={styles.header}>
       <span>Lab</span>
       <h1>펜 그리기</h1>
-      <p>빈 자모 상자에 펜으로 그으면 획 하나가 된다. 왼쪽은 그은 점 그대로, 오른쪽은 허용오차 ε로 줄인 앵커와 핸들. 손가락은 그리지 않는다.</p>
+      <p>빈 자모 상자에 펜이나 손가락으로 그으면 획 하나가 된다. 왼쪽은 그은 점 그대로, 오른쪽은 허용오차 ε로 줄인 앵커와 핸들. 상자 안에서는 스크롤되지 않는다.</p>
     </header>
 
     <div className={styles.controls}>

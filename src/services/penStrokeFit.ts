@@ -103,9 +103,12 @@ export function penCornerIndices(points: readonly PenPoint[], angleDeg = PEN_COR
   const limit = (angleDeg * Math.PI) / 180
   const turn = new Array<number>(count).fill(0)
   for (let i = 1; i < count - 1; i++) {
-    const back = normalize(subtract(points[i], points[spanIndex(points, i, -1, span)]))
-    const forward = normalize(subtract(points[spanIndex(points, i, 1, span)], points[i]))
-    if ((back.x === 0 && back.y === 0) || (forward.x === 0 && forward.y === 0)) continue
+    const before = points[spanIndex(points, i, -1, span)]
+    const after = points[spanIndex(points, i, 1, span)]
+    // 끝에 닿아 짧은 벡터로 재면 떨림이 큰 각이 된다. 양쪽이 span의 반은 돼야 잰다 — 끝에서 그만큼 안쪽 꺾임은 못 잡는다.
+    if (distance(before, points[i]) < span / 2 || distance(after, points[i]) < span / 2) continue
+    const back = normalize(subtract(points[i], before))
+    const forward = normalize(subtract(after, points[i]))
     turn[i] = Math.acos(Math.max(-1, Math.min(1, dot(back, forward))))
   }
   const corners: number[] = []
@@ -287,8 +290,8 @@ function segmentsToAnchors(segments: readonly Segment[]): AnchorPoint[] {
   return anchors
 }
 
-/** 획을 촘촘한 점으로 편다 — 이탈 거리 재기용. */
-function sampleStroke(points: readonly AnchorPoint[], steps = 32): PenPoint[] {
+/** 획을 촘촘한 점으로 편다 — 이탈 거리 재기용. 96조각이면 꺾은선 오차가 ε의 1/1000 아래다. */
+function sampleStroke(points: readonly AnchorPoint[], steps = 96): PenPoint[] {
   const sampled: PenPoint[] = []
   for (let i = 0; i < points.length - 1; i++) {
     const a = points[i]
@@ -304,7 +307,7 @@ function sampleStroke(points: readonly AnchorPoint[], steps = 32): PenPoint[] {
   return sampled
 }
 
-/** 그은 점들이 맞춘 획에서 벗어난 최대 거리(0–1). 곡선은 32조각으로 펴서 잰다. */
+/** 그은 점들이 맞춘 획에서 벗어난 최대 거리(0–1). 곡선은 96조각으로 펴서 잰다. */
 export function penFitDeviation(points: readonly PenPoint[], stroke: Pick<StrokeDataV2, 'points'>): number {
   const sampled = sampleStroke(stroke.points)
   if (sampled.length < 2) return points.length === 0 ? 0 : Infinity

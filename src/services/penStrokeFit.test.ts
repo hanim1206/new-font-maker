@@ -67,16 +67,23 @@ describe('펜 획 맞춤', () => {
     expect(result.maxDeviation).toBeLessThanOrEqual(EPS)
   })
 
-  // 쪼개는 자리가 ε마다 달라서 앵커 수가 ε에 꼭 단조롭진 않다(Schneider 방식의 성질). 양 끝 후보만 비교한다.
-  it('S자 곡선도 허용오차 안에서 맞고, 허용오차가 가장 작을 때 앵커가 가장 많거나 같다', () => {
+  // 앵커 수는 쪼개는 자리가 ε마다 달라 ε에 단조롭지 않다(Schneider 방식의 성질). 여기선 성질만 본다: 모든 ε에서 이탈 ≤ ε, 꺾임 없음.
+  it('S자 곡선은 어느 허용오차에서도 그 안에서 맞고 꺾임으로 잡히지 않는다', () => {
     const points = [...arc({ x: .5, y: .3 }, .18, 270, 90, 60, .0015, 5), ...arc({ x: .5, y: .66 }, .18, 270, 450, 60, .0015, 6).slice(1)]
-    const counts = PEN_FIT_EPSILON_CANDIDATES.map((epsilon) => {
+    for (const epsilon of PEN_FIT_EPSILON_CANDIDATES) {
       const result = fitPenStroke(points, { epsilon })!
       expect(result.maxDeviation).toBeLessThanOrEqual(epsilon)
-      expect(result.anchorCount).toBeLessThanOrEqual(7)
-      return result.anchorCount
-    })
-    expect(counts[0]).toBeGreaterThanOrEqual(counts[counts.length - 1])
+      expect(result.corners).toEqual([])
+      expect(result.anchorCount).toBeGreaterThanOrEqual(3)
+    }
+  })
+
+  it('촘촘한 직선의 시작 떨림을 꺾임으로 잡지 않는다', () => {
+    for (let seed = 11; seed < 31; seed++) {
+      const result = fitPenStroke(line({ x: .1, y: .5 }, { x: .9, y: .5 }, 400, .002, seed))!
+      expect(result.corners, `seed ${seed}`).toEqual([])
+      expect(result.anchorCount, `seed ${seed}`).toBe(2)
+    }
   })
 
   it('짧은 점 하나 · 톡 찍기는 획이 안 된다', () => {
