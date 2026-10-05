@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { StrokeDataV2 } from '../types'
-import { adoptStrokeRoles, closeIfNear, fitStrokesToPresetBounds, matchStrokeRoles, ROLE_MATCH_TAU_CANDIDATES, strokeRoleScore } from './strokeRoleMatch'
+import { adoptStrokeRoles, closeIfNear, fitStrokesToPresetBounds, joinStrokesAtEnds, matchStrokeRoles, ROLE_MATCH_TAU_CANDIDATES, strokeRoleScore } from './strokeRoleMatch'
 
 const stroke = (id: string, points: [number, number][], closed = false): StrokeDataV2 => ({
   id, closed, thickness: .07, points: points.map(([x, y]) => ({ x, y })),
@@ -133,6 +133,27 @@ describe('그린 획에 역할 붙이기', () => {
     const top = Math.min(...[0, .25, .5, .75, 1].map((t) => { const u = 1 - t; const a = fit.points[0], b = fit.points[1]; return u * u * u * a.y + 3 * u * u * t * a.handleOut!.y + 3 * u * t * t * b.handleIn!.y + t * t * t * b.y }))
     expect(top).toBeGreaterThanOrEqual(-1e-6)
     expect(fit.points[0].y).toBeCloseTo(1, 6)
+  })
+
+  it('ㄱ을 두 획으로 나눠 그으면 끝점이 두께 안일 때 한 획으로 이어져 ㄱ-1이 된다', () => {
+    const drawn = [stroke('a', [[0, .02], [.97, .03]]), stroke('b', [[.98, .05], [.98, 1]])]
+    const joined = joinStrokesAtEnds(drawn, .07)
+    expect(joined).toHaveLength(1)
+    expect(joined[0].points).toHaveLength(3)
+    expect(joined[0].points[1].x).toBeCloseTo(.975, 6)
+    expect(matchStrokeRoles(joined, PRESET_ㄱ).state).toBe('recognized')
+  })
+
+  it('이어 붙이기는 방향이 반대여도 뒤집어 잇고, 끝이 멀거나 중간에 닿으면 잇지 않는다', () => {
+    // 둘째 획을 아래→위로 그어 끝이 앞 획 끝에 닿는 경우
+    const flipped = joinStrokesAtEnds([stroke('a', [[0, 0], [1, 0]]), stroke('b', [[1, 1], [1, .02]])], .07)
+    expect(flipped).toHaveLength(1)
+    expect(flipped[0].points.map((p) => [p.x, p.y])).toEqual([[0, 0], [1, .01], [1, 1]])
+    // ㅏ: 곁줄기가 기둥 중간에 닿는다 — 끝점끼리는 멀어서 안 잇는다
+    const separate = joinStrokesAtEnds([stroke('a', [[0, 0], [0, 1]]), stroke('b', [[0, .5], [1, .5]])], .07)
+    expect(separate).toHaveLength(2)
+    // 끝이 두께보다 멀면 안 잇는다
+    expect(joinStrokesAtEnds([stroke('a', [[0, 0], [.8, 0]]), stroke('b', [[1, 0], [1, 1]])], .07)).toHaveLength(2)
   })
 
   it('closeIfNear는 끝이 멀거나 점이 적으면 null', () => {

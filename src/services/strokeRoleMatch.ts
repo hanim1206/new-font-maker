@@ -217,6 +217,37 @@ export function fitStrokesToPresetBounds(drawn: readonly StrokeDataV2[], presets
   }))
 }
 
+/**
+ * 연달아 그은 두 획의 끝점이 `gap` 안이면 한 획으로 잇는다(10-05 사용자 결정) — ㄱ · ㄹ처럼 프리셋이 한 획인 자모를 나눠 그었을 때.
+ * 끝점과 끝점만 잇는다. 방향이 반대면 뒤집어 잇고, 이음매는 꺾임(핸들 없음)으로 둔다. 기둥 중간에 닿는 곁줄기는 잇지 않는다.
+ * 순서가 떨어진 획끼리는 보지 않는다 — 그린 순서대로 앞 획에 붙일 수 있는지만 본다. 닫힌 획은 건너뛴다.
+ */
+export function joinStrokesAtEnds(strokes: readonly StrokeDataV2[], gap: number): StrokeDataV2[] {
+  const out: StrokeDataV2[] = []
+  for (const stroke of strokes) {
+    const prev = out[out.length - 1]
+    if (!prev || prev.closed || stroke.closed || prev.points.length < 2 || stroke.points.length < 2) { out.push(stroke); continue }
+    const a0 = prev.points[0], a1 = prev.points[prev.points.length - 1]
+    const b0 = stroke.points[0], b1 = stroke.points[stroke.points.length - 1]
+    // 앞 획의 끝에 붙이는 두 경우를 먼저, 앞 획의 시작에 붙이는 두 경우를 다음에.
+    const candidates: { d: number; head: AnchorPoint[]; tail: AnchorPoint[] }[] = [
+      { d: distance(a1, b0), head: prev.points, tail: stroke.points },
+      { d: distance(a1, b1), head: prev.points, tail: reversed(stroke.points) },
+      { d: distance(a0, b1), head: stroke.points, tail: prev.points },
+      { d: distance(a0, b0), head: reversed(stroke.points), tail: prev.points },
+    ]
+    const best = candidates.reduce((pick, item) => (item.d < pick.d ? item : pick))
+    if (best.d > gap) { out.push(stroke); continue }
+    const seamA = best.head[best.head.length - 1]
+    const seamB = best.tail[0]
+    const seam: AnchorPoint = { x: (seamA.x + seamB.x) / 2, y: (seamA.y + seamB.y) / 2 }
+    if (seamA.handleIn) seam.handleIn = { ...seamA.handleIn }
+    if (seamB.handleOut) seam.handleOut = { ...seamB.handleOut }
+    out[out.length - 1] = { ...prev, points: [...best.head.slice(0, -1), seam, ...best.tail.slice(1)] }
+  }
+  return out
+}
+
 function reversed(points: readonly AnchorPoint[]): AnchorPoint[] {
   return [...points].reverse().map((point) => {
     const { handleIn, handleOut, ...rest } = point
