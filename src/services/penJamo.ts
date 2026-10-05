@@ -1,7 +1,7 @@
 import type { BoxConfig, JamoData, StrokeDataV2, StrokeLinecap } from '../types'
 import { fitPenStroke, PEN_FIT_EPSILON, penClosesOnItself } from './penStrokeFit'
 import type { PenPoint } from './penStrokeFit'
-import { adoptStrokeRoles, closeIfNear, fitStrokesInkToUnitBox, flattenCenterline, fitStrokesToPresetBounds, joinStrokesAtEnds, matchStrokeRoles, ROLE_MATCH_TAU } from './strokeRoleMatch'
+import { adoptStrokeRoles, fitStrokesInkToUnitBox, flattenCenterline, fitStrokesToPresetBounds, joinStrokesAtEnds, matchStrokeRoles, ROLE_MATCH_TAU } from './strokeRoleMatch'
 import type { JamoRecognition, RoleMatch } from './strokeRoleMatch'
 
 /**
@@ -109,7 +109,7 @@ export interface PenStrokeResult {
 }
 
 /**
- * 닫으려던 획인지. 손으로 그은 ㅇ은 끝이 시작에 딱 안 닿거나 지나친다 — 두께 안으로 만나야만 닫힌 획으로 치면 너무 박하다(10-06 사용자).
+ * 닫으려던 획인지. 손으로 그은 ㅇ은 끝이 시작에 딱 안 닿거나 지나친다 — 두께 안으로 만나야만 닫힌 역할을 주면 너무 박하다(10-06 사용자).
  * ㄱ · ㄷ처럼 벌어진 획은 틈이 제 크기와 비슷해 여기 안 든다.
  */
 function looksClosed(stroke: StrokeDataV2): boolean {
@@ -117,26 +117,17 @@ function looksClosed(stroke: StrokeDataV2): boolean {
   return stroke.closed || penClosesOnItself(flattenCenterline(stroke))
 }
 
-/** 닫으려던 획을 닫는다. 끝 앵커를 시작에 합치고(앵커가 모자라면 끝에서 시작으로 곧게 잇는다) 닫힌 획으로 돌려준다. */
-function closeLoosely(stroke: StrokeDataV2): StrokeDataV2 {
-  return closeIfNear(stroke, Infinity) ?? { ...stroke, closed: true }
-}
-
 /**
  * 그은 획(`candidates`)을 빈 역할(`freeIndexes`)에 붙인다. 판정은 자모 전체를 프리셋 범위에 채운 좌표로, 승계(방향 · 닫기)는 프리셋을 그은 범위로 옮겨 그은 좌표로 한다.
- * 닫으려던 획은 닫힌 획으로 보고 견주고, 닫힌 역할과 짝이 되면 닫아서 넘긴다.
+ * 닫으려던 획은 닫힌 획으로 보고 견준다. 닫힌 역할과 짝이 되면 **열린 채 그대로** 역할만 붙인다 — 안 닫은 것도 그린 사람의 멋이다(10-06 사용자). 끝이 두께 안으로 만난 획만 닫는다.
  */
 function judgePenRoles(kept: readonly StrokeDataV2[], candidates: readonly StrokeDataV2[], presets: readonly StrokeDataV2[], freeIndexes: readonly number[], jamoKey: string, tau: number) {
   const group = [...kept, ...candidates]
   const freePresets = freeIndexes.map((index) => presets[index])
   const filled = fitStrokesToPresetBounds(group, presets).slice(kept.length).map((stroke, index) => (looksClosed(candidates[index]) ? { ...stroke, closed: true } : stroke))
   const match = matchStrokeRoles(filled, freePresets, { tau })
-  const ready = candidates.map((stroke, index) => {
-    const pair = match.pairs.find((item) => item.drawn === index)
-    return pair && freePresets[pair.preset].closed && !stroke.closed && looksClosed(stroke) ? closeLoosely(stroke) : stroke
-  })
   const placed = fitStrokesToPresetBounds(presets, group)
-  const adopted = adoptStrokeRoles(ready, freeIndexes.map((index) => placed[index]), match, { jamoKey })
+  const adopted = adoptStrokeRoles(candidates, freeIndexes.map((index) => placed[index]), match, { jamoKey, openAsClosed: (index) => looksClosed(candidates[index]) })
   return { adopted, score: match.pairs.reduce((sum, pair) => sum + pair.score, 0) }
 }
 

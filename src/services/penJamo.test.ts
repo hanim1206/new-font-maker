@@ -103,7 +103,7 @@ describe('펜 자모', () => {
     expect(penJamoState(branch!.jamo, 'strokes', ㅏ)).toEqual({ state: 'recognized', missing: [] })
   })
 
-  it('ㅎ의 동그라미는 끝이 덜 닿게 · 찌그러지게 그어도 닫힌 획으로 역할을 받는다', () => {
+  it('ㅎ의 동그라미는 끝이 덜 닿게 · 찌그러지게 그어도 역할을 받는다 — 닫지 않고 그은 그대로', () => {
     const ㅎ: JamoData = { char: 'ㅎ', type: 'choseong', strokes: [
       stroke('ㅎ-1', [[.5, 0], [.5, .21]]),
       stroke('ㅎ-2', [[0, .21], [1, .21]]),
@@ -121,11 +121,21 @@ describe('펜 자모', () => {
     const result = addPenStroke(jamo, 'strokes', loop, ㅎ, { drawn })
     expect(result?.strokeId).toBe('ㅎ-circle')
     expect(result?.jamo.strokes?.map((item) => item.id)).toEqual(['ㅎ-1', 'ㅎ-2', 'ㅎ-circle'])
-    expect(result?.jamo.strokes?.[2].closed).toBe(true)
     expect(penJamoState(result!.jamo, 'strokes', ㅎ).state).toBe('recognized')
-    // 벌어진 획(ㄷ 꼴)은 닫지 않는다
+    // 열린 채 그대로다 — 끝이 시작에 안 닿은 틈이 남는다.
+    const circle = result!.jamo.strokes![2]
+    expect(circle.closed).toBe(false)
+    const first = circle.points[0], last = circle.points[circle.points.length - 1]
+    expect(Math.hypot(first.x - last.x, first.y - last.y)).toBeGreaterThan(.15)
+    // 끝이 두께 안으로 만나게 한 바퀴 돈 획은 닫는다
+    const full = Array.from({ length: 41 }, (_, index) => {
+      const angle = (-90 + 357 * index / 40) * Math.PI / 180
+      return { x: .5 + .36 * Math.cos(angle), y: .72 + .2 * Math.sin(angle) }
+    })
+    expect(addPenStroke(jamo, 'strokes', full, ㅎ, { drawn })?.jamo.strokes?.[2]).toMatchObject({ id: 'ㅎ-circle', closed: true })
+    // 벌어진 획(ㄷ 꼴)은 동그라미 역할을 못 받는다
     const open = addPenStroke(jamo, 'strokes', [...line([.8, .5], [.2, .5]), ...line([.2, .52], [.2, .95]), ...line([.22, .95], [.8, .95])], ㅎ, { drawn })
-    expect(open?.jamo.strokes?.every((item) => !item.closed || item.id !== open.strokeId)).toBe(true)
+    expect(open?.strokeId).not.toBe('ㅎ-circle')
   })
 
   it('비우기: 펜이 꺼져 있으면 전부 지우고, 켜져 있으면 그은 획만 남겨 역할을 다시 붙인다', () => {

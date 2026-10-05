@@ -16,6 +16,11 @@ export interface RoleMatchOptions {
   tau?: number
   /** 자유 획 id의 자모 표시(`pen-<jamo>-<n>`). */
   jamoKey?: string
+  /**
+   * 닫힌 역할과 짝이 됐지만 끝이 두께 안으로 안 만나는 그린 획을, 열린 채로 그 역할에 붙여도 되는지(그린 획 인덱스).
+   * 되면 id · 두께 · 끝모양만 승계하고 점과 닫힘은 그은 그대로 둔다. 안 주면 자유 획으로 돌린다.
+   */
+  openAsClosed?: (drawn: number) => boolean
 }
 
 export interface RolePair {
@@ -263,11 +268,13 @@ function reversed(points: readonly AnchorPoint[]): AnchorPoint[] {
   })
 }
 
-/** 열린 획의 시작 · 끝이 `gap` 안이면 닫는다 — 마지막 앵커를 떼고 closed. 아니면 null. */
+/** 열린 획의 시작 · 끝이 `gap` 안이면 닫는다 — 마지막 앵커를 떼고 closed(앵커가 셋뿐이면 떼지 않는다). 아니면 null. */
 export function closeIfNear(stroke: StrokeDataV2, gap: number): StrokeDataV2 | null {
   const points = stroke.points
-  if (stroke.closed || points.length < 4) return null
+  if (stroke.closed || points.length < 3) return null
   if (distance(points[0], points[points.length - 1]) > gap) return null
+  // 앵커 셋으로 맞춰진 둥근 획은 끝 앵커를 떼면 둘만 남아 납작해진다 — 그대로 두고 닫기만 한다(끝과 시작 사이는 두께 안의 짧은 마디).
+  if (points.length === 3) return { ...stroke, closed: true }
   const kept = points.slice(0, -1).map((point) => ({ ...point }))
   const last = points[points.length - 1]
   // 끝 앵커의 들어오는 핸들을 첫 앵커로 옮겨 마지막 마디가 매끈히 닫히게.
@@ -277,7 +284,7 @@ export function closeIfNear(stroke: StrokeDataV2, gap: number): StrokeDataV2 | n
 
 /**
  * 짝에 따라 역할을 승계한 획 배열. 순서는 프리셋 순서(엔진이 인덱스로 짝 짓는 곳이 있다), 자유 획은 뒤에 붙는다.
- * 프리셋이 닫힌 획이면 그린 획의 끝이 두께 안일 때 닫고, 아니면 승계하지 않고 자유 획으로 돌린다.
+ * 프리셋이 닫힌 획이면 그린 획의 끝이 두께 안일 때 닫는다. 아니면 `openAsClosed`가 허락할 때 열린 채로 승계하고, 그것도 아니면 자유 획으로 돌린다.
  * 방향은 프리셋과 맞춘다 — 그린 시작점이 프리셋 끝점에 더 가까우면 뒤집는다.
  */
 export function adoptStrokeRoles(drawn: readonly StrokeDataV2[], presets: readonly StrokeDataV2[], match: RoleMatch, options: RoleMatchOptions = {}): { strokes: StrokeDataV2[]; state: JamoRecognition; freeIds: string[]; ids: string[] } {
@@ -290,11 +297,12 @@ export function adoptStrokeRoles(drawn: readonly StrokeDataV2[], presets: readon
   for (const pair of match.pairs) {
     const preset = presets[pair.preset]
     let stroke = drawn[pair.drawn]
+    let closed = preset.closed
     if (preset.closed) {
-      // 부르는 쪽이 이미 닫아 준 획(느슨하게 닫기)은 그대로 받는다.
-      const closed = stroke.closed ? stroke : closeIfNear(stroke, preset.thickness)
-      if (!closed) { free.push(pair.drawn); continue }
-      stroke = closed
+      const joined = closeIfNear(stroke, preset.thickness)
+      if (joined) stroke = joined
+      else if (options.openAsClosed?.(pair.drawn)) closed = false
+      else { free.push(pair.drawn); continue }
     } else {
       const first = stroke.points[0]
       const last = stroke.points[stroke.points.length - 1]
@@ -304,7 +312,7 @@ export function adoptStrokeRoles(drawn: readonly StrokeDataV2[], presets: readon
         stroke = { ...stroke, points: reversed(stroke.points) }
       }
     }
-    const next: StrokeDataV2 = { ...stroke, id: preset.id, closed: preset.closed, thickness: preset.thickness }
+    const next: StrokeDataV2 = { ...stroke, id: preset.id, closed, thickness: preset.thickness }
     if (preset.label !== undefined) next.label = preset.label
     if (preset.linecap !== undefined) next.linecap = preset.linecap
     if (preset.linejoin !== undefined) next.linejoin = preset.linejoin
