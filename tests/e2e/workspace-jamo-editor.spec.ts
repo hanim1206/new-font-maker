@@ -258,6 +258,41 @@ test('획 편집 `초기화`는 한 번 묻고 고친 자소를 프리셋으로 
   await expect(strokes).toHaveCount(before + 1)
 })
 
+test('획 편집 `펜`으로 ㄱ을 한 획 그으면 인식되고, 끝을 누르면 저장된다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EA%B0%80&mode=stroke&part=CH')
+  const editor = page.getByRole('region', { name: /완성 글자 편집/ })
+  await expect(editor).toBeVisible()
+  await page.getByTestId('jamo-stroke-pen').click()
+  // 고친 흔적(조건부 변형 · 문맥별 모양)이 있으면 비워진다고 먼저 알린다.
+  const sheet = page.getByTestId('jamo-pen-reset-confirm')
+  if (await sheet.count()) await page.getByTestId('jamo-pen-reset-ok').click()
+  await expect(page.getByTestId('pen-layer')).toBeVisible()
+  // 펜 모드에서는 획 눌림 영역이 없다.
+  await expect(editor.locator('svg [data-editor-hit="stroke"]')).toHaveCount(0)
+
+  // 칸(점선 상자) 안에 ㄱ 꼴 한 획.
+  const box = (await page.getByTestId('pen-box').boundingBox())!
+  const at = (x: number, y: number) => ({ x: box.x + box.width * x, y: box.y + box.height * y })
+  const start = at(.08, .08)
+  await page.mouse.move(start.x, start.y)
+  await page.mouse.down()
+  for (const [x, y] of [[.3, .07], [.6, .06], [.9, .06], [.92, .3], [.92, .6], [.92, .92]]) {
+    const point = at(x, y)
+    await page.mouse.move(point.x, point.y, { steps: 4 })
+  }
+  await page.mouse.up()
+  await expect(page.getByTestId('jamo-pen-status')).toHaveText('인식됨')
+  await page.screenshot({ path: 'test-results/pen-recognized.png' })
+
+  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeDisabled()
+  await page.getByTestId('jamo-stroke-pen-done').click()
+  await expect(page.getByTestId('pen-layer')).toHaveCount(0)
+  await expect(editor.locator('svg [data-stroke-id="ㄱ-1"]')).toHaveCount(1)
+  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
+  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
+  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeDisabled()
+})
+
 test('획을 세로부 칸에만 둔 ㅒ · ㅖ도 획 편집에서 획을 고른다', async ({ page }) => {
   // 베타 제보(09-28): ㅒ · ㅖ는 그려지는데 획 편집에서 누를 획이 없었다. 둘만 획을 `verticalStrokes`에 둔다.
   for (const char of ['얘', '예']) {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
-import { Check, Circle, ClipboardPaste, Copy, Dices, Download, Import, Link2, ListTree, LoaderCircle, Minus, Plus, Redo2, RotateCcw, Settings2, Share2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
+import { Check, Circle, ClipboardPaste, Copy, Dices, Download, Import, Link2, ListTree, LoaderCircle, Minus, Pencil, Plus, Redo2, RotateCcw, Settings2, Share2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { create } from 'zustand'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
@@ -52,6 +52,10 @@ import { useUnifiedTrackpad } from '../src/features/mobile-editor/useUnifiedTrac
 import { calculateBoxes } from '../src/utils/layoutCalculator'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { createCirclePath, pointsToSvgD } from '../src/utils/pathUtils'
+import { getJamoRenderBox } from '../src/utils/jamoGeometry'
+import { applyPenToJamo, penResetCount, presetChannelOf, recognizePenJamo, viewBoxToJamoBox } from '../src/services/penJamo'
+import type { PenChannel } from '../src/services/penJamo'
+import type { PenPoint } from '../src/services/penStrokeFit'
 import { addHandlesToPoint, mergeStrokes, pointHasHandles, removeHandlesFromPoint, splitStroke } from '../src/utils/strokeEditUtils'
 import { MERGE_PROXIMITY } from '../src/utils/snapUtils'
 import type {
@@ -160,6 +164,39 @@ type Selection =
 /** 캔버스 직접 끌기가 조절판과 같은 이동 계산을 쓰게 하는 문. `change`의 단위는 조절판과 같다(1 = 상자 좌표 0.001). */
 /** `shownBox`는 이동량을 비율로 나눈 칸(끌기를 시작할 때 그 획이 놓인 칸). 안 주면 선택이 기억한 칸. */
 type StrokeDragApi = { begin: () => void; change: (movement: StrokeMoveDelta, shownBox?: BoxConfig) => void; commit: () => void; cancel: () => void }
+/**
+ * 캔버스에 올리는 펜 층(플랜 2026-10-05 고스트 따라 긋기). 있으면 잠긴 자소의 눌림 영역을 걷고 투명 판 하나가 긋기를 받는다.
+ * 점은 `presetJamo` · `presetStrokes`가 놓이는 상자(고스트가 깔리는 바로 그 상자)의 0–1로 올린다 — 저장한 획이 같은 상자에 놓인다.
+ */
+type PenCanvas = {
+  renderPart: Part
+  presetJamo: JamoData
+  presetStrokes: StrokeDataV2[]
+  /** 고스트로 깔지 여부. */
+  ghost: boolean
+  /** 이미 그은 점 묶음(자모 상자 0–1). */
+  raw: PenPoint[][]
+  onStroke: (points: PenPoint[]) => void
+}
+
+/** 도구 줄에 내려 주는 펜 도구 상태와 동작(상태는 부모가 든다). */
+type PenTool = {
+  active: boolean
+  /** 펜을 못 쓰는 이유(단추 설명). 쓸 수 있으면 null. */
+  blocked: string | null
+  ghost: boolean
+  hasStrokes: boolean
+  /** 들어갈 때 사라질 오버라이드 수. 0이면 안내 없이 바로 켠다. */
+  resetCount: number
+  /** 칩에 띄울 인식 상태. */
+  status: string
+  onStart: () => void
+  onDone: () => void
+  onClear: () => void
+  onToggleGhost: () => void
+  onCancel: () => void
+}
+
 /** 끌기로 치는 최소 거리(px). 이보다 짧으면 누르기다. 조절판도 같은 문턱을 쓴다. */
 const DRAG_THRESHOLD_PX = 3
 /**
@@ -371,6 +408,8 @@ const NO_STROKES: readonly string[] = []
 const editorPartOf = (part: Part): MobileEditorPart => part === 'CH' ? 'CH' : part === 'JO' ? 'JO' : 'JU'
 /** `획 고치기`로 잠긴 동안 고치지 않는 자소의 잉크 농도. */
 const LOCKED_OUT_OPACITY = 0.22
+/** 펜 모드에서 지금 자소의 옛 잉크. */
+const PEN_INK_OPACITY = 0.12
 
 function layoutAreaLabel(part: MobileEditorPart): string {
   if (part === 'CH') return '초성'
@@ -474,6 +513,82 @@ function Glyph({
   </SvgRenderer>
 }
 
+/**
+ * 펜 층. 고스트 · 그은 선 · 입력 판을 SvgRenderer 안(기울기 변환 안쪽)에 그린다.
+ * 화면 → 자모 상자는 판의 화면 변환을 거꾸로 돌려 얻는다 — 글자가 기울어도 맞는다.
+ */
+function PenLayer({ pen, box, viewport, u }: { pen: PenCanvas; box: BoxConfig; viewport: BoxConfig; u: number }) {
+  const surfaceRef = useRef<SVGRectElement>(null)
+  const drawing = useRef<PenPoint[] | null>(null)
+  /** 지금 긋는 포인터. 다른 손가락이 닿아도 이 획에 섞이지 않는다. */
+  const activePointer = useRef<number | null>(null)
+  const [current, setCurrent] = useState<PenPoint[] | null>(null)
+  // iOS Safari는 SVG의 `touch-action: none`을 건너뛰기도 해서 세로로 그으면 화면이 스크롤된다. 펜 층이 있는 동안 터치 이동을 직접 막는다(passive 아님).
+  useEffect(() => {
+    const svg = surfaceRef.current?.ownerSVGElement
+    if (!svg) return
+    const block = (event: TouchEvent) => { if (event.cancelable) event.preventDefault() }
+    svg.addEventListener('touchstart', block, { passive: false })
+    svg.addEventListener('touchmove', block, { passive: false })
+    return () => {
+      svg.removeEventListener('touchstart', block)
+      svg.removeEventListener('touchmove', block)
+    }
+  }, [])
+  const toBox = (target: SVGGraphicsElement, clientX: number, clientY: number): PenPoint | null => {
+    const matrix = target.getScreenCTM()
+    if (!matrix) return null
+    const at = new DOMPoint(clientX, clientY).matrixTransform(matrix.inverse())
+    return viewBoxToJamoBox([{ x: at.x, y: at.y }], box, VIEW_BOX_SIZE)[0]
+  }
+  /** 펜은 한 프레임에 여러 점을 보낸다 — 합쳐진 이벤트를 풀어 떨림까지 그대로 받는다. 합성 이벤트에는 없어 한 점으로 돌아간다. */
+  const pointsOf = (event: ReactPointerEvent<SVGRectElement>): PenPoint[] => {
+    const native = event.nativeEvent as globalThis.PointerEvent & { getCoalescedEvents?: () => globalThis.PointerEvent[] }
+    const events = native.getCoalescedEvents?.() ?? []
+    const source = events.length > 0 ? events : [native]
+    return source.map((item) => toBox(event.currentTarget, item.clientX, item.clientY)).filter((point): point is PenPoint => point !== null)
+  }
+  const begin = (event: ReactPointerEvent<SVGRectElement>) => {
+    event.stopPropagation()
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    if (activePointer.current !== null) return
+    const first = toBox(event.currentTarget, event.clientX, event.clientY)
+    if (!first) return
+    event.currentTarget.setPointerCapture(event.pointerId)
+    activePointer.current = event.pointerId
+    drawing.current = [first]
+    setCurrent(drawing.current)
+  }
+  const move = (event: ReactPointerEvent<SVGRectElement>) => {
+    event.stopPropagation()
+    if (!drawing.current || event.pointerId !== activePointer.current) return
+    drawing.current = [...drawing.current, ...pointsOf(event)]
+    setCurrent(drawing.current)
+  }
+  const finish = (event: ReactPointerEvent<SVGRectElement>, cancelled: boolean) => {
+    event.stopPropagation()
+    if (event.pointerId !== activePointer.current) return
+    activePointer.current = null
+    const points = drawing.current
+    drawing.current = null
+    setCurrent(null)
+    if (!cancelled && points && points.length >= 2) pen.onStroke(points)
+  }
+  const pathOf = (points: readonly PenPoint[]) => points.map((point, index) => {
+    const at = absolutePoint(point, box)
+    return `${index === 0 ? 'M' : 'L'}${at.x.toFixed(2)} ${at.y.toFixed(2)}`
+  }).join(' ')
+  const lineWidth = 0.7 * u
+  return <g data-testid="pen-layer">
+    <rect x={box.x * VIEW_BOX_SIZE} y={box.y * VIEW_BOX_SIZE} width={box.width * VIEW_BOX_SIZE} height={box.height * VIEW_BOX_SIZE} fill="none" stroke={EDIT_COLOR.editGuide} strokeWidth={0.4 * u} strokeDasharray={`${1.5 * u} ${1.5 * u}`} pointerEvents="none" data-testid="pen-box" />
+    {pen.ghost && pen.presetStrokes.map((stroke) => <path key={stroke.id} d={pointsToSvgD(stroke.points, stroke.closed, box, VIEW_BOX_SIZE)} fill="none" stroke={EDIT_COLOR.editGuide} strokeWidth={stroke.thickness * VIEW_BOX_SIZE} strokeLinecap="round" strokeLinejoin="round" opacity={0.6} pointerEvents="none" data-testid="pen-ghost" />)}
+    {pen.raw.map((points, index) => <path key={index} d={pathOf(points)} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={lineWidth} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" data-testid="pen-raw" />)}
+    {current && <path d={pathOf(current)} fill="none" stroke={EDIT_COLOR.editSelect} strokeWidth={lineWidth} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
+    {/* 글자가 기울어도 판이 칸 모서리를 덮도록 보기 창보다 넉넉히 깐다. */}
+    <rect ref={surfaceRef} x={viewport.x * VIEW_BOX_SIZE - 100} y={viewport.y * VIEW_BOX_SIZE - 100} width={viewport.width * VIEW_BOX_SIZE + 200} height={viewport.height * VIEW_BOX_SIZE + 200} fill="transparent" pointerEvents="all" onPointerDown={begin} onPointerMove={move} onPointerUp={(event) => finish(event, false)} onPointerCancel={(event) => finish(event, true)} data-testid="pen-surface" />
+  </g>
+}
+
 function FocusedGlyph({
   char,
   syllable,
@@ -493,11 +608,14 @@ function FocusedGlyph({
   grid,
   designBody,
   globalStyle,
+  pen = null,
 }: {
   char: string
   syllable: DecomposedSyllable
   schema: LayoutSchema
   selection: Selection
+  /** 펜 모드. 있으면 잠긴 자소의 눌림 영역 대신 펜 층이 긋기를 받는다. */
+  pen?: PenCanvas | null
   /** `획 고치기`로 들어온 자소. 이 자소의 획만 잡히고 나머지는 흐리게 그린다. */
   lockedPart?: MobileEditorPart | null
   /** 주면 잡은 점 · 핸들 · 획을 캔버스에서 바로 끈다(셸 안). 없으면 누르기로 고르기만 한다. */
@@ -528,6 +646,11 @@ function FocusedGlyph({
     jong: syllable.jongseong?.char ?? '',
   }), [placement, schema, syllable])
   const targets = useMemo(() => getRenderedStrokeTargets(syllable, boxes), [boxes, syllable])
+  // 펜 상자. 프리셋 획을 이 칸에 놓는 상자 하나 — 고스트도 그은 점도 저장한 획도 같은 상자다(JU 줄기마다 달라지는 `targets`의 상자는 안 쓴다).
+  const penBox = useMemo(() => {
+    const target = pen ? boxes[pen.renderPart] : undefined
+    return pen && target ? getJamoRenderBox(pen.presetJamo, pen.presetStrokes, target) : null
+  }, [pen, boxes])
   // 고른 홀자 줄기의 보선과 끝 표시. 세로로 끌면 저장 획이 아니라 보선이 움직인다 — 안쪽 보선은 레이아웃 편집처럼 칸 밖까지 길게 그린다.
   // 끝 표시: 보선에 매인 끝은 막대(보선 따라 세로로 미끄러짐), 칸 테두리에 매인 끝은 찬 점(획 편집에선 세로로 잠김). 테두리 보선은 길게 안 그린다 — 찬 점이 잠김을 말하고, 칸 변은 부품 상자로 보인다.
   const stemGuides = useMemo(() => {
@@ -577,10 +700,12 @@ function FocusedGlyph({
   // `획 고치기`로 들어왔을 때만 다르다 — 고치는 자소만 제 색이고 나머지는 흐리다. 글자는 제자리 그대로다.
   const partStyles = useMemo(() => {
     if (inkHidden && ghostVisible) return Object.fromEntries((['CH', 'JU', 'JU_H', 'JU_V', 'JO'] as Part[]).map((part) => [part, { opacity: 0 }])) as Partial<Record<Part, { opacity: number }>>
+    // 펜 모드: 지금 자소의 옛 잉크는 곧 새로 그은 획으로 바뀐다. 거의 지워 고스트와 그은 선이 보이게 한다.
+    if (penBox && lockedPart) return Object.fromEntries((['CH', 'JU', 'JU_H', 'JU_V', 'JO'] as Part[]).map((part) => [part, { opacity: editorPartOf(part) === lockedPart ? PEN_INK_OPACITY : LOCKED_OUT_OPACITY }])) as Partial<Record<Part, { opacity: number }>>
     return lockedPart
       ? Object.fromEntries((['CH', 'JU', 'JU_H', 'JU_V', 'JO'] as Part[]).filter((part) => editorPartOf(part) !== lockedPart).map((part) => [part, { opacity: LOCKED_OUT_OPACITY }])) as Partial<Record<Part, { opacity: number }>>
       : undefined
-  }, [lockedPart, inkHidden, ghostVisible])
+  }, [lockedPart, inkHidden, ghostVisible, penBox])
   const canvasStyle = {
     '--view-unit': u,
     '--construction-band-size': `${GRID_SYSTEM_2_UNIT * GRID_SYSTEM_2_STROKE_UNITS * 100}%`,
@@ -799,7 +924,7 @@ function FocusedGlyph({
         {stemGuides.some((guide) => !guide.border) && <g aria-hidden="true" pointerEvents="none" data-testid="stem-rail-guides">
           {stemGuides.filter((guide) => !guide.border).map((guide) => <line key={guide.key} x1={-6} x2={106} y1={guide.y} y2={guide.y} stroke={PART_COLOR.JU} strokeWidth={0.4 * u} data-rail-key={guide.key} />)}
         </g>}
-        {targets.map((target) => {
+        {!penBox && targets.map((target) => {
           // 잠긴 동안 다른 자소는 눌리지 않는다. 잠긴 자소의 획은 자소 통째 선택을 거치지 않고 바로 잡힌다.
           if (lockedPart && target.editorPart !== lockedPart) return null
           const path = pointsToSvgD(target.stroke.points, target.stroke.closed, target.box, VIEW_BOX_SIZE)
@@ -854,7 +979,7 @@ function FocusedGlyph({
         })}
         {/* 점은 펼친 획에만 뜬다. `여러 점`으로 다른 획에서 골라 둔 점이 있으면 그 획의 점도 남긴다.
             잡기만 하고 아직 안 펼친 획도 꼭짓점 눌림 영역(`catch`)은 깐다 — 잡은 획 가까이 누르면 다른 획보다 이 획의 점이 먼저다. */}
-        {selectedPart && selection.kind !== 'component' && targets.filter((target) => target.editorPart === selectedPart
+        {!penBox && selectedPart && selection.kind !== 'component' && targets.filter((target) => target.editorPart === selectedPart
           && (target.stroke.id === selectedStrokeId || selectedPoints.some((point) => point.strokeId === target.stroke.id))).flatMap((target) => {
           const shown = target.stroke.id === pointsOpenStrokeId || selectedPoints.some((point) => point.strokeId === target.stroke.id)
           return target.stroke.points.map((point, pointIndex) => {
@@ -867,7 +992,7 @@ function FocusedGlyph({
             </g>
           })
         })}
-        {(selection.kind === 'point' || selection.kind === 'handle') && targets.filter((target) => target.stroke.id === selection.strokeId).flatMap((target) => {
+        {!penBox && (selection.kind === 'point' || selection.kind === 'handle') && targets.filter((target) => target.stroke.id === selection.strokeId).flatMap((target) => {
           const point = target.stroke.points[selection.pointIndex]
           if (!point) return []
           const anchor = absolutePoint(point, target.box)
@@ -928,6 +1053,7 @@ function FocusedGlyph({
             {wholeJamoCentered.y && <line x1={-8} x2={108} y1={cy} y2={cy} className={styles.snapHitLine} data-testid="whole-jamo-center" data-axis="y" />}
           </>
         })()}
+        {pen && penBox && <PenLayer pen={pen} box={penBox} viewport={viewport} u={u} />}
       </SvgRenderer>
       {wholeJamoCentered
         ? <span className={styles.snapHitChip} data-testid="stroke-snap-chip">파트 가운데</span>
@@ -976,6 +1102,7 @@ function InferenceTrackpad({
   frameForEdit,
   toolSlot = null,
   onSpread = null,
+  penTool = null,
 }: {
   glyph: string
   syllable: DecomposedSyllable
@@ -1014,6 +1141,8 @@ function InferenceTrackpad({
   toolSlot?: HTMLElement | null
   /** 잡은 획이 형제에 퍼뜨릴 수 있는 홀자 줄기면 도구 줄 맨 아래 `전파`. 누르면 그 획 하나를 기준으로 반영 창이 뜬다. */
   onSpread?: (() => void) | null
+  /** 펜 도구(잠긴 자소를 펜으로 다시 긋는다). 없으면 단추를 안 그린다. */
+  penTool?: PenTool | null
 }) {
   const direct = Boolean(dragApiRef)
   // 지금 끄는 손이 조절판인지. 셸 안에서도 조절판을 함께 두므로(섬세한 편집) 캔버스 끌기와 구분한다.
@@ -1035,6 +1164,14 @@ function InferenceTrackpad({
   const [addMenuOpen, setAddMenuOpen] = useState(false)
   // `초기화`를 눌러 되돌릴지 묻는 창이 떠 있는지.
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
+  // 펜을 켜면 조건부 변형이 비워진다는 안내 창이 떠 있는지.
+  const [penConfirmOpen, setPenConfirmOpen] = useState(false)
+  useEffect(() => {
+    if (!penConfirmOpen) return
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setPenConfirmOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [penConfirmOpen])
   useEffect(() => {
     if (!resetConfirmOpen) return
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setResetConfirmOpen(false) }
@@ -1694,7 +1831,7 @@ function InferenceTrackpad({
     const scaling = trackpad.visualState.mode === 'scale'
     // 늘리는 중에 진하게 켤 길. 잠긴 축으로 벌리면 켜지 않는다. 자소 전체는 벌린 축과 상관없이 둘 다라 켜진 채(둘 다 옅게) 둔다.
     const scaleLaneAxis = wholeJamoPinch ? null : trackpad.visualState.axis && stretchAxes[trackpad.visualState.axis] ? trackpad.visualState.axis : null
-    const directLabel = [
+    const directLabel = penTool?.active ? penTool.status : [
       selectedPoints.length > 1 ? `점 ${selectedPoints.length}개 함께` : '',
       inkGapLimiter ? pastGapLimit.current ? `${inkGapLimiter.char}에서 옆 자소에 너무 붙음` : `${inkGapLimiter.char}에서 최소 간격 · 더 끌면 넘어감` : '',
     ].filter(Boolean).join(' · ')
@@ -1714,7 +1851,19 @@ function InferenceTrackpad({
     }
     const deleteButton = canDelete && <Pressable type="button" onClick={deleteSelection} aria-label={selection.kind === 'stroke' ? '획 삭제' : '꼭짓점 삭제'}><Trash2 size={18} aria-hidden="true" /><span>삭제</span></Pressable>
     const connectButton = mergeTarget && <Pressable type="button" onClick={connectStroke} aria-label="가까운 선 연결"><Link2 size={18} aria-hidden="true" /><span>잇기</span></Pressable>
-    const strokeTools = (
+    const startPen = () => {
+      if (!penTool || penTool.blocked) return
+      if (penTool.resetCount > 0) setPenConfirmOpen(true)
+      else penTool.onStart()
+    }
+    const strokeTools = penTool?.active ? (
+      <div className={styles.strokeToolRow} role="toolbar" aria-label="펜 도구">
+        <Pressable type="button" onClick={penTool.onDone} aria-label="펜 끝내고 저장" data-testid="jamo-stroke-pen-done"><Check size={18} aria-hidden="true" /><span>끝</span></Pressable>
+        <Pressable type="button" onClick={penTool.onClear} disabled={!penTool.hasStrokes} aria-label="그은 획 모두 지우기" data-testid="jamo-stroke-pen-clear"><RotateCcw size={18} aria-hidden="true" /><span>다시</span></Pressable>
+        <Pressable type="button" onClick={penTool.onToggleGhost} aria-pressed={penTool.ghost} aria-label="고스트 보기" data-testid="jamo-stroke-pen-ghost"><Spline size={18} aria-hidden="true" /><span>고스트</span></Pressable>
+        <Pressable type="button" onClick={penTool.onCancel} aria-label="펜 취소" data-testid="jamo-stroke-pen-cancel"><X size={18} aria-hidden="true" /><span>취소</span></Pressable>
+      </div>
+    ) : (
       <div className={styles.strokeToolRow} role="toolbar" aria-label="획 편집 도구">
         <Pressable type="button" onClick={() => setAddMenuOpen((open) => !open)} disabled={!creationBase} aria-expanded={addMenuOpen && Boolean(creationBase)} aria-label="획 추가"><Plus size={18} aria-hidden="true" /><span>추가</span></Pressable>
         {/* 늘 그려 두고 높이만 0 ↔ 제 높이로 굴린다. 글로벌 스타일을 열 때처럼 `추가`는 제자리, 아래 단추만 스르륵 밀려난다. */}
@@ -1743,6 +1892,7 @@ function InferenceTrackpad({
         {selection.kind !== 'stroke' && wholeJamoSource && <Pressable type="button" onClick={copyStroke} aria-label={`${wholeJamoSource.char} 획 모두 복사`} data-testid="jamo-strokes-copy-all">{strokeCopied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}<span>{strokeCopied ? '복사함' : '복사'}</span></Pressable>}
         {creationBase && clipboardStrokes.length > 0 && <Pressable type="button" onClick={pasteStroke} aria-label="획 붙여넣기" data-testid="jamo-stroke-paste"><ClipboardPaste size={18} aria-hidden="true" /><span>붙여넣기</span></Pressable>}
         {creationBase && doubleSplit && <Pressable type="button" onClick={takeSingle} aria-label={`${doubleSplit.single} 모양 가져오기`} data-testid="jamo-stroke-take-single"><Import size={18} aria-hidden="true" /><span>{doubleSplit.single} 모양</span></Pressable>}
+        {creationBase && penTool && <Pressable type="button" onClick={startPen} disabled={Boolean(penTool.blocked)} aria-label={penTool.blocked ?? '펜으로 그리기'} data-testid="jamo-stroke-pen"><Pencil size={18} aria-hidden="true" /><span>펜</span></Pressable>}
         {creationBase && <Pressable type="button" onClick={() => setResetConfirmOpen(true)} disabled={!canResetJamo} aria-label={`${creationBase.jamo.char} 프리셋으로 초기화`} data-testid="jamo-stroke-reset"><RotateCcw size={18} aria-hidden="true" /><span>초기화</span></Pressable>}
         {/* 맨 아래 주황 단추. 잡은 홀자 줄기의 모양(휨 · 기울기)을 같은 갈래 형제에 퍼뜨린다 — 모양이 마스터와 다를 때만 뜬다. */}
         {onSpread && <Pressable type="button" className={styles.strokeToolSpread} onClick={onSpread} aria-label="이 획 모양을 형제에 전파" data-testid="jamo-stroke-spread"><Share2 size={18} aria-hidden="true" /><span>전파</span></Pressable>}
@@ -1751,12 +1901,12 @@ function InferenceTrackpad({
     return (
       <section className={styles.strokeToolSection} data-testid="jamo-stroke-tools">
         {/* 경고만 한 줄. 알릴 게 없으면 줄을 접는다 — 늘어나고 줄어드는 건 트랙패드라 캔버스는 안 흔들린다. */}
-        {directLabel && <p className={styles.strokeWarning}>{directLabel}</p>}
+        {directLabel && <p className={styles.strokeWarning} data-testid="jamo-pen-status">{directLabel}</p>}
         {/* `틀 다시 맞추기`는 일단 숨긴다(기능은 남겨 둔다). */}
         <Pressable type="button" hidden onClick={resetFrame} disabled={!liveJamo?.frame} data-testid="jamo-frame-reset">틀 다시 맞추기</Pressable>
         {/* 트랙패드가 남는 세로를 다 먹고, 도구 단추는 그 오른쪽에 2열로 선다(단추 줄이 차지하던 세로를 트랙패드에 준다). */}
         <div className={styles.strokeWorkRow}>
-          <JamoScaleSlider disabled={!creationBase} onStart={beginJamoScale} onChange={changeJamoScale} onCommit={commitJamoScale} onCancel={cancelJamoScale} />
+          <JamoScaleSlider disabled={!creationBase || Boolean(penTool?.active)} onStart={beginJamoScale} onChange={changeJamoScale} onCommit={commitJamoScale} onCancel={cancelJamoScale} />
           {/* 섬세한 편집용 조절판. 손가락이 글자를 가리지 않고, 1px이 1u라 캔버스 끌기보다 잘게 옮긴다. */}
           <div
             {...trackpad.handlers}
@@ -1776,6 +1926,21 @@ function InferenceTrackpad({
           {!toolSlot && strokeTools}
         </div>
         {toolSlot && createPortal(strokeTools, toolSlot)}
+        {penConfirmOpen && penTool && createPortal(
+          <div className={confirmStyles.backdrop} onClick={() => setPenConfirmOpen(false)}>
+            <div className={confirmStyles.sheet} role="alertdialog" aria-modal="true" aria-label="펜으로 그리기 전 안내" onClick={(event) => event.stopPropagation()} data-testid="jamo-pen-reset-confirm">
+              <header>
+                <b>{penTool.resetCount}개가 초기화돼요</b>
+                <small>이 자소에 있던 조건부 변형 · 문맥별 모양 · 간격 보정이 펜으로 그은 획으로 바뀌면서 비워져요. 실행 취소로 되살릴 수 있어요.</small>
+              </header>
+              <div className={confirmStyles.actions}>
+                <Pressable type="button" onClick={() => setPenConfirmOpen(false)}>취소</Pressable>
+                <Pressable type="submit" onClick={() => { setPenConfirmOpen(false); penTool.onStart() }} autoFocus data-testid="jamo-pen-reset-ok">펜 켜기</Pressable>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
         {resetConfirmOpen && creationBase && createPortal(
           <div className={confirmStyles.backdrop} onClick={() => setResetConfirmOpen(false)}>
             <div className={confirmStyles.sheet} role="alertdialog" aria-modal="true" aria-label="프리셋으로 초기화" onClick={(event) => event.stopPropagation()} data-testid="jamo-stroke-reset-confirm">
@@ -2008,6 +2173,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const [soloEntry] = useState(() => chrome === 'workspace' && initialStrokePart() === 'CH' ? soloConsonantOf(focus.char) : null)
   const [selectedChar, setSelectedChar] = useState(soloEntry ?? focus.char)
   const [selection, setSelection] = useState<Selection>({ kind: 'none' })
+  // 펜 세션. 잠긴 자소를 펜으로 다시 긋는 동안만 있다. `raw`는 그은 점 묶음(자모 상자 0–1) — 끝을 눌러야 판정을 거쳐 저장된다.
+  const [pen, setPen] = useState<{ ghost: boolean; raw: PenPoint[][] } | null>(null)
   const [selectedPoints, setSelectedPoints] = useState<SelectedPoint[]>([])
   // 획 묶음(여러 획 함께 이동). 둘 이상일 때만 묶음이다. 점 묶음(`selectedPoints`)과 따로 — 획 묶음은 점을 안 띄운다.
   const [selectedStrokes, setSelectedStrokes] = useState<string[]>([])
@@ -2605,6 +2772,63 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       pickFirstStrokeRef.current = true
     }
   }
+  // ===== 펜 (플랜 2026-10-05 고스트 따라 긋기, 2덩이) =====
+  // 잠긴 자소의 프리셋(현 문맥 계열 변형 포함)이 고스트이자 역할 판정의 기준이다. 섞임홀자(칸이 가로부 · 세로부로 갈린 홀자)는 채널 배정이 아직 없어 막는다.
+  const penSetup = (() => {
+    if (!lockedPart) return null
+    const jamo = lockedPart === 'CH' ? syllable.choseong : lockedPart === 'JU' ? syllable.jungseong : syllable.jongseong
+    if (!jamo) return null
+    const boxes = placement.kind === 'boxes' ? placement.boxes : focusedBoxes
+    const renderPart: Part | null = lockedPart === 'JU' ? (boxes.JU ? 'JU' : null) : lockedPart
+    const base = getBaseJamo(jamo.type, jamo.char)
+    const preset = base ? adoptFamilyStrokes(base, familyOfSyllable(syllable)) : null
+    const blocked = lockedPart === 'JU' && !boxes.JU ? '섞임홀자는 곧' : !preset ? '프리셋이 없는 자모예요' : null
+    const channel: PenChannel = preset ? presetChannelOf(preset) : 'strokes'
+    return { jamo, renderPart, preset, channel, blocked }
+  })()
+  const penRecognition = pen && penSetup?.preset ? recognizePenJamo({ [penSetup.channel]: pen.raw }, penSetup.preset).byChannel[penSetup.channel] : undefined
+  const penStatus = (() => {
+    if (!pen || !penSetup) return ''
+    if (pen.raw.length === 0) return '칸 안에 그어 보세요'
+    if (!penRecognition || penRecognition.strokes.length === 0) return '획으로 못 읽었어요 · 다시 그어 보세요'
+    if (penRecognition.state === 'recognized') return '인식됨'
+    if (penRecognition.state === 'partial') return penRecognition.missing.length > 0 ? `일부 자유 · 안 그린 획 ${penRecognition.missing.join(', ')}` : '일부 자유'
+    return penSetup.jamo.type === 'jungseong' ? '자유 · 기둥·보선이 안 따라가요' : '자유 · 문맥 조정은 적용 안 돼요'
+  })()
+  // 잠긴 자소가 바뀌거나 글자를 바꾸거나 스타일 · 레이아웃으로 나가면 긋던 것은 버린다.
+  useEffect(() => { setPen(null) }, [selectedChar, lockedPart, styleLocksCanvas, isLayoutMode])
+  const penDone = () => {
+    if (!pen || !penSetup || !lockedPart) { setPen(null); return }
+    const strokes = penRecognition?.strokes ?? []
+    setPen(null)
+    if (strokes.length === 0) return
+    const { jamo, channel } = penSetup
+    const before = structuredClone(adoptFamilyStrokes(getJamo(jamo.type, jamo.char) ?? jamo, familyOfSyllable(syllable)))
+    const after = applyPenToJamo(before, { [channel]: strokes })
+    // 초기화와 같은 길: 틀 없이, 잉크 간격 보정 없이 저장한다. 틀은 다음 일반 편집 때 굳는다.
+    commitJamo(before, after, { kind: 'stroke-move', glyph: selectedChar, component: componentFor(selectedChar, lockedPart, jamo), jamoType: jamo.type, strokeId: strokes[0].id, delta: { x: 0, y: 0 } }, { unframed: true, pastGapLimit: true })
+  }
+  const penTool: PenTool | null = penSetup ? {
+    active: pen !== null,
+    blocked: penSetup.blocked ?? (penSetup.renderPart ? null : '이 자소는 펜을 못 써요'),
+    ghost: pen?.ghost ?? true,
+    hasStrokes: (pen?.raw.length ?? 0) > 0,
+    resetCount: penResetCount(getJamo(penSetup.jamo.type, penSetup.jamo.char) ?? penSetup.jamo),
+    status: penStatus,
+    onStart: () => { setSelection({ kind: 'none' }); setSelectedPoints([]); setSelectedStrokes([]); setPreviewJamo(null); setPen({ ghost: true, raw: [] }) },
+    onDone: penDone,
+    onClear: () => setPen((current) => current && { ...current, raw: [] }),
+    onToggleGhost: () => setPen((current) => current && { ...current, ghost: !current.ghost }),
+    onCancel: () => setPen(null),
+  } : null
+  const penCanvas: PenCanvas | null = pen && penSetup?.preset && penSetup.renderPart && !penSetup.blocked && !styleLocksCanvas ? {
+    renderPart: penSetup.renderPart,
+    presetJamo: penSetup.preset,
+    presetStrokes: penSetup.preset[penSetup.channel] ?? [],
+    ghost: pen.ghost,
+    raw: pen.raw,
+    onStroke: (points) => setPen((current) => current && { ...current, raw: [...current.raw, points] }),
+  } : null
   const closeGlobalStyle = () => {
     setPreviewBrush(null)
     setPreviewTone(null)
@@ -2653,6 +2877,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     const entry = history.at(-1)
     if (!entry) return
     revertEntry(entry)
+    setPen(null)
     setHistory((entries) => entries.slice(0, -1))
     setFuture((entries) => [...entries, entry])
     setPreviewJamo(null)
@@ -2674,6 +2899,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     else if (entry.kind === 'tone') applyTone(entry.after)
     else if (entry.kind === 'beak') { if (entry.groupId) useJamoGroupStore.getState().setStemBeak(entry.groupId, entry.after); else useGlobalStyleStore.getState().setStemBeak(entry.after) }
     else updateJamo(entry.after)
+    setPen(null)
     setFuture((entries) => entries.slice(0, -1))
     setHistory((entries) => [...entries, entry])
     if (entry.kind === 'layout' || entry.kind === 'jamo') useCalibrationProjectStore.getState().addSampleGlyphEdit(entry.edit)
@@ -2832,7 +3058,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
           ? <div ref={setStrokeToolSlot} className={styles.strokeToolSlot} data-testid="jamo-stroke-tool-slot" />
           : chrome === 'workspace' && layoutAvailable && !styleLocksCanvas && <LayoutContextCards activeContextId={corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00).contextId} allActive={false} ink={strokeCardInk ?? undefined} />}
         <div className={styles.focusArea}>
-        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={styleLocksCanvas ? { kind: 'none' } : selection} onSelect={styleLocksCanvas ? () => {} : selectFromCanvas} selectedPoints={styleLocksCanvas ? [] : selectedPoints} selectedStrokes={styleLocksCanvas ? [] : selectedStrokes} multiSelectArmed={!styleLocksCanvas && multiArmed} wholeJamoCentered={styleLocksCanvas ? null : wholeJamoCentered} onPointSelect={styleLocksCanvas ? () => {} : selectPointFromCanvas} lockedPart={styleLocksCanvas ? null : lockedPart} dragApiRef={directManipulation && !styleLocksCanvas ? dragApiRef : undefined} padDragRef={directManipulation && !styleLocksCanvas ? padDragRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={focusedGlobalStyle} />
+        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={styleLocksCanvas ? { kind: 'none' } : selection} onSelect={styleLocksCanvas ? () => {} : selectFromCanvas} selectedPoints={styleLocksCanvas ? [] : selectedPoints} selectedStrokes={styleLocksCanvas ? [] : selectedStrokes} multiSelectArmed={!styleLocksCanvas && multiArmed} wholeJamoCentered={styleLocksCanvas ? null : wholeJamoCentered} onPointSelect={styleLocksCanvas ? () => {} : selectPointFromCanvas} lockedPart={styleLocksCanvas ? null : lockedPart} dragApiRef={directManipulation && !styleLocksCanvas ? dragApiRef : undefined} padDragRef={directManipulation && !styleLocksCanvas ? padDragRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={focusedGlobalStyle} pen={penCanvas} />
         </div>
         </div>
       </section>}
@@ -2890,6 +3116,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         frameForEdit={frameForEdit}
         toolSlot={strokeToolSlot}
         onSpread={spreadTarget ? openSpread : null}
+        penTool={penTool}
       />}
       {/* 획 편집은 끄는 즉시 저장된다. 레이아웃으로 돌아가는 문은 머리 `‹`(도마를 들고 왔으면 섹션 홈), 되돌리기는 ↶. */}
       {strokeFrameAvailable && !globalStylePanel && boxFitIssue && <div className={styles.strokeDoneBar}>
