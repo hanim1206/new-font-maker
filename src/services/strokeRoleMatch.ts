@@ -149,6 +149,52 @@ export function matchStrokeRoles(drawn: readonly StrokeDataV2[], presets: readon
   return { pairs, free, missing, state }
 }
 
+interface Bounds { minX: number; maxX: number; minY: number; maxY: number }
+
+function boundsOf(strokes: readonly Pick<StrokeDataV2, 'points'>[]): Bounds | null {
+  const bounds: Bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
+  for (const stroke of strokes) for (const point of stroke.points) {
+    bounds.minX = Math.min(bounds.minX, point.x); bounds.maxX = Math.max(bounds.maxX, point.x)
+    bounds.minY = Math.min(bounds.minY, point.y); bounds.maxY = Math.max(bounds.maxY, point.y)
+  }
+  return Number.isFinite(bounds.minX) ? bounds : null
+}
+
+/** 축의 범위가 이보다 좁으면(ㅣ의 가로, ㅡ의 세로) 늘리지 않고 가운데만 맞춘다. */
+const FLAT_AXIS = 0.05
+
+/**
+ * 그린 획 묶음을 프리셋 획 묶음의 범위에 꽉 채운다 — 작게 그려도, 한쪽에 치우쳐 그려도 칸을 채운 모양이 된다(10-05 사용자 결정).
+ * 자모 전체 범위를 한 번에 옮기므로 획 사이 비율은 그대로다. 핸들도 같이 옮긴다.
+ * 어느 쪽이든 한 축이 납작하면(`FLAT_AXIS` 미만) 그 축은 다른 축의 배율로 늘리고 가운데를 맞춘다.
+ */
+export function fitStrokesToPresetBounds(drawn: readonly StrokeDataV2[], presets: readonly StrokeDataV2[]): StrokeDataV2[] {
+  const from = boundsOf(drawn)
+  const to = boundsOf(presets)
+  if (!from || !to) return [...drawn]
+  const fromW = from.maxX - from.minX, fromH = from.maxY - from.minY
+  const toW = to.maxX - to.minX, toH = to.maxY - to.minY
+  const flatX = fromW < FLAT_AXIS || toW < FLAT_AXIS
+  const flatY = fromH < FLAT_AXIS || toH < FLAT_AXIS
+  let scaleX = flatX ? NaN : toW / fromW
+  let scaleY = flatY ? NaN : toH / fromH
+  if (Number.isNaN(scaleX) && Number.isNaN(scaleY)) { scaleX = 1; scaleY = 1 }
+  else if (Number.isNaN(scaleX)) scaleX = scaleY
+  else if (Number.isNaN(scaleY)) scaleY = scaleX
+  const fromCX = (from.minX + from.maxX) / 2, fromCY = (from.minY + from.maxY) / 2
+  const toCX = (to.minX + to.maxX) / 2, toCY = (to.minY + to.maxY) / 2
+  const map = (p: { x: number; y: number }) => ({ x: toCX + (p.x - fromCX) * scaleX, y: toCY + (p.y - fromCY) * scaleY })
+  return drawn.map((stroke) => ({
+    ...stroke,
+    points: stroke.points.map((point) => {
+      const next: AnchorPoint = { ...point, ...map(point) }
+      if (point.handleIn) next.handleIn = map(point.handleIn)
+      if (point.handleOut) next.handleOut = map(point.handleOut)
+      return next
+    }),
+  }))
+}
+
 function reversed(points: readonly AnchorPoint[]): AnchorPoint[] {
   return [...points].reverse().map((point) => {
     const { handleIn, handleOut, ...rest } = point

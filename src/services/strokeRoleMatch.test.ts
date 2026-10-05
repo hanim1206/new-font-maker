@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { StrokeDataV2 } from '../types'
-import { adoptStrokeRoles, closeIfNear, matchStrokeRoles, ROLE_MATCH_TAU_CANDIDATES, strokeRoleScore } from './strokeRoleMatch'
+import { adoptStrokeRoles, closeIfNear, fitStrokesToPresetBounds, matchStrokeRoles, ROLE_MATCH_TAU_CANDIDATES, strokeRoleScore } from './strokeRoleMatch'
 
 const stroke = (id: string, points: [number, number][], closed = false): StrokeDataV2 => ({
   id, closed, thickness: .07, points: points.map(([x, y]) => ({ x, y })),
@@ -96,6 +96,30 @@ describe('그린 획에 역할 붙이기', () => {
     const turned = stroke('t', [[0, .5], [1, .5]])
     const score = strokeRoleScore(turned, PRESET_ㅏ[0])
     expect(score).toBeLessThan(.65)
+  })
+
+  it('작게 치우쳐 그린 ㄱ은 프리셋 범위에 꽉 채워진 뒤 인식된다', () => {
+    const tiny = [stroke('a', [[.6, .6], [.8, .6], [.8, .85]])]
+    expect(matchStrokeRoles(tiny, PRESET_ㄱ).state).toBe('free')
+    const filled = fitStrokesToPresetBounds(tiny, PRESET_ㄱ)
+    expect(filled[0].points[0].x).toBeCloseTo(0, 6)
+    expect(filled[0].points[1].x).toBeCloseTo(.98, 6)
+    expect(filled[0].points[2].y).toBeCloseTo(1, 6)
+    expect(matchStrokeRoles(filled, PRESET_ㄱ).state).toBe('recognized')
+  })
+
+  it('꽉 채우기는 자모 전체 범위로 한 번에 옮겨 획 사이 비율을 지키고, 납작한 축은 가운데만 맞춘다', () => {
+    const drawn = [stroke('a', [[.3, .3], [.3, .5]]), stroke('b', [[.3, .4], [.4, .4]])]
+    const filled = fitStrokesToPresetBounds(drawn, PRESET_ㅏ)
+    // 기둥 길이 .2 → 1, 곁줄기 .1 → .5 (같은 배율은 아니지만 자모 범위가 통째로 맞는다)
+    expect(filled[0].points[1].y - filled[0].points[0].y).toBeCloseTo(1, 6)
+    expect(filled[1].points[1].x - filled[1].points[0].x).toBeCloseTo(1, 6)
+    // ㅣ처럼 프리셋 가로 범위가 0이면 가로는 세로 배율로 늘리고 가운데(0.5)에 둔다
+    const bar = [stroke('a', [[.2, .3], [.22, .6]])]
+    const [fit] = fitStrokesToPresetBounds(bar, [stroke('ㅣ-1', [[.5, 0], [.5, 1]])])
+    expect((fit.points[0].x + fit.points[1].x) / 2).toBeCloseTo(.5, 6)
+    expect(fit.points[0].y).toBeCloseTo(0, 6)
+    expect(fit.points[1].y).toBeCloseTo(1, 6)
   })
 
   it('closeIfNear는 끝이 멀거나 점이 적으면 null', () => {

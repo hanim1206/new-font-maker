@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { fitPenStroke, PEN_FIT_EPSILON, PEN_FIT_EPSILON_CANDIDATES } from '../src/services/penStrokeFit'
 import type { PenFitResult, PenPoint } from '../src/services/penStrokeFit'
-import { adoptStrokeRoles, matchStrokeRoles, ROLE_MATCH_TAU, ROLE_MATCH_TAU_CANDIDATES } from '../src/services/strokeRoleMatch'
+import { adoptStrokeRoles, fitStrokesToPresetBounds, matchStrokeRoles, ROLE_MATCH_TAU, ROLE_MATCH_TAU_CANDIDATES } from '../src/services/strokeRoleMatch'
 import type { JamoRecognition, RoleMatch } from '../src/services/strokeRoleMatch'
 import { getBaseJamo } from '../src/stores/jamoStore'
 import type { BoxConfig, JamoData, StrokeDataV2 } from '../src/types'
@@ -86,6 +86,8 @@ export function PenLabPage() {
   const [char, setChar] = useState('ㄱ')
   const [channel, setChannel] = useState<Channel>('strokes')
   const [ghost, setGhost] = useState(true)
+  /** 그린 묶음을 프리셋 범위에 꽉 채운 뒤 판정한다(10-05 사용자 결정, 기본 켬). */
+  const [fill, setFill] = useState(true)
   const [copied, setCopied] = useState(false)
   const drawing = useRef<PenPoint[] | null>(null)
   /** 지금 긋는 포인터. 다른 손가락이 닿아도 이 획에 섞이지 않는다. */
@@ -116,7 +118,10 @@ export function PenLabPage() {
   })), [strokes])
 
   /** 고른 ε의 획들(맞춤 실패한 것은 뺀다) → τ 후보별 짝. */
-  const drawn = useMemo(() => fitted.map((item) => item.byEpsilon[epsilon]?.stroke ?? null).filter((stroke): stroke is StrokeDataV2 => stroke !== null), [fitted, epsilon])
+  const drawn = useMemo(() => {
+    const strokes = fitted.map((item) => item.byEpsilon[epsilon]?.stroke ?? null).filter((stroke): stroke is StrokeDataV2 => stroke !== null)
+    return fill ? fitStrokesToPresetBounds(strokes, presets) : strokes
+  }, [fitted, epsilon, fill, presets])
   const matches = useMemo(() => Object.fromEntries(ROLE_MATCH_TAU_CANDIDATES.map((candidate) => [candidate, matchStrokeRoles(drawn, presets, { tau: candidate })])) as Record<Tau, RoleMatch>, [drawn, presets])
   const adopted = useMemo(() => adoptStrokeRoles(drawn, presets, matches[tau], { jamoKey: jamo?.char ?? 'jamo' }), [drawn, presets, matches, tau, jamo])
 
@@ -173,6 +178,7 @@ export function PenLabPage() {
         <input className={styles.char} value={char} maxLength={1} onChange={(event) => { setChar(event.target.value); setStrokes([]) }} aria-label="자모" data-testid="pen-lab-char" />
         {channels.length > 1 && channels.map((item) => <Button key={item} size="sm" variant={item === activeChannel ? 'primary' : 'default'} role="radio" aria-checked={item === activeChannel} onClick={() => { setChannel(item); setStrokes([]) }}>{CHANNEL_LABEL[item]}</Button>)}
         <Button size="sm" variant={ghost ? 'primary' : 'default'} aria-pressed={ghost} onClick={() => setGhost((on) => !on)}>고스트</Button>
+        <Button size="sm" variant={fill ? 'primary' : 'default'} aria-pressed={fill} onClick={() => setFill((on) => !on)} data-testid="pen-lab-fill">꽉 채우기</Button>
         {!jamo && <small className={styles.warn}>프리셋에 없는 자모</small>}
       </div>
       <div className={styles.group} role="radiogroup" aria-label="허용오차 ε">
