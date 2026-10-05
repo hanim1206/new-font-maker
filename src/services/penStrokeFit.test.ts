@@ -148,6 +148,23 @@ describe('펜 획 맞춤', () => {
     }
   })
 
+  it('펜을 대고 머뭇거린 시작도 접히지 않는다 — 첫 앵커가 그 자리고 획은 한 방향으로만 간다', () => {
+    // 한자리에서 떨다가(머뭇거림) 오른쪽으로 긋는다. 떨림이 호 길이를 다 써도 끝점이 안쪽으로 접히면 안 된다.
+    const dwell = [{ x: .18, y: .25 }, { x: .182, y: .255 }, { x: .176, y: .258 }, { x: .179, y: .253 }, { x: .184, y: .252 }, { x: .178, y: .249 }, { x: .183, y: .256 }]
+    const fit = fitPenStroke([...dwell, ...line({ x: .2, y: .252 }, { x: .8, y: .26 }, 60, 0.003, 5)], { thickness: .07 })!
+    const xs = fit.stroke.points.map((point) => point.x)
+    expect(xs[0]).toBeLessThan(.2)
+    for (let i = 1; i < xs.length; i++) expect(xs[i]).toBeGreaterThan(xs[i - 1])
+  })
+
+  it('시작에서 옆으로 나갔다 돌아온 갈고리도 잘라 낸다', () => {
+    // 아래로 삐쳤다가 제자리로 돌아와 오른쪽으로 긋는다. 시작점은 몸통 선 위지만 그 사이가 벗어났다.
+    const hook = [{ x: .18, y: .25 }, { x: .172, y: .27 }, { x: .165, y: .29 }, { x: .172, y: .268 }, { x: .182, y: .251 }]
+    const fit = fitPenStroke([...hook, ...line({ x: .19, y: .25 }, { x: .8, y: .25 }, 60)], { thickness: .07 })!
+    for (const point of fit.stroke.points) expect(Math.abs(point.y - .25)).toBeLessThan(.012)
+    expect(fit.stroke.points[0].x).toBeLessThan(.25)
+  })
+
   it('둥근 획(ㅇ)은 조금 울퉁불퉁하게 그어도 안쪽 앵커마다 핸들이 일직선이라 모가 안 난다', () => {
     const ring = Array.from({ length: 121 }, (_, i) => {
       const t = -Math.PI / 2 + 2 * Math.PI * i / 120

@@ -105,10 +105,24 @@ const HOOK_MIN_OFFSET = 0.02
 const HOOK_CUT_OFFSET = 0.006
 /** 시작과 끝이 이보다 가까우면 닫는 획으로 보고 갈고리를 안 자른다. */
 const HOOK_CLOSED_GAP = 0.1
+/** 또는 시작과 끝 사이가 획 크기(범위의 대각선)의 이 비율 안이면 닫으려던 획이다 — 손으로 그은 ㅇ은 끝이 덜 닿거나 지나친다. */
+export const PEN_LOOSE_CLOSE_RATIO = 0.4
+
+/** 닫으려던 획(ㅇ · ㅁ)인지. 두 끝은 갈고리가 아니라 닫는 자리라 자르지도 옮기지도 않는다. ㄱ · ㄷ처럼 벌어진 획은 틈이 제 크기와 비슷해 안 든다. */
+export function penClosesOnItself(points: readonly PenPoint[]): boolean {
+  if (points.length < 3) return false
+  const gap = distance(points[0], points[points.length - 1])
+  if (gap < HOOK_CLOSED_GAP) return true
+  const xs = points.map((point) => point.x), ys = points.map((point) => point.y)
+  const size = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys))
+  return gap <= size * PEN_LOOSE_CLOSE_RATIO
+}
 
 /**
  * 펜을 대고 떼는 순간의 갈고리를 잘라 낸다. 남기면 끝 마디가 옆을 향해, 평평한 끝이 비스듬해지거나 꺾임 이음이 길게 뾰족해진다.
  * 끝에서 `HOOK_LENGTH` 안쪽 점을 그 바로 안쪽 몸통(같은 길이)의 현을 늘인 선과 견준다. 꺾임 검사와 상관없이 본다 — 짧은 갈고리는 꺾임으로 안 잡힌다.
+ * 길이는 끝점에서 곧게 잰 거리다. 호 길이로 재면 펜을 대고 머뭇거린 떨림 · 나갔다 돌아온 갈고리가 길이를 다 써서 몸통을 못 찾는다.
+ * 끝점이 몸통 선 위로 돌아와 있어도 그 사이에 벗어난 점이 있으면 갈고리다.
  */
 export function trimPenHooks(points: readonly PenPoint[]): PenPoint[] {
   const arc = [0]
@@ -116,25 +130,27 @@ export function trimPenHooks(points: readonly PenPoint[]): PenPoint[] {
   const total = arc[arc.length - 1]
   if (total < HOOK_LENGTH * 3) return [...points]
   // 시작과 끝이 만나는 획(ㅇ · ㅁ)은 끝이 갈고리가 아니라 닫는 자리다.
-  if (distance(points[0], points[points.length - 1]) < HOOK_CLOSED_GAP) return [...points]
+  if (penClosesOnItself(points)) return [...points]
   /** `from` 끝에서 안쪽으로 걸어 자를 인덱스(그 점까지 남는다). 갈고리가 아니면 끝 그대로. */
   const cutFrom = (forward: boolean): number => {
+    const end = forward ? 0 : points.length - 1
+    const inward = forward ? 1 : -1
+    const other = points.length - 1 - end
     const at = (length: number) => {
-      const target = forward ? length : total - length
-      let i = 0
-      while (i < arc.length - 1 && arc[i] < target) i++
+      let i = end
+      while (i !== other && distance(points[i], points[end]) < length) i += inward
       return i
     }
-    const end = forward ? 0 : points.length - 1
     const bodyNear = at(HOOK_LENGTH)
     const bodyFar = at(HOOK_LENGTH * 2)
     const a = points[bodyFar], b = points[bodyNear]
     const length = distance(a, b)
     if (length === 0) return end
     const off = (p: PenPoint) => Math.abs((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) / length
-    if (off(points[end]) <= HOOK_MIN_OFFSET) return end
-    const step = forward ? -1 : 1
-    for (let i = bodyNear; i !== end; i += step) if (off(points[i + step]) > HOOK_CUT_OFFSET) return i
+    let worst = 0
+    for (let i = end; i !== bodyNear; i += inward) worst = Math.max(worst, off(points[i]))
+    if (worst <= HOOK_MIN_OFFSET) return end
+    for (let i = bodyNear; i !== end; i -= inward) if (off(points[i - inward]) > HOOK_CUT_OFFSET) return i
     return end
   }
   const first = cutFrom(true)
@@ -171,18 +187,18 @@ export function smoothPenPoints(points: readonly PenPoint[], window: number): Pe
 /**
  * `points[end]`를 그 끝에서 `window`의 반 · 하나만큼 안쪽 점 둘을 잇는 선 위로 옮긴다(선에 수직으로 내린 자리). `limit`은 끝이 속한 마디의 반대쪽 끝.
  * 마디가 `window`의 두 배보다 짧으면 그대로 둔다.
+ * 안쪽 점은 끝점에서 곧게 잰 거리로 고른다 — 펜을 대고 머뭇거린 떨림이 호 길이를 다 써 버리면 두 점이 한자리에 잡혀 끝이 엉뚱한 데로 접힌다.
  */
 function settlePenEnd(points: PenPoint[], end: number, limit: number, window: number): void {
   const step = end === 0 ? 1 : -1
-  let length = 0
   let near = -1
   let far = -1
   for (let i = end; i !== limit; i += step) {
-    length += distance(points[i], points[i + step])
+    const length = distance(points[end], points[i + step])
     if (near < 0 && length >= window / 2) near = i + step
     if (length >= window) { far = i + step; break }
   }
-  if (near < 0 || far < 0) return
+  if (near < 0 || far < 0 || distance(points[near], points[far]) < window / 4) return
   let rest = 0
   for (let i = far; i !== limit; i += step) rest += distance(points[i], points[i + step])
   if (rest < window) return
@@ -449,7 +465,7 @@ export function fitPenStroke(points: readonly PenPoint[], options: PenFitOptions
   }
   // 획의 두 끝(꺾임 말고)은 거른 몸통이 향하는 선 위로 옮긴다. 끝점만 손떨림 그대로 남아 끝이 휘는 것을 막는다.
   // 닫는 획(ㅇ · ㅁ)은 두 끝이 만나야 하므로 그대로 둔다.
-  if (distance(raw[0], raw[raw.length - 1]) >= HOOK_CLOSED_GAP) {
+  if (!penClosesOnItself(raw)) {
     settlePenEnd(thinned, 0, breaks[1], window)
     settlePenEnd(thinned, thinned.length - 1, breaks[breaks.length - 2], window)
   }
