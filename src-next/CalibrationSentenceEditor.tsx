@@ -1698,7 +1698,7 @@ function InferenceTrackpad({
       if (key === 'c' && ((selection.kind === 'stroke' && selectedStroke) || wholeJamoSource)) {
         event.preventDefault()
         copyStroke()
-      } else if (key === 'v' && creationBase && clipboardStrokes.length > 0) {
+      } else if (key === 'v' && creationBase && clipboardStrokes.length > 0 && !penTool?.active) {
         event.preventDefault()
         pasteStroke()
       }
@@ -1721,7 +1721,8 @@ function InferenceTrackpad({
   // 조절판 이동이 캔버스 끌기 계산(px → em · 같은 스냅)으로 가는 중인지. 셸 안의 획 · 점 · 핸들만 그렇고, 자소 통째 · 옛 화면은 옛 계산이다.
   const padRouted = useRef(false)
   // 아무것도 안 골랐으면 잠긴 자소 전체가 잡힌 상태다: 두 손가락은 통째로 키우고(왼쪽 크기 막대와 같은 계산, 가로 · 세로 같은 비율), 한 손가락은 통째로 옮긴다.
-  const wholeJamoPinch = selection.kind === 'none' && Boolean(creationBase)
+  // 펜이 켜져 있으면 조절판을 끈다 — 긋다가 조절판에 닿아 자소가 통째로 옮겨지지 않게(리뷰 10-05).
+  const wholeJamoPinch = selection.kind === 'none' && Boolean(creationBase) && !penTool?.active
   const wholeJamoFactor = useRef(1)
   const wholeJamoMove = useRef<{ source: JamoData; center: { x: number; y: number }; delta: StrokeMoveDelta } | null>(null)
   const beginWholeJamoMove = () => {
@@ -2786,7 +2787,11 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     const channel: PenChannel = preset ? presetChannelOf(preset) : 'strokes'
     return { jamo, renderPart, preset, channel, blocked }
   })()
-  const penRecognition = pen && penSetup?.preset ? recognizePenJamo({ [penSetup.channel]: pen.raw }, penSetup.preset).byChannel[penSetup.channel] : undefined
+  // 편집기 전체가 다시 그려질 때마다 맞춤 · 판정을 다시 돌리지 않게 그은 점이 바뀔 때만 센다.
+  const penRecognition = useMemo(
+    () => (pen && penSetup?.preset ? recognizePenJamo({ [penSetup.channel]: pen.raw }, penSetup.preset).byChannel[penSetup.channel] : undefined),
+    [pen, penSetup],
+  )
   const penStatus = (() => {
     if (!pen || !penSetup) return ''
     if (pen.raw.length === 0) return '칸 안에 그어 보세요'
