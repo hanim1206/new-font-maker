@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { fitPenStroke, PEN_FIT_EPSILON, PEN_FIT_EPSILON_CANDIDATES } from '../src/services/penStrokeFit'
 import type { PenFitResult, PenPoint } from '../src/services/penStrokeFit'
-import { adoptStrokeRoles, fitStrokesToPresetBounds, joinStrokesAtEnds, matchStrokeRoles, ROLE_MATCH_TAU, ROLE_MATCH_TAU_CANDIDATES } from '../src/services/strokeRoleMatch'
+import { recognizePenJamo } from '../src/services/penJamo'
+import { matchStrokeRoles, ROLE_MATCH_TAU, ROLE_MATCH_TAU_CANDIDATES } from '../src/services/strokeRoleMatch'
 import type { JamoRecognition, RoleMatch } from '../src/services/strokeRoleMatch'
 import { getBaseJamo } from '../src/stores/jamoStore'
 import type { BoxConfig, JamoData, StrokeDataV2 } from '../src/types'
@@ -124,14 +125,15 @@ export function PenLabPage() {
     byEpsilon: Object.fromEntries(PEN_FIT_EPSILON_CANDIDATES.map((candidate) => [candidate, fitPenStroke(raw, { epsilon: candidate, thickness: THICKNESS, id: `pen-${index}` })])) as Record<Epsilon, PenFitResult | null>,
   })), [strokes])
 
-  /** 고른 ε의 획들(맞춤 실패한 것은 뺀다) → τ 후보별 짝. */
-  const drawn = useMemo(() => {
-    const strokes = fitted.map((item) => item.byEpsilon[epsilon]?.stroke ?? null).filter((stroke): stroke is StrokeDataV2 => stroke !== null)
-    const joined = join ? joinStrokesAtEnds(strokes, THICKNESS) : strokes
-    return fill ? fitStrokesToPresetBounds(joined, presets) : joined
-  }, [fitted, epsilon, fill, join, presets])
+  /** 맞춤 → 잇기 → 채우기 → 판정은 편집기 펜과 같은 `recognizePenJamo`. 토글은 옵션으로 넘긴다. */
+  const recognized = useMemo(
+    () => recognizePenJamo({ [activeChannel]: strokes }, jamo ?? { char: 'jamo' }, { epsilon, tau, fill, join }).byChannel[activeChannel],
+    [strokes, activeChannel, jamo, epsilon, tau, fill, join],
+  )
+  const drawn = useMemo(() => recognized?.drawn ?? [], [recognized])
+  /** 판정 전 획에 τ 후보별 짝. */
   const matches = useMemo(() => Object.fromEntries(ROLE_MATCH_TAU_CANDIDATES.map((candidate) => [candidate, matchStrokeRoles(drawn, presets, { tau: candidate })])) as Record<Tau, RoleMatch>, [drawn, presets])
-  const adopted = useMemo(() => adoptStrokeRoles(drawn, presets, matches[tau], { jamoKey: jamo?.char ?? 'jamo' }), [drawn, presets, matches, tau, jamo])
+  const adopted = { strokes: recognized?.strokes ?? [], state: recognized?.state ?? 'free' }
 
   const begin = (event: ReactPointerEvent<SVGSVGElement>) => {
     // 펜 · 손가락 · 마우스 전부 긋는다(10-05 사용자 결정 — 폰에서는 손가락뿐이다). 마우스는 왼쪽 단추만.
