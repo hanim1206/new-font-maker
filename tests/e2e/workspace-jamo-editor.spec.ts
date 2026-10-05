@@ -258,46 +258,68 @@ test('획 편집 `초기화`는 한 번 묻고 고친 자소를 프리셋으로 
   await expect(strokes).toHaveCount(before + 1)
 })
 
-test('획 편집 `펜`으로 ㄱ을 한 획 그으면 인식되고, 끝을 누르면 저장된다', async ({ page }) => {
+test('획 편집 `펜`은 도구 줄을 그대로 둔 채 켜지고, 그은 획은 손을 떼면 새 획으로 저장되고, `비우기`는 기존 획만 지운다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EA%B0%80&mode=stroke&part=CH')
   const editor = page.getByRole('region', { name: /완성 글자 편집/ })
   await expect(editor).toBeVisible()
-  // 펜은 `추가`를 열면 선 · 원 · 사각 옆에 있다.
+  const undo = page.getByRole('button', { name: '형태 편집 실행 취소' })
+  // 긋는 자리는 지금 ㄱ이 놓인 자리로 잰다.
+  const box = (await editor.locator('svg [data-stroke-id="ㄱ-1"]').first().boundingBox())!
+  // 펜은 `추가`를 열면 선 · 원 · 사각 옆에 있다. 켜도 도구 줄은 그대로고 `펜`만 눌린 표시가 된다.
   await page.getByRole('button', { name: '획 추가' }).click()
-  await page.getByTestId('jamo-stroke-pen').click()
-  // 고친 흔적(조건부 변형 · 문맥별 모양)이 있으면 비워진다고 먼저 알린다.
-  const sheet = page.getByTestId('jamo-pen-reset-confirm')
-  if (await sheet.count()) await page.getByTestId('jamo-pen-reset-ok').click()
+  const pen = page.getByTestId('jamo-stroke-pen')
+  await pen.click()
   await expect(page.getByTestId('pen-layer')).toBeVisible()
-  // 펜 모드에서는 획 눌림 영역이 없다.
+  await expect(pen).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('toolbar', { name: '획 편집 도구' })).toBeVisible()
+  await expect(page.getByTestId('jamo-stroke-fit')).toBeVisible()
+  // 펜이 켜진 동안은 늘 긋는다 — 획 눌림 영역이 없다.
   await expect(editor.locator('svg [data-editor-hit="stroke"]')).toHaveCount(0)
 
-  // 칸(점선 상자) 안에 ㄱ 꼴 한 획.
-  const box = (await page.getByTestId('pen-box').boundingBox())!
+  // 기존 ㄱ 안쪽에 작은 ㄱ 꼴 한 획.
   const at = (x: number, y: number) => ({ x: box.x + box.width * x, y: box.y + box.height * y })
-  const start = at(.08, .08)
-  await page.mouse.move(start.x, start.y)
-  await page.mouse.down()
-  for (const [x, y] of [[.3, .07], [.6, .06], [.9, .06], [.92, .3], [.92, .6], [.92, .92]]) {
-    const point = at(x, y)
-    await page.mouse.move(point.x, point.y, { steps: 4 })
+  const draw = async () => {
+    const start = at(.25, .35)
+    await page.mouse.move(start.x, start.y)
+    await page.mouse.down()
+    for (const [x, y] of [[.4, .35], [.55, .34], [.7, .34], [.71, .5], [.71, .65], [.71, .8]]) {
+      const point = at(x, y)
+      await page.mouse.move(point.x, point.y, { steps: 4 })
+    }
+    // 긋는 중에도 저장될 굵기로 바로 보인다.
+    await expect(page.getByTestId('pen-live')).toHaveCount(1)
+    await page.mouse.up()
+    await expect(page.getByTestId('pen-live')).toHaveCount(0)
   }
-  // 긋는 중에도 저장될 굵기로 바로 보인다.
-  await expect(page.getByTestId('pen-live')).toHaveCount(1)
-  await page.mouse.up()
-  await expect(page.getByTestId('pen-live')).toHaveCount(0)
-  await expect(page.getByTestId('jamo-pen-status')).toHaveText('인식됨')
-  // 손을 떼도 그은 자리에 그대로 남는다. 칸 채우기 · 판정 결과는 `끝`에 들어간다.
-  await expect(page.getByTestId('pen-raw')).toHaveCount(1)
-  await page.screenshot({ path: 'test-results/pen-recognized.png' })
+  await expect(undo).toBeDisabled()
+  await draw()
+  // 손을 떼면 바로 저장된다. ㄱ 역할 자리는 차 있으니 새 획은 자유 획이고, 이번에 그은 획만 제 색으로 덧그려진다.
+  await expect(undo).toBeEnabled()
+  await expect(page.getByTestId('pen-fresh')).toHaveCount(1)
+  await expect(page.getByTestId('jamo-pen-status')).toHaveText('일부 자유')
+  await page.screenshot({ path: 'test-results/pen-added.png' })
 
-  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeDisabled()
-  await page.getByTestId('jamo-stroke-pen-done').click()
+  // `비우기`는 펜이 켜진 동안 옅은 기존 획만 지운다. 그은 획이 남아 빈 ㄱ 역할을 받고, 펜은 켜진 채다.
+  await page.getByTestId('jamo-stroke-clear').click()
+  await expect(page.getByTestId('jamo-pen-status')).toHaveText('인식됨')
+  await expect(page.getByTestId('pen-fresh')).toHaveCount(1)
+  await expect(page.getByTestId('jamo-stroke-clear')).toBeDisabled()
+  await expect(page.getByTestId('pen-layer')).toBeVisible()
+  await undo.click()
+  await expect(page.getByTestId('jamo-pen-status')).toHaveText('일부 자유')
+
+  // 무르기는 되돌리기로. 펜은 켜진 채다.
+  await undo.click()
+  await expect(undo).toBeDisabled()
+  await expect(page.getByTestId('pen-fresh')).toHaveCount(0)
+  await expect(page.getByTestId('pen-layer')).toBeVisible()
+
+  // 다시 긋고 `펜`을 누르면 꺼진다. 기존 획과 새 획이 둘 다 잡히는 획으로 남는다.
+  await draw()
+  await pen.click()
   await expect(page.getByTestId('pen-layer')).toHaveCount(0)
-  await expect(editor.locator('svg [data-stroke-id="ㄱ-1"]')).toHaveCount(1)
-  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
-  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
-  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeDisabled()
+  await expect(editor.locator('svg [data-stroke-id="ㄱ-1"]')).not.toHaveCount(0)
+  await expect(editor.locator('svg [data-stroke-id="pen-ㄱ-1"]')).not.toHaveCount(0)
 })
 
 test('획을 세로부 칸에만 둔 ㅒ · ㅖ도 획 편집에서 획을 고른다', async ({ page }) => {

@@ -1,7 +1,7 @@
 import type { BoxConfig, JamoData, StrokeDataV2, StrokeLinecap } from '../types'
-import { fitPenStroke, PEN_FIT_EPSILON } from './penStrokeFit'
+import { fitPenStroke, PEN_FIT_EPSILON, penClosesOnItself } from './penStrokeFit'
 import type { PenPoint } from './penStrokeFit'
-import { adoptStrokeRoles, fitStrokesInkToUnitBox, fitStrokesToPresetBounds, joinStrokesAtEnds, matchStrokeRoles, ROLE_MATCH_TAU } from './strokeRoleMatch'
+import { adoptStrokeRoles, closeIfNear, fitStrokesInkToUnitBox, flattenCenterline, fitStrokesToPresetBounds, joinStrokesAtEnds, matchStrokeRoles, ROLE_MATCH_TAU } from './strokeRoleMatch'
 import type { JamoRecognition, RoleMatch } from './strokeRoleMatch'
 
 /**
@@ -91,24 +91,170 @@ export function recognizePenJamo(
   return { byChannel, state }
 }
 
-/**
- * 그린 획으로 채널을 통째 바꾼 자모. 그린 채널만 바꾼다(없으면 그대로).
- * 사용자가 쓴 조건부 변형(`overrides`)은 옛 획 기준이라 비운다 — 문맥 계열 변형(`contextStrokes`)도 같다.
- * 잉크 안전 보정은 저장 길(`pastGapLimit`)이 지운다.
- */
-export function applyPenToJamo(before: JamoData, drawn: Partial<Record<PenChannel, StrokeDataV2[]>>): JamoData {
-  const after = structuredClone(before)
-  for (const channel of Object.keys(drawn) as PenChannel[]) {
-    const strokes = drawn[channel]
-    if (strokes && strokes.length > 0) after[channel] = structuredClone(strokes)
-  }
-  delete after.overrides
-  delete after.contextStrokes
-  return after
+/** 펜으로 그었지만 역할을 못 받은 획의 id 머리. */
+const PEN_FREE_PREFIX = 'pen-'
+
+export interface PenStrokeOptions extends Pick<PenRecognizeOptions, 'tau' | 'epsilon'> {
+  /**
+   * 이번에 펜을 켠 뒤 그은 획인지. 그런 획은 새 획과 함께 다시 판정한다 — 기둥만 그었을 때의 판정이 곁줄기를 그은 뒤 바뀔 수 있다.
+   * 안 주면 새 획만 판정한다. 펜을 켜기 전부터 있던 획은 역할도 자리도 건드리지 않는다.
+   */
+  drawn?: (stroke: StrokeDataV2) => boolean
 }
 
-/** 펜으로 들어갈 때 사라지는 것의 수. 조건부 변형 + 문맥 계열 변형 + 문맥 잉크 보정 하나. */
-export function penResetCount(jamo: Pick<JamoData, 'overrides' | 'contextStrokes' | 'contextualInkSafety'> | undefined): number {
-  if (!jamo) return 0
-  return (jamo.overrides?.length ?? 0) + Object.keys(jamo.contextStrokes ?? {}).length + (jamo.contextualInkSafety ? 1 : 0)
+export interface PenStrokeResult {
+  jamo: JamoData
+  /** 방금 그은 획이 받은 id(역할을 받았으면 프리셋 id, 아니면 `pen-…`). 앞 획에 이어졌으면 그 이어진 획의 id. */
+  strokeId: string
+}
+
+/**
+ * 닫으려던 획인지. 손으로 그은 ㅇ은 끝이 시작에 딱 안 닿거나 지나친다 — 두께 안으로 만나야만 닫힌 획으로 치면 너무 박하다(10-06 사용자).
+ * ㄱ · ㄷ처럼 벌어진 획은 틈이 제 크기와 비슷해 여기 안 든다.
+ */
+function looksClosed(stroke: StrokeDataV2): boolean {
+  // 크기는 곡선을 편 점으로 잰다 — 둥근 획은 앵커가 서넛뿐이라 앵커만 보면 작게 나온다.
+  return stroke.closed || penClosesOnItself(flattenCenterline(stroke))
+}
+
+/** 닫으려던 획을 닫는다. 끝 앵커를 시작에 합치고(앵커가 모자라면 끝에서 시작으로 곧게 잇는다) 닫힌 획으로 돌려준다. */
+function closeLoosely(stroke: StrokeDataV2): StrokeDataV2 {
+  return closeIfNear(stroke, Infinity) ?? { ...stroke, closed: true }
+}
+
+/**
+ * 그은 획(`candidates`)을 빈 역할(`freeIndexes`)에 붙인다. 판정은 자모 전체를 프리셋 범위에 채운 좌표로, 승계(방향 · 닫기)는 프리셋을 그은 범위로 옮겨 그은 좌표로 한다.
+ * 닫으려던 획은 닫힌 획으로 보고 견주고, 닫힌 역할과 짝이 되면 닫아서 넘긴다.
+ */
+function judgePenRoles(kept: readonly StrokeDataV2[], candidates: readonly StrokeDataV2[], presets: readonly StrokeDataV2[], freeIndexes: readonly number[], jamoKey: string, tau: number) {
+  const group = [...kept, ...candidates]
+  const freePresets = freeIndexes.map((index) => presets[index])
+  const filled = fitStrokesToPresetBounds(group, presets).slice(kept.length).map((stroke, index) => (looksClosed(candidates[index]) ? { ...stroke, closed: true } : stroke))
+  const match = matchStrokeRoles(filled, freePresets, { tau })
+  const ready = candidates.map((stroke, index) => {
+    const pair = match.pairs.find((item) => item.drawn === index)
+    return pair && freePresets[pair.preset].closed && !stroke.closed && looksClosed(stroke) ? closeLoosely(stroke) : stroke
+  })
+  const placed = fitStrokesToPresetBounds(presets, group)
+  const adopted = adoptStrokeRoles(ready, freeIndexes.map((index) => placed[index]), match, { jamoKey })
+  return { adopted, score: match.pairs.reduce((sum, pair) => sum + pair.score, 0) }
+}
+
+const endGap = (a: StrokeDataV2, b: StrokeDataV2) => {
+  const ends = (stroke: StrokeDataV2) => [stroke.points[0], stroke.points[stroke.points.length - 1]]
+  return Math.min(...ends(a).flatMap((p) => ends(b).map((q) => Math.hypot(p.x - q.x, p.y - q.y))))
+}
+
+/**
+ * 펜으로 그은 한 획을 자모에 더한다(플랜 2026-10-05, 10-06 결정). 그은 자리 그대로 둔다 — 칸에 채우지 않는다.
+ * 늘 새 획이다. 프리셋 역할 중 **비어 있는 자리**(펜을 켜기 전부터 있던 획이 안 가진 자리)와 닮았으면 역할을 받고, 아니면 자유 획(`pen-…`)으로 남는다.
+ * 닮았는지는 속으로만 자모 전체를 프리셋 범위에 채워 견준다 — 작게 · 치우쳐 그어도 모양이 맞으면 인식된다.
+ * 방금 그은 획의 끝이 이번에 그은 다른 획의 끝에 닿으면(두께 안) 이은 쪽과 안 이은 쪽을 둘 다 판정해 자유 획이 적은 쪽을 고른다 — 나눠 그은 ㄱ은 이어지고, ㅂ의 밑 보는 기둥에 안 붙는다.
+ */
+export function addPenStroke(
+  before: JamoData,
+  channel: PenChannel,
+  points: readonly PenPoint[],
+  preset: Pick<JamoData, 'char' | 'strokes' | 'horizontalStrokes' | 'verticalStrokes'>,
+  options: PenStrokeOptions = {},
+): PenStrokeResult | null {
+  const presets = preset[channel] ?? []
+  const existing = before[channel] ?? []
+  const thickness = presets[0]?.thickness ?? existing[0]?.thickness ?? PEN_DEFAULT_THICKNESS
+  const fitted = fitPenStroke([...points], { epsilon: options.epsilon ?? PEN_FIT_EPSILON, thickness, id: `${PEN_FREE_PREFIX}new` })?.stroke
+  if (!fitted) return null
+  const presetIds = new Set(presets.map((stroke) => stroke.id))
+  const earlier = existing.filter((stroke) => options.drawn?.(stroke))
+  const kept = existing.filter((stroke) => !options.drawn?.(stroke))
+  const holders = kept.filter((stroke) => presetIds.has(stroke.id))
+  const others = kept.filter((stroke) => !presetIds.has(stroke.id))
+  const heldIds = new Set(holders.map((stroke) => stroke.id))
+  const freeIndexes = presets.map((_, index) => index).filter((index) => !heldIds.has(presets[index].id))
+  // 새 획은 늘 후보의 마지막이다.
+  const judge = (candidates: StrokeDataV2[]) => judgePenRoles(kept, candidates, presets, freeIndexes, preset.char, options.tau ?? ROLE_MATCH_TAU)
+  const variants = [judge([...earlier, fitted])]
+  const near = earlier
+    .map((stroke, index) => ({ index, gap: stroke.closed || fitted.closed ? Infinity : endGap(stroke, fitted) }))
+    .filter((item) => item.gap <= thickness)
+    .sort((a, b) => a.gap - b.gap)[0]
+  if (near) {
+    const joined = joinStrokesAtEnds([earlier[near.index], fitted], thickness)
+    if (joined.length === 1) variants.push(judge([...earlier.filter((_, index) => index !== near.index), joined[0]]))
+  }
+  const best = variants.reduce((pick, item) => (
+    item.adopted.freeIds.length < pick.adopted.freeIds.length || (item.adopted.freeIds.length === pick.adopted.freeIds.length && item.score > pick.score) ? item : pick
+  ))
+  // 자유 획 id가 앞서 있던 획과 겹치지 않게 번호를 다시 매긴다.
+  const taken = new Set(kept.map((stroke) => stroke.id))
+  const renamed = new Map<string, string>()
+  let n = 1
+  for (const id of best.adopted.freeIds) {
+    while (taken.has(`${PEN_FREE_PREFIX}${preset.char}-${n}`)) n++
+    const next = `${PEN_FREE_PREFIX}${preset.char}-${n}`
+    taken.add(next)
+    renamed.set(id, next)
+  }
+  const strokes = best.adopted.strokes.map((stroke) => (renamed.has(stroke.id) ? { ...stroke, id: renamed.get(stroke.id)! } : stroke))
+  const lastId = best.adopted.ids[best.adopted.ids.length - 1]
+  // 역할 획은 프리셋 순서로(엔진이 순서로 짝 짓는 곳이 있다), 손으로 넣은 획, 자유 획 차례.
+  const order = new Map(presets.map((stroke, index) => [stroke.id, index]))
+  const roles = [...holders, ...strokes.filter((stroke) => presetIds.has(stroke.id))].sort((a, b) => order.get(a.id)! - order.get(b.id)!)
+  const jamo = structuredClone(before)
+  jamo[channel] = structuredClone([...roles, ...others, ...strokes.filter((stroke) => !presetIds.has(stroke.id))])
+  return { jamo, strokeId: renamed.get(lastId) ?? lastId }
+}
+
+/**
+ * `비우기`: 자모의 획을 지운다. `drawn`을 주면(펜이 켜진 동안) 이번에 그은 획은 남기고 전부터 있던 획만 지운다.
+ * 역할 자리가 다 비므로 남은 획을 처음부터 다시 판정한다 — 옅은 획을 따라 그은 뒤 비우면 그은 획이 그 역할을 받는다. 좌표는 그대로다.
+ */
+export function clearPenJamo(
+  before: JamoData,
+  channel: PenChannel,
+  preset: Pick<JamoData, 'char' | 'strokes' | 'horizontalStrokes' | 'verticalStrokes'>,
+  options: PenStrokeOptions = {},
+): JamoData {
+  const presets = preset[channel] ?? []
+  const left = (before[channel] ?? []).filter((stroke) => options.drawn?.(stroke))
+  const jamo = structuredClone(before)
+  if (left.length === 0) { jamo[channel] = []; return jamo }
+  const { adopted } = judgePenRoles([], left, presets, presets.map((_, index) => index), preset.char, options.tau ?? ROLE_MATCH_TAU)
+  jamo[channel] = structuredClone(adopted.strokes)
+  return jamo
+}
+
+/** 자모가 프리셋 역할을 얼마나 갖췄는지. 역할이 다 있고 자유 획이 없으면 인식됨, 역할이 하나도 없으면 자유. */
+export function penJamoState(jamo: Pick<JamoData, PenChannel>, channel: PenChannel, preset: Pick<JamoData, PenChannel>): { state: JamoRecognition; missing: string[] } {
+  const presets = preset[channel] ?? []
+  const strokes = jamo[channel] ?? []
+  const ids = new Set(strokes.map((stroke) => stroke.id))
+  const missing = presets.filter((stroke) => !ids.has(stroke.id)).map((stroke) => stroke.id)
+  const free = strokes.some((stroke) => stroke.id.startsWith(PEN_FREE_PREFIX))
+  const state: JamoRecognition = missing.length === presets.length ? 'free' : missing.length === 0 && !free ? 'recognized' : 'partial'
+  return { state, missing }
+}
+
+/**
+ * `맞춤`: 자모의 획 묶음을 기본 프리셋이 놓이는 자리와 똑같이 채운다(중심선 범위를 프리셋의 중심선 범위에). 획 사이 비율은 지킨다.
+ * 그러면 굵기는 칸(윤곽 기준) 안에 들고, 획이 시작하고 끝나는 자리는 프리셋처럼 테두리에 닿는다 — 끝 모양은 세지 않는다(10-06 사용자 결정).
+ * 맞춘 자소와 손 안 댄 기본 자소의 크기가 같고, 기본 자소는 맞춰도 그대로다.
+ */
+export function fitJamoToCell(jamo: JamoData, channel: PenChannel, preset: Pick<JamoData, PenChannel>): JamoData {
+  const strokes = jamo[channel] ?? []
+  if (strokes.length === 0) return jamo
+  const next = structuredClone(jamo)
+  next[channel] = fitStrokesToPresetBounds(strokes, preset[channel] ?? [])
+  return next
+}
+
+/** 두 자모의 그 채널 획이 같은 자리인지(`맞춤`을 눌러도 달라질 게 없는지). */
+export function sameStrokePlaces(a: Pick<JamoData, PenChannel>, b: Pick<JamoData, PenChannel>, channel: PenChannel, tolerance = 1e-3): boolean {
+  const left = a[channel] ?? []
+  const right = b[channel] ?? []
+  if (left.length !== right.length) return false
+  return left.every((stroke, index) => {
+    const other = right[index]
+    return stroke.points.length === other.points.length
+      && stroke.points.every((point, at) => Math.abs(point.x - other.points[at].x) <= tolerance && Math.abs(point.y - other.points[at].y) <= tolerance)
+  })
 }

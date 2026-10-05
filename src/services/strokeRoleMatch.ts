@@ -152,7 +152,7 @@ export function matchStrokeRoles(drawn: readonly StrokeDataV2[], presets: readon
 interface Bounds { minX: number; maxX: number; minY: number; maxY: number }
 
 /** 중심선을 점으로 편다 — 곡선이 앵커 밖으로 불룩한 만큼까지 범위에 넣기 위해. */
-function flattenCenterline(stroke: Pick<StrokeDataV2, 'points' | 'closed'>, steps = 16): { x: number; y: number }[] {
+export function flattenCenterline(stroke: Pick<StrokeDataV2, 'points' | 'closed'>, steps = 16): { x: number; y: number }[] {
   const points = stroke.points
   const out: { x: number; y: number }[] = []
   const count = stroke.closed ? points.length : points.length - 1
@@ -280,16 +280,19 @@ export function closeIfNear(stroke: StrokeDataV2, gap: number): StrokeDataV2 | n
  * 프리셋이 닫힌 획이면 그린 획의 끝이 두께 안일 때 닫고, 아니면 승계하지 않고 자유 획으로 돌린다.
  * 방향은 프리셋과 맞춘다 — 그린 시작점이 프리셋 끝점에 더 가까우면 뒤집는다.
  */
-export function adoptStrokeRoles(drawn: readonly StrokeDataV2[], presets: readonly StrokeDataV2[], match: RoleMatch, options: RoleMatchOptions = {}): { strokes: StrokeDataV2[]; state: JamoRecognition; freeIds: string[] } {
+export function adoptStrokeRoles(drawn: readonly StrokeDataV2[], presets: readonly StrokeDataV2[], match: RoleMatch, options: RoleMatchOptions = {}): { strokes: StrokeDataV2[]; state: JamoRecognition; freeIds: string[]; ids: string[] } {
   const jamoKey = options.jamoKey ?? 'jamo'
   const thickness = presets[0]?.thickness ?? drawn[0]?.thickness ?? 0.07
   const adopted: StrokeDataV2[] = []
+  // 그린 획 인덱스 → 붙은 id. 호출자가 방금 그은 획이 무엇이 됐는지 찾는 데 쓴다.
+  const ids: string[] = []
   const free = [...match.free]
   for (const pair of match.pairs) {
     const preset = presets[pair.preset]
     let stroke = drawn[pair.drawn]
     if (preset.closed) {
-      const closed = closeIfNear(stroke, preset.thickness)
+      // 부르는 쪽이 이미 닫아 준 획(느슨하게 닫기)은 그대로 받는다.
+      const closed = stroke.closed ? stroke : closeIfNear(stroke, preset.thickness)
       if (!closed) { free.push(pair.drawn); continue }
       stroke = closed
     } else {
@@ -306,16 +309,18 @@ export function adoptStrokeRoles(drawn: readonly StrokeDataV2[], presets: readon
     if (preset.linecap !== undefined) next.linecap = preset.linecap
     if (preset.linejoin !== undefined) next.linejoin = preset.linejoin
     adopted.push(next)
+    ids[pair.drawn] = next.id
   }
   free.sort((a, b) => a - b)
   const freeIds: string[] = []
   free.forEach((index, n) => {
     const id = `pen-${jamoKey}-${n + 1}`
     freeIds.push(id)
+    ids[index] = id
     adopted.push({ ...drawn[index], id, thickness })
   })
   const state: JamoRecognition = adopted.length === freeIds.length ? 'free' : freeIds.length === 0 && match.missing.length === 0 ? 'recognized' : 'partial'
-  return { strokes: adopted, state, freeIds }
+  return { strokes: adopted, state, freeIds, ids }
 }
 
 /** 잉크(중심선 + 굵기 반 + 끝 모양)가 중심선 범위 밖으로 나가는 폭. 마디마다 양옆으로 굵기 반을 벌리고, 끝이 둥글거나 네모면 끝을 앞으로 내민다. */
