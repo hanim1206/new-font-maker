@@ -1,0 +1,215 @@
+import type { AnchorPoint, StrokeDataV2 } from '../types'
+
+/**
+ * 그린 획에 역할 붙이기 (플랜 2026-10-05 고스트 따라 긋기).
+ *
+ * 엔진은 획의 모양이 아니라 id · 순서 · 방향 · 채널로 판단한다. 그래서 그린 획을 프리셋 획에 1:1로 대응시키고,
+ * 점수가 문턱 `tau` 이상인 쌍은 프리셋 획의 역할(id · closed · 두께 · 끝모양)을 승계해 좌표만 바꾼다.
+ * 짝이 없는 그린 획은 자유 획(`pen-…` id)으로 남고, 짝이 없는 프리셋 획은 빠진 획으로 보고한다.
+ *
+ * 점수(0–1)는 현 각도 · 중심 위치 · 크기 · 닫힘의 가중합이다. 좌표는 전부 같은 상자의 0–1.
+ * 섞임홀자는 채널(가로부 · 세로부)마다 상자가 달라서 채널별로 따로 부른다.
+ */
+
+export interface RoleMatchOptions {
+  /** 이 점수 미만이면 짝으로 안 본다. */
+  tau?: number
+  /** 자유 획 id의 자모 표시(`pen-<jamo>-<n>`). */
+  jamoKey?: string
+}
+
+export interface RolePair {
+  drawn: number
+  preset: number
+  score: number
+}
+
+export type JamoRecognition = 'recognized' | 'partial' | 'free'
+
+export interface RoleMatch {
+  pairs: RolePair[]
+  /** 짝 없는 그린 획 인덱스. */
+  free: number[]
+  /** 짝 없는 프리셋 획 인덱스(안 그린 획). */
+  missing: number[]
+  /** 전부 짝 = 인식됨, 일부 = 일부 자유, 짝 0 = 자유. */
+  state: JamoRecognition
+}
+
+export const ROLE_MATCH_TAU = 0.65
+export const ROLE_MATCH_TAU_CANDIDATES = [0.5, 0.65, 0.8] as const
+
+const WEIGHT = { angle: 0.35, position: 0.35, size: 0.2, closed: 0.1 } as const
+/** 중심이 이만큼(상자 비율) 떨어지면 위치 점수 0. */
+const POSITION_SPAN = 0.5
+/** 짝 짓기를 전수로 도는 최대 획 수. 넘으면 탐욕으로. */
+const BRUTE_FORCE_MAX = 7
+
+interface Signature {
+  /** 현(첫 점→끝 점)의 방향, 0–180도. 닫힌 획은 의미 없음. */
+  angle: number
+  center: { x: number; y: number }
+  /** 상자 대각선 길이(0–√2). */
+  size: number
+  closed: boolean
+}
+
+const distance = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y)
+
+function signatureOf(stroke: Pick<StrokeDataV2, 'points' | 'closed'>): Signature {
+  const points = stroke.points
+  const xs = points.map((p) => p.x)
+  const ys = points.map((p) => p.y)
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys)
+  const first = points[0]
+  const last = points[points.length - 1]
+  const angle = ((Math.atan2(last.y - first.y, last.x - first.x) * 180) / Math.PI + 360) % 180
+  return {
+    angle,
+    center: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+    size: Math.hypot(maxX - minX, maxY - minY),
+    closed: stroke.closed,
+  }
+}
+
+/** 두 방향(0–180)의 차, 0–90. */
+const angleGap = (a: number, b: number) => {
+  const gap = Math.abs(a - b) % 180
+  return Math.min(gap, 180 - gap)
+}
+
+/** 그린 획 ↔ 프리셋 획 한 쌍의 점수(0–1). */
+export function strokeRoleScore(drawn: Pick<StrokeDataV2, 'points' | 'closed'>, preset: Pick<StrokeDataV2, 'points' | 'closed'>): number {
+  if (drawn.points.length === 0 || preset.points.length === 0) return 0
+  const a = signatureOf(drawn)
+  const b = signatureOf(preset)
+  // 닫힌 획은 현 방향이 뜻이 없다. 둘 다 닫혔으면 각도는 만점.
+  const angle = a.closed && b.closed ? 1 : 1 - angleGap(a.angle, b.angle) / 90
+  const position = 1 - Math.min(distance(a.center, b.center) / POSITION_SPAN, 1)
+  const size = a.size === 0 && b.size === 0 ? 1 : Math.min(a.size, b.size) / Math.max(a.size, b.size)
+  const closed = a.closed === b.closed ? 1 : 0
+  return WEIGHT.angle * angle + WEIGHT.position * position + WEIGHT.size * size + WEIGHT.closed * closed
+}
+
+/** 점수 행렬에서 합이 가장 큰 1:1 짝. 작은 쪽을 기준으로 전수 또는 탐욕. */
+function assign(scores: number[][]): [number, number][] {
+  const rows = scores.length
+  const cols = scores[0]?.length ?? 0
+  if (rows === 0 || cols === 0) return []
+  if (Math.min(rows, cols) <= BRUTE_FORCE_MAX && Math.max(rows, cols) <= BRUTE_FORCE_MAX + 2) {
+    let best: [number, number][] = []
+    let bestSum = -1
+    const used = new Array<boolean>(cols).fill(false)
+    const walk = (row: number, picked: [number, number][], sum: number) => {
+      if (row === rows) {
+        if (sum > bestSum) { bestSum = sum; best = [...picked] }
+        return
+      }
+      // 이 줄을 비워 두는 경우(열이 모자랄 때)
+      walk(row + 1, picked, sum)
+      for (let col = 0; col < cols; col++) {
+        if (used[col]) continue
+        used[col] = true
+        picked.push([row, col])
+        walk(row + 1, picked, sum + scores[row][col])
+        picked.pop()
+        used[col] = false
+      }
+    }
+    walk(0, [], 0)
+    return best
+  }
+  const picked: [number, number][] = []
+  const usedRow = new Set<number>()
+  const usedCol = new Set<number>()
+  const all: [number, number, number][] = []
+  scores.forEach((line, row) => line.forEach((score, col) => all.push([score, row, col])))
+  all.sort((p, q) => q[0] - p[0])
+  for (const [, row, col] of all) {
+    if (usedRow.has(row) || usedCol.has(col)) continue
+    usedRow.add(row); usedCol.add(col)
+    picked.push([row, col])
+  }
+  return picked
+}
+
+/** 그린 획들을 프리셋 획들에 1:1로 대응시킨다. `tau` 미만인 쌍은 푼다. */
+export function matchStrokeRoles(drawn: readonly StrokeDataV2[], presets: readonly StrokeDataV2[], options: RoleMatchOptions = {}): RoleMatch {
+  const tau = options.tau ?? ROLE_MATCH_TAU
+  const scores = drawn.map((stroke) => presets.map((preset) => strokeRoleScore(stroke, preset)))
+  const pairs = assign(scores)
+    .map(([d, p]) => ({ drawn: d, preset: p, score: scores[d][p] }))
+    .filter((pair) => pair.score >= tau)
+    .sort((a, b) => a.preset - b.preset)
+  const pairedDrawn = new Set(pairs.map((pair) => pair.drawn))
+  const pairedPreset = new Set(pairs.map((pair) => pair.preset))
+  const free = drawn.map((_, index) => index).filter((index) => !pairedDrawn.has(index))
+  const missing = presets.map((_, index) => index).filter((index) => !pairedPreset.has(index))
+  const state: JamoRecognition = pairs.length === 0 ? 'free' : free.length === 0 && missing.length === 0 ? 'recognized' : 'partial'
+  return { pairs, free, missing, state }
+}
+
+function reversed(points: readonly AnchorPoint[]): AnchorPoint[] {
+  return [...points].reverse().map((point) => {
+    const { handleIn, handleOut, ...rest } = point
+    const next: AnchorPoint = { ...rest }
+    if (handleOut) next.handleIn = handleOut
+    if (handleIn) next.handleOut = handleIn
+    return next
+  })
+}
+
+/** 열린 획의 시작 · 끝이 `gap` 안이면 닫는다 — 마지막 앵커를 떼고 closed. 아니면 null. */
+export function closeIfNear(stroke: StrokeDataV2, gap: number): StrokeDataV2 | null {
+  const points = stroke.points
+  if (stroke.closed || points.length < 4) return null
+  if (distance(points[0], points[points.length - 1]) > gap) return null
+  const kept = points.slice(0, -1).map((point) => ({ ...point }))
+  const last = points[points.length - 1]
+  // 끝 앵커의 들어오는 핸들을 첫 앵커로 옮겨 마지막 마디가 매끈히 닫히게.
+  if (last.handleIn) kept[0] = { ...kept[0], handleIn: { ...last.handleIn } }
+  return { ...stroke, points: kept, closed: true }
+}
+
+/**
+ * 짝에 따라 역할을 승계한 획 배열. 순서는 프리셋 순서(엔진이 인덱스로 짝 짓는 곳이 있다), 자유 획은 뒤에 붙는다.
+ * 프리셋이 닫힌 획이면 그린 획의 끝이 두께 안일 때 닫고, 아니면 승계하지 않고 자유 획으로 돌린다.
+ * 방향은 프리셋과 맞춘다 — 그린 시작점이 프리셋 끝점에 더 가까우면 뒤집는다.
+ */
+export function adoptStrokeRoles(drawn: readonly StrokeDataV2[], presets: readonly StrokeDataV2[], match: RoleMatch, options: RoleMatchOptions = {}): { strokes: StrokeDataV2[]; state: JamoRecognition; freeIds: string[] } {
+  const jamoKey = options.jamoKey ?? 'jamo'
+  const thickness = presets[0]?.thickness ?? drawn[0]?.thickness ?? 0.07
+  const adopted: StrokeDataV2[] = []
+  const free = [...match.free]
+  for (const pair of match.pairs) {
+    const preset = presets[pair.preset]
+    let stroke = drawn[pair.drawn]
+    if (preset.closed) {
+      const closed = closeIfNear(stroke, preset.thickness)
+      if (!closed) { free.push(pair.drawn); continue }
+      stroke = closed
+    } else {
+      const first = stroke.points[0]
+      const last = stroke.points[stroke.points.length - 1]
+      const presetFirst = preset.points[0]
+      const presetLast = preset.points[preset.points.length - 1]
+      if (distance(first, presetLast) + distance(last, presetFirst) < distance(first, presetFirst) + distance(last, presetLast)) {
+        stroke = { ...stroke, points: reversed(stroke.points) }
+      }
+    }
+    const next: StrokeDataV2 = { ...stroke, id: preset.id, closed: preset.closed, thickness: preset.thickness }
+    if (preset.label !== undefined) next.label = preset.label
+    if (preset.linecap !== undefined) next.linecap = preset.linecap
+    if (preset.linejoin !== undefined) next.linejoin = preset.linejoin
+    adopted.push(next)
+  }
+  free.sort((a, b) => a - b)
+  const freeIds: string[] = []
+  free.forEach((index, n) => {
+    const id = `pen-${jamoKey}-${n + 1}`
+    freeIds.push(id)
+    adopted.push({ ...drawn[index], id, thickness })
+  })
+  const state: JamoRecognition = adopted.length === freeIds.length ? 'free' : freeIds.length === 0 && match.missing.length === 0 ? 'recognized' : 'partial'
+  return { strokes: adopted, state, freeIds }
+}
