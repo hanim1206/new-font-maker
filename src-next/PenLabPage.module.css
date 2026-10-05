@@ -1,0 +1,27 @@
+.page { min-height: 100dvh; padding: 28px 16px; background: rgb(var(--color-background)); color: rgb(var(--color-foreground)); }
+.header, .controls, .boards, .table, .note { width: min(1100px, 100%); margin-inline: auto; }
+.header { display: grid; gap: 3px; margin-bottom: 18px; }
+.header span { color: rgb(var(--color-primary)); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.header h1 { font-size: clamp(24px, 4vw, 36px); line-height: 1.1; }
+.header p { max-width: 760px; color: rgb(var(--color-text-3)); font-size: 13px; }
+
+.controls { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 16px; margin-bottom: 12px; padding: 12px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); }
+.group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
+.group > span { margin-right: 4px; font-weight: 700; }
+
+.boards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+@media (max-width: 720px) { .boards { grid-template-columns: minmax(0, 1fr); } }
+.board { display: grid; gap: 6px; margin: 0; }
+.board figcaption { color: rgb(var(--color-text-3)); font-size: 12px; text-align: center; }
+.canvas, .result { width: 100%; aspect-ratio: 1; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); }
+/* 펜이 긋는 동안 화면이 따라 움직이지 않게. 손가락 스크롤은 상자 밖에서 한다. */
+.canvas { touch-action: none; cursor: crosshair; user-select: none; -webkit-user-select: none; }
+
+.table { border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.table th, .table td { padding: 6px 10px; border-bottom: 1px solid rgb(var(--color-border)); text-align: right; }
+.table th { color: rgb(var(--color-text-3)); font-weight: 600; }
+.table td:first-child, .table th:first-child { text-align: left; }
+.chosen { background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); }
+.over { color: rgb(var(--color-destructive)); font-weight: 700; }
+.empty { color: rgb(var(--color-text-3)); text-align: center; }
+.note { margin-top: 8px; color: rgb(var(--color-text-3)); font-size: 12px; }

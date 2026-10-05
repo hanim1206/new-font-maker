@@ -61,6 +61,12 @@ export async function showDevLab(show: (node: ReactNode) => void): Promise<boole
     return true
   }
 
+  if (path === '/pen-lab') {
+    const { PenLabPage } = await import('./PenLabPage')
+    show(<PenLabPage />)
+    return true
+  }
+
   if (path === '/style-guide') {
     const { StyleGuideLabPage } = await import('./StyleGuideLabPage')
     show(<StyleGuideLabPage />)

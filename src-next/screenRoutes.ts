@@ -26,6 +26,7 @@ export const LAB_SCREEN_ROUTES = [
   '/font-guide-lab',
   '/spectrum-lab',
   '/design-body-lab',
+  '/pen-lab',
   '/style-guide',
 ] as const
 
