@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { fitPenStroke, PEN_FIT_EPSILON, PEN_FIT_EPSILON_CANDIDATES } from '../src/services/penStrokeFit'
 import type { PenFitResult, PenPoint } from '../src/services/penStrokeFit'
@@ -59,6 +59,20 @@ export function PenLabPage() {
   const drawing = useRef<PenPoint[] | null>(null)
   /** 지금 긋는 포인터. 다른 손가락이 닿아도 이 획에 섞이지 않는다. */
   const activePointer = useRef<number | null>(null)
+  const canvasRef = useRef<SVGSVGElement>(null)
+
+  // iOS Safari는 SVG의 `touch-action: none`을 건너뛰기도 해서 세로로 그으면 화면이 스크롤된다. 터치 이동을 직접 막는다(passive 아님).
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const block = (event: TouchEvent) => { if (event.cancelable) event.preventDefault() }
+    canvas.addEventListener('touchstart', block, { passive: false })
+    canvas.addEventListener('touchmove', block, { passive: false })
+    return () => {
+      canvas.removeEventListener('touchstart', block)
+      canvas.removeEventListener('touchmove', block)
+    }
+  }, [])
 
   const fitted = useMemo<Fitted[]>(() => strokes.map((raw, index) => ({
     raw,
@@ -120,8 +134,8 @@ export function PenLabPage() {
     </div>
 
     <div className={styles.boards}>
-      <figure className={styles.board}>
-        <svg viewBox={`0 0 ${VIEW} ${VIEW}`} className={styles.canvas} data-testid="pen-lab-canvas"
+      <figure className={`${styles.board} ${styles.drawBoard}`}>
+        <svg ref={canvasRef} viewBox={`0 0 ${VIEW} ${VIEW}`} className={styles.canvas} data-testid="pen-lab-canvas"
           onPointerDown={begin} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish}>
           <rect width={VIEW} height={VIEW} fill={EDIT_COLOR.surface} />
           {GRID.map((at) => <g key={at} stroke={EDIT_COLOR.border} strokeWidth={1}><line x1={at} y1={0} x2={at} y2={VIEW} /><line x1={0} y1={at} x2={VIEW} y2={at} /></g>)}

@@ -14,7 +14,8 @@
 .board { display: grid; gap: 6px; margin: 0; }
 .board figcaption { color: rgb(var(--color-text-3)); font-size: 12px; text-align: center; }
 .canvas, .result { width: 100%; aspect-ratio: 1; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); }
-/* 긋는 동안 화면이 따라 움직이지 않게. 스크롤은 상자 밖에서 한다. */
+/* 긋는 동안 화면이 따라 움직이지 않게. 스크롤은 상자 밖에서 한다. SVG만으로는 iOS가 무시하기도 해서 감싼 figure에도 건다. */
+.drawBoard { touch-action: none; }
 .canvas { touch-action: none; cursor: crosshair; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 
 .table { border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
