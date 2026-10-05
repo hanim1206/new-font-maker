@@ -117,6 +117,12 @@ function adoptLocalCopy(): void {
 async function gate(): Promise<void> {
   // 라우터 스토어는 이 파일을 읽을 때 옛 주소를 이미 들었다. 그냥 `replaceState`하면 화면은 `/fonts`로 남는다(개발 서버는 옛 문장 보정으로 샌다).
   if (window.location.pathname === FONTS_PATH) navigate(DASHBOARD_PATH, { replace: true })
+  // 이용약관 · 개인정보 처리방침. 로그인과 상관없이 연다(카카오 심사 · 가입 전에 읽는다).
+  if (window.location.pathname === '/terms' || window.location.pathname === '/privacy') {
+    const { LegalPage } = await import('./legal/LegalPage')
+    show(<LegalPage kind={window.location.pathname === '/terms' ? 'terms' : 'privacy'} />)
+    return
+  }
   // 관리자 화면(`/admin/*`). 개발 서버에서만, 로그인과 상관없이(발급 API가 이 맥에서만 받는다). 배포 번들에는 없다.
   if (import.meta.env.DEV && isAdminPath(window.location.pathname)) {
     const { AdminApp } = await import('./admin/AdminApp')

@@ -12,6 +12,8 @@ export const PRODUCT_SCREEN_ROUTES = [
   '/workspace/jamo',
   '/workspace/review',
   '/account',
+  '/terms',
+  '/privacy',
 ] as const
 
 /** 랩. 개발 서버에서만 열린다(`devLabs.tsx` · `devPages.tsx`). 명세는 있어도 되고 없어도 된다. */
