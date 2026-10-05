@@ -1,4 +1,4 @@
-import type { AnchorPoint, StrokeDataV2 } from '../types'
+import type { AnchorPoint, StrokeDataV2, StrokeLinecap } from '../types'
 
 /**
  * 그린 획에 역할 붙이기 (플랜 2026-10-05 고스트 따라 긋기).
@@ -191,9 +191,14 @@ const FLAT_AXIS = 0.05
  * 어느 쪽이든 한 축이 납작하면(`FLAT_AXIS` 미만) 그 축은 다른 축의 배율로 늘리고 가운데를 맞춘다.
  */
 export function fitStrokesToPresetBounds(drawn: readonly StrokeDataV2[], presets: readonly StrokeDataV2[]): StrokeDataV2[] {
-  const from = boundsOf(drawn)
   const to = boundsOf(presets)
-  if (!from || !to) return [...drawn]
+  return to ? fitStrokesToBounds(drawn, to) : [...drawn]
+}
+
+/** 그린 획 묶음의 중심선 범위를 `to`에 맞춘다(`fitStrokesToPresetBounds`의 몸통 — 납작한 축 규칙이 같다). */
+function fitStrokesToBounds(drawn: readonly StrokeDataV2[], to: Bounds): StrokeDataV2[] {
+  const from = boundsOf(drawn)
+  if (!from) return [...drawn]
   const fromW = from.maxX - from.minX, fromH = from.maxY - from.minY
   const toW = to.maxX - to.minX, toH = to.maxY - to.minY
   const flatX = fromW < FLAT_AXIS || toW < FLAT_AXIS
@@ -311,4 +316,51 @@ export function adoptStrokeRoles(drawn: readonly StrokeDataV2[], presets: readon
   })
   const state: JamoRecognition = adopted.length === freeIds.length ? 'free' : freeIds.length === 0 && match.missing.length === 0 ? 'recognized' : 'partial'
   return { strokes: adopted, state, freeIds }
+}
+
+/** 잉크(중심선 + 굵기 반 + 끝 모양)가 중심선 범위 밖으로 나가는 폭. 마디마다 양옆으로 굵기 반을 벌리고, 끝이 둥글거나 네모면 끝을 앞으로 내민다. */
+function inkPadsOf(strokes: readonly StrokeDataV2[], half: { x: number; y: number }, linecap: StrokeLinecap): Bounds | null {
+  const center = boundsOf(strokes)
+  if (!center) return null
+  const ink: Bounds = { ...center }
+  const add = (x: number, y: number) => {
+    ink.minX = Math.min(ink.minX, x); ink.maxX = Math.max(ink.maxX, x)
+    ink.minY = Math.min(ink.minY, y); ink.maxY = Math.max(ink.maxY, y)
+  }
+  for (const stroke of strokes) {
+    const points = flattenCenterline(stroke)
+    for (let i = 0; i + 1 < points.length; i++) {
+      const a = points[i], b = points[i + 1]
+      // 굵기는 em으로 같아도 상자 좌표에선 축마다 다르다 — em 공간에서 법선을 구해 축별로 되돌린다.
+      const dx = (b.x - a.x) / half.x, dy = (b.y - a.y) / half.y
+      const length = Math.hypot(dx, dy)
+      if (length === 0) continue
+      const nx = -dy / length * half.x, ny = dx / length * half.y
+      for (const p of [a, b]) { add(p.x + nx, p.y + ny); add(p.x - nx, p.y - ny) }
+    }
+    if (!stroke.closed && (stroke.linecap ?? linecap) !== 'butt' && points.length > 0) {
+      for (const end of [points[0], points[points.length - 1]]) { add(end.x - half.x, end.y - half.y); add(end.x + half.x, end.y + half.y) }
+    }
+  }
+  return { minX: center.minX - ink.minX, maxX: ink.maxX - center.maxX, minY: center.minY - ink.minY, maxY: ink.maxY - center.maxY }
+}
+
+/**
+ * 잉크가 자모 상자(0–1) 안에 들도록 획 묶음을 맞춘다(10-05 사용자 결정 — 윤곽까지 상자 안).
+ * 잉크가 상자 밖으로 내미는 쪽만 그만큼 중심선 범위를 안으로 당긴다(획 사이 비율은 지킨다). `half`는 굵기 반을 상자 좌표로 옮긴 축별 값.
+ * 법선이 배율에 따라 조금 바뀌므로 두 번 맞춘다.
+ */
+export function fitStrokesInkToUnitBox(strokes: readonly StrokeDataV2[], half: { x: number; y: number }, linecap: StrokeLinecap = 'round'): StrokeDataV2[] {
+  let out = [...strokes]
+  for (let pass = 0; pass < 2; pass++) {
+    const pads = inkPadsOf(out, half, linecap)
+    const center = boundsOf(out)
+    if (!pads || !center) return out
+    // 상자 밖으로 나가는 쪽만 줄인다. 프리셋이 상자를 다 안 쓰는 자모(가운데 놓인 획)는 그대로다.
+    out = fitStrokesToBounds(out, {
+      minX: Math.max(center.minX, pads.minX), maxX: Math.min(center.maxX, 1 - pads.maxX),
+      minY: Math.max(center.minY, pads.minY), maxY: Math.min(center.maxY, 1 - pads.maxY),
+    })
+  }
+  return out
 }

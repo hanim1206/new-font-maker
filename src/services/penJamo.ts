@@ -1,7 +1,7 @@
-import type { BoxConfig, JamoData, StrokeDataV2 } from '../types'
+import type { BoxConfig, JamoData, StrokeDataV2, StrokeLinecap } from '../types'
 import { fitPenStroke, PEN_FIT_EPSILON } from './penStrokeFit'
 import type { PenPoint } from './penStrokeFit'
-import { adoptStrokeRoles, fitStrokesToPresetBounds, joinStrokesAtEnds, matchStrokeRoles, ROLE_MATCH_TAU } from './strokeRoleMatch'
+import { adoptStrokeRoles, fitStrokesInkToUnitBox, fitStrokesToPresetBounds, joinStrokesAtEnds, matchStrokeRoles, ROLE_MATCH_TAU } from './strokeRoleMatch'
 import type { JamoRecognition, RoleMatch } from './strokeRoleMatch'
 
 /**
@@ -46,6 +46,11 @@ export interface PenRecognizeOptions {
   fill?: boolean
   /** 끝점이 두께 안인 연달아 그은 획을 한 획으로 잇는다(기본 켬). */
   join?: boolean
+  /**
+   * 주면 판정 뒤 잉크(굵기 · 끝 모양 포함)가 자모 상자 0–1 안에 들도록 맞춘다(채우기가 켜졌을 때만).
+   * `half`는 굵기 반을 상자 좌표로 옮긴 축별 값 — 상자 크기를 아는 쪽(편집기)이 정한다.
+   */
+  inkBox?: { half: { x: number; y: number }; linecap?: StrokeLinecap }
 }
 
 export interface PenChannelResult {
@@ -78,7 +83,8 @@ export function recognizePenJamo(
     const drawn = options.fill === false ? joined : fitStrokesToPresetBounds(joined, presets)
     const match = matchStrokeRoles(drawn, presets, { tau })
     const adopted = adoptStrokeRoles(drawn, presets, match, { jamoKey: preset.char })
-    byChannel[channel] = { strokes: adopted.strokes, state: adopted.state, missing: match.missing.map((index) => presets[index].id), drawn, match }
+    const strokes = options.inkBox && options.fill !== false ? fitStrokesInkToUnitBox(adopted.strokes, options.inkBox.half, options.inkBox.linecap) : adopted.strokes
+    byChannel[channel] = { strokes, state: adopted.state, missing: match.missing.map((index) => presets[index].id), drawn, match }
   }
   const states = Object.values(byChannel).map((result) => result.state)
   const state: JamoRecognition = states.length === 0 || states.every((item) => item === 'free') ? 'free' : states.every((item) => item === 'recognized') ? 'recognized' : 'partial'

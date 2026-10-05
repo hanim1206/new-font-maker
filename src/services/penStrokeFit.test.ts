@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fitPenStroke, PEN_FIT_EPSILON_CANDIDATES, penCornerIndices, penFitDeviation, thinPenPoints } from './penStrokeFit'
+import { fitPenStroke, PEN_FIT_EPSILON_CANDIDATES, smoothPenPoints, penCornerIndices, penFitDeviation, thinPenPoints } from './penStrokeFit'
 import type { PenPoint } from './penStrokeFit'
 
 /** 시드 고정 난수 — 펜 떨림 흉내. 같은 시드면 같은 점. */
@@ -111,5 +111,56 @@ describe('펜 획 맞춤', () => {
   it('이탈 거리는 맞춘 선에서 떨어진 만큼이다', () => {
     const stroke = { points: [{ x: 0, y: .5 }, { x: 1, y: .5 }] }
     expect(penFitDeviation([{ x: .5, y: .5 }, { x: .3, y: .53 }], stroke)).toBeCloseTo(.03, 6)
+  })
+
+  it('손떨림 거르기: 떨리는 가로가 곧아지고, 끝점과 ㄱ의 꺾임은 그대로다', () => {
+    // 떨림(진폭 0.008)이 ε0.01 근처라 거르지 않으면 곡선 마디가 여럿 생긴다.
+    const wobbly = line({ x: .1, y: .5 }, { x: .9, y: .5 }, 120, .008, 7)
+    const off = fitPenStroke(wobbly, { smoothing: 0 })!
+    const on = fitPenStroke(wobbly)!
+    expect(on.anchorCount).toBeLessThanOrEqual(off.anchorCount)
+    const offY = Math.max(...off.stroke.points.map((point) => Math.abs(point.y - .5)))
+    const onY = Math.max(...on.stroke.points.map((point) => Math.abs(point.y - .5)))
+    expect(onY).toBeLessThan(offY)
+    // 끝은 길이를 지키고(가로 자리 그대로), 떨린 만큼만 몸통 선 위로 옮긴다.
+    expect(on.stroke.points[0].x).toBeCloseTo(wobbly[0].x, 2)
+    expect(on.stroke.points.at(-1)!.x).toBeCloseTo(wobbly.at(-1)!.x, 2)
+    expect(Math.abs(on.stroke.points.at(-1)!.y - .5)).toBeLessThanOrEqual(Math.abs(wobbly.at(-1)!.y - .5) + 1e-9)
+    const ㄱ = [...line({ x: .1, y: .1 }, { x: .9, y: .1 }, 60, .004, 3), ...line({ x: .9, y: .1 }, { x: .9, y: .9 }, 60, .004, 4).slice(1)]
+    const fitted = fitPenStroke(ㄱ)!
+    expect(fitted.corners).toHaveLength(1)
+    expect(fitted.stroke.points.some((point) => Math.abs(point.x - .9) < .01 && Math.abs(point.y - .1) < .01)).toBe(true)
+    // 창이 0이면 그대로 돌려준다.
+    expect(smoothPenPoints(wobbly, 0)).toEqual(wobbly)
+  })
+
+  it('펜을 뗄 때 생긴 끝 갈고리는 잘라 끝이 옆으로 꺾이지 않는다', () => {
+    const straight = line({ x: .1, y: .3 }, { x: .85, y: .3 }, 80)
+    const hooked = [...straight, { x: .855, y: .305 }, { x: .858, y: .312 }, { x: .859, y: .32 }]
+    // 시작 갈고리는 꺾임으로 안 잡힐 만큼 짧고 완만해도 자른다.
+    const start = [{ x: .08, y: .27 }, { x: .09, y: .29 }, ...straight]
+    for (const points of [hooked, start]) {
+      const fitted = fitPenStroke(points)!
+      expect(fitted.corners).toEqual([])
+      expect(fitted.anchorCount).toBe(2)
+      // 자른 자리는 몸통 선에서 0.006 미만까지만 남는다.
+      for (const point of fitted.stroke.points) expect(Math.abs(point.y - .3)).toBeLessThan(.006)
+    }
+  })
+
+  it('둥근 획(ㅇ)은 조금 울퉁불퉁하게 그어도 안쪽 앵커마다 핸들이 일직선이라 모가 안 난다', () => {
+    const ring = Array.from({ length: 121 }, (_, i) => {
+      const t = -Math.PI / 2 + 2 * Math.PI * i / 120
+      const w = 1 + .03 * Math.sin(3 * t + 1) + .02 * Math.sin(7 * t)
+      return { x: .5 + .42 * Math.cos(t) * w, y: .5 + .42 * Math.sin(t) * w }
+    })
+    const fitted = fitPenStroke(ring)!
+    expect(fitted.corners).toEqual([])
+    for (const point of fitted.stroke.points.slice(1, -1)) {
+      expect(point.handleIn && point.handleOut).toBeTruthy()
+      const a = Math.atan2(point.y - point.handleIn!.y, point.x - point.handleIn!.x)
+      const b = Math.atan2(point.handleOut!.y - point.y, point.handleOut!.x - point.x)
+      expect(Math.abs(Math.sin(a - b))).toBeLessThan(1e-6)
+    }
   })
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { StrokeDataV2 } from '../types'
-import { adoptStrokeRoles, closeIfNear, fitStrokesToPresetBounds, joinStrokesAtEnds, matchStrokeRoles, ROLE_MATCH_TAU_CANDIDATES, strokeRoleScore } from './strokeRoleMatch'
+import { adoptStrokeRoles, closeIfNear, fitStrokesInkToUnitBox, fitStrokesToPresetBounds, joinStrokesAtEnds, matchStrokeRoles, ROLE_MATCH_TAU_CANDIDATES, strokeRoleScore } from './strokeRoleMatch'
 
 const stroke = (id: string, points: [number, number][], closed = false): StrokeDataV2 => ({
   id, closed, thickness: .07, points: points.map(([x, y]) => ({ x, y })),
@@ -160,5 +160,23 @@ describe('그린 획에 역할 붙이기', () => {
     expect(closeIfNear(stroke('a', [[0, 0], [1, 0], [1, 1]]), .07)).toBeNull()
     expect(closeIfNear(stroke('a', [[0, 0], [1, 0], [1, 1], [0, .5]]), .07)).toBeNull()
     expect(closeIfNear(stroke('a', [[0, 0], [1, 0], [1, 1], [0, 1], [.02, .03]]), .07)?.points).toHaveLength(4)
+  })
+
+  it('잉크(굵기 · 끝 모양)가 상자 0–1 안에 들도록 넘는 쪽만 당긴다', () => {
+    // ㄱ: 중심선이 상자 끝에 붙어 가로는 위로, 세로는 오른쪽으로 굵기 반만큼 넘는다. 끝은 평평(butt)이라 왼쪽 · 아래는 안 넘는다.
+    const half = { x: .05, y: .04 }
+    const [ㄱ] = fitStrokesInkToUnitBox([stroke('ㄱ', [[0, 0], [1, 0], [1, 1]])], half, 'butt')
+    const xs = ㄱ.points.map((point) => point.x), ys = ㄱ.points.map((point) => point.y)
+    expect(Math.min(...ys)).toBeCloseTo(.04, 3)
+    expect(Math.max(...xs)).toBeCloseTo(.95, 3)
+    expect(Math.min(...xs)).toBeCloseTo(0, 3)
+    expect(Math.max(...ys)).toBeCloseTo(1, 3)
+    // 둥근 끝이면 끝도 앞으로 내밀어 네 변 모두 당긴다.
+    const [round] = fitStrokesInkToUnitBox([stroke('ㄱ', [[0, 0], [1, 0], [1, 1]])], half, 'round')
+    expect(Math.min(...round.points.map((point) => point.x))).toBeCloseTo(.05, 3)
+    expect(Math.max(...round.points.map((point) => point.y))).toBeCloseTo(.96, 3)
+    // 상자를 다 안 쓰는 획은 그대로다.
+    const inner = stroke('ㅡ', [[.2, .5], [.8, .5]])
+    expect(fitStrokesInkToUnitBox([inner], half, 'round')[0].points).toEqual(inner.points)
   })
 })

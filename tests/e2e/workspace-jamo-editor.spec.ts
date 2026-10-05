@@ -262,6 +262,8 @@ test('획 편집 `펜`으로 ㄱ을 한 획 그으면 인식되고, 끝을 누�
   await page.goto('/workspace/jamo?char=%EA%B0%80&mode=stroke&part=CH')
   const editor = page.getByRole('region', { name: /완성 글자 편집/ })
   await expect(editor).toBeVisible()
+  // 펜은 `추가`를 열면 선 · 원 · 사각 옆에 있다.
+  await page.getByRole('button', { name: '획 추가' }).click()
   await page.getByTestId('jamo-stroke-pen').click()
   // 고친 흔적(조건부 변형 · 문맥별 모양)이 있으면 비워진다고 먼저 알린다.
   const sheet = page.getByTestId('jamo-pen-reset-confirm')
@@ -280,8 +282,13 @@ test('획 편집 `펜`으로 ㄱ을 한 획 그으면 인식되고, 끝을 누�
     const point = at(x, y)
     await page.mouse.move(point.x, point.y, { steps: 4 })
   }
+  // 긋는 중에도 저장될 굵기로 바로 보인다.
+  await expect(page.getByTestId('pen-live')).toHaveCount(1)
   await page.mouse.up()
+  await expect(page.getByTestId('pen-live')).toHaveCount(0)
   await expect(page.getByTestId('jamo-pen-status')).toHaveText('인식됨')
+  // 손을 떼도 그은 자리에 그대로 남는다. 칸 채우기 · 판정 결과는 `끝`에 들어간다.
+  await expect(page.getByTestId('pen-raw')).toHaveCount(1)
   await page.screenshot({ path: 'test-results/pen-recognized.png' })
 
   await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeDisabled()
