@@ -6,7 +6,6 @@ export const LEGAL_FIELDS: Record<string, string> = {
   운영자: '김한임',
   '문의 이메일': 'hangulkangul@gmail.com',
   시행일: '2026년 10월 9일',
-  'Supabase 리전': '',
   '의견 보관 기간': '1년',
   '호스팅 로그 보관 기간': '30일',
 }

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { LEGAL_FIELDS } from './legalInfo'
 import { fillFields, parseLegalMarkdown, parseSpans } from './legalMarkdown'
 
 describe('약관 마크다운 읽기', () => {
@@ -39,5 +40,7 @@ describe('약관 마크다운 읽기', () => {
     expect(source).not.toContain('⚠')
     const blocks = parseLegalMarkdown(source)
     expect(blocks.filter((block) => block.kind === 'heading').length).toBeGreaterThan(5)
+    // 공개 문서라 빈칸이 화면에 `{이름}`으로 남으면 안 된다.
+    expect(fillFields(source, LEGAL_FIELDS).match(/\{[^{}]+\}/g)).toBeNull()
   })
 })
