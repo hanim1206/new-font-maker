@@ -3,7 +3,7 @@ import type { ComponentFitPart } from './notoComponentFitView'
 import type { EditableRail, MedialFitPart } from './notoMedialFitView'
 import { corpusIdentity } from './notoCorpus'
 import type { StrokeRailBinding } from '../src/services/notoMedialMasterFit'
-import { applyFacesDelta, applyMedialDelta, hasLayoutEdit, layoutDeltaOf, propagationCandidates, propagationEditOf, resolveSemanticRail, semanticKeyOf } from './reviewPropagation'
+import { applyFacesDelta, applyMedialDelta, hasLayoutEdit, initialRowChunks, layoutDeltaOf, propagationCandidates, propagationEditOf, resolveSemanticRail, semanticKeyOf } from './reviewPropagation'
 
 /** 레이아웃 rail 편집 → 배치 Δ → 다른 글자 표본. 순수 계산만 본다. Δ는 획 역할 키(`primaryBeam.center`)로 든다. 획 길이(시작·끝)는 여기서 안 다룬다. */
 
@@ -170,5 +170,12 @@ describe('propagationCandidates', () => {
     expect(pages.map((item) => item.character)).not.toContain('자')
     expect(new Set(pages.map((item) => item.codepoint)).size).toBe(pages.length)
     expect(pages.every((item) => item.initialJamo === 'ㅈ')).toBe(true)
+  })
+  it('첫닿자 줄 세 덩이 = 오른 · 아래 · 섞임, 덩이마다 받침 없는 글자 뒤에 고른 받침 글자', () => {
+    const chunks = initialRowChunks(['ㅈ'], '자'.codePointAt(0)!)
+    const text = chunks.map((chunk) => `${chunk.family}:${chunk.items.map((item) => item.character).join('')}`)
+    expect(text).toEqual(['right:저지재제쟈져집정적잔', 'bottom:조주즈죠쥬죽중존줄', 'mixed:좌줘죄쥐즤좨줬좐줠죔'])
+    const all = chunks.flatMap((chunk) => chunk.items)
+    expect(new Set(all.map((item) => item.codepoint)).size).toBe(all.length)
   })
 })

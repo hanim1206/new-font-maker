@@ -7,6 +7,7 @@ import type { BoxConfig, Part } from '../src/types'
 import { CORPUS_FINALS, CORPUS_INITIALS, CORPUS_MEDIALS, CORPUS_TOTAL, corpusCodepoint, corpusIdentity } from './notoCorpus'
 import type { CorpusIdentity } from './notoCorpus'
 import { jamoPartOf } from './layoutDeltaStore'
+import { medialFamilyOf } from '../src/utils/jamoContextStrokes'
 import type { ComponentFitPart } from './notoComponentFitView'
 import type { EditableRail, MedialFitPart } from './notoMedialFitView'
 
@@ -258,6 +259,27 @@ function curatedPages(source: CorpusIdentity, scope: PropagationScope, count: nu
       page.push(next)
     }
     return page
+  })
+}
+
+/** 획 편집 첫닿자 줄의 세 덩이. 한 덩이 = 홀자 계열 하나, 받침 없는 글자 몇에 받침 있는 글자 몇을 뒤에 붙인다. 익숙한 홀자 순(`familiarInitialRun`)과 같다. */
+export const INITIAL_ROW_FAMILIES = ['right', 'bottom', 'mixed'] as const
+export type InitialRowFamily = typeof INITIAL_ROW_FAMILIES[number]
+const INITIAL_ROW_OPEN = 6
+const INITIAL_ROW_CLOSED = 4
+const INITIAL_ROW_CLOSED_FINALS = [...'ㄴㄹㅁㅇ']
+export function initialRowChunks(jamos: readonly string[], excludeCodepoint: number): { family: InitialRowFamily; items: CorpusIdentity[] }[] {
+  const initials = jamos.filter((initial) => CORPUS_INITIALS.includes(initial))
+  const run = familiarInitialRun(initials, excludeCodepoint)
+  return INITIAL_ROW_FAMILIES.map((family) => {
+    const open = run.filter((item) => item.finalJamo === null && medialFamilyOf(item.medialJamo) === family).slice(0, INITIAL_ROW_OPEN)
+    // 받침 글자는 고른 묶음의 진짜 낱말 글자(집 정 적 · 죽 중 · 줬)가 먼저. 모자라면 익숙한 홀자 순으로 ㄴㄹㅁㅇ 받침을 돌려 채운다.
+    const curated = identitiesOf(SAMPLE_BATCHES[`${family}-final`]?.join('') ?? '').filter((item) => initials.includes(item.initialJamo) && item.codepoint !== excludeCodepoint)
+    const familyMedials = FAMILIAR_MEDIALS.filter((medial) => medialFamilyOf(medial) === family)
+    const machine = familyMedials.flatMap((medial, index) => initials.map((initial) => corpusIdentity(corpusCodepoint(initial, medial, INITIAL_ROW_CLOSED_FINALS[index % INITIAL_ROW_CLOSED_FINALS.length])))).filter((item) => item.codepoint !== excludeCodepoint)
+    const seen = new Set<number>()
+    const closed = [...curated, ...machine].filter((item) => seen.has(item.codepoint) ? false : (seen.add(item.codepoint), true)).slice(0, INITIAL_ROW_CLOSED)
+    return { family, items: [...open, ...closed] }
   })
 }
 

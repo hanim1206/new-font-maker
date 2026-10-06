@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { Part } from '../src/types'
 import type { CorpusIdentity } from './notoCorpus'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
@@ -11,7 +11,9 @@ import { useLayoutDelta } from './layoutDeltaStore'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { propagationCardBaseOf, propagationCardViewOf } from './propagationCardView'
 import type { PropagationCardBox } from './propagationCardView'
-import { hasLayoutEdit, propagationCandidates } from './reviewPropagation'
+import { hasLayoutEdit, initialRowChunks, propagationCandidates } from './reviewPropagation'
+import { Ellipsis } from 'lucide-react'
+import { medialFamilyOf } from '../src/utils/jamoContextStrokes'
 import { ruleSamples } from './scopePicker'
 import { ruleKey } from './scopeRule'
 import type { ScopeRule } from './scopeRule'
@@ -106,9 +108,13 @@ export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, e
   const rowKey = rule ? `${source.codepoint}:rule:${ruleKey(rule)}` : `${source.codepoint}:${scope}:${group}:${jamos.join('')}:${anyContext ? 'any' : 'one'}`
   const [loaded, setLoaded] = useState({ rowKey, batches: 1 })
   const batches = loaded.rowKey === rowKey ? loaded.batches : 1
+  // 획 편집 첫닿자 줄(`모든 ㅈ 글자`)은 묶음 대신 홀자 계열 세 덩이(오른 | 아래 | 섞임)로 선다.
+  const chunked = !rule && scope === 'jamo' && group === 'CH' && anyContext
+  const chunks = useMemo(() => chunked ? initialRowChunks(jamos, source.codepoint) : [], [chunked, jamos, source.codepoint])
   const { candidates, exhausted } = useMemo(() => {
     const list: CorpusIdentity[] = []
     if (!focus) return { candidates: list, exhausted: true }
+    if (chunked) return { candidates: chunks.flatMap((chunk) => chunk.items), exhausted: true }
     if (rule) {
       // 규칙식 범위는 표본 묶음이 아니라 규칙에 닿는 글자를 앞에서부터 가져온다.
       const want = CARD_COUNT * batches
@@ -122,7 +128,7 @@ export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, e
       for (const item of fresh) { seen.add(item.codepoint); list.push(item) }
     }
     return { candidates: list, exhausted: false }
-  }, [focus, source, scope, batches, jamos, anyContext, rule])
+  }, [focus, source, scope, batches, jamos, anyContext, rule, chunked, chunks])
   // 단독 칸이 서면 기준 글자(들고 온 음절)도 줄 맨 앞에 둔다. 표본은 기준 글자를 빼고 뽑아서, 단독 칸에서 그 음절로 돌아갈 길이 없어진다.
   const shown = useMemo(() => lead && !candidates.some((item) => item.codepoint === source.codepoint) ? [source, ...candidates] : candidates, [lead, candidates, source])
   const loadNextBatch = () => { if (!exhausted) setLoaded((current) => (current.rowKey === rowKey ? current.batches : 1) === batches ? { rowKey, batches: batches + 1 } : current) }
@@ -143,7 +149,25 @@ export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, e
     </figure>}
     {/* 범위가 바뀌면 줄을 새로 만들어 맨 앞에서 시작한다. */}
     <div key={rowKey} ref={scroller} className={styles.cards} data-testid="review-propagation-cards" onScroll={(event) => { const el = event.currentTarget; if (el.scrollLeft + el.clientWidth * 2 >= el.scrollWidth) loadNextBatch() }}>
-      {bundle && focus && shown.map((identity) => <TouchedGlyph key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} ghostVisible={ghostVisible} active={identity.character === activeChar} onPick={onPick} />)}
+      {bundle && focus && !chunked && shown.map((identity) => <TouchedGlyph key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} ghostVisible={ghostVisible} active={identity.character === activeChar} onPick={onPick} />)}
+      {/* 세 덩이는 가는 세로선으로 갈린다. 단독 칸에서 돌아갈 기준 글자(`shown`의 맨 앞)는 첫 덩이 앞에 선다. */}
+      {bundle && focus && chunked && chunks.map((chunk, index) => {
+        // 들고 온 음절(기준 글자)은 줄 맨 앞이 아니라 제 홀자 계열 덩이의 맨 앞에 선다 — `조`로 들어왔으면 아래 덩이 앞.
+        const leadIn = lead && medialFamilyOf(source.medialJamo) === chunk.family && !chunk.items.some((item) => item.codepoint === source.codepoint) ? [source] : []
+        const items = [...leadIn, ...chunk.items]
+        // 글자를 고르면 그 글자가 아니라 덩이가 켜진다 — 획은 덩이(홀자 계열) 단위로 갈리기 때문이다.
+        const active = items.some((identity) => identity.character === activeChar)
+        return <Fragment key={chunk.family}>
+          {index > 0 && <span className={styles.divider} aria-hidden="true" />}
+          <div className={styles.chunk} data-family={chunk.family} data-active={active || undefined} data-testid="touched-glyph-chunk">
+            {items.map((identity) => <TouchedGlyph key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} ghostVisible={ghostVisible} active={identity.character === activeChar} onPick={onPick} />)}
+          </div>
+        </Fragment>
+      })}
     </div>
+    {/* 맨 오른쪽 고정 더보기. 아직 아무것도 안 한다 — 첫닿자 변형 3벌 플랜에서 기능이 붙는다. */}
+    {chunked && <div className={styles.more}>
+      <Pressable aria-label="더보기" data-testid="touched-glyph-more"><Ellipsis size={18} aria-hidden="true" /></Pressable>
+    </div>}
   </section>
 })
