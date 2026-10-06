@@ -11,3 +11,27 @@
 .label { flex: 1 1 auto; }
 /* 보는 가지의 `따로 그리기`. 글 없이 화살표 하나. */
 .split { display: grid; place-items: center; flex: 0 0 auto; inline-size: 28px; block-size: 28px; border-radius: 999px; background: rgb(var(--color-primary)); color: rgb(var(--color-primary-foreground)); }
+/* 화살표를 누르면 그 가지의 선이 팽팽해졌다가 가지 쪽으로 감기며 사라지고, 가지는 튕겨 나간다 · 기본은 살짝 되튄다. 길이는 `SNAP_MS`. */
+.lines path[data-snapping] { stroke: rgb(var(--color-primary)); stroke-dasharray: 1 1; animation: snapLine .52s cubic-bezier(.4, 0, .2, 1) forwards; }
+@keyframes snapLine {
+  0% { stroke-dashoffset: 0; stroke-width: 1.8; }
+  30% { stroke-dashoffset: 0; stroke-width: 3.2; }
+  100% { stroke-dashoffset: -1; stroke-width: 1.2; }
+}
+.branch[data-snapping] { animation: snapBranch .52s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes snapBranch {
+  0% { transform: translateX(0); }
+  30% { transform: translateX(-4px); }
+  60% { transform: translateX(10px); }
+  100% { transform: translateX(0); }
+}
+.root[data-snapping] { animation: snapRoot .52s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes snapRoot {
+  0% { transform: translateX(0); }
+  30% { transform: translateX(3px); }
+  60% { transform: translateX(-5px); }
+  100% { transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lines path[data-snapping], .branch[data-snapping], .root[data-snapping] { animation: none; }
+}
