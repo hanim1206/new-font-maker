@@ -2564,10 +2564,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     return target ? { kind: 'stroke', component: componentFor(selectedChar, part, target.jamo), editorPart: part, renderPart: target.renderPart, jamo: target.jamo, strokeId: target.stroke.id, box: target.box } : null
   }
   // 넣기 도구(추가 · 원 · 붙여넣기)의 기댈 곳. 획을 다 지운 자소는 잡을 첫 획이 없어, 빈 자소와 그 상자로 선다.
+  // 비었나는 화면에 그려지는 꼴(가른 벌을 올린 `editableJamoOf`)로 본다 — 저장 꼴은 벌을 다 지워도 기본 획이 남아 있어 `추가`가 꺼진다.
   const creationSelectionOf = (part: MobileEditorPart): Selection | null => {
     const first = firstStrokeSelectionOf(part)
     if (first) return first
-    const jamo = part === 'CH' ? syllable.choseong : part === 'JU' ? syllable.jungseong : syllable.jongseong
+    const stored = part === 'CH' ? syllable.choseong : part === 'JU' ? syllable.jungseong : syllable.jongseong
+    const jamo = stored ? editableJamoOf(stored, syllable) : undefined
     const boxes = placement.kind === 'boxes' ? placement.boxes : focusedBoxes
     const renderPart: Part | undefined = part === 'JU' ? (['JU', 'JU_H', 'JU_V'] as const).find((item) => boxes[item]) : part
     const box = renderPart ? boxes[renderPart] : undefined
