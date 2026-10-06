@@ -160,4 +160,15 @@ describe('propagationCandidates', () => {
     const second = propagationCandidates({ source: 간, scope: 'jamo', count: 8, focus: 'CH', jamos: ['ㅎ'], page: 1 })
     expect(second.some((item) => first.some((other) => other.codepoint === item.codepoint))).toBe(false)
   })
+  it('획 편집 첫닿자 줄(레이아웃 너머)은 익숙한 홀자 순 — 받침 없는 글자 먼저, 그다음 받침 있는 글자', () => {
+    const 자 = corpusIdentity('자'.codePointAt(0)!)
+    const run = { source: 자, scope: 'jamo' as const, count: 8, focus: 'CH' as const, jamos: ['ㅈ'], anyContext: true }
+    expect(charactersOf(run)).toBe('저조주즈지재제쟈')
+    expect(charactersOf({ ...run, page: 1 })).toBe('져죠쥬쟤졔좌줘죄')
+    expect(charactersOf({ ...run, page: 2 })).toBe('쥐즤좨줴잔절좀중')
+    const pages = Array.from({ length: 19 }, (_, page) => propagationCandidates({ ...run, page })).flat()
+    expect(pages.map((item) => item.character)).not.toContain('자')
+    expect(new Set(pages.map((item) => item.codepoint)).size).toBe(pages.length)
+    expect(pages.every((item) => item.initialJamo === 'ㅈ')).toBe(true)
+  })
 })

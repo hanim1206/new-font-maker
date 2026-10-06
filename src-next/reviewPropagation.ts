@@ -181,6 +181,29 @@ export const layoutSampleCharOf = (contextId: string): string => LAYOUT_SAMPLE_C
 const SAMPLE_INITIALS = [...'ㄱㄴㅁㅅㅇㅈㅎㄹㅂㅋ']
 const SAMPLE_FINALS: (string | null)[] = [null, ...'ㄴㄹㅁㅇㄱㅂ']
 
+// 획 편집 첫닿자 줄(`모든 ㅈ 글자`)의 홀자 순서. 기본 여섯 → ㅐㅔ → ㅑㅕㅛㅠ → ㅒㅖ → 섞임. 사전 순(자 재 쟈 쟤 저…)은 드문 글자가 앞에 끼어 낯설다(10-06 사용자).
+const FAMILIAR_MEDIALS = [...'ㅏㅓㅗㅜㅡㅣㅐㅔㅑㅕㅛㅠㅒㅖㅘㅝㅚㅟㅢㅙㅞ']
+const ROW_FINALS = [...'ㄴㄹㅁㅇㄱㅂ']
+
+/**
+ * 획 편집 첫닿자 줄의 글자 전부, 익숙한 홀자 순. 받침 없는 글자가 먼저 한 바퀴(자 저 조 주 즈 지 재 제…),
+ * 그다음 같은 홀자 순으로 받침 있는 글자가 여섯 바퀴 — 바퀴마다 받침을 한 칸씩 밀어 같은 받침이 줄지어 서지 않게 한다. 고른 묶음은 안 쓴다.
+ */
+function familiarInitialRun(initials: readonly string[], excludeCodepoint: number): CorpusIdentity[] {
+  const run: CorpusIdentity[] = []
+  for (let round = 0; round <= ROW_FINALS.length; round += 1) {
+    FAMILIAR_MEDIALS.forEach((medial, index) => {
+      const final = round === 0 ? null : ROW_FINALS[(index + round - 1) % ROW_FINALS.length]
+      for (const initial of initials) {
+        if (!CORPUS_INITIALS.includes(initial)) continue
+        const codepoint = corpusCodepoint(initial, medial, final)
+        if (codepoint !== excludeCodepoint) run.push(corpusIdentity(codepoint))
+      }
+    })
+  }
+  return run
+}
+
 /** 표본 묶음 = 범위 칩과 같다. `layer` = 같은 문맥, `jamo` = 같은 문맥에서 잡은 부품의 자모가 고른 것 중 하나, `all` = 전부. */
 
 /** 잡은 부품의 자모. 초성이면 첫닿자, 받침이면 받침, 홀자 계열은 홀자. */
@@ -246,6 +269,14 @@ export function propagationCandidates(input: { source: CorpusIdentity; scope: Pr
   const { source, scope, count, focus, anyContext = false } = input
   const jamos = input.jamos ?? []
   const group = focus ? jamoPartOf(focus) : 'JU'
+  // 획 편집의 첫닿자 줄은 고른 묶음 없이 익숙한 홀자 순으로 간다. 레이아웃 편집의 `이 자모만`은 아래 그대로(고른 묶음 먼저).
+  if (scope === 'jamo' && group === 'CH' && anyContext) {
+    const run = familiarInitialRun(jamos, source.codepoint)
+    const total = Math.ceil(run.length / count)
+    if (total === 0) return []
+    const page = ((input.page ?? 0) % total + total) % total
+    return run.slice(page * count, (page + 1) * count)
+  }
   // 고른 자모가 표본 목록 밖이면(ㅋ 받침 등) 그 자모를 목록에 보태 카드가 비지 않게 한다.
   const initials = scope === 'jamo' && group === 'CH' ? [...new Set([...SAMPLE_INITIALS, ...jamos])] : SAMPLE_INITIALS
   const finals = scope === 'jamo' && group === 'JO' ? [...new Set([...SAMPLE_FINALS, ...jamos])] : SAMPLE_FINALS
