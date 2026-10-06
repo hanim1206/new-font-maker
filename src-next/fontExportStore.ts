@@ -6,6 +6,7 @@ import { collectFontData } from '../src/services/fontDataBridge'
 import { parallelHangulPortables } from '../src/services/fontExportParallel'
 import { allExportChars } from '../src/services/fontExportUtils'
 import { generateAndDownloadFont } from '../src/services/fontGenerator'
+import { DEFAULT_FAMILY_NAME } from '../src/services/fontIdentity'
 import type { PortableHangulGlyph } from '../src/services/fontGenerator'
 import type { OpenTypeValidationReport } from '../src/services/openTypeValidation'
 import { accountFontName, nextExportRevision } from './accountFontSync'
@@ -25,7 +26,7 @@ import { DEFAULT_SAMPLE_SENTENCE } from './sampleSentences'
  */
 
 export const FONT_NAME_STORAGE_KEY = 'font-export-family-name-v1'
-export const DEFAULT_FONT_NAME = 'FontMaker'
+export const DEFAULT_FONT_NAME = DEFAULT_FAMILY_NAME
 export const FONT_TAB_PATH = '/workspace/font'
 export const FONT_EXPORT_DONE_PATH = '/workspace/font/export'
 export const DASHBOARD_PATH = '/dashboard'

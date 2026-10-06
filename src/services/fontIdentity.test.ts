@@ -62,7 +62,14 @@ describe('폰트 이름 체계', () => {
     expect(isValidPostScriptName('꾸불체-Regular')).toBe(false)
     expect(isValidPostScriptName('A[1]')).toBe(false)
     expect(isValidPostScriptName('')).toBe(false)
-    expect(createFontIdentity('', 'Regular').postScriptName).toBe('FontMaker-Regular')
+    expect(createFontIdentity('', 'Regular').postScriptName).toBe('Kangul-Regular')
+  })
+
+  it('이름을 안 적으면 칸글체, 영문 이름은 Kangul', () => {
+    const identity = createFontIdentity('', 'Regular')
+    expect(identity.asciiFamilyName).toBe('Kangul')
+    expect(identity.localizedFamilyName).toBe('칸글체')
+    expect(createFontIdentity('칸글체', 'Bold').postScriptName).toBe('Kangul-Bold')
   })
 
   it('굵기 600부터 Bold. 스타일 이름이 비트를 정한다', () => {

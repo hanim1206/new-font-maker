@@ -10,7 +10,7 @@
 // @ts-expect-error opentype.js에 타입 정의 파일 없음
 import * as opentype from 'opentype.js'
 import { fontVersionText } from './fontRevision'
-import { createFontIdentity, styleFlagsOf, styleNameForWeight } from './fontIdentity'
+import { createFontIdentity, DEFAULT_FAMILY_NAME, styleFlagsOf, styleNameForWeight } from './fontIdentity'
 import type { FontIdentity } from './fontIdentity'
 import { WINDOWS_LANGUAGE_KOREAN, finalizeOpenTypePackaging } from './openTypePackaging'
 import type { OpenTypeNaming } from './openTypePackaging'
@@ -640,7 +640,7 @@ function createSpaceGlyph(advanceWidth: number): InstanceType<typeof opentype.Gl
  */
 export function downloadTTF(
   arrayBuffer: ArrayBuffer,
-  fileName: string = 'fontmaker.otf'
+  fileName: string = 'kangul.otf'
 ): void {
   const blob = new Blob([arrayBuffer], { type: 'font/otf' })
   const url = URL.createObjectURL(blob)
@@ -734,7 +734,7 @@ function createLatinGlyphs(coverage: ExportCoverageOptions | undefined): { glyph
 
 /** 파일 이름. 사용자가 적은 이름(한글 그대로)에 `.otf`. */
 export function exportFileNameOf(familyName: string): string {
-  const sanitizedName = familyName.replace(/[^a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ\s_-]/g, '').trim() || 'fontmaker'
+  const sanitizedName = familyName.replace(/[^a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ\s_-]/g, '').trim() || DEFAULT_FAMILY_NAME
   return `${sanitizedName}.otf`
 }
 
@@ -753,7 +753,7 @@ export async function generateFontBuffer(
   options: FontGeneratorOptions = {}
 ): Promise<FontGeneratorResult> {
   const {
-    familyName = 'FontMaker',
+    familyName = DEFAULT_FAMILY_NAME,
     asciiFamilyName,
     onProgress,
     placementOf,
