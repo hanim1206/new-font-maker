@@ -150,18 +150,23 @@ describe('펜 자모', () => {
     expect(traced.strokes).toHaveLength(2)
   })
 
-  it('맞춤은 작게 그은 획을 프리셋이 놓이는 자리에 채우고, 기본 자모는 그대로 둔다', () => {
+  it('맞춤은 잉크(굵기 · 끝 모양 포함)가 칸 네 변에 닿게 채운다 — 굵기 0.07 · 정사각 칸 · 평평한 끝', () => {
+    const ink = { half: { x: .035, y: .035 }, linecap: 'butt' as const }
     const small = addPenStroke({ ...ㄱ, strokes: [] }, 'strokes', ㄱRaw({ x: .05, y: .05, size: .4 }), ㄱ)!.jamo
-    const fitted = fitJamoToCell(small, 'strokes', ㄱ)
+    const fitted = fitJamoToCell(small, 'strokes', ink)
     expect(sameStrokePlaces(small, fitted, 'strokes')).toBe(false)
-    // 중심선 범위가 프리셋과 같다 — 시작 · 끝이 테두리에 닿고 굵기만큼 줄이지 않는다.
+    // ㄱ: 가로줄기 왼쪽 끝은 평평해 중심선이 왼 변에 닿고(0), 위는 굵기 반만큼 안쪽(.035). 기둥 오른쪽은 굵기 반 안쪽(.965), 아래 끝은 평평해 아래 변에 닿는다(1).
     const xs = fitted.strokes![0].points.map((point) => point.x), ys = fitted.strokes![0].points.map((point) => point.y)
-    expect(Math.min(...xs)).toBeCloseTo(0, 3)
-    expect(Math.max(...xs)).toBeCloseTo(.98, 3)
-    expect(Math.min(...ys)).toBeCloseTo(0, 3)
-    expect(Math.max(...ys)).toBeCloseTo(1, 3)
-    // 한 번 맞춘 것 · 손 안 댄 기본 자모는 맞춰도 같다 — 단추가 꺼진다
-    expect(sameStrokePlaces(fitted, fitJamoToCell(fitted, 'strokes', ㄱ), 'strokes')).toBe(true)
-    expect(sameStrokePlaces(ㄱ, fitJamoToCell(ㄱ, 'strokes', ㄱ), 'strokes')).toBe(true)
+    expect(Math.min(...xs)).toBeCloseTo(0, 2)
+    expect(Math.max(...xs)).toBeCloseTo(.965, 2)
+    expect(Math.min(...ys)).toBeCloseTo(.035, 2)
+    expect(Math.max(...ys)).toBeCloseTo(1, 2)
+    // 한 번 맞춘 것은 다시 맞춰도 같다 — 단추가 꺼진다
+    expect(sameStrokePlaces(fitted, fitJamoToCell(fitted, 'strokes', ink), 'strokes')).toBe(true)
+    // 둥근 끝이면 끝도 굵기 반만큼 앞으로 나와 네 변 다 안쪽이다
+    const round = fitJamoToCell(small, 'strokes', { ...ink, linecap: 'round' })
+    const rx = round.strokes![0].points.map((point) => point.x), ry = round.strokes![0].points.map((point) => point.y)
+    expect(Math.min(...rx)).toBeCloseTo(.035, 2)
+    expect(Math.max(...ry)).toBeCloseTo(.965, 2)
   })
 })

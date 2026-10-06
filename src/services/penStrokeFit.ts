@@ -99,12 +99,18 @@ export function thinPenPoints(points: readonly PenPoint[], minGap = DEFAULT_MIN_
   return kept
 }
 
-/** 끝 갈고리로 보는 길이(0–1, 호 길이). 이 안에서 획 몸통의 선을 벗어나면 갈고리다. */
-const HOOK_LENGTH = 0.06
-/** 갈고리 끝이 몸통 선에서 이만큼 넘게 벗어나야 자른다(손떨림은 안 건드린다). */
-const HOOK_MIN_OFFSET = 0.02
-/** 몸통 선에서 이만큼 벗어나기 시작한 자리에서 자른다. */
-const HOOK_CUT_OFFSET = 0.006
+/**
+ * 끝 갈고리 문턱은 굵기에 묶는다(10-06 사용자 결정) — 펜을 대고 뗄 때 생기는 갈고리는 획의 잉크 안에 숨을 만큼 작고, 일부러 그은 꼬리(ㅈ 끝)는 잉크 밖으로 나간다.
+ * 굵기 0.07이면 창 0.06 · 자르는 문턱 0.0175 · 자르는 자리 0.006.
+ */
+/** 끝 갈고리로 보는 길이(굵기 배수). 이 안에서 획 몸통의 선을 벗어나면 갈고리다. */
+const HOOK_LENGTH_RATIO = 0.85
+/** 갈고리가 몸통 선에서 굵기의 이 배수 넘게 벗어나야 자른다(손떨림은 안 건드린다). */
+const HOOK_MIN_OFFSET_RATIO = 0.25
+/** 몸통 선에서 굵기의 이 배수만큼 벗어나기 시작한 자리에서 자른다. */
+const HOOK_CUT_OFFSET_RATIO = 0.085
+/** 끝점이 몸통 선에서 굵기의 반(잉크 띠)보다 멀면 갈고리가 아니라 일부러 그은 꼬리다 — 자르지 않는다. */
+const HOOK_END_BAND_RATIO = 0.5
 /** 시작과 끝이 이보다 가까우면 닫는 획으로 보고 갈고리를 안 자른다. */
 const HOOK_CLOSED_GAP = 0.1
 /** 또는 시작과 끝 사이가 획 크기(범위의 대각선)의 이 비율 안이고 한 바퀴 도는 꼴이면 닫으려던 획이다 — 손으로 그은 ㅇ은 끝이 덜 닿거나 지나친다. */
@@ -155,11 +161,15 @@ export function penClosesOnItself(points: readonly PenPoint[]): boolean {
  * 길이는 끝점에서 곧게 잰 거리다. 호 길이로 재면 펜을 대고 머뭇거린 떨림 · 나갔다 돌아온 갈고리가 길이를 다 써서 몸통을 못 찾는다.
  * 끝점이 몸통 선 위로 돌아와 있어도 그 사이에 벗어난 점이 있으면 갈고리다.
  */
-export function trimPenHooks(points: readonly PenPoint[]): PenPoint[] {
+export function trimPenHooks(points: readonly PenPoint[], thickness = DEFAULT_THICKNESS): PenPoint[] {
+  const hookLength = thickness * HOOK_LENGTH_RATIO
+  const minOffset = thickness * HOOK_MIN_OFFSET_RATIO
+  const cutOffset = thickness * HOOK_CUT_OFFSET_RATIO
+  const endBand = thickness * HOOK_END_BAND_RATIO
   const arc = [0]
   for (let i = 1; i < points.length; i++) arc.push(arc[i - 1] + distance(points[i - 1], points[i]))
   const total = arc[arc.length - 1]
-  if (total < HOOK_LENGTH * 3) return [...points]
+  if (total < hookLength * 3) return [...points]
   // 시작과 끝이 실제로 만나는 획(ㅇ · ㅁ)은 끝이 갈고리가 아니라 닫는 자리다. 닫으려던 것 같다는 추정으로는 끝을 안 건드린다.
   if (penEndsMeet(points)) return [...points]
   /** `from` 끝에서 안쪽으로 걸어 자를 인덱스(그 점까지 남는다). 갈고리가 아니면 끝 그대로. */
@@ -172,16 +182,18 @@ export function trimPenHooks(points: readonly PenPoint[]): PenPoint[] {
       while (i !== other && distance(points[i], points[end]) < length) i += inward
       return i
     }
-    const bodyNear = at(HOOK_LENGTH)
-    const bodyFar = at(HOOK_LENGTH * 2)
+    const bodyNear = at(hookLength)
+    const bodyFar = at(hookLength * 2)
     const a = points[bodyFar], b = points[bodyNear]
     const length = distance(a, b)
     if (length === 0) return end
     const off = (p: PenPoint) => Math.abs((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) / length
+    // 끝점이 잉크 띠 밖이면 갈고리가 아니라 꼬리다(ㅈ 끝처럼 일부러 그은 짧은 꺾임). 갈고리는 띠 안에서 옆으로 샜다 끝난다.
+    if (off(points[end]) > endBand) return end
     let worst = 0
     for (let i = end; i !== bodyNear; i += inward) worst = Math.max(worst, off(points[i]))
-    if (worst <= HOOK_MIN_OFFSET) return end
-    for (let i = bodyNear; i !== end; i -= inward) if (off(points[i - inward]) > HOOK_CUT_OFFSET) return i
+    if (worst <= minOffset) return end
+    for (let i = bodyNear; i !== end; i -= inward) if (off(points[i - inward]) > cutOffset) return i
     return end
   }
   const first = cutFrom(true)
@@ -547,7 +559,8 @@ function smoothBetweenCorners(raw: readonly PenPoint[], options: PenFitOptions):
 export function fitPenStroke(points: readonly PenPoint[], options: PenFitOptions = {}): PenFitResult | null {
   const epsilon = options.epsilon ?? PEN_FIT_EPSILON
   const span = options.cornerSpan ?? DEFAULT_CORNER_SPAN
-  const raw = trimPenHooks(thinPenPoints(points, options.minGap ?? DEFAULT_MIN_GAP))
+  const thickness = options.thickness ?? DEFAULT_THICKNESS
+  const raw = trimPenHooks(thinPenPoints(points, options.minGap ?? DEFAULT_MIN_GAP), thickness)
   if (raw.length < 2) return null
   const { thinned, corners, breaks, window } = smoothBetweenCorners(raw, options)
   // 획의 두 끝(꺾임 말고)은 거른 몸통이 향하는 선 위로 옮긴다. 끝점만 손떨림 그대로 남아 끝이 휘는 것을 막는다.
@@ -567,7 +580,6 @@ export function fitPenStroke(points: readonly PenPoint[], options: PenFitOptions
   }
   const fitted = segmentsToAnchors(segments)
   if (fitted.length < 2) return null
-  const thickness = options.thickness ?? DEFAULT_THICKNESS
   const anchors = options.roundAcute ? roundAcuteCorners(fitted, new Set(corners.map((index) => `${thinned[index].x},${thinned[index].y}`)), thickness) : fitted
   const stroke: StrokeDataV2 = {
     id: options.id ?? `stroke-${Date.now()}`,

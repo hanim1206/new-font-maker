@@ -157,6 +157,19 @@ describe('펜 획 맞춤', () => {
     for (let i = 1; i < xs.length; i++) expect(xs[i]).toBeGreaterThan(xs[i - 1])
   })
 
+  it('일부러 그은 짧은 꼬리(ㅈ 끝)는 잉크 띠 밖으로 나가므로 갈고리로 안 자른다 — 굵기에 묶인 문턱', () => {
+    // 사선 몸통 뒤에 왼쪽으로 빠지는 짧은 꼬리(곧은 거리 0.054, 몸통 선에서 0.05쯤 벗어남). 굵기 0.07의 반 0.035보다 멀다.
+    const body = line({ x: .5, y: .05 }, { x: .1, y: .9 }, 120)
+    const tail = Array.from({ length: 16 }, (_, i) => { const t = (i + 1) / 16; return { x: .1 - .05 * t, y: .9 + .08 * t - .1 * t * t } })
+    const fit = fitPenStroke([...body, ...tail], { thickness: .07 })!
+    const last = fit.stroke.points[fit.stroke.points.length - 1]
+    expect(last.x).toBeLessThan(.07)
+    expect(fit.anchorCount).toBeGreaterThanOrEqual(3)
+    // 같은 꼬리도 굵기가 두 배면 잉크 띠 안이라 갈고리로 잘린다.
+    const thick = fitPenStroke([...body, ...tail], { thickness: .14 })!
+    expect(thick.stroke.points[thick.stroke.points.length - 1].x).toBeGreaterThan(.085)
+  })
+
   it('시작에서 옆으로 나갔다 돌아온 갈고리도 잘라 낸다', () => {
     // 아래로 삐쳤다가 제자리로 돌아와 오른쪽으로 긋는다. 시작점은 몸통 선 위지만 그 사이가 벗어났다.
     const hook = [{ x: .18, y: .25 }, { x: .172, y: .27 }, { x: .165, y: .29 }, { x: .172, y: .268 }, { x: .182, y: .251 }]

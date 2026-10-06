@@ -2797,8 +2797,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     const strokes = jamo[channel] ?? []
     const first = strokes[0] ?? preset?.[channel]?.[0]
     const sample = { thickness: first?.thickness ?? PEN_DEFAULT_THICKNESS, linecap: first?.linecap, linejoin: first?.linejoin }
-    return { jamo, renderPart, preset, channel, blocked, sample }
-  }, [lockedPart, syllable, placement, focusedBoxes])
+    // `맞춤`이 잉크를 채울 칸. 굵기(글자 좌표)를 칸 좌표의 축별 반 굵기로 옮긴다.
+    const box = renderPart ? boxes[renderPart] : undefined
+    const halfInk = sample.thickness * weightToMultiplier(focusedGlobalStyle.weight) / 2
+    const ink = box && box.width > 0 && box.height > 0 ? { half: { x: halfInk / box.width, y: halfInk / box.height }, linecap: sample.linecap ?? focusedGlobalStyle.linecap } : null
+    return { jamo, renderPart, preset, channel, blocked, sample, ink }
+  }, [lockedPart, syllable, placement, focusedBoxes, focusedGlobalStyle.weight, focusedGlobalStyle.linecap])
   const penBase = pen?.base
   // 이번에 펜을 켠 뒤 그은 획 = 켠 순간에 없던 획. 그은 획끼리는 다음 획을 그을 때 함께 다시 판정한다.
   const penDrawn = (stroke: StrokeDataV2) => Boolean(penBase) && !penBase!.has(JSON.stringify(stroke.points))
@@ -2831,16 +2835,16 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     if (!result) return
     commitJamo(before, result.jamo, { kind: 'stroke-move', glyph: selectedChar, component: componentFor(selectedChar, lockedPart, penSetup.jamo), jamoType: before.type, strokeId: result.strokeId, delta: { x: 0, y: 0 } }, { pastGapLimit: true })
   }
-  // `맞춤`: 자소를 기본 프리셋이 놓이는 자리와 똑같이 채운다. 눌러도 달라질 게 없으면(손 안 댄 기본 자소 포함) 단추가 꺼진다.
+  // `맞춤`: 자소의 잉크(굵기 · 끝 모양 포함)가 칸에 꽉 차게 채운다. 눌러도 달라질 게 없으면 단추가 꺼진다.
   const fitted = useMemo(() => {
-    if (!penSetup?.preset || penSetup.blocked) return null
-    const after = fitJamoToCell(penSetup.jamo, penSetup.channel, penSetup.preset)
+    if (!penSetup?.preset || !penSetup.ink || penSetup.blocked) return null
+    const after = fitJamoToCell(penSetup.jamo, penSetup.channel, penSetup.ink)
     return sameStrokePlaces(penSetup.jamo, after, penSetup.channel) ? null : after
   }, [penSetup])
   const fitJamo = () => {
     const before = storedPenJamo()
-    if (!fitted || !penSetup?.preset || !lockedPart || !before) return
-    const after = fitJamoToCell(before, penSetup.channel, penSetup.preset)
+    if (!fitted || !penSetup?.preset || !penSetup.ink || !lockedPart || !before) return
+    const after = fitJamoToCell(before, penSetup.channel, penSetup.ink)
     const strokeId = after[penSetup.channel]?.[0]?.id
     if (!strokeId) return
     commitJamo(before, after, { kind: 'stroke-move', glyph: selectedChar, component: componentFor(selectedChar, lockedPart, penSetup.jamo), jamoType: before.type, strokeId, delta: { x: 0, y: 0 } }, { pastGapLimit: true })

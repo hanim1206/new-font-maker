@@ -361,6 +361,20 @@ function inkPadsOf(strokes: readonly StrokeDataV2[], half: { x: number; y: numbe
 }
 
 /**
+ * 잉크(중심선 + 굵기 반 + 끝 모양)가 자모 상자(0–1)에 꽉 차게 획 묶음을 맞춘다 — 네 변 모두 잉크가 닿는다(10-06 사용자 결정: `맞춤`은 두께 포함한 크기를 칸에).
+ * `half`는 굵기 반을 상자 좌표로 옮긴 축별 값. 법선이 배율에 따라 조금 바뀌므로 두 번 맞춘다.
+ */
+export function fitStrokesInkToFillUnitBox(strokes: readonly StrokeDataV2[], half: { x: number; y: number }, linecap: StrokeLinecap = 'round'): StrokeDataV2[] {
+  let out = [...strokes]
+  for (let pass = 0; pass < 2; pass++) {
+    const pads = inkPadsOf(out, half, linecap)
+    if (!pads) return out
+    out = fitStrokesToBounds(out, { minX: pads.minX, maxX: 1 - pads.maxX, minY: pads.minY, maxY: 1 - pads.maxY })
+  }
+  return out
+}
+
+/**
  * 잉크가 자모 상자(0–1) 안에 들도록 획 묶음을 맞춘다(10-05 사용자 결정 — 윤곽까지 상자 안).
  * 잉크가 상자 밖으로 내미는 쪽만 그만큼 중심선 범위를 안으로 당긴다(획 사이 비율은 지킨다). `half`는 굵기 반을 상자 좌표로 옮긴 축별 값.
  * 법선이 배율에 따라 조금 바뀌므로 두 번 맞춘다.

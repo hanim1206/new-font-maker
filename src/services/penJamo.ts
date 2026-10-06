@@ -1,7 +1,7 @@
 import type { BoxConfig, JamoData, StrokeDataV2, StrokeLinecap } from '../types'
 import { fitPenStroke, PEN_FIT_EPSILON, penClosesOnItself } from './penStrokeFit'
 import type { PenPoint } from './penStrokeFit'
-import { adoptStrokeRoles, fitStrokesInkToUnitBox, flattenCenterline, fitStrokesToPresetBounds, joinStrokesAtEnds, matchStrokeRoles, ROLE_MATCH_TAU } from './strokeRoleMatch'
+import { adoptStrokeRoles, fitStrokesInkToFillUnitBox, fitStrokesInkToUnitBox, flattenCenterline, fitStrokesToPresetBounds, joinStrokesAtEnds, matchStrokeRoles, ROLE_MATCH_TAU } from './strokeRoleMatch'
 import type { JamoRecognition, RoleMatch } from './strokeRoleMatch'
 
 /**
@@ -227,16 +227,18 @@ export function penJamoState(jamo: Pick<JamoData, PenChannel>, channel: PenChann
   return { state, missing }
 }
 
+/** 칸 좌표로 옮긴 굵기 반(축별)과 끝 모양. `half.x = 굵기 × 굵기 배율 / 2 / 칸 너비`. */
+export interface PenInkBox { half: { x: number; y: number }; linecap?: StrokeLinecap }
+
 /**
- * `맞춤`: 자모의 획 묶음을 기본 프리셋이 놓이는 자리와 똑같이 채운다(중심선 범위를 프리셋의 중심선 범위에). 획 사이 비율은 지킨다.
- * 그러면 굵기는 칸(윤곽 기준) 안에 들고, 획이 시작하고 끝나는 자리는 프리셋처럼 테두리에 닿는다 — 끝 모양은 세지 않는다(10-06 사용자 결정).
- * 맞춘 자소와 손 안 댄 기본 자소의 크기가 같고, 기본 자소는 맞춰도 그대로다.
+ * `맞춤`: 자모의 획 묶음을 잉크(굵기 · 끝 모양 포함)가 칸에 꽉 차게 채운다 — 네 변 모두 잉크가 닿는다. 획 사이 비율은 지킨다.
+ * 10-06 사용자 결정(뒤집힘): 처음엔 중심선 범위를 프리셋 범위에 맞췄는데(끝 모양 안 셈), "두께 포함한 크기가 박스 안에 핏"으로 바꿨다. 그래서 손 안 댄 기본 자소도 잉크가 칸 밖으로 나가 있으면 맞추면 바뀐다.
  */
-export function fitJamoToCell(jamo: JamoData, channel: PenChannel, preset: Pick<JamoData, PenChannel>): JamoData {
+export function fitJamoToCell(jamo: JamoData, channel: PenChannel, ink: PenInkBox): JamoData {
   const strokes = jamo[channel] ?? []
   if (strokes.length === 0) return jamo
   const next = structuredClone(jamo)
-  next[channel] = fitStrokesToPresetBounds(strokes, preset[channel] ?? [])
+  next[channel] = fitStrokesInkToFillUnitBox(strokes, ink.half, ink.linecap)
   return next
 }
 
