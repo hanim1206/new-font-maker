@@ -15,6 +15,7 @@ import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { useEditHistoryStore } from './editHistoryStore'
 import { newLayoutEntry } from './layoutEntry'
 import { adoptFamilyStrokes, familyOfSyllable, wholeJamoStrokes } from '../src/utils/jamoContextStrokes'
+import { ACUTE_MITER_LIMIT } from '../src/services/strokeToOutline'
 import { DOUBLE_SPLIT, doubleFromSingle } from '../src/utils/jamoFromChoseong'
 import { withFrameFrom, withoutFrame } from '../src/utils/jamoFrame'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
@@ -197,6 +198,8 @@ type PenTool = {
   /** `비우기`로 지울 획이 있는지. 펜이 켜진 동안은 전부터 있던 획만 센다. */
   canClear: boolean
   onClear: () => void
+  /** 개발용: 마지막 펜 입력과 자모 상태를 클립보드로. 복사됐으면 true. */
+  devCopyRaw?: () => Promise<boolean>
 }
 
 /** 끌기로 치는 최소 거리(px). 이보다 짧으면 누르기다. 조절판도 같은 문턱을 쓴다. */
@@ -574,7 +577,11 @@ function PenLayer({ pen, box, fresh, viewport, u, weightMultiplier, globalLineca
     const points = drawing.current
     drawing.current = null
     setCurrent(null)
-    if (!cancelled && points && points.length >= 2) pen.onStroke(points)
+    if (!cancelled && points && points.length >= 2) {
+      // 개발용: 마지막으로 그은 점을 남겨 둔다 — 실제 펜슬 입력을 그대로 가져다 맞춤을 재현하려고(도구 줄 `입력 복사`).
+      if (DEV_TOOLS_ENABLED) { try { localStorage.setItem('pen:lastRaw', JSON.stringify(points.map((point) => [Number(point.x.toFixed(4)), Number(point.y.toFixed(4))]))) } catch { /* 저장 공간이 없으면 그냥 넘어간다 */ } }
+      pen.onStroke(points)
+    }
   }
   const pathOf = (points: readonly PenPoint[]) => points.map((point, index) => {
     const at = absolutePoint(point, box)
@@ -583,7 +590,8 @@ function PenLayer({ pen, box, fresh, viewport, u, weightMultiplier, globalLineca
   const lineWidth = 0.7 * u
   // 긋는 중인 획은 저장될 굵기로, 손떨림만 거른 선으로 그린다. 곡선 맞춤은 손을 뗄 때 한 번만 한다 — 긋는 내내 다시 맞추면 지나온 곡선이 계속 흔들린다.
   const live = current && current.length >= 2 ? stabilizePenPoints(current) : null
-  const inkStyle = (stroke: Pick<StrokeDataV2, 'thickness' | 'linecap' | 'linejoin'>) => ({ fill: 'none', stroke: EDIT_COLOR.foreground, strokeWidth: stroke.thickness * weightMultiplier * VIEW_BOX_SIZE, strokeLinecap: stroke.linecap ?? globalLinecap ?? 'round', strokeLinejoin: stroke.linejoin ?? globalLinejoin ?? 'round', pointerEvents: 'none' } as const)
+  // 실제 그리기(SvgRenderer)와 같은 끝 · 꺾임 · 뾰족 한계 — 그은 직후에 보이는 모양이 저장된 모양과 같아야 한다(10-06 사용자: 직후엔 뾰족, 다시 열면 깎임).
+  const inkStyle = (stroke: Pick<StrokeDataV2, 'thickness' | 'linecap' | 'linejoin'>) => ({ fill: 'none', stroke: EDIT_COLOR.foreground, strokeWidth: stroke.thickness * weightMultiplier * VIEW_BOX_SIZE, strokeLinecap: stroke.linecap ?? globalLinecap ?? 'butt', strokeLinejoin: stroke.linejoin ?? globalLinejoin ?? 'miter', strokeMiterlimit: ACUTE_MITER_LIMIT, pointerEvents: 'none' } as const)
   return <g data-testid="pen-layer">
     {/* 이번에 그은 획은 옅어진 자소 위에 제 색으로 덧그린다. */}
     {fresh.map((item) => <path key={item.stroke.id} d={pointsToSvgD(item.stroke.points, item.stroke.closed, item.box, VIEW_BOX_SIZE)} {...inkStyle(item.stroke)} data-testid="pen-fresh" />)}
@@ -1551,6 +1559,12 @@ function InferenceTrackpad({
   // 고른 획을 두께·모양 그대로 복사판에 담는다. 획을 안 잡고 자소만 잡혔으면 그 자소 획을 전부 담는다.
   const clipboardStrokes = useStrokeClipboard((state) => state.strokes)
   const [strokeCopied, setStrokeCopied] = useState(false)
+  // 개발용: 마지막 펜 입력을 클립보드로(부모가 자모 상태까지 담아 준다).
+  const [penRawCopied, setPenRawCopied] = useState(false)
+  const copyPenRaw = () => {
+    if (!penTool?.devCopyRaw) return
+    void penTool.devCopyRaw().then((ok) => { if (ok) { setPenRawCopied(true); window.setTimeout(() => setPenRawCopied(false), 1200) } })
+  }
   const wholeJamoSource = selection.kind === 'component' ? selection.jamo
     : selection.kind === 'none' ? creationBase?.jamo ?? null
       : null
@@ -1903,6 +1917,7 @@ function InferenceTrackpad({
         {selection.kind !== 'stroke' && wholeJamoSource && <Pressable type="button" onClick={copyStroke} aria-label={`${wholeJamoSource.char} 획 모두 복사`} data-testid="jamo-strokes-copy-all">{strokeCopied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}<span>{strokeCopied ? '복사함' : '복사'}</span></Pressable>}
         {creationBase && clipboardStrokes.length > 0 && <Pressable type="button" onClick={pasteStroke} aria-label="획 붙여넣기" data-testid="jamo-stroke-paste"><ClipboardPaste size={18} aria-hidden="true" /><span>붙여넣기</span></Pressable>}
         {creationBase && doubleSplit && <Pressable type="button" onClick={takeSingle} aria-label={`${doubleSplit.single} 모양 가져오기`} data-testid="jamo-stroke-take-single"><Import size={18} aria-hidden="true" /><span>{doubleSplit.single} 모양</span></Pressable>}
+        {penTool?.devCopyRaw && penActive && <Pressable type="button" onClick={copyPenRaw} aria-label="마지막 펜 입력 복사 (개발용)" data-testid="dev-pen-raw-copy"><Copy size={18} aria-hidden="true" /><span>{penRawCopied ? '복사함' : '입력 복사'}</span></Pressable>}
         {/* 자소의 획을 한 번에 지운다. 펜이 켜진 동안은 옅은(전부터 있던) 획만 지워 따라 그은 획이 남는다 — 펜은 켜 둔다. */}
         {creationBase && penTool && <Pressable type="button" onClick={penTool.onClear} disabled={!penTool.canClear} aria-label={penActive ? `${creationBase.jamo.char} 기존 획 비우기` : `${creationBase.jamo.char} 획 모두 비우기`} data-testid="jamo-stroke-clear"><Eraser size={18} aria-hidden="true" /><span>비우기</span></Pressable>}
         {/* 자소를 기본 프리셋이 놓이는 자리와 똑같이 채운다. 늘 보이고, 이미 그 자리면 꺼진다. */}
@@ -2866,6 +2881,27 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     onFit: fitJamo,
     canClear: clearable > 0,
     onClear: clearJamo,
+    devCopyRaw: DEV_TOOLS_ENABLED ? async () => {
+      let raw = ''
+      try { raw = localStorage.getItem('pen:lastRaw') ?? '' } catch { raw = '' }
+      if (!raw) return false
+      // 자취와 함께 지금 자모(틀 포함)도 담는다 — 거대 획처럼 상자 계산이 어긋난 경우를 그대로 재현하려고.
+      const text = JSON.stringify({ char: selectedChar, part: lockedPart, raw: JSON.parse(raw), jamo: getJamo(penSetup.jamo.type, penSetup.jamo.char) })
+      // 로컬 http(아이패드로 맥에 붙을 때)에는 navigator.clipboard가 없다 — 숨은 글상자로 복사한다.
+      if (navigator.clipboard) { await navigator.clipboard.writeText(text); return true }
+      const area = document.createElement('textarea')
+      area.value = text
+      area.setAttribute('readonly', '')
+      area.style.position = 'fixed'
+      area.style.opacity = '0'
+      document.body.appendChild(area)
+      area.focus()
+      area.select()
+      area.setSelectionRange(0, text.length)
+      const ok = document.execCommand('copy')
+      document.body.removeChild(area)
+      return ok
+    } : undefined,
   } : null
   const penCanvas: PenCanvas | null = pen && penSetup?.preset && penSetup.renderPart && !penSetup.blocked && !styleLocksCanvas ? {
     renderPart: penSetup.renderPart,
