@@ -45,8 +45,8 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: '한글 폰트 메이커',
-        short_name: '한글 폰트 메이커',
+        name: '한글칸글',
+        short_name: '한글칸글',
         description: '내 손으로 한글 폰트를 만들어 보는 도구',
         theme_color: '#292820',
         background_color: '#f0eee7',
