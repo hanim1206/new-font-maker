@@ -18,6 +18,8 @@ export interface PartStyle {
   fillColor?: string
   opacity?: number
   hidden?: boolean  // true이면 해당 파트 렌더링 스킵 (StrokeOverlay가 대신 렌더링)
+  /** 이 파트의 잉크 묶음에 거는 SVG 필터(`url(#id)`). 필터 정의는 쓰는 쪽이 `children`으로 넣는다 — 획 편집이 통째로 고른 자소에 테두리를 두르는 데 쓴다. */
+  filter?: string
 }
 
 interface SvgRendererProps {
@@ -246,7 +248,7 @@ export function SvgRenderer({
     if (partPrimitives.length === 0) return null
 
     return (
-      <g key={part} opacity={partOpacity}>
+      <g key={part} opacity={partOpacity} filter={ps?.filter}>
         {partPrimitives.map((primitive) => renderPrimitive(primitive, strokeColorOf?.(primitive.source) ?? partColor))}
       </g>
     )

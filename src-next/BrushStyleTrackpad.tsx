@@ -9,6 +9,7 @@ import { Button } from './components/ui/button'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { Field, RangeBar } from './components/ui/range'
 import { MITER_ANGLE_RANGE, miterAngleOf, miterLimitOf, miterLimitOfAngle } from '../src/services/strokeJoin'
+import { JOIN_CHOICES } from './strokeJoinChoices'
 
 const TIP_OPTIONS: Array<{ tip: BrushTip; label: string }> = [
   { tip: 'round', label: '원형' }, { tip: 'ellipse', label: '납작형' }, { tip: 'rectangle', label: '네모형' },
@@ -23,14 +24,8 @@ const END_CHOICES: Array<{ id: 'plain' | 'flat'; label: string; tip: BrushTip }>
   { id: 'plain', label: '일반 붓', tip: 'round' },
   { id: 'flat', label: '납작 붓', tip: 'ellipse' },
 ]
-/**
- * 꺾임 셋. 뾰족은 뾰족 한계 손잡이가 따로 있고, 둥긂은 손잡이 없이 꼭짓점 중심 반폭 원호다(둥글기 막대와 독립 — 막대만으로는 예각이 안 둥글어진다).
- * 그림은 ㄱ 모서리 하나를 그 꺾임으로 그린 것.
- */
-const JOIN_CHOICES: Array<{ id: StrokeLinejoin; label: string }> = [
-  { id: 'miter', label: '뾰족' }, { id: 'bevel', label: '깎음' }, { id: 'round', label: '둥긂' },
-]
-function JoinPicto({ join }: { join: StrokeLinejoin }) {
+/** 꺾임 그림. ㄱ 모서리 하나를 그 꺾임으로 그린 것 — 전역 `획` 탭과 획 편집 `스타일` 패널이 같이 쓴다. */
+export function JoinPicto({ join }: { join: StrokeLinejoin }) {
   return <svg viewBox="0 0 64 52" aria-hidden="true"><path d="M12 14 H48 V44" fill="none" stroke="currentColor" strokeWidth="12" strokeLinejoin={join} strokeMiterlimit={4} /></svg>
 }
 const roundnessOf = (style: StrokeRenderStyle): number => style.mode === 'brush' && style.brush.tip === 'round' ? Math.round((style.roundness ?? 0) * 100) : 0

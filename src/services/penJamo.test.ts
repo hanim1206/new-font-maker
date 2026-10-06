@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { JamoData, StrokeDataV2 } from '../types'
-import { addPenStroke, clearPenJamo, fitJamoToCell, penJamoState, presetChannelOf, recognizePenJamo, sameStrokePlaces, viewBoxToJamoBox } from './penJamo'
+import { addPenStroke, fitJamoToCell, penJamoState, presetChannelOf, recognizePenJamo, removePenStrokes, sameStrokePlaces, viewBoxToJamoBox } from './penJamo'
 
 const stroke = (id: string, points: [number, number][]): StrokeDataV2 => ({
   id, closed: false, thickness: .07, points: points.map(([x, y]) => ({ x, y })),
@@ -138,14 +138,21 @@ describe('펜 자모', () => {
     expect(open?.strokeId).not.toBe('ㅎ-circle')
   })
 
-  it('비우기: 펜이 꺼져 있으면 전부 지우고, 켜져 있으면 그은 획만 남겨 역할을 다시 붙인다', () => {
-    expect(clearPenJamo(ㄱ, 'strokes', ㄱ).strokes).toEqual([])
-    // 기존 ㄱ 위에 작게 따라 그으면 자유 획이다. 비우면 기존 획이 사라지고 그은 획이 ㄱ 역할을 받는다 — 자리는 그대로.
-    const traced = addPenStroke(ㄱ, 'strokes', ㄱRaw({ x: .1, y: .1, size: .5 }), ㄱ, { drawn: drawnSince(ㄱ) })!.jamo
+  it('펜 중 삭제: 옛 획을 지우면 그은 획이 빈 역할을 받고, 그은 획을 지우면 옛 획은 그대로다', () => {
+    // 기존 ㄱ 위에 작게 따라 그으면 자유 획이다. 옛 ㄱ을 지우면 그은 획이 ㄱ 역할을 받는다 — 자리는 그대로.
+    const drawn = drawnSince(ㄱ)
+    const traced = addPenStroke(ㄱ, 'strokes', ㄱRaw({ x: .1, y: .1, size: .5 }), ㄱ, { drawn })!.jamo
     expect(traced.strokes?.map((item) => item.id)).toEqual(['ㄱ-1', 'pen-ㄱ-1'])
-    const cleared = clearPenJamo(traced, 'strokes', ㄱ, { drawn: drawnSince(ㄱ) })
-    expect(cleared.strokes?.map((item) => item.id)).toEqual(['ㄱ-1'])
-    expect(boundsOf(cleared.strokes![0]).maxX).toBeLessThan(.65)
+    const oldGone = removePenStrokes(traced, 'strokes', ㄱ, new Set(['ㄱ-1']), { drawn })
+    expect(oldGone.strokes?.map((item) => item.id)).toEqual(['ㄱ-1'])
+    expect(boundsOf(oldGone.strokes![0]).maxX).toBeLessThan(.65)
+    // 그은 획을 지우면 옛 획만 남는다 — 역할도 좌표도 그대로.
+    const newGone = removePenStrokes(traced, 'strokes', ㄱ, new Set(['pen-ㄱ-1']), { drawn })
+    expect(newGone.strokes).toEqual(ㄱ.strokes)
+    // 묶어서 다 지우면 빈 자모.
+    expect(removePenStrokes(traced, 'strokes', ㄱ, new Set(['ㄱ-1', 'pen-ㄱ-1']), { drawn }).strokes).toEqual([])
+    // `drawn`을 안 주면 지우기만 한다 — 남은 자유 획은 자유 획 그대로.
+    expect(removePenStrokes(traced, 'strokes', ㄱ, new Set(['ㄱ-1'])).strokes?.map((item) => item.id)).toEqual(['pen-ㄱ-1'])
     // 원본은 건드리지 않는다
     expect(traced.strokes).toHaveLength(2)
   })

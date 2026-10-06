@@ -139,6 +139,31 @@ const endGap = (a: StrokeDataV2, b: StrokeDataV2) => {
 }
 
 /**
+ * 판정이 끝난 그은 획을 자모에 놓는다. 자유 획 id가 앞서 있던 획과 겹치지 않게 번호를 다시 매기고,
+ * 역할 획은 프리셋 순서로(엔진이 순서로 짝 짓는 곳이 있다), 손으로 넣은 획, 자유 획 차례로 세운다.
+ */
+function placePenStrokes(before: JamoData, channel: PenChannel, presets: readonly StrokeDataV2[], kept: readonly StrokeDataV2[], adopted: { strokes: StrokeDataV2[]; freeIds: string[] }, jamoChar: string) {
+  const presetIds = new Set(presets.map((stroke) => stroke.id))
+  const taken = new Set(kept.map((stroke) => stroke.id))
+  const renamed = new Map<string, string>()
+  let n = 1
+  for (const id of adopted.freeIds) {
+    while (taken.has(`${PEN_FREE_PREFIX}${jamoChar}-${n}`)) n++
+    const next = `${PEN_FREE_PREFIX}${jamoChar}-${n}`
+    taken.add(next)
+    renamed.set(id, next)
+  }
+  const strokes = adopted.strokes.map((stroke) => (renamed.has(stroke.id) ? { ...stroke, id: renamed.get(stroke.id)! } : stroke))
+  const order = new Map(presets.map((stroke, index) => [stroke.id, index]))
+  const holders = kept.filter((stroke) => presetIds.has(stroke.id))
+  const others = kept.filter((stroke) => !presetIds.has(stroke.id))
+  const roles = [...holders, ...strokes.filter((stroke) => presetIds.has(stroke.id))].sort((x, y) => order.get(x.id)! - order.get(y.id)!)
+  const jamo = structuredClone(before)
+  jamo[channel] = structuredClone([...roles, ...others, ...strokes.filter((stroke) => !presetIds.has(stroke.id))])
+  return { jamo, renamed }
+}
+
+/**
  * 펜으로 그은 한 획을 자모에 더한다(플랜 2026-10-05, 10-06 결정). 그은 자리 그대로 둔다 — 칸에 채우지 않는다.
  * 늘 새 획이다. 프리셋 역할 중 **비어 있는 자리**(펜을 켜기 전부터 있던 획이 안 가진 자리)와 닮았으면 역할을 받고, 아니면 자유 획(`pen-…`)으로 남는다.
  * 닮았는지는 속으로만 자모 전체를 프리셋 범위에 채워 견준다 — 작게 · 치우쳐 그어도 모양이 맞으면 인식된다.
@@ -159,9 +184,7 @@ export function addPenStroke(
   const presetIds = new Set(presets.map((stroke) => stroke.id))
   const earlier = existing.filter((stroke) => options.drawn?.(stroke))
   const kept = existing.filter((stroke) => !options.drawn?.(stroke))
-  const holders = kept.filter((stroke) => presetIds.has(stroke.id))
-  const others = kept.filter((stroke) => !presetIds.has(stroke.id))
-  const heldIds = new Set(holders.map((stroke) => stroke.id))
+  const heldIds = new Set(kept.filter((stroke) => presetIds.has(stroke.id)).map((stroke) => stroke.id))
   const freeIndexes = presets.map((_, index) => index).filter((index) => !heldIds.has(presets[index].id))
   // 새 획은 늘 후보의 마지막이다.
   const judge = (candidates: StrokeDataV2[]) => judgePenRoles(kept, candidates, presets, freeIndexes, preset.char, options.tau ?? ROLE_MATCH_TAU)
@@ -177,43 +200,36 @@ export function addPenStroke(
   const best = variants.reduce((pick, item) => (
     item.adopted.freeIds.length < pick.adopted.freeIds.length || (item.adopted.freeIds.length === pick.adopted.freeIds.length && item.score > pick.score) ? item : pick
   ))
-  // 자유 획 id가 앞서 있던 획과 겹치지 않게 번호를 다시 매긴다.
-  const taken = new Set(kept.map((stroke) => stroke.id))
-  const renamed = new Map<string, string>()
-  let n = 1
-  for (const id of best.adopted.freeIds) {
-    while (taken.has(`${PEN_FREE_PREFIX}${preset.char}-${n}`)) n++
-    const next = `${PEN_FREE_PREFIX}${preset.char}-${n}`
-    taken.add(next)
-    renamed.set(id, next)
-  }
-  const strokes = best.adopted.strokes.map((stroke) => (renamed.has(stroke.id) ? { ...stroke, id: renamed.get(stroke.id)! } : stroke))
+  const { jamo, renamed } = placePenStrokes(before, channel, presets, kept, best.adopted, preset.char)
   const lastId = best.adopted.ids[best.adopted.ids.length - 1]
-  // 역할 획은 프리셋 순서로(엔진이 순서로 짝 짓는 곳이 있다), 손으로 넣은 획, 자유 획 차례.
-  const order = new Map(presets.map((stroke, index) => [stroke.id, index]))
-  const roles = [...holders, ...strokes.filter((stroke) => presetIds.has(stroke.id))].sort((a, b) => order.get(a.id)! - order.get(b.id)!)
-  const jamo = structuredClone(before)
-  jamo[channel] = structuredClone([...roles, ...others, ...strokes.filter((stroke) => !presetIds.has(stroke.id))])
   return { jamo, strokeId: renamed.get(lastId) ?? lastId }
 }
 
 /**
- * `비우기`: 자모의 획을 지운다. `drawn`을 주면(펜이 켜진 동안) 이번에 그은 획은 남기고 전부터 있던 획만 지운다.
- * 역할 자리가 다 비므로 남은 획을 처음부터 다시 판정한다 — 옅은 획을 따라 그은 뒤 비우면 그은 획이 그 역할을 받는다. 좌표는 그대로다.
+ * 펜이 켜진 동안 획을 지운다(하나든 묶음이든). 지운 뒤 이번에 그은 획(`drawn`)을 빈 역할 자리에 다시 판정한다 —
+ * 옅은 획을 따라 그은 뒤 그 옛 획을 지우면 그은 획이 그 역할을 받는다. 좌표는 그대로다.
+ * 펜을 켜기 전부터 있던 획은 역할도 자리도 건드리지 않는다. `drawn`을 안 주면 지우기만 한다.
  */
-export function clearPenJamo(
+export function removePenStrokes(
   before: JamoData,
   channel: PenChannel,
   preset: Pick<JamoData, 'char' | 'strokes' | 'horizontalStrokes' | 'verticalStrokes'>,
+  removeIds: ReadonlySet<string>,
   options: PenStrokeOptions = {},
 ): JamoData {
   const presets = preset[channel] ?? []
-  const left = (before[channel] ?? []).filter((stroke) => options.drawn?.(stroke))
-  const jamo = structuredClone(before)
-  if (left.length === 0) { jamo[channel] = []; return jamo }
-  const { adopted } = judgePenRoles([], left, presets, presets.map((_, index) => index), preset.char, options.tau ?? ROLE_MATCH_TAU)
-  jamo[channel] = structuredClone(adopted.strokes)
-  return jamo
+  const left = (before[channel] ?? []).filter((stroke) => !removeIds.has(stroke.id))
+  const earlier = left.filter((stroke) => options.drawn?.(stroke))
+  if (earlier.length === 0) {
+    const jamo = structuredClone(before)
+    jamo[channel] = structuredClone(left)
+    return jamo
+  }
+  const kept = left.filter((stroke) => !options.drawn?.(stroke))
+  const heldIds = new Set(kept.map((stroke) => stroke.id))
+  const freeIndexes = presets.map((_, index) => index).filter((index) => !heldIds.has(presets[index].id))
+  const { adopted } = judgePenRoles(kept, earlier, presets, freeIndexes, preset.char, options.tau ?? ROLE_MATCH_TAU)
+  return placePenStrokes(before, channel, presets, kept, adopted, preset.char).jamo
 }
 
 /** 자모가 프리셋 역할을 얼마나 갖췄는지. 역할이 다 있고 자유 획이 없으면 인식됨, 역할이 하나도 없으면 자유. */
