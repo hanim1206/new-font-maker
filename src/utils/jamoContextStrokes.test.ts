@@ -4,7 +4,7 @@ import { resolveGlyphInkPrimitives } from '../services/glyphInkResolver'
 import { getRenderedStrokeTargets } from '../services/mobileEditorContext'
 import type { DecomposedSyllable, JamoData, StrokeDataV2 } from '../types'
 import baseJamos from '../data/baseJamos.json'
-import { adoptFamilyStrokes, familyOfSyllable, medialFamilyOf, strokesForFamily, wholeJamoStrokes } from './jamoContextStrokes'
+import { adoptFamilyStrokes, familyOfSyllable, hasFamilyStrokes, medialFamilyOf, mergeFamilyStrokes, splitFamilyStrokes, strokesForFamily, wholeJamoStrokes, writeFamilyStrokes } from './jamoContextStrokes'
 
 const line = (id: string, x2: number): StrokeDataV2 => ({ id, points: [{ x: 0, y: 0 }, { x: x2, y: 1 }], closed: false, thickness: 0.07 })
 const giyeok: JamoData = { char: 'ㄱ', type: 'choseong', strokes: [line('ㄱ-1', 1)], contextStrokes: { bottom: [line('ㄱ-1', 0.3)] } }
@@ -75,5 +75,64 @@ describe('통째 상자 자소의 획(ㅒ · ㅖ 편집 버그)', () => {
       expect(targets.filter((target) => target.editorPart === 'JU').length, char).toBe(stored)
       expect(stored, char).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('첫닿자 변형 가르기 · 합치기 · 저장', () => {
+  const base: JamoData = { char: 'ㅈ', type: 'choseong', strokes: [line('ㅈ-1', 1)] }
+
+  it('가르면 그 계열이 기본 획 복제로 생기고, 합치면 사라진다', () => {
+    const split = splitFamilyStrokes(base, 'bottom')
+    expect(hasFamilyStrokes(base, 'bottom')).toBe(false)
+    expect(hasFamilyStrokes(split, 'bottom')).toBe(true)
+    expect(split.contextStrokes!.bottom![0].points[1].x).toBe(1)
+    expect(splitFamilyStrokes(split, 'bottom')).toBe(split)
+    const merged = mergeFamilyStrokes(split, 'bottom')
+    expect(merged.contextStrokes).toBeUndefined()
+    expect(mergeFamilyStrokes(base, 'bottom')).toBe(base)
+  })
+
+  it('가른 계열에서 고치면 그 변형만 바뀌고 기본 · 다른 변형은 그대로', () => {
+    const stored = splitFamilyStrokes(splitFamilyStrokes(base, 'bottom'), 'mixed')
+    const view = adoptFamilyStrokes(stored, 'bottom')
+    view.strokes![0].points[1].x = 0.3
+    const saved = writeFamilyStrokes(stored, view, 'bottom')
+    expect(saved.strokes![0].points[1].x).toBe(1)
+    expect(saved.contextStrokes!.bottom![0].points[1].x).toBe(0.3)
+    expect(saved.contextStrokes!.mixed![0].points[1].x).toBe(1)
+    expect(strokesForFamily(saved, 'right')![0].points[1].x).toBe(1)
+  })
+
+  it('기본(단독 칸)에서 고치면 안 가른 계열만 따라오고 가른 변형은 남는다', () => {
+    const stored = splitFamilyStrokes(base, 'bottom')
+    const view = adoptFamilyStrokes(stored, null)
+    view.strokes![0].points[1].x = 0.6
+    const saved = writeFamilyStrokes(stored, view, null)
+    expect(saved.strokes![0].points[1].x).toBe(0.6)
+    expect(saved.contextStrokes!.bottom![0].points[1].x).toBe(1)
+    expect(strokesForFamily(saved, 'right')![0].points[1].x).toBe(0.6)
+    expect(strokesForFamily(saved, 'bottom')![0].points[1].x).toBe(1)
+  })
+
+  it('안 가른 계열에서 고치면 예전처럼 기본 획에 쓴다(받침 · 홀자 경로 그대로)', () => {
+    const view = adoptFamilyStrokes(base, 'right')
+    view.strokes![0].points[1].x = 0.4
+    const saved = writeFamilyStrokes(base, view, 'right')
+    expect(saved.strokes![0].points[1].x).toBe(0.4)
+    expect(saved.contextStrokes).toBeUndefined()
+  })
+
+  it('틀은 계열 사본으로 따로 든다 — 변형 편집은 그 계열 틀만, 기본 편집은 변형 틀을 남긴다', () => {
+    const stored = splitFamilyStrokes(base, 'bottom')
+    const view = adoptFamilyStrokes(stored, 'bottom')
+    view.frame = { strokes: [line('ㅈ-1', 0.9)] }
+    const saved = writeFamilyStrokes(stored, view, 'bottom')
+    expect(saved.frame!.strokes![0].points[1].x).toBe(1)
+    expect(saved.frame!.contextStrokes!.bottom![0].points[1].x).toBe(0.9)
+    const baseView = adoptFamilyStrokes(saved, null)
+    baseView.frame = { strokes: [line('ㅈ-1', 0.5)] }
+    const savedBase = writeFamilyStrokes(saved, baseView, null)
+    expect(savedBase.frame!.strokes![0].points[1].x).toBe(0.5)
+    expect(savedBase.frame!.contextStrokes!.bottom![0].points[1].x).toBe(0.9)
   })
 })

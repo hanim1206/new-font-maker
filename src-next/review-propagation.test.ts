@@ -3,7 +3,7 @@ import type { ComponentFitPart } from './notoComponentFitView'
 import type { EditableRail, MedialFitPart } from './notoMedialFitView'
 import { corpusIdentity } from './notoCorpus'
 import type { StrokeRailBinding } from '../src/services/notoMedialMasterFit'
-import { applyFacesDelta, applyMedialDelta, hasLayoutEdit, layoutDeltaOf, propagationCandidates, propagationEditOf, resolveSemanticRail, semanticKeyOf } from './reviewPropagation'
+import { applyFacesDelta, applyMedialDelta, hasLayoutEdit, initialRowChunks, layoutDeltaOf, propagationCandidates, propagationEditOf, resolveSemanticRail, semanticKeyOf } from './reviewPropagation'
 
 /** 레이아웃 rail 편집 → 배치 Δ → 다른 글자 표본. 순수 계산만 본다. Δ는 획 역할 키(`primaryBeam.center`)로 든다. 획 길이(시작·끝)는 여기서 안 다룬다. */
 
@@ -159,5 +159,23 @@ describe('propagationCandidates', () => {
     expect(first.slice(0, 3).map((item) => item.character).join('')).toBe('한할힘')
     const second = propagationCandidates({ source: 간, scope: 'jamo', count: 8, focus: 'CH', jamos: ['ㅎ'], page: 1 })
     expect(second.some((item) => first.some((other) => other.codepoint === item.codepoint))).toBe(false)
+  })
+  it('획 편집 첫닿자 줄(레이아웃 너머)은 익숙한 홀자 순 — 받침 없는 글자 먼저, 그다음 받침 있는 글자', () => {
+    const 자 = corpusIdentity('자'.codePointAt(0)!)
+    const run = { source: 자, scope: 'jamo' as const, count: 8, focus: 'CH' as const, jamos: ['ㅈ'], anyContext: true }
+    expect(charactersOf(run)).toBe('저조주즈지재제쟈')
+    expect(charactersOf({ ...run, page: 1 })).toBe('져죠쥬쟤졔좌줘죄')
+    expect(charactersOf({ ...run, page: 2 })).toBe('쥐즤좨줴잔절좀중')
+    const pages = Array.from({ length: 19 }, (_, page) => propagationCandidates({ ...run, page })).flat()
+    expect(pages.map((item) => item.character)).not.toContain('자')
+    expect(new Set(pages.map((item) => item.codepoint)).size).toBe(pages.length)
+    expect(pages.every((item) => item.initialJamo === 'ㅈ')).toBe(true)
+  })
+  it('첫닿자 줄 세 덩이 = 오른 · 아래 · 섞임, 덩이마다 받침 없는 글자 뒤에 고른 받침 글자', () => {
+    const chunks = initialRowChunks(['ㅈ'], '자'.codePointAt(0)!)
+    const text = chunks.map((chunk) => `${chunk.family}:${chunk.items.map((item) => item.character).join('')}`)
+    expect(text).toEqual(['right:저지재제쟈져집정적잔', 'bottom:조주즈죠쥬죽중존줄', 'mixed:좌줘죄쥐즤좨줬좐줠죔'])
+    const all = chunks.flatMap((chunk) => chunk.items)
+    expect(new Set(all.map((item) => item.codepoint)).size).toBe(all.length)
   })
 })

@@ -514,7 +514,15 @@ test('캔버스에서 획 · 점을 멀리 끌어도 글자 칸 밖으로 나가
   const open = async (syllable: string, part: string, inSyllable = false) => {
     await page.goto(`/workspace/jamo?char=${encodeURIComponent(syllable)}&mode=stroke&part=${part}`)
     await expect(page.locator('[data-editor-hit="stroke"]').first()).toBeAttached({ timeout: 60_000 })
-    if (inSyllable) await page.locator(`[data-testid="review-propagation-card"][data-char="${syllable}"] [data-testid="review-propagation-open"]`).first().click()
+    if (inSyllable) {
+      await page.locator(`[data-testid="review-propagation-card"][data-char="${syllable}"] [data-testid="review-propagation-open"]`).first().click()
+      // 첫닿자는 안 가른 홀자 계열 글자를 열면 보기만이다. `따로 그리기`로 그 계열을 갈라야 고칠 수 있다(첫닿자 획 변형 3벌).
+      if (part === 'CH') {
+        await page.getByTestId('variant-gate-split').click()
+        // 선이 끊기는 움직임이 끝나야 캔버스가 산다.
+        await expect(page.getByTestId('variant-gate')).toHaveCount(0)
+      }
+    }
     await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
   }
   const boxOf = (id: string) => page.locator(`[data-editor-hit="stroke"][data-stroke-id="${id}"]`).evaluate((element) => { const b = (element as SVGGraphicsElement).getBBox(); return { left: b.x, right: b.x + b.width, top: b.y, bottom: b.y + b.height } })

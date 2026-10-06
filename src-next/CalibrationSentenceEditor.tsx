@@ -14,7 +14,10 @@ import { effectiveLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { useEditHistoryStore } from './editHistoryStore'
 import { newLayoutEntry } from './layoutEntry'
-import { adoptFamilyStrokes, familyOfSyllable, wholeJamoStrokes } from '../src/utils/jamoContextStrokes'
+import { adoptFamilyStrokes, familyOfSyllable, hasFamilyStrokes, mergeFamilyStrokes, splitFamilyStrokes, wholeJamoStrokes, writeFamilyStrokes } from '../src/utils/jamoContextStrokes'
+import type { MedialFamily } from '../src/types'
+import { initialRowChunks } from './reviewPropagation'
+import { VariantGateCard } from './VariantGateCard'
 import { countOwnJoins, miterLimitOf, withoutOwnJoins } from '../src/services/strokeJoin'
 import { centerlineInkGroups } from '../src/services/finalGlyphInk'
 import { brushInkGroupsToSvgPaths } from '../src/services/brushGeometry'
@@ -250,6 +253,8 @@ export type HistoryEntry =
   // 획 편집 끌기.
   // `picked`: 이 편집을 할 때 잡혀 있던 선택(획 · 점 묶음 · 획 묶음 · 자소 전체). 되돌리기 · 다시 하기가 되살린다 — 선택 자체는 기록 단위가 아니다.
   | { kind: 'jamo'; jamoType: JamoData['type']; char: string; before: JamoData; after: JamoData; edit: SampleGlyphEdit; picked?: PickedSelection }
+  // 첫닿자 변형 가르기 · 합치기. 획은 안 바뀌고 변형 목록만 바뀐다.
+  | { kind: 'jamoVariant'; char: string; before: JamoData; after: JamoData }
   | { kind: 'brush'; before: StrokeRenderStyle; after: StrokeRenderStyle; ends?: { before: StrokeEnds; after: StrokeEnds } }
   // 전역 패널의 `풀기` — 꺾임을 따로 정한 획들의 값을 한 번에 지운다. 자소 여럿이 한 줄의 되돌리기.
   | { kind: 'jamos'; before: JamoData[]; after: JamoData[] }
@@ -2631,6 +2636,37 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     pickFirstStrokeRef.current = true
   }
   const soloLead = useMemo(() => soloChar ? { char: soloChar, active: selectedChar === soloChar } : undefined, [soloChar, selectedChar])
+  // 첫닿자 변형 3벌. 지금 글자의 홀자 계열(단독 칸은 null)과, 그 계열을 따로 그렸는지.
+  const editFamily = familyOfSyllable(syllable)
+  const storedChoseong = syllable.choseong ? choseong[syllable.choseong.char] : undefined
+  const familySplit = !!storedChoseong && hasFamilyStrokes(storedChoseong, editFamily)
+  const splitFamilies = useMemo(() => storedChoseong ? (['right', 'bottom', 'mixed'] as const).filter((family) => hasFamilyStrokes(storedChoseong, family)) : [], [storedChoseong])
+  // 안 가른 계열의 글자를 열면 캔버스는 보기만, 조절판 자리엔 `따로 그리기` 카드. 기본은 단독 칸에서 고친다.
+  // `닿는 글자` 줄에서 고른 글자일 때만(`strokeRowAnchor`) — 주소로 음절을 바로 연 옛 길(`?mode=stroke`만)은 예전처럼 기본 획을 고친다.
+  const variantGate = chrome === 'workspace' && editMode === 'stroke' && strokeCardPart === 'CH' && strokeRowAnchor !== null && !isSoloConsonant(selectedChar) && editFamily && storedChoseong && !familySplit ? editFamily : null
+  // 트리 가지에 그릴 계열별 대표 글자(자 · 조 · 좌) — 줄의 첫 글자와 같다.
+  const gateExamples = useMemo(() => storedChoseong ? Object.fromEntries(initialRowChunks([storedChoseong.char], 0).map((chunk) => [chunk.family, chunk.items[0]?.character])) as Partial<Record<MedialFamily, string>> : {}, [storedChoseong])
+  const commitVariant = (after: JamoData) => {
+    if (!storedChoseong || after === storedChoseong) return
+    setHistory((entries) => [...entries, { kind: 'jamoVariant', char: storedChoseong.char, before: structuredClone(storedChoseong), after }])
+    setFuture([])
+    updateJamo(after)
+    setPreviewJamo(null)
+  }
+  const splitVariant = () => {
+    if (!variantGate || !storedChoseong) return
+    commitVariant(splitFamilyStrokes(storedChoseong, variantGate))
+    // 가르자마자 이 글자의 첫 획을 잡아 바로 고친다.
+    pickFirstStrokeRef.current = true
+  }
+  const mergeVariant = () => {
+    if (!editFamily || !storedChoseong || !familySplit) return
+    commitVariant(mergeFamilyStrokes(storedChoseong, editFamily))
+    setSelection({ kind: 'none' })
+    setSelectedPoints([])
+    setSelectedStrokes([])
+  }
+  const canvasLocked = styleLocksCanvas || variantGate !== null
   useEffect(() => {
     if (!pickFirstStrokeRef.current || !lockedPart) return
     pickFirstStrokeRef.current = false
@@ -2782,11 +2818,13 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     // `틀 다시 맞추기`만 틀 없이 저장한다. 되돌리기는 기록의 `before`(틀이 없던 때)로 돌아가므로 틀도 같이 사라진다.
     const framedAfter = options?.unframed ? withoutFrame(after) : frameForEdit(after)
     const safeAfter = options?.pastGapLimit ? withoutInkSafety(framedAfter) : withContextualInkSafety(storedBefore, before, framedAfter, minimumInkGap)
+    // 편집기는 그 계열 획만 든 자모를 고쳤다. 저장은 계열 변형이 있으면 그 자리에, 없으면 기본 획에 — 다른 변형은 남는다.
+    const storedAfter = writeFamilyStrokes(storedBefore, safeAfter, familyOfSyllable(syllable))
     const edit = createSampleGlyphEdit(raw)
-    setHistory((entries) => [...entries, { kind: 'jamo', jamoType: before.type, char: before.char, before: storedBefore, after: safeAfter, edit, picked: { selection, points: selectedPoints, strokes: selectedStrokes } }])
+    setHistory((entries) => [...entries, { kind: 'jamo', jamoType: before.type, char: before.char, before: storedBefore, after: storedAfter, edit, picked: { selection, points: selectedPoints, strokes: selectedStrokes } }])
     setFuture([])
     useCalibrationProjectStore.getState().addSampleGlyphEdit(edit)
-    updateJamo(safeAfter)
+    updateJamo(storedAfter)
     setPreviewJamo(null)
     setSelection((current) => current.kind === 'none' ? current : { ...current, jamo: safeAfter })
   }
@@ -3325,15 +3363,15 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       {/* 획 편집에도 같은 자리·같은 높이로 `닿는 글자` 줄이 선다. 범위는 고치는 자모가 든 글자 전부(레이아웃을 안 가린다).
           줄이 두 모드에 다 있어야 `획 고치기`로 오갈 때 캔버스가 안 튄다. */}
       {chrome === 'workspace' && strokeFrameAvailable && !styleLocksCanvas && !big && strokeRowJamo && strokeCardPart &&
-        <TouchedGlyphRow source={strokeRowSource} bundle={notoBundle} edit={NO_LAYOUT_EDIT} ghostVisible={false} focus={strokeCardPart} scope="jamo" group={strokeCardPart} jamos={strokeRowJamos} anyContext onPick={pickStrokeRowChar} activeChar={selectedChar} lead={soloLead} onPickLead={pickSolo} />}
+        <TouchedGlyphRow source={strokeRowSource} bundle={notoBundle} edit={NO_LAYOUT_EDIT} ghostVisible={false} focus={strokeCardPart} scope="jamo" group={strokeCardPart} jamos={strokeRowJamos} anyContext onPick={pickStrokeRowChar} activeChar={selectedChar} lead={soloLead} onPickLead={pickSolo} splitFamilies={splitFamilies} onMerge={familySplit && !isSoloConsonant(selectedChar) ? mergeVariant : null} />}
       {!styleSpaceOpen && <section className={styles.editor} data-chrome={chrome} data-stroke-tools={!globalStylePanel && directManipulation ? true : undefined} data-big={big || undefined} aria-label={`${selectedChar} 완성 글자 편집`}>
         {/* 셸 안 획 편집에서는 캔버스 왼쪽에 도구 단추가 세로로 선다(한 칸씩 넘기는 슬라이드). 여섯 칸 표지는 숨긴다 — 닿는 범위는 위 `닿는 글자` 줄이 보여 준다. */}
         <div className={styles.strokeStage}>
         {chrome === 'workspace' && !globalStylePanel && directManipulation && !styleLocksCanvas
           ? <div ref={setStrokeToolSlot} className={styles.strokeToolSlot} data-testid="jamo-stroke-tool-slot" />
           : chrome === 'workspace' && layoutAvailable && !styleLocksCanvas && <LayoutContextCards activeContextId={corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00).contextId} allActive={false} ink={strokeCardInk ?? undefined} />}
-        <div className={styles.focusArea}>
-        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={styleLocksCanvas ? { kind: 'none' } : selection} onSelect={styleLocksCanvas ? () => {} : selectFromCanvas} selectedPoints={styleLocksCanvas ? [] : selectedPoints} selectedStrokes={styleLocksCanvas ? [] : selectedStrokes} multiSelectArmed={!styleLocksCanvas && multiArmed} wholeJamoCentered={styleLocksCanvas ? null : wholeJamoCentered} onPointSelect={styleLocksCanvas ? () => {} : selectPointFromCanvas} lockedPart={styleLocksCanvas ? null : lockedPart} dragApiRef={directManipulation && !styleLocksCanvas ? dragApiRef : undefined} padDragRef={directManipulation && !styleLocksCanvas ? padDragRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={focusedGlobalStyle} pen={penCanvas}
+        <div className={styles.focusArea} data-gated={variantGate ? true : undefined}>
+        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={canvasLocked ? { kind: 'none' } : selection} onSelect={canvasLocked ? () => {} : selectFromCanvas} selectedPoints={canvasLocked ? [] : selectedPoints} selectedStrokes={canvasLocked ? [] : selectedStrokes} multiSelectArmed={!canvasLocked && multiArmed} wholeJamoCentered={canvasLocked ? null : wholeJamoCentered} onPointSelect={canvasLocked ? () => {} : selectPointFromCanvas} lockedPart={canvasLocked ? null : lockedPart} dragApiRef={directManipulation && !canvasLocked ? dragApiRef : undefined} padDragRef={directManipulation && !canvasLocked ? padDragRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={focusedGlobalStyle} pen={penCanvas}
           corner={canvasBigAvailable && <Pressable type="button" className={styles.canvasBigToggle} onClick={() => setCanvasBig((on) => !on)} aria-pressed={big} aria-label={big ? '캔버스 작게 보기' : '캔버스 크게 보기'} title={big ? '작게' : '크게'} data-testid="canvas-big-toggle">{big ? <Minimize2 size={18} aria-hidden="true" /> : <Maximize2 size={18} aria-hidden="true" />}</Pressable>} />
         </div>
         </div>
@@ -3365,7 +3403,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
           onCommit={commitBeak}
           scope={benchGroup && { groupName: benchGroup.name, groupSize: benchGroup.chars.length, toGroup: beakGroup !== null, onChange: (toGroup) => { draftBeak(null); setBeakToGroup(toGroup) } }}
         />}
-      /> : <InferenceTrackpad
+      /> : variantGate && storedChoseong ? <section className={styles.trackpadSection} data-testid="variant-gate-section">
+        <VariantGateCard jamo={storedChoseong.char} family={variantGate} splitFamilies={splitFamilies} examples={gateExamples} onSplit={splitVariant} />
+      </section> : <InferenceTrackpad
         glyph={selectedChar}
         syllable={syllable}
         selection={selection}
