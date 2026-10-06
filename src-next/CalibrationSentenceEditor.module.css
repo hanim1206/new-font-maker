@@ -280,3 +280,30 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .sentenceRun button { --tw-ring-color: transparent; }
 /* 전역 꺾임을 바꿔도 안 바뀌는 획 안내 — 패널 안 한 줄, 오른쪽 끝에 `풀기`. */
 .joinOverrideNote { margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: rgb(var(--color-text-4)); font-size: var(--font-11); }
+
+/* 캔버스 `크게` 보기. 문장 줄 · `닿는 글자` 줄 · 조절판이 비키고 캔버스와 도구 줄만 남는다.
+   도구 줄은 어느 폭에서든 화면 맨 아래 가로 한 줄로 눕고(넘치면 옆으로 한 칸씩), 캔버스는 정사각형을 풀고 남은 자리를 가로 · 세로 다 채운다.
+   글자는 짧은 변에 맞춰 가운데에 놓이고, 긴 쪽으로는 눈금 바깥이 더 보인다. */
+.canvasCorner { position: absolute; z-index: 3; top: 10px; right: 10px; display: flex; }
+.canvasBigToggle { width: 36px; height: 36px; display: grid; place-items: center; border-radius: var(--radius-md); background: rgb(var(--color-surface-3) / .92); color: rgb(var(--color-text-2)); }
+.canvasBigToggle:active { background: rgb(var(--color-foreground) / .1); }
+.scrollArea[data-big] > .sentence { display: none; }
+.editor[data-chrome='workspace'][data-big] { flex: 1 1 auto; min-height: 0; }
+.editor[data-chrome='workspace'][data-big] .strokeStage { flex: 1 1 auto; min-height: 0; flex-direction: column-reverse; align-items: stretch; gap: 10px; }
+.editor[data-chrome='workspace'][data-big] .focusArea { flex: 1 1 auto; min-height: 0; align-items: stretch; }
+/* 비율(1)은 풀지 않는다 — 늘어난 높이가 비율을 이긴다. 비율을 풀었다 되돌리면 사파리가 끈 뒤에도 큰 화면의 폭을 높이로 붙들고 있다. */
+.editor[data-chrome='workspace'][data-big] .focusCanvas { width: 100%; align-self: stretch; }
+.editor[data-big] .strokeToolSlot { flex: 0 0 60px; contain: none; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; mask-image: linear-gradient(to right, black calc(100% - 18px), transparent 100%); }
+/* 단추 줄은 가운데에 모은다 — 양 끝 단추의 자동 여백으로. 넘치면 여백이 0이 되어 왼쪽부터 밀어 넘긴다.
+   (`width: max-content` + `margin: auto`는 사파리가 줄 폭을 좁게 재서 쏠린다.) */
+.editor[data-big] .strokeToolSlot .strokeToolRow { flex-direction: row; padding: 4px 12px; }
+.editor[data-big] .strokeToolSlot .strokeToolRow > :first-child { margin-left: auto; }
+.editor[data-big] .strokeToolSlot .strokeToolRow > :last-child { margin-right: auto; }
+.editor[data-big] .strokeToolSlot .strokeToolRow button { flex: 0 0 52px; height: 52px; scroll-margin-left: 0; }
+.editor[data-big] .strokeToolSlot .strokeAddMenu { flex: 0 0 auto; grid-template-rows: none; grid-template-columns: 0fr; margin-top: 0; margin-left: -6px; transition: grid-template-columns var(--motion-slow) var(--ease-standard), margin-left var(--motion-slow) var(--ease-standard), opacity var(--motion-slow) var(--ease-standard), visibility 0s linear var(--motion-slow); }
+.editor[data-big] .strokeToolSlot .strokeAddMenu[data-open='true'] { grid-template-columns: 1fr; margin-left: 0; transition-delay: 0s; }
+.editor[data-big] .strokeToolSlot .strokeAddMenu > div { min-width: 0; flex-direction: row; }
+.editor[data-big] .strokeToolSlot .strokeToolRow .strokeToolSpread { margin-top: 0; }
+.strokeToolSection[data-pad-hidden] { flex: 0 0 auto; gap: 0; padding: 0; border-top: 0; }
+/* 경고 · 펜 상태 한 줄은 화면 왼쪽 아래에 뜬다(조절판 자리가 없으므로). */
+.strokeToolSection[data-pad-hidden] .strokeWarning { top: auto; bottom: 12px; left: 16px; max-width: calc(100% - 32px); }

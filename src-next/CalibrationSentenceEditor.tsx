@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
-import { Check, Circle, ClipboardPaste, Copy, CornerDownRight, Dices, Download, Eraser, Import, Link2, ListTree, LoaderCircle, Minus, Pencil, Plus, Redo2, RotateCcw, Scan, Settings2, Share2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
+import { Check, Circle, ClipboardPaste, Copy, CornerDownRight, Dices, Download, Eraser, Import, Link2, ListTree, LoaderCircle, Maximize2, Minimize2, Minus, Pencil, Plus, Redo2, RotateCcw, Scan, Settings2, Share2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { create } from 'zustand'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
@@ -621,11 +621,14 @@ function FocusedGlyph({
   designBody,
   globalStyle,
   pen = null,
+  corner = null,
 }: {
   char: string
   syllable: DecomposedSyllable
   schema: LayoutSchema
   selection: Selection
+  /** 캔버스 오른쪽 위 귀퉁이에 얹는 단추(`크게`). 눌러도 캔버스 고르기 · 끌기 · 펜 긋기로 안 번진다. */
+  corner?: ReactNode
   /** 펜 모드. 있으면 잠긴 자소의 눌림 영역 대신 펜 층이 긋기를 받는다. */
   pen?: PenCanvas | null
   /** `획 고치기`로 들어온 자소. 이 자소의 획만 잡히고 나머지는 흐리게 그린다. */
@@ -859,7 +862,9 @@ function FocusedGlyph({
     const api = dragApiRef?.current
     const canvas = canvasRef.current
     if (!api || !canvas) return
-    const emPerPx = viewport.width / canvas.getBoundingClientRect().width * gain
+    // 보기 창은 정사각이고 캔버스의 짧은 변에 맞춰 그려진다(`크게` 보기에선 캔버스가 정사각이 아니다).
+    const canvasRect = canvas.getBoundingClientRect()
+    const emPerPx = viewport.width / Math.min(canvasRect.width, canvasRect.height) * gain
     const uprightDx = dx + Math.tan(globalStyle.slant * Math.PI / 180) * dy
     const snapped = snapStrokeDrag({ anchors: state.anchors, requested: { x: uprightDx * emPerPx, y: dy * emPerPx }, candidates: state.candidates })
     setSnapHits((current) => current?.x?.value === snapped.hits.x?.value && current?.y?.value === snapped.hits.y?.value && current?.x?.label === snapped.hits.x?.label && current?.y?.label === snapped.hits.y?.label ? current : snapped.hits)
@@ -1074,6 +1079,7 @@ function FocusedGlyph({
         ? <span className={styles.snapHitChip} data-testid="stroke-snap-chip">파트 가운데</span>
         : snapHitLabels.length > 0 && <span className={styles.snapHitChip} data-testid="stroke-snap-chip">{snapHitLabels.join(' · ')}</span>}
       <span className={styles.focusChar} aria-hidden="true">{char} · {fontSpace.unitsPerEm} UPM</span>
+      {corner && <span className={styles.canvasCorner} onPointerDown={(event) => event.stopPropagation()} onPointerUp={(event) => event.stopPropagation()}>{corner}</span>}
       <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="noto-ghost-toggle" panel={
         <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, whiteSpace: 'nowrap' }}>
           <input type="checkbox" checked={inkHidden} onChange={(event) => setInkHidden(event.target.checked)} data-testid="dev-ink-hidden" />내 획 숨김
@@ -1118,6 +1124,7 @@ function InferenceTrackpad({
   toolSlot = null,
   onSpread = null,
   penTool = null,
+  padHidden = false,
 }: {
   glyph: string
   syllable: DecomposedSyllable
@@ -1158,6 +1165,8 @@ function InferenceTrackpad({
   onSpread?: (() => void) | null
   /** 펜 도구(잠긴 자소를 펜으로 다시 긋는다). 없으면 단추를 안 그린다. */
   penTool?: PenTool | null
+  /** 캔버스 `크게` 보기. 조절판과 자소 크기 막대를 안 그린다 — 이동 계산과 도구 줄은 이 부품이 들고 있어 부품은 그대로 남는다. */
+  padHidden?: boolean
 }) {
   const direct = Boolean(dragApiRef)
   // 지금 끄는 손이 조절판인지. 셸 안에서도 조절판을 함께 두므로(섬세한 편집) 캔버스 끌기와 구분한다.
@@ -1942,13 +1951,13 @@ function InferenceTrackpad({
       </div>
     )
     return (
-      <section className={styles.strokeToolSection} data-testid="jamo-stroke-tools">
+      <section className={styles.strokeToolSection} data-pad-hidden={padHidden || undefined} data-testid="jamo-stroke-tools">
         {/* 경고 · 펜 상태 한 줄. 조절판 위에 띄워 자리를 안 차지한다 — 뜨고 사라져도 조절판도 캔버스도 안 흔들린다. */}
         {directLabel && <p className={styles.strokeWarning} data-testid="jamo-pen-status">{directLabel}</p>}
         {/* `틀 다시 맞추기`는 일단 숨긴다(기능은 남겨 둔다). */}
         <Pressable type="button" hidden onClick={resetFrame} disabled={!liveJamo?.frame} data-testid="jamo-frame-reset">틀 다시 맞추기</Pressable>
         {/* 트랙패드가 남는 세로를 다 먹고, 도구 단추는 그 오른쪽에 2열로 선다(단추 줄이 차지하던 세로를 트랙패드에 준다). */}
-        <div className={styles.strokeWorkRow}>
+        {!padHidden && <div className={styles.strokeWorkRow}>
           <JamoScaleSlider disabled={!creationBase || Boolean(penTool?.active)} onStart={beginJamoScale} onChange={changeJamoScale} onCommit={commitJamoScale} onCancel={cancelJamoScale} />
           {/* 섬세한 편집용 조절판. 손가락이 글자를 가리지 않고, 1px이 1u라 캔버스 끌기보다 잘게 옮긴다. */}
           <div
@@ -1967,7 +1976,7 @@ function InferenceTrackpad({
             {trackpad.visualState.points.map((point, index) => <span key={index} className={legacyTrackpadStyles.pinchPoint} style={{ left: point.x, top: point.y }} aria-hidden="true" />)}
           </div>
           {!toolSlot && strokeTools}
-        </div>
+        </div>}
         {toolSlot && createPortal(strokeTools, toolSlot)}
         {resetConfirmOpen && creationBase && createPortal(
           <div className={confirmStyles.backdrop} onClick={() => setResetConfirmOpen(false)}>
@@ -2262,6 +2271,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const groupPreviewBeak = useJamoGroupStore((state) => (beakGroup && state.previewBeak?.groupId === beakGroup.id ? state.previewBeak.beak : null))
   const [isShapeRuleOpen, setIsShapeRuleOpen] = useState(false)
   const [editMode, setEditMode] = useState<EditMode>(initialEditMode)
+  // 획 편집 캔버스 `크게` 보기. 화면 상태일 뿐 저장하지 않는다 — 글자를 바꿔도 켜진 채, 레이아웃으로 나가면 꺼진다.
+  const [canvasBig, setCanvasBig] = useState(false)
   // `획 고치기`로 들어온 자소. 획 편집에서 선택을 푼 채 `완료`해도 레이아웃이 이 부품을 다시 켠다.
   const [strokeEntryPart, setStrokeEntryPart] = useState<MobileEditorPart | null>(initialStrokePart)
   const [pendingStrokePart, setPendingStrokePart] = useState<MobileEditorPart | null>(initialStrokePart)
@@ -2394,6 +2405,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const sentenceCompact = chrome === 'workspace'
   // 획 편집에서는 문장 줄이 위로 접혀 사라지고 `닿는 글자` 줄만 남는다. 그만큼 캔버스와 트랙패드가 커진다.
   const sentenceCollapsed = chrome === 'workspace' && strokeFrameAvailable && !isLayoutMode && !styleLocksCanvas && !styleSpaceOpen
+  // `크게`는 셸 안 획 편집(펜 포함)에서만. 켜면 도마 줄 · 문장 줄 · `닿는 글자` 줄 · 조절판이 비키고 캔버스와 도구 줄만 남는다.
+  const canvasBigAvailable = chrome === 'workspace' && !styleOnly && !isLayoutMode && !styleLocksCanvas
+  const big = canvasBig && canvasBigAvailable
   const sentenceRef = useRef<HTMLElement>(null)
   useEffect(() => {
     const section = sentenceRef.current
@@ -2801,7 +2815,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     setMultiSelectArmed(false)
     setPreviewJamo(null)
     setPreviewSchema(null)
-    if (mode === 'layout') closeGlobalStyle()
+    if (mode === 'layout') { closeGlobalStyle(); setCanvasBig(false) }
   }
   const editStrokes = (part: Part) => {
     const editorPart: MobileEditorPart = part === 'CH' ? 'CH' : part === 'JO' ? 'JO' : 'JU'
@@ -3126,7 +3140,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     <>
       {/* 문장 줄부터 편집부까지 한 덩어리. 레이아웃 모드에서만 세로로 밀린다 — `내 문장`이 위로 빠지고 `닿는 글자` 줄이 그 자리에 붙는다.
           두 모드가 같은 덩어리를 써야 오갈 때 문장 줄이 다시 안 그려진다(가로 스크롤 자리 유지). */}
-      <div className={styles.scrollArea} data-scroll={(isLayoutMode && !styleLocksCanvas) || undefined} data-sheet={sentenceSheetOpen || sentenceSheetClosing || undefined}>
+      <div className={styles.scrollArea} data-scroll={(isLayoutMode && !styleLocksCanvas) || undefined} data-sheet={sentenceSheetOpen || sentenceSheetClosing || undefined} data-big={big || undefined}>
       {styleOnly && above}
       <section ref={sentenceRef} className={`${styles.sentence} ${chrome === 'workspace' ? styleMode.strip : ''}`} data-compact={sentenceCompact || undefined} data-grown={styleSpaceOpen || undefined} data-sheet={sentenceSheetOpen || undefined} data-sheet-wrap={sentenceSheetOpen || sentenceSheetClosing || undefined} style={{ '--sheet-h': `${sentenceSheetHeight}px` } as CSSProperties} onClick={pickSentenceCaret} data-collapsed={sentenceCollapsed || undefined} aria-hidden={sentenceCollapsed || undefined} inert={sentenceCollapsed || undefined} aria-label="보정 문장">
         {/* 셸 안에서는 돋보기 하나. 누르면 문장 줄이 그 자리에서 펼쳐지고, 같은 자리의 닫기로 접힌다. 문장 바꾸기(주사위 · 직접 입력)는 펼친 줄에서 한다. */}
@@ -3168,16 +3182,17 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       </section> : <>
       {/* 획 편집에도 같은 자리·같은 높이로 `닿는 글자` 줄이 선다. 범위는 고치는 자모가 든 글자 전부(레이아웃을 안 가린다).
           줄이 두 모드에 다 있어야 `획 고치기`로 오갈 때 캔버스가 안 튄다. */}
-      {chrome === 'workspace' && strokeFrameAvailable && !styleLocksCanvas && strokeRowJamo && strokeCardPart &&
+      {chrome === 'workspace' && strokeFrameAvailable && !styleLocksCanvas && !big && strokeRowJamo && strokeCardPart &&
         <TouchedGlyphRow source={strokeRowSource} bundle={notoBundle} edit={NO_LAYOUT_EDIT} ghostVisible={false} focus={strokeCardPart} scope="jamo" group={strokeCardPart} jamos={strokeRowJamos} anyContext onPick={pickStrokeRowChar} activeChar={selectedChar} lead={soloLead} onPickLead={pickSolo} />}
-      {!styleSpaceOpen && <section className={styles.editor} data-chrome={chrome} data-stroke-tools={!globalStylePanel && directManipulation ? true : undefined} aria-label={`${selectedChar} 완성 글자 편집`}>
+      {!styleSpaceOpen && <section className={styles.editor} data-chrome={chrome} data-stroke-tools={!globalStylePanel && directManipulation ? true : undefined} data-big={big || undefined} aria-label={`${selectedChar} 완성 글자 편집`}>
         {/* 셸 안 획 편집에서는 캔버스 왼쪽에 도구 단추가 세로로 선다(한 칸씩 넘기는 슬라이드). 여섯 칸 표지는 숨긴다 — 닿는 범위는 위 `닿는 글자` 줄이 보여 준다. */}
         <div className={styles.strokeStage}>
         {chrome === 'workspace' && !globalStylePanel && directManipulation && !styleLocksCanvas
           ? <div ref={setStrokeToolSlot} className={styles.strokeToolSlot} data-testid="jamo-stroke-tool-slot" />
           : chrome === 'workspace' && layoutAvailable && !styleLocksCanvas && <LayoutContextCards activeContextId={corpusIdentity(selectedChar.codePointAt(0) ?? 0xac00).contextId} allActive={false} ink={strokeCardInk ?? undefined} />}
         <div className={styles.focusArea}>
-        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={styleLocksCanvas ? { kind: 'none' } : selection} onSelect={styleLocksCanvas ? () => {} : selectFromCanvas} selectedPoints={styleLocksCanvas ? [] : selectedPoints} selectedStrokes={styleLocksCanvas ? [] : selectedStrokes} multiSelectArmed={!styleLocksCanvas && multiArmed} wholeJamoCentered={styleLocksCanvas ? null : wholeJamoCentered} onPointSelect={styleLocksCanvas ? () => {} : selectPointFromCanvas} lockedPart={styleLocksCanvas ? null : lockedPart} dragApiRef={directManipulation && !styleLocksCanvas ? dragApiRef : undefined} padDragRef={directManipulation && !styleLocksCanvas ? padDragRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={focusedGlobalStyle} pen={penCanvas} />
+        <FocusedGlyph char={selectedChar} syllable={syllable} schema={effectiveSchema} selection={styleLocksCanvas ? { kind: 'none' } : selection} onSelect={styleLocksCanvas ? () => {} : selectFromCanvas} selectedPoints={styleLocksCanvas ? [] : selectedPoints} selectedStrokes={styleLocksCanvas ? [] : selectedStrokes} multiSelectArmed={!styleLocksCanvas && multiArmed} wholeJamoCentered={styleLocksCanvas ? null : wholeJamoCentered} onPointSelect={styleLocksCanvas ? () => {} : selectPointFromCanvas} lockedPart={styleLocksCanvas ? null : lockedPart} dragApiRef={directManipulation && !styleLocksCanvas ? dragApiRef : undefined} padDragRef={directManipulation && !styleLocksCanvas ? padDragRef : undefined} gapWarningParts={gapWarningParts} fontSpace={fontSpace} grid={grid} designBody={designBody} globalStyle={focusedGlobalStyle} pen={penCanvas}
+          corner={canvasBigAvailable && <Pressable type="button" className={styles.canvasBigToggle} onClick={() => setCanvasBig((on) => !on)} aria-pressed={big} aria-label={big ? '캔버스 작게 보기' : '캔버스 크게 보기'} title={big ? '작게' : '크게'} data-testid="canvas-big-toggle">{big ? <Minimize2 size={18} aria-hidden="true" /> : <Maximize2 size={18} aria-hidden="true" />}</Pressable>} />
         </div>
         </div>
       </section>}
@@ -3237,6 +3252,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         toolSlot={strokeToolSlot}
         onSpread={spreadTarget ? openSpread : null}
         penTool={penTool}
+        padHidden={big}
       />}
       {/* 획 편집은 끄는 즉시 저장된다. 레이아웃으로 돌아가는 문은 머리 `‹`(도마를 들고 왔으면 섹션 홈), 되돌리기는 ↶. */}
       {strokeFrameAvailable && !globalStylePanel && boxFitIssue && <div className={styles.strokeDoneBar}>
@@ -3272,7 +3288,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     setInkGapLimiter(null)
     pickFirstStrokeRef.current = true
   }
-  const benchRow = benchType && benchChars.length > 0 && editMode === 'stroke' && (
+  const benchRow = benchType && benchChars.length > 0 && editMode === 'stroke' && !big && (
     <div className={styles.bench} role="tablist" aria-label="도마" data-testid="workbench">
       {benchChars.map((char) => <Pressable key={char} type="button" role="tab" aria-selected={char === benchJamo} onClick={() => pickBenchJamo(char)}>{char}</Pressable>)}
     </div>
@@ -3281,6 +3297,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     return (
       <MobileWorkspaceShell
         activeArea={styleOnly ? 'font' : 'jamo'}
+        wide={big}
         projectName={projectName}
         heading={styleOnly ? '스타일' : undefined}
         cover={cover}

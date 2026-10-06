@@ -35,8 +35,11 @@ export function MobileWorkspaceShell({
   cover,
   heading,
   beforeLeave,
+  wide = false,
 }: {
   children: ReactNode
+  /** 480 기둥을 풀고 화면 폭을 다 쓴다(획 편집 캔버스 `크게` 보기). 끄면 기둥으로 돌아온다. */
+  wide?: boolean
   /** 어느 화면인지. 탭은 없어졌지만 부르는 쪽이 이름표로 준다. */
   activeArea: WorkspaceArea
   /** 머리 가운데 이름. 안 넘기면 지금 연 폰트 이름(어느 화면이든 같다). */
@@ -60,7 +63,7 @@ export function MobileWorkspaceShell({
   const leave = (go: () => void) => { if (beforeLeave) beforeLeave(go); else go() }
   return (
     <main className={styles.page}>
-      <div className={styles.shell}>
+      <div className={styles.shell} data-wide={wide || undefined}>
         <header className={styles.projectHeader}>
           {/* 왼쪽은 위 덱으로 나가는 문 — 화살표만, 오른쪽 머리 단추와 같은 생김새. 이름은 읽기용 레이블에만. 오른쪽은 편집 기록. */}
           {back && 'onClick' in back

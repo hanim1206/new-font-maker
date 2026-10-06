@@ -480,3 +480,57 @@ test('캔버스에서 획 · 점을 멀리 끌어도 글자 칸 밖으로 나가
   for (const handle of handles) inside({ left: handle.x, right: handle.x, top: handle.y, bottom: handle.y }, '핸들')
   inside(await boxOf('ㅇ-circle'), 'ㅇ 잉크')
 })
+
+test('캔버스 `크게`를 켜면 조절판 · `닿는 글자` 줄이 비키고 캔버스가 남은 자리를 채운다. 켠 채 끈 획은 저장되고, 끄면 처음 크기로 돌아온다', async ({ page }) => {
+  await page.goto(`/workspace/jamo?char=${encodeURIComponent('이')}&mode=stroke&part=JU`)
+  const stroke = page.locator('[data-editor-hit="stroke"][data-stroke-id="ㅣ-1"]')
+  await expect(stroke).toBeAttached({ timeout: 60_000 })
+  const canvas = page.getByTestId('focus-canvas')
+  await expect(canvas).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
+  const toggle = page.getByTestId('canvas-big-toggle')
+  const small = (await canvas.boundingBox())!
+  await expect(page.getByTestId('jamo-stroke-trackpad')).toBeVisible()
+
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  // 조절판은 안 그리지만 도구 줄은 남는다 — 캔버스 아래 가로 한 줄, 화면 안.
+  await expect(page.getByTestId('jamo-stroke-trackpad')).toHaveCount(0)
+  await expect(page.getByRole('toolbar', { name: '획 편집 도구' })).toBeVisible()
+  const big = (await canvas.boundingBox())!
+  expect(big.width).toBeGreaterThan(small.width)
+  // 세로로 긴 화면에선 정사각형을 풀고 높이까지 채운다.
+  expect(big.height).toBeGreaterThan(big.width)
+  const slot = (await page.getByTestId('jamo-stroke-tool-slot').boundingBox())!
+  expect(slot.y).toBeGreaterThanOrEqual(big.y + big.height)
+  expect(slot.y + slot.height).toBeLessThanOrEqual((page.viewportSize()?.height ?? 0) + 1)
+  const overflow = await page.evaluate(() => ({ horizontal: document.documentElement.scrollWidth - window.innerWidth, vertical: document.documentElement.scrollHeight - window.innerHeight }))
+  expect(overflow.horizontal).toBeLessThanOrEqual(0)
+  expect(overflow.vertical).toBeLessThanOrEqual(0)
+
+  // 켠 채 캔버스에서 획을 끌면 옮겨지고 바로 저장된다.
+  const xOf = () => stroke.evaluate((element) => (element as SVGGraphicsElement).getBBox().x)
+  const beforeX = await xOf()
+  const at = (await stroke.boundingBox())!
+  const from = { x: at.x + at.width / 2, y: at.y + at.height / 2 }
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  for (let step = 1; step <= 8; step += 1) await page.mouse.move(from.x - 60 * step / 8, from.y)
+  await page.mouse.up()
+  await expect.poll(xOf).toBeLessThan(beforeX)
+  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
+
+  // 끄면 조절판이 돌아오고 캔버스는 처음 크기 · 정사각형이다.
+  await toggle.click()
+  await expect(page.getByTestId('jamo-stroke-trackpad')).toBeVisible()
+  const back = (await canvas.boundingBox())!
+  expect(Math.round(back.width)).toBe(Math.round(small.width))
+  expect(Math.round(back.height)).toBe(Math.round(small.height))
+
+  // 켠 채 머리 `‹`로 레이아웃에 나가면 꺼지고, 셸은 다시 480 기둥이다.
+  await page.setViewportSize({ width: 820, height: 1180 })
+  await toggle.click()
+  await expect.poll(async () => (await page.locator('main > div').first().boundingBox())!.width).toBe(820)
+  await page.getByTestId('workspace-back').click()
+  await expect(page.getByTestId('canvas-big-toggle')).toHaveCount(0)
+  await expect.poll(async () => (await page.locator('main > div').first().boundingBox())!.width).toBe(480)
+})
