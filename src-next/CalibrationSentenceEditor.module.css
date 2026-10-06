@@ -278,3 +278,5 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 
 /* 문장 줄 글자는 고른 글자를 밑줄로 보인다 — 공용 Pressable의 포커스 테두리는 숨긴다(box-shadow는 안전 표시가 쓴다). */
 .sentenceRun button { --tw-ring-color: transparent; }
+/* 전역 꺾임을 바꿔도 안 바뀌는 획 안내 — 패널 안 한 줄, 오른쪽 끝에 `풀기`. */
+.joinOverrideNote { margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: rgb(var(--color-text-4)); font-size: var(--font-11); }

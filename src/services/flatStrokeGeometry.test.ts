@@ -245,3 +245,27 @@ describe('전역 둥글기(roundness)', () => {
     expect(at(inner(3), 0.495, 0.1)).toBe(true)
   })
 })
+
+describe('꺾임 종류와 뾰족 한계 — 한 입구에서 받은 값대로 그린다', () => {
+  // 안쪽 각 35도로 꺾인 갈지자 한 꺾임. 굵기 0.2, 반폭 0.1.
+  const acute = [{ x: 0, y: 0 }, { x: 1, y: .35 }, { x: 0, y: .7 }]
+  const spikeOf = (groups: ReturnType<typeof polylineToFlatInkGroups>) => Math.max(...groups.flat().flat().map((p) => p.x))
+
+  it('뾰족 한계 1.64는 예각을 깎고, 4는 뾰족하게 둔다(화면 SVG의 stroke-miterlimit과 같은 뜻)', () => {
+    const cut = spikeOf(polylineToFlatInkGroups(acute, false, .2, 'butt', 'miter', 24, undefined, undefined, undefined, 1.64))
+    const spike = spikeOf(polylineToFlatInkGroups(acute, false, .2, 'butt', 'miter', 24, undefined, undefined, undefined, 4))
+    const bevel = spikeOf(polylineToFlatInkGroups(acute, false, .2, 'butt', 'bevel', 24))
+    expect(cut).toBeCloseTo(bevel, 9)
+    expect(spike).toBeGreaterThan(cut + .15)
+  })
+
+  it('둥긂 이음은 둥글기 막대가 있어도 바깥 꺾임을 꼭짓점 중심 반폭 원호로 그린다(막대와 독립)', () => {
+    const rounding = { radius: .05, anchors: new Set([1]) }
+    const groups = polylineToFlatInkGroups(acute, false, .2, 'butt', 'round', 24, rounding)
+    const vertex = acute[1]
+    const farthest = Math.max(...groups.flat().flat().filter((p) => p.x > .9).map((p) => Math.hypot(p.x - vertex.x, p.y - vertex.y)))
+    // 원호 반지름(반폭 0.1) 안에 다 든다 — 막대 반지름(0.05)으로 깎은 모서리가 아니라 반폭 원호다.
+    expect(farthest).toBeLessThanOrEqual(.1 + 1e-6)
+    expect(farthest).toBeGreaterThan(.1 - 1e-3)
+  })
+})

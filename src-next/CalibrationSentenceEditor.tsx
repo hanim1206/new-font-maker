@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
-import { Check, Circle, ClipboardPaste, Copy, Dices, Download, Eraser, Import, Link2, ListTree, LoaderCircle, Minus, Pencil, Plus, Redo2, RotateCcw, Scan, Settings2, Share2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
+import { Check, Circle, ClipboardPaste, Copy, CornerDownRight, Dices, Download, Eraser, Import, Link2, ListTree, LoaderCircle, Minus, Pencil, Plus, Redo2, RotateCcw, Scan, Settings2, Share2, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { create } from 'zustand'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
@@ -15,7 +15,7 @@ import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { useEditHistoryStore } from './editHistoryStore'
 import { newLayoutEntry } from './layoutEntry'
 import { adoptFamilyStrokes, familyOfSyllable, wholeJamoStrokes } from '../src/utils/jamoContextStrokes'
-import { ACUTE_MITER_LIMIT } from '../src/services/strokeToOutline'
+import { countOwnJoins, miterLimitOf, withoutOwnJoins } from '../src/services/strokeJoin'
 import { DOUBLE_SPLIT, doubleFromSingle } from '../src/utils/jamoFromChoseong'
 import { withFrameFrom, withoutFrame } from '../src/utils/jamoFrame'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
@@ -244,6 +244,8 @@ export type HistoryEntry =
   // `picked`: 이 편집을 할 때 잡혀 있던 선택(획 · 점 묶음 · 획 묶음 · 자소 전체). 되돌리기 · 다시 하기가 되살린다 — 선택 자체는 기록 단위가 아니다.
   | { kind: 'jamo'; jamoType: JamoData['type']; char: string; before: JamoData; after: JamoData; edit: SampleGlyphEdit; picked?: PickedSelection }
   | { kind: 'brush'; before: StrokeRenderStyle; after: StrokeRenderStyle; ends?: { before: StrokeEnds; after: StrokeEnds } }
+  // 전역 패널의 `풀기` — 꺾임을 따로 정한 획들의 값을 한 번에 지운다. 자소 여럿이 한 줄의 되돌리기.
+  | { kind: 'jamos'; before: JamoData[]; after: JamoData[] }
   | { kind: 'tone'; before: StyleTone; after: StyleTone }
   // `groupId`가 있으면 사용자 묶음의 부리. `groupBefore`는 되돌릴 값(없으면 전역을 따르던 상태).
   | { kind: 'beak'; before: StemBeakStyle; after: StemBeakStyle; groupId?: string; groupBefore?: StemBeakStyle }
@@ -521,7 +523,7 @@ function Glyph({
  * 펜 층. 이번에 그은 획 · 긋는 중인 선 · 입력 판을 SvgRenderer 안(기울기 변환 안쪽)에 그린다.
  * 화면 → 자모 상자는 판의 화면 변환을 거꾸로 돌려 얻는다 — 글자가 기울어도 맞는다.
  */
-function PenLayer({ pen, box, fresh, viewport, weightMultiplier, globalLinecap, globalLinejoin }: { pen: PenCanvas; box: BoxConfig; fresh: readonly { stroke: StrokeDataV2; box: BoxConfig }[]; viewport: BoxConfig; weightMultiplier: number; globalLinecap?: StrokeLinecap; globalLinejoin?: StrokeLinejoin }) {
+function PenLayer({ pen, box, fresh, viewport, weightMultiplier, globalLinecap, globalLinejoin, miterLimit }: { pen: PenCanvas; box: BoxConfig; fresh: readonly { stroke: StrokeDataV2; box: BoxConfig }[]; viewport: BoxConfig; weightMultiplier: number; globalLinecap?: StrokeLinecap; globalLinejoin?: StrokeLinejoin; miterLimit: number }) {
   const surfaceRef = useRef<SVGRectElement>(null)
   const drawing = useRef<PenPoint[] | null>(null)
   /** 지금 긋는 포인터. 다른 손가락이 닿아도 이 획에 섞이지 않는다. */
@@ -589,7 +591,7 @@ function PenLayer({ pen, box, fresh, viewport, weightMultiplier, globalLinecap, 
   // 긋는 중인 획은 저장될 굵기로, 그은 점 그대로 그린다. 손떨림 거르기와 곡선 맞춤은 손을 뗄 때 한 번만 한다 — 긋는 내내 다시 거르면 펜 뒤 꼬리가 계속 자리를 바꾸고, 이미 완성된 획처럼 보인다(10-06 사용자: 실험실 페이지의 날 선이 자연스러웠다).
   const live = current && current.length >= 2 ? current : null
   // 실제 그리기(SvgRenderer)와 같은 끝 · 꺾임 · 뾰족 한계 — 그은 직후에 보이는 모양이 저장된 모양과 같아야 한다(10-06 사용자: 직후엔 뾰족, 다시 열면 깎임).
-  const inkStyle = (stroke: Pick<StrokeDataV2, 'thickness' | 'linecap' | 'linejoin'>) => ({ fill: 'none', stroke: EDIT_COLOR.foreground, strokeWidth: stroke.thickness * weightMultiplier * VIEW_BOX_SIZE, strokeLinecap: stroke.linecap ?? globalLinecap ?? 'butt', strokeLinejoin: stroke.linejoin ?? globalLinejoin ?? 'miter', strokeMiterlimit: ACUTE_MITER_LIMIT, pointerEvents: 'none' } as const)
+  const inkStyle = (stroke: Pick<StrokeDataV2, 'thickness' | 'linecap' | 'linejoin'>) => ({ fill: 'none', stroke: EDIT_COLOR.foreground, strokeWidth: stroke.thickness * weightMultiplier * VIEW_BOX_SIZE, strokeLinecap: stroke.linecap ?? globalLinecap ?? 'butt', strokeLinejoin: stroke.linejoin ?? globalLinejoin ?? 'miter', strokeMiterlimit: miterLimit, pointerEvents: 'none' } as const)
   return <g data-testid="pen-layer">
     {/* 이번에 그은 획은 옅어진 자소 위에 제 색으로 덧그린다. */}
     {fresh.map((item) => <path key={item.stroke.id} d={pointsToSvgD(item.stroke.points, item.stroke.closed, item.box, VIEW_BOX_SIZE)} {...inkStyle(item.stroke)} data-testid="pen-fresh" />)}
@@ -1066,7 +1068,7 @@ function FocusedGlyph({
             {wholeJamoCentered.y && <line x1={-8} x2={108} y1={cy} y2={cy} className={styles.snapHitLine} data-testid="whole-jamo-center" data-axis="y" />}
           </>
         })()}
-        {pen && penBox && <PenLayer pen={pen} box={penBox} fresh={penFresh} viewport={viewport} weightMultiplier={penWeight} globalLinecap={globalStyle.linecap} globalLinejoin={globalStyle.linejoin} />}
+        {pen && penBox && <PenLayer pen={pen} box={penBox} fresh={penFresh} viewport={viewport} weightMultiplier={penWeight} globalLinecap={globalStyle.linecap} globalLinejoin={globalStyle.linejoin} miterLimit={miterLimitOf(globalStyle.strokeStyle)} />}
       </SvgRenderer>
       {wholeJamoCentered
         ? <span className={styles.snapHitChip} data-testid="stroke-snap-chip">파트 가운데</span>
@@ -1658,6 +1660,23 @@ function InferenceTrackpad({
     onSelectionChange(nextStrokeId ? { ...selection, kind: 'stroke', strokeId: nextStrokeId, jamo: after } : { kind: 'none' })
   }
   // 개발용 — 잡은 획의 저장 두께를 5%씩 바꾼다. 노토 900 맞추기 실험에서 "어느 획을 얼마나 얇게 했나"가 저장값 차이로 남는다.
+  // 잡은 획(묶음)의 꺾임. 누를 때마다 전역 따름 → 뾰족 → 깎음 → 둥긂 → 전역 따름. 획별 값이 있으면 전역을 바꿔도 안 바뀐다(획 > 전역).
+  const JOIN_CYCLE: Array<StrokeLinejoin | undefined> = [undefined, 'miter', 'bevel', 'round']
+  const JOIN_NAMES: Record<StrokeLinejoin, string> = { miter: '뾰족', bevel: '깎음', round: '둥긂' }
+  const joinTargets = selection.kind === 'stroke' && selectedStroke ? (selectedStrokes.length > 1 ? selectedStrokes : [selectedStroke.id]) : []
+  const strokeJoinLabel = selectedStroke ? (selectedStroke.linejoin ? JOIN_NAMES[selectedStroke.linejoin] : '전역') : '전역'
+  const cycleStrokeJoin = () => {
+    if (selection.kind !== 'stroke' || !selectedStroke || joinTargets.length === 0) return
+    const next = JOIN_CYCLE[(JOIN_CYCLE.indexOf(selectedStroke.linejoin) + 1) % JOIN_CYCLE.length]
+    const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
+    const after = joinTargets.reduce((jamo, id) => updateJamoStroke(jamo, id, (stroke) => {
+      const { linejoin: _dropped, ...rest } = stroke
+      void _dropped
+      return next ? { ...rest, linejoin: next } : rest
+    }), before)
+    onCommitJamo(before, after, { kind: 'stroke-move', glyph, component: selection.component, jamoType: selection.jamo.type, strokeId: selectedStroke.id, delta: { x: 0, y: 0 } })
+    onSelectionChange({ ...selection, jamo: after })
+  }
   const scaleStrokeThickness = (factor: number) => {
     if ((selection.kind !== 'stroke' && selection.kind !== 'point' && selection.kind !== 'handle') || !selectedStroke) return
     const before = structuredClone(adoptFamilyStrokes(getJamo(selection.jamo.type, selection.jamo.char) ?? selection.jamo, familyOfSyllable(syllable)))
@@ -1896,6 +1915,8 @@ function InferenceTrackpad({
           <Pressable type="button" onClick={copyStroke} aria-label="획 복사" data-testid="jamo-stroke-copy">{strokeCopied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}<span>{strokeCopied ? '복사함' : '복사'}</span></Pressable>
           {deleteButton}
           {connectButton}
+          {/* 꺾임은 획 하나(묶음)에만 따로 둔다. 펜이 켜진 동안은 그리기 도구만 남긴다. */}
+          {selectedStroke && !penActive && <Pressable type="button" onClick={cycleStrokeJoin} aria-label={`꺾임 ${strokeJoinLabel} — 누르면 다음 모양`} data-testid="jamo-stroke-join" data-join={selectedStroke.linejoin ?? 'global'}><CornerDownRight size={18} aria-hidden="true" /><span>꺾임 {strokeJoinLabel}</span></Pressable>}
           {DEV_TOOLS_ENABLED && selectedStroke && <>
             <Pressable type="button" onClick={() => scaleStrokeThickness(1 / 1.05)} aria-label="획 두께 5% 얇게 (개발용)" data-testid="dev-stroke-thinner"><Minus size={18} aria-hidden="true" /><span>얇게</span></Pressable>
             <Pressable type="button" onClick={() => scaleStrokeThickness(1.05)} aria-label="획 두께 5% 굵게 (개발용)" data-testid="dev-stroke-thicker"><Plus size={18} aria-hidden="true" /><span>{Math.round(selectedStroke.thickness * 1000)}u</span></Pressable>
@@ -2644,6 +2665,24 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     if (endsChanged) applyEnds(endsChanged.after)
     setPreviewBrush(null)
   }
+  // 꺾임을 따로 정한 획 수(폰트 전체)와 `풀기`. 전역 꺾임을 바꿔도 그 획들은 안 바뀌므로 패널이 한 줄로 알린다.
+  const ownJoinCount = useMemo(() => [choseong, jungseong, jongseong].reduce((sum, map) => sum + Object.values(map).reduce((inner, jamo) => inner + countOwnJoins(jamo), 0), 0), [choseong, jungseong, jongseong])
+  const releaseOwnJoins = () => {
+    const before: JamoData[] = []
+    const after: JamoData[] = []
+    for (const map of [choseong, jungseong, jongseong]) {
+      for (const jamo of Object.values(map)) {
+        const stripped = withoutOwnJoins(jamo)
+        if (stripped === jamo) continue
+        before.push(structuredClone(jamo))
+        after.push(stripped)
+      }
+    }
+    if (after.length === 0) return
+    setHistory((entries) => [...entries, { kind: 'jamos', before, after }])
+    setFuture([])
+    for (const jamo of after) updateJamo(jamo)
+  }
   const applyTone = (tone: StyleTone) => {
     const { updateStyle } = useGlobalStyleStore.getState()
     updateStyle('weight', tone.weight)
@@ -2920,6 +2959,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     else if (entry.kind === 'layoutDelta') { useLayoutDeltaStore.getState().restore(entry.before); setLayoutEpoch((epoch) => epoch + 1) }
     else if (entry.kind === 'stemShape') { useStemMasterStore.setState({ masters: entry.mastersBefore }); for (const [char, jamo] of Object.entries(entry.jamoBefore)) useJamoStore.getState().updateJungseong(char, jamo) }
     else if (entry.kind === 'brush') { useGlobalStyleStore.getState().setStrokeRenderStyle(entry.before); if (entry.ends) applyEnds(entry.ends.before) }
+    else if (entry.kind === 'jamos') { for (const jamo of entry.before) updateJamo(jamo) }
     else if (entry.kind === 'tone') applyTone(entry.before)
     else if (entry.kind === 'beak') { if (entry.groupId) useJamoGroupStore.getState().setStemBeak(entry.groupId, entry.groupBefore); else useGlobalStyleStore.getState().setStemBeak(entry.before) }
     else updateJamo(entry.before)
@@ -2975,6 +3015,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     else if (entry.kind === 'layoutDelta') { useLayoutDeltaStore.getState().restore(entry.after); setLayoutEpoch((epoch) => epoch + 1) }
     else if (entry.kind === 'stemShape') { useStemMasterStore.setState({ masters: entry.mastersAfter }); for (const [char, jamo] of Object.entries(entry.jamoAfter)) useJamoStore.getState().updateJungseong(char, jamo) }
     else if (entry.kind === 'brush') { useGlobalStyleStore.getState().setStrokeRenderStyle(entry.after); if (entry.ends) applyEnds(entry.ends.after) }
+    else if (entry.kind === 'jamos') { for (const jamo of entry.after) updateJamo(jamo) }
     else if (entry.kind === 'tone') applyTone(entry.after)
     else if (entry.kind === 'beak') { if (entry.groupId) useJamoGroupStore.getState().setStemBeak(entry.groupId, entry.after); else useGlobalStyleStore.getState().setStemBeak(entry.after) }
     else updateJamo(entry.after)
@@ -3154,6 +3195,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
           onDraftChange={setPreviewBrush}
           onCommit={commitBrush}
           ends={{ linecap: globalStyle.linecap, linejoin: globalStyle.linejoin }}
+          joinOverrides={{ count: ownJoinCount, onRelease: releaseOwnJoins }}
           renderPreview={(strokeStyle, ends) => <Glyph char="한" size={42} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={null} previewSchema={null} layoutHighlight={null} globalStyle={{ ...globalStyle, ...ends, strokeStyle, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : globalStyle.brush }} />}
           embedded
           productOptions={chrome === 'workspace'}

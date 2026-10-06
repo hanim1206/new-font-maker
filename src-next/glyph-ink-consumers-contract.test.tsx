@@ -9,6 +9,7 @@ import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { brushInkGroupsToSvgPaths, strokeToBrushInkGroups } from '../src/services/brushGeometry'
 import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
 import { stemScaleOf } from '../src/services/strokeRenderGeometry'
+import { DEFAULT_MITER_LIMIT } from '../src/services/strokeJoin'
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
 import { isCounterKeepOn, weightToMultiplier } from '../src/stores/globalStyleStore'
 import type {
@@ -152,6 +153,8 @@ describe('SvgRenderer 공통 잉크 소비 계약', () => {
         ),
         'stroke-linecap': primitive.effectiveLinecap,
         'stroke-linejoin': primitive.effectiveLinejoin,
+        // 뾰족 한계는 전역 하나(`strokeJoin.ts`). 기본값은 1.64.
+        'stroke-miterlimit': String(DEFAULT_MITER_LIMIT),
       }
     })
 
@@ -264,6 +267,7 @@ describe('SvgRenderer 공통 잉크 소비 계약', () => {
         ),
         'stroke-linecap': primitive.effectiveLinecap,
         'stroke-linejoin': primitive.effectiveLinejoin,
+        'stroke-miterlimit': String(DEFAULT_MITER_LIMIT),
         style: 'transition:d 0.15s ease, stroke-width 0.15s ease',
       }))
     const contradictoryVisiblePaths = resolvedContradiction.primitives

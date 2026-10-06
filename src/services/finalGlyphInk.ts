@@ -11,6 +11,7 @@ import { unionInkRegions } from './inkBoolean'
 import { strokeToFlatInkGroups } from './flatStrokeGeometry'
 import { brushInkGroupsToInkRegions } from './inkGeometry'
 import { contrastOf, hasRoundness, innerRoundnessOf, roundnessOf, stemScaleOf, strokeToRenderInkGroups } from './strokeRenderGeometry'
+import { miterLimitOf } from './strokeJoin'
 import type { Contour } from './strokeToOutline'
 
 const BOOLEAN_OPTIONS = { positionEpsilon: 1e-9, minRingArea: 1e-12 } as const
@@ -146,14 +147,14 @@ export function materializeFinalGlyphInk(
     if (vertices === 0) return { ok: false, primitiveId: primitive.id, message: '최종 잉크 곡선 오차 옵션이 유효하지 않습니다.' }
     const groups = flat
       ? (rounded
-        ? strokeToFlatInkGroups(primitive.stroke as StrokeDataV2, { ...primitive.box }, primitive.weightMultiplier, 'butt', 'miter', vertices, roundnessOf(strokeStyle as StrokeRenderStyle), innerRoundnessOf(strokeStyle as StrokeRenderStyle), contrastOf(strokeStyle as StrokeRenderStyle), stemScaleOf(strokeStyle as StrokeRenderStyle))
-        : strokeToFlatInkGroups(primitive.stroke as StrokeDataV2, { ...primitive.box }, primitive.weightMultiplier, primitive.effectiveLinecap, primitive.effectiveLinejoin, vertices))
+        ? strokeToFlatInkGroups(primitive.stroke as StrokeDataV2, { ...primitive.box }, primitive.weightMultiplier, 'butt', primitive.effectiveLinejoin, vertices, roundnessOf(strokeStyle as StrokeRenderStyle), innerRoundnessOf(strokeStyle as StrokeRenderStyle), contrastOf(strokeStyle as StrokeRenderStyle), stemScaleOf(strokeStyle as StrokeRenderStyle), miterLimitOf(strokeStyle as StrokeRenderStyle))
+        : strokeToFlatInkGroups(primitive.stroke as StrokeDataV2, { ...primitive.box }, primitive.weightMultiplier, primitive.effectiveLinecap, primitive.effectiveLinejoin, vertices, 0, undefined, 0, 1, miterLimitOf(strokeStyle as StrokeRenderStyle)))
       : strokeToRenderInkGroups(
         primitive.stroke as StrokeDataV2,
         { ...primitive.box },
         primitive.weightMultiplier,
         strokeStyle as StrokeRenderStyle,
-        { ellipseVertexCount: vertices },
+        { ellipseVertexCount: vertices, join: { linejoin: primitive.effectiveLinejoin, miterLimit: miterLimitOf(strokeStyle as StrokeRenderStyle) } },
       )
     const strokeRegions = brushInkGroupsToInkRegions(groups)
     if (strokeRegions.length === 0) {

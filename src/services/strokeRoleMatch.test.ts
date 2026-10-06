@@ -188,3 +188,14 @@ describe('그린 획에 역할 붙이기', () => {
     expect(fitStrokesInkToUnitBox([inner], half, 'round')[0].points).toEqual(inner.points)
   })
 })
+
+describe('역할 승계와 꺾임', () => {
+  it('프리셋의 끝 모양은 가져오지만 꺾임은 가져오지 않는다 — 펜 획은 전역 꺾임을 따른다', () => {
+    const preset = [{ ...PRESET_ㄱ[0], linecap: 'round' as const, linejoin: 'round' as const }]
+    const drawn = [stroke('stroke-1', [[.05, .08], [.9, .05], [.92, .95]])]
+    const match = matchStrokeRoles(drawn, preset)
+    const { strokes } = adoptStrokeRoles(drawn, preset, match)
+    expect(strokes[0].linecap).toBe('round')
+    expect(strokes[0].linejoin).toBeUndefined()
+  })
+})

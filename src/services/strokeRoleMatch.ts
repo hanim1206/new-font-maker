@@ -317,7 +317,7 @@ export function adoptStrokeRoles(drawn: readonly StrokeDataV2[], presets: readon
     const next: StrokeDataV2 = { ...stroke, id: preset.id, closed, thickness: preset.thickness }
     if (preset.label !== undefined) next.label = preset.label
     if (preset.linecap !== undefined) next.linecap = preset.linecap
-    if (preset.linejoin !== undefined) next.linejoin = preset.linejoin
+    // 꺾임은 승계하지 않는다 — 펜으로 그은 획은 전역 꺾임을 따른다(2026-10-06 꺾임 모양 고르기 D0).
     adopted.push(next)
     ids[pair.drawn] = next.id
   }

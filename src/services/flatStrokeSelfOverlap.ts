@@ -2,6 +2,7 @@ import { ClipperD, ClipType, EndType, FillRule, JoinType, PolyTreeD, inflatePath
 import type { PathD, PolyPathD } from 'clipper2-ts'
 import type { StrokeLinecap, StrokeLinejoin } from '../types'
 import type { BrushContour, BrushInkGroup, BrushPoint } from './brushGeometry'
+import { DEFAULT_MITER_LIMIT } from './strokeJoin'
 
 /**
  * 일자 스트로커가 만든 윤곽이 스스로 겹칠 때의 대체 경로.
@@ -15,7 +16,6 @@ import type { BrushContour, BrushInkGroup, BrushPoint } from './brushGeometry'
 
 /** 소수 8자리 격자. `polygonBoolean`과 같다. */
 const PRECISION = 8
-const MITER_LIMIT = 4
 
 type Pair = { x: number; y: number }
 
@@ -64,7 +64,7 @@ function collect(node: PolyPathD, out: BrushInkGroup[]): void {
 }
 
 /** 편 중심선을 반폭만큼 부풀린 면. 닫힌 획은 띠(안팎 두 링), 열린 획은 끝 모양을 따른다. */
-export function inflateFlatCenterline(points: readonly BrushPoint[], closed: boolean, thickness: number, cap: StrokeLinecap, join: StrokeLinejoin, rounded: boolean): BrushInkGroup[] {
+export function inflateFlatCenterline(points: readonly BrushPoint[], closed: boolean, thickness: number, cap: StrokeLinecap, join: StrokeLinejoin, rounded: boolean, miterLimit = DEFAULT_MITER_LIMIT): BrushInkGroup[] {
   const path: PathD = points.map(({ x, y }) => ({ x, y }))
   if (closed && path.length > 1) {
     const first = path[0], last = path[path.length - 1]
@@ -73,7 +73,7 @@ export function inflateFlatCenterline(points: readonly BrushPoint[], closed: boo
   if (path.length < 2) return []
   const joinType = rounded || join === 'round' ? JoinType.Round : join === 'bevel' ? JoinType.Bevel : JoinType.Miter
   const endType = closed ? EndType.Joined : cap === 'round' ? EndType.Round : cap === 'square' ? EndType.Square : EndType.Butt
-  const inflated = inflatePathsD([path], thickness / 2, joinType, endType, MITER_LIMIT, PRECISION)
+  const inflated = inflatePathsD([path], thickness / 2, joinType, endType, miterLimit, PRECISION)
   if (!inflated.length) return []
   // 바깥 · 구멍 짝을 세운다.
   const clipper = new ClipperD(PRECISION)

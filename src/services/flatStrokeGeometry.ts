@@ -2,6 +2,7 @@ import type { BoxConfig, StrokeDataV2, StrokeLinecap, StrokeLinejoin } from '../
 import { flattenStrokeCenterlineWithAnchors } from './brushGeometry'
 import type { BrushContour, BrushInkGroup, BrushPoint } from './brushGeometry'
 import { flatGroupsOverlap, inflateFlatCenterline } from './flatStrokeSelfOverlap'
+import { DEFAULT_MITER_LIMIT } from './strokeJoin'
 
 /**
  * 끝이 일자인 획(butt·square 캡, miter·bevel 조인)을 면으로 만든다.
@@ -27,8 +28,6 @@ export const INNER_ROUNDNESS_MAX = 3
 export interface FlatCornerRounding { radius: number; anchors: ReadonlySet<number>; innerRadius?: number }
 /** 토막별 반폭 배율. `curved`는 그 토막이 곡선을 편 것인지. */
 export type FlatWidthOf = (direction: BrushPoint, curved: boolean) => number
-/** SVG stroke-miterlimit 기본값. 이보다 뾰족하면 bevel로 떨어진다. */
-const MITER_LIMIT = 4
 const ROUND_VERTICES = 24
 
 function unit(from: BrushPoint, to: BrushPoint): BrushPoint | null {
@@ -77,7 +76,7 @@ function miterOf(vertex: BrushPoint, incoming: BrushPoint, outgoing: BrushPoint,
 /**
  * `halves`는 토막마다의 반폭(가로·세로 대비가 있으면 다르다). `baseHalf`는 대비 없는 반폭 — 굴림 반지름의 기준.
  */
-function offsetSide(points: readonly BrushPoint[], dirs: readonly (BrushPoint | null)[], closed: boolean, halves: readonly number[], baseHalf: number, sign: number, join: StrokeLinejoin, vertices: number, rounding?: FlatCornerRounding): BrushPoint[] {
+function offsetSide(points: readonly BrushPoint[], dirs: readonly (BrushPoint | null)[], closed: boolean, halves: readonly number[], baseHalf: number, sign: number, join: StrokeLinejoin, vertices: number, rounding?: FlatCornerRounding, miterLimit = DEFAULT_MITER_LIMIT): BrushPoint[] {
   const count = points.length
   const out: BrushPoint[] = []
   const halfIn = (index: number) => halves[(index - 1 + count) % count]
@@ -116,6 +115,8 @@ function offsetSide(points: readonly BrushPoint[], dirs: readonly (BrushPoint | 
     // 바깥쪽 = 오프셋 방향이 꺾이는 쪽의 반대.
     const outer = (nA.x + nB.x) * sign * (outgoing.x - incoming.x) + (nA.y + nB.y) * sign * (outgoing.y - incoming.y) < 0
     const miter = miterOf(vertex, incoming, outgoing, hIn, hOut, sign)
+    // 둥긂 이음은 바깥 꺾임을 꼭짓점 중심 반폭 원호로 — 둥글기 막대와 독립이라 막대의 굴림보다 먼저 본다(예각도 둥글어진다). 안쪽은 아래 막대 굴림을 그대로 받는다.
+    if (outer && join === 'round') { out.push(a, ...arc(vertex, { x: a.x - vertex.x, y: a.y - vertex.y }, { x: b.x - vertex.x, y: b.y - vertex.y }, (hIn + hOut) / 2, vertices), b); continue }
     // 앵커 꺾임의 굴림: 안팎 모두 두 오프셋 선의 교점(miter)에서 양쪽으로 d만큼 물러나 반지름 r의 호로 잇는다.
     // d = r·tan(θ/2). 이웃 변이 짧으면 d를 줄이고 r도 그에 맞춘다(호는 늘 두 변에 접한다). 반지름은 그 자리 반폭을 따른다.
     const localScale = baseHalf > EPSILON ? (hIn + hOut) / (2 * baseHalf) : 1
@@ -135,9 +136,8 @@ function offsetSide(points: readonly BrushPoint[], dirs: readonly (BrushPoint | 
       }
     }
     if (!outer) { if (miter) out.push(miter); else out.push(a, b); continue }
-    if (join === 'round') { out.push(a, ...arc(vertex, { x: a.x - vertex.x, y: a.y - vertex.y }, { x: b.x - vertex.x, y: b.y - vertex.y }, (hIn + hOut) / 2, vertices), b); continue }
     // miter 길이 비율 = sqrt(2/(1+cos φ)). 한계를 넘으면 bevel.
-    if (join === 'miter' && miter && Math.sqrt(2 / (1 + cosine)) <= MITER_LIMIT) out.push(miter)
+    if (join === 'miter' && miter && Math.sqrt(2 / (1 + cosine)) <= miterLimit) out.push(miter)
     else out.push(a, b)
   }
   return out
@@ -169,6 +169,7 @@ export function polylineToFlatInkGroups(
   rounding?: FlatCornerRounding,
   widthOf?: FlatWidthOf,
   curvedSegments?: ReadonlySet<number>,
+  miterLimit = DEFAULT_MITER_LIMIT,
 ): BrushInkGroup[] {
   if (points.length < 2 || !(thickness > 0)) return []
   const half = thickness / 2
@@ -205,8 +206,8 @@ export function polylineToFlatInkGroups(
     : curvedSegments
   const halves = directions.map((direction, index) => direction && widthOf ? half * Math.max(0.05, widthOf(direction, curvedNow?.has(index) ?? false)) : half)
   // 급한 굽이 안쪽에서 오프셋 선이 제 몸을 지나 작은 고리가 생기면 잘라낸다.
-  const left = removeLoops(offsetSide(path, directions, closed, halves, half, 1, join, roundVertices, cornerRounding), closed)
-  const right = removeLoops(offsetSide(path, directions, closed, halves, half, -1, join, roundVertices, cornerRounding), closed)
+  const left = removeLoops(offsetSide(path, directions, closed, halves, half, 1, join, roundVertices, cornerRounding, miterLimit), closed)
+  const right = removeLoops(offsetSide(path, directions, closed, halves, half, -1, join, roundVertices, cornerRounding, miterLimit), closed)
   if (left.length < 2 || right.length < 2) return []
   if (closed) {
     const rings: BrushContour[] = Math.abs(ringArea(left)) >= Math.abs(ringArea(right)) ? [left, right] : [right, left]
@@ -247,7 +248,7 @@ export function polylineToFlatInkGroups(
     : joined
   // 급한 굽이 안쪽에서 오프셋 선이 제 몸을 지나면 윤곽 하나로는 Boolean이 못 받는다. 그때만 조각(세그먼트 사각형 + 조인 + 캡)으로 낸다.
   // 머리핀처럼 되돌아 꺾이면 테두리는 안 꼬여도 안쪽 가장자리가 앞 토막 몸을 지나며 잉크를 잘라 먹는다(피드백 35, 가로줄기에 흰 쐐기). 그때도 조각으로.
-  if (ringSelfIntersects(ring) || hasHairpinTurn(directions, closed)) return piecewiseFlatInkGroups(path, directions, halves, cap, join, roundVertices)
+  if (ringSelfIntersects(ring) || hasHairpinTurn(directions, closed)) return piecewiseFlatInkGroups(path, directions, halves, cap, join, roundVertices, miterLimit)
   return [[ring]]
 }
 
@@ -328,7 +329,7 @@ function circle(center: BrushPoint, radius: number, vertices: number): BrushCont
  * 조각 방식: 세그먼트마다 사각형, 꺾임마다 조인 패치(양쪽 다 얹는다 — 안쪽은 사각형에 덮인다), 열린 끝에 캡.
  * 조각은 전부 볼록해서 Boolean이 안전하지만 곡선을 잘게 편 자리마다 조각이 생겨 느리다. 윤곽 하나가 안 될 때만 쓴다.
  */
-function piecewiseFlatInkGroups(path: readonly BrushPoint[], directions: readonly (BrushPoint | null)[], halves: readonly number[], cap: StrokeLinecap, join: StrokeLinejoin, vertices: number): BrushInkGroup[] {
+function piecewiseFlatInkGroups(path: readonly BrushPoint[], directions: readonly (BrushPoint | null)[], halves: readonly number[], cap: StrokeLinecap, join: StrokeLinejoin, vertices: number, miterLimit: number): BrushInkGroup[] {
   const groups: BrushInkGroup[] = []
   const count = directions.length
   for (let index = 0; index < count; index += 1) {
@@ -349,7 +350,7 @@ function piecewiseFlatInkGroups(path: readonly BrushPoint[], directions: readonl
     const cosine = nA.x * nB.x + nA.y * nB.y
     for (const sign of [1, -1]) {
       const a = add(vertex, nA, hIn * sign), b = add(vertex, nB, hOut * sign)
-      const miter = join === 'miter' && 1 + cosine > EPSILON && Math.sqrt(2 / (1 + cosine)) <= MITER_LIMIT ? miterOf(vertex, incoming, outgoing, hIn, hOut, sign) : null
+      const miter = join === 'miter' && 1 + cosine > EPSILON && Math.sqrt(2 / (1 + cosine)) <= miterLimit ? miterOf(vertex, incoming, outgoing, hIn, hOut, sign) : null
       groups.push([miter ? [vertex, a, miter, b] : [vertex, a, b]])
     }
   }
@@ -445,6 +446,7 @@ export function strokeToFlatInkGroups(
   innerRoundness?: number,
   contrast = 0,
   stemScale = 1,
+  miterLimit = DEFAULT_MITER_LIMIT,
 ): BrushInkGroup[] {
   const { points, anchorIndices, curvedSegments } = flattenStrokeCenterlineWithAnchors(stroke, box)
   const thickness = Math.max(stroke.thickness * weightMultiplier, 0.001)
@@ -453,10 +455,10 @@ export function strokeToFlatInkGroups(
     // 안쪽은 반폭을 넘어서도 굴린다(최대 3배). 이웃 변 길이 한도(45%)에 걸려 자연히 멈춘다.
     ? { radius: Math.min(1, Math.max(0, roundness)) * thickness / 2, innerRadius: Math.min(INNER_ROUNDNESS_MAX, Math.max(0, inner)) * thickness / 2, anchors: anchorIndices }
     : undefined
-  const groups = polylineToFlatInkGroups(points, stroke.closed, thickness, cap, join, roundVertices, rounding, directionalWidthOf(contrast, stemScale, stemScale !== 1 ? gentleCurveDirection(points, stroke.closed, curvedSegments) : null), curvedSegments)
+  const groups = polylineToFlatInkGroups(points, stroke.closed, thickness, cap, join, roundVertices, rounding, directionalWidthOf(contrast, stemScale, stemScale !== 1 ? gentleCurveDirection(points, stroke.closed, curvedSegments) : null), curvedSegments, miterLimit)
   // 곡선이 반폭보다 급하게 꺾여 윤곽이 스스로 겹치면 쐐기가 뚫리고 최종 잉크가 그 획을 거부한다. 그때만 Clipper2 오프셋으로 다시 만든다.
   if (!flatGroupsOverlap(groups)) return groups
-  const inflated = inflateFlatCenterline(points, stroke.closed, thickness, cap, join, rounding !== undefined)
+  const inflated = inflateFlatCenterline(points, stroke.closed, thickness, cap, join, rounding !== undefined, miterLimit)
   return inflated.length ? inflated : groups
 }
 

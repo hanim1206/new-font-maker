@@ -9,7 +9,7 @@ import { brushInkGroupsToSvgPaths, strokeToBrushInkGroups } from '../services/br
 import { resolveGlyphInkPrimitives } from '../services/glyphInkResolver'
 import { needsFilledRenderInk, stemScaleOf, strokeToRenderInkGroups, verticalWidthFactorOf } from '../services/strokeRenderGeometry'
 import { stemBeakGroupOf, stemBeakInkGroups } from '../services/stemBeak'
-import { ACUTE_MITER_LIMIT } from '../services/strokeToOutline'
+import { miterLimitOf } from '../services/strokeJoin'
 import { useGroupBeakResolver } from '../stores/jamoGroupStore'
 import type { GroupBeakResolver } from '../stores/jamoGroupStore'
 
@@ -175,7 +175,7 @@ export function SvgRenderer({
       const paths = brushInkGroupsToSvgPaths(
         renderStyle.mode === 'brush' && renderStyle.brush.tip !== 'round'
           ? strokeToBrushInkGroups(stroke, primitive.box, primitive.weightMultiplier, renderStyle.brush)
-          : strokeToRenderInkGroups(stroke, primitive.box, primitive.weightMultiplier, renderStyle),
+          : strokeToRenderInkGroups(stroke, primitive.box, primitive.weightMultiplier, renderStyle, { join: { linejoin: primitive.effectiveLinejoin, miterLimit: miterLimitOf(renderStyle) } }),
         VIEW_BOX_SIZE,
       )
       return (
@@ -189,7 +189,7 @@ export function SvgRenderer({
     if (beaks.length > 0) {
       return (
         <g key={primitive.id}>
-          <path d={d} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap={primitive.effectiveLinecap} strokeLinejoin={primitive.effectiveLinejoin} strokeMiterlimit={ACUTE_MITER_LIMIT} />
+          <path d={d} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap={primitive.effectiveLinecap} strokeLinejoin={primitive.effectiveLinejoin} strokeMiterlimit={miterLimitOf(renderStyle)} />
           {beaks.map((path, index) => <path key={`${primitive.id}-beak-${index}`} d={path} fill={color} data-stem-beak="true" />)}
         </g>
       )
@@ -204,7 +204,7 @@ export function SvgRenderer({
         strokeWidth={strokeWidth}
         strokeLinecap={primitive.effectiveLinecap}
         strokeLinejoin={primitive.effectiveLinejoin}
-        strokeMiterlimit={ACUTE_MITER_LIMIT}
+        strokeMiterlimit={miterLimitOf(renderStyle)}
         style={enableTransition ? { transition: 'd 0.15s ease, stroke-width 0.15s ease' } : undefined}
       />
     )
