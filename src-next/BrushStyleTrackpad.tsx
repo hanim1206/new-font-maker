@@ -28,6 +28,10 @@ const END_CHOICES: Array<{ id: 'plain' | 'flat'; label: string; tip: BrushTip }>
 export function JoinPicto({ join }: { join: StrokeLinejoin }) {
   return <svg viewBox="0 0 64 52" aria-hidden="true"><path d="M12 14 H48 V44" fill="none" stroke="currentColor" strokeWidth="12" strokeLinejoin={join} strokeMiterlimit={4} /></svg>
 }
+/** `적용 안 함` 그림. 획 편집 `스타일` 패널의 줄마다 맨 앞 칸 — 이 획에 따로 정한 값이 없다는 뜻이다. 꺾임 그림과 같은 틀. */
+export function NonePicto() {
+  return <svg viewBox="0 0 64 52" aria-hidden="true"><circle cx="32" cy="27" r="15" fill="none" stroke="currentColor" strokeWidth="4" /><path d="M21.4 37.6 L42.6 16.4" fill="none" stroke="currentColor" strokeWidth="4" /></svg>
+}
 const roundnessOf = (style: StrokeRenderStyle): number => style.mode === 'brush' && style.brush.tip === 'round' ? Math.round((style.roundness ?? 0) * 100) : 0
 /** 안쪽 둥글기(%). 따로 정하지 않았으면 바깥을 따른다(연결). */
 const innerRoundnessOf = (style: StrokeRenderStyle): number => style.mode === 'brush' && style.brush.tip === 'round' && style.innerRoundness !== undefined ? Math.round(style.innerRoundness * 100) : roundnessOf(style)

@@ -34,5 +34,21 @@
   {
     "file": "tests/e2e/app-safety.spec.ts",
     "title": "그리다 던지면 흰 화면 대신 오류 화면: 백업 받기 · 자세히 · 다시 불러오기"
+  },
+  {
+    "file": "tests/e2e/safari-ink.spec.ts",
+    "title": "사파리 폰: 획 편집 첫 화면(통째 선택)에서 `크게`를 켜고 꺼도 획이 그려져 있다"
+  },
+  {
+    "file": "tests/e2e/safari-ink.spec.ts",
+    "title": "사파리 아이패드: 획 편집 첫 화면(통째 선택)에서 `크게`를 켜고 꺼도 획이 그려져 있다"
+  },
+  {
+    "file": "tests/e2e/stroke-drag-live.spec.ts",
+    "title": "홀자와 함께 그려진 글자에서 홀자 줄기를 끌면 끄는 동안 잉크가 따라 움직인다"
+  },
+  {
+    "file": "tests/e2e/stroke-drag-live.spec.ts",
+    "title": "가른 벌(세로홀자 첫닿자)에서 획을 끌면 끄는 동안 잉크가 따라 움직이고, 벌에 따로 준 굵기가 기본으로 덮이지 않는다"
   }
 ]
