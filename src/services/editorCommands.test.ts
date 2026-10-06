@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { JamoData } from '../types'
-import { jamoCenterlineCenter, limitJamoMoveDelta, limitJamoScaleFactor, moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStroke, scaleStrokes, snapWholeJamoDelta, translateJamoStrokes } from './editorCommands'
+import { jamoCenterlineCenter, limitJamoMoveDelta, limitJamoScale, moveHandle, movePoint, moveStroke, scaleJamoStrokes, scaleStroke, scaleStrokes, snapWholeJamoDelta, translateJamoStrokes } from './editorCommands'
 
 const baseJamo: JamoData = {
   char: 'ㄱ',
@@ -247,21 +247,65 @@ describe('자소 통째 크기 · 이동은 글자 칸 안에서 멈춘다', () 
       { id: 'b', points: [{ x: 0.2, y: 0.2 }, { x: 0.2, y: 0.6 }], closed: false, thickness: 0.07 },
     ],
   }
-  // 가운데는 (0.5, 0.4). 위쪽 한계가 가장 가깝다: 0.2 → 0.1까지 = 배율 1.5.
+  // 가운데는 (0.5, 0.4). 위쪽 한계가 가장 가깝다: 가운데 기준이면 0.2 → 0.1까지 = 배율 1.5.
   const bounds = { minX: -0.4, maxX: 1.4, minY: 0.1, maxY: 1.2 }
   const boundsOf = () => bounds
 
-  it('키우면 한계에 먼저 닿는 점에서 멈추고, 가로 · 세로는 같은 비율 그대로다', () => {
-    expect(limitJamoScaleFactor(square, 2, boundsOf)).toBeCloseTo(1.5, 9)
-    expect(limitJamoScaleFactor(square, 1.2, boundsOf)).toBe(1.2)
-    const scaled = scaleJamoStrokes(square, limitJamoScaleFactor(square, 2, boundsOf))
-    expect(Math.min(...scaled.strokes!.flatMap((stroke) => stroke.points.map((point) => point.y)))).toBeCloseTo(0.1, 9)
+  const extentOf = (jamo: JamoData) => {
+    const points = jamo.strokes!.flatMap((stroke) => stroke.points)
+    const xs = points.map((point) => point.x)
+    const ys = points.map((point) => point.y)
+    return { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) }
+  }
+  const grown = (source: JamoData, requested: number, of: typeof boundsOf) => {
+    const fit = limitJamoScale(source, requested, of)
+    return { fit, extent: extentOf(scaleJamoStrokes(source, fit.factor, fit.shift)) }
+  }
+
+  it('한계에 안 닿으면 가운데 기준 그대로 커지고 밀지 않는다', () => {
+    const { fit, extent } = grown(square, 1.2, boundsOf)
+    expect(fit).toEqual({ factor: 1.2, shift: { x: 0, y: 0 } })
+    expect(extent.top).toBeCloseTo(0.16, 9)
+    expect(extent.bottom).toBeCloseTo(0.64, 9)
   })
 
-  it('줄이는 쪽과 한계를 모르는 획은 막지 않고, 이미 한계에 있으면 안 커진다', () => {
-    expect(limitJamoScaleFactor(square, 0.5, boundsOf)).toBe(0.5)
-    expect(limitJamoScaleFactor(square, 2, () => undefined)).toBe(2)
-    expect(limitJamoScaleFactor(square, 2, () => ({ ...bounds, minY: 0.2 }))).toBe(1)
+  it('한쪽이 한계에 닿으면 그쪽을 붙잡고 반대쪽으로 더 커진다 — 가로 · 세로는 같은 비율 그대로', () => {
+    // 가운데 기준이면 1.5에서 위(0.1)에 닿는다. 2배는 위를 0.1에 붙이고 아래로 자란다: 높이 0.4 → 0.8.
+    const { fit, extent } = grown(square, 2, boundsOf)
+    expect(fit.factor).toBe(2)
+    expect(fit.shift.x).toBe(0)
+    expect(fit.shift.y).toBeCloseTo(0.1, 9)
+    expect(extent.top).toBeCloseTo(0.1, 9)
+    expect(extent.bottom).toBeCloseTo(0.9, 9)
+    expect((extent.right - extent.left) / 0.6).toBeCloseTo((extent.bottom - extent.top) / 0.4, 9)
+    // 이미 한계에 붙어 있어도 반대쪽으로 커진다(전에는 안 커졌다).
+    const stuck = grown(square, 2, () => ({ ...bounds, minY: 0.2 }))
+    expect(stuck.fit.factor).toBe(2)
+    expect(stuck.extent.top).toBeCloseTo(0.2, 9)
+    expect(stuck.extent.bottom).toBeCloseTo(1, 9)
+  })
+
+  it('한 축의 양쪽이 다 닿으면 거기서 멈춘다', () => {
+    // 세로 한계 0.1 ~ 0.7 = 0.6, 높이 0.4 → 1.5배. 위아래 모두 한계에 닿는다.
+    const { fit, extent } = grown(square, 2, () => ({ ...bounds, maxY: 0.7 }))
+    expect(fit.factor).toBeCloseTo(1.5, 9)
+    expect(extent.top).toBeCloseTo(0.1, 9)
+    expect(extent.bottom).toBeCloseTo(0.7, 9)
+    // 양쪽이 이미 붙어 있으면 안 커진다.
+    expect(limitJamoScale(square, 2, () => ({ ...bounds, minY: 0.2, maxY: 0.6 }))).toEqual({ factor: 1, shift: { x: 0, y: 0 } })
+  })
+
+  it('곡선 핸들이 먼저 닿으면 핸들을 한계에 붙이고 민다', () => {
+    const curved: JamoData = { char: 'ㅇ', type: 'choseong', strokes: [{ id: 'a', points: [{ x: 0.2, y: 0.4, handleOut: { x: 0.2, y: 0.1 } }, { x: 0.8, y: 0.6 }], closed: false, thickness: 0.07 }] }
+    const fit = limitJamoScale(curved, 1.5, () => ({ minX: -1, maxX: 2, minY: 0.1, maxY: 2 }))
+    const scaled = scaleJamoStrokes(curved, fit.factor, fit.shift)
+    expect(fit.factor).toBe(1.5)
+    expect(scaled.strokes![0].points[0].handleOut!.y).toBeCloseTo(0.1, 9)
+  })
+
+  it('줄이는 쪽과 한계를 모르는 획은 막지도 밀지도 않는다', () => {
+    expect(limitJamoScale(square, 0.5, boundsOf)).toEqual({ factor: 0.5, shift: { x: 0, y: 0 } })
+    expect(limitJamoScale(square, 2, () => undefined)).toEqual({ factor: 2, shift: { x: 0, y: 0 } })
   })
 
   it('통째 이동도 어느 점이든 한계에 닿는 만큼까지만 간다(가로 · 세로 따로)', () => {

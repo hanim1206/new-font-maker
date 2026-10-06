@@ -9,17 +9,19 @@ const KEY_STEP = .02
 /**
  * 트랙패드 왼쪽 세로 막대. 올리면 자소가 커지고 내리면 작아진다.
  * 조그다 — 끄는 만큼 바뀌고, 손을 떼면 손잡이가 가운데로 돌아온다. 끌었다 놓은 한 번이 되돌리기 한 번이다.
+ * 숫자는 요청이 아니라 실제로 커진 배율이다(`onChange`가 돌려준다) — 글자 칸에 막혀 덜 커지면 그만큼만 보인다.
  */
 export function JamoScaleSlider({ disabled, onStart, onChange, onCommit, onCancel }: {
   disabled: boolean
   onStart: () => void
-  onChange: (factor: number) => void
+  onChange: (factor: number) => number
   onCommit: (factor: number) => void
   onCancel: () => void
 }) {
   const trackRef = useRef<HTMLDivElement>(null)
   const drag = useRef<{ pointerId: number; startY: number; half: number; ratio: number } | null>(null)
   const [ratio, setRatio] = useState<number | null>(null)
+  const [applied, setApplied] = useState(1)
   const factorOf = (value: number) => 1 + value * SCALE_RANGE
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -30,6 +32,7 @@ export function JamoScaleSlider({ disabled, onStart, onChange, onCommit, onCance
     track.setPointerCapture(event.pointerId)
     drag.current = { pointerId: event.pointerId, startY: event.clientY, half: Math.max(1, track.clientHeight / 2), ratio: 0 }
     setRatio(0)
+    setApplied(1)
     onStart()
   }
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -38,7 +41,7 @@ export function JamoScaleSlider({ disabled, onStart, onChange, onCommit, onCance
     const next = Math.max(-1, Math.min(1, (current.startY - event.clientY) / current.half))
     current.ratio = next
     setRatio(next)
-    onChange(factorOf(next))
+    setApplied(onChange(factorOf(next)))
   }
   const finish = (event: PointerEvent<HTMLDivElement>, commit: boolean) => {
     const current = drag.current
@@ -60,6 +63,7 @@ export function JamoScaleSlider({ disabled, onStart, onChange, onCommit, onCance
   }
 
   const active = ratio !== null
+  const percent = Math.round((active ? applied : 1) * 100)
   return (
     <div
       ref={trackRef}
@@ -71,8 +75,8 @@ export function JamoScaleSlider({ disabled, onStart, onChange, onCommit, onCance
       aria-disabled={disabled}
       aria-valuemin={Math.round(factorOf(-1) * 100)}
       aria-valuemax={Math.round(factorOf(1) * 100)}
-      aria-valuenow={Math.round(factorOf(ratio ?? 0) * 100)}
-      aria-valuetext={`${Math.round(factorOf(ratio ?? 0) * 100)}%`}
+      aria-valuenow={percent}
+      aria-valuetext={`${percent}%`}
       data-active={active}
       style={{ '--ratio': ratio ?? 0 } as CSSProperties}
       data-testid="jamo-scale-slider"
@@ -84,7 +88,7 @@ export function JamoScaleSlider({ disabled, onStart, onChange, onCommit, onCance
     >
       <span className={styles.rail} aria-hidden="true" />
       <span className={styles.thumb} aria-hidden="true" />
-      {active && <output className={styles.value}>{Math.round(factorOf(ratio) * 100)}%</output>}
+      {active && <output className={styles.value}>{percent}%</output>}
     </div>
   )
 }

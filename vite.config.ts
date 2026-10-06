@@ -10,7 +10,7 @@ import { feedbackAdminApiPlugin } from './scripts/feedbackAdminApi'
 import { styleLibraryApiPlugin } from './scripts/styleLibraryApi'
 import { housePresetApiPlugin } from './scripts/housePresetApi'
 import { announcementAdminApiPlugin } from './scripts/announcementAdminApi'
-import { sharedCheckoutPath } from './scripts/sharedCheckoutPath'
+import { sharedCheckoutPath, sharedEnvDir } from './scripts/sharedCheckoutPath'
 import { spectrumFontApiPlugin } from './scripts/spectrumFontApi'
 import { testRunApiPlugin } from './scripts/testRunApi'
 
@@ -21,6 +21,8 @@ const referenceFonts = sharedCheckoutPath(fileURLToPath(new URL('.', import.meta
 
 // https://vite.dev/config/
 export default defineConfig({
+  // 워크트리에 `.env`가 없으면 메인 체크아웃 것을 읽는다(개발 서버 · 단위 테스트 모두).
+  envDir: sharedEnvDir(fileURLToPath(new URL('.', import.meta.url))),
   plugins: [
     react(),
     notoCorpusApiPlugin(guideCorpus),
@@ -101,6 +103,10 @@ export default defineConfig({
   optimizeDeps: {
     entries: ['index.html'],
   },
+  // 워크트리는 메인 체크아웃 node_modules를 심링크로 같이 쓴다. 묶음 캐시가 기본 자리(node_modules/.vite)면
+  // 다른 워크트리 서버가 다시 묶을 때 이 서버의 묶음을 덮어 React가 두 벌 섞인다(e2e 중 관리자 화면 Invalid hook call).
+  // 캐시는 체크아웃마다 따로 둔다.
+  cacheDir: fileURLToPath(new URL('./.vite-cache', import.meta.url)),
   server: {
     host: true, // 네트워크에서 접근 가능하도록 설정
     port: 5173, // 기본 포트 (필요시 변경 가능)

@@ -250,28 +250,32 @@ export function scaleStrokes(
   return { jamo, scale, changed: true, lockedAxes }
 }
 
+const renderedStrokesOf = (jamo: JamoData) => [...(jamo.strokes ?? []), ...(jamo.horizontalStrokes ?? []), ...(jamo.verticalStrokes ?? [])]
+const allStrokesOf = (jamo: JamoData) => [...renderedStrokesOf(jamo), ...Object.values(jamo.contextStrokes ?? {}).flatMap((variant) => variant ?? [])]
+
+/** 자소 통째 크기의 기준 가운데 — 모든 채널 · 문맥 변형 점의 중심선 범위 가운데. 키우는 쪽과 한계를 재는 쪽이 같이 쓴다. */
+function jamoScaleCenter(jamo: JamoData): Vec | null {
+  const points = allStrokesOf(jamo).flatMap((stroke) => stroke.points)
+  if (!points.length) return null
+  const xs = points.map((point) => point.x)
+  const ys = points.map((point) => point.y)
+  return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 }
+}
+
 /**
  * 자소 전체를 같은 비율로 키우고 줄인다. 모든 채널의 점 · 핸들을 중심선 범위의 가운데를 기준으로 옮기고, 두께는 그대로 둔다.
  * 상자 경계로 막지 않는다 — 틀이 상자를 붙잡으니 넘친 만큼 상자 밖으로 나간다.
+ * `shift`는 키운 뒤 통째로 옮길 거리(`limitJamoScale`이 글자 칸 끝에 닿은 쪽을 붙잡으려고 준다).
  */
-export function scaleJamoStrokes(source: JamoData, factor: number): JamoData {
+export function scaleJamoStrokes(source: JamoData, factor: number, shift: StrokeMoveDelta = { x: 0, y: 0 }): JamoData {
   const jamo = cloneJamoData(source)
-  const strokes = [
-    ...(jamo.strokes ?? []),
-    ...(jamo.horizontalStrokes ?? []),
-    ...(jamo.verticalStrokes ?? []),
-    ...Object.values(jamo.contextStrokes ?? {}).flatMap((variant) => variant ?? []),
-  ]
-  const points = strokes.flatMap((stroke) => stroke.points)
-  if (!points.length || !Number.isFinite(factor) || factor <= 0 || Math.abs(factor - 1) < EPSILON) return jamo
-  const xs = points.map((point) => point.x)
-  const ys = points.map((point) => point.y)
-  const center = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 }
+  const center = jamoScaleCenter(jamo)
+  if (!center || !Number.isFinite(factor) || factor <= 0 || Math.abs(factor - 1) < EPSILON) return jamo
   const transform = (point: { x: number; y: number }) => {
-    point.x = center.x + (point.x - center.x) * factor
-    point.y = center.y + (point.y - center.y) * factor
+    point.x = center.x + (point.x - center.x) * factor + shift.x
+    point.y = center.y + (point.y - center.y) * factor + shift.y
   }
-  for (const point of points) {
+  for (const point of allStrokesOf(jamo).flatMap((stroke) => stroke.points)) {
     transform(point)
     if (point.handleIn) transform(point.handleIn)
     if (point.handleOut) transform(point.handleOut)
@@ -282,35 +286,54 @@ export function scaleJamoStrokes(source: JamoData, factor: number): JamoData {
 /** 획 하나가 놓인 상자에서의 편집 한계(상자 좌표)를 준다. 모르는 획이면 undefined — 그 획은 한계를 안 본다. */
 export type StrokeBoundsOf = (strokeId: string) => NormalizedBounds | undefined
 
-const renderedStrokesOf = (jamo: JamoData) => [...(jamo.strokes ?? []), ...(jamo.horizontalStrokes ?? []), ...(jamo.verticalStrokes ?? [])]
+/** 자소 통째 크기에 실제로 쓸 배율과, 글자 칸 안에 두려고 같이 옮길 거리. `scaleJamoStrokes`에 그대로 넘긴다. */
+export interface JamoScaleFit {
+  factor: number
+  shift: StrokeMoveDelta
+}
 
 /**
- * 자소 통째 크기 배율을 글자 칸 안에 가둔다. 자소 상자는 넘어도 되지만(틀이 상자를 붙잡는다) 글자 칸 밖으로는 못 나간다.
- * 키울 때만 줄인다 — 어느 점이든 한계에 먼저 닿는 배율에서 멈춘다(가로 · 세로 같은 비율이라 하나로 정해진다).
- * 기준 가운데는 `scaleJamoStrokes`와 같다.
+ * 자소 통째 크기를 글자 칸 안에 가둔다. 자소 상자는 넘어도 되지만(틀이 상자를 붙잡는다) 글자 칸 밖으로는 못 나간다.
+ * 가운데 기준으로 키우다 한쪽이 칸 끝에 닿으면 그쪽을 붙잡고 반대쪽으로 더 키운다 — 닿은 만큼만 통째로 민다(`shift`).
+ * 한 축의 양쪽이 다 닿으면 거기서 멈춘다(가로 · 세로 같은 비율이라 배율은 하나다). 줄일 때는 막지도 밀지도 않는다.
+ * 한계는 점 · 핸들을 다 본다. 기준 가운데는 `scaleJamoStrokes`와 같다.
  */
-export function limitJamoScaleFactor(source: JamoData, factor: number, boundsOf: StrokeBoundsOf): number {
-  if (!Number.isFinite(factor) || factor <= 1) return factor
-  const all = [...renderedStrokesOf(source), ...Object.values(source.contextStrokes ?? {}).flatMap((variant) => variant ?? [])].flatMap((stroke) => stroke.points)
-  if (!all.length) return factor
-  const xs = all.map((point) => point.x)
-  const ys = all.map((point) => point.y)
-  const center = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 }
-  let limit = factor
-  const reach = (value: number, centerValue: number, min: number, max: number) => {
-    const distance = value - centerValue
-    if (distance > EPSILON) limit = Math.min(limit, (max - centerValue) / distance)
-    else if (distance < -EPSILON) limit = Math.min(limit, (centerValue - min) / -distance)
-  }
-  for (const stroke of renderedStrokesOf(source)) {
+export function limitJamoScale(source: JamoData, factor: number, boundsOf: StrokeBoundsOf): JamoScaleFit {
+  const free: JamoScaleFit = { factor, shift: { x: 0, y: 0 } }
+  const center = jamoScaleCenter(source)
+  if (!Number.isFinite(factor) || factor <= 1 || !center) return free
+  // 획마다 점 · 핸들이 차지한 범위와 그 획의 한계. 한계가 획마다 다를 수 있다(섞임홀자의 가로부 · 세로부).
+  const spans = renderedStrokesOf(source).flatMap((stroke) => {
     const bounds = boundsOf(stroke.id)
-    if (!bounds) continue
-    for (const point of withHandles(stroke.points)) {
-      reach(point.x, center.x, bounds.minX, bounds.maxX)
-      reach(point.y, center.y, bounds.minY, bounds.maxY)
+    const points = withHandles(stroke.points)
+    if (!bounds || !points.length) return []
+    const xs = points.map((point) => point.x)
+    const ys = points.map((point) => point.y)
+    return [{
+      x: { from: Math.min(...xs), to: Math.max(...xs), min: bounds.minX, max: bounds.maxX },
+      y: { from: Math.min(...ys), to: Math.max(...ys), min: bounds.minY, max: bounds.maxY },
+    }]
+  })
+  if (!spans.length) return free
+  const axes = ['x', 'y'] as const
+  // 키운 뒤 통째로 밀어 칸 안에 넣을 자리가 있으려면, 어느 두 획을 잡아도 (한 획의 끝 − 다른 획의 시작) × 배율이 두 한계 사이에 들어야 한다.
+  let limit = factor
+  for (const axis of axes) {
+    for (const head of spans) {
+      for (const tail of spans) {
+        const length = tail[axis].to - head[axis].from
+        if (length > EPSILON) limit = Math.min(limit, (tail[axis].max - head[axis].min) / length)
+      }
     }
   }
-  return Math.max(1, limit)
+  const applied = Math.max(1, limit)
+  // 그 배율에서 칸 안에 드는 가장 작은 이동. 안 닿았으면 0이다.
+  const shiftOn = (axis: 'x' | 'y') => {
+    const low = Math.max(...spans.map((span) => span[axis].min - center[axis] - (span[axis].from - center[axis]) * applied))
+    const high = Math.min(...spans.map((span) => span[axis].max - center[axis] - (span[axis].to - center[axis]) * applied))
+    return Math.min(Math.max(0, low), high)
+  }
+  return { factor: applied, shift: applied - 1 < EPSILON ? { x: 0, y: 0 } : { x: shiftOn('x'), y: shiftOn('y') } }
 }
 
 /** 자소 통째 이동을 글자 칸 안에 가둔다. 어느 점이든 한계에 닿는 만큼까지만 간다(가로 · 세로 따로). */

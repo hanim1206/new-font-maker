@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { loadEnv } from 'vite'
+import { sharedEnvDir } from './sharedCheckoutPath'
 import type { Plugin } from 'vite'
 import { announcementDraftProblem } from '../src-next/announcements'
 import type { AnnouncementDraft, AnnouncementStatus } from '../src-next/announcements'
@@ -49,7 +50,7 @@ export function announcementFailureOf(error: unknown): string {
 
 export function announcementAdminApiPlugin(root: string): Plugin {
   let mode = 'development'
-  const admin = () => createAnnouncementAdmin(feedbackAdminEnvOf(loadEnv(mode, root, '')))
+  const admin = () => createAnnouncementAdmin(feedbackAdminEnvOf(loadEnv(mode, sharedEnvDir(root), '')))
 
   return {
     name: 'announcement-admin-api',

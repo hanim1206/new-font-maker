@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { loadEnv } from 'vite'
+import { sharedEnvDir } from './sharedCheckoutPath'
 import type { Plugin } from 'vite'
 import { rejectReasonOf } from './betaInviteApi'
 import { createFeedbackAdmin, feedbackAdminEnvOf, REPLY_MAX_LENGTH } from './feedbackAdmin'
@@ -36,7 +37,7 @@ export function failureOf(error: unknown): string {
 
 export function feedbackAdminApiPlugin(root: string): Plugin {
   let mode = 'development'
-  const admin = () => createFeedbackAdmin(feedbackAdminEnvOf(loadEnv(mode, root, '')))
+  const admin = () => createFeedbackAdmin(feedbackAdminEnvOf(loadEnv(mode, sharedEnvDir(root), '')))
 
   return {
     name: 'feedback-admin-api',

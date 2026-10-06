@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
-import { sharedCheckoutPath } from './sharedCheckoutPath'
+import { sharedCheckoutPath, sharedEnvDir } from './sharedCheckoutPath'
 
 const base = realpathSync(mkdtempSync(path.join(tmpdir(), 'shared-checkout-')))
 const main = path.join(base, 'main')
@@ -33,5 +33,25 @@ describe('git에 없는 로컬 데이터 경로', () => {
     const warn = vi.fn()
     expect(sharedCheckoutPath(worktree, '.no-such-folder', warn)).toBe(path.join(worktree, '.no-such-folder'))
     expect(warn).toHaveBeenCalledOnce()
+  })
+})
+
+describe('.env 폴더', () => {
+  it('워크트리에 .env가 없으면 메인 체크아웃 폴더, 있으면 제 폴더, 어디에도 없으면 조용히 제 폴더', () => {
+    const lonely = realpathSync(mkdtempSync(path.join(tmpdir(), 'no-env-')))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      expect(sharedEnvDir(worktree)).toBe(worktree)
+      expect(warn).not.toHaveBeenCalled()
+      writeFileSync(path.join(main, '.env'), 'A=1')
+      expect(sharedEnvDir(worktree)).toBe(main)
+      writeFileSync(path.join(worktree, '.env'), 'A=2')
+      expect(sharedEnvDir(worktree)).toBe(worktree)
+      expect(sharedEnvDir(lonely)).toBe(lonely)
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+      rmSync(lonely, { recursive: true, force: true })
+    }
   })
 })

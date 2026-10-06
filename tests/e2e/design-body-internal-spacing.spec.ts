@@ -8,14 +8,17 @@ test('에의 ㅔ 가로점은 네모꼴 축소 비율을 따라 유지된다', a
 
   const glyphButton = page.getByRole('button', { name: /^에 편집/ })
   const horizontalArm = glyphButton.locator('svg path').nth(2)
+  // 기본 네모꼴은 획을 선(stroke)으로, 바꾼 네모꼴은 면(fill)으로 그린다. Playwright `boundingBox`는 선 두께를 사방에 더해
+  // 기본 쪽 가로점만 길게 잡으니(.275 대 .196), 두 경우 모두 잉크 길이와 같은 기하 경계(getBoundingClientRect)로 잰다.
   const ratio = async () => {
-    const [glyphBox, armBox] = await Promise.all([glyphButton.boundingBox(), horizontalArm.boundingBox()])
-    if (!glyphBox || !armBox) throw new Error('에 또는 ㅔ 가로점의 화면 경계를 찾지 못했습니다.')
-    return armBox.width / glyphBox.width
+    const [glyphBox, armWidth] = await Promise.all([glyphButton.boundingBox(), horizontalArm.evaluate((path) => path.getBoundingClientRect().width)])
+    if (!glyphBox || !armWidth) throw new Error('에 또는 ㅔ 가로점의 화면 경계를 찾지 못했습니다.')
+    return armWidth / glyphBox.width
   }
   // 문장을 바꾸면 글자도 300ms쯤 뒤 한 번 더 그려진다. 부하가 크면 더 늦어 첫 값을 바로 재면 그 사이 값이 잡힌다 — 두 번 연달아 같을 때까지 기다린다.
+  // 그 사이 값은 .12쯤이라 다 그려진 값(.2쯤)과 갈린다 — .15를 넘고 두 번 연달아 같을 때까지 기다린다.
   let last = Number.NaN
-  await expect.poll(async () => { const now = await ratio(); const same = Math.abs(now - last) < 1e-6; last = now; return same }, { intervals: [400] }).toBe(true)
+  await expect.poll(async () => { const now = await ratio(); const same = now > .15 && Math.abs(now - last) < 1e-6; last = now; return same }, { intervals: [400] }).toBe(true)
   const before = last
   const glyphWidth = (await glyphButton.boundingBox())?.width ?? 0
 
