@@ -79,7 +79,7 @@ export function betaInviteLinkOf(appUrl: string, nickname: string): string {
 /** 카톡으로 한 번에 보내는 초대 메시지: 이름 붙은 링크 · 코드 · 설치 안내 · 제보 안내. */
 export function betaInviteMessage({ nickname, code, appUrl, installGuideUrl }: BetaInviteMessageInput): string {
   const lines = [
-    '[한글 폰트 메이커 베타 초대]',
+    '[한글칸글 베타 초대]',
     `${nickname}님, 내 손으로 한글 폰트를 만들어 보는 베타에 초대해요.`,
     '',
     `1. 여기서 열어요: ${betaInviteLinkOf(appUrl, nickname)}`,

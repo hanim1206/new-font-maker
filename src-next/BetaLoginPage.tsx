@@ -52,7 +52,7 @@ export function BetaLoginPage({ onSignedIn }: { onSignedIn: () => void }) {
 
   return <main className={styles.loginPage}>
     <form className={styles.shell} onSubmit={submit} data-revealed={revealed || undefined} data-testid="beta-login">
-      <h1 className={styles.srOnly}>한글 폰트 메이커</h1>
+      <h1 className={styles.srOnly}>한글칸글</h1>
       <div className={styles.hello}>
         {/* 글자는 따로 불러와 늦게 뜬다. 줄 수만큼 자리를 미리 잡아 아래 문구가 밀리지 않게 한다. */}
         <div className={styles.greeting} data-lines={name ? 2 : 1} role="img" aria-label={name ? `환영합니다 ${name}` : '환영합니다'} data-testid="beta-login-hello">

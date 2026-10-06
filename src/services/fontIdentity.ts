@@ -27,7 +27,9 @@ export interface FontIdentityOptions {
   asciiFamilyName?: string
 }
 
-export const DEFAULT_ASCII_FAMILY_NAME = 'FontMaker'
+/** 이름을 안 적고 받을 때의 기본 이름. 영문 이름은 로마자 변환 대신 서비스 이름을 쓴다. */
+export const DEFAULT_FAMILY_NAME = '칸글체'
+export const DEFAULT_ASCII_FAMILY_NAME = 'Kangul'
 const POSTSCRIPT_NAME_MAX_LENGTH = 63
 
 const HANGUL_BASE = 0xac00
@@ -98,8 +100,8 @@ export function styleFlagsOf(styleName: string): { bold: boolean; italic: boolea
 
 /** 사용자 이름 + 스타일 → 정식 ASCII 이름과 한국어 localized 이름. */
 export function createFontIdentity(familyName: string, styleName = 'Regular', options: FontIdentityOptions = {}): FontIdentity {
-  const displayName = familyName.trim() || DEFAULT_ASCII_FAMILY_NAME
-  const explicitAscii = options.asciiFamilyName?.trim()
+  const displayName = familyName.trim() || DEFAULT_FAMILY_NAME
+  const explicitAscii = options.asciiFamilyName?.trim() || (displayName === DEFAULT_FAMILY_NAME ? DEFAULT_ASCII_FAMILY_NAME : undefined)
   const asciiFamilyName = (explicitAscii ? asciiFamilyNameOf(explicitAscii) : asciiFamilyNameOf(displayName)) || DEFAULT_ASCII_FAMILY_NAME
   const safeStyle = postScriptSafe(styleName) || 'Regular'
   const postScriptFamily = postScriptSafe(asciiFamilyName) || DEFAULT_ASCII_FAMILY_NAME
