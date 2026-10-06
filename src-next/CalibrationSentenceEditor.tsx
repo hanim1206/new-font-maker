@@ -15,6 +15,7 @@ import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { useEditHistoryStore } from './editHistoryStore'
 import { newLayoutEntry } from './layoutEntry'
 import { adoptFamilyStrokes, familyOfSyllable, hasFamilyStrokes, mergeFamilyStrokes, splitFamilyStrokes, writeFamilyStrokes } from '../src/utils/jamoContextStrokes'
+import type { MedialFamily } from '../src/types'
 import { initialRowChunks } from './reviewPropagation'
 import { VariantGateCard } from './VariantGateCard'
 import { DOUBLE_SPLIT, doubleFromSingle } from '../src/utils/jamoFromChoseong'
@@ -2295,7 +2296,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   // 안 가른 계열의 글자를 열면 캔버스는 보기만, 조절판 자리엔 `따로 그리기` 카드. 기본은 단독 칸에서 고친다.
   // `닿는 글자` 줄에서 고른 글자일 때만(`strokeRowAnchor`) — 주소로 음절을 바로 연 옛 길(`?mode=stroke`만)은 예전처럼 기본 획을 고친다.
   const variantGate = chrome === 'workspace' && editMode === 'stroke' && strokeCardPart === 'CH' && strokeRowAnchor !== null && !isSoloConsonant(selectedChar) && editFamily && storedChoseong && !familySplit ? editFamily : null
-  const gateExamples = useMemo(() => variantGate && storedChoseong ? initialRowChunks([storedChoseong.char], 0).find((chunk) => chunk.family === variantGate)?.items.slice(0, 5).map((item) => item.character).join(' ') ?? '' : '', [variantGate, storedChoseong])
+  // 트리 가지에 그릴 계열별 대표 글자(자 · 조 · 좌) — 줄의 첫 글자와 같다.
+  const gateExamples = useMemo(() => storedChoseong ? Object.fromEntries(initialRowChunks([storedChoseong.char], 0).map((chunk) => [chunk.family, chunk.items[0]?.character])) as Partial<Record<MedialFamily, string>> : {}, [storedChoseong])
   const commitVariant = (after: JamoData) => {
     if (!storedChoseong || after === storedChoseong) return
     setHistory((entries) => [...entries, { kind: 'jamoVariant', char: storedChoseong.char, before: structuredClone(storedChoseong), after }])
@@ -2902,7 +2904,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
           scope={benchGroup && { groupName: benchGroup.name, groupSize: benchGroup.chars.length, toGroup: beakGroup !== null, onChange: (toGroup) => { draftBeak(null); setBeakToGroup(toGroup) } }}
         />}
       /> : variantGate && storedChoseong ? <section className={styles.trackpadSection} data-testid="variant-gate-section">
-        <VariantGateCard jamo={storedChoseong.char} family={variantGate} examples={gateExamples} onSplit={splitVariant} />
+        <VariantGateCard jamo={storedChoseong.char} family={variantGate} splitFamilies={splitFamilies} examples={gateExamples} onSplit={splitVariant} />
       </section> : <InferenceTrackpad
         glyph={selectedChar}
         syllable={syllable}
