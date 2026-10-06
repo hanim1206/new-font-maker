@@ -311,6 +311,16 @@ export function hasHairpinTurn(directions: readonly (BrushPoint | null)[], close
   return false
 }
 
+/** 열린 선의 양 끝을 끝 방향으로 `reach`만큼 늘인 사본(사각 끝이 덮는 자리까지). */
+function squareExtended(points: readonly BrushPoint[], reach: number): BrushPoint[] {
+  const out = points.map((point) => ({ x: point.x, y: point.y }))
+  if (out.length < 2) return out
+  const first = unit(out[0], out[1]), last = unit(out[out.length - 2], out[out.length - 1])
+  if (first) out[0] = add(out[0], first, -reach)
+  if (last) out[out.length - 1] = add(out[out.length - 1], last, reach)
+  return out
+}
+
 /** 열린 선이 제 몸을 가로지르는지(이웃하지 않은 토막끼리 교차). 끝과 처음을 잇는 변은 없다 — 고리를 그린 획을 가린다. */
 export function polylineSelfIntersects(points: readonly BrushPoint[]): boolean {
   const last = points.length - 1
@@ -474,12 +484,13 @@ export function strokeToFlatInkGroups(
     : undefined
   // 획이 제 몸을 가로지르면(일부러 그린 고리) 윤곽 하나로는 못 담는다. Clipper2 오프셋이 겹친 자리를 합쳐 고리 몸과 속을 깔끔한 면으로 낸다.
   // 아래 겹침 대체 경로와 같은 길이라 대비 · 모서리별 둥글기는 못 따른다.
-  const selfCrossing = !stroke.closed && polylineSelfIntersects(points)
+  // 끝이 사각이면 양 끝이 반폭만큼 더 나간다 — 늘어난 끝이 몸을 뚫고 지나가도 고리다(끝이 몸에 닿는 6자).
+  const selfCrossing = !stroke.closed && polylineSelfIntersects(cap === 'square' ? squareExtended(points, thickness / 2) : points)
   if (selfCrossing) {
     const looped = inflateFlatCenterline(points, false, thickness, cap, join, rounding !== undefined, miterLimit)
     if (looped.length) return looped
   }
-  const groups = polylineToFlatInkGroups(points, stroke.closed, thickness, cap, join, roundVertices, rounding, directionalWidthOf(contrast, stemScale, stemScale !== 1 ? gentleCurveDirection(points, stroke.closed, curvedSegments) : null), curvedSegments, miterLimit, selfCrossing)
+  const groups = polylineToFlatInkGroups(points, stroke.closed, thickness, cap, join, roundVertices, rounding, directionalWidthOf(contrast, stemScale, stemScale !== 1 ? gentleCurveDirection(points, stroke.closed, curvedSegments) : null), curvedSegments, miterLimit, cap === 'square' ? undefined : selfCrossing)
   // 곡선이 반폭보다 급하게 꺾여 윤곽이 스스로 겹치면 쐐기가 뚫리고 최종 잉크가 그 획을 거부한다. 그때만 Clipper2 오프셋으로 다시 만든다.
   if (!flatGroupsOverlap(groups)) return groups
   const inflated = inflateFlatCenterline(points, stroke.closed, thickness, cap, join, rounding !== undefined, miterLimit)

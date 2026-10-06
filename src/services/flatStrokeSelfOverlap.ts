@@ -44,9 +44,40 @@ function ringsCross(first: readonly Pair[], second: readonly Pair[] | null): boo
   return false
 }
 
-/** 윤곽 묶음 중 스스로 겹치거나 서로 가로지르는 링이 있는지. 한 묶음 = [바깥, ...구멍]. */
+/** 면 합치기(`inkBoolean`)가 링을 단순하다고 보는 것과 같은 허용 오차. */
+const TOUCH_EPSILON = 1e-9
+
+function onSegment(point: Pair, start: Pair, end: Pair): boolean {
+  return Math.abs(cross(start, end, point)) <= TOUCH_EPSILON
+    && point.x >= Math.min(start.x, end.x) - TOUCH_EPSILON && point.x <= Math.max(start.x, end.x) + TOUCH_EPSILON
+    && point.y >= Math.min(start.y, end.y) - TOUCH_EPSILON && point.y <= Math.max(start.y, end.y) + TOUCH_EPSILON
+}
+
+/**
+ * 링이 제 몸에 닿거나 포개지는지(가로지르지는 않아도). 면 합치기는 이런 링을 "스스로 겹친다"며 거부한다.
+ * 굵기보다 좁게 접혀 돌아오는 U자 획이 그렇다 — 두 끝면이 한 직선 위에서 포개진다(2026-10-06, 레이아웃에서 그 자소가 통째로 빠졌다).
+ * 이웃한 변 · 길이 0인 변은 건너뛴다(면 합치기도 같은 점을 먼저 합친다).
+ */
+function ringTouchesItself(source: readonly Pair[]): boolean {
+  const ring = source.filter((point, index) => { const previous = source[(index + source.length - 1) % source.length]; return Math.abs(point.x - previous.x) > TOUCH_EPSILON || Math.abs(point.y - previous.y) > TOUCH_EPSILON })
+  const count = ring.length
+  if (count < 4) return false
+  for (let i = 0; i < count; i += 1) {
+    const a = ring[i], b = ring[(i + 1) % count]
+    for (let j = i + 2; j < count; j += 1) {
+      if ((j + 1) % count === i) continue
+      const c = ring[j], d = ring[(j + 1) % count]
+      if (Math.max(a.x, b.x) < Math.min(c.x, d.x) - TOUCH_EPSILON || Math.max(c.x, d.x) < Math.min(a.x, b.x) - TOUCH_EPSILON) continue
+      if (Math.max(a.y, b.y) < Math.min(c.y, d.y) - TOUCH_EPSILON || Math.max(c.y, d.y) < Math.min(a.y, b.y) - TOUCH_EPSILON) continue
+      if (onSegment(c, a, b) || onSegment(d, a, b) || onSegment(a, c, d) || onSegment(b, c, d)) return true
+    }
+  }
+  return false
+}
+
+/** 윤곽 묶음 중 스스로 겹치거나(가로지르거나 닿거나) 서로 가로지르는 링이 있는지. 한 묶음 = [바깥, ...구멍]. */
 export function flatGroupsOverlap(groups: readonly BrushInkGroup[]): boolean {
-  return groups.some((group) => group.some((ring, index) => ringsCross(ring, null) || group.slice(index + 1).some((other) => ringsCross(ring, other))))
+  return groups.some((group) => group.some((ring, index) => ringsCross(ring, null) || ringTouchesItself(ring) || group.slice(index + 1).some((other) => ringsCross(ring, other))))
 }
 
 function collect(node: PolyPathD, out: BrushInkGroup[]): void {

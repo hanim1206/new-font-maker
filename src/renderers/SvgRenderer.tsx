@@ -6,12 +6,16 @@ import { weightToMultiplier } from '../utils/globalStyleUtils'
 import { isCounterKeepOn } from '../stores/globalStyleStore'
 import type { GlobalStyle } from '../stores/globalStyleStore'
 import { brushInkGroupsToSvgPaths, strokeToBrushInkGroups } from '../services/brushGeometry'
+import { centerlineInkGroups } from '../services/finalGlyphInk'
 import { resolveGlyphInkPrimitives } from '../services/glyphInkResolver'
 import { needsFilledRenderInk, stemScaleOf, strokeToRenderInkGroups, verticalWidthFactorOf } from '../services/strokeRenderGeometry'
 import { stemBeakGroupOf, stemBeakInkGroups } from '../services/stemBeak'
 import { miterLimitOf } from '../services/strokeJoin'
 import { useGroupBeakResolver } from '../stores/jamoGroupStore'
 import type { GroupBeakResolver } from '../stores/jamoGroupStore'
+
+/** 전역 스타일이 없을 때 면 그리기가 쓰는 기본(둥근 붓촉, 둥글기 · 대비 없음). */
+const DEFAULT_FILLED_STYLE = { mode: 'brush' as const, brush: { tip: 'round' as const, aspectRatio: 1, angle: 0 } }
 
 // 파트별 스타일 (자모 편집 시 비편집 파트 흐리게 표시 등)
 export interface PartStyle {
@@ -53,6 +57,9 @@ interface SvgRendererProps {
   clipGlyphs?: boolean
   // path에 CSS transition 적용 여부 (기본: false)
   enableTransition?: boolean
+  // 잉크를 그리는 길. `auto`(기본)는 기본 스타일이면 브라우저 선 그리기(SVG stroke), 둥글기 · 붓촉이 있으면 면.
+  // `filled`는 늘 면 — 레이아웃 · 추출과 같은 한 입구(`centerlineInkGroups`)로 테두리를 만들어 칠한다. 획 편집 캔버스가 쓴다: 고치는 자리에서 보이는 그림이 곧 폰트에 들어가는 그림이다.
+  ink?: 'auto' | 'filled'
   // 굵기 배율을 직접 준다. 없으면 `globalStyle.weight`에서 계산한다. 실험실(굵기 보정 층)이 노토 곡선을 대 볼 때만 쓴다.
   weightMultiplier?: number
   // 묶음 부리를 직접 준다. 없으면 이 기기의 묶음 저장소를 읽는다. 남의 폰트를 그릴 때(관리자 미리보기) 내 묶음이 섞이지 않게.
@@ -89,6 +96,7 @@ export function SvgRenderer({
   overflow = 'visible',
   clipGlyphs,
   enableTransition = false,
+  ink = 'auto',
   weightMultiplier: weightMultiplierProp,
   groupBeakOf: groupBeakOfProp,
   strokeColorOf,
@@ -172,6 +180,18 @@ export function SvgRenderer({
     const beaks = beakPathsById.get(primitive.id) ?? []
 
     const renderStyle = globalStyle?.strokeStyle ?? (globalStyle?.brush ? { mode: 'brush' as const, brush: globalStyle.brush } : undefined)
+    if (ink === 'filled') {
+      // 그 스타일에서 면을 못 만들면(붓 말고 다른 모드의 각진 끝) 아래 옛 길로 그린다.
+      const made = centerlineInkGroups(primitive, renderStyle ?? DEFAULT_FILLED_STYLE)
+      if (made.ok && made.groups.length > 0) {
+        return (
+          <g key={primitive.id} data-ink="filled">
+            {brushInkGroupsToSvgPaths(made.groups, VIEW_BOX_SIZE).map((path, index) => <path key={`${primitive.id}-ink-${index}`} d={path} fill={color} fillRule="evenodd" />)}
+            {beaks.map((path, index) => <path key={`${primitive.id}-beak-${index}`} d={path} fill={color} data-stem-beak="true" />)}
+          </g>
+        )
+      }
+    }
     // 둥근 붓촉이라도 전역 둥글기가 있으면 SVG stroke로는 못 그려 OTF와 같은 채운 윤곽으로 간다.
     if (renderStyle && needsFilledRenderInk(renderStyle)) {
       const paths = brushInkGroupsToSvgPaths(

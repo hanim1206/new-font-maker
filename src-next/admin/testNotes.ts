@@ -99,6 +99,7 @@ export const TEST_NOTES: Record<string, readonly [name: string, check: string, p
   'src/utils/strokeMigration.test.ts': ['옛 획 옮기기', '옛 방식 획을 새 방식 획으로 옮기고, 옮길 게 없으면 그대로 두는지 봄', '옛 폰트를 새 방식으로 열기', '도마 · 저장 · 옛 자료'],
   'src/utils/thinStemMigration.test.ts': ['ㅡ · ㅢ 옛 기울기 옮기기', 'ㅡ · ㅢ의 예전 저장 방식 보 기울기를 지금 방식으로 옮겨도 화면 모양이 같은지 봄', '옛 보 기울기를 그대로 살림', '도마 · 저장 · 옛 자료'],
   // ── 출력(OTF)
+  'src-next/ink-parity.test.ts': ['선 그리기 = 면 그리기', '고리 · 좁은 U자 · 되돌아 꺾임 같은 펜 모양과 기본 프리셋 획을 두 방식으로 그려 같은 그림인지, 면을 못 만드는 획이 없는지 봄', '획 편집 캔버스에 보이는 그림이 레이아웃 · 받은 폰트와 같게', '화면 = 파일'],
   'src-next/otf-screen-parity.test.ts': ['화면과 같은 자리 · 모양', '굵기 · 기울기 · 둥글기 · 네모꼴을 바꿔도 폰트 파일 글자가 화면과 같은 자리 · 모양인지 봄', '편집 때 본 글자와 받은 폰트가 같게', '화면 = 파일'],
   'src-next/rendering-contract.test.ts': ['곡선 · 두께 그대로', 'ㅇ 곡선이 각지지 않고, 닿자 · 홀자 획 두께가 칸 크기와 무관하게 같은지 봄', '기본 글자 그리기 규칙 지킴', '화면 = 파일'],
   'src-next/glyph-ink-consumers-contract.test.tsx': ['화면이 공용 계산 쓰기', '화면이 글자를 그릴 때 공용 계산 결과를 그대로 쓰고, 따로 다시 계산하지 않는지 봄', '모든 화면의 글자 모양 통일', '화면 = 파일'],
