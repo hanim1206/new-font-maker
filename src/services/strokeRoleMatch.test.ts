@@ -162,6 +162,14 @@ describe('그린 획에 역할 붙이기', () => {
     expect(closeIfNear(stroke('a', [[0, 0], [1, 0], [1, 1], [0, 1], [.02, .03]]), .07)?.points).toHaveLength(4)
   })
 
+  it('거의 세로인 획 하나를 채우면 가로로 안 늘린다 — 대각선이 되지 않는다', () => {
+    // 폭 0.06, 높이 0.8. 가로를 프리셋 폭(1)에 맞추면 17배라 대각선 막대가 된다.
+    const [fitted] = fitStrokesToPresetBounds([stroke('p', [[.5, .1], [.56, .9]])], PRESET_ㄱ)
+    const xs = fitted.points.map((point) => point.x), ys = fitted.points.map((point) => point.y)
+    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(.1)
+    expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(1, 3)
+  })
+
   it('잉크(굵기 · 끝 모양)가 상자 0–1 안에 들도록 넘는 쪽만 당긴다', () => {
     // ㄱ: 중심선이 상자 끝에 붙어 가로는 위로, 세로는 오른쪽으로 굵기 반만큼 넘는다. 끝은 평평(butt)이라 왼쪽 · 아래는 안 넘는다.
     const half = { x: .05, y: .04 }

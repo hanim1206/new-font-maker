@@ -189,6 +189,8 @@ function boundsOf(strokes: readonly Pick<StrokeDataV2, 'points' | 'closed'>[]): 
 
 /** 축의 범위가 이보다 좁으면(ㅣ의 가로, ㅡ의 세로) 늘리지 않고 가운데만 맞춘다. */
 const FLAT_AXIS = 0.05
+/** 또는 다른 축 범위의 이 비율보다 좁아도 납작한 축이다 — 거의 세로인 획(폭 0.06)을 가로로 20배 늘려 대각선으로 만들지 않는다(10-06 사용자 제보). */
+const FLAT_RATIO = 0.25
 
 /**
  * 그린 획 묶음을 프리셋 획 묶음의 범위에 꽉 채운다 — 작게 그려도, 한쪽에 치우쳐 그려도 칸을 채운 모양이 된다(10-05 사용자 결정).
@@ -206,8 +208,8 @@ function fitStrokesToBounds(drawn: readonly StrokeDataV2[], to: Bounds): StrokeD
   if (!from) return [...drawn]
   const fromW = from.maxX - from.minX, fromH = from.maxY - from.minY
   const toW = to.maxX - to.minX, toH = to.maxY - to.minY
-  const flatX = fromW < FLAT_AXIS || toW < FLAT_AXIS
-  const flatY = fromH < FLAT_AXIS || toH < FLAT_AXIS
+  const flatX = fromW < FLAT_AXIS || toW < FLAT_AXIS || fromW < fromH * FLAT_RATIO
+  const flatY = fromH < FLAT_AXIS || toH < FLAT_AXIS || fromH < fromW * FLAT_RATIO
   let scaleX = flatX ? NaN : toW / fromW
   let scaleY = flatY ? NaN : toH / fromH
   if (Number.isNaN(scaleX) && Number.isNaN(scaleY)) { scaleX = 1; scaleY = 1 }

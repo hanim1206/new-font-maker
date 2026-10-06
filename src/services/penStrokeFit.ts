@@ -129,8 +129,13 @@ function turningOf(points: readonly PenPoint[], size: number): { signed: number;
   return { signed, total }
 }
 
+/** 두 끝이 실제로 만난 획(ㅇ · ㅁ)인지 — 끝은 갈고리가 아니라 닫는 자리라 자르지도 옮기지도 않는다. 추정은 없다(10-06 사용자: 안 닫힌 획에 자동 보정 금지). */
+export function penEndsMeet(points: readonly PenPoint[]): boolean {
+  return points.length >= 3 && distance(points[0], points[points.length - 1]) < HOOK_CLOSED_GAP
+}
+
 /**
- * 닫으려던 획(ㅇ · ㅁ)인지. 두 끝은 갈고리가 아니라 닫는 자리라 자르지도 옮기지도 않는다.
+ * 닫으려던 획(ㅇ · ㅁ)인지 — 역할 판정에서 닫힌 역할과 견줄 때만 쓴다. 끝 처리(갈고리 자르기 · 끝 토막 펴기)는 이 추정을 안 본다.
  * 끝이 거의 만났거나, 틈이 제 크기에 견줘 작으면서 한쪽으로 한 바퀴 도는 꼴일 때다. ㄱ · ㄷ처럼 벌어진 획은 틈이 커서, 갈지자로 꺾다가 고리를 지은 획은 한쪽으로만 돌지 않아서 안 든다.
  */
 export function penClosesOnItself(points: readonly PenPoint[]): boolean {
@@ -155,8 +160,8 @@ export function trimPenHooks(points: readonly PenPoint[]): PenPoint[] {
   for (let i = 1; i < points.length; i++) arc.push(arc[i - 1] + distance(points[i - 1], points[i]))
   const total = arc[arc.length - 1]
   if (total < HOOK_LENGTH * 3) return [...points]
-  // 시작과 끝이 만나는 획(ㅇ · ㅁ)은 끝이 갈고리가 아니라 닫는 자리다.
-  if (penClosesOnItself(points)) return [...points]
+  // 시작과 끝이 실제로 만나는 획(ㅇ · ㅁ)은 끝이 갈고리가 아니라 닫는 자리다. 닫으려던 것 같다는 추정으로는 끝을 안 건드린다.
+  if (penEndsMeet(points)) return [...points]
   /** `from` 끝에서 안쪽으로 걸어 자를 인덱스(그 점까지 남는다). 갈고리가 아니면 끝 그대로. */
   const cutFrom = (forward: boolean): number => {
     const end = forward ? 0 : points.length - 1
@@ -211,26 +216,29 @@ export function smoothPenPoints(points: readonly PenPoint[], window: number): Pe
 }
 
 /**
- * `points[end]`를 그 끝에서 `window`의 반 · 하나만큼 안쪽 점 둘을 잇는 선 위로 옮긴다(선에 수직으로 내린 자리). `limit`은 끝이 속한 마디의 반대쪽 끝.
+ * 끝에서 `straight`까지의 점을, 거기서 `window`의 반만큼 더 안쪽 점 둘을 잇는 선 위로 옮긴다(선에 수직으로 내린 자리) — 끝 토막을 곧게 편다. `limit`은 끝이 속한 마디의 반대쪽 끝.
  * 마디가 `window`의 두 배보다 짧으면 그대로 둔다.
  * 안쪽 점은 끝점에서 곧게 잰 거리로 고른다 — 펜을 대고 머뭇거린 떨림이 호 길이를 다 써 버리면 두 점이 한자리에 잡혀 끝이 엉뚱한 데로 접힌다.
  */
-function settlePenEnd(points: PenPoint[], end: number, limit: number, window: number): void {
+function settlePenEnd(points: PenPoint[], end: number, limit: number, window: number, straight = window / 2): void {
   const step = end === 0 ? 1 : -1
   let near = -1
   let far = -1
   for (let i = end; i !== limit; i += step) {
     const length = distance(points[end], points[i + step])
-    if (near < 0 && length >= window / 2) near = i + step
-    if (length >= window) { far = i + step; break }
+    if (near < 0 && length >= straight) near = i + step
+    if (length >= straight + window / 2) { far = i + step; break }
   }
   if (near < 0 || far < 0 || distance(points[near], points[far]) < window / 4) return
   let rest = 0
   for (let i = far; i !== limit; i += step) rest += distance(points[i], points[i + step])
   if (rest < window) return
   const direction = normalize(subtract(points[near], points[far]))
-  const along = dot(subtract(points[end], points[near]), direction)
-  points[end] = add(points[near], scale(direction, along))
+  // 끝점만이 아니라 끝에서 `near`까지를 전부 그 선 위로 내린다 — 끝 토막이 곧아야 평평한 끝이 몸통에 직각으로 서고, 펜이 닿는 순간 살짝 말린 자취가 끝을 부채꼴로 만들지 않는다(10-06 사용자).
+  for (let i = end; i !== near; i += step) {
+    const along = dot(subtract(points[i], points[near]), direction)
+    points[i] = add(points[near], scale(direction, Math.max(0, along)))
+  }
 }
 
 /** `i`에서 `span`만큼 떨어진 앞(-1) · 뒤(+1) 점의 인덱스. 끝에 닿으면 끝. */
@@ -298,6 +306,9 @@ function chordParameters(points: readonly PenPoint[], first: number, last: numbe
   return total === 0 ? u.map((_, i) => i / Math.max(1, u.length - 1)) : u.map((value) => value / total)
 }
 
+/** 핸들이 현의 이 배수를 넘으면 풀이가 무너진 것으로 본다. */
+const HANDLE_MAX_CHORD_RATIO = 3
+
 /** 양 끝 접선 방향을 두고 제어점 거리(alpha)만 최소제곱으로 푼다. */
 function generateBezier(points: readonly PenPoint[], first: number, last: number, u: readonly number[], tHat1: PenPoint, tHat2: PenPoint): [PenPoint, PenPoint, PenPoint, PenPoint] {
   const p0 = points[first]
@@ -323,8 +334,10 @@ function generateBezier(points: readonly PenPoint[], first: number, last: number
   let alpha2 = det === 0 ? 0 : (c00 * x1 - c01 * x0) / det
   const chord = distance(p0, p3)
   const tiny = 1e-6 * chord
-  // 풀이가 무너지면(음수 · 너무 작음) 현의 1/3로 둔다 — Schneider의 보루.
-  if (!Number.isFinite(alpha1) || !Number.isFinite(alpha2) || alpha1 < tiny || alpha2 < tiny) {
+  // 풀이가 무너지면(음수 · 너무 작음 · 현의 몇 배로 튐) 현의 1/3로 둔다 — Schneider의 보루.
+  // 점 두셋짜리 짧은 조각은 행렬이 거의 특이해 핸들이 상자 밖 8배까지 튄 적이 있다(10-06 사용자 자취). 270도 호도 핸들은 현의 2.3배라 3배면 넉넉하다.
+  const huge = chord * HANDLE_MAX_CHORD_RATIO
+  if (!Number.isFinite(alpha1) || !Number.isFinite(alpha2) || alpha1 < tiny || alpha2 < tiny || alpha1 > huge || alpha2 > huge) {
     alpha1 = chord / 3
     alpha2 = chord / 3
   }
@@ -548,7 +561,7 @@ export function fitPenStroke(points: readonly PenPoint[], options: PenFitOptions
   const { thinned, corners, breaks, window } = smoothBetweenCorners(raw, options)
   // 획의 두 끝(꺾임 말고)은 거른 몸통이 향하는 선 위로 옮긴다. 끝점만 손떨림 그대로 남아 끝이 휘는 것을 막는다.
   // 닫는 획(ㅇ · ㅁ)은 두 끝이 만나야 하므로 그대로 둔다.
-  if (!penClosesOnItself(raw)) {
+  if (!penEndsMeet(raw)) {
     settlePenEnd(thinned, 0, breaks[1], window)
     settlePenEnd(thinned, thinned.length - 1, breaks[breaks.length - 2], window)
   }
