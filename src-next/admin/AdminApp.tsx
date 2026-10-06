@@ -37,7 +37,7 @@ function AdminSidebar({ section, lab, pending, onGo, onLab }: {
     <SidebarHeader className="h-14 flex-row items-center gap-2.5 px-3.5 group-data-[collapsible=icon]:px-2.5">
       <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-foreground text-sm font-extrabold text-surface" aria-hidden>한</span>
       <span className="flex min-w-0 flex-col leading-tight group-data-[collapsible=icon]:hidden">
-        <strong className="truncate text-sm font-extrabold">한글 폰트 메이커</strong>
+        <strong className="truncate text-sm font-extrabold">한글칸글</strong>
         <span className="truncate text-xs text-text-dim-5">관리</span>
       </span>
     </SidebarHeader>

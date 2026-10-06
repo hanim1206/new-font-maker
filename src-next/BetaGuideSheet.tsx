@@ -19,5 +19,5 @@ const SLIDES = STEPS.map(({ image, title, body, bottom }) => ({ image: imageSrc(
  * 넘김 · 닫기 규칙은 공지와 같은 판(`SlideSheet`) — 첫 장 `건너뛰기`, 마지막 장 `시작하기`, Esc로만 닫는다.
  */
 export function BetaGuideSheet({ onClose }: { onClose: () => void }) {
-  return <SlideSheet slides={SLIDES} label="한글 폰트 메이커 둘러보기" testId="beta-guide" firstLabel="건너뛰기" lastLabel="시작하기" onClose={onClose} />
+  return <SlideSheet slides={SLIDES} label="한글칸글 둘러보기" testId="beta-guide" firstLabel="건너뛰기" lastLabel="시작하기" onClose={onClose} />
 }
