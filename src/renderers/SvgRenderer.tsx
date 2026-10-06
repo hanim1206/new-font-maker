@@ -9,6 +9,7 @@ import { brushInkGroupsToSvgPaths, strokeToBrushInkGroups } from '../services/br
 import { resolveGlyphInkPrimitives } from '../services/glyphInkResolver'
 import { needsFilledRenderInk, stemScaleOf, strokeToRenderInkGroups, verticalWidthFactorOf } from '../services/strokeRenderGeometry'
 import { stemBeakGroupOf, stemBeakInkGroups } from '../services/stemBeak'
+import { ACUTE_MITER_LIMIT } from '../services/strokeToOutline'
 import { useGroupBeakResolver } from '../stores/jamoGroupStore'
 import type { GroupBeakResolver } from '../stores/jamoGroupStore'
 
@@ -188,7 +189,7 @@ export function SvgRenderer({
     if (beaks.length > 0) {
       return (
         <g key={primitive.id}>
-          <path d={d} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap={primitive.effectiveLinecap} strokeLinejoin={primitive.effectiveLinejoin} />
+          <path d={d} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap={primitive.effectiveLinecap} strokeLinejoin={primitive.effectiveLinejoin} strokeMiterlimit={ACUTE_MITER_LIMIT} />
           {beaks.map((path, index) => <path key={`${primitive.id}-beak-${index}`} d={path} fill={color} data-stem-beak="true" />)}
         </g>
       )
@@ -203,6 +204,7 @@ export function SvgRenderer({
         strokeWidth={strokeWidth}
         strokeLinecap={primitive.effectiveLinecap}
         strokeLinejoin={primitive.effectiveLinejoin}
+        strokeMiterlimit={ACUTE_MITER_LIMIT}
         style={enableTransition ? { transition: 'd 0.15s ease, stroke-width 0.15s ease' } : undefined}
       />
     )

@@ -2817,7 +2817,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const commitPenStroke = (points: PenPoint[]) => {
     const before = storedPenJamo()
     if (!pen || !penSetup?.preset || !lockedPart || !before) return
-    const result = addPenStroke(before, penSetup.channel, points, penSetup.preset, { drawn: penDrawn })
+    // 끝 모양 따라가기: 끝이 둥근 글씨는 예각 꺾임도 둥글게, 네모 끝은 그리기가 평평하게 깎는다.
+    const roundAcute = (penSetup.sample.linecap ?? focusedGlobalStyle.linecap) === 'round'
+    const result = addPenStroke(before, penSetup.channel, points, penSetup.preset, { drawn: penDrawn, roundAcute })
     if (!result) return
     commitJamo(before, result.jamo, { kind: 'stroke-move', glyph: selectedChar, component: componentFor(selectedChar, lockedPart, penSetup.jamo), jamoType: before.type, strokeId: result.strokeId, delta: { x: 0, y: 0 } }, { pastGapLimit: true })
   }

@@ -179,11 +179,11 @@ describe('펜 획 맞춤', () => {
     expect(penClosesOnItself([...line({ x: .1, y: .1 }, { x: .9, y: .1 }, 40), ...line({ x: .9, y: .1 }, { x: .9, y: .9 }, 40)])).toBe(false)
   })
 
-  it('예각 꺾임은 둥글게 돌리고 직각(ㄱ)은 날카롭게 둔다', () => {
+  it('예각 꺾임 둥글리기를 켜면 예각만 돌리고 직각(ㄱ)은 날카롭게 둔다', () => {
     // 갈지자: 오른쪽으로 긋다가 왼쪽 아래로 날카롭게 꺾는다(안쪽 각 약 30도).
     const zig = [...line({ x: .1, y: .2 }, { x: .8, y: .2 }, 40), ...line({ x: .8, y: .2 }, { x: .15, y: .5 }, 40)]
-    const rounded = fitPenStroke(zig, { thickness: .07 })!.stroke
-    const sharp = fitPenStroke(zig, { thickness: .07, roundAcute: false })!.stroke
+    const rounded = fitPenStroke(zig, { thickness: .07, roundAcute: true })!.stroke
+    const sharp = fitPenStroke(zig, { thickness: .07 })!.stroke
     // 꺾임점(.8,.2)이 앵커에서 사라지고, 꺾임점을 향하는 핸들을 가진 앵커 둘이 생긴다.
     expect(sharp.points.some((point) => Math.hypot(point.x - .8, point.y - .2) < .01)).toBe(true)
     expect(rounded.points.some((point) => Math.hypot(point.x - .8, point.y - .2) < .01)).toBe(false)
@@ -192,7 +192,7 @@ describe('펜 획 맞춤', () => {
     expect(handles.length).toBeGreaterThanOrEqual(1)
     // 직각 ㄱ은 그대로
     const angle = [...line({ x: .1, y: .1 }, { x: .9, y: .1 }, 40), ...line({ x: .9, y: .1 }, { x: .9, y: .9 }, 40)]
-    const ㄱ = fitPenStroke(angle, { thickness: .07 })!.stroke
+    const ㄱ = fitPenStroke(angle, { thickness: .07, roundAcute: true })!.stroke
     expect(ㄱ.points.some((point) => Math.hypot(point.x - .9, point.y - .1) < .01)).toBe(true)
   })
 

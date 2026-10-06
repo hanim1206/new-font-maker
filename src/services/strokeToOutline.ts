@@ -14,6 +14,13 @@
 import type { StrokeDataV2, AnchorPoint, BoxConfig, StrokeLinecap, StrokeLinejoin } from '../types'
 import { normalizeClosedStrokePoints } from '../utils/strokePathUtils'
 
+/**
+ * 뾰족 이음(miter)을 허용하는 한계 — 꺾임점에서 이음 끝까지가 굵기 반의 이 배수를 넘으면 평평하게 깎는다(bevel).
+ * 1.64 = 1/sin(75°/2): 안쪽 각이 75도보다 좁은 예각 꺾임만 깎이고, 직각(1.41)은 뾰족하게 남는다(10-06 사용자 결정 — 네모 끝 글씨에서 갈지자 꺾임이 길게 튀어나오지 않게).
+ * SVG 기본값(4)이면 29도까지 뾰족하다. 기본 프리셋에는 80도보다 좁은 각진 꺾임이 없어 기존 글자는 안 바뀐다.
+ */
+export const ACUTE_MITER_LIMIT = 1.64
+
 // ===== 타입 정의 =====
 
 /** 폰트 컨투어의 단일 점 */
@@ -277,7 +284,7 @@ function joinOffsetSides(
   if (linejoin === 'round') {
     return roundJoinPoints(center, previousEnd, nextStart, Math.sign(turn))
   }
-  if (linejoin === 'miter' && intersection && dist(center, intersection) <= halfWidth * 4) {
+  if (linejoin === 'miter' && intersection && dist(center, intersection) <= halfWidth * ACUTE_MITER_LIMIT) {
     return [intersection]
   }
   return [previousEnd, nextStart]

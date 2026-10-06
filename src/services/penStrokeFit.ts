@@ -30,7 +30,7 @@ export interface PenFitOptions {
   smoothing?: number
   thickness?: number
   id?: string
-  /** 예각 꺾임을 둥글게 돌린다(기본 켬). */
+  /** 예각 꺾임을 둥글게 돌린다(기본 끔). 끝이 둥근 글씨에서 켠다 — 네모 끝 글씨는 그리기가 예각 이음을 평평하게 깎는다(`ACUTE_MITER_LIMIT`). */
   roundAcute?: boolean
 }
 
@@ -448,7 +448,7 @@ const ROUND_MAX_SHARE = 0.4
 const ROUND_HANDLE = 0.55
 
 /**
- * 예각으로 꺾인 앵커를 둥글게 돌린다(10-06 사용자 결정) — 갈지자처럼 접히는 자리가 뾰족 이음으로 길게 튀어나오는 것을 막는다. ㄱ 같은 직각은 그대로 날카롭다.
+ * 예각으로 꺾인 앵커를 둥글게 돌린다 — 끝이 둥근 글씨에서 갈지자처럼 접히는 자리를 실제 펜처럼 둥글게(10-06 사용자 결정: 끝 모양 따라가기). ㄱ 같은 직각은 그대로다.
  * 꺾임점을 떼고 양옆 마디 위 두 점을 핸들이 꺾임점 쪽을 향하는 호로 잇는다. 반지름은 굵기만큼(마디가 짧으면 그만큼 줄인다).
  */
 function roundAcuteCorners(anchors: readonly AnchorPoint[], cornerAt: ReadonlySet<string>, radius: number): AnchorPoint[] {
@@ -564,7 +564,7 @@ export function fitPenStroke(points: readonly PenPoint[], options: PenFitOptions
   const fitted = segmentsToAnchors(segments)
   if (fitted.length < 2) return null
   const thickness = options.thickness ?? DEFAULT_THICKNESS
-  const anchors = options.roundAcute === false ? fitted : roundAcuteCorners(fitted, new Set(corners.map((index) => `${thinned[index].x},${thinned[index].y}`)), thickness)
+  const anchors = options.roundAcute ? roundAcuteCorners(fitted, new Set(corners.map((index) => `${thinned[index].x},${thinned[index].y}`)), thickness) : fitted
   const stroke: StrokeDataV2 = {
     id: options.id ?? `stroke-${Date.now()}`,
     points: anchors,

@@ -95,6 +95,8 @@ export function recognizePenJamo(
 const PEN_FREE_PREFIX = 'pen-'
 
 export interface PenStrokeOptions extends Pick<PenRecognizeOptions, 'tau' | 'epsilon'> {
+  /** 예각 꺾임을 둥글게 돌린다 — 끝이 둥근 글씨일 때. */
+  roundAcute?: boolean
   /**
    * 이번에 펜을 켠 뒤 그은 획인지. 그런 획은 새 획과 함께 다시 판정한다 — 기둥만 그었을 때의 판정이 곁줄기를 그은 뒤 바뀔 수 있다.
    * 안 주면 새 획만 판정한다. 펜을 켜기 전부터 있던 획은 역할도 자리도 건드리지 않는다.
@@ -152,7 +154,7 @@ export function addPenStroke(
   const presets = preset[channel] ?? []
   const existing = before[channel] ?? []
   const thickness = presets[0]?.thickness ?? existing[0]?.thickness ?? PEN_DEFAULT_THICKNESS
-  const fitted = fitPenStroke([...points], { epsilon: options.epsilon ?? PEN_FIT_EPSILON, thickness, id: `${PEN_FREE_PREFIX}new` })?.stroke
+  const fitted = fitPenStroke([...points], { epsilon: options.epsilon ?? PEN_FIT_EPSILON, thickness, id: `${PEN_FREE_PREFIX}new`, roundAcute: options.roundAcute })?.stroke
   if (!fitted) return null
   const presetIds = new Set(presets.map((stroke) => stroke.id))
   const earlier = existing.filter((stroke) => options.drawn?.(stroke))
