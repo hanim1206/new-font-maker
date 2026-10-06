@@ -296,17 +296,17 @@ test('획 편집 `펜`은 도구 줄을 그대로 둔 채 켜지고, 그은 획�
   // 손을 떼면 바로 저장된다. ㄱ 역할 자리는 차 있으니 새 획은 자유 획이고, 이번에 그은 획만 제 색으로 덧그려진다.
   await expect(undo).toBeEnabled()
   await expect(page.getByTestId('pen-fresh')).toHaveCount(1)
-  await expect(page.getByTestId('jamo-pen-status')).toHaveText('일부 자유')
+  // 닿자는 인식 상태를 안 띄운다 — 역할이 있든 없든 결과가 같다.
+  await expect(page.getByTestId('jamo-pen-status')).toHaveCount(0)
   await page.screenshot({ path: 'test-results/pen-added.png' })
 
   // `비우기`는 펜이 켜진 동안 옅은 기존 획만 지운다. 그은 획이 남아 빈 ㄱ 역할을 받고, 펜은 켜진 채다.
   await page.getByTestId('jamo-stroke-clear').click()
-  await expect(page.getByTestId('jamo-pen-status')).toHaveText('인식됨')
   await expect(page.getByTestId('pen-fresh')).toHaveCount(1)
   await expect(page.getByTestId('jamo-stroke-clear')).toBeDisabled()
   await expect(page.getByTestId('pen-layer')).toBeVisible()
   await undo.click()
-  await expect(page.getByTestId('jamo-pen-status')).toHaveText('일부 자유')
+  await expect(page.getByTestId('jamo-stroke-clear')).toBeEnabled()
 
   // 무르기는 되돌리기로. 펜은 켜진 채다.
   await undo.click()

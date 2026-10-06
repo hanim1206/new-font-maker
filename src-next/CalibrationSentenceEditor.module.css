@@ -221,7 +221,7 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 /* 셸 안 획 편집의 도구 줄. 조절판 자리를 대신한다 — 옮기기는 캔버스에서 직접 한다. */
 /* 획 편집 도구 줄 아래에서는 캔버스가 제 크기만 차지하고, 남는 세로는 트랙패드가 가져간다. */
 .editor[data-chrome='workspace'][data-stroke-tools] { flex: 0 0 auto; }
-.strokeToolSection { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px 16px 10px; border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
+.strokeToolSection { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px 16px 10px; border-top: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
 .strokeWorkRow { flex: 1 1 auto; min-height: 0; display: flex; gap: 6px; }
 .strokeToolRow { flex: 0 0 auto; display: grid; grid-template-columns: repeat(2, 48px); grid-auto-rows: minmax(34px, 56px); align-content: start; gap: 6px; }
 .strokeToolRow button { min-height: 34px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 1px solid rgb(var(--color-border)); border-radius: var(--radius-lg); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: var(--font-10); font-weight: var(--weight-bold); }
@@ -253,7 +253,8 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 /* 펼친 선 · 원 · 사각은 흰 바탕 + 회색 테로 `추가` 밑에 딸린 것임을 보인다. */
 .strokeToolSlot .strokeToolRow .strokeAddItem { background: rgb(var(--color-surface)); box-shadow: inset 0 0 0 1.5px rgb(var(--color-surface-3)); }
 .strokeToolSlot .strokeAddMenu > div { gap: 6px; }
-.strokeWarning { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgb(var(--color-edit-select)); font-size: var(--font-11); font-weight: var(--weight-semibold); }
+/* 조절판 왼쪽 위에 띄운다 — 자리를 안 차지해 글자가 뜨고 사라져도 조절판 크기가 그대로다. 눌림은 조절판으로 지나간다. */
+.strokeWarning { position: absolute; z-index: 2; top: 16px; left: 64px; max-width: calc(100% - 88px); margin: 0; padding: 3px 8px; border-radius: var(--radius-md); background: rgb(var(--color-surface) / .86); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgb(var(--color-edit-select)); font-size: var(--font-11); font-weight: var(--weight-semibold); pointer-events: none; }
 /* 획 편집 캔버스 뒤에 까는 레이아웃 기준선(읽기 전용)과, 끌다 걸린 자리. 걸린 색은 레이아웃과 같은 주황. */
 .guideRail { stroke: rgb(var(--color-edit-slot-ju) / .32); stroke-width: calc(.25 * var(--view-unit, 1)); stroke-dasharray: calc(1.2 * var(--view-unit, 1)) calc(1.2 * var(--view-unit, 1)); pointer-events: none; }
 .snapHitLine { stroke: rgb(var(--color-edit-select)); stroke-width: calc(.5 * var(--view-unit, 1)); pointer-events: none; }

@@ -55,7 +55,7 @@ import { createCirclePath, pointsToSvgD } from '../src/utils/pathUtils'
 import { getJamoRenderBox } from '../src/utils/jamoGeometry'
 import { addPenStroke, clearPenJamo, fitJamoToCell, PEN_DEFAULT_THICKNESS, penJamoState, presetChannelOf, sameStrokePlaces, viewBoxToJamoBox } from '../src/services/penJamo'
 import type { PenChannel } from '../src/services/penJamo'
-import { fitPenStroke, PEN_FIT_EPSILON } from '../src/services/penStrokeFit'
+import { stabilizePenPoints } from '../src/services/penStrokeFit'
 import type { PenPoint } from '../src/services/penStrokeFit'
 import { addHandlesToPoint, mergeStrokes, pointHasHandles, removeHandlesFromPoint, splitStroke } from '../src/utils/strokeEditUtils'
 import { MERGE_PROXIMITY } from '../src/utils/snapUtils'
@@ -581,15 +581,14 @@ function PenLayer({ pen, box, fresh, viewport, u, weightMultiplier, globalLineca
     return `${index === 0 ? 'M' : 'L'}${at.x.toFixed(2)} ${at.y.toFixed(2)}`
   }).join(' ')
   const lineWidth = 0.7 * u
-  // 긋는 중인 획은 저장될 굵기 · 끝 모양으로, 맞춤(ε)을 거친 매끈한 선으로 바로 그린다. 손을 떼면 그 자리 그대로 저장된다.
-  const thickness = pen.sample.thickness
-  const live = current && current.length >= 2 ? fitPenStroke(current, { epsilon: PEN_FIT_EPSILON, thickness, id: 'pen-live' })?.stroke ?? null : null
+  // 긋는 중인 획은 저장될 굵기로, 손떨림만 거른 선으로 그린다. 곡선 맞춤은 손을 뗄 때 한 번만 한다 — 긋는 내내 다시 맞추면 지나온 곡선이 계속 흔들린다.
+  const live = current && current.length >= 2 ? stabilizePenPoints(current) : null
   const inkStyle = (stroke: Pick<StrokeDataV2, 'thickness' | 'linecap' | 'linejoin'>) => ({ fill: 'none', stroke: EDIT_COLOR.foreground, strokeWidth: stroke.thickness * weightMultiplier * VIEW_BOX_SIZE, strokeLinecap: stroke.linecap ?? globalLinecap ?? 'round', strokeLinejoin: stroke.linejoin ?? globalLinejoin ?? 'round', pointerEvents: 'none' } as const)
   return <g data-testid="pen-layer">
     {/* 이번에 그은 획은 옅어진 자소 위에 제 색으로 덧그린다. */}
     {fresh.map((item) => <path key={item.stroke.id} d={pointsToSvgD(item.stroke.points, item.stroke.closed, item.box, VIEW_BOX_SIZE)} {...inkStyle(item.stroke)} data-testid="pen-fresh" />)}
     {live
-      ? <path d={pointsToSvgD(live.points, false, box, VIEW_BOX_SIZE)} {...inkStyle(pen.sample)} data-testid="pen-live" />
+      ? <path d={pathOf(live)} {...inkStyle(pen.sample)} strokeLinejoin="round" data-testid="pen-live" />
       : current && <path d={pathOf(current)} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={lineWidth} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
     {/* 글자가 기울어도 판이 칸 모서리를 덮도록 보기 창보다 넉넉히 깐다. */}
     <rect ref={surfaceRef} x={viewport.x * VIEW_BOX_SIZE - 100} y={viewport.y * VIEW_BOX_SIZE - 100} width={viewport.width * VIEW_BOX_SIZE + 200} height={viewport.height * VIEW_BOX_SIZE + 200} fill="transparent" pointerEvents="all" onPointerDown={begin} onPointerMove={move} onPointerUp={(event) => finish(event, false)} onPointerCancel={(event) => finish(event, true)} data-testid="pen-surface" />
@@ -1915,7 +1914,7 @@ function InferenceTrackpad({
     )
     return (
       <section className={styles.strokeToolSection} data-testid="jamo-stroke-tools">
-        {/* 경고만 한 줄. 알릴 게 없으면 줄을 접는다 — 늘어나고 줄어드는 건 트랙패드라 캔버스는 안 흔들린다. */}
+        {/* 경고 · 펜 상태 한 줄. 조절판 위에 띄워 자리를 안 차지한다 — 뜨고 사라져도 조절판도 캔버스도 안 흔들린다. */}
         {directLabel && <p className={styles.strokeWarning} data-testid="jamo-pen-status">{directLabel}</p>}
         {/* `틀 다시 맞추기`는 일단 숨긴다(기능은 남겨 둔다). */}
         <Pressable type="button" hidden onClick={resetFrame} disabled={!liveJamo?.frame} data-testid="jamo-frame-reset">틀 다시 맞추기</Pressable>
@@ -2803,11 +2802,13 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     if (!pen || !penSetup?.preset) return ''
     const strokes = penSetup.jamo[penSetup.channel] ?? []
     if (strokes.length === 0) return '그어 보세요'
+    // 닿자는 역할이 있든 없든 그리기 · 칸 맞춤 · 내보내기가 같아 알릴 게 없다(10-06 조사). 홀자만 기둥 · 보선이 걸린다.
+    if (penSetup.jamo.type !== 'jungseong') return ''
     const { state, missing } = penJamoState(penSetup.jamo, penSetup.channel, penSetup.preset)
     // 아직 안 그었고 역할도 다 있으면 알릴 게 없다.
     if (state === 'recognized') return penFreshIds.size > 0 ? '인식됨' : ''
     if (state === 'partial') return missing.length > 0 ? `일부 자유 · 안 그린 획 ${missing.join(', ')}` : '일부 자유'
-    return penSetup.jamo.type === 'jungseong' ? '자유 · 기둥·보선이 안 따라가요' : '자유 · 문맥 조정은 적용 안 돼요'
+    return '자유 · 기둥·보선이 안 따라가요'
   })()
   // 잠긴 자소가 바뀌거나 글자를 바꾸거나 스타일 · 레이아웃으로 나가면 펜을 끈다.
   useEffect(() => { setPen(null) }, [selectedChar, lockedPart, styleLocksCanvas, isLayoutMode])
