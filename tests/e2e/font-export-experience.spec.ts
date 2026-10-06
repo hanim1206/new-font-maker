@@ -29,15 +29,24 @@ test('대시보드 카드: 취소하면 아무 일도 없고, 받는 동안 원 
   await expect(button).toHaveAttribute('data-state', 'idle')
   await expect(button).toBeEnabled()
 
+  // 퍼센트는 마지막 조립 단계에서 99에 선다. 부하가 크면 첫 값을 읽을 때 이미 99라 "첫 값보다 오른다"를 기다리면 끝나지 않는다.
+  // 그래서 받는 동안 단추에 뜬 퍼센트를 브라우저 안에서 전부 적어 두고, 끝난 뒤 그 기록이 올랐는지 본다.
+  await page.evaluate(() => {
+    const target = document.querySelector('[data-testid="dashboard-font-download"]')!
+    const seen: number[] = []
+    ;(window as unknown as { __exportPercents: number[] }).__exportPercents = seen
+    const record = () => { const value = Number(target.textContent?.replace('%', '')); if (target.textContent?.includes('%') && value !== seen.at(-1)) seen.push(value) }
+    new MutationObserver(record).observe(target, { subtree: true, childList: true, characterData: true })
+  })
   const downloadPromise = page.waitForEvent('download', { timeout: 200_000 })
   await startCardExport(page, '대기체')
   await expect(button).toBeDisabled()
-  const percentOf = async () => Number((await button.textContent())?.replace('%', '') ?? 'NaN')
-  const first = await percentOf()
-  expect(Number.isFinite(first)).toBe(true)
-  await expect.poll(percentOf, { timeout: 120_000 }).toBeGreaterThan(first)
 
   expect((await downloadPromise).suggestedFilename()).toBe('대기체.otf')
+  const percents = await page.evaluate(() => (window as unknown as { __exportPercents: number[] }).__exportPercents)
+  expect(percents.length).toBeGreaterThan(1)
+  expect(percents).toEqual([...percents].sort((a, b) => a - b))
+  expect(percents.at(-1)).toBe(99)
   await expect.poll(() => page.evaluate(() => localStorage.getItem('font-export-family-name-v1'))).toBe('대기체')
   await expect(page).toHaveURL(/\/workspace\/font\/export$/, { timeout: 60_000 })
   const done = page.getByTestId('font-export-done')
