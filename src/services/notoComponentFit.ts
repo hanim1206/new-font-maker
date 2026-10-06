@@ -189,11 +189,13 @@ export function componentProtrusion(input: Pick<ComponentFitInput, 'jamo' | 'cha
 
 export function fitNotoComponent(input: ComponentFitInput): ComponentFitOutcome {
   const strokes = componentStrokesOf(input.jamo, input.channel, input.family)
-  if (!strokes.length) return { ok: false, message: `${input.jamo.char}: 앱 획이 없습니다.` }
-  if (![input.faces.left, input.faces.right, input.faces.top, input.faces.bottom].every(Number.isFinite)) return { ok: false, message: '박스 네 변이 없습니다.' }
   // 기준 틀이 있으면 상자는 틀(고치기 전 획 사본)로 정하고, 지금 획은 그 상자에 그대로 놓는다 — 틀 밖으로 나간 획은 faces 밖으로 튀어나온다.
   const frameJamo = frameJamoOf(input.jamo)
   const framed = frameJamo ? componentStrokesOf(frameJamo, input.channel, input.family) : []
+  // 획을 다 지운 자모도 틀이 있으면 그 틀로 상자를 정한다(잉크는 없다). 빈 자모를 실패로 치면 글자 배치가 통째로 옛 배치로 떨어져,
+  // 빈 칸은 좁았다가 첫 획을 그으면 모델 상자로 넓어지고 그은 획이 그만큼 늘어났다(10-06 사용자: ㅍ을 지우고 펜으로 그을 때).
+  if (!strokes.length && !framed.length) return { ok: false, message: `${input.jamo.char}: 앱 획이 없습니다.` }
+  if (![input.faces.left, input.faces.right, input.faces.top, input.faces.bottom].every(Number.isFinite)) return { ok: false, message: '박스 네 변이 없습니다.' }
   const boxStrokes = framed.length ? framed : strokes
   const placed = componentBoxFromFaces(boxStrokes, input.faces, input.weightMultiplier ?? 1)
   if (typeof placed === 'string') return { ok: false, message: placed }

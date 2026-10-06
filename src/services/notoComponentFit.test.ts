@@ -62,6 +62,20 @@ describe('componentBoxFromFaces', () => {
     expect(Math.max(...points.map((p) => p.y))).toBeCloseTo(faces.bottom, 5)
   })
 
+  it('획을 다 지운 자모도 기준 틀이 있으면 같은 상자를 받는다 — 잉크만 없다', () => {
+    const faces = { left: 0.1, right: 0.5, top: 0.15, bottom: 0.79 }
+    const full = fitNotoComponent({ part: 'CH', jamo: GIYEOK, faces, glyphId: 'ㄱ' })
+    // 고치기 전 획을 틀로 굳힌 뒤 획을 전부 지운 자모.
+    const emptied: JamoData = { ...GIYEOK, strokes: [], frame: { strokes: structuredClone(GIYEOK.strokes!) } }
+    const fit = fitNotoComponent({ part: 'CH', jamo: emptied, faces, glyphId: 'ㄱ' })
+    expect(full.ok && fit.ok).toBe(true)
+    if (!full.ok || !fit.ok) return
+    expect(fit.fit.box).toEqual(full.fit.box)
+    expect(fit.fit.primitives).toEqual([])
+    // 틀도 없으면 상자를 정할 획이 없다 — 전처럼 실패다.
+    expect(fitNotoComponent({ part: 'CH', jamo: { ...GIYEOK, strokes: [] }, faces, glyphId: 'ㄱ' }).ok).toBe(false)
+  })
+
   it('전역 굵기는 중심선을 지킨다: 상자는 그대로, 잉크만 faces 밖으로 굵어진다', () => {
     const faces = { left: 0.1, right: 0.5, top: 0.15, bottom: 0.79 }
     const fit = fitNotoComponent({ part: 'CH', jamo: GIYEOK, faces, glyphId: 'ㄱ' })
