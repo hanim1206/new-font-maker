@@ -38,7 +38,7 @@ export function MobileWorkspaceShell({
   wide = false,
 }: {
   children: ReactNode
-  /** 480 기둥을 풀고 화면 폭을 다 쓴다(획 편집 캔버스 `크게` 보기). 끄면 기둥으로 돌아온다. */
+  /** 획 편집 캔버스 `크게` 보기: 480 기둥을 풀어 화면 폭을 다 쓰고 머리도 뺀다 — 캔버스가 머리 자리까지 올라간다. 되돌리기 · 다시 실행은 캔버스 귀퉁이가 대신 그린다(단축키는 그대로). 끄면 기둥과 머리가 돌아온다. */
   wide?: boolean
   /** 어느 화면인지. 탭은 없어졌지만 부르는 쪽이 이름표로 준다. */
   activeArea: WorkspaceArea
@@ -64,7 +64,7 @@ export function MobileWorkspaceShell({
   return (
     <main className={styles.page}>
       <div className={styles.shell} data-wide={wide || undefined}>
-        <header className={styles.projectHeader}>
+        {!wide && <header className={styles.projectHeader}>
           {/* 왼쪽은 위 덱으로 나가는 문 — 화살표만, 오른쪽 머리 단추와 같은 생김새. 이름은 읽기용 레이블에만. 오른쪽은 편집 기록. */}
           {back && 'onClick' in back
             ? <Pressable type="button" className={styles.back} onClick={() => leave(back.onClick)} aria-label={`${back.label}(으)로`} title={back.label} data-testid="workspace-back">
@@ -91,7 +91,7 @@ export function MobileWorkspaceShell({
               <Pressable type="button" disabled={!history?.canRedo} onClick={history?.onRedo} aria-label="형태 편집 다시 실행"><Redo2 size={18} /></Pressable>
             </>}
           </div>
-        </header>
+        </header>}
 
         {/* 내용 자리. 머리 아래를 다 쓰고, `cover`가 이 자리만 덮는다. */}
         <div className={styles.body}>
