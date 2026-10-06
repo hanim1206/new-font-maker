@@ -92,6 +92,19 @@ describe('첫닿자 변형 가르기 · 합치기 · 저장', () => {
     expect(mergeFamilyStrokes(base, 'bottom')).toBe(base)
   })
 
+  it('가른 계열의 획을 다 지워도 가른 채다 — 빈 글자로 그리고, 다음 저장은 그 변형 자리에 간다', () => {
+    const split = splitFamilyStrokes(base, 'bottom')
+    const view = adoptFamilyStrokes(split, 'bottom')
+    const emptied = writeFamilyStrokes(split, { ...view, strokes: [] }, 'bottom')
+    expect(hasFamilyStrokes(emptied, 'bottom')).toBe(true)
+    expect(strokesForFamily(emptied, 'bottom')).toEqual([])
+    expect(strokesForFamily(emptied, 'right')![0].points[1].x).toBe(1)
+    // 빈 변형에서 새로 그리면 기본이 아니라 변형에 쓴다.
+    const redrawn = writeFamilyStrokes(emptied, { ...adoptFamilyStrokes(emptied, 'bottom'), strokes: [line('ㅈ-새', 0.4)] }, 'bottom')
+    expect(redrawn.strokes![0].points[1].x).toBe(1)
+    expect(redrawn.contextStrokes!.bottom![0].points[1].x).toBe(0.4)
+  })
+
   it('가른 계열에서 고치면 그 변형만 바뀌고 기본 · 다른 변형은 그대로', () => {
     const stored = splitFamilyStrokes(splitFamilyStrokes(base, 'bottom'), 'mixed')
     const view = adoptFamilyStrokes(stored, 'bottom')
