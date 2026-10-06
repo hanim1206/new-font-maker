@@ -277,3 +277,5 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 
 /* 문장 줄 글자는 고른 글자를 밑줄로 보인다 — 공용 Pressable의 포커스 테두리는 숨긴다(box-shadow는 안전 표시가 쓴다). */
 .sentenceRun button { --tw-ring-color: transparent; }
+/* 안 가른 계열의 글자를 연 획 편집. 캔버스는 보기만이라 흐리게 — 아래 카드가 `따로 그리기`를 묻는다. */
+.editor[data-chrome='workspace'] .focusArea[data-gated] { opacity: .55; filter: grayscale(1); pointer-events: none; }

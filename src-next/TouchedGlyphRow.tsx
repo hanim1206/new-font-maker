@@ -21,6 +21,7 @@ import type { PropagationEdit, PropagationScope } from './reviewPropagation'
 import type { OverrideGroup } from './layoutOverrides'
 import { EDIT_COLOR } from './editColors'
 import { Pressable } from './components/ui/pressable'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './components/ui/dropdown-menu'
 import styles from './TouchedGlyphRow.module.css'
 
 /**
@@ -78,7 +79,7 @@ const TouchedGlyph = memo(function TouchedGlyph({ identity, bundle, edit, ghostV
   </figure>
 })
 
-export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, edit, ghostVisible = true, focus, scope, group, jamos, anyContext, rule, activeChar, onPick, lead, onPickLead }: {
+export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, edit, ghostVisible = true, focus, scope, group, jamos, anyContext, rule, activeChar, onPick, lead, onPickLead, splitFamilies, onMerge }: {
   source: CorpusIdentity
   bundle: NotoPresetModelBundle | null
   edit: PropagationEdit
@@ -103,6 +104,10 @@ export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, e
   /** 줄 맨 앞에 붙박이로 서는 자소 단독 칸(획 편집의 첫닿자 `ㄴ`). 줄을 밀어도 제자리다. */
   lead?: { char: string; active: boolean }
   onPickLead?: () => void
+  /** 첫닿자 줄에서 따로 그린 홀자 계열. 그 덩이에 표시가 붙는다. */
+  splitFamilies?: readonly string[]
+  /** `⋯`의 `다시 합치기`. 지금 열린 글자의 계열이 가른 계열일 때만 온다. 없으면 흐린 항목. */
+  onMerge?: (() => void) | null
 }) {
   // 글자·범위·고른 자모가 바뀌면 줄을 새로 만들고 한 묶음으로 돌아간다.
   const rowKey = rule ? `${source.codepoint}:rule:${ruleKey(rule)}` : `${source.codepoint}:${scope}:${group}:${jamos.join('')}:${anyContext ? 'any' : 'one'}`
@@ -159,15 +164,20 @@ export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, e
         const active = items.some((identity) => identity.character === activeChar)
         return <Fragment key={chunk.family}>
           {index > 0 && <span className={styles.divider} aria-hidden="true" />}
-          <div className={styles.chunk} data-family={chunk.family} data-active={active || undefined} data-testid="touched-glyph-chunk">
+          <div className={styles.chunk} data-family={chunk.family} data-active={active || undefined} data-split={splitFamilies?.includes(chunk.family) || undefined} data-testid="touched-glyph-chunk">
             {items.map((identity) => <TouchedGlyph key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} ghostVisible={ghostVisible} active={identity.character === activeChar} onPick={onPick} />)}
           </div>
         </Fragment>
       })}
     </div>
-    {/* 맨 오른쪽 고정 더보기. 아직 아무것도 안 한다 — 첫닿자 변형 3벌 플랜에서 기능이 붙는다. */}
+    {/* 맨 오른쪽 고정 더보기. 가른 계열의 글자를 열었을 때만 `다시 합치기`가 산다. */}
     {chunked && <div className={styles.more}>
-      <Pressable aria-label="더보기" data-testid="touched-glyph-more"><Ellipsis size={18} aria-hidden="true" /></Pressable>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild><Pressable aria-label="더보기" data-testid="touched-glyph-more"><Ellipsis size={18} aria-hidden="true" /></Pressable></DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem disabled={!onMerge} onSelect={() => onMerge?.()} data-testid="touched-glyph-merge">다시 합치기</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>}
   </section>
 })

@@ -1,0 +1,6 @@
+/* 획 편집에서 안 가른 홀자 계열의 글자를 열었을 때 조절판 자리에 서는 카드. 높이는 조절판(`.trackpad` 176px)과 같아 아래가 안 밀린다. */
+.card { box-sizing: border-box; height: 176px; display: flex; flex-direction: column; gap: 6px; padding: 18px 18px 14px; border: 1px solid rgb(var(--color-border)); border-radius: var(--radius-xl); background: rgb(var(--color-surface)); }
+.title { margin: 0; color: rgb(var(--color-foreground)); font-size: var(--font-16); font-weight: var(--weight-bold); line-height: 1.35; }
+.title b { color: rgb(var(--color-primary)); font-weight: inherit; }
+.sub { margin: 0; color: rgb(var(--color-muted-foreground)); font-size: var(--font-13); line-height: 1.4; }
+.actions { margin-top: auto; display: flex; justify-content: flex-end; }
