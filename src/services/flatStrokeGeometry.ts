@@ -170,6 +170,8 @@ export function polylineToFlatInkGroups(
   widthOf?: FlatWidthOf,
   curvedSegments?: ReadonlySet<number>,
   miterLimit = DEFAULT_MITER_LIMIT,
+  /** 중심선이 제 몸을 가로지르는지. 부르는 쪽이 이미 쟀으면 넘긴다(두 번 재지 않게). 안 넘기면 여기서 잰다. */
+  selfCrossing?: boolean,
 ): BrushInkGroup[] {
   if (points.length < 2 || !(thickness > 0)) return []
   const half = thickness / 2
@@ -206,8 +208,12 @@ export function polylineToFlatInkGroups(
     : curvedSegments
   const halves = directions.map((direction, index) => direction && widthOf ? half * Math.max(0.05, widthOf(direction, curvedNow?.has(index) ?? false)) : half)
   // 급한 굽이 안쪽에서 오프셋 선이 제 몸을 지나 작은 고리가 생기면 잘라낸다.
-  const left = removeLoops(offsetSide(path, directions, closed, halves, half, 1, join, roundVertices, cornerRounding, miterLimit), closed)
-  const right = removeLoops(offsetSide(path, directions, closed, halves, half, -1, join, roundVertices, cornerRounding, miterLimit), closed)
+  // 다만 획이 제 몸을 가로지르면(일부러 그린 고리) 오프셋 선의 교차는 꼬임이 아니라 고리의 가장자리다 — 잘라내면 고리가 통째로 사라진다(2026-10-06).
+  // 그때는 손대지 않고 아래에서 조각으로 낸다(붓이 지나간 자리 전부).
+  const crossesItself = !closed && (selfCrossing ?? polylineSelfIntersects(path))
+  const trim = (side: BrushPoint[]) => crossesItself ? side : removeLoops(side, closed)
+  const left = trim(offsetSide(path, directions, closed, halves, half, 1, join, roundVertices, cornerRounding, miterLimit))
+  const right = trim(offsetSide(path, directions, closed, halves, half, -1, join, roundVertices, cornerRounding, miterLimit))
   if (left.length < 2 || right.length < 2) return []
   if (closed) {
     const rings: BrushContour[] = Math.abs(ringArea(left)) >= Math.abs(ringArea(right)) ? [left, right] : [right, left]
@@ -248,7 +254,7 @@ export function polylineToFlatInkGroups(
     : joined
   // 급한 굽이 안쪽에서 오프셋 선이 제 몸을 지나면 윤곽 하나로는 Boolean이 못 받는다. 그때만 조각(세그먼트 사각형 + 조인 + 캡)으로 낸다.
   // 머리핀처럼 되돌아 꺾이면 테두리는 안 꼬여도 안쪽 가장자리가 앞 토막 몸을 지나며 잉크를 잘라 먹는다(피드백 35, 가로줄기에 흰 쐐기). 그때도 조각으로.
-  if (ringSelfIntersects(ring) || hasHairpinTurn(directions, closed)) return piecewiseFlatInkGroups(path, directions, halves, cap, join, roundVertices, miterLimit)
+  if (crossesItself || ringSelfIntersects(ring) || hasHairpinTurn(directions, closed)) return piecewiseFlatInkGroups(path, directions, halves, cap, join, roundVertices, miterLimit)
   return [[ring]]
 }
 
@@ -301,6 +307,17 @@ export function hasHairpinTurn(directions: readonly (BrushPoint | null)[], close
   for (let index = 0; index < last; index += 1) {
     const current = directions[index], next = directions[(index + 1) % count]
     if (current && next && current.x * next.x + current.y * next.y < HAIRPIN_COS) return true
+  }
+  return false
+}
+
+/** 열린 선이 제 몸을 가로지르는지(이웃하지 않은 토막끼리 교차). 끝과 처음을 잇는 변은 없다 — 고리를 그린 획을 가린다. */
+export function polylineSelfIntersects(points: readonly BrushPoint[]): boolean {
+  const last = points.length - 1
+  for (let i = 0; i < last; i += 1) {
+    for (let j = i + 2; j < last; j += 1) {
+      if (segmentsCross(points[i], points[i + 1], points[j], points[j + 1])) return true
+    }
   }
   return false
 }
@@ -455,7 +472,14 @@ export function strokeToFlatInkGroups(
     // 안쪽은 반폭을 넘어서도 굴린다(최대 3배). 이웃 변 길이 한도(45%)에 걸려 자연히 멈춘다.
     ? { radius: Math.min(1, Math.max(0, roundness)) * thickness / 2, innerRadius: Math.min(INNER_ROUNDNESS_MAX, Math.max(0, inner)) * thickness / 2, anchors: anchorIndices }
     : undefined
-  const groups = polylineToFlatInkGroups(points, stroke.closed, thickness, cap, join, roundVertices, rounding, directionalWidthOf(contrast, stemScale, stemScale !== 1 ? gentleCurveDirection(points, stroke.closed, curvedSegments) : null), curvedSegments, miterLimit)
+  // 획이 제 몸을 가로지르면(일부러 그린 고리) 윤곽 하나로는 못 담는다. Clipper2 오프셋이 겹친 자리를 합쳐 고리 몸과 속을 깔끔한 면으로 낸다.
+  // 아래 겹침 대체 경로와 같은 길이라 대비 · 모서리별 둥글기는 못 따른다.
+  const selfCrossing = !stroke.closed && polylineSelfIntersects(points)
+  if (selfCrossing) {
+    const looped = inflateFlatCenterline(points, false, thickness, cap, join, rounding !== undefined, miterLimit)
+    if (looped.length) return looped
+  }
+  const groups = polylineToFlatInkGroups(points, stroke.closed, thickness, cap, join, roundVertices, rounding, directionalWidthOf(contrast, stemScale, stemScale !== 1 ? gentleCurveDirection(points, stroke.closed, curvedSegments) : null), curvedSegments, miterLimit, selfCrossing)
   // 곡선이 반폭보다 급하게 꺾여 윤곽이 스스로 겹치면 쐐기가 뚫리고 최종 잉크가 그 획을 거부한다. 그때만 Clipper2 오프셋으로 다시 만든다.
   if (!flatGroupsOverlap(groups)) return groups
   const inflated = inflateFlatCenterline(points, stroke.closed, thickness, cap, join, rounding !== undefined, miterLimit)
