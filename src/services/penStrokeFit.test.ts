@@ -170,6 +170,22 @@ describe('펜 획 맞춤', () => {
     expect(thick.stroke.points[thick.stroke.points.length - 1].x).toBeGreaterThan(.085)
   })
 
+  it('머리핀 꺾임(안쪽 20°)을 둥글려도 고리가 생기지 않는다 — 호 핸들은 각도에 맞춘다', () => {
+    // 내려오다 160° 꺾어 되올라가는 획. 끝이 둥근 글씨(roundAcute)에서 꺾임을 둥글린다.
+    const down = line({ x: .5, y: .1 }, { x: .15, y: .45 }, 80)
+    const up = line({ x: .15, y: .45 }, { x: .5, y: .3 }, 80).slice(1)
+    const fit = fitPenStroke([...down, ...up], { thickness: .07, roundAcute: true })!
+    // 둥글린 호의 두 앵커 사이 핸들이 서로를 넘지 않는다(넘으면 고리). 호는 굵기 반 안쪽에 머문다.
+    const pts = fit.stroke.points
+    const i = pts.findIndex((p, k) => k > 0 && p.handleOut && pts[k + 1]?.handleIn && !pts[k + 1].handleOut)
+    expect(fit.maxDeviation).toBeLessThan(.05)
+    expect(i).toBeGreaterThan(0)
+    const a = pts[i], b = pts[i + 1]
+    const chord = Math.hypot(b.x - a.x, b.y - a.y)
+    expect(Math.hypot(a.handleOut!.x - a.x, a.handleOut!.y - a.y)).toBeLessThan(chord)
+    expect(Math.hypot(b.handleIn!.x - b.x, b.handleIn!.y - b.y)).toBeLessThan(chord)
+  })
+
   it('시작에서 옆으로 나갔다 돌아온 갈고리도 잘라 낸다', () => {
     // 아래로 삐쳤다가 제자리로 돌아와 오른쪽으로 긋는다. 시작점은 몸통 선 위지만 그 사이가 벗어났다.
     const hook = [{ x: .18, y: .25 }, { x: .172, y: .27 }, { x: .165, y: .29 }, { x: .172, y: .268 }, { x: .182, y: .251 }]

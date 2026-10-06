@@ -53,8 +53,8 @@ const DEFAULT_MIN_GAP = 0.004
 const DEFAULT_CORNER_SPAN = 0.03
 /** 안정화 0–100(프로크리에이트 브러시의 안정화 숫자처럼). 100이면 호 길이 0.12 창으로 거른다. */
 export const PEN_STABILIZATION_MAX_WINDOW = 0.12
-/** 기본 안정화(10-05 사용자 — 50, 조절 없이 고정). */
-export const PEN_STABILIZATION = 50
+/** 기본 안정화. 10-05엔 50이었는데 급한 굽이가 뭉개져 10-06 사용자 "제일 매끈한 걸로" — 25. 펜슬 떨림은 작아 이만큼이면 된다. */
+export const PEN_STABILIZATION = 25
 /** 손떨림 거르기 기본 창. */
 export const PEN_SMOOTHING = PEN_STABILIZATION / 100 * PEN_STABILIZATION_MAX_WINDOW
 const DEFAULT_THICKNESS = 0.07
@@ -190,6 +190,10 @@ export function trimPenHooks(points: readonly PenPoint[], thickness = DEFAULT_TH
     const off = (p: PenPoint) => Math.abs((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) / length
     // 끝점이 잉크 띠 밖이면 갈고리가 아니라 꼬리다(ㅈ 끝처럼 일부러 그은 짧은 꺾임). 갈고리는 띠 안에서 옆으로 샜다 끝난다.
     if (off(points[end]) > endBand) return end
+    // 끝 토막의 방향이 몸통과 45° 안이면 갈고리가 아니라 완만히 굽는 꼬리다 — 펜을 뗀 갈고리는 몸통과 60° 넘게 꺾인다.
+    const tip = points[at(hookLength / 3)]
+    const tipDir = normalize(subtract(points[end], tip)), bodyDir = normalize(subtract(b, a))
+    if (dot(tipDir, bodyDir) > Math.cos(Math.PI / 4)) return end
     let worst = 0
     for (let i = end; i !== bodyNear; i += inward) worst = Math.max(worst, off(points[i]))
     if (worst <= minOffset) return end
@@ -232,24 +236,46 @@ export function smoothPenPoints(points: readonly PenPoint[], window: number): Pe
  * 마디가 `window`의 두 배보다 짧으면 그대로 둔다.
  * 안쪽 점은 끝점에서 곧게 잰 거리로 고른다 — 펜을 대고 머뭇거린 떨림이 호 길이를 다 써 버리면 두 점이 한자리에 잡혀 끝이 엉뚱한 데로 접힌다.
  */
-function settlePenEnd(points: PenPoint[], end: number, limit: number, window: number, straight = window / 2): void {
+/** 끝 토막을 펼 때 몸통 방향을 재는 기준 길이(곧은 거리). 안정화 창과 상관없이 고정 — 창이 작아지면 떨리는 선에서 방향이 흔들린다. */
+const SETTLE_BASE = 0.03
+
+function settlePenEnd(points: PenPoint[], end: number, limit: number, window: number, band: number, straight = window / 2): void {
   const step = end === 0 ? 1 : -1
   let near = -1
   let far = -1
   for (let i = end; i !== limit; i += step) {
     const length = distance(points[end], points[i + step])
     if (near < 0 && length >= straight) near = i + step
-    if (length >= straight + window / 2) { far = i + step; break }
+    if (length >= straight + SETTLE_BASE) { far = i + step; break }
   }
-  if (near < 0 || far < 0 || distance(points[near], points[far]) < window / 4) return
+  if (near < 0 || far < 0 || distance(points[near], points[far]) < SETTLE_BASE / 2) return
   let rest = 0
   for (let i = far; i !== limit; i += step) rest += distance(points[i], points[i + step])
   if (rest < window) return
-  const direction = normalize(subtract(points[near], points[far]))
+  // 몸통 선은 near~far 점 전체의 최소제곱 직선(주축)이다 — 점 둘로 재면 떨림이 방향을 흔든다.
+  let mx = 0, my = 0, n = 0
+  for (let i = near; i !== far + step; i += step) { mx += points[i].x; my += points[i].y; n++ }
+  mx /= n; my /= n
+  let sxx = 0, sxy = 0, syy = 0
+  for (let i = near; i !== far + step; i += step) { const dx = points[i].x - mx, dy = points[i].y - my; sxx += dx * dx; sxy += dx * dy; syy += dy * dy }
+  const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy)
+  let direction = { x: Math.cos(angle), y: Math.sin(angle) }
+  // 끝 쪽을 향하게 맞춘다.
+  if (dot(direction, subtract(points[near], points[far])) < 0) direction = scale(direction, -1)
+  const base = { x: mx, y: my }
+  const nearAlong = dot(subtract(points[near], base), direction)
+  // 끝 토막이 그 선에서 잉크 띠(`band` = 굵기 반) 밖으로 나가 있거나 선과 반대로 가면 떨림이 아니라 휘어 나간 꼬리다 — 선 위로 누르면 꼬리가 한 점으로 뭉개진다(10-06 ㅎ 자취). 그대로 둔다.
+  // 띠 안의 짧은 토막(펜이 닿는 순간 70° 꺾인 0.02짜리 시작)은 편다 — 두면 굵은 끝에 혹이 생긴다(10-06 둘째 ㅎ 자취).
+  for (let i = end; i !== near; i += step) {
+    const rel = subtract(points[i], base)
+    const along = dot(rel, direction)
+    const off = Math.hypot(rel.x - direction.x * along, rel.y - direction.y * along)
+    if (off > band || along < nearAlong) return
+  }
   // 끝점만이 아니라 끝에서 `near`까지를 전부 그 선 위로 내린다 — 끝 토막이 곧아야 평평한 끝이 몸통에 직각으로 서고, 펜이 닿는 순간 살짝 말린 자취가 끝을 부채꼴로 만들지 않는다(10-06 사용자).
   for (let i = end; i !== near; i += step) {
-    const along = dot(subtract(points[i], points[near]), direction)
-    points[i] = add(points[near], scale(direction, Math.max(0, along)))
+    const along = dot(subtract(points[i], base), direction)
+    points[i] = add(base, scale(direction, Math.max(nearAlong, along)))
   }
 }
 
@@ -469,8 +495,8 @@ function segmentsToAnchors(segments: readonly Segment[]): AnchorPoint[] {
 const ACUTE_TURN = 105
 /** 둥글린 자리에서 꺾임점까지의 거리는 옆 마디의 이 비율을 넘지 않는다. */
 const ROUND_MAX_SHARE = 0.4
-/** 둥글린 호의 핸들 길이(꺾임점까지 거리의 비율). 0.55면 직각 호가 원에 가깝다. */
-const ROUND_HANDLE = 0.55
+/** 둥글린 호의 핸들 길이는 호의 각도로 정한다 — 3차 베지어로 원호를 그릴 때의 공식 4/3·tan(θ/4)·R (직각이면 0.55R). 거리 비율로 고정하면 예리한 꺾임에서 넘쳐 고리가 된다(10-06 ㅎ 자취). */
+const arcHandleLength = (sweepRad: number, radius: number) => (4 / 3) * Math.tan(sweepRad / 4) * radius
 
 /**
  * 예각으로 꺾인 앵커를 둥글게 돌린다 — 끝이 둥근 글씨에서 갈지자처럼 접히는 자리를 실제 펜처럼 둥글게(10-06 사용자 결정: 끝 모양 따라가기). ㄱ 같은 직각은 그대로다.
@@ -478,31 +504,83 @@ const ROUND_HANDLE = 0.55
  */
 function roundAcuteCorners(anchors: readonly AnchorPoint[], cornerAt: ReadonlySet<string>, radius: number): AnchorPoint[] {
   const key = (point: PenPoint) => `${point.x},${point.y}`
+  const work: AnchorPoint[] = anchors.map((anchor) => ({ ...anchor }))
   const out: AnchorPoint[] = []
-  for (let i = 0; i < anchors.length; i++) {
-    const anchor = anchors[i]
+  for (let i = 0; i < work.length; i++) {
+    const anchor = work[i]
     const prev = out[out.length - 1]
-    const next = anchors[i + 1]
-    if (!prev || !next || !cornerAt.has(key(anchor))) { out.push({ ...anchor }); continue }
+    const next = work[i + 1]
+    if (!prev || !next || !cornerAt.has(key(anchor))) { out.push(anchor); continue }
     // 들어오는 · 나가는 방향은 핸들이 있으면 핸들로, 없으면 옆 앵커로 잰다.
     const toPrev = normalize(subtract(anchor.handleIn ?? prev, anchor))
     const toNext = normalize(subtract(anchor.handleOut ?? next, anchor))
     const turn = 180 - Math.acos(Math.max(-1, Math.min(1, dot(toPrev, toNext)))) * 180 / Math.PI
-    if (turn <= ACUTE_TURN) { out.push({ ...anchor }); continue }
+    if (turn <= ACUTE_TURN) { out.push(anchor); continue }
     const inner = (180 - turn) * Math.PI / 180
-    const wanted = radius * Math.tan(Math.PI / 2 - inner / 2)
+    // 둥글리면 꺾임 끝이 반지름 × (1/sin(안쪽각/2) − 1)만큼 깎인다. 예리할수록 깊어지니 깎이는 깊이는 굵기 반까지만 — 머리핀(안쪽 20°)은 반지름이 작아진다.
+    const bitePerRadius = 1 / Math.sin(inner / 2) - 1
+    const r = Math.min(radius, bitePerRadius > 0 ? radius / 2 / bitePerRadius : radius)
+    const wanted = r * Math.tan(Math.PI / 2 - inner / 2)
     const d = Math.min(wanted, distance(anchor, prev) * ROUND_MAX_SHARE, distance(anchor, next) * ROUND_MAX_SHARE)
-    if (!(d > 0)) { out.push({ ...anchor }); continue }
-    const a: AnchorPoint = add(anchor, scale(toPrev, d))
-    const b: AnchorPoint = add(anchor, scale(toNext, d))
-    // 들어오던 곡선의 접선은 지키고 길이만 줄인다.
-    if (anchor.handleIn) a.handleIn = add(a, scale(subtract(anchor.handleIn, anchor), 0.7))
-    if (anchor.handleOut) b.handleOut = add(b, scale(subtract(anchor.handleOut, anchor), 0.7))
-    a.handleOut = add(a, scale(subtract(anchor, a), ROUND_HANDLE))
-    b.handleIn = add(b, scale(subtract(anchor, b), ROUND_HANDLE))
-    out.push(a, b)
+    if (!(d > 0)) { out.push(anchor); continue }
+    // 양옆 마디를 꺾임점에서 d 떨어진 자리에서 실제로 쪼갠다 — 옛 핸들을 그대로 두고 끝점만 옮기면 곡선이 뒤틀린다.
+    const a = cutTowardCorner(prev, anchor, d, 'in')
+    const b = cutTowardCorner(anchor, next, d, 'out')
+    // 호: 꺾임점을 향하는 접선끼리 잇는다. 핸들 길이는 호의 각도와 실제 반지름으로(원호 공식).
+    const used = d * Math.tan(inner / 2)
+    const sweep = Math.acos(Math.max(-1, Math.min(1, dot(a.tangent, scale(b.tangent, -1)))))
+    const k = arcHandleLength(sweep, used)
+    a.point.handleOut = add(a.point, scale(a.tangent, k))
+    b.point.handleIn = add(b.point, scale(b.tangent, k))
+    out.push(a.point, b.point)
   }
   return out
+}
+
+/** 3차 베지어를 t에서 둘로 나눈다(de Casteljau). */
+function splitCubic(p0: PenPoint, p1: PenPoint, p2: PenPoint, p3: PenPoint, t: number): { left: [PenPoint, PenPoint, PenPoint, PenPoint]; right: [PenPoint, PenPoint, PenPoint, PenPoint] } {
+  const lerp = (a: PenPoint, b: PenPoint) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t })
+  const q0 = lerp(p0, p1), q1 = lerp(p1, p2), q2 = lerp(p2, p3)
+  const r0 = lerp(q0, q1), r1 = lerp(q1, q2)
+  const s = lerp(r0, r1)
+  return { left: [p0, q0, r0, s], right: [s, r1, q2, p3] }
+}
+
+/**
+ * `from`→`to` 마디를 꺾임점(`side`가 'in'이면 `to`, 'out'이면 `from`)에서 곧은 거리 d인 자리에서 쪼개, 꺾임점 쪽 조각을 떼고 남는 끝점을 돌려준다.
+ * 핸들이 있으면 곡선을 그 자리에서 나눠 옆 앵커의 핸들도 고친다(제자리 수정). `tangent`는 그 끝점에서 꺾임점을 향하는 접선 방향.
+ */
+function cutTowardCorner(from: AnchorPoint, to: AnchorPoint, d: number, side: 'in' | 'out'): { point: AnchorPoint; tangent: PenPoint } {
+  const corner = side === 'in' ? to : from
+  const other = side === 'in' ? from : to
+  if (!from.handleOut && !to.handleIn) {
+    const dir = normalize(subtract(other, corner))
+    const point: AnchorPoint = add(corner, scale(dir, d))
+    return { point, tangent: scale(dir, -1) }
+  }
+  const p0 = from, p1 = from.handleOut ?? from, p2 = to.handleIn ?? to, p3 = to
+  const at = (t: number) => bezierAt(p0, p1, p2, p3, t)
+  // 꺾임점에서 곧은 거리가 d가 되는 t를 이분법으로 찾는다(꺾임점에 가까울수록 거리가 준다).
+  let lo = 0, hi = 1
+  for (let n = 0; n < 40; n++) {
+    const mid = (lo + hi) / 2
+    const far = distance(at(mid), corner) > d
+    if (side === 'in') { if (far) lo = mid; else hi = mid } else { if (far) hi = mid; else lo = mid }
+  }
+  const t = (lo + hi) / 2
+  const { left, right } = splitCubic(p0, p1, p2, p3, t)
+  if (side === 'in') {
+    if (from.handleOut) from.handleOut = left[1]
+    const point: AnchorPoint = { x: left[3].x, y: left[3].y }
+    if (to.handleIn) point.handleIn = left[2]
+    const back = from.handleOut ? left[2] : left[1]
+    return { point, tangent: normalize(subtract(point, back)) }
+  }
+  if (to.handleIn) to.handleIn = right[2]
+  const point: AnchorPoint = { x: right[0].x, y: right[0].y }
+  if (from.handleOut) point.handleOut = right[1]
+  const ahead = to.handleIn ? right[1] : right[2]
+  return { point, tangent: normalize(subtract(point, ahead)) }
 }
 
 /** 획을 촘촘한 점으로 편다 — 이탈 거리 재기용. 96조각이면 꺾은선 오차가 ε의 1/1000 아래다. */
@@ -543,7 +621,20 @@ export function penFitDeviation(points: readonly PenPoint[], stroke: Pick<Stroke
 function smoothBetweenCorners(raw: readonly PenPoint[], options: PenFitOptions): { thinned: PenPoint[]; corners: number[]; breaks: number[]; window: number } {
   const span = options.cornerSpan ?? DEFAULT_CORNER_SPAN
   // 꺾임은 꺾임 재는 거리만큼만 살짝 거른 점에서 찾는다 — 손떨림이 가짜 꺾임으로 잡히지 않고, ㄱ의 모서리는 그대로 잡힌다.
-  const corners = penCornerIndices(smoothPenPoints(raw, span), options.cornerAngle ?? PEN_CORNER_ANGLE, span)
+  const found = penCornerIndices(smoothPenPoints(raw, span), options.cornerAngle ?? PEN_CORNER_ANGLE, span)
+  // 거른 점에서 찾은 꺾임은 머뭇거린 끝에서 한두 점 비켜 잡힌다 — 그러면 진짜 끝이 다음 곡선 마디 안에 들어가 앵커 둘이 겹치고 혹이 생긴다(10-06 사용자 "뱀 입").
+  // span 안에서 날 점의 이웃 방향 변화가 가장 큰 자리로 되맞춘다.
+  const localTurn = (i: number) => {
+    if (i <= 0 || i >= raw.length - 1) return 0
+    const back = normalize(subtract(raw[i], raw[i - 1])), forward = normalize(subtract(raw[i + 1], raw[i]))
+    return Math.acos(Math.max(-1, Math.min(1, dot(back, forward))))
+  }
+  const corners = found.map((c) => {
+    let best = c
+    for (let i = c - 1; i > 0 && distance(raw[i], raw[c]) < span; i--) if (localTurn(i) > localTurn(best)) best = i
+    for (let i = c + 1; i < raw.length - 1 && distance(raw[i], raw[c]) < span; i++) if (localTurn(i) > localTurn(best)) best = i
+    return best
+  }).filter((c, k, all) => k === 0 || c > all[k - 1])
   const breaks = [0, ...corners, raw.length - 1]
   // 꺾임 사이 마디만 세게 거른다 — 모서리는 날카롭게 남는다.
   const window = options.smoothing ?? PEN_SMOOTHING
@@ -566,8 +657,8 @@ export function fitPenStroke(points: readonly PenPoint[], options: PenFitOptions
   // 획의 두 끝(꺾임 말고)은 거른 몸통이 향하는 선 위로 옮긴다. 끝점만 손떨림 그대로 남아 끝이 휘는 것을 막는다.
   // 닫는 획(ㅇ · ㅁ)은 두 끝이 만나야 하므로 그대로 둔다.
   if (!penEndsMeet(raw)) {
-    settlePenEnd(thinned, 0, breaks[1], window)
-    settlePenEnd(thinned, thinned.length - 1, breaks[breaks.length - 2], window)
+    settlePenEnd(thinned, 0, breaks[1], window, thickness / 2)
+    settlePenEnd(thinned, thinned.length - 1, breaks[breaks.length - 2], window, thickness / 2)
   }
   const segments: Segment[] = []
   for (let i = 0; i < breaks.length - 1; i++) {
