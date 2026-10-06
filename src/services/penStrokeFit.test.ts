@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fitPenStroke, PEN_FIT_EPSILON_CANDIDATES, smoothPenPoints, penCornerIndices, penFitDeviation, thinPenPoints } from './penStrokeFit'
+import { fitPenStroke, PEN_FIT_EPSILON_CANDIDATES, penClosesOnItself, smoothPenPoints, penCornerIndices, penFitDeviation, stabilizePenPoints, thinPenPoints } from './penStrokeFit'
 import type { PenPoint } from './penStrokeFit'
 
 /** 시드 고정 난수 — 펜 떨림 흉내. 같은 시드면 같은 점. */
@@ -163,6 +163,54 @@ describe('펜 획 맞춤', () => {
     const fit = fitPenStroke([...hook, ...line({ x: .19, y: .25 }, { x: .8, y: .25 }, 60)], { thickness: .07 })!
     for (const point of fit.stroke.points) expect(Math.abs(point.y - .25)).toBeLessThan(.012)
     expect(fit.stroke.points[0].x).toBeLessThan(.25)
+  })
+
+  it('닫으려던 획: 덜 닫힌 동그라미는 맞고, 갈지자로 꺾다 고리를 지은 한 획(흘려 쓴 ㅎ)은 아니다', () => {
+    expect(penClosesOnItself(arc({ x: .5, y: .5 }, .4, -90, 220, 120, 0.004))).toBe(true)
+    // 오른쪽으로 긋고 → 왼쪽 아래로 꺾고 → 오른쪽으로 다시 꺾어 고리를 짓는다. 끝이 시작 가까이 오지만 한쪽으로만 돌지 않는다.
+    const cursive = [
+      ...line({ x: .3, y: .2 }, { x: .7, y: .2 }, 30, 0.003, 3),
+      ...line({ x: .7, y: .22 }, { x: .3, y: .45 }, 30, 0.003, 4),
+      ...line({ x: .32, y: .46 }, { x: .6, y: .5 }, 20, 0.003, 5),
+      ...arc({ x: .5, y: .68 }, .2, -60, 250, 80, 0.003, 6),
+    ]
+    expect(penClosesOnItself(cursive)).toBe(false)
+    // ㄱ은 틈이 제 크기만 하다
+    expect(penClosesOnItself([...line({ x: .1, y: .1 }, { x: .9, y: .1 }, 40), ...line({ x: .9, y: .1 }, { x: .9, y: .9 }, 40)])).toBe(false)
+  })
+
+  it('예각 꺾임은 둥글게 돌리고 직각(ㄱ)은 날카롭게 둔다', () => {
+    // 갈지자: 오른쪽으로 긋다가 왼쪽 아래로 날카롭게 꺾는다(안쪽 각 약 30도).
+    const zig = [...line({ x: .1, y: .2 }, { x: .8, y: .2 }, 40), ...line({ x: .8, y: .2 }, { x: .15, y: .5 }, 40)]
+    const rounded = fitPenStroke(zig, { thickness: .07 })!.stroke
+    const sharp = fitPenStroke(zig, { thickness: .07, roundAcute: false })!.stroke
+    // 꺾임점(.8,.2)이 앵커에서 사라지고, 꺾임점을 향하는 핸들을 가진 앵커 둘이 생긴다.
+    expect(sharp.points.some((point) => Math.hypot(point.x - .8, point.y - .2) < .01)).toBe(true)
+    expect(rounded.points.some((point) => Math.hypot(point.x - .8, point.y - .2) < .01)).toBe(false)
+    expect(rounded.points.length).toBe(sharp.points.length + 1)
+    const handles = rounded.points.filter((point) => point.handleOut && Math.hypot(point.handleOut.x - .8, point.handleOut.y - .2) < Math.hypot(point.x - .8, point.y - .2))
+    expect(handles.length).toBeGreaterThanOrEqual(1)
+    // 직각 ㄱ은 그대로
+    const angle = [...line({ x: .1, y: .1 }, { x: .9, y: .1 }, 40), ...line({ x: .9, y: .1 }, { x: .9, y: .9 }, 40)]
+    const ㄱ = fitPenStroke(angle, { thickness: .07 })!.stroke
+    expect(ㄱ.points.some((point) => Math.hypot(point.x - .9, point.y - .1) < .01)).toBe(true)
+  })
+
+  it('긋는 중 미리보기는 지나온 부분이 다시 움직이지 않는다 — 둥근 획을 점 하나씩 늘려도', () => {
+    const circle = arc({ x: .5, y: .5 }, .4, -90, 260, 300, 0.004)
+    let previous: PenPoint[] | null = null
+    for (let count = 30; count <= circle.length; count += 3) {
+      const shown = stabilizePenPoints(circle.slice(0, count))
+      if (previous) {
+        const tip = circle[count - 4]
+        // 펜 끝에서 떨어진(0.1 넘게) 지난 프레임의 점은 이번 프레임의 선 위에 그대로 있다.
+        for (const point of previous) {
+          if (Math.hypot(point.x - tip.x, point.y - tip.y) < .1) continue
+          expect(Math.min(...shown.map((other) => Math.hypot(point.x - other.x, point.y - other.y)))).toBeLessThan(.004)
+        }
+      }
+      previous = shown
+    }
   })
 
   it('둥근 획(ㅇ)은 조금 울퉁불퉁하게 그어도 안쪽 앵커마다 핸들이 일직선이라 모가 안 난다', () => {

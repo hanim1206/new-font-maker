@@ -30,6 +30,8 @@ export interface PenFitOptions {
   smoothing?: number
   thickness?: number
   id?: string
+  /** 예각 꺾임을 둥글게 돌린다(기본 켬). */
+  roundAcute?: boolean
 }
 
 export interface PenFitResult {
@@ -105,17 +107,41 @@ const HOOK_MIN_OFFSET = 0.02
 const HOOK_CUT_OFFSET = 0.006
 /** 시작과 끝이 이보다 가까우면 닫는 획으로 보고 갈고리를 안 자른다. */
 const HOOK_CLOSED_GAP = 0.1
-/** 또는 시작과 끝 사이가 획 크기(범위의 대각선)의 이 비율 안이면 닫으려던 획이다 — 손으로 그은 ㅇ은 끝이 덜 닿거나 지나친다. */
+/** 또는 시작과 끝 사이가 획 크기(범위의 대각선)의 이 비율 안이고 한 바퀴 도는 꼴이면 닫으려던 획이다 — 손으로 그은 ㅇ은 끝이 덜 닿거나 지나친다. */
 export const PEN_LOOSE_CLOSE_RATIO = 0.4
+/** 한 바퀴 도는 꼴: 한쪽으로 돈 각의 합이 이만큼(도)은 되고, */
+const LOOP_MIN_TURN = 240
+/** 돈 각의 대부분(이 비율)이 같은 쪽이어야 한다. 갈지자로 꺾다가 고리를 지은 획은 이쪽저쪽으로 돌아 여기서 걸린다. */
+const LOOP_ONE_WAY_RATIO = 0.75
 
-/** 닫으려던 획(ㅇ · ㅁ)인지. 두 끝은 갈고리가 아니라 닫는 자리라 자르지도 옮기지도 않는다. ㄱ · ㄷ처럼 벌어진 획은 틈이 제 크기와 비슷해 안 든다. */
+/** 획을 굵게 다시 찍어(범위 대각선의 1/24 간격) 잰 돈 각의 합. 손떨림은 간격에 묻힌다. `signed`는 방향을 따져 더한 값, `total`은 크기만 더한 값(도). */
+function turningOf(points: readonly PenPoint[], size: number): { signed: number; total: number } {
+  const step = size / 24
+  const coarse: PenPoint[] = [points[0]]
+  for (const point of points) if (distance(coarse[coarse.length - 1], point) >= step) coarse.push(point)
+  let signed = 0, total = 0
+  for (let i = 1; i < coarse.length - 1; i++) {
+    const a = subtract(coarse[i], coarse[i - 1]), b = subtract(coarse[i + 1], coarse[i])
+    const turn = Math.atan2(a.x * b.y - a.y * b.x, dot(a, b)) * 180 / Math.PI
+    signed += turn
+    total += Math.abs(turn)
+  }
+  return { signed, total }
+}
+
+/**
+ * 닫으려던 획(ㅇ · ㅁ)인지. 두 끝은 갈고리가 아니라 닫는 자리라 자르지도 옮기지도 않는다.
+ * 끝이 거의 만났거나, 틈이 제 크기에 견줘 작으면서 한쪽으로 한 바퀴 도는 꼴일 때다. ㄱ · ㄷ처럼 벌어진 획은 틈이 커서, 갈지자로 꺾다가 고리를 지은 획은 한쪽으로만 돌지 않아서 안 든다.
+ */
 export function penClosesOnItself(points: readonly PenPoint[]): boolean {
   if (points.length < 3) return false
   const gap = distance(points[0], points[points.length - 1])
   if (gap < HOOK_CLOSED_GAP) return true
   const xs = points.map((point) => point.x), ys = points.map((point) => point.y)
   const size = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys))
-  return gap <= size * PEN_LOOSE_CLOSE_RATIO
+  if (gap > size * PEN_LOOSE_CLOSE_RATIO) return false
+  const { signed, total } = turningOf(points, size)
+  return Math.abs(signed) >= LOOP_MIN_TURN && Math.abs(signed) >= total * LOOP_ONE_WAY_RATIO
 }
 
 /**
@@ -414,6 +440,46 @@ function segmentsToAnchors(segments: readonly Segment[]): AnchorPoint[] {
   return anchors
 }
 
+/** 이보다 크게 꺾이면(도, 방향 변화) 예각이다 — 안쪽 각이 75도보다 좁다. 손으로 그은 직각은 10도쯤 흔들려 여유를 둔다. */
+const ACUTE_TURN = 105
+/** 둥글린 자리에서 꺾임점까지의 거리는 옆 마디의 이 비율을 넘지 않는다. */
+const ROUND_MAX_SHARE = 0.4
+/** 둥글린 호의 핸들 길이(꺾임점까지 거리의 비율). 0.55면 직각 호가 원에 가깝다. */
+const ROUND_HANDLE = 0.55
+
+/**
+ * 예각으로 꺾인 앵커를 둥글게 돌린다(10-06 사용자 결정) — 갈지자처럼 접히는 자리가 뾰족 이음으로 길게 튀어나오는 것을 막는다. ㄱ 같은 직각은 그대로 날카롭다.
+ * 꺾임점을 떼고 양옆 마디 위 두 점을 핸들이 꺾임점 쪽을 향하는 호로 잇는다. 반지름은 굵기만큼(마디가 짧으면 그만큼 줄인다).
+ */
+function roundAcuteCorners(anchors: readonly AnchorPoint[], cornerAt: ReadonlySet<string>, radius: number): AnchorPoint[] {
+  const key = (point: PenPoint) => `${point.x},${point.y}`
+  const out: AnchorPoint[] = []
+  for (let i = 0; i < anchors.length; i++) {
+    const anchor = anchors[i]
+    const prev = out[out.length - 1]
+    const next = anchors[i + 1]
+    if (!prev || !next || !cornerAt.has(key(anchor))) { out.push({ ...anchor }); continue }
+    // 들어오는 · 나가는 방향은 핸들이 있으면 핸들로, 없으면 옆 앵커로 잰다.
+    const toPrev = normalize(subtract(anchor.handleIn ?? prev, anchor))
+    const toNext = normalize(subtract(anchor.handleOut ?? next, anchor))
+    const turn = 180 - Math.acos(Math.max(-1, Math.min(1, dot(toPrev, toNext)))) * 180 / Math.PI
+    if (turn <= ACUTE_TURN) { out.push({ ...anchor }); continue }
+    const inner = (180 - turn) * Math.PI / 180
+    const wanted = radius * Math.tan(Math.PI / 2 - inner / 2)
+    const d = Math.min(wanted, distance(anchor, prev) * ROUND_MAX_SHARE, distance(anchor, next) * ROUND_MAX_SHARE)
+    if (!(d > 0)) { out.push({ ...anchor }); continue }
+    const a: AnchorPoint = add(anchor, scale(toPrev, d))
+    const b: AnchorPoint = add(anchor, scale(toNext, d))
+    // 들어오던 곡선의 접선은 지키고 길이만 줄인다.
+    if (anchor.handleIn) a.handleIn = add(a, scale(subtract(anchor.handleIn, anchor), 0.7))
+    if (anchor.handleOut) b.handleOut = add(b, scale(subtract(anchor.handleOut, anchor), 0.7))
+    a.handleOut = add(a, scale(subtract(anchor, a), ROUND_HANDLE))
+    b.handleIn = add(b, scale(subtract(anchor, b), ROUND_HANDLE))
+    out.push(a, b)
+  }
+  return out
+}
+
 /** 획을 촘촘한 점으로 편다 — 이탈 거리 재기용. 96조각이면 꺾은선 오차가 ε의 1/1000 아래다. */
 function sampleStroke(points: readonly AnchorPoint[], steps = 96): PenPoint[] {
   const sampled: PenPoint[] = []
@@ -448,11 +514,9 @@ export function penFitDeviation(points: readonly PenPoint[], stroke: Pick<Stroke
  * 펜으로 그은 점들을 획 하나로. 점이 둘 미만이면(톡 찍기만 하면) null.
  * 돌려주는 `maxDeviation`은 정리한 점 기준이다 — 합쳐서 뺀 점은 `minGap` 안이라 그만큼은 더 벗어날 수 있다.
  */
-export function fitPenStroke(points: readonly PenPoint[], options: PenFitOptions = {}): PenFitResult | null {
-  const epsilon = options.epsilon ?? PEN_FIT_EPSILON
+/** 꺾임을 찾고 꺾임 사이 마디마다 손떨림을 거른다. 맞춤과 긋는 중 미리보기가 같이 쓴다. */
+function smoothBetweenCorners(raw: readonly PenPoint[], options: PenFitOptions): { thinned: PenPoint[]; corners: number[]; breaks: number[]; window: number } {
   const span = options.cornerSpan ?? DEFAULT_CORNER_SPAN
-  const raw = trimPenHooks(thinPenPoints(points, options.minGap ?? DEFAULT_MIN_GAP))
-  if (raw.length < 2) return null
   // 꺾임은 꺾임 재는 거리만큼만 살짝 거른 점에서 찾는다 — 손떨림이 가짜 꺾임으로 잡히지 않고, ㄱ의 모서리는 그대로 잡힌다.
   const corners = penCornerIndices(smoothPenPoints(raw, span), options.cornerAngle ?? PEN_CORNER_ANGLE, span)
   const breaks = [0, ...corners, raw.length - 1]
@@ -463,6 +527,25 @@ export function fitPenStroke(points: readonly PenPoint[], options: PenFitOptions
     const smoothed = smoothPenPoints(raw.slice(breaks[i], breaks[i + 1] + 1), window)
     smoothed.forEach((point, k) => { thinned[breaks[i] + k] = point })
   }
+  return { thinned, corners, breaks, window }
+}
+
+/**
+ * 긋는 중에 보여 줄 선. 손떨림만 거른 점을 그대로 돌려준다 — 곡선 맞춤은 하지 않는다.
+ * 맞춤은 점이 늘 때마다 조각을 새로 나눠, 긋는 내내 다시 맞추면 이미 지나온 곡선이 계속 흔들린다(둥근 획에서 칸의 8%까지).
+ * 거르기는 가까운 점끼리만 보므로 지나온 부분은 그대로 서 있고 펜 끝 근처만 따라 바뀐다. 갈고리 자르기 · 끝점 정리도 손을 뗄 때만 한다.
+ */
+export function stabilizePenPoints(points: readonly PenPoint[], options: PenFitOptions = {}): PenPoint[] {
+  const raw = thinPenPoints(points, options.minGap ?? DEFAULT_MIN_GAP)
+  return raw.length < 3 ? raw : smoothBetweenCorners(raw, options).thinned
+}
+
+export function fitPenStroke(points: readonly PenPoint[], options: PenFitOptions = {}): PenFitResult | null {
+  const epsilon = options.epsilon ?? PEN_FIT_EPSILON
+  const span = options.cornerSpan ?? DEFAULT_CORNER_SPAN
+  const raw = trimPenHooks(thinPenPoints(points, options.minGap ?? DEFAULT_MIN_GAP))
+  if (raw.length < 2) return null
+  const { thinned, corners, breaks, window } = smoothBetweenCorners(raw, options)
   // 획의 두 끝(꺾임 말고)은 거른 몸통이 향하는 선 위로 옮긴다. 끝점만 손떨림 그대로 남아 끝이 휘는 것을 막는다.
   // 닫는 획(ㅇ · ㅁ)은 두 끝이 만나야 하므로 그대로 둔다.
   if (!penClosesOnItself(raw)) {
@@ -478,13 +561,15 @@ export function fitPenStroke(points: readonly PenPoint[], options: PenFitOptions
     const tHat2 = endTangent(thinned.slice(first, last + 1), last - first, -1, span)
     fitCubic(thinned, first, last, tHat1, tHat2, epsilon, segments)
   }
-  const anchors = segmentsToAnchors(segments)
-  if (anchors.length < 2) return null
+  const fitted = segmentsToAnchors(segments)
+  if (fitted.length < 2) return null
+  const thickness = options.thickness ?? DEFAULT_THICKNESS
+  const anchors = options.roundAcute === false ? fitted : roundAcuteCorners(fitted, new Set(corners.map((index) => `${thinned[index].x},${thinned[index].y}`)), thickness)
   const stroke: StrokeDataV2 = {
     id: options.id ?? `stroke-${Date.now()}`,
     points: anchors,
     closed: false,
-    thickness: options.thickness ?? DEFAULT_THICKNESS,
+    thickness,
   }
   return { stroke, corners, pointCount: thinned.length, anchorCount: anchors.length, maxDeviation: penFitDeviation(thinned, stroke) }
 }
