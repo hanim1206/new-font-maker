@@ -14,10 +14,11 @@ import { effectiveLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { useEditHistoryStore } from './editHistoryStore'
 import { newLayoutEntry } from './layoutEntry'
-import { adoptFamilyStrokes, familyOfSyllable, hasFamilyStrokes, mergeFamilyStrokes, splitFamilyStrokes, wholeJamoStrokes, writeFamilyStrokes } from '../src/utils/jamoContextStrokes'
+import { adoptFamilyStrokes, familyOfSyllable, hasFamilyStrokes, splitFamilyStrokes, wholeJamoStrokes, writeFamilyStrokes } from '../src/utils/jamoContextStrokes'
 import type { MedialFamily } from '../src/types'
 import { initialRowChunks } from './reviewPropagation'
-import { VariantGateCard } from './VariantGateCard'
+import { VariantGateCard, type VariantNode } from './VariantGateCard'
+import { VariantDrawer } from './VariantDrawer'
 import { countOwnJoins, miterLimitOf, withoutOwnJoins } from '../src/services/strokeJoin'
 import { centerlineInkGroups } from '../src/services/finalGlyphInk'
 import { brushInkGroupsToSvgPaths } from '../src/services/brushGeometry'
@@ -2653,19 +2654,34 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     updateJamo(after)
     setPreviewJamo(null)
   }
-  const splitVariant = () => {
-    if (!variantGate || !storedChoseong) return
-    commitVariant(splitFamilyStrokes(storedChoseong, variantGate))
-    // 가르자마자 이 글자의 첫 획을 잡아 바로 고친다.
+  // 트리 화살표. 안 가른 가지로 갈 때 그 계열을 먼저 가른다(게이트에서도, 줄 `⋯` 트리에서도 온다).
+  const splitVariant = (family: MedialFamily) => {
+    if (!storedChoseong || hasFamilyStrokes(storedChoseong, family)) return
+    commitVariant(splitFamilyStrokes(storedChoseong, family))
+    // 가르자마자 트리를 접고 이 글자의 첫 획을 잡아 바로 고친다.
+    setTreeOpen(false)
     pickFirstStrokeRef.current = true
   }
-  const mergeVariant = () => {
-    if (!editFamily || !storedChoseong || !familySplit) return
-    commitVariant(mergeFamilyStrokes(storedChoseong, editFamily))
-    setSelection({ kind: 'none' })
-    setSelectedPoints([])
-    setSelectedStrokes([])
+  // 트리에서 칸으로 가기. 기본 = 단독 칸, 가지 = 그 계열 대표 글자(줄의 첫 글자).
+  const goVariant = (node: VariantNode) => {
+    setTreeOpen(false)
+    if (node === 'base') { pickSolo(); return }
+    const char = gateExamples[node]
+    if (char) pickStrokeRowChar(char)
   }
+  // `닿는 글자` 줄 `⋯` = 조절판 자리 트리 토글. 게이트(안 가른 계열)는 트리가 강제로 서고, 가른 뒤엔 `⋯`로 연다. 글자를 바꾸면 접힌다.
+  const [treeOpen, setTreeOpen] = useState(false)
+  // 게이트 드로어를 끌어 내렸는지. 캔버스는 잠긴 채고 `⋯`로 다시 올린다.
+  const [gateDismissed, setGateDismissed] = useState(false)
+  // 트리에서 고른 칸. 줄의 켜진 덩이가 따라온다. 글자를 바꾸거나 트리를 접으면 푼다.
+  const [treePicked, setTreePicked] = useState<VariantNode | null>(null)
+  useEffect(() => { setTreeOpen(false); setGateDismissed(false); setTreePicked(null) }, [selectedChar])
+  const variantTreeAvailable = chrome === 'workspace' && editMode === 'stroke' && strokeCardPart === 'CH' && !!storedChoseong && !big
+  const variantTreeShown = variantTreeAvailable && ((variantGate !== null && !gateDismissed) || treeOpen)
+  const closeTree = () => { setTreeOpen(false); setGateDismissed(true); setTreePicked(null) }
+  const variantTree = variantTreeAvailable
+    ? { open: variantTreeShown, onToggle: () => { if (variantTreeShown) closeTree(); else { setTreeOpen(true); setGateDismissed(false) } } }
+    : undefined
   const canvasLocked = styleLocksCanvas || variantGate !== null
   useEffect(() => {
     if (!pickFirstStrokeRef.current || !lockedPart) return
@@ -3363,7 +3379,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
       {/* 획 편집에도 같은 자리·같은 높이로 `닿는 글자` 줄이 선다. 범위는 고치는 자모가 든 글자 전부(레이아웃을 안 가린다).
           줄이 두 모드에 다 있어야 `획 고치기`로 오갈 때 캔버스가 안 튄다. */}
       {chrome === 'workspace' && strokeFrameAvailable && !styleLocksCanvas && !big && strokeRowJamo && strokeCardPart &&
-        <TouchedGlyphRow source={strokeRowSource} bundle={notoBundle} edit={NO_LAYOUT_EDIT} ghostVisible={false} focus={strokeCardPart} scope="jamo" group={strokeCardPart} jamos={strokeRowJamos} anyContext onPick={pickStrokeRowChar} activeChar={selectedChar} lead={soloLead} onPickLead={pickSolo} splitFamilies={splitFamilies} onMerge={familySplit && !isSoloConsonant(selectedChar) ? mergeVariant : null} />}
+        <TouchedGlyphRow source={strokeRowSource} bundle={notoBundle} edit={NO_LAYOUT_EDIT} ghostVisible={false} focus={strokeCardPart} scope="jamo" group={strokeCardPart} jamos={strokeRowJamos} anyContext onPick={pickStrokeRowChar} activeChar={selectedChar} lead={soloLead} onPickLead={pickSolo} splitFamilies={splitFamilies} tree={variantTree} highlight={variantTreeShown ? treePicked : null} />}
       {!styleSpaceOpen && <section className={styles.editor} data-chrome={chrome} data-stroke-tools={!globalStylePanel && directManipulation ? true : undefined} data-big={big || undefined} aria-label={`${selectedChar} 완성 글자 편집`}>
         {/* 셸 안 획 편집에서는 캔버스 왼쪽에 도구 단추가 세로로 선다(한 칸씩 넘기는 슬라이드). 여섯 칸 표지는 숨긴다 — 닿는 범위는 위 `닿는 글자` 줄이 보여 준다. */}
         <div className={styles.strokeStage}>
@@ -3403,9 +3419,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
           onCommit={commitBeak}
           scope={benchGroup && { groupName: benchGroup.name, groupSize: benchGroup.chars.length, toGroup: beakGroup !== null, onChange: (toGroup) => { draftBeak(null); setBeakToGroup(toGroup) } }}
         />}
-      /> : variantGate && storedChoseong ? <section className={styles.trackpadSection} data-testid="variant-gate-section">
-        <VariantGateCard jamo={storedChoseong.char} family={variantGate} splitFamilies={splitFamilies} examples={gateExamples} onSplit={splitVariant} />
-      </section> : <InferenceTrackpad
+      /> : <InferenceTrackpad
         glyph={selectedChar}
         syllable={syllable}
         selection={selection}
@@ -3438,6 +3452,12 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         padHidden={big}
         globalLinejoin={globalStyle.linejoin}
       />}
+      {/* 첫닿자 변형 트리. 조절판을 덮는 하단 드로어 — 안 가른 계열의 글자를 열면 저절로 올라오고(게이트), 가른 뒤엔 줄 `⋯`로. 끌어 내리면 닫힌다. */}
+      {variantTreeAvailable && storedChoseong && <VariantDrawer open={variantTreeShown} onClose={closeTree} title="닿자 형태 전파" description={splitFamilies.length >= 3 ? '기본 닿자의 영향을 받는 레이아웃이 없어요.' : `${3 - splitFamilies.length}개의 레이아웃이 기본 닿자의 영향을 받아요.`}>
+        <div data-testid="variant-gate-section" data-gate={variantGate ? true : undefined}>
+          <VariantGateCard jamo={storedChoseong.char} viewing={isSoloConsonant(selectedChar) || !editFamily ? 'base' : editFamily} splitFamilies={splitFamilies} examples={gateExamples} onSplit={splitVariant} onGo={goVariant} onPick={setTreePicked} />
+        </div>
+      </VariantDrawer>}
       {/* 획 편집은 끄는 즉시 저장된다. 레이아웃으로 돌아가는 문은 머리 `‹`(도마를 들고 왔으면 섹션 홈), 되돌리기는 ↶. */}
       {strokeFrameAvailable && !globalStylePanel && boxFitIssue && <div className={styles.strokeDoneBar}>
         <p role="status" data-testid="jamo-box-fit-issue">이 획은 모델 상자에 안 맞아 옛 배치로 그립니다 · {boxFitIssue.message}</p>
