@@ -592,6 +592,13 @@ test('캔버스 `크게`를 켜면 조절판 · `닿는 글자` 줄이 비키고
 
   await toggle.click()
   await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  // 머리가 사라지고 캔버스가 그 자리까지 올라간다. 되돌리기 · 다시 실행은 캔버스 귀퉁이에, `작게`는 그 아래에 뜬다.
+  await expect(page.getByTestId('workspace-back')).toHaveCount(0)
+  const cornerUndo = canvas.getByRole('button', { name: '형태 편집 실행 취소' })
+  await expect(cornerUndo).toBeVisible()
+  await expect(canvas.getByRole('button', { name: '형태 편집 다시 실행' })).toBeVisible()
+  expect((await canvas.boundingBox())!.y).toBeLessThan(small.y)
+  expect((await toggle.boundingBox())!.y).toBeGreaterThan((await cornerUndo.boundingBox())!.y)
   // 조절판은 안 그리지만 도구 줄은 남는다 — 캔버스 아래 가로 한 줄, 화면 안.
   await expect(page.getByTestId('jamo-stroke-trackpad')).toHaveCount(0)
   await expect(page.getByRole('toolbar', { name: '획 편집 도구' })).toBeVisible()
@@ -625,13 +632,17 @@ test('캔버스 `크게`를 켜면 조절판 · `닿는 글자` 줄이 비키고
   expect(Math.round(back.width)).toBe(Math.round(small.width))
   expect(Math.round(back.height)).toBe(Math.round(small.height))
 
-  // 켠 채 머리 `‹`로 레이아웃에 나가면 꺼지고, 셸은 다시 480 기둥이다.
+  // 귀퉁이 되돌리기가 끈 것을 되돌린다. 넓은 화면에서 켜면 셸이 화면 폭을 다 쓰고, 끄면 머리와 480 기둥이 돌아와 `‹`로 레이아웃에 나간다.
   await page.setViewportSize({ width: 820, height: 1180 })
   await toggle.click()
   await expect.poll(async () => (await page.locator('main > div').first().boundingBox())!.width).toBe(820)
+  await canvas.getByRole('button', { name: '형태 편집 실행 취소' }).click()
+  await expect.poll(xOf).toBe(beforeX)
+  await expect(canvas.getByRole('button', { name: '형태 편집 다시 실행' })).toBeEnabled()
+  await toggle.click()
+  await expect.poll(async () => (await page.locator('main > div').first().boundingBox())!.width).toBe(480)
   await page.getByTestId('workspace-back').click()
   await expect(page.getByTestId('canvas-big-toggle')).toHaveCount(0)
-  await expect.poll(async () => (await page.locator('main > div').first().boundingBox())!.width).toBe(480)
 })
 
 test('도구 줄은 고른 것에 쓰는 단추만 세우고, `추가` · `스타일`은 조절판 자리에 패널로 편다. 크게 보기에서는 도구 줄이 그 자리에서 바뀐다', async ({ page }) => {
@@ -665,6 +676,7 @@ test('도구 줄은 고른 것에 쓰는 단추만 세우고, `추가` · `스�
   await join.click()
   await expect(panel).toHaveAttribute('data-panel', 'style')
   await expect(pad).toHaveCount(0)
+  await expect(panel.getByRole('heading', { name: '스타일' })).toBeVisible()
   await expect(panel.getByRole('heading', { name: '꺾임' })).toBeVisible()
   const choices = page.getByTestId('jamo-stroke-join-choice')
   await expect(choices).toHaveCount(4)
@@ -677,6 +689,23 @@ test('도구 줄은 고른 것에 쓰는 단추만 세우고, `추가` · `스�
   const lowest = (await choices.last().boundingBox())!
   expect(lowest.y + lowest.height).toBeLessThanOrEqual((page.viewportSize()?.height ?? 0) + 1)
   await page.screenshot({ path: 'test-results/tool-panel-join.png' })
+  // 굵기 줄: 왼쪽은 꺾임과 같은 `적용 안 함` 칸, 오른쪽 막대는 그 획의 기본 굵기에 대한 %. 바꾸면 칸이 꺼지고, 칸을 누르면 기본으로 돌아온다.
+  const thickness = page.getByTestId('jamo-stroke-thickness')
+  const thicknessValue = page.getByTestId('jamo-stroke-thickness-value')
+  const thicknessNone = page.getByTestId('jamo-stroke-thickness-none')
+  await expect(thicknessValue).toHaveText('100%')
+  await expect(thicknessNone).toHaveAttribute('aria-checked', 'true')
+  await thickness.fill('120')
+  await expect(thicknessValue).toHaveText('120%')
+  await expect(thicknessNone).toHaveAttribute('aria-checked', 'false')
+  await expect(panel).toBeVisible()
+  expect(await canvas.boundingBox()).toEqual(small)
+  const bar = (await thickness.boundingBox())!
+  expect(bar.y + bar.height).toBeLessThanOrEqual((page.viewportSize()?.height ?? 0) + 1)
+  await page.screenshot({ path: 'test-results/tool-panel-style.png' })
+  await thicknessNone.click()
+  await expect(thicknessValue).toHaveText('100%')
+  await expect(thicknessNone).toHaveAttribute('aria-checked', 'true')
   // 다시 누르면 조절판으로 돌아온다.
   await join.click()
   await expect(panel).toHaveCount(0)
@@ -686,6 +715,7 @@ test('도구 줄은 고른 것에 쓰는 단추만 세우고, `추가` · `스�
   await join.click()
   await tools.getByRole('button', { name: '획 추가' }).click()
   await expect(panel).toHaveAttribute('data-panel', 'add')
+  await expect(panel.getByRole('heading', { name: '추가' })).toBeVisible()
   await expect(page.getByTestId('jamo-stroke-add-circle')).toBeVisible()
   await page.screenshot({ path: 'test-results/tool-panel-add.png' })
 

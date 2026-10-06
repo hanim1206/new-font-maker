@@ -243,15 +243,22 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .strokeToolSlot .strokeToolRow .strokeToolSpread svg { color: rgb(var(--color-edit-select)); }
 .strokeToolSlot .strokeToolRow > button[aria-expanded='true'] svg, .strokeToolSlot .strokeToolRow > button[aria-pressed='true'] svg { color: inherit; }
 /* 도구 줄 단추(`추가` · `꺾임`)가 조절판 자리에 펴는 패널. 조절판과 자소 크기 막대가 비킨 자리를 그대로 쓴다. */
-.toolPanel { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; align-items: flex-start; justify-content: center; }
+/* 화면이 낮아 내용이 다 안 들면 패널 안에서 밀어 내린다(폰마다 남는 높이가 달라 딱 맞출 수 없다). 캔버스는 안 움직인다. */
+.toolPanel { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.toolPanel::-webkit-scrollbar { display: none; }
+/* 패널 이름. 위아래로 숨 쉴 자리를 둬 줄 이름(꺾임 · 굵기)과 갈린다. 아래 내용은 제 높이만 쓴다(세로로 늘어나지 않게). */
+.toolPanelTitle { margin: 0; padding: 8px 0 16px; color: rgb(var(--color-foreground)); font-size: var(--font-18); font-weight: var(--weight-bold); line-height: 24px; }
+.toolPanel > .panelChoices, .toolPanel > .stylePanel { flex: 0 0 auto; }
 /* `스타일` 패널: 줄마다 작은 이름 + 그림 칸. 줄이 늘면 아래로 쌓인다(전역 스타일 패널의 줄 이름과 같은 글자). */
-.stylePanel { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.stylePanel { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
 .stylePanel section { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .stylePanel h3 { margin: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; color: rgb(var(--color-text-3)); font-size: var(--font-14); font-weight: var(--weight-semibold); }
 .stylePanel h3 output { color: rgb(var(--color-foreground)); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; }
-/* 단추 두엇이 나란한 줄(굵기의 얇게 · 굵게). 같은 너비로 나눈다. */
-.stylePanelRow { display: flex; gap: 8px; }
-.stylePanelRow > * { flex: 1 1 0; min-width: 0; }
+/* 그림 칸 하나 + 막대 줄(굵기). 칸은 꺾임 줄의 첫 칸과 같은 너비, 막대는 남은 세 칸을 쓴다. */
+.stylePanelSplit { min-width: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: center; gap: 8px; }
+.stylePanelBar { grid-column: 2 / -1; min-width: 0; padding: 0 6px 0 20px; }
+/* 낮은 화면(폰 사파리)에서는 두 줄이 조절판 자리에 들게 그림과 줄 사이를 줄인다. */
+@media (max-height: 720px) { .toolPanelTitle { padding: 4px 0 10px; } .stylePanel { gap: 8px; } .stylePanel section { gap: 4px; } .stylePanel [role='radio'] { gap: 4px; padding-top: 6px; padding-bottom: 4px; } .stylePanel [role='radio'] svg { width: 35px; height: 28px; } }
 /* 패널 안 그림 칸 한 줄(추가: 선 · 원 · 사각 · 펜, 꺾임: 전역 따름 · 뾰족 · 깎음 · 둥긂). 칸 수만큼 같은 너비로 나눈다. */
 .panelChoices { flex: 1 1 auto; min-width: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
 /* 조절판 왼쪽 위에 띄운다 — 자리를 안 차지해 글자가 뜨고 사라져도 조절판 크기가 그대로다. 눌림은 조절판으로 지나간다. */
@@ -287,7 +294,10 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 /* 캔버스 `크게` 보기. 문장 줄 · `닿는 글자` 줄 · 조절판이 비키고 캔버스와 도구 줄만 남는다.
    도구 줄은 어느 폭에서든 화면 맨 아래 가로 한 줄로 눕고(넘치면 옆으로 한 칸씩), 캔버스는 정사각형을 풀고 남은 자리를 가로 · 세로 다 채운다.
    글자는 짧은 변에 맞춰 가운데에 놓이고, 긴 쪽으로는 눈금 바깥이 더 보인다. */
-.canvasCorner { position: absolute; z-index: 3; top: 10px; right: 10px; display: flex; }
+.canvasCorner { position: absolute; z-index: 3; top: 10px; right: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+/* `크게`에서 귀퉁이 윗줄: 되돌리기 · 다시 실행. 그 아래가 `작게`. */
+.canvasCornerRow { display: flex; gap: 8px; }
+.canvasBigToggle:disabled { opacity: .34; }
 .canvasBigToggle { width: 36px; height: 36px; display: grid; place-items: center; border-radius: var(--radius-md); background: rgb(var(--color-surface-3) / .92); color: rgb(var(--color-text-2)); }
 .canvasBigToggle:active { background: rgb(var(--color-foreground) / .1); }
 .scrollArea[data-big] > .sentence { display: none; }
@@ -307,6 +317,7 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .editor[data-big] .strokeToolSlot .stylePanel { flex: 0 1 auto; }
 .editor[data-big] .strokeToolSlot .strokeToolRow[data-panel] { align-items: center; gap: 8px; }
 .editor[data-big] .strokeToolSlot .panelChoices { flex: 0 1 auto; grid-auto-columns: minmax(0, 72px); }
+.editor[data-big] .strokeToolSlot .stylePanelSplit { grid-template-columns: repeat(4, minmax(0, 72px)); }
 .editor[data-big] .strokeToolSlot .strokeToolRow .strokeToolSpread { margin-top: 0; }
 .strokeToolSection[data-pad-hidden] { flex: 0 0 auto; gap: 0; padding: 0; border-top: 0; }
 /* 경고 · 펜 상태 한 줄은 화면 왼쪽 아래에 뜬다(조절판 자리가 없으므로). */
