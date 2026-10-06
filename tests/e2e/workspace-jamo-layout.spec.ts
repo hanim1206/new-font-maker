@@ -376,7 +376,9 @@ test('켠 부품의 획 고치기로 내려가고, 안 끝난 변경이 있으�
   await expect(page.getByTestId('jamo-stroke-trackpad')).toBeVisible()
   await expect(page.getByRole('toolbar', { name: '획 편집 도구' }).getByRole('button', { name: '획 추가' })).toBeEnabled()
   const strokeHits = editor.locator('svg [data-editor-hit="stroke"]')
-  await expect(strokeHits.and(editor.locator('[data-selected="true"]'))).toHaveCount(1)
+  // 첫 화면은 자소가 통째로 골라진 상태다 — 획 하나가 잡혀 있지 않고 잉크 둘레에 테두리가 둘린다.
+  await expect(strokeHits.and(editor.locator('[data-selected="true"]'))).toHaveCount(0)
+  await expect(page.getByTestId('whole-jamo-outline')).toHaveCount(1)
   // 잠긴 동안 눌리는 획은 첫닿자 ㅁ 것뿐이다.
   const lockedHitCount = await strokeHits.count()
   // 셸 안 획 캔버스는 레이아웃 캔버스와 같은 크기 · 같은 가로 자리다. 문장 줄이 접힌 만큼 위로 올라간다.
@@ -660,8 +662,16 @@ test('획 편집의 머리 ‹는 고친 채로 레이아웃으로 나가고 ↶
   // 잡힌 획의 중심선. 저장소 문자열은 처음엔 비어 있을 수 있어서 화면에 그려진 획으로 비교한다.
   const selectedStroke = () => page.locator('[data-editor-hit="stroke"][data-selected="true"]').getAttribute('d')
 
+  // 첫 화면은 자소 통째라 획을 눌러서 잡는다.
+  const pickFirstStroke = async () => {
+    const hit = page.locator('[data-editor-hit="stroke"]').first()
+    await hit.dispatchEvent('pointerdown')
+    await hit.dispatchEvent('pointerup')
+    await expect(hit).toHaveAttribute('data-selected', 'true')
+  }
   await page.getByTestId('review-canvas').locator('[data-edit-part]').first().dispatchEvent('click')
   await page.waitForFunction(() => document.querySelector('section[aria-label="보정 문장"]')?.getBoundingClientRect().height === 0)
+  await pickFirstStroke()
   const before = await selectedStroke()
   expect(before).toBeTruthy()
   await openStrokePoints(page, (paths) => Math.max(0, paths.indexOf(before!)))
@@ -687,6 +697,7 @@ test('획 편집의 머리 ‹는 고친 채로 레이아웃으로 나가고 ↶
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
   await expect(undoButton).toBeEnabled()
   await page.getByTestId('review-canvas').locator('[data-edit-part]').first().dispatchEvent('click')
+  await pickFirstStroke()
   await expect.poll(selectedStroke).toBe(edited)
   // 되돌리기는 ↶ 두 번(고친 두 번). 되돌린 것은 ↷로 살린다.
   await undoButton.click()
@@ -695,11 +706,14 @@ test('획 편집의 머리 ‹는 고친 채로 레이아웃으로 나가고 ↶
   await expect(redoButton).toBeEnabled()
 })
 
-test('주소 &mode=stroke&part=JO는 받침이 잡힌 획 편집을 바로 연다', async ({ page }) => {
+test('주소 &mode=stroke&part=JO는 받침이 통째로 골라진 획 편집을 바로 연다', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%A9%88&mode=stroke&part=JO')
   await expect(page.getByRole('region', { name: '멈 완성 글자 편집' })).toBeVisible()
   await expect(page.getByTestId('jamo-stroke-tools')).toBeVisible()
-  await expect(page.locator('[data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(1)
+  // 획 하나가 아니라 받침 ㅁ이 통째로 골라져 있다(잉크 둘레 테두리). 받침 획만 눌린다.
+  await expect(page.getByTestId('whole-jamo-outline')).toHaveCount(1)
+  await expect(page.locator('[data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(0)
+  await expect(page.getByRole('toolbar', { name: '획 편집 도구' })).toHaveAttribute('data-mode', 'jamo')
   await page.getByTestId('workspace-back').click()
   await expect(page.getByTestId('review-canvas').getByTestId('review-part-hit').and(page.locator('[aria-pressed="true"]'))).toHaveAttribute('aria-label', '받침 ㅁ 선택', { timeout: 20_000 })
 })
@@ -1078,7 +1092,11 @@ test('첫닿자 획 편집은 단독 칸으로 열리고, 줄에서 음절로 �
   const solo = page.getByTestId('touched-glyph-solo')
   await expect(solo).toHaveAttribute('data-active', 'true', { timeout: 20_000 })
   await expect(page.getByRole('region', { name: 'ㄴ 완성 글자 편집' })).toBeVisible()
-  // 들어오면 첫 획이 잡혀 있다. 단독 칸에는 옆 자소가 없다.
+  // 들어오면 자소가 통째로 골라져 있다. 획은 눌러서 잡는다. 단독 칸에는 옆 자소가 없다.
+  await expect(page.locator('svg [data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(0)
+  await expect(page.getByTestId('whole-jamo-outline')).toHaveCount(1)
+  await page.locator('svg [data-editor-hit="stroke"]').first().dispatchEvent('pointerdown')
+  await page.locator('svg [data-editor-hit="stroke"]').first().dispatchEvent('pointerup')
   await expect(page.locator('svg [data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(1)
   await expect(page.getByTestId('focus-canvas')).not.toHaveAttribute('data-placement', 'boxes')
   // 단독 칸 바로 뒤가 들고 온 음절이다.

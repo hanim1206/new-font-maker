@@ -5,6 +5,7 @@ import { persist } from 'zustand/middleware'
 import type { BrushStyle, LayoutType, Padding, StrokeLinecap, StrokeLinejoin, StrokeRenderStyle } from '../types'
 import { DEFAULT_STEM_BEAK, normalizeStemBeak, type StemBeakStyle } from '../services/stemBeak'
 import { INNER_ROUNDNESS_MAX } from '../services/flatStrokeGeometry'
+import { DEFAULT_MITER_LIMIT } from '../services/strokeJoin'
 import { withBodyCompensation } from '../services/bodyCompensation'
 import { mergeLayoutPadding, useLayoutStore } from './layoutStore'
 
@@ -164,10 +165,13 @@ export function normalizeStrokeRenderStyle(
   // 안쪽 둥글기는 따로 정했을 때만 키를 둔다. 없으면 바깥을 따른다(연결).
   const innerRoundness = input?.mode === 'brush' && Number.isFinite(input.innerRoundness) ? Math.max(0, Math.min(INNER_ROUNDNESS_MAX, input.innerRoundness as number)) : undefined
   const contrast = input?.mode === 'brush' && Number.isFinite(input.contrast) ? Math.max(-1, Math.min(1, input.contrast as number)) : 0
+  // 뾰족 한계(1~4). 기본값(1.64)이면 키를 안 둔다 — 옛 저장분과 같은 모양.
+  const miterLimit = input?.mode === 'brush' && Number.isFinite(input.miterLimit) ? Math.max(1, Math.min(4, input.miterLimit as number)) : DEFAULT_MITER_LIMIT
   const style: StrokeRenderStyle = { mode: 'brush', brush: normalizeBrushStyle(candidate) }
   if (roundness > 0) style.roundness = roundness
   if (innerRoundness !== undefined) style.innerRoundness = innerRoundness
   if (contrast !== 0) style.contrast = contrast
+  if (Math.abs(miterLimit - DEFAULT_MITER_LIMIT) > 1e-9) style.miterLimit = miterLimit
   return style
 }
 
@@ -220,7 +224,7 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
           state.style.brush = normalizeBrushStyle(value)
           // 붓촉만 바꿀 때 전역 둥글기는 그대로 둔다.
           const previous = state.style.strokeStyle.mode === 'brush' ? state.style.strokeStyle : undefined
-          state.style.strokeStyle = normalizeStrokeRenderStyle({ mode: 'brush', brush: state.style.brush, roundness: previous?.roundness, innerRoundness: previous?.innerRoundness, contrast: previous?.contrast })
+          state.style.strokeStyle = normalizeStrokeRenderStyle({ mode: 'brush', brush: state.style.brush, roundness: previous?.roundness, innerRoundness: previous?.innerRoundness, contrast: previous?.contrast, miterLimit: previous?.miterLimit })
         }),
 
       setStrokeRenderStyle: (value) =>

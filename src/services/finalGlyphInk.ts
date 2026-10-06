@@ -7,10 +7,12 @@ import type {
   StrokeDataV2,
   StrokeRenderStyle,
 } from '../types'
+import type { BrushInkGroup } from './brushGeometry'
 import { unionInkRegions } from './inkBoolean'
 import { strokeToFlatInkGroups } from './flatStrokeGeometry'
 import { brushInkGroupsToInkRegions } from './inkGeometry'
 import { contrastOf, hasRoundness, innerRoundnessOf, roundnessOf, stemScaleOf, strokeToRenderInkGroups } from './strokeRenderGeometry'
+import { miterLimitOf } from './strokeJoin'
 import type { Contour } from './strokeToOutline'
 
 const BOOLEAN_OPTIONS = { positionEpsilon: 1e-9, minRingArea: 1e-12 } as const
@@ -111,6 +113,53 @@ function cloneRegion(region: DeepReadonly<InkRegion>): InkRegion {
   }
 }
 
+/** 최종 잉크의 기본 정밀도. 화면 · 레이아웃 · 추출이 같은 값으로 면을 만든다. */
+export const DEFAULT_FINAL_INK_OPTIONS: FinalGlyphInkMaterializationOptions = { unitsPerEm: 1000, maxCurveErrorFontUnits: 0.5 }
+
+/** 중심선 하나를 면으로 만드는 데 필요한 것. `ResolvedCenterlinePrimitive`가 그대로 들어온다. */
+export interface CenterlineInkInput {
+  id?: string
+  stroke: DeepReadonly<StrokeDataV2>
+  box: Readonly<{ x: number; y: number; width: number; height: number }>
+  weightMultiplier: number
+  effectiveLinecap: 'butt' | 'round' | 'square'
+  effectiveLinejoin: 'miter' | 'round' | 'bevel'
+}
+
+/**
+ * 중심선 하나 → 면 묶음. **획을 면으로 만드는 분기는 여기 하나다** — 최종 잉크(레이아웃 · 추출)와 화면(`SvgRenderer`의 면 그리기)이 같이 부른다.
+ * 끝 · 꺾임 · 뾰족 한계 · 둥글기 · 대비 · 붓촉을 받는다. 화면은 획마다 따로 칠하고, 최종 잉크만 획끼리 합친다.
+ */
+export function centerlineInkGroups(
+  primitive: CenterlineInkInput,
+  strokeStyle: DeepReadonly<StrokeRenderStyle>,
+  options: FinalGlyphInkMaterializationOptions = DEFAULT_FINAL_INK_OPTIONS,
+): { ok: true; groups: BrushInkGroup[] } | { ok: false; message: string } {
+  // 끝·꺾임이 둥글지 않은 중심선은 붓 tip 방식으로 못 만든다. brush 모드에서만 일자 stroker로 대신한다.
+  // 전역 둥글기가 있으면 끝 모양과 상관없이 일자 stroker가 모서리를 굴린다(화면 · OTF와 같은 함수).
+  // 납작·네모 붓촉은 붓촉이 끝을 만든다. 끝 모양과 상관없이 붓촉으로 긋는다(`strokeToRenderInkGroups`와 같은 분기).
+  const shapedTip = strokeStyle.mode === 'brush' && strokeStyle.brush.tip !== 'round'
+  const rounded = !shapedTip && hasRoundness(strokeStyle as StrokeRenderStyle)
+  const flat = !shapedTip && (rounded || primitive.effectiveLinecap !== 'round' || primitive.effectiveLinejoin !== 'round')
+  if (flat && strokeStyle.mode !== 'brush') {
+    return { ok: false, message: `중심선 ${primitive.id ?? ''}의 ${primitive.effectiveLinecap}/${primitive.effectiveLinejoin} 윤곽 변환은 ${strokeStyle.mode} 스타일에서 지원하지 않습니다.` }
+  }
+  const vertices = resolveFinalInkEllipseVertexCount(primitive.stroke.thickness * primitive.weightMultiplier / 2, options)
+  if (vertices === 0) return { ok: false, message: '최종 잉크 곡선 오차 옵션이 유효하지 않습니다.' }
+  const groups = flat
+    ? (rounded
+      ? strokeToFlatInkGroups(primitive.stroke as StrokeDataV2, { ...primitive.box }, primitive.weightMultiplier, 'butt', primitive.effectiveLinejoin, vertices, roundnessOf(strokeStyle as StrokeRenderStyle), innerRoundnessOf(strokeStyle as StrokeRenderStyle), contrastOf(strokeStyle as StrokeRenderStyle), stemScaleOf(strokeStyle as StrokeRenderStyle), miterLimitOf(strokeStyle as StrokeRenderStyle))
+      : strokeToFlatInkGroups(primitive.stroke as StrokeDataV2, { ...primitive.box }, primitive.weightMultiplier, primitive.effectiveLinecap, primitive.effectiveLinejoin, vertices, 0, undefined, 0, 1, miterLimitOf(strokeStyle as StrokeRenderStyle)))
+    : strokeToRenderInkGroups(
+      primitive.stroke as StrokeDataV2,
+      { ...primitive.box },
+      primitive.weightMultiplier,
+      strokeStyle as StrokeRenderStyle,
+      { ellipseVertexCount: vertices, join: { linejoin: primitive.effectiveLinejoin, miterLimit: miterLimitOf(strokeStyle as StrokeRenderStyle) } },
+    )
+  return { ok: true, groups }
+}
+
 /**
  * 모든 양의 선·면 primitive를 같은 glyph-normalized 면으로 바꾼 뒤 한 번 union한다.
  * 반환값만 SVG와 OTF가 소비하며 각 소비자는 Boolean을 다시 수행하지 않는다.
@@ -129,33 +178,9 @@ export function materializeFinalGlyphInk(
       regions.push(cloneRegion(primitive.region))
       continue
     }
-    // 끝·꺾임이 둥글지 않은 중심선은 붓 tip 방식으로 못 만든다. brush 모드에서만 일자 stroker로 대신한다.
-    // 전역 둥글기가 있으면 끝 모양과 상관없이 일자 stroker가 모서리를 굴린다(화면 · OTF와 같은 함수).
-    // 납작·네모 붓촉은 붓촉이 끝을 만든다. 끝 모양과 상관없이 붓촉으로 긋는다(`strokeToRenderInkGroups`와 같은 분기).
-    const shapedTip = strokeStyle.mode === 'brush' && strokeStyle.brush.tip !== 'round'
-    const rounded = !shapedTip && hasRoundness(strokeStyle as StrokeRenderStyle)
-    const flat = !shapedTip && (rounded || primitive.effectiveLinecap !== 'round' || primitive.effectiveLinejoin !== 'round')
-    if (flat && strokeStyle.mode !== 'brush') {
-      return {
-        ok: false,
-        primitiveId: primitive.id,
-        message: `중심선 ${primitive.id}의 ${primitive.effectiveLinecap}/${primitive.effectiveLinejoin} 윤곽 변환은 ${strokeStyle.mode} 스타일에서 지원하지 않습니다.`,
-      }
-    }
-    const vertices = resolveFinalInkEllipseVertexCount(primitive.stroke.thickness * primitive.weightMultiplier / 2, options)
-    if (vertices === 0) return { ok: false, primitiveId: primitive.id, message: '최종 잉크 곡선 오차 옵션이 유효하지 않습니다.' }
-    const groups = flat
-      ? (rounded
-        ? strokeToFlatInkGroups(primitive.stroke as StrokeDataV2, { ...primitive.box }, primitive.weightMultiplier, 'butt', 'miter', vertices, roundnessOf(strokeStyle as StrokeRenderStyle), innerRoundnessOf(strokeStyle as StrokeRenderStyle), contrastOf(strokeStyle as StrokeRenderStyle), stemScaleOf(strokeStyle as StrokeRenderStyle))
-        : strokeToFlatInkGroups(primitive.stroke as StrokeDataV2, { ...primitive.box }, primitive.weightMultiplier, primitive.effectiveLinecap, primitive.effectiveLinejoin, vertices))
-      : strokeToRenderInkGroups(
-        primitive.stroke as StrokeDataV2,
-        { ...primitive.box },
-        primitive.weightMultiplier,
-        strokeStyle as StrokeRenderStyle,
-        { ellipseVertexCount: vertices },
-      )
-    const strokeRegions = brushInkGroupsToInkRegions(groups)
+    const made = centerlineInkGroups(primitive, strokeStyle, options)
+    if (!made.ok) return { ok: false, primitiveId: primitive.id, message: made.message }
+    const strokeRegions = brushInkGroupsToInkRegions(made.groups)
     if (strokeRegions.length === 0) {
       return { ok: false, primitiveId: primitive.id, message: `중심선 ${primitive.id}을 면으로 만들 수 없습니다.` }
     }

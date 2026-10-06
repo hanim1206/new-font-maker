@@ -8,6 +8,8 @@ import styles from './CalibrationSentenceEditor.module.css'
 import { Button } from './components/ui/button'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { Field, RangeBar } from './components/ui/range'
+import { MITER_ANGLE_RANGE, miterAngleOf, miterLimitOf, miterLimitOfAngle } from '../src/services/strokeJoin'
+import { JOIN_CHOICES } from './strokeJoinChoices'
 
 const TIP_OPTIONS: Array<{ tip: BrushTip; label: string }> = [
   { tip: 'round', label: '원형' }, { tip: 'ellipse', label: '납작형' }, { tip: 'rectangle', label: '네모형' },
@@ -22,8 +24,10 @@ const END_CHOICES: Array<{ id: 'plain' | 'flat'; label: string; tip: BrushTip }>
   { id: 'plain', label: '일반 붓', tip: 'round' },
   { id: 'flat', label: '납작 붓', tip: 'ellipse' },
 ]
-/** 둥글기 막대를 움직이면 저장된 끝 모양은 각진 끝으로 돌아간다 — 둥근 끝 위에 또 굴리지 않는다. */
-const SQUARE_ENDS: StrokeEnds = { linecap: 'butt', linejoin: 'miter' }
+/** 꺾임 그림. ㄱ 모서리 하나를 그 꺾임으로 그린 것 — 전역 `획` 탭과 획 편집 `스타일` 패널이 같이 쓴다. */
+export function JoinPicto({ join }: { join: StrokeLinejoin }) {
+  return <svg viewBox="0 0 64 52" aria-hidden="true"><path d="M12 14 H48 V44" fill="none" stroke="currentColor" strokeWidth="12" strokeLinejoin={join} strokeMiterlimit={4} /></svg>
+}
 const roundnessOf = (style: StrokeRenderStyle): number => style.mode === 'brush' && style.brush.tip === 'round' ? Math.round((style.roundness ?? 0) * 100) : 0
 /** 안쪽 둥글기(%). 따로 정하지 않았으면 바깥을 따른다(연결). */
 const innerRoundnessOf = (style: StrokeRenderStyle): number => style.mode === 'brush' && style.brush.tip === 'round' && style.innerRoundness !== undefined ? Math.round(style.innerRoundness * 100) : roundnessOf(style)
@@ -50,7 +54,7 @@ function clampCutAngle(value: number, preferredSign = 1): number {
 function aspectRatioToFlatness(value: number): number { return Math.round((1 - value) / 0.8 * 100) }
 function flatnessToAspectRatio(value: number): number { return Math.max(0.2, Math.min(1, 1 - value / 100 * 0.8)) }
 
-export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, onClose, renderPreview, embedded = false, productOptions = false, ends, leading }: {
+export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, onClose, renderPreview, embedded = false, productOptions = false, ends, leading, joinOverrides }: {
   committed: StrokeRenderStyle
   draft: StrokeRenderStyle | null
   onDraftChange: (style: StrokeRenderStyle | null) => void
@@ -64,6 +68,8 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
   ends?: StrokeEnds
   /** 탭 안에서 붓보다 먼저 놓는 조절(`획` 탭의 굵기). */
   leading?: ReactNode
+  /** 꺾임을 따로 정한 획 수와 `풀기`. 전역 꺾임을 바꿔도 그 획들은 안 바뀌므로 패널 안 한 줄로 알린다(팝업 없음). */
+  joinOverrides?: { count: number; onRelease: () => void }
 }) {
   const current = draft ?? committed
   const beforeRef = useRef<StrokeRenderStyle | null>(null)
@@ -80,8 +86,9 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
     if (beforeRef.current) {
       const after = latestRef.current
       // 둥글기를 줬는데 저장된 끝 모양이 둥근 끝이면 각진 끝으로 같이 되돌린다(막대가 이긴다). 되돌리기 한 줄에 같이 실린다.
-      const squareEnds = ends && (Math.max(roundnessOf(after), innerRoundnessOf(after)) > 0 || contrastOf(after) !== 0) && (ends.linecap !== 'butt' || ends.linejoin !== 'miter')
-      onCommit(beforeRef.current, after, squareEnds ? { before: ends, after: SQUARE_ENDS } : undefined)
+      // 꺾임은 막대와 독립이라 그대로 둔다.
+      const squareEnds = ends && (Math.max(roundnessOf(after), innerRoundnessOf(after)) > 0 || contrastOf(after) !== 0) && ends.linecap !== 'butt'
+      onCommit(beforeRef.current, after, squareEnds ? { before: ends, after: { ...ends, linecap: 'butt' } } : undefined)
     }
     beforeRef.current = null
     setActiveValue(null)
@@ -105,6 +112,12 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
     preview(next); onCommit(committed, next)
   }
   const endChoice = current.mode !== 'brush' ? null : current.brush.tip === 'ellipse' ? 'flat' : current.brush.tip === 'round' ? 'plain' : null
+  /** 꺾임 종류는 붓 스타일이 아니라 끝 모양 묶음(`ends`)의 값이라, 스타일은 그대로 두고 끝 모양만 바꿔 한 줄의 되돌리기로 싣는다. */
+  const selectJoin = (linejoin: StrokeLinejoin) => {
+    if (!ends || ends.linejoin === linejoin) return
+    onCommit(committed, committed, { before: ends, after: { ...ends, linejoin } })
+  }
+  const miterAngle = miterAngleOf(miterLimitOf(current))
   const selectEndChoice = (choice: typeof END_CHOICES[number]) => {
     if (current.mode !== 'brush' || choice.id === endChoice) return
     const next: StrokeRenderStyle = { ...current, brush: { ...current.brush, tip: choice.tip } }
@@ -176,7 +189,7 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
       onPointerDown={(event) => { begin(label); const next = startRangeDrag(event); if (next !== null && next !== value) preview(update(next)) }}
       onPointerMove={(event) => { const next = moveRangeDrag(event); if (next !== null && next !== value) preview(update(next)) }}
       onChange={(event) => { begin(label); preview(update(Number(event.target.value))) }} onPointerUp={(event) => { endRangeDrag(event); finish() }} onPointerCancel={(event) => { endRangeDrag(event); cancel() }}
-      onKeyDown={(event) => handleRangeKeys(event, label)} onKeyUp={finish} aria-label={label === '납작함' ? '붓촉 납작함' : label} data-testid={label === '바깥 둥글기' ? 'style-roundness' : label === '안쪽 둥글기' ? 'style-inner-roundness' : label === '가로·세로 대비' ? 'style-contrast' : undefined} />
+      onKeyDown={(event) => handleRangeKeys(event, label)} onKeyUp={finish} aria-label={label === '납작함' ? '붓촉 납작함' : label} data-testid={label === '바깥 둥글기' ? 'style-roundness' : label === '안쪽 둥글기' ? 'style-inner-roundness' : label === '가로·세로 대비' ? 'style-contrast' : label === '뾰족 한계' ? 'style-miter-angle' : undefined} />
     {ticks && <RangeTicks min={min} max={max} ticks={ticks} />}
   </Field>
   const angle = current.mode === 'angled-area' ? current.cutAngle : current.mode === 'brush' ? current.brush.angle : 0
@@ -232,6 +245,23 @@ export function BrushStyleTrackpad({ committed, draft, onDraftChange, onCommit, 
           </div>
           : <div className={styles.brushControlGrid}>{flatness}{renderAnglePad()}</div>
       })()}
+      {current.brush.tip === 'round' && productOptions && ends && <>
+        <h3>꺾임</h3>
+        <ChoiceGroup variant="tile" className="grid grid-cols-3 gap-2" aria-label="획 꺾임 모양">{JOIN_CHOICES.map((choice) => (
+          <ChoiceItem key={choice.id} checked={ends.linejoin === choice.id} data-join-choice={choice.id} onClick={() => selectJoin(choice.id)} className="[&_svg]:h-[44px] [&_svg]:w-14">
+            <JoinPicto join={choice.id} /><strong>{choice.label}</strong>
+          </ChoiceItem>
+        ))}</ChoiceGroup>
+        {/* 뾰족 한계는 안쪽 각으로 고른다 — 이 각보다 좁게 꺾이면 평평하게 깎인다. 기본 75도. */}
+        {ends.linejoin === 'miter' && <div className={styles.brushControlGrid} style={{ gridTemplateColumns: 'minmax(0, 1fr)', minHeight: 0, gap: 0 }}>
+          {range('뾰족 한계', miterAngle, MITER_ANGLE_RANGE.min, MITER_ANGLE_RANGE.max, 5, (value) => ({ ...current, miterLimit: miterLimitOfAngle(value) }), `${miterAngle}°보다 좁으면 깎음`, [{ at: MITER_ANGLE_RANGE.min, text: `${MITER_ANGLE_RANGE.min}°` }, { at: MITER_ANGLE_RANGE.default, text: `${MITER_ANGLE_RANGE.default}°` }, { at: MITER_ANGLE_RANGE.max, text: `${MITER_ANGLE_RANGE.max}°` }])}
+        </div>}
+        {/* `<p>`는 한 화면 스타일 페이지가 숨기므로(`GlobalStyleMode.module.css`) 줄 하나짜리 div. */}
+        {joinOverrides && joinOverrides.count > 0 && <div className={styles.joinOverrideNote} data-testid="style-join-overrides">
+          <span>획 {joinOverrides.count}개는 꺾임이 따로 정해져 있어요</span>
+          <Button variant="link" size="sm" className="px-0" onClick={joinOverrides.onRelease} data-testid="style-join-release">풀기</Button>
+        </div>}
+      </>}
       {current.brush.tip === 'round' && productOptions && <div className={styles.brushControlGrid} style={{ gridTemplateColumns: 'minmax(0, 1fr)', minHeight: 0, gap: 0 }}>
         {/* 막대는 5 단위로 탁탁 걸린다(09-25 사용자). */}
         {/* 바깥 · 안쪽은 한 쌍이라 나란히 둔다. */}
