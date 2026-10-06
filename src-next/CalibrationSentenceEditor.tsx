@@ -56,7 +56,6 @@ import { createCirclePath, pointsToSvgD } from '../src/utils/pathUtils'
 import { getJamoRenderBox } from '../src/utils/jamoGeometry'
 import { addPenStroke, clearPenJamo, fitJamoToCell, PEN_DEFAULT_THICKNESS, penJamoState, presetChannelOf, sameStrokePlaces, viewBoxToJamoBox } from '../src/services/penJamo'
 import type { PenChannel } from '../src/services/penJamo'
-import { stabilizePenPoints } from '../src/services/penStrokeFit'
 import type { PenPoint } from '../src/services/penStrokeFit'
 import { addHandlesToPoint, mergeStrokes, pointHasHandles, removeHandlesFromPoint, splitStroke } from '../src/utils/strokeEditUtils'
 import { MERGE_PROXIMITY } from '../src/utils/snapUtils'
@@ -522,7 +521,7 @@ function Glyph({
  * 펜 층. 이번에 그은 획 · 긋는 중인 선 · 입력 판을 SvgRenderer 안(기울기 변환 안쪽)에 그린다.
  * 화면 → 자모 상자는 판의 화면 변환을 거꾸로 돌려 얻는다 — 글자가 기울어도 맞는다.
  */
-function PenLayer({ pen, box, fresh, viewport, u, weightMultiplier, globalLinecap, globalLinejoin }: { pen: PenCanvas; box: BoxConfig; fresh: readonly { stroke: StrokeDataV2; box: BoxConfig }[]; viewport: BoxConfig; u: number; weightMultiplier: number; globalLinecap?: StrokeLinecap; globalLinejoin?: StrokeLinejoin }) {
+function PenLayer({ pen, box, fresh, viewport, weightMultiplier, globalLinecap, globalLinejoin }: { pen: PenCanvas; box: BoxConfig; fresh: readonly { stroke: StrokeDataV2; box: BoxConfig }[]; viewport: BoxConfig; weightMultiplier: number; globalLinecap?: StrokeLinecap; globalLinejoin?: StrokeLinejoin }) {
   const surfaceRef = useRef<SVGRectElement>(null)
   const drawing = useRef<PenPoint[] | null>(null)
   /** 지금 긋는 포인터. 다른 손가락이 닿아도 이 획에 섞이지 않는다. */
@@ -587,17 +586,14 @@ function PenLayer({ pen, box, fresh, viewport, u, weightMultiplier, globalLineca
     const at = absolutePoint(point, box)
     return `${index === 0 ? 'M' : 'L'}${at.x.toFixed(2)} ${at.y.toFixed(2)}`
   }).join(' ')
-  const lineWidth = 0.7 * u
-  // 긋는 중인 획은 저장될 굵기로, 손떨림만 거른 선으로 그린다. 곡선 맞춤은 손을 뗄 때 한 번만 한다 — 긋는 내내 다시 맞추면 지나온 곡선이 계속 흔들린다.
-  const live = current && current.length >= 2 ? stabilizePenPoints(current) : null
+  // 긋는 중인 획은 저장될 굵기로, 그은 점 그대로 그린다. 손떨림 거르기와 곡선 맞춤은 손을 뗄 때 한 번만 한다 — 긋는 내내 다시 거르면 펜 뒤 꼬리가 계속 자리를 바꾸고, 이미 완성된 획처럼 보인다(10-06 사용자: 실험실 페이지의 날 선이 자연스러웠다).
+  const live = current && current.length >= 2 ? current : null
   // 실제 그리기(SvgRenderer)와 같은 끝 · 꺾임 · 뾰족 한계 — 그은 직후에 보이는 모양이 저장된 모양과 같아야 한다(10-06 사용자: 직후엔 뾰족, 다시 열면 깎임).
   const inkStyle = (stroke: Pick<StrokeDataV2, 'thickness' | 'linecap' | 'linejoin'>) => ({ fill: 'none', stroke: EDIT_COLOR.foreground, strokeWidth: stroke.thickness * weightMultiplier * VIEW_BOX_SIZE, strokeLinecap: stroke.linecap ?? globalLinecap ?? 'butt', strokeLinejoin: stroke.linejoin ?? globalLinejoin ?? 'miter', strokeMiterlimit: ACUTE_MITER_LIMIT, pointerEvents: 'none' } as const)
   return <g data-testid="pen-layer">
     {/* 이번에 그은 획은 옅어진 자소 위에 제 색으로 덧그린다. */}
     {fresh.map((item) => <path key={item.stroke.id} d={pointsToSvgD(item.stroke.points, item.stroke.closed, item.box, VIEW_BOX_SIZE)} {...inkStyle(item.stroke)} data-testid="pen-fresh" />)}
-    {live
-      ? <path d={pathOf(live)} {...inkStyle(pen.sample)} strokeLinejoin="round" data-testid="pen-live" />
-      : current && <path d={pathOf(current)} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={lineWidth} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
+    {live && <path d={pathOf(live)} {...inkStyle(pen.sample)} strokeLinejoin="round" data-testid="pen-live" />}
     {/* 글자가 기울어도 판이 칸 모서리를 덮도록 보기 창보다 넉넉히 깐다. */}
     <rect ref={surfaceRef} x={viewport.x * VIEW_BOX_SIZE - 100} y={viewport.y * VIEW_BOX_SIZE - 100} width={viewport.width * VIEW_BOX_SIZE + 200} height={viewport.height * VIEW_BOX_SIZE + 200} fill="transparent" pointerEvents="all" onPointerDown={begin} onPointerMove={move} onPointerUp={(event) => finish(event, false)} onPointerCancel={(event) => finish(event, true)} data-testid="pen-surface" />
   </g>
@@ -687,13 +683,10 @@ function FocusedGlyph({
       })
   }, [dragApiRef, placement, selection, targets])
   // 화면에 보이는 부품 상자는 레이아웃 모드와 같은 잉크 바깥면이다. 획을 놓는 `boxes`는 두께 절반만큼 안쪽인 중심선 상자라 그대로 그리면 잉크가 상자를 뚫고 나온다.
-  // 칸 해석이 없는 글자(단독 자소)는 중심선 상자를 그 자소의 굵기 반만큼 바깥으로 넓혀 같은 뜻의 상자로 보인다 — 굵기가 칸 안에 든다.
+  // 칸 해석이 없는 글자(단독 자소)는 중심선 상자 그대로다 — 굵기 반을 일괄로 더하면 끝이 평평한 줄기 쪽에 여백이 생기고, 획이 없을 때 칸이 줄어 격자가 튄다(10-06 사용자).
   const inkBoxes = useMemo(() => placement.kind === 'boxes' && resolution
     ? Object.fromEntries(resolution.parts.map((part) => [part.part, facesToBox(part.faces)])) as Partial<Record<Part, BoxConfig>>
-    : Object.fromEntries((Object.entries(boxes) as [Part, BoxConfig][]).map(([part, box]) => {
-      const half = Math.max(0, ...targets.filter((target) => target.renderPart === part).map((target) => target.stroke.thickness)) * penWeight / 2
-      return [part, { x: box.x - half, y: box.y - half, width: box.width + half * 2, height: box.height + half * 2 }]
-    })) as Partial<Record<Part, BoxConfig>>, [placement, resolution, boxes, targets, penWeight])
+    : boxes, [placement, resolution, boxes])
   // 보기 창. 자소 단독이면 그 잉크에 맞춰 당긴다. `u`는 판 전체 보기에서 뷰박스 1이 지금 뷰박스 몇인지 — 점 · 선 굵기를 화면에서 같은 크기로 두는 데 곱한다.
   const viewport = useMemo(() => canvasViewportFor(syllable, inkBoxes), [syllable, inkBoxes])
   const u = viewport.width / CANVAS_VIEWPORT.width
@@ -1073,7 +1066,7 @@ function FocusedGlyph({
             {wholeJamoCentered.y && <line x1={-8} x2={108} y1={cy} y2={cy} className={styles.snapHitLine} data-testid="whole-jamo-center" data-axis="y" />}
           </>
         })()}
-        {pen && penBox && <PenLayer pen={pen} box={penBox} fresh={penFresh} viewport={viewport} u={u} weightMultiplier={penWeight} globalLinecap={globalStyle.linecap} globalLinejoin={globalStyle.linejoin} />}
+        {pen && penBox && <PenLayer pen={pen} box={penBox} fresh={penFresh} viewport={viewport} weightMultiplier={penWeight} globalLinecap={globalStyle.linecap} globalLinejoin={globalStyle.linejoin} />}
       </SvgRenderer>
       {wholeJamoCentered
         ? <span className={styles.snapHitChip} data-testid="stroke-snap-chip">파트 가운데</span>

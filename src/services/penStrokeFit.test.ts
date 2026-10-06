@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fitPenStroke, PEN_FIT_EPSILON_CANDIDATES, penClosesOnItself, smoothPenPoints, penCornerIndices, penFitDeviation, stabilizePenPoints, thinPenPoints } from './penStrokeFit'
+import { fitPenStroke, PEN_FIT_EPSILON_CANDIDATES, penClosesOnItself, smoothPenPoints, penCornerIndices, penFitDeviation, thinPenPoints } from './penStrokeFit'
 import type { PenPoint } from './penStrokeFit'
 
 /** 시드 고정 난수 — 펜 떨림 흉내. 같은 시드면 같은 점. */
@@ -206,22 +206,6 @@ describe('펜 획 맞춤', () => {
     }
   })
 
-  it('긋는 중 미리보기는 지나온 부분이 다시 움직이지 않는다 — 둥근 획을 점 하나씩 늘려도', () => {
-    const circle = arc({ x: .5, y: .5 }, .4, -90, 260, 300, 0.004)
-    let previous: PenPoint[] | null = null
-    for (let count = 30; count <= circle.length; count += 3) {
-      const shown = stabilizePenPoints(circle.slice(0, count))
-      if (previous) {
-        const tip = circle[count - 4]
-        // 펜 끝에서 떨어진(0.1 넘게) 지난 프레임의 점은 이번 프레임의 선 위에 그대로 있다.
-        for (const point of previous) {
-          if (Math.hypot(point.x - tip.x, point.y - tip.y) < .1) continue
-          expect(Math.min(...shown.map((other) => Math.hypot(point.x - other.x, point.y - other.y)))).toBeLessThan(.004)
-        }
-      }
-      previous = shown
-    }
-  })
 
   it('둥근 획(ㅇ)은 조금 울퉁불퉁하게 그어도 안쪽 앵커마다 핸들이 일직선이라 모가 안 난다', () => {
     const ring = Array.from({ length: 121 }, (_, i) => {

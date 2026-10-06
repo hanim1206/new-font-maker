@@ -543,15 +543,6 @@ function smoothBetweenCorners(raw: readonly PenPoint[], options: PenFitOptions):
   return { thinned, corners, breaks, window }
 }
 
-/**
- * 긋는 중에 보여 줄 선. 손떨림만 거른 점을 그대로 돌려준다 — 곡선 맞춤은 하지 않는다.
- * 맞춤은 점이 늘 때마다 조각을 새로 나눠, 긋는 내내 다시 맞추면 이미 지나온 곡선이 계속 흔들린다(둥근 획에서 칸의 8%까지).
- * 거르기는 가까운 점끼리만 보므로 지나온 부분은 그대로 서 있고 펜 끝 근처만 따라 바뀐다. 갈고리 자르기 · 끝점 정리도 손을 뗄 때만 한다.
- */
-export function stabilizePenPoints(points: readonly PenPoint[], options: PenFitOptions = {}): PenPoint[] {
-  const raw = thinPenPoints(points, options.minGap ?? DEFAULT_MIN_GAP)
-  return raw.length < 3 ? raw : smoothBetweenCorners(raw, options).thinned
-}
 
 export function fitPenStroke(points: readonly PenPoint[], options: PenFitOptions = {}): PenFitResult | null {
   const epsilon = options.epsilon ?? PEN_FIT_EPSILON
