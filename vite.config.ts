@@ -110,8 +110,10 @@ export default defineConfig({
   server: {
     host: true, // 네트워크에서 접근 가능하도록 설정
     port: 5173, // 기본 포트 (필요시 변경 가능)
+    // 이 체크아웃 안의 `.claude` · `.codex`만 안 본다. `**/.claude/**`로 쓰면 `.claude/worktrees/` 안에서 띄운 서버가
+    // 제 파일까지 안 봐서 HMR이 죽고 변환 캐시가 낡은 채 남는다(10-06).
     watch: {
-      ignored: ['**/.claude/**', '**/.codex/**'],
+      ignored: [fileURLToPath(new URL('./.claude/**', import.meta.url)), fileURLToPath(new URL('./.codex/**', import.meta.url))],
     },
     proxy: {
       '/api/reference': {
