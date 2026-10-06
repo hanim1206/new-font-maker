@@ -1,0 +1,15 @@
+/* 뒤를 어둡게 덮는 막. 드로어와 같이 떴다 사라진다. */
+.scrim { position: fixed; inset: 0; z-index: 29; background: rgb(var(--color-scrim) / .3); opacity: 0; visibility: hidden; transition: opacity .28s ease, visibility 0s linear .28s; }
+.scrim[data-open] { opacity: 1; visibility: visible; transition: opacity .28s ease, visibility 0s; }
+/* 조절판 자리를 덮는 하단 드로어. 화면 아래에 붙고 가운데 정렬, 위 모서리만 둥글다. 열리면 올라오고 닫히면 내려간다. 아래 여백을 넉넉히 둬 트리가 캔버스 쪽으로 올라온다. */
+.drawer { position: fixed; inset-inline: 0; bottom: 0; z-index: 30; box-sizing: border-box; width: min(100%, 440px); margin: 0 auto; padding: 0 12px calc(env(safe-area-inset-bottom) + 40px); border-radius: var(--radius-xl) var(--radius-xl) 0 0; background: rgb(var(--color-surface)); box-shadow: var(--shadow-overlay); transform: translateY(100%); visibility: hidden; touch-action: none; transition: transform .28s cubic-bezier(.32, .72, 0, 1), visibility 0s linear .28s; }
+.drawer[data-open] { transform: translateY(0); visibility: visible; transition: transform .28s cubic-bezier(.32, .72, 0, 1), visibility 0s; }
+/* 끄는 동안은 손가락을 바로 따른다. */
+.drawer[data-dragging] { transition: none; }
+/* 손잡이. 위 가운데 짧은 막대. */
+.handle { width: 36px; height: 4px; margin: 10px auto 14px; border-radius: 999px; background: rgb(var(--color-border)); }
+/* 제목. `닿자 형태 전파` — 트리가 보여 주는 것. */
+.title { margin: 0 8px 4px; font-size: var(--font-16); font-weight: var(--weight-bold); color: rgb(var(--color-foreground)); }
+/* 한 줄 설명. 기본 닿자를 따라오는 레이아웃 수. */
+.description { margin: 0 8px 10px; font-size: var(--font-13); color: rgb(var(--color-muted-foreground)); }
+@media (prefers-reduced-motion: reduce) { .drawer, .drawer[data-open], .scrim, .scrim[data-open] { transition: none; } }

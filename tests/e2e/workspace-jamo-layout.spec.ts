@@ -425,9 +425,15 @@ async function openStrokePoints(page: Page, pick: (paths: string[]) => number = 
  * 첫닿자 획 편집은 단독 칸(`ㄱ`)으로 먼저 열린다. 음절 문맥(모델 상자 · 기준선)에서 고치려면 `닿는 글자` 줄에서 그 음절을 누른다.
  * 줄 맨 앞은 단독 칸, 그 뒤가 들고 온 음절이다.
  */
-async function openSyllableContext(page: Page, char: string) {
+async function openSyllableContext(page: Page, char: string, { split = true }: { split?: boolean } = {}) {
   await page.getByTestId('touched-glyph-row').locator(`[data-testid="review-propagation-card"][data-char="${char}"] button`).click()
   await expect(page.getByRole('region', { name: `${char} 완성 글자 편집` })).toBeVisible()
+  // 첫닿자는 안 가른 홀자 계열 글자를 열면 보기만이다. `따로 그리기`로 그 계열을 갈라야 고칠 수 있다(첫닿자 획 변형 3벌).
+  // 줄을 오가기만 하는 테스트는 `split: false`로 보기 상태 그대로 둔다.
+  if (split && await page.getByTestId('variant-gate-split').count()) {
+    await page.getByTestId('variant-gate-split').click()
+    await expect(page.getByTestId('variant-gate')).toHaveCount(0, { timeout: 10_000 })
+  }
 }
 
 /** 셸 안 획 편집은 조절판 없이 캔버스에서 바로 끈다. 점이 손가락을 따라오고, 한 번 끌기가 기록 한 줄이다. */
@@ -1108,7 +1114,7 @@ test('첫닿자 획 편집은 단독 칸으로 열리고, 줄에서 음절로 �
   const before = await hit.getAttribute('d')
   await page.keyboard.press('Shift+ArrowRight')
   await expect.poll(() => hit.getAttribute('d')).not.toBe(before)
-  await openSyllableContext(page, '나')
+  await openSyllableContext(page, '나', { split: false })
   await expect(page.getByTestId('focus-canvas')).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
   await expect(solo).not.toHaveAttribute('data-active', 'true')
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()

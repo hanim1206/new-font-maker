@@ -493,6 +493,17 @@ describe('FontData 레이아웃 저장 계약', () => {
     }
   })
 
+  it('스타일 화면이 쓰는 획 스타일 값(둥글기 · 대비 · 뾰족 한계)을 전부 담아도 저장 계약을 통과하고 그대로 돌아온다', () => {
+    // 뾰족 한계 막대가 쓰는 `miterLimit`을 계약이 몰라 저장이 던지고, 새로고침 뒤 앱이 안 뜬 적이 있다(10-06).
+    const strokeStyle = { mode: 'brush' as const, brush: { tip: 'ellipse' as const, aspectRatio: 0.2, angle: 30 }, roundness: 0.6, innerRoundness: 2, contrast: -0.4, miterLimit: 1.035 }
+    useGlobalStyleStore.getState().setStrokeRenderStyle(strokeStyle)
+
+    const first = collectFontData()
+    expect(first.globalStyle.style.strokeStyle).toEqual(strokeStyle)
+    expect(applyFontData(JSON.parse(JSON.stringify(first)))).toEqual(expect.objectContaining({ ok: true }))
+    expect(collectFontData()).toEqual(first)
+  })
+
   it('손상되거나 미래 version인 입력은 어떤 store도 바꾸지 않는다', () => {
     const seeded = cloneFontData(originalFontData)
     seeded.shapeSystem = shapeEnvelope()

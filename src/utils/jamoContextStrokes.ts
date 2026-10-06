@@ -5,7 +5,14 @@ import { frameOf } from './jamoFrame'
  * 문맥별 획 변형. 같은 자모라도 홀자 계열(오른홀자 가·아래홀자 고·혼합 과)마다 Noto 골격이 다르다(ㄱ 다리 길이·굽이).
  * 기본 프리셋은 `contextStrokes`에 계열별 획을 두고, 렌더·잉크·편집 겨냥은 전부 여기서 고른다.
  * 사용자가 어느 문맥에서든 자모를 손대면 그 문맥의 획이 하나뿐인 골격이 되고 변형은 사라진다(획 우선: 자소 하나).
+ * 변형은 "키가 있으면 가른 것"이다 — 획을 다 지워 빈 배열이 되어도 가른 채다(지우고 새로 그리는 길). 빈 변형은 빈 글자로 그린다.
  */
+
+/** 그 계열에 변형 자리가 있나(비어 있어도). */
+function familyVariantOf<T extends DeepReadonly<JamoData> | JamoData>(jamo: T, family: MedialFamily | null | undefined): T['strokes'] | undefined {
+  const variant = family ? jamo.contextStrokes?.[family] : undefined
+  return (variant ?? undefined) as T['strokes'] | undefined
+}
 
 export function medialFamilyOf(medialJamo: string | null | undefined): MedialFamily | null {
   if (!medialJamo) return null
@@ -16,10 +23,9 @@ export function familyOfSyllable(syllable: Pick<DecomposedSyllable, 'jungseong'>
   return medialFamilyOf(syllable.jungseong?.char)
 }
 
-/** `strokes` 채널을 문맥 계열로 고른다. 변형이 없거나 계열을 모르면 기본 획. */
+/** `strokes` 채널을 문맥 계열로 고른다. 변형이 없거나 계열을 모르면 기본 획. 가른 뒤 다 지운 빈 변형은 빈 채로 돌려준다. */
 export function strokesForFamily<T extends DeepReadonly<JamoData> | JamoData>(jamo: T, family: MedialFamily | null | undefined): T['strokes'] {
-  const variant = family ? jamo.contextStrokes?.[family] : undefined
-  return (variant && variant.length ? variant : jamo.strokes) as T['strokes']
+  return familyVariantOf(jamo, family) ?? jamo.strokes
 }
 
 /**
@@ -35,15 +41,15 @@ export function wholeJamoStrokes(jamo: JamoData): StrokeDataV2[] {
 export function adoptFamilyStrokes(jamo: JamoData, family: MedialFamily | null | undefined): JamoData {
   const clone = structuredClone(jamo)
   if (!clone.contextStrokes) return clone
-  const variant = family ? clone.contextStrokes[family] : undefined
-  if (variant && variant.length) clone.strokes = structuredClone(variant) as StrokeDataV2[]
+  const variant = familyVariantOf(clone, family)
+  if (variant) clone.strokes = structuredClone(variant) as StrokeDataV2[]
   delete clone.contextStrokes
   return clone
 }
 
-/** 이 계열에 따로 그린 획(변형)이 있나. 비어 있는 변형은 없는 것으로 친다. */
+/** 이 계열을 따로 그렸나(변형 자리가 있나). 획을 다 지운 빈 변형도 가른 것이다. */
 export function hasFamilyStrokes(jamo: DeepReadonly<JamoData> | JamoData, family: MedialFamily | null | undefined): boolean {
-  return !!family && !!jamo.contextStrokes?.[family]?.length
+  return familyVariantOf(jamo, family) !== undefined
 }
 
 /** 가르기: 그 계열 변형을 기본 획 복제로 만든다(출발은 늘 기본). 이미 있으면 그대로 돌려준다. */
@@ -75,7 +81,7 @@ export function mergeFamilyStrokes(jamo: JamoData, family: MedialFamily): JamoDa
 export function writeFamilyStrokes(stored: DeepReadonly<JamoData>, edited: JamoData, family: MedialFamily | null | undefined): JamoData {
   const variants = stored.contextStrokes as JamoData['contextStrokes'] | undefined
   const storedFrame = (stored.frame ? structuredClone(stored.frame) : null) as JamoFrame | null
-  if (family && variants?.[family]?.length) {
+  if (family && variants?.[family] !== undefined) {
     const next: JamoData = { ...edited, strokes: structuredClone(stored.strokes) as StrokeDataV2[] | undefined, contextStrokes: { ...structuredClone(variants), [family]: edited.strokes ?? [] } }
     if (edited.frame) {
       const base = storedFrame ?? frameOf(stored)

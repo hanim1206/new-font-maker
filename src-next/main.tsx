@@ -12,7 +12,7 @@ import { setPersistWriteErrorHandler } from '../src/utils/debouncedStorage'
 import { autoPickOf, clearLocalFont, dropForeignCopy, editorPlanOf, hasLocalFont, readStamp, writeStamp } from './accountFont'
 import { LOCAL_OWNER } from './localFontApi'
 import { showAppNotice } from './appNotice'
-import { AppErrorBoundary } from './AppErrorBoundary'
+import { AppErrorBoundary, AppErrorScreen } from './AppErrorBoundary'
 import { AppNoticeBar } from './AppNoticeBar'
 import { watchAppUpdate } from './appUpdate'
 import { authGateMode, sessionUser } from './betaAuth'
@@ -217,5 +217,9 @@ async function start(me?: string, nickname: string | null = null): Promise<void>
 // 개발 서버에서만 스타일가이드의 주색 · 테마 미리보기를 덮어 쓴다(이 브라우저에만 저장). 배포 빌드에서는 빠진다.
 if (import.meta.env.DEV) void import('./themePreview').then(({ startThemePreview }) => startThemePreview())
 
-void gate()
+// 여는 길에서 던지면(사본을 못 읽음 · 저장 계약 거부) 뼈대 화면에 멈춰 있지 않고 오류 화면을 띄운다.
+void gate().catch((error: unknown) => {
+  recordError(error, 'promise')
+  show(<AppErrorScreen />)
+})
 

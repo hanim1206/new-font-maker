@@ -85,7 +85,7 @@ npm run where          # 워크트리 · 브랜치 · 주소 · 켜짐 표
 npm run build          # tsc -b + vite build
 npm test               # vitest (src, src-next)
 npm run test:e2e       # playwright 전체(실험실 스펙 빼고, 넣으려면 E2E_LABS=1)
-npm run test:smoke     # 스모크 묶음(제품 큰 길 9개, 1분 안쪽)
+npm run test:smoke     # 스모크 묶음(제품 큰 길 + 사파리 · 끌기 픽셀 검사, 1분 안쪽)
 npm run lint
 npm run reference:lab  # 레퍼런스 랩 서버
 npm run reference:noto # Noto 코퍼스 추출
@@ -105,12 +105,14 @@ npm run reference:noto # Noto 코퍼스 추출
 - 모든 좌표는 0–1 정규화. `StrokeData`는 구별된 유니온, `isPathStroke()`로 좁힌다.
 - Zustand는 `set(state => { state.x = y })` 패턴. State와 Actions 인터페이스 분리.
 - 커밋은 `COMMIT_CONVENTION.md`: `<type>(<scope>): <한글 제목>`. AI 워터마크·Co-Author 금지.
-- 유지할 설계 결정: Split + Padding 레이아웃, 스키마와 계산된 박스의 분리, 획 우선(centerline) 모델과 두께 고정 — 나머지는 옵시디언 `원칙.md`.
+- 유지할 설계 결정: Split + Padding 레이아웃, 스키마와 계산된 박스의 분리, 획 우선(centerline) 모델과 문맥별 두께 고정(획마다 굵기는 사용자가 정한다) — 나머지는 옵시디언 `원칙.md`.
 
 ## 주의
 
 - SVG 이벤트는 DOM 렌더 순서가 결정한다. `StrokeOverlay`의 투명 배경 rect 뒤에 렌더된 오버레이만 이벤트를 받는다. 안 먹히면 코드 구조보다 실제 렌더 순서를 먼저 본다. 이벤트 순서를 고친 뒤에는 Playwright로 확인한다.
 - 섞임홀자(ㅘ, ㅢ 등)는 `horizontalStrokes` / `verticalStrokes`를 분리해 쓴다.
+- 획 편집 동작은 `editableJamoOf`(가른 벌을 기본 획 자리에 올린 자모)에서 출발한다. 저장 꼴(기본 획 + 벌 목록)을 그대로 고치면 화면의 벌이 아니라 기본 획이 바뀌어 미리보기가 안 보이고, 저장할 때 벌이 기본 모양으로 덮인다.
+- SVG 필터는 범위를 보이는 만큼만 잡는다(`wholeOutlineRegion.ts`). 사파리는 필터 범위가 기기 픽셀 4096 × 4096 넓이를 넘으면 필터를 건 그림을 통째로 안 그린다.
 - `.gitignore`가 최소한이다. `dist/`, `.env`, IDE 설정을 커밋하지 않는다.
 
 ## 일하는 습관
@@ -137,6 +139,8 @@ npm run reference:noto # Noto 코퍼스 추출
 
 무엇을 단위 테스트로 덮나 — `services/` · `utils/`의 순수 로직을 추가하거나 고치면 단위 테스트를 같이 쓴다. 특히 좌표 정규화, `isPathStroke()` 분기, 섞임홀자 가로·세로 분리.
 
+- e2e · 스모크는 크롬으로 DOM만 본다. 그려진 그림을 보는 것은 `safari-ink`(사파리 엔진)와 `stroke-drag-live`(끄는 동안) 둘뿐이다(`tests/e2e/ink.ts`의 `inkOf`). 그래서 화면을 바꾸면 확인 카드 전에 손으로 넷을 본다 — ① 사파리 엔진(Playwright WebKit)으로 ② 들어가자마자의 첫 화면 그대로 ③ 스크린샷이나 잉크 픽셀로 그림까지 ④ 끌기 · 막대는 끄는 동안까지. 자소 단독만 말고 홀자와 함께 그려진 글자 · 가른 벌(홀자별 첫닿자)에서도 본다. 새 편집 동작을 넣으면 `stroke-drag-live`에 한 줄 보탠다.
+- 같은 영역 e2e 스펙이 손대기 전부터 실패하면 덮어 두지 않는다. 손 안 댄 dev에서도 실패하는지 가려 보고하고, 고칠 수 있으면 같이 고친다.
 - 푸시 문지기 `.githooks/pre-push` — dev · main · claude/main은 스모크를 돌려 실패하면 막는다(main 전체 검사는 훅의 `MAIN_FULL`로 꺼 둠 — 한글날 뒤 흔들리는 테스트 고치고 켠다. 문서만 바뀐 푸시는 건너뜀, 작업 트리가 더러우면 푸시하는 커밋만 임시 워크트리에서). 급할 때만 `git push --no-verify`.
 - 확인용 서버와 e2e는 워크트리 고정 포트(`npm run dev:here` · `npm run where`).
 - e2e · 스모크는 컴퓨터 전체에서 한 번에 하나만 돈다(`.git/e2e.lock`). 다른 워크트리 것이 돌면 줄을 선다. 포트가 달라도 컴퓨터 힘을 나눠 써 시간 초과가 나기 때문이다. 내 단위 테스트도 e2e와 동시에 돌리지 않는다.
