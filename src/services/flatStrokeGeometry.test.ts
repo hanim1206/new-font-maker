@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { contrastWidthOf, polylineToFlatInkGroups, ringSelfIntersects, strokeToFlatInkGroups } from './flatStrokeGeometry'
+import { contrastWidthOf, polylineSelfIntersects, polylineToFlatInkGroups, ringSelfIntersects, strokeToFlatInkGroups } from './flatStrokeGeometry'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
 import type { StrokeDataV2 } from '../types'
 import { unionInkRegions } from './inkBoolean'
@@ -94,6 +94,58 @@ describe('polylineToFlatInkGroups', () => {
       expect(inside(x, box.y), `중심선 t=${t.toFixed(2)}`).toBe(true)
       expect(inside(x, box.y - 0.01), `윗쪽 t=${t.toFixed(2)}`).toBe(true)
     }
+  })
+
+  it('제 몸을 가로지르는 고리는 잘라내지 않는다 — 고리 몸이 다 차고 속은 비어 있다(2026-10-06, 레이아웃 · 글자 줄에서 고리가 사라짐)', () => {
+    // 위에서 내려와 왼쪽 아래로 휘고, 고리를 한 바퀴 돌아 내려온 줄기를 가로질러 오른쪽으로 빠지는 한 획. 펜으로 흘려 그은 ㅍ 아래 고리와 같은 꼴.
+    const points: { x: number; y: number }[] = []
+    for (let i = 0; i <= 24; i += 1) { const t = i / 24; points.push({ x: 0.70 + 0.04 * Math.sin(t * 2.2) - 0.52 * t * t, y: 0.05 + 0.83 * t }) }
+    const loop = { cx: 0.02, cy: 0.95, rx: 0.26, ry: 0.13 }
+    const loopStart = points.length
+    for (let i = 1; i <= 48; i += 1) { const a = 0.75 + (i / 48) * (Math.PI * 2 - 0.55); points.push({ x: loop.cx + loop.rx * Math.cos(a), y: loop.cy + loop.ry * Math.sin(a) }) }
+    const loopEnd = points.length
+    const last = points[points.length - 1]
+    for (let i = 1; i <= 24; i += 1) { const t = i / 24; points.push({ x: last.x + (1.08 - last.x) * t, y: last.y + (0.93 - last.y) * t + 0.07 * Math.sin(t * Math.PI) }) }
+    const stroke: StrokeDataV2 = { id: 'loop', closed: false, thickness: 0.06, points }
+    const box = { x: 0.28, y: 0.14, width: 0.5, height: 0.52 }
+    const at = (point: { x: number; y: number }) => ({ x: box.x + point.x * box.width, y: box.y + point.y * box.height })
+    const contains = (ring: readonly { x: number; y: number }[], x: number, y: number) => {
+      let hit = false
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+        if ((ring[i].y > y) !== (ring[j].y > y) && x < (ring[j].x - ring[i].x) * (y - ring[i].y) / (ring[j].y - ring[i].y) + ring[i].x) hit = !hit
+      }
+      return hit
+    }
+    for (const join of ['miter', 'round', 'bevel'] as const) {
+      const ink = union(strokeToFlatInkGroups(stroke, box, 1, 'butt', join))
+      const inked = (x: number, y: number) => ink.some((region) => contains(region.outer, x, y) && !region.holes.some((hole) => contains(hole, x, y)))
+      // 중심선이 지나간 자리는 고리를 포함해 전부 잉크다(전에는 고리 구간이 통째로 빠졌다).
+      for (let index = 1; index < points.length - 1; index += 1) {
+        const p = at(points[index])
+        expect(inked(p.x, p.y), `${join} 중심선 ${index}${index >= loopStart && index < loopEnd ? ' (고리)' : ''}`).toBe(true)
+      }
+      // 고리 속은 비어 있다 — 뭉개서 채운 게 아니다.
+      const center = at({ x: loop.cx, y: loop.cy })
+      expect(inked(center.x, center.y), `${join} 고리 속`).toBe(false)
+      expect(ink.reduce((count, region) => count + region.holes.length, 0), `${join} 구멍`).toBe(1)
+    }
+  })
+
+  it('제 몸을 안 가로지르는 급한 굽이는 고리로 안 본다 — 전처럼 한 덩어리, 구멍 없음', () => {
+    // 반폭(0.035)보다 급하게(반지름 0.02) 휘어 되돌아 나가는 굽이: 오른쪽 위에서 와서 왼쪽 끝에서 돌아 오른쪽 아래로 벌어지며 나간다.
+    // 안쪽 오프셋은 꼬이지만 중심선은 제 몸을 안 지난다.
+    const points = [
+      { x: 0.9, y: 0.38 },
+      ...Array.from({ length: 25 }, (_, i) => { const a = -Math.PI / 2 - Math.PI * i / 24; return { x: 0.5 + 0.02 * Math.cos(a), y: 0.5 + 0.02 * Math.sin(a) } }),
+      { x: 0.9, y: 0.62 },
+    ]
+    expect(polylineSelfIntersects(points)).toBe(false)
+    const ink = union(strokeToFlatInkGroups({ id: 'u', closed: false, thickness: 0.07, points }, { x: 0, y: 0, width: 1, height: 1 }, 1, 'butt', 'round'))
+    expect(ink.length).toBe(1)
+    expect(ink[0].holes.length).toBe(0)
+    // 고리를 도는 선은 가로지른다고 본다. 끝과 처음을 잇는 변은 없어서, 양 끝이 가까운 열린 곡선(C자)은 안 걸린다.
+    expect(polylineSelfIntersects([{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }, { x: 1, y: 0 }])).toBe(true)
+    expect(polylineSelfIntersects(Array.from({ length: 20 }, (_, i) => ({ x: Math.cos(0.3 + i * 0.3), y: Math.sin(0.3 + i * 0.3) })))).toBe(false)
   })
 
   it('둥근 캡·조인은 호로 잇는다', () => {
@@ -243,5 +295,29 @@ describe('전역 둥글기(roundness)', () => {
     expect(area(inner(0.3)[0])).toBeGreaterThan(area(inner(0.1)[0]))
     // 반지름 3(반폭 30배)이면 이웃 변(안쪽 오프셋 변 0.9 · 0.9)의 45%에서 걸린다: 접점은 0.9 − 0.405.
     expect(at(inner(3), 0.495, 0.1)).toBe(true)
+  })
+})
+
+describe('꺾임 종류와 뾰족 한계 — 한 입구에서 받은 값대로 그린다', () => {
+  // 안쪽 각 35도로 꺾인 갈지자 한 꺾임. 굵기 0.2, 반폭 0.1.
+  const acute = [{ x: 0, y: 0 }, { x: 1, y: .35 }, { x: 0, y: .7 }]
+  const spikeOf = (groups: ReturnType<typeof polylineToFlatInkGroups>) => Math.max(...groups.flat().flat().map((p) => p.x))
+
+  it('뾰족 한계 1.64는 예각을 깎고, 4는 뾰족하게 둔다(화면 SVG의 stroke-miterlimit과 같은 뜻)', () => {
+    const cut = spikeOf(polylineToFlatInkGroups(acute, false, .2, 'butt', 'miter', 24, undefined, undefined, undefined, 1.64))
+    const spike = spikeOf(polylineToFlatInkGroups(acute, false, .2, 'butt', 'miter', 24, undefined, undefined, undefined, 4))
+    const bevel = spikeOf(polylineToFlatInkGroups(acute, false, .2, 'butt', 'bevel', 24))
+    expect(cut).toBeCloseTo(bevel, 9)
+    expect(spike).toBeGreaterThan(cut + .15)
+  })
+
+  it('둥긂 이음은 둥글기 막대가 있어도 바깥 꺾임을 꼭짓점 중심 반폭 원호로 그린다(막대와 독립)', () => {
+    const rounding = { radius: .05, anchors: new Set([1]) }
+    const groups = polylineToFlatInkGroups(acute, false, .2, 'butt', 'round', 24, rounding)
+    const vertex = acute[1]
+    const farthest = Math.max(...groups.flat().flat().filter((p) => p.x > .9).map((p) => Math.hypot(p.x - vertex.x, p.y - vertex.y)))
+    // 원호 반지름(반폭 0.1) 안에 다 든다 — 막대 반지름(0.05)으로 깎은 모서리가 아니라 반폭 원호다.
+    expect(farthest).toBeLessThanOrEqual(.1 + 1e-6)
+    expect(farthest).toBeGreaterThan(.1 - 1e-3)
   })
 })

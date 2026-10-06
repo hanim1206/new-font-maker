@@ -36,6 +36,7 @@ import { mergeStrokeContourGroupsForCff } from './contourBoolean'
 import { simplifyMergedContours } from './contourSimplify'
 import { brushInkGroupsToFontContours, strokeToBrushInkGroups } from './brushGeometry'
 import { needsFilledRenderInk, strokeToRenderInkGroups, verticalWidthFactorOf } from './strokeRenderGeometry'
+import { miterLimitOf } from './strokeJoin'
 import { stemBeakInkGroups } from './stemBeak'
 import type { DeepReadonly } from '../types'
 import type { FinalGlyphInk } from './finalGlyphInk'
@@ -392,7 +393,7 @@ export function glyphDataToFontContours(glyphData: GlyphData, simplifyEpsilon?: 
       const groups = brushInkGroupsToFontContours(
         renderStyle.mode === 'brush' && renderStyle.brush.tip !== 'round'
           ? strokeToBrushInkGroups(resolved.stroke, resolved.box, glyphData.weightMultiplier, renderStyle.brush)
-          : strokeToRenderInkGroups(resolved.stroke, resolved.box, glyphData.weightMultiplier, renderStyle),
+          : strokeToRenderInkGroups(resolved.stroke, resolved.box, glyphData.weightMultiplier, renderStyle, { join: { linejoin: resolved.effectiveLinejoin, miterLimit: miterLimitOf(renderStyle) } }),
         UPM,
         ASCENDER,
         glyphData.slant,
@@ -409,6 +410,7 @@ export function glyphDataToFontContours(glyphData: GlyphData, simplifyEpsilon?: 
         slant: glyphData.slant,
         globalLinecap: resolved.effectiveLinecap,
         globalLinejoin: resolved.effectiveLinejoin,
+        miterLimit: miterLimitOf(renderStyle),
         ascender: ASCENDER,
       }
     )

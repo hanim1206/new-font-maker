@@ -13,6 +13,14 @@
  */
 import type { StrokeDataV2, AnchorPoint, BoxConfig, StrokeLinecap, StrokeLinejoin } from '../types'
 import { normalizeClosedStrokePoints } from '../utils/strokePathUtils'
+import { DEFAULT_MITER_LIMIT, miterWithinLimit } from './strokeJoin'
+
+/**
+ * 뾰족 이음(miter)을 허용하는 한계 — 꺾임점에서 이음 끝까지가 굵기 반의 이 배수를 넘으면 평평하게 깎는다(bevel).
+ * 1.64 = 1/sin(75°/2): 안쪽 각이 75도보다 좁은 예각 꺾임만 깎이고, 직각(1.41)은 뾰족하게 남는다(10-06 사용자 결정 — 네모 끝 글씨에서 갈지자 꺾임이 길게 튀어나오지 않게).
+ * SVG 기본값(4)이면 29도까지 뾰족하다. 기본 프리셋에는 80도보다 좁은 각진 꺾임이 없어 기존 글자는 안 바뀐다.
+ */
+export const ACUTE_MITER_LIMIT = DEFAULT_MITER_LIMIT
 
 // ===== 타입 정의 =====
 
@@ -38,6 +46,8 @@ export interface StrokeStyle {
   slant: number               // 기울기 (도)
   globalLinecap: StrokeLinecap
   globalLinejoin: StrokeLinejoin
+  /** 뾰족 한계(반폭의 배수). 없으면 기본 1.64. */
+  miterLimit?: number
   ascender: number
 }
 
@@ -260,6 +270,7 @@ function joinOffsetSides(
   side: OffsetSide,
   halfWidth: number,
   linejoin: StrokeLinejoin,
+  miterLimit: number,
 ): Vec2[] {
   const turn = cross(previousTangent, nextTangent)
   if (Math.abs(turn) < 1e-6) {
@@ -277,7 +288,7 @@ function joinOffsetSides(
   if (linejoin === 'round') {
     return roundJoinPoints(center, previousEnd, nextStart, Math.sign(turn))
   }
-  if (linejoin === 'miter' && intersection && dist(center, intersection) <= halfWidth * 4) {
+  if (linejoin === 'miter' && intersection && miterWithinLimit(dist(center, intersection), halfWidth, miterLimit)) {
     return [intersection]
   }
   return [previousEnd, nextStart]
@@ -290,6 +301,7 @@ function assembleOpenSide(
   segTangents: Array<{ startTangent: Vec2; endTangent: Vec2 }>,
   halfWidth: number,
   linejoin: StrokeLinejoin,
+  miterLimit: number,
 ): Vec2[] {
   const result = [...segments[0][side]]
   for (let index = 1; index < segments.length; index += 1) {
@@ -304,6 +316,7 @@ function assembleOpenSide(
       side,
       halfWidth,
       linejoin,
+      miterLimit,
     ))
     result.push(...next.slice(1))
   }
@@ -317,6 +330,7 @@ function assembleClosedSide(
   segTangents: Array<{ startTangent: Vec2; endTangent: Vec2 }>,
   halfWidth: number,
   linejoin: StrokeLinejoin,
+  miterLimit: number,
 ): Vec2[] {
   const result: Vec2[] = []
   for (let index = 0; index < segments.length; index += 1) {
@@ -332,6 +346,7 @@ function assembleClosedSide(
       side,
       halfWidth,
       linejoin,
+      miterLimit,
     ))
     result.push(...next.slice(1, -1))
   }
@@ -613,6 +628,7 @@ export function strokeToContours(
   // linecap 결정 (globalStyleStore resolveLinecap 로직)
   const capType: StrokeLinecap = stroke.linecap ?? style.globalLinecap ?? 'round'
   const joinType: StrokeLinejoin = stroke.linejoin ?? style.globalLinejoin ?? 'round'
+  const miterLimit = style.miterLimit ?? DEFAULT_MITER_LIMIT
 
   // 앵커 → 절대 좌표 변환. 기울기는 여기서 주지 않는다 — 화면(`SvgRenderer`)은 곧은 잉크를 만든 뒤 통째로 기울인다.
   // 중심선을 먼저 기울이고 굵기를 입히면 기둥이 1/cos(기울기)만큼 굵어지고 가로줄기 끝이 기울지 않아 화면과 어긋난다.
@@ -645,8 +661,8 @@ export function strokeToContours(
   }
 
   const contours = stroke.closed
-    ? assembleClosedContours(absAnchors, segments, segTangents, effectiveHalfWidth, joinType)
-    : assembleOpenContours(absAnchors, segments, segTangents, effectiveHalfWidth, capType, joinType)
+    ? assembleClosedContours(absAnchors, segments, segTangents, effectiveHalfWidth, joinType, miterLimit)
+    : assembleOpenContours(absAnchors, segments, segTangents, effectiveHalfWidth, capType, joinType, miterLimit)
   return slantContours(contours, upm, style.slant, style.ascender)
 }
 
@@ -670,10 +686,11 @@ function assembleOpenContours(
   halfWidth: number,
   capType: StrokeLinecap,
   linejoin: StrokeLinejoin,
+  miterLimit: number,
 ): Contour[] {
   // 각 꺾임에서 SVG와 같은 round/miter/bevel join을 만든다.
-  let leftPoints = assembleOpenSide('left', absAnchors, segments, segTangents, halfWidth, linejoin)
-  let rightPoints = assembleOpenSide('right', absAnchors, segments, segTangents, halfWidth, linejoin)
+  let leftPoints = assembleOpenSide('left', absAnchors, segments, segTangents, halfWidth, linejoin, miterLimit)
+  let rightPoints = assembleOpenSide('right', absAnchors, segments, segTangents, halfWidth, linejoin, miterLimit)
 
   // Douglas-Peucker 단순화
   leftPoints = douglasPeucker(leftPoints, 0.5)
@@ -721,10 +738,11 @@ function assembleClosedContours(
   segTangents: Array<{ startTangent: Vec2; endTangent: Vec2 }>,
   halfWidth: number,
   linejoin: StrokeLinejoin,
+  miterLimit: number,
 ): Contour[] {
   // 왼쪽 = outer, 오른쪽 = inner
-  let outerPoints = assembleClosedSide('left', absAnchors, segments, segTangents, halfWidth, linejoin)
-  let innerPoints = assembleClosedSide('right', absAnchors, segments, segTangents, halfWidth, linejoin)
+  let outerPoints = assembleClosedSide('left', absAnchors, segments, segTangents, halfWidth, linejoin, miterLimit)
+  let innerPoints = assembleClosedSide('right', absAnchors, segments, segTangents, halfWidth, linejoin, miterLimit)
 
   // 단순화
   outerPoints = douglasPeucker(outerPoints, 0.5)

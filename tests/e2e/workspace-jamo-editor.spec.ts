@@ -91,7 +91,7 @@ test('획 편집 `원` 버튼은 지금 자모 상자에 닫힌 타원 획을 �
   await strokeHit.dispatchEvent('pointerdown')
   const before = await strokes.count()
 
-  // `추가`를 누르면 선 · 원 · 사각이 아래로 펼쳐지고, 고르면 접힌다.
+  // `추가`를 누르면 선 · 원 · 사각이 조절판 자리에 펴지고, 고르면 닫힌다.
   await add.click()
   await expect(add).toHaveAttribute('aria-expanded', 'true')
   await circle.click()
@@ -135,7 +135,7 @@ test('획 편집 `복사`한 획은 다른 자소에 `붙여넣기`로 같은 �
   await page.screenshot({ path: 'test-results/stroke-copy-paste.png' })
 })
 
-test('획을 안 잡고 자소만 잠긴 채 `복사`하면 그 자소 획이 다 담기고, `붙여넣기`는 한꺼번에 비켜 더한다 (빱의 받침 ㅂ)', async ({ page }) => {
+test('자소가 통째로 골라진 채(첫 화면 · 빈 곳) `복사`하면 그 자소 획이 다 담기고 `붙여넣기`는 한꺼번에 비켜 더한다. `삭제`는 한 번에 다 지운다 (빱의 받침 ㅂ)', async ({ page }) => {
   await page.goto('/workspace/jamo?char=%EB%B9%B1&mode=stroke&part=JO')
   const canvas = page.getByTestId('focus-canvas')
   await expect(canvas).toHaveAttribute('data-placement', 'boxes', { timeout: 20_000 })
@@ -148,11 +148,23 @@ test('획을 안 잡고 자소만 잠긴 채 `복사`하면 그 자소 획이 �
   const before = await strokes.count()
   expect(before).toBeGreaterThan(1)
 
-  // 획을 잡으면 획 하나 복사, 빈 곳으로 풀면 자소 통째 복사.
-  await expect(tools.getByRole('button', { name: 'ㅂ 획 모두 복사' })).toHaveCount(0)
+  // 첫 화면은 받침 ㅂ이 통째로 골라진 상태다: 획 하나가 잡혀 있지 않고 잉크 둘레에 테두리. `전체선택` 단추는 없다 — 통째로 가는 문은 빈 곳 누르기다.
+  const outline = page.getByTestId('whole-jamo-outline')
+  await expect(selected).toHaveCount(0)
+  await expect(outline).toHaveCount(1)
+  await expect(tools).toHaveAttribute('data-mode', 'jamo')
+  await expect(page.getByTestId('jamo-stroke-select-all')).toHaveCount(0)
+  // 획 하나를 잡으면 테두리가 걷히고, 빈 곳을 누르면 통째로 돌아간다.
+  await strokes.first().dispatchEvent('pointerdown')
+  await strokes.first().dispatchEvent('pointerup')
+  await expect(selected).toHaveCount(1)
+  await expect(outline).toHaveCount(0)
+  await expect(tools).toHaveAttribute('data-mode', 'stroke')
   await canvas.dispatchEvent('pointerdown')
   await expect(selected).toHaveCount(0)
-  await tools.getByRole('button', { name: 'ㅂ 획 모두 복사' }).click()
+  await expect(outline).toHaveCount(1)
+  // 통째로 골라진 채 `복사` → `붙여넣기`.
+  await tools.getByRole('button', { name: '획 복사' }).click()
   await tools.getByRole('button', { name: '획 붙여넣기' }).click()
   // 원래 획은 그대로 두고 ㅂ 획 전부가 더해진다. 같은 자리라 겹치지 않게 비켜 놓는다.
   await expect(strokes).toHaveCount(before * 2)
@@ -161,6 +173,15 @@ test('획을 안 잡고 자소만 잠긴 채 `복사`하면 그 자소 획이 �
   expect(new Set(paths).size).toBe(before * 2)
   await page.screenshot({ path: 'test-results/stroke-copy-whole-jamo.png' })
   // 되돌리기 한 번이면 한꺼번에 빠진다.
+  await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
+  await expect(strokes).toHaveCount(before)
+
+  // 통째로 골라진 채 `삭제`는 획을 한 번에 다 지운다(옛 `비우기`). 되돌리기 한 번이면 다 돌아온다.
+  await canvas.dispatchEvent('pointerdown')
+  await expect(tools).toHaveAttribute('data-mode', 'jamo')
+  await tools.getByRole('button', { name: '획 삭제' }).click()
+  await expect(strokes).toHaveCount(0)
+  await expect(tools.getByRole('button', { name: '획 삭제' })).toHaveCount(0)
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
   await expect(strokes).toHaveCount(before)
 })
@@ -201,7 +222,7 @@ test('획 편집 `사각`은 닫힌 네 점 획을 넣고, 같은 자소에 `복
   await expect(tools.getByRole('button', { name: '곡선화' })).toHaveCount(0)
   await expect(tools.getByRole('button', { name: '선 끊기' })).toHaveCount(0)
 
-  // 펼쳐도 `추가`는 제자리다. 도구 칸이 스크롤되어 위로 밀리지 않는다.
+  // 패널을 펴도 `추가`는 제자리다. 도구 칸이 스크롤되어 위로 밀리지 않는다.
   const addButton = tools.getByRole('button', { name: '획 추가' })
   const addBefore = await addButton.boundingBox()
   await addButton.click()
@@ -223,21 +244,31 @@ test('획 편집 `사각`은 닫힌 네 점 획을 넣고, 같은 자소에 `복
 })
 
 test('획 편집 `초기화`는 한 번 묻고 고친 자소를 프리셋으로 되돌리고, 되돌리기 한 번이면 고친 모양이 돌아온다', async ({ page }) => {
-  await page.goto('/workspace/jamo?mode=stroke')
+  await page.goto('/workspace/jamo?char=%EA%B0%80&mode=stroke&part=CH')
   const editor = page.getByRole('region', { name: /완성 글자 편집/ })
   await expect(editor).toBeVisible()
   const tools = page.getByRole('toolbar', { name: '획 편집 도구' })
   const reset = page.getByTestId('jamo-stroke-reset')
   const strokes = editor.locator('svg [data-editor-hit="stroke"]')
-  await strokes.first().dispatchEvent('pointerdown')
-  await strokes.first().dispatchEvent('pointerdown')
+  const pickFirst = async () => {
+    await strokes.first().dispatchEvent('pointerdown')
+    await strokes.first().dispatchEvent('pointerdown')
+    await expect(tools).toHaveAttribute('data-mode', 'stroke')
+  }
+  // `초기화`는 자소 통째 단추라 획을 고른 채로는 안 보인다. 빈 곳을 눌러 풀면 나온다.
+  const blank = () => page.getByTestId('focus-canvas').dispatchEvent('pointerdown')
+  await pickFirst()
   const before = await strokes.count()
+  await expect(reset).toHaveCount(0)
+  await blank()
   // 손대기 전에는 프리셋 그대로라 꺼져 있다.
   await expect(reset).toBeDisabled()
 
+  await pickFirst()
   await tools.getByRole('button', { name: '획 복사' }).click()
   await tools.getByRole('button', { name: '획 붙여넣기' }).click()
   await expect(strokes).toHaveCount(before + 1)
+  await blank()
   await expect(reset).toBeEnabled()
   // 누르면 먼저 묻는다. 취소하면 그대로다.
   const confirm = page.getByTestId('jamo-stroke-reset-confirm')
@@ -251,11 +282,100 @@ test('획 편집 `초기화`는 한 번 묻고 고친 자소를 프리셋으로 
   await page.getByTestId('jamo-stroke-reset-ok').click()
   await expect(confirm).toHaveCount(0)
   await expect(strokes).toHaveCount(before)
-  await expect(reset).toBeDisabled()
+  // 되돌린 자소의 첫 획이 잡힌다. 다시 풀어 보면 `초기화`는 꺼져 있다.
   await expect(editor.locator('svg [data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(1)
+  await blank()
+  await expect(reset).toBeDisabled()
 
   await page.getByRole('button', { name: '형태 편집 실행 취소' }).click()
   await expect(strokes).toHaveCount(before + 1)
+})
+
+test('획 편집 `펜`은 도구 줄을 그대로 둔 채 켜지고, 그은 획은 손을 떼면 새 획으로 저장된다. 켠 채 톡 누르면 획이 골라져 지울 수 있다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EA%B0%80&mode=stroke&part=CH')
+  const editor = page.getByRole('region', { name: /완성 글자 편집/ })
+  await expect(editor).toBeVisible()
+  const undo = page.getByRole('button', { name: '형태 편집 실행 취소' })
+  // 긋는 자리는 지금 ㄱ이 놓인 자리로 잰다.
+  const box = (await editor.locator('svg [data-stroke-id="ㄱ-1"]').first().boundingBox())!
+  // 펜은 `추가`를 열면 선 · 원 · 사각 옆에 있다. 켜면 패널은 닫히고 도구 줄 첫 칸이 눌린 `펜`으로 바뀐다.
+  await page.getByRole('button', { name: '획 추가' }).click()
+  const pen = page.getByTestId('jamo-stroke-pen')
+  await pen.click()
+  await expect(page.getByTestId('pen-layer')).toBeVisible()
+  await expect(pen).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('toolbar', { name: '획 편집 도구' })).toBeVisible()
+  await expect(page.getByTestId('jamo-stroke-fit')).toBeVisible()
+  // 펜이 켜진 동안 끌면 긋는다. 켤 때 선택은 풀린다.
+  await expect(editor.locator('svg [data-editor-hit="stroke"][data-selected="true"]')).toHaveCount(0)
+
+  // 기존 ㄱ 안쪽에 작은 ㄱ 꼴 한 획.
+  const at = (x: number, y: number) => ({ x: box.x + box.width * x, y: box.y + box.height * y })
+  const draw = async () => {
+    const start = at(.25, .35)
+    await page.mouse.move(start.x, start.y)
+    await page.mouse.down()
+    for (const [x, y] of [[.4, .35], [.55, .34], [.7, .34], [.71, .5], [.71, .65], [.71, .8]]) {
+      const point = at(x, y)
+      await page.mouse.move(point.x, point.y, { steps: 4 })
+    }
+    // 긋는 중에도 저장될 굵기로 바로 보인다.
+    await expect(page.getByTestId('pen-live')).toHaveCount(1)
+    await page.mouse.up()
+    await expect(page.getByTestId('pen-live')).toHaveCount(0)
+  }
+  await expect(undo).toBeDisabled()
+  await draw()
+  // 손을 떼면 바로 저장된다. ㄱ 역할 자리는 차 있으니 새 획은 자유 획이고, 이번에 그은 획만 제 색으로 덧그려진다.
+  await expect(undo).toBeEnabled()
+  await expect(page.getByTestId('pen-fresh')).toHaveCount(1)
+  // 닿자는 인식 상태를 안 띄운다 — 역할이 있든 없든 결과가 같다.
+  await expect(page.getByTestId('jamo-pen-status')).toHaveCount(0)
+  await page.screenshot({ path: 'test-results/pen-added.png' })
+
+  // 펜을 든 채 톡 누르면(안 끌고 떼면) 긋지 않고 그 자리의 획이 골라진다. 겹친 자리는 위에 있는 그은 획이 잡히니, 옛 ㄱ만 닿는 자리를 찾아 누른다.
+  const tools = page.getByRole('toolbar', { name: '획 편집 도구' })
+  const selectedHit = editor.locator('svg [data-editor-hit="stroke"][data-selected="true"]')
+  const oldAt = await editor.locator('svg [data-editor-hit="stroke"][data-stroke-id="ㄱ-1"]').evaluate((element) => {
+    const path = element as SVGPathElement
+    for (let step = 1; step < 50; step += 1) {
+      const at = path.getPointAtLength(path.getTotalLength() * step / 50).matrixTransform(path.getScreenCTM()!)
+      const top = document.elementsFromPoint(at.x, at.y).find((item) => item.getAttribute('data-editor-hit') === 'stroke')
+      if (top === path) return { x: at.x, y: at.y }
+    }
+    return null
+  })
+  expect(oldAt).not.toBeNull()
+  await page.mouse.click(oldAt!.x, oldAt!.y)
+  await expect(selectedHit).toHaveAttribute('data-stroke-id', 'ㄱ-1')
+  await expect(page.getByTestId('pen-fresh')).toHaveCount(1)
+  await expect(tools).toHaveAttribute('data-mode', 'stroke')
+  await expect(tools.getByTestId('jamo-stroke-pen')).toHaveAttribute('aria-pressed', 'true')
+  await page.screenshot({ path: 'test-results/pen-tap-select.png' })
+  // 옛 획을 지우면 그은 획이 남아 빈 ㄱ 역할을 받고, 펜은 켜진 채다.
+  await tools.getByRole('button', { name: '획 삭제' }).click()
+  await expect(page.getByTestId('pen-fresh')).toHaveCount(1)
+  await expect(editor.locator('svg [data-editor-hit="stroke"]')).toHaveCount(1)
+  await expect(editor.locator('svg [data-editor-hit="stroke"]')).toHaveAttribute('data-stroke-id', 'ㄱ-1')
+  await expect(page.getByTestId('pen-layer')).toBeVisible()
+  await undo.click()
+  await expect(editor.locator('svg [data-editor-hit="stroke"]')).toHaveCount(2)
+  // 빈 곳을 톡 누르면 풀린다.
+  await page.mouse.click(box.x + box.width * .3, box.y + box.height * .8)
+  await expect(selectedHit).toHaveCount(0)
+
+  // 무르기는 되돌리기로. 펜은 켜진 채다.
+  await undo.click()
+  await expect(undo).toBeDisabled()
+  await expect(page.getByTestId('pen-fresh')).toHaveCount(0)
+  await expect(page.getByTestId('pen-layer')).toBeVisible()
+
+  // 다시 긋고 `펜`을 누르면 꺼진다. 기존 획과 새 획이 둘 다 잡히는 획으로 남는다.
+  await draw()
+  await pen.click()
+  await expect(page.getByTestId('pen-layer')).toHaveCount(0)
+  await expect(editor.locator('svg [data-stroke-id="ㄱ-1"]')).not.toHaveCount(0)
+  await expect(editor.locator('svg [data-stroke-id="pen-ㄱ-1"]')).not.toHaveCount(0)
 })
 
 test('획을 세로부 칸에만 둔 ㅒ · ㅖ도 획 편집에서 획을 고른다', async ({ page }) => {
@@ -458,4 +578,190 @@ test('캔버스에서 획 · 점을 멀리 끌어도 글자 칸 밖으로 나가
   expect(handles).toHaveLength(2)
   for (const handle of handles) inside({ left: handle.x, right: handle.x, top: handle.y, bottom: handle.y }, '핸들')
   inside(await boxOf('ㅇ-circle'), 'ㅇ 잉크')
+})
+
+test('캔버스 `크게`를 켜면 조절판 · `닿는 글자` 줄이 비키고 캔버스가 남은 자리를 채운다. 켠 채 끈 획은 저장되고, 끄면 처음 크기로 돌아온다', async ({ page }) => {
+  await page.goto(`/workspace/jamo?char=${encodeURIComponent('이')}&mode=stroke&part=JU`)
+  const stroke = page.locator('[data-editor-hit="stroke"][data-stroke-id="ㅣ-1"]')
+  await expect(stroke).toBeAttached({ timeout: 60_000 })
+  const canvas = page.getByTestId('focus-canvas')
+  await expect(canvas).toHaveAttribute('data-placement', 'boxes', { timeout: 60_000 })
+  const toggle = page.getByTestId('canvas-big-toggle')
+  const small = (await canvas.boundingBox())!
+  await expect(page.getByTestId('jamo-stroke-trackpad')).toBeVisible()
+
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  // 조절판은 안 그리지만 도구 줄은 남는다 — 캔버스 아래 가로 한 줄, 화면 안.
+  await expect(page.getByTestId('jamo-stroke-trackpad')).toHaveCount(0)
+  await expect(page.getByRole('toolbar', { name: '획 편집 도구' })).toBeVisible()
+  const big = (await canvas.boundingBox())!
+  expect(big.width).toBeGreaterThan(small.width)
+  // 세로로 긴 화면에선 정사각형을 풀고 높이까지 채운다.
+  expect(big.height).toBeGreaterThan(big.width)
+  const slot = (await page.getByTestId('jamo-stroke-tool-slot').boundingBox())!
+  expect(slot.y).toBeGreaterThanOrEqual(big.y + big.height)
+  expect(slot.y + slot.height).toBeLessThanOrEqual((page.viewportSize()?.height ?? 0) + 1)
+  const overflow = await page.evaluate(() => ({ horizontal: document.documentElement.scrollWidth - window.innerWidth, vertical: document.documentElement.scrollHeight - window.innerHeight }))
+  expect(overflow.horizontal).toBeLessThanOrEqual(0)
+  expect(overflow.vertical).toBeLessThanOrEqual(0)
+
+  // 켠 채 캔버스에서 획을 끌면 옮겨지고 바로 저장된다.
+  const xOf = () => stroke.evaluate((element) => (element as SVGGraphicsElement).getBBox().x)
+  const beforeX = await xOf()
+  const at = (await stroke.boundingBox())!
+  const from = { x: at.x + at.width / 2, y: at.y + at.height / 2 }
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  for (let step = 1; step <= 8; step += 1) await page.mouse.move(from.x - 60 * step / 8, from.y)
+  await page.mouse.up()
+  await expect.poll(xOf).toBeLessThan(beforeX)
+  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
+
+  // 끄면 조절판이 돌아오고 캔버스는 처음 크기 · 정사각형이다.
+  await toggle.click()
+  await expect(page.getByTestId('jamo-stroke-trackpad')).toBeVisible()
+  const back = (await canvas.boundingBox())!
+  expect(Math.round(back.width)).toBe(Math.round(small.width))
+  expect(Math.round(back.height)).toBe(Math.round(small.height))
+
+  // 켠 채 머리 `‹`로 레이아웃에 나가면 꺼지고, 셸은 다시 480 기둥이다.
+  await page.setViewportSize({ width: 820, height: 1180 })
+  await toggle.click()
+  await expect.poll(async () => (await page.locator('main > div').first().boundingBox())!.width).toBe(820)
+  await page.getByTestId('workspace-back').click()
+  await expect(page.getByTestId('canvas-big-toggle')).toHaveCount(0)
+  await expect.poll(async () => (await page.locator('main > div').first().boundingBox())!.width).toBe(480)
+})
+
+test('도구 줄은 고른 것에 쓰는 단추만 세우고, `추가` · `스타일`은 조절판 자리에 패널로 편다. 크게 보기에서는 도구 줄이 그 자리에서 바뀐다', async ({ page }) => {
+  await page.goto('/workspace/jamo?char=%EA%B0%80&mode=stroke&part=CH')
+  const editor = page.getByRole('region', { name: /완성 글자 편집/ })
+  const canvas = page.getByTestId('focus-canvas')
+  const tools = page.getByRole('toolbar', { name: '획 편집 도구' })
+  const hit = editor.locator('svg [data-editor-hit="stroke"][data-stroke-id="ㄱ-1"]')
+  await expect(hit).toBeAttached({ timeout: 60_000 })
+  const pickStroke = async () => {
+    for (let tries = 0; tries < 4 && await hit.getAttribute('data-selected') !== 'true'; tries += 1) await hit.dispatchEvent('pointerdown')
+    await expect(hit).toHaveAttribute('data-selected', 'true')
+  }
+  const panel = page.getByTestId('jamo-tool-panel')
+  const pad = page.getByTestId('jamo-stroke-trackpad')
+  const join = page.getByTestId('jamo-stroke-style')
+
+  // 획을 고르면 획에 쓰는 단추만 — 자소 통째 단추(비우기 · 맞춤 · 초기화)는 없다.
+  await pickStroke()
+  await expect(tools).toHaveAttribute('data-mode', 'stroke')
+  await expect(tools.getByRole('button', { name: '획 복사' })).toBeVisible()
+  await expect(tools.getByRole('button', { name: '획 삭제' })).toBeVisible()
+  await expect(join).toHaveAttribute('data-join', 'global')
+  for (const id of ['jamo-stroke-fit', 'jamo-stroke-reset']) await expect(page.getByTestId(id)).toHaveCount(0)
+  // `비우기` · `전체선택` 단추는 없다 — 자소가 통째로 골라진 첫 화면 · 빈 곳에서 `삭제` · `복사`가 획 전부에 한다.
+  await expect(page.getByTestId('jamo-stroke-clear')).toHaveCount(0)
+  await expect(page.getByTestId('jamo-stroke-select-all')).toHaveCount(0)
+
+  // `스타일`을 누르면 조절판이 비키고 그 자리에 패널: 줄 이름 `꺾임` 아래 그림 칸 넷. 골라도 열려 있고 캔버스는 안 움직인다.
+  const small = (await canvas.boundingBox())!
+  await join.click()
+  await expect(panel).toHaveAttribute('data-panel', 'style')
+  await expect(pad).toHaveCount(0)
+  await expect(panel.getByRole('heading', { name: '꺾임' })).toBeVisible()
+  const choices = page.getByTestId('jamo-stroke-join-choice')
+  await expect(choices).toHaveCount(4)
+  await expect(choices.first()).toHaveAttribute('aria-checked', 'true')
+  await page.locator('[data-testid="jamo-stroke-join-choice"][data-join="round"]').click()
+  await expect(join).toHaveAttribute('data-join', 'round')
+  await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeEnabled()
+  await expect(panel).toBeVisible()
+  expect(await canvas.boundingBox()).toEqual(small)
+  const lowest = (await choices.last().boundingBox())!
+  expect(lowest.y + lowest.height).toBeLessThanOrEqual((page.viewportSize()?.height ?? 0) + 1)
+  await page.screenshot({ path: 'test-results/tool-panel-join.png' })
+  // 다시 누르면 조절판으로 돌아온다.
+  await join.click()
+  await expect(panel).toHaveCount(0)
+  await expect(pad).toBeVisible()
+
+  // 패널은 한 번에 하나. `스타일`을 편 채 `추가`를 누르면 `추가` 패널로 바뀐다.
+  await join.click()
+  await tools.getByRole('button', { name: '획 추가' }).click()
+  await expect(panel).toHaveAttribute('data-panel', 'add')
+  await expect(page.getByTestId('jamo-stroke-add-circle')).toBeVisible()
+  await page.screenshot({ path: 'test-results/tool-panel-add.png' })
+
+  // 패널을 편 채 다른 단추를 누르면 패널은 닫히고 그 단추가 제 일을 한다. `추가` 패널은 캔버스를 눌러도 닫힌다.
+  await page.getByTestId('jamo-stroke-copy').click()
+  await expect(panel).toHaveCount(0)
+  await expect(pad).toBeVisible()
+  await tools.getByRole('button', { name: '획 추가' }).click()
+  await expect(panel).toHaveAttribute('data-panel', 'add')
+  await canvas.dispatchEvent('pointerdown')
+  await expect(panel).toHaveCount(0)
+  await pickStroke()
+  await join.click()
+  await expect(panel).toHaveAttribute('data-panel', 'style')
+  await tools.getByRole('button', { name: '획 복사' }).click()
+  await expect(panel).toHaveCount(0)
+  await expect(page.getByTestId('jamo-stroke-paste')).toBeVisible()
+
+  // 점을 고르면 `스타일` 패널은 닫히고, 점에 쓰는 단추만 남는다.
+  await join.click()
+  await expect(panel).toHaveAttribute('data-panel', 'style')
+  for (let tap = 0; tap < 2 && await editor.locator('svg [data-editor-point="hit"]').count() === 0; tap += 1) {
+    await hit.dispatchEvent('pointerdown')
+    await hit.dispatchEvent('pointerup')
+  }
+  const points = editor.locator('svg [data-editor-point="hit"]')
+  await points.last().dispatchEvent('pointerdown')
+  await points.last().dispatchEvent('pointerup')
+  await expect(tools).toHaveAttribute('data-mode', 'point')
+  await expect(panel).toHaveCount(0)
+  await expect(pad).toBeVisible()
+  await expect(tools.getByRole('button', { name: /^(곡선화|직선화)$/ })).toBeVisible()
+  await expect(tools.getByRole('button', { name: '획 복사' })).toHaveCount(0)
+  await expect(join).toHaveCount(0)
+
+  // 펜을 고르면 패널은 닫히고 첫 칸이 켜진 `펜`. 자소 통째 단추가 선다. 다시 누르면 `추가`로 돌아온다.
+  await tools.getByRole('button', { name: '획 추가' }).click()
+  await page.getByTestId('jamo-stroke-pen').click()
+  await expect(panel).toHaveCount(0)
+  await expect(tools).toHaveAttribute('data-mode', 'jamo')
+  await expect(tools.getByTestId('jamo-stroke-pen')).toHaveAttribute('aria-pressed', 'true')
+  await expect(tools.getByRole('button', { name: '획 추가' })).toHaveCount(0)
+  await expect(page.getByTestId('jamo-stroke-fit')).toBeVisible()
+  await tools.getByTestId('jamo-stroke-pen').click()
+  await expect(tools.getByRole('button', { name: '획 추가' })).toBeVisible()
+  await expect(tools).toHaveAttribute('data-mode', 'jamo')
+  await expect(page.getByTestId('jamo-stroke-reset')).toBeVisible()
+  // 펜을 끄면 자소 통째다 — 획에 하는 일(복사 · 삭제 · 스타일)이 자소의 획 전부에 걸린다.
+  await expect(tools.getByRole('button', { name: '획 삭제' })).toBeVisible()
+  await expect(join).toBeVisible()
+
+  // 크게 보기: 조절판이 없으니 도구 줄이 그 자리에서 패널로 바뀐다. 스타일을 펴면 줄이 자라 캔버스가 그만큼 줄고, `뒤로`면 제 크기로 돌아온다.
+  await pickStroke()
+  await page.getByTestId('canvas-big-toggle').click()
+  await expect(pad).toHaveCount(0)
+  const big = (await canvas.boundingBox())!
+  await join.click()
+  await expect(tools).toHaveAttribute('data-panel', 'style')
+  await expect(page.getByTestId('jamo-stroke-join-choice')).toHaveCount(4)
+  const slot = (await page.getByTestId('jamo-stroke-tool-slot').boundingBox())!
+  expect(slot.y + slot.height).toBeLessThanOrEqual((page.viewportSize()?.height ?? 0) + 1)
+  expect((await canvas.boundingBox())!.height).toBeLessThan(big.height)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0)
+  await page.screenshot({ path: 'test-results/tool-panel-big-join.png' })
+  await page.getByTestId('jamo-tool-panel-back').click()
+  await expect(tools).toHaveAttribute('data-mode', 'stroke')
+  expect(await canvas.boundingBox()).toEqual(big)
+  // `추가`도 같은 그림 칸이라 줄이 같은 만큼 자라고, `뒤로`면 돌아온다.
+  await tools.getByRole('button', { name: '획 추가' }).click()
+  await expect(tools).toHaveAttribute('data-panel', 'add')
+  await expect(page.getByTestId('jamo-stroke-add-circle')).toBeVisible()
+  expect((await canvas.boundingBox())!.height).toBeLessThan(big.height)
+  await page.getByTestId('jamo-tool-panel-back').click()
+  await expect(tools).toHaveAttribute('data-mode', 'stroke')
+  expect(await canvas.boundingBox()).toEqual(big)
+  await page.getByTestId('canvas-big-toggle').click()
+  await expect(pad).toBeVisible()
+  expect(await canvas.boundingBox()).toEqual(small)
 })

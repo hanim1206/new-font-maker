@@ -10,6 +10,7 @@ import {
 import { strokeToAngledAreaInkGroups } from './areaStrokeGeometry'
 import { contrastWidthOf, INNER_ROUNDNESS_MAX, strokeToFlatInkGroups } from './flatStrokeGeometry'
 import { strokeToGridSystem2InkGroups } from './gridSystem2Geometry'
+import { miterLimitOf, type EffectiveJoin } from './strokeJoin'
 
 /** 획 스타일의 전역 둥글기(0~1). 둥근 붓촉의 brush 모드에서만 뜻이 있고, 그 밖에는 0. */
 export function roundnessOf(style: StrokeRenderStyle | undefined): number {
@@ -133,14 +134,14 @@ export function strokeToRenderInkGroups(
   box: BoxConfig,
   weightMultiplier: number,
   style: StrokeRenderStyle,
-  options?: { ellipseVertexCount?: number },
+  options?: { ellipseVertexCount?: number; join?: EffectiveJoin },
 ): BrushInkGroup[] {
   if (style.mode === 'angled-area') return strokeToAngledAreaInkGroups(stroke, box, weightMultiplier, style)
   if (style.mode === 'dot-pattern') return strokeToDotPatternInkGroups(stroke, box, weightMultiplier, style)
   if (style.mode === 'legacy-snapped-centerline') return strokeToGridSystem2InkGroups(stroke, box, weightMultiplier)
   if (style.brush.tip === 'round' && hasRoundness(style)) {
-    // 전역 둥글기: 각진 끝(butt · miter) 윤곽의 모서리를 굴린다. 저장된 linecap · linejoin은 안 본다.
-    return strokeToFlatInkGroups(stroke, box, weightMultiplier, 'butt', 'miter', options?.ellipseVertexCount, roundnessOf(style), innerRoundnessOf(style), contrastOf(style), stemScaleOf(style))
+    // 전역 둥글기: 각진 끝(butt) 윤곽의 모서리를 굴린다. 끝 모양은 막대가 맡고, 꺾임은 실효 꺾임(획 > 전역)을 따른다 — 안 주면 뾰족.
+    return strokeToFlatInkGroups(stroke, box, weightMultiplier, 'butt', options?.join?.linejoin ?? 'miter', options?.ellipseVertexCount, roundnessOf(style), innerRoundnessOf(style), contrastOf(style), stemScaleOf(style), options?.join?.miterLimit ?? miterLimitOf(style))
   }
   if (style.brush.tip === 'round') {
     const centerline = flattenStrokeCenterline(stroke, box)

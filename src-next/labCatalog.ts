@@ -16,6 +16,8 @@ const LAB_NAMES: Record<LabRoute, string> = {
   '/font-guide-lab': '기준선(Font Guide)',
   '/spectrum-lab': '성격 스펙트럼',
   '/design-body-lab': '네모꼴',
+  '/pen-lab': '펜 그리기',
+  '/ink-parity-lab': '면 그리기 견줌',
   '/style-guide': '스타일가이드',
 }
 
