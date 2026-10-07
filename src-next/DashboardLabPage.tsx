@@ -13,6 +13,8 @@ import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { borrowFromChoseong, canBorrowFromChoseong, matchesChoseong } from '../src/utils/jamoFromChoseong'
 import { LatinGlyph } from './LatinGlyph'
 import { isNotoLatinChar } from '../src/services/notoLatinSource'
+import { SYMBOL_GROUPS, SYMBOL_LIST } from '../src/data/symbols'
+import { useSymbolStore } from '../src/stores/symbolStore'
 import { AppGlyph } from './AppGlyph'
 import { editedDayText, nextFontName } from './accountFont'
 import { createFont, deleteFont, listFonts, renameFont } from './accountFontApi'
@@ -54,13 +56,14 @@ import styleMode from './GlobalStyleMode.module.css'
  * 아직 없는 것: `…`의 복제. 파일 이름은 옛 랩 이름 그대로다.
  */
 
-type SectionId = 'style' | 'layout' | 'choseong' | 'jungseong' | 'jongseong'
+type SectionId = 'style' | 'layout' | 'choseong' | 'jungseong' | 'jongseong' | 'symbol'
 const SECTIONS: { id: SectionId; label: string }[] = [
   { id: 'style', label: '스타일' },
   { id: 'choseong', label: '초성' },
   { id: 'jungseong', label: '중성' },
   { id: 'jongseong', label: '종성' },
   { id: 'layout', label: '레이아웃' },
+  { id: 'symbol', label: '숫자 · 기호' },
 ]
 /** 레이아웃 6칸 대표 글자 — 세로홀자 · 가로홀자 · 섞임홀자 × 받침 유무. */
 const LAYOUT_SAMPLES = ['래', '노', '화', '별', '을', '원'] as const
@@ -174,6 +177,8 @@ function InSyllableGlyph({ type, char, size }: { type: 'jungseong' | 'jongseong'
 
 /** 자소 카드 잉크. 첫닿자는 단독으로, 홀자 · 받침은 글자 속 비율로. */
 function JamoGlyph({ type, char, size }: { type: JamoType; char: string; size: number }) {
+  // 숫자 · 기호는 받는 폰트 그림 그대로(획으로 고친 것은 획, 아니면 노토). 카드 크기에 맞춰 글자 크기를 준다.
+  if (type === 'symbol') return <span className={styles.symbolInk} style={{ fontSize: size }}><LatinGlyph char={char} /></span>
   return type === 'choseong' ? <AppGlyph char={char} size={size} upright /> : <InSyllableGlyph type={type} char={char} size={size} />
 }
 
@@ -516,15 +521,16 @@ function StyleTile({ kind, label, value, panel = 'brush' }: { kind: 'weight' | '
   </li>
 }
 
-type JamoType = 'choseong' | 'jungseong' | 'jongseong'
-const JAMO_LABEL: Record<JamoType, string> = { choseong: '초성', jungseong: '중성', jongseong: '종성' }
+type JamoType = 'choseong' | 'jungseong' | 'jongseong' | 'symbol'
+const JAMO_LABEL: Record<JamoType, string> = { choseong: '초성', jungseong: '중성', jongseong: '종성', symbol: '숫자 · 기호' }
 const PREVIEW_COUNT = 4
 
 /**
  * 자모 에디터(획 편집)로. 섹션 홈의 `편집 n`만 부른다. 도마를 그 자소들로 두고 첫 자소의 대표 글자를 그 자소 획 편집으로 연다.
  * 지금 홈 주소(묶기 포함)를 `returnTo`로 남겨 편집기 `‹`가 이 홈으로 돌아온다.
  */
-const EDITOR_PART: Record<JamoType, 'CH' | 'JU' | 'JO'> = { choseong: 'CH', jungseong: 'JU', jongseong: 'JO' }
+// 숫자 · 기호는 첫닿자 자리 하나로 연다(`symbolEditing`).
+const EDITOR_PART: Record<JamoType, 'CH' | 'JU' | 'JO'> = { choseong: 'CH', jungseong: 'JU', jongseong: 'JO', symbol: 'CH' }
 function openEditor(type: JamoType, chars: readonly string[]) {
   useWorkbenchStore.getState().place(type, chars, `${window.location.pathname}${window.location.search}`)
   navigate(`/workspace/jamo?char=${encodeURIComponent(workbenchSyllable(type, chars[0]))}&mode=stroke&part=${EDITOR_PART[type]}`)
@@ -612,13 +618,18 @@ const BY_MEDIAL_KIND: Grouping = {
     { label: '섞임홀자', members: 'ㅘㅙㅚㅝㅞㅟㅢ' },
   ].map(({ label, members }) => ({ label, chars: chars.filter((c) => members.includes(c)) })).filter((group) => group.chars.length > 0),
 }
+// 숫자 · 기호. 쓰임새로 나눈다.
+const BY_SYMBOL_KIND: Grouping = {
+  id: 'kind', label: '쓰임', groups: (chars) => SYMBOL_GROUPS.map((group) => ({ label: group.label, chars: chars.filter((c) => group.chars.includes(c)) })).filter((group) => group.chars.length > 0),
+}
 const GROUPINGS: Record<JamoType, Grouping[]> = {
+  symbol: [BY_SYMBOL_KIND, ALL],
   choseong: [ALL, BY_STEM, BY_DOUBLE, BY_STROKES],
   jungseong: [ALL, BY_MEDIAL_KIND, BY_SIDE_STEM, BY_STROKES],
   jongseong: [ALL, BY_FINAL_KIND, BY_CLUSTER_HEAD, BY_STROKES],
 }
 // 칩을 안 골랐을 때. 중성은 홀자(레이아웃 6칸과 같은 말), 종성은 홑 · 쌍 · 겹이 `전체`보다 먼저 쓸모 있다.
-const DEFAULT_GROUPING: Record<JamoType, string> = { choseong: 'all', jungseong: 'kind', jongseong: 'kind' }
+const DEFAULT_GROUPING: Record<JamoType, string> = { choseong: 'all', jungseong: 'kind', jongseong: 'kind', symbol: 'kind' }
 
 /**
  * 받침을 초성 모양으로 켜기 직전 모양. 끄면 여기로 돌아간다(연결이 아니라 복사 + 되돌리기).
@@ -646,7 +657,10 @@ const GROUP_GAP = 28
  * 아래 칩 탭 = 빼기, 휴지통 = 비우기, `n개 고치기` = 도마를 들고 편집기로. 담기 · 빼기는 여기서만 한다.
  */
 function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] }) {
-  const jamos = useJamoStore((state) => state[type])
+  const jamoMap = useJamoStore((state) => (type === 'symbol' ? null : state[type]))
+  const symbols = useSymbolStore((state) => state.symbols)
+  // 기호는 획 수만 쓴다(묶기 `획 수`는 없지만 묶음 시트가 같은 함수를 받는다).
+  const jamos: Record<string, JamoData> = useMemo(() => jamoMap ?? Object.fromEntries(Object.entries(symbols).map(([char, symbol]) => [char, { type: 'choseong', char, strokes: symbol.strokes }])), [jamoMap, symbols])
   const benchType = useWorkbenchStore((state) => state.type)
   const benchChars = useWorkbenchStore((state) => state.chars)
   const add = useWorkbenchStore((state) => state.add)
@@ -1055,9 +1069,10 @@ export function DashboardLabPage() {
   const name = useUIStore((state) => state.currentProjectName) ?? '내 폰트'
   const style = useGlobalStyleStore((state) => state.style)
   const isJamoModified = useJamoStore((state) => state.isJamoModified)
-  const count = (type: JamoType, chars: readonly string[]) => chars.filter((c) => isJamoModified(type, c)).length
+  const count = (type: Exclude<JamoType, 'symbol'>, chars: readonly string[]) => chars.filter((c) => isJamoModified(type, c)).length
   const modifiedBy = { choseong: count('choseong', CHOSEONG_LIST), jungseong: count('jungseong', JUNGSEONG_LIST), jongseong: count('jongseong', FINALS) }
   const modified = modifiedBy.choseong + modifiedBy.jungseong + modifiedBy.jongseong
+  const symbolsTouched = useSymbolStore((state) => SYMBOL_LIST.filter((char) => state.symbols[char]).length)
   const roundness = Math.round((style.strokeStyle?.mode === 'brush' ? style.strokeStyle.roundness ?? 0 : 0) * 100)
 
   // 머리 알약 = 지금 폰트 이름(시트에서 바꾼 이름도 따라간다, `renamedAccountFont`). 누르면 내 폰트 시트.
@@ -1162,6 +1177,12 @@ export function DashboardLabPage() {
                 </li>)}
               </ul>
             </section>
+
+            {/* 숫자 · 기호. 맨 아래. 요약 줄만 — 판과 묶기는 기호 홈(`/dashboard/symbol`). 고친 기호만 획, 나머지는 노토. */}
+            <section ref={(el) => { sections.current.symbol = el }}>
+              <SectionHead title="숫자 · 기호" count={SYMBOL_LIST.length} hint={symbolsTouched > 0 ? `고친 ${symbolsTouched}` : undefined} onClick={() => navigate('/dashboard/symbol')} testId="dashboard-symbol" />
+              <JamoPreview type="symbol" chars={SYMBOL_LIST} />
+            </section>
           </div>
         </div>
       </div>
@@ -1173,7 +1194,7 @@ export function DashboardLabPage() {
   </main>
 }
 
-const JAMO_CHARS: Record<JamoType, readonly string[]> = { choseong: CHOSEONG_ORDER, jungseong: JUNGSEONG_LIST, jongseong: FINALS }
+const JAMO_CHARS: Record<JamoType, readonly string[]> = { choseong: CHOSEONG_ORDER, jungseong: JUNGSEONG_LIST, jongseong: FINALS, symbol: SYMBOL_LIST }
 
 /** 섹션 홈 주소(`/dashboard/<종류>`). 모르는 종류면 대시보드로 넘긴다. */
 export function JamoHomePage() {

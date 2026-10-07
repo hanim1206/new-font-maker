@@ -30,12 +30,12 @@ function ring(id: string, cx: number, cy: number, rx: number, ry: number, k = 0.
 }
 
 /**
- * 점(`?`의 아래 점, `,`의 머리): 아주 작은 고리를 굵게 — 어느 굵기에서도 안이 꽉 찬다. 400에서 반지름 `r`(EM 비율), 굵기 따라 함께 커진다.
- * `cellWidth`는 칸 폭(EM) — 칸 좌표는 가로 · 세로 단위가 달라서 x 반지름을 따로 잰다.
+ * 점(`?`의 아래 점, `,`의 머리): 아주 짧은 세로 획을 둥근 끝으로 굵게 — 어느 굵기에서도 안이 꽉 찬 원이다. 400에서 반지름 `r`(EM 비율), 굵기 따라 함께 커진다.
+ * 끝 모양은 전역 설정과 상관없이 둥글게 고정한다(노토의 점도 둥글다). 작은 고리로 그리면 화면 렌더러에서 가운데가 뚫린다.
  */
-function dot(id: string, cx: number, cy: number, r: number, cellWidth: number): StrokeDataV2 {
-  const core = r * 0.1
-  return ring(id, cx, cy, core / cellWidth, core, 0.552, (r - core) * 2)
+function dot(id: string, cx: number, cy: number, r: number): StrokeDataV2 {
+  const half = r * 0.05
+  return { id, points: [{ x: cx, y: cy - half }, { x: cx, y: cy + half }], closed: false, thickness: r * 2, linecap: 'round' }
 }
 
 const SEEDS: Record<string, StrokeDataV2[]> = {
@@ -61,11 +61,11 @@ const SEEDS: Record<string, StrokeDataV2[]> = {
         { x: 0.461, y: 0.659 },
       ],
     },
-    dot('?-dot', 0.468, 0.824, 0.066, 0.474),
+    dot('?-dot', 0.468, 0.824, 0.066),
   ],
   // 노토 ,: 53–221 × −190–126(폭 278). 둥근 머리에서 왼아래로 휘는 꼬리.
   ',': [
-    dot(',-head', 0.52, 0.815, 0.068, 0.278),
+    dot(',-head', 0.52, 0.815, 0.068),
     {
       id: ',-tail',
       closed: false,

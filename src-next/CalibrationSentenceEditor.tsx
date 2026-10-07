@@ -10,7 +10,7 @@ import { DevGhostToggle } from './DevGhostToggle'
 import { ensureDevNotoFont } from './devNotoSwap'
 import { DEV_TOOLS_ENABLED } from './devTools'
 import { facesToBox, identityOfSyllable } from '../src/services/contextBoxResolver'
-import { contextPlacementOf, useContextPlacement, useNotoModel } from './notoModel'
+import { contextPlacementOf, useContextPlacement, useNotoModel, type GlyphPlacement } from './notoModel'
 import { GlyphLayoutEditor } from './GlyphLayoutEditor'
 import { effectiveLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
@@ -133,6 +133,10 @@ import { GRID_SYSTEM_2_STROKE_UNITS, GRID_SYSTEM_2_UNIT } from '../src/services/
 import { ShapeRulePanel } from './ShapeRulePanel'
 import { isDeleteKey, isTypingTarget } from './workspace/keyboardShortcuts'
 import { MobileWorkspaceShell } from './workspace/WorkspaceChrome'
+import { isSymbolChar, isSymbolJamo, saveSymbolJamo, symbolCanvasBox, symbolJamoOf, symbolSyllableOf } from './symbolEditing'
+import { useNotoLatinData } from './useNotoLatinData'
+import { useSymbolStore } from '../src/stores/symbolStore'
+import { symbolSeedOf } from '../src/data/symbolSeeds'
 import { useUIStore } from '../src/stores/uiStore'
 
 /** 어느 껍데기 안에 그릴지. standalone = 옛 `/` 전체 화면, workspace = 셸 자소 탭 안. */
@@ -311,7 +315,7 @@ function initialFocus(): { char: string; sentence: string; custom: boolean } {
   // 대시보드 폰트 카드와 같은 예시 문장. 여기서 바꾸면 대시보드도 바뀐다.
   const base = useFontExportStore.getState().sampleSentence.trim() || SAMPLE_SENTENCES[0]
   // 그냥 들어오면 문장 첫 글자를 잡는다. 문장에 없는 글자를 포커스한 채 열지 않는다.
-  if (!requested || !isEditableHangul(requested)) return { char: [...base].find(isEditableHangul) ?? [...base][0], sentence: base, custom: false }
+  if (!requested || !(isEditableHangul(requested) || isSymbolChar(requested))) return { char: [...base].find(isEditableHangul) ?? [...base][0], sentence: base, custom: false }
   if ([...base].includes(requested)) return { char: requested, sentence: base, custom: false }
   return { char: requested, sentence: `${requested} ${base}`, custom: true }
 }
@@ -347,6 +351,8 @@ function editableJamoOf(jamo: JamoData, syllable: DecomposedSyllable): JamoData 
 }
 
 function updateJamo(jamo: JamoData): void {
+  // 숫자 · 기호는 첫닿자 자리로 열지만 기호 저장소에 쓴다(`symbolEditing`).
+  if (isSymbolJamo(jamo)) { saveSymbolJamo(jamo); return }
   const store = useJamoStore.getState()
   if (jamo.type === 'choseong') store.updateChoseong(jamo.char, jamo)
   else if (jamo.type === 'jungseong') store.updateJungseong(jamo.char, jamo)
@@ -354,10 +360,32 @@ function updateJamo(jamo: JamoData): void {
 }
 
 function getJamo(type: JamoData['type'], char: string): JamoData | undefined {
+  if (isSymbolJamo({ type, char })) return symbolJamoOf(char)
   const store = useJamoStore.getState()
   if (type === 'choseong') return store.choseong[char]
   if (type === 'jungseong') return store.jungseong[char]
   return store.jongseong[char]
+}
+
+/** 되돌릴 기본 꼴. 숫자 · 기호는 씨앗 획. */
+function baseJamoOf(type: JamoData['type'], char: string): JamoData | undefined {
+  if (isSymbolJamo({ type, char })) return { type, char, strokes: symbolSeedOf(char).strokes }
+  return getBaseJamo(type, char)
+}
+
+/**
+ * 편집 캔버스의 배치. 한글은 칸 해석(`useContextPlacement`), 숫자 · 기호는 노토 400 폭 칸 하나를 가운데에(`symbolCanvasBox`).
+ * 기호 칸은 추출(`symbolContoursOf`)과 같은 크기라 캔버스에서 고친 그대로 받는 폰트에 들어간다.
+ */
+function useEditorPlacement(syllable: DecomposedSyllable, schema: LayoutSchema, globalStyle: GlobalStyle) {
+  const result = useContextPlacement(syllable, schema, globalStyle)
+  const latin = useNotoLatinData()
+  const symbol = isSymbolChar(syllable.char) && syllable.choseong !== null && syllable.jungseong === null
+  return useMemo(() => {
+    if (!symbol) return result
+    const placement: GlyphPlacement = { kind: 'boxes', boxes: { CH: symbolCanvasBox(syllable.char, latin) } }
+    return { placement, resolution: null, referencePlacement: placement }
+  }, [symbol, result, latin, syllable.char])
 }
 
 function getJamoStrokes(jamo: JamoData): StrokeDataV2[] {
@@ -711,7 +739,7 @@ function FocusedGlyph({
   globalStyle: GlobalStyle
 }) {
   // 배치는 칸 해석 함수(모델 상자)가 우선, 못 풀면 스키마. 획 겨냥·편집 오버레이도 같은 상자를 쓴다.
-  const { placement, resolution, referencePlacement } = useContextPlacement(syllable, schema, globalStyle)
+  const { placement, resolution, referencePlacement } = useEditorPlacement(syllable, schema, globalStyle)
   const boxes = useMemo(() => placement.kind === 'boxes' ? placement.boxes : calculateBoxes(schema, {
     cho: syllable.choseong?.char ?? '',
     jung: syllable.jungseong?.char ?? '',
@@ -1720,7 +1748,7 @@ function InferenceTrackpad({
   }
   // 지금 자소(고른 것, 없으면 잠긴 것)를 기본 프리셋으로 되돌린다. 문맥 변형까지 처음 그대로 — 틀 · 잉크 간격 보정도 얹지 않는다.
   // 고친 획이 한 번에 다 사라지니 먼저 묻는다(되돌리기로 되살릴 수는 있다).
-  const resetBase = creationBase ? getBaseJamo(creationBase.jamo.type, creationBase.jamo.char) : undefined
+  const resetBase = creationBase ? baseJamoOf(creationBase.jamo.type, creationBase.jamo.char) : undefined
   const canResetJamo = Boolean(creationBase && resetBase
     && JSON.stringify(getJamo(creationBase.jamo.type, creationBase.jamo.char)) !== JSON.stringify(resetBase))
   const resetJamo = () => {
@@ -1819,7 +1847,7 @@ function InferenceTrackpad({
   // 여럿을 골랐을 때 보이는 값은 잡은 획(통째면 첫 획)의 것이고, 막대를 끌면 고른 획 전부가 저마다의 기본 굵기에서 같은 %가 된다.
   // 끄는 동안은 미리보기, 손을 떼면 되돌리기 한 줄. `적용 안 함`은 기본 굵기로 돌린다.
   const thicknessStroke = toolPanel !== 'style' ? undefined : selection.kind === 'stroke' && selectedStroke ? selectedStroke : wholePicked ? pickedJamoStrokes()[0] : undefined
-  const thicknessPreset = thicknessStroke && pickedBase ? getBaseJamo(pickedBase.jamo.type, pickedBase.jamo.char) : undefined
+  const thicknessPreset = thicknessStroke && pickedBase ? baseJamoOf(pickedBase.jamo.type, pickedBase.jamo.char) : undefined
   const thicknessPresetStrokes = thicknessPreset ? getJamoStrokes(adoptFamilyStrokes(thicknessPreset, familyOfSyllable(syllable))) : []
   const thicknessBaseOf = (strokeId: string) => baseStrokeThickness(thicknessPresetStrokes, strokeId)
   const [thicknessDraft, setThicknessDraft] = useState<number | null>(null)
@@ -2530,7 +2558,11 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     const strokeStyle = previewBrush ?? globalStyle.strokeStyle
     return { ...globalStyle, ...previewTone, stemBeak: previewBeak ?? globalStyle.stemBeak, strokeStyle, brush: strokeStyle.mode === 'brush' ? strokeStyle.brush : globalStyle.brush }
   }, [globalStyle, previewBeak, previewBrush, previewTone])
-  const baseSyllable = useMemo(() => decomposeSyllable(selectedChar, choseong, jungseong, jongseong), [selectedChar, choseong, jungseong, jongseong])
+  // 숫자 · 기호를 열었는지. 첫닿자 자리에 기호 하나를 올려 같은 획 편집 도구를 쓴다. 레이아웃 · 닿는 글자 줄 · 문맥 보정은 없다.
+  const symbolOpen = isSymbolChar(selectedChar)
+  const symbolStrokes = useSymbolStore((state) => state.symbols[selectedChar])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 기호 획이 바뀌면 다시 읽는다.
+  const baseSyllable = useMemo(() => symbolOpen ? symbolSyllableOf(selectedChar) : decomposeSyllable(selectedChar, choseong, jungseong, jongseong), [symbolOpen, symbolStrokes, selectedChar, choseong, jungseong, jongseong])
   const previewedSyllable = useMemo(() => withPreviewJamo(baseSyllable, previewJamo), [baseSyllable, previewJamo])
   const baseSchema = schemas[previewedSyllable.layoutType]
   const displayedSchema = previewSchema?.layoutType === previewedSyllable.layoutType ? previewSchema.schema : baseSchema
@@ -2560,13 +2592,14 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   }, [chrome, notoBundle, previewEnds, previewGlobalStyle, exclusions, layoutDeltaRules])
   const measuresOnScreenBoxes = chrome === 'workspace' && Boolean(notoBundle)
   const syllable = useMemo(
-    () => resolveSyllableContextualInkSafety(previewedSyllable, screenBoxesOf(previewedSyllable, effectiveSchema)).syllable,
-    [effectiveSchema, previewedSyllable, screenBoxesOf],
+    () => symbolOpen ? previewedSyllable : resolveSyllableContextualInkSafety(previewedSyllable, screenBoxesOf(previewedSyllable, effectiveSchema)).syllable,
+    [effectiveSchema, previewedSyllable, screenBoxesOf, symbolOpen],
   )
   // 레이아웃 모드는 글자가 모델 상자로 그려질 때만 뜻이 있다. 그때는 옛 경로(자소 통째 이동 → 스키마)가 글자에 안 닿으므로 셸 안에서는 끈다.
   // 고치는 글자의 실효 스타일. 미리보기를 얹은 저장값에 이 레이아웃 네모꼴의 자동 보정을 얹는다(`getEffectiveStyle`과 같은 길).
-  const focusedGlobalStyle = useMemo(() => resolveEffectiveStyle(previewGlobalStyle, exclusions, syllable.layoutType, effectiveSchema.padding), [previewGlobalStyle, exclusions, syllable.layoutType, effectiveSchema.padding])
-  const { placement, resolution: placementResolution } = useContextPlacement(syllable, effectiveSchema, focusedGlobalStyle)
+  // 기호는 네모꼴 보정을 받지 않는다 — 추출도 전역 스타일 그대로 그린다.
+  const focusedGlobalStyle = useMemo(() => symbolOpen ? previewGlobalStyle : resolveEffectiveStyle(previewGlobalStyle, exclusions, syllable.layoutType, effectiveSchema.padding), [symbolOpen, previewGlobalStyle, exclusions, syllable.layoutType, effectiveSchema.padding])
+  const { placement, resolution: placementResolution } = useEditorPlacement(syllable, effectiveSchema, focusedGlobalStyle)
   // 레이아웃 모드는 모델이 있으면 열린다. 지금 획이 모델 상자에 맞는지(`placement.kind`)에 매지 않는다 —
   // 획을 고치다 맞춤이 깨지면(ㅡ를 곡선으로 → 상자가 획 두께보다 작음) 나가는 문(`완료`)까지 사라져 갇힌다.
   const layoutAvailable = chrome === 'workspace' && isEditableHangul(selectedChar) && (selectedChar.codePointAt(0) ?? 0) >= 0xac00 && !notoModelError
@@ -2688,7 +2721,8 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   const chooseChar = (char: string) => switchChar(char)
   const switchChar = (char: string) => {
     // 글자를 바꾸면 기본 상태(레이아웃)로 돌아간다.
-    if (chrome === 'workspace') { setEditMode('layout'); setStrokeEntryPart(null) }
+    // 숫자 · 기호는 레이아웃이 없어 늘 획 편집으로 연다.
+    if (chrome === 'workspace') { setEditMode(isSymbolChar(char) ? 'stroke' : 'layout'); setStrokeEntryPart(isSymbolChar(char) ? 'CH' : null) }
     setStrokeRowAnchor(null)
     setSelectedChar(char)
     setSelection({ kind: 'none' })
@@ -3153,7 +3187,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
     const jamo = adoptFamilyStrokes(part, family)
     const boxes = placement.kind === 'boxes' ? placement.boxes : focusedBoxes
     const renderPart: Part | null = lockedPart === 'JU' ? (boxes.JU ? 'JU' : null) : lockedPart
-    const base = getBaseJamo(jamo.type, jamo.char)
+    const base = baseJamoOf(jamo.type, jamo.char)
     const preset = base ? adoptFamilyStrokes(base, family) : null
     const blocked = lockedPart === 'JU' && !boxes.JU ? '섞임홀자는 곧' : !preset ? '프리셋이 없는 자모예요' : null
     const channel: PenChannel = preset ? presetChannelOf(preset) : 'strokes'
@@ -3420,6 +3454,11 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         : <Pressable key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width, paddingInlineStart: bearing }} type="button" aria-current={char === selectedChar ? 'true' : undefined} data-ink-gap-limiter={inkGapLimiter?.id === contextId ? 'true' : undefined} data-ink-safety-adjusted={isSafetyAdjusted ? 'true' : undefined} data-layout-applied={isScopeApplied ? 'true' : undefined} aria-label={`${char} 편집${isSafetyAdjusted ? ', 충돌 안전 보정됨' : ''}`} onClick={() => chooseChar(char)}>
           <Glyph char={char} size={sentenceEm} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={previewJamo} previewSchema={previewSchema} layoutHighlight={layoutHighlight} globalStyle={previewGlobalStyle} />
         </Pressable>
+      : isSymbolChar(char) && !inSheet
+        // 고칠 수 있는 숫자 · 기호. 누르면 그 기호를 획 편집으로 연다. 지금 연 기호는 캔버스의 획(미리보기 포함) 그대로 그린다.
+        ? <Pressable key={`${lineIndex}-${char}-${charIndex}`} type="button" className={styles.latinGlyph} aria-current={char === selectedChar ? 'true' : undefined} aria-label={`${char} 편집`} onClick={() => chooseChar(char)}>
+            <LatinGlyph char={char} style={previewGlobalStyle} symbol={symbolOpen && char === selectedChar ? { char, strokes: syllable.choseong?.strokes ?? [] } : undefined} />
+          </Pressable>
       : isNotoLatinChar(char)
         ? <span key={`${lineIndex}-${char}-${charIndex}`} data-char-index={inSheet ? charIndex : undefined} className={styles.latinGlyph}><LatinGlyph char={char} style={previewGlobalStyle} /></span>
         : <span key={`${lineIndex}-${char}-${charIndex}`} data-char-index={inSheet ? charIndex : undefined} className={/\s/u.test(char) ? styles.spaceGlyph : styles.punctuationGlyph} style={{ inlineSize: width }} aria-label={/\s/u.test(char) ? '공백' : char}>{char}</span>
@@ -3590,7 +3629,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
   // 도마 칩 줄. 획 편집(자모 에디터)에서만 — 레이아웃 편집엔 도마가 없다. 지금 글자에 든 도마 자소가 검정.
   // 탭하면 그 자소의 대표 글자로 바꾸되 획 편집에 머문다(문장에 없으면 앞에 붙인다). `닿는 글자` 줄에서 글자를 고르는 것과 같은 길.
   const benchJamo = benchType ? workbenchJamoOf(benchType, selectedChar) : null
-  const benchPart: MobileEditorPart | null = benchType === 'choseong' ? 'CH' : benchType === 'jungseong' ? 'JU' : benchType === 'jongseong' ? 'JO' : null
+  const benchPart: MobileEditorPart | null = benchType === 'choseong' || benchType === 'symbol' ? 'CH' : benchType === 'jungseong' ? 'JU' : benchType === 'jongseong' ? 'JO' : null
   const pickBenchJamo = (char: string) => {
     if (!benchType || !benchPart || char === benchJamo) return
     const syllable = workbenchSyllable(benchType, char)
