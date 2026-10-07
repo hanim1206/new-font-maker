@@ -1,0 +1,30 @@
+/* 이용약관 · 개인정보 처리방침. 계정 페이지와 같은 480 흰 판, 선 · 카드 없이 여백으로 나눈다. 글은 고를 수 있게(복사해 갈 수 있게). */
+.page { min-height: 100dvh; background: rgb(var(--color-background)); color: rgb(var(--color-foreground)); }
+.shell { width: min(100%, 480px); min-height: 100dvh; box-sizing: border-box; margin: 0 auto; display: flex; flex-direction: column; background: rgb(var(--color-surface)); box-shadow: var(--shadow-md); }
+
+.bar { position: sticky; top: 0; z-index: 2; min-height: 56px; display: flex; align-items: center; padding: max(0px, env(safe-area-inset-top)) 8px 0; background: rgb(var(--color-surface)); }
+
+.body { flex: 1; padding: 8px 24px max(32px, env(safe-area-inset-bottom)); font-size: var(--font-14); line-height: 1.7; word-break: keep-all; overflow-wrap: anywhere; user-select: text; }
+.body h1 { margin: 8px 0 4px; font-size: var(--font-28); font-weight: var(--weight-heavy); letter-spacing: -.01em; }
+.sub { margin: 0 0 20px; color: rgb(var(--color-text-4)); font-size: var(--font-14); }
+.body h2 { margin: 32px 0 8px; font-size: var(--font-16); font-weight: var(--weight-bold); }
+.body p { margin: 0 0 10px; color: rgb(var(--color-text-2)); }
+.body strong { color: rgb(var(--color-foreground)); font-weight: var(--weight-bold); }
+
+.list { margin: 0 0 10px; padding-left: 20px; color: rgb(var(--color-text-2)); }
+/* 앱 기본 스타일이 목록 기호를 지운다 — 조항 번호가 보여야 해서 되살린다. */
+ol.list { list-style: decimal; }
+ul.list { list-style: disc; }
+.list li { margin: 4px 0; padding-left: 2px; }
+.list li::marker { color: rgb(var(--color-text-4)); }
+.list .list { margin: 4px 0 0; }
+
+/* 표는 좁은 화면에서 옆으로 민다(쪽 전체가 밀리지 않게). */
+.tableWrap { margin: 4px -24px 12px; padding: 0 24px; overflow-x: auto; }
+.table { min-width: 100%; border-collapse: collapse; font-size: var(--font-13); line-height: 1.5; }
+.table th, .table td { padding: 8px 10px; text-align: left; vertical-align: top; }
+.table th { background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-3)); font-weight: var(--weight-semibold); white-space: nowrap; }
+.table td { border-bottom: 1px solid rgb(var(--color-surface-2)); color: rgb(var(--color-text-2)); min-width: 88px; }
+
+.band { height: 12px; margin: 32px -24px 16px; background: rgb(var(--color-surface-2)); }
+.other { color: rgb(var(--color-primary)); font-weight: var(--weight-semibold); text-decoration: none; }
