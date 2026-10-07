@@ -216,6 +216,8 @@ type PenTool = {
 const DRAG_THRESHOLD_PX = 3
 /** 펜이 켜진 동안 톡 누르기로 치는 거리(px). 손을 뗄 때까지 이 안에서만 움직였으면 긋지 않고 그 자리의 획을 고른다. */
 const PEN_TAP_SLOP_PX = 6
+/** 펜 점 솎기(화면 px). 앞 점에서 이만큼 못 간 점은 받지 않는다 — 펜슬 떨림이 점을 촘촘히 쌓아 급꺾임이 생기고 곡선이 과해지는 것을 막는다. */
+const PEN_MIN_STEP_PX = 6
 /**
  * 조절판 끌기를 캔버스 끌기와 같은 계산(px → em, 같은 스냅)으로 돌리는 문. 캔버스가 연다.
  * `move`는 조절판에서 손가락이 간 거리(px). `begin`이 false면 지금 선택으로는 못 끈다(조절판 옛 계산으로 간다).
@@ -552,6 +554,8 @@ function PenLayer({ pen, box, fresh, viewport, weightMultiplier, globalLinecap, 
   const surfaceRef = useRef<SVGRectElement>(null)
   /** 누른 자리와 거기서 가장 멀리 간 거리(화면 px). 톡 누르기인지 가른다. */
   const press = useRef({ x: 0, y: 0, travel: 0 })
+  /** 마지막으로 받은 점(화면 px). 점 솎기의 기준. */
+  const lastClient = useRef({ x: 0, y: 0 })
   const drawing = useRef<PenPoint[] | null>(null)
   /** 지금 긋는 포인터. 다른 손가락이 닿아도 이 획에 섞이지 않는다. */
   const activePointer = useRef<number | null>(null)
@@ -574,12 +578,20 @@ function PenLayer({ pen, box, fresh, viewport, weightMultiplier, globalLinecap, 
     const at = new DOMPoint(clientX, clientY).matrixTransform(matrix.inverse())
     return viewBoxToJamoBox([{ x: at.x, y: at.y }], box, VIEW_BOX_SIZE)[0]
   }
-  /** 펜은 한 프레임에 여러 점을 보낸다 — 합쳐진 이벤트를 풀어 떨림까지 그대로 받는다. 합성 이벤트에는 없어 한 점으로 돌아간다. */
+  /** 펜은 한 프레임에 여러 점을 보낸다 — 합쳐진 이벤트를 풀어 받되, 앞 점에서 `PEN_MIN_STEP_PX`만큼 못 간 점은 솎는다. 합성 이벤트에는 없어 한 점으로 돌아간다. */
   const pointsOf = (event: ReactPointerEvent<SVGRectElement>): PenPoint[] => {
     const native = event.nativeEvent as globalThis.PointerEvent & { getCoalescedEvents?: () => globalThis.PointerEvent[] }
     const events = native.getCoalescedEvents?.() ?? []
     const source = events.length > 0 ? events : [native]
-    return source.map((item) => toBox(event.currentTarget, item.clientX, item.clientY)).filter((point): point is PenPoint => point !== null)
+    const out: PenPoint[] = []
+    for (const item of source) {
+      if (Math.hypot(item.clientX - lastClient.current.x, item.clientY - lastClient.current.y) < PEN_MIN_STEP_PX) continue
+      const point = toBox(event.currentTarget, item.clientX, item.clientY)
+      if (!point) continue
+      lastClient.current = { x: item.clientX, y: item.clientY }
+      out.push(point)
+    }
+    return out
   }
   const begin = (event: ReactPointerEvent<SVGRectElement>) => {
     event.stopPropagation()
@@ -590,6 +602,7 @@ function PenLayer({ pen, box, fresh, viewport, weightMultiplier, globalLinecap, 
     event.currentTarget.setPointerCapture(event.pointerId)
     activePointer.current = event.pointerId
     press.current = { x: event.clientX, y: event.clientY, travel: 0 }
+    lastClient.current = { x: event.clientX, y: event.clientY }
     drawing.current = [first]
     setCurrent(drawing.current)
   }
@@ -632,7 +645,10 @@ function PenLayer({ pen, box, fresh, viewport, weightMultiplier, globalLinecap, 
       // 방금 그은 획도 캔버스 잉크와 같은 면 그리기로 — 저장된 모양(레이아웃 · 추출)과 한 그림이다. 면을 못 만들면 선으로.
       const made = centerlineInkGroups({ id: item.stroke.id, stroke: item.stroke, box: item.box, weightMultiplier, effectiveLinecap: item.stroke.linecap ?? globalLinecap ?? 'butt', effectiveLinejoin: item.stroke.linejoin ?? globalLinejoin ?? 'miter' }, strokeStyle ?? PEN_FILLED_STYLE)
       return made.ok && made.groups.length > 0
-        ? <path key={item.stroke.id} d={brushInkGroupsToSvgPaths(made.groups, VIEW_BOX_SIZE).join(' ')} fill={EDIT_COLOR.foreground} fillRule="evenodd" pointerEvents="none" data-testid="pen-fresh" />
+        // 조각마다 `<path>` 하나 — 한 path에 합쳐 evenodd로 칠하면 겹친 조각(급꺾임 · 자기 교차 때 사각형 + 동그라미)이 서로 뚫린다(SvgRenderer와 같은 방식).
+        ? <g key={item.stroke.id} pointerEvents="none" data-testid="pen-fresh">
+          {brushInkGroupsToSvgPaths(made.groups, VIEW_BOX_SIZE).map((path, index) => <path key={index} d={path} fill={EDIT_COLOR.foreground} fillRule="evenodd" />)}
+        </g>
         : <path key={item.stroke.id} d={pointsToSvgD(item.stroke.points, item.stroke.closed, item.box, VIEW_BOX_SIZE)} {...inkStyle(item.stroke)} data-testid="pen-fresh" />
     })}
     {live && <path d={pathOf(live)} {...inkStyle(pen.sample)} strokeLinejoin="round" data-testid="pen-live" />}

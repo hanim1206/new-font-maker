@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fitPenStroke, PEN_FIT_EPSILON_CANDIDATES, penClosesOnItself, smoothPenPoints, penCornerIndices, penFitDeviation, thinPenPoints } from './penStrokeFit'
+import { fitPenStroke, PEN_FIT_EPSILON, PEN_FIT_EPSILON_CANDIDATES, penClosesOnItself, smoothPenPoints, penCornerIndices, penFitDeviation, thinPenPoints } from './penStrokeFit'
 import type { PenPoint } from './penStrokeFit'
 
 /** 시드 고정 난수 — 펜 떨림 흉내. 같은 시드면 같은 점. */
@@ -29,7 +29,8 @@ function arc(c: PenPoint, r: number, from: number, to: number, n: number, wobble
   })
 }
 
-const EPS = 0.01
+/** 기본 ε. 아래 맞춤은 ε을 안 넘겨 기본값을 타니 기준도 같은 상수다. */
+const EPS = PEN_FIT_EPSILON
 
 describe('펜 획 맞춤', () => {
   it('가까운 점은 합치고 끝점은 남긴다', () => {

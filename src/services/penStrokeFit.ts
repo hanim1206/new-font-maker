@@ -46,7 +46,7 @@ export interface PenFitResult {
 }
 
 /** 기본 허용오차. G0에서 정한다 — 후보는 `PEN_FIT_EPSILON_CANDIDATES`. */
-export const PEN_FIT_EPSILON = 0.01
+export const PEN_FIT_EPSILON = 0.02
 export const PEN_FIT_EPSILON_CANDIDATES = [0.005, 0.01, 0.02] as const
 export const PEN_CORNER_ANGLE = 60
 const DEFAULT_MIN_GAP = 0.004
