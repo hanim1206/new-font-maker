@@ -178,11 +178,12 @@ test('글자 네모꼴은 막대 하나다: 좁게 ↔ 기본 ↔ 넓게, 좁히
 test('기울어진 글자: 잉크 · 핸들만 기울고 눈금은 곧으며, 점을 세로로 끌어도 손가락 아래에 있다', async ({ page }) => {
   const strokeUrl = `/workspace/jamo?mode=stroke&char=${encodeURIComponent('한')}`
   await page.goto(strokeUrl)
-  await expect(page.getByTestId('focus-canvas').locator('svg')).toBeVisible()
+  // 캔버스 안에는 그림 svg 말고 귀퉁이 `크게` 아이콘 svg도 있다 — 첫 번째가 그림.
+  await expect(page.getByTestId('focus-canvas').locator('svg').first()).toBeVisible()
   await setStoredStyle(page, { slant: 12 })
   // 열고 나면 주소에서 글자 · 모드를 지운다(`23b0c1a`). 새로고침 대신 같은 주소로 다시 연다.
   await page.goto(strokeUrl)
-  const svg = page.getByTestId('focus-canvas').locator('svg')
+  const svg = page.getByTestId('focus-canvas').locator('svg').first()
   await expect(svg).toBeVisible()
 
   const layers = await svg.evaluate((element) => {
