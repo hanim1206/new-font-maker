@@ -33,6 +33,14 @@ export const DASHBOARD_PATH = '/dashboard'
 
 export type FontExportStatus = 'idle' | 'exporting' | 'downloaded' | 'failed'
 
+/**
+ * 받기 전 문지기. 앱이 켜질 때 `ConsentSheet`가 동의 확인(`ensureDownloadConsent`)을 끼운다.
+ * 이 파일은 추출 워커(`fontExportParallel.worker.ts`)도 가져오므로 동의 · 로그인 코드를 여기서 직접 import하지 않는다 — 워커 번들(IIFE)은 코드 분할이 안 된다.
+ */
+export type ExportGate = (familyName: string) => Promise<boolean>
+let exportGate: ExportGate = async () => true
+export function setExportGate(gate: ExportGate): void { exportGate = gate }
+
 /** 추출이 끝난 순간 어디였나. `font` · `dashboard`는 기다리던 화면이라 완료 페이지로, `elsewhere`는 토스트만. */
 export type ExportOrigin = 'font' | 'dashboard' | 'elsewhere'
 
@@ -175,9 +183,7 @@ export const useFontExportStore = create<FontExportState & FontExportActions>()(
     if (get().status === 'exporting') return
     const familyName = name.trim() || DEFAULT_FONT_NAME
     // 받기 전 동의(약관 · 14세 · 공개 · 사용 조건). 없으면 시트가 뜨고, 손님은 카카오로 간다 — 돌아와서 다시 받는다.
-    const { ensureDownloadConsent } = await import('./downloadConsent')
-    const { useFontPresetStore } = await import('./fontPresetStore')
-    if (!(await ensureDownloadConsent(familyName, useFontPresetStore.getState().preset))) { set({ dialogOpen: false }); return }
+    if (!(await exportGate(familyName))) { set({ dialogOpen: false }); return }
     try { localStorage.setItem(FONT_NAME_STORAGE_KEY, familyName) } catch { /* 저장 못 해도 추출은 된다 */ }
     set({ dialogOpen: false, familyName, status: 'exporting', progress: '준비 중...', percent: 0, error: '', notice: null, doneElsewhere: false })
     // 도중에 탭이 죽으면(아이폰 메모리) 다시 열 때 알린다. 어떻게 끝나든 지운다.

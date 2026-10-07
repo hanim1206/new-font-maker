@@ -11,8 +11,6 @@ vi.mock('../src/services/fontGenerator', () => ({ generateAndDownloadFont: (...a
 vi.mock('./notoModel', () => ({ loadNotoModel: async () => ({}), contextPlacementOf: () => ({ placement: { kind: 'schema' } }) }))
 vi.mock('./accountFontSync', () => ({ accountFontName: () => null, nextExportRevision: async () => 3 }))
 vi.mock('./router', () => ({ navigate: (...args: unknown[]) => navigate(...args) }))
-// 받기 전 동의 시트는 여기서 안 본다(`download-consent.test.ts`). 늘 동의한 것으로.
-vi.mock('./downloadConsent', () => ({ ensureDownloadConsent: async () => true }))
 
 const bytes = new ArrayBuffer(8)
 const success = { success: true, glyphCount: 3, fileSize: 8, bytes, fileName: '꾸불체.otf', skippedChars: [] }

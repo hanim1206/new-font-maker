@@ -3,7 +3,9 @@ import type { ReactNode } from 'react'
 import { Button } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
 import { signInWithKakao } from './betaAuth'
-import { allChecked, NO_CHECKS, recordConsent, savePendingDownload, TERMS_VERSION, useConsentStore } from './downloadConsent'
+import { allChecked, ensureDownloadConsent, NO_CHECKS, recordConsent, savePendingDownload, TERMS_VERSION, useConsentStore } from './downloadConsent'
+import { setExportGate } from './fontExportStore'
+import { useFontPresetStore } from './fontPresetStore'
 import type { ConsentChecks, ConsentItem, ConsentRequest } from './downloadConsent'
 import styles from './ConsentSheet.module.css'
 
@@ -12,6 +14,9 @@ import styles from './ConsentSheet.module.css'
  * 필수 넷을 다 체크해야 단추가 켜진다. 손님은 `동의하고 카카오로 계속`(체크한 것과 받던 폰트 이름을 남기고 떠난다),
  * 회원은 `동의하고 받기`(프로필에 적고 바로 받는다). 베타 계정도 처음 받을 때 한 번 본다.
  */
+// 추출 들머리에 동의 문지기를 끼운다. 이 모듈이 앱에 한 번 실리면 된다(`main.tsx`).
+setExportGate((familyName) => ensureDownloadConsent(familyName, useFontPresetStore.getState().preset))
+
 export function ConsentSheet() {
   const request = useConsentStore((state) => state.request)
   if (!request) return null
