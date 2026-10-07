@@ -31,7 +31,7 @@ function staticHost(files: Record<string, unknown>) {
   const fetchJson: FetchJson = async <T,>(url: string) => {
     requests.push(url)
     const file = url.split('?')[0]
-    if (!(file in files)) throw new Error('Noto 프리셋 파일이 배포에 없습니다.')
+    if (!(file in files)) throw new Error('글자 자료 파일이 배포에 없습니다.')
     return files[file] as T
   }
   return { requests, fetchJson }
@@ -86,9 +86,9 @@ describe('Noto 프리셋 정적 경로', () => {
   it('묶음에 없는 글자와 한글 음절 밖 글자는 없다고 말한다', async () => {
     const host = staticHost({ '/noto-preset/manifest.json': MANIFEST, '/noto-preset/glyphs/000.json': { [0xac00]: glyph(0xac00) } })
     const loader = createNotoPresetGlyphLoader({ fetchJson: host.fetchJson, source: 'static' })
-    await expect(loader.glyph(0xac05)).rejects.toThrow('이 글자의 Noto 윤곽이 없습니다.')
-    await expect(loader.glyph(0x3131)).rejects.toThrow('이 글자의 Noto 윤곽이 없습니다.')
-    await expect(loader.glyph(0xac00 + 28)).rejects.toThrow('Noto 프리셋 파일이 배포에 없습니다.')
+    await expect(loader.glyph(0xac05)).rejects.toThrow('이 글자의 자료가 없습니다.')
+    await expect(loader.glyph(0x3131)).rejects.toThrow('이 글자의 자료가 없습니다.')
+    await expect(loader.glyph(0xac00 + 28)).rejects.toThrow('글자 자료 파일이 배포에 없습니다.')
   })
 
   it('source를 안 주면 지금처럼 API 주소를 쓴다', async () => {
