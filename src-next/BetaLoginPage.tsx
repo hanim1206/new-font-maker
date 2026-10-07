@@ -153,3 +153,23 @@ export function WithdrawnPage({ justNow = false }: { justNow?: boolean }) {
     </div>
   </main>
 }
+
+/**
+ * 손님으로 만든 사본을 들고 로그인했는데 계정에 폰트가 이미 있다. 어느 쪽을 열지 묻는다(10-06 결정).
+ * `지금 것으로 바꾸기`는 자리가 없으면 최근 계정 폰트를 지운다 — 그 말을 단추 아래에 적는다.
+ */
+export function CopyChoicePage({ accountFontName, replaces, onChoose }: { accountFontName: string; replaces: string | null; onChoose: (choice: 'account' | 'local') => void }) {
+  const [busy, setBusy] = useState(false)
+  const choose = (choice: 'account' | 'local') => { if (busy) return; setBusy(true); onChoose(choice) }
+  return <main className={styles.page}>
+    <div className={styles.card} data-testid="copy-choice">
+      <header>
+        <h1>어느 폰트를 열까요?</h1>
+        <p>계정에 <strong>{accountFontName}</strong>이 있고, 이 기기에서 로그인 전에 만든 폰트도 있어요.</p>
+      </header>
+      <Button type="button" size="block" variant="default" disabled={busy} onClick={() => choose('account')} data-testid="copy-choice-account">계정 폰트 열기</Button>
+      <Button type="button" size="block" variant="secondary" disabled={busy} onClick={() => choose('local')} data-testid="copy-choice-local">지금 것으로 바꾸기</Button>
+      <footer>{replaces ? `지금 것으로 바꾸면 ${replaces}은 지워져요. 계정 폰트를 열면 이 기기 폰트는 사라져요.` : '계정 폰트를 열면 이 기기 폰트는 사라져요.'}</footer>
+    </div>
+  </main>
+}

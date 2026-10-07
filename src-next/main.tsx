@@ -9,7 +9,8 @@ import { LEGACY_CALIBRATION_LAYOUT_PROFILE_V1 } from '../src/data/legacyCalibrat
 import { DEFAULT_LAYOUT_SCHEMAS } from '../src/utils/layoutCalculator'
 import '../src/index.css'
 import { setPersistWriteErrorHandler } from '../src/utils/debouncedStorage'
-import { autoPickOf, clearLocalFont, dropForeignCopy, editorPlanOf, hasLocalFont, readStamp, writeStamp } from './accountFont'
+import { autoPickOf, clearLocalFont, copyChoicePlanOf, dropForeignCopy, editorPlanOf, hasLocalFont, readStamp, writeStamp } from './accountFont'
+import type { CopyChoice } from './accountFont'
 import { LOCAL_OWNER } from './localFontApi'
 import { showAppNotice } from './appNotice'
 import { AppErrorBoundary, AppErrorScreen } from './AppErrorBoundary'
@@ -114,11 +115,35 @@ function adoptLocalCopy(): void {
   writeStamp(window.localStorage, { owner: LOCAL_OWNER, fontId: null, pending: false, create: '내 폰트' })
 }
 
-/** 손님(`local`) 이름표를 뗀다. 주인 없는 사본은 `dropForeignCopy`가 지우지 않고, 계정이 비었으면 첫 폰트로 올라간다. */
-function releaseGuestCopy(): void {
+/** 손님(`local`) 이름표를 뗀다. 주인 없는 사본은 `dropForeignCopy`가 지우지 않고, 계정이 비었으면 첫 폰트로 올라간다. 뗐으면 true. */
+function releaseGuestCopy(): boolean {
   const stamp = readStamp(window.localStorage)
-  if (stamp.owner !== LOCAL_OWNER) return
+  if (stamp.owner !== LOCAL_OWNER) return false
   writeStamp(window.localStorage, { owner: null, fontId: null, pending: false })
+  return hasLocalFont(window.localStorage)
+}
+
+/**
+ * 손님 사본을 들고 로그인했는데 계정에 폰트가 있으면 묻는다(`CopyChoicePage`). 계정이 비었으면 묻지 않고 사본이 첫 폰트가 된다(`autoPickOf`).
+ * 목록을 못 받으면 묻지 않고 그냥 연다 — 사본은 남아 있어 다음에 다시 묻는다.
+ */
+async function askCopyChoice(me: string, nickname: string | null): Promise<boolean> {
+  const { deleteFont, listFonts } = await import('./accountFontApi')
+  const listed = await listFonts(me)
+  if (!listed.ok || listed.value.length === 0) return false
+  const { loadProfile } = await import('./profileApi')
+  const limit = (await loadProfile(me))?.fontLimit ?? 1
+  const fonts = listed.value
+  const { CopyChoicePage } = await import('./BetaLoginPage')
+  const choice = await new Promise<CopyChoice>((resolve) => {
+    const replaces = copyChoicePlanOf('local', me, fonts, limit, nickname).deleteIds.map((id) => fonts.find((font) => font.id === id)?.name ?? '').filter(Boolean).join(' · ')
+    show(<CopyChoicePage accountFontName={fonts[0].name} replaces={replaces || null} onChoose={resolve} />)
+  })
+  const plan = copyChoicePlanOf(choice, me, fonts, limit, nickname)
+  for (const id of plan.deleteIds) await deleteFont(id)
+  if (plan.clear) clearLocalFont(window.localStorage)
+  writeStamp(window.localStorage, plan.stamp)
+  return true
 }
 
 /**
@@ -175,8 +200,8 @@ async function gate(): Promise<void> {
       adoptLocalCopy()
       return start(LOCAL_OWNER, LOCAL_NICKNAME)
     }
-    // 손님으로 만든 사본은 주인 없는 사본으로 — 계정이 비었으면 첫 폰트가 된다(`autoPickOf`).
-    releaseGuestCopy()
+    // 손님으로 만든 사본은 주인 없는 사본으로 — 계정이 비었으면 첫 폰트가 된다(`autoPickOf`), 있으면 묻는다.
+    if (releaseGuestCopy()) await askCopyChoice(user.id, user.nickname)
   } else if (!user) {
     show(<BetaLoginPage onSignedIn={onSignedIn} />)
     return
