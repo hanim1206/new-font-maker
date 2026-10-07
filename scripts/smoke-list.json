@@ -50,5 +50,9 @@
   {
     "file": "tests/e2e/stroke-drag-live.spec.ts",
     "title": "가른 벌(세로홀자 첫닿자)에서 획을 끌면 끄는 동안 잉크가 따라 움직이고, 벌에 따로 준 굵기가 기본으로 덮이지 않는다"
+  },
+  {
+    "file": "tests/e2e/global-style-everywhere.spec.ts",
+    "title": "굵기를 900으로 바꾸면 대시보드 · 레이아웃 캔버스 · 획 편집 캔버스 · 검수 칸의 잉크가 전부 굵어진다"
   }
 ]
