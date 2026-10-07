@@ -152,7 +152,7 @@ export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, e
   return <section className={styles.row} aria-label="닿는 글자" data-testid="touched-glyph-row">
     {lead && <figure className={`${styles.card} ${styles.lead}`} data-active={lead.active || undefined} data-testid="touched-glyph-solo">
       <Pressable aria-current={lead.active || undefined} onClick={onPickLead} aria-label={`${lead.char} 단독으로 열기`}>
-        <span className={styles.leadGlyph}><AppGlyph char={lead.char} size={24} upright /></span>
+        <span className={styles.leadGlyph}><AppGlyph char={lead.char} size={24} /></span>
       </Pressable>
       <figcaption className={styles.caption}><b>{lead.char}</b></figcaption>
     </figure>}

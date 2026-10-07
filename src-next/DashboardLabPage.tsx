@@ -115,8 +115,8 @@ function LayoutThumb({ char, size }: { char: string; size: number }) {
   const globalPadding = useLayoutStore((state) => state.globalPadding)
   const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
   const syllable = useMemo(() => decomposeSyllable(char, choseong, jungseong, jongseong), [char, choseong, jungseong, jongseong])
-  const effectiveStyle = useEffectiveGlobalStyle(syllable.layoutType)
-  const globalStyle = useMemo(() => ({ ...effectiveStyle, slant: 0 }), [effectiveStyle])
+  // 글자는 기울여 그리고 부품 상자만 곧게 깐다(`straightUnderlay`) — 레이아웃 편집 캔버스와 같다.
+  const globalStyle = useEffectiveGlobalStyle(syllable.layoutType)
   const schema = withEffectivePadding(schemas[syllable.layoutType], globalPadding, paddingOverrides[syllable.layoutType])
   const { placement } = useContextPlacement(syllable, schema, globalStyle)
   const boxes = placement.kind === 'boxes' ? (Object.entries(placement.boxes) as [Part, { x: number; y: number; width: number; height: number }][]) : []
@@ -128,7 +128,7 @@ function LayoutThumb({ char, size }: { char: string; size: number }) {
     globalStyle={globalStyle}
     overflow="visible"
     clipGlyphs={false}
-    underlay={boxes.length ? <g>{boxes.map(([part, box]) => <rect key={part} x={box.x * 100} y={box.y * 100} width={box.width * 100} height={box.height * 100} fill={PART_COLOR[part]} fillOpacity={0.16} />)}</g> : undefined}
+    straightUnderlay={boxes.length ? <g>{boxes.map(([part, box]) => <rect key={part} x={box.x * 100} y={box.y * 100} width={box.width * 100} height={box.height * 100} fill={PART_COLOR[part]} fillOpacity={0.16} />)}</g> : undefined}
   />
 }
 
@@ -146,7 +146,7 @@ function InSyllableGlyph({ type, char, size }: { type: 'jungseong' | 'jongseong'
   const globalPadding = useLayoutStore((state) => state.globalPadding)
   const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
   const syllable = useMemo(() => decomposeSyllable(workbenchSyllable(type, char), choseong, jungseong, jongseong), [type, char, choseong, jungseong, jongseong])
-  // 자소 카드는 결과를 보는 곳이라 기울기까지 그대로 그린다(10-07 사용자). 레이아웃 칸(`LayoutThumb`)만 상자를 보여 곧게 둔다.
+  // 자소 카드는 결과를 보는 곳이라 기울기까지 그대로 그린다(10-07 사용자). 레이아웃 칸(`LayoutThumb`)도 글자는 기울이고 상자만 곧게 둔다.
   const globalStyle = useEffectiveGlobalStyle(syllable.layoutType)
   const schema = withEffectivePadding(schemas[syllable.layoutType], globalPadding, paddingOverrides[syllable.layoutType])
   const { placement } = useContextPlacement(syllable, schema, globalStyle)

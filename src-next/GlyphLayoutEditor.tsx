@@ -4,7 +4,7 @@ import { notoOutlineGhostPath } from '../src/services/notoOutlineInk'
 import { DevGhostToggle } from './DevGhostToggle'
 import { ensureDevNotoFont } from './devNotoSwap'
 import { DEV_TOOLS_ENABLED } from './devTools'
-import { useGlobalStyleStore } from '../src/stores/globalStyleStore'
+import { useEffectiveGlobalStyle, useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import { approvedInputFor } from './notoApprovedIndex'
 import { editableComponentRailsOf, fitComponentsForGlyph, renderComponentPart } from './notoComponentFitView'
 import type { ComponentFaces } from '../src/services/notoComponentFit'
@@ -83,7 +83,7 @@ type CanvasRail = EditableRail & { part: Part; locked?: boolean; baseline: numbe
 // 방향키 → 축 방향 부호. 가로 위치(x)는 좌우, 세로 위치(y)는 상하(아래가 +).
 const nudgeOf = (key: string, axis: 'x' | 'y'): number => axis === 'x' ? (key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0) : (key === 'ArrowDown' ? 1 : key === 'ArrowUp' ? -1 : 0)
 
-function GhostCanvas({ ghost, ghostChar, ghostVisible = true, inkHidden = false, body, measured, editable = [], activePart, selectedRail, snappedRail, snapHit, showDelta = true, onSelectRail, onDragRail, onDragState, onNudgeRail, onSelectPart, onEditPart, editLocked = false, onReleaseRail, label, overlays = [], componentOverlays = [], boxes = [] }: {
+function GhostCanvas({ ghost, ghostChar, ghostVisible = true, inkHidden = false, body, measured, editable = [], activePart, selectedRail, snappedRail, snapHit, showDelta = true, onSelectRail, onDragRail, onDragState, onNudgeRail, onSelectPart, onEditPart, editLocked = false, onReleaseRail, label, overlays = [], componentOverlays = [], boxes = [], slant = 0 }: {
   ghost: string
   /** 고스트 글자. 굵기 400이 아니면 추출 윤곽(400) 대신 노토 가변 글꼴 텍스트로 지금 굵기를 그린다. */
   ghostChar?: string
@@ -127,6 +127,8 @@ function GhostCanvas({ ghost, ghostChar, ghostVisible = true, inkHidden = false,
   label: string
   /** 내 홀자 획 마스터 잉크. 검정. */
   overlays?: string[]
+  /** 전역 기울기(도). 고스트와 잉크에만 건다. */
+  slant?: number
   /** 닿자 박스 fit 잉크(앱 획). 검정. */
   componentOverlays?: string[]
   /** 획 뒤에 칠하는 부품 상자. */
@@ -227,11 +229,14 @@ function GhostCanvas({ ghost, ghostChar, ghostVisible = true, inkHidden = false,
       </g>
     })}
     {/* Noto 고스트. 잉크가 아니라 비교용이라 반투명으로 깐다. 검정 획 아래에 두어 벗어난 곳만 회색으로 보인다. */}
+    {/* 상자 · 보선은 곧게, 고스트와 잉크만 전역 기울기로 — 획 편집 캔버스 · 닿는 글자 줄과 같은 가운데 기준 skewX. */}
+    <g transform={slant ? `translate(.5 .5) skewX(${-slant}) translate(-.5 -.5)` : undefined}>
     {ghostVisible && (weightGhost
       ? <text x="0" y=".88" fontFamily="'Noto Sans KR', sans-serif" fontWeight={ghostWeight} fontSize="1" transform={designBodySvgTransform(body, 1)} fill={EDIT_COLOR.editGhost} fillOpacity=".55" data-testid="review-ghost">{ghostChar}</text>
       : <path d={ghost} transform={designBodySvgTransform(body, 1)} fill={EDIT_COLOR.editGhost} fillOpacity=".55" fillRule="evenodd" data-testid="review-ghost" />)}
     {!(inkHidden && ghostVisible) && overlays.map((path, index) => <path key={index} d={path} fill={EDIT_COLOR.foreground} fillRule="evenodd" data-testid="review-fit-ink" />)}
     {!(inkHidden && ghostVisible) && componentOverlays.map((path, index) => <path key={`c${index}`} d={path} fill={EDIT_COLOR.foreground} fillRule="evenodd" data-testid="review-component-ink" />)}
+    </g>
     {/* Δ 띠. 켠 영역에서 옮긴 rail 전부: 기준값 자리와 지금 자리 사이를 주황 단색으로 칠한다. 선택을 풀어도 남는다. 잉크 위에 얹어 옮긴 구간이 바로 보인다.
         길이는 그 rail의 영역 상자 안으로만 — 캔버스 끝까지 그으면 다른 영역까지 덮는다. 상자가 없으면 캔버스 끝까지. */}
     {showDelta && editable.filter((rail) => rail.touched && (!activePart || samePartGroup(rail.part, activePart)) && Math.abs(rail.value - rail.baseline) > 1e-9).map((rail) => {
@@ -328,6 +333,8 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
   const [facesByPart, setFacesByPart] = useState<(ComponentFaces | undefined)[]>([])
   // 화면 잉크는 자소 탭과 같은 글로벌 끝 모양으로. 측정·xor는 이 스타일을 안 탄다.
   const inkStyle = useFitInkStyle(layoutType)
+  // 맞춤 잉크는 직각 상자 기준이라 기울기를 빼고 만든다. 화면에 그릴 때만 기울인다.
+  const slant = useEffectiveGlobalStyle(layoutType).slant
   const componentRendered = useMemo(() => componentParts.map((part, index) => renderComponentPart(part, facesByPart[index], inkStyle)), [componentParts, facesByPart, inkStyle])
   const componentOverlays = componentRendered.flatMap((part) => part.path ? [part.path] : [])
   // 홀자 편집은 세션 임시이고 칸 해석과 같은 순서로 쌓는다: 상자 변 Δ로 rail을 다시 놓고(`slotParts`), 그 위에 rail Δ를 얹는다.
@@ -503,12 +510,12 @@ function GlyphLayoutBody({ glyph, initialPart, onCommitted, onEditStrokes, onPic
 
   return <div className={styles.editor} data-testid="glyph-layout-editor">
       {/* 상단 두 줄의 아랫줄. 윗줄은 `내 문장`이라 이 편집부 바로 위에 있다. 글자 크기·칸 높이가 같고 줄 높이는 고정이다. */}
-      <TouchedGlyphRow source={glyph.identity} bundle={bundle} edit={propagationEdit} ghostVisible={ghostVisible} focus={rail?.part} scope={selection.scope} group={selection.group} jamos={selection.jamos} rule={selection.rule} onPick={onPickCharacter} />
+      <TouchedGlyphRow source={glyph.identity} bundle={bundle} edit={propagationEdit} ghostVisible={ghostVisible} focus={rail?.part} scope={selection.scope} group={selection.group} jamos={selection.jamos} rule={selection.rule} onPick={onPickCharacter} slant={slant} />
       <section className={styles.canvasSection}>
         {/* 캔버스 왼쪽 세로 표지. 여섯 칸 중 지금 고치는 칸을 켜기만 한다 — 범위는 아래 옵션 스택에서 고른다. */}
         <LayoutContextCards activeContextId={glyph.identity.contextId} allActive={selection.scope === 'all'} />
         <div className={styles.canvasArea}>
-        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostChar={glyph.identity.character} ghostVisible={ghostVisible} inkHidden={inkHidden} body={body} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail && rail.id === selectedRail ? rail.id : undefined} snappedRail={snapHit?.id} snapHit={snapHit} onSelectRail={(id) => { if (id !== rail?.id) setSnapHit(null); setSelectedRail(id); setError('') }} onReleaseRail={() => { setSelectedRail(undefined); setSnapHit(null) }} onSelectPart={selectPart} onEditPart={onEditStrokes ? (part) => { if (editCount === 0) onEditStrokes(part) } : undefined} editLocked={editCount > 0} onDragRail={(id, value) => changeRail(id, value, { snap: true })} onDragState={setDragging} onNudgeRail={(id, delta) => { const target = editable.find((item) => item.id === id); if (target) changeRail(id, target.value + delta / bodyAxis[target.axis].scale) }} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
+        {'path' in ghost ? <GhostCanvas ghost={ghost.path} ghostChar={glyph.identity.character} ghostVisible={ghostVisible} inkHidden={inkHidden} body={body} measured={measured} editable={canvasRails} activePart={activePart} selectedRail={rail && rail.id === selectedRail ? rail.id : undefined} snappedRail={snapHit?.id} snapHit={snapHit} onSelectRail={(id) => { if (id !== rail?.id) setSnapHit(null); setSelectedRail(id); setError('') }} onReleaseRail={() => { setSelectedRail(undefined); setSnapHit(null) }} onSelectPart={selectPart} onEditPart={onEditStrokes ? (part) => { if (editCount === 0) onEditStrokes(part) } : undefined} editLocked={editCount > 0} onDragRail={(id, value) => changeRail(id, value, { snap: true })} onDragState={setDragging} onNudgeRail={(id, delta) => { const target = editable.find((item) => item.id === id); if (target) changeRail(id, target.value + delta / bodyAxis[target.axis].scale) }} label={`${glyph.identity.character} Noto 고스트`} overlays={overlays} componentOverlays={componentOverlays} boxes={boxes} slant={slant} /> : <p className={styles.warning} role="alert">{ghost.error}</p>}
         <DevGhostToggle pressed={ghostVisible} onToggle={toggleGhost} testId="review-ghost-toggle" panel={
           <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, whiteSpace: 'nowrap' }}>
             <input type="checkbox" checked={inkHidden} onChange={(event) => setInkHidden(event.target.checked)} data-testid="dev-ink-hidden" />내 획 숨김
