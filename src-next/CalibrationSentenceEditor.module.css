@@ -110,6 +110,8 @@ section.sentence[data-sheet] .sentenceRun { align-self: stretch; max-height: 100
 .sentenceRun span.sentenceSheetHint { block-size: auto; margin-left: 6px; color: rgb(var(--color-text-5)); font-size: var(--font-16); line-height: 1.4; text-align: left; }
 .spaceGlyph { color: transparent !important; user-select: none; }
 .punctuationGlyph { font-family: ui-sans-serif, system-ui, sans-serif; font-size: .72em; line-height: 1.38em !important; }
+/* 숫자 · 영문 · 기호. 받는 폰트에 들어가는 노토 윤곽(`LatinGlyph`)으로 한글 칸과 같은 1em 높이에 그린다. */
+.latinGlyph { display: inline-flex; flex: 0 0 auto; block-size: 1em; line-height: 0; }
 .editor { min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 16px; }
 /* 검수 캔버스(ReviewWorkspacePage .canvas)와 같은 틀: 흰 바탕, 20px 모서리. 눈금·글자몸은 SVG 깔개에 그린다. */
 .focusCanvas { position: relative; width: min(84vw, 368px); aspect-ratio: 1; overflow: hidden; border: 1px solid rgb(var(--color-border)); border-radius: var(--radius-xl); background-color: rgb(var(--color-inverse-foreground)); touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }

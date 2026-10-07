@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
 import { Check, ChevronLeft, Circle, ClipboardPaste, Copy, Dices, Download, Import, Link2, ListTree, LoaderCircle, Maximize2, Minimize2, Minus, Pencil, Plus, Redo2, RotateCcw, Scan, Settings2, Share2, SlidersHorizontal, Spline, Square, TextCursorInput, Trash2, Undo2, Unlink, X, ZoomIn } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import { LatinGlyph } from './LatinGlyph'
+import { isNotoLatinChar } from '../src/services/notoLatinSource'
 import { create } from 'zustand'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { loadGhostVisible, saveGhostVisible, useGhostComparison, useNotoGhost } from './notoGhostCompare'
@@ -3418,7 +3420,9 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         : <Pressable key={`${lineIndex}-${char}-${charIndex}`} style={{ inlineSize: width, paddingInlineStart: bearing }} type="button" aria-current={char === selectedChar ? 'true' : undefined} data-ink-gap-limiter={inkGapLimiter?.id === contextId ? 'true' : undefined} data-ink-safety-adjusted={isSafetyAdjusted ? 'true' : undefined} data-layout-applied={isScopeApplied ? 'true' : undefined} aria-label={`${char} 편집${isSafetyAdjusted ? ', 충돌 안전 보정됨' : ''}`} onClick={() => chooseChar(char)}>
           <Glyph char={char} size={sentenceEm} maps={maps} schemas={schemas} globalPadding={globalPadding} paddingOverrides={paddingOverrides} previewJamo={previewJamo} previewSchema={previewSchema} layoutHighlight={layoutHighlight} globalStyle={previewGlobalStyle} />
         </Pressable>
-      : <span key={`${lineIndex}-${char}-${charIndex}`} data-char-index={inSheet ? charIndex : undefined} className={/\s/u.test(char) ? styles.spaceGlyph : styles.punctuationGlyph} style={{ inlineSize: width }} aria-label={/\s/u.test(char) ? '공백' : char}>{char}</span>
+      : isNotoLatinChar(char)
+        ? <span key={`${lineIndex}-${char}-${charIndex}`} data-char-index={inSheet ? charIndex : undefined} className={styles.latinGlyph}><LatinGlyph char={char} style={previewGlobalStyle} /></span>
+        : <span key={`${lineIndex}-${char}-${charIndex}`} data-char-index={inSheet ? charIndex : undefined} className={/\s/u.test(char) ? styles.spaceGlyph : styles.punctuationGlyph} style={{ inlineSize: width }} aria-label={/\s/u.test(char) ? '공백' : char}>{char}</span>
   }
   // 셸 안에서는 도구 줄이 없다(출력은 폰트 탭, 형태 규칙은 머리, 실행취소 · 다시실행은 셸 머리). 아래 줄은 옛 단독 화면 것.
   const menuLabel = (text: string) => chrome === 'workspace' ? <em>{text}</em> : null

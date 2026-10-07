@@ -11,6 +11,8 @@ import { groupMatching, sameChars, useJamoGroupStore, type JamoGroup } from '../
 import type { JamoData, LayoutSchema, Padding, Part } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { borrowFromChoseong, canBorrowFromChoseong, matchesChoseong } from '../src/utils/jamoFromChoseong'
+import { LatinGlyph } from './LatinGlyph'
+import { isNotoLatinChar } from '../src/services/notoLatinSource'
 import { AppGlyph } from './AppGlyph'
 import { editedDayText, nextFontName } from './accountFont'
 import { createFont, deleteFont, listFonts, renameFont } from './accountFontApi'
@@ -250,6 +252,7 @@ function FontCard({ name, fontLimit, onRename, onDuplicate, onDelete }: {
   const letterSpacing = useGlobalStyleStore((state) => state.style.letterSpacing)
   const spaceAdvance = `${SPACE_ADVANCE / UPM}em`
   const renderChar = (char: string, index: number) => {
+    if (isNotoLatinChar(char)) return <span key={index} className={editorStyles.latinGlyph} data-char-index={index}><LatinGlyph char={char} /></span>
     if (!isHangul(char)) return <span key={index} className={/\s/u.test(char) ? editorStyles.spaceGlyph : editorStyles.punctuationGlyph} style={/\s/u.test(char) ? { inlineSize: spaceAdvance } : undefined} data-char-index={index} aria-label={/\s/u.test(char) ? '공백' : char}>{char}</span>
     const padding = mergeLayoutPadding(globalPadding, paddingOverrides, decomposeSyllable(char, choseong, jungseong, jongseong).layoutType)
     // 그림은 1em 네모 그대로 두고 몸통만 보이게 왼쪽 여백만큼 당긴다(편집기 글자 칸과 같은 자리).

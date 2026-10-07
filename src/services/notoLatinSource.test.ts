@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { ASCII_PRINTABLE_CODE_POINTS } from './fontGenerator'
-import { nearestNotoLatinWeight, notoLatinSourceOf, quadraticContourOf } from './notoLatinSource'
+import { isNotoLatinChar, latinPathOf, nearestNotoLatinWeight, notoLatinSourceOf, quadraticContourOf } from './notoLatinSource'
 import type { NotoLatinData } from './notoLatinSource'
 
 const DATA = JSON.parse(readFileSync(fileURLToPath(new URL('../data/notoLatin.v1.json', import.meta.url)), 'utf8')) as NotoLatinData
@@ -60,5 +60,15 @@ describe('노토 숫자 · 기호 출처', () => {
       expect(moved.y).toBe(point.y)
       expect(Math.abs(moved.x - (point.x + (point.y - 380) * tangent))).toBeLessThanOrEqual(1)
     })
+  })
+
+  it('SVG 경로: on-curve는 L, off-curve는 다음 점까지 Q, y는 뒤집는다', () => {
+    const contour = quadraticContourOf([[0, 0, 1], [10, 0, 0], [20, 10, 0], [20, 20, 1]], identity)
+    expect(latinPathOf([contour])).toBe('M0 0Q10 0 15 -5Q20 -10 20 -20L0 0Z')
+  })
+
+  it('그릴 글자는 띄어쓰기 뺀 ASCII 한 글자뿐', () => {
+    expect(['0', 'A', '~', '!'].every(isNotoLatinChar)).toBe(true)
+    expect([' ', '가', '·', '…', 'AB', ''].some(isNotoLatinChar)).toBe(false)
   })
 })

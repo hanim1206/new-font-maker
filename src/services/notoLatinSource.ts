@@ -78,3 +78,29 @@ export function notoLatinSourceOf(data: NotoLatinData, style: NotoLatinStyle): L
     },
   }
 }
+
+/** 2차 윤곽(숨은 점을 넣은 뒤) → SVG 경로. y는 아래로 뒤집는다. */
+export function latinPathOf(contours: Contour[]): string {
+  const parts: string[] = []
+  for (const contour of contours) {
+    const start = contour.findIndex((point) => point.onCurve)
+    if (start < 0 || contour.length < 2) continue
+    const at = (index: number) => contour[(start + index) % contour.length]
+    parts.push(`M${at(0).x} ${-at(0).y}`)
+    for (let index = 1; index <= contour.length; index += 1) {
+      const point = at(index)
+      if (point.onCurve) { parts.push(`L${point.x} ${-point.y}`); continue }
+      const next = at(index + 1)
+      parts.push(`Q${point.x} ${-point.y} ${next.x} ${-next.y}`)
+      index += 1
+    }
+    parts.push('Z')
+  }
+  return parts.join('')
+}
+
+/** 그릴 수 있는 글자인지. 띄어쓰기 · 한글 · 그 밖의 문자는 아니다. */
+export function isNotoLatinChar(char: string): boolean {
+  const code = char.codePointAt(0) ?? 0
+  return [...char].length === 1 && code >= 0x21 && code <= 0x7e
+}

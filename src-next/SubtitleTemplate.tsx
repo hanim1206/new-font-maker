@@ -1,4 +1,6 @@
 import { AppGlyph } from './AppGlyph'
+import { LatinGlyph } from './LatinGlyph'
+import { isNotoLatinChar } from '../src/services/notoLatinSource'
 import styles from './SubtitleTemplate.module.css'
 
 /**
@@ -19,7 +21,9 @@ export function SubtitleTemplate({ fontFamily, size = GLYPH_PX }: { fontFamily?:
           ? line
           : [...line].map((char, index) => isHangul(char)
             ? <span key={index} className={styles.glyph}><AppGlyph char={char} size={size} upright /></span>
-            : <span key={index} className={styles.plain}>{char}</span>)}
+            : isNotoLatinChar(char)
+              ? <span key={index} className={styles.glyph}><LatinGlyph char={char} /></span>
+              : <span key={index} className={styles.plain}>{char}</span>)}
       </p>)}
     </div>
   </figure>
