@@ -2,8 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ReactNode } from 'react'
 import { Check, ChevronDown, ChevronRight, Copy, LayoutGrid, Maximize, Minus, MousePointerClick, PanelRightClose, PanelRightOpen, Plus, X } from 'lucide-react'
 import { Button } from './components/ui/button'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from './components/ui/select'
-import { PREVIEW_CASE_GROUPS } from './previewCases'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from './components/ui/select'
+import { PREVIEW_CASE_GROUPS, previewHintOf } from './previewCases'
 import { FILE_SCREEN, LIBRARY_GROUPS, itemIdsOfElement, libraryItems } from './styleLibrary'
 import type { LibraryGroup, LibraryItem, LibraryScreen } from './styleLibrary'
 import { applyThemePreview, readThemePreview, writeThemePreview } from './themePreview'
@@ -422,10 +422,11 @@ export function StyleGuideLabPage() {
           <SelectTrigger className="h-9 flex-1 bg-surface" aria-label="미리보기 화면 고르기" data-testid="style-guide-preview-pick">
             <SelectValue placeholder="화면 고르기" />
           </SelectTrigger>
-          <SelectContent>
-            {PREVIEW_CASE_GROUPS.map((group) => <SelectGroup key={group.label}>
+          <SelectContent className="min-w-[340px]">
+            {PREVIEW_CASE_GROUPS.map((group, index) => <SelectGroup key={group.label}>
+              {index > 0 && <SelectSeparator />}
               <SelectLabel>{group.label}</SelectLabel>
-              {group.cases.map((entry) => <SelectItem key={entry.route} value={entry.route}>{entry.label}</SelectItem>)}
+              {group.cases.map((entry) => <SelectItem key={entry.route} value={entry.route} hint={previewHintOf(entry.route)}>{entry.label}</SelectItem>)}
             </SelectGroup>)}
           </SelectContent>
         </Select>}
