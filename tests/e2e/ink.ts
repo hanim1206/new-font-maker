@@ -4,8 +4,13 @@ import type { Locator, Page } from '@playwright/test'
  * 화면에 실제로 그려진 잉크를 픽셀로 잰다. 다른 스펙은 DOM만 봐서 "DOM은 멀쩡한데 안 그려진다" · "끄는 동안 안 움직인다"를 못 잡는다.
  * 캔버스(`focus-canvas`)의 검은 픽셀 수 · 캔버스에서 차지하는 몫(%) · 무게중심 x(기기 픽셀)를 돌려준다.
  */
-export async function inkOf(page: Page): Promise<{ count: number; share: number; x: number }> {
-  const box = (await page.getByTestId('focus-canvas').boundingBox())!
+export function inkOf(page: Page): Promise<{ count: number; share: number; x: number }> {
+  return inkOfLocator(page, page.getByTestId('focus-canvas'))
+}
+
+/** `inkOf`와 같되 아무 요소나 — 대시보드 카드 · 레이아웃 캔버스 · 검수 칸처럼 `focus-canvas`가 아닌 곳. */
+export async function inkOfLocator(page: Page, target: Locator): Promise<{ count: number; share: number; x: number }> {
+  const box = (await target.boundingBox())!
   const shot = (await page.screenshot({ clip: box })).toString('base64')
   return page.evaluate(async (data) => {
     const image = new Image()
