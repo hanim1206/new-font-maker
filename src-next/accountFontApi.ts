@@ -1,14 +1,14 @@
 import { supabase } from '../src/lib/supabase'
 import type { FontData } from '../src/types/database'
-import { authGateMode } from './betaAuth'
+import { storageMode } from './betaAuth'
 import * as local from './localFontApi'
 
 /**
  * `font_projects` 서버 호출. 스토어를 가져오지 않아 메인 화면(`/fonts`)도 쓴다.
  * 지운 폰트(`deleted_at`)는 읽지 않는다. RLS가 내 줄만 돌려준다.
- * 로그인 게이트가 꺼진 개발 서버에서는 같은 함수가 localStorage(`localFontApi`)를 본다 — 메인 화면과 편집 화면이 dev에서도 같은 길.
+ * 로그인 게이트가 꺼진 개발 서버와 손님(`download` 모드의 로그인 전)은 같은 함수가 localStorage(`localFontApi`)를 본다 — 메인 화면과 편집 화면이 dev에서도 같은 길.
  */
-const isLocal = () => authGateMode() === 'off'
+const isLocal = () => storageMode() === 'local'
 
 const TABLE = 'font_projects'
 

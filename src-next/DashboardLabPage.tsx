@@ -20,7 +20,7 @@ import { DEFAULT_FONT_NAME, FONT_NAME_STORAGE_KEY, useFontExportStore } from './
 import { StylePicto } from './StylePicto'
 import { clearAppNotice, showAppNotice } from './appNotice'
 import { leaveDeletedFont, openFont, openNewFont } from './fontSwitch'
-import { authGateMode, sessionUser } from './betaAuth'
+import { sessionUser, storageMode } from './betaAuth'
 import { useUnseenReply } from './useFeedback'
 import { navigate } from './router'
 import { useContextPlacement } from './notoModel'
@@ -912,7 +912,7 @@ function useFontList() {
   useEffect(() => {
     if (!session) return
     void listFonts(session.me).then((listed) => { if (listed.ok) setFonts(listed.value) })
-    if (authGateMode() === 'on') void sessionUser().then((user) => setNickname(user?.nickname ?? null)).catch(() => undefined)
+    if (storageMode() === 'account') void sessionUser().then((user) => setNickname(user?.nickname ?? null)).catch(() => undefined)
     else setNickname('내 폰트')
   }, [session])
 

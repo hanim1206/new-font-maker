@@ -12,6 +12,7 @@ export const PRODUCT_SCREEN_ROUTES = [
   '/workspace/jamo',
   '/workspace/review',
   '/account',
+  '/login',
   '/terms',
   '/privacy',
 ] as const

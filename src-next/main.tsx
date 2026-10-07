@@ -15,7 +15,7 @@ import { showAppNotice } from './appNotice'
 import { AppErrorBoundary, AppErrorScreen } from './AppErrorBoundary'
 import { AppNoticeBar } from './AppNoticeBar'
 import { watchAppUpdate } from './appUpdate'
-import { authGateMode, sessionUser } from './betaAuth'
+import { authGateMode, enterGuest, loginAt, sessionUser, signInErrorOf } from './betaAuth'
 import { DevCrashProbe } from './devCrash'
 import { EditLockedPage } from './EditLockedPage'
 import { editLockName, holdEditLock, takeStealRequest } from './editLock'
@@ -69,6 +69,8 @@ document.addEventListener('dragstart', (event) => {
 const FONTS_PATH = '/fonts'
 const DASHBOARD_PATH = '/dashboard'
 const ADMIN_PATH = '/admin'
+/** 받을 때 로그인(`download`)의 로그인 화면. */
+const LOGIN_PATH = '/login'
 const isAdminPath = (pathname: string) => pathname === ADMIN_PATH || pathname.startsWith(`${ADMIN_PATH}/`)
 /** 게이트가 꺼진 개발 서버에서 새 폰트 이름. */
 const LOCAL_NICKNAME = '내 폰트'
@@ -110,6 +112,13 @@ function adoptLocalCopy(): void {
   writeStamp(window.localStorage, { owner: LOCAL_OWNER, fontId: null, pending: false, create: '내 폰트' })
 }
 
+/** 손님(`local`) 이름표를 뗀다. 주인 없는 사본은 `dropForeignCopy`가 지우지 않고, 계정이 비었으면 첫 폰트로 올라간다. */
+function releaseGuestCopy(): void {
+  const stamp = readStamp(window.localStorage)
+  if (stamp.owner !== LOCAL_OWNER) return
+  writeStamp(window.localStorage, { owner: null, fontId: null, pending: false })
+}
+
 /**
  * 로그인 게이트(베타). 로그인 안 됐으면 앱 대신 코드 입력 화면을 띄운다.
  * 들어오면 대시보드부터(마지막 폰트, 없으면 최근 폰트 · 새 폰트). 편집 주소를 바로 열거나 새로고침하면 마지막 폰트로 바로 연다.
@@ -140,8 +149,29 @@ async function gate(): Promise<void> {
     return
   }
   const user = await sessionUser()
-  if (!user) {
-    show(<BetaLoginPage onSignedIn={() => window.location.assign(DASHBOARD_PATH)} />)
+  const onSignedIn = () => window.location.assign(DASHBOARD_PATH)
+  // 카카오에서 실패를 달고 돌아왔다. 주소 조각은 지우고 알림 줄 한 줄.
+  const signInError = signInErrorOf(window.location.hash)
+  if (signInError) {
+    history.replaceState(null, '', window.location.pathname + window.location.search)
+    showAppNotice('sign-in', { tone: 'error', message: `로그인하지 못했어요. ${signInError}`, dismissable: true })
+  }
+  if (loginAt() === 'download') {
+    // 받을 때 로그인: 로그인 전엔 손님으로 이 기기 사본을 바로 연다. 로그인 화면은 `/login`(동의 시트 · 계정 화면에서 온다).
+    if (window.location.pathname === LOGIN_PATH) {
+      if (user) { navigate(DASHBOARD_PATH, { replace: true }); return start(user.id, user.nickname) }
+      show(<BetaLoginPage kakao onSignedIn={onSignedIn} />)
+      return
+    }
+    if (!user) {
+      enterGuest()
+      adoptLocalCopy()
+      return start(LOCAL_OWNER, LOCAL_NICKNAME)
+    }
+    // 손님으로 만든 사본은 주인 없는 사본으로 — 계정이 비었으면 첫 폰트가 된다(`autoPickOf`).
+    releaseGuestCopy()
+  } else if (!user) {
+    show(<BetaLoginPage onSignedIn={onSignedIn} />)
     return
   }
   // 남의 이름표가 붙은 브라우저 사본은 스토어가 읽기 전에 지운다(공용 기기).

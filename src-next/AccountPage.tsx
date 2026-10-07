@@ -4,7 +4,7 @@ import { Bug, ChevronDown, ChevronLeft, ChevronRight, Eye, Heart, MessageCircle,
 import type { LucideIcon } from 'lucide-react'
 import { FONT_LIMIT } from './accountFont'
 import { listFonts } from './accountFontApi'
-import { authGateMode, signOutAndReload } from './betaAuth'
+import { authGateMode, isGuest, signOutAndReload } from './betaAuth'
 import { REPORT_TAG_LABEL, hasUnseenReply, markSeen, readSeen, whenText } from './feedback'
 import type { ReportTag } from './feedback'
 import { useMe, useThreads } from './useFeedback'
@@ -45,7 +45,7 @@ function AccountHome() {
     <Bar back="/dashboard" />
     <div className={styles.body}>
       <h1>{me?.nickname ?? '나'}</h1>
-      <p className={styles.sub}>베타 참여자</p>
+      <p className={styles.sub}>{isGuest() ? '로그인 전' : '베타 참여자'}</p>
       <dl className={styles.facts}>
         <div><dt>내 폰트</dt><dd data-testid="account-font-count">{fontCount ?? '–'} / {FONT_LIMIT}개</dd></div>
         <div><dt>요금제</dt><dd>베타 · 무료</dd></div>
@@ -57,7 +57,9 @@ function AccountHome() {
         {unseen && <span className={styles.dot} aria-label="새 답장" />}
         <ChevronRight aria-hidden="true" />
       </Button>
-      {authGateMode() === 'on' && <Button variant="quiet" size="lg" className={styles.signOut} onClick={() => void signOutAndReload()}>로그아웃</Button>}
+      {authGateMode() === 'on' && (isGuest()
+        ? <Button variant="default" size="block" className={styles.signOut} onClick={() => window.location.assign('/login')} data-testid="account-login">카카오로 시작하기</Button>
+        : <Button variant="quiet" size="lg" className={styles.signOut} onClick={() => void signOutAndReload()}>로그아웃</Button>)}
     </div>
   </Shell>
 }
