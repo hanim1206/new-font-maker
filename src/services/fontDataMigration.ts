@@ -2,6 +2,7 @@ import type { FontData, FontDataV1_2 } from '../types/database'
 import {
   FONT_DATA_V1_3_VERSION,
   FONT_DATA_V1_4_VERSION,
+  FONT_DATA_V1_5_VERSION,
   FONT_DATA_VERSION,
   FONT_PRESET_IDS,
   LEGACY_FONT_DATA_VERSION,
@@ -13,6 +14,7 @@ import {
 import {
   canonicalizeLegacyFontPayload,
   validateFontDataPayload,
+  validateSymbols,
 } from './fontDataPayloadValidation'
 import { migrateJamoMap } from '../utils/strokeMigration'
 import { withThinStemsInEm } from '../utils/thinStemMigration'
@@ -37,7 +39,7 @@ export type FontDataParseResult =
   | {
     ok: true
     data: FontData
-    migratedFrom?: typeof LEGACY_FONT_DATA_VERSION | typeof FONT_DATA_V1_3_VERSION | typeof FONT_DATA_V1_4_VERSION
+    migratedFrom?: typeof LEGACY_FONT_DATA_VERSION | typeof FONT_DATA_V1_3_VERSION | typeof FONT_DATA_V1_4_VERSION | typeof FONT_DATA_V1_5_VERSION
   }
   | { ok: false; issues: FontDataParseIssue[] }
 
@@ -137,8 +139,8 @@ function sortIssues(issues: FontDataParseIssue[]): FontDataParseIssue[] {
 
 /**
  * DB/local JSON ingress의 유일한 FontData version 경계다.
- * 1.2/1.3/1.4는 원본 payload를 보존한 1.5로 올리되 layout grid/catalog를 추측해 만들지 않는다.
- * 1.4 이하에는 `layoutDelta`가 없고, 올려도 만들지 않는다(없음 = 조정 없음).
+ * 1.2/1.3/1.4/1.5는 원본 payload를 보존한 1.6으로 올리되 layout grid/catalog를 추측해 만들지 않는다.
+ * 1.4 이하에는 `layoutDelta`가 없고, 올려도 만들지 않는다(없음 = 조정 없음). 1.5 이하에는 `symbols`가 없다(없음 = 전부 노토).
  */
 export function parseAndMigrateFontData(value: unknown): FontDataParseResult {
   if (!isRecord(value)) {
@@ -150,6 +152,7 @@ export function parseAndMigrateFontData(value: unknown): FontDataParseResult {
   if (value.version !== LEGACY_FONT_DATA_VERSION
     && value.version !== FONT_DATA_V1_3_VERSION
     && value.version !== FONT_DATA_V1_4_VERSION
+    && value.version !== FONT_DATA_V1_5_VERSION
     && value.version !== FONT_DATA_VERSION) {
     return {
       ok: false,
@@ -159,16 +162,19 @@ export function parseAndMigrateFontData(value: unknown): FontDataParseResult {
 
   const allowedKeys = new Set<string>(COMMON_KEYS)
   if (value.version !== LEGACY_FONT_DATA_VERSION) allowedKeys.add('shapeSystem')
-  if (value.version === FONT_DATA_VERSION) {
+  const hasLayoutDelta = value.version === FONT_DATA_V1_5_VERSION || value.version === FONT_DATA_VERSION
+  if (hasLayoutDelta) {
     allowedKeys.add('layoutDelta')
     allowedKeys.add('preset')
   }
+  if (value.version === FONT_DATA_VERSION) allowedKeys.add('symbols')
   const issues = Object.keys(value)
     .filter((key) => !allowedKeys.has(key))
     .map((key) => issue('unsupported-field', `$.${key}`, '지원하지 않는 FontData 필드입니다.'))
   issues.push(...validatePayload(value))
-  if (value.version === FONT_DATA_VERSION && hasOwn(value, 'layoutDelta')) issues.push(...validateLayoutDelta(value.layoutDelta))
-  if (value.version === FONT_DATA_VERSION && hasOwn(value, 'preset')
+  if (hasLayoutDelta && hasOwn(value, 'layoutDelta')) issues.push(...validateLayoutDelta(value.layoutDelta))
+  if (value.version === FONT_DATA_VERSION && hasOwn(value, 'symbols')) issues.push(...validateSymbols(value.symbols))
+  if (hasLayoutDelta && hasOwn(value, 'preset')
     && !(FONT_PRESET_IDS as readonly unknown[]).includes(value.preset)) {
     issues.push(issue('invalid-field', '$.preset', '알 수 없는 preset입니다.'))
   }

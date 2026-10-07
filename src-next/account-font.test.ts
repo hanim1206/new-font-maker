@@ -232,12 +232,12 @@ beforeEach(() => {
 })
 
 describe('저장 형식 1.5', () => {
-  it('1.4는 레이아웃 조정 · preset 없이 1.5로 올린다', () => {
+  it('1.4는 레이아웃 조정 · preset 없이 1.6으로 올린다', () => {
     const withoutPreset: Partial<FontData> = structuredClone(baseFont)
     delete withoutPreset.preset
     const result = parseAndMigrateFontData({ ...withoutPreset, version: '1.4.0' })
     expect(result.ok && result.migratedFrom).toBe('1.4.0')
-    expect(result.ok && result.data.version).toBe('1.5.0')
+    expect(result.ok && result.data.version).toBe('1.6.0')
     expect(result.ok && result.data).not.toHaveProperty('layoutDelta')
   })
 
@@ -284,7 +284,7 @@ describe('계정 폰트 열기 · 자동 저장', () => {
   it('만들기 표시가 있으면 그 이름으로 만든다. 한도에 걸리면 메인 화면으로', async () => {
     writeStamp(storage, stampOf({ owner: 'me', create: 'test1 2' }))
     expect(await startAccountFont('me')).toEqual({ ok: true })
-    expect(calls.find((call) => call.op === 'insert')?.payload).toMatchObject({ user_id: 'me', name: 'test1 2', font_data: { version: '1.5.0', preset: 'basic-gothic' } })
+    expect(calls.find((call) => call.op === 'insert')?.payload).toMatchObject({ user_id: 'me', name: 'test1 2', font_data: { version: '1.6.0', preset: 'basic-gothic' } })
     expect(readStamp(storage)).toEqual(stampOf({ owner: 'me', fontId: 'new-font' }))
 
     resetAccountFontForTest()
@@ -444,7 +444,7 @@ describe('다른 기기 · 다른 탭과 겹칠 때', () => {
     const backup = workGuard.buildWorkBackup(storage, new Date(2026, 8, 25))
     expect(backup.raw).toBe(false)
     expect(backup.fileName).toBe('test1_2026-09-25.json')
-    expect(backup.data).toMatchObject({ version: '1.5.0', preset: 'basic-gothic' })
+    expect(backup.data).toMatchObject({ version: '1.6.0', preset: 'basic-gothic' })
   })
 })
 

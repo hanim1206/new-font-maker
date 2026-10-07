@@ -3,6 +3,7 @@ import { LOCAL_OWNER } from './localFontApi'
 import { applyFontData, collectFontData } from '../src/services/fontDataBridge'
 import { useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
+import { useSymbolStore } from '../src/stores/symbolStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import { useShapeSystemStore } from '../src/stores/shapeSystemStore'
 import { useUIStore } from '../src/stores/uiStore'
@@ -282,6 +283,9 @@ function watchStores(): void {
   })
   useLayoutDeltaStore.subscribe((next, prev) => {
     if (next.rules !== prev.rules) markChanged()
+  })
+  useSymbolStore.subscribe((next, prev) => {
+    if (next.symbols !== prev.symbols) markChanged()
   })
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void flushAccountFont()

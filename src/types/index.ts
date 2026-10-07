@@ -1779,6 +1779,16 @@ export interface JamoData {
   overrides?: JamoOverride[]
 }
 
+/**
+ * 숫자 · 기호 한 글자(ASCII U+0021~U+007E)를 획으로 만든 것. 없으면 노토 윤곽을 쓴다.
+ * 점은 0–1: x는 그 기호 폭(`symbolAdvanceOf`), y는 EM 높이(0 = 위 880, 0.88 = 밑선, 1 = 아래 −120). 두께는 자소와 같은 EM 단위.
+ * 플랜: docs/plans/2026-10-08_숫자-기호-획-편집.md
+ */
+export interface SymbolGlyph {
+  char: string
+  strokes: StrokeDataV2[]
+}
+
 /** 기준 틀이 담는 획 채널. `JamoData`의 획 채널과 같은 꼴이라 같은 규칙(채널 · 문맥 계열)으로 고른다. */
 export type JamoFrame = Pick<JamoData, 'strokes' | 'horizontalStrokes' | 'verticalStrokes' | 'contextStrokes'>
 

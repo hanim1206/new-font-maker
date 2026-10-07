@@ -500,6 +500,28 @@ function validateGlobalStyle(value: unknown, issues: FontPayloadValidationIssue[
   }
 }
 
+/** 1.6 `symbols`: 글자(ASCII U+0021~U+007E 한 글자) → `{ char, strokes }`. 열쇠와 `char`가 같아야 한다. */
+export function validateSymbols(value: unknown): FontPayloadValidationIssue[] {
+  const issues: FontPayloadValidationIssue[] = []
+  if (!isRecord(value)) {
+    push(issues, 'invalid-field', '$.symbols', 'symbols는 객체여야 합니다.')
+    return issues
+  }
+  for (const [char, symbol] of Object.entries(value).sort(([a], [b]) => a.localeCompare(b))) {
+    const path = `$.symbols.${char}`
+    const code = char.codePointAt(0) ?? 0
+    if ([...char].length !== 1 || code < 0x21 || code > 0x7e) push(issues, 'unsupported-field', path, '숫자 · 기호는 ASCII 한 글자만 받습니다.')
+    if (!isRecord(symbol)) {
+      push(issues, 'invalid-field', path, 'symbol은 객체여야 합니다.')
+      continue
+    }
+    exactKeys(symbol, ['char', 'strokes'], ['char', 'strokes'], path, issues)
+    if (symbol.char !== char) push(issues, 'invalid-field', `${path}.char`, 'char가 열쇠와 다릅니다.')
+    validateStrokeArray(symbol.strokes, `${path}.strokes`, issues, false)
+  }
+  return issues
+}
+
 export function validateFontDataPayload(
   value: Record<string, unknown>,
   allowLegacy: boolean,
