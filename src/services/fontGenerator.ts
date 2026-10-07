@@ -44,6 +44,7 @@ import { projectFinalGlyphInkToFontContours } from './finalGlyphInk'
 import { compactGlyphForCff, replaceCffCharStrings } from './cffCharStrings'
 import { subroutinizeForExport } from './cffSubroutinizeRunner'
 import type { CompactGlyph } from './cffCharStrings'
+import { licenseNamingOf } from './fontLicense'
 
 // ===== 타입 정의 =====
 
@@ -88,6 +89,8 @@ export interface FontGeneratorOptions {
    * `allExportChars()` 순서여야 cmap이 직렬 추출과 같다.
    */
   hangulPortables?: readonly PortableHangulGlyph[]
+  /** 제작 번호(폰트 id · 추출 버전). 설명(name ID 10)에 들어가 운영자만 대조할 수 있다. 개인 정보는 넣지 않는다. */
+  serial?: string
 }
 
 /** 폰트 생성 결과 */
@@ -235,7 +238,7 @@ function applyEnglishFontNames(font: InstanceType<typeof opentype.Font>, identit
   const version = fontVersionText(revision)
   for (const platform of ['unicode', 'macintosh', 'windows'] as const) {
     names[platform] = {
-      copyright: { en: copyrightText() },
+      copyright: { en: licenseNamingOf().copyright },
       fontFamily: { en: identity.asciiFamilyName },
       fontSubfamily: { en: identity.styleName },
       uniqueID: { en: uniqueIdText(identity, revision) },
@@ -248,19 +251,17 @@ function applyEnglishFontNames(font: InstanceType<typeof opentype.Font>, identit
   }
 }
 
-function copyrightText(): string {
-  return `Copyright (c) ${new Date().getFullYear()}`
-}
 
 /** name ID 3. 버전이 들어가므로 같은 이름으로 다시 받아도 파일마다 다르다 — iOS가 새 파일로 알아본다. */
 function uniqueIdText(identity: FontIdentity, revision = 0): string {
   return `${fontVersionText(revision)};${FONT_VENDOR_ID};${identity.postScriptName}`
 }
 
-/** name 표에 쓸 값. ID 1 · 2 · 4 · 6과 한국어 localized 이름을 한 출처(`identity`)에서 만든다. */
-export function namingOf(identity: FontIdentity, revision = 0): OpenTypeNaming {
+/** name 표에 쓸 값. ID 1 · 2 · 4 · 6과 한국어 localized 이름을 한 출처(`identity`)에서, 출처 · 라이선스는 `fontLicense.ts`에서 만든다. */
+export function namingOf(identity: FontIdentity, revision = 0, serial?: string): OpenTypeNaming {
+  const license = licenseNamingOf(serial)
   return {
-    copyright: copyrightText(),
+    ...license,
     familyName: identity.asciiFamilyName,
     subfamilyName: identity.styleName,
     uniqueId: uniqueIdText(identity, revision),
@@ -279,10 +280,11 @@ function packageFont(
   identity: FontIdentity,
   revision = 0,
   cff?: { charStrings: readonly Uint8Array[]; globalSubrs: readonly Uint8Array[] },
+  serial?: string,
 ): ArrayBuffer {
   // 글리프를 `compactGlyphForCff`로 굳혔으면 opentype.js는 대역 윤곽으로 묶고, CharStrings(와 전역 서브루틴)만 진짜 바이트로 갈아 끼운다.
   const raw = cff ? replaceCffCharStrings(font.toArrayBuffer() as ArrayBuffer, cff.charStrings, cff.globalSubrs) : font.toArrayBuffer() as ArrayBuffer
-  return finalizeOpenTypePackaging(raw, { naming: namingOf(identity, revision), macStyle: styleFlagsOf(identity.styleName), revision })
+  return finalizeOpenTypePackaging(raw, { naming: namingOf(identity, revision, serial), macStyle: styleFlagsOf(identity.styleName), revision })
 }
 
 /** fsSelection: 스타일 이름과 같은 답. Bold면 BOLD(0x20), 아니면 REGULAR(0x40). Italic은 아직 안 만든다. */
@@ -761,6 +763,7 @@ export async function generateFontBuffer(
     coverage,
     simplifyEpsilon,
     hangulPortables,
+    serial,
   } = options
 
   // 단계별 걸린 시간(ms). 느린 폰트(손글씨체 등)의 병목을 콘솔에서 바로 보려고 끝에 한 줄로 찍는다.
@@ -897,7 +900,7 @@ export async function generateFontBuffer(
     mark('폰트 객체 조립')
     const subroutines = await subroutinized
     mark('서브루틴 대기')
-    const arrayBuffer = packageFont(font, identity, revision, subroutines)
+    const arrayBuffer = packageFont(font, identity, revision, subroutines, serial)
     mark('패키징')
     const validation = validateOpenTypeForIOS(arrayBuffer)
     mark('검사')

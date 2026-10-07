@@ -71,7 +71,7 @@ describe('createNotoPresetGlyphLoader', () => {
     await expect(loader.glyph(1.5)).rejects.toThrow('정수')
 
     const broken = createNotoPresetGlyphLoader(fakeFetch({ '/api/noto-preset': { schema: 'other' } }))
-    await expect(broken.manifest()).rejects.toThrow('manifest 형식')
+    await expect(broken.manifest()).rejects.toThrow('목록 형식')
 
     const { fetchJson, calls } = fakeFetch({})
     const retry = createNotoPresetGlyphLoader({ fetchJson })

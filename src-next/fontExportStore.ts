@@ -6,9 +6,11 @@ import { collectFontData } from '../src/services/fontDataBridge'
 import { parallelHangulPortables } from '../src/services/fontExportParallel'
 import { allExportChars } from '../src/services/fontExportUtils'
 import { generateAndDownloadFont } from '../src/services/fontGenerator'
-import { DEFAULT_FAMILY_NAME } from '../src/services/fontIdentity'
+import { DEFAULT_FAMILY_NAME, asciiFamilyNameOf } from '../src/services/fontIdentity'
+import { reservedFontNameIn } from '../src/services/fontLicense'
 import type { PortableHangulGlyph } from '../src/services/fontGenerator'
 import type { OpenTypeValidationReport } from '../src/services/openTypeValidation'
+import { readStamp } from './accountFont'
 import { accountFontName, nextExportRevision } from './accountFontSync'
 import { effectiveLayoutDelta, layoutDeltaSnapshot } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
@@ -182,6 +184,9 @@ export const useFontExportStore = create<FontExportState & FontExportActions>()(
   confirm: async (name) => {
     if (get().status === 'exporting') return
     const familyName = name.trim() || DEFAULT_FONT_NAME
+    // OFL 예약 이름. 한글 이름도 로마자로 옮기면 걸릴 수 있다(노토체 → Notoche).
+    const reserved = reservedFontNameIn(familyName) ?? reservedFontNameIn(asciiFamilyNameOf(familyName))
+    if (reserved) { set({ dialogOpen: false, notice: `이름에 "${reserved}"는 쓸 수 없어요. 다른 이름으로 받아 주세요.` }); return }
     // 받기 전 동의(약관 · 14세 · 공개 · 사용 조건). 없으면 시트가 뜨고, 손님은 카카오로 간다 — 돌아와서 다시 받는다.
     if (!(await exportGate(familyName))) { set({ dialogOpen: false }); return }
     try { localStorage.setItem(FONT_NAME_STORAGE_KEY, familyName) } catch { /* 저장 못 해도 추출은 된다 */ }
@@ -197,6 +202,13 @@ export const useFontExportStore = create<FontExportState & FontExportActions>()(
   },
 }))
 
+/** 폰트 파일 설명에 넣는 제작 번호. 계정 폰트 id와 추출 버전이라 운영자만 대조할 수 있다. 이 기기 폰트면 `local`. */
+function exportSerialOf(revision: number): string {
+  let fontId: string | null = null
+  try { fontId = readStamp(window.localStorage).fontId } catch { /* 저장소를 못 읽으면 local */ }
+  return `${fontId ?? 'local'}-r${revision}`
+}
+
 /** `confirm`의 본체. 이름 창을 닫고 `exporting`으로 바꾼 뒤 부른다. */
 async function runExport(familyName: string): Promise<void> {
   const set = useFontExportStore.setState
@@ -211,7 +223,7 @@ async function runExport(familyName: string): Promise<void> {
     parallelSources = { bundle, deltas }
   } catch (failure) {
     const reason = failure instanceof Error ? failure.message : String(failure)
-    const error = `Noto 모델을 읽지 못해 추출을 멈췄습니다: ${reason}`
+    const error = `글자 배치 자료를 읽지 못해 추출을 멈췄습니다: ${reason}`
     set({ progress: '', percent: 0, status: 'failed', error, notice: `OTF를 만들지 못했어요. ${error}` })
     window.setTimeout(() => set({ status: 'idle' }), 1800)
     return
@@ -260,6 +272,7 @@ async function runExport(familyName: string): Promise<void> {
     familyName,
     placementOf,
     revision,
+    serial: exportSerialOf(revision),
     // 합친 뒤 윤곽 점 줄이기 — 붓·둥글기 폰트의 추출 시간·파일을 줄인다(G0·G1 닫힘).
     simplifyEpsilon: EXPORT_SIMPLIFY_EPSILON,
     hangulPortables: portables ?? undefined,

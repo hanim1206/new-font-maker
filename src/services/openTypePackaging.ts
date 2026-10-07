@@ -51,6 +51,12 @@ export interface OpenTypeNaming {
   fullName: string
   version: string
   postScriptName: string
+  /** ID 8 · 10 · 11 · 13 · 14. 출처 · 라이선스(`fontLicense.ts`). */
+  manufacturer?: string
+  description?: string
+  vendorUrl?: string
+  license?: string
+  licenseUrl?: string
   localized?: readonly LocalizedNaming[]
 }
 
@@ -303,6 +309,11 @@ export function nameRecordsOf(naming: OpenTypeNaming): NameRecordSpec[] {
     [4, naming.fullName],
     [5, naming.version],
     [6, naming.postScriptName],
+    [8, naming.manufacturer],
+    [10, naming.description],
+    [11, naming.vendorUrl],
+    [13, naming.license],
+    [14, naming.licenseUrl],
   ]
   const records: NameRecordSpec[] = []
   for (const [nameId, text] of english) {

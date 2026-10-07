@@ -172,7 +172,7 @@ export function notoPresetApiPlugin(directory: string): Plugin {
           return send(200, await reader.manifest())
         }
         const glyph = await reader.glyph(Number(match[1]))
-        if (!glyph) return send(404, { error: '이 글자의 Noto 윤곽이 없습니다.' })
+        if (!glyph) return send(404, { error: '이 글자의 자료가 없습니다.' })
         // 글자 응답은 stageKeys가 바뀌면 URL이 아니라 클라이언트 캐시 키가 바뀌므로 짧게만 캐시한다.
         response.setHeader('Cache-Control', 'private, max-age=60')
         send(200, glyph)
