@@ -14,8 +14,9 @@ import { LOCAL_OWNER } from './localFontApi'
 import { showAppNotice } from './appNotice'
 import { AppErrorBoundary, AppErrorScreen } from './AppErrorBoundary'
 import { AppNoticeBar } from './AppNoticeBar'
+import { ConsentSheet } from './ConsentSheet'
 import { watchAppUpdate } from './appUpdate'
-import { authGateMode, enterGuest, loginAt, sessionUser, signInErrorOf } from './betaAuth'
+import { authGateMode, enterGuest, loginAt, sessionUser, signInErrorOf, takeWithdrawnFlag } from './betaAuth'
 import { DevCrashProbe } from './devCrash'
 import { EditLockedPage } from './EditLockedPage'
 import { editLockName, holdEditLock, takeStealRequest } from './editLock'
@@ -35,6 +36,7 @@ function show(node: ReactNode): void {
         {node}
       </AppErrorBoundary>
       <AppNoticeBar />
+      <ConsentSheet />
     </StrictMode>,
   )
 }
@@ -143,9 +145,14 @@ async function gate(): Promise<void> {
     adoptLocalCopy()
     return start(LOCAL_OWNER, LOCAL_NICKNAME)
   }
-  const { AuthMisconfiguredPage, BetaLoginPage } = await import('./BetaLoginPage')
+  const { AuthMisconfiguredPage, BetaLoginPage, WithdrawnPage } = await import('./BetaLoginPage')
   if (mode === 'misconfigured') {
     show(<AuthMisconfiguredPage />)
+    return
+  }
+  // 방금 탈퇴하고 새로 불러왔다. 안내 한 장만.
+  if (takeWithdrawnFlag()) {
+    show(<WithdrawnPage justNow />)
     return
   }
   const user = await sessionUser()
@@ -172,6 +179,16 @@ async function gate(): Promise<void> {
     releaseGuestCopy()
   } else if (!user) {
     show(<BetaLoginPage onSignedIn={onSignedIn} />)
+    return
+  }
+  // 탈퇴한 계정은 들어오지 못한다. 프로필을 못 읽으면(표가 아직 없음 · 연결) 정상으로 본다 — RLS가 한 번 더 막는다.
+  const { loadProfile } = await import('./profileApi')
+  const profile = await loadProfile(user.id)
+  if (profile?.withdrawnAt) {
+    const { clearSignedOutCopy } = await import('./accountFont')
+    await (await import('../src/lib/supabase')).supabase.auth.signOut()
+    clearSignedOutCopy(window.localStorage)
+    show(<WithdrawnPage />)
     return
   }
   // 남의 이름표가 붙은 브라우저 사본은 스토어가 읽기 전에 지운다(공용 기기).

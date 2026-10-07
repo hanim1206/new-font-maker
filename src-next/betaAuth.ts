@@ -152,3 +152,31 @@ export async function signOutAndReload(): Promise<void> {
   if (me) writeStamp(window.localStorage, { owner: me, fontId: null, pending: false })
   window.location.reload()
 }
+
+/**
+ * 탈퇴. 날짜를 적고(`withdraw`) 로그아웃한 뒤 새로 불러온다. 저장 안 한 변경은 올리지 않는다 — 탈퇴한 사람의 폰트는 RLS가 막는다.
+ * 30일 안에 복구를 원하면 hangulkangul@gmail.com으로(탈퇴 화면 안내).
+ */
+export async function withdrawAndReload(): Promise<{ ok: true } | { ok: false; message: string }> {
+  const me = await sessionUserId()
+  if (!me) return { ok: false, message: 'not-signed-in' }
+  const { withdraw } = await import('./profileApi')
+  const done = await withdraw(me)
+  if (!done.ok) return done
+  const { clearSignedOutCopy } = await import('./accountFont')
+  await (await client()).auth.signOut()
+  clearSignedOutCopy(window.localStorage)
+  try { window.sessionStorage.setItem(WITHDRAWN_FLAG, '1') } catch { /* 안내 없이 로그인 화면 */ }
+  window.location.reload()
+  return { ok: true }
+}
+
+/** 탈퇴 직후 새로 불러온 첫 화면에서 안내를 띄우는 표시. 읽으면 지운다. */
+export const WITHDRAWN_FLAG = 'font-maker-withdrawn'
+export function takeWithdrawnFlag(): boolean {
+  try {
+    const had = window.sessionStorage.getItem(WITHDRAWN_FLAG) === '1'
+    window.sessionStorage.removeItem(WITHDRAWN_FLAG)
+    return had
+  } catch { return false }
+}

@@ -52,3 +52,5 @@
 .mineReply p { margin: 0; font-size: var(--font-14); line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
 .mineReply small { color: rgb(var(--color-text-5)); font-size: var(--font-12); }
 @keyframes openIn { from { opacity: 0; transform: translateY(-4px); } }
+.withdraw { align-self: center; margin-top: 4px; }
+.guestNote { margin: 36px 0 12px; color: rgb(var(--color-text-3)); font-size: var(--font-15); line-height: 1.5; word-break: keep-all; }

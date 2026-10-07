@@ -137,3 +137,19 @@ export function AccountFontFailedPage({ reason, message }: { reason: 'network' |
     </div>
   </main>
 }
+
+/**
+ * 탈퇴한 계정. 로그인 직후 프로필의 탈퇴 날짜를 보고 로그아웃시킨 뒤 이것만 띄운다(`main.tsx`).
+ * 30일 안엔 운영자가 되살릴 수 있고, 지난 계정은 지운다(약관 제9조).
+ */
+export function WithdrawnPage({ justNow = false }: { justNow?: boolean }) {
+  return <main className={styles.page} role="alert">
+    <div className={styles.card} data-testid="withdrawn-page">
+      <header>
+        <h1>{justNow ? '탈퇴했어요' : '탈퇴 처리된 계정이에요'}</h1>
+        <p>{justNow ? '그동안 고마웠어요. ' : ''}30일 안에 되돌리고 싶으면 hangulkangul@gmail.com으로 알려 주세요.</p>
+      </header>
+      <Button type="button" size="block" variant="default" onClick={() => window.location.assign('/')}>처음으로</Button>
+    </div>
+  </main>
+}

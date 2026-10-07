@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { isGuest } from './betaAuth'
 import type { FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, CircleHelp, MapPin, MessageSquareWarning } from 'lucide-react'
@@ -20,6 +21,8 @@ import styles from './ReportButton.module.css'
  */
 export function ReportButton({ className }: { className?: string }) {
   const [context, setContext] = useState<FeedbackContext | null>(null)
+  // 손님(받을 때 로그인 모드의 로그인 전)의 의견은 이 기기에만 남아 아무도 못 본다. 단추를 안 보인다.
+  if (isGuest()) return null
   return <>
     <Pressable type="button" className={`${styles.trigger} ${className ?? ''}`} aria-label="이 화면 제보하기" title="이 화면 제보하기" onClick={() => setContext(feedbackContextOf(window.location.pathname))} data-testid="report-open">
       <MessageSquareWarning size={16} aria-hidden="true" />

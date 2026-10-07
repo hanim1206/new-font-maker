@@ -174,6 +174,10 @@ export const useFontExportStore = create<FontExportState & FontExportActions>()(
   confirm: async (name) => {
     if (get().status === 'exporting') return
     const familyName = name.trim() || DEFAULT_FONT_NAME
+    // 받기 전 동의(약관 · 14세 · 공개 · 사용 조건). 없으면 시트가 뜨고, 손님은 카카오로 간다 — 돌아와서 다시 받는다.
+    const { ensureDownloadConsent } = await import('./downloadConsent')
+    const { useFontPresetStore } = await import('./fontPresetStore')
+    if (!(await ensureDownloadConsent(familyName, useFontPresetStore.getState().preset))) { set({ dialogOpen: false }); return }
     try { localStorage.setItem(FONT_NAME_STORAGE_KEY, familyName) } catch { /* 저장 못 해도 추출은 된다 */ }
     set({ dialogOpen: false, familyName, status: 'exporting', progress: '준비 중...', percent: 0, error: '', notice: null, doneElsewhere: false })
     // 도중에 탭이 죽으면(아이폰 메모리) 다시 열 때 알린다. 어떻게 끝나든 지운다.

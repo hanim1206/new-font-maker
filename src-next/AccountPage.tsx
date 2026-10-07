@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Bug, ChevronDown, ChevronLeft, ChevronRight, Eye, Heart, MessageCircle, MessageSquareWarning, Sparkles } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { FONT_LIMIT } from './accountFont'
+import { useProfile, fontLimitOf } from './useProfile'
 import { listFonts } from './accountFontApi'
-import { authGateMode, isGuest, signOutAndReload } from './betaAuth'
+import { authGateMode, isGuest, signOutAndReload, withdrawAndReload } from './betaAuth'
 import { REPORT_TAG_LABEL, hasUnseenReply, markSeen, readSeen, whenText } from './feedback'
 import type { ReportTag } from './feedback'
 import { useMe, useThreads } from './useFeedback'
@@ -29,10 +29,18 @@ function Shell({ children, testId }: { children: ReactNode; testId: string }) {
   return <main className={styles.page}><div className={styles.shell} data-testid={testId}>{children}</div></main>
 }
 
+/** 탈퇴 확인. 폰트는 30일 뒤 지워진다(약관 제9조) — 되돌리려면 메일로. */
+async function confirmWithdraw(): Promise<void> {
+  if (!window.confirm('탈퇴하면 만든 폰트를 더 받을 수 없고 30일 뒤 지워져요. 탈퇴할까요?')) return
+  const done = await withdrawAndReload()
+  if (!done.ok) window.alert('탈퇴하지 못했어요. 다시 해 주세요.')
+}
+
 function AccountHome() {
   const me = useMe()
   const [fontCount, setFontCount] = useState<number | null>(null)
   const { threads } = useThreads(me)
+  const profile = useProfile(me?.id ?? null)
   useEffect(() => {
     if (!me) return
     void listFonts(me.id).then((listed) => { if (listed.ok) setFontCount(listed.value.length) })
@@ -46,20 +54,25 @@ function AccountHome() {
     <div className={styles.body}>
       <h1>{me?.nickname ?? '나'}</h1>
       <p className={styles.sub}>{isGuest() ? '로그인 전' : '베타 참여자'}</p>
-      <dl className={styles.facts}>
-        <div><dt>내 폰트</dt><dd data-testid="account-font-count">{fontCount ?? '–'} / {FONT_LIMIT}개</dd></div>
-        <div><dt>요금제</dt><dd>베타 · 무료</dd></div>
-        <div><dt>가입</dt><dd>{joined}</dd></div>
-      </dl>
+      {isGuest()
+        ? <p className={styles.guestNote}>지금 만드는 폰트는 이 기기에만 있어요. 받을 때 카카오로 로그인하면 계정에 저장돼요.</p>
+        : <dl className={styles.facts}>
+          <div><dt>내 폰트</dt><dd data-testid="account-font-count">{fontCount ?? '–'} / {fontLimitOf(profile)}개</dd></div>
+          <div><dt>요금제</dt><dd>베타 · 무료</dd></div>
+          <div><dt>가입</dt><dd>{joined}</dd></div>
+        </dl>}
       <div className={styles.band} />
-      <Button variant="plain" size="row" className={styles.link} onClick={() => navigate('/account/feedback')} data-testid="account-feedback">
+      {!isGuest() && <Button variant="plain" size="row" className={styles.link} onClick={() => navigate('/account/feedback')} data-testid="account-feedback">
         <strong>내가 보낸 의견</strong>
         {unseen && <span className={styles.dot} aria-label="새 답장" />}
         <ChevronRight aria-hidden="true" />
-      </Button>
+      </Button>}
       {authGateMode() === 'on' && (isGuest()
         ? <Button variant="default" size="block" className={styles.signOut} onClick={() => window.location.assign('/login')} data-testid="account-login">카카오로 시작하기</Button>
-        : <Button variant="quiet" size="lg" className={styles.signOut} onClick={() => void signOutAndReload()}>로그아웃</Button>)}
+        : <>
+          <Button variant="quiet" size="lg" className={styles.signOut} onClick={() => void signOutAndReload()}>로그아웃</Button>
+          <Button variant="faint" size="sm" className={styles.withdraw} onClick={() => void confirmWithdraw()} data-testid="account-withdraw">탈퇴하기</Button>
+        </>)}
     </div>
   </Shell>
 }

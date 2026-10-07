@@ -1,0 +1,27 @@
+/* 다운로드 직전 동의 시트. 대시보드 카드 `…` 시트(토스식)와 같은 생김새 — 아래에서 올라오고 뒤는 어둡게. */
+.layer { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; background: rgb(var(--color-scrim) / .36); animation: fadeIn var(--motion-normal) var(--ease-standard); }
+.sheet { width: min(100%, 480px); max-height: calc(100dvh - 24px); overflow: auto; box-sizing: border-box; margin: 0 12px calc(env(safe-area-inset-bottom) + 12px); padding: 10px 16px 12px; border-radius: var(--radius-xl); background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); display: flex; flex-direction: column; gap: 8px; animation: sheetUp 360ms cubic-bezier(0.32, 0.72, 0, 1); }
+.sheet::before { content: ''; flex: none; width: 36px; height: 4px; margin: 2px auto 6px; border-radius: var(--radius-full); background: rgb(var(--color-surface-3)); }
+.sheet h3 { margin: 0; font-size: var(--font-20); font-weight: var(--weight-bold); letter-spacing: -0.01em; }
+.sheet > p { margin: 0; color: rgb(var(--color-text-4)); font-size: var(--font-16); }
+/* 모두 동의 — 한 줄 크게, 켜면 바탕이 옅어진다. */
+.all { margin-top: 8px; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 14px; border-radius: var(--radius-lg); background: rgb(var(--color-surface-2)); font-size: var(--font-16); font-weight: var(--weight-bold); }
+.all[data-checked] { background: rgb(var(--color-foreground) / .06); }
+.items { margin: 0; padding: 0 2px; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.items li { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; }
+.items label { display: flex; align-items: flex-start; gap: 12px; }
+.items label > :first-child { margin-top: 3px; }
+.title { font-size: var(--font-15); line-height: 1.45; word-break: keep-all; }
+.title em { margin-right: 2px; font-style: normal; color: rgb(var(--color-text-4)); font-size: var(--font-12); font-weight: var(--weight-bold); }
+.title a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.items small { padding-left: 28px; color: rgb(var(--color-text-4)); font-size: var(--font-13); line-height: 1.45; word-break: keep-all; }
+.failed { color: rgb(var(--color-destructive-dark)); font-size: var(--font-13); }
+.actions { margin-top: 10px; display: flex; gap: 8px; }
+.actions > * { flex: 1; }
+.actions > [data-primary] { flex: 2; }
+/* 손님의 주 단추는 카카오 색. style-guard: allow 카카오 브랜드 색 */
+.kakao { background: #FEE500; color: rgb(0 0 0 / .85); } /* style-guard: allow 카카오 브랜드 색 */
+.kakao:hover:not(:disabled) { background: #FEE500; opacity: .92; } /* style-guard: allow 카카오 브랜드 색 */
+@keyframes fadeIn { from { opacity: 0; } }
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .layer, .sheet { animation: none; } }
