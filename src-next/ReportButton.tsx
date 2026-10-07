@@ -31,7 +31,7 @@ export function ReportButton({ className }: { className?: string }) {
   </>
 }
 
-/** 제보 판. 머리 단추 말고도 연다 — 폰트 완성의 `한임에게 자랑하기`는 `잘했어요` + 문구를 채워 연다. */
+/** 제보 판. 머리 단추 말고도 연다 — 폰트 완성의 `자랑하기`는 `잘했어요` + 문구를 채워 연다. */
 export function ReportSheet({ context, onClose, initialTag = null, initialDraft = '' }: { context: FeedbackContext; onClose: () => void; initialTag?: ReportTag | null; initialDraft?: string }) {
   const me = useMe()
   const [tag, setTag] = useState<ReportTag | null>(initialTag)
@@ -77,7 +77,7 @@ export function ReportSheet({ context, onClose, initialTag = null, initialDraft 
         ? <div className={styles.done}>
           <span className={styles.doneMark}><Check size={26} strokeWidth={3} aria-hidden="true" /></span>
           <h3>보냈어요</h3>
-          <p>한임이 읽고 답하면 마이페이지에 빨간 점이 떠요.</p>
+          <p>답이 오면 마이페이지에 빨간 점이 떠요.</p>
           <div className={styles.actions}>
             <Button type="button" size="sheet" variant="secondary" className={styles.minor} onClick={() => { close(); navigate('/account/feedback') }}>보낸 의견 보기</Button>
             <Button type="button" size="sheet" variant="default" className={styles.major} onClick={close}>닫기</Button>

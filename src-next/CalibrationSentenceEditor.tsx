@@ -3619,7 +3619,7 @@ export function CalibrationSentenceEditor({ chrome = 'standalone', space = 'edit
         activeArea={styleOnly ? 'font' : 'jamo'}
         wide={big}
         projectName={projectName}
-        heading={styleOnly ? '스타일' : undefined}
+        heading={styleOnly ? '스타일' : isLayoutMode ? '레이아웃 편집' : '자소 편집'}
         cover={cover}
         // 획 편집은 레이아웃 위에 얹힌 층이다. 머리 `‹`가 레이아웃으로 내려가는 문(옛 `완료`). 도마를 들고 왔으면 섹션 홈으로.
         back={!styleOnly && editMode === 'stroke' && strokeFrameAvailable ? { label: '레이아웃', onClick: () => chooseEditMode('layout') } : undefined}

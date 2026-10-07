@@ -18,9 +18,11 @@ test('옛 화면 주소(현황 · 원형 · 조합별 결과)는 자소 탭으�
   }
 
   await page.goto('/workspace/not-a-screen')
-  await expect(page.getByRole('heading', { name: '작업 화면을 찾을 수 없어요' })).toBeVisible()
-  await expect(page.getByText('잘못된 주소를 문장 보정 화면으로 숨기지 않았습니다.')).toBeVisible()
-  await expect(page.getByRole('link', { name: '대시보드로 이동' })).toHaveAttribute('href', '/dashboard')
+  await expect(page.getByTestId('not-found')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '404' })).toBeVisible()
+  await expect(page).toHaveTitle('없는 페이지 · 한글칸글')
+  await page.getByRole('button', { name: '내 폰트로 가기' }).click()
+  await expect(page).toHaveURL(/\/dashboard$/)
 })
 
 test('옛 뼈대 주소는 자소 화면으로 넘어간다', async ({ page }) => {
@@ -29,11 +31,13 @@ test('옛 뼈대 주소는 자소 화면으로 넘어간다', async ({ page }) =
   await expect(page.getByTestId('jamo-layout-mode')).toBeVisible()
 })
 
-test('머리는 `‹`(화살표만) · 폰트 이름 · 되돌리기고 햄버거는 없다', async ({ page }) => {
+test('머리는 `‹`(화살표만) · 화면 이름 · 되돌리기고 햄버거는 없다', async ({ page }) => {
   await page.goto('/workspace/jamo')
   await expect(page.getByRole('button', { name: '주 메뉴' })).toHaveCount(0)
   await expect(page.getByTestId('workspace-font-home')).toHaveAttribute('aria-label', '내 폰트로')
   await expect(page.getByTestId('workspace-font-home')).toHaveText('')
+  await expect(page.getByRole('heading', { name: '레이아웃 편집' })).toBeVisible()
+  await expect(page).toHaveTitle('레이아웃 편집 · 한글칸글')
   await expect(page.getByRole('button', { name: '형태 편집 실행 취소' })).toBeVisible()
   // 하단 탭은 없다 — 화면 사이 이동은 대시보드가 한다.
   await expect(page.getByTestId('workspace-tabs')).toHaveCount(0)
