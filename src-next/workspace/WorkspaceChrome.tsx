@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { usePageTitle } from '../pageTitle'
 import { ChevronLeft, Redo2, Undo2 } from 'lucide-react'
 import { flushAccountFont, useAccountSaveStore } from '../accountFontSync'
 import { useFontExportStore } from '../fontExportStore'
@@ -58,6 +59,7 @@ export function MobileWorkspaceShell({
 }) {
   const openedName = useUIStore((state) => state.currentProjectName)
   const title = projectName ?? openedName ?? '새 한글 폰트'
+  usePageTitle(heading ?? title)
   // ⌘Z · ⇧⌘Z는 머리의 되돌리기 · 다시 실행 단추와 같은 일.
   useHistoryShortcuts(history)
   const leave = (go: () => void) => { if (beforeLeave) beforeLeave(go); else go() }

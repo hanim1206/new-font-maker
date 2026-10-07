@@ -148,9 +148,12 @@ describe('layout profile startup migration bootstrap', () => {
     expect(blockedBranchIndex).toBeGreaterThan(bootstrapCallIndex)
     expect(blockedReturnIndex).toBeGreaterThan(blockedBranchIndex)
     expect(dynamicImportIndex).toBeGreaterThan(blockedReturnIndex)
-    expect(mainSource.slice(blockedBranchIndex, dynamicImportIndex)).toContain('role="alert"')
-    expect(mainSource.slice(blockedBranchIndex, dynamicImportIndex)).toContain('자동으로 해결하거나')
+    // 막히면 안내 화면(`MigrationBlockedPage`)만 띄우고, 복구용 원본 키를 `자세히`에 남긴다.
+    const blockedPageSource = readFileSync(new URL('./MigrationBlockedPage.tsx', import.meta.url), 'utf8')
+    expect(mainSource.slice(blockedBranchIndex, dynamicImportIndex)).toContain('<MigrationBlockedPage')
     expect(mainSource.slice(blockedBranchIndex, dynamicImportIndex)).toContain('LAYOUT_PROFILE_MIGRATION_BACKUP_KEY')
+    expect(blockedPageSource).toContain('role="alert"')
+    expect(blockedPageSource).toContain('원본은 이 기기에 그대로 있어요')
     expect(bootstrapSource).not.toMatch(/stores\//)
   })
 

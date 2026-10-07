@@ -5,13 +5,14 @@ import { AccountPage } from './AccountPage'
 import { DashboardLabPage, JamoHomePage } from './DashboardLabPage'
 import { FontExportDonePage } from './FontExportDonePage'
 import { FontWorkspacePage } from './FontWorkspacePage'
+import { NotFoundPage } from './NotFoundPage'
 import { ReviewWorkspacePage } from './ReviewWorkspacePage'
 import { ShapeWorkspacePage } from './ShapeWorkspacePage'
 import { Button } from './components/ui/button'
 import { FontExportDialog } from './workspace/FontExportDialog'
 
 /**
- * 앱을 열면 대시보드가 처음이다 — 화면 사이 입구가 다 거기 있다. 프로덕션에서 모르는 주소도 여기로 온다.
+ * 앱을 열면 대시보드가 처음이다 — 화면 사이 입구가 다 거기 있다. 모르는 주소는 404(`NotFoundPage`).
  * 글자 쿼리(`?char=`)가 있으면 그 글자를 여는 링크라 자소 화면으로 그대로 넘긴다.
  */
 function HomeRedirect() {
@@ -40,7 +41,7 @@ function Page() {
   if (pathname === '/workspace/review' || pathname.startsWith('/workspace/review/')) return <ReviewWorkspacePage key={key} />
   if (pathname === '/workspace' || pathname.startsWith('/workspace/')) return <ShapeWorkspacePage key={key} />
   if (DevPage) return <Suspense fallback={null}><DevPage /></Suspense>
-  return <HomeRedirect key={key} />
+  return <NotFoundPage />
 }
 
 /**

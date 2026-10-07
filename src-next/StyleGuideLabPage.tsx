@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ReactNode } from 'react'
 import { Check, ChevronDown, ChevronRight, Copy, LayoutGrid, Maximize, Minus, MousePointerClick, PanelRightClose, PanelRightOpen, Plus, X } from 'lucide-react'
 import { Button } from './components/ui/button'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from './components/ui/select'
+import { PREVIEW_CASE_GROUPS } from './previewCases'
 import { FILE_SCREEN, LIBRARY_GROUPS, itemIdsOfElement, libraryItems } from './styleLibrary'
 import type { LibraryGroup, LibraryItem, LibraryScreen } from './styleLibrary'
 import { applyThemePreview, readThemePreview, writeThemePreview } from './themePreview'
@@ -287,6 +289,16 @@ export function StyleGuideLabPage() {
     select(id)
     go({ name: '누른 화면', route }, entry.selector)
   }
+  // 미리보기 화면 고르기 — 평소 화면과 상황 화면(오류 · 404 · 잠김 · 로그인)을 골라 그대로 본다(`previewCases.ts`).
+  const [picked, setPicked] = useState('')
+  const pickScreen = (route: string) => {
+    setPicked(route)
+    setPreviewOpen(true)
+    pending.current = null
+    setFound(null)
+    if (frameSrc === route && frame.current?.contentWindow) frame.current.contentWindow.location.assign(route)
+    else setFrameSrc(route)
+  }
   const titleOf = (id: string) => items.find((entry) => entry.id === id)?.title ?? id
 
   const onFrameLoad = () => {
@@ -406,11 +418,22 @@ export function StyleGuideLabPage() {
 
     <aside className={`row-span-2 row-start-1 col-start-3 flex min-h-0 flex-col items-center gap-2 border-l border-border-subtle bg-surface-3 py-5 ${previewOpen ? 'px-4' : 'px-1'}`}>
       <div className="flex w-full items-center justify-center gap-1">
-        {previewOpen && <span className="text-12 font-semibold text-text-dim-4">미리보기 · <code>{frameSrc}</code></span>}
+        {previewOpen && <Select value={picked} onValueChange={pickScreen}>
+          <SelectTrigger className="h-9 flex-1 bg-surface" aria-label="미리보기 화면 고르기" data-testid="style-guide-preview-pick">
+            <SelectValue placeholder="화면 고르기" />
+          </SelectTrigger>
+          <SelectContent>
+            {PREVIEW_CASE_GROUPS.map((group) => <SelectGroup key={group.label}>
+              <SelectLabel>{group.label}</SelectLabel>
+              {group.cases.map((entry) => <SelectItem key={entry.route} value={entry.route}>{entry.label}</SelectItem>)}
+            </SelectGroup>)}
+          </SelectContent>
+        </Select>}
         <Button type="button" variant="ghost" size="icon" className={previewOpen ? 'ml-auto' : ''} onClick={() => setPreviewOpen((open) => !open)} aria-label={previewOpen ? '미리보기 접기' : '미리보기 펴기'} title={previewOpen ? '미리보기 접기' : '미리보기 펴기'}>
           {previewOpen ? <PanelRightClose aria-hidden="true" /> : <PanelRightOpen aria-hidden="true" />}
         </Button>
       </div>
+      {previewOpen && <span className="w-full truncate text-12 font-semibold text-text-dim-4">미리보기 · <code>{frameSrc}</code></span>}
       <iframe ref={frame} src={frameSrc} onLoad={onFrameLoad} title="미리보기" className={previewOpen ? 'w-[390px] flex-1 rounded-xl border border-border bg-card shadow-md' : 'pointer-events-none h-px w-px opacity-0'} data-testid="style-guide-preview" />
     </aside>
   </main>

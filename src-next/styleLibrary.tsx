@@ -65,6 +65,8 @@ export const FILE_SCREEN: Record<string, LibraryScreen> = {
   'src-next/FontExportDonePage.tsx': { name: '추출 완료', route: '/workspace/font/export', hint: '받기가 끝나야 보인다' },
   'src-next/GlobalStyleTrackpad.tsx': { name: '스타일 탭(옛 단독 화면 닫기)', route: '/workspace/font' },
   'src-next/LayoutScopePicker.tsx': { name: '자소 · 범위 고르기', route: '/workspace/jamo', hint: '`+ 옵션 추가`를 눌러야 보인다' },
+  'src-next/MigrationBlockedPage.tsx': { name: '옛 작업을 못 옮김', route: '/dashboard?preview=migration' },
+  'src-next/NotFoundPage.tsx': { name: '없는 주소(404)', route: '/dashboard?preview=not-found' },
   'src-next/ReportButton.tsx': { name: '제보 시트', route: '/dashboard', hint: '머리의 빨간 제보 단추를 누른다' },
   'src-next/SlideSheet.tsx': { name: '안내 시트', route: '/dashboard', hint: '제보 시트의 `둘러보기`' },
   'src-next/StemBeakControls.tsx': { name: '스타일 · 부리 탭', route: '/workspace/font', hint: '아래 `부리` 탭을 누른다' },
@@ -110,7 +112,7 @@ const VARIANT_INFO: Record<keyof typeof BUTTON_VARIANTS, [string, string]> = {
   link: ['밑줄 글자', '`바깥과 같이` 같은 작은 되돌림.'],
   faint: ['더 옅은 글자', '`처음 값으로` 되돌리기 · 도마 비우기.'],
   chip: ['칩', '고르면 검정. 묶기 · 범위 고르기.'],
-  soft: ['옅은 알약', '`한임 답 보기`. 새 답이면 주색.'],
+  soft: ['옅은 알약', '`답 보기`. 새 답이면 주색.'],
 }
 const SIZE_INFO: Record<keyof typeof BUTTON_SIZES, [string, string]> = {
   default: ['기본 36', '보통 단추.'],
