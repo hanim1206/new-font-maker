@@ -71,12 +71,17 @@ export async function sessionUserId(): Promise<string | null> {
   return (await sessionUser())?.id ?? null
 }
 
-/** 로그인한 계정 id와 이름(`nicknameOf`), 가입 때(계정 페이지). */
-export async function sessionUser(): Promise<{ id: string; nickname: string | null; createdAt: string | null } | null> {
+/** 초대 코드로 만든 베타 계정인가. 베타 계정은 발급할 때 `<아이디>@<베타 도메인>` 메일을 받는다. */
+export function isBetaEmail(email: string | null | undefined, domain: string = betaEmailDomain()): boolean {
+  return Boolean(email) && email!.toLowerCase().endsWith(`@${domain.toLowerCase()}`)
+}
+
+/** 로그인한 계정 id와 이름(`nicknameOf`), 가입 때, 베타 계정인지(계정 페이지). */
+export async function sessionUser(): Promise<{ id: string; nickname: string | null; createdAt: string | null; beta: boolean } | null> {
   const { data } = await (await client()).auth.getSession()
   const user = data.session?.user
   if (!user) return null
-  return { id: user.id, nickname: nicknameOf(user.user_metadata), createdAt: user.created_at ?? null }
+  return { id: user.id, nickname: nicknameOf(user.user_metadata), createdAt: user.created_at ?? null, beta: isBetaEmail(user.email) }
 }
 
 /** 베타 계정은 발급할 때 적은 친구 아이디(`nickname`), 카카오 계정은 카카오 프로필 이름(`name` · `preferred_username`). */

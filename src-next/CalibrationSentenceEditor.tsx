@@ -2388,6 +2388,11 @@ function DesignBodyControls({
 /** 글로벌 스타일 공간에서 문장 글자 하나의 크기(px). 평소는 24. */
 const STYLE_SPACE_EM = 112
 const WEIGHT_STOPS = [100, 200, 300, 400, 500, 600, 700, 800, 900]
+/**
+ * 굵기 막대 끝. 속공간 지키기가 안 끝나 굵은 굵기는 속공간이 막혀 한글날 오픈에서 600까지만 연다(10-07 사용자). 개발 서버 · e2e는 900.
+ * 이미 600보다 굵게 저장된 폰트는 막대 끝을 그 값까지 늘려 저장값을 그대로 둔다 — 내리면 다시 600까지만 오른다.
+ */
+const WEIGHT_OPEN_MAX = DEV_TOOLS_ENABLED ? 900 : 600
 
 /** 굵기. 폰트 전체에 한 값이고 100 단위로만 멈춘다. 끄는 동안은 미리보기만, 손을 떼면 적용한다. `획` 탭 맨 위에 붓 조절과 같은 막대로 놓인다. 기울기는 저장소에 있지만 지금은 화면에 내놓지 않는다. */
 function StyleWeightRange({
@@ -2404,13 +2409,14 @@ function StyleWeightRange({
   const tone = draft ?? committed
   const commit = () => { if (draft) onCommit(committed, draft) }
   const setWeight = (weight: number | null) => { if (weight !== null && weight !== tone.weight) onDraftChange({ ...tone, weight }) }
-  // 다른 획 막대와 같은 생김새: 제목 오른쪽 값, 아래 눈금(100 · 400 · 900만 글씨).
+  const max = Math.max(WEIGHT_OPEN_MAX, committed.weight)
+  // 다른 획 막대와 같은 생김새: 제목 오른쪽 값, 아래 눈금(100 · 400 · 끝만 글씨).
   return <>
     <Field label="굵기" value={tone.weight}>
-      <RangeBar min="100" max="900" step="100" value={tone.weight} aria-label="굵기" data-testid="style-weight" onChange={(event) => setWeight(Number(event.target.value))}
+      <RangeBar min="100" max={max} step="100" value={tone.weight} aria-label="굵기" data-testid="style-weight" onChange={(event) => setWeight(Number(event.target.value))}
         onPointerDown={(event) => setWeight(startRangeDrag(event))} onPointerMove={(event) => setWeight(moveRangeDrag(event))}
         onPointerUp={(event) => { endRangeDrag(event); commit() }} onPointerCancel={(event) => { endRangeDrag(event); commit() }} onKeyUp={commit} onBlur={commit} />
-      <RangeTicks min={100} max={900} ticks={WEIGHT_STOPS.map((at) => ({ at, text: at === 100 || at === 400 || at === 900 ? String(at) : undefined }))} />
+      <RangeTicks min={100} max={max} ticks={WEIGHT_STOPS.filter((at) => at <= max).map((at) => ({ at, text: at === 100 || at === 400 || at === max ? String(at) : undefined }))} />
     </Field>
     {/* 속공간 지키기(굵기 자동 보정) 체크박스는 개발 중이라 숨겼다(10-03). 되살릴 땐 `isCounterKeepOn` · `setCounterKeep`. */}
   </>

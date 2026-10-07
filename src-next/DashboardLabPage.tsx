@@ -38,6 +38,7 @@ import { AnnouncementSpot } from './AnnouncementSpot'
 import { BetaGuideSheet } from './BetaGuideSheet'
 import { markBetaGuideSeen, shouldShowBetaGuide } from './betaGuide'
 import { Pressable } from './components/ui/pressable'
+import { LOCKED_STYLE_PANELS } from './stylePanels'
 import { Button } from './components/ui/button'
 import styles from './DashboardLabPage.module.css'
 // 카드 문장 줄은 편집기 문장 줄과 같은 생김새 · 동작이다.
@@ -1129,9 +1130,9 @@ export function DashboardLabPage() {
               <SectionHead title="스타일" hint="이 폰트 전체" onClick={() => navigate('/workspace/font')} testId="dashboard-style" />
               <ul className={styles.tiles}>
                 <StyleTile kind="weight" label="굵기" value={String(style.weight)} />
-                <StyleTile kind="slant" label="기울기" value={`${style.slant}°`} />
+                {/* 기울기는 고칠 곳이 없어 타일도 뺐다(10-07). 부리는 탭이 잠긴 동안 타일도 숨긴다. */}
                 <StyleTile kind="roundness" label="둥글기" value={`${roundness}%`} />
-                <StyleTile kind="beak" label="부리" value={style.stemBeak?.enabled ? '있음' : '없음'} panel="beak" />
+                {!LOCKED_STYLE_PANELS.includes('beak') && <StyleTile kind="beak" label="부리" value={style.stemBeak?.enabled ? '있음' : '없음'} panel="beak" />}
               </ul>
             </section>
 

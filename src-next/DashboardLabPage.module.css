@@ -115,7 +115,8 @@
 .sectionHead svg { margin-left: auto; color: rgb(var(--color-text-5)); }
 
 /* 스타일 타일 넷. 글자 하나에 값 하나. */
-.tiles { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+/* 타일 수는 열린 스타일에 따라 바뀐다(부리 잠금 · 10-07). 몇 장이든 한 줄을 나눠 쓴다. */
+.tiles { margin: 0; padding: 0; list-style: none; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
 .tiles li { display: flex; }
 /* 칸 전체가 버튼. 값 옆 `›`로 누를 수 있다는 걸 보인다. */
 .tile { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0 8px; border: 0; border-radius: var(--radius-lg); background: rgb(var(--color-surface-2)); color: inherit; font: inherit; cursor: pointer; }

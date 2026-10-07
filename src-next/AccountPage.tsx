@@ -53,12 +53,12 @@ function AccountHome() {
     <Bar back="/dashboard" />
     <div className={styles.body}>
       <h1>{me?.nickname ?? '나'}</h1>
-      <p className={styles.sub}>{isGuest() ? '로그인 전' : '베타 참여자'}</p>
+      <p className={styles.sub}>{isGuest() ? '로그인 전' : me?.beta ? '베타 참여자' : '회원'}</p>
       {isGuest()
         ? <p className={styles.guestNote}>지금 만드는 폰트는 이 기기에만 있어요. 받을 때 카카오로 로그인하면 계정에 저장돼요.</p>
         : <dl className={styles.facts}>
           <div><dt>내 폰트</dt><dd data-testid="account-font-count">{fontCount ?? '–'} / {fontLimitOf(profile)}개</dd></div>
-          <div><dt>요금제</dt><dd>베타 · 무료</dd></div>
+          <div><dt>요금제</dt><dd>{me?.beta ? '베타 · 무료' : '무료'}</dd></div>
           <div><dt>가입</dt><dd>{joined}</dd></div>
         </dl>}
       <div className={styles.band} />

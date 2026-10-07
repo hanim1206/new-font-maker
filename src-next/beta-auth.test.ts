@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { authGateModeOf, loginAtOf, nicknameOf, signInErrorOf, signInFailureOf } from './betaAuth'
+import { authGateModeOf, isBetaEmail, loginAtOf, nicknameOf, signInErrorOf, signInFailureOf } from './betaAuth'
 
 describe('베타 로그인 게이트', () => {
   const configured = { VITE_SUPABASE_URL: 'https://x.supabase.co', VITE_SUPABASE_ANON_KEY: 'anon' }
@@ -48,5 +48,16 @@ describe('베타 로그인 게이트', () => {
     expect(signInErrorOf('#error=server_error&error_code=unexpected_failure&error_description=Error+getting+user+email+from+external+provider'))
       .toBe('Error getting user email from external provider')
     expect(signInErrorOf('#error=access_denied')).toBe('access_denied')
+  })
+})
+
+describe('베타 계정 가리기', () => {
+  it('베타 도메인 메일만 베타다(대소문자 무시)', () => {
+    expect(isBetaEmail('hanim@beta.invalid', 'beta.invalid')).toBe(true)
+    expect(isBetaEmail('Hanim@BETA.invalid', 'beta.invalid')).toBe(true)
+    expect(isBetaEmail('someone@kakao.com', 'beta.invalid')).toBe(false)
+    expect(isBetaEmail('x@notbeta.invalid', 'beta.invalid')).toBe(false)
+    expect(isBetaEmail(null, 'beta.invalid')).toBe(false)
+    expect(isBetaEmail(undefined, 'beta.invalid')).toBe(false)
   })
 })
