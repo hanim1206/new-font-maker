@@ -92,8 +92,11 @@ test('굵기는 100 단위로만 멈추고, 끄는 동안은 미리보기 · 손
   const panel = page.getByRole('region', { name: '글로벌 스타일 설정' })
   await panel.getByRole('tab', { name: '획', exact: true }).click()
 
-  // 기울기는 지금 내놓지 않는다.
-  await expect(panel.getByTestId('style-slant')).toHaveCount(0)
+  // 기울기는 굵기 아래 막대 — 오른쪽으로만 15도까지, 1도씩(10-07).
+  const slant = panel.getByTestId('style-slant')
+  await expect(slant).toHaveAttribute('min', '0')
+  await expect(slant).toHaveAttribute('max', '15')
+  await expect(slant).toHaveAttribute('step', '1')
   const weight = panel.getByTestId('style-weight')
   await expect(weight).toHaveAttribute('step', '100')
   await weight.fill('700')

@@ -2393,8 +2393,10 @@ const WEIGHT_STOPS = [100, 200, 300, 400, 500, 600, 700, 800, 900]
  * 이미 600보다 굵게 저장된 폰트는 막대 끝을 그 값까지 늘려 저장값을 그대로 둔다 — 내리면 다시 600까지만 오른다.
  */
 const WEIGHT_OPEN_MAX = DEV_TOOLS_ENABLED ? 900 : 600
+/** 기울기 막대 범위(도). 오른쪽으로만 15도까지 — 이탤릭으로 쓰는 만큼(10-07 사용자). 범위 밖으로 저장된 폰트는 막대를 그 값까지 늘린다. */
+const SLANT_RANGE = { min: 0, max: 15 } as const
 
-/** 굵기. 폰트 전체에 한 값이고 100 단위로만 멈춘다. 끄는 동안은 미리보기만, 손을 떼면 적용한다. `획` 탭 맨 위에 붓 조절과 같은 막대로 놓인다. 기울기는 저장소에 있지만 지금은 화면에 내놓지 않는다. */
+/** 굵기 · 기울기. 폰트 전체에 한 값이다. 굵기는 100 단위, 기울기는 1도 단위로 멈춘다. 끄는 동안은 미리보기만, 손을 떼면 적용한다. `획` 탭 맨 위에 붓 조절과 같은 막대로 놓인다. */
 function StyleWeightRange({
   committed,
   draft,
@@ -2410,6 +2412,9 @@ function StyleWeightRange({
   const commit = () => { if (draft) onCommit(committed, draft) }
   const setWeight = (weight: number | null) => { if (weight !== null && weight !== tone.weight) onDraftChange({ ...tone, weight }) }
   const max = Math.max(WEIGHT_OPEN_MAX, committed.weight)
+  const setSlant = (slant: number | null) => { if (slant !== null && slant !== tone.slant) onDraftChange({ ...tone, slant }) }
+  const slantMin = Math.min(SLANT_RANGE.min, committed.slant)
+  const slantMax = Math.max(SLANT_RANGE.max, committed.slant)
   // 다른 획 막대와 같은 생김새: 제목 오른쪽 값, 아래 눈금(100 · 400 · 끝만 글씨).
   return <>
     <Field label="굵기" value={tone.weight}>
@@ -2417,6 +2422,12 @@ function StyleWeightRange({
         onPointerDown={(event) => setWeight(startRangeDrag(event))} onPointerMove={(event) => setWeight(moveRangeDrag(event))}
         onPointerUp={(event) => { endRangeDrag(event); commit() }} onPointerCancel={(event) => { endRangeDrag(event); commit() }} onKeyUp={commit} onBlur={commit} />
       <RangeTicks min={100} max={max} ticks={WEIGHT_STOPS.filter((at) => at <= max).map((at) => ({ at, text: at === 100 || at === 400 || at === max ? String(at) : undefined }))} />
+    </Field>
+    <Field label="기울기" value={`${tone.slant}°`}>
+      <RangeBar min={slantMin} max={slantMax} step="1" value={tone.slant} aria-label="기울기" data-testid="style-slant" onChange={(event) => setSlant(Number(event.target.value))}
+        onPointerDown={(event) => setSlant(startRangeDrag(event))} onPointerMove={(event) => setSlant(moveRangeDrag(event))}
+        onPointerUp={(event) => { endRangeDrag(event); commit() }} onPointerCancel={(event) => { endRangeDrag(event); commit() }} onKeyUp={commit} onBlur={commit} />
+      <RangeTicks min={slantMin} max={slantMax} ticks={[{ at: slantMin, text: `${slantMin}°` }, { at: 5 }, { at: 10 }, { at: slantMax, text: `${slantMax}°` }]} />
     </Field>
     {/* 속공간 지키기(굵기 자동 보정) 체크박스는 개발 중이라 숨겼다(10-03). 되살릴 땐 `isCounterKeepOn` · `setCounterKeep`. */}
   </>
