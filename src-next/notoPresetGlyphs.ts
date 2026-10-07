@@ -63,8 +63,8 @@ export async function defaultFetchJson<T>(url: string, signal?: AbortSignal): Pr
   const response = await fetch(url, { signal })
   const value: unknown = await response.json().catch(() => undefined)
   // 정적 호스팅은 없는 파일에 404나 SPA용 index.html(200, JSON 아님)을 준다. 둘 다 "배포에 파일이 없음"이다.
-  if (response.status === 404 || (response.ok && value === undefined)) throw new Error((value as { error?: string } | undefined)?.error ?? 'Noto 프리셋 파일이 배포에 없습니다.')
-  if (!response.ok) throw new Error((value as { error?: string } | undefined)?.error ?? 'Noto 프리셋을 읽지 못했습니다.')
+  if (response.status === 404 || (response.ok && value === undefined)) throw new Error((value as { error?: string } | undefined)?.error ?? '글자 자료 파일이 배포에 없습니다.')
+  if (!response.ok) throw new Error((value as { error?: string } | undefined)?.error ?? '글자 자료를 읽지 못했습니다.')
   return value as T
 }
 
@@ -135,7 +135,7 @@ export function createNotoPresetGlyphLoader(input: { fetchJson?: FetchJson; cach
 
   const sharedManifest = () => {
     manifestPromise ??= fetchJson<NotoPresetManifest>(isStatic ? `${staticRoot}/manifest.json` : API).then((value) => {
-      if (value?.schema !== NOTO_PRESET_SCHEMA || typeof value.stageKeys?.outline !== 'string') throw new Error('Noto 프리셋 manifest 형식이 다릅니다.')
+      if (value?.schema !== NOTO_PRESET_SCHEMA || typeof value.stageKeys?.outline !== 'string') throw new Error('글자 자료 목록 형식이 다릅니다.')
       return value
     }).catch((error: unknown) => { manifestPromise = undefined; throw error })
     return manifestPromise
@@ -156,7 +156,7 @@ export function createNotoPresetGlyphLoader(input: { fetchJson?: FetchJson; cach
   const staticGlyph = async (manifest: NotoPresetManifest, codepoint: number) => {
     const index = notoPresetChunkIndex(codepoint)
     const value = index === null ? undefined : (await sharedChunk(manifest, index))[String(codepoint)]
-    if (!value) throw new Error('이 글자의 Noto 윤곽이 없습니다.')
+    if (!value) throw new Error('이 글자의 자료가 없습니다.')
     if (value.identity?.codepoint !== codepoint || !value.outline?.operations) throw new Error('받은 글자가 요청과 다릅니다.')
     return value
   }

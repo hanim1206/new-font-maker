@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { NotFoundPage } from './NotFoundPage'
+import { usePageTitle } from './pageTitle'
 import type { ReactNode } from 'react'
 import { Bug, ChevronDown, ChevronLeft, ChevronRight, Eye, Heart, MessageCircle, MessageSquareWarning, Sparkles } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -37,6 +39,7 @@ async function confirmWithdraw(): Promise<void> {
 }
 
 function AccountHome() {
+  usePageTitle('계정')
   const me = useMe()
   const [fontCount, setFontCount] = useState<number | null>(null)
   const { threads } = useThreads(me)
@@ -87,6 +90,7 @@ const TAG_ICON: Record<ReportTag, LucideIcon> = { broken: Bug, odd: Eye, wish: S
  * 쓰기는 화면 머리의 제보 단추(`ReportButton`)가 한다. `/account/feedback/<대화 id>`로 오면 그 줄의 답을 펼쳐 둔다(옛 링크).
  */
 function FeedbackHome({ openId = null }: { openId?: string | null }) {
+  usePageTitle('내가 보낸 의견')
   const me = useMe()
   const { threads, failed } = useThreads(me)
   const [open, setOpen] = useState<string | null>(openId)
@@ -125,14 +129,14 @@ function FeedbackHome({ openId = null }: { openId?: string | null }) {
               {mine.map((message) => <p key={message.id}>{message.body}</p>)}
               <small>{[context?.screen, tag && REPORT_TAG_LABEL[tag], whenText(thread.first.createdAt)].filter(Boolean).join(' · ')}</small>
               {replies.length > 0 && <Button variant="soft" size="sm" className={styles.mineToggle} aria-expanded={expanded} onClick={() => setOpen(expanded ? null : thread.id)} data-highlight={unseen || undefined} data-testid="feedback-reply-toggle">
-                <MessageCircle aria-hidden="true" />한임 답 {expanded ? '접기' : '보기'}
+                <MessageCircle aria-hidden="true" />답 {expanded ? '접기' : '보기'}
                 {unseen && <span className={styles.mineDot} aria-label="새 답장" />}
                 <ChevronDown aria-hidden="true" />
               </Button>}
               {expanded && <div className={styles.mineReplies} data-testid="feedback-open">
                 {replies.map((reply) => <div key={reply.id} className={styles.mineReply}>
                   <p>{reply.body}</p>
-                  <small>한임 · {whenText(reply.createdAt, new Date(), true)}</small>
+                  <small>한글칸글 · {whenText(reply.createdAt, new Date(), true)}</small>
                 </div>)}
               </div>}
             </div>
@@ -148,5 +152,6 @@ function FeedbackHome({ openId = null }: { openId?: string | null }) {
 export function AccountPage({ pathname }: { pathname: string }) {
   const parts = pathname.split('/').filter(Boolean)
   if (parts[1] === 'feedback') return <FeedbackHome openId={parts[2] ?? null} />
+  if (parts.length > 1) return <NotFoundPage />
   return <AccountHome />
 }

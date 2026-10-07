@@ -62,7 +62,7 @@ export function AppErrorScreen() {
         <Button type="button" size="block" variant="outline" onClick={takeBackup} data-testid="app-error-backup">작업 백업 받기</Button>
         {backup === 'done' && <p className={styles.note}>백업 파일을 받았어요.</p>}
         {backup === 'raw' && <p className={styles.note}>백업 파일을 받았어요(브라우저에 남은 원본 그대로).</p>}
-        {backup === 'failed' && <p className={styles.note}>백업을 만들지 못했어요. 이 화면을 캡처해 초대한 사람에게 보내 주세요.</p>}
+        {backup === 'failed' && <p className={styles.note}>백업을 만들지 못했어요. 이 화면을 캡처해 hangulkangul@gmail.com으로 보내 주세요.</p>}
         <Button type="button" size="block" variant="default" onClick={() => void reload()} disabled={reloading} data-testid="app-error-reload">다시 불러오기</Button>
         <details className={styles.details}>
           <summary>자세히</summary>

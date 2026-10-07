@@ -7,7 +7,7 @@ const STEPS: { image: string; title: string; body: string; bottom?: true }[] = [
   { image: '3-jamo', title: '초성 · 중성 · 종성', body: '고칠 자소를 골라 담고 ‘고치기’를 눌러요. 획을 끌어 모양을 바꾸면 그 자소가 들어간 글자가 다 같이 바뀌어요.' },
   { image: '4-layout', title: '레이아웃', body: '글자 안에서 초성 · 중성 · 종성이 앉는 자리예요. 여섯 틀마다 상자 선을 끌어 자리를 넓히거나 좁혀요.' },
   { image: '5-review', title: '검수', body: '만든 글자를 표로 모아 훑어봐요. 어색한 글자를 누르면 그 글자로 들어가 고쳐요.' },
-  { image: '6-download', bottom: true, title: '다운로드 · 제보', body: '다 되면 폰트 카드의 ↓ 단추로 OTF 파일을 받아요. 이상한 곳이나 바라는 게 있으면 헤더의 피드백 버튼으로 한임에게 알려 주세요.' },
+  { image: '6-download', bottom: true, title: '다운로드 · 제보', body: '다 되면 폰트 카드의 ↓ 단추로 OTF 파일을 받아요. 이상한 곳이나 바라는 게 있으면 헤더의 피드백 버튼으로 알려 주세요.' },
 ]
 
 const imageSrc = (name: string) => `/beta-guide/${name}.jpg`

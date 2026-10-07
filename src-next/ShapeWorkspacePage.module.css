@@ -1,5 +1,0 @@
-.screenId { color: rgb(var(--color-primary)); font-size: var(--font-10); font-weight: var(--weight-heavy); letter-spacing: .05em; }
-.notFound { min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; text-align: center; }
-.notFound h1 { font-size: var(--font-20); }
-.notFound p { color: rgb(var(--color-text-3)); font-size: var(--font-11); }
-.notFound a { min-height: 44px; display: inline-flex; align-items: center; padding: 0 16px; border-radius: var(--radius-md); background: rgb(var(--color-primary)); color: rgb(var(--color-primary-foreground)); font-size: var(--font-11); font-weight: var(--weight-heavy); text-decoration: none; }

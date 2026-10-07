@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { NotFoundPage } from './NotFoundPage'
+import { usePageTitle } from './pageTitle'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Dices, Download, Ellipsis, Minus, PencilLine, Plus, ScanSearch, Trash2, UserRound, X } from 'lucide-react'
 import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../src/data/Hangul'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
@@ -644,6 +646,7 @@ const GROUP_GAP = 28
  * 아래 칩 탭 = 빼기, 휴지통 = 비우기, `n개 고치기` = 도마를 들고 편집기로. 담기 · 빼기는 여기서만 한다.
  */
 function JamoHome({ type, chars }: { type: JamoType; chars: readonly string[] }) {
+  usePageTitle(JAMO_LABEL[type])
   const jamos = useJamoStore((state) => state[type])
   const benchType = useWorkbenchStore((state) => state.type)
   const benchChars = useWorkbenchStore((state) => state.chars)
@@ -1050,6 +1053,7 @@ function FontSheet({ list, modified, top, closing, onClose, onClosed }: {
 }
 
 export function DashboardLabPage() {
+  usePageTitle('내 폰트')
   const name = useUIStore((state) => state.currentProjectName) ?? '내 폰트'
   const style = useGlobalStyleStore((state) => state.style)
   const isJamoModified = useJamoStore((state) => state.isJamoModified)
@@ -1178,8 +1182,7 @@ const JAMO_CHARS: Record<JamoType, readonly string[]> = { choseong: CHOSEONG_ORD
 export function JamoHomePage() {
   const type = window.location.pathname.split('/')[2] as JamoType
   const known = type in JAMO_CHARS
-  useEffect(() => { if (!known) navigate('/dashboard', { replace: true }) }, [known])
-  if (!known) return null
+  if (!known) return <NotFoundPage />
   return <main className={styles.page}>
     <div className={styles.shell}>
       <JamoHome type={type} chars={JAMO_CHARS[type]} />
