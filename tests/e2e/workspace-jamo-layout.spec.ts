@@ -819,7 +819,7 @@ test.skip('변을 이 자리에 맞추면 범위 안 글자가 같은 자리에 
   const canvas = page.getByTestId('review-canvas')
   const cards = page.getByTestId('review-propagation-card')
   // 카드 안 닿자 상자(초록)의 y = 그 글자의 첫닿자 윗변.
-  const cardTops = async () => (await cards.locator('svg rect[fill="#2f9a6a"]').evaluateAll((nodes) => nodes.map((n) => Number(n.getAttribute('y'))))).filter((v) => Number.isFinite(v))
+  const cardTops = async () => (await cards.locator('svg rect[fill="#ff6a1a"]').evaluateAll((nodes) => nodes.map((n) => Number(n.getAttribute('y'))))).filter((v) => Number.isFinite(v))
 
   // 홀자 rail(중심)엔 맞추기가 없다.
   await selectMedialBox(page)

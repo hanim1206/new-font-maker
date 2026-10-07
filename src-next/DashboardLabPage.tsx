@@ -102,7 +102,7 @@ function withEffectivePadding(schema: LayoutSchema, globalPadding: Padding, over
   return { ...schema, padding, designBodyPadding: padding }
 }
 
-/** 레이아웃 칸. `AppGlyph`와 같은 길이로 그리되 첫닿자 상자를 옅게 깔아 "이 구조군의 배치"임을 보인다. */
+/** 레이아웃 칸. `AppGlyph`와 같은 길이로 그리되 부품 상자(첫닿자 · 홀자 · 받침)를 제 색으로 옅게 깔아 "이 구조군의 배치"임을 보인다. */
 function LayoutThumb({ char, size }: { char: string; size: number }) {
   const choseong = useJamoStore((state) => state.choseong)
   const jungseong = useJamoStore((state) => state.jungseong)
@@ -115,7 +115,7 @@ function LayoutThumb({ char, size }: { char: string; size: number }) {
   const globalStyle = useMemo(() => ({ ...effectiveStyle, slant: 0 }), [effectiveStyle])
   const schema = withEffectivePadding(schemas[syllable.layoutType], globalPadding, paddingOverrides[syllable.layoutType])
   const { placement } = useContextPlacement(syllable, schema, globalStyle)
-  const box = placement.kind === 'boxes' ? placement.boxes.CH : undefined
+  const boxes = placement.kind === 'boxes' ? (Object.entries(placement.boxes) as [Part, { x: number; y: number; width: number; height: number }][]) : []
   return <SvgRenderer
     syllable={syllable}
     schema={placement.kind === 'schema' ? placement.schema : undefined}
@@ -124,7 +124,7 @@ function LayoutThumb({ char, size }: { char: string; size: number }) {
     globalStyle={globalStyle}
     overflow="visible"
     clipGlyphs={false}
-    underlay={box ? <rect x={box.x * 100} y={box.y * 100} width={box.width * 100} height={box.height * 100} fill={PART_COLOR.CH} fillOpacity={0.16} /> : undefined}
+    underlay={boxes.length ? <g>{boxes.map(([part, box]) => <rect key={part} x={box.x * 100} y={box.y * 100} width={box.width * 100} height={box.height * 100} fill={PART_COLOR[part]} fillOpacity={0.16} />)}</g> : undefined}
   />
 }
 

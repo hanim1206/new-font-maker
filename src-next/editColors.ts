@@ -4,14 +4,14 @@
  * 키 → 토큰: 이름 그대로 `--color-<토큰>`(예: `editSelect` → `--color-edit-select`).
  */
 export const EDIT_COLOR = {
-  editSelect: '#f0561e',
+  editSelect: '#0d99ff',
   editHandle: '#0d99ff',
   editGhost: '#3a3a36',
   editGuide: '#c4cbd4',
   editBaseline: '#a6a297',
-  editSlotCh: '#2f9a6a',
-  editSlotJu: '#3b6fd6',
-  editSlotJo: '#8b5cf6',
+  editSlotCh: '#ff6a1a',
+  editSlotJu: '#9fd21a',
+  editSlotJo: '#7a3fe0',
   editSlotOff: '#c9c5bb',
   /** 캔버스 글자 잉크 · 손잡이 테두리. */
   foreground: '#181b1f',

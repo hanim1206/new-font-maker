@@ -47,9 +47,9 @@
     --palette-orange-500: 240 86 30;
     --palette-orange-600: 234 88 12;
     --palette-sky-500: 13 153 255;
-    --palette-ink-green: 47 154 106;
-    --palette-ink-blue: 59 111 214;
-    --palette-ink-violet: 139 92 246;
+    --palette-ink-orange: 255 106 26;
+    --palette-ink-lime: 159 210 26;
+    --palette-ink-violet: 122 63 224;
     --palette-stone-300: 201 197 187;
     --palette-stone-400: 166 162 151;
     --palette-stone-800: 58 58 54;
@@ -108,10 +108,10 @@
     --color-text-6: var(--palette-gray-400);
 
     /* 3층 편집 색. 보선 · 띠(edit-rail)는 4단계에서 캔버스 색을 조사하고 더한다. */
-    --color-edit-select: var(--palette-orange-500);
+    --color-edit-select: var(--palette-sky-500);
     --color-editor-point-selected: var(--palette-orange-600);
-    --color-edit-slot-ch: var(--palette-ink-green);
-    --color-edit-slot-ju: var(--palette-ink-blue);
+    --color-edit-slot-ch: var(--palette-ink-orange);
+    --color-edit-slot-ju: var(--palette-ink-lime);
     --color-edit-slot-jo: var(--palette-ink-violet);
     --color-edit-slot-off: var(--palette-stone-300);
     --color-edit-ghost: var(--palette-stone-800);
