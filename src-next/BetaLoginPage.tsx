@@ -7,6 +7,7 @@ import { welcomeNameOf } from './betaWelcome'
 import { markBetaGuidePending } from './betaGuide'
 import styles from './BetaLoginPage.module.css'
 import { Button } from './components/ui/button'
+import { usePageTitle } from './pageTitle'
 
 const BetaWelcomeGlyphs = lazy(() => import('./BetaWelcomeGlyphs'))
 
@@ -29,6 +30,7 @@ const FAILURE_TEXT: Record<Exclude<BetaSignInResult, { ok: true }>['reason'], st
  * `kakao`(받을 때 로그인 모드의 `/login`): 카카오 단추가 앞이고 초대 코드는 작은 링크 뒤에 접혀 있다.
  */
 export function BetaLoginPage({ onSignedIn, kakao = false }: { onSignedIn: () => void; kakao?: boolean }) {
+  usePageTitle('로그인')
   const [name] = useState(() => welcomeNameOf(window.location.search, window.localStorage))
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
@@ -116,7 +118,7 @@ export function AuthMisconfiguredPage() {
     <div className={styles.card}>
       <header>
         <h1>지금은 들어갈 수 없어요</h1>
-        <p>서버 설정이 빠져 있어요. 초대한 사람에게 알려 주세요.</p>
+        <p>서버 설정이 빠져 있어요. hangulkangul@gmail.com으로 알려 주세요.</p>
       </header>
     </div>
   </main>
@@ -130,7 +132,7 @@ export function AccountFontFailedPage({ reason, message }: { reason: 'network' |
         <h1>폰트를 불러오지 못했어요</h1>
         <p>{reason === 'network'
           ? '인터넷 연결을 확인하고 다시 시도해 주세요.'
-          : '저장된 폰트를 읽을 수 없어요. 초대한 사람에게 알려 주세요. 폰트는 서버에 그대로 있어요.'}</p>
+          : '저장된 폰트를 읽을 수 없어요. hangulkangul@gmail.com으로 알려 주세요. 폰트는 서버에 그대로 있어요.'}</p>
       </header>
       <Button type="button" size="block" variant="default" onClick={() => window.location.reload()}>다시 시도</Button>
       <footer>{message}</footer>

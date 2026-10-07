@@ -101,7 +101,7 @@ test('대시보드 카드에서 받으면 완료 페이지로 가고, ‹ 내 �
   await expect(page).toHaveURL(/\/dashboard$/)
 })
 
-test('완료 페이지의 한임에게 자랑하기는 제보 판을 잘했어요 · 문구로 연다', async ({ page }) => {
+test('완료 페이지의 자랑하기는 제보 판을 잘했어요 · 문구로 연다', async ({ page }) => {
   test.setTimeout(240_000)
   await page.goto('/dashboard')
   // 주사위로 바꾼 카드 문장이 완료 페이지에 그대로 온다.

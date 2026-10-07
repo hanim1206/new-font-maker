@@ -151,6 +151,11 @@ async function askCopyChoice(me: string, nickname: string | null): Promise<boole
  * 들어오면 대시보드부터(마지막 폰트, 없으면 최근 폰트 · 새 폰트). 편집 주소를 바로 열거나 새로고침하면 마지막 폰트로 바로 연다.
  */
 async function gate(): Promise<void> {
+  // 스타일 가이드 미리보기가 고르는 상황 화면(`?preview=`). 개발 서버에서만, 배포 번들에는 없다.
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('preview')) {
+    const { showDevPreview } = await import('./devPreview')
+    if (await showDevPreview(show)) return
+  }
   // 라우터 스토어는 이 파일을 읽을 때 옛 주소를 이미 들었다. 그냥 `replaceState`하면 화면은 `/fonts`로 남는다(개발 서버는 옛 문장 보정으로 샌다).
   if (window.location.pathname === FONTS_PATH) navigate(DASHBOARD_PATH, { replace: true })
   // 이용약관 · 개인정보 처리방침. 로그인과 상관없이 연다(카카오 심사 · 가입 전에 읽는다).
@@ -254,17 +259,8 @@ async function start(me?: string, nickname: string | null = null): Promise<void>
   })
 
   if (migration.status === 'blocked') {
-    show(
-      <main role="alert" style={{ maxWidth: 560, margin: '20vh auto', padding: 24, lineHeight: 1.6 }}>
-        <h1>레이아웃 데이터를 안전하게 보존했습니다</h1>
-        <p>기존 데이터의 자동 이관을 완료하지 못해 편집 화면을 열지 않았습니다.</p>
-        <p>{migration.message}</p>
-        <p>충돌을 자동으로 해결하거나 어느 쪽 데이터도 임의로 선택하지 않았습니다.</p>
-        <p>
-          복구용 원본은 <code>{LAYOUT_PROFILE_MIGRATION_BACKUP_KEY}</code> 키에 보존되어 있습니다.
-        </p>
-      </main>,
-    )
+    const { MigrationBlockedPage } = await import('./MigrationBlockedPage')
+    show(<MigrationBlockedPage detail={`${migration.message}\n복구용 원본: ${LAYOUT_PROFILE_MIGRATION_BACKUP_KEY}`} />)
     return
   }
 

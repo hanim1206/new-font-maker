@@ -238,13 +238,7 @@
   }
 }
 
-/* 폰트 로드 */
-@font-face {
-  font-family: 'Pretendard';
-  src: local('Pretendard'),
-    url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.min.css');
-  font-display: swap;
-}
+/* 글꼴 Pretendard는 `index.html`의 링크가 불러온다. */
 
 /* 앱 전체에서 끌어서 글자 선택 · 길게 눌러 뜨는 메뉴 · 요소 끌어 옮기기를 막는다. 입력칸만 예외. 캔버스 끌기는 앱이 직접 처리해서 그대로 된다. */
 html {

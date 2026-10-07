@@ -72,7 +72,7 @@ function ExportedFont({ export: done }: { export: NonNullable<ReturnType<typeof 
     </div>
     <footer className={styles.actions}>
       <Button type="button" size="sheet" variant="secondary" className={styles.again} onClick={() => downloadTTF(done.bytes, done.fileName)} data-testid="font-export-redownload"><Download size={18} aria-hidden="true" />다시 받기</Button>
-      <Button type="button" size="sheet" variant="default" className={styles.brag} onClick={() => setBragging(true)} data-testid="font-export-brag"><Heart size={18} aria-hidden="true" />한임에게 자랑하기</Button>
+      <Button type="button" size="sheet" variant="default" className={styles.brag} onClick={() => setBragging(true)} data-testid="font-export-brag"><Heart size={18} aria-hidden="true" />자랑하기</Button>
     </footer>
     {bragging && <ReportSheet context={feedbackContextOf(window.location.pathname)} initialTag="praise" initialDraft={`${done.familyName} ${version} 만들었어요!`} onClose={() => setBragging(false)} />}
   </section>

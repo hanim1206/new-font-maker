@@ -1,0 +1,13 @@
+/* 없는 주소. 카드 없이 화면 전체. */
+.page { min-height: 100dvh; box-sizing: border-box; display: flex; flex-direction: column; padding: 0 20px calc(env(safe-area-inset-bottom) + 24px); background: rgb(var(--color-surface)); color: rgb(var(--color-foreground)); }
+.top { height: 56px; display: inline-flex; align-self: flex-start; align-items: center; gap: 8px; color: inherit; font-size: var(--font-16); font-weight: var(--weight-heavy); text-decoration: none; }
+.top img { width: 28px; height: 28px; }
+.body { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding-bottom: 56px; text-align: center; }
+/* 로고의 세 칸을 점선으로 비운 그림. 색은 첫닿자 · 홀자 · 받침 칸 색. */
+.mark { width: 132px; height: 132px; margin-bottom: 8px; fill: none; stroke-width: 6; stroke-dasharray: 14 10; stroke-linecap: round; }
+.ch { stroke: rgb(var(--color-edit-slot-ch)); }
+.ju { stroke: rgb(var(--color-edit-slot-ju)); }
+.jo { stroke: rgb(var(--color-edit-slot-jo)); }
+.body h1 { margin: 0; font-size: var(--font-36); font-weight: var(--weight-heavy); letter-spacing: .02em; }
+.body p { margin: 0; color: rgb(var(--color-text-3)); font-size: var(--font-14); line-height: 1.6; }
+.action { width: min(100%, 320px); margin-top: 20px; }
