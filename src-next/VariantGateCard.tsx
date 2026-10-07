@@ -188,7 +188,7 @@ export function VariantGateCard({ jamo, viewing, splitFamilies, onApply, onEditB
       </svg>
       <div className={styles.root} data-picked={picked === 'base' || undefined} data-snapping={snapping ? true : undefined} data-testid="variant-gate-root">
         <Pressable type="button" className={styles.pick} onClick={() => press('base')} aria-pressed={picked === 'base'} aria-current={viewing === 'base' || undefined} aria-label={labelOf('base')}>
-          <AppGlyph char={jamo} size={96} upright choseongOverride={breathing} />
+          <AppGlyph char={jamo} size={96} choseongOverride={breathing} />
           <span className={styles.label}>기본</span>
         </Pressable>
       </div>
@@ -197,7 +197,7 @@ export function VariantGateCard({ jamo, viewing, splitFamilies, onApply, onEditB
         return <div key={item} className={styles.branch} style={{ top: BRANCH_Y[index] + 14 - BRANCH_H / 2 }} data-family={item} data-picked={picked === item || undefined} data-split={!connected(item) || undefined} data-connected={draftOf(item) || undefined} data-snapping={snapping === item || undefined} data-joining={joining === item || undefined} data-testid="variant-gate-branch">
           {/* 보기 글자 둘 위 · 이름표 아래, 가운데. 이어진 가지는 기본과 같이 숨쉰다. */}
           <Pressable type="button" className={styles.pick} onClick={() => press(item)} aria-pressed={picked === item} aria-current={viewing === item || undefined} aria-label={labelOf(item)}>
-            <span className={styles.glyph}>{(examples.length ? examples : [jamo]).map((char) => <AppGlyph key={char} char={char} size={40} upright choseongOverride={breathing} />)}</span>
+            <span className={styles.glyph}>{(examples.length ? examples : [jamo]).map((char) => <AppGlyph key={char} char={char} size={40} choseongOverride={breathing} />)}</span>
             <span className={styles.label}>{MEDIAL_FAMILY_LABEL[item]}</span>
           </Pressable>
         </div>
@@ -260,9 +260,9 @@ function VariantMergeSheet({ jamo, families, stored, onCancel, onConfirm }: { ja
       {families.map((family) => {
         const example = initialRowExamples(jamo, family)[0] ?? jamo
         return <div key={family} className={styles.preview} data-family={family}>
-          <figure><AppGlyph char={example} size={88} upright /><figcaption>지금</figcaption></figure>
+          <figure><AppGlyph char={example} size={88} /><figcaption>지금</figcaption></figure>
           <ArrowRight size={22} aria-hidden="true" />
-          <figure data-after><AppGlyph char={example} size={88} upright choseongOverride={merged} /><figcaption>덮어쓴 뒤</figcaption></figure>
+          <figure data-after><AppGlyph char={example} size={88} choseongOverride={merged} /><figcaption>덮어쓴 뒤</figcaption></figure>
         </div>
       })}
       <div className={styles.sheetActions}>

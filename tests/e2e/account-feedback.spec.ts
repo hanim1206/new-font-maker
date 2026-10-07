@@ -29,7 +29,10 @@ test('머리 제보 단추로 보내면 내가 보낸 의견에 글 전체가 �
   await sheet.getByRole('button', { name: '닫기' }).click()
   await page.getByTestId('dashboard-account').click()
   await expect(page).toHaveURL(/\/account$/)
-  await expect(page.getByTestId('account-page')).toContainText('베타 참여자')
+  // 게이트 없는 개발 서버는 베타 계정이 아니라 `회원 · 무료`(베타 표시는 초대 코드 계정만, 10-07).
+  await expect(page.getByTestId('account-page')).toContainText('회원')
+  await expect(page.getByTestId('account-page')).toContainText('무료')
+  await expect(page.getByTestId('account-page')).not.toContainText('베타')
   await expect(page.getByTestId('account-font-count')).toHaveText('1 / 3개')
 
   await page.getByTestId('account-feedback').click()

@@ -7,13 +7,14 @@ import { LOCAL_OWNER } from './localFontApi'
 
 /** 계정 페이지 · 대시보드 아바타가 같이 쓰는 계정 · 의견 훅. 게이트가 꺼지면 계정 대신 `local`. */
 
-export interface Me { id: string; nickname: string | null; joinedAt: string | null }
+/** `beta`: 초대 코드로 만든 베타 계정. 계정 페이지가 `베타` 표시를 이 계정에만 붙인다. */
+export interface Me { id: string; nickname: string | null; joinedAt: string | null; beta: boolean }
 
 export function useMe(): Me | null {
   const [me, setMe] = useState<Me | null>(null)
   useEffect(() => {
-    if (storageMode() === 'local') { setMe({ id: LOCAL_OWNER, nickname: null, joinedAt: null }); return }
-    void sessionUser().then((user) => { if (user) setMe({ id: user.id, nickname: user.nickname, joinedAt: user.createdAt }) }).catch(() => undefined)
+    if (storageMode() === 'local') { setMe({ id: LOCAL_OWNER, nickname: null, joinedAt: null, beta: false }); return }
+    void sessionUser().then((user) => { if (user) setMe({ id: user.id, nickname: user.nickname, joinedAt: user.createdAt, beta: user.beta }) }).catch(() => undefined)
   }, [])
   return me
 }

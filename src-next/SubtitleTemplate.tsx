@@ -18,7 +18,7 @@ export function SubtitleTemplate({ fontFamily, size = GLYPH_PX }: { fontFamily?:
         {fontFamily
           ? line
           : [...line].map((char, index) => isHangul(char)
-            ? <span key={index} className={styles.glyph}><AppGlyph char={char} size={size} upright /></span>
+            ? <span key={index} className={styles.glyph}><AppGlyph char={char} size={size} /></span>
             : <span key={index} className={styles.plain}>{char}</span>)}
       </p>)}
     </div>

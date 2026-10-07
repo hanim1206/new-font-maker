@@ -40,6 +40,7 @@ import { AnnouncementSpot } from './AnnouncementSpot'
 import { BetaGuideSheet } from './BetaGuideSheet'
 import { markBetaGuideSeen, shouldShowBetaGuide } from './betaGuide'
 import { Pressable } from './components/ui/pressable'
+import { LOCKED_STYLE_PANELS } from './stylePanels'
 import { Button } from './components/ui/button'
 import styles from './DashboardLabPage.module.css'
 // 카드 문장 줄은 편집기 문장 줄과 같은 생김새 · 동작이다.
@@ -116,8 +117,8 @@ function LayoutThumb({ char, size }: { char: string; size: number }) {
   const globalPadding = useLayoutStore((state) => state.globalPadding)
   const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
   const syllable = useMemo(() => decomposeSyllable(char, choseong, jungseong, jongseong), [char, choseong, jungseong, jongseong])
-  const effectiveStyle = useEffectiveGlobalStyle(syllable.layoutType)
-  const globalStyle = useMemo(() => ({ ...effectiveStyle, slant: 0 }), [effectiveStyle])
+  // 글자는 기울여 그리고 부품 상자만 곧게 깐다(`straightUnderlay`) — 레이아웃 편집 캔버스와 같다.
+  const globalStyle = useEffectiveGlobalStyle(syllable.layoutType)
   const schema = withEffectivePadding(schemas[syllable.layoutType], globalPadding, paddingOverrides[syllable.layoutType])
   const { placement } = useContextPlacement(syllable, schema, globalStyle)
   const boxes = placement.kind === 'boxes' ? (Object.entries(placement.boxes) as [Part, { x: number; y: number; width: number; height: number }][]) : []
@@ -129,7 +130,7 @@ function LayoutThumb({ char, size }: { char: string; size: number }) {
     globalStyle={globalStyle}
     overflow="visible"
     clipGlyphs={false}
-    underlay={boxes.length ? <g>{boxes.map(([part, box]) => <rect key={part} x={box.x * 100} y={box.y * 100} width={box.width * 100} height={box.height * 100} fill={PART_COLOR[part]} fillOpacity={0.16} />)}</g> : undefined}
+    straightUnderlay={boxes.length ? <g>{boxes.map(([part, box]) => <rect key={part} x={box.x * 100} y={box.y * 100} width={box.width * 100} height={box.height * 100} fill={PART_COLOR[part]} fillOpacity={0.16} />)}</g> : undefined}
   />
 }
 
@@ -147,8 +148,8 @@ function InSyllableGlyph({ type, char, size }: { type: 'jungseong' | 'jongseong'
   const globalPadding = useLayoutStore((state) => state.globalPadding)
   const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
   const syllable = useMemo(() => decomposeSyllable(workbenchSyllable(type, char), choseong, jungseong, jongseong), [type, char, choseong, jungseong, jongseong])
-  const effectiveStyle = useEffectiveGlobalStyle(syllable.layoutType)
-  const globalStyle = useMemo(() => ({ ...effectiveStyle, slant: 0 }), [effectiveStyle])
+  // 자소 카드는 결과를 보는 곳이라 기울기까지 그대로 그린다(10-07 사용자). 레이아웃 칸(`LayoutThumb`)도 글자는 기울이고 상자만 곧게 둔다.
+  const globalStyle = useEffectiveGlobalStyle(syllable.layoutType)
   const schema = withEffectivePadding(schemas[syllable.layoutType], globalPadding, paddingOverrides[syllable.layoutType])
   const { placement } = useContextPlacement(syllable, schema, globalStyle)
   const boxes = placement.kind === 'boxes' ? SHOWN_PARTS[type].map((part: Part) => placement.boxes[part]).filter((box) => !!box) : []
@@ -174,7 +175,7 @@ function InSyllableGlyph({ type, char, size }: { type: 'jungseong' | 'jongseong'
 
 /** 자소 카드 잉크. 첫닿자는 단독으로, 홀자 · 받침은 글자 속 비율로. */
 function JamoGlyph({ type, char, size }: { type: JamoType; char: string; size: number }) {
-  return type === 'choseong' ? <AppGlyph char={char} size={size} upright /> : <InSyllableGlyph type={type} char={char} size={size} />
+  return type === 'choseong' ? <AppGlyph char={char} size={size} /> : <InSyllableGlyph type={type} char={char} size={size} />
 }
 
 /**
@@ -1134,8 +1135,9 @@ export function DashboardLabPage() {
               <ul className={styles.tiles}>
                 <StyleTile kind="weight" label="굵기" value={String(style.weight)} />
                 <StyleTile kind="slant" label="기울기" value={`${style.slant}°`} />
+                {/* 부리는 탭이 잠긴 동안 타일도 숨긴다. */}
                 <StyleTile kind="roundness" label="둥글기" value={`${roundness}%`} />
-                <StyleTile kind="beak" label="부리" value={style.stemBeak?.enabled ? '있음' : '없음'} panel="beak" />
+                {!LOCKED_STYLE_PANELS.includes('beak') && <StyleTile kind="beak" label="부리" value={style.stemBeak?.enabled ? '있음' : '없음'} panel="beak" />}
               </ul>
             </section>
 

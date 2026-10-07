@@ -134,7 +134,7 @@ export function LayoutScopePicker({ source, rule, deltaLine, part, railRole, con
       {/* 켠 범위에 드는 글자. 보기만 하는 자리다. */}
       <div className={styles.samples} data-testid="scope-picker-samples">
         {samples.map((identity) => <span key={identity.codepoint} data-testid="scope-picker-sample" data-char={identity.character}>
-          <AppGlyph char={identity.character} size={SAMPLE_SIZE} upright />
+          <AppGlyph char={identity.character} size={SAMPLE_SIZE} />
         </span>)}
         {count > samples.length && <small>외 {(count - samples.length).toLocaleString()}자</small>}
       </div>
