@@ -30,7 +30,7 @@ export const SIGN_OUT_KEYS = [
 
 export const LOCAL_STAMP_KEY = 'font-maker-account-owner-v1'
 
-/** 계정당 지우지 않은 폰트 수 한도. DB 트리거(`limit_font_projects_per_user`)와 같은 숫자. */
+/** 폰트 한도 기본값. 진짜 한도는 `profiles.font_limit`(새 계정 1 · 베타 3)이고, 프로필을 못 읽었을 때와 게이트 꺼진 dev에서만 이 숫자. */
 export const FONT_LIMIT = 3
 
 export interface LocalStamp {
@@ -162,4 +162,26 @@ export function editedDayText(updatedAt: string, now = new Date()): string {
   if (days === 1) return '어제 고침'
   if (days < 7) return `${days}일 전 고침`
   return `${then.getMonth() + 1}월 ${then.getDate()}일 고침`
+}
+
+/**
+ * 손님 사본을 들고 로그인했는데 계정에 폰트가 이미 있다(플랜 `2026-10-06_카카오-로그인-다운로드-게이트.md`, 10-06 결정). 묻고 고른 대로:
+ * - `account`: 계정 폰트를 연다. 사본은 비운다.
+ * - `local`: 지금 사본으로 바꾼다 — 자리가 없으면(한도) 가장 최근 폰트를 소프트 삭제하고, 사본을 새 폰트로 만든다.
+ * `fonts`는 최근 고친 순.
+ */
+export type CopyChoice = 'account' | 'local'
+
+export function copyChoicePlanOf(
+  choice: CopyChoice,
+  me: string,
+  fonts: readonly { id: string; name: string }[],
+  fontLimit: number,
+  nickname: string | null,
+): { clear: boolean; deleteIds: string[]; stamp: LocalStamp } {
+  if (choice === 'account' || fonts.length === 0) return { clear: true, deleteIds: [], stamp: { owner: me, fontId: fonts[0]?.id ?? null, pending: false, fresh: true } }
+  const over = Math.max(0, fonts.length - fontLimit + 1)
+  const deleteIds = fonts.slice(0, over).map((font) => font.id)
+  const remaining = fonts.filter((font) => !deleteIds.includes(font.id)).map((font) => font.name)
+  return { clear: false, deleteIds, stamp: { owner: me, fontId: null, pending: false, create: nextFontName(nickname, remaining) } }
 }

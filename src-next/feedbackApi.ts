@@ -1,5 +1,5 @@
 import { supabase } from '../src/lib/supabase'
-import { authGateMode } from './betaAuth'
+import { storageMode } from './betaAuth'
 import type { FeedbackContext, FeedbackMessage } from './feedback'
 
 /**
@@ -10,7 +10,7 @@ import type { FeedbackContext, FeedbackMessage } from './feedback'
 
 const TABLE = 'feedback_messages'
 export const LOCAL_FEEDBACK_KEY = 'font-maker-local-feedback-v1'
-const isLocal = () => authGateMode() === 'off'
+const isLocal = () => storageMode() === 'local'
 
 export type FeedbackResult<T> = { ok: true; value: T } | { ok: false; message: string }
 

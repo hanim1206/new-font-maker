@@ -3,6 +3,7 @@ import { parseAndMigrateFontData } from '../src/services/fontDataMigration'
 import type { FontData } from '../src/types/database'
 import {
   autoPickOf,
+  copyChoicePlanOf,
   clearLocalFont,
   clearSignedOutCopy,
   dropForeignCopy,
@@ -453,5 +454,22 @@ describe('추출 알림', () => {
     expect(skippedNotice([])).toBeNull()
     expect(skippedNotice(['빽'])).toBe('폰트는 받았지만 빽: 모양을 만들지 못해 빈 칸으로 들어갔어요. 획을 고쳐 다시 받아 주세요.')
     expect(skippedNotice(['ㄱ', '가', '각', '간', '갇'])).toContain('ㄱ · 가 · 각 외 2자')
+  })
+})
+
+describe('손님 사본과 계정 폰트가 둘 다 있을 때(묻기)', () => {
+  const fonts = [{ id: 'new', name: '민지체 2' }, { id: 'old', name: '민지체' }]
+
+  it('계정 폰트 열기: 사본을 비우고 최근 폰트를 기록에서 읽는다', () => {
+    expect(copyChoicePlanOf('account', 'me', fonts, 1, '민지')).toEqual({ clear: true, deleteIds: [], stamp: { owner: 'me', fontId: 'new', pending: false, fresh: true } })
+  })
+
+  it('지금 것으로 바꾸기: 한도가 찼으면 최근 폰트를 지우고 사본을 새 폰트로 만든다', () => {
+    expect(copyChoicePlanOf('local', 'me', fonts, 1, '민지')).toEqual({ clear: false, deleteIds: ['new', 'old'], stamp: { owner: 'me', fontId: null, pending: false, create: '민지체' } })
+    expect(copyChoicePlanOf('local', 'me', fonts, 2, '민지')).toEqual({ clear: false, deleteIds: ['new'], stamp: { owner: 'me', fontId: null, pending: false, create: '민지체 2' } })
+  })
+
+  it('지금 것으로 바꾸기: 자리가 남으면 지우지 않고 더한다', () => {
+    expect(copyChoicePlanOf('local', 'me', fonts, 3, '민지')).toEqual({ clear: false, deleteIds: [], stamp: { owner: 'me', fontId: null, pending: false, create: '민지체 3' } })
   })
 })

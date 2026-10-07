@@ -9,13 +9,15 @@ import { LEGACY_CALIBRATION_LAYOUT_PROFILE_V1 } from '../src/data/legacyCalibrat
 import { DEFAULT_LAYOUT_SCHEMAS } from '../src/utils/layoutCalculator'
 import '../src/index.css'
 import { setPersistWriteErrorHandler } from '../src/utils/debouncedStorage'
-import { autoPickOf, clearLocalFont, dropForeignCopy, editorPlanOf, hasLocalFont, readStamp, writeStamp } from './accountFont'
+import { autoPickOf, clearLocalFont, copyChoicePlanOf, dropForeignCopy, editorPlanOf, hasLocalFont, readStamp, writeStamp } from './accountFont'
+import type { CopyChoice } from './accountFont'
 import { LOCAL_OWNER } from './localFontApi'
 import { showAppNotice } from './appNotice'
 import { AppErrorBoundary, AppErrorScreen } from './AppErrorBoundary'
 import { AppNoticeBar } from './AppNoticeBar'
+import { ConsentSheet } from './ConsentSheet'
 import { watchAppUpdate } from './appUpdate'
-import { authGateMode, sessionUser } from './betaAuth'
+import { authGateMode, enterGuest, loginAt, sessionUser, signInErrorOf, takeWithdrawnFlag } from './betaAuth'
 import { DevCrashProbe } from './devCrash'
 import { EditLockedPage } from './EditLockedPage'
 import { editLockName, holdEditLock, takeStealRequest } from './editLock'
@@ -35,6 +37,7 @@ function show(node: ReactNode): void {
         {node}
       </AppErrorBoundary>
       <AppNoticeBar />
+      <ConsentSheet />
     </StrictMode>,
   )
 }
@@ -69,6 +72,8 @@ document.addEventListener('dragstart', (event) => {
 const FONTS_PATH = '/fonts'
 const DASHBOARD_PATH = '/dashboard'
 const ADMIN_PATH = '/admin'
+/** 받을 때 로그인(`download`)의 로그인 화면. */
+const LOGIN_PATH = '/login'
 const isAdminPath = (pathname: string) => pathname === ADMIN_PATH || pathname.startsWith(`${ADMIN_PATH}/`)
 /** 게이트가 꺼진 개발 서버에서 새 폰트 이름. */
 const LOCAL_NICKNAME = '내 폰트'
@@ -110,6 +115,37 @@ function adoptLocalCopy(): void {
   writeStamp(window.localStorage, { owner: LOCAL_OWNER, fontId: null, pending: false, create: '내 폰트' })
 }
 
+/** 손님(`local`) 이름표를 뗀다. 주인 없는 사본은 `dropForeignCopy`가 지우지 않고, 계정이 비었으면 첫 폰트로 올라간다. 뗐으면 true. */
+function releaseGuestCopy(): boolean {
+  const stamp = readStamp(window.localStorage)
+  if (stamp.owner !== LOCAL_OWNER) return false
+  writeStamp(window.localStorage, { owner: null, fontId: null, pending: false })
+  return hasLocalFont(window.localStorage)
+}
+
+/**
+ * 손님 사본을 들고 로그인했는데 계정에 폰트가 있으면 묻는다(`CopyChoicePage`). 계정이 비었으면 묻지 않고 사본이 첫 폰트가 된다(`autoPickOf`).
+ * 목록을 못 받으면 묻지 않고 그냥 연다 — 사본은 남아 있어 다음에 다시 묻는다.
+ */
+async function askCopyChoice(me: string, nickname: string | null): Promise<boolean> {
+  const { deleteFont, listFonts } = await import('./accountFontApi')
+  const listed = await listFonts(me)
+  if (!listed.ok || listed.value.length === 0) return false
+  const { loadProfile } = await import('./profileApi')
+  const limit = (await loadProfile(me))?.fontLimit ?? 1
+  const fonts = listed.value
+  const { CopyChoicePage } = await import('./BetaLoginPage')
+  const choice = await new Promise<CopyChoice>((resolve) => {
+    const replaces = copyChoicePlanOf('local', me, fonts, limit, nickname).deleteIds.map((id) => fonts.find((font) => font.id === id)?.name ?? '').filter(Boolean).join(' · ')
+    show(<CopyChoicePage accountFontName={fonts[0].name} replaces={replaces || null} onChoose={resolve} />)
+  })
+  const plan = copyChoicePlanOf(choice, me, fonts, limit, nickname)
+  for (const id of plan.deleteIds) await deleteFont(id)
+  if (plan.clear) clearLocalFont(window.localStorage)
+  writeStamp(window.localStorage, plan.stamp)
+  return true
+}
+
 /**
  * 로그인 게이트(베타). 로그인 안 됐으면 앱 대신 코드 입력 화면을 띄운다.
  * 들어오면 대시보드부터(마지막 폰트, 없으면 최근 폰트 · 새 폰트). 편집 주소를 바로 열거나 새로고침하면 마지막 폰트로 바로 연다.
@@ -134,14 +170,50 @@ async function gate(): Promise<void> {
     adoptLocalCopy()
     return start(LOCAL_OWNER, LOCAL_NICKNAME)
   }
-  const { AuthMisconfiguredPage, BetaLoginPage } = await import('./BetaLoginPage')
+  const { AuthMisconfiguredPage, BetaLoginPage, WithdrawnPage } = await import('./BetaLoginPage')
   if (mode === 'misconfigured') {
     show(<AuthMisconfiguredPage />)
     return
   }
+  // 방금 탈퇴하고 새로 불러왔다. 안내 한 장만.
+  if (takeWithdrawnFlag()) {
+    show(<WithdrawnPage justNow />)
+    return
+  }
   const user = await sessionUser()
-  if (!user) {
-    show(<BetaLoginPage onSignedIn={() => window.location.assign(DASHBOARD_PATH)} />)
+  const onSignedIn = () => window.location.assign(DASHBOARD_PATH)
+  // 카카오에서 실패를 달고 돌아왔다. 주소 조각은 지우고 알림 줄 한 줄.
+  const signInError = signInErrorOf(window.location.hash)
+  if (signInError) {
+    history.replaceState(null, '', window.location.pathname + window.location.search)
+    showAppNotice('sign-in', { tone: 'error', message: `로그인하지 못했어요. ${signInError}`, dismissable: true })
+  }
+  if (loginAt() === 'download') {
+    // 받을 때 로그인: 로그인 전엔 손님으로 이 기기 사본을 바로 연다. 로그인 화면은 `/login`(동의 시트 · 계정 화면에서 온다).
+    if (window.location.pathname === LOGIN_PATH) {
+      if (user) { navigate(DASHBOARD_PATH, { replace: true }); return start(user.id, user.nickname) }
+      show(<BetaLoginPage kakao onSignedIn={onSignedIn} />)
+      return
+    }
+    if (!user) {
+      enterGuest()
+      adoptLocalCopy()
+      return start(LOCAL_OWNER, LOCAL_NICKNAME)
+    }
+    // 손님으로 만든 사본은 주인 없는 사본으로 — 계정이 비었으면 첫 폰트가 된다(`autoPickOf`), 있으면 묻는다.
+    if (releaseGuestCopy()) await askCopyChoice(user.id, user.nickname)
+  } else if (!user) {
+    show(<BetaLoginPage onSignedIn={onSignedIn} />)
+    return
+  }
+  // 탈퇴한 계정은 들어오지 못한다. 프로필을 못 읽으면(표가 아직 없음 · 연결) 정상으로 본다 — RLS가 한 번 더 막는다.
+  const { loadProfile } = await import('./profileApi')
+  const profile = await loadProfile(user.id)
+  if (profile?.withdrawnAt) {
+    const { clearSignedOutCopy } = await import('./accountFont')
+    await (await import('../src/lib/supabase')).supabase.auth.signOut()
+    clearSignedOutCopy(window.localStorage)
+    show(<WithdrawnPage />)
     return
   }
   // 남의 이름표가 붙은 브라우저 사본은 스토어가 읽기 전에 지운다(공용 기기).

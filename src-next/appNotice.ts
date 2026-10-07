@@ -6,10 +6,10 @@ import { create } from 'zustand'
  */
 
 /** `font-list`: 대시보드에서 폰트 바꾸기 · 만들기 · 이름 · 지우기가 실패했다. `export-interrupted`: 폰트 받기 도중 탭이 죽고 다시 열렸다. */
-export type AppNoticeKind = 'conflict' | 'local-copy' | 'export-interrupted' | 'font-list' | 'update'
+export type AppNoticeKind = 'conflict' | 'local-copy' | 'export-interrupted' | 'font-list' | 'sign-in' | 'update'
 
 /** 앞이 먼저 보인다. 작업을 잃을 수 있는 것부터. */
-export const NOTICE_ORDER: readonly AppNoticeKind[] = ['conflict', 'local-copy', 'export-interrupted', 'font-list', 'update']
+export const NOTICE_ORDER: readonly AppNoticeKind[] = ['conflict', 'local-copy', 'export-interrupted', 'font-list', 'sign-in', 'update']
 
 export interface AppNoticeAction {
   label: string

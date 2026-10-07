@@ -12,7 +12,7 @@ import type { JamoData, LayoutSchema, Padding, Part } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { borrowFromChoseong, canBorrowFromChoseong, matchesChoseong } from '../src/utils/jamoFromChoseong'
 import { AppGlyph } from './AppGlyph'
-import { editedDayText, FONT_LIMIT, nextFontName } from './accountFont'
+import { editedDayText, nextFontName } from './accountFont'
 import { createFont, deleteFont, listFonts, renameFont } from './accountFontApi'
 import type { FontSummary } from './accountFontApi'
 import { accountFontName, accountFontSession, collectAccountFontData, renamedAccountFont } from './accountFontSync'
@@ -20,8 +20,11 @@ import { DEFAULT_FONT_NAME, FONT_NAME_STORAGE_KEY, useFontExportStore } from './
 import { StylePicto } from './StylePicto'
 import { clearAppNotice, showAppNotice } from './appNotice'
 import { leaveDeletedFont, openFont, openNewFont } from './fontSwitch'
-import { authGateMode, sessionUser } from './betaAuth'
+import { sessionUser, sessionUserId, storageMode } from './betaAuth'
 import { useUnseenReply } from './useFeedback'
+import { fontLimitOf, useProfile } from './useProfile'
+import { takePendingDownload } from './downloadConsent'
+import { agreeTerms, rememberProfile } from './profileApi'
 import { navigate } from './router'
 import { useContextPlacement } from './notoModel'
 import { ExportNoticeToast } from './workspace/WorkspaceChrome'
@@ -178,11 +181,13 @@ function JamoGlyph({ type, char, size }: { type: JamoType; char: string; size: n
  * 오른쪽 버튼은 둘: `…`(이름 바꾸기 · 복제 · 삭제) · 다운로드. 이름 바꾸기 · 삭제 확인은 `…` 시트 안에서 한다.
  * 다운로드도 같은 시트가 올라와 폰트 이름(설치 이름 · 파일 이름)을 받고 OTF를 만든다.
  */
-function FontCard({ name, onRename, onDuplicate, onDelete }: {
+function FontCard({ name, fontLimit, onRename, onDuplicate, onDelete }: {
   name: string
   onRename: (name: string) => void
   /** 없으면(한도가 찼거나 랩 화면) 복제를 흐리게. */
   onDuplicate?: () => void
+  /** 폰트 한도(복제 못 할 때 안내). */
+  fontLimit: number
   /** 없으면(계정 폰트를 안 연 랩 화면) 삭제를 흐리게. */
   onDelete?: () => void
 }) {
@@ -315,7 +320,7 @@ function FontCard({ name, onRename, onDuplicate, onDelete }: {
     </section>
     {/* 추출은 폰트의 속성 — 워크스페이스 폰트 탭과 같은 버튼을 카드 안에. 화면 하단엔 두지 않는다. */}
     <footer>
-      <FontCardMenu label="더보기" name={name} onRename={onRename} onDuplicate={onDuplicate} onDelete={onDelete} />
+      <FontCardMenu label="더보기" name={name} limit={fontLimit} onRename={onRename} onDuplicate={onDuplicate} onDelete={onDelete} />
       <FontCardDownload />
     </footer>
   </article>
@@ -376,6 +381,21 @@ function FontCardDownload() {
     setDraft(accountFontName() ?? (saved || DEFAULT_FONT_NAME))
     show()
   }
+  // 동의 시트에서 카카오로 갔다 돌아왔다. 동의를 프로필에 적고, 받던 이름으로 이름 시트를 다시 연다.
+  useEffect(() => {
+    const pending = takePendingDownload(window.sessionStorage)
+    if (!pending || storageMode() !== 'account') return
+    void (async () => {
+      const me = await sessionUserId()
+      if (!me) return
+      const agreed = await agreeTerms(me, pending.version, pending.license)
+      if (agreed.ok) rememberProfile(agreed.value)
+      setDraft(pending.fontName)
+      show()
+    })()
+    // 처음 그릴 때 한 번.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const next = draft.trim()
   const submit = () => {
     if (!next || exporting) return
@@ -420,7 +440,7 @@ function FontCardDownload() {
  * 이름 바꾸기 · 삭제 확인은 같은 시트가 그 화면으로 바뀐다 — 카드로 돌아가 고치지 않는다.
  * 바깥 탭 · Esc면 닫히고, 닫힐 땐 거꾸로 내려간다. 키보드가 올라오면 시트도 그 위로 올라탄다. 복제는 자리가 남았을 때만 — 지금 폰트를 `○○ 사본`으로 하나 더 만든다.
  */
-function FontCardMenu({ label, name, onRename, onDuplicate, onDelete }: { label: string; name: string; onRename: (name: string) => void; onDuplicate?: () => void; onDelete?: () => void }) {
+function FontCardMenu({ label, name, limit, onRename, onDuplicate, onDelete }: { label: string; name: string; limit: number; onRename: (name: string) => void; onDuplicate?: () => void; onDelete?: () => void }) {
   const [step, setStep] = useState<'menu' | 'rename' | 'delete'>('menu')
   const [draft, setDraft] = useState(name)
   const { open, closing, keyboard, show, close } = useFloatingSheet(() => setStep('menu'))
@@ -458,7 +478,7 @@ function FontCardMenu({ label, name, onRename, onDuplicate, onDelete }: { label:
         </div>}
         {step === 'menu' && <>
           <Pressable type="button" role="menuitem" onClick={() => setStep('rename')}><PencilLine size={22} aria-hidden="true" />이름 바꾸기</Pressable>
-          <Pressable type="button" role="menuitem" disabled={!onDuplicate} data-testid="dashboard-font-duplicate" onClick={() => { close(); onDuplicate?.() }}><Copy size={22} aria-hidden="true" />복제{!onDuplicate && <small>폰트 {FONT_LIMIT}개가 다 찼어요</small>}</Pressable>
+          <Pressable type="button" role="menuitem" disabled={!onDuplicate} data-testid="dashboard-font-duplicate" onClick={() => { close(); onDuplicate?.() }}><Copy size={22} aria-hidden="true" />복제{!onDuplicate && <small>폰트 {limit}개가 다 찼어요</small>}</Pressable>
           <Pressable type="button" role="menuitem" data-danger disabled={!onDelete} data-testid="dashboard-font-delete" onClick={() => setStep('delete')}><Trash2 size={22} aria-hidden="true" />삭제</Pressable>
         </>}
       </div>
@@ -906,13 +926,14 @@ function useFontList() {
   const [session] = useState(accountFontSession)
   const [fonts, setFonts] = useState<FontSummary[] | null>(null)
   const [nickname, setNickname] = useState<string | null>(null)
+  const limit = fontLimitOf(useProfile(session?.me ?? null))
   const [moving, setMoving] = useState(false)
   // 옮겨 가는 폰트 이름. 누르자마자 알약이 이 이름이 되고 드로어가 닫히며 판이 흐려진다 — 다시 열리는 동안 기다리는 걸 보인다.
   const [movingTo, setMovingTo] = useState<string | null>(null)
   useEffect(() => {
     if (!session) return
     void listFonts(session.me).then((listed) => { if (listed.ok) setFonts(listed.value) })
-    if (authGateMode() === 'on') void sessionUser().then((user) => setNickname(user?.nickname ?? null)).catch(() => undefined)
+    if (storageMode() === 'account') void sessionUser().then((user) => setNickname(user?.nickname ?? null)).catch(() => undefined)
     else setNickname('내 폰트')
   }, [session])
 
@@ -930,7 +951,8 @@ function useFontList() {
     currentId: session?.fontId ?? null,
     // 만든 순서 그대로. 고르거나 고쳐도 자리가 바뀌지 않는다.
     fonts: fonts && [...fonts].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
-    full: (fonts?.length ?? FONT_LIMIT) >= FONT_LIMIT,
+    full: (fonts?.length ?? limit) >= limit,
+    limit,
     moving,
     movingTo,
     open: (fontId: string) => {
@@ -938,7 +960,7 @@ function useFontList() {
       if (session && font && fontId !== session.fontId) void go(font.name, () => openFont(session.me, fontId, font.name))
     },
     create: () => {
-      if (!session || !fonts || fonts.length >= FONT_LIMIT) return
+      if (!session || !fonts || fonts.length >= limit) return
       const name = nextFontName(nickname, fonts.map((font) => font.name))
       void go(name, () => openNewFont(session.me, name))
     },
@@ -955,12 +977,12 @@ function useFontList() {
      * 카드 `…` 복제. 지금 화면의 폰트 그대로 `○○ 사본`을 새로 만들고, 여기 머문다 — 알림의 `열기`로 사본으로 간다.
      * 자리가 없으면(한도) 없다. 서버가 한 번 더 막으면 알림만.
      */
-    duplicateCurrent: session && fonts && fonts.length < FONT_LIMIT ? () => {
+    duplicateCurrent: session && fonts && fonts.length < limit ? () => {
       if (moving) return
       const current = fonts.find((font) => font.id === session.fontId)?.name ?? accountFontName() ?? '내 폰트'
       const name = copyName(current, fonts.map((font) => font.name))
       void createFont(session.me, name, collectAccountFontData()).then((created) => {
-        if (!created.ok) { fontListFailed(created.limit ? `폰트는 ${FONT_LIMIT}개까지 만들 수 있어요.` : '복제하지 못했어요. 다시 해 주세요.'); return }
+        if (!created.ok) { fontListFailed(created.limit ? `폰트는 ${limit}개까지 만들 수 있어요.` : '복제하지 못했어요. 다시 해 주세요.'); return }
         const at = new Date().toISOString()
         setFonts((list) => list && [...list, { id: created.value.id, name, updatedAt: created.value.updatedAt ?? at, createdAt: at }])
         showAppNotice('font-list', { tone: 'info', message: `‘${name}’을 만들었어요.`, dismissable: true, actions: [{ label: '열기', run: () => { clearAppNotice('font-list'); void go(name, () => openFont(session.me, created.value.id, name)) } }] })
@@ -1021,7 +1043,7 @@ function FontSheet({ list, modified, top, closing, onClose, onClosed }: {
           })}
         </ul>}
       <Pressable type="button" className={styles.fontSheetCreate} disabled={list.moving || list.full} onClick={list.create} data-testid="dashboard-font-create"><Plus size={20} aria-hidden="true" />새 폰트</Pressable>
-      {list.full && <p className={styles.fontSheetNote}>폰트는 {FONT_LIMIT}개까지 만들 수 있어요. 하나를 지우면 새로 만들 수 있어요.</p>}
+      {list.full && <p className={styles.fontSheetNote}>폰트는 {list.limit}개까지 만들 수 있어요. 하나를 지우면 새로 만들 수 있어요.</p>}
     </div>
   </div>
 }
@@ -1092,7 +1114,7 @@ export function DashboardLabPage() {
       <div ref={scroller} className={styles.scroll} data-dashboard-scroll onScroll={onScroll} onWheel={unpin} onTouchStart={unpin} onPointerDown={unpin} onKeyDown={unpin} data-moving={fontList.movingTo !== null || undefined} aria-busy={fontList.movingTo !== null || undefined}>
         {/* 지금 폰트 카드 하나. 다른 폰트는 머리 알약 시트에서. */}
         <div className={styles.fontCardRow}>
-          <FontCard name={name} onRename={fontList.renameCurrent} onDuplicate={fontList.duplicateCurrent} onDelete={fontList.removeCurrent} />
+          <FontCard name={name} fontLimit={fontList.limit} onRename={fontList.renameCurrent} onDuplicate={fontList.duplicateCurrent} onDelete={fontList.removeCurrent} />
         </div>
 
         <div className={styles.body}>
