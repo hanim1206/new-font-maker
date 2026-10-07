@@ -516,10 +516,11 @@ test('캔버스에서 획 · 점을 멀리 끌어도 글자 칸 밖으로 나가
     await expect(page.locator('[data-editor-hit="stroke"]').first()).toBeAttached({ timeout: 60_000 })
     if (inSyllable) {
       await page.locator(`[data-testid="review-propagation-card"][data-char="${syllable}"] [data-testid="review-propagation-open"]`).first().click()
-      // 첫닿자는 안 가른 홀자 계열 글자를 열면 보기만이다. `따로 그리기`로 그 계열을 갈라야 고칠 수 있다(첫닿자 획 변형 3벌).
+      // 첫닿자의 안 가른 홀자 계열 글자는 기본을 상속받는다. 획에 처음 손대면 트리가 묻고, 연결 토글을 끄고 `적용`해 갈라야 그 계열만 고친다(첫닿자 획 변형 3벌).
       if (part === 'CH') {
-        await page.getByTestId('variant-gate-split').click()
-        // 선이 끊기는 움직임이 끝나야 캔버스가 산다.
+        await page.locator('[data-editor-hit="stroke"]').first().dispatchEvent('pointerdown')
+        await page.getByTestId('variant-gate-toggle').click()
+        await page.getByTestId('variant-gate-apply').click()
         await expect(page.getByTestId('variant-gate')).toHaveCount(0)
       }
     }

@@ -1,8 +1,8 @@
 /* 뒤를 어둡게 덮는 막. 드로어와 같이 떴다 사라진다. */
 .scrim { position: fixed; inset: 0; z-index: 29; background: rgb(var(--color-scrim) / .3); opacity: 0; visibility: hidden; transition: opacity .28s ease, visibility 0s linear .28s; }
 .scrim[data-open] { opacity: 1; visibility: visible; transition: opacity .28s ease, visibility 0s; }
-/* 조절판 자리를 덮는 하단 드로어. 화면 아래에 붙고 가운데 정렬, 위 모서리만 둥글다. 열리면 올라오고 닫히면 내려간다. 아래 여백을 넉넉히 둬 트리가 캔버스 쪽으로 올라온다. */
-.drawer { position: fixed; inset-inline: 0; bottom: 0; z-index: 30; box-sizing: border-box; width: min(100%, 440px); margin: 0 auto; padding: 0 12px calc(env(safe-area-inset-bottom) + 40px); border-radius: var(--radius-xl) var(--radius-xl) 0 0; background: rgb(var(--color-surface)); box-shadow: var(--shadow-overlay); transform: translateY(100%); visibility: hidden; touch-action: none; transition: transform .28s cubic-bezier(.32, .72, 0, 1), visibility 0s linear .28s; }
+/* 조절판 자리를 덮는 하단 드로어. 화면 아래에 붙고 가운데 정렬, 위 모서리만 둥글다. 열리면 올라오고 닫히면 내려간다. 아래 여백은 홈 막대만큼 + 12px — 맨 아래 단추가 바닥에 붙는다(10-07 사용자). */
+.drawer { position: fixed; inset-inline: 0; bottom: 0; z-index: 30; box-sizing: border-box; width: min(100%, 440px); margin: 0 auto; padding: 0 12px calc(env(safe-area-inset-bottom) + 12px); border-radius: var(--radius-xl) var(--radius-xl) 0 0; background: rgb(var(--color-surface)); box-shadow: var(--shadow-overlay); transform: translateY(100%); visibility: hidden; touch-action: none; transition: transform .28s cubic-bezier(.32, .72, 0, 1), visibility 0s linear .28s; }
 .drawer[data-open] { transform: translateY(0); visibility: visible; transition: transform .28s cubic-bezier(.32, .72, 0, 1), visibility 0s; }
 /* 끄는 동안은 손가락을 바로 따른다. */
 .drawer[data-dragging] { transition: none; }

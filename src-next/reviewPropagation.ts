@@ -7,7 +7,6 @@ import type { BoxConfig, Part } from '../src/types'
 import { CORPUS_FINALS, CORPUS_INITIALS, CORPUS_MEDIALS, CORPUS_TOTAL, corpusCodepoint, corpusIdentity } from './notoCorpus'
 import type { CorpusIdentity } from './notoCorpus'
 import { jamoPartOf } from './layoutDeltaStore'
-import { medialFamilyOf } from '../src/utils/jamoContextStrokes'
 import type { ComponentFitPart } from './notoComponentFitView'
 import type { EditableRail, MedialFitPart } from './notoMedialFitView'
 
@@ -262,25 +261,30 @@ function curatedPages(source: CorpusIdentity, scope: PropagationScope, count: nu
   })
 }
 
-/** 획 편집 첫닿자 줄의 세 덩이. 한 덩이 = 홀자 계열 하나, 받침 없는 글자 몇에 받침 있는 글자 몇을 뒤에 붙인다. 익숙한 홀자 순(`familiarInitialRun`)과 같다. */
+/** 획 편집 첫닿자 줄의 세 덩이. 한 덩이 = 홀자 계열 하나. */
 export const INITIAL_ROW_FAMILIES = ['right', 'bottom', 'mixed'] as const
 export type InitialRowFamily = typeof INITIAL_ROW_FAMILIES[number]
-const INITIAL_ROW_OPEN = 6
-const INITIAL_ROW_CLOSED = 4
-const INITIAL_ROW_CLOSED_FINALS = [...'ㄴㄹㅁㅇ']
+/**
+ * 덩이마다 보기 글자 둘(홀자 · 받침). 세로홀자 = 바깥줄기 ㅏ · 안줄기 ㅓ+ㄴ(10-07 사용자), 가로홀자 = ㅗ · ㅜ+ㄴ, 섞임홀자 = ㅘ · ㅝ+ㅆ.
+ * 줄이 한 화면에 들어오게 줄인 것(전엔 받침 없음 6 + 받침 4). 변형 트리의 가지 글자와 같다.
+ */
+const INITIAL_ROW_EXAMPLES: Readonly<Record<InitialRowFamily, readonly [medial: string, final: string | null][]>> = {
+  right: [['ㅏ', null], ['ㅓ', 'ㄴ']],
+  bottom: [['ㅗ', null], ['ㅜ', 'ㄴ']],
+  mixed: [['ㅘ', null], ['ㅝ', 'ㅆ']],
+}
+/** 첫닿자 `initial`로 그 계열의 보기 글자 둘을 짓는다(자 전 · 조 준 · 좌 줬). 첫닿자가 아니면 빈 배열. */
+export function initialRowExamples(initial: string, family: InitialRowFamily): string[] {
+  if (!CORPUS_INITIALS.includes(initial)) return []
+  return INITIAL_ROW_EXAMPLES[family].map(([medial, final]) => String.fromCodePoint(corpusCodepoint(initial, medial, final)))
+}
+/** 줄의 세 덩이. 덩이 = 그 계열 보기 글자 둘(들고 온 글자는 뺀다 — 줄이 제 덩이 맨 앞에 따로 세운다). 자모가 여럿이면 자모 순으로 이어 붙인다. */
 export function initialRowChunks(jamos: readonly string[], excludeCodepoint: number): { family: InitialRowFamily; items: CorpusIdentity[] }[] {
   const initials = jamos.filter((initial) => CORPUS_INITIALS.includes(initial))
-  const run = familiarInitialRun(initials, excludeCodepoint)
-  return INITIAL_ROW_FAMILIES.map((family) => {
-    const open = run.filter((item) => item.finalJamo === null && medialFamilyOf(item.medialJamo) === family).slice(0, INITIAL_ROW_OPEN)
-    // 받침 글자는 고른 묶음의 진짜 낱말 글자(집 정 적 · 죽 중 · 줬)가 먼저. 모자라면 익숙한 홀자 순으로 ㄴㄹㅁㅇ 받침을 돌려 채운다.
-    const curated = identitiesOf(SAMPLE_BATCHES[`${family}-final`]?.join('') ?? '').filter((item) => initials.includes(item.initialJamo) && item.codepoint !== excludeCodepoint)
-    const familyMedials = FAMILIAR_MEDIALS.filter((medial) => medialFamilyOf(medial) === family)
-    const machine = familyMedials.flatMap((medial, index) => initials.map((initial) => corpusIdentity(corpusCodepoint(initial, medial, INITIAL_ROW_CLOSED_FINALS[index % INITIAL_ROW_CLOSED_FINALS.length])))).filter((item) => item.codepoint !== excludeCodepoint)
-    const seen = new Set<number>()
-    const closed = [...curated, ...machine].filter((item) => seen.has(item.codepoint) ? false : (seen.add(item.codepoint), true)).slice(0, INITIAL_ROW_CLOSED)
-    return { family, items: [...open, ...closed] }
-  })
+  return INITIAL_ROW_FAMILIES.map((family) => ({
+    family,
+    items: initials.flatMap((initial) => initialRowExamples(initial, family)).map((character) => corpusIdentity(character.codePointAt(0)!)).filter((item) => item.codepoint !== excludeCodepoint),
+  }))
 }
 
 /**

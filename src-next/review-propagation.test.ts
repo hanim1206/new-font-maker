@@ -171,10 +171,11 @@ describe('propagationCandidates', () => {
     expect(new Set(pages.map((item) => item.codepoint)).size).toBe(pages.length)
     expect(pages.every((item) => item.initialJamo === 'ㅈ')).toBe(true)
   })
-  it('첫닿자 줄 세 덩이 = 오른 · 아래 · 섞임, 덩이마다 받침 없는 글자 뒤에 고른 받침 글자', () => {
+  it('첫닿자 줄 세 덩이 = 오른 · 아래 · 섞임, 덩이마다 보기 글자 둘(홀자 · 받침)이고 들고 온 글자는 뺀다', () => {
     const chunks = initialRowChunks(['ㅈ'], '자'.codePointAt(0)!)
     const text = chunks.map((chunk) => `${chunk.family}:${chunk.items.map((item) => item.character).join('')}`)
-    expect(text).toEqual(['right:저지재제쟈져집정적잔', 'bottom:조주즈죠쥬죽중존줄', 'mixed:좌줘죄쥐즤좨줬좐줠죔'])
+    expect(text).toEqual(['right:전', 'bottom:조준', 'mixed:좌줬'])
+    expect(initialRowChunks(['ㅈ'], '각'.codePointAt(0)!).map((chunk) => chunk.items.map((item) => item.character).join(''))).toEqual(['자전', '조준', '좌줬'])
     const all = chunks.flatMap((chunk) => chunk.items)
     expect(new Set(all.map((item) => item.codepoint)).size).toBe(all.length)
   })

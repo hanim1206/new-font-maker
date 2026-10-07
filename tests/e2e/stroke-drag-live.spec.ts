@@ -41,10 +41,12 @@ test('홀자와 함께 그려진 글자에서 홀자 줄기를 끌면 끄는 동
 test('가른 벌(세로홀자 첫닿자)에서 획을 끌면 끄는 동안 잉크가 따라 움직이고, 벌에 따로 준 굵기가 기본으로 덮이지 않는다', async ({ page }) => {
   await page.goto(`/workspace/jamo?char=${encodeURIComponent('가')}&mode=stroke&part=CH`)
   await expect(page.locator('svg [data-editor-hit="stroke"]').first()).toBeAttached({ timeout: 60_000 })
-  // `닿는 글자` 줄에서 `가`를 고르고 세로홀자 벌을 가른다.
+  // `닿는 글자` 줄에서 `가`를 고르고, 획에 처음 손대면 뜨는 트리의 연결 토글을 끄고 적용해 세로홀자 벌을 가른다.
   await page.locator('[data-testid="review-propagation-card"][data-char="가"] button').first().click()
-  await page.getByTestId('variant-gate-split').click()
   const hit = page.locator('svg [data-editor-hit="stroke"]').first()
+  await hit.dispatchEvent('pointerdown')
+  await page.getByTestId('variant-gate-toggle').click()
+  await page.getByTestId('variant-gate-apply').click()
   await expect(page.getByTestId('variant-gate')).toHaveCount(0, { timeout: 10_000 })
   // 벌의 굵기를 기본과 다르게 준다(자소가 통째로 골라진 채).
   await page.getByTestId('jamo-stroke-style').click()

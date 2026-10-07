@@ -14,7 +14,6 @@ import type { PropagationCardBox } from './propagationCardView'
 import { hasLayoutEdit, initialRowChunks, propagationCandidates } from './reviewPropagation'
 import { Ellipsis } from 'lucide-react'
 import { medialFamilyOf } from '../src/utils/jamoContextStrokes'
-import type { VariantNode } from './VariantGateCard'
 import { ruleSamples } from './scopePicker'
 import { ruleKey } from './scopeRule'
 import type { ScopeRule } from './scopeRule'
@@ -79,7 +78,7 @@ const TouchedGlyph = memo(function TouchedGlyph({ identity, bundle, edit, ghostV
   </figure>
 })
 
-export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, edit, ghostVisible = true, focus, scope, group, jamos, anyContext, rule, activeChar, onPick, lead, onPickLead, splitFamilies, tree, highlight }: {
+export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, edit, ghostVisible = true, focus, scope, group, jamos, anyContext, rule, activeChar, onPick, lead, onPickLead, splitFamilies, tree }: {
   source: CorpusIdentity
   bundle: NotoPresetModelBundle | null
   edit: PropagationEdit
@@ -108,8 +107,6 @@ export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, e
   splitFamilies?: readonly string[]
   /** `⋯` = 조절판 자리 변형 트리 토글(기본 ← 선 → 세 가지, 가르기). 첫닿자 줄에서만. */
   tree?: { open: boolean; onToggle: () => void }
-  /** 트리에서 고른 칸. 있으면 열린 글자 대신 이 덩이(또는 단독 칸)가 켜진다. */
-  highlight?: VariantNode | null
 }) {
   // 글자·범위·고른 자모가 바뀌면 줄을 새로 만들고 한 묶음으로 돌아간다.
   const rowKey = rule ? `${source.codepoint}:rule:${ruleKey(rule)}` : `${source.codepoint}:${scope}:${group}:${jamos.join('')}:${anyContext ? 'any' : 'one'}`
@@ -148,7 +145,7 @@ export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, e
     if (el.scrollWidth <= el.clientWidth + 1) loadNextBatch()
   })
   return <section className={styles.row} aria-label="닿는 글자" data-testid="touched-glyph-row">
-    {lead && <figure className={`${styles.card} ${styles.lead}`} data-active={(highlight ? highlight === 'base' : lead.active) || undefined} data-testid="touched-glyph-solo">
+    {lead && <figure className={`${styles.card} ${styles.lead}`} data-active={lead.active || undefined} data-testid="touched-glyph-solo">
       <Pressable aria-current={lead.active || undefined} onClick={onPickLead} aria-label={`${lead.char} 단독으로 열기`}>
         <span className={styles.leadGlyph}><AppGlyph char={lead.char} size={24} upright /></span>
       </Pressable>
@@ -163,7 +160,7 @@ export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, e
         const leadIn = lead && medialFamilyOf(source.medialJamo) === chunk.family && !chunk.items.some((item) => item.codepoint === source.codepoint) ? [source] : []
         const items = [...leadIn, ...chunk.items]
         // 글자를 고르면 그 글자가 아니라 덩이가 켜진다 — 획은 덩이(홀자 계열) 단위로 갈리기 때문이다.
-        const active = highlight ? highlight === chunk.family : items.some((identity) => identity.character === activeChar)
+        const active = items.some((identity) => identity.character === activeChar)
         return <Fragment key={chunk.family}>
           {index > 0 && <span className={styles.divider} aria-hidden="true" />}
           <div className={styles.chunk} data-family={chunk.family} data-active={active || undefined} data-split={splitFamilies?.includes(chunk.family) || undefined} data-testid="touched-glyph-chunk">

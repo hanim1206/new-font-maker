@@ -1,58 +1,103 @@
-/* 획 편집 첫닿자 변형 트리. 조절판 자리에 선다. 테두리 · 바탕 없이 그림만. 글자가 숨쉬는 게 보이게 칸을 키워 조절판(176px)보다 높다. 자리는 `VariantGateCard.tsx`의 상수와 같다. */
-.card { position: relative; box-sizing: border-box; width: 332px; max-width: 100%; height: 268px; margin: 0 auto; padding-block: 14px; }
+/* 획 편집 첫닿자 변형 트리. 조절판 자리에 선다. 테두리 · 바탕 없이 그림과 아래 큰 단추 하나. 글자가 숨쉬는 게 보이게 칸을 키워 조절판(176px)보다 높다. */
+.card { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+/* 트리 그림. 자리는 `VariantGateCard.tsx`의 상수와 같다. */
+.tree { position: relative; box-sizing: border-box; width: 332px; max-width: 100%; height: 268px; padding-block: 14px; }
 .lines { position: absolute; inset: 14px 0 auto 0; width: 332px; height: 240px; pointer-events: none; }
-.lines path { fill: none; stroke: rgb(var(--color-border)); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+/* 아래 큰 단추. 드로어 폭을 채운다(`Button` sheet · primary). 모양은 부품이, 여기선 폭만. */
+.cta { align-self: stretch; }
+/* 연결 토글 줄. 옅은 알약 안에 이름 왼쪽 · 스위치 오른쪽. */
+.toggleRow { align-self: stretch; display: flex; align-items: center; justify-content: space-between; min-height: 56px; padding: 0 16px 0 18px; border-radius: var(--radius-xl); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: var(--font-16); font-weight: var(--weight-bold); cursor: pointer; }
+.lines path { fill: none; stroke: rgb(var(--color-border)); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; transition: stroke .3s ease; }
 /* 선을 타고 가는 공. 선과 같은 색. */
 .pulse { fill: rgb(var(--color-border)); }
-/* 기본 ㅈ. 왼쪽 큰 칸. 고르기 단추(`.pick`)가 칸을 채우고 화살표는 오른쪽 아래 귀퉁이. */
+/* 기본 ㅈ. 왼쪽 큰 칸. 고르기 단추(`.pick`)가 칸을 채운다. */
 .root { position: absolute; left: 0; top: 68px; box-sizing: border-box; width: 120px; height: 132px; border-radius: var(--radius-lg); background: rgb(var(--color-muted)); color: rgb(var(--color-foreground)); font-size: var(--font-13); font-weight: var(--weight-bold); }
 .root .pick { flex-direction: column; justify-content: center; gap: 0; padding: 12px; }
 .root .label { flex: 0 0 auto; text-align: center; }
 /* 가지 셋. 이어진 선 = 기본의 영향을 받는 가지, 따로 그린 가지는 선이 없다. */
-.branch { position: absolute; left: 196px; box-sizing: border-box; width: 136px; height: 72px; display: flex; align-items: center; gap: 4px; padding-inline-end: 10px; border-radius: var(--radius-md); background: rgb(var(--color-muted)); color: rgb(var(--color-foreground)); font-size: var(--font-13); font-weight: var(--weight-bold); }
-/* 가지: 글자 위 · 이름표 아래, 왼쪽 정렬. */
-.branch .pick { flex: 1 1 auto; min-width: 0; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; padding: 4px 0 8px 14px; }
-.branch .label { flex: 0 0 auto; font-size: var(--font-12); line-height: 1; }
-/* 고른 칸. 테두리 없이 옅은 바탕, 사방으로 조금 커진다. */
-.root, .branch { transition: transform .22s cubic-bezier(.34, 1.56, .64, 1), background-color .2s; }
-.root[data-picked], .branch[data-picked] { background: rgb(var(--color-primary) / .1); transform: scale(1.06); z-index: 1; }
+.branch { position: absolute; left: 196px; box-sizing: border-box; width: 136px; height: 72px; display: flex; align-items: center; gap: 4px; border-radius: var(--radius-md); background: rgb(var(--color-muted)); color: rgb(var(--color-foreground)); font-size: var(--font-13); font-weight: var(--weight-bold); }
+/* 가지: 보기 글자 둘 위 · 이름표 아래, 가운데 정렬. */
+.branch .pick { flex: 1 1 auto; min-width: 0; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 4px 0 6px; }
+.branch .label { flex: 0 0 auto; font-size: var(--font-12); line-height: 1; text-align: center; }
+/* 고른 가지의 이름표는 파랑(토글 · 적용과 같은 색 = 고른 것). */
+.branch[data-picked] .label { color: rgb(var(--color-primary)); }
+/* 가지 자리: 이어진 가지는 기본 쪽(왼쪽) 4px, 끊긴 가지는 오른쪽 4px(10-07 사용자). 끊기 · 잇기 애니가 이 두 자리 사이를 옮긴다. */
+.branch { --shift: 4px; transform: translateX(var(--shift)); }
+.branch[data-connected] { --shift: -4px; }
+/* 고른 칸. 테두리 없이 옅은 바탕만(크기는 안 건드린다 — 10-07 사용자, 칸이 촐싹거림). 바탕은 불투명(선이 비치지 않게). */
+.root, .branch { transition: background-color .25s ease, transform .4s cubic-bezier(.4, 0, .2, 1); }
+.root[data-picked], .branch[data-picked] { background: rgb(var(--color-primary-light)); z-index: 1; }
 @media (prefers-reduced-motion: reduce) { .root, .branch { transition: none; } }
 /* 칸을 채우는 고르기 단추. 모양은 칸이 낸다. */
 .pick { display: flex; align-items: center; box-sizing: border-box; width: 100%; height: 100%; padding: 0; border: 0; border-radius: inherit; background: none; color: inherit; font: inherit; cursor: pointer; }
 .pick:focus { outline: none; }
 .pick:focus-visible { outline: 2px solid rgb(var(--color-primary)); outline-offset: -2px; }
-.glyph { display: grid; place-items: center; padding: 2px; }
+.glyph { display: flex; align-items: center; justify-content: center; gap: 0; padding: 0; }
 /* 이름표. 글자보다 한 단 물러난 회색. */
 .label { flex: 1 1 auto; text-align: left; white-space: nowrap; color: rgb(var(--color-muted-foreground)); }
-/* 고른 칸의 `가기`(안 가른 가지면 따로 그리기). 글 없이 화살표 하나. 기본 칸에서는 오른쪽 아래 귀퉁이. */
-.go { display: grid; place-items: center; flex: 0 0 auto; inline-size: 28px; block-size: 28px; border-radius: 999px; background: rgb(var(--color-primary)); color: rgb(var(--color-primary-foreground)); animation: popIn .26s cubic-bezier(.34, 1.56, .64, 1) both; }
-/* 칸을 고르면 화살표가 톡 튀어나온다. */
-@keyframes popIn {
-  0% { transform: scale(.5); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
+/* 토글을 켜면: 선이 기본에서 가지로 그려 나오고(0.42초), 닿는 순간 가지가 2px 살짝 밀린다. 선 먼저 · 칸 나중, 칸은 작게(촐싹거리지 않게). 길이는 `JOIN_MS`. */
+.lines path[data-joining] { stroke-dasharray: 1 1; animation: joinLine .6s cubic-bezier(.4, 0, .2, 1) both; }
+/* 파랗게 뻗어 나와 닿으면 회색으로 가라앉는다. 색은 켜지고 꺼지는 게 아니라 섞여 들어온다. */
+@keyframes joinLine {
+  0% { stroke-dashoffset: 1; stroke: rgb(var(--color-primary)); }
+  70% { stroke-dashoffset: 0; stroke: rgb(var(--color-primary)); }
+  100% { stroke-dashoffset: 0; stroke: rgb(var(--color-border)); }
 }
-.root .go { position: absolute; right: 6px; bottom: 6px; }
-/* 화살표를 누르면 그 가지의 선이 팽팽해졌다가 가지 쪽으로 감기며 사라지고, 가지는 튕겨 나간다 · 기본은 살짝 되튄다. 길이는 `SNAP_MS`. */
-.lines path[data-snapping] { stroke: rgb(var(--color-primary)); stroke-dasharray: 1 1; animation: snapLine .52s cubic-bezier(.4, 0, .2, 1) forwards; }
+.branch[data-joining] { animation: joinBranch .4s cubic-bezier(.4, 0, .2, 1) .42s both; }
+/* 오른쪽 자리에서 선이 닿는 순간 왼쪽 자리로 옮겨 앉는다(조금 지나쳤다 돌아옴). */
+@keyframes joinBranch {
+  0% { transform: translateX(4px); }
+  60% { transform: translateX(-5px); }
+  100% { transform: translateX(-4px); }
+}
+/* 토글을 끄면: 그 가지의 선이 팽팽해졌다가 가운데서 양옆으로 끊겨 사라지고(0.4초), 그 다음 가지는 3px 살짝 밀리고 기본은 2px 되민다(0.36초, 작게). 선 먼저 · 칸 나중. 길이는 `SNAP_MS`. */
+.lines path[data-snapping] { animation: snapLine .5s cubic-bezier(.4, 0, .2, 1) forwards; }
+/* 회색에서 파랗게 물들며 팽팽해졌다가 가운데서 양옆으로 끊긴다(10-07 사용자). `pathLength` 1에 대시 = 앞 토막 a · 빈 곳 1−2a · 뒤 토막 a(뒤에 긴 빈 곳으로 반복 막음). a를 ½ → 0으로 줄이면 가운데가 먼저 비고 양 끝이 기본 · 가지 쪽으로 물러난다. */
 @keyframes snapLine {
-  0% { stroke-dashoffset: 0; stroke-width: 1.8; }
-  30% { stroke-dashoffset: 0; stroke-width: 3.2; }
-  100% { stroke-dashoffset: -1; stroke-width: 1.2; }
+  0% { stroke-dasharray: .5 0 .5 100; stroke-width: 1.8; stroke: rgb(var(--color-border)); }
+  35% { stroke-dasharray: .5 0 .5 100; stroke-width: 2.8; stroke: rgb(var(--color-primary)); }
+  100% { stroke-dasharray: 0 1 0 100; stroke-width: 1.4; stroke: rgb(var(--color-primary)); }
 }
-.branch[data-snapping] { animation: snapBranch .52s cubic-bezier(.34, 1.56, .64, 1); }
+.branch[data-snapping] { animation: snapBranch .45s cubic-bezier(.4, 0, .2, 1) .45s both; }
+/* 왼쪽 자리에서 선이 끊긴 뒤 오른쪽 자리로 밀려난다(조금 지나쳤다 돌아옴). */
 @keyframes snapBranch {
-  0% { transform: translateX(0); }
-  30% { transform: translateX(-4px); }
-  60% { transform: translateX(10px); }
-  100% { transform: translateX(0); }
+  0% { transform: translateX(-4px); }
+  60% { transform: translateX(5px); }
+  100% { transform: translateX(4px); }
 }
-.root[data-snapping] { animation: snapRoot .52s cubic-bezier(.34, 1.56, .64, 1); }
+.root[data-snapping] { animation: snapRoot .45s cubic-bezier(.4, 0, .2, 1) .45s both; }
 @keyframes snapRoot {
   0% { transform: translateX(0); }
-  30% { transform: translateX(3px); }
-  60% { transform: translateX(-5px); }
+  40% { transform: translateX(-2px); }
   100% { transform: translateX(0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .lines path[data-snapping], .branch[data-snapping], .root[data-snapping], .go { animation: none; }
+  .lines path[data-snapping], .lines path[data-joining], .branch[data-snapping], .branch[data-joining], .root[data-snapping] { animation: none; }
+  .root, .branch { transition: none; }
 }
+
+/* 떠 있는 시트(덮어쓰기 확인). 대시보드 폰트 메뉴 시트와 같은 꼴 — 뒤를 어둡게, 아래에서 떠 있는 카드가 올라온다. 드로어(30)보다 위. */
+.sheetLayer { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; background: rgb(var(--color-scrim) / .36); animation: fadeIn var(--motion-normal) var(--ease-standard); }
+.sheet { width: min(100%, 480px); box-sizing: border-box; margin: 0 12px calc(env(safe-area-inset-bottom) + 12px); padding: 16px 16px 12px; border-radius: var(--radius-xl); background: rgb(var(--color-surface)); display: flex; flex-direction: column; gap: 8px; animation: sheetUp 360ms cubic-bezier(0.32, 0.72, 0, 1); }
+.sheet::before { content: ''; width: 36px; height: 4px; margin: -4px auto 8px; border-radius: var(--radius-full); background: rgb(var(--color-surface-3)); }
+.sheetLayer[data-closing] { animation: fadeOut 260ms var(--ease-standard) forwards; }
+.sheetLayer[data-closing] .sheet { animation: sheetDown 260ms cubic-bezier(0.4, 0, 0.6, 1) forwards; }
+.sheet h3 { margin: 0; padding: 0 4px; font-size: var(--font-20); font-weight: var(--weight-bold); letter-spacing: -0.01em; }
+.sheet p { margin: 0; padding: 0 4px; color: rgb(var(--color-text-4)); font-size: var(--font-16); }
+/* 지금 → 덮어쓴 뒤. 옅은 칸 안에 글자 둘과 화살표, 계열마다 한 칸. 이름표는 글자 아래, 덮어쓴 뒤만 주색. */
+.preview { margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 14px; padding: 12px 10px; border-radius: var(--radius-lg); background: rgb(var(--color-surface-2)); color: rgb(var(--color-text-5)); }
+.preview + .preview { margin-top: 0; }
+.preview figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.preview figcaption { font-size: var(--font-12); font-weight: var(--weight-semibold); color: rgb(var(--color-text-5)); }
+.preview figure[data-after] figcaption { color: rgb(var(--color-primary)); }
+.preview > svg { flex: none; margin-bottom: 18px; }
+/* 아래 큰 단추 둘은 `Button` sheet. 주 동작이 두 배 폭. 글이 길면 줄바꿈. */
+.sheetActions { margin-top: 12px; display: flex; gap: 8px; }
+.sheetActions > * { white-space: normal; }
+.sheetActions > * { flex: 1; }
+.sheetActions > [data-primary] { flex: 2; }
+@keyframes fadeIn { from { opacity: 0; } }
+@keyframes fadeOut { to { opacity: 0; } }
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes sheetDown { from { transform: none; } to { transform: translateY(calc(100% + 24px)); } }
+@media (prefers-reduced-motion: reduce) { .sheetLayer, .sheet, .sheetLayer[data-closing], .sheetLayer[data-closing] .sheet { animation: none; } }

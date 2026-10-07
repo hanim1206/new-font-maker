@@ -428,11 +428,15 @@ async function openStrokePoints(page: Page, pick: (paths: string[]) => number = 
 async function openSyllableContext(page: Page, char: string, { split = true }: { split?: boolean } = {}) {
   await page.getByTestId('touched-glyph-row').locator(`[data-testid="review-propagation-card"][data-char="${char}"] button`).click()
   await expect(page.getByRole('region', { name: `${char} 완성 글자 편집` })).toBeVisible()
-  // 첫닿자는 안 가른 홀자 계열 글자를 열면 보기만이다. `따로 그리기`로 그 계열을 갈라야 고칠 수 있다(첫닿자 획 변형 3벌).
-  // 줄을 오가기만 하는 테스트는 `split: false`로 보기 상태 그대로 둔다.
-  if (split && await page.getByTestId('variant-gate-split').count()) {
-    await page.getByTestId('variant-gate-split').click()
-    await expect(page.getByTestId('variant-gate')).toHaveCount(0, { timeout: 10_000 })
+  // 첫닿자의 안 가른 홀자 계열 글자는 기본을 상속받는다. 획에 처음 손대면 트리가 묻고, 연결 토글을 끄고 `적용`해 갈라야 그 계열만 고친다(첫닿자 획 변형 3벌).
+  // 줄을 오가기만 하는 테스트는 `split: false`로 상속 상태 그대로 둔다.
+  if (split) {
+    await page.locator('[data-editor-hit="stroke"]').first().dispatchEvent('pointerdown')
+    if (await page.getByTestId('variant-gate-toggle').count()) {
+      await page.getByTestId('variant-gate-toggle').click()
+      await page.getByTestId('variant-gate-apply').click()
+      await expect(page.getByTestId('variant-gate')).toHaveCount(0, { timeout: 10_000 })
+    }
   }
 }
 
