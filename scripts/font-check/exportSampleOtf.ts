@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url'
 /**
  * 앱과 같은 파이프라인으로 기본 스토어 상태의 OTF를 파일로 만든다. 브라우저 없이 iOS 검사 · fontTools 대조용.
  *
- *     npx vite-node scripts/font-check/exportSampleOtf.ts [출력 경로] [--name 꾸불체] [--ascii Kkubul] [--revision 1] [--font-data 폰트데이터.json]
+ *     npx vite-node scripts/font-check/exportSampleOtf.ts [출력 경로] [--name 꾸불체] [--ascii Kkubul] [--revision 1] [--font-data 폰트데이터.json] [--weight 600]
+ * `--weight 600`은 전역 굵기를 바꾼 뒤 추출한다. 숫자 · 기호는 앱처럼 노토 윤곽을 그 굵기로 넣는다.
  * `--font-data`는 `font_projects.font_data` 값(또는 그 행의 JSON 배열)을 앱처럼 스토어에 적용한 뒤 추출한다.
  *
  * 기본 출력은 `reference-data/font-check/샘플.otf`. 끝에 `validateOpenTypeForIOS` 결과를 찍는다.
@@ -52,12 +53,19 @@ if (fontDataPath) {
   if (!applied.ok) throw new Error(`폰트 데이터 적용 실패: ${applied.error.message}`)
   useLayoutDeltaStore.getState().restore({ rules: applied.data.layoutDelta?.rules ?? {} })
 }
+const weightArg = argValue('--weight')
+const { useGlobalStyleStore } = await import('../../src/stores/globalStyleStore')
+if (weightArg) useGlobalStyleStore.setState((state) => { state.style.weight = Number(weightArg) })
+const { notoLatinSourceOf } = await import('../../src/services/notoLatinSource')
+const { weight, slant, letterSpacing } = useGlobalStyleStore.getState().style
+const notoLatin = JSON.parse(readFileSync(path.join(ROOT, 'src', 'data', 'notoLatin.v1.json'), 'utf8'))
+const latinSource = notoLatinSourceOf(notoLatin, { weight, slant, letterSpacing })
 const model = JSON.parse(readFileSync(path.join(ROOT, 'public', 'noto-preset', 'model.json'), 'utf8'))
 const placementOf = exportStore.placementResolverOf(model, deltaStore.layoutDeltaSnapshot())
 
 const started = performance.now()
 const { EXPORT_SIMPLIFY_EPSILON } = await import('../../src/services/contourSimplify')
-const result = await generateFontBuffer({ familyName, asciiFamilyName, placementOf, revision, simplifyEpsilon: EXPORT_SIMPLIFY_EPSILON })
+const result = await generateFontBuffer({ familyName, asciiFamilyName, placementOf, revision, simplifyEpsilon: EXPORT_SIMPLIFY_EPSILON, coverage: { mode: 'compatibility', latinSource } })
 if (!result.success || !result.bytes) throw new Error(result.error ?? '추출 실패')
 await mkdir(path.dirname(outPath), { recursive: true })
 await writeFile(outPath, Buffer.from(result.bytes))

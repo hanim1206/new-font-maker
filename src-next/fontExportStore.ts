@@ -6,6 +6,9 @@ import { collectFontData } from '../src/services/fontDataBridge'
 import { parallelHangulPortables } from '../src/services/fontExportParallel'
 import { allExportChars } from '../src/services/fontExportUtils'
 import { generateAndDownloadFont } from '../src/services/fontGenerator'
+import type { ExportCoverageOptions } from '../src/services/fontGenerator'
+import { loadNotoLatinData, notoLatinSourceOf } from '../src/services/notoLatinSource'
+import { useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import { DEFAULT_FAMILY_NAME } from '../src/services/fontIdentity'
 import type { PortableHangulGlyph } from '../src/services/fontGenerator'
 import type { OpenTypeValidationReport } from '../src/services/openTypeValidation'
@@ -197,6 +200,20 @@ export const useFontExportStore = create<FontExportState & FontExportActions>()(
   },
 }))
 
+/**
+ * 숫자 · 영문 · 기호는 노토 산스 KR 윤곽을 사용자 굵기 · 기울기 · 자간에 맞춰 넣는다.
+ * 데이터를 못 읽으면 한글만 넣는다 — 그 글자는 기기 기본 글꼴이 대신 그린다(전과 같다).
+ */
+async function latinCoverage(): Promise<ExportCoverageOptions | undefined> {
+  try {
+    const { weight, slant, letterSpacing } = useGlobalStyleStore.getState().style
+    return { mode: 'compatibility', latinSource: notoLatinSourceOf(await loadNotoLatinData(), { weight, slant, letterSpacing }) }
+  } catch (failure) {
+    console.warn('숫자 · 기호 데이터를 읽지 못해 한글만 넣습니다:', failure)
+    return undefined
+  }
+}
+
 /** `confirm`의 본체. 이름 창을 닫고 `exporting`으로 바꾼 뒤 부른다. */
 async function runExport(familyName: string): Promise<void> {
   const set = useFontExportStore.setState
@@ -256,8 +273,10 @@ async function runExport(familyName: string): Promise<void> {
     }
   }
 
+  const coverage = await latinCoverage()
   const result = await generateAndDownloadFont({
     familyName,
+    coverage,
     placementOf,
     revision,
     // 합친 뒤 윤곽 점 줄이기 — 붓·둥글기 폰트의 추출 시간·파일을 줄인다(G0·G1 닫힘).
