@@ -5,7 +5,7 @@
 .head h1 { margin: 0; font-size: var(--font-16); font-weight: var(--weight-heavy); }
 /* 머리 왼쪽 회색 알약 = 지금 폰트 이름 + 꺾쇠. 누르면 내 폰트 시트. 긴 이름은 한 줄에서 `…`. */
 .head .title { flex: 1; min-width: 0; display: flex; margin-left: -8px; }
-.head .switcher { max-width: 100%; min-height: 36px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px 0 18px; border-radius: var(--radius-full); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: var(--font-16); font-weight: var(--weight-semibold); transition: background-color var(--motion-fast) var(--ease-standard); }
+.head .switcher { max-width: 100%; min-height: 36px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px 0 18px; border-radius: var(--radius-full); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: var(--font-18); font-weight: var(--weight-heavy); transition: background-color var(--motion-fast) var(--ease-standard); }
 .head .switcher span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .head .switcher svg { flex: none; color: rgb(var(--color-text-4)); transition: transform var(--motion-normal) var(--ease-standard); }
 .head .switcher svg[data-open] { transform: rotate(180deg); }

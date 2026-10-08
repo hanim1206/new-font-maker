@@ -56,10 +56,9 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
     <div className={styles.shell} data-testid={`legal-${kind}`}>
       <header className={styles.bar}>
         <Button variant="plain" size="icon-lg" aria-label="뒤로" onClick={goBack}><ChevronLeft aria-hidden="true" /></Button>
+        <h1>{doc.title}</h1>
       </header>
       <article className={styles.body}>
-        <h1>{doc.title}</h1>
-        <p className={styles.sub}>한글칸글</p>
         {blocks.map((block, index) => <Block key={index} block={block} />)}
         <div className={styles.band} />
         <a className={styles.other} href={`/${doc.other}`}>{doc.otherTitle} 보기</a>
