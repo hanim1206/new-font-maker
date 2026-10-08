@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import { instanceInJamo, masterFromStroke } from '../services/stemMaster'
 import type { JamoData, StrokeDataV2 } from '../types'
-import { mergeStrokes, splitStroke } from './strokeEditUtils'
+import { mergeStrokes, splitStroke, withUniqueIds } from './strokeEditUtils'
 
 const strokeById = (jamo: JamoData, id: string) => jamo.strokes!.find((stroke) => stroke.id === id)!
 
@@ -34,6 +34,25 @@ describe('splitStroke', () => {
     secondJunction.handleOut!.x += 0.1
     expect(firstJunction.x).toBe(0.5)
     expect(firstJunction.handleOut?.x).toBe(0.6)
+  })
+})
+
+describe('splitStroke id', () => {
+  const line = (id: string, count: number): StrokeDataV2 => ({ id, points: Array.from({ length: count }, (_, index) => ({ x: index / (count - 1), y: .5 })), closed: false, thickness: .07 })
+
+  it('같은 획을 두 번 끊어도 새 획 id가 겹치지 않는다 (10-08 ㅁ 버그)', () => {
+    const [first, second] = splitStroke(line('ㅁ-1', 5), 2, ['ㅁ-1'])!
+    expect([first.id, second.id]).toEqual(['ㅁ-1', 'ㅁ-1-b'])
+    const [again, third] = splitStroke(first, 1, [first.id, second.id])!
+    expect(new Set([again.id, second.id, third.id]).size).toBe(3)
+  })
+
+  it('겹친 id는 뒤에 나온 것만 새 id로 바꾸고, 겹친 것이 없으면 같은 배열을 돌려준다', () => {
+    const strokes = [line('a', 2), line('a-b', 2), line('a-b', 2)]
+    const [fixed] = withUniqueIds([strokes])
+    expect(fixed!.map((stroke) => stroke.id)).toEqual(['a', 'a-b', 'a-b-2'])
+    const [same] = withUniqueIds([fixed])
+    expect(same).toBe(fixed)
   })
 })
 
