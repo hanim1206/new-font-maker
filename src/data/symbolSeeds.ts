@@ -1,4 +1,5 @@
 import type { StrokeDataV2, SymbolGlyph } from '../types'
+import { FITTED_SYMBOL_SEEDS } from './symbolSeedsFitted'
 
 /**
  * 숫자 · 기호 씨앗 획. 편집기가 기호를 처음 열 때 채워 준다(저장은 고친 뒤에만).
@@ -38,7 +39,7 @@ function dot(id: string, cx: number, cy: number, r: number): StrokeDataV2 {
   return { id, points: [{ x: cx, y: cy - half }, { x: cx, y: cy + half }], closed: false, thickness: r * 2, linecap: 'round' }
 }
 
-const SEEDS: Record<string, StrokeDataV2[]> = {
+const HAND_SEEDS: Record<string, StrokeDataV2[]> = {
   // 노토 0: 바깥 50–506 × −13–746, 안 138–418 × 61–674(폭 555).
   '0': [ring('0-ring', 0.5, 0.513, 0.332, 0.343, 0.6)],
   // 노토 1: 줄기 252–343, 깃 121→273(위 733), 발 88–490(아래 0–76).
@@ -77,6 +78,9 @@ const SEEDS: Record<string, StrokeDataV2[]> = {
     },
   ],
 }
+
+/** 손으로 맞춘 넷(`0 1 ? ,`) + 나머지는 노토 중심선에 자동으로 맞춘 씨앗(`symbolSeedsFitted.ts`). */
+const SEEDS: Record<string, StrokeDataV2[]> = { ...FITTED_SYMBOL_SEEDS, ...HAND_SEEDS }
 
 /** 씨앗이 있으면 그 사본, 없으면 빈 획. */
 export function symbolSeedOf(char: string): SymbolGlyph {
