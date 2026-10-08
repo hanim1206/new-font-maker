@@ -34,7 +34,7 @@ import { PART_COLOR, PART_LABEL } from './partColors'
 import { randomSampleSentence, SAMPLE_SENTENCES } from './sampleSentences'
 import { getBaseJamo, useJamoStore } from '../src/stores/jamoStore'
 import { useWorkbenchStore, workbenchJamoOf, workbenchSyllable } from '../src/stores/workbenchStore'
-import { groupMatching, useJamoGroupStore } from '../src/stores/jamoGroupStore'
+import { groupMatching, groupStemBeakFor, useJamoGroupStore } from '../src/stores/jamoGroupStore'
 import confirmStyles from './workspace/FontExportDialog.module.css'
 import { mergeLayoutPadding, mergePadding, useLayoutStore } from '../src/stores/layoutStore'
 import { hangulAdvance as fontMetricsAdvance, hangulLeftBearing, SPACE_ADVANCE } from '../src/services/fontMetrics'
@@ -113,9 +113,9 @@ import { wholeOutlineRegion } from './wholeOutlineRegion'
 import { StemBeakControls } from './StemBeakControls'
 import { designBodyAxis, designBodySvgTransform, REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../src/services/designBodyPlacement'
 import { withBodyCompensation } from '../src/services/bodyCompensation'
-import { stemScaleOf } from '../src/services/strokeRenderGeometry'
+import { stemScaleOf, verticalWidthFactorOf } from '../src/services/strokeRenderGeometry'
 import { endRangeDrag, moveRangeDrag, startRangeDrag } from './rangeDrag'
-import { DEFAULT_STEM_BEAK, type StemBeakStyle } from '../src/services/stemBeak'
+import { DEFAULT_STEM_BEAK, stemBeakInkGroups, type StemBeakStyle } from '../src/services/stemBeak'
 import styleMode from './GlobalStyleMode.module.css'
 import { EDIT_COLOR } from './editColors'
 import { Button } from './components/ui/button'
@@ -549,7 +549,7 @@ function Glyph({
  * 펜 층. 이번에 그은 획 · 긋는 중인 선 · 입력 판을 SvgRenderer 안(기울기 변환 안쪽)에 그린다.
  * 화면 → 자모 상자는 판의 화면 변환을 거꾸로 돌려 얻는다 — 글자가 기울어도 맞는다.
  */
-function PenLayer({ pen, box, fresh, viewport, weightMultiplier, globalLinecap, globalLinejoin, miterLimit, strokeStyle, onTap }: { pen: PenCanvas; box: BoxConfig; fresh: readonly { stroke: StrokeDataV2; box: BoxConfig }[]; viewport: BoxConfig; weightMultiplier: number; globalLinecap?: StrokeLinecap; globalLinejoin?: StrokeLinejoin; miterLimit: number; strokeStyle?: StrokeRenderStyle; onTap: (clientX: number, clientY: number) => void }) {
+function PenLayer({ pen, box, fresh, freshBeaks, viewport, weightMultiplier, globalLinecap, globalLinejoin, miterLimit, strokeStyle, onTap }: { pen: PenCanvas; box: BoxConfig; fresh: readonly { stroke: StrokeDataV2; box: BoxConfig }[]; freshBeaks: ReadonlyMap<string, readonly string[]>; viewport: BoxConfig; weightMultiplier: number; globalLinecap?: StrokeLinecap; globalLinejoin?: StrokeLinejoin; miterLimit: number; strokeStyle?: StrokeRenderStyle; onTap: (clientX: number, clientY: number) => void }) {
   const surfaceRef = useRef<SVGRectElement>(null)
   /** 누른 자리와 거기서 가장 멀리 간 거리(화면 px). 톡 누르기인지 가른다. */
   const press = useRef({ x: 0, y: 0, travel: 0 })
@@ -643,12 +643,18 @@ function PenLayer({ pen, box, fresh, viewport, weightMultiplier, globalLinecap, 
     {fresh.map((item) => {
       // 방금 그은 획도 캔버스 잉크와 같은 면 그리기로 — 저장된 모양(레이아웃 · 추출)과 한 그림이다. 면을 못 만들면 선으로.
       const made = centerlineInkGroups({ id: item.stroke.id, stroke: item.stroke, box: item.box, weightMultiplier, effectiveLinecap: item.stroke.linecap ?? globalLinecap ?? 'butt', effectiveLinejoin: item.stroke.linejoin ?? globalLinejoin ?? 'miter' }, strokeStyle ?? PEN_FILLED_STYLE)
+      // 부리도 같이 덧그린다. 아래 옅은 자소 잉크에는 이 획의 부리가 그려져 있어, 빠뜨리면 회색 잔상으로 남는다(10-08 ㅂ 버그).
+      const beaks = (freshBeaks.get(item.stroke.id) ?? []).map((path, index) => <path key={`beak-${index}`} d={path} fill={EDIT_COLOR.foreground} data-stem-beak="true" />)
       return made.ok && made.groups.length > 0
         // 조각마다 `<path>` 하나 — 한 path에 합쳐 evenodd로 칠하면 겹친 조각(급꺾임 · 자기 교차 때 사각형 + 동그라미)이 서로 뚫린다(SvgRenderer와 같은 방식).
         ? <g key={item.stroke.id} pointerEvents="none" data-testid="pen-fresh">
           {brushInkGroupsToSvgPaths(made.groups, VIEW_BOX_SIZE).map((path, index) => <path key={index} d={path} fill={EDIT_COLOR.foreground} fillRule="evenodd" />)}
+          {beaks}
         </g>
-        : <path key={item.stroke.id} d={pointsToSvgD(item.stroke.points, item.stroke.closed, item.box, VIEW_BOX_SIZE)} {...inkStyle(item.stroke)} data-testid="pen-fresh" />
+        : <g key={item.stroke.id} pointerEvents="none" data-testid="pen-fresh">
+          <path d={pointsToSvgD(item.stroke.points, item.stroke.closed, item.box, VIEW_BOX_SIZE)} {...inkStyle(item.stroke)} />
+          {beaks}
+        </g>
     })}
     {live && <path d={pathOf(live)} {...inkStyle(pen.sample)} strokeLinejoin="round" data-testid="pen-live" />}
     {/* 글자가 기울어도 판이 칸 모서리를 덮도록 보기 창보다 넉넉히 깐다. */}
@@ -730,6 +736,21 @@ function FocusedGlyph({
     onSelect({ kind: 'stroke', component: componentFor(char, target.editorPart, target.jamo), editorPart: target.editorPart, renderPart: target.renderPart, jamo: target.jamo, strokeId: target.stroke.id, box: target.box })
   }
   const penWeight = weightToMultiplier(globalStyle.weight)
+  // 방금 그은 획의 부리. 그리기(`SvgRenderer`)와 같은 함수 · 같은 값(전역 부리, 묶음 부리가 있으면 그것)으로 만든다.
+  const beakGroups = useJamoGroupStore((state) => state.groups)
+  const beakPreview = useJamoGroupStore((state) => state.previewBeak)
+  const penFreshBeaks = useMemo(() => {
+    if (penFresh.length === 0) return new Map<string, string[]>()
+    const sources = targets.filter((target) => target.editorPart === lockedPart)
+    const groups = stemBeakInkGroups(sources.map((target) => ({
+      stroke: target.stroke,
+      box: target.box,
+      weightMultiplier: penWeight * verticalWidthFactorOf(globalStyle.strokeStyle),
+      group: target.renderPart,
+      style: groupStemBeakFor(beakGroups, target.jamo.type, target.jamo.char, beakPreview),
+    })), globalStyle.stemBeak, globalStyle.strokeStyle)
+    return new Map(sources.map((target, index) => [target.stroke.id, brushInkGroupsToSvgPaths(groups[index], VIEW_BOX_SIZE)]))
+  }, [penFresh, targets, lockedPart, penWeight, globalStyle.strokeStyle, globalStyle.stemBeak, beakGroups, beakPreview])
   // 고른 홀자 줄기의 보선과 끝 표시. 세로로 끌면 저장 획이 아니라 보선이 움직인다 — 안쪽 보선은 레이아웃 편집처럼 칸 밖까지 길게 그린다.
   // 끝 표시: 보선에 매인 끝은 막대(보선 따라 세로로 미끄러짐), 칸 테두리에 매인 끝은 찬 점(획 편집에선 세로로 잠김). 테두리 보선은 길게 안 그린다 — 찬 점이 잠김을 말하고, 칸 변은 부품 상자로 보인다.
   const stemGuides = useMemo(() => {
@@ -1160,7 +1181,7 @@ function FocusedGlyph({
             {wholeJamoCentered.y && <line x1={-8} x2={108} y1={cy} y2={cy} className={styles.snapHitLine} data-testid="whole-jamo-center" data-axis="y" />}
           </>
         })()}
-        {pen && penBox && <PenLayer pen={pen} box={penBox} fresh={penFresh} viewport={viewport} weightMultiplier={penWeight} globalLinecap={globalStyle.linecap} globalLinejoin={globalStyle.linejoin} miterLimit={miterLimitOf(globalStyle.strokeStyle)} strokeStyle={globalStyle.strokeStyle} onTap={pickUnderPen} />}
+        {pen && penBox && <PenLayer pen={pen} box={penBox} fresh={penFresh} freshBeaks={penFreshBeaks} viewport={viewport} weightMultiplier={penWeight} globalLinecap={globalStyle.linecap} globalLinejoin={globalStyle.linejoin} miterLimit={miterLimitOf(globalStyle.strokeStyle)} strokeStyle={globalStyle.strokeStyle} onTap={pickUnderPen} />}
         {/* 펜 중에 고른 획(묶음)의 중심선. 방금 그은 획의 잉크는 펜 층이 그리므로 그 위에 얹어야 보인다. 눌림은 안 받는다. */}
         {penBox && <g className={styles.strokeTarget} style={{ '--selection-color': SELECTION_COLOR } as CSSProperties} pointerEvents="none">
           {targets.filter((target) => (!lockedPart || target.editorPart === lockedPart) && (selectedStrokeId === target.stroke.id || (selectedStrokes.length > 1 && selectedStrokes.includes(target.stroke.id))))
