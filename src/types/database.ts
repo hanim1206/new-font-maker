@@ -10,6 +10,7 @@ import type {
   StrokeLinecap,
   StrokeLinejoin,
   StrokeRenderStyle,
+  SymbolGlyph,
 } from './index'
 import type { ContextBoxDelta } from '../services/contextBoxResolver'
 
@@ -40,7 +41,8 @@ export interface FontGlobalStyleExclusion {
 export const LEGACY_FONT_DATA_VERSION = '1.2.0' as const
 export const FONT_DATA_V1_3_VERSION = '1.3.0' as const
 export const FONT_DATA_V1_4_VERSION = '1.4.0' as const
-export const FONT_DATA_VERSION = '1.5.0' as const
+export const FONT_DATA_V1_5_VERSION = '1.5.0' as const
+export const FONT_DATA_VERSION = '1.6.0' as const
 
 /**
  * 폰트가 어느 기본 폰트에서 시작했는지. 저장 칸과 화면에는 우리 이름만 쓴다.
@@ -94,6 +96,13 @@ export interface FontDataV1_4 extends FontDataPayload {
   shapeSystem?: DeepReadonly<ShapeSystemSourceV2>
 }
 
+export interface FontDataV1_5 extends FontDataPayload {
+  version: typeof FONT_DATA_V1_5_VERSION
+  shapeSystem?: DeepReadonly<ShapeSystemSourceV2>
+  layoutDelta?: FontLayoutDelta
+  preset?: FontPresetId
+}
+
 export interface FontData extends FontDataPayload {
   version: typeof FONT_DATA_VERSION
   /** Shape v2 raw source만 저장하며 resolved grid/box/윤곽/provenance/history는 저장하지 않는다. */
@@ -102,9 +111,11 @@ export interface FontData extends FontDataPayload {
   layoutDelta?: FontLayoutDelta
   /** 시작한 기본 폰트. 없으면(1.4 이하) `basic-gothic`으로 읽는다. */
   preset?: FontPresetId
+  /** 획으로 만든 숫자 · 기호(글자 → 획). 없거나 빠진 글자는 노토 윤곽. 1.6부터. */
+  symbols?: Record<string, SymbolGlyph>
 }
 
-export type PersistedFontData = FontDataV1_2 | FontDataV1_3 | FontDataV1_4 | FontData
+export type PersistedFontData = FontDataV1_2 | FontDataV1_3 | FontDataV1_4 | FontDataV1_5 | FontData
 
 // ===== font_projects 테이블 Row =====
 export interface FontProject {

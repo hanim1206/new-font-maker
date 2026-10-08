@@ -7,6 +7,7 @@
 import { flushLayoutStorePersistence, useLayoutStore } from '../stores/layoutStore'
 import { flushJamoStorePersistence, useJamoStore } from '../stores/jamoStore'
 import { useGlobalStyleStore } from '../stores/globalStyleStore'
+import { flushSymbolStorePersistence, useSymbolStore } from '../stores/symbolStore'
 import { useHistoryStore } from '../stores/historyStore'
 import { useEditorHistoryStore } from '../stores/editorHistoryStore'
 import {
@@ -40,6 +41,7 @@ function flushDebouncedFontStores(): void {
   flushLayoutStorePersistence()
   flushJamoStorePersistence()
   flushShapeSystemStorePersistence()
+  flushSymbolStorePersistence()
 }
 
 /**
@@ -72,6 +74,9 @@ export function collectFontData(): FontData {
     },
   }
   if (shapeSystem.source) data.shapeSystem = structuredClone(shapeSystem.source)
+  // 획으로 만든 숫자 · 기호. 하나도 없으면 칸을 두지 않는다(전부 노토).
+  const symbols = useSymbolStore.getState().symbols
+  if (Object.keys(symbols).length > 0) data.symbols = structuredClone(symbols)
   const parsed = parseAndMigrateFontData(data)
   if (!parsed.ok) {
     throw new Error(`현재 FontData를 저장 계약으로 직렬화할 수 없습니다: ${parsed.issues.map(({ path, code }) => `${path}:${code}`).join(', ')}`)
@@ -134,6 +139,7 @@ export function applyFontData(value: unknown): FontDataApplyResult {
     past: shapeState.past,
     future: shapeState.future,
   })
+  const symbolsBefore = structuredClone(useSymbolStore.getState().symbols)
   const historyState = useHistoryStore.getState()
   const historyBefore = structuredClone({
     undoStack: historyState.undoStack,
@@ -165,6 +171,8 @@ export function applyFontData(value: unknown): FontDataApplyResult {
       style: fontData.globalStyle.style,
       exclusions: fontData.globalStyle.exclusions,
     })
+
+    useSymbolStore.getState().loadFontData(fontData.symbols)
 
     const shapeResult = loadShapeSystemFromFontData(fontData.shapeSystem ?? null)
     if (!shapeResult.ok) throw new Error(shapeResult.error.message)
@@ -202,6 +210,7 @@ export function applyFontData(value: unknown): FontDataApplyResult {
         past: shapeBefore.past,
         future: shapeBefore.future,
       })],
+      ['symbolStore', () => useSymbolStore.setState({ symbols: symbolsBefore })],
       ['historyStore', () => useHistoryStore.setState(historyBefore)],
       ['editorHistoryStore', () => useEditorHistoryStore.setState(editorHistoryBefore)],
       // 앞서 durable write가 일부 성공했더라도 복원된 before 값을 즉시 다시 기록한다.

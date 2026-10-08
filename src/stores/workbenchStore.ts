@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../data/Hangul'
+import { SYMBOL_LIST } from '../data/symbols'
 
 /**
  * 도마. 편집기로 들고 들어가는 자소 묶음 — 폰트당 하나, 이름 없음.
@@ -10,7 +11,8 @@ import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../data/Hangul'
  * 플랜: docs/plans/2026-09-26_섹션-홈과-도마.md
  */
 
-export type WorkbenchJamoType = 'choseong' | 'jungseong' | 'jongseong'
+/** `symbol`은 숫자 · 기호(자소가 아니다). 편집기에서 기호 하나를 그대로 연다. */
+export type WorkbenchJamoType = 'choseong' | 'jungseong' | 'jongseong' | 'symbol'
 
 interface WorkbenchState {
   type: WorkbenchJamoType | null
@@ -34,15 +36,16 @@ interface WorkbenchActions {
   clear: () => void
 }
 
-const LISTS: Record<WorkbenchJamoType, readonly string[]> = { choseong: CHOSEONG_LIST, jungseong: JUNGSEONG_LIST, jongseong: JONGSEONG_LIST }
+const LISTS: Record<WorkbenchJamoType, readonly string[]> = { choseong: CHOSEONG_LIST, jungseong: JUNGSEONG_LIST, jongseong: JONGSEONG_LIST, symbol: SYMBOL_LIST }
 
 function sorted(type: WorkbenchJamoType, chars: Iterable<string>): string[] {
   const list = LISTS[type]
   return [...new Set(chars)].filter((char) => list.includes(char)).sort((a, b) => list.indexOf(a) - list.indexOf(b))
 }
 
-/** 자소 하나를 편집기에서 열 대표 글자. 초성은 ㅏ와, 홀자는 ㅇ 아래, 받침은 `아` 밑에. */
+/** 자소 하나를 편집기에서 열 대표 글자. 초성은 ㅏ와, 홀자는 ㅇ 아래, 받침은 `아` 밑에. 기호는 그 기호 그대로. */
 export function workbenchSyllable(type: WorkbenchJamoType, char: string): string {
+  if (type === 'symbol') return char
   const cho = type === 'choseong' ? CHOSEONG_LIST.indexOf(char as (typeof CHOSEONG_LIST)[number]) : CHOSEONG_LIST.indexOf('ㅇ')
   const jung = type === 'jungseong' ? JUNGSEONG_LIST.indexOf(char as (typeof JUNGSEONG_LIST)[number]) : JUNGSEONG_LIST.indexOf('ㅏ')
   const jong = type === 'jongseong' ? JONGSEONG_LIST.indexOf(char as (typeof JONGSEONG_LIST)[number]) : 0
@@ -53,7 +56,7 @@ export function workbenchSyllable(type: WorkbenchJamoType, char: string): string
 /** 글자에서 도마 종류의 자소를 꺼낸다. 완성형이 아니면 글자 그대로(자소 단독). */
 export function workbenchJamoOf(type: WorkbenchJamoType, char: string): string | null {
   const code = char.codePointAt(0) ?? 0
-  if (code < 0xac00 || code > 0xd7a3) return LISTS[type].includes(char) ? char : null
+  if (type === 'symbol' || code < 0xac00 || code > 0xd7a3) return LISTS[type].includes(char) ? char : null
   const index = code - 0xac00
   if (type === 'choseong') return CHOSEONG_LIST[Math.floor(index / (21 * 28))]
   if (type === 'jungseong') return JUNGSEONG_LIST[Math.floor((index % (21 * 28)) / 28)]

@@ -56,10 +56,12 @@ if (fontDataPath) {
 const weightArg = argValue('--weight')
 const { useGlobalStyleStore } = await import('../../src/stores/globalStyleStore')
 if (weightArg) useGlobalStyleStore.setState((state) => { state.style.weight = Number(weightArg) })
-const { notoLatinSourceOf } = await import('../../src/services/notoLatinSource')
-const { weight, slant, letterSpacing } = useGlobalStyleStore.getState().style
+const [{ symbolLatinSourceOf }, { useSymbolStore }] = await Promise.all([
+  import('../../src/services/symbolGlyph'),
+  import('../../src/stores/symbolStore'),
+])
 const notoLatin = JSON.parse(readFileSync(path.join(ROOT, 'src', 'data', 'notoLatin.v1.json'), 'utf8'))
-const latinSource = notoLatinSourceOf(notoLatin, { weight, slant, letterSpacing })
+const latinSource = symbolLatinSourceOf(notoLatin, useGlobalStyleStore.getState().style, useSymbolStore.getState().symbols)
 const model = JSON.parse(readFileSync(path.join(ROOT, 'public', 'noto-preset', 'model.json'), 'utf8'))
 const placementOf = exportStore.placementResolverOf(model, deltaStore.layoutDeltaSnapshot())
 

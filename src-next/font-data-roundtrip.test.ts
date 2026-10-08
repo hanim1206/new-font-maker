@@ -163,7 +163,7 @@ describe('FontData 레이아웃 저장 계약', () => {
 
     const serialized = JSON.stringify(collectFontData())
     const parsed = JSON.parse(serialized) as FontData
-    expect(parsed.version).toBe('1.5.0')
+    expect(parsed.version).toBe('1.6.0')
 
     applyFontData(parsed)
     const roundTripped = collectFontData()
@@ -221,7 +221,7 @@ describe('FontData 레이아웃 저장 계약', () => {
     ])
   })
 
-  it('1.2 payload를 기존 필드 손실 없이 1.5로 한 번만 이관한다', () => {
+  it('1.2 payload를 기존 필드 손실 없이 1.6으로 한 번만 이관한다', () => {
     const legacy = structuredClone(originalFontData) as unknown as FontDataV1_2
     legacy.version = '1.2.0'
     const before = structuredClone(legacy)
@@ -229,14 +229,14 @@ describe('FontData 레이아웃 저장 계약', () => {
     expect(first.ok).toBe(true)
     if (!first.ok) return
     expect(first.migratedFrom).toBe('1.2.0')
-    expect(first.data.version).toBe('1.5.0')
+    expect(first.data.version).toBe('1.6.0')
     expect(first.data).not.toHaveProperty('shapeSystem')
     expect({ ...first.data, version: '1.2.0' }).toEqual(legacy)
     expect(legacy).toEqual(before)
     expect(parseAndMigrateFontData(first.data)).toEqual({ ok: true, data: first.data })
   })
 
-  it('1.3 Shape v1을 1.5 Shape v2의 명시적 null/null 상태로 이관한다', () => {
+  it('1.3 Shape v1을 1.6 Shape v2의 명시적 null/null 상태로 이관한다', () => {
     const legacy = structuredClone(originalFontData) as unknown as FontDataV1_3
     legacy.version = '1.3.0'
     legacy.shapeSystem = shapeEnvelopeV1()
@@ -245,7 +245,7 @@ describe('FontData 레이아웃 저장 계약', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.migratedFrom).toBe('1.3.0')
-    expect(result.data.version).toBe('1.5.0')
+    expect(result.data.version).toBe('1.6.0')
     expect(result.data.shapeSystem?.version).toBe(2)
     expect(result.data.shapeSystem?.layoutGridSystem).toBeNull()
     expect(result.data.shapeSystem?.contextPresetCatalog).toBeNull()
@@ -696,5 +696,43 @@ describe('FontData 레이아웃 저장 계약', () => {
     for (const forbidden of ['past', 'future', 'provenance', 'resolvedPartGrid', 'InkRegion']) {
       expect(serialized).not.toContain(`"${forbidden}"`)
     }
+  })
+})
+
+describe('FontData 1.6 숫자 · 기호(symbols)', () => {
+  const ZERO = { char: '0', strokes: [{ id: '0-ring', points: [{ x: 0.5, y: 0.17 }, { x: 0.85, y: 0.5 }, { x: 0.5, y: 0.86 }, { x: 0.15, y: 0.5 }], closed: true, thickness: 0.07 }] }
+
+  it('획으로 만든 기호만 저장하고, 왕복 뒤 그대로 돌아온다. 없는 폰트를 열면 비운다', async () => {
+    const { useSymbolStore } = await import('../src/stores/symbolStore')
+    expect(collectFontData()).not.toHaveProperty('symbols')
+    useSymbolStore.getState().setStrokes('0', ZERO.strokes)
+    const saved = JSON.parse(JSON.stringify(collectFontData())) as FontData
+    expect(saved.symbols).toEqual({ '0': ZERO })
+
+    applyFontData(cloneFontData(originalFontData))
+    expect(useSymbolStore.getState().symbols).toEqual({})
+    expect(applyFontData(saved).ok).toBe(true)
+    expect(useSymbolStore.getState().symbols).toEqual({ '0': ZERO })
+    useSymbolStore.getState().resetSymbol('0')
+  })
+
+  it('1.5 payload(layoutDelta · preset)를 그대로 1.6으로 올린다', () => {
+    const v15 = { ...structuredClone(originalFontData), version: '1.5.0', layoutDelta: { rules: {} }, preset: 'basic-gothic' }
+    const result = parseAndMigrateFontData(v15)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.migratedFrom).toBe('1.5.0')
+    expect(result.data.version).toBe('1.6.0')
+    expect(result.data.layoutDelta).toEqual({ rules: {} })
+    expect(result.data).not.toHaveProperty('symbols')
+  })
+
+  it('1.5에는 symbols가 없고, 1.6의 잘못된 기호는 막는다', () => {
+    const base = structuredClone(originalFontData) as unknown as Record<string, unknown>
+    expect(parseAndMigrateFontData({ ...base, version: '1.5.0', symbols: { '0': ZERO } }).ok).toBe(false)
+    expect(parseAndMigrateFontData({ ...base, symbols: { '0': ZERO } }).ok).toBe(true)
+    expect(parseAndMigrateFontData({ ...base, symbols: { '가': { ...ZERO, char: '가' } } }).ok).toBe(false)
+    expect(parseAndMigrateFontData({ ...base, symbols: { '0': { ...ZERO, char: '1' } } }).ok).toBe(false)
+    expect(parseAndMigrateFontData({ ...base, symbols: { '0': { char: '0', strokes: [{ id: 'x' }] } } }).ok).toBe(false)
   })
 })
