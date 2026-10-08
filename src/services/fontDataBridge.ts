@@ -16,6 +16,7 @@ import {
 } from '../stores/shapeSystemStore'
 import type { FontData } from '../types/database'
 import { FONT_DATA_VERSION } from '../types/database'
+import { withUniqueStrokeIdsInFontData } from '../utils/strokeIdRepair'
 import { parseAndMigrateFontData } from './fontDataMigration'
 
 export type FontDataApplyResult =
@@ -84,7 +85,8 @@ export function collectFontData(): FontData {
  * 각 스토어의 loadFontData 액션을 호출하여 파생값 재계산 포함
  */
 export function applyFontData(value: unknown): FontDataApplyResult {
-  const parsed = parseAndMigrateFontData(value)
+  // 옛 `끊기`로 획 id가 겹친 채 저장된 폰트도 연다(겹친 쪽에 새 id). 저장 계약은 그대로 겹침을 막는다.
+  const parsed = parseAndMigrateFontData(withUniqueStrokeIdsInFontData(value))
   if (!parsed.ok) {
     return {
       ok: false,

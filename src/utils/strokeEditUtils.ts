@@ -67,13 +67,45 @@ function reversedPoints(points: AnchorPoint[]): AnchorPoint[] {
   }))
 }
 
+/** `wanted`가 비었으면 그대로, 아니면 `-2` `-3` …을 붙여 `taken`에 없는 id를 돌려준다. */
+export function uniqueStrokeId(wanted: string, taken: ReadonlySet<string>): string {
+  if (!taken.has(wanted)) return wanted
+  let index = 2
+  while (taken.has(`${wanted}-${index}`)) index += 1
+  return `${wanted}-${index}`
+}
+
+/**
+ * 획 묶음들에서 겹친 id를 뒤에 나온 쪽부터 새 id로 바꾼다. 묶음들은 한 자모의 획으로 함께 센다(기본 · 가로부 · 세로부).
+ * 겹친 것이 없으면 같은 배열을 그대로 돌려준다.
+ */
+export function withUniqueIds<T extends { id: string }>(groups: ReadonlyArray<readonly T[] | undefined>): Array<T[] | undefined> {
+  const seen = new Set<string>()
+  const all = new Set(groups.flatMap((group) => group?.map((item) => item.id) ?? []))
+  return groups.map((group) => {
+    if (!group) return group
+    let changed = false
+    const next = group.map((item) => {
+      if (!seen.has(item.id)) { seen.add(item.id); return item }
+      const id = uniqueStrokeId(item.id, new Set([...all, ...seen]))
+      seen.add(id)
+      changed = true
+      return { ...item, id }
+    })
+    return changed ? next : (group as T[])
+  })
+}
+
 /**
  * 획을 선택한 포인트에서 분리합니다.
  * 선택한 포인트가 양쪽 stroke에 모두 포함됩니다.
  *
+ * 뒤쪽 획 id는 `takenIds`(같은 자모의 다른 획 id)와 겹치지 않게 짓는다. 같은 획을 두 번 끊으면 `-b`가 둘이 되어
+ * 한 획을 끌면 다른 획도 같이 움직이고, 화면에 획이 겹쳐 늘어난다(10-08 ㅁ 끊기 버그).
+ *
  * @returns [앞쪽 stroke, 뒤쪽 stroke] 또는 분리 불가 시 null
  */
-export function splitStroke(stroke: StrokeDataV2, pointIndex: number): [StrokeDataV2, StrokeDataV2] | null {
+export function splitStroke(stroke: StrokeDataV2, pointIndex: number, takenIds: Iterable<string> = []): [StrokeDataV2, StrokeDataV2] | null {
   if (stroke.closed) return null
   if (pointIndex <= 0 || pointIndex >= stroke.points.length - 1) return null
 
@@ -91,7 +123,7 @@ export function splitStroke(stroke: StrokeDataV2, pointIndex: number): [StrokeDa
   }
 
   const strokeB: StrokeDataV2 = {
-    id: `${stroke.id}-b`,
+    id: uniqueStrokeId(`${stroke.id}-b`, new Set([...takenIds, stroke.id])),
     points: secondHalf,
     closed: false,
     thickness: stroke.thickness,

@@ -1768,7 +1768,7 @@ function InferenceTrackpad({
       onSelectionChange({ ...selection, kind: 'point', pointIndex: 0, jamo: after })
       return
     }
-    const halves = splitStroke(selectedStroke, selection.pointIndex)
+    const halves = splitStroke(selectedStroke, selection.pointIndex, getJamoStrokes(before).map((stroke) => stroke.id))
     if (!halves) return
     const [first, second] = halves
     const after = addJamoStroke(updateJamoStroke(before, selectedStroke.id, () => first), selectedStroke.id, second)
