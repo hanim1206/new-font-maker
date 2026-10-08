@@ -5,7 +5,7 @@
 .head h1 { margin: 0; font-size: var(--font-16); font-weight: var(--weight-heavy); }
 /* 머리 왼쪽 회색 알약 = 지금 폰트 이름 + 꺾쇠. 누르면 내 폰트 시트. 긴 이름은 한 줄에서 `…`. */
 .head .title { flex: 1; min-width: 0; display: flex; margin-left: -8px; }
-.head .switcher { max-width: 100%; min-height: 36px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px 0 18px; border-radius: var(--radius-full); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: var(--font-16); font-weight: var(--weight-semibold); transition: background-color var(--motion-fast) var(--ease-standard); }
+.head .switcher { max-width: 100%; min-height: 36px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px 0 18px; border-radius: var(--radius-full); background: rgb(var(--color-surface-2)); color: rgb(var(--color-foreground)); font-size: var(--font-18); font-weight: var(--weight-heavy); transition: background-color var(--motion-fast) var(--ease-standard); }
 .head .switcher span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .head .switcher svg { flex: none; color: rgb(var(--color-text-4)); transition: transform var(--motion-normal) var(--ease-standard); }
 .head .switcher svg[data-open] { transform: rotate(180deg); }
@@ -115,7 +115,8 @@
 .sectionHead svg { margin-left: auto; color: rgb(var(--color-text-5)); }
 
 /* 스타일 타일 넷. 글자 하나에 값 하나. */
-.tiles { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+/* 타일 수는 열린 스타일에 따라 바뀐다(부리 잠금 · 10-07). 몇 장이든 한 줄을 나눠 쓴다. */
+.tiles { margin: 0; padding: 0; list-style: none; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
 .tiles li { display: flex; }
 /* 칸 전체가 버튼. 값 옆 `›`로 누를 수 있다는 걸 보인다. */
 .tile { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0 8px; border: 0; border-radius: var(--radius-lg); background: rgb(var(--color-surface-2)); color: inherit; font: inherit; cursor: pointer; }

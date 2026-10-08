@@ -40,7 +40,7 @@ const FILL_LIMIT = 8
 const BOX_COLOR: Record<PropagationCardBox['kind'], string> = { medial: EDIT_COLOR.editSlotJu, component: EDIT_COLOR.editSlotCh }
 
 // 카드마다 props가 그대로면 다시 그리지 않는다. 획을 끄는 동안 부모가 매 움직임 다시 그려도 카드는 쉰다.
-const TouchedGlyph = memo(function TouchedGlyph({ identity, bundle, edit, ghostVisible, active = false, onPick }: { identity: CorpusIdentity; bundle: NotoPresetModelBundle; edit: PropagationEdit; ghostVisible: boolean; active?: boolean; onPick?: (character: string) => void }) {
+const TouchedGlyph = memo(function TouchedGlyph({ identity, bundle, edit, ghostVisible, active = false, onPick, slant = 0 }: { identity: CorpusIdentity; bundle: NotoPresetModelBundle; edit: PropagationEdit; ghostVisible: boolean; active?: boolean; onPick?: (character: string) => void; slant?: number }) {
   const { glyph, error } = useNotoGlyph(identity.codepoint)
   const layoutType = layoutTypeOfSyllable(identity.medialJamo, identity.finalJamo !== null)
   const inkStyle = useFitInkStyle(layoutType)
@@ -65,9 +65,12 @@ const TouchedGlyph = memo(function TouchedGlyph({ identity, bundle, edit, ghostV
     <Pressable disabled={!onPick || live} aria-current={active || undefined} onClick={() => onPick?.(identity.character)} aria-label={`${identity.character} 열기${note ? `, ${note}` : ''}`} title={note || undefined} data-testid="review-propagation-open">
     <svg viewBox={VIEW_BOX} role="img" aria-label={`${identity.character} 미리보기`}>
       {view?.boxes.map((item, index) => <rect key={index} x={item.box.x} y={item.box.y} width={item.box.width} height={item.box.height} fill={BOX_COLOR[item.kind]} fillOpacity=".12" stroke={BOX_COLOR[item.kind]} strokeOpacity=".5" strokeWidth=".004" />)}
+      {/* 상자는 곧게, 잉크만 기운다 — 획 편집 캔버스 · 렌더러와 같은 가운데 기준 skewX. */}
+      <g transform={slant ? `translate(.5 .5) skewX(${-slant}) translate(-.5 -.5)` : undefined}>
       {ghostVisible && view?.ghost && <path d={view.ghost} transform={view.ghostTransform} fill={EDIT_COLOR.editGhost} fillOpacity=".35" fillRule="evenodd" data-testid="review-propagation-ghost" />}
       {view?.after.map((path, index) => <path key={index} d={path} fill={EDIT_COLOR.foreground} fillRule="evenodd" />)}
       {view?.before.map((path, index) => <path key={`b${index}`} d={path} fill="none" stroke={EDIT_COLOR.editSelect} strokeWidth=".006" strokeDasharray=".012 .008" />)}
+      </g>
     </svg>
     </Pressable>
     {/* 글자 이름은 그림이 이미 말한다. 칸 높이를 문장 줄과 맞추려고 글씨는 화면에서 숨기고 읽기 도구에만 남긴다. */}
@@ -78,7 +81,7 @@ const TouchedGlyph = memo(function TouchedGlyph({ identity, bundle, edit, ghostV
   </figure>
 })
 
-export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, edit, ghostVisible = true, focus, scope, group, jamos, anyContext, rule, activeChar, onPick, lead, onPickLead, splitFamilies, tree }: {
+export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, edit, ghostVisible = true, focus, scope, group, jamos, anyContext, rule, activeChar, onPick, lead, onPickLead, splitFamilies, tree, slant = 0 }: {
   source: CorpusIdentity
   bundle: NotoPresetModelBundle | null
   edit: PropagationEdit
@@ -98,6 +101,8 @@ export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, e
   rule?: ScopeRule
   /** 지금 열린 글자. 줄에 있으면 그 칸을 켠다(획 편집에서 줄을 그대로 두고 누른 칸만 바꿀 때). */
   activeChar?: string
+  /** 잉크 기울기(도). 획 편집 줄만 전역 기울기를 준다. 레이아웃 편집은 보선과 맞게 곧게 둔다(0). */
+  slant?: number
   /** 글자를 누르면 그 글자를 연다. 없으면 보기만 한다. */
   onPick?: (character: string) => void
   /** 줄 맨 앞에 붙박이로 서는 자소 단독 칸(획 편집의 첫닿자 `ㄴ`). 줄을 밀어도 제자리다. */
@@ -147,13 +152,13 @@ export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, e
   return <section className={styles.row} aria-label="닿는 글자" data-testid="touched-glyph-row">
     {lead && <figure className={`${styles.card} ${styles.lead}`} data-active={lead.active || undefined} data-testid="touched-glyph-solo">
       <Pressable aria-current={lead.active || undefined} onClick={onPickLead} aria-label={`${lead.char} 단독으로 열기`}>
-        <span className={styles.leadGlyph}><AppGlyph char={lead.char} size={24} upright /></span>
+        <span className={styles.leadGlyph}><AppGlyph char={lead.char} size={24} /></span>
       </Pressable>
       <figcaption className={styles.caption}><b>{lead.char}</b></figcaption>
     </figure>}
     {/* 범위가 바뀌면 줄을 새로 만들어 맨 앞에서 시작한다. */}
     <div key={rowKey} ref={scroller} className={styles.cards} data-testid="review-propagation-cards" onScroll={(event) => { const el = event.currentTarget; if (el.scrollLeft + el.clientWidth * 2 >= el.scrollWidth) loadNextBatch() }}>
-      {bundle && focus && !chunked && shown.map((identity) => <TouchedGlyph key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} ghostVisible={ghostVisible} active={identity.character === activeChar} onPick={onPick} />)}
+      {bundle && focus && !chunked && shown.map((identity) => <TouchedGlyph key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} ghostVisible={ghostVisible} active={identity.character === activeChar} onPick={onPick} slant={slant} />)}
       {/* 세 덩이는 가는 세로선으로 갈린다. 단독 칸에서 돌아갈 기준 글자(`shown`의 맨 앞)는 첫 덩이 앞에 선다. */}
       {bundle && focus && chunked && chunks.map((chunk, index) => {
         // 들고 온 음절(기준 글자)은 줄 맨 앞이 아니라 제 홀자 계열 덩이의 맨 앞에 선다 — `조`로 들어왔으면 아래 덩이 앞.
@@ -164,7 +169,7 @@ export const TouchedGlyphRow = memo(function TouchedGlyphRow({ source, bundle, e
         return <Fragment key={chunk.family}>
           {index > 0 && <span className={styles.divider} aria-hidden="true" />}
           <div className={styles.chunk} data-family={chunk.family} data-active={active || undefined} data-split={splitFamilies?.includes(chunk.family) || undefined} data-testid="touched-glyph-chunk">
-            {items.map((identity) => <TouchedGlyph key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} ghostVisible={ghostVisible} active={identity.character === activeChar} onPick={onPick} />)}
+            {items.map((identity) => <TouchedGlyph key={identity.codepoint} identity={identity} bundle={bundle} edit={edit} ghostVisible={ghostVisible} active={identity.character === activeChar} onPick={onPick} slant={slant} />)}
           </div>
         </Fragment>
       })}

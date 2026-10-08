@@ -5,6 +5,7 @@ import { useFontExportStore } from './fontExportStore'
 import { SubtitleTemplate } from './SubtitleTemplate'
 import { REFERENCE_HEIGHT, REFERENCE_WIDTH } from '../src/services/designBodyPlacement'
 import { STEM_BEAK_SHAPES } from '../src/services/stemBeak'
+import { LOCKED_STYLE_PANELS } from './stylePanels'
 import { useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import { useLayoutStore } from '../src/stores/layoutStore'
 import styles from './FontWorkspacePage.module.css'
@@ -39,7 +40,7 @@ function StyleSummary() {
       <li>네모꼴 <b>{bodyLabel}</b></li>
       <li>붓 <b>{flatBrush ? '납작' : '일반'}</b></li>
       <li>굵기 <b>{style.weight}</b></li>
-      <li>부리 <b>{beak}</b></li>
+      {!LOCKED_STYLE_PANELS.includes('beak') && <li>부리 <b>{beak}</b></li>}
     </ul>
   </header>
 }

@@ -77,7 +77,7 @@ function LazyCellGlyph({ char }: { char: string }) {
   const swapped = import.meta.env.DEV && notoSwap
   return (
     <>
-      <span style={swapped ? { display: 'none' } : undefined}><AppGlyph char={char} size={CELL_GLYPH_SIZE} upright /></span>
+      <span style={swapped ? { display: 'none' } : undefined}><AppGlyph char={char} size={CELL_GLYPH_SIZE} /></span>
       {swapped && <DevNotoCell char={char} />}
     </>
   )
