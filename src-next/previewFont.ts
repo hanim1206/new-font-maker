@@ -1,5 +1,6 @@
 import { REFERENCE_BODY_PADDING } from '../src/services/designBodyPlacement'
 import { parseAndMigrateFontData } from '../src/services/fontDataMigration'
+import { withUniqueStrokeIdsInFontData } from '../src/utils/strokeIdRepair'
 import { migrateJamoMap } from '../src/utils/strokeMigration'
 import baseJamos from '../src/data/baseJamos.json'
 import { DEFAULT_STYLE, loadedGlobalStyle } from '../src/stores/globalStyleStore'
@@ -29,7 +30,7 @@ export interface PreviewFont {
 }
 
 export function previewFontOf(value: unknown): { ok: true; font: PreviewFont } | { ok: false; message: string } {
-  const parsed = parseAndMigrateFontData(value)
+  const parsed = parseAndMigrateFontData(withUniqueStrokeIdsInFontData(value))
   if (!parsed.ok) return { ok: false, message: parsed.issues.map(({ path, code }) => `${path}:${code}`).join(', ') }
   const data = parsed.data
   return {

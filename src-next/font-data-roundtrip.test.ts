@@ -420,6 +420,18 @@ describe('FontData 레이아웃 저장 계약', () => {
     }
   })
 
+  it('옛 `끊기`로 획 id가 겹친 채 저장된 폰트도 적용할 때 겹친 쪽에 새 id를 주어 연다', () => {
+    const baseStroke = structuredClone(originalFontData.jamoData.choseong['ㄱ'].strokes![0])
+    const broken = cloneFontData(originalFontData)
+    broken.jamoData.choseong['ㄱ'].strokes = [baseStroke, { ...structuredClone(baseStroke), points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] }]
+    const applied = applyFontData(broken)
+    expect(applied.ok).toBe(true)
+    const ids = useJamoStore.getState().choseong['ㄱ'].strokes!.map((stroke) => stroke.id)
+    expect(ids).toEqual([baseStroke.id, `${baseStroke.id}-2`])
+    // 다시 저장하면 계약을 통과한다.
+    expect(parseAndMigrateFontData(collectFontData()).ok).toBe(true)
+  })
+
   it('같은 ID라도 주소 owner가 다르면 1.2 호환 이관을 유지한다', () => {
     const legacy = structuredClone(originalFontData) as unknown as FontDataV1_2
     legacy.version = '1.2.0'
