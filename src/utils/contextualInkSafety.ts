@@ -54,6 +54,41 @@ export function withContextualInkSafety(
   }
 }
 
+const SHAPE_EPSILON = 0.0001
+
+/** 점 · 손잡이가 모두 같은 만큼 옮겨졌는지(획을 통째로 민 것). 하나라도 다르게 움직였으면 모양을 고친 것이다. */
+function movedRigidly(origin: StrokeDataV2, target: StrokeDataV2): boolean {
+  const first = target.points[0]
+  const start = origin.points[0]
+  if (!first || !start) return true
+  const dx = first.x - start.x
+  const dy = first.y - start.y
+  const same = (from: { x: number; y: number } | undefined, to: { x: number; y: number } | undefined) => (
+    !from && !to ? true
+      : !from || !to ? false
+        : Math.abs(to.x - from.x - dx) <= SHAPE_EPSILON && Math.abs(to.y - from.y - dy) <= SHAPE_EPSILON
+  )
+  return target.points.every((point, index) => {
+    const before = origin.points[index]
+    return same(before, point) && same(before.handleIn, point.handleIn) && same(before.handleOut, point.handleOut)
+  })
+}
+
+function reshapedStrokes(origin: StrokeDataV2[] | undefined, target: StrokeDataV2[] | undefined): boolean {
+  if (!origin || !target) return false
+  return target.some((stroke, index) => !movedRigidly(origin[index], stroke))
+}
+
+/**
+ * 획 모양(점 · 곡선)을 고쳤는지. 고친 모양은 사용자가 그린 대로 둔다 — 되당기면 휜 획이 글자마다 펴져
+ * 편집기에서 본 모양과 검수 · 추출이 달라진다(10-13 사용자: 휜 그대로). 통째로 옮기기 · 굵기만 되당긴다.
+ */
+export function hasReshapedInk(origin: JamoInkSafetyOrigin, target: JamoData): boolean {
+  return reshapedStrokes(origin.strokes, target.strokes)
+    || reshapedStrokes(origin.horizontalStrokes, target.horizontalStrokes)
+    || reshapedStrokes(origin.verticalStrokes, target.verticalStrokes)
+}
+
 function interpolateNumber(origin: number, target: number, factor: number): number {
   return origin + (target - origin) * factor
 }
@@ -116,7 +151,7 @@ export interface ContextualInkSafetyResult {
   limitedParts: MobileEditorPart[]
 }
 
-/** 공유 자모 목표를 각 완성 글자의 실제 잉크 여유만큼 적용한다. */
+/** 공유 자모 목표를 각 완성 글자의 실제 잉크 여유만큼 적용한다. 획 모양을 고친 자모는 되당기지 않는다(`hasReshapedInk`). */
 export function resolveSyllableContextualInkSafety(
   syllable: DecomposedSyllable,
   boxes: Partial<Record<Part, BoxConfig>>,
@@ -128,6 +163,7 @@ export function resolveSyllableContextualInkSafety(
     const target = jamoForPart(resolved, part)
     const safety = target?.contextualInkSafety
     if (!target || !safety || !hasCompatibleInkTopology(safety.origin, target)) continue
+    if (hasReshapedInk(safety.origin, target)) continue
 
     const baselineJamo = interpolateJamoInk(safety.origin, target, 0)
     const baselineSyllable = replacePart(resolved, part, baselineJamo)

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import type { JamoData, StrokeDataV2 } from '../types'
 import { validateFontDataPayload } from './fontDataPayloadValidation'
-import { DEFAULT_STEM_BEAK, normalizeStemBeak, STEM_BEAK_SHAPES, stemBeakInkGroups, type StemBeakSource, type StemBeakStyle } from './stemBeak'
+import { DEFAULT_STEM_BEAK, normalizeStemBeak, STEM_BEAK_SHAPES, stemBeakInkGroups, stemBeakLockedOf, type StemBeakSource, type StemBeakStyle } from './stemBeak'
 
 type JamoType = JamoData['type']
 const presets = baseJamos as unknown as Record<JamoType, Record<string, JamoData>>
@@ -35,6 +35,12 @@ describe('세로줄기 부리 G0 대표', () => {
 
   it('ㅂ — 획 하나 안의 두 세로 마디에 다 붙고 걸침에는 없다', () => {
     expect(beaksOf('choseong', 'ㅂ')).toEqual({ 'ㅂ-1': 2 })
+  })
+
+  it('배포 빌드에서만 잠긴다 — 개발 서버 · 테스트 · 노드 스크립트는 그린다', () => {
+    expect(stemBeakLockedOf({ DEV: false })).toBe(true)
+    expect(stemBeakLockedOf({ DEV: true })).toBe(false)
+    expect(stemBeakLockedOf(undefined)).toBe(false)
   })
 
   it('꺼져 있으면 아무것도 안 나온다', () => {
