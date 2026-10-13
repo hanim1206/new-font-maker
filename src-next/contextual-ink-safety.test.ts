@@ -53,6 +53,19 @@ describe('문맥별 잉크 안전 적용', () => {
     expect(tight.limitedParts).toEqual(['JU'])
   })
 
+  it('획 모양을 고친(휜) 자소는 좁은 글자에서도 되당기지 않는다', () => {
+    const bent: JamoData = {
+      ...choseong,
+      strokes: [{ id: 'ch', points: [{ x: 1, y: 0 }, { x: 1.4, y: 0.5, handleIn: { x: 1.4, y: 0.3 }, handleOut: { x: 1.4, y: 0.7 } }, { x: 1, y: 1 }], closed: false, thickness: 0.05 }],
+    }
+    const withMid: JamoData = { ...choseong, strokes: [{ id: 'ch', points: [{ x: 1, y: 0 }, { x: 1, y: 0.5 }, { x: 1, y: 1 }], closed: false, thickness: 0.05 }] }
+    const target = withContextualInkSafety(withMid, withMid, bent, 0.1)
+    const tight = resolveSyllableContextualInkSafety({ ...syllable(medial(0)), choseong: target }, tightBoxes)
+
+    expect(tight.syllable.choseong?.strokes?.[0].points[1].x).toBeCloseTo(1.4)
+    expect(tight.limitedParts).toEqual([])
+  })
+
   it('연속 편집에서도 최초 안전 보정 시작 형태를 유지한다', () => {
     const origin = medial(0)
     const first = withContextualInkSafety(origin, origin, medial(-0.2), 0.1)
