@@ -3,6 +3,7 @@ import { immer } from 'zustand/middleware/immer'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { JamoData, JamoOverride, Padding } from '../types'
 import { migrateJamoMap } from '../utils/strokeMigration'
+import { withUniqueStrokeIdsInMap } from '../utils/strokeIdRepair'
 import { withThinStemsInEm } from '../utils/thinStemMigration'
 import baseJamos from '../data/baseJamos.json'
 import { createDebouncedStorage } from '../utils/debouncedStorage'
@@ -363,6 +364,10 @@ export const useJamoStore = create<JamoState & JamoActions>()(
             state.jungseong = jungseong
             state.jongseong = jongseong
           }
+          // 옛 `끊기`가 만든 겹친 획 id를 고친다. 그대로 두면 끊은 획이 같이 움직이고 저장 계약에 걸린다.
+          state.choseong = withUniqueStrokeIdsInMap(state.choseong)
+          state.jungseong = withUniqueStrokeIdsInMap(state.jungseong)
+          state.jongseong = withUniqueStrokeIdsInMap(state.jongseong)
           // 높이 0인 칸에서 백만 배로 저장된 보 기울기를 넓힌 칸 비율로 옮겨 적는다. 고칠 것이 있을 때만 바꾼다.
           const thinFixed = withThinStemsInEm(state.jungseong)
           if (thinFixed !== state.jungseong) state.jungseong = thinFixed

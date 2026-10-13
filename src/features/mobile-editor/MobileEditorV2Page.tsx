@@ -1094,7 +1094,7 @@ function Trackpad({ target }: { target: ActiveEditTarget }) {
       useMobileEditorStore.getState().selectPoint(target.renderPart, selectedStroke.id, 0)
       return
     }
-    const halves = splitStroke(selectedStroke, target.pointIndex)
+    const halves = splitStroke(selectedStroke, target.pointIndex, getJamoStrokes(before).map((stroke) => stroke.id))
     if (!halves) return
     const [first, second] = halves
     const after = addJamoStroke(updateJamoStroke(before, selectedStroke.id, () => first), selectedStroke.id, second)
