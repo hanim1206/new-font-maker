@@ -32,6 +32,16 @@ export interface StemBeakStyle {
 
 export const DEFAULT_STEM_BEAK: StemBeakStyle = { enabled: false, shape: 'angled', size: 1, angle: 25 }
 
+/**
+ * 부리 탭이 잠긴 동안(배포 빌드) 저장된 부리도 그리지 않는다 — 화면 · 미리보기 · 추출 전부(10-13 사용자).
+ * 잠그기 전에 켠 부리를 끌 길이 없어서다. 값은 지우지 않으니 탭을 열면 돌아온다.
+ * 개발 서버 · 테스트는 열려 있고, Vite 밖(노드 스크립트)도 열린 것으로 본다. 탭 잠금은 `src-next/stylePanels.ts`.
+ */
+export function stemBeakLockedOf(env: { DEV?: boolean } | undefined): boolean {
+  return env?.DEV === false
+}
+export const STEM_BEAK_LOCKED: boolean = stemBeakLockedOf((import.meta as { env?: { DEV?: boolean } }).env)
+
 export function normalizeStemBeak(value: unknown): StemBeakStyle {
   const input = value && typeof value === 'object' ? value as Record<string, unknown> : {}
   const number = (raw: unknown, min: number, max: number, fallback: number) => (
@@ -70,6 +80,7 @@ const DEPTH_RATIO = 0.9
  * `renderStyle`이 납작 · 네모 붓촉이면 줄기 폭을 그 붓촉이 실제로 남기는 폭으로 잰다(굵기 그대로 쓰면 부리가 줄기보다 넓다).
  */
 export function stemBeakInkGroups(sources: readonly StemBeakSource[], style: StemBeakStyle | undefined, renderStyle?: StrokeRenderStyle): BrushInkGroup[][] {
+  if (STEM_BEAK_LOCKED) return sources.map(() => [])
   if (!style?.enabled && !sources.some((source) => source.style?.enabled)) return sources.map(() => [])
   return sources.map((source) => {
     const own = source.style ?? style
