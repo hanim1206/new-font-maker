@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BoxConfig } from '../types'
-import { applyLayoutRules, bodyOfPadding, DEFAULT_LAYOUT_RULE_PARAMS, fitBoxToVerticalInk } from './layoutRules'
+import { applyLayoutRules, bodyOfPadding, CHO_SHAPE_TARGET, DEFAULT_LAYOUT_RULE_PARAMS, fitBoxToVerticalInk, JONG_SHAPE_TOP, JONG_TOP_OVERRIDE, RULE_REFERENCE_BODY, STEM_COLUMN_TARGET, TWO_STEM_CHO_SCALE } from './layoutRules'
 import type { LayoutRuleParams, RuleBoxes, RuleInk, RuleMeasure } from './layoutRules'
 
 /**
@@ -24,7 +24,7 @@ const START: RuleBoxes = {
   JU: { x: 0.6, y: 0.2, width: 0.3, height: 0.5 },
   JO: { x: 0.15, y: 0.6, width: 0.7, height: 0.3 },
 }
-const off = (params: LayoutRuleParams = DEFAULT_LAYOUT_RULE_PARAMS): LayoutRuleParams => ({ ...params, rules: { faces: false, pillar: false, finalTop: false, gap: false } })
+const off = (params: LayoutRuleParams = DEFAULT_LAYOUT_RULE_PARAMS): LayoutRuleParams => ({ ...params, rules: { faces: false, choShape: false, stemColumn: false, finalTop: false, jongShape: false, pillar: false, pillarReach: false, gap: false } })
 const only = (rule: keyof LayoutRuleParams['rules'], extra: Partial<LayoutRuleParams> = {}): LayoutRuleParams => ({ ...DEFAULT_LAYOUT_RULE_PARAMS, ...extra, rules: { ...off().rules, [rule]: true } })
 const bottomOf = (box: BoxConfig) => box.y + box.height
 const rightOf = (box: BoxConfig) => box.x + box.width
@@ -137,14 +137,70 @@ describe('배치 규칙', () => {
     expect(result.boxes.JU!.x).toBeCloseTo(0.58)
   })
 
-  it('순서는 기둥 → 받침 윗면 → 틈이고 규칙마다 다시 잰다', () => {
+  it('순서는 받침 윗면 → 기둥 → 틈이고 규칙마다 다시 잰다(자모가 없으면 모양별 규칙은 건너뛴다)', () => {
     const seen: string[] = []
     const measure: RuleMeasure = (boxes) => { seen.push(Object.keys(boxes).sort().join('')); return measureInset(boxes) }
-    const result = applyLayoutRules({ boxes: START, body: BODY, params: DEFAULT_LAYOUT_RULE_PARAMS, measure })
+    const params = { ...DEFAULT_LAYOUT_RULE_PARAMS, rules: { ...DEFAULT_LAYOUT_RULE_PARAMS.rules, gap: true } }
+    const result = applyLayoutRules({ boxes: START, body: BODY, params, measure })
     expect(seen).toHaveLength(4)
     const rules = result.steps.map((step) => step.rule)
-    expect(rules.indexOf('pillar')).toBeLessThan(rules.indexOf('finalTop'))
-    expect(rules.lastIndexOf('finalTop')).toBeLessThan(rules.indexOf('gap') === -1 ? rules.length : rules.indexOf('gap'))
+    expect(rules.indexOf('finalTop')).toBeLessThan(rules.indexOf('pillar'))
+    expect(rules).not.toContain('choShape')
+    expect(rules.lastIndexOf('pillar')).toBeLessThan(rules.indexOf('gap') === -1 ? rules.length : rules.indexOf('gap'))
     expect(result.boxes.JU!.y).toBeCloseTo(BODY.top)
+  })
+
+  describe('모양별 규칙(노토 몸통에서 잰 목표)', () => {
+    const REF = RULE_REFERENCE_BODY
+    const run = (rule: keyof LayoutRuleParams['rules'], jamo: { cho: string; jung: string; jong: string }) =>
+      applyLayoutRules({ boxes: START, body: REF, params: only(rule), measure: measureInset, jamo })
+
+    it('규칙 A · 네모 첫닿자는 폭 .412, 꼭지 첫닿자는 윗면 .055', () => {
+      const square = run('choShape', { cho: 'ㅁ', jung: 'ㅏ', jong: 'ㄴ' }).boxes.CH!
+      expect(square.width).toBeCloseTo(CHO_SHAPE_TARGET.square.width)
+      expect(square.x).toBeCloseTo(CHO_SHAPE_TARGET.square.left)
+      expect(square.y).toBeCloseTo(CHO_SHAPE_TARGET.square.top)
+      expect(run('choShape', { cho: 'ㅎ', jung: 'ㅏ', jong: 'ㄴ' }).boxes.CH!.y).toBeCloseTo(0.055)
+    })
+
+    it('규칙 A · 두 기둥 홀자 옆에서는 첫닿자 폭이 준다 · 꼬리 첫닿자는 더 내려온다', () => {
+      expect(run('choShape', { cho: 'ㅁ', jung: 'ㅐ', jong: 'ㄴ' }).boxes.CH!.width).toBeCloseTo(CHO_SHAPE_TARGET.square.width * TWO_STEM_CHO_SCALE)
+      const tail = run('choShape', { cho: 'ㄱ', jung: 'ㅏ', jong: 'ㄴ' }).boxes.CH!
+      expect(bottomOf(tail)).toBeCloseTo(CHO_SHAPE_TARGET.square.bottom + 0.04)
+    })
+
+    it('규칙 A · 받침이 없으면 아랫면은 그대로', () => {
+      const boxes = { CH: START.CH!, JU: START.JU! }
+      const result = applyLayoutRules({ boxes, body: REF, params: only('choShape'), measure: measureInset, jamo: { cho: 'ㅁ', jung: 'ㅏ', jong: '' } })
+      expect(bottomOf(result.boxes.CH!)).toBeCloseTo(bottomOf(START.CH!))
+    })
+
+    it('규칙 B · ㅣ는 오른면이 기둥 줄(.779)에 서고 폭은 그대로, ㅔ는 왼가지까지 맞춘다', () => {
+      const i = run('stemColumn', { cho: 'ㅁ', jung: 'ㅣ', jong: 'ㄴ' }).boxes.JU!
+      expect(rightOf(i)).toBeCloseTo(STEM_COLUMN_TARGET['ㅣ'].right)
+      expect(i.width).toBeCloseTo(START.JU!.width)
+      const e = run('stemColumn', { cho: 'ㅁ', jung: 'ㅔ', jong: 'ㄴ' }).boxes.JU!
+      expect(e.x).toBeCloseTo(STEM_COLUMN_TARGET['ㅔ'].left!)
+      expect(rightOf(e)).toBeCloseTo(STEM_COLUMN_TARGET['ㅔ'].right)
+    })
+
+    it('규칙 C · 받침 윗면은 모양 갈래를 따른다(ㄴ .654 · ㄹ .577 · ㅎ .54)', () => {
+      expect(run('jongShape', { cho: 'ㅁ', jung: 'ㅏ', jong: 'ㄴ' }).boxes.JO!.y).toBeCloseTo(JONG_TOP_OVERRIDE['ㄴ'])
+      expect(run('jongShape', { cho: 'ㅁ', jung: 'ㅏ', jong: 'ㄹ' }).boxes.JO!.y).toBeCloseTo(JONG_SHAPE_TOP.stacked)
+      expect(run('jongShape', { cho: 'ㅁ', jung: 'ㅏ', jong: 'ㅎ' }).boxes.JO!.y).toBeCloseTo(JONG_SHAPE_TOP.dot)
+    })
+
+    it('규칙 D · 받침 ㄴ이면 기둥이 받침 윗면 아래로 내려오고, ㄱ이면 안 움직인다', () => {
+      const reach = run('pillarReach', { cho: 'ㅁ', jung: 'ㅣ', jong: 'ㄴ' }).boxes.JU!
+      expect(bottomOf(reach)).toBeCloseTo(START.JO!.y + 0.067)
+      expect(reach.y).toBeCloseTo(START.JU!.y)
+      expect(run('pillarReach', { cho: 'ㅁ', jung: 'ㅣ', jong: 'ㄱ' }).steps).toEqual([])
+    })
+
+    it('다른 글자 몸에서는 몸 안의 같은 비율 자리로 옮긴다', () => {
+      const result = applyLayoutRules({ boxes: START, body: BODY, params: only('jongShape'), measure: measureInset, jamo: { cho: 'ㅁ', jung: 'ㅏ', jong: 'ㄹ' } })
+      const ratio = (JONG_SHAPE_TOP.stacked - REF.top) / (REF.bottom - REF.top)
+      expect(result.boxes.JO!.y).toBeCloseTo(BODY.top + ratio * (BODY.bottom - BODY.top))
+    })
   })
 })

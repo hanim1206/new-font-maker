@@ -10,6 +10,7 @@ import type { JamoMaps, ScoredGlyph } from './layoutRulesScore'
 import { useNotoModel } from './notoModel'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
 import { PART_COLOR, PART_LABEL } from './partColors'
+import { LayoutRuleFindings } from './layoutRuleFindings'
 import styles from './LayoutRulesLabPage.module.css'
 
 /**
@@ -155,8 +156,10 @@ export function LayoutRulesLabPage() {
     <header className={styles.header}>
       <span>Layout rules lab</span>
       <h1>배치 규칙 채점판</h1>
-      <p>Split + Padding 상자에서 출발해 규칙 셋을 먹인 자리와, 지금 엔진(노토 변화량 모델)의 자리가 노토와 얼마나 가까운지 xor로 잰다. 숫자가 작을수록 노토에 가깝다. 색은 규칙 − 모델: 초록이면 규칙이 더 가깝고, 회색은 +{NOTO_DELTA_TOLERANCE} 안, 빨강은 그보다 멀다.</p>
+      <p>Split + Padding 상자에서 출발해 규칙을 먹인 자리와, 지금 엔진(노토 변화량 모델)의 자리가 노토와 얼마나 가까운지 xor로 잰다. 숫자가 작을수록 노토에 가깝다. 색은 규칙 − 모델: 초록이면 규칙이 더 가깝고, 회색은 +{NOTO_DELTA_TOLERANCE} 안, 빨강은 그보다 멀다.</p>
     </header>
+
+    <LayoutRuleFindings params={params} />
 
     <section className={styles.controls}>
       <div className={styles.group}>

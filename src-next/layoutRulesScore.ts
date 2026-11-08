@@ -105,6 +105,25 @@ function xorOf(syllable: DecomposedSyllable, placement: GlyphInkPlacement, style
   return value ? { xor: value.xorRatio, regions: app.regions } : { message: 'Noto 고스트 면적이 0입니다.' }
 }
 
+/**
+ * 줄기 목표(칸 안 비율)를 em 자리 그대로 다른 칸으로 옮긴다. 비율을 그대로 복사하면 칸 높이가 다를 때 곁줄기가 엉뚱한 높이에 선다.
+ * "홀자 안쪽 줄기를 노토 보선에 맞춤"의 뜻은 보선의 em 자리를 따르는 것이다.
+ */
+function railsInBox(from: BoxConfig, to: BoxConfig): NonNullable<BoxConfig['stems']> {
+  const y = (ratio: number | undefined) => ratio === undefined ? undefined : (from.y + ratio * from.height - to.y) / to.height
+  const result: Record<string, NonNullable<BoxConfig['stems']>[string]> = {}
+  for (const [id, rail] of Object.entries(from.stems ?? {})) {
+    result[id] = {
+      ...rail,
+      ...(rail.top !== undefined ? { top: y(rail.top) } : {}),
+      ...(rail.bottom !== undefined ? { bottom: y(rail.bottom) } : {}),
+      ...(rail.center !== undefined ? { center: y(rail.center) } : {}),
+      ...(rail.dx !== undefined ? { dx: rail.dx * from.width / to.width } : {}),
+    }
+  }
+  return result
+}
+
 export interface ScoreInput {
   char: string
   maps: JamoMaps
@@ -139,7 +158,9 @@ export function scoreGlyph(input: ScoreInput): ScoredGlyph {
   if ('message' in schemaXor) return failed(schemaXor.message)
 
   // 규칙
-  const ruled = applyLayoutRules({ boxes: schemaBoxes, body: bodyOfPadding(START_PADDING), params, measure: partInkMeasure(syllable, style) })
+  const jamo = { cho: syllable.choseong?.char ?? '', jung: syllable.jungseong?.char ?? '', jong: syllable.jongseong?.char ?? '' }
+  const ruled = applyLayoutRules({ boxes: schemaBoxes, body: bodyOfPadding(START_PADDING), params, measure: partInkMeasure(syllable, style), jamo })
+  if (input.snapStems && modelBoxes?.JU?.stems && ruled.boxes.JU) ruled.boxes.JU = { ...ruled.boxes.JU, stems: railsInBox(modelBoxes.JU, ruled.boxes.JU) }
   const ruleXor = xorOf(syllable, { kind: 'boxes', boxes: ruled.boxes }, style, ghost.regions)
   if ('message' in ruleXor) return failed(ruleXor.message)
 
