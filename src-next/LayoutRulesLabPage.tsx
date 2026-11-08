@@ -5,7 +5,7 @@ import { DEFAULT_STYLE } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
 import type { BoxConfig } from '../src/types'
 import { EDIT_COLOR } from './editColors'
-import { BOX_TOLERANCE, EDGE_LABEL, EDGES, medianOf, NOTO_DELTA_TOLERANCE, regionsToPath, REPRESENTATIVE_CHARS, sampleChars, scoreGlyph } from './layoutRulesScore'
+import { BOX_TOLERANCE, EDGE_LABEL, EDGES, GLYPH_KIND_LABEL, glyphKindOf, INK_CLOSE_TOLERANCE, medianOf, NOTO_DELTA_TOLERANCE, regionsToPath, REPRESENTATIVE_CHARS, sampleChars, scoreGlyph } from './layoutRulesScore'
 import type { JamoMaps, ScoredGlyph } from './layoutRulesScore'
 import { useNotoModel } from './notoModel'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
@@ -63,13 +63,22 @@ function useScores(input: { chars: string[]; maps: JamoMaps; params: LayoutRuleP
   return { scores, progress }
 }
 
-/** 박스 차이(가장 큰 변 |차이|)를 색으로. 0.01 안은 초록, 허용(0.02) 안은 회색, 그 밖은 빨강이 짙어진다. */
-function boxColor(maxAbs: number | null): string {
-  if (maxAbs === null) return 'rgb(var(--color-surface-3))'
-  if (maxAbs <= BOX_TOLERANCE / 2) return 'rgba(60, 170, 90, 0.35)'
-  if (maxAbs <= BOX_TOLERANCE) return 'rgba(120, 120, 120, 0.18)'
-  const strength = Math.min(1, (maxAbs - BOX_TOLERANCE) / 0.1)
+/** 칸 바탕색: 초록(0.01 안) · 회색(0.02 안) · 노랑(끝 길이 — 한 변만 튀고 획은 가까움) · 빨강(자리, 차이가 클수록 짙게). */
+function cellBackground(score: ScoredGlyph): string {
+  const kind = glyphKindOf(score)
+  if (kind === 'fail') return 'rgb(var(--color-surface-3))'
+  if (kind === 'good') return 'rgba(60, 170, 90, 0.35)'
+  if (kind === 'ok') return 'rgba(120, 120, 120, 0.18)'
+  if (kind === 'tip') return 'rgba(230, 170, 30, 0.45)'
+  const strength = Math.min(1, ((score.box?.maxAbs ?? 0) - BOX_TOLERANCE) / 0.1)
   return `rgba(220, 60, 40, ${(0.2 + strength * 0.6).toFixed(2)})`
+}
+/** 칸 점: xor 규칙 − 모델. 0.02 안 초록 · 0.05 안 회색 · 그 밖 빨강. */
+function inkDotColor(delta: number | null): string {
+  if (delta === null) return 'transparent'
+  if (delta <= NOTO_DELTA_TOLERANCE) return 'rgb(60, 170, 90)'
+  if (delta <= 0.05) return 'rgb(140, 140, 140)'
+  return 'rgb(220, 60, 40)'
 }
 const boxMaxOf = (score: ScoredGlyph): number | null => score.ok && score.box ? score.box.maxAbs : null
 const PART_SHORT: Record<'CH' | 'JU' | 'JO', string> = { CH: '첫', JU: '홀', JO: '받' }
@@ -154,6 +163,8 @@ export function LayoutRulesLabPage() {
       boxMedian: medianOf(boxes),
       boxSchemaMedian: medianOf(ok.map((score) => score.box?.schemaMaxAbs ?? null).filter((value): value is number => value !== null)),
       boxWithin: boxes.filter((value) => value <= BOX_TOLERANCE).length,
+      tip: ok.filter((score) => glyphKindOf(score) === 'tip').length,
+      place: ok.filter((score) => glyphKindOf(score) === 'place').length,
       boxCount: boxes.length,
       model: medianOf(withModel.map((score) => score.xor.model ?? 0)),
       schema: medianOf(ok.map((score) => score.xor.schema)),
@@ -204,26 +215,29 @@ export function LayoutRulesLabPage() {
     <section className={styles.summary} data-testid="layout-rules-summary">
       {modelError && <span className={styles.fail}>모델을 못 읽었다: {modelError}</span>}
       <span>계산 {progress.done}/{progress.total}{summary.failed ? ` · 실패 ${summary.failed}` : ''}</span>
-      <span>박스 최대 차이 중앙값 — 규칙 <b className={summary.boxMedian !== null && summary.boxMedian <= BOX_TOLERANCE ? styles.pass : styles.over}>{pct(summary.boxMedian)}</b> · 규칙 끔 <b>{pct(summary.boxSchemaMedian)}</b> · 박스 일치({BOX_TOLERANCE} 안) <b>{summary.boxWithin}</b>/{summary.boxCount} · 한계에 닿음 <b>{summary.limited}</b></span>
+      <span>박스 최대 차이 중앙값 — 규칙 <b className={summary.boxMedian !== null && summary.boxMedian <= BOX_TOLERANCE ? styles.pass : styles.over}>{pct(summary.boxMedian)}</b> · 규칙 끔 <b>{pct(summary.boxSchemaMedian)}</b> · 박스 일치({BOX_TOLERANCE} 안) <b>{summary.boxWithin}</b>/{summary.boxCount} · 밖 — 자리 <b className={styles.over}>{summary.place}</b> · 끝 길이 <b className={styles.tip}>{summary.tip}</b>(한 변만 튐 · xor 모델 + {INK_CLOSE_TOLERANCE} 안, 2차 몫) · 한계에 닿음 <b>{summary.limited}</b></span>
       <span className={styles.aside}>잉크 xor 중앙값 — 모델 <b>{pct(summary.model)}</b> · 스키마 <b>{pct(summary.schema)}</b> · 규칙 <b className={gateColor(summary.rule, summary.model)}>{pct(summary.rule)}</b> · 모델 + {NOTO_DELTA_TOLERANCE} 안 {summary.within} · 더 가까움 {summary.better}</span>
     </section>
 
     <section className={styles.body}>
       <div className={styles.gridWrap}>
+        <p className={styles.legend}>바탕 = 박스(초록 0.01 안 · 회색 0.02 안 · <span className={styles.tip}>노랑 끝 길이</span> · <span className={styles.over}>빨강 자리</span>) · 점 = xor 규칙 − 모델(초록 0.02 안 · 회색 0.05 안 · 빨강 밖)</p>
         <div className={styles.grid} data-testid="layout-rules-grid">
           {chars.map((char) => {
             const score = scores.get(char)
             const boxMax = score ? boxMaxOf(score) : null
-            return <button key={char} type="button" className={styles.cell} style={{ background: score ? boxColor(boxMax) : undefined }} aria-pressed={char === selected} onClick={() => setSelected(char)} title={score?.ok ? `박스 최대 차이 ${pct(boxMax)} (${worstLabel(score)}) · xor 규칙 ${pct(score.xor.rule)} · 모델 ${pct(score.xor.model)}` : score?.message} data-failed={score && !score.ok ? '' : undefined}>
+            const delta = score ? deltaOf(score) : null
+            return <button key={char} type="button" className={styles.cell} style={{ background: score ? cellBackground(score) : undefined }} aria-pressed={char === selected} onClick={() => setSelected(char)} title={score?.ok ? `${GLYPH_KIND_LABEL[glyphKindOf(score)]} · 박스 최대 차이 ${pct(boxMax)} (${worstLabel(score)}) · xor 규칙 − 모델 ${signed(delta)}` : score?.message} data-failed={score && !score.ok ? '' : undefined} data-kind={score ? glyphKindOf(score) : undefined}>
               <span className={styles.cellChar}>{char}</span>
               <span className={styles.cellValue}>{score?.ok ? pct(boxMax) : score ? '!' : ''}</span>
+              {score?.ok && <span className={styles.cellDot} style={{ background: inkDotColor(delta) }} aria-hidden="true" />}
             </button>
           })}
         </div>
         <div className={styles.worst}>
           <h3>박스 차이 큰 글자 {WORST_COUNT} — 아직 못 찾은 규칙</h3>
           <ol>
-            {worst.map((score) => <li key={score.char}><button type="button" onClick={() => setSelected(score.char)} aria-pressed={score.char === selected}>{score.char}</button> <b>{pct(boxMaxOf(score))}</b> · {worstLabel(score)}{score.limited ? ' · 한계' : ''}</li>)}
+            {worst.map((score) => <li key={score.char}><button type="button" onClick={() => setSelected(score.char)} aria-pressed={score.char === selected}>{score.char}</button> <b>{pct(boxMaxOf(score))}</b> · {worstLabel(score)}{glyphKindOf(score) === 'tip' ? <span className={styles.tip}> · 끝 길이</span> : null}{score.limited ? ' · 한계' : ''}</li>)}
           </ol>
         </div>
       </div>

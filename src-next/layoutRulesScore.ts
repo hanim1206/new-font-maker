@@ -95,6 +95,32 @@ export function boxScoreOf(rule: RuleInk, model: RuleInk, schema: RuleInk): BoxS
   return { parts, maxAbs, meanAbs: count ? sum / count : 0, worst, schemaMaxAbs }
 }
 
+/** 박스는 빨간데 획(xor)은 가까운 글자를 가르는 xor 차이(규칙 − 모델) 한계. */
+export const INK_CLOSE_TOLERANCE = 0.03
+export type GlyphKind = 'fail' | 'good' | 'ok' | 'tip' | 'place'
+export const GLYPH_KIND_LABEL: Record<GlyphKind, string> = { fail: '실패', good: '0.01 안', ok: '0.02 안', tip: '끝 길이(한 변만 · 획 가까움)', place: '자리' }
+
+/** 허용 밖으로 어긋난 변의 수(부품 × 네 변). */
+export function edgesOver(box: BoxScore, tolerance = BOX_TOLERANCE): number {
+  let count = 0
+  for (const part of Object.values(box.parts)) for (const edge of EDGES) if (Math.abs(part.diff[edge]) > tolerance) count += 1
+  return count
+}
+
+/**
+ * 격자 칸의 갈래. good · ok는 박스로 끝. 박스가 허용 밖이면 둘로 가른다 —
+ * 한 변만 튀고 xor가 모델에 가까우면 '끝 길이'(가지 · 꼬리 끝이 짧거나 긴 것, 2차 몫), 나머지는 '자리'.
+ */
+export function glyphKindOf(score: ScoredGlyph): GlyphKind {
+  if (!score.ok || !score.box) return 'fail'
+  const { maxAbs } = score.box
+  if (maxAbs <= BOX_TOLERANCE / 2) return 'good'
+  if (maxAbs <= BOX_TOLERANCE) return 'ok'
+  const delta = score.xor.model === null ? null : score.xor.rule - score.xor.model
+  if (edgesOver(score.box) === 1 && delta !== null && delta <= INK_CLOSE_TOLERANCE) return 'tip'
+  return 'place'
+}
+
 function boundsOfRegions(regions: readonly DeepReadonly<InkRegion>[]): InkBounds | null {
   let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity
   for (const region of regions) for (const point of region.outer) {

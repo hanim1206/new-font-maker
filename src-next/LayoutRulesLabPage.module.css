@@ -22,10 +22,13 @@
 @media (max-width: 900px) { .body { grid-template-columns: 1fr; } }
 .gridWrap { display: grid; gap: 12px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 3px; padding: 8px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); }
-.cell { display: grid; justify-items: center; gap: 1px; padding: 4px 2px; border: 1px solid transparent; border-radius: 6px; background: rgb(var(--color-surface-2)); color: inherit; font: inherit; cursor: pointer; }
+.cell { position: relative; display: grid; justify-items: center; gap: 1px; padding: 4px 2px; border: 1px solid transparent; border-radius: 6px; background: rgb(var(--color-surface-2)); color: inherit; font: inherit; cursor: pointer; }
 .cell[aria-pressed='true'] { border-color: rgb(var(--color-foreground)); }
 .cell[data-failed] { color: rgb(var(--color-destructive)); }
 .cellChar { font-size: 18px; line-height: 1.1; }
+.cellDot { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; }
+.tip { color: rgb(var(--color-warning)); }
+.legend { margin: 0; font-size: 12px; color: rgb(var(--color-text-3)); }
 .cellValue { font-size: 9px; color: rgb(var(--color-text-3)); font-variant-numeric: tabular-nums; }
 
 .worst { padding: 12px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); font-size: 13px; font-variant-numeric: tabular-nums; }
