@@ -46,6 +46,8 @@ export interface ScoredGlyph {
   /** 노토 대비 xor. 모델은 모델이 없거나 못 풀면 null. */
   xor: { model: number | null; schema: number; rule: number }
   boxes: { schema: RuleBoxes; rule: RuleBoxes; model: RuleBoxes | null }
+  /** 1차 채점: 부품별 잉크 바깥 네모(네 변)의 규칙 − 모델 차이. 모델이 없으면 null. */
+  box: BoxScore | null
   steps: LayoutRuleStep[]
   limited: boolean
   /** 그림용(em 0~1). 규칙 자리의 앱 잉크와 노토 고스트. */
@@ -53,6 +55,45 @@ export interface ScoredGlyph {
 }
 
 export const NOTO_DELTA_TOLERANCE = 0.02
+/** 1차 게이트: 네 변 차이가 전부 이 안이면 "박스 일치". */
+export const BOX_TOLERANCE = 0.02
+
+export type Edge = 'left' | 'right' | 'top' | 'bottom'
+export const EDGES: readonly Edge[] = ['left', 'right', 'top', 'bottom']
+export const EDGE_LABEL: Record<Edge, string> = { left: '왼', right: '오른', top: '위', bottom: '아래' }
+export interface PartBoxScore { rule: InkBounds; model: InkBounds; diff: Record<Edge, number>; maxAbs: number }
+export interface BoxScore {
+  parts: Partial<Record<RulePart, PartBoxScore>>
+  /** 모든 부품 · 변 중 가장 큰 |차이|. */
+  maxAbs: number
+  /** 모든 변 |차이|의 평균. */
+  meanAbs: number
+  /** 가장 많이 어긋난 자리. */
+  worst: { part: RulePart; edge: Edge; diff: number } | null
+  /** 규칙 끔(스키마) 상자의 같은 값. */
+  schemaMaxAbs: number
+}
+
+export function boxScoreOf(rule: RuleInk, model: RuleInk, schema: RuleInk): BoxScore {
+  const parts: BoxScore['parts'] = {}
+  let maxAbs = 0, sum = 0, count = 0, schemaMaxAbs = 0
+  let worst: BoxScore['worst'] = null
+  for (const part of RULE_PARTS) {
+    const r = rule[part], m = model[part], sc = schema[part]
+    if (!r || !m) continue
+    const diff = { left: 0, right: 0, top: 0, bottom: 0 } as Record<Edge, number>
+    let partMax = 0
+    for (const edge of EDGES) {
+      diff[edge] = r.bounds[edge] - m.bounds[edge]
+      const abs = Math.abs(diff[edge])
+      partMax = Math.max(partMax, abs); sum += abs; count += 1
+      if (abs > maxAbs) { maxAbs = abs; worst = { part, edge, diff: diff[edge] } }
+      if (sc) schemaMaxAbs = Math.max(schemaMaxAbs, Math.abs(sc.bounds[edge] - m.bounds[edge]))
+    }
+    parts[part] = { rule: r.bounds, model: m.bounds, diff, maxAbs: partMax }
+  }
+  return { parts, maxAbs, meanAbs: count ? sum / count : 0, worst, schemaMaxAbs }
+}
 
 function boundsOfRegions(regions: readonly DeepReadonly<InkRegion>[]): InkBounds | null {
   let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity
@@ -92,7 +133,7 @@ export function partInkMeasure(syllable: DecomposedSyllable, style: GlobalStyle)
   }
 }
 
-const pickRuleBoxes = (boxes: Partial<Record<Part, BoxConfig>>): RuleBoxes => {
+export const pickRuleBoxes = (boxes: Partial<Record<Part, BoxConfig>>): RuleBoxes => {
   const result: RuleBoxes = {}
   for (const part of RULE_PARTS) if (boxes[part]) result[part] = { ...boxes[part]! }
   return result
@@ -137,7 +178,7 @@ export interface ScoreInput {
 
 export function scoreGlyph(input: ScoreInput): ScoredGlyph {
   const { char, maps, style, model, params } = input
-  const failed = (message: string): ScoredGlyph => ({ char, ok: false, message, xor: { model: null, schema: 0, rule: 0 }, boxes: { schema: {}, rule: {}, model: null }, steps: [], limited: false, ink: { rule: [], ghost: [] } })
+  const failed = (message: string): ScoredGlyph => ({ char, ok: false, message, xor: { model: null, schema: 0, rule: 0 }, boxes: { schema: {}, rule: {}, model: null }, box: null, steps: [], limited: false, ink: { rule: [], ghost: [] } })
   let syllable: DecomposedSyllable
   try { syllable = decomposeSyllable(char, maps.choseong, maps.jungseong, maps.jongseong) }
   catch (failure) { return failed(failure instanceof Error ? failure.message : '분해 실패') }
@@ -164,10 +205,14 @@ export function scoreGlyph(input: ScoreInput): ScoredGlyph {
   const ruleXor = xorOf(syllable, { kind: 'boxes', boxes: ruled.boxes }, style, ghost.regions)
   if ('message' in ruleXor) return failed(ruleXor.message)
 
+  const measure = partInkMeasure(syllable, style)
+  const box = modelBoxes ? boxScoreOf(measure(ruled.boxes), measure(modelBoxes), measure(schemaBoxes)) : null
+
   return {
     char, ok: true,
     xor: { model: modelXor && 'xor' in modelXor ? modelXor.xor : null, schema: schemaXor.xor, rule: ruleXor.xor },
     boxes: { schema: schemaBoxes, rule: ruled.boxes, model: modelBoxes },
+    box,
     steps: ruled.steps,
     limited: ruled.limited,
     ink: { rule: ruleXor.regions, ghost: ghost.regions },

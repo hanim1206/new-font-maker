@@ -5,7 +5,7 @@ import { DEFAULT_STYLE } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
 import type { BoxConfig } from '../src/types'
 import { EDIT_COLOR } from './editColors'
-import { medianOf, NOTO_DELTA_TOLERANCE, regionsToPath, REPRESENTATIVE_CHARS, sampleChars, scoreGlyph } from './layoutRulesScore'
+import { BOX_TOLERANCE, EDGE_LABEL, EDGES, medianOf, NOTO_DELTA_TOLERANCE, regionsToPath, REPRESENTATIVE_CHARS, sampleChars, scoreGlyph } from './layoutRulesScore'
 import type { JamoMaps, ScoredGlyph } from './layoutRulesScore'
 import { useNotoModel } from './notoModel'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
@@ -15,7 +15,7 @@ import styles from './LayoutRulesLabPage.module.css'
 
 /**
  * 배치 규칙 채점판. 플랜 `2026-11-08_배치-규칙-역추론-실험.md`의 A.
- * 글자마다 세 자리(모델 · 스키마 · 규칙)에 그려 노토와의 xor를 재고, 규칙이 모델보다 얼마나 가깝거나 먼지 색으로 칠한다.
+ * 1차(박스): 글자마다 세 자리(모델 · 스키마 · 규칙)에 그려 부품별 잉크 바깥 네모 네 변이 모델과 얼마나 어긋나는지 재고, 그 최대치로 색을 칠한다. 잉크 xor는 참고로만 보인다.
  * 규칙 스위치와 변수(k · m)를 바꾸면 표본이 다시 계산된다. 차이가 큰 글자 상위 20이 "아직 못 찾은 규칙" 목록이다.
  * 전역 스타일은 기본값으로 고정한다 — 여기서 재는 것은 배치뿐이다.
  */
@@ -46,7 +46,7 @@ function useScores(input: { chars: string[]; maps: JamoMaps; params: LayoutRuleP
         if (cancelled || run.current !== token) return
         for (const item of glyphs) {
           if ('error' in item) {
-            next.set(item.char, { char: item.char, ok: false, message: item.error, xor: { model: null, schema: 0, rule: 0 }, boxes: { schema: {}, rule: {}, model: null }, steps: [], limited: false, ink: { rule: [], ghost: [] } })
+            next.set(item.char, { char: item.char, ok: false, message: item.error, xor: { model: null, schema: 0, rule: 0 }, boxes: { schema: {}, rule: {}, model: null }, box: null, steps: [], limited: false, ink: { rule: [], ghost: [] } })
             continue
           }
           next.set(item.char, scoreGlyph({ char: item.char, maps, style: DEFAULT_STYLE, model, outline: item.glyph.outline, params, snapStems }))
@@ -63,14 +63,17 @@ function useScores(input: { chars: string[]; maps: JamoMaps; params: LayoutRuleP
   return { scores, progress }
 }
 
-/** 규칙 − 모델 차이를 색으로. 음수(규칙이 더 가까움)는 초록, 허용 안은 회색, 그 밖은 빨강이 짙어진다. */
-function deltaColor(delta: number | null): string {
-  if (delta === null) return 'rgb(var(--color-surface-3))'
-  if (delta <= 0) return 'rgba(60, 170, 90, 0.35)'
-  if (delta <= NOTO_DELTA_TOLERANCE) return 'rgba(120, 120, 120, 0.18)'
-  const strength = Math.min(1, (delta - NOTO_DELTA_TOLERANCE) / 0.15)
+/** 박스 차이(가장 큰 변 |차이|)를 색으로. 0.01 안은 초록, 허용(0.02) 안은 회색, 그 밖은 빨강이 짙어진다. */
+function boxColor(maxAbs: number | null): string {
+  if (maxAbs === null) return 'rgb(var(--color-surface-3))'
+  if (maxAbs <= BOX_TOLERANCE / 2) return 'rgba(60, 170, 90, 0.35)'
+  if (maxAbs <= BOX_TOLERANCE) return 'rgba(120, 120, 120, 0.18)'
+  const strength = Math.min(1, (maxAbs - BOX_TOLERANCE) / 0.1)
   return `rgba(220, 60, 40, ${(0.2 + strength * 0.6).toFixed(2)})`
 }
+const boxMaxOf = (score: ScoredGlyph): number | null => score.ok && score.box ? score.box.maxAbs : null
+const PART_SHORT: Record<'CH' | 'JU' | 'JO', string> = { CH: '첫', JU: '홀', JO: '받' }
+const worstLabel = (score: ScoredGlyph) => score.box?.worst ? `${PART_SHORT[score.box.worst.part]} ${EDGE_LABEL[score.box.worst.edge]} ${signed(score.box.worst.diff)}` : ''
 
 const pct = (value: number | null) => value === null ? '—' : value.toFixed(3)
 const signed = (value: number | null) => value === null ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(3)}`
@@ -98,11 +101,20 @@ function Detail({ score, show }: { score: ScoredGlyph; show: { ghost: boolean; i
     </svg>
     <div className={styles.detailText}>
       <h2>{score.char} <small>{score.limited ? '한계에 닿음' : ''}</small></h2>
+      {score.box && <table className={styles.edgeTable}>
+        <thead><tr><th>박스 차이(규칙 − 모델)</th>{EDGES.map((edge) => <th key={edge}>{EDGE_LABEL[edge]}</th>)}</tr></thead>
+        <tbody>{RULE_PARTS.map((part) => {
+          const row = score.box!.parts[part]
+          return row ? <tr key={part}><th style={{ color: PART_COLOR[part] }}>{PART_LABEL[part]}</th>{EDGES.map((edge) => <td key={edge} data-over={Math.abs(row.diff[edge]) > BOX_TOLERANCE || undefined}>{signed(row.diff[edge])}</td>)}</tr> : null
+        })}</tbody>
+      </table>}
       <table className={styles.xorTable}><tbody>
-        <tr><th>모델(지금 엔진)</th><td>{pct(score.xor.model)}</td></tr>
-        <tr><th>스키마(규칙 끔)</th><td>{pct(score.xor.schema)}</td></tr>
-        <tr><th>규칙</th><td>{pct(score.xor.rule)}</td></tr>
-        <tr><th>규칙 − 모델</th><td>{signed(deltaOf(score))}</td></tr>
+        <tr><th>박스 최대 차이</th><td>{pct(boxMaxOf(score))}</td></tr>
+        <tr><th>박스 차이 · 규칙 끔</th><td>{pct(score.box?.schemaMaxAbs ?? null)}</td></tr>
+        <tr><th>잉크 xor · 모델(지금 엔진)</th><td>{pct(score.xor.model)}</td></tr>
+        <tr><th>잉크 xor · 규칙 끔</th><td>{pct(score.xor.schema)}</td></tr>
+        <tr><th>잉크 xor · 규칙</th><td>{pct(score.xor.rule)}</td></tr>
+        <tr><th>잉크 xor · 규칙 − 모델</th><td>{signed(deltaOf(score))}</td></tr>
       </tbody></table>
       <ol className={styles.steps}>
         {score.steps.length === 0 && <li>움직인 규칙 없음</li>}
@@ -135,9 +147,14 @@ export function LayoutRulesLabPage() {
     const ok = list.filter((score) => score.ok)
     const withModel = ok.filter((score) => score.xor.model !== null)
     const deltas = withModel.map((score) => score.xor.rule - (score.xor.model ?? 0))
+    const boxes = ok.map(boxMaxOf).filter((value): value is number => value !== null)
     return {
       count: ok.length,
       failed: list.length - ok.length,
+      boxMedian: medianOf(boxes),
+      boxSchemaMedian: medianOf(ok.map((score) => score.box?.schemaMaxAbs ?? null).filter((value): value is number => value !== null)),
+      boxWithin: boxes.filter((value) => value <= BOX_TOLERANCE).length,
+      boxCount: boxes.length,
       model: medianOf(withModel.map((score) => score.xor.model ?? 0)),
       schema: medianOf(ok.map((score) => score.xor.schema)),
       rule: medianOf(ok.map((score) => score.xor.rule)),
@@ -146,7 +163,7 @@ export function LayoutRulesLabPage() {
       limited: ok.filter((score) => score.limited).length,
     }
   }, [list])
-  const worst = useMemo(() => list.filter((score) => deltaOf(score) !== null).sort((a, b) => (deltaOf(b) ?? 0) - (deltaOf(a) ?? 0)).slice(0, WORST_COUNT), [list])
+  const worst = useMemo(() => list.filter((score) => boxMaxOf(score) !== null).sort((a, b) => (boxMaxOf(b) ?? 0) - (boxMaxOf(a) ?? 0)).slice(0, WORST_COUNT), [list])
   const selectedScore = scores.get(selected) ?? null
 
   const toggleRule = (rule: LayoutRuleId) => setParams((prev) => ({ ...prev, rules: { ...prev.rules, [rule]: !prev.rules[rule] } }))
@@ -156,7 +173,7 @@ export function LayoutRulesLabPage() {
     <header className={styles.header}>
       <span>Layout rules lab</span>
       <h1>배치 규칙 채점판</h1>
-      <p>Split + Padding 상자에서 출발해 규칙을 먹인 자리와, 지금 엔진(노토 변화량 모델)의 자리가 노토와 얼마나 가까운지 xor로 잰다. 숫자가 작을수록 노토에 가깝다. 색은 규칙 − 모델: 초록이면 규칙이 더 가깝고, 회색은 +{NOTO_DELTA_TOLERANCE} 안, 빨강은 그보다 멀다.</p>
+      <p>1차는 박스로 맞춘다. 규칙이 놓은 자리에 그린 부품별 잉크 바깥 네모(왼 · 오른 · 위 · 아래)가 지금 엔진(노토 변화량 모델)의 네모와 얼마나 어긋나는지 em으로 잰다. 글자 점수는 열두 변 중 가장 큰 차이다. 초록 {BOX_TOLERANCE / 2} 안 · 회색 {BOX_TOLERANCE} 안(일치) · 빨강은 그 밖. 잉크 xor는 2차(획)용 참고로 같이 둔다.</p>
     </header>
 
     <LayoutRuleFindings params={params} />
@@ -187,8 +204,8 @@ export function LayoutRulesLabPage() {
     <section className={styles.summary} data-testid="layout-rules-summary">
       {modelError && <span className={styles.fail}>모델을 못 읽었다: {modelError}</span>}
       <span>계산 {progress.done}/{progress.total}{summary.failed ? ` · 실패 ${summary.failed}` : ''}</span>
-      <span>xor 중앙값 — 모델 <b>{pct(summary.model)}</b> · 스키마 <b>{pct(summary.schema)}</b> · 규칙 <b className={gateColor(summary.rule, summary.model)}>{pct(summary.rule)}</b></span>
-      <span>모델 + {NOTO_DELTA_TOLERANCE} 안 <b>{summary.within}</b>/{summary.count} · 규칙이 더 가까움 <b>{summary.better}</b> · 한계에 닿음 <b>{summary.limited}</b></span>
+      <span>박스 최대 차이 중앙값 — 규칙 <b className={summary.boxMedian !== null && summary.boxMedian <= BOX_TOLERANCE ? styles.pass : styles.over}>{pct(summary.boxMedian)}</b> · 규칙 끔 <b>{pct(summary.boxSchemaMedian)}</b> · 박스 일치({BOX_TOLERANCE} 안) <b>{summary.boxWithin}</b>/{summary.boxCount} · 한계에 닿음 <b>{summary.limited}</b></span>
+      <span className={styles.aside}>잉크 xor 중앙값 — 모델 <b>{pct(summary.model)}</b> · 스키마 <b>{pct(summary.schema)}</b> · 규칙 <b className={gateColor(summary.rule, summary.model)}>{pct(summary.rule)}</b> · 모델 + {NOTO_DELTA_TOLERANCE} 안 {summary.within} · 더 가까움 {summary.better}</span>
     </section>
 
     <section className={styles.body}>
@@ -196,17 +213,17 @@ export function LayoutRulesLabPage() {
         <div className={styles.grid} data-testid="layout-rules-grid">
           {chars.map((char) => {
             const score = scores.get(char)
-            const delta = score ? deltaOf(score) : null
-            return <button key={char} type="button" className={styles.cell} style={{ background: score ? deltaColor(delta) : undefined }} aria-pressed={char === selected} onClick={() => setSelected(char)} title={score?.ok ? `규칙 ${pct(score.xor.rule)} · 모델 ${pct(score.xor.model)}` : score?.message} data-failed={score && !score.ok ? '' : undefined}>
+            const boxMax = score ? boxMaxOf(score) : null
+            return <button key={char} type="button" className={styles.cell} style={{ background: score ? boxColor(boxMax) : undefined }} aria-pressed={char === selected} onClick={() => setSelected(char)} title={score?.ok ? `박스 최대 차이 ${pct(boxMax)} (${worstLabel(score)}) · xor 규칙 ${pct(score.xor.rule)} · 모델 ${pct(score.xor.model)}` : score?.message} data-failed={score && !score.ok ? '' : undefined}>
               <span className={styles.cellChar}>{char}</span>
-              <span className={styles.cellValue}>{score?.ok ? signed(delta) : score ? '!' : ''}</span>
+              <span className={styles.cellValue}>{score?.ok ? pct(boxMax) : score ? '!' : ''}</span>
             </button>
           })}
         </div>
         <div className={styles.worst}>
-          <h3>차이 큰 글자 {WORST_COUNT} — 아직 못 찾은 규칙</h3>
+          <h3>박스 차이 큰 글자 {WORST_COUNT} — 아직 못 찾은 규칙</h3>
           <ol>
-            {worst.map((score) => <li key={score.char}><button type="button" onClick={() => setSelected(score.char)} aria-pressed={score.char === selected}>{score.char}</button> 규칙 {pct(score.xor.rule)} · 모델 {pct(score.xor.model)} · <b>{signed(deltaOf(score))}</b>{score.limited ? ' · 한계' : ''}</li>)}
+            {worst.map((score) => <li key={score.char}><button type="button" onClick={() => setSelected(score.char)} aria-pressed={score.char === selected}>{score.char}</button> <b>{pct(boxMaxOf(score))}</b> · {worstLabel(score)}{score.limited ? ' · 한계' : ''}</li>)}
           </ol>
         </div>
       </div>
