@@ -182,10 +182,9 @@ function railsInBox(from: BoxConfig, to: BoxConfig): NonNullable<BoxConfig['stem
   for (const [id, rail] of Object.entries(from.stems ?? {})) {
     result[id] = {
       ...rail,
-      ...(rail.top !== undefined ? { top: y(rail.top) } : {}),
-      ...(rail.bottom !== undefined ? { bottom: y(rail.bottom) } : {}),
+      // 줄기 끝(top · bottom)은 상자 비율 그대로 둔다 — 상자를 늘이면 끝도 따라가야 규칙이 맞춘 기둥 끝이 그대로 그려진다.
+      // 곁줄기 높이(center)만 em 자리로 옮긴다(칸 높이가 달라도 곁줄기가 엉뚱한 높이에 서지 않게). 가로 치우침(dx)도 상자 비율 그대로 — 규칙이 맞춘 기둥 줄이 그대로 그려진다.
       ...(rail.center !== undefined ? { center: y(rail.center) } : {}),
-      ...(rail.dx !== undefined ? { dx: rail.dx * from.width / to.width } : {}),
     }
   }
   return result
@@ -226,7 +225,11 @@ export function scoreGlyph(input: ScoreInput): ScoredGlyph {
 
   // 규칙
   const jamo = { cho: syllable.choseong?.char ?? '', jung: syllable.jungseong?.char ?? '', jong: syllable.jongseong?.char ?? '' }
-  const ruled = applyLayoutRules({ boxes: schemaBoxes, body: bodyOfPadding(START_PADDING), params, measure: partInkMeasure(syllable, style), jamo })
+  // 규칙이 재는 잉크도 마지막에 그릴 모습과 같아야 한다 — 줄기 보선을 켜면 재기 전에 매번 모델 보선을 그 상자로 옮겨 놓고 잰다.
+  // (안 그러면 규칙은 옛 줄기 자리로 맞추고 그림은 새 줄기 자리로 그려져, ㅔ ㅖ 기둥처럼 줄기가 상자 끝인 홀자가 어긋난다.)
+  const plainMeasure = partInkMeasure(syllable, style)
+  const snap = (boxes: RuleBoxes): RuleBoxes => input.snapStems && modelBoxes?.JU?.stems && boxes.JU ? { ...boxes, JU: { ...boxes.JU, stems: railsInBox(modelBoxes.JU, boxes.JU) } } : boxes
+  const ruled = applyLayoutRules({ boxes: snap(schemaBoxes), body: bodyOfPadding(START_PADDING), params, measure: (boxes) => plainMeasure(snap(boxes)), jamo })
   if (input.snapStems && modelBoxes?.JU?.stems && ruled.boxes.JU) ruled.boxes.JU = { ...ruled.boxes.JU, stems: railsInBox(modelBoxes.JU, ruled.boxes.JU) }
   const ruleXor = xorOf(syllable, { kind: 'boxes', boxes: ruled.boxes }, style, ghost.regions)
   if ('message' in ruleXor) return failed(ruleXor.message)

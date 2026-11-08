@@ -70,7 +70,14 @@ const branchInsetByJung = by(branchRows, (r) => r.jung, (r) => r.JU.left - r.CH.
 const jung = Object.fromEntries(RIGHT_VOWELS.map((j) => {
   const mine = rows.filter((r) => r.jung === j && !DOUBLE_CHO.has(r.cho))
   const dbl = rows.filter((r) => r.jung === j && DOUBLE_CHO.has(r.cho))
-  return [j, { left: r3(median(mine.map((r) => r.JU.left))), right: r3(median(mine.map((r) => r.JU.right))), leftNextToDouble: r3(median(dbl.map((r) => r.JU.left))) }]
+  // 왼면이 밀릴 때 오른면(기둥)이 따라오는 비율: 모든 글자에서 오른면을 왼면에 최소제곱으로 맞춘 기울기(ㅏ ㅑ ㅣ처럼 왼면이 안 움직이는 홀자는 뜻이 없어 0).
+  const all = rows.filter((r) => r.jung === j)
+  const mx = all.reduce((sum, r) => sum + r.JU.left, 0) / all.length
+  const my = all.reduce((sum, r) => sum + r.JU.right, 0) / all.length
+  const sxx = all.reduce((sum, r) => sum + (r.JU.left - mx) ** 2, 0)
+  const sxy = all.reduce((sum, r) => sum + (r.JU.left - mx) * (r.JU.right - my), 0)
+  const rightFollowsLeft = sxx > 1e-4 ? r3(sxy / sxx) : 0
+  return [j, { left: r3(median(mine.map((r) => r.JU.left))), right: r3(median(mine.map((r) => r.JU.right))), leftNextToDouble: r3(median(dbl.map((r) => r.JU.left))), rightFollowsLeft }]
 }))
 // 받침: 왼 · 오른 · 위 · 아래, 기둥 끝 − 받침 윗면
 const jong = Object.fromEntries(FINALS.map((j) => {
@@ -83,6 +90,11 @@ const jong = Object.fromEntries(FINALS.map((j) => {
 // 받침 오른면의 홀자별 치우침(받침 가운데값 대비)
 const jongRightByJung = by(withJong, (r) => r.jung, (r) => r.JO!.right - jong[r.jong].right)
 const jongLeftByJung = by(withJong, (r) => r.jung, (r) => r.JO!.left - jong[r.jong].left)
+// 받침 윗면의 첫닿자별 치우침(ㅎ처럼 키 큰 첫닿자가 받침을 아래로 민다)
+const jongTopByCho = by(withJong, (r) => r.cho, (r) => r.JO!.top - jong[r.jong].top)
+// 첫닿자 윗면의 받침별 치우침(낮은 ㄴ 받침이면 첫닿자가 내려온다) + 그 뒤 남는 홀자별 잔차(두 기둥 홀자 옆)
+const choTopByJong = by(withJong, (r) => r.jong, (r) => r.CH.top - cho[r.cho].top)
+const choTopByJung = by(rows, (r) => r.jung, (r) => r.CH.top - cho[r.cho].top - (r.jong ? choTopByJong[r.jong] : 0))
 // 받침 없는 홀자 기둥 아래
 const pillarBottomNoFinal = r3(median(noJong.map((r) => r.JU.bottom)))
 
@@ -95,7 +107,7 @@ const out = `/* eslint-disable */
  */
 
 export interface ChoTarget { left: number; right: number; top: number; twoStemScale: number; bottomNoFinal: number }
-export interface JungTarget { left: number; right: number; leftNextToDouble: number }
+export interface JungTarget { left: number; right: number; leftNextToDouble: number; rightFollowsLeft: number }
 export interface JongTarget { left: number; right: number; top: number; bottom: number; pillarReach: number }
 
 /** 첫닿자: 기둥 하나짜리 홀자 옆의 왼 · 오른 · 위, 두 기둥 홀자 옆 폭 비율, 받침 없을 때 아래. */
@@ -109,7 +121,7 @@ export const JONG_GAP_OFFSET: Record<string, number> = ${JSON.stringify(jongGapO
 export const BRANCH_INSET_BY_CHO: Record<string, number> = ${JSON.stringify(branchInsetByCho, null, 2)}
 export const BRANCH_INSET_BY_JUNG: Record<string, number> = ${JSON.stringify(branchInsetByJung, null, 2)}
 
-/** 홀자: 왼 · 오른, 쌍자음 옆의 왼면. */
+/** 홀자: 왼 · 오른, 쌍자음 옆의 왼면, 왼면이 밀릴 때 오른면(기둥)이 따라오는 비율(ㅔ ㅖ만 뜻이 있다 — 왼 기둥이 밀리면 기둥도 얼마쯤 같이 밀린다). */
 export const JUNG_TARGET: Record<string, JungTarget> = ${JSON.stringify(jung, null, 2)}
 
 /** 받침: 네 변과 기둥 끝(받침 윗면 대비, + = 아래). */
@@ -119,6 +131,13 @@ export const JONG_TARGET: Record<string, JongTarget> = ${JSON.stringify(jong, nu
 export const JONG_LEFT_BY_JUNG: Record<string, number> = ${JSON.stringify(jongLeftByJung, null, 2)}
 export const JONG_RIGHT_BY_JUNG: Record<string, number> = ${JSON.stringify(jongRightByJung, null, 2)}
 
+/** 받침 윗면의 첫닿자별 치우침(+ = 아래). ㅎ처럼 키 큰 첫닿자가 받침을 민다. */
+export const JONG_TOP_BY_CHO: Record<string, number> = ${JSON.stringify(jongTopByCho, null, 2)}
+
+/** 첫닿자 윗면의 받침별 치우침(+ = 아래)과, 그 뒤 남는 홀자별 잔차. */
+export const CHO_TOP_BY_JONG: Record<string, number> = ${JSON.stringify(choTopByJong, null, 2)}
+export const CHO_TOP_BY_JUNG: Record<string, number> = ${JSON.stringify(choTopByJung, null, 2)}
+
 /** 받침 없을 때 홀자 기둥 아래. */
 export const PILLAR_BOTTOM_NO_FINAL = ${pillarBottomNoFinal}
 `
@@ -127,4 +146,5 @@ console.log('rows', rows.length, 'written src/services/layoutRuleTargets.ts')
 console.log('choGap', JSON.stringify(choGap), 'jongGapOffset', JSON.stringify(jongGapOffset))
 console.log('branchInsetByCho', JSON.stringify(branchInsetByCho), 'byJung', JSON.stringify(branchInsetByJung))
 console.log('jongRightByJung', JSON.stringify(jongRightByJung), 'jongLeftByJung', JSON.stringify(jongLeftByJung))
-console.log('jung', JSON.stringify(jung))
+console.log('jongTopByCho', JSON.stringify(jongTopByCho))
+console.log('choTopByJong', JSON.stringify(choTopByJong), 'choTopByJung', JSON.stringify(choTopByJung))

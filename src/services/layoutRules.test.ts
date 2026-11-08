@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { BoxConfig } from '../types'
 import { applyLayoutRules, bodyOfPadding, DEFAULT_LAYOUT_RULE_PARAMS, fitBoxToVerticalInk, RULE_REFERENCE_BODY } from './layoutRules'
-import { BRANCH_INSET_BY_CHO, BRANCH_INSET_BY_JUNG, CHO_GAP, CHO_TARGET, JONG_GAP_OFFSET, JONG_RIGHT_BY_JUNG, JONG_TARGET, JUNG_TARGET, PILLAR_BOTTOM_NO_FINAL } from './layoutRuleTargets'
+import { BRANCH_INSET_BY_CHO, BRANCH_INSET_BY_JUNG, CHO_GAP, CHO_TARGET, CHO_TOP_BY_JONG, CHO_TOP_BY_JUNG, JONG_GAP_OFFSET, JONG_RIGHT_BY_JUNG, JONG_TARGET, JONG_TOP_BY_CHO, JUNG_TARGET, PILLAR_BOTTOM_NO_FINAL } from './layoutRuleTargets'
 import type { LayoutRuleParams, RuleBoxes, RuleInk, RuleMeasure } from './layoutRules'
 
 /**
@@ -141,8 +141,8 @@ describe('배치 규칙', () => {
     const measure: RuleMeasure = (boxes) => { seen.push(Object.keys(boxes).sort().join('')); return measureInset(boxes) }
     const params = { ...DEFAULT_LAYOUT_RULE_PARAMS, rules: { ...DEFAULT_LAYOUT_RULE_PARAMS.rules, gap: true } }
     const result = applyLayoutRules({ boxes: START, body: BODY, params, measure })
-    // faces · choBottom · pillar · gap 넷만 잰다.
-    expect(seen).toHaveLength(4)
+    // faces · choBottom · pillar · gap만 잰다(표 규칙은 자모가 없어 건너뜀). 맞추는 규칙은 다시 재므로 넷 이상.
+    expect(seen.length).toBeGreaterThanOrEqual(4)
     const rules = result.steps.map((step) => step.rule)
     expect(rules).not.toContain('choTable')
     expect(rules).not.toContain('jongTable')
@@ -160,7 +160,7 @@ describe('배치 규칙', () => {
       const ch = run('choTable', { cho: 'ㅁ', jung: 'ㅏ', jong: 'ㄴ' }).boxes.CH!
       expect(ch.x).toBeCloseTo(CHO_TARGET['ㅁ'].left)
       expect(rightOf(ch)).toBeCloseTo(CHO_TARGET['ㅁ'].right)
-      expect(ch.y).toBeCloseTo(CHO_TARGET['ㅁ'].top)
+      expect(ch.y).toBeCloseTo(CHO_TARGET['ㅁ'].top + CHO_TOP_BY_JONG['ㄴ'] + CHO_TOP_BY_JUNG['ㅏ'])
       expect(bottomOf(ch)).toBeCloseTo(bottomOf(START.CH!))
     })
 
@@ -186,7 +186,7 @@ describe('배치 규칙', () => {
 
     it('규칙 C · 받침 네 변은 표, 왼 · 오른은 홀자별 치우침을 더한다', () => {
       const jo = run('jongTable', { cho: 'ㅁ', jung: 'ㅏ', jong: 'ㄴ' }).boxes.JO!
-      expect(jo.y).toBeCloseTo(JONG_TARGET['ㄴ'].top)
+      expect(jo.y).toBeCloseTo(JONG_TARGET['ㄴ'].top + JONG_TOP_BY_CHO['ㅁ'])
       expect(bottomOf(jo)).toBeCloseTo(JONG_TARGET['ㄴ'].bottom)
       expect(rightOf(jo)).toBeCloseTo(JONG_TARGET['ㄴ'].right + JONG_RIGHT_BY_JUNG['ㅏ'])
     })
@@ -200,6 +200,24 @@ describe('배치 규칙', () => {
       expect(bottomOf(run('pillar', { cho: 'ㅁ', jung: 'ㅣ', jong: 'ㄴ' }).boxes.JU!)).toBeCloseTo(START.JO!.y + JONG_TARGET['ㄴ'].pillarReach)
       expect(bottomOf(run('pillar', { cho: 'ㅁ', jung: 'ㅣ', jong: 'ㄱ' }).boxes.JU!)).toBeCloseTo(START.JO!.y + JONG_TARGET['ㄱ'].pillarReach)
       expect(bottomOf(run('pillar', { cho: 'ㅁ', jung: 'ㅣ', jong: '' }, { CH: START.CH!, JU: START.JU! }).boxes.JU!)).toBeCloseTo(PILLAR_BOTTOM_NO_FINAL)
+    })
+
+    it('획 두께가 그대로인 잉크도 다시 재서 목표에 닿는다', () => {
+      // 잉크 = 상자 ± 0.05(두께 반, 상자를 늘여도 그대로). 한 번 비례로 맞추면 어긋나고, 다시 재면 닿는다.
+      const measureFixed: RuleMeasure = (boxes) => {
+        const ink: RuleInk = {}
+        for (const part of ['CH', 'JU', 'JO'] as const) {
+          const box = boxes[part]
+          if (box) ink[part] = { bounds: { left: box.x - 0.05, right: box.x + box.width + 0.05, top: box.y - 0.05, bottom: box.y + box.height + 0.05 }, thickness: THICK }
+        }
+        return ink
+      }
+      const result = applyLayoutRules({ boxes: START, body: REF, params: only('jongTable'), measure: measureFixed, jamo: { cho: 'ㅁ', jung: 'ㅣ', jong: 'ㄴ' } })
+      const ink = measureFixed(result.boxes).JO!.bounds
+      // 다시 맞추기는 변화가 0.0005 em 아래면 멈춘다 — 목표와 0.002 안이면 닿은 것으로 본다(한 번만 맞추면 0.01 넘게 어긋난다).
+      expect(Math.abs(ink.top - (JONG_TARGET['ㄴ'].top + JONG_TOP_BY_CHO['ㅁ']))).toBeLessThan(0.002)
+      expect(Math.abs(ink.bottom - JONG_TARGET['ㄴ'].bottom)).toBeLessThan(0.002)
+      expect(result.steps).toHaveLength(1)
     })
 
     it('다른 글자 몸에서는 몸 안의 같은 비율 자리로 옮긴다', () => {

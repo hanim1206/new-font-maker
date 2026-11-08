@@ -7,7 +7,7 @@
  */
 
 export interface ChoTarget { left: number; right: number; top: number; twoStemScale: number; bottomNoFinal: number }
-export interface JungTarget { left: number; right: number; leftNextToDouble: number }
+export interface JungTarget { left: number; right: number; leftNextToDouble: number; rightFollowsLeft: number }
 export interface JongTarget { left: number; right: number; top: number; bottom: number; pillarReach: number }
 
 /** 첫닿자: 기둥 하나짜리 홀자 옆의 왼 · 오른 · 위, 두 기둥 홀자 옆 폭 비율, 받침 없을 때 아래. */
@@ -228,52 +228,61 @@ export const BRANCH_INSET_BY_JUNG: Record<string, number> = {
   "ㅖ": 0
 }
 
-/** 홀자: 왼 · 오른, 쌍자음 옆의 왼면. */
+/** 홀자: 왼 · 오른, 쌍자음 옆의 왼면, 왼면이 밀릴 때 오른면(기둥)이 따라오는 비율(ㅔ ㅖ만 뜻이 있다 — 왼 기둥이 밀리면 기둥도 얼마쯤 같이 밀린다). */
 export const JUNG_TARGET: Record<string, JungTarget> = {
   "ㅏ": {
     "left": 0.668,
     "right": 0.882,
-    "leftNextToDouble": 0.675
+    "leftNextToDouble": 0.675,
+    "rightFollowsLeft": 0.019
   },
   "ㅐ": {
     "left": 0.538,
     "right": 0.813,
-    "leftNextToDouble": 0.57
+    "leftNextToDouble": 0.57,
+    "rightFollowsLeft": 0.335
   },
   "ㅑ": {
     "left": 0.667,
     "right": 0.881,
-    "leftNextToDouble": 0.674
+    "leftNextToDouble": 0.674,
+    "rightFollowsLeft": -0.116
   },
   "ㅒ": {
     "left": 0.537,
     "right": 0.814,
-    "leftNextToDouble": 0.569
+    "leftNextToDouble": 0.569,
+    "rightFollowsLeft": 0.334
   },
   "ㅓ": {
     "left": 0.516,
     "right": 0.791,
-    "leftNextToDouble": 0.561
+    "leftNextToDouble": 0.561,
+    "rightFollowsLeft": 0.1
   },
   "ㅔ": {
     "left": 0.424,
     "right": 0.814,
-    "leftNextToDouble": 0.488
+    "leftNextToDouble": 0.488,
+    "rightFollowsLeft": 0.088
   },
   "ㅕ": {
     "left": 0.519,
     "right": 0.789,
-    "leftNextToDouble": 0.57
+    "leftNextToDouble": 0.57,
+    "rightFollowsLeft": 0.088
   },
   "ㅖ": {
     "left": 0.419,
     "right": 0.814,
-    "leftNextToDouble": 0.495
+    "leftNextToDouble": 0.495,
+    "rightFollowsLeft": 0.13
   },
   "ㅣ": {
     "left": 0.708,
     "right": 0.778,
-    "leftNextToDouble": 0.715
+    "leftNextToDouble": 0.715,
+    "rightFollowsLeft": 1
   }
 }
 
@@ -492,6 +501,71 @@ export const JONG_RIGHT_BY_JUNG: Record<string, number> = {
   "ㅕ": -0.004,
   "ㅖ": 0.017,
   "ㅣ": -0.007
+}
+
+/** 받침 윗면의 첫닿자별 치우침(+ = 아래). ㅎ처럼 키 큰 첫닿자가 받침을 민다. */
+export const JONG_TOP_BY_CHO: Record<string, number> = {
+  "ㄱ": -0.007,
+  "ㄲ": 0,
+  "ㄴ": -0.001,
+  "ㄷ": -0.001,
+  "ㄸ": 0,
+  "ㄹ": 0.009,
+  "ㅁ": -0.001,
+  "ㅂ": 0,
+  "ㅃ": 0.001,
+  "ㅅ": 0,
+  "ㅆ": 0,
+  "ㅇ": -0.001,
+  "ㅈ": 0,
+  "ㅉ": 0.001,
+  "ㅊ": 0.011,
+  "ㅋ": 0,
+  "ㅌ": 0.01,
+  "ㅍ": 0,
+  "ㅎ": 0.023
+}
+
+/** 첫닿자 윗면의 받침별 치우침(+ = 아래)과, 그 뒤 남는 홀자별 잔차. */
+export const CHO_TOP_BY_JONG: Record<string, number> = {
+  "ㄱ": 0.007,
+  "ㄲ": 0.005,
+  "ㄳ": 0.005,
+  "ㄴ": 0.019,
+  "ㄵ": 0.005,
+  "ㄶ": 0,
+  "ㄷ": 0.005,
+  "ㄹ": -0.006,
+  "ㄺ": -0.006,
+  "ㄻ": -0.006,
+  "ㄼ": -0.006,
+  "ㄽ": -0.006,
+  "ㄾ": -0.006,
+  "ㄿ": -0.006,
+  "ㅀ": -0.006,
+  "ㅁ": 0.005,
+  "ㅂ": 0,
+  "ㅄ": -0.001,
+  "ㅅ": 0.012,
+  "ㅆ": 0.005,
+  "ㅇ": 0.011,
+  "ㅈ": 0.005,
+  "ㅊ": -0.005,
+  "ㅋ": 0.005,
+  "ㅌ": -0.006,
+  "ㅍ": 0.005,
+  "ㅎ": -0.006
+}
+export const CHO_TOP_BY_JUNG: Record<string, number> = {
+  "ㅏ": 0,
+  "ㅐ": 0.006,
+  "ㅑ": 0,
+  "ㅒ": 0.006,
+  "ㅓ": -0.001,
+  "ㅔ": 0.005,
+  "ㅕ": -0.002,
+  "ㅖ": 0.005,
+  "ㅣ": 0
 }
 
 /** 받침 없을 때 홀자 기둥 아래. */
