@@ -51,8 +51,6 @@ path.tab{fill:var(--tab);opacity:.45}path.step{fill:none;stroke:var(--step);stro
 <div class="add">다음 칸 — 가설을 말해 주면 공식으로 옮겨 채점하고, 통과하면 여기 한 줄이 생긴다.</div>
 <div class="pools" id="pools"></div>
 <div class="legend"><span><i style="background:var(--raw)"></i>날것</span><span><i style="background:var(--step)"></i>지금 고른 칸</span><span><i style="background:var(--tab)"></i>외운 표</span><span><i style="background:var(--noto)"></i>노토</span><span>거리 = 어긋난 잉크 ÷ 노토 잉크</span></div>
-<div class="glyphs" id="glyphs"></div>
-<div class="legend"><span><i style="background:var(--tab);opacity:.5"></i>초록 면 = 외운 표</span><span><i style="border:2px solid var(--step);background:#fff"></i>파랑 선 = 고른 칸</span></div>
 </section>
 
 <h2>아직 표가 하는 일</h2>
@@ -93,7 +91,6 @@ function pools() {
     dots += `<div class="dot" style="left:100%;background:var(--noto)"></div><div class="lab" style="left:100%"><b>0</b>노토</div>`;
     el.insertAdjacentHTML('beforeend', `<div class="pool"><h3>${p==='588'?'받침 있는 588자':'받침 없는 171자'}</h3><div class="meta">패턴만으로 ${Math.round((1-s.steps[sel]/s.raw)*100)}% · 외운 표 ${Math.round((1-s.table/s.raw)*100)}%</div><div class="track"><div class="bar"></div>${dots}</div></div>`);
   }
-  document.getElementById('glyphs').innerHTML = [...'가각갈말할'].map(c => `<div>${svgOf(c, sel)}${c}</div>`).join('');
 }
 function moves() {
   const box = document.getElementById('moves'); box.innerHTML = '';
