@@ -128,8 +128,8 @@ function JamoGrid({ cellOf, onTap, focus }: { cellOf: (L: string, slot: Slot) =>
 }
 
 /** 전 → 후 글자 한 쌍. */
-function BeforeAfter({ before, after, char, style, size = 72, override }: { before: Bank | null; after: Bank; char: string; style: GlobalStyle; size?: number; override?: Record<string, TypedSample> }) {
-  return <div className={styles.pair}>
+function BeforeAfter({ before, after, char, style, size = 72, override, active }: { before: Bank | null; after: Bank; char: string; style: GlobalStyle; size?: number; override?: Record<string, TypedSample>; active?: 'before' | 'after' }) {
+  return <div className={`${styles.pair}${active ? ` ${active === 'after' ? styles.pairAfter : styles.pairBefore}` : ''}`}>
     <span className={styles.pairOld}>{before ? <BankGlyph bank={before} char={char} size={size} style={style} faintMissing={false} /> : <span className={styles.emptyGlyph} style={{ width: size, height: size, fontSize: size * 0.4 }}>새</span>}</span>
     <span className={styles.pairArrow}>→</span>
     <span className={styles.pairNew}><BankGlyph bank={after} char={char} size={size} style={style} override={override} faintMissing={false} /></span>
@@ -521,8 +521,18 @@ export function HandwritingLabPage() {
               const sample = got[got.length - 1]
               if (!sample) return null
               return <div className={styles.detail} data-testid="handwriting-detail">
-                <BeforeAfter before={bank} after={previewBank} char={sample.from} style={style} override={{ [L]: sample }} />
-                <small>{slot === 2 ? '받침 ' : ''}{L} · {sample.from}</small>
+                {(() => {
+                  // 다른 자모는 지금 고른 대로 두고 이 자모만 끈 것 / 켠 것. 지금 고른 쪽에 테두리 — 토글하면 같이 옮겨 간다
+                  const on = ['new', 'dupOn'].includes(cardCell(L, slot).state)
+                  const had = !!bank.jamo[L], cur = card.choices.jamo[L]
+                  const offChoice: JamoChoice = had ? { kind: 'keep' } : { kind: 'skip' }
+                  const onChoice: JamoChoice = had ? (cur?.kind === 'slot' ? cur : { kind: 'swap' }) : { kind: 'new' }
+                  const withL = (c: JamoChoice) => applyChoices(bank, card.gathered, { ...card.choices, jamo: { ...card.choices.jamo, [L]: c } })
+                  return <>
+                    <BeforeAfter before={withL(offChoice)} after={withL(onChoice)} char={sample.from} style={style} active={on ? 'after' : 'before'} />
+                    <small className={on ? styles.detailOn : undefined}>{slot === 2 ? '받침 ' : ''}{L} · {on ? '반영해요' : '그대로 둬요'}</small>
+                  </>
+                })()}
               </div>
             })()}
           </>}

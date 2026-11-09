@@ -85,9 +85,12 @@
 .pair { display: flex; align-items: center; gap: 6px; }
 .pairOld, .pairNew { display: inline-flex; border-radius: 8px; background: rgb(var(--color-surface-2)); }
 .pairOld { opacity: .5; }
+.pairBefore .pairOld, .pairAfter .pairNew { opacity: 1; box-shadow: 0 0 0 2px rgb(var(--color-edit-select)); }
+.pairBefore .pairNew { opacity: .35; }
 .pairArrow { color: rgb(var(--color-text-4)); }
 .detail { display: flex; align-items: center; gap: 14px; padding: 8px 12px; border-radius: 10px; background: rgb(var(--color-surface-2)); }
 .detail small { color: rgb(var(--color-text-3)); }
+.detail small.detailOn { color: rgb(var(--color-edit-select)); font-weight: 700; }
 
 .layGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
 .layTile { position: relative; display: grid; justify-items: center; gap: 6px; padding: 10px 8px 8px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); cursor: pointer; opacity: .55; }
