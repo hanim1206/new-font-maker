@@ -20,7 +20,7 @@ const RAW = { ...DEFAULT_LAYOUT_RULE_PARAMS, rules: { faces: false, choTable: fa
 // 사다리 칸. 가설이 통과하면 여기에 한 줄 보탠다.
 const STEPS = [
   { id: 'base', name: '패턴만', who: '관계 규칙 · 획 꼴 다섯 · 받침 없을 때 첫닿자 공식', params: PAT },
-  { id: 'jungKinds', name: '+ 홀자 가지 갈래', who: '하니무스 관찰 11/9: 가로줄기가 뻗은 쪽으로 홀자가 간다 → 기둥은 가지 반대쪽으로 비켜서고 오른가지는 기둥 밖으로', params: { ...PAT, jungKinds: true } },
+  { id: 'jungKinds', name: '+ 홀자 가지 갈래', who: '하니무스 관찰 11/9: 가로줄기가 뻗은 쪽으로 홀자가 간다 → 기둥이 하나면 가지 반대쪽으로 비켜서고, 기둥이 둘이면 기둥 틀은 그대로 두고 가지만 밖으로 나간다(ㅔㅖ 오른 기둥 = ㅐㅒ 0.813 · 0.814)', params: { ...PAT, jungKinds: true } },
 ]
 const med = (a: number[]) => { const x = a.filter(Number.isFinite).sort((p, q) => p - q); return x.length ? x[x.length >> 1] : NaN }
 const keys = ['CH.left', 'CH.right', 'CH.top', 'CH.bottom', 'JU.left', 'JU.right', 'JU.top', 'JU.bottom', 'JO.left', 'JO.right', 'JO.top', 'JO.bottom']
