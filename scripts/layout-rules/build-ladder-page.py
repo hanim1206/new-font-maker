@@ -65,6 +65,7 @@ const D = __DATA__;
 const V = D.V, N = D.steps.length;
 const PARTN = {CH:'첫닿자',JU:'홀자',JO:'받침'}, EDGEN = {left:'왼면',right:'오른면',top:'윗면',bottom:'아랫면'};
 const CHOS = [...'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'], JUNGS = ['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅣ'], JONGS = [...'ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ'];
+const OPEN = new Set();
 const KEYS = ['CH.left','CH.right','CH.top','CH.bottom','JU.left','JU.right','JU.top','JU.bottom','JO.left','JO.right','JO.top','JO.bottom'];
 const mmed = a => { const x = a.filter(v => v !== undefined && isFinite(v)).sort((p,q)=>p-q); return x.length ? x[x.length>>1] : null; };
 const col = v => { if (v === null) return '#f4f4f5'; const t = Math.min(1, Math.abs(v)/0.08); return v > 0 ? `rgba(214,69,69,${0.06+0.8*t})` : `rgba(31,79,216,${0.06+0.8*t})`; };
@@ -100,7 +101,7 @@ function moves() {
   const box = document.getElementById('moves'); box.innerHTML = '';
   const rows = D.rows.filter(r => r.pool === pool);
   const gs = KEYS.map(k => { const v = rows.map(r => r.moves[sel][k]).filter(x => x !== undefined); const v0 = rows.map(r => r.moves[0][k]).filter(x => x !== undefined);
-    return { key: k, med: mmed(v.map(Math.abs)) ?? 0, base: mmed(v0.map(Math.abs)) ?? 0, sgn: mmed(v) ?? 0, n: v.length, over: v.filter(x => Math.abs(x) > 0.02).length }; }).filter(g => g.n).sort((a,b) => b.med - a.med);
+    return { key: k, med: mmed(v.map(Math.abs)) ?? 0, base: mmed(v0.map(Math.abs)) ?? 0, sgn: mmed(v) ?? 0, n: v.length, over: v.filter(x => Math.abs(x) > 0.02).length }; }).filter(g => g.n); // 순서는 고정(첫닿자 → 홀자 → 받침, 왼 · 오른 · 위 · 아래)
   const maxMed = Math.max(...gs.map(g => Math.max(g.med, g.base)));
   gs.forEach((g, gi) => {
     const [p, e] = g.key.split('.'); const mv = r => r.moves[sel][g.key];
@@ -116,9 +117,9 @@ function moves() {
     const views = { cho: [`첫닿자별 — 홀자 ${rep.jStar} 고정`, rep.byCho.map(c => cellOf(c, byChar[c]?.cho ?? ''))], jung: [`홀자별 — 첫닿자 ${rep.cStar} 고정`, rep.byJung.map(c => cellOf(c, byChar[c]?.jung ?? ''))], ...(rep.byJong.length ? { jong: ['받침별', rep.byJong.map(c => cellOf(c, byChar[c]?.jong ?? ''))] } : {}), top: ['가장 많이', rep.top.map(c => cellOf(c, ''))] };
     const tabs = `<div class="vtabs">${Object.entries({cho:'첫닿자별',jung:'홀자별',jong:'받침별',top:'가장 많이'}).filter(([k]) => views[k]).map(([k,l],i) => `<button data-v="${k}" class="${i===0?'on':''}">${l}</button>`).join('')}</div>`;
     const panes = Object.entries(views).map(([k,[cap,cells]],i) => `<div class="vpane" data-v="${k}" style="${i===0?'':'display:none'}"><div class="scale">${cap} · 초록 면 = 외운 표 · 파랑 선 = ${sel}칸</div><div class="exs">${cells.join('')}</div></div>`).join('');
-    box.insertAdjacentHTML('beforeend', `<div class="mv${gi===0?' open':''}"><div class="head"><div class="name">${PARTN[p]} ${EDGEN[e]}<small>표가 대개 ${dirOf(e, g.sgn)}으로 · 0.02 넘게 ${g.over}/${g.n}</small></div><div class="bar"><i style="width:${g.med/maxMed*100}%"></i>${sel>0?`<u style="left:0;width:${g.base/maxMed*100}%"></u>`:''}</div><div class="num">가운데 ${g.med.toFixed(3)}${sel>0?` (패턴만 ${g.base.toFixed(3)})`:''}</div></div><div class="body"><div class="scale">첫닿자 × 홀자<i style="background:rgba(214,69,69,.7)"></i>오른쪽 · 아래<i style="background:rgba(31,79,216,.7)"></i>왼쪽 · 위</div>${heat}${jong}${tabs}${panes}</div></div>`);
+    box.insertAdjacentHTML('beforeend', `<div class="mv${OPEN.has(g.key)?' open':''}" data-key="${g.key}"><div class="head"><div class="name">${PARTN[p]} ${EDGEN[e]}<small>표가 대개 ${dirOf(e, g.sgn)}으로 · 0.02 넘게 ${g.over}/${g.n}</small></div><div class="bar"><i style="width:${g.med/maxMed*100}%"></i>${sel>0?`<u style="left:0;width:${g.base/maxMed*100}%"></u>`:''}</div><div class="num">가운데 ${g.med.toFixed(3)}${sel>0?` (패턴만 ${g.base.toFixed(3)})`:''}</div></div><div class="body"><div class="scale">첫닿자 × 홀자<i style="background:rgba(214,69,69,.7)"></i>오른쪽 · 아래<i style="background:rgba(31,79,216,.7)"></i>왼쪽 · 위</div>${heat}${jong}${tabs}${panes}</div></div>`);
   });
-  box.querySelectorAll('.mv .head').forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
+  box.querySelectorAll('.mv .head').forEach(h => h.addEventListener('click', () => { const m = h.parentElement; m.classList.toggle('open'); const k = m.dataset.key; m.classList.contains('open') ? OPEN.add(k) : OPEN.delete(k); }));
   box.querySelectorAll('.vtabs button').forEach(b => b.addEventListener('click', () => { const m = b.closest('.mv'); m.querySelectorAll('.vtabs button').forEach(x => x.classList.toggle('on', x===b)); m.querySelectorAll('.vpane').forEach(x => x.style.display = x.dataset.v === b.dataset.v ? '' : 'none'); }));
 }
 function renderAll() { ladder(); pools(); moves(); }
