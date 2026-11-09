@@ -19,6 +19,8 @@ export interface JamoShapeFeatures {
   rightTop: number
   /** 닫힌 획(동그라미)이 있는가. */
   ring: boolean
+  /** 굽은 닫힌 획(동그라미 ㅇ, ㅎ의 ㅇ)이 있는가. 곧은 닫힌 획(ㅁ)은 아니다. */
+  round: boolean
   /** 잉크 넓이(틀 넓이 대비). */
   area: number
   /** 잉크 무게중심(틀 기준). */
@@ -81,6 +83,7 @@ export function shapeFeaturesOfStrokes(strokes: readonly DeepReadonly<StrokeData
     rightClosed: rowsWith(1 - BAND, 1),
     rightTop,
     ring: strokes.some((stroke) => stroke.closed),
+    round: strokes.some((stroke) => stroke.closed && stroke.points.some((pt) => !!pt.handleIn || !!pt.handleOut)),
     area: area / (N * N),
     centerX: area ? sumX / area / N : 0.5,
     centerY: area ? sumY / area / N : 0.5,

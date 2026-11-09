@@ -58,3 +58,24 @@ export const branchInsetOf = (f: Pick<JamoShapeFeatures, 'rightTop'>): number =>
  * ㅔ ㅖ의 가지는 첫닿자 오른면을 따라가므로 같이 왼쪽으로 간다. 양은 외운 표의 두 기둥 가운데값.
  */
 export const TWO_STEM_CHO_NARROW = 0.093
+
+/**
+ * 첫닿자 양옆 들임(2026-11-09, 사용자 질문 "ㅓㅕㅔㅖ 왼면 오차는 홀자만의 것인가"에서 — 답은 첫닿자 폭이었다).
+ * 가장자리에 세로벽이 선 홑닿자(ㄱ ㄴ ㄷ ㄹ ㅁ ㅂ ㅋ ㅌ)는 꽉 차 보여 왼면을 `CHO_WALL_LEFT`만큼 들이고,
+ * 오른쪽이 위부터 막혔으면 오른면도 `CHO_WALL_RIGHT`만큼 들인다(오른쪽 위가 빈 ㄴ은 오른면을 두고 홀자 가지가 파고든다).
+ * 빗줄기 · 꼭지 · 동그라미 닿자(ㅅ ㅈ ㅊ ㅎ ㅇ)와 ㅍ은 그대로. 쌍닿자는 두 자모가 나눠 쓰느라 오른면을 `CHO_DOUBLE_RIGHT`만큼 더 낸다.
+ * 19 첫닿자 표 잔차(가운데값)에서 벽 있는 10자는 양면 모두 ±0.02 안.
+ */
+export const CHO_WALL_LEFT = 0.045
+export const CHO_WALL_RIGHT = 0.055
+export const CHO_DOUBLE_LEFT = 0.015
+export const CHO_DOUBLE_RIGHT = 0.045
+const DOUBLE_CHO: ReadonlySet<string> = new Set(['ㄲ', 'ㄸ', 'ㅃ', 'ㅆ', 'ㅉ'])
+/** 세로벽: 왼띠나 오른띠 절반 넘게 잉크가 서 있고 동그라미가 아니다(ㅁ은 벽, ㅇ은 아님). */
+export const hasChoWall = (f: Pick<JamoShapeFeatures, 'leftClosed' | 'rightClosed' | 'round'>): boolean => !f.round && Math.max(f.leftClosed, f.rightClosed) >= 0.5
+/** 첫닿자 왼면 · 오른면을 안으로 들일 양(몸 em, +면 안쪽). */
+export function choSideInsetOf(cho: string, f: Pick<JamoShapeFeatures, 'leftClosed' | 'rightClosed' | 'round' | 'rightTop'>): { left: number; right: number } {
+  if (DOUBLE_CHO.has(cho)) return { left: CHO_DOUBLE_LEFT, right: -CHO_DOUBLE_RIGHT }
+  if (!hasChoWall(f)) return { left: 0, right: 0 }
+  return { left: CHO_WALL_LEFT, right: CHO_WALL_RIGHT * (1 - f.rightTop) }
+}

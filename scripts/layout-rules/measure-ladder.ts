@@ -22,6 +22,7 @@ const HYPS = [
   { id: 'jungKinds', name: '홀자 가지 갈래', who: '하니무스 관찰 11/9: 가로줄기가 뻗은 쪽으로 홀자가 간다 → 기둥이 하나면 가지 반대쪽으로 비켜서고, 기둥이 둘이면 기둥 틀은 그대로 두고 가지만 밖으로 나간다(ㅔㅖ 오른 기둥 = ㅐㅒ 0.813 · 0.814)', patch: { jungKinds: true } },
   { id: 'branchInset', name: '왼가지 끝은 첫닿자 오른쪽 모양 따라', who: '하니무스 관찰 11/9: 닿자 오른쪽이 막혔으면 붙고 뚫렸으면 띄운다 → 오른쪽이 위부터 막힌 자음은 가지가 오른면에 살짝 걸치고, 오른쪽 위가 빈 자음(ㄴ ㅅ)은 그 빈 자리로 더 파고든다', patch: { branchInset: true } },
   { id: 'twoStemNarrow', name: '두 기둥 홀자 옆에선 첫닿자가 좁아진다', who: '하니무스 관찰 11/9: ㅔ ㅖ는 홀자 왼면이 더 왼쪽 → 기둥이 둘이면 홀자가 자리를 더 차지해 첫닿자 오른면이 0.093 들어오고, ㅔ ㅖ 가지가 그걸 따라간다', patch: { twoStemNarrow: true } },
+  { id: 'choWall', name: '세로벽 있는 첫닿자는 좁게, 쌍닿자는 넓게', who: '하니무스 질문 11/9: ㅓㅕㅔㅖ 왼면 오차는 홀자만의 것인가 → 아니고 첫닿자 폭이었다. 가장자리에 세로벽이 선 ㄱㄴㄷㄹㅁㅂㅋㅌ는 꽉 차 보여 양옆을 들이고(오른쪽 위가 빈 ㄴ은 왼쪽만), 쌍닿자는 오른쪽으로 더 낸다', patch: { choWall: true } },
 ]
 /** 조합 번호(mask)의 i번째 비트가 켜져 있으면 i번째 가설을 켠다. 0 = 패턴만. */
 const STEPS = Array.from({ length: 1 << HYPS.length }, (_, mask) => ({ params: HYPS.reduce((p, h, i) => (mask >> i) & 1 ? { ...p, ...h.patch } : p, PAT as any) }))

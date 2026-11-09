@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import { shapeFeaturesOf } from './jamoShapeFeatures'
-import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, branchInsetOf, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
+import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, branchInsetOf, choSideInsetOf, hasChoWall, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { CHO_TARGET, JUNG_TARGET } from './layoutRuleTargets'
 
 const CHO_TARGET_A_RIGHT = JUNG_TARGET['ㅏ'].right
@@ -49,5 +49,19 @@ describe('왼가지 끝 — 첫닿자 오른쪽 모양', () => {
     expect(top('ㅅ')).toBeGreaterThan(top('ㅁ'))
     expect(top('ㄱ')).toBeLessThan(0.05)
     expect(branchInsetOf(shapeFeaturesOf(cho('ㄴ'))!)).toBeLessThan(branchInsetOf(shapeFeaturesOf(cho('ㅁ'))!) - 0.05)
+  })
+})
+
+describe('첫닿자 양옆 — 세로벽', () => {
+  it('ㄱ ㄴ ㄷ ㄹ ㅁ ㅂ ㅋ ㅌ는 벽이 있고 ㅅ ㅈ ㅊ ㅎ ㅇ ㅍ은 없다', () => {
+    const wall = (k: string) => hasChoWall(shapeFeaturesOf(cho(k))!)
+    for (const k of 'ㄱㄴㄷㄹㅁㅂㅋㅌ') expect(wall(k), k).toBe(true)
+    for (const k of 'ㅅㅈㅊㅎㅇㅍ') expect(wall(k), k).toBe(false)
+  })
+  it('오른쪽 위가 빈 ㄴ은 왼면만 들이고, 쌍닿자는 오른면을 밖으로 낸다', () => {
+    const inset = (k: string) => choSideInsetOf(k, shapeFeaturesOf(cho(k))!)
+    expect(inset('ㄴ').right).toBeLessThan(0.01)
+    expect(inset('ㅁ').right).toBeGreaterThan(0.05)
+    expect(inset('ㅆ').right).toBeLessThan(0)
   })
 })

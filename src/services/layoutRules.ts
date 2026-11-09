@@ -1,7 +1,7 @@
 import type { BoxConfig, Padding } from '../types'
 import { BRANCH_INSET_BY_PAIR, CHO_RIGHT_BY_JUNG, CHO_RIGHT_BY_PAIR, JONG_RIGHT_BY_CHO } from './layoutRuleResiduals'
 import type { JamoShapeFeatures } from './jamoShapeFeatures'
-import { CHO_TOP_DROP_NO_FINAL, TWO_STEM_CHO_NARROW, branchInsetOf, DOUBLE_CHO_SHIFT, PILLAR_RIGHT, RIGHT_BRANCH_OUT, TWO_STEM_FOLLOW, TWO_STEM_SPAN, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
+import { CHO_TOP_DROP_NO_FINAL, TWO_STEM_CHO_NARROW, branchInsetOf, choSideInsetOf, DOUBLE_CHO_SHIFT, PILLAR_RIGHT, RIGHT_BRANCH_OUT, TWO_STEM_FOLLOW, TWO_STEM_SPAN, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { BRANCH_INSET_BY_CHO, BRANCH_INSET_BY_JUNG, CHO_GAP, CHO_TARGET, CHO_TOP_BY_JONG, CHO_TOP_BY_JUNG, JONG_GAP_OFFSET, JONG_LEFT_BY_JUNG, JONG_RIGHT_BY_JUNG, JONG_TARGET, JONG_TOP_BY_CHO, JUNG_TARGET, PILLAR_BOTTOM_NO_FINAL } from './layoutRuleTargets'
 
 /**
@@ -73,6 +73,8 @@ export interface LayoutRuleParams {
   branchInset: boolean
   /** 표 없이 두 기둥 홀자(ㅐ ㅒ ㅔ ㅖ) 옆에서 첫닿자 오른면을 `TWO_STEM_CHO_NARROW`만큼 들인다. */
   twoStemNarrow: boolean
+  /** 표 없이 첫닿자 양옆을 생김새(`choSideInsetOf`)대로 들인다 — 세로벽 있는 닿자는 좁게, 쌍닿자는 오른쪽으로 넓게. */
+  choWall: boolean
 }
 
 /** 공식에 쓰는 자모 생김새 특징. */
@@ -87,6 +89,7 @@ export const DEFAULT_LAYOUT_RULE_PARAMS: LayoutRuleParams = {
   jungKinds: false,
   branchInset: false,
   twoStemNarrow: false,
+  choWall: false,
 }
 
 export interface LayoutRuleStep {
@@ -408,15 +411,21 @@ export function applyLayoutRules(input: {
   const steps: LayoutRuleStep[] = []
 
   const twoStem = !jamo && params.twoStemNarrow && !!input.jamo && TWO_STEM_VOWELS.has(input.jamo.jung)
-  // 첫닿자 오른면 목표는 처음 잰 자리에서 한 번만 정한다(다시 맞추기 때마다 또 빼지 않게).
-  let narrowRight: number | null = null
+  const wall = !jamo && params.choWall && !!input.jamo && input.features?.cho ? choSideInsetOf(input.jamo.cho, input.features.cho) : null
+  const choSides = twoStem || (!!wall && (wall.left !== 0 || wall.right !== 0))
+  // 첫닿자 양면 목표는 처음 잰 자리에서 한 번만 정한다(다시 맞추기 때마다 또 빼지 않게).
+  let sides: { left: number; right: number } | null = null
   const apply = (rule: LayoutRuleId, ink: RuleInk): LayoutRuleStep | null => {
-    if (rule === 'choTable' && twoStem) {
+    if (rule === 'choTable' && choSides) {
       const box = boxes.CH, ch = ink.CH
       if (!box || !ch) return null
-      narrowRight ??= ch.bounds.right - scaleX(body) * TWO_STEM_CHO_NARROW
-      const after = fitBoxToHorizontalInk(box, ch.bounds, { left: ch.bounds.left, right: narrowRight })
-      return { rule: 'choTable', part: 'CH', before: clone(box), after, limited: false, note: `두 기둥 홀자 옆 — 첫닿자 오른면 ${fixed(ch.bounds.right)} → ${fixed(narrowRight)}` }
+      const sx = scaleX(body)
+      sides ??= {
+        left: ch.bounds.left + sx * (wall?.left ?? 0),
+        right: ch.bounds.right - sx * ((twoStem ? TWO_STEM_CHO_NARROW : 0) + (wall?.right ?? 0)),
+      }
+      const after = fitBoxToHorizontalInk(box, ch.bounds, sides)
+      return { rule: 'choTable', part: 'CH', before: clone(box), after, limited: false, note: `${twoStem ? '두 기둥 홀자 옆 · ' : ''}${wall ? '첫닿자 생김새 · ' : ''}첫닿자 가로 ${fixed(ch.bounds.left)}~${fixed(ch.bounds.right)} → ${fixed(sides.left)}~${fixed(sides.right)}` }
     }
     if (rule === 'choTable') return applyChoTable(boxes, ink, body, jamo!, input.features?.cho ?? null, params.formulas)
     if (rule === 'jungTable') return jamo ? applyJungTable(boxes, ink, body, jamo, params.jungKinds) : (params.jungKinds || params.branchInset) && input.jamo ? applyJungKindsOnly(boxes, ink, body, input.jamo.jung, params.branchInset ? input.features?.cho ?? null : null, params.jungKinds) : null
@@ -427,7 +436,7 @@ export function applyLayoutRules(input: {
   }
   for (const rule of LAYOUT_RULE_ORDER) {
     if (!params.rules[rule]) continue
-    if (rule === 'choTable' && !jamo && !twoStem) continue
+    if (rule === 'choTable' && !jamo && !choSides) continue
     if (rule === 'jongTable' && !jamo) continue
     if (rule === 'jungTable' && !jamo && !((params.jungKinds || params.branchInset) && input.jamo)) continue
     if (rule === 'faces') { steps.push(...applyFaces(boxes, measure(boxes))); continue }
