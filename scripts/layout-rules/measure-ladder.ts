@@ -60,9 +60,16 @@ for (const pool of ['588', '171']) for (const k of keys) {
   reps[pool + ' ' + k] = { jStar, cStar, byCho: byCho.map((r: any) => r.char), byJung: byJung.map((r: any) => r.char), byJong: byJong.map((r: any) => r.char), top: top.map((r: any) => r.char) }
 }
 // 칸마다 바로 아래 칸보다 가장 많이 나아진 글자(노토까지 거리 기준)
-const stepTop: string[][] = STEPS.map((_, i) => i === 0 ? [] : [...rows].sort((a, b) => (b.x.steps[i - 1] - b.x.steps[i]) - (a.x.steps[i - 1] - a.x.steps[i])).slice(0, 10).map((r) => r.char))
-for (const list of stepTop) for (const c of list) need.add(c)
+// 칸마다 홀자 가지 갈래별로 가장 많이 나아진 글자(같은 갈래끼리만 줄 세운다).
+const KINDS = [['오른가지 ㅏㅑ', 'ㅏㅑ'], ['가지 없음 ㅣ', 'ㅣ'], ['왼가지 ㅓㅕ', 'ㅓㅕ'], ['두 기둥 ㅐㅒㅔㅖ', 'ㅐㅒㅔㅖ']] as const
+const gain = (r: any, i: number) => r.x.steps[i - 1] - r.x.steps[i]
+const stepTop = STEPS.map((_, i) => i === 0 ? [] : KINDS.map(([label, js]) => {
+  const pr = rows.filter((r) => js.includes(r.jung))
+  const top = [...pr].sort((a, b) => gain(b, i) - gain(a, i)).slice(0, 4)
+  for (const r of top) need.add(r.char)
+  return { label, med: +med(pr.map((r) => gain(r, i))).toFixed(3), items: top.map((r) => ({ char: r.char, before: +r.x.steps[i - 1].toFixed(3), after: +r.x.steps[i].toFixed(3) })) }
+}))
 const svgs: Record<string, { table: string; steps: string[] }> = {}
 for (const c of need) { const r = res.get(c); if (r) svgs[c] = { table: regionsToPath(r.table.ink.rule, V), steps: r.steps.map((s: any) => regionsToPath(s.ink.rule, V)) } }
-fs.writeFileSync(process.env.OUT!, JSON.stringify({ V, steps: STEPS.map(({ id, name, who }) => ({ id, name, who })), summary, rows: rows.map(({ x, ...r }) => r), reps, svgs, stepTop: stepTop.map((list, i) => list.map((c) => { const r = rows.find((q) => q.char === c)!; return { char: c, before: +r.x.steps[i - 1].toFixed(3), after: +r.x.steps[i].toFixed(3) } })) }))
+fs.writeFileSync(process.env.OUT!, JSON.stringify({ V, steps: STEPS.map(({ id, name, who }) => ({ id, name, who })), summary, rows: rows.map(({ x, ...r }) => r), reps, svgs, stepTop }))
 console.log(JSON.stringify(summary))
