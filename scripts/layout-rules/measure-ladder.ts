@@ -17,12 +17,13 @@ const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ', JUNG_AL
 const JUNGS = ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅣ']
 const PAT = { ...DEFAULT_LAYOUT_RULE_PARAMS, tables: false, rules: { ...DEFAULT_LAYOUT_RULE_PARAMS.rules, gap: true } }
 const RAW = { ...DEFAULT_LAYOUT_RULE_PARAMS, rules: { faces: false, choTable: false, jungTable: false, jongTable: false, choBottom: false, pillar: false, gap: false } }
-// 사다리 칸. 가설이 통과하면 여기에 한 줄 보탠다.
-const STEPS = [
-  { id: 'base', name: '패턴만', who: '관계 규칙 · 획 꼴 다섯 · 받침 없을 때 첫닿자 공식', params: PAT },
-  { id: 'jungKinds', name: '+ 홀자 가지 갈래', who: '하니무스 관찰 11/9: 가로줄기가 뻗은 쪽으로 홀자가 간다 → 기둥이 하나면 가지 반대쪽으로 비켜서고, 기둥이 둘이면 기둥 틀은 그대로 두고 가지만 밖으로 나간다(ㅔㅖ 오른 기둥 = ㅐㅒ 0.813 · 0.814)', params: { ...PAT, jungKinds: true } },
-  { id: 'branchInset', name: '+ 왼가지 끝은 첫닿자 오른쪽 모양 따라', who: '하니무스 관찰 11/9: 닿자 오른쪽이 막혔으면 붙고 뚫렸으면 띄운다 → 오른쪽이 위부터 막힌 자음은 가지가 오른면에 살짝 걸치고, 오른쪽 위가 빈 자음(ㄴ ㅅ)은 그 빈 자리로 더 파고든다', params: { ...PAT, jungKinds: true, branchInset: true } },
+// 가설. 통과하면 여기에 한 줄 보탠다. 화면에서 하나씩 켜고 끌 수 있게 켜고 끈 모든 조합(2^가설 수)을 채점한다.
+const HYPS = [
+  { id: 'jungKinds', name: '홀자 가지 갈래', who: '하니무스 관찰 11/9: 가로줄기가 뻗은 쪽으로 홀자가 간다 → 기둥이 하나면 가지 반대쪽으로 비켜서고, 기둥이 둘이면 기둥 틀은 그대로 두고 가지만 밖으로 나간다(ㅔㅖ 오른 기둥 = ㅐㅒ 0.813 · 0.814)', patch: { jungKinds: true } },
+  { id: 'branchInset', name: '왼가지 끝은 첫닿자 오른쪽 모양 따라', who: '하니무스 관찰 11/9: 닿자 오른쪽이 막혔으면 붙고 뚫렸으면 띄운다 → 오른쪽이 위부터 막힌 자음은 가지가 오른면에 살짝 걸치고, 오른쪽 위가 빈 자음(ㄴ ㅅ)은 그 빈 자리로 더 파고든다', patch: { branchInset: true } },
 ]
+/** 조합 번호(mask)의 i번째 비트가 켜져 있으면 i번째 가설을 켠다. 0 = 패턴만. */
+const STEPS = Array.from({ length: 1 << HYPS.length }, (_, mask) => ({ params: HYPS.reduce((p, h, i) => (mask >> i) & 1 ? { ...p, ...h.patch } : p, PAT as any) }))
 const med = (a: number[]) => { const x = a.filter(Number.isFinite).sort((p, q) => p - q); return x.length ? x[x.length >> 1] : NaN }
 const keys = ['CH.left', 'CH.right', 'CH.top', 'CH.bottom', 'JU.left', 'JU.right', 'JU.top', 'JU.bottom', 'JO.left', 'JO.right', 'JO.top', 'JO.bottom']
 const rows: any[] = []
@@ -60,19 +61,10 @@ for (const pool of ['588', '171']) for (const k of keys) {
   for (const r of [...byCho, ...byJung, ...byJong, ...top]) need.add(r.char)
   reps[pool + ' ' + k] = { jStar, cStar, byCho: byCho.map((r: any) => r.char), byJung: byJung.map((r: any) => r.char), byJong: byJong.map((r: any) => r.char), top: top.map((r: any) => r.char) }
 }
-// 칸마다 바로 아래 칸보다 가장 많이 나아진 글자(노토까지 거리 기준)
-// 칸마다 홀자 가지 갈래별로 가장 많이 나아진 글자(같은 갈래끼리만 줄 세운다).
-const KINDS = [['오른가지 ㅏㅑ', 'ㅏㅑ'], ['가지 없음 ㅣ', 'ㅣ'], ['왼가지 ㅓㅕ', 'ㅓㅕ'], ['두 기둥 ㅐㅒㅔㅖ', 'ㅐㅒㅔㅖ']] as const
-const gain = (r: any, i: number) => r.x.steps[i - 1] - r.x.steps[i]
-const stepTop = STEPS.map((_, i) => i === 0 ? [] : KINDS.map(([label, js]) => {
-  const pr = rows.filter((r) => js.includes(r.jung))
-  const top = [...pr].sort((a, b) => gain(b, i) - gain(a, i)).slice(0, 4)
-  for (const r of top) need.add(r.char)
-  return { label, med: +med(pr.map((r) => gain(r, i))).toFixed(3), items: top.map((r) => ({ char: r.char, before: +r.x.steps[i - 1].toFixed(3), after: +r.x.steps[i].toFixed(3) })) }
-}))
+const KINDS = [['오른가지 ㅏㅑ', 'ㅏㅑ'], ['가지 없음 ㅣ', 'ㅣ'], ['왼가지 ㅓㅕ', 'ㅓㅕ'], ['두 기둥 ㅐㅒㅔㅖ', 'ㅐㅒㅔㅖ']]
 const svgs: Record<string, { table: string; steps: string[] }> = {}
 // 칸을 누르면 어느 글자든 나올 수 있어 전부 그린다.
 for (const r of rows) need.add(r.char)
 for (const c of need) { const r = res.get(c); if (r) svgs[c] = { table: regionsToPath(r.table.ink.rule, V), steps: r.steps.map((s: any) => regionsToPath(s.ink.rule, V)) } }
-fs.writeFileSync(process.env.OUT!, JSON.stringify({ V, steps: STEPS.map(({ id, name, who }) => ({ id, name, who })), summary, rows: rows.map(({ x, ...r }) => r), reps, svgs, stepTop }))
+fs.writeFileSync(process.env.OUT!, JSON.stringify({ V, hyps: HYPS.map(({ id, name, who }) => ({ id, name, who })), kinds: KINDS, summary, rows: rows.map(({ x, ...r }) => ({ ...r, xs: x.steps.map((v: number) => +v.toFixed(3)) })), reps, svgs }))
 console.log(JSON.stringify(summary))

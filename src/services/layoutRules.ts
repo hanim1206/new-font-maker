@@ -69,7 +69,7 @@ export interface LayoutRuleParams {
   tables: boolean
   /** 홀자 가로 자리를 홀자 표 아홉 줄 대신 가지 모양 갈래 넷으로 낸다(`layoutRuleFormulas.ts`의 PILLAR_RIGHT). */
   jungKinds: boolean
-  /** 표 없이 왼가지 끝을 첫닿자 오른쪽 모양(`branchInsetOf`)으로 낸다. `jungKinds`와 같이 켠다. */
+  /** 표 없이 왼가지 끝을 첫닿자 오른쪽 모양(`branchInsetOf`)으로 낸다. `jungKinds`와 따로 켜고 끈다. */
   branchInset: boolean
 }
 
@@ -361,16 +361,18 @@ function applyGap(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, params: Layout
  * 기둥은 가지 반대쪽으로 비켜서고(PILLAR_RIGHT), 오른가지는 기둥 밖으로 나간다(RIGHT_BRANCH_OUT).
  * 왼가지 홀자(ㅓ ㅕ ㅔ ㅖ)는 첫닿자 파고듦이 아직 표라서 폭은 그대로 두고 오른면만 맞춘다.
  */
-function applyJungKindsOnly(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jung: string, cho: JamoShapeFeatures | null): LayoutRuleStep | null {
+function applyJungKindsOnly(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jung: string, cho: JamoShapeFeatures | null, kinds: boolean): LayoutRuleStep | null {
   const box = boxes.JU
   const ju = ink.JU
   const kind = vowelBranchKindOf(jung)
   if (!box || !ju || !kind) return null
-  const right = atX(body, PILLAR_RIGHT[kind] + (kind === 'right' ? RIGHT_BRANCH_OUT : 0))
   const inset = LEFT_BRANCH_VOWELS.has(jung) && cho && ink.CH ? branchInsetOf(cho) : null
+  // 갈래 공식이 꺼져 있으면 기둥은 제자리에 두고 왼가지 끝만 옮긴다.
+  if (!kinds && inset === null) return null
+  const right = kinds ? atX(body, PILLAR_RIGHT[kind] + (kind === 'right' ? RIGHT_BRANCH_OUT : 0)) : ju.bounds.right
   const left = inset !== null && ink.CH
     ? ink.CH.bounds.right + scaleX(body) * inset
-    : LEFT_BRANCH_VOWELS.has(jung)
+    : LEFT_BRANCH_VOWELS.has(jung) || !kinds
     ? right - (ju.bounds.right - ju.bounds.left)
     : atX(body, kind === 'twoStem' ? PILLAR_RIGHT.twoStem - TWO_STEM_SPAN : PILLAR_RIGHT[kind]) - (kind === 'twoStem' ? 0 : ju.thickness)
   const after = fitBoxToHorizontalInk(box, ju.bounds, { left, right })
@@ -404,7 +406,7 @@ export function applyLayoutRules(input: {
 
   const apply = (rule: LayoutRuleId, ink: RuleInk): LayoutRuleStep | null => {
     if (rule === 'choTable') return applyChoTable(boxes, ink, body, jamo!, input.features?.cho ?? null, params.formulas)
-    if (rule === 'jungTable') return jamo ? applyJungTable(boxes, ink, body, jamo, params.jungKinds) : params.jungKinds && input.jamo ? applyJungKindsOnly(boxes, ink, body, input.jamo.jung, params.branchInset ? input.features?.cho ?? null : null) : null
+    if (rule === 'jungTable') return jamo ? applyJungTable(boxes, ink, body, jamo, params.jungKinds) : (params.jungKinds || params.branchInset) && input.jamo ? applyJungKindsOnly(boxes, ink, body, input.jamo.jung, params.branchInset ? input.features?.cho ?? null : null, params.jungKinds) : null
     if (rule === 'jongTable') return applyJongTable(boxes, ink, body, jamo!)
     if (rule === 'choBottom') return applyChoBottom(boxes, ink, body, params, jamo)
     if (rule === 'pillar') return applyPillar(boxes, ink, body, params, jamo)
@@ -413,7 +415,7 @@ export function applyLayoutRules(input: {
   for (const rule of LAYOUT_RULE_ORDER) {
     if (!params.rules[rule]) continue
     if ((rule === 'choTable' || rule === 'jongTable') && !jamo) continue
-    if (rule === 'jungTable' && !jamo && !(params.jungKinds && input.jamo)) continue
+    if (rule === 'jungTable' && !jamo && !((params.jungKinds || params.branchInset) && input.jamo)) continue
     if (rule === 'faces') { steps.push(...applyFaces(boxes, measure(boxes))); continue }
     if (rule === 'gap') { steps.push(...applyGap(boxes, measure(boxes), body, params, params.branchInset && !!input.jamo && LEFT_BRANCH_VOWELS.has(input.jamo.jung))); continue }
     // 상자를 늘여도 획 두께는 그대로라 잉크는 상자에 비례해 늘지 않는다. 한 번 맞춘 뒤 다시 재서, 목표에 닿을 때까지(최대 REFIT_ROUNDS번) 다시 맞춘다.

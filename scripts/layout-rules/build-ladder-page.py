@@ -9,7 +9,7 @@ main{max-width:1080px;margin:0 auto;padding:28px 20px 80px}
 h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:34px 0 8px}p.sub{color:var(--mute);margin:0 0 16px}
 .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px}
 .ladder .st{display:grid;grid-template-columns:28px 1fr 170px;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line);cursor:pointer}
-.ladder .st:first-child{border-top:0}.ladder .st input{width:18px;height:18px}
+.ladder .st:first-child{border-top:0}.ladder .st.base{cursor:default}.ladder .st input{width:18px;height:18px}
 .ladder .st .nm{font-weight:600}.ladder .st small{display:block;color:var(--mute);font-weight:400;font-size:12px}
 .ladder .st .num{text-align:right;font-size:13px;color:var(--mute)}.ladder .st .num b{color:var(--ink);font-size:15px}
 .ladder .st.cur .nm{color:var(--step)}
@@ -50,24 +50,24 @@ body.pk main{margin-left:12px;margin-right:calc(min(400px,38vw) + 24px)}
 #pick .pg{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}#pick .pg div{text-align:center;font-size:10px;color:var(--mute)}#pick .pg b{color:var(--ink);font-size:12px}#pick .pg .hi svg{outline:2px solid #111;border-radius:6px}
 </style></head><body><div id="pick"></div><main>
 <h1>가설 사다리 — 우리 패턴으로 노토까지</h1>
-<p class="sub">맨 아래 칸 "패턴만"에서 출발해, 맞다고 확인된 가설을 한 칸씩 쌓는다. 칸을 고르면 그 칸까지 쌓은 결과로 거리와 "아직 표가 하는 일"이 바뀐다. 목표는 표 없이 패턴만으로 파란 점을 초록(외운 표) 점까지 미는 것이다.</p>
+<p class="sub">"패턴만"에서 출발해 맞다고 확인된 가설을 하나씩 보탠다. 가설은 하나씩 켜고 끌 수 있고, 켠 조합으로 거리와 "아직 표가 하는 일"이 바뀐다. 목표는 표 없이 패턴만으로 파란 점을 초록(외운 표) 점까지 미는 것이다.</p>
 
 <section class="card">
 <div class="ladder" id="ladder"></div>
 <div class="add">다음 칸 — 가설을 말해 주면 공식으로 옮겨 채점하고, 통과하면 여기 한 줄이 생긴다.</div>
 <div class="pools" id="pools"></div>
-<div class="legend"><span><i style="background:var(--raw)"></i>날것</span><span><i style="background:var(--step)"></i>지금 고른 칸</span><span><i style="background:var(--tab)"></i>외운 표</span><span><i style="background:var(--noto)"></i>노토</span><span>거리 = 어긋난 잉크 ÷ 노토 잉크</span></div>
+<div class="legend"><span><i style="background:var(--raw)"></i>날것</span><span><i style="background:var(--step)"></i>지금 조합</span><span><i style="background:var(--tab)"></i>외운 표</span><span><i style="background:var(--noto)"></i>노토</span><span>거리 = 어긋난 잉크 ÷ 노토 잉크</span></div>
 </section>
 
 <h2>아직 표가 하는 일</h2>
-<p class="sub">고른 칸과 외운 표의 상자 차이. 칸 숫자는 표가 그 짝에서 변을 더 옮기는 양(빨강 오른쪽 · 아래, 파랑 왼쪽 · 위). 가설이 맞으면 해당 줄의 막대가 줄고 판이 하얘진다. 점선은 "패턴만" 때 막대 길이.</p>
+<p class="sub">지금 조합과 외운 표의 상자 차이. 칸 숫자는 표가 그 짝에서 변을 더 옮기는 양(빨강 오른쪽 · 아래, 파랑 왼쪽 · 위). 가설이 맞으면 해당 줄의 막대가 줄고 판이 하얘진다. 점선은 "패턴만" 때 막대 길이.</p>
 <div class="poolsw"><button data-pool="171" class="on">받침 없는 171자</button><button data-pool="588">받침 있는 588자</button></div>
 <section class="card" id="moves"></section>
 <div class="note">보는 법 — 한 줄 전체가 같은 색이면 "그 첫닿자는 늘 이렇다", 한 열이 같은 색이면 "그 홀자 옆에서는 늘 이렇다"는 패턴 후보다. 아래 글자 탭은 첫닿자별(홀자 고정) · 홀자별(첫닿자 고정) · 받침별 · 가장 많이 순.</div>
 </main>
 <script>
 const D = __DATA__;
-const V = D.V, N = D.steps.length;
+const V = D.V, N = 1 << D.hyps.length;
 const PARTN = {CH:'첫닿자',JU:'홀자',JO:'받침'}, EDGEN = {left:'왼면',right:'오른면',top:'윗면',bottom:'아랫면'};
 const CHOS = [...'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'], JUNGS = ['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅣ'], JONGS = [...'ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ'];
 /** 글자가 카드 테두리에 닿지 않게 둘레에 두는 여백(V 단위). */
@@ -91,7 +91,7 @@ function panel() {
   if (cho) body += line(`줄 — 첫닿자 ${cho}`, JUNGS.map(j => glyph(mid(rows.filter(r => r.cho === cho && r.jung === j)), j === jung)));
   if (jung) body += line(`열 — 홀자 ${jung}`, CHOS.map(c => glyph(mid(rows.filter(r => r.cho === c && r.jung === jung)), c === cho)));
   if (t === 'jong') body += line(`받침 ${a}`, [...rows.filter(r => r.jong === a)].sort((x, y) => Math.abs(mv(y)) - Math.abs(mv(x))).map(r => glyph(r, false)));
-  el.innerHTML = `<div class="ph"><b>${PARTN[p]} ${EDGEN[e]}</b> · ${pool}자 · ${sel}칸<button id="pickx">✕</button></div><div class="ps">초록 면 = 외운 표 · 파랑 선 = ${sel}칸 · 숫자 = 표가 더 옮기는 양</div>${body}`;
+  el.innerHTML = `<div class="ph"><b>${PARTN[p]} ${EDGEN[e]}</b> · ${pool}자 · ${selName()}<button id="pickx">✕</button></div><div class="ps">초록 면 = 외운 표 · 파랑 선 = 지금 조합 · 숫자 = 표가 더 옮기는 양</div>${body}`;
   el.style.display = 'block'; document.body.classList.add('pk');
   document.getElementById('pickx').onclick = () => { delete SELC[pool + ' ' + LAST]; LAST = null; moves(); };
 }
@@ -116,23 +116,29 @@ let sel = N - 1, pool = '171';
 const svgOf = (c, i) => { const g = D.svgs[c]; return g ? `<svg viewBox="${-PADV} ${-PADV} ${V+2*PADV} ${V+2*PADV}"><path class="tab" d="${g.table}" fill-rule="evenodd"/><path class="step" d="${g.steps[i]}"/></svg>` : ''; };
 function ladder() {
   const el = document.getElementById('ladder'); el.innerHTML = '';
-  [...D.steps.keys()].reverse().forEach(i => {
-    const st = D.steps[i]; const s5 = D.summary['588'], s1 = D.summary['171'];
-    const pct = (s, x) => Math.round((1 - x / s.raw) * 100);
-    el.insertAdjacentHTML('beforeend', `<label class="st ${i===sel?'cur':''}"><input type="radio" name="step" ${i===sel?'checked':''} data-i="${i}"><div class="nm">${i}. ${st.name}<small>${st.who}</small></div><div class="num">588 <b>${s5.steps[i].toFixed(2)}</b> (${pct(s5, s5.steps[i])}%)<br>171 <b>${s1.steps[i].toFixed(2)}</b> (${pct(s1, s1.steps[i])}%)</div></label>`);
-    const groups = (D.stepTop[i] ?? []);
-    const ex = t => { const g = D.svgs[t.char]; return g ? `<div><svg viewBox="${-PADV} ${-PADV} ${V+2*PADV} ${V+2*PADV}"><path class="prev" d="${g.steps[i-1]}" fill-rule="evenodd"/><path class="step" d="${g.steps[i]}"/></svg><b>${t.char}</b> ${t.before.toFixed(2)} → ${t.after.toFixed(2)}</div>` : ''; };
-    if (groups.length) el.insertAdjacentHTML('beforeend', `<div class="stex"><div class="scale">이 칸을 켰을 때 가장 많이 나아진 글자, 홀자 가지 갈래별로 — 회색 면 = 바로 아래 칸(${i-1}칸) · 파랑 선 = 이 칸(${i}칸). 숫자는 노토까지 거리 전 → 후.</div>${groups.map(gr => `<div class="kg"><div class="kgh">${gr.label} <small>이 갈래 글자들은 가운데값으로 거리 ${Math.abs(gr.med).toFixed(2)} ${gr.med >= 0 ? '줄어듦' : '늘어남'}</small></div>${gr.items.some(t => t.before - t.after > 0.005) ? `<div class="exs">${gr.items.filter(t => t.before - t.after > 0.005).map(ex).join('')}</div>` : '<div class="scale">이 칸에서는 바뀌지 않는다</div>'}</div>`).join('')}</div>`);
+  const s5 = D.summary['588'], s1 = D.summary['171'];
+  const pct = (s, x) => Math.round((1 - x / s.raw) * 100);
+  const nums = m => `588 <b>${s5.steps[m].toFixed(2)}</b> (${pct(s5, s5.steps[m])}%)<br>171 <b>${s1.steps[m].toFixed(2)}</b> (${pct(s1, s1.steps[m])}%)`;
+  el.insertAdjacentHTML('beforeend', `<div class="st base"><span></span><div class="nm">패턴만 <small>늘 켜져 있다 — 관계 규칙 · 획 꼴 다섯 · 받침 없을 때 첫닿자 공식</small></div><div class="num">${nums(0)}</div></div>`);
+  D.hyps.forEach((h, i) => {
+    const bit = 1 << i, on = (sel & bit) !== 0, off = sel & ~bit, with_ = sel | bit;
+    const d = (s, a, b) => `${s.steps[a].toFixed(2)} → ${s.steps[b].toFixed(2)}`;
+    el.insertAdjacentHTML('beforeend', `<label class="st ${on ? 'cur' : ''}"><input type="checkbox" ${on ? 'checked' : ''} data-bit="${bit}"><div class="nm">${i + 1}. ${h.name}<small>${h.who}</small></div><div class="num">이것만 켜고 끄면<br>588 ${d(s5, off, with_)}<br>171 ${d(s1, off, with_)}</div></label>`);
+    if (!on) return;
+    const ex = r => { const g = D.svgs[r.char]; return g ? `<div><svg viewBox="${-PADV} ${-PADV} ${V+2*PADV} ${V+2*PADV}"><path class="prev" d="${g.steps[off]}" fill-rule="evenodd"/><path class="step" d="${g.steps[with_]}"/></svg><b>${r.char}</b> ${r.xs[off].toFixed(2)} → ${r.xs[with_].toFixed(2)}</div>` : ''; };
+    const groups = D.kinds.map(([label, js]) => { const pr = D.rows.filter(r => js.includes(r.jung)); const gain = r => r.xs[off] - r.xs[with_]; const top = [...pr].sort((a, b) => gain(b) - gain(a)).slice(0, 4).filter(r => gain(r) > 0.005); return { label, med: mmed(pr.map(gain)) ?? 0, top }; });
+    el.insertAdjacentHTML('beforeend', `<div class="stex"><div class="scale">이 가설을 켰을 때 가장 많이 나아진 글자, 홀자 가지 갈래별로 — 회색 면 = 이것만 끈 것 · 파랑 선 = 켠 것(다른 가설은 지금 체크 그대로). 숫자는 노토까지 거리 전 → 후.</div>${groups.map(gr => `<div class="kg"><div class="kgh">${gr.label} <small>이 갈래 글자들은 가운데값으로 거리 ${Math.abs(gr.med).toFixed(2)} ${gr.med >= 0 ? '줄어듦' : '늘어남'}</small></div>${gr.top.length ? `<div class="exs">${gr.top.map(ex).join('')}</div>` : '<div class="scale">이 가설로는 바뀌지 않는다</div>'}</div>`).join('')}</div>`);
   });
-  el.querySelectorAll('input').forEach(x => x.addEventListener('change', () => { sel = +x.dataset.i; renderAll(); }));
+  el.querySelectorAll('input').forEach(x => x.addEventListener('change', () => { sel ^= +x.dataset.bit; renderAll(); }));
 }
+const selName = () => sel === 0 ? '패턴만' : '패턴만 + ' + D.hyps.map((h, i) => (sel >> i) & 1 ? (i + 1) : null).filter(Boolean).join(' · ');
 function pools() {
   const el = document.getElementById('pools'); el.innerHTML = '';
   for (const p of ['171','588']) {
     const s = D.summary[p]; const max = s.raw; const px = v => (1 - v / max) * 100;
     let dots = `<div class="dot" style="left:0;background:var(--raw)"></div><div class="lab up" style="left:0"><b>${s.raw.toFixed(2)}</b>날것</div>`;
     s.steps.forEach((v, i) => { if (i !== sel) dots += `<div class="dot small" style="left:${px(v)}%;background:var(--step)"></div>`; });
-    dots += `<div class="dot" style="left:${px(s.steps[sel])}%;background:var(--step)"></div><div class="lab" style="left:${px(s.steps[sel])}%"><b>${s.steps[sel].toFixed(2)}</b>${sel}칸</div>`;
+    dots += `<div class="dot" style="left:${px(s.steps[sel])}%;background:var(--step)"></div><div class="lab" style="left:${px(s.steps[sel])}%"><b>${s.steps[sel].toFixed(2)}</b>지금</div>`;
     dots += `<div class="dot" style="left:${px(s.table)}%;background:var(--tab)"></div><div class="lab up" style="left:${px(s.table)}%"><b>${s.table.toFixed(2)}</b>외운 표</div>`;
     dots += `<div class="dot" style="left:100%;background:var(--noto)"></div><div class="lab" style="left:100%"><b>0</b>노토</div>`;
     el.insertAdjacentHTML('beforeend', `<div class="pool"><h3>${p==='588'?'받침 있는 588자':'받침 없는 171자'}</h3><div class="meta">패턴만으로 ${Math.round((1-s.steps[sel]/s.raw)*100)}% · 외운 표 ${Math.round((1-s.table/s.raw)*100)}%</div><div class="track"><div class="bar"></div>${dots}</div></div>`);
