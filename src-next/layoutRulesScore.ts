@@ -1,6 +1,8 @@
 import { materializeFinalGlyphInk } from '../src/services/finalGlyphInk'
 import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
 import { applyLayoutRules, bodyOfPadding, RULE_PARTS } from '../src/services/layoutRules'
+import { applyStrokeShapeRules, STROKE_SHAPES_OFF } from '../src/services/strokeShapeRules'
+import type { StrokeShapeParams } from '../src/services/strokeShapeRules'
 import type { InkBounds, LayoutRuleParams, LayoutRuleStep, RuleBoxes, RuleInk, RuleMeasure, RulePart } from '../src/services/layoutRules'
 import { appGlyphInkRegions, ghostXorRatio, glyphPlacementOf } from '../src/services/notoGlyphXor'
 import type { GlyphInkPlacement } from '../src/services/notoGlyphXor'
@@ -52,6 +54,8 @@ export interface ScoredGlyph {
   limited: boolean
   /** 그림용(em 0~1). 규칙 자리의 앱 잉크와 노토 고스트. */
   ink: { rule: readonly DeepReadonly<InkRegion>[]; ghost: readonly DeepReadonly<InkRegion>[] }
+  /** 규칙 자리에 그린 음절(획 꼴 규칙을 입힌 것). 획별 채점이 다시 쓴다. 실패면 null. */
+  drawn: DecomposedSyllable | null
 }
 
 export const NOTO_DELTA_TOLERANCE = 0.02
@@ -199,11 +203,13 @@ export interface ScoreInput {
   params: LayoutRuleParams
   /** 홀자 안쪽 줄기(곁줄기 등)를 모델이 푼 노토 보선에 맞춘다. 끄면 자모 원형 비율 그대로. */
   snapStems: boolean
+  /** 2차 획 꼴 규칙. 자리는 그대로 두고 그릴 때만 꼴을 바꾼다. 없으면 끔. */
+  shapes?: StrokeShapeParams
 }
 
 export function scoreGlyph(input: ScoreInput): ScoredGlyph {
   const { char, maps, style, model, params } = input
-  const failed = (message: string): ScoredGlyph => ({ char, ok: false, message, xor: { model: null, schema: 0, rule: 0 }, boxes: { schema: {}, rule: {}, model: null }, box: null, steps: [], limited: false, ink: { rule: [], ghost: [] } })
+  const failed = (message: string): ScoredGlyph => ({ char, ok: false, message, xor: { model: null, schema: 0, rule: 0 }, boxes: { schema: {}, rule: {}, model: null }, box: null, steps: [], limited: false, ink: { rule: [], ghost: [] }, drawn: null })
   let syllable: DecomposedSyllable
   try { syllable = decomposeSyllable(char, maps.choseong, maps.jungseong, maps.jongseong) }
   catch (failure) { return failed(failure instanceof Error ? failure.message : '분해 실패') }
@@ -231,7 +237,9 @@ export function scoreGlyph(input: ScoreInput): ScoredGlyph {
   const snap = (boxes: RuleBoxes): RuleBoxes => input.snapStems && modelBoxes?.JU?.stems && boxes.JU ? { ...boxes, JU: { ...boxes.JU, stems: railsInBox(modelBoxes.JU, boxes.JU) } } : boxes
   const ruled = applyLayoutRules({ boxes: snap(schemaBoxes), body: bodyOfPadding(START_PADDING), params, measure: (boxes) => plainMeasure(snap(boxes)), jamo })
   if (input.snapStems && modelBoxes?.JU?.stems && ruled.boxes.JU) ruled.boxes.JU = { ...ruled.boxes.JU, stems: railsInBox(modelBoxes.JU, ruled.boxes.JU) }
-  const ruleXor = xorOf(syllable, { kind: 'boxes', boxes: ruled.boxes }, style, ghost.regions)
+  // 자리는 원래 꼴로 정하고, 그림만 꼴 규칙을 입혀 그린다.
+  const drawn = applyStrokeShapeRules(syllable, input.shapes ?? STROKE_SHAPES_OFF)
+  const ruleXor = xorOf(drawn, { kind: 'boxes', boxes: ruled.boxes }, style, ghost.regions)
   if ('message' in ruleXor) return failed(ruleXor.message)
 
   const measure = partInkMeasure(syllable, style)
@@ -245,6 +253,7 @@ export function scoreGlyph(input: ScoreInput): ScoredGlyph {
     steps: ruled.steps,
     limited: ruled.limited,
     ink: { rule: ruleXor.regions, ghost: ghost.regions },
+    drawn,
   }
 }
 

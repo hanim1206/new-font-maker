@@ -4,6 +4,9 @@ import type { LayoutRuleId, LayoutRuleParams, RuleBoxes } from '../src/services/
 import { DEFAULT_STYLE } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
 import type { BoxConfig } from '../src/types'
+import { DEFAULT_STROKE_SHAPE_PARAMS } from '../src/services/strokeShapeRules'
+import type { StrokeShapeParams } from '../src/services/strokeShapeRules'
+import { strokeXorShares } from './layoutRulesStrokeXor'
 import { EDIT_COLOR } from './editColors'
 import { BOX_TOLERANCE, EDGE_LABEL, EDGES, GLYPH_KIND_LABEL, glyphKindOf, INK_CLOSE_TOLERANCE, medianOf, NOTO_DELTA_TOLERANCE, regionsToPath, REPRESENTATIVE_CHARS, sampleChars, scoreGlyph } from './layoutRulesScore'
 import type { JamoMaps, ScoredGlyph } from './layoutRulesScore'
@@ -25,8 +28,8 @@ const VIEW = 300
 const WORST_COUNT = 20
 const BATCH = 6
 
-function useScores(input: { chars: string[]; maps: JamoMaps; params: LayoutRuleParams; snapStems: boolean; modelReady: boolean; model: Parameters<typeof scoreGlyph>[0]['model'] }) {
-  const { chars, maps, params, snapStems, modelReady, model } = input
+function useScores(input: { chars: string[]; maps: JamoMaps; params: LayoutRuleParams; snapStems: boolean; shapes: StrokeShapeParams; modelReady: boolean; model: Parameters<typeof scoreGlyph>[0]['model'] }) {
+  const { chars, maps, params, snapStems, shapes, modelReady, model } = input
   const [scores, setScores] = useState<Map<string, ScoredGlyph>>(new Map())
   const [progress, setProgress] = useState({ done: 0, total: 0 })
   const run = useRef(0)
@@ -46,10 +49,10 @@ function useScores(input: { chars: string[]; maps: JamoMaps; params: LayoutRuleP
         if (cancelled || run.current !== token) return
         for (const item of glyphs) {
           if ('error' in item) {
-            next.set(item.char, { char: item.char, ok: false, message: item.error, xor: { model: null, schema: 0, rule: 0 }, boxes: { schema: {}, rule: {}, model: null }, box: null, steps: [], limited: false, ink: { rule: [], ghost: [] } })
+            next.set(item.char, { char: item.char, ok: false, message: item.error, xor: { model: null, schema: 0, rule: 0 }, boxes: { schema: {}, rule: {}, model: null }, box: null, steps: [], limited: false, ink: { rule: [], ghost: [] }, drawn: null })
             continue
           }
-          next.set(item.char, scoreGlyph({ char: item.char, maps, style: DEFAULT_STYLE, model, outline: item.glyph.outline, params, snapStems }))
+          next.set(item.char, scoreGlyph({ char: item.char, maps, style: DEFAULT_STYLE, model, outline: item.glyph.outline, params, snapStems, shapes }))
         }
         setScores(new Map(next))
         setProgress({ done: Math.min(index + BATCH, chars.length), total: chars.length })
@@ -58,7 +61,7 @@ function useScores(input: { chars: string[]; maps: JamoMaps; params: LayoutRuleP
     }
     void work()
     return () => { cancelled = true }
-  }, [chars, maps, params, snapStems, modelReady, model])
+  }, [chars, maps, params, snapStems, shapes, modelReady, model])
 
   return { scores, progress }
 }
@@ -125,6 +128,7 @@ function Detail({ score, show }: { score: ScoredGlyph; show: { ghost: boolean; i
         <tr><th>잉크 xor · 규칙</th><td>{pct(score.xor.rule)}</td></tr>
         <tr><th>잉크 xor · 규칙 − 모델</th><td>{signed(deltaOf(score))}</td></tr>
       </tbody></table>
+      <StrokeShares score={score} />
       <ol className={styles.steps}>
         {score.steps.length === 0 && <li>움직인 규칙 없음</li>}
         {score.steps.map((step, index) => <li key={index} data-limited={step.limited || undefined}>
@@ -133,6 +137,21 @@ function Detail({ score, show }: { score: ScoredGlyph; show: { ghost: boolean; i
       </ol>
     </div>
   </div>
+}
+
+/** 2차 채점: 노토와 어긋난 잉크를 획마다 나눈 것. 남는 = 우리 잉크 중 노토 밖, 모자란 = 노토 잉크 중 우리 밖(가장 가까운 획 몫). */
+function StrokeShares({ score }: { score: ScoredGlyph }) {
+  const shares = useMemo(() => score.drawn ? strokeXorShares({ syllable: score.drawn, boxes: score.boxes.rule, style: DEFAULT_STYLE, ghost: score.ink.ghost }) : [], [score])
+  if (shares.length === 0) return null
+  const total = shares.reduce((sum, share) => sum + share.extra + share.missing, 0)
+  const rows = [...shares].sort((a, b) => (b.extra + b.missing) - (a.extra + a.missing))
+  return <table className={styles.edgeTable} data-testid="stroke-shares">
+    <thead><tr><th>획별 어긋남(노토 잉크 대비)</th><th>남는</th><th>모자란</th><th>몫</th></tr></thead>
+    <tbody>{rows.map((share) => {
+      const sum = share.extra + share.missing
+      return <tr key={`${share.part}:${share.strokeId}`}><th style={{ color: PART_COLOR[share.part] }}>{share.strokeId}</th><td>{pct(share.extra)}</td><td>{pct(share.missing)}</td><td data-over={total > 0 && sum / total >= 0.5 || undefined}>{total > 0 ? `${Math.round((sum / total) * 100)}%` : '-'}</td></tr>
+    })}</tbody>
+  </table>
 }
 
 export function LayoutRulesLabPage() {
@@ -144,12 +163,13 @@ export function LayoutRulesLabPage() {
 
   const [params, setParams] = useState<LayoutRuleParams>(DEFAULT_LAYOUT_RULE_PARAMS)
   const [snapStems, setSnapStems] = useState(true)
+  const [shapes, setShapes] = useState<StrokeShapeParams>(DEFAULT_STROKE_SHAPE_PARAMS)
   const [sample, setSample] = useState<SampleKind>('six')
   const [selected, setSelected] = useState<string>(REPRESENTATIVE_CHARS[1])
   const [show, setShow] = useState({ ghost: true, ink: true, schema: false, model: true, rule: true })
 
   const chars = useMemo(() => sample === 'six' ? [...REPRESENTATIVE_CHARS] : sampleChars(), [sample])
-  const { scores, progress } = useScores({ chars, maps, params, snapStems, modelReady: Boolean(bundle) || Boolean(modelError), model: bundle })
+  const { scores, progress } = useScores({ chars, maps, params, snapStems, shapes, modelReady: Boolean(bundle) || Boolean(modelError), model: bundle })
 
   const list = useMemo(() => chars.map((char) => scores.get(char)).filter((score): score is ScoredGlyph => Boolean(score)), [chars, scores])
   const summary = useMemo(() => {
@@ -194,6 +214,8 @@ export function LayoutRulesLabPage() {
         <h3>규칙</h3>
         {LAYOUT_RULE_ORDER.map((rule) => <label key={rule}><input type="checkbox" checked={params.rules[rule]} onChange={() => toggleRule(rule)} data-testid={`rule-${rule}`} /> {LAYOUT_RULE_LABEL[rule]}</label>)}
         <label><input type="checkbox" checked={snapStems} onChange={() => setSnapStems((value) => !value)} /> 홀자 안쪽 줄기를 노토 보선에 맞춤</label>
+        <h3>획 꼴(2차)</h3>
+        <label><input type="checkbox" checked={shapes.giyeokSweep} onChange={() => setShapes((prev) => ({ ...prev, giyeokSweep: !prev.giyeokSweep }))} data-testid="shape-giyeokSweep" /> ㄱ ㅋ ㄲ 세로줄기를 삐침으로(오른홀자 옆)</label>
       </div>
       <div className={styles.group}>
         <h3>변수</h3>
