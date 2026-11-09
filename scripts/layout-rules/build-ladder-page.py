@@ -43,7 +43,12 @@ path.tab{fill:var(--tab);opacity:.45}path.prev{fill:#9a9aa2;opacity:.4}.kg{margi
 .vtabs{display:flex;gap:6px;margin-top:16px}.vtabs button{font-size:12px;padding:4px 12px}
 .exs{display:grid;grid-template-columns:repeat(10,1fr);gap:8px;margin-top:6px}.exs div{text-align:center;font-size:11px;color:var(--mute)}.exs b{color:var(--ink);font-size:13px}
 .note{background:#eef6f0;border:1px solid #cfe6d6;border-radius:10px;padding:12px 16px;font-size:13px;margin-top:14px}
-</style></head><body><main>
+#pick{display:none;position:fixed;top:12px;right:12px;width:min(400px,38vw);max-height:calc(100vh - 24px);overflow:auto;background:#fff;border:1px solid #ddd;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.14);padding:12px 14px;z-index:20}
+body.pk main{margin-left:12px;margin-right:calc(min(400px,38vw) + 24px)}
+#pick .ph{font-size:14px;display:flex;align-items:center;gap:4px}#pick .ph button{margin-left:auto;border:0;background:none;font-size:15px;cursor:pointer;color:var(--mute)}
+#pick .ps{font-size:11px;color:var(--mute);margin:2px 0 6px}#pick .pt{font-size:12px;font-weight:600;margin:8px 0 4px}
+#pick .pg{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}#pick .pg div{text-align:center;font-size:10px;color:var(--mute)}#pick .pg b{color:var(--ink);font-size:12px}#pick .pg .hi svg{outline:2px solid #111;border-radius:6px}
+</style></head><body><div id="pick"></div><main>
 <h1>가설 사다리 — 우리 패턴으로 노토까지</h1>
 <p class="sub">맨 아래 칸 "패턴만"에서 출발해, 맞다고 확인된 가설을 한 칸씩 쌓는다. 칸을 고르면 그 칸까지 쌓은 결과로 거리와 "아직 표가 하는 일"이 바뀐다. 목표는 표 없이 패턴만으로 파란 점을 초록(외운 표) 점까지 미는 것이다.</p>
 
@@ -67,6 +72,27 @@ const PARTN = {CH:'첫닿자',JU:'홀자',JO:'받침'}, EDGEN = {left:'왼면',r
 const CHOS = [...'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'], JUNGS = ['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅣ'], JONGS = [...'ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ'];
 const OPEN = new Set();
 const SELC = {};
+let LAST = null;
+/** 고른 칸의 줄(같은 첫닿자)과 열(같은 홀자)을 오른쪽 위 고정 패널에 띄운다. */
+function panel() {
+  const el = document.getElementById('pick'); const pick = LAST && SELC[pool + ' ' + LAST];
+  if (!pick) { el.style.display = 'none'; document.body.classList.remove('pk'); return; }
+  const key = LAST; const [p, e] = key.split('.'); const mv = r => r.moves[sel][key];
+  const rows = D.rows.filter(r => r.pool === pool && mv(r) !== undefined);
+  const mid = list => { const m = mmed(list.map(mv)); return [...list].sort((x, y) => Math.abs(mv(x) - m) - Math.abs(mv(y) - m))[0]; };
+  const [t, a, b] = pick.split('|');
+  const glyph = (r, hi) => r && D.svgs[r.char] ? `<div class="${hi ? 'hi' : ''}">${svgOf(r.char, sel)}<b>${r.char}</b> ${fmt(mv(r))}</div>` : '<div></div>';
+  const line = (title, cells) => `<div class="pl"><div class="pt">${title}</div><div class="pg">${cells.join('')}</div></div>`;
+  let body = '';
+  const cho = t === 'cell' || t === 'cho' ? a : null, jung = t === 'cell' ? b : t === 'jung' ? a : null;
+  if (t === 'cell') body += line(`${a} × ${b} 칸`, [...rows.filter(r => r.cho === a && r.jung === b)].sort((x, y) => Math.abs(mv(y)) - Math.abs(mv(x))).map(r => glyph(r, false)));
+  if (cho) body += line(`줄 — 첫닿자 ${cho}`, JUNGS.map(j => glyph(mid(rows.filter(r => r.cho === cho && r.jung === j)), j === jung)));
+  if (jung) body += line(`열 — 홀자 ${jung}`, CHOS.map(c => glyph(mid(rows.filter(r => r.cho === c && r.jung === jung)), c === cho)));
+  if (t === 'jong') body += line(`받침 ${a}`, [...rows.filter(r => r.jong === a)].sort((x, y) => Math.abs(mv(y)) - Math.abs(mv(x))).map(r => glyph(r, false)));
+  el.innerHTML = `<div class="ph"><b>${PARTN[p]} ${EDGEN[e]}</b> · ${pool}자 · ${sel}칸<button id="pickx">✕</button></div><div class="ps">초록 면 = 외운 표 · 파랑 선 = ${sel}칸 · 숫자 = 표가 더 옮기는 양</div>${body}`;
+  el.style.display = 'block'; document.body.classList.add('pk');
+  document.getElementById('pickx').onclick = () => { delete SELC[pool + ' ' + LAST]; LAST = null; moves(); };
+}
 /** 기본으로 고르는 칸: 표가 가장 많이 옮기는 첫닿자 × 홀자 칸. */
 function defaultSel(rows, mv) { let best = null, bv = -1; for (const c of CHOS) for (const j of JUNGS) { const v = mmed(rows.filter(r => r.cho===c && r.jung===j).map(mv)); if (v !== null && Math.abs(v) > bv) { bv = Math.abs(v); best = `cell|${c}|${j}`; } } return best; }
 function pickedOf(rows, mv, pick) {
@@ -124,14 +150,13 @@ function moves() {
     let jong = '';
     if (pool === '588') { const cell = {}; for (const r of rows) if (mv(r) !== undefined) (cell[r.cho+r.jung] ??= []).push(mv(r)); const cm = Object.fromEntries(Object.entries(cell).map(([k,v]) => [k, mmed(v)]));
       jong = `<div class="scale">받침별 — 같은 첫닿자 · 홀자 칸에 받침이 더 얹는 양</div><div class="jong">${JONGS.map(k => { const v = mmed(rows.filter(r=>r.jong===k && mv(r)!==undefined).map(r=>mv(r) - cm[r.cho+r.jung])); return `<div><div class="c" data-s="jong|${k}" style="background:${col(v)}">${fmt(v)}</div>${k}</div>`; }).join('')}</div>`; }
-    const pick = SELC[pool + ' ' + g.key] ?? defaultSel(rows, mv);
-    const picked = pickedOf(rows, mv, pick);
-    const panes = `<div class="vpane"><div class="scale">${picked.cap} · 초록 면 = 외운 표 · 파랑 선 = ${sel}칸 · 숫자 = 표가 더 옮기는 양</div><div class="exs">${picked.list.map(r => D.svgs[r.char] ? `<div>${svgOf(r.char, sel)}<b>${r.char}</b> ${fmt(mv(r))}</div>` : '').join('') || '<div class="scale">글자 없음</div>'}</div></div>`;
+    const panes = '';
     const tabs = '';
-    box.insertAdjacentHTML('beforeend', `<div class="mv${OPEN.has(g.key)?' open':''}" data-key="${g.key}" data-def="${defaultSel(rows, mv)}"><div class="head"><div class="name">${PARTN[p]} ${EDGEN[e]}<small>표가 대개 ${dirOf(e, g.sgn)}으로 · 0.02 넘게 ${g.over}/${g.n}</small></div><div class="bar"><i style="width:${g.med/maxMed*100}%"></i>${sel>0?`<u style="left:0;width:${g.base/maxMed*100}%"></u>`:''}</div><div class="num">가운데 ${g.med.toFixed(3)}${sel>0?` (패턴만 ${g.base.toFixed(3)})`:''}</div></div><div class="body"><div class="scale">첫닿자 × 홀자 · 칸을 누르면 그 글자들이 아래에 나온다<i style="background:rgba(214,69,69,.7)"></i>오른쪽 · 아래<i style="background:rgba(31,79,216,.7)"></i>왼쪽 · 위</div>${heat}${jong}${tabs}${panes}</div></div>`);
+    box.insertAdjacentHTML('beforeend', `<div class="mv${OPEN.has(g.key)?' open':''}" data-key="${g.key}"><div class="head"><div class="name">${PARTN[p]} ${EDGEN[e]}<small>표가 대개 ${dirOf(e, g.sgn)}으로 · 0.02 넘게 ${g.over}/${g.n}</small></div><div class="bar"><i style="width:${g.med/maxMed*100}%"></i>${sel>0?`<u style="left:0;width:${g.base/maxMed*100}%"></u>`:''}</div><div class="num">가운데 ${g.med.toFixed(3)}${sel>0?` (패턴만 ${g.base.toFixed(3)})`:''}</div></div><div class="body"><div class="scale">첫닿자 × 홀자 · 칸을 누르면 그 줄 · 그 열 글자가 오른쪽 위에 뜬다<i style="background:rgba(214,69,69,.7)"></i>오른쪽 · 아래<i style="background:rgba(31,79,216,.7)"></i>왼쪽 · 위</div>${heat}${jong}${tabs}${panes}</div></div>`);
   });
   box.querySelectorAll('.mv .head').forEach(h => h.addEventListener('click', () => { const m = h.parentElement; m.classList.toggle('open'); const k = m.dataset.key; m.classList.contains('open') ? OPEN.add(k) : OPEN.delete(k); }));
-  box.querySelectorAll('.mv').forEach(m => { const key = pool + ' ' + m.dataset.key; const cur = SELC[key]; m.querySelectorAll('[data-s]').forEach(c => { if (cur ? c.dataset.s === cur : c.dataset.s === m.dataset.def) c.classList.add('pick'); c.addEventListener('click', () => { SELC[key] = c.dataset.s; moves(); }); }); });
+  box.querySelectorAll('.mv').forEach(m => { const key = pool + ' ' + m.dataset.key; const cur = SELC[key]; m.querySelectorAll('[data-s]').forEach(c => { if (cur === c.dataset.s) c.classList.add('pick'); c.addEventListener('click', () => { SELC[key] = c.dataset.s; LAST = m.dataset.key; moves(); }); }); });
+  panel();
 }
 function renderAll() { ladder(); pools(); moves(); }
 document.querySelectorAll('.poolsw button').forEach(b => b.addEventListener('click', () => { pool = b.dataset.pool; document.querySelectorAll('.poolsw button').forEach(x => x.classList.toggle('on', x===b)); moves(); }));
