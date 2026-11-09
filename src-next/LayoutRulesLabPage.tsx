@@ -213,6 +213,7 @@ export function LayoutRulesLabPage() {
       <div className={styles.group}>
         <h3>규칙</h3>
         {LAYOUT_RULE_ORDER.map((rule) => <label key={rule}><input type="checkbox" checked={params.rules[rule]} onChange={() => toggleRule(rule)} data-testid={`rule-${rule}`} /> {LAYOUT_RULE_LABEL[rule]}</label>)}
+        <label><input type="checkbox" checked={params.formulas} onChange={() => setParams((prev) => ({ ...prev, formulas: !prev.formulas }))} data-testid="rule-formulas" /> 표 대신 공식(G0 — 첫닿자 아래, 받침 없음. 나머지 열은 아직 표)</label>
         <label><input type="checkbox" checked={snapStems} onChange={() => setSnapStems((value) => !value)} /> 홀자 안쪽 줄기를 노토 보선에 맞춤</label>
         <h3>획 꼴(2차)</h3>
         <label><input type="checkbox" checked={shapes.giyeokSweep} onChange={() => setShapes((prev) => ({ ...prev, giyeokSweep: !prev.giyeokSweep }))} data-testid="shape-giyeokSweep" /> ㄱ ㅋ ㄲ 세로줄기를 삐침으로(오른홀자 옆)</label>
