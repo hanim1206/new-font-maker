@@ -1,4 +1,7 @@
 .wrap { display: grid; gap: 12px; }
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 300px); gap: 12px; align-items: start; }
+@media (max-width: 1100px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+.side { display: grid; gap: 8px; align-content: start; }
 .big { display: grid; place-items: center; padding: 16px; border: 1px solid rgb(var(--color-border)); border-radius: 14px; background: rgb(var(--color-surface)); }
 .mark { cursor: pointer; }
 .mark text { pointer-events: none; }

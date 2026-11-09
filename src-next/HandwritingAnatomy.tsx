@@ -233,17 +233,32 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
   const pick = (s: Slot) => { setHot(null); setFocus(slot === s ? null : { char, slot: s }) }
 
   return <div className={styles.wrap} data-testid="handwriting-anatomy">
-    <div className={styles.big}>
-      <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined}
-        size={size} globalStyle={style} overflow="visible" clipGlyphs={false} strokeColorOf={colorOf}>
-        {slots.filter((s) => !slot || s.slot === slot).flatMap((s) => s.parts.map((b, i) => <rect key={`${s.slot}-${i}`} x={b.x * V} y={b.y * V} width={b.width * V} height={b.height * V}
-          fill="none" stroke={SLOT_COLOR[s.slot]} strokeWidth={0.35} strokeDasharray="1.2 1" pointerEvents="none" />))}
-        {hotItem?.line && <polyline points={hotItem.line.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={0.6} strokeDasharray="1.5 1" pointerEvents="none" />}
-        {active?.items.map((it) => <g key={it.n} className={styles.mark} onClick={() => setHot(hot === it.n ? null : it.n)}>
-          <circle cx={it.at.x} cy={it.at.y} r={hot === it.n ? 3.6 : 3} fill={hot === it.n ? EDIT_COLOR.foreground : SLOT_COLOR[active.slot]} stroke={EDIT_COLOR.surface} strokeWidth={0.5} />
-          <text x={it.at.x} y={it.at.y + 1.25} fontSize={3.4} fontWeight={700} textAnchor="middle" fill={EDIT_COLOR.surface}>{it.n}</text>
-        </g>)}
-      </SvgRenderer>
+    <div className={styles.stage}>
+      <div className={styles.big}>
+        <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined}
+          size={size} globalStyle={style} overflow="visible" clipGlyphs={false} strokeColorOf={colorOf}>
+          {slots.filter((s) => !slot || s.slot === slot).flatMap((s) => s.parts.map((b, i) => <rect key={`${s.slot}-${i}`} x={b.x * V} y={b.y * V} width={b.width * V} height={b.height * V}
+            fill="none" stroke={SLOT_COLOR[s.slot]} strokeWidth={0.35} strokeDasharray="1.2 1" pointerEvents="none" />))}
+          {hotItem?.line && <polyline points={hotItem.line.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={0.6} strokeDasharray="1.5 1" pointerEvents="none" />}
+          {active?.items.map((it) => <g key={it.n} className={styles.mark} onClick={() => setHot(hot === it.n ? null : it.n)}>
+            <circle cx={it.at.x} cy={it.at.y} r={hot === it.n ? 3.6 : 3} fill={hot === it.n ? EDIT_COLOR.foreground : SLOT_COLOR[active.slot]} stroke={EDIT_COLOR.surface} strokeWidth={0.5} />
+            <text x={it.at.x} y={it.at.y + 1.25} fontSize={3.4} fontWeight={700} textAnchor="middle" fill={EDIT_COLOR.surface}>{it.n}</text>
+          </g>)}
+        </SvgRenderer>
+      </div>
+      <div className={styles.side}>
+        {active && <ol className={styles.rows}>
+          {active.items.map((it) => <li key={it.n}>
+            <button type="button" className={`${styles.row}${hot === it.n ? ` ${styles.rowOn}` : ''}`} style={{ ['--slot' as string]: `var(${SLOT_VAR[active.slot]})` }} onClick={() => setHot(hot === it.n ? null : it.n)}>
+              <span className={styles.n}>{it.n}</span><b>{it.label}</b><small>{it.note}</small><code>{it.strokeId}</code>
+            </button>
+          </li>)}
+        </ol>}
+        {scope && <div className={styles.scope} data-testid="handwriting-anatomy-scope">
+          <span>묶음</span><b>{scope.label}</b>{scopeCount !== undefined && <em>{scopeCount.toLocaleString()}자</em>}
+        </div>}
+        {!active && <p className={styles.hint}>자모를 누르면 그 자모의 부위가 번호로 펼쳐져요.</p>}
+      </div>
     </div>
 
     <div className={styles.slots}>
@@ -254,16 +269,5 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
       </button>)}
     </div>
 
-    {active && <ol className={styles.rows}>
-      {active.items.map((it) => <li key={it.n}>
-        <button type="button" className={`${styles.row}${hot === it.n ? ` ${styles.rowOn}` : ''}`} style={{ ['--slot' as string]: `var(${SLOT_VAR[active.slot]})` }} onClick={() => setHot(hot === it.n ? null : it.n)}>
-          <span className={styles.n}>{it.n}</span><b>{it.label}</b><small>{it.note}</small><code>{it.strokeId}</code>
-        </button>
-      </li>)}
-    </ol>}
-    {scope && <div className={styles.scope} data-testid="handwriting-anatomy-scope">
-      <span>묶음</span><b>{scope.label}</b>{scopeCount !== undefined && <em>{scopeCount.toLocaleString()}자</em>}
-    </div>}
-    {!active && <p className={styles.hint}>자모를 누르면 그 자모의 부위가 번호로 펼쳐져요.</p>}
   </div>
 })
