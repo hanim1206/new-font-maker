@@ -33,7 +33,8 @@ import { Input } from './components/ui/input'
 import { Field, RangeBar } from './components/ui/range'
 import { Switch } from './components/ui/switch'
 import { EDIT_COLOR } from './editColors'
-import { HandwritingAnatomy } from './HandwritingAnatomy'
+import { HandwritingAnatomy, jamoScopeKeys } from './HandwritingAnatomy'
+import type { PartScope, Slot as AnatomySlot } from './HandwritingAnatomy'
 import styles from './HandwritingLabPage.module.css'
 
 /**
@@ -197,6 +198,28 @@ export function HandwritingLabPage() {
   const [view, setView] = useState<'anatomy' | 'collect'>('anatomy')
   const [picked, setPicked] = useState<string | null>(null)
   const [highlight, setHighlight] = useState<Set<string> | null>(null)
+  /** 해부 패널에서 고른 부위 묶음 — 글자표에 같은 묶음 글자를 칠한다. */
+  const [partScope, setPartScope] = useState<PartScope | null>(null)
+  const jamoCho = useJamoStore((state) => state.choseong)
+  const jamoJung = useJamoStore((state) => state.jungseong)
+  const jamoJong = useJamoStore((state) => state.jongseong)
+  const scopeHits = useMemo(() => {
+    if (!partScope) return null
+    const cache = new Map<string, boolean>()
+    const has = (slot: AnatomySlot, L: string) => {
+      const k = `${slot}${L}`
+      if (!cache.has(k)) {
+        const jamo = (slot === 'CH' ? jamoCho : slot === 'JU' ? jamoJung : jamoJong)[L]
+        cache.set(k, !!jamo && jamoScopeKeys(jamo, slot).has(partScope.key))
+      }
+      return cache.get(k)!
+    }
+    return new Set(CHART_SYLLABLES.filter((ch) => {
+      const c = ch.charCodeAt(0) - 0xAC00
+      const jong = JONGSEONG_LIST[c % 28]
+      return has('CH', CHOSEONG_LIST[Math.floor(c / 588)]) || has('JU', JUNGSEONG_LIST[Math.floor((c % 588) / 28)]) || (!!jong && has('JO', jong))
+    }))
+  }, [partScope, jamoCho, jamoJung, jamoJong])
   const [scroll, setScroll] = useState({ top: 0, height: 600 })
 
   const drawing = useRef<{ cell: number; points: PenPoint[] } | null>(null)
@@ -482,7 +505,7 @@ export function HandwritingLabPage() {
         <span>{chartSource === 'preset' ? '제품 프리셋 2,350자' : `${stats.ok}/${CHART_SYLLABLES.length} 다 참${stats.partial ? ` · 반쯤 ${stats.partial}` : ''}`}</span>
       </div>
       <div ref={chartRef} className={styles.chart} data-testid="handwriting-chart">
-        <ChartRows bank={bank} style={chartStyle} picked={picked} highlight={highlight} firstRow={firstRow} lastRow={lastRow} onPick={setPicked} source={chartSource} />
+        <ChartRows bank={bank} style={chartStyle} picked={picked} highlight={view === 'anatomy' ? scopeHits : highlight} firstRow={firstRow} lastRow={lastRow} onPick={setPicked} source={chartSource} />
       </div>
       {pickedInfo && view === 'collect' && <div className={styles.pickedInfo}>
         <b>{pickedInfo.title}</b>
@@ -503,7 +526,7 @@ export function HandwritingLabPage() {
         <div className={styles.titleRow}><h1>글자 해부</h1><Button size="sm" onClick={() => setView('collect')} data-testid="handwriting-view-collect">손글씨 수집으로</Button></div>
         <p>왼쪽 글자표에서 글자를 누르면 크게 보여요. 자모를 누르면 그 자모의 줄기 · 꺾임 · 머리 · 맺음이 번호로 펼쳐져요.</p>
       </header>
-      <HandwritingAnatomy char={picked ?? '각'} style={style} />
+      <HandwritingAnatomy char={picked ?? '각'} style={style} onScope={setPartScope} scopeCount={scopeHits?.size} />
     </main> : <main className={styles.work}>
       <header className={styles.header}>
         <span>Handwriting Lab</span>
