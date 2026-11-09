@@ -35,3 +35,5 @@
 .sideHead { display: flex; align-items: center; gap: 8px; padding: 2px 4px 4px; font-size: 14px; }
 .sideHead i { width: 10px; height: 10px; border-radius: 4px; background: rgb(var(--slot)); }
 .sideHead small { color: rgb(var(--color-text-3)); font-size: 12px; }
+.attrs { display: flex; flex-wrap: wrap; gap: 4px; grid-column: 2 / -1; }
+.attrs em { padding: 1px 6px; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-2)); font-style: normal; font-size: 11px; }

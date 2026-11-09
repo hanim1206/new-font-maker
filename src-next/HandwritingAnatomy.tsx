@@ -46,6 +46,8 @@ interface AnatomyItem {
   scope: { fn: PartScope; shape: PartScope }
   /** 작은 자모 그림에서 칠할 자리: 마디면 그 마디 길(viewBox 0–100), 끝 · 꺾임이면 점. */
   paint: { d: string } | { x: number; y: number }
+  /** 묶음 안을 더 거를 속성(이름은 그대로 두고 따로 단다). 획을 바꿀 때 기본은 묶음 전체, 이걸로 좁힌다. */
+  attrs: string[]
 }
 
 const vowelKind = (char: string): string => {
@@ -100,7 +102,32 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
   const labels = stemLabelsOf(primitives, jamo, table)
   const out: AnatomyItem[] = []
   let n = 1
-  for (const { stroke, box, source } of primitives) {
+  const centerOf = (p: Prim) => toView(p.stroke.points.reduce((a, q) => ({ x: a.x + q.x / p.stroke.points.length, y: a.y + q.y / p.stroke.points.length }), { x: 0, y: 0 }), p.box)
+  const named = (want: string) => primitives.filter((p) => table[p.stroke.id] === want)
+  const attrsOf = (p: Prim): string[] => {
+    const attrs: string[] = [slot === 'JU' ? vowelKind(jamo.char) : SLOT_NAME[slot]]
+    const place = labels.get(p.stroke.id)?.split(' ')
+    if (place && place.length > 1) attrs.push(place[0])
+    const own = table[p.stroke.id]
+    const c = centerOf(p)
+    if (own === 'gyeotjulgi' || own === 'geolchim') {
+      // 곁줄기 방향: 가장 가까운 기둥의 오른쪽인지 왼쪽인지.
+      const pillars = named('gidung').map(centerOf)
+      if (pillars.length) {
+        const near = pillars.reduce((a, q) => (Math.abs(q.x - c.x) < Math.abs(a.x - c.x) ? q : a))
+        attrs.push(c.x > near.x ? '오른쪽으로 뻗음' : '왼쪽으로 뻗음')
+      }
+    }
+    if (own === 'jjalbeungidung') {
+      // 짧은기둥 방향: 보 위로 서는지(ㅗ) 아래로 내리는지(ㅜ).
+      const beams = named('bo').map(centerOf)
+      if (beams.length) attrs.push(c.y < beams[0].y ? '보 위' : '보 아래')
+    }
+    return attrs
+  }
+  for (const prim of primitives) {
+    const { stroke, box, source } = prim
+    const attrs = attrsOf(prim)
     const others = primitives.filter((p) => p.source.channel === source.channel && p.stroke.id !== stroke.id).map((p) => p.stroke)
     const geo = describeStrokeGeometry(stroke, others)
     const name = table[stroke.id] ?? null
@@ -130,13 +157,13 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
     })
     if (reversed) steps.reverse()
     for (const step of steps) {
-      if ('corner' in step) { const c = step.corner; out.push({ n: n++, strokeId: stroke.id, kind: 'corner', label: '꺾임', note: `${Math.round(c.turn)}° 돎`, at: toView(c, box), scope: cornerScope, paint: toView(c, box) }); continue }
+      if ('corner' in step) { const c = step.corner; out.push({ n: n++, strokeId: stroke.id, kind: 'corner', label: '꺾임', note: `${Math.round(c.turn)}° 돎`, at: toView(c, box), scope: cornerScope, paint: toView(c, box), attrs }); continue }
       const seg = step.seg
       const shape = STEM_SHAPE_LABEL[seg.shape]
       if (seg.shape === 'dunggeunjulgi') {
         const c = pts.reduce((a, p) => ({ x: a.x + p.x / pts.length, y: a.y + p.y / pts.length }), { x: 0, y: 0 })
         const top = pts.reduce((a, p) => (p.y < a.y ? p : a), pts[0])
-        out.push({ n: n++, strokeId: stroke.id, label: stem ?? shape, kind: 'segment', note: name ? shape : '닫힌 획', at: toView({ x: c.x, y: top.y }, box), scope: stemScope(seg.shape), paint: { d: pointsToSvgD(pts, stroke.closed, box, V) } })
+        out.push({ n: n++, strokeId: stroke.id, label: stem ?? shape, kind: 'segment', note: name ? shape : '닫힌 획', at: toView({ x: c.x, y: top.y }, box), scope: stemScope(seg.shape), paint: { d: pointsToSvgD(pts, stroke.closed, box, V) }, attrs })
         continue
       }
       const a = pts[seg.fromPoint], b = pts[seg.toPoint]
@@ -145,15 +172,16 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
       const one = geo.segments.length === 1
       // 머리 · 맺음은 마디마다 — 가로줄기는 왼쪽, 나머지는 위쪽이 머리(사전). 획을 쓴 차례가 아니라 마디 모양으로 정한다.
       const segName = one && stem ? stem : shape
-      if (seg.head?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'head', label: '머리', note: `${segName}의 열린 끝`, at: endMark(seg.head.point), scope: endScope('머리', seg.shape), paint: toView(pts[seg.head.point], box) })
+      if (seg.head?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'head', label: '머리', note: `${segName}의 열린 끝`, at: endMark(seg.head.point), scope: endScope('머리', seg.shape), paint: toView(pts[seg.head.point], box), attrs })
       out.push({
         n: n++, strokeId: stroke.id, kind: 'segment',
         label: one && stem ? stem : shape,
         note: [name && one ? shape : name ? `${STEM_NAME_LABEL[name]}의 한 마디` : '', curved ? '휜 마디' : ''].filter(Boolean).join(' · ') || '곧은 마디',
         at: { x: (line[0].x + line[1].x) / 2, y: (line[0].y + line[1].y) / 2 }, line, scope: stemScope(seg.shape),
         paint: { d: pointsToSvgD(pts.slice(Math.min(seg.fromPoint, seg.toPoint), Math.max(seg.fromPoint, seg.toPoint) + 1), false, box, V) },
+        attrs,
       })
-      if (seg.tail?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'tail', label: '맺음', note: `${segName}의 열린 끝`, at: endMark(seg.tail.point), scope: endScope('맺음', seg.shape), paint: toView(pts[seg.tail.point], box) })
+      if (seg.tail?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'tail', label: '맺음', note: `${segName}의 열린 끝`, at: endMark(seg.tail.point), scope: endScope('맺음', seg.shape), paint: toView(pts[seg.tail.point], box), attrs })
     }
   }
   // 번호가 앞 번호와 겹치면 마디를 따라 옆으로 옮긴다.
@@ -323,6 +351,7 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
           {active.items.map((it) => <li key={it.n}>
             <button type="button" className={`${styles.row}${hot === it.n ? ` ${styles.rowOn}` : ''}`} style={{ ['--slot' as string]: `var(${SLOT_VAR[active.slot]})` }} onClick={() => setHot(hot === it.n ? null : it.n)}>
               <span className={styles.n}>{it.n}</span><b>{it.label}</b><small>{it.note}</small><code>{it.strokeId}</code>
+              <span className={styles.attrs}>{it.attrs.map((a) => <em key={a}>{a}</em>)}</span>
             </button>
           </li>)}
         </ol>}
