@@ -14,7 +14,7 @@ import { strokeToRenderInkGroups } from '../src/services/strokeRenderGeometry'
 import { brushInkGroupsToSvgPaths } from '../src/services/brushGeometry'
 import { miterLimitOf } from '../src/services/strokeJoin'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
-import type { StrokeDataV2 } from '../src/types'
+import type { JamoData, StrokeDataV2 } from '../src/types'
 import type { Slot } from '../src/services/handwritingRead'
 import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../src/data/Hangul'
 import type { PenPoint } from '../src/services/penStrokeFit'
@@ -203,6 +203,12 @@ export function HandwritingLabPage() {
   const jamoCho = useJamoStore((state) => state.choseong)
   const jamoJung = useJamoStore((state) => state.jungseong)
   const jamoJong = useJamoStore((state) => state.jongseong)
+  /** 묶음이 든 자모 — 묶음은 자모의 성질이라 자모로 센다. */
+  const scopeJamo = useMemo(() => {
+    if (!partScope) return undefined
+    const lists: [AnatomySlot, readonly string[], Record<string, JamoData>][] = [['CH', CHOSEONG_LIST, jamoCho], ['JU', JUNGSEONG_LIST, jamoJung], ['JO', (JONGSEONG_LIST as readonly string[]).filter(Boolean), jamoJong]]
+    return lists.map(([slot, list, map]) => ({ slot, total: list.length, hits: list.filter((L) => !!map[L] && jamoScopeKeys(map[L], slot).has(partScope.key)) })).filter((g) => g.hits.length > 0)
+  }, [partScope, jamoCho, jamoJung, jamoJong])
   const scopeHits = useMemo(() => {
     if (!partScope) return null
     const cache = new Map<string, boolean>()
@@ -526,7 +532,7 @@ export function HandwritingLabPage() {
         <div className={styles.titleRow}><h1>글자 해부</h1><Button size="sm" onClick={() => setView('collect')} data-testid="handwriting-view-collect">손글씨 수집으로</Button></div>
         <p>왼쪽 글자표에서 글자를 누르면 크게 보여요. 자모를 누르면 그 자모의 줄기 · 꺾임 · 머리 · 맺음이 번호로 펼쳐져요.</p>
       </header>
-      <HandwritingAnatomy char={picked ?? '각'} style={style} onScope={setPartScope} scopeCount={scopeHits?.size} />
+      <HandwritingAnatomy char={picked ?? '각'} style={style} onScope={setPartScope} scopeJamo={scopeJamo} />
     </main> : <main className={styles.work}>
       <header className={styles.header}>
         <span>Handwriting Lab</span>

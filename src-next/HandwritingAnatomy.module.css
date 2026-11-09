@@ -25,3 +25,7 @@
 .scope { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px; border: 1px solid rgb(var(--color-border)); border-radius: 10px; background: rgb(var(--color-surface)); font-size: 13px; }
 .scope > span { color: rgb(var(--color-text-3)); font-size: 12px; }
 .scope em { padding: 1px 8px; border-radius: 999px; background: rgb(var(--color-success-soft)); font-style: normal; font-size: 12px; font-weight: 700; }
+.scopeJamo { display: grid; grid-template-columns: 10px auto auto 1fr; align-items: baseline; gap: 6px; flex-basis: 100%; }
+.scopeJamo i { width: 8px; height: 8px; border-radius: 4px; background: rgb(var(--slot)); }
+.scopeJamo small { color: rgb(var(--color-text-3)); font-size: 12px; }
+.scopeJamo span { font-size: 14px; letter-spacing: .04em; overflow-wrap: anywhere; }

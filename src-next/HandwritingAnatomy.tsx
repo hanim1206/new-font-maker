@@ -102,12 +102,10 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
     const geo = describeStrokeGeometry(stroke, others)
     const name = table[stroke.id] ?? null
     const stem = labels.get(stroke.id)
-    const endNote = stem ? `${stem}의 열린 끝` : '열린 끝'
     // 기능 층 줄기 이름: 표 이름(기둥 · 보 …), 없으면 닿자는 자리 + 모양(첫닿자 세로줄기), 홀자는 모양.
     const fnStem = (shape: StemShape) => name ? STEM_NAME_LABEL[name] : slot === 'JU' ? STEM_SHAPE_LABEL[shape] : `${SLOT_NAME[slot]} ${STEM_SHAPE_LABEL[shape]}`
     const stemScope = (shape: StemShape) => ({ fn: { key: `줄기|${fnStem(shape)}`, label: fnStem(shape) }, shape: { key: `줄기|${STEM_SHAPE_LABEL[shape]}`, label: `모든 ${STEM_SHAPE_LABEL[shape]}` } })
     const endScope = (word: '머리' | '맺음', shape: StemShape) => ({ fn: { key: `${word}|${fnStem(shape)}`, label: `${fnStem(shape)}의 ${word}` }, shape: { key: `${word}|${STEM_SHAPE_LABEL[shape]}`, label: `${STEM_SHAPE_LABEL[shape]}의 ${word}` } })
-    const segAt = (point: number) => (point === 0 ? geo.segments[0] : geo.segments[geo.segments.length - 1])?.shape ?? 'garojulgi'
     const cornerScope = { fn: { key: `꺾임|${SLOT_NAME[slot]}`, label: `${SLOT_NAME[slot]} 꺾임` }, shape: { key: '꺾임', label: '모든 꺾임' } }
     const pts = stroke.points
     // 끝 표시는 획 끝에서 바깥으로 조금 밀어 마디 번호와 안 겹치게.
@@ -127,7 +125,6 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
       if (!stroke.closed && geo.corners[i]) steps.push({ corner: geo.corners[i] })
     })
     if (reversed) steps.reverse()
-    if (geo.head?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'head', label: '머리', note: endNote, at: endMark(geo.head.point), scope: endScope('머리', segAt(geo.head.point)) })
     for (const step of steps) {
       if ('corner' in step) { const c = step.corner; out.push({ n: n++, strokeId: stroke.id, kind: 'corner', label: '꺾임', note: `${Math.round(c.turn)}° 돎`, at: toView(c, box), scope: cornerScope }); continue }
       const seg = step.seg
@@ -142,14 +139,17 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
       const line = [a, b].map((p) => toView(p, box))
       const curved = !!(a.handleOut || b.handleIn)
       const one = geo.segments.length === 1
+      // 머리 · 맺음은 마디마다 — 가로줄기는 왼쪽, 나머지는 위쪽이 머리(사전). 획을 쓴 차례가 아니라 마디 모양으로 정한다.
+      const segName = one && stem ? stem : shape
+      if (seg.head?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'head', label: '머리', note: `${segName}의 열린 끝`, at: endMark(seg.head.point), scope: endScope('머리', seg.shape) })
       out.push({
         n: n++, strokeId: stroke.id, kind: 'segment',
         label: one && stem ? stem : shape,
         note: [name && one ? shape : name ? `${STEM_NAME_LABEL[name]}의 한 마디` : '', curved ? '휜 마디' : ''].filter(Boolean).join(' · ') || '곧은 마디',
         at: { x: (line[0].x + line[1].x) / 2, y: (line[0].y + line[1].y) / 2 }, line, scope: stemScope(seg.shape),
       })
+      if (seg.tail?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'tail', label: '맺음', note: `${segName}의 열린 끝`, at: endMark(seg.tail.point), scope: endScope('맺음', seg.shape) })
     }
-    if (geo.tail?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'tail', label: '맺음', note: endNote, at: endMark(geo.tail.point), scope: endScope('맺음', segAt(geo.tail.point)) })
   }
   // 번호가 앞 번호와 겹치면 마디를 따라 옆으로 옮긴다.
   const near = (p: { x: number; y: number }, upto: number) => out.slice(0, upto).some((o) => Math.hypot(o.at.x - p.x, o.at.y - p.y) < 6)
@@ -180,7 +180,7 @@ export function jamoScopeKeys(jamo: JamoData, slot: Slot): Set<string> {
   return keys
 }
 
-export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style, size = 360, onScope, scopeCount }: { char: string; style: GlobalStyle; size?: number; onScope?: (scope: PartScope | null) => void; scopeCount?: number }) {
+export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style, size = 360, onScope, scopeJamo }: { char: string; style: GlobalStyle; size?: number; onScope?: (scope: PartScope | null) => void; scopeJamo?: { slot: Slot; total: number; hits: string[] }[] }) {
   const choseong = useJamoStore((state) => state.choseong)
   const jungseong = useJamoStore((state) => state.jungseong)
   const jongseong = useJamoStore((state) => state.jongseong)
@@ -255,7 +255,10 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
           </li>)}
         </ol>}
         {scope && <div className={styles.scope} data-testid="handwriting-anatomy-scope">
-          <span>묶음</span><b>{scope.label}</b>{scopeCount !== undefined && <em>{scopeCount.toLocaleString()}자</em>}
+          <span>묶음</span><b>{scope.label}</b>
+          {scopeJamo?.map((g) => <div key={g.slot} className={styles.scopeJamo} style={{ ['--slot' as string]: `var(${SLOT_VAR[g.slot]})` }}>
+            <i aria-hidden="true" /><small>{SLOT_NAME[g.slot]}</small><em>{g.hits.length}/{g.total}</em><span>{g.hits.join(' ')}</span>
+          </div>)}
         </div>}
         {!active && <p className={styles.hint}>자모를 누르면 그 자모의 부위가 번호로 펼쳐져요.</p>}
       </div>
