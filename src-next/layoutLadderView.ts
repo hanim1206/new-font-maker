@@ -174,7 +174,7 @@ function pools() {
     if (s.steps[sel] !== undefined) dots += `<div class="dot" style="left:${px(s.steps[sel])}%;background:var(--step)"></div><div class="lab" style="left:${px(s.steps[sel])}%"><b>${s.steps[sel].toFixed(2)}</b>지금</div>`;
     dots += `<div class="dot" style="left:${px(s.table)}%;background:var(--tab)"></div><div class="lab up" style="left:${px(s.table)}%"><b>${s.table.toFixed(2)}</b>외운 표</div>`;
     dots += `<div class="dot" style="left:100%;background:var(--noto)"></div><div class="lab" style="left:100%"><b>0</b>노토</div>`;
-    el.insertAdjacentHTML('beforeend', `<div class="pool"><h3>${p==='588'?'받침 있는 588자':'받침 없는 171자'}</h3><div class="meta">패턴만으로 ${pct(s, s.steps[sel])}% · 외운 표 ${Math.round((1-s.table/s.raw)*100)}%</div><div class="track"><div class="bar"></div>${dots}</div></div>`);
+    el.insertAdjacentHTML('beforeend', `<div class="pool"><h3>${p==='588'?'받침 있는 588자':'받침 없는 171자'}</h3><div class="meta">지금 조합 ${pct(s, s.steps[sel])}% · 외운 표 ${Math.round((1-s.table/s.raw)*100)}%</div><div class="track"><div class="bar"></div>${dots}</div></div>`);
   }
 }
 function moves() {
