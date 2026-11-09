@@ -28,8 +28,9 @@
 .scopeJamo { display: grid; grid-template-columns: 10px auto auto 1fr; align-items: baseline; gap: 6px; flex-basis: 100%; }
 .scopeJamo i { width: 8px; height: 8px; border-radius: 4px; background: rgb(var(--slot)); }
 .scopeJamo small { color: rgb(var(--color-text-3)); font-size: 12px; }
-.scopeJamo .minis { display: flex; flex-wrap: wrap; gap: 4px; grid-column: 1 / -1; }
-.mini { width: 30px; height: 30px; border-radius: 6px; background: rgb(var(--color-surface-2)); }
+.scopeJamo .minis { display: flex; flex-wrap: wrap; gap: 6px; grid-column: 1 / -1; }
+.mini { border-radius: 6px; background: rgb(var(--color-surface-2)); }
+.main { display: grid; gap: 12px; align-content: start; min-width: 0; }
 .hit { cursor: pointer; }
 .sideHead { display: flex; align-items: center; gap: 8px; padding: 2px 4px 4px; font-size: 14px; }
 .sideHead i { width: 10px; height: 10px; border-radius: 4px; background: rgb(var(--slot)); }

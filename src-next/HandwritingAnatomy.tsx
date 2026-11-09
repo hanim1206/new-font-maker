@@ -192,16 +192,52 @@ export function jamoScopeKeys(jamo: JamoData, slot: Slot): Set<string> {
   return keys
 }
 
-/** 묶음 상자의 작은 자모: 자모는 흐리게, 고른 묶음에 드는 부위만 자리 색으로 칠한다. */
-const ScopeMini = memo(function ScopeMini({ jamo, slot, scopeKey }: { jamo: JamoData; slot: Slot; scopeKey: string }) {
-  const { prims, items } = useMemo(() => unitItems(jamo, slot), [jamo, slot])
+const CHO_ORDER = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
+const JUNG_ORDER = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
+const JONG_ORDER = ' ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ'
+/** 자모를 보일 본보기 글자: 첫닿자는 ○+ㅏ, 홀자는 ㅇ+○, 받침은 가+○. 글자 속 상자 비율 그대로 보이려고. */
+const sampleChar = (slot: Slot, ch: string): string | null => {
+  const [c, j, t] = slot === 'CH' ? [CHO_ORDER.indexOf(ch), 0, 0] : slot === 'JU' ? [11, JUNG_ORDER.indexOf(ch), 0] : [0, 0, JONG_ORDER.indexOf(ch)]
+  if (c < 0 || j < 0 || t < 0) return null
+  return String.fromCharCode(0xac00 + (c * 21 + j) * 28 + t)
+}
+
+/** 묶음 상자의 작은 자모: 본보기 글자 속 자리 · 비율 그대로 그 자모만 흐리게 그리고, 고른 묶음에 드는 부위만 자리 색으로 칠한다. */
+const ScopeMini = memo(function ScopeMini({ ch, slot, scopeKey, style }: { ch: string; slot: Slot; scopeKey: string; style: GlobalStyle }) {
+  const choseong = useJamoStore((state) => state.choseong)
+  const jungseong = useJamoStore((state) => state.jungseong)
+  const jongseong = useJamoStore((state) => state.jongseong)
+  const schemas = useLayoutStore((state) => state.layoutSchemas)
+  const globalPadding = useLayoutStore((state) => state.globalPadding)
+  const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
+  const drawn = useMemo(() => {
+    const sample = sampleChar(slot, ch)
+    if (!sample) return null
+    const syllable = decomposeSyllable(sample, choseong, jungseong, jongseong)
+    const jamo = slot === 'CH' ? syllable.choseong : slot === 'JU' ? syllable.jungseong : syllable.jongseong
+    if (!jamo) return null
+    const padding = mergePadding(globalPadding, paddingOverrides[syllable.layoutType])
+    const schema = { ...schemas[syllable.layoutType], padding, designBodyPadding: padding }
+    const resolved = resolveGlyphInkPrimitives({ syllable, placement: { kind: 'schema', schema }, weightMultiplier: weightToMultiplier(style.weight), globalLinecap: style.linecap, globalLinejoin: style.linejoin, horizontalInkBounds: { min: 0, max: 1 } })
+    const prims = resolved.primitives.filter((p) => SLOT_OF[p.source.part] === slot).map((p) => ({ stroke: p.stroke as StrokeDataV2, box: p.box, source: p.source }))
+    const parts = (Object.entries(resolved.boxes) as [Part, BoxConfig][]).filter(([part]) => SLOT_OF[part] === slot).map(([, b]) => b)
+    if (!prims.length || !parts.length) return null
+    const x0 = Math.min(...parts.map((b) => b.x)) * V, y0 = Math.min(...parts.map((b) => b.y)) * V
+    const x1 = Math.max(...parts.map((b) => b.x + b.width)) * V, y1 = Math.max(...parts.map((b) => b.y + b.height)) * V
+    return { prims, items: itemsOf(prims, jamo, SLOT_TYPE[slot], slot), vb: { x: x0 - 6, y: y0 - 6, w: x1 - x0 + 12, h: y1 - y0 + 12 } }
+  }, [ch, slot, choseong, jungseong, jongseong, schemas, globalPadding, paddingOverrides, style.weight, style.linecap, style.linejoin])
+  if (!drawn) return <b>{ch}</b>
+  const { prims, items, vb } = drawn
   const hits = items.filter((it) => it.scope.fn.key === scopeKey || it.scope.shape.key === scopeKey)
   const color = SLOT_COLOR[slot]
-  return <svg viewBox="-8 -8 116 116" className={styles.mini} role="img" aria-label={jamo.char}>
-    {prims.map((p) => <path key={p.stroke.id} d={pointsToSvgD(p.stroke.points, p.stroke.closed, p.box, V)} fill="none" stroke={EDIT_COLOR.editSlotOff} strokeWidth={9} strokeLinecap="square" strokeLinejoin="miter" />)}
+  // 모든 작은 자모를 같은 배율로 — 첫닿자 · 받침 · 홀자의 크기 차이까지 글자 속 그대로.
+  const K = 1.0
+  const sw = 4.5
+  return <svg viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} width={Math.round(K * vb.w)} height={Math.round(K * vb.h)} className={styles.mini} role="img" aria-label={ch}>
+    {prims.map((p) => <path key={p.stroke.id} d={pointsToSvgD(p.stroke.points, p.stroke.closed, p.box, V)} fill="none" stroke={EDIT_COLOR.editSlotOff} strokeWidth={sw} strokeLinecap="square" strokeLinejoin="miter" />)}
     {hits.map((it, i) => 'd' in it.paint
-      ? <path key={i} d={it.paint.d} fill="none" stroke={color} strokeWidth={9} strokeLinecap="square" strokeLinejoin="miter" />
-      : <circle key={i} cx={it.paint.x} cy={it.paint.y} r={8} fill={color} />)}
+      ? <path key={i} d={it.paint.d} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="square" strokeLinejoin="miter" />
+      : <circle key={i} cx={it.paint.x} cy={it.paint.y} r={4.5} fill={color} />)}
   </svg>
 })
 
@@ -259,6 +295,7 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
 
   return <div className={styles.wrap} data-testid="handwriting-anatomy">
     <div className={styles.stage}>
+      <div className={styles.main}>
       <div className={styles.big} onClick={() => { setHot(null); setFocus(null) }}>
         <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined}
           size={size} globalStyle={style} overflow="visible" clipGlyphs={false} strokeColorOf={colorOf}>
@@ -274,6 +311,14 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
           </g>)}
         </SvgRenderer>
       </div>
+      {scope && <div className={styles.scope} data-testid="handwriting-anatomy-scope">
+        <span>묶음</span><b>{scope.label}</b>
+        {scopeJamo?.map((g) => <div key={g.slot} className={styles.scopeJamo} style={{ ['--slot' as string]: `var(${SLOT_VAR[g.slot]})` }}>
+          <i aria-hidden="true" /><small>{SLOT_NAME[g.slot]}</small><em>{g.hits.length}/{g.total}</em>
+          <span className={styles.minis}>{g.hits.map((h) => <ScopeMini key={h} ch={h} slot={g.slot} scopeKey={scope.key} style={style} />)}</span>
+        </div>)}
+      </div>}
+      </div>
       <div className={styles.side}>
         {active && <div className={styles.sideHead} style={{ ['--slot' as string]: `var(${SLOT_VAR[active.slot]})` }}>
           <i aria-hidden="true" /><b>{SLOT_NAME[active.slot]} {active.jamo.char}</b>{active.slot === 'JU' && <small>{vowelKind(active.jamo.char)}</small>}
@@ -285,13 +330,6 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
             </button>
           </li>)}
         </ol>}
-        {scope && <div className={styles.scope} data-testid="handwriting-anatomy-scope">
-          <span>묶음</span><b>{scope.label}</b>
-          {scopeJamo?.map((g) => <div key={g.slot} className={styles.scopeJamo} style={{ ['--slot' as string]: `var(${SLOT_VAR[g.slot]})` }}>
-            <i aria-hidden="true" /><small>{SLOT_NAME[g.slot]}</small><em>{g.hits.length}/{g.total}</em>
-            <span className={styles.minis}>{g.hits.map((h) => { const j = (g.slot === 'CH' ? choseong : g.slot === 'JU' ? jungseong : jongseong)[h]; return j ? <ScopeMini key={h} jamo={j} slot={g.slot} scopeKey={scope.key} /> : <b key={h}>{h}</b> })}</span>
-          </div>)}
-        </div>}
         {!active && <p className={styles.hint}>글자에서 자모를 누르면 그 자모의 부위가 번호로 펼쳐져요. 빈 곳을 누르면 닫혀요.</p>}
       </div>
     </div>
