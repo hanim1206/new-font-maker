@@ -18,7 +18,9 @@ import type { StrokeDataV2 } from '../src/types'
 import type { Slot } from '../src/services/handwritingRead'
 import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../src/data/Hangul'
 import type { PenPoint } from '../src/services/penStrokeFit'
-import { getBaseJamo } from '../src/stores/jamoStore'
+import { getBaseJamo, useJamoStore } from '../src/stores/jamoStore'
+import { mergePadding, useLayoutStore } from '../src/stores/layoutStore'
+import { useContextPlacement } from './notoModel'
 import { DEFAULT_STYLE } from '../src/stores/globalStyleStore'
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
@@ -108,13 +110,30 @@ const BankGlyph = memo(function BankGlyph({ bank, char, size, style, override, f
     underlay={missing.length ? missing.map(([part, b]) => <rect key={part} x={b.x * V} y={b.y * V} width={b.width * V} height={b.height * V} fill="none" stroke={EDIT_COLOR.text5} strokeWidth={1.2} strokeDasharray="3 2" rx={1} />) : undefined} />
 })
 
+/** 제품 프리셋(자모 저장소 + 배치)으로 글자 하나. AppGlyph와 같지만 전역 스타일은 실험실 슬라이더 값을 받는다 — 은행이 비어도 스타일 변화를 2,350자로 본다. */
+const PresetGlyph = memo(function PresetGlyph({ char, size, style }: { char: string; size: number; style: GlobalStyle }) {
+  const choseong = useJamoStore((state) => state.choseong)
+  const jungseong = useJamoStore((state) => state.jungseong)
+  const jongseong = useJamoStore((state) => state.jongseong)
+  const schemas = useLayoutStore((state) => state.layoutSchemas)
+  const globalPadding = useLayoutStore((state) => state.globalPadding)
+  const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
+  const syllable = useMemo(() => decomposeSyllable(char, choseong, jungseong, jongseong), [char, choseong, jungseong, jongseong])
+  const schema = useMemo(() => {
+    const padding = mergePadding(globalPadding, paddingOverrides[syllable.layoutType])
+    return { ...schemas[syllable.layoutType], padding, designBodyPadding: padding }
+  }, [schemas, globalPadding, paddingOverrides, syllable.layoutType])
+  const { placement } = useContextPlacement(syllable, schema, style)
+  return <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} size={size} globalStyle={style} overflow="visible" clipGlyphs={false} />
+})
+
 /** 글자표 줄들. 확인 카드를 만질 때 다시 그리지 않게 따로 묶는다(iPad 개발 서버에서 토글이 느렸다). */
-const ChartRows = memo(function ChartRows({ bank, style, picked, highlight, firstRow, lastRow, onPick }: { bank: Bank; style: GlobalStyle; picked: string | null; highlight: Set<string> | null; firstRow: number; lastRow: number; onPick: (ch: string) => void }) {
+const ChartRows = memo(function ChartRows({ bank, style, picked, highlight, firstRow, lastRow, onPick, source }: { bank: Bank; style: GlobalStyle; picked: string | null; highlight: Set<string> | null; firstRow: number; lastRow: number; onPick: (ch: string) => void; source: 'bank' | 'preset' }) {
   const chartRows = Math.ceil(CHART_SYLLABLES.length / CHART_COLS)
   return <div style={{ height: chartRows * CHART_CELL, position: 'relative' }}>
     {Array.from({ length: Math.max(0, lastRow - firstRow) }, (_, k) => firstRow + k).map((row) => <div key={row} className={styles.chartRow} style={{ top: row * CHART_CELL, height: CHART_CELL }}>
       {CHART_SYLLABLES.slice(row * CHART_COLS, row * CHART_COLS + CHART_COLS).map((ch) => <button key={ch} type="button" className={`${styles.chartCell}${picked === ch ? ` ${styles.chartPicked}` : ''}${highlight?.has(ch) ? ` ${styles.chartNew}` : ''}`} style={{ width: CHART_CELL, height: CHART_CELL }} onClick={() => onPick(ch)} title={ch}>
-        <BankGlyph bank={bank} char={ch} size={CHART_CELL - 6} style={style} />
+        {source === 'preset' ? <PresetGlyph char={ch} size={CHART_CELL - 6} style={style} /> : <BankGlyph bank={bank} char={ch} size={CHART_CELL - 6} style={style} />}
       </button>)}
     </div>)}
   </div>
@@ -171,6 +190,8 @@ export function HandwritingLabPage() {
   const [roundJoins, setRoundJoins] = useState(false)
   /** 전역 둥글기 0~1(제품 strokeStyle.roundness). 끝 · 꺾임 모서리를 둥글기 × 반폭으로 굴린다. */
   const [roundness, setRoundness] = useState(0)
+  /** 글자표를 은행으로 그릴지 제품 프리셋으로 그릴지. 프리셋이면 스타일 변화가 2,350자 전부에서 보인다. */
+  const [chartSource, setChartSource] = useState<'bank' | 'preset'>('bank')
   const [picked, setPicked] = useState<string | null>(null)
   const [highlight, setHighlight] = useState<Set<string> | null>(null)
   const [scroll, setScroll] = useState({ top: 0, height: 600 })
@@ -447,18 +468,18 @@ export function HandwritingLabPage() {
             </g>
           })}
   </>, [letters, raws, reads, cols, roundJoins, style, weight]) // eslint-disable-line react-hooks/exhaustive-deps
-  const imitateGlyphs = useMemo(() => letters.map((ch, i) => <BankGlyph key={`${ch}-${i}`} bank={bank} char={ch} size={56} style={style} />), [letters, bank, style])
+  const imitateGlyphs = useMemo(() => letters.map((ch, i) => chartSource === 'preset' ? <PresetGlyph key={`${ch}-${i}`} char={ch} size={56} style={style} /> : <BankGlyph key={`${ch}-${i}`} bank={bank} char={ch} size={56} style={style} />), [letters, bank, style, chartSource])
   const badCells = letters.map((_, i) => reads[i]).filter((r): r is SyllableRead => !!r && r.state === 'bad')
   const readCount = letters.filter((_, i) => reads[i]?.state === 'ok').length
 
   return <div className={styles.page}>
     <aside className={styles.chartPane}>
       <div className={styles.chartHead}>
-        <strong>내 글자표</strong>
-        <span>{stats.ok}/{CHART_SYLLABLES.length} 다 참{stats.partial ? ` · 반쯤 ${stats.partial}` : ''}</span>
+        <strong>{chartSource === 'preset' ? '프리셋 글자표' : '내 글자표'}</strong>
+        <span>{chartSource === 'preset' ? '제품 프리셋 2,350자' : `${stats.ok}/${CHART_SYLLABLES.length} 다 참${stats.partial ? ` · 반쯤 ${stats.partial}` : ''}`}</span>
       </div>
       <div ref={chartRef} className={styles.chart} data-testid="handwriting-chart">
-        <ChartRows bank={bank} style={chartStyle} picked={picked} highlight={highlight} firstRow={firstRow} lastRow={lastRow} onPick={setPicked} />
+        <ChartRows bank={bank} style={chartStyle} picked={picked} highlight={highlight} firstRow={firstRow} lastRow={lastRow} onPick={setPicked} source={chartSource} />
       </div>
       {pickedInfo && <div className={styles.pickedInfo}>
         <b>{pickedInfo.title}</b>
@@ -466,6 +487,7 @@ export function HandwritingLabPage() {
         {pickedInfo.sentence && <Button size="sm" onClick={() => setSentence(pickedInfo.sentence!, `${pickedInfo.sentence}를 써 주세요.`)}>이 문장 쓰기</Button>}
       </div>}
       <div className={styles.styleBox}>
+        <label className={styles.switchRow}>프리셋으로 보기<Switch checked={chartSource === 'preset'} onCheckedChange={(on) => setChartSource(on ? 'preset' : 'bank')} data-testid="handwriting-preset-view" /></label>
         <Field label="굵기" value={weight}><RangeBar min={100} max={900} step={100} value={weight} onChange={(e) => setWeight(Number(e.target.value))} /></Field>
         <Field label="둥글기" value={`${Math.round(roundness * 100)}%`}><RangeBar min={0} max={100} step={5} value={Math.round(roundness * 100)} onChange={(e) => setRoundness(Number(e.target.value) / 100)} data-testid="handwriting-roundness" /></Field>
         <label className={styles.switchRow}>꺾임 모두 굴리기<Switch checked={roundJoins} onCheckedChange={setRoundJoins} /></label>
@@ -513,7 +535,7 @@ export function HandwritingLabPage() {
       </figure>
 
       <section className={styles.panel}>
-        <h2>지금 은행으로 그린 이 문장</h2>
+        <h2>{chartSource === 'preset' ? '프리셋으로 그린 이 문장' : '지금 은행으로 그린 이 문장'}</h2>
         <div className={styles.imitate}>
           {imitateGlyphs}
         </div>
