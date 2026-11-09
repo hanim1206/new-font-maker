@@ -19,6 +19,9 @@ export interface JamoShapeFeatures {
   rightTop: number
   /** 가로줄기 층 수: 틀 가운데(15~85%) 세로줄마다 위에서 아래로 잉크를 몇 번 지나는지 세어 80번째 백분위. ㄱ ㄴ 1 · ㄷ ㅁ ㅂ 2 · ㄹ ㅌ 3. */
   layers: number
+  /** 사선 다리: 열린 획이 틀 아래 귀퉁이(왼쪽 · 오른쪽 25% 안)에서 비스듬히 바깥으로 내려가며 끝나는가 — ㅅ ㅈ ㅊ의 삐침 · 내림. */
+  legLeft: boolean
+  legRight: boolean
   /** 닫힌 획(동그라미)이 있는가. */
   ring: boolean
   /** 굽은 닫힌 획(동그라미 ㅇ, ㅎ의 ㅇ)이 있는가. 곧은 닫힌 획(ㅁ)은 아니다. */
@@ -81,7 +84,20 @@ export function shapeFeaturesOfStrokes(strokes: readonly DeepReadonly<StrokeData
   for (let x = Math.floor(N * 0.15); x < Math.ceil(N * 0.85); x += 1) { let count = 0, prev = 0; for (let y = 0; y < N; y += 1) { const v = grid[y * N + x]; if (v && !prev) count += 1; prev = v } runs.push(count) }
   runs.sort((a, b) => a - b)
   const layers = runs[Math.floor(runs.length * 0.8)] ?? 0
+  let legLeft = false, legRight = false
+  for (const stroke of strokes) {
+    if (stroke.closed || stroke.points.length < 2) continue
+    const points = stroke.points as readonly Anchor[]
+    const b = points[points.length - 1], a = points[points.length - 2]
+    const c = b.handleIn ?? a.handleOut ?? a
+    const dx = b.x - c.x, dy = b.y - c.y
+    if (b.y < 0.8 || dy < 0.05 || Math.abs(dx) < 0.25 * dy) continue
+    if (dx < 0 && b.x < 0.25) legLeft = true
+    if (dx > 0 && b.x > 0.75) legRight = true
+  }
   return {
+    legLeft,
+    legRight,
     topDot: topFlat < 0.35 && secondWidth > 0.7,
     topFlat,
     bottomFlat: colsWith(1 - BAND, 1),

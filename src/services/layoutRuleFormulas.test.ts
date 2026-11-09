@@ -123,3 +123,18 @@ describe('받침은 기둥을 따라간다 · 키 큰 첫닿자', () => {
     expect(jongDropOf(cho('ㄱ'))).toBe(0)
   })
 })
+
+describe('받침 사선 다리 · 겹받침 벽', () => {
+  const jong = (k: string) => shapeFeaturesOf((baseJamos as unknown as { jongseong: Record<string, JamoData> }).jongseong[k])!
+  it('ㅅ ㅈ ㅊ은 양쪽 다리, ㄳ ㅄ은 오른 다리, ㄱ ㄴ은 다리가 없다', () => {
+    expect([jong('ㅅ').legLeft, jong('ㅅ').legRight, jong('ㅈ').legRight, jong('ㅊ').legLeft]).toEqual([true, true, true, true])
+    expect([jong('ㄳ').legLeft, jong('ㄳ').legRight, jong('ㅄ').legRight]).toEqual([false, true, true])
+    expect([jong('ㄱ').legRight, jong('ㄴ').legRight]).toEqual([false, false])
+  })
+  it('홑받침 다리는 들이지 않고, 겹받침 다리는 뻗고, ㄺ 오른쪽은 들인다', () => {
+    expect(jongSideInsetOf('ㅅ', jong('ㅅ'), { legs: true })).toEqual({ left: 0, right: 0 })
+    expect(jongSideInsetOf('ㄳ', jong('ㄳ'), { legs: true, multi: true }).right).toBeCloseTo(-0.03, 3)
+    expect(jongSideInsetOf('ㄺ', jong('ㄺ'), { legs: true, multi: true }).right).toBeGreaterThan(0.04)
+    expect(jongSideInsetOf('ㄺ', jong('ㄺ'), { legs: true, multi: true }).left).toBeCloseTo(-0.015, 3)
+  })
+})

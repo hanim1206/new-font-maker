@@ -89,6 +89,10 @@ export interface LayoutRuleParams {
   jongFollow: boolean
   /** 표 없이 키 큰 첫닿자(층 셋 이상 · 꼭지) 밑에서 받침 윗면을 내린다(`jongDropOf`). */
   choTallJong: boolean
+  /** 받침 사선 다리(ㅅ ㅈ ㅊ)는 벽으로 치지 않고, 겹받침 다리는 바깥으로 뻗는다(`jongSideInsetOf` legs). `jongWall`과 함께 쓴다. */
+  jongLegs: boolean
+  /** 겹받침 · 쌍받침에도 받침 벽을 건다(`jongSideInsetOf` multi). `jongWall`과 함께 쓴다. */
+  jongWallMulti: boolean
 }
 
 /** 공식에 쓰는 자모 생김새 특징. */
@@ -111,6 +115,8 @@ export const DEFAULT_LAYOUT_RULE_PARAMS: LayoutRuleParams = {
   jongWall: false,
   jongFollow: false,
   choTallJong: false,
+  jongLegs: false,
+  jongWallMulti: false,
 }
 
 export interface LayoutRuleStep {
@@ -440,7 +446,7 @@ export function applyLayoutRules(input: {
   const choSides = twoStem || (!!wall && (wall.left !== 0 || wall.right !== 0)) || liftHere || topShift !== 0
   const jongRaise = (!jamo && params.jongHeight && input.features?.jong ? jongRaiseOf(input.features.jong) : 0)
     - (!jamo && params.choTallJong && input.jamo?.jong && input.features?.cho ? jongDropOf(input.features.cho) : 0)
-  const jongSides = !jamo && params.jongWall && input.jamo?.jong && input.features?.jong ? jongSideInsetOf(input.jamo.jong, input.features.jong) : null
+  const jongSides = !jamo && params.jongWall && input.jamo?.jong && input.features?.jong ? jongSideInsetOf(input.jamo.jong, input.features.jong, { legs: params.jongLegs, multi: params.jongWallMulti }) : null
   const jongShift = !jamo && params.jongFollow && input.jamo?.jong ? jongFollowOf(input.jamo.jung) : 0
   const jongShape = jongRaise !== 0 || jongShift !== 0 || (!!jongSides && (jongSides.left !== 0 || jongSides.right !== 0))
   let jongTop: number | null = null

@@ -127,14 +127,32 @@ export const pillarDiveOf = (jong: Pick<JamoShapeFeatures, 'rightTop'>): number 
  * 받침 한쪽이 세로줄기로 막혀 있을수록 노토는 그쪽을 안으로 들인다. 들임(몸 em, +면 안쪽) = 0.041 × 막힘, 양쪽 따로.
  * 받침 몫과 홀자 몫(`jongFollowOf`)을 나눠 맞춘 값이다. 홑받침 14개: 왼면 ±0.02 안 13/14, 오른면 12/14.
  * (처음엔 받침별 중앙값으로 0.057 × 막힘 − 0.01을 맞췄는데, 588자는 받침마다 짝 홀자가 치우쳐 있어 홀자 몫이 섞여 있었다.)
- * 겹받침과 쌍받침은 두 자모를 나란히 놓은 꼴이라 벽 모양으로 읽히지 않아 아직 건드리지 않는다.
+ * 겹받침과 쌍받침은 가설 13(`opts.multi`), 사선 다리는 가설 12(`opts.legs`)에서 따로 다룬다.
+ * 가설 12 사선 다리(2026-11-09, 받침 닿자 몫에서): ㅅ ㅈ ㅊ의 다리를 격자는 "반쯤 막힌 벽"으로 읽어 들였는데, 노토는 다리 쪽을 들이지 않는다. 겹받침의 다리(ㄳ ㄽ ㅄ ㅆ ㄵ)는 0.03 더 뻗는다.
+ * 가설 13 겹받침 벽: ㄺ ㄻ ㄼ ㄲ은 오른쪽이 홑받침처럼 0.041 들어오고, 겹받침 왼쪽은 모두 0.015쯤 더 나간다(남는 것: ㄿ ㅀ ㄶ 오른쪽 0.02~0.035 덜 들어감).
  */
 export const JONG_WALL_SLOPE = 0.041
 export const JONG_WALL_BASE = 0
+/** 사선 다리(가설 12): 겹받침 · 쌍받침의 다리는 그쪽으로 0.03 더 뻗는다. 홑받침 다리는 벽으로 치지 않을 뿐 그대로 둔다. */
+export const JONG_LEG_OUT = 0.03
+/** 겹받침 벽(가설 13): 겹받침 · 쌍받침도 오른쪽은 세로벽만큼 들이고, 왼쪽은 0.015 더 뻗는다. */
+export const JONG_MULTI_LEFT_OUT = 0.015
 const SINGLE_JONG = new Set([...'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ'])
-export function jongSideInsetOf(jong: string, f: Pick<JamoShapeFeatures, 'leftClosed' | 'rightClosed'>): { left: number; right: number } {
-  if (!SINGLE_JONG.has(jong)) return { left: 0, right: 0 }
-  return { left: JONG_WALL_BASE + JONG_WALL_SLOPE * f.leftClosed, right: JONG_WALL_BASE + JONG_WALL_SLOPE * f.rightClosed }
+export function jongSideInsetOf(
+  jong: string,
+  f: Pick<JamoShapeFeatures, 'leftClosed' | 'rightClosed' | 'legLeft' | 'legRight'>,
+  opts: { legs?: boolean; multi?: boolean } = {},
+): { left: number; right: number } {
+  const single = SINGLE_JONG.has(jong)
+  const side = (closed: number, leg: boolean, multiOut: number): number => {
+    if (opts.legs && leg) return single ? 0 : -JONG_LEG_OUT
+    if (single) return JONG_WALL_BASE + JONG_WALL_SLOPE * closed
+    return opts.multi ? multiOut : 0
+  }
+  return {
+    left: side(f.leftClosed, f.legLeft, -JONG_MULTI_LEFT_OUT),
+    right: side(f.rightClosed, f.legRight, JONG_WALL_SLOPE * f.rightClosed),
+  }
 }
 
 /**
