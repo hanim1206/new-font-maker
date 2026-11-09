@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import { shapeFeaturesOf } from './jamoShapeFeatures'
-import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, branchInsetOf, choBottomLiftOf, choSideInsetOf, hasChoWall, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
+import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, hasChoWall, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { CHO_TARGET, JUNG_TARGET } from './layoutRuleTargets'
 
 const CHO_TARGET_A_RIGHT = JUNG_TARGET['ㅏ'].right
@@ -71,5 +71,14 @@ describe('첫닿자 아랫면 — 바닥 모양', () => {
     const lift = (k: string, hasFinal: boolean) => choBottomLiftOf(shapeFeaturesOf(cho(k))!, hasFinal)
     expect(lift('ㄴ', false) - lift('ㄱ', false)).toBeGreaterThan(0.06)
     expect(lift('ㅁ', true) - lift('ㅋ', true)).toBeGreaterThan(0.05)
+  })
+})
+
+describe('첫닿자 윗면 — 꼭지와 받침', () => {
+  it('꼭지 닿자 ㅊ ㅎ은 나머지보다 위에서 시작하고, 받침이 있으면 다 같이 내려온다', () => {
+    const shift = (k: string, hasFinal: boolean) => choTopShiftOf(shapeFeaturesOf(cho(k))!, hasFinal)
+    expect(shift('ㅎ', false)).toBeLessThan(shift('ㄱ', false) - 0.05)
+    expect(shift('ㅊ', true)).toBeLessThan(shift('ㅁ', true) - 0.04)
+    expect(shift('ㅁ', true)).toBeGreaterThan(shift('ㅁ', false))
   })
 })

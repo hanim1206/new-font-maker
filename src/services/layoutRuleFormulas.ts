@@ -90,3 +90,16 @@ export const CHO_LIFT_NO_FINAL_FLAT = 0.077
 export const CHO_LIFT_FINAL_FLAT = 0.061
 export const choBottomLiftOf = (f: Pick<JamoShapeFeatures, 'bottomFlat'>, hasFinal: boolean): number =>
   hasFinal ? CHO_LIFT_FINAL_FLAT * f.bottomFlat : CHO_LIFT_NO_FINAL_BASE + CHO_LIFT_NO_FINAL_FLAT * f.bottomFlat
+
+/**
+ * 첫닿자 윗면(2026-11-09, 사용자 관찰 "첫닿자 윗면은 ㅎ ㅊ 등 꼭지 있는 애들이 다르다"에서).
+ * 받침이 있으면 첫닿자 윗면이 다 같이 `CHO_TOP_DROP_FINAL` 내려온다. 꼭지 닿자(ㅊ ㅎ)는 꼭지가 윗선 위로 솟아
+ * 나머지보다 받침 없으면 `CHO_TOP_DOT_UP_NO_FINAL`, 있으면 `CHO_TOP_DOT_UP_FINAL` 위에서 시작한다.
+ * 같은 첫닿자 안에서 홀자와 상관없이 0.01(받침 있으면 0.04) 안으로 같다.
+ */
+export const CHO_TOP_DROP_FINAL = 0.06
+export const CHO_TOP_DOT_UP_NO_FINAL = 0.08
+export const CHO_TOP_DOT_UP_FINAL = 0.055
+/** 첫닿자 윗면을 내릴 양(몸 em, + = 아래). */
+export const choTopShiftOf = (f: Pick<JamoShapeFeatures, 'topDot'>, hasFinal: boolean): number =>
+  (hasFinal ? CHO_TOP_DROP_FINAL : 0) - (f.topDot ? (hasFinal ? CHO_TOP_DOT_UP_FINAL : CHO_TOP_DOT_UP_NO_FINAL) : 0)

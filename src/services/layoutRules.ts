@@ -1,7 +1,7 @@
 import type { BoxConfig, Padding } from '../types'
 import { BRANCH_INSET_BY_PAIR, CHO_RIGHT_BY_JUNG, CHO_RIGHT_BY_PAIR, JONG_RIGHT_BY_CHO } from './layoutRuleResiduals'
 import type { JamoShapeFeatures } from './jamoShapeFeatures'
-import { CHO_TOP_DROP_NO_FINAL, TWO_STEM_CHO_NARROW, branchInsetOf, choBottomLiftOf, choSideInsetOf, DOUBLE_CHO_SHIFT, PILLAR_RIGHT, RIGHT_BRANCH_OUT, TWO_STEM_FOLLOW, TWO_STEM_SPAN, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
+import { CHO_TOP_DROP_NO_FINAL, TWO_STEM_CHO_NARROW, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, DOUBLE_CHO_SHIFT, PILLAR_RIGHT, RIGHT_BRANCH_OUT, TWO_STEM_FOLLOW, TWO_STEM_SPAN, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { BRANCH_INSET_BY_CHO, BRANCH_INSET_BY_JUNG, CHO_GAP, CHO_TARGET, CHO_TOP_BY_JONG, CHO_TOP_BY_JUNG, JONG_GAP_OFFSET, JONG_LEFT_BY_JUNG, JONG_RIGHT_BY_JUNG, JONG_TARGET, JONG_TOP_BY_CHO, JUNG_TARGET, PILLAR_BOTTOM_NO_FINAL } from './layoutRuleTargets'
 
 /**
@@ -77,6 +77,8 @@ export interface LayoutRuleParams {
   choWall: boolean
   /** 표 없이 첫닿자 아랫면을 바닥 모양(`choBottomLiftOf`)만큼 올린다 — 바닥이 막힌 닿자일수록 위에서 끝난다. */
   choBottomShape: boolean
+  /** 표 없이 첫닿자 윗면을 받침 유무와 꼭지(`choTopShiftOf`)로 낸다 — 받침 있으면 내려오고, 꼭지 닿자는 위로 솟는다. */
+  choTopShape: boolean
 }
 
 /** 공식에 쓰는 자모 생김새 특징. */
@@ -93,6 +95,7 @@ export const DEFAULT_LAYOUT_RULE_PARAMS: LayoutRuleParams = {
   twoStemNarrow: false,
   choWall: false,
   choBottomShape: false,
+  choTopShape: false,
 }
 
 export interface LayoutRuleStep {
@@ -418,9 +421,10 @@ export function applyLayoutRules(input: {
   const lift = !jamo && params.choBottomShape && input.features?.cho ? choBottomLiftOf(input.features.cho, !!input.jamo?.jong) : 0
   // 받침이 있으면 아랫면은 choBottom(받침 윗면 기준)이 정하므로 거기서 올린다. 받침이 없으면 여기서.
   const liftHere = lift !== 0 && !input.jamo?.jong
-  const choSides = twoStem || (!!wall && (wall.left !== 0 || wall.right !== 0)) || liftHere
+  const topShift = !jamo && params.choTopShape && input.features?.cho ? choTopShiftOf(input.features.cho, !!input.jamo?.jong) : 0
+  const choSides = twoStem || (!!wall && (wall.left !== 0 || wall.right !== 0)) || liftHere || topShift !== 0
   // 첫닿자 양면 목표는 처음 잰 자리에서 한 번만 정한다(다시 맞추기 때마다 또 빼지 않게).
-  let sides: { left: number; right: number; bottom: number } | null = null
+  let sides: { left: number; right: number; top: number; bottom: number } | null = null
   const apply = (rule: LayoutRuleId, ink: RuleInk): LayoutRuleStep | null => {
     if (rule === 'choTable' && choSides) {
       const box = boxes.CH, ch = ink.CH
@@ -429,11 +433,12 @@ export function applyLayoutRules(input: {
       sides ??= {
         left: ch.bounds.left + sx * (wall?.left ?? 0),
         right: ch.bounds.right - sx * ((twoStem ? TWO_STEM_CHO_NARROW : 0) + (wall?.right ?? 0)),
+        top: ch.bounds.top + scaleY(body) * topShift,
         bottom: ch.bounds.bottom - scaleY(body) * (liftHere ? lift : 0),
       }
       const wide = fitBoxToHorizontalInk(box, ch.bounds, sides)
-      const after = liftHere ? fitBoxToVerticalInk(wide, ch.bounds, { top: ch.bounds.top, bottom: sides.bottom }) : wide
-      return { rule: 'choTable', part: 'CH', before: clone(box), after, limited: false, note: `${twoStem ? '두 기둥 홀자 옆 · ' : ''}${wall ? '첫닿자 생김새 · ' : ''}첫닿자 가로 ${fixed(ch.bounds.left)}~${fixed(ch.bounds.right)} → ${fixed(sides.left)}~${fixed(sides.right)}${liftHere ? `, 아래 ${fixed(ch.bounds.bottom)} → ${fixed(sides.bottom)}` : ''}` }
+      const after = liftHere || topShift !== 0 ? fitBoxToVerticalInk(wide, ch.bounds, { top: sides.top, bottom: sides.bottom }) : wide
+      return { rule: 'choTable', part: 'CH', before: clone(box), after, limited: false, note: `${twoStem ? '두 기둥 홀자 옆 · ' : ''}${wall ? '첫닿자 생김새 · ' : ''}첫닿자 가로 ${fixed(ch.bounds.left)}~${fixed(ch.bounds.right)} → ${fixed(sides.left)}~${fixed(sides.right)}${topShift !== 0 ? `, 위 ${fixed(ch.bounds.top)} → ${fixed(sides.top)}` : ''}${liftHere ? `, 아래 ${fixed(ch.bounds.bottom)} → ${fixed(sides.bottom)}` : ''}` }
     }
     if (rule === 'choTable') return applyChoTable(boxes, ink, body, jamo!, input.features?.cho ?? null, params.formulas)
     if (rule === 'jungTable') return jamo ? applyJungTable(boxes, ink, body, jamo, params.jungKinds) : (params.jungKinds || params.branchInset) && input.jamo ? applyJungKindsOnly(boxes, ink, body, input.jamo.jung, params.branchInset ? input.features?.cho ?? null : null, params.jungKinds) : null
