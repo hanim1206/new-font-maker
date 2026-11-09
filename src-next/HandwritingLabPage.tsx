@@ -141,6 +141,8 @@ function JamoGrid({ cellOf, onTap, focus }: { cellOf: (L: string, slot: Slot) =>
 
 /** 전 → 후 글자 한 쌍. */
 function BeforeAfter({ before, after, char, style, size = 72, override, active }: { before: Bank | null; after: Bank; char: string; style: GlobalStyle; size?: number; override?: Record<string, TypedSample>; active?: 'before' | 'after' }) {
+  // 처음 들어오는 것은 비교할 전이 없다 — 후 하나만
+  if (!before) return <div className={styles.pair}><span className={styles.pairNew}><BankGlyph bank={after} char={char} size={size} style={style} override={override} faintMissing={false} /></span></div>
   return <div className={`${styles.pair}${active ? ` ${active === 'after' ? styles.pairAfter : styles.pairBefore}` : ''}`}>
     <span className={styles.pairOld}>{before ? <BankGlyph bank={before} char={char} size={size} style={style} faintMissing={false} /> : <span className={styles.emptyGlyph} style={{ width: size, height: size, fontSize: size * 0.4 }}>새</span>}</span>
     <span className={styles.pairArrow}>→</span>
@@ -512,7 +514,7 @@ export function HandwritingLabPage() {
           <DialogHeader>
             <div className={styles.cardHead}>
               <div><DialogTitle>{card.step === 1 ? '이번 문장에서 모은 것' : '이번 글씨의 배치 버릇'}</DialogTitle>
-                <p className={styles.sub}>{card.step === 1 ? `${card.gathered.reads.map((r) => r.char).join('')} · ${card.gathered.reads.length}자 읽음` : '누르면 그 배치에 이번 글씨를 섞어요'}</p></div>
+                <p className={styles.sub}>{card.step === 1 ? `${card.gathered.reads.map((r) => r.char).join('')} · ${card.gathered.reads.length}자 읽음` : ((Object.keys(card.gathered.lay) as LayoutKey[]).some((k) => bank.lay[k]) ? '이미 있는 배치는 누르면 이번 글씨를 섞어요' : '처음 잡는 배치예요. 반영하면 이대로 들어가요')}</p></div>
               {!rewrite && <div className={styles.steps}><span className={card.step === 1 ? styles.stepOn : ''}>1 글자</span>›<span className={card.step === 2 ? styles.stepOn : ''}>2 레이아웃</span></div>}
             </div>
           </DialogHeader>
