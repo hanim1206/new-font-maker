@@ -5,7 +5,7 @@ import type { DeepReadonly } from '../src/types'
 import { LADDER_HYPS, LADDER_KINDS, LADDER_V, ladderBase, ladderMedian, ladderPools, ladderStep } from './layoutLadder'
 import type { LadderPool, LadderRow } from './layoutLadder'
 import type { JamoMaps, ScoreInput, ScoredGlyph } from './layoutRulesScore'
-import { LADDER_CSS, LADDER_HTML, mountLadderView } from './layoutLadderView'
+import { LADDER_CSS, LADDER_CSS_WORK, LADDER_HTML, mountLadderView } from './layoutLadderView'
 import { useNotoModel } from './notoModel'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
 
@@ -104,7 +104,7 @@ export function LayoutLadderLabPage() {
   }, [bundle])
 
   return <>
-    <style>{LADDER_CSS}</style>
+    <style>{LADDER_CSS + LADDER_CSS_WORK}</style>
     <div className="LL-status" style={{ position: 'sticky', top: 0, zIndex: 30, padding: '6px 20px', fontSize: 12, background: '#1d1d1f', color: '#fff' }}>{error ? `모델을 못 읽었다: ${error}` : status}</div>
     <div ref={host} className="LL" />
   </>

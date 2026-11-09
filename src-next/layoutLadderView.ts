@@ -78,8 +78,7 @@ export const LADDER_CSS = `.LL{--ink:#1d1d1f;--mute:#6e6e73;--line:#e3e3e6;--bg:
 .LL .exs div{text-align:center;font-size:11px;color:var(--mute)}
 .LL .exs b{color:var(--ink);font-size:13px}
 .LL .note{background:#eef6f0;border:1px solid #cfe6d6;border-radius:10px;padding:12px 16px;font-size:13px;margin-top:14px}
-.LL #pick{display:none;position:fixed;top:40px;right:12px;width:min(400px,38vw);max-height:calc(100vh - 52px);overflow:auto;background:#fff;border:1px solid #ddd;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.14);padding:12px 14px;z-index:20}
-.LL.pk main{margin-left:12px;margin-right:calc(min(400px,38vw) + 24px)}
+.LL #pick{display:none;margin-top:12px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
 .LL #pick .ph{font-size:14px;display:flex;align-items:center;gap:4px}
 .LL #pick .ph button{margin-left:auto;border:0;background:none;font-size:15px;cursor:pointer;color:var(--mute)}
 .LL #pick .ps{font-size:11px;color:var(--mute);margin:2px 0 6px}
@@ -88,6 +87,8 @@ export const LADDER_CSS = `.LL{--ink:#1d1d1f;--mute:#6e6e73;--line:#e3e3e6;--bg:
 .LL #pick .pg div{text-align:center;font-size:10px;color:var(--mute)}
 .LL #pick .pg b{color:var(--ink);font-size:12px}
 .LL #pick .pg .hi svg{outline:2px solid #111;border-radius:6px}`
+
+export const LADDER_CSS_WORK = `.LL main{max-width:1280px}.LL .work{display:grid;grid-template-columns:400px 1fr;gap:20px;align-items:start}.LL .side{position:sticky;top:40px;max-height:calc(100vh - 52px);overflow:auto}.LL #canvas svg{background:#fff;border:1px solid var(--line);border-radius:12px;aspect-ratio:auto}.LL #canvas .edge{cursor:pointer}.LL #canvas .edge:hover .vis{opacity:.7}.LL #canvas text{font-size:7px;fill:var(--ink);pointer-events:none;font-variant-numeric:tabular-nums}.LL #canvas .pn{font-size:9px;fill:var(--mute)}.LL .ehead{display:grid;grid-template-columns:1fr 200px;gap:12px;align-items:center;margin-bottom:10px}.LL .ehead .name{font-weight:600;font-size:16px}.LL .ehead small{display:block;font-weight:400;color:var(--mute);font-size:12px}`
 
 export const LADDER_HTML = `<div id="pick"></div><main>
 <h1>가설 사다리 — 우리 패턴으로 노토까지</h1>
@@ -101,10 +102,9 @@ export const LADDER_HTML = `<div id="pick"></div><main>
 </section>
 
 <h2>아직 표가 하는 일</h2>
-<p class="sub">지금 조합과 외운 표의 상자 차이. 칸 숫자는 표가 그 짝에서 변을 더 옮기는 양(빨강 오른쪽 · 아래, 파랑 왼쪽 · 위). 가설이 맞으면 해당 줄의 막대가 줄고 판이 하얘진다. 점선은 "패턴만" 때 막대 길이.</p>
-<div class="poolsw"><button data-pool="171" class="on">받침 없는 171자</button><button data-pool="588">받침 있는 588자</button></div>
-<section class="card" id="moves"></section>
-<div class="note">보는 법 — 한 줄 전체가 같은 색이면 "그 첫닿자는 늘 이렇다", 한 열이 같은 색이면 "그 홀자 옆에서는 늘 이렇다"는 패턴 후보다. 아래 글자 탭은 첫닿자별(홀자 고정) · 홀자별(첫닿자 고정) · 받침별 · 가장 많이 순.</div>
+<p class="sub">지금 조합과 외운 표의 상자 차이. 왼쪽 틀에서 상자의 변을 누르면 그 변의 첫닿자 × 홀자 표가 오른쪽에 뜬다. 변의 색과 숫자는 그 변을 표가 더 옮기는 양의 가운데값(절댓값), 괄호는 "패턴만" 때. 칸을 누르면 그 줄 · 그 열 글자가 틀 아래에 뜬다.</p>
+<div class="work"><aside class="side"><div class="poolsw"><button data-pool="171" class="on">받침 없는 171자</button><button data-pool="588">받침 있는 588자</button></div><div id="canvas"></div><div id="pick"></div></aside><section class="card" id="moves"></section></div>
+<div class="note">보는 법 — 한 줄 전체가 같은 색이면 "그 첫닿자는 늘 이렇다", 한 열이 같은 색이면 "그 홀자 옆에서는 늘 이렇다"는 패턴 후보다. </div>
 </main>
 `
 
@@ -115,13 +115,12 @@ const PARTN = {CH:'첫닿자',JU:'홀자',JO:'받침'}, EDGEN = {left:'왼면',r
 const CHOS = [...'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'], JUNGS = ['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅣ'], JONGS = [...'ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ'];
 /** 글자가 카드 테두리에 닿지 않게 둘레에 두는 여백(V 단위). */
 const PADV = 14;
-const OPEN = new Set();
 const SELC = {};
 let LAST = null;
-/** 고른 칸의 줄(같은 첫닿자)과 열(같은 홀자)을 오른쪽 위 고정 패널에 띄운다. */
+/** 고른 칸의 줄(같은 첫닿자)과 열(같은 홀자)을 왼쪽 틀 아래에 띄운다. */
 function panel() {
   const el = root.querySelector('#' + 'pick'); const pick = LAST && SELC[pool + ' ' + LAST];
-  if (!pick) { el.style.display = 'none'; root.classList.remove('pk'); return; }
+  if (!pick) { el.style.display = 'none'; return; }
   const key = LAST; const [p, e] = key.split('.'); const mv = r => (r.moves[sel] ?? {})[key];
   const rows = D.rows.filter(r => r.pool === pool && mv(r) !== undefined);
   const mid = list => { const m = mmed(list.map(mv)); return [...list].sort((x, y) => Math.abs(mv(x) - m) - Math.abs(mv(y) - m))[0]; };
@@ -135,8 +134,8 @@ function panel() {
   if (jung) body += line(`열 — 홀자 ${jung}`, CHOS.map(c => glyph(mid(rows.filter(r => r.cho === c && r.jung === jung)), c === cho)));
   if (t === 'jong') body += line(`받침 ${a}`, [...rows.filter(r => r.jong === a)].sort((x, y) => Math.abs(mv(y)) - Math.abs(mv(x))).map(r => glyph(r, false)));
   el.innerHTML = `<div class="ph"><b>${PARTN[p]} ${EDGEN[e]}</b> · ${pool}자 · ${selName()}<button id="pickx">✕</button></div><div class="ps">초록 면 = 외운 표 · 파랑 선 = 지금 조합 · 숫자 = 표가 더 옮기는 양</div>${body}`;
-  el.style.display = 'block'; root.classList.add('pk');
-  root.querySelector('#pickx').onclick = () => { delete SELC[pool + ' ' + LAST]; LAST = null; moves(); };
+  el.style.display = 'block';
+  root.querySelector('#pickx').onclick = () => { delete SELC[pool + ' ' + LAST]; moves(); };
 }
 const KEYS = ['CH.left','CH.right','CH.top','CH.bottom','JU.left','JU.right','JU.top','JU.bottom','JO.left','JO.right','JO.top','JO.bottom'];
 const f2 = v => v === undefined || v === null ? '…' : v.toFixed(2);
@@ -177,28 +176,60 @@ function pools() {
     el.insertAdjacentHTML('beforeend', `<div class="pool"><h3>${p==='588'?'받침 있는 588자':'받침 없는 171자'}</h3><div class="meta">지금 조합 ${pct(s, s.steps[sel])}% · 외운 표 ${Math.round((1-s.table/s.raw)*100)}%</div><div class="track"><div class="bar"></div>${dots}</div></div>`);
   }
 }
+/** 틀 그림 속 상자 자리(그림 좌표 200). 받침 있을 때와 없을 때. */
+const FRAME = {
+  '588': { CH: [28, 26, 108, 98], JU: [128, 20, 170, 124], JO: [36, 144, 170, 180] },
+  '171': { CH: [28, 50, 112, 150], JU: [132, 20, 172, 180] },
+};
+let EDGE = null;
+function stats(rows, k) {
+  const v = rows.map(r => (r.moves[sel] ?? {})[k]).filter(x => x !== undefined); const v0 = rows.map(r => (r.moves[0] ?? {})[k]).filter(x => x !== undefined);
+  return { key: k, med: mmed(v.map(Math.abs)) ?? 0, base: mmed(v0.map(Math.abs)) ?? 0, sgn: mmed(v) ?? 0, n: v.length, over: v.filter(x => Math.abs(x) > 0.02).length };
+}
+/** 왼쪽 틀: 상자 열두 변을 오차 크기대로 칠하고, 누르면 그 변을 고른다. */
+function canvas(rows, gs) {
+  const el = root.querySelector('#canvas'); const fr = FRAME[pool];
+  const by = Object.fromEntries(gs.map(g => [g.key, g]));
+  const tone = g => { const t = Math.min(1, g.med / 0.06); return g.sgn > 0 ? `rgba(214,69,69,${0.15 + 0.85 * t})` : `rgba(31,79,216,${0.15 + 0.85 * t})`; };
+  let svg = `<svg viewBox="0 0 200 200" width="100%"><rect x="6" y="6" width="188" height="188" fill="none" stroke="#e3e3e6" stroke-dasharray="3 3"/>`;
+  for (const [part, [x0, y0, x1, y1]] of Object.entries(fr)) {
+    svg += `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="#f4f4f5" stroke="none"/><text class="pn" x="${(x0 + x1) / 2}" y="${(y0 + y1) / 2 + 4}" text-anchor="middle">${PARTN[part]}</text>`;
+    const sides = { left: [x0, y0, x0, y1], right: [x1, y0, x1, y1], top: [x0, y0, x1, y0], bottom: [x0, y1, x1, y1] };
+    for (const [e, [ax, ay, bx, by_]] of Object.entries(sides)) {
+      const g = by[part + '.' + e]; if (!g) continue;
+      const on = EDGE === g.key; const mx = (ax + bx) / 2, my = (ay + by_) / 2;
+      const tx = e === 'left' ? ax - 3 : e === 'right' ? ax + 3 : mx, ty = e === 'top' ? ay - 3 : e === 'bottom' ? ay + 9 : my;
+      const rot = e === 'left' ? ` transform="rotate(-90 ${tx} ${ty})"` : e === 'right' ? ` transform="rotate(90 ${tx} ${ty})"` : '';
+      const anchor = 'middle';
+      svg += `<g class="edge" data-key="${g.key}"><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by_}" stroke="transparent" stroke-width="16"/><line class="vis" x1="${ax}" y1="${ay}" x2="${bx}" y2="${by_}" stroke="${tone(g)}" stroke-width="${on ? 8 : 5}" stroke-linecap="round"/>${on ? `<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by_}" stroke="#111" stroke-width="1.5"/>` : ''}<text x="${tx}" y="${ty}"${rot} text-anchor="${anchor}" style="font-weight:${on ? 700 : 400}">${g.med.toFixed(3).replace(/^0/, '')}${sel > 0 ? ` (${g.base.toFixed(3).replace(/^0/, '')})` : ''}</text></g>`;
+    }
+  }
+  svg += `</svg>`;
+  el.innerHTML = svg;
+  el.querySelectorAll('.edge').forEach(n => n.addEventListener('click', () => { EDGE = n.dataset.key; LAST = EDGE; moves(); }));
+}
 function moves() {
   const box = root.querySelector('#' + 'moves'); box.innerHTML = '';
   const rows = D.rows.filter(r => r.pool === pool);
-  const gs = KEYS.map(k => { const v = rows.map(r => (r.moves[sel] ?? {})[k]).filter(x => x !== undefined); const v0 = rows.map(r => (r.moves[0] ?? {})[k]).filter(x => x !== undefined);
-    return { key: k, med: mmed(v.map(Math.abs)) ?? 0, base: mmed(v0.map(Math.abs)) ?? 0, sgn: mmed(v) ?? 0, n: v.length, over: v.filter(x => Math.abs(x) > 0.02).length }; }).filter(g => g.n); // 순서는 고정(첫닿자 → 홀자 → 받침, 왼 · 오른 · 위 · 아래)
-  const maxMed = Math.max(...gs.map(g => Math.max(g.med, g.base)));
-  gs.forEach((g) => {
-    const [p, e] = g.key.split('.'); const mv = r => (r.moves[sel] ?? {})[g.key];
-    let heat = `<div class="heat" style="grid-template-columns:28px repeat(9,1fr) 8px 1fr"><div></div>${JUNGS.map(j=>`<div class="h" data-s="jung|${j}">${j}</div>`).join('')}<div></div><div class="h">첫닿자별</div>`;
-    for (const c of CHOS) { heat += `<div class="rh" data-s="cho|${c}">${c}</div>`; for (const j of JUNGS) { const v = mmed(rows.filter(r => r.cho===c && r.jung===j).map(mv)); heat += `<div class="c" data-s="cell|${c}|${j}" style="background:${col(v)}">${fmt(v)}</div>`; } const rv = mmed(rows.filter(r => r.cho===c).map(mv)); heat += `<div></div><div class="c m" data-s="cho|${c}" style="background:${col(rv)}">${fmt(rv)}</div>`; }
-    heat += `<div class="rh" style="font-size:11px">홀자별</div>${JUNGS.map(j => { const v = mmed(rows.filter(r=>r.jung===j).map(mv)); return `<div class="c m" data-s="jung|${j}" style="background:${col(v)}">${fmt(v)}</div>`; }).join('')}</div>`;
-    let jong = '';
-    if (pool === '588') { const cell = {}; for (const r of rows) if (mv(r) !== undefined) (cell[r.cho+r.jung] ??= []).push(mv(r)); const cm = Object.fromEntries(Object.entries(cell).map(([k,v]) => [k, mmed(v)]));
-      jong = `<div class="scale">받침별 — 같은 첫닿자 · 홀자 칸에 받침이 더 얹는 양</div><div class="jong">${JONGS.map(k => { const v = mmed(rows.filter(r=>r.jong===k && mv(r)!==undefined).map(r=>mv(r) - cm[r.cho+r.jung])); return `<div><div class="c" data-s="jong|${k}" style="background:${col(v)}">${fmt(v)}</div>${k}</div>`; }).join('')}</div>`; }
-    const panes = '';
-    const tabs = '';
-    box.insertAdjacentHTML('beforeend', `<div class="mv${OPEN.has(g.key)?' open':''}" data-key="${g.key}"><div class="head"><div class="name">${PARTN[p]} ${EDGEN[e]}<small>표가 대개 ${dirOf(e, g.sgn)}으로 · 0.02 넘게 ${g.over}/${g.n}</small></div><div class="bar"><i style="width:${g.med/maxMed*100}%"></i>${sel>0?`<u style="left:0;width:${g.base/maxMed*100}%"></u>`:''}</div><div class="num">가운데 ${g.med.toFixed(3)}${sel>0?` (패턴만 ${g.base.toFixed(3)})`:''}</div></div><div class="body"><div class="scale">첫닿자 × 홀자 · 칸을 누르면 그 줄 · 그 열이, 머리(ㄱ · ㅏ …)를 누르면 그 줄이나 열 하나가 오른쪽 위에 뜬다<i style="background:rgba(214,69,69,.7)"></i>오른쪽 · 아래<i style="background:rgba(31,79,216,.7)"></i>왼쪽 · 위</div>${heat}${jong}${tabs}${panes}</div></div>`);
-  });
-  box.querySelectorAll('.mv .head').forEach(h => h.addEventListener('click', () => { const m = h.parentElement; m.classList.toggle('open'); const k = m.dataset.key; if (m.classList.contains('open')) OPEN.add(k); else OPEN.delete(k); }));
-  box.querySelectorAll('.mv').forEach(m => { const key = pool + ' ' + m.dataset.key; const cur = SELC[key]; m.querySelectorAll('[data-s]').forEach(c => { if (cur === c.dataset.s) c.classList.add('pick');
+  const gs = KEYS.map(k => stats(rows, k)).filter(g => g.n);
+  if (!gs.length) { canvas(rows, gs); box.innerHTML = '<div class="scale">아직 이 조합을 재는 중이다.</div>'; panel(); return; }
+  if (!EDGE || !gs.some(g => g.key === EDGE)) EDGE = [...gs].sort((a, b) => b.med - a.med)[0].key;
+  LAST = EDGE;
+  canvas(rows, gs);
+  const g = gs.find(x => x.key === EDGE);
+  const [p, e] = g.key.split('.'); const mv = r => (r.moves[sel] ?? {})[g.key];
+  const maxMed = Math.max(...gs.map(x => Math.max(x.med, x.base)));
+  let heat = `<div class="heat" style="grid-template-columns:28px repeat(9,1fr) 8px 1fr"><div></div>${JUNGS.map(j=>`<div class="h" data-s="jung|${j}">${j}</div>`).join('')}<div></div><div class="h">첫닿자별</div>`;
+  for (const c of CHOS) { heat += `<div class="rh" data-s="cho|${c}">${c}</div>`; for (const j of JUNGS) { const v = mmed(rows.filter(r => r.cho===c && r.jung===j).map(mv)); heat += `<div class="c" data-s="cell|${c}|${j}" style="background:${col(v)}">${fmt(v)}</div>`; } const rv = mmed(rows.filter(r => r.cho===c).map(mv)); heat += `<div></div><div class="c m" data-s="cho|${c}" style="background:${col(rv)}">${fmt(rv)}</div>`; }
+  heat += `<div class="rh" style="font-size:11px">홀자별</div>${JUNGS.map(j => { const v = mmed(rows.filter(r=>r.jung===j).map(mv)); return `<div class="c m" data-s="jung|${j}" style="background:${col(v)}">${fmt(v)}</div>`; }).join('')}</div>`;
+  let jong = '';
+  if (pool === '588') { const cell = {}; for (const r of rows) if (mv(r) !== undefined) (cell[r.cho+r.jung] ??= []).push(mv(r)); const cm = Object.fromEntries(Object.entries(cell).map(([k,v]) => [k, mmed(v)]));
+    jong = `<div class="scale">받침별 — 같은 첫닿자 · 홀자 칸에 받침이 더 얹는 양</div><div class="jong">${JONGS.map(k => { const v = mmed(rows.filter(r=>r.jong===k && mv(r)!==undefined).map(r=>mv(r) - cm[r.cho+r.jung])); return `<div><div class="c" data-s="jong|${k}" style="background:${col(v)}">${fmt(v)}</div>${k}</div>`; }).join('')}</div>`; }
+  box.innerHTML = `<div class="ehead"><div class="name">${PARTN[p]} ${EDGEN[e]}<small>표가 대개 ${dirOf(e, g.sgn)}으로 · 0.02 넘게 ${g.over}/${g.n} · 가운데 ${g.med.toFixed(3)}${sel>0?` (패턴만 ${g.base.toFixed(3)})`:''}</small></div><div class="mv"><div class="bar"><i style="width:${g.med/maxMed*100}%"></i>${sel>0?`<u style="left:0;width:${g.base/maxMed*100}%"></u>`:''}</div></div></div><div class="scale">첫닿자 × 홀자 · 칸을 누르면 그 줄 · 그 열이, 머리(ㄱ · ㅏ …)를 누르면 그 줄이나 열 하나가 왼쪽 틀 아래에 뜬다<i style="background:rgba(214,69,69,.7)"></i>오른쪽 · 아래<i style="background:rgba(31,79,216,.7)"></i>왼쪽 · 위</div>${heat}${jong}`;
+  const key = pool + ' ' + EDGE; const cur = SELC[key];
+  box.querySelectorAll('[data-s]').forEach(c => { if (cur === c.dataset.s) c.classList.add('pick');
     const [ct, cc, cj] = c.dataset.s.split('|'); const [pt, pa, pb] = (cur ?? '').split('|');
-    if (ct === 'cell' && ((pt === 'cho' && cc === pa) || (pt === 'jung' && cj === pa) || (pt === 'cell' && (cc === pa || cj === pb) && c.dataset.s !== cur))) c.classList.add('line'); c.addEventListener('click', () => { SELC[key] = c.dataset.s; LAST = m.dataset.key; moves(); }); }); });
+    if (ct === 'cell' && ((pt === 'cho' && cc === pa) || (pt === 'jung' && cj === pa) || (pt === 'cell' && (cc === pa || cj === pb) && c.dataset.s !== cur))) c.classList.add('line'); c.addEventListener('click', () => { SELC[key] = c.dataset.s; moves(); }); });
   panel();
 }
 function renderAll() { ladder(); pools(); moves(); }
