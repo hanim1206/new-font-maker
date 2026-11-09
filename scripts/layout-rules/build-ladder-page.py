@@ -25,7 +25,7 @@ h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:34px 0 8px}p.sub{color
 .glyphs{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:16px}
 .glyphs div{text-align:center;font-size:12px;color:var(--mute)}
 svg{width:100%;aspect-ratio:1;background:#fff;border:1px solid var(--line);border-radius:8px;display:block}
-path.tab{fill:var(--tab);opacity:.45}path.step{fill:none;stroke:var(--step);stroke-width:1.6;fill-rule:evenodd}
+path.tab{fill:var(--tab);opacity:.45}path.prev{fill:#9a9aa2;opacity:.4}.stex{padding:0 0 12px 38px}path.step{fill:none;stroke:var(--step);stroke-width:1.6;fill-rule:evenodd}
 .legend{display:flex;gap:16px;font-size:12px;color:var(--mute);margin-top:10px;flex-wrap:wrap}.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:5px}
 .poolsw{display:flex;gap:8px;margin:0 0 12px}.poolsw button,.vtabs button{font:inherit;font-size:13px;padding:5px 14px;border-radius:999px;border:1px solid var(--line);background:#fff;cursor:pointer}.poolsw button.on,.vtabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .mv{border-top:1px solid var(--line);padding:12px 0}.mv:first-child{border-top:0}
@@ -77,6 +77,8 @@ function ladder() {
     const st = D.steps[i]; const s5 = D.summary['588'], s1 = D.summary['171'];
     const pct = (s, x) => Math.round((1 - x / s.raw) * 100);
     el.insertAdjacentHTML('beforeend', `<label class="st ${i===sel?'cur':''}"><input type="radio" name="step" ${i===sel?'checked':''} data-i="${i}"><div class="nm">${i}. ${st.name}<small>${st.who}</small></div><div class="num">588 <b>${s5.steps[i].toFixed(2)}</b> (${pct(s5, s5.steps[i])}%)<br>171 <b>${s1.steps[i].toFixed(2)}</b> (${pct(s1, s1.steps[i])}%)</div></label>`);
+    const top = (D.stepTop[i] ?? []);
+    if (top.length) el.insertAdjacentHTML('beforeend', `<div class="stex"><div class="scale">이 칸에서 가장 많이 나아진 글자 — 회색 면 = 바로 아래 칸(${i-1}칸) · 파랑 선 = 이 칸(${i}칸). 숫자는 노토까지 거리 전 → 후.</div><div class="exs">${top.map(t => { const g = D.svgs[t.char]; return g ? `<div><svg viewBox="0 0 ${V} ${V}"><path class="prev" d="${g.steps[i-1]}" fill-rule="evenodd"/><path class="step" d="${g.steps[i]}"/></svg><b>${t.char}</b> ${t.before.toFixed(2)} → ${t.after.toFixed(2)}</div>` : ''; }).join('')}</div></div>`);
   });
   el.querySelectorAll('input').forEach(x => x.addEventListener('change', () => { sel = +x.dataset.i; renderAll(); }));
 }
