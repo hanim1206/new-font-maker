@@ -32,7 +32,7 @@ const outlineOf = (cp: number) => {
 }
 const JUNG_CODE: Record<string, number> = { 'ㅏ': 0, 'ㅐ': 1, 'ㅑ': 2, 'ㅓ': 4, 'ㅔ': 5, 'ㅕ': 6, 'ㅣ': 20 }
 const compose = (cho: string, jung: string, jong: string) => String.fromCodePoint(0xac00 + ((CHOSEONG_LIST as readonly string[]).indexOf(cho) * 21 + JUNG_CODE[jung]) * 28 + (JONGSEONG_LIST as readonly string[]).indexOf(jong))
-const SHAPES = { giyeokSweep: false, bottomKick: false, tailSweep: false, compoundJong: true }
+const SHAPES = { giyeokSweep: false, bottomKick: false, tailSweep: false, compoundJong: true, hieutParts: false }
 const FIT_CHO = ['ㄱ', 'ㄹ', 'ㅇ', 'ㅊ', 'ㄲ', 'ㅂ', 'ㅍ'], HOLD_CHO = ['ㄴ', 'ㅁ', 'ㅅ', 'ㅈ', 'ㅌ', 'ㅎ']
 
 const glyphsOf = (chars: string[]) => chars.flatMap((char) => {

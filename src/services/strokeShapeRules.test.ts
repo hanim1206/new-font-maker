@@ -6,7 +6,7 @@ import { applyStrokeShapeRules, BOTTOM_KICK_SHAPES, COMPOUND_JONG_BOXES, GIYEOK_
 
 const maps = baseJamos as unknown as { choseong: Record<string, JamoData>; jungseong: Record<string, JamoData>; jongseong: Record<string, JamoData> }
 const syllableOf = (char: string) => decomposeSyllable(char, maps.choseong, maps.jungseong, maps.jongseong)
-const ON = { giyeokSweep: true, bottomKick: true, tailSweep: false, compoundJong: false }
+const ON = { giyeokSweep: true, bottomKick: true, tailSweep: false, compoundJong: false, hieutParts: false }
 
 describe('획 꼴 규칙 — ㄱ 삐침', () => {
   it('오른홀자 옆 ㄱ은 꺾임에서 왼쪽 아래로 휘어 내린다', () => {
@@ -128,5 +128,22 @@ describe('획 꼴 규칙 — 섞임받침을 홑받침 둘로', () => {
   it('표에 없는 섞임받침과 자모 목록이 없을 때는 그대로 둔다', () => {
     expect(applyStrokeShapeRules(syllableOf('닭'), ONLY, maps.jongseong).jongseong).toBe(syllableOf('닭').jongseong)
     expect(applyStrokeShapeRules(syllableOf('앓'), ONLY).jongseong).toBe(syllableOf('앓').jongseong)
+  })
+})
+
+describe('획 꼴 규칙 — ㅎ 머리 · 동그라미', () => {
+  const ONLY = { ...STROKE_SHAPES_OFF, hieutParts: true }
+  const lowest = (strokes: { closed?: boolean; points: { y: number }[] }[], closed: boolean) => Math.min(...strokes.filter((stroke) => !!stroke.closed === closed).flatMap((stroke) => stroke.points.map((point) => point.y)))
+
+  it('받침 ㅎ은 가로줄기를 내리고 동그라미를 아래로 옮긴다', () => {
+    const before = maps.jongseong['ㅎ'].strokes!
+    const after = applyStrokeShapeRules(syllableOf('렣'), ONLY).jongseong!.strokes!
+    expect(after.find((stroke) => stroke.id === 'ㅎ종-2')!.points[0].y).toBeGreaterThan(before.find((stroke) => stroke.id === 'ㅎ종-2')!.points[0].y)
+    expect(lowest(after, true)).toBeGreaterThan(lowest(before, true))
+  })
+
+  it('첫닿자 ㅎ은 오른홀자 옆에서만 바꾼다', () => {
+    expect(applyStrokeShapeRules(syllableOf('하'), ONLY).choseong!.strokes).not.toEqual(maps.choseong['ㅎ'].strokes)
+    expect(applyStrokeShapeRules(syllableOf('호'), ONLY).choseong).toBe(syllableOf('호').choseong)
   })
 })

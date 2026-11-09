@@ -18,10 +18,12 @@ export interface StrokeShapeParams {
   tailSweep: boolean
   /** 섞임받침을 홑받침 둘로 다시 그린다(받침 상자 안 작은 상자 둘). */
   compoundJong: boolean
+  /** ㅎ(첫닿자 · 홑받침)의 머리와 동그라미 자리를 노토에 맞춘다. */
+  hieutParts: boolean
 }
 
-export const STROKE_SHAPES_OFF: StrokeShapeParams = { giyeokSweep: false, bottomKick: false, tailSweep: false, compoundJong: false }
-export const DEFAULT_STROKE_SHAPE_PARAMS: StrokeShapeParams = { giyeokSweep: true, bottomKick: true, tailSweep: true, compoundJong: true }
+export const STROKE_SHAPES_OFF: StrokeShapeParams = { giyeokSweep: false, bottomKick: false, tailSweep: false, compoundJong: false, hieutParts: false }
+export const DEFAULT_STROKE_SHAPE_PARAMS: StrokeShapeParams = { giyeokSweep: true, bottomKick: true, tailSweep: true, compoundJong: true, hieutParts: true }
 
 /** 꼴 규칙을 쓰는 홀자 — 오른홀자 아홉. 아래홀자 옆에서는 노토도 꺾어 내리고 평평하게 맺는다(아직 안 잼). */
 export const SWEEP_VOWELS: readonly string[] = ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅣ']
@@ -293,6 +295,23 @@ export function compoundJongStrokes(compound: string, parts: readonly [DeepReado
 
 type DeepReadonlyJamo = Pick<JamoData, 'strokes'>
 
+/**
+ * 다섯째 규칙 — ㅎ 머리 · 동그라미: 남은 어긋남 1위가 홑받침 ㅎ 동그라미, 2 · 4위가 첫닿자 ㅎ이었다. 노토 ㅎ은 동그라미가 더 낮고 넓다.
+ * 머리(꼭지 · 가로줄기)와 동그라미를 각자 상자(자모 틀 0~1 기준)에 다시 넣는다. 값은 `scripts/layout-rules/measure-hieut.ts`로 노토 xor가 가장 작은 곳을 찾은 것.
+ */
+export const HIEUT_BOXES: Record<'cho' | 'jong', { head: SubBox; ring: SubBox }> = {
+  // 첫닿자: 머리와 동그라미를 함께 0.06 내린다.
+  cho: { head: { x0: 0, y0: 0.06, x1: 1, y1: 1.015 }, ring: { x0: -0.007, y0: 0.06, x1: 1.008, y1: 1 } },
+  // 받침: 꼭지를 길게 · 가로줄기를 낮게(0.213 → 0.29), 동그라미는 아래로 납작하게(0.415~1 → 0.56~1).
+  jong: { head: { x0: 0.007, y0: 0.037, x1: 1, y1: 1.24 }, ring: { x0: 0, y0: 0.225, x1: 1.008, y1: 1.015 } },
+}
+
+const hieutStrokesWith = (boxes: { head: SubBox; ring: SubBox }) => (strokes: readonly StrokeDataV2[]): StrokeDataV2[] =>
+  strokes.map((stroke) => {
+    const box = stroke.closed ? boxes.ring : boxes.head
+    return { ...stroke, points: stroke.points.map((point) => placePoint(point, box)) }
+  })
+
 function mapJamoStrokes(jamo: JamoData, change: (strokes: readonly StrokeDataV2[]) => StrokeDataV2[] | null): JamoData {
   const strokes = jamo.strokes ? change(jamo.strokes) : null
   let contextStrokes = jamo.contextStrokes
@@ -317,6 +336,7 @@ export function applyStrokeShapeRules(syllable: DecomposedSyllable, params: Stro
       syllable = { ...syllable, jongseong: rebuilt }
     }
   }
+  if (params.hieutParts && syllable.jongseong?.char === 'ㅎ') syllable = { ...syllable, jongseong: mapJamoStrokes(syllable.jongseong, hieutStrokesWith(HIEUT_BOXES.jong)) }
   if (!syllable.choseong || !syllable.jungseong || !SWEEP_VOWELS.includes(syllable.jungseong.char)) return syllable
   let choseong = syllable.choseong
   if (params.giyeokSweep) choseong = mapJamoStrokes(choseong, sweepStrokes)
@@ -326,6 +346,7 @@ export function applyStrokeShapeRules(syllable: DecomposedSyllable, params: Stro
   if (params.bottomKick && LEFT_BRANCH_KICK_VOWELS.includes(jung)) choseong = mapJamoStrokes(choseong, kickStrokesWith(BOTTOM_KICK_SHAPES_LEFT_BRANCH))
   const tailGroup = tailGroupOf(jung)
   if (params.tailSweep && tailGroup) choseong = mapJamoStrokes(choseong, tailStrokesWith(TAIL_SHAPES[tailGroup]))
+  if (params.hieutParts && choseong.char === 'ㅎ') choseong = mapJamoStrokes(choseong, hieutStrokesWith(HIEUT_BOXES.cho))
   const jongseong = params.bottomKick && syllable.jongseong ? mapJamoStrokes(syllable.jongseong, kickStrokesWith(JONG_KICK_SHAPES)) : syllable.jongseong
   return choseong === syllable.choseong && jongseong === syllable.jongseong ? syllable : { ...syllable, choseong, jongseong }
 }

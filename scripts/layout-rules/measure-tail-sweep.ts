@@ -32,7 +32,7 @@ const GROUP_VOWELS = { right: ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ'], left: ['ㅓ', 'ㅔ',
 const FIT_JONGS = [0, 4, 8, 21, 27], HOLD_JONGS = [1, 16, 17, 19, 20]
 const STROKES: Record<string, [string, string]> = { 'ㅈ': ['ㅈ-left', 'ㅈ-right'], 'ㅊ': ['ㅊ-left', 'ㅊ-right'], 'ㅉ': ['ㅉ-1l', 'ㅉ-2r'] }
 const compose = (cho: string, jung: string, jong: number) => String.fromCodePoint(0xac00 + ((CHOSEONG_LIST as readonly string[]).indexOf(cho) * 21 + JUNG_CODE[jung]) * 28 + jong)
-const SHAPES = { giyeokSweep: false, bottomKick: false, tailSweep: true }
+const SHAPES = { giyeokSweep: false, bottomKick: false, tailSweep: true, compoundJong: false, hieutParts: false }
 const range = (from: number, to: number, step: number) => { const out: number[] = []; for (let v = from; v <= to + 1e-9; v += step) out.push(+v.toFixed(3)); return out }
 
 const glyphsOf = (chars: string[]) => chars.flatMap((char) => {
