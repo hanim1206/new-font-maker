@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import { shapeFeaturesOf } from './jamoShapeFeatures'
-import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, jongRaiseOf, jongSideInsetOf, pillarDiveOf, hasChoWall, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
+import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, jongDropOf, jongFollowOf, jongRaiseOf, jongSideInsetOf, pillarDiveOf, hasChoWall, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { CHO_TARGET, JUNG_TARGET } from './layoutRuleTargets'
 
 const CHO_TARGET_A_RIGHT = JUNG_TARGET['ㅏ'].right
@@ -108,5 +108,18 @@ describe('받침 세로벽', () => {
     expect(Math.abs(jongSideInsetOf('ㄴ', jong('ㄴ')).right)).toBeLessThan(0.01)
     expect(jongSideInsetOf('ㄱ', jong('ㄱ')).right).toBeGreaterThan(0.04)
     expect(jongSideInsetOf('ㄳ', jong('ㄳ'))).toEqual({ left: 0, right: 0 })
+  })
+})
+
+describe('받침은 기둥을 따라간다 · 키 큰 첫닿자', () => {
+  it('ㅏ 옆 받침은 왼쪽, 두 기둥 옆은 오른쪽, ㅣ 옆은 그대로', () => {
+    expect(jongFollowOf('ㅏ')).toBeCloseTo(-0.022, 3)
+    expect(jongFollowOf('ㅔ')).toBeCloseTo(0.0198, 3)
+    expect(jongFollowOf('ㅣ')).toBe(0)
+  })
+  it('ㅎ 밑 받침이 가장 많이 내려오고 ㄱ 밑은 그대로', () => {
+    const cho = (k: string) => shapeFeaturesOf((baseJamos as unknown as { choseong: Record<string, JamoData> }).choseong[k])!
+    expect(jongDropOf(cho('ㅎ'))).toBeCloseTo(0.021, 3)
+    expect(jongDropOf(cho('ㄱ'))).toBe(0)
   })
 })

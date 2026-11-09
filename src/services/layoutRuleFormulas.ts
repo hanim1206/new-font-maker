@@ -124,14 +124,35 @@ export const pillarDiveOf = (jong: Pick<JamoShapeFeatures, 'rightTop'>): number 
 
 /**
  * 받침 세로벽(2026-11-09, AI 가설 — 가설 4 "세로벽 있는 첫닿자는 좁게"를 받침에 옮긴 꼴).
- * 받침 한쪽이 세로줄기로 막혀 있을수록 노토는 그쪽을 안으로 들인다. 들임(몸 em, +면 안쪽) = 0.057 × 막힘 − 0.01, 양쪽 따로.
- * 홑받침 14개 맞추기: 왼면 ±0.02 안 11/14, 오른면 8/14(ㄱ ㅋ ㄷ 0.03쯤 덜 들어감 · ㄹ ㅂ ㅈ ㅊ 0.03쯤 더 들어감).
+ * 받침 한쪽이 세로줄기로 막혀 있을수록 노토는 그쪽을 안으로 들인다. 들임(몸 em, +면 안쪽) = 0.041 × 막힘, 양쪽 따로.
+ * 받침 몫과 홀자 몫(`jongFollowOf`)을 나눠 맞춘 값이다. 홑받침 14개: 왼면 ±0.02 안 13/14, 오른면 12/14.
+ * (처음엔 받침별 중앙값으로 0.057 × 막힘 − 0.01을 맞췄는데, 588자는 받침마다 짝 홀자가 치우쳐 있어 홀자 몫이 섞여 있었다.)
  * 겹받침과 쌍받침은 두 자모를 나란히 놓은 꼴이라 벽 모양으로 읽히지 않아 아직 건드리지 않는다.
  */
-export const JONG_WALL_SLOPE = 0.057
-export const JONG_WALL_BASE = -0.01
+export const JONG_WALL_SLOPE = 0.041
+export const JONG_WALL_BASE = 0
 const SINGLE_JONG = new Set([...'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ'])
 export function jongSideInsetOf(jong: string, f: Pick<JamoShapeFeatures, 'leftClosed' | 'rightClosed'>): { left: number; right: number } {
   if (!SINGLE_JONG.has(jong)) return { left: 0, right: 0 }
   return { left: JONG_WALL_BASE + JONG_WALL_SLOPE * f.leftClosed, right: JONG_WALL_BASE + JONG_WALL_SLOPE * f.rightClosed }
 }
+
+/**
+ * 받침은 기둥을 따라간다(2026-11-09, 사용자 관찰 "받침 왼면은 홀자가 바깥인지 안인지, 한 줄인지 두 줄인지에 따라 극명하게 갈린다").
+ * 받침 면을 받침 몫 + 홀자 몫으로 나누면 588자가 모두 ±0.02 안에 든다. 홀자 몫은 받침을 통째로 옮기는 꼴이다:
+ * ㅏ ㅑ −0.02~−0.03(왼쪽), ㅐ ㅒ ㅔ ㅖ +0.01~+0.02(오른쪽), ㅣ ㅓ ㅕ 0. 기둥 자리(PILLAR_RIGHT)가 ㅣ에서 옮긴 거리의 0.55배다.
+ */
+export const JONG_FOLLOW = 0.55
+export function jongFollowOf(jung: string): number {
+  const kind = vowelBranchKindOf(jung)
+  return kind ? JONG_FOLLOW * (PILLAR_RIGHT[kind] - PILLAR_RIGHT.none) : 0
+}
+
+/**
+ * 키 큰 첫닿자 밑에선 받침이 내려온다(2026-11-09, 받침 윗면을 받침 몫 + 첫닿자 몫으로 나눠서 찾음 — 홀자 몫은 0).
+ * 첫닿자 몫: ㅎ 0.023 · ㅊ 0.011 · ㄹ ㅌ 0.009~0.010, 나머지 0. 층이 셋 이상이면 층마다 0.01, 꼭지가 있으면 0.011.
+ * 내려옴(몸 em) = 0.01 × max(0, 층 − 2) + 0.011 × 꼭지. 남는 것: ㅉ(층 3인데 0.001), ㄱ만 다른 첫닿자보다 0.007 위.
+ */
+export const JONG_DROP_LAYER = 0.01
+export const JONG_DROP_DOT = 0.011
+export const jongDropOf = (cho: Pick<JamoShapeFeatures, 'layers' | 'topDot'>): number => JONG_DROP_LAYER * Math.max(0, cho.layers - 2) + (cho.topDot ? JONG_DROP_DOT : 0)
