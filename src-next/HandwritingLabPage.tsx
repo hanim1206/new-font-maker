@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { Dices, Eraser, PenLine, RotateCcw } from 'lucide-react'
 import { readSyllable } from '../src/services/handwritingRead'
@@ -10,6 +10,10 @@ import {
 import type { Bank, CardChoices, Gathered, JamoChoice, LayoutKey, SampleType, TypedSample } from '../src/services/handwritingBank'
 import { composeChar, HANDWRITING_THICKNESS } from '../src/services/handwritingRead'
 import { fitPenStroke, PEN_FIT_EPSILON } from '../src/services/penStrokeFit'
+import { strokeToRenderInkGroups } from '../src/services/strokeRenderGeometry'
+import { brushInkGroupsToSvgPaths } from '../src/services/brushGeometry'
+import { miterLimitOf } from '../src/services/strokeJoin'
+import { weightToMultiplier } from '../src/utils/globalStyleUtils'
 import type { StrokeDataV2 } from '../src/types'
 import type { Slot } from '../src/services/handwritingRead'
 import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../src/data/Hangul'
@@ -165,6 +169,8 @@ export function HandwritingLabPage() {
   const [picker, setPicker] = useState<{ open: boolean; L: string | null; slot: Slot }>({ open: false, L: null, slot: 0 })
   const [weight, setWeight] = useState(400)
   const [roundJoins, setRoundJoins] = useState(false)
+  /** 전역 둥글기 0~1(제품 strokeStyle.roundness). 끝 · 꺾임 모서리를 둥글기 × 반폭으로 굴린다. */
+  const [roundness, setRoundness] = useState(0)
   const [picked, setPicked] = useState<string | null>(null)
   const [highlight, setHighlight] = useState<Set<string> | null>(null)
   const [scroll, setScroll] = useState({ top: 0, height: 600 })
@@ -179,7 +185,12 @@ export function HandwritingLabPage() {
   const letters = useMemo(() => lettersOf(text), [text])
   const cols = Math.min(letters.length || 1, 5)
   const rows = Math.max(1, Math.ceil(letters.length / cols))
-  const style = useMemo<GlobalStyle>(() => ({ ...DEFAULT_STYLE, weight, linejoin: roundJoins ? 'round' : 'miter', linecap: roundJoins ? 'round' : 'butt' }), [weight, roundJoins])
+  const style = useMemo<GlobalStyle>(() => ({
+    ...DEFAULT_STYLE, weight, linejoin: roundJoins ? 'round' : 'miter', linecap: roundJoins ? 'round' : 'butt',
+    strokeStyle: { mode: 'brush', brush: { tip: 'round', aspectRatio: 1, angle: 0 }, ...(roundness > 0 ? { roundness } : {}) },
+  }), [weight, roundJoins, roundness])
+  /** 글자표 2,350자는 슬라이더를 놓은 뒤에 따라온다. 쓰기 칸 · 카드는 바로 바뀐다. */
+  const chartStyle = useDeferredValue(style)
   const phase = phaseOf(bank)
   const progress = progressOf(bank)
   const stats = useMemo(() => chartStats(bank), [bank])
@@ -423,7 +434,8 @@ export function HandwritingLabPage() {
                   const st = fittedOf(pts)
                   if (!st) return null
                   return <g key={k}>
-                    <path d={pointsToSvgD(st.points, st.closed, UNIT_BOX, CELL)} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={HANDWRITING_THICKNESS * CELL} strokeLinecap={roundJoins ? 'round' : 'butt'} strokeLinejoin={roundJoins ? 'round' : 'miter'} />
+                    {brushInkGroupsToSvgPaths(strokeToRenderInkGroups({ ...st, thickness: HANDWRITING_THICKNESS }, UNIT_BOX, weightToMultiplier(weight), style.strokeStyle!, { join: { linejoin: roundJoins ? 'round' : 'miter', miterLimit: miterLimitOf(style.strokeStyle) } }), CELL)
+                      .map((d, m) => <path key={m} d={d} fill={EDIT_COLOR.foreground} fillRule="evenodd" />)}
                     {st.points.map((p, n) => <circle key={n} cx={p.x * CELL} cy={p.y * CELL} r={1.6} fill={EDIT_COLOR.editSelect} />)}
                   </g>
                 })}
@@ -434,7 +446,7 @@ export function HandwritingLabPage() {
               </g>}
             </g>
           })}
-  </>, [letters, raws, reads, cols, roundJoins]) // eslint-disable-line react-hooks/exhaustive-deps
+  </>, [letters, raws, reads, cols, roundJoins, style, weight]) // eslint-disable-line react-hooks/exhaustive-deps
   const imitateGlyphs = useMemo(() => letters.map((ch, i) => <BankGlyph key={`${ch}-${i}`} bank={bank} char={ch} size={56} style={style} />), [letters, bank, style])
   const badCells = letters.map((_, i) => reads[i]).filter((r): r is SyllableRead => !!r && r.state === 'bad')
   const readCount = letters.filter((_, i) => reads[i]?.state === 'ok').length
@@ -446,7 +458,7 @@ export function HandwritingLabPage() {
         <span>{stats.ok}/{CHART_SYLLABLES.length} 다 참{stats.partial ? ` · 반쯤 ${stats.partial}` : ''}</span>
       </div>
       <div ref={chartRef} className={styles.chart} data-testid="handwriting-chart">
-        <ChartRows bank={bank} style={style} picked={picked} highlight={highlight} firstRow={firstRow} lastRow={lastRow} onPick={setPicked} />
+        <ChartRows bank={bank} style={chartStyle} picked={picked} highlight={highlight} firstRow={firstRow} lastRow={lastRow} onPick={setPicked} />
       </div>
       {pickedInfo && <div className={styles.pickedInfo}>
         <b>{pickedInfo.title}</b>
@@ -455,6 +467,7 @@ export function HandwritingLabPage() {
       </div>}
       <div className={styles.styleBox}>
         <Field label="굵기" value={weight}><RangeBar min={100} max={900} step={100} value={weight} onChange={(e) => setWeight(Number(e.target.value))} /></Field>
+        <Field label="둥글기" value={`${Math.round(roundness * 100)}%`}><RangeBar min={0} max={100} step={5} value={Math.round(roundness * 100)} onChange={(e) => setRoundness(Number(e.target.value) / 100)} data-testid="handwriting-roundness" /></Field>
         <label className={styles.switchRow}>꺾임 모두 굴리기<Switch checked={roundJoins} onCheckedChange={setRoundJoins} /></label>
       </div>
     </aside>
