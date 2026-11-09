@@ -4,7 +4,7 @@ import { readSyllable } from './handwritingRead'
 import type { SyllableRead } from './handwritingRead'
 import {
   applyChoices, chartStats, emptyBank, fitBox, gather, layoutKeyOf, phaseOf, pickSentence, placeSyllable, planSyllable,
-  SEED_SENTENCE, sentenceFor, typeOf, exampleOf,
+  SEED_SENTENCE, sentenceFor, typeOf, exampleOf, recommendSentences,
 } from './handwritingBank'
 
 /** 꼭짓점을 잇는 꺾은선을 촘촘한 점으로. 칸 0–1 좌표. */
@@ -179,6 +179,25 @@ describe('손글씨 은행 — 배치 6종과 자모 견본', () => {
     expect(right.x).toBeCloseTo(0.6, 5)
     const same = fitBox({ x0: 0.1, y0: 0.2, x1: 0.5, y1: 0.6 }, { x0: 0.25, y0: 0.25, w: 0.5, h: 0.5 }, 1, 'c')
     expect(same.x).toBeCloseTo(0.3, 6); expect(same.y).toBeCloseTo(0.35, 6); expect(same.width).toBeCloseTo(0.2, 6); expect(same.height).toBeCloseTo(0.2, 6)
+  })
+
+  it('추천 문장: 글자표가 몇 자 차는지로 줄 세운다', () => {
+    const { bank } = seedBank()
+    // 배치가 셋뿐이라 1단계 — 배치를 많이 잡는 문장이 앞에 온다
+    const first = recommendSentences(bank, '', 3)
+    expect(first.length).toBe(3)
+    expect(first[0].text).toBe(SEED_SENTENCE)
+    expect(first[0].layouts).toBeGreaterThan(0)
+    // 배치 6종을 다 채운 척하면 2단계 — 다 차는 글자 수 내림차순, 채우는 글자가 있는 문장만
+    const full = { ...bank, lay: Object.fromEntries(['세로홀자', '세로홀자 + 받침', '가로홀자', '가로홀자 + 받침', '섞임홀자', '섞임홀자 + 받침'].map((k) => [k, bank.lay['가로홀자']!])) } as typeof bank
+    const second = recommendSentences(full, '', 3)
+    expect(second[0].fills).toBeGreaterThanOrEqual(second[1].fills)
+    expect(second[1].fills).toBeGreaterThanOrEqual(second[2].fills)
+    expect(second[0].fills).toBeGreaterThan(0)
+    expect(second[0].newJamo.length).toBeGreaterThan(0)
+    expect(second.some((r) => r.text.replace(/\s+/g, '') === '')).toBe(false)
+    // 지금 문장은 뺀다
+    expect(recommendSentences(full, second[0].text, 3).some((r) => r.text === second[0].text)).toBe(false)
   })
 
   it('주사위: 1단계는 씨앗 문장, 글자표 칸은 그 자모가 든 문장', () => {

@@ -319,29 +319,61 @@ export function newJamoIn(bank: Bank, text: string): string[] {
   return out
 }
 
-/** 주사위. 1단계는 배치를 많이 채우는 문장(씨앗 먼저), 2단계는 새 자모가 가장 많은 짧은 문장. 지금 문장은 피한다. */
-export function pickSentence(bank: Bank, current: string, pool: readonly string[] = SENTENCE_POOL): string | null {
+export interface Recommendation {
+  text: string
+  /** 이 문장을 다 쓰고 반영하면 글자표에 새로 다 차는 글자 수. */
+  fills: number
+  /** 새로 반쯤 차게 되는 글자 수(배치는 있고 자모 일부만 생김). */
+  halfFills: number
+  /** 새로 모이는 자모. */
+  newJamo: string[]
+  /** 1단계에서 새로 잡히는 배치 수. */
+  layouts: number
+}
+
+/**
+ * 문장마다 "쓰면 글자표가 몇 자 차나"를 센다. 2,350자마다 지금 은행에서 모자란 자모만 미리 적어 두고,
+ * 문장이 주는 새 자모가 그 모자람을 다 덮으면 다 참, 일부만 덮으면 반쯤 참으로 센다. 배치가 없는 글자는 안 센다(배치는 1단계가 잡는다).
+ */
+export function recommendSentences(bank: Bank, current: string, count = 3, pool: readonly string[] = SENTENCE_POOL): Recommendation[] {
   const cur = current.replace(/\s+/g, '')
-  const notCurrent = (t: string) => t.replace(/\s+/g, '') !== cur
-  if (phaseOf(bank) === 1) {
-    if (layoutGain(bank, SEED_SENTENCE) && notCurrent(SEED_SENTENCE)) return SEED_SENTENCE
-    let best: { t: string; g: number } | null = null
-    for (const t of pool) {
-      if (!notCurrent(t)) continue
-      const g = layoutGain(bank, t)
-      if (g && (!best || g > best.g)) best = { t, g }
-    }
-    return best?.t ?? null
+  const phase = phaseOf(bank)
+  // 글자마다 모자란 자모(배치 있는 글자만)
+  const missing: { all: string[]; had: boolean }[] = []
+  for (const ch of CHART_SYLLABLES) {
+    const plan = planSyllable(bank, ch)
+    if (!plan?.layout || plan.ok) continue
+    missing.push({ all: plan.missing, had: plan.partial })
   }
-  let best: { t: string; g: number; n: number } | null = null
+  const out: Recommendation[] = []
   for (const t of pool) {
-    if (!notCurrent(t)) continue
-    const g = jamoGain(bank, t)
-    if (!g) continue
-    const n = lettersOf(t).length
-    if (!best || g > best.g || (g === best.g && n < best.n)) best = { t, g, n }
+    if (t.replace(/\s+/g, '') === cur) continue
+    const newJamo = newJamoIn(bank, t)
+    const layouts = layoutGain(bank, t)
+    if (newJamo.length === 0 && layouts === 0) continue
+    const give = new Set(newJamo)
+    let fills = 0, halfFills = 0
+    for (const m of missing) {
+      const covered = m.all.filter((L) => give.has(L)).length
+      if (covered === m.all.length) fills++
+      else if (covered > 0 && !m.had) halfFills++
+    }
+    out.push({ text: t, fills, halfFills, newJamo, layouts })
   }
-  return best?.t ?? null
+  const n = (r: Recommendation) => lettersOf(r.text).length
+  out.sort((a, b) => phase === 1
+    ? b.layouts - a.layouts || b.fills - a.fills || n(a) - n(b)
+    : b.fills - a.fills || b.halfFills - a.halfFills || b.newJamo.length - a.newJamo.length || n(a) - n(b))
+  if (phase === 1 && layoutGain(bank, SEED_SENTENCE) && SEED_SENTENCE.replace(/\s+/g, '') !== cur) {
+    const i = out.findIndex((r) => r.text === SEED_SENTENCE)
+    if (i > 0) out.unshift(...out.splice(i, 1))
+  }
+  return out.slice(0, count)
+}
+
+/** 주사위. 추천 1순위 — 1단계는 배치를 많이 잡는 문장(씨앗 먼저), 2단계는 글자표가 가장 많이 차는 문장. 지금 문장은 피한다. */
+export function pickSentence(bank: Bank, current: string, pool: readonly string[] = SENTENCE_POOL): string | null {
+  return recommendSentences(bank, current, 1, pool)[0]?.text ?? null
 }
 
 /** 이 자모들을 담은 문장 가운데 가장 많이 담고 짧은 것(글자표 칸을 눌렀을 때). */
@@ -359,7 +391,7 @@ export function sentenceFor(need: readonly string[], pool: readonly string[] = S
 
 /** 주사위가 고르는 문장 풀. 자주 쓰는 말로, 2,350자를 채우는 데 드문 자모(ㄺ ㄼ ㅀ ㅄ ㅙ ㅞ 등)까지 들어 있다. */
 export const SENTENCE_POOL: readonly string[] = [
-  '다람쥐 헌 쳇바퀴에 타고파', '봄바람이 불어요', '햇살 좋은 오후', '꽃잎이 떨어진다', '밤하늘의 별빛', '따뜻한 커피 한 잔', '우리 같이 걸을까', '노을 지는 바닷가',
+  SEED_SENTENCE, '다람쥐 헌 쳇바퀴에 타고파', '봄바람이 불어요', '햇살 좋은 오후', '꽃잎이 떨어진다', '밤하늘의 별빛', '따뜻한 커피 한 잔', '우리 같이 걸을까', '노을 지는 바닷가',
   '작은 새가 노래해', '눈 내리는 겨울밤', '푸른 숲속 오솔길', '괜찮아 잘하고 있어', '비 온 뒤 무지개', '뭐 먹을지 고민돼', '꿈꾸는 소년과 소녀', '흰 구름 위의 고래',
   '여름 수박 한 통', '퀴즈 왕 됐어요', '엄마 손 칼국수', '짧은 편지를 써요', '늦은 밤 라디오', '똑똑 누구세요', '쉬는 날엔 낮잠', '의자에 앉은 고양이',
   '읽고 싶은 책 한 권', '닭갈비 먹으러 가자', '샘물처럼 맑은 웃음', '웬 떡이야', '훨훨 날아가렴', '뛰어놀던 운동장', '싫어도 해야 해', '값진 하루였어',

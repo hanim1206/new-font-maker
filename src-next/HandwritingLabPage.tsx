@@ -5,7 +5,7 @@ import { readSyllable } from '../src/services/handwritingRead'
 import type { SyllableRead } from '../src/services/handwritingRead'
 import {
   applyChoices, chartStats, CHART_SYLLABLES, emptyBank, exampleOf, FIRST_TYPES, gather, layoutGain, LAYOUT_KEYS, newJamoIn, phaseOf, pickSentence,
-  placeSyllable, planSyllable, progressOf, SEED_SENTENCE, sentenceFor, TYPE_NAME, averageLayout, blendLayout,
+  placeSyllable, planSyllable, progressOf, recommendSentences, SEED_SENTENCE, sentenceFor, TYPE_NAME, averageLayout, blendLayout,
 } from '../src/services/handwritingBank'
 import type { Bank, CardChoices, Gathered, JamoChoice, LayoutEntry, SampleType, TypedSample } from '../src/services/handwritingBank'
 import type { PenPoint } from '../src/services/penStrokeFit'
@@ -129,6 +129,8 @@ export function HandwritingLabPage() {
   const phase = phaseOf(bank)
   const progress = progressOf(bank)
   const stats = useMemo(() => chartStats(bank), [bank])
+  /** 지금 은행 기준 추천 문장 셋. ㅇㅋ로 은행이 바뀌면 따라 바뀐다. */
+  const recommended = useMemo(() => recommendSentences(bank, text, 3), [bank, text])
 
   useEffect(() => { saveBank(bank) }, [bank])
 
@@ -266,7 +268,7 @@ export function HandwritingLabPage() {
     if (!pick) { setMessage(phaseOf(from) === 1 ? '준비된 문장으로는 남은 배치를 못 채워요. 직접 문장을 쳐 보세요.' : '자모를 다 모았어요. 2,350자가 모두 채워졌을 거예요.'); return }
     const why = phaseOf(from) === 1
       ? `먼저 배치부터 잡아요. 이 문장에 아직 없는 배치 ${layoutGain(from, pick)}가지가 들어 있어요. 다 쓰고 확인 카드를 눌러 주세요.`
-      : `이 문장에서 새로 모을 자모: ${newJamoIn(from, pick).join(' ')}. 다 쓰고 확인 카드를 눌러 주세요.`
+      : `이 문장을 반영하면 글자표에 ${recommendSentences(from, text, 1)[0]?.fills ?? 0}자가 새로 차요. 새 자모: ${newJamoIn(from, pick).join(' ')}. 다 쓰고 확인 카드를 눌러 주세요.`
     setSentence(pick, why)
   }
   const rewriteSlot = (L: string, type: SampleType) => {
@@ -361,6 +363,14 @@ export function HandwritingLabPage() {
         <Button size="sm" onClick={resetAll}><RotateCcw />처음부터</Button>
       </div>
       <p className={styles.message} data-testid="handwriting-message">{message}</p>
+      {recommended.length > 0 && <div className={styles.recs} data-testid="handwriting-recs">
+        <span>{phase === 1 ? '배치를 잡는 문장' : '안 채워진 글자를 채우는 문장'}</span>
+        {recommended.map((r) => <Button key={r.text} size="sm" onClick={() => setSentence(r.text, phase === 1
+          ? `이 문장에 아직 없는 배치 ${r.layouts}가지가 들어 있어요. 다 쓰고 확인 카드를 눌러 주세요.`
+          : `이 문장을 반영하면 글자표에 ${r.fills}자가 새로 차요. 새 자모: ${r.newJamo.join(' ')}. 다 쓰고 확인 카드를 눌러 주세요.`)}>
+          {r.text}<em>{phase === 1 ? `배치 +${r.layouts}` : `+${r.fills}자${r.halfFills ? ` · 반쯤 +${r.halfFills}` : ''}`}</em>
+        </Button>)}
+      </div>}
 
       <figure className={styles.board}>
         <svg ref={canvasRef} viewBox={`0 0 ${cols * CELL} ${rows * CELL}`} className={styles.canvas} style={{ aspectRatio: `${cols} / ${rows}` }} data-testid="handwriting-canvas"
