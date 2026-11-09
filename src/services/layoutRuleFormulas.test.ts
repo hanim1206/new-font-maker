@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import { shapeFeaturesOf } from './jamoShapeFeatures'
-import { choBottomNoFinal, choTopDropNoFinal } from './layoutRuleFormulas'
-import { CHO_TARGET } from './layoutRuleTargets'
+import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
+import { CHO_TARGET, JUNG_TARGET } from './layoutRuleTargets'
+
+const CHO_TARGET_A_RIGHT = JUNG_TARGET['ㅏ'].right
 import type { JamoData } from '../types'
 
 const cho = (key: string) => (baseJamos as { choseong: Record<string, JamoData> }).choseong[key]
@@ -23,5 +25,19 @@ describe('받침 없을 때 첫닿자 윗면이 내려오는 양', () => {
     expect(drop('ㅎ')).toBeLessThan(drop('ㅁ'))
     expect(drop('ㅁ')).toBeLessThan(drop('ㅋ'))
     for (const key of Object.keys(CHO_TARGET)) expect(drop(key), key).toBeGreaterThan(0)
+  })
+})
+
+describe('홀자 가지 갈래', () => {
+  it('오른쪽 홀자 아홉이 갈래 넷으로 나뉜다', () => {
+    expect(['ㅏ', 'ㅑ'].map(vowelBranchKindOf)).toEqual(['right', 'right'])
+    expect(['ㅓ', 'ㅕ'].map(vowelBranchKindOf)).toEqual(['left', 'left'])
+    expect(['ㅐ', 'ㅒ', 'ㅔ', 'ㅖ'].map(vowelBranchKindOf)).toEqual(['twoStem', 'twoStem', 'twoStem', 'twoStem'])
+    expect(vowelBranchKindOf('ㅣ')).toBe('none')
+  })
+  it('기둥은 가지 반대쪽으로 비켜서고 오른가지 끝은 표의 ㅏ 오른면과 같다', () => {
+    expect(PILLAR_RIGHT.right).toBeLessThan(PILLAR_RIGHT.none)
+    expect(PILLAR_RIGHT.left).toBeGreaterThan(PILLAR_RIGHT.none)
+    expect(Math.abs(PILLAR_RIGHT.right + RIGHT_BRANCH_OUT - CHO_TARGET_A_RIGHT)).toBeLessThan(0.005)
   })
 })

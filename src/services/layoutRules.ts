@@ -1,7 +1,7 @@
 import type { BoxConfig, Padding } from '../types'
 import { BRANCH_INSET_BY_PAIR, CHO_RIGHT_BY_JUNG, CHO_RIGHT_BY_PAIR, JONG_RIGHT_BY_CHO } from './layoutRuleResiduals'
 import type { JamoShapeFeatures } from './jamoShapeFeatures'
-import { CHO_TOP_DROP_NO_FINAL, choBottomNoFinal, choTopDropNoFinal } from './layoutRuleFormulas'
+import { CHO_TOP_DROP_NO_FINAL, DOUBLE_CHO_SHIFT, PILLAR_RIGHT, RIGHT_BRANCH_OUT, TWO_STEM_FOLLOW, TWO_STEM_SPAN, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { BRANCH_INSET_BY_CHO, BRANCH_INSET_BY_JUNG, CHO_GAP, CHO_TARGET, CHO_TOP_BY_JONG, CHO_TOP_BY_JUNG, JONG_GAP_OFFSET, JONG_LEFT_BY_JUNG, JONG_RIGHT_BY_JUNG, JONG_TARGET, JONG_TOP_BY_CHO, JUNG_TARGET, PILLAR_BOTTOM_NO_FINAL } from './layoutRuleTargets'
 
 /**
@@ -65,6 +65,10 @@ export interface LayoutRuleParams {
   m: number
   /** 표 대신 공식(G0): 공식이 표와 같은 점수를 낸 열(첫닿자 아래, 받침 없음)을 자모 생김새에서 낸다. 특징이 없으면 표로 간다. */
   formulas: boolean
+  /** 자모별 표를 쓴다. 끄면 표 규칙(첫닿자 · 홀자 · 받침 표)은 건너뛰고 관계 규칙만 k · m 값으로 돈다 — "우리 패턴만" 단계를 재는 용도. */
+  tables: boolean
+  /** 홀자 가로 자리를 홀자 표 아홉 줄 대신 가지 모양 갈래 넷으로 낸다(`layoutRuleFormulas.ts`의 PILLAR_RIGHT). */
+  jungKinds: boolean
 }
 
 /** 공식에 쓰는 자모 생김새 특징. */
@@ -75,6 +79,8 @@ export const DEFAULT_LAYOUT_RULE_PARAMS: LayoutRuleParams = {
   k: 0.25,
   m: 0.6,
   formulas: false,
+  tables: true,
+  jungKinds: false,
 }
 
 export interface LayoutRuleStep {
@@ -203,19 +209,26 @@ function applyChoTable(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jamo: Rul
  * 왼가지 홀자(ㅓ ㅕ ㅔ ㅖ)는 첫닿자 오른면 + 첫닿자별 파고듦(오른쪽이 열린 ㄴ은 깊이, 닫힌 ㄹ은 틈을 두고) + 홀자별 잔차.
  * 나머지(ㅏ ㅑ ㅐ ㅒ ㅣ)는 홀자별 표, 첫닿자가 쌍자음이면 쌍자음 옆 값. ㅔ ㅖ는 왼 기둥이 밀린 만큼의 일정 비율로 기둥도 따라간다. 세로는 그대로.
  */
-function applyJungTable(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jamo: RuleJamo): LayoutRuleStep | null {
+function applyJungTable(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jamo: RuleJamo, kinds: boolean): LayoutRuleStep | null {
   const box = boxes.JU
   const ju = ink.JU
   const target = JUNG_TARGET[jamo.jung]
   if (!box || !ju || !target) return null
   const double = DOUBLE_CONSONANTS.has(jamo.cho)
+  const kind = kinds ? vowelBranchKindOf(jamo.jung) : null
+  // 갈래 공식: 기둥은 가지 반대쪽으로 비켜서고, 오른가지는 기둥 밖으로 나간다.
+  const kindRight = kind ? PILLAR_RIGHT[kind] + (kind === 'right' ? RIGHT_BRANCH_OUT : 0) : null
+  const kindLeft = kind && kind !== 'left' && !LEFT_BRANCH_VOWELS.has(jamo.jung)
+    ? (kind === 'twoStem' ? PILLAR_RIGHT.twoStem - TWO_STEM_SPAN : PILLAR_RIGHT[kind] - ju.thickness / scaleX(body)) + (double ? DOUBLE_CHO_SHIFT[kind] : 0)
+    : null
+  const baseLeft = kind ? (kindLeft ?? target.left) : target.left
   const inset = LEFT_BRANCH_VOWELS.has(jamo.jung) && ink.CH ? BRANCH_INSET_BY_CHO[jamo.cho] : undefined
   const left = inset !== undefined && ink.CH
     ? ink.CH.bounds.right + scaleX(body) * (inset + (BRANCH_INSET_BY_JUNG[jamo.jung] ?? 0) + (BRANCH_INSET_BY_PAIR[jamo.cho + jamo.jung] ?? 0))
-    : atX(body, double ? target.leftNextToDouble : target.left)
+    : atX(body, kindLeft ?? (double ? target.leftNextToDouble : target.left))
   // 왼가지 두 기둥 홀자(ㅔ ㅖ)는 왼 기둥이 밀리면 기둥도 그 비율만큼 같이 밀린다(모델에서 잰 기울기).
-  const follows = inset !== undefined && TWO_STEM_VOWELS.has(jamo.jung) ? target.rightFollowsLeft : 0
-  const right = atX(body, target.right) + follows * (left - atX(body, target.left))
+  const follows = inset !== undefined && TWO_STEM_VOWELS.has(jamo.jung) ? (kind ? TWO_STEM_FOLLOW : target.rightFollowsLeft) : 0
+  const right = atX(body, kindRight ?? target.right) + follows * (left - atX(body, baseLeft))
   const after = fitBoxToHorizontalInk(box, ju.bounds, { left, right })
   const how = inset !== undefined ? `왼가지 — 첫닿자 오른면 ${fixed(ink.CH!.bounds.right)} ${inset < 0 ? '−' : '+'} ${fixed(Math.abs(inset))}` : double ? '쌍자음 옆' : '표'
   return { rule: 'jungTable', part: 'JU', before: clone(box), after, limited: false, note: `${jamo.jung} · ${how} — 가로 ${fixed(ju.bounds.left)}~${fixed(ju.bounds.right)} → ${fixed(left)}~${fixed(right)}` }
@@ -356,14 +369,15 @@ export function applyLayoutRules(input: {
   /** 자모 생김새 특징. 받침 없을 때 첫닿자 윗면은 늘 이걸로 내고, `params.formulas`가 켜져 있으면 첫닿자 아래(받침 없음)도 표 대신 공식으로 낸다. */
   features?: RuleFeatures
 }): LayoutRuleResult {
-  const { body, params, measure, jamo } = input
+  const { body, params, measure } = input
+  const jamo = params.tables ? input.jamo : undefined
   const boxes: RuleBoxes = {}
   for (const part of RULE_PARTS) if (input.boxes[part]) boxes[part] = clone(input.boxes[part]!)
   const steps: LayoutRuleStep[] = []
 
   const apply = (rule: LayoutRuleId, ink: RuleInk): LayoutRuleStep | null => {
     if (rule === 'choTable') return applyChoTable(boxes, ink, body, jamo!, input.features?.cho ?? null, params.formulas)
-    if (rule === 'jungTable') return applyJungTable(boxes, ink, body, jamo!)
+    if (rule === 'jungTable') return applyJungTable(boxes, ink, body, jamo!, params.jungKinds)
     if (rule === 'jongTable') return applyJongTable(boxes, ink, body, jamo!)
     if (rule === 'choBottom') return applyChoBottom(boxes, ink, body, params, jamo)
     if (rule === 'pillar') return applyPillar(boxes, ink, body, params, jamo)
