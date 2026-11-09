@@ -7,6 +7,7 @@ import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
 import { describeStrokeGeometry, grammarOf, STEM_NAME_LABEL, STEM_SHAPE_LABEL } from '../src/services/strokeGrammar'
 import type { JamoType } from '../src/services/strokeGrammar'
+import { MEDIAL_STEM_ROLES } from '../src/services/medialStemRails'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import type { BoxConfig, JamoData, Part, ResolvedStrokeInkSource, StrokeDataV2 } from '../src/types'
@@ -48,14 +49,56 @@ const vowelKind = (char: string): string => {
 
 const toView = (p: { x: number; y: number }, box: Readonly<BoxConfig>) => ({ x: (box.x + p.x * box.width) * V, y: (box.y + p.y * box.height) * V })
 
-function itemsOf(primitives: { stroke: StrokeDataV2; box: Readonly<BoxConfig>; source: ResolvedStrokeInkSource }[], jamo: JamoData, type: JamoType): AnatomyItem[] {
+/** 홀자 보선 역할 → 자리말. 같은 이름 줄기가 둘 이상일 때만 붙인다. */
+const ROLE_PLACE: Record<string, string> = { leftStem: '왼', rightStem: '오른', upperBeam: '위', lowerBeam: '아래', innerPillar: '안', outerPillar: '바깥' }
+type Prim = { stroke: StrokeDataV2; box: Readonly<BoxConfig>; source: ResolvedStrokeInkSource }
+
+/**
+ * 획마다 부를 이름. 이름(표의 줄기 이름, 없으면 한 마디 획의 모양)은 같은 것끼리 공유하고 — 부위 단위 스타일이 같이 잡도록 —
+ * 한 자모에 같은 이름이 둘 이상이면 자리말을 붙인다. 홀자는 보선 역할 표(안 · 바깥 · 위 · 아래 · 왼 · 오른), 나머지는 놓인 자리로.
+ */
+function stemLabelsOf(primitives: Prim[], jamo: JamoData, table: Readonly<Record<string, string | null>>): Map<string, string> {
+  const base = new Map<string, string>()
+  const centers = new Map<string, { x: number; y: number }>()
+  for (const { stroke, box, source } of primitives) {
+    const others = primitives.filter((p) => p.source.channel === source.channel && p.stroke.id !== stroke.id).map((p) => p.stroke)
+    const geo = describeStrokeGeometry(stroke, others)
+    const name = table[stroke.id] as keyof typeof STEM_NAME_LABEL | null | undefined
+    const label = name ? STEM_NAME_LABEL[name] : geo.segments.length === 1 ? STEM_SHAPE_LABEL[geo.segments[0].shape] : null
+    if (!label) continue
+    base.set(stroke.id, label)
+    const c = stroke.points.reduce((a, p) => ({ x: a.x + p.x / stroke.points.length, y: a.y + p.y / stroke.points.length }), { x: 0, y: 0 })
+    centers.set(stroke.id, toView(c, box))
+  }
+  const out = new Map(base)
+  const groups = new Map<string, string[]>()
+  base.forEach((label, id) => groups.set(label, [...(groups.get(label) ?? []), id]))
+  const roles = MEDIAL_STEM_ROLES[jamo.char]
+  groups.forEach((ids, label) => {
+    if (ids.length < 2) return
+    const fromRoles = ids.map((id) => ROLE_PLACE[roles?.[id]?.[1] ?? ''])
+    if (fromRoles.every(Boolean) && new Set(fromRoles).size === ids.length) { ids.forEach((id, i) => out.set(id, `${fromRoles[i]} ${label}`)); return }
+    const pts = ids.map((id) => centers.get(id)!)
+    const spread = (k: 'x' | 'y') => Math.max(...pts.map((p) => p[k])) - Math.min(...pts.map((p) => p[k]))
+    const k: 'x' | 'y' = spread('x') >= spread('y') ? 'x' : 'y'
+    const words = k === 'x' ? (ids.length === 2 ? ['왼', '오른'] : ['왼', '가운데', '오른']) : (ids.length === 2 ? ['위', '아래'] : ['위', '가운데', '아래'])
+    const order = [...ids].sort((a, b) => centers.get(a)![k] - centers.get(b)![k])
+    order.forEach((id, i) => out.set(id, words[i] ? `${words[i]} ${label}` : `${label} ${i + 1}`))
+  })
+  return out
+}
+
+function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType): AnatomyItem[] {
   const table = grammarOf(type, jamo.char)
+  const labels = stemLabelsOf(primitives, jamo, table)
   const out: AnatomyItem[] = []
   let n = 1
   for (const { stroke, box, source } of primitives) {
     const others = primitives.filter((p) => p.source.channel === source.channel && p.stroke.id !== stroke.id).map((p) => p.stroke)
     const geo = describeStrokeGeometry(stroke, others)
     const name = table[stroke.id] ?? null
+    const stem = labels.get(stroke.id)
+    const endNote = stem ? `${stem}의 열린 끝` : '열린 끝'
     const pts = stroke.points
     // 끝 표시는 획 끝에서 바깥으로 조금 밀어 마디 번호와 안 겹치게.
     const endMark = (i: number) => {
@@ -74,7 +117,7 @@ function itemsOf(primitives: { stroke: StrokeDataV2; box: Readonly<BoxConfig>; s
       if (!stroke.closed && geo.corners[i]) steps.push({ corner: geo.corners[i] })
     })
     if (reversed) steps.reverse()
-    if (geo.head?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'head', label: '머리', note: '열린 끝', at: endMark(geo.head.point) })
+    if (geo.head?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'head', label: '머리', note: endNote, at: endMark(geo.head.point) })
     for (const step of steps) {
       if ('corner' in step) { const c = step.corner; out.push({ n: n++, strokeId: stroke.id, kind: 'corner', label: '꺾임', note: `${Math.round(c.turn)}° 돎`, at: toView(c, box) }); continue }
       const seg = step.seg
@@ -82,7 +125,7 @@ function itemsOf(primitives: { stroke: StrokeDataV2; box: Readonly<BoxConfig>; s
       if (seg.shape === 'dunggeunjulgi') {
         const c = pts.reduce((a, p) => ({ x: a.x + p.x / pts.length, y: a.y + p.y / pts.length }), { x: 0, y: 0 })
         const top = pts.reduce((a, p) => (p.y < a.y ? p : a), pts[0])
-        out.push({ n: n++, strokeId: stroke.id, label: name ? STEM_NAME_LABEL[name] : shape, kind: 'segment', note: name ? shape : '닫힌 획', at: toView({ x: c.x, y: top.y }, box) })
+        out.push({ n: n++, strokeId: stroke.id, label: stem ?? shape, kind: 'segment', note: name ? shape : '닫힌 획', at: toView({ x: c.x, y: top.y }, box) })
         continue
       }
       const a = pts[seg.fromPoint], b = pts[seg.toPoint]
@@ -91,12 +134,12 @@ function itemsOf(primitives: { stroke: StrokeDataV2; box: Readonly<BoxConfig>; s
       const one = geo.segments.length === 1
       out.push({
         n: n++, strokeId: stroke.id, kind: 'segment',
-        label: name && one ? STEM_NAME_LABEL[name] : shape,
+        label: one && stem ? stem : shape,
         note: [name && one ? shape : name ? `${STEM_NAME_LABEL[name]}의 한 마디` : '', curved ? '휜 마디' : ''].filter(Boolean).join(' · ') || '곧은 마디',
         at: { x: (line[0].x + line[1].x) / 2, y: (line[0].y + line[1].y) / 2 }, line,
       })
     }
-    if (geo.tail?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'tail', label: '맺음', note: '열린 끝', at: endMark(geo.tail.point) })
+    if (geo.tail?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'tail', label: '맺음', note: endNote, at: endMark(geo.tail.point) })
   }
   // 번호가 앞 번호와 겹치면 마디를 따라 옆으로 옮긴다.
   const near = (p: { x: number; y: number }, upto: number) => out.slice(0, upto).some((o) => Math.hypot(o.at.x - p.x, o.at.y - p.y) < 6)
