@@ -197,6 +197,23 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
   return out
 }
 
+/**
+ * 목록 차례: 머리 · 맺음은 자기 줄기(마디) 바로 아래에 들여 쓴다 — 줄기 없이 있을 수 없는 부분이라서.
+ * 꺾임은 두 마디를 잇는 부분이라 줄기와 같은 높이에 둔다. 번호는 쓰는 차례 그대로.
+ */
+function listOrder(items: AnatomyItem[]): { it: AnatomyItem; sub: boolean }[] {
+  const out: { it: AnatomyItem; sub: boolean }[] = []
+  items.forEach((it, i) => {
+    if (it.kind === 'head' || it.kind === 'tail') return
+    out.push({ it, sub: false })
+    if (it.kind !== 'segment') return
+    const before = items[i - 1], after = items[i + 1]
+    if (before?.kind === 'head' && before.strokeId === it.strokeId) out.push({ it: before, sub: true })
+    if (after?.kind === 'tail' && after.strokeId === it.strokeId) out.push({ it: after, sub: true })
+  })
+  return out
+}
+
 const UNIT: BoxConfig = { x: 0, y: 0, width: 1, height: 1 }
 const CHANNELS = ['strokes', 'horizontalStrokes', 'verticalStrokes'] as const
 /**
@@ -348,10 +365,10 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
           <i aria-hidden="true" /><b>{SLOT_NAME[active.slot]} {active.jamo.char}</b>{active.slot === 'JU' && <small>{vowelKind(active.jamo.char)}</small>}
         </div>}
         {active && <ol className={styles.rows}>
-          {active.items.map((it) => <li key={it.n}>
+          {listOrder(active.items).map(({ it, sub }) => <li key={it.n} className={sub ? styles.sub : undefined}>
             <button type="button" className={`${styles.row}${hot === it.n ? ` ${styles.rowOn}` : ''}`} style={{ ['--slot' as string]: `var(${SLOT_VAR[active.slot]})` }} onClick={() => setHot(hot === it.n ? null : it.n)}>
               <span className={styles.n}>{it.n}</span><b>{it.label}</b><small>{it.note}</small><code>{it.strokeId}</code>
-              <span className={styles.attrs}>{it.attrs.map((a) => <em key={a}>{a}</em>)}</span>
+              {!sub && <span className={styles.attrs}>{it.attrs.map((a) => <em key={a}>{a}</em>)}</span>}
             </button>
           </li>)}
         </ol>}

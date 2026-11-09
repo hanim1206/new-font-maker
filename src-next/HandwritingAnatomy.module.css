@@ -37,3 +37,5 @@
 .sideHead small { color: rgb(var(--color-text-3)); font-size: 12px; }
 .attrs { display: flex; flex-wrap: wrap; gap: 4px; grid-column: 2 / -1; }
 .attrs em { padding: 1px 6px; border-radius: 999px; background: rgb(var(--color-surface-3)); color: rgb(var(--color-text-2)); font-style: normal; font-size: 11px; }
+.sub { padding-left: 28px; position: relative; }
+.sub::before { content: ''; position: absolute; left: 14px; top: 0; bottom: 50%; width: 10px; border-left: 1px solid rgb(var(--color-border)); border-bottom: 1px solid rgb(var(--color-border)); border-bottom-left-radius: 6px; }
