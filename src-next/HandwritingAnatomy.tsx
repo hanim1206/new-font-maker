@@ -11,6 +11,7 @@ import { MEDIAL_STEM_ROLES } from '../src/services/medialStemRails'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import type { BoxConfig, JamoData, Part, ResolvedStrokeInkSource, StrokeDataV2 } from '../src/types'
+import { pointsToSvgD } from '../src/utils/pathUtils'
 import { EDIT_COLOR } from './editColors'
 import styles from './HandwritingAnatomy.module.css'
 
@@ -234,19 +235,25 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
 
   return <div className={styles.wrap} data-testid="handwriting-anatomy">
     <div className={styles.stage}>
-      <div className={styles.big}>
+      <div className={styles.big} onClick={() => { setHot(null); setFocus(null) }}>
         <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined}
           size={size} globalStyle={style} overflow="visible" clipGlyphs={false} strokeColorOf={colorOf}>
           {slots.filter((s) => !slot || s.slot === slot).flatMap((s) => s.parts.map((b, i) => <rect key={`${s.slot}-${i}`} x={b.x * V} y={b.y * V} width={b.width * V} height={b.height * V}
             fill="none" stroke={SLOT_COLOR[s.slot]} strokeWidth={0.35} strokeDasharray="1.2 1" pointerEvents="none" />))}
+          {/* 자모 고르기: 획 위를 누르면 그 자모가 펼쳐진다. 투명한 굵은 선이 눌림을 받는다. */}
+          {slots.flatMap((s) => s.prims.map((p, i) => <path key={`hit-${s.slot}-${i}`} d={pointsToSvgD(p.stroke.points, p.stroke.closed, p.box, V)} fill="none" stroke="transparent" strokeWidth={9}
+            pointerEvents="stroke" className={styles.hit} data-testid={`handwriting-anatomy-${s.slot}`} onClick={(e) => { e.stopPropagation(); if (slot !== s.slot) pick(s.slot) }} />))}
           {hotItem?.line && <polyline points={hotItem.line.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={0.6} strokeDasharray="1.5 1" pointerEvents="none" />}
-          {active?.items.map((it) => <g key={it.n} className={styles.mark} onClick={() => setHot(hot === it.n ? null : it.n)}>
+          {active?.items.map((it) => <g key={it.n} className={styles.mark} onClick={(e) => { e.stopPropagation(); setHot(hot === it.n ? null : it.n) }}>
             <circle cx={it.at.x} cy={it.at.y} r={hot === it.n ? 3.6 : 3} fill={hot === it.n ? EDIT_COLOR.foreground : SLOT_COLOR[active.slot]} stroke={EDIT_COLOR.surface} strokeWidth={0.5} />
             <text x={it.at.x} y={it.at.y + 1.25} fontSize={3.4} fontWeight={700} textAnchor="middle" fill={EDIT_COLOR.surface}>{it.n}</text>
           </g>)}
         </SvgRenderer>
       </div>
       <div className={styles.side}>
+        {active && <div className={styles.sideHead} style={{ ['--slot' as string]: `var(${SLOT_VAR[active.slot]})` }}>
+          <i aria-hidden="true" /><b>{SLOT_NAME[active.slot]} {active.jamo.char}</b>{active.slot === 'JU' && <small>{vowelKind(active.jamo.char)}</small>}
+        </div>}
         {active && <ol className={styles.rows}>
           {active.items.map((it) => <li key={it.n}>
             <button type="button" className={`${styles.row}${hot === it.n ? ` ${styles.rowOn}` : ''}`} style={{ ['--slot' as string]: `var(${SLOT_VAR[active.slot]})` }} onClick={() => setHot(hot === it.n ? null : it.n)}>
@@ -260,17 +267,10 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
             <i aria-hidden="true" /><small>{SLOT_NAME[g.slot]}</small><em>{g.hits.length}/{g.total}</em><span>{g.hits.join(' ')}</span>
           </div>)}
         </div>}
-        {!active && <p className={styles.hint}>자모를 누르면 그 자모의 부위가 번호로 펼쳐져요.</p>}
+        {!active && <p className={styles.hint}>글자에서 자모를 누르면 그 자모의 부위가 번호로 펼쳐져요. 빈 곳을 누르면 닫혀요.</p>}
       </div>
     </div>
 
-    <div className={styles.slots}>
-      {slots.map((s) => <button key={s.slot} type="button" className={`${styles.slot}${slot === s.slot ? ` ${styles.slotOn}` : ''}`} style={{ ['--slot' as string]: `var(${SLOT_VAR[s.slot]})` }}
-        onClick={() => pick(s.slot)} data-testid={`handwriting-anatomy-${s.slot}`}>
-        <i aria-hidden="true" /><b>{SLOT_NAME[s.slot]} {s.jamo.char}</b>{s.slot === 'JU' && <small>{vowelKind(s.jamo.char)}</small>}
-        {slot !== s.slot && <span className={styles.chips}>{[...new Set(s.items.map((it) => it.label))].map((l) => <em key={l}>{l}</em>)}</span>}
-      </button>)}
-    </div>
 
   </div>
 })
