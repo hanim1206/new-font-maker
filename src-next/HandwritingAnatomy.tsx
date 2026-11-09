@@ -202,7 +202,7 @@ const sampleChar = (slot: Slot, ch: string): string | null => {
   return String.fromCharCode(0xac00 + (c * 21 + j) * 28 + t)
 }
 
-/** 묶음 상자의 작은 자모: 본보기 글자 속 자리 · 비율 그대로 그 자모만 흐리게 그리고, 고른 묶음에 드는 부위만 자리 색으로 칠한다. */
+/** 묶음 상자의 작은 자모: 같은 크기 글자 네모 안에, 본보기 글자 속 자리 · 비율 그대로 그 자모만 흐리게 그리고, 고른 묶음에 드는 부위만 자리 색으로 칠한다. */
 const ScopeMini = memo(function ScopeMini({ ch, slot, scopeKey, style }: { ch: string; slot: Slot; scopeKey: string; style: GlobalStyle }) {
   const choseong = useJamoStore((state) => state.choseong)
   const jungseong = useJamoStore((state) => state.jungseong)
@@ -220,20 +220,16 @@ const ScopeMini = memo(function ScopeMini({ ch, slot, scopeKey, style }: { ch: s
     const schema = { ...schemas[syllable.layoutType], padding, designBodyPadding: padding }
     const resolved = resolveGlyphInkPrimitives({ syllable, placement: { kind: 'schema', schema }, weightMultiplier: weightToMultiplier(style.weight), globalLinecap: style.linecap, globalLinejoin: style.linejoin, horizontalInkBounds: { min: 0, max: 1 } })
     const prims = resolved.primitives.filter((p) => SLOT_OF[p.source.part] === slot).map((p) => ({ stroke: p.stroke as StrokeDataV2, box: p.box, source: p.source }))
-    const parts = (Object.entries(resolved.boxes) as [Part, BoxConfig][]).filter(([part]) => SLOT_OF[part] === slot).map(([, b]) => b)
-    if (!prims.length || !parts.length) return null
-    const x0 = Math.min(...parts.map((b) => b.x)) * V, y0 = Math.min(...parts.map((b) => b.y)) * V
-    const x1 = Math.max(...parts.map((b) => b.x + b.width)) * V, y1 = Math.max(...parts.map((b) => b.y + b.height)) * V
-    return { prims, items: itemsOf(prims, jamo, SLOT_TYPE[slot], slot), vb: { x: x0 - 6, y: y0 - 6, w: x1 - x0 + 12, h: y1 - y0 + 12 } }
+    if (!prims.length) return null
+    return { prims, items: itemsOf(prims, jamo, SLOT_TYPE[slot], slot) }
   }, [ch, slot, choseong, jungseong, jongseong, schemas, globalPadding, paddingOverrides, style.weight, style.linecap, style.linejoin])
   if (!drawn) return <b>{ch}</b>
-  const { prims, items, vb } = drawn
+  const { prims, items } = drawn
   const hits = items.filter((it) => it.scope.fn.key === scopeKey || it.scope.shape.key === scopeKey)
   const color = SLOT_COLOR[slot]
-  // 모든 작은 자모를 같은 배율로 — 첫닿자 · 받침 · 홀자의 크기 차이까지 글자 속 그대로.
-  const K = 1.0
-  const sw = 4.5
-  return <svg viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} width={Math.round(K * vb.w)} height={Math.round(K * vb.h)} className={styles.mini} role="img" aria-label={ch}>
+  // 칸은 모두 같은 크기의 글자 네모. 그 안에 자모가 본보기 글자 속 자리 · 크기 그대로 그려진다.
+  const sw = 5
+  return <svg viewBox="-4 -4 108 108" width={60} height={60} className={styles.mini} role="img" aria-label={ch}>
     {prims.map((p) => <path key={p.stroke.id} d={pointsToSvgD(p.stroke.points, p.stroke.closed, p.box, V)} fill="none" stroke={EDIT_COLOR.editSlotOff} strokeWidth={sw} strokeLinecap="square" strokeLinejoin="miter" />)}
     {hits.map((it, i) => 'd' in it.paint
       ? <path key={i} d={it.paint.d} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="square" strokeLinejoin="miter" />
