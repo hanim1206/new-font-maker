@@ -61,7 +61,7 @@ body.pk main{margin-left:12px;margin-right:calc(min(400px,38vw) + 24px)}
 
 <h2>아직 표가 하는 일</h2>
 <p class="sub">고른 칸과 외운 표의 상자 차이. 칸 숫자는 표가 그 짝에서 변을 더 옮기는 양(빨강 오른쪽 · 아래, 파랑 왼쪽 · 위). 가설이 맞으면 해당 줄의 막대가 줄고 판이 하얘진다. 점선은 "패턴만" 때 막대 길이.</p>
-<div class="poolsw"><button data-pool="588" class="on">받침 있는 588자</button><button data-pool="171">받침 없는 171자</button></div>
+<div class="poolsw"><button data-pool="171" class="on">받침 없는 171자</button><button data-pool="588">받침 있는 588자</button></div>
 <section class="card" id="moves"></section>
 <div class="note">보는 법 — 한 줄 전체가 같은 색이면 "그 첫닿자는 늘 이렇다", 한 열이 같은 색이면 "그 홀자 옆에서는 늘 이렇다"는 패턴 후보다. 아래 글자 탭은 첫닿자별(홀자 고정) · 홀자별(첫닿자 고정) · 받침별 · 가장 많이 순.</div>
 </main>
@@ -112,7 +112,7 @@ const mmed = a => { const x = a.filter(v => v !== undefined && isFinite(v)).sort
 const col = v => { if (v === null) return '#f4f4f5'; const t = Math.min(1, Math.abs(v)/0.08); return v > 0 ? `rgba(214,69,69,${0.06+0.8*t})` : `rgba(31,79,216,${0.06+0.8*t})`; };
 const fmt = v => v === null ? '' : (Math.abs(v) < 0.0005 ? '0' : (v>0?'+':'−') + Math.abs(v).toFixed(3).replace(/^0/,''));
 const dirOf = (e, v) => (e==='left'||e==='right') ? (v>0?'오른쪽':'왼쪽') : (v>0?'아래':'위');
-let sel = N - 1, pool = '588';
+let sel = N - 1, pool = '171';
 const svgOf = (c, i) => { const g = D.svgs[c]; return g ? `<svg viewBox="${-PADV} ${-PADV} ${V+2*PADV} ${V+2*PADV}"><path class="tab" d="${g.table}" fill-rule="evenodd"/><path class="step" d="${g.steps[i]}"/></svg>` : ''; };
 function ladder() {
   const el = document.getElementById('ladder'); el.innerHTML = '';
@@ -128,7 +128,7 @@ function ladder() {
 }
 function pools() {
   const el = document.getElementById('pools'); el.innerHTML = '';
-  for (const p of ['588','171']) {
+  for (const p of ['171','588']) {
     const s = D.summary[p]; const max = s.raw; const px = v => (1 - v / max) * 100;
     let dots = `<div class="dot" style="left:0;background:var(--raw)"></div><div class="lab up" style="left:0"><b>${s.raw.toFixed(2)}</b>날것</div>`;
     s.steps.forEach((v, i) => { if (i !== sel) dots += `<div class="dot small" style="left:${px(v)}%;background:var(--step)"></div>`; });
