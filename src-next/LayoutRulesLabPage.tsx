@@ -216,7 +216,7 @@ export function LayoutRulesLabPage() {
         <label><input type="checkbox" checked={snapStems} onChange={() => setSnapStems((value) => !value)} /> 홀자 안쪽 줄기를 노토 보선에 맞춤</label>
         <h3>획 꼴(2차)</h3>
         <label><input type="checkbox" checked={shapes.giyeokSweep} onChange={() => setShapes((prev) => ({ ...prev, giyeokSweep: !prev.giyeokSweep }))} data-testid="shape-giyeokSweep" /> ㄱ ㅋ ㄲ 세로줄기를 삐침으로(오른홀자 옆)</label>
-        <label><input type="checkbox" checked={shapes.bottomKick} onChange={() => setShapes((prev) => ({ ...prev, bottomKick: !prev.bottomKick }))} data-testid="shape-bottomKick" /> ㄴ ㄷ ㄸ ㄹ ㅌ ㅍ 맨 아래 가로줄기 치킴(ㅏ ㅐ ㅑ ㅒ ㅣ 옆)</label>
+        <label><input type="checkbox" checked={shapes.bottomKick} onChange={() => setShapes((prev) => ({ ...prev, bottomKick: !prev.bottomKick }))} data-testid="shape-bottomKick" /> ㄴ ㄷ ㄸ ㄹ ㅌ ㅍ 맨 아래 가로줄기 치킴(왼가지 옆은 짧게, 받침 ㄵ의 ㄴ도)</label>
       </div>
       <div className={styles.group}>
         <h3>변수</h3>

@@ -64,8 +64,19 @@ describe('획 꼴 규칙 — 맨 아래 가로줄기 치킴', () => {
     expect(end.handleIn?.y).toBeCloseTo(1)
   })
 
-  it('왼가지 홀자(ㅓ ㅕ) 옆에서는 치키지 않는다', () => {
-    expect(applyStrokeShapeRules(syllableOf('러'), ON).choseong!.strokes).toEqual(maps.choseong['ㄹ'].strokes)
+  it('왼가지 홀자(ㅓ ㅕ) 옆에서는 덜 빼고, ㄴ은 치키지 않는다', () => {
+    const right = applyStrokeShapeRules(syllableOf('라'), ON).choseong!.strokes![0].points.at(-1)!
+    const left = applyStrokeShapeRules(syllableOf('러'), ON).choseong!.strokes![0].points.at(-1)!
+    expect(left.x).toBeLessThan(right.x)
+    expect(left.x).toBeGreaterThan(1)
+    expect(applyStrokeShapeRules(syllableOf('너'), ON).choseong!.strokes).toEqual(maps.choseong['ㄴ'].strokes)
+  })
+
+  it('받침 ㄵ의 ㄴ은 ㅈ 쪽으로 끝을 올리고, 홑받침 ㄴ은 그대로다', () => {
+    const nj = applyStrokeShapeRules(syllableOf('앉'), ON).jongseong!.strokes!.find((stroke) => stroke.id === 'ㄵ종-1')!
+    const before = maps.jongseong['ㄵ'].strokes!.find((stroke) => stroke.id === 'ㄵ종-1')!
+    expect(nj.points.at(-1)!.y).toBeLessThan(before.points.at(-1)!.y)
+    expect(applyStrokeShapeRules(syllableOf('안'), ON).jongseong).toBe(syllableOf('안').jongseong ?? null)
   })
 
   it('ㄸ은 오른 ㄷ만, ㅍ은 아래 가로줄기만 바뀐다', () => {

@@ -112,7 +112,7 @@ function sweepStrokes(strokes: readonly StrokeDataV2[]): StrokeDataV2[] | null {
 }
 
 /**
- * 둘째 규칙 — 맨 아래 가로줄기 치킴: 오른홀자 옆 ㄴ ㄷ ㄸ ㄹ ㅌ ㅍ의 맨 아래 가로줄기는 노토에서 오른쪽으로 더 나가며 끝이 살짝 올라간다.
+ * 둘째 규칙 — 맨 아래 가로줄기 치킴: 오른홀자 옆 ㄴ ㄷ ㄸ ㄹ ㅌ ㅍ의 맨 아래 가로줄기는 노토에서 상자 밖으로 더 나가며 끝이 살짝 올라간다(받침 ㄵ의 ㄴ도).
  * 마지막 토막(꺾임 → 맺음)만 바꾼다. 맺음을 오른쪽으로 reach배(원래 토막 길이 기준) 빼고 rise만큼 올리고,
  * 원래 줄 위 bend 자리에 손잡이를 두어 처음엔 평평하다가 끝으로 갈수록 올라가게 한다.
  */
@@ -133,9 +133,25 @@ export const BOTTOM_KICK_SHAPES: Record<string, KickShape> = {
 }
 
 /**
- * 치킴을 쓰는 홀자. 왼가지 홀자(ㅓ ㅔ ㅕ ㅖ) 옆에서는 맺음이 가지에 막혀 노토도 덜 뺀다 — 588자에서 넣으면 오히려 멀어졌다.
+ * 왼가지 홀자(ㅓ ㅔ ㅕ ㅖ) 옆 첫닿자. 노토도 가지 밑으로 빼고 올리지만 오른가지 옆의 절반쯤만 뺀다(ㄹ 0.042 em, 오른가지 옆 0.090).
+ * 오른가지 값을 그대로 쓰면 오히려 멀어졌다. ㄴ은 노토가 거의 안 빼서 넣지 않는다.
  */
+export const BOTTOM_KICK_SHAPES_LEFT_BRANCH: Record<string, KickShape> = {
+  'ㄷ-1': { reach: 1.15, rise: 0, bend: 0.3 },
+  'ㄸ-4': { reach: 1.15, rise: 0.02, bend: 0.7 },
+  'ㄹ-1': { reach: 1.3, rise: 0.04, bend: 0.7 },
+  'ㅌ-1': { reach: 1.15, rise: 0.04, bend: 0.7 },
+  'ㅍ-2': { reach: 1.05, rise: 0.04, bend: 0.5 },
+}
+
+/** 받침 ㄵ의 ㄴ — 노토는 가로줄기를 ㅈ 쪽으로 비스듬히 올려 맺는다(길이는 그대로, 끝이 받침 칸 높이의 0.15 올라감). 홀 받침 ㄴ ㄷ ㄹ ㅌ은 노토도 평평하다. */
+export const JONG_KICK_SHAPES: Record<string, KickShape> = {
+  'ㄵ종-1': { reach: 0.9, rise: 0.15, bend: 0.3 },
+}
+
+/** 치킴을 쓰는 홀자. 오른가지 · ㅣ와 왼가지는 값이 다르다. */
 export const KICK_VOWELS: readonly string[] = ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅣ']
+export const LEFT_BRANCH_KICK_VOWELS: readonly string[] = ['ㅓ', 'ㅔ', 'ㅕ', 'ㅖ']
 
 /** 마지막 토막이 오른쪽으로 가는 가로줄기이고 손잡이가 없는 획만 바꾼다. */
 export function kickStroke(stroke: StrokeDataV2, shape: KickShape): StrokeDataV2 | null {
@@ -156,10 +172,10 @@ export function kickStroke(stroke: StrokeDataV2, shape: KickShape): StrokeDataV2
   }
 }
 
-function kickStrokes(strokes: readonly StrokeDataV2[]): StrokeDataV2[] | null {
+const kickStrokesWith = (table: Readonly<Record<string, KickShape>>) => (strokes: readonly StrokeDataV2[]): StrokeDataV2[] | null => {
   let changed = false
   const next = strokes.map((stroke) => {
-    const shape = BOTTOM_KICK_SHAPES[stroke.id]
+    const shape = table[stroke.id]
     const kicked = shape ? kickStroke(stroke, shape) : null
     if (kicked) changed = true
     return kicked ?? stroke
@@ -184,6 +200,9 @@ export function applyStrokeShapeRules(syllable: DecomposedSyllable, params: Stro
   let choseong = syllable.choseong
   if (params.giyeokSweep) choseong = mapJamoStrokes(choseong, sweepStrokes)
   // 틀은 처음 바꾸기 전 획으로 굳힌다(withFrameFrom은 이미 틀이 있으면 그대로 둔다).
-  if (params.bottomKick && KICK_VOWELS.includes(syllable.jungseong.char)) choseong = mapJamoStrokes(choseong, kickStrokes)
-  return choseong === syllable.choseong ? syllable : { ...syllable, choseong }
+  const jung = syllable.jungseong.char
+  if (params.bottomKick && KICK_VOWELS.includes(jung)) choseong = mapJamoStrokes(choseong, kickStrokesWith(BOTTOM_KICK_SHAPES))
+  if (params.bottomKick && LEFT_BRANCH_KICK_VOWELS.includes(jung)) choseong = mapJamoStrokes(choseong, kickStrokesWith(BOTTOM_KICK_SHAPES_LEFT_BRANCH))
+  const jongseong = params.bottomKick && syllable.jongseong ? mapJamoStrokes(syllable.jongseong, kickStrokesWith(JONG_KICK_SHAPES)) : syllable.jongseong
+  return choseong === syllable.choseong && jongseong === syllable.jongseong ? syllable : { ...syllable, choseong, jongseong }
 }
