@@ -8,7 +8,7 @@ import { DEFAULT_STROKE_SHAPE_PARAMS } from '../src/services/strokeShapeRules'
 import type { StrokeShapeParams } from '../src/services/strokeShapeRules'
 import { strokeXorShares } from './layoutRulesStrokeXor'
 import { EDIT_COLOR } from './editColors'
-import { BOX_TOLERANCE, EDGE_LABEL, EDGES, GLYPH_KIND_LABEL, glyphKindOf, INK_CLOSE_TOLERANCE, medianOf, NOTO_DELTA_TOLERANCE, regionsToPath, REPRESENTATIVE_CHARS, sampleChars, scoreGlyph } from './layoutRulesScore'
+import { BOX_TOLERANCE, EDGE_LABEL, EDGES, GLYPH_KIND_LABEL, glyphKindOf, INK_CLOSE_TOLERANCE, medianOf, noFinalChars, NOTO_DELTA_TOLERANCE, regionsToPath, REPRESENTATIVE_CHARS, sampleChars, scoreGlyph } from './layoutRulesScore'
 import type { JamoMaps, ScoredGlyph } from './layoutRulesScore'
 import { useNotoModel } from './notoModel'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
@@ -23,7 +23,7 @@ import styles from './LayoutRulesLabPage.module.css'
  * 전역 스타일은 기본값으로 고정한다 — 여기서 재는 것은 배치뿐이다.
  */
 
-type SampleKind = 'six' | 'full'
+type SampleKind = 'six' | 'full' | 'noFinal'
 const VIEW = 300
 const WORST_COUNT = 20
 const BATCH = 6
@@ -168,7 +168,7 @@ export function LayoutRulesLabPage() {
   const [selected, setSelected] = useState<string>(REPRESENTATIVE_CHARS[1])
   const [show, setShow] = useState({ ghost: true, ink: true, schema: false, model: true, rule: true })
 
-  const chars = useMemo(() => sample === 'six' ? [...REPRESENTATIVE_CHARS] : sampleChars(), [sample])
+  const chars = useMemo(() => sample === 'six' ? [...REPRESENTATIVE_CHARS] : sample === 'noFinal' ? noFinalChars() : sampleChars(), [sample])
   const { scores, progress } = useScores({ chars, maps, params, snapStems, shapes, modelReady: Boolean(bundle) || Boolean(modelError), model: bundle })
 
   const list = useMemo(() => chars.map((char) => scores.get(char)).filter((score): score is ScoredGlyph => Boolean(score)), [chars, scores])
@@ -234,6 +234,7 @@ export function LayoutRulesLabPage() {
         <h3>표본</h3>
         <label><input type="radio" name="sample" checked={sample === 'six'} onChange={() => setSample('six')} /> 대표 여섯 (가 각 갈 날 말 할)</label>
         <label><input type="radio" name="sample" checked={sample === 'full'} onChange={() => setSample('full')} /> 전수 {sampleChars().length}자 (오른홀자 + 받침)</label>
+        <label><input type="radio" name="sample" checked={sample === 'noFinal'} onChange={() => setSample('noFinal')} data-testid="sample-no-final" /> 받침 없음 {noFinalChars().length}자 (첫닿자 19 × 오른홀자 9)</label>
         <h3>그림</h3>
         {(['ghost', 'ink', 'rule', 'model', 'schema'] as const).map((key) => <label key={key}><input type="checkbox" checked={show[key]} onChange={() => setShow((prev) => ({ ...prev, [key]: !prev[key] }))} /> {({ ghost: '노토 고스트', ink: '우리 잉크(규칙 자리)', rule: '규칙 상자', model: '모델 상자(점선)', schema: '스키마 상자(파선)' })[key]}</label>)}
       </div>

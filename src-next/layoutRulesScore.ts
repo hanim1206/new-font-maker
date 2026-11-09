@@ -294,6 +294,13 @@ export function sampleChars(): string[] {
   return [...chars]
 }
 
+/** 받침 없는 표본 171자 — 첫닿자 19 × 오른홀자 9. 588 전수에는 받침 없는 글자가 없어 따로 둔다(2026-11-09). */
+export function noFinalChars(): string[] {
+  const chars: string[] = []
+  for (const cho of CHOSEONG_LIST) for (const jung of RIGHT_VOWELS) chars.push(compose(cho, jung, ''))
+  return chars
+}
+
 /** 가운데값. 빈 목록은 null. */
 export function medianOf(values: readonly number[]): number | null {
   if (!values.length) return null

@@ -1,7 +1,7 @@
 import type { BoxConfig, Padding } from '../types'
 import { BRANCH_INSET_BY_PAIR, CHO_RIGHT_BY_JUNG, CHO_RIGHT_BY_PAIR, JONG_RIGHT_BY_CHO } from './layoutRuleResiduals'
 import type { JamoShapeFeatures } from './jamoShapeFeatures'
-import { choBottomNoFinal } from './layoutRuleFormulas'
+import { CHO_TOP_DROP_NO_FINAL, choBottomNoFinal, choTopDropNoFinal } from './layoutRuleFormulas'
 import { BRANCH_INSET_BY_CHO, BRANCH_INSET_BY_JUNG, CHO_GAP, CHO_TARGET, CHO_TOP_BY_JONG, CHO_TOP_BY_JUNG, JONG_GAP_OFFSET, JONG_LEFT_BY_JUNG, JONG_RIGHT_BY_JUNG, JONG_TARGET, JONG_TOP_BY_CHO, JUNG_TARGET, PILLAR_BOTTOM_NO_FINAL } from './layoutRuleTargets'
 
 /**
@@ -179,7 +179,8 @@ const scaleX = (body: RuleBody) => (body.right - body.left) / (RULE_REFERENCE_BO
  * 기둥이 둘인 홀자(ㅐ ㅒ ㅔ ㅖ) 옆에서는 폭이 표의 비율로 준다(왼면 기준).
  * 아래는 받침이 있으면 그대로 두고(규칙 D가 받침 윗면에서 정한다), 없으면 표의 받침 없는 아래.
  */
-function applyChoTable(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jamo: RuleJamo, formula: JamoShapeFeatures | null): LayoutRuleStep | null {
+function applyChoTable(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jamo: RuleJamo, features: JamoShapeFeatures | null, formulas: boolean): LayoutRuleStep | null {
+  const formula = formulas ? features : null
   const box = boxes.CH
   const ch = ink.CH
   const target = CHO_TARGET[jamo.cho]
@@ -187,7 +188,8 @@ function applyChoTable(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jamo: Rul
   const twoStem = TWO_STEM_VOWELS.has(jamo.jung)
   const twoStemScale = target.twoStemScale
   const width = (target.right - target.left) * (twoStem ? twoStemScale : 1)
-  const byJong = jamo.jong ? (CHO_TOP_BY_JONG[jamo.jong] ?? 0) : 0
+  // 받침이 있으면 받침별 치우침(표), 없으면 윗면이 내려온다(생김새 공식 — 표의 윗면은 받침 있는 글자에서 잰 값이다).
+  const byJong = jamo.jong ? (CHO_TOP_BY_JONG[jamo.jong] ?? 0) : features ? choTopDropNoFinal(features) : CHO_TOP_DROP_NO_FINAL
   const top = target.top + byJong + (CHO_TOP_BY_JUNG[jamo.jung] ?? 0)
   const widen = (CHO_RIGHT_BY_JUNG[jamo.jung] ?? 0) + (CHO_RIGHT_BY_PAIR[jamo.cho + jamo.jung] ?? 0)
   const bottomNoFinal = formula ? choBottomNoFinal(formula) : target.bottomNoFinal
@@ -351,17 +353,16 @@ export function applyLayoutRules(input: {
   measure: RuleMeasure
   /** 표 규칙(첫닿자 · 홀자 · 받침)과 받침별 틈 · 내려옴에 쓴다. 없으면 표 규칙은 건너뛰고 m으로 간다. */
   jamo?: RuleJamo
-  /** 자모 생김새 특징. `params.formulas`가 켜져 있고 첫닿자 특징이 있으면 공식이 통과한 열(첫닿자 아래)은 표 대신 공식으로 낸다. */
+  /** 자모 생김새 특징. 받침 없을 때 첫닿자 윗면은 늘 이걸로 내고, `params.formulas`가 켜져 있으면 첫닿자 아래(받침 없음)도 표 대신 공식으로 낸다. */
   features?: RuleFeatures
 }): LayoutRuleResult {
   const { body, params, measure, jamo } = input
-  const choFormula = params.formulas ? input.features?.cho ?? null : null
   const boxes: RuleBoxes = {}
   for (const part of RULE_PARTS) if (input.boxes[part]) boxes[part] = clone(input.boxes[part]!)
   const steps: LayoutRuleStep[] = []
 
   const apply = (rule: LayoutRuleId, ink: RuleInk): LayoutRuleStep | null => {
-    if (rule === 'choTable') return applyChoTable(boxes, ink, body, jamo!, choFormula)
+    if (rule === 'choTable') return applyChoTable(boxes, ink, body, jamo!, input.features?.cho ?? null, params.formulas)
     if (rule === 'jungTable') return applyJungTable(boxes, ink, body, jamo!)
     if (rule === 'jongTable') return applyJongTable(boxes, ink, body, jamo!)
     if (rule === 'choBottom') return applyChoBottom(boxes, ink, body, params, jamo)

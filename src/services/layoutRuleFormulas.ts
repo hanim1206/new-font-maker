@@ -9,3 +9,13 @@ import type { JamoShapeFeatures } from './jamoShapeFeatures'
 
 /** 첫닿자가 받침 없을 때 앉는 아래(몸 em). 바닥이 평평하면(ㄴ ㄷ ㅁ ㅂ ㅌ ㅍ) 낮게 앉고, 뾰족하거나 둥글면(ㄱ ㅅ ㅈ ㅇ) 조금 띄운다. 표본 안 오차 가운데 0.006, 최대 0.019. */
 export const choBottomNoFinal = (cho: JamoShapeFeatures): number => 0.811 - 0.0738 * cho.bottomFlat
+
+/**
+ * 받침이 없을 때 첫닿자 윗면이 표(받침 있는 글자에서 잰 윗면)보다 내려오는 양(몸 em, + = 아래).
+ * 받침이 없으면 첫닿자가 아래로 길어지는데(아래는 `choBottomNoFinal`) 위는 같이 안 올라가고 조금 내려온다.
+ * 꼭지가 있으면(ㅊ ㅎ) 덜 내려오고, 바닥이 평평할수록 덜 내려온다(ㅋ 0.049 · ㄱ 0.043 · ㅁ 0.032 · ㅎ 0.013).
+ * 받침 없는 95자(첫닿자 19 × ㅏㅑㅓㅕㅣ) 모델 잉크 가운데값에 맞춤. 자모 하나 빼고 맞히면 19/19가 ±0.01 안(최대 0.009).
+ */
+export const choTopDropNoFinal = (cho: JamoShapeFeatures): number => 0.0436 - 0.0211 * (cho.topDot ? 1 : 0) - 0.0111 * cho.bottomFlat
+/** 생김새 특징이 없을 때 쓰는 내려오는 양(열아홉 자 가운데값). */
+export const CHO_TOP_DROP_NO_FINAL = 0.0335
