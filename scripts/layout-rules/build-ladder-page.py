@@ -1,5 +1,10 @@
 import json, os
 d = json.load(open('/tmp/claude-0/m/ladder.json'))
+# 글자 그림 좌표는 V(120) 단위라 소수 한 자리면 충분하다 — 조합이 늘어도 파일이 가볍게.
+import re as _re
+_r1 = lambda t: _re.sub(r'(\d+\.\d)\d+', r'\1', t)
+for _c, _g in d['svgs'].items():
+    _g['table'] = _r1(_g['table']); _g['steps'] = [_r1(x) for x in _g['steps']]
 html = r'''<!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8"><title>가설 사다리 — 노토까지</title>
 <style>

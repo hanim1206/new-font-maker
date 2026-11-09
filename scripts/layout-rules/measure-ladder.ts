@@ -21,6 +21,7 @@ const RAW = { ...DEFAULT_LAYOUT_RULE_PARAMS, rules: { faces: false, choTable: fa
 const HYPS = [
   { id: 'jungKinds', name: '홀자 가지 갈래', who: '하니무스 관찰 11/9: 가로줄기가 뻗은 쪽으로 홀자가 간다 → 기둥이 하나면 가지 반대쪽으로 비켜서고, 기둥이 둘이면 기둥 틀은 그대로 두고 가지만 밖으로 나간다(ㅔㅖ 오른 기둥 = ㅐㅒ 0.813 · 0.814)', patch: { jungKinds: true } },
   { id: 'branchInset', name: '왼가지 끝은 첫닿자 오른쪽 모양 따라', who: '하니무스 관찰 11/9: 닿자 오른쪽이 막혔으면 붙고 뚫렸으면 띄운다 → 오른쪽이 위부터 막힌 자음은 가지가 오른면에 살짝 걸치고, 오른쪽 위가 빈 자음(ㄴ ㅅ)은 그 빈 자리로 더 파고든다', patch: { branchInset: true } },
+  { id: 'twoStemNarrow', name: '두 기둥 홀자 옆에선 첫닿자가 좁아진다', who: '하니무스 관찰 11/9: ㅔ ㅖ는 홀자 왼면이 더 왼쪽 → 기둥이 둘이면 홀자가 자리를 더 차지해 첫닿자 오른면이 0.093 들어오고, ㅔ ㅖ 가지가 그걸 따라간다', patch: { twoStemNarrow: true } },
 ]
 /** 조합 번호(mask)의 i번째 비트가 켜져 있으면 i번째 가설을 켠다. 0 = 패턴만. */
 const STEPS = Array.from({ length: 1 << HYPS.length }, (_, mask) => ({ params: HYPS.reduce((p, h, i) => (mask >> i) & 1 ? { ...p, ...h.patch } : p, PAT as any) }))

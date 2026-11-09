@@ -51,3 +51,10 @@ export const TWO_STEM_FOLLOW = 0.11
 export const BRANCH_INSET_BASE = -0.0243
 export const BRANCH_INSET_SKY = -0.0778
 export const branchInsetOf = (f: Pick<JamoShapeFeatures, 'rightTop'>): number => BRANCH_INSET_BASE + BRANCH_INSET_SKY * f.rightTop
+
+/**
+ * 두 기둥 홀자 옆 첫닿자 폭(2026-11-09, 사용자 관찰 "ㅔ ㅖ는 홀자 왼면이 더 왼쪽"에서).
+ * 홀자 기둥이 둘(ㅐ ㅒ ㅔ ㅖ)이면 홀자가 자리를 더 차지해 첫닿자 오른면이 이만큼(몸 em) 안으로 들어온다.
+ * ㅔ ㅖ의 가지는 첫닿자 오른면을 따라가므로 같이 왼쪽으로 간다. 양은 외운 표의 두 기둥 가운데값.
+ */
+export const TWO_STEM_CHO_NARROW = 0.093
