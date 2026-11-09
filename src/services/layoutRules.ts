@@ -1,4 +1,5 @@
 import type { BoxConfig, Padding } from '../types'
+import { BRANCH_INSET_BY_PAIR, CHO_RIGHT_BY_JUNG, CHO_RIGHT_BY_PAIR, JONG_RIGHT_BY_CHO } from './layoutRuleResiduals'
 import { BRANCH_INSET_BY_CHO, BRANCH_INSET_BY_JUNG, CHO_GAP, CHO_TARGET, CHO_TOP_BY_JONG, CHO_TOP_BY_JUNG, JONG_GAP_OFFSET, JONG_LEFT_BY_JUNG, JONG_RIGHT_BY_JUNG, JONG_TARGET, JONG_TOP_BY_CHO, JUNG_TARGET, PILLAR_BOTTOM_NO_FINAL } from './layoutRuleTargets'
 
 /**
@@ -178,7 +179,8 @@ function applyChoTable(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jamo: Rul
   const twoStem = TWO_STEM_VOWELS.has(jamo.jung)
   const width = (target.right - target.left) * (twoStem ? target.twoStemScale : 1)
   const top = target.top + (jamo.jong ? CHO_TOP_BY_JONG[jamo.jong] ?? 0 : 0) + (CHO_TOP_BY_JUNG[jamo.jung] ?? 0)
-  const goal: InkBounds = { left: atX(body, target.left), right: atX(body, target.left + width), top: atY(body, top), bottom: ink.JO ? ch.bounds.bottom : atY(body, target.bottomNoFinal) }
+  const widen = (CHO_RIGHT_BY_JUNG[jamo.jung] ?? 0) + (CHO_RIGHT_BY_PAIR[jamo.cho + jamo.jung] ?? 0)
+  const goal: InkBounds = { left: atX(body, target.left), right: atX(body, target.left + width + widen), top: atY(body, top), bottom: ink.JO ? ch.bounds.bottom : atY(body, target.bottomNoFinal) }
   const after = fitBoxToInk(box, ch.bounds, goal)
   return { rule: 'choTable', part: 'CH', before: clone(box), after, limited: false, note: `${jamo.cho}${twoStem ? ' · 두 기둥 옆 ×' + target.twoStemScale : ''} — 가로 ${fixed(goal.left)}~${fixed(goal.right)}, 윗면 ${fixed(ch.bounds.top)} → ${fixed(goal.top)}` }
 }
@@ -196,7 +198,7 @@ function applyJungTable(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jamo: Ru
   const double = DOUBLE_CONSONANTS.has(jamo.cho)
   const inset = LEFT_BRANCH_VOWELS.has(jamo.jung) && ink.CH ? BRANCH_INSET_BY_CHO[jamo.cho] : undefined
   const left = inset !== undefined && ink.CH
-    ? ink.CH.bounds.right + scaleX(body) * (inset + (BRANCH_INSET_BY_JUNG[jamo.jung] ?? 0))
+    ? ink.CH.bounds.right + scaleX(body) * (inset + (BRANCH_INSET_BY_JUNG[jamo.jung] ?? 0) + (BRANCH_INSET_BY_PAIR[jamo.cho + jamo.jung] ?? 0))
     : atX(body, double ? target.leftNextToDouble : target.left)
   // 왼가지 두 기둥 홀자(ㅔ ㅖ)는 왼 기둥이 밀리면 기둥도 그 비율만큼 같이 밀린다(모델에서 잰 기울기).
   const follows = inset !== undefined && TWO_STEM_VOWELS.has(jamo.jung) ? target.rightFollowsLeft : 0
@@ -214,7 +216,7 @@ function applyJongTable(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jamo: Ru
   if (!box || !jo || !target) return null
   const goal: InkBounds = {
     left: atX(body, target.left + (JONG_LEFT_BY_JUNG[jamo.jung] ?? 0)),
-    right: atX(body, target.right + (JONG_RIGHT_BY_JUNG[jamo.jung] ?? 0)),
+    right: atX(body, target.right + (JONG_RIGHT_BY_JUNG[jamo.jung] ?? 0) + (JONG_RIGHT_BY_CHO[jamo.cho] ?? 0)),
     top: atY(body, target.top + (JONG_TOP_BY_CHO[jamo.cho] ?? 0)),
     bottom: atY(body, target.bottom),
   }

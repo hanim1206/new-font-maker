@@ -1,3 +1,4 @@
+import { BRANCH_INSET_BY_PAIR, CHO_RIGHT_BY_JUNG, JONG_RIGHT_BY_CHO } from './layoutRuleResiduals'
 import { describe, expect, it } from 'vitest'
 import type { BoxConfig } from '../types'
 import { applyLayoutRules, bodyOfPadding, DEFAULT_LAYOUT_RULE_PARAMS, fitBoxToVerticalInk, RULE_REFERENCE_BODY } from './layoutRules'
@@ -180,8 +181,19 @@ describe('배치 규칙', () => {
 
     it('규칙 B · 왼가지 홀자(ㅓ)의 왼면은 첫닿자 오른면 + 첫닿자별 파고듦', () => {
       const eo = run('jungTable', { cho: 'ㄴ', jung: 'ㅓ', jong: 'ㄴ' }).boxes.JU!
-      expect(eo.x).toBeCloseTo(rightOf(START.CH!) + BRANCH_INSET_BY_CHO['ㄴ'] + BRANCH_INSET_BY_JUNG['ㅓ'])
+      expect(eo.x).toBeCloseTo(rightOf(START.CH!) + BRANCH_INSET_BY_CHO['ㄴ'] + BRANCH_INSET_BY_JUNG['ㅓ'] + BRANCH_INSET_BY_PAIR['ㄴㅓ'])
       expect(rightOf(eo)).toBeCloseTo(JUNG_TARGET['ㅓ'].right)
+    })
+
+    it('남은 보정 · 덧셈으로 안 맞는 짝만 예외, ㅣ 옆 첫닿자는 넓게, ㅆ ㅉ 아래 받침은 오른쪽으로', () => {
+      expect(BRANCH_INSET_BY_PAIR['ㄷㅕ']).toBeUndefined()
+      const de = run('jungTable', { cho: 'ㄷ', jung: 'ㅕ', jong: 'ㄴ' }).boxes.JU!
+      expect(de.x).toBeCloseTo(rightOf(START.CH!) + BRANCH_INSET_BY_CHO['ㄷ'] + BRANCH_INSET_BY_JUNG['ㅕ'])
+      const wide = run('choTable', { cho: 'ㅁ', jung: 'ㅣ', jong: 'ㄴ' }).boxes.CH!
+      const plain = run('choTable', { cho: 'ㅁ', jung: 'ㅑ', jong: 'ㄴ' }).boxes.CH!
+      expect(rightOf(wide) - rightOf(plain)).toBeGreaterThan(CHO_RIGHT_BY_JUNG['ㅣ'] * 0.8)
+      const jo = run('jongTable', { cho: 'ㅆ', jung: 'ㅏ', jong: 'ㄴ' }).boxes.JO!
+      expect(rightOf(jo)).toBeCloseTo(JONG_TARGET['ㄴ'].right + JONG_RIGHT_BY_JUNG['ㅏ'] + JONG_RIGHT_BY_CHO['ㅆ'])
     })
 
     it('규칙 C · 받침 네 변은 표, 왼 · 오른은 홀자별 치우침을 더한다', () => {
