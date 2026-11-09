@@ -1,0 +1,105 @@
+import { DEFAULT_LAYOUT_RULE_PARAMS } from '../src/services/layoutRules'
+import type { LayoutRuleParams } from '../src/services/layoutRules'
+import { DEFAULT_STROKE_SHAPE_PARAMS, STROKE_SHAPES_OFF } from '../src/services/strokeShapeRules'
+import { DEFAULT_STYLE } from '../src/stores/globalStyleStore'
+import type { DeepReadonly } from '../src/types'
+import { noFinalChars, regionsToPath, sampleChars, scoreGlyph } from './layoutRulesScore'
+import type { JamoMaps, ScoreInput, ScoredGlyph } from './layoutRulesScore'
+
+/**
+ * 가설 사다리 — "패턴만"(외운 표 없이 관계 규칙만)에서 출발해, 사용자가 던진 시각 보정 가설을 하나씩 켜고 끈다.
+ * 실험실(`/layout-ladder`)과 측정 스크립트(`scripts/layout-rules/measure-ladder.ts`)가 같이 쓴다.
+ * 가설이 통과하면 `LADDER_HYPS`에 한 줄 보탠다.
+ */
+
+export interface LadderHyp { id: string; name: string; who: string; patch: Partial<LayoutRuleParams> }
+
+export const LADDER_HYPS: readonly LadderHyp[] = [
+  { id: 'jungKinds', name: '홀자 가지 갈래', who: '하니무스 관찰 11/9: 가로줄기가 뻗은 쪽으로 홀자가 간다 → 기둥이 하나면 가지 반대쪽으로 비켜서고, 기둥이 둘이면 기둥 틀은 그대로 두고 가지만 밖으로 나간다(ㅔㅖ 오른 기둥 = ㅐㅒ 0.813 · 0.814)', patch: { jungKinds: true } },
+  { id: 'branchInset', name: '왼가지 끝은 첫닿자 오른쪽 모양 따라', who: '하니무스 관찰 11/9: 닿자 오른쪽이 막혔으면 붙고 뚫렸으면 띄운다 → 오른쪽이 위부터 막힌 자음은 가지가 오른면에 살짝 걸치고, 오른쪽 위가 빈 자음(ㄴ ㅅ)은 그 빈 자리로 더 파고든다', patch: { branchInset: true } },
+  { id: 'twoStemNarrow', name: '두 기둥 홀자 옆에선 첫닿자가 좁아진다', who: '하니무스 관찰 11/9: ㅔ ㅖ는 홀자 왼면이 더 왼쪽 → 기둥이 둘이면 홀자가 자리를 더 차지해 첫닿자 오른면이 0.093 들어오고, ㅔ ㅖ 가지가 그걸 따라간다', patch: { twoStemNarrow: true } },
+  { id: 'choWall', name: '세로벽 있는 첫닿자는 좁게, 쌍닿자는 넓게', who: '하니무스 질문 11/9: ㅓㅕㅔㅖ 왼면 오차는 홀자만의 것인가 → 아니고 첫닿자 폭이었다. 가장자리에 세로벽이 선 ㄱㄴㄷㄹㅁㅂㅋㅌ는 꽉 차 보여 양옆을 들이고(오른쪽 위가 빈 ㄴ은 왼쪽만), 쌍닿자는 오른쪽으로 더 낸다', patch: { choWall: true } },
+]
+
+/** 패턴만: 외운 표를 끄고 틈 규칙은 켠다. */
+export const LADDER_PATTERNS: LayoutRuleParams = { ...DEFAULT_LAYOUT_RULE_PARAMS, tables: false, rules: { ...DEFAULT_LAYOUT_RULE_PARAMS.rules, gap: true } }
+/** 날것: 규칙을 모두 끈다. */
+export const LADDER_RAW: LayoutRuleParams = { ...DEFAULT_LAYOUT_RULE_PARAMS, rules: { faces: false, choTable: false, jungTable: false, jongTable: false, choBottom: false, pillar: false, gap: false } }
+
+/** 조합 번호(mask)의 i번째 비트가 켜져 있으면 i번째 가설을 켠다. 0 = 패턴만. */
+export const ladderParams = (mask: number): LayoutRuleParams => LADDER_HYPS.reduce<LayoutRuleParams>((params, hyp, i) => (mask >> i) & 1 ? { ...params, ...hyp.patch } : params, LADDER_PATTERNS)
+
+export const LADDER_KINDS: readonly (readonly [string, string])[] = [['오른가지 ㅏㅑ', 'ㅏㅑ'], ['가지 없음 ㅣ', 'ㅣ'], ['왼가지 ㅓㅕ', 'ㅓㅕ'], ['두 기둥 ㅐㅒㅔㅖ', 'ㅐㅒㅔㅖ']]
+export const LADDER_KEYS = ['CH.left', 'CH.right', 'CH.top', 'CH.bottom', 'JU.left', 'JU.right', 'JU.top', 'JU.bottom', 'JO.left', 'JO.right', 'JO.top', 'JO.bottom'] as const
+/** 글자 그림 한 변 길이(그림 좌표 단위). */
+export const LADDER_V = 120
+
+const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
+const JUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
+const JONG = ['', ...'ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ']
+
+export type LadderPool = '588' | '171'
+export const ladderPools = (): { pool: LadderPool; chars: string[] }[] => [{ pool: '588', chars: sampleChars() }, { pool: '171', chars: noFinalChars() }]
+
+/** 한 글자의 사다리 기록. 조합마다 칸이 채워진다(아직 안 잰 조합은 비어 있다). */
+export interface LadderRow {
+  char: string
+  pool: LadderPool
+  cho: string
+  jung: string
+  jong: string
+  /** 조합별: 외운 표 − 이 조합, 부품.변마다(몸 em). */
+  moves: Record<number, Record<string, number>>
+  /** 조합별 노토까지 거리(xor). */
+  xs: Record<number, number>
+  raw: number
+  table: number
+  /** 그림: 외운 표, 조합별. */
+  svgTable: string
+  svgSteps: Record<number, string>
+}
+
+type Model = ScoreInput['model']
+type Outline = ScoreInput['outline']
+
+const r1 = (path: string) => path.replace(/(\d+\.\d)\d+/g, '$1')
+const pathOf = (score: ScoredGlyph) => r1(regionsToPath(score.ink.rule, LADDER_V))
+
+function movesOf(table: ScoredGlyph, step: ScoredGlyph): Record<string, number> {
+  const m: Record<string, number> = {}
+  for (const part of ['CH', 'JU', 'JO'] as const) {
+    const a = table.box?.parts[part]?.rule, b = step.box?.parts[part]?.rule
+    if (!a || !b) continue
+    for (const edge of ['left', 'right', 'top', 'bottom'] as const) m[`${part}.${edge}`] = +(a[edge] - b[edge]).toFixed(4)
+  }
+  return m
+}
+
+/** 글자 하나의 기준(날것 · 외운 표)을 잰다. 실패하면 null. */
+export function ladderBase(input: { char: string; pool: LadderPool; maps: JamoMaps; model: Model; outline: DeepReadonly<Outline> }): { row: LadderRow; table: ScoredGlyph } | null {
+  const { char, pool, maps, model, outline } = input
+  const table = scoreGlyph({ char, maps, style: DEFAULT_STYLE, model, outline, params: DEFAULT_LAYOUT_RULE_PARAMS, snapStems: true, shapes: DEFAULT_STROKE_SHAPE_PARAMS })
+  const raw = scoreGlyph({ char, maps, style: DEFAULT_STYLE, model, outline, params: LADDER_RAW, snapStems: false, shapes: STROKE_SHAPES_OFF })
+  if (!table.ok || !table.box || !raw.ok) return null
+  const code = char.codePointAt(0)! - 0xac00
+  return {
+    table,
+    row: { char, pool, cho: CHO[Math.floor(code / 588)], jung: JUNG[Math.floor((code % 588) / 28)], jong: JONG[code % 28], moves: {}, xs: {}, raw: raw.xor.rule, table: table.xor.rule, svgTable: pathOf(table), svgSteps: {} },
+  }
+}
+
+/** 한 조합을 글자 하나에 재서 기록에 채운다. 실패하면 false. */
+export function ladderStep(input: { row: LadderRow; table: ScoredGlyph; mask: number; maps: JamoMaps; model: Model; outline: DeepReadonly<Outline> }): boolean {
+  const { row, table, mask, maps, model, outline } = input
+  const step = scoreGlyph({ char: row.char, maps, style: DEFAULT_STYLE, model, outline, params: ladderParams(mask), snapStems: false, shapes: DEFAULT_STROKE_SHAPE_PARAMS })
+  if (!step.ok || !step.box) return false
+  row.moves[mask] = movesOf(table, step)
+  row.xs[mask] = step.xor.rule
+  row.svgSteps[mask] = pathOf(step)
+  return true
+}
+
+export const ladderMedian = (values: readonly number[]): number | null => {
+  const x = values.filter(Number.isFinite).slice().sort((a, b) => a - b)
+  return x.length ? x[x.length >> 1] : null
+}

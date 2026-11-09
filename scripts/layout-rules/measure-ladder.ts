@@ -7,6 +7,7 @@ import { DEFAULT_STYLE } from '/home/user/new-font-maker/src/stores/globalStyleS
 import { DEFAULT_LAYOUT_RULE_PARAMS } from '/home/user/new-font-maker/src/services/layoutRules'
 import { DEFAULT_STROKE_SHAPE_PARAMS, STROKE_SHAPES_OFF } from '/home/user/new-font-maker/src/services/strokeShapeRules'
 import { scoreGlyph, sampleChars, noFinalChars, regionsToPath } from '/home/user/new-font-maker/src-next/layoutRulesScore'
+import { LADDER_HYPS, LADDER_RAW, ladderParams } from '/home/user/new-font-maker/src-next/layoutLadder'
 import { notoPresetChunkFile, notoPresetChunkIndex } from '/home/user/new-font-maker/src-next/notoPresetGlyphs'
 const maps = baseJamos as any
 const model = JSON.parse(fs.readFileSync('/home/user/new-font-maker/public/noto-preset/model.json', 'utf8'))
@@ -15,17 +16,10 @@ const outlineOf = (cp: number) => { const i = notoPresetChunkIndex(cp)!; if (!ch
 const V = 120
 const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ', JUNG_ALL = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ', JONG = ['', ...'ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ']
 const JUNGS = ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅣ']
-const PAT = { ...DEFAULT_LAYOUT_RULE_PARAMS, tables: false, rules: { ...DEFAULT_LAYOUT_RULE_PARAMS.rules, gap: true } }
-const RAW = { ...DEFAULT_LAYOUT_RULE_PARAMS, rules: { faces: false, choTable: false, jungTable: false, jongTable: false, choBottom: false, pillar: false, gap: false } }
-// 가설. 통과하면 여기에 한 줄 보탠다. 화면에서 하나씩 켜고 끌 수 있게 켜고 끈 모든 조합(2^가설 수)을 채점한다.
-const HYPS = [
-  { id: 'jungKinds', name: '홀자 가지 갈래', who: '하니무스 관찰 11/9: 가로줄기가 뻗은 쪽으로 홀자가 간다 → 기둥이 하나면 가지 반대쪽으로 비켜서고, 기둥이 둘이면 기둥 틀은 그대로 두고 가지만 밖으로 나간다(ㅔㅖ 오른 기둥 = ㅐㅒ 0.813 · 0.814)', patch: { jungKinds: true } },
-  { id: 'branchInset', name: '왼가지 끝은 첫닿자 오른쪽 모양 따라', who: '하니무스 관찰 11/9: 닿자 오른쪽이 막혔으면 붙고 뚫렸으면 띄운다 → 오른쪽이 위부터 막힌 자음은 가지가 오른면에 살짝 걸치고, 오른쪽 위가 빈 자음(ㄴ ㅅ)은 그 빈 자리로 더 파고든다', patch: { branchInset: true } },
-  { id: 'twoStemNarrow', name: '두 기둥 홀자 옆에선 첫닿자가 좁아진다', who: '하니무스 관찰 11/9: ㅔ ㅖ는 홀자 왼면이 더 왼쪽 → 기둥이 둘이면 홀자가 자리를 더 차지해 첫닿자 오른면이 0.093 들어오고, ㅔ ㅖ 가지가 그걸 따라간다', patch: { twoStemNarrow: true } },
-  { id: 'choWall', name: '세로벽 있는 첫닿자는 좁게, 쌍닿자는 넓게', who: '하니무스 질문 11/9: ㅓㅕㅔㅖ 왼면 오차는 홀자만의 것인가 → 아니고 첫닿자 폭이었다. 가장자리에 세로벽이 선 ㄱㄴㄷㄹㅁㅂㅋㅌ는 꽉 차 보여 양옆을 들이고(오른쪽 위가 빈 ㄴ은 왼쪽만), 쌍닿자는 오른쪽으로 더 낸다', patch: { choWall: true } },
-]
-/** 조합 번호(mask)의 i번째 비트가 켜져 있으면 i번째 가설을 켠다. 0 = 패턴만. */
-const STEPS = Array.from({ length: 1 << HYPS.length }, (_, mask) => ({ params: HYPS.reduce((p, h, i) => (mask >> i) & 1 ? { ...p, ...h.patch } : p, PAT as any) }))
+const RAW = LADDER_RAW
+// 가설 목록은 실험실과 같이 쓴다(`src-next/layoutLadder.ts`). 켜고 끈 모든 조합(2^가설 수)을 채점한다.
+const HYPS = LADDER_HYPS
+const STEPS = Array.from({ length: 1 << HYPS.length }, (_, mask) => ({ params: ladderParams(mask) }))
 const med = (a: number[]) => { const x = a.filter(Number.isFinite).sort((p, q) => p - q); return x.length ? x[x.length >> 1] : NaN }
 const keys = ['CH.left', 'CH.right', 'CH.top', 'CH.bottom', 'JU.left', 'JU.right', 'JU.top', 'JU.bottom', 'JO.left', 'JO.right', 'JO.top', 'JO.bottom']
 const rows: any[] = []
