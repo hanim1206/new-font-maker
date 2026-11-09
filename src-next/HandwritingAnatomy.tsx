@@ -104,10 +104,11 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
     const name = table[stroke.id] ?? null
     const stem = labels.get(stroke.id)
     // 기능 층 줄기 이름: 표 이름(기둥 · 보 …), 없으면 닿자는 자리 + 모양(첫닿자 세로줄기), 홀자는 모양.
-    const fnStem = (shape: StemShape) => name ? STEM_NAME_LABEL[name] : slot === 'JU' ? STEM_SHAPE_LABEL[shape] : `${SLOT_NAME[slot]} ${STEM_SHAPE_LABEL[shape]}`
+    const fnStem = (shape: StemShape) => name ? STEM_NAME_LABEL[name] : slot === 'JU' ? STEM_SHAPE_LABEL[shape] : `닿자 ${STEM_SHAPE_LABEL[shape]}`
     const stemScope = (shape: StemShape) => ({ fn: { key: `줄기|${fnStem(shape)}`, label: fnStem(shape) }, shape: { key: `줄기|${STEM_SHAPE_LABEL[shape]}`, label: `모든 ${STEM_SHAPE_LABEL[shape]}` } })
     const endScope = (word: '머리' | '맺음', shape: StemShape) => ({ fn: { key: `${word}|${fnStem(shape)}`, label: `${fnStem(shape)}의 ${word}` }, shape: { key: `${word}|${STEM_SHAPE_LABEL[shape]}`, label: `${STEM_SHAPE_LABEL[shape]}의 ${word}` } })
-    const cornerScope = { fn: { key: `꺾임|${SLOT_NAME[slot]}`, label: `${SLOT_NAME[slot]} 꺾임` }, shape: { key: '꺾임', label: '모든 꺾임' } }
+    const cornerWho = slot === 'JU' ? '홀자' : '닿자'
+    const cornerScope = { fn: { key: `꺾임|${cornerWho}`, label: `${cornerWho} 꺾임` }, shape: { key: '꺾임', label: '모든 꺾임' } }
     const pts = stroke.points
     // 끝 표시는 획 끝에서 바깥으로 조금 밀어 마디 번호와 안 겹치게.
     const endMark = (i: number) => {
