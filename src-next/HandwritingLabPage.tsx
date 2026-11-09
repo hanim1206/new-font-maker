@@ -33,6 +33,7 @@ import { Input } from './components/ui/input'
 import { Field, RangeBar } from './components/ui/range'
 import { Switch } from './components/ui/switch'
 import { EDIT_COLOR } from './editColors'
+import { HandwritingAnatomy } from './HandwritingAnatomy'
 import styles from './HandwritingLabPage.module.css'
 
 /**
@@ -191,7 +192,9 @@ export function HandwritingLabPage() {
   /** 전역 둥글기 0~1(제품 strokeStyle.roundness). 끝 · 꺾임 모서리를 둥글기 × 반폭으로 굴린다. */
   const [roundness, setRoundness] = useState(0)
   /** 글자표를 은행으로 그릴지 제품 프리셋으로 그릴지. 프리셋이면 스타일 변화가 2,350자 전부에서 보인다. */
-  const [chartSource, setChartSource] = useState<'bank' | 'preset'>('bank')
+  const [chartSource, setChartSource] = useState<'bank' | 'preset'>('preset')
+  /** 오른쪽: 고른 글자 해부(기본) · 손글씨 수집. */
+  const [view, setView] = useState<'anatomy' | 'collect'>('anatomy')
   const [picked, setPicked] = useState<string | null>(null)
   const [highlight, setHighlight] = useState<Set<string> | null>(null)
   const [scroll, setScroll] = useState({ top: 0, height: 600 })
@@ -481,7 +484,7 @@ export function HandwritingLabPage() {
       <div ref={chartRef} className={styles.chart} data-testid="handwriting-chart">
         <ChartRows bank={bank} style={chartStyle} picked={picked} highlight={highlight} firstRow={firstRow} lastRow={lastRow} onPick={setPicked} source={chartSource} />
       </div>
-      {pickedInfo && <div className={styles.pickedInfo}>
+      {pickedInfo && view === 'collect' && <div className={styles.pickedInfo}>
         <b>{pickedInfo.title}</b>
         <p>{pickedInfo.body}</p>
         {pickedInfo.sentence && <Button size="sm" onClick={() => setSentence(pickedInfo.sentence!, `${pickedInfo.sentence}를 써 주세요.`)}>이 문장 쓰기</Button>}
@@ -494,10 +497,17 @@ export function HandwritingLabPage() {
       </div>
     </aside>
 
-    <main className={styles.work}>
+    {view === 'anatomy' ? <main className={styles.work}>
       <header className={styles.header}>
         <span>Handwriting Lab</span>
-        <h1>손글씨 수집</h1>
+        <div className={styles.titleRow}><h1>글자 해부</h1><Button size="sm" onClick={() => setView('collect')} data-testid="handwriting-view-collect">손글씨 수집으로</Button></div>
+        <p>왼쪽 글자표에서 글자를 누르면 크게 보여요. 자모를 누르면 그 자모의 줄기 · 꺾임 · 머리 · 맺음이 번호로 펼쳐져요.</p>
+      </header>
+      <HandwritingAnatomy char={picked ?? '각'} style={style} />
+    </main> : <main className={styles.work}>
+      <header className={styles.header}>
+        <span>Handwriting Lab</span>
+        <div className={styles.titleRow}><h1>손글씨 수집</h1><Button size="sm" onClick={() => setView('anatomy')} data-testid="handwriting-view-anatomy">글자 해부로</Button></div>
         <p>{phase === 1 ? '1단계 · 배치 6종 잡기' : '2단계 · 자모 모으기'} — 문장을 칸에 쓰고 확인 카드에서 ㅇㅋ하면 은행에 들어가요. 저장은 이 브라우저에만.</p>
       </header>
 
@@ -541,7 +551,7 @@ export function HandwritingLabPage() {
         </div>
         <p className={styles.note}>배운 것만 흉내 내요. 빈 자리는 점선 상자, 배치가 없는 글자는 글자만.</p>
       </section>
-    </main>
+    </main>}
 
     <Dialog open={!!card?.open} onOpenChange={(open) => { if (!open) setCard(null) }}>
       <DialogContent className={styles.card}>
