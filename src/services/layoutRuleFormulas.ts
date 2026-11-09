@@ -79,3 +79,14 @@ export function choSideInsetOf(cho: string, f: Pick<JamoShapeFeatures, 'leftClos
   if (!hasChoWall(f)) return { left: 0, right: 0 }
   return { left: CHO_WALL_LEFT, right: CHO_WALL_RIGHT * (1 - f.rightTop) }
 }
+
+/**
+ * 첫닿자 아랫면을 바닥 모양으로 올리기(2026-11-09, 사용자 관찰 "하단이 막혀 있는 닿자와 뚫려 있는 닿자의 높이 차이"에서).
+ * 바닥이 가로줄기로 막힌 닿자(ㄴ ㄷ ㄹ ㅁ ㅂ ㅌ ㅍ)는 노토가 더 위에서 끝내고, 세로줄기 끝만 내려오는 ㄱ ㅋ ㄲ은 거의 그대로 둔다.
+ * 올림(몸 em) = 받침 없으면 0.015 + 0.077 × 바닥 너비(bottomFlat, 19/19 ±0.02), 받침 있으면 바닥 너비 몫 0.061 × 바닥 너비만(받침별 몫은 아직).
+ */
+export const CHO_LIFT_NO_FINAL_BASE = 0.015
+export const CHO_LIFT_NO_FINAL_FLAT = 0.077
+export const CHO_LIFT_FINAL_FLAT = 0.061
+export const choBottomLiftOf = (f: Pick<JamoShapeFeatures, 'bottomFlat'>, hasFinal: boolean): number =>
+  hasFinal ? CHO_LIFT_FINAL_FLAT * f.bottomFlat : CHO_LIFT_NO_FINAL_BASE + CHO_LIFT_NO_FINAL_FLAT * f.bottomFlat

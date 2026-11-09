@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import { shapeFeaturesOf } from './jamoShapeFeatures'
-import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, branchInsetOf, choSideInsetOf, hasChoWall, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
+import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, branchInsetOf, choBottomLiftOf, choSideInsetOf, hasChoWall, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { CHO_TARGET, JUNG_TARGET } from './layoutRuleTargets'
 
 const CHO_TARGET_A_RIGHT = JUNG_TARGET['ㅏ'].right
@@ -63,5 +63,13 @@ describe('첫닿자 양옆 — 세로벽', () => {
     expect(inset('ㄴ').right).toBeLessThan(0.01)
     expect(inset('ㅁ').right).toBeGreaterThan(0.05)
     expect(inset('ㅆ').right).toBeLessThan(0)
+  })
+})
+
+describe('첫닿자 아랫면 — 바닥 모양', () => {
+  it('바닥이 막힌 ㄴ ㅁ은 세로줄기 끝만 내려오는 ㄱ ㅋ보다 많이 올린다', () => {
+    const lift = (k: string, hasFinal: boolean) => choBottomLiftOf(shapeFeaturesOf(cho(k))!, hasFinal)
+    expect(lift('ㄴ', false) - lift('ㄱ', false)).toBeGreaterThan(0.06)
+    expect(lift('ㅁ', true) - lift('ㅋ', true)).toBeGreaterThan(0.05)
   })
 })

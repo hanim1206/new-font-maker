@@ -1,7 +1,7 @@
 import type { BoxConfig, Padding } from '../types'
 import { BRANCH_INSET_BY_PAIR, CHO_RIGHT_BY_JUNG, CHO_RIGHT_BY_PAIR, JONG_RIGHT_BY_CHO } from './layoutRuleResiduals'
 import type { JamoShapeFeatures } from './jamoShapeFeatures'
-import { CHO_TOP_DROP_NO_FINAL, TWO_STEM_CHO_NARROW, branchInsetOf, choSideInsetOf, DOUBLE_CHO_SHIFT, PILLAR_RIGHT, RIGHT_BRANCH_OUT, TWO_STEM_FOLLOW, TWO_STEM_SPAN, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
+import { CHO_TOP_DROP_NO_FINAL, TWO_STEM_CHO_NARROW, branchInsetOf, choBottomLiftOf, choSideInsetOf, DOUBLE_CHO_SHIFT, PILLAR_RIGHT, RIGHT_BRANCH_OUT, TWO_STEM_FOLLOW, TWO_STEM_SPAN, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { BRANCH_INSET_BY_CHO, BRANCH_INSET_BY_JUNG, CHO_GAP, CHO_TARGET, CHO_TOP_BY_JONG, CHO_TOP_BY_JUNG, JONG_GAP_OFFSET, JONG_LEFT_BY_JUNG, JONG_RIGHT_BY_JUNG, JONG_TARGET, JONG_TOP_BY_CHO, JUNG_TARGET, PILLAR_BOTTOM_NO_FINAL } from './layoutRuleTargets'
 
 /**
@@ -75,6 +75,8 @@ export interface LayoutRuleParams {
   twoStemNarrow: boolean
   /** 표 없이 첫닿자 양옆을 생김새(`choSideInsetOf`)대로 들인다 — 세로벽 있는 닿자는 좁게, 쌍닿자는 오른쪽으로 넓게. */
   choWall: boolean
+  /** 표 없이 첫닿자 아랫면을 바닥 모양(`choBottomLiftOf`)만큼 올린다 — 바닥이 막힌 닿자일수록 위에서 끝난다. */
+  choBottomShape: boolean
 }
 
 /** 공식에 쓰는 자모 생김새 특징. */
@@ -90,6 +92,7 @@ export const DEFAULT_LAYOUT_RULE_PARAMS: LayoutRuleParams = {
   branchInset: false,
   twoStemNarrow: false,
   choWall: false,
+  choBottomShape: false,
 }
 
 export interface LayoutRuleStep {
@@ -260,19 +263,19 @@ function applyJongTable(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jamo: Ru
 }
 
 /** 규칙 D · 첫닿자 아래 = 받침 윗면 − 두께 × 틈. 틈은 첫닿자별 표(꼬리 있는 ㄱ ㅋ은 작고 네모난 ㅁ ㄴ은 크다) + 받침별 잔차(ㅎ ㅀ ㅊ처럼 꼭지가 솟은 받침은 음수). 표에 없으면 m. 받침이 없으면 건너뛴다. */
-function applyChoBottom(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, params: LayoutRuleParams, jamo: RuleJamo | undefined): LayoutRuleStep | null {
+function applyChoBottom(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, params: LayoutRuleParams, jamo: RuleJamo | undefined, lift = 0): LayoutRuleStep | null {
   const box = boxes.CH
   const ch = ink.CH
   const jo = ink.JO
   if (!box || !ch || !jo) return null
   const baseGap = jamo ? CHO_GAP[jamo.cho] : undefined
   const gap = baseGap !== undefined ? baseGap + (JONG_GAP_OFFSET[jamo!.jong] ?? 0) : params.m
-  let bottom = jo.bounds.top - meanThickness(ch, jo) * gap
+  let bottom = jo.bounds.top - meanThickness(ch, jo) * gap - scaleY(body) * lift
   let limited = false
   if (bottom - ch.bounds.top < MIN_PART_HEIGHT) { bottom = ch.bounds.top + MIN_PART_HEIGHT; limited = true }
   if (bottom > body.bottom) { bottom = body.bottom; limited = true }
   const after = fitBoxToVerticalInk(box, ch.bounds, { top: ch.bounds.top, bottom })
-  return { rule: 'choBottom', part: 'CH', before: clone(box), after, limited, note: `첫닿자 아래 ${fixed(ch.bounds.bottom)} → ${fixed(bottom)} (받침 윗면 ${fixed(jo.bounds.top)} − 두께 × ${fixed(gap)})` }
+  return { rule: 'choBottom', part: 'CH', before: clone(box), after, limited, note: `첫닿자 아래 ${fixed(ch.bounds.bottom)} → ${fixed(bottom)} (받침 윗면 ${fixed(jo.bounds.top)} − 두께 × ${fixed(gap)}${lift ? ` − 바닥 모양 ${fixed(lift)}` : ''})` }
 }
 
 /**
@@ -412,9 +415,12 @@ export function applyLayoutRules(input: {
 
   const twoStem = !jamo && params.twoStemNarrow && !!input.jamo && TWO_STEM_VOWELS.has(input.jamo.jung)
   const wall = !jamo && params.choWall && !!input.jamo && input.features?.cho ? choSideInsetOf(input.jamo.cho, input.features.cho) : null
-  const choSides = twoStem || (!!wall && (wall.left !== 0 || wall.right !== 0))
+  const lift = !jamo && params.choBottomShape && input.features?.cho ? choBottomLiftOf(input.features.cho, !!input.jamo?.jong) : 0
+  // 받침이 있으면 아랫면은 choBottom(받침 윗면 기준)이 정하므로 거기서 올린다. 받침이 없으면 여기서.
+  const liftHere = lift !== 0 && !input.jamo?.jong
+  const choSides = twoStem || (!!wall && (wall.left !== 0 || wall.right !== 0)) || liftHere
   // 첫닿자 양면 목표는 처음 잰 자리에서 한 번만 정한다(다시 맞추기 때마다 또 빼지 않게).
-  let sides: { left: number; right: number } | null = null
+  let sides: { left: number; right: number; bottom: number } | null = null
   const apply = (rule: LayoutRuleId, ink: RuleInk): LayoutRuleStep | null => {
     if (rule === 'choTable' && choSides) {
       const box = boxes.CH, ch = ink.CH
@@ -423,14 +429,16 @@ export function applyLayoutRules(input: {
       sides ??= {
         left: ch.bounds.left + sx * (wall?.left ?? 0),
         right: ch.bounds.right - sx * ((twoStem ? TWO_STEM_CHO_NARROW : 0) + (wall?.right ?? 0)),
+        bottom: ch.bounds.bottom - scaleY(body) * (liftHere ? lift : 0),
       }
-      const after = fitBoxToHorizontalInk(box, ch.bounds, sides)
-      return { rule: 'choTable', part: 'CH', before: clone(box), after, limited: false, note: `${twoStem ? '두 기둥 홀자 옆 · ' : ''}${wall ? '첫닿자 생김새 · ' : ''}첫닿자 가로 ${fixed(ch.bounds.left)}~${fixed(ch.bounds.right)} → ${fixed(sides.left)}~${fixed(sides.right)}` }
+      const wide = fitBoxToHorizontalInk(box, ch.bounds, sides)
+      const after = liftHere ? fitBoxToVerticalInk(wide, ch.bounds, { top: ch.bounds.top, bottom: sides.bottom }) : wide
+      return { rule: 'choTable', part: 'CH', before: clone(box), after, limited: false, note: `${twoStem ? '두 기둥 홀자 옆 · ' : ''}${wall ? '첫닿자 생김새 · ' : ''}첫닿자 가로 ${fixed(ch.bounds.left)}~${fixed(ch.bounds.right)} → ${fixed(sides.left)}~${fixed(sides.right)}${liftHere ? `, 아래 ${fixed(ch.bounds.bottom)} → ${fixed(sides.bottom)}` : ''}` }
     }
     if (rule === 'choTable') return applyChoTable(boxes, ink, body, jamo!, input.features?.cho ?? null, params.formulas)
     if (rule === 'jungTable') return jamo ? applyJungTable(boxes, ink, body, jamo, params.jungKinds) : (params.jungKinds || params.branchInset) && input.jamo ? applyJungKindsOnly(boxes, ink, body, input.jamo.jung, params.branchInset ? input.features?.cho ?? null : null, params.jungKinds) : null
     if (rule === 'jongTable') return applyJongTable(boxes, ink, body, jamo!)
-    if (rule === 'choBottom') return applyChoBottom(boxes, ink, body, params, jamo)
+    if (rule === 'choBottom') return applyChoBottom(boxes, ink, body, params, jamo, lift)
     if (rule === 'pillar') return applyPillar(boxes, ink, body, params, jamo)
     return null
   }
