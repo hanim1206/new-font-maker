@@ -70,6 +70,8 @@ const D = __DATA__;
 const V = D.V, N = D.steps.length;
 const PARTN = {CH:'첫닿자',JU:'홀자',JO:'받침'}, EDGEN = {left:'왼면',right:'오른면',top:'윗면',bottom:'아랫면'};
 const CHOS = [...'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'], JUNGS = ['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅣ'], JONGS = [...'ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ'];
+/** 글자가 카드 테두리에 닿지 않게 둘레에 두는 여백(V 단위). */
+const PADV = 14;
 const OPEN = new Set();
 const SELC = {};
 let LAST = null;
@@ -111,7 +113,7 @@ const col = v => { if (v === null) return '#f4f4f5'; const t = Math.min(1, Math.
 const fmt = v => v === null ? '' : (Math.abs(v) < 0.0005 ? '0' : (v>0?'+':'−') + Math.abs(v).toFixed(3).replace(/^0/,''));
 const dirOf = (e, v) => (e==='left'||e==='right') ? (v>0?'오른쪽':'왼쪽') : (v>0?'아래':'위');
 let sel = N - 1, pool = '588';
-const svgOf = (c, i) => { const g = D.svgs[c]; return g ? `<svg viewBox="0 0 ${V} ${V}"><path class="tab" d="${g.table}" fill-rule="evenodd"/><path class="step" d="${g.steps[i]}"/></svg>` : ''; };
+const svgOf = (c, i) => { const g = D.svgs[c]; return g ? `<svg viewBox="${-PADV} ${-PADV} ${V+2*PADV} ${V+2*PADV}"><path class="tab" d="${g.table}" fill-rule="evenodd"/><path class="step" d="${g.steps[i]}"/></svg>` : ''; };
 function ladder() {
   const el = document.getElementById('ladder'); el.innerHTML = '';
   [...D.steps.keys()].reverse().forEach(i => {
@@ -119,7 +121,7 @@ function ladder() {
     const pct = (s, x) => Math.round((1 - x / s.raw) * 100);
     el.insertAdjacentHTML('beforeend', `<label class="st ${i===sel?'cur':''}"><input type="radio" name="step" ${i===sel?'checked':''} data-i="${i}"><div class="nm">${i}. ${st.name}<small>${st.who}</small></div><div class="num">588 <b>${s5.steps[i].toFixed(2)}</b> (${pct(s5, s5.steps[i])}%)<br>171 <b>${s1.steps[i].toFixed(2)}</b> (${pct(s1, s1.steps[i])}%)</div></label>`);
     const groups = (D.stepTop[i] ?? []);
-    const ex = t => { const g = D.svgs[t.char]; return g ? `<div><svg viewBox="0 0 ${V} ${V}"><path class="prev" d="${g.steps[i-1]}" fill-rule="evenodd"/><path class="step" d="${g.steps[i]}"/></svg><b>${t.char}</b> ${t.before.toFixed(2)} → ${t.after.toFixed(2)}</div>` : ''; };
+    const ex = t => { const g = D.svgs[t.char]; return g ? `<div><svg viewBox="${-PADV} ${-PADV} ${V+2*PADV} ${V+2*PADV}"><path class="prev" d="${g.steps[i-1]}" fill-rule="evenodd"/><path class="step" d="${g.steps[i]}"/></svg><b>${t.char}</b> ${t.before.toFixed(2)} → ${t.after.toFixed(2)}</div>` : ''; };
     if (groups.length) el.insertAdjacentHTML('beforeend', `<div class="stex"><div class="scale">이 칸을 켰을 때 가장 많이 나아진 글자, 홀자 가지 갈래별로 — 회색 면 = 바로 아래 칸(${i-1}칸) · 파랑 선 = 이 칸(${i}칸). 숫자는 노토까지 거리 전 → 후.</div>${groups.map(gr => `<div class="kg"><div class="kgh">${gr.label} <small>이 갈래 글자들은 가운데값으로 거리 ${Math.abs(gr.med).toFixed(2)} ${gr.med >= 0 ? '줄어듦' : '늘어남'}</small></div><div class="exs">${gr.items.map(ex).join('')}</div></div>`).join('')}</div>`);
   });
   el.querySelectorAll('input').forEach(x => x.addEventListener('change', () => { sel = +x.dataset.i; renderAll(); }));
