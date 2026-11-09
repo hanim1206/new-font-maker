@@ -4,6 +4,7 @@
 //
 //   node scripts/worktree-port.mjs         이 워크트리 포트 출력
 //   node scripts/worktree-port.mjs serve   이 포트로 확인용 서버(로그인 게이트 끔) 띄우기
+//   node scripts/worktree-port.mjs serve --host   같은 와이파이의 아이패드 · 폰에서도 붙게(0.0.0.0). 주소는 vite가 Network로 찍어 준다
 //   node scripts/worktree-port.mjs list    워크트리 · 브랜치 · 주소 · 켜짐 표
 import { execSync, spawn } from 'node:child_process'
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
@@ -89,8 +90,14 @@ function serve() {
       : `포트 ${port}를 다른 곳이 쓰고 있음: ${on.cwd} (pid ${on.pid})`)
     process.exit(on.cwd === root ? 0 : 1)
   }
-  console.log(`확인용 서버: http://127.0.0.1:${port}/dashboard`)
-  const child = spawn('npm', ['run', 'dev:nogate', '--', '--port', String(port)], { cwd: root, stdio: 'inherit' })
+  // `--host`가 붙으면 바깥 기기에서도 붙게 연다(손글씨 실험실을 아이패드로 볼 때). 나머지 인자는 vite로 그대로 넘긴다.
+  const extra = process.argv.slice(3)
+  const open = extra.includes('--host')
+  const passthrough = extra.filter((arg) => arg !== '--host')
+  console.log(`확인용 서버: http://127.0.0.1:${port}/dashboard${open ? ' (다른 기기: 아래 Network 주소)' : ''}`)
+  const child = open
+    ? spawn('npx', ['vite', '--host', '0.0.0.0', '--strictPort', '--port', String(port), ...passthrough], { cwd: root, stdio: 'inherit', env: { ...process.env, VITE_AUTH_GATE: 'off' } })
+    : spawn('npm', ['run', 'dev:nogate', '--', '--port', String(port), ...passthrough], { cwd: root, stdio: 'inherit' })
   child.on('exit', (code) => process.exit(code ?? 0))
 }
 
