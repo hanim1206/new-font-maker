@@ -70,6 +70,8 @@ const stepTop = STEPS.map((_, i) => i === 0 ? [] : KINDS.map(([label, js]) => {
   return { label, med: +med(pr.map((r) => gain(r, i))).toFixed(3), items: top.map((r) => ({ char: r.char, before: +r.x.steps[i - 1].toFixed(3), after: +r.x.steps[i].toFixed(3) })) }
 }))
 const svgs: Record<string, { table: string; steps: string[] }> = {}
+// 칸을 누르면 어느 글자든 나올 수 있어 전부 그린다.
+for (const r of rows) need.add(r.char)
 for (const c of need) { const r = res.get(c); if (r) svgs[c] = { table: regionsToPath(r.table.ink.rule, V), steps: r.steps.map((s: any) => regionsToPath(s.ink.rule, V)) } }
 fs.writeFileSync(process.env.OUT!, JSON.stringify({ V, steps: STEPS.map(({ id, name, who }) => ({ id, name, who })), summary, rows: rows.map(({ x, ...r }) => r), reps, svgs, stepTop }))
 console.log(JSON.stringify(summary))

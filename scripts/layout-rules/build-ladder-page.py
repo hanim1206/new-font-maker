@@ -37,7 +37,7 @@ path.tab{fill:var(--tab);opacity:.45}path.prev{fill:#9a9aa2;opacity:.4}.kg{margi
 .mv .body{display:none;margin-top:14px}.mv.open .body{display:block}
 .heat{display:grid;gap:2px;font-size:11px;align-items:center}
 .heat .c{height:24px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
-.heat .h{color:var(--mute);text-align:center;font-size:12px}.heat .rh{font-size:13px;text-align:center}.heat .m{font-weight:600}
+.heat .h{color:var(--mute);text-align:center;font-size:12px}.heat .rh{font-size:13px;text-align:center}.heat .m{font-weight:600}[data-s]{cursor:pointer}[data-s]:hover{outline:1px solid #888}[data-s].pick{outline:2px solid #111;outline-offset:-1px}
 .jong{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px;font-size:11px}.jong div{width:42px;text-align:center}.jong .c{height:22px;border-radius:3px;display:flex;align-items:center;justify-content:center}
 .scale{font-size:12px;color:var(--mute);margin:10px 0 4px}.scale i{display:inline-block;width:14px;height:10px;border-radius:2px;vertical-align:-1px;margin:0 3px 0 10px}
 .vtabs{display:flex;gap:6px;margin-top:16px}.vtabs button{font-size:12px;padding:4px 12px}
@@ -66,6 +66,19 @@ const V = D.V, N = D.steps.length;
 const PARTN = {CH:'첫닿자',JU:'홀자',JO:'받침'}, EDGEN = {left:'왼면',right:'오른면',top:'윗면',bottom:'아랫면'};
 const CHOS = [...'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'], JUNGS = ['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅣ'], JONGS = [...'ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ'];
 const OPEN = new Set();
+const SELC = {};
+/** 기본으로 고르는 칸: 표가 가장 많이 옮기는 첫닿자 × 홀자 칸. */
+function defaultSel(rows, mv) { let best = null, bv = -1; for (const c of CHOS) for (const j of JUNGS) { const v = mmed(rows.filter(r => r.cho===c && r.jung===j).map(mv)); if (v !== null && Math.abs(v) > bv) { bv = Math.abs(v); best = `cell|${c}|${j}`; } } return best; }
+function pickedOf(rows, mv, pick) {
+  const [t, a, b] = (pick ?? '').split('|'); const has = r => mv(r) !== undefined;
+  const byAbs = list => [...list].sort((x, y) => Math.abs(mv(y)) - Math.abs(mv(x)));
+  const mid = list => { const m = mmed(list.map(mv)); return [...list].sort((x, y) => Math.abs(mv(x) - m) - Math.abs(mv(y) - m))[0]; };
+  if (t === 'cell') return { cap: `${a} × ${b} 칸의 글자`, list: byAbs(rows.filter(r => has(r) && r.cho===a && r.jung===b)) };
+  if (t === 'cho') return { cap: `첫닿자 ${a} — 홀자마다 가운데 글자 하나`, list: JUNGS.map(j => mid(rows.filter(r => has(r) && r.cho===a && r.jung===j))).filter(Boolean) };
+  if (t === 'jung') return { cap: `홀자 ${a} — 첫닿자마다 가운데 글자 하나`, list: CHOS.map(c => mid(rows.filter(r => has(r) && r.cho===c && r.jung===a))).filter(Boolean) };
+  if (t === 'jong') return { cap: `받침 ${a}의 글자`, list: byAbs(rows.filter(r => has(r) && r.jong===a)) };
+  return { cap: '칸을 고르면 글자가 나온다', list: [] };
+}
 const KEYS = ['CH.left','CH.right','CH.top','CH.bottom','JU.left','JU.right','JU.top','JU.bottom','JO.left','JO.right','JO.top','JO.bottom'];
 const mmed = a => { const x = a.filter(v => v !== undefined && isFinite(v)).sort((p,q)=>p-q); return x.length ? x[x.length>>1] : null; };
 const col = v => { if (v === null) return '#f4f4f5'; const t = Math.min(1, Math.abs(v)/0.08); return v > 0 ? `rgba(214,69,69,${0.06+0.8*t})` : `rgba(31,79,216,${0.06+0.8*t})`; };
@@ -106,21 +119,19 @@ function moves() {
   gs.forEach((g, gi) => {
     const [p, e] = g.key.split('.'); const mv = r => r.moves[sel][g.key];
     let heat = `<div class="heat" style="grid-template-columns:28px repeat(9,1fr) 8px 1fr"><div></div>${JUNGS.map(j=>`<div class="h">${j}</div>`).join('')}<div></div><div class="h">첫닿자별</div>`;
-    for (const c of CHOS) { heat += `<div class="rh">${c}</div>`; for (const j of JUNGS) { const v = mmed(rows.filter(r => r.cho===c && r.jung===j).map(mv)); heat += `<div class="c" style="background:${col(v)}">${fmt(v)}</div>`; } const rv = mmed(rows.filter(r => r.cho===c).map(mv)); heat += `<div></div><div class="c m" style="background:${col(rv)}">${fmt(rv)}</div>`; }
-    heat += `<div class="rh" style="font-size:11px">홀자별</div>${JUNGS.map(j => { const v = mmed(rows.filter(r=>r.jung===j).map(mv)); return `<div class="c m" style="background:${col(v)}">${fmt(v)}</div>`; }).join('')}</div>`;
+    for (const c of CHOS) { heat += `<div class="rh">${c}</div>`; for (const j of JUNGS) { const v = mmed(rows.filter(r => r.cho===c && r.jung===j).map(mv)); heat += `<div class="c" data-s="cell|${c}|${j}" style="background:${col(v)}">${fmt(v)}</div>`; } const rv = mmed(rows.filter(r => r.cho===c).map(mv)); heat += `<div></div><div class="c m" data-s="cho|${c}" style="background:${col(rv)}">${fmt(rv)}</div>`; }
+    heat += `<div class="rh" style="font-size:11px">홀자별</div>${JUNGS.map(j => { const v = mmed(rows.filter(r=>r.jung===j).map(mv)); return `<div class="c m" data-s="jung|${j}" style="background:${col(v)}">${fmt(v)}</div>`; }).join('')}</div>`;
     let jong = '';
     if (pool === '588') { const cell = {}; for (const r of rows) if (mv(r) !== undefined) (cell[r.cho+r.jung] ??= []).push(mv(r)); const cm = Object.fromEntries(Object.entries(cell).map(([k,v]) => [k, mmed(v)]));
-      jong = `<div class="scale">받침별 — 같은 첫닿자 · 홀자 칸에 받침이 더 얹는 양</div><div class="jong">${JONGS.map(k => { const v = mmed(rows.filter(r=>r.jong===k && mv(r)!==undefined).map(r=>mv(r) - cm[r.cho+r.jung])); return `<div><div class="c" style="background:${col(v)}">${fmt(v)}</div>${k}</div>`; }).join('')}</div>`; }
-    const byChar = Object.fromEntries(rows.map(r => [r.char, r]));
-    const cellOf = (c, label) => { const r = byChar[c]; return r && D.svgs[c] ? `<div>${svgOf(c, sel)}<b>${label}</b> ${c} ${fmt(mv(r))}</div>` : ''; };
-    const rep = D.reps[pool + ' ' + g.key] ?? {byCho:[],byJung:[],byJong:[],top:[]};
-    const views = { cho: [`첫닿자별 — 홀자 ${rep.jStar} 고정`, rep.byCho.map(c => cellOf(c, byChar[c]?.cho ?? ''))], jung: [`홀자별 — 첫닿자 ${rep.cStar} 고정`, rep.byJung.map(c => cellOf(c, byChar[c]?.jung ?? ''))], ...(rep.byJong.length ? { jong: ['받침별', rep.byJong.map(c => cellOf(c, byChar[c]?.jong ?? ''))] } : {}), top: ['가장 많이', rep.top.map(c => cellOf(c, ''))] };
-    const tabs = `<div class="vtabs">${Object.entries({cho:'첫닿자별',jung:'홀자별',jong:'받침별',top:'가장 많이'}).filter(([k]) => views[k]).map(([k,l],i) => `<button data-v="${k}" class="${i===0?'on':''}">${l}</button>`).join('')}</div>`;
-    const panes = Object.entries(views).map(([k,[cap,cells]],i) => `<div class="vpane" data-v="${k}" style="${i===0?'':'display:none'}"><div class="scale">${cap} · 초록 면 = 외운 표 · 파랑 선 = ${sel}칸</div><div class="exs">${cells.join('')}</div></div>`).join('');
-    box.insertAdjacentHTML('beforeend', `<div class="mv${OPEN.has(g.key)?' open':''}" data-key="${g.key}"><div class="head"><div class="name">${PARTN[p]} ${EDGEN[e]}<small>표가 대개 ${dirOf(e, g.sgn)}으로 · 0.02 넘게 ${g.over}/${g.n}</small></div><div class="bar"><i style="width:${g.med/maxMed*100}%"></i>${sel>0?`<u style="left:0;width:${g.base/maxMed*100}%"></u>`:''}</div><div class="num">가운데 ${g.med.toFixed(3)}${sel>0?` (패턴만 ${g.base.toFixed(3)})`:''}</div></div><div class="body"><div class="scale">첫닿자 × 홀자<i style="background:rgba(214,69,69,.7)"></i>오른쪽 · 아래<i style="background:rgba(31,79,216,.7)"></i>왼쪽 · 위</div>${heat}${jong}${tabs}${panes}</div></div>`);
+      jong = `<div class="scale">받침별 — 같은 첫닿자 · 홀자 칸에 받침이 더 얹는 양</div><div class="jong">${JONGS.map(k => { const v = mmed(rows.filter(r=>r.jong===k && mv(r)!==undefined).map(r=>mv(r) - cm[r.cho+r.jung])); return `<div><div class="c" data-s="jong|${k}" style="background:${col(v)}">${fmt(v)}</div>${k}</div>`; }).join('')}</div>`; }
+    const pick = SELC[pool + ' ' + g.key] ?? defaultSel(rows, mv);
+    const picked = pickedOf(rows, mv, pick);
+    const panes = `<div class="vpane"><div class="scale">${picked.cap} · 초록 면 = 외운 표 · 파랑 선 = ${sel}칸 · 숫자 = 표가 더 옮기는 양</div><div class="exs">${picked.list.map(r => D.svgs[r.char] ? `<div>${svgOf(r.char, sel)}<b>${r.char}</b> ${fmt(mv(r))}</div>` : '').join('') || '<div class="scale">글자 없음</div>'}</div></div>`;
+    const tabs = '';
+    box.insertAdjacentHTML('beforeend', `<div class="mv${OPEN.has(g.key)?' open':''}" data-key="${g.key}" data-def="${defaultSel(rows, mv)}"><div class="head"><div class="name">${PARTN[p]} ${EDGEN[e]}<small>표가 대개 ${dirOf(e, g.sgn)}으로 · 0.02 넘게 ${g.over}/${g.n}</small></div><div class="bar"><i style="width:${g.med/maxMed*100}%"></i>${sel>0?`<u style="left:0;width:${g.base/maxMed*100}%"></u>`:''}</div><div class="num">가운데 ${g.med.toFixed(3)}${sel>0?` (패턴만 ${g.base.toFixed(3)})`:''}</div></div><div class="body"><div class="scale">첫닿자 × 홀자 · 칸을 누르면 그 글자들이 아래에 나온다<i style="background:rgba(214,69,69,.7)"></i>오른쪽 · 아래<i style="background:rgba(31,79,216,.7)"></i>왼쪽 · 위</div>${heat}${jong}${tabs}${panes}</div></div>`);
   });
   box.querySelectorAll('.mv .head').forEach(h => h.addEventListener('click', () => { const m = h.parentElement; m.classList.toggle('open'); const k = m.dataset.key; m.classList.contains('open') ? OPEN.add(k) : OPEN.delete(k); }));
-  box.querySelectorAll('.vtabs button').forEach(b => b.addEventListener('click', () => { const m = b.closest('.mv'); m.querySelectorAll('.vtabs button').forEach(x => x.classList.toggle('on', x===b)); m.querySelectorAll('.vpane').forEach(x => x.style.display = x.dataset.v === b.dataset.v ? '' : 'none'); }));
+  box.querySelectorAll('.mv').forEach(m => { const key = pool + ' ' + m.dataset.key; const cur = SELC[key]; m.querySelectorAll('[data-s]').forEach(c => { if (cur ? c.dataset.s === cur : c.dataset.s === m.dataset.def) c.classList.add('pick'); c.addEventListener('click', () => { SELC[key] = c.dataset.s; moves(); }); }); });
 }
 function renderAll() { ladder(); pools(); moves(); }
 document.querySelectorAll('.poolsw button').forEach(b => b.addEventListener('click', () => { pool = b.dataset.pool; document.querySelectorAll('.poolsw button').forEach(x => x.classList.toggle('on', x===b)); moves(); }));
