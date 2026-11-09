@@ -103,3 +103,13 @@ export const CHO_TOP_DOT_UP_FINAL = 0.055
 /** 첫닿자 윗면을 내릴 양(몸 em, + = 아래). */
 export const choTopShiftOf = (f: Pick<JamoShapeFeatures, 'topDot'>, hasFinal: boolean): number =>
   (hasFinal ? CHO_TOP_DROP_FINAL : 0) - (f.topDot ? (hasFinal ? CHO_TOP_DOT_UP_FINAL : CHO_TOP_DOT_UP_NO_FINAL) : 0)
+
+/**
+ * 받침 키(2026-11-09, AI 가설 — 이용제 받침군과 겹친다: 3층 ㄹ ㅂ ㅌ · 꼭지 ㅊ ㅎ · 겹받침이 높다).
+ * 가로줄기 층이 많을수록 받침 윗면이 올라간다. 꼭지 받침은 꼭지만큼 더 솟는다.
+ * 올림(몸 em) = −0.0207 + 0.029 × 층 수 + 0.0459 × 꼭지. 받침 27개 하나 빼고 맞추기 ±0.02 안 19/27(남는 것 ㅈ ㅆ ㅀ ㄶ).
+ */
+export const JONG_RAISE_BASE = -0.0207
+export const JONG_RAISE_LAYER = 0.029
+export const JONG_RAISE_DOT = 0.0459
+export const jongRaiseOf = (f: Pick<JamoShapeFeatures, 'layers' | 'topDot'>): number => JONG_RAISE_BASE + JONG_RAISE_LAYER * f.layers + (f.topDot ? JONG_RAISE_DOT : 0)

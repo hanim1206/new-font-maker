@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import { shapeFeaturesOf } from './jamoShapeFeatures'
-import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, hasChoWall, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
+import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, jongRaiseOf, hasChoWall, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { CHO_TARGET, JUNG_TARGET } from './layoutRuleTargets'
 
 const CHO_TARGET_A_RIGHT = JUNG_TARGET['ㅏ'].right
@@ -80,5 +80,15 @@ describe('첫닿자 윗면 — 꼭지와 받침', () => {
     expect(shift('ㅎ', false)).toBeLessThan(shift('ㄱ', false) - 0.05)
     expect(shift('ㅊ', true)).toBeLessThan(shift('ㅁ', true) - 0.04)
     expect(shift('ㅁ', true)).toBeGreaterThan(shift('ㅁ', false))
+  })
+})
+
+describe('받침 키 — 가로줄기 층', () => {
+  it('ㄱ ㄴ은 1층, ㄷ ㅁ은 2층, ㄹ ㅌ은 3층이고 층이 많을수록 받침이 올라간다', () => {
+    const jong = (k: string) => shapeFeaturesOf((baseJamos as unknown as { jongseong: Record<string, JamoData> }).jongseong[k])!
+    expect(jong('ㄱ').layers).toBe(1)
+    expect(jong('ㅁ').layers).toBe(2)
+    expect(jong('ㄹ').layers).toBe(3)
+    expect(jongRaiseOf(jong('ㄹ'))).toBeGreaterThan(jongRaiseOf(jong('ㄱ')) + 0.05)
   })
 })

@@ -1,7 +1,7 @@
 import type { BoxConfig, Padding } from '../types'
 import { BRANCH_INSET_BY_PAIR, CHO_RIGHT_BY_JUNG, CHO_RIGHT_BY_PAIR, JONG_RIGHT_BY_CHO } from './layoutRuleResiduals'
 import type { JamoShapeFeatures } from './jamoShapeFeatures'
-import { CHO_TOP_DROP_NO_FINAL, TWO_STEM_CHO_NARROW, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, DOUBLE_CHO_SHIFT, PILLAR_RIGHT, RIGHT_BRANCH_OUT, TWO_STEM_FOLLOW, TWO_STEM_SPAN, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
+import { CHO_TOP_DROP_NO_FINAL, TWO_STEM_CHO_NARROW, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, jongRaiseOf, DOUBLE_CHO_SHIFT, PILLAR_RIGHT, RIGHT_BRANCH_OUT, TWO_STEM_FOLLOW, TWO_STEM_SPAN, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { BRANCH_INSET_BY_CHO, BRANCH_INSET_BY_JUNG, CHO_GAP, CHO_TARGET, CHO_TOP_BY_JONG, CHO_TOP_BY_JUNG, JONG_GAP_OFFSET, JONG_LEFT_BY_JUNG, JONG_RIGHT_BY_JUNG, JONG_TARGET, JONG_TOP_BY_CHO, JUNG_TARGET, PILLAR_BOTTOM_NO_FINAL } from './layoutRuleTargets'
 
 /**
@@ -79,6 +79,8 @@ export interface LayoutRuleParams {
   choBottomShape: boolean
   /** 표 없이 첫닿자 윗면을 받침 유무와 꼭지(`choTopShiftOf`)로 낸다 — 받침 있으면 내려오고, 꼭지 닿자는 위로 솟는다. */
   choTopShape: boolean
+  /** 표 없이 받침 윗면을 층 수와 꼭지(`jongRaiseOf`)로 올린다 — 층이 많고 꼭지가 있을수록 받침이 키가 크다. */
+  jongHeight: boolean
 }
 
 /** 공식에 쓰는 자모 생김새 특징. */
@@ -96,6 +98,7 @@ export const DEFAULT_LAYOUT_RULE_PARAMS: LayoutRuleParams = {
   choWall: false,
   choBottomShape: false,
   choTopShape: false,
+  jongHeight: false,
 }
 
 export interface LayoutRuleStep {
@@ -423,6 +426,8 @@ export function applyLayoutRules(input: {
   const liftHere = lift !== 0 && !input.jamo?.jong
   const topShift = !jamo && params.choTopShape && input.features?.cho ? choTopShiftOf(input.features.cho, !!input.jamo?.jong) : 0
   const choSides = twoStem || (!!wall && (wall.left !== 0 || wall.right !== 0)) || liftHere || topShift !== 0
+  const jongRaise = !jamo && params.jongHeight && input.features?.jong ? jongRaiseOf(input.features.jong) : 0
+  let jongTop: number | null = null
   // 첫닿자 양면 목표는 처음 잰 자리에서 한 번만 정한다(다시 맞추기 때마다 또 빼지 않게).
   let sides: { left: number; right: number; top: number; bottom: number } | null = null
   const apply = (rule: LayoutRuleId, ink: RuleInk): LayoutRuleStep | null => {
@@ -442,6 +447,13 @@ export function applyLayoutRules(input: {
     }
     if (rule === 'choTable') return applyChoTable(boxes, ink, body, jamo!, input.features?.cho ?? null, params.formulas)
     if (rule === 'jungTable') return jamo ? applyJungTable(boxes, ink, body, jamo, params.jungKinds) : (params.jungKinds || params.branchInset) && input.jamo ? applyJungKindsOnly(boxes, ink, body, input.jamo.jung, params.branchInset ? input.features?.cho ?? null : null, params.jungKinds) : null
+    if (rule === 'jongTable' && !jamo) {
+      const box = boxes.JO, jo = ink.JO
+      if (!box || !jo) return null
+      jongTop ??= jo.bounds.top - scaleY(body) * jongRaise
+      const after = fitBoxToVerticalInk(box, jo.bounds, { top: jongTop, bottom: jo.bounds.bottom })
+      return { rule: 'jongTable', part: 'JO', before: clone(box), after, limited: false, note: `받침 키 — 윗면 ${fixed(jo.bounds.top)} → ${fixed(jongTop)}` }
+    }
     if (rule === 'jongTable') return applyJongTable(boxes, ink, body, jamo!)
     if (rule === 'choBottom') return applyChoBottom(boxes, ink, body, params, jamo, lift)
     if (rule === 'pillar') return applyPillar(boxes, ink, body, params, jamo)
@@ -450,7 +462,7 @@ export function applyLayoutRules(input: {
   for (const rule of LAYOUT_RULE_ORDER) {
     if (!params.rules[rule]) continue
     if (rule === 'choTable' && !jamo && !choSides) continue
-    if (rule === 'jongTable' && !jamo) continue
+    if (rule === 'jongTable' && !jamo && jongRaise === 0) continue
     if (rule === 'jungTable' && !jamo && !((params.jungKinds || params.branchInset) && input.jamo)) continue
     if (rule === 'faces') { steps.push(...applyFaces(boxes, measure(boxes))); continue }
     if (rule === 'gap') { steps.push(...applyGap(boxes, measure(boxes), body, params, params.branchInset && !!input.jamo && LEFT_BRANCH_VOWELS.has(input.jamo.jung))); continue }
