@@ -78,19 +78,19 @@ export const LADDER_CSS = `.LL{--ink:#1d1d1f;--mute:#6e6e73;--line:#e3e3e6;--bg:
 .LL .exs div{text-align:center;font-size:11px;color:var(--mute)}
 .LL .exs b{color:var(--ink);font-size:13px}
 .LL .note{background:#eef6f0;border:1px solid #cfe6d6;border-radius:10px;padding:12px 16px;font-size:13px;margin-top:14px}
-.LL #pick{display:none;position:fixed;top:40px;right:12px;width:340px;max-height:60vh;overflow:auto;background:#fff;border:1px solid #ddd;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.16);padding:10px 12px;z-index:40}
+.LL #pick{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
 .LL #pick .ph{font-size:14px;display:flex;align-items:center;gap:4px}
 .LL #pick .ph button{margin-left:auto;border:0;background:none;font-size:15px;cursor:pointer;color:var(--mute)}
 .LL #pick .ps{font-size:11px;color:var(--mute);margin:2px 0 6px}
 .LL #pick .pt{font-size:12px;font-weight:600;margin:8px 0 4px}
-.LL #pick .pg{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+.LL #pick .pg{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 .LL #pick .pg div{text-align:center;font-size:10px;color:var(--mute)}
-.LL #pick .pg b{color:var(--ink);font-size:11px}.LL #pick svg{border-radius:6px}
+.LL #pick .pg b{color:var(--ink);font-size:13px}.LL #pick svg{border-radius:6px}
 .LL #pick .pg .hi svg{outline:2px solid #111;border-radius:6px}`
 
-export const LADDER_CSS_WORK = `.LL main{max-width:1280px}.LL .work{display:grid;grid-template-columns:400px 1fr;gap:20px;align-items:start}.LL .side{position:sticky;top:40px;max-height:calc(100vh - 52px);overflow:auto}.LL #canvas svg{background:#fff;border:1px solid var(--line);border-radius:12px;aspect-ratio:auto}.LL #canvas .edge{cursor:pointer}.LL #canvas .edge:hover .vis{opacity:.7}.LL #canvas text{font-size:7px;fill:var(--ink);pointer-events:none;font-variant-numeric:tabular-nums}.LL #canvas .pn{font-size:9px;fill:var(--mute)}.LL .ehead{display:grid;grid-template-columns:1fr 200px;gap:12px;align-items:center;margin-bottom:10px}.LL .ehead .name{font-weight:600;font-size:16px}.LL .ehead small{display:block;font-weight:400;color:var(--mute);font-size:12px}`
+export const LADDER_CSS_WORK = `.LL main{max-width:none;padding-left:24px;padding-right:24px}.LL .work{display:grid;grid-template-columns:320px minmax(480px,1fr) 440px;gap:20px;align-items:start}.LL .side{position:sticky;top:40px;max-height:calc(100vh - 52px);overflow:auto}.LL #canvas svg{background:#fff;border:1px solid var(--line);border-radius:12px;aspect-ratio:auto}.LL #canvas .edge{cursor:pointer}.LL #canvas .edge:hover .vis{opacity:.7}.LL #canvas text{font-size:7px;fill:var(--ink);pointer-events:none;font-variant-numeric:tabular-nums}.LL #canvas .pn{font-size:9px;fill:var(--mute)}.LL .ehead{display:grid;grid-template-columns:1fr 200px;gap:12px;align-items:center;margin-bottom:10px}.LL .ehead .name{font-weight:600;font-size:16px}.LL .ehead small{display:block;font-weight:400;color:var(--mute);font-size:12px}`
 
-export const LADDER_HTML = `<div id="pick"></div><main>
+export const LADDER_HTML = `<main>
 <h1>가설 사다리 — 우리 패턴으로 노토까지</h1>
 <p class="sub">"패턴만"에서 출발해 맞다고 확인된 가설을 하나씩 보탠다. 가설은 하나씩 켜고 끌 수 있고, 켠 조합으로 거리와 "아직 표가 하는 일"이 바뀐다. 목표는 표 없이 패턴만으로 파란 점을 초록(외운 표) 점까지 미는 것이다.</p>
 
@@ -102,8 +102,8 @@ export const LADDER_HTML = `<div id="pick"></div><main>
 </section>
 
 <h2>아직 표가 하는 일</h2>
-<p class="sub">지금 조합과 외운 표의 상자 차이. 왼쪽 틀에서 상자의 변을 누르면 그 변의 첫닿자 × 홀자 표가 오른쪽에 뜬다. 변의 색과 숫자는 그 변을 표가 더 옮기는 양의 가운데값(절댓값), 괄호는 "패턴만" 때. 칸을 누르면 그 줄 · 그 열 글자가 오른쪽 위 팝업에 뜬다.</p>
-<div class="work"><aside class="side"><div class="poolsw"><button data-pool="171" class="on">받침 없는 171자</button><button data-pool="588">받침 있는 588자</button></div><div id="canvas"></div></aside><section class="card" id="moves"></section></div>
+<p class="sub">지금 조합과 외운 표의 상자 차이. 왼쪽 틀에서 상자의 변을 누르면 그 변의 첫닿자 × 홀자 표가 가운데에 뜬다. 변의 색과 숫자는 그 변을 표가 더 옮기는 양의 가운데값(절댓값), 괄호는 "패턴만" 때. 칸을 누르면 그 줄 · 그 열 글자가 오른쪽 영역에 뜬다.</p>
+<div class="work"><aside class="side"><div class="poolsw"><button data-pool="171" class="on">받침 없는 171자</button><button data-pool="588">받침 있는 588자</button></div><div id="canvas"></div></aside><section class="card" id="moves"></section><aside class="side"><div id="pick"></div></aside></div>
 <div class="note">보는 법 — 한 줄 전체가 같은 색이면 "그 첫닿자는 늘 이렇다", 한 열이 같은 색이면 "그 홀자 옆에서는 늘 이렇다"는 패턴 후보다. </div>
 </main>
 `
@@ -117,10 +117,10 @@ const CHOS = [...'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'], J
 const PADV = 14;
 const SELC = {};
 let LAST = null;
-/** 고른 칸의 줄(같은 첫닿자)과 열(같은 홀자)을 오른쪽 위 고정 팝업에 띄운다. */
+/** 고른 칸의 줄(같은 첫닿자)과 열(같은 홀자)을 오른쪽 영역에 띄운다. */
 function panel() {
   const el = root.querySelector('#' + 'pick'); const pick = LAST && SELC[pool + ' ' + LAST];
-  if (!pick) { el.style.display = 'none'; return; }
+  if (!pick) { el.innerHTML = '<div class="ps">가운데 표에서 칸이나 머리(ㄱ · ㅏ …)를 누르면 그 줄 · 그 열의 글자가 여기 뜬다.</div>'; return; }
   const key = LAST; const [p, e] = key.split('.'); const mv = r => (r.moves[sel] ?? {})[key];
   const rows = D.rows.filter(r => r.pool === pool && mv(r) !== undefined);
   const mid = list => { const m = mmed(list.map(mv)); return [...list].sort((x, y) => Math.abs(mv(x) - m) - Math.abs(mv(y) - m))[0]; };
@@ -134,7 +134,7 @@ function panel() {
   if (jung) body += line(`열 — 홀자 ${jung}`, CHOS.map(c => glyph(mid(rows.filter(r => r.cho === c && r.jung === jung)), c === cho)));
   if (t === 'jong') body += line(`받침 ${a}`, [...rows.filter(r => r.jong === a)].sort((x, y) => Math.abs(mv(y)) - Math.abs(mv(x))).map(r => glyph(r, false)));
   el.innerHTML = `<div class="ph"><b>${PARTN[p]} ${EDGEN[e]}</b> · ${pool}자 · ${selName()}<button id="pickx">✕</button></div><div class="ps">초록 면 = 외운 표 · 파랑 선 = 지금 조합 · 숫자 = 표가 더 옮기는 양</div>${body}`;
-  el.style.display = 'block';
+  
   root.querySelector('#pickx').onclick = () => { delete SELC[pool + ' ' + LAST]; moves(); };
 }
 const KEYS = ['CH.left','CH.right','CH.top','CH.bottom','JU.left','JU.right','JU.top','JU.bottom','JO.left','JO.right','JO.top','JO.bottom'];
@@ -225,7 +225,7 @@ function moves() {
   let jong = '';
   if (pool === '588') { const cell = {}; for (const r of rows) if (mv(r) !== undefined) (cell[r.cho+r.jung] ??= []).push(mv(r)); const cm = Object.fromEntries(Object.entries(cell).map(([k,v]) => [k, mmed(v)]));
     jong = `<div class="scale">받침별 — 같은 첫닿자 · 홀자 칸에 받침이 더 얹는 양</div><div class="jong">${JONGS.map(k => { const v = mmed(rows.filter(r=>r.jong===k && mv(r)!==undefined).map(r=>mv(r) - cm[r.cho+r.jung])); return `<div><div class="c" data-s="jong|${k}" style="background:${col(v)}">${fmt(v)}</div>${k}</div>`; }).join('')}</div>`; }
-  box.innerHTML = `<div class="ehead"><div class="name">${PARTN[p]} ${EDGEN[e]}<small>표가 대개 ${dirOf(e, g.sgn)}으로 · 0.02 넘게 ${g.over}/${g.n} · 가운데 ${g.med.toFixed(3)}${sel>0?` (패턴만 ${g.base.toFixed(3)})`:''}</small></div><div class="mv"><div class="bar"><i style="width:${g.med/maxMed*100}%"></i>${sel>0?`<u style="left:0;width:${g.base/maxMed*100}%"></u>`:''}</div></div></div><div class="scale">첫닿자 × 홀자 · 칸을 누르면 그 줄 · 그 열이, 머리(ㄱ · ㅏ …)를 누르면 그 줄이나 열 하나가 오른쪽 위 팝업에 뜬다<i style="background:rgba(214,69,69,.7)"></i>오른쪽 · 아래<i style="background:rgba(31,79,216,.7)"></i>왼쪽 · 위</div>${heat}${jong}`;
+  box.innerHTML = `<div class="ehead"><div class="name">${PARTN[p]} ${EDGEN[e]}<small>표가 대개 ${dirOf(e, g.sgn)}으로 · 0.02 넘게 ${g.over}/${g.n} · 가운데 ${g.med.toFixed(3)}${sel>0?` (패턴만 ${g.base.toFixed(3)})`:''}</small></div><div class="mv"><div class="bar"><i style="width:${g.med/maxMed*100}%"></i>${sel>0?`<u style="left:0;width:${g.base/maxMed*100}%"></u>`:''}</div></div></div><div class="scale">첫닿자 × 홀자 · 칸을 누르면 그 줄 · 그 열이, 머리(ㄱ · ㅏ …)를 누르면 그 줄이나 열 하나가 오른쪽 영역에 뜬다<i style="background:rgba(214,69,69,.7)"></i>오른쪽 · 아래<i style="background:rgba(31,79,216,.7)"></i>왼쪽 · 위</div>${heat}${jong}`;
   const key = pool + ' ' + EDGE; const cur = SELC[key];
   box.querySelectorAll('[data-s]').forEach(c => { if (cur === c.dataset.s) c.classList.add('pick');
     const [ct, cc, cj] = c.dataset.s.split('|'); const [pt, pa, pb] = (cur ?? '').split('|');
