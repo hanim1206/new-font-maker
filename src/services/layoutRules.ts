@@ -1,7 +1,7 @@
 import type { BoxConfig, Padding } from '../types'
 import { BRANCH_INSET_BY_PAIR, CHO_RIGHT_BY_JUNG, CHO_RIGHT_BY_PAIR, JONG_RIGHT_BY_CHO } from './layoutRuleResiduals'
 import type { JamoShapeFeatures } from './jamoShapeFeatures'
-import { CHO_TOP_DROP_NO_FINAL, TWO_STEM_CHO_NARROW, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, jongRaiseOf, pillarDiveOf, DOUBLE_CHO_SHIFT, PILLAR_RIGHT, RIGHT_BRANCH_OUT, TWO_STEM_FOLLOW, TWO_STEM_SPAN, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
+import { CHO_TOP_DROP_NO_FINAL, TWO_STEM_CHO_NARROW, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, jongRaiseOf, jongSideInsetOf, pillarDiveOf, DOUBLE_CHO_SHIFT, PILLAR_RIGHT, RIGHT_BRANCH_OUT, TWO_STEM_FOLLOW, TWO_STEM_SPAN, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { BRANCH_INSET_BY_CHO, BRANCH_INSET_BY_JUNG, CHO_GAP, CHO_TARGET, CHO_TOP_BY_JONG, CHO_TOP_BY_JUNG, JONG_GAP_OFFSET, JONG_LEFT_BY_JUNG, JONG_RIGHT_BY_JUNG, JONG_TARGET, JONG_TOP_BY_CHO, JUNG_TARGET, PILLAR_BOTTOM_NO_FINAL } from './layoutRuleTargets'
 
 /**
@@ -83,6 +83,8 @@ export interface LayoutRuleParams {
   jongHeight: boolean
   /** 표 없이 받침 오른쪽 위가 비면 홀자 기둥을 그 빈 자리로 내린다(`pillarDiveOf`). */
   pillarDive: boolean
+  /** 표 없이 받침 양옆을 세로벽 막힘(`jongSideInsetOf`)대로 들인다 — 벽 쪽일수록 안으로. */
+  jongWall: boolean
 }
 
 /** 공식에 쓰는 자모 생김새 특징. */
@@ -102,6 +104,7 @@ export const DEFAULT_LAYOUT_RULE_PARAMS: LayoutRuleParams = {
   choTopShape: false,
   jongHeight: false,
   pillarDive: false,
+  jongWall: false,
 }
 
 export interface LayoutRuleStep {
@@ -430,7 +433,10 @@ export function applyLayoutRules(input: {
   const topShift = !jamo && params.choTopShape && input.features?.cho ? choTopShiftOf(input.features.cho, !!input.jamo?.jong) : 0
   const choSides = twoStem || (!!wall && (wall.left !== 0 || wall.right !== 0)) || liftHere || topShift !== 0
   const jongRaise = !jamo && params.jongHeight && input.features?.jong ? jongRaiseOf(input.features.jong) : 0
+  const jongSides = !jamo && params.jongWall && input.jamo?.jong && input.features?.jong ? jongSideInsetOf(input.jamo.jong, input.features.jong) : null
+  const jongShape = jongRaise !== 0 || (!!jongSides && (jongSides.left !== 0 || jongSides.right !== 0))
   let jongTop: number | null = null
+  let jongLR: { left: number; right: number } | null = null
   // 첫닿자 양면 목표는 처음 잰 자리에서 한 번만 정한다(다시 맞추기 때마다 또 빼지 않게).
   let sides: { left: number; right: number; top: number; bottom: number } | null = null
   const apply = (rule: LayoutRuleId, ink: RuleInk): LayoutRuleStep | null => {
@@ -454,8 +460,10 @@ export function applyLayoutRules(input: {
       const box = boxes.JO, jo = ink.JO
       if (!box || !jo) return null
       jongTop ??= jo.bounds.top - scaleY(body) * jongRaise
-      const after = fitBoxToVerticalInk(box, jo.bounds, { top: jongTop, bottom: jo.bounds.bottom })
-      return { rule: 'jongTable', part: 'JO', before: clone(box), after, limited: false, note: `받침 키 — 윗면 ${fixed(jo.bounds.top)} → ${fixed(jongTop)}` }
+      jongLR ??= { left: jo.bounds.left + scaleX(body) * (jongSides?.left ?? 0), right: jo.bounds.right - scaleX(body) * (jongSides?.right ?? 0) }
+      const tall = jongRaise !== 0 ? fitBoxToVerticalInk(box, jo.bounds, { top: jongTop, bottom: jo.bounds.bottom }) : box
+      const after = jongSides ? fitBoxToHorizontalInk(tall, jo.bounds, jongLR) : tall
+      return { rule: 'jongTable', part: 'JO', before: clone(box), after, limited: false, note: `받침 생김새 — 윗면 ${fixed(jo.bounds.top)} → ${fixed(jongTop)}${jongSides ? `, 가로 ${fixed(jo.bounds.left)}~${fixed(jo.bounds.right)} → ${fixed(jongLR.left)}~${fixed(jongLR.right)}` : ''}` }
     }
     if (rule === 'jongTable') return applyJongTable(boxes, ink, body, jamo!)
     if (rule === 'choBottom') return applyChoBottom(boxes, ink, body, params, jamo, lift)
@@ -465,7 +473,7 @@ export function applyLayoutRules(input: {
   for (const rule of LAYOUT_RULE_ORDER) {
     if (!params.rules[rule]) continue
     if (rule === 'choTable' && !jamo && !choSides) continue
-    if (rule === 'jongTable' && !jamo && jongRaise === 0) continue
+    if (rule === 'jongTable' && !jamo && !jongShape) continue
     if (rule === 'jungTable' && !jamo && !((params.jungKinds || params.branchInset) && input.jamo)) continue
     if (rule === 'faces') { steps.push(...applyFaces(boxes, measure(boxes))); continue }
     if (rule === 'gap') { steps.push(...applyGap(boxes, measure(boxes), body, params, params.branchInset && !!input.jamo && LEFT_BRANCH_VOWELS.has(input.jamo.jung))); continue }

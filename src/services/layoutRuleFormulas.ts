@@ -121,3 +121,17 @@ export const jongRaiseOf = (f: Pick<JamoShapeFeatures, 'layers' | 'topDot'>): nu
  */
 export const PILLAR_DIVE = 0.13
 export const pillarDiveOf = (jong: Pick<JamoShapeFeatures, 'rightTop'>): number => PILLAR_DIVE * jong.rightTop
+
+/**
+ * 받침 세로벽(2026-11-09, AI 가설 — 가설 4 "세로벽 있는 첫닿자는 좁게"를 받침에 옮긴 꼴).
+ * 받침 한쪽이 세로줄기로 막혀 있을수록 노토는 그쪽을 안으로 들인다. 들임(몸 em, +면 안쪽) = 0.057 × 막힘 − 0.01, 양쪽 따로.
+ * 홑받침 14개 맞추기: 왼면 ±0.02 안 11/14, 오른면 8/14(ㄱ ㅋ ㄷ 0.03쯤 덜 들어감 · ㄹ ㅂ ㅈ ㅊ 0.03쯤 더 들어감).
+ * 겹받침과 쌍받침은 두 자모를 나란히 놓은 꼴이라 벽 모양으로 읽히지 않아 아직 건드리지 않는다.
+ */
+export const JONG_WALL_SLOPE = 0.057
+export const JONG_WALL_BASE = -0.01
+const SINGLE_JONG = new Set([...'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ'])
+export function jongSideInsetOf(jong: string, f: Pick<JamoShapeFeatures, 'leftClosed' | 'rightClosed'>): { left: number; right: number } {
+  if (!SINGLE_JONG.has(jong)) return { left: 0, right: 0 }
+  return { left: JONG_WALL_BASE + JONG_WALL_SLOPE * f.leftClosed, right: JONG_WALL_BASE + JONG_WALL_SLOPE * f.rightClosed }
+}
