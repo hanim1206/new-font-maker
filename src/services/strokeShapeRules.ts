@@ -262,10 +262,13 @@ export const COMPOUND_JONG_PARTS: Readonly<Record<string, readonly [string, stri
   'ㄽ': ['ㄹ', 'ㅅ'], 'ㄾ': ['ㄹ', 'ㅌ'], 'ㄿ': ['ㄹ', 'ㅍ'], 'ㅀ': ['ㄹ', 'ㅎ'], 'ㅄ': ['ㅂ', 'ㅅ'],
 }
 
-/** 섞임받침 → [왼 자모 상자, 오른 자모 상자]. 값은 `scripts/layout-rules/measure-compound-jong.ts`로 노토 xor가 가장 작은 곳을 찾은 것. 표에 없는 섞임받침은 그대로 그린다. */
-export const COMPOUND_JONG_BOXES: Record<string, readonly [SubBox, SubBox]> = {
-  'ㄶ': [{ x0: 0.02, y0: 0.155, x1: 0.373, y1: 0.903 }, { x0: 0.393, y0: 0.12, x1: 1, y1: 1.012 }],
-  'ㅀ': [{ x0: -0.02, y0: 0.1, x1: 0.4, y1: 0.96 }, { x0: 0.48, y0: 0.01, x1: 1.03, y1: 1.03 }],
+/**
+ * 섞임받침 → [왼 자모 상자, 오른 자모 상자, (있으면) 오른 자모 동그라미 상자]. 값은 `scripts/layout-rules/measure-compound-jong.ts`로 노토 xor가 가장 작은 곳을 찾은 것. 표에 없는 섞임받침은 그대로 그린다.
+ * ㅎ은 노토가 섞임받침 안에서 머리(꼭지 · 가로줄기)를 높고 넓게, 동그라미는 작게 쓴다 — 한 상자로 함께 줄이면 안 맞아 동그라미 상자를 따로 둔다.
+ */
+export const COMPOUND_JONG_BOXES: Record<string, readonly SubBox[]> = {
+  'ㄶ': [{ x0: 0.025, y0: 0.15, x1: 0.373, y1: 0.903 }, { x0: 0.341, y0: 0.037, x1: 1, y1: 1.224 }, { x0: 0.386, y0: 0.255, x1: 0.963, y1: 1 }],
+  'ㅀ': [{ x0: -0.02, y0: 0.1, x1: 0.4, y1: 0.96 }, { x0: 0.458, y0: -0.005, x1: 1.06, y1: 1.03 }, { x0: 0.472, y0: 0.138, x1: 1.038, y1: 1.008 }],
   'ㅄ': [{ x0: 0.034, y0: 0, x1: 0.428, y1: 0.958 }, { x0: 0.497, y0: -0.01, x1: 1.005, y1: 0.97 }],
   // ㄺ ㄻ ㄼ ㄽ ㄾ ㄿ는 홑받침 둘로 그려도 홀드아웃에서 나아지지 않아(손그림이 이미 노토와 가깝다) 그대로 둔다.
   // ㄳ ㄵ도 홀드아웃은 나아졌지만 588에서 섞였다(ㄵ은 치킴 붙은 손그림이 더 가깝다). 그대로 둔다.
@@ -277,12 +280,15 @@ const placePoint = (point: PathPoint, box: SubBox): PathPoint => {
 }
 
 /** 홑받침 둘을 작은 상자에 넣어 섞임받침 획을 만든다. 획 id는 `ㅀ종:ㄹ종-1`처럼 섞임받침 이름을 앞에 붙인다. */
-export function compoundJongStrokes(compound: string, parts: readonly [DeepReadonlyJamo, DeepReadonlyJamo], boxes: readonly [SubBox, SubBox]): StrokeDataV2[] {
-  return parts.flatMap((part, index) => (part.strokes ?? []).map((stroke) => ({
-    ...(structuredClone(stroke) as StrokeDataV2),
-    id: `${compound}종:${stroke.id}`,
-    points: stroke.points.map((point) => placePoint(structuredClone(point) as PathPoint, boxes[index])),
-  })))
+export function compoundJongStrokes(compound: string, parts: readonly [DeepReadonlyJamo, DeepReadonlyJamo], boxes: readonly SubBox[]): StrokeDataV2[] {
+  return parts.flatMap((part, index) => (part.strokes ?? []).map((stroke) => {
+    const box = index === 1 && stroke.closed && boxes[2] ? boxes[2] : boxes[index]
+    return {
+      ...(structuredClone(stroke) as StrokeDataV2),
+      id: `${compound}종:${stroke.id}`,
+      points: stroke.points.map((point) => placePoint(structuredClone(point) as PathPoint, box)),
+    }
+  }))
 }
 
 type DeepReadonlyJamo = Pick<JamoData, 'strokes'>
