@@ -14,10 +14,14 @@ export interface StrokeShapeParams {
   giyeokSweep: boolean
   /** ㄴ ㄷ ㄸ ㄹ ㅌ ㅍ 맨 아래 가로줄기를 오른쪽으로 빼며 치켜 올린다. */
   bottomKick: boolean
+  /** ㅈ ㅊ ㅉ 삐침 · 내림 끝을 바깥으로 더 휘어 뺀다. */
+  tailSweep: boolean
+  /** 섞임받침을 홑받침 둘로 다시 그린다(받침 상자 안 작은 상자 둘). */
+  compoundJong: boolean
 }
 
-export const STROKE_SHAPES_OFF: StrokeShapeParams = { giyeokSweep: false, bottomKick: false }
-export const DEFAULT_STROKE_SHAPE_PARAMS: StrokeShapeParams = { giyeokSweep: true, bottomKick: true }
+export const STROKE_SHAPES_OFF: StrokeShapeParams = { giyeokSweep: false, bottomKick: false, tailSweep: false, compoundJong: false }
+export const DEFAULT_STROKE_SHAPE_PARAMS: StrokeShapeParams = { giyeokSweep: true, bottomKick: true, tailSweep: true, compoundJong: true }
 
 /** 꼴 규칙을 쓰는 홀자 — 오른홀자 아홉. 아래홀자 옆에서는 노토도 꺾어 내리고 평평하게 맺는다(아직 안 잼). */
 export const SWEEP_VOWELS: readonly string[] = ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅣ']
@@ -183,6 +187,106 @@ const kickStrokesWith = (table: Readonly<Record<string, KickShape>>) => (strokes
   return changed ? next : null
 }
 
+/**
+ * 셋째 규칙 — ㅈ ㅊ ㅉ 꼬리 휨: 가운데 벌어짐은 노토와 같지만, 노토는 아래로 갈수록 왼 삐침 끝을 더 왼쪽으로, 오른 내림 끝을 더 오른쪽으로 휘어 뺀다.
+ * 손잡이 하나짜리 곡선(머리 → 맺음)의 맺음을 (dx, dy)만큼 옮기고 머리 쪽 손잡이를 가로로 hx만큼 옮겨 휨을 바꾼다. 값은 자모 틀 기준 비율이다.
+ */
+export interface TailShape {
+  dx: number
+  dy: number
+  hx: number
+}
+
+/** 홀자 무리 → 획 id → 꼴. 값은 `scripts/layout-rules/measure-tail-sweep.ts`로 노토 xor가 가장 작은 곳을 찾은 것. */
+export const TAIL_SHAPES: Record<'right' | 'left' | 'i', Record<string, TailShape>> = {
+  right: {
+    'ㅈ-left': { dx: -0.02, dy: 0, hx: 0.05 }, 'ㅈ-right': { dx: 0.04, dy: 0, hx: -0.05 },
+    'ㅊ-left': { dx: -0.04, dy: 0, hx: 0.05 }, 'ㅊ-right': { dx: 0.04, dy: 0, hx: 0 },
+    // ㅉ 둘째 ㅈ의 내림은 노토가 훨씬 길게 끌어내린다.
+    'ㅉ-1l': { dx: -0.06, dy: 0, hx: 0.05 }, 'ㅉ-2r': { dx: 0.06, dy: 0.16, hx: -0.1 },
+  },
+  left: {
+    'ㅈ-left': { dx: -0.02, dy: 0, hx: 0.05 }, 'ㅈ-right': { dx: 0.06, dy: 0, hx: -0.05 },
+    'ㅊ-left': { dx: -0.04, dy: 0, hx: 0.1 }, 'ㅊ-right': { dx: 0.02, dy: 0, hx: 0 },
+    'ㅉ-1l': { dx: -0.04, dy: 0, hx: 0.05 }, 'ㅉ-2r': { dx: 0.06, dy: 0.16, hx: -0.1 },
+  },
+  // ㅣ 옆은 왼 삐침 끝은 그대로 두고 손잡이만 밀어 더 둥글게, 오른 내림은 가장 많이 뺀다.
+  i: {
+    'ㅈ-left': { dx: 0, dy: 0, hx: 0.1 }, 'ㅈ-right': { dx: 0.08, dy: 0, hx: 0 },
+    'ㅊ-left': { dx: -0.02, dy: 0, hx: 0.15 }, 'ㅊ-right': { dx: 0.06, dy: 0, hx: 0.05 },
+    'ㅉ-1l': { dx: -0.04, dy: 0.04, hx: 0.05 }, 'ㅉ-2r': { dx: 0.06, dy: 0.16, hx: -0.05 },
+  },
+}
+
+export const tailGroupOf = (jung: string): keyof typeof TAIL_SHAPES | null =>
+  ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ'].includes(jung) ? 'right' : LEFT_BRANCH_KICK_VOWELS.includes(jung) ? 'left' : jung === 'ㅣ' ? 'i' : null
+
+/** 두 점 곡선(머리에만 손잡이, 맺음은 맨 점)만 바꾼다. */
+export function tailStroke(stroke: StrokeDataV2, shape: TailShape): StrokeDataV2 | null {
+  const [head, tail] = stroke.points
+  if (stroke.points.length !== 2 || stroke.closed || !head.handleOut || head.handleIn || !plainPoint(tail)) return null
+  return {
+    ...stroke,
+    points: [
+      { ...head, handleOut: { x: head.handleOut.x + shape.hx, y: head.handleOut.y } },
+      { x: tail.x + shape.dx, y: tail.y + shape.dy },
+    ],
+  }
+}
+
+const tailStrokesWith = (table: Readonly<Record<string, TailShape>>) => (strokes: readonly StrokeDataV2[]): StrokeDataV2[] | null => {
+  let changed = false
+  const next = strokes.map((stroke) => {
+    const shape = table[stroke.id]
+    const moved = shape ? tailStroke(stroke, shape) : null
+    if (moved) changed = true
+    return moved ?? stroke
+  })
+  return changed ? next : null
+}
+
+/**
+ * 넷째 규칙 — 섞임받침을 홑받침 둘로: baseJamos의 섞임받침은 한 벌씩 따로 그려 있어 홑받침과 꼴이 따로 논다(ㅀ의 ㅎ 동그라미가 넓어 ㄹ을 파고든다).
+ * 받침 상자 안을 작은 상자 둘로 가르고, 그 안에 홑받침 획을 그대로 줄여 넣는다. 작은 상자는 섞임받침 틀(0~1) 기준이다.
+ * 획 굵기는 문맥별로 고정이라 줄여도 그대로다. 원래 획을 틀로 굳히므로 받침 상자 맞춤은 바뀌지 않는다.
+ */
+export interface SubBox {
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+}
+
+export const COMPOUND_JONG_PARTS: Readonly<Record<string, readonly [string, string]>> = {
+  'ㄳ': ['ㄱ', 'ㅅ'], 'ㄵ': ['ㄴ', 'ㅈ'], 'ㄶ': ['ㄴ', 'ㅎ'], 'ㄺ': ['ㄹ', 'ㄱ'], 'ㄻ': ['ㄹ', 'ㅁ'], 'ㄼ': ['ㄹ', 'ㅂ'],
+  'ㄽ': ['ㄹ', 'ㅅ'], 'ㄾ': ['ㄹ', 'ㅌ'], 'ㄿ': ['ㄹ', 'ㅍ'], 'ㅀ': ['ㄹ', 'ㅎ'], 'ㅄ': ['ㅂ', 'ㅅ'],
+}
+
+/** 섞임받침 → [왼 자모 상자, 오른 자모 상자]. 값은 `scripts/layout-rules/measure-compound-jong.ts`로 노토 xor가 가장 작은 곳을 찾은 것. 표에 없는 섞임받침은 그대로 그린다. */
+export const COMPOUND_JONG_BOXES: Record<string, readonly [SubBox, SubBox]> = {
+  'ㄶ': [{ x0: 0.02, y0: 0.155, x1: 0.373, y1: 0.903 }, { x0: 0.393, y0: 0.12, x1: 1, y1: 1.012 }],
+  'ㅀ': [{ x0: -0.02, y0: 0.1, x1: 0.4, y1: 0.96 }, { x0: 0.48, y0: 0.01, x1: 1.03, y1: 1.03 }],
+  'ㅄ': [{ x0: 0.034, y0: 0, x1: 0.428, y1: 0.958 }, { x0: 0.497, y0: -0.01, x1: 1.005, y1: 0.97 }],
+  // ㄺ ㄻ ㄼ ㄽ ㄾ ㄿ는 홑받침 둘로 그려도 홀드아웃에서 나아지지 않아(손그림이 이미 노토와 가깝다) 그대로 둔다.
+  // ㄳ ㄵ도 홀드아웃은 나아졌지만 588에서 섞였다(ㄵ은 치킴 붙은 손그림이 더 가깝다). 그대로 둔다.
+}
+
+const placePoint = (point: PathPoint, box: SubBox): PathPoint => {
+  const at = (p: { x: number; y: number }) => ({ x: box.x0 + p.x * (box.x1 - box.x0), y: box.y0 + p.y * (box.y1 - box.y0) })
+  return { ...point, ...at(point), ...(point.handleIn ? { handleIn: at(point.handleIn) } : {}), ...(point.handleOut ? { handleOut: at(point.handleOut) } : {}) }
+}
+
+/** 홑받침 둘을 작은 상자에 넣어 섞임받침 획을 만든다. 획 id는 `ㅀ종:ㄹ종-1`처럼 섞임받침 이름을 앞에 붙인다. */
+export function compoundJongStrokes(compound: string, parts: readonly [DeepReadonlyJamo, DeepReadonlyJamo], boxes: readonly [SubBox, SubBox]): StrokeDataV2[] {
+  return parts.flatMap((part, index) => (part.strokes ?? []).map((stroke) => ({
+    ...(structuredClone(stroke) as StrokeDataV2),
+    id: `${compound}종:${stroke.id}`,
+    points: stroke.points.map((point) => placePoint(structuredClone(point) as PathPoint, boxes[index])),
+  })))
+}
+
+type DeepReadonlyJamo = Pick<JamoData, 'strokes'>
+
 function mapJamoStrokes(jamo: JamoData, change: (strokes: readonly StrokeDataV2[]) => StrokeDataV2[] | null): JamoData {
   const strokes = jamo.strokes ? change(jamo.strokes) : null
   let contextStrokes = jamo.contextStrokes
@@ -195,7 +299,18 @@ function mapJamoStrokes(jamo: JamoData, change: (strokes: readonly StrokeDataV2[
 }
 
 /** 그릴 음절에 획 꼴 규칙을 입힌다. 바뀐 것이 없으면 받은 음절을 그대로 돌려준다. */
-export function applyStrokeShapeRules(syllable: DecomposedSyllable, params: StrokeShapeParams): DecomposedSyllable {
+export function applyStrokeShapeRules(syllable: DecomposedSyllable, params: StrokeShapeParams, jongJamos?: Readonly<Record<string, Pick<JamoData, 'strokes'>>>): DecomposedSyllable {
+  if (params.compoundJong && jongJamos && syllable.jongseong) {
+    const jong = syllable.jongseong
+    const parts = COMPOUND_JONG_PARTS[jong.char]
+    const boxes = COMPOUND_JONG_BOXES[jong.char]
+    const left = parts && jongJamos[parts[0]], right = parts && jongJamos[parts[1]]
+    if (parts && boxes && left?.strokes && right?.strokes) {
+      const rebuilt = withFrameFrom({ ...jong, strokes: compoundJongStrokes(jong.char, [left, right], boxes) }, jong)
+      delete rebuilt.contextStrokes
+      syllable = { ...syllable, jongseong: rebuilt }
+    }
+  }
   if (!syllable.choseong || !syllable.jungseong || !SWEEP_VOWELS.includes(syllable.jungseong.char)) return syllable
   let choseong = syllable.choseong
   if (params.giyeokSweep) choseong = mapJamoStrokes(choseong, sweepStrokes)
@@ -203,6 +318,8 @@ export function applyStrokeShapeRules(syllable: DecomposedSyllable, params: Stro
   const jung = syllable.jungseong.char
   if (params.bottomKick && KICK_VOWELS.includes(jung)) choseong = mapJamoStrokes(choseong, kickStrokesWith(BOTTOM_KICK_SHAPES))
   if (params.bottomKick && LEFT_BRANCH_KICK_VOWELS.includes(jung)) choseong = mapJamoStrokes(choseong, kickStrokesWith(BOTTOM_KICK_SHAPES_LEFT_BRANCH))
+  const tailGroup = tailGroupOf(jung)
+  if (params.tailSweep && tailGroup) choseong = mapJamoStrokes(choseong, tailStrokesWith(TAIL_SHAPES[tailGroup]))
   const jongseong = params.bottomKick && syllable.jongseong ? mapJamoStrokes(syllable.jongseong, kickStrokesWith(JONG_KICK_SHAPES)) : syllable.jongseong
   return choseong === syllable.choseong && jongseong === syllable.jongseong ? syllable : { ...syllable, choseong, jongseong }
 }

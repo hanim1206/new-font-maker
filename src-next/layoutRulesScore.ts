@@ -238,7 +238,7 @@ export function scoreGlyph(input: ScoreInput): ScoredGlyph {
   const ruled = applyLayoutRules({ boxes: snap(schemaBoxes), body: bodyOfPadding(START_PADDING), params, measure: (boxes) => plainMeasure(snap(boxes)), jamo })
   if (input.snapStems && modelBoxes?.JU?.stems && ruled.boxes.JU) ruled.boxes.JU = { ...ruled.boxes.JU, stems: railsInBox(modelBoxes.JU, ruled.boxes.JU) }
   // 자리는 원래 꼴로 정하고, 그림만 꼴 규칙을 입혀 그린다.
-  const drawn = applyStrokeShapeRules(syllable, input.shapes ?? STROKE_SHAPES_OFF)
+  const drawn = applyStrokeShapeRules(syllable, input.shapes ?? STROKE_SHAPES_OFF, input.maps.jongseong)
   const ruleXor = xorOf(drawn, { kind: 'boxes', boxes: ruled.boxes }, style, ghost.regions)
   if ('message' in ruleXor) return failed(ruleXor.message)
 

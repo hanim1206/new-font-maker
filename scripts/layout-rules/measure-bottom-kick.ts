@@ -33,7 +33,7 @@ const outlineOf = (cp: number) => {
 const JUNG_CODE: Record<string, number> = { 'ㅏ': 0, 'ㅐ': 1, 'ㅑ': 2, 'ㅒ': 3, 'ㅓ': 4, 'ㅔ': 5, 'ㅕ': 6, 'ㅖ': 7, 'ㅣ': 20 }
 const RIGHT = ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅣ'], LEFT = ['ㅓ', 'ㅔ', 'ㅕ', 'ㅖ']
 const compose = (cho: string, jung: string, jong: number) => String.fromCodePoint(0xac00 + ((CHOSEONG_LIST as readonly string[]).indexOf(cho) * 21 + JUNG_CODE[jung]) * 28 + jong)
-const SHAPES = { giyeokSweep: false, bottomKick: true }
+const SHAPES = { giyeokSweep: false, bottomKick: true, tailSweep: false }
 
 interface Group { name: string; table: Record<string, KickShape>; strokeId: string; chars: string[]; reaches: number[]; rises: number[] }
 const choChars = (cho: string, vowels: string[]) => vowels.flatMap((jung) => [0, 4, 8, 16, 21].map((jong) => compose(cho, jung, jong)))
