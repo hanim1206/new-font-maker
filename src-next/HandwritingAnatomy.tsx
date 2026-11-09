@@ -199,17 +199,20 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
 
 /**
  * 목록 차례: 머리 · 맺음은 자기 줄기(마디) 바로 아래에 들여 쓴다 — 줄기 없이 있을 수 없는 부분이라서.
- * 꺾임은 두 마디를 잇는 부분이라 줄기와 같은 높이에 둔다. 번호는 쓰는 차례 그대로.
+ * 꺾임은 두 마디를 잇는 부분이라 줄기와 같은 높이에 둔다. 번호는 줄기 · 꺾임이 1, 2, 3…, 딸린 부분은 1-1, 1-2.
  */
-function listOrder(items: AnatomyItem[]): { it: AnatomyItem; sub: boolean }[] {
-  const out: { it: AnatomyItem; sub: boolean }[] = []
+function listOrder(items: AnatomyItem[]): { it: AnatomyItem; sub: boolean; tag: string }[] {
+  const out: { it: AnatomyItem; sub: boolean; tag: string }[] = []
+  let top = 0
   items.forEach((it, i) => {
     if (it.kind === 'head' || it.kind === 'tail') return
-    out.push({ it, sub: false })
+    top += 1
+    out.push({ it, sub: false, tag: `${top}` })
     if (it.kind !== 'segment') return
     const before = items[i - 1], after = items[i + 1]
-    if (before?.kind === 'head' && before.strokeId === it.strokeId) out.push({ it: before, sub: true })
-    if (after?.kind === 'tail' && after.strokeId === it.strokeId) out.push({ it: after, sub: true })
+    let k = 0
+    if (before?.kind === 'head' && before.strokeId === it.strokeId) out.push({ it: before, sub: true, tag: `${top}-${++k}` })
+    if (after?.kind === 'tail' && after.strokeId === it.strokeId) out.push({ it: after, sub: true, tag: `${top}-${++k}` })
   })
   return out
 }
@@ -322,6 +325,8 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
 
   const active = slots.find((s) => s.slot === slot) ?? null
   const hotItem = active?.items.find((it) => it.n === hot) ?? null
+  const ordered = useMemo(() => (active ? listOrder(active.items) : []), [active])
+  const tagOf = new Map(ordered.map((o) => [o.it.n, o.tag]))
   // 형태 층으로 넓히기는 나중에 획을 바꾸고 전파 범위를 고를 때 꺼낸다(사용자 11-09). 지금은 기능 층만.
   const scope = hotItem ? hotItem.scope.fn : null
   useEffect(() => { onScope?.(scope) }, [scope?.key]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -346,10 +351,10 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
           {slots.flatMap((s) => s.prims.map((p, i) => <path key={`hit-${s.slot}-${i}`} d={pointsToSvgD(p.stroke.points, p.stroke.closed, p.box, V)} fill="none" stroke="transparent" strokeWidth={9}
             pointerEvents="stroke" className={styles.hit} data-testid={`handwriting-anatomy-${s.slot}`} onClick={(e) => { e.stopPropagation(); if (slot !== s.slot) pick(s.slot) }} />))}
           {hotItem?.line && <polyline points={hotItem.line.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={0.6} strokeDasharray="1.5 1" pointerEvents="none" />}
-          {active?.items.map((it) => <g key={it.n} className={styles.mark} onClick={(e) => { e.stopPropagation(); setHot(hot === it.n ? null : it.n) }}>
-            <circle cx={it.at.x} cy={it.at.y} r={hot === it.n ? 3.6 : 3} fill={hot === it.n ? EDIT_COLOR.foreground : SLOT_COLOR[active.slot]} stroke={EDIT_COLOR.surface} strokeWidth={0.5} />
-            <text x={it.at.x} y={it.at.y + 1.25} fontSize={3.4} fontWeight={700} textAnchor="middle" fill={EDIT_COLOR.surface}>{it.n}</text>
-          </g>)}
+          {active?.items.map((it) => { const tag = tagOf.get(it.n) ?? `${it.n}`; const long = tag.length > 2; return <g key={it.n} className={styles.mark} onClick={(e) => { e.stopPropagation(); setHot(hot === it.n ? null : it.n) }}>
+            <circle cx={it.at.x} cy={it.at.y} r={(hot === it.n ? 3.6 : 3) + (long ? 0.6 : 0)} fill={hot === it.n ? EDIT_COLOR.foreground : SLOT_COLOR[active.slot]} stroke={EDIT_COLOR.surface} strokeWidth={0.5} />
+            <text x={it.at.x} y={it.at.y + 1.25} fontSize={long ? 2.5 : 3.4} fontWeight={700} textAnchor="middle" fill={EDIT_COLOR.surface}>{tag}</text>
+          </g> })}
         </SvgRenderer>
       </div>
       {scope && <div className={styles.scope} data-testid="handwriting-anatomy-scope">
@@ -365,9 +370,9 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
           <i aria-hidden="true" /><b>{SLOT_NAME[active.slot]} {active.jamo.char}</b>{active.slot === 'JU' && <small>{vowelKind(active.jamo.char)}</small>}
         </div>}
         {active && <ol className={styles.rows}>
-          {listOrder(active.items).map(({ it, sub }) => <li key={it.n} className={sub ? styles.sub : undefined}>
+          {ordered.map(({ it, sub, tag }) => <li key={it.n} className={sub ? styles.sub : undefined}>
             <button type="button" className={`${styles.row}${hot === it.n ? ` ${styles.rowOn}` : ''}`} style={{ ['--slot' as string]: `var(${SLOT_VAR[active.slot]})` }} onClick={() => setHot(hot === it.n ? null : it.n)}>
-              <span className={styles.n}>{it.n}</span><b>{it.label}</b><small>{it.note}</small><code>{it.strokeId}</code>
+              <span className={styles.n}>{tag}</span><b>{it.label}</b><small>{it.note}</small><code>{it.strokeId}</code>
               {!sub && <span className={styles.attrs}>{it.attrs.map((a) => <em key={a}>{a}</em>)}</span>}
             </button>
           </li>)}
