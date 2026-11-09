@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import type { JamoData } from '../types'
 import { decomposeSyllable } from '../utils/hangulUtils'
-import { applyStrokeShapeRules, GIYEOK_SWEEP_SHAPES, STROKE_SHAPES_OFF, sweepStroke, sweepXAt } from './strokeShapeRules'
+import { applyStrokeShapeRules, BOTTOM_KICK_SHAPES, GIYEOK_SWEEP_SHAPES, kickStroke, STROKE_SHAPES_OFF, sweepStroke, sweepXAt } from './strokeShapeRules'
 
 const maps = baseJamos as unknown as { choseong: Record<string, JamoData>; jungseong: Record<string, JamoData>; jongseong: Record<string, JamoData> }
 const syllableOf = (char: string) => decomposeSyllable(char, maps.choseong, maps.jungseong, maps.jongseong)
-const ON = { giyeokSweep: true }
+const ON = { giyeokSweep: true, bottomKick: true }
 
 describe('획 꼴 규칙 — ㄱ 삐침', () => {
   it('오른홀자 옆 ㄱ은 꺾임에서 왼쪽 아래로 휘어 내린다', () => {
@@ -27,7 +27,7 @@ describe('획 꼴 규칙 — ㄱ 삐침', () => {
   })
 
   it('끄거나 아래홀자 · 다른 닿자면 음절을 그대로 돌려준다', () => {
-    for (const [char, params] of [['가', STROKE_SHAPES_OFF], ['고', ON], ['구', ON], ['나', ON]] as const) {
+    for (const [char, params] of [['가', STROKE_SHAPES_OFF], ['고', ON], ['구', ON], ['마', ON], ['노', ON]] as const) {
       const syllable = syllableOf(char)
       expect(applyStrokeShapeRules(syllable, params)).toBe(syllable)
     }
@@ -50,5 +50,34 @@ describe('획 꼴 규칙 — ㄱ 삐침', () => {
     const stroke = maps.choseong['ㄱ'].strokes![0]
     expect(sweepStroke({ ...stroke, points: [...stroke.points, { x: 0.5, y: 1 }] }, GIYEOK_SWEEP_SHAPES['ㄱ-1'])).toBeNull()
     expect(sweepStroke({ ...stroke, points: [stroke.points[0], { ...stroke.points[1], handleOut: { x: 1, y: 0.2 } }, stroke.points[2]] }, GIYEOK_SWEEP_SHAPES['ㄱ-1'])).toBeNull()
+  })
+})
+
+describe('획 꼴 규칙 — 맨 아래 가로줄기 치킴', () => {
+  it('ㅏ 옆 ㄹ은 마지막 토막만 오른쪽으로 빼고 끝을 올린다', () => {
+    const before = maps.choseong['ㄹ'].strokes![0].points
+    const after = applyStrokeShapeRules(syllableOf('라'), ON).choseong!.strokes![0].points
+    expect(after.slice(0, -1)).toEqual(before.slice(0, -1))
+    const end = after[after.length - 1]
+    expect(end.x).toBeCloseTo(BOTTOM_KICK_SHAPES['ㄹ-1'].reach)
+    expect(end.y).toBeCloseTo(1 - BOTTOM_KICK_SHAPES['ㄹ-1'].rise)
+    expect(end.handleIn?.y).toBeCloseTo(1)
+  })
+
+  it('왼가지 홀자(ㅓ ㅕ) 옆에서는 치키지 않는다', () => {
+    expect(applyStrokeShapeRules(syllableOf('러'), ON).choseong!.strokes).toEqual(maps.choseong['ㄹ'].strokes)
+  })
+
+  it('ㄸ은 오른 ㄷ만, ㅍ은 아래 가로줄기만 바뀐다', () => {
+    const ddi = applyStrokeShapeRules(syllableOf('따'), ON).choseong!.strokes!
+    expect(ddi.find((stroke) => stroke.id === 'ㄸ-1')).toEqual(maps.choseong['ㄸ'].strokes!.find((stroke) => stroke.id === 'ㄸ-1'))
+    expect(ddi.find((stroke) => stroke.id === 'ㄸ-4')!.points.at(-1)!.handleIn).toBeDefined()
+    const pi = applyStrokeShapeRules(syllableOf('파'), ON).choseong!.strokes!
+    expect(pi.filter((stroke) => stroke.points.some((point) => point.handleIn)).map((stroke) => stroke.id)).toEqual(['ㅍ-2'])
+  })
+
+  it('세로로 끝나는 획이나 손잡이가 있는 획은 건드리지 않는다', () => {
+    const stroke = maps.choseong['ㄱ'].strokes![0]
+    expect(kickStroke(stroke, BOTTOM_KICK_SHAPES['ㄹ-1'])).toBeNull()
   })
 })

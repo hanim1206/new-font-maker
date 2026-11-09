@@ -12,12 +12,14 @@ import { withFrameFrom } from '../utils/jamoFrame'
 export interface StrokeShapeParams {
   /** ㄱ ㅋ ㄲ 세로줄기를 삐침으로. */
   giyeokSweep: boolean
+  /** ㄴ ㄷ ㄸ ㄹ ㅌ ㅍ 맨 아래 가로줄기를 오른쪽으로 빼며 치켜 올린다. */
+  bottomKick: boolean
 }
 
-export const STROKE_SHAPES_OFF: StrokeShapeParams = { giyeokSweep: false }
-export const DEFAULT_STROKE_SHAPE_PARAMS: StrokeShapeParams = { giyeokSweep: true }
+export const STROKE_SHAPES_OFF: StrokeShapeParams = { giyeokSweep: false, bottomKick: false }
+export const DEFAULT_STROKE_SHAPE_PARAMS: StrokeShapeParams = { giyeokSweep: true, bottomKick: true }
 
-/** 삐침을 쓰는 홀자 — 오른홀자 아홉. 아래홀자는 ㄱ이 위에 눕고 내림이 짧아 노토도 거의 꺾어 내린다. */
+/** 꼴 규칙을 쓰는 홀자 — 오른홀자 아홉. 아래홀자 옆에서는 노토도 꺾어 내리고 평평하게 맺는다(아직 안 잼). */
 export const SWEEP_VOWELS: readonly string[] = ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅣ']
 
 /**
@@ -109,11 +111,67 @@ function sweepStrokes(strokes: readonly StrokeDataV2[]): StrokeDataV2[] | null {
   })
 }
 
-function sweepJamo(jamo: JamoData): JamoData {
-  const strokes = jamo.strokes ? sweepStrokes(jamo.strokes) : null
+/**
+ * 둘째 규칙 — 맨 아래 가로줄기 치킴: 오른홀자 옆 ㄴ ㄷ ㄸ ㄹ ㅌ ㅍ의 맨 아래 가로줄기는 노토에서 오른쪽으로 더 나가며 끝이 살짝 올라간다.
+ * 마지막 토막(꺾임 → 맺음)만 바꾼다. 맺음을 오른쪽으로 reach배(원래 토막 길이 기준) 빼고 rise만큼 올리고,
+ * 원래 줄 위 bend 자리에 손잡이를 두어 처음엔 평평하다가 끝으로 갈수록 올라가게 한다.
+ */
+export interface KickShape {
+  reach: number
+  rise: number
+  bend: number
+}
+
+/** 획 id → 꼴. 값은 `scripts/layout-rules/measure-bottom-kick.ts`로 노토 xor가 가장 작은 곳을 찾은 것. */
+export const BOTTOM_KICK_SHAPES: Record<string, KickShape> = {
+  'ㄴ-1': { reach: 1.0, rise: 0.1, bend: 0.3 },
+  'ㄷ-1': { reach: 1.25, rise: 0.08, bend: 0.3 },
+  'ㄸ-4': { reach: 1.2, rise: 0.06, bend: 0.3 },
+  'ㄹ-1': { reach: 1.4, rise: 0.06, bend: 0.7 },
+  'ㅌ-1': { reach: 1.2, rise: 0.06, bend: 0.7 },
+  'ㅍ-2': { reach: 1.1, rise: 0.06, bend: 0.3 },
+}
+
+/**
+ * 치킴을 쓰는 홀자. 왼가지 홀자(ㅓ ㅔ ㅕ ㅖ) 옆에서는 맺음이 가지에 막혀 노토도 덜 뺀다 — 588자에서 넣으면 오히려 멀어졌다.
+ */
+export const KICK_VOWELS: readonly string[] = ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅣ']
+
+/** 마지막 토막이 오른쪽으로 가는 가로줄기이고 손잡이가 없는 획만 바꾼다. */
+export function kickStroke(stroke: StrokeDataV2, shape: KickShape): StrokeDataV2 | null {
+  const count = stroke.points.length
+  if (count < 2 || stroke.closed) return null
+  const from = stroke.points[count - 2]
+  const to = stroke.points[count - 1]
+  if (!plainPoint(from) || !plainPoint(to) || Math.abs(from.y - to.y) > 1e-6) return null
+  const length = to.x - from.x
+  if (length <= 0) return null
+  const endX = from.x + length * shape.reach
+  return {
+    ...stroke,
+    points: [
+      ...stroke.points.slice(0, count - 1),
+      { x: endX, y: to.y - shape.rise, handleIn: { x: from.x + (endX - from.x) * shape.bend, y: to.y } },
+    ],
+  }
+}
+
+function kickStrokes(strokes: readonly StrokeDataV2[]): StrokeDataV2[] | null {
+  let changed = false
+  const next = strokes.map((stroke) => {
+    const shape = BOTTOM_KICK_SHAPES[stroke.id]
+    const kicked = shape ? kickStroke(stroke, shape) : null
+    if (kicked) changed = true
+    return kicked ?? stroke
+  })
+  return changed ? next : null
+}
+
+function mapJamoStrokes(jamo: JamoData, change: (strokes: readonly StrokeDataV2[]) => StrokeDataV2[] | null): JamoData {
+  const strokes = jamo.strokes ? change(jamo.strokes) : null
   let contextStrokes = jamo.contextStrokes
   if (contextStrokes) {
-    const entries = Object.entries(contextStrokes).map(([family, list]) => [family, (list && sweepStrokes(list)) ?? list] as const)
+    const entries = Object.entries(contextStrokes).map(([family, list]) => [family, (list && change(list)) ?? list] as const)
     contextStrokes = Object.fromEntries(entries) as JamoData['contextStrokes']
   }
   if (!strokes && contextStrokes === jamo.contextStrokes) return jamo
@@ -122,8 +180,10 @@ function sweepJamo(jamo: JamoData): JamoData {
 
 /** 그릴 음절에 획 꼴 규칙을 입힌다. 바뀐 것이 없으면 받은 음절을 그대로 돌려준다. */
 export function applyStrokeShapeRules(syllable: DecomposedSyllable, params: StrokeShapeParams): DecomposedSyllable {
-  if (!params.giyeokSweep || !syllable.choseong || !syllable.jungseong) return syllable
-  if (!SWEEP_VOWELS.includes(syllable.jungseong.char)) return syllable
-  const choseong = sweepJamo(syllable.choseong)
+  if (!syllable.choseong || !syllable.jungseong || !SWEEP_VOWELS.includes(syllable.jungseong.char)) return syllable
+  let choseong = syllable.choseong
+  if (params.giyeokSweep) choseong = mapJamoStrokes(choseong, sweepStrokes)
+  // 틀은 처음 바꾸기 전 획으로 굳힌다(withFrameFrom은 이미 틀이 있으면 그대로 둔다).
+  if (params.bottomKick && KICK_VOWELS.includes(syllable.jungseong.char)) choseong = mapJamoStrokes(choseong, kickStrokes)
   return choseong === syllable.choseong ? syllable : { ...syllable, choseong }
 }
