@@ -8,7 +8,9 @@ import {
   placeSyllable, planSyllable, progressOf, recommendSentences, SEED_SENTENCE, sentenceFor, TYPE_NAME,
 } from '../src/services/handwritingBank'
 import type { Bank, CardChoices, Gathered, JamoChoice, LayoutKey, SampleType, TypedSample } from '../src/services/handwritingBank'
-import { composeChar } from '../src/services/handwritingRead'
+import { composeChar, HANDWRITING_THICKNESS } from '../src/services/handwritingRead'
+import { fitPenStroke, PEN_FIT_EPSILON } from '../src/services/penStrokeFit'
+import type { StrokeDataV2 } from '../src/types'
 import type { Slot } from '../src/services/handwritingRead'
 import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../src/data/Hangul'
 import type { PenPoint } from '../src/services/penStrokeFit'
@@ -50,6 +52,14 @@ const JAMO_COLUMNS: readonly { name: string; slot: Slot; list: readonly string[]
 const exampleFor = (L: string, slot: Slot, type: SampleType): string | null => slot === 1 ? composeChar('ㅇ', L, null) : exampleOf(L, slot === 2 ? 'J' : type)
 
 type CellRaws = PenPoint[][]
+
+/** 펜을 뗀 획마다 한 번만 벡터로 맞춘다. 읽기(`readSyllable`)와 같은 허용오차 · 굵기. */
+const fitCache = new WeakMap<PenPoint[], StrokeDataV2 | null>()
+const fittedOf = (raw: PenPoint[]): StrokeDataV2 | null => {
+  if (!fitCache.has(raw)) fitCache.set(raw, fitPenStroke(raw, { epsilon: PEN_FIT_EPSILON, thickness: HANDWRITING_THICKNESS })?.stroke ?? null)
+  return fitCache.get(raw) ?? null
+}
+const UNIT_BOX = { x: 0, y: 0, width: 1, height: 1 }
 
 const lettersOf = (text: string) => [...text.replace(/\s+/g, '')].filter((ch) => /[가-힣]/.test(ch)).slice(0, MAX_CELLS)
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
@@ -453,7 +463,18 @@ export function HandwritingLabPage() {
               <rect x={ox + 1} y={oy + 1} width={CELL - 2} height={CELL - 2} fill={EDIT_COLOR.surface} stroke={EDIT_COLOR.editGuide} rx={4} />
               <text x={ox + 6} y={oy + 14} fontSize={11} fill={EDIT_COLOR.editGuide} fontWeight={700}>{ch}</text>
               {read && <text x={ox + CELL / 2} y={oy + CELL - 5} fontSize={9} textAnchor="middle" fill={read.state === 'ok' ? EDIT_COLOR.editSelect : EDIT_COLOR.destructive}>{read.state === 'ok' ? '✓ 읽었어요' : read.notes[0]}</text>}
-              {raws[i].map((pts, k) => <path key={k} d={rawPath(pts, ox, oy)} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />)}
+              {/* 그은 날 선은 연하게 밑에, 맞춘 벡터는 위에 — 어떻게 펴졌는지 바로 보이게 */}
+              {raws[i].map((pts, k) => <path key={k} d={rawPath(pts, ox, oy)} fill="none" stroke={EDIT_COLOR.editGuide} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />)}
+              <g transform={`translate(${ox} ${oy})`} pointerEvents="none" data-testid={`handwriting-vector-${i}`}>
+                {raws[i].map((pts, k) => {
+                  const st = fittedOf(pts)
+                  if (!st) return null
+                  return <g key={k}>
+                    <path d={pointsToSvgD(st.points, st.closed, UNIT_BOX, CELL)} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={HANDWRITING_THICKNESS * CELL} strokeLinecap={roundJoins ? 'round' : 'butt'} strokeLinejoin={roundJoins ? 'round' : 'miter'} />
+                    {st.points.map((p, n) => <circle key={n} cx={p.x * CELL} cy={p.y * CELL} r={1.6} fill={EDIT_COLOR.editSelect} />)}
+                  </g>
+                })}
+              </g>
               {has && <g className={styles.eraser} onPointerDown={(e) => { e.stopPropagation(); clearCell(i) }} data-testid={`handwriting-erase-${i}`}>
                 <circle cx={ox + CELL - 11} cy={oy + 11} r={8} fill={EDIT_COLOR.surface} stroke={EDIT_COLOR.editGuide} />
                 <text x={ox + CELL - 11} y={oy + 14.5} fontSize={10} textAnchor="middle" fill={EDIT_COLOR.foreground}>✕</text>
