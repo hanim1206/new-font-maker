@@ -21,6 +21,7 @@ const RAW = { ...DEFAULT_LAYOUT_RULE_PARAMS, rules: { faces: false, choTable: fa
 const STEPS = [
   { id: 'base', name: '패턴만', who: '관계 규칙 · 획 꼴 다섯 · 받침 없을 때 첫닿자 공식', params: PAT },
   { id: 'jungKinds', name: '+ 홀자 가지 갈래', who: '하니무스 관찰 11/9: 가로줄기가 뻗은 쪽으로 홀자가 간다 → 기둥이 하나면 가지 반대쪽으로 비켜서고, 기둥이 둘이면 기둥 틀은 그대로 두고 가지만 밖으로 나간다(ㅔㅖ 오른 기둥 = ㅐㅒ 0.813 · 0.814)', params: { ...PAT, jungKinds: true } },
+  { id: 'branchInset', name: '+ 왼가지 끝은 첫닿자 오른쪽 모양 따라', who: '하니무스 관찰 11/9: 닿자 오른쪽이 막혔으면 붙고 뚫렸으면 띄운다 → 오른쪽이 위부터 막힌 자음은 가지가 오른면에 살짝 걸치고, 오른쪽 위가 빈 자음(ㄴ ㅅ)은 그 빈 자리로 더 파고든다', params: { ...PAT, jungKinds: true, branchInset: true } },
 ]
 const med = (a: number[]) => { const x = a.filter(Number.isFinite).sort((p, q) => p - q); return x.length ? x[x.length >> 1] : NaN }
 const keys = ['CH.left', 'CH.right', 'CH.top', 'CH.bottom', 'JU.left', 'JU.right', 'JU.top', 'JU.bottom', 'JO.left', 'JO.right', 'JO.top', 'JO.bottom']

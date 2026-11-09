@@ -15,6 +15,8 @@ export interface JamoShapeFeatures {
   /** 왼띠 · 오른띠에 잉크가 있는 가로줄 비율(세로줄기가 그 변에 있으면 1). */
   leftClosed: number
   rightClosed: number
+  /** 오른쪽 띠(잉크 폭의 오른쪽 25%)에 잉크가 처음 나오는 높이(잉크 높이 대비). 0 = 맨 위부터 막힘(ㄱ ㅁ ㄷ), 1에 가까울수록 오른쪽 위가 빈다(ㄴ 0.94 · ㅅ 0.66). */
+  rightTop: number
   /** 닫힌 획(동그라미)이 있는가. */
   ring: boolean
   /** 잉크 넓이(틀 넓이 대비). */
@@ -63,6 +65,13 @@ export function shapeFeaturesOfStrokes(strokes: readonly DeepReadonly<StrokeData
   let area = 0, sumX = 0, sumY = 0
   for (let i = 0; i < N * N; i += 1) if (grid[i]) { area += 1; sumY += Math.floor(i / N); sumX += i % N }
   const topFlat = colsWith(0, BAND)
+  let x0 = N, x1 = -1, y0 = N, y1 = -1
+  for (let i = 0; i < N * N; i += 1) if (grid[i]) { const x = i % N, y = Math.floor(i / N); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y) }
+  let rightTop = 1
+  if (x1 >= 0) {
+    const from = Math.round(x1 - (x1 - x0 + 1) * 0.25)
+    for (let y = y0; y <= y1 && rightTop === 1; y += 1) for (let x = from; x <= x1; x += 1) if (grid[y * N + x]) { rightTop = (y - y0) / (y1 - y0 + 1); break }
+  }
   const secondWidth = colsWith(BAND, BAND * 2)
   return {
     topDot: topFlat < 0.35 && secondWidth > 0.7,
@@ -70,6 +79,7 @@ export function shapeFeaturesOfStrokes(strokes: readonly DeepReadonly<StrokeData
     bottomFlat: colsWith(1 - BAND, 1),
     leftClosed: rowsWith(0, BAND),
     rightClosed: rowsWith(1 - BAND, 1),
+    rightTop,
     ring: strokes.some((stroke) => stroke.closed),
     area: area / (N * N),
     centerX: area ? sumX / area / N : 0.5,

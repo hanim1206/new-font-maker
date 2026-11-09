@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import { shapeFeaturesOf } from './jamoShapeFeatures'
-import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
+import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, branchInsetOf, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { CHO_TARGET, JUNG_TARGET } from './layoutRuleTargets'
 
 const CHO_TARGET_A_RIGHT = JUNG_TARGET['ㅏ'].right
@@ -39,5 +39,15 @@ describe('홀자 가지 갈래', () => {
     expect(PILLAR_RIGHT.right).toBeLessThan(PILLAR_RIGHT.none)
     expect(PILLAR_RIGHT.left).toBeGreaterThan(PILLAR_RIGHT.none)
     expect(Math.abs(PILLAR_RIGHT.right + RIGHT_BRANCH_OUT - CHO_TARGET_A_RIGHT)).toBeLessThan(0.005)
+  })
+})
+
+describe('왼가지 끝 — 첫닿자 오른쪽 모양', () => {
+  it('오른쪽 위가 빈 ㄴ ㅅ은 위부터 막힌 ㄱ ㅁ보다 가지가 더 파고든다', () => {
+    const top = (k: string) => shapeFeaturesOf(cho(k))!.rightTop
+    expect(top('ㄴ')).toBeGreaterThan(top('ㅅ'))
+    expect(top('ㅅ')).toBeGreaterThan(top('ㅁ'))
+    expect(top('ㄱ')).toBeLessThan(0.05)
+    expect(branchInsetOf(shapeFeaturesOf(cho('ㄴ'))!)).toBeLessThan(branchInsetOf(shapeFeaturesOf(cho('ㅁ'))!) - 0.05)
   })
 })

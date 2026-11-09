@@ -41,3 +41,13 @@ export const TWO_STEM_SPAN = 0.276
 export const DOUBLE_CHO_SHIFT: Record<VowelBranchKind, number> = { none: 0.007, right: 0.007, left: 0.045, twoStem: 0.032 }
 /** ㅔ ㅖ: 왼 기둥이 밀린 만큼 오른 기둥이 따라가는 비율. */
 export const TWO_STEM_FOLLOW = 0.11
+
+/**
+ * 왼가지 끝 자리(2026-11-09, 사용자 관찰 "닿자 오른쪽이 막혔으면 붙고, 뚫렸으면 띄운다"에서).
+ * 가지 끝 − 첫닿자 오른면(몸 em). 오른쪽이 위부터 막힌 자음(ㄱ ㅁ ㅂ ㅇ ㄷ …)은 가지가 오른면에 살짝 걸치고,
+ * 오른쪽 위가 빈 자음(ㄴ ㅅ)은 가지가 그 빈 자리로 더 파고든다 — 그래도 같은 높이에 잉크가 없어 틈은 크게 남는다.
+ * 19 첫닿자 하나 빼고 맞추기 ±0.02 안 13/19. 남는 것: ㄹ ㅌ(가로줄기 끝과 맞서 띄움) · ㅆ.
+ */
+export const BRANCH_INSET_BASE = -0.0243
+export const BRANCH_INSET_SKY = -0.0778
+export const branchInsetOf = (f: Pick<JamoShapeFeatures, 'rightTop'>): number => BRANCH_INSET_BASE + BRANCH_INSET_SKY * f.rightTop
