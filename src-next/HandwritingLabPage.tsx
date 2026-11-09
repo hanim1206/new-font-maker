@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { Dices, Eraser, PenLine, RotateCcw } from 'lucide-react'
 import { readSyllable } from '../src/services/handwritingRead'
@@ -77,7 +77,7 @@ function saveBank(bank: Bank) { try { localStorage.setItem(STORAGE_KEY, JSON.str
 const rawPath = (points: PenPoint[], ox: number, oy: number) => points.map((p, i) => `${i ? 'L' : 'M'}${(ox + p.x * CELL).toFixed(1)} ${(oy + p.y * CELL).toFixed(1)}`).join(' ')
 
 /** 자모 견본 하나의 작은 그림. 섞임홀자는 가로부 · 세로부를 제 자리에. */
-function SampleThumb({ sample, size = 40, color = EDIT_COLOR.foreground }: { sample: TypedSample; size?: number; color?: string }) {
+const SampleThumb = memo(function SampleThumb({ sample, size = 40, color = EDIT_COLOR.foreground }: { sample: TypedSample; size?: number; color?: string }) {
   const V = 100, pad = 14
   const a = Math.min(4, Math.max(0.25, sample.asp))
   let w = V - 2 * pad, h = V - 2 * pad
@@ -90,10 +90,10 @@ function SampleThumb({ sample, size = 40, color = EDIT_COLOR.foreground }: { sam
   return <svg viewBox={`0 0 ${V} ${V}`} width={size} height={size} className={styles.thumb} aria-hidden>
     {groups.flatMap((g, gi) => g.strokes.map((s, i) => <path key={`${gi}-${i}`} d={pointsToSvgD(s.points, s.closed, g.box, V)} fill="none" stroke={color} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />))}
   </svg>
-}
+})
 
 /** 은행으로 글자 하나를 제품 렌더러로 그린다. 견본이 빈 자리는 점선 상자, 배치가 없으면 글자만 연하게. */
-function BankGlyph({ bank, char, size, style, override, faintMissing = true }: { bank: Bank; char: string; size: number; style: GlobalStyle; override?: Record<string, TypedSample>; faintMissing?: boolean }) {
+const BankGlyph = memo(function BankGlyph({ bank, char, size, style, override, faintMissing = true }: { bank: Bank; char: string; size: number; style: GlobalStyle; override?: Record<string, TypedSample>; faintMissing?: boolean }) {
   const placed = useMemo(() => placeSyllable(bank, char, override), [bank, char, override])
   const syllable = useMemo(() => placed ? decomposeSyllable(char, placed.choseongMap, placed.jungseongMap, placed.jongseongMap) : null, [placed, char])
   if (!placed || !syllable) return <span className={styles.emptyGlyph} style={{ width: size, height: size, fontSize: size * 0.4 }}>{char}</span>
@@ -102,7 +102,19 @@ function BankGlyph({ bank, char, size, style, override, faintMissing = true }: {
   const missing = Object.entries(placed.missingBoxes) as [Part, BoxConfig][]
   return <SvgRenderer syllable={syllable} boxes={placed.boxes} size={size} globalStyle={style} fillColor={partial && faintMissing ? EDIT_COLOR.editGuide : EDIT_COLOR.foreground}
     underlay={missing.length ? missing.map(([part, b]) => <rect key={part} x={b.x * V} y={b.y * V} width={b.width * V} height={b.height * V} fill="none" stroke={EDIT_COLOR.text5} strokeWidth={1.2} strokeDasharray="3 2" rx={1} />) : undefined} />
-}
+})
+
+/** 글자표 줄들. 확인 카드를 만질 때 다시 그리지 않게 따로 묶는다(iPad 개발 서버에서 토글이 느렸다). */
+const ChartRows = memo(function ChartRows({ bank, style, picked, highlight, firstRow, lastRow, onPick }: { bank: Bank; style: GlobalStyle; picked: string | null; highlight: Set<string> | null; firstRow: number; lastRow: number; onPick: (ch: string) => void }) {
+  const chartRows = Math.ceil(CHART_SYLLABLES.length / CHART_COLS)
+  return <div style={{ height: chartRows * CHART_CELL, position: 'relative' }}>
+    {Array.from({ length: Math.max(0, lastRow - firstRow) }, (_, k) => firstRow + k).map((row) => <div key={row} className={styles.chartRow} style={{ top: row * CHART_CELL, height: CHART_CELL }}>
+      {CHART_SYLLABLES.slice(row * CHART_COLS, row * CHART_COLS + CHART_COLS).map((ch) => <button key={ch} type="button" className={`${styles.chartCell}${picked === ch ? ` ${styles.chartPicked}` : ''}${highlight?.has(ch) ? ` ${styles.chartNew}` : ''}`} style={{ width: CHART_CELL, height: CHART_CELL }} onClick={() => onPick(ch)} title={ch}>
+        <BankGlyph bank={bank} char={ch} size={CHART_CELL - 6} style={style} />
+      </button>)}
+    </div>)}
+  </div>
+})
 
 type CellState = 'none' | 'have' | 'new' | 'skip' | 'dup' | 'dupOn'
 interface CellInfo { state: CellState; sample?: TypedSample }
@@ -392,6 +404,36 @@ export function HandwritingLabPage() {
     return { title: `${picked} — ${plan.missing.join(' ')}이(가) 없어요`, body: s ? `이 문장에 들어 있어요: ${s}` : '준비된 문장에는 없어요. 직접 쳐 보세요.', sentence: s }
   }, [picked, bank, text])
 
+  // 쓰기 칸의 글자 · 획 · 벡터. 긋는 중(current)이나 확인 카드를 만질 때 다시 만들지 않는다
+  const boardInk = useMemo(() => <>
+          {letters.map((ch, i) => {
+            const ox = (i % cols) * CELL, oy = Math.floor(i / cols) * CELL
+            const read = reads[i]
+            const has = raws[i].length > 0
+            return <g key={i}>
+              <rect x={ox + 1} y={oy + 1} width={CELL - 2} height={CELL - 2} fill={EDIT_COLOR.surface} stroke={EDIT_COLOR.editGuide} rx={4} />
+              <text x={ox + 6} y={oy + 14} fontSize={11} fill={EDIT_COLOR.editGuide} fontWeight={700}>{ch}</text>
+              {read && <text x={ox + CELL / 2} y={oy + CELL - 5} fontSize={9} textAnchor="middle" fill={read.state === 'ok' ? EDIT_COLOR.editSelect : EDIT_COLOR.destructive}>{read.state === 'ok' ? '✓ 읽었어요' : read.notes[0]}</text>}
+              {/* 그은 날 선은 연하게 밑에, 맞춘 벡터는 위에 — 어떻게 펴졌는지 바로 보이게 */}
+              {raws[i].map((pts, k) => <path key={k} d={rawPath(pts, ox, oy)} fill="none" stroke={EDIT_COLOR.editGuide} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />)}
+              <g transform={`translate(${ox} ${oy})`} pointerEvents="none" data-testid={`handwriting-vector-${i}`}>
+                {raws[i].map((pts, k) => {
+                  const st = fittedOf(pts)
+                  if (!st) return null
+                  return <g key={k}>
+                    <path d={pointsToSvgD(st.points, st.closed, UNIT_BOX, CELL)} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={HANDWRITING_THICKNESS * CELL} strokeLinecap={roundJoins ? 'round' : 'butt'} strokeLinejoin={roundJoins ? 'round' : 'miter'} />
+                    {st.points.map((p, n) => <circle key={n} cx={p.x * CELL} cy={p.y * CELL} r={1.6} fill={EDIT_COLOR.editSelect} />)}
+                  </g>
+                })}
+              </g>
+              {has && <g className={styles.eraser} onPointerDown={(e) => { e.stopPropagation(); clearCell(i) }} data-testid={`handwriting-erase-${i}`}>
+                <circle cx={ox + CELL - 11} cy={oy + 11} r={8} fill={EDIT_COLOR.surface} stroke={EDIT_COLOR.editGuide} />
+                <text x={ox + CELL - 11} y={oy + 14.5} fontSize={10} textAnchor="middle" fill={EDIT_COLOR.foreground}>✕</text>
+              </g>}
+            </g>
+          })}
+  </>, [letters, raws, reads, cols, roundJoins]) // eslint-disable-line react-hooks/exhaustive-deps
+  const imitateGlyphs = useMemo(() => letters.map((ch, i) => <BankGlyph key={`${ch}-${i}`} bank={bank} char={ch} size={56} style={style} />), [letters, bank, style])
   const badCells = letters.map((_, i) => reads[i]).filter((r): r is SyllableRead => !!r && r.state === 'bad')
   const readCount = letters.filter((_, i) => reads[i]?.state === 'ok').length
 
@@ -402,13 +444,7 @@ export function HandwritingLabPage() {
         <span>{stats.ok}/{CHART_SYLLABLES.length} 다 참{stats.partial ? ` · 반쯤 ${stats.partial}` : ''}</span>
       </div>
       <div ref={chartRef} className={styles.chart} data-testid="handwriting-chart">
-        <div style={{ height: chartRows * CHART_CELL, position: 'relative' }}>
-          {Array.from({ length: Math.max(0, lastRow - firstRow) }, (_, k) => firstRow + k).map((row) => <div key={row} className={styles.chartRow} style={{ top: row * CHART_CELL, height: CHART_CELL }}>
-            {CHART_SYLLABLES.slice(row * CHART_COLS, row * CHART_COLS + CHART_COLS).map((ch) => <button key={ch} type="button" className={`${styles.chartCell}${picked === ch ? ` ${styles.chartPicked}` : ''}${highlight?.has(ch) ? ` ${styles.chartNew}` : ''}`} style={{ width: CHART_CELL, height: CHART_CELL }} onClick={() => setPicked(ch)} title={ch}>
-              <BankGlyph bank={bank} char={ch} size={CHART_CELL - 6} style={style} />
-            </button>)}
-          </div>)}
-        </div>
+        <ChartRows bank={bank} style={style} picked={picked} highlight={highlight} firstRow={firstRow} lastRow={lastRow} onPick={setPicked} />
       </div>
       {pickedInfo && <div className={styles.pickedInfo}>
         <b>{pickedInfo.title}</b>
@@ -455,32 +491,7 @@ export function HandwritingLabPage() {
       <figure className={styles.board}>
         <svg ref={canvasRef} viewBox={`0 0 ${cols * CELL} ${rows * CELL}`} className={styles.canvas} style={{ aspectRatio: `${cols} / ${rows}` }} data-testid="handwriting-canvas"
           onPointerDown={begin} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish}>
-          {letters.map((ch, i) => {
-            const ox = (i % cols) * CELL, oy = Math.floor(i / cols) * CELL
-            const read = reads[i]
-            const has = raws[i].length > 0
-            return <g key={i}>
-              <rect x={ox + 1} y={oy + 1} width={CELL - 2} height={CELL - 2} fill={EDIT_COLOR.surface} stroke={EDIT_COLOR.editGuide} rx={4} />
-              <text x={ox + 6} y={oy + 14} fontSize={11} fill={EDIT_COLOR.editGuide} fontWeight={700}>{ch}</text>
-              {read && <text x={ox + CELL / 2} y={oy + CELL - 5} fontSize={9} textAnchor="middle" fill={read.state === 'ok' ? EDIT_COLOR.editSelect : EDIT_COLOR.destructive}>{read.state === 'ok' ? '✓ 읽었어요' : read.notes[0]}</text>}
-              {/* 그은 날 선은 연하게 밑에, 맞춘 벡터는 위에 — 어떻게 펴졌는지 바로 보이게 */}
-              {raws[i].map((pts, k) => <path key={k} d={rawPath(pts, ox, oy)} fill="none" stroke={EDIT_COLOR.editGuide} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />)}
-              <g transform={`translate(${ox} ${oy})`} pointerEvents="none" data-testid={`handwriting-vector-${i}`}>
-                {raws[i].map((pts, k) => {
-                  const st = fittedOf(pts)
-                  if (!st) return null
-                  return <g key={k}>
-                    <path d={pointsToSvgD(st.points, st.closed, UNIT_BOX, CELL)} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={HANDWRITING_THICKNESS * CELL} strokeLinecap={roundJoins ? 'round' : 'butt'} strokeLinejoin={roundJoins ? 'round' : 'miter'} />
-                    {st.points.map((p, n) => <circle key={n} cx={p.x * CELL} cy={p.y * CELL} r={1.6} fill={EDIT_COLOR.editSelect} />)}
-                  </g>
-                })}
-              </g>
-              {has && <g className={styles.eraser} onPointerDown={(e) => { e.stopPropagation(); clearCell(i) }} data-testid={`handwriting-erase-${i}`}>
-                <circle cx={ox + CELL - 11} cy={oy + 11} r={8} fill={EDIT_COLOR.surface} stroke={EDIT_COLOR.editGuide} />
-                <text x={ox + CELL - 11} y={oy + 14.5} fontSize={10} textAnchor="middle" fill={EDIT_COLOR.foreground}>✕</text>
-              </g>}
-            </g>
-          })}
+          {boardInk}
           {current && <path d={rawPath(current.points, (current.cell % cols) * CELL, Math.floor(current.cell / cols) * CELL)} fill="none" stroke={EDIT_COLOR.editSelect} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />}
         </svg>
         <figcaption>칸마다 글자 하나. 오른쪽 위 ✕로 그 칸만 지워요.{badCells.length ? ` 못 읽은 칸: ${badCells.map((r) => r.char).join(', ')}` : ''}</figcaption>
@@ -489,7 +500,7 @@ export function HandwritingLabPage() {
       <section className={styles.panel}>
         <h2>지금 은행으로 그린 이 문장</h2>
         <div className={styles.imitate}>
-          {letters.map((ch, i) => <BankGlyph key={`${ch}-${i}`} bank={bank} char={ch} size={56} style={style} />)}
+          {imitateGlyphs}
         </div>
         <p className={styles.note}>배운 것만 흉내 내요. 빈 자리는 점선 상자, 배치가 없는 글자는 글자만.</p>
       </section>
