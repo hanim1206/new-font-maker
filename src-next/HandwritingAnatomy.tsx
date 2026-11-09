@@ -12,7 +12,6 @@ import { weightToMultiplier } from '../src/utils/globalStyleUtils'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import type { BoxConfig, JamoData, Part, ResolvedStrokeInkSource, StrokeDataV2 } from '../src/types'
 import { EDIT_COLOR } from './editColors'
-import { Button } from './components/ui/button'
 import styles from './HandwritingAnatomy.module.css'
 
 /**
@@ -30,8 +29,6 @@ const SLOT_NAME: Record<Slot, string> = { CH: '첫닿자', JU: '홀자', JO: '�
 const SLOT_COLOR: Record<Slot, string> = { CH: EDIT_COLOR.editSlotCh, JU: EDIT_COLOR.editSlotJu, JO: EDIT_COLOR.editSlotJo }
 const SLOT_VAR: Record<Slot, string> = { CH: '--color-edit-slot-ch', JU: '--color-edit-slot-ju', JO: '--color-edit-slot-jo' }
 const V = 100
-/** 조사 '로/으로'. 받침이 없거나 ㄹ이면 로. */
-const withRo = (word: string) => { const c = word.charCodeAt(word.length - 1) - 0xAC00; const jong = c >= 0 && c < 11172 ? c % 28 : 0; return `${word}${jong === 0 || jong === 8 ? '로' : '으로'}` }
 
 interface AnatomyItem {
   n: number
@@ -223,8 +220,8 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
 
   const active = slots.find((s) => s.slot === slot) ?? null
   const hotItem = active?.items.find((it) => it.n === hot) ?? null
-  const [level, setLevel] = useState<'fn' | 'shape'>('fn')
-  const scope = hotItem ? hotItem.scope[level] : null
+  // 형태 층으로 넓히기는 나중에 획을 바꾸고 전파 범위를 고를 때 꺼낸다(사용자 11-09). 지금은 기능 층만.
+  const scope = hotItem ? hotItem.scope.fn : null
   useEffect(() => { onScope?.(scope) }, [scope?.key]) // eslint-disable-line react-hooks/exhaustive-deps
   const colorOf = (source: ResolvedStrokeInkSource) => {
     const s = SLOT_OF[source.part]
@@ -266,10 +263,6 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
     </ol>}
     {scope && <div className={styles.scope} data-testid="handwriting-anatomy-scope">
       <span>묶음</span><b>{scope.label}</b>{scopeCount !== undefined && <em>{scopeCount.toLocaleString()}자</em>}
-      <div className={styles.scopeBtns}>
-        <Button size="sm" variant={level === 'fn' ? 'primary' : undefined} onClick={() => setLevel('fn')} data-testid="handwriting-scope-fn">{hotItem!.scope.fn.label}</Button>
-        <Button size="sm" variant={level === 'shape' ? 'primary' : undefined} onClick={() => setLevel('shape')} data-testid="handwriting-scope-shape">{withRo(hotItem!.scope.shape.label)} 넓히기</Button>
-      </div>
     </div>}
     {!active && <p className={styles.hint}>자모를 누르면 그 자모의 부위가 번호로 펼쳐져요.</p>}
   </div>
