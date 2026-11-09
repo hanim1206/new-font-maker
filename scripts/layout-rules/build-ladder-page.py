@@ -37,7 +37,7 @@ path.tab{fill:var(--tab);opacity:.45}path.prev{fill:#9a9aa2;opacity:.4}.kg{margi
 .mv .body{display:none;margin-top:14px}.mv.open .body{display:block}
 .heat{display:grid;gap:2px;font-size:11px;align-items:center}
 .heat .c{height:24px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
-.heat .h{color:var(--mute);text-align:center;font-size:12px}.heat .rh{font-size:13px;text-align:center}.heat .m{font-weight:600}[data-s]{cursor:pointer}[data-s]:hover{outline:1px solid #888}[data-s].pick{outline:2px solid #111;outline-offset:-1px}
+.heat .h{color:var(--mute);text-align:center;font-size:12px}.heat .rh{font-size:13px;text-align:center}.heat .m{font-weight:600}[data-s]{cursor:pointer}[data-s]:hover{outline:1px solid #888}[data-s].line{outline:1.5px solid rgba(0,0,0,.45);outline-offset:-1px}[data-s].pick{outline:2px solid #111;outline-offset:-1px}
 .jong{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px;font-size:11px}.jong div{width:42px;text-align:center}.jong .c{height:22px;border-radius:3px;display:flex;align-items:center;justify-content:center}
 .scale{font-size:12px;color:var(--mute);margin:10px 0 4px}.scale i{display:inline-block;width:14px;height:10px;border-radius:2px;vertical-align:-1px;margin:0 3px 0 10px}
 .vtabs{display:flex;gap:6px;margin-top:16px}.vtabs button{font-size:12px;padding:4px 12px}
@@ -146,18 +146,20 @@ function moves() {
   const maxMed = Math.max(...gs.map(g => Math.max(g.med, g.base)));
   gs.forEach((g, gi) => {
     const [p, e] = g.key.split('.'); const mv = r => r.moves[sel][g.key];
-    let heat = `<div class="heat" style="grid-template-columns:28px repeat(9,1fr) 8px 1fr"><div></div>${JUNGS.map(j=>`<div class="h">${j}</div>`).join('')}<div></div><div class="h">첫닿자별</div>`;
-    for (const c of CHOS) { heat += `<div class="rh">${c}</div>`; for (const j of JUNGS) { const v = mmed(rows.filter(r => r.cho===c && r.jung===j).map(mv)); heat += `<div class="c" data-s="cell|${c}|${j}" style="background:${col(v)}">${fmt(v)}</div>`; } const rv = mmed(rows.filter(r => r.cho===c).map(mv)); heat += `<div></div><div class="c m" data-s="cho|${c}" style="background:${col(rv)}">${fmt(rv)}</div>`; }
+    let heat = `<div class="heat" style="grid-template-columns:28px repeat(9,1fr) 8px 1fr"><div></div>${JUNGS.map(j=>`<div class="h" data-s="jung|${j}">${j}</div>`).join('')}<div></div><div class="h">첫닿자별</div>`;
+    for (const c of CHOS) { heat += `<div class="rh" data-s="cho|${c}">${c}</div>`; for (const j of JUNGS) { const v = mmed(rows.filter(r => r.cho===c && r.jung===j).map(mv)); heat += `<div class="c" data-s="cell|${c}|${j}" style="background:${col(v)}">${fmt(v)}</div>`; } const rv = mmed(rows.filter(r => r.cho===c).map(mv)); heat += `<div></div><div class="c m" data-s="cho|${c}" style="background:${col(rv)}">${fmt(rv)}</div>`; }
     heat += `<div class="rh" style="font-size:11px">홀자별</div>${JUNGS.map(j => { const v = mmed(rows.filter(r=>r.jung===j).map(mv)); return `<div class="c m" data-s="jung|${j}" style="background:${col(v)}">${fmt(v)}</div>`; }).join('')}</div>`;
     let jong = '';
     if (pool === '588') { const cell = {}; for (const r of rows) if (mv(r) !== undefined) (cell[r.cho+r.jung] ??= []).push(mv(r)); const cm = Object.fromEntries(Object.entries(cell).map(([k,v]) => [k, mmed(v)]));
       jong = `<div class="scale">받침별 — 같은 첫닿자 · 홀자 칸에 받침이 더 얹는 양</div><div class="jong">${JONGS.map(k => { const v = mmed(rows.filter(r=>r.jong===k && mv(r)!==undefined).map(r=>mv(r) - cm[r.cho+r.jung])); return `<div><div class="c" data-s="jong|${k}" style="background:${col(v)}">${fmt(v)}</div>${k}</div>`; }).join('')}</div>`; }
     const panes = '';
     const tabs = '';
-    box.insertAdjacentHTML('beforeend', `<div class="mv${OPEN.has(g.key)?' open':''}" data-key="${g.key}"><div class="head"><div class="name">${PARTN[p]} ${EDGEN[e]}<small>표가 대개 ${dirOf(e, g.sgn)}으로 · 0.02 넘게 ${g.over}/${g.n}</small></div><div class="bar"><i style="width:${g.med/maxMed*100}%"></i>${sel>0?`<u style="left:0;width:${g.base/maxMed*100}%"></u>`:''}</div><div class="num">가운데 ${g.med.toFixed(3)}${sel>0?` (패턴만 ${g.base.toFixed(3)})`:''}</div></div><div class="body"><div class="scale">첫닿자 × 홀자 · 칸을 누르면 그 줄 · 그 열 글자가 오른쪽 위에 뜬다<i style="background:rgba(214,69,69,.7)"></i>오른쪽 · 아래<i style="background:rgba(31,79,216,.7)"></i>왼쪽 · 위</div>${heat}${jong}${tabs}${panes}</div></div>`);
+    box.insertAdjacentHTML('beforeend', `<div class="mv${OPEN.has(g.key)?' open':''}" data-key="${g.key}"><div class="head"><div class="name">${PARTN[p]} ${EDGEN[e]}<small>표가 대개 ${dirOf(e, g.sgn)}으로 · 0.02 넘게 ${g.over}/${g.n}</small></div><div class="bar"><i style="width:${g.med/maxMed*100}%"></i>${sel>0?`<u style="left:0;width:${g.base/maxMed*100}%"></u>`:''}</div><div class="num">가운데 ${g.med.toFixed(3)}${sel>0?` (패턴만 ${g.base.toFixed(3)})`:''}</div></div><div class="body"><div class="scale">첫닿자 × 홀자 · 칸을 누르면 그 줄 · 그 열이, 머리(ㄱ · ㅏ …)를 누르면 그 줄이나 열 하나가 오른쪽 위에 뜬다<i style="background:rgba(214,69,69,.7)"></i>오른쪽 · 아래<i style="background:rgba(31,79,216,.7)"></i>왼쪽 · 위</div>${heat}${jong}${tabs}${panes}</div></div>`);
   });
   box.querySelectorAll('.mv .head').forEach(h => h.addEventListener('click', () => { const m = h.parentElement; m.classList.toggle('open'); const k = m.dataset.key; m.classList.contains('open') ? OPEN.add(k) : OPEN.delete(k); }));
-  box.querySelectorAll('.mv').forEach(m => { const key = pool + ' ' + m.dataset.key; const cur = SELC[key]; m.querySelectorAll('[data-s]').forEach(c => { if (cur === c.dataset.s) c.classList.add('pick'); c.addEventListener('click', () => { SELC[key] = c.dataset.s; LAST = m.dataset.key; moves(); }); }); });
+  box.querySelectorAll('.mv').forEach(m => { const key = pool + ' ' + m.dataset.key; const cur = SELC[key]; m.querySelectorAll('[data-s]').forEach(c => { if (cur === c.dataset.s) c.classList.add('pick');
+    const [ct, cc, cj] = c.dataset.s.split('|'); const [pt, pa, pb] = (cur ?? '').split('|');
+    if (ct === 'cell' && ((pt === 'cho' && cc === pa) || (pt === 'jung' && cj === pa) || (pt === 'cell' && (cc === pa || cj === pb) && c.dataset.s !== cur))) c.classList.add('line'); c.addEventListener('click', () => { SELC[key] = c.dataset.s; LAST = m.dataset.key; moves(); }); }); });
   panel();
 }
 function renderAll() { ladder(); pools(); moves(); }
