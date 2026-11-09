@@ -44,6 +44,8 @@ interface AnatomyItem {
   line?: { x: number; y: number }[]
   /** 이 부위가 드는 묶음 — 기능 층 · 형태 층. */
   scope: { fn: PartScope; shape: PartScope }
+  /** 작은 자모 그림에서 칠할 자리: 마디면 그 마디 길(viewBox 0–100), 끝 · 꺾임이면 점. */
+  paint: { d: string } | { x: number; y: number }
 }
 
 const vowelKind = (char: string): string => {
@@ -128,13 +130,13 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
     })
     if (reversed) steps.reverse()
     for (const step of steps) {
-      if ('corner' in step) { const c = step.corner; out.push({ n: n++, strokeId: stroke.id, kind: 'corner', label: '꺾임', note: `${Math.round(c.turn)}° 돎`, at: toView(c, box), scope: cornerScope }); continue }
+      if ('corner' in step) { const c = step.corner; out.push({ n: n++, strokeId: stroke.id, kind: 'corner', label: '꺾임', note: `${Math.round(c.turn)}° 돎`, at: toView(c, box), scope: cornerScope, paint: toView(c, box) }); continue }
       const seg = step.seg
       const shape = STEM_SHAPE_LABEL[seg.shape]
       if (seg.shape === 'dunggeunjulgi') {
         const c = pts.reduce((a, p) => ({ x: a.x + p.x / pts.length, y: a.y + p.y / pts.length }), { x: 0, y: 0 })
         const top = pts.reduce((a, p) => (p.y < a.y ? p : a), pts[0])
-        out.push({ n: n++, strokeId: stroke.id, label: stem ?? shape, kind: 'segment', note: name ? shape : '닫힌 획', at: toView({ x: c.x, y: top.y }, box), scope: stemScope(seg.shape) })
+        out.push({ n: n++, strokeId: stroke.id, label: stem ?? shape, kind: 'segment', note: name ? shape : '닫힌 획', at: toView({ x: c.x, y: top.y }, box), scope: stemScope(seg.shape), paint: { d: pointsToSvgD(pts, stroke.closed, box, V) } })
         continue
       }
       const a = pts[seg.fromPoint], b = pts[seg.toPoint]
@@ -143,14 +145,15 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
       const one = geo.segments.length === 1
       // 머리 · 맺음은 마디마다 — 가로줄기는 왼쪽, 나머지는 위쪽이 머리(사전). 획을 쓴 차례가 아니라 마디 모양으로 정한다.
       const segName = one && stem ? stem : shape
-      if (seg.head?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'head', label: '머리', note: `${segName}의 열린 끝`, at: endMark(seg.head.point), scope: endScope('머리', seg.shape) })
+      if (seg.head?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'head', label: '머리', note: `${segName}의 열린 끝`, at: endMark(seg.head.point), scope: endScope('머리', seg.shape), paint: toView(pts[seg.head.point], box) })
       out.push({
         n: n++, strokeId: stroke.id, kind: 'segment',
         label: one && stem ? stem : shape,
         note: [name && one ? shape : name ? `${STEM_NAME_LABEL[name]}의 한 마디` : '', curved ? '휜 마디' : ''].filter(Boolean).join(' · ') || '곧은 마디',
         at: { x: (line[0].x + line[1].x) / 2, y: (line[0].y + line[1].y) / 2 }, line, scope: stemScope(seg.shape),
+        paint: { d: pointsToSvgD(pts.slice(Math.min(seg.fromPoint, seg.toPoint), Math.max(seg.fromPoint, seg.toPoint) + 1), false, box, V) },
       })
-      if (seg.tail?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'tail', label: '맺음', note: `${segName}의 열린 끝`, at: endMark(seg.tail.point), scope: endScope('맺음', seg.shape) })
+      if (seg.tail?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'tail', label: '맺음', note: `${segName}의 열린 끝`, at: endMark(seg.tail.point), scope: endScope('맺음', seg.shape), paint: toView(pts[seg.tail.point], box) })
     }
   }
   // 번호가 앞 번호와 겹치면 마디를 따라 옆으로 옮긴다.
@@ -172,15 +175,35 @@ const CHANNELS = ['strokes', 'horizontalStrokes', 'verticalStrokes'] as const
  * 자모 하나에 든 부위 묶음 키 전부(기능 층 + 형태 층). 글자표에 같은 묶음 글자를 칠할 때 쓴다.
  * 기본 자모 획으로 읽는다 — 가른 벌(홀자별 첫닿자)의 꼴 차이는 여기 안 든다.
  */
-export function jamoScopeKeys(jamo: JamoData, slot: Slot): Set<string> {
+function unitItems(jamo: JamoData, slot: Slot): { prims: Prim[]; items: AnatomyItem[] } {
+  // 섞임홀자는 가로 · 세로 획이 각자 상자 기준이라, 작은 그림에서 대충 겹치지 않게 가로는 왼쪽, 세로는 오른쪽에 놓는다.
+  const mixed = !!jamo.horizontalStrokes?.length && !!jamo.verticalStrokes?.length
+  const boxOf = (channel: (typeof CHANNELS)[number]): BoxConfig => !mixed ? UNIT : channel === 'horizontalStrokes' ? { x: 0, y: 0, width: 0.72, height: 1 } : { x: 0.6, y: 0, width: 0.4, height: 1 }
   const prims: Prim[] = CHANNELS.flatMap((channel) => ((jamo[channel] ?? []) as StrokeDataV2[]).map((stroke) => ({
-    stroke, box: UNIT,
+    stroke, box: boxOf(channel),
     source: { kind: 'stroke' as const, glyphId: '', part: (slot === 'JU' ? (channel === 'horizontalStrokes' ? 'JU_H' : channel === 'verticalStrokes' ? 'JU_V' : 'JU') : slot) as Part, channel, jamoId: jamo.char, strokeId: stroke.id },
   })))
+  return { prims, items: itemsOf(prims, jamo, SLOT_TYPE[slot], slot) }
+}
+
+export function jamoScopeKeys(jamo: JamoData, slot: Slot): Set<string> {
   const keys = new Set<string>()
-  itemsOf(prims, jamo, SLOT_TYPE[slot], slot).forEach((it) => { keys.add(it.scope.fn.key); keys.add(it.scope.shape.key) })
+  unitItems(jamo, slot).items.forEach((it) => { keys.add(it.scope.fn.key); keys.add(it.scope.shape.key) })
   return keys
 }
+
+/** 묶음 상자의 작은 자모: 자모는 흐리게, 고른 묶음에 드는 부위만 자리 색으로 칠한다. */
+const ScopeMini = memo(function ScopeMini({ jamo, slot, scopeKey }: { jamo: JamoData; slot: Slot; scopeKey: string }) {
+  const { prims, items } = useMemo(() => unitItems(jamo, slot), [jamo, slot])
+  const hits = items.filter((it) => it.scope.fn.key === scopeKey || it.scope.shape.key === scopeKey)
+  const color = SLOT_COLOR[slot]
+  return <svg viewBox="-8 -8 116 116" className={styles.mini} role="img" aria-label={jamo.char}>
+    {prims.map((p) => <path key={p.stroke.id} d={pointsToSvgD(p.stroke.points, p.stroke.closed, p.box, V)} fill="none" stroke={EDIT_COLOR.editSlotOff} strokeWidth={9} strokeLinecap="square" strokeLinejoin="miter" />)}
+    {hits.map((it, i) => 'd' in it.paint
+      ? <path key={i} d={it.paint.d} fill="none" stroke={color} strokeWidth={9} strokeLinecap="square" strokeLinejoin="miter" />
+      : <circle key={i} cx={it.paint.x} cy={it.paint.y} r={8} fill={color} />)}
+  </svg>
+})
 
 export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style, size = 360, onScope, scopeJamo }: { char: string; style: GlobalStyle; size?: number; onScope?: (scope: PartScope | null) => void; scopeJamo?: { slot: Slot; total: number; hits: string[] }[] }) {
   const choseong = useJamoStore((state) => state.choseong)
@@ -265,7 +288,8 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
         {scope && <div className={styles.scope} data-testid="handwriting-anatomy-scope">
           <span>묶음</span><b>{scope.label}</b>
           {scopeJamo?.map((g) => <div key={g.slot} className={styles.scopeJamo} style={{ ['--slot' as string]: `var(${SLOT_VAR[g.slot]})` }}>
-            <i aria-hidden="true" /><small>{SLOT_NAME[g.slot]}</small><em>{g.hits.length}/{g.total}</em><span>{g.hits.join(' ')}</span>
+            <i aria-hidden="true" /><small>{SLOT_NAME[g.slot]}</small><em>{g.hits.length}/{g.total}</em>
+            <span className={styles.minis}>{g.hits.map((h) => { const j = (g.slot === 'CH' ? choseong : g.slot === 'JU' ? jungseong : jongseong)[h]; return j ? <ScopeMini key={h} jamo={j} slot={g.slot} scopeKey={scope.key} /> : <b key={h}>{h}</b> })}</span>
           </div>)}
         </div>}
         {!active && <p className={styles.hint}>글자에서 자모를 누르면 그 자모의 부위가 번호로 펼쳐져요. 빈 곳을 누르면 닫혀요.</p>}
