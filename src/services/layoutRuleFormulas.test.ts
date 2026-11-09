@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import { shapeFeaturesOf } from './jamoShapeFeatures'
-import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, jongRaiseOf, hasChoWall, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
+import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, jongRaiseOf, pillarDiveOf, hasChoWall, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { CHO_TARGET, JUNG_TARGET } from './layoutRuleTargets'
 
 const CHO_TARGET_A_RIGHT = JUNG_TARGET['ㅏ'].right
@@ -90,5 +90,13 @@ describe('받침 키 — 가로줄기 층', () => {
     expect(jong('ㅁ').layers).toBe(2)
     expect(jong('ㄹ').layers).toBe(3)
     expect(jongRaiseOf(jong('ㄹ'))).toBeGreaterThan(jongRaiseOf(jong('ㄱ')) + 0.05)
+  })
+})
+
+describe('기둥 파고듦 — 받침 오른쪽 위', () => {
+  it('오른쪽 위가 빈 받침 ㄴ ㅅ 옆에서만 기둥이 내려온다', () => {
+    const jong = (k: string) => shapeFeaturesOf((baseJamos as unknown as { jongseong: Record<string, JamoData> }).jongseong[k])!
+    expect(pillarDiveOf(jong('ㄴ'))).toBeGreaterThan(0.1)
+    expect(pillarDiveOf(jong('ㅁ'))).toBeLessThan(0.01)
   })
 })

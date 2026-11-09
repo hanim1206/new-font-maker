@@ -113,3 +113,11 @@ export const JONG_RAISE_BASE = -0.0207
 export const JONG_RAISE_LAYER = 0.029
 export const JONG_RAISE_DOT = 0.0459
 export const jongRaiseOf = (f: Pick<JamoShapeFeatures, 'layers' | 'topDot'>): number => JONG_RAISE_BASE + JONG_RAISE_LAYER * f.layers + (f.topDot ? JONG_RAISE_DOT : 0)
+
+/**
+ * 기둥 파고듦(2026-11-09, AI 가설 — 가설 2 "오른쪽 위가 빈 첫닿자로 가지가 파고든다"를 세로로 돌린 꼴).
+ * 받침 오른쪽 위가 비면(ㄴ 0.95 · ㅅ 0.70) 홀자 기둥이 그 빈 자리로 더 내려온다. 내려옴(몸 em) = 0.13 × rightTop.
+ * 받침 27개 맞추기 ±0.02 안 21/27. 남는 것: 위가 둥글거나 뾰족한 ㅇ ㅈ ㅆ ㅊ ㅎ ㄶ(0.04쯤 더 내려옴).
+ */
+export const PILLAR_DIVE = 0.13
+export const pillarDiveOf = (jong: Pick<JamoShapeFeatures, 'rightTop'>): number => PILLAR_DIVE * jong.rightTop

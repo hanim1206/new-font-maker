@@ -1,7 +1,7 @@
 import type { BoxConfig, Padding } from '../types'
 import { BRANCH_INSET_BY_PAIR, CHO_RIGHT_BY_JUNG, CHO_RIGHT_BY_PAIR, JONG_RIGHT_BY_CHO } from './layoutRuleResiduals'
 import type { JamoShapeFeatures } from './jamoShapeFeatures'
-import { CHO_TOP_DROP_NO_FINAL, TWO_STEM_CHO_NARROW, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, jongRaiseOf, DOUBLE_CHO_SHIFT, PILLAR_RIGHT, RIGHT_BRANCH_OUT, TWO_STEM_FOLLOW, TWO_STEM_SPAN, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
+import { CHO_TOP_DROP_NO_FINAL, TWO_STEM_CHO_NARROW, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, jongRaiseOf, pillarDiveOf, DOUBLE_CHO_SHIFT, PILLAR_RIGHT, RIGHT_BRANCH_OUT, TWO_STEM_FOLLOW, TWO_STEM_SPAN, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { BRANCH_INSET_BY_CHO, BRANCH_INSET_BY_JUNG, CHO_GAP, CHO_TARGET, CHO_TOP_BY_JONG, CHO_TOP_BY_JUNG, JONG_GAP_OFFSET, JONG_LEFT_BY_JUNG, JONG_RIGHT_BY_JUNG, JONG_TARGET, JONG_TOP_BY_CHO, JUNG_TARGET, PILLAR_BOTTOM_NO_FINAL } from './layoutRuleTargets'
 
 /**
@@ -81,6 +81,8 @@ export interface LayoutRuleParams {
   choTopShape: boolean
   /** 표 없이 받침 윗면을 층 수와 꼭지(`jongRaiseOf`)로 올린다 — 층이 많고 꼭지가 있을수록 받침이 키가 크다. */
   jongHeight: boolean
+  /** 표 없이 받침 오른쪽 위가 비면 홀자 기둥을 그 빈 자리로 내린다(`pillarDiveOf`). */
+  pillarDive: boolean
 }
 
 /** 공식에 쓰는 자모 생김새 특징. */
@@ -99,6 +101,7 @@ export const DEFAULT_LAYOUT_RULE_PARAMS: LayoutRuleParams = {
   choBottomShape: false,
   choTopShape: false,
   jongHeight: false,
+  pillarDive: false,
 }
 
 export interface LayoutRuleStep {
@@ -288,7 +291,7 @@ function applyChoBottom(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, params: 
  * 규칙 E · 홀자 기둥 — 위는 글자 몸 위. 아래는 받침이 있으면 받침 윗면 + 받침별 내려옴(표, 오른 위가 빈 ㄴ ㅅ은 아래로, 보통은 조금 위),
  * 없으면 표의 받침 없는 기둥 아래. 표에 없는 받침이면 받침 윗면 − 두께 × m.
  */
-function applyPillar(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, params: LayoutRuleParams, jamo: RuleJamo | undefined): LayoutRuleStep | null {
+function applyPillar(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, params: LayoutRuleParams, jamo: RuleJamo | undefined, dive = 0): LayoutRuleStep | null {
   const box = boxes.JU
   const ju = ink.JU
   if (!box || !ju) return null
@@ -298,8 +301,8 @@ function applyPillar(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, params: Lay
   if (!jo) { bottom = jamo ? atY(body, PILLAR_BOTTOM_NO_FINAL) : body.bottom; source = '받침 없음' }
   else {
     const reach = jamo ? JONG_TARGET[jamo.jong]?.pillarReach : undefined
-    bottom = reach !== undefined ? jo.bounds.top + reach * scaleY(body) : jo.bounds.top - meanThickness(ju, jo) * params.m
-    source = reach !== undefined ? `받침 윗면 ${reach >= 0 ? '+' : ''}${fixed(reach)}` : `받침 윗면 − 두께 × ${fixed(params.m)}`
+    bottom = reach !== undefined ? jo.bounds.top + reach * scaleY(body) : jo.bounds.top - meanThickness(ju, jo) * params.m + dive * scaleY(body)
+    source = reach !== undefined ? `받침 윗면 ${reach >= 0 ? '+' : ''}${fixed(reach)}` : `받침 윗면 − 두께 × ${fixed(params.m)}${dive ? ` + 파고듦 ${fixed(dive)}` : ''}`
   }
   let limited = false
   if (bottom > body.bottom) { bottom = body.bottom; limited = true }
@@ -456,7 +459,7 @@ export function applyLayoutRules(input: {
     }
     if (rule === 'jongTable') return applyJongTable(boxes, ink, body, jamo!)
     if (rule === 'choBottom') return applyChoBottom(boxes, ink, body, params, jamo, lift)
-    if (rule === 'pillar') return applyPillar(boxes, ink, body, params, jamo)
+    if (rule === 'pillar') return applyPillar(boxes, ink, body, params, jamo, !jamo && params.pillarDive && input.features?.jong ? pillarDiveOf(input.features.jong) : 0)
     return null
   }
   for (const rule of LAYOUT_RULE_ORDER) {
