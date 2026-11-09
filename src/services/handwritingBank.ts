@@ -127,11 +127,25 @@ export type JamoChoice =
 export interface CardChoices {
   jamo: Record<string, JamoChoice>
   layout: 'keep' | 'mix'
+  /** 배치마다 섞을지. 있으면 `layout`보다 앞선다. */
+  mix?: Partial<Record<LayoutKey, boolean>>
 }
 
 const isFirstConsonant = (L: string, sample: TypedSample) => (CHOSEONG_LIST as readonly string[]).includes(L) && sample.slot !== 1
 
-/** 확인 카드의 선택대로 은행에 넣는다. 원본은 두고 새 은행을 돌려준다. 기본값: 1단계에서는 새 자모는 넣고 있던 것은 두기, 2단계는 두기. */
+/** 이 자모가 은행에서 그 자리(첫닿자 · 홀자 · 받침) 꼴을 이미 갖고 있나. 같은 ㄱ이라도 첫닿자와 받침은 따로 센다. */
+export function hasSlot(entry: JamoEntry | undefined, slot: Slot): boolean {
+  if (!entry) return false
+  if (slot === 0) return FIRST_TYPES.some((t) => entry.by[t]) || entry.rep.slot === 0
+  if (slot === 2) return !!entry.by.J || entry.rep.slot === 2
+  return entry.rep.slot === 1
+}
+
+/**
+ * 확인 카드의 선택대로 은행에 넣는다. 원본은 두고 새 은행을 돌려준다.
+ * 자리(첫닿자 · 홀자 · 받침)마다 따로 본다 — 은행에 없던 자리는 skip이 아니면 넣고, 있던 자리는 swap · slot일 때만 바꾼다.
+ * 배치는 `mix[key]`가 있으면 그대로, 없으면 1단계는 섞고 2단계는 `layout`을 따른다.
+ */
 export function applyChoices(bank: Bank, gathered: Gathered, choices: CardChoices): Bank {
   const next: Bank = { lay: { ...bank.lay }, jamo: { ...bank.jamo }, history: [...bank.history, ...gathered.reads.map((r) => r.char)] }
   const phase = phaseOf(bank)
@@ -140,28 +154,35 @@ export function applyChoices(bank: Bank, gathered: Gathered, choices: CardChoice
     if (!reads?.length) continue
     const fresh = averageLayout(reads)
     const had = next.lay[key]
-    next.lay[key] = !had ? fresh : phase === 1 || choices.layout === 'mix' ? blendLayout(had, fresh) : had
+    const mix = choices.mix?.[key] ?? (phase === 1 || choices.layout === 'mix')
+    next.lay[key] = !had ? fresh : mix ? blendLayout(had, fresh) : had
   }
   for (const L of Object.keys(gathered.jamo)) {
     const samples = gathered.jamo[L]
-    const choice: JamoChoice = choices.jamo[L] ?? (phase === 1 && !next.jamo[L] ? { kind: 'new' } : { kind: 'keep' })
-    if (choice.kind === 'skip') continue
-    const sample = choice.kind === 'slot' ? (samples.filter((s) => s.type === choice.type).pop() ?? samples[samples.length - 1]) : samples[samples.length - 1]
     const had = next.jamo[L]
-    if (!had) {
-      if (choice.kind === 'keep') continue
-      next.jamo[L] = { rep: sample, by: { [sample.type]: sample }, versions: [sample] }
-      continue
-    }
-    const entry: JamoEntry = { rep: had.rep, by: { ...had.by }, versions: [...had.versions, ...samples] }
-    if (choice.kind === 'slot') entry.by[sample.type] = sample
-    else if (choice.kind === 'swap') {
-      if (isFirstConsonant(L, sample)) {
+    const choice: JamoChoice = choices.jamo[L] ?? (had ? { kind: 'keep' } : { kind: 'new' })
+    // 없던 자모를 두기로 하면 넣지 않는다(예전 동작)
+    if (choice.kind === 'skip' || (!had && choice.kind === 'keep')) continue
+    let entry: JamoEntry | null = had ? { rep: had.rep, by: { ...had.by }, versions: [...had.versions, ...samples] } : null
+    for (const slot of [0, 1, 2] as Slot[]) {
+      const inSlot = samples.filter((s) => s.slot === slot)
+      if (!inSlot.length) continue
+      const sample = choice.kind === 'slot' && slot === 0 ? (inSlot.filter((s) => s.type === choice.type).pop() ?? inSlot[inSlot.length - 1]) : inSlot[inSlot.length - 1]
+      if (!entry) { entry = { rep: sample, by: { [sample.type]: sample }, versions: [...samples] }; continue }
+      if (!hasSlot(entry, slot)) {
+        // 은행에 없던 자리: 그대로 채운다(첫닿자 꼴만 있던 ㄱ에 받침 ㄱ이 들어오는 경우)
         entry.by[sample.type] = sample
-        if (had.rep.type === sample.type) entry.rep = sample
-      } else entry.rep = sample
+        continue
+      }
+      if (choice.kind === 'slot' && slot === 0) entry.by[sample.type] = sample
+      else if (choice.kind === 'swap') {
+        if (isFirstConsonant(L, sample)) {
+          entry.by[sample.type] = sample
+          if (entry.rep.type === sample.type || (slot === 2 && entry.rep.slot === 2)) entry.rep = sample
+        } else entry.rep = sample
+      }
     }
-    next.jamo[L] = entry
+    if (entry) next.jamo[L] = entry
   }
   return next
 }

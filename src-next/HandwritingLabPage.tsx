@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { Dices, Eraser, RotateCcw } from 'lucide-react'
+import { Dices, Eraser, PenLine, RotateCcw } from 'lucide-react'
 import { readSyllable } from '../src/services/handwritingRead'
 import type { SyllableRead } from '../src/services/handwritingRead'
 import {
-  applyChoices, chartStats, CHART_SYLLABLES, emptyBank, exampleOf, FIRST_TYPES, gather, layoutGain, LAYOUT_KEYS, newJamoIn, phaseOf, pickSentence,
-  placeSyllable, planSyllable, progressOf, recommendSentences, SEED_SENTENCE, sentenceFor, TYPE_NAME, averageLayout, blendLayout,
+  applyChoices, chartStats, CHART_SYLLABLES, emptyBank, exampleOf, FIRST_TYPES, gather, hasSlot, layoutGain, LAYOUT_KEYS, newJamoIn, phaseOf, pickSentence,
+  placeSyllable, planSyllable, progressOf, recommendSentences, SEED_SENTENCE, sentenceFor, TYPE_NAME,
 } from '../src/services/handwritingBank'
-import type { Bank, CardChoices, Gathered, JamoChoice, LayoutEntry, SampleType, TypedSample } from '../src/services/handwritingBank'
+import type { Bank, CardChoices, Gathered, JamoChoice, LayoutKey, SampleType, TypedSample } from '../src/services/handwritingBank'
+import { composeChar } from '../src/services/handwritingRead'
+import type { Slot } from '../src/services/handwritingRead'
+import { CHOSEONG_LIST, JONGSEONG_LIST, JUNGSEONG_LIST } from '../src/data/Hangul'
 import type { PenPoint } from '../src/services/penStrokeFit'
 import { getBaseJamo } from '../src/stores/jamoStore'
 import { DEFAULT_STYLE } from '../src/stores/globalStyleStore'
@@ -37,7 +40,14 @@ const MAX_CELLS = 15
 const READ_DELAY = 900
 const CHART_COLS = 10
 const CHART_CELL = 40
-const CHOICE_ORDER: readonly SampleType[] = [...FIRST_TYPES, 'J']
+/** 확인 카드 · 자모 고르기의 세 컬럼. */
+const JAMO_COLUMNS: readonly { name: string; slot: Slot; list: readonly string[] }[] = [
+  { name: '첫닿자', slot: 0, list: CHOSEONG_LIST },
+  { name: '홀자', slot: 1, list: JUNGSEONG_LIST },
+  { name: '받침', slot: 2, list: (JONGSEONG_LIST as readonly string[]).filter(Boolean) },
+]
+/** 자모 하나만 고칠 때 쓸 본보기 글자. 홀자는 ㅇ 옆에. */
+const exampleFor = (L: string, slot: Slot, type: SampleType): string | null => slot === 1 ? composeChar('ㅇ', L, null) : exampleOf(L, slot === 2 ? 'J' : type)
 
 type CellRaws = PenPoint[][]
 
@@ -72,19 +82,6 @@ function SampleThumb({ sample, size = 40, color = EDIT_COLOR.foreground }: { sam
   </svg>
 }
 
-/** 배치 한 벌의 작은 그림: 부품 상자만. */
-function LayoutThumb({ entry, size = 72 }: { entry: LayoutEntry; size?: number }) {
-  const V = 100
-  const colors: Record<Part, string> = { CH: EDIT_COLOR.editSlotCh, JU: EDIT_COLOR.editSlotJu, JU_H: EDIT_COLOR.editSlotJu, JU_V: EDIT_COLOR.editSlotJu, JO: EDIT_COLOR.editSlotJo }
-  return <svg viewBox={`-3 -3 ${V + 6} ${V + 6}`} width={size} height={size} className={styles.thumb} aria-hidden>
-    <rect x={0} y={0} width={V} height={V} fill="none" stroke={EDIT_COLOR.editGuide} />
-    {(Object.keys(entry.boxes) as Part[]).map((part) => {
-      const r = entry.boxes[part]!
-      return <rect key={part} x={r.x0 * V} y={r.y0 * V} width={(r.x1 - r.x0) * V} height={(r.y1 - r.y0) * V} fill={colors[part]} fillOpacity={0.28} stroke={colors[part]} strokeWidth={1.5} />
-    })}
-  </svg>
-}
-
 /** 은행으로 글자 하나를 제품 렌더러로 그린다. 견본이 빈 자리는 점선 상자, 배치가 없으면 글자만 연하게. */
 function BankGlyph({ bank, char, size, style, override, faintMissing = true }: { bank: Bank; char: string; size: number; style: GlobalStyle; override?: Record<string, TypedSample>; faintMissing?: boolean }) {
   const placed = useMemo(() => placeSyllable(bank, char, override), [bank, char, override])
@@ -97,7 +94,39 @@ function BankGlyph({ bank, char, size, style, override, faintMissing = true }: {
     underlay={missing.length ? missing.map(([part, b]) => <rect key={part} x={b.x * V} y={b.y * V} width={b.width * V} height={b.height * V} fill="none" stroke={EDIT_COLOR.text5} strokeWidth={1.2} strokeDasharray="3 2" rx={1} />) : undefined} />
 }
 
-interface CardState { open: boolean; then: 'roll' | null; gathered: Gathered; choices: CardChoices }
+type CellState = 'none' | 'have' | 'new' | 'skip' | 'dup' | 'dupOn'
+interface CellInfo { state: CellState; sample?: TypedSample }
+
+/** 첫닿자 · 홀자 · 받침 세 컬럼에 전체 자모를 깔고, 칸마다 상태를 보여 준다. 새 · 덮 칸은 손글씨 조각 그대로. */
+function JamoGrid({ cellOf, onTap, focus }: { cellOf: (L: string, slot: Slot) => CellInfo; onTap: (L: string, slot: Slot) => void; focus?: { L: string; slot: Slot } | null }) {
+  return <div className={styles.jcols}>
+    {JAMO_COLUMNS.map((col) => <div key={col.name} className={styles.jcol}>
+      <b>{col.name}</b>
+      <div className={styles.jlist}>
+        {col.list.map((L) => {
+          const info = cellOf(L, col.slot)
+          const focused = focus?.L === L && focus.slot === col.slot
+          return <button key={L} type="button" className={`${styles.jcell} ${styles[`j_${info.state}`]}${focused ? ` ${styles.jfocus}` : ''}`} onClick={() => onTap(L, col.slot)} data-testid={`jamo-${col.slot}-${L}`} title={L}>
+            {info.sample ? <SampleThumb sample={info.sample} size={30} /> : L}
+            {(info.state === 'new' || info.state === 'skip') && <i className={styles.jbadge}>{info.state === 'new' ? '새' : '뺌'}</i>}
+            {(info.state === 'dup' || info.state === 'dupOn') && <i className={styles.jbadge}>{info.state === 'dupOn' ? '✓' : '덮'}</i>}
+          </button>
+        })}
+      </div>
+    </div>)}
+  </div>
+}
+
+/** 전 → 후 글자 한 쌍. */
+function BeforeAfter({ before, after, char, style, size = 72, override }: { before: Bank | null; after: Bank; char: string; style: GlobalStyle; size?: number; override?: Record<string, TypedSample> }) {
+  return <div className={styles.pair}>
+    <span className={styles.pairOld}>{before ? <BankGlyph bank={before} char={char} size={size} style={style} faintMissing={false} /> : <span className={styles.emptyGlyph} style={{ width: size, height: size, fontSize: size * 0.4 }}>새</span>}</span>
+    <span className={styles.pairArrow}>→</span>
+    <span className={styles.pairNew}><BankGlyph bank={after} char={char} size={size} style={style} override={override} faintMissing={false} /></span>
+  </div>
+}
+
+interface CardState { open: boolean; step: 1 | 2; then: 'roll' | null; gathered: Gathered; choices: CardChoices; focus: { L: string; slot: Slot } | null }
 
 export function HandwritingLabPage() {
   const [bank, setBank] = useState<Bank>(loadBank)
@@ -109,6 +138,7 @@ export function HandwritingLabPage() {
   const [message, setMessage] = useState('씨앗 문장 아홉 자를 칸에 써 주세요. 여섯 가지 배치가 다 들어 있어요. 다 쓰고 확인 카드를 누르면 읽은 것을 보여 줘요.')
   const [card, setCard] = useState<CardState | null>(null)
   const [rewrite, setRewrite] = useState<{ L: string; type: SampleType } | null>(null)
+  const [picker, setPicker] = useState<{ open: boolean; L: string | null; slot: Slot }>({ open: false, L: null, slot: 0 })
   const [weight, setWeight] = useState(400)
   const [roundJoins, setRoundJoins] = useState(false)
   const [picked, setPicked] = useState<string | null>(null)
@@ -231,19 +261,52 @@ export function HandwritingLabPage() {
   // ----- 확인 카드 -----
   const openCard = (then: 'roll' | null) => {
     const gathered = gather(reads.slice(0, letters.length))
-    const choices: CardChoices = { jamo: {}, layout: 'keep' }
+    const choices: CardChoices = { jamo: {}, layout: 'keep', mix: {} }
+    let focus: CardState['focus'] = null
     for (const L of Object.keys(gathered.jamo)) {
       const samples = gathered.jamo[L]
-      if (rewrite && rewrite.L === L && samples.some((s) => s.type === rewrite.type)) choices.jamo[L] = { kind: 'slot', type: rewrite.type }
+      const target = rewrite && rewrite.L === L
+      if (target && samples.some((s) => s.slot === 0 && s.type === rewrite.type)) choices.jamo[L] = { kind: 'slot', type: rewrite.type }
+      else if (target && bank.jamo[L]) choices.jamo[L] = { kind: 'swap' }
       else choices.jamo[L] = bank.jamo[L] ? { kind: 'keep' } : { kind: 'new' }
+      const dup = samples.find((s) => hasSlot(bank.jamo[L], s.slot))
+      if (target || (dup && !focus)) focus = { L, slot: (dup ?? samples[0]).slot }
     }
-    setCard({ open: true, then, gathered, choices })
+    if (!focus) { const L = Object.keys(gathered.jamo)[0]; if (L) focus = { L, slot: gathered.jamo[L][0].slot } }
+    // 배치: 1단계에선 이미 있는 배치도 섞는 게 기본, 2단계는 두기가 기본
+    for (const key of Object.keys(gathered.lay) as LayoutKey[]) if (bank.lay[key]) choices.mix![key] = phase === 1 && !rewrite
+    setCard({ open: true, step: 1, then, gathered, choices, focus })
   }
   const previewBank = useMemo(() => card ? applyChoices(bank, card.gathered, card.choices) : null, [bank, card])
-  const previewStats = useMemo(() => previewBank ? chartStats(previewBank) : null, [previewBank])
-  const added = useMemo(() => previewStats ? [...previewStats.okSet].filter((ch) => !stats.okSet.has(ch)) : [], [previewStats, stats])
+  /** 2단계 전 → 후: 1단계 고른 자모는 그대로 두고 배치만 안 섞은 것 / 섞은 것. */
+  const layoutPair = useMemo(() => {
+    if (!card) return null
+    const keys = Object.keys(card.gathered.lay) as LayoutKey[]
+    const none = Object.fromEntries(keys.map((k) => [k, false])), all = Object.fromEntries(keys.map((k) => [k, true]))
+    return { before: applyChoices(bank, card.gathered, { ...card.choices, mix: none }), after: applyChoices(bank, card.gathered, { ...card.choices, mix: all }) }
+  }, [bank, card])
 
   const setChoice = (L: string, choice: JamoChoice) => setCard((c) => c && { ...c, choices: { ...c.choices, jamo: { ...c.choices.jamo, [L]: choice } } })
+  /** 카드 격자에서 칸 하나의 상태. */
+  const cardCell = (L: string, slot: Slot): CellInfo => {
+    const have = hasSlot(bank.jamo[L], slot)
+    const got = card?.gathered.jamo[L]?.filter((s) => s.slot === slot)
+    if (!card || !got?.length) return { state: have ? 'have' : 'none' }
+    const choice = card.choices.jamo[L]
+    const sample = choice?.kind === 'slot' && slot === 0 ? (got.filter((s) => s.type === choice.type).pop() ?? got[got.length - 1]) : got[got.length - 1]
+    if (choice?.kind === 'skip') return { state: 'skip', sample }
+    if (!have) return { state: 'new', sample }
+    return { state: choice?.kind === 'swap' || choice?.kind === 'slot' ? 'dupOn' : 'dup', sample }
+  }
+  const tapCardCell = (L: string, slot: Slot) => {
+    const info = cardCell(L, slot)
+    if (info.state === 'none' || info.state === 'have') return
+    setCard((c) => c && { ...c, focus: { L, slot } })
+    if (info.state === 'new') setChoice(L, { kind: 'skip' })
+    else if (info.state === 'skip') setChoice(L, bank.jamo[L] ? { kind: 'keep' } : { kind: 'new' })
+    else if (info.state === 'dup') setChoice(L, { kind: 'swap' })
+    else setChoice(L, { kind: 'keep' })
+  }
   const applyCard = (): Bank | null => {
     if (!card || !previewBank) return null
     const before = stats.okSet
@@ -271,13 +334,19 @@ export function HandwritingLabPage() {
       : `이 문장을 반영하면 글자표에 ${recommendSentences(from, text, 1)[0]?.fills ?? 0}자가 새로 차요. 새 자모: ${newJamoIn(from, pick).join(' ')}. 다 쓰고 확인 카드를 눌러 주세요.`
     setSentence(pick, why)
   }
-  const rewriteSlot = (L: string, type: SampleType) => {
-    const next = applyCard()
-    const ex = exampleOf(L, type)
+  /** 자모 하나만 고치기: 본보기 글자 한 칸만 쓰게 한다. */
+  const startRewrite = (L: string, slot: Slot, type: SampleType) => {
+    const ex = exampleFor(L, slot, type)
     if (!ex) return
-    setRewrite({ L, type })
-    setSentence(ex, `${ex}를 써 주세요. 여기서 ${L}만 ${TYPE_NAME[type]} 자리 꼴로 가져가요.`)
-    void next
+    setPicker({ open: false, L: null, slot: 0 })
+    setRewrite({ L, type: slot === 2 ? 'J' : type })
+    setSentence(ex, `${ex} 한 자만 써 주세요. 여기서 ${slot === 2 ? '받침 ' : ''}${L}만 가져가요${slot === 0 ? `(${TYPE_NAME[type]} 자리 꼴)` : ''}.`)
+  }
+  const pickerCell = (L: string, slot: Slot): CellInfo => {
+    const entry = bank.jamo[L]
+    if (!hasSlot(entry, slot)) return { state: 'none' }
+    const sample = slot === 2 ? entry!.by.J ?? entry!.rep : slot === 0 ? FIRST_TYPES.map((t) => entry!.by[t]).find(Boolean) ?? entry!.rep : entry!.rep
+    return { state: 'have', sample }
   }
   const resetAll = () => {
     if (!window.confirm('모은 배치와 자모를 모두 지울까요? 되돌릴 수 없어요.')) return
@@ -359,6 +428,7 @@ export function HandwritingLabPage() {
         <Input value={text} onChange={(e) => { setText(e.target.value); clearAll(); setRewrite(null) }} className={styles.sentence} aria-label="문장" />
         <Button size="sm" onClick={() => rollDice()} data-testid="handwriting-dice"><Dices />주사위</Button>
         <Button size="sm" variant="primary" onClick={() => openCard(null)} disabled={readCount === 0} data-testid="handwriting-card">확인 카드{readCount ? ` (${readCount})` : ''}</Button>
+        <Button size="sm" onClick={() => setPicker({ open: true, L: null, slot: 0 })} data-testid="handwriting-pick-jamo"><PenLine />자모 하나 고치기</Button>
         <Button size="sm" onClick={clearAll} disabled={raws.every((c) => c.length === 0)}><Eraser />다 지우기</Button>
         <Button size="sm" onClick={resetAll}><RotateCcw />처음부터</Button>
       </div>
@@ -407,86 +477,78 @@ export function HandwritingLabPage() {
     <Dialog open={!!card?.open} onOpenChange={(open) => { if (!open) setCard(null) }}>
       <DialogContent className={styles.card}>
         {card && <>
-          <DialogHeader><DialogTitle>{phase === 1 ? '이번 문장에서 읽은 배치' : '이번 문장에서 모은 것'}</DialogTitle></DialogHeader>
-          {card.gathered.reads.length === 0
-            ? <p>아직 읽은 글자가 없어요. 칸에 글자를 쓰고 잠깐 기다리면 읽어요.{card.gathered.bad.length ? ` 못 읽은 칸: ${card.gathered.bad.join(', ')}` : ''}</p>
-            : <>
-              {card.gathered.bad.length > 0 && <p className={styles.warn}>못 읽은 칸이 있어요: {card.gathered.bad.join(', ')} — 이 글자는 넣지 않아요. 그 칸만 지우고 다시 쓸 수 있어요.</p>}
-              <div className={styles.chips}>{card.gathered.reads.map((r) => <span key={r.char + letters.indexOf(r.char)} className={styles.chip}>{r.char}<button type="button" className={styles.chipX} title="이 글자만 다시 쓰기" onClick={() => clearCell(reads.indexOf(r))}>✕</button></span>)}</div>
+          <DialogHeader>
+            <div className={styles.cardHead}>
+              <div><DialogTitle>{card.step === 1 ? '이번 문장에서 모은 것' : '이번 글씨의 배치 버릇'}</DialogTitle>
+                <p className={styles.sub}>{card.step === 1 ? `${card.gathered.reads.map((r) => r.char).join('')} · ${card.gathered.reads.length}자 읽음` : '누르면 그 배치에 이번 글씨를 섞어요'}</p></div>
+              {!rewrite && <div className={styles.steps}><span className={card.step === 1 ? styles.stepOn : ''}>1 글자</span>›<span className={card.step === 2 ? styles.stepOn : ''}>2 레이아웃</span></div>}
+            </div>
+          </DialogHeader>
+          {card.gathered.bad.length > 0 && <p className={styles.warn}>못 읽은 칸: {card.gathered.bad.join(', ')} — 넣지 않아요.</p>}
+          {card.gathered.reads.length === 0 && <p>아직 읽은 글자가 없어요. 칸에 글자를 쓰고 잠깐 기다리면 읽어요.</p>}
 
-              {phase === 1 && <>
-                <div className={styles.layRow}>
-                  {LAYOUT_KEYS.map((k) => {
-                    const rs = card.gathered.lay[k]
-                    return <div key={k} className={styles.layCell}>
-                      {rs ? <><LayoutThumb entry={averageLayout(rs)} /><div><b>{k}</b><br />{rs.map((r) => r.char).join(', ')}{bank.lay[k] ? <><br /><small>이미 있어요 → 섞어요</small></> : null}</div></>
-                        : <div className={styles.layMiss}>{k}<br /><small>{bank.lay[k] ? '이미 있음' : '아직'}</small></div>}
-                    </div>
-                  })}
-                </div>
-                <p>배치 {Object.keys(card.gathered.lay).length}가지를 읽었어요.{(() => { const missing = LAYOUT_KEYS.filter((k) => !bank.lay[k] && !card.gathered.lay[k]); return missing.length ? ` 아직 없는 배치: ${missing.join(', ')}. 확정한 뒤 주사위를 누르면 나머지를 채우는 문장을 줘요.` : ' 여섯 가지가 다 모였어요.' })()}</p>
-                <div className={styles.bonus}>덤으로 모은 자모 {Object.keys(card.gathered.jamo).length}개: {Object.entries(card.gathered.jamo).map(([L, samples]) => <span key={L}><SampleThumb sample={samples[0]} size={30} /> {L}</span>)}</div>
-              </>}
+          {card.step === 1 && card.gathered.reads.length > 0 && <>
+            {(() => {
+              const cells = Object.entries(card.gathered.jamo).flatMap(([L, ss]) => [...new Set(ss.map((s) => s.slot))].map((slot) => cardCell(L, slot)))
+              const nNew = cells.filter((c) => c.state === 'new').length, nDup = cells.filter((c) => c.state === 'dup' || c.state === 'dupOn').length
+              return <div className={styles.secHead}><b>이번에 모은 글자</b><span className={styles.badgeNew}>새로 {nNew}</span>{nDup > 0 && <span className={styles.badgeDup}>겹침 {nDup}</span>}<span className={styles.sub}>새것은 그대로 올라가요. 겹치는 건 누르면 이번 글씨로 덮어요</span></div>
+            })()}
+            <JamoGrid cellOf={cardCell} onTap={tapCardCell} focus={card.focus} />
+            {card.focus && previewBank && (() => {
+              const { L, slot } = card.focus
+              const got = card.gathered.jamo[L]?.filter((s) => s.slot === slot) ?? []
+              const sample = got[got.length - 1]
+              if (!sample) return null
+              return <div className={styles.detail} data-testid="handwriting-detail">
+                <BeforeAfter before={bank} after={previewBank} char={sample.from} style={style} override={{ [L]: sample }} />
+                <small>{slot === 2 ? '받침 ' : ''}{L} · {sample.from}</small>
+              </div>
+            })()}
+          </>}
 
-              {phase === 2 && <>
-                {Object.entries(card.gathered.jamo).map(([L, samples]) => {
-                  const choice = card.choices.jamo[L]
-                  const sample = choice?.kind === 'slot' ? (samples.filter((s) => s.type === choice.type).pop() ?? samples[samples.length - 1]) : samples[samples.length - 1]
-                  const had = bank.jamo[L]
-                  const isCho = sample.slot === 0
-                  const old = had ? (isCho ? had.by[sample.type] ?? had.rep : had.rep) : null
-                  return <div key={L} className={styles.jamoRow}>
-                    <div className={styles.jamoHead}>
-                      <SampleThumb sample={sample} /><b>{L}</b>
-                      {choice?.kind === 'slot' && <><span className={styles.tag}>{TYPE_NAME[sample.type]} 자리 꼴</span><small>이 자리 꼴로 넣어요</small></>}
-                      {choice?.kind !== 'slot' && !had && <><span className={`${styles.tag} ${styles.tagNew}`}>새로</span>
-                        <label className={styles.inl}><input type="checkbox" checked={choice?.kind !== 'skip'} onChange={(e) => setChoice(L, { kind: e.target.checked ? 'new' : 'skip' })} /> 넣기</label></>}
-                      {choice?.kind !== 'slot' && had && old && <><span className={styles.tag}>이미 있음</span><small>지금 것</small><SampleThumb sample={old} />
-                        <span>→</span>
-                        <label className={styles.inl}><input type="radio" name={`k-${L}`} checked={choice?.kind !== 'swap'} onChange={() => setChoice(L, { kind: 'keep' })} /> 두기</label>
-                        <label className={styles.inl}><input type="radio" name={`k-${L}`} checked={choice?.kind === 'swap'} onChange={() => setChoice(L, { kind: 'swap' })} /> {isCho ? `${TYPE_NAME[sample.type]} 자리는 ` : ''}이걸로 바꾸기</label></>}
-                    </div>
-                    {isCho && !had && <div className={styles.varRow}>
-                      <small>다른 자리에 놓으면:</small>
-                      {CHOICE_ORDER.map((tp) => {
-                        const ex = exampleOf(L, tp)
-                        if (!ex || !previewBank) return null
-                        return <span key={tp} className={styles.varCell}>
-                          <BankGlyph bank={previewBank} char={ex} size={56} style={style} override={{ [L]: sample }} faintMissing={false} />
-                          <small>{ex}{tp === sample.type ? ' (쓴 자리)' : ''}</small>
-                          {tp !== sample.type && <Button size="sm" onClick={() => rewriteSlot(L, tp)}>이 자리 다시 쓰기</Button>}
-                        </span>
-                      })}
-                    </div>}
-                  </div>
-                })}
-                {Object.keys(card.gathered.jamo).length === 0 && <p>읽힌 자모가 없어요.</p>}
-                {Object.keys(card.gathered.lay).length > 0 && <div className={styles.layQ}>
-                  <p>배치는 이미 확정돼 있어요. 이번 글씨의 배치 버릇을 중간값에 섞을까요?</p>
-                  <div className={styles.layRow}>
-                    {(Object.keys(card.gathered.lay) as typeof LAYOUT_KEYS[number][]).map((k) => {
-                      const fresh = averageLayout(card.gathered.lay[k]!), have = bank.lay[k]!
-                      const pct = (e: LayoutEntry) => e.boxes.CH ? Math.round((e.boxes.CH.x1 - e.boxes.CH.x0) * 100) : 0
-                      return <div key={k} className={styles.layCell}><LayoutThumb entry={have} size={56} /><LayoutThumb entry={fresh} size={56} />
-                        <div><b>{k}</b> · {card.gathered.lay[k]!.map((r) => r.char).join(', ')}<br /><small>첫닿자 너비 {pct(have)}% → 섞으면 {pct(blendLayout(have, fresh))}% (이번 글씨 {pct(fresh)}%)</small></div></div>
-                    })}
-                  </div>
-                  <label className={styles.inl}><input type="radio" name="lmix" checked={card.choices.layout === 'keep'} onChange={() => setCard((c) => c && { ...c, choices: { ...c.choices, layout: 'keep' } })} /> 두기</label>
-                  <label className={styles.inl}><input type="radio" name="lmix" checked={card.choices.layout === 'mix'} onChange={() => setCard((c) => c && { ...c, choices: { ...c.choices, layout: 'mix' } })} /> 섞기</label>
-                </div>}
-              </>}
+          {card.step === 2 && layoutPair && <>
+            <div className={styles.layGrid}>
+              {(Object.keys(card.gathered.lay) as LayoutKey[]).map((k) => {
+                const char = card.gathered.lay[k]![0].char
+                const isNew = !bank.lay[k]
+                const on = isNew || !!card.choices.mix?.[k]
+                return <button key={k} type="button" className={`${styles.layTile}${on ? ` ${styles.layOn}` : ''}`} disabled={isNew} data-testid={`handwriting-lay-${k}`}
+                  onClick={() => setCard((c) => c && { ...c, choices: { ...c.choices, mix: { ...c.choices.mix, [k]: !c.choices.mix?.[k] } } })}>
+                  <i className={styles.layChk}>{isNew ? '새' : on ? '✓' : ''}</i>
+                  <BeforeAfter before={isNew ? null : layoutPair.before} after={layoutPair.after} char={char} style={style} size={64} />
+                  <small>{k}</small>
+                </button>
+              })}
+            </div>
+            {phase === 1 && (() => {
+              const missing = LAYOUT_KEYS.filter((k) => !bank.lay[k] && !card.gathered.lay[k])
+              return <p className={styles.sub}>{missing.length ? `반영하면 배치 ${6 - missing.length}/6. 아직 없는 배치: ${missing.join(', ')}` : '반영하면 배치 여섯 가지가 다 모여요.'}</p>
+            })()}
+          </>}
 
-              <p className={styles.preview} data-testid="handwriting-preview">
-                {previewBank && phaseOf(previewBank) === 1
-                  ? `반영하면 배치 ${LAYOUT_KEYS.filter((k) => previewBank.lay[k]).length}/6. 여섯이 다 모이면 글자표가 차기 시작해요.`
-                  : <>반영하면 글자표에 <b>+{added.length}자</b>가 새로 채워져요{previewStats && previewStats.partial - stats.partial > 0 ? `, 반쯤 찬 글자 +${previewStats.partial - stats.partial}` : ''}.{added.length ? ` 예: ${added.slice(0, 12).join(' ')}` : ''}</>}
-              </p>
-            </>}
           <DialogFooter>
-            <Button onClick={() => setCard(null)}>아직</Button>
-            <Button variant="primary" disabled={card.gathered.reads.length === 0} onClick={() => { const then = card.then; const next = applyCard(); if (then === 'roll' && next) window.setTimeout(() => rollDice(next), 50) }} data-testid="handwriting-ok">ㅇㅋ, 이대로 반영</Button>
+            {card.step === 1 && rewrite
+              // 자모 하나 고치기는 레이아웃 단계 없이 바로 반영
+              ? <><Button onClick={() => setCard(null)}>아직</Button>
+                <Button variant="primary" disabled={card.gathered.reads.length === 0} onClick={() => applyCard()} data-testid="handwriting-ok">ㅇㅋ, 반영</Button></>
+              : card.step === 1
+              ? <><Button onClick={() => setCard(null)}>아직</Button>
+                <Button variant="primary" disabled={card.gathered.reads.length === 0} onClick={() => setCard((c) => c && { ...c, step: 2 })} data-testid="handwriting-next">다음 › 레이아웃</Button></>
+              : <><Button onClick={() => setCard((c) => c && { ...c, step: 1 })}>‹ 이전</Button>
+                <Button variant="primary" onClick={() => { const then = card.then; const next = applyCard(); if (then === 'roll' && next) window.setTimeout(() => rollDice(next), 50) }} data-testid="handwriting-ok">ㅇㅋ, 반영</Button></>}
           </DialogFooter>
         </>}
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={picker.open} onOpenChange={(open) => { if (!open) setPicker({ open: false, L: null, slot: 0 }) }}>
+      <DialogContent className={styles.card}>
+        <DialogHeader><DialogTitle>자모 하나 고치기</DialogTitle><p className={styles.sub}>고칠 자모를 누르면 그 자모가 든 글자 한 자만 쓰게 해요.</p></DialogHeader>
+        <JamoGrid cellOf={pickerCell} focus={picker.L ? { L: picker.L, slot: picker.slot } : null} onTap={(L, slot) => slot === 0 ? setPicker({ open: true, L, slot }) : startRewrite(L, slot, 'J')} />
+        {picker.L && picker.slot === 0 && <div className={styles.slotRow} data-testid="handwriting-slot-row">
+          <small>{picker.L}를 어느 자리 꼴로 쓸까요?</small>
+          {FIRST_TYPES.map((t) => <Button key={t} size="sm" onClick={() => startRewrite(picker.L!, 0, t)}>{exampleOf(picker.L!, t)}<em>{TYPE_NAME[t]}</em></Button>)}
+        </div>}
       </DialogContent>
     </Dialog>
   </div>
