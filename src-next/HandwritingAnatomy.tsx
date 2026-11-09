@@ -5,7 +5,7 @@ import { useContextPlacement } from './notoModel'
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
-import { describeStrokeGeometry, grammarOf, STEM_NAME_LABEL, STEM_SHAPE_LABEL } from '../src/services/strokeGrammar'
+import { describeStrokeGeometry, grammarOf, STEM_NAME_LABEL, STEM_SHAPE_LABEL, TOUCH_DISTANCE } from '../src/services/strokeGrammar'
 import type { JamoType, StemShape } from '../src/services/strokeGrammar'
 import { MEDIAL_STEM_ROLES } from '../src/services/medialStemRails'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
@@ -97,6 +97,22 @@ function stemLabelsOf(primitives: Prim[], jamo: JamoData, table: Readonly<Record
   return out
 }
 
+type V2 = { x: number; y: number }
+const unit = (v: V2): V2 => { const d = Math.hypot(v.x, v.y) || 1; return { x: v.x / d, y: v.y / d } }
+/**
+ * 꺾임이 앉은 귀. 두 팔(꺾임에서 뻗어 나가는 쪽)을 더한 방향의 반대가 귀다 — 팔이 왼쪽 · 아래로 가면 오른 위 귀(ㄱ).
+ * 팔 둘이 거의 맞서 한쪽이 안 정해지면 그쪽 말은 뺀다.
+ */
+function earOf(armA: V2, armB: V2): { word: string; out: V2 } {
+  const a = unit(armA), b = unit(armB)
+  const v = { x: a.x + b.x, y: a.y + b.y }
+  const h = v.x < -0.35 ? '오른' : v.x > 0.35 ? '왼' : ''
+  const ver = v.y > 0.35 ? '위' : v.y < -0.35 ? '아래' : ''
+  return { word: `${[h, ver].filter(Boolean).join(' ') || '가운데'} 귀`, out: unit({ x: -v.x, y: -v.y }) }
+}
+/** 꺾임 각: 90° 안팎이면 곧은, 덜 돌면(둔각) 벌어진, 더 돌면(예각) 좁은 꺾임. */
+const angleWord = (turn: number) => (turn < 70 ? '벌어진 꺾임' : turn > 110 ? '좁은 꺾임' : '곧은 꺾임')
+
 function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot): AnatomyItem[] {
   const table = grammarOf(type, jamo.char)
   const labels = stemLabelsOf(primitives, jamo, table)
@@ -130,6 +146,8 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
     const attrs = attrsOf(prim)
     const others = primitives.filter((p) => p.source.channel === source.channel && p.stroke.id !== stroke.id).map((p) => p.stroke)
     const geo = describeStrokeGeometry(stroke, others)
+    // 열린 꼴: 획 끝 하나라도 다른 획에 안 닿으면 트인 꺾임(ㄱ · ㄴ), 끝이 다 막히거나 닫힌 획이면 속공간을 감싸는 꺾임(ㅁ).
+    const strokeOpen = !stroke.closed && geo.segments.some((g) => g.head?.open || g.tail?.open)
     const name = table[stroke.id] ?? null
     const stem = labels.get(stroke.id)
     // 기능 층 줄기 이름: 표 이름(기둥 · 보 …), 없으면 닿자는 자리 + 모양(첫닿자 세로줄기), 홀자는 모양.
@@ -157,7 +175,17 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
     })
     if (reversed) steps.reverse()
     for (const step of steps) {
-      if ('corner' in step) { const c = step.corner; out.push({ n: n++, strokeId: stroke.id, kind: 'corner', label: '꺾임', note: `${Math.round(c.turn)}° 돎`, at: toView(c, box), scope: cornerScope, paint: toView(c, box), attrs }); continue }
+      if ('corner' in step) {
+        const c = step.corner
+        // 닫힌 획은 첫 점을 끝에 한 번 더 적어 두기도 한다 — 그 점을 빼야 첫 꺾임의 이웃이 맞다.
+        const ring = stroke.closed && pts.length > 2 && Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) < 1e-6 ? pts.slice(0, -1) : pts
+        const k = ring.length
+        const at = toView(c, box)
+        const nb = (j: number) => toView(ring[(j + k) % k], box)
+        const ear = earOf({ x: nb(c.point - 1).x - at.x, y: nb(c.point - 1).y - at.y }, { x: nb(c.point + 1).x - at.x, y: nb(c.point + 1).y - at.y })
+        out.push({ n: n++, strokeId: stroke.id, kind: 'corner', label: '꺾임', note: `${Math.round(c.turn)}° 돎`, at, scope: cornerScope, paint: at, attrs: [...attrs, ear.word, strokeOpen ? '열린 꼴' : '닫힌 꼴', angleWord(c.turn)] })
+        continue
+      }
       const seg = step.seg
       const shape = STEM_SHAPE_LABEL[seg.shape]
       if (seg.shape === 'dunggeunjulgi') {
@@ -183,6 +211,35 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
       })
       if (seg.tail?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'tail', label: '맺음', note: `${segName}의 열린 끝`, at: endMark(seg.tail.point), scope: endScope('맺음', seg.shape), paint: toView(pts[seg.tail.point], box), attrs })
     }
+  }
+  // 만난 꺾임: 두 획의 끝끼리 맞닿아 귀를 이루는 곳(ㅁ을 두 획으로 그렸을 때의 귀). 한 획 안 꺾임과 같은 묶음에 든다.
+  const ends = primitives.flatMap((p) => {
+    const pts = p.stroke.points
+    if (p.stroke.closed || pts.length < 2) return []
+    return [0, pts.length - 1].map((i) => {
+      const nb = i === 0 ? (pts[0].handleOut ?? pts[1]) : (pts[i].handleIn ?? pts[i - 1])
+      return { p, i, at: toView(pts[i], p.box), arm: toView(nb, p.box), local: pts[i], other: pts[i === 0 ? pts.length - 1 : 0] }
+    })
+  })
+  const touchesOthers = (p: Prim, pt: { x: number; y: number }) => primitives.some((q) => q !== p && q.stroke.points.some((r) => Math.hypot(toView(r, q.box).x - toView(pt, p.box).x, toView(r, q.box).y - toView(pt, p.box).y) < TOUCH_DISTANCE * p.box.width * V))
+  for (let a = 0; a < ends.length; a++) for (let b = a + 1; b < ends.length; b++) {
+    const A = ends[a], B = ends[b]
+    if (A.p === B.p) continue
+    const reach = TOUCH_DISTANCE * Math.min(A.p.box.width, A.p.box.height) * V
+    if (Math.hypot(A.at.x - B.at.x, A.at.y - B.at.y) > reach) continue
+    const armA = { x: A.arm.x - A.at.x, y: A.arm.y - A.at.y }, armB = { x: B.arm.x - B.at.x, y: B.arm.y - B.at.y }
+    const ua = unit(armA), ub = unit(armB)
+    const turn = 180 - Math.acos(Math.max(-1, Math.min(1, ua.x * ub.x + ua.y * ub.y))) * 180 / Math.PI
+    if (turn < 30 || turn > 150) continue
+    const at = { x: (A.at.x + B.at.x) / 2, y: (A.at.y + B.at.y) / 2 }
+    const ear = earOf(armA, armB)
+    const closed = touchesOthers(A.p, A.other) && touchesOthers(B.p, B.other)
+    const who = (p: Prim) => labels.get(p.stroke.id) ?? '획'
+    out.push({
+      n: n++, strokeId: `${A.p.stroke.id}+${B.p.stroke.id}`, kind: 'corner', label: '만난 꺾임', note: `${who(A.p)} · ${who(B.p)}가 만남`,
+      at: { x: at.x + ear.out.x * 4.5, y: at.y + ear.out.y * 4.5 }, scope: { fn: { key: `꺾임|${slot === 'JU' ? '홀자' : '닿자'}`, label: `${slot === 'JU' ? '홀자' : '닿자'} 꺾임` }, shape: { key: '꺾임', label: '모든 꺾임' } },
+      paint: at, attrs: [slot === 'JU' ? vowelKind(jamo.char) : SLOT_NAME[slot], ear.word, closed ? '닫힌 꼴' : '열린 꼴', angleWord(turn), '획끼리 만남'],
+    })
   }
   // 번호가 앞 번호와 겹치면 마디를 따라 옆으로 옮긴다.
   const near = (p: { x: number; y: number }, upto: number) => out.slice(0, upto).some((o) => Math.hypot(o.at.x - p.x, o.at.y - p.y) < 6)
@@ -336,7 +393,7 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
     const s = SLOT_OF[source.part]
     if (!slot) return SLOT_COLOR[s]
     if (s !== slot) return EDIT_COLOR.editSlotOff
-    if (hotItem && hotItem.strokeId !== source.strokeId) return EDIT_COLOR.editGuide
+    if (hotItem && !hotItem.strokeId.split('+').includes(source.strokeId)) return EDIT_COLOR.editGuide
     return SLOT_COLOR[s]
   }
   const pick = (s: Slot) => { setHot(null); setFocus(slot === s ? null : { char, slot: s }) }
