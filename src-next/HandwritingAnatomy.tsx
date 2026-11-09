@@ -244,7 +244,7 @@ const CHO_ORDER = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
 const JUNG_ORDER = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
 const JONG_ORDER = ' ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ'
 /** 자모를 보일 본보기 글자: 첫닿자는 ○+ㅏ, 홀자는 ㅇ+○, 받침은 가+○. 글자 속 상자 비율 그대로 보이려고. */
-const sampleChar = (slot: Slot, ch: string): string | null => {
+export const sampleChar = (slot: Slot, ch: string): string | null => {
   const [c, j, t] = slot === 'CH' ? [CHO_ORDER.indexOf(ch), 0, 0] : slot === 'JU' ? [11, JUNG_ORDER.indexOf(ch), 0] : [0, 0, JONG_ORDER.indexOf(ch)]
   if (c < 0 || j < 0 || t < 0) return null
   return String.fromCharCode(0xac00 + (c * 21 + j) * 28 + t)
@@ -285,7 +285,7 @@ const ScopeMini = memo(function ScopeMini({ ch, slot, scopeKey, style }: { ch: s
   </svg>
 })
 
-export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style, size = 360, onScope, scopeJamo }: { char: string; style: GlobalStyle; size?: number; onScope?: (scope: PartScope | null) => void; scopeJamo?: { slot: Slot; total: number; hits: string[] }[] }) {
+export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style, size = 360, onScope, scopeJamo, focusRequest, onFocusSlot }: { char: string; style: GlobalStyle; size?: number; onScope?: (scope: PartScope | null) => void; scopeJamo?: { slot: Slot; total: number; hits: string[] }[]; /** 자모 카드에서 고르면 그 자리를 바로 펼친다. */ focusRequest?: { char: string; slot: Slot; at: number } | null; /** 펼친 자리가 바뀌면 알린다(자모 카드 표시용). */ onFocusSlot?: (slot: Slot | null) => void }) {
   const choseong = useJamoStore((state) => state.choseong)
   const jungseong = useJamoStore((state) => state.jungseong)
   const jongseong = useJamoStore((state) => state.jongseong)
@@ -299,8 +299,10 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
   }, [schemas, globalPadding, paddingOverrides, syllable.layoutType])
   const { placement } = useContextPlacement(syllable, schema, style)
   const [focus, setFocus] = useState<{ char: string; slot: Slot } | null>(null)
+  useEffect(() => { if (focusRequest) { setHot(null); setFocus({ char: focusRequest.char, slot: focusRequest.slot }) } }, [focusRequest?.at]) // eslint-disable-line react-hooks/exhaustive-deps
   const [hot, setHot] = useState<number | null>(null)
   const slot = focus?.char === char ? focus.slot : null
+  useEffect(() => { onFocusSlot?.(slot) }, [slot]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 렌더러와 같은 입력으로 획을 풀어, 그려지는 그 획에서 부위를 읽는다.
   const resolved = useMemo(() => resolveGlyphInkPrimitives({
