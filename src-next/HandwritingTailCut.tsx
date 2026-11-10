@@ -18,6 +18,24 @@ export interface TailCut { source: ResolvedStrokeInkSource; points: string }
 const V = 100
 type Prim = { stroke: StrokeDataV2; box: Readonly<BoxConfig>; source: ResolvedStrokeInkSource; weightMultiplier: number }
 
+/**
+ * 맺음이 열렸는지. 획 문법은 끝에서 0.1 안에 다른 획이 있으면 닿은 끝으로 읽는데, 그러면 곁줄기 아래로 조금 내려온 기둥 끝(ㅞ의 안 기둥)까지
+ * 막힌 끝이 된다. 맺음은 끝이 다른 획 밖으로 나와 있으면 열린 것으로 본다 — 끝 점이 다른 획에서 이만큼(자모 상자 기준) 떨어져 있으면 열림.
+ */
+const TAIL_GAP = 0.05
+export function tailIsOpen(stroke: StrokeDataV2, point: number, others: readonly StrokeDataV2[]): boolean {
+  const p = stroke.points[point]
+  const toSeg = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+    const dx = b.x - a.x, dy = b.y - a.y
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)))
+    return Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t))
+  }
+  return others.every((other) => {
+    const pts = other.closed ? [...other.points, other.points[0]] : other.points
+    return pts.slice(1).every((q, i) => toSeg(pts[i], q) > TAIL_GAP)
+  })
+}
+
 export function tailCutsOf(primitives: readonly Prim[], angleOf: CutAngleResolver): TailCut[] {
   const out: TailCut[] = []
   for (const prim of primitives) {
@@ -28,7 +46,7 @@ export function tailCutsOf(primitives: readonly Prim[], angleOf: CutAngleResolve
     const view = (p: { x: number; y: number }) => ({ x: (box.x + p.x * box.width) * V, y: (box.y + p.y * box.height) * V })
     for (const seg of describeStrokeGeometry(stroke, others).segments) {
       const tail = seg.tail
-      if (!tail?.open || tail.kind !== 'end') continue
+      if (!tail || tail.kind !== 'end' || !(tail.open || tailIsOpen(stroke, tail.point, others))) continue
       const angle = angleOf(source, STEM_SHAPE_LABEL[seg.shape])
       if (!angle) continue
       const i = tail.point

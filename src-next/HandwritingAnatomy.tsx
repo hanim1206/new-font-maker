@@ -15,7 +15,7 @@ import type { GroupBeakResolver } from '../src/stores/jamoGroupStore'
 import { Button } from './components/ui/button'
 import { pointsToSvgD } from '../src/utils/pathUtils'
 import { EDIT_COLOR } from './editColors'
-import { TailCutInk, useTailCuts } from './HandwritingTailCut'
+import { TailCutInk, tailIsOpen, useTailCuts } from './HandwritingTailCut'
 import type { CutAngleResolver } from './HandwritingTailCut'
 import styles from './HandwritingAnatomy.module.css'
 
@@ -241,7 +241,7 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
         paint: { d: pointsToSvgD(pts.slice(Math.min(seg.fromPoint, seg.toPoint), Math.max(seg.fromPoint, seg.toPoint) + 1), false, box, V) },
         attrs: segAttrs,
       })
-      if (seg.tail?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'tail', label: '맺음', note: `${segName}의 열린 끝`, at: endMark(seg.tail.point), scope: endScope('맺음', seg.shape), paint: toView(pts[seg.tail.point], box), attrs: segAttrs })
+      if (seg.tail && (seg.tail.open || (seg.tail.kind === 'end' && tailIsOpen(stroke, seg.tail.point, others)))) out.push({ n: n++, strokeId: stroke.id, kind: 'tail', label: '맺음', note: `${segName}의 열린 끝`, at: endMark(seg.tail.point), scope: endScope('맺음', seg.shape), paint: toView(pts[seg.tail.point], box), attrs: segAttrs })
     }
   }
   // 만난 꺾임: 두 획의 끝끼리 맞닿아 귀를 이루는 곳(ㅁ을 두 획으로 그렸을 때의 귀). 한 획 안 꺾임과 같은 묶음에 든다.
