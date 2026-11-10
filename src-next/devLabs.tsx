@@ -73,6 +73,18 @@ export async function showDevLab(show: (node: ReactNode) => void): Promise<boole
     return true
   }
 
+  if (path === '/layout-rules') {
+    const { LayoutRulesLabPage } = await import('./LayoutRulesLabPage')
+    show(<LayoutRulesLabPage />)
+    return true
+  }
+
+  if (path === '/layout-ladder') {
+    const { LayoutLadderLabPage } = await import('./LayoutLadderLabPage')
+    show(<LayoutLadderLabPage />)
+    return true
+  }
+
   if (path === '/style-guide') {
     const { StyleGuideLabPage } = await import('./StyleGuideLabPage')
     show(<StyleGuideLabPage />)
