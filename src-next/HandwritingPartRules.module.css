@@ -1,6 +1,7 @@
 .dialog { width: min(920px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 48px); display: flex; flex-direction: column; }
 .sentence { margin: 6px 0 0; font-size: 15px; }
 .sentence b { padding: 3px 10px; border-radius: 8px; background: rgb(var(--color-surface-3)); font-weight: 700; }
+.note { margin: 0; color: rgb(var(--color-text-3)); font-size: 12px; }
 .sentence span { color: rgb(var(--color-text-3)); }
 .body { display: grid; gap: 16px; overflow-y: auto; min-height: 0; padding: 4px 2px; }
 .body section { display: grid; gap: 8px; }
