@@ -11,6 +11,8 @@ import { MEDIAL_STEM_ROLES } from '../src/services/medialStemRails'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import type { BoxConfig, JamoData, Part, ResolvedStrokeInkSource, StrokeDataV2 } from '../src/types'
+import type { GroupBeakResolver } from '../src/stores/jamoGroupStore'
+import { Button } from './components/ui/button'
 import { pointsToSvgD } from '../src/utils/pathUtils'
 import { EDIT_COLOR } from './editColors'
 import styles from './HandwritingAnatomy.module.css'
@@ -24,10 +26,10 @@ import styles from './HandwritingAnatomy.module.css'
 export type Slot = 'CH' | 'JU' | 'JO'
 /** 부위 묶음. 기능 층(짧은기둥의 머리)과 형태 층(세로줄기의 머리) 두 높이가 있다. */
 export interface PartScope { key: string; label: string }
-const SLOT_OF: Record<Part, Slot> = { CH: 'CH', JU: 'JU', JU_H: 'JU', JU_V: 'JU', JO: 'JO' }
+export const SLOT_OF: Record<Part, Slot> = { CH: 'CH', JU: 'JU', JU_H: 'JU', JU_V: 'JU', JO: 'JO' }
 const SLOT_TYPE: Record<Slot, JamoType> = { CH: 'choseong', JU: 'jungseong', JO: 'jongseong' }
-const SLOT_NAME: Record<Slot, string> = { CH: '첫닿자', JU: '홀자', JO: '받침' }
-const SLOT_COLOR: Record<Slot, string> = { CH: EDIT_COLOR.editSlotCh, JU: EDIT_COLOR.editSlotJu, JO: EDIT_COLOR.editSlotJo }
+export const SLOT_NAME: Record<Slot, string> = { CH: '첫닿자', JU: '홀자', JO: '받침' }
+export const SLOT_COLOR: Record<Slot, string> = { CH: EDIT_COLOR.editSlotCh, JU: EDIT_COLOR.editSlotJu, JO: EDIT_COLOR.editSlotJo }
 const SLOT_VAR: Record<Slot, string> = { CH: '--color-edit-slot-ch', JU: '--color-edit-slot-ju', JO: '--color-edit-slot-jo' }
 const V = 100
 
@@ -319,6 +321,18 @@ function unitItems(jamo: JamoData, slot: Slot): { prims: Prim[]; items: AnatomyI
   return { prims, items: itemsOf(prims, jamo, SLOT_TYPE[slot], slot) }
 }
 
+/** 부리를 얹을 수 있는 자리의 묶음 키: 세로줄기의 열린 머리. */
+export const BEAK_TARGET_KEY = '머리|세로줄기'
+/**
+ * 자모에서 부리가 얹힐 획 → 그 머리가 달린 줄기 이름(기둥 · 짧은기둥 · 닿자 세로줄기 …).
+ * 부리는 획 단위로 걸리므로(`SvgRenderer`의 `groupBeakOf`) 획 id로 찾는다.
+ */
+export function beakHeadsOf(jamo: JamoData, slot: Slot): Map<string, string> {
+  const out = new Map<string, string>()
+  unitItems(jamo, slot).items.forEach((it) => { if (it.kind === 'head' && it.scope.shape.key === BEAK_TARGET_KEY) out.set(it.strokeId, it.scope.fn.key.split('|')[1]) })
+  return out
+}
+
 export function jamoScopeKeys(jamo: JamoData, slot: Slot): Set<string> {
   const keys = new Set<string>()
   unitItems(jamo, slot).items.forEach((it) => { keys.add(it.scope.fn.key); keys.add(it.scope.shape.key) })
@@ -370,7 +384,19 @@ const ScopeMini = memo(function ScopeMini({ ch, slot, scopeKey, style }: { ch: s
   </svg>
 })
 
-export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style, size = 360, onScope, scopeJamo, focusRequest, onFocusSlot }: { char: string; style: GlobalStyle; size?: number; onScope?: (scope: PartScope | null) => void; scopeJamo?: { slot: Slot; total: number; hits: string[] }[]; /** 자모 카드에서 고르면 그 자리를 바로 펼친다. */ focusRequest?: { char: string; slot: Slot; at: number } | null; /** 펼친 자리가 바뀌면 알린다(자모 카드 표시용). */ onFocusSlot?: (slot: Slot | null) => void }) {
+export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style, size = 360, onScope, scopeJamo, focusRequest, onFocusSlot, groupBeakOf, onAddStyle }: {
+  char: string; style: GlobalStyle; size?: number
+  onScope?: (scope: PartScope | null) => void
+  scopeJamo?: { slot: Slot; total: number; hits: string[] }[]
+  /** 자모 카드에서 고르면 그 자리를 바로 펼친다. */
+  focusRequest?: { char: string; slot: Slot; at: number } | null
+  /** 펼친 자리가 바뀌면 알린다(자모 카드 표시용). */
+  onFocusSlot?: (slot: Slot | null) => void
+  /** 부위 스타일 규칙이 정한 획별 부리. */
+  groupBeakOf?: GroupBeakResolver
+  /** 고른 부위에 스타일 걸기 팝업을 연다. 지금은 세로줄기의 머리(부리)만. */
+  onAddStyle?: (from: { stem: string; slot: Slot }) => void
+}) {
   const choseong = useJamoStore((state) => state.choseong)
   const jungseong = useJamoStore((state) => state.jungseong)
   const jongseong = useJamoStore((state) => state.jongseong)
@@ -431,7 +457,7 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
       <div className={styles.main}>
       <div className={styles.big} onClick={() => { setHot(null); setFocus(null) }}>
         <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined}
-          size={size} globalStyle={style} overflow="visible" clipGlyphs={false} strokeColorOf={colorOf}>
+          size={size} globalStyle={style} overflow="visible" clipGlyphs={false} strokeColorOf={colorOf} groupBeakOf={groupBeakOf}>
           {slots.filter((s) => !slot || s.slot === slot).flatMap((s) => s.parts.map((b, i) => <rect key={`${s.slot}-${i}`} x={b.x * V} y={b.y * V} width={b.width * V} height={b.height * V}
             fill="none" stroke={SLOT_COLOR[s.slot]} strokeWidth={0.35} strokeDasharray="1.2 1" pointerEvents="none" />))}
           {/* 자모 고르기: 획 위를 누르면 그 자모가 펼쳐진다. 투명한 굵은 선이 눌림을 받는다. */}
@@ -450,7 +476,11 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
           <i aria-hidden="true" /><small>{SLOT_NAME[g.slot]}</small><em>{g.hits.length}/{g.total}</em>
           <span className={styles.minis}>{g.hits.map((h) => <ScopeMini key={h} ch={h} slot={g.slot} scopeKey={scope.key} style={style} />)}</span>
         </div>)}
-      </div>}
+      
+          {onAddStyle && hotItem && (hotItem.kind === 'head' && hotItem.scope.shape.key === BEAK_TARGET_KEY
+            ? <Button size="sm" variant="primary" className={styles.addStyle} onClick={() => onAddStyle({ stem: hotItem.scope.fn.key.split('|')[1], slot: active!.slot })} data-testid="handwriting-add-style">스타일 추가하기</Button>
+            : <p className={styles.hint}>이 부위에 걸 스타일은 아직 없어요. 지금은 세로줄기의 머리에 부리만 얹을 수 있어요.</p>)}
+</div>}
       </div>
       <div className={styles.side}>
         {active && <div className={styles.sideHead} style={{ ['--slot' as string]: `var(${SLOT_VAR[active.slot]})` }}>
