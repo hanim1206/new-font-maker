@@ -470,6 +470,8 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
     <div className={styles.stage}>
       <div className={styles.main}>
       <div className={styles.big} onClick={() => { setHot(null); setFocus(null) }}>
+        {/* 스타일 추가하기는 캔버스 오른쪽 위에(사용자 11-11). 고른 부위에 걸 스타일이 있을 때만. */}
+        {onAddStyle && hotItem && styleKind && <Button size="sm" variant="primary" className={styles.addStyle} onClick={(e) => { e.stopPropagation(); onAddStyle({ kind: styleKind, stem: hotItem.scope.fn.key.split('|')[1], slot: active!.slot }) }} data-testid="handwriting-add-style">스타일 추가하기</Button>}
         <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined}
           size={size} globalStyle={style} overflow="visible" clipGlyphs={false} strokeColorOf={colorOf} groupBeakOf={groupBeakOf} partStyles={cutMask.partStyles}>
           {cutMask.defs}
@@ -492,9 +494,7 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
           <span className={styles.minis}>{g.hits.map((h) => <ScopeMini key={h} ch={h} slot={g.slot} scopeKey={scope.key} style={style} />)}</span>
         </div>)}
       
-        {onAddStyle && hotItem && (styleKind
-          ? <Button size="sm" variant="primary" className={styles.addStyle} onClick={() => onAddStyle({ kind: styleKind, stem: hotItem.scope.fn.key.split('|')[1], slot: active!.slot })} data-testid="handwriting-add-style">스타일 추가하기</Button>
-          : <p className={styles.hint}>이 부위에 걸 스타일은 아직 없어요. 지금은 세로줄기의 머리에 부리, 맺음에 비스듬히 자르기를 걸 수 있어요.</p>)}
+        {onAddStyle && hotItem && !styleKind && <p className={styles.hint}>이 부위에 걸 스타일은 아직 없어요. 지금은 세로줄기의 머리에 부리, 맺음에 비스듬히 자르기를 걸 수 있어요.</p>}
       </div>}
       </div>
       <div className={styles.side}>
