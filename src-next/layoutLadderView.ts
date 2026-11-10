@@ -12,13 +12,22 @@ export const LADDER_CSS = `.LL{--ink:#1d1d1f;--mute:#6e6e73;--line:#e3e3e6;--bg:
 .LL h2{font-size:17px;margin:34px 0 8px}
 .LL p.sub{color:var(--mute);margin:0 0 16px}
 .LL .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px}
-.LL .ladder .st{display:grid;grid-template-columns:28px 1fr 170px;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line);cursor:pointer}
+.LL .ladder .st{display:grid;grid-template-columns:24px 1fr 250px;gap:8px;align-items:center;padding:5px 0;border-top:1px solid var(--line);cursor:pointer}
 .LL .ladder .st:first-child{border-top:0}
 .LL .ladder .st.base{cursor:default}
 .LL .ladder .st input{width:18px;height:18px}
 .LL .ladder .st .nm{font-weight:600}
 .LL .ladder .st small{display:block;color:var(--mute);font-weight:400;font-size:12px}
-.LL .ladder .st .num{text-align:right;font-size:13px;color:var(--mute)}
+.LL .ladder .st .num{text-align:right;font-size:12px;color:var(--mute)}
+.LL .ladder .st .nm[data-hyp]{cursor:pointer}
+.LL .ladder .st .more{font-weight:400;font-size:12px;color:var(--mute);text-decoration:underline}
+.LL .pop{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:24px}
+.LL .pop[hidden]{display:none}
+.LL .pop .pin{position:relative;background:#fff;border-radius:12px;max-width:760px;width:100%;max-height:85vh;overflow:auto;padding:20px 22px}
+.LL .pop .pin h3{margin:0 70px 6px 0;font-size:17px}
+.LL .pop .pin .who{margin:0 0 6px;color:var(--ink);font-size:14px}
+.LL .pop .pin .num{margin:0 0 12px;color:var(--mute);font-size:13px}
+.LL .pop .x{position:absolute;top:14px;right:14px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 10px;cursor:pointer}
 .LL .ladder .st .num b{color:var(--ink);font-size:15px}
 .LL .ladder .st.cur .nm{color:var(--step)}
 .LL .ladder .add{color:var(--mute);font-size:13px;padding-top:10px;border-top:1px dashed var(--line)}
@@ -96,6 +105,7 @@ export const LADDER_HTML = `<main>
 
 <section class="card">
 <div class="ladder" id="ladder"></div>
+<div class="pop" id="pop" hidden><div class="pin"><button class="x" id="popx">닫기</button><div id="popbody"></div></div></div>
 <div class="add">다음 칸 — 가설을 말해 주면 공식으로 옮겨 채점하고, 통과하면 여기 한 줄이 생긴다.</div>
 <div class="pools" id="pools"></div>
 <div class="legend"><span><i style="background:var(--raw)"></i>날것</span><span><i style="background:var(--step)"></i>지금 조합</span><span><i style="background:var(--tab)"></i>외운 표</span><span><i style="background:var(--noto)"></i>노토</span><span>거리 = 어긋난 잉크 ÷ 노토 잉크</span></div>
@@ -144,6 +154,10 @@ const col = v => { if (v === null) return '#f4f4f5'; const t = Math.min(1, Math.
 const fmt = v => v === null ? '' : (Math.abs(v) < 0.0005 ? '0' : (v>0?'+':'−') + Math.abs(v).toFixed(3).replace(/^0/,''));
 const dirOf = (e, v) => (e==='left'||e==='right') ? (v>0?'오른쪽':'왼쪽') : (v>0?'아래':'위');
 let sel = N - 1, pool = '171';
+const closePop = () => { popHyp = null; root.querySelector('#pop').hidden = true; };
+root.querySelector('#popx').addEventListener('click', closePop);
+root.querySelector('#pop').addEventListener('click', e => { if (e.target.id === 'pop') closePop(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePop(); });
 const svgOf = (c, i) => { const g = D.svgs[c]; return g ? `<svg viewBox="${-PADV} ${-PADV} ${V+2*PADV} ${V+2*PADV}"><path class="tab" d="${g.table}" fill-rule="evenodd"/><path class="step" d="${g.steps[i]}"/></svg>` : ''; };
 function ladder() {
   const el = root.querySelector('#' + 'ladder'); el.innerHTML = '';
@@ -154,13 +168,26 @@ function ladder() {
   D.hyps.forEach((h, i) => {
     const bit = 1 << i, on = (sel & bit) !== 0, off = sel & ~bit, with_ = sel | bit;
     const d = (s, a, b) => `${f2(s.steps[a])} → ${f2(s.steps[b])}`;
-    el.insertAdjacentHTML('beforeend', `<label class="st ${on ? 'cur' : ''}"><input type="checkbox" ${on ? 'checked' : ''} data-bit="${bit}"><div class="nm">${i + 1}. ${h.name}<small>${h.who}</small></div><div class="num">이것만 켜고 끄면<br>588 ${d(s5, off, with_)}<br>171 ${d(s1, off, with_)}</div></label>`);
-    if (!on) return;
-    const ex = r => { const g = D.svgs[r.char]; return g ? `<div><svg viewBox="${-PADV} ${-PADV} ${V+2*PADV} ${V+2*PADV}"><path class="prev" d="${g.steps[off]}" fill-rule="evenodd"/><path class="step" d="${g.steps[with_]}"/></svg><b>${r.char}</b> ${f2(r.xs[off])} → ${f2(r.xs[with_])}</div>` : ''; };
-    const groups = D.kinds.map(([label, js]) => { const pr = D.rows.filter(r => js.includes(r.jung)); const gain = r => (r.xs[off] ?? NaN) - (r.xs[with_] ?? NaN); const top = pr.filter(r => isFinite(gain(r))).sort((a, b) => gain(b) - gain(a)).slice(0, 4).filter(r => gain(r) > 0.005); return { label, med: mmed(pr.map(gain)) ?? 0, top }; });
-    el.insertAdjacentHTML('beforeend', `<div class="stex"><div class="scale">이 가설을 켰을 때 가장 많이 나아진 글자, 홀자 가지 갈래별로 — 회색 면 = 이것만 끈 것 · 파랑 선 = 켠 것(다른 가설은 지금 체크 그대로). 숫자는 노토까지 거리 전 → 후.</div>${groups.map(gr => `<div class="kg"><div class="kgh">${gr.label} <small>이 갈래 글자들은 가운데값으로 거리 ${Math.abs(gr.med).toFixed(2)} ${gr.med >= 0 ? '줄어듦' : '늘어남'}</small></div>${gr.top.length ? `<div class="exs">${gr.top.map(ex).join('')}</div>` : '<div class="scale">이 가설로는 바뀌지 않는다</div>'}</div>`).join('')}</div>`);
+    el.insertAdjacentHTML('beforeend', `<div class="st ${on ? 'cur' : ''}"><input type="checkbox" ${on ? 'checked' : ''} data-bit="${bit}"><div class="nm" data-hyp="${i}">${i + 1}. ${h.name} <span class="more">자세히</span></div><div class="num">켜고 끄면 588 ${d(s5, off, with_)} · 171 ${d(s1, off, with_)}</div></div>`);
   });
   el.querySelectorAll('input').forEach(x => x.addEventListener('change', () => { sel ^= +x.dataset.bit; onSel(sel); renderAll(); }));
+  el.querySelectorAll('.nm[data-hyp]').forEach(x => x.addEventListener('click', () => { popHyp = +x.dataset.hyp; popup(); }));
+  if (popHyp !== null) popup();
+}
+// 가설 자세히 — 누른 가설의 설명과 가장 많이 나아진 글자를 가운데 팝업으로 띄운다.
+let popHyp = null;
+function popup() {
+  const pop = root.querySelector('#pop'), body = root.querySelector('#popbody');
+  if (popHyp === null) { pop.hidden = true; return; }
+  const i = popHyp, h = D.hyps[i], bit = 1 << i, on = (sel & bit) !== 0, off = sel & ~bit, with_ = sel | bit;
+  const s5 = D.summary['588'], s1 = D.summary['171'];
+  const d = (s, a, b) => `${f2(s.steps[a])} → ${f2(s.steps[b])}`;
+  const ready = D.rows.some(r => r.xs[off] !== undefined && r.xs[with_] !== undefined);
+  const ex = r => { const g = D.svgs[r.char]; return g ? `<div><svg viewBox="${-PADV} ${-PADV} ${V+2*PADV} ${V+2*PADV}"><path class="prev" d="${g.steps[off]}" fill-rule="evenodd"/><path class="step" d="${g.steps[with_]}"/></svg><b>${r.char}</b> ${f2(r.xs[off])} → ${f2(r.xs[with_])}</div>` : ''; };
+  const groups = D.kinds.map(([label, js]) => { const pr = D.rows.filter(r => js.includes(r.jung)); const gain = r => (r.xs[off] ?? NaN) - (r.xs[with_] ?? NaN); const top = pr.filter(r => isFinite(gain(r))).sort((a, b) => gain(b) - gain(a)).slice(0, 4).filter(r => gain(r) > 0.005); return { label, med: mmed(pr.map(gain)) ?? 0, top }; });
+  body.innerHTML = `<h3>${i + 1}. ${h.name}</h3><p class="who">${h.who}</p><p class="num">이것만 켜고 끄면 — 588 ${d(s5, off, with_)} · 171 ${d(s1, off, with_)}${on ? '' : ' (지금은 꺼져 있다)'}</p>`
+    + (ready ? `<div class="stex"><div class="scale">가장 많이 나아진 글자, 홀자 가지 갈래별로 — 회색 면 = 이것만 끈 것 · 파랑 선 = 켠 것(다른 가설은 지금 체크 그대로). 숫자는 노토까지 거리 전 → 후.</div>${groups.map(gr => `<div class="kg"><div class="kgh">${gr.label} <small>이 갈래 글자들은 가운데값으로 거리 ${Math.abs(gr.med).toFixed(2)} ${gr.med >= 0 ? '줄어듦' : '늘어남'}</small></div>${gr.top.length ? `<div class="exs">${gr.top.map(ex).join('')}</div>` : '<div class="scale">이 가설로는 바뀌지 않는다</div>'}</div>`).join('')}</div>` : '<div class="scale">이 조합을 재는 중이다. 다 재면 글자가 뜬다.</div>');
+  pop.hidden = false;
 }
 const selName = () => sel === 0 ? '패턴만' : '패턴만 + ' + D.hyps.map((h, i) => (sel >> i) & 1 ? (i + 1) : null).filter(Boolean).join(' · ');
 function pools() {
