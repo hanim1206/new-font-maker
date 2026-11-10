@@ -141,6 +141,30 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
     }
     return attrs
   }
+  // 층: 닿자의 가로줄기는 맨 위 · 가운데 · 맨 아래, 세로줄기는 맨 왼 · 가운데 · 맨 오른. 쓴 차례가 아니라 놓인 자리로 정한다 —
+  // 사용자가 꼴을 바꾸거나 획을 달리 나눠 그려도 같은 자리면 같은 층이다(11-10). 하나뿐이면 자모 안 어디쯤인지로 정한다.
+  const layerOf = new Map<string, string>()
+  if (slot !== 'JU') {
+    const all = primitives.flatMap((p) => p.stroke.points.map((q) => toView(q, p.box)))
+    const span = { x0: Math.min(...all.map((q) => q.x)), x1: Math.max(...all.map((q) => q.x)), y0: Math.min(...all.map((q) => q.y)), y1: Math.max(...all.map((q) => q.y)) }
+    const segs = primitives.flatMap((p) => {
+      const others = primitives.filter((o) => o.source.channel === p.source.channel && o.stroke.id !== p.stroke.id).map((o) => o.stroke)
+      return describeStrokeGeometry(p.stroke, others).segments.filter((g) => g.shape === 'garojulgi' || g.shape === 'serojulgi').map((g) => {
+        const a = toView(p.stroke.points[g.fromPoint], p.box), b = toView(p.stroke.points[g.toPoint], p.box)
+        return { key: `${p.stroke.id}:${g.fromPoint}`, shape: g.shape, c: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } }
+      })
+    })
+    for (const shape of ['garojulgi', 'serojulgi'] as const) {
+      const k: 'x' | 'y' = shape === 'garojulgi' ? 'y' : 'x'
+      const [lo, mid, hi] = shape === 'garojulgi' ? ['맨 위', '가운데', '맨 아래'] : ['맨 왼', '가운데', '맨 오른']
+      const size = (k === 'y' ? span.y1 - span.y0 : span.x1 - span.x0) || 1
+      // 자모 안 자리 비율로 정한다 — 줄기 개수로 세면 ㅋ의 덧줄기(가운데)가 맨 아래가 되어 버린다.
+      for (const g of segs.filter((q) => q.shape === shape)) {
+        const t = (g.c[k] - (k === 'y' ? span.y0 : span.x0)) / size
+        layerOf.set(g.key, t < 0.35 ? lo : t > 0.65 ? hi : mid)
+      }
+    }
+  }
   for (const prim of primitives) {
     const { stroke, box, source } = prim
     const attrs = attrsOf(prim)
@@ -200,16 +224,20 @@ function itemsOf(primitives: Prim[], jamo: JamoData, type: JamoType, slot: Slot)
       const one = geo.segments.length === 1
       // 머리 · 맺음은 마디마다 — 가로줄기는 왼쪽, 나머지는 위쪽이 머리(사전). 획을 쓴 차례가 아니라 마디 모양으로 정한다.
       const segName = one && stem ? stem : shape
-      if (seg.head?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'head', label: '머리', note: `${segName}의 열린 끝`, at: endMark(seg.head.point), scope: endScope('머리', seg.shape), paint: toView(pts[seg.head.point], box), attrs })
+      // 꼭지에는 층을 안 단다. 같은 축 자리말(ㅍ의 위 · 아래)은 층이 대신하니 속성에서 뺀다 — 이름에는 남는다.
+      const sameAxis = seg.shape === 'garojulgi' ? ['위', '아래'] : ['왼', '오른']
+      const layer = name === 'kkokji' ? undefined : layerOf.get(`${stroke.id}:${seg.fromPoint}`)
+      const segAttrs = layer ? [...attrs.filter((w) => !sameAxis.includes(w)), layer] : attrs
+      if (seg.head?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'head', label: '머리', note: `${segName}의 열린 끝`, at: endMark(seg.head.point), scope: endScope('머리', seg.shape), paint: toView(pts[seg.head.point], box), attrs: segAttrs })
       out.push({
         n: n++, strokeId: stroke.id, kind: 'segment',
         label: one && stem ? stem : shape,
         note: [name && one ? shape : name ? `${STEM_NAME_LABEL[name]}의 한 마디` : '', curved ? '휜 마디' : ''].filter(Boolean).join(' · ') || '곧은 마디',
         at: { x: (line[0].x + line[1].x) / 2, y: (line[0].y + line[1].y) / 2 }, line, scope: stemScope(seg.shape),
         paint: { d: pointsToSvgD(pts.slice(Math.min(seg.fromPoint, seg.toPoint), Math.max(seg.fromPoint, seg.toPoint) + 1), false, box, V) },
-        attrs,
+        attrs: segAttrs,
       })
-      if (seg.tail?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'tail', label: '맺음', note: `${segName}의 열린 끝`, at: endMark(seg.tail.point), scope: endScope('맺음', seg.shape), paint: toView(pts[seg.tail.point], box), attrs })
+      if (seg.tail?.open) out.push({ n: n++, strokeId: stroke.id, kind: 'tail', label: '맺음', note: `${segName}의 열린 끝`, at: endMark(seg.tail.point), scope: endScope('맺음', seg.shape), paint: toView(pts[seg.tail.point], box), attrs: segAttrs })
     }
   }
   // 만난 꺾임: 두 획의 끝끼리 맞닿아 귀를 이루는 곳(ㅁ을 두 획으로 그렸을 때의 귀). 한 획 안 꺾임과 같은 묶음에 든다.
