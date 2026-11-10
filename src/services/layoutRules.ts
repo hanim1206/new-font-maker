@@ -1,7 +1,7 @@
 import type { BoxConfig, Padding } from '../types'
 import { BRANCH_INSET_BY_PAIR, CHO_RIGHT_BY_JUNG, CHO_RIGHT_BY_PAIR, JONG_RIGHT_BY_CHO } from './layoutRuleResiduals'
 import type { JamoShapeFeatures } from './jamoShapeFeatures'
-import { CHO_TOP_DROP_NO_FINAL, TWO_STEM_CHO_NARROW, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, jongDropOf, jongFollowOf, jongRaiseOf, jongSideInsetOf, pillarDiveOf, DOUBLE_CHO_SHIFT, PILLAR_RIGHT, RIGHT_BRANCH_OUT, TWO_STEM_FOLLOW, TWO_STEM_SPAN, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
+import { CHO_TOP_DROP_NO_FINAL, TWO_STEM_CHO_NARROW, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, jongDropOf, jongFollowOf, jongRaiseOf, jongSideInsetOf, medialStemsOf, pillarDiveOf, DOUBLE_CHO_SHIFT, PILLAR_RIGHT, RIGHT_BRANCH_OUT, TWO_STEM_FOLLOW, TWO_STEM_SPAN, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { BRANCH_INSET_BY_CHO, BRANCH_INSET_BY_JUNG, CHO_GAP, CHO_TARGET, CHO_TOP_BY_JONG, CHO_TOP_BY_JUNG, JONG_GAP_OFFSET, JONG_LEFT_BY_JUNG, JONG_RIGHT_BY_JUNG, JONG_TARGET, JONG_TOP_BY_CHO, JUNG_TARGET, PILLAR_BOTTOM_NO_FINAL } from './layoutRuleTargets'
 
 /**
@@ -93,6 +93,10 @@ export interface LayoutRuleParams {
   jongLegs: boolean
   /** 겹받침 · 쌍받침에도 받침 벽을 건다(`jongSideInsetOf` multi). `jongWall`과 함께 쓴다. */
   jongWallMulti: boolean
+  /** 표 없이 곁줄기 가운데를 첫닿자 잉크 가운데 높이에 둔다(`medialStemsOf` beams). */
+  beamToCho: boolean
+  /** 표 없이 두 기둥 홀자 안 기둥을 짧게 한다(`medialStemsOf` innerPillar). */
+  innerPillarShort: boolean
 }
 
 /** 공식에 쓰는 자모 생김새 특징. */
@@ -117,6 +121,8 @@ export const DEFAULT_LAYOUT_RULE_PARAMS: LayoutRuleParams = {
   choTallJong: false,
   jongLegs: false,
   jongWallMulti: false,
+  beamToCho: false,
+  innerPillarShort: false,
 }
 
 export interface LayoutRuleStep {
@@ -505,5 +511,11 @@ export function applyLayoutRules(input: {
     if (first && last) steps.push({ ...first, after: last.after, limited: last.limited })
   }
 
+  // 홀자 보선 — 상자가 다 정해진 뒤 곁줄기 높이 · 안 기둥 끝을 줄기 목표로 싣는다.
+  if (!jamo && (params.beamToCho || params.innerPillarShort) && input.jamo && boxes.JU) {
+    const ch = measure(boxes).CH
+    const stems = medialStemsOf({ jung: input.jamo.jung, box: boxes.JU, choMid: ch ? (ch.bounds.top + ch.bounds.bottom) / 2 : null, hasFinal: !!input.jamo.jong, beams: params.beamToCho, innerPillar: params.innerPillarShort })
+    if (Object.keys(stems).length) boxes.JU = { ...boxes.JU, stems: { ...boxes.JU.stems, ...stems } }
+  }
   return { boxes, steps, limited: steps.some((step) => step.limited) }
 }

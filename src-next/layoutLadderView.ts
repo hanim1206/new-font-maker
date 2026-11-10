@@ -121,7 +121,7 @@ export const LADDER_HTML = `<main>
 export function mountLadderView(root: HTMLElement, D: any, onSel: (mask: number) => void): { render: () => void; mask: () => number } {
 
 const V = D.V, N = 1 << D.hyps.length;
-const PARTN = {CH:'첫닿자',JU:'홀자',JO:'받침'}, EDGEN = {left:'왼면',right:'오른면',top:'윗면',bottom:'아랫면'};
+const PARTN = {CH:'첫닿자',JU:'홀자',JO:'받침'}, EDGEN = {left:'왼면',right:'오른면',top:'윗면',bottom:'아랫면',beam:'곁줄기 높이',inX:'안 기둥 가로 자리',inTop:'안 기둥 위 끝',inBot:'안 기둥 아래 끝'};
 const CHOS = [...'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'], JUNGS = ['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅣ'], JONGS = [...'ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ'];
 /** 글자가 카드 테두리에 닿지 않게 둘레에 두는 여백(V 단위). */
 const PADV = 14;
@@ -151,12 +151,12 @@ function panel() {
   root.querySelector('#pickv').onclick = () => { VIEW = (VIEW + 1) % 3; el.className = 'v' + VIEW; root.querySelector('#pickv').textContent = '보기: ' + VIEWN[VIEW]; };
   root.querySelector('#pickx').onclick = () => { delete SELC[pool + ' ' + LAST]; moves(); };
 }
-const KEYS = ['CH.left','CH.right','CH.top','CH.bottom','JU.left','JU.right','JU.top','JU.bottom','JO.left','JO.right','JO.top','JO.bottom'];
+const KEYS = ['CH.left','CH.right','CH.top','CH.bottom','JU.left','JU.right','JU.top','JU.bottom','JU.beam','JU.inX','JU.inTop','JU.inBot','JO.left','JO.right','JO.top','JO.bottom'];
 const f2 = v => v === undefined || v === null ? '…' : v.toFixed(2);
 const mmed = a => { const x = a.filter(v => v !== undefined && isFinite(v)).sort((p,q)=>p-q); return x.length ? x[x.length>>1] : null; };
 const col = v => { if (v === null) return '#f4f4f5'; const t = Math.min(1, Math.abs(v)/0.08); return v > 0 ? `rgba(214,69,69,${0.06+0.8*t})` : `rgba(31,79,216,${0.06+0.8*t})`; };
 const fmt = v => v === null ? '' : (Math.abs(v) < 0.0005 ? '0' : (v>0?'+':'−') + Math.abs(v).toFixed(3).replace(/^0/,''));
-const dirOf = (e, v) => (e==='left'||e==='right') ? (v>0?'오른쪽':'왼쪽') : (v>0?'아래':'위');
+const dirOf = (e, v) => (e==='left'||e==='right'||e==='inX') ? (v>0?'오른쪽':'왼쪽') : (v>0?'아래':'위');
 let sel = N - 1, pool = '171';
 const closePop = () => { popHyp = null; root.querySelector('#pop').hidden = true; };
 root.querySelector('#popx').addEventListener('click', closePop);
@@ -225,12 +225,16 @@ function canvas(rows, gs) {
   let svg = `<svg viewBox="0 0 200 200" width="100%"><rect x="6" y="6" width="188" height="188" fill="none" stroke="#e3e3e6" stroke-dasharray="3 3"/>`;
   for (const [part, [x0, y0, x1, y1]] of Object.entries(fr)) {
     svg += `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="#f4f4f5" stroke="none"/><text class="pn" x="${(x0 + x1) / 2}" y="${(y0 + y1) / 2 + 4}" text-anchor="middle">${PARTN[part]}</text>`;
-    const sides = { left: [x0, y0, x0, y1], right: [x1, y0, x1, y1], top: [x0, y0, x1, y0], bottom: [x0, y1, x1, y1] };
+    const px = x0 + (x1 - x0) * 0.38, my0 = (y0 + y1) / 2;
+    const sides = { left: [x0, y0, x0, y1], right: [x1, y0, x1, y1], top: [x0, y0, x1, y0], bottom: [x0, y1, x1, y1],
+      // 홀자 보선: 곁줄기(가운데 가로줄), 안 기둥(왼쪽 세로줄과 그 위 · 아래 끝)
+      ...(part === 'JU' ? { beam: [px + 6, my0, x1 - 4, my0], inX: [px, y0 + 22, px, y1 - 22], inTop: [px, y0 + 10, px, y0 + 20], inBot: [px, y1 - 20, px, y1 - 10] } : {}) };
     for (const [e, [ax, ay, bx, by_]] of Object.entries(sides)) {
       const g = by[part + '.' + e]; if (!g) continue;
       const on = EDGE === g.key; const mx = (ax + bx) / 2, my = (ay + by_) / 2;
-      const tx = e === 'left' ? ax - 3 : e === 'right' ? ax + 3 : mx, ty = e === 'top' ? ay - 3 : e === 'bottom' ? ay + 9 : my;
-      const rot = e === 'left' ? ` transform="rotate(-90 ${tx} ${ty})"` : e === 'right' ? ` transform="rotate(90 ${tx} ${ty})"` : '';
+      const rail = e === 'beam' || e.startsWith('in');
+      const tx = e === 'left' ? ax - 3 : e === 'right' ? ax + 3 : rail && e !== 'beam' ? ax - 4 : mx, ty = e === 'top' ? ay - 3 : e === 'bottom' ? ay + 9 : e === 'beam' ? ay - 3 : my;
+      const rot = e === 'left' || e === 'inX' ? ` transform="rotate(-90 ${tx} ${ty})"` : e === 'right' ? ` transform="rotate(90 ${tx} ${ty})"` : '';
       const anchor = 'middle';
       svg += `<g class="edge" data-key="${g.key}"><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by_}" stroke="transparent" stroke-width="16"/><line class="vis" x1="${ax}" y1="${ay}" x2="${bx}" y2="${by_}" stroke="${tone(g)}" stroke-width="${on ? 8 : 5}" stroke-linecap="round"/>${on ? `<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by_}" stroke="#111" stroke-width="1.5"/>` : ''}<text x="${tx}" y="${ty}"${rot} text-anchor="${anchor}" style="font-weight:${on ? 700 : 400}">${g.med.toFixed(3).replace(/^0/, '')}${sel > 0 ? ` (${g.base.toFixed(3).replace(/^0/, '')})` : ''}</text></g>`;
     }

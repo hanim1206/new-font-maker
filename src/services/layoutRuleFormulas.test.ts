@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import { shapeFeaturesOf } from './jamoShapeFeatures'
-import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, jongDropOf, jongFollowOf, jongRaiseOf, jongSideInsetOf, pillarDiveOf, hasChoWall, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
+import { PILLAR_RIGHT, RIGHT_BRANCH_OUT, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, jongDropOf, jongFollowOf, jongRaiseOf, jongSideInsetOf, medialStemsOf, pillarDiveOf, hasChoWall, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { CHO_TARGET, JUNG_TARGET } from './layoutRuleTargets'
 
 const CHO_TARGET_A_RIGHT = JUNG_TARGET['ㅏ'].right
@@ -136,5 +136,20 @@ describe('받침 사선 다리 · 겹받침 벽', () => {
     expect(jongSideInsetOf('ㄳ', jong('ㄳ'), { legs: true, multi: true }).right).toBeCloseTo(-0.03, 3)
     expect(jongSideInsetOf('ㄺ', jong('ㄺ'), { legs: true, multi: true }).right).toBeGreaterThan(0.04)
     expect(jongSideInsetOf('ㄺ', jong('ㄺ'), { legs: true, multi: true }).left).toBeCloseTo(-0.015, 3)
+  })
+})
+
+describe('홀자 보선 — 곁줄기 높이 · 안 기둥', () => {
+  it('받침 없으면 곁줄기 가운데를 첫닿자 가운데(−0.01)에, 둘이면 간격은 그대로', () => {
+    const one = medialStemsOf({ jung: 'ㅏ', box: { y: 0.1, height: 0.8 }, choMid: 0.45, hasFinal: false, beams: true, innerPillar: false })
+    expect(one['ㅏ-2'].center).toBeCloseTo((0.44 - 0.1) / 0.8, 5)
+    const two = medialStemsOf({ jung: 'ㅑ', box: { y: 0.1, height: 0.8 }, choMid: 0.45, hasFinal: false, beams: true, innerPillar: false })
+    expect((two['ㅑ-2'].center! + two['ㅑ-3'].center!) / 2).toBeCloseTo((0.44 - 0.1) / 0.8, 5)
+    expect(medialStemsOf({ jung: 'ㅏ', box: { y: 0.1, height: 0.8 }, choMid: 0.45, hasFinal: true, beams: true, innerPillar: false })).toEqual({})
+  })
+  it('ㅐ 안 기둥은 위가 내려오고 아래가 올라온다, ㅏ에는 없다', () => {
+    const s = medialStemsOf({ jung: 'ㅐ', box: { y: 0, height: 1 }, choMid: null, hasFinal: false, beams: false, innerPillar: true })['ㅐ-1']
+    expect(s.bottom! - s.top!).toBeLessThan(1 - 0.06)
+    expect(medialStemsOf({ jung: 'ㅏ', box: { y: 0, height: 1 }, choMid: null, hasFinal: false, beams: false, innerPillar: true })).toEqual({})
   })
 })

@@ -1,3 +1,6 @@
+import { JUNGSEONG_MAP } from '../data/Hangul'
+import type { BoxConfig, StemRailTarget } from '../types'
+import { MEDIAL_STEM_ROLES } from './medialStemRails'
 import type { JamoShapeFeatures } from './jamoShapeFeatures'
 
 /**
@@ -174,3 +177,41 @@ export function jongFollowOf(jung: string): number {
 export const JONG_DROP_LAYER = 0.01
 export const JONG_DROP_DOT = 0.011
 export const jongDropOf = (cho: Pick<JamoShapeFeatures, 'layers' | 'topDot'>): number => JONG_DROP_LAYER * Math.max(0, cho.layers - 2) + (cho.topDot ? JONG_DROP_DOT : 0)
+
+/**
+ * 홀자 보선(2026-11-10, 보선 채점에서 — 사용자 지적 "홀자는 보선으로 그리기로 했으니 보선 자리로 채점해야").
+ * 가설 14 곁줄기 높이: 보 · 곁줄기(가로 줄기)의 가운데가 첫닿자 잉크 가운데 높이에 선다(노토 ±0.013, 받침 유무 상관없음).
+ *   곁줄기가 둘(ㅑ ㅕ ㅒ ㅖ)이면 둘 사이 간격은 자모 그대로 두고 가운데만 맞춘다.
+ * 가설 15 안 기둥: 두 기둥 홀자(ㅐ ㅒ ㅔ ㅖ)의 안 기둥은 위 끝이 0.018 내려오고, 아래 끝이 받침 없으면 0.048 · 있으면 0.016 올라온다.
+ * 돌려주는 값은 홀자 칸 안 비율의 줄기 목표(`BoxConfig.stems`).
+ */
+/** 곁줄기 가운데는 첫닿자 잉크 가운데보다 0.01 위(171 · 588 홀자별 가운데값 −0.006~−0.013). */
+export const BEAM_CHO_OFFSET = -0.01
+export const INNER_PILLAR_TOP_DROP = 0.018
+export const INNER_PILLAR_BOTTOM_LIFT = { noFinal: 0.048, final: 0.016 } as const
+type StemPoint = { x: number; y: number }
+const strokesOfJung = (jung: string) => { const j = JUNGSEONG_MAP[jung]; return j ? [...(j.strokes ?? []), ...(j.horizontalStrokes ?? []), ...(j.verticalStrokes ?? [])] : [] }
+export function medialStemsOf(input: { jung: string; box: Pick<BoxConfig, 'y' | 'height'>; choMid: number | null; hasFinal: boolean; beams: boolean; innerPillar: boolean }): Record<string, StemRailTarget> {
+  const { jung, box, choMid, hasFinal } = input
+  const roles = MEDIAL_STEM_ROLES[jung]
+  const out: Record<string, StemRailTarget> = {}
+  if (!roles || box.height <= 0) return out
+  const ends = (id: string): [StemPoint, StemPoint] | null => { const s = strokesOfJung(jung).find((t) => t.id === id); return s && s.points.length >= 2 ? [s.points[0], s.points[s.points.length - 1]] : null }
+  const ids = Object.keys(roles).filter((id) => roles[id][0] === 'JU')
+  if (input.beams && choMid !== null && !hasFinal) {
+    const beams = ids.filter((id) => roles[id][1].endsWith('Beam')).map((id) => ({ id, e: ends(id) })).filter((b): b is { id: string; e: [StemPoint, StemPoint] } => !!b.e)
+    if (beams.length) {
+      const ys = beams.map((b) => (b.e[0].y + b.e[1].y) / 2), mean = ys.reduce((a, b) => a + b, 0) / ys.length
+      const target = (choMid + BEAM_CHO_OFFSET - box.y) / box.height
+      beams.forEach((b, i) => { out[b.id] = { center: target + ys[i] - mean } })
+    }
+  }
+  if (input.innerPillar) {
+    const id = ids.find((k) => roles[k][1] === 'innerPillar'), e = id ? ends(id) : null
+    if (id && e) {
+      const top = Math.min(e[0].y, e[1].y), bottom = Math.max(e[0].y, e[1].y)
+      out[id] = { top: top + INNER_PILLAR_TOP_DROP / box.height, bottom: bottom - (hasFinal ? INNER_PILLAR_BOTTOM_LIFT.final : INNER_PILLAR_BOTTOM_LIFT.noFinal) / box.height }
+    }
+  }
+  return out
+}

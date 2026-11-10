@@ -29,6 +29,8 @@ export const LADDER_HYPS: readonly LadderHyp[] = [
   { id: 'choTallJong', name: '키 큰 첫닿자 밑에선 받침이 내려온다', who: 'AI 가설 11/9(받침 윗면을 받침 몫 + 첫닿자 몫으로 나눠서): 첫닿자 층이 셋 이상이면 층마다 0.01, 꼭지가 있으면 0.011만큼 받침 윗면이 내려온다(ㅎ 0.021 · ㅊ 0.011 · ㄹ ㅌ ㅉ 0.01)', patch: { choTallJong: true } },
   { id: 'jongLegs', name: '사선 다리는 벽이 아니다', who: 'AI 가설 11/9(받침 닿자 몫에서, 가설 9와 함께): ㅅ ㅈ ㅊ의 사선 다리 쪽은 들이지 않는다. 겹받침 · 쌍받침의 다리(ㄳ ㄽ ㅄ ㅆ ㄵ)는 0.03 더 뻗는다', patch: { jongLegs: true } },
   { id: 'jongWallMulti', name: '겹받침도 오른쪽 벽은 들인다', who: 'AI 가설 11/9(가설 9를 겹받침으로): ㄺ ㄻ ㄼ ㄲ처럼 오른쪽이 막힌 겹받침은 홑받침처럼 0.041 × 막힘 들이고, 겹받침 왼쪽은 0.015 더 뻗는다', patch: { jongWallMulti: true } },
+  { id: 'beamToCho', name: '곁줄기는 첫닿자 가운데 높이에', who: 'AI 가설 11/10(보선 채점에서, 사용자 지적 "홀자는 보선 자리로 채점해야"): 보 · 곁줄기 가운데가 첫닿자 잉크 가운데 높이에 선다(노토 ±0.013). 곁줄기가 둘이면 간격은 그대로 두고 가운데만 맞춘다', patch: { beamToCho: true } },
+  { id: 'innerPillarShort', name: '두 기둥 홀자 안 기둥은 짧다', who: 'AI 가설 11/10(보선 채점에서): ㅐ ㅒ ㅔ ㅖ 안 기둥은 위 끝이 0.018 내려오고 아래 끝이 받침 없으면 0.048, 있으면 0.016 올라온다', patch: { innerPillarShort: true } },
 ]
 
 /** 패턴만: 외운 표를 끄고 틈 규칙은 켠다. */
@@ -40,7 +42,7 @@ export const LADDER_RAW: LayoutRuleParams = { ...DEFAULT_LAYOUT_RULE_PARAMS, rul
 export const ladderParams = (mask: number): LayoutRuleParams => LADDER_HYPS.reduce<LayoutRuleParams>((params, hyp, i) => (mask >> i) & 1 ? { ...params, ...hyp.patch } : params, LADDER_PATTERNS)
 
 export const LADDER_KINDS: readonly (readonly [string, string])[] = [['오른가지 ㅏㅑ', 'ㅏㅑ'], ['가지 없음 ㅣ', 'ㅣ'], ['왼가지 ㅓㅕ', 'ㅓㅕ'], ['두 기둥 ㅐㅒㅔㅖ', 'ㅐㅒㅔㅖ']]
-export const LADDER_KEYS = ['CH.left', 'CH.right', 'CH.top', 'CH.bottom', 'JU.left', 'JU.right', 'JU.top', 'JU.bottom', 'JO.left', 'JO.right', 'JO.top', 'JO.bottom'] as const
+export const LADDER_KEYS = ['CH.left', 'CH.right', 'CH.top', 'CH.bottom', 'JU.left', 'JU.right', 'JU.top', 'JU.bottom', 'JU.beam', 'JU.inX', 'JU.inTop', 'JU.inBot', 'JO.left', 'JO.right', 'JO.top', 'JO.bottom'] as const
 /** 글자 그림 한 변 길이(그림 좌표 단위). */
 export const LADDER_V = 120
 
@@ -75,8 +77,20 @@ type Outline = ScoreInput['outline']
 const r1 = (path: string) => path.replace(/(\d+\.\d)\d+/g, '$1')
 const pathOf = (score: ScoredGlyph) => r1(regionsToPath(score.ink.rule, LADDER_V))
 
-function movesOf(table: ScoredGlyph, step: ScoredGlyph): Record<string, number> {
+/** 보선 칸 — 상자 네 변 옆에 홀자 안쪽 줄기 자리를 덧붙인다(곁줄기 높이는 곁줄기가 둘이면 두 높이의 가운데). */
+function railKeysOf(jung: string, maps: JamoMaps, score: ScoredGlyph): Record<string, number> {
+  const r = railsOf(jung, maps.jungseong[jung] as DeepReadonly<JamoData> | undefined, score.boxes.rule.JU)
+  const out: Record<string, number> = {}
+  const beams = Object.keys(r).filter((k) => /Beam\.y$/.test(k)).map((k) => r[k])
+  if (beams.length) out['JU.beam'] = beams.reduce((a, b) => a + b, 0) / beams.length
+  if (r['innerPillar.x'] !== undefined) { out['JU.inX'] = r['innerPillar.x']; out['JU.inTop'] = r['innerPillar.top']; out['JU.inBot'] = r['innerPillar.bottom'] }
+  return out
+}
+
+function movesOf(table: ScoredGlyph, step: ScoredGlyph, jung: string, maps: JamoMaps): Record<string, number> {
   const m: Record<string, number> = {}
+  const a = railKeysOf(jung, maps, table), b = railKeysOf(jung, maps, step)
+  for (const k in a) if (b[k] !== undefined) m[k] = +(a[k] - b[k]).toFixed(4)
   for (const part of ['CH', 'JU', 'JO'] as const) {
     const a = table.box?.parts[part]?.rule, b = step.box?.parts[part]?.rule
     if (!a || !b) continue
@@ -129,7 +143,7 @@ export function ladderStep(input: { row: LadderRow; table: ScoredGlyph; mask: nu
   const { row, table, mask, maps, model, outline } = input
   const step = scoreGlyph({ char: row.char, maps, style: DEFAULT_STYLE, model, outline, params: ladderParams(mask), snapStems: false, shapes: DEFAULT_STROKE_SHAPE_PARAMS })
   if (!step.ok || !step.box) return false
-  row.moves[mask] = movesOf(table, step)
+  row.moves[mask] = movesOf(table, step, row.jung, maps)
   row.xs[mask] = step.xor.rule
   row.svgSteps[mask] = pathOf(step)
   return true
