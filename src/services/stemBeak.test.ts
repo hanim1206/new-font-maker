@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import baseJamos from '../data/baseJamos.json'
 import type { JamoData, StrokeDataV2 } from '../types'
 import { validateFontDataPayload } from './fontDataPayloadValidation'
-import { DEFAULT_STEM_BEAK, normalizeStemBeak, STEM_BEAK_SHAPES, stemBeakInkGroups, stemBeakLockedOf, type StemBeakSource, type StemBeakStyle } from './stemBeak'
+import { DEFAULT_STEM_BEAK, normalizeStemBeak, STEM_BEAK_SHAPES, stemBeakInkGroups, stemBeakLockedOf, stemBeakTrimmedStrokes, type StemBeakSource, type StemBeakStyle } from './stemBeak'
 
 type JamoType = JamoData['type']
 const presets = baseJamos as unknown as Record<JamoType, Record<string, JamoData>>
@@ -78,19 +78,27 @@ describe('세로줄기 부리 G1 홀드아웃', () => {
     expect(beaksOf('jungseong', 'ㅡ', ON, [vertical, diagonal])).toEqual({ 'stroke-1': 1 })
   })
 
-  it('부리는 머리의 왼쪽 위로 나가고 줄기 머리를 덮는다', () => {
+  it('부리는 머리의 왼쪽으로 나가되 줄기 원래 높이 안에 앉고, 줄기 머리는 부리 윗변 아래로 깎인다', () => {
     const stroke: StrokeDataV2 = { id: 's', points: [{ x: 0.5, y: 0.2 }, { x: 0.5, y: 0.8 }], closed: false, thickness: 0.1 }
     const box = { x: 0.1, y: 0, width: 0.5, height: 1 }
-    const [[[contour]]] = stemBeakInkGroups([{ stroke, box, weightMultiplier: 2, group: 'g' }], ON)
+    const sources = [{ stroke, box, weightMultiplier: 2, group: 'g' }]
+    const [[[contour]]] = stemBeakInkGroups(sources, ON)
     const headX = 0.1 + 0.5 * 0.5
     const width = 0.2
+    const rise = (width + 0.6 * width) * Math.tan(ON.angle * Math.PI / 180)
     const [rightTop, tip, leftLow, rightLow] = contour
-    expect(rightTop).toEqual({ x: headX + width / 2, y: 0.2 })
+    // 뾰족한 끝이 원래 머리 높이(가장 높은 점), 오른쪽 윗귀는 그만큼 아래.
     expect(tip.x).toBeCloseTo(headX - width / 2 - 0.6 * width, 6)
-    expect(tip.y).toBeLessThan(0.2)
+    expect(tip.y).toBeCloseTo(0.2, 6)
+    expect(rightTop.x).toBeCloseTo(headX + width / 2, 6)
+    expect(rightTop.y).toBeCloseTo(0.2 + rise, 6)
     expect(leftLow.x).toBeCloseTo(headX - width / 2, 6)
-    expect(leftLow.y).toBeCloseTo(0.2 + 0.9 * width, 6)
+    expect(leftLow.y).toBeCloseTo(0.2 + rise + 0.9 * width, 6)
     expect(rightLow.x).toBeCloseTo(headX + width / 2, 6)
+    // 줄기는 오른쪽 윗귀 높이부터 그린다.
+    const [trimmed] = stemBeakTrimmedStrokes(sources, ON)
+    expect(trimmed?.points[0].y).toBeCloseTo(0.2 + rise, 6)
+    expect(trimmed?.points[1]).toEqual(stroke.points[1])
   })
 
   it('모양 다섯 가지 — 어느 것이든 줄기 머리의 두 모서리를 덮고, 양쪽 모양만 오른쪽으로도 나간다', () => {
@@ -100,9 +108,14 @@ describe('세로줄기 부리 G1 홀드아웃', () => {
       return (a.y > point.y) !== (b.y > point.y) && point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x ? !hit : hit
     }, false)
     for (const { id } of STEM_BEAK_SHAPES) {
-      const [[[contour]]] = stemBeakInkGroups([{ stroke, box: UNIT_BOX, weightMultiplier: 1, group: 'g' }], { ...ON, shape: id })
-      expect(inside({ x: 0.5 - 0.045, y: 0.205 }, contour), `${id} 왼쪽 모서리`).toBe(true)
-      expect(inside({ x: 0.5 + 0.045, y: 0.205 }, contour), `${id} 오른쪽 모서리`).toBe(true)
+      const sources = [{ stroke, box: UNIT_BOX, weightMultiplier: 1, group: 'g' }]
+      const [[[contour]]] = stemBeakInkGroups(sources, { ...ON, shape: id })
+      // 덮는 것은 실제로 그리는(머리를 깎은) 줄기의 머리 모서리다.
+      const headY = stemBeakTrimmedStrokes(sources, { ...ON, shape: id })[0]?.points[0].y ?? 0.2
+      expect(inside({ x: 0.5 - 0.045, y: headY + 0.005 }, contour), `${id} 왼쪽 모서리`).toBe(true)
+      expect(inside({ x: 0.5 + 0.045, y: headY + 0.005 }, contour), `${id} 오른쪽 모서리`).toBe(true)
+      // 어느 모양이든 줄기 원래 높이 위로는 안 나간다.
+      expect(Math.min(...contour.map(({ y }) => y)), `${id} 높이 안`).toBeGreaterThanOrEqual(0.2 - 1e-9)
       expect(Math.min(...contour.map(({ x }) => x)), `${id} 왼쪽으로 나감`).toBeLessThan(0.45 - 1e-6)
       const right = Math.max(...contour.map(({ x }) => x))
       if (id === 'bar' || id === 'flare') expect(right, id).toBeGreaterThan(0.55 + 1e-6)

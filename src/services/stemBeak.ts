@@ -75,11 +75,10 @@ const REACH_RATIO = 0.6
 /** 부리 아랫변이 줄기 왼쪽 면에 닿는 깊이 = 크기 × 굵기 × 이 값. */
 const DEPTH_RATIO = 0.9
 
-/**
- * 획마다 부리 면을 돌려준다. 순서는 `sources`와 같고, 부리가 없는 획은 빈 배열.
- * `renderStyle`이 납작 · 네모 붓촉이면 줄기 폭을 그 붓촉이 실제로 남기는 폭으로 잰다(굵기 그대로 쓰면 부리가 줄기보다 넓다).
- */
-export function stemBeakInkGroups(sources: readonly StemBeakSource[], style: StemBeakStyle | undefined, renderStyle?: StrokeRenderStyle): BrushInkGroup[][] {
+/** 부리 하나의 계획: 면, 그 부리가 앉은 머리 · 꼬리 점, 줄기 머리를 깎아 내릴 길이(글자 칸 단위). */
+interface BeakPlan { contour: BrushPoint[]; head: number; tail: number; lift: number }
+
+function beakPlansOf(sources: readonly StemBeakSource[], style: StemBeakStyle | undefined, renderStyle?: StrokeRenderStyle): BeakPlan[][] {
   if (STEM_BEAK_LOCKED) return sources.map(() => [])
   if (!style?.enabled && !sources.some((source) => source.style?.enabled)) return sources.map(() => [])
   return sources.map((source) => {
@@ -89,9 +88,46 @@ export function stemBeakInkGroups(sources: readonly StemBeakSource[], style: Ste
     const { segments } = describeStrokeGeometry(source.stroke, others)
     return segments.flatMap((segment) => {
       if (segment.shape !== 'serojulgi' || !segment.head || segment.head.kind !== 'end' || !segment.head.open || !segment.tail) return []
-      const contour = beakContour(source, segment.head, segment.tail, own, renderStyle)
-      return contour ? [[contour]] : []
+      const made = beakContour(source, segment.head, segment.tail, own, renderStyle)
+      return made ? [{ contour: made.contour, head: segment.head.point, tail: segment.tail.point, lift: made.lift }] : []
     })
+  })
+}
+
+/**
+ * 획마다 부리 면을 돌려준다. 순서는 `sources`와 같고, 부리가 없는 획은 빈 배열.
+ * `renderStyle`이 납작 · 네모 붓촉이면 줄기 폭을 그 붓촉이 실제로 남기는 폭으로 잰다(굵기 그대로 쓰면 부리가 줄기보다 넓다).
+ * 부리는 줄기 원래 높이 안에 든다 — 가장 높은 점이 줄기 머리 높이다. 각진 · 원형 부리는 그만큼 내려앉고, 줄기 머리는 `stemBeakTrimmedStrokes`로 깎는다(11-11).
+ */
+export function stemBeakInkGroups(sources: readonly StemBeakSource[], style: StemBeakStyle | undefined, renderStyle?: StrokeRenderStyle): BrushInkGroup[][] {
+  return beakPlansOf(sources, style, renderStyle).map((plans) => plans.map((plan) => [plan.contour]))
+}
+
+/**
+ * 부리 때문에 머리를 깎은 획. 깎을 것이 없으면 `null`(원래 획을 그대로 그린다). 화면 · 추출 · 측정이 모두 이 획으로 줄기를 그린다.
+ * 머리 점을 꼬리 쪽으로 당긴다 — 각진 부리면 줄기 오른쪽 윗귀가 부리 윗변 아래로 들어가 윗면이 기운다.
+ */
+export function stemBeakTrimmedStrokes(sources: readonly StemBeakSource[], style: StemBeakStyle | undefined, renderStyle?: StrokeRenderStyle): (StrokeDataV2 | null)[] {
+  return beakPlansOf(sources, style, renderStyle).map((plans, index) => {
+    const cuts = plans.filter((plan) => plan.lift > 0)
+    if (!cuts.length) return null
+    const { stroke, box } = sources[index]
+    const points = stroke.points.map((point) => ({ ...point }))
+    for (const plan of cuts) {
+      const head = stroke.points[plan.head], tail = stroke.points[plan.tail]
+      const a = toGlyph(head, box), b = toGlyph(tail, box)
+      const length = Math.hypot(b.x - a.x, b.y - a.y)
+      if (!length) continue
+      const t = Math.min(plan.lift / length, 0.9)
+      const dx = (tail.x - head.x) * t, dy = (tail.y - head.y) * t
+      const moved = points[plan.head]
+      points[plan.head] = {
+        ...moved, x: moved.x + dx, y: moved.y + dy,
+        ...(moved.handleIn ? { handleIn: { x: moved.handleIn.x + dx, y: moved.handleIn.y + dy } } : {}),
+        ...(moved.handleOut ? { handleOut: { x: moved.handleOut.x + dx, y: moved.handleOut.y + dy } } : {}),
+      }
+    }
+    return { ...stroke, points }
   })
 }
 
@@ -112,7 +148,7 @@ function stemWidthAcross(thickness: number, across: BrushPoint, renderStyle: Str
  * 부리 면 하나. 줄기 머리에서 `u`는 왼쪽(+), `v`는 줄기를 따라 아래(+)인 좌표로 그린다.
  * 어느 모양이든 줄기 머리를 덮도록 닫아서 줄기 잉크와 틈 없이 합쳐진다.
  */
-function beakContour(source: StemBeakSource, head: { x: number; y: number }, tail: { x: number; y: number }, style: StemBeakStyle, renderStyle: StrokeRenderStyle | undefined): BrushPoint[] | null {
+function beakContour(source: StemBeakSource, head: { x: number; y: number }, tail: { x: number; y: number }, style: StemBeakStyle, renderStyle: StrokeRenderStyle | undefined): { contour: BrushPoint[]; lift: number } | null {
   const top = toGlyph(head, source.box)
   const bottom = toGlyph(tail, source.box)
   const length = Math.hypot(bottom.x - top.x, bottom.y - top.y)
@@ -123,36 +159,42 @@ function beakContour(source: StemBeakSource, head: { x: number; y: number }, tai
   const along = { x: (bottom.x - top.x) / length, y: (bottom.y - top.y) / length }
   const left = { x: -along.y, y: along.x }
   const width = stemWidthAcross(thickness, left, renderStyle)
-  const at = (u: number, v: number): BrushPoint => ({ x: top.x + left.x * u + along.x * v, y: top.y + left.y * u + along.y * v })
-
   const half = width / 2
   const reach = REACH_RATIO * style.size * width
-  const depth = Math.min(DEPTH_RATIO * style.size * width, length)
-  switch (style.shape) {
-    case 'slab': {
-      const slab = Math.min(depth * 0.6, length)
-      return [at(-half, 0), at(half + reach, 0), at(half + reach, slab), at(half, slab), at(half, depth), at(-half, depth)]
-    }
-    case 'bar': {
-      const slab = Math.min(depth * 0.6, length)
-      return [at(-half - reach, 0), at(half + reach, 0), at(half + reach, slab), at(-half - reach, slab)]
-    }
-    case 'flare':
-      return [at(-half - reach, 0), at(half + reach, 0), at(half, depth), at(-half, depth)]
-    case 'round': {
-      // 줄기 축에서 왼쪽으로 조금 치우친 원. 반지름이 줄기 반폭보다 커서 머리를 덮는다.
-      const radius = half + reach * 0.5
-      const centerU = reach * 0.5
-      const centerV = radius * 0.35
-      return Array.from({ length: ROUND_STEPS }, (_, step) => {
-        const turn = step / ROUND_STEPS * Math.PI * 2
-        return at(centerU + Math.cos(turn) * radius, centerV + Math.sin(turn) * radius)
-      })
-    }
-    default: {
-      // 명조식: 머리 오른쪽 위 모서리 → 왼쪽 밖 뾰족한 끝 → 줄기 왼쪽 면.
-      const rise = (width + reach) * Math.tan(style.angle * Math.PI / 180)
-      return [at(-half, 0), at(half + reach, -rise), at(half, depth), at(-half, depth)]
+  // 원래 머리 위로 튀어나오는 만큼(lift) 부리 전체를 내린다 — 가장 높은 점이 머리 높이에 온다. 줄기 길이를 넘지는 않는다.
+  const rise = style.shape === 'angled' ? Math.max(0, (width + reach) * Math.tan(style.angle * Math.PI / 180)) : 0
+  const lift = Math.min(length * 0.9, style.shape === 'angled' ? rise : style.shape === 'round' ? (half + reach * 0.5) * 0.65 : 0)
+  const at = (u: number, v: number): BrushPoint => ({ x: top.x + left.x * u + along.x * (v + lift), y: top.y + left.y * u + along.y * (v + lift) })
+  const depth = Math.min(DEPTH_RATIO * style.size * width, length - lift)
+  const contour = beakShape()
+  return { contour, lift }
+  function beakShape(): BrushPoint[] {
+    switch (style.shape) {
+      case 'slab': {
+        const slab = Math.min(depth * 0.6, length)
+        return [at(-half, 0), at(half + reach, 0), at(half + reach, slab), at(half, slab), at(half, depth), at(-half, depth)]
+      }
+      case 'bar': {
+        const slab = Math.min(depth * 0.6, length)
+        return [at(-half - reach, 0), at(half + reach, 0), at(half + reach, slab), at(-half - reach, slab)]
+      }
+      case 'flare':
+        return [at(-half - reach, 0), at(half + reach, 0), at(half, depth), at(-half, depth)]
+      case 'round': {
+        // 줄기 축에서 왼쪽으로 조금 치우친 원. 반지름이 줄기 반폭보다 커서 머리를 덮는다.
+        const radius = half + reach * 0.5
+        const centerU = reach * 0.5
+        const centerV = radius * 0.35
+        return Array.from({ length: ROUND_STEPS }, (_, step) => {
+          const turn = step / ROUND_STEPS * Math.PI * 2
+          return at(centerU + Math.cos(turn) * radius, centerV + Math.sin(turn) * radius)
+        })
+      }
+      default: {
+        // 명조식: 머리 오른쪽 위 모서리 → 왼쪽 밖 뾰족한 끝 → 줄기 왼쪽 면. 뾰족한 끝이 원래 머리 높이에 온다.
+        const tilt = (width + reach) * Math.tan(style.angle * Math.PI / 180)
+        return [at(-half, 0), at(half + reach, -tilt), at(half, depth), at(-half, depth)]
+      }
     }
   }
 }

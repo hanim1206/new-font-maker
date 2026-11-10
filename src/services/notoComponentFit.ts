@@ -8,7 +8,7 @@ import { brushInkGroupsToInkRegions } from './inkGeometry'
 import { multiPolygonArea, unionOf } from './notoFitReport'
 import { notoOutlineToInkRegions } from './notoOutlineInk'
 import type { NotoOutline } from './notoOutlineInk'
-import { stemBeakGroupOf, stemBeakInkGroups, type StemBeakStyle } from './stemBeak'
+import { stemBeakGroupOf, stemBeakInkGroups, stemBeakTrimmedStrokes, type StemBeakStyle } from './stemBeak'
 import { verticalWidthFactorOf } from './strokeRenderGeometry'
 
 /**
@@ -57,17 +57,22 @@ export function withStemBeakRegions(primitives: readonly ResolvedInkPrimitive[],
   if (!style?.stemBeak?.enabled && !style?.beakOf) return primitives
   const renderStyle = fitStrokeStyleOf(style)
   const centerlines = primitives.filter((primitive): primitive is ResolvedCenterlinePrimitive => primitive.kind === 'centerline')
-  const groups = stemBeakInkGroups(centerlines.map((primitive) => ({
+  const sources = centerlines.map((primitive) => ({
     stroke: primitive.stroke as StrokeDataV2,
     box: primitive.box,
     weightMultiplier: primitive.weightMultiplier * verticalWidthFactorOf(renderStyle),
     group: stemBeakGroupOf(primitive.source),
     style: style.beakOf?.(primitive.source),
-  })), style.stemBeak, renderStyle)
+  }))
+  const groups = stemBeakInkGroups(sources, style.stemBeak, renderStyle)
+  // 부리가 줄기 높이 안에 앉도록 머리를 깎은 줄기(화면 · OTF와 같은 함수).
+  const trimmedList = stemBeakTrimmedStrokes(sources, style.stemBeak, renderStyle)
+  const trimmed = new Map(centerlines.flatMap((primitive, index) => (trimmedList[index] ? [[primitive, trimmedList[index]!] as const] : [])))
+  const kept = trimmed.size ? primitives.map((primitive) => (primitive.kind === 'centerline' && trimmed.has(primitive) ? { ...primitive, stroke: trimmed.get(primitive)! } : primitive)) : primitives
   const beaks = centerlines.flatMap((primitive, index) => brushInkGroupsToInkRegions(groups[index]).map((region, at) => ({
     kind: 'region' as const, coordinateSpace: 'glyph-normalized' as const, id: `${primitive.id}:beak:${at}`, source: primitive.source, region,
   })))
-  return beaks.length === 0 ? primitives : [...primitives, ...beaks]
+  return beaks.length === 0 ? kept : [...kept, ...beaks]
 }
 
 /** brush 모드만 fit 잉크에 쓴다. 면·점 스타일은 일자 끝을 못 만들어 fit 기본으로 돌아간다. */
