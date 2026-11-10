@@ -38,7 +38,7 @@ import { JamoGlyph } from './DashboardLabPage'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { Pressable } from './components/ui/pressable'
 import { beakResolverOf, buildPartIndexes, cutResolverOf, kindOf, loadPartRules, newRule, PartRuleDialog, RULE_TARGET, ruleReach, ruleSentence, savePartRules, sortRules, stemsOf } from './HandwritingPartRules'
-import { TailCutInk, useTailCuts } from './HandwritingTailCut'
+import { useTailCutMask, useTailCuts } from './HandwritingTailCut'
 import type { CutAngleResolver } from './HandwritingTailCut'
 import type { PartRule } from './HandwritingPartRules'
 import ruleStyles from './HandwritingPartRules.module.css'
@@ -136,7 +136,8 @@ const PresetGlyph = memo(function PresetGlyph({ char, size, style, groupBeakOf, 
   }, [schemas, globalPadding, paddingOverrides, syllable.layoutType])
   const { placement } = useContextPlacement(syllable, schema, style)
   const cuts = useTailCuts(syllable, placement, style, cutAngleOf)
-  return <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} size={size} globalStyle={style} overflow="visible" clipGlyphs={false} groupBeakOf={groupBeakOf}>{cuts.length > 0 && <TailCutInk cuts={cuts} />}</SvgRenderer>
+  const cutMask = useTailCutMask(cuts)
+  return <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} size={size} globalStyle={style} overflow="visible" clipGlyphs={false} groupBeakOf={groupBeakOf} partStyles={cutMask.partStyles}>{cutMask.defs}</SvgRenderer>
 })
 
 /** 글자표 줄들. 확인 카드를 만질 때 다시 그리지 않게 따로 묶는다(iPad 개발 서버에서 토글이 느렸다). */

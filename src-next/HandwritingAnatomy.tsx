@@ -15,7 +15,7 @@ import type { GroupBeakResolver } from '../src/stores/jamoGroupStore'
 import { Button } from './components/ui/button'
 import { pointsToSvgD } from '../src/utils/pathUtils'
 import { EDIT_COLOR } from './editColors'
-import { TailCutInk, tailIsOpen, useTailCuts } from './HandwritingTailCut'
+import { tailIsOpen, useTailCutMask, useTailCuts } from './HandwritingTailCut'
 import type { CutAngleResolver } from './HandwritingTailCut'
 import styles from './HandwritingAnatomy.module.css'
 
@@ -462,6 +462,7 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
     return SLOT_COLOR[s]
   }
   const cuts = useTailCuts(syllable, placement, style, cutAngleOf)
+  const cutMask = useTailCutMask(cuts)
   const styleKind = !hotItem ? null : hotItem.kind === 'tail' ? 'cut' as const : hotItem.kind === 'head' && hotItem.scope.shape.key === BEAK_TARGET_KEY ? 'beak' as const : null
   const pick = (s: Slot) => { setHot(null); setFocus(slot === s ? null : { char, slot: s }) }
 
@@ -470,8 +471,8 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
       <div className={styles.main}>
       <div className={styles.big} onClick={() => { setHot(null); setFocus(null) }}>
         <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined}
-          size={size} globalStyle={style} overflow="visible" clipGlyphs={false} strokeColorOf={colorOf} groupBeakOf={groupBeakOf}>
-          <TailCutInk cuts={cuts} colorOf={colorOf} />
+          size={size} globalStyle={style} overflow="visible" clipGlyphs={false} strokeColorOf={colorOf} groupBeakOf={groupBeakOf} partStyles={cutMask.partStyles}>
+          {cutMask.defs}
           {slots.filter((s) => !slot || s.slot === slot).flatMap((s) => s.parts.map((b, i) => <rect key={`${s.slot}-${i}`} x={b.x * V} y={b.y * V} width={b.width * V} height={b.height * V}
             fill="none" stroke={SLOT_COLOR[s.slot]} strokeWidth={0.35} strokeDasharray="1.2 1" pointerEvents="none" />))}
           {/* 자모 고르기: 획 위를 누르면 그 자모가 펼쳐진다. 투명한 굵은 선이 눌림을 받는다. */}

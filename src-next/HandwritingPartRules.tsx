@@ -17,7 +17,7 @@ import { Field, RangeBar } from './components/ui/range'
 import { EDIT_COLOR } from './editColors'
 import { beakHeadsOf, sampleChar, SLOT_COLOR, SLOT_NAME, SLOT_OF, tailEndsOf } from './HandwritingAnatomy'
 import type { Slot } from './HandwritingAnatomy'
-import { TailCutInk, useTailCuts } from './HandwritingTailCut'
+import { useTailCutMask, useTailCuts } from './HandwritingTailCut'
 import type { CutAngleResolver } from './HandwritingTailCut'
 import { useContextPlacement } from './notoModel'
 import styles from './HandwritingPartRules.module.css'
@@ -163,12 +163,13 @@ const RuleCard = memo(function RuleCard({ slot, ch, kind, style, groupBeakOf, cu
   }, [schemas, globalPadding, paddingOverrides, syllable.layoutType])
   const { placement } = useContextPlacement(syllable, schema, style)
   const cuts = useTailCuts(syllable, placement, style, cutAngleOf)
+  const cutMask = useTailCutMask(cuts, HIDE[slot])
   const cutIds = useMemo(() => new Set(cuts.filter((c) => SLOT_OF[c.source.part] === slot).map((c) => c.source.strokeId)), [cuts, slot])
   const colorOf = (source: ResolvedStrokeInkSource) => ((kind === 'cut' ? cutIds.has(source.strokeId) : groupBeakOf(source)?.enabled) ? SLOT_COLOR[slot] : EDIT_COLOR.editSlotOff)
   return <Pressable type="button" className={styles.card} data-off={off || undefined} aria-pressed={!off} aria-label={`${ch} ${off ? '넣기' : '빼기'}`} onClick={onToggle} data-testid={`part-rule-card-${slot}-${ch}`}>
     <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined}
-      size={64} globalStyle={style} overflow="visible" clipGlyphs={false} partStyles={HIDE[slot]} strokeColorOf={colorOf} groupBeakOf={groupBeakOf}>
-      <TailCutInk cuts={cuts} colorOf={colorOf} hidden={(source) => SLOT_OF[source.part] !== slot} />
+      size={64} globalStyle={style} overflow="visible" clipGlyphs={false} partStyles={cutMask.partStyles} strokeColorOf={colorOf} groupBeakOf={groupBeakOf}>
+      {cutMask.defs}
     </SvgRenderer>
     {off && <em>뺌</em>}
   </Pressable>
