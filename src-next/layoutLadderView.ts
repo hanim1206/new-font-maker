@@ -95,7 +95,7 @@ export const LADDER_CSS = `.LL{--ink:#1d1d1f;--mute:#6e6e73;--line:#e3e3e6;--bg:
 .LL #pick .pg{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 .LL #pick .pg div{text-align:center;font-size:10px;color:var(--mute)}
 .LL #pick .pg b{color:var(--ink);font-size:13px}.LL #pick svg{border-radius:6px}
-.LL #pick .pg .hi svg{outline:2px solid #111;border-radius:6px}.LL #pick .pg [data-c]{cursor:pointer}.LL #pick .v1 path.step{display:none}.LL #pick .v2 path.tab{display:none}.LL #pick .v1 b::after{content:' 표'}.LL #pick .v2 b::after{content:' 지금'}`
+.LL #pick .pg .hi svg{outline:2px solid #111;border-radius:6px}.LL #pick .pv{margin:0 0 4px}.LL #pick .pv button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:3px 10px;font-size:12px;cursor:pointer}.LL #pick path.tab{opacity:1;fill:var(--tab);fill-opacity:.45;mix-blend-mode:multiply}.LL #pick path.step{fill:var(--step);fill-opacity:.45;stroke:none;mix-blend-mode:multiply}.LL #pick.v1 path.step{display:none}.LL #pick.v2 path.tab{display:none}`
 
 export const LADDER_CSS_WORK = `.LL main{max-width:none;padding-left:24px;padding-right:24px}.LL .work{display:grid;grid-template-columns:300px minmax(0,1fr) 420px;gap:20px;align-items:start}.LL .side{position:sticky;top:40px;max-height:calc(100vh - 52px);overflow:auto}.LL #canvas svg{background:#fff;border:1px solid var(--line);border-radius:12px;aspect-ratio:auto}.LL #canvas .edge{cursor:pointer}.LL #canvas .edge:hover .vis{opacity:.7}.LL #canvas text{font-size:7px;fill:var(--ink);pointer-events:none;font-variant-numeric:tabular-nums}.LL #canvas .pn{font-size:9px;fill:var(--mute)}.LL .ehead{display:grid;grid-template-columns:1fr 200px;gap:12px;align-items:center;margin-bottom:10px}.LL .ehead .name{font-weight:600;font-size:16px}.LL .ehead small{display:block;font-weight:400;color:var(--mute);font-size:12px}`
 
@@ -127,8 +127,9 @@ const CHOS = [...'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'], J
 const PADV = 14;
 const SELC = {};
 let LAST = null;
-// 글자 칸을 누를 때마다 둘 다 → 초록(외운 표)만 → 파랑(지금 조합)만 → 둘 다.
-const VIEW = {};
+// 위 단추를 누를 때마다 오른쪽 글자 전부가 둘 다 → 초록(외운 표)만 → 파랑(지금 조합)만 → 둘 다.
+let VIEW = 0;
+const VIEWN = ['둘 다', '초록만', '파랑만'];
 /** 고른 칸의 줄(같은 첫닿자)과 열(같은 홀자)을 오른쪽 영역에 띄운다. */
 function panel() {
   const el = root.querySelector('#' + 'pick'); const pick = LAST && SELC[pool + ' ' + LAST];
@@ -137,7 +138,7 @@ function panel() {
   const rows = D.rows.filter(r => r.pool === pool && mv(r) !== undefined);
   const mid = list => { const m = mmed(list.map(mv)); return [...list].sort((x, y) => Math.abs(mv(x) - m) - Math.abs(mv(y) - m))[0]; };
   const [t, a, b] = pick.split('|');
-  const glyph = (r, hi) => r && D.svgs[r.char] ? `<div class="${hi ? 'hi' : ''} v${VIEW[r.char] ?? 0}" data-c="${r.char}">${svgOf(r.char, sel)}<b>${r.char}</b> ${fmt(mv(r))}</div>` : '<div></div>';
+  const glyph = (r, hi) => r && D.svgs[r.char] ? `<div class="${hi ? 'hi' : ''}">${svgOf(r.char, sel)}<b>${r.char}</b> ${fmt(mv(r))}</div>` : '<div></div>';
   const line = (title, cells) => `<div class="pl"><div class="pt">${title}</div><div class="pg">${cells.join('')}</div></div>`;
   let body = '';
   const cho = t === 'cell' || t === 'cho' ? a : null, jung = t === 'cell' ? b : t === 'jung' ? a : null;
@@ -145,8 +146,9 @@ function panel() {
   if (cho) body += line(`줄 — 첫닿자 ${cho}`, JUNGS.map(j => glyph(mid(rows.filter(r => r.cho === cho && r.jung === j)), j === jung)));
   if (jung) body += line(`열 — 홀자 ${jung}`, CHOS.map(c => glyph(mid(rows.filter(r => r.cho === c && r.jung === jung)), c === cho)));
   if (t === 'jong') body += line(`받침 ${a}`, [...rows.filter(r => r.jong === a)].sort((x, y) => Math.abs(mv(y)) - Math.abs(mv(x))).map(r => glyph(r, false)));
-  el.innerHTML = `<div class="ph"><b>${PARTN[p]} ${EDGEN[e]}</b> · ${pool}자 · ${selName()}<button id="pickx">✕</button></div><div class="ps">초록 면 = 외운 표 · 파랑 선 = 지금 조합 · 숫자 = 표가 더 옮기는 양 · 글자를 누를 때마다 초록만 → 파랑만 → 둘 다</div>${body}`;
-  el.querySelectorAll('[data-c]').forEach(c => c.addEventListener('click', () => { const ch = c.dataset.c, v = ((VIEW[ch] ?? 0) + 1) % 3; VIEW[ch] = v; el.querySelectorAll(`[data-c="${ch}"]`).forEach(x => { x.classList.remove('v0', 'v1', 'v2'); x.classList.add('v' + v); }); }));
+  el.innerHTML = `<div class="ph"><b>${PARTN[p]} ${EDGEN[e]}</b> · ${pool}자 · ${selName()}<button id="pickx">✕</button></div><div class="ps">초록 면 = 외운 표 · 파랑 면 = 지금 조합 · 겹친 곳은 진한 청록 · 숫자 = 표가 더 옮기는 양</div><div class="pv"><button id="pickv">보기: ${VIEWN[VIEW]}</button></div>${body}`;
+  el.className = 'v' + VIEW;
+  root.querySelector('#pickv').onclick = () => { VIEW = (VIEW + 1) % 3; el.className = 'v' + VIEW; root.querySelector('#pickv').textContent = '보기: ' + VIEWN[VIEW]; };
   root.querySelector('#pickx').onclick = () => { delete SELC[pool + ' ' + LAST]; moves(); };
 }
 const KEYS = ['CH.left','CH.right','CH.top','CH.bottom','JU.left','JU.right','JU.top','JU.bottom','JO.left','JO.right','JO.top','JO.bottom'];
