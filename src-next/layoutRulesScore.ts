@@ -1,6 +1,7 @@
 import { materializeFinalGlyphInk } from '../src/services/finalGlyphInk'
 import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
 import { applyLayoutRules, bodyOfPadding, RULE_PARTS } from '../src/services/layoutRules'
+import { shapeFeaturesOf } from '../src/services/jamoShapeFeatures'
 import { applyStrokeShapeRules, STROKE_SHAPES_OFF } from '../src/services/strokeShapeRules'
 import type { StrokeShapeParams } from '../src/services/strokeShapeRules'
 import type { InkBounds, LayoutRuleParams, LayoutRuleStep, RuleBoxes, RuleInk, RuleMeasure, RulePart } from '../src/services/layoutRules'
@@ -235,10 +236,11 @@ export function scoreGlyph(input: ScoreInput): ScoredGlyph {
   // (안 그러면 규칙은 옛 줄기 자리로 맞추고 그림은 새 줄기 자리로 그려져, ㅔ ㅖ 기둥처럼 줄기가 상자 끝인 홀자가 어긋난다.)
   const plainMeasure = partInkMeasure(syllable, style)
   const snap = (boxes: RuleBoxes): RuleBoxes => input.snapStems && modelBoxes?.JU?.stems && boxes.JU ? { ...boxes, JU: { ...boxes.JU, stems: railsInBox(modelBoxes.JU, boxes.JU) } } : boxes
-  const ruled = applyLayoutRules({ boxes: snap(schemaBoxes), body: bodyOfPadding(START_PADDING), params, measure: (boxes) => plainMeasure(snap(boxes)), jamo })
+  const features = { cho: syllable.choseong ? shapeFeaturesOf(syllable.choseong) : null, jong: syllable.jongseong ? shapeFeaturesOf(syllable.jongseong) : null }
+  const ruled = applyLayoutRules({ boxes: snap(schemaBoxes), body: bodyOfPadding(START_PADDING), params, measure: (boxes) => plainMeasure(snap(boxes)), jamo, features })
   if (input.snapStems && modelBoxes?.JU?.stems && ruled.boxes.JU) ruled.boxes.JU = { ...ruled.boxes.JU, stems: railsInBox(modelBoxes.JU, ruled.boxes.JU) }
   // 자리는 원래 꼴로 정하고, 그림만 꼴 규칙을 입혀 그린다.
-  const drawn = applyStrokeShapeRules(syllable, input.shapes ?? STROKE_SHAPES_OFF)
+  const drawn = applyStrokeShapeRules(syllable, input.shapes ?? STROKE_SHAPES_OFF, input.maps.jongseong)
   const ruleXor = xorOf(drawn, { kind: 'boxes', boxes: ruled.boxes }, style, ghost.regions)
   if ('message' in ruleXor) return failed(ruleXor.message)
 
@@ -290,6 +292,13 @@ export function sampleChars(): string[] {
     } else chars.add(char)
   }
   return [...chars]
+}
+
+/** 받침 없는 표본 171자 — 첫닿자 19 × 오른홀자 9. 588 전수에는 받침 없는 글자가 없어 따로 둔다(2026-11-09). */
+export function noFinalChars(): string[] {
+  const chars: string[] = []
+  for (const cho of CHOSEONG_LIST) for (const jung of RIGHT_VOWELS) chars.push(compose(cho, jung, ''))
+  return chars
 }
 
 /** 가운데값. 빈 목록은 null. */

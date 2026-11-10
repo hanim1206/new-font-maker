@@ -8,7 +8,7 @@ import { DEFAULT_STROKE_SHAPE_PARAMS } from '../src/services/strokeShapeRules'
 import type { StrokeShapeParams } from '../src/services/strokeShapeRules'
 import { strokeXorShares } from './layoutRulesStrokeXor'
 import { EDIT_COLOR } from './editColors'
-import { BOX_TOLERANCE, EDGE_LABEL, EDGES, GLYPH_KIND_LABEL, glyphKindOf, INK_CLOSE_TOLERANCE, medianOf, NOTO_DELTA_TOLERANCE, regionsToPath, REPRESENTATIVE_CHARS, sampleChars, scoreGlyph } from './layoutRulesScore'
+import { BOX_TOLERANCE, EDGE_LABEL, EDGES, GLYPH_KIND_LABEL, glyphKindOf, INK_CLOSE_TOLERANCE, medianOf, noFinalChars, NOTO_DELTA_TOLERANCE, regionsToPath, REPRESENTATIVE_CHARS, sampleChars, scoreGlyph } from './layoutRulesScore'
 import type { JamoMaps, ScoredGlyph } from './layoutRulesScore'
 import { useNotoModel } from './notoModel'
 import { notoPresetGlyphs } from './notoPresetGlyphs'
@@ -23,7 +23,7 @@ import styles from './LayoutRulesLabPage.module.css'
  * 전역 스타일은 기본값으로 고정한다 — 여기서 재는 것은 배치뿐이다.
  */
 
-type SampleKind = 'six' | 'full'
+type SampleKind = 'six' | 'full' | 'noFinal'
 const VIEW = 300
 const WORST_COUNT = 20
 const BATCH = 6
@@ -168,7 +168,7 @@ export function LayoutRulesLabPage() {
   const [selected, setSelected] = useState<string>(REPRESENTATIVE_CHARS[1])
   const [show, setShow] = useState({ ghost: true, ink: true, schema: false, model: true, rule: true })
 
-  const chars = useMemo(() => sample === 'six' ? [...REPRESENTATIVE_CHARS] : sampleChars(), [sample])
+  const chars = useMemo(() => sample === 'six' ? [...REPRESENTATIVE_CHARS] : sample === 'noFinal' ? noFinalChars() : sampleChars(), [sample])
   const { scores, progress } = useScores({ chars, maps, params, snapStems, shapes, modelReady: Boolean(bundle) || Boolean(modelError), model: bundle })
 
   const list = useMemo(() => chars.map((char) => scores.get(char)).filter((score): score is ScoredGlyph => Boolean(score)), [chars, scores])
@@ -213,10 +213,15 @@ export function LayoutRulesLabPage() {
       <div className={styles.group}>
         <h3>규칙</h3>
         {LAYOUT_RULE_ORDER.map((rule) => <label key={rule}><input type="checkbox" checked={params.rules[rule]} onChange={() => toggleRule(rule)} data-testid={`rule-${rule}`} /> {LAYOUT_RULE_LABEL[rule]}</label>)}
+        <label><input type="checkbox" checked={params.formulas} onChange={() => setParams((prev) => ({ ...prev, formulas: !prev.formulas }))} data-testid="rule-formulas" /> 표 대신 공식(G0 — 첫닿자 아래, 받침 없음. 나머지 열은 아직 표)</label>
+        <label><input type="checkbox" checked={params.jungKinds} onChange={() => setParams((prev) => ({ ...prev, jungKinds: !prev.jungKinds }))} data-testid="rule-jung-kinds" /> 홀자 표 대신 가지 갈래 넷(기둥은 가지 반대쪽으로 비켜서고 오른가지는 기둥 밖으로)</label>
         <label><input type="checkbox" checked={snapStems} onChange={() => setSnapStems((value) => !value)} /> 홀자 안쪽 줄기를 노토 보선에 맞춤</label>
         <h3>획 꼴(2차)</h3>
         <label><input type="checkbox" checked={shapes.giyeokSweep} onChange={() => setShapes((prev) => ({ ...prev, giyeokSweep: !prev.giyeokSweep }))} data-testid="shape-giyeokSweep" /> ㄱ ㅋ ㄲ 세로줄기를 삐침으로(오른홀자 옆)</label>
         <label><input type="checkbox" checked={shapes.bottomKick} onChange={() => setShapes((prev) => ({ ...prev, bottomKick: !prev.bottomKick }))} data-testid="shape-bottomKick" /> ㄴ ㄷ ㄸ ㄹ ㅌ ㅍ 맨 아래 가로줄기 치킴(왼가지 옆은 짧게, 받침 ㄵ의 ㄴ도)</label>
+        <label><input type="checkbox" checked={shapes.tailSweep} onChange={() => setShapes((prev) => ({ ...prev, tailSweep: !prev.tailSweep }))} data-testid="shape-tailSweep" /> ㅈ ㅊ ㅉ 삐침 · 내림 끝을 바깥으로 휘어 빼기(오른홀자 옆)</label>
+        <label><input type="checkbox" checked={shapes.compoundJong} onChange={() => setShapes((prev) => ({ ...prev, compoundJong: !prev.compoundJong }))} data-testid="shape-compoundJong" /> 섞임받침 ㅀ ㄶ ㅄ을 홑받침 둘로 다시 그리기</label>
+        <label><input type="checkbox" checked={shapes.hieutParts} onChange={() => setShapes((prev) => ({ ...prev, hieutParts: !prev.hieutParts }))} data-testid="shape-hieutParts" /> ㅎ(첫닿자 · 받침) 머리와 동그라미 자리 노토에 맞추기</label>
       </div>
       <div className={styles.group}>
         <h3>변수</h3>
@@ -230,6 +235,7 @@ export function LayoutRulesLabPage() {
         <h3>표본</h3>
         <label><input type="radio" name="sample" checked={sample === 'six'} onChange={() => setSample('six')} /> 대표 여섯 (가 각 갈 날 말 할)</label>
         <label><input type="radio" name="sample" checked={sample === 'full'} onChange={() => setSample('full')} /> 전수 {sampleChars().length}자 (오른홀자 + 받침)</label>
+        <label><input type="radio" name="sample" checked={sample === 'noFinal'} onChange={() => setSample('noFinal')} data-testid="sample-no-final" /> 받침 없음 {noFinalChars().length}자 (첫닿자 19 × 오른홀자 9)</label>
         <h3>그림</h3>
         {(['ghost', 'ink', 'rule', 'model', 'schema'] as const).map((key) => <label key={key}><input type="checkbox" checked={show[key]} onChange={() => setShow((prev) => ({ ...prev, [key]: !prev[key] }))} /> {({ ghost: '노토 고스트', ink: '우리 잉크(규칙 자리)', rule: '규칙 상자', model: '모델 상자(점선)', schema: '스키마 상자(파선)' })[key]}</label>)}
       </div>

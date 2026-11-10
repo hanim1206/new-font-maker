@@ -1,5 +1,7 @@
 import type { BoxConfig, Padding } from '../types'
 import { BRANCH_INSET_BY_PAIR, CHO_RIGHT_BY_JUNG, CHO_RIGHT_BY_PAIR, JONG_RIGHT_BY_CHO } from './layoutRuleResiduals'
+import type { JamoShapeFeatures } from './jamoShapeFeatures'
+import { CHO_TOP_DROP_NO_FINAL, TWO_STEM_CHO_NARROW, branchInsetOf, choBottomLiftOf, choSideInsetOf, choTopShiftOf, jongDropOf, jongFollowOf, jongRaiseOf, jongSideInsetOf, pillarDiveOf, DOUBLE_CHO_SHIFT, PILLAR_RIGHT, RIGHT_BRANCH_OUT, TWO_STEM_FOLLOW, TWO_STEM_SPAN, choBottomNoFinal, choTopDropNoFinal, vowelBranchKindOf } from './layoutRuleFormulas'
 import { BRANCH_INSET_BY_CHO, BRANCH_INSET_BY_JUNG, CHO_GAP, CHO_TARGET, CHO_TOP_BY_JONG, CHO_TOP_BY_JUNG, JONG_GAP_OFFSET, JONG_LEFT_BY_JUNG, JONG_RIGHT_BY_JUNG, JONG_TARGET, JONG_TOP_BY_CHO, JUNG_TARGET, PILLAR_BOTTOM_NO_FINAL } from './layoutRuleTargets'
 
 /**
@@ -61,12 +63,60 @@ export interface LayoutRuleParams {
   k: number
   /** 표에 없는 첫닿자일 때 첫닿자 아래 = 받침 윗면 − 두께 × m. */
   m: number
+  /** 표 대신 공식(G0): 공식이 표와 같은 점수를 낸 열(첫닿자 아래, 받침 없음)을 자모 생김새에서 낸다. 특징이 없으면 표로 간다. */
+  formulas: boolean
+  /** 자모별 표를 쓴다. 끄면 표 규칙(첫닿자 · 홀자 · 받침 표)은 건너뛰고 관계 규칙만 k · m 값으로 돈다 — "우리 패턴만" 단계를 재는 용도. */
+  tables: boolean
+  /** 홀자 가로 자리를 홀자 표 아홉 줄 대신 가지 모양 갈래 넷으로 낸다(`layoutRuleFormulas.ts`의 PILLAR_RIGHT). */
+  jungKinds: boolean
+  /** 표 없이 왼가지 끝을 첫닿자 오른쪽 모양(`branchInsetOf`)으로 낸다. `jungKinds`와 따로 켜고 끈다. */
+  branchInset: boolean
+  /** 표 없이 두 기둥 홀자(ㅐ ㅒ ㅔ ㅖ) 옆에서 첫닿자 오른면을 `TWO_STEM_CHO_NARROW`만큼 들인다. */
+  twoStemNarrow: boolean
+  /** 표 없이 첫닿자 양옆을 생김새(`choSideInsetOf`)대로 들인다 — 세로벽 있는 닿자는 좁게, 쌍닿자는 오른쪽으로 넓게. */
+  choWall: boolean
+  /** 표 없이 첫닿자 아랫면을 바닥 모양(`choBottomLiftOf`)만큼 올린다 — 바닥이 막힌 닿자일수록 위에서 끝난다. */
+  choBottomShape: boolean
+  /** 표 없이 첫닿자 윗면을 받침 유무와 꼭지(`choTopShiftOf`)로 낸다 — 받침 있으면 내려오고, 꼭지 닿자는 위로 솟는다. */
+  choTopShape: boolean
+  /** 표 없이 받침 윗면을 층 수와 꼭지(`jongRaiseOf`)로 올린다 — 층이 많고 꼭지가 있을수록 받침이 키가 크다. */
+  jongHeight: boolean
+  /** 표 없이 받침 오른쪽 위가 비면 홀자 기둥을 그 빈 자리로 내린다(`pillarDiveOf`). */
+  pillarDive: boolean
+  /** 표 없이 받침 양옆을 세로벽 막힘(`jongSideInsetOf`)대로 들인다 — 벽 쪽일수록 안으로. */
+  jongWall: boolean
+  /** 표 없이 받침을 홀자 기둥 자리(`jongFollowOf`)만큼 가로로 옮긴다 — ㅏ ㅑ 옆에선 왼쪽, 두 기둥 옆에선 오른쪽. */
+  jongFollow: boolean
+  /** 표 없이 키 큰 첫닿자(층 셋 이상 · 꼭지) 밑에서 받침 윗면을 내린다(`jongDropOf`). */
+  choTallJong: boolean
+  /** 받침 사선 다리(ㅅ ㅈ ㅊ)는 벽으로 치지 않고, 겹받침 다리는 바깥으로 뻗는다(`jongSideInsetOf` legs). `jongWall`과 함께 쓴다. */
+  jongLegs: boolean
+  /** 겹받침 · 쌍받침에도 받침 벽을 건다(`jongSideInsetOf` multi). `jongWall`과 함께 쓴다. */
+  jongWallMulti: boolean
 }
+
+/** 공식에 쓰는 자모 생김새 특징. */
+export interface RuleFeatures { cho?: JamoShapeFeatures | null; jong?: JamoShapeFeatures | null }
 
 export const DEFAULT_LAYOUT_RULE_PARAMS: LayoutRuleParams = {
   rules: { faces: true, choTable: true, jungTable: true, jongTable: true, choBottom: true, pillar: true, gap: false },
   k: 0.25,
   m: 0.6,
+  formulas: false,
+  tables: true,
+  jungKinds: false,
+  branchInset: false,
+  twoStemNarrow: false,
+  choWall: false,
+  choBottomShape: false,
+  choTopShape: false,
+  jongHeight: false,
+  pillarDive: false,
+  jongWall: false,
+  jongFollow: false,
+  choTallJong: false,
+  jongLegs: false,
+  jongWallMulti: false,
 }
 
 export interface LayoutRuleStep {
@@ -171,18 +221,23 @@ const scaleX = (body: RuleBody) => (body.right - body.left) / (RULE_REFERENCE_BO
  * 기둥이 둘인 홀자(ㅐ ㅒ ㅔ ㅖ) 옆에서는 폭이 표의 비율로 준다(왼면 기준).
  * 아래는 받침이 있으면 그대로 두고(규칙 D가 받침 윗면에서 정한다), 없으면 표의 받침 없는 아래.
  */
-function applyChoTable(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jamo: RuleJamo): LayoutRuleStep | null {
+function applyChoTable(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jamo: RuleJamo, features: JamoShapeFeatures | null, formulas: boolean): LayoutRuleStep | null {
+  const formula = formulas ? features : null
   const box = boxes.CH
   const ch = ink.CH
   const target = CHO_TARGET[jamo.cho]
   if (!box || !ch || !target) return null
   const twoStem = TWO_STEM_VOWELS.has(jamo.jung)
-  const width = (target.right - target.left) * (twoStem ? target.twoStemScale : 1)
-  const top = target.top + (jamo.jong ? CHO_TOP_BY_JONG[jamo.jong] ?? 0 : 0) + (CHO_TOP_BY_JUNG[jamo.jung] ?? 0)
+  const twoStemScale = target.twoStemScale
+  const width = (target.right - target.left) * (twoStem ? twoStemScale : 1)
+  // 받침이 있으면 받침별 치우침(표), 없으면 윗면이 내려온다(생김새 공식 — 표의 윗면은 받침 있는 글자에서 잰 값이다).
+  const byJong = jamo.jong ? (CHO_TOP_BY_JONG[jamo.jong] ?? 0) : features ? choTopDropNoFinal(features) : CHO_TOP_DROP_NO_FINAL
+  const top = target.top + byJong + (CHO_TOP_BY_JUNG[jamo.jung] ?? 0)
   const widen = (CHO_RIGHT_BY_JUNG[jamo.jung] ?? 0) + (CHO_RIGHT_BY_PAIR[jamo.cho + jamo.jung] ?? 0)
-  const goal: InkBounds = { left: atX(body, target.left), right: atX(body, target.left + width + widen), top: atY(body, top), bottom: ink.JO ? ch.bounds.bottom : atY(body, target.bottomNoFinal) }
+  const bottomNoFinal = formula ? choBottomNoFinal(formula) : target.bottomNoFinal
+  const goal: InkBounds = { left: atX(body, target.left), right: atX(body, target.left + width + widen), top: atY(body, top), bottom: ink.JO ? ch.bounds.bottom : atY(body, bottomNoFinal) }
   const after = fitBoxToInk(box, ch.bounds, goal)
-  return { rule: 'choTable', part: 'CH', before: clone(box), after, limited: false, note: `${jamo.cho}${twoStem ? ' · 두 기둥 옆 ×' + target.twoStemScale : ''} — 가로 ${fixed(goal.left)}~${fixed(goal.right)}, 윗면 ${fixed(ch.bounds.top)} → ${fixed(goal.top)}` }
+  return { rule: 'choTable', part: 'CH', before: clone(box), after, limited: false, note: `${jamo.cho}${formula ? ' · 공식' : ''}${twoStem ? ' · 두 기둥 옆 ×' + fixed(twoStemScale) : ''} — 가로 ${fixed(goal.left)}~${fixed(goal.right)}, 윗면 ${fixed(ch.bounds.top)} → ${fixed(goal.top)}` }
 }
 
 /**
@@ -190,19 +245,26 @@ function applyChoTable(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jamo: Rul
  * 왼가지 홀자(ㅓ ㅕ ㅔ ㅖ)는 첫닿자 오른면 + 첫닿자별 파고듦(오른쪽이 열린 ㄴ은 깊이, 닫힌 ㄹ은 틈을 두고) + 홀자별 잔차.
  * 나머지(ㅏ ㅑ ㅐ ㅒ ㅣ)는 홀자별 표, 첫닿자가 쌍자음이면 쌍자음 옆 값. ㅔ ㅖ는 왼 기둥이 밀린 만큼의 일정 비율로 기둥도 따라간다. 세로는 그대로.
  */
-function applyJungTable(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jamo: RuleJamo): LayoutRuleStep | null {
+function applyJungTable(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jamo: RuleJamo, kinds: boolean): LayoutRuleStep | null {
   const box = boxes.JU
   const ju = ink.JU
   const target = JUNG_TARGET[jamo.jung]
   if (!box || !ju || !target) return null
   const double = DOUBLE_CONSONANTS.has(jamo.cho)
+  const kind = kinds ? vowelBranchKindOf(jamo.jung) : null
+  // 갈래 공식: 기둥은 가지 반대쪽으로 비켜서고, 오른가지는 기둥 밖으로 나간다.
+  const kindRight = kind ? PILLAR_RIGHT[kind] + (kind === 'right' ? RIGHT_BRANCH_OUT : 0) : null
+  const kindLeft = kind && kind !== 'left' && !LEFT_BRANCH_VOWELS.has(jamo.jung)
+    ? (kind === 'twoStem' ? PILLAR_RIGHT.twoStem - TWO_STEM_SPAN : PILLAR_RIGHT[kind] - ju.thickness / scaleX(body)) + (double ? DOUBLE_CHO_SHIFT[kind] : 0)
+    : null
+  const baseLeft = kind ? (kindLeft ?? target.left) : target.left
   const inset = LEFT_BRANCH_VOWELS.has(jamo.jung) && ink.CH ? BRANCH_INSET_BY_CHO[jamo.cho] : undefined
   const left = inset !== undefined && ink.CH
     ? ink.CH.bounds.right + scaleX(body) * (inset + (BRANCH_INSET_BY_JUNG[jamo.jung] ?? 0) + (BRANCH_INSET_BY_PAIR[jamo.cho + jamo.jung] ?? 0))
-    : atX(body, double ? target.leftNextToDouble : target.left)
+    : atX(body, kindLeft ?? (double ? target.leftNextToDouble : target.left))
   // 왼가지 두 기둥 홀자(ㅔ ㅖ)는 왼 기둥이 밀리면 기둥도 그 비율만큼 같이 밀린다(모델에서 잰 기울기).
-  const follows = inset !== undefined && TWO_STEM_VOWELS.has(jamo.jung) ? target.rightFollowsLeft : 0
-  const right = atX(body, target.right) + follows * (left - atX(body, target.left))
+  const follows = inset !== undefined && TWO_STEM_VOWELS.has(jamo.jung) ? (kind ? TWO_STEM_FOLLOW : target.rightFollowsLeft) : 0
+  const right = atX(body, kindRight ?? target.right) + follows * (left - atX(body, baseLeft))
   const after = fitBoxToHorizontalInk(box, ju.bounds, { left, right })
   const how = inset !== undefined ? `왼가지 — 첫닿자 오른면 ${fixed(ink.CH!.bounds.right)} ${inset < 0 ? '−' : '+'} ${fixed(Math.abs(inset))}` : double ? '쌍자음 옆' : '표'
   return { rule: 'jungTable', part: 'JU', before: clone(box), after, limited: false, note: `${jamo.jung} · ${how} — 가로 ${fixed(ju.bounds.left)}~${fixed(ju.bounds.right)} → ${fixed(left)}~${fixed(right)}` }
@@ -225,26 +287,26 @@ function applyJongTable(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jamo: Ru
 }
 
 /** 규칙 D · 첫닿자 아래 = 받침 윗면 − 두께 × 틈. 틈은 첫닿자별 표(꼬리 있는 ㄱ ㅋ은 작고 네모난 ㅁ ㄴ은 크다) + 받침별 잔차(ㅎ ㅀ ㅊ처럼 꼭지가 솟은 받침은 음수). 표에 없으면 m. 받침이 없으면 건너뛴다. */
-function applyChoBottom(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, params: LayoutRuleParams, jamo: RuleJamo | undefined): LayoutRuleStep | null {
+function applyChoBottom(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, params: LayoutRuleParams, jamo: RuleJamo | undefined, lift = 0): LayoutRuleStep | null {
   const box = boxes.CH
   const ch = ink.CH
   const jo = ink.JO
   if (!box || !ch || !jo) return null
-  const choGap = jamo ? CHO_GAP[jamo.cho] : undefined
-  const gap = choGap !== undefined ? choGap + (JONG_GAP_OFFSET[jamo!.jong] ?? 0) : params.m
-  let bottom = jo.bounds.top - meanThickness(ch, jo) * gap
+  const baseGap = jamo ? CHO_GAP[jamo.cho] : undefined
+  const gap = baseGap !== undefined ? baseGap + (JONG_GAP_OFFSET[jamo!.jong] ?? 0) : params.m
+  let bottom = jo.bounds.top - meanThickness(ch, jo) * gap - scaleY(body) * lift
   let limited = false
   if (bottom - ch.bounds.top < MIN_PART_HEIGHT) { bottom = ch.bounds.top + MIN_PART_HEIGHT; limited = true }
   if (bottom > body.bottom) { bottom = body.bottom; limited = true }
   const after = fitBoxToVerticalInk(box, ch.bounds, { top: ch.bounds.top, bottom })
-  return { rule: 'choBottom', part: 'CH', before: clone(box), after, limited, note: `첫닿자 아래 ${fixed(ch.bounds.bottom)} → ${fixed(bottom)} (받침 윗면 ${fixed(jo.bounds.top)} − 두께 × ${fixed(gap)})` }
+  return { rule: 'choBottom', part: 'CH', before: clone(box), after, limited, note: `첫닿자 아래 ${fixed(ch.bounds.bottom)} → ${fixed(bottom)} (받침 윗면 ${fixed(jo.bounds.top)} − 두께 × ${fixed(gap)}${lift ? ` − 바닥 모양 ${fixed(lift)}` : ''})` }
 }
 
 /**
  * 규칙 E · 홀자 기둥 — 위는 글자 몸 위. 아래는 받침이 있으면 받침 윗면 + 받침별 내려옴(표, 오른 위가 빈 ㄴ ㅅ은 아래로, 보통은 조금 위),
  * 없으면 표의 받침 없는 기둥 아래. 표에 없는 받침이면 받침 윗면 − 두께 × m.
  */
-function applyPillar(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, params: LayoutRuleParams, jamo: RuleJamo | undefined): LayoutRuleStep | null {
+function applyPillar(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, params: LayoutRuleParams, jamo: RuleJamo | undefined, dive = 0): LayoutRuleStep | null {
   const box = boxes.JU
   const ju = ink.JU
   if (!box || !ju) return null
@@ -254,8 +316,8 @@ function applyPillar(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, params: Lay
   if (!jo) { bottom = jamo ? atY(body, PILLAR_BOTTOM_NO_FINAL) : body.bottom; source = '받침 없음' }
   else {
     const reach = jamo ? JONG_TARGET[jamo.jong]?.pillarReach : undefined
-    bottom = reach !== undefined ? jo.bounds.top + reach * scaleY(body) : jo.bounds.top - meanThickness(ju, jo) * params.m
-    source = reach !== undefined ? `받침 윗면 ${reach >= 0 ? '+' : ''}${fixed(reach)}` : `받침 윗면 − 두께 × ${fixed(params.m)}`
+    bottom = reach !== undefined ? jo.bounds.top + reach * scaleY(body) : jo.bounds.top - meanThickness(ju, jo) * params.m + dive * scaleY(body)
+    source = reach !== undefined ? `받침 윗면 ${reach >= 0 ? '+' : ''}${fixed(reach)}` : `받침 윗면 − 두께 × ${fixed(params.m)}${dive ? ` + 파고듦 ${fixed(dive)}` : ''}`
   }
   let limited = false
   if (bottom > body.bottom) { bottom = body.bottom; limited = true }
@@ -273,7 +335,7 @@ const GAP_PAIRS: readonly GapPair[] = [
 ]
 
 /** 규칙 1 · 획 사이 최소 틈 — 두 부품 잉크 사이가 두께 × k보다 좁으면 반반 밀어 벌린다. 한쪽이 몸에 막히면 남은 몫을 다른 쪽이 진다. */
-function applyGap(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, params: LayoutRuleParams): LayoutRuleStep[] {
+function applyGap(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, params: LayoutRuleParams, branchDecides = false): LayoutRuleStep[] {
   const steps: LayoutRuleStep[] = []
   const bounds: Partial<Record<RulePart, InkBounds>> = {}
   for (const part of RULE_PARTS) if (ink[part]) bounds[part] = { ...ink[part]!.bounds }
@@ -288,6 +350,8 @@ function applyGap(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, params: Layout
     if (!boxA || !boxB || !inkA || !inkB || !bA || !bB) continue
     const crossOverlap = axis === 'x' ? overlaps(bA.top, bA.bottom, bB.top, bB.bottom) : overlaps(bA.left, bA.right, bB.left, bB.right)
     if (!crossOverlap) continue
+    // 왼가지 끝 공식이 켜져 있으면 첫닿자–홀자 가로 틈은 그 공식이 정한다(가지는 첫닿자 틀 안으로 파고든다).
+    if (branchDecides && a === 'CH' && b === 'JU' && axis === 'x') continue
     const gap = axis === 'x' ? bB.left - bA.right : bB.top - bA.bottom
     const minGap = meanThickness(inkA, inkB) * params.k
     if (gap >= minGap - EPSILON) continue
@@ -324,6 +388,30 @@ function applyGap(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, params: Layout
   return steps
 }
 
+
+/**
+ * 가설 사다리용 — 표 없이 "홀자 가지 갈래"만으로 홀자 가로 자리를 낸다.
+ * 기둥은 가지 반대쪽으로 비켜서고(PILLAR_RIGHT), 오른가지는 기둥 밖으로 나간다(RIGHT_BRANCH_OUT).
+ * 왼가지 홀자(ㅓ ㅕ ㅔ ㅖ)는 첫닿자 파고듦이 아직 표라서 폭은 그대로 두고 오른면만 맞춘다.
+ */
+function applyJungKindsOnly(boxes: RuleBoxes, ink: RuleInk, body: RuleBody, jung: string, cho: JamoShapeFeatures | null, kinds: boolean): LayoutRuleStep | null {
+  const box = boxes.JU
+  const ju = ink.JU
+  const kind = vowelBranchKindOf(jung)
+  if (!box || !ju || !kind) return null
+  const inset = LEFT_BRANCH_VOWELS.has(jung) && cho && ink.CH ? branchInsetOf(cho) : null
+  // 갈래 공식이 꺼져 있으면 기둥은 제자리에 두고 왼가지 끝만 옮긴다.
+  if (!kinds && inset === null) return null
+  const right = kinds ? atX(body, PILLAR_RIGHT[kind] + (kind === 'right' ? RIGHT_BRANCH_OUT : 0)) : ju.bounds.right
+  const left = inset !== null && ink.CH
+    ? ink.CH.bounds.right + scaleX(body) * inset
+    : LEFT_BRANCH_VOWELS.has(jung) || !kinds
+    ? right - (ju.bounds.right - ju.bounds.left)
+    : atX(body, kind === 'twoStem' ? PILLAR_RIGHT.twoStem - TWO_STEM_SPAN : PILLAR_RIGHT[kind]) - (kind === 'twoStem' ? 0 : ju.thickness)
+  const after = fitBoxToHorizontalInk(box, ju.bounds, { left, right })
+  return { rule: 'jungTable', part: 'JU', before: clone(box), after, limited: false, note: `${jung} · 가지 갈래(${kind}) — 가로 ${fixed(ju.bounds.left)}~${fixed(ju.bounds.right)} → ${fixed(left)}~${fixed(right)}` }
+}
+
 /**
  * 규칙을 순서대로 먹인다. 규칙마다 상자를 다시 재서(`measure`) 앞 규칙이 옮긴 결과 위에서 움직인다.
  * 꺼진 규칙은 건너뛴다. 모든 규칙이 꺼져 있으면 출발 상자 그대로다.
@@ -340,25 +428,69 @@ export function applyLayoutRules(input: {
   measure: RuleMeasure
   /** 표 규칙(첫닿자 · 홀자 · 받침)과 받침별 틈 · 내려옴에 쓴다. 없으면 표 규칙은 건너뛰고 m으로 간다. */
   jamo?: RuleJamo
+  /** 자모 생김새 특징. 받침 없을 때 첫닿자 윗면은 늘 이걸로 내고, `params.formulas`가 켜져 있으면 첫닿자 아래(받침 없음)도 표 대신 공식으로 낸다. */
+  features?: RuleFeatures
 }): LayoutRuleResult {
-  const { body, params, measure, jamo } = input
+  const { body, params, measure } = input
+  const jamo = params.tables ? input.jamo : undefined
   const boxes: RuleBoxes = {}
   for (const part of RULE_PARTS) if (input.boxes[part]) boxes[part] = clone(input.boxes[part]!)
   const steps: LayoutRuleStep[] = []
 
+  const twoStem = !jamo && params.twoStemNarrow && !!input.jamo && TWO_STEM_VOWELS.has(input.jamo.jung)
+  const wall = !jamo && params.choWall && !!input.jamo && input.features?.cho ? choSideInsetOf(input.jamo.cho, input.features.cho) : null
+  const lift = !jamo && params.choBottomShape && input.features?.cho ? choBottomLiftOf(input.features.cho, !!input.jamo?.jong) : 0
+  // 받침이 있으면 아랫면은 choBottom(받침 윗면 기준)이 정하므로 거기서 올린다. 받침이 없으면 여기서.
+  const liftHere = lift !== 0 && !input.jamo?.jong
+  const topShift = !jamo && params.choTopShape && input.features?.cho ? choTopShiftOf(input.features.cho, !!input.jamo?.jong) : 0
+  const choSides = twoStem || (!!wall && (wall.left !== 0 || wall.right !== 0)) || liftHere || topShift !== 0
+  const jongRaise = (!jamo && params.jongHeight && input.features?.jong ? jongRaiseOf(input.features.jong) : 0)
+    - (!jamo && params.choTallJong && input.jamo?.jong && input.features?.cho ? jongDropOf(input.features.cho) : 0)
+  const jongSides = !jamo && params.jongWall && input.jamo?.jong && input.features?.jong ? jongSideInsetOf(input.jamo.jong, input.features.jong, { legs: params.jongLegs, multi: params.jongWallMulti }) : null
+  const jongShift = !jamo && params.jongFollow && input.jamo?.jong ? jongFollowOf(input.jamo.jung) : 0
+  const jongShape = jongRaise !== 0 || jongShift !== 0 || (!!jongSides && (jongSides.left !== 0 || jongSides.right !== 0))
+  let jongTop: number | null = null
+  let jongLR: { left: number; right: number } | null = null
+  // 첫닿자 양면 목표는 처음 잰 자리에서 한 번만 정한다(다시 맞추기 때마다 또 빼지 않게).
+  let sides: { left: number; right: number; top: number; bottom: number } | null = null
   const apply = (rule: LayoutRuleId, ink: RuleInk): LayoutRuleStep | null => {
-    if (rule === 'choTable') return applyChoTable(boxes, ink, body, jamo!)
-    if (rule === 'jungTable') return applyJungTable(boxes, ink, body, jamo!)
+    if (rule === 'choTable' && choSides) {
+      const box = boxes.CH, ch = ink.CH
+      if (!box || !ch) return null
+      const sx = scaleX(body)
+      sides ??= {
+        left: ch.bounds.left + sx * (wall?.left ?? 0),
+        right: ch.bounds.right - sx * ((twoStem ? TWO_STEM_CHO_NARROW : 0) + (wall?.right ?? 0)),
+        top: ch.bounds.top + scaleY(body) * topShift,
+        bottom: ch.bounds.bottom - scaleY(body) * (liftHere ? lift : 0),
+      }
+      const wide = fitBoxToHorizontalInk(box, ch.bounds, sides)
+      const after = liftHere || topShift !== 0 ? fitBoxToVerticalInk(wide, ch.bounds, { top: sides.top, bottom: sides.bottom }) : wide
+      return { rule: 'choTable', part: 'CH', before: clone(box), after, limited: false, note: `${twoStem ? '두 기둥 홀자 옆 · ' : ''}${wall ? '첫닿자 생김새 · ' : ''}첫닿자 가로 ${fixed(ch.bounds.left)}~${fixed(ch.bounds.right)} → ${fixed(sides.left)}~${fixed(sides.right)}${topShift !== 0 ? `, 위 ${fixed(ch.bounds.top)} → ${fixed(sides.top)}` : ''}${liftHere ? `, 아래 ${fixed(ch.bounds.bottom)} → ${fixed(sides.bottom)}` : ''}` }
+    }
+    if (rule === 'choTable') return applyChoTable(boxes, ink, body, jamo!, input.features?.cho ?? null, params.formulas)
+    if (rule === 'jungTable') return jamo ? applyJungTable(boxes, ink, body, jamo, params.jungKinds) : (params.jungKinds || params.branchInset) && input.jamo ? applyJungKindsOnly(boxes, ink, body, input.jamo.jung, params.branchInset ? input.features?.cho ?? null : null, params.jungKinds) : null
+    if (rule === 'jongTable' && !jamo) {
+      const box = boxes.JO, jo = ink.JO
+      if (!box || !jo) return null
+      jongTop ??= jo.bounds.top - scaleY(body) * jongRaise
+      jongLR ??= { left: jo.bounds.left + scaleX(body) * ((jongSides?.left ?? 0) + jongShift), right: jo.bounds.right - scaleX(body) * ((jongSides?.right ?? 0) - jongShift) }
+      const tall = jongRaise !== 0 ? fitBoxToVerticalInk(box, jo.bounds, { top: jongTop, bottom: jo.bounds.bottom }) : box
+      const after = jongSides || jongShift !== 0 ? fitBoxToHorizontalInk(tall, jo.bounds, jongLR) : tall
+      return { rule: 'jongTable', part: 'JO', before: clone(box), after, limited: false, note: `받침 생김새 — 윗면 ${fixed(jo.bounds.top)} → ${fixed(jongTop)}${jongSides || jongShift !== 0 ? `, 가로 ${fixed(jo.bounds.left)}~${fixed(jo.bounds.right)} → ${fixed(jongLR.left)}~${fixed(jongLR.right)}` : ''}` }
+    }
     if (rule === 'jongTable') return applyJongTable(boxes, ink, body, jamo!)
-    if (rule === 'choBottom') return applyChoBottom(boxes, ink, body, params, jamo)
-    if (rule === 'pillar') return applyPillar(boxes, ink, body, params, jamo)
+    if (rule === 'choBottom') return applyChoBottom(boxes, ink, body, params, jamo, lift)
+    if (rule === 'pillar') return applyPillar(boxes, ink, body, params, jamo, !jamo && params.pillarDive && input.features?.jong ? pillarDiveOf(input.features.jong) : 0)
     return null
   }
   for (const rule of LAYOUT_RULE_ORDER) {
     if (!params.rules[rule]) continue
-    if ((rule === 'choTable' || rule === 'jungTable' || rule === 'jongTable') && !jamo) continue
+    if (rule === 'choTable' && !jamo && !choSides) continue
+    if (rule === 'jongTable' && !jamo && !jongShape) continue
+    if (rule === 'jungTable' && !jamo && !((params.jungKinds || params.branchInset) && input.jamo)) continue
     if (rule === 'faces') { steps.push(...applyFaces(boxes, measure(boxes))); continue }
-    if (rule === 'gap') { steps.push(...applyGap(boxes, measure(boxes), body, params)); continue }
+    if (rule === 'gap') { steps.push(...applyGap(boxes, measure(boxes), body, params, params.branchInset && !!input.jamo && LEFT_BRANCH_VOWELS.has(input.jamo.jung))); continue }
     // 상자를 늘여도 획 두께는 그대로라 잉크는 상자에 비례해 늘지 않는다. 한 번 맞춘 뒤 다시 재서, 목표에 닿을 때까지(최대 REFIT_ROUNDS번) 다시 맞춘다.
     let first: LayoutRuleStep | null = null
     let last: LayoutRuleStep | null = null
