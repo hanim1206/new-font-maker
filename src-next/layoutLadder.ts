@@ -2,7 +2,8 @@ import { DEFAULT_LAYOUT_RULE_PARAMS } from '../src/services/layoutRules'
 import type { LayoutRuleParams } from '../src/services/layoutRules'
 import { DEFAULT_STROKE_SHAPE_PARAMS, STROKE_SHAPES_OFF } from '../src/services/strokeShapeRules'
 import { DEFAULT_STYLE } from '../src/stores/globalStyleStore'
-import type { DeepReadonly } from '../src/types'
+import type { BoxConfig, DeepReadonly, JamoData, StrokeDataV2 } from '../src/types'
+import { MEDIAL_STEM_ROLES, stemEndsFor } from '../src/services/medialStemRails'
 import { noFinalChars, regionsToPath, sampleChars, scoreGlyph } from './layoutRulesScore'
 import type { JamoMaps, ScoreInput, ScoredGlyph } from './layoutRulesScore'
 
@@ -82,6 +83,32 @@ function movesOf(table: ScoredGlyph, step: ScoredGlyph): Record<string, number> 
     for (const edge of ['left', 'right', 'top', 'bottom'] as const) m[`${part}.${edge}`] = +(a[edge] - b[edge]).toFixed(4)
   }
   return m
+}
+
+/**
+ * 홀자 보선 자리 — 이름 있는 줄기(MEDIAL_STEM_ROLES)마다 그린 자리를 글자 좌표로 잰다.
+ * 기둥(세로 줄기)은 가로 자리 x와 위 · 아래 끝, 보 · 곁줄기(가로 줄기)는 높이 y와 왼 · 오른 끝.
+ * 상자 네 변으로는 안 보이는 안 기둥 자리 · 곁줄기 높이를 채점하려고 쓴다.
+ */
+export function railsOf(jung: string, jamo: DeepReadonly<JamoData> | undefined, box: DeepReadonly<BoxConfig> | undefined): Record<string, number> {
+  const out: Record<string, number> = {}
+  const roles = MEDIAL_STEM_ROLES[jung]
+  if (!jamo || !box || !roles) return out
+  const strokes = [...(jamo.strokes ?? []), ...(jamo.horizontalStrokes ?? []), ...(jamo.verticalStrokes ?? [])] as StrokeDataV2[]
+  for (const stroke of strokes) {
+    const role = roles[stroke.id]
+    if (!role || role[0] !== 'JU' || stroke.points.length < 2) continue
+    const moved = stemEndsFor(jamo as JamoData, stroke, box as BoxConfig)
+    const a = moved?.start ?? stroke.points[0], b = moved?.end ?? stroke.points[stroke.points.length - 1]
+    const X = (v: number) => box.x + v * box.width, Y = (v: number) => box.y + v * box.height
+    const name = role[1]
+    if (Math.abs(b.y - a.y) * box.height >= Math.abs(b.x - a.x) * box.width) {
+      out[`${name}.x`] = X((a.x + b.x) / 2); out[`${name}.top`] = Y(Math.min(a.y, b.y)); out[`${name}.bottom`] = Y(Math.max(a.y, b.y))
+    } else {
+      out[`${name}.y`] = Y((a.y + b.y) / 2); out[`${name}.left`] = X(Math.min(a.x, b.x)); out[`${name}.right`] = X(Math.max(a.x, b.x))
+    }
+  }
+  return out
 }
 
 /** 글자 하나의 기준(날것 · 외운 표)을 잰다. 실패하면 null. */
