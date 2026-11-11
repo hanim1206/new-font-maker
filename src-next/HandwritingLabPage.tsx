@@ -38,6 +38,8 @@ import { EDIT_COLOR } from './editColors'
 import { HandwritingAnatomy, jamoScopeKeys, sampleChar } from './HandwritingAnatomy'
 import { FamilyCanvas } from './FamilyLabPage'
 import { applyFamilyEditsToStore } from './familyEditsStore'
+import { FAMILY_STAGES } from '../src/services/jamoFamily'
+
 import { JamoGlyph } from './DashboardLabPage'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { Pressable } from './components/ui/pressable'
@@ -51,6 +53,9 @@ import ruleStyles from './HandwritingPartRules.module.css'
 import type { GroupBeakResolver } from '../src/stores/jamoGroupStore'
 import type { PartScope, Slot as AnatomySlot } from './HandwritingAnatomy'
 import styles from './HandwritingLabPage.module.css'
+
+/** 가족 캔버스가 있는 닿자. 글자표 첫닿자 · 받침 카드를 누르면 팝업이 뜬다(사용자 11-12). */
+const FAMILY_MEMBERS = new Set(FAMILY_STAGES.flatMap((s) => s.members))
 
 /**
  * 손글씨 수집 실험실(플랜 `2026-11-09_손글씨-수집-실험실.md`). 시안(구간별 보선 결속)의 수집 흐름을 제품 획 모델과 렌더러 위에 올린 것.
@@ -575,7 +580,7 @@ export function HandwritingLabPage() {
           {(chartTab === 'CH' ? CHOSEONG_LIST : chartTab === 'JU' ? JUNGSEONG_LIST : (JONGSEONG_LIST as readonly string[]).filter(Boolean)).map((ch) => {
             const inScope = !!scopeJamo?.some((g) => g.slot === chartTab && g.hits.includes(ch))
             const on = focusSlot === chartTab && !!picked && sampleChar(chartTab, ch) === picked
-            return <Pressable key={ch} type="button" className={styles.jamoCard} data-on={on || undefined} data-scope={inScope || undefined} aria-label={ch} aria-pressed={on} onClick={() => pickJamo(chartTab, ch)} data-testid={`handwriting-jamo-card-${ch}`}>
+            return <Pressable key={ch} type="button" className={styles.jamoCard} data-on={on || undefined} data-scope={inScope || undefined} aria-label={ch} aria-pressed={on} onClick={() => { pickJamo(chartTab, ch); if (chartTab !== 'JU' && FAMILY_MEMBERS.has(ch)) setFamilyFor(ch) }} data-testid={`handwriting-jamo-card-${ch}`}>
               <span className={styles.jamoInk}><JamoGlyph type={chartTab === 'CH' ? 'choseong' : chartTab === 'JU' ? 'jungseong' : 'jongseong'} char={ch} size={52} /></span>
             </Pressable>
           })}
