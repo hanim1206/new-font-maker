@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
 import { describeStrokeGeometry, STEM_SHAPE_LABEL } from '../src/services/strokeGrammar'
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
@@ -6,6 +6,7 @@ import type { PartStyle } from '../src/renderers/SvgRenderer'
 import type { DecomposedSyllable, GlyphInkPlacement, Part, ResolvedStrokeInkSource, StrokeDataV2 } from '../src/types'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
 import { Button } from './components/ui/button'
+import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { EDIT_COLOR } from './editColors'
 import { tailCutsOf, tailIsOpen, useTailCutMask } from './HandwritingTailCut'
 import type { CutAngleResolver, TailCut } from './HandwritingTailCut'
@@ -147,6 +148,37 @@ export function usePartRuleInk(
 // ── 빚는 캔버스 ─────────────────────────────────────────────────────────────────────────────────
 
 const CANVAS = { w: 300, h: 420, unit: 44, stem: 6.4 }
+/** 빚는 도구. `point`는 점 · 손잡이 편집, 나머지는 덩어리를 눌러 빚는다. */
+type SculptTool = 'point' | 'inflate' | 'pinch'
+const TOOL_LABEL: Record<SculptTool, string> = { point: '점 고치기', inflate: '부풀리기', pinch: '조이기' }
+const TOOL_HINT: Record<SculptTool, string> = {
+  point: '점과 손잡이를 끌어 윤곽을 고쳐요.',
+  inflate: '머리나 맺음을 누르고 있으면 한 칸씩 커져요.',
+  pinch: '머리나 맺음 위에서 좌우로 쓸면 한 칸씩 줄어요. 두 손가락 쓸기도 돼요.',
+}
+/** 붓이 닿는 반지름 · 한 번에 움직이는 칸(굵기 배수). 결과는 늘 0.05 칸에 붙는다. */
+const BRUSH = 0.9, STEP = 0.1, HOLD_MS = 220, SWIPE_PX = 26
+const snap = (v: number) => Math.round(v * 20) / 20
+
+/** 붓 자리(`at`, 구역 좌표) 안의 점을 구역 뿌리(접합선 가운데)에서 멀어지게 · 가까워지게 한 칸 옮긴다. 접합점은 그대로. */
+export function sculptZone(points: readonly MasterPoint[], zone: 'head' | 'tail', len: number, at: XY, tool: 'inflate' | 'pinch'): MasterPoint[] | null {
+  const root = { x: 0, y: zone === 'head' ? len : -len }
+  let changed = false
+  const next = points.map((p, i) => {
+    if (i === 0 || i === points.length - 1 || Math.hypot(p.x - at.x, p.y - at.y) > BRUSH) return p
+    const dx = p.x - root.x, dy = p.y - root.y
+    const d = Math.hypot(dx, dy)
+    if (tool === 'pinch' ? d <= 0.3 : d >= 3.2) return p
+    const s = tool === 'inflate' ? STEP : -STEP
+    const x = snap(p.x + (d ? dx / d : 0) * s), y = snap(p.y + (d ? dy / d : zone === 'head' ? -1 : 1) * s)
+    const mx = x - p.x, my = y - p.y
+    if (!mx && !my) return p
+    changed = true
+    return { ...p, x, y, ...(p.in ? { in: { x: p.in.x + mx, y: p.in.y + my } } : {}), ...(p.out ? { out: { x: p.out.x + mx, y: p.out.y + my } } : {}) }
+  })
+  return changed ? next : null
+}
+
 type Sel = { zone: 'head' | 'tail'; i: number; part: 'p' | 'in' | 'out' } | { line: 'head' | 'tail' }
 
 /** 선 하나를 빚는 캔버스. 점 · 손잡이 · 구간 선을 끈다. 접합점(구간 선 위 두 점)은 구간 선을 따라 움직인다. */
@@ -154,8 +186,64 @@ export function StemMasterCanvas({ master, onChange }: { master: StemMasterShape
   const svgRef = useRef<SVGSVGElement>(null)
   const drag = useRef<Sel | null>(null)
   const [picked, setPicked] = useState<{ zone: 'head' | 'tail'; i: number } | null>(null)
+  const [tool, setTool] = useState<SculptTool>('point')
+  const [brush, setBrush] = useState<{ x: number; y: number; down: boolean } | null>(null)
   const { w, h, unit, stem } = CANVAS
   const x0 = w / 2, yTop = (h - stem * unit) / 2, yBottom = yTop + stem * unit
+  // 누르고 있는 동안 도는 타이머와 휠이 늘 지금 꼴을 보게 한다.
+  const live = useRef({ master, onChange, tool })
+  live.current = { master, onChange, tool }
+  const hold = useRef<{ timer: number | null; at: { x: number; y: number }; lastX: number; swipe: number; fast: boolean }>({ timer: null, at: { x: 0, y: 0 }, lastX: 0, swipe: 0, fast: false })
+  const viewAt = (e: { clientX: number; clientY: number }) => {
+    const box = svgRef.current!.getBoundingClientRect()
+    return { x: (e.clientX - box.left) * w / box.width, y: (e.clientY - box.top) * h / box.height }
+  }
+  const sculpt = (kind: 'inflate' | 'pinch', at: { x: number; y: number }) => {
+    const m = live.current.master
+    const head = sculptZone(m.head, 'head', m.headLen, { x: (at.x - x0) / unit, y: (at.y - yTop) / unit }, kind)
+    const tail = sculptZone(m.tail, 'tail', m.tailLen, { x: (at.x - x0) / unit, y: (at.y - yBottom) / unit }, kind)
+    if (head || tail) live.current.onChange({ ...m, head: head ?? m.head, tail: tail ?? m.tail, preset: 'custom' })
+  }
+  const stopHold = () => { if (hold.current.timer !== null) { window.clearInterval(hold.current.timer); hold.current.timer = null } }
+  useEffect(() => stopHold, [])
+  // 두 손가락 좌우 쓸기(휠 가로). 화면이 같이 밀리지 않게 막아야 해서 직접 건다.
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+    let acc = 0
+    const onWheel = (e: WheelEvent) => {
+      if (live.current.tool !== 'pinch' || Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return
+      e.preventDefault()
+      acc += Math.abs(e.deltaX)
+      while (acc >= SWIPE_PX * 2) { acc -= SWIPE_PX * 2; sculpt('pinch', viewAt(e)) }
+    }
+    svg.addEventListener('wheel', onWheel, { passive: false })
+    return () => svg.removeEventListener('wheel', onWheel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const toolDown = (e: React.PointerEvent) => {
+    const at = viewAt(e)
+    hold.current = { timer: null, at, lastX: at.x, swipe: 0, fast: e.pressure > 0.6 }
+    setBrush({ ...at, down: true })
+    svgRef.current?.setPointerCapture(e.pointerId)
+    if (tool === 'inflate') {
+      sculpt('inflate', at)
+      // 세기를 읽는 기기(펜슬)는 세게 누르면 더 빨리 커진다.
+      hold.current.timer = window.setInterval(() => sculpt('inflate', hold.current.at), hold.current.fast ? HOLD_MS / 2 : HOLD_MS)
+    }
+  }
+  const toolMove = (e: React.PointerEvent) => {
+    const at = viewAt(e)
+    setBrush((b) => ({ ...at, down: b?.down ?? false }))
+    if (!brush?.down) return
+    hold.current.at = at
+    if (tool === 'pinch') {
+      hold.current.swipe += Math.abs(at.x - hold.current.lastX)
+      hold.current.lastX = at.x
+      while (hold.current.swipe >= SWIPE_PX) { hold.current.swipe -= SWIPE_PX; sculpt('pinch', at) }
+    }
+  }
+  const toolUp = () => { stopHold(); setBrush((b) => (b ? { ...b, down: false } : b)) }
   const toView = (zone: 'head' | 'tail') => (p: XY) => ({ x: x0 + p.x * unit, y: (zone === 'head' ? yTop : yBottom) + p.y * unit })
   const fromEvent = (e: React.PointerEvent, zone: 'head' | 'tail'): XY => {
     const box = svgRef.current!.getBoundingClientRect()
@@ -216,21 +304,27 @@ export function StemMasterCanvas({ master, onChange }: { master: StemMasterShape
     const point: MasterPoint = curved ? { x: cur.x, y: cur.y } : { x: cur.x, y: cur.y, ...(prev ? { in: { x: cur.x - dir.x, y: cur.y - dir.y } } : {}), ...(next ? { out: { x: cur.x + dir.x, y: cur.y + dir.y } } : {}) }
     setPoints(picked.zone, list.map((p, i) => (i === picked.i ? point : p)))
   }
+  const sculpting = tool !== 'point'
   const zoneY = { head: yTop + master.headLen * unit, tail: yBottom - master.tailLen * unit }
   return <div className={styles.canvasWrap}>
-    <svg ref={svgRef} viewBox={`0 0 ${w} ${h}`} className={styles.canvas} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onPointerDown={() => setPicked(null)} data-testid="stem-master-canvas">
+    <div className={styles.toolPick}><ChoiceGroup variant="segment" aria-label="빚는 도구">
+      {(Object.keys(TOOL_LABEL) as SculptTool[]).map((id) => <ChoiceItem key={id} checked={tool === id} onClick={() => { stopHold(); setTool(id); setPicked(null); setBrush(null) }} data-testid={`stem-master-tool-${id}`}>{TOOL_LABEL[id]}</ChoiceItem>)}
+    </ChoiceGroup></div>
+    <svg ref={svgRef} viewBox={`0 0 ${w} ${h}`} className={sculpting ? `${styles.canvas} ${styles.sculpt}` : styles.canvas} onPointerMove={sculpting ? toolMove : move} onPointerUp={sculpting ? toolUp : end} onPointerCancel={sculpting ? toolUp : end} onPointerLeave={sculpting ? () => { if (!brush?.down) setBrush(null) } : undefined} onPointerDown={sculpting ? toolDown : () => setPicked(null)} data-testid="stem-master-canvas">
       <path d={outline} fill={EDIT_COLOR.foreground} />
       <line x1={x0} y1={yTop} x2={x0} y2={yBottom} stroke={EDIT_COLOR.surface} strokeOpacity={0.5} strokeWidth={1.5} strokeDasharray="5 5" pointerEvents="none" />
       {(['head', 'tail'] as const).map((zone) => <g key={zone}>
         <line x1={12} y1={zoneY[zone]} x2={w - 12} y2={zoneY[zone]} stroke={EDIT_COLOR.editSelect} strokeWidth={1.2} strokeDasharray="5 4" pointerEvents="none" />
-        <line x1={12} y1={zoneY[zone]} x2={w - 12} y2={zoneY[zone]} stroke="transparent" strokeWidth={14} className={styles.zoneLine} onPointerDown={start({ line: zone })} data-testid={`stem-master-line-${zone}`} />
+        <line x1={12} y1={zoneY[zone]} x2={w - 12} y2={zoneY[zone]} stroke="transparent" strokeWidth={14} className={styles.zoneLine} pointerEvents={sculpting ? 'none' : undefined} onPointerDown={start({ line: zone })} data-testid={`stem-master-line-${zone}`} />
         <text x={14} y={zone === 'head' ? zoneY[zone] - 6 : zoneY[zone] + 14} fontSize={11} fill={EDIT_COLOR.editSelect}>{zone === 'head' ? '머리 구간' : '맺음 구간'}</text>
       </g>)}
-      {cur && picked && (['in', 'out'] as const).map((part) => { const hp = cur[part]; if (!hp) return null; const a = toView(picked.zone)(cur), b = toView(picked.zone)(hp); return <g key={part}>
+      {sculpting && (['head', 'tail'] as const).flatMap((zone) => master[zone].slice(1, -1).map((p, i) => { const q = toView(zone)(p); return <circle key={`${zone}-${i}`} cx={q.x} cy={q.y} r={2.5} fill={EDIT_COLOR.editSelect} pointerEvents="none" /> }))}
+      {sculpting && brush && <circle cx={brush.x} cy={brush.y} r={BRUSH * unit} fill={EDIT_COLOR.editSelect} fillOpacity={brush.down ? 0.22 : 0.1} stroke={EDIT_COLOR.editSelect} strokeWidth={1.2} pointerEvents="none" data-testid="stem-master-brush" />}
+      {!sculpting && cur && picked && (['in', 'out'] as const).map((part) => { const hp = cur[part]; if (!hp) return null; const a = toView(picked.zone)(cur), b = toView(picked.zone)(hp); return <g key={part}>
         <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={EDIT_COLOR.editHandle} strokeWidth={1} pointerEvents="none" />
         <rect x={b.x - 4.5} y={b.y - 4.5} width={9} height={9} fill={EDIT_COLOR.surface} stroke={EDIT_COLOR.editHandle} strokeWidth={1.5} className={styles.grab} onPointerDown={start({ zone: picked.zone, i: picked.i, part })} />
       </g> })}
-      {(['head', 'tail'] as const).flatMap((zone) => master[zone].map((p, i) => {
+      {!sculpting && (['head', 'tail'] as const).flatMap((zone) => master[zone].map((p, i) => {
         const q = toView(zone)(p)
         const on = picked?.zone === zone && picked.i === i
         // 접합점은 구간 선으로만 움직인다.
@@ -239,10 +333,11 @@ export function StemMasterCanvas({ master, onChange }: { master: StemMasterShape
           : <circle key={`${zone}-${i}`} cx={q.x} cy={q.y} r={on ? 7 : 6} fill={on ? EDIT_COLOR.editSelect : EDIT_COLOR.surface} stroke={EDIT_COLOR.editSelect} strokeWidth={2} className={styles.grab} onPointerDown={start({ zone, i, part: 'p' })} data-testid={`stem-master-point-${zone}-${i}`} />
       }))}
     </svg>
-    <div className={styles.tools}>
+    <p className={styles.hint}>{TOOL_HINT[tool]}</p>
+    {!sculpting && <div className={styles.tools}>
       <Button size="sm" disabled={!picked} onClick={addPoint}>점 더하기</Button>
       <Button size="sm" disabled={!picked || isJoint(picked.zone, picked.i)} onClick={removePoint}>점 지우기</Button>
       <Button size="sm" disabled={!picked || isJoint(picked.zone, picked.i)} onClick={toggleCurve}>{cur && (cur.in || cur.out) ? '펴기' : '굽히기'}</Button>
-    </div>
+    </div>}
   </div>
 }

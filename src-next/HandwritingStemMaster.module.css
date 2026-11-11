@@ -3,3 +3,6 @@
 .grab { cursor: grab; }
 .zoneLine { cursor: ns-resize; }
 .tools { display: flex; gap: 6px; }
+.sculpt { cursor: none; }
+.hint { margin: 0; max-width: 300px; color: rgb(var(--color-text-3)); font-size: 12px; }
+.toolPick { width: 300px; white-space: nowrap; }
