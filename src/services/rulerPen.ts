@@ -510,6 +510,104 @@ export function removePath(d0: DrawnJamo, id: number): DrawnJamo {
   d.paths = d.paths.filter((p) => p.id !== id)
   return d
 }
+// ---- 지우개 ----
+export interface Rect { x0: number; y0: number; x1: number; y1: number }
+/** 점이 든 칸, 또는 두 점이 든 칸들을 감싸는 네모(S). */
+export function cellRect(a: V, b: V = a): Rect {
+  const f = (v: number) => Math.floor(v / CELL) * CELL
+  return { x0: Math.min(f(a[0]), f(b[0])), y0: Math.min(f(a[1]), f(b[1])), x1: Math.max(f(a[0]), f(b[0])) + CELL, y1: Math.max(f(a[1]), f(b[1])) + CELL }
+}
+const inRect = (q: V, r: Rect, e = 0.01) => q[0] >= r.x0 - e && q[0] <= r.x1 + e && q[1] >= r.y0 - e && q[1] <= r.y1 + e
+/** 마디 위 비율 u(0~1)의 점. */
+function segAt(d: DrawnJamo, s: PathSeg, u: number): V | null {
+  const t = s.a + (s.b - s.a) * u
+  if (s.g.type === 'c') { const c = d.circles.find((x) => x.id === s.g.id); return c ? [c.x + c.r * Math.cos(t), c.y + c.r * Math.sin(t)] : null }
+  const l = d.lines.find((x) => x.id === s.g.id); return l ? linePt(l, t) : null
+}
+function segLen(d: DrawnJamo, s: PathSeg): number {
+  if (s.g.type === 'c') { const c = d.circles.find((x) => x.id === s.g.id); return c ? Math.abs(s.b - s.a) * c.r : 0 }
+  const l = d.lines.find((x) => x.id === s.g.id); return l ? Math.abs(s.b - s.a) * dist(l.a, l.b) : 0
+}
+/** 마디가 네모 변을 지나는 비율들. */
+function rectCrossings(d: DrawnJamo, s: PathSeg, r: Rect): number[] {
+  const out: number[] = [], span = s.b - s.a
+  if (Math.abs(span) < 1e-9) return out
+  const toU = (t: number) => (t - s.a) / span
+  if (s.g.type === 'l') {
+    const l = d.lines.find((x) => x.id === s.g.id); if (!l) return out
+    const dx = l.b[0] - l.a[0], dy = l.b[1] - l.a[1]
+    if (Math.abs(dx) > 1e-9) for (const x of [r.x0, r.x1]) out.push(toU((x - l.a[0]) / dx))
+    if (Math.abs(dy) > 1e-9) for (const y of [r.y0, r.y1]) out.push(toU((y - l.a[1]) / dy))
+  } else {
+    const c = d.circles.find((x) => x.id === s.g.id); if (!c) return out
+    const th: number[] = []
+    for (const x of [r.x0, r.x1]) { const k = (x - c.x) / c.r; if (Math.abs(k) <= 1) { const a = Math.acos(k); th.push(a, -a) } }
+    for (const y of [r.y0, r.y1]) { const k = (y - c.y) / c.r; if (Math.abs(k) <= 1) { const a = Math.asin(k); th.push(a, Math.PI - a) } }
+    const lo = Math.min(s.a, s.b), hi = Math.max(s.a, s.b)
+    for (let t of th) { while (t > lo) t -= TAU; while (t < lo) t += TAU; for (; t <= hi; t += TAU) out.push(toU(t)) }
+  }
+  return out.filter((u) => u > 1e-6 && u < 1 - 1e-6)
+}
+/** 네모 안에 든 펜 선 부분을 잘라 낸다. 가운데가 잘린 선은 둘로 나뉜다. 자와 원래 획은 그대로. */
+export function eraseRect(d0: DrawnJamo, r: Rect): DrawnJamo {
+  let changed = false
+  const d = cloneDrawn(d0)
+  const out: DrawnPath[] = []
+  for (const p of d.paths) {
+    /* 남는 조각: [마디 번호, 시작 비율, 끝 비율] */
+    const kept: [number, number, number][] = []
+    let cut = false
+    p.segs.forEach((s, i) => {
+      const us = [0, ...rectCrossings(d, s, r).sort((a, b) => a - b), 1]
+      for (let k = 0; k < us.length - 1; k++) {
+        if (us[k + 1] - us[k] < 1e-9) continue
+        const m = segAt(d, s, (us[k] + us[k + 1]) / 2)
+        if (m && inRect(m, r)) { cut = true; continue }
+        const last = kept[kept.length - 1]
+        if (last && last[0] === i && Math.abs(last[2] - us[k]) < 1e-9) last[2] = us[k + 1]
+        else kept.push([i, us[k], us[k + 1]])
+      }
+    })
+    if (!cut) { out.push(p); continue }
+    changed = true
+    const part = (i: number, u0: number, u1: number): PathSeg => { const s = p.segs[i], sp = s.b - s.a; return { g: { ...s.g }, a: s.a + sp * u0, b: s.a + sp * u1 } }
+    const full = p.segs.length === 1 && p.segs[0].g.type === 'c' && Math.abs(p.segs[0].b - p.segs[0].a) >= TAU - 1e-3
+    const runs: PathSeg[][] = []
+    if (full && kept.length > 1 && kept[0][1] < 1e-9 && kept[kept.length - 1][2] > 1 - 1e-9) {
+      /* 온 원이 한 군데 잘리면 잘린 자리를 건너 이어진 호 하나 */
+      const f = kept.shift()!, l = kept.pop()!, s = p.segs[0], sp = s.b - s.a
+      runs.push([{ g: { ...s.g }, a: s.a + sp * l[1], b: s.b + sp * f[2] }])
+    }
+    let run: PathSeg[] = []
+    let prev: [number, number, number] | null = null
+    for (const kp of kept) {
+      const joined = prev && kp[0] === prev[0] + 1 && prev[2] > 1 - 1e-9 && kp[1] < 1e-9
+      if (!joined && run.length) { runs.push(run); run = [] }
+      run.push(part(kp[0], kp[1], kp[2]))
+      prev = kp
+    }
+    if (run.length) runs.push(run)
+    let first = true
+    for (const segs of runs) {
+      const ok = segs.filter((s) => segLen(d, s) >= 0.5)
+      if (!ok.length) continue
+      out.push({ id: first ? p.id : d.nid++, segs: ok })
+      first = false
+    }
+  }
+  if (!changed) return d0
+  d.paths = out
+  return d
+}
+/** u 가까이 지나는 펜 선. */
+export function pathAt(d: DrawnJamo, u: V, tol = 2): DrawnPath | null {
+  let best: DrawnPath | null = null, bd = tol
+  for (const p of d.paths) for (const s of p.segs) {
+    const n = Math.max(2, Math.ceil(segLen(d, s) / 0.5))
+    for (let i = 0; i <= n; i++) { const q = segAt(d, s, i / n); if (q) { const dd = dist(q, u); if (dd < bd) { bd = dd; best = p } } }
+  }
+  return best
+}
 export function pathEnds(d: DrawnJamo, p: DrawnPath): { start: V | null; end: V | null } {
   const first = p.segs[0], last = p.segs[p.segs.length - 1]
   const full = p.segs.length === 1 && first.g.type === 'c' && Math.abs(first.b - first.a) >= TAU - 1e-3
