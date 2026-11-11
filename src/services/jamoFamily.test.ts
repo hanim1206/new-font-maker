@@ -26,10 +26,9 @@ describe('닿자 가족 이어 두기', () => {
     expect(links['ㅉ']['ㅉ-2r'].every((l) => l?.parent === 'ㅈ' && l.stroke === 'ㅈ-right')).toBe(true)
   })
 
-  it('ㅊ 꼭지는 ㅎ 꼭지에서 온다', () => {
-    const dot = links['ㅊ']['ㅊ-dot']?.filter(Boolean) ?? []
-    expect(dot.length).toBeGreaterThan(0)
-    expect(dot.every((l) => l!.parent === 'ㅎ')).toBe(true)
+  it('ㅊ 꼭지는 따로, 아래는 ㅈ을 잇는다', () => {
+    expect(links['ㅊ']['ㅊ-dot'].every((l) => l === null)).toBe(true)
+    expect(links['ㅊ']['ㅊ-left'].every((l) => l?.parent === 'ㅈ')).toBe(true)
   })
 
   it('ㄱ을 옮기면 ㅋ과 ㄲ이 따라온다', () => {
