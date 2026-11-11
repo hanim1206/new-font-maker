@@ -15,7 +15,8 @@ export interface FamilyStage { id: string; name: string; members: string[] }
 export const FAMILY_STAGES: FamilyStage[] = [
   { id: 'giyeok', name: 'ㄱ 가족', members: ['ㄱ', 'ㅋ', 'ㄲ'] },
   { id: 'nieun', name: 'ㄴ 가족', members: ['ㄴ', 'ㄷ', 'ㅌ', 'ㄸ', 'ㄹ'] },
-  { id: 'mieum', name: 'ㅁ 가족', members: ['ㅁ', 'ㅂ', 'ㅍ', 'ㅃ'] },
+  // ㅁ에서 ㅂ · ㅍ을 뽑으면 꼴이 어색해서(사용자 11-11) 셋은 따로 시작한다. ㅃ만 ㅂ을 잇는다.
+  { id: 'mieum', name: 'ㅁ · ㅂ · ㅍ', members: ['ㅁ', 'ㅂ', 'ㅃ', 'ㅍ'] },
   { id: 'ieung', name: 'ㅇ 가족', members: ['ㅇ', 'ㅎ'] },
   { id: 'siot', name: 'ㅅ 가족', members: ['ㅅ', 'ㅈ', 'ㅊ', 'ㅆ', 'ㅉ'] },
 ]
@@ -30,8 +31,6 @@ export const FAMILY_RELATIONS: Record<string, FamilyRelation[]> = {
   'ㅌ': [{ parent: 'ㄷ', regions: [FULL] }],
   'ㄸ': [{ parent: 'ㄷ', regions: [{ x0: 0, y0: 0.007, x1: 0.5625, y1: 0.961 }, { x0: 0.587, y0: 0.004, x1: 1, y1: 0.99 }] }],
   'ㄹ': [{ parent: 'ㄷ', regions: [{ x0: 0, y0: 0.493, x1: 1, y1: 1 }] }],
-  'ㅂ': [{ parent: 'ㅁ', regions: [FULL] }],
-  'ㅍ': [{ parent: 'ㅂ', regions: [FULL] }],
   'ㅃ': [{ parent: 'ㅂ', regions: [{ x0: 0.061, y0: 0, x1: 0.395, y1: 1 }, { x0: 0.612, y0: 0, x1: 0.946, y1: 1 }] }],
   'ㅎ': [{ parent: 'ㅇ', regions: [{ x0: 0.169, y0: 0.447, x1: 0.831, y1: 1 }] }],
   'ㅈ': [{ parent: 'ㅅ', regions: [FULL] }],
@@ -93,6 +92,14 @@ export function findFamilyLinks(presets: Record<string, StrokeDataV2[]>): Family
         })
         if (best) row[i] = best
       })
+      // 길이가 달라 끝점이 허용 거리 밖이어도(ㅉ의 짧은 오른 내림), 같은 앞 획에 같은 차례로 붙은 획이면 남은 점도 차례대로 잇는다.
+      const top = scored[0]?.c
+      if (top && top.placed.length === s.points.length) {
+        const mine = row.filter((l): l is PointLink => !!l && l.parent === top.rel.parent && l.stroke === top.ps.id)
+        if (mine.length && mine.every((l) => row[l.index] === l)) {
+          row.forEach((l, i) => { if (!l) row[i] = { parent: top.rel.parent, stroke: top.ps.id, index: i, sx: top.sx, sy: top.sy } })
+        }
+      }
     }
   }
   return links
