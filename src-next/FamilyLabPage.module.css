@@ -1,0 +1,38 @@
+.page { min-height: 100dvh; padding: 24px 20px 40px; background: rgb(var(--color-background)); color: rgb(var(--color-foreground)); display: grid; gap: 18px; align-content: start; user-select: none; -webkit-user-select: none; }
+.header { display: grid; gap: 4px; max-width: 900px; }
+.header span { font-size: 12px; font-weight: 700; color: rgb(var(--color-primary)); letter-spacing: .04em; }
+.header h1 { margin: 0; font-size: 26px; }
+.header p { margin: 0; font-size: 14px; color: rgb(var(--color-text-3)); line-height: 1.55; }
+
+.stages { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.stage { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); text-align: left; }
+.stage small { font-size: 12px; color: rgb(var(--color-text-3)); }
+.stage b { font-size: 18px; letter-spacing: .12em; }
+.stage[data-on] { box-shadow: inset 0 0 0 2px rgb(var(--color-foreground)); }
+
+.work { display: grid; grid-template-columns: minmax(0, 480px) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .work { grid-template-columns: minmax(0, 1fr); } }
+.canvasCard { display: grid; gap: 10px; padding: 16px; border-radius: 16px; border: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); }
+.canvasHead { display: flex; align-items: baseline; gap: 10px; }
+.canvasHead b { font-size: 22px; }
+.canvasHead span { font-size: 13px; color: rgb(var(--color-text-3)); }
+.canvas { width: 100%; aspect-ratio: 1; touch-action: none; border-radius: 10px; background: rgb(var(--color-surface)); }
+.legend { display: flex; gap: 16px; font-size: 12px; color: rgb(var(--color-text-3)); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.legend i[data-k='linked'] { background: rgb(var(--color-primary)); }
+.legend i[data-k='own'] { border: 2px solid rgb(var(--color-foreground)); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions > :last-child { margin-left: auto; }
+
+.side { display: grid; gap: 10px; align-content: start; }
+.side h2 { margin: 6px 0 0; font-size: 16px; }
+.side p { margin: 0; font-size: 13px; color: rgb(var(--color-text-3)); }
+.strip { display: flex; flex-wrap: wrap; gap: 8px; }
+.member { display: grid; justify-items: center; gap: 4px; padding: 8px; border-radius: 12px; border: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); }
+.member small { font-size: 12px; color: rgb(var(--color-text-3)); }
+.member[data-on] { box-shadow: inset 0 0 0 2px rgb(var(--color-foreground)); }
+.map { display: grid; gap: 6px; padding: 10px; border-radius: 12px; border: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); width: max-content; }
+.mapRow { display: flex; gap: 4px; }
+.mapCell { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 8px; background: rgb(var(--color-surface-2)); }
+.mapCell[data-on] { box-shadow: inset 0 0 0 2px rgb(var(--color-foreground)); }
+.note { font-size: 12px !important; }
