@@ -1,6 +1,8 @@
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { Dices, Eraser, PenLine, RotateCcw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Dices, Eraser, PenLine, RotateCcw } from 'lucide-react'
+import { glyphGroups, GROUP_COLS, STAGE_NAME } from '../src/services/glyphGroups'
+import type { GlyphGroup } from '../src/services/glyphGroups'
 import { readSyllable } from '../src/services/handwritingRead'
 import type { SyllableRead } from '../src/services/handwritingRead'
 import {
@@ -153,6 +155,19 @@ const ChartRows = memo(function ChartRows({ bank, style, picked, highlight, firs
   </div>
 })
 
+/** 글자표 묶음 하나 — 가로 10칸, 줄마다 질문에 맞춘 글자. 빈칸은 비워 둔다. */
+const GroupGrid = memo(function GroupGrid({ group, bank, style, picked, highlight, onPick, source, groupBeakOf, cutAngleOf }: { group: GlyphGroup; bank: Bank; style: GlobalStyle; picked: string | null; highlight: Set<string> | null; onPick: (ch: string) => void; source: 'bank' | 'preset'; groupBeakOf?: GroupBeakResolver; cutAngleOf?: CutAngleResolver | null }) {
+  return <div className={styles.groupGrid} style={{ gridTemplateColumns: `repeat(${GROUP_COLS}, ${CHART_CELL}px)` }} data-testid={`handwriting-group-${group.id}`}>
+    {group.rows.flatMap((r, y) => Array.from({ length: GROUP_COLS }, (_, x) => {
+      const ch = [...r][x]
+      if (!ch || ch === ' ') return <span key={`${y}-${x}`} className={styles.groupEmpty} style={{ width: CHART_CELL, height: CHART_CELL }} />
+      return <Pressable key={`${y}-${x}`} type="button" className={`${styles.chartCell}${picked === ch ? ` ${styles.chartPicked}` : ''}${highlight?.has(ch) ? ` ${styles.chartNew}` : ''}`} style={{ width: CHART_CELL, height: CHART_CELL }} onClick={() => onPick(ch)} title={ch}>
+        {source === 'preset' ? <PresetGlyph char={ch} size={CHART_CELL - 6} style={style} groupBeakOf={groupBeakOf} cutAngleOf={cutAngleOf} /> : <BankGlyph bank={bank} char={ch} size={CHART_CELL - 6} style={style} />}
+      </Pressable>
+    }))}
+  </div>
+})
+
 type CellState = 'none' | 'have' | 'new' | 'skip' | 'dup' | 'dupOn'
 interface CellInfo { state: CellState; sample?: TypedSample }
 
@@ -214,6 +229,8 @@ export function HandwritingLabPage() {
   const [partScope, setPartScope] = useState<PartScope | null>(null)
   /** 글자표 탭: 글자 2,350 또는 첫닿자 · 홀자 · 받침 자소 카드(앱 대시보드의 그 카드). */
   const [chartTab, setChartTab] = useState<'glyph' | AnatomySlot>('glyph')
+  /** 글자표 묶음 번호. 맨 끝은 전체 2,350자. */
+  const [groupIdx, setGroupIdx] = useState(0)
   const [focusRequest, setFocusRequest] = useState<{ char: string; slot: AnatomySlot; at: number } | null>(null)
   const [focusSlot, setFocusSlot] = useState<AnatomySlot | null>(null)
   const pickJamo = (slot: AnatomySlot, ch: string) => {
@@ -276,6 +293,9 @@ export function HandwritingLabPage() {
   }), [weight, roundJoins, roundness])
   /** 글자표 2,350자는 슬라이더를 놓은 뒤에 따라온다. 쓰기 칸 · 카드는 바로 바뀐다. */
   const chartStyle = useDeferredValue(style)
+  const groups = useMemo(() => glyphGroups({ char: picked, slot: focusSlot }), [picked, focusSlot])
+  const group = groups[groupIdx]
+  const showGroups = !(view === 'anatomy' && chartTab !== 'glyph')
   const phase = phaseOf(bank)
   const progress = progressOf(bank)
   const stats = useMemo(() => chartStats(bank), [bank])
@@ -556,7 +576,19 @@ export function HandwritingLabPage() {
           })}
         </div>
       </div>}
-      <div ref={chartRef} className={styles.chart} hidden={view === 'anatomy' && chartTab !== 'glyph'} data-testid="handwriting-chart">
+      {showGroups && <div className={styles.groupNav} data-testid="handwriting-group-nav">
+        <Button size="sm" aria-label="앞 묶음" onClick={() => setGroupIdx((i) => (i + groups.length - 1) % groups.length)}><ChevronLeft /></Button>
+        <div className={styles.groupTitle}>
+          <small>{STAGE_NAME[group.stage]} · {groupIdx + 1}/{groups.length}</small>
+          <b data-testid="handwriting-group-name">{group.name}</b>
+          <span>{group.question}</span>
+        </div>
+        <Button size="sm" aria-label="다음 묶음" onClick={() => setGroupIdx((i) => (i + 1) % groups.length)} data-testid="handwriting-group-next"><ChevronRight /></Button>
+      </div>}
+      {showGroups && group.id !== 'all' && <div className={`${styles.chart} ${styles.groupBox}`}>
+        <GroupGrid group={group} bank={bank} style={chartStyle} picked={picked} highlight={view === 'anatomy' ? scopeHits : highlight} onPick={setPicked} source={chartSource} groupBeakOf={ruleBeakOf} cutAngleOf={ruleCutOf} />
+      </div>}
+      <div ref={chartRef} className={styles.chart} hidden={!showGroups || group.id !== 'all'} data-testid="handwriting-chart">
         <ChartRows bank={bank} style={chartStyle} picked={picked} highlight={view === 'anatomy' ? scopeHits : highlight} firstRow={firstRow} lastRow={lastRow} onPick={setPicked} source={chartSource} groupBeakOf={ruleBeakOf} cutAngleOf={ruleCutOf} />
       </div>
       {pickedInfo && view === 'collect' && <div className={styles.pickedInfo}>
