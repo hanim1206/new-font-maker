@@ -9,7 +9,7 @@ import { brushInkGroupsToSvgPaths, strokeToBrushInkGroups } from '../services/br
 import { centerlineInkGroups } from '../services/finalGlyphInk'
 import { resolveGlyphInkPrimitives } from '../services/glyphInkResolver'
 import { needsFilledRenderInk, stemScaleOf, strokeToRenderInkGroups, verticalWidthFactorOf } from '../services/strokeRenderGeometry'
-import { stemBeakGroupOf, stemBeakInkGroups, stemBeakTrimmedStrokes } from '../services/stemBeak'
+import { stemBeakGroupOf, stemBeakInkGroups } from '../services/stemBeak'
 import { miterLimitOf } from '../services/strokeJoin'
 import { useGroupBeakResolver } from '../stores/jamoGroupStore'
 import type { GroupBeakResolver } from '../stores/jamoGroupStore'
@@ -158,30 +158,22 @@ export function SvgRenderer({
   // 사용자 묶음에 부리 값이 있으면 그 자소의 획은 그 값을 쓴다.
   const storedGroupBeakOf = useGroupBeakResolver()
   const groupBeakOf = groupBeakOfProp ?? storedGroupBeakOf
-  const { beakPathsById, trimmedById } = useMemo(() => {
-    const sources = centerlines.map((primitive) => ({
+  const beakPathsById = useMemo(() => {
+    const groups = stemBeakInkGroups(centerlines.map((primitive) => ({
       stroke: asLegacyReadonlyStroke(primitive.stroke),
       box: primitive.box,
       // 부리는 기둥 폭에 맞춘다. 가로·세로 대비가 있으면 기둥이 그만큼 굵다.
       weightMultiplier: primitive.weightMultiplier * verticalWidthFactorOf(beakRenderStyle),
       group: stemBeakGroupOf(primitive.source),
       style: groupBeakOf(primitive.source),
-    }))
-    const groups = stemBeakInkGroups(sources, stemBeak, beakRenderStyle)
-    // 부리가 줄기 높이 안에 앉도록 머리를 깎은 획(각진 · 원형 부리). 추출 · 측정도 같은 함수를 쓴다.
-    const trimmed = stemBeakTrimmedStrokes(sources, stemBeak, beakRenderStyle)
-    return {
-      beakPathsById: new Map(centerlines.map((primitive, index) => [primitive.id, brushInkGroupsToSvgPaths(groups[index], VIEW_BOX_SIZE)])),
-      trimmedById: new Map(centerlines.flatMap((primitive, index) => (trimmed[index] ? [[primitive.id, trimmed[index]!] as const] : []))),
-    }
+    })), stemBeak, beakRenderStyle)
+    return new Map(centerlines.map((primitive, index) => [primitive.id, brushInkGroupsToSvgPaths(groups[index], VIEW_BOX_SIZE)]))
   }, [centerlines, stemBeak, beakRenderStyle, groupBeakOf])
 
   const renderPrimitive = (
-    original: ResolvedCenterlinePrimitive,
+    primitive: ResolvedCenterlinePrimitive,
     color: string
   ) => {
-    const trimmedStroke = trimmedById.get(original.id)
-    const primitive = trimmedStroke ? { ...original, stroke: trimmedStroke } : original
     const stroke = asLegacyReadonlyStroke(primitive.stroke)
     // V2 통합 렌더링: 모든 획을 path로 렌더링
     const d = pointsToSvgD(stroke.points, stroke.closed, primitive.box, VIEW_BOX_SIZE)

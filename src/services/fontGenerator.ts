@@ -37,7 +37,7 @@ import { simplifyMergedContours } from './contourSimplify'
 import { brushInkGroupsToFontContours, strokeToBrushInkGroups } from './brushGeometry'
 import { needsFilledRenderInk, strokeToRenderInkGroups, verticalWidthFactorOf } from './strokeRenderGeometry'
 import { miterLimitOf } from './strokeJoin'
-import { stemBeakInkGroups, stemBeakTrimmedStrokes } from './stemBeak'
+import { stemBeakInkGroups } from './stemBeak'
 import type { DeepReadonly } from '../types'
 import type { FinalGlyphInk } from './finalGlyphInk'
 import { projectFinalGlyphInkToFontContours } from './finalGlyphInk'
@@ -388,20 +388,7 @@ export function glyphDataToFontContours(glyphData: GlyphData, simplifyEpsilon?: 
   // CFF 1은 겹친 컨투어를 even-odd로 상쇄하므로 획별 잉크 묶음을 유지한다.
   const contourGroups: Contour[][] = []
 
-  // 세로줄기 부리: 화면과 같은 함수로 만든 면을 획 잉크와 함께 합친다. 줄기 머리는 부리가 높이 안에 앉도록 깎은 획으로 그린다.
-  const beakSources = glyphData.strokes.map((resolved, index) => ({
-    stroke: resolved.stroke,
-    box: resolved.box,
-    // 부리는 기둥 폭에 맞춘다(화면과 같이 가로·세로 대비를 읽는다).
-    weightMultiplier: glyphData.weightMultiplier * verticalWidthFactorOf(glyphData.strokeStyle),
-    group: resolved.beakGroup ?? `stroke-${index}`,
-    style: resolved.beakStyle,
-  }))
-  const beakGroups = stemBeakInkGroups(beakSources, glyphData.stemBeak, glyphData.strokeStyle)
-  const trimmedStrokes = stemBeakTrimmedStrokes(beakSources, glyphData.stemBeak, glyphData.strokeStyle)
-
-  for (const [strokeIndex, original] of glyphData.strokes.entries()) {
-    const resolved = trimmedStrokes[strokeIndex] ? { ...original, stroke: trimmedStrokes[strokeIndex]! } : original
+  for (const resolved of glyphData.strokes) {
     const renderStyle = glyphData.strokeStyle ?? { mode: 'brush' as const, brush: glyphData.brush }
     // 둥근 붓촉이라도 전역 둥글기가 있으면 화면과 같은 채운 윤곽(`strokeToRenderInkGroups`)으로 간다.
     if (needsFilledRenderInk(renderStyle)) {
@@ -432,6 +419,15 @@ export function glyphDataToFontContours(glyphData: GlyphData, simplifyEpsilon?: 
     if (contours.length > 0) contourGroups.push(contours)
   }
 
+  // 세로줄기 부리: 화면과 같은 함수로 만든 면을 획 잉크와 함께 합친다.
+  const beakGroups = stemBeakInkGroups(glyphData.strokes.map((resolved, index) => ({
+    stroke: resolved.stroke,
+    box: resolved.box,
+    // 부리는 기둥 폭에 맞춘다(화면과 같이 가로·세로 대비를 읽는다).
+    weightMultiplier: glyphData.weightMultiplier * verticalWidthFactorOf(glyphData.strokeStyle),
+    group: resolved.beakGroup ?? `stroke-${index}`,
+    style: resolved.beakStyle,
+  })), glyphData.stemBeak, glyphData.strokeStyle)
   contourGroups.push(...brushInkGroupsToFontContours(beakGroups.flat(), UPM, ASCENDER, glyphData.slant))
 
   // 합치기 전에는 단순화하지 않는다 — 살짝 닿는 획이 떨어져 윤곽 개수가 바뀐다(G1에서 확인, 10-02). 합친 뒤에만 ε를 쓴다.
