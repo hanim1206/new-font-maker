@@ -1,6 +1,6 @@
 // 닿자 가족 캔버스의 저장(이 브라우저). 실험실 페이지와 글자 해부 팝업이 같이 쓴다.
 import { getBaseJamo, useJamoStore } from '../src/stores/jamoStore'
-import { emptyFamilyEdits, familyDeltas, FAMILY_STAGES, findFamilyLinks, presetConsonantStrokes, withFamilyDeltas } from '../src/services/jamoFamily'
+import { emptyFamilyEdits, familyDeltas, familyDrawnStrokes, FAMILY_STAGES, findFamilyLinks, presetConsonantStrokes, withFamilyDeltas } from '../src/services/jamoFamily'
 import type { FamilyEdits } from '../src/services/jamoFamily'
 
 export const FAMILY_STORE_KEY = 'family-lab-v1'
@@ -24,11 +24,15 @@ export function applyFamilyEditsToStore(): string[] {
   try { applied = JSON.parse(localStorage.getItem(APPLIED_KEY) ?? '[]') as string[] } catch { applied = [] }
   const now: string[] = []
   for (const ch of FAMILY_STAGES.flatMap((s) => s.members)) {
-    const deltas = familyDeltas(presets, links, edits, ch)
+    const moved = familyDeltas(presets, links, edits, ch)
+    const drawn = familyDrawnStrokes(presets, edits, ch)
     const cho = getBaseJamo('choseong', ch), jong = getBaseJamo('jongseong', ch)
-    if (deltas) {
-      if (cho) store.updateChoseong(ch, withFamilyDeltas(cho, deltas))
-      if (jong) store.updateJongseong(ch, withFamilyDeltas(jong, deltas))
+    if (moved || drawn.length) {
+      const deltas = moved ?? (presets[ch] ?? []).map((s) => s.points.map(() => ({ x: 0, y: 0 })))
+      /* 자와 펜으로 그은 선은 기본 획 뒤에 붙인다(문맥 변형 획에는 아직 안 붙인다) */
+      const withDrawn = (j: NonNullable<typeof cho>) => { const out = withFamilyDeltas(j, deltas); return drawn.length ? { ...out, strokes: [...(out.strokes ?? []), ...drawn] } : out }
+      if (cho) store.updateChoseong(ch, withDrawn(cho))
+      if (jong) store.updateJongseong(ch, withDrawn(jong))
       now.push(ch)
     } else if (applied.includes(ch)) {
       if (cho) store.resetJamoChar('choseong', ch)
