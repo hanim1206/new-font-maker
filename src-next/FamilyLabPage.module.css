@@ -9,7 +9,7 @@
 .header h1 { margin: 0; font-size: 26px; }
 .header p { margin: 0; font-size: 14px; color: rgb(var(--color-text-3)); line-height: 1.55; }
 
-.stages { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.stages { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
 .stage { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgb(var(--color-border)); background: rgb(var(--color-surface)); text-align: left; }
 .stage small { font-size: 12px; color: rgb(var(--color-text-3)); }
 .stage b { font-size: 18px; letter-spacing: .12em; }

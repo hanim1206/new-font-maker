@@ -15,8 +15,10 @@ export interface FamilyStage { id: string; name: string; members: string[] }
 export const FAMILY_STAGES: FamilyStage[] = [
   { id: 'giyeok', name: 'ㄱ 가족', members: ['ㄱ', 'ㅋ', 'ㄲ'] },
   { id: 'nieun', name: 'ㄴ 가족', members: ['ㄴ', 'ㄷ', 'ㅌ', 'ㄸ', 'ㄹ'] },
-  // ㅁ에서 ㅂ · ㅍ을 뽑으면 꼴이 어색해서(사용자 11-11) 셋은 따로 시작한다. ㅃ만 ㅂ을 잇는다.
-  { id: 'mieum', name: 'ㅁ · ㅂ · ㅍ', members: ['ㅁ', 'ㅂ', 'ㅃ', 'ㅍ'] },
+  // ㅁ에서 ㅂ · ㅍ을 뽑으면 꼴이 어색해서(사용자 11-11) 셋은 단계를 따로 둔다. ㅃ만 ㅂ을 잇는다.
+  { id: 'mieum', name: 'ㅁ', members: ['ㅁ'] },
+  { id: 'bieup', name: 'ㅂ 가족', members: ['ㅂ', 'ㅃ'] },
+  { id: 'pieup', name: 'ㅍ', members: ['ㅍ'] },
   { id: 'ieung', name: 'ㅇ 가족', members: ['ㅇ', 'ㅎ'] },
   { id: 'siot', name: 'ㅅ 가족', members: ['ㅅ', 'ㅈ', 'ㅊ', 'ㅆ', 'ㅉ'] },
 ]
@@ -34,11 +36,8 @@ export const FAMILY_RELATIONS: Record<string, FamilyRelation[]> = {
   'ㅃ': [{ parent: 'ㅂ', regions: [{ x0: 0.061, y0: 0, x1: 0.395, y1: 1 }, { x0: 0.612, y0: 0, x1: 0.946, y1: 1 }] }],
   'ㅎ': [{ parent: 'ㅇ', regions: [{ x0: 0.169, y0: 0.447, x1: 0.831, y1: 1 }] }],
   'ㅈ': [{ parent: 'ㅅ', regions: [FULL] }],
-  'ㅊ': [
-    // 꼭지는 ㅎ에서 배운다 — ㅎ 맨 위 0.213 높이를 ㅊ 맨 위 0.247 높이로
-    { parent: 'ㅎ', regions: [{ x0: 0, y0: 0, x1: 1, y1: 1.16 }], strokes: ['ㅎ-1'], into: ['ㅊ-dot'] },
-    { parent: 'ㅈ', regions: [{ x0: 0, y0: 0.247, x1: 1, y1: 1 }] },
-  ],
+  // ㅊ 꼭지는 ㅎ을 잇지 않고 ㅊ에서 따로 고친다(사용자 11-11). 아래 ㅈ 부분만 잇는다.
+  'ㅊ': [{ parent: 'ㅈ', regions: [{ x0: 0, y0: 0.247, x1: 1, y1: 1 }], into: ['ㅊ-1', 'ㅊ-left', 'ㅊ-right'] }],
   'ㅆ': [{ parent: 'ㅅ', regions: [{ x0: 0, y0: 0, x1: 0.523, y1: 1 }, { x0: 0.5, y0: 0, x1: 1, y1: 1 }] }],
   'ㅉ': [{ parent: 'ㅈ', regions: [{ x0: 0, y0: 0, x1: 0.472, y1: 0.95 }, { x0: 0.472, y0: 0, x1: 1, y1: 1 }] }],
 }

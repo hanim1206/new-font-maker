@@ -66,7 +66,7 @@ export function FamilyLabPage() {
   </div>
 }
 
-/** 다섯 단계 띠 + 편집 캔버스 + 가족 띠 · 전체 지도. 실험실 페이지와 글자 해부 팝업이 같이 쓴다. */
+/** 단계 띠 + 편집 캔버스 + 가족 띠 · 전체 지도. 실험실 페이지와 글자 해부 팝업이 같이 쓴다. */
 export function FamilyCanvas({ start, compact }: { start?: string; compact?: boolean }) {
   const presets = useMemo(() => presetConsonantStrokes((ch) => getBaseJamo('choseong', ch)), [])
   const links = useMemo(() => findFamilyLinks(presets), [presets])
@@ -185,7 +185,7 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
             <small>{m} · {touched(m) ? '손댐' : inherits(m) ? '이어받음' : '프리셋'}</small>
           </Pressable>)}
         </div>
-        <h2>다섯 단계 전체</h2>
+        <h2>전체 단계</h2>
         <div className={styles.map}>
           {FAMILY_STAGES.map((s, si) => <div key={s.id} className={styles.mapRow}>
             {s.members.map((m, mi) => <Pressable key={m} type="button" className={styles.mapCell} data-on={si === stageIdx && mi === memberIdx || undefined} onClick={() => go(si, mi)} aria-label={m}>
@@ -193,7 +193,7 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
             </Pressable>)}
           </div>)}
         </div>
-        <p className={styles.note}>ㅊ의 꼭지는 4단계 ㅎ의 꼭지를 이어받는다. 옅은 회색은 아직 아무도 손대지 않은 자모.</p>
+        <p className={styles.note}>ㅁ · ㅂ · ㅍ과 ㅊ 꼭지는 따로 시작한다. 옅은 회색은 아직 아무도 손대지 않은 자모.</p>
       </aside>
     </div>
   </div>
