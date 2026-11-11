@@ -1,4 +1,9 @@
 .page { min-height: 100dvh; padding: 24px 20px 40px; background: rgb(var(--color-background)); color: rgb(var(--color-foreground)); display: grid; gap: 18px; align-content: start; user-select: none; -webkit-user-select: none; }
+/* 페이지와 팝업이 같이 쓰는 몸통. 팝업(compact)에서는 칸을 줄인다. */
+.body { display: grid; gap: 18px; align-content: start; user-select: none; -webkit-user-select: none; }
+.body[data-compact] { gap: 12px; }
+.body[data-compact] .work { grid-template-columns: minmax(0, 400px) minmax(0, 1fr); }
+.body[data-compact] .stage b { font-size: 15px; }
 .header { display: grid; gap: 4px; max-width: 900px; }
 .header span { font-size: 12px; font-weight: 700; color: rgb(var(--color-primary)); letter-spacing: .04em; }
 .header h1 { margin: 0; font-size: 26px; }

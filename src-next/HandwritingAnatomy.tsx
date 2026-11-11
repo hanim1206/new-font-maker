@@ -19,7 +19,10 @@ import { tailIsOpen } from './HandwritingTailCut'
 import { usePartRuleInk } from './HandwritingStemMaster'
 import type { StemMasterResolver } from './HandwritingStemMaster'
 import type { CutAngleResolver } from './HandwritingTailCut'
+import { FAMILY_STAGES } from '../src/services/jamoFamily'
 import styles from './HandwritingAnatomy.module.css'
+
+const FAMILY_MEMBERS = new Set(FAMILY_STAGES.flatMap((s) => s.members))
 
 /**
  * 선택한 글자 해부(손글씨 실험실 오른쪽). 프리셋 글자를 크게 그리고 첫닿자 · 홀자 · 받침을 색과 점선 상자로 나눠 보인다.
@@ -402,7 +405,7 @@ export const ScopeMini = memo(function ScopeMini({ ch, slot, scopeKey, style }: 
   </svg>
 })
 
-export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style, size = 360, onScope, scopeJamo, focusRequest, onFocusSlot, groupBeakOf, cutAngleOf, masterOf, onAddStyle }: {
+export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style, size = 360, onScope, scopeJamo, focusRequest, onFocusSlot, groupBeakOf, cutAngleOf, masterOf, onAddStyle, onOpenFamily }: {
   char: string; style: GlobalStyle; size?: number
   onScope?: (scope: PartScope | null) => void
   scopeJamo?: { slot: Slot; total: number; hits: string[] }[]
@@ -418,6 +421,8 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
   masterOf?: StemMasterResolver | null
   /** 고른 부위에 스타일 걸기 팝업을 연다. 세로줄기의 머리(부리)와 맺음(비스듬히 자르기). */
   onAddStyle?: (from: { kind: 'beak' | 'cut'; stem: string; slot: Slot }) => void
+  /** 고른 닿자를 가족 캔버스 팝업에서 고친다. 홀자에는 가족이 없어 단추가 안 뜬다. */
+  onOpenFamily?: (consonant: string) => void
 }) {
   const choseong = useJamoStore((state) => state.choseong)
   const jungseong = useJamoStore((state) => state.jungseong)
@@ -482,6 +487,7 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
       <div className={styles.big} onClick={() => { setHot(null); setFocus(null) }}>
         {/* 스타일 추가하기는 캔버스 오른쪽 위에(사용자 11-11). 고른 부위에 걸 스타일이 있을 때만. */}
         {onAddStyle && hotItem && styleKind && <Button size="sm" variant="primary" className={styles.addStyle} onClick={(e) => { e.stopPropagation(); onAddStyle({ kind: styleKind, stem: hotItem.scope.fn.key.split('|')[1], slot: active!.slot }) }} data-testid="handwriting-add-style">스타일 추가하기</Button>}
+        {onOpenFamily && active && active.slot !== 'JU' && FAMILY_MEMBERS.has(active.jamo.char) && <Button size="sm" className={styles.openFamily} onClick={(e) => { e.stopPropagation(); onOpenFamily(active.jamo.char) }} data-testid="handwriting-open-family">{active.jamo.char} 가족 캔버스</Button>}
         <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined}
           size={size} globalStyle={style} overflow="visible" clipGlyphs={false} strokeColorOf={colorOf} groupBeakOf={groupBeakOf} partStyles={ruleInk.partStyles}>
           {ruleInk.overlay(colorOf)}

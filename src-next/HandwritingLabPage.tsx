@@ -36,6 +36,8 @@ import { Field, RangeBar } from './components/ui/range'
 import { Switch } from './components/ui/switch'
 import { EDIT_COLOR } from './editColors'
 import { HandwritingAnatomy, jamoScopeKeys, sampleChar } from './HandwritingAnatomy'
+import { FamilyCanvas } from './FamilyLabPage'
+import { applyFamilyEditsToStore } from './familyEditsStore'
 import { JamoGlyph } from './DashboardLabPage'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { Pressable } from './components/ui/pressable'
@@ -233,6 +235,8 @@ export function HandwritingLabPage() {
   const [groupIdx, setGroupIdx] = useState(0)
   const [focusRequest, setFocusRequest] = useState<{ char: string; slot: AnatomySlot; at: number } | null>(null)
   const [focusSlot, setFocusSlot] = useState<AnatomySlot | null>(null)
+  /** 가족 캔버스 팝업에서 여는 닿자. 닫을 때 고친 꼴을 자모 저장에 넣는다. */
+  const [familyFor, setFamilyFor] = useState<string | null>(null)
   const pickJamo = (slot: AnatomySlot, ch: string) => {
     const sample = sampleChar(slot, ch)
     if (!sample) return
@@ -625,7 +629,7 @@ export function HandwritingLabPage() {
         <div className={styles.titleRow}><h1>글자 해부</h1><span className={styles.titleButtons}><Button size="sm" onClick={() => setView('dictionary')} data-testid="handwriting-view-dictionary">부위 사전</Button><Button size="sm" onClick={() => setView('collect')} data-testid="handwriting-view-collect">손글씨 수집으로</Button></span></div>
         <p>왼쪽 글자표에서 글자를 누르면 크게 보여요. 자모를 누르면 그 자모의 줄기 · 꺾임 · 머리 · 맺음이 번호로 펼쳐져요.</p>
       </header>
-      <HandwritingAnatomy char={picked ?? '각'} style={style} onScope={setPartScope} scopeJamo={scopeJamo} focusRequest={focusRequest} onFocusSlot={setFocusSlot} groupBeakOf={ruleBeakOf} cutAngleOf={ruleCutOf} masterOf={ruleMasterOf} onAddStyle={addStyle} />
+      <HandwritingAnatomy char={picked ?? '각'} style={style} onScope={setPartScope} scopeJamo={scopeJamo} focusRequest={focusRequest} onFocusSlot={setFocusSlot} groupBeakOf={ruleBeakOf} cutAngleOf={ruleCutOf} masterOf={ruleMasterOf} onAddStyle={addStyle} onOpenFamily={setFamilyFor} />
     </main> : view === 'dictionary' ? <main className={styles.work}>
       <header className={styles.header}>
         <span>Handwriting Lab</span>
@@ -756,6 +760,13 @@ export function HandwritingLabPage() {
                 <Button variant="primary" onClick={() => { const then = card.then; const next = applyCard(); if (then === 'roll' && next) window.setTimeout(() => rollDice(next), 50) }} data-testid="handwriting-ok">ㅇㅋ, 반영</Button></>}
           </DialogFooter>
         </>}
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={!!familyFor} onOpenChange={(open) => { if (!open) { applyFamilyEditsToStore(); setFamilyFor(null) } }}>
+      <DialogContent className={styles.familyCard} data-testid="family-popup">
+        <DialogHeader><DialogTitle>닿자 가족 캔버스</DialogTitle><p className={styles.sub}>앞 자모를 고치면 같은 가족 뒤 자모가 따라와요. 닫으면 해부 글자와 글자표에 들어가요.</p></DialogHeader>
+        {familyFor && <FamilyCanvas start={familyFor} compact />}
       </DialogContent>
     </Dialog>
 

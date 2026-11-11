@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { getBaseJamo } from '../stores/jamoStore'
 import {
-  cutFamilyStroke, emptyFamilyEdits, familyStrokes, findFamilyLinks, linkOf, moveFamilyPoint,
-  presetConsonantStrokes, relinkFamilyStroke,
+  cutFamilyStroke, emptyFamilyEdits, familyDeltas, familyStrokes, findFamilyLinks, linkOf, moveFamilyPoint,
+  presetConsonantStrokes, relinkFamilyStroke, withFamilyDeltas,
 } from './jamoFamily'
 
 const presets = presetConsonantStrokes((ch) => getBaseJamo('choseong', ch))
@@ -44,5 +44,16 @@ describe('닿자 가족 이어 두기', () => {
     expect(x(edits)).toBeCloseTo(base + 0.1)
     edits = relinkFamilyStroke(edits, 'ㅋ', stroke)
     expect(x(edits)).toBeCloseTo(base)
+  })
+
+  it('고친 꼴은 첫닿자와 받침 자모에 같이 들어가고, 틀은 프리셋으로 굳는다', () => {
+    const s = first('ㄱ')
+    const edits = moveFamilyPoint(links, emptyFamilyEdits(), 'ㄱ', s.id, 0, { x: 0.05, y: 0 })
+    expect(familyDeltas(presets, links, emptyFamilyEdits(), 'ㅋ')).toBeNull()
+    const d = familyDeltas(presets, links, edits, 'ㅋ')!
+    const jong = getBaseJamo('jongseong', 'ㅋ')!
+    const out = withFamilyDeltas(jong, d)
+    expect(out.frame?.strokes?.[0].points[0].x).toBe(jong.strokes![0].points[0].x)
+    expect(out.strokes!.some((t, i) => t.points.some((p, j) => p.x !== jong.strokes![i].points[j].x))).toBe(true)
   })
 })

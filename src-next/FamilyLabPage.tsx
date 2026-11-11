@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { ChevronLeft, ChevronRight, Link2, RotateCcw, Unlink } from 'lucide-react'
 import { getBaseJamo } from '../src/stores/jamoStore'
+import { FAMILY_STORE_KEY, loadFamilyEdits } from './familyEditsStore'
 import type { StrokeDataV2 } from '../src/types'
 import {
-  cutFamilyStroke, emptyFamilyEdits, FAMILY_STAGES, familyStrokes, findFamilyLinks, linkOf, moveFamilyPoint,
+  cutFamilyStroke, FAMILY_STAGES, familyStrokes, findFamilyLinks, linkOf, moveFamilyPoint,
   presetConsonantStrokes, relinkFamilyStroke,
 } from '../src/services/jamoFamily'
 import type { FamilyEdits, FamilyLinks, XY } from '../src/services/jamoFamily'
@@ -13,20 +14,11 @@ import { Pressable } from './components/ui/pressable'
 import { EDIT_COLOR } from './editColors'
 import styles from './FamilyLabPage.module.css'
 
-const STORE_KEY = 'family-lab-v1'
 /** 캔버스 칸 수. 점은 이 칸에 붙는다. */
 const GRID = 20
 const CANVAS = 440
 /** 자모 상자를 캔버스 안에 놓는 여백(캔버스 비율). */
 const PAD = 0.16
-
-const loadEdits = (): FamilyEdits => {
-  try {
-    const raw = localStorage.getItem(STORE_KEY)
-    if (raw) { const v = JSON.parse(raw) as FamilyEdits; if (v && v.moves && v.cut) return v }
-  } catch { /* 깨진 저장은 버린다 */ }
-  return emptyFamilyEdits()
-}
 
 /** 상자 좌표(0~1) → 캔버스 좌표. */
 const toCanvas = (p: XY, size: number): XY => ({ x: (PAD + p.x * (1 - 2 * PAD)) * size, y: (PAD + p.y * (1 - 2 * PAD)) * size })
@@ -64,16 +56,29 @@ function JamoThumb({ strokes, size, faint }: { strokes: StrokeDataV2[]; size: nu
 }
 
 export function FamilyLabPage() {
+  return <div className={styles.page}>
+    <header className={styles.header}>
+      <span>Family Lab</span>
+      <h1>닿자 가족 캔버스</h1>
+      <p>가족마다 맨 앞 자모를 먼저 만든다. 옆으로 넘기면 다음 자모가 앞 꼴을 이어받은 채로 열린다. 파란 점은 앞 자모를 가리켜서 여기선 못 움직이고, 앞을 고치면 같이 바뀐다. 따로 가려면 획을 고르고 끊는다. 점은 칸에 붙는다. 저장은 이 브라우저에만.</p>
+    </header>
+    <FamilyCanvas />
+  </div>
+}
+
+/** 다섯 단계 띠 + 편집 캔버스 + 가족 띠 · 전체 지도. 실험실 페이지와 글자 해부 팝업이 같이 쓴다. */
+export function FamilyCanvas({ start, compact }: { start?: string; compact?: boolean }) {
   const presets = useMemo(() => presetConsonantStrokes((ch) => getBaseJamo('choseong', ch)), [])
   const links = useMemo(() => findFamilyLinks(presets), [presets])
-  const [edits, setEdits] = useState<FamilyEdits>(loadEdits)
-  const [stageIdx, setStageIdx] = useState(0)
-  const [memberIdx, setMemberIdx] = useState(0)
+  const [edits, setEdits] = useState<FamilyEdits>(loadFamilyEdits)
+  const startAt = start ? FAMILY_STAGES.findIndex((s) => s.members.includes(start)) : -1
+  const [stageIdx, setStageIdx] = useState(Math.max(0, startAt))
+  const [memberIdx, setMemberIdx] = useState(startAt >= 0 ? FAMILY_STAGES[startAt].members.indexOf(start!) : 0)
   const [picked, setPicked] = useState<string | null>(null)
   const [drag, setDrag] = useState<{ stroke: string; index: number } | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
 
-  useEffect(() => { localStorage.setItem(STORE_KEY, JSON.stringify(edits)) }, [edits])
+  useEffect(() => { localStorage.setItem(FAMILY_STORE_KEY, JSON.stringify(edits)) }, [edits])
 
   const stage = FAMILY_STAGES[stageIdx]
   const ch = stage.members[memberIdx]
@@ -119,13 +124,7 @@ export function FamilyLabPage() {
   })
 
   const unit = CANVAS / GRID
-  return <div className={styles.page}>
-    <header className={styles.header}>
-      <span>Family Lab</span>
-      <h1>닿자 가족 캔버스</h1>
-      <p>가족마다 맨 앞 자모를 먼저 만든다. 옆으로 넘기면 다음 자모가 앞 꼴을 이어받은 채로 열린다. 파란 점은 앞 자모를 가리켜서 여기선 못 움직이고, 앞을 고치면 같이 바뀐다. 따로 가려면 획을 고르고 끊는다. 점은 칸에 붙는다. 저장은 이 브라우저에만.</p>
-    </header>
-
+  return <div className={styles.body} data-compact={compact || undefined}>
     <nav className={styles.stages} aria-label="단계">
       {FAMILY_STAGES.map((s, i) => <Pressable key={s.id} type="button" className={styles.stage} data-on={i === stageIdx || undefined} onClick={() => go(i, 0)} data-testid={`family-stage-${s.id}`}>
         <small>{i + 1}단계{s.members.some(touched) ? ' · 손댐' : ''}</small>

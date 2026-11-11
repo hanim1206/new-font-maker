@@ -40,4 +40,5 @@
 .sub { padding-left: 28px; position: relative; }
 .sub::before { content: ''; position: absolute; left: 14px; top: 0; bottom: 50%; width: 10px; border-left: 1px solid rgb(var(--color-border)); border-bottom: 1px solid rgb(var(--color-border)); border-bottom-left-radius: 6px; }
 .addStyle { position: absolute; top: 12px; right: 12px; z-index: 1; }
+.openFamily { position: absolute; top: 12px; left: 12px; z-index: 1; }
 .scope .hint { flex-basis: 100%; }

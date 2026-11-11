@@ -2,6 +2,7 @@
 // 이어받은 점은 앞 자모의 점을 계속 가리킨다. 앞을 고치면 뒤로 전파되고, 뒤에서는 그 점을 직접 못 움직인다(끊으면 따로 간다).
 // 이어 붙는 관계는 프리셋 획 모양에서 찾는다: 앞 자모를 뒤 자모 안의 자리(region)로 옮겨 놓았을 때 겹치는 점끼리 잇는다.
 import type { AnchorPoint, JamoData, StrokeDataV2 } from '../types'
+import { frameOf } from '../utils/jamoFrame'
 
 export interface XY { x: number; y: number }
 interface Region { x0: number; y0: number; x1: number; y1: number }
@@ -163,4 +164,26 @@ export function presetConsonantStrokes(jamo: (ch: string) => JamoData | undefine
   const out: Record<string, StrokeDataV2[]> = {}
   for (const stage of FAMILY_STAGES) for (const ch of stage.members) out[ch] = jamo(ch)?.strokes ?? []
   return out
+}
+
+/** 자모의 획마다 점마다 프리셋에서 옮겨진 양. 하나도 안 옮겨졌으면 null. */
+export function familyDeltas(presets: Record<string, StrokeDataV2[]>, links: FamilyLinks, edits: FamilyEdits, ch: string): XY[][] | null {
+  const out = (presets[ch] ?? []).map((s) => s.points.map((_, i) => deltaOf(links, edits, ch, s.id, i)))
+  return out.some((row) => row.some((d) => Math.abs(d.x) > 1e-9 || Math.abs(d.y) > 1e-9)) ? out : null
+}
+
+const shiftStrokes = (strokes: StrokeDataV2[] | undefined, deltas: XY[][]): StrokeDataV2[] | undefined => {
+  if (!strokes || strokes.length !== deltas.length || strokes.some((s, i) => s.points.length !== deltas[i].length)) return strokes
+  return strokes.map((s, i) => ({ ...s, points: s.points.map((p, j) => shift(p, deltas[i][j])) }))
+}
+
+/**
+ * 가족 캔버스에서 고친 꼴을 자모 데이터에 입힌다. 첫닿자 · 받침은 획 순서와 점 수가 같아서 같은 옮김을 그대로 쓴다.
+ * 순서나 점 수가 다른 채널(문맥 변형 등)은 건드리지 않는다. 기준 틀은 프리셋으로 굳혀, 옮긴 점이 상자 안팎으로 그대로 보이게 한다.
+ */
+export function withFamilyDeltas(base: JamoData, deltas: XY[][]): JamoData {
+  const contextStrokes = base.contextStrokes
+    ? Object.fromEntries(Object.entries(base.contextStrokes).map(([k, v]) => [k, shiftStrokes(v, deltas)])) as JamoData['contextStrokes']
+    : undefined
+  return { ...base, strokes: shiftStrokes(base.strokes, deltas), ...(contextStrokes ? { contextStrokes } : {}), frame: frameOf(base) }
 }
