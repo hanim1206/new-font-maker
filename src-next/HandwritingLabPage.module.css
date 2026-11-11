@@ -22,6 +22,7 @@
 .header { display: grid; gap: 3px; }
 .header span { color: rgb(var(--color-primary)); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .titleRow { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.titleButtons { display: flex; gap: 6px; }
 .header h1 { font-size: clamp(22px, 3vw, 30px); line-height: 1.1; }
 .header p { color: rgb(var(--color-text-3)); font-size: 13px; }
 .prog { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 14px; font-size: 12px; }

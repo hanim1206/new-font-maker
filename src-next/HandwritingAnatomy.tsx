@@ -342,6 +342,11 @@ export function tailEndsOf(jamo: JamoData, slot: Slot): Map<string, string> {
   return out
 }
 
+/** 자모 하나의 부위 목록(부위 사전용): 묶음 키 두 층과 종류 · 속성. 기본 자모 획으로 읽는다. */
+export function jamoPartList(jamo: JamoData, slot: Slot): { fn: string; shape: string; kind: 'segment' | 'corner' | 'head' | 'tail'; attrs: string[] }[] {
+  return unitItems(jamo, slot).items.map((it) => ({ fn: it.scope.fn.key, shape: it.scope.shape.key, kind: it.kind, attrs: it.attrs }))
+}
+
 export function jamoScopeKeys(jamo: JamoData, slot: Slot): Set<string> {
   const keys = new Set<string>()
   unitItems(jamo, slot).items.forEach((it) => { keys.add(it.scope.fn.key); keys.add(it.scope.shape.key) })
@@ -359,7 +364,7 @@ export const sampleChar = (slot: Slot, ch: string): string | null => {
 }
 
 /** 묶음 상자의 작은 자모: 같은 크기 글자 네모 안에, 본보기 글자 속 자리 · 비율 그대로 그 자모만 흐리게 그리고, 고른 묶음에 드는 부위만 자리 색으로 칠한다. */
-const ScopeMini = memo(function ScopeMini({ ch, slot, scopeKey, style }: { ch: string; slot: Slot; scopeKey: string; style: GlobalStyle }) {
+export const ScopeMini = memo(function ScopeMini({ ch, slot, scopeKey, style }: { ch: string; slot: Slot; scopeKey: string; style: GlobalStyle }) {
   const choseong = useJamoStore((state) => state.choseong)
   const jungseong = useJamoStore((state) => state.jungseong)
   const jongseong = useJamoStore((state) => state.jongseong)
@@ -381,7 +386,9 @@ const ScopeMini = memo(function ScopeMini({ ch, slot, scopeKey, style }: { ch: s
   }, [ch, slot, choseong, jungseong, jongseong, schemas, globalPadding, paddingOverrides, style.weight, style.linecap, style.linejoin])
   if (!drawn) return <b>{ch}</b>
   const { prims, items } = drawn
-  const hits = items.filter((it) => it.scope.fn.key === scopeKey || it.scope.shape.key === scopeKey)
+  // `머리|*`처럼 끝이 `|*`면 그 낱말로 시작하는 묶음 전부(부위 사전이 쓴다).
+  const hit = (key: string) => (scopeKey.endsWith('|*') ? key.startsWith(scopeKey.slice(0, -1)) : key === scopeKey)
+  const hits = items.filter((it) => hit(it.scope.fn.key) || hit(it.scope.shape.key))
   const color = SLOT_COLOR[slot]
   // 칸은 모두 같은 크기의 글자 네모. 그 안에 자모가 본보기 글자 속 자리 · 크기 그대로 그려진다.
   const sw = 5

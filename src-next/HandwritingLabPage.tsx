@@ -41,6 +41,7 @@ import { beakResolverOf, buildPartIndexes, cutResolverOf, kindOf, loadPartRules,
 import { useTailCutMask, useTailCuts } from './HandwritingTailCut'
 import type { CutAngleResolver } from './HandwritingTailCut'
 import type { PartRule } from './HandwritingPartRules'
+import { HandwritingPartDictionary } from './HandwritingPartDictionary'
 import ruleStyles from './HandwritingPartRules.module.css'
 import type { GroupBeakResolver } from '../src/stores/jamoGroupStore'
 import type { PartScope, Slot as AnatomySlot } from './HandwritingAnatomy'
@@ -206,7 +207,7 @@ export function HandwritingLabPage() {
   /** 글자표를 은행으로 그릴지 제품 프리셋으로 그릴지. 프리셋이면 스타일 변화가 2,350자 전부에서 보인다. */
   const [chartSource, setChartSource] = useState<'bank' | 'preset'>('preset')
   /** 오른쪽: 고른 글자 해부(기본) · 손글씨 수집. */
-  const [view, setView] = useState<'anatomy' | 'collect'>('anatomy')
+  const [view, setView] = useState<'anatomy' | 'collect' | 'dictionary'>('anatomy')
   const [picked, setPicked] = useState<string | null>(null)
   const [highlight, setHighlight] = useState<Set<string> | null>(null)
   /** 해부 패널에서 고른 부위 묶음 — 글자표에 같은 묶음 글자를 칠한다. */
@@ -587,10 +588,17 @@ export function HandwritingLabPage() {
     {view === 'anatomy' ? <main className={styles.work}>
       <header className={styles.header}>
         <span>Handwriting Lab</span>
-        <div className={styles.titleRow}><h1>글자 해부</h1><Button size="sm" onClick={() => setView('collect')} data-testid="handwriting-view-collect">손글씨 수집으로</Button></div>
+        <div className={styles.titleRow}><h1>글자 해부</h1><span className={styles.titleButtons}><Button size="sm" onClick={() => setView('dictionary')} data-testid="handwriting-view-dictionary">부위 사전</Button><Button size="sm" onClick={() => setView('collect')} data-testid="handwriting-view-collect">손글씨 수집으로</Button></span></div>
         <p>왼쪽 글자표에서 글자를 누르면 크게 보여요. 자모를 누르면 그 자모의 줄기 · 꺾임 · 머리 · 맺음이 번호로 펼쳐져요.</p>
       </header>
       <HandwritingAnatomy char={picked ?? '각'} style={style} onScope={setPartScope} scopeJamo={scopeJamo} focusRequest={focusRequest} onFocusSlot={setFocusSlot} groupBeakOf={ruleBeakOf} cutAngleOf={ruleCutOf} onAddStyle={addStyle} />
+    </main> : view === 'dictionary' ? <main className={styles.work}>
+      <header className={styles.header}>
+        <span>Handwriting Lab</span>
+        <div className={styles.titleRow}><h1>부위 사전</h1><Button size="sm" onClick={() => setView('anatomy')} data-testid="handwriting-view-anatomy">글자 해부로</Button></div>
+        <p>부위마다 뜻 · 성립 조건 · 엔진이 읽는 법을 적고, 지금 프리셋에서 그 부위가 있는 자모를 그려요. 작은 자모를 누르면 글자 해부에서 열려요.</p>
+      </header>
+      <HandwritingPartDictionary style={style} onPick={(slot, ch) => { pickJamo(slot, ch); setView('anatomy') }} />
     </main> : <main className={styles.work}>
       <header className={styles.header}>
         <span>Handwriting Lab</span>
