@@ -1,0 +1,5 @@
+.canvasWrap { display: grid; gap: 8px; justify-items: start; }
+.canvas { width: 300px; height: 420px; border: 1px solid rgb(var(--color-border)); border-radius: 12px; background: rgb(var(--color-surface-2)); touch-action: none; user-select: none; }
+.grab { cursor: grab; }
+.zoneLine { cursor: ns-resize; }
+.tools { display: flex; gap: 6px; }

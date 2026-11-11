@@ -37,8 +37,9 @@ import { HandwritingAnatomy, jamoScopeKeys, sampleChar } from './HandwritingAnat
 import { JamoGlyph } from './DashboardLabPage'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { Pressable } from './components/ui/pressable'
-import { beakResolverOf, buildPartIndexes, cutResolverOf, kindOf, loadPartRules, newRule, PartRuleDialog, RULE_TARGET, ruleReach, ruleSentence, savePartRules, sortRules, stemsOf } from './HandwritingPartRules'
-import { useTailCutMask, useTailCuts } from './HandwritingTailCut'
+import { beakResolverOf, buildPartIndexes, cutResolverOf, kindOf, masterResolverOf, loadPartRules, newRule, PartRuleDialog, RULE_TARGET, ruleReach, ruleSentence, savePartRules, sortRules, stemsOf } from './HandwritingPartRules'
+import { usePartRuleInk } from './HandwritingStemMaster'
+import type { StemMasterResolver } from './HandwritingStemMaster'
 import type { CutAngleResolver } from './HandwritingTailCut'
 import type { PartRule } from './HandwritingPartRules'
 import { HandwritingPartDictionary } from './HandwritingPartDictionary'
@@ -123,7 +124,7 @@ const BankGlyph = memo(function BankGlyph({ bank, char, size, style, override, f
 })
 
 /** 제품 프리셋(자모 저장소 + 배치)으로 글자 하나. AppGlyph와 같지만 전역 스타일은 실험실 슬라이더 값을 받는다 — 은행이 비어도 스타일 변화를 2,350자로 본다. */
-const PresetGlyph = memo(function PresetGlyph({ char, size, style, groupBeakOf, cutAngleOf }: { char: string; size: number; style: GlobalStyle; groupBeakOf?: GroupBeakResolver; cutAngleOf?: CutAngleResolver | null }) {
+const PresetGlyph = memo(function PresetGlyph({ char, size, style, groupBeakOf, cutAngleOf, masterOf }: { char: string; size: number; style: GlobalStyle; groupBeakOf?: GroupBeakResolver; cutAngleOf?: CutAngleResolver | null; masterOf?: StemMasterResolver | null }) {
   const choseong = useJamoStore((state) => state.choseong)
   const jungseong = useJamoStore((state) => state.jungseong)
   const jongseong = useJamoStore((state) => state.jongseong)
@@ -136,18 +137,17 @@ const PresetGlyph = memo(function PresetGlyph({ char, size, style, groupBeakOf, 
     return { ...schemas[syllable.layoutType], padding, designBodyPadding: padding }
   }, [schemas, globalPadding, paddingOverrides, syllable.layoutType])
   const { placement } = useContextPlacement(syllable, schema, style)
-  const cuts = useTailCuts(syllable, placement, style, cutAngleOf)
-  const cutMask = useTailCutMask(cuts)
-  return <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} size={size} globalStyle={style} overflow="visible" clipGlyphs={false} groupBeakOf={groupBeakOf} partStyles={cutMask.partStyles}>{cutMask.defs}</SvgRenderer>
+  const ruleInk = usePartRuleInk(syllable, placement, style, cutAngleOf, masterOf)
+  return <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined} size={size} globalStyle={style} overflow="visible" clipGlyphs={false} groupBeakOf={groupBeakOf} partStyles={ruleInk.partStyles}>{ruleInk.overlay()}</SvgRenderer>
 })
 
 /** 글자표 줄들. 확인 카드를 만질 때 다시 그리지 않게 따로 묶는다(iPad 개발 서버에서 토글이 느렸다). */
-const ChartRows = memo(function ChartRows({ bank, style, picked, highlight, firstRow, lastRow, onPick, source, groupBeakOf, cutAngleOf }: { bank: Bank; style: GlobalStyle; picked: string | null; highlight: Set<string> | null; firstRow: number; lastRow: number; onPick: (ch: string) => void; source: 'bank' | 'preset'; groupBeakOf?: GroupBeakResolver; cutAngleOf?: CutAngleResolver | null }) {
+const ChartRows = memo(function ChartRows({ bank, style, picked, highlight, firstRow, lastRow, onPick, source, groupBeakOf, cutAngleOf, masterOf }: { bank: Bank; style: GlobalStyle; picked: string | null; highlight: Set<string> | null; firstRow: number; lastRow: number; onPick: (ch: string) => void; source: 'bank' | 'preset'; groupBeakOf?: GroupBeakResolver; cutAngleOf?: CutAngleResolver | null; masterOf?: StemMasterResolver | null }) {
   const chartRows = Math.ceil(CHART_SYLLABLES.length / CHART_COLS)
   return <div style={{ height: chartRows * CHART_CELL, position: 'relative' }}>
     {Array.from({ length: Math.max(0, lastRow - firstRow) }, (_, k) => firstRow + k).map((row) => <div key={row} className={styles.chartRow} style={{ top: row * CHART_CELL, height: CHART_CELL }}>
       {CHART_SYLLABLES.slice(row * CHART_COLS, row * CHART_COLS + CHART_COLS).map((ch) => <button key={ch} type="button" className={`${styles.chartCell}${picked === ch ? ` ${styles.chartPicked}` : ''}${highlight?.has(ch) ? ` ${styles.chartNew}` : ''}`} style={{ width: CHART_CELL, height: CHART_CELL }} onClick={() => onPick(ch)} title={ch}>
-        {source === 'preset' ? <PresetGlyph char={ch} size={CHART_CELL - 6} style={style} groupBeakOf={groupBeakOf} cutAngleOf={cutAngleOf} /> : <BankGlyph bank={bank} char={ch} size={CHART_CELL - 6} style={style} />}
+        {source === 'preset' ? <PresetGlyph char={ch} size={CHART_CELL - 6} style={style} groupBeakOf={groupBeakOf} cutAngleOf={cutAngleOf} masterOf={masterOf} /> : <BankGlyph bank={bank} char={ch} size={CHART_CELL - 6} style={style} />}
       </button>)}
     </div>)}
   </div>
@@ -229,12 +229,13 @@ export function HandwritingLabPage() {
   const [partRules, setPartRules] = useState<PartRule[]>(loadPartRules)
   const [ruleDraft, setRuleDraft] = useState<{ rule: PartRule; isNew: boolean } | null>(null)
   const partIndexes = useMemo(() => buildPartIndexes({ CH: jamoCho, JU: jamoJung, JO: jamoJong }), [jamoCho, jamoJung, jamoJong])
-  const ruleStems = useMemo(() => ({ beak: stemsOf(partIndexes.beak), cut: stemsOf(partIndexes.cut) }), [partIndexes])
+  const ruleStems = useMemo(() => ({ beak: stemsOf(partIndexes.beak), cut: stemsOf(partIndexes.cut), master: stemsOf(partIndexes.master) }), [partIndexes])
   const sortedRules = useMemo(() => sortRules(partRules, partIndexes), [partRules, partIndexes])
   const ruleBeakOf = useMemo(() => beakResolverOf(sortedRules, partIndexes.beak), [sortedRules, partIndexes])
   const ruleCutOf = useMemo(() => cutResolverOf(sortedRules, partIndexes.cut), [sortedRules, partIndexes])
+  const ruleMasterOf = useMemo(() => masterResolverOf(sortedRules, partIndexes.master), [sortedRules, partIndexes])
   const commitRules = (next: PartRule[]) => { setPartRules(next); savePartRules(next) }
-  const addStyle = useCallback(({ kind }: { kind: 'beak' | 'cut' }) => setRuleDraft({ rule: newRule(kind, ruleStems[kind]), isNew: true }), [ruleStems])
+  const addStyle = useCallback(({ kind }: { kind: 'beak' | 'cut' | 'master' }) => setRuleDraft({ rule: newRule(kind, ruleStems[kind]), isNew: true }), [ruleStems])
   /** 묶음이 든 자모 — 묶음은 자모의 성질이라 자모로 센다. */
   const scopeJamo = useMemo(() => {
     if (!partScope) return undefined
@@ -557,7 +558,7 @@ export function HandwritingLabPage() {
         </div>
       </div>}
       <div ref={chartRef} className={styles.chart} hidden={view === 'anatomy' && chartTab !== 'glyph'} data-testid="handwriting-chart">
-        <ChartRows bank={bank} style={chartStyle} picked={picked} highlight={view === 'anatomy' ? scopeHits : highlight} firstRow={firstRow} lastRow={lastRow} onPick={setPicked} source={chartSource} groupBeakOf={ruleBeakOf} cutAngleOf={ruleCutOf} />
+        <ChartRows bank={bank} style={chartStyle} picked={picked} highlight={view === 'anatomy' ? scopeHits : highlight} firstRow={firstRow} lastRow={lastRow} onPick={setPicked} source={chartSource} groupBeakOf={ruleBeakOf} cutAngleOf={ruleCutOf} masterOf={ruleMasterOf} />
       </div>
       {pickedInfo && view === 'collect' && <div className={styles.pickedInfo}>
         <b>{pickedInfo.title}</b>
@@ -572,6 +573,7 @@ export function HandwritingLabPage() {
       </div>
       {view === 'anatomy' && <div className={ruleStyles.list} data-testid="part-rule-list">
         <h4>걸려 있는 부위 스타일 (좁은 규칙이 이겨요)</h4>
+        <Button size="sm" onClick={() => addStyle({ kind: 'master' })} data-testid="stem-master-open">줄기마스터 빚기</Button>
         {sortedRules.length === 0 && <p className={ruleStyles.empty}>아직 없어요. 세로줄기의 머리나 맺음을 고르고 스타일 추가하기를 눌러 보세요.</p>}
         {sortedRules.map((rule) => { const reach = ruleReach(rule, partIndexes[kindOf(rule)]); return <Pressable key={rule.id} type="button" className={ruleStyles.rule} onClick={() => setRuleDraft({ rule, isNew: false })}>
           <b>{RULE_TARGET[kindOf(rule)]}</b><span>{ruleSentence(rule, ruleStems[kindOf(rule)])}</span>
@@ -591,7 +593,7 @@ export function HandwritingLabPage() {
         <div className={styles.titleRow}><h1>글자 해부</h1><span className={styles.titleButtons}><Button size="sm" onClick={() => setView('dictionary')} data-testid="handwriting-view-dictionary">부위 사전</Button><Button size="sm" onClick={() => setView('collect')} data-testid="handwriting-view-collect">손글씨 수집으로</Button></span></div>
         <p>왼쪽 글자표에서 글자를 누르면 크게 보여요. 자모를 누르면 그 자모의 줄기 · 꺾임 · 머리 · 맺음이 번호로 펼쳐져요.</p>
       </header>
-      <HandwritingAnatomy char={picked ?? '각'} style={style} onScope={setPartScope} scopeJamo={scopeJamo} focusRequest={focusRequest} onFocusSlot={setFocusSlot} groupBeakOf={ruleBeakOf} cutAngleOf={ruleCutOf} onAddStyle={addStyle} />
+      <HandwritingAnatomy char={picked ?? '각'} style={style} onScope={setPartScope} scopeJamo={scopeJamo} focusRequest={focusRequest} onFocusSlot={setFocusSlot} groupBeakOf={ruleBeakOf} cutAngleOf={ruleCutOf} masterOf={ruleMasterOf} onAddStyle={addStyle} />
     </main> : view === 'dictionary' ? <main className={styles.work}>
       <header className={styles.header}>
         <span>Handwriting Lab</span>
