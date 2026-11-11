@@ -2,6 +2,8 @@
 // 이어받은 점은 앞 자모의 점을 계속 가리킨다. 앞을 고치면 뒤로 전파되고, 뒤에서는 그 점을 직접 못 움직인다(끊으면 따로 간다).
 // 이어 붙는 관계는 프리셋 획 모양에서 찾는다: 앞 자모를 뒤 자모 안의 자리(region)로 옮겨 놓았을 때 겹치는 점끼리 잇는다.
 import type { AnchorPoint, JamoData, StrokeDataV2 } from '../types'
+import { drawnStrokes } from './rulerPen'
+import type { DrawnJamo } from './rulerPen'
 import { frameOf } from '../utils/jamoFrame'
 
 export interface XY { x: number; y: number }
@@ -108,6 +110,8 @@ export function findFamilyLinks(presets: Record<string, StrokeDataV2[]>): Family
 export interface FamilyEdits {
   moves: Record<string, Record<string, Record<number, XY>>>
   cut: Record<string, string[]>
+  /** 자모마다 놓은 자와 그 위에 그은 선(자와 펜). 이어받지 않고 그 자모에만 있다. */
+  drawn?: Record<string, DrawnJamo>
 }
 export const emptyFamilyEdits = (): FamilyEdits => ({ moves: {}, cut: {} })
 
@@ -136,7 +140,13 @@ const shift = (p: AnchorPoint, d: XY): AnchorPoint => ({
 
 /** 지금 보이는 획 — 프리셋 + 옮김. 손잡이는 점과 같이 움직인다. */
 export function familyStrokes(presets: Record<string, StrokeDataV2[]>, links: FamilyLinks, edits: FamilyEdits, ch: string): StrokeDataV2[] {
-  return (presets[ch] ?? []).map((s) => ({ ...s, points: s.points.map((p, i) => shift(p, deltaOf(links, edits, ch, s.id, i))) }))
+  const moved = (presets[ch] ?? []).map((s) => ({ ...s, points: s.points.map((p, i) => shift(p, deltaOf(links, edits, ch, s.id, i))) }))
+  return moved.concat(familyDrawnStrokes(presets, edits, ch))
+}
+
+/** 자와 펜으로 그은 선 — 굵기는 그 자모 프리셋 첫 획을 따른다. */
+export function familyDrawnStrokes(presets: Record<string, StrokeDataV2[]>, edits: FamilyEdits, ch: string): StrokeDataV2[] {
+  return drawnStrokes(edits.drawn?.[ch], presets[ch]?.[0]?.thickness ?? 0.08)
 }
 
 /** 점 하나를 옮긴다(이어받은 점은 못 옮긴다 — 끊어야 한다). */
