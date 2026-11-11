@@ -15,7 +15,9 @@ import type { GroupBeakResolver } from '../src/stores/jamoGroupStore'
 import { Button } from './components/ui/button'
 import { pointsToSvgD } from '../src/utils/pathUtils'
 import { EDIT_COLOR } from './editColors'
-import { tailIsOpen, useTailCutMask, useTailCuts } from './HandwritingTailCut'
+import { tailIsOpen } from './HandwritingTailCut'
+import { usePartRuleInk } from './HandwritingStemMaster'
+import type { StemMasterResolver } from './HandwritingStemMaster'
 import type { CutAngleResolver } from './HandwritingTailCut'
 import styles from './HandwritingAnatomy.module.css'
 
@@ -400,7 +402,7 @@ export const ScopeMini = memo(function ScopeMini({ ch, slot, scopeKey, style }: 
   </svg>
 })
 
-export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style, size = 360, onScope, scopeJamo, focusRequest, onFocusSlot, groupBeakOf, cutAngleOf, onAddStyle }: {
+export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style, size = 360, onScope, scopeJamo, focusRequest, onFocusSlot, groupBeakOf, cutAngleOf, masterOf, onAddStyle }: {
   char: string; style: GlobalStyle; size?: number
   onScope?: (scope: PartScope | null) => void
   scopeJamo?: { slot: Slot; total: number; hits: string[] }[]
@@ -412,6 +414,8 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
   groupBeakOf?: GroupBeakResolver
   /** 부위 스타일 규칙이 정한 맺음 자르기. */
   cutAngleOf?: CutAngleResolver | null
+  /** 부위 스타일 규칙이 정한 줄기마스터 꼴. */
+  masterOf?: StemMasterResolver | null
   /** 고른 부위에 스타일 걸기 팝업을 연다. 세로줄기의 머리(부리)와 맺음(비스듬히 자르기). */
   onAddStyle?: (from: { kind: 'beak' | 'cut'; stem: string; slot: Slot }) => void
 }) {
@@ -468,8 +472,7 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
     if (hotItem && !hotItem.strokeId.split('+').includes(source.strokeId)) return EDIT_COLOR.editGuide
     return SLOT_COLOR[s]
   }
-  const cuts = useTailCuts(syllable, placement, style, cutAngleOf)
-  const cutMask = useTailCutMask(cuts)
+  const ruleInk = usePartRuleInk(syllable, placement, style, cutAngleOf, masterOf)
   const styleKind = !hotItem ? null : hotItem.kind === 'tail' ? 'cut' as const : hotItem.kind === 'head' && hotItem.scope.shape.key === BEAK_TARGET_KEY ? 'beak' as const : null
   const pick = (s: Slot) => { setHot(null); setFocus(slot === s ? null : { char, slot: s }) }
 
@@ -480,8 +483,8 @@ export const HandwritingAnatomy = memo(function HandwritingAnatomy({ char, style
         {/* 스타일 추가하기는 캔버스 오른쪽 위에(사용자 11-11). 고른 부위에 걸 스타일이 있을 때만. */}
         {onAddStyle && hotItem && styleKind && <Button size="sm" variant="primary" className={styles.addStyle} onClick={(e) => { e.stopPropagation(); onAddStyle({ kind: styleKind, stem: hotItem.scope.fn.key.split('|')[1], slot: active!.slot }) }} data-testid="handwriting-add-style">스타일 추가하기</Button>}
         <SvgRenderer syllable={syllable} schema={placement.kind === 'schema' ? placement.schema : undefined} boxes={placement.kind === 'boxes' ? placement.boxes : undefined}
-          size={size} globalStyle={style} overflow="visible" clipGlyphs={false} strokeColorOf={colorOf} groupBeakOf={groupBeakOf} partStyles={cutMask.partStyles}>
-          {cutMask.defs}
+          size={size} globalStyle={style} overflow="visible" clipGlyphs={false} strokeColorOf={colorOf} groupBeakOf={groupBeakOf} partStyles={ruleInk.partStyles}>
+          {ruleInk.overlay(colorOf)}
           {slots.filter((s) => !slot || s.slot === slot).flatMap((s) => s.parts.map((b, i) => <rect key={`${s.slot}-${i}`} x={b.x * V} y={b.y * V} width={b.width * V} height={b.height * V}
             fill="none" stroke={SLOT_COLOR[s.slot]} strokeWidth={0.35} strokeDasharray="1.2 1" pointerEvents="none" />))}
           {/* 자모 고르기: 획 위를 누르면 그 자모가 펼쳐진다. 투명한 굵은 선이 눌림을 받는다. */}
