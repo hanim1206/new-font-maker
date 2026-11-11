@@ -11,7 +11,7 @@ import {
 import type { FamilyEdits, FamilyLinks, XY } from '../src/services/jamoFamily'
 import {
   addCircle, addLine, CANVAS_PAD, dragPathEnd, drawFreehand, emptyDrawn, magnetOf, nibCandidate, nibCommit, nibTrail,
-  pathEnds, pathToStroke, projOn, removePath, removeRuler, rulerHit, snapPoint,
+  cellRect, eraseRect, pathAt, pathEnds, pathToStroke, projOn, removePath, removeRuler, rulerHit, snapPoint,
 } from '../src/services/rulerPen'
 import type { DrawnJamo, NibCandidate, NibTrail, V } from '../src/services/rulerPen'
 import { Button } from './components/ui/button'
@@ -83,7 +83,7 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
   const [drag, setDrag] = useState<{ stroke: string; index: number } | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   /* 자와 펜 */
-  type Tool = 'edit' | 'circle' | 'line' | 'pen'
+  type Tool = 'edit' | 'circle' | 'line' | 'pen' | 'erase'
   const [tool, setToolState] = useState<Tool>('edit')
   const [circleR, setCircleR] = useState(10)
   const [hoverS, setHoverS] = useState<V | null>(null)
@@ -94,6 +94,8 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
   const [rulerSel, setRulerSel] = useState<{ type: 'c' | 'l'; id: number } | null>(null)
   const histRef = useRef<Record<string, DrawnJamo[]>>({})
   const lastTap = useRef<{ t: number; u: V } | null>(null)
+  const [eraseDrag, setEraseDrag] = useState<{ a: V; b: V } | null>(null)
+  const lastErase = useRef<{ t: number; u: V; changed: boolean } | null>(null)
 
   useEffect(() => { localStorage.setItem(FAMILY_STORE_KEY, JSON.stringify(edits)) }, [edits])
 
@@ -119,7 +121,7 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
     const prev = histRef.current[ch]?.pop()
     if (prev) setEdits((ed) => ({ ...ed, drawn: { ...ed.drawn, [ch]: prev } }))
   }
-  const clearTransient = () => { setLineA(null); setSketch(null); setNib(null); setEndDrag(null); setRulerSel(null) }
+  const clearTransient = () => { setEraseDrag(null); setLineA(null); setSketch(null); setNib(null); setEndDrag(null); setRulerSel(null) }
   const setTool = (t: Tool) => { clearTransient(); setToolState(t) }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -167,6 +169,7 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
       if (!lineA) { const hit = rulerHit(drawn, u); if (hit) { setRulerSel(hit); return } setRulerSel(null); setLineA(q); return }
       setDrawn(addLine(drawn, lineA, q)); setLineA(null); return
     }
+    if (tool === 'erase') { setEraseDrag({ a: u, b: u }); return }
     if (tool === 'pen') {
       const m = magnetOf(drawn, u)
       setSketch({ pts: [u], disp: [m ? m.proj : u], mk: m ? m.r.k : null, lock: !!m, moved: false })
@@ -176,6 +179,7 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
     const u = sOf(e)
     if (!u) return
     setHoverS(u)
+    if (tool === 'erase' && eraseDrag) { setEraseDrag({ ...eraseDrag, b: u }); return }
     if (tool === 'pen' && sketch) {
       const L = sketch.pts[sketch.pts.length - 1]
       if (Math.hypot(u[0] - L[0], u[1] - L[1]) < 0.3) return
@@ -196,6 +200,7 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
   }
   const toolUp = (e: ReactPointerEvent) => {
     const u = sOf(e)
+    if (tool === 'erase' && eraseDrag && u) { eraseUp(eraseDrag.a, u); return }
     if (tool !== 'pen' || !sketch || !u) return
     const sk = sketch
     setSketch(null)
@@ -214,6 +219,29 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
       return
     }
     if (!dbl) setNib({ A: snapPoint(drawn, u), pathId: null, after: null, trail: null, cand: null })
+  }
+
+  /* 지우개: 칸 하나 · 끈 네모만큼 펜 선을 잘라 낸다. 같은 자리 두 번 톡이면 그 선을 통째로 */
+  const eraseUp = (a: V, b: V) => {
+    setEraseDrag(null)
+    const ca = cellRect(a), cb = cellRect(b)
+    const tap = ca.x0 === cb.x0 && ca.y0 === cb.y0 && Math.hypot(a[0] - b[0], a[1] - b[1]) < 2
+    const now = Date.now(), lt = lastErase.current
+    if (tap && lt && now - lt.t < 400 && Math.hypot(lt.u[0] - a[0], lt.u[1] - a[1]) < 2) {
+      lastErase.current = null
+      const hist = (histRef.current[ch] ??= [])
+      const base = lt.changed && hist.length ? hist[hist.length - 1] : drawn
+      const hit = pathAt(base, a)
+      if (hit) {
+        if (lt.changed) hist.pop()
+        hist.push(base)
+        setEdits((ed) => ({ ...ed, drawn: { ...ed.drawn, [ch]: removePath(base, hit.id) } }))
+        return
+      }
+    }
+    const next = eraseRect(drawn, cellRect(a, b))
+    lastErase.current = tap ? { t: now, u: a, changed: next !== drawn } : null
+    setDrawn(next)
   }
 
   const onMove = (e: ReactPointerEvent) => {
@@ -300,6 +328,7 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
             {tool === 'circle' && hoverS && !rulerSel && <circle cx={Math.round(hoverS[0] / 5) * 5 * CANVAS / 100} cy={Math.round(hoverS[1] / 5) * 5 * CANVAS / 100} r={circleR * CANVAS / 100} fill="none" stroke={EDIT_COLOR.editSelect} strokeDasharray="4 3" />}
             {tool === 'line' && lineA && hoverS && (() => { const q = snapPoint(drawn, hoverS); return <line x1={lineA[0] * CANVAS / 100} y1={lineA[1] * CANVAS / 100} x2={q[0] * CANVAS / 100} y2={q[1] * CANVAS / 100} stroke={EDIT_COLOR.editSelect} strokeDasharray="4 3" /> })()}
             {sketch && sketch.disp.length > 1 && <path d={'M' + sketch.disp.map((q) => `${(q[0] * CANVAS / 100).toFixed(1)} ${(q[1] * CANVAS / 100).toFixed(1)}`).join('L')} fill="none" stroke={EDIT_COLOR.editSelect} strokeOpacity={0.45} strokeLinecap="round" strokeLinejoin="round" strokeWidth={thickness * CANVAS * (1 - 2 * PAD)} />}
+            {tool === 'erase' && (eraseDrag || hoverS) && (() => { const r = eraseDrag ? cellRect(eraseDrag.a, eraseDrag.b) : cellRect(hoverS!); return <rect x={r.x0 * CANVAS / 100} y={r.y0 * CANVAS / 100} width={(r.x1 - r.x0) * CANVAS / 100} height={(r.y1 - r.y0) * CANVAS / 100} fill={EDIT_COLOR.editSelect} fillOpacity={0.12} stroke={EDIT_COLOR.editSelect} strokeDasharray="4 3" data-testid="family-erase-rect" /> })()}
             {nib && <circle cx={nib.A[0] * CANVAS / 100} cy={nib.A[1] * CANVAS / 100} r={4} fill={EDIT_COLOR.editSelect} />}
             {nib?.cand && (() => {
               const tmp = nibCommit(drawn, nib.cand, null)
@@ -308,11 +337,11 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
               return st ? <path d={strokeD(st, CANVAS)} fill="none" stroke={EDIT_COLOR.editSelect} strokeOpacity={0.45} strokeWidth={thickness * CANVAS * (1 - 2 * PAD)} /> : null
             })()}
           </g>
-          {tool !== 'edit' && <rect x={0} y={0} width={CANVAS} height={CANVAS} fill="transparent" style={{ cursor: 'crosshair' }} data-testid="family-tool-layer"
-            onPointerDown={toolDown} onPointerMove={toolMove} onPointerUp={toolUp} />}
+          {tool !== 'edit' && <rect x={0} y={0} width={CANVAS} height={CANVAS} fill="transparent" style={{ cursor: tool === 'erase' ? 'cell' : 'crosshair' }} data-testid="family-tool-layer"
+            onPointerDown={toolDown} onPointerMove={toolMove} onPointerUp={toolUp} onPointerLeave={() => setHoverS(null)} />}
         </svg>
         <div className={styles.tools} data-testid="family-tools">
-          {([['edit', '고치기'], ['circle', '◯ 원 자'], ['line', '╱ 직선 자'], ['pen', '✏️ 펜']] as const).map(([k, label]) =>
+          {([['edit', '고치기'], ['circle', '◯ 원 자'], ['line', '╱ 직선 자'], ['pen', '✏️ 펜'], ['erase', '🧽 지우개']] as const).map(([k, label]) =>
             <Button key={k} size="sm" variant="chip" aria-pressed={tool === k} onClick={() => setTool(k)} data-testid={`family-tool-${k}`}>{label}</Button>)}
           <Button size="sm" variant="outline" onClick={undoDrawn} disabled={!histRef.current[ch]?.length} data-testid="family-undo"><Undo2 />되돌리기</Button>
         </div>
@@ -323,13 +352,13 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
         <p className={styles.toolHint}>{tool === 'edit' ? '점을 끌어 고친다. 그은 선의 주황 끝점은 그 선의 자를 따라 늘고 준다.'
           : tool === 'circle' ? '누른 칸 자리에 원 자를 놓는다. 놓인 자를 누르면 고른다.'
           : tool === 'line' ? '점 두 개를 찍어 직선 자를 놓는다. 자끼리 만나는 점 · 칸 자리에 붙는다.'
+          : tool === 'erase' ? '칸을 누르면 그 칸 안의 펜 선이 잘려 나가고, 끌면 네모만큼 한꺼번에. 선을 두 번 톡 누르면 통째로 지운다. 자와 원래 획은 지우지 않는다(자는 고를 때 나오는 \'이 자 빼기\'로).'
           : '누르고 끌면 손 긋기, 톡 누르면 펜촉(다음 톡마다 마디, 두 번 톡이나 Esc로 끝). 자 위에서 시작하면 그 자를 벗어나지 않고, 자 밖에서 시작하면 자 가까이서 붙는다. 자 없는 곳엔 칸에 맞는 자가 새로 생긴다.'}</p>
         <div className={styles.legend}><span><i data-k="linked" />앞 자모에서 이어 옴</span><span><i data-k="own" />이 자모 것 · 끌어서 고침</span></div>
         <div className={styles.actions}>
           <Button size="sm" onClick={() => step(-1)} disabled={stageIdx === 0 && memberIdx === 0} data-testid="family-prev"><ChevronLeft />앞</Button>
           {pickedStroke && pickedTie !== 'own' && <Button size="sm" onClick={() => setEdits((ed) => cutFamilyStroke(presets, links, ed, ch, pickedStroke.id))} data-testid="family-cut"><Unlink />이 획만 따로(끊기)</Button>}
           {pickedCut && <Button size="sm" onClick={() => setEdits((ed) => relinkFamilyStroke(ed, ch, picked!))} data-testid="family-relink"><Link2 />다시 잇기</Button>}
-          {picked?.startsWith('d') && <Button size="sm" onClick={() => { setDrawn(removePath(drawn, Number(picked.slice(1)))); setPicked(null) }} data-testid="family-drawn-remove"><Trash2 />이 선 빼기</Button>}
           {rulerSel && <Button size="sm" onClick={() => { setDrawn(removeRuler(drawn, rulerSel)); setRulerSel(null) }} data-testid="family-ruler-remove"><Trash2 />이 자 빼기</Button>}
           <Button size="sm" onClick={resetJamo} disabled={!touched(ch) && !edits.cut[ch]?.length && !drawn.circles.length && !drawn.lines.length}><RotateCcw />이 자모 처음으로</Button>
           <Button size="sm" variant="primary" onClick={() => step(1)} disabled={stageIdx === FAMILY_STAGES.length - 1 && memberIdx === stage.members.length - 1} data-testid="family-next">다음<ChevronRight /></Button>
