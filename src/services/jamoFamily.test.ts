@@ -15,6 +15,17 @@ describe('닿자 가족 이어 두기', () => {
     expect(ids).toContain('ㄱ')
   })
 
+  it('ㅁ · ㅂ · ㅍ은 따로 시작하고 ㅃ만 ㅂ을 잇는다', () => {
+    const parents = (ch: string) => new Set(Object.values(links[ch] ?? {}).flat().filter(Boolean).map((l) => l!.parent))
+    expect(parents('ㅂ').size).toBe(0)
+    expect(parents('ㅍ').size).toBe(0)
+    expect([...parents('ㅃ')]).toEqual(['ㅂ'])
+  })
+
+  it('ㅉ의 짧은 오른 내림도 끝점까지 ㅈ을 잇는다', () => {
+    expect(links['ㅉ']['ㅉ-2r'].every((l) => l?.parent === 'ㅈ' && l.stroke === 'ㅈ-right')).toBe(true)
+  })
+
   it('ㅊ 꼭지는 ㅎ 꼭지에서 온다', () => {
     const dot = links['ㅊ']['ㅊ-dot']?.filter(Boolean) ?? []
     expect(dot.length).toBeGreaterThan(0)

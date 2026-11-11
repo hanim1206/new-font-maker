@@ -136,7 +136,7 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
       <section className={styles.canvasCard}>
         <div className={styles.canvasHead}>
           <b data-testid="family-current">{ch}</b>
-          <span>{memberIdx === 0 && !inherits(ch) ? '가족의 첫 자모 · 여기서 시작' : `${parentsOf(ch).join(' · ')}에서 이어받아 열림`}</span>
+          <span>{!inherits(ch) ? (memberIdx === 0 ? '가족의 첫 자모 · 여기서 시작' : '따로 시작 · 앞 자모를 잇지 않음') : `${parentsOf(ch).join(' · ')}에서 이어받아 열림`}</span>
         </div>
         <svg ref={svgRef} viewBox={`0 0 ${CANVAS} ${CANVAS}`} className={styles.canvas} data-testid="family-canvas"
           onPointerMove={onMove} onPointerUp={() => setDrag(null)} onPointerLeave={() => setDrag(null)}
