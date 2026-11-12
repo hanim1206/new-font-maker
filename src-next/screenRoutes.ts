@@ -32,6 +32,8 @@ export const LAB_SCREEN_ROUTES = [
   '/pen-lab',
   '/ink-parity-lab',
   '/layout-rules',
+  '/handwriting-lab',
+  '/family-lab',
   '/layout-ladder',
   '/style-guide',
 ] as const

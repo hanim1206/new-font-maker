@@ -174,7 +174,7 @@ function InSyllableGlyph({ type, char, size }: { type: 'jungseong' | 'jongseong'
 }
 
 /** 자소 카드 잉크. 첫닿자는 단독으로, 홀자 · 받침은 글자 속 비율로. */
-function JamoGlyph({ type, char, size }: { type: JamoType; char: string; size: number }) {
+export function JamoGlyph({ type, char, size }: { type: JamoType; char: string; size: number }) {
   return type === 'choseong' ? <AppGlyph char={char} size={size} /> : <InSyllableGlyph type={type} char={char} size={size} />
 }
 
