@@ -112,6 +112,8 @@ export interface FamilyEdits {
   cut: Record<string, string[]>
   /** 자모마다 놓은 자와 그 위에 그은 선(자와 펜). 이어받지 않고 그 자모에만 있다. */
   drawn?: Record<string, DrawnJamo>
+  /** 자모마다 뺀 프리셋 획 id. 지우지 않고 숨겨 두니 목록에서 빼면 되살아난다. */
+  hidden?: Record<string, string[]>
 }
 export const emptyFamilyEdits = (): FamilyEdits => ({ moves: {}, cut: {} })
 
@@ -138,9 +140,26 @@ const shift = (p: AnchorPoint, d: XY): AnchorPoint => ({
   ...(p.handleOut ? { handleOut: { x: p.handleOut.x + d.x, y: p.handleOut.y + d.y } } : {}),
 })
 
-/** 지금 보이는 획 — 프리셋 + 옮김. 손잡이는 점과 같이 움직인다. */
+/**
+ * 이 프리셋 획이 빠졌나. 내가 뺐거나, 끊지 않은 획인데 점 절반 이상이 앞 자모의 빠진 획을 이어받고 있으면 빠진다
+ * (ㄱ에서 획을 빼면 그 획을 이어받던 ㅋ · ㄲ의 획도 같이 빠진다).
+ */
+export function isHiddenStroke(links: FamilyLinks, edits: FamilyEdits, ch: string, stroke: string, depth = 0): boolean {
+  if (edits.hidden?.[ch]?.includes(stroke)) return true
+  if (depth > 6 || isCut(edits, ch, stroke)) return false
+  const row = links[ch]?.[stroke] ?? []
+  if (!row.length) return false
+  const n = row.filter((l) => l && isHiddenStroke(links, edits, l.parent, l.stroke, depth + 1)).length
+  return n > 0 && n * 2 >= row.length
+}
+/** 빠진 프리셋 획 차례(프리셋 순서). */
+export function hiddenStrokeIndices(presets: Record<string, StrokeDataV2[]>, links: FamilyLinks, edits: FamilyEdits, ch: string): number[] {
+  return (presets[ch] ?? []).flatMap((s, i) => isHiddenStroke(links, edits, ch, s.id) ? [i] : [])
+}
+
+/** 지금 보이는 획 — 프리셋 + 옮김(뺀 획은 빼고). 손잡이는 점과 같이 움직인다. */
 export function familyStrokes(presets: Record<string, StrokeDataV2[]>, links: FamilyLinks, edits: FamilyEdits, ch: string): StrokeDataV2[] {
-  const moved = (presets[ch] ?? []).map((s) => ({ ...s, points: s.points.map((p, i) => shift(p, deltaOf(links, edits, ch, s.id, i))) }))
+  const moved = (presets[ch] ?? []).filter((s) => !isHiddenStroke(links, edits, ch, s.id)).map((s) => ({ ...s, points: s.points.map((p, i) => shift(p, deltaOf(links, edits, ch, s.id, i))) }))
   return moved.concat(familyDrawnStrokes(presets, edits, ch))
 }
 
@@ -202,4 +221,14 @@ export function withFamilyDeltas(base: JamoData, deltas: XY[][]): JamoData {
     ? Object.fromEntries(Object.entries(base.contextStrokes).map(([k, v]) => [k, shiftStrokes(v, deltas)])) as JamoData['contextStrokes']
     : undefined
   return { ...base, strokes: shiftStrokes(base.strokes, deltas), ...(contextStrokes ? { contextStrokes } : {}), frame: frameOf(base) }
+}
+
+/** 뺀 프리셋 획을 자모 데이터에서 덜어 낸다. 획 수가 프리셋과 같은 채널만 건드린다. */
+export function withoutHiddenStrokes(base: JamoData, hidden: number[], count: number): JamoData {
+  if (!hidden.length) return base
+  const drop = (strokes: StrokeDataV2[] | undefined) => strokes && strokes.length === count ? strokes.filter((_, i) => !hidden.includes(i)) : strokes
+  const contextStrokes = base.contextStrokes
+    ? Object.fromEntries(Object.entries(base.contextStrokes).map(([k, v]) => [k, drop(v)])) as JamoData['contextStrokes']
+    : undefined
+  return { ...base, strokes: drop(base.strokes), ...(contextStrokes ? { contextStrokes } : {}) }
 }

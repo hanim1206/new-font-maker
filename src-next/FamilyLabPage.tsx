@@ -10,7 +10,7 @@ import {
 } from '../src/services/jamoFamily'
 import type { FamilyEdits, FamilyLinks, XY } from '../src/services/jamoFamily'
 import {
-  addCircle, addLine, CANVAS_PAD, dragPathEnd, drawFreehand, emptyDrawn, magnetOf, nibCandidate, nibCommit, nibTrail,
+  addCircle, addLine, boxToS, CANVAS_PAD, dragPathEnd, drawFreehand, emptyDrawn, magnetOf, nibCandidate, nibCommit, nibTrail,
   cellRect, eraseRect, pathAt, pathEnds, pathToStroke, projOn, removePath, removeRuler, rulerHit, snapPoint,
 } from '../src/services/rulerPen'
 import type { DrawnJamo, NibCandidate, NibTrail, V } from '../src/services/rulerPen'
@@ -32,6 +32,29 @@ const fromCanvas = (p: XY, size: number): XY => ({ x: (p.x / size - PAD) / (1 - 
 const snap = (p: XY): XY => {
   const c = toCanvas(p, GRID)
   return fromCanvas({ x: Math.round(c.x), y: Math.round(c.y) }, GRID)
+}
+
+/** 캔버스 S 좌표 u 가까이 지나는 프리셋 획(그은 선 d… 은 뺀다). 곡선은 잘게 나눠 잰다. */
+function presetStrokeAt(strokes: StrokeDataV2[], u: V): string | null {
+  let best: string | null = null, bd = Infinity
+  for (const s of strokes) {
+    if (s.id.startsWith('d')) continue
+    const tol = Math.max(2, s.thickness * 100 * (1 - 2 * PAD) / 2 + 1)
+    const pts = s.points, segs: [typeof pts[number], typeof pts[number]][] = []
+    for (let i = 1; i < pts.length; i++) segs.push([pts[i - 1], pts[i]])
+    if (s.closed && pts.length > 1) segs.push([pts[pts.length - 1], pts[0]])
+    for (const [a, b] of segs) {
+      const c0 = a.handleOut ?? a, c1 = b.handleIn ?? b
+      for (let k = 0; k <= 24; k++) {
+        const t = k / 24, m = 1 - t
+        const x = m * m * m * a.x + 3 * m * m * t * c0.x + 3 * m * t * t * c1.x + t * t * t * b.x
+        const y = m * m * m * a.y + 3 * m * m * t * c0.y + 3 * m * t * t * c1.y + t * t * t * b.y
+        const q = boxToS({ x, y }), d = Math.hypot(q[0] - u[0], q[1] - u[1])
+        if (d < tol && d < bd) { bd = d; best = s.id }
+      }
+    }
+  }
+  return best
 }
 
 function strokeD(s: StrokeDataV2, size: number): string {
@@ -92,7 +115,9 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
   const [nib, setNib] = useState<{ A: V; pathId: number | null; after: string | null; trail: NibTrail | null; cand: NibCandidate | null } | null>(null)
   const [endDrag, setEndDrag] = useState<{ pathId: number; which: 'start' | 'end' } | null>(null)
   const [rulerSel, setRulerSel] = useState<{ type: 'c' | 'l'; id: number } | null>(null)
-  const histRef = useRef<Record<string, DrawnJamo[]>>({})
+  /* 되돌리기 — 자모마다 (그은 선, 뺀 프리셋 획) 한 벌씩 */
+  type Snap = { drawn: DrawnJamo; hidden: string[] }
+  const histRef = useRef<Record<string, Snap[]>>({})
   const lastTap = useRef<{ t: number; u: V } | null>(null)
   const [eraseDrag, setEraseDrag] = useState<{ a: V; b: V } | null>(null)
   const lastErase = useRef<{ t: number; u: V; changed: boolean } | null>(null)
@@ -102,7 +127,7 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
   const stage = FAMILY_STAGES[stageIdx]
   const ch = stage.members[memberIdx]
   const strokes = familyStrokes(presets, links, edits, ch)
-  const touched = (c: string) => Object.values(edits.moves[c] ?? {}).some((pts) => Object.values(pts).some((d) => d.x || d.y)) || !!edits.drawn?.[c]?.paths.length
+  const touched = (c: string) => Object.values(edits.moves[c] ?? {}).some((pts) => Object.values(pts).some((d) => d.x || d.y)) || !!edits.drawn?.[c]?.paths.length || !!edits.hidden?.[c]?.length
   const inherits = (c: string) => Object.values(links[c] ?? {}).some((row) => row.some(Boolean))
   const parentsOf = (c: string) => [...new Set(Object.values(links[c] ?? {}).flatMap((row) => row.filter(Boolean).map((l) => l!.parent)))]
   const affected = (c: string, depth = 0): boolean => touched(c) || (depth < 6 && parentsOf(c).some((p) => affected(p, depth + 1)))
@@ -112,14 +137,22 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
 
   const drawn: DrawnJamo = edits.drawn?.[ch] ?? emptyDrawn()
   const thickness = presets[ch]?.[0]?.thickness ?? 0.08
+  const hiddenOwn = edits.hidden?.[ch] ?? []
+  const snapNow = (): Snap => ({ drawn, hidden: hiddenOwn })
+  const presetIds = (presets[ch] ?? []).map((s) => s.id)
+  const allPresetsOut = presetIds.length > 0 && presetIds.every((id) => hiddenOwn.includes(id))
   const setDrawn = (next: DrawnJamo) => {
     if (next === drawn) return
-    ;(histRef.current[ch] ??= []).push(drawn)
+    ;(histRef.current[ch] ??= []).push(snapNow())
     setEdits((ed) => ({ ...ed, drawn: { ...ed.drawn, [ch]: next } }))
+  }
+  const setHidden = (next: string[]) => {
+    ;(histRef.current[ch] ??= []).push(snapNow())
+    setEdits((ed) => ({ ...ed, hidden: { ...ed.hidden, [ch]: next } }))
   }
   const undoDrawn = () => {
     const prev = histRef.current[ch]?.pop()
-    if (prev) setEdits((ed) => ({ ...ed, drawn: { ...ed.drawn, [ch]: prev } }))
+    if (prev) setEdits((ed) => ({ ...ed, drawn: { ...ed.drawn, [ch]: prev.drawn }, hidden: { ...ed.hidden, [ch]: prev.hidden } }))
   }
   const clearTransient = () => { setEraseDrag(null); setLineA(null); setSketch(null); setNib(null); setEndDrag(null); setRulerSel(null) }
   const setTool = (t: Tool) => { clearTransient(); setToolState(t) }
@@ -230,12 +263,17 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
     if (tap && lt && now - lt.t < 400 && Math.hypot(lt.u[0] - a[0], lt.u[1] - a[1]) < 2) {
       lastErase.current = null
       const hist = (histRef.current[ch] ??= [])
-      const base = lt.changed && hist.length ? hist[hist.length - 1] : drawn
+      const base = lt.changed && hist.length ? hist[hist.length - 1].drawn : drawn
       const hit = pathAt(base, a)
-      if (hit) {
+      const preset = hit ? null : presetStrokeAt(strokes, a)
+      if (hit || preset) {
         if (lt.changed) hist.pop()
-        hist.push(base)
-        setEdits((ed) => ({ ...ed, drawn: { ...ed.drawn, [ch]: removePath(base, hit.id) } }))
+        hist.push({ drawn: base, hidden: hiddenOwn })
+        /* 그은 선이면 통째로 지우고, 프리셋 획이면 숨긴다(이어받던 뒤 자모 획도 같이 빠진다) */
+        setEdits((ed) => hit
+          ? { ...ed, drawn: { ...ed.drawn, [ch]: removePath(base, hit.id) } }
+          : { ...ed, drawn: { ...ed.drawn, [ch]: base }, hidden: { ...ed.hidden, [ch]: [...hiddenOwn, preset!] } })
+        if (picked === preset) setPicked(null)
         return
       }
     }
@@ -260,7 +298,8 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
     const moves = { ...ed.moves }; delete moves[ch]
     const cut = { ...ed.cut }; delete cut[ch]
     const drawnAll = { ...ed.drawn }; delete drawnAll[ch]
-    return { moves, cut, drawn: drawnAll }
+    const hidden = { ...ed.hidden }; delete hidden[ch]
+    return { moves, cut, drawn: drawnAll, hidden }
   })
 
   const unit = CANVAS / GRID
@@ -320,7 +359,7 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
               if (!q) return null
               return <circle key={`e${p.id}${which}`} cx={q[0] * CANVAS / 100} cy={q[1] * CANVAS / 100} r={7} fill={EDIT_COLOR.surface} stroke={EDIT_COLOR.editSlotCh} strokeWidth={2.5}
                 style={{ cursor: 'grab' }} data-testid={`family-drawn-end-${p.id}-${which}`}
-                onPointerDown={(ev) => { ev.stopPropagation(); setPicked(`d${p.id}`); (ev.currentTarget.ownerSVGElement as SVGSVGElement).setPointerCapture(ev.pointerId); (histRef.current[ch] ??= []).push(drawn); setEndDrag({ pathId: p.id, which }) }} />
+                onPointerDown={(ev) => { ev.stopPropagation(); setPicked(`d${p.id}`); (ev.currentTarget.ownerSVGElement as SVGSVGElement).setPointerCapture(ev.pointerId); (histRef.current[ch] ??= []).push(snapNow()); setEndDrag({ pathId: p.id, which }) }} />
             })
           })}
           {/* 미리보기 */}
@@ -352,7 +391,7 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
         <p className={styles.toolHint}>{tool === 'edit' ? '점을 끌어 고친다. 그은 선의 주황 끝점은 그 선의 자를 따라 늘고 준다.'
           : tool === 'circle' ? '누른 칸 자리에 원 자를 놓는다. 놓인 자를 누르면 고른다.'
           : tool === 'line' ? '점 두 개를 찍어 직선 자를 놓는다. 자끼리 만나는 점 · 칸 자리에 붙는다.'
-          : tool === 'erase' ? '칸을 누르면 그 칸 안의 펜 선이 잘려 나가고, 끌면 네모만큼 한꺼번에. 선을 두 번 톡 누르면 통째로 지운다. 자와 원래 획은 지우지 않는다(자는 고를 때 나오는 \'이 자 빼기\'로).'
+          : tool === 'erase' ? '칸을 누르면 그 칸 안의 펜 선이 잘려 나가고, 끌면 네모만큼 한꺼번에. 선을 두 번 톡 누르면 통째로 지운다. 프리셋 획은 두 번 톡으로 그 획만 빠진다(이어받던 뒤 자모 획도 같이). 되돌리기나 \'이 자모 처음으로\'로 살아난다.'
           : '누르고 끌면 손 긋기, 톡 누르면 펜촉(다음 톡마다 마디, 두 번 톡이나 Esc로 끝). 자 위에서 시작하면 그 자를 벗어나지 않고, 자 밖에서 시작하면 자 가까이서 붙는다. 자 없는 곳엔 칸에 맞는 자가 새로 생긴다.'}</p>
         <div className={styles.legend}><span><i data-k="linked" />앞 자모에서 이어 옴</span><span><i data-k="own" />이 자모 것 · 끌어서 고침</span></div>
         <div className={styles.actions}>
@@ -360,6 +399,7 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
           {pickedStroke && pickedTie !== 'own' && <Button size="sm" onClick={() => setEdits((ed) => cutFamilyStroke(presets, links, ed, ch, pickedStroke.id))} data-testid="family-cut"><Unlink />이 획만 따로(끊기)</Button>}
           {pickedCut && <Button size="sm" onClick={() => setEdits((ed) => relinkFamilyStroke(ed, ch, picked!))} data-testid="family-relink"><Link2 />다시 잇기</Button>}
           {rulerSel && <Button size="sm" onClick={() => { setDrawn(removeRuler(drawn, rulerSel)); setRulerSel(null) }} data-testid="family-ruler-remove"><Trash2 />이 자 빼기</Button>}
+          {presetIds.length > 0 && <Button size="sm" onClick={() => { setHidden(allPresetsOut ? [] : presetIds); setPicked(null) }} data-testid="family-presets-toggle"><Trash2 />{allPresetsOut ? '프리셋 다시 넣기' : '프리셋 다 빼기'}</Button>}
           <Button size="sm" onClick={resetJamo} disabled={!touched(ch) && !edits.cut[ch]?.length && !drawn.circles.length && !drawn.lines.length}><RotateCcw />이 자모 처음으로</Button>
           <Button size="sm" variant="primary" onClick={() => step(1)} disabled={stageIdx === FAMILY_STAGES.length - 1 && memberIdx === stage.members.length - 1} data-testid="family-next">다음<ChevronRight /></Button>
         </div>
