@@ -150,6 +150,14 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
     ;(histRef.current[ch] ??= []).push(snapNow())
     setEdits((ed) => ({ ...ed, hidden: { ...ed.hidden, [ch]: next } }))
   }
+  /* 전체 지우기 — 프리셋 획 · 자 · 펜 선을 한 번에 비운다. 되돌리기 한 번이나 '이 자모 처음으로'로 돌아온다 */
+  const isBlank = allPresetsOut && !drawn.circles.length && !drawn.lines.length && !drawn.paths.length
+  const clearAll = () => {
+    if (isBlank) return
+    ;(histRef.current[ch] ??= []).push(snapNow())
+    clearTransient(); setPicked(null)
+    setEdits((ed) => ({ ...ed, drawn: { ...ed.drawn, [ch]: { ...emptyDrawn(), nid: drawn.nid } }, hidden: { ...ed.hidden, [ch]: presetIds } }))
+  }
   const undoDrawn = () => {
     const prev = histRef.current[ch]?.pop()
     if (prev) setEdits((ed) => ({ ...ed, drawn: { ...ed.drawn, [ch]: prev.drawn }, hidden: { ...ed.hidden, [ch]: prev.hidden } }))
@@ -383,6 +391,7 @@ export function FamilyCanvas({ start, compact }: { start?: string; compact?: boo
           {([['edit', '고치기'], ['circle', '◯ 원 자'], ['line', '╱ 직선 자'], ['pen', '✏️ 펜'], ['erase', '🧽 지우개']] as const).map(([k, label]) =>
             <Button key={k} size="sm" variant="chip" aria-pressed={tool === k} onClick={() => setTool(k)} data-testid={`family-tool-${k}`}>{label}</Button>)}
           <Button size="sm" variant="outline" onClick={undoDrawn} disabled={!histRef.current[ch]?.length} data-testid="family-undo"><Undo2 />되돌리기</Button>
+          <Button size="sm" variant="outline" onClick={clearAll} disabled={isBlank} data-testid="family-clear-all"><Trash2 />전체 지우기</Button>
         </div>
         {/* 크기 줄은 늘 자리를 잡아 둔다 — 도구를 바꿀 때 팝업이 들썩이지 않게 */}
         {<div className={styles.tools} data-hidden={tool !== 'circle' || undefined}>
