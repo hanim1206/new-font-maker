@@ -20,7 +20,7 @@ import { Pressable } from './components/ui/pressable'
 import { Switch } from './components/ui/switch'
 import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type FenceLine, type FencePull } from './fenceBand'
-import { applyPartEdits, appliedWeight, bigBoxes, dirOf, dragLook, dragPart, editsBetween, gapCapMultiplier, lookOf, regionLabels, scaledWeight, simsBoxes, simsPartOf, type Dir, type GapStroke, type LayoutEdits, type Look, type Region, type SimsPart } from './moldLab'
+import { applyPartEdits, appliedWeight, dirOf, dragGrip, dragLook, dragWhole, editsBetween, gripAt, lookBoxes, lookRect, wholeGripAt, type BoxGrip, type Rect, type WholeGrip, gapCapMultiplier, lookOf, regionLabels, scaledWeight, simsBoxes, simsPartOf, type Dir, type GapStroke, type LayoutEdits, type Look, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement } from './notoModel'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
@@ -36,15 +36,19 @@ import styles from './MoldLabPage.module.css'
  */
 
 const FIRST_SENTENCE = '아버지가 바다 너머 저기 산다'
-type Step = 'draw' | 'mold'
-const STEP_NAMES: Record<Step, string> = { draw: '긋기', mold: '빚기' }
-const STEP_ORDER: readonly Step[] = ['draw', 'mold']
+// 빚기는 두 걸음: 인상 잡기(전체 먼저) → 부위 다듬기(다람쥐 검수 10번, 하니무스 2026-11-21 승인).
+type Step = 'draw' | 'shape' | 'part'
+const STEP_NAMES: Record<Step, string> = { draw: '긋기', shape: '인상 잡기', part: '부위 다듬기' }
+const STEP_ORDER: readonly Step[] = ['draw', 'shape', 'part']
 
 /** 그은 줄기를 자모에 입힌 것. 닿자는 짜임마다 칸 비율이 달라 짜임별로 따로. */
 interface Drawn {
   jungseong?: Readonly<Record<string, JamoData>>
   consonants: Record<LayoutType, { choseong: Record<string, JamoData>; jongseong: Record<string, JamoData> }>
 }
+
+/** 굵게 할 때 자소 칸을 키워 보는 비율(작은 것부터). 거북이 표: 굵기 1%p마다 자소가 0.3~0.6% 커진다 — 900(두께 ×1.95)이면 4%쯤, 넉넉히 12%까지. */
+const JAMO_GROWS: readonly number[] = [1, 1.03, 1.06, 1.09, 1.12]
 
 const SLOT_COLOR: Record<SimsPart, string> = { CH: EDIT_COLOR.editSlotCh, JU: EDIT_COLOR.editSlotJu, JO: EDIT_COLOR.editSlotJo }
 
@@ -125,35 +129,44 @@ function fencedBoxes(input: { syllable: DecomposedSyllable; baseSyllable: Decomp
   return { boxes: fence.on ? movedBoxes(current, correction.moves) : current, pulls: [...pulls, ...correction.pulls], need }
 }
 
-/** 칸 편집(짜임) → 폭(전체) 순서로 입힌 칸. 편집은 폭을 뺀 글자 단위다. */
+/** 칸 편집(짜임) → 크기 · 키 · 폭(전체) 순서로 입힌 칸. 편집은 폭을 뺀 글자 단위다. */
 function moldedBoxes(boxes: Partial<Record<Part, BoxConfig>>, layout: LayoutType, edits: LayoutEdits, look: Look) {
-  return bigBoxes(applyPartEdits(boxes, edits[layout]), { frame: lookOf(look, 'frame') })
+  return lookBoxes(applyPartEdits(boxes, edits[layout]), look)
 }
 
 /**
  * 빚은 글자 하나. 칸을 풀고, 짜임 편집 · 폭 · 굵기 · 끝 모양을 차례로 입혀 그린다.
  * `sel`이 있으면 고른 부위만 제 색으로, 나머지는 옅게 그린다.
  */
-function MoldGlyph({ char, size, edits, look, drawn, sel, shownStroke, testId, weightCap = Infinity, onCap, fence, onFence }: { char: string; size: number; edits: LayoutEdits; look: Look; drawn?: Drawn; sel?: Region | null; shownStroke?: (key: string) => boolean; testId?: string; weightCap?: number; onCap?: (ratio: number) => void; fence?: MoldFence; onFence?: (need: number, pulls: readonly FencePull[]) => void }) {
+function MoldGlyph({ char, size, edits, look, drawn, sel, shownStroke, testId, onCap, fence, onFence }: { char: string; size: number; edits: LayoutEdits; look: Look; drawn?: Drawn; sel?: Region | null; shownStroke?: (key: string) => boolean; testId?: string; weightCap?: number; onCap?: (grow: number, limited: boolean) => void; fence?: MoldFence; onFence?: (need: number, pulls: readonly FencePull[]) => void }) {
   const { syllable, effective, placement, padding } = useGlyphBase(char, drawn)
   const base = useGlyphBase(char, undefined)
   const molded = useMemo(() => placement.kind === 'boxes' ? moldedBoxes(placement.boxes, syllable.layoutType, edits, look) : undefined, [placement, syllable.layoutType, edits, look])
-  // 울타리: 그은 획 때문에 칸 밖으로 나간 것을 당긴다. 기준 글자는 그은 게 없을 때 같은 칸의 모습.
-  const fenced = useMemo(() => fence && molded ? fencedBoxes({ syllable, baseSyllable: drawn ? base.syllable : syllable, boxes: molded, style: effective, padding, fence }) : null, [fence, molded, syllable, base.syllable, drawn, effective, padding])
-  useEffect(() => { if (fenced) onFence?.(fenced.need, fenced.pulls) }, [onFence, fenced])
-  const boxes = fenced?.boxes ?? molded
 
-  // 획 사이 최소 틈: 이 글자가 버틸 수 있는 굵기 비율을 재서 올린다. 글줄은 가장 작은 비율을 다 같이 쓴다.
-  const capRatio = useMemo(() => {
-    if (!onCap || placement.kind !== 'boxes' || !boxes) return Infinity
+  // 굵게 해도 멈추지 않는다. 획이 붙을 자리(ㄹ 가로 사이 등)가 생기면 자소 칸을 조금씩 키워 그 안의 틈을 낸다 —
+  // 굵은 폰트도 자소가 줄지 않고 조금 커지며, 자소 사이 틈이 대신 준다(거북이 자소별 표 2절). 키워도 모자라면 그 글자만 그 자리에서 멈춘다.
+  const wanted = lookOf(look, 'weight')
+  const grown = useMemo(() => {
+    if (!molded || placement.kind !== 'boxes' || wanted <= 1) return { boxes: molded, grow: 1, ratio: wanted }
     const ref = gapStrokesOf(syllable, placement, effective.linecap, effective.linejoin)
-    const cur = gapStrokesOf(syllable, { kind: 'boxes', boxes }, effective.linecap, effective.linejoin)
-    const capM = gapCapMultiplier(ref, cur, weightToMultiplier(effective.weight))
-    return capM === Infinity ? Infinity : weightUnder(capM, 100) / effective.weight
-  }, [onCap, placement, boxes, syllable, effective])
-  useEffect(() => { onCap?.(capRatio) }, [onCap, capRatio])
-  // 굵게 할 때만 틈이 바닥 아래로 가지 않는 데서 멈춘다. 칸을 만져서는 굵기가 안 바뀐다.
-  const ratio = appliedWeight(lookOf(look, 'weight'), weightCap)
+    const baseM = weightToMultiplier(effective.weight)
+    const wantedM = weightToMultiplier(scaledWeight(effective.weight, wanted))
+    let capM = Infinity
+    for (const grow of JAMO_GROWS) {
+      const candidate = grow === 1 ? molded : scaledBoxes(molded, grow)
+      capM = gapCapMultiplier(ref, gapStrokesOf(syllable, { kind: 'boxes', boxes: candidate }, effective.linecap, effective.linejoin), baseM, 0)
+      if (capM >= wantedM) return { boxes: candidate, grow, ratio: wanted }
+    }
+    const last = JAMO_GROWS[JAMO_GROWS.length - 1]
+    return { boxes: scaledBoxes(molded, last), grow: last, ratio: Math.max(1, weightUnder(capM, 100) / effective.weight) }
+  }, [molded, placement, wanted, syllable, effective])
+  useEffect(() => { onCap?.(grown.grow, grown.ratio < wanted) }, [onCap, grown, wanted])
+
+  // 울타리: 그은 획 때문에 칸 밖으로 나간 것을 당긴다. 기준 글자는 그은 게 없을 때 같은 칸의 모습.
+  const fenced = useMemo(() => fence && grown.boxes ? fencedBoxes({ syllable, baseSyllable: drawn ? base.syllable : syllable, boxes: grown.boxes, style: effective, padding, fence }) : null, [fence, grown.boxes, syllable, base.syllable, drawn, effective, padding])
+  useEffect(() => { if (fenced) onFence?.(fenced.need, fenced.pulls) }, [onFence, fenced])
+  const boxes = fenced?.boxes ?? grown.boxes
+  const ratio = grown.ratio
   const soft = lookOf(look, 'soft') > 0.5
   const globalStyle = useMemo(() => {
     const weighted = ratio === 1 ? effective : { ...effective, weight: scaledWeight(effective.weight, ratio) }
@@ -167,7 +180,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, shownStroke, testId, w
   }, [sel, shownStroke])
 
   // 폭이 좁아지면 글자 칸도 같이 좁힌다. 자간은 글자 사이를 더하거나 뺀다.
-  const slot = { width: size * lookOf(look, 'frame') + size * lookOf(look, 'tracking'), marginInline: 0 }
+  const slot = { width: size * lookOf(look, 'frame') * lookOf(look, 'size') + size * lookOf(look, 'tracking'), marginInline: 0 }
   return <span className={styles.glyph} style={slot} data-testid={testId}>
     <SvgRenderer
       syllable={syllable}
@@ -299,12 +312,13 @@ function useSpring(target: Record<string, number>): Record<string, number> {
     }
     frame.current = requestAnimationFrame(step)
   }, [key])
-  useEffect(() => () => { if (frame.current !== null) cancelAnimationFrame(frame.current) }, [])
+  // 개발 모드(StrictMode)는 효과를 한 번 껐다 켠다. 끌 때 표시를 지워야 다시 켤 때 스프링이 돈다.
+  useEffect(() => () => { if (frame.current !== null) cancelAnimationFrame(frame.current); frame.current = null }, [])
   return cur.current
 }
 
 const PARTS: readonly SimsPart[] = ['CH', 'JU', 'JO']
-const LOOK_KEYS = ['weight', 'soft', 'frame', 'tracking'] as const
+const LOOK_KEYS = ['weight', 'soft', 'frame', 'tracking', 'size', 'height'] as const
 const ZERO_EDIT = [0, 0, 0, 0] as const
 const STAGE = 220
 const DIRS: readonly { dir: Dir; x: number; y: number; arrow: string }[] = [
@@ -313,49 +327,80 @@ const DIRS: readonly { dir: Dir; x: number; y: number; arrow: string }[] = [
   { dir: 'ul', x: 18, y: 17, arrow: '↖' }, { dir: 'ur', x: 82, y: 17, arrow: '↗' },
   { dir: 'dl', x: 18, y: 83, arrow: '↙' }, { dir: 'dr', x: 82, y: 83, arrow: '↘' },
 ]
-const REGION_BUTTONS: readonly { region: Region; name: string; color: string }[] = [
+const REGION_BUTTONS: readonly { region: SimsPart; name: string; color: string }[] = [
   { region: 'CH', name: '첫닿자', color: EDIT_COLOR.editSlotCh }, { region: 'JU', name: '홀자', color: EDIT_COLOR.editSlotJu },
-  { region: 'JO', name: '받침', color: EDIT_COLOR.editSlotJo }, { region: 'STROKE', name: '획', color: EDIT_COLOR.editSelect },
-  { region: 'WHOLE', name: '전체', color: EDIT_COLOR.text5 },
+  { region: 'JO', name: '받침', color: EDIT_COLOR.editSlotJo },
 ]
+/** 손잡이 잡는 폭(px). 폰 손가락 크기. */
+const GRIP_PX = 16
+const pct = (value: number) => `${(value * 100).toFixed(2)}%`
+const signed = (value: number) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`
 
 function labelOf(dir: Dir, labels: { up: string; down: string; left: string; right: string }): string {
   if (dir === 'up' || dir === 'down' || dir === 'left' || dir === 'right') return labels[dir]
-  return `${labels[dir[0] === 'u' ? 'up' : 'down']} · ${labels[dir[1] === 'l' ? 'left' : 'right']}`
+  return [labels[dir[0] === 'u' ? 'up' : 'down'], labels[dir[1] === 'l' ? 'left' : 'right']].filter(Boolean).join(' · ')
 }
 
-/** 2단계: 심즈처럼 빚기. 큰 글자에서 부위를 콕 고르고 어디서든 여덟 방향으로 끈다. */
-function SimsStep({ char, drawn, edits, setEdits, look, setLook, weightCap, sel, setSel, onBegin, fence }: {
+type Mode = 'shape' | 'part'
+type Grab = { x0: number; y0: number; moved: boolean; start: Partial<Record<SimsPart, BoxConfig>>; look: Look; grip?: BoxGrip; whole?: WholeGrip; last?: string; lastX?: number; lastY?: number }
+
+/**
+ * 빚기 무대. 두 걸음이 같은 큰 글자를 쓴다.
+ * - 인상 잡기(shape): 네모꼴 테두리 — 모서리 = 크기, 위 · 아래 변 = 키, 왼 · 오른 변 = 폭. 글자 안쪽을 위아래로 끌면 굵기, 좌우로 끌면 끝 둥글기.
+ * - 부위 다듬기(part): 부위를 콕 골라 칸 상자의 네 변 · 가운데를 끌거나(기존 한글칸글 상자 조절처럼), 상자 밖에서 여덟 방향으로 끈다(심즈 방식).
+ */
+function SimsStep({ mode, char, drawn, edits, setEdits, look, setLook, weightCap, weightNote, sel, setSel, onBegin, fence }: {
+  mode: Mode
   fence?: MoldFence
   char: string; drawn?: Drawn; edits: LayoutEdits; setEdits: (update: (now: LayoutEdits) => LayoutEdits) => void
-  look: Look; setLook: (next: Look) => void; weightCap: number; sel: Region | null; setSel: (region: Region | null) => void; onBegin: () => void
+  look: Look; setLook: (next: Look) => void; weightCap: number; weightNote?: string; sel: Region | null; setSel: (region: Region | null) => void; onBegin: () => void
 }) {
-  const { syllable, placement } = useGlyphBase(char, drawn)
+  const { syllable, placement, padding, effective } = useGlyphBase(char, drawn)
   const layout = syllable.layoutType
   const origin = useMemo(() => placement.kind === 'boxes' ? simsBoxes(placement.boxes) : {}, [placement])
   const present: Record<SimsPart, boolean> = { CH: !!syllable.choseong, JU: !!syllable.jungseong, JO: !!syllable.jongseong }
+  const part: SimsPart | null = mode === 'part' && (sel === 'CH' || sel === 'JU' || sel === 'JO') && present[sel] ? sel : null
+  const body: Rect = useMemo(() => [padding.left, padding.top, 1 - padding.right, 1 - padding.bottom], [padding])
   const [dir, setDir] = useState<Dir | null>(null)
   const [pressing, setPressing] = useState(false)
-  const grab = useRef<{ x0: number; y0: number; moved: boolean; start: Partial<Record<SimsPart, BoxConfig>>; look: Look } | null>(null)
+  const [gripOn, setGripOn] = useState<string | null>(null)
+  const grab = useRef<Grab | null>(null)
+  const [bump, setBump] = useState(0)
+  const lastBump = useRef(0)
+  const bumpWall = () => { const now = Date.now(); if (now - lastBump.current > 450) { lastBump.current = now; setBump((n) => n + 1) } }
   const svgHost = useRef<HTMLDivElement>(null)
 
   // 큰 글자만 젤리로 따라온다(글줄은 손 그대로).
   const target = useMemo(() => {
     const out: Record<string, number> = { press: pressing ? 0.96 : 1 }
-    for (const part of PARTS) (edits[layout]?.[part] ?? ZERO_EDIT).forEach((value, i) => { out[`${part}${i}`] = value })
+    for (const one of PARTS) (edits[layout]?.[one] ?? ZERO_EDIT).forEach((value, i) => { out[`${one}${i}`] = value })
     for (const key of LOOK_KEYS) out[key] = lookOf(look, key)
     return out
   }, [edits, layout, look, pressing])
   const shown = useSpring(target)
   // shown은 같은 객체를 고쳐 쓰므로 매번 새로 만든다(스프링이 돌 때마다 다시 그린다).
-  const shownEdits: LayoutEdits = { [layout]: Object.fromEntries(PARTS.map((part) => [part, [0, 1, 2, 3].map((i) => shown[`${part}${i}`] ?? 0)])) }
-  const shownLook: Look = { weight: shown.weight, soft: shown.soft, frame: shown.frame, tracking: shown.tracking }
+  const shownEdits: LayoutEdits = { [layout]: Object.fromEntries(PARTS.map((one) => [one, [0, 1, 2, 3].map((i) => shown[`${one}${i}`] ?? 0)])) }
+  const shownLook: Look = Object.fromEntries(LOOK_KEYS.map((key) => [key, shown[key]]))
 
-  const frame = lookOf(look, 'frame')
+  /** 화면 좌표 → 글자 단위(큰 글자 svg 기준). */
+  const glyphPoint = (clientX: number, clientY: number) => {
+    const svg = svgHost.current?.querySelector('svg')
+    if (!svg) return null
+    const rect = svg.getBoundingClientRect()
+    return { x: (clientX - rect.left) / rect.width, y: (clientY - rect.top) / rect.width, unit: rect.width }
+  }
+  const nowBoxes = () => placement.kind === 'boxes' ? simsBoxes(moldedBoxes(placement.boxes, layout, edits, look)) : {}
+
   const begin = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (placement.kind !== 'boxes') return
     event.currentTarget.setPointerCapture(event.pointerId)
-    grab.current = { x0: event.clientX, y0: event.clientY, moved: false, start: simsBoxes(applyPartEdits(placement.boxes, edits[layout])), look }
+    const at = glyphPoint(event.clientX, event.clientY)
+    const tol = at ? GRIP_PX / at.unit : 0
+    let grip: BoxGrip | undefined, whole: WholeGrip | undefined
+    if (at && mode === 'shape') whole = wholeGripAt(lookRect(body, look), at.x, at.y, tol)
+    if (at && part) { const box = nowBoxes()[part]; if (box) grip = gripAt(box, at.x, at.y, tol) }
+    grab.current = { x0: event.clientX, y0: event.clientY, moved: false, start: simsBoxes(applyPartEdits(placement.boxes, edits[layout])), look, grip, whole }
+    setGripOn(whole ?? grip ?? null)
   }
   const move = (event: ReactPointerEvent<HTMLDivElement>) => {
     const g = grab.current
@@ -363,65 +408,104 @@ function SimsStep({ char, drawn, edits, setEdits, look, setLook, weightCap, sel,
     let dx = event.clientX - g.x0, dy = event.clientY - g.y0
     if (!g.moved) {
       const len = Math.hypot(dx, dy)
-      if (len < 8) return
-      if (!sel) { grab.current = null; return }
-      // 문턱(8px)만큼 툭 뛰지 않게 기준점을 옮긴다.
-      g.moved = true; g.x0 += dx * 8 / len; g.y0 += dy * 8 / len
+      if (len < 6) return
+      // 부위 다듬기의 끌기는 하나: 변은 그 변만, 가운데(칸 안)는 자리 옮기기. 칸 밖에서 끌면 아무것도 안 한다.
+      if (mode === 'part' && (!part || !g.grip)) { grab.current = null; setGripOn(null); return }
+      // 문턱만큼 툭 뛰지 않게 기준점을 옮긴다.
+      g.moved = true; g.x0 += dx * 6 / len; g.y0 += dy * 6 / len
       dx = event.clientX - g.x0; dy = event.clientY - g.y0
-      onBegin(); setPressing(true)
+      onBegin(); setPressing(!g.grip && !g.whole)
+    }
+    const unit = glyphPoint(0, 0)?.unit ?? STAGE
+    // 손잡이는 손 그대로(1:1), 어디서든 끌기는 조금 느리게.
+    // 벽: 손은 더 갔는데 값이 그대로면 젤리로 툭 튕겨 알린다.
+    const wall = (out: unknown) => {
+      const key = JSON.stringify(out)
+      if (g.last === key && Math.hypot(event.clientX - (g.lastX ?? event.clientX), event.clientY - (g.lastY ?? event.clientY)) > 3) bumpWall()
+      if (g.last !== key) { g.last = key; g.lastX = event.clientX; g.lastY = event.clientY }
+    }
+    if (g.whole) { const next = dragWhole(g.look, body, g.whole, dx / unit, dy / unit); wall(next); setLook(next); return }
+    const frameX = lookOf(look, 'frame') * lookOf(look, 'size'), frameY = lookOf(look, 'height') * lookOf(look, 'size')
+    if (g.grip && part) {
+      const next = dragGrip(g.start, origin, part, g.grip, dx / unit / frameX, dy / unit / frameY)
+      wall(next[part])
+      setEdits((now) => ({ ...now, [layout]: editsBetween(origin, next) }))
+      return
     }
     setDir(dirOf(dx, dy))
     const du = dx / STAGE * 0.8, dv = dy / STAGE * 0.8
-    if (sel === 'CH' || sel === 'JU' || sel === 'JO') {
-      if (!present[sel]) return
-      const next = dragPart(g.start, origin, sel, du / frame, dv, layout)
-      setEdits((now) => ({ ...now, [layout]: editsBetween(origin, next) }))
-    } else if (sel) setLook(dragLook(g.look, sel, du, dv))
+    if (mode === 'shape') { const next = dragLook(g.look, 'STROKE', du, dv); wall(next); setLook(next) }
   }
   const end = (event: ReactPointerEvent<HTMLDivElement>) => {
     const g = grab.current
     grab.current = null
-    setDir(null); setPressing(false)
-    if (!g || g.moved || placement.kind !== 'boxes') return
-    // 콕: 누른 자리의 부위를 고른다. 칸에서 멀면 글자 전체.
-    const svg = svgHost.current?.querySelector('svg')
-    if (!svg) return
-    const rect = svg.getBoundingClientRect()
-    const x = (event.clientX - rect.left) / rect.width, y = (event.clientY - rect.top) / rect.width
-    const boxes = simsBoxes(moldedBoxes(placement.boxes, layout, edits, look))
+    setDir(null); setPressing(false); setGripOn(null)
+    if (!g || g.moved || placement.kind !== 'boxes' || mode !== 'part') return
+    // 콕: 누른 자리의 부위를 고른다. 칸 상자 손잡이를 콕 누른 것은 고르기가 아니다.
+    if (g.grip) return
+    const at = glyphPoint(event.clientX, event.clientY)
+    if (!at) return
+    const boxes = nowBoxes()
     let best: { part: SimsPart; d: number } | null = null
-    for (const part of PARTS) {
-      const box = boxes[part]
-      if (!box || !present[part]) continue
-      const ddx = Math.max(box.x - x, 0, x - box.x - box.width), ddy = Math.max(box.y - y, 0, y - box.y - box.height)
+    for (const one of PARTS) {
+      const box = boxes[one]
+      if (!box || !present[one]) continue
+      const ddx = Math.max(box.x - at.x, 0, at.x - box.x - box.width), ddy = Math.max(box.y - at.y, 0, at.y - box.y - box.height)
       const d = Math.hypot(ddx, ddy) - (ddx === 0 && ddy === 0 ? box.width * box.height : 0) // 겹치면 작은 칸 먼저
-      if (!best || d < best.d) best = { part, d }
+      if (!best || d < best.d) best = { part: one, d }
     }
-    setSel(best && best.d < 0.06 ? best.part : 'WHOLE')
+    if (best && best.d < 0.06) setSel(best.part)
   }
 
-  const labels = sel ? regionLabels(sel, layout) : null
-  const now = sel === 'CH' || sel === 'JU' || sel === 'JO'
-    ? (() => { const box = placement.kind === 'boxes' ? simsBoxes(applyPartEdits(placement.boxes, edits[layout]))[sel] : undefined; return box ? `가로 ${Math.round(box.width * 100)} · 세로 ${Math.round(box.height * 100)}` : '이 글자엔 없어요' })()
-    : sel === 'STROKE' ? `굵기 ×${appliedWeight(lookOf(look, 'weight'), weightCap).toFixed(2)} · 끝 ${lookOf(look, 'soft') > 0.5 ? '흐물' : '또렷'}${appliedWeight(lookOf(look, 'weight'), weightCap) < lookOf(look, 'weight') ? ' · 틈 지키려고 멈춤' : ''}`
-      : sel === 'WHOLE' ? `폭 ×${frame.toFixed(2)} · 자간 ${lookOf(look, 'tracking') >= 0 ? '+' : ''}${Math.round(lookOf(look, 'tracking') * 100)}%` : ''
-
-  return <section className={styles.panel} aria-label="빚기">
-    <div className={styles.stage} onPointerDown={begin} onPointerMove={move} onPointerUp={end} onPointerCancel={end} data-testid="mold-stage">
-      <div ref={svgHost} className={styles.stageGlyph} style={{ transform: `scale(${(shown.press ?? 1).toFixed(4)})` }}>
-        <MoldGlyph char={char} size={STAGE} edits={shownEdits} look={shownLook} drawn={drawn} sel={sel} weightCap={weightCap} fence={fence} testId="mold-focus" />
+  // 무대 위 손잡이 그림. 큰 글자 svg와 같은 자리(무대 가운데 STAGE px 네모)에 깐다.
+  const overlay = (() => {
+    if (mode === 'shape') {
+      const [x0, y0, x1, y1] = lookRect(body, shownLook)
+      return <div className={styles.frameBox} style={{ left: pct(x0), top: pct(y0), width: pct(x1 - x0), height: pct(y1 - y0) }} data-testid="mold-frame">
+        {(['t', 'b', 'l', 'r', 'tl', 'tr', 'bl', 'br'] as const).map((grip) => <span key={grip} className={styles.grip} data-grip={grip} data-on={gripOn === grip || undefined} />)}
       </div>
-      {labels ? DIRS.map(({ dir: d, x, y, arrow }) => <span key={d} className={styles.arrow} data-corner={d.length === 2 || undefined} data-on={dir === d || undefined} data-off={(dir && dir !== d) || undefined} style={{ left: `${x}%`, top: `${y}%` }} data-testid={`mold-arrow-${d}`}>
-        {x < 50 ? `${arrow} ${labelOf(d, labels)}` : x > 50 ? `${labelOf(d, labels)} ${arrow}` : `${arrow} ${labelOf(d, labels)}`}
-      </span>) : <span className={styles.tapNote}>만질 곳을 콕 누르세요</span>}
+    }
+    if (!part || placement.kind !== 'boxes') return null
+    const box = simsBoxes(moldedBoxes(placement.boxes, layout, shownEdits, shownLook))[part]
+    if (!box) return null
+    return <div className={styles.partBox} style={{ left: pct(box.x), top: pct(box.y), width: pct(box.width), height: pct(box.height), borderColor: SLOT_COLOR[part] }} data-testid="mold-partbox">
+      {(['t', 'b', 'l', 'r', 'move'] as const).map((grip) => <span key={grip} className={styles.grip} data-grip={grip} data-on={gripOn === grip || undefined} style={{ background: SLOT_COLOR[part] }} />)}
     </div>
-    <p className={styles.simsReadout} data-testid="mold-readout">{labels ? <><strong>{labels.name}</strong> {now}</> : ' '}</p>
-    <ChoiceGroup variant="segment" aria-label="부위" className={styles.regions}>
-      {REGION_BUTTONS.map(({ region, name, color }) => <ChoiceItem key={region} checked={sel === region} disabled={(region === 'CH' || region === 'JU' || region === 'JO') && !present[region]} onClick={() => setSel(region)} data-testid={`mold-region-${region}`}>
+  })()
+
+  // 여덟 방향 알약은 인상 잡기(굵기 · 끝 둥글기)에만. 부위 다듬기는 칸 상자 손잡이 하나로.
+  const showArrows = !gripOn && mode === 'shape'
+  const labels = mode === 'shape' ? regionLabels('STROKE', layout) : null
+  const weightNow = scaledWeight(effective.weight, appliedWeight(lookOf(look, 'weight'), weightCap))
+  const readout = mode === 'shape'
+    ? `크기 ×${lookOf(look, 'size').toFixed(2)} · 키 ×${lookOf(look, 'height').toFixed(2)} · 폭 ×${lookOf(look, 'frame').toFixed(2)} · 굵기 ${weightNow} · 끝 ${lookOf(look, 'soft') > 0.5 ? '둥긂' : '또렷'} · 자간 ${signed(lookOf(look, 'tracking'))}`
+    : part ? (() => { const box = placement.kind === 'boxes' ? simsBoxes(applyPartEdits(placement.boxes, edits[layout]))[part] : undefined; return box ? `가로 ${Math.round(box.width * 100)} · 세로 ${Math.round(box.height * 100)}` : '' })() : ''
+
+  return <section className={styles.panel} aria-label={mode === 'shape' ? '인상 잡기' : '부위 다듬기'}>
+    <div className={styles.stage} onPointerDown={begin} onPointerMove={move} onPointerUp={end} onPointerCancel={end} data-grip={gripOn ?? undefined} data-testid="mold-stage">
+      <div className={styles.bumper} data-bump={bump === 0 ? undefined : bump % 2 ? 'a' : 'b'} data-testid="mold-bumper">
+      <div ref={svgHost} className={styles.stageGlyph} style={{ transform: `scale(${(shown.press ?? 1).toFixed(4)})` }}>
+        <MoldGlyph char={char} size={STAGE} edits={shownEdits} look={shownLook} drawn={drawn} sel={mode === 'part' ? part : null} weightCap={weightCap} fence={fence} testId="mold-focus" />
+      </div>
+      <div className={styles.handles} data-mode={mode} style={{ width: STAGE, height: STAGE }}>{overlay}</div>
+      </div>
+      {labels && showArrows ? DIRS.map(({ dir: d, x, y, arrow }) => {
+        const text = labelOf(d, labels)
+        if (!text) return null
+        return <span key={d} className={styles.arrow} data-corner={d.length === 2 || undefined} data-on={dir === d || undefined} data-off={(dir && dir !== d) || undefined} style={{ left: `${x}%`, top: `${y}%` }} data-testid={`mold-arrow-${d}`}>
+          {x < 50 ? `${arrow} ${text}` : x > 50 ? `${text} ${arrow}` : `${arrow} ${text}`}
+        </span>
+      }) : mode === 'part' && !part && <span className={styles.tapNote}>다듬을 부위를 콕 누르세요</span>}
+    </div>
+    <p className={styles.simsReadout} data-testid="mold-readout">{mode === 'shape' ? <><strong>인상</strong> {readout}{weightNote ? <><br />{weightNote}</> : null}</> : part ? <><strong>{regionLabels(part, layout).name}</strong> {readout}</> : ' '}</p>
+    {mode === 'part' && <ChoiceGroup variant="segment" aria-label="부위" className={styles.regions}>
+      {REGION_BUTTONS.map(({ region, name, color }) => <ChoiceItem key={region} checked={part === region} disabled={!present[region]} onClick={() => setSel(region)} data-testid={`mold-region-${region}`}>
         <span className={styles.dot} style={{ background: color }} aria-hidden="true" />{name}
       </ChoiceItem>)}
-    </ChoiceGroup>
-    <p className={styles.note}>글자에서 첫닿자 · 홀자 · 받침을 콕 누르면 그 부위가 빛나고, 둘레에 끌 방향과 바뀌는 것이 떠요. 어디서든 끌면 돼요. 대각선이면 두 가지가 같이 바뀌어요. 같은 짜임의 글자가 글줄에서 같이 바뀌어요. 값은 아직 임시예요.</p>
+    </ChoiceGroup>}
+    <p className={styles.note}>{mode === 'shape'
+      ? '네모 테두리의 모서리를 끌면 크기, 위 · 아래 변은 키, 왼 · 오른 변은 폭이 바뀌어요. 글자 안쪽을 위아래로 끌면 굵기, 좌우로 끌면 끝 둥글기. 자간은 위 글줄에서 좌우로 끌어요. 벽에 닿으면 글자가 툭 튕겨요. 값은 아직 임시예요.'
+      : '부위를 콕 누르면 칸 상자가 떠요. 변을 끌면 그 변만, 칸 안을 끌면 자리를 옮겨요. 이웃 부위는 처음 크기의 70%까지만 눌리고, 그다음엔 밀려나다 글자 끝에서 멈춰요. 벽에 닿으면 글자가 툭 튕겨요. 이 걸음은 건너뛰어도 돼요.'}</p>
   </section>
 }
 
@@ -438,14 +522,17 @@ export function MoldLabPage() {
   const [focusAt, setFocusAt] = useState(0)
   const [history, setHistory] = useState<Snapshot[]>([])
   const [compare, setCompare] = useState(false)
-  // 글자마다 버틸 수 있는 굵기 비율(획 사이 최소 틈). 글줄은 가장 작은 것을 다 같이 쓴다.
-  const [caps, setCaps] = useState<Record<string, number>>({})
+  const lineDrag = useRef<{ x0: number; look: Look; moved: boolean; width: number } | null>(null)
+  // 굵게 할 때 글자마다 자소를 얼마나 키웠나 · 키워도 모자라 멈췄나(안내에만 쓴다).
+  const [caps, setCaps] = useState<Record<string, { grow: number; limited: boolean }>>({})
   const capReporters = useMemo(() => {
-    const out: Record<number, (ratio: number) => void> = {}
-    ;[...sentence].forEach((_, at) => { out[at] = (ratio: number) => setCaps((all) => (all[`${sentence}-${at}`] === ratio ? all : { ...all, [`${sentence}-${at}`]: ratio })) })
+    const out: Record<number, (grow: number, limited: boolean) => void> = {}
+    ;[...sentence].forEach((_, at) => { out[at] = (grow, limited) => setCaps((all) => { const key = `${sentence}-${at}`; const old = all[key]; return old && old.grow === grow && old.limited === limited ? all : { ...all, [key]: { grow, limited } } }) })
     return out
   }, [sentence])
-  const weightCap = Math.min(Infinity, ...[...sentence].map((char, at) => (char === ' ' ? Infinity : caps[`${sentence}-${at}`] ?? Infinity)))
+  const capsNow = [...sentence].flatMap((char, at) => (char === ' ' || !caps[`${sentence}-${at}`] ? [] : [caps[`${sentence}-${at}`]]))
+  const weightNote = [capsNow.some((cap) => cap.grow > 1) ? `${capsNow.filter((cap) => cap.grow > 1).length}자는 자소를 키워 틈을 냄` : '', capsNow.some((cap) => cap.limited) ? `${capsNow.filter((cap) => cap.limited).length}자는 획이 붙기 직전에 멈춤` : ''].filter(Boolean).join(' · ')
+  const weightCap = Infinity
   // 울타리 보정(획 긋기 시험판에서 가져옴). 켜면 그은 획 때문에 울타리 밖으로 나간 글자를 당긴다.
   const [fenceOn, setFenceOn] = useState(true)
   const [fenceLine, setFenceLine] = useState<FenceLine>('safe')
@@ -508,12 +595,10 @@ export function MoldLabPage() {
   })
   const layoutOfFocus = decomposeSyllable(focusChar, choseong, jungseong, jongseong).layoutType
   const resetRegion = () => {
-    if (!sel) return
     remember()
-    // 칸은 서로 맞물려 있어 짜임째로 되돌린다.
-    if (sel === 'CH' || sel === 'JU' || sel === 'JO') setEdits((now) => { const copy = { ...now }; delete copy[layoutOfFocus]; return copy })
-    else if (sel === 'STROKE') setLook((now) => ({ ...now, weight: undefined, soft: undefined }))
-    else setLook((now) => ({ ...now, frame: undefined, tracking: undefined }))
+    // 인상은 통째로, 칸은 서로 맞물려 있어 짜임째로 되돌린다.
+    if (step === 'shape') setLook({})
+    else setEdits((now) => { const copy = { ...now }; delete copy[layoutOfFocus]; return copy })
   }
 
   const NO_EDITS: LayoutEdits = useMemo(() => ({}), [])
@@ -533,10 +618,21 @@ export function MoldLabPage() {
     </header>
 
     <section className={styles.card} aria-label="예시 글줄">
-      <div className={styles.line} data-testid="mold-line">
+      <div className={styles.line} data-testid="mold-line" data-drag={step === 'shape' || undefined}
+        onPointerDown={(event) => { if (step !== 'shape') return; lineDrag.current = { x0: event.clientX, look, moved: false, width: event.currentTarget.getBoundingClientRect().width } }}
+        onPointerMove={(event) => {
+          const g = lineDrag.current
+          if (!g) return
+          const dx = event.clientX - g.x0
+          if (!g.moved) { if (Math.abs(dx) < 8) return; g.moved = true; remember(); event.currentTarget.setPointerCapture(event.pointerId) }
+          // 글줄에서 좌우로 끌면 자간. 글줄 폭만큼 끌면 자간이 50%쯤 바뀐다.
+          setLook(dragLook(g.look, 'WHOLE', dx / g.width * 1.67, 0))
+        }}
+        onPointerUp={() => { const g = lineDrag.current; window.setTimeout(() => { if (lineDrag.current === g) lineDrag.current = null }, 0) }}
+        onPointerCancel={() => { lineDrag.current = null }}>
         {chars.map((char, at) => char === ' '
           ? <span key={at} className={styles.space} />
-          : <Pressable key={`${sentence}-${at}`} className={styles.lineChar} data-on={(step === 'mold' && at === focusIndex) || undefined} onClick={() => { setFocusAt(at); setStep('mold') }} aria-label={`${char} 크게 빚기`} data-testid={`mold-pick-${at}`}>
+          : <Pressable key={`${sentence}-${at}`} className={styles.lineChar} data-on={(step !== 'draw' && at === focusIndex) || undefined} onClick={() => { if (lineDrag.current?.moved) return; setFocusAt(at); if (step === 'draw') setStep('shape') }} aria-label={`${char} 크게 빚기`} data-testid={`mold-pick-${at}`}>
             <MoldGlyph char={char} size={42} edits={lineEdits} look={lineLook} drawn={lineDrawn} shownStroke={step === 'draw' && !compare ? shownStroke : undefined} testId={`mold-char-${at}`} weightCap={weightCap} onCap={compare ? undefined : capReporters[at]} fence={compare ? undefined : fence} onFence={compare ? undefined : fenceReporters[at]} />
           </Pressable>)}
       </div>
@@ -560,13 +656,15 @@ export function MoldLabPage() {
       </div>
     </section>
 
-    {step === 'draw' && <DrawStep raws={raws} setRaws={setRaws} stems={stems} onDone={() => setStep('mold')} />}
-    {step === 'mold' && <>
-      <SimsStep fence={compare ? undefined : fence} char={focusChar} drawn={drawn} edits={edits} setEdits={setEdits} look={look} setLook={setLook} weightCap={weightCap} sel={sel} setSel={setSel} onBegin={remember} />
+    {step === 'draw' && <DrawStep raws={raws} setRaws={setRaws} stems={stems} onDone={() => setStep('shape')} />}
+    {step !== 'draw' && <>
+      <SimsStep mode={step} weightNote={weightNote} fence={compare ? undefined : fence} char={focusChar} drawn={drawn} edits={edits} setEdits={setEdits} look={look} setLook={setLook} weightCap={weightCap} sel={sel} setSel={setSel} onBegin={remember} />
       <div className={styles.moldActions}>
         <Button variant="outline" size="sm" onClick={undo} disabled={!history.length} data-testid="mold-undo"><Undo2 aria-hidden="true" />되돌리기</Button>
-        <Button variant="outline" size="sm" onClick={resetRegion} disabled={!sel} data-testid="mold-reset-region"><RotateCcw aria-hidden="true" />부위 처음대로</Button>
+        <Button variant="outline" size="sm" onClick={resetRegion} disabled={step === 'part' && !sel} data-testid="mold-reset-region"><RotateCcw aria-hidden="true" />{step === 'shape' ? '인상 처음대로' : '부위 처음대로'}</Button>
       </div>
+      {step === 'shape' && <Button size="block" onClick={() => setStep('part')} data-testid="mold-to-part">부위 다듬기로<ChevronRight aria-hidden="true" /></Button>}
+      {step === 'shape' && <p className={styles.skipNote}>부위 다듬기는 건너뛰어도 돼요.</p>}
     </>}
 
     {changed > 0 && <Button variant="ghost" size="sm" className={styles.center} onClick={() => { remember(); setEdits({}); setLook({}); setRaws({}); setStep('draw') }} data-testid="mold-reset-all"><RotateCcw aria-hidden="true" />모두 처음대로</Button>}

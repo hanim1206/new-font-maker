@@ -113,3 +113,31 @@
 .fenceTitle span { overflow: hidden; color: rgb(var(--color-text-3)); font-size: var(--font-12); font-weight: var(--weight-medium); text-overflow: ellipsis; white-space: nowrap; }
 .fenceLine { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: rgb(var(--color-text-3)); font-size: var(--font-12); }
 .fenceLineSwitch { flex: none; }
+
+/* 무대 손잡이: 큰 글자와 같은 자리(무대 가운데 네모)에 깐다. 누르기는 무대가 받고, 여기는 그림만. */
+.line[data-drag] { touch-action: none; cursor: ew-resize; }
+.handles { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+.frameBox, .partBox { position: absolute; box-sizing: border-box; }
+.frameBox { border: 1.5px dashed rgb(var(--color-text-4)); }
+.partBox { border: 1.5px solid; }
+.grip { position: absolute; border-radius: var(--radius-full); background: rgb(var(--color-foreground)); box-shadow: 0 0 0 2px rgb(var(--color-surface)); transition: transform .1s; }
+.grip[data-on] { transform: scale(1.4); }
+.grip[data-grip='t'], .grip[data-grip='b'] { left: 50%; width: 22px; height: 6px; margin-left: -11px; }
+.grip[data-grip='l'], .grip[data-grip='r'] { top: 50%; width: 6px; height: 22px; margin-top: -11px; }
+.grip[data-grip='t'] { top: -3px; } .grip[data-grip='b'] { bottom: -3px; }
+.grip[data-grip='l'] { left: -3px; } .grip[data-grip='r'] { right: -3px; }
+.grip[data-grip='tl'], .grip[data-grip='tr'], .grip[data-grip='bl'], .grip[data-grip='br'] { width: 12px; height: 12px; border-radius: var(--radius-xs); }
+.grip[data-grip='tl'] { top: -6px; left: -6px; } .grip[data-grip='tr'] { top: -6px; right: -6px; }
+.grip[data-grip='bl'] { bottom: -6px; left: -6px; } .grip[data-grip='br'] { bottom: -6px; right: -6px; }
+.grip[data-grip='move'] { top: 50%; left: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; opacity: .85; }
+
+/* 벽에 닿으면 글자 + 손잡이가 툭 튕긴다(a · b를 번갈아 써 매번 다시 돈다). */
+.bumper { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.bumper[data-bump='a'] { animation: wallBumpA .32s ease-out; }
+.bumper[data-bump='b'] { animation: wallBumpB .32s ease-out; }
+@keyframes wallBumpA { 0% { transform: scale(1); } 35% { transform: scale(1.035); } 70% { transform: scale(.99); } 100% { transform: scale(1); } }
+@keyframes wallBumpB { 0% { transform: scale(1); } 35% { transform: scale(1.035); } 70% { transform: scale(.99); } 100% { transform: scale(1); } }
+/* 인상 잡기에 처음 들어오면 손잡이가 한 번 움찔해 끌 수 있는 곳을 알린다. */
+.handles[data-mode='shape'] .grip { animation: gripHint .7s ease-out .25s 1 backwards; }
+@keyframes gripHint { 0% { transform: scale(1); } 30% { transform: scale(1.8); } 55% { transform: scale(.85); } 80% { transform: scale(1.15); } 100% { transform: scale(1); } }
+.skipNote { color: rgb(var(--color-text-4)); font-size: var(--font-12); text-align: center; }

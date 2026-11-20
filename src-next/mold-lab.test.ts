@@ -162,15 +162,16 @@ describe('심즈처럼 빚기', () => {
   })
   it('첫닿자 키를 키우면 받침이 위에서 눌리고 밑선은 그대로', async () => {
     const { dragPart } = await import('./moldLab')
-    const out = dragPart(boxes, boxes, 'CH', 0, -0.1, vertical)
-    expect(out.CH!.height).toBeCloseTo(0.39)
+    const out = dragPart(boxes, boxes, 'CH', 0, -0.05, vertical)
+    expect(out.CH!.height).toBeCloseTo(0.34)
     expect(out.JO!.y).toBeGreaterThan(boxes.JO.y)
     expect(out.JO!.y + out.JO!.height).toBeCloseTo(boxes.JO.y + boxes.JO.height)
   })
   it('받침이 더 못 눌리면 첫닿자도 멈춘다', async () => {
     const { dragPart } = await import('./moldLab')
     const out = dragPart(boxes, boxes, 'CH', 0, -1, vertical)
-    expect(out.JO!.height).toBeGreaterThan(0.08 - 1e-9)
+    // 이웃 벽: 받침은 처음 키의 70% 아래로 안 눌린다.
+    expect(out.JO!.height).toBeGreaterThan(0.3 * 0.7 - 1e-9)
     expect(out.CH!.y + out.CH!.height).toBeLessThan(out.JO!.y)
   })
   it('세로홀자 기둥을 옮기면 첫닿자가 밀리지 않고 홀자만 옮겨진다(사이가 벌어질 때)', async () => {
@@ -194,8 +195,48 @@ describe('심즈처럼 빚기', () => {
   it('획 · 전체는 한계선 밖으로 안 나간다', async () => {
     const { dragLook, LOOK_WALL } = await import('./moldLab')
     expect(dragLook({}, 'STROKE', 0, -5).weight).toBe(LOOK_WALL.weight[1])
-    expect(dragLook({}, 'WHOLE', -5, 5).frame).toBe(LOOK_WALL.frame[0])
-    expect(dragLook({}, 'WHOLE', -5, 5).tracking).toBe(LOOK_WALL.tracking[1])
+    expect(dragLook({}, 'STROKE', 0, 5).weight).toBe(LOOK_WALL.weight[0])
+    expect(dragLook({}, 'WHOLE', 5, 0).tracking).toBe(LOOK_WALL.tracking[1])
+  })
+  it('굵기 벽은 엔진 굵기 100~900을 다 쓴다(기본 400)', async () => {
+    const { LOOK_WALL, scaledWeight } = await import('./moldLab')
+    expect(scaledWeight(400, LOOK_WALL.weight[0])).toBe(100)
+    expect(scaledWeight(400, LOOK_WALL.weight[1])).toBe(900)
+  })
+  it('홀자 기둥을 끝까지 옮겨도 홀자는 납작해지지 않고, 첫닿자는 70% 벽에서 멈춘다', async () => {
+    const { dragPart, NEIGHBOR_FLOOR } = await import('./moldLab')
+    const out = dragPart(boxes, boxes, 'JU', -1, 0, vertical)
+    expect(out.JU!.width).toBeCloseTo(boxes.JU.width)
+    expect(out.CH!.width).toBeGreaterThan(boxes.CH.width * NEIGHBOR_FLOOR - 1e-9)
+    expect(out.CH!.x).toBeGreaterThan(0.02 - 1e-9)
+  })
+  it('가로홀자 보를 끝까지 올려도 보 칸 키는 그대로', async () => {
+    const { dragPart } = await import('./moldLab')
+    const h = { CH: { x: 0.2, y: 0.1, width: 0.6, height: 0.35 }, JU: { x: 0.1, y: 0.55, width: 0.8, height: 0.3 } }
+    const out = dragPart(h, h, 'JU', 0, -1, 'choseong-jungseong-horizontal')
+    expect(out.JU!.height).toBeCloseTo(0.3)
+    expect(out.CH!.height).toBeGreaterThan(0.35 * 0.7 - 1e-9)
+  })
+  it('칸 손잡이: 변 하나만 움직이고, 가운데는 통째로 옮긴다', async () => {
+    const { dragGrip, gripAt } = await import('./moldLab')
+    const left = dragGrip(boxes, boxes, 'JO', 'l', -0.05, 0)
+    expect(left.JO!.x).toBeCloseTo(0.15)
+    expect(left.JO!.x + left.JO!.width).toBeCloseTo(0.8)
+    const moved = dragGrip(boxes, boxes, 'CH', 'move', 0, 0.03)
+    expect(moved.CH!.y).toBeCloseTo(0.17)
+    expect(moved.CH!.height).toBeCloseTo(0.29)
+    expect(gripAt(boxes.CH, 0.12, 0.3, 0.05)).toBe('l')
+    expect(gripAt(boxes.CH, 0.295, 0.285, 0.05)).toBe('move')
+    expect(gripAt(boxes.CH, 0.9, 0.9, 0.05)).toBeUndefined()
+  })
+  it('네모꼴 손잡이: 모서리는 크기, 위아래 변은 키, 좌우 변은 폭', async () => {
+    const { dragWhole, wholeGripAt, lookOf } = await import('./moldLab')
+    const body: [number, number, number, number] = [0.1, 0.1, 0.9, 0.9]
+    expect(wholeGripAt(body, 0.1, 0.1, 0.05)).toBe('tl')
+    expect(wholeGripAt(body, 0.5, 0.9, 0.05)).toBe('b')
+    expect(lookOf(dragWhole({}, body, 'r', 0.04, 0), 'frame')).toBeCloseTo(1.1)
+    expect(lookOf(dragWhole({}, body, 't', 0, 0.04), 'height')).toBeCloseTo(0.9)
+    expect(lookOf(dragWhole({}, body, 'br', -0.04, -0.04), 'size')).toBeCloseTo(0.9)
   })
 })
 
