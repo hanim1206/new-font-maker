@@ -20,7 +20,7 @@ import { EDIT_COLOR } from './editColors'
 import { applyPartEdits, bigBoxes, dirOf, dragLook, dragPart, editsBetween, gapCapMultiplier, lookOf, regionLabels, scaledWeight, simsBoxes, simsPartOf, type Dir, type GapStroke, type LayoutEdits, type Look, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement } from './notoModel'
 import { SAMPLE_SENTENCES } from './sampleSentences'
-import { consonantBoxesOf, consonantShapesOf, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, type DrawnStem, type StemKind } from './strokeLab'
+import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
 import styles from './MoldLabPage.module.css'
 
 /**
@@ -89,7 +89,7 @@ function moldedBoxes(boxes: Partial<Record<Part, BoxConfig>>, layout: LayoutType
  * 빚은 글자 하나. 칸을 풀고, 짜임 편집 · 폭 · 굵기 · 끝 모양을 차례로 입혀 그린다.
  * `sel`이 있으면 고른 부위만 제 색으로, 나머지는 옅게 그린다.
  */
-function MoldGlyph({ char, size, edits, look, drawn, sel, testId, weightCap = Infinity, onCap }: { char: string; size: number; edits: LayoutEdits; look: Look; drawn?: Drawn; sel?: Region | null; testId?: string; weightCap?: number; onCap?: (ratio: number) => void }) {
+function MoldGlyph({ char, size, edits, look, drawn, sel, shownStroke, testId, weightCap = Infinity, onCap }: { char: string; size: number; edits: LayoutEdits; look: Look; drawn?: Drawn; sel?: Region | null; shownStroke?: (key: string) => boolean; testId?: string; weightCap?: number; onCap?: (ratio: number) => void }) {
   const { syllable, effective, placement } = useGlyphBase(char, drawn)
   const boxes = useMemo(() => placement.kind === 'boxes' ? moldedBoxes(placement.boxes, syllable.layoutType, edits, look) : undefined, [placement, syllable.layoutType, edits, look])
 
@@ -110,10 +110,11 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, testId, weightCap = In
     return soft ? { ...weighted, linecap: 'round' as const, linejoin: 'round' as const } : weighted
   }, [effective, ratio, soft])
   const colorOf = useCallback((source: ResolvedStrokeInkSource) => {
+    if (shownStroke) return shownStroke(`${simsPartOf(source.part)}:${source.jamoId}:${source.strokeId}`) ? undefined : 'transparent'
     if (sel === 'STROKE') return EDIT_COLOR.editSelect
     if (sel === 'CH' || sel === 'JU' || sel === 'JO') return simsPartOf(source.part) === sel ? SLOT_COLOR[sel] : EDIT_COLOR.editSlotOff
     return undefined
-  }, [sel])
+  }, [sel, shownStroke])
 
   // 폭이 좁아지면 글자 칸도 같이 좁힌다. 자간은 글자 사이를 더하거나 뺀다.
   const slot = { width: size * lookOf(look, 'frame') + size * lookOf(look, 'tracking'), marginInline: 0 }
@@ -126,7 +127,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, testId, weightCap = In
       globalStyle={globalStyle}
       overflow="visible"
       clipGlyphs={false}
-      strokeColorOf={sel && sel !== 'WHOLE' ? colorOf : undefined}
+      strokeColorOf={shownStroke || (sel && sel !== 'WHOLE') ? colorOf : undefined}
     />
   </span>
 }
@@ -414,6 +415,16 @@ export function MoldLabPage() {
     return { jungseong: Object.keys(masters).length ? propagatedJungseong(jungseong, {}, masters) : undefined, consonants }
   }, [stems, choseong, jungseong, jongseong])
 
+  // 긋기 단계 글줄: 내가 그은 줄기 종류가 쓰인 획만 보인다(그을 때마다 글자가 조금씩 채워진다).
+  const stemKeys = useMemo(() => ({ CH: consonantStemKeys(choseong), JU: vowelStemKeys(jungseong), JO: consonantStemKeys(jongseong) }), [choseong, jungseong, jongseong])
+  const shownStroke = useCallback((key: string) => {
+    const [family, ...rest] = key.split(':')
+    const id = rest.join(':')
+    if (family === 'JU') { const kind = stemKeys.JU.get(id); return !!kind && !!stems[kind]?.ok }
+    const kinds = (family === 'CH' ? stemKeys.CH : stemKeys.JO).get(id)
+    return !!kinds && kinds.some((kind) => stems[kind]?.ok)
+  }, [stemKeys, stems])
+
   const chars = [...sentence]
   const focusIndex = chars[focusAt] && chars[focusAt] !== ' ' ? focusAt : chars.findIndex((char) => char !== ' ')
   const focusChar = chars[focusIndex] ?? '빚'
@@ -454,13 +465,12 @@ export function MoldLabPage() {
       </ChoiceGroup>
     </header>
 
-    {/* 긋기에서는 한 줄기라도 긋기 전까지 글줄을 숨긴다(내 선이 처음 보이는 순간을 남기려고). */}
-    {(step !== 'draw' || drawn) && <section className={styles.card} aria-label="예시 글줄">
+    <section className={styles.card} aria-label="예시 글줄">
       <div className={styles.line} data-testid="mold-line">
         {chars.map((char, at) => char === ' '
           ? <span key={at} className={styles.space} />
           : <Pressable key={`${sentence}-${at}`} className={styles.lineChar} data-on={(step === 'mold' && at === focusIndex) || undefined} onClick={() => { setFocusAt(at); setStep('mold') }} aria-label={`${char} 크게 빚기`} data-testid={`mold-pick-${at}`}>
-            <MoldGlyph char={char} size={42} edits={lineEdits} look={lineLook} drawn={lineDrawn} testId={`mold-char-${at}`} weightCap={weightCap} onCap={compare ? undefined : capReporters[at]} />
+            <MoldGlyph char={char} size={42} edits={lineEdits} look={lineLook} drawn={lineDrawn} shownStroke={step === 'draw' && !compare ? shownStroke : undefined} testId={`mold-char-${at}`} weightCap={weightCap} onCap={compare ? undefined : capReporters[at]} />
           </Pressable>)}
       </div>
       <div className={styles.lineActions}>
@@ -469,7 +479,7 @@ export function MoldLabPage() {
           onPointerDown={() => setCompare(true)} onPointerUp={() => setCompare(false)} onPointerLeave={() => setCompare(false)} onPointerCancel={() => setCompare(false)}
           data-testid="mold-compare">{compare ? '처음 모습' : '누르는 동안 처음과 견주기'}</Button>
       </div>
-    </section>}
+    </section>
 
     {step === 'draw' && <DrawStep raws={raws} setRaws={setRaws} stems={stems} onDone={() => setStep('mold')} />}
     {step === 'mold' && <>
