@@ -454,7 +454,8 @@ export function MoldLabPage() {
       </ChoiceGroup>
     </header>
 
-    <section className={styles.card} aria-label="예시 글줄">
+    {/* 긋기에서는 한 줄기라도 긋기 전까지 글줄을 숨긴다(내 선이 처음 보이는 순간을 남기려고). */}
+    {(step !== 'draw' || drawn) && <section className={styles.card} aria-label="예시 글줄">
       <div className={styles.line} data-testid="mold-line">
         {chars.map((char, at) => char === ' '
           ? <span key={at} className={styles.space} />
@@ -468,7 +469,7 @@ export function MoldLabPage() {
           onPointerDown={() => setCompare(true)} onPointerUp={() => setCompare(false)} onPointerLeave={() => setCompare(false)} onPointerCancel={() => setCompare(false)}
           data-testid="mold-compare">{compare ? '처음 모습' : '누르는 동안 처음과 견주기'}</Button>
       </div>
-    </section>
+    </section>}
 
     {step === 'draw' && <DrawStep raws={raws} setRaws={setRaws} stems={stems} onDone={() => setStep('mold')} />}
     {step === 'mold' && <>
