@@ -9,7 +9,7 @@ import type { BoxConfig, LayoutType, Part } from '../src/types'
  * 값 = 엔진이 기준 상태에서 잰 값(`engine`) + (지금 − 기준). 엔진 기준값이 이미 울타리 밖인 값(무게중심 · 가로 틈)은 긋기 전에도 당긴다.
  *
  * 선은 둘이다(하니무스 2026-11-20): 안전선 = 폰트 90% 폭(자동 보정이 당기는 자리), 한계선 = 눈에 어색해지는 선(조작을 막는 자리).
- * 한계선 값은 9문항 실험 뒤에 채운다 — 지금은 받침 밑선만 있고, 비어 있는 값은 당기지 않는다.
+ * 한계선 값은 하니무스 한 사람 답으로 채운 가설이다(거북이 범위표). 비어 있는 값은 당기지 않는다.
  * 단위는 글자 몸 높이 비율. 저장하지 않고 제품 값도 안 바꾼다.
  */
 
@@ -28,6 +28,8 @@ export interface FenceBands {
   /** 틈의 잔차 폭: 기대 틈(굵기에 따른 직선)에서 벗어나도 되는 만큼. 세로 틈 = 첫닿 ↔ 세로홀자, 가로 틈 = 첫닿 ↔ 가로홀자. */
   gapCol?: Band
   gapRow?: Band
+  /** 세로 틈의 아래 끝을 기대 틈의 비율로 줄 때(0.7 = 기대 틈의 70%). 있으면 `gapCol.lo` 대신 쓴다 — 굵기가 달라져도 따라간다. */
+  gapColFloor?: number
   /** 받침 글자의 위아래 무게중심 */
   centroid?: Partial<Record<FinalLayout, Band>>
 }
@@ -78,8 +80,22 @@ export const GOTHIC_FENCE: FencePreset = {
         'choseong-jungseong-mixed-jongseong': { lo: 0.484, hi: 0.504 },
       },
     },
-    // 한계선: 받침 밑선은 안전선의 두 배 자리(가운데 0.009에서 끝 0.013까지의 두 배). 나머지 셋은 9문항 실험 뒤에 채운다.
-    limit: { finalBottomSd: 0.017 },
+    // 한계선(가설): 거북이 범위표 "안전선과 한계선"(2026-11-20) — 하니무스 한 사람이 마지막으로 "괜찮다"고 한 값. 답이 더 모이면 바뀐다.
+    limit: {
+      // 받침 밑선은 안전선 끝이 곧 한계다(두 배 자리에서 어색).
+      finalBottomSd: 0.013,
+      // 좁은 쪽 1.2%까지. 넓은 쪽은 안 물어봐서 임시로 안전선 끝.
+      topLine: { lo: 0.012, hi: 0.058 },
+      // 세로 틈: 굵기에서 기대하는 틈의 70%까지 좁혀도 된다. 벌리는 쪽은 안 물어봐서 안전선 끝. 가로 틈은 아직 없다.
+      gapCol: { lo: -0.059, hi: 0.021 },
+      gapColFloor: 0.7,
+      // 받침 글자 무게중심: 울타리 가운데에서 아래로 세로 3.4 · 가로 2.8 · 섞임 4.0%p. 위쪽은 임시로 같은 폭.
+      centroid: {
+        'choseong-jungseong-vertical-jongseong': { lo: 0.4655, hi: 0.5335 },
+        'choseong-jungseong-horizontal-jongseong': { lo: 0.479, hi: 0.535 },
+        'choseong-jungseong-mixed-jongseong': { lo: 0.454, hi: 0.534 },
+      },
+    },
   },
 }
 
@@ -239,7 +255,8 @@ export function correctGlyph(input: { layout: LayoutType; now: GlyphMeasure; ref
   if (axis && gapBand && gapNow !== undefined && gapRef !== undefined) {
     const expected = expectedGap(preset, axis, input.thick)
     const value = (axis === 'col' ? preset.engine.gapCol : preset.engine.gapRow) + (gapNow - gapRef) / body
-    const moved = pull('gap', value, { lo: expected + gapBand.lo, hi: expected + gapBand.hi }) * body
+    const lo = axis === 'col' && bands.gapColFloor !== undefined ? expected * bands.gapColFloor : expected + gapBand.lo
+    const moved = pull('gap', value, { lo, hi: expected + gapBand.hi }) * body
     // 틈을 벌리려면 첫닿을 홀자 반대쪽으로.
     if (axis === 'col') moves.initialDx = -moved
     else moves.initialDy = -moved

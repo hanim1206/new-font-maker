@@ -57,13 +57,19 @@ describe('울타리 자동 보정', () => {
     expect(off(big.after)).toBeCloseTo(tolerance, 4)
   })
 
-  it('한계선은 받침 밑선만 정해져 있다 — 안전선보다 넓고, 나머지 값은 당기지 않는다', () => {
-    expect(finalBottomTolerance(GOTHIC_FENCE, 'limit')!).toBeGreaterThan(finalBottomTolerance(GOTHIC_FENCE, 'safe')!)
-    const base = measured('곤')
-    const now = measured('곤', shakenBoxes(base.boxes, base.layout, 0, 2)).measure
-    const limit = correctGlyph({ layout: base.layout, now, reference: base.measure, line: 'limit' })
-    expect(limit.pulls.map((item) => item.value)).toEqual(['finalBottom'])
-    expect(limit.moves.upperDy).toBe(0)
+  it('한계선은 안전선보다 좁지 않다 — 안전선이 당기는 흔들림도 한계선 안이면 그대로 둔다', () => {
+    expect(finalBottomTolerance(GOTHIC_FENCE, 'limit')!).toBeGreaterThanOrEqual(finalBottomTolerance(GOTHIC_FENCE, 'safe')!)
+    const { safe, limit } = GOTHIC_FENCE.lines
+    expect(limit.topLine!.lo).toBeLessThan(safe.topLine!.lo)
+    expect(expectedGap(GOTHIC_FENCE, 'col') * limit.gapColFloor!).toBeLessThan(expectedGap(GOTHIC_FENCE, 'col') + safe.gapCol!.lo)
+    // 조금 흔든 세로 틈(첫닿 0.02em)은 안전선 밖, 한계선 안.
+    const base = measured('나')
+    const now = measured('나', shakenBoxes(base.boxes, base.layout, 0, 1)).measure
+    expect(pullOf(correctGlyph({ layout: base.layout, now, reference: base.measure }), 'gap')!.pulled).toBeGreaterThan(0)
+    expect(pullOf(correctGlyph({ layout: base.layout, now, reference: base.measure, line: 'limit' }), 'gap')!.pulled).toBe(0)
+    // 엔진 기준 무게중심(세로 + 받침 0.522)은 안전선 밖이지만 한계선 안이다.
+    const final = measured('간')
+    expect(pullOf(correctGlyph({ layout: final.layout, now: final.measure, reference: final.measure, line: 'limit' }), 'centroid')).toMatchObject({ pulled: 0, left: 0 })
   })
 
   it('세로 틈: 첫닿이 홀자 쪽으로 밀리면 울타리 아래 끝까지 되벌린다', () => {
