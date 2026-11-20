@@ -1,0 +1,75 @@
+/* 첫 화면 = 학습 입구. 폰 한 손 화면이 먼저 — 위에서 글줄을 보고, 가운데서 긋고, 아래(엄지 자리)에서 다음으로. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(480px, 100%);
+  min-height: 100dvh;
+  margin-inline: auto;
+  padding: max(8px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+  background: rgb(var(--color-background));
+  color: rgb(var(--color-foreground));
+}
+
+.header { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 52px; }
+.brand { font-size: var(--font-18); font-weight: var(--weight-heavy); }
+.makeLink { border-radius: var(--radius-full); }
+
+.progress { display: grid; gap: 6px; }
+.dots { display: flex; gap: 6px; }
+.dots > span { width: 22px; height: 6px; border-radius: var(--radius-full); background: rgb(var(--color-surface-4)); }
+.dots > span[data-state='done'] { background: rgb(var(--color-foreground)); }
+.dots > span[data-state='now'] { background: rgb(var(--color-primary)); }
+.quota { color: rgb(var(--color-text-5)); font-size: var(--font-12); }
+
+.lineCard {
+  padding: 12px;
+  border: 1px solid rgb(var(--color-border-subtle));
+  border-radius: var(--radius-xl);
+  background: rgb(var(--color-surface));
+  box-shadow: var(--shadow-sm);
+}
+.line { display: flex; flex-wrap: wrap; align-items: center; row-gap: 4px; min-height: 80px; }
+.space { width: 12px; }
+
+.askBox { display: grid; gap: 2px; margin-top: 4px; }
+.ask { font-size: var(--font-20); font-weight: var(--weight-heavy); line-height: 1.35; }
+.sub { color: rgb(var(--color-text-4)); font-size: var(--font-14); }
+
+.pad {
+  width: 100%;
+  max-height: 34dvh;
+  aspect-ratio: 3 / 4;
+  align-self: center;
+  border: 1px solid rgb(var(--color-border-subtle));
+  border-radius: var(--radius-xl);
+  background: rgb(var(--color-surface));
+  box-shadow: var(--shadow-sm);
+  /* 긋는 동안 화면이 따라 움직이지 않게. iOS는 SVG에서 이걸 건너뛰기도 해서 터치 이동도 직접 막는다(stemPad). */
+  touch-action: none;
+  cursor: crosshair;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.feedback { min-height: 64px; }
+.warn { color: rgb(var(--color-warning)); font-size: var(--font-14); font-weight: var(--weight-semibold); text-align: center; padding-top: 8px; }
+.toast {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: rgb(var(--color-inverse));
+  color: rgb(var(--color-inverse-foreground));
+  font-size: var(--font-14);
+  line-height: 1.45;
+  animation: rise var(--motion-slow) var(--ease-standard);
+}
+.toast strong { font-weight: var(--weight-bold); }
+.toast small { color: rgb(var(--color-inverse-foreground) / .6); font-size: var(--font-12); }
+@keyframes rise { from { transform: translateY(8px); } to { transform: none; } }
+
+.done { display: flex; flex: 1; flex-direction: column; gap: 4px; margin-top: 4px; }
+.grow { flex: 1; }
+.cta { width: 100%; margin-top: auto; }
