@@ -4,14 +4,15 @@ import { Check, ChevronRight, Dices, RotateCcw } from 'lucide-react'
 import type { PenPoint } from '../src/services/penStrokeFit'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { propagatedJungseong } from '../src/stores/stemMasterStore'
-import type { ResolvedStrokeInkSource } from '../src/types'
+import type { JamoData, LayoutType, ResolvedStrokeInkSource } from '../src/types'
+import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { pointsToSvgD } from '../src/utils/pathUtils'
 import { AppGlyph } from './AppGlyph'
 import { Button } from './components/ui/button'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { EDIT_COLOR } from './editColors'
 import { randomSampleSentence } from './sampleSentences'
-import { consonantShapesOf, consonantStemKeys, drawnStem, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
+import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
 import styles from './PillarLabPage.module.css'
 
 /**
@@ -109,12 +110,17 @@ export function PillarLabPage() {
   const overrides = useMemo(() => {
     const masters = mastersOf(stems, jungseong)
     const shapes = consonantShapesOf(stems)
+    // 닿자 칸은 짜임마다 비율이 달라 짜임별로 따로 입힌다.
+    const consonants = Object.fromEntries(LAYOUTS.map((layout) => {
+      const box = consonantBoxesOf(layout)
+      return [layout, { choseong: shapeConsonants(choseong, shapes, box.CH).changed, jongseong: shapeConsonants(jongseong, shapes, box.JO).changed }]
+    })) as Record<LayoutType, { choseong: Record<string, JamoData>; jongseong: Record<string, JamoData> }>
     return {
       jungseong: Object.keys(masters).length ? propagatedJungseong(jungseong, {}, masters) : undefined,
-      choseong: shapeConsonants(choseong, shapes).changed,
-      jongseong: shapeConsonants(jongseong, shapes).changed,
+      consonants,
     }
   }, [stems, choseong, jungseong, jongseong])
+  const layoutOf = useCallback((char: string): LayoutType => decomposeSyllable(char, choseong, jungseong, jongseong).layoutType, [choseong, jungseong, jongseong])
 
   const vowelKeys = useMemo(() => vowelStemKeys(jungseong), [jungseong])
   const initialKeys = useMemo(() => consonantStemKeys(choseong), [choseong])
@@ -178,8 +184,8 @@ export function PillarLabPage() {
           ? <span key={index} className={styles.space} />
           : <AppGlyph key={index} char={char} size={40}
             jungseongOverride={mine ? overrides.jungseong : undefined}
-            choseongOverride={mine ? overrides.choseong : undefined}
-            jongseongOverride={mine ? overrides.jongseong : undefined}
+            choseongOverride={mine ? overrides.consonants[layoutOf(char)]?.choseong : undefined}
+            jongseongOverride={mine ? overrides.consonants[layoutOf(char)]?.jongseong : undefined}
             strokeColorOf={strokeColorOf} />)}
       </div>
       <div className={styles.lineTools}>

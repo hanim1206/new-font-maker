@@ -67,6 +67,37 @@ describe('획 긋기 시험판', () => {
     expect(stroke.points[stroke.points.length - 1]).toMatchObject({ x: giyeok.points[2].x, y: giyeok.points[2].y })
   })
 
+  it('닿자: 긴 가로 마디는 가로 긴 선, 짧은 세로 마디는 세로 짧은 선 — 안 그었으면 짝으로', () => {
+    const vertical = drawnStem(bowed({ x: 0.37, y: 0.1 }, { x: 0.37, y: 0.9 }), 'vertical')
+    const shortVertical = drawnStem(bowed({ x: 0.37, y: 0.3 }, { x: 0.37, y: 0.7 }), 'shortVertical')
+    const horizontal = drawnStem(bowed({ x: 0.2, y: 0.5 }, { x: 0.55, y: 0.5 }), 'horizontal')
+    const longHorizontal = drawnStem(bowed({ x: 0.05, y: 0.5 }, { x: 0.7, y: 0.5 }), 'longHorizontal')
+    const hieut = jamos('choseong', ['ㅎ', 'ㄱ'])
+    const all = shapeConsonants(hieut, consonantShapesOf({ vertical, shortVertical, horizontal, longHorizontal })).keys
+    expect(all.get('ㅎ:ㅎ-1')).toEqual(['shortVertical'])
+    expect(all.get('ㅎ:ㅎ-2')).toEqual(['longHorizontal'])
+    expect(all.get('ㄱ:ㄱ-1')?.sort()).toEqual(['longHorizontal', 'vertical'])
+    const pairOnly = shapeConsonants(hieut, consonantShapesOf({ vertical, horizontal })).keys
+    expect(pairOnly.get('ㅎ:ㅎ-1')).toEqual(['vertical'])
+    expect(pairOnly.get('ㅎ:ㅎ-2')).toEqual(['horizontal'])
+  })
+
+  it('닿자: 납작한 칸에서도 em으로 잰 휨은 정사각 칸과 같다', () => {
+    const shapes = consonantShapesOf({ longHorizontal: drawnStem(bowed({ x: 0.05, y: 0.5 }, { x: 0.7, y: 0.5 }, 0.08, 0), 'longHorizontal') })
+    const stroke = getBaseJamo('choseong', 'ㅎ')!.strokes!.find((item) => item.id === 'ㅎ-2')!
+    // 휜 정도 = 가장 먼 앵커 · 손잡이의 옆 어긋남(em) ÷ 마디 길이(em).
+    const bendEm = (box: { width: number; height: number }) => {
+      const { stroke: placed } = shapeConsonantStroke(stroke, shapes, box)
+      const y0 = stroke.points[0].y
+      const off = Math.max(...placed.points.flatMap((p) => [p, p.handleIn, p.handleOut]).filter(Boolean).map((p) => Math.abs(p!.y - y0) * box.height))
+      return off / (Math.abs(stroke.points[1].x - stroke.points[0].x) * box.width)
+    }
+    const square = bendEm({ width: 1, height: 1 })
+    expect(square).toBeGreaterThan(0.02)
+    expect(bendEm({ width: 0.62, height: 0.3 })).toBeCloseTo(square, 6)
+    expect(bendEm({ width: 0.45, height: 0.6 })).toBeCloseTo(square, 6)
+  })
+
   it('닿자: ㅅ의 두 사선은 대각선 하나를 뒤집어 쓰고, ㅇ은 동그라미, ㅁ은 닫힌 채로', () => {
     const stems: Partial<Record<StemKind, DrawnStem>> = {
       vertical: drawnStem(bowed({ x: 0.37, y: 0.1 }, { x: 0.37, y: 0.9 }), 'vertical'),
