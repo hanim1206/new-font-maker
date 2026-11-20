@@ -32,7 +32,7 @@ export interface FenceBands {
   gapColFloor?: number
   /** 받침 글자의 위아래 무게중심 */
   centroid?: Partial<Record<FinalLayout, Band>>
-  /** 자소 사이 잉크 틈이 기준 글자의 틈에서 줄어도 되는 비율(0.7 = 기준의 70%까지). 넘으면 그은 휨을 줄인다. */
+  /** 자소 사이 잉크 틈이 기준 글자의 틈에서 줄어도 되는 비율(0.7 = 기준의 70%까지). 휜 획이 써도 되는 칸을 여기서 정한다. */
   clearanceFloor?: number
 }
 
@@ -266,60 +266,80 @@ export function clearanceRatio(now: Clearances, reference: Clearances): number {
   return worst === Infinity ? 1 : worst
 }
 
-/** 자소 하나를 줄여도 되는 한도(원래 크기의 몫). 그 아래로는 누르지 않는다 — 받침 높이를 34% 아래로 안 누르는 것과 같은 뜻의 어림. */
-export const MIN_PART_SCALE = 0.8
+// ── 휜 획을 제 칸 안에 넣기 ──
+// 보선(자소 상자)과 그은 모양은 사용자 것이라 보정이 건드리지 않는다. 서비스가 정하는 건 획을 칸 안에 넣는 법뿐이다(하니무스 2026-11-20).
+// 칸 = 기본 획이 차지하던 자리 + 옆 자소 쪽 틈에서 써도 되는 몫. 휘어서 그 밖으로 불룩 나온 획은 먼저 빈 쪽으로 옮기고, 그래도 넘치면 그 방향으로만 줄인다.
 
-/**
- * 틈이 모자란 자소 쌍을 서로에게서 물린다: 마주 보는 쪽만 줄이고 바깥쪽 면(윗선 · 밑선 · 옆선)은 그대로 둔다. 그은 모양은 안 건드린다.
- * `need`는 더 벌려야 하는 틈(em)이고 두 자소가 반씩 나눠 물러난다. `original`은 줄이기 전 상자 — 한도를 잰다.
- */
-export function shrunkApart(boxes: Readonly<Partial<Record<Part, BoxConfig>>>, original: Readonly<Partial<Record<Part, BoxConfig>>>, pair: PartPair, nearest: Nearest, need: number): Partial<Record<Part, BoxConfig>> {
-  const out: Partial<Record<Part, BoxConfig>> = { ...boxes }
-  const [first, second] = pair.split('-') as ['CH' | 'JU', 'JU' | 'JO']
-  const vertical = Math.abs(nearest.dy) >= Math.abs(nearest.dx)
-  const forward = (vertical ? nearest.dy : nearest.dx) >= 0
-  const shrink = (group: 'CH' | 'JU' | 'JO', keepStart: boolean) => {
-    for (const part of Object.keys(out) as Part[]) {
-      const box = out[part], base = original[part]
-      if (!box || !base || groupOf(part) !== group) continue
-      const size = vertical ? box.height : box.width
-      const floor = (vertical ? base.height : base.width) * MIN_PART_SCALE
-      const cut = Math.max(0, Math.min(need / 2, size - floor))
-      if (vertical) out[part] = { ...box, y: keepStart ? box.y : box.y + cut, height: size - cut }
-      else out[part] = { ...box, x: keepStart ? box.x : box.x + cut, width: size - cut }
+export interface Rect { minX: number; maxX: number; minY: number; maxY: number }
+/** 부위마다 중심선이 차지한 네모(em). */
+export type PartRects = Partial<Record<Part, Rect>>
+
+export function partRects(strokes: readonly MeasuredStroke[]): PartRects {
+  const out: PartRects = {}
+  for (const stroke of strokes) {
+    const rect = out[stroke.part] ?? (out[stroke.part] = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity })
+    for (const p of flatten(stroke)) {
+      rect.minX = Math.min(rect.minX, p.x); rect.maxX = Math.max(rect.maxX, p.x)
+      rect.minY = Math.min(rect.minY, p.y); rect.maxY = Math.max(rect.maxY, p.y)
     }
   }
-  // 둘째가 첫째의 아래 · 오른쪽에 있으면 첫째는 앞쪽 면을 지키고 뒤를 줄이고, 둘째는 뒤쪽 면을 지키고 앞을 줄인다.
-  shrink(first, forward)
-  shrink(second, !forward)
   return out
 }
 
-/**
- * 틈이 모자랄 때 줄여 보는 단계(앞이 그은 그대로). 먼저 휨만 줄이고 기울기는 남긴다 — 기울여 그은 선이 수평 · 수직으로 눕지 않게.
- * 휨을 다 펴도 닿을 때만 기울기를 줄인다.
- */
-export const BEND_LEVELS: readonly { bend: number; tilt: number }[] = [
-  { bend: 1, tilt: 1 }, { bend: 0.66, tilt: 1 }, { bend: 0.33, tilt: 1 }, { bend: 0, tilt: 1 }, { bend: 0, tilt: 0.5 }, { bend: 0, tilt: 0 },
-]
+/** 옆에 다른 자소가 없는 쪽으로 불룩 나와도 되는 만큼(em). 글자 옆 여백 안쪽이다. */
+export const OUTER_SLACK = 0.04
 
 /**
- * 휨 단계마다의 틈 비율(`ratios[i]`는 `BEND_LEVELS[i]`로 그렸을 때) → 고를 단계와 기록.
- * 앞에서부터 처음으로 울타리 안인 단계를 고른다. 다 밖이면 틈이 가장 넓은 단계.
+ * 부위마다 획이 있어도 되는 칸. 기준 글자(기본 획)의 네모에서, 옆 자소가 있는 쪽은 둘 사이 잉크 틈의 `(1 − floor) ÷ 2`만큼(둘이 반씩 써도 틈이 `floor` 아래로 안 준다),
+ * 옆 자소가 없는 쪽은 `OUTER_SLACK`만큼 넓힌다.
  */
-export function pickBend(ratioAt: (level: number) => number, floor: number | undefined): { level: number; pull: FencePull | null } {
-  if (floor === undefined) return { level: 0, pull: null }
-  const band = { lo: floor, hi: Infinity }
-  const before = ratioAt(0)
-  if (before >= floor) return { level: 0, pull: { value: 'clearance', before, after: before, band, pulled: 0, left: 0 } }
-  let best = 0, bestRatio = before
-  for (let level = 1; level < BEND_LEVELS.length; level++) {
-    const ratio = ratioAt(level)
-    if (ratio > bestRatio) { best = level; bestRatio = ratio }
-    if (ratio >= floor) break
+export function allowedRects(reference: PartRects, thickness: number, floor: number): PartRects {
+  const out: PartRects = {}
+  const parts = Object.keys(reference) as Part[]
+  for (const part of parts) {
+    const own = reference[part]!
+    const slack = { left: OUTER_SLACK, right: OUTER_SLACK, up: OUTER_SLACK, down: OUTER_SLACK }
+    for (const other of parts) {
+      if (other === part) continue
+      const rect = reference[other]!
+      const share = (gap: number) => Math.max(0, gap - thickness) * (1 - floor) / 2
+      const overlapsY = rect.minY < own.maxY && rect.maxY > own.minY, overlapsX = rect.minX < own.maxX && rect.maxX > own.minX
+      if (overlapsY && rect.minX >= own.maxX) slack.right = Math.min(slack.right, share(rect.minX - own.maxX))
+      if (overlapsY && rect.maxX <= own.minX) slack.left = Math.min(slack.left, share(own.minX - rect.maxX))
+      if (overlapsX && rect.minY >= own.maxY) slack.down = Math.min(slack.down, share(rect.minY - own.maxY))
+      if (overlapsX && rect.maxY <= own.minY) slack.up = Math.min(slack.up, share(own.minY - rect.maxY))
+    }
+    out[part] = { minX: own.minX - slack.left, maxX: own.maxX + slack.right, minY: own.minY - slack.up, maxY: own.maxY + slack.down }
   }
-  // 당긴 양은 줄인 휨의 몫(−0.5 = 휨을 반으로). 기울기까지 줄였으면 −1 아래로 센다.
-  return { level: best, pull: { value: 'clearance', before, after: bestRatio, band, pulled: BEND_LEVELS[best].bend - 1 - (1 - BEND_LEVELS[best].tilt), left: bestRatio >= floor ? 0 : floor - bestRatio } }
+  return out
+}
+
+/** 한 축에서 [lo, hi] 구간을 칸 [min, max] 안에 넣는 선형 변환(p → at + (p − lo) × scale)과 넘쳤던 길이. */
+function fitAxis(lo: number, hi: number, min: number, max: number): { scale: number; at: number; over: number } {
+  const size = hi - lo, room = max - min
+  const over = Math.max(0, min - lo) + Math.max(0, hi - max)
+  if (over <= EPS) return { scale: 1, at: lo, over: 0 }
+  // 칸보다 작으면 옮기기만, 크면 칸에 꽉 차게 줄인다.
+  if (size <= room) return { scale: 1, at: lo < min ? min : max - size, over }
+  return { scale: room / size, at: min, over }
+}
+
+/**
+ * 지금 획(`now`)이 칸(`allowed`) 밖으로 나온 부위의 상자를 칸 안으로 맞춘다. 모양은 그대로, 넘친 방향으로만 옮기거나 줄인다.
+ * `overflow`는 가장 크게 넘쳤던 길이(em).
+ */
+export function fittedBoxes(boxes: Readonly<Partial<Record<Part, BoxConfig>>>, now: PartRects, allowed: PartRects): { boxes: Partial<Record<Part, BoxConfig>>; overflow: number } {
+  const out: Partial<Record<Part, BoxConfig>> = { ...boxes }
+  let overflow = 0
+  for (const part of Object.keys(now) as Part[]) {
+    const box = out[part], ink = now[part], room = allowed[part]
+    if (!box || !ink || !room) continue
+    const x = fitAxis(ink.minX, ink.maxX, room.minX, room.maxX), y = fitAxis(ink.minY, ink.maxY, room.minY, room.maxY)
+    if (x.over <= EPS && y.over <= EPS) continue
+    overflow = Math.max(overflow, x.over, y.over)
+    out[part] = { x: x.at + (box.x - ink.minX) * x.scale, y: y.at + (box.y - ink.minY) * y.scale, width: box.width * x.scale, height: box.height * y.scale }
+  }
+  return { boxes: out, overflow }
 }
 
 // ── 당기기 ──
@@ -473,7 +493,7 @@ export const FENCE_ORDER: readonly FenceValue[] = ['clearance', 'finalBottom', '
 
 /** 당긴 방향을 쉬운 말로. */
 export function pullWord(value: FenceValue, pulled: number): string {
-  if (value === 'clearance') return '휨 줄임'
+  if (value === 'clearance') return '칸 안으로'
   if (value === 'finalBottom') return pulled < 0 ? '올림' : '내림'
   if (value === 'gap') return pulled > 0 ? '벌림' : '좁힘'
   if (value === 'topLine') return pulled > 0 ? '윗부분 올림' : '윗부분 내림'

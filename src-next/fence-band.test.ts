@@ -4,9 +4,7 @@ import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
 import { getBaseJamo } from '../src/stores/jamoStore'
 import type { BoxConfig, JamoData, Part } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
-import { bentStems } from './fenceBend'
-import { drawnStem } from './strokeLab'
-import { BEND_LEVELS, nearestBetweenParts, shrunkApart, clearanceRatio, correctGlyph, expectedGap, partClearances, pickBend, type FenceCorrection, finalBottomTolerance, GOTHIC_FENCE, measureGlyph, movedBoxes, shakenBoxes, summarize, type GlyphMeasure, type ShakeLevel } from './fenceBand'
+import { allowedRects, fittedBoxes, OUTER_SLACK, partRects, clearanceRatio, correctGlyph, expectedGap, partClearances, type FenceCorrection, finalBottomTolerance, GOTHIC_FENCE, measureGlyph, movedBoxes, shakenBoxes, summarize, type GlyphMeasure, type ShakeLevel } from './fenceBand'
 
 const CHOSEONG = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ', JUNGSEONG = 'ㅏㅓㅗㅜㅡㅣ'
 const map = (type: JamoData['type'], chars: string) => Object.fromEntries([...chars].map((char) => [char, getBaseJamo(type, char)]).filter(([, jamo]) => jamo)) as Record<string, JamoData>
@@ -136,58 +134,38 @@ describe('울타리 자동 보정', () => {
     expect(partClearances([line('CH', 0.3), line('CH', 0.31)])).toEqual({})
   })
 
-  it('휨 줄이기: 틈이 울타리에 들 때까지만 줄이고, 처음부터 안이면 그대로 둔다', () => {
-    expect(pickBend(() => 0.9, 0.7)).toMatchObject({ level: 0, pull: { pulled: 0, left: 0 } })
-    // 그은 그대로 0.2, 한 단계 0.5, 두 단계 0.8 → 두 단계(휨 반)에서 멈춘다.
-    const ratios = [0.2, 0.5, 0.8, 0.9, 1, 1]
-    const picked = pickBend((level) => ratios[level], 0.7)
-    expect(picked.level).toBe(2)
-    expect(picked.pull).toMatchObject({ value: 'clearance', before: 0.2, after: 0.8, pulled: BEND_LEVELS[2].bend - 1, left: 0 })
-    // 다 줄여도 좁으면 가장 넓은 단계를 고르고 남은 만큼 알린다.
-    const stuck = pickBend((level) => [0.1, 0.3, 0.2, 0.2, 0.2, 0.2][level], 0.7)
-    expect(stuck.level).toBe(1)
-    expect(stuck.pull!.left).toBeCloseTo(0.4, 9)
-    // 울타리 값이 없으면 손대지 않는다.
-    expect(pickBend(() => 0, undefined)).toEqual({ level: 0, pull: null })
+  it('칸: 옆 자소 쪽은 틈의 몫만큼, 빈 쪽은 여백만큼 넓다', () => {
+    const reference = { CH: { minX: 0.1, maxX: 0.4, minY: 0.1, maxY: 0.9 }, JU: { minX: 0.7, maxX: 0.7, minY: 0.1, maxY: 0.9 } }
+    const allowed = allowedRects(reference, 0.06, 0.7)
+    // 둘 사이 잉크 틈 0.3 − 0.06 = 0.24, 써도 되는 몫은 30%를 반씩 = 0.036.
+    expect(allowed.CH!.maxX).toBeCloseTo(0.436, 9)
+    expect(allowed.JU!.minX).toBeCloseTo(0.664, 9)
+    expect(allowed.JU!.maxX).toBeCloseTo(0.7 + OUTER_SLACK, 9)
+    expect(allowed.CH!.minX).toBeCloseTo(0.1 - OUTER_SLACK, 9)
   })
 
-  it('휨을 줄여도 기울기는 남는다 — 기울여 그은 가로선이 수평으로 눕지 않는다', () => {
-    // 오른쪽이 올라가게 기울이고 가운데를 부풀린 가로선.
-    const raw = Array.from({ length: 60 }, (_, i) => { const t = i / 59; return { x: 0.1 + 0.55 * t, y: 0.6 - 0.15 * t + Math.sin(Math.PI * t) * 0.06 } })
-    const stem = drawnStem(raw, 'longHorizontal')
-    if (!stem.ok || !stem.shape) throw new Error('가로 긴 선을 못 받았다')
-    const tilt = stem.shape[stem.shape.length - 1].r
-    expect(Math.abs(tilt)).toBeGreaterThan(0.1)
-    const flat = bentStems({ longHorizontal: stem }, { bend: 0, tilt: 1 }).longHorizontal!
-    if (!flat.ok || !flat.shape) throw new Error('모양이 없다')
-    expect(flat.shape[flat.shape.length - 1].r).toBeCloseTo(tilt, 9)
-    // 휨은 사라져 모든 점이 시작 → 끝 직선 위에 있다.
-    for (const point of flat.shape) expect(point.r).toBeCloseTo(tilt * point.t, 9)
-    const level = bentStems({ longHorizontal: stem }, { bend: 0, tilt: 0 }).longHorizontal!
-    if (level.ok && level.shape) expect(level.shape[level.shape.length - 1].r).toBeCloseTo(0, 9)
+  it('휜 획 넣기: 칸보다 작으면 빈 쪽으로 옮기기만, 크면 넘친 방향으로만 줄인다', () => {
+    const allowed = { JU: { minX: 0.664, maxX: 0.74, minY: 0.1, maxY: 0.9 } }
+    const boxes = { JU: { x: 0.6, y: 0.05, width: 0.2, height: 0.9 } }
+    // 안이면 그대로.
+    expect(fittedBoxes(boxes, { JU: { minX: 0.68, maxX: 0.72, minY: 0.1, maxY: 0.9 } }, allowed)).toMatchObject({ boxes, overflow: 0 })
+    // 왼쪽(첫닿 쪽)으로 0.024 불룩 — 폭 0.06은 칸(0.076)보다 작다 → 오른쪽으로 옮기기만 한다.
+    const moved = fittedBoxes(boxes, { JU: { minX: 0.64, maxX: 0.7, minY: 0.1, maxY: 0.9 } }, allowed)
+    expect(moved.overflow).toBeCloseTo(0.024, 9)
+    expect(moved.boxes.JU).toMatchObject({ width: 0.2, height: 0.9 })
+    expect(moved.boxes.JU!.x).toBeCloseTo(0.624, 9)
+    // 폭 0.152로 크게 휘면 가로로만 반으로 줄인다. 세로(길이)는 그대로.
+    const squeezed = fittedBoxes(boxes, { JU: { minX: 0.6, maxX: 0.752, minY: 0.1, maxY: 0.9 } }, allowed)
+    expect(squeezed.boxes.JU!.width).toBeCloseTo(0.1, 9)
+    expect(squeezed.boxes.JU!.height).toBe(0.9)
+    expect(squeezed.boxes.JU!.x).toBeCloseTo(0.664, 9)
   })
 
-  it('자소 물리기: 마주 보는 쪽만 줄이고 바깥 면은 그대로 둔다', () => {
-    const boxes = { CH: { x: 0.1, y: 0.05, width: 0.8, height: 0.4 }, JO: { x: 0.1, y: 0.5, width: 0.8, height: 0.45 } }
-    // 받침이 첫닿 아래에 있다 → 첫닿은 아래를, 받침은 위를 줄인다.
-    const apart = shrunkApart(boxes, boxes, 'CH-JO', { gap: 0, dx: 0, dy: 0.05 }, 0.04)
-    expect(apart.CH).toMatchObject({ y: 0.05, height: 0.38 })
-    expect(apart.JO!.y).toBeCloseTo(0.52, 9)
-    expect(apart.JO!.y + apart.JO!.height).toBeCloseTo(0.95, 9)
-    // 한도(원래의 80%) 아래로는 안 줄인다.
-    const far = shrunkApart(boxes, boxes, 'CH-JO', { gap: 0, dx: 0, dy: 0.05 }, 1)
-    expect(far.CH!.height).toBeCloseTo(0.32, 9)
-    expect(far.JO!.height).toBeCloseTo(0.36, 9)
-    // 실제 글자: 받침 상자를 위로 밀어 넣어 닿게 한 뒤 물리면 틈이 다시 벌어진다.
-    const base = measured('곤')
-    const strokesOf = (b: Partial<Record<Part, BoxConfig>>) => {
-      const syllable = decomposeSyllable('곤', cho, jung, jong)
-      return resolveGlyphInkPrimitives({ syllable, placement: { kind: 'boxes', boxes: b }, weightMultiplier: 1, horizontalInkBounds: { min: 0, max: 1 } }).primitives
-        .map((primitive) => ({ part: primitive.source.part, box: primitive.box, points: primitive.stroke.points, closed: primitive.stroke.closed, thickness: primitive.stroke.thickness }))
-    }
-    const pushed = { ...base.boxes, JO: { ...base.boxes.JO!, y: base.boxes.JO!.y - 0.08 } }
-    const tight = nearestBetweenParts(strokesOf(pushed))['JU-JO']!
-    const loose = nearestBetweenParts(strokesOf(shrunkApart(pushed, pushed, 'JU-JO', tight, 0.06)))['JU-JO']!
-    expect(loose.gap).toBeGreaterThan(tight.gap + 0.02)
+  it('부위 네모는 휜 선의 불룩한 데까지 잰다', () => {
+    const box = { x: 0, y: 0, width: 1, height: 1 }
+    const bowed = { part: 'JU' as const, box, points: [{ x: 0.7, y: 0.1, handleOut: { x: 0.9, y: 0.3 } }, { x: 0.7, y: 0.9, handleIn: { x: 0.9, y: 0.7 } }], closed: false }
+    const rect = partRects([bowed]).JU!
+    expect(rect.minX).toBeCloseTo(0.7, 9)
+    expect(rect.maxX).toBeCloseTo(0.85, 2)
   })
 })
