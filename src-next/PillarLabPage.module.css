@@ -1,0 +1,58 @@
+/* 기둥 긋기 시험판. 폰 한 손 화면이 먼저 — 위에서 글줄을 보고, 아래(엄지 자리)에서 긋는다. */
+.page {
+  display: grid;
+  gap: 14px;
+  width: min(480px, 100%);
+  min-height: 100dvh;
+  margin-inline: auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+  background: rgb(var(--color-background));
+  color: rgb(var(--color-foreground));
+  align-content: start;
+}
+
+.header { display: grid; gap: 2px; }
+.eyebrow { color: rgb(var(--color-primary)); font-size: var(--font-11); font-weight: var(--weight-heavy); letter-spacing: .08em; }
+.header h1 { font-size: var(--font-24); font-weight: var(--weight-heavy); line-height: 1.2; }
+.header p { color: rgb(var(--color-text-3)); font-size: var(--font-14); }
+
+.lineCard {
+  display: grid;
+  gap: 12px;
+  padding: 14px 12px 12px;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: var(--radius-lg);
+  background: rgb(var(--color-surface));
+}
+.line { display: flex; flex-wrap: wrap; align-items: center; row-gap: 6px; min-height: 92px; }
+.space { width: 14px; }
+.lineTools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.viewSwitch { margin-left: auto; min-width: 128px; }
+
+.levels { display: grid; gap: 8px; }
+.levels h2 { color: rgb(var(--color-text-3)); font-size: var(--font-13); font-weight: var(--weight-bold); }
+.levelGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.levelGrid > button { border: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
+.levelGrid > button[aria-checked='true'] { border-color: rgb(var(--color-foreground)); background: rgb(var(--color-surface)); }
+.levelLine { width: 44px; height: 58px; }
+.levelGlyphs { display: flex; justify-content: center; }
+
+.padWrap { display: grid; gap: 8px; }
+.pad {
+  width: 100%;
+  max-height: 42dvh;
+  aspect-ratio: 3 / 4;
+  justify-self: center;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: var(--radius-lg);
+  background: rgb(var(--color-surface));
+  /* 긋는 동안 화면이 따라 움직이지 않게. iOS는 SVG에서 이걸 건너뛰기도 해서 터치 이동도 직접 막는다(TSX). */
+  touch-action: none;
+  cursor: crosshair;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.padNote { min-height: 20px; color: rgb(var(--color-text-4)); font-size: var(--font-13); text-align: center; }
+.padNote[data-state='done'] { color: rgb(var(--color-foreground)); font-weight: var(--weight-semibold); }
+.padNote[data-state='warn'] { color: rgb(var(--color-warning)); font-weight: var(--weight-semibold); }
