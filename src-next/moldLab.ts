@@ -464,3 +464,166 @@ export function gapCapMultiplier(reference: readonly GapStroke[], current: reado
   }
   return cap
 }
+
+// ── 심즈처럼 빚기(2026-11-20 하니무스 "일단 가보자고") ──
+// 글자에서 부위(첫닿자 · 홀자 · 받침)를 콕 눌러 고르고, 어디서든 여덟 방향으로 끈다.
+// 칸 편집은 짜임마다 "칸 네 선을 얼마나 옮겼나"로 두어, 같은 짜임의 다른 글자에도 같은 만큼 옮긴다.
+// 획(굵기 · 또렷↔흐물)과 전체(폭 · 자간)는 글자 위에 잡을 데가 없어 단추로 고른다.
+
+export type SimsPart = 'CH' | 'JU' | 'JO'
+export type Region = SimsPart | 'STROKE' | 'WHOLE'
+/** 칸 네 선의 이동량(글자 단위): 왼선 · 오른선 · 윗선 · 밑선. */
+export type PartEdit = readonly [number, number, number, number]
+export type LayoutEdits = Partial<Record<LayoutType, Partial<Record<SimsPart, PartEdit>>>>
+export interface Look { weight?: number; soft?: number; frame?: number; tracking?: number }
+export type Dir = 'up' | 'down' | 'left' | 'right' | 'ul' | 'ur' | 'dl' | 'dr'
+export interface RegionLabels { name: string; up: string; down: string; left: string; right: string }
+
+/** 획 · 전체 값의 한계선. 굵기 · 자간은 옛 숨 손잡이 양 끝, 폭은 옛 틀 손잡이와 같다. */
+export const LOOK_WALL = { weight: [0.7, 1.45], soft: [0, 1], frame: [0.78, 1.16], tracking: [-0.04, 0.14] } as const
+const LOOK_ENGINE = { weight: 1, soft: 0, frame: 1, tracking: 0 } as const
+export const lookOf = (look: Look, key: keyof Look) => look[key] ?? LOOK_ENGINE[key]
+
+export const simsPartOf = (part: Part): SimsPart => (part === 'JU_H' || part === 'JU_V' ? 'JU' : part)
+const isVertical = (layout: LayoutType) => layout.includes('jungseong-vertical')
+
+export function regionLabels(region: Region, layout: LayoutType): RegionLabels {
+  if (region === 'CH') return { name: '첫닿자', up: '키 크게', down: '키 작게', left: '좁게', right: '넓게' }
+  if (region === 'JO') return { name: '받침', up: '키 크게', down: '키 작게', left: '좁게', right: '넓게' }
+  if (region === 'JU') return isVertical(layout)
+    ? { name: '홀자', up: '길게', down: '짧게', left: '기둥 왼쪽으로', right: '기둥 오른쪽으로' }
+    : { name: '홀자', up: '보 위로', down: '보 아래로', left: '짧게', right: '길게' }
+  if (region === 'STROKE') return { name: '획', up: '굵게', down: '가늘게', left: '또렷하게', right: '흐물하게' }
+  return { name: '글자 전체', up: '자간 좁게', down: '자간 넓게', left: '길쭉하게', right: '납작하게' }
+}
+
+/** 끈 방향(화면 px, 아래가 +) → 여덟 방향 중 가까운 것. */
+export function dirOf(dx: number, dy: number): Dir {
+  const sector = Math.round(Math.atan2(dy, dx) / (Math.PI / 4))
+  const map: Record<string, Dir> = { 0: 'right', 1: 'dr', 2: 'down', 3: 'dl', 4: 'left', '-4': 'left', '-3': 'ul', '-2': 'up', '-1': 'ur' }
+  return map[String(sector)]
+}
+
+type Rect = [number, number, number, number] // x0 y0 x1 y1
+const rectOf = (box: BoxConfig): Rect => [box.x, box.y, box.x + box.width, box.y + box.height]
+const boxOfRect = (base: BoxConfig, [x0, y0, x1, y1]: Rect): BoxConfig => ({ ...base, x: x0, y: y0, width: x1 - x0, height: y1 - y0 })
+
+/** 짜임 편집을 칸에 입힌다. 섞임홀자의 JU_H · JU_V는 홀자 편집을 같이 받는다. 너무 얇아지면 가운데로 모은다. */
+export function applyPartEdits(boxes: Partial<Record<Part, BoxConfig>>, edits: Partial<Record<SimsPart, PartEdit>> | undefined): Partial<Record<Part, BoxConfig>> {
+  if (!edits) return boxes
+  const out: Partial<Record<Part, BoxConfig>> = { ...boxes }
+  for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) {
+    const edit = box && edits[simsPartOf(part)]
+    if (!edit) continue
+    let [x0, y0, x1, y1] = rectOf(box)
+    x0 += edit[0]; x1 += edit[1]; y0 += edit[2]; y1 += edit[3]
+    if (x1 - x0 < 0.03) { const c = (x0 + x1) / 2; x0 = c - 0.015; x1 = c + 0.015 }
+    if (y1 - y0 < 0.03) { const c = (y0 + y1) / 2; y0 = c - 0.015; y1 = c + 0.015 }
+    out[part] = boxOfRect(box, [x0, y0, x1, y1])
+  }
+  return out
+}
+
+/** 처음 칸 → 지금 칸의 편집값. */
+export function editsBetween(origin: Partial<Record<SimsPart, BoxConfig>>, next: Partial<Record<SimsPart, BoxConfig>>): Partial<Record<SimsPart, PartEdit>> {
+  const out: Partial<Record<SimsPart, PartEdit>> = {}
+  for (const part of Object.keys(next) as SimsPart[]) {
+    const a = origin[part], b = next[part]
+    if (!a || !b) continue
+    const [ax0, ay0, ax1, ay1] = rectOf(a), [bx0, by0, bx1, by1] = rectOf(b)
+    out[part] = [bx0 - ax0, bx1 - ax1, by0 - ay0, by1 - ay1]
+  }
+  return out
+}
+
+/** 섞임홀자는 JU_H · JU_V를 묶은 한 칸으로 본다. */
+export function simsBoxes(boxes: Partial<Record<Part, BoxConfig>>): Partial<Record<SimsPart, BoxConfig>> {
+  const out: Partial<Record<SimsPart, BoxConfig>> = {}
+  if (boxes.CH) out.CH = boxes.CH
+  if (boxes.JO) out.JO = boxes.JO
+  const ju = [boxes.JU, boxes.JU_H, boxes.JU_V].filter((box): box is BoxConfig => !!box)
+  if (ju.length) {
+    const x0 = Math.min(...ju.map((b) => b.x)), y0 = Math.min(...ju.map((b) => b.y))
+    const x1 = Math.max(...ju.map((b) => b.x + b.width)), y1 = Math.max(...ju.map((b) => b.y + b.height))
+    out.JU = { x: x0, y: y0, width: x1 - x0, height: y1 - y0 }
+  }
+  return out
+}
+
+const SIMS_MIN = 0.08, SIMS_LO = 0.02, SIMS_HI = 0.98
+interface Neighbor { part: SimsPart; side: 'l' | 'r' | 't' | 'b'; gap: number }
+function neighborsOf(boxes: Partial<Record<SimsPart, BoxConfig>>, grabbed: SimsPart): Neighbor[] {
+  const p = boxes[grabbed]
+  if (!p) return []
+  const out: Neighbor[] = []
+  for (const [part, q] of Object.entries(boxes) as [SimsPart, BoxConfig][]) {
+    if (part === grabbed || !q) continue
+    if (q.x >= p.x + p.width - 0.02) out.push({ part, side: 'r', gap: q.x - (p.x + p.width) })
+    else if (q.x + q.width <= p.x + 0.02) out.push({ part, side: 'l', gap: p.x - (q.x + q.width) })
+    else if (q.y >= p.y + p.height - 0.02) out.push({ part, side: 'b', gap: q.y - (p.y + p.height) })
+    else if (q.y + q.height <= p.y + 0.02) out.push({ part, side: 't', gap: p.y - (q.y + q.height) })
+  }
+  return out
+}
+const minSide = (size: number) => Math.min(SIMS_MIN, size * 0.5 + 0.02, size)
+
+/**
+ * 부위를 끈 결과 칸. du · dv는 글자 단위(위로 끌면 dv < 0).
+ * 잡은 칸이 자라면 맞닿은 칸의 가까운 선이 따라 밀리고 먼 선은 그대로라 짜부된다. 더 짜부될 수 없으면 칸째로 밀려난다.
+ * 잡은 칸은 처음 크기의 0.5~1.6배 안에서만 바뀌고, 이웃이 글자 끝까지 밀리면 더 못 자란다.
+ */
+export function dragPart(start: Partial<Record<SimsPart, BoxConfig>>, origin: Partial<Record<SimsPart, BoxConfig>>, grabbed: SimsPart, du: number, dv: number, layout: LayoutType): Partial<Record<SimsPart, BoxConfig>> {
+  const s = start[grabbed], o = origin[grabbed]
+  if (!s || !o) return start
+  let [x0, y0, x1, y1] = rectOf(s)
+  const grow = -dv
+  if (grabbed === 'CH') { y1 += grow; x0 -= du / 2; x1 += du / 2 }
+  else if (grabbed === 'JO') { y0 -= grow; x0 -= du / 2; x1 += du / 2 }
+  else if (isVertical(layout)) { y0 -= grow / 2; y1 += grow / 2; x0 += du; x1 += du }
+  else { y0 -= grow; y1 -= grow; x0 -= du / 2; x1 += du / 2 }
+  if (x1 - x0 < o.width * 0.5) { const c = (x0 + x1) / 2; x0 = c - o.width * 0.25; x1 = c + o.width * 0.25 }
+  if (y1 - y0 < o.height * 0.5) {
+    if (grabbed === 'CH') y1 = y0 + o.height * 0.5
+    else if (grabbed === 'JO') y0 = y1 - o.height * 0.5
+    else { const c = (y0 + y1) / 2; y0 = c - o.height * 0.25; y1 = c + o.height * 0.25 }
+  }
+  // 처음 크기의 1.6배까지만 자란다.
+  if (x1 - x0 > o.width * 1.6) { const c = (x0 + x1) / 2; x0 = c - o.width * 0.8; x1 = c + o.width * 0.8 }
+  if (y1 - y0 > o.height * 1.6) {
+    if (grabbed === 'CH') y1 = y0 + o.height * 1.6
+    else if (grabbed === 'JO') y0 = y1 - o.height * 1.6
+    else { const c = (y0 + y1) / 2; y0 = c - o.height * 0.8; y1 = c + o.height * 0.8 }
+  }
+  // 이웃이 끝까지 밀리면 멈춘다.
+  const neighbors = neighborsOf(start, grabbed)
+  for (const n of neighbors) {
+    const q = start[n.part]!
+    const mw = minSide(q.width), mh = minSide(q.height)
+    if (n.side === 'r') x1 = Math.min(x1, Math.max(q.x + q.width, SIMS_HI) - mw - n.gap)
+    if (n.side === 'l') x0 = Math.max(x0, Math.min(q.x, SIMS_LO) + mw + n.gap)
+    if (n.side === 'b') y1 = Math.min(y1, Math.max(q.y + q.height, SIMS_HI) - mh - n.gap)
+    if (n.side === 't') y0 = Math.max(y0, Math.min(q.y, SIMS_LO) + mh + n.gap)
+  }
+  x0 = Math.max(SIMS_LO, x0); y0 = Math.max(SIMS_LO, y0); x1 = Math.min(SIMS_HI, x1); y1 = Math.min(SIMS_HI, y1)
+  if (x1 - x0 < 0.03) x1 = x0 + 0.03
+  if (y1 - y0 < 0.03) y1 = y0 + 0.03
+  const out: Partial<Record<SimsPart, BoxConfig>> = { ...start, [grabbed]: boxOfRect(s, [x0, y0, x1, y1]) }
+  for (const n of neighbors) {
+    const q = start[n.part]!
+    let [qx0, qy0, qx1, qy1] = rectOf(q)
+    const mw = minSide(q.width), mh = minSide(q.height)
+    if (n.side === 'r') { qx0 = x1 + n.gap; qx1 = Math.max(qx1, qx0 + mw) }
+    if (n.side === 'l') { qx1 = x0 - n.gap; qx0 = Math.min(qx0, qx1 - mw) }
+    if (n.side === 'b') { qy0 = y1 + n.gap; qy1 = Math.max(qy1, qy0 + mh) }
+    if (n.side === 't') { qy1 = y0 - n.gap; qy0 = Math.min(qy0, qy1 - mh) }
+    out[n.part] = boxOfRect(q, [qx0, qy0, qx1, qy1])
+  }
+  return out
+}
+
+/** 획 · 전체를 끈 결과. du · dv는 글자 단위(위로 끌면 dv < 0). */
+export function dragLook(start: Look, region: 'STROKE' | 'WHOLE', du: number, dv: number): Look {
+  const clampTo = (key: keyof typeof LOOK_WALL, value: number) => Math.max(LOOK_WALL[key][0], Math.min(LOOK_WALL[key][1], value))
+  if (region === 'STROKE') return { ...start, weight: clampTo('weight', lookOf(start, 'weight') * Math.exp(-dv * 1.6)), soft: clampTo('soft', lookOf(start, 'soft') + du * 2.5) }
+  return { ...start, frame: clampTo('frame', lookOf(start, 'frame') + du * 0.5), tracking: clampTo('tracking', lookOf(start, 'tracking') + dv * 0.3) }
+}

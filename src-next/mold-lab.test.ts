@@ -143,3 +143,58 @@ describe('획 사이 최소 틈 — 닿는 곳 가까이', () => {
     expect(gapCapMultiplier(siot, siot, 1)).toBe(Infinity)
   })
 })
+
+describe('심즈처럼 빚기', () => {
+  const vertical = 'choseong-jungseong-vertical-jongseong' as const
+  const boxes = {
+    CH: { x: 0.12, y: 0.14, width: 0.35, height: 0.29 },
+    JU: { x: 0.7, y: 0.05, width: 0.17, height: 0.47 },
+    JO: { x: 0.2, y: 0.62, width: 0.6, height: 0.3 },
+  }
+  it('칸 편집은 선 이동량이라 되돌려 입히면 같은 칸', async () => {
+    const { applyPartEdits, editsBetween } = await import('./moldLab')
+    const next = { ...boxes, CH: { x: 0.1, y: 0.14, width: 0.4, height: 0.35 } }
+    const edits = editsBetween(boxes, next)
+    const back = applyPartEdits(boxes, edits)
+    expect(back.CH!.width).toBeCloseTo(0.4)
+    expect(back.CH!.height).toBeCloseTo(0.35)
+    expect(back.JO!.y).toBeCloseTo(0.62)
+  })
+  it('첫닿자 키를 키우면 받침이 위에서 눌리고 밑선은 그대로', async () => {
+    const { dragPart } = await import('./moldLab')
+    const out = dragPart(boxes, boxes, 'CH', 0, -0.1, vertical)
+    expect(out.CH!.height).toBeCloseTo(0.39)
+    expect(out.JO!.y).toBeGreaterThan(boxes.JO.y)
+    expect(out.JO!.y + out.JO!.height).toBeCloseTo(boxes.JO.y + boxes.JO.height)
+  })
+  it('받침이 더 못 눌리면 첫닿자도 멈춘다', async () => {
+    const { dragPart } = await import('./moldLab')
+    const out = dragPart(boxes, boxes, 'CH', 0, -1, vertical)
+    expect(out.JO!.height).toBeGreaterThan(0.08 - 1e-9)
+    expect(out.CH!.y + out.CH!.height).toBeLessThan(out.JO!.y)
+  })
+  it('세로홀자 기둥을 옮기면 첫닿자가 밀리지 않고 홀자만 옮겨진다(사이가 벌어질 때)', async () => {
+    const { dragPart } = await import('./moldLab')
+    const out = dragPart(boxes, boxes, 'JU', 0.05, 0, vertical)
+    expect(out.JU!.x).toBeCloseTo(0.75)
+    expect(out.CH!.x + out.CH!.width).toBeCloseTo(0.75 - (0.7 - 0.47))
+  })
+  it('여덟 방향', async () => {
+    const { dirOf } = await import('./moldLab')
+    expect(dirOf(0, -10)).toBe('up')
+    expect(dirOf(-10, -10)).toBe('ul')
+    expect(dirOf(10, 10)).toBe('dr')
+    expect(dirOf(-10, 1)).toBe('left')
+  })
+  it('홀자 방향 말은 짜임에 따라 다르다', async () => {
+    const { regionLabels } = await import('./moldLab')
+    expect(regionLabels('JU', vertical).left).toBe('기둥 왼쪽으로')
+    expect(regionLabels('JU', 'choseong-jungseong-horizontal').up).toBe('보 위로')
+  })
+  it('획 · 전체는 한계선 밖으로 안 나간다', async () => {
+    const { dragLook, LOOK_WALL } = await import('./moldLab')
+    expect(dragLook({}, 'STROKE', 0, -5).weight).toBe(LOOK_WALL.weight[1])
+    expect(dragLook({}, 'WHOLE', -5, 5).frame).toBe(LOOK_WALL.frame[0])
+    expect(dragLook({}, 'WHOLE', -5, 5).tracking).toBe(LOOK_WALL.tracking[1])
+  })
+})
