@@ -196,35 +196,60 @@ export type PartPair = 'CH-JU' | 'JU-JO' | 'CH-JO'
 /** 자소 둘 사이의 가장 좁은 잉크 틈(em). 0 아래면 겹친 것. */
 export type Clearances = Partial<Record<PartPair, number>>
 
-function pointToSegment(p: Pt, a: Pt, b: Pt): number {
-  const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy
-  const t = len2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2)) : 0
-  return Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t))
-}
 const side = (a: Pt, b: Pt, c: Pt) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
-function segmentDistance(a: Pt, b: Pt, c: Pt, d: Pt): number {
-  if (side(a, b, c) * side(a, b, d) < 0 && side(c, d, a) * side(c, d, b) < 0) return 0
-  return Math.min(pointToSegment(a, c, d), pointToSegment(b, c, d), pointToSegment(c, a, b), pointToSegment(d, a, b))
+/** 자소 둘 사이에서 가장 가까운 자리: 잉크 틈(em)과 첫 자소 → 둘째 자소 방향. */
+export interface Nearest { gap: number; dx: number; dy: number }
+
+function closest(a: Pt, b: Pt, c: Pt, d: Pt): { distance: number; dx: number; dy: number } {
+  const mid = (p: Pt, q: Pt) => ({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 })
+  if (side(a, b, c) * side(a, b, d) < 0 && side(c, d, a) * side(c, d, b) < 0) {
+    // 엇갈렸으면 방향은 두 마디의 가운데끼리로 어림한다.
+    const from = mid(a, b), to = mid(c, d)
+    return { distance: 0, dx: to.x - from.x, dy: to.y - from.y }
+  }
+  const project = (p: Pt, s: Pt, e: Pt): Pt => {
+    const dx = e.x - s.x, dy = e.y - s.y, len2 = dx * dx + dy * dy
+    const t = len2 > 0 ? Math.max(0, Math.min(1, ((p.x - s.x) * dx + (p.y - s.y) * dy) / len2)) : 0
+    return { x: s.x + dx * t, y: s.y + dy * t }
+  }
+  // 첫 자소의 점 → 둘째 자소 쪽 벡터들 가운데 가장 짧은 것.
+  const candidates: [Pt, Pt][] = [[a, project(a, c, d)], [b, project(b, c, d)], [project(c, a, b), c], [project(d, a, b), d]]
+  let best = { distance: Infinity, dx: 0, dy: 0 }
+  for (const [from, to] of candidates) {
+    const distance = Math.hypot(to.x - from.x, to.y - from.y)
+    if (distance < best.distance) best = { distance, dx: to.x - from.x, dy: to.y - from.y }
+  }
+  return best
 }
 
-/** 자소 쌍마다 가장 좁은 잉크 틈 = 중심선 사이 거리 − 두 획 굵기의 반씩. 같은 자소 안의 획은 일부러 이어지니 보지 않는다. */
-export function partClearances(strokes: readonly MeasuredStroke[]): Clearances {
-  const lines = strokes.map((stroke) => ({ group: stroke.part === 'CH' ? 'CH' : stroke.part === 'JO' ? 'JO' : 'JU', line: flatten(stroke), half: (stroke.thickness ?? 0) / 2 }))
-  const out: Clearances = {}
-  for (const [first, second] of [['CH', 'JU'], ['JU', 'JO'], ['CH', 'JO']] as const) {
-    let best = Infinity
+const groupOf = (part: Part) => (part === 'CH' ? 'CH' : part === 'JO' ? 'JO' : 'JU')
+const PAIRS = [['CH', 'JU'], ['JU', 'JO'], ['CH', 'JO']] as const
+
+/** 자소 쌍마다 가장 가까운 자리. 잉크 틈 = 중심선 사이 거리 − 두 획 굵기의 반씩. 같은 자소 안의 획은 일부러 이어지니 보지 않는다. */
+export function nearestBetweenParts(strokes: readonly MeasuredStroke[]): Partial<Record<PartPair, Nearest>> {
+  const lines = strokes.map((stroke) => ({ group: groupOf(stroke.part), line: flatten(stroke), half: (stroke.thickness ?? 0) / 2 }))
+  const out: Partial<Record<PartPair, Nearest>> = {}
+  for (const [first, second] of PAIRS) {
+    let best: Nearest | null = null
     for (const a of lines) {
       if (a.group !== first) continue
       for (const b of lines) {
         if (b.group !== second) continue
         for (let i = 1; i < a.line.length; i++) for (let j = 1; j < b.line.length; j++) {
-          best = Math.min(best, segmentDistance(a.line[i - 1], a.line[i], b.line[j - 1], b.line[j]) - a.half - b.half)
+          const found = closest(a.line[i - 1], a.line[i], b.line[j - 1], b.line[j])
+          const gap = found.distance - a.half - b.half
+          if (!best || gap < best.gap) best = { gap, dx: found.dx, dy: found.dy }
         }
       }
     }
-    if (best < Infinity) out[`${first}-${second}` as PartPair] = best
+    if (best) out[`${first}-${second}` as PartPair] = best
   }
   return out
+}
+
+/** 자소 쌍마다 가장 좁은 잉크 틈. */
+export function partClearances(strokes: readonly MeasuredStroke[]): Clearances {
+  return Object.fromEntries(Object.entries(nearestBetweenParts(strokes)).map(([pair, nearest]) => [pair, nearest.gap])) as Clearances
 }
 
 /** 이보다 좁은 기준 틈은 처음부터 붙여 그린 자리로 보고 견주지 않는다(em). */
@@ -239,6 +264,35 @@ export function clearanceRatio(now: Clearances, reference: Clearances): number {
     worst = Math.min(worst, gap / base)
   }
   return worst === Infinity ? 1 : worst
+}
+
+/** 자소 하나를 줄여도 되는 한도(원래 크기의 몫). 그 아래로는 누르지 않는다 — 받침 높이를 34% 아래로 안 누르는 것과 같은 뜻의 어림. */
+export const MIN_PART_SCALE = 0.8
+
+/**
+ * 틈이 모자란 자소 쌍을 서로에게서 물린다: 마주 보는 쪽만 줄이고 바깥쪽 면(윗선 · 밑선 · 옆선)은 그대로 둔다. 그은 모양은 안 건드린다.
+ * `need`는 더 벌려야 하는 틈(em)이고 두 자소가 반씩 나눠 물러난다. `original`은 줄이기 전 상자 — 한도를 잰다.
+ */
+export function shrunkApart(boxes: Readonly<Partial<Record<Part, BoxConfig>>>, original: Readonly<Partial<Record<Part, BoxConfig>>>, pair: PartPair, nearest: Nearest, need: number): Partial<Record<Part, BoxConfig>> {
+  const out: Partial<Record<Part, BoxConfig>> = { ...boxes }
+  const [first, second] = pair.split('-') as ['CH' | 'JU', 'JU' | 'JO']
+  const vertical = Math.abs(nearest.dy) >= Math.abs(nearest.dx)
+  const forward = (vertical ? nearest.dy : nearest.dx) >= 0
+  const shrink = (group: 'CH' | 'JU' | 'JO', keepStart: boolean) => {
+    for (const part of Object.keys(out) as Part[]) {
+      const box = out[part], base = original[part]
+      if (!box || !base || groupOf(part) !== group) continue
+      const size = vertical ? box.height : box.width
+      const floor = (vertical ? base.height : base.width) * MIN_PART_SCALE
+      const cut = Math.max(0, Math.min(need / 2, size - floor))
+      if (vertical) out[part] = { ...box, y: keepStart ? box.y : box.y + cut, height: size - cut }
+      else out[part] = { ...box, x: keepStart ? box.x : box.x + cut, width: size - cut }
+    }
+  }
+  // 둘째가 첫째의 아래 · 오른쪽에 있으면 첫째는 앞쪽 면을 지키고 뒤를 줄이고, 둘째는 뒤쪽 면을 지키고 앞을 줄인다.
+  shrink(first, forward)
+  shrink(second, !forward)
+  return out
 }
 
 /**

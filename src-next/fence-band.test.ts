@@ -6,7 +6,7 @@ import type { BoxConfig, JamoData, Part } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { bentStems } from './fenceBend'
 import { drawnStem } from './strokeLab'
-import { BEND_LEVELS, clearanceRatio, correctGlyph, expectedGap, partClearances, pickBend, type FenceCorrection, finalBottomTolerance, GOTHIC_FENCE, measureGlyph, movedBoxes, shakenBoxes, summarize, type GlyphMeasure, type ShakeLevel } from './fenceBand'
+import { BEND_LEVELS, nearestBetweenParts, shrunkApart, clearanceRatio, correctGlyph, expectedGap, partClearances, pickBend, type FenceCorrection, finalBottomTolerance, GOTHIC_FENCE, measureGlyph, movedBoxes, shakenBoxes, summarize, type GlyphMeasure, type ShakeLevel } from './fenceBand'
 
 const CHOSEONG = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ', JUNGSEONG = 'ㅏㅓㅗㅜㅡㅣ'
 const map = (type: JamoData['type'], chars: string) => Object.fromEntries([...chars].map((char) => [char, getBaseJamo(type, char)]).filter(([, jamo]) => jamo)) as Record<string, JamoData>
@@ -165,5 +165,29 @@ describe('울타리 자동 보정', () => {
     for (const point of flat.shape) expect(point.r).toBeCloseTo(tilt * point.t, 9)
     const level = bentStems({ longHorizontal: stem }, { bend: 0, tilt: 0 }).longHorizontal!
     if (level.ok && level.shape) expect(level.shape[level.shape.length - 1].r).toBeCloseTo(0, 9)
+  })
+
+  it('자소 물리기: 마주 보는 쪽만 줄이고 바깥 면은 그대로 둔다', () => {
+    const boxes = { CH: { x: 0.1, y: 0.05, width: 0.8, height: 0.4 }, JO: { x: 0.1, y: 0.5, width: 0.8, height: 0.45 } }
+    // 받침이 첫닿 아래에 있다 → 첫닿은 아래를, 받침은 위를 줄인다.
+    const apart = shrunkApart(boxes, boxes, 'CH-JO', { gap: 0, dx: 0, dy: 0.05 }, 0.04)
+    expect(apart.CH).toMatchObject({ y: 0.05, height: 0.38 })
+    expect(apart.JO!.y).toBeCloseTo(0.52, 9)
+    expect(apart.JO!.y + apart.JO!.height).toBeCloseTo(0.95, 9)
+    // 한도(원래의 80%) 아래로는 안 줄인다.
+    const far = shrunkApart(boxes, boxes, 'CH-JO', { gap: 0, dx: 0, dy: 0.05 }, 1)
+    expect(far.CH!.height).toBeCloseTo(0.32, 9)
+    expect(far.JO!.height).toBeCloseTo(0.36, 9)
+    // 실제 글자: 받침 상자를 위로 밀어 넣어 닿게 한 뒤 물리면 틈이 다시 벌어진다.
+    const base = measured('곤')
+    const strokesOf = (b: Partial<Record<Part, BoxConfig>>) => {
+      const syllable = decomposeSyllable('곤', cho, jung, jong)
+      return resolveGlyphInkPrimitives({ syllable, placement: { kind: 'boxes', boxes: b }, weightMultiplier: 1, horizontalInkBounds: { min: 0, max: 1 } }).primitives
+        .map((primitive) => ({ part: primitive.source.part, box: primitive.box, points: primitive.stroke.points, closed: primitive.stroke.closed, thickness: primitive.stroke.thickness }))
+    }
+    const pushed = { ...base.boxes, JO: { ...base.boxes.JO!, y: base.boxes.JO!.y - 0.08 } }
+    const tight = nearestBetweenParts(strokesOf(pushed))['JU-JO']!
+    const loose = nearestBetweenParts(strokesOf(shrunkApart(pushed, pushed, 'JU-JO', tight, 0.06)))['JU-JO']!
+    expect(loose.gap).toBeGreaterThan(tight.gap + 0.02)
   })
 })

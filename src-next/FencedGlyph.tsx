@@ -9,7 +9,7 @@ import type { BoxConfig, DecomposedSyllable, GlyphInkPlacement, JamoData, Paddin
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { identityOfSyllable } from '../src/services/contextBoxResolver'
-import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickBend, shakenBoxes, type FenceLine, type FencePull, type ShakeLevel } from './fenceBand'
+import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, nearestBetweenParts, pickBend, shakenBoxes, shrunkApart, type Clearances, type FenceLine, type FencePull, type PartPair, type ShakeLevel } from './fenceBand'
 import { useLayoutDelta } from './layoutDeltaStore'
 import { contextPlacementOf, useNotoModel } from './notoModel'
 
@@ -27,15 +27,23 @@ function resolved(syllable: DecomposedSyllable, placement: GlyphInkPlacement, st
     horizontalInkBounds: HORIZONTAL_INK_BOUNDS,
   })
   const strokes = result.primitives.map((primitive) => ({ part: primitive.source.part, box: primitive.box, points: primitive.stroke.points, closed: primitive.stroke.closed, thickness: primitive.stroke.thickness * primitive.weightMultiplier }))
-  return { boxes: result.boxes, measure: measureGlyph(strokes), clearances: partClearances(strokes) }
+  const nearest = nearestBetweenParts(strokes)
+  return { boxes: result.boxes, measure: measureGlyph(strokes), nearest, clearances: Object.fromEntries(Object.entries(nearest).map(([pair, item]) => [pair, item.gap])) as Clearances }
 }
 
 /** 잉크 몸 높이(em). 기본 네모꼴에서 엔진이 잰 몸 높이를 지금 네모꼴 비율로 옮긴다. */
 const bodyOf = (padding: Padding) => GOTHIC_FENCE.engine.body * Math.max(0.5, 1 - padding.top - padding.bottom) / (1 - DEFAULT_GLOBAL_PADDING.top - DEFAULT_GLOBAL_PADDING.bottom)
 
+/** 틈이 모자랄 때 고치는 법: 자소를 서로 물려 줄이기(그은 모양 그대로) 또는 그은 휨 줄이기. */
+export type ClearanceMethod = 'shrink' | 'bend'
+const SPREAD_ROUNDS = 4
+const MIN_REFERENCE = 0.01
+
 export interface FenceOptions {
   /** 보정 켬 */
   on: boolean
+  /** 획끼리 닿을 때 고치는 법. 기본은 휨 줄이기(기울기는 남김). 자소 줄이기는 견줘 보려고 만들어 둔 것 — 보선 이동과 맞출 방식이 정해지면 정리한다. */
+  method?: ClearanceMethod
   line: FenceLine
   /** 일부러 흔들기(보정 전에 배치를 민다) */
   shake: ShakeLevel
@@ -81,7 +89,7 @@ export function FencedGlyph({ char, size, className, strokeColorOf, levels, fenc
   const { bundle } = useNotoModel()
   const identity = useMemo(() => bundle ? identityOfSyllable(baseSyllable) : null, [bundle, baseSyllable])
   const delta = useLayoutDelta(identity)
-  const { on, line, shake, index } = fence
+  const { on, line, shake, index, method = 'bend' } = fence
 
   const result = useMemo<{ syllable: DecomposedSyllable; boxes: Partial<Record<Part, BoxConfig>>; pulls: readonly FencePull[] }>(() => {
     const place = (syllable: DecomposedSyllable) => resolved(syllable, contextPlacementOf({ bundle, identity, syllable, schema, ends: globalStyle, delta }).placement, globalStyle)
@@ -96,20 +104,55 @@ export function FencedGlyph({ char, size, className, strokeColorOf, levels, fenc
       if (!made) { const syllable = syllableAt(level); made = { syllable, placed: place(syllable) }; drawn.set(level, made) }
       return made
     }
-    // 1) 자소 사이 틈: 휨을 줄여 맞춘다. 끈 채로도 재서 "켜면 얼마나"를 알려 준다.
-    const bend = levels && levels.length > 1
-      ? pickBend((level) => (level < levels.length ? clearanceRatio(at(level).placed.clearances, reference.clearances) : -Infinity), GOTHIC_FENCE.lines[line].clearanceFloor)
-      : { level: 0, pull: null }
-    const { syllable, placed } = at(on ? bend.level : 0)
+    // 1) 자소 사이 틈. 끈 채로도 재서 "켜면 얼마나"를 알려 준다.
+    const floor = GOTHIC_FENCE.lines[line].clearanceFloor
+    let chosen = at(0)
+    let clearancePull: FencePull | null = null
+    if (floor !== undefined && method === 'bend' && levels && levels.length > 1) {
+      // 휨을 줄인 자모로 바꾼다.
+      const bend = pickBend((level) => (level < levels.length ? clearanceRatio(at(level).placed.clearances, reference.clearances) : -Infinity), floor)
+      clearancePull = bend.pull
+      if (on) chosen = at(bend.level)
+    } else if (floor !== undefined) {
+      // 그은 모양은 두고, 닿는 자소 둘을 마주 보는 쪽만 줄여 서로 물린다. 줄인 뒤 다시 재서 모자라면 몇 번 더.
+      const before = clearanceRatio(chosen.placed.clearances, reference.clearances)
+      let placed = chosen.placed
+      const original = placed.boxes
+      if (before < floor) {
+        let boxes = original
+        for (let round = 0; round < SPREAD_ROUNDS; round++) {
+          let changed = false
+          for (const pair of Object.keys(reference.clearances) as PartPair[]) {
+            const base = reference.clearances[pair], nearest = placed.nearest[pair]
+            if (base === undefined || base < MIN_REFERENCE || !nearest) continue
+            const need = base * floor - nearest.gap
+            if (need <= 1e-4) continue
+            boxes = shrunkApart(boxes, original, pair, nearest, need * 1.15)
+            changed = true
+          }
+          if (!changed) break
+          placed = resolved(chosen.syllable, { kind: 'boxes', boxes }, globalStyle)
+        }
+      }
+      const after = clearanceRatio(placed.clearances, reference.clearances)
+      // 당긴 양 = 가장 많이 줄인 자소가 줄어든 몫.
+      const shrunk = Math.max(0, ...(Object.keys(original) as Part[]).map((part) => {
+        const from = original[part], to = placed.boxes[part]
+        return from && to ? Math.max(1 - to.height / from.height, 1 - to.width / from.width) : 0
+      }))
+      clearancePull = { value: 'clearance', before, after, band: { lo: floor, hi: Infinity }, pulled: shrunk < 1e-4 ? 0 : -shrunk, left: after >= floor - 1e-3 ? 0 : floor - after }
+      if (on) chosen = { syllable: chosen.syllable, placed }
+    }
+    const { syllable, placed } = chosen
     // 2) 배치 값 넷: 상자를 옮긴다.
     const shaken = shakenBoxes(placed.boxes, layout, index, shake)
     const now = shake === 0 ? placed.measure : resolved(syllable, { kind: 'boxes', boxes: shaken }, globalStyle).measure
-    const bendPulls = bend.pull ? [bend.pull] : NO_PULLS
+    const bendPulls = clearancePull ? [clearancePull] : NO_PULLS
     if (!now || !reference.measure) return { syllable, boxes: shaken, pulls: bendPulls }
     // 몸 높이는 지금 네모꼴(위아래 여백)에서 — 네모꼴을 옮기면 울타리 단위도 따라간다. 잉크 몸은 네모꼴보다 획 굵기만큼 크다(엔진 측정 0.905).
     const correction = correctGlyph({ layout, now, reference: reference.measure, line, body: bodyOf(padding) })
     return { syllable, boxes: on ? movedBoxes(shaken, correction.moves) : shaken, pulls: [...bendPulls, ...correction.pulls] }
-  }, [char, levels, baseSyllable, storedChoseong, storedJungseong, storedJongseong, bundle, identity, delta, schema, globalStyle, layout, on, line, shake, index, padding])
+  }, [char, levels, baseSyllable, storedChoseong, storedJungseong, storedJongseong, bundle, identity, delta, schema, globalStyle, layout, on, line, shake, index, method, padding])
 
   useEffect(() => { onPulls?.(index, result.pulls) }, [onPulls, index, result.pulls])
 
