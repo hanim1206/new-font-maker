@@ -16,7 +16,7 @@
 .header h1 { font-size: var(--font-24); font-weight: var(--weight-heavy); line-height: 1.2; }
 .header p { color: rgb(var(--color-text-3)); font-size: var(--font-14); }
 
-.progress { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; }
+.progress { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; }
 .progress > span { height: 4px; border-radius: var(--radius-full); background: rgb(var(--color-surface-3)); }
 .progress > span[data-state='done'] { background: rgb(var(--color-foreground)); }
 .progress > span[data-state='now'] { background: rgb(var(--color-primary)); }
@@ -67,3 +67,7 @@
 .results > li[data-match='true'] .resultAnswer { color: rgb(var(--color-success)); }
 .results > li[data-match='false'] .resultAnswer { color: rgb(var(--color-warning)); }
 .resultNote { color: rgb(var(--color-text-4)); font-size: var(--font-13); }
+.setSwitch { justify-self: start; min-width: 240px; }
+.limits { display: grid; gap: 6px; padding: 10px 12px; border-radius: var(--radius-md); background: rgb(var(--color-surface-2)); }
+.limits > li { display: flex; justify-content: space-between; gap: 8px; font-size: var(--font-13); }
+.limits strong { font-weight: var(--weight-heavy); }
