@@ -4,7 +4,7 @@ import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
 import { getBaseJamo } from '../src/stores/jamoStore'
 import type { BoxConfig, JamoData, Part } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
-import { allowedRects, fittedBoxes, OUTER_SLACK, partRects, clearanceRatio, correctGlyph, expectedGap, partClearances, type FenceCorrection, finalBottomTolerance, GOTHIC_FENCE, measureGlyph, movedBoxes, shakenBoxes, summarize, type GlyphMeasure, type ShakeLevel } from './fenceBand'
+import { JAMO_SCALES, pickJamoScale, scaledBoxes, clearanceRatio, correctGlyph, expectedGap, partClearances, type FenceCorrection, finalBottomTolerance, GOTHIC_FENCE, measureGlyph, movedBoxes, shakenBoxes, summarize, type GlyphMeasure, type ShakeLevel } from './fenceBand'
 
 const CHOSEONG = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ', JUNGSEONG = 'ㅏㅓㅗㅜㅡㅣ'
 const map = (type: JamoData['type'], chars: string) => Object.fromEntries([...chars].map((char) => [char, getBaseJamo(type, char)]).filter(([, jamo]) => jamo)) as Record<string, JamoData>
@@ -134,38 +134,15 @@ describe('울타리 자동 보정', () => {
     expect(partClearances([line('CH', 0.3), line('CH', 0.31)])).toEqual({})
   })
 
-  it('칸: 옆 자소 쪽은 틈의 몫만큼, 빈 쪽은 여백만큼 넓다', () => {
-    const reference = { CH: { minX: 0.1, maxX: 0.4, minY: 0.1, maxY: 0.9 }, JU: { minX: 0.7, maxX: 0.7, minY: 0.1, maxY: 0.9 } }
-    const allowed = allowedRects(reference, 0.06, 0.7)
-    // 둘 사이 잉크 틈 0.3 − 0.06 = 0.24, 써도 되는 몫은 30%를 반씩 = 0.036.
-    expect(allowed.CH!.maxX).toBeCloseTo(0.436, 9)
-    expect(allowed.JU!.minX).toBeCloseTo(0.664, 9)
-    expect(allowed.JU!.maxX).toBeCloseTo(0.7 + OUTER_SLACK, 9)
-    expect(allowed.CH!.minX).toBeCloseTo(0.1 - OUTER_SLACK, 9)
+  it('자소 줄이기: 틈이 바닥을 넘는 가장 큰 비율을 고르고, 안 되면 한도에서 멈춘다', () => {
+    expect(pickJamoScale(() => 1, 0.7)).toBe(1)
+    expect(pickJamoScale((scale) => (scale <= 0.85 ? 0.8 : 0.2), 0.7)).toBe(0.85)
+    expect(pickJamoScale(() => -1, 0.7)).toBe(JAMO_SCALES[JAMO_SCALES.length - 1])
   })
 
-  it('휜 획 넣기: 칸보다 작으면 빈 쪽으로 옮기기만, 크면 넘친 방향으로만 줄인다', () => {
-    const allowed = { JU: { minX: 0.664, maxX: 0.74, minY: 0.1, maxY: 0.9 } }
-    const boxes = { JU: { x: 0.6, y: 0.05, width: 0.2, height: 0.9 } }
-    // 안이면 그대로.
-    expect(fittedBoxes(boxes, { JU: { minX: 0.68, maxX: 0.72, minY: 0.1, maxY: 0.9 } }, allowed)).toMatchObject({ boxes, overflow: 0 })
-    // 왼쪽(첫닿 쪽)으로 0.024 불룩 — 폭 0.06은 칸(0.076)보다 작다 → 오른쪽으로 옮기기만 한다.
-    const moved = fittedBoxes(boxes, { JU: { minX: 0.64, maxX: 0.7, minY: 0.1, maxY: 0.9 } }, allowed)
-    expect(moved.overflow).toBeCloseTo(0.024, 9)
-    expect(moved.boxes.JU).toMatchObject({ width: 0.2, height: 0.9 })
-    expect(moved.boxes.JU!.x).toBeCloseTo(0.624, 9)
-    // 폭 0.152로 크게 휘면 가로로만 반으로 줄인다. 세로(길이)는 그대로.
-    const squeezed = fittedBoxes(boxes, { JU: { minX: 0.6, maxX: 0.752, minY: 0.1, maxY: 0.9 } }, allowed)
-    expect(squeezed.boxes.JU!.width).toBeCloseTo(0.1, 9)
-    expect(squeezed.boxes.JU!.height).toBe(0.9)
-    expect(squeezed.boxes.JU!.x).toBeCloseTo(0.664, 9)
-  })
-
-  it('부위 네모는 휜 선의 불룩한 데까지 잰다', () => {
-    const box = { x: 0, y: 0, width: 1, height: 1 }
-    const bowed = { part: 'JU' as const, box, points: [{ x: 0.7, y: 0.1, handleOut: { x: 0.9, y: 0.3 } }, { x: 0.7, y: 0.9, handleIn: { x: 0.9, y: 0.7 } }], closed: false }
-    const rect = partRects([bowed]).JU!
-    expect(rect.minX).toBeCloseTo(0.7, 9)
-    expect(rect.maxX).toBeCloseTo(0.85, 2)
+  it('자소 줄이기: 상자마다 제 가운데를 붙든 채 같은 비율로 준다', () => {
+    const boxes = scaledBoxes({ JU: { x: 0.5, y: 0.1, width: 0.4, height: 0.8 }, CH: { x: 0, y: 0.1, width: 0.3, height: 0.4 } }, 0.5)
+    for (const [key, want] of Object.entries({ x: 0.6, y: 0.3, width: 0.2, height: 0.4 })) expect(boxes.JU![key as keyof BoxConfig]).toBeCloseTo(want, 9)
+    for (const [key, want] of Object.entries({ x: 0.075, y: 0.2, width: 0.15, height: 0.2 })) expect(boxes.CH![key as keyof BoxConfig]).toBeCloseTo(want, 9)
   })
 })

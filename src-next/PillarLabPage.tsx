@@ -69,7 +69,7 @@ const percent = (value: number) => `${(value * 100).toFixed(1)}%`
 /** 값 하나의 결과 한 줄: 당긴 글자 수와 가장 크게 당긴 양, 못 당기고 남은 것. */
 function fenceRowText(row: FenceSummaryRow): string {
   if (row.checked === 0) return '잴 글자 없음'
-  const moved = row.count > 0 ? (row.value === 'clearance' ? `${row.count}자 넘친 획 ${percent(row.max)} 넣음` : `${row.count}자 ${percent(row.max)} ${row.word}`) : ''
+  const moved = row.count > 0 ? (row.value === 'clearance' ? `모든 자소 ${percent(row.max)} 줄임` : `${row.count}자 ${percent(row.max)} ${row.word}`) : ''
   const stuck = row.stuck > 0 ? (row.value === 'clearance' ? `${row.stuck}자 아직 좁음` : `${row.stuck}자 ${percent(row.left)} 남음`) : ''
   return [moved, stuck].filter(Boolean).join(' · ') || '울타리 안'
 }
@@ -100,6 +100,9 @@ export function PillarLabPage() {
   const [fenceOpen, setFenceOpen] = useState(false)
   const [pulls, setPulls] = useState<Record<number, readonly FencePull[]>>({})
   const reportPulls = useCallback((index: number, list: readonly FencePull[]) => setPulls((all) => (all[index] === list ? all : { ...all, [index]: list })), [])
+  // 글자마다 바라는 줄이는 비율을 모아, 글줄에서 가장 작은 비율로 모든 글자의 자소를 똑같이 줄인다.
+  const [needs, setNeeds] = useState<Record<number, number>>({})
+  const reportNeed = useCallback((index: number, wanted: number) => setNeeds((all) => (all[index] === wanted ? all : { ...all, [index]: wanted })), [])
   const drawing = useRef<PenPoint[] | null>(null)
   const activePointer = useRef<number | null>(null)
   const padRef = useRef<SVGSVGElement>(null)
@@ -188,6 +191,7 @@ export function PillarLabPage() {
   }
 
   const chars = [...sentence]
+  const jamoScale = Math.min(1, ...chars.map((char, index) => (char === ' ' ? 1 : needs[index] ?? 1)))
   const livePulls = chars.map((char, index) => (char === ' ' ? [] : pulls[index] ?? []))
   const fenceRows = summarize(livePulls)
   const pulledCount = livePulls.filter((list) => list.some((item) => item.pulled !== 0)).length
@@ -211,7 +215,7 @@ export function PillarLabPage() {
               choseongOverride={mine ? overrides.consonants[layoutOf(char)]?.choseong : undefined}
               jongseongOverride={mine ? overrides.consonants[layoutOf(char)]?.jongseong : undefined}
               strokeColorOf={strokeColorOf}
-              fence={{ on: fenceOn, line: 'safe', shake, index }} onPulls={reportPulls} />
+              fence={{ on: fenceOn, line: 'safe', shake, index, scale: jamoScale }} onPulls={reportPulls} onNeed={reportNeed} />
           </span>)}
       </div>
       <div className={styles.lineTools}>
