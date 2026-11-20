@@ -4,7 +4,7 @@ import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
 import { getBaseJamo } from '../src/stores/jamoStore'
 import type { BoxConfig, JamoData, Part } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
-import { correctGlyph, expectedGap, type FenceCorrection, finalBottomTolerance, GOTHIC_FENCE, measureGlyph, movedBoxes, shakenBoxes, summarize, type GlyphMeasure, type ShakeLevel } from './fenceBand'
+import { BEND_LEVELS, clearanceRatio, correctGlyph, expectedGap, partClearances, pickBend, type FenceCorrection, finalBottomTolerance, GOTHIC_FENCE, measureGlyph, movedBoxes, shakenBoxes, summarize, type GlyphMeasure, type ShakeLevel } from './fenceBand'
 
 const CHOSEONG = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ', JUNGSEONG = 'ㅏㅓㅗㅜㅡㅣ'
 const map = (type: JamoData['type'], chars: string) => Object.fromEntries([...chars].map((char) => [char, getBaseJamo(type, char)]).filter(([, jamo]) => jamo)) as Record<string, JamoData>
@@ -116,8 +116,36 @@ describe('울타리 자동 보정', () => {
 
   it('당긴 기록을 값마다 한 줄로 모은다', () => {
     const rows = summarize(['간', '나', '그', '곤'].map((char, index) => shakenThenCorrected(char, 2, index).correction.pulls))
-    expect(rows.map((row) => row.value)).toEqual(['finalBottom', 'gap', 'topLine', 'centroid'])
+    expect(rows.map((row) => row.value)).toEqual(['clearance', 'finalBottom', 'gap', 'topLine', 'centroid'])
     expect(rows.find((row) => row.value === 'finalBottom')).toMatchObject({ checked: 2, count: 2 })
     expect(rows.find((row) => row.value === 'gap')).toMatchObject({ checked: 2, count: 2, word: '벌림' })
+  })
+
+  it('자소 사이 틈: 다른 자소의 획끼리 가까워지면 비율이 줄고, 겹치면 0 아래다', () => {
+    const box = { x: 0, y: 0, width: 1, height: 1 }
+    const line = (part: 'CH' | 'JU', x: number) => ({ part, box, points: [{ x, y: 0.1 }, { x, y: 0.9 }], closed: false, thickness: 0.06 })
+    const reference = partClearances([line('CH', 0.3), line('JU', 0.6)])
+    expect(reference['CH-JU']).toBeCloseTo(0.3 - 0.06, 9)
+    expect(clearanceRatio(partClearances([line('CH', 0.3), line('JU', 0.48)]), reference)).toBeCloseTo(0.5, 9)
+    // 엇갈린 선은 중심선 거리가 0 — 굵기만큼 겹친 것으로 센다.
+    const crossing = partClearances([line('CH', 0.3), { part: 'JU', box, points: [{ x: 0.1, y: 0.5 }, { x: 0.6, y: 0.5 }], closed: false, thickness: 0.06 }])
+    expect(clearanceRatio(crossing, reference)).toBeLessThan(0)
+    // 같은 자소 안의 획은 보지 않는다.
+    expect(partClearances([line('CH', 0.3), line('CH', 0.31)])).toEqual({})
+  })
+
+  it('휨 줄이기: 틈이 울타리에 들 때까지만 줄이고, 처음부터 안이면 그대로 둔다', () => {
+    expect(pickBend(() => 0.9, 0.7)).toMatchObject({ level: 0, pull: { pulled: 0, left: 0 } })
+    // 그은 그대로 0.2, 한 단계 0.5, 두 단계 0.8 → 두 단계(휨 반)에서 멈춘다.
+    const ratios = [0.2, 0.5, 0.8, 0.9, 1]
+    const picked = pickBend((level) => ratios[level], 0.7)
+    expect(picked.level).toBe(2)
+    expect(picked.pull).toMatchObject({ value: 'clearance', before: 0.2, after: 0.8, pulled: BEND_LEVELS[2] - 1, left: 0 })
+    // 다 줄여도 좁으면 가장 넓은 단계를 고르고 남은 만큼 알린다.
+    const stuck = pickBend((level) => [0.1, 0.3, 0.2, 0.2, 0.2][level], 0.7)
+    expect(stuck.level).toBe(1)
+    expect(stuck.pull!.left).toBeCloseTo(0.4, 9)
+    // 울타리 값이 없으면 손대지 않는다.
+    expect(pickBend(() => 0, undefined)).toEqual({ level: 0, pull: null })
   })
 })

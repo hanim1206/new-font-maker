@@ -4,15 +4,16 @@ import { Check, ChevronDown, ChevronRight, Dices, RotateCcw } from 'lucide-react
 import type { PenPoint } from '../src/services/penStrokeFit'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { propagatedJungseong } from '../src/stores/stemMasterStore'
-import type { JamoData, LayoutType, ResolvedStrokeInkSource } from '../src/types'
+import type { LayoutType, ResolvedStrokeInkSource } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { pointsToSvgD } from '../src/utils/pathUtils'
 import { Button } from './components/ui/button'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { Switch } from './components/ui/switch'
 import { EDIT_COLOR } from './editColors'
-import { FENCE_NAMES, summarize, type FencePull, type FenceSummaryRow, type ShakeLevel } from './fenceBand'
-import { FencedGlyph } from './FencedGlyph'
+import { BEND_LEVELS, FENCE_NAMES, summarize, type FencePull, type FenceSummaryRow, type ShakeLevel } from './fenceBand'
+import { bentStems } from './fenceBend'
+import { FencedGlyph, type GlyphOverride } from './FencedGlyph'
 import { randomSampleSentence } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
 import styles from './PillarLabPage.module.css'
@@ -69,8 +70,8 @@ const percent = (value: number) => `${(value * 100).toFixed(1)}%`
 /** 값 하나의 결과 한 줄: 당긴 글자 수와 가장 크게 당긴 양, 못 당기고 남은 것. */
 function fenceRowText(row: FenceSummaryRow): string {
   if (row.checked === 0) return '잴 글자 없음'
-  const moved = row.count > 0 ? `${row.count}자 ${percent(row.max)} ${row.word}` : ''
-  const stuck = row.stuck > 0 ? `${row.stuck}자 ${percent(row.left)} 남음` : ''
+  const moved = row.count > 0 ? (row.value === 'clearance' ? `${row.count}자 휨 최대 ${Math.round(row.max * 100)}% 줄임` : `${row.count}자 ${percent(row.max)} ${row.word}`) : ''
+  const stuck = row.stuck > 0 ? (row.value === 'clearance' ? `${row.stuck}자 아직 좁음` : `${row.stuck}자 ${percent(row.left)} 남음`) : ''
   return [moved, stuck].filter(Boolean).join(' · ') || '울타리 안'
 }
 
@@ -125,18 +126,19 @@ export function PillarLabPage() {
     const raw = raws[info.kind]
     return raw ? [[info.kind, drawnStem(raw, info.kind)]] : []
   })) as Partial<Record<StemKind, DrawnStem>>, [raws])
-  const overrides = useMemo(() => {
-    const masters = mastersOf(stems, jungseong)
-    const shapes = consonantShapesOf(stems)
+  // 휨 단계마다 한 벌씩(앞이 그은 그대로). 울타리 보정이 획끼리 닿는 글자에서 휨을 줄인 벌로 바꿔 그린다.
+  const levelsByLayout = useMemo(() => {
+    const made = BEND_LEVELS.map((keep) => {
+      const bent = bentStems(stems, keep)
+      const masters = mastersOf(bent, jungseong)
+      const shapes = consonantShapesOf(bent)
+      return { shapes, jungseong: Object.keys(masters).length ? propagatedJungseong(jungseong, {}, masters) : undefined }
+    })
     // 닿자 칸은 짜임마다 비율이 달라 짜임별로 따로 입힌다.
-    const consonants = Object.fromEntries(LAYOUTS.map((layout) => {
+    return Object.fromEntries(LAYOUTS.map((layout) => {
       const box = consonantBoxesOf(layout)
-      return [layout, { choseong: shapeConsonants(choseong, shapes, box.CH).changed, jongseong: shapeConsonants(jongseong, shapes, box.JO).changed }]
-    })) as Record<LayoutType, { choseong: Record<string, JamoData>; jongseong: Record<string, JamoData> }>
-    return {
-      jungseong: Object.keys(masters).length ? propagatedJungseong(jungseong, {}, masters) : undefined,
-      consonants,
-    }
+      return [layout, made.map((level): GlyphOverride => ({ jungseong: level.jungseong, choseong: shapeConsonants(choseong, level.shapes, box.CH).changed, jongseong: shapeConsonants(jongseong, level.shapes, box.JO).changed }))]
+    })) as Record<LayoutType, GlyphOverride[]>
   }, [stems, choseong, jungseong, jongseong])
   const layoutOf = useCallback((char: string): LayoutType => decomposeSyllable(char, choseong, jungseong, jongseong).layoutType, [choseong, jungseong, jongseong])
 
@@ -207,9 +209,7 @@ export function PillarLabPage() {
           ? <span key={index} className={styles.space} />
           : <span key={index} className={styles.glyph} data-pulled={livePulls[index].some((item) => item.pulled !== 0) || undefined}>
             <FencedGlyph char={char} size={40}
-              jungseongOverride={mine ? overrides.jungseong : undefined}
-              choseongOverride={mine ? overrides.consonants[layoutOf(char)]?.choseong : undefined}
-              jongseongOverride={mine ? overrides.consonants[layoutOf(char)]?.jongseong : undefined}
+              levels={mine ? levelsByLayout[layoutOf(char)] : undefined}
               strokeColorOf={strokeColorOf}
               fence={{ on: fenceOn, line: 'safe', shake, index }} onPulls={reportPulls} />
           </span>)}

@@ -13,7 +13,7 @@ import type { BoxConfig, LayoutType, Part } from '../src/types'
  * 단위는 글자 몸 높이 비율. 저장하지 않고 제품 값도 안 바꾼다.
  */
 
-export type FenceValue = 'finalBottom' | 'gap' | 'topLine' | 'centroid'
+export type FenceValue = 'clearance' | 'finalBottom' | 'gap' | 'topLine' | 'centroid'
 export type FenceLine = 'safe' | 'limit'
 export interface Band { lo: number; hi: number }
 
@@ -32,6 +32,8 @@ export interface FenceBands {
   gapColFloor?: number
   /** 받침 글자의 위아래 무게중심 */
   centroid?: Partial<Record<FinalLayout, Band>>
+  /** 자소 사이 잉크 틈이 기준 글자의 틈에서 줄어도 되는 비율(0.7 = 기준의 70%까지). 넘으면 그은 휨을 줄인다. */
+  clearanceFloor?: number
 }
 
 export interface FencePreset {
@@ -70,6 +72,8 @@ export const GOTHIC_FENCE: FencePreset = {
   gapLine: { col: { at0: 0.286, slope: -1.35 }, row: { at0: 0.312, slope: -1.118 } },
   lines: {
     safe: {
+      // 자소 사이 틈은 폰트에서 잰 안전선이 아직 없다. 한계선(기대 틈의 70%)을 빌려 쓴다 — 그은 모양을 되도록 살리려고.
+      clearanceFloor: 0.7,
       finalBottomSd: 0.013,
       topLine: { lo: 0.039, hi: 0.058 },
       gapCol: { lo: -0.009, hi: 0.021 },
@@ -89,6 +93,7 @@ export const GOTHIC_FENCE: FencePreset = {
       // 세로 틈: 굵기에서 기대하는 틈의 70%까지 좁혀도 된다. 벌리는 쪽은 안 물어봐서 안전선 끝. 가로 틈은 아직 없다.
       gapCol: { lo: -0.059, hi: 0.021 },
       gapColFloor: 0.7,
+      clearanceFloor: 0.7,
       // 받침 글자 무게중심: 울타리 가운데에서 아래로 세로 3.4 · 가로 2.8 · 섞임 4.0%p. 위쪽은 임시로 같은 폭.
       centroid: {
         'choseong-jungseong-vertical-jongseong': { lo: 0.4655, hi: 0.5335 },
@@ -108,6 +113,8 @@ export interface MeasuredStroke {
   box: Readonly<BoxConfig>
   points: readonly (Pt & { handleIn?: Pt; handleOut?: Pt })[]
   closed: boolean
+  /** 잉크 굵기(em). 자소 사이 틈을 잴 때만 쓴다. */
+  thickness?: number
 }
 
 interface Group { minX: number; maxX: number; minY: number; maxY: number; length: number; sumY: number }
@@ -181,6 +188,79 @@ export function measureGlyph(strokes: readonly MeasuredStroke[]): GlyphMeasure |
     upper,
     ...(JO.length > 0 ? { final: JO } : {}),
   }
+}
+
+// ── 자소 사이 틈(획끼리 닿음) ──
+
+export type PartPair = 'CH-JU' | 'JU-JO' | 'CH-JO'
+/** 자소 둘 사이의 가장 좁은 잉크 틈(em). 0 아래면 겹친 것. */
+export type Clearances = Partial<Record<PartPair, number>>
+
+function pointToSegment(p: Pt, a: Pt, b: Pt): number {
+  const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy
+  const t = len2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2)) : 0
+  return Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t))
+}
+const side = (a: Pt, b: Pt, c: Pt) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+function segmentDistance(a: Pt, b: Pt, c: Pt, d: Pt): number {
+  if (side(a, b, c) * side(a, b, d) < 0 && side(c, d, a) * side(c, d, b) < 0) return 0
+  return Math.min(pointToSegment(a, c, d), pointToSegment(b, c, d), pointToSegment(c, a, b), pointToSegment(d, a, b))
+}
+
+/** 자소 쌍마다 가장 좁은 잉크 틈 = 중심선 사이 거리 − 두 획 굵기의 반씩. 같은 자소 안의 획은 일부러 이어지니 보지 않는다. */
+export function partClearances(strokes: readonly MeasuredStroke[]): Clearances {
+  const lines = strokes.map((stroke) => ({ group: stroke.part === 'CH' ? 'CH' : stroke.part === 'JO' ? 'JO' : 'JU', line: flatten(stroke), half: (stroke.thickness ?? 0) / 2 }))
+  const out: Clearances = {}
+  for (const [first, second] of [['CH', 'JU'], ['JU', 'JO'], ['CH', 'JO']] as const) {
+    let best = Infinity
+    for (const a of lines) {
+      if (a.group !== first) continue
+      for (const b of lines) {
+        if (b.group !== second) continue
+        for (let i = 1; i < a.line.length; i++) for (let j = 1; j < b.line.length; j++) {
+          best = Math.min(best, segmentDistance(a.line[i - 1], a.line[i], b.line[j - 1], b.line[j]) - a.half - b.half)
+        }
+      }
+    }
+    if (best < Infinity) out[`${first}-${second}` as PartPair] = best
+  }
+  return out
+}
+
+/** 이보다 좁은 기준 틈은 처음부터 붙여 그린 자리로 보고 견주지 않는다(em). */
+const MIN_REFERENCE_CLEARANCE = 0.01
+
+/** 지금 틈 ÷ 기준 틈의 가장 작은 값. 1이면 기준과 같고, 0 아래면 획이 겹쳤다. 견줄 쌍이 없으면 1. */
+export function clearanceRatio(now: Clearances, reference: Clearances): number {
+  let worst = Infinity
+  for (const pair of Object.keys(reference) as PartPair[]) {
+    const base = reference[pair], gap = now[pair]
+    if (base === undefined || gap === undefined || base < MIN_REFERENCE_CLEARANCE) continue
+    worst = Math.min(worst, gap / base)
+  }
+  return worst === Infinity ? 1 : worst
+}
+
+/** 그은 휨을 얼마나 남길지의 단계(1 = 그은 그대로, 0 = 곧게). 틈이 울타리 안에 들 때까지 한 단계씩 줄인다. */
+export const BEND_LEVELS: readonly number[] = [1, 0.75, 0.5, 0.25, 0]
+
+/**
+ * 휨 단계마다의 틈 비율(`ratios[i]`는 `BEND_LEVELS[i]`로 그렸을 때) → 고를 단계와 기록.
+ * 앞에서부터 처음으로 울타리 안인 단계를 고른다. 다 밖이면 틈이 가장 넓은 단계.
+ */
+export function pickBend(ratioAt: (level: number) => number, floor: number | undefined): { level: number; pull: FencePull | null } {
+  if (floor === undefined) return { level: 0, pull: null }
+  const band = { lo: floor, hi: Infinity }
+  const before = ratioAt(0)
+  if (before >= floor) return { level: 0, pull: { value: 'clearance', before, after: before, band, pulled: 0, left: 0 } }
+  let best = 0, bestRatio = before
+  for (let level = 1; level < BEND_LEVELS.length; level++) {
+    const ratio = ratioAt(level)
+    if (ratio > bestRatio) { best = level; bestRatio = ratio }
+    if (ratio >= floor) break
+  }
+  // 당긴 양은 줄인 휨의 몫(−0.5 = 휨을 반으로).
+  return { level: best, pull: { value: 'clearance', before, after: bestRatio, band, pulled: BEND_LEVELS[best] - 1, left: bestRatio >= floor ? 0 : floor - bestRatio } }
 }
 
 // ── 당기기 ──
@@ -329,11 +409,12 @@ export function shakenBoxes(boxes: Boxes, layout: LayoutType, index: number, lev
 
 // ── 화면에 보일 말 ──
 
-export const FENCE_NAMES: Record<FenceValue, string> = { finalBottom: '받침 밑선', gap: '획 사이 틈', topLine: '받침 유무 윗선 차이', centroid: '무게중심' }
-export const FENCE_ORDER: readonly FenceValue[] = ['finalBottom', 'gap', 'topLine', 'centroid']
+export const FENCE_NAMES: Record<FenceValue, string> = { clearance: '획끼리 닿음', finalBottom: '받침 밑선', gap: '획 사이 틈', topLine: '받침 유무 윗선 차이', centroid: '무게중심' }
+export const FENCE_ORDER: readonly FenceValue[] = ['clearance', 'finalBottom', 'gap', 'topLine', 'centroid']
 
 /** 당긴 방향을 쉬운 말로. */
 export function pullWord(value: FenceValue, pulled: number): string {
+  if (value === 'clearance') return '휨 줄임'
   if (value === 'finalBottom') return pulled < 0 ? '올림' : '내림'
   if (value === 'gap') return pulled > 0 ? '벌림' : '좁힘'
   if (value === 'topLine') return pulled > 0 ? '윗부분 올림' : '윗부분 내림'
