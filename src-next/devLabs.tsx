@@ -73,6 +73,12 @@ export async function showDevLab(show: (node: ReactNode) => void): Promise<boole
     return true
   }
 
+  if (path === '/fence-lab') {
+    const { FenceLabPage } = await import('./FenceLabPage')
+    show(<FenceLabPage />)
+    return true
+  }
+
   if (path === '/ink-parity-lab') {
     const { InkParityLabPage } = await import('./InkParityLabPage')
     show(<InkParityLabPage />)

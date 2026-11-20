@@ -1,0 +1,69 @@
+/* 울타리 실험지. 폰 한 손 화면 — 위에서 글줄을 보고, 아래(엄지 자리)에서 답한다. 획 긋기 시험판과 같은 틀. */
+.page {
+  display: grid;
+  gap: 14px;
+  width: min(480px, 100%);
+  min-height: 100dvh;
+  margin-inline: auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+  background: rgb(var(--color-background));
+  color: rgb(var(--color-foreground));
+  align-content: start;
+}
+
+.header { display: grid; gap: 2px; }
+.eyebrow { color: rgb(var(--color-primary)); font-size: var(--font-11); font-weight: var(--weight-heavy); letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+.header h1 { font-size: var(--font-24); font-weight: var(--weight-heavy); line-height: 1.2; }
+.header p { color: rgb(var(--color-text-3)); font-size: var(--font-14); }
+
+.progress { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; }
+.progress > span { height: 4px; border-radius: var(--radius-full); background: rgb(var(--color-surface-3)); }
+.progress > span[data-state='done'] { background: rgb(var(--color-foreground)); }
+.progress > span[data-state='now'] { background: rgb(var(--color-primary)); }
+
+.card {
+  display: grid;
+  gap: 12px;
+  padding: 18px 12px;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: var(--radius-lg);
+  background: rgb(var(--color-surface));
+}
+.line { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; row-gap: 8px; min-height: 160px; align-content: center; }
+.space { width: 16px; }
+
+.ask { min-height: 64px; color: rgb(var(--color-text-4)); font-size: var(--font-13); text-align: center; align-content: center; }
+.reveal {
+  display: grid;
+  gap: 2px;
+  min-height: 64px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: rgb(var(--color-surface-2));
+}
+.revealLabel { color: rgb(var(--color-text-4)); font-size: var(--font-11); font-weight: var(--weight-semibold); }
+.reveal strong { font-size: var(--font-16); font-weight: var(--weight-heavy); }
+.revealDetail { color: rgb(var(--color-text-3)); font-size: var(--font-13); }
+
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.wide { grid-column: 1 / -1; }
+
+.resultTitle { font-size: var(--font-16); font-weight: var(--weight-heavy); }
+.results { display: grid; gap: 0; counter-reset: item; }
+.results > li {
+  display: grid;
+  grid-template-columns: 20px 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgb(var(--color-border));
+  font-size: var(--font-13);
+  counter-increment: item;
+}
+.results > li::before { content: counter(item); color: rgb(var(--color-text-4)); font-variant-numeric: tabular-nums; }
+.resultName { font-weight: var(--weight-semibold); }
+.resultLevel { color: rgb(var(--color-text-3)); }
+.resultAnswer { min-width: 52px; text-align: right; font-weight: var(--weight-semibold); }
+.results > li[data-match='true'] .resultAnswer { color: rgb(var(--color-success)); }
+.results > li[data-match='false'] .resultAnswer { color: rgb(var(--color-warning)); }
+.resultNote { color: rgb(var(--color-text-4)); font-size: var(--font-13); }
