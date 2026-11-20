@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { Check, ChevronRight, Dices, RotateCcw } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Dices, RotateCcw } from 'lucide-react'
 import type { PenPoint } from '../src/services/penStrokeFit'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { propagatedJungseong } from '../src/stores/stemMasterStore'
@@ -96,6 +96,8 @@ export function PillarLabPage() {
   // 울타리 보정: 켜면 배치 값이 울타리(안전선) 밖인 글자를 당긴다. 흔들기는 보정이 당기는 걸 보려고 배치를 일부러 민다.
   const [fenceOn, setFenceOn] = useState(true)
   const [shake, setShake] = useState<ShakeLevel>(0)
+  // 자세히(값 넷 · 흔들기)는 접어 둔다 — 폰에서 긋는 판까지 한 화면에 들어와야 긋다가 화면이 안 밀린다.
+  const [fenceOpen, setFenceOpen] = useState(false)
   const [pulls, setPulls] = useState<Record<number, readonly FencePull[]>>({})
   const reportPulls = useCallback((index: number, list: readonly FencePull[]) => setPulls((all) => (all[index] === list ? all : { ...all, [index]: list })), [])
   const drawing = useRef<PenPoint[] | null>(null)
@@ -193,7 +195,7 @@ export function PillarLabPage() {
   const fenceNote = [pulledCount > 0 ? `${fenceOn ? '' : '켜면 '}${pulledCount}자 당김` : '', stuckCount > 0 ? `${stuckCount}자는 다 못 당김` : ''].filter(Boolean).join(' · ') || '모두 울타리 안'
   const note = stem && !stem.ok ? reasonText(stem) : accepted ? `방금 그은 게 ${withCopula(info.term)}. 길이와 자리, 굵기는 우리가 맞췄어요.` : info.hint
 
-  return <main className={styles.page}>
+  return <main className={styles.page} data-open={fenceOpen || undefined}>
     <header className={styles.header}>
       <span className={styles.eyebrow}>시험판 · 줄기 {doneCount}/{STEMS.length}</span>
       <h1>획 긋기</h1>
@@ -220,27 +222,27 @@ export function PillarLabPage() {
           <ChoiceItem checked={!mine} onClick={() => setView('base')}>기본</ChoiceItem>
         </ChoiceGroup>
       </div>
-    </section>
-
-    <section className={styles.fenceCard} aria-label="울타리 보정" data-testid="fence-card">
-      <div className={styles.fenceHead}>
-        <div>
-          <strong>울타리 보정</strong>
-          <span data-testid="fence-count">{fenceNote}</span>
+      <div className={styles.fence} data-testid="fence-card">
+        <div className={styles.fenceHead}>
+          <Button variant="ghost" size="chip" aria-expanded={fenceOpen} onClick={() => setFenceOpen((open) => !open)} data-testid="fence-more">
+            <strong>울타리 보정</strong><span data-testid="fence-count">{fenceNote}</span><ChevronDown aria-hidden="true" data-open={fenceOpen || undefined} />
+          </Button>
+          <Switch checked={fenceOn} onCheckedChange={setFenceOn} aria-label="울타리 보정" data-testid="fence-switch" />
         </div>
-        <Switch checked={fenceOn} onCheckedChange={setFenceOn} aria-label="울타리 보정" data-testid="fence-switch" />
-      </div>
-      <ul className={styles.fenceRows}>
-        {fenceRows.map((row) => <li key={row.value} data-moved={row.count > 0 || undefined} data-stuck={row.stuck > 0 || undefined} data-testid={`fence-row-${row.value}`}>
-          <span>{FENCE_NAMES[row.value]}</span>
-          <b>{fenceRowText(row)}</b>
-        </li>)}
-      </ul>
-      <div className={styles.fenceShake}>
-        <span>일부러 흔들기</span>
-        <ChoiceGroup variant="segment" aria-label="일부러 흔들기" className={styles.shakeSwitch}>
-          {([[0, '끔'], [1, '조금'], [2, '많이']] as const).map(([level, name]) => <ChoiceItem key={level} checked={shake === level} onClick={() => setShake(level)} data-testid={`fence-shake-${level}`}>{name}</ChoiceItem>)}
-        </ChoiceGroup>
+        {fenceOpen && <>
+          <ul className={styles.fenceRows}>
+            {fenceRows.map((row) => <li key={row.value} data-moved={row.count > 0 || undefined} data-stuck={row.stuck > 0 || undefined} data-testid={`fence-row-${row.value}`}>
+              <span>{FENCE_NAMES[row.value]}</span>
+              <b>{fenceRowText(row)}</b>
+            </li>)}
+          </ul>
+          <div className={styles.fenceShake}>
+            <span>일부러 흔들기</span>
+            <ChoiceGroup variant="segment" aria-label="일부러 흔들기" className={styles.shakeSwitch}>
+              {([[0, '끔'], [1, '조금'], [2, '많이']] as const).map(([level, name]) => <ChoiceItem key={level} checked={shake === level} onClick={() => setShake(level)} data-testid={`fence-shake-${level}`}>{name}</ChoiceItem>)}
+            </ChoiceGroup>
+          </div>
+        </>}
       </div>
     </section>
 
@@ -254,13 +256,13 @@ export function PillarLabPage() {
     </nav>
 
     <section className={styles.padWrap} aria-label="긋는 판">
-      <svg ref={padRef} viewBox={VIEWBOX} className={styles.pad} data-testid="pillar-pad"
+      <div className={styles.padBox}><svg ref={padRef} viewBox={VIEWBOX} className={styles.pad} data-testid="pillar-pad"
         onPointerDown={begin} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish}>
         <Guide kind={kind} />
         {!current && stem?.ok && <path d={pointsToSvgD(stem.fit.stroke.points, kind === 'circle', UNIT_BOX, VIEW)} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={PAD_INK * VIEW} strokeLinecap="round" strokeLinejoin="round" data-testid="pillar-fitted" />}
         {!current && raw && <path d={rawPath(raw)} fill="none" stroke={EDIT_COLOR.editSelect} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" opacity={0.7} />}
         {current && <path d={rawPath(current)} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={PAD_INK * VIEW} strokeLinecap="round" strokeLinejoin="round" />}
-      </svg>
+      </svg></div>
       <p className={styles.padNote} data-testid="pillar-note" data-state={stem && !stem.ok ? 'warn' : accepted ? 'done' : 'idle'}>{note}</p>
       <div className={styles.padActions}>
         <Button variant="outline" size="block" onClick={() => setRaws((all) => ({ ...all, [kind]: undefined }))} disabled={!raw} data-testid="pillar-reset"><RotateCcw aria-hidden="true" />다시 긋기</Button>
