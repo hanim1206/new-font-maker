@@ -255,3 +255,85 @@ export function valueText(group: GroupInfo, value: number | undefined): string {
   const pct = Math.round((v / base - 1) * 100)
   return `보통${pct === 0 ? '' : pct > 0 ? ` +${pct}%` : ` ${pct}%`}`
 }
+
+// ===== 큰 빚기: 글줄 전체를 바꾸는 손잡이 셋(크기 · 틀 · 숨) =====
+// 고양이 추천(뼈대 문서 22:01 절, 하니무스 "여기서 얹어봐" 22:07): 긋기 뒤 내 선 위에서, 폭은 안전선이 아니라 한계선 가까이까지.
+// 큰 손잡이 셋은 폰트에서 잰 폭이 아직 없어 모두 임시값이다. 띠의 가운데 칸(보통 폭)도 임시로 둔 폭이다.
+
+export type BigKey = 'size' | 'frame' | 'breath'
+export interface BigInfo {
+  key: BigKey
+  name: string
+  /** 띠 왼쪽 끝 · 오른쪽 끝의 말 */
+  left: string
+  right: string
+  what: string
+  range: Range
+}
+
+export const BIG: readonly BigInfo[] = [
+  {
+    key: 'size', name: '크기', left: '닿자 작게', right: '닿자 크게', what: '첫닿자를 키우면 받침은 그만큼 작아져요. 받침 밑선은 그대로예요.',
+    range: { engine: 1, presets: { narrow: 0.92, normal: 1, wide: 1.08 }, safe: [0.95, 1.05], wall: [0.8, 1.2] },
+  },
+  {
+    key: 'frame', name: '틀', left: '길쭉하게', right: '납작하게', what: '글자의 가로 폭을 줄이거나 늘려요. 네모꼴이 길쭉해지거나 납작해져요.',
+    range: { engine: 1, presets: { narrow: 0.88, normal: 1, wide: 1.08 }, safe: [0.95, 1.04], wall: [0.78, 1.16] },
+  },
+  {
+    key: 'breath', name: '숨', left: '진하게', right: '성기게', what: '진하게 하면 획이 굵고 글자가 붙어요. 성기게 하면 가늘고 사이가 벌어져요.',
+    range: { engine: 0, presets: { narrow: -0.5, normal: 0, wide: 0.5 }, safe: [-0.2, 0.2], wall: [-1, 1] },
+  },
+]
+export const bigInfo = (key: BigKey) => BIG.find((info) => info.key === key)!
+
+export type BigValues = Partial<Record<BigKey, number>>
+
+/** 숨 → 굵기 배율 · 자간(글자 크기 비율). 왼쪽 끝 −1 = 굵기 ×1.45 · 자간 −4%, 오른쪽 끝 +1 = 굵기 ×0.7 · 자간 +14%. */
+export function breathOf(value: number | undefined): { weight: number; tracking: number } {
+  const v = Math.max(-1, Math.min(1, value ?? 0))
+  return { weight: v < 0 ? 1 - v * 0.45 : 1 - v * 0.3, tracking: v < 0 ? v * 0.04 : v * 0.14 }
+}
+
+/** 굵기(100–900)에 배율을 곱한다. */
+export const scaledWeight = (weight: number, scale: number) => Math.max(100, Math.min(900, Math.round(weight * scale)))
+
+/**
+ * 큰 빚기를 상자에 입힌다(갈래 값보다 먼저 — 갈래는 그 위의 더 다듬기).
+ * - 크기 s: 첫닿자는 가운데를 두고 ×s, 받침은 밑선 · 가로 가운데를 두고 ×(2 − s).
+ * - 틀 w: 모든 상자를 글자 가운데(x 0.5)를 두고 가로로 ×w.
+ */
+export function bigBoxes(boxes: Partial<Record<Part, BoxConfig>>, big: BigValues): Partial<Record<Part, BoxConfig>> {
+  const out = { ...boxes }
+  const s = big.size === undefined ? 1 : clampToWall(bigInfo('size').range, big.size)
+  if (s !== 1) {
+    if (out.CH) {
+      const box = out.CH
+      out.CH = { ...box, x: box.x + box.width * (1 - s) / 2, y: box.y + box.height * (1 - s) / 2, width: box.width * s, height: box.height * s }
+    }
+    if (out.JO) {
+      const box = out.JO
+      const t = 2 - s
+      out.JO = { ...box, x: box.x + box.width * (1 - t) / 2, y: box.y + box.height * (1 - t), width: box.width * t, height: box.height * t }
+    }
+  }
+  const w = big.frame === undefined ? 1 : clampToWall(bigInfo('frame').range, big.frame)
+  if (w !== 1) {
+    for (const part of Object.keys(out) as Part[]) {
+      const box = out[part]
+      if (box) out[part] = { ...box, x: 0.5 + (box.x - 0.5) * w, width: box.width * w }
+    }
+  }
+  return out
+}
+
+/** 큰 빚기 값 → 보이는 말. */
+export function bigText(info: BigInfo, value: number | undefined): string {
+  if (value === undefined || Math.abs(value - info.range.engine) < 1e-6) return '처음 그대로'
+  if (info.key === 'breath') {
+    const { weight, tracking } = breathOf(value)
+    return `굵기 ×${weight.toFixed(2)} · 자간 ${tracking >= 0 ? '+' : ''}${Math.round(tracking * 100)}%`
+  }
+  const pct = Math.round((value - 1) * 100)
+  return info.key === 'size' ? `첫닿자 ${pct > 0 ? '+' : ''}${pct}% · 받침 ${pct > 0 ? '' : '+'}${-pct}%` : `가로 ${pct > 0 ? '+' : ''}${pct}%`
+}

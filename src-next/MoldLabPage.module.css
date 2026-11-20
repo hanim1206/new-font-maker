@@ -26,7 +26,7 @@
 }
 .line { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; row-gap: 6px; min-height: 120px; align-content: center; }
 .space { width: 14px; }
-.glyph { display: inline-flex; touch-action: manipulation; border-radius: var(--radius-sm); }
+.glyph { display: inline-flex; justify-content: center; overflow: visible; touch-action: manipulation; border-radius: var(--radius-sm); }
 .glyph:active { background: rgb(var(--color-surface-2)); }
 .lineActions { display: flex; align-items: center; justify-content: space-between; }
 .changed { color: rgb(var(--color-text-4)); font-size: var(--font-12); font-weight: var(--weight-semibold); }
@@ -62,7 +62,6 @@
 .ruler { position: relative; height: 44px; touch-action: none; cursor: ew-resize; }
 .rulerTrack { position: absolute; left: 0; right: 0; top: 20px; height: 4px; border-radius: var(--radius-full); background: rgb(var(--color-surface-3)); }
 .rulerSafe { position: absolute; top: 18px; height: 8px; border-radius: var(--radius-full); background: rgb(var(--color-success) / .35); }
-.rulerTick { position: absolute; top: 14px; width: 2px; height: 16px; margin-left: -1px; background: rgb(var(--color-text-4)); }
 .rulerEngine { position: absolute; top: 30px; width: 6px; height: 6px; margin-left: -3px; border-radius: var(--radius-full); background: rgb(var(--color-text-5)); }
 .rulerThumb {
   position: absolute;
@@ -76,13 +75,44 @@
   box-shadow: 0 1px 4px rgb(15 23 42 / .25);
 }
 .rulerThumb[data-out] { background: rgb(var(--color-warning)); }
-.rulerWallL, .rulerWallR { position: absolute; top: 0; color: rgb(var(--color-destructive)); font-size: var(--font-10); font-weight: var(--weight-heavy); }
-.rulerWallL { left: 0; }
-.rulerWallR { right: 0; }
 
 .readout { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .readout strong { font-size: var(--font-16); font-weight: var(--weight-heavy); }
 .readout span { color: rgb(var(--color-success)); font-size: var(--font-13); font-weight: var(--weight-semibold); }
 .readout span[data-out] { color: rgb(var(--color-warning)); }
 .note { color: rgb(var(--color-text-4)); font-size: var(--font-12); }
-.resetAll { justify-self: center; }
+.center { justify-self: center; }
+
+.steps { width: 100%; margin-top: 6px; }
+.rulerWrap { display: grid; gap: 0; }
+.rulerEnds { display: flex; justify-content: space-between; color: rgb(var(--color-text-4)); font-size: var(--font-11); font-weight: var(--weight-semibold); }
+
+.stems { display: flex; gap: 6px; overflow-x: auto; margin-inline: -12px; padding-inline: 12px; scrollbar-width: none; }
+.stems::-webkit-scrollbar { display: none; }
+.stems > button { flex: none; }
+.stems > button[data-done]:not([aria-selected='true']) { color: rgb(var(--color-success)); }
+.stemNo { font-variant-numeric: tabular-nums; opacity: .6; }
+.pad {
+  width: 100%;
+  max-height: 38dvh;
+  aspect-ratio: 3 / 4;
+  justify-self: center;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: var(--radius-lg);
+  background: rgb(var(--color-background));
+  touch-action: none;
+  cursor: crosshair;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.padNote { min-height: 20px; color: rgb(var(--color-text-4)); font-size: var(--font-13); text-align: center; }
+.padNote[data-state='done'] { color: rgb(var(--color-foreground)); font-weight: var(--weight-semibold); }
+.padNote[data-state='warn'] { color: rgb(var(--color-warning)); font-weight: var(--weight-semibold); }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.big { display: grid; gap: 4px; padding-bottom: 10px; border-bottom: 1px solid rgb(var(--color-border)); }
+.bigHead { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.bigHead h2 { font-size: var(--font-18); font-weight: var(--weight-heavy); }
+.bigHead span { margin-left: auto; color: rgb(var(--color-text-3)); font-size: var(--font-13); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
+.bigHead span[data-out] { color: rgb(var(--color-warning)); }

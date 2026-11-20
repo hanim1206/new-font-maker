@@ -69,3 +69,33 @@ describe('빚기 시험판', () => {
     expect(partAt(HORIZONTAL_FINAL, 0.5, 0.99, { CH: true, JU: true })).toBe('JU')
   })
 })
+
+describe('큰 빚기', () => {
+  it('크기는 첫닿자를 키우고 받침은 밑선을 두고 줄인다', async () => {
+    const { bigBoxes } = await import('./moldLab')
+    const out = bigBoxes(HORIZONTAL_FINAL, { size: 1.1 })
+    expect(out.CH!.width).toBeCloseTo(0.55)
+    expect(out.CH!.x + out.CH!.width / 2).toBeCloseTo(0.5)
+    expect(out.JO!.height).toBeCloseTo(0.315)
+    expect(out.JO!.y + out.JO!.height).toBeCloseTo(0.95)
+    expect(out.JU).toEqual(HORIZONTAL_FINAL.JU)
+  })
+
+  it('틀은 가운데를 두고 가로만 줄이고, 벽 밖 값은 벽에서 멈춘다', async () => {
+    const { bigBoxes, bigInfo } = await import('./moldLab')
+    const out = bigBoxes(VERTICAL, { frame: 0.5 })
+    const w = bigInfo('frame').range.wall[0]
+    expect(out.JU!.width).toBeCloseTo(0.3 * w)
+    expect(out.JU!.y).toBe(VERTICAL.JU.y)
+    expect(out.CH!.x).toBeCloseTo(0.5 + (0.1 - 0.5) * w)
+  })
+
+  it('숨은 진하게면 굵고 붙고, 성기게면 가늘고 벌어진다', async () => {
+    const { breathOf } = await import('./moldLab')
+    expect(breathOf(0)).toEqual({ weight: 1, tracking: 0 })
+    expect(breathOf(-1).weight).toBeGreaterThan(1)
+    expect(breathOf(-1).tracking).toBeLessThan(0)
+    expect(breathOf(1).weight).toBeLessThan(1)
+    expect(breathOf(1).tracking).toBeGreaterThan(0)
+  })
+})
