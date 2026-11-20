@@ -209,7 +209,8 @@
             }
           ],
           "closed": false,
-          "thickness": 0.07
+          "thickness": 0.07,
+          "linecap": "square"
         }
       ]
     },

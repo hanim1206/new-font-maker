@@ -8,8 +8,10 @@ import type { PartShift } from './AppGlyph'
  */
 
 export type FenceValue = 'finalBottom' | 'topLine' | 'gap' | 'centroid'
-/** 0 가운데 · 1 울타리 끝 · 2 울타리 두 배 밖(가운데에서 끝까지 거리의 두 배). */
-export type FenceLevel = 0 | 1 | 2
+/** 가운데에서 울타리 끝까지 거리의 몇 배인가. 0 가운데 · 1 울타리 끝 · 2 두 배 밖 … (확인 12문항은 0 · 1 · 2, 한계선 문항은 3 · 4 · 6). */
+export type FenceLevel = number
+/** 흔드는 쪽. 기본은 값마다 정한 쪽, `wide`는 반대쪽(윗선 차이를 넓히는 쪽). */
+export type FenceSide = 'default' | 'wide'
 
 export interface FenceValueInfo {
   value: FenceValue
@@ -26,11 +28,15 @@ export const FENCE_VALUES: readonly FenceValueInfo[] = [
   { value: 'centroid', name: '무게중심', detail: '받침 글자의 위아래 무게중심', sentence: '맑은 하늘 밑 넓은 들판' },
 ]
 
-export const LEVEL_NAMES: Record<FenceLevel, string> = { 0: '가운데', 1: '울타리 끝', 2: '울타리 두 배 밖' }
+const TIMES: Record<number, string> = { 2: '두', 3: '세', 4: '네', 5: '다섯', 6: '여섯' }
+export function levelName(level: FenceLevel, side: FenceSide = 'default'): string {
+  const base = level === 0 ? '가운데' : level === 1 ? '울타리 끝' : `울타리 ${TIMES[level] ?? level} 배 밖`
+  return side === 'wide' ? `${base}(넓은 쪽)` : base
+}
 
 /** 울타리: 가운데와 이번에 쓰는 끝. 목표 = 가운데 + 단계 × (끝 − 가운데). */
 interface Fence { engine: number; center: number; end: number }
-const targetOf = (fence: Fence, level: FenceLevel) => fence.center + level * (fence.end - fence.center)
+const targetOf = (fence: Fence, level: FenceLevel, side: FenceSide = 'default') => fence.center + (side === 'wide' ? -1 : 1) * level * (fence.end - fence.center)
 
 /** 받침 밑선 흩어짐(표준편차). 엔진 0.008, 고딕 0.009 [0.006~0.013] — 넓은 쪽 끝을 쓴다. */
 const FINAL_BOTTOM: Fence = { engine: 0.008, center: 0.009, end: 0.013 }
@@ -61,7 +67,7 @@ const upper = (dy: number): PartShift => ({ CH: { dy }, JU: { dy }, JU_H: { dy }
  * - 틈: 세로 짜임에서 첫닿을 (엔진 − 목표)만큼 홀자 쪽으로.
  * - 무게중심: 받침 글자의 윗부분을 (목표 − 엔진) ÷ 몫만큼 옮긴다.
  */
-export function fenceShift(value: FenceValue, level: FenceLevel, layout: LayoutType, finalIndex: number): PartShift | undefined {
+export function fenceShift(value: FenceValue, level: FenceLevel, layout: LayoutType, finalIndex: number, side: FenceSide = 'default'): PartShift | undefined {
   switch (value) {
     case 'finalBottom': {
       if (!hasFinal(layout)) return undefined
@@ -71,7 +77,8 @@ export function fenceShift(value: FenceValue, level: FenceLevel, layout: LayoutT
     }
     case 'topLine': {
       if (layout !== 'choseong-jungseong-horizontal-jongseong') return undefined
-      return upper(TOP_LINE.engine - targetOf(TOP_LINE, level))
+      // 윗선 차이는 0 아래로 안 간다(받침 글자가 받침 없는 글자보다 낮게 시작하면 다른 규칙이 깨진다) — 0에서 멈춘다.
+      return upper(TOP_LINE.engine - Math.max(0, targetOf(TOP_LINE, level, side)))
     }
     case 'gap': {
       if (!isVertical(layout)) return undefined
@@ -85,7 +92,7 @@ export function fenceShift(value: FenceValue, level: FenceLevel, layout: LayoutT
   }
 }
 
-export interface FenceItem { value: FenceValue; level: FenceLevel }
+export interface FenceItem { value: FenceValue; level: FenceLevel; side?: FenceSide }
 
 /** 12문항. 같은 값이 붙어 나오지 않게 섞은 고정 순서(사람마다 같은 순서라 답을 견주기 쉽다). */
 export const FENCE_ITEMS: readonly FenceItem[] = [
@@ -94,6 +101,24 @@ export const FENCE_ITEMS: readonly FenceItem[] = [
   { value: 'topLine', level: 1 }, { value: 'finalBottom', level: 0 }, { value: 'gap', level: 2 }, { value: 'centroid', level: 0 },
 ]
 
+/**
+ * 한계선 10문항(거북이 설계, 하니무스 "둘로 나눈다" 21:06). 확인 12문항에서 두 배 밖도 괜찮았던 셋을 세 · 네 · 여섯 배 밖까지 흔든다.
+ * 윗선 차이는 다섯 배쯤에서 0에 닿아 여섯 배는 0에서 멈추고, 넓은 쪽으로 여섯 배도 한 문항. 무게중심은 울타리 가운데 기준이다(엔진 값이 이미 밖이라).
+ * 처음 어색하다고 답한 단계가 한계선이다.
+ */
+export const LIMIT_ITEMS: readonly FenceItem[] = [
+  { value: 'topLine', level: 3 }, { value: 'gap', level: 4 }, { value: 'centroid', level: 6 }, { value: 'topLine', level: 6, side: 'wide' }, { value: 'gap', level: 3 },
+  { value: 'centroid', level: 3 }, { value: 'topLine', level: 4 }, { value: 'gap', level: 6 }, { value: 'centroid', level: 4 }, { value: 'topLine', level: 6 },
+]
+
+/** 값 · 쪽마다 처음 어색하다고 답한 단계(작은 단계부터). 다 괜찮으면 null — 한계선은 그보다 밖. */
+export function limitOf(items: readonly FenceItem[], answers: readonly (Answer | undefined)[], value: FenceValue, side: FenceSide = 'default'): FenceLevel | null | undefined {
+  const asked = items.map((item, index) => ({ item, answer: answers[index] })).filter(({ item }) => item.value === value && (item.side ?? 'default') === side)
+  if (!asked.length || asked.some(({ answer }) => !answer)) return undefined
+  const awkward = asked.filter(({ answer }) => answer === 'awkward').map(({ item }) => item.level).sort((a, b) => a - b)
+  return awkward.length ? awkward[0] : null
+}
+
 export const fenceInfo = (value: FenceValue) => FENCE_VALUES.find((info) => info.value === value)!
 
 /** 기대 답: 가운데 · 끝은 괜찮다, 두 배 밖은 어색하다. */
@@ -101,12 +126,13 @@ export const expectedAnswer = (level: FenceLevel): Answer => (level === 2 ? 'awk
 export type Answer = 'ok' | 'awkward'
 
 /** 결과를 붙여 넣기 좋은 글로. */
-export function answersText(answers: readonly (Answer | undefined)[]): string {
-  const lines = FENCE_ITEMS.map((item, index) => {
+export function answersText(answers: readonly (Answer | undefined)[], items: readonly FenceItem[] = FENCE_ITEMS): string {
+  const limit = items !== FENCE_ITEMS
+  const lines = items.map((item, index) => {
     const answer = answers[index]
     const said = answer === 'ok' ? '괜찮다' : answer === 'awkward' ? '어색하다' : '—'
-    const match = answer ? (answer === expectedAnswer(item.level) ? '기대대로' : '기대와 다름') : ''
-    return `${index + 1}. ${fenceInfo(item.value).name} · ${LEVEL_NAMES[item.level]} → ${said} ${match}`.trim()
+    const match = !limit && answer ? (answer === expectedAnswer(item.level) ? '기대대로' : '기대와 다름') : ''
+    return `${index + 1}. ${fenceInfo(item.value).name} · ${levelName(item.level, item.side)} → ${said} ${match}`.trim()
   })
-  return ['울타리 실험지 12문항', ...lines].join('\n')
+  return [limit ? `한계선 ${items.length}문항` : '울타리 실험지 12문항', ...lines].join('\n')
 }
