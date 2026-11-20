@@ -1,4 +1,4 @@
-/* 기둥 긋기 시험판. 폰 한 손 화면이 먼저 — 위에서 글줄을 보고, 아래(엄지 자리)에서 긋는다. */
+/* 획 긋기 시험판. 폰 한 손 화면이 먼저 — 위에서 글줄을 보고, 아래(엄지 자리)에서 긋는다. */
 .page {
   display: grid;
   gap: 14px;
@@ -49,3 +49,10 @@
 .padNote { min-height: 20px; color: rgb(var(--color-text-4)); font-size: var(--font-13); text-align: center; }
 .padNote[data-state='done'] { color: rgb(var(--color-foreground)); font-weight: var(--weight-semibold); }
 .padNote[data-state='warn'] { color: rgb(var(--color-warning)); font-weight: var(--weight-semibold); }
+
+.stems { display: flex; gap: 6px; overflow-x: auto; margin-inline: -16px; padding-inline: 16px; scrollbar-width: none; }
+.stems::-webkit-scrollbar { display: none; }
+.stems > button { flex: none; }
+.stems > button[data-done]:not([aria-selected='true']) { color: rgb(var(--color-success)); }
+.stemNo { font-variant-numeric: tabular-nums; opacity: .6; }
+.padActions { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; }
