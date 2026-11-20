@@ -152,6 +152,11 @@ const BASE_JAMOS = {
   jongseong: baseJamos.jongseong as Record<string, JamoData>,
 }
 
+/** 기본 프리셋 세 벌 통째 사본. 사용자가 고친 것과 상관없이 처음 모양으로 그릴 때(학습 입구). */
+export function baseJamoMaps(): { choseong: Record<string, JamoData>; jungseong: Record<string, JamoData>; jongseong: Record<string, JamoData> } {
+  return deepClone(BASE_JAMOS)
+}
+
 /** 한 자모의 기본 프리셋(baseJamos.json) 사본. 사용자가 고친 것과 상관없는 처음 모양. */
 export function getBaseJamo(type: 'choseong' | 'jungseong' | 'jongseong', char: string): JamoData | undefined {
   const base = BASE_JAMOS[type][char]

@@ -8,17 +8,18 @@ import { FontWorkspacePage } from './FontWorkspacePage'
 import { NotFoundPage } from './NotFoundPage'
 import { ReviewWorkspacePage } from './ReviewWorkspacePage'
 import { ShapeWorkspacePage } from './ShapeWorkspacePage'
+import { StartPage } from './StartPage'
 import { Button } from './components/ui/button'
 import { FontExportDialog } from './workspace/FontExportDialog'
 
 /**
- * 앱을 열면 대시보드가 처음이다 — 화면 사이 입구가 다 거기 있다. 모르는 주소는 404(`NotFoundPage`).
+ * 앱을 열면 첫 화면(`/start`, 학습 입구)이 처음이다 — 들어오자마자 긋는다. 제작 입구는 거기서 대시보드로(입구 B안, 2026-11-21). 모르는 주소는 404(`NotFoundPage`).
  * 글자 쿼리(`?char=`)가 있으면 그 글자를 여는 링크라 자소 화면으로 그대로 넘긴다.
  */
 function HomeRedirect() {
   useEffect(() => {
     const { search, hash } = window.location
-    navigate(new URLSearchParams(search).has('char') ? `/workspace/jamo${search}${hash}` : '/dashboard', { replace: true })
+    navigate(new URLSearchParams(search).has('char') ? `/workspace/jamo${search}${hash}` : '/start', { replace: true })
   }, [])
   return null
 }
@@ -31,6 +32,7 @@ function Page() {
   const pathname = usePathname()
   const key = useRouteKey()
   if (pathname === '/') return <HomeRedirect key={key} />
+  if (pathname === '/start') return <StartPage key={key} />
   if (pathname === '/dashboard') return <DashboardLabPage key={key} />
   // 섹션 홈. 묶기(`?group=`)는 화면이 조용히 고치니 경로로만 연다.
   if (pathname.startsWith('/dashboard/')) return <JamoHomePage key={pathname} />
