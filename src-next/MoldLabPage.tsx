@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent } from 'react'
+import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
 import { Check, ChevronRight, Dices, RotateCcw, Undo2 } from 'lucide-react'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
@@ -19,8 +19,8 @@ import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { Pressable } from './components/ui/pressable'
 import { Switch } from './components/ui/switch'
 import { EDIT_COLOR } from './editColors'
-import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type FenceLine, type FencePull } from './fenceBand'
-import { applyPartEdits, appliedWeight, dirOf, dragGrip, dragLook, dragWhole, editsBetween, gripAt, lookBoxes, lookRect, wholeGripAt, type BoxGrip, type Rect, type WholeGrip, gapCapMultiplier, lookOf, regionLabels, scaledWeight, simsBoxes, simsPartOf, type Dir, type GapStroke, type LayoutEdits, type Look, type Region, type SimsPart } from './moldLab'
+import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair } from './fenceBand'
+import { applyPartEdits, appliedWeight, dragLook, dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement } from './notoModel'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
@@ -138,35 +138,40 @@ function moldedBoxes(boxes: Partial<Record<Part, BoxConfig>>, layout: LayoutType
  * 빚은 글자 하나. 칸을 풀고, 짜임 편집 · 폭 · 굵기 · 끝 모양을 차례로 입혀 그린다.
  * `sel`이 있으면 고른 부위만 제 색으로, 나머지는 옅게 그린다.
  */
-function MoldGlyph({ char, size, edits, look, drawn, sel, shownStroke, testId, onCap, fence, onFence }: { char: string; size: number; edits: LayoutEdits; look: Look; drawn?: Drawn; sel?: Region | null; shownStroke?: (key: string) => boolean; testId?: string; weightCap?: number; onCap?: (grow: number, limited: boolean) => void; fence?: MoldFence; onFence?: (need: number, pulls: readonly FencePull[]) => void }) {
+function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke, testId, weightCap = Infinity, onCap, fence, onFence }: { char: string; size: number; edits: LayoutEdits; look: Look; drawn?: Drawn; sel?: Region | null; highlight?: readonly Part[]; shownStroke?: (key: string) => boolean; testId?: string; weightCap?: number; onCap?: (ratio: number) => void; fence?: MoldFence; onFence?: (need: number, pulls: readonly FencePull[]) => void }) {
   const { syllable, effective, placement, padding } = useGlyphBase(char, drawn)
   const base = useGlyphBase(char, undefined)
   const molded = useMemo(() => placement.kind === 'boxes' ? moldedBoxes(placement.boxes, syllable.layoutType, edits, look) : undefined, [placement, syllable.layoutType, edits, look])
 
-  // 굵게 해도 멈추지 않는다. 획이 붙을 자리(ㄹ 가로 사이 등)가 생기면 자소 칸을 조금씩 키워 그 안의 틈을 낸다 —
-  // 굵은 폰트도 자소가 줄지 않고 조금 커지며, 자소 사이 틈이 대신 준다(거북이 자소별 표 2절). 키워도 모자라면 그 글자만 그 자리에서 멈춘다.
+  // 굵기는 글줄 전체가 같다(다람쥐 검수 1번). 글자마다 "자소를 끝까지 키워도 획이 안 붙는 가장 굵은 비율"을 올리고, 글줄은 가장 작은 것을 다 같이 쓴다.
+  // 그 굵기 안에서 획이 붙을 자리(ㄹ 가로 사이 등)가 생기는 글자만 자소 칸을 조금 키워 틈을 낸다 — 굵은 폰트도 자소가 줄지 않고 조금 커진다(거북이 자소별 표 2절).
   const wanted = lookOf(look, 'weight')
+  const capRatio = useMemo(() => {
+    if (!onCap || !molded || placement.kind !== 'boxes' || wanted <= 1) return Infinity
+    const ref = gapStrokesOf(syllable, placement, effective.linecap, effective.linejoin)
+    const last = JAMO_GROWS[JAMO_GROWS.length - 1]
+    const capM = gapCapMultiplier(ref, gapStrokesOf(syllable, { kind: 'boxes', boxes: scaledBoxes(molded, last) }, effective.linecap, effective.linejoin), weightToMultiplier(effective.weight), 0)
+    return capM === Infinity ? Infinity : Math.max(1, weightUnder(capM, 100) / effective.weight)
+  }, [onCap, molded, placement, wanted, syllable, effective])
+  useEffect(() => { onCap?.(capRatio) }, [onCap, capRatio])
+  const ratio = appliedWeight(wanted, weightCap)
   const grown = useMemo(() => {
-    if (!molded || placement.kind !== 'boxes' || wanted <= 1) return { boxes: molded, grow: 1, ratio: wanted }
+    if (!molded || placement.kind !== 'boxes' || ratio <= 1) return { boxes: molded, grow: 1 }
     const ref = gapStrokesOf(syllable, placement, effective.linecap, effective.linejoin)
     const baseM = weightToMultiplier(effective.weight)
-    const wantedM = weightToMultiplier(scaledWeight(effective.weight, wanted))
-    let capM = Infinity
+    const needM = weightToMultiplier(scaledWeight(effective.weight, ratio))
     for (const grow of JAMO_GROWS) {
       const candidate = grow === 1 ? molded : scaledBoxes(molded, grow)
-      capM = gapCapMultiplier(ref, gapStrokesOf(syllable, { kind: 'boxes', boxes: candidate }, effective.linecap, effective.linejoin), baseM, 0)
-      if (capM >= wantedM) return { boxes: candidate, grow, ratio: wanted }
+      if (gapCapMultiplier(ref, gapStrokesOf(syllable, { kind: 'boxes', boxes: candidate }, effective.linecap, effective.linejoin), baseM, 0) >= needM) return { boxes: candidate, grow }
     }
     const last = JAMO_GROWS[JAMO_GROWS.length - 1]
-    return { boxes: scaledBoxes(molded, last), grow: last, ratio: Math.max(1, weightUnder(capM, 100) / effective.weight) }
-  }, [molded, placement, wanted, syllable, effective])
-  useEffect(() => { onCap?.(grown.grow, grown.ratio < wanted) }, [onCap, grown, wanted])
+    return { boxes: scaledBoxes(molded, last), grow: last }
+  }, [molded, placement, ratio, syllable, effective])
 
   // 울타리: 그은 획 때문에 칸 밖으로 나간 것을 당긴다. 기준 글자는 그은 게 없을 때 같은 칸의 모습.
   const fenced = useMemo(() => fence && grown.boxes ? fencedBoxes({ syllable, baseSyllable: drawn ? base.syllable : syllable, boxes: grown.boxes, style: effective, padding, fence }) : null, [fence, grown.boxes, syllable, base.syllable, drawn, effective, padding])
   useEffect(() => { if (fenced) onFence?.(fenced.need, fenced.pulls) }, [onFence, fenced])
   const boxes = fenced?.boxes ?? grown.boxes
-  const ratio = grown.ratio
   const soft = lookOf(look, 'soft') > 0.5
   const globalStyle = useMemo(() => {
     const weighted = ratio === 1 ? effective : { ...effective, weight: scaledWeight(effective.weight, ratio) }
@@ -174,10 +179,12 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, shownStroke, testId, o
   }, [effective, ratio, soft])
   const colorOf = useCallback((source: ResolvedStrokeInkSource) => {
     if (shownStroke) return shownStroke(`${simsPartOf(source.part)}:${source.jamoId}:${source.strokeId}`) ? undefined : 'transparent'
+    // 잡은 보선 양쪽 부위만 제 색(선 이름 대신).
+    if (highlight) return highlight.includes(source.part) ? SLOT_COLOR[simsPartOf(source.part)] : EDIT_COLOR.editSlotOff
     if (sel === 'STROKE') return EDIT_COLOR.editSelect
     if (sel === 'CH' || sel === 'JU' || sel === 'JO') return simsPartOf(source.part) === sel ? SLOT_COLOR[sel] : EDIT_COLOR.editSlotOff
     return undefined
-  }, [sel, shownStroke])
+  }, [sel, shownStroke, highlight])
 
   // 폭이 좁아지면 글자 칸도 같이 좁힌다. 자간은 글자 사이를 더하거나 뺀다.
   const slot = { width: size * lookOf(look, 'frame') * lookOf(look, 'size') + size * lookOf(look, 'tracking'), marginInline: 0 }
@@ -190,7 +197,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, shownStroke, testId, o
       globalStyle={globalStyle}
       overflow="visible"
       clipGlyphs={false}
-      strokeColorOf={shownStroke || (sel && sel !== 'WHOLE') ? colorOf : undefined}
+      strokeColorOf={shownStroke || highlight || (sel && sel !== 'WHOLE') ? colorOf : undefined}
     />
   </span>
 }
@@ -317,37 +324,76 @@ function useSpring(target: Record<string, number>): Record<string, number> {
   return cur.current
 }
 
-const PARTS: readonly SimsPart[] = ['CH', 'JU', 'JO']
 const LOOK_KEYS = ['weight', 'soft', 'frame', 'tracking', 'size', 'height'] as const
-const ZERO_EDIT = [0, 0, 0, 0] as const
 const STAGE = 220
-const DIRS: readonly { dir: Dir; x: number; y: number; arrow: string }[] = [
-  { dir: 'up', x: 50, y: 6, arrow: '↑' }, { dir: 'down', x: 50, y: 94, arrow: '↓' },
-  { dir: 'left', x: 12, y: 50, arrow: '←' }, { dir: 'right', x: 88, y: 50, arrow: '→' },
-  { dir: 'ul', x: 18, y: 17, arrow: '↖' }, { dir: 'ur', x: 82, y: 17, arrow: '↗' },
-  { dir: 'dl', x: 18, y: 83, arrow: '↙' }, { dir: 'dr', x: 82, y: 83, arrow: '↘' },
-]
-const REGION_BUTTONS: readonly { region: SimsPart; name: string; color: string }[] = [
-  { region: 'CH', name: '첫닿자', color: EDIT_COLOR.editSlotCh }, { region: 'JU', name: '홀자', color: EDIT_COLOR.editSlotJu },
-  { region: 'JO', name: '받침', color: EDIT_COLOR.editSlotJo },
-]
-/** 손잡이 잡는 폭(px). 폰 손가락 크기. */
-const GRIP_PX = 16
-const pct = (value: number) => `${(value * 100).toFixed(2)}%`
-const signed = (value: number) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`
-
-function labelOf(dir: Dir, labels: { up: string; down: string; left: string; right: string }): string {
-  if (dir === 'up' || dir === 'down' || dir === 'left' || dir === 'right') return labels[dir]
-  return [labels[dir[0] === 'u' ? 'up' : 'down'], labels[dir[1] === 'l' ? 'left' : 'right']].filter(Boolean).join(' · ')
-}
+const ALL_PARTS: readonly Part[] = ['CH', 'JU', 'JU_H', 'JU_V', 'JO']
+/** 기둥 선을 1(글자 단위) 끌면 굵기 비율이 이만큼 바뀐다. 끝에서 끝(0.25~2.25)까지 무대의 2/3쯤 — 조금 끌어 최대로 튀지 않게(하니무스 2026-11-21). */
+const STEM_GAIN = 3
+/** 선 · 손잡이 잡는 폭(px). 폰 손가락 크기. */
+const GRAB_PX = 14
+const HANDLE = { long: 20, short: 11 }
+const RULER = 14
 
 type Mode = 'shape' | 'part'
-type Grab = { x0: number; y0: number; moved: boolean; start: Partial<Record<SimsPart, BoxConfig>>; look: Look; grip?: BoxGrip; whole?: WholeGrip; last?: string; lastX?: number; lastY?: number }
+/** 무대에 까는 선 하나. 자리는 보이는 글자 단위(전체 값까지 입힌 것). */
+interface GuideLine {
+  id: string
+  axis: 'h' | 'v'
+  pos: number
+  color: string
+  dashed?: boolean
+  /** 손잡이를 선의 어느 끝에(가로선은 오른쪽, 세로선은 아래 · 위) */
+  end: 'start' | 'end'
+  /** 눈금자: 움직일 수 있는 범위와 처음 자리 */
+  lo: number; hi: number; origin: number
+  /** 잡으면 제 색을 입힐 부위(보선의 양쪽) */
+  parts?: readonly Part[]
+  /** 잡은 뒤 d(보이는 글자 단위)만큼 끌었을 때. 벽에 막혔으면 false */
+  drag: (d: number) => boolean
+}
+type Grab =
+  | { kind: 'line'; line: GuideLine; x0: number; y0: number; moved: boolean; last?: number }
+  | { kind: 'tip'; x0: number; y0: number; moved: boolean; soft: number; dir: [number, number] }
+  | { kind: 'move'; part: Part; x0: number; y0: number; moved: boolean; edits: PartEdits; gaps?: Clearances }
+  | { kind: 'tap'; x0: number; y0: number; moved: boolean }
+
+/** 부위를 옮길 때 획끼리 지킬 틈(em). 처음부터 이보다 가까웠으면 그 틈을 지킨다. */
+const INK_GAP = 0.02
+const groupOf = (part: Part): 'CH' | 'JU' | 'JO' => (part === 'CH' ? 'CH' : part === 'JO' ? 'JO' : 'JU')
+function inkStrokes(syllable: DecomposedSyllable, boxes: Partial<Record<Part, BoxConfig>>, style: GlobalStyle, multiplier: number) {
+  const result = resolveGlyphInkPrimitives({ syllable, placement: { kind: 'boxes', boxes }, weightMultiplier: multiplier, globalLinecap: style.linecap, globalLinejoin: style.linejoin, horizontalInkBounds: { min: 0, max: 1 } })
+  return result.primitives.map((primitive) => ({ part: primitive.source.part, box: primitive.box, points: primitive.stroke.points, closed: primitive.stroke.closed, thickness: primitive.stroke.thickness * primitive.weightMultiplier }))
+}
+
+/** 홀자 기둥(가장 긴 곧은 줄기)과 곁줄기 끝. 보이는 글자 단위. */
+function stemOf(syllable: DecomposedSyllable, boxes: Partial<Record<Part, BoxConfig>>, style: GlobalStyle, multiplier: number) {
+  const result = resolveGlyphInkPrimitives({ syllable, placement: { kind: 'boxes', boxes }, weightMultiplier: multiplier, globalLinecap: style.linecap, globalLinejoin: style.linejoin, horizontalInkBounds: { min: 0, max: 1 } })
+  const lines = result.primitives.filter((p) => p.source.part.startsWith('JU') && p.stroke.points.length === 2 && !p.stroke.closed).map((p) => {
+    const at = (q: { x: number; y: number }) => ({ x: p.box.x + q.x * p.box.width, y: p.box.y + q.y * p.box.height })
+    const a = at(p.stroke.points[0]), z = at(p.stroke.points[1])
+    return { a, z, len: Math.hypot(z.x - a.x, z.y - a.y), thick: p.stroke.thickness * p.weightMultiplier }
+  })
+  if (!lines.length) return null
+  const vertical = lines.filter((l) => Math.abs(l.z.x - l.a.x) < 0.01)
+  const stem = [...(vertical.length ? vertical : lines)].sort((p, q) => q.len - p.len)[0]
+  const axis: 'h' | 'v' = Math.abs(stem.z.x - stem.a.x) < 0.01 ? 'v' : 'h'
+  const c = axis === 'v' ? stem.a.x : stem.a.y
+  const branch = lines.filter((l) => l !== stem).sort((p, q) => p.len - q.len)[0]
+  let tip: { x: number; y: number; dir: [number, number] } | null = null
+  if (branch) {
+    const da = Math.abs((axis === 'v' ? branch.a.x : branch.a.y) - c), dz = Math.abs((axis === 'v' ? branch.z.x : branch.z.y) - c)
+    const end = dz > da ? branch.z : branch.a
+    const sign = Math.sign((axis === 'v' ? end.x : end.y) - c) || 1
+    tip = { x: end.x, y: end.y, dir: axis === 'v' ? [sign, 0] : [0, sign] }
+  }
+  return { axis, c, thick: stem.thick, tip }
+}
 
 /**
- * 빚기 무대. 두 걸음이 같은 큰 글자를 쓴다.
- * - 인상 잡기(shape): 네모꼴 테두리 — 모서리 = 크기, 위 · 아래 변 = 키, 왼 · 오른 변 = 폭. 글자 안쪽을 위아래로 끌면 굵기, 좌우로 끌면 끝 둥글기.
- * - 부위 다듬기(part): 부위를 콕 골라 칸 상자의 네 변 · 가운데를 끌거나(기존 한글칸글 상자 조절처럼), 상자 밖에서 여덟 방향으로 끈다(심즈 방식).
+ * 빚기 무대(보선 끌기, A안). 상자 없이 화면 끝까지 가는 선을 끈다.
+ * - 인상 잡기(shape): 바깥 파란 선 넷(위 · 아래 = 키, 왼 · 오른 = 폭), 기둥을 감싼 주황 두 선(벌리면 굵게), 곁줄기 끝 점(당기면 둥글게). 크기는 두 손가락.
+ * - 부위 다듬기(part): 부위 사이 보선(양쪽 부위가 나눠 쓴다). 부위를 끌면 다른 부위와 겹치지 않는 데까지 통째로 옮긴다. 홀자를 누르면 기둥 두 선 · 끝 점도 뜬다.
+ * 왼쪽(가로선) · 아래(세로선) 눈금자에 지금 자리, 처음 자리(점선), 움직일 수 있는 범위(옅은 띠). 선은 여섯 개 이하, 잡은 선만 진하게.
  */
 function SimsStep({ mode, char, drawn, edits, setEdits, look, setLook, weightCap, weightNote, sel, setSel, onBegin, fence }: {
   mode: Mode
@@ -355,159 +401,248 @@ function SimsStep({ mode, char, drawn, edits, setEdits, look, setLook, weightCap
   char: string; drawn?: Drawn; edits: LayoutEdits; setEdits: (update: (now: LayoutEdits) => LayoutEdits) => void
   look: Look; setLook: (next: Look) => void; weightCap: number; weightNote?: string; sel: Region | null; setSel: (region: Region | null) => void; onBegin: () => void
 }) {
-  const { syllable, placement, padding, effective } = useGlyphBase(char, drawn)
+  const { syllable, placement, effective } = useGlyphBase(char, drawn)
   const layout = syllable.layoutType
-  const origin = useMemo(() => placement.kind === 'boxes' ? simsBoxes(placement.boxes) : {}, [placement])
-  const present: Record<SimsPart, boolean> = { CH: !!syllable.choseong, JU: !!syllable.jungseong, JO: !!syllable.jongseong }
-  const part: SimsPart | null = mode === 'part' && (sel === 'CH' || sel === 'JU' || sel === 'JO') && present[sel] ? sel : null
-  const body: Rect = useMemo(() => [padding.left, padding.top, 1 - padding.right, 1 - padding.bottom], [padding])
-  const [dir, setDir] = useState<Dir | null>(null)
-  const [pressing, setPressing] = useState(false)
-  const [gripOn, setGripOn] = useState<string | null>(null)
-  const grab = useRef<Grab | null>(null)
+  const origin = useMemo<Partial<Record<Part, BoxConfig>>>(() => placement.kind === 'boxes' ? placement.boxes : {}, [placement])
+  const stageRef = useRef<HTMLDivElement>(null)
+  const [stageW, setStageW] = useState(320)
+  useEffect(() => {
+    const el = stageRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setStageW(el.clientWidth))
+    ro.observe(el)
+    setStageW(el.clientWidth)
+    return () => ro.disconnect()
+  }, [])
+  const off = (stageW - STAGE) / 2
+  const px = (u: number) => off + u * STAGE
+  const [active, setActive] = useState<GuideLine | null>(null)
   const [bump, setBump] = useState(0)
   const lastBump = useRef(0)
   const bumpWall = () => { const now = Date.now(); if (now - lastBump.current > 450) { lastBump.current = now; setBump((n) => n + 1) } }
-  const svgHost = useRef<HTMLDivElement>(null)
+  const grab = useRef<Grab | null>(null)
+  const pointers = useRef(new Map<number, { x: number; y: number }>())
+  const pinch = useRef<{ d0: number; size: number } | null>(null)
 
   // 큰 글자만 젤리로 따라온다(글줄은 손 그대로).
   const target = useMemo(() => {
-    const out: Record<string, number> = { press: pressing ? 0.96 : 1 }
-    for (const one of PARTS) (edits[layout]?.[one] ?? ZERO_EDIT).forEach((value, i) => { out[`${one}${i}`] = value })
+    const out: Record<string, number> = {}
+    const mine = edits[layout] ?? {}
+    for (const key of ['CH', 'JU', 'JU_H', 'JU_V', 'JO'] as const) (mine[key] ?? [0, 0, 0, 0]).forEach((value, i) => { out[`${key}${i}`] = value })
     for (const key of LOOK_KEYS) out[key] = lookOf(look, key)
     return out
-  }, [edits, layout, look, pressing])
+  }, [edits, layout, look])
   const shown = useSpring(target)
-  // shown은 같은 객체를 고쳐 쓰므로 매번 새로 만든다(스프링이 돌 때마다 다시 그린다).
-  const shownEdits: LayoutEdits = { [layout]: Object.fromEntries(PARTS.map((one) => [one, [0, 1, 2, 3].map((i) => shown[`${one}${i}`] ?? 0)])) }
+  const shownEdits: LayoutEdits = { [layout]: Object.fromEntries((['CH', 'JU', 'JU_H', 'JU_V', 'JO'] as const).filter((key) => edits[layout]?.[key]).map((key) => [key, [0, 1, 2, 3].map((i) => shown[`${key}${i}`] ?? 0)])) }
   const shownLook: Look = Object.fromEntries(LOOK_KEYS.map((key) => [key, shown[key]]))
 
-  /** 화면 좌표 → 글자 단위(큰 글자 svg 기준). */
-  const glyphPoint = (clientX: number, clientY: number) => {
-    const svg = svgHost.current?.querySelector('svg')
-    if (!svg) return null
-    const rect = svg.getBoundingClientRect()
-    return { x: (clientX - rect.left) / rect.width, y: (clientY - rect.top) / rect.width, unit: rect.width }
-  }
-  const nowBoxes = () => placement.kind === 'boxes' ? simsBoxes(moldedBoxes(placement.boxes, layout, edits, look)) : {}
+  // 지금(보이기 전) 칸 · 보이는 칸
+  const now = applyPartEdits(origin, edits[layout])
+  const sx = lookOf(look, 'frame') * lookOf(look, 'size'), sy = lookOf(look, 'height') * lookOf(look, 'size')
+  const tx = (u: number) => 0.5 + (u - 0.5) * sx, ty = (v: number) => 0.5 + (v - 0.5) * sy
+  const ratio = appliedWeight(lookOf(look, 'weight'), weightCap)
+  const multiplier = weightToMultiplier(scaledWeight(effective.weight, ratio))
+  const stem = useMemo(() => placement.kind === 'boxes' ? stemOf(syllable, moldedBoxes(placement.boxes, layout, edits, look), effective, multiplier) : null, [placement, syllable, layout, edits, look, effective, multiplier])
+  const juPicked = mode === 'part' && sel === 'JU'
 
+  // ── 선 만들기(지금 값으로. 끌기는 잡은 때의 값에서 셈한다) ──
+  const lines: GuideLine[] = []
+  const bounds = (() => {
+    const all = Object.values(origin).filter((b): b is BoxConfig => !!b)
+    if (!all.length) return [0, 0, 1, 1]
+    return [Math.min(...all.map((b) => b.x)), Math.min(...all.map((b) => b.y)), Math.max(...all.map((b) => b.x + b.width)), Math.max(...all.map((b) => b.y + b.height))]
+  })()
+  if (mode === 'shape') {
+    const outer = (id: string, axis: 'h' | 'v', base: number, key: 'height' | 'frame') => {
+      const startLook = look
+      const k0 = lookOf(look, key), size = lookOf(look, 'size')
+      const posOf = (k: number) => 0.5 + (base - 0.5) * k * size
+      const [w0, w1] = LOOK_WALL[key]
+      lines.push({
+        id, axis, pos: posOf(k0), color: EDIT_COLOR.editSelect, end: 'end', lo: Math.min(posOf(w0), posOf(w1)), hi: Math.max(posOf(w0), posOf(w1)), origin: 0.5 + (base - 0.5) * size,
+        drag: (d) => { const want = (posOf(k0) + d - 0.5) / ((base - 0.5) * size); const k = Math.max(w0, Math.min(w1, want)); setLook({ ...startLook, [key]: k }); return k === want },
+      })
+    }
+    outer('top', 'h', bounds[1], 'height'); outer('bottom', 'h', bounds[3], 'height'); outer('left', 'v', bounds[0], 'frame'); outer('right', 'v', bounds[2], 'frame')
+  }
+  if (stem && (mode === 'shape' || juPicked)) {
+    const startLook = look, r0 = lookOf(look, 'weight')
+    const half = stem.thick / 2
+    const baseHalf = half / multiplier * weightToMultiplier(effective.weight)
+    const [w0, w1] = LOOK_WALL.weight
+    const halfAt = (r: number) => baseHalf / weightToMultiplier(effective.weight) * weightToMultiplier(scaledWeight(effective.weight, Math.min(r, weightCap)))
+    for (const side of [-1, 1] as const) {
+      lines.push({
+        id: `stem${side}`, axis: stem.axis, pos: stem.c + side * half, color: SLOT_COLOR.CH, dashed: true, end: 'start',
+        lo: Math.min(stem.c + side * halfAt(w0), stem.c + side * halfAt(w1)), hi: Math.max(stem.c + side * halfAt(w0), stem.c + side * halfAt(w1)), origin: stem.c + side * baseHalf,
+        drag: (d) => { const want = r0 + side * d * STEM_GAIN; const r = Math.max(w0, Math.min(w1, want)); setLook({ ...startLook, weight: r }); return r === want && appliedWeight(r, weightCap) === r },
+      })
+    }
+  }
+  if (mode === 'part') {
+    seamsOf(layout, origin).forEach((seam, i) => {
+      const v = seam.axis === 'v', scale = v ? sx : sy, t = v ? tx : ty
+      const startEdits = edits[layout] ?? {}
+      const pre = seamPos(seam, now)
+      const [lo, hi] = seamRange(seam, origin, now)
+      const color = seam.b.includes('JO') ? SLOT_COLOR.JO : SLOT_COLOR.JU
+      lines.push({
+        id: `seam${i}`, axis: seam.axis, pos: t(pre), color, end: 'end', lo: t(pre + lo), hi: t(pre + hi), origin: t(seamPos(seam, origin)), parts: [...seam.a, ...seam.b],
+        drag: (d) => { const out = dragSeam(seam, origin, startEdits, d / scale); setEdits((all) => ({ ...all, [layout]: out.edits })); return !out.clamped },
+      })
+    })
+  }
+  const shownLines = lines.slice(0, 6)
+  const tip = stem?.tip && (mode === 'shape' || juPicked) ? stem.tip : null
+
+  // ── 손 ──
+  const local = (event: ReactPointerEvent<HTMLDivElement>) => { const r = event.currentTarget.getBoundingClientRect(); return { x: event.clientX - r.left, y: event.clientY - r.top } }
+  const handleAt = (line: GuideLine) => line.axis === 'h' ? { x: stageW - HANDLE.long / 2 - 4, y: px(line.pos) } : { x: px(line.pos), y: line.end === 'start' ? HANDLE.long / 2 + 4 : stageW - RULER - HANDLE.long / 2 - 4 }
+  const partAt = (x: number, y: number): Part | null => {
+    const u = (x - off) / STAGE, v = (y - off) / STAGE
+    const shownBoxes = placement.kind === 'boxes' ? moldedBoxes(placement.boxes, layout, edits, look) : {}
+    let best: { part: Part; d: number } | null = null
+    for (const part of ALL_PARTS) {
+      const b = shownBoxes[part]
+      if (!b) continue
+      const dx = Math.max(b.x - u, 0, u - b.x - b.width), dy = Math.max(b.y - v, 0, v - b.y - b.height)
+      const d = dx === 0 && dy === 0 ? -1 + b.width * b.height : Math.hypot(dx, dy) // 칸 안이면 작은 칸이 먼저(겹친 칸에서 홀자 · 받침을 잡기 쉽게)
+      if (!best || d < best.d) best = { part, d }
+    }
+    return best && best.d < 0.05 ? best.part : null
+  }
   const begin = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (placement.kind !== 'boxes') return
     event.currentTarget.setPointerCapture(event.pointerId)
-    const at = glyphPoint(event.clientX, event.clientY)
-    const tol = at ? GRIP_PX / at.unit : 0
-    let grip: BoxGrip | undefined, whole: WholeGrip | undefined
-    if (at && mode === 'shape') whole = wholeGripAt(lookRect(body, look), at.x, at.y, tol)
-    if (at && part) { const box = nowBoxes()[part]; if (box) grip = gripAt(box, at.x, at.y, tol) }
-    grab.current = { x0: event.clientX, y0: event.clientY, moved: false, start: simsBoxes(applyPartEdits(placement.boxes, edits[layout])), look, grip, whole }
-    setGripOn(whole ?? grip ?? null)
+    const at = local(event)
+    pointers.current.set(event.pointerId, at)
+    if (pointers.current.size === 2) {
+      const [a, b] = [...pointers.current.values()]
+      pinch.current = { d0: Math.hypot(a.x - b.x, a.y - b.y), size: lookOf(look, 'size') }
+      grab.current = null; onBegin(); return
+    }
+    if (tip && Math.hypot(at.x - px(tip.x), at.y - px(tip.y)) < GRAB_PX + 4) { grab.current = { kind: 'tip', x0: at.x, y0: at.y, moved: false, soft: lookOf(look, 'soft'), dir: tip.dir }; return }
+    let hit: GuideLine | null = null, best = GRAB_PX
+    for (const line of shownLines) {
+      const h = handleAt(line)
+      // 손잡이는 넉넉히, 선 몸통은 좁게(선이 획 위를 지나도 획을 누를 수 있게). 끌지 않고 떼면 그 자리 부위를 고른다.
+      const d = Math.min(Math.hypot(at.x - h.x, at.y - h.y) * 0.6, (line.axis === 'h' ? Math.abs(at.y - px(line.pos)) : Math.abs(at.x - px(line.pos))) * 1.6)
+      if (d < best) { best = d; hit = line }
+    }
+    if (hit) { grab.current = { kind: 'line', line: hit, x0: at.x, y0: at.y, moved: false }; setActive(hit); return }
+    const part = mode === 'part' ? partAt(at.x, at.y) : null
+    if (part) { grab.current = { kind: 'move', part, x0: at.x, y0: at.y, moved: false, edits: edits[layout] ?? {} }; return }
+    grab.current = { kind: 'tap', x0: at.x, y0: at.y, moved: false }
   }
   const move = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!pointers.current.has(event.pointerId)) return
+    const at = local(event)
+    pointers.current.set(event.pointerId, at)
+    if (pinch.current && pointers.current.size === 2) {
+      const [a, b] = [...pointers.current.values()]
+      const want = pinch.current.size * Math.hypot(a.x - b.x, a.y - b.y) / pinch.current.d0
+      const size = Math.max(LOOK_WALL.size[0], Math.min(LOOK_WALL.size[1], want))
+      if (size !== want) bumpWall()
+      setLook({ ...look, size }); return
+    }
     const g = grab.current
     if (!g) return
-    let dx = event.clientX - g.x0, dy = event.clientY - g.y0
-    if (!g.moved) {
-      const len = Math.hypot(dx, dy)
-      if (len < 6) return
-      // 부위 다듬기의 끌기는 하나: 변은 그 변만, 가운데(칸 안)는 자리 옮기기. 칸 밖에서 끌면 아무것도 안 한다.
-      if (mode === 'part' && (!part || !g.grip)) { grab.current = null; setGripOn(null); return }
-      // 문턱만큼 툭 뛰지 않게 기준점을 옮긴다.
-      g.moved = true; g.x0 += dx * 6 / len; g.y0 += dy * 6 / len
-      dx = event.clientX - g.x0; dy = event.clientY - g.y0
-      onBegin(); setPressing(!g.grip && !g.whole)
+    const dx = at.x - g.x0, dy = at.y - g.y0
+    if (!g.moved) { if (Math.hypot(dx, dy) < 4) return; g.moved = true; onBegin() }
+    let ok = true
+    if (g.kind === 'line') ok = g.line.drag((g.line.axis === 'h' ? dy : dx) / STAGE)
+    else if (g.kind === 'tip') { const want = g.soft + (dx * g.dir[0] + dy * g.dir[1]) / STAGE * 8; const soft = Math.max(0, Math.min(1, want)); ok = soft === want; setLook({ ...look, soft }) }
+    else if (g.kind === 'move') {
+      if (sel !== simsPartOf(g.part)) setSel(simsPartOf(g.part))
+      const startBoxes = applyPartEdits(origin, g.edits)
+      const want = { du: dx / STAGE / sx, dv: dy / STAGE / sy }
+      // 글자 끝(0.02~0.98)은 상자로, 다른 부위와는 획(잉크)끼리 닿기 전에 멈춘다 — 상자끼리는 원래 겹쳐 있어도 획은 떨어져 있다.
+      const boxed = moveApart({ [g.part]: startBoxes[g.part] }, g.part, want.du, want.dv)
+      const gapsAt = (du: number, dv: number) => partClearances(inkStrokes(syllable, applyPartEdits(origin, movePartEdit(g.edits, g.part, du, dv)), effective, multiplier))
+      const start = g.gaps ?? (g.gaps = gapsAt(0, 0))
+      const clear = (du: number, dv: number) => { const gaps = gapsAt(du, dv); return (Object.keys(start) as PartPair[]).every((pair) => !pair.includes(groupOf(g.part)) || (gaps[pair] ?? 1) >= Math.min(start[pair] ?? 1, INK_GAP) - 1e-4) }
+      const furthest = (ok0: (t: number) => boolean) => { if (ok0(1)) return 1; let lo = 0, hi = 1; for (let i = 0; i < 10; i++) { const mid = (lo + hi) / 2; if (ok0(mid)) lo = mid; else hi = mid } return lo }
+      const u = boxed.du * furthest((t) => clear(boxed.du * t, 0))
+      const v = boxed.dv * furthest((t) => clear(u, boxed.dv * t))
+      ok = Math.abs(u - want.du) < 1e-6 && Math.abs(v - want.dv) < 1e-6
+      setEdits((all) => ({ ...all, [layout]: movePartEdit(g.edits, g.part, u, v) }))
     }
-    const unit = glyphPoint(0, 0)?.unit ?? STAGE
-    // 손잡이는 손 그대로(1:1), 어디서든 끌기는 조금 느리게.
-    // 벽: 손은 더 갔는데 값이 그대로면 젤리로 툭 튕겨 알린다.
-    const wall = (out: unknown) => {
-      const key = JSON.stringify(out)
-      if (g.last === key && Math.hypot(event.clientX - (g.lastX ?? event.clientX), event.clientY - (g.lastY ?? event.clientY)) > 3) bumpWall()
-      if (g.last !== key) { g.last = key; g.lastX = event.clientX; g.lastY = event.clientY }
-    }
-    if (g.whole) { const next = dragWhole(g.look, body, g.whole, dx / unit, dy / unit); wall(next); setLook(next); return }
-    const frameX = lookOf(look, 'frame') * lookOf(look, 'size'), frameY = lookOf(look, 'height') * lookOf(look, 'size')
-    if (g.grip && part) {
-      const next = dragGrip(g.start, origin, part, g.grip, dx / unit / frameX, dy / unit / frameY)
-      wall(next[part])
-      setEdits((now) => ({ ...now, [layout]: editsBetween(origin, next) }))
-      return
-    }
-    setDir(dirOf(dx, dy))
-    const du = dx / STAGE * 0.8, dv = dy / STAGE * 0.8
-    if (mode === 'shape') { const next = dragLook(g.look, 'STROKE', du, dv); wall(next); setLook(next) }
+    if (!ok) bumpWall()
   }
   const end = (event: ReactPointerEvent<HTMLDivElement>) => {
+    pointers.current.delete(event.pointerId)
+    if (pointers.current.size < 2) pinch.current = null
     const g = grab.current
     grab.current = null
-    setDir(null); setPressing(false); setGripOn(null)
-    if (!g || g.moved || placement.kind !== 'boxes' || mode !== 'part') return
-    // 콕: 누른 자리의 부위를 고른다. 칸 상자 손잡이를 콕 누른 것은 고르기가 아니다.
-    if (g.grip) return
-    const at = glyphPoint(event.clientX, event.clientY)
-    if (!at) return
-    const boxes = nowBoxes()
-    let best: { part: SimsPart; d: number } | null = null
-    for (const one of PARTS) {
-      const box = boxes[one]
-      if (!box || !present[one]) continue
-      const ddx = Math.max(box.x - at.x, 0, at.x - box.x - box.width), ddy = Math.max(box.y - at.y, 0, at.y - box.y - box.height)
-      const d = Math.hypot(ddx, ddy) - (ddx === 0 && ddy === 0 ? box.width * box.height : 0) // 겹치면 작은 칸 먼저
-      if (!best || d < best.d) best = { part: one, d }
-    }
-    if (best && best.d < 0.06) setSel(best.part)
+    setActive(null)
+    if (!g || g.moved || mode !== 'part') return
+    if (g.kind === 'tap' || g.kind === 'move' || g.kind === 'line') { const part = partAt(g.x0, g.y0); setSel(part ? simsPartOf(part) : null) }
   }
+  const onWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
+    if (!event.ctrlKey) return
+    const size = Math.max(LOOK_WALL.size[0], Math.min(LOOK_WALL.size[1], lookOf(look, 'size') * Math.exp(-event.deltaY * 0.004)))
+    setLook({ ...look, size })
+  }
+  // ctrl + 휠이 브라우저 확대로 새지 않게
+  useEffect(() => {
+    const el = stageRef.current
+    if (!el) return
+    const block = (event: WheelEvent) => { if (event.ctrlKey) event.preventDefault() }
+    el.addEventListener('wheel', block, { passive: false })
+    return () => el.removeEventListener('wheel', block)
+  }, [])
 
-  // 무대 위 손잡이 그림. 큰 글자 svg와 같은 자리(무대 가운데 STAGE px 네모)에 깐다.
-  const overlay = (() => {
-    if (mode === 'shape') {
-      const [x0, y0, x1, y1] = lookRect(body, shownLook)
-      return <div className={styles.frameBox} style={{ left: pct(x0), top: pct(y0), width: pct(x1 - x0), height: pct(y1 - y0) }} data-testid="mold-frame">
-        {(['t', 'b', 'l', 'r', 'tl', 'tr', 'bl', 'br'] as const).map((grip) => <span key={grip} className={styles.grip} data-grip={grip} data-on={gripOn === grip || undefined} />)}
-      </div>
-    }
-    if (!part || placement.kind !== 'boxes') return null
-    const box = simsBoxes(moldedBoxes(placement.boxes, layout, shownEdits, shownLook))[part]
-    if (!box) return null
-    return <div className={styles.partBox} style={{ left: pct(box.x), top: pct(box.y), width: pct(box.width), height: pct(box.height), borderColor: SLOT_COLOR[part] }} data-testid="mold-partbox">
-      {(['t', 'b', 'l', 'r', 'move'] as const).map((grip) => <span key={grip} className={styles.grip} data-grip={grip} data-on={gripOn === grip || undefined} style={{ background: SLOT_COLOR[part] }} />)}
-    </div>
-  })()
-
-  // 여덟 방향 알약은 인상 잡기(굵기 · 끝 둥글기)에만. 부위 다듬기는 칸 상자 손잡이 하나로.
-  const showArrows = !gripOn && mode === 'shape'
-  const labels = mode === 'shape' ? regionLabels('STROKE', layout) : null
-  const weightNow = scaledWeight(effective.weight, appliedWeight(lookOf(look, 'weight'), weightCap))
+  // 잡은 보선의 양쪽 부위에만 색. 부위를 골랐으면 그 부위.
+  const highlight = active?.parts ?? (mode === 'part' && sel && sel !== 'STROKE' && sel !== 'WHOLE' ? ALL_PARTS.filter((part) => simsPartOf(part) === sel) : undefined)
+  const activeNow = active ? shownLines.find((line) => line.id === active.id) ?? null : null
+  const sizeText = (part: Part) => { const b = now[part]; return b ? `${Math.round(b.width * 100)}×${Math.round(b.height * 100)}` : '' }
   const readout = mode === 'shape'
-    ? `크기 ×${lookOf(look, 'size').toFixed(2)} · 키 ×${lookOf(look, 'height').toFixed(2)} · 폭 ×${lookOf(look, 'frame').toFixed(2)} · 굵기 ${weightNow} · 끝 ${lookOf(look, 'soft') > 0.5 ? '둥긂' : '또렷'} · 자간 ${signed(lookOf(look, 'tracking'))}`
-    : part ? (() => { const box = placement.kind === 'boxes' ? simsBoxes(applyPartEdits(placement.boxes, edits[layout]))[part] : undefined; return box ? `가로 ${Math.round(box.width * 100)} · 세로 ${Math.round(box.height * 100)}` : '' })() : ''
+    ? `크기 ×${lookOf(look, 'size').toFixed(2)} · 키 ×${lookOf(look, 'height').toFixed(2)} · 폭 ×${lookOf(look, 'frame').toFixed(2)} · 굵기 ${scaledWeight(effective.weight, ratio)} · 끝 ${lookOf(look, 'soft') > 0.5 ? '둥긂' : '또렷'} · 자간 ${lookOf(look, 'tracking') >= 0 ? '+' : ''}${Math.round(lookOf(look, 'tracking') * 100)}%`
+    : (activeNow?.parts ?? (highlight ?? [])).filter((part) => now[part]).map((part) => `${PART_NAMES[part]} ${sizeText(part)}`).join(' · ')
 
   return <section className={styles.panel} aria-label={mode === 'shape' ? '인상 잡기' : '부위 다듬기'}>
-    <div className={styles.stage} onPointerDown={begin} onPointerMove={move} onPointerUp={end} onPointerCancel={end} data-grip={gripOn ?? undefined} data-testid="mold-stage">
+    <div ref={stageRef} className={styles.stage} onPointerDown={begin} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onWheel={onWheel} data-active={active?.id} data-testid="mold-stage">
       <div className={styles.bumper} data-bump={bump === 0 ? undefined : bump % 2 ? 'a' : 'b'} data-testid="mold-bumper">
-      <div ref={svgHost} className={styles.stageGlyph} style={{ transform: `scale(${(shown.press ?? 1).toFixed(4)})` }}>
-        <MoldGlyph char={char} size={STAGE} edits={shownEdits} look={shownLook} drawn={drawn} sel={mode === 'part' ? part : null} weightCap={weightCap} fence={fence} testId="mold-focus" />
+        <div className={styles.stageGlyph}>
+          <MoldGlyph char={char} size={STAGE} edits={shownEdits} look={shownLook} drawn={drawn} highlight={highlight} weightCap={weightCap} fence={fence} testId="mold-focus" />
+        </div>
       </div>
-      <div className={styles.handles} data-mode={mode} style={{ width: STAGE, height: STAGE }}>{overlay}</div>
-      </div>
-      {labels && showArrows ? DIRS.map(({ dir: d, x, y, arrow }) => {
-        const text = labelOf(d, labels)
-        if (!text) return null
-        return <span key={d} className={styles.arrow} data-corner={d.length === 2 || undefined} data-on={dir === d || undefined} data-off={(dir && dir !== d) || undefined} style={{ left: `${x}%`, top: `${y}%` }} data-testid={`mold-arrow-${d}`}>
-          {x < 50 ? `${arrow} ${text}` : x > 50 ? `${text} ${arrow}` : `${arrow} ${text}`}
-        </span>
-      }) : mode === 'part' && !part && <span className={styles.tapNote}>다듬을 부위를 콕 누르세요</span>}
+      <svg className={styles.guides} width={stageW} height={stageW} aria-hidden="true">
+        <rect x={0} y={0} width={RULER} height={stageW} fill={EDIT_COLOR.border} />
+        <rect x={0} y={stageW - RULER} width={stageW} height={RULER} fill={EDIT_COLOR.border} />
+        {Array.from({ length: 19 }, (_, i) => (i + 1) / 20).map((u) => <g key={u} stroke={EDIT_COLOR.editGuide} strokeWidth={1}>
+          <line x1={0} y1={u * stageW} x2={u === 0.5 ? 8 : 4} y2={u * stageW} />
+          <line x1={u * stageW} y1={stageW} x2={u * stageW} y2={stageW - (u === 0.5 ? 8 : 4)} />
+        </g>)}
+        {activeNow && (activeNow.axis === 'h'
+          ? <g data-testid="mold-ruler"><rect x={0} y={px(activeNow.lo)} width={RULER} height={Math.max(2, px(activeNow.hi) - px(activeNow.lo))} fill={activeNow.color} opacity={0.2} />
+            <line x1={0} x2={RULER} y1={px(activeNow.origin)} y2={px(activeNow.origin)} stroke={activeNow.color} strokeWidth={1.5} strokeDasharray="3 2" />
+            <line x1={0} x2={RULER} y1={px(activeNow.pos)} y2={px(activeNow.pos)} stroke={activeNow.color} strokeWidth={3} /></g>
+          : <g data-testid="mold-ruler"><rect y={stageW - RULER} x={px(activeNow.lo)} height={RULER} width={Math.max(2, px(activeNow.hi) - px(activeNow.lo))} fill={activeNow.color} opacity={0.2} />
+            <line y1={stageW - RULER} y2={stageW} x1={px(activeNow.origin)} x2={px(activeNow.origin)} stroke={activeNow.color} strokeWidth={1.5} strokeDasharray="3 2" />
+            <line y1={stageW - RULER} y2={stageW} x1={px(activeNow.pos)} x2={px(activeNow.pos)} stroke={activeNow.color} strokeWidth={3} /></g>)}
+        {shownLines.map((line) => {
+          const on = active?.id === line.id
+          const p = px(line.pos), h = handleAt(line)
+          return <g key={line.id} opacity={active && !on ? 0.35 : on ? 1 : 0.7} data-testid={`mold-line-${line.id}`}>
+            {line.axis === 'h'
+              ? <line x1={RULER} x2={stageW} y1={p} y2={p} stroke={line.color} strokeWidth={on ? 2 : 1.25} strokeDasharray={line.dashed ? '5 3' : undefined} />
+              : <line y1={0} y2={stageW - RULER} x1={p} x2={p} stroke={line.color} strokeWidth={on ? 2 : 1.25} strokeDasharray={line.dashed ? '5 3' : undefined} />}
+            <rect x={h.x - (line.axis === 'h' ? HANDLE.long : HANDLE.short) / 2} y={h.y - (line.axis === 'h' ? HANDLE.short : HANDLE.long) / 2} width={line.axis === 'h' ? HANDLE.long : HANDLE.short} height={line.axis === 'h' ? HANDLE.short : HANDLE.long} rx={HANDLE.short / 2} fill={line.color} />
+          </g>
+        })}
+        {tip && <circle cx={px(tip.x)} cy={px(tip.y)} r={6} fill={lookOf(look, 'soft') > 0.5 ? SLOT_COLOR.CH : EDIT_COLOR.surface} stroke={SLOT_COLOR.CH} strokeWidth={2} data-testid="mold-tip" />}
+      </svg>
+      {mode === 'part' && !sel && !active && <span className={styles.tapNote}>부위를 끌면 옮기고, 선을 끌면 양쪽이 같이 바뀌어요</span>}
     </div>
-    <p className={styles.simsReadout} data-testid="mold-readout">{mode === 'shape' ? <><strong>인상</strong> {readout}{weightNote ? <><br />{weightNote}</> : null}</> : part ? <><strong>{regionLabels(part, layout).name}</strong> {readout}</> : ' '}</p>
-    {mode === 'part' && <ChoiceGroup variant="segment" aria-label="부위" className={styles.regions}>
-      {REGION_BUTTONS.map(({ region, name, color }) => <ChoiceItem key={region} checked={part === region} disabled={!present[region]} onClick={() => setSel(region)} data-testid={`mold-region-${region}`}>
-        <span className={styles.dot} style={{ background: color }} aria-hidden="true" />{name}
-      </ChoiceItem>)}
-    </ChoiceGroup>}
+    <p className={styles.simsReadout} data-testid="mold-readout">{mode === 'shape' ? <>{readout}{weightNote ? <><br />{weightNote}</> : null}</> : readout || ' '}</p>
     <p className={styles.note}>{mode === 'shape'
-      ? '네모 테두리의 모서리를 끌면 크기, 위 · 아래 변은 키, 왼 · 오른 변은 폭이 바뀌어요. 글자 안쪽을 위아래로 끌면 굵기, 좌우로 끌면 끝 둥글기. 자간은 위 글줄에서 좌우로 끌어요. 벽에 닿으면 글자가 툭 튕겨요. 값은 아직 임시예요.'
-      : '부위를 콕 누르면 칸 상자가 떠요. 변을 끌면 그 변만, 칸 안을 끌면 자리를 옮겨요. 이웃 부위는 처음 크기의 70%까지만 눌리고, 그다음엔 밀려나다 글자 끝에서 멈춰요. 벽에 닿으면 글자가 툭 튕겨요. 이 걸음은 건너뛰어도 돼요.'}</p>
+      ? '파란 선: 위 · 아래 = 키, 왼 · 오른 = 폭. 주황 두 선은 기둥을 감싼 선이라 벌리면 굵게, 좁히면 가늘게. 주황 점을 바깥으로 당기면 끝이 둥글어요. 크기는 두 손가락(컴퓨터는 Ctrl + 휠), 자간은 위 글줄에서 좌우로 끌어요.'
+      : '부위 사이 선을 끌면 양쪽 부위가 같이 바뀌어요(한쪽이 넓어지면 한쪽이 좁아져요). 부위를 끌면 다른 부위에 닿기 전까지 통째로 옮겨요. 홀자를 누르면 기둥 선과 끝 점이 떠요. 벽에 닿으면 글자가 툭 튕겨요. 이 걸음은 건너뛰어도 돼요.'}</p>
   </section>
 }
+
+const PART_NAMES: Record<Part, string> = { CH: '첫닿자', JU: '홀자', JU_H: '가로홀자', JU_V: '세로홀자', JO: '받침' }
 
 interface Snapshot { edits: LayoutEdits; look: Look }
 
@@ -523,16 +658,15 @@ export function MoldLabPage() {
   const [history, setHistory] = useState<Snapshot[]>([])
   const [compare, setCompare] = useState(false)
   const lineDrag = useRef<{ x0: number; look: Look; moved: boolean; width: number } | null>(null)
-  // 굵게 할 때 글자마다 자소를 얼마나 키웠나 · 키워도 모자라 멈췄나(안내에만 쓴다).
-  const [caps, setCaps] = useState<Record<string, { grow: number; limited: boolean }>>({})
+  // 글자마다 버틸 수 있는 가장 굵은 비율(자소를 끝까지 키워도 획이 안 붙는 데까지). 글줄은 가장 작은 것을 다 같이 쓴다 — 굵기는 글줄 전체가 같다.
+  const [caps, setCaps] = useState<Record<string, number>>({})
   const capReporters = useMemo(() => {
-    const out: Record<number, (grow: number, limited: boolean) => void> = {}
-    ;[...sentence].forEach((_, at) => { out[at] = (grow, limited) => setCaps((all) => { const key = `${sentence}-${at}`; const old = all[key]; return old && old.grow === grow && old.limited === limited ? all : { ...all, [key]: { grow, limited } } }) })
+    const out: Record<number, (ratio: number) => void> = {}
+    ;[...sentence].forEach((_, at) => { out[at] = (ratio: number) => setCaps((all) => (all[`${sentence}-${at}`] === ratio ? all : { ...all, [`${sentence}-${at}`]: ratio })) })
     return out
   }, [sentence])
-  const capsNow = [...sentence].flatMap((char, at) => (char === ' ' || !caps[`${sentence}-${at}`] ? [] : [caps[`${sentence}-${at}`]]))
-  const weightNote = [capsNow.some((cap) => cap.grow > 1) ? `${capsNow.filter((cap) => cap.grow > 1).length}자는 자소를 키워 틈을 냄` : '', capsNow.some((cap) => cap.limited) ? `${capsNow.filter((cap) => cap.limited).length}자는 획이 붙기 직전에 멈춤` : ''].filter(Boolean).join(' · ')
-  const weightCap = Infinity
+  const weightCap = Math.min(Infinity, ...[...sentence].map((char, at) => (char === ' ' ? Infinity : caps[`${sentence}-${at}`] ?? Infinity)))
+  const weightNote = appliedWeight(lookOf(look, 'weight'), weightCap) < lookOf(look, 'weight') ? '획이 붙기 직전이라 글줄 전체가 여기서 멈춤' : ''
   // 울타리 보정(획 긋기 시험판에서 가져옴). 켜면 그은 획 때문에 울타리 밖으로 나간 글자를 당긴다.
   const [fenceOn, setFenceOn] = useState(true)
   const [fenceLine, setFenceLine] = useState<FenceLine>('safe')

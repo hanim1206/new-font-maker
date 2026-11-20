@@ -249,3 +249,36 @@ describe('굵기 배율', () => {
     expect(appliedWeight(1.4, 0.7)).toBe(1)
   })
 })
+
+describe('보선 끌기(A안)', () => {
+  it('세로 짜임 보선을 밀면 첫닿자가 넓어지고 홀자가 좁아진다 — 둘은 안 겹친다', async () => {
+    const { seamsOf, dragSeam, applyPartEdits, seamPos } = await import('./moldLab')
+    const seams = seamsOf('choseong-jungseong-vertical', VERTICAL)
+    expect(seams).toHaveLength(1)
+    const out = dragSeam(seams[0], VERTICAL, {}, 0.04)
+    const now = applyPartEdits(VERTICAL, out.edits)
+    expect(now.CH!.width).toBeCloseTo(0.44)
+    expect(now.JU!.x).toBeCloseTo(0.64)
+    expect(now.CH!.x + now.CH!.width).toBeLessThanOrEqual(now.JU!.x)
+    expect(seamPos(seams[0], now)).toBeCloseTo(0.59)
+    expect(out.clamped).toBe(false)
+  })
+  it('보선은 부위가 처음의 0.7배 아래로 줄기 전에 멈춘다', async () => {
+    const { seamsOf, dragSeam, applyPartEdits } = await import('./moldLab')
+    const seam = seamsOf('choseong-jungseong-vertical', VERTICAL)[0]
+    const out = dragSeam(seam, VERTICAL, {}, 0.5)
+    expect(out.clamped).toBe(true)
+    expect(applyPartEdits(VERTICAL, out.edits).JU!.width).toBeCloseTo(0.21)
+  })
+  it('받침 있는 가로 짜임은 보선이 둘', async () => {
+    const { seamsOf } = await import('./moldLab')
+    expect(seamsOf('choseong-jungseong-horizontal-jongseong', HORIZONTAL_FINAL).map((s) => [s.a, s.b])).toEqual([[['CH'], ['JU']], [['JU'], ['JO']]])
+  })
+  it('부위를 통째로 옮기면 다른 부위에 닿는 데서 멈춘다', async () => {
+    const { moveApart } = await import('./moldLab')
+    expect(moveApart(VERTICAL, 'CH', 0.3, 0).du).toBeCloseTo(0.1)
+    expect(moveApart(VERTICAL, 'CH', -0.3, 0).du).toBeCloseTo(-0.08)
+    const down = moveApart(HORIZONTAL_FINAL, 'CH', 0, 0.2)
+    expect(down.dv).toBeCloseTo(0.03)
+  })
+})

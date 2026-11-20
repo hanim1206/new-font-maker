@@ -474,7 +474,10 @@ export type SimsPart = 'CH' | 'JU' | 'JO'
 export type Region = SimsPart | 'STROKE' | 'WHOLE'
 /** 칸 네 선의 이동량(글자 단위): 왼선 · 오른선 · 윗선 · 밑선. */
 export type PartEdit = readonly [number, number, number, number]
-export type LayoutEdits = Partial<Record<LayoutType, Partial<Record<SimsPart, PartEdit>>>>
+/** 편집 열쇠: 부위 셋 + 섞임홀자의 가로 · 세로 쪽(보선 끌기에서 따로 움직인다). */
+export type EditPart = SimsPart | 'JU_H' | 'JU_V'
+export type PartEdits = Partial<Record<EditPart, PartEdit>>
+export type LayoutEdits = Partial<Record<LayoutType, PartEdits>>
 /** 획 · 전체 값. 폭 · 키 · 크기는 글자 가운데를 두고 늘이고 줄인다. */
 export interface Look { weight?: number; soft?: number; frame?: number; tracking?: number; size?: number; height?: number }
 export type Dir = 'up' | 'down' | 'left' | 'right' | 'ul' | 'ur' | 'dl' | 'dr'
@@ -515,17 +518,26 @@ export type Rect = [number, number, number, number] // x0 y0 x1 y1
 const rectOf = (box: BoxConfig): Rect => [box.x, box.y, box.x + box.width, box.y + box.height]
 const boxOfRect = (base: BoxConfig, [x0, y0, x1, y1]: Rect): BoxConfig => ({ ...base, x: x0, y: y0, width: x1 - x0, height: y1 - y0 })
 
-/** 짜임 편집을 칸에 입힌다. 섞임홀자의 JU_H · JU_V는 홀자 편집을 같이 받는다. 너무 얇아지면 가운데로 모은다. */
-export function applyPartEdits(boxes: Partial<Record<Part, BoxConfig>>, edits: Partial<Record<SimsPart, PartEdit>> | undefined): Partial<Record<Part, BoxConfig>> {
+/** 이 칸이 받는 편집: 홀자 전체(JU) 편집 + 섞임홀자 쪽(JU_H · JU_V) 편집을 더한다. */
+export function editOf(edits: PartEdits | undefined, part: Part): PartEdit | undefined {
+  if (!edits) return undefined
+  const whole = edits[simsPartOf(part)]
+  const own = part === 'JU_H' || part === 'JU_V' ? edits[part] : undefined
+  if (!whole || !own) return own ?? whole
+  return [whole[0] + own[0], whole[1] + own[1], whole[2] + own[2], whole[3] + own[3]]
+}
+
+/** 짜임 편집을 칸에 입힌다. 섞임홀자의 JU_H · JU_V는 홀자 편집을 같이 받는다. 너무 얇아지면 가운데로 모은다(처음부터 선 하나인 칸은 그대로). */
+export function applyPartEdits(boxes: Partial<Record<Part, BoxConfig>>, edits: PartEdits | undefined): Partial<Record<Part, BoxConfig>> {
   if (!edits) return boxes
   const out: Partial<Record<Part, BoxConfig>> = { ...boxes }
   for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) {
-    const edit = box && edits[simsPartOf(part)]
+    const edit = box && editOf(edits, part)
     if (!edit) continue
     let [x0, y0, x1, y1] = rectOf(box)
     x0 += edit[0]; x1 += edit[1]; y0 += edit[2]; y1 += edit[3]
-    if (x1 - x0 < 0.03) { const c = (x0 + x1) / 2; x0 = c - 0.015; x1 = c + 0.015 }
-    if (y1 - y0 < 0.03) { const c = (y0 + y1) / 2; y0 = c - 0.015; y1 = c + 0.015 }
+    if (x1 - x0 < 0.03 && box.width >= 0.03) { const c = (x0 + x1) / 2; x0 = c - 0.015; x1 = c + 0.015 }
+    if (y1 - y0 < 0.03 && box.height >= 0.03) { const c = (y0 + y1) / 2; y0 = c - 0.015; y1 = c + 0.015 }
     out[part] = boxOfRect(box, [x0, y0, x1, y1])
   }
   return out
@@ -739,3 +751,103 @@ export function dragLook(start: Look, region: 'STROKE' | 'WHOLE', du: number, dv
  * 칸을 만지다 칸이 좁아져도 굵기를 몰래 바꾸지 않는다(하니무스 2026-11-20 "굵기 누르지도 않았는데").
  */
 export const appliedWeight = (wanted: number, cap: number) => (wanted <= 1 ? wanted : Math.min(wanted, Math.max(1, cap)))
+
+
+// ── 보선 끌기(A안, 하니무스 2026-11-21 승인) ──
+// 부위 사이에 보선 하나를 두고 양쪽 부위가 나눠 쓴다. 선을 밀면 한쪽 부위가 넓어지고 다른 쪽이 좁아져, 둘이 겹칠 일이 없다.
+
+/** 보선 하나: `a` 부위들의 먼 변(오른 · 밑)과 `b` 부위들의 가까운 변(왼 · 위) 사이. */
+export interface Seam { axis: 'h' | 'v'; a: readonly Part[]; b: readonly Part[] }
+
+/** 짜임에 맞는 보선들. 섞임홀자는 가로 쪽(JU_H)과 세로 쪽(JU_V)을 따로 본다. */
+export function seamsOf(layout: LayoutType, boxes: Partial<Record<Part, BoxConfig>>): Seam[] {
+  const has = (part: Part) => !!boxes[part]
+  const final = has('JO')
+  const out: Seam[] = []
+  if (layout.includes('jungseong-mixed')) {
+    out.push({ axis: 'v', a: ['CH', 'JU_H'], b: ['JU_V'] })
+    out.push({ axis: 'h', a: ['CH'], b: ['JU_H'] })
+    if (final) out.push({ axis: 'h', a: ['CH', 'JU_H', 'JU_V'], b: ['JO'] })
+  } else if (isVertical(layout)) {
+    out.push({ axis: 'v', a: ['CH'], b: ['JU'] })
+    if (final) out.push({ axis: 'h', a: ['CH', 'JU'], b: ['JO'] })
+  } else {
+    out.push({ axis: 'h', a: ['CH'], b: ['JU'] })
+    if (final) out.push({ axis: 'h', a: ['JU'], b: ['JO'] })
+  }
+  return out.filter((seam) => [...seam.a, ...seam.b].every(has))
+}
+
+const sizeOn = (box: BoxConfig, axis: 'h' | 'v') => (axis === 'v' ? box.width : box.height)
+/** 보선 자리(글자 단위): 양쪽 변의 가운데. */
+export function seamPos(seam: Seam, boxes: Partial<Record<Part, BoxConfig>>): number {
+  const v = seam.axis === 'v'
+  const far = Math.max(...seam.a.map((part) => { const b = boxes[part]!; return v ? b.x + b.width : b.y + b.height }))
+  const near = Math.min(...seam.b.map((part) => { const b = boxes[part]!; return v ? b.x : b.y }))
+  return (far + near) / 2
+}
+/** 보선을 더 밀 수 있는 범위 [아래, 위](글자 단위). 양쪽 부위 모두 처음 크기의 0.7~1.6배 안. 처음부터 선 하나인 칸(ㅢ의 ㅡ)은 따지지 않는다. */
+export function seamRange(seam: Seam, origin: Partial<Record<Part, BoxConfig>>, now: Partial<Record<Part, BoxConfig>>): [number, number] {
+  let lo = -Infinity, hi = Infinity
+  for (const part of seam.a) {
+    const o = sizeOn(origin[part]!, seam.axis), c = sizeOn(now[part]!, seam.axis)
+    if (o < 0.03) continue
+    lo = Math.max(lo, NEIGHBOR_FLOOR * o - c); hi = Math.min(hi, OWN_RANGE[1] * o - c)
+  }
+  for (const part of seam.b) {
+    const o = sizeOn(origin[part]!, seam.axis), c = sizeOn(now[part]!, seam.axis)
+    if (o < 0.03) continue
+    lo = Math.max(lo, c - OWN_RANGE[1] * o); hi = Math.min(hi, c - NEIGHBOR_FLOOR * o)
+  }
+  return [Math.min(lo, 0), Math.max(hi, 0)]
+}
+const editKey = (part: Part): EditPart => (part === 'JU_H' || part === 'JU_V' ? part : simsPartOf(part))
+const addEdit = (edits: PartEdits, part: Part, index: number, amount: number): PartEdits => {
+  const key = editKey(part)
+  const next = [...(edits[key] ?? [0, 0, 0, 0])] as [number, number, number, number]
+  next[index] += amount
+  return { ...edits, [key]: next }
+}
+/** 보선을 d(글자 단위)만큼 민 편집. 범위 밖이면 범위 끝까지. */
+export function dragSeam(seam: Seam, origin: Partial<Record<Part, BoxConfig>>, start: PartEdits, d: number): { edits: PartEdits; clamped: boolean } {
+  const [lo, hi] = seamRange(seam, origin, applyPartEdits(origin, start))
+  const used = Math.max(lo, Math.min(hi, d))
+  let edits = start
+  for (const part of seam.a) edits = addEdit(edits, part, seam.axis === 'v' ? 1 : 3, used)
+  for (const part of seam.b) edits = addEdit(edits, part, seam.axis === 'v' ? 0 : 2, used)
+  return { edits, clamped: Math.abs(used - d) > 1e-9 }
+}
+
+/**
+ * 부위 칸을 통째로 옮기되 다른 부위와 겹치지 않게 멈춘다(가로 먼저, 다음 세로). 글자 끝(0.02~0.98)도 넘지 않는다.
+ * 처음부터 겹쳐 있는 칸(섞임홀자의 첫닿자 ↔ 가로 쪽 등)은 벽으로 치지 않는다.
+ */
+export function moveApart(boxes: Partial<Record<Part, BoxConfig>>, part: Part, du: number, dv: number): { du: number; dv: number } {
+  const p = boxes[part]
+  if (!p) return { du: 0, dv: 0 }
+  const others = (Object.entries(boxes) as [Part, BoxConfig][]).filter(([key, box]) => key !== part && box && editKey(key) !== editKey(part) && !(part.startsWith('JU') && key.startsWith('JU')))
+  const overlap = (a0: number, a1: number, b0: number, b1: number) => a0 < b1 - 1e-6 && b0 < a1 - 1e-6
+  const [x0, y0, x1, y1] = rectOf(p)
+  let lo = SIMS_LO - x0, hi = SIMS_HI - x1
+  for (const [, q] of others) {
+    const [qx0, qy0, qx1, qy1] = rectOf(q)
+    if (!overlap(y0, y1, qy0, qy1) || overlap(x0, x1, qx0, qx1)) continue
+    if (qx0 >= x1) hi = Math.min(hi, qx0 - x1)
+    else lo = Math.max(lo, qx1 - x0)
+  }
+  const u = Math.max(Math.min(lo, 0), Math.min(Math.max(hi, 0), du))
+  const nx0 = x0 + u, nx1 = x1 + u
+  let vlo = SIMS_LO - y0, vhi = SIMS_HI - y1
+  for (const [, q] of others) {
+    const [qx0, qy0, qx1, qy1] = rectOf(q)
+    if (!overlap(nx0, nx1, qx0, qx1) || overlap(y0, y1, qy0, qy1)) continue
+    if (qy0 >= y1) vhi = Math.min(vhi, qy0 - y1)
+    else vlo = Math.max(vlo, qy1 - y0)
+  }
+  const v = Math.max(Math.min(vlo, 0), Math.min(Math.max(vhi, 0), dv))
+  return { du: u, dv: v }
+}
+/** 부위 칸 하나를 옮긴 편집. */
+export function movePartEdit(edits: PartEdits, part: Part, du: number, dv: number): PartEdits {
+  return addEdit(addEdit(addEdit(addEdit(edits, part, 0, du), part, 1, du), part, 2, dv), part, 3, dv)
+}
