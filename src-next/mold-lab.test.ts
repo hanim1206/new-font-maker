@@ -198,3 +198,13 @@ describe('심즈처럼 빚기', () => {
     expect(dragLook({}, 'WHOLE', -5, 5).tracking).toBe(LOOK_WALL.tracking[1])
   })
 })
+
+describe('굵기 배율', () => {
+  it('칸을 만져 틈 상한이 1 아래로 내려가도 굵기는 그대로, 굵게 할 때만 멈춘다', async () => {
+    const { appliedWeight } = await import('./moldLab')
+    expect(appliedWeight(1, 0.8)).toBe(1)
+    expect(appliedWeight(0.8, 0.5)).toBe(0.8)
+    expect(appliedWeight(1.4, 1.2)).toBe(1.2)
+    expect(appliedWeight(1.4, 0.7)).toBe(1)
+  })
+})

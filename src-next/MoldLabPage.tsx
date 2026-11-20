@@ -17,7 +17,7 @@ import { Button } from './components/ui/button'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { Pressable } from './components/ui/pressable'
 import { EDIT_COLOR } from './editColors'
-import { applyPartEdits, bigBoxes, dirOf, dragLook, dragPart, editsBetween, gapCapMultiplier, lookOf, regionLabels, scaledWeight, simsBoxes, simsPartOf, type Dir, type GapStroke, type LayoutEdits, type Look, type Region, type SimsPart } from './moldLab'
+import { applyPartEdits, appliedWeight, bigBoxes, dirOf, dragLook, dragPart, editsBetween, gapCapMultiplier, lookOf, regionLabels, scaledWeight, simsBoxes, simsPartOf, type Dir, type GapStroke, type LayoutEdits, type Look, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement } from './notoModel'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
@@ -102,8 +102,8 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, shownStroke, testId, w
     return capM === Infinity ? Infinity : weightUnder(capM, 100) / effective.weight
   }, [onCap, placement, boxes, syllable, effective])
   useEffect(() => { onCap?.(capRatio) }, [onCap, capRatio])
-  // 틈이 바닥 아래로 가지 않는 데까지만 굵게 한다. 칸이 좁아져 처음 굵기로도 붙으면 그만큼 가늘게 한다.
-  const ratio = Math.min(lookOf(look, 'weight'), weightCap)
+  // 굵게 할 때만 틈이 바닥 아래로 가지 않는 데서 멈춘다. 칸을 만져서는 굵기가 안 바뀐다.
+  const ratio = appliedWeight(lookOf(look, 'weight'), weightCap)
   const soft = lookOf(look, 'soft') > 0.5
   const globalStyle = useMemo(() => {
     const weighted = ratio === 1 ? effective : { ...effective, weight: scaledWeight(effective.weight, ratio) }
@@ -352,7 +352,7 @@ function SimsStep({ char, drawn, edits, setEdits, look, setLook, weightCap, sel,
   const labels = sel ? regionLabels(sel, layout) : null
   const now = sel === 'CH' || sel === 'JU' || sel === 'JO'
     ? (() => { const box = placement.kind === 'boxes' ? simsBoxes(applyPartEdits(placement.boxes, edits[layout]))[sel] : undefined; return box ? `가로 ${Math.round(box.width * 100)} · 세로 ${Math.round(box.height * 100)}` : '이 글자엔 없어요' })()
-    : sel === 'STROKE' ? `굵기 ×${Math.min(lookOf(look, 'weight'), weightCap).toFixed(2)} · 끝 ${lookOf(look, 'soft') > 0.5 ? '흐물' : '또렷'}${weightCap < lookOf(look, 'weight') ? ' · 틈 지키려고 멈춤' : ''}`
+    : sel === 'STROKE' ? `굵기 ×${appliedWeight(lookOf(look, 'weight'), weightCap).toFixed(2)} · 끝 ${lookOf(look, 'soft') > 0.5 ? '흐물' : '또렷'}${appliedWeight(lookOf(look, 'weight'), weightCap) < lookOf(look, 'weight') ? ' · 틈 지키려고 멈춤' : ''}`
       : sel === 'WHOLE' ? `폭 ×${frame.toFixed(2)} · 자간 ${lookOf(look, 'tracking') >= 0 ? '+' : ''}${Math.round(lookOf(look, 'tracking') * 100)}%` : ''
 
   return <section className={styles.panel} aria-label="빚기">

@@ -627,3 +627,9 @@ export function dragLook(start: Look, region: 'STROKE' | 'WHOLE', du: number, dv
   if (region === 'STROKE') return { ...start, weight: clampTo('weight', lookOf(start, 'weight') * Math.exp(-dv * 1.6)), soft: clampTo('soft', lookOf(start, 'soft') + du * 2.5) }
   return { ...start, frame: clampTo('frame', lookOf(start, 'frame') + du * 0.5), tracking: clampTo('tracking', lookOf(start, 'tracking') + dv * 0.3) }
 }
+
+/**
+ * 실제로 쓰는 굵기 배율. 틈 바닥은 사용자가 굵게 할 때만 멈추는 데 쓴다.
+ * 칸을 만지다 칸이 좁아져도 굵기를 몰래 바꾸지 않는다(하니무스 2026-11-20 "굵기 누르지도 않았는데").
+ */
+export const appliedWeight = (wanted: number, cap: number) => (wanted <= 1 ? wanted : Math.min(wanted, Math.max(1, cap)))
