@@ -416,13 +416,14 @@ export function MoldLabPage() {
   }, [stems, choseong, jungseong, jongseong])
 
   // 긋기 단계 글줄: 내가 그은 줄기 종류가 쓰인 획만 보인다(그을 때마다 글자가 조금씩 채워진다).
+  // 닿자는 ㄴ · ㅂ 밑처럼 세로 + 가로가 한 획으로 이어진 것이 있어, 그 획에 쓰인 줄기를 다 그어야 보인다.
   const stemKeys = useMemo(() => ({ CH: consonantStemKeys(choseong), JU: vowelStemKeys(jungseong), JO: consonantStemKeys(jongseong) }), [choseong, jungseong, jongseong])
   const shownStroke = useCallback((key: string) => {
     const [family, ...rest] = key.split(':')
     const id = rest.join(':')
     if (family === 'JU') { const kind = stemKeys.JU.get(id); return !!kind && !!stems[kind]?.ok }
     const kinds = (family === 'CH' ? stemKeys.CH : stemKeys.JO).get(id)
-    return !!kinds && kinds.some((kind) => stems[kind]?.ok)
+    return !!kinds && kinds.length > 0 && kinds.every((kind) => stems[kind]?.ok)
   }, [stemKeys, stems])
 
   const chars = [...sentence]
