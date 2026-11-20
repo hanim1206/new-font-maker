@@ -328,12 +328,139 @@ export function bigBoxes(boxes: Partial<Record<Part, BoxConfig>>, big: BigValues
 }
 
 /** 큰 빚기 값 → 보이는 말. */
-export function bigText(info: BigInfo, value: number | undefined): string {
+export function bigText(info: BigInfo, value: number | undefined, weightCap = Infinity): string {
   if (value === undefined || Math.abs(value - info.range.engine) < 1e-6) return '처음 그대로'
   if (info.key === 'breath') {
     const { weight, tracking } = breathOf(value)
-    return `굵기 ×${weight.toFixed(2)} · 자간 ${tracking >= 0 ? '+' : ''}${Math.round(tracking * 100)}%`
+    return `굵기 ×${Math.min(weight, weightCap).toFixed(2)} · 자간 ${tracking >= 0 ? '+' : ''}${Math.round(tracking * 100)}%`
   }
   const pct = Math.round((value - 1) * 100)
   return info.key === 'size' ? `첫닿자 ${pct > 0 ? '+' : ''}${pct}% · 받침 ${pct > 0 ? '' : '+'}${-pct}%` : `가로 ${pct > 0 ? '+' : ''}${pct}%`
+}
+
+// ===== 획 사이 최소 틈 (하니무스 22:20 "ㄹ 뭉쳐진 거 최소 틈은 있어야지") =====
+// 숨을 진하게 하거나 크기 · 틀로 칸을 좁히면 ㄹ 같은 자소의 획이 붙는다. 거북이 기준(틈은 굵기선의 70%가 한계)을 바닥으로 건다:
+// 폰트도 굵어지면 틈이 준다(거북이 굵기선: 틈 = a − b × 굵기, b는 0.5~1.1, 가운데 0.9쯤). 그래서 바닥은 "그 굵기에서 기대하는 틈의 70%"다:
+// 지금 틈 ≥ 0.7 × (처음 틈 − b × 늘어난 두께). 처음 = 같은 획 · 빚기 전 상자 · 처음 굵기.
+
+export const GAP_FLOOR = 0.7
+/** 굵기선 기울기(굵기가 늘면 기대 틈이 주는 몫). 거북이 자소별 표의 가운데쯤 — 자소별로 나누기 전 임시. */
+export const GAP_SLOPE = 0.9
+/** 어떤 경우에도 남기는 틈(두께의 몫). 엔진의 최소 틈과 같다. */
+export const MIN_GAP_OF_THICKNESS = 0.25
+
+export interface GapStroke {
+  points: readonly { x: number; y: number; handleIn?: { x: number; y: number }; handleOut?: { x: number; y: number } }[]
+  closed: boolean
+  box: { x: number; y: number; width: number; height: number }
+  /** 굵기 배율 1일 때 두께(글자 칸 단위) */
+  thickness: number
+  /** 어느 자소의 획인가. 같은 자소 안의 틈만 센다(자소 사이 틈은 울타리 보정이 맡는다). */
+  part?: string
+}
+
+type Pt = { x: number; y: number }
+const CURVE_STEPS = 6
+function flattenStroke(stroke: GapStroke): Pt[] {
+  const { points, closed, box } = stroke
+  const at = (p: Pt): Pt => ({ x: box.x + p.x * box.width, y: box.y + p.y * box.height })
+  const out: Pt[] = []
+  if (!points.length) return out
+  out.push(at(points[0]))
+  const count = closed ? points.length : points.length - 1
+  for (let i = 0; i < count; i++) {
+    const a = points[i], b = points[(i + 1) % points.length]
+    if (!a.handleOut && !b.handleIn) { out.push(at(b)); continue }
+    const c1 = a.handleOut ?? a, c2 = b.handleIn ?? b
+    for (let step = 1; step <= CURVE_STEPS; step++) {
+      const t = step / CURVE_STEPS, u = 1 - t
+      out.push(at({ x: u * u * u * a.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * b.x, y: u * u * u * a.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * b.y }))
+    }
+  }
+  return out
+}
+
+function pointSeg(p: Pt, a: Pt, b: Pt): number {
+  const dx = b.x - a.x, dy = b.y - a.y
+  const len = dx * dx + dy * dy
+  const t = len === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len))
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
+}
+function segSeg(a: Pt, b: Pt, c: Pt, d: Pt): number {
+  const cross = (o: Pt, p: Pt, q: Pt) => (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x)
+  const d1 = cross(c, d, a), d2 = cross(c, d, b), d3 = cross(a, b, c), d4 = cross(a, b, d)
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return 0
+  return Math.min(pointSeg(a, c, d), pointSeg(b, c, d), pointSeg(c, a, b), pointSeg(d, a, b))
+}
+
+interface Seg { stroke: number; part?: string; a: Pt; b: Pt; arc: number; len: number }
+function segmentsOf(strokes: readonly GapStroke[]): Seg[] {
+  const out: Seg[] = []
+  strokes.forEach((stroke, index) => {
+    const line = flattenStroke(stroke)
+    let arc = 0
+    for (let i = 1; i < line.length; i++) {
+      const len = Math.hypot(line[i].x - line[i - 1].x, line[i].y - line[i - 1].y)
+      out.push({ stroke: index, part: stroke.part, a: line[i - 1], b: line[i], arc, len })
+      arc += len
+    }
+  })
+  return out
+}
+
+/**
+ * 획 사이 최소 틈을 지키며 쓸 수 있는 가장 큰 굵기 배율(`weightMultiplier`).
+ * 처음(`reference`, 굵기 배율 `baseMultiplier`)과 지금(`current`)은 같은 획을 같은 순서로 가진다(빚기는 상자만 바꾼다).
+ * - 처음부터 붙어 있거나 거의 붙은 짝(틈이 두께의 0.6배 아래)은 원래 이어 그린 것이라 안 센다.
+ * - 한 획 안의 두 토막은 획을 따라 잰 거리가 둘 사이 거리보다 넉넉히 멀 때만 센다(ㄹ의 위 · 가운데 가로처럼 접혀 마주 보는 곳).
+ * - 처음 틈이 글자 칸의 1/4보다 넓은 짝은 붙을 일이 없어 안 센다.
+ * - 자소가 다른 짝(첫닿자 ↔ 홀자 가지 끝 등)은 안 센다. 폰트도 원래 붙여 그리기도 하고, 자소 사이 틈은 울타리 보정의 일이다.
+ * 지킬 틈이 없으면 Infinity.
+ */
+export function gapCapMultiplier(reference: readonly GapStroke[], current: readonly GapStroke[], baseMultiplier: number, floor = GAP_FLOOR, slope = GAP_SLOPE): number {
+  const ref = segmentsOf(reference)
+  const cur = segmentsOf(current)
+  if (ref.length !== cur.length) return Infinity
+  // 서로 닿는 두 획(ㅅ 두 다리, ㅎ 꼭지 등)의 닿는 곳. 닿는 곳 가까이의 쐐기 틈은 굵어지면 원래 메워진다 — 거기서 멀리 떨어진 마주 봄만 센다.
+  const contacts = new Map<string, Pt[]>()
+  for (let i = 0; i < ref.length; i++) {
+    for (let j = i + 1; j < ref.length; j++) {
+      const ri = ref[i], rj = ref[j]
+      if (ri.stroke === rj.stroke || ri.part !== rj.part) continue
+      const half = (reference[ri.stroke].thickness + reference[rj.stroke].thickness) / 2
+      if (segSeg(ri.a, ri.b, rj.a, rj.b) > half * baseMultiplier) continue
+      const key = `${Math.min(ri.stroke, rj.stroke)}-${Math.max(ri.stroke, rj.stroke)}`
+      const list = contacts.get(key) ?? []
+      list.push({ x: (ri.a.x + ri.b.x + rj.a.x + rj.b.x) / 4, y: (ri.a.y + ri.b.y + rj.a.y + rj.b.y) / 4 })
+      contacts.set(key, list)
+    }
+  }
+  let cap = Infinity
+  for (let i = 0; i < ref.length; i++) {
+    for (let j = i + 1; j < ref.length; j++) {
+      const ri = ref[i], rj = ref[j]
+      if (ri.part !== rj.part) continue
+      const half = (reference[ri.stroke].thickness + reference[rj.stroke].thickness) / 2
+      if (half <= 0) continue
+      const dRef = segSeg(ri.a, ri.b, rj.a, rj.b)
+      const gapRef = dRef - half * baseMultiplier
+      // 처음부터 두께의 0.6배도 안 떨어진 짝(ㅎ 꼭지 아래처럼 거의 붙여 그린 곳)은 원래 붙여 보이는 자리라 안 센다.
+      if (gapRef < half * baseMultiplier * 0.6 || gapRef > 0.25) continue
+      if (ri.stroke === rj.stroke) {
+        const along = Math.abs(rj.arc - ri.arc) - (rj.arc > ri.arc ? ri.len : rj.len)
+        if (along < 2 * dRef + half * baseMultiplier * 2) continue
+      } else {
+        const touch = contacts.get(`${Math.min(ri.stroke, rj.stroke)}-${Math.max(ri.stroke, rj.stroke)}`)
+        if (touch && touch.some((point) => Math.min(pointSeg(point, ri.a, ri.b), pointSeg(point, rj.a, rj.b)) < 2 * dRef + half * baseMultiplier * 2)) continue
+      }
+      const dCur = segSeg(cur[i].a, cur[i].b, cur[j].a, cur[j].b)
+      // ① 굵기선 바닥: d − m·h ≥ floor × (g0 − slope × (m − m0)·h). g0 = 빚은 상자에서 처음 굵기일 때 틈 — 칸을 줄였으면 기대 틈도 같이 준다.
+      const g0 = dCur - half * baseMultiplier
+      const byLine = (dCur - floor * (g0 + slope * baseMultiplier * half)) / (half * (1 - floor * slope))
+      // ② 절대 바닥: 틈 ≥ 두께 × 0.25(엔진의 최소 틈). 칸이 너무 좁아져 처음 굵기로도 붙으면 여기서 가늘어진다.
+      const byFloor = dCur / (half * (1 + MIN_GAP_OF_THICKNESS))
+      cap = Math.min(cap, Math.max(Math.min(byLine, byFloor), 0))
+    }
+  }
+  return cap
 }

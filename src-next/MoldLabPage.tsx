@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { Check, ChevronRight, Dices, RotateCcw } from 'lucide-react'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
+import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
 import type { PenPoint } from '../src/services/penStrokeFit'
 import { useEffectiveGlobalStyle } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { mergePadding, useLayoutStore } from '../src/stores/layoutStore'
 import { propagatedJungseong } from '../src/stores/stemMasterStore'
 import type { DecomposedSyllable, JamoData, LayoutType, Part, ResolvedStrokeInkSource } from '../src/types'
+import { weightToMultiplier } from '../src/utils/globalStyleUtils'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { pointsToSvgD } from '../src/utils/pathUtils'
 import { Badge } from './components/ui/badge'
@@ -15,7 +17,7 @@ import { Button } from './components/ui/button'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { Pressable } from './components/ui/pressable'
 import { EDIT_COLOR } from './editColors'
-import { BIG, bigBoxes, bigText, breathOf, dragValue, groupOfPart, GROUPS, groupsOfSyllable, inSafe, moldBoxes, partAt, positionOf, presetOf, scaledWeight, stanceName, valueText, type BigKey, type BigValues, type GroupId, type MoldValues, type Preset, type Range } from './moldLab'
+import { BIG, bigBoxes, gapCapMultiplier, bigText, breathOf, dragValue, groupOfPart, GROUPS, groupsOfSyllable, inSafe, moldBoxes, partAt, positionOf, presetOf, scaledWeight, stanceName, valueText, type BigKey, type BigValues, type GapStroke, type GroupId, type MoldValues, type Preset, type Range } from './moldLab'
 import { useContextPlacement } from './notoModel'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, type DrawnStem, type StemKind } from './strokeLab'
@@ -51,7 +53,20 @@ function partInGroup(part: Part, syllable: DecomposedSyllable, group: GroupId | 
  * 빚은 글자 하나. `AppGlyph`와 같은 길(자모 + 칸 해석 + 전역 스타일)로 상자를 풀고, 그은 줄기 · 큰 빚기 · 갈래 값을 차례로 입혀 그린다.
  * 누르면 누른 자리의 부위로 갈래를 알린다.
  */
-function MoldGlyph({ char, size, values, big, drawn, highlight, onPick, testId }: { char: string; size: number; values: MoldValues; big: BigValues; drawn?: Drawn; highlight?: GroupId; onPick?: (pick: Pick) => void; testId?: string }) {
+/** 풀린 상자로 중심선을 얻는다(굵기 배율 1). 틈 재기용. */
+function gapStrokesOf(syllable: DecomposedSyllable, boxes: NonNullable<Parameters<typeof resolveGlyphInkPrimitives>[0]['placement']>, linecap: Parameters<typeof resolveGlyphInkPrimitives>[0]['globalLinecap'], linejoin: Parameters<typeof resolveGlyphInkPrimitives>[0]['globalLinejoin']): GapStroke[] {
+  const result = resolveGlyphInkPrimitives({ syllable, placement: boxes, weightMultiplier: 1, globalLinecap: linecap, globalLinejoin: linejoin, horizontalInkBounds: { min: 0, max: 1 } })
+  return result.primitives.map((primitive) => ({ points: primitive.stroke.points, closed: primitive.stroke.closed, box: primitive.box, thickness: primitive.stroke.thickness, part: primitive.source.part.startsWith('JU') ? 'JU' : primitive.source.part }))
+}
+
+/** 굵기 배율 상한 → 그 아래에서 가장 굵은 굵기 값(100–900). */
+function weightUnder(multiplier: number, from: number): number {
+  let weight = from
+  while (weight + 5 <= 900 && weightToMultiplier(weight + 5) <= multiplier) weight += 5
+  return weight
+}
+
+function MoldGlyph({ char, size, values, big, drawn, highlight, onPick, testId, weightCap = Infinity, onCap }: { char: string; size: number; values: MoldValues; big: BigValues; drawn?: Drawn; highlight?: GroupId; onPick?: (pick: Pick) => void; testId?: string; weightCap?: number; onCap?: (ratio: number) => void }) {
   const storedChoseong = useJamoStore((state) => state.choseong)
   const storedJungseong = useJamoStore((state) => state.jungseong)
   const storedJongseong = useJamoStore((state) => state.jongseong)
@@ -66,12 +81,25 @@ function MoldGlyph({ char, size, values, big, drawn, highlight, onPick, testId }
   const syllable = useMemo(() => decomposeSyllable(char, choseong, jungseong, jongseong), [char, choseong, jungseong, jongseong])
   const effective = useEffectiveGlobalStyle(syllable.layoutType)
   const breath = breathOf(big.breath)
-  const globalStyle = useMemo(() => breath.weight === 1 ? effective : { ...effective, weight: scaledWeight(effective.weight, breath.weight) }, [effective, breath.weight])
   const padding = mergePadding(globalPadding, paddingOverrides[syllable.layoutType])
   const schema = { ...schemas[syllable.layoutType], padding, designBodyPadding: padding }
-  const { placement } = useContextPlacement(syllable, schema, globalStyle)
+  // 상자는 처음 굵기로 푼다(굵기를 바꿔도 상자가 따라 흔들리지 않게).
+  const { placement } = useContextPlacement(syllable, schema, effective)
   const vowelChar = syllable.jungseong?.char
   const boxes = useMemo(() => placement.kind === 'boxes' ? moldBoxes(bigBoxes(placement.boxes, big), syllable.layoutType, vowelChar, values) : undefined, [placement, big, syllable.layoutType, vowelChar, values])
+
+  // 획 사이 최소 틈: 이 글자가 버틸 수 있는 굵기 비율을 재서 올린다. 글줄은 가장 작은 비율을 다 같이 쓴다.
+  const capRatio = useMemo(() => {
+    if (!onCap || placement.kind !== 'boxes' || !boxes) return Infinity
+    const ref = gapStrokesOf(syllable, placement, effective.linecap, effective.linejoin)
+    const cur = gapStrokesOf(syllable, { kind: 'boxes', boxes }, effective.linecap, effective.linejoin)
+    const capM = gapCapMultiplier(ref, cur, weightToMultiplier(effective.weight))
+    return capM === Infinity ? Infinity : weightUnder(capM, 100) / effective.weight
+  }, [onCap, placement, boxes, syllable, effective])
+  useEffect(() => { onCap?.(capRatio) }, [onCap, capRatio])
+  // 틈이 바닥 아래로 가지 않는 데까지만 굵게 한다. 크기 · 틀로 칸이 좁아져 처음 굵기로도 붙으면 그만큼 가늘게 한다.
+  const ratio = Math.min(breath.weight, weightCap)
+  const globalStyle = useMemo(() => ratio === 1 ? effective : { ...effective, weight: scaledWeight(effective.weight, ratio) }, [effective, ratio])
   const colorOf = useCallback((source: ResolvedStrokeInkSource) => partInGroup(source.part, syllable, highlight) ? EDIT_COLOR.editSelect : undefined, [syllable, highlight])
 
   // 틀이 좁아지면 글자 칸도 같이 좁힌다(글자 사이가 그대로 남지 않게). 숨은 글자 사이를 더하거나 뺀다.
@@ -230,18 +258,21 @@ function DrawStep({ raws, setRaws, stems, onDone }: { raws: Partial<Record<StemK
 }
 
 /** 2단계: 큰 손잡이 셋. */
-function BigStep({ big, setBig, onNext }: { big: BigValues; setBig: (key: BigKey, value: number | undefined) => void; onNext: () => void }) {
+function BigStep({ big, setBig, weightCap, onNext }: { big: BigValues; setBig: (key: BigKey, value: number | undefined) => void; weightCap: number; onNext: () => void }) {
+  const wanted = breathOf(big.breath).weight
+  const held = weightCap < wanted
   return <section className={styles.panel} aria-label="빚기">
     {BIG.map((info) => {
       const value = big[info.key]
       return <div key={info.key} className={styles.big} data-testid={`mold-big-${info.key}`}>
         <div className={styles.bigHead}>
           <h2>{info.name}</h2>
-          <span data-out={value !== undefined && !inSafe(info.range, value) || undefined} data-testid={`mold-big-${info.key}-value`}>{bigText(info, value)}</span>
+          <span data-out={value !== undefined && !inSafe(info.range, value) || undefined} data-testid={`mold-big-${info.key}-value`}>{bigText(info, value, info.key === 'breath' ? weightCap : undefined)}</span>
           {value !== undefined && <Button variant="ghost" size="chip-sm" onClick={() => setBig(info.key, undefined)} aria-label={`${info.name} 처음대로`}><RotateCcw aria-hidden="true" /></Button>}
         </div>
         <Ruler range={info.range} value={value} onChange={(next) => setBig(info.key, next)} left={info.left} right={info.right} testId={`mold-big-${info.key}-ruler`} />
         <p className={styles.note}>{info.what}</p>
+        {info.key === 'breath' && held && <p className={styles.hold} data-testid="mold-gap-hold">{weightCap < 1 ? `칸이 좁아져 획 사이 틈을 지키려고 굵기를 ×${weightCap.toFixed(2)}로 가늘게 했어요.` : `획 사이 틈을 지키려고 굵기 ×${weightCap.toFixed(2)}에서 멈췄어요.`} 틈은 그 굵기에서 기대하는 틈의 70%까지예요.</p>}
       </div>
     })}
     <p className={styles.note}>가운데 초록 칸은 보통 폭, 양 끝은 넘지 못하는 벽이에요. 셋 다 아직 폰트에서 잰 폭이 없어 임시값이에요.</p>
@@ -251,13 +282,22 @@ function BigStep({ big, setBig, onNext }: { big: BigValues; setBig: (key: BigKey
 
 export function MoldLabPage() {
   const [step, setStep] = useState<Step>('draw')
-  const [sentence, setSentence] = useState(FIRST_SENTENCE)
+  // `?s=문장`으로 처음 문장을 정할 수 있다(확인용).
+  const [sentence, setSentence] = useState(() => new URLSearchParams(window.location.search).get('s')?.trim() || FIRST_SENTENCE)
   const [raws, setRaws] = useState<Partial<Record<StemKind, PenPoint[]>>>({})
   const [big, setBigValues] = useState<BigValues>({})
   const [pick, setPick] = useState<Pick | null>(null)
   const [values, setValues] = useState<MoldValues>({})
   const [compare, setCompare] = useState(false)
   const [seed, setSeed] = useState(0)
+  // 글자마다 버틸 수 있는 굵기 비율(획 사이 최소 틈). 글줄은 가장 작은 것을 다 같이 쓴다.
+  const [caps, setCaps] = useState<Record<string, number>>({})
+  const capReporters = useMemo(() => {
+    const out: Record<number, (ratio: number) => void> = {}
+    ;[...sentence].forEach((_, at) => { out[at] = (ratio: number) => setCaps((all) => (all[`${sentence}-${at}`] === ratio ? all : { ...all, [`${sentence}-${at}`]: ratio })) })
+    return out
+  }, [sentence])
+  const weightCap = Math.min(Infinity, ...[...sentence].map((char, at) => (char === ' ' ? Infinity : caps[`${sentence}-${at}`] ?? Infinity)))
   const focusDrag = useRef<{ x: number; start: number; width: number } | null>(null)
 
   const choseong = useJamoStore((state) => state.choseong)
@@ -339,7 +379,7 @@ export function MoldLabPage() {
       <div className={styles.line} data-testid="mold-line">
         {[...sentence].map((char, at) => char === ' '
           ? <span key={at} className={styles.space} />
-          : <MoldGlyph key={`${sentence}-${at}`} char={char} size={42} values={lineValues} big={lineBig} drawn={lineDrawn} highlight={group} onPick={step === 'refine' ? setPick : undefined} testId={`mold-char-${at}`} />)}
+          : <MoldGlyph key={`${sentence}-${at}`} char={char} size={42} values={lineValues} big={lineBig} drawn={lineDrawn} highlight={group} onPick={step === 'refine' ? setPick : undefined} testId={`mold-char-${at}`} weightCap={weightCap} onCap={compare ? undefined : capReporters[at]} />)}
       </div>
       <div className={styles.lineActions}>
         <Button variant="ghost" size="sm" onClick={roll} data-testid="mold-dice"><Dices aria-hidden="true" />다른 문장</Button>
@@ -350,7 +390,7 @@ export function MoldLabPage() {
     </section>
 
     {step === 'draw' && <DrawStep raws={raws} setRaws={setRaws} stems={stems} onDone={() => setStep('mold')} />}
-    {step === 'mold' && <BigStep big={big} setBig={setBig} onNext={() => setStep('refine')} />}
+    {step === 'mold' && <BigStep big={big} setBig={setBig} weightCap={weightCap} onNext={() => setStep('refine')} />}
 
     {step === 'refine' && (info && pick ? <section className={styles.panel} aria-label="갈래" data-testid="mold-panel">
       <nav className={styles.crumbs} aria-label="범위">
@@ -380,13 +420,13 @@ export function MoldLabPage() {
           onPointerUp={() => { focusDrag.current = null }}
           onPointerCancel={() => { focusDrag.current = null }}
         >
-          <MoldGlyph char={pick.char} size={128} values={values} big={big} drawn={drawn} highlight={group} />
+          <MoldGlyph char={pick.char} size={128} values={values} big={big} drawn={drawn} highlight={group} weightCap={weightCap} />
           {range && <span className={styles.focusHint}>← 좌우로 끌기 →</span>}
         </div>
         <div className={styles.siblings}>
           <span className={styles.siblingsLabel}>같은 갈래</span>
           <div className={styles.siblingGrid} data-testid="mold-siblings">
-            {siblings.map((char) => <MoldGlyph key={`${seed}-${char}`} char={char} size={36} values={values} big={big} drawn={drawn} highlight={group} onPick={setPick} />)}
+            {siblings.map((char) => <MoldGlyph key={`${seed}-${char}`} char={char} size={36} values={values} big={big} drawn={drawn} highlight={group} onPick={setPick} weightCap={weightCap} />)}
           </div>
           <Button variant="outline" size="chip-sm" onClick={() => setSeed((now) => now + 1)} data-testid="mold-sibling-dice"><Dices aria-hidden="true" />주사위</Button>
         </div>

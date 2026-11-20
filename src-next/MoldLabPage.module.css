@@ -116,3 +116,4 @@
 .bigHead h2 { font-size: var(--font-18); font-weight: var(--weight-heavy); }
 .bigHead span { margin-left: auto; color: rgb(var(--color-text-3)); font-size: var(--font-13); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
 .bigHead span[data-out] { color: rgb(var(--color-warning)); }
+.hold { color: rgb(var(--color-warning)); font-size: var(--font-12); font-weight: var(--weight-semibold); }

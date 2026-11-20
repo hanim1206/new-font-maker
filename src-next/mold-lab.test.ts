@@ -99,3 +99,47 @@ describe('큰 빚기', () => {
     expect(breathOf(1).tracking).toBeGreaterThan(0)
   })
 })
+
+describe('획 사이 최소 틈', () => {
+  // ㄹ처럼 가로 셋을 지그재그로 이은 획 하나(칸 0.5 높이). 획 사이 중심 거리 0.25 · 0.25.
+  const rieul = (height: number, thickness = 0.05) => [{
+    points: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 0.5 }, { x: 0, y: 0.5 }, { x: 0, y: 1 }, { x: 1, y: 1 }],
+    closed: false, box: { x: 0.2, y: 0.2, width: 0.5, height }, thickness,
+  }]
+
+  it('기울기 0이면 지금 칸의 처음 틈 70%가 남을 때까지 굵어질 수 있다', async () => {
+    const { gapCapMultiplier } = await import('./moldLab')
+    // 틈 g0 = 0.25 − 0.05 = 0.2 → 0.25 − m × 0.05 ≥ 0.14 → m ≤ 2.2
+    expect(gapCapMultiplier(rieul(0.5), rieul(0.5), 1, 0.7, 0)).toBeCloseTo(2.2)
+    // 칸을 줄이면(중심 거리 0.2, g0 0.15) 덜 굵어진다 → 0.2 − 0.05m ≥ 0.105 → m ≤ 1.9
+    expect(gapCapMultiplier(rieul(0.5), rieul(0.4), 1, 0.7, 0)).toBeCloseTo(1.9)
+  })
+
+  it('굵기선을 따르면 굵어진 만큼 기대 틈도 줄어 바닥이 낮아지되, 틈은 두께의 1/4 밑으로 안 간다', async () => {
+    const { gapCapMultiplier } = await import('./moldLab')
+    // 굵기선 쪽은 여유가 커서, 절대 바닥(0.2 ≥ 1.25 × 0.05m → m ≤ 3.2)이 먼저 막는다.
+    expect(gapCapMultiplier(rieul(0.5), rieul(0.4), 1)).toBeCloseTo(3.2)
+    // 칸을 아주 좁히면(중심 거리 0.05) 처음 굵기로도 붙는다 → 가늘게(m ≤ 0.8).
+    expect(gapCapMultiplier(rieul(0.5), rieul(0.1), 1)).toBeCloseTo(0.8)
+  })
+})
+
+describe('획 사이 최소 틈 — 자소 사이', () => {
+  it('자소가 다른 획 짝은 세지 않는다', async () => {
+    const { gapCapMultiplier } = await import('./moldLab')
+    const bar = (y: number, part: string) => ({ points: [{ x: 0, y }, { x: 1, y }], closed: false, box: { x: 0, y: 0, width: 1, height: 1 }, thickness: 0.05, part })
+    const pair = [bar(0.3, 'CH'), bar(0.4, 'JU')]
+    expect(gapCapMultiplier(pair, pair, 1)).toBe(Infinity)
+    const same = [bar(0.3, 'CH'), bar(0.4, 'CH')]
+    expect(gapCapMultiplier(same, same, 1)).toBeLessThan(Infinity)
+  })
+})
+
+describe('획 사이 최소 틈 — 닿는 곳 가까이', () => {
+  it('ㅅ처럼 한 점에서 갈라지는 두 획의 쐐기는 세지 않는다', async () => {
+    const { gapCapMultiplier } = await import('./moldLab')
+    const leg = (x: number) => ({ points: [{ x: 0.5, y: 0 }, { x, y: 1 }], closed: false, box: { x: 0, y: 0, width: 0.5, height: 0.5 }, thickness: 0.05, part: 'CH' })
+    const siot = [leg(0), leg(1)]
+    expect(gapCapMultiplier(siot, siot, 1)).toBe(Infinity)
+  })
+})
