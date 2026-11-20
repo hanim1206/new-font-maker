@@ -70,7 +70,7 @@ const percent = (value: number) => `${(value * 100).toFixed(1)}%`
 /** 값 하나의 결과 한 줄: 당긴 글자 수와 가장 크게 당긴 양, 못 당기고 남은 것. */
 function fenceRowText(row: FenceSummaryRow): string {
   if (row.checked === 0) return '잴 글자 없음'
-  const moved = row.count > 0 ? (row.value === 'clearance' ? `${row.count}자 휨 최대 ${Math.round(row.max * 100)}% 줄임` : `${row.count}자 ${percent(row.max)} ${row.word}`) : ''
+  const moved = row.count > 0 ? (row.value === 'clearance' ? `${row.count}자 ${row.max > 1 ? '휨 펴고 기울기도 줄임' : `휨 최대 ${Math.round(row.max * 100)}% 줄임`}` : `${row.count}자 ${percent(row.max)} ${row.word}`) : ''
   const stuck = row.stuck > 0 ? (row.value === 'clearance' ? `${row.stuck}자 아직 좁음` : `${row.stuck}자 ${percent(row.left)} 남음`) : ''
   return [moved, stuck].filter(Boolean).join(' · ') || '울타리 안'
 }

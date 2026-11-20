@@ -4,6 +4,8 @@ import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
 import { getBaseJamo } from '../src/stores/jamoStore'
 import type { BoxConfig, JamoData, Part } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
+import { bentStems } from './fenceBend'
+import { drawnStem } from './strokeLab'
 import { BEND_LEVELS, clearanceRatio, correctGlyph, expectedGap, partClearances, pickBend, type FenceCorrection, finalBottomTolerance, GOTHIC_FENCE, measureGlyph, movedBoxes, shakenBoxes, summarize, type GlyphMeasure, type ShakeLevel } from './fenceBand'
 
 const CHOSEONG = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ', JUNGSEONG = 'ㅏㅓㅗㅜㅡㅣ'
@@ -137,15 +139,31 @@ describe('울타리 자동 보정', () => {
   it('휨 줄이기: 틈이 울타리에 들 때까지만 줄이고, 처음부터 안이면 그대로 둔다', () => {
     expect(pickBend(() => 0.9, 0.7)).toMatchObject({ level: 0, pull: { pulled: 0, left: 0 } })
     // 그은 그대로 0.2, 한 단계 0.5, 두 단계 0.8 → 두 단계(휨 반)에서 멈춘다.
-    const ratios = [0.2, 0.5, 0.8, 0.9, 1]
+    const ratios = [0.2, 0.5, 0.8, 0.9, 1, 1]
     const picked = pickBend((level) => ratios[level], 0.7)
     expect(picked.level).toBe(2)
-    expect(picked.pull).toMatchObject({ value: 'clearance', before: 0.2, after: 0.8, pulled: BEND_LEVELS[2] - 1, left: 0 })
+    expect(picked.pull).toMatchObject({ value: 'clearance', before: 0.2, after: 0.8, pulled: BEND_LEVELS[2].bend - 1, left: 0 })
     // 다 줄여도 좁으면 가장 넓은 단계를 고르고 남은 만큼 알린다.
-    const stuck = pickBend((level) => [0.1, 0.3, 0.2, 0.2, 0.2][level], 0.7)
+    const stuck = pickBend((level) => [0.1, 0.3, 0.2, 0.2, 0.2, 0.2][level], 0.7)
     expect(stuck.level).toBe(1)
     expect(stuck.pull!.left).toBeCloseTo(0.4, 9)
     // 울타리 값이 없으면 손대지 않는다.
     expect(pickBend(() => 0, undefined)).toEqual({ level: 0, pull: null })
+  })
+
+  it('휨을 줄여도 기울기는 남는다 — 기울여 그은 가로선이 수평으로 눕지 않는다', () => {
+    // 오른쪽이 올라가게 기울이고 가운데를 부풀린 가로선.
+    const raw = Array.from({ length: 60 }, (_, i) => { const t = i / 59; return { x: 0.1 + 0.55 * t, y: 0.6 - 0.15 * t + Math.sin(Math.PI * t) * 0.06 } })
+    const stem = drawnStem(raw, 'longHorizontal')
+    if (!stem.ok || !stem.shape) throw new Error('가로 긴 선을 못 받았다')
+    const tilt = stem.shape[stem.shape.length - 1].r
+    expect(Math.abs(tilt)).toBeGreaterThan(0.1)
+    const flat = bentStems({ longHorizontal: stem }, { bend: 0, tilt: 1 }).longHorizontal!
+    if (!flat.ok || !flat.shape) throw new Error('모양이 없다')
+    expect(flat.shape[flat.shape.length - 1].r).toBeCloseTo(tilt, 9)
+    // 휨은 사라져 모든 점이 시작 → 끝 직선 위에 있다.
+    for (const point of flat.shape) expect(point.r).toBeCloseTo(tilt * point.t, 9)
+    const level = bentStems({ longHorizontal: stem }, { bend: 0, tilt: 0 }).longHorizontal!
+    if (level.ok && level.shape) expect(level.shape[level.shape.length - 1].r).toBeCloseTo(0, 9)
   })
 })

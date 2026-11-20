@@ -241,8 +241,13 @@ export function clearanceRatio(now: Clearances, reference: Clearances): number {
   return worst === Infinity ? 1 : worst
 }
 
-/** 그은 휨을 얼마나 남길지의 단계(1 = 그은 그대로, 0 = 곧게). 틈이 울타리 안에 들 때까지 한 단계씩 줄인다. */
-export const BEND_LEVELS: readonly number[] = [1, 0.75, 0.5, 0.25, 0]
+/**
+ * 틈이 모자랄 때 줄여 보는 단계(앞이 그은 그대로). 먼저 휨만 줄이고 기울기는 남긴다 — 기울여 그은 선이 수평 · 수직으로 눕지 않게.
+ * 휨을 다 펴도 닿을 때만 기울기를 줄인다.
+ */
+export const BEND_LEVELS: readonly { bend: number; tilt: number }[] = [
+  { bend: 1, tilt: 1 }, { bend: 0.66, tilt: 1 }, { bend: 0.33, tilt: 1 }, { bend: 0, tilt: 1 }, { bend: 0, tilt: 0.5 }, { bend: 0, tilt: 0 },
+]
 
 /**
  * 휨 단계마다의 틈 비율(`ratios[i]`는 `BEND_LEVELS[i]`로 그렸을 때) → 고를 단계와 기록.
@@ -259,8 +264,8 @@ export function pickBend(ratioAt: (level: number) => number, floor: number | und
     if (ratio > bestRatio) { best = level; bestRatio = ratio }
     if (ratio >= floor) break
   }
-  // 당긴 양은 줄인 휨의 몫(−0.5 = 휨을 반으로).
-  return { level: best, pull: { value: 'clearance', before, after: bestRatio, band, pulled: BEND_LEVELS[best] - 1, left: bestRatio >= floor ? 0 : floor - bestRatio } }
+  // 당긴 양은 줄인 휨의 몫(−0.5 = 휨을 반으로). 기울기까지 줄였으면 −1 아래로 센다.
+  return { level: best, pull: { value: 'clearance', before, after: bestRatio, band, pulled: BEND_LEVELS[best].bend - 1 - (1 - BEND_LEVELS[best].tilt), left: bestRatio >= floor ? 0 : floor - bestRatio } }
 }
 
 // ── 당기기 ──

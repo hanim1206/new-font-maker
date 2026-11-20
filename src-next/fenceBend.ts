@@ -1,17 +1,21 @@
 import type { DrawnStem, RelPoint, StemKind } from './strokeLab'
 
+/** 휨 단계 하나: 그은 휨과 기울기를 얼마나 남길지(1 = 그대로, 0 = 없앰). */
+export interface BendLevel { bend: number; tilt: number }
+
 /**
- * 그은 줄기의 휨 · 기울기를 `keep`만큼만 남긴다(1 = 그은 그대로, 0 = 곧게). 울타리 보정이 획끼리 닿는 글자에서 휨을 줄일 때 쓴다.
+ * 그은 줄기의 휨과 기울기를 따로 줄인다. 울타리 보정이 획끼리 닿는 글자에서 쓴다.
+ * 기울기 = 끝점이 축에서 벗어난 만큼(시작 → 끝 직선), 휨 = 그 직선에서 벗어난 만큼.
  * 동그라미는 놓일 자리의 크기에 맞춰 들어가므로 그대로 둔다.
  */
-export function bentStems(stems: Partial<Record<StemKind, DrawnStem>>, keep: number): Partial<Record<StemKind, DrawnStem>> {
-  if (keep === 1) return stems
-  const scale = <T extends { t: number; r: number }>(point: T): T => ({ ...point, r: point.r * keep })
+export function bentStems(stems: Partial<Record<StemKind, DrawnStem>>, keep: BendLevel): Partial<Record<StemKind, DrawnStem>> {
+  if (keep.bend === 1 && keep.tilt === 1) return stems
   const out: Partial<Record<StemKind, DrawnStem>> = {}
   for (const [kind, stem] of Object.entries(stems) as [StemKind, DrawnStem][]) {
-    out[kind] = stem.ok && stem.shape
-      ? { ...stem, shape: stem.shape.map((point): RelPoint => ({ ...scale(point), ...(point.handleIn ? { handleIn: scale(point.handleIn) } : {}), ...(point.handleOut ? { handleOut: scale(point.handleOut) } : {}) })) }
-      : stem
+    if (!stem.ok || !stem.shape) { out[kind] = stem; continue }
+    const tilt = stem.shape[stem.shape.length - 1].r
+    const scale = <T extends { t: number; r: number }>(point: T): T => ({ ...point, r: tilt * point.t * keep.tilt + (point.r - tilt * point.t) * keep.bend })
+    out[kind] = { ...stem, shape: stem.shape.map((point): RelPoint => ({ ...scale(point), ...(point.handleIn ? { handleIn: scale(point.handleIn) } : {}), ...(point.handleOut ? { handleOut: scale(point.handleOut) } : {}) })) }
   }
   return out
 }
