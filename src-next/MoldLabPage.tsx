@@ -6,9 +6,10 @@ import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
 import type { PenPoint } from '../src/services/penStrokeFit'
 import { useEffectiveGlobalStyle } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
-import { mergePadding, useLayoutStore } from '../src/stores/layoutStore'
+import { DEFAULT_GLOBAL_PADDING, mergePadding, useLayoutStore } from '../src/stores/layoutStore'
+import type { GlobalStyle } from '../src/stores/globalStyleStore'
 import { propagatedJungseong } from '../src/stores/stemMasterStore'
-import type { BoxConfig, JamoData, LayoutType, Part, ResolvedStrokeInkSource } from '../src/types'
+import type { BoxConfig, GlyphInkPlacement, JamoData, LayoutType, Padding, Part, ResolvedStrokeInkSource } from '../src/types'
 import type { DecomposedSyllable } from '../src/types'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
@@ -16,7 +17,9 @@ import { pointsToSvgD } from '../src/utils/pathUtils'
 import { Button } from './components/ui/button'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { Pressable } from './components/ui/pressable'
+import { Switch } from './components/ui/switch'
 import { EDIT_COLOR } from './editColors'
+import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type FenceLine, type FencePull } from './fenceBand'
 import { applyPartEdits, appliedWeight, bigBoxes, dirOf, dragLook, dragPart, editsBetween, gapCapMultiplier, lookOf, regionLabels, scaledWeight, simsBoxes, simsPartOf, type Dir, type GapStroke, type LayoutEdits, type Look, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement } from './notoModel'
 import { SAMPLE_SENTENCES } from './sampleSentences'
@@ -74,10 +77,52 @@ function useGlyphBase(char: string, drawn: Drawn | undefined) {
   const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
   const syllable = useMemo(() => decomposeSyllable(char, choseong, jungseong, jongseong), [char, choseong, jungseong, jongseong])
   const effective = useEffectiveGlobalStyle(syllable.layoutType)
-  const padding = mergePadding(globalPadding, paddingOverrides[syllable.layoutType])
-  const schema = { ...schemas[syllable.layoutType], padding, designBodyPadding: padding }
+  const padding = useMemo(() => mergePadding(globalPadding, paddingOverrides[syllable.layoutType]), [globalPadding, paddingOverrides, syllable.layoutType])
+  const schema = useMemo(() => ({ ...schemas[syllable.layoutType], padding, designBodyPadding: padding }), [schemas, syllable.layoutType, padding])
   const { placement } = useContextPlacement(syllable, schema, effective)
-  return { syllable, effective, placement }
+  return { syllable, effective, placement, padding }
+}
+
+// ── 울타리 보정(획 긋기 시험판과 같은 계산 `fenceBand.ts`) ──
+
+/** 울타리 켬 · 선. 자소 줄이는 비율은 글줄 전체가 같이 쓴다(가장 많이 줄여야 하는 글자의 것). */
+interface MoldFence { on: boolean; line: FenceLine; scale: number }
+const FENCE_LINE_NAMES: Record<FenceLine, string> = { safe: '안전선', limit: '한계선' }
+
+/** 렌더러와 같은 입구로 풀어 잰다(획 긋기 시험판의 `FencedGlyph`와 같은 길). */
+function fenceMeasured(syllable: DecomposedSyllable, placement: GlyphInkPlacement, style: GlobalStyle) {
+  const result = resolveGlyphInkPrimitives({ syllable, placement, weightMultiplier: weightToMultiplier(style.weight), globalLinecap: style.linecap, globalLinejoin: style.linejoin, horizontalInkBounds: { min: 0, max: 1 } })
+  const strokes = result.primitives.map((primitive) => ({ part: primitive.source.part, box: primitive.box, points: primitive.stroke.points, closed: primitive.stroke.closed, thickness: primitive.stroke.thickness * primitive.weightMultiplier }))
+  return { measure: measureGlyph(strokes), clearances: partClearances(strokes) }
+}
+const fenceBody = (padding: Padding) => GOTHIC_FENCE.engine.body * Math.max(0.5, 1 - padding.top - padding.bottom) / (1 - DEFAULT_GLOBAL_PADDING.top - DEFAULT_GLOBAL_PADDING.bottom)
+
+/**
+ * 빚은 칸에 울타리를 얹는다. 기준은 같은 글자를 기본 획(저장소) + 지금 빚은 칸으로 푼 것 — 빚은 칸은 사용자 것이라 그대로 두고,
+ * 그은 획 때문에 생긴 것(휜 획이 닿음 · 받침 밑선 · 틈 · 윗선 · 무게중심)만 당긴다.
+ * 1) 휜 획이 옆 자소에 닿으면 자소를 모두 같은 비율로 줄인다(비율은 `onNeed`로 올리고 글줄 공통 `fence.scale`로 받는다). 2) 배치 값 넷을 울타리 끝까지 당긴다.
+ */
+function fencedBoxes(input: { syllable: DecomposedSyllable; baseSyllable: DecomposedSyllable; boxes: Partial<Record<Part, BoxConfig>>; style: GlobalStyle; padding: Padding; fence: MoldFence }) {
+  const { syllable, baseSyllable, boxes, style, padding, fence } = input
+  const at = (target: DecomposedSyllable, ratio: number) => fenceMeasured(target, { kind: 'boxes', boxes: ratio === 1 ? boxes : scaledBoxes(boxes, ratio) }, style)
+  const reference = at(baseSyllable, 1)
+  const placed = at(syllable, 1)
+  const floor = GOTHIC_FENCE.lines[fence.line].clearanceFloor
+  const pulls: FencePull[] = []
+  let need = 1
+  let current = boxes
+  let now = placed
+  if (floor !== undefined && syllable !== baseSyllable) {
+    need = pickJamoScale((ratio) => clearanceRatio(at(syllable, ratio).clearances, reference.clearances), floor)
+    const fitted = at(syllable, fence.scale)
+    const before = clearanceRatio(placed.clearances, reference.clearances), after = clearanceRatio(fitted.clearances, reference.clearances)
+    pulls.push({ value: 'clearance', before, after, band: { lo: floor, hi: Infinity }, pulled: fence.scale - 1, left: after >= floor - 1e-3 ? 0 : floor - after })
+    if (fence.on && fence.scale < 1) { current = scaledBoxes(boxes, fence.scale); now = fitted }
+  }
+  const scaledReference = fence.on && fence.scale < 1 ? at(baseSyllable, fence.scale) : reference
+  if (!now.measure || !scaledReference.measure) return { boxes: current, pulls, need }
+  const correction = correctGlyph({ layout: syllable.layoutType, now: now.measure, reference: scaledReference.measure, line: fence.line, body: fenceBody(padding) })
+  return { boxes: fence.on ? movedBoxes(current, correction.moves) : current, pulls: [...pulls, ...correction.pulls], need }
 }
 
 /** 칸 편집(짜임) → 폭(전체) 순서로 입힌 칸. 편집은 폭을 뺀 글자 단위다. */
@@ -89,9 +134,14 @@ function moldedBoxes(boxes: Partial<Record<Part, BoxConfig>>, layout: LayoutType
  * 빚은 글자 하나. 칸을 풀고, 짜임 편집 · 폭 · 굵기 · 끝 모양을 차례로 입혀 그린다.
  * `sel`이 있으면 고른 부위만 제 색으로, 나머지는 옅게 그린다.
  */
-function MoldGlyph({ char, size, edits, look, drawn, sel, shownStroke, testId, weightCap = Infinity, onCap }: { char: string; size: number; edits: LayoutEdits; look: Look; drawn?: Drawn; sel?: Region | null; shownStroke?: (key: string) => boolean; testId?: string; weightCap?: number; onCap?: (ratio: number) => void }) {
-  const { syllable, effective, placement } = useGlyphBase(char, drawn)
-  const boxes = useMemo(() => placement.kind === 'boxes' ? moldedBoxes(placement.boxes, syllable.layoutType, edits, look) : undefined, [placement, syllable.layoutType, edits, look])
+function MoldGlyph({ char, size, edits, look, drawn, sel, shownStroke, testId, weightCap = Infinity, onCap, fence, onFence }: { char: string; size: number; edits: LayoutEdits; look: Look; drawn?: Drawn; sel?: Region | null; shownStroke?: (key: string) => boolean; testId?: string; weightCap?: number; onCap?: (ratio: number) => void; fence?: MoldFence; onFence?: (need: number, pulls: readonly FencePull[]) => void }) {
+  const { syllable, effective, placement, padding } = useGlyphBase(char, drawn)
+  const base = useGlyphBase(char, undefined)
+  const molded = useMemo(() => placement.kind === 'boxes' ? moldedBoxes(placement.boxes, syllable.layoutType, edits, look) : undefined, [placement, syllable.layoutType, edits, look])
+  // 울타리: 그은 획 때문에 칸 밖으로 나간 것을 당긴다. 기준 글자는 그은 게 없을 때 같은 칸의 모습.
+  const fenced = useMemo(() => fence && molded ? fencedBoxes({ syllable, baseSyllable: drawn ? base.syllable : syllable, boxes: molded, style: effective, padding, fence }) : null, [fence, molded, syllable, base.syllable, drawn, effective, padding])
+  useEffect(() => { if (fenced) onFence?.(fenced.need, fenced.pulls) }, [onFence, fenced])
+  const boxes = fenced?.boxes ?? molded
 
   // 획 사이 최소 틈: 이 글자가 버틸 수 있는 굵기 비율을 재서 올린다. 글줄은 가장 작은 비율을 다 같이 쓴다.
   const capRatio = useMemo(() => {
@@ -275,7 +325,8 @@ function labelOf(dir: Dir, labels: { up: string; down: string; left: string; rig
 }
 
 /** 2단계: 심즈처럼 빚기. 큰 글자에서 부위를 콕 고르고 어디서든 여덟 방향으로 끈다. */
-function SimsStep({ char, drawn, edits, setEdits, look, setLook, weightCap, sel, setSel, onBegin }: {
+function SimsStep({ char, drawn, edits, setEdits, look, setLook, weightCap, sel, setSel, onBegin, fence }: {
+  fence?: MoldFence
   char: string; drawn?: Drawn; edits: LayoutEdits; setEdits: (update: (now: LayoutEdits) => LayoutEdits) => void
   look: Look; setLook: (next: Look) => void; weightCap: number; sel: Region | null; setSel: (region: Region | null) => void; onBegin: () => void
 }) {
@@ -358,7 +409,7 @@ function SimsStep({ char, drawn, edits, setEdits, look, setLook, weightCap, sel,
   return <section className={styles.panel} aria-label="빚기">
     <div className={styles.stage} onPointerDown={begin} onPointerMove={move} onPointerUp={end} onPointerCancel={end} data-testid="mold-stage">
       <div ref={svgHost} className={styles.stageGlyph} style={{ transform: `scale(${(shown.press ?? 1).toFixed(4)})` }}>
-        <MoldGlyph char={char} size={STAGE} edits={shownEdits} look={shownLook} drawn={drawn} sel={sel} weightCap={weightCap} testId="mold-focus" />
+        <MoldGlyph char={char} size={STAGE} edits={shownEdits} look={shownLook} drawn={drawn} sel={sel} weightCap={weightCap} fence={fence} testId="mold-focus" />
       </div>
       {labels ? DIRS.map(({ dir: d, x, y, arrow }) => <span key={d} className={styles.arrow} data-corner={d.length === 2 || undefined} data-on={dir === d || undefined} data-off={(dir && dir !== d) || undefined} style={{ left: `${x}%`, top: `${y}%` }} data-testid={`mold-arrow-${d}`}>
         {x < 50 ? `${arrow} ${labelOf(d, labels)}` : x > 50 ? `${labelOf(d, labels)} ${arrow}` : `${arrow} ${labelOf(d, labels)}`}
@@ -395,6 +446,21 @@ export function MoldLabPage() {
     return out
   }, [sentence])
   const weightCap = Math.min(Infinity, ...[...sentence].map((char, at) => (char === ' ' ? Infinity : caps[`${sentence}-${at}`] ?? Infinity)))
+  // 울타리 보정(획 긋기 시험판에서 가져옴). 켜면 그은 획 때문에 울타리 밖으로 나간 글자를 당긴다.
+  const [fenceOn, setFenceOn] = useState(true)
+  const [fenceLine, setFenceLine] = useState<FenceLine>('safe')
+  const [fenceReports, setFenceReports] = useState<Record<string, { need: number; pulls: readonly FencePull[] }>>({})
+  const fenceReporters = useMemo(() => {
+    const out: Record<number, (need: number, pulls: readonly FencePull[]) => void> = {}
+    ;[...sentence].forEach((_, at) => { out[at] = (need, pulls) => setFenceReports((all) => { const key = `${sentence}-${at}`; const old = all[key]; return old && old.need === need && JSON.stringify(old.pulls) === JSON.stringify(pulls) ? all : { ...all, [key]: { need, pulls } } }) })
+    return out
+  }, [sentence])
+  const fenceReportsNow = [...sentence].flatMap((char, at) => (char === ' ' ? [] : fenceReports[`${sentence}-${at}`] ? [fenceReports[`${sentence}-${at}`]] : []))
+  const jamoScale = Math.min(1, ...fenceReportsNow.map((report) => report.need))
+  const fence = useMemo<MoldFence>(() => ({ on: fenceOn, line: fenceLine, scale: jamoScale }), [fenceOn, fenceLine, jamoScale])
+  const pulledCount = fenceReportsNow.filter((report) => report.pulls.some((item) => item.pulled !== 0)).length
+  const stuckCount = fenceReportsNow.filter((report) => report.pulls.some((item) => item.left > 0)).length
+  const fenceNote = [pulledCount > 0 ? `${fenceOn ? '' : '켜면 '}${pulledCount}자 당김` : '', stuckCount > 0 ? `${stuckCount}자는 다 못 당김` : ''].filter(Boolean).join(' · ') || '모두 울타리 안'
 
   const choseong = useJamoStore((state) => state.choseong)
   const jungseong = useJamoStore((state) => state.jungseong)
@@ -471,7 +537,7 @@ export function MoldLabPage() {
         {chars.map((char, at) => char === ' '
           ? <span key={at} className={styles.space} />
           : <Pressable key={`${sentence}-${at}`} className={styles.lineChar} data-on={(step === 'mold' && at === focusIndex) || undefined} onClick={() => { setFocusAt(at); setStep('mold') }} aria-label={`${char} 크게 빚기`} data-testid={`mold-pick-${at}`}>
-            <MoldGlyph char={char} size={42} edits={lineEdits} look={lineLook} drawn={lineDrawn} shownStroke={step === 'draw' && !compare ? shownStroke : undefined} testId={`mold-char-${at}`} weightCap={weightCap} onCap={compare ? undefined : capReporters[at]} />
+            <MoldGlyph char={char} size={42} edits={lineEdits} look={lineLook} drawn={lineDrawn} shownStroke={step === 'draw' && !compare ? shownStroke : undefined} testId={`mold-char-${at}`} weightCap={weightCap} onCap={compare ? undefined : capReporters[at]} fence={compare ? undefined : fence} onFence={compare ? undefined : fenceReporters[at]} />
           </Pressable>)}
       </div>
       <div className={styles.lineActions}>
@@ -480,11 +546,23 @@ export function MoldLabPage() {
           onPointerDown={() => setCompare(true)} onPointerUp={() => setCompare(false)} onPointerLeave={() => setCompare(false)} onPointerCancel={() => setCompare(false)}
           data-testid="mold-compare">{compare ? '처음 모습' : '누르는 동안 처음과 견주기'}</Button>
       </div>
+      <div className={styles.fence} data-testid="fence-card">
+        <div className={styles.fenceHead}>
+          <span className={styles.fenceTitle}><strong>울타리 보정</strong><span data-testid="fence-count">{fenceNote}</span></span>
+          <Switch checked={fenceOn} onCheckedChange={setFenceOn} aria-label="울타리 보정" data-testid="fence-switch" />
+        </div>
+        <div className={styles.fenceLine}>
+          <span>세기 · 안전선이 더 세게 당김</span>
+          <ChoiceGroup variant="segment" aria-label="울타리 선" className={styles.fenceLineSwitch}>
+            {(['safe', 'limit'] as const).map((line) => <ChoiceItem key={line} checked={fenceLine === line} disabled={!fenceOn} onClick={() => setFenceLine(line)} data-testid={`fence-line-${line}`}>{FENCE_LINE_NAMES[line]}</ChoiceItem>)}
+          </ChoiceGroup>
+        </div>
+      </div>
     </section>
 
     {step === 'draw' && <DrawStep raws={raws} setRaws={setRaws} stems={stems} onDone={() => setStep('mold')} />}
     {step === 'mold' && <>
-      <SimsStep char={focusChar} drawn={drawn} edits={edits} setEdits={setEdits} look={look} setLook={setLook} weightCap={weightCap} sel={sel} setSel={setSel} onBegin={remember} />
+      <SimsStep fence={compare ? undefined : fence} char={focusChar} drawn={drawn} edits={edits} setEdits={setEdits} look={look} setLook={setLook} weightCap={weightCap} sel={sel} setSel={setSel} onBegin={remember} />
       <div className={styles.moldActions}>
         <Button variant="outline" size="sm" onClick={undo} disabled={!history.length} data-testid="mold-undo"><Undo2 aria-hidden="true" />되돌리기</Button>
         <Button variant="outline" size="sm" onClick={resetRegion} disabled={!sel} data-testid="mold-reset-region"><RotateCcw aria-hidden="true" />부위 처음대로</Button>

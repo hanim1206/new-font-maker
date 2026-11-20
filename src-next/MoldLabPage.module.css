@@ -104,3 +104,12 @@
 .regions { width: 100%; }
 .dot { display: inline-block; width: 8px; height: 8px; margin-right: 4px; border-radius: var(--radius-full); }
 .moldActions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* 울타리 보정 카드(획 긋기 시험판과 같은 모양) */
+.fence { display: grid; gap: 8px; padding-top: 8px; border-top: 1px solid rgb(var(--color-border)); }
+.fenceHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.fenceTitle { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.fenceTitle strong { font-size: var(--font-13); font-weight: var(--weight-heavy); }
+.fenceTitle span { overflow: hidden; color: rgb(var(--color-text-3)); font-size: var(--font-12); font-weight: var(--weight-medium); text-overflow: ellipsis; white-space: nowrap; }
+.fenceLine { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: rgb(var(--color-text-3)); font-size: var(--font-12); }
+.fenceLineSwitch { flex: none; }
