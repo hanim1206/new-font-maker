@@ -1,12 +1,14 @@
 import { fitPenStroke, PEN_STABILIZATION_MAX_WINDOW, penClosesOnItself } from '../src/services/penStrokeFit'
 import type { PenFitResult, PenPoint } from '../src/services/penStrokeFit'
 import { boundStrokesOf, isUnder, stemReferenceBox, type AxisPoint, type StemMaster, type StemMasters } from '../src/services/stemMaster'
-import type { AnchorPoint, JamoData, StrokeDataV2 } from '../src/types'
+import { DEFAULT_LAYOUT_CONFIGS } from '../src/data/layoutConfigs'
+import type { AnchorPoint, JamoData, LayoutType, StrokeDataV2 } from '../src/types'
 
 /**
  * 획 긋기 시험판(학습 단계 프로토타입)의 계산. 줄기 여섯을 한 번씩 그으면 글자 전체에 퍼뜨린다.
  * - 모음 줄기 넷(세로선 · 세로 짧은 선 · 가로선 · 가로 긴 선)은 홀자 줄기 마스터(기둥 · 짧은기둥 · 곁줄기 · 보)가 되어 기존 엔진(`propagatedJungseong`)으로 퍼진다.
- * - 닿자는 엔진에 퍼뜨리기가 없어 여기서 간이로 한다: 곧은 마디(가로 · 세로)는 가로선 · 세로선 모양, 사선 획은 대각선(뒤집어 씀), 둥근 닫힌 획은 동그라미.
+ * - 닿자는 엔진에 퍼뜨리기가 없어 여기서 간이로 한다: 곧은 마디는 길이에 따라 가로선 · 가로 긴 선 · 세로선 · 세로 짧은 선 모양, 사선 획은 대각선(뒤집어 씀), 둥근 닫힌 획은 동그라미.
+ *   닿자 칸은 짜임마다 가로세로 비율이 달라서(가로 짜임 받침 칸은 납작하다) 모양을 em으로 놓는다 — 휨이 칸 비율 따라 들쭉날쭉하지 않게.
  * 모양(휨 · 기울기)은 그은 대로 살리고 손 떨림만 지운다. 길이 · 자리 · 굵기는 서비스가 정한다(하니무스 2026-11-20).
  * 떨림 정리는 중간으로 고정(하니무스 2026-11-20). 저장하지 않고 제품 값도 안 바꾼다.
  * 기획: 고양이 `학습-단계-뼈대-2026-11-20.md`.
@@ -183,20 +185,34 @@ export function vowelStemKeys(jungseong: Readonly<Record<string, JamoData>>): Ma
 // ── 닿자: 간이 퍼뜨리기 ──
 
 type Vec = { x: number; y: number }
-const sub = (a: Vec, b: Vec): Vec => ({ x: a.x - b.x, y: a.y - b.y })
+
+/** 닿자 칸의 크기(em). 획 좌표(칸 안 0–1)를 em으로 펴서 모양을 놓는다. */
+export interface BoxSize { width: number; height: number }
+const SQUARE: BoxSize = { width: 1, height: 1 }
+
+/** 짜임 목록(기본 짜임 표 순서). */
+export const LAYOUTS = Object.keys(DEFAULT_LAYOUT_CONFIGS) as LayoutType[]
+
+/** 짜임별 닿자 칸 크기(em). 기본 짜임 표의 첫닿 · 받침 칸. */
+export function consonantBoxesOf(layout: LayoutType): { CH: BoxSize; JO: BoxSize } {
+  const boxes = DEFAULT_LAYOUT_CONFIGS[layout]?.boxes
+  const size = (box?: { width: number; height: number }) => (box && box.width > 0 && box.height > 0 ? { width: box.width, height: box.height } : SQUARE)
+  return { CH: size(boxes?.CH), JO: size(boxes?.JO ?? boxes?.CH) }
+}
 
 /**
  * A→B 사이에 모양을 놓은 앵커들(A 포함, B 포함). `mirror`면 옆 어긋남을 뒤집는다.
  * 닿자는 끝이 다른 획과 이어지니 두 끝을 제자리에 둔다 — 끝의 옆 어긋남(기울기)만큼 기울여 빼고 휨만 남긴다.
+ * 휨은 em에서 잰다: 칸 좌표를 칸 크기로 펴서 놓고 다시 접는다. 그래야 납작한 칸에서 세로 마디가 덜 휘고 가로 마디가 더 휘는 일이 없다.
  */
-function placeShape(shape: readonly RelPoint[], a: Vec, b: Vec, mirror = false): AnchorPoint[] {
-  const d = sub(b, a)
+function placeShape(shape: readonly RelPoint[], a: Vec, b: Vec, mirror = false, box: BoxSize = SQUARE): AnchorPoint[] {
+  const d = { x: (b.x - a.x) * box.width, y: (b.y - a.y) * box.height }
   const normal = { x: d.y, y: -d.x }
   const sign = mirror ? -1 : 1
   const tilt = shape[shape.length - 1].r
   const at = (point: { t: number; r: number }) => {
     const r = (point.r - tilt * point.t) * sign
-    return { x: a.x + d.x * point.t + normal.x * r, y: a.y + d.y * point.t + normal.y * r }
+    return { x: a.x + (d.x * point.t + normal.x * r) / box.width, y: a.y + (d.y * point.t + normal.y * r) / box.height }
   }
   return shape.map((point, index) => {
     const placed: AnchorPoint = index === 0 ? { ...a } : index === shape.length - 1 ? { ...b } : at(point)
@@ -221,16 +237,20 @@ function segmentKind(a: AnchorPoint, b: AnchorPoint): 'horizontal' | 'vertical' 
 
 export interface ConsonantShapes {
   horizontal?: RelPoint[]
+  longHorizontal?: RelPoint[]
   vertical?: RelPoint[]
+  shortVertical?: RelPoint[]
   diagonal?: { shape: RelPoint[]; leftward: boolean }
   loop?: AnchorPoint[]
 }
 
 export function consonantShapesOf(stems: Partial<Record<StemKind, DrawnStem>>): ConsonantShapes {
   const shapes: ConsonantShapes = {}
-  const h = stems.horizontal, v = stems.vertical, d = stems.diagonal, c = stems.circle
+  const h = stems.horizontal, lh = stems.longHorizontal, v = stems.vertical, sv = stems.shortVertical, d = stems.diagonal, c = stems.circle
   if (h?.ok && h.shape) shapes.horizontal = h.shape
+  if (lh?.ok && lh.shape) shapes.longHorizontal = lh.shape
   if (v?.ok && v.shape) shapes.vertical = v.shape
+  if (sv?.ok && sv.shape) shapes.shortVertical = sv.shape
   if (d?.ok && d.shape) {
     const points = d.fit.stroke.points
     shapes.diagonal = { shape: d.shape, leftward: points[points.length - 1].x < points[0].x }
@@ -250,11 +270,31 @@ function isDiagonal(stroke: StrokeDataV2): boolean {
 /** 둥근 닫힌 획(ㅇ · ㅎ의 동그라미) — 손잡이가 있는 닫힌 획. */
 const isRound = (stroke: StrokeDataV2) => stroke.closed && stroke.points.some((point) => point.handleIn || point.handleOut)
 
+/** 칸 한 변의 이만큼 이상을 가로지르는 마디는 긴 선이다(ㄱ · ㄷ · ㅁ의 가로, ㄴ · ㅁ · ㅂ의 세로). 짧은 건 ㅎ · ㅊ의 꼭지, ㅌ · ㅍ의 안쪽 같은 것. */
+const LONG_SPAN = 0.6
+
+/**
+ * 곧은 마디에 쓸 줄기. 가로는 길면 가로 긴 선, 세로는 짧으면 세로 짧은 선 — 안 그었으면 짝(가로선 · 세로선)으로 대신한다.
+ */
+function segmentShape(kind: 'horizontal' | 'vertical', a: Vec, b: Vec, shapes: ConsonantShapes): { kind: StemKind; shape: RelPoint[] } | null {
+  const pick = (first: StemKind, second: StemKind) => {
+    const shape = shapes[first as keyof ConsonantShapes] as RelPoint[] | undefined
+    if (shape) return { kind: first, shape }
+    const fallback = shapes[second as keyof ConsonantShapes] as RelPoint[] | undefined
+    return fallback ? { kind: second, shape: fallback } : null
+  }
+  if (kind === 'horizontal') {
+    return Math.abs(b.x - a.x) >= LONG_SPAN ? pick('longHorizontal', 'horizontal') : pick('horizontal', 'longHorizontal')
+  }
+  return Math.abs(b.y - a.y) >= LONG_SPAN ? pick('vertical', 'shortVertical') : pick('shortVertical', 'vertical')
+}
+
 /**
  * 닿자 획 하나에 줄기 모양을 입힌다. 바뀐 줄기 종류도 돌려준다(색 표시용).
- * 곧은 마디는 각 마디를 가로선 · 세로선 모양으로 바꾸고 꺾인 자리는 그대로 둔다 — 꺾임은 따로 긋지 않고 가로선과 세로선을 잇는다(하니무스 2026-11-20).
+ * 곧은 마디는 각 마디를 가로 · 세로 줄기 모양으로 바꾸고 꺾인 자리는 그대로 둔다 — 꺾임은 따로 긋지 않고 가로선과 세로선을 잇는다(하니무스 2026-11-20).
+ * `box`는 이 닿자 칸의 크기(em). 모양을 em에서 놓아 칸 비율에 휨이 끌려가지 않게 한다.
  */
-export function shapeConsonantStroke(stroke: StrokeDataV2, shapes: ConsonantShapes): { stroke: StrokeDataV2; kinds: StemKind[] } {
+export function shapeConsonantStroke(stroke: StrokeDataV2, shapes: ConsonantShapes, box: BoxSize = SQUARE): { stroke: StrokeDataV2; kinds: StemKind[] } {
   if (isRound(stroke)) {
     if (!shapes.loop) return { stroke, kinds: [] }
     const xs = stroke.points.flatMap((point) => [point.x]), ys = stroke.points.flatMap((point) => [point.y])
@@ -269,7 +309,7 @@ export function shapeConsonantStroke(stroke: StrokeDataV2, shapes: ConsonantShap
     // 위에서 아래로 놓고, 그은 대각선과 좌우가 다르면 뒤집어 쓴다(삐침 ↔ 내림).
     const [top, bottom] = a.y <= b.y ? [a, b] : [b, a]
     const leftward = bottom.x < top.x
-    const placed = placeShape(shapes.diagonal.shape, { x: top.x, y: top.y }, { x: bottom.x, y: bottom.y }, leftward !== shapes.diagonal.leftward)
+    const placed = placeShape(shapes.diagonal.shape, { x: top.x, y: top.y }, { x: bottom.x, y: bottom.y }, leftward !== shapes.diagonal.leftward, box)
     return { stroke: { ...stroke, points: a.y <= b.y ? placed : reversed(placed) }, kinds: ['diagonal'] }
   }
   const points = stroke.points
@@ -280,13 +320,13 @@ export function shapeConsonantStroke(stroke: StrokeDataV2, shapes: ConsonantShap
   for (let i = 0; i < count; i++) {
     const a = points[i], b = points[(i + 1) % points.length]
     const kind = segmentKind(a, b)
-    const shape = kind === 'horizontal' ? shapes.horizontal : kind === 'vertical' ? shapes.vertical : undefined
+    const chosen = kind ? segmentShape(kind, a, b, shapes) : null
     let segment: AnchorPoint[]
-    if (shape && kind) {
-      kinds.add(kind)
+    if (chosen && kind) {
+      kinds.add(chosen.kind)
       // 모양은 가로 왼→오른, 세로 위→아래로 잰 것이다. 거꾸로 가는 마디는 바르게 놓고 뒤집는다.
       const forward = kind === 'horizontal' ? b.x >= a.x : b.y >= a.y
-      const placed = forward ? placeShape(shape, a, b) : reversed(placeShape(shape, b, a))
+      const placed = forward ? placeShape(chosen.shape, a, b, false, box) : reversed(placeShape(chosen.shape, b, a, false, box))
       segment = placed.map((point, index) => (index === 0 ? { ...point, ...(a.handleIn ? { handleIn: a.handleIn } : {}) } : point))
     } else {
       segment = [{ ...a }, { ...b }]
@@ -311,15 +351,15 @@ export function shapeConsonantStroke(stroke: StrokeDataV2, shapes: ConsonantShap
 }
 
 /** 닿자 자모 묶음 전체에 줄기 모양을 입힌다. 바뀐 자모와 `자모:획id` → 종류 표를 돌려준다. */
-export function shapeConsonants(jamos: Readonly<Record<string, JamoData>>, shapes: ConsonantShapes): { changed: Record<string, JamoData>; keys: Map<string, StemKind[]> } {
+export function shapeConsonants(jamos: Readonly<Record<string, JamoData>>, shapes: ConsonantShapes, box: BoxSize = SQUARE): { changed: Record<string, JamoData>; keys: Map<string, StemKind[]> } {
   const changed: Record<string, JamoData> = {}
   const keys = new Map<string, StemKind[]>()
-  if (!shapes.horizontal && !shapes.vertical && !shapes.diagonal && !shapes.loop) return { changed, keys }
+  if (!Object.values(shapes).some(Boolean)) return { changed, keys }
   for (const [char, jamo] of Object.entries(jamos)) {
     if (!jamo.strokes?.length) continue
     let touched = false
     const strokes = jamo.strokes.map((stroke) => {
-      const result = shapeConsonantStroke(stroke, shapes)
+      const result = shapeConsonantStroke(stroke, shapes, box)
       if (result.kinds.length === 0) return stroke
       touched = true
       keys.set(`${char}:${stroke.id}`, result.kinds)
@@ -332,9 +372,12 @@ export function shapeConsonants(jamos: Readonly<Record<string, JamoData>>, shape
 
 /** 닿자에서 줄기 종류별로 쓰이는 획(색 표시용, 그은 것과 상관없이). */
 export function consonantStemKeys(jamos: Readonly<Record<string, JamoData>>): Map<string, StemKind[]> {
+  const line = (): RelPoint[] => [{ t: 0, r: 0 }, { t: 1, r: 0 }]
   const all: ConsonantShapes = {
-    horizontal: [{ t: 0, r: 0 }, { t: 1, r: 0 }],
-    vertical: [{ t: 0, r: 0 }, { t: 1, r: 0 }],
+    horizontal: line(),
+    longHorizontal: line(),
+    vertical: line(),
+    shortVertical: line(),
     diagonal: { shape: [{ t: 0, r: 0 }, { t: 1, r: 0 }], leftward: true },
     loop: [{ x: 0.5, y: 0 }, { x: 0.5, y: 1 }],
   }
