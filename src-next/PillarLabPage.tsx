@@ -7,10 +7,12 @@ import { propagatedJungseong } from '../src/stores/stemMasterStore'
 import type { JamoData, LayoutType, ResolvedStrokeInkSource } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { pointsToSvgD } from '../src/utils/pathUtils'
-import { AppGlyph } from './AppGlyph'
 import { Button } from './components/ui/button'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
+import { Switch } from './components/ui/switch'
 import { EDIT_COLOR } from './editColors'
+import { FENCE_NAMES, summarize, type FencePull, type FenceSummaryRow, type ShakeLevel } from './fenceBand'
+import { FencedGlyph } from './FencedGlyph'
 import { randomSampleSentence } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
 import styles from './PillarLabPage.module.css'
@@ -63,6 +65,15 @@ function reasonText(stem: Exclude<DrawnStem, { ok: true }>): string {
   return stem.kind === 'vertical' || stem.kind === 'shortVertical' ? '세로로 그어 주세요' : '가로로 그어 주세요'
 }
 
+const percent = (value: number) => `${(value * 100).toFixed(1)}%`
+/** 값 하나의 결과 한 줄: 당긴 글자 수와 가장 크게 당긴 양, 못 당기고 남은 것. */
+function fenceRowText(row: FenceSummaryRow): string {
+  if (row.checked === 0) return '잴 글자 없음'
+  const moved = row.count > 0 ? `${row.count}자 ${percent(row.max)} ${row.word}` : ''
+  const stuck = row.stuck > 0 ? `${row.stuck}자 ${percent(row.left)} 남음` : ''
+  return [moved, stuck].filter(Boolean).join(' · ') || '울타리 안'
+}
+
 /** 판에 까는 점선 길잡이. 길이 · 자리는 서비스가 정하니 대충의 크기만 보인다. */
 function Guide({ kind }: { kind: StemKind }) {
   const props = { fill: 'none', stroke: EDIT_COLOR.editGuide, strokeWidth: 4, strokeDasharray: '12 16', strokeLinecap: 'round' as const }
@@ -82,6 +93,11 @@ export function PillarLabPage() {
   const [kind, setKind] = useState<StemKind>('vertical')
   const [view, setView] = useState<View>('mine')
   const [marked, setMarked] = useState(true)
+  // 울타리 보정: 켜면 배치 값이 울타리(안전선) 밖인 글자를 당긴다. 흔들기는 보정이 당기는 걸 보려고 배치를 일부러 민다.
+  const [fenceOn, setFenceOn] = useState(true)
+  const [shake, setShake] = useState<ShakeLevel>(0)
+  const [pulls, setPulls] = useState<Record<number, readonly FencePull[]>>({})
+  const reportPulls = useCallback((index: number, list: readonly FencePull[]) => setPulls((all) => (all[index] === list ? all : { ...all, [index]: list })), [])
   const drawing = useRef<PenPoint[] | null>(null)
   const activePointer = useRef<number | null>(null)
   const padRef = useRef<SVGSVGElement>(null)
@@ -170,6 +186,11 @@ export function PillarLabPage() {
   }
 
   const chars = [...sentence]
+  const livePulls = chars.map((char, index) => (char === ' ' ? [] : pulls[index] ?? []))
+  const fenceRows = summarize(livePulls)
+  const pulledCount = livePulls.filter((list) => list.some((item) => item.pulled !== 0)).length
+  const stuckCount = livePulls.filter((list) => list.some((item) => item.left > 0)).length
+  const fenceNote = [pulledCount > 0 ? `${fenceOn ? '' : '켜면 '}${pulledCount}자 당김` : '', stuckCount > 0 ? `${stuckCount}자는 다 못 당김` : ''].filter(Boolean).join(' · ') || '모두 울타리 안'
   const note = stem && !stem.ok ? reasonText(stem) : accepted ? `방금 그은 게 ${withCopula(info.term)}. 길이와 자리, 굵기는 우리가 맞췄어요.` : info.hint
 
   return <main className={styles.page}>
@@ -182,11 +203,14 @@ export function PillarLabPage() {
       <div className={styles.line} data-testid="pillar-line">
         {chars.map((char, index) => char === ' '
           ? <span key={index} className={styles.space} />
-          : <AppGlyph key={index} char={char} size={40}
-            jungseongOverride={mine ? overrides.jungseong : undefined}
-            choseongOverride={mine ? overrides.consonants[layoutOf(char)]?.choseong : undefined}
-            jongseongOverride={mine ? overrides.consonants[layoutOf(char)]?.jongseong : undefined}
-            strokeColorOf={strokeColorOf} />)}
+          : <span key={index} className={styles.glyph} data-pulled={livePulls[index].some((item) => item.pulled !== 0) || undefined}>
+            <FencedGlyph char={char} size={40}
+              jungseongOverride={mine ? overrides.jungseong : undefined}
+              choseongOverride={mine ? overrides.consonants[layoutOf(char)]?.choseong : undefined}
+              jongseongOverride={mine ? overrides.consonants[layoutOf(char)]?.jongseong : undefined}
+              strokeColorOf={strokeColorOf}
+              fence={{ on: fenceOn, line: 'safe', shake, index }} onPulls={reportPulls} />
+          </span>)}
       </div>
       <div className={styles.lineTools}>
         <Button variant="soft" size="chip" onClick={() => setSentence((now) => randomSampleSentence(now))} data-testid="pillar-roll"><Dices aria-hidden="true" />다른 문장</Button>
@@ -194,6 +218,28 @@ export function PillarLabPage() {
         <ChoiceGroup variant="segment" aria-label="보기" className={styles.viewSwitch}>
           <ChoiceItem checked={mine} disabled={doneCount === 0} onClick={() => setView('mine')}>내 줄기</ChoiceItem>
           <ChoiceItem checked={!mine} onClick={() => setView('base')}>기본</ChoiceItem>
+        </ChoiceGroup>
+      </div>
+    </section>
+
+    <section className={styles.fenceCard} aria-label="울타리 보정" data-testid="fence-card">
+      <div className={styles.fenceHead}>
+        <div>
+          <strong>울타리 보정</strong>
+          <span data-testid="fence-count">{fenceNote}</span>
+        </div>
+        <Switch checked={fenceOn} onCheckedChange={setFenceOn} aria-label="울타리 보정" data-testid="fence-switch" />
+      </div>
+      <ul className={styles.fenceRows}>
+        {fenceRows.map((row) => <li key={row.value} data-moved={row.count > 0 || undefined} data-stuck={row.stuck > 0 || undefined} data-testid={`fence-row-${row.value}`}>
+          <span>{FENCE_NAMES[row.value]}</span>
+          <b>{fenceRowText(row)}</b>
+        </li>)}
+      </ul>
+      <div className={styles.fenceShake}>
+        <span>일부러 흔들기</span>
+        <ChoiceGroup variant="segment" aria-label="일부러 흔들기" className={styles.shakeSwitch}>
+          {([[0, '끔'], [1, '조금'], [2, '많이']] as const).map(([level, name]) => <ChoiceItem key={level} checked={shake === level} onClick={() => setShake(level)} data-testid={`fence-shake-${level}`}>{name}</ChoiceItem>)}
         </ChoiceGroup>
       </div>
     </section>

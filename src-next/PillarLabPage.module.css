@@ -56,3 +56,20 @@
 .stems > button[data-done]:not([aria-selected='true']) { color: rgb(var(--color-success)); }
 .stemNo { font-variant-numeric: tabular-nums; opacity: .6; }
 .padActions { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; }
+
+/* 울타리 보정: 당긴 글자 밑에 점, 값 넷은 한 줄씩. */
+.glyph { position: relative; display: inline-flex; }
+.glyph[data-pulled]::after { content: ''; position: absolute; left: 50%; bottom: -4px; width: 4px; height: 4px; margin-left: -2px; border-radius: var(--radius-full); background: rgb(var(--color-primary)); }
+.fenceCard { display: grid; gap: 10px; padding: 12px; border: 1px solid rgb(var(--color-border)); border-radius: var(--radius-lg); background: rgb(var(--color-surface)); }
+.fenceHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.fenceHead > div { display: grid; gap: 2px; }
+.fenceHead strong { font-size: var(--font-14); font-weight: var(--weight-heavy); }
+.fenceHead span { color: rgb(var(--color-text-3)); font-size: var(--font-12); }
+.fenceRows { display: grid; gap: 4px; }
+.fenceRows li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
+.fenceRows span { flex: none; color: rgb(var(--color-text-4)); font-size: var(--font-12); }
+.fenceRows b { color: rgb(var(--color-text-3)); font-size: var(--font-12); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; text-align: right; }
+.fenceRows li[data-moved] b { color: rgb(var(--color-primary)); }
+.fenceShake { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: rgb(var(--color-text-3)); font-size: var(--font-12); }
+.shakeSwitch { min-width: 168px; }
+.fenceRows li[data-stuck]:not([data-moved]) b { color: rgb(var(--color-warning)); }
