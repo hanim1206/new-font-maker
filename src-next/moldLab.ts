@@ -1,0 +1,257 @@
+import type { BoxConfig, LayoutType, Part } from '../src/types'
+
+/**
+ * 빚기 시험판의 계산. 학습에서는 글자 하나가 아니라 "갈래" 단위로 만진다(고양이 추천안, `학습-단계-뼈대-2026-11-20.md` 21:42 절).
+ * 범위는 세 층: 전체 → 짜임(레이아웃) → 갈래(홀자 가지 갈래). 메뉴로 고르지 않고 글자의 어디를 잡았는지로 정한다.
+ * - 홀자를 잡으면 홀자 갈래(세로 오른가지 · 왼가지 · 두 기둥 · 가지 없음, 가로 위가지 · 아래가지 · 없음). 손잡이는 첫닿자와 홀자 사이 틈.
+ * - 첫닿자를 잡으면 그 짜임의 첫닿자 크기. 안쪽 모서리(홀자 쪽)는 그대로 두고 바깥으로 키운다 — 틈을 지킨다.
+ * - 받침을 잡으면 그 짜임의 받침 위 틈. 받침은 누르지 않고 밑선도 그대로, 윗부분(첫닿자 · 홀자)만 옮긴다.
+ * 값은 고딕 86개 분포(거북이 `layout-band-out.json`, 굵기에 맞춘 선 + 잔차 5 · 50 · 95%)에서 왔다. 좁게 · 보통 · 넓게 = 5 · 50 · 95%(안전선 안).
+ * 끌어서 다듬을 때 넘지 못하는 벽(한계선)은 틈 −35%(하니무스 한계선 답: −30% 괜찮다 · −40% 어색), 넓은 쪽은 같은 폭으로 둔 임시값.
+ * 갈래별 측정은 거북이가 진행 중이라, 직접 잰 값이 없는 갈래는 가까운 갈래 값을 빌려 쓰고 `source: 'borrowed'`로 표시한다.
+ * 저장하지 않고 제품 값도 안 바꾼다. 단위는 글자 높이 비율(울타리 실험지와 같은 어림).
+ */
+
+export type GroupId =
+  | 'v-right' | 'v-left' | 'v-double' | 'v-none'
+  | 'h-up' | 'h-down' | 'h-none'
+  | 'mixed'
+  | 'ch-vertical' | 'ch-horizontal' | 'ch-mixed'
+  | 'jo-vertical' | 'jo-horizontal' | 'jo-mixed'
+
+export type Layer = '짜임' | '갈래'
+export type Handle = 'gapX' | 'gapY' | 'chSize' | 'finalGap'
+/** measured: 이 갈래를 직접 잰 값 · borrowed: 가까운 갈래 값을 빌린 임시값 · guess: 측정 없이 둔 임시값 · none: 손잡이 없음 */
+export type ValueSource = 'measured' | 'borrowed' | 'guess' | 'none'
+export type Preset = 'narrow' | 'normal' | 'wide'
+export type Stance = 'vertical' | 'horizontal' | 'mixed'
+
+export interface Range {
+  /** 지금 엔진(노토 모델 배치)의 값. 이 값이면 아무것도 안 옮긴다. */
+  engine: number
+  presets: Record<Preset, number>
+  /** 안전선(폰트 90%가 있는 폭). 프리셋은 이 안. */
+  safe: [number, number]
+  /** 한계선. 끌어도 이 밖으로는 안 나간다. */
+  wall: [number, number]
+}
+
+export interface GroupInfo {
+  id: GroupId
+  layer: Layer
+  /** 짜임 이름(세로 · 가로 · 섞임) */
+  stance: Stance
+  name: string
+  /** 갈래에 드는 자모(보이는 이름) */
+  members: string
+  handle: Handle | null
+  handleName: string
+  source: ValueSource
+  /** 값이 어디서 왔는지 한 줄 */
+  note: string
+  range: Range | null
+  presetNames: Record<Preset, string>
+}
+
+const ENGINE_THICK = 0.0654
+/** 굵기에 맞춘 선(a + b × 굵기)과 잔차 5 · 50 · 95%. 고딕 86개. */
+const fit = (a: number, b: number, residuals: [number, number, number]) => {
+  const center = a + b * ENGINE_THICK
+  return { center, p5: center + residuals[0], p50: center + residuals[1], p95: center + residuals[2] }
+}
+/** 첫닿자 ↔ 세로홀자 기둥 틈(니 미 기 이). 엔진 0.192. */
+const GAP_COL = fit(0.2862, -1.3517, [-0.0091, -0.0006, 0.0212])
+/** 첫닿자 ↔ 가로홀자 보 틈(그 느 므). 엔진 0.224. */
+const GAP_ROW = fit(0.3120, -1.1182, [-0.0110, -0.0039, 0.0191])
+/** 홀자 ↔ 받침 틈(는). 엔진 0.122. */
+const GAP_FIN = fit(0.1914, -0.8551, [-0.0143, -0.0002, 0.0257])
+
+/** 한계선: 가운데에서 ±35%(좁은 쪽은 하니무스 한계선 답, 넓은 쪽은 같은 폭으로 둔 임시값). */
+const WALL_SHARE = 0.35
+function gapRange(engine: number, band: ReturnType<typeof fit>): Range {
+  return {
+    engine,
+    presets: { narrow: band.p5, normal: band.p50, wide: band.p95 },
+    safe: [band.p5, band.p95],
+    wall: [band.center * (1 - WALL_SHARE), band.center * (1 + WALL_SHARE)],
+  }
+}
+const COL = gapRange(0.192, GAP_COL)
+const ROW = gapRange(0.224, GAP_ROW)
+const FIN = gapRange(0.1215, GAP_FIN)
+/** 첫닿자 크기(배율). 측정 없음 — 임시값. */
+const CH_SIZE: Range = { engine: 1, presets: { narrow: 0.94, normal: 1, wide: 1.06 }, safe: [0.94, 1.06], wall: [0.86, 1.14] }
+
+const GAP_NAMES: Record<Preset, string> = { narrow: '좁게', normal: '보통', wide: '넓게' }
+const SIZE_NAMES: Record<Preset, string> = { narrow: '작게', normal: '보통', wide: '크게' }
+
+const STANCE_NAME: Record<Stance, string> = { vertical: '세로', horizontal: '가로', mixed: '섞임' }
+
+const vowel = (id: GroupId, stance: Stance, name: string, members: string, source: ValueSource, note: string): GroupInfo => ({
+  id, layer: '갈래', stance, name, members,
+  handle: stance === 'vertical' ? 'gapX' : 'gapY',
+  handleName: '첫닿자와 홀자 사이 틈',
+  source, note,
+  range: stance === 'vertical' ? COL : ROW,
+  presetNames: GAP_NAMES,
+})
+
+export const GROUPS: Record<GroupId, GroupInfo> = {
+  'v-right': vowel('v-right', 'vertical', '세로홀자 · 오른가지', 'ㅏ ㅑ', 'borrowed', 'ㅣ 틈 측정을 빌림(가지가 바깥이라 틈은 같다고 봄)'),
+  'v-left': vowel('v-left', 'vertical', '세로홀자 · 왼가지', 'ㅓ ㅕ', 'borrowed', 'ㅣ 틈 측정을 빌림 — 왼가지 갈래 측정 대기'),
+  'v-double': vowel('v-double', 'vertical', '세로홀자 · 두 기둥', 'ㅐ ㅒ ㅔ ㅖ', 'borrowed', 'ㅣ 틈 측정을 빌림 — 두 기둥 갈래 측정 대기'),
+  'v-none': vowel('v-none', 'vertical', '세로홀자 · 가지 없음', 'ㅣ', 'measured', '고딕 86개 니 미 기 이에서 잼'),
+  'h-up': vowel('h-up', 'horizontal', '가로홀자 · 위가지', 'ㅗ ㅛ', 'borrowed', 'ㅡ 틈 측정을 빌림 — 위가지 갈래 측정 대기'),
+  'h-down': vowel('h-down', 'horizontal', '가로홀자 · 아래가지', 'ㅜ ㅠ', 'borrowed', 'ㅡ 틈 측정을 빌림(가지가 아래라 틈은 같다고 봄)'),
+  'h-none': vowel('h-none', 'horizontal', '가로홀자 · 가지 없음', 'ㅡ', 'measured', '고딕 86개 그 느 므에서 잼'),
+  mixed: {
+    id: 'mixed', layer: '갈래', stance: 'mixed', name: '섞임홀자', members: 'ㅘ ㅝ ㅢ …',
+    handle: null, handleName: '', source: 'none', note: '값이 갈리는지 아직 안 잼 — 손잡이 없음', range: null, presetNames: GAP_NAMES,
+  },
+  'ch-vertical': chGroup('vertical'),
+  'ch-horizontal': chGroup('horizontal'),
+  'ch-mixed': chGroup('mixed'),
+  'jo-vertical': joGroup('vertical'),
+  'jo-horizontal': joGroup('horizontal'),
+  'jo-mixed': joGroup('mixed'),
+}
+
+export const stanceName = (stance: Stance) => `${STANCE_NAME[stance]} 짜임`
+
+function chGroup(stance: Stance): GroupInfo {
+  return {
+    id: `ch-${stance}` as GroupId, layer: '짜임', stance, name: `${STANCE_NAME[stance]} 짜임 · 첫닿자`, members: '첫닿자 전부',
+    handle: 'chSize', handleName: '첫닿자 크기', source: 'guess', note: '측정 없음 — 임시값(±6%, 벽 ±14%)', range: CH_SIZE, presetNames: SIZE_NAMES,
+  }
+}
+function joGroup(stance: Stance): GroupInfo {
+  return {
+    id: `jo-${stance}` as GroupId, layer: '짜임', stance, name: `${STANCE_NAME[stance]} 짜임 · 받침`, members: '받침 전부',
+    handle: 'finalGap', handleName: '받침 위 틈(받침은 안 누름)',
+    source: stance === 'horizontal' ? 'measured' : 'borrowed',
+    note: stance === 'horizontal' ? '고딕 86개 는에서 잼' : '가로 짜임(는) 측정을 빌림 — 갈래 측정 대기',
+    range: FIN, presetNames: GAP_NAMES,
+  }
+}
+
+const VOWEL_GROUP: Record<string, GroupId> = {
+  'ㅏ': 'v-right', 'ㅑ': 'v-right', 'ㅓ': 'v-left', 'ㅕ': 'v-left',
+  'ㅐ': 'v-double', 'ㅒ': 'v-double', 'ㅔ': 'v-double', 'ㅖ': 'v-double', 'ㅣ': 'v-none',
+  'ㅗ': 'h-up', 'ㅛ': 'h-up', 'ㅜ': 'h-down', 'ㅠ': 'h-down', 'ㅡ': 'h-none',
+  'ㅘ': 'mixed', 'ㅙ': 'mixed', 'ㅚ': 'mixed', 'ㅝ': 'mixed', 'ㅞ': 'mixed', 'ㅟ': 'mixed', 'ㅢ': 'mixed',
+}
+export const vowelGroupOf = (vowelChar: string | undefined): GroupId | undefined => vowelChar ? VOWEL_GROUP[vowelChar] : undefined
+
+export function stanceOf(layout: LayoutType): Stance | undefined {
+  if (layout.startsWith('choseong-jungseong-vertical')) return 'vertical'
+  if (layout.startsWith('choseong-jungseong-horizontal')) return 'horizontal'
+  if (layout.startsWith('choseong-jungseong-mixed')) return 'mixed'
+  return undefined
+}
+const hasFinal = (layout: LayoutType) => layout.endsWith('-jongseong')
+
+/** 잡은 부위 → 갈래. 홀자는 홀자 갈래, 첫닿자 · 받침은 짜임 층. */
+export function groupOfPart(part: Part, layout: LayoutType, vowelChar: string | undefined): GroupId | undefined {
+  const stance = stanceOf(layout)
+  if (!stance) return undefined
+  if (part === 'CH') return `ch-${stance}` as GroupId
+  if (part === 'JO') return hasFinal(layout) ? `jo-${stance}` as GroupId : undefined
+  return vowelGroupOf(vowelChar)
+}
+
+/** 이 글자에 듣는 갈래들(홀자 갈래 · 첫닿자 짜임 · 받침 짜임). */
+export function groupsOfSyllable(layout: LayoutType, vowelChar: string | undefined): GroupId[] {
+  const stance = stanceOf(layout)
+  if (!stance) return []
+  const out: GroupId[] = []
+  const vg = vowelGroupOf(vowelChar)
+  if (vg) out.push(vg)
+  out.push(`ch-${stance}` as GroupId)
+  if (hasFinal(layout)) out.push(`jo-${stance}` as GroupId)
+  return out
+}
+
+export const clampToWall = (range: Range, value: number) => Math.max(range.wall[0], Math.min(range.wall[1], value))
+export const inSafe = (range: Range, value: number) => value >= range.safe[0] - 1e-9 && value <= range.safe[1] + 1e-9
+
+/** 사용자가 정한 값(갈래 → 값). 없으면 엔진 그대로. */
+export type MoldValues = Partial<Record<GroupId, number>>
+
+const UPPER: readonly Part[] = ['CH', 'JU', 'JU_H', 'JU_V']
+const move = (box: BoxConfig | undefined, dx: number, dy: number): BoxConfig | undefined => box && { ...box, x: box.x + dx, y: box.y + dy }
+
+/**
+ * 풀린 부위 상자에 이 글자의 갈래 값들을 입힌다. 순서: 첫닿자 크기 → 홀자 틈 → 받침 위 틈.
+ * - 틈: 첫닿자를 (엔진 − 목표)만큼 홀자 쪽으로(세로 짜임은 가로, 가로 짜임은 세로). 섞임은 손잡이 없음.
+ * - 첫닿자 크기: 홀자 쪽 모서리를 두고 바깥으로 키운다(세로 짜임은 오른쪽 모서리 · 세로 가운데, 가로 짜임은 아래 모서리 · 가로 가운데, 섞임은 오른쪽 아래 모서리).
+ * - 받침 위 틈: 받침은 그대로, 윗부분 전부를 (엔진 − 목표)만큼 아래로.
+ */
+export function moldBoxes(boxes: Partial<Record<Part, BoxConfig>>, layout: LayoutType, vowelChar: string | undefined, values: MoldValues): Partial<Record<Part, BoxConfig>> {
+  const stance = stanceOf(layout)
+  if (!stance) return boxes
+  const out = { ...boxes }
+
+  const size = values[`ch-${stance}` as GroupId]
+  if (size !== undefined && out.CH) {
+    const box = out.CH
+    const s = clampToWall(CH_SIZE, size)
+    const width = box.width * s
+    const height = box.height * s
+    const x = stance === 'horizontal' ? box.x + (box.width - width) / 2 : box.x + box.width - width
+    const y = stance === 'vertical' ? box.y + (box.height - height) / 2 : box.y + box.height - height
+    out.CH = { ...box, x, y, width, height }
+  }
+
+  const vg = vowelGroupOf(vowelChar)
+  const gap = vg ? values[vg] : undefined
+  const vowelRange = vg ? GROUPS[vg].range : null
+  if (gap !== undefined && vowelRange && vg && out.CH) {
+    const d = vowelRange.engine - clampToWall(vowelRange, gap)
+    out.CH = GROUPS[vg].handle === 'gapX' ? move(out.CH, d, 0) : move(out.CH, 0, d)
+  }
+
+  const fin = hasFinal(layout) ? values[`jo-${stance}` as GroupId] : undefined
+  if (fin !== undefined) {
+    const d = FIN.engine - clampToWall(FIN, fin)
+    for (const part of UPPER) if (out[part]) out[part] = move(out[part], 0, d)
+  }
+  return out
+}
+
+/** 잡은 자리(글자 칸 0–1)에서 가장 가까운 부위. 상자 안이면 거리 0, 겹치면 작은 상자. */
+export function partAt(boxes: Partial<Record<Part, BoxConfig>>, x: number, y: number, present: Partial<Record<Part, boolean>>): Part | undefined {
+  let best: { part: Part; distance: number; area: number } | undefined
+  for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) {
+    if (!box || !present[part]) continue
+    const dx = Math.max(box.x - x, 0, x - (box.x + box.width))
+    const dy = Math.max(box.y - y, 0, y - (box.y + box.height))
+    const distance = Math.hypot(dx, dy)
+    const area = box.width * box.height
+    if (!best || distance < best.distance - 1e-9 || (Math.abs(distance - best.distance) < 1e-9 && area < best.area)) best = { part, distance, area }
+  }
+  return best?.part
+}
+
+/** 끌기: 손가락 1px당 값. 판 너비 전체를 끌면 한계선 끝에서 끝까지. */
+export function dragValue(range: Range, start: number, deltaPx: number, widthPx: number): number {
+  return clampToWall(range, start + (deltaPx / Math.max(1, widthPx)) * (range.wall[1] - range.wall[0]))
+}
+
+/** 값 → 띠 위 자리(0–1, 한계선 끝에서 끝). */
+export const positionOf = (range: Range, value: number) => (value - range.wall[0]) / (range.wall[1] - range.wall[0])
+
+/** 지금 값에 가장 가까운 프리셋(같으면 그 이름, 아니면 undefined = 다듬은 값). */
+export function presetOf(range: Range, value: number | undefined): Preset | undefined {
+  if (value === undefined) return undefined
+  return (Object.keys(range.presets) as Preset[]).find((key) => Math.abs(range.presets[key] - value) < 1e-6)
+}
+
+/** 값 → 보이는 말. 틈은 보통에서 몇 %, 크기는 몇 %. */
+export function valueText(group: GroupInfo, value: number | undefined): string {
+  const range = group.range
+  if (!range) return '—'
+  const v = value ?? range.engine
+  const base = range.presets.normal
+  const pct = Math.round((v / base - 1) * 100)
+  return `보통${pct === 0 ? '' : pct > 0 ? ` +${pct}%` : ` ${pct}%`}`
+}

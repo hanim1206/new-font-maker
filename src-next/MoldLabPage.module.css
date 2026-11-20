@@ -1,0 +1,88 @@
+/* 빚기 시험판. 폰 한 손 화면 — 위에서 글줄을 보고 글자를 잡고, 아래(엄지 자리)에서 프리셋 · 띠로 빚는다. 울타리 실험지와 같은 틀. */
+.page {
+  display: grid;
+  gap: 12px;
+  width: min(480px, 100%);
+  min-height: 100dvh;
+  margin-inline: auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+  background: rgb(var(--color-background));
+  color: rgb(var(--color-foreground));
+  align-content: start;
+}
+
+.header { display: grid; gap: 2px; }
+.eyebrow { color: rgb(var(--color-primary)); font-size: var(--font-11); font-weight: var(--weight-heavy); letter-spacing: .08em; }
+.header h1 { font-size: var(--font-24); font-weight: var(--weight-heavy); line-height: 1.2; }
+.header p { color: rgb(var(--color-text-3)); font-size: var(--font-14); }
+
+.card, .panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px 12px;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: var(--radius-lg);
+  background: rgb(var(--color-surface));
+}
+.line { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; row-gap: 6px; min-height: 120px; align-content: center; }
+.space { width: 14px; }
+.glyph { display: inline-flex; touch-action: manipulation; border-radius: var(--radius-sm); }
+.glyph:active { background: rgb(var(--color-surface-2)); }
+.lineActions { display: flex; align-items: center; justify-content: space-between; }
+.changed { color: rgb(var(--color-text-4)); font-size: var(--font-12); font-weight: var(--weight-semibold); }
+
+.ask { min-height: 56px; color: rgb(var(--color-text-4)); font-size: var(--font-13); text-align: center; align-content: center; }
+
+.crumbs { display: flex; align-items: center; gap: 2px; color: rgb(var(--color-text-4)); font-size: var(--font-12); font-weight: var(--weight-semibold); }
+.crumbs svg { width: 12px; height: 12px; }
+.crumbs span[data-on] { color: rgb(var(--color-foreground)); font-weight: var(--weight-heavy); }
+.groupHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.groupHead h2 { font-size: var(--font-18); font-weight: var(--weight-heavy); line-height: 1.25; }
+.members { color: rgb(var(--color-text-3)); font-size: var(--font-13); }
+
+.focusRow { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; }
+.focus {
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  padding: 8px 8px 6px;
+  border-radius: var(--radius-md);
+  background: rgb(var(--color-surface-2));
+  touch-action: none;
+  cursor: ew-resize;
+}
+.focusHint { text-align: center; color: rgb(var(--color-text-4)); font-size: var(--font-10); font-weight: var(--weight-semibold); }
+.siblings { display: grid; gap: 6px; justify-items: start; }
+.siblingsLabel { color: rgb(var(--color-text-4)); font-size: var(--font-11); font-weight: var(--weight-semibold); }
+.siblingGrid { display: grid; grid-template-columns: repeat(3, auto); gap: 2px; }
+
+.presets { width: 100%; }
+
+.ruler { position: relative; height: 44px; touch-action: none; cursor: ew-resize; }
+.rulerTrack { position: absolute; left: 0; right: 0; top: 20px; height: 4px; border-radius: var(--radius-full); background: rgb(var(--color-surface-3)); }
+.rulerSafe { position: absolute; top: 18px; height: 8px; border-radius: var(--radius-full); background: rgb(var(--color-success) / .35); }
+.rulerTick { position: absolute; top: 14px; width: 2px; height: 16px; margin-left: -1px; background: rgb(var(--color-text-4)); }
+.rulerEngine { position: absolute; top: 30px; width: 6px; height: 6px; margin-left: -3px; border-radius: var(--radius-full); background: rgb(var(--color-text-5)); }
+.rulerThumb {
+  position: absolute;
+  top: 10px;
+  width: 24px;
+  height: 24px;
+  margin-left: -12px;
+  border: 3px solid rgb(var(--color-surface));
+  border-radius: var(--radius-full);
+  background: rgb(var(--color-foreground));
+  box-shadow: 0 1px 4px rgb(15 23 42 / .25);
+}
+.rulerThumb[data-out] { background: rgb(var(--color-warning)); }
+.rulerWallL, .rulerWallR { position: absolute; top: 0; color: rgb(var(--color-destructive)); font-size: var(--font-10); font-weight: var(--weight-heavy); }
+.rulerWallL { left: 0; }
+.rulerWallR { right: 0; }
+
+.readout { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.readout strong { font-size: var(--font-16); font-weight: var(--weight-heavy); }
+.readout span { color: rgb(var(--color-success)); font-size: var(--font-13); font-weight: var(--weight-semibold); }
+.readout span[data-out] { color: rgb(var(--color-warning)); }
+.note { color: rgb(var(--color-text-4)); font-size: var(--font-12); }
+.resetAll { justify-self: center; }
