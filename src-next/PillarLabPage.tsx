@@ -4,19 +4,19 @@ import { Dices, RotateCcw } from 'lucide-react'
 import type { PenPoint } from '../src/services/penStrokeFit'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { propagatedJungseong } from '../src/stores/stemMasterStore'
-import type { JamoData, ResolvedStrokeInkSource } from '../src/types'
+import type { ResolvedStrokeInkSource } from '../src/types'
 import { pointsToSvgD } from '../src/utils/pathUtils'
 import { AppGlyph } from './AppGlyph'
 import { Button } from './components/ui/button'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { EDIT_COLOR } from './editColors'
-import { CALM_PRESETS, pillarFromDrawn, pillarStrokeKeys, type CalmLevel, type PillarResult } from './pillarStroke'
+import { CALM_PRESETS, pillarFromDrawn, pillarStrokeKeys, type PillarResult } from './pillarStroke'
 import { randomSampleSentence } from './sampleSentences'
 import styles from './PillarLabPage.module.css'
 
 /**
  * 기둥 긋기 시험판(학습 1단계). 세로로 한 번 그으면 예시 글줄의 홀자 기둥이 전부 내 선으로 바뀐다.
- * 떨림 정리는 세 벌(약하게 · 중간 · 세게)을 나란히 보여 고르게 한다. 주사위는 문장을 바꾸고, `기둥 자리`는 내 줄기가 쓰인 획을 색으로 보인다.
+ * 떨림 정리는 중간으로 고정했다(세 벌 비교 뒤 하니무스 결정). 주사위는 문장을 바꾸고, `기둥 자리`는 내 줄기가 쓰인 획을 색으로 보인다.
  * 폰에서 손가락 · 펜슬로 긋는 화면이 먼저다. 저장하지 않고 제품 값(자모 스토어 · 마스터)도 바꾸지 않는다 — 미리보기는 `jungseongOverride`로만.
  * 기획: 고양이 `학습-단계-뼈대-2026-11-20.md`.
  */
@@ -28,8 +28,8 @@ const VIEW = 1000
 const VIEWBOX = `0 0 ${PAD_W * VIEW} ${VIEW}`
 /** 판에 보이는 잉크 굵기(em). 그은 선을 굵게 보여 줄 뿐, 글자 굵기는 서비스가 정한다. */
 const PAD_INK = 0.06
-/** 세 벌 칸에 같이 보이는 글자. 기둥이 크게 보이는 것들. */
-const LEVEL_SAMPLE = '비녀'
+/** 떨림 정리는 중간으로 고정(하니무스 2026-11-20, 세 벌 고르기는 노출 안 함). */
+const CALM_PRESET = CALM_PRESETS.find((preset) => preset.level === 'medium')!
 
 type View = 'mine' | 'base'
 
@@ -59,7 +59,6 @@ export function PillarLabPage() {
   const [sentence, setSentence] = useState(FIRST_SENTENCE)
   const [raw, setRaw] = useState<PenPoint[] | null>(null)
   const [current, setCurrent] = useState<PenPoint[] | null>(null)
-  const [level, setLevel] = useState<CalmLevel>('medium')
   const [view, setView] = useState<View>('mine')
   const [marked, setMarked] = useState(true)
   const drawing = useRef<PenPoint[] | null>(null)
@@ -82,22 +81,11 @@ export function PillarLabPage() {
   const jungseong = useJamoStore((state) => state.jungseong)
   const pillarKeys = useMemo(() => pillarStrokeKeys(jungseong), [jungseong])
 
-  /** 세 벌 모두 계산해 둔다 — 칸마다 나란히 보이고, 고른 벌이 글줄에 간다. */
-  const results = useMemo(() => {
-    if (!raw) return null
-    return Object.fromEntries(CALM_PRESETS.map((preset) => [preset.level, pillarFromDrawn(raw, preset)])) as Record<CalmLevel, PillarResult>
-  }, [raw])
-  const overrides = useMemo(() => {
-    if (!results) return null
-    return Object.fromEntries(CALM_PRESETS.map((preset) => {
-      const result = results[preset.level]
-      return [preset.level, result.ok ? propagatedJungseong(jungseong, {}, { gidung: result.master }) : null]
-    })) as Record<CalmLevel, Record<string, JamoData> | null>
-  }, [results, jungseong])
-  const chosen = results?.[level]
+  const chosen = useMemo(() => (raw ? pillarFromDrawn(raw, CALM_PRESET) : null), [raw])
+  const override = useMemo(() => (chosen?.ok ? propagatedJungseong(jungseong, {}, { gidung: chosen.master }) : undefined), [chosen, jungseong])
   const failed = chosen && !chosen.ok ? REASON_TEXT[chosen.reason] : null
   const accepted = !!chosen?.ok
-  const lineOverride = view === 'mine' ? overrides?.[level] ?? undefined : undefined
+  const lineOverride = view === 'mine' ? override : undefined
 
   const markColor = useCallback((source: ResolvedStrokeInkSource) => (
     source.part.startsWith('JU') && pillarKeys.has(`${source.jamoId}:${source.strokeId}`) ? EDIT_COLOR.editSelect : undefined
@@ -154,24 +142,6 @@ export function PillarLabPage() {
         </ChoiceGroup>
       </div>
     </section>
-
-    {accepted && <section className={styles.levels} aria-label="떨림 정리">
-      <h2>떨림 정리</h2>
-      <ChoiceGroup variant="tile" aria-label="떨림 정리" className={styles.levelGrid}>
-        {CALM_PRESETS.map((preset) => {
-          const result = results?.[preset.level]
-          const override = overrides?.[preset.level] ?? undefined
-          return <ChoiceItem key={preset.level} checked={level === preset.level} onClick={() => { setLevel(preset.level); setView('mine') }} data-testid={`pillar-level-${preset.level}`}>
-            <svg viewBox={VIEWBOX} className={styles.levelLine} aria-hidden="true">
-              {raw && <path d={rawPath(raw)} fill="none" stroke={EDIT_COLOR.editGuide} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />}
-              {result?.ok && <path d={pointsToSvgD(result.fit.stroke.points, false, { x: 0, y: 0, width: 1, height: 1 }, VIEW)} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={PAD_INK * VIEW} strokeLinecap="round" strokeLinejoin="round" />}
-            </svg>
-            <span className={styles.levelGlyphs}>{[...LEVEL_SAMPLE].map((char, index) => <AppGlyph key={index} char={char} size={34} jungseongOverride={override} />)}</span>
-            <strong>{preset.label}</strong>
-          </ChoiceItem>
-        })}
-      </ChoiceGroup>
-    </section>}
 
     <section className={styles.padWrap} aria-label="긋는 판">
       <svg ref={padRef} viewBox={VIEWBOX} className={styles.pad} data-testid="pillar-pad"

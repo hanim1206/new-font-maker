@@ -29,13 +29,6 @@
 .lineTools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .viewSwitch { margin-left: auto; min-width: 128px; }
 
-.levels { display: grid; gap: 8px; }
-.levels h2 { color: rgb(var(--color-text-3)); font-size: var(--font-13); font-weight: var(--weight-bold); }
-.levelGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.levelGrid > button { border: 1px solid rgb(var(--color-border-subtle)); background: rgb(var(--color-surface)); }
-.levelGrid > button[aria-checked='true'] { border-color: rgb(var(--color-foreground)); background: rgb(var(--color-surface)); }
-.levelLine { width: 44px; height: 58px; }
-.levelGlyphs { display: flex; justify-content: center; }
 
 .padWrap { display: grid; gap: 8px; }
 .pad {
