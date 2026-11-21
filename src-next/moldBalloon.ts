@@ -158,6 +158,12 @@ interface InsidePair { i: number; j: number; target: number; ring?: boolean; clo
 interface Stub { on: number; stroke: number; keep: number; free: 0 | 1 }
 /** 붙은 짧은 획이 남길 보이는 길이(처음 대비). */
 const STUB_KEEP = 0.5
+/**
+ * 꺾인 획의 열린 팔(ㄱ · ㄲ 윗 가로, ㄴ 세로): 꺾인 기둥 밖으로 보이는 길이 ≥ 기둥 굵기 × 이 값.
+ * 기둥이 팔보다 굵으면 「깨」 ㄲ이 "11"로 읽혔다. 처음부터 이보다 짧은 팔은 처음 비율을 지킨다.
+ */
+const ARM_KEEP = 0.75
+interface Arm { leg: number; perp: number; keep: number }
 /** 붙은 짧은 획을 살리려고 이웃 자소 칸을 비켜 세울 때, 처음 칸의 이만큼은 남긴다. */
 const NEIGHBOR_KEEP = 0.82
 /** ㅇ 속 흰 틈은 처음의 이만큼 아래로 안 줄인다. */
@@ -186,9 +192,10 @@ function coveredAt(at: Pt, segs: readonly Seg[], own: BalloonGroup, thickOf: (g:
  * 자소 안: 나란한 두 토막, 처음부터 붙지 않은 것, 한 획 굽은 길의 이웃 · 이음 자리 쐐기는 뺀다.
  * 자소 사이: 모든 토막 쌍(끝이 옆면을 보는 것도) 가운데 가까운 것들.
  */
-function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, delta: number): { inside: InsidePair[]; between: PartPair[]; stubs: Stub[] } {
+function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, delta: number): { inside: InsidePair[]; between: PartPair[]; stubs: Stub[]; arms: Arm[] } {
   const inside: InsidePair[] = []
   const stubs: Stub[] = []
+  const arms: Arm[] = []
   const byParts = new Map<string, { a: Part; b: Part; list: { i: number; j: number; gap: number }[] }>()
   // 획 처음부터 잰 길이(토막 시작)와 획 전체 길이.
   const startAt: number[] = [], total = new Map<number, number>()
@@ -299,7 +306,23 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
     // 가까운 쌍만 본다(칸이 움직이며 순서가 바뀔 수 있어 넉넉히).
     between.push({ a, b, target, pairs: list.filter((item) => item.gap <= least + 0.15).sort((x, y) => x.gap - y.gap).slice(0, 16).map(({ i, j }) => ({ i, j })) })
   }
-  return { inside, between, stubs }
+  // 열린 팔: 획 첫 · 끝 토막이 다음 토막과 꺾여 있고(거의 수직), 그 끝이 다른 획에 안 붙은 것.
+  strokes.forEach((stroke, index) => {
+    if (stroke.closed) return
+    const own = segs.map((seg, at) => ({ seg, at })).filter(({ seg }) => seg.stroke === index)
+    if (own.length < 2) return
+    for (const [leg, perp, end] of [[own[0], own[1], { x: own[0].seg.ax, y: own[0].seg.ay }], [own[own.length - 1], own[own.length - 2], { x: own[own.length - 1].seg.bx, y: own[own.length - 1].seg.by }]] as const) {
+      const ll = lengthOf(leg.seg), lp = lengthOf(perp.seg)
+      if (ll < EPS || lp < EPS) continue
+      const cos = Math.abs(((leg.seg.bx - leg.seg.ax) * (perp.seg.bx - perp.seg.ax) + (leg.seg.by - leg.seg.ay) * (perp.seg.by - perp.seg.ay)) / ll / lp)
+      if (cos > 0.3) continue
+      if (segs.some((other) => other.stroke !== index && other.group === leg.seg.group && pointToSeg(end.x, end.y, other).d <= halfOf(other, base) + 1e-3)) continue
+      const half0 = halfOf(perp.seg, base)
+      if (half0 < EPS) continue
+      arms.push({ leg: leg.at, perp: perp.at, keep: Math.min(ARM_KEEP, Math.max(0, (ll - half0) / (2 * half0))) })
+    }
+  })
+  return { inside, between, stubs, arms }
 }
 
 interface Cell { x0: number; y0: number; x1: number; y1: number }
@@ -336,7 +359,7 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
   const first = segmentsOf(strokes, unit, input.boxes)
   const median = [...strokes].map((s) => s.thickness).sort((a, b) => a - b)[Math.floor(strokes.length / 2)] ?? 0.07
   const delta = median * Math.max(0, want.v - base.v)
-  const { inside, between, stubs } = pickPairs(first, strokes, base, delta)
+  const { inside, between, stubs, arms } = pickPairs(first, strokes, base, delta)
   const parts = [...new Set(strokes.map((s) => s.part))]
   // 칸 = 처음 굵기의 잉크 칸. 자소 사이 틈에 따라 변이 움직인다.
   const cells = new Map<Part, Cell>(), firstCenter = new Map<Part, Cell>()
@@ -410,6 +433,14 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
       else { const f = room / Math.max(a * now.h + b * now.v, EPS); sol[g].h = Math.min(sol[g].h, now.h * f); sol[g].v = Math.min(sol[g].v, now.v * f) }
     }
     // 붙은 짧은 획: 붙은 획의 반 두께가 그 획 길이를 다 먹지 않게(곁줄기 · 꼭지가 사라지지 않게).
+    // 열린 팔: 기둥 반 두께 ≤ 팔 길이 ÷ (1 + 2 × 지킬 비).
+    for (const arm of arms) {
+      const leg = segs[arm.leg], perp = segs[arm.perp], g = perp.group
+      const most = lengthOf(leg) / (1 + 2 * arm.keep)
+      const { a, b } = sharesOf(perp), lean = b / Math.max(a + b, EPS)
+      if (lean > 0.7) sol[g].v = Math.min(sol[g].v, (most - a * thick[g].h) / Math.max(b, EPS))
+      else if (lean < 0.3) sol[g].h = Math.min(sol[g].h, (most - b * thick[g].v) / Math.max(a, EPS))
+    }
     for (const stub of stubs) {
       const o = segs[stub.on], g = o.group
       // 지금 길이로 잰다 — 뼈대가 줄면(굵어진 보에 밀려) 짧은기둥도 같이 줄어, 처음 길이로 재면 「풍」「숲」 짧은기둥이 묻혔다.

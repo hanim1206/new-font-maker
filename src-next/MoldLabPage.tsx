@@ -205,6 +205,10 @@ function stretchedSyllable(syllable: DecomposedSyllable, reaches: ReadonlyMap<st
   return { ...syllable, choseong: moveJamo(syllable.choseong, ['CH']) ?? syllable.choseong, jungseong: moveJamo(syllable.jungseong, ['JU', 'JU_H', 'JU_V']) ?? syllable.jungseong, jongseong: moveJamo(syllable.jongseong, ['JO']) ?? syllable.jongseong }
 }
 /** 붓 스타일의 대비만 바꾼다(0이면 뺀다). */
+// 풍선 굵기는 칸을 잉크로 풀어 0~1 안에 둔다. 엔진의 칸 밀기(중심선이 가장 굵은 반 두께 안쪽)는 가로획 열린 끝을 잉크로 안 쳐
+// 「깨」 ㄲ을 통째 오른쪽으로 밀어 ㅐ에 붙였다 — 그래서 끈다.
+const HEAVY_INK_BOUNDS = { min: -1, max: 2 } as const
+
 function heavyStrokeStyle(style: GlobalStyle['strokeStyle'], contrast: number): GlobalStyle['strokeStyle'] {
   if (style.mode !== 'brush') return style
   const rest = { ...style }
@@ -421,6 +425,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
             overflow="visible"
             clipGlyphs={false}
             strokeColorOf={strokeColorOf}
+            horizontalInkBounds={HEAVY_INK_BOUNDS}
           />
         </span>
       })}
