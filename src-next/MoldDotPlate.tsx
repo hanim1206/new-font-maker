@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { DOT_ROWS, dotsOf, dotToLook, notoDot, type DotKey, type Look } from './moldLab'
+import { DOT_ROWS, dotsOf, dotToLook, lookOf, lookToDot, notoDot, type DotKey, type Look } from './moldLab'
 import styles from './MoldLabPage.module.css'
 
 /**
@@ -38,7 +38,7 @@ const dotOfRow = (r: number) => Math.max(0, Math.min(N, Math.round(r + 0.5)))
 interface Pulse { x: number; t0: number; amp: number; speed: number }
 type Mode = 'sweep' | 'one' | null
 
-export function MoldDotPlate({ keys, locks, look, setLook, onBegin, onSay }: { keys: readonly DotKey[]; locks?: Partial<Record<DotKey, number>>; look: Look; setLook: (next: Look) => void; onBegin: () => void; onSay: (text: string) => void }) {
+export function MoldDotPlate({ keys, locks, look, home = {}, setLook, onBegin, onSay }: { keys: readonly DotKey[]; locks?: Partial<Record<DotKey, number>>; look: Look; home?: Look; setLook: (next: Look) => void; onBegin: () => void; onSay: (text: string) => void }) {
   const G = keys.length, C = G * W, PX = S / C
   const groupAt = (c: number) => Math.max(0, Math.min(G - 1, Math.floor(Math.max(0, Math.min(C - 1, Math.round(c))) / W)))
   /** 값 b 가운데의 x. */
@@ -71,9 +71,17 @@ export function MoldDotPlate({ keys, locks, look, setLook, onBegin, onSay }: { k
   const kick = (b: number, amount: number) => { const a = anim.current; a.wave[b] = Math.max(a.wave[b], amount); pulse(b * W + (W - 1) / 2, amount * 0.9) }
 
   const commit = (next: number[]) => {
+    const before = vals.current
     vals.current = next
     const out: Look = { ...lookRef.current }
-    keys.forEach((key, i) => { out[key] = dotToLook(key, next[i]) })
+    // 움직인 줄만 쓴다. 안 건드린 줄까지 칸 값으로 다시 쓰면 기본값(칸 사이에 있는 값)이 가까운 칸으로 바뀌어
+    // 한 줄을 움직일 때마다 다른 줄 모양도 조금씩 달라졌다(하니무스 2026-11-21 "각 좌표는 절댓값만").
+    // 처음 값의 칸으로 돌아오면 처음 값 그대로(칸 값으로 반올림하지 않는다).
+    keys.forEach((key, i) => {
+      if (next[i] === before[i]) return
+      if (next[i] === lookToDot(key, lookOf(home, key))) { if (home[key] === undefined) delete out[key]; else out[key] = home[key] }
+      else out[key] = dotToLook(key, next[i])
+    })
     setLook(out)
   }
   const setOne = (b: number, k: number, amount: number) => {

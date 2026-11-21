@@ -904,6 +904,9 @@ export function MoldLabPage() {
   const [raws, setRaws] = useState<Partial<Record<StemKind, PenPoint[]>>>({})
   const [edits, setEdits] = useState<LayoutEdits>({})
   const [look, setLook] = useState<Look>(() => inkLookOf(useGlobalStyleStore.getState().style))
+  const storeStyle = useGlobalStyleStore((state) => state.style)
+  // 판의 처음 값: 저장소 값(굵기 · 붓) + 엔진 그대로. 그 칸으로 돌아오면 처음 값 그대로 쓴다.
+  const homeLook = useMemo(() => inkLookOf(storeStyle), [storeStyle])
   // 저장소가 늦게 불려 오면(새로 고침) 아직 안 만진 판만 저장된 값으로 맞춘다.
   const styleHydrated = useGlobalStyleStore((state) => state._hydrated)
   useEffect(() => { if (styleHydrated) setLook((now) => (Object.keys(now).every((key) => key === 'weightBase') ? inkLookOf(useGlobalStyleStore.getState().style) : now)) }, [styleHydrated])
@@ -1117,7 +1120,7 @@ export function MoldLabPage() {
         <ChoiceGroup variant="segment" aria-label="판" className={styles.plates}>
           {(['ink', 'frame'] as const).map((key) => <ChoiceItem key={key} checked={plate === key} onClick={() => setPlate(key)} data-testid={`mold-plate-${key}`}>{PLATE_NAMES[key]}</ChoiceItem>)}
         </ChoiceGroup>
-        <MoldDotPlate key={plate} keys={plate === 'frame' ? FRAME_KEYS : INK_KEYS} locks={plate === 'ink' && weightLock !== undefined ? { weight: weightLock } : undefined} look={look} setLook={setLook} onBegin={remember} onSay={setPlateSay} />
+        <MoldDotPlate key={plate} keys={plate === 'frame' ? FRAME_KEYS : INK_KEYS} locks={plate === 'ink' && weightLock !== undefined ? { weight: weightLock } : undefined} look={look} home={homeLook} setLook={setLook} onBegin={remember} onSay={setPlateSay} />
         <p className={styles.simsReadout} data-testid="mold-readout">{plateSay}{weightNote ? <><br />{weightNote}</> : null}</p>
         <p className={styles.skipNote}>점선 · 폰트들의 가운데 / 검은 눈금 · 지금 바탕(노토)</p>
       </section>}
