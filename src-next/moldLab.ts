@@ -744,20 +744,30 @@ export function gripAt(box: BoxConfig, x: number, y: number, tol: number): BoxGr
  */
 // 가로 · 섞임 짜임 첫닿자 밑 ÷ 글자 키: 폰트 121벌 가운데 0.65, 95% 0.70, 끝 0.52 ~ 0.76 → 아래로 끝까지 0.11(거북이 2026-11-22 2번).
 const CENTER_BAR_DOWN = 0.11
-export const CENTER_SHARE = { open: { up: 0.12, down: 0.23 }, closed: { up: 0.03, down: 0.035 } } as const
+export const CENTER_SHARE = { open: { up: 0.12, down: 0.23 }, closed: { up: 0.155, down: 0.066 } } as const
 /**
  * 가로 · 섞임 짜임은 보가 첫닿자 밑을 따라 내려가므로, 보가 글자 칸 밑(0.98)에 닿으면 더 안 내려간다(첫닿자만 길어져 보를 덮지 않게).
  * 받침 없는 세로 짜임만 첫닿자 밑이 글자 밑까지 간다(Gugi · 나눔펜).
  */
 function centerLiftRoom(lift: number, boxes: Partial<Record<Part, BoxConfig>>, layout?: LayoutType): number {
   if (lift >= 0 || !layout) return lift
-  // 받침 글자는 받침 칸 윗변까지만 내린다(다람쥐 4차: 허리선 0에서 「한」 ㅎ이 ㄴ과, 「숭」 ㅜ 기둥이 ㅇ과 겹침).
+  // 받침 글자는 받침 칸 윗변까지 내리고, 그 너머는 받침 윗변을 같이 눌러 받침을 줄인다(`finalPushOf`) — 받침이 처음의 0.65배(닿자 크기 바닥, 폰트 측정)가 될 때까지.
+  // 다람쥐 4차(허리선 0에서 「한」 ㅎ이 ㄴ과 겹침) 뒤로 받침 윗변에서 멈췄더니 받침 글자 첫닿자 밑이 0.64까지만 갔다(폰트 95% 0.664, 다람쥐 재검수 4번).
   const jo = boxes.JO
-  // 칸 사이가 비어 보여도 획은 칸 끝에 붙어 있으니, 획 하나 굵기(0.05)는 남긴다.
-  const above = (box?: BoxConfig) => (jo && box ? Math.max(0, jo.y - box.y - box.height - 0.05) : Infinity)
+  const above = (box?: BoxConfig) => (jo && box ? Math.max(0, jo.y - box.y - box.height - 0.05) + (1 - FINAL_PUSH_FLOOR) * jo.height : Infinity)
   if (isVertical(layout)) return jo ? Math.max(lift, -above(boxes.CH)) : lift
   const bar = boxes.JU_H ?? boxes.JU
   return bar ? Math.max(lift, -Math.min(Math.max(0, 0.98 - bar.y - bar.height), above(bar))) : lift
+}
+/** 받침이 눌려 줄어드는 바닥(처음 키 대비): 닿자 크기 줄 아래 끝 0.65(CH_SIZE, 폰트 측정). */
+const FINAL_PUSH_FLOOR = 0.65
+/** 허리선이 받침 칸 윗변을 넘어 내려간 만큼(받침 윗변을 같이 누르는 양). */
+function finalPushOf(lift: number, boxes: Partial<Record<Part, BoxConfig>>, layout: LayoutType): number {
+  const jo = boxes.JO
+  if (lift >= 0 || !jo) return 0
+  const over = isVertical(layout) ? boxes.CH : boxes.JU_H ?? boxes.JU
+  if (!over) return 0
+  return Math.max(0, -lift - Math.max(0, jo.y - over.y - over.height - 0.05))
 }
 export function centerLift(look: Look, boxes: Partial<Record<Part, BoxConfig>>, layout?: LayoutType): number {
   const c = lookOf(look, 'center')
@@ -854,9 +864,11 @@ export function impressBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: Look
   if (k === 1 && lift === 0) return boxes
   const out: Partial<Record<Part, BoxConfig>> = {}
   const pushed = k === 1 ? boxes : pushJamo(boxes, k, layout)
+  const finalPush = layout ? finalPushOf(lift, pushed, layout) : 0
   for (const [part, box] of Object.entries(pushed) as [Part, BoxConfig][]) {
     if (!box) continue
     let next = box
+    if (part === 'JO' && finalPush > 0) next = { ...next, y: next.y + finalPush, height: next.height - finalPush }
     if (lift !== 0 && layout) {
       const horizontalVowel = !isVertical(layout) && !layout.includes('jungseong-mixed')
       // 첫닿자: 윗변은 그대로, 밑변만 허리선을 따라.

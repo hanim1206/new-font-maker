@@ -339,12 +339,17 @@ describe('도트판 인상 잡기', () => {
   })
   it('무게중심(허리선): 틀은 두고 첫닿자 밑변과 보가 오른다 · 받침 글자는 폭이 좁다', async () => {
     const { impressBoxes, waistSyllable } = await import('./moldLab')
-    // 받침 글자: 위로 끝까지 가도 글자 키(0.9)의 3%
+    // 받침 글자: 위로 끝까지 글자 키(0.9)의 15.5%(폰트 첫닿자밑받침 5번째 백분위 0.451까지, 다람쥐 재검수 4번)
     const out = impressBoxes(HORIZONTAL_FINAL, { center: 1 }, 'choseong-jungseong-horizontal-jongseong')
     expect(out.CH!.y).toBeCloseTo(0.05)
-    expect(out.CH!.height).toBeCloseTo(0.273)
-    expect(out.JU!.y).toBeCloseTo(0.353)
+    expect(out.CH!.height).toBeCloseTo(0.3 - 0.155 * 0.9)
+    expect(out.JU!.y).toBeCloseTo(0.38 - 0.155 * 0.9)
     expect(out.JO).toEqual(HORIZONTAL_FINAL.JO)
+    // 아래로는 받침 윗변까지(틈 0.05 남김) 간 뒤 받침 윗변을 같이 눌러 받침을 줄인다. 밑변은 그대로.
+    const down = impressBoxes(HORIZONTAL_FINAL, { center: -1 }, 'choseong-jungseong-horizontal-jongseong')
+    const pushBy = 0.066 * 0.9 - (0.6 - 0.53 - 0.05)
+    expect(down.JO!.y).toBeCloseTo(0.6 + pushBy)
+    expect(down.JO!.y + down.JO!.height).toBeCloseTo(0.95)
     // 받침 없음: 위로 12%, 아래로 23%. 홀자 칸은 그대로.
     const v = impressBoxes(VERTICAL, { center: 1 }, 'choseong-jungseong-vertical')
     expect(v.JU).toEqual(VERTICAL.JU)

@@ -46,6 +46,8 @@ export interface BalloonResult {
  * 가석원(0.28em, 획을 붙여 그림)은 이 셈의 끝이 아니다 — 붙여 그리기는 따로.
  */
 export const BALLOON_END = { between: 0.05, inside: 0.03 } as const
+/** 막힌 속(ㅇ · ㅁ · ㅍ)이 굵기 끝에서 남기는 몫: 검은고딕 속 너비 ÷ 처음(거북이 넓어짐 공식 표). */
+const RING_END = 0.27
 /** 세로줄기가 1 굵어질 때 흰 틈이 줄어드는 양. 받침 위는 덜 준다(받침이 밀려 내려가서). */
 export const BALLOON_SLOPE = { inside: 0.5, between: 0.67, final: 0.33 } as const
 /** 한 글자 안에서 자소끼리 굵기가 이보다 갈리지 않는다(10-01 눈 ② "획 두께 차이가 커서 안 예쁨" · 바닥 0.8과 같은 뜻). */
@@ -155,9 +157,11 @@ const facing = (p: Seg, q: Seg) => (p.bx - p.ax) * (q.bx - q.ax) + (p.by - p.ay)
 
 interface InsidePair { i: number; j: number; target: number; ring?: boolean; closed?: boolean }
 /** 꼭지 · 곁줄기처럼 다른 획 옆면에 끝이 붙은 짧은 획. 붙은 획이 굵어져도 보이는 길이가 처음의 반은 남는다. */
-interface Stub { on: number; stroke: number; keep: number; free: 0 | 1 }
+interface Stub { on: number; stroke: number; keep: number; free: 0 | 1; /** 처음 보이던 길이(묻힌 몫 뺀). */ visible: number }
 /** 붙은 짧은 획이 남길 보이는 길이(처음 대비). */
 const STUB_KEEP = 0.5
+/** 폰트 128벌 곁줄기ㅏ(기둥 밖으로 나온 길이 ÷ 제 두께) 5번째 백분위(mold-fit/dist.json). `moldLab` 곁줄기 길이 바닥과 같은 값. */
+const BRANCH_FLOOR = 0.754
 /**
  * 꺾인 획의 열린 팔(ㄱ · ㄲ 윗 가로, ㄴ 세로): 꺾인 기둥 밖으로 보이는 길이 ≥ 기둥 굵기 × 이 값. 처음부터 더 짧은 팔은 처음 비율을 지킨다.
  * 거북이 2026-11-22 열린-팔.md(고딕 · 제목체 103벌): 쌍닿자는 고딕 900에서 0.85 ~ 0.96, 가장 작은 값 0.83. 홑닿자 끝은 가석원 0.78.
@@ -286,7 +290,7 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
       // 반대 끝이 다른 자소 잉크에 묻힌 몫(「풍」 짧은기둥 끝이 ㅇ에 닿음)은 처음부터 안 보이던 길이다.
       const freeEnd = which === 0 ? { x: own[own.length - 1].bx, y: own[own.length - 1].by } : { x: own[0].ax, y: own[0].ay }
       const covered0 = coveredAt(freeEnd, segs, seg.group, () => base)
-      found.push({ on: (best as { on: number }).on, stroke: index, keep: STUB_KEEP * Math.max(0, visible0 - covered0.depth), free: which === 0 ? 1 : 0 })
+      found.push({ on: (best as { on: number }).on, stroke: index, keep: STUB_KEEP * Math.max(0, visible0 - covered0.depth), visible: Math.max(0, visible0 - covered0.depth), free: which === 0 ? 1 : 0 })
     }
     // 두 끝이 다 붙은 획(ㅐ 두 기둥 사이 가로획)은 꼭지가 아니라 다리다 — 두 기둥 사이 틈은 자소 안 틈이 맡는다.
     // 꼭지로 보면 보이는 길이 반을 지키려 기둥 굵기를 눌러 「깨」 기둥이 유난히 가늘었다.
@@ -297,7 +301,9 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
   // 틈은 굵기가 실제로 그만큼 필요할 때만 준다(예산이 남으면 처음 틈 그대로). 처음부터 바닥보다 좁은 틈은 그대로 지킨다.
   // 막힌 속은 굵어진 만큼 줄어든다: ㅇ 고리 처음 − 1.0 × Δt, ㅁ · ㅍ처럼 네 획이 두른 칸 처음 − 1.24 × Δt, 바닥 0.03em(거북이 넓어짐 공식 4절).
   // 열린 틈은 여기서 처음 틈만 적어 두고, 바닥은 굵기에 따라 푼다(세로줄기 예산 g = max(0.025, 0.2 × 줄기), 2절).
-  for (const pair of inside) if (pair.ring) pair.target = Math.min(pair.target, Math.max(BALLOON_END.inside, pair.target - (pair.closed ? 1.0 : 1.24) * delta))
+  // 굵기 줄 끝(검은고딕)에서 막힌 속은 처음의 0.27배가 남는다(거북이 넓어짐 공식 표: 노토 900 0.63 · 주아 0.59 · 검은고딕 0.27). 그 아래로는 안 줄인다 —
+  // 바닥 0.03em만 두면 「풍」 ㅍ 속이 굵기 100에서 실금이 됐다(다람쥐 재검수 3번).
+  for (const pair of inside) if (pair.ring) pair.target = Math.min(pair.target, Math.max(BALLOON_END.inside, RING_END * pair.target, pair.target - (pair.closed ? 1.0 : 1.24) * delta))
   const between: PartPair[] = []
   for (const { a, b, list } of byParts.values()) {
     const least = Math.min(...list.map((item) => item.gap))
@@ -452,7 +458,10 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
       // 반대 끝이 이웃 자소 잉크에 묻히면 그 몫도 뺀다. 모자라면 이웃 칸을 먼저 비켜 세운다(받침 ㅇ이 조금 작아진다) — 보 굵기는 그다음.
       const freeEnd = stub.free === 1 ? { x: own[own.length - 1].bx, y: own[own.length - 1].by } : { x: own[0].ax, y: own[0].ay }
       const cover = coveredAt(freeEnd, segs, g, (group) => thick[group])
-      const short = stub.keep - (now - halfOf(o, thick[g]) - cover.depth)
+      // 바닥: 기둥 잉크 밖으로 나온 길이가 제 두께의 0.754배(폰트 128벌 곁줄기ㅏ 5번째 백분위 — 곁줄기 길이 줄과 같은 값).
+      // 처음 보이던 길이의 반만 지키면 굵기 끝에서 「향」 ㅑ 곁줄기가 기둥에 묻혀 점이 됐다(다람쥐 재검수 3번).
+      const keep = Math.max(stub.keep, Math.min(stub.visible, BRANCH_FLOOR * 2 * halfOf(own[stub.free === 1 ? own.length - 1 : 0], thick[g])))
+      const short = keep - (now - halfOf(o, thick[g]) - cover.depth)
       let depth = cover.depth
       if (short > 5e-4 && cover.seg >= 0) {
         const nbr = segs[cover.seg], cell = cells.get(nbr.part), first0 = firstCell.get(nbr.part)
@@ -466,7 +475,7 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
           depth = Math.max(0, depth - step)
         }
       }
-      const { a, b } = sharesOf(o), room = now - stub.keep - depth, lean = b / Math.max(a + b, EPS)
+      const { a, b } = sharesOf(o), room = now - keep - depth, lean = b / Math.max(a + b, EPS)
       if (lean > 0.7) sol[g].v = Math.min(sol[g].v, (room - a * thick[g].h) / Math.max(b, EPS))
       else if (lean < 0.3) sol[g].h = Math.min(sol[g].h, (room - b * thick[g].v) / Math.max(a, EPS))
       else { const f = room / Math.max(a * thick[g].h + b * thick[g].v, EPS); sol[g].h = Math.min(sol[g].h, thick[g].h * f); sol[g].v = Math.min(sol[g].v, thick[g].v * f) }
