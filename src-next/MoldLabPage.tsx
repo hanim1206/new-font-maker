@@ -27,6 +27,7 @@ import { useContextPlacement, useNotoModel } from './notoModel'
 import { balloonGroupOf, endReachOf, inkOfThick, solveBalloon, type BalloonGroup, type BalloonStroke } from './moldBalloon'
 import { applyBakedLayouts, bakedConsonants, bakedResidual, bakedVowels, bakeLayout, jagRules, meanThick, type BakeTarget, type BakedLayout } from './moldBake'
 import { layoutDeltaSnapshot } from './layoutDeltaStore'
+import { captureOrigin, dropOrigin, MoldOriginContext, readOrigin, restoreOrigin, storesStamp, useMoldOrigin, writeOrigin, type MoldOrigin } from './moldOrigin'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
 import { MoldDotPlate } from './MoldDotPlate'
@@ -95,9 +96,14 @@ function weightUnder(multiplier: number, from: number): number {
 
 /** 글자 하나의 자모(그은 줄기 입힘) · 칸 해석. `AppGlyph`와 같은 길. */
 function useGlyphBase(char: string, drawn: Drawn | undefined) {
-  const storedChoseong = useJamoStore((state) => state.choseong)
-  const storedJungseong = useJamoStore((state) => state.jungseong)
-  const storedJongseong = useJamoStore((state) => state.jongseong)
+  // 써 넣은 적이 있으면 원본(처음 써 넣기 직전 저장소)으로 그린다 — 판 값이 저장된 모양 위에 또 얹히지 않게.
+  const origin = useMoldOrigin()
+  const liveChoseong = useJamoStore((state) => state.choseong)
+  const liveJungseong = useJamoStore((state) => state.jungseong)
+  const liveJongseong = useJamoStore((state) => state.jongseong)
+  const storedChoseong = origin?.choseong ?? liveChoseong
+  const storedJungseong = origin?.jungseong ?? liveJungseong
+  const storedJongseong = origin?.jongseong ?? liveJongseong
   const baseLayout = useMemo(() => decomposeSyllable(char, storedChoseong, storedJungseong, storedJongseong).layoutType, [char, storedChoseong, storedJungseong, storedJongseong])
   const consonants = drawn?.consonants[baseLayout]
   const choseong = useMemo(() => consonants ? { ...storedChoseong, ...consonants.choseong } : storedChoseong, [storedChoseong, consonants])
@@ -107,12 +113,13 @@ function useGlyphBase(char: string, drawn: Drawn | undefined) {
   const globalPadding = useLayoutStore((state) => state.globalPadding)
   const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
   const syllable = useMemo(() => decomposeSyllable(char, choseong, jungseong, jongseong), [char, choseong, jungseong, jongseong])
-  const stored = useEffectiveGlobalStyle(syllable.layoutType)
+  const live = useEffectiveGlobalStyle(syllable.layoutType)
+  const stored = useMemo(() => (origin ? { ...live, ...origin.style } : live), [live, origin])
   // 저장된 굵기 · 붓 값은 판(`inkLookOf`)이 들고 있으니 바탕에서 뺀다(두 번 얹히지 않게).
   const effective = useMemo(() => moldBaseStyle(stored), [stored])
   const padding = useMemo(() => mergePadding(globalPadding, paddingOverrides[syllable.layoutType]), [globalPadding, paddingOverrides, syllable.layoutType])
   const schema = useMemo(() => ({ ...schemas[syllable.layoutType], padding, designBodyPadding: padding }), [schemas, syllable.layoutType, padding])
-  const { placement } = useContextPlacement(syllable, schema, effective)
+  const { placement } = useContextPlacement(syllable, schema, effective, origin?.layout)
   return { syllable, effective, placement, padding, schema }
 }
 
@@ -901,15 +908,25 @@ export function MoldLabPage() {
   const [step, setStep] = useState<Step>('draw')
   // `?s=문장`으로 처음 문장을 정할 수 있다(확인용).
   const [sentence, setSentence] = useState(() => new URLSearchParams(window.location.search).get('s')?.trim() || FIRST_SENTENCE)
-  const [raws, setRaws] = useState<Partial<Record<StemKind, PenPoint[]>>>({})
-  const [edits, setEdits] = useState<LayoutEdits>({})
-  const [look, setLook] = useState<Look>(() => inkLookOf(useGlobalStyleStore.getState().style))
+  // 원본(`moldOrigin.ts`): 써 넣은 적이 있으면 화면은 원본 + 판 값, 판은 마지막으로 써 넣은 값에서 시작한다.
+  const [origin, setOrigin] = useState<MoldOrigin | null>(() => readOrigin())
+  const [raws, setRaws] = useState<Partial<Record<StemKind, PenPoint[]>>>(() => origin?.saved.raws ?? {})
+  const [edits, setEdits] = useState<LayoutEdits>(() => origin?.saved.edits ?? {})
+  const [look, setLook] = useState<Look>(() => origin?.saved.look ?? inkLookOf(useGlobalStyleStore.getState().style))
   const storeStyle = useGlobalStyleStore((state) => state.style)
-  // 판의 처음 값: 저장소 값(굵기 · 붓) + 엔진 그대로. 그 칸으로 돌아오면 처음 값 그대로 쓴다.
-  const homeLook = useMemo(() => inkLookOf(storeStyle), [storeStyle])
+  // 판의 처음 값: 원본(없으면 저장소) 굵기 · 붓 + 엔진 그대로. 그 칸으로 돌아오면 처음 값 그대로 쓴다.
+  const homeStyle = origin?.style ?? storeStyle
+  const homeLook = useMemo(() => inkLookOf(homeStyle), [homeStyle])
   // 저장소가 늦게 불려 오면(새로 고침) 아직 안 만진 판만 저장된 값으로 맞춘다.
   const styleHydrated = useGlobalStyleStore((state) => state._hydrated)
-  useEffect(() => { if (styleHydrated) setLook((now) => (Object.keys(now).every((key) => key === 'weightBase') ? inkLookOf(useGlobalStyleStore.getState().style) : now)) }, [styleHydrated])
+  const jamoHydrated = useJamoStore((state) => state._hydrated)
+  useEffect(() => { if (styleHydrated && !origin) setLook((now) => (Object.keys(now).every((key) => key === 'weightBase') ? inkLookOf(useGlobalStyleStore.getState().style) : now)) }, [styleHydrated]) // eslint-disable-line react-hooks/exhaustive-deps -- 불려 온 때 한 번
+  // 써 넣은 뒤 다른 화면에서 저장소를 고쳤으면 원본은 버린다(그 고침을 다음 써 넣기가 덮지 않게). 판도 처음으로.
+  useEffect(() => {
+    if (!styleHydrated || !jamoHydrated || !origin || origin.stamp === storesStamp()) return
+    dropOrigin(); setOrigin(null)
+    setLook(inkLookOf(useGlobalStyleStore.getState().style)); setEdits({}); setRaws({})
+  }, [styleHydrated, jamoHydrated]) // eslint-disable-line react-hooks/exhaustive-deps -- 불려 온 때 한 번
   const [sel, setSel] = useState<Region | null>(null)
   const [focusAt, setFocusAt] = useState(0)
   const [history, setHistory] = useState<Snapshot[]>([])
@@ -961,11 +978,15 @@ export function MoldLabPage() {
   const writeStore = () => {
     const items = BAKE_SAMPLES.map((sample) => bakeItems.current[sample]).filter((item): item is BakeTarget => !!item)
     if (!bundle || items.length === 0) return
+    // 절댓값으로 써 넣기: 저장소를 원본(처음 써 넣기 직전)으로 되돌리고 판 값을 한 번만 얹는다. 화면도 원본으로 그렸다.
+    const base = origin ?? captureOrigin()
+    restoreOrigin(base)
     const store = useGlobalStyleStore.getState()
+    const baseStyle = { ...store.style, ...base.style }
     // 획 판 → 전역 스타일. 굵기는 글줄이 실제로 쓴 값(막힌 데서 멈춘 값), 자간은 비율로 좁아진 폭 + 자간 줄.
-    const inked = moldInk({ ...moldBaseStyle(store.style), weight: scaledWeight(MOLD_BASE_WEIGHT, appliedWeight(lookOf(look, 'weight'), weightCap)) }, look)
+    const inked = moldInk({ ...moldBaseStyle(baseStyle), weight: scaledWeight(MOLD_BASE_WEIGHT, appliedWeight(lookOf(look, 'weight'), weightCap)) }, look)
     const sx = items.reduce((sum, item) => sum + item.sx, 0) / items.length
-    const letterSpacing = Math.round((store.style.letterSpacing + sx - 1 + lookOf(look, 'tracking')) * 1000) / 1000
+    const letterSpacing = Math.round((base.style.letterSpacing + sx - 1 + lookOf(look, 'tracking')) * 1000) / 1000
     // 칸 → 레이아웃 Δ. 새 스타일의 끝 모양으로 풀어 본다.
     const snapshot = layoutDeltaSnapshot()
     const ends = { linecap: inked.linecap, linejoin: inked.linejoin, strokeStyle: inked.strokeStyle }
@@ -985,9 +1006,10 @@ export function MoldLabPage() {
     store.updateStyle('letterSpacing', letterSpacing)
     store.setBrushStyle(inked.brush)
     store.setStrokeRenderStyle(inked.strokeStyle)
-    // 저장소가 빚은 값을 가졌으니 화면 값은 처음으로(두 번 얹히지 않게). 되돌리기도 비운다 — 되돌리면 빚은 값이 저장소 위에 한 번 더 얹힌다.
-    setHistory([])
-    setLook(inkLookOf(useGlobalStyleStore.getState().style)); setEdits({}); setRaws({}); setBakeAsk(false)
+    // 판은 제자리에 둔다. 화면은 원본 + 판 값이라 저장소에 쓴 것과 같은 그림이고, 다시 써 넣어도 원본에서 다시 푼다.
+    const next: MoldOrigin = { ...base, saved: structuredClone({ look, edits, raws }), stamp: storesStamp() }
+    writeOrigin(next); setOrigin(next)
+    setBakeAsk(false)
     // 남은 차이: 대표 글자만이 아니라 글줄 글자마다, 써 넣은 저장소로 다시 풀어 빚은 칸과 잰다.
     const after = layoutDeltaSnapshot()
     let residual = Math.max(0, ...layouts.map((item) => item.residual)), worst = ''
@@ -1002,9 +1024,10 @@ export function MoldLabPage() {
   const jamoScale = Math.min(1, ...fenceReportsNow.map((report) => report.need))
   const fence = useMemo<MoldFence>(() => ({ on: fenceOn, line: fenceLine, scale: jamoScale }), [fenceOn, fenceLine, jamoScale])
 
-  const choseong = useJamoStore((state) => state.choseong)
-  const jungseong = useJamoStore((state) => state.jungseong)
-  const jongseong = useJamoStore((state) => state.jongseong)
+  const liveChoseong = useJamoStore((state) => state.choseong)
+  const liveJungseong = useJamoStore((state) => state.jungseong)
+  const liveJongseong = useJamoStore((state) => state.jongseong)
+  const choseong = origin?.choseong ?? liveChoseong, jungseong = origin?.jungseong ?? liveJungseong, jongseong = origin?.jongseong ?? liveJongseong
 
   const stems = useMemo(() => Object.fromEntries(STEMS.flatMap((info) => {
     const raw = raws[info.kind]
@@ -1090,7 +1113,7 @@ export function MoldLabPage() {
   const NEXT_LABEL: Partial<Record<Step, string>> = { shape: '부위 다듬기로', part: '획 다듬기로', stroke: '마무리로' }
   const tracking = lookOf(look, 'tracking'), [t0, t1] = LOOK_WALL.tracking, trackingPct = Math.round((tracking - t0) / (t1 - t0) * 100)
 
-  return <main className={styles.page}>
+  return <MoldOriginContext.Provider value={origin}><main className={styles.page}>
     <header className={styles.header}>
       <span className={styles.eyebrow}>빚기 시험판 · {stepIndex + 1}/{STEP_ORDER.length} {STEP_NAMES[step]}</span>
       <ChoiceGroup variant="segment" aria-label="단계" className={styles.steps}>
@@ -1190,8 +1213,8 @@ export function MoldLabPage() {
       ? <div className={styles.moldActions} data-testid="mold-reset-ask">
         <span className={styles.skipNote}>그은 획까지 모두 지움</span>
         <Button variant="outline" size="sm" onClick={() => setAskReset(false)} data-testid="mold-reset-no">취소</Button>
-        <Button variant="destructive" size="sm" onClick={() => { remember(); setEdits({}); setLook(inkLookOf(useGlobalStyleStore.getState().style)); setRaws({}); setStep('draw'); setAskReset(false) }} data-testid="mold-reset-yes">지우기</Button>
+        <Button variant="destructive" size="sm" onClick={() => { remember(); setEdits({}); setLook(homeLook); setRaws({}); setStep('draw'); setAskReset(false) }} data-testid="mold-reset-yes">지우기</Button>
       </div>
       : <Button variant="ghost" size="sm" className={styles.center} onClick={() => setAskReset(true)} data-testid="mold-reset-all"><RotateCcw aria-hidden="true" />모두 처음대로</Button>)}
-  </main>
+  </main></MoldOriginContext.Provider>
 }
