@@ -1,3 +1,4 @@
+import { weightToMultiplier } from '../src/utils/globalStyleUtils'
 import type { BoxConfig, DecomposedSyllable, JamoData, LayoutType, Part, StrokeDataV2 } from '../src/types'
 
 /**
@@ -485,7 +486,7 @@ export type LayoutEdits = Partial<Record<LayoutType, PartEdits>>
  * balloon = 풍선 닿자의 획 사이 최소 틈(em, 사용자가 고름),
  * round = 끝 · 모서리 둥글기(0~1, 붓 둥글기), contrast = 획 대비(0~1, + 는 세로 굵게 · 가로 가늘게).
  */
-export interface Look { weight?: number; soft?: number; frame?: number; tracking?: number; size?: number; height?: number; jamo?: number; center?: number; round?: number; contrast?: number; balloon?: number; open?: number; branch?: number; serif?: number; wobble?: number }
+export interface Look { weight?: number; soft?: number; frame?: number; tracking?: number; size?: number; height?: number; jamo?: number; center?: number; round?: number; contrast?: number; balloon?: number; open?: number; branch?: number; serif?: number; nib?: number; jag?: number }
 export type Dir = 'up' | 'down' | 'left' | 'right' | 'ul' | 'ur' | 'dl' | 'dr'
 export interface RegionLabels { name: string; up: string; down: string; left: string; right: string }
 
@@ -496,8 +497,10 @@ export interface RegionLabels { name: string; up: string; down: string; left: st
  */
 // 인상 잡기 값은 넓게(하니무스 2026-11-21 "더 다이나믹한 스펙트럼으로, 과하면 그때 다듬기"). 굵기는 이미 엔진 끝(100~900)까지.
 // center는 첫닿자 칸 키에 대한 비율(허리선이 첫닿자 키의 몇 할만큼 오르나). open은 받침 없는 글자의 키(1이 네모).
-export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.55, 1.45], tracking: [-0.08, 0.2], size: [0.45, 1.3], height: [0.6, 1.3], jamo: [0.5, 1.6], center: [-0.35, 0.35], round: [0, 1], contrast: [0, 0.95], balloon: [0.01, 0.08], open: [0.6, 1], branch: [0.3, 1.6], serif: [0, 1], wobble: [0, 1] } as const
-const LOOK_ENGINE = { weight: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.04, open: 1, branch: 1, serif: 0, wobble: 0 } as const
+// 판 양 끝 = 가장 멀리 간 목표 폰트(거북이 방향안 3차, 하니무스 2026-11-21 승인). 값은 노토(엔진)에 곱하는 배율이고, 칸 10은 폰트 가운데다(`DOT_SCALE`).
+// center는 허리선(-1 아래 ~ +1 위, 짜임마다 폭이 다르다 `centerLift`). nib는 붓촉(빗금 굵기 차), jag는 글자마다 윗선 들쭉날쭉(표준편차 ÷ 키).
+export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.84, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [-0.08, 0.19], jag: [0.027, 0.09] } as const
+export const LOOK_ENGINE = { weight: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.04, open: 1, branch: 1, serif: 0, nib: 0, jag: 0.027 } as const
 const clampLook = (key: keyof typeof LOOK_WALL, value: number) => Math.max(LOOK_WALL[key][0], Math.min(LOOK_WALL[key][1], value))
 export const lookOf = (look: Look, key: keyof Look) => look[key] ?? LOOK_ENGINE[key]
 
@@ -700,6 +703,34 @@ export function gripAt(box: BoxConfig, x: number, y: number, tol: number): BoxGr
   return x > x0 && x < x1 && y > y0 && y < y1 ? 'move' : undefined
 }
 
+/**
+ * 무게중심 = 허리선(거북이 방향안 4차, 하니무스 2026-11-21): 첫닿자 밑 · 곁줄기 · 보 높이가 같이 오르내린다. 바깥 틀은 그대로.
+ * 폭은 실제 폰트 범위에서 짜임마다 따로(첫닿자 밑, 글자 키 대비): 받침 없음 위로 0.12 · 아래로 0.23(궁서 0.65 ~ Gugi 1.00),
+ * 받침 있음 위로 0.03 · 아래로 0.035(받침 위 끝은 거의 고정이라 좁다). `center` −1 ~ +1, + 는 위로. 돌려주는 값은 칸 단위(+ 위로).
+ */
+const CENTER_BAR_DOWN = 0.06
+export const CENTER_SHARE = { open: { up: 0.12, down: 0.23 }, closed: { up: 0.03, down: 0.035 } } as const
+/**
+ * 가로 · 섞임 짜임은 보가 첫닿자 밑을 따라 내려가므로, 보가 글자 칸 밑(0.98)에 닿으면 더 안 내려간다(첫닿자만 길어져 보를 덮지 않게).
+ * 받침 없는 세로 짜임만 첫닿자 밑이 글자 밑까지 간다(Gugi · 나눔펜).
+ */
+function centerLiftRoom(lift: number, boxes: Partial<Record<Part, BoxConfig>>, layout?: LayoutType): number {
+  if (lift >= 0 || !layout || isVertical(layout)) return lift
+  const bar = boxes.JU_H ?? boxes.JU
+  return bar ? Math.max(lift, -Math.max(0, 0.98 - bar.y - bar.height)) : lift
+}
+export function centerLift(look: Look, boxes: Partial<Record<Part, BoxConfig>>, layout?: LayoutType): number {
+  const c = lookOf(look, 'center')
+  if (c === 0 || !layout) return 0
+  const list = Object.values(boxes).filter((box): box is BoxConfig => !!box)
+  if (!list.length) return 0
+  const span = Math.max(...list.map((b) => b.y + b.height)) - Math.min(...list.map((b) => b.y))
+  const share = CENTER_SHARE[layout.includes('jongseong') ? 'closed' : 'open']
+  // 아래로 23%는 받침 없는 세로 짜임에서 잰 값이다. 가로 · 섞임 짜임은 보가 받쳐 첫닿자가 덜 내려간다(재지 않은 임시값 6%, 「의」에서 ㅇ이 ㅡ에 닿지 않는 데까지).
+  const down = isVertical(layout) ? share.down : Math.min(share.down, CENTER_BAR_DOWN)
+  return c * (c > 0 ? share.up : down) * span
+}
+
 /** 전체 값(폭 · 키 · 크기)을 칸에 입힌다. 모두 글자 가운데(0.5, 0.5)를 두고 늘이고 줄인다. */
 /**
  * 닿자 크기 · 무게중심을 칸에 입힌다.
@@ -710,8 +741,7 @@ export function gripAt(box: BoxConfig, x: number, y: number, tol: number): BoxGr
  */
 export function impressBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: Look, layout?: LayoutType): Partial<Record<Part, BoxConfig>> {
   const k = lookOf(look, 'jamo')
-  // 허리선은 첫닿자 칸 키의 비율만큼 오른다(글자 단위로 두면 키 작은 글자 · 폭 줄인 글자에서 첫닿자가 납작하게 무너진다).
-  const lift = lookOf(look, 'center') * (boxes.CH?.height ?? 0) * k
+  const lift = centerLiftRoom(centerLift(look, boxes, layout), boxes, layout)
   if (k === 1 && lift === 0) return boxes
   const out: Partial<Record<Part, BoxConfig>> = {}
   for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) {
@@ -727,6 +757,9 @@ export function impressBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: Look
       if (part === 'CH') next = { ...next, height: Math.max(0.05, next.height - lift) }
       // 보(가로홀자)는 칸째 허리선을 따라.
       if ((part === 'JU' && horizontalVowel) || part === 'JU_H') next = { ...next, y: Math.max(0.02, Math.min(0.98 - next.height, next.y - lift)) }
+      // 섞임홀자의 세로 쪽은 보에 붙어 있다: 밑은 두고 윗변만 보를 따라.
+      // (ㅢ처럼 세로 쪽이 보보다 위에서 시작하면 그대로.)
+      if (part === 'JU_V' && boxes.JU_H && next.y >= boxes.JU_H.y - 1e-6 && next.height + lift > 0.05) next = { ...next, y: next.y - lift, height: next.height + lift }
     }
     out[part] = next
   }
@@ -763,9 +796,12 @@ function openBoxes(boxes: Partial<Record<Part, BoxConfig>>, open: number, layout
   return out
 }
 
-/** 전체 값이 칸을 글자 칸(이 안쪽)보다 크게 키우면, 비율은 두고 통째로 줄여 넣는다. 엔진은 잉크를 가로 0~1에서 자르므로 넘치면 획끼리 가로지른다(다람쥐: 폭 100에서 과 · 한 · 원). */
-const LOOK_FIT: [number, number] = [0.03, 0.97]
-/** 전체 값(폭 · 키 · 크기)으로 실제 쓰는 가로 · 세로 배율. 칸이 글자 칸을 넘치면 같이 줄인다. */
+/**
+ * 전체 값이 칸을 글자 칸보다 크게 키우면, 비율은 두고 통째로 줄여 넣는다. 엔진은 잉크를 가로 0~1에서 자르므로 넘치면 획끼리 가로지른다.
+ * 벽은 칸 끝(0 ~ 1, 거북이 방향안: 개구 1.00 em)이고, 칸 끝에서 획 두께 반만큼 안쪽이다.
+ */
+const HALF_THICK = 0.033
+/** 전체 값(비율 · 크기)으로 실제 쓰는 가로 · 세로 배율. 칸이 글자 칸을 넘치면 같이 줄인다. 크기가 키를, 비율이 폭을 정한다. */
 export function lookScale(boxes: Partial<Record<Part, BoxConfig>>, look: Look): { sx: number; sy: number } {
   const sx = lookOf(look, 'frame') * lookOf(look, 'size'), sy = lookOf(look, 'height') * lookOf(look, 'size')
   const list = Object.values(boxes).filter((box): box is BoxConfig => !!box)
@@ -773,15 +809,14 @@ export function lookScale(boxes: Partial<Record<Part, BoxConfig>>, look: Look): 
   const far = (lo: number, hi: number) => Math.max(0.5 - lo, hi - 0.5)
   const fx = far(Math.min(...list.map((b) => b.x)), Math.max(...list.map((b) => b.x + b.width)))
   const fy = far(Math.min(...list.map((b) => b.y)), Math.max(...list.map((b) => b.y + b.height)))
-  const room = 0.5 - LOOK_FIT[0]
+  const room = 0.5 - HALF_THICK * Math.min(lookOf(look, 'weight'), 2.25)
   const fit = Math.min(1, fx * sx > room ? room / (fx * sx) : 1, fy * sy > room ? room / (fy * sy) : 1)
   return { sx: sx * fit, sy: sy * fit }
 }
 
-/** 무게중심 허리선이 실제로 오르는 만큼(글자 단위). `after`는 `impressBoxes`를 거친 칸(첫닿자 키가 이미 줄어 있다). */
-export function waistLift(look: Look, after: Partial<Record<Part, BoxConfig>>): number {
-  const c = lookOf(look, 'center'), h = after.CH?.height ?? 0
-  return c === 0 || c >= 1 ? 0 : c * h / (1 - c)
+/** 무게중심 허리선이 실제로 오르는 만큼(칸 단위, + 위로). 곁줄기도 첫닿자 밑과 같은 만큼. */
+export function waistLift(look: Look, boxes: Partial<Record<Part, BoxConfig>>, layout?: LayoutType): number {
+  return centerLiftRoom(centerLift(look, boxes, layout), boxes, layout)
 }
 
 /** 획 고치기 도우미: 자모의 모든 획 묶음(strokes · 가로 · 세로)에 같은 바꾸기를 건다. 섞임홀자는 가로 · 세로 묶음을 따로 받는다. */
@@ -835,36 +870,6 @@ function seeded(text: string): () => number {
 }
 
 /**
- * 손글씨 흔들림(다람쥐 7번: 개구는 값이 다 맞아도 너무 반듯). 곧은 획의 두 끝을 조금 흔들고, 가운데를 옆으로 휘게 한다.
- * `amount` 0~1, 1이면 끝은 글자의 2.5%, 휨은 3.5%쯤. 같은 글자는 늘 같은 모양.
- */
-export function wobbleSyllable(syllable: DecomposedSyllable, amount: number, boxes: Partial<Record<Part, BoxConfig>>): DecomposedSyllable {
-  if (amount <= 0) return syllable
-  const shake = (jamo: JamoData | null, part: Part): JamoData | null => {
-    if (!jamo) return jamo
-    const box = boxes[part] ?? (part === 'JU' ? boxes.JU_V ?? boxes.JU_H : undefined)
-    if (!box) return jamo
-    // 납작한 칸(ㅡ 칸 높이 0 같은)은 그 방향 좌표가 뜻이 없다 — 그 방향으로는 흔들지 않는다(나누면 값이 터진다).
-    const okX = box.width > 0.02, okY = box.height > 0.02
-    const ex = okX ? 0.025 * amount / box.width : 0, ey = okY ? 0.025 * amount / box.height : 0
-    return mapGroups(jamo, (strokes) => strokes.map((stroke) => {
-      if (!straight(stroke)) return stroke
-      const rnd = seeded(`${syllable.char}:${part}:${stroke.id}`)
-      const j = () => rnd() * 2 - 1
-      const [a, b] = endsOf(stroke).map((p) => ({ x: p.x + j() * ex, y: p.y + j() * ey }))
-      // 가운데 휨: 획에 수직으로 밀고, 손잡이로 부드럽게 잇는다.
-      const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx * box.width, dy * box.height) || 1
-      const bend = j() * 0.035 * amount
-      const nx = okX ? (-dy * box.height / len) * bend / box.width : 0, ny = okY ? (dx * box.width / len) * bend / box.height : 0
-      const mid = { x: (a.x + b.x) / 2 + nx, y: (a.y + b.y) / 2 + ny }
-      const hx = dx / 4, hy = dy / 4
-      return { ...stroke, points: [a, { ...mid, handleIn: { x: mid.x - hx, y: mid.y - hy }, handleOut: { x: mid.x + hx, y: mid.y + hy } }, b] }
-    }))
-  }
-  return { ...syllable, choseong: shake(syllable.choseong, 'CH'), jungseong: shake(syllable.jungseong, 'JU'), jongseong: shake(syllable.jongseong, 'JO') }
-}
-
-/**
  * 부리 흉내(다람쥐 6번, 엔진에 부리 값이 없어 획을 덧댄다). 세로로 곧은 획은 윗끝에 왼쪽 아래로 짧은 삐침을,
  * 가로로 곧은 획은 오른끝에 아래로 짧은 맺음을 단다. `amount` 0~1, 1이면 길이가 글자의 6%.
  */
@@ -901,15 +906,38 @@ export function serifSyllable(syllable: DecomposedSyllable, amount: number, boxe
   return { ...syllable, choseong: add(syllable.choseong, 'CH'), jungseong: add(syllable.jungseong, 'JU'), jongseong: add(syllable.jongseong, 'JO') }
 }
 
-export function lookBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: Look, layout?: LayoutType): Partial<Record<Part, BoxConfig>> {
+/**
+ * 글자마다 윗선 들쭉날쭉(거북이 방향안 3차, 하니무스 2026-11-21 승인). 손글씨체 넷(개구 · 나눔펜 · 하이멜로디 · Stylish)이 이것 없이는 안 나온다.
+ * `jag`는 윗선이 글자마다 흩어지는 정도(표준편차 ÷ 키). 노토가 이미 가진 0.027보다 더한 만큼만 글자 이름 씨앗으로 윗변을 올리고 내린다.
+ * 밑변은 그대로(밑선 들쭉날쭉은 탈네모가 맡는다), 글자 칸을 넘지 않는다.
+ */
+export function jagBoxes(boxes: Partial<Record<Part, BoxConfig>>, jag: number, char?: string): Partial<Record<Part, BoxConfig>> {
+  const extra = Math.sqrt(Math.max(0, jag * jag - LOOK_ENGINE.jag ** 2))
+  if (!char || extra < 1e-4) return boxes
+  const list = Object.values(boxes).filter((box): box is BoxConfig => !!box)
+  if (!list.length) return boxes
+  const top = Math.min(...list.map((b) => b.y)), bottom = Math.max(...list.map((b) => b.y + b.height)), span = bottom - top
+  if (span < 0.1) return boxes
+  // 고른 분포(−√3 ~ √3)는 표준편차가 1이다.
+  const u = (seeded(`${char}:jag`)() * 2 - 1) * Math.sqrt(3)
+  const nextTop = Math.max(HALF_THICK, Math.min(top + span * 0.4, top - u * extra * span))
+  const k = (bottom - nextTop) / span
+  const out: Partial<Record<Part, BoxConfig>> = {}
+  for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) if (box) out[part] = { ...box, y: bottom - (bottom - box.y) * k, height: box.height * k }
+  return out
+}
+
+export function lookBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: Look, layout?: LayoutType, char?: string): Partial<Record<Part, BoxConfig>> {
   boxes = openBoxes(impressBoxes(boxes, look, layout), lookOf(look, 'open'), layout)
   const { sx, sy } = lookScale(boxes, look)
-  if (sx === 1 && sy === 1) return boxes
-  const out: Partial<Record<Part, BoxConfig>> = {}
-  for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) {
-    if (box) out[part] = { ...box, x: 0.5 + (box.x - 0.5) * sx, y: 0.5 + (box.y - 0.5) * sy, width: box.width * sx, height: box.height * sy }
+  if (sx !== 1 || sy !== 1) {
+    const out: Partial<Record<Part, BoxConfig>> = {}
+    for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) {
+      if (box) out[part] = { ...box, x: 0.5 + (box.x - 0.5) * sx, y: 0.5 + (box.y - 0.5) * sy, width: box.width * sx, height: box.height * sy }
+    }
+    boxes = out
   }
-  return out
+  return jagBoxes(boxes, lookOf(look, 'jag'), char)
 }
 
 /** 네모꼴(글자 몸)을 전체 값대로 옮긴 사각형. `body`는 처음 네모꼴 [x0, y0, x1, y1]. */
@@ -1061,27 +1089,60 @@ export function movePartEdit(edits: PartEdits, part: Part, du: number, dv: numbe
   return addEdit(addEdit(addEdit(addEdit(edits, part, 0, du), part, 1, du), part, 2, dv), part, 3, dv)
 }
 
-// ── 도트판 인상 잡기(하니무스 2026-11-21): 다섯 값을 0~20칸(한 칸 = 5)으로 ──
+// ── 도트판 인상 잡기(하니무스 2026-11-21): 판 둘(틀 · 획), 값마다 0~20칸(한 칸 = 5) ──
 
-/** 도트판 다섯 줄. 차례대로 굵기 · 닿자 크기 · 무게중심 · 둥글기 · 획 대비. */
-export const DOT_KEYS = ['weight', 'size', 'frame', 'height', 'open', 'jamo', 'center', 'round', 'contrast'] as const
+/**
+ * 판 둘(고양이 흐름 다시 보기 · 정할 것 1, 하니무스 2026-11-21 19:18 승인). 버전 1 글로벌 스타일 탭처럼 틀과 획으로 가른다.
+ * 틀 판: 크기 · 비율 · 닿자 크기 · 탈네모 · 윗선 들쭉날쭉, 맨 끝에 무게중심. 획 판: 굵기 · 획 대비 · 둥글기 · 붓촉.
+ * 폭 · 키는 비율 한 줄(`frame`)로 합쳤다. 크기가 키를, 비율이 폭을 정한다.
+ */
+export const FRAME_KEYS = ['size', 'frame', 'jamo', 'open', 'jag', 'center'] as const
+export const INK_KEYS = ['weight', 'contrast', 'round', 'nib'] as const
+export const DOT_KEYS = [...FRAME_KEYS, ...INK_KEYS] as const
 export type DotKey = (typeof DOT_KEYS)[number]
 export const DOT_ROWS = 20
 const half = DOT_ROWS / 2
-/** 칸 수(0~20) → 값. 가운데(10)가 엔진 그대로인 값은 양쪽 끝을 따로 잇는다. */
+/**
+ * 눈금(거북이 방향안 2·3차): 양 끝 = 가장 멀리 간 목표 폰트, 칸 10 = 폰트 분포 가운데. 노토(엔진)는 줄 위 작은 표시일 뿐 영점이 아니다(R033).
+ * 값은 노토에 곱하는 배율로 바꿔 둔다(폰트에서 잰 양 ÷ 노토의 양). 예: 크기 0.75 · 0.92 · 1.00 em ÷ 노토 0.905.
+ */
+export const DOT_SCALE: Partial<Record<DotKey, readonly [number, number, number]>> = {
+  // 굵기(줄기 ÷ 키) 0.042 · 0.075 ÷ 노토 0.072 = 두께 0.58 · 1.04배를 굵기 값(400에 곱하는 비율)으로. 위 끝은 엔진 끝(900).
+  // 0.22(가석원)는 안쪽으로 굵어지기가 들어와야 닿는다.
+  weight: [weightRatioOfThickness(0.58), weightRatioOfThickness(1.04), LOOK_WALL.weight[1]],
+  size: [0.83, 1.02, 1.105],
+  // 비율(가로 ÷ 세로) 0.78 · 0.95 · 1.15 ÷ 노토 0.93
+  frame: [0.84, 1.02, 1.24],
+  // 닿자 크기(ㅇ 높이 ÷ 기둥) 0.40 · 0.64 · 1.00 ÷ 노토 0.73
+  jamo: [0.55, 0.88, 1.37],
+  center: [-1, 0, 1],
+  // 붓촉: ㅅ 왼 ÷ 오른 빗금 1.15 · 1.00 · 0.71
+  nib: [-0.08, 0, 0.19],
+}
+/** 두께 배율(400 대비) → 굵기 값 비율. 굵기 값과 두께는 곧은 비례가 아니다(`weightToMultiplier`). */
+function weightRatioOfThickness(t: number): number {
+  let lo = 100, hi = 900
+  for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; if (weightToMultiplier(mid) < t * weightToMultiplier(400)) lo = mid; else hi = mid }
+  return lo / 400
+}
+/** 획 대비는 엔진 값(−1 ~ 1)이 아니라 가로 ÷ 세로 굵기로 눈금을 둔다: 1.46(나눔펜, 가로가 더 굵음) · 0.83(고딕 가운데) · 0.32. */
+const CONTRAST_RATIO = [1.46, 0.83, 0.32] as const
+/** 가로 ÷ 세로 굵기 → 엔진 대비 값(`contrastWidthOf`의 거꾸로: + 쪽 세로 1 + 0.8c · 가로 1 − 0.45c, − 쪽 ±0.5c). */
+export function contrastOfRatio(r: number): number {
+  return r <= 1 ? (1 - r) / (0.8 * r + 0.45) : -2 * (r - 1) / (r + 1)
+}
+const twoSided = (t: number, [lo, mid, hi]: readonly [number, number, number]) => (t <= half ? lo + (mid - lo) * t / half : mid + (hi - mid) * (t - half) / half)
+/** 칸 수(0~20) → 값. */
 export function dotToLook(key: DotKey, k: number): number {
   const t = Math.max(0, Math.min(DOT_ROWS, k))
-  const twoSided = (lo: number, mid: number, hi: number) => (t <= half ? lo + (mid - lo) * t / half : mid + (hi - mid) * (t - half) / half)
-  if (key === 'weight') return twoSided(LOOK_WALL.weight[0], 1, LOOK_WALL.weight[1])
-  if (key === 'jamo') return twoSided(LOOK_WALL.jamo[0], 1, LOOK_WALL.jamo[1])
-  if (key === 'frame') return twoSided(LOOK_WALL.frame[0], 1, LOOK_WALL.frame[1])
-  if (key === 'size') return twoSided(LOOK_WALL.size[0], 1, LOOK_WALL.size[1])
-  // 탈네모: 0이 네모(엔진 그대로), 올릴수록 받침 없는 글자가 짧아진다.
+  const scale = DOT_SCALE[key]
+  if (scale) return twoSided(t, scale)
+  if (key === 'contrast') return contrastOfRatio(twoSided(t, CONTRAST_RATIO))
+  // 탈네모: 0이 네모(엔진 그대로), 올릴수록 받침 없는 글자가 짧아진다(Dongle 0.48까지).
   if (key === 'open') return 1 - (1 - LOOK_WALL.open[0]) * t / DOT_ROWS
-  if (key === 'height') return twoSided(LOOK_WALL.height[0], 1, LOOK_WALL.height[1])
-  if (key === 'center') return twoSided(LOOK_WALL.center[0], 0, LOOK_WALL.center[1])
-  if (key === 'round') return LOOK_WALL.round[1] * t / DOT_ROWS
-  return LOOK_WALL.contrast[1] * t / DOT_ROWS
+  // 윗선 들쭉날쭉: 0이 노토 그대로(0.027), 끝이 개구(0.090).
+  if (key === 'jag') return LOOK_WALL.jag[0] + (LOOK_WALL.jag[1] - LOOK_WALL.jag[0]) * t / DOT_ROWS
+  return LOOK_WALL.round[1] * t / DOT_ROWS
 }
 /** 값 → 칸 수(가장 가까운 칸). */
 export function lookToDot(key: DotKey, value: number): number {
@@ -1089,7 +1150,36 @@ export function lookToDot(key: DotKey, value: number): number {
   for (let k = 0; k <= DOT_ROWS; k++) { const d = Math.abs(dotToLook(key, k) - value); if (d < gap - 1e-9) { gap = d; best = k } }
   return best
 }
-export const dotsOf = (look: Look): number[] => DOT_KEYS.map((key) => lookToDot(key, lookOf(look, key)))
+export const dotsOf = (look: Look, keys: readonly DotKey[] = DOT_KEYS): number[] => keys.map((key) => lookToDot(key, lookOf(look, key)))
+/** 노토(엔진 그대로)가 줄의 어느 칸에 있나. 줄 위에 작은 표시로만 그린다. */
+export const notoDot = (key: DotKey) => lookToDot(key, LOOK_ENGINE[key])
+
+/**
+ * 붓촉(거북이 방향안 4차: 목표 15개 중 7개에 필요, 획 대비와는 따로 움직인다). 기운 붓으로 쓴 것처럼 오른 내림(↘)은 굵게, 왼 삐침(↙)은 가늘게.
+ * 획마다 보이는 방향 φ(글자 단위)의 sin 2φ만큼 굵기를 `1 + nib × sin 2φ`배. 가로 · 세로(sin 2φ = 0)는 그대로라 획 대비와 겹치지 않는다.
+ * 엔진의 납작 붓(타원 붓촉)은 둥글기 · 대비와 같이 못 써서, 이 값은 획 굵기로 흉내 낸다.
+ */
+export function nibSyllable(syllable: DecomposedSyllable, nib: number, boxes: Partial<Record<Part, BoxConfig>>): DecomposedSyllable {
+  if (nib === 0) return syllable
+  const tilt = (jamo: JamoData | null, part: Part): JamoData | null => {
+    if (!jamo) return jamo
+    const box = boxes[part] ?? (part === 'JU' ? boxes.JU_V ?? boxes.JU_H : undefined)
+    if (!box) return jamo
+    return mapGroups(jamo, (strokes) => strokes.map((stroke) => {
+      if (stroke.closed || stroke.points.length < 2) return stroke
+      let sum = 0, total = 0
+      for (let i = 1; i < stroke.points.length; i++) {
+        const dx = (stroke.points[i].x - stroke.points[i - 1].x) * box.width, dy = (stroke.points[i].y - stroke.points[i - 1].y) * box.height
+        const len = Math.hypot(dx, dy)
+        if (len < 1e-6) continue
+        sum += 2 * dx * dy / len; total += len // len × sin 2φ
+      }
+      const f = total > 0 ? 1 + nib * sum / total : 1
+      return Math.abs(f - 1) < 1e-4 ? stroke : { ...stroke, thickness: stroke.thickness * f }
+    }))
+  }
+  return { ...syllable, choseong: tilt(syllable.choseong, 'CH'), jungseong: tilt(syllable.jungseong, 'JU'), jongseong: tilt(syllable.jongseong, 'JO') }
+}
 
 // ── 풍선 닿자(하니무스 2026-11-21): 닿자가 커지다 옆 획에 닿을 만큼 가까워지면 서로 밀어내 최소 틈을 지킨다 ──
 

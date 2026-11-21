@@ -284,17 +284,22 @@ describe('보선 끌기(A안)', () => {
 })
 
 describe('도트판 인상 잡기', () => {
-  it('가운데(10칸)가 엔진 그대로고, 끝은 벽 값이다', async () => {
-    const { dotToLook, lookToDot, dotsOf, LOOK_WALL } = await import('./moldLab')
-    expect(dotToLook('weight', 10)).toBe(1)
-    expect(dotToLook('weight', 0)).toBe(LOOK_WALL.weight[0])
+  it('칸 10은 폰트 가운데, 끝은 가장 멀리 간 목표 폰트, 노토는 따로 표시', async () => {
+    const { dotToLook, lookToDot, dotsOf, notoDot, contrastOfRatio, FRAME_KEYS, INK_KEYS, LOOK_WALL } = await import('./moldLab')
+    expect(FRAME_KEYS[FRAME_KEYS.length - 1]).toBe('center')
+    expect(FRAME_KEYS).not.toContain('height')
+    expect(dotToLook('size', 10)).toBeCloseTo(1.02)
+    expect(dotToLook('size', 20)).toBeCloseTo(1.105)
     expect(dotToLook('weight', 20)).toBe(LOOK_WALL.weight[1])
-    expect(dotToLook('jamo', 10)).toBe(1)
     expect(dotToLook('center', 10)).toBe(0)
-    expect(dotToLook('round', 0)).toBe(0)
-    expect(dotsOf({})).toEqual([10, 10, 10, 10, 0, 10, 10, 0, 0])
-    expect(dotToLook('frame', 10)).toBe(1)
-    expect(dotToLook('height', 0)).toBe(LOOK_WALL.height[0])
+    // 노토는 크기 · 비율에서 가운데보다 조금 아래, 획 대비는 1.0이라 가운데(0.83)보다 아래
+    expect(notoDot('size')).toBe(9)
+    expect(notoDot('contrast')).toBe(7)
+    expect(dotsOf({}, FRAME_KEYS)).toEqual([9, 9, 12, 0, 0, 10])
+    expect(dotsOf({}, INK_KEYS)).toEqual([9, 7, 0, 10])
+    // 획 대비 눈금은 가로 ÷ 세로 굵기: 1이면 엔진 0, 1을 넘으면(가로가 더 굵음) 음수
+    expect(contrastOfRatio(1)).toBe(0)
+    expect(contrastOfRatio(1.46)).toBeLessThan(0)
     for (let k = 0; k <= 20; k++) expect(lookToDot('jamo', dotToLook('jamo', k))).toBe(k)
   })
   it('닿자 크기는 제 칸 가운데를 붙든 채 가로세로 같이 커진다', async () => {
@@ -306,18 +311,19 @@ describe('도트판 인상 잡기', () => {
     expect(out.CH!.y + out.CH!.height / 2).toBeCloseTo(0.5)
     expect(out.JU).toEqual(VERTICAL.JU)
   })
-  it('무게중심(A안): 틀은 두고 첫닿자 밑변과 보만 허리선을 따라 오른다', async () => {
+  it('무게중심(허리선): 틀은 두고 첫닿자 밑변과 보가 오른다 · 받침 글자는 폭이 좁다', async () => {
     const { impressBoxes, waistSyllable } = await import('./moldLab')
-    // 허리선은 첫닿자 키(0.3)의 비율만큼: 0.2 → 0.06
-    const out = impressBoxes(HORIZONTAL_FINAL, { center: 0.2 }, 'choseong-jungseong-horizontal-jongseong')
+    // 받침 글자: 위로 끝까지 가도 글자 키(0.9)의 3%
+    const out = impressBoxes(HORIZONTAL_FINAL, { center: 1 }, 'choseong-jungseong-horizontal-jongseong')
     expect(out.CH!.y).toBeCloseTo(0.05)
-    expect(out.CH!.height).toBeCloseTo(0.24)
-    expect(out.JU!.y).toBeCloseTo(0.32)
+    expect(out.CH!.height).toBeCloseTo(0.273)
+    expect(out.JU!.y).toBeCloseTo(0.353)
     expect(out.JO).toEqual(HORIZONTAL_FINAL.JO)
-    // 세로홀자: 칸은 그대로, 곁줄기(가로 획)만 위로. 기둥은 그대로.
-    const v = impressBoxes(VERTICAL, { center: 0.2 }, 'choseong-jungseong-vertical')
+    // 받침 없음: 위로 12%, 아래로 23%. 홀자 칸은 그대로.
+    const v = impressBoxes(VERTICAL, { center: 1 }, 'choseong-jungseong-vertical')
     expect(v.JU).toEqual(VERTICAL.JU)
-    expect(v.CH!.height).toBeCloseTo(0.48)
+    expect(v.CH!.height).toBeCloseTo(0.492)
+    expect(impressBoxes(VERTICAL, { center: -1 }, 'choseong-jungseong-vertical').CH!.height).toBeCloseTo(0.807)
     const stem = { id: 's', closed: false, thickness: 0.08, points: [{ x: 0.3, y: 0 }, { x: 0.3, y: 1 }] }
     const branch = { id: 'b', closed: false, thickness: 0.08, points: [{ x: 0.3, y: 0.5 }, { x: 0.8, y: 0.5 }] }
     const syllable = { char: '가', choseong: null, jongseong: null, layoutType: 'choseong-jungseong-vertical' as const, jungseong: { char: 'ㅏ', type: 'jungseong' as const, strokes: [stem, branch] } }
@@ -362,13 +368,27 @@ describe('인상 · 획 다듬기 값', () => {
     expect(out[1].points[0].x).toBeCloseTo(0.3)
     expect(out[1].points[1].x).toBeCloseTo(0.5)
   })
-  it('부리는 획을 덧대고, 흔들림은 같은 글자에 늘 같다', async () => {
-    const { serifSyllable, wobbleSyllable } = await import('./moldLab')
+  it('부리는 획을 덧대고, 붓촉은 빗금만 굵기를 가른다', async () => {
+    const { serifSyllable, nibSyllable } = await import('./moldLab')
     expect(serifSyllable(ga, 1, VERTICAL).jungseong!.strokes!.length).toBe(4)
     expect(serifSyllable(ga, 0, VERTICAL)).toBe(ga)
-    const a = wobbleSyllable(ga, 1, VERTICAL), b = wobbleSyllable(ga, 1, VERTICAL)
-    expect(a).toEqual(b)
-    expect(a.jungseong!.strokes![0].points.length).toBe(3)
+    const sio = { ...ga, jungseong: { char: 'ㅅ', type: 'jungseong' as const, strokes: [line('l', [0.5, 0], [0, 1]), line('r', [0.5, 0], [1, 1]), line('h', [0, 0.5], [1, 0.5])] } }
+    const out = nibSyllable(sio, 0.19, { JU: { x: 0, y: 0, width: 1, height: 1 } }).jungseong!.strokes!
+    expect(out[0].thickness).toBeLessThan(0.08)
+    expect(out[1].thickness).toBeGreaterThan(0.08)
+    expect(out[2].thickness).toBe(0.08)
+  })
+  it('윗선 들쭉날쭉: 밑변은 그대로, 같은 글자는 늘 같고 칸을 안 넘는다', async () => {
+    const { jagBoxes } = await import('./moldLab')
+    expect(jagBoxes(VERTICAL, 0.027, '가')).toBe(VERTICAL)
+    const tops = ['가', '나', '다', '라', '마', '바'].map((char) => {
+      const out = jagBoxes(VERTICAL, 0.09, char)
+      expect(out.JU!.y + out.JU!.height).toBeCloseTo(0.95)
+      expect(jagBoxes(VERTICAL, 0.09, char)).toEqual(out)
+      return out.JU!.y
+    })
+    expect(Math.min(...tops)).toBeGreaterThanOrEqual(0.03)
+    expect(new Set(tops.map((y) => y.toFixed(3))).size).toBeGreaterThan(1)
   })
   it('탈네모: 받침 없는 글자만 윗변을 두고 짧아진다 · 넘치면 비율 두고 줄여 넣는다', async () => {
     const { lookBoxes, lookScale } = await import('./moldLab')
@@ -376,8 +396,8 @@ describe('인상 · 획 다듬기 값', () => {
     expect(short.JU!.y).toBeCloseTo(0.05)
     expect(short.JU!.height).toBeCloseTo(0.54)
     expect(lookBoxes(HORIZONTAL_FINAL, { open: 0.6 }, 'choseong-jungseong-horizontal-jongseong')).toEqual(HORIZONTAL_FINAL)
-    const { sx, sy } = lookScale(VERTICAL, { frame: 1.45 })
-    expect(sx).toBeLessThan(1.45)
-    expect(sx / sy).toBeCloseTo(1.45)
+    const { sx, sy } = lookScale(VERTICAL, { frame: 1.24, size: 1.105 })
+    expect(sx).toBeLessThan(1.24 * 1.105)
+    expect(sx / sy).toBeCloseTo(1.24)
   })
 })

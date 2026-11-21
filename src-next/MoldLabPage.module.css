@@ -167,3 +167,8 @@
 /* 인상 잡기: 글줄을 낮춰 도트판과 한 화면에 */
 .line[data-compact] { min-height: 64px; }
 .dotPlate { max-width: 300px; margin-inline: auto; }
+
+/* 인상 잡기 판 둘(틀 판 · 획 판) 고르기 */
+.plates {
+  align-self: center;
+}
