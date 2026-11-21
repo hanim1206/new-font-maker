@@ -22,10 +22,10 @@ import { Pressable } from './components/ui/pressable'
 import { Field, RangeBar } from './components/ui/range'
 import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
-import { heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement, useNotoModel } from './notoModel'
 import { inkOfThick, solveBalloon, type BalloonGroup, type BalloonStroke } from './moldBalloon'
-import { applyBakedLayouts, bakedConsonants, bakedVowels, bakeLayout, jagRules, meanThick, type BakeTarget, type BakedLayout } from './moldBake'
+import { applyBakedLayouts, bakedConsonants, bakedResidual, bakedVowels, bakeLayout, jagRules, meanThick, type BakeTarget, type BakedLayout } from './moldBake'
 import { layoutDeltaSnapshot } from './layoutDeltaStore'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
@@ -187,7 +187,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const shaped = useMemo(() => {
     if (placement.kind !== 'boxes') return { syllable: raw, boxes: undefined }
     // 풍선 굵기는 자소마다 안으로 당기므로(`solveBalloon`), 글자 통째로 안으로 당기는 셈(`lookScale`)에는 굵기를 안 넣는다.
-    const boxes = moldedBoxes(placement.boxes, raw.layoutType, edits, { ...look, jamo: Math.min(1, lookOf(look, 'jamo')), ...(heavyOn ? { weight: 1 } : {}) }, char)
+    const boxes = moldedBoxes(placement.boxes, raw.layoutType, edits, { ...look, jamo: Math.min(1, lookOf(look, 'jamo')), ...(heavyOn ? { weight: 1, weightBase: 1 } : {}) }, char)
     // 허리선 → 곁줄기 길이 → 줄기마다(휨 · 길이 · 틈) → 부리 → 붓촉 순서로 획을 고친다(획 다듬기 값은 획 모양만 바꾸고 칸은 두지 않는다).
     const waisted = waistSyllable(raw, waistLift(look, placement.boxes, raw.layoutType), boxes)
     const stroked = serifSyllable(stemSyllable(branchSyllable(waisted, lookOf(look, 'branch')), look), lookOf(look, 'serif'), boxes)
@@ -272,7 +272,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     }
     const base = { v: contrast >= 0 ? 1 + 0.8 * contrast : 1 + 0.5 * contrast, h: contrast >= 0 ? 1 - 0.45 * contrast : 1 - 0.5 * contrast }
     const k = heavyThicknessOf(wanted)
-    const solved = solveBalloon({ strokes, boxes: placed, base, want: { v: base.v * k, h: base.h * k } })
+    const solved = solveBalloon({ strokes, boxes: placed, base, want: { v: base.v * k, h: base.h * (1 + (k - 1) * HEAVY_HORIZONTAL_SHARE) } })
     // 푼 칸(획 상자 기준)의 바뀐 만큼을 부위 칸에 그대로 옮긴다.
     const out: Partial<Record<Part, BoxConfig>> = { ...boxes }
     for (const [part, next] of Object.entries(solved.boxes) as [Part, BoxConfig][]) {
@@ -298,7 +298,8 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   }, [sel, shownStroke, highlight])
 
   // 폭이 좁아지면 글자 칸도 같이 좁힌다. 자간은 글자 사이를 더하거나 뺀다.
-  const scale = placement.kind === 'boxes' ? lookScale(placement.boxes, look).sx : lookOf(look, 'frame') * lookOf(look, 'size')
+  // 칸 셈과 같은 값으로(풍선 굵기는 글자 통째 당김이 없다). 다르면 써 넣을 때마다 자간이 줄어든다(다람쥐 D 검수 2번).
+  const scale = placement.kind === 'boxes' ? lookScale(placement.boxes, heavyOn ? { ...look, weight: 1, weightBase: 1 } : look).sx : lookOf(look, 'frame') * lookOf(look, 'size')
   // 저장소의 자간(써 넣은 값 포함)도 얹는다 — 써 넣은 뒤 화면 값을 처음으로 돌려도 글줄 간격이 그대로다.
   const slot = { width: size * scale + size * (lookOf(look, 'tracking') + effective.letterSpacing), marginInline: 0 }
   // 저장소에 써 넣기: 그리는 칸 그대로를 목표로 넘긴다(긋기 · 획 다듬기 획은 아직 안 넘어감).
@@ -785,6 +786,8 @@ const PART_LAYOUTS: readonly { layout: LayoutType; name: string; sample: string 
   { layout: 'choseong-jungseong-mixed', name: '섞임', sample: '과' },
   { layout: 'choseong-jungseong-mixed-jongseong', name: '섞임 받침', sample: '곽' },
 ]
+/** 써 넣을 때 칸을 재는 글자: 홀자 스물하나 × 받침 없음 · 있음(첫닿자 · 받침 ㄱ). 짜임 × 홀자마다 Δ 하나. */
+const BAKE_SAMPLES: readonly string[] = Array.from({ length: 21 }, (_, medial) => [String.fromCharCode(0xac00 + medial * 28), String.fromCharCode(0xac00 + medial * 28 + 1)]).flat()
 /** 닿는 글자를 고를 때 보태는 자주 쓰는 글자. */
 const COMMON_CHARS = '가나다라마바사아자차카타파하각간감강갈같개거건것게겠경고공과관교구국군그근글기길김까나남내너는니다단달당대더도동되된될두들등때또로를리마만말매먹면명모목무문물미민바반발밤방배번보본부분불비사산살상새생서선설성세소속손수술시신실심아안않알앞애야약양어언얼업없었에여역연열영예오온올와외요용우운울원월위유으은을음의이인일입있자작잘장저전점정제조좀종주준중지직진질집짓차참창책처천철청초최추출치친큰타터토통투트파판편평포표품하학한할함해했행허현형호화확환활회후희'
 
@@ -801,7 +804,7 @@ export function MoldLabPage() {
   const [look, setLook] = useState<Look>(() => inkLookOf(useGlobalStyleStore.getState().style))
   // 저장소가 늦게 불려 오면(새로 고침) 아직 안 만진 판만 저장된 값으로 맞춘다.
   const styleHydrated = useGlobalStyleStore((state) => state._hydrated)
-  useEffect(() => { if (styleHydrated) setLook((now) => (Object.keys(now).length === 0 ? inkLookOf(useGlobalStyleStore.getState().style) : now)) }, [styleHydrated])
+  useEffect(() => { if (styleHydrated) setLook((now) => (Object.keys(now).every((key) => key === 'weightBase') ? inkLookOf(useGlobalStyleStore.getState().style) : now)) }, [styleHydrated])
   const [sel, setSel] = useState<Region | null>(null)
   const [focusAt, setFocusAt] = useState(0)
   const [history, setHistory] = useState<Snapshot[]>([])
@@ -843,12 +846,15 @@ export function MoldLabPage() {
   // 저장소에 써 넣기(PR D): 짜임마다 대표 글자 하나를 안 보이게 그려 빚은 칸을 받아 둔다. 윗선 들쭉날쭉은 글자마다 달라서 뺀다.
   const { bundle } = useNotoModel()
   const bakeItems = useRef<Record<string, BakeTarget>>({})
-  const bakeReporters = useMemo(() => Object.fromEntries(PART_LAYOUTS.map(({ sample }) => [sample, (item: BakeTarget) => { bakeItems.current[sample] = item }])), [])
+  const bakeReporters = useMemo(() => Object.fromEntries(BAKE_SAMPLES.map((sample) => [sample, (item: BakeTarget) => { bakeItems.current[sample] = item }])), [])
   const bakeLook = useMemo(() => ({ ...look, jag: LOOK_ENGINE.jag }), [look])
   const [bakeAsk, setBakeAsk] = useState(false)
-  const [baked, setBaked] = useState<{ layouts: number; residual: number; jamo: number } | null>(null)
+  const [baked, setBaked] = useState<{ layouts: number; residual: number; worst: string; jamo: number } | null>(null)
+  // 글줄 글자도 빚은 칸을 받아 둔다 — 써 넣은 뒤 대표 글자 말고 글줄 전체에서 남은 차이를 잰다.
+  const lineBakeItems = useRef<Record<string, BakeTarget>>({})
+  const lineBakeReporters = useMemo(() => Object.fromEntries([...sentence].map((_, at) => [at, (item: BakeTarget) => { lineBakeItems.current[`${sentence}-${at}`] = item }])) as Record<number, (item: BakeTarget) => void>, [sentence])
   const writeStore = () => {
-    const items = PART_LAYOUTS.map(({ sample }) => bakeItems.current[sample]).filter((item): item is BakeTarget => !!item)
+    const items = BAKE_SAMPLES.map((sample) => bakeItems.current[sample]).filter((item): item is BakeTarget => !!item)
     if (!bundle || items.length === 0) return
     const store = useGlobalStyleStore.getState()
     // 획 판 → 전역 스타일. 굵기는 글줄이 실제로 쓴 값(막힌 데서 멈춘 값), 자간은 비율로 좁아진 폭 + 자간 줄.
@@ -877,7 +883,15 @@ export function MoldLabPage() {
     // 저장소가 빚은 값을 가졌으니 화면 값은 처음으로(두 번 얹히지 않게). 되돌리기도 비운다 — 되돌리면 빚은 값이 저장소 위에 한 번 더 얹힌다.
     setHistory([])
     setLook(inkLookOf(useGlobalStyleStore.getState().style)); setEdits({}); setRaws({}); setBakeAsk(false)
-    setBaked({ layouts: layouts.length, residual: Math.max(0, ...layouts.map((item) => item.residual)), jamo: Object.keys(choseongOut).length + Object.keys(jungseongOut).length + Object.keys(jongseongOut).length })
+    // 남은 차이: 대표 글자만이 아니라 글줄 글자마다, 써 넣은 저장소로 다시 풀어 빚은 칸과 잰다.
+    const after = layoutDeltaSnapshot()
+    let residual = Math.max(0, ...layouts.map((item) => item.residual)), worst = ''
+    ;[...sentence].forEach((char, at) => {
+      const item = char === ' ' ? undefined : lineBakeItems.current[`${sentence}-${at}`]
+      const r = item ? bakedResidual({ bundle, snapshot: after, ends, item }) : null
+      if (r !== null && r > residual) { residual = r; worst = char }
+    })
+    setBaked({ layouts: layouts.length, residual, worst, jamo: Object.keys(choseongOut).length + Object.keys(jungseongOut).length + Object.keys(jongseongOut).length })
   }
   const fenceReportsNow = [...sentence].flatMap((char, at) => (char === ' ' ? [] : fenceReports[`${sentence}-${at}`] ? [fenceReports[`${sentence}-${at}`]] : []))
   const jamoScale = Math.min(1, ...fenceReportsNow.map((report) => report.need))
@@ -984,7 +998,7 @@ export function MoldLabPage() {
         {chars.map((char, at) => char === ' '
           ? <span key={at} className={styles.space} />
           : <Pressable key={`${sentence}-${at}`} className={styles.lineChar} data-on={(step === 'part' && (partChar ? char === partChar : at === focusIndex)) || undefined} onClick={() => { setFocusAt(at); setPartChar(null) }} aria-label={`${char} 크게 보기`} data-testid={`mold-pick-${at}`}>
-            <MoldGlyph char={char} size={42} edits={lineEdits} look={lineLook} drawn={lineDrawn} shownStroke={step === 'draw' && !compare ? shownStroke : undefined} testId={`mold-char-${at}`} weightCap={weightCap} onCap={compare ? undefined : capReporters[at]} fence={compare ? undefined : fence} onFence={compare ? undefined : fenceReporters[at]} />
+            <MoldGlyph char={char} size={42} edits={lineEdits} look={lineLook} drawn={lineDrawn} shownStroke={step === 'draw' && !compare ? shownStroke : undefined} testId={`mold-char-${at}`} weightCap={weightCap} onCap={compare ? undefined : capReporters[at]} onBake={compare ? undefined : lineBakeReporters[at]} fence={compare ? undefined : fence} onFence={compare ? undefined : fenceReporters[at]} />
           </Pressable>)}
       </div>
       <div className={styles.lineActions}>
@@ -1049,13 +1063,13 @@ export function MoldLabPage() {
             <Button size="sm" onClick={writeStore} disabled={!bundle} data-testid="mold-bake-yes">써 넣기</Button>
           </div>
           : <Button size="sm" onClick={() => { setBaked(null); setBakeAsk(true) }} data-testid="mold-bake">저장소에 써 넣기</Button>}
-        {baked && <p className={styles.note} data-testid="mold-baked">써 넣음 · 짜임 {baked.layouts} · 자모 {baked.jamo} · 남은 차이 {Math.round(baked.residual * 1000)}u. 부리는 출시 뒤</p>}
+        {baked && <p className={styles.note} data-testid="mold-baked">써 넣음 · 짜임×홀자 {baked.layouts} · 자모 {baked.jamo} · 남은 차이 {Math.round(baked.residual * 1000)}u{baked.worst ? `(가장 큰 글자 「${baked.worst}」 — 같은 짜임 · 홀자는 첫닿자 ㄱ 글자의 칸을 같이 받는다)` : ''}. 부리는 출시 뒤</p>}
         {baked && <div className={styles.moldActions}>
           <Button variant="outline" size="sm" onClick={() => window.location.assign('/workspace/font')} data-testid="mold-go-font">폰트 탭에서 보기</Button>
           <Button variant="outline" size="sm" onClick={() => window.location.assign('/dashboard')} data-testid="mold-go-dashboard">이어서 깎기</Button>
         </div>}
         <div className={styles.bakeHidden} aria-hidden="true">
-          {PART_LAYOUTS.map(({ sample }) => <MoldGlyph key={sample} char={sample} size={20} edits={edits} look={bakeLook} drawn={drawn} weightCap={weightCap} fence={fence} onBake={bakeReporters[sample]} />)}
+          {BAKE_SAMPLES.map((sample) => <MoldGlyph key={sample} char={sample} size={20} edits={edits} look={bakeLook} drawn={drawn} weightCap={weightCap} fence={fence} onBake={bakeReporters[sample]} />)}
         </div>
         <Button variant="outline" size="sm" onClick={downloadOutline} data-testid="mold-export">윤곽 내보내기(SVG)</Button>
       </section>}

@@ -487,7 +487,7 @@ export type LayoutEdits = Partial<Record<LayoutType, PartEdits>>
  * balloon = 풍선 닿자의 획 사이 최소 틈(em, 사용자가 고름),
  * round = 끝 · 모서리 둥글기(0~1, 붓 둥글기), contrast = 획 대비(0~1, + 는 세로 굵게 · 가로 가늘게).
  */
-export interface Look { weight?: number; soft?: number; frame?: number; tracking?: number; size?: number; height?: number; jamo?: number; center?: number; round?: number; contrast?: number; balloon?: number; open?: number; branch?: number; serif?: number; nib?: number; jag?: number; bendGidung?: number; bendGyeot?: number; bendJjal?: number; bendBo?: number; bendGeol?: number; gapGyeot?: number }
+export interface Look { weight?: number; /** 저장소에 써 넣은 굵기(그 당김은 이미 저장된 칸에 들어 있다). 사용자 값 아님. */ weightBase?: number; soft?: number; frame?: number; tracking?: number; size?: number; height?: number; jamo?: number; center?: number; round?: number; contrast?: number; balloon?: number; open?: number; branch?: number; serif?: number; nib?: number; jag?: number; bendGidung?: number; bendGyeot?: number; bendJjal?: number; bendBo?: number; bendGeol?: number; gapGyeot?: number }
 export type Dir = 'up' | 'down' | 'left' | 'right' | 'ul' | 'ur' | 'dl' | 'dr'
 export interface RegionLabels { name: string; up: string; down: string; left: string; right: string }
 
@@ -519,12 +519,15 @@ export const STEM_KEYS = Object.keys(STEM_ENGINE) as StemKey[]
 
 /**
  * 풍선 굵기(플랜 `2026-11-21_풍선-굵기`): 굵기 값은 엔진 끝(900 = 2.25) 너머로 간다. 그 위는 두께가 굵기 값에 곧게 비례한다.
- * 위 끝은 두께 4배(세로줄기 0.28em, 가석원). 실제로 얼마나 굵어지는지는 자소마다 칸이 정한다(`moldBalloon.ts`).
+ * 위 끝은 두께 2.7배(세로줄기 0.19em, 검은고딕) — 읽히는 가장 굵은 끝. 처음엔 가석원(4배)이었으나 획을 붙여 그리지 않으면
+ * 「가」 「저」가 덩어리가 됐다(하니무스 2026-11-21 폰 캡처). 실제로 얼마나 굵어지는지는 자소마다 칸이 정한다(`moldBalloon.ts`).
  */
 export const ENGINE_TOP = 2.25
-export const HEAVY_TOP = ENGINE_TOP * 4 / 1.9502
-export const LOOK_WALL = { weight: [0.25, HEAVY_TOP], soft: [0, 1], frame: [0.74, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09], ...STEM_WALL } as const
-export const LOOK_ENGINE = { weight: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.04, open: 1, branch: 1, serif: 0, nib: 0, jag: 0.027, ...STEM_ENGINE } as const
+export const HEAVY_TOP = ENGINE_TOP * 2.7 / 1.9502
+/** 굵어진 몫 가운데 가로줄기가 받는 비율. 굵은 폰트는 가로를 덜 굵게 한다(검은고딕 가로 ÷ 세로 0.79, 노토 900 0.96). */
+export const HEAVY_HORIZONTAL_SHARE = 0.8
+export const LOOK_WALL = { weight: [0.25, HEAVY_TOP], weightBase: [0.25, HEAVY_TOP], soft: [0, 1], frame: [0.74, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09], ...STEM_WALL } as const
+export const LOOK_ENGINE = { weight: 1, weightBase: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.04, open: 1, branch: 1, serif: 0, nib: 0, jag: 0.027, ...STEM_ENGINE } as const
 const clampLook = (key: keyof typeof LOOK_WALL, value: number) => Math.max(LOOK_WALL[key][0], Math.min(LOOK_WALL[key][1], value))
 export const lookOf = (look: Look, key: keyof Look) => look[key] ?? LOOK_ENGINE[key]
 
@@ -921,12 +924,19 @@ export function lookScale(boxes: Partial<Record<Part, BoxConfig>>, look: Look): 
   const fx = far(Math.min(...list.map((b) => b.x)), Math.max(...list.map((b) => b.x + b.width)))
   const fy = far(Math.min(...list.map((b) => b.y)), Math.max(...list.map((b) => b.y + b.height)))
   // 굵기는 안쪽으로만(거북이 2차 a = 0): 획이 굵어진 반만큼 칸을 안으로 당겨 잉크 바깥 끝을 그대로 둔다. 바깥 틀은 크기 줄 몫.
-  const grow = HALF_THICK * (thicknessOf(lookOf(look, 'weight')) - 1)
+  // 저장소에 써 넣은 굵기(`weightBase`)의 당김은 이미 저장된 칸에 들어 있다 — 그 위로 더 굵어진 만큼만 당긴다(다람쥐 D 검수 2번: 다시 써 넣으면 또 줄어듦).
+  const grow = HALF_THICK * (thicknessOf(lookOf(look, 'weight')) - thicknessOf(lookOf(look, 'weightBase')))
   const inward = (far: number, s: number) => (far * s > grow + 0.05 ? (far * s - grow) / (far * s) : 1)
   const ix = inward(fx, sx), iy = inward(fy, sy)
   // 잉크 바깥 끝이 글자 칸(0~1)에 닿을 때까지. 획 반 두께는 지금 굵기로 잰다 — 가는 글자가 굵은 글자 몫만큼 덜 커지던 것(다람쥐 PR A 3번).
-  const room = 0.5 - HALF_THICK * thicknessOf(lookOf(look, 'weight'))
-  const fit = Math.min(1, fx * sx > room ? room / (fx * sx) : 1, fy * sy > room ? room / (fy * sy) : 1)
+  // 당긴(또는 가늘어져 넓힌) 뒤의 끝으로 잰다 — 앞 끝으로 재면 써 넣은 뒤(당김이 칸에 들어간 뒤)에만 줄어든다(다람쥐 D 검수 2번).
+  // 처음 칸(저장소 굵기 · 화면 값 처음)이 이미 넘치던 몫은 빼고 잰다. 엔진이 넓게 두는 칸(「궈」 보)은 저장소로도 못 줄여서,
+  // 그 몫까지 매번 줄이면 써 넣을 때마다 첫닿자가 또 줄었다(「원」).
+  const fitAt = (weight: number, ex: number, ey: number) => {
+    const room = 0.5 - HALF_THICK * thicknessOf(weight)
+    return Math.min(1, ex > room ? room / ex : 1, ey > room ? room / ey : 1)
+  }
+  const fit = Math.min(1, fitAt(lookOf(look, 'weight'), fx * sx * ix, fy * sy * iy) / fitAt(lookOf(look, 'weightBase'), fx, fy))
   return { sx: sx * ix * fit, sy: sy * iy * fit }
 }
 /** 굵기 값(400에 곱하는 비율) → 획 두께 배율(400 대비). */
@@ -1259,7 +1269,7 @@ const half = DOT_ROWS / 2
  * 값은 노토에 곱하는 배율로 바꿔 둔다(폰트에서 잰 양 ÷ 노토의 양). 예: 크기 0.75 · 0.92 · 1.00 em ÷ 노토 0.905.
  */
 export const DOT_SCALE: Partial<Record<DotKey, readonly [number, number, number]>> = {
-  // 굵기(줄기 ÷ 키) 0.042 · 0.075 ÷ 노토 0.072 = 두께 0.58 · 1.04배를 굵기 값(400에 곱하는 비율)으로. 위 끝은 꽉 찬 끝(두께 4배, `HEAVY_TOP`).
+  // 굵기(줄기 ÷ 키) 0.042 · 0.075 ÷ 노토 0.072 = 두께 0.58 · 1.04배를 굵기 값(400에 곱하는 비율)으로. 위 끝은 검은고딕(두께 2.7배, `HEAVY_TOP`).
   weight: [weightRatioOfThickness(0.58), weightRatioOfThickness(1.04), LOOK_WALL.weight[1]],
   size: [0.83, 1.02, 1.105],
   // 비율(가로 ÷ 세로) 0.78 · 0.95 · 1.15 ÷ 노토 0.93. 아래 끝은 Dongle(다람쥐 자 0.656)까지 — 0.84에서 0.73에 멈췄다(2026-11-21).
@@ -1334,7 +1344,7 @@ export function moldBaseStyle<T extends { weight: number; brush: BrushStyle; str
 /** 저장된 스타일 → 획 판 값(엔진 그대로인 값은 안 넣는다). */
 export function inkLookOf(style: { weight: number; strokeStyle: StrokeRenderStyle }): Look {
   const out: Look = {}
-  if (style.weight !== MOLD_BASE_WEIGHT) out.weight = style.weight / MOLD_BASE_WEIGHT
+  if (style.weight !== MOLD_BASE_WEIGHT) out.weight = out.weightBase = style.weight / MOLD_BASE_WEIGHT
   const ink = style.strokeStyle as StrokeRenderStyle & { roundness?: number; contrast?: number; brush?: BrushStyle }
   if (ink.mode !== 'brush') return out
   if (ink.brush?.tip === 'ellipse') out.nib = Math.max(0, Math.min(1, (1 - ink.brush.aspectRatio) / 0.75))

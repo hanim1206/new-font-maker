@@ -38,7 +38,12 @@ export interface BalloonResult {
 }
 
 /** 꽉 찬 끝의 흰 틈(em). 자소 사이는 가석원 0.027, 자소 안 획 사이 바닥은 0.02(그 뒤는 붙여 그리는 폰트 — 이번엔 안 함). */
-export const BALLOON_END = { between: 0.03, inside: 0.02 } as const
+/**
+ * 꽉 찬 끝의 흰 틈(em). 굵기 줄 위 끝은 검은고딕(세로줄기 0.19em)이다 — 그 폰트의 자소 사이 틈 0.06~0.08, 속공간 0.07.
+ * 작은 글자(글줄 42px)에서도 흰 틈이 보이게 사이 0.05 · 안 0.03을 바닥으로 둔다(하니무스 2026-11-21 폰 캡처: 0.03 · 0.02에서 덩어리).
+ * 가석원(0.28em, 획을 붙여 그림)은 이 셈의 끝이 아니다 — 붙여 그리기는 따로.
+ */
+export const BALLOON_END = { between: 0.05, inside: 0.03 } as const
 /** 세로줄기가 1 굵어질 때 흰 틈이 줄어드는 양. 받침 위는 덜 준다(받침이 밀려 내려가서). */
 export const BALLOON_SLOPE = { inside: 0.5, between: 0.67, final: 0.33 } as const
 /** 한 글자 안에서 자소끼리 굵기가 이보다 갈리지 않는다(10-01 눈 ② "획 두께 차이가 커서 안 예쁨" · 바닥 0.8과 같은 뜻). */
@@ -183,7 +188,13 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
       segs.forEach((other, at) => {
         if (other.stroke === index || other.group !== seg.group || lengthOf(other) < EPS) return
         const d = pointToSeg(end.x, end.y, other).d
-        if (d <= halfOf(other, base) + 1e-3 && (!best || d < best.d)) best = { on: at, d }
+        if (d > halfOf(other, base) + 1e-3 || (best && d >= best.d)) return
+        // 옆면에 붙어야 한다 — 다른 획의 끝과 만나는 것(ㅈ · ㅅ 두 다리, ㄱ 꺾임)은 이음이지 꼭지가 아니다.
+        const strokeOf = segs.filter((seg2) => seg2.stroke === other.stroke)
+        const head = strokeOf[0], tail = strokeOf[strokeOf.length - 1]
+        const nearEnd = Math.min(Math.hypot(end.x - head.ax, end.y - head.ay), Math.hypot(end.x - tail.bx, end.y - tail.by))
+        if (!strokes[other.stroke].closed && nearEnd <= halfOf(other, base) + halfOf(seg, base) + 1e-3) return
+        best = { on: at, d }
       })
       if (!best) continue
       const other = segs[(best as { on: number }).on]
@@ -303,9 +314,10 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
     // 붙은 짧은 획: 붙은 획의 반 두께가 그 획 길이를 다 먹지 않게(곁줄기 · 꼭지가 사라지지 않게).
     for (const stub of stubs) {
       const o = segs[stub.on], g = o.group
-      const { a, b } = sharesOf(o), room = stub.room
-      if (b >= a) sol[g].v = Math.min(sol[g].v, (room - a * thick[g].h) / Math.max(b, EPS))
-      else sol[g].h = Math.min(sol[g].h, (room - b * thick[g].v) / Math.max(a, EPS))
+      const { a, b } = sharesOf(o), room = stub.room, lean = b / Math.max(a + b, EPS)
+      if (lean > 0.7) sol[g].v = Math.min(sol[g].v, (room - a * thick[g].h) / Math.max(b, EPS))
+      else if (lean < 0.3) sol[g].h = Math.min(sol[g].h, (room - b * thick[g].v) / Math.max(a, EPS))
+      else { const f = room / Math.max(a * thick[g].h + b * thick[g].v, EPS); sol[g].h = Math.min(sol[g].h, thick[g].h * f); sol[g].v = Math.min(sol[g].v, thick[g].v * f) }
     }
     // 뼈대 바닥: 굵기가 칸을 다 먹으면(ㄱ처럼 마주 보는 획이 없는 자소) 그 축 굵기를 누른다.
     for (const part of parts) {

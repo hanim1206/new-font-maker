@@ -13,9 +13,9 @@ import type { ScopeRule } from './scopeRule'
 
 /**
  * 빚기 → 버전 1 저장소에 써 넣기(하니무스 2026-11-21 "저장소에 써 넣기").
- * 칸: 짜임마다 대표 글자 하나의 빚은 칸을 목표로, 레이아웃 Δ(`layoutDeltaStore`, 사용자 전용)를 찾는다.
+ * 칸: 짜임 × 홀자마다 글자 하나(첫닿자 ㄱ, 받침 ㄱ)의 빚은 칸을 목표로, 레이아웃 Δ(`layoutDeltaStore`, 사용자 전용)를 찾는다.
  * Δ와 칸 사이에는 홀자 rail 아핀 · 네모꼴 옮기기가 끼어 곧은 셈이 안 되므로, 배치를 다시 풀어 보며 남은 차이를 더해 간다(몇 번이면 닫힌다).
- * 같은 짜임의 다른 글자는 같은 Δ를 받는다 — 글자마다 다른 몫(윗선 들쭉날쭉 · 닿자 크기에 따른 밀림의 글자별 차이)은 안 넘어간다.
+ * 같은 짜임 · 홀자의 다른 글자는 같은 Δ를 받는다 — 첫닿자 · 받침마다 다른 몫(닿자 크기에 따른 밀림의 글자별 차이)은 안 넘어간다.
  */
 
 export interface BakeTarget {
@@ -33,6 +33,12 @@ export interface BakeTarget {
   thick: Readonly<Record<string, number>>
 }
 
+/**
+ * 써 넣는 범위: 짜임 × 홀자 하나(다람쥐 D 검수 1번 · 윗선 검수 3번). 짜임마다 대표 글자 하나의 Δ를 같이 주면
+ * 홀자가 다른 글자(「늬」「원」, ㅜ · ㅡ + 받침)는 빚은 칸과 달라지고, 윗선을 내리면 홀자와 받침이 겹쳤다.
+ */
+export const medialRuleOf = (identity: { contextId: string; medialJamo: string }): ScopeRule => ({ ...ruleOfContext(identity.contextId), medial: [identity.medialJamo] })
+
 export interface BakedLayout { rule: ScopeRule; delta: ContextBoxDelta; residual: number; char: string }
 
 const SIDES = ['left', 'right', 'top', 'bottom'] as const
@@ -45,6 +51,11 @@ export function bakeLayout(input: { bundle: NotoPresetModelBundle; snapshot: Lay
   const base = effectiveLayoutDelta(snapshot, identity)
   const faces: Partial<Record<Part, FacesDelta>> = {}
   let residual = Infinity
+  // 엔진이 안 따르는 변(섞임홀자의 가로 · 세로 칸처럼 rail에 묶인 변)은 더해도 안 움직인다. 그런 변에 계속 더하면
+  // 저장소에 쌓여 다시 써 넣을 때마다 커진다(「원」이 써 넣을 때마다 좁아짐). 더했는데 차이가 반도 안 줄면 그 몫을 빼고 멈춘다.
+  const lastErr: Partial<Record<string, number>> = {}
+  const lastAdd: Partial<Record<string, number>> = {}
+  const frozen = new Set<string>()
   for (let round = 0; round < (input.rounds ?? 6); round++) {
     const delta = addContextBoxDelta(base, { faces })
     const { placement } = contextPlacementOf({ bundle, identity, syllable: item.syllable, schema: item.schema, ends, delta })
@@ -56,15 +67,45 @@ export function bakeLayout(input: { bundle: NotoPresetModelBundle; snapshot: Lay
       const a = boxToFaces(want), b = boxToFaces(got)
       const next = (faces[part] ??= {})
       for (const side of SIDES) {
+        const key = `${part}:${side}`
         const err = a[side] - b[side]
         residual = Math.max(residual, Math.abs(err))
+        if (frozen.has(key)) continue
+        const before = lastErr[key]
+        if (before !== undefined && Math.abs(before) > 2e-4 && Math.abs(err) > Math.abs(before) * 0.5) {
+          next[side] = ((next[side] as number | undefined) ?? 0) - (lastAdd[key] ?? 0)
+          frozen.add(key)
+          continue
+        }
         next[side] = ((next[side] as number | undefined) ?? 0) + err
+        lastErr[key] = err
+        lastAdd[key] = err
       }
     }
     if (residual < 2e-4) break
   }
   // 마지막 더하기는 아직 안 풀어 봤으니, 남은 차이는 그 전 값으로 적는다(다음 판에서 더 줄어든다).
-  return { rule: ruleOfContext(identity.contextId), delta: { faces }, residual, char: item.char }
+  return { rule: medialRuleOf(identity), delta: { faces }, residual, char: item.char }
+}
+
+/**
+ * 써 넣은 뒤 한 글자가 빚은 칸과 얼마나 다른가(em, 변 차이의 가장 큰 값). 같은 짜임은 대표 글자 하나의 Δ를 같이 받으므로,
+ * 대표가 아닌 글자(「늬」「원」처럼 홀자가 다른 글자)는 여기서만 차이가 드러난다(다람쥐 D 검수 1번: "남은 차이 0u"인데 그림이 다름).
+ */
+export function bakedResidual(input: { bundle: NotoPresetModelBundle; snapshot: LayoutDeltaSnapshot; ends: Pick<GlobalStyle, 'linecap' | 'linejoin' | 'strokeStyle'>; item: BakeTarget }): number | null {
+  const { bundle, snapshot, ends, item } = input
+  const identity = identityOfSyllable(item.syllable)
+  if (!identity) return null
+  const { placement } = contextPlacementOf({ bundle, identity, syllable: item.syllable, schema: item.schema, ends, delta: effectiveLayoutDelta(snapshot, identity) })
+  if (placement.kind !== 'boxes') return null
+  let residual = 0
+  for (const [part, want] of Object.entries(item.target) as [Part, BoxConfig][]) {
+    const got = placement.boxes[part]
+    if (!want || !got) continue
+    const a = boxToFaces(want), b = boxToFaces(got)
+    for (const side of SIDES) residual = Math.max(residual, Math.abs(a[side] - b[side]))
+  }
+  return residual
 }
 
 /** 찾은 Δ를 저장소에 더한다(같은 범위에 다시 써 넣으면 더해진다 — 늘 지금 칸 기준 차이라서). */
@@ -149,7 +190,7 @@ export function jagRules(items: readonly BakeTarget[], jag: number): BakedLayout
   for (const item of items) {
     const identity = identityOfSyllable(item.syllable)
     if (!identity) continue
-    const base = ruleOfContext(identity.contextId)
+    const base = medialRuleOf(identity)
     for (const initial of JAG_INITIALS) {
       const moved = jagBoxes(item.target, jag, initial)
       if (moved === item.target) continue
