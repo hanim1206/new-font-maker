@@ -1143,7 +1143,8 @@ export function MoldLabPage() {
   const resetRegion = () => {
     remember()
     // 인상은 통째로, 칸은 서로 맞물려 있어 짜임째로 되돌린다.
-    if (step === 'shape') setLook((now) => Object.fromEntries([...STROKE_KEYS, 'tracking' as const].map((key) => [key, now[key]])))
+    // 처음 값 = 판의 처음 칸(원본 · 저장소 굵기 · 붓, `homeLook`). 써 넣은 굵기(`weightBase`)를 지우면 그 당김이 두 번 들어간다(다람쥐 2026-11-22).
+    if (step === 'shape') setLook((now) => ({ ...homeLook, ...Object.fromEntries([...STROKE_KEYS, 'tracking' as const].map((key) => [key, now[key]])) }))
     else if (step === 'finish') setLook((now) => ({ ...now, tracking: undefined }))
     else if (step === 'stroke') setLook((now) => ({ ...now, ...Object.fromEntries(STROKE_KEYS.map((key) => [key, undefined])) }))
     else setEdits((now) => { const copy = { ...now }; delete copy[layoutOfFocus]; return copy })

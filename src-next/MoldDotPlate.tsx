@@ -149,7 +149,7 @@ export function MoldDotPlate({ keys, locks, look, home = {}, setLook, onBegin, o
   }, [])
 
   // ── 손 ──
-  const grab = useRef<{ c: number; r: number; k0: number; mode: Mode; passed: Set<number>; lastB: number } | null>(null)
+  const grab = useRef<{ c: number; r: number; mode: Mode; passed: Set<number>; lastB: number } | null>(null)
   const cellOf = (event: ReactPointerEvent<SVGSVGElement>) => {
     const svg = svgRef.current!, pt = svg.createSVGPoint(); pt.x = event.clientX; pt.y = event.clientY
     const q = pt.matrixTransform(svg.getScreenCTM()!.inverse())
@@ -162,7 +162,7 @@ export function MoldDotPlate({ keys, locks, look, home = {}, setLook, onBegin, o
     const q = cellOf(event)
     if (q.r < -1.5 || q.r > N || q.c < -1 || q.c > C) return
     event.currentTarget.setPointerCapture(event.pointerId)
-    grab.current = { c: q.c, r: q.r, k0: 0, mode: null, passed: new Set(), lastB: groupAt(q.c) }
+    grab.current = { c: q.c, r: q.r, mode: null, passed: new Set(), lastB: groupAt(q.c) }
     const a = anim.current; a.fx = q.c; a.fy = q.r; a.lastFx = q.c; a.lastFy = q.r
     if (hintRef.current) hintRef.current.style.display = 'none'
     fingerRef.current?.setAttribute('cx', String(q.x)); fingerRef.current?.setAttribute('cy', String(q.y)); fingerRef.current?.setAttribute('opacity', '0.82')
@@ -178,7 +178,7 @@ export function MoldDotPlate({ keys, locks, look, home = {}, setLook, onBegin, o
       const dx = Math.abs(q.c - g.c), dy = Math.abs(q.r - g.r)
       // 옆으로 1.2칸 넘게 가면 긋기. 위아래로 반 칸만 가도 바로 한 줄 다시 잡기.
       if (dx > 1.2 && dx * 2.5 >= dy) { g.mode = 'sweep'; onSay('긋는 중') }
-      else if (dy > 0.5 && dx < 0.3 * dy) { g.mode = 'one'; a.sel = groupAt(g.c); a.grabbing = a.sel; g.k0 = vals.current[a.sel] }
+      else if (dy > 0.5 && dx < 0.3 * dy) { g.mode = 'one'; a.sel = groupAt(g.c); a.grabbing = a.sel }
       else return
     }
     // 한 줄을 잡으면 손을 뗄 때까지 그 줄만. 손이 옆으로 흘러도 긋기로 안 바뀐다(다람쥐 2026-11-22: 폰에서 60~80px 흐르면 옆 줄이 딸려 감).
@@ -190,7 +190,8 @@ export function MoldDotPlate({ keys, locks, look, home = {}, setLook, onBegin, o
       g.lastB = b
     } else if (g.mode === 'one' && a.sel != null) {
       const b = a.sel
-      setOne(b, Math.max(0, Math.min(N, Math.round(g.k0 + (q.r - g.r)))), 2.4)
+      // 손 높이 그대로(하니무스 2026-11-22 "손 높이 그대로(절댓값)"): 잡은 뒤에도 손가락이 있는 칸이 값이다.
+      setOne(b, dotOfRow(a.fy), 2.4)
       const x = chipX(b), y = OY + S - P * (a.fy + 0.5)
       arrowsRef.current?.setAttribute('d', `M ${x + 36} ${y - 30} v 60 M ${x + 31} ${y - 24} l 5 -7 l 5 7 M ${x + 31} ${y + 24} l 5 7 l 5 -7`)
       arrowsRef.current?.setAttribute('opacity', '1')
