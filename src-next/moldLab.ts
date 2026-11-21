@@ -81,8 +81,11 @@ function gapRange(engine: number, band: ReturnType<typeof fit>): Range {
 const COL = gapRange(0.192, GAP_COL)
 const ROW = gapRange(0.224, GAP_ROW)
 const FIN = gapRange(0.1215, GAP_FIN)
-/** 첫닿자 크기(배율). 측정 없음 — 임시값. */
-const CH_SIZE: Range = { engine: 1, presets: { narrow: 0.94, normal: 1, wide: 1.06 }, safe: [0.94, 1.06], wall: [0.86, 1.14] }
+/**
+ * 첫닿자 크기(배율). 거북이 2026-11-22(눈대중-여덟-값.md 3번): 닿자 크기 ÷ 가운데값이 폰트 155벌에서 5% 0.65 · 95% 1.20, 끝 0.57 ~ 1.44.
+ * 노토 코퍼스(initial.roleFaces)는 첫닿자마다 폭 비가 다르다 — 칸에 곱하므로 그 비는 그대로 남는다.
+ */
+const CH_SIZE: Range = { engine: 1, presets: { narrow: 0.65, normal: 1, wide: 1.2 }, safe: [0.65, 1.2], wall: [0.57, 1.44] }
 
 const GAP_NAMES: Record<Preset, string> = { narrow: '좁게', normal: '보통', wide: '넓게' }
 const SIZE_NAMES: Record<Preset, string> = { narrow: '작게', normal: '보통', wide: '크게' }
@@ -123,7 +126,7 @@ export const stanceName = (stance: Stance) => `${STANCE_NAME[stance]} 짜임`
 function chGroup(stance: Stance): GroupInfo {
   return {
     id: `ch-${stance}` as GroupId, layer: '짜임', stance, name: `${STANCE_NAME[stance]} 짜임 · 첫닿자`, members: '첫닿자 전부',
-    handle: 'chSize', handleName: '첫닿자 크기', source: 'guess', note: '측정 없음 — 임시값(±6%, 벽 ±14%)', range: CH_SIZE, presetNames: SIZE_NAMES,
+    handle: 'chSize', handleName: '첫닿자 크기', source: 'measured', note: '폰트 155벌 닿자 크기 ÷ 가운데값(5% 0.65 · 95% 1.20, 끝 0.57 ~ 1.44)', range: CH_SIZE, presetNames: SIZE_NAMES,
   }
 }
 function joGroup(stance: Stance): GroupInfo {
@@ -612,7 +615,8 @@ const SIMS_LO = 0.02, SIMS_HI = 0.98
  * 이웃 자소 벽: 밀려서 짜부되는 이웃은 처음 크기의 이 비율 아래로 안 줄어든다. 그보다 더 밀면 칸째로 밀려나고, 글자 끝에 닿으면 잡은 칸이 멈춘다.
  * 근거는 거북이 「자소별 틈과 크기」(고딕 86벌): 자소 높이 · 너비의 5% 끝이 가운데 값의 0.87~0.93배. 고딕만 잰 값이라 손글씨 · 제목체 몫을 더 남겨 0.7로 둔다(임시).
  */
-export const NEIGHBOR_FLOOR = 0.7
+// 노토 코퍼스: 문맥 때문에 첫닿자가 줄어드는 가장 작은 몫이 폭 0.83 · 키 0.84, 폰트의 「빼」 ㅐ 폭 ÷ 「배」 ㅐ 폭 0.80 ~ 0.84(거북이 2026-11-22 7번).
+export const NEIGHBOR_FLOOR = 0.8
 /** 잡은 칸 스스로는 처음 크기의 이 범위 안에서만 바뀐다. */
 export const OWN_RANGE = [0.5, 1.6] as const
 const MIN_SIDE = 0.03
@@ -735,7 +739,8 @@ export function gripAt(box: BoxConfig, x: number, y: number, tol: number): BoxGr
  * 폭은 실제 폰트 범위에서 짜임마다 따로(첫닿자 밑, 글자 키 대비): 받침 없음 위로 0.12 · 아래로 0.23(궁서 0.65 ~ Gugi 1.00),
  * 받침 있음 위로 0.03 · 아래로 0.035(받침 위 끝은 거의 고정이라 좁다). `center` −1 ~ +1, + 는 위로. 돌려주는 값은 칸 단위(+ 위로).
  */
-const CENTER_BAR_DOWN = 0.06
+// 가로 · 섞임 짜임 첫닿자 밑 ÷ 글자 키: 폰트 121벌 가운데 0.65, 95% 0.70, 끝 0.52 ~ 0.76 → 아래로 끝까지 0.11(거북이 2026-11-22 2번).
+const CENTER_BAR_DOWN = 0.11
 export const CENTER_SHARE = { open: { up: 0.12, down: 0.23 }, closed: { up: 0.03, down: 0.035 } } as const
 /**
  * 가로 · 섞임 짜임은 보가 첫닿자 밑을 따라 내려가므로, 보가 글자 칸 밑(0.98)에 닿으면 더 안 내려간다(첫닿자만 길어져 보를 덮지 않게).
@@ -758,7 +763,7 @@ export function centerLift(look: Look, boxes: Partial<Record<Part, BoxConfig>>, 
   if (!list.length) return 0
   const span = Math.max(...list.map((b) => b.y + b.height)) - Math.min(...list.map((b) => b.y))
   const share = CENTER_SHARE[layout.includes('jongseong') ? 'closed' : 'open']
-  // 아래로 23%는 받침 없는 세로 짜임에서 잰 값이다. 가로 · 섞임 짜임은 보가 받쳐 첫닿자가 덜 내려간다(재지 않은 임시값 6%, 「의」에서 ㅇ이 ㅡ에 닿지 않는 데까지).
+  // 아래로 23%는 받침 없는 세로 짜임에서 잰 값이다. 가로 · 섞임 짜임은 보가 받쳐 첫닿자가 덜 내려간다(폰트 끝 0.11).
   const down = isVertical(layout) ? share.down : Math.min(share.down, CENTER_BAR_DOWN)
   return c * (c > 0 ? share.up : down) * span
 }
@@ -1058,17 +1063,27 @@ export function jagSeedOf(char: string): string {
   return code >= 0 && code < 11172 ? CHO_LIST[Math.floor(code / 588)] : char
 }
 export const JAG_INITIALS = [...CHO_LIST]
+/**
+ * 윗선 무늬(거북이 2026-11-22 8번): 첫닿자마다 윗선이 내려가는 양(글자 키 대비, + 아래). 폰트 123벌 가운데값, 노토 코퍼스 `initial.roleFaces.top`과 방향이 같다.
+ * 폰트의 90%가 이 무늬와 상관 0.5를 넘는다. 흩어짐 가운데값 0.023이 이 무늬 한 벌.
+ */
+export const JAG_PATTERN: Readonly<Record<string, number>> = { ㄱ: 0.019, ㄲ: 0.017, ㄴ: 0, ㄷ: 0.007, ㄸ: 0.011, ㄹ: -0.007, ㅁ: 0, ㅂ: -0.015, ㅃ: -0.004, ㅅ: -0.018, ㅆ: -0.008, ㅇ: -0.019, ㅈ: 0.008, ㅉ: 0.004, ㅊ: -0.057, ㅋ: 0.011, ㅌ: 0, ㅍ: 0.007, ㅎ: -0.059 }
+const JAG_PATTERN_SPREAD = 0.023
+/** 폰트 흩어짐 95%. 이보다 큰 몫(손글씨)만 씨앗 난수로 더한다. */
+const JAG_PATTERN_TOP = 0.047
 export function jagBoxes(boxes: Partial<Record<Part, BoxConfig>>, jag: number, char?: string): Partial<Record<Part, BoxConfig>> {
-  const extra = Math.sqrt(Math.max(0, jag * jag - LOOK_ENGINE.jag ** 2))
-  if (!char || extra < 1e-4) return boxes
+  if (!char || jag <= LOOK_ENGINE.jag + 1e-4) return boxes
   const list = Object.values(boxes).filter((box): box is BoxConfig => !!box)
   if (!list.length) return boxes
   const top = Math.min(...list.map((b) => b.y)), bottom = Math.max(...list.map((b) => b.y + b.height)), span = bottom - top
   if (span < 0.1) return boxes
-  // 윗선은 이미 글자 칸 위 끝에 붙어 있어 올릴 자리가 없다. 위로 가는 절반을 잘라 내면 흩어짐이 절반쯤만 나온다(다람쥐 PR A 4번: 끝에서 0.050).
-  // 그래서 내리기만 한다: 0 ~ √12 사이 고른 분포는 표준편차가 1이다.
-  const v = seeded(`${jagSeedOf(char)}:jag`)() * Math.sqrt(12)
-  const nextTop = Math.min(top + span * 0.4, top + v * extra * span)
+  // 엔진(노토)은 이미 jag 0.027만큼의 무늬를 가졌다. 더한 만큼만 무늬를 세게 한다.
+  const pattern = (JAG_PATTERN[jagSeedOf(char)] ?? 0) * (Math.min(jag, JAG_PATTERN_TOP) - LOOK_ENGINE.jag) / JAG_PATTERN_SPREAD
+  // 95% 너머(손글씨)는 첫닿자 씨앗으로 내리기만 한다: 0 ~ √12 고른 분포는 표준편차 1.
+  const extra = Math.sqrt(Math.max(0, jag * jag - JAG_PATTERN_TOP ** 2))
+  const v = extra > 1e-4 ? seeded(`${jagSeedOf(char)}:jag`)() * Math.sqrt(12) * extra : 0
+  // 위로 가는 몫(ㅊ ㅎ 꼭지)은 글자 칸 위 끝(0)까지만.
+  const nextTop = Math.max(0, Math.min(top + span * 0.4, top + (pattern + v) * span))
   const k = (bottom - nextTop) / span
   const out: Partial<Record<Part, BoxConfig>> = {}
   for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) if (box) out[part] = { ...box, y: bottom - (bottom - box.y) * k, height: box.height * k }

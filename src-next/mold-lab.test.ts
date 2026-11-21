@@ -264,12 +264,12 @@ describe('보선 끌기(A안)', () => {
     expect(seamPos(seams[0], now)).toBeCloseTo(0.59)
     expect(out.clamped).toBe(false)
   })
-  it('보선은 최소 간격(처음의 0.7배)에서 한 번 붙들고, 더 끌면 넘어가 0.45배에서 막힌다', async () => {
+  it('보선은 최소 간격(처음의 NEIGHBOR_FLOOR배, 0.8)에서 한 번 붙들고, 더 끌면 넘어가 0.45배에서 막힌다', async () => {
     const { seamsOf, dragSeam, applyPartEdits } = await import('./moldLab')
     const seam = seamsOf('choseong-jungseong-vertical', VERTICAL)[0]
     const held = dragSeam(seam, VERTICAL, {}, 0.1)
     expect(held.wall).toBe('held')
-    expect(applyPartEdits(VERTICAL, held.edits).JU!.width).toBeCloseTo(0.21)
+    expect(applyPartEdits(VERTICAL, held.edits).JU!.width).toBeCloseTo(0.24)
     const past = dragSeam(seam, VERTICAL, {}, 0.2)
     expect(past.wall).toBe('past')
     expect(applyPartEdits(VERTICAL, past.edits).JU!.width).toBeCloseTo(0.16)
