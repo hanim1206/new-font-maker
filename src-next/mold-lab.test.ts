@@ -507,3 +507,16 @@ describe('다람쥐 PR A 고치기', () => {
     expect(sd / span).toBeGreaterThan(0.06)
   })
 })
+
+describe('획 판은 저장된 값을 그대로 읽는다', () => {
+  it('써 넣은 굵기 · 둥글기 · 대비 · 붓촉을 다시 읽으면 같은 칸', async () => {
+    const { DEFAULT_STYLE } = await import('../src/stores/globalStyleStore')
+    const { inkLookOf, moldBaseStyle, moldInk, scaledWeight, MOLD_BASE_WEIGHT, dotsOf, INK_KEYS } = await import('./moldLab')
+    for (const look of [{ weight: 0.9, round: 0.4 }, { weight: 1.6, contrast: 0.3 }, { nib: 0.5 }]) {
+      const baked = moldInk({ ...moldBaseStyle(DEFAULT_STYLE), weight: scaledWeight(MOLD_BASE_WEIGHT, look.weight ?? 1) }, look)
+      expect(dotsOf(inkLookOf(baked), INK_KEYS)).toEqual(dotsOf(look, INK_KEYS))
+      // 바탕은 저장 값을 뺀 것이라, 다시 얹어도 두 번 얹히지 않는다.
+      expect(moldBaseStyle(baked).weight).toBe(MOLD_BASE_WEIGHT)
+    }
+  })
+})

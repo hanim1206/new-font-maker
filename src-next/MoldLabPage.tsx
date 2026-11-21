@@ -21,7 +21,7 @@ import { Pressable } from './components/ui/pressable'
 import { Field, RangeBar } from './components/ui/range'
 import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
-import { stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement, useNotoModel } from './notoModel'
 import { applyBakedLayouts, bakedConsonants, bakedVowels, bakeLayout, jagRules, meanThick, type BakeTarget, type BakedLayout } from './moldBake'
 import { layoutDeltaSnapshot } from './layoutDeltaStore'
@@ -99,7 +99,9 @@ function useGlyphBase(char: string, drawn: Drawn | undefined) {
   const globalPadding = useLayoutStore((state) => state.globalPadding)
   const paddingOverrides = useLayoutStore((state) => state.paddingOverrides)
   const syllable = useMemo(() => decomposeSyllable(char, choseong, jungseong, jongseong), [char, choseong, jungseong, jongseong])
-  const effective = useEffectiveGlobalStyle(syllable.layoutType)
+  const stored = useEffectiveGlobalStyle(syllable.layoutType)
+  // 저장된 굵기 · 붓 값은 판(`inkLookOf`)이 들고 있으니 바탕에서 뺀다(두 번 얹히지 않게).
+  const effective = useMemo(() => moldBaseStyle(stored), [stored])
   const padding = useMemo(() => mergePadding(globalPadding, paddingOverrides[syllable.layoutType]), [globalPadding, paddingOverrides, syllable.layoutType])
   const schema = useMemo(() => ({ ...schemas[syllable.layoutType], padding, designBodyPadding: padding }), [schemas, syllable.layoutType, padding])
   const { placement } = useContextPlacement(syllable, schema, effective)
@@ -725,7 +727,10 @@ export function MoldLabPage() {
   const [sentence, setSentence] = useState(() => new URLSearchParams(window.location.search).get('s')?.trim() || FIRST_SENTENCE)
   const [raws, setRaws] = useState<Partial<Record<StemKind, PenPoint[]>>>({})
   const [edits, setEdits] = useState<LayoutEdits>({})
-  const [look, setLook] = useState<Look>({})
+  const [look, setLook] = useState<Look>(() => inkLookOf(useGlobalStyleStore.getState().style))
+  // 저장소가 늦게 불려 오면(새로 고침) 아직 안 만진 판만 저장된 값으로 맞춘다.
+  const styleHydrated = useGlobalStyleStore((state) => state._hydrated)
+  useEffect(() => { if (styleHydrated) setLook((now) => (Object.keys(now).length === 0 ? inkLookOf(useGlobalStyleStore.getState().style) : now)) }, [styleHydrated])
   const [sel, setSel] = useState<Region | null>(null)
   const [focusAt, setFocusAt] = useState(0)
   const [history, setHistory] = useState<Snapshot[]>([])
@@ -776,7 +781,7 @@ export function MoldLabPage() {
     if (!bundle || items.length === 0) return
     const store = useGlobalStyleStore.getState()
     // 획 판 → 전역 스타일. 굵기는 글줄이 실제로 쓴 값(막힌 데서 멈춘 값), 자간은 비율로 좁아진 폭 + 자간 줄.
-    const inked = moldInk({ ...store.style, weight: scaledWeight(store.style.weight, appliedWeight(lookOf(look, 'weight'), weightCap)) }, look)
+    const inked = moldInk({ ...moldBaseStyle(store.style), weight: scaledWeight(MOLD_BASE_WEIGHT, appliedWeight(lookOf(look, 'weight'), weightCap)) }, look)
     const sx = items.reduce((sum, item) => sum + item.sx, 0) / items.length
     const letterSpacing = Math.round((store.style.letterSpacing + sx - 1 + lookOf(look, 'tracking')) * 1000) / 1000
     // 칸 → 레이아웃 Δ. 새 스타일의 끝 모양으로 풀어 본다.
@@ -800,7 +805,7 @@ export function MoldLabPage() {
     store.setStrokeRenderStyle(inked.strokeStyle)
     // 저장소가 빚은 값을 가졌으니 화면 값은 처음으로(두 번 얹히지 않게). 되돌리기도 비운다 — 되돌리면 빚은 값이 저장소 위에 한 번 더 얹힌다.
     setHistory([])
-    setLook({}); setEdits({}); setRaws({}); setBakeAsk(false)
+    setLook(inkLookOf(useGlobalStyleStore.getState().style)); setEdits({}); setRaws({}); setBakeAsk(false)
     setBaked({ layouts: layouts.length, residual: Math.max(0, ...layouts.map((item) => item.residual)), jamo: Object.keys(choseongOut).length + Object.keys(jungseongOut).length + Object.keys(jongseongOut).length })
   }
   const fenceReportsNow = [...sentence].flatMap((char, at) => (char === ' ' ? [] : fenceReports[`${sentence}-${at}`] ? [fenceReports[`${sentence}-${at}`]] : []))
@@ -995,7 +1000,7 @@ export function MoldLabPage() {
       ? <div className={styles.moldActions} data-testid="mold-reset-ask">
         <span className={styles.skipNote}>그은 획까지 모두 지움</span>
         <Button variant="outline" size="sm" onClick={() => setAskReset(false)} data-testid="mold-reset-no">취소</Button>
-        <Button variant="destructive" size="sm" onClick={() => { remember(); setEdits({}); setLook({}); setRaws({}); setStep('draw'); setAskReset(false) }} data-testid="mold-reset-yes">지우기</Button>
+        <Button variant="destructive" size="sm" onClick={() => { remember(); setEdits({}); setLook(inkLookOf(useGlobalStyleStore.getState().style)); setRaws({}); setStep('draw'); setAskReset(false) }} data-testid="mold-reset-yes">지우기</Button>
       </div>
       : <Button variant="ghost" size="sm" className={styles.center} onClick={() => setAskReset(true)} data-testid="mold-reset-all"><RotateCcw aria-hidden="true" />모두 처음대로</Button>)}
   </main>

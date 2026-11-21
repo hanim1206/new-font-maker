@@ -1307,6 +1307,29 @@ export function moldInk<T extends { brush: BrushStyle; strokeStyle: StrokeRender
   if (round === 0 && contrast === 0) return style
   return { ...style, strokeStyle: { ...style.strokeStyle, ...(round > 0 ? { roundness: round, innerRoundness: round * 2 } : {}), ...(contrast !== 0 ? { contrast } : {}) } }
 }
+/**
+ * 획 판은 저장된 값 그대로를 보여 준다(하니무스 Mac 확인 2026-11-21: 써 넣고 새로 고치면 굵기 41 → 45, 둥글기 8 → 0으로 보임).
+ * 그래서 그림은 저장소의 굵기 · 둥글기 · 대비 · 붓촉을 뺀 바탕(`moldBaseStyle`) 위에 판 값을 얹고, 판의 처음 값은 저장소에서 읽는다(`inkLookOf`).
+ * 틀 판 값은 레이아웃 Δ로 들어가 되읽을 수 없어, 써 넣은 뒤엔 지금 저장소 모양이 새 출발점이다.
+ */
+export const MOLD_BASE_WEIGHT = 400
+const ROUND_BRUSH: BrushStyle = { tip: 'round', aspectRatio: 0.5, angle: 0 }
+export function moldBaseStyle<T extends { weight: number; brush: BrushStyle; strokeStyle: StrokeRenderStyle }>(style: T): T {
+  if (style.strokeStyle.mode !== 'brush') return { ...style, weight: MOLD_BASE_WEIGHT }
+  const { roundness: _r, innerRoundness: _i, contrast: _c, ...rest } = style.strokeStyle as StrokeRenderStyle & { roundness?: number; innerRoundness?: number; contrast?: number }
+  return { ...style, weight: MOLD_BASE_WEIGHT, brush: ROUND_BRUSH, strokeStyle: { ...rest, brush: ROUND_BRUSH } as StrokeRenderStyle }
+}
+/** 저장된 스타일 → 획 판 값(엔진 그대로인 값은 안 넣는다). */
+export function inkLookOf(style: { weight: number; strokeStyle: StrokeRenderStyle }): Look {
+  const out: Look = {}
+  if (style.weight !== MOLD_BASE_WEIGHT) out.weight = style.weight / MOLD_BASE_WEIGHT
+  const ink = style.strokeStyle as StrokeRenderStyle & { roundness?: number; contrast?: number; brush?: BrushStyle }
+  if (ink.mode !== 'brush') return out
+  if (ink.brush?.tip === 'ellipse') out.nib = Math.max(0, Math.min(1, (1 - ink.brush.aspectRatio) / 0.75))
+  if (ink.roundness) out.round = ink.roundness
+  if (ink.contrast) out.contrast = ink.contrast
+  return out
+}
 /** 납작 붓의 각도(화면 가로축 기준). 붓 각도 줄은 아직 없다(고양이 문구: 납작 붓일 때만 나옴). */
 export const NIB_ANGLE = 35
 /**
