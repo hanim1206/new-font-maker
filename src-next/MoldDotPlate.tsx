@@ -82,6 +82,9 @@ export function MoldDotPlate({ keys, locks, look, home = {}, setLook, onBegin, o
       if (next[i] === lookToDot(key, lookOf(home, key))) { if (home[key] === undefined) delete out[key]; else out[key] = home[key] }
       else out[key] = dotToLook(key, next[i])
     })
+    // 한 손짓 안에서 여러 줄을 잇달아 쓰면(빠르게 긋기) 화면이 다시 그려지기 전이라 lookRef가 옛 값이다. 방금 쓴 값을 바로 들고 있어야
+    // 다음 줄이 앞 줄을 덮어 되돌리지 않는다(다람쥐 2026-11-22: 빠르게 그으면 두 줄만 남고 나머지가 튕겨 돌아옴).
+    lookRef.current = out
     setLook(out)
   }
   const setOne = (b: number, k: number, amount: number) => {
@@ -178,8 +181,7 @@ export function MoldDotPlate({ keys, locks, look, home = {}, setLook, onBegin, o
       else if (dy > 0.5 && dx < 0.3 * dy) { g.mode = 'one'; a.sel = groupAt(g.c); a.grabbing = a.sel; g.k0 = vals.current[a.sel] }
       else return
     }
-    // 한 줄을 잡았다가 옆으로 두 칸 넘게 가면 긋기로 바꾼다
-    if (g.mode === 'one' && Math.abs(q.c - g.c) > 2) { g.mode = 'sweep'; g.passed = new Set([a.sel ?? 0]); g.lastB = a.sel ?? 0; a.sel = null; arrowsRef.current?.setAttribute('opacity', '0'); onSay('긋는 중') }
+    // 한 줄을 잡으면 손을 뗄 때까지 그 줄만. 손이 옆으로 흘러도 긋기로 안 바뀐다(다람쥐 2026-11-22: 폰에서 60~80px 흐르면 옆 줄이 딸려 감).
     if (g.mode === 'sweep') {
       const b = groupAt(a.fx); a.grabbing = b
       const k = dotOfRow(a.fy)
