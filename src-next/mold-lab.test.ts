@@ -424,3 +424,27 @@ describe('인상 · 획 다듬기 값', () => {
     expect(sx / sy).toBeCloseTo(1.24)
   })
 })
+
+describe('밀림 2차(거북이): 기둥 밀림 · 바닥 멈춤 · 안쪽 굵기', () => {
+  it('기둥 밀림은 닿자가 작으면 1, 크면 0.04', async () => {
+    const { pillarPush } = await import('./moldLab')
+    expect(pillarPush(0.55)).toBe(1)
+    expect(pillarPush(1)).toBeCloseTo(0.107, 2)
+    expect(pillarPush(1.37)).toBeCloseTo(0.04)
+    expect(pillarPush(0.7)).toBeGreaterThan(pillarPush(0.9))
+  })
+  it('닿자가 자라면 기둥도 같이 밀리고, 틈 검사에 걸린 변은 멈춘다', async () => {
+    const { growSides } = await import('./moldLab')
+    const free = growSides(VERTICAL, 1.2, {}, () => true, 8, 'choseong-jungseong-vertical')
+    expect(free.boxes.JU!.x).toBeGreaterThan(VERTICAL.JU!.x)
+    const stop = growSides(VERTICAL, 1.2, {}, (b) => b.CH!.x + b.CH!.width <= VERTICAL.CH!.x + VERTICAL.CH!.width + 1e-9, 8, 'choseong-jungseong-vertical')
+    expect(stop.boxes.JU!.x).toBeCloseTo(VERTICAL.JU!.x)
+  })
+  it('굵기는 안쪽으로: 굵을수록 칸이 줄어 잉크 바깥 끝을 지킨다', async () => {
+    const { lookScale, thicknessOf } = await import('./moldLab')
+    expect(thicknessOf(1)).toBe(1)
+    const thin = lookScale(VERTICAL, {}), bold = lookScale(VERTICAL, { weight: 2.25 })
+    expect(bold.sx).toBeLessThan(thin.sx)
+    expect(bold.sy).toBeLessThan(thin.sy)
+  })
+})

@@ -739,6 +739,22 @@ export function centerLift(look: Look, boxes: Partial<Record<Part, BoxConfig>>, 
  * 줄어들 때는 같은 비율로 거꾸로. 틈이 한계까지 줄면 이웃을 다 민다는 부분은 추정이라 넣지 않았다(풍선 닿자가 틈에서 멈춘다).
  */
 export const PUSH = { inner: 0.75, vowel: 0.1, finalCh: 0.665, finalStem: 1 } as const
+/** 노토의 닿자 크기(ㅇ 높이 ÷ 기둥). 닿자 크기 값 k는 이 양에 곱하는 배율이다. */
+export const NOTO_JAMO = 0.73
+/**
+ * 기둥 밀림 m(거북이 2026-11-21 2차, 117벌): 닿자 크기로 고른다. 닿자가 작으면 틈을 지키고 기둥을 민다(명조 1.0), 크면 틈을 먹는다(0.04).
+ * 표는 구간 가운데값(0.5 밑 1.0 · 0.5~0.65 0.21 · 0.65~0.8 0.11 · 0.8 위 0.04)이고, 그 사이는 곧게 잇는다.
+ */
+const PILLAR_PUSH = [[0.45, 1], [0.575, 0.21], [0.725, 0.11], [0.85, 0.04]] as const
+export function pillarPush(k: number): number {
+  const size = NOTO_JAMO * k
+  if (size <= PILLAR_PUSH[0][0]) return PILLAR_PUSH[0][1]
+  for (let i = 1; i < PILLAR_PUSH.length; i++) {
+    const [x1, y1] = PILLAR_PUSH[i], [x0, y0] = PILLAR_PUSH[i - 1]
+    if (size <= x1) return y0 + (y1 - y0) * (size - x0) / (x1 - x0)
+  }
+  return PILLAR_PUSH[PILLAR_PUSH.length - 1][1]
+}
 export type Side = 'l' | 'r' | 't' | 'b'
 /** 닿자의 안쪽 변(홀자 · 받침 쪽). 그 축에서는 늘어난 몫의 3/4이 이쪽으로 간다. 안쪽 변이 없는 축은 반반. */
 export function innerSides(part: 'CH' | 'JO', layout: LayoutType): Side[] {
@@ -767,9 +783,9 @@ function pushJamo(boxes: Partial<Record<Part, BoxConfig>>, k: number, layout?: L
     const dw = box.width * (k - 1), dh = box.height * (k - 1)
     out[part] = { ...box, x: box.x - dw * sideShare(inner, 'l'), y: box.y - dh * sideShare(inner, 't'), width: box.width + dw, height: box.height + dh }
     if (part === 'CH') {
-      // 홀자는 0.1만 밀린다(먼 변은 그대로).
+      // 기둥은 닿자 크기에 따라(`pillarPush`), 보는 0.1만 밀린다(먼 변은 그대로).
       const side = mixed ? out.JU_V : vertical ? out.JU : undefined
-      if (side && inner.includes('r')) { const m = dw * PUSH.vowel, next = { ...side, x: side.x + m, width: Math.max(0.01, side.width - m) }; if (mixed) out.JU_V = next; else out.JU = next }
+      if (side && inner.includes('r')) { const m = dw * pillarPush(k), next = { ...side, x: side.x + m, width: Math.max(0.01, side.width - m) }; if (mixed) out.JU_V = next; else out.JU = next }
       const bar = mixed ? out.JU_H : !vertical ? out.JU : undefined
       if (bar && inner.includes('b')) { const m = dh * PUSH.vowel; if (mixed) out.JU_H = { ...bar, y: bar.y + m }; else out.JU = { ...bar, y: bar.y + m } }
     } else {
@@ -859,9 +875,17 @@ export function lookScale(boxes: Partial<Record<Part, BoxConfig>>, look: Look): 
   const far = (lo: number, hi: number) => Math.max(0.5 - lo, hi - 0.5)
   const fx = far(Math.min(...list.map((b) => b.x)), Math.max(...list.map((b) => b.x + b.width)))
   const fy = far(Math.min(...list.map((b) => b.y)), Math.max(...list.map((b) => b.y + b.height)))
-  const room = 0.5 - HALF_THICK * Math.min(lookOf(look, 'weight'), 2.25)
+  // 굵기는 안쪽으로만(거북이 2차 a = 0): 획이 굵어진 반만큼 칸을 안으로 당겨 잉크 바깥 끝을 그대로 둔다. 바깥 틀은 크기 줄 몫.
+  const grow = HALF_THICK * (thicknessOf(lookOf(look, 'weight')) - 1)
+  const inward = (far: number, s: number) => (far * s > grow + 0.05 ? (far * s - grow) / (far * s) : 1)
+  const ix = inward(fx, sx), iy = inward(fy, sy)
+  const room = 0.5 - HALF_THICK
   const fit = Math.min(1, fx * sx > room ? room / (fx * sx) : 1, fy * sy > room ? room / (fy * sy) : 1)
-  return { sx: sx * fit, sy: sy * fit }
+  return { sx: sx * ix * fit, sy: sy * iy * fit }
+}
+/** 굵기 값(400에 곱하는 비율) → 획 두께 배율(400 대비). */
+export function thicknessOf(weight: number): number {
+  return weightToMultiplier(Math.max(100, Math.min(900, 400 * weight))) / weightToMultiplier(400)
 }
 
 /** 무게중심 허리선이 실제로 오르는 만큼(칸 단위, + 위로). 곁줄기도 첫닿자 밑과 같은 만큼. */
@@ -1314,8 +1338,18 @@ export function growSides(boxes: Partial<Record<Part, BoxConfig>>, k: number, st
           : side === 'r' ? { ...b, width: b.width + dx }
           : side === 't' ? { ...b, y: b.y - dy, height: b.height + dy }
           : { ...b, height: b.height + dy }
-        const trial = { ...out, [part]: next }
-        if (ok(trial, thick)) out[part] = next
+        const trial: Partial<Record<Part, BoxConfig>> = { ...out, [part]: next }
+        // 첫닿자가 안쪽으로 자라면 이웃 홀자도 민다: 기둥은 닿자 크기에 따라(`pillarPush`), 보는 0.1.
+        if (layout && part === 'CH' && inner.includes(side) && (side === 'r' || side === 'b')) {
+          const mixed = layout.includes('jungseong-mixed'), vertical = isVertical(layout)
+          const key: Part | null = side === 'r' ? (mixed ? 'JU_V' : vertical ? 'JU' : null) : (mixed ? 'JU_H' : !vertical ? 'JU' : null)
+          const n = key ? trial[key] : undefined
+          if (key && n) {
+            const m = side === 'r' ? dx * pillarPush(k) : dy * PUSH.vowel
+            trial[key] = side === 'r' ? { ...n, x: n.x + m, width: Math.max(0.01, n.width - m) } : { ...n, y: n.y + m }
+          }
+        }
+        if (ok(trial, thick)) Object.assign(out, trial)
         else open.delete(part + side)
       }
     }

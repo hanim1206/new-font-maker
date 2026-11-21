@@ -20,7 +20,7 @@ import { Pressable } from './components/ui/pressable'
 import { Field, RangeBar } from './components/ui/range'
 import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
-import { applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, lookScale, serifSyllable, waistLift, nibBrush, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, nibBrush, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement } from './notoModel'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
@@ -193,13 +193,16 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const fencedOut = fenced?.boxes ?? grown.boxes
   // 풍선 닿자(하니무스 2026-11-21): 보이는 글자 그대로(굵기 · 울타리까지 입힌 뒤) 잰다. 닿자 칸의 변과 획 하나하나가 같이 부풀고,
   // 잉크가 옆 자소와 최소 틈에 닿은 변 · 획만 멈춘다. 처음부터 그보다 가까운 쌍은 처음 틈을 지킨다. 글자 칸(0~1) 밖으로는 잉크가 안 나간다.
-  const wantJamo = lookOf(look, 'jamo'), wantGap = lookOf(look, 'balloon')
+  const wantJamo = lookOf(look, 'jamo')
   const balloon = useMemo(() => {
     if (!fencedOut || wantJamo <= 1) return { syllable, boxes: fencedOut }
     const multiplier = weightToMultiplier(ratio === 1 ? effective.weight : scaledWeight(effective.weight, ratio))
     const startInk = inkStrokes(syllable, fencedOut, effective, multiplier)
     const target: Partial<Record<PartPair, number>> = {}
-    for (const [pair, near] of Object.entries(nearestBetweenParts(startInk)) as [PartPair, { gap: number }][]) target[pair] = Math.min(wantGap, near.gap)
+    // 바닥(거북이 2차): 틈이 획 굵기의 0.7배에 닿으면 그 변은 멈춘다. 처음부터 더 좁은 쌍은 처음 틈을 지킨다.
+    const thicks = startInk.map((stroke) => stroke.thickness ?? 0).filter((t) => t > 0).sort((a, b) => a - b)
+    const floor = GAP_FLOOR * (thicks[Math.floor(thicks.length / 2)] ?? 0.07)
+    for (const [pair, near] of Object.entries(nearestBetweenParts(startInk)) as [PartPair, { gap: number }][]) target[pair] = Math.min(floor, near.gap)
     const edge = inkReach(startInk)
     const lo = Math.min(-BALLOON_EDGE, edge.lo), hi = Math.max(1 + BALLOON_EDGE, edge.hi)
     // 닿자 굵기는 닿자 크기에서 뗀다(다람쥐 세 번째 맞추기 3번: 홀자와 굵기가 따로 놂). 칸만 부풀고 획 두께는 글줄 굵기 그대로.
@@ -209,7 +212,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       return r.lo >= lo - 1e-6 && r.hi <= hi + 1e-6 && balloonOk(nearestBetweenParts(ink), target)
     }, 8, syllable.layoutType)
     return { syllable: inflateSyllable(syllable, out.thick), boxes: out.boxes }
-  }, [fencedOut, wantJamo, wantGap, syllable, effective, ratio])
+  }, [fencedOut, wantJamo, syllable, effective, ratio])
   const boxes = balloon.boxes
   const round = lookOf(look, 'round'), contrast = lookOf(look, 'contrast'), nib = lookOf(look, 'nib')
   const globalStyle = useMemo(() => {
