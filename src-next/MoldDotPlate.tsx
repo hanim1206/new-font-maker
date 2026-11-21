@@ -5,7 +5,7 @@ import styles from './MoldLabPage.module.css'
 
 /**
  * 인상 잡기 도트판(하니무스 2026-11-21, 고양이 와이어프레임 "다" 안 · 만져 본 목업 그대로).
- * 판 한 장에 20×20 둥근 점, 값마다 세 줄 폭(값 일곱: 굵기 · 폭 · 키 · 닿자 크기 · 무게중심 · 둥글기 · 획 대비), 세로 한 칸 = 5.
+ * 판 한 장에 20×20 둥근 점, 값마다 두 줄 폭(값 아홉: 굵기 · 크기 · 폭 · 키 · 탈네모 · 닿자 크기 · 무게중심 · 둥글기 · 획 대비), 세로 한 칸 = 5.
  * - 판을 가로로 한 번 그으면 지나간 값마다 손 높이를 잡는다.
  * - 한 색 위에서 위아래로 끌면 그 값만 잡은 자리에서 손이 간 만큼(툭 뛰지 않게).
  * - 톡 누르면 그 줄이 누른 높이로. 맨 아래 점 아래로 내리면 0.
@@ -18,12 +18,14 @@ const OY = 44
 const S = N * P
 /** 값 수 · 값마다 세로줄 수 · 가로 칸 수. 판 너비는 그대로, 가로 칸 너비만 줄인다. */
 const G = DOT_KEYS.length
-const W = 3
+const W = 2
 const C = G * W
 const PX = S / C
-const NAMES = ['굵기', '폭', '키', '닿자 크기', '무게중심', '둥글기', '획 대비']
+const NAMES = ['굵기', '크기', '폭', '키', '탈네모', '닿자 크기', '무게중심', '둥글기', '획 대비']
+/** 판 밑에 쓰는 짧은 이름(두 줄 폭이 좁다). 읽기 줄은 긴 이름. */
+const SHORT = ['굵기', '크기', '폭', '키', '탈네모', '닿자', '중심', '둥글기', '대비']
 // 레퍼런스 점 판 색(이 화면에만 쓰는 외관 — 하니무스 결정 2026-11-21 "레퍼런스풍 외관은 이 화면에만").
-const COL = ['#D8552B', '#7357C9', '#2E9BA6', '#5B93C4', '#C9A227', '#1F5B45', '#A9335C'] // style-guard: allow 도트판 전용 값 색
+const COL = ['#D8552B', '#8A6A44', '#7357C9', '#2E9BA6', '#D97FA8', '#5B93C4', '#C9A227', '#1F5B45', '#A9335C'] // style-guard: allow 도트판 전용 값 색
 const OFF = '#bfc0c0' // style-guard: allow 도트판 꺼진 점
 const PLATE = '#e7e8e8' // style-guard: allow 도트판 바탕
 const INK = '#111111' // style-guard: allow 도트판 손 표시
@@ -32,7 +34,7 @@ const groupAt = (c: number) => Math.max(0, Math.min(G - 1, Math.floor(Math.max(0
 /** 값 b 가운데의 x. */
 const chipX = (b: number) => OX + PX * (b * W + W / 2)
 /** 몇 째 값인지 말로. */
-const COUNT = ['', '한', '두', '세', '네', '다섯', '여섯', '일곱'][G] ?? String(G)
+const COUNT = ['', '한', '두', '세', '네', '다섯', '여섯', '일곱', '여덟', '아홉'][G] ?? String(G)
 /** 손 높이(칸) → 칸 수 0~20. 맨 아래 점 아래로 내리면 0. */
 const dotOfRow = (r: number) => Math.max(0, Math.min(N, Math.round(r + 0.5)))
 
@@ -198,9 +200,9 @@ export function MoldDotPlate({ look, setLook, onBegin, onSay }: { look: Look; se
       return <g key={key} ref={(el) => { chipRefs.current[i].g = el }} data-testid={`mold-dot-${key}`}>
         <g ref={(el) => { chipRefs.current[i].c = el }}>
           <rect x={x - PX * W / 2 + 2.5} y={0} width={PX * W - 5} height={24} rx={7} fill={COL[i]} />
-          <text ref={(el) => { chipRefs.current[i].t = el }} x={x} y={17} textAnchor="middle" fontSize={13} fontWeight={600} fill={COL[i] === '#C9A227' ? INK : PLATE} /* style-guard: allow 겨자색 딱지만 검은 글씨 */ className={styles.dotNum} />
+          <text ref={(el) => { chipRefs.current[i].t = el }} x={x} y={17} textAnchor="middle" fontSize={12} fontWeight={600} fill={COL[i] === '#C9A227' ? INK : PLATE} /* style-guard: allow 겨자색 딱지만 검은 글씨 */ className={styles.dotNum} />
         </g>
-        <text x={x} y={OY + S + 34} textAnchor="middle" fontSize={NAMES[i].length > 3 ? 10 : 12} fontWeight={600} fill={INK}>{NAMES[i]}</text>
+        <text x={x} y={OY + S + 34} textAnchor="middle" fontSize={SHORT[i].length > 2 ? 10 : 11.5} fontWeight={600} fill={INK}>{SHORT[i]}</text>
       </g>
     })}
     <g ref={hintRef} pointerEvents="none">

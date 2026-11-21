@@ -292,7 +292,7 @@ describe('도트판 인상 잡기', () => {
     expect(dotToLook('jamo', 10)).toBe(1)
     expect(dotToLook('center', 10)).toBe(0)
     expect(dotToLook('round', 0)).toBe(0)
-    expect(dotsOf({})).toEqual([10, 10, 10, 10, 10, 0, 0])
+    expect(dotsOf({})).toEqual([10, 10, 10, 10, 0, 10, 10, 0, 0])
     expect(dotToLook('frame', 10)).toBe(1)
     expect(dotToLook('height', 0)).toBe(LOOK_WALL.height[0])
     for (let k = 0; k <= 20; k++) expect(lookToDot('jamo', dotToLook('jamo', k))).toBe(k)
@@ -308,15 +308,16 @@ describe('도트판 인상 잡기', () => {
   })
   it('무게중심(A안): 틀은 두고 첫닿자 밑변과 보만 허리선을 따라 오른다', async () => {
     const { impressBoxes, waistSyllable } = await import('./moldLab')
-    const out = impressBoxes(HORIZONTAL_FINAL, { center: 0.05 }, 'choseong-jungseong-horizontal-jongseong')
+    // 허리선은 첫닿자 키(0.3)의 비율만큼: 0.2 → 0.06
+    const out = impressBoxes(HORIZONTAL_FINAL, { center: 0.2 }, 'choseong-jungseong-horizontal-jongseong')
     expect(out.CH!.y).toBeCloseTo(0.05)
-    expect(out.CH!.height).toBeCloseTo(0.25)
-    expect(out.JU!.y).toBeCloseTo(0.33)
+    expect(out.CH!.height).toBeCloseTo(0.24)
+    expect(out.JU!.y).toBeCloseTo(0.32)
     expect(out.JO).toEqual(HORIZONTAL_FINAL.JO)
     // 세로홀자: 칸은 그대로, 곁줄기(가로 획)만 위로. 기둥은 그대로.
-    const v = impressBoxes(VERTICAL, { center: 0.05 }, 'choseong-jungseong-vertical')
+    const v = impressBoxes(VERTICAL, { center: 0.2 }, 'choseong-jungseong-vertical')
     expect(v.JU).toEqual(VERTICAL.JU)
-    expect(v.CH!.height).toBeCloseTo(0.55)
+    expect(v.CH!.height).toBeCloseTo(0.48)
     const stem = { id: 's', closed: false, thickness: 0.08, points: [{ x: 0.3, y: 0 }, { x: 0.3, y: 1 }] }
     const branch = { id: 'b', closed: false, thickness: 0.08, points: [{ x: 0.3, y: 0.5 }, { x: 0.8, y: 0.5 }] }
     const syllable = { char: '가', choseong: null, jongseong: null, layoutType: 'choseong-jungseong-vertical' as const, jungseong: { char: 'ㅏ', type: 'jungseong' as const, strokes: [stem, branch] } }
@@ -348,5 +349,35 @@ describe('풍선 닿자', () => {
     expect(out.choseong!.strokes![0].thickness).toBeCloseTo(12)
     expect(out.jongseong!.strokes![0].thickness).toBeCloseTo(12)
     expect(out.jungseong!.strokes![0].thickness).toBe(10)
+  })
+})
+
+describe('인상 · 획 다듬기 값', () => {
+  const line = (id: string, a: [number, number], b: [number, number]) => ({ id, closed: false, thickness: 0.08, points: [{ x: a[0], y: a[1] }, { x: b[0], y: b[1] }] })
+  const ga = { char: '가', choseong: null, jongseong: null, layoutType: 'choseong-jungseong-vertical' as const, jungseong: { char: 'ㅏ', type: 'jungseong' as const, strokes: [line('s', [0.3, 0], [0.3, 1]), line('b', [0.3, 0.5], [0.8, 0.5])] } }
+  it('곁줄기 길이: 기둥에 붙은 끝은 두고 바깥 끝만', async () => {
+    const { branchSyllable } = await import('./moldLab')
+    const out = branchSyllable(ga, 0.4).jungseong!.strokes!
+    expect(out[0]).toEqual(ga.jungseong.strokes[0])
+    expect(out[1].points[0].x).toBeCloseTo(0.3)
+    expect(out[1].points[1].x).toBeCloseTo(0.5)
+  })
+  it('부리는 획을 덧대고, 흔들림은 같은 글자에 늘 같다', async () => {
+    const { serifSyllable, wobbleSyllable } = await import('./moldLab')
+    expect(serifSyllable(ga, 1, VERTICAL).jungseong!.strokes!.length).toBe(4)
+    expect(serifSyllable(ga, 0, VERTICAL)).toBe(ga)
+    const a = wobbleSyllable(ga, 1, VERTICAL), b = wobbleSyllable(ga, 1, VERTICAL)
+    expect(a).toEqual(b)
+    expect(a.jungseong!.strokes![0].points.length).toBe(3)
+  })
+  it('탈네모: 받침 없는 글자만 윗변을 두고 짧아진다 · 넘치면 비율 두고 줄여 넣는다', async () => {
+    const { lookBoxes, lookScale } = await import('./moldLab')
+    const short = lookBoxes(VERTICAL, { open: 0.6 }, 'choseong-jungseong-vertical')
+    expect(short.JU!.y).toBeCloseTo(0.05)
+    expect(short.JU!.height).toBeCloseTo(0.54)
+    expect(lookBoxes(HORIZONTAL_FINAL, { open: 0.6 }, 'choseong-jungseong-horizontal-jongseong')).toEqual(HORIZONTAL_FINAL)
+    const { sx, sy } = lookScale(VERTICAL, { frame: 1.45 })
+    expect(sx).toBeLessThan(1.45)
+    expect(sx / sy).toBeCloseTo(1.45)
   })
 })

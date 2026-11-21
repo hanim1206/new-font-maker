@@ -17,10 +17,11 @@ import { pointsToSvgD } from '../src/utils/pathUtils'
 import { Button } from './components/ui/button'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { Pressable } from './components/ui/pressable'
+import { Field, RangeBar } from './components/ui/range'
 import { Switch } from './components/ui/switch'
 import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
-import { applyPartEdits, appliedWeight, balloonOk, balloonStrokeIds, growSides, inflateSyllable, waistSyllable, BALLOON_GAPS, type BalloonGap, dragLook, dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, lookScale, serifSyllable, waistLift, wobbleSyllable, inflateSyllable, waistSyllable, BALLOON_GAPS, type BalloonGap, dragLook, dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement } from './notoModel'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
@@ -43,7 +44,10 @@ const STEP_NAMES: Record<Step, string> = { draw: '긋기', shape: '인상 잡기
 const STEP_ORDER: readonly Step[] = ['draw', 'shape', 'part', 'stroke']
 /** 획 다듬기(하니무스 2026-11-21 "인상 → 부위 → 획"). 이번엔 자리와 뼈대만 — 획 끝 하나, 부리 · 꺾임은 다음에. */
 const STROKE_ENDS = [{ key: 'sharp', name: '또렷', soft: 0 }, { key: 'round', name: '둥긂', soft: 1 }] as const
-const STROKE_LATER = ['부리', '꺾임'] as const
+/** 획 다듬기 막대 셋. 값 0~100으로 보이고, 안에서는 벽 사이로 잇는다. */
+const STROKE_BARS = [{ key: 'branch', name: '곁줄기 길이' }, { key: 'serif', name: '부리' }, { key: 'wobble', name: '손글씨 흔들림' }] as const
+const STROKE_KEYS = ['soft', 'branch', 'serif', 'wobble'] as const
+const STROKE_LATER = ['꺾임'] as const
 
 /** 그은 줄기를 자모에 입힌 것. 닿자는 짜임마다 칸 비율이 달라 짜임별로 따로. */
 interface Drawn {
@@ -59,7 +63,7 @@ const SLOT_COLOR: Record<SimsPart, string> = { CH: EDIT_COLOR.editSlotCh, JU: ED
 /** 풀린 상자로 중심선을 얻는다(굵기 배율 1). 틈 재기용. */
 function gapStrokesOf(syllable: DecomposedSyllable, boxes: NonNullable<Parameters<typeof resolveGlyphInkPrimitives>[0]['placement']>, linecap: Parameters<typeof resolveGlyphInkPrimitives>[0]['globalLinecap'], linejoin: Parameters<typeof resolveGlyphInkPrimitives>[0]['globalLinejoin']): GapStroke[] {
   const result = resolveGlyphInkPrimitives({ syllable, placement: boxes, weightMultiplier: 1, globalLinecap: linecap, globalLinejoin: linejoin, horizontalInkBounds: { min: 0, max: 1 } })
-  return result.primitives.map((primitive) => ({ points: primitive.stroke.points, closed: primitive.stroke.closed, box: primitive.box, thickness: primitive.stroke.thickness, part: primitive.source.part.startsWith('JU') ? 'JU' : primitive.source.part }))
+  return result.primitives.map((primitive) => ({ points: primitive.stroke.points, closed: primitive.stroke.closed, box: primitive.box, thickness: primitive.stroke.thickness, part: primitive.source.part }))
 }
 
 /** 굵기 배율 상한 → 그 아래에서 가장 굵은 굵기 값(100–900). */
@@ -151,7 +155,10 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const shaped = useMemo(() => {
     if (placement.kind !== 'boxes') return { syllable: raw, boxes: undefined }
     const boxes = moldedBoxes(placement.boxes, raw.layoutType, edits, { ...look, jamo: Math.min(1, lookOf(look, 'jamo')) })
-    return { boxes, syllable: waistSyllable(raw, lookOf(look, 'center'), boxes) }
+    // 허리선 → 곁줄기 길이 → 손글씨 흔들림 → 부리 순서로(부리는 흔든 획 끝에 붙는다) 획을 고친다(획 다듬기 값은 획 모양만 바꾸고 칸은 두지 않는다).
+    const waisted = waistSyllable(raw, waistLift(look, boxes), boxes)
+    const stroked = serifSyllable(wobbleSyllable(branchSyllable(waisted, lookOf(look, 'branch')), lookOf(look, 'wobble'), boxes), lookOf(look, 'serif'), boxes)
+    return { boxes, syllable: stroked }
   }, [placement, raw, edits, look])
   const syllable = shaped.syllable
   const molded = shaped.boxes
@@ -196,7 +203,8 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     for (const [pair, near] of Object.entries(nearestBetweenParts(startInk)) as [PartPair, { gap: number }][]) target[pair] = Math.min(wantGap, near.gap)
     const edge = inkReach(startInk)
     const lo = Math.min(-BALLOON_EDGE, edge.lo), hi = Math.max(1 + BALLOON_EDGE, edge.hi)
-    const out = growSides(fencedOut, wantJamo, balloonStrokeIds(syllable), (trial, thick) => {
+    // 닿자 굵기는 닿자 크기에서 뗀다(다람쥐 세 번째 맞추기 3번: 홀자와 굵기가 따로 놂). 칸만 부풀고 획 두께는 글줄 굵기 그대로.
+    const out = growSides(fencedOut, wantJamo, {}, (trial, thick) => {
       const ink = inkStrokes(inflateSyllable(syllable, thick), trial, effective, multiplier)
       const r = inkReach(ink)
       return r.lo >= lo - 1e-6 && r.hi <= hi + 1e-6 && balloonOk(nearestBetweenParts(ink), target)
@@ -223,7 +231,8 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   }, [sel, shownStroke, highlight])
 
   // 폭이 좁아지면 글자 칸도 같이 좁힌다. 자간은 글자 사이를 더하거나 뺀다.
-  const slot = { width: size * lookOf(look, 'frame') * lookOf(look, 'size') + size * lookOf(look, 'tracking'), marginInline: 0 }
+  const scale = placement.kind === 'boxes' ? lookScale(placement.boxes, look).sx : lookOf(look, 'frame') * lookOf(look, 'size')
+  const slot = { width: size * scale + size * lookOf(look, 'tracking'), marginInline: 0 }
   return <span className={styles.glyph} style={slot} data-testid={testId}>
     <SvgRenderer
       syllable={balloon.syllable}
@@ -360,7 +369,7 @@ function useSpring(target: Record<string, number>): Record<string, number> {
   return cur.current
 }
 
-const LOOK_KEYS = ['weight', 'soft', 'frame', 'tracking', 'size', 'height', 'jamo', 'center', 'round', 'contrast', 'balloon'] as const
+const LOOK_KEYS = ['weight', 'soft', 'frame', 'tracking', 'size', 'height', 'jamo', 'center', 'round', 'contrast', 'balloon', 'open', 'branch', 'serif', 'wobble'] as const
 const STAGE = 220
 const ALL_PARTS: readonly Part[] = ['CH', 'JU', 'JU_H', 'JU_V', 'JO']
 /** 기둥 선을 1(글자 단위) 끌면 굵기 비율이 이만큼 바뀐다. 끝에서 끝(0.25~2.25)까지 무대의 2/3쯤 — 조금 끌어 최대로 튀지 않게(하니무스 2026-11-21). */
@@ -786,8 +795,8 @@ export function MoldLabPage() {
   const resetRegion = () => {
     remember()
     // 인상은 통째로, 칸은 서로 맞물려 있어 짜임째로 되돌린다.
-    if (step === 'shape') setLook((now) => ({ soft: now.soft }))
-    else if (step === 'stroke') setLook((now) => ({ ...now, soft: undefined }))
+    if (step === 'shape') setLook((now) => Object.fromEntries(STROKE_KEYS.map((key) => [key, now[key]])))
+    else if (step === 'stroke') setLook((now) => ({ ...now, ...Object.fromEntries(STROKE_KEYS.map((key) => [key, undefined])) }))
     else setEdits((now) => { const copy = { ...now }; delete copy[layoutOfFocus]; return copy })
   }
 
@@ -874,6 +883,12 @@ export function MoldLabPage() {
               {STROKE_ENDS.map((end) => <ChoiceItem key={end.key} checked={(lookOf(look, 'soft') > 0.5 ? 1 : 0) === end.soft} onClick={() => { remember(); setLook({ ...look, soft: end.soft }) }} data-testid={`stroke-end-${end.key}`}>{end.name}</ChoiceItem>)}
             </ChoiceGroup>
           </div>
+          {STROKE_BARS.map((bar) => {
+            const [lo, hi] = LOOK_WALL[bar.key], value = lookOf(look, bar.key), pct = Math.round((value - lo) / (hi - lo) * 100)
+            return <Field key={bar.key} label={bar.name} value={pct}>
+              <RangeBar min={0} max={100} value={pct} onPointerDown={remember} onKeyDown={remember} onChange={(event) => setLook({ ...look, [bar.key]: lo + (hi - lo) * Number(event.currentTarget.value) / 100 })} aria-label={bar.name} data-testid={`stroke-${bar.key}`} />
+            </Field>
+          })}
           {STROKE_LATER.map((name) => <div key={name} className={styles.fenceLine}><span>{name}</span><span className={styles.skipNote}>다음에 넣어요</span></div>)}
         </section>
         : <SimsStep mode={step} weightNote={weightNote} fence={compare ? undefined : fence} char={focusChar} drawn={drawn} edits={edits} setEdits={setEdits} look={look} setLook={setLook} weightCap={weightCap} sel={sel} setSel={setSel} onBegin={remember} />}
