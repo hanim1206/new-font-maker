@@ -482,9 +482,10 @@ export type LayoutEdits = Partial<Record<LayoutType, PartEdits>>
 /**
  * 전체 값. 도트판 인상 잡기(하니무스 2026-11-21)가 다섯 값을 더 쓴다:
  * jamo = 닿자(첫닿자 · 받침) 크기 배율(제 칸 가운데를 붙든 채 가로세로 같이), center = 무게중심(+ 위로, 글자 단위),
+ * balloon = 풍선 닿자의 획 사이 최소 틈(em, 사용자가 고름),
  * round = 끝 · 모서리 둥글기(0~1, 붓 둥글기), contrast = 획 대비(0~1, + 는 세로 굵게 · 가로 가늘게).
  */
-export interface Look { weight?: number; soft?: number; frame?: number; tracking?: number; size?: number; height?: number; jamo?: number; center?: number; round?: number; contrast?: number }
+export interface Look { weight?: number; soft?: number; frame?: number; tracking?: number; size?: number; height?: number; jamo?: number; center?: number; round?: number; contrast?: number; balloon?: number }
 export type Dir = 'up' | 'down' | 'left' | 'right' | 'ul' | 'ur' | 'dl' | 'dr'
 export interface RegionLabels { name: string; up: string; down: string; left: string; right: string }
 
@@ -493,8 +494,8 @@ export interface RegionLabels { name: string; up: string; down: string; left: st
  * 굵기는 기본 굵기(400)에 곱하는 비율이라 엔진이 그리는 100~900 전체(두께 ×0.40~1.95)가 들어오게 0.25~2.25(다람쥐 검수 2026-11-21 "굵기 폭 넓히기").
  * 크기 · 키 · 폭은 글자 가운데를 두고 늘이고 줄인다. 값은 아직 임시다.
  */
-export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.7, 1.25], tracking: [-0.08, 0.2], size: [0.6, 1.15], height: [0.7, 1.15], jamo: [0.6, 1.3], center: [-0.12, 0.12], round: [0, 1], contrast: [0, 0.9] } as const
-const LOOK_ENGINE = { weight: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0 } as const
+export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.7, 1.25], tracking: [-0.08, 0.2], size: [0.6, 1.15], height: [0.7, 1.15], jamo: [0.6, 1.3], center: [-0.12, 0.12], round: [0, 1], contrast: [0, 0.9], balloon: [0.01, 0.045] } as const
+const LOOK_ENGINE = { weight: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.025 } as const
 const clampLook = (key: keyof typeof LOOK_WALL, value: number) => Math.max(LOOK_WALL[key][0], Math.min(LOOK_WALL[key][1], value))
 export const lookOf = (look: Look, key: keyof Look) => look[key] ?? LOOK_ENGINE[key]
 
@@ -908,3 +909,61 @@ export function lookToDot(key: DotKey, value: number): number {
   return best
 }
 export const dotsOf = (look: Look): number[] => DOT_KEYS.map((key) => lookToDot(key, lookOf(look, key)))
+
+// ── 풍선 닿자(하니무스 2026-11-21): 닿자가 커지다 옆 획에 닿을 만큼 가까워지면 서로 밀어내 최소 틈을 지킨다 ──
+
+/** 획 사이 최소 틈(em) 고르기. 사용자가 정한다. */
+export const BALLOON_GAPS = { narrow: 0.01, normal: 0.025, wide: 0.045 } as const
+export type BalloonGap = keyof typeof BALLOON_GAPS
+type PairKey = 'CH-JU' | 'JU-JO' | 'CH-JO'
+type Near = { gap: number; dx: number; dy: number }
+const GROUP_PARTS: Record<'CH' | 'JU' | 'JO', readonly Part[]> = { CH: ['CH'], JU: ['JU', 'JU_H', 'JU_V'], JO: ['JO'] }
+
+const EDGE: [number, number] = [0.02, 0.98]
+/** 칸을 글자 끝 안으로: 넘친 쪽 변만 잘라 줄인다(밀려서 눌리는 모양). */
+const squeezeIn = (b: BoxConfig): BoxConfig => {
+  let { x, y, width, height } = b
+  if (x < EDGE[0]) { width -= EDGE[0] - x; x = EDGE[0] }
+  if (y < EDGE[0]) { height -= EDGE[0] - y; y = EDGE[0] }
+  if (x + width > EDGE[1]) width = EDGE[1] - x
+  if (y + height > EDGE[1]) height = EDGE[1] - y
+  return { x, y, width: Math.max(0.02, width), height: Math.max(0.02, height) }
+}
+/** 칸을 글자 끝 안으로: 크기는 지키고 자리만 옮긴다(넘치면 그때만 줄인다). */
+const shiftIn = (b: BoxConfig): BoxConfig => {
+  const span = EDGE[1] - EDGE[0]
+  const width = Math.min(b.width, span), height = Math.min(b.height, span)
+  return { x: Math.max(EDGE[0], Math.min(EDGE[1] - width, b.x + (b.width - width) / 2)), y: Math.max(EDGE[0], Math.min(EDGE[1] - height, b.y + (b.height - height) / 2)), width, height }
+}
+
+/**
+ * 풍선 닿자: 키운 닿자(첫닿자 · 받침)는 크기를 지킨 채 글자 끝 안으로 들이고, 옆 자소와 틈이 `target` 아래면
+ * 가장 가까운 방향으로 밀어낸다. 밀린 자소가 글자 끝에 닿으면 넘친 쪽이 눌려 줄어든다 — 닿자가 부풀고 옆이 눌리는 모양.
+ * 몇 번 되풀이해 맞춘다. `nearestOf`는 칸으로 그린 잉크에서 자소 쌍마다 가장 가까운 자리(틈 · 첫 자소 → 둘째 자소 방향)를 낸다.
+ */
+export function balloonBoxes(boxes: Partial<Record<Part, BoxConfig>>, nearestOf: (boxes: Partial<Record<Part, BoxConfig>>) => Partial<Record<PairKey, Near>>, target: Partial<Record<PairKey, number>>, rounds = 10): Partial<Record<Part, BoxConfig>> {
+  const out = { ...boxes }
+  for (const part of ['CH', 'JO'] as const) { const b = out[part]; if (b) out[part] = shiftIn(b) }
+  for (let round = 0; round < rounds; round++) {
+    const near = nearestOf(out)
+    let moved = false
+    for (const [pair, want] of Object.entries(target) as [PairKey, number][]) {
+      const n = near[pair]
+      if (!n || n.gap >= want - 1e-4) continue
+      const len = Math.hypot(n.dx, n.dy)
+      // 방향이 없으면(겹쳐 중심이 같으면) 위아래로 민다.
+      const [ux, uy] = len > 1e-6 ? [n.dx / len, n.dy / len] : [0, 1]
+      const [first, second] = pair.split('-') as ['CH' | 'JU', 'JU' | 'JO']
+      // 키운 닿자는 덜 밀리고 홀자가 더 밀린다(닿자가 부푸는 쪽).
+      const share = (group: 'CH' | 'JU' | 'JO') => (group === 'JU' ? 0.75 : 0.25)
+      const need = want - n.gap + 0.002, total = share(first) + share(second)
+      for (const [group, sign] of [[first, -1], [second, 1]] as const) for (const part of GROUP_PARTS[group]) {
+        const b = out[part], d = need * share(group) / total
+        if (b) out[part] = squeezeIn({ ...b, x: b.x + sign * ux * d, y: b.y + sign * uy * d })
+      }
+      moved = true
+    }
+    if (!moved) break
+  }
+  return out
+}

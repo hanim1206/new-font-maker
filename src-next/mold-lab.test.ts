@@ -312,3 +312,25 @@ describe('도트판 인상 잡기', () => {
     expect(out.JO!.y).toBeCloseTo(0.58)
   })
 })
+
+describe('풍선 닿자', () => {
+  it('틈이 모자라면 두 자소를 반씩 밀어내고, 넉넉하면 그대로 둔다', async () => {
+    const { balloonBoxes } = await import('./moldLab')
+    // 칸 사이 가로 거리를 틈으로 보는 가짜 잉크
+    const near = (b: Record<string, { x: number; width: number } | undefined>) => ({ 'CH-JU': { gap: b.JU!.x - (b.CH!.x + b.CH!.width), dx: 1, dy: 0 } })
+    const tight = { CH: box(0.1, 0.2, 0.48, 0.6), JU: box(0.6, 0.05, 0.3, 0.9) }
+    const out = balloonBoxes(tight, near, { 'CH-JU': 0.05 })
+    expect(out.JU!.x - (out.CH!.x + out.CH!.width)).toBeGreaterThanOrEqual(0.05 - 1e-3)
+    expect(out.CH!.width).toBeCloseTo(0.48)
+    expect(balloonBoxes(VERTICAL, near, { 'CH-JU': 0.05 })).toEqual(VERTICAL)
+  })
+  it('밀린 자소가 글자 끝에 닿으면 넘친 쪽이 눌려 줄어든다', async () => {
+    const { balloonBoxes } = await import('./moldLab')
+    const near = (b: Record<string, { x: number; width: number } | undefined>) => ({ 'CH-JU': { gap: b.JU!.x - (b.CH!.x + b.CH!.width), dx: 1, dy: 0 } })
+    const wide = { CH: box(0.02, 0.2, 0.6, 0.6), JU: box(0.62, 0.05, 0.36, 0.9) }
+    const out = balloonBoxes(wide, near, { 'CH-JU': 0.06 }, 20)
+    expect(out.JU!.x + out.JU!.width).toBeLessThanOrEqual(0.98 + 1e-6)
+    expect(out.JU!.width).toBeLessThan(0.36)
+    expect(out.JU!.x - (out.CH!.x + out.CH!.width)).toBeGreaterThanOrEqual(0.06 - 1e-3)
+  })
+})

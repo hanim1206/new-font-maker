@@ -19,8 +19,8 @@ import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { Pressable } from './components/ui/pressable'
 import { Switch } from './components/ui/switch'
 import { EDIT_COLOR } from './editColors'
-import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair } from './fenceBand'
-import { applyPartEdits, appliedWeight, dragLook, dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
+import { applyPartEdits, appliedWeight, balloonBoxes, BALLOON_GAPS, type BalloonGap, dragLook, dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement } from './notoModel'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
@@ -93,6 +93,7 @@ function useGlyphBase(char: string, drawn: Drawn | undefined) {
 /** 울타리 켬 · 선. 자소 줄이는 비율은 글줄 전체가 같이 쓴다(가장 많이 줄여야 하는 글자의 것). */
 interface MoldFence { on: boolean; line: FenceLine; scale: number }
 const FENCE_LINE_NAMES: Record<FenceLine, string> = { safe: '안전선', limit: '한계선' }
+const BALLOON_NAMES: Record<BalloonGap, string> = { narrow: '좁게', normal: '보통', wide: '넓게' }
 
 /** 렌더러와 같은 입구로 풀어 잰다(획 긋기 시험판의 `FencedGlyph`와 같은 길). */
 function fenceMeasured(syllable: DecomposedSyllable, placement: GlyphInkPlacement, style: GlobalStyle) {
@@ -142,7 +143,19 @@ function moldedBoxes(boxes: Partial<Record<Part, BoxConfig>>, layout: LayoutType
 function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke, testId, weightCap = Infinity, onCap, fence, onFence }: { char: string; size: number; edits: LayoutEdits; look: Look; drawn?: Drawn; sel?: Region | null; highlight?: readonly Part[]; shownStroke?: (key: string) => boolean; testId?: string; weightCap?: number; onCap?: (ratio: number) => void; fence?: MoldFence; onFence?: (need: number, pulls: readonly FencePull[]) => void }) {
   const { syllable, effective, placement, padding } = useGlyphBase(char, drawn)
   const base = useGlyphBase(char, undefined)
-  const molded = useMemo(() => placement.kind === 'boxes' ? moldedBoxes(placement.boxes, syllable.layoutType, edits, look) : undefined, [placement, syllable.layoutType, edits, look])
+  // 닿자를 키우면 풍선처럼: 옆 획에 최소 틈보다 가까워지면 서로 밀어내고, 글자 끝을 넘으면 전체를 같이 줄인다(하니무스 2026-11-21).
+  const molded = useMemo(() => {
+    if (placement.kind !== 'boxes') return undefined
+    const boxes = moldedBoxes(placement.boxes, syllable.layoutType, edits, look)
+    if (lookOf(look, 'jamo') <= 1) return boxes
+    const multiplier = weightToMultiplier(effective.weight)
+    const nearestOf = (b: Partial<Record<Part, BoxConfig>>) => nearestBetweenParts(inkStrokes(syllable, b, effective, multiplier))
+    const baseline = nearestOf(moldedBoxes(placement.boxes, syllable.layoutType, edits, { ...look, jamo: 1 }))
+    const want = lookOf(look, 'balloon')
+    const target: Partial<Record<PartPair, number>> = {}
+    for (const [pair, near] of Object.entries(baseline) as [PartPair, { gap: number }][]) target[pair] = Math.min(want, Math.max(0, near.gap))
+    return balloonBoxes(boxes, nearestOf, target)
+  }, [placement, syllable, edits, look, effective])
 
   // 굵기는 글줄 전체가 같다(다람쥐 검수 1번). 글자마다 "자소를 끝까지 키워도 획이 안 붙는 가장 굵은 비율"을 올리고, 글줄은 가장 작은 것을 다 같이 쓴다.
   // 그 굵기 안에서 획이 붙을 자리(ㄹ 가로 사이 등)가 생기는 글자만 자소 칸을 조금 키워 틈을 낸다 — 굵은 폰트도 자소가 줄지 않고 조금 커진다(거북이 자소별 표 2절).
@@ -329,7 +342,7 @@ function useSpring(target: Record<string, number>): Record<string, number> {
   return cur.current
 }
 
-const LOOK_KEYS = ['weight', 'soft', 'frame', 'tracking', 'size', 'height'] as const
+const LOOK_KEYS = ['weight', 'soft', 'frame', 'tracking', 'size', 'height', 'jamo', 'center', 'round', 'contrast', 'balloon'] as const
 const STAGE = 220
 const ALL_PARTS: readonly Part[] = ['CH', 'JU', 'JU_H', 'JU_V', 'JO']
 /** 기둥 선을 1(글자 단위) 끌면 굵기 비율이 이만큼 바뀐다. 끝에서 끝(0.25~2.25)까지 무대의 2/3쯤 — 조금 끌어 최대로 튀지 않게(하니무스 2026-11-21). */
@@ -802,6 +815,12 @@ export function MoldLabPage() {
         ? <section className={styles.panel} aria-label="인상 잡기">
           <MoldDotPlate look={look} setLook={setLook} onBegin={remember} onSay={setPlateSay} />
           <p className={styles.simsReadout} data-testid="mold-readout">{plateSay}{weightNote ? <><br />{weightNote}</> : null}</p>
+          <div className={styles.fenceLine} data-testid="balloon-gap">
+            <span>닿자를 키울 때 획 사이 최소 틈</span>
+            <ChoiceGroup variant="segment" aria-label="획 사이 최소 틈" className={styles.fenceLineSwitch}>
+              {(Object.keys(BALLOON_GAPS) as BalloonGap[]).map((key) => <ChoiceItem key={key} checked={Math.abs(lookOf(look, 'balloon') - BALLOON_GAPS[key]) < 1e-9} onClick={() => { remember(); setLook({ ...look, balloon: BALLOON_GAPS[key] }) }} data-testid={`balloon-${key}`}>{BALLOON_NAMES[key]}</ChoiceItem>)}
+            </ChoiceGroup>
+          </div>
         </section>
         : <SimsStep mode={step} weightNote={weightNote} fence={compare ? undefined : fence} char={focusChar} drawn={drawn} edits={edits} setEdits={setEdits} look={look} setLook={setLook} weightCap={weightCap} sel={sel} setSel={setSel} onBegin={remember} />}
       <div className={styles.moldActions}>
