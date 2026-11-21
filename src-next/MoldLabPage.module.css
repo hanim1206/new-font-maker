@@ -161,3 +161,9 @@
   font-family: var(--font-mono, ui-monospace, monospace);
   font-variant-numeric: tabular-nums;
 }
+.fenceTools { display: flex; flex: none; align-items: center; gap: 4px; }
+.fenceChevron { transition: transform .15s; }
+.fenceChevron[data-open] { transform: rotate(180deg); }
+/* 인상 잡기: 글줄을 낮춰 도트판과 한 화면에 */
+.line[data-compact] { min-height: 64px; }
+.dotPlate { max-width: 300px; margin-inline: auto; }

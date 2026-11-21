@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
-import { Check, ChevronRight, Dices, RotateCcw, Undo2 } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Dices, RotateCcw, Undo2 } from 'lucide-react'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
 import type { PenPoint } from '../src/services/penStrokeFit'
@@ -20,7 +20,7 @@ import { Pressable } from './components/ui/pressable'
 import { Switch } from './components/ui/switch'
 import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
-import { applyPartEdits, appliedWeight, balloonBoxes, BALLOON_GAPS, type BalloonGap, dragLook, dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { applyPartEdits, appliedWeight, balloonOk, growSides, inflateSyllable, waistSyllable, BALLOON_GAPS, type BalloonGap, dragLook, dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement } from './notoModel'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
@@ -133,7 +133,7 @@ function fencedBoxes(input: { syllable: DecomposedSyllable; baseSyllable: Decomp
 
 /** 칸 편집(짜임) → 크기 · 키 · 폭(전체) 순서로 입힌 칸. 편집은 폭을 뺀 글자 단위다. */
 function moldedBoxes(boxes: Partial<Record<Part, BoxConfig>>, layout: LayoutType, edits: LayoutEdits, look: Look) {
-  return lookBoxes(applyPartEdits(boxes, edits[layout]), look)
+  return lookBoxes(applyPartEdits(boxes, edits[layout]), look, layout)
 }
 
 /**
@@ -141,21 +141,33 @@ function moldedBoxes(boxes: Partial<Record<Part, BoxConfig>>, layout: LayoutType
  * `sel`이 있으면 고른 부위만 제 색으로, 나머지는 옅게 그린다.
  */
 function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke, testId, weightCap = Infinity, onCap, fence, onFence }: { char: string; size: number; edits: LayoutEdits; look: Look; drawn?: Drawn; sel?: Region | null; highlight?: readonly Part[]; shownStroke?: (key: string) => boolean; testId?: string; weightCap?: number; onCap?: (ratio: number) => void; fence?: MoldFence; onFence?: (need: number, pulls: readonly FencePull[]) => void }) {
-  const { syllable, effective, placement, padding } = useGlyphBase(char, drawn)
+  const { syllable: raw, effective, placement, padding } = useGlyphBase(char, drawn)
   const base = useGlyphBase(char, undefined)
-  // 닿자를 키우면 풍선처럼: 옆 획에 최소 틈보다 가까워지면 서로 밀어내고, 글자 끝을 넘으면 전체를 같이 줄인다(하니무스 2026-11-21).
-  const molded = useMemo(() => {
-    if (placement.kind !== 'boxes') return undefined
-    const boxes = moldedBoxes(placement.boxes, syllable.layoutType, edits, look)
-    if (lookOf(look, 'jamo') <= 1) return boxes
+  // 무게중심(거북이 A안): ㅏ · ㅓ 곁줄기 높이는 획에서, 첫닿자 밑변 · 보는 칸에서(`impressBoxes`) 옮긴다.
+  // 풍선 닿자(하니무스 2026-11-21): 닿자 칸의 변과 획이 같이 부풀고, 옆 획과 최소 틈에 닿은 변만 멈춘다 — 굵기를 줄여 맞추지 않는다.
+  const shaped = useMemo(() => {
+    if (placement.kind !== 'boxes') return { syllable: raw, boxes: undefined, jamo: 1 }
+    const at = (jamo: number) => {
+      const lookAt = { ...look, jamo }
+      const boxes = moldedBoxes(placement.boxes, raw.layoutType, edits, lookAt)
+      return { boxes, syllable: inflateSyllable(waistSyllable(raw, lookOf(look, 'center'), boxes), Math.max(1, jamo)) }
+    }
+    const wantJamo = lookOf(look, 'jamo')
+    if (wantJamo <= 1 && lookOf(look, 'center') === 0) return { ...at(wantJamo), jamo: wantJamo }
     const multiplier = weightToMultiplier(effective.weight)
-    const nearestOf = (b: Partial<Record<Part, BoxConfig>>) => nearestBetweenParts(inkStrokes(syllable, b, effective, multiplier))
-    const baseline = nearestOf(moldedBoxes(placement.boxes, syllable.layoutType, edits, { ...look, jamo: 1 }))
+    // 기준 틈: 닿자 크기 · 무게중심을 엔진 그대로 둔 모습. 가 · 카처럼 곁줄기가 첫닿자에 가까워져도 이 틈(최소 틈까지)은 지킨다.
+    const baseline = nearestBetweenParts(inkStrokes(raw, moldedBoxes(placement.boxes, raw.layoutType, edits, { ...look, jamo: 1, center: 0 }), effective, multiplier))
     const want = lookOf(look, 'balloon')
     const target: Partial<Record<PartPair, number>> = {}
     for (const [pair, near] of Object.entries(baseline) as [PartPair, { gap: number }][]) target[pair] = Math.min(want, Math.max(0, near.gap))
-    return balloonBoxes(boxes, nearestOf, target)
-  }, [placement, syllable, edits, look, effective])
+    // 변마다 따로 부푼다: 닿자 칸(엔진 그대로 크기)의 네 변과 획 두께를 조금씩 키우고, 최소 틈에 막힌 변만 멈춘다.
+    const start = at(1)
+    if (wantJamo <= 1) return { ...at(wantJamo), jamo: wantJamo }
+    const grown = growSides(start.boxes, wantJamo, (boxes, thick) => balloonOk(nearestBetweenParts(inkStrokes(inflateSyllable(start.syllable, thick), boxes, effective, multiplier)), target))
+    return { syllable: inflateSyllable(start.syllable, grown.thick), boxes: grown.boxes, jamo: wantJamo }
+  }, [placement, raw, edits, look, effective])
+  const syllable = shaped.syllable
+  const molded = shaped.boxes
 
   // 굵기는 글줄 전체가 같다(다람쥐 검수 1번). 글자마다 "자소를 끝까지 키워도 획이 안 붙는 가장 굵은 비율"을 올리고, 글줄은 가장 작은 것을 다 같이 쓴다.
   // 그 굵기 안에서 획이 붙을 자리(ㄹ 가로 사이 등)가 생기는 글자만 자소 칸을 조금 키워 틈을 낸다 — 굵은 폰트도 자소가 줄지 않고 조금 커진다(거북이 자소별 표 2절).
@@ -688,6 +700,8 @@ export function MoldLabPage() {
   const weightNote = appliedWeight(lookOf(look, 'weight'), weightCap) < lookOf(look, 'weight') ? '획이 붙기 직전이라 글줄 전체가 여기서 멈춤' : ''
   // 울타리 보정(획 긋기 시험판에서 가져옴). 켜면 그은 획 때문에 울타리 밖으로 나간 글자를 당긴다.
   const [fenceOn, setFenceOn] = useState(true)
+  // 인상 잡기에서는 울타리 카드를 접어 글줄과 도트판이 폰 한 화면에 들어오게(하니무스 2026-11-21).
+  const [fenceOpen, setFenceOpen] = useState(false)
   const [fenceLine, setFenceLine] = useState<FenceLine>('safe')
   const [fenceReports, setFenceReports] = useState<Record<string, { need: number; pulls: readonly FencePull[] }>>({})
   const fenceReporters = useMemo(() => {
@@ -771,7 +785,7 @@ export function MoldLabPage() {
     </header>
 
     <section className={styles.card} aria-label="예시 글줄">
-      <div className={styles.line} data-testid="mold-line" data-drag={step === 'shape' || undefined}
+      <div className={styles.line} data-testid="mold-line" data-drag={step === 'shape' || undefined} data-compact={step === 'shape' || undefined}
         onPointerDown={(event) => { if (step !== 'shape') return; lineDrag.current = { x0: event.clientX, look, moved: false, width: event.currentTarget.getBoundingClientRect().width } }}
         onPointerMove={(event) => {
           const g = lineDrag.current
@@ -793,20 +807,27 @@ export function MoldLabPage() {
         <Button variant="ghost" size="sm" onClick={roll} data-testid="mold-dice"><Dices aria-hidden="true" />다른 문장</Button>
         <Button variant="chip" size="chip-sm" aria-pressed={compare} disabled={changed === 0}
           onPointerDown={() => setCompare(true)} onPointerUp={() => setCompare(false)} onPointerLeave={() => setCompare(false)} onPointerCancel={() => setCompare(false)}
-          data-testid="mold-compare">{compare ? '처음 모습' : '누르는 동안 처음과 견주기'}</Button>
+          data-testid="mold-compare">{compare ? '처음 모습' : step === 'shape' ? '처음과 견주기' : '누르는 동안 처음과 견주기'}</Button>
+        {step === 'shape' && !fenceOpen && <span className={styles.fenceTools} data-testid="fence-card">
+          <Button variant="ghost" size="sm" onClick={() => setFenceOpen(true)} aria-expanded={false} data-testid="fence-open">울타리<ChevronDown aria-hidden="true" className={styles.fenceChevron} /></Button>
+          <Switch checked={fenceOn} onCheckedChange={setFenceOn} aria-label="울타리 보정" data-testid="fence-switch" />
+        </span>}
       </div>
-      <div className={styles.fence} data-testid="fence-card">
+      {(step !== 'shape' || fenceOpen) && <div className={styles.fence} data-testid="fence-card">
         <div className={styles.fenceHead}>
           <span className={styles.fenceTitle}><strong>울타리 보정</strong><span data-testid="fence-count">{fenceNote}</span></span>
-          <Switch checked={fenceOn} onCheckedChange={setFenceOn} aria-label="울타리 보정" data-testid="fence-switch" />
+          <span className={styles.fenceTools}>
+            {step === 'shape' && <Button variant="ghost" size="sm" onClick={() => setFenceOpen((open) => !open)} aria-expanded={fenceOpen} data-testid="fence-open">{fenceOpen ? '접기' : '펼치기'}<ChevronDown aria-hidden="true" data-open={fenceOpen || undefined} className={styles.fenceChevron} /></Button>}
+            <Switch checked={fenceOn} onCheckedChange={setFenceOn} aria-label="울타리 보정" data-testid="fence-switch" />
+          </span>
         </div>
-        <div className={styles.fenceLine}>
+        {(step !== 'shape' || fenceOpen) && <div className={styles.fenceLine}>
           <span>세기 · 안전선이 더 세게 당김</span>
           <ChoiceGroup variant="segment" aria-label="울타리 선" className={styles.fenceLineSwitch}>
             {(['safe', 'limit'] as const).map((line) => <ChoiceItem key={line} checked={fenceLine === line} disabled={!fenceOn} onClick={() => setFenceLine(line)} data-testid={`fence-line-${line}`}>{FENCE_LINE_NAMES[line]}</ChoiceItem>)}
           </ChoiceGroup>
-        </div>
-      </div>
+        </div>}
+      </div>}
     </section>
 
     {step === 'draw' && <DrawStep raws={raws} setRaws={setRaws} stems={stems} onDone={() => setStep('shape')} />}

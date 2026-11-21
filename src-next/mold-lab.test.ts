@@ -304,33 +304,45 @@ describe('도트판 인상 잡기', () => {
     expect(out.CH!.y + out.CH!.height / 2).toBeCloseTo(0.5)
     expect(out.JU).toEqual(VERTICAL.JU)
   })
-  it('무게중심을 올리면 첫닿자 · 홀자가 위로, 받침은 덜 간다', async () => {
-    const { impressBoxes } = await import('./moldLab')
-    const out = impressBoxes(HORIZONTAL_FINAL, { center: 0.05 })
-    expect(out.CH!.y).toBeCloseTo(0.02)
+  it('무게중심(A안): 틀은 두고 첫닿자 밑변과 보만 허리선을 따라 오른다', async () => {
+    const { impressBoxes, waistSyllable } = await import('./moldLab')
+    const out = impressBoxes(HORIZONTAL_FINAL, { center: 0.05 }, 'choseong-jungseong-horizontal-jongseong')
+    expect(out.CH!.y).toBeCloseTo(0.05)
+    expect(out.CH!.height).toBeCloseTo(0.25)
     expect(out.JU!.y).toBeCloseTo(0.33)
-    expect(out.JO!.y).toBeCloseTo(0.58)
+    expect(out.JO).toEqual(HORIZONTAL_FINAL.JO)
+    // 세로홀자: 칸은 그대로, 곁줄기(가로 획)만 위로. 기둥은 그대로.
+    const v = impressBoxes(VERTICAL, { center: 0.05 }, 'choseong-jungseong-vertical')
+    expect(v.JU).toEqual(VERTICAL.JU)
+    expect(v.CH!.height).toBeCloseTo(0.55)
+    const stem = { id: 's', closed: false, thickness: 0.08, points: [{ x: 0.3, y: 0 }, { x: 0.3, y: 1 }] }
+    const branch = { id: 'b', closed: false, thickness: 0.08, points: [{ x: 0.3, y: 0.5 }, { x: 0.8, y: 0.5 }] }
+    const syllable = { char: '가', choseong: null, jongseong: null, layoutType: 'choseong-jungseong-vertical' as const, jungseong: { char: 'ㅏ', type: 'jungseong' as const, strokes: [stem, branch] } }
+    const moved = waistSyllable(syllable, 0.09, VERTICAL)
+    expect(moved.jungseong!.strokes![0]).toEqual(stem)
+    expect(moved.jungseong!.strokes![1].points[0].y).toBeCloseTo(0.4)
   })
 })
 
 describe('풍선 닿자', () => {
-  it('틈이 모자라면 두 자소를 반씩 밀어내고, 넉넉하면 그대로 둔다', async () => {
-    const { balloonBoxes } = await import('./moldLab')
-    // 칸 사이 가로 거리를 틈으로 보는 가짜 잉크
-    const near = (b: Record<string, { x: number; width: number } | undefined>) => ({ 'CH-JU': { gap: b.JU!.x - (b.CH!.x + b.CH!.width), dx: 1, dy: 0 } })
-    const tight = { CH: box(0.1, 0.2, 0.48, 0.6), JU: box(0.6, 0.05, 0.3, 0.9) }
-    const out = balloonBoxes(tight, near, { 'CH-JU': 0.05 })
-    expect(out.JU!.x - (out.CH!.x + out.CH!.width)).toBeGreaterThanOrEqual(0.05 - 1e-3)
-    expect(out.CH!.width).toBeCloseTo(0.48)
-    expect(balloonBoxes(VERTICAL, near, { 'CH-JU': 0.05 })).toEqual(VERTICAL)
+  it('막힌 변만 멈추고 나머지 변 · 두께는 끝까지 부푼다', async () => {
+    const { growSides } = await import('./moldLab')
+    // 첫닿자 오른변이 홀자(0.6)에서 0.05 안쪽이면 막힘
+    const ok = (b: Record<string, { x: number; width: number } | undefined>) => b.JU!.x - (b.CH!.x + b.CH!.width) >= 0.05 - 1e-9
+    const out = growSides(VERTICAL, 1.2, (b) => ok(b))
+    expect(out.boxes.CH!.x + out.boxes.CH!.width).toBeLessThanOrEqual(0.55 + 1e-9)
+    expect(out.boxes.CH!.x).toBeCloseTo(0.06)
+    expect(out.boxes.CH!.height).toBeCloseTo(0.72)
+    expect(out.thick.CH).toBeCloseTo(1.2)
+    expect(out.boxes.JU).toEqual(VERTICAL.JU)
   })
-  it('밀린 자소가 글자 끝에 닿으면 넘친 쪽이 눌려 줄어든다', async () => {
-    const { balloonBoxes } = await import('./moldLab')
-    const near = (b: Record<string, { x: number; width: number } | undefined>) => ({ 'CH-JU': { gap: b.JU!.x - (b.CH!.x + b.CH!.width), dx: 1, dy: 0 } })
-    const wide = { CH: box(0.02, 0.2, 0.6, 0.6), JU: box(0.62, 0.05, 0.36, 0.9) }
-    const out = balloonBoxes(wide, near, { 'CH-JU': 0.06 }, 20)
-    expect(out.JU!.x + out.JU!.width).toBeLessThanOrEqual(0.98 + 1e-6)
-    expect(out.JU!.width).toBeLessThan(0.36)
-    expect(out.JU!.x - (out.CH!.x + out.CH!.width)).toBeGreaterThanOrEqual(0.06 - 1e-3)
+  it('풍선 닿자는 첫닿자 · 받침 획만 두꺼워진다', async () => {
+    const { inflateSyllable } = await import('./moldLab')
+    const st = (t: number) => ({ id: 'a', closed: false, thickness: t, points: [{ x: 0, y: 0 }, { x: 1, y: 0 }] })
+    const syl = { char: '한', layoutType: 'choseong-jungseong-vertical-jongseong' as const, choseong: { char: 'ㅎ', type: 'choseong' as const, strokes: [st(10)] }, jungseong: { char: 'ㅏ', type: 'jungseong' as const, strokes: [st(10)] }, jongseong: { char: 'ㄴ', type: 'jongseong' as const, strokes: [st(10)] } }
+    const out = inflateSyllable(syl, 1.2)
+    expect(out.choseong!.strokes![0].thickness).toBeCloseTo(12)
+    expect(out.jongseong!.strokes![0].thickness).toBeCloseTo(12)
+    expect(out.jungseong!.strokes![0].thickness).toBe(10)
   })
 })

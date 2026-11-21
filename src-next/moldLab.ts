@@ -1,4 +1,4 @@
-import type { BoxConfig, LayoutType, Part } from '../src/types'
+import type { BoxConfig, DecomposedSyllable, JamoData, LayoutType, Part, StrokeDataV2 } from '../src/types'
 
 /**
  * 빚기 시험판의 계산. 학습에서는 글자 하나가 아니라 "갈래" 단위로 만진다(고양이 추천안, `학습-단계-뼈대-2026-11-20.md` 21:42 절).
@@ -494,7 +494,7 @@ export interface RegionLabels { name: string; up: string; down: string; left: st
  * 굵기는 기본 굵기(400)에 곱하는 비율이라 엔진이 그리는 100~900 전체(두께 ×0.40~1.95)가 들어오게 0.25~2.25(다람쥐 검수 2026-11-21 "굵기 폭 넓히기").
  * 크기 · 키 · 폭은 글자 가운데를 두고 늘이고 줄인다. 값은 아직 임시다.
  */
-export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.7, 1.25], tracking: [-0.08, 0.2], size: [0.6, 1.15], height: [0.7, 1.15], jamo: [0.6, 1.3], center: [-0.12, 0.12], round: [0, 1], contrast: [0, 0.9], balloon: [0.01, 0.045] } as const
+export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.7, 1.25], tracking: [-0.08, 0.2], size: [0.6, 1.15], height: [0.7, 1.15], jamo: [0.6, 1.3], center: [-0.08, 0.08], round: [0, 1], contrast: [0, 0.9], balloon: [0.01, 0.045] } as const
 const LOOK_ENGINE = { weight: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.025 } as const
 const clampLook = (key: keyof typeof LOOK_WALL, value: number) => Math.max(LOOK_WALL[key][0], Math.min(LOOK_WALL[key][1], value))
 export const lookOf = (look: Look, key: keyof Look) => look[key] ?? LOOK_ENGINE[key]
@@ -702,9 +702,11 @@ export function gripAt(box: BoxConfig, x: number, y: number, tol: number): BoxGr
 /**
  * 닿자 크기 · 무게중심을 칸에 입힌다.
  * 닿자 크기: 첫닿자 · 받침 칸을 제 가운데를 붙든 채 가로세로 같이 키우고 줄인다(1 = 엔진 그대로, 칸에 꽉).
- * 무게중심: 엔진에 값 하나로는 없어 칸 옮기기로 흉내 낸다 — 첫닿자 · 홀자를 위(+) · 아래로 옮기고 받침은 그 0.4만큼. 글자 끝(0.02~0.98)은 넘지 않는다.
+ * 무게중심(거북이 A안, 하니무스 2026-11-21): 틀(기둥 위 · 아래 끝)은 그대로 두고 안쪽 허리선만 옮긴다.
+ * 칸에서는 첫닿자 칸 밑변과, 가로홀자(ㅗ · ㅜ · ㅡ, 섞임의 가로 쪽)의 칸을 같이 올리고 내린다. ㅏ · ㅓ 곁줄기 높이는 획에서 옮긴다(`waistSyllable`).
+ * `center` + 는 허리가 위로(무게중심 높음).
  */
-export function impressBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: Look): Partial<Record<Part, BoxConfig>> {
+export function impressBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: Look, layout?: LayoutType): Partial<Record<Part, BoxConfig>> {
   const k = lookOf(look, 'jamo'), lift = lookOf(look, 'center')
   if (k === 1 && lift === 0) return boxes
   const out: Partial<Record<Part, BoxConfig>> = {}
@@ -715,18 +717,41 @@ export function impressBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: Look
       const cx = box.x + box.width / 2, cy = box.y + box.height / 2
       next = { ...box, x: cx - box.width * k / 2, y: cy - box.height * k / 2, width: box.width * k, height: box.height * k }
     }
-    if (lift !== 0) {
-      const dv = -lift * (part === 'JO' ? 0.4 : 1)
-      const y = Math.max(0.02, Math.min(0.98 - next.height, next.y + dv))
-      next = { ...next, y }
+    if (lift !== 0 && layout) {
+      const horizontalVowel = !isVertical(layout) && !layout.includes('jungseong-mixed')
+      // 첫닿자: 윗변은 그대로, 밑변만 허리선을 따라.
+      if (part === 'CH') next = { ...next, height: Math.max(0.05, next.height - lift) }
+      // 보(가로홀자)는 칸째 허리선을 따라.
+      if ((part === 'JU' && horizontalVowel) || part === 'JU_H') next = { ...next, y: Math.max(0.02, Math.min(0.98 - next.height, next.y - lift)) }
     }
     out[part] = next
   }
   return out
 }
 
-export function lookBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: Look): Partial<Record<Part, BoxConfig>> {
-  boxes = impressBoxes(boxes, look)
+/** 획 하나가 가로(두 끝 높이가 같다)인가. */
+const isLevel = (stroke: StrokeDataV2) => stroke.points.length >= 2 && !stroke.closed && stroke.points.every((p) => Math.abs(p.y - stroke.points[0].y) < 1e-3)
+/**
+ * 무게중심(거북이 A안)의 곁줄기: 세로홀자(ㅏ · ㅓ · ㅐ …, 섞임의 세로 쪽)의 가로 곁줄기를 허리선을 따라 옮긴다. 기둥은 그대로.
+ * `lift`는 글자 단위(+ 위로), `box`는 그 홀자 칸(칸 안 좌표로 바꾸는 데 쓴다).
+ */
+export function waistSyllable(syllable: DecomposedSyllable, lift: number, boxes: Partial<Record<Part, BoxConfig>>): DecomposedSyllable {
+  const ju = syllable.jungseong
+  if (!ju || lift === 0) return syllable
+  const mixed = syllable.layoutType.includes('jungseong-mixed')
+  if (!mixed && !isVertical(syllable.layoutType)) return syllable
+  const box = boxes[mixed ? 'JU_V' : 'JU']
+  if (!box || box.height < 0.05) return syllable
+  const dy = -lift / box.height
+  const move = (strokes?: StrokeDataV2[]) => strokes?.map((stroke) => isLevel(stroke)
+    ? { ...stroke, points: stroke.points.map((p) => { const y = Math.max(0.04, Math.min(0.96, p.y + dy)), d = y - p.y; return { ...p, y, ...(p.handleIn ? { handleIn: { ...p.handleIn, y: p.handleIn.y + d } } : {}), ...(p.handleOut ? { handleOut: { ...p.handleOut, y: p.handleOut.y + d } } : {}) } }) }
+    : stroke)
+  const next: JamoData = mixed ? { ...ju, verticalStrokes: move(ju.verticalStrokes) } : { ...ju, strokes: move(ju.strokes) }
+  return { ...syllable, jungseong: next }
+}
+
+export function lookBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: Look, layout?: LayoutType): Partial<Record<Part, BoxConfig>> {
+  boxes = impressBoxes(boxes, look, layout)
   const sx = lookOf(look, 'frame') * lookOf(look, 'size'), sy = lookOf(look, 'height') * lookOf(look, 'size')
   if (sx === 1 && sy === 1) return boxes
   const out: Partial<Record<Part, BoxConfig>> = {}
@@ -917,53 +942,61 @@ export const BALLOON_GAPS = { narrow: 0.01, normal: 0.025, wide: 0.045 } as cons
 export type BalloonGap = keyof typeof BALLOON_GAPS
 type PairKey = 'CH-JU' | 'JU-JO' | 'CH-JO'
 type Near = { gap: number; dx: number; dy: number }
-const GROUP_PARTS: Record<'CH' | 'JU' | 'JO', readonly Part[]> = { CH: ['CH'], JU: ['JU', 'JU_H', 'JU_V'], JO: ['JO'] }
 
 const EDGE: [number, number] = [0.02, 0.98]
-/** 칸을 글자 끝 안으로: 넘친 쪽 변만 잘라 줄인다(밀려서 눌리는 모양). */
-const squeezeIn = (b: BoxConfig): BoxConfig => {
-  let { x, y, width, height } = b
-  if (x < EDGE[0]) { width -= EDGE[0] - x; x = EDGE[0] }
-  if (y < EDGE[0]) { height -= EDGE[0] - y; y = EDGE[0] }
-  if (x + width > EDGE[1]) width = EDGE[1] - x
-  if (y + height > EDGE[1]) height = EDGE[1] - y
-  return { x, y, width: Math.max(0.02, width), height: Math.max(0.02, height) }
+/** 모든 자소 쌍이 최소 틈을 지키나(풍선 닿자가 막히는 기준). */
+export function balloonOk(near: Partial<Record<PairKey, Near>>, target: Partial<Record<PairKey, number>>): boolean {
+  return (Object.entries(target) as [PairKey, number][]).every(([pair, want]) => (near[pair]?.gap ?? Infinity) >= want - 0.003)
 }
-/** 칸을 글자 끝 안으로: 크기는 지키고 자리만 옮긴다(넘치면 그때만 줄인다). */
-const shiftIn = (b: BoxConfig): BoxConfig => {
-  const span = EDGE[1] - EDGE[0]
-  const width = Math.min(b.width, span), height = Math.min(b.height, span)
-  return { x: Math.max(EDGE[0], Math.min(EDGE[1] - width, b.x + (b.width - width) / 2)), y: Math.max(EDGE[0], Math.min(EDGE[1] - height, b.y + (b.height - height) / 2)), width, height }
+
+/** 풍선 닿자의 획: 첫닿자 · 받침 획 두께를 `k`배(숫자 하나면 둘 다, 부위별이면 따로). */
+export function inflateSyllable(syllable: DecomposedSyllable, k: number | Partial<Record<Part, number>>): DecomposedSyllable {
+  const of = (part: Part) => (typeof k === 'number' ? k : k[part] ?? 1)
+  if (of('CH') === 1 && of('JO') === 1) return syllable
+  const inflate = (jamo: JamoData | null, f: number): JamoData | null => {
+    if (!jamo || f === 1) return jamo
+    const fat = (strokes?: StrokeDataV2[]) => strokes?.map((stroke) => ({ ...stroke, thickness: stroke.thickness * f }))
+    return {
+    ...jamo,
+    strokes: fat(jamo.strokes), horizontalStrokes: fat(jamo.horizontalStrokes), verticalStrokes: fat(jamo.verticalStrokes),
+    contextStrokes: jamo.contextStrokes && Object.fromEntries(Object.entries(jamo.contextStrokes).map(([family, strokes]) => [family, fat(strokes)])),
+    }
+  }
+  return { ...syllable, choseong: inflate(syllable.choseong, of('CH')), jongseong: inflate(syllable.jongseong, of('JO')) }
 }
 
 /**
- * 풍선 닿자: 키운 닿자(첫닿자 · 받침)는 크기를 지킨 채 글자 끝 안으로 들이고, 옆 자소와 틈이 `target` 아래면
- * 가장 가까운 방향으로 밀어낸다. 밀린 자소가 글자 끝에 닿으면 넘친 쪽이 눌려 줄어든다 — 닿자가 부풀고 옆이 눌리는 모양.
- * 몇 번 되풀이해 맞춘다. `nearestOf`는 칸으로 그린 잉크에서 자소 쌍마다 가장 가까운 자리(틈 · 첫 자소 → 둘째 자소 방향)를 낸다.
+ * 변마다 따로 부푸는 풍선 닿자(하니무스 2026-11-21 "ㅇ이면 오른쪽은 막혀도 위 · 아래는 계속").
+ * 첫닿자 · 받침 칸의 네 변과 획 두께를 조금씩(`steps`번) 키우며, 한 걸음 키웠을 때 최소 틈을 못 지키면 그 변(또는 두께)만 멈춘다.
+ * 글자 끝(0.02~0.98)도 막힘이다. `ok(boxes, thick)`가 틈 검사(thick = 부위별 두께 배율).
  */
-export function balloonBoxes(boxes: Partial<Record<Part, BoxConfig>>, nearestOf: (boxes: Partial<Record<Part, BoxConfig>>) => Partial<Record<PairKey, Near>>, target: Partial<Record<PairKey, number>>, rounds = 10): Partial<Record<Part, BoxConfig>> {
+export function growSides(boxes: Partial<Record<Part, BoxConfig>>, k: number, ok: (boxes: Partial<Record<Part, BoxConfig>>, thick: Partial<Record<Part, number>>) => boolean, steps = 6): { boxes: Partial<Record<Part, BoxConfig>>; thick: Partial<Record<Part, number>> } {
   const out = { ...boxes }
-  for (const part of ['CH', 'JO'] as const) { const b = out[part]; if (b) out[part] = shiftIn(b) }
-  for (let round = 0; round < rounds; round++) {
-    const near = nearestOf(out)
-    let moved = false
-    for (const [pair, want] of Object.entries(target) as [PairKey, number][]) {
-      const n = near[pair]
-      if (!n || n.gap >= want - 1e-4) continue
-      const len = Math.hypot(n.dx, n.dy)
-      // 방향이 없으면(겹쳐 중심이 같으면) 위아래로 민다.
-      const [ux, uy] = len > 1e-6 ? [n.dx / len, n.dy / len] : [0, 1]
-      const [first, second] = pair.split('-') as ['CH' | 'JU', 'JU' | 'JO']
-      // 키운 닿자는 덜 밀리고 홀자가 더 밀린다(닿자가 부푸는 쪽).
-      const share = (group: 'CH' | 'JU' | 'JO') => (group === 'JU' ? 0.75 : 0.25)
-      const need = want - n.gap + 0.002, total = share(first) + share(second)
-      for (const [group, sign] of [[first, -1], [second, 1]] as const) for (const part of GROUP_PARTS[group]) {
-        const b = out[part], d = need * share(group) / total
-        if (b) out[part] = squeezeIn({ ...b, x: b.x + sign * ux * d, y: b.y + sign * uy * d })
+  const thick: Partial<Record<Part, number>> = {}
+  if (k <= 1) return { boxes: out, thick }
+  const parts = (['CH', 'JO'] as const).filter((part) => out[part])
+  type Side = 'l' | 'r' | 't' | 'b' | 'w'
+  const open = new Map<string, boolean>()
+  for (const part of parts) { thick[part] = 1; for (const side of ['l', 'r', 't', 'b', 'w'] as Side[]) open.set(part + side, true) }
+  for (let step = 1; step <= steps; step++) {
+    for (const part of parts) {
+      const o = boxes[part]!
+      const dx = o.width * (k - 1) / 2 / steps, dy = o.height * (k - 1) / 2 / steps
+      for (const side of ['t', 'b', 'l', 'r', 'w'] as Side[]) {
+        if (!open.get(part + side)) continue
+        const b = out[part]!
+        let next = b
+        let nextThick = thick[part]!
+        if (side === 'l') next = { ...b, x: b.x - dx, width: b.width + dx }
+        if (side === 'r') next = { ...b, width: b.width + dx }
+        if (side === 't') next = { ...b, y: b.y - dy, height: b.height + dy }
+        if (side === 'b') next = { ...b, height: b.height + dy }
+        if (side === 'w') nextThick = 1 + (k - 1) * step / steps
+        const inside = next.x >= EDGE[0] - 1e-9 && next.y >= EDGE[0] - 1e-9 && next.x + next.width <= EDGE[1] + 1e-9 && next.y + next.height <= EDGE[1] + 1e-9
+        const trial = { ...out, [part]: next }
+        if (inside && ok(trial, { ...thick, [part]: nextThick })) { out[part] = next; thick[part] = nextThick } else open.set(part + side, false)
       }
-      moved = true
     }
-    if (!moved) break
   }
-  return out
+  return { boxes: out, thick }
 }
