@@ -170,6 +170,19 @@ function moldedBoxes(boxes: Partial<Record<Part, BoxConfig>>, layout: LayoutType
 function onlyGroup(syllable: DecomposedSyllable, group: BalloonGroup): DecomposedSyllable {
   return { ...syllable, choseong: group === 'CH' ? syllable.choseong : null, jungseong: group === 'JU' ? syllable.jungseong : null, jongseong: group === 'JO' ? syllable.jongseong : null }
 }
+/**
+ * 굵어질 때 글자 잉크 폭이 바깥으로 넓어지는 양(세로줄기 굵어진 em 1당). 거북이 넓어짐 공식 1절(폰트 집안 21개 가운데값).
+ * 오른끝: 곁줄기로 끝나면 0.10, 기둥 0.37, 섞임 0.49, 기둥 둘 0.35(쌍닿자와 만나면 0.55). 가로 짜임 0.20.
+ * 왼끝: ㄱ · 쌍닿자 0.43, ㅇ ㅁ ㅂ 0.27, 가로 짜임 0.15, 그 밖 0.29.
+ */
+function outerWidenOf(syllable: DecomposedSyllable): { left: number; right: number } {
+  const initial = syllable.choseong?.char ?? '', medial = syllable.jungseong?.char ?? ''
+  const doubled = 'ㄲㄸㅃㅆㅉ'.includes(initial) && initial !== ''
+  const horizontal = 'ㅗㅛㅜㅠㅡ'.includes(medial) && medial !== ''
+  const right = horizontal ? 0.2 : 'ㅘㅙㅚㅝㅞㅟㅢ'.includes(medial) ? 0.49 : 'ㅐㅔㅒㅖ'.includes(medial) ? (doubled ? 0.55 : 0.35) : 'ㅏㅑ'.includes(medial) ? 0.1 : 0.37
+  const left = initial === 'ㄱ' || doubled ? 0.43 : 'ㅇㅁㅂ'.includes(initial) && initial !== '' ? 0.27 : horizontal ? 0.15 : 0.29
+  return { left, right }
+}
 type Pt2 = { x: number; y: number }
 /** 획 고치기: 열린 끝 옮김(자소 칸 좌표) 또는 토막으로 나눈 획들. */
 type StrokeReshape = { start: Pt2; end: Pt2 } | { pieces: StrokeDataV2[] }
@@ -293,7 +306,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     }
     const base = { v: contrast >= 0 ? 1 + 0.8 * contrast : 1 + 0.5 * contrast, h: contrast >= 0 ? 1 - 0.45 * contrast : 1 - 0.5 * contrast }
     const k = heavyThicknessOf(wanted)
-    const solved = solveBalloon({ strokes, boxes: placed, base, want: { v: base.v * k, h: base.h * (1 + (k - 1) * HEAVY_HORIZONTAL_SHARE) } })
+    const solved = solveBalloon({ strokes, boxes: placed, base, want: { v: base.v * k, h: base.h * (1 + (k - 1) * HEAVY_HORIZONTAL_SHARE) }, outer: outerWidenOf(balloon.syllable) })
     // 푼 칸(획 상자 기준)의 바뀐 만큼을 부위 칸에 그대로 옮긴다.
     const out: Partial<Record<Part, BoxConfig>> = { ...boxes }
     for (const [part, next] of Object.entries(solved.boxes) as [Part, BoxConfig][]) {

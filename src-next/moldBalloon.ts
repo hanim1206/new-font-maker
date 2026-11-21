@@ -31,6 +31,8 @@ export interface BalloonInput {
   /** 출발 굵기(대비 줄 값까지 든 것)와 바라는 굵기. */
   base: Thick
   want: Thick
+  /** 글자 잉크 폭이 바깥으로 넓어지는 양(세로줄기가 굵어진 em 1당, 왼끝 · 오른끝). 거북이 넓어짐 공식 1절. 없으면 안 넓어진다. */
+  outer?: { left: number; right: number }
 }
 export interface BalloonResult {
   boxes: Partial<Record<Part, BoxConfig>>
@@ -47,7 +49,7 @@ export const BALLOON_END = { between: 0.05, inside: 0.03 } as const
 /** 세로줄기가 1 굵어질 때 흰 틈이 줄어드는 양. 받침 위는 덜 준다(받침이 밀려 내려가서). */
 export const BALLOON_SLOPE = { inside: 0.5, between: 0.67, final: 0.33 } as const
 /** 한 글자 안에서 자소끼리 굵기가 이보다 갈리지 않는다(10-01 눈 ② "획 두께 차이가 커서 안 예쁨" · 바닥 0.8과 같은 뜻). */
-export const BALLOON_BAND = 0.75
+export const BALLOON_BAND = 0.8
 /** 자소 뼈대(중심선 너비 · 키)는 처음의 이 비율 아래로 안 줄어든다 — ㄱ이 덩어리가 되지 않게. */
 const SKELETON_MIN = 0.4
 /** 처음부터 이보다 가까운 획 쌍(두께 대비)은 붙여 그린 것 — 지키지 않는다(엔진 `counterKeep`의 MIN_GAP_RATIO). */
@@ -151,15 +153,16 @@ function gapBetween(p: Seg, q: Seg, thickP: Thick, thickQ: Thick) {
 const parallel = (p: Seg, q: Seg) => Math.abs((p.bx - p.ax) * (q.bx - q.ax) + (p.by - p.ay) * (q.by - q.ay)) >= PARALLEL_COS * lengthOf(p) * lengthOf(q)
 const facing = (p: Seg, q: Seg) => (p.bx - p.ax) * (q.bx - q.ax) + (p.by - p.ay) * (q.by - q.ay) < -0.5 * lengthOf(p) * lengthOf(q)
 
-interface InsidePair { i: number; j: number; target: number; ring?: boolean }
+interface InsidePair { i: number; j: number; target: number; ring?: boolean; closed?: boolean }
 /** 꼭지 · 곁줄기처럼 다른 획 옆면에 끝이 붙은 짧은 획. 붙은 획이 굵어져도 보이는 길이가 처음의 반은 남는다. */
 interface Stub { on: number; stroke: number; keep: number; free: 0 | 1 }
 /** 붙은 짧은 획이 남길 보이는 길이(처음 대비). */
 const STUB_KEEP = 0.5
 /** 붙은 짧은 획을 살리려고 이웃 자소 칸을 비켜 세울 때, 처음 칸의 이만큼은 남긴다. */
-const NEIGHBOR_KEEP = 0.8
+const NEIGHBOR_KEEP = 0.82
 /** ㅇ 속 흰 틈은 처음의 이만큼 아래로 안 줄인다. */
-const RING_KEEP = 0.45
+/** 자소 안 열린 틈의 바닥(거북이 넓어짐 공식 2절): max(least em, ratio × 세로줄기). */
+const STEM_GAP = { least: 0.025, ratio: 0.2 } as const
 /** 자소 사이 경계를 한 판에 옮기는 양(굵기 모자람 차이 1당 em). */
 const SHARE_STEP = 0.006
 /** 한 자소 안 가로÷세로가 바라는 비의 이만큼 아래로 안 간다. */
@@ -204,7 +207,7 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
   // 닫힌 속(ㅍ · ㅂ 두 기둥과 두 보가 두른 칸): 두 획에 함께 닿은 획이 둘 이상이면 그 사이는 막힌 속이다(ㅐ 두 기둥은 다리 하나라 열린 속).
   const touch = new Set<string>()
   for (const key of joints.keys()) { const [a, b] = key.split(':'); touch.add(`${a}:${b}`); touch.add(`${b}:${a}`) }
-  const enclosed = (a: number, b: number) => strokes.reduce((count, _, r) => (r !== a && r !== b && touch.has(`${r}:${a}`) && touch.has(`${r}:${b}`) ? count + 1 : count), 0) >= 2
+  const enclosed = (a: number, b: number) => !touch.has(`${a}:${b}`) && strokes.reduce((count, _, r) => (r !== a && r !== b && touch.has(`${r}:${a}`) && touch.has(`${r}:${b}`) ? count + 1 : count), 0) >= 2
   for (let i = 0; i < segs.length; i++) for (let j = i + 1; j < segs.length; j++) {
     const p = segs[i], q = segs[j]
     if (lengthOf(p) < EPS || lengthOf(q) < EPS) continue
@@ -225,10 +228,19 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
         if (near.d >= 0.5 * along) continue
       }
       const joint = p.stroke === q.stroke ? undefined : joints.get(`${p.stroke}:${q.stroke}`)
+      // 두 획이 같은 획에 매달려 그 옆에서 가장 가까우면(ㅊ의 ㅅ 두 다리가 보 밑에서 갈라짐) 그 쐐기는 틈이 아니다 — 굵어지면 메워진다.
+      if (p.stroke !== q.stroke && !parallel(p, q)) {
+        const mid = { x: (near.p.x + near.q.x) / 2, y: (near.p.y + near.q.y) / 2 }
+        const hung = strokes.some((_, r) => r !== p.stroke && r !== q.stroke && touch.has(`${r}:${p.stroke}`) && touch.has(`${r}:${q.stroke}`)
+          && segs.some((seg) => seg.stroke === r && pointToSeg(mid.x, mid.y, seg).d <= halfOf(seg, base) + Math.max(p.t, q.t)))
+        if (hung) continue
+      }
+      // 서로 이어진 두 획(ㅊ의 ㅅ 두 다리가 한 점에서 갈라짐)은 마주 보지 않는 한 그 사이가 쐐기다 — 굵어지면 메워진다.
+      if (joint && !facing(p, q)) continue
       // 이어진 두 획이 나란하지 않으면(ㅅ 두 다리) 이음에서 멀어질수록 벌어진다 — 이음 옆 쐐기는 틈이 아니다.
       if (joint && !parallel(p, q)) continue
       if (joint && !facing(p, q) && near.d >= 0.5 * (Math.hypot(near.p.x - joint.x, near.p.y - joint.y) + Math.hypot(near.q.x - joint.x, near.q.y - joint.y))) continue
-      inside.push({ i, j, target: gap, ring: p.stroke === q.stroke ? !!strokes[p.stroke].closed : enclosed(p.stroke, q.stroke) })
+      inside.push({ i, j, target: gap, ring: p.stroke === q.stroke ? !!strokes[p.stroke].closed : enclosed(p.stroke, q.stroke), closed: p.stroke === q.stroke && !!strokes[p.stroke].closed })
     } else {
       const { gap } = gapBetween(p, q, base, base)
       const key = p.part < q.part ? `${p.part}|${q.part}` : `${q.part}|${p.part}`
@@ -274,8 +286,9 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
   // 자소 안 목표는 그 자소의 가장 좁은 틈에서 잰다. 사이에 획이 낀 먼 쌍(ㅌ 첫 · 셋째 가로줄기)이 제 넓은 틈을 지키려 들면 가까운 쌍보다 먼저 막는다.
   // 자소 안 틈은 바닥까지 내준다 — 획 굵기를 먼저 지키고 흰 틈으로 버틴다(하니무스 2026-11-21 「깨」: "패딩을 최소한까지 밀어붙이더라도 획 두께는 유지").
   // 틈은 굵기가 실제로 그만큼 필요할 때만 준다(예산이 남으면 처음 틈 그대로). 처음부터 바닥보다 좁은 틈은 그대로 지킨다.
-  // 막힌 속(ㅇ 고리 안, ㅍ · ㅂ 네 획이 두른 칸)은 처음의 RING_KEEP은 남긴다 — 바닥까지 내주면 「풍」 받침 ㅇ이 막혀 점이 되고 ㅍ이 덩어리가 됐다.
-  for (const pair of inside) pair.target = Math.min(pair.target, pair.ring ? Math.max(BALLOON_END.inside, RING_KEEP * pair.target) : BALLOON_END.inside)
+  // 막힌 속은 굵어진 만큼 줄어든다: ㅇ 고리 처음 − 1.0 × Δt, ㅁ · ㅍ처럼 네 획이 두른 칸 처음 − 1.24 × Δt, 바닥 0.03em(거북이 넓어짐 공식 4절).
+  // 열린 틈은 여기서 처음 틈만 적어 두고, 바닥은 굵기에 따라 푼다(세로줄기 예산 g = max(0.025, 0.2 × 줄기), 2절).
+  for (const pair of inside) if (pair.ring) pair.target = Math.min(pair.target, Math.max(BALLOON_END.inside, pair.target - (pair.closed ? 1.0 : 1.24) * delta))
   const between: PartPair[] = []
   for (const { a, b, list } of byParts.values()) {
     const least = Math.min(...list.map((item) => item.gap))
@@ -329,6 +342,15 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
   const cells = new Map<Part, Cell>(), firstCenter = new Map<Part, Cell>()
   const firstCell = new Map<Part, Cell>()
   for (const part of parts) { const e = extents(first, part, start[balloonGroupOf(part)]); if (e) { cells.set(part, { ...e.ink }); firstCell.set(part, { ...e.ink }); firstCenter.set(part, e.center) } }
+  // 글자 폭이 넓어진다(밖 1/4 · 속 3/4, 거북이 넓어짐 공식 1절): 가장 왼쪽 · 오른쪽 자소의 바깥 변만 Δt × 계수만큼. 글자 칸(0~1) 밖으로는 안 나간다.
+  if (input.outer && cells.size) {
+    const all = [...cells.values()]
+    const minX = Math.min(...all.map((c) => c.x0)), maxX = Math.max(...all.map((c) => c.x1))
+    for (const cell of all) {
+      if (cell.x0 <= minX + 0.02) cell.x0 = Math.max(0, cell.x0 - input.outer.left * delta)
+      if (cell.x1 >= maxX - 0.02) cell.x1 = Math.min(1, cell.x1 + input.outer.right * delta)
+    }
+  }
   const thick = Object.fromEntries(groups.map((g) => [g, { ...want }])) as Record<BalloonGroup, Thick>
   const cap = Object.fromEntries(groups.map((g) => [g, { v: Infinity, h: Infinity }])) as Record<BalloonGroup, Thick>
   let boxes: Partial<Record<Part, BoxConfig>> = { ...input.boxes }
@@ -379,7 +401,9 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
       const sp = sharesOf(p), sq = sharesOf(q), kp = k(p), kq = k(q)
       const d = gp.d, a = sp.a * kp + sq.a * kq, b = sp.b * kp + sq.b * kq
       if (a + b < EPS) continue
-      const room = d - pair.target
+      // 열린 틈의 바닥은 줄기 굵기를 따른다: max(0.025em, 0.2 × 줄기). 처음 틈이 그보다 좁으면 처음 틈.
+      const floor = pair.ring ? pair.target : Math.min(pair.target, Math.max(STEM_GAP.least, STEM_GAP.ratio * median * now.v))
+      const room = d - floor
       const lean = b / (a + b)
       if (lean < 0.3) sol[g].h = Math.min(sol[g].h, (room - b * now.v) / Math.max(a, EPS))
       else if (lean > 0.7) sol[g].v = Math.min(sol[g].v, (room - a * now.h) / Math.max(b, EPS))
