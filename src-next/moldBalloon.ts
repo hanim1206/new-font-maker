@@ -159,10 +159,12 @@ interface Stub { on: number; stroke: number; keep: number; free: 0 | 1 }
 /** 붙은 짧은 획이 남길 보이는 길이(처음 대비). */
 const STUB_KEEP = 0.5
 /**
- * 꺾인 획의 열린 팔(ㄱ · ㄲ 윗 가로, ㄴ 세로): 꺾인 기둥 밖으로 보이는 길이 ≥ 기둥 굵기 × 이 값.
- * 기둥이 팔보다 굵으면 「깨」 ㄲ이 "11"로 읽혔다. 처음부터 이보다 짧은 팔은 처음 비율을 지킨다.
+ * 꺾인 획의 열린 팔(ㄱ · ㄲ 윗 가로, ㄴ 세로): 꺾인 기둥 밖으로 보이는 길이 ≥ 기둥 굵기 × 이 값. 처음부터 더 짧은 팔은 처음 비율을 지킨다.
+ * 거북이 2026-11-22 열린-팔.md(고딕 · 제목체 103벌): 쌍닿자는 고딕 900에서 0.85 ~ 0.96, 가장 작은 값 0.83. 홑닿자 끝은 가석원 0.78.
+ * 그래서 0.85, 세로줄기 0.15em 너머(굵기 끝)에서 0.19em까지 0.78로 내린다. 폰트도 팔을 지키려 기둥을 가늘게 한다(「깨」 ㄱ 기둥 0.84배).
  */
-const ARM_KEEP = 0.75
+const ARM_KEEP = { least: 0.85, end: 0.78, from: 0.15, to: 0.19 } as const
+const armKeepAt = (stem: number) => ARM_KEEP.least - (ARM_KEEP.least - ARM_KEEP.end) * Math.max(0, Math.min(1, (stem - ARM_KEEP.from) / (ARM_KEEP.to - ARM_KEEP.from)))
 interface Arm { leg: number; perp: number; keep: number }
 /** 붙은 짧은 획을 살리려고 이웃 자소 칸을 비켜 세울 때, 처음 칸의 이만큼은 남긴다. */
 const NEIGHBOR_KEEP = 0.82
@@ -319,7 +321,7 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
       if (segs.some((other) => other.stroke !== index && other.group === leg.seg.group && pointToSeg(end.x, end.y, other).d <= halfOf(other, base) + 1e-3)) continue
       const half0 = halfOf(perp.seg, base)
       if (half0 < EPS) continue
-      arms.push({ leg: leg.at, perp: perp.at, keep: Math.min(ARM_KEEP, Math.max(0, (ll - half0) / (2 * half0))) })
+      arms.push({ leg: leg.at, perp: perp.at, keep: Math.max(0, (ll - half0) / (2 * half0)) })
     }
   })
   return { inside, between, stubs, arms }
@@ -436,7 +438,8 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
     // 열린 팔: 기둥 반 두께 ≤ 팔 길이 ÷ (1 + 2 × 지킬 비).
     for (const arm of arms) {
       const leg = segs[arm.leg], perp = segs[arm.perp], g = perp.group
-      const most = lengthOf(leg) / (1 + 2 * arm.keep)
+      const keep = Math.min(arm.keep, armKeepAt(median * want.v))
+      const most = lengthOf(leg) / (1 + 2 * keep)
       const { a, b } = sharesOf(perp), lean = b / Math.max(a + b, EPS)
       if (lean > 0.7) sol[g].v = Math.min(sol[g].v, (most - a * thick[g].h) / Math.max(b, EPS))
       else if (lean < 0.3) sol[g].h = Math.min(sol[g].h, (most - b * thick[g].v) / Math.max(a, EPS))
