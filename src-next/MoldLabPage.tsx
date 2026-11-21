@@ -1113,7 +1113,9 @@ export function MoldLabPage() {
 
   const NO_EDITS: LayoutEdits = useMemo(() => ({}), [])
   const NO_LOOK: Look = useMemo(() => ({}), [])
-  const lineEdits = compare ? NO_EDITS : edits
+  // 부위를 끄는 동안도 글줄은 한 박자 늦게(하니무스 2026-11-22 "부위 옮길 때 버벅임"): 큰 판의 글자가 먼저 따라오고 글줄은 뒤따른다.
+  const lazyEdits = useDeferredValue(edits)
+  const lineEdits = compare ? NO_EDITS : lazyEdits
   // 글줄은 판 값을 한 박자 늦게 따른다(useDeferredValue): 굵기 줄을 끄는 동안 판 막대가 먼저 움직이고 글줄은 따라온다(하니무스 2026-11-22 버벅임, 거북이 느려진 곳 5번).
   const lazyLook = useDeferredValue(look)
   const lineLook = compare ? NO_LOOK : lazyLook

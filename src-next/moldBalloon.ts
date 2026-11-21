@@ -135,16 +135,18 @@ function nearest(p: Seg, q: Seg): { d: number; p: Pt; q: Pt } {
   const d1 = cross(p.ax, p.ay, p.bx, p.by, q.ax, q.ay), d2 = cross(p.ax, p.ay, p.bx, p.by, q.bx, q.by)
   const d3 = cross(q.ax, q.ay, q.bx, q.by, p.ax, p.ay), d4 = cross(q.ax, q.ay, q.bx, q.by, p.bx, p.by)
   if (d1 * d2 < 0 && d3 * d4 < 0) { const k = d3 / (d3 - d4); const at = { x: p.ax + k * (p.bx - p.ax), y: p.ay + k * (p.by - p.ay) }; return { d: 0, p: at, q: at } }
-  // 네 끝점에서 맞은편 토막까지. 가장 가까운 것 하나만 남긴다.
-  let bestD = Infinity, fx = 0, fy = 0, tx = 0, ty = 0, onQ = true
-  const tryEnd = (px: number, py: number, s: Seg, toQ: boolean) => {
-    const dx = s.bx - s.ax, dy = s.by - s.ay, l2 = dx * dx + dy * dy
-    const k = l2 < EPS ? 0 : Math.max(0, Math.min(1, ((px - s.ax) * dx + (py - s.ay) * dy) / l2))
-    const x = s.ax + k * dx, y = s.ay + k * dy, d = Math.hypot(px - x, py - y)
-    if (d < bestD) { bestD = d; fx = px; fy = py; tx = x; ty = y; onQ = toQ }
-  }
-  tryEnd(p.ax, p.ay, q, true); tryEnd(p.bx, p.by, q, true); tryEnd(q.ax, q.ay, p, false); tryEnd(q.bx, q.by, p, false)
-  return onQ ? { d: bestD, p: { x: fx, y: fy }, q: { x: tx, y: ty } } : { d: bestD, p: { x: tx, y: ty }, q: { x: fx, y: fy } }
+  // 네 끝점에서 맞은편 토막까지. 가장 가까운 것 하나만 남긴다(모듈 칸 하나에 적어 객체 · 함수를 안 만든다).
+  NEAR.d = Infinity
+  endToSeg(p.ax, p.ay, q, true); endToSeg(p.bx, p.by, q, true); endToSeg(q.ax, q.ay, p, false); endToSeg(q.bx, q.by, p, false)
+  const { d, fx, fy, tx, ty } = NEAR
+  return NEAR.onQ ? { d, p: { x: fx, y: fy }, q: { x: tx, y: ty } } : { d, p: { x: tx, y: ty }, q: { x: fx, y: fy } }
+}
+const NEAR = { d: Infinity, fx: 0, fy: 0, tx: 0, ty: 0, onQ: true }
+function endToSeg(px: number, py: number, s: Seg, toQ: boolean): void {
+  const dx = s.bx - s.ax, dy = s.by - s.ay, l2 = dx * dx + dy * dy
+  const k = l2 < EPS ? 0 : Math.max(0, Math.min(1, ((px - s.ax) * dx + (py - s.ay) * dy) / l2))
+  const x = s.ax + k * dx, y = s.ay + k * dy, d = Math.hypot(px - x, py - y)
+  if (d < NEAR.d) { NEAR.d = d; NEAR.fx = px; NEAR.fy = py; NEAR.tx = x; NEAR.ty = y; NEAR.onQ = toQ }
 }
 /** 잇는 방향으로 토막이 내미는 두께 — 옆면은 반 두께 그대로, 각진 끝은 0(끝은 굵어져도 안 나온다). */
 function reachOf(s: Seg, nx: number, ny: number, thick: Thick): number {
