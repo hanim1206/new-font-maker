@@ -31,6 +31,11 @@ export interface BakeTarget {
   molded: Partial<Record<Part, BoxConfig>>
   /** 풍선 닿자 획 두께 배율(`strokeKey` 열쇠). */
   thick: Readonly<Record<string, number>>
+  /**
+   * 풍선 굵기(굵기 칸 55 위)로 그린 글자: 화면이 실제로 쓴 칸(넓힘까지)과 자소 묶음마다 세로 · 가로 획 두께(em, 가운데 획 기준).
+   * 버전 1은 글줄 한 굵기로 그려 이 그림을 다 못 받는다 — 남은 차이에 넣어 숨기지 않는다(다람쥐 재검수 1번).
+   */
+  heavy?: { boxes: Partial<Record<Part, BoxConfig>>; ink: Partial<Record<'CH' | 'JU' | 'JO', { v: number; h: number; t: number }>> }
 }
 
 /**
@@ -163,7 +168,7 @@ export function bakedConsonants(stored: JamoMap, drawn: DrawnConsonants | undefi
 }
 
 /** 홀자: 긋기 마스터 → 허리선(곁줄기 높이, 계열 대표 글자의 칸 기준) → 곁줄기 길이 → 줄기마다 휨 · 길이 · 틈. 화면(`MoldGlyph`)과 같은 순서. */
-export function bakedVowels(stored: JamoMap, drawn: JamoMap | undefined, items: readonly BakeTarget[], look: Look): Record<string, JamoData> {
+export function bakedVowels(stored: JamoMap, drawn: JamoMap | undefined, items: readonly BakeTarget[], look: Look, ends?: { ink: number; linecap?: string }): Record<string, JamoData> {
   const out: Record<string, JamoData> = {}
   const repOf = (family: MedialFamilyKey) => items.find((item) => item.syllable.layoutType === FAMILY_LAYOUT[family].open)
   for (const [char, base] of Object.entries(stored)) {
@@ -172,7 +177,7 @@ export function bakedVowels(stored: JamoMap, drawn: JamoMap | undefined, items: 
     const rep = repOf(family)
     let syllable: DecomposedSyllable = { char, choseong: null, jongseong: null, jungseong: start, layoutType: FAMILY_LAYOUT[family].open }
     if (rep) syllable = waistSyllable(syllable, rep.lift, rep.molded)
-    syllable = stemSyllable(branchSyllable(syllable, lookOf(look, 'branch')), look)
+    syllable = stemSyllable(branchSyllable(syllable, lookOf(look, 'branch'), rep && ends ? { boxes: rep.molded, ...ends } : undefined), look)
     let next = syllable.jungseong!
     // 곁줄기 길이 · 허리선은 칸에 놓은 뒤 획만 고친 것이라, 틀(`frame`)을 고치기 전 획으로 둔다. 안 그러면 짧아진 곁줄기 범위로 자소를 다시 늘려 맞춘다.
     if (next !== start) next = { ...next, frame: start.frame ?? { strokes: start.strokes, horizontalStrokes: start.horizontalStrokes, verticalStrokes: start.verticalStrokes } }

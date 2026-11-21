@@ -235,9 +235,9 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     const boxes = moldedBoxes(placement.boxes, raw.layoutType, edits, { ...look, jamo: Math.min(1, lookOf(look, 'jamo')), ...(heavyOn ? { weight: 1, weightBase: 1 } : {}) }, char)
     // 허리선 → 곁줄기 길이 → 줄기마다(휨 · 길이 · 틈) → 부리 → 붓촉 순서로 획을 고친다(획 다듬기 값은 획 모양만 바꾸고 칸은 두지 않는다).
     const waisted = waistSyllable(raw, waistLift(look, placement.boxes, raw.layoutType), boxes)
-    const stroked = serifSyllable(stemSyllable(branchSyllable(waisted, lookOf(look, 'branch')), look), lookOf(look, 'serif'), boxes)
+    const stroked = serifSyllable(stemSyllable(branchSyllable(waisted, lookOf(look, 'branch'), { boxes, ink: weightToMultiplier(MOLD_BASE_WEIGHT), linecap: effective.linecap }), look), lookOf(look, 'serif'), boxes)
     return { boxes, syllable: stroked }
-  }, [placement, raw, edits, look, char, heavyOn])
+  }, [placement, raw, edits, look, char, heavyOn, effective.linecap])
   const syllable = shaped.syllable
   const molded = shaped.boxes
 
@@ -412,7 +412,19 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const slot = { width: size * scale + size * (lookOf(look, 'tracking') + effective.letterSpacing), marginInline: 0 }
   // 저장소에 써 넣기: 그리는 칸 그대로를 목표로 넘긴다(긋기 · 획 다듬기 획은 아직 안 넘어감).
   const lift = placement.kind === 'boxes' ? waistLift(look, placement.boxes, raw.layoutType) : 0
-  useEffect(() => { if (onBake && boxes && molded) onBake({ char, syllable: raw, schema, target: boxes, sx: scale, lift, molded, thick: balloon.thick }) }, [onBake, boxes, char, raw, schema, scale, lift, molded, balloon.thick])
+  const heavyBake = useMemo(() => {
+    if (!heavy) return undefined
+    const ink: NonNullable<BakeTarget['heavy']>['ink'] = {}
+    for (const group of ['CH', 'JU', 'JO'] as const) {
+      const jamo = group === 'CH' ? heavy.syllable.choseong : group === 'JU' ? heavy.syllable.jungseong : heavy.syllable.jongseong
+      const list = jamo ? [...(jamo.strokes ?? []), ...(jamo.horizontalStrokes ?? []), ...(jamo.verticalStrokes ?? [])].map((stroke) => stroke.thickness).sort((a, b) => a - b) : []
+      if (!list.length) continue
+      const t = list[Math.floor(list.length / 2)] * weightToMultiplier(MOLD_BASE_WEIGHT)
+      ink[group] = { v: t * heavy.thick[group].v, h: t * heavy.thick[group].h, t: list[Math.floor(list.length / 2)] }
+    }
+    return { boxes: heavy.boxes, ink }
+  }, [heavy])
+  useEffect(() => { if (onBake && boxes && molded) onBake({ char, syllable: raw, schema, target: boxes, sx: scale, lift, molded, thick: balloon.thick, heavy: heavyBake }) }, [onBake, boxes, char, raw, schema, scale, lift, molded, balloon.thick, heavyBake])
   const strokeColorOf = shownStroke || highlight || (sel && sel !== 'WHOLE') ? colorOf : undefined
   if (heavy) {
     // 자소마다 가로 · 세로 굵기가 다르다. 엔진의 대비(토막 방향별 두께)를 자소마다 따로 줘서 겹쳐 그린다.
@@ -866,10 +878,11 @@ const toEm = (d: string) => d.replace(/-?\d*\.?\d+(?:e-?\d+)?/g, (n) => String(M
 function outlineOf(): OutlineGlyph[] {
   return [...document.querySelectorAll<HTMLElement>('span[data-testid^="mold-char-"]')].map((el) => {
     const index = Number(el.dataset.testid!.slice('mold-char-'.length))
-    const svg = el.querySelector('svg')
-    const px = svg ? Number(svg.getAttribute('width')) || 1 : 1
+    // 풍선 굵기는 첫닿자 · 홀자 · 받침을 자소마다 따로 그려 겹친다(같은 칸 좌표). 그래서 svg를 모두 모은다(다람쥐 재검수 2번).
+    const svgs = [...el.querySelectorAll('svg')]
+    const px = svgs[0] ? Number(svgs[0].getAttribute('width')) || 1 : 1
     const paths: OutlinePath[] = []
-    for (const path of svg ? [...svg.querySelectorAll('path')] : []) {
+    for (const path of svgs.flatMap((svg) => [...svg.querySelectorAll('path')])) {
       const fill = path.getAttribute('fill'), stroke = path.getAttribute('stroke'), d = path.getAttribute('d')
       if (!d || fill === 'transparent' || stroke === 'transparent') continue
       // 화면은 붓 모양에 따라 채운 윤곽(둥글기 · 대비)이나 중심선 + 굵기(stroke)로 그린다. 둘 다 그린 그대로 넘긴다.
@@ -971,7 +984,7 @@ export function MoldLabPage() {
   const bakeReporters = useMemo(() => Object.fromEntries(BAKE_SAMPLES.map((sample) => [sample, (item: BakeTarget) => { bakeItems.current[sample] = item }])), [])
   const bakeLook = useMemo(() => ({ ...look, jag: LOOK_ENGINE.jag }), [look])
   const [bakeAsk, setBakeAsk] = useState(false)
-  const [baked, setBaked] = useState<{ layouts: number; residual: number; worst: string; jamo: number } | null>(null)
+  const [baked, setBaked] = useState<{ layouts: number; residual: number; worst: string; heavy: boolean; jamo: number } | null>(null)
   // 글줄 글자도 빚은 칸을 받아 둔다 — 써 넣은 뒤 대표 글자 말고 글줄 전체에서 남은 차이를 잰다.
   const lineBakeItems = useRef<Record<string, BakeTarget>>({})
   const lineBakeReporters = useMemo(() => Object.fromEntries([...sentence].map((_, at) => [at, (item: BakeTarget) => { lineBakeItems.current[`${sentence}-${at}`] = item }])) as Record<number, (item: BakeTarget) => void>, [sentence])
@@ -998,7 +1011,7 @@ export function MoldLabPage() {
     const jamo = useJamoStore.getState()
     const choseongOut = bakedConsonants(jamo.choseong, drawn?.consonants, 'choseong', meanThick(items, 'CH'))
     const jongseongOut = bakedConsonants(jamo.jongseong, drawn?.consonants, 'jongseong', meanThick(items, 'JO'))
-    const jungseongOut = bakedVowels(jamo.jungseong, drawn?.jungseong, items, look)
+    const jungseongOut = bakedVowels(jamo.jungseong, drawn?.jungseong, items, look, { ink: weightToMultiplier(MOLD_BASE_WEIGHT), linecap: inked.linecap })
     for (const [char, data] of Object.entries(choseongOut)) jamo.updateChoseong(char, data)
     for (const [char, data] of Object.entries(jungseongOut)) jamo.updateJungseong(char, data)
     for (const [char, data] of Object.entries(jongseongOut)) jamo.updateJongseong(char, data)
@@ -1012,13 +1025,23 @@ export function MoldLabPage() {
     setBakeAsk(false)
     // 남은 차이: 대표 글자만이 아니라 글줄 글자마다, 써 넣은 저장소로 다시 풀어 빚은 칸과 잰다.
     const after = layoutDeltaSnapshot()
-    let residual = Math.max(0, ...layouts.map((item) => item.residual)), worst = ''
+    let residual = Math.max(0, ...layouts.map((item) => item.residual)), worst = '', heavyLeft = false
     ;[...sentence].forEach((char, at) => {
       const item = char === ' ' ? undefined : lineBakeItems.current[`${sentence}-${at}`]
-      const r = item ? bakedResidual({ bundle, snapshot: after, ends, item }) : null
+      let r = item ? bakedResidual({ bundle, snapshot: after, ends, item: item.heavy ? { ...item, target: item.heavy.boxes } : item }) : null
+      // 풍선 굵기: 버전 1은 글줄 한 굵기(저장소 굵기 × 닿자 두께 배율)로 그린다. 화면의 자소마다 세로 · 가로 두께와의 차이도 남은 차이다.
+      if (item?.heavy) {
+        const storeM = weightToMultiplier(inked.weight)
+        for (const [group, ink] of Object.entries(item.heavy.ink) as ['CH' | 'JU' | 'JO', { v: number; h: number; t: number }][]) {
+          const scale = group === 'CH' ? meanThick(items, 'CH') : group === 'JO' ? meanThick(items, 'JO') : 1
+          const store = ink.t * scale * storeM
+          r = Math.max(r ?? 0, Math.abs(ink.v - store), Math.abs(ink.h - store))
+        }
+        heavyLeft = true
+      }
       if (r !== null && r > residual) { residual = r; worst = char }
     })
-    setBaked({ layouts: layouts.length, residual, worst, jamo: Object.keys(choseongOut).length + Object.keys(jungseongOut).length + Object.keys(jongseongOut).length })
+    setBaked({ layouts: layouts.length, residual, worst, heavy: heavyLeft, jamo: Object.keys(choseongOut).length + Object.keys(jungseongOut).length + Object.keys(jongseongOut).length })
   }
   const fenceReportsNow = [...sentence].flatMap((char, at) => (char === ' ' ? [] : fenceReports[`${sentence}-${at}`] ? [fenceReports[`${sentence}-${at}`]] : []))
   const jamoScale = Math.min(1, ...fenceReportsNow.map((report) => report.need))
@@ -1191,7 +1214,7 @@ export function MoldLabPage() {
             <Button size="sm" onClick={writeStore} disabled={!bundle} data-testid="mold-bake-yes">써 넣기</Button>
           </div>
           : <Button size="sm" onClick={() => { setBaked(null); setBakeAsk(true) }} data-testid="mold-bake">저장소에 써 넣기</Button>}
-        {baked && <p className={styles.note} data-testid="mold-baked">써 넣음 · 짜임×홀자 {baked.layouts} · 자모 {baked.jamo} · 남은 차이 {Math.round(baked.residual * 1000)}u{baked.worst ? `(가장 큰 글자 「${baked.worst}」 — 같은 짜임 · 홀자는 첫닿자 ㄱ 글자의 칸을 같이 받는다)` : ''}. 부리는 출시 뒤</p>}
+        {baked && <p className={styles.note} data-testid="mold-baked">써 넣음 · 짜임×홀자 {baked.layouts} · 자모 {baked.jamo} · 남은 차이 {Math.round(baked.residual * 1000)}u{baked.worst ? `(가장 큰 글자 「${baked.worst}」 — 같은 짜임 · 홀자는 첫닿자 ㄱ 글자의 칸을 같이 받는다)` : ''}.{baked.heavy ? ' 굵기 풍선(자소마다 굵기 · 넓힘 · 열린 끝)은 저장소에 아직 다 안 들어감 — 버전 1은 글줄 한 굵기로 그림.' : ''} 부리는 출시 뒤</p>}
         {baked && <div className={styles.moldActions}>
           <Button variant="outline" size="sm" onClick={() => window.location.assign('/workspace/font')} data-testid="mold-go-font">폰트 탭에서 보기</Button>
           <Button variant="outline" size="sm" onClick={() => window.location.assign('/dashboard')} data-testid="mold-go-dashboard">이어서 깎기</Button>

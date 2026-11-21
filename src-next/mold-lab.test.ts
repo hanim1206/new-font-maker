@@ -394,6 +394,15 @@ describe('인상 · 획 다듬기 값', () => {
     expect(out[1].points[0].x).toBeCloseTo(0.3)
     expect(out[1].points[1].x).toBeCloseTo(0.5)
   })
+  it('곁줄기 길이는 가로홀자 짧은기둥을 안 건드리고, 바닥은 기둥 밖으로 두께 0.754배 (다람쥐 재검수 5번)', async () => {
+    const { branchSyllable } = await import('./moldLab')
+    const gu = { ...ga, char: '구', layoutType: 'choseong-jungseong-horizontal' as const, jungseong: { char: 'ㅜ', type: 'jungseong' as const, strokes: [line('b', [0, 0.2], [1, 0.2]), line('s', [0.5, 0.2], [0.5, 1])] } }
+    expect(branchSyllable(gu, 0.3)).toBe(gu)
+    const boxes = { JU: box(0.6, 0.05, 0.3, 0.9) }
+    const out = branchSyllable(ga, 0.3, { boxes, ink: 1, linecap: 'butt' }).jungseong!.strokes!
+    const len = (out[1].points[1].x - out[1].points[0].x) * 0.3
+    expect(len - 0.08 / 2).toBeCloseTo(0.754 * 0.08, 6)
+  })
   it('부리는 획을 덧대고, 붓촉은 엔진 납작 붓을 고른다', async () => {
     const { serifSyllable, nibBrush, dotToLook } = await import('./moldLab')
     expect(serifSyllable(ga, 1, VERTICAL).jungseong!.strokes!.length).toBe(4)
@@ -411,7 +420,7 @@ describe('인상 · 획 다듬기 값', () => {
       expect(jagBoxes(VERTICAL, 0.09, char)).toEqual(out)
       return out.JU!.y
     })
-    expect(Math.min(...tops)).toBeGreaterThanOrEqual(0.03)
+    expect(Math.min(...tops)).toBeGreaterThanOrEqual(0)
     expect(new Set(tops.map((y) => y.toFixed(3))).size).toBeGreaterThan(1)
   })
   it('탈네모: 받침 없는 글자만 윗변을 두고 짧아진다 · 넘치면 비율 두고 줄여 넣는다', async () => {
@@ -497,14 +506,21 @@ describe('다람쥐 PR A 고치기', () => {
     ] } as unknown as JamoData
     const out = branchSyllable({ char: '애', choseong: null, jongseong: null, jungseong: ju, layoutType: 'choseong-jungseong-vertical' } as unknown as DecomposedSyllable, 1.6).jungseong!.strokes!
     expect(out[2].points).toEqual(ju.strokes![2].points)
-    expect(out[1].points[1].x).toBeCloseTo(0.2 + 0.4 * 1.6, 6)
+    // 두 기둥을 잇는 가로획은 이음줄기라 그대로(다람쥐 재검수 5번 「왜」).
+    expect(out[1].points).toEqual(ju.strokes![1].points)
   })
-  it('윗선 들쭉날쭉은 내리기만 해서 끝(0.09)에서 흩어짐이 거의 다 나온다', () => {
-    const tops = JAG_INITIALS.map((c) => Math.min(...Object.values(jagBoxes(VERTICAL, 0.09, c)).map((b) => b!.y)))
-    const mean = tops.reduce((a, b) => a + b, 0) / tops.length
-    const sd = Math.sqrt(tops.reduce((a, b) => a + (b - mean) ** 2, 0) / tops.length)
-    const span = Math.max(...Object.values(VERTICAL).map((b) => b!.y + b!.height)) - Math.min(...Object.values(VERTICAL).map((b) => b!.y))
-    expect(sd / span).toBeGreaterThan(0.06)
+  it('윗선 들쭉날쭉은 끝(0.09)까지 첫닿자 무늬 하나로, 난수 없이 (다람쥐 재검수 6번)', async () => {
+    const { JAG_PATTERN } = await import('./moldLab')
+    // 위로 넉넉한 칸(꼭지가 글자 칸 위 끝에 안 걸리게).
+    const ROOMY = { CH: box(0.1, 0.3, 0.4, 0.4), JU: box(0.6, 0.25, 0.3, 0.7) }
+    const span = 0.7
+    for (const jag of [0.05, 0.09]) {
+      const k = (jag - 0.027) / 0.023
+      for (const c of JAG_INITIALS) {
+        const top = Math.min(...Object.values(jagBoxes(ROOMY, jag, c)).map((b) => b!.y))
+        expect((top - 0.25) / span).toBeCloseTo(JAG_PATTERN[c] * k, 6)
+      }
+    }
   })
 })
 

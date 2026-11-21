@@ -979,20 +979,36 @@ const endsOf = (stroke: StrokeDataV2) => [stroke.points[0], stroke.points[stroke
 const lengthOf = (stroke: StrokeDataV2) => { const [a, b] = endsOf(stroke); return Math.hypot(b.x - a.x, b.y - a.y) }
 
 /**
- * 곁줄기 길이(다람쥐 세 번째 맞추기 5번: Gugi의 점 같은 곁줄기). 홀자 묶음마다 가장 긴 곧은 획을 기둥(보)으로 보고,
- * 나머지 곧은 획은 기둥에 붙은 끝을 두고 `k`배로 늘이거나 줄인다. 칸 안 좌표라 칸 밖으로 조금 나갈 수 있다.
+ * 곁줄기 길이(다람쥐 세 번째 맞추기 5번: Gugi의 점 같은 곁줄기). 곁줄기는 기둥에 붙은 짧은 가로획이라(타이포그래피 사전)
+ * 세로홀자(ㅏ ㅑ ㅓ ㅕ ㅐ ㅒ ㅔ ㅖ)와 섞임홀자의 세로 묶음에서만 고친다 — 가로홀자의 짧은기둥은 건드리지 않는다(다람쥐 재검수 5번).
+ * 기둥에 붙은 끝을 두고 `k`배로 늘이거나 줄인다. 두 기둥을 잇는 가로획(ㅐ ㅙ)은 이음줄기라 그대로 둔다.
+ * `fit`을 주면 두 끝을 지킨다.
+ * - 바닥: 기둥 잉크 밖으로 나온 길이가 곁줄기 두께의 0.754배(폰트 128벌 `곁줄기ㅏ` 5번째 백분위, mold-fit/dist.json). 그 아래는 「아」가 「이」로 읽힌다.
+ * - 천장: 잉크가 글자 칸(0~1) 밖으로 안 나간다.
  */
-export function branchSyllable(syllable: DecomposedSyllable, k: number): DecomposedSyllable {
+const VERTICAL_MEDIALS = new Set([...'ㅏㅑㅓㅕㅐㅒㅔㅖ'])
+const MIXED_MEDIALS = new Set([...'ㅘㅙㅚㅝㅞㅟㅢ'])
+/** 폰트 128벌 곁줄기ㅏ(기둥 밖으로 나온 길이 ÷ 곁줄기 두께) 5번째 백분위. */
+export const BRANCH_FLOOR = 0.754
+export interface BranchFit { boxes: Partial<Record<Part, BoxConfig>>; ink: number; linecap?: string }
+export function branchSyllable(syllable: DecomposedSyllable, k: number, fit?: BranchFit): DecomposedSyllable {
   const ju = syllable.jungseong
   if (!ju || k === 1) return syllable
+  const vertical = VERTICAL_MEDIALS.has(ju.char), mixed = MIXED_MEDIALS.has(ju.char)
+  if (!vertical && !mixed) return syllable
+  const box = fit?.boxes[mixed ? 'JU_V' : 'JU'] ?? fit?.boxes.JU
+  const em = (p: { x: number; y: number }) => (box ? { x: box.x + p.x * box.width, y: box.y + p.y * box.height } : p)
+  const emLen = (a: { x: number; y: number }, b: { x: number; y: number }) => { const p = em(a), q = em(b); return Math.hypot(q.x - p.x, q.y - p.y) }
   const fix = (strokes: StrokeDataV2[]) => {
     const lines = strokes.filter(straight)
-    if (lines.length < 2) return strokes
-    const stem = lines.reduce((a, b) => (lengthOf(b) > lengthOf(a) ? b : a))
+    const upright = lines.filter((line) => { const [a, b] = endsOf(line); return Math.abs(b.y - a.y) > Math.abs(b.x - a.x) })
+    if (!upright.length || lines.length < 2) return strokes
+    const stem = upright.reduce((a, b) => (lengthOf(b) > lengthOf(a) ? b : a))
     const [s0, s1] = endsOf(stem)
-    const toStem = (p: { x: number; y: number }) => {
-      const dx = s1.x - s0.x, dy = s1.y - s0.y, t = Math.max(0, Math.min(1, ((p.x - s0.x) * dx + (p.y - s0.y) * dy) / (dx * dx + dy * dy || 1)))
-      return Math.hypot(p.x - (s0.x + dx * t), p.y - (s0.y + dy * t))
+    const distTo = (p: { x: number; y: number }, line: StrokeDataV2) => {
+      const [l0, l1] = endsOf(line), dx = l1.x - l0.x, dy = l1.y - l0.y
+      const t = Math.max(0, Math.min(1, ((p.x - l0.x) * dx + (p.y - l0.y) * dy) / (dx * dx + dy * dy || 1)))
+      return Math.hypot(p.x - (l0.x + dx * t), p.y - (l0.y + dy * t))
     }
     return strokes.map((stroke) => {
       if (stroke === stem || !straight(stroke)) return stroke
@@ -1000,18 +1016,26 @@ export function branchSyllable(syllable: DecomposedSyllable, k: number): Decompo
       // 기둥과 나란한 획은 곁줄기가 아니다(ㅐ · ㅔ · ㅙ의 둘째 기둥). 늘이면 기둥이 글자 칸 밖으로 빠진다(거북이 계산기 2026-11-21).
       const ux = s1.x - s0.x, uy = s1.y - s0.y, vx = b.x - a.x, vy = b.y - a.y
       if (Math.abs(ux * vy - uy * vx) < 0.5 * Math.hypot(ux, uy) * Math.hypot(vx, vy)) return stroke
-      const near = toStem(a) <= toStem(b) ? a : b
-      return { ...stroke, points: stroke.points.map((p) => (p === near ? p : { ...p, x: near.x + (p.x - near.x) * k, y: near.y + (p.y - near.y) * k })) }
+      const near = distTo(a, stem) <= distTo(b, stem) ? a : b, far = near === a ? b : a
+      // 먼 끝도 다른 획에 붙어 있으면 이음줄기(ㅐ의 가로획). 늘이면 둘째 기둥을 뚫는다(다람쥐 재검수 5번 「왜」).
+      if (strokes.some((other) => other !== stroke && other !== stem && straight(other) && distTo(far, other) < 0.06)) return stroke
+      let kk = k
+      if (fit) {
+        const t = (stroke.thickness ?? 0.07) * fit.ink, stemT = (stem.thickness ?? 0.07) * fit.ink
+        const cap = fit.linecap && fit.linecap !== 'butt' ? t / 2 : 0
+        const len = emLen(near, far)
+        if (len > 1e-6) {
+          kk = Math.max(kk, Math.min(1, (BRANCH_FLOOR * t + stemT / 2 - cap) / len))
+          const p = em(near), q = em(far), dx = q.x - p.x, dy = q.y - p.y, edge = t / 2 + cap
+          const room = (from: number, d: number) => (d > 1e-9 ? (1 - edge - from) / d : d < -1e-9 ? (edge - from) / d : Infinity)
+          kk = Math.min(kk, Math.max(1, Math.min(room(p.x, dx), room(p.y, dy))))
+        }
+      }
+      return { ...stroke, points: stroke.points.map((pt) => (pt === near ? pt : { ...pt, x: near.x + (pt.x - near.x) * kk, y: near.y + (pt.y - near.y) * kk })) }
     })
   }
+  if (mixed) return { ...syllable, jungseong: { ...ju, verticalStrokes: ju.verticalStrokes && fix(ju.verticalStrokes) } }
   return { ...syllable, jungseong: mapGroups(ju, fix) }
-}
-
-/** 0~1 사이 같은 수를 늘 같게(글자 · 획 이름으로 씨앗). 손글씨 흔들림이 다시 그릴 때마다 바뀌지 않게. */
-function seeded(text: string): () => number {
-  let h = 2166136261
-  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619) }
-  return () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 10000) / 10000 }
 }
 
 /**
@@ -1072,21 +1096,16 @@ export const JAG_INITIALS = [...CHO_LIST]
  */
 export const JAG_PATTERN: Readonly<Record<string, number>> = { ㄱ: 0.019, ㄲ: 0.017, ㄴ: 0, ㄷ: 0.007, ㄸ: 0.011, ㄹ: -0.007, ㅁ: 0, ㅂ: -0.015, ㅃ: -0.004, ㅅ: -0.018, ㅆ: -0.008, ㅇ: -0.019, ㅈ: 0.008, ㅉ: 0.004, ㅊ: -0.057, ㅋ: 0.011, ㅌ: 0, ㅍ: 0.007, ㅎ: -0.059 }
 const JAG_PATTERN_SPREAD = 0.023
-/** 폰트 흩어짐 95%. 이보다 큰 몫(손글씨)만 씨앗 난수로 더한다. */
-const JAG_PATTERN_TOP = 0.047
 export function jagBoxes(boxes: Partial<Record<Part, BoxConfig>>, jag: number, char?: string): Partial<Record<Part, BoxConfig>> {
   if (!char || jag <= LOOK_ENGINE.jag + 1e-4) return boxes
   const list = Object.values(boxes).filter((box): box is BoxConfig => !!box)
   if (!list.length) return boxes
   const top = Math.min(...list.map((b) => b.y)), bottom = Math.max(...list.map((b) => b.y + b.height)), span = bottom - top
   if (span < 0.1) return boxes
-  // 엔진(노토)은 이미 jag 0.027만큼의 무늬를 가졌다. 더한 만큼만 무늬를 세게 한다.
-  const pattern = (JAG_PATTERN[jagSeedOf(char)] ?? 0) * (Math.min(jag, JAG_PATTERN_TOP) - LOOK_ENGINE.jag) / JAG_PATTERN_SPREAD
-  // 95% 너머(손글씨)는 첫닿자 씨앗으로 내리기만 한다: 0 ~ √12 고른 분포는 표준편차 1.
-  const extra = Math.sqrt(Math.max(0, jag * jag - JAG_PATTERN_TOP ** 2))
-  const v = extra > 1e-4 ? seeded(`${jagSeedOf(char)}:jag`)() * Math.sqrt(12) * extra : 0
+  // 엔진(노토)은 이미 jag 0.027만큼의 무늬를 가졌다. 더한 만큼만 무늬를 세게 한다 — 끝(0.09)까지 무늬 하나로, 난수 없이(다람쥐 재검수 6번).
+  const pattern = (JAG_PATTERN[jagSeedOf(char)] ?? 0) * (jag - LOOK_ENGINE.jag) / JAG_PATTERN_SPREAD
   // 위로 가는 몫(ㅊ ㅎ 꼭지)은 글자 칸 위 끝(0)까지만.
-  const nextTop = Math.max(0, Math.min(top + span * 0.4, top + (pattern + v) * span))
+  const nextTop = Math.max(0, Math.min(top + span * 0.4, top + pattern * span))
   const k = (bottom - nextTop) / span
   const out: Partial<Record<Part, BoxConfig>> = {}
   for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) if (box) out[part] = { ...box, y: bottom - (bottom - box.y) * k, height: box.height * k }
