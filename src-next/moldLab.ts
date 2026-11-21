@@ -1,5 +1,5 @@
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
-import type { BoxConfig, DecomposedSyllable, JamoData, LayoutType, Part, StrokeDataV2 } from '../src/types'
+import type { BoxConfig, BrushStyle, DecomposedSyllable, JamoData, LayoutType, Part, StrokeDataV2, StrokeRenderStyle } from '../src/types'
 
 /**
  * 빚기 시험판의 계산. 학습에서는 글자 하나가 아니라 "갈래" 단위로 만진다(고양이 추천안, `학습-단계-뼈대-2026-11-20.md` 21:42 절).
@@ -1242,6 +1242,16 @@ export const dotsOf = (look: Look, keys: readonly DotKey[] = DOT_KEYS): number[]
 /** 노토(엔진 그대로)가 줄의 어느 칸에 있나. 줄 위에 작은 표시로만 그린다. */
 export const notoDot = (key: DotKey) => lookToDot(key, LOOK_ENGINE[key])
 
+/** 획 판의 붓 값(둥글기 · 대비 · 붓촉)을 스타일에 얹는다. 화면과 저장소에 써 넣기가 같이 쓴다. 붓 모드가 아니면 그대로. */
+export function moldInk<T extends { brush: BrushStyle; strokeStyle: StrokeRenderStyle }>(style: T, look: Look): T {
+  if (style.strokeStyle.mode !== 'brush') return style
+  const round = lookOf(look, 'round'), contrast = lookOf(look, 'contrast')
+  // 붓촉: 납작 붓이면 엔진의 타원 붓촉. 이때 둥글기 · 대비는 엔진이 안 쓴다.
+  const flat = nibBrush(lookOf(look, 'nib'))
+  if (flat) return { ...style, brush: flat, strokeStyle: { ...style.strokeStyle, brush: flat } }
+  if (round === 0 && contrast === 0) return style
+  return { ...style, strokeStyle: { ...style.strokeStyle, ...(round > 0 ? { roundness: round, innerRoundness: round * 2 } : {}), ...(contrast !== 0 ? { contrast } : {}) } }
+}
 /** 납작 붓의 각도(화면 가로축 기준). 붓 각도 줄은 아직 없다(고양이 문구: 납작 붓일 때만 나옴). */
 export const NIB_ANGLE = 35
 /**

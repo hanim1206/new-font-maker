@@ -181,3 +181,6 @@
 .touchedRow { display: flex; flex-wrap: wrap; gap: 4px; }
 .touchedChar { position: relative; display: inline-flex; border-radius: var(--radius-sm); cursor: pointer; }
 .touchedGhost { position: absolute; inset: 0; opacity: .25; pointer-events: none; }
+
+/* 저장소에 써 넣기: 짜임 대표 글자를 안 보이게 그려 칸만 받는다. */
+.bakeHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }

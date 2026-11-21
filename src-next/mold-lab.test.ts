@@ -448,3 +448,16 @@ describe('밀림 2차(거북이): 기둥 밀림 · 바닥 멈춤 · 안쪽 굵�
     expect(bold.sy).toBeLessThan(thin.sy)
   })
 })
+
+describe('저장소에 써 넣기', () => {
+  it('획 판 값은 붓 스타일로: 납작 붓이면 타원 붓촉, 아니면 둥글기 · 대비', async () => {
+    const { moldInk } = await import('./moldLab')
+    const style = { brush: { tip: 'round' as const, aspectRatio: 1, angle: 0 }, strokeStyle: { mode: 'brush' as const, brush: { tip: 'round' as const, aspectRatio: 1, angle: 0 } } }
+    expect(moldInk(style, {})).toBe(style)
+    const flat = moldInk(style, { nib: 1, round: 0.5 })
+    expect(flat.brush.tip).toBe('ellipse')
+    expect(flat.strokeStyle).toMatchObject({ brush: { tip: 'ellipse' } })
+    expect(flat.strokeStyle).not.toHaveProperty('roundness')
+    expect(moldInk(style, { round: 0.5, contrast: 0.2 }).strokeStyle).toMatchObject({ roundness: 0.5, innerRoundness: 1, contrast: 0.2 })
+  })
+})

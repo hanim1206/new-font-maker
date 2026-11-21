@@ -4,7 +4,7 @@ import { Check, ChevronRight, Dices, RotateCcw, Undo2 } from 'lucide-react'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
 import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
 import type { PenPoint } from '../src/services/penStrokeFit'
-import { useEffectiveGlobalStyle } from '../src/stores/globalStyleStore'
+import { useEffectiveGlobalStyle, useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { DEFAULT_GLOBAL_PADDING, mergePadding, useLayoutStore } from '../src/stores/layoutStore'
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
@@ -20,8 +20,10 @@ import { Pressable } from './components/ui/pressable'
 import { Field, RangeBar } from './components/ui/range'
 import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
-import { applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, nibBrush, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
-import { useContextPlacement } from './notoModel'
+import { applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { useContextPlacement, useNotoModel } from './notoModel'
+import { applyBakedLayouts, bakeLayout, type BakeTarget, type BakedLayout } from './moldBake'
+import { layoutDeltaSnapshot } from './layoutDeltaStore'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
 import { MoldDotPlate } from './MoldDotPlate'
@@ -93,7 +95,7 @@ function useGlyphBase(char: string, drawn: Drawn | undefined) {
   const padding = useMemo(() => mergePadding(globalPadding, paddingOverrides[syllable.layoutType]), [globalPadding, paddingOverrides, syllable.layoutType])
   const schema = useMemo(() => ({ ...schemas[syllable.layoutType], padding, designBodyPadding: padding }), [schemas, syllable.layoutType, padding])
   const { placement } = useContextPlacement(syllable, schema, effective)
-  return { syllable, effective, placement, padding }
+  return { syllable, effective, placement, padding, schema }
 }
 
 // ── 울타리 보정(획 긋기 시험판과 같은 계산 `fenceBand.ts`) ──
@@ -146,8 +148,8 @@ function moldedBoxes(boxes: Partial<Record<Part, BoxConfig>>, layout: LayoutType
  * 빚은 글자 하나. 칸을 풀고, 짜임 편집 · 폭 · 굵기 · 끝 모양을 차례로 입혀 그린다.
  * `sel`이 있으면 고른 부위만 제 색으로, 나머지는 옅게 그린다.
  */
-function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke, testId, weightCap = Infinity, onCap, fence, onFence }: { char: string; size: number; edits: LayoutEdits; look: Look; drawn?: Drawn; sel?: Region | null; highlight?: readonly Part[]; shownStroke?: (key: string) => boolean; testId?: string; weightCap?: number; onCap?: (ratio: number) => void; fence?: MoldFence; onFence?: (need: number, pulls: readonly FencePull[]) => void }) {
-  const { syllable: raw, effective, placement, padding } = useGlyphBase(char, drawn)
+function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke, testId, weightCap = Infinity, onCap, fence, onFence, onBake }: { char: string; size: number; edits: LayoutEdits; look: Look; drawn?: Drawn; sel?: Region | null; highlight?: readonly Part[]; shownStroke?: (key: string) => boolean; testId?: string; weightCap?: number; onCap?: (ratio: number) => void; fence?: MoldFence; onFence?: (need: number, pulls: readonly FencePull[]) => void; onBake?: (item: BakeTarget) => void }) {
+  const { syllable: raw, effective, placement, padding, schema } = useGlyphBase(char, drawn)
   const base = useGlyphBase(char, undefined)
   // 무게중심(거북이 A안): ㅏ · ㅓ 곁줄기 높이는 획에서, 첫닿자 밑변 · 보는 칸에서(`impressBoxes`) 옮긴다.
   // 닿자 크기 1 아래는 칸을 줄이기만 한다. 1 위는 풍선 닿자 — 칸은 그대로 두고 맨 끝(울타리까지 입힌 뒤)에서 부풀린다.
@@ -217,15 +219,8 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const round = lookOf(look, 'round'), contrast = lookOf(look, 'contrast'), nib = lookOf(look, 'nib')
   const globalStyle = useMemo(() => {
     const weighted = ratio === 1 ? effective : { ...effective, weight: scaledWeight(effective.weight, ratio) }
-    // 획 끝 · 꺾임은 둥글기 하나가 맡는다(거북이 방향안 4차: 둥글기가 끝과 꺾임 모서리를 같이 굴림).
-    const softened = weighted
-    if (softened.strokeStyle.mode !== 'brush') return softened
-    // 붓촉: 납작 붓이면 엔진의 타원 붓촉. 이때 둥글기 · 대비는 엔진이 안 쓴다.
-    const flat = nibBrush(nib)
-    if (flat) return { ...softened, brush: flat, strokeStyle: { ...softened.strokeStyle, brush: flat } }
-    // 둥글기 · 획 대비는 엔진의 붓 값(둥근 붓촉에서만 뜻이 있다)에 그대로 얹는다.
-    if (round === 0 && contrast === 0) return softened
-    return { ...softened, strokeStyle: { ...softened.strokeStyle, ...(round > 0 ? { roundness: round, innerRoundness: round * 2 } : {}), ...(contrast !== 0 ? { contrast } : {}) } }
+    // 획 끝 · 꺾임은 둥글기 하나가 맡는다(거북이 방향안 4차). 둥글기 · 대비 · 붓촉은 엔진의 붓 값에 얹는다(`moldInk`).
+    return moldInk(weighted, { round, contrast, nib })
   }, [effective, ratio, round, contrast, nib])
   const colorOf = useCallback((source: ResolvedStrokeInkSource) => {
     if (shownStroke) return shownStroke(`${simsPartOf(source.part)}:${source.jamoId}:${source.strokeId}`) ? undefined : 'transparent'
@@ -238,7 +233,10 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
 
   // 폭이 좁아지면 글자 칸도 같이 좁힌다. 자간은 글자 사이를 더하거나 뺀다.
   const scale = placement.kind === 'boxes' ? lookScale(placement.boxes, look).sx : lookOf(look, 'frame') * lookOf(look, 'size')
-  const slot = { width: size * scale + size * lookOf(look, 'tracking'), marginInline: 0 }
+  // 저장소의 자간(써 넣은 값 포함)도 얹는다 — 써 넣은 뒤 화면 값을 처음으로 돌려도 글줄 간격이 그대로다.
+  const slot = { width: size * scale + size * (lookOf(look, 'tracking') + effective.letterSpacing), marginInline: 0 }
+  // 저장소에 써 넣기: 그리는 칸 그대로를 목표로 넘긴다(긋기 · 획 다듬기 획은 아직 안 넘어감).
+  useEffect(() => { if (onBake && boxes) onBake({ char, syllable: raw, schema, target: boxes, sx: scale }) }, [onBake, boxes, char, raw, schema, scale])
   return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char}>
     <SvgRenderer
       syllable={balloon.syllable}
@@ -714,6 +712,35 @@ export function MoldLabPage() {
     ;[...sentence].forEach((_, at) => { out[at] = (need, pulls) => setFenceReports((all) => { const key = `${sentence}-${at}`; const old = all[key]; return old && old.need === need && JSON.stringify(old.pulls) === JSON.stringify(pulls) ? all : { ...all, [key]: { need, pulls } } }) })
     return out
   }, [sentence])
+  // 저장소에 써 넣기(PR D): 짜임마다 대표 글자 하나를 안 보이게 그려 빚은 칸을 받아 둔다. 윗선 들쭉날쭉은 글자마다 달라서 뺀다.
+  const { bundle } = useNotoModel()
+  const bakeItems = useRef<Record<string, BakeTarget>>({})
+  const bakeReporters = useMemo(() => Object.fromEntries(PART_LAYOUTS.map(({ sample }) => [sample, (item: BakeTarget) => { bakeItems.current[sample] = item }])), [])
+  const bakeLook = useMemo(() => ({ ...look, jag: LOOK_ENGINE.jag }), [look])
+  const [bakeAsk, setBakeAsk] = useState(false)
+  const [baked, setBaked] = useState<{ layouts: number; residual: number } | null>(null)
+  const writeStore = () => {
+    const items = PART_LAYOUTS.map(({ sample }) => bakeItems.current[sample]).filter((item): item is BakeTarget => !!item)
+    if (!bundle || items.length === 0) return
+    const store = useGlobalStyleStore.getState()
+    // 획 판 → 전역 스타일. 굵기는 글줄이 실제로 쓴 값(막힌 데서 멈춘 값), 자간은 비율로 좁아진 폭 + 자간 줄.
+    const inked = moldInk({ ...store.style, weight: scaledWeight(store.style.weight, appliedWeight(lookOf(look, 'weight'), weightCap)) }, look)
+    const sx = items.reduce((sum, item) => sum + item.sx, 0) / items.length
+    const letterSpacing = Math.round((store.style.letterSpacing + sx - 1 + lookOf(look, 'tracking')) * 1000) / 1000
+    // 칸 → 레이아웃 Δ. 새 스타일의 끝 모양으로 풀어 본다.
+    const snapshot = layoutDeltaSnapshot()
+    const ends = { linecap: inked.linecap, linejoin: inked.linejoin, strokeStyle: inked.strokeStyle }
+    const layouts = items.map((item) => bakeLayout({ bundle, snapshot, ends, item })).filter((item): item is BakedLayout => !!item)
+    applyBakedLayouts(layouts)
+    store.updateStyle('weight', inked.weight)
+    store.updateStyle('letterSpacing', letterSpacing)
+    store.setBrushStyle(inked.brush)
+    store.setStrokeRenderStyle(inked.strokeStyle)
+    // 저장소가 빚은 값을 가졌으니 화면 값은 처음으로(두 번 얹히지 않게).
+    remember()
+    setLook({}); setEdits({}); setBakeAsk(false)
+    setBaked({ layouts: layouts.length, residual: Math.max(0, ...layouts.map((item) => item.residual)) })
+  }
   const fenceReportsNow = [...sentence].flatMap((char, at) => (char === ' ' ? [] : fenceReports[`${sentence}-${at}`] ? [fenceReports[`${sentence}-${at}`]] : []))
   const jamoScale = Math.min(1, ...fenceReportsNow.map((report) => report.need))
   const fence = useMemo<MoldFence>(() => ({ on: fenceOn, line: fenceLine, scale: jamoScale }), [fenceOn, fenceLine, jamoScale])
@@ -872,7 +899,22 @@ export function MoldLabPage() {
         <Field label="자간" value={`${tracking >= 0 ? '+' : ''}${Math.round(tracking * 100)}%`}>
           <RangeBar min={0} max={100} value={trackingPct} onPointerDown={remember} onKeyDown={remember} onChange={(event) => setLook({ ...look, tracking: t0 + (t1 - t0) * Number(event.currentTarget.value) / 100 })} aria-label="자간" data-testid="finish-tracking" />
         </Field>
-        <p className={styles.note}>자간은 글자 모양이 다 정해진 뒤 글줄에서 맞춤. 이름 · 저장 · 폰트 만들기는 버전 1 폰트 탭으로 이어짐(다음에 넣음).</p>
+        <p className={styles.note}>자간은 글자 모양이 다 정해진 뒤 글줄에서 맞춤. 써 넣으면 지금 연 폰트의 전역 스타일과 레이아웃에 들어가고, 폰트 탭 · 추출 · 검수 격자에서 그대로 보임.</p>
+        {bakeAsk
+          ? <div className={styles.moldActions} data-testid="mold-bake-ask">
+            <span className={styles.skipNote}>지금 연 폰트에 빚은 값을 써 넣음</span>
+            <Button variant="outline" size="sm" onClick={() => setBakeAsk(false)} data-testid="mold-bake-no">취소</Button>
+            <Button size="sm" onClick={writeStore} disabled={!bundle} data-testid="mold-bake-yes">써 넣기</Button>
+          </div>
+          : <Button size="sm" onClick={() => { setBaked(null); setBakeAsk(true) }} data-testid="mold-bake">저장소에 써 넣기</Button>}
+        {baked && <p className={styles.note} data-testid="mold-baked">써 넣음 · 짜임 {baked.layouts} · 남은 차이 {Math.round(baked.residual * 1000)}u. 긋기 획 · 획 다듬기(곁줄기 · 허리선 곁줄기 · 부리) · 닿자 획 두께 · 윗선은 아직 안 넘어감</p>}
+        {baked && <div className={styles.moldActions}>
+          <Button variant="outline" size="sm" onClick={() => window.location.assign('/workspace/font')} data-testid="mold-go-font">폰트 탭에서 보기</Button>
+          <Button variant="outline" size="sm" onClick={() => window.location.assign('/dashboard')} data-testid="mold-go-dashboard">이어서 깎기</Button>
+        </div>}
+        <div className={styles.bakeHidden} aria-hidden="true">
+          {PART_LAYOUTS.map(({ sample }) => <MoldGlyph key={sample} char={sample} size={20} edits={edits} look={bakeLook} weightCap={weightCap} fence={fence} onBake={bakeReporters[sample]} />)}
+        </div>
         <Button variant="outline" size="sm" onClick={downloadOutline} data-testid="mold-export">윤곽 내보내기(SVG)</Button>
       </section>}
       <div className={styles.moldActions}>
