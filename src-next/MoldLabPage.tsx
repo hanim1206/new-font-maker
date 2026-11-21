@@ -431,7 +431,7 @@ function inkStrokes(syllable: DecomposedSyllable, boxes: Partial<Record<Part, Bo
 }
 
 /** 풍선 닿자 잉크가 글자 칸 밖으로 나가도 되는 만큼(em). 옆 글자와 닿지 않을 만큼만. */
-const BALLOON_EDGE = 0.01
+const BALLOON_EDGE = 0
 /** 첫닿자 · 받침 잉크가 닿는 가장 바깥(글자 단위, 가로 · 세로 같이). 풍선 닿자가 글자 칸 밖으로 안 나가게. */
 function inkReach(strokes: ReturnType<typeof inkStrokes>) {
   let lo = Infinity, hi = -Infinity
@@ -510,7 +510,30 @@ function SimsStep({ char, drawn, edits, setEdits, look, weightCap, sel, setSel, 
       const color = seam.b.includes('JO') ? SLOT_COLOR.JO : SLOT_COLOR.JU
       lines.push({
         id: `seam${i}`, axis: seam.axis, pos: t(pre), color, end: 'end', lo: t(pre + lo), hi: t(pre + hi), origin: t(seamPos(seam, origin)), parts: [...seam.a, ...seam.b], scale,
-        drag: (d) => { const out = dragSeam(seam, origin, startEdits, d / scale); setEdits((all) => ({ ...all, [layout]: out.edits })); return out.wall },
+        drag: (d) => {
+          // 넘어가도 획이 서로 겹치기 전에서 멈춘다(하니무스 2026-11-21 "당긴다": 「가」가 「기」로 보이면 안 됨). 처음부터 겹친 쌍은 더 겹치지만 않게.
+          const want = d / scale, out = dragSeam(seam, origin, startEdits, want)
+          if (out.wall === 'past' || out.wall === 'hard') {
+            const inkOf = (partEdits: PartEdits) => inkStrokes(syllable, moldedBoxes(origin, layout, { ...edits, [layout]: partEdits }, { ...look, jamo: Math.min(1, lookOf(look, 'jamo')) }), effective, multiplier)
+            // 보이는 길이: 획 길이(em)에서 붙은 끝이 이웃 줄기에 묻히는 두께만큼 뺀다. 짧은 곁줄기가 줄기 속으로 사라지는 것을 잡는다.
+            const seen = (ink: ReturnType<typeof inkOf>) => ink.map((stroke) => { const a = stroke.points[0], z = stroke.points[stroke.points.length - 1]; return Math.hypot((z.x - a.x) * stroke.box.width, (z.y - a.y) * stroke.box.height) - (stroke.thickness ?? 0) })
+            const startInk = inkOf(startEdits), base = nearestBetweenParts(startInk), baseSeen = seen(startInk)
+            const ok = (partEdits: PartEdits) => {
+              const ink = inkOf(partEdits)
+              if (!Object.entries(nearestBetweenParts(ink)).every(([pair, near]) => near.gap >= Math.min(0, base[pair as PartPair]?.gap ?? 0) - 1e-4)) return false
+              const now = seen(ink)
+              return ink.length !== startInk.length || now.every((length, i) => baseSeen[i] < 0.02 || length >= 0.5 * baseSeen[i])
+            }
+            if (!ok(out.edits)) {
+              let good = 0, bad = want
+              for (let i = 0; i < 14; i++) { const mid = (good + bad) / 2; if (ok(dragSeam(seam, origin, startEdits, mid).edits)) good = mid; else bad = mid }
+              const stop = dragSeam(seam, origin, startEdits, good)
+              setEdits((all) => ({ ...all, [layout]: stop.edits }))
+              return 'hard'
+            }
+          }
+          setEdits((all) => ({ ...all, [layout]: out.edits })); return out.wall
+        },
       })
     })
   }

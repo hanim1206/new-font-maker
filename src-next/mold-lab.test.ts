@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DecomposedSyllable, JamoData, StrokeDataV2 } from '../src/types'
-import { bendMaster, stemSyllable, clampToWall, dragValue, groupOfPart, GROUPS, groupsOfSyllable, inSafe, moldBoxes, partAt, presetOf } from './moldLab'
+import { bendMaster, branchSyllable, jagBoxes, JAG_INITIALS, stemSyllable, clampToWall, dragValue, groupOfPart, GROUPS, groupsOfSyllable, inSafe, moldBoxes, partAt, presetOf } from './moldLab'
 
 const box = (x: number, y: number, width: number, height: number) => ({ x, y, width, height })
 const VERTICAL = { CH: box(0.1, 0.2, 0.4, 0.6), JU: box(0.6, 0.05, 0.3, 0.9) }
@@ -485,5 +485,25 @@ describe('획 다듬기 줄기(C)', () => {
   it('bendMaster: 두 점이면 손잡이를 4/3배로 달아 가운데가 그만큼 나간다', () => {
     const m = bendMaster({ name: 'gidung', points: [{ t: 0, o: 0 }, { t: 1, o: 0 }] }, 0.03)
     expect(m.points[0].handleOut!.o).toBeCloseTo(0.04, 6)
+  })
+})
+
+describe('다람쥐 PR A 고치기', () => {
+  it('곁줄기 길이는 기둥과 나란한 둘째 기둥(ㅐ)을 늘이지 않는다', () => {
+    const ju = { char: 'ㅐ', type: 'jungseong', strokes: [
+      { id: 'a', points: [{ x: 0.2, y: 0 }, { x: 0.2, y: 1 }], closed: false, thickness: 0.07 },
+      { id: 'b', points: [{ x: 0.2, y: 0.5 }, { x: 0.6, y: 0.5 }], closed: false, thickness: 0.07 },
+      { id: 'c', points: [{ x: 0.6, y: 0.05 }, { x: 0.6, y: 0.95 }], closed: false, thickness: 0.07 },
+    ] } as unknown as JamoData
+    const out = branchSyllable({ char: '애', choseong: null, jongseong: null, jungseong: ju, layoutType: 'choseong-jungseong-vertical' } as unknown as DecomposedSyllable, 1.6).jungseong!.strokes!
+    expect(out[2].points).toEqual(ju.strokes![2].points)
+    expect(out[1].points[1].x).toBeCloseTo(0.2 + 0.4 * 1.6, 6)
+  })
+  it('윗선 들쭉날쭉은 내리기만 해서 끝(0.09)에서 흩어짐이 거의 다 나온다', () => {
+    const tops = JAG_INITIALS.map((c) => Math.min(...Object.values(jagBoxes(VERTICAL, 0.09, c)).map((b) => b!.y)))
+    const mean = tops.reduce((a, b) => a + b, 0) / tops.length
+    const sd = Math.sqrt(tops.reduce((a, b) => a + (b - mean) ** 2, 0) / tops.length)
+    const span = Math.max(...Object.values(VERTICAL).map((b) => b!.y + b!.height)) - Math.min(...Object.values(VERTICAL).map((b) => b!.y))
+    expect(sd / span).toBeGreaterThan(0.06)
   })
 })

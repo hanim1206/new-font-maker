@@ -733,9 +733,14 @@ export const CENTER_SHARE = { open: { up: 0.12, down: 0.23 }, closed: { up: 0.03
  * 받침 없는 세로 짜임만 첫닿자 밑이 글자 밑까지 간다(Gugi · 나눔펜).
  */
 function centerLiftRoom(lift: number, boxes: Partial<Record<Part, BoxConfig>>, layout?: LayoutType): number {
-  if (lift >= 0 || !layout || isVertical(layout)) return lift
+  if (lift >= 0 || !layout) return lift
+  // 받침 글자는 받침 칸 윗변까지만 내린다(다람쥐 4차: 허리선 0에서 「한」 ㅎ이 ㄴ과, 「숭」 ㅜ 기둥이 ㅇ과 겹침).
+  const jo = boxes.JO
+  // 칸 사이가 비어 보여도 획은 칸 끝에 붙어 있으니, 획 하나 굵기(0.05)는 남긴다.
+  const above = (box?: BoxConfig) => (jo && box ? Math.max(0, jo.y - box.y - box.height - 0.05) : Infinity)
+  if (isVertical(layout)) return jo ? Math.max(lift, -above(boxes.CH)) : lift
   const bar = boxes.JU_H ?? boxes.JU
-  return bar ? Math.max(lift, -Math.max(0, 0.98 - bar.y - bar.height)) : lift
+  return bar ? Math.max(lift, -Math.min(Math.max(0, 0.98 - bar.y - bar.height), above(bar))) : lift
 }
 export function centerLift(look: Look, boxes: Partial<Record<Part, BoxConfig>>, layout?: LayoutType): number {
   const c = lookOf(look, 'center')
@@ -874,9 +879,25 @@ export function waistSyllable(syllable: DecomposedSyllable, lift: number, boxes:
 /** 받침 없는 글자의 키(탈네모): 받침 없는 짜임은 글자 윗변을 두고 세로로 `open`배. */
 function openBoxes(boxes: Partial<Record<Part, BoxConfig>>, open: number, layout?: LayoutType): Partial<Record<Part, BoxConfig>> {
   if (open === 1 || !layout || layout.includes('jongseong')) return boxes
-  const top = Math.min(...Object.values(boxes).filter((box): box is BoxConfig => !!box).map((box) => box.y))
+  const list = Object.values(boxes).filter((box): box is BoxConfig => !!box)
+  const top = Math.min(...list.map((box) => box.y)), bottom = Math.max(...list.map((box) => box.y + box.height)), span = bottom - top
+  // 세로 짜임(가)은 통째로 눌러도 기둥만 짧아진다. 가로 · 섞임 짜임(무 · 과)은 첫닿자와 보가 위아래로 쌓여 통째로 누르면 납작한 덩어리가 된다(다람쥐 PR A 6번).
+  // 그래서 첫닿자는 √배만 줄이고(폭과 같이 줄어 꼴이 남는다), 남은 몫은 아래(보 · 짧은기둥)가 받는다. 아래가 0.35배보다 줄면 첫닿자가 더 받는다.
+  const ch = boxes.CH
+  let a = open, b = open
+  if (ch && !isVertical(layout) && span > 0.1) {
+    const head = ch.y + ch.height - top, tail = span - head
+    if (head > 0.05 && tail > 0.05) {
+      a = Math.sqrt(open); b = (open * span - a * head) / tail
+      if (b < 0.35) { b = 0.35; a = Math.max(0.2, (open * span - b * tail) / head) }
+    }
+  }
+  const cut = ch && a !== b ? ch.y + ch.height : bottom
+  const map = (y: number) => (y <= cut ? top + (y - top) * a : top + (cut - top) * a + (y - cut) * b)
   const out: Partial<Record<Part, BoxConfig>> = {}
-  for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) if (box) out[part] = { ...box, y: top + (box.y - top) * open, height: box.height * open }
+  // 폭도 √배로 좁힌다 — 키만 줄이면 납작해진다. Dongle의 받침 없는 글자도 작고 좁다.
+  const sx = Math.sqrt(open), cx = (Math.min(...list.map((box) => box.x)) + Math.max(...list.map((box) => box.x + box.width))) / 2
+  for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) if (box) { const y = map(box.y); out[part] = { ...box, x: cx + (box.x - cx) * sx, width: box.width * sx, y, height: map(box.y + box.height) - y } }
   return out
 }
 
@@ -897,7 +918,8 @@ export function lookScale(boxes: Partial<Record<Part, BoxConfig>>, look: Look): 
   const grow = HALF_THICK * (thicknessOf(lookOf(look, 'weight')) - 1)
   const inward = (far: number, s: number) => (far * s > grow + 0.05 ? (far * s - grow) / (far * s) : 1)
   const ix = inward(fx, sx), iy = inward(fy, sy)
-  const room = 0.5 - HALF_THICK
+  // 잉크 바깥 끝이 글자 칸(0~1)에 닿을 때까지. 획 반 두께는 지금 굵기로 잰다 — 가는 글자가 굵은 글자 몫만큼 덜 커지던 것(다람쥐 PR A 3번).
+  const room = 0.5 - HALF_THICK * thicknessOf(lookOf(look, 'weight'))
   const fit = Math.min(1, fx * sx > room ? room / (fx * sx) : 1, fy * sy > room ? room / (fy * sy) : 1)
   return { sx: sx * ix * fit, sy: sy * iy * fit }
 }
@@ -947,6 +969,9 @@ export function branchSyllable(syllable: DecomposedSyllable, k: number): Decompo
     return strokes.map((stroke) => {
       if (stroke === stem || !straight(stroke)) return stroke
       const [a, b] = endsOf(stroke)
+      // 기둥과 나란한 획은 곁줄기가 아니다(ㅐ · ㅔ · ㅙ의 둘째 기둥). 늘이면 기둥이 글자 칸 밖으로 빠진다(거북이 계산기 2026-11-21).
+      const ux = s1.x - s0.x, uy = s1.y - s0.y, vx = b.x - a.x, vy = b.y - a.y
+      if (Math.abs(ux * vy - uy * vx) < 0.5 * Math.hypot(ux, uy) * Math.hypot(vx, vy)) return stroke
       const near = toStem(a) <= toStem(b) ? a : b
       return { ...stroke, points: stroke.points.map((p) => (p === near ? p : { ...p, x: near.x + (p.x - near.x) * k, y: near.y + (p.y - near.y) * k })) }
     })
@@ -1020,9 +1045,10 @@ export function jagBoxes(boxes: Partial<Record<Part, BoxConfig>>, jag: number, c
   if (!list.length) return boxes
   const top = Math.min(...list.map((b) => b.y)), bottom = Math.max(...list.map((b) => b.y + b.height)), span = bottom - top
   if (span < 0.1) return boxes
-  // 고른 분포(−√3 ~ √3)는 표준편차가 1이다.
-  const u = (seeded(`${jagSeedOf(char)}:jag`)() * 2 - 1) * Math.sqrt(3)
-  const nextTop = Math.max(HALF_THICK, Math.min(top + span * 0.4, top - u * extra * span))
+  // 윗선은 이미 글자 칸 위 끝에 붙어 있어 올릴 자리가 없다. 위로 가는 절반을 잘라 내면 흩어짐이 절반쯤만 나온다(다람쥐 PR A 4번: 끝에서 0.050).
+  // 그래서 내리기만 한다: 0 ~ √12 사이 고른 분포는 표준편차가 1이다.
+  const v = seeded(`${jagSeedOf(char)}:jag`)() * Math.sqrt(12)
+  const nextTop = Math.min(top + span * 0.4, top + v * extra * span)
   const k = (bottom - nextTop) / span
   const out: Partial<Record<Part, BoxConfig>> = {}
   for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) if (box) out[part] = { ...box, y: bottom - (bottom - box.y) * k, height: box.height * k }
