@@ -167,13 +167,22 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   // 굵기는 글줄 전체가 같다(다람쥐 검수 1번). 글자마다 "자소를 끝까지 키워도 획이 안 붙는 가장 굵은 비율"을 올리고, 글줄은 가장 작은 것을 다 같이 쓴다.
   // 그 굵기 안에서 획이 붙을 자리(ㄹ 가로 사이 등)가 생기는 글자만 자소 칸을 조금 키워 틈을 낸다 — 굵은 폰트도 자소가 줄지 않고 조금 커진다(거북이 자소별 표 2절).
   const wanted = lookOf(look, 'weight')
+  // 상한은 굵기 값과 따로 잰다(하니무스 2026-11-21 "굵기 올리면 깜빡이며 튕김"): 굵기가 안쪽으로 굵어지며 칸을 줄이므로(`lookScale`),
+  // 지금 굵기의 칸으로 재면 굵기 → 칸 → 상한 → 잠금 → 굵기가 서로 물려 값이 오락가락한다. 그래서 굵기 끝(가장 줄어든 칸)으로 한 번만 잰다.
   const capRatio = useMemo(() => {
-    if (!onCap || !molded || placement.kind !== 'boxes' || wanted <= 1) return Infinity
+    if (!onCap || placement.kind !== 'boxes') return Infinity
     const ref = gapStrokesOf(syllable, placement, effective.linecap, effective.linejoin)
     const last = JAMO_GROWS[JAMO_GROWS.length - 1]
-    const capM = gapCapMultiplier(ref, gapStrokesOf(syllable, { kind: 'boxes', boxes: scaledBoxes(molded, last) }, effective.linecap, effective.linejoin), weightToMultiplier(effective.weight), 0)
-    return capM === Infinity ? Infinity : Math.max(1, weightUnder(capM, 100) / effective.weight)
-  }, [onCap, molded, placement, wanted, syllable, effective])
+    const capAt = (weight: number) => {
+      const boxes = moldedBoxes(placement.boxes, raw.layoutType, edits, { ...look, weight, jamo: Math.min(1, lookOf(look, 'jamo')) }, char)
+      const capM = gapCapMultiplier(ref, gapStrokesOf(syllable, { kind: 'boxes', boxes: scaledBoxes(boxes, last) }, effective.linecap, effective.linejoin), weightToMultiplier(effective.weight), 0)
+      return capM === Infinity ? Infinity : Math.max(1, weightUnder(capM, 100) / effective.weight)
+    }
+    // 굵기 끝의 칸에서 시작해, 그 상한에서의 칸으로 몇 번 다시 잰다(지금 굵기와 무관해서 끄는 동안 흔들리지 않는다).
+    let cap = capAt(LOOK_WALL.weight[1])
+    for (let i = 0; i < 3 && cap !== Infinity; i++) cap = Math.min(capAt(cap), LOOK_WALL.weight[1])
+    return cap
+  }, [onCap, placement, raw.layoutType, edits, look.frame, look.size, look.height, look.jamo, look.center, look.open, look.jag, syllable, effective, char]) // eslint-disable-line react-hooks/exhaustive-deps -- 굵기 값은 일부러 뺀다
   useEffect(() => { onCap?.(capRatio) }, [onCap, capRatio])
   const ratio = appliedWeight(wanted, weightCap)
   const grown = useMemo(() => {
