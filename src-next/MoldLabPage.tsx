@@ -20,7 +20,7 @@ import { Pressable } from './components/ui/pressable'
 import { Field, RangeBar } from './components/ui/range'
 import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
-import { applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, lookScale, serifSyllable, waistLift, nibSyllable, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, lookScale, serifSyllable, waistLift, nibBrush, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement } from './notoModel'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
@@ -156,7 +156,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     const boxes = moldedBoxes(placement.boxes, raw.layoutType, edits, { ...look, jamo: Math.min(1, lookOf(look, 'jamo')) }, char)
     // 허리선 → 곁줄기 길이 → 부리 → 붓촉 순서로 획을 고친다(획 다듬기 값은 획 모양만 바꾸고 칸은 두지 않는다).
     const waisted = waistSyllable(raw, waistLift(look, placement.boxes, raw.layoutType), boxes)
-    const stroked = nibSyllable(serifSyllable(branchSyllable(waisted, lookOf(look, 'branch')), lookOf(look, 'serif'), boxes), lookOf(look, 'nib'), boxes)
+    const stroked = serifSyllable(branchSyllable(waisted, lookOf(look, 'branch')), lookOf(look, 'serif'), boxes)
     return { boxes, syllable: stroked }
   }, [placement, raw, edits, look, char])
   const syllable = shaped.syllable
@@ -211,15 +211,19 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     return { syllable: inflateSyllable(syllable, out.thick), boxes: out.boxes }
   }, [fencedOut, wantJamo, wantGap, syllable, effective, ratio])
   const boxes = balloon.boxes
-  const round = lookOf(look, 'round'), contrast = lookOf(look, 'contrast')
+  const round = lookOf(look, 'round'), contrast = lookOf(look, 'contrast'), nib = lookOf(look, 'nib')
   const globalStyle = useMemo(() => {
     const weighted = ratio === 1 ? effective : { ...effective, weight: scaledWeight(effective.weight, ratio) }
     // 획 끝 · 꺾임은 둥글기 하나가 맡는다(거북이 방향안 4차: 둥글기가 끝과 꺾임 모서리를 같이 굴림).
     const softened = weighted
+    if (softened.strokeStyle.mode !== 'brush') return softened
+    // 붓촉: 납작 붓이면 엔진의 타원 붓촉. 이때 둥글기 · 대비는 엔진이 안 쓴다.
+    const flat = nibBrush(nib)
+    if (flat) return { ...softened, brush: flat, strokeStyle: { ...softened.strokeStyle, brush: flat } }
     // 둥글기 · 획 대비는 엔진의 붓 값(둥근 붓촉에서만 뜻이 있다)에 그대로 얹는다.
-    if ((round === 0 && contrast === 0) || softened.strokeStyle.mode !== 'brush') return softened
+    if (round === 0 && contrast === 0) return softened
     return { ...softened, strokeStyle: { ...softened.strokeStyle, ...(round > 0 ? { roundness: round, innerRoundness: round * 2 } : {}), ...(contrast !== 0 ? { contrast } : {}) } }
-  }, [effective, ratio, round, contrast])
+  }, [effective, ratio, round, contrast, nib])
   const colorOf = useCallback((source: ResolvedStrokeInkSource) => {
     if (shownStroke) return shownStroke(`${simsPartOf(source.part)}:${source.jamoId}:${source.strokeId}`) ? undefined : 'transparent'
     // 잡은 보선 양쪽 부위만 제 색(선 이름 대신).

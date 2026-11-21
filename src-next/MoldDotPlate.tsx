@@ -144,7 +144,9 @@ export function MoldDotPlate({ keys, locks, look, setLook, onBegin, onSay }: { k
     const q = pt.matrixTransform(svg.getScreenCTM()!.inverse())
     return { c: (q.x - OX) / PX - 0.5, r: (OY + S - q.y) / P - 0.5, x: q.x, y: q.y }
   }
-  const NAME = (b: number) => `${NAMES[keys[b]]} ${vals.current[b] * 5} · ${ENDS[keys[b]][0]} ↔ ${ENDS[keys[b]][1]}${vals.current[b] >= lockOf(b) && lockOf(b) < N ? ' · 더 가면 획이 붙어요' : ''}`
+  // 납작 붓(붓촉 > 0)에서는 엔진이 둥글기 · 대비를 안 쓴다.
+  const flatNote = (b: number) => { const n = keys.indexOf('nib'); return (keys[b] === 'round' || keys[b] === 'contrast') && n >= 0 && vals.current[n] > 0 ? ' · 납작 붓에선 안 먹음' : '' }
+  const NAME = (b: number) => `${NAMES[keys[b]]} ${vals.current[b] * 5} · ${ENDS[keys[b]][0]} ↔ ${ENDS[keys[b]][1]}${vals.current[b] >= lockOf(b) && lockOf(b) < N ? ' · 더 가면 획이 붙어요' : ''}${flatNote(b)}`
   const down = (event: ReactPointerEvent<SVGSVGElement>) => {
     const q = cellOf(event)
     if (q.r < -1.5 || q.r > N || q.c < -1 || q.c > C) return

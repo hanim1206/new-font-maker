@@ -499,7 +499,7 @@ export interface RegionLabels { name: string; up: string; down: string; left: st
 // center는 첫닿자 칸 키에 대한 비율(허리선이 첫닿자 키의 몇 할만큼 오르나). open은 받침 없는 글자의 키(1이 네모).
 // 판 양 끝 = 가장 멀리 간 목표 폰트(거북이 방향안 3차, 하니무스 2026-11-21 승인). 값은 노토(엔진)에 곱하는 배율이고, 칸 10은 폰트 가운데다(`DOT_SCALE`).
 // center는 허리선(-1 아래 ~ +1 위, 짜임마다 폭이 다르다 `centerLift`). nib는 붓촉(빗금 굵기 차), jag는 글자마다 윗선 들쭉날쭉(표준편차 ÷ 키).
-export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.84, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [-0.08, 0.19], jag: [0.027, 0.09] } as const
+export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.84, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09] } as const
 export const LOOK_ENGINE = { weight: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.04, open: 1, branch: 1, serif: 0, nib: 0, jag: 0.027 } as const
 const clampLook = (key: keyof typeof LOOK_WALL, value: number) => Math.max(LOOK_WALL[key][0], Math.min(LOOK_WALL[key][1], value))
 export const lookOf = (look: Look, key: keyof Look) => look[key] ?? LOOK_ENGINE[key]
@@ -1180,8 +1180,6 @@ export const DOT_SCALE: Partial<Record<DotKey, readonly [number, number, number]
   // 닿자 크기(ㅇ 높이 ÷ 기둥) 0.40 · 0.64 · 1.00 ÷ 노토 0.73
   jamo: [0.55, 0.88, 1.37],
   center: [-1, 0, 1],
-  // 붓촉: ㅅ 왼 ÷ 오른 빗금 1.15 · 1.00 · 0.71
-  nib: [-0.08, 0, 0.19],
 }
 /** 두께 배율(400 대비) → 굵기 값 비율. 굵기 값과 두께는 곧은 비례가 아니다(`weightToMultiplier`). */
 function weightRatioOfThickness(t: number): number {
@@ -1204,6 +1202,8 @@ export function dotToLook(key: DotKey, k: number): number {
   if (key === 'contrast') return contrastOfRatio(twoSided(t, CONTRAST_RATIO))
   // 탈네모: 0이 네모(엔진 그대로), 올릴수록 받침 없는 글자가 짧아진다(Dongle 0.48까지).
   if (key === 'open') return 1 - (1 - LOOK_WALL.open[0]) * t / DOT_ROWS
+  // 붓촉: 0이 둥근 붓(엔진 그대로), 끝이 가장 납작한 붓.
+  if (key === 'nib') return LOOK_WALL.nib[1] * t / DOT_ROWS
   // 윗선 들쭉날쭉: 0이 노토 그대로(0.027), 끝이 개구(0.090).
   if (key === 'jag') return LOOK_WALL.jag[0] + (LOOK_WALL.jag[1] - LOOK_WALL.jag[0]) * t / DOT_ROWS
   return LOOK_WALL.round[1] * t / DOT_ROWS
@@ -1218,31 +1218,15 @@ export const dotsOf = (look: Look, keys: readonly DotKey[] = DOT_KEYS): number[]
 /** 노토(엔진 그대로)가 줄의 어느 칸에 있나. 줄 위에 작은 표시로만 그린다. */
 export const notoDot = (key: DotKey) => lookToDot(key, LOOK_ENGINE[key])
 
+/** 납작 붓의 각도(화면 가로축 기준). 붓 각도 줄은 아직 없다(고양이 문구: 납작 붓일 때만 나옴). */
+export const NIB_ANGLE = 35
 /**
- * 붓촉(거북이 방향안 4차: 목표 15개 중 7개에 필요, 획 대비와는 따로 움직인다). 기운 붓으로 쓴 것처럼 오른 내림(↘)은 굵게, 왼 삐침(↙)은 가늘게.
- * 획마다 보이는 방향 φ(글자 단위)의 sin 2φ만큼 굵기를 `1 + nib × sin 2φ`배. 가로 · 세로(sin 2φ = 0)는 그대로라 획 대비와 겹치지 않는다.
- * 엔진의 납작 붓(타원 붓촉)은 둥글기 · 대비와 같이 못 써서, 이 값은 획 굵기로 흉내 낸다.
+ * 붓촉(하니무스 2026-11-21 "붓촉 바꾸면 바뀌는 게 없다"): 획 굵기 흉내 대신 엔진의 진짜 납작 붓(타원 붓촉)을 쓴다.
+ * 0이면 둥근 붓 그대로(null). 올릴수록 붓이 납작해져 짧은 축 ÷ 긴 축이 1 → 0.25. 납작 붓에서는 엔진이 둥글기 · 대비를 안 쓴다.
  */
-export function nibSyllable(syllable: DecomposedSyllable, nib: number, boxes: Partial<Record<Part, BoxConfig>>): DecomposedSyllable {
-  if (nib === 0) return syllable
-  const tilt = (jamo: JamoData | null, part: Part): JamoData | null => {
-    if (!jamo) return jamo
-    const box = boxes[part] ?? (part === 'JU' ? boxes.JU_V ?? boxes.JU_H : undefined)
-    if (!box) return jamo
-    return mapGroups(jamo, (strokes) => strokes.map((stroke) => {
-      if (stroke.closed || stroke.points.length < 2) return stroke
-      let sum = 0, total = 0
-      for (let i = 1; i < stroke.points.length; i++) {
-        const dx = (stroke.points[i].x - stroke.points[i - 1].x) * box.width, dy = (stroke.points[i].y - stroke.points[i - 1].y) * box.height
-        const len = Math.hypot(dx, dy)
-        if (len < 1e-6) continue
-        sum += 2 * dx * dy / len; total += len // len × sin 2φ
-      }
-      const f = total > 0 ? 1 + nib * sum / total : 1
-      return Math.abs(f - 1) < 1e-4 ? stroke : { ...stroke, thickness: stroke.thickness * f }
-    }))
-  }
-  return { ...syllable, choseong: tilt(syllable.choseong, 'CH'), jungseong: tilt(syllable.jungseong, 'JU'), jongseong: tilt(syllable.jongseong, 'JO') }
+export function nibBrush(nib: number): { tip: 'ellipse'; aspectRatio: number; angle: number } | null {
+  if (nib <= 0) return null
+  return { tip: 'ellipse', aspectRatio: 1 - 0.75 * Math.min(1, nib), angle: NIB_ANGLE }
 }
 
 // ── 풍선 닿자(하니무스 2026-11-21): 닿자가 커지다 옆 획에 닿을 만큼 가까워지면 서로 밀어내 최소 틈을 지킨다 ──
