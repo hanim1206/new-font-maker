@@ -1,25 +1,28 @@
 /* 획 긋기 시험판. 폰 한 손 화면이 먼저 — 위에서 글줄을 보고, 아래(엄지 자리)에서 긋는다. */
 .page {
-  display: grid;
-  gap: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   width: min(480px, 100%);
-  min-height: 100dvh;
+  /* 긋는 판까지 한 화면에 — 세로로 밀리면 긋다가 화면이 움직인다. 울타리 자세히를 펼쳤을 때만 길어진다. */
+  height: 100dvh;
   margin-inline: auto;
   padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
   background: rgb(var(--color-background));
   color: rgb(var(--color-foreground));
-  align-content: start;
 }
+.page[data-open] { height: auto; min-height: 100dvh; }
+.page > * { flex: none; }
 
-.header { display: grid; gap: 2px; }
+.header { display: flex; flex-direction: row-reverse; align-items: baseline; justify-content: space-between; gap: 8px; }
 .eyebrow { color: rgb(var(--color-primary)); font-size: var(--font-11); font-weight: var(--weight-heavy); letter-spacing: .08em; }
-.header h1 { font-size: var(--font-24); font-weight: var(--weight-heavy); line-height: 1.2; }
+.header h1 { font-size: var(--font-20); font-weight: var(--weight-heavy); line-height: 1.2; }
 .header p { color: rgb(var(--color-text-3)); font-size: var(--font-14); }
 
 .lineCard {
   display: grid;
-  gap: 12px;
-  padding: 14px 12px 12px;
+  gap: 8px;
+  padding: 12px 12px 8px;
   border: 1px solid rgb(var(--color-border));
   border-radius: var(--radius-lg);
   background: rgb(var(--color-surface));
@@ -30,12 +33,15 @@
 .viewSwitch { margin-left: auto; min-width: 128px; }
 
 
-.padWrap { display: grid; gap: 8px; }
+.page > .padWrap { display: flex; flex: 1 1 0; flex-direction: column; gap: 8px; min-height: 0; }
+.page[data-open] > .padWrap { flex: none; }
+.padWrap > * { flex: none; }
+/* 남는 높이를 판이 다 쓴다. 판은 3:4를 지킨 채 이 칸 안에 들어간다(긋는 좌표가 그 비율이다). */
+.padWrap > .padBox { display: grid; flex: 1 1 0; place-items: center; min-height: 160px; container-type: size; }
+.page[data-open] .padBox { flex: none; height: 42dvh; }
 .pad {
-  width: 100%;
-  max-height: 42dvh;
+  height: min(100cqh, 100cqw * 4 / 3);
   aspect-ratio: 3 / 4;
-  justify-self: center;
   border: 1px solid rgb(var(--color-border));
   border-radius: var(--radius-lg);
   background: rgb(var(--color-surface));
@@ -46,7 +52,7 @@
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
-.padNote { min-height: 20px; color: rgb(var(--color-text-4)); font-size: var(--font-13); text-align: center; }
+.padNote { display: grid; place-items: center; min-height: 38px; line-height: 1.4; color: rgb(var(--color-text-4)); font-size: var(--font-13); text-align: center; }
 .padNote[data-state='done'] { color: rgb(var(--color-foreground)); font-weight: var(--weight-semibold); }
 .padNote[data-state='warn'] { color: rgb(var(--color-warning)); font-weight: var(--weight-semibold); }
 
@@ -56,3 +62,22 @@
 .stems > button[data-done]:not([aria-selected='true']) { color: rgb(var(--color-success)); }
 .stemNo { font-variant-numeric: tabular-nums; opacity: .6; }
 .padActions { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; }
+
+/* 울타리 보정: 글줄 카드 안 한 줄(이름 · 당긴 수 · 스위치). 눌러 펼치면 값 넷과 흔들기. 당긴 글자 밑에 점. */
+.glyph { position: relative; display: inline-flex; }
+.glyph[data-pulled]::after { content: ''; position: absolute; left: 50%; bottom: -4px; width: 4px; height: 4px; margin-left: -2px; border-radius: var(--radius-full); background: rgb(var(--color-primary)); }
+.fence { display: grid; gap: 8px; padding-top: 6px; border-top: 1px solid rgb(var(--color-border)); }
+.fenceHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.fenceHead > button:first-child { min-width: 0; margin-left: -8px; gap: 6px; }
+.fenceHead strong { font-size: var(--font-13); font-weight: var(--weight-heavy); }
+.fenceHead span { overflow: hidden; color: rgb(var(--color-text-3)); font-size: var(--font-12); font-weight: var(--weight-medium); text-overflow: ellipsis; white-space: nowrap; }
+.fenceHead svg { flex: none; transition: transform .15s; }
+.fenceHead svg[data-open] { transform: rotate(180deg); }
+.fenceRows { display: grid; gap: 4px; }
+.fenceRows li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
+.fenceRows span { flex: none; color: rgb(var(--color-text-4)); font-size: var(--font-12); }
+.fenceRows b { color: rgb(var(--color-text-3)); font-size: var(--font-12); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; text-align: right; }
+.fenceRows li[data-moved] b { color: rgb(var(--color-primary)); }
+.fenceRows li[data-stuck]:not([data-moved]) b { color: rgb(var(--color-warning)); }
+.fenceShake { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: rgb(var(--color-text-3)); font-size: var(--font-12); }
+.shakeSwitch { min-width: 168px; }

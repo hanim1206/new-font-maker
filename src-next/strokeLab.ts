@@ -264,7 +264,8 @@ function isDiagonal(stroke: StrokeDataV2): boolean {
   if (stroke.closed || stroke.points.length !== 2) return false
   const [a, b] = stroke.points
   const dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y), chord = Math.hypot(dx, dy)
-  return chord > 0.2 && dx > chord * 0.26 && dy > chord * 0.26
+  // 0.15: ㅆ · ㅉ의 안쪽 다리, ㄽ · ㅄ의 ㅅ처럼 좁은 칸에서 가파른 다리도 대각선이다(하니무스 2026-11-21 "쌍시옷 이슈").
+  return chord > 0.2 && dx > chord * 0.15 && dy > chord * 0.15
 }
 
 /** 둥근 닫힌 획(ㅇ · ㅎ의 동그라미) — 손잡이가 있는 닫힌 획. */
