@@ -517,7 +517,7 @@ export const STEM_TUNE: Readonly<Record<StemBase, { name: string; bend: StemKey;
 }
 export const STEM_KEYS = Object.keys(STEM_ENGINE) as StemKey[]
 
-export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.84, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09], ...STEM_WALL } as const
+export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.74, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09], ...STEM_WALL } as const
 export const LOOK_ENGINE = { weight: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.04, open: 1, branch: 1, serif: 0, nib: 0, jag: 0.027, ...STEM_ENGINE } as const
 const clampLook = (key: keyof typeof LOOK_WALL, value: number) => Math.max(LOOK_WALL[key][0], Math.min(LOOK_WALL[key][1], value))
 export const lookOf = (look: Look, key: keyof Look) => look[key] ?? LOOK_ENGINE[key]
@@ -1253,8 +1253,8 @@ export const DOT_SCALE: Partial<Record<DotKey, readonly [number, number, number]
   // 0.22(가석원)는 안쪽으로 굵어지기가 들어와야 닿는다.
   weight: [weightRatioOfThickness(0.58), weightRatioOfThickness(1.04), LOOK_WALL.weight[1]],
   size: [0.83, 1.02, 1.105],
-  // 비율(가로 ÷ 세로) 0.78 · 0.95 · 1.15 ÷ 노토 0.93
-  frame: [0.84, 1.02, 1.24],
+  // 비율(가로 ÷ 세로) 0.78 · 0.95 · 1.15 ÷ 노토 0.93. 아래 끝은 Dongle(다람쥐 자 0.656)까지 — 0.84에서 0.73에 멈췄다(2026-11-21).
+  frame: [0.74, 1.02, 1.24],
   // 닿자 크기(ㅇ 높이 ÷ 기둥) 0.40 · 0.64 · 1.00 ÷ 노토 0.73
   jamo: [0.55, 0.88, 1.37],
   center: [-1, 0, 1],
