@@ -517,7 +517,13 @@ export const STEM_TUNE: Readonly<Record<StemBase, { name: string; bend: StemKey;
 }
 export const STEM_KEYS = Object.keys(STEM_ENGINE) as StemKey[]
 
-export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.74, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09], ...STEM_WALL } as const
+/**
+ * 풍선 굵기(플랜 `2026-11-21_풍선-굵기`): 굵기 값은 엔진 끝(900 = 2.25) 너머로 간다. 그 위는 두께가 굵기 값에 곧게 비례한다.
+ * 위 끝은 두께 4배(세로줄기 0.28em, 가석원). 실제로 얼마나 굵어지는지는 자소마다 칸이 정한다(`moldBalloon.ts`).
+ */
+export const ENGINE_TOP = 2.25
+export const HEAVY_TOP = ENGINE_TOP * 4 / 1.9502
+export const LOOK_WALL = { weight: [0.25, HEAVY_TOP], soft: [0, 1], frame: [0.74, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09], ...STEM_WALL } as const
 export const LOOK_ENGINE = { weight: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.04, open: 1, branch: 1, serif: 0, nib: 0, jag: 0.027, ...STEM_ENGINE } as const
 const clampLook = (key: keyof typeof LOOK_WALL, value: number) => Math.max(LOOK_WALL[key][0], Math.min(LOOK_WALL[key][1], value))
 export const lookOf = (look: Look, key: keyof Look) => look[key] ?? LOOK_ENGINE[key]
@@ -927,6 +933,10 @@ export function lookScale(boxes: Partial<Record<Part, BoxConfig>>, look: Look): 
 export function thicknessOf(weight: number): number {
   return weightToMultiplier(Math.max(100, Math.min(900, 400 * weight))) / weightToMultiplier(400)
 }
+/** 풍선 굵기의 두께 배율: 엔진 끝까지는 `thicknessOf`, 그 위는 곧은 비례. */
+export function heavyThicknessOf(weight: number): number {
+  return weight <= ENGINE_TOP ? thicknessOf(weight) : thicknessOf(ENGINE_TOP) * weight / ENGINE_TOP
+}
 
 /** 무게중심 허리선이 실제로 오르는 만큼(칸 단위, + 위로). 곁줄기도 첫닿자 밑과 같은 만큼. */
 export function waistLift(look: Look, boxes: Partial<Record<Part, BoxConfig>>, layout?: LayoutType): number {
@@ -1249,8 +1259,7 @@ const half = DOT_ROWS / 2
  * 값은 노토에 곱하는 배율로 바꿔 둔다(폰트에서 잰 양 ÷ 노토의 양). 예: 크기 0.75 · 0.92 · 1.00 em ÷ 노토 0.905.
  */
 export const DOT_SCALE: Partial<Record<DotKey, readonly [number, number, number]>> = {
-  // 굵기(줄기 ÷ 키) 0.042 · 0.075 ÷ 노토 0.072 = 두께 0.58 · 1.04배를 굵기 값(400에 곱하는 비율)으로. 위 끝은 엔진 끝(900).
-  // 0.22(가석원)는 안쪽으로 굵어지기가 들어와야 닿는다.
+  // 굵기(줄기 ÷ 키) 0.042 · 0.075 ÷ 노토 0.072 = 두께 0.58 · 1.04배를 굵기 값(400에 곱하는 비율)으로. 위 끝은 꽉 찬 끝(두께 4배, `HEAVY_TOP`).
   weight: [weightRatioOfThickness(0.58), weightRatioOfThickness(1.04), LOOK_WALL.weight[1]],
   size: [0.83, 1.02, 1.105],
   // 비율(가로 ÷ 세로) 0.78 · 0.95 · 1.15 ÷ 노토 0.93. 아래 끝은 Dongle(다람쥐 자 0.656)까지 — 0.84에서 0.73에 멈췄다(2026-11-21).
@@ -1276,6 +1285,8 @@ const twoSided = (t: number, [lo, mid, hi]: readonly [number, number, number]) =
 export function dotToLook(key: DotKey, k: number): number {
   const t = Math.max(0, Math.min(DOT_ROWS, k))
   const scale = DOT_SCALE[key]
+  // 굵기 위 절반은 같은 비율씩 굵어진다(1.04배 → 4배를 곧게 나누면 보통 ~ 굵은 사이가 세 칸뿐이다).
+  if (key === 'weight' && scale && t > half) return scale[1] * (scale[2] / scale[1]) ** ((t - half) / half)
   if (scale) return twoSided(t, scale)
   if (key === 'contrast') return contrastOfRatio(twoSided(t, CONTRAST_RATIO))
   // 탈네모: 0이 네모(엔진 그대로), 올릴수록 받침 없는 글자가 짧아진다(Dongle 0.48까지).
@@ -1316,7 +1327,8 @@ export const MOLD_BASE_WEIGHT = 400
 const ROUND_BRUSH: BrushStyle = { tip: 'round', aspectRatio: 0.5, angle: 0 }
 export function moldBaseStyle<T extends { weight: number; brush: BrushStyle; strokeStyle: StrokeRenderStyle }>(style: T): T {
   if (style.strokeStyle.mode !== 'brush') return { ...style, weight: MOLD_BASE_WEIGHT }
-  const { roundness: _r, innerRoundness: _i, contrast: _c, ...rest } = style.strokeStyle as StrokeRenderStyle & { roundness?: number; innerRoundness?: number; contrast?: number }
+  const rest: StrokeRenderStyle & { roundness?: number; innerRoundness?: number; contrast?: number } = { ...style.strokeStyle }
+  delete rest.roundness; delete rest.innerRoundness; delete rest.contrast
   return { ...style, weight: MOLD_BASE_WEIGHT, brush: ROUND_BRUSH, strokeStyle: { ...rest, brush: ROUND_BRUSH } as StrokeRenderStyle }
 }
 /** 저장된 스타일 → 획 판 값(엔진 그대로인 값은 안 넣는다). */
