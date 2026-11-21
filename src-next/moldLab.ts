@@ -504,9 +504,12 @@ export interface RegionLabels { name: string; up: string; down: string; left: st
 // 판 양 끝 = 가장 멀리 간 목표 폰트(거북이 방향안 3차, 하니무스 2026-11-21 승인). 값은 노토(엔진)에 곱하는 배율이고, 칸 10은 폰트 가운데다(`DOT_SCALE`).
 // center는 허리선(-1 아래 ~ +1 위, 짜임마다 폭이 다르다 `centerLift`). nib는 붓촉(빗금 굵기 차), jag는 글자마다 윗선 들쭉날쭉(표준편차 ÷ 키).
 // 획 다듬기 줄기 값. 휨은 줄기 가운데가 옆으로 나간 양(줄기 길이에 대한 비율), 길이는 빈 끝 Δ, 틈은 붙은 끝이 기둥에서 떨어진 양(em, 글자 폭 기준 — 엔진 줄기 마스터 단위).
-// 범위는 아직 폰트로 재지 않은 임시값(틈은 줄기 중심선에서 재서, 굵기 절반을 넘어야 떨어져 보인다. 끝 0.08 ≈ Gugi 떨어진 점 눈대중).
-const BEND: readonly [number, number] = [-0.12, 0.12]
-const STEM_WALL = { bendGidung: BEND, bendGyeot: BEND, bendJjal: BEND, bendBo: BEND, bendGeol: BEND, gapGyeot: [0, 0.08] as const }
+// 범위는 폰트 120여 벌에서 잰 끝(거북이 2026-11-22 획-휨과-곁줄기-틈.md). 고딕 · 제목체는 휨 0, 손글씨만 휜다.
+// 기둥 · 보 · 짧은기둥 · 걸침 끝 ±0.037(Gamja Flower) · −0.027(Yeon Sung) → ±0.04. 곁줄기는 −0.09 ~ +0.11 → ±0.10.
+// 틈은 줄기 중심선에서 잰다: 떨어진 폰트는 Gugi 하나, 중심선에서 0.093em(굵기 절반 + 0.033) → 끝 0.095.
+const BEND: readonly [number, number] = [-0.04, 0.04]
+const BEND_GYEOT: readonly [number, number] = [-0.1, 0.1]
+const STEM_WALL = { bendGidung: BEND, bendGyeot: BEND_GYEOT, bendJjal: BEND, bendBo: BEND, bendGeol: BEND, gapGyeot: [0, 0.095] as const }
 const STEM_ENGINE = { bendGidung: 0, bendGyeot: 0, bendJjal: 0, bendBo: 0, bendGeol: 0, gapGyeot: 0 }
 export type StemKey = keyof typeof STEM_ENGINE
 /** 줄기마다 만지는 값. 곁줄기 길이는 예전 값(`branch`, 배율)을 그대로 쓴다. */
