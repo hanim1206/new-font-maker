@@ -1228,8 +1228,9 @@ export function dotToLook(key: DotKey, k: number): number {
   if (key === 'open') return 1 - (1 - LOOK_WALL.open[0]) * t / DOT_ROWS
   // 붓촉: 0이 둥근 붓(엔진 그대로), 끝이 가장 납작한 붓.
   if (key === 'nib') return LOOK_WALL.nib[1] * t / DOT_ROWS
-  // 윗선 들쭉날쭉: 0이 노토 그대로(0.027), 끝이 개구(0.090).
-  if (key === 'jag') return LOOK_WALL.jag[0] + (LOOK_WALL.jag[1] - LOOK_WALL.jag[0]) * t / DOT_ROWS
+  // 윗선 들쭉날쭉: 칸 20(위 끝)이 노토 그대로(0.027), 칸 0이 개구(0.090).
+  // 위아래는 거꾸로(하니무스 2026-11-21 "윗선은 위가 기준"): 위 끝이 가지런(노토 0.027), 내릴수록 들쭉날쭉.
+  if (key === 'jag') return LOOK_WALL.jag[1] - (LOOK_WALL.jag[1] - LOOK_WALL.jag[0]) * t / DOT_ROWS
   return LOOK_WALL.round[1] * t / DOT_ROWS
 }
 /** 값 → 칸 수(가장 가까운 칸). */
