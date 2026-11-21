@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { Check, ChevronRight, Dices, RotateCcw, Undo2 } from 'lucide-react'
 import { SvgRenderer } from '../src/renderers/SvgRenderer'
@@ -1114,7 +1114,9 @@ export function MoldLabPage() {
   const NO_EDITS: LayoutEdits = useMemo(() => ({}), [])
   const NO_LOOK: Look = useMemo(() => ({}), [])
   const lineEdits = compare ? NO_EDITS : edits
-  const lineLook = compare ? NO_LOOK : look
+  // 글줄은 판 값을 한 박자 늦게 따른다(useDeferredValue): 굵기 줄을 끄는 동안 판 막대가 먼저 움직이고 글줄은 따라온다(하니무스 2026-11-22 버벅임, 거북이 느려진 곳 5번).
+  const lazyLook = useDeferredValue(look)
+  const lineLook = compare ? NO_LOOK : lazyLook
   const lineDrawn = compare ? undefined : drawn
   const stepIndex = STEP_ORDER.indexOf(step)
   const changed = Object.keys(edits).length + Object.values(look).filter((value) => value !== undefined).length + Object.keys(raws).filter((key) => raws[key as StemKind]).length

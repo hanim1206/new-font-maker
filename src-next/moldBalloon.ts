@@ -58,9 +58,11 @@ const SKELETON_MIN = 0.4
 const JOINED_RATIO = 0.25
 const PARALLEL_COS = Math.cos(20 / 180 * Math.PI)
 const ROUNDS = 24
+/** 판 사이 굵기 · 칸 변화가 이보다 작으면 다 푼 것으로 본다. */
+const CONVERGED = 1e-4
 const EPS = 1e-6
 
-interface Seg { stroke: number; at: number; part: Part; group: BalloonGroup; t: number; ax: number; ay: number; bx: number; by: number }
+interface Seg { stroke: number; at: number; part: Part; group: BalloonGroup; t: number; ax: number; ay: number; bx: number; by: number; /** 길이(만들 때 한 번 잰다 — 판마다 거듭 재던 것이 시간의 14%, 거북이 2026-11-22). */ len: number }
 interface Pt { x: number; y: number }
 
 /** 처음 칸 기준의 정규 좌표(칸이 바뀌면 같은 비율 자리로 간다). 너비 0인 칸은 가운데. */
@@ -109,12 +111,12 @@ function segmentsOf(strokes: readonly BalloonStroke[], unit: Pt[][], boxes: Part
     const count = stroke.closed ? points.length : points.length - 1
     for (let at = 0; at < count; at++) {
       const a = points[at], b = points[(at + 1) % points.length]
-      out.push({ stroke: index, at, part: stroke.part, group: balloonGroupOf(stroke.part), t: stroke.thickness, ax: a.x, ay: a.y, bx: b.x, by: b.y })
+      out.push({ stroke: index, at, part: stroke.part, group: balloonGroupOf(stroke.part), t: stroke.thickness, ax: a.x, ay: a.y, bx: b.x, by: b.y, len: Math.hypot(b.x - a.x, b.y - a.y) })
     }
   })
   return out
 }
-const lengthOf = (s: Seg) => Math.hypot(s.bx - s.ax, s.by - s.ay)
+const lengthOf = (s: Seg) => s.len
 /** 선이 얼마나 섰나(가로 0 · 세로 1). */
 const uprightOf = (s: Seg) => { const l = lengthOf(s); return l > EPS ? ((s.by - s.ay) / l) ** 2 : 0 }
 /** 토막의 반 두께의 가로줄기 몫(A) · 세로줄기 몫(B): 반 두께 = A × h + B × v. */
@@ -128,16 +130,21 @@ function pointToSeg(px: number, py: number, s: Seg): { d: number; x: number; y: 
   return { d: Math.hypot(px - x, py - y), x, y }
 }
 const cross = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) => (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
-/** 두 토막 사이 가장 가까운 두 점. 가로지르면 거리 0. */
+/** 두 토막 사이 가장 가까운 두 점. 가로지르면 거리 0. 판마다 수천 번 불려 객체를 덜 만든다(쓰레기 치우기 8.5%, 거북이 2026-11-22). */
 function nearest(p: Seg, q: Seg): { d: number; p: Pt; q: Pt } {
   const d1 = cross(p.ax, p.ay, p.bx, p.by, q.ax, q.ay), d2 = cross(p.ax, p.ay, p.bx, p.by, q.bx, q.by)
   const d3 = cross(q.ax, q.ay, q.bx, q.by, p.ax, p.ay), d4 = cross(q.ax, q.ay, q.bx, q.by, p.bx, p.by)
   if (d1 * d2 < 0 && d3 * d4 < 0) { const k = d3 / (d3 - d4); const at = { x: p.ax + k * (p.bx - p.ax), y: p.ay + k * (p.by - p.ay) }; return { d: 0, p: at, q: at } }
-  const c = [
-    { ...pointToSeg(p.ax, p.ay, q), from: { x: p.ax, y: p.ay }, onQ: true }, { ...pointToSeg(p.bx, p.by, q), from: { x: p.bx, y: p.by }, onQ: true },
-    { ...pointToSeg(q.ax, q.ay, p), from: { x: q.ax, y: q.ay }, onQ: false }, { ...pointToSeg(q.bx, q.by, p), from: { x: q.bx, y: q.by }, onQ: false },
-  ].reduce((a, b) => (b.d < a.d ? b : a))
-  return c.onQ ? { d: c.d, p: c.from, q: { x: c.x, y: c.y } } : { d: c.d, p: { x: c.x, y: c.y }, q: c.from }
+  // 네 끝점에서 맞은편 토막까지. 가장 가까운 것 하나만 남긴다.
+  let bestD = Infinity, fx = 0, fy = 0, tx = 0, ty = 0, onQ = true
+  const tryEnd = (px: number, py: number, s: Seg, toQ: boolean) => {
+    const dx = s.bx - s.ax, dy = s.by - s.ay, l2 = dx * dx + dy * dy
+    const k = l2 < EPS ? 0 : Math.max(0, Math.min(1, ((px - s.ax) * dx + (py - s.ay) * dy) / l2))
+    const x = s.ax + k * dx, y = s.ay + k * dy, d = Math.hypot(px - x, py - y)
+    if (d < bestD) { bestD = d; fx = px; fy = py; tx = x; ty = y; onQ = toQ }
+  }
+  tryEnd(p.ax, p.ay, q, true); tryEnd(p.bx, p.by, q, true); tryEnd(q.ax, q.ay, p, false); tryEnd(q.bx, q.by, p, false)
+  return onQ ? { d: bestD, p: { x: fx, y: fy }, q: { x: tx, y: ty } } : { d: bestD, p: { x: tx, y: ty }, q: { x: fx, y: fy } }
 }
 /** 잇는 방향으로 토막이 내미는 두께 — 옆면은 반 두께 그대로, 각진 끝은 0(끝은 굵어져도 안 나온다). */
 function reachOf(s: Seg, nx: number, ny: number, thick: Thick): number {
@@ -418,7 +425,10 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
     }
   }
 
+  // 굵기 · 칸이 더 안 움직이면 멈춘다(24판을 다 돌던 것, 거북이 2026-11-22 느려진 곳 3번). 판마다 굵기는 반씩 다가가니 1e-4 아래면 화면에서 안 보인다.
+  const snapshot = () => [...groups.flatMap((g) => [thick[g].v, thick[g].h]), ...[...cells.values()].flatMap((c) => [c.x0, c.x1, c.y0, c.y1])]
   for (let round = 0; round < ROUNDS; round++) {
+    const before = snapshot()
     fit()
     const segs = segmentsOf(strokes, unit, boxes, { thick, base })
     // 2. 예산: 자소 안 나란한 획 사이 틈이 목표를 지키는 가장 굵은 값. 칸이 바뀌면 다시 푼다(바라는 값에서 출발).
@@ -563,6 +573,8 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
         }
       }
     }
+    const after = snapshot()
+    if (round >= 3 && after.every((value, at) => Math.abs(value - before[at]) < CONVERGED)) break
   }
   fit()
   return { boxes, thick }
