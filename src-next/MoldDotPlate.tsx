@@ -5,7 +5,7 @@ import styles from './MoldLabPage.module.css'
 
 /**
  * 인상 잡기 도트판(하니무스 2026-11-21, 고양이 와이어프레임 "다" 안 · 만져 본 목업 그대로).
- * 판 한 장에 20×20 둥근 점, 값마다 네 줄 폭(가로 네 점은 빛에만 씀), 세로 한 칸 = 5.
+ * 판 한 장에 20×20 둥근 점, 값마다 세 줄 폭(값 일곱: 굵기 · 폭 · 키 · 닿자 크기 · 무게중심 · 둥글기 · 획 대비), 세로 한 칸 = 5.
  * - 판을 가로로 한 번 그으면 지나간 값마다 손 높이를 잡는다.
  * - 한 색 위에서 위아래로 끌면 그 값만 잡은 자리에서 손이 간 만큼(툭 뛰지 않게).
  * - 톡 누르면 그 줄이 누른 높이로. 맨 아래 점 아래로 내리면 0.
@@ -16,14 +16,23 @@ const P = 16.6
 const OX = 13
 const OY = 44
 const S = N * P
-const NAMES = ['굵기', '닿자 크기', '무게중심', '둥글기', '획 대비']
+/** 값 수 · 값마다 세로줄 수 · 가로 칸 수. 판 너비는 그대로, 가로 칸 너비만 줄인다. */
+const G = DOT_KEYS.length
+const W = 3
+const C = G * W
+const PX = S / C
+const NAMES = ['굵기', '폭', '키', '닿자 크기', '무게중심', '둥글기', '획 대비']
 // 레퍼런스 점 판 색(이 화면에만 쓰는 외관 — 하니무스 결정 2026-11-21 "레퍼런스풍 외관은 이 화면에만").
-const COL = ['#D8552B', '#5B93C4', '#C9A227', '#1F5B45', '#A9335C'] // style-guard: allow 도트판 전용 값 색
+const COL = ['#D8552B', '#7357C9', '#2E9BA6', '#5B93C4', '#C9A227', '#1F5B45', '#A9335C'] // style-guard: allow 도트판 전용 값 색
 const OFF = '#bfc0c0' // style-guard: allow 도트판 꺼진 점
 const PLATE = '#e7e8e8' // style-guard: allow 도트판 바탕
 const INK = '#111111' // style-guard: allow 도트판 손 표시
 
-const groupAt = (c: number) => Math.max(0, Math.min(4, Math.floor(Math.max(0, Math.min(N - 1, Math.round(c))) / 4)))
+const groupAt = (c: number) => Math.max(0, Math.min(G - 1, Math.floor(Math.max(0, Math.min(C - 1, Math.round(c))) / W)))
+/** 값 b 가운데의 x. */
+const chipX = (b: number) => OX + PX * (b * W + W / 2)
+/** 몇 째 값인지 말로. */
+const COUNT = ['', '한', '두', '세', '네', '다섯', '여섯', '일곱'][G] ?? String(G)
 /** 손 높이(칸) → 칸 수 0~20. 맨 아래 점 아래로 내리면 0. */
 const dotOfRow = (r: number) => Math.max(0, Math.min(N, Math.round(r + 0.5)))
 
@@ -44,13 +53,13 @@ export function MoldDotPlate({ look, setLook, onBegin, onSay }: { look: Look; se
   useEffect(() => { vals.current = dotsOf(look) }, [look])
 
   const anim = useRef({
-    hc: Array.from({ length: N }, (_, c) => dotsOf(look)[Math.floor(c / 4)]), vc: new Array(N).fill(0) as number[],
-    peak: new Array(N).fill(0) as number[], peakV: new Array(N).fill(0) as number[], wave: [0, 0, 0, 0, 0],
+    hc: Array.from({ length: C }, (_, c) => dotsOf(look)[Math.floor(c / W)]), vc: new Array(C).fill(0) as number[],
+    peak: new Array(C).fill(0) as number[], peakV: new Array(C).fill(0) as number[], wave: new Array(G).fill(0) as number[],
     pulses: [] as Pulse[], halo: 0, fx: null as number | null, fy: null as number | null, lastFx: 0, lastFy: 0,
     sel: null as number | null, grabbing: null as number | null,
   })
   const pulse = (x: number, amp: number, speed = 26) => { const a = anim.current; a.pulses.push({ x, t0: performance.now(), amp, speed }); if (a.pulses.length > 24) a.pulses.shift() }
-  const kick = (b: number, amount: number) => { const a = anim.current; a.wave[b] = Math.max(a.wave[b], amount); pulse(b * 4 + 1.5, amount * 0.9) }
+  const kick = (b: number, amount: number) => { const a = anim.current; a.wave[b] = Math.max(a.wave[b], amount); pulse(b * W + (W - 1) / 2, amount * 0.9) }
 
   const commit = (next: number[]) => {
     vals.current = next
@@ -70,25 +79,25 @@ export function MoldDotPlate({ look, setLook, onBegin, onSay }: { look: Look; se
       const a = anim.current, v = vals.current
       const dt = Math.min(0.033, (t - lastT) / 1000); lastT = t
       for (let i = a.pulses.length - 1; i >= 0; i--) if (t - a.pulses[i].t0 > 1600) a.pulses.splice(i, 1)
-      const lift = new Array(N).fill(0) as number[]
-      for (let c = 0; c < N; c++) {
-        const b = Math.floor(c / 4)
+      const lift = new Array(C).fill(0) as number[]
+      for (let c = 0; c < C; c++) {
+        const b = Math.floor(c / W)
         for (const q of a.pulses) {
           const age = (t - q.t0) / 1000, d = Math.abs(c - q.x), k = age * q.speed - d
           if (k > 0 && k < 5) lift[c] += q.amp * Math.sin(Math.PI * k / 5) * Math.exp(-age * 1.6) * Math.exp(-d * 0.06)
         }
         lift[c] += a.wave[b] * (0.55 + 0.45 * Math.sin(t / 70 + c * 1.3))
         // 덜 눌러 둔 스프링(크게 튕김). 같은 값의 네 줄은 안쪽부터 조금씩 늦게.
-        const lag = 1 - 0.13 * (c % 4), acc = 300 * lag * (v[b] - a.hc[c]) - (10 + 3 * (c % 4)) * a.vc[c]
+        const lag = 1 - 0.13 * (c % W), acc = 300 * lag * (v[b] - a.hc[c]) - (10 + 3 * (c % W)) * a.vc[c]
         a.vc[c] += acc * dt; a.hc[c] += a.vc[c] * dt
         const now = a.hc[c] + lift[c]
         if (now > a.peak[c]) { a.peak[c] = now; a.peakV[c] = 0 } else { a.peakV[c] += 26 * dt; a.peak[c] = Math.max(now, a.peak[c] - a.peakV[c] * dt) }
       }
-      for (let b = 0; b < 5; b++) a.wave[b] *= Math.exp(-dt * 2.2)
+      for (let b = 0; b < G; b++) a.wave[b] *= Math.exp(-dt * 2.2)
       a.halo += ((a.fx != null ? 1 : 0) - a.halo) * Math.min(1, dt * 14)
       const dots = dotsRef.current
-      for (let c = 0; c < N; c++) {
-        const b = Math.floor(c / 4), top = Math.round(a.hc[c]) - 1, up = lift[c], pk = Math.round(a.peak[c]) - 1
+      for (let c = 0; c < C; c++) {
+        const b = Math.floor(c / W), top = Math.round(a.hc[c]) - 1, up = lift[c], pk = Math.round(a.peak[c]) - 1
         for (let r = 0; r < N; r++) {
           let fill = OFF, d = 8.4, op = 1
           if (r <= top) { fill = COL[b]; d = r === top ? 13.6 : 11; if (a.sel != null && a.sel !== b) op = 0.28 }
@@ -108,7 +117,7 @@ export function MoldDotPlate({ look, setLook, onBegin, onSay }: { look: Look; se
         ch.g.setAttribute('opacity', a.sel != null && a.sel !== i ? '0.35' : '1')
         // 잡는 값의 딱지는 크게(손가락에 가려진 값을 위에서 읽게)
         const want = a.grabbing === i ? 1.7 : 1; ch.z += (want - ch.z) * Math.min(1, dt * 16)
-        const x = OX + P * (i * 4 + 2)
+        const x = chipX(i)
         ch.c.setAttribute('transform', `translate(${x} 12) scale(${ch.z.toFixed(3)}) translate(${-x} -12)`)
         if (a.grabbing === i && fingerRef.current && ch.g.nextSibling !== fingerRef.current) ch.g.parentNode?.insertBefore(ch.g, fingerRef.current)
       })
@@ -123,12 +132,12 @@ export function MoldDotPlate({ look, setLook, onBegin, onSay }: { look: Look; se
   const cellOf = (event: ReactPointerEvent<SVGSVGElement>) => {
     const svg = svgRef.current!, pt = svg.createSVGPoint(); pt.x = event.clientX; pt.y = event.clientY
     const q = pt.matrixTransform(svg.getScreenCTM()!.inverse())
-    return { c: (q.x - OX) / P - 0.5, r: (OY + S - q.y) / P - 0.5, x: q.x, y: q.y }
+    return { c: (q.x - OX) / PX - 0.5, r: (OY + S - q.y) / P - 0.5, x: q.x, y: q.y }
   }
   const NAME = (b: number) => `${NAMES[b]} ${vals.current[b] * 5}`
   const down = (event: ReactPointerEvent<SVGSVGElement>) => {
     const q = cellOf(event)
-    if (q.r < -1.5 || q.r > N || q.c < -1 || q.c > N) return
+    if (q.r < -1.5 || q.r > N || q.c < -1 || q.c > C) return
     event.currentTarget.setPointerCapture(event.pointerId)
     grab.current = { c: q.c, r: q.r, k0: 0, mode: null, passed: new Set(), lastB: groupAt(q.c) }
     const a = anim.current; a.fx = q.c; a.fy = q.r; a.lastFx = q.c; a.lastFy = q.r
@@ -140,7 +149,7 @@ export function MoldDotPlate({ look, setLook, onBegin, onSay }: { look: Look; se
     const g = grab.current
     if (!g) return
     const q = cellOf(event), a = anim.current
-    a.fx = Math.max(0, Math.min(N - 1, q.c)); a.fy = Math.max(-1.5, Math.min(N - 1, q.r)); a.lastFx = a.fx; a.lastFy = a.fy
+    a.fx = Math.max(0, Math.min(C - 1, q.c)); a.fy = Math.max(-1.5, Math.min(N - 1, q.r)); a.lastFx = a.fx; a.lastFy = a.fy
     fingerRef.current?.setAttribute('cx', String(q.x)); fingerRef.current?.setAttribute('cy', String(q.y))
     if (!g.mode) {
       const dx = Math.abs(q.c - g.c), dy = Math.abs(q.r - g.r)
@@ -160,7 +169,7 @@ export function MoldDotPlate({ look, setLook, onBegin, onSay }: { look: Look; se
     } else if (g.mode === 'one' && a.sel != null) {
       const b = a.sel
       setOne(b, Math.max(0, Math.min(N, Math.round(g.k0 + (q.r - g.r)))), 2.4)
-      const x = OX + P * (b * 4 + 2), y = OY + S - P * (a.fy + 0.5)
+      const x = chipX(b), y = OY + S - P * (a.fy + 0.5)
       arrowsRef.current?.setAttribute('d', `M ${x + 36} ${y - 30} v 60 M ${x + 31} ${y - 24} l 5 -7 l 5 7 M ${x + 31} ${y + 24} l 5 7 l 5 -7`)
       arrowsRef.current?.setAttribute('opacity', '1')
       onSay(NAME(b))
@@ -172,7 +181,7 @@ export function MoldDotPlate({ look, setLook, onBegin, onSay }: { look: Look; se
     grab.current = null
     const a = anim.current
     if (!g.mode) { const b = groupAt(g.c); if (!setOne(b, dotOfRow(g.r), 3.2)) kick(b, 3.2); onSay(NAME(b)) }
-    else if (g.mode === 'sweep') { pulse(-2, 3.2, 30); a.wave = a.wave.map((w) => Math.max(w, 1.4)); onSay(g.passed.size === 5 ? '다섯 값을 한 번에 잡았어요 · 한 줄만 위아래로 다시 잡기' : '끝까지 그으면 다섯 값이 다 잡혀요') }
+    else if (g.mode === 'sweep') { pulse(-2, 3.2, 30); a.wave = a.wave.map((w) => Math.max(w, 1.4)); onSay(g.passed.size === G ? `${COUNT} 값을 한 번에 잡았어요 · 한 줄만 위아래로 다시 잡기` : `끝까지 그으면 ${COUNT} 값이 다 잡혀요`) }
     else if (a.sel != null) onSay(`${NAME(a.sel)} · 다른 줄도 위아래로`)
     a.fx = null; a.fy = null; a.sel = null; a.grabbing = null
     fingerRef.current?.setAttribute('opacity', '0'); arrowsRef.current?.setAttribute('opacity', '0')
@@ -181,17 +190,17 @@ export function MoldDotPlate({ look, setLook, onBegin, onSay }: { look: Look; se
   const hintY = OY + S / 2 + P / 2
   return <svg ref={svgRef} className={styles.dotPlate} viewBox="0 -14 358 434" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} data-testid="mold-dotplate" role="img" aria-label="인상 도트판">
     <rect x={0} y={OY - 12} width={358} height={S + 24} rx={26} fill={PLATE} />
-    {Array.from({ length: N }, (_, c) => Array.from({ length: N }, (_, r) => <circle key={`${c}-${r}`} ref={(el) => { if (!dotsRef.current[c]) dotsRef.current[c] = []; if (el) dotsRef.current[c][r] = el }} cx={OX + P * (c + 0.5)} cy={OY + S - P * (r + 0.5)} r={4.2} fill={OFF} />))}
+    {Array.from({ length: C }, (_, c) => Array.from({ length: N }, (_, r) => <circle key={`${c}-${r}`} ref={(el) => { if (!dotsRef.current[c]) dotsRef.current[c] = []; if (el) dotsRef.current[c][r] = el }} cx={OX + PX * (c + 0.5)} cy={OY + S - P * (r + 0.5)} r={4.2} fill={OFF} />))}
     <text x={OX - 9} y={OY + 4} fontSize={9} fill={OFF}>+</text>
     <text x={OX - 9} y={OY + S} fontSize={9} fill={OFF}>0</text>
     {DOT_KEYS.map((key, i) => {
-      const x = OX + P * (i * 4 + 2)
+      const x = chipX(i)
       return <g key={key} ref={(el) => { chipRefs.current[i].g = el }} data-testid={`mold-dot-${key}`}>
         <g ref={(el) => { chipRefs.current[i].c = el }}>
-          <rect x={x - 26} y={0} width={52} height={24} rx={7} fill={COL[i]} />
-          <text ref={(el) => { chipRefs.current[i].t = el }} x={x} y={17} textAnchor="middle" fontSize={14} fontWeight={600} fill={i === 2 ? INK : PLATE} className={styles.dotNum} />
+          <rect x={x - PX * W / 2 + 2.5} y={0} width={PX * W - 5} height={24} rx={7} fill={COL[i]} />
+          <text ref={(el) => { chipRefs.current[i].t = el }} x={x} y={17} textAnchor="middle" fontSize={13} fontWeight={600} fill={COL[i] === '#C9A227' ? INK : PLATE} /* style-guard: allow 겨자색 딱지만 검은 글씨 */ className={styles.dotNum} />
         </g>
-        <text x={x} y={OY + S + 34} textAnchor="middle" fontSize={12} fontWeight={600} fill={INK}>{NAMES[i]}</text>
+        <text x={x} y={OY + S + 34} textAnchor="middle" fontSize={NAMES[i].length > 3 ? 10 : 12} fontWeight={600} fill={INK}>{NAMES[i]}</text>
       </g>
     })}
     <g ref={hintRef} pointerEvents="none">

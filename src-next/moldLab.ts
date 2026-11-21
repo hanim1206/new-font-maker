@@ -494,7 +494,8 @@ export interface RegionLabels { name: string; up: string; down: string; left: st
  * 굵기는 기본 굵기(400)에 곱하는 비율이라 엔진이 그리는 100~900 전체(두께 ×0.40~1.95)가 들어오게 0.25~2.25(다람쥐 검수 2026-11-21 "굵기 폭 넓히기").
  * 크기 · 키 · 폭은 글자 가운데를 두고 늘이고 줄인다. 값은 아직 임시다.
  */
-export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.7, 1.25], tracking: [-0.08, 0.2], size: [0.6, 1.15], height: [0.7, 1.15], jamo: [0.6, 1.3], center: [-0.08, 0.08], round: [0, 1], contrast: [0, 0.9], balloon: [0.01, 0.045] } as const
+// 인상 잡기 값은 넓게(하니무스 2026-11-21 "더 다이나믹한 스펙트럼으로, 과하면 그때 다듬기"). 굵기는 이미 엔진 끝(100~900)까지.
+export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.55, 1.45], tracking: [-0.08, 0.2], size: [0.6, 1.15], height: [0.6, 1.3], jamo: [0.5, 1.6], center: [-0.15, 0.15], round: [0, 1], contrast: [0, 0.95], balloon: [0.01, 0.045] } as const
 const LOOK_ENGINE = { weight: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.025 } as const
 const clampLook = (key: keyof typeof LOOK_WALL, value: number) => Math.max(LOOK_WALL[key][0], Math.min(LOOK_WALL[key][1], value))
 export const lookOf = (look: Look, key: keyof Look) => look[key] ?? LOOK_ENGINE[key]
@@ -913,7 +914,7 @@ export function movePartEdit(edits: PartEdits, part: Part, du: number, dv: numbe
 // ── 도트판 인상 잡기(하니무스 2026-11-21): 다섯 값을 0~20칸(한 칸 = 5)으로 ──
 
 /** 도트판 다섯 줄. 차례대로 굵기 · 닿자 크기 · 무게중심 · 둥글기 · 획 대비. */
-export const DOT_KEYS = ['weight', 'jamo', 'center', 'round', 'contrast'] as const
+export const DOT_KEYS = ['weight', 'frame', 'height', 'jamo', 'center', 'round', 'contrast'] as const
 export type DotKey = (typeof DOT_KEYS)[number]
 export const DOT_ROWS = 20
 const half = DOT_ROWS / 2
@@ -923,6 +924,8 @@ export function dotToLook(key: DotKey, k: number): number {
   const twoSided = (lo: number, mid: number, hi: number) => (t <= half ? lo + (mid - lo) * t / half : mid + (hi - mid) * (t - half) / half)
   if (key === 'weight') return twoSided(LOOK_WALL.weight[0], 1, LOOK_WALL.weight[1])
   if (key === 'jamo') return twoSided(LOOK_WALL.jamo[0], 1, LOOK_WALL.jamo[1])
+  if (key === 'frame') return twoSided(LOOK_WALL.frame[0], 1, LOOK_WALL.frame[1])
+  if (key === 'height') return twoSided(LOOK_WALL.height[0], 1, LOOK_WALL.height[1])
   if (key === 'center') return twoSided(LOOK_WALL.center[0], 0, LOOK_WALL.center[1])
   if (key === 'round') return LOOK_WALL.round[1] * t / DOT_ROWS
   return LOOK_WALL.contrast[1] * t / DOT_ROWS
@@ -943,58 +946,82 @@ export type BalloonGap = keyof typeof BALLOON_GAPS
 type PairKey = 'CH-JU' | 'JU-JO' | 'CH-JO'
 type Near = { gap: number; dx: number; dy: number }
 
-const EDGE: [number, number] = [0.02, 0.98]
 /** 모든 자소 쌍이 최소 틈을 지키나(풍선 닿자가 막히는 기준). */
 export function balloonOk(near: Partial<Record<PairKey, Near>>, target: Partial<Record<PairKey, number>>): boolean {
   return (Object.entries(target) as [PairKey, number][]).every(([pair, want]) => (near[pair]?.gap ?? Infinity) >= want - 0.003)
 }
 
-/** 풍선 닿자의 획: 첫닿자 · 받침 획 두께를 `k`배(숫자 하나면 둘 다, 부위별이면 따로). */
-export function inflateSyllable(syllable: DecomposedSyllable, k: number | Partial<Record<Part, number>>): DecomposedSyllable {
-  const of = (part: Part) => (typeof k === 'number' ? k : k[part] ?? 1)
-  if (of('CH') === 1 && of('JO') === 1) return syllable
-  const inflate = (jamo: JamoData | null, f: number): JamoData | null => {
-    if (!jamo || f === 1) return jamo
-    const fat = (strokes?: StrokeDataV2[]) => strokes?.map((stroke) => ({ ...stroke, thickness: stroke.thickness * f }))
+/** 획 하나의 두께 배율 열쇠(부위 + 획 id). */
+export const strokeKey = (part: Part, id: string) => `${part}:${id}`
+type Thick = number | Partial<Record<Part, number>> | Readonly<Record<string, number>>
+
+/** 풍선 닿자의 획: 첫닿자 · 받침 획 두께를 키운다. 숫자 하나면 둘 다, 부위별(`CH`·`JO`)이면 따로, `strokeKey` 열쇠면 획마다 따로. */
+export function inflateSyllable(syllable: DecomposedSyllable, k: Thick): DecomposedSyllable {
+  const of = (part: Part, id: string): number => {
+    if (typeof k === 'number') return k
+    const byStroke = (k as Record<string, number>)[strokeKey(part, id)]
+    return byStroke ?? (k as Partial<Record<Part, number>>)[part] ?? 1
+  }
+  if (typeof k === 'number' ? k === 1 : Object.keys(k).length === 0) return syllable
+  const inflate = (jamo: JamoData | null, part: Part): JamoData | null => {
+    if (!jamo) return jamo
+    const fat = (strokes?: StrokeDataV2[]) => strokes?.map((stroke) => { const f = of(part, stroke.id); return f === 1 ? stroke : { ...stroke, thickness: stroke.thickness * f } })
     return {
     ...jamo,
     strokes: fat(jamo.strokes), horizontalStrokes: fat(jamo.horizontalStrokes), verticalStrokes: fat(jamo.verticalStrokes),
     contextStrokes: jamo.contextStrokes && Object.fromEntries(Object.entries(jamo.contextStrokes).map(([family, strokes]) => [family, fat(strokes)])),
     }
   }
-  return { ...syllable, choseong: inflate(syllable.choseong, of('CH')), jongseong: inflate(syllable.jongseong, of('JO')) }
+  return { ...syllable, choseong: inflate(syllable.choseong, 'CH'), jongseong: inflate(syllable.jongseong, 'JO') }
 }
 
+/** 첫닿자 · 받침의 획 id(두께를 획마다 따로 키울 때 쓴다). */
+export function balloonStrokeIds(syllable: DecomposedSyllable): Partial<Record<Part, string[]>> {
+  const ids = (jamo: JamoData | null) => jamo ? [...new Set([...(jamo.strokes ?? []), ...(jamo.horizontalStrokes ?? []), ...(jamo.verticalStrokes ?? []), ...Object.values(jamo.contextStrokes ?? {}).flat()].map((stroke) => stroke.id))] : []
+  return { CH: ids(syllable.choseong), JO: ids(syllable.jongseong) }
+}
+
+/** 풍선 닿자 획이 칸보다 얼마나 더 두꺼워지나: 닿자가 k배면 획은 1 + (k − 1) × 이 값. */
+export const BALLOON_THICK_GAIN = 2.5
+
 /**
- * 변마다 따로 부푸는 풍선 닿자(하니무스 2026-11-21 "ㅇ이면 오른쪽은 막혀도 위 · 아래는 계속").
- * 첫닿자 · 받침 칸의 네 변과 획 두께를 조금씩(`steps`번) 키우며, 한 걸음 키웠을 때 최소 틈을 못 지키면 그 변(또는 두께)만 멈춘다.
- * 글자 끝(0.02~0.98)도 막힘이다. `ok(boxes, thick)`가 틈 검사(thick = 부위별 두께 배율).
+ * 풍선 닿자(하니무스 2026-11-21 "닿자끼리 닿을 만큼 가까워져야 막힌다, 획은 더 두꺼워져도 된다").
+ * 첫닿자 · 받침 칸의 네 변과 획 하나하나의 두께를 조금씩(`steps`번) 같이 키운다. 한 걸음 키웠을 때 잉크 사이 최소 틈을 못 지키면
+ * 그 변(또는 그 획 두께)만 멈추고 나머지는 계속 부푼다. 보이지 않는 벽은 없다 — 글자 끝도 `ok`가 잉크로 본다.
+ * `ok(boxes, thick)`가 틈 검사, thick 열쇠는 `strokeKey`.
  */
-export function growSides(boxes: Partial<Record<Part, BoxConfig>>, k: number, ok: (boxes: Partial<Record<Part, BoxConfig>>, thick: Partial<Record<Part, number>>) => boolean, steps = 6): { boxes: Partial<Record<Part, BoxConfig>>; thick: Partial<Record<Part, number>> } {
+export function growSides(boxes: Partial<Record<Part, BoxConfig>>, k: number, strokeIds: Partial<Record<Part, string[]>>, ok: (boxes: Partial<Record<Part, BoxConfig>>, thick: Record<string, number>) => boolean, steps = 8): { boxes: Partial<Record<Part, BoxConfig>>; thick: Record<string, number> } {
   const out = { ...boxes }
-  const thick: Partial<Record<Part, number>> = {}
+  const thick: Record<string, number> = {}
   if (k <= 1) return { boxes: out, thick }
   const parts = (['CH', 'JO'] as const).filter((part) => out[part])
-  type Side = 'l' | 'r' | 't' | 'b' | 'w'
-  const open = new Map<string, boolean>()
-  for (const part of parts) { thick[part] = 1; for (const side of ['l', 'r', 't', 'b', 'w'] as Side[]) open.set(part + side, true) }
+  const open = new Set<string>()
+  for (const part of parts) {
+    for (const side of ['l', 'r', 't', 'b']) open.add(part + side)
+    for (const id of strokeIds[part] ?? []) { thick[strokeKey(part, id)] = 1; open.add(strokeKey(part, id)) }
+  }
   for (let step = 1; step <= steps; step++) {
+    const wantThick = 1 + (k - 1) * BALLOON_THICK_GAIN * step / steps
     for (const part of parts) {
+      for (const id of strokeIds[part] ?? []) {
+        const key = strokeKey(part, id)
+        if (!open.has(key)) continue
+        const trial = { ...thick, [key]: wantThick }
+        if (ok(out, trial)) thick[key] = wantThick
+        else open.delete(key)
+      }
       const o = boxes[part]!
       const dx = o.width * (k - 1) / 2 / steps, dy = o.height * (k - 1) / 2 / steps
-      for (const side of ['t', 'b', 'l', 'r', 'w'] as Side[]) {
-        if (!open.get(part + side)) continue
+      for (const side of ['t', 'b', 'l', 'r']) {
+        if (!open.has(part + side)) continue
         const b = out[part]!
-        let next = b
-        let nextThick = thick[part]!
-        if (side === 'l') next = { ...b, x: b.x - dx, width: b.width + dx }
-        if (side === 'r') next = { ...b, width: b.width + dx }
-        if (side === 't') next = { ...b, y: b.y - dy, height: b.height + dy }
-        if (side === 'b') next = { ...b, height: b.height + dy }
-        if (side === 'w') nextThick = 1 + (k - 1) * step / steps
-        const inside = next.x >= EDGE[0] - 1e-9 && next.y >= EDGE[0] - 1e-9 && next.x + next.width <= EDGE[1] + 1e-9 && next.y + next.height <= EDGE[1] + 1e-9
+        const next = side === 'l' ? { ...b, x: b.x - dx, width: b.width + dx }
+          : side === 'r' ? { ...b, width: b.width + dx }
+          : side === 't' ? { ...b, y: b.y - dy, height: b.height + dy }
+          : { ...b, height: b.height + dy }
         const trial = { ...out, [part]: next }
-        if (inside && ok(trial, { ...thick, [part]: nextThick })) { out[part] = next; thick[part] = nextThick } else open.set(part + side, false)
+        if (ok(trial, thick)) out[part] = next
+        else open.delete(part + side)
       }
     }
   }

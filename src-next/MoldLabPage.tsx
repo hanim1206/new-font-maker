@@ -20,7 +20,7 @@ import { Pressable } from './components/ui/pressable'
 import { Switch } from './components/ui/switch'
 import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
-import { applyPartEdits, appliedWeight, balloonOk, growSides, inflateSyllable, waistSyllable, BALLOON_GAPS, type BalloonGap, dragLook, dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { applyPartEdits, appliedWeight, balloonOk, balloonStrokeIds, growSides, inflateSyllable, waistSyllable, BALLOON_GAPS, type BalloonGap, dragLook, dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement } from './notoModel'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
@@ -38,9 +38,12 @@ import styles from './MoldLabPage.module.css'
 
 const FIRST_SENTENCE = '아버지가 바다 너머 저기 산다'
 // 빚기는 두 걸음: 인상 잡기(전체 먼저) → 부위 다듬기(다람쥐 검수 10번, 하니무스 2026-11-21 승인).
-type Step = 'draw' | 'shape' | 'part'
-const STEP_NAMES: Record<Step, string> = { draw: '긋기', shape: '인상 잡기', part: '부위 다듬기' }
-const STEP_ORDER: readonly Step[] = ['draw', 'shape', 'part']
+type Step = 'draw' | 'shape' | 'part' | 'stroke'
+const STEP_NAMES: Record<Step, string> = { draw: '긋기', shape: '인상 잡기', part: '부위 다듬기', stroke: '획 다듬기' }
+const STEP_ORDER: readonly Step[] = ['draw', 'shape', 'part', 'stroke']
+/** 획 다듬기(하니무스 2026-11-21 "인상 → 부위 → 획"). 이번엔 자리와 뼈대만 — 획 끝 하나, 부리 · 꺾임은 다음에. */
+const STROKE_ENDS = [{ key: 'sharp', name: '또렷', soft: 0 }, { key: 'round', name: '둥긂', soft: 1 }] as const
+const STROKE_LATER = ['부리', '꺾임'] as const
 
 /** 그은 줄기를 자모에 입힌 것. 닿자는 짜임마다 칸 비율이 달라 짜임별로 따로. */
 interface Drawn {
@@ -144,28 +147,12 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const { syllable: raw, effective, placement, padding } = useGlyphBase(char, drawn)
   const base = useGlyphBase(char, undefined)
   // 무게중심(거북이 A안): ㅏ · ㅓ 곁줄기 높이는 획에서, 첫닿자 밑변 · 보는 칸에서(`impressBoxes`) 옮긴다.
-  // 풍선 닿자(하니무스 2026-11-21): 닿자 칸의 변과 획이 같이 부풀고, 옆 획과 최소 틈에 닿은 변만 멈춘다 — 굵기를 줄여 맞추지 않는다.
+  // 닿자 크기 1 아래는 칸을 줄이기만 한다. 1 위는 풍선 닿자 — 칸은 그대로 두고 맨 끝(울타리까지 입힌 뒤)에서 부풀린다.
   const shaped = useMemo(() => {
-    if (placement.kind !== 'boxes') return { syllable: raw, boxes: undefined, jamo: 1 }
-    const at = (jamo: number) => {
-      const lookAt = { ...look, jamo }
-      const boxes = moldedBoxes(placement.boxes, raw.layoutType, edits, lookAt)
-      return { boxes, syllable: inflateSyllable(waistSyllable(raw, lookOf(look, 'center'), boxes), Math.max(1, jamo)) }
-    }
-    const wantJamo = lookOf(look, 'jamo')
-    if (wantJamo <= 1 && lookOf(look, 'center') === 0) return { ...at(wantJamo), jamo: wantJamo }
-    const multiplier = weightToMultiplier(effective.weight)
-    // 기준 틈: 닿자 크기 · 무게중심을 엔진 그대로 둔 모습. 가 · 카처럼 곁줄기가 첫닿자에 가까워져도 이 틈(최소 틈까지)은 지킨다.
-    const baseline = nearestBetweenParts(inkStrokes(raw, moldedBoxes(placement.boxes, raw.layoutType, edits, { ...look, jamo: 1, center: 0 }), effective, multiplier))
-    const want = lookOf(look, 'balloon')
-    const target: Partial<Record<PartPair, number>> = {}
-    for (const [pair, near] of Object.entries(baseline) as [PartPair, { gap: number }][]) target[pair] = Math.min(want, Math.max(0, near.gap))
-    // 변마다 따로 부푼다: 닿자 칸(엔진 그대로 크기)의 네 변과 획 두께를 조금씩 키우고, 최소 틈에 막힌 변만 멈춘다.
-    const start = at(1)
-    if (wantJamo <= 1) return { ...at(wantJamo), jamo: wantJamo }
-    const grown = growSides(start.boxes, wantJamo, (boxes, thick) => balloonOk(nearestBetweenParts(inkStrokes(inflateSyllable(start.syllable, thick), boxes, effective, multiplier)), target))
-    return { syllable: inflateSyllable(start.syllable, grown.thick), boxes: grown.boxes, jamo: wantJamo }
-  }, [placement, raw, edits, look, effective])
+    if (placement.kind !== 'boxes') return { syllable: raw, boxes: undefined }
+    const boxes = moldedBoxes(placement.boxes, raw.layoutType, edits, { ...look, jamo: Math.min(1, lookOf(look, 'jamo')) })
+    return { boxes, syllable: waistSyllable(raw, lookOf(look, 'center'), boxes) }
+  }, [placement, raw, edits, look])
   const syllable = shaped.syllable
   const molded = shaped.boxes
 
@@ -197,7 +184,26 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   // 울타리: 그은 획 때문에 칸 밖으로 나간 것을 당긴다. 기준 글자는 그은 게 없을 때 같은 칸의 모습.
   const fenced = useMemo(() => fence && grown.boxes ? fencedBoxes({ syllable, baseSyllable: drawn ? base.syllable : syllable, boxes: grown.boxes, style: effective, padding, fence }) : null, [fence, grown.boxes, syllable, base.syllable, drawn, effective, padding])
   useEffect(() => { if (fenced) onFence?.(fenced.need, fenced.pulls) }, [onFence, fenced])
-  const boxes = fenced?.boxes ?? grown.boxes
+  const fencedOut = fenced?.boxes ?? grown.boxes
+  // 풍선 닿자(하니무스 2026-11-21): 보이는 글자 그대로(굵기 · 울타리까지 입힌 뒤) 잰다. 닿자 칸의 변과 획 하나하나가 같이 부풀고,
+  // 잉크가 옆 자소와 최소 틈에 닿은 변 · 획만 멈춘다. 처음부터 그보다 가까운 쌍은 처음 틈을 지킨다. 글자 칸(0~1) 밖으로는 잉크가 안 나간다.
+  const wantJamo = lookOf(look, 'jamo'), wantGap = lookOf(look, 'balloon')
+  const balloon = useMemo(() => {
+    if (!fencedOut || wantJamo <= 1) return { syllable, boxes: fencedOut }
+    const multiplier = weightToMultiplier(ratio === 1 ? effective.weight : scaledWeight(effective.weight, ratio))
+    const startInk = inkStrokes(syllable, fencedOut, effective, multiplier)
+    const target: Partial<Record<PartPair, number>> = {}
+    for (const [pair, near] of Object.entries(nearestBetweenParts(startInk)) as [PartPair, { gap: number }][]) target[pair] = Math.min(wantGap, near.gap)
+    const edge = inkReach(startInk)
+    const lo = Math.min(-BALLOON_EDGE, edge.lo), hi = Math.max(1 + BALLOON_EDGE, edge.hi)
+    const out = growSides(fencedOut, wantJamo, balloonStrokeIds(syllable), (trial, thick) => {
+      const ink = inkStrokes(inflateSyllable(syllable, thick), trial, effective, multiplier)
+      const r = inkReach(ink)
+      return r.lo >= lo - 1e-6 && r.hi <= hi + 1e-6 && balloonOk(nearestBetweenParts(ink), target)
+    })
+    return { syllable: inflateSyllable(syllable, out.thick), boxes: out.boxes }
+  }, [fencedOut, wantJamo, wantGap, syllable, effective, ratio])
+  const boxes = balloon.boxes
   const soft = lookOf(look, 'soft') > 0.5
   const round = lookOf(look, 'round'), contrast = lookOf(look, 'contrast')
   const globalStyle = useMemo(() => {
@@ -205,7 +211,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     const softened = soft ? { ...weighted, linecap: 'round' as const, linejoin: 'round' as const } : weighted
     // 둥글기 · 획 대비는 엔진의 붓 값(둥근 붓촉에서만 뜻이 있다)에 그대로 얹는다.
     if ((round === 0 && contrast === 0) || softened.strokeStyle.mode !== 'brush') return softened
-    return { ...softened, strokeStyle: { ...softened.strokeStyle, ...(round > 0 ? { roundness: round } : {}), ...(contrast !== 0 ? { contrast } : {}) } }
+    return { ...softened, strokeStyle: { ...softened.strokeStyle, ...(round > 0 ? { roundness: round, innerRoundness: round * 2 } : {}), ...(contrast !== 0 ? { contrast } : {}) } }
   }, [effective, ratio, soft, round, contrast])
   const colorOf = useCallback((source: ResolvedStrokeInkSource) => {
     if (shownStroke) return shownStroke(`${simsPartOf(source.part)}:${source.jamoId}:${source.strokeId}`) ? undefined : 'transparent'
@@ -220,7 +226,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const slot = { width: size * lookOf(look, 'frame') * lookOf(look, 'size') + size * lookOf(look, 'tracking'), marginInline: 0 }
   return <span className={styles.glyph} style={slot} data-testid={testId}>
     <SvgRenderer
-      syllable={syllable}
+      syllable={balloon.syllable}
       schema={placement.kind === 'schema' ? placement.schema : undefined}
       boxes={boxes}
       size={size}
@@ -395,6 +401,22 @@ function inkStrokes(syllable: DecomposedSyllable, boxes: Partial<Record<Part, Bo
   return result.primitives.map((primitive) => ({ part: primitive.source.part, box: primitive.box, points: primitive.stroke.points, closed: primitive.stroke.closed, thickness: primitive.stroke.thickness * primitive.weightMultiplier }))
 }
 
+/** 풍선 닿자 잉크가 글자 칸 밖으로 나가도 되는 만큼(em). 옆 글자와 닿지 않을 만큼만. */
+const BALLOON_EDGE = 0.01
+/** 첫닿자 · 받침 잉크가 닿는 가장 바깥(글자 단위, 가로 · 세로 같이). 풍선 닿자가 글자 칸 밖으로 안 나가게. */
+function inkReach(strokes: ReturnType<typeof inkStrokes>) {
+  let lo = Infinity, hi = -Infinity
+  for (const s of strokes) {
+    if (s.part !== 'CH' && s.part !== 'JO') continue
+    const half = (s.thickness ?? 0) / 2
+    for (const q of s.points) {
+      const x = s.box.x + q.x * s.box.width, y = s.box.y + q.y * s.box.height
+      lo = Math.min(lo, x - half, y - half); hi = Math.max(hi, x + half, y + half)
+    }
+  }
+  return { lo, hi }
+}
+
 /** 홀자 기둥(가장 긴 곧은 줄기)과 곁줄기 끝. 보이는 글자 단위. */
 function stemOf(syllable: DecomposedSyllable, boxes: Partial<Record<Part, BoxConfig>>, style: GlobalStyle, multiplier: number) {
   const result = resolveGlyphInkPrimitives({ syllable, placement: { kind: 'boxes', boxes }, weightMultiplier: multiplier, globalLinecap: style.linecap, globalLinejoin: style.linejoin, horizontalInkBounds: { min: 0, max: 1 } })
@@ -473,7 +495,6 @@ function SimsStep({ mode, char, drawn, edits, setEdits, look, setLook, weightCap
   const ratio = appliedWeight(lookOf(look, 'weight'), weightCap)
   const multiplier = weightToMultiplier(scaledWeight(effective.weight, ratio))
   const stem = useMemo(() => placement.kind === 'boxes' ? stemOf(syllable, moldedBoxes(placement.boxes, layout, edits, look), effective, multiplier) : null, [placement, syllable, layout, edits, look, effective, multiplier])
-  const juPicked = mode === 'part' && sel === 'JU'
 
   // ── 선 만들기(지금 값으로. 끌기는 잡은 때의 값에서 셈한다) ──
   const lines: GuideLine[] = []
@@ -495,7 +516,7 @@ function SimsStep({ mode, char, drawn, edits, setEdits, look, setLook, weightCap
     }
     outer('top', 'h', bounds[1], 'height'); outer('bottom', 'h', bounds[3], 'height'); outer('left', 'v', bounds[0], 'frame'); outer('right', 'v', bounds[2], 'frame')
   }
-  if (stem && (mode === 'shape' || juPicked)) {
+  if (stem && mode === 'shape') {
     const startLook = look, r0 = lookOf(look, 'weight')
     const half = stem.thick / 2
     const baseHalf = half / multiplier * weightToMultiplier(effective.weight)
@@ -523,7 +544,8 @@ function SimsStep({ mode, char, drawn, edits, setEdits, look, setLook, weightCap
     })
   }
   const shownLines = lines.slice(0, 6)
-  const tip = stem?.tip && (mode === 'shape' || juPicked) ? stem.tip : null
+  // 굵기 · 획 끝은 인상 잡기(도트판)에서만 만진다(하니무스 2026-11-21). 부위 다듬기에는 자리 · 크기만.
+  const tip = stem?.tip && mode === 'shape' ? stem.tip : null
 
   // ── 손 ──
   const local = (event: ReactPointerEvent<HTMLDivElement>) => { const r = event.currentTarget.getBoundingClientRect(); return { x: event.clientX - r.left, y: event.clientY - r.top } }
@@ -764,7 +786,8 @@ export function MoldLabPage() {
   const resetRegion = () => {
     remember()
     // 인상은 통째로, 칸은 서로 맞물려 있어 짜임째로 되돌린다.
-    if (step === 'shape') setLook({})
+    if (step === 'shape') setLook((now) => ({ soft: now.soft }))
+    else if (step === 'stroke') setLook((now) => ({ ...now, soft: undefined }))
     else setEdits((now) => { const copy = { ...now }; delete copy[layoutOfFocus]; return copy })
   }
 
@@ -843,13 +866,24 @@ export function MoldLabPage() {
             </ChoiceGroup>
           </div>
         </section>
+        : step === 'stroke'
+        ? <section className={styles.panel} aria-label="획 다듬기" data-testid="mold-stroke-step">
+          <div className={styles.fenceLine}>
+            <span>획 끝</span>
+            <ChoiceGroup variant="segment" aria-label="획 끝" className={styles.fenceLineSwitch}>
+              {STROKE_ENDS.map((end) => <ChoiceItem key={end.key} checked={(lookOf(look, 'soft') > 0.5 ? 1 : 0) === end.soft} onClick={() => { remember(); setLook({ ...look, soft: end.soft }) }} data-testid={`stroke-end-${end.key}`}>{end.name}</ChoiceItem>)}
+            </ChoiceGroup>
+          </div>
+          {STROKE_LATER.map((name) => <div key={name} className={styles.fenceLine}><span>{name}</span><span className={styles.skipNote}>다음에 넣어요</span></div>)}
+        </section>
         : <SimsStep mode={step} weightNote={weightNote} fence={compare ? undefined : fence} char={focusChar} drawn={drawn} edits={edits} setEdits={setEdits} look={look} setLook={setLook} weightCap={weightCap} sel={sel} setSel={setSel} onBegin={remember} />}
       <div className={styles.moldActions}>
         <Button variant="outline" size="sm" onClick={undo} disabled={!history.length} data-testid="mold-undo"><Undo2 aria-hidden="true" />되돌리기</Button>
-        <Button variant="outline" size="sm" onClick={resetRegion} disabled={step === 'part' && !sel} data-testid="mold-reset-region"><RotateCcw aria-hidden="true" />{step === 'shape' ? '인상 처음대로' : '부위 처음대로'}</Button>
+        <Button variant="outline" size="sm" onClick={resetRegion} disabled={step === 'part' && !sel} data-testid="mold-reset-region"><RotateCcw aria-hidden="true" />{step === 'shape' ? '인상 처음대로' : step === 'stroke' ? '획 처음대로' : '부위 처음대로'}</Button>
       </div>
       {step === 'shape' && <Button size="block" onClick={() => setStep('part')} data-testid="mold-to-part">부위 다듬기로<ChevronRight aria-hidden="true" /></Button>}
       {step === 'shape' && <p className={styles.skipNote}>부위 다듬기는 건너뛰어도 돼요.</p>}
+      {step === 'part' && <Button size="block" onClick={() => setStep('stroke')} data-testid="mold-to-stroke">획 다듬기로<ChevronRight aria-hidden="true" /></Button>}
     </>}
 
     {changed > 0 && <Button variant="ghost" size="sm" className={styles.center} onClick={() => { remember(); setEdits({}); setLook({}); setRaws({}); setStep('draw') }} data-testid="mold-reset-all"><RotateCcw aria-hidden="true" />모두 처음대로</Button>}

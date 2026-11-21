@@ -292,7 +292,9 @@ describe('도트판 인상 잡기', () => {
     expect(dotToLook('jamo', 10)).toBe(1)
     expect(dotToLook('center', 10)).toBe(0)
     expect(dotToLook('round', 0)).toBe(0)
-    expect(dotsOf({})).toEqual([10, 10, 10, 0, 0])
+    expect(dotsOf({})).toEqual([10, 10, 10, 10, 10, 0, 0])
+    expect(dotToLook('frame', 10)).toBe(1)
+    expect(dotToLook('height', 0)).toBe(LOOK_WALL.height[0])
     for (let k = 0; k <= 20; k++) expect(lookToDot('jamo', dotToLook('jamo', k))).toBe(k)
   })
   it('닿자 크기는 제 칸 가운데를 붙든 채 가로세로 같이 커진다', async () => {
@@ -329,11 +331,13 @@ describe('풍선 닿자', () => {
     const { growSides } = await import('./moldLab')
     // 첫닿자 오른변이 홀자(0.6)에서 0.05 안쪽이면 막힘
     const ok = (b: Record<string, { x: number; width: number } | undefined>) => b.JU!.x - (b.CH!.x + b.CH!.width) >= 0.05 - 1e-9
-    const out = growSides(VERTICAL, 1.2, (b) => ok(b))
+    // 획 b가 1.3배를 넘으면 막힘(그 획만 멈춘다)
+    const out = growSides(VERTICAL, 1.2, { CH: ['a', 'b'] }, (b, thick) => ok(b) && (thick['CH:b'] ?? 1) <= 1.3 + 1e-9)
     expect(out.boxes.CH!.x + out.boxes.CH!.width).toBeLessThanOrEqual(0.55 + 1e-9)
     expect(out.boxes.CH!.x).toBeCloseTo(0.06)
     expect(out.boxes.CH!.height).toBeCloseTo(0.72)
-    expect(out.thick.CH).toBeCloseTo(1.2)
+    expect(out.thick['CH:a']).toBeCloseTo(1.5)
+    expect(out.thick['CH:b']).toBeLessThanOrEqual(1.3 + 1e-9)
     expect(out.boxes.JU).toEqual(VERTICAL.JU)
   })
   it('풍선 닿자는 첫닿자 · 받침 획만 두꺼워진다', async () => {
