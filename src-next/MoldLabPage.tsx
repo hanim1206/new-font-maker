@@ -171,15 +171,19 @@ function onlyGroup(syllable: DecomposedSyllable, group: BalloonGroup): Decompose
   return { ...syllable, choseong: group === 'CH' ? syllable.choseong : null, jungseong: group === 'JU' ? syllable.jungseong : null, jongseong: group === 'JO' ? syllable.jongseong : null }
 }
 type Pt2 = { x: number; y: number }
-/** 획 열린 끝을 옮긴 글자(자소 칸 안 좌표의 옮김, 부위|획 id로). 손잡이도 같이 옮긴다. */
-function stretchedSyllable(syllable: DecomposedSyllable, reaches: ReadonlyMap<string, { start: Pt2; end: Pt2 }>): DecomposedSyllable {
-  const moveStrokes = (parts: readonly Part[], list: StrokeDataV2[] | undefined) => list?.map((stroke) => {
+/** 획 고치기: 열린 끝 옮김(자소 칸 좌표) 또는 토막으로 나눈 획들. */
+type StrokeReshape = { start: Pt2; end: Pt2 } | { pieces: StrokeDataV2[] }
+/** 획 열린 끝을 옮기거나 토막으로 나눈 글자(부위|획 id로). 손잡이도 같이 옮긴다. */
+function stretchedSyllable(syllable: DecomposedSyllable, reaches: ReadonlyMap<string, StrokeReshape>): DecomposedSyllable {
+  const moveStrokes = (parts: readonly Part[], list: StrokeDataV2[] | undefined) => list?.flatMap((stroke) => {
     const reach = parts.map((part) => reaches.get(`${part}|${stroke.id}`)).find(Boolean)
-    if (!reach || stroke.closed || stroke.points.length < 2) return stroke
+    if (!reach) return [stroke]
+    if ('pieces' in reach) return reach.pieces
+    if (stroke.closed || stroke.points.length < 2) return [stroke]
     const shift = (point: StrokeDataV2['points'][number], by: Pt2) => ({ ...point, x: point.x + by.x, y: point.y + by.y, ...(point.handleIn ? { handleIn: { x: point.handleIn.x + by.x, y: point.handleIn.y + by.y } } : {}), ...(point.handleOut ? { handleOut: { x: point.handleOut.x + by.x, y: point.handleOut.y + by.y } } : {}) })
     const points = [...stroke.points]
     points[0] = shift(points[0], reach.start); points[points.length - 1] = shift(points[points.length - 1], reach.end)
-    return { ...stroke, points }
+    return [{ ...stroke, points }]
   })
   const moveJamo = (jamo: JamoData | null | undefined, parts: readonly Part[]) => jamo && {
     ...jamo, strokes: moveStrokes(parts, jamo.strokes), horizontalStrokes: moveStrokes(parts, jamo.horizontalStrokes), verticalStrokes: moveStrokes(parts, jamo.verticalStrokes),
@@ -299,16 +303,65 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       out[part] = { ...box, x: next.x + (box.x - from.x) * kx, y: next.y + (box.y - from.y) * ky, width: box.width * kx, height: box.height * ky }
     }
     // 열린 끝 늘이기(푼 셈과 같은 값): 가로가 덜 굵어진 만큼 가로획 열린 끝을 늘여 세로줄기 바깥선과 맞춘다(「른」 ㄹ).
-    const reaches = new Map<string, { start: Pt2; end: Pt2 }>()
+    // 꺾인 곧은 획(ㄹ · ㄱ · ㄴ)은 토막마다 따로 그린다 — 한 획으로 그리면 가로 · 세로 굵기가 다른 두 토막의 꺾임에서
+    // 안쪽 윤곽이 엇갈려 꺾인 곳이 덩어리가 됐다(하니무스 2026-11-21 「른」). 토막 끝은 이웃 토막 반 두께만큼 늘여 모서리를 채운다.
+    const reaches = new Map<string, StrokeReshape>()
+    const squareCap = effective.linecap === 'square'
+    // 끝선 맞춤: 열린 끝이 같은 자소의 수직인 토막 중심선 위에 있으면(ㄹ 윗 가로 왼끝 ↔ 아래 세로) 그 토막 바깥선까지 늘인다.
+    const axisSegs = result.primitives.flatMap((primitive, index) => {
+      const stroke = strokes[index], part = primitive.source.part, thick = solved.thick[balloonGroupOf(part)]
+      return stroke.points.slice(1).map((b, at) => {
+        const a = stroke.points[at], l = Math.hypot(b.x - a.x, b.y - a.y), u = l < 1e-9 ? 0.5 : ((b.y - a.y) / l) ** 2
+        return { part, a, b, u, half: stroke.thickness / 2 * (u > 0.5 ? thick.v : thick.h) }
+      })
+    })
+    const alignReach = (part: Part, end: Pt2, inward: Pt2, own: number) => {
+      const horizontal = Math.abs(inward.x) > Math.abs(inward.y)
+      let best = -1
+      for (const seg of axisSegs) {
+        if (seg.part !== part || (horizontal ? seg.u < 0.97 : seg.u > 0.03)) continue
+        const off = horizontal ? Math.abs(seg.a.x - end.x) : Math.abs(seg.a.y - end.y)
+        const lo = horizontal ? Math.min(seg.a.y, seg.b.y) : Math.min(seg.a.x, seg.b.x), hi = horizontal ? Math.max(seg.a.y, seg.b.y) : Math.max(seg.a.x, seg.b.x)
+        const across = horizontal ? end.y : end.x
+        if (off > 0.25 * own + 0.012 || across < lo - 0.3 || across > hi + 0.3) continue
+        best = Math.max(best, seg.half)
+      }
+      return best
+    }
     result.primitives.forEach((primitive, index) => {
-      const stroke = strokes[index], part = primitive.source.part
+      const stroke = strokes[index], part = primitive.source.part, thick = solved.thick[balloonGroupOf(part)]
       if (stroke.closed) return
-      const reach = endReachOf(stroke.points, stroke.thickness, solved.thick[balloonGroupOf(part)], base)
-      if (reach.start < 1e-6 && reach.end < 1e-6) return
       const from = placed[part], next = solved.boxes[part]
       const kx = from && next && from.width > 1e-6 ? next.width / from.width : 1, ky = from && next && from.height > 1e-6 ? next.height / from.height : 1
       const bw = primitive.box.width * kx, bh = primitive.box.height * ky
-      const local = (a: Pt2, b: Pt2, by: number): Pt2 => { const l = Math.hypot(b.x - a.x, b.y - a.y); return l < 1e-9 || bw < 1e-9 || bh < 1e-9 ? { x: 0, y: 0 } : { x: (a.x - b.x) / l * by / bw, y: (a.y - b.y) / l * by / bh } }
+      if (bw < 1e-9 || bh < 1e-9) return
+      const reach = endReachOf(stroke.points, stroke.thickness, thick, base)
+      const raw = primitive.stroke as StrokeDataV2
+      const anchors = raw.points
+      const straight = anchors.length >= 3 && anchors.every((point) => !point.handleIn && !point.handleOut)
+      const em = anchors.map((point) => ({ x: primitive.box.x + point.x * primitive.box.width, y: primitive.box.y + point.y * primitive.box.height }))
+      const upright = (a: Pt2, b: Pt2) => { const l = Math.hypot(b.x - a.x, b.y - a.y); return l < 1e-9 ? 0 : ((b.y - a.y) / l) ** 2 }
+      const axisAligned = straight && em.slice(1).every((point, at) => { const u = upright(em[at], point); return u < 0.03 || u > 0.97 })
+      // 끝을 em 길이 `by`만큼 a → b 바깥쪽(a 쪽)으로 옮기는 자소 칸 좌표.
+      const local = (a: Pt2, b: Pt2, by: number): Pt2 => { const l = Math.hypot(b.x - a.x, b.y - a.y); return l < 1e-9 ? { x: 0, y: 0 } : { x: (a.x - b.x) / l * by / bw, y: (a.y - b.y) / l * by / bh } }
+      if (axisAligned) {
+        const half = em.slice(1).map((point, at) => stroke.thickness / 2 * (upright(em[at], point) > 0.5 ? thick.v : thick.h))
+        const last = em.length - 2
+        const pieces = em.slice(1).map((point, at) => {
+          const a = em[at], b = point
+          const openBy = (end: Pt2, other: Pt2, fallback: number) => {
+            const aligned = alignReach(part, end, { x: other.x - end.x, y: other.y - end.y }, half[at])
+            return aligned >= 0 ? aligned : (squareCap ? half[at] : 0) + fallback
+          }
+          const startBy = at > 0 ? half[at - 1] : openBy(a, b, reach.start)
+          const endBy = at < last ? half[at + 1] : openBy(b, a, reach.end)
+          const ds = local(a, b, startBy), de = local(b, a, endBy)
+          return { ...raw, id: `${raw.id}~${at}`, linecap: 'butt' as const, points: [{ x: anchors[at].x + ds.x, y: anchors[at].y + ds.y }, { x: anchors[at + 1].x + de.x, y: anchors[at + 1].y + de.y }] }
+        })
+        reaches.set(`${part}|${primitive.source.strokeId}`, { pieces })
+        return
+      }
+      if (reach.start < 1e-6 && reach.end < 1e-6) return
       const pts = stroke.points, n = pts.length
       reaches.set(`${part}|${primitive.source.strokeId}`, { start: local(pts[0], pts[1], reach.start), end: local(pts[n - 1], pts[n - 2], reach.end) })
     })
