@@ -1,4 +1,5 @@
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
+import { instanceInJamo, instanceOf, JAMO_CHANNELS, masterFromStroke, masterNameOf, baseOf, stemAxisOf, stemReferenceBox, type AxisPoint, type StemBase, type StemMaster } from '../src/services/stemMaster'
 import type { BoxConfig, BrushStyle, DecomposedSyllable, JamoData, LayoutType, Part, StrokeDataV2, StrokeRenderStyle } from '../src/types'
 
 /**
@@ -486,7 +487,7 @@ export type LayoutEdits = Partial<Record<LayoutType, PartEdits>>
  * balloon = 풍선 닿자의 획 사이 최소 틈(em, 사용자가 고름),
  * round = 끝 · 모서리 둥글기(0~1, 붓 둥글기), contrast = 획 대비(0~1, + 는 세로 굵게 · 가로 가늘게).
  */
-export interface Look { weight?: number; soft?: number; frame?: number; tracking?: number; size?: number; height?: number; jamo?: number; center?: number; round?: number; contrast?: number; balloon?: number; open?: number; branch?: number; serif?: number; nib?: number; jag?: number }
+export interface Look { weight?: number; soft?: number; frame?: number; tracking?: number; size?: number; height?: number; jamo?: number; center?: number; round?: number; contrast?: number; balloon?: number; open?: number; branch?: number; serif?: number; nib?: number; jag?: number; bendGidung?: number; bendGyeot?: number; bendJjal?: number; bendBo?: number; bendGeol?: number; gapGyeot?: number }
 export type Dir = 'up' | 'down' | 'left' | 'right' | 'ul' | 'ur' | 'dl' | 'dr'
 export interface RegionLabels { name: string; up: string; down: string; left: string; right: string }
 
@@ -499,8 +500,25 @@ export interface RegionLabels { name: string; up: string; down: string; left: st
 // center는 첫닿자 칸 키에 대한 비율(허리선이 첫닿자 키의 몇 할만큼 오르나). open은 받침 없는 글자의 키(1이 네모).
 // 판 양 끝 = 가장 멀리 간 목표 폰트(거북이 방향안 3차, 하니무스 2026-11-21 승인). 값은 노토(엔진)에 곱하는 배율이고, 칸 10은 폰트 가운데다(`DOT_SCALE`).
 // center는 허리선(-1 아래 ~ +1 위, 짜임마다 폭이 다르다 `centerLift`). nib는 붓촉(빗금 굵기 차), jag는 글자마다 윗선 들쭉날쭉(표준편차 ÷ 키).
-export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.84, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09] } as const
-export const LOOK_ENGINE = { weight: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.04, open: 1, branch: 1, serif: 0, nib: 0, jag: 0.027 } as const
+// 획 다듬기 줄기 값. 휨은 줄기 가운데가 옆으로 나간 양(줄기 길이에 대한 비율), 길이는 빈 끝 Δ, 틈은 붙은 끝이 기둥에서 떨어진 양(em, 글자 폭 기준 — 엔진 줄기 마스터 단위).
+// 범위는 아직 폰트로 재지 않은 임시값(틈은 줄기 중심선에서 재서, 굵기 절반을 넘어야 떨어져 보인다. 끝 0.08 ≈ Gugi 떨어진 점 눈대중).
+const BEND: readonly [number, number] = [-0.12, 0.12]
+const STEM_WALL = { bendGidung: BEND, bendGyeot: BEND, bendJjal: BEND, bendBo: BEND, bendGeol: BEND, gapGyeot: [0, 0.08] as const }
+const STEM_ENGINE = { bendGidung: 0, bendGyeot: 0, bendJjal: 0, bendBo: 0, bendGeol: 0, gapGyeot: 0 }
+export type StemKey = keyof typeof STEM_ENGINE
+/** 줄기마다 만지는 값. 곁줄기 길이는 예전 값(`branch`, 배율)을 그대로 쓴다. */
+export const STEM_TUNE: Readonly<Record<StemBase, { name: string; bend: StemKey; reach?: StemKey | 'branch'; gap?: StemKey }>> = {
+  gidung: { name: '기둥', bend: 'bendGidung' },
+  gyeotjulgi: { name: '곁줄기', bend: 'bendGyeot', reach: 'branch', gap: 'gapGyeot' },
+  // 짧은기둥 길이 · 틈은 써 넣으면 엔진이 보에 다시 붙여 놓아(가로홀자 rail) 화면과 달라진다 — 휨만.
+  jjalbeungidung: { name: '짧은기둥', bend: 'bendJjal' },
+  bo: { name: '보', bend: 'bendBo' },
+  geolchim: { name: '걸침', bend: 'bendGeol' },
+}
+export const STEM_KEYS = Object.keys(STEM_ENGINE) as StemKey[]
+
+export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.84, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09], ...STEM_WALL } as const
+export const LOOK_ENGINE = { weight: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.04, open: 1, branch: 1, serif: 0, nib: 0, jag: 0.027, ...STEM_ENGINE } as const
 const clampLook = (key: keyof typeof LOOK_WALL, value: number) => Math.max(LOOK_WALL[key][0], Math.min(LOOK_WALL[key][1], value))
 export const lookOf = (look: Look, key: keyof Look) => look[key] ?? LOOK_ENGINE[key]
 
@@ -1376,4 +1394,77 @@ export function growSides(boxes: Partial<Record<Part, BoxConfig>>, k: number, st
     }
   }
   return { boxes: out, thick }
+}
+
+/** 마스터 모양에 휨을 더한다. 가운데가 `bend`(em)만큼 나간 활 모양(양 끝은 그대로). 손잡이 없는 두 점이면 손잡이를 단다. */
+export function bendMaster(master: StemMaster, bend: number): StemMaster {
+  if (!bend) return master
+  const arc = (t: number) => 4 * bend * t * (1 - t)
+  const ps = master.points
+  if (ps.length === 2 && !ps[0].handleOut && !ps[1].handleIn) {
+    // 세 점 베지어의 가운데 높이는 손잡이 높이의 3/4라 손잡이를 4/3배로.
+    const o = (t: number) => ps[0].o + (ps[1].o - ps[0].o) * t + (4 / 3) * bend
+    return { ...master, points: [{ ...ps[0], handleOut: { t: 1 / 3, o: o(1 / 3) } }, { ...ps[1], handleIn: { t: 2 / 3, o: o(2 / 3) } }] }
+  }
+  const shift = (p: { t: number; o: number }) => ({ ...p, o: p.o + arc(p.t) })
+  return { ...master, points: ps.map((p): AxisPoint => ({ ...shift(p), ...(p.handleIn ? { handleIn: shift(p.handleIn) } : {}), ...(p.handleOut ? { handleOut: shift(p.handleOut) } : {}) })) }
+}
+
+/** 두 점 획(손잡이 있어도)의 s(0~1) 자리. */
+function cubicAt(stroke: StrokeDataV2, s: number) {
+  const [a, b] = [stroke.points[0], stroke.points[stroke.points.length - 1]]
+  const h1 = a.handleOut ?? a, h2 = b.handleIn ?? b, u = 1 - s
+  return { x: u * u * u * a.x + 3 * u * u * s * h1.x + 3 * u * s * s * h2.x + s * s * s * b.x, y: u * u * u * a.y + 3 * u * u * s * h1.y + 3 * u * s * s * h2.y + s * s * s * b.y }
+}
+/** 보가 휘면 거기 붙은 짧은기둥 끝을 보의 새 자리로 옮긴다(안 그러면 휜 보를 뚫거나 떨어진다). */
+function followBeam(ju: JamoData, before: StrokeDataV2[], after: StrokeDataV2[]): StrokeDataV2[] {
+  const at = before.findIndex((stroke) => { const name = masterNameOf(ju, before, stroke.id); return !!name && baseOf(name) === 'bo' })
+  if (at < 0 || before[at] === after[at] || before[at].points.length !== 2 || after[at].points.length !== 2) return after
+  const old = before[at], bent = after[at], x0 = old.points[0].x, x1 = old.points[1].x
+  if (Math.abs(x1 - x0) < 1e-6) return after
+  return after.map((stroke, index) => {
+    const name = masterNameOf(ju, before, before[index].id)
+    if (!name || baseOf(name) !== 'jjalbeungidung') return stroke
+    const ends = [0, stroke.points.length - 1]
+    const near = ends.reduce((a, b) => (Math.abs(stroke.points[a].y - cubicAt(old, 0.5).y) <= Math.abs(stroke.points[b].y - cubicAt(old, 0.5).y) ? a : b))
+    const p = stroke.points[near], s = Math.max(0, Math.min(1, (p.x - x0) / (x1 - x0)))
+    const dy = cubicAt(bent, s).y - cubicAt(old, s).y
+    if (Math.abs(dy) < 1e-9) return stroke
+    const moved = { ...p, y: p.y + dy, ...(p.handleIn ? { handleIn: { ...p.handleIn, y: p.handleIn.y + dy } } : {}), ...(p.handleOut ? { handleOut: { ...p.handleOut, y: p.handleOut.y + dy } } : {}) }
+    return { ...stroke, points: stroke.points.map((q, i) => (i === near ? moved : q)) }
+  })
+}
+
+/**
+ * 획 다듬기(C): 홀자 줄기를 이름(기둥 · 곁줄기 · 짧은기둥 · 보 · 걸침)마다 고친다. 엔진 줄기 마스터 꼴로 읽어(`masterFromStroke`) 휨 · 길이 · 틈을 더하고
+ * 다시 놓는다(`instanceInJamo`). 지금 모양(긋기 획)에 더하는 것이라 같은 이름 줄기는 모든 글자에서 같은 만큼 바뀐다.
+ */
+export function stemSyllable(syllable: DecomposedSyllable, look: Look): DecomposedSyllable {
+  const ju = syllable.jungseong
+  if (!ju || STEM_KEYS.every((key) => !look[key])) return syllable
+  let next: JamoData = ju
+  for (const channel of JAMO_CHANNELS) {
+    const strokes = ju[channel]
+    if (!strokes) continue
+    const rewritten = strokes.map((stroke) => {
+      const name = masterNameOf(ju, strokes, stroke.id)
+      if (!name) return stroke
+      const tune = STEM_TUNE[baseOf(name)]
+      const bend = look[tune.bend] ?? 0, reach = tune.reach && tune.reach !== 'branch' ? look[tune.reach] ?? 0 : 0, gap = tune.gap ? look[tune.gap] ?? 0 : 0
+      if (!bend && !reach && !gap) return stroke
+      const own = masterFromStroke(ju, channel, stroke.id)
+      if (!own) return stroke
+      // 틈은 줄기를 통째로 떼어 낸다(길이는 그대로) — 붙은 끝만 옮기면 짧은 곁줄기(ㅓ)가 사라진다. 걸침은 두 끝이 다 붙어 양쪽에서 띄운다.
+      // 휨만이면 끝점은 그대로 두고 모양만 바꾼다 — 붙은 끝을 다시 맞추는 `instanceInJamo`는 기본 프리셋 자리로 끝을 옮긴다(짧은기둥이 보를 뚫음).
+      // 휨은 줄기 길이에 대한 비율이다 — 짧은기둥처럼 짧은 줄기가 긴 기둥만큼 휘면 갈고리가 된다.
+      const box = stemReferenceBox(ju.char, channel, stroke), first = stroke.points[0], last = stroke.points[stroke.points.length - 1]
+      const bendEm = bend * Math.hypot((last.x - first.x) * box.width, (last.y - first.y) * box.height)
+      if (!gap && !reach) return instanceOf(stroke, bendMaster(own, bendEm), box, stemAxisOf(name))
+      const both = own.name === 'geolchim'
+      const master = bendMaster({ ...own, reach: (own.reach ?? 0) + reach + (both ? 0 : gap), gap: (own.gap ?? 0) + gap, ...(both ? { gapEnd: (own.gapEnd ?? 0) + gap } : {}) }, bendEm)
+      return instanceInJamo(ju, channel, stroke, master)
+    })
+    next = { ...next, [channel]: followBeam(ju, strokes, rewritten) }
+  }
+  return { ...syllable, jungseong: next }
 }

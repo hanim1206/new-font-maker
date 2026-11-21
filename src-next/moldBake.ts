@@ -3,7 +3,7 @@ import type { ContextBoxDelta, FacesDelta } from '../src/services/contextBoxReso
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
 import type { BoxConfig, DecomposedSyllable, JamoData, LayoutSchema, LayoutType, Part, StrokeDataV2 } from '../src/types'
 import { medialFamilyOf } from '../src/utils/jamoContextStrokes'
-import { branchSyllable, jagBoxes, JAG_INITIALS, waistSyllable } from './moldLab'
+import { branchSyllable, jagBoxes, JAG_INITIALS, lookOf, stemSyllable, waistSyllable, type Look } from './moldLab'
 import { effectiveLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { contextPlacementOf } from './notoModel'
@@ -121,8 +121,8 @@ export function bakedConsonants(stored: JamoMap, drawn: DrawnConsonants | undefi
   return out
 }
 
-/** 홀자: 긋기 마스터 → 허리선(곁줄기 높이, 계열 대표 글자의 칸 기준) → 곁줄기 길이. 화면(`MoldGlyph`)과 같은 순서. */
-export function bakedVowels(stored: JamoMap, drawn: JamoMap | undefined, items: readonly BakeTarget[], branch: number): Record<string, JamoData> {
+/** 홀자: 긋기 마스터 → 허리선(곁줄기 높이, 계열 대표 글자의 칸 기준) → 곁줄기 길이 → 줄기마다 휨 · 길이 · 틈. 화면(`MoldGlyph`)과 같은 순서. */
+export function bakedVowels(stored: JamoMap, drawn: JamoMap | undefined, items: readonly BakeTarget[], look: Look): Record<string, JamoData> {
   const out: Record<string, JamoData> = {}
   const repOf = (family: MedialFamilyKey) => items.find((item) => item.syllable.layoutType === FAMILY_LAYOUT[family].open)
   for (const [char, base] of Object.entries(stored)) {
@@ -131,7 +131,7 @@ export function bakedVowels(stored: JamoMap, drawn: JamoMap | undefined, items: 
     const rep = repOf(family)
     let syllable: DecomposedSyllable = { char, choseong: null, jongseong: null, jungseong: start, layoutType: FAMILY_LAYOUT[family].open }
     if (rep) syllable = waistSyllable(syllable, rep.lift, rep.molded)
-    syllable = branchSyllable(syllable, branch)
+    syllable = stemSyllable(branchSyllable(syllable, lookOf(look, 'branch')), look)
     let next = syllable.jungseong!
     // 곁줄기 길이 · 허리선은 칸에 놓은 뒤 획만 고친 것이라, 틀(`frame`)을 고치기 전 획으로 둔다. 안 그러면 짧아진 곁줄기 범위로 자소를 다시 늘려 맞춘다.
     if (next !== start) next = { ...next, frame: start.frame ?? { strokes: start.strokes, horizontalStrokes: start.horizontalStrokes, verticalStrokes: start.verticalStrokes } }

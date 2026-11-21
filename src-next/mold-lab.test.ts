@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { clampToWall, dragValue, groupOfPart, GROUPS, groupsOfSyllable, inSafe, moldBoxes, partAt, presetOf } from './moldLab'
+import type { DecomposedSyllable, JamoData, StrokeDataV2 } from '../src/types'
+import { bendMaster, stemSyllable, clampToWall, dragValue, groupOfPart, GROUPS, groupsOfSyllable, inSafe, moldBoxes, partAt, presetOf } from './moldLab'
 
 const box = (x: number, y: number, width: number, height: number) => ({ x, y, width, height })
 const VERTICAL = { CH: box(0.1, 0.2, 0.4, 0.6), JU: box(0.6, 0.05, 0.3, 0.9) }
@@ -459,5 +460,30 @@ describe('저장소에 써 넣기', () => {
     expect(flat.strokeStyle).toMatchObject({ brush: { tip: 'ellipse' } })
     expect(flat.strokeStyle).not.toHaveProperty('roundness')
     expect(moldInk(style, { round: 0.5, contrast: 0.2 }).strokeStyle).toMatchObject({ roundness: 0.5, innerRoundness: 1, contrast: 0.2 })
+  })
+})
+
+describe('획 다듬기 줄기(C)', () => {
+  const o = (gidung: StrokeDataV2['points'], bo?: StrokeDataV2['points']) => ({ char: 'ㅏ', type: 'jungseong', strokes: [{ id: 'ㅏ-1', points: gidung, closed: false, thickness: 0.07 }, { id: 'ㅏ-2', points: bo ?? [{ x: 0, y: 0.5 }, { x: 1, y: 0.5 }], closed: false, thickness: 0.07 }] }) as unknown as JamoData
+  const syl = (ju: JamoData) => ({ char: '아', choseong: null, jongseong: null, jungseong: ju, layoutType: 'choseong-jungseong-vertical' }) as unknown as DecomposedSyllable
+  it('값이 없으면 그대로', () => {
+    const s = syl(o([{ x: 0, y: 0 }, { x: 0, y: 1 }]))
+    expect(stemSyllable(s, {})).toBe(s)
+  })
+  it('기둥 휨은 끝점을 두고 가운데만 옆으로 내민다', () => {
+    const out = stemSyllable(syl(o([{ x: 0, y: 0 }, { x: 0, y: 1 }])), { bendGidung: 0.1 }).jungseong!.strokes![0]
+    expect(out.points[0]).toMatchObject({ x: 0, y: 0 })
+    expect(out.points[1]).toMatchObject({ x: 0, y: 1 })
+    expect(Math.abs(out.points[0].handleOut!.x)).toBeGreaterThan(0.05)
+  })
+  it('곁줄기 틈은 붙은 끝을 떼되 길이는 둔다', () => {
+    const before = o([{ x: 0, y: 0 }, { x: 0, y: 1 }]).strokes![1]
+    const out = stemSyllable(syl(o([{ x: 0, y: 0 }, { x: 0, y: 1 }])), { gapGyeot: 0.05 }).jungseong!.strokes![1]
+    expect(out.points[0].x).toBeGreaterThan(before.points[0].x + 0.01)
+    expect(out.points[1].x - out.points[0].x).toBeCloseTo(before.points[1].x - before.points[0].x, 3)
+  })
+  it('bendMaster: 두 점이면 손잡이를 4/3배로 달아 가운데가 그만큼 나간다', () => {
+    const m = bendMaster({ name: 'gidung', points: [{ t: 0, o: 0 }, { t: 1, o: 0 }] }, 0.03)
+    expect(m.points[0].handleOut!.o).toBeCloseTo(0.04, 6)
   })
 })

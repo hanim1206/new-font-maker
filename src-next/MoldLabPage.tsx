@@ -9,6 +9,7 @@ import { useJamoStore } from '../src/stores/jamoStore'
 import { DEFAULT_GLOBAL_PADDING, mergePadding, useLayoutStore } from '../src/stores/layoutStore'
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
 import { propagatedJungseong } from '../src/stores/stemMasterStore'
+import { baseOf, JAMO_CHANNELS, masterNameOf, type StemBase } from '../src/services/stemMaster'
 import type { BoxConfig, GlyphInkPlacement, JamoData, LayoutType, Padding, Part, ResolvedStrokeInkSource } from '../src/types'
 import type { DecomposedSyllable } from '../src/types'
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
@@ -20,7 +21,7 @@ import { Pressable } from './components/ui/pressable'
 import { Field, RangeBar } from './components/ui/range'
 import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
-import { applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement, useNotoModel } from './notoModel'
 import { applyBakedLayouts, bakedConsonants, bakedVowels, bakeLayout, jagRules, meanThick, type BakeTarget, type BakedLayout } from './moldBake'
 import { layoutDeltaSnapshot } from './layoutDeltaStore'
@@ -47,10 +48,17 @@ const STEP_NAMES: Record<Step, string> = { draw: '긋기', shape: '인상 잡기
 const STEP_ORDER: readonly Step[] = ['draw', 'shape', 'part', 'stroke', 'finish']
 type Plate = 'frame' | 'ink'
 const PLATE_NAMES: Record<Plate, string> = { ink: '획', frame: '틀' }
-/** 획 다듬기 막대 둘. 값 0~100으로 보이고, 안에서는 벽 사이로 잇는다. 손 떨림 값은 두지 않는다(정할 것 5: 긋기에서 떨림만 지우고 손맛은 붓촉이 맡음). */
-const STROKE_BARS = [{ key: 'branch', name: '곁줄기 길이' }, { key: 'serif', name: '부리' }] as const
-const STROKE_KEYS = ['branch', 'serif'] as const
-const STROKE_LATER = ['줄기 종류마다(기둥 · 곁줄기 · 짧은기둥 · 보 · 걸침)', '부리 묶음 여섯'] as const
+/**
+ * 획 다듬기(C): 줄기 다섯 중 하나를 골라 휨 · 길이 · 틈. 같은 이름 줄기는 모든 글자에서 함께 바뀐다(엔진 줄기 마스터).
+ * 값 0~100으로 보이고, 안에서는 벽 사이로 잇는다. 손 떨림 값은 두지 않는다(정할 것 5). 부리 묶음은 출시 뒤(하니무스 2026-11-21).
+ */
+const STEM_PICKS = Object.keys(STEM_TUNE) as StemBase[]
+const STROKE_KEYS = ['branch', 'serif', ...STEM_KEYS] as const
+const STROKE_LATER = ['부리 묶음 여섯 · 출시 뒤'] as const
+const stemBarsOf = (base: StemBase): { key: StemKey | 'branch'; name: string }[] => {
+  const tune = STEM_TUNE[base]
+  return [{ key: tune.bend, name: '휨' }, ...(tune.reach ? [{ key: tune.reach, name: '길이' }] : []), ...(tune.gap ? [{ key: tune.gap, name: '틈' }] : [])]
+}
 
 /** 그은 줄기를 자모에 입힌 것. 닿자는 짜임마다 칸 비율이 달라 짜임별로 따로. */
 interface Drawn {
@@ -156,9 +164,9 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const shaped = useMemo(() => {
     if (placement.kind !== 'boxes') return { syllable: raw, boxes: undefined }
     const boxes = moldedBoxes(placement.boxes, raw.layoutType, edits, { ...look, jamo: Math.min(1, lookOf(look, 'jamo')) }, char)
-    // 허리선 → 곁줄기 길이 → 부리 → 붓촉 순서로 획을 고친다(획 다듬기 값은 획 모양만 바꾸고 칸은 두지 않는다).
+    // 허리선 → 곁줄기 길이 → 줄기마다(휨 · 길이 · 틈) → 부리 → 붓촉 순서로 획을 고친다(획 다듬기 값은 획 모양만 바꾸고 칸은 두지 않는다).
     const waisted = waistSyllable(raw, waistLift(look, placement.boxes, raw.layoutType), boxes)
-    const stroked = serifSyllable(branchSyllable(waisted, lookOf(look, 'branch')), lookOf(look, 'serif'), boxes)
+    const stroked = serifSyllable(stemSyllable(branchSyllable(waisted, lookOf(look, 'branch')), look), lookOf(look, 'serif'), boxes)
     return { boxes, syllable: stroked }
   }, [placement, raw, edits, look, char])
   const syllable = shaped.syllable
@@ -698,6 +706,17 @@ export function MoldLabPage() {
   const [sel, setSel] = useState<Region | null>(null)
   const [focusAt, setFocusAt] = useState(0)
   const [history, setHistory] = useState<Snapshot[]>([])
+  const [stemPick, setStemPick] = useState<StemBase>('gidung')
+  const storedVowels = useJamoStore((state) => state.jungseong)
+  // 같은 이름 줄기가 몇 개인지(모든 홀자, 채널마다). 고르면 이 수만큼 함께 바뀐다.
+  const stemCount = useMemo(() => {
+    const count = Object.fromEntries(STEM_PICKS.map((base) => [base, 0])) as Record<StemBase, number>
+    for (const jamo of Object.values(storedVowels)) for (const channel of JAMO_CHANNELS) {
+      const strokes = jamo[channel] ?? []
+      for (const stroke of strokes) { const name = masterNameOf(jamo, strokes, stroke.id); if (name) count[baseOf(name)]++ }
+    }
+    return count
+  }, [storedVowels])
   const [compare, setCompare] = useState(false)
   const [plate, setPlate] = useState<Plate>('ink')
   const [plateSay, setPlateSay] = useState('판을 가로질러 한 번에 그어 보기')
@@ -748,7 +767,7 @@ export function MoldLabPage() {
     const jamo = useJamoStore.getState()
     const choseongOut = bakedConsonants(jamo.choseong, drawn?.consonants, 'choseong', meanThick(items, 'CH'))
     const jongseongOut = bakedConsonants(jamo.jongseong, drawn?.consonants, 'jongseong', meanThick(items, 'JO'))
-    const jungseongOut = bakedVowels(jamo.jungseong, drawn?.jungseong, items, lookOf(look, 'branch'))
+    const jungseongOut = bakedVowels(jamo.jungseong, drawn?.jungseong, items, look)
     for (const [char, data] of Object.entries(choseongOut)) jamo.updateChoseong(char, data)
     for (const [char, data] of Object.entries(jungseongOut)) jamo.updateJungseong(char, data)
     for (const [char, data] of Object.entries(jongseongOut)) jamo.updateJongseong(char, data)
@@ -907,13 +926,17 @@ export function MoldLabPage() {
         </section>
       </>}
       {step === 'stroke' && <section className={styles.panel} aria-label="획 다듬기" data-testid="mold-stroke-step">
-        {STROKE_BARS.map((bar) => {
+        <ChoiceGroup variant="segment" aria-label="줄기 고르기" className={styles.plates} data-testid="mold-stem-picks">
+          {STEM_PICKS.map((base) => <ChoiceItem key={base} checked={stemPick === base} onClick={() => setStemPick(base)} data-testid={`mold-stem-${base}`}>{STEM_TUNE[base].name}</ChoiceItem>)}
+        </ChoiceGroup>
+        {[...stemBarsOf(stemPick), { key: 'serif' as const, name: '부리' }].map((bar) => {
           const [lo, hi] = LOOK_WALL[bar.key], value = lookOf(look, bar.key), pct = Math.round((value - lo) / (hi - lo) * 100)
           return <Field key={bar.key} label={bar.name} value={pct}>
-            <RangeBar min={0} max={100} value={pct} onPointerDown={remember} onKeyDown={remember} onChange={(event) => setLook({ ...look, [bar.key]: lo + (hi - lo) * Number(event.currentTarget.value) / 100 })} aria-label={bar.name} data-testid={`stroke-${bar.key}`} />
+            <RangeBar min={0} max={100} value={pct} onPointerDown={remember} onKeyDown={remember} onChange={(event) => setLook({ ...look, [bar.key]: lo + (hi - lo) * Number(event.currentTarget.value) / 100 })} aria-label={`${bar.key === 'serif' ? '' : `${STEM_TUNE[stemPick].name} `}${bar.name}`} data-testid={`stroke-${bar.key}`} />
           </Field>
         })}
-        {STROKE_LATER.map((name) => <div key={name} className={styles.fenceLine}><span>{name}</span><span className={styles.skipNote}>다음에 넣어요</span></div>)}
+        <div className={styles.fenceLine} data-testid="mold-stem-count"><span>같은 이름 줄기</span><span>{stemCount[stemPick]}개 함께 바뀜</span></div>
+        {STROKE_LATER.map((name) => <div key={name} className={styles.fenceLine}><span>{name}</span></div>)}
       </section>}
       {step === 'finish' && <section className={styles.panel} aria-label="마무리" data-testid="mold-finish-step">
         <Field label="자간" value={`${tracking >= 0 ? '+' : ''}${Math.round(tracking * 100)}%`}>
