@@ -985,6 +985,16 @@ export function serifSyllable(syllable: DecomposedSyllable, amount: number, boxe
  * `jag`는 윗선이 글자마다 흩어지는 정도(표준편차 ÷ 키). 노토가 이미 가진 0.027보다 더한 만큼만 글자 이름 씨앗으로 윗변을 올리고 내린다.
  * 밑변은 그대로(밑선 들쭉날쭉은 탈네모가 맡는다), 글자 칸을 넘지 않는다.
  */
+const CHO_LIST = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
+/**
+ * 윗선 들쭉날쭉의 씨앗: 글자가 아니라 첫닿자(저장소에 써 넣기, 하니무스 2026-11-21 D-2).
+ * 글자마다 따로 두면 저장소에 1만 개 넘는 규칙이 생긴다. 첫닿자 열아홉 × 짜임 여섯 규칙으로 같은 그림을 낸다.
+ */
+export function jagSeedOf(char: string): string {
+  const code = char.charCodeAt(0) - 0xac00
+  return code >= 0 && code < 11172 ? CHO_LIST[Math.floor(code / 588)] : char
+}
+export const JAG_INITIALS = [...CHO_LIST]
 export function jagBoxes(boxes: Partial<Record<Part, BoxConfig>>, jag: number, char?: string): Partial<Record<Part, BoxConfig>> {
   const extra = Math.sqrt(Math.max(0, jag * jag - LOOK_ENGINE.jag ** 2))
   if (!char || extra < 1e-4) return boxes
@@ -993,7 +1003,7 @@ export function jagBoxes(boxes: Partial<Record<Part, BoxConfig>>, jag: number, c
   const top = Math.min(...list.map((b) => b.y)), bottom = Math.max(...list.map((b) => b.y + b.height)), span = bottom - top
   if (span < 0.1) return boxes
   // 고른 분포(−√3 ~ √3)는 표준편차가 1이다.
-  const u = (seeded(`${char}:jag`)() * 2 - 1) * Math.sqrt(3)
+  const u = (seeded(`${jagSeedOf(char)}:jag`)() * 2 - 1) * Math.sqrt(3)
   const nextTop = Math.max(HALF_THICK, Math.min(top + span * 0.4, top - u * extra * span))
   const k = (bottom - nextTop) / span
   const out: Partial<Record<Part, BoxConfig>> = {}

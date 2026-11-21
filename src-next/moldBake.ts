@@ -24,6 +24,11 @@ export interface BakeTarget {
   target: Partial<Record<Part, BoxConfig>>
   /** 이 글자 칸의 가로 배율(자간으로 옮긴다). */
   sx: number
+  /** 허리선이 곁줄기를 옮긴 양과 그때의 칸(획 고치기 `waistSyllable`가 쓴 그대로). */
+  lift: number
+  molded: Partial<Record<Part, BoxConfig>>
+  /** 풍선 닿자 획 두께 배율(`strokeKey` 열쇠). */
+  thick: Readonly<Record<string, number>>
 }
 
 export interface BakedLayout { rule: ScopeRule; delta: ContextBoxDelta; residual: number; char: string }

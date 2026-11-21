@@ -206,7 +206,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   // 잉크가 옆 자소와 최소 틈에 닿은 변 · 획만 멈춘다. 처음부터 그보다 가까운 쌍은 처음 틈을 지킨다. 글자 칸(0~1) 밖으로는 잉크가 안 나간다.
   const wantJamo = lookOf(look, 'jamo')
   const balloon = useMemo(() => {
-    if (!fencedOut || wantJamo <= 1) return { syllable, boxes: fencedOut }
+    if (!fencedOut || wantJamo <= 1) return { syllable, boxes: fencedOut, thick: {} as Record<string, number> }
     const multiplier = weightToMultiplier(ratio === 1 ? effective.weight : scaledWeight(effective.weight, ratio))
     const startInk = inkStrokes(syllable, fencedOut, effective, multiplier)
     const target: Partial<Record<PartPair, number>> = {}
@@ -222,7 +222,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       const r = inkReach(ink)
       return r.lo >= lo - 1e-6 && r.hi <= hi + 1e-6 && balloonOk(nearestBetweenParts(ink), target)
     }, 8, syllable.layoutType)
-    return { syllable: inflateSyllable(syllable, out.thick), boxes: out.boxes }
+    return { syllable: inflateSyllable(syllable, out.thick), boxes: out.boxes, thick: out.thick }
   }, [fencedOut, wantJamo, syllable, effective, ratio])
   const boxes = balloon.boxes
   const round = lookOf(look, 'round'), contrast = lookOf(look, 'contrast'), nib = lookOf(look, 'nib')
@@ -245,7 +245,8 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   // 저장소의 자간(써 넣은 값 포함)도 얹는다 — 써 넣은 뒤 화면 값을 처음으로 돌려도 글줄 간격이 그대로다.
   const slot = { width: size * scale + size * (lookOf(look, 'tracking') + effective.letterSpacing), marginInline: 0 }
   // 저장소에 써 넣기: 그리는 칸 그대로를 목표로 넘긴다(긋기 · 획 다듬기 획은 아직 안 넘어감).
-  useEffect(() => { if (onBake && boxes) onBake({ char, syllable: raw, schema, target: boxes, sx: scale }) }, [onBake, boxes, char, raw, schema, scale])
+  const lift = placement.kind === 'boxes' ? waistLift(look, placement.boxes, raw.layoutType) : 0
+  useEffect(() => { if (onBake && boxes && molded) onBake({ char, syllable: raw, schema, target: boxes, sx: scale, lift, molded, thick: balloon.thick }) }, [onBake, boxes, char, raw, schema, scale, lift, molded, balloon.thick])
   return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char}>
     <SvgRenderer
       syllable={balloon.syllable}
@@ -846,7 +847,7 @@ export function MoldLabPage() {
     <header className={styles.header}>
       <span className={styles.eyebrow}>빚기 시험판 · {stepIndex + 1}/{STEP_ORDER.length} {STEP_NAMES[step]}</span>
       <ChoiceGroup variant="segment" aria-label="단계" className={styles.steps}>
-        {STEP_ORDER.map((key, at) => <ChoiceItem key={key} checked={step === key} disabled={at > stepIndex} onClick={() => { if (at <= stepIndex) setStep(key) }} data-testid={`mold-step-${key}`}>{at + 1} {STEP_NAMES[key]}</ChoiceItem>)}
+        {STEP_ORDER.map((key, at) => <ChoiceItem key={key} checked={step === key} onClick={() => setStep(key)} data-testid={`mold-step-${key}`}>{at + 1} {STEP_NAMES[key]}</ChoiceItem>)}
       </ChoiceGroup>
     </header>
 
@@ -922,7 +923,7 @@ export function MoldLabPage() {
           <Button variant="outline" size="sm" onClick={() => window.location.assign('/dashboard')} data-testid="mold-go-dashboard">이어서 깎기</Button>
         </div>}
         <div className={styles.bakeHidden} aria-hidden="true">
-          {PART_LAYOUTS.map(({ sample }) => <MoldGlyph key={sample} char={sample} size={20} edits={edits} look={bakeLook} weightCap={weightCap} fence={fence} onBake={bakeReporters[sample]} />)}
+          {PART_LAYOUTS.map(({ sample }) => <MoldGlyph key={sample} char={sample} size={20} edits={edits} look={bakeLook} drawn={drawn} weightCap={weightCap} fence={fence} onBake={bakeReporters[sample]} />)}
         </div>
         <Button variant="outline" size="sm" onClick={downloadOutline} data-testid="mold-export">윤곽 내보내기(SVG)</Button>
       </section>}
