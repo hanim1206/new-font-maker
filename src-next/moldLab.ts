@@ -479,7 +479,12 @@ export type EditPart = SimsPart | 'JU_H' | 'JU_V'
 export type PartEdits = Partial<Record<EditPart, PartEdit>>
 export type LayoutEdits = Partial<Record<LayoutType, PartEdits>>
 /** 획 · 전체 값. 폭 · 키 · 크기는 글자 가운데를 두고 늘이고 줄인다. */
-export interface Look { weight?: number; soft?: number; frame?: number; tracking?: number; size?: number; height?: number }
+/**
+ * 전체 값. 도트판 인상 잡기(하니무스 2026-11-21)가 다섯 값을 더 쓴다:
+ * jamo = 닿자(첫닿자 · 받침) 크기 배율(제 칸 가운데를 붙든 채 가로세로 같이), center = 무게중심(+ 위로, 글자 단위),
+ * round = 끝 · 모서리 둥글기(0~1, 붓 둥글기), contrast = 획 대비(0~1, + 는 세로 굵게 · 가로 가늘게).
+ */
+export interface Look { weight?: number; soft?: number; frame?: number; tracking?: number; size?: number; height?: number; jamo?: number; center?: number; round?: number; contrast?: number }
 export type Dir = 'up' | 'down' | 'left' | 'right' | 'ul' | 'ur' | 'dl' | 'dr'
 export interface RegionLabels { name: string; up: string; down: string; left: string; right: string }
 
@@ -488,8 +493,8 @@ export interface RegionLabels { name: string; up: string; down: string; left: st
  * 굵기는 기본 굵기(400)에 곱하는 비율이라 엔진이 그리는 100~900 전체(두께 ×0.40~1.95)가 들어오게 0.25~2.25(다람쥐 검수 2026-11-21 "굵기 폭 넓히기").
  * 크기 · 키 · 폭은 글자 가운데를 두고 늘이고 줄인다. 값은 아직 임시다.
  */
-export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.7, 1.25], tracking: [-0.08, 0.2], size: [0.6, 1.15], height: [0.7, 1.15] } as const
-const LOOK_ENGINE = { weight: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1 } as const
+export const LOOK_WALL = { weight: [0.25, 2.25], soft: [0, 1], frame: [0.7, 1.25], tracking: [-0.08, 0.2], size: [0.6, 1.15], height: [0.7, 1.15], jamo: [0.6, 1.3], center: [-0.12, 0.12], round: [0, 1], contrast: [0, 0.9] } as const
+const LOOK_ENGINE = { weight: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0 } as const
 const clampLook = (key: keyof typeof LOOK_WALL, value: number) => Math.max(LOOK_WALL[key][0], Math.min(LOOK_WALL[key][1], value))
 export const lookOf = (look: Look, key: keyof Look) => look[key] ?? LOOK_ENGINE[key]
 
@@ -693,7 +698,34 @@ export function gripAt(box: BoxConfig, x: number, y: number, tol: number): BoxGr
 }
 
 /** 전체 값(폭 · 키 · 크기)을 칸에 입힌다. 모두 글자 가운데(0.5, 0.5)를 두고 늘이고 줄인다. */
+/**
+ * 닿자 크기 · 무게중심을 칸에 입힌다.
+ * 닿자 크기: 첫닿자 · 받침 칸을 제 가운데를 붙든 채 가로세로 같이 키우고 줄인다(1 = 엔진 그대로, 칸에 꽉).
+ * 무게중심: 엔진에 값 하나로는 없어 칸 옮기기로 흉내 낸다 — 첫닿자 · 홀자를 위(+) · 아래로 옮기고 받침은 그 0.4만큼. 글자 끝(0.02~0.98)은 넘지 않는다.
+ */
+export function impressBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: Look): Partial<Record<Part, BoxConfig>> {
+  const k = lookOf(look, 'jamo'), lift = lookOf(look, 'center')
+  if (k === 1 && lift === 0) return boxes
+  const out: Partial<Record<Part, BoxConfig>> = {}
+  for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) {
+    if (!box) continue
+    let next = box
+    if (k !== 1 && (part === 'CH' || part === 'JO')) {
+      const cx = box.x + box.width / 2, cy = box.y + box.height / 2
+      next = { ...box, x: cx - box.width * k / 2, y: cy - box.height * k / 2, width: box.width * k, height: box.height * k }
+    }
+    if (lift !== 0) {
+      const dv = -lift * (part === 'JO' ? 0.4 : 1)
+      const y = Math.max(0.02, Math.min(0.98 - next.height, next.y + dv))
+      next = { ...next, y }
+    }
+    out[part] = next
+  }
+  return out
+}
+
 export function lookBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: Look): Partial<Record<Part, BoxConfig>> {
+  boxes = impressBoxes(boxes, look)
   const sx = lookOf(look, 'frame') * lookOf(look, 'size'), sy = lookOf(look, 'height') * lookOf(look, 'size')
   if (sx === 1 && sy === 1) return boxes
   const out: Partial<Record<Part, BoxConfig>> = {}
@@ -851,3 +883,28 @@ export function moveApart(boxes: Partial<Record<Part, BoxConfig>>, part: Part, d
 export function movePartEdit(edits: PartEdits, part: Part, du: number, dv: number): PartEdits {
   return addEdit(addEdit(addEdit(addEdit(edits, part, 0, du), part, 1, du), part, 2, dv), part, 3, dv)
 }
+
+// ── 도트판 인상 잡기(하니무스 2026-11-21): 다섯 값을 0~20칸(한 칸 = 5)으로 ──
+
+/** 도트판 다섯 줄. 차례대로 굵기 · 닿자 크기 · 무게중심 · 둥글기 · 획 대비. */
+export const DOT_KEYS = ['weight', 'jamo', 'center', 'round', 'contrast'] as const
+export type DotKey = (typeof DOT_KEYS)[number]
+export const DOT_ROWS = 20
+const half = DOT_ROWS / 2
+/** 칸 수(0~20) → 값. 가운데(10)가 엔진 그대로인 값은 양쪽 끝을 따로 잇는다. */
+export function dotToLook(key: DotKey, k: number): number {
+  const t = Math.max(0, Math.min(DOT_ROWS, k))
+  const twoSided = (lo: number, mid: number, hi: number) => (t <= half ? lo + (mid - lo) * t / half : mid + (hi - mid) * (t - half) / half)
+  if (key === 'weight') return twoSided(LOOK_WALL.weight[0], 1, LOOK_WALL.weight[1])
+  if (key === 'jamo') return twoSided(LOOK_WALL.jamo[0], 1, LOOK_WALL.jamo[1])
+  if (key === 'center') return twoSided(LOOK_WALL.center[0], 0, LOOK_WALL.center[1])
+  if (key === 'round') return LOOK_WALL.round[1] * t / DOT_ROWS
+  return LOOK_WALL.contrast[1] * t / DOT_ROWS
+}
+/** 값 → 칸 수(가장 가까운 칸). */
+export function lookToDot(key: DotKey, value: number): number {
+  let best = 0, gap = Infinity
+  for (let k = 0; k <= DOT_ROWS; k++) { const d = Math.abs(dotToLook(key, k) - value); if (d < gap - 1e-9) { gap = d; best = k } }
+  return best
+}
+export const dotsOf = (look: Look): number[] => DOT_KEYS.map((key) => lookToDot(key, lookOf(look, key)))

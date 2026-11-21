@@ -147,3 +147,17 @@
   inset: 0;
   pointer-events: none;
 }
+
+/* 인상 잡기 도트판(레퍼런스풍 외관은 이 화면에만) */
+.dotPlate {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.dotNum {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+}

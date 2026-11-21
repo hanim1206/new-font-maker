@@ -24,6 +24,7 @@ import { applyPartEdits, appliedWeight, dragLook, dragSeam, lookBoxes, gapCapMul
 import { useContextPlacement } from './notoModel'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
+import { MoldDotPlate } from './MoldDotPlate'
 import styles from './MoldLabPage.module.css'
 
 /**
@@ -173,10 +174,14 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   useEffect(() => { if (fenced) onFence?.(fenced.need, fenced.pulls) }, [onFence, fenced])
   const boxes = fenced?.boxes ?? grown.boxes
   const soft = lookOf(look, 'soft') > 0.5
+  const round = lookOf(look, 'round'), contrast = lookOf(look, 'contrast')
   const globalStyle = useMemo(() => {
     const weighted = ratio === 1 ? effective : { ...effective, weight: scaledWeight(effective.weight, ratio) }
-    return soft ? { ...weighted, linecap: 'round' as const, linejoin: 'round' as const } : weighted
-  }, [effective, ratio, soft])
+    const softened = soft ? { ...weighted, linecap: 'round' as const, linejoin: 'round' as const } : weighted
+    // 둥글기 · 획 대비는 엔진의 붓 값(둥근 붓촉에서만 뜻이 있다)에 그대로 얹는다.
+    if ((round === 0 && contrast === 0) || softened.strokeStyle.mode !== 'brush') return softened
+    return { ...softened, strokeStyle: { ...softened.strokeStyle, ...(round > 0 ? { roundness: round } : {}), ...(contrast !== 0 ? { contrast } : {}) } }
+  }, [effective, ratio, soft, round, contrast])
   const colorOf = useCallback((source: ResolvedStrokeInkSource) => {
     if (shownStroke) return shownStroke(`${simsPartOf(source.part)}:${source.jamoId}:${source.strokeId}`) ? undefined : 'transparent'
     // 잡은 보선 양쪽 부위만 제 색(선 이름 대신).
@@ -658,6 +663,7 @@ export function MoldLabPage() {
   const [history, setHistory] = useState<Snapshot[]>([])
   const [compare, setCompare] = useState(false)
   const lineDrag = useRef<{ x0: number; look: Look; moved: boolean; width: number } | null>(null)
+  const [plateSay, setPlateSay] = useState('판을 가로질러 한 번에 그어 보기')
   // 글자마다 버틸 수 있는 가장 굵은 비율(자소를 끝까지 키워도 획이 안 붙는 데까지). 글줄은 가장 작은 것을 다 같이 쓴다 — 굵기는 글줄 전체가 같다.
   const [caps, setCaps] = useState<Record<string, number>>({})
   const capReporters = useMemo(() => {
@@ -792,7 +798,12 @@ export function MoldLabPage() {
 
     {step === 'draw' && <DrawStep raws={raws} setRaws={setRaws} stems={stems} onDone={() => setStep('shape')} />}
     {step !== 'draw' && <>
-      <SimsStep mode={step} weightNote={weightNote} fence={compare ? undefined : fence} char={focusChar} drawn={drawn} edits={edits} setEdits={setEdits} look={look} setLook={setLook} weightCap={weightCap} sel={sel} setSel={setSel} onBegin={remember} />
+      {step === 'shape'
+        ? <section className={styles.panel} aria-label="인상 잡기">
+          <MoldDotPlate look={look} setLook={setLook} onBegin={remember} onSay={setPlateSay} />
+          <p className={styles.simsReadout} data-testid="mold-readout">{plateSay}{weightNote ? <><br />{weightNote}</> : null}</p>
+        </section>
+        : <SimsStep mode={step} weightNote={weightNote} fence={compare ? undefined : fence} char={focusChar} drawn={drawn} edits={edits} setEdits={setEdits} look={look} setLook={setLook} weightCap={weightCap} sel={sel} setSel={setSel} onBegin={remember} />}
       <div className={styles.moldActions}>
         <Button variant="outline" size="sm" onClick={undo} disabled={!history.length} data-testid="mold-undo"><Undo2 aria-hidden="true" />되돌리기</Button>
         <Button variant="outline" size="sm" onClick={resetRegion} disabled={step === 'part' && !sel} data-testid="mold-reset-region"><RotateCcw aria-hidden="true" />{step === 'shape' ? '인상 처음대로' : '부위 처음대로'}</Button>

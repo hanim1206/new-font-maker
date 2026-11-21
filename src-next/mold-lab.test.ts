@@ -282,3 +282,33 @@ describe('보선 끌기(A안)', () => {
     expect(down.dv).toBeCloseTo(0.03)
   })
 })
+
+describe('도트판 인상 잡기', () => {
+  it('가운데(10칸)가 엔진 그대로고, 끝은 벽 값이다', async () => {
+    const { dotToLook, lookToDot, dotsOf, LOOK_WALL } = await import('./moldLab')
+    expect(dotToLook('weight', 10)).toBe(1)
+    expect(dotToLook('weight', 0)).toBe(LOOK_WALL.weight[0])
+    expect(dotToLook('weight', 20)).toBe(LOOK_WALL.weight[1])
+    expect(dotToLook('jamo', 10)).toBe(1)
+    expect(dotToLook('center', 10)).toBe(0)
+    expect(dotToLook('round', 0)).toBe(0)
+    expect(dotsOf({})).toEqual([10, 10, 10, 0, 0])
+    for (let k = 0; k <= 20; k++) expect(lookToDot('jamo', dotToLook('jamo', k))).toBe(k)
+  })
+  it('닿자 크기는 제 칸 가운데를 붙든 채 가로세로 같이 커진다', async () => {
+    const { impressBoxes } = await import('./moldLab')
+    const out = impressBoxes(VERTICAL, { jamo: 1.2 })
+    expect(out.CH!.width).toBeCloseTo(0.48)
+    expect(out.CH!.height).toBeCloseTo(0.72)
+    expect(out.CH!.x + out.CH!.width / 2).toBeCloseTo(0.3)
+    expect(out.CH!.y + out.CH!.height / 2).toBeCloseTo(0.5)
+    expect(out.JU).toEqual(VERTICAL.JU)
+  })
+  it('무게중심을 올리면 첫닿자 · 홀자가 위로, 받침은 덜 간다', async () => {
+    const { impressBoxes } = await import('./moldLab')
+    const out = impressBoxes(HORIZONTAL_FINAL, { center: 0.05 })
+    expect(out.CH!.y).toBeCloseTo(0.02)
+    expect(out.JU!.y).toBeCloseTo(0.33)
+    expect(out.JO!.y).toBeCloseTo(0.58)
+  })
+})
