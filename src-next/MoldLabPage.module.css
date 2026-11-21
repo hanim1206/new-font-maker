@@ -172,3 +172,12 @@
 .plates {
   align-self: center;
 }
+.simsReadout[data-wall='held'], .simsReadout[data-wall='past'] { color: rgb(var(--color-warning)); font-weight: var(--weight-heavy); }
+
+/* 부위 다듬기: 짜임 여섯 · 닿는 글자 */
+.layouts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.layoutCount { color: rgb(var(--color-text-3)); font-size: var(--font-12); font-variant-numeric: tabular-nums; }
+.touched { display: grid; gap: 6px; }
+.touchedRow { display: flex; flex-wrap: wrap; gap: 4px; }
+.touchedChar { position: relative; display: inline-flex; border-radius: var(--radius-sm); cursor: pointer; }
+.touchedGhost { position: absolute; inset: 0; opacity: .25; pointer-events: none; }

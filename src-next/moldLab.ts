@@ -733,6 +733,59 @@ export function centerLift(look: Look, boxes: Partial<Record<Part, BoxConfig>>, 
 
 /** 전체 값(폭 · 키 · 크기)을 칸에 입힌다. 모두 글자 가운데(0.5, 0.5)를 두고 늘이고 줄인다. */
 /**
+ * 밀림 공식(거북이 2026-11-21, 고딕 86벌, https://claude.ai/artifact/A7iQiyksvaw9WX4jYsFF5Z).
+ * 닿자가 커지면 늘어난 몫의 1/4은 바깥으로, 3/4은 안쪽(홀자 쪽)으로 가서 틈이 받는다. 홀자는 늘어난 몫의 0.1만 밀린다.
+ * 받침이 커져 윗변이 오르면 첫닿자 밑(가로 짜임의 보도)은 그 0.665배, 세로홀자 기둥 밑은 1.0배 따라 오른다.
+ * 줄어들 때는 같은 비율로 거꾸로. 틈이 한계까지 줄면 이웃을 다 민다는 부분은 추정이라 넣지 않았다(풍선 닿자가 틈에서 멈춘다).
+ */
+export const PUSH = { inner: 0.75, vowel: 0.1, finalCh: 0.665, finalStem: 1 } as const
+export type Side = 'l' | 'r' | 't' | 'b'
+/** 닿자의 안쪽 변(홀자 · 받침 쪽). 그 축에서는 늘어난 몫의 3/4이 이쪽으로 간다. 안쪽 변이 없는 축은 반반. */
+export function innerSides(part: 'CH' | 'JO', layout: LayoutType): Side[] {
+  if (part === 'JO') return ['t']
+  const final = layout.includes('jongseong')
+  if (layout.includes('jungseong-mixed')) return ['r', 'b']
+  if (isVertical(layout)) return final ? ['r', 'b'] : ['r']
+  return ['b']
+}
+/** 축마다 안쪽 변이 가져가는 몫(0.5면 가운데를 붙든 것). */
+export function sideShare(inner: readonly Side[], side: Side): number {
+  const opposite: Record<Side, Side> = { l: 'r', r: 'l', t: 'b', b: 't' }
+  if (inner.includes(side)) return PUSH.inner
+  if (inner.includes(opposite[side])) return 1 - PUSH.inner
+  return 0.5
+}
+function pushJamo(boxes: Partial<Record<Part, BoxConfig>>, k: number, layout?: LayoutType): Partial<Record<Part, BoxConfig>> {
+  const out = { ...boxes }
+  // 짜임을 모르면 제 칸 가운데를 붙든 채(이웃은 그대로).
+  if (!layout) { for (const part of ['CH', 'JO'] as const) { const b = boxes[part]; if (b) out[part] = { ...b, x: b.x - b.width * (k - 1) / 2, y: b.y - b.height * (k - 1) / 2, width: b.width * k, height: b.height * k } } return out }
+  const vertical = isVertical(layout), mixed = layout.includes('jungseong-mixed')
+  for (const part of ['CH', 'JO'] as const) {
+    const box = boxes[part]
+    if (!box) continue
+    const inner = innerSides(part, layout)
+    const dw = box.width * (k - 1), dh = box.height * (k - 1)
+    out[part] = { ...box, x: box.x - dw * sideShare(inner, 'l'), y: box.y - dh * sideShare(inner, 't'), width: box.width + dw, height: box.height + dh }
+    if (part === 'CH') {
+      // 홀자는 0.1만 밀린다(먼 변은 그대로).
+      const side = mixed ? out.JU_V : vertical ? out.JU : undefined
+      if (side && inner.includes('r')) { const m = dw * PUSH.vowel, next = { ...side, x: side.x + m, width: Math.max(0.01, side.width - m) }; if (mixed) out.JU_V = next; else out.JU = next }
+      const bar = mixed ? out.JU_H : !vertical ? out.JU : undefined
+      if (bar && inner.includes('b')) { const m = dh * PUSH.vowel; if (mixed) out.JU_H = { ...bar, y: bar.y + m }; else out.JU = { ...bar, y: bar.y + m } }
+    } else {
+      const rise = dh * sideShare(inner, 't')
+      const ch = out.CH
+      if (ch) out.CH = { ...ch, height: Math.max(0.03, ch.height - rise * PUSH.finalCh) }
+      const stem = mixed ? out.JU_V : vertical ? out.JU : undefined
+      if (stem) { const next = { ...stem, height: Math.max(0.03, stem.height - rise * PUSH.finalStem) }; if (mixed) out.JU_V = next; else out.JU = next }
+      const bar = mixed ? out.JU_H : !vertical ? out.JU : undefined
+      if (bar) { const next = { ...bar, y: bar.y - rise * PUSH.finalCh }; if (mixed) out.JU_H = next; else out.JU = next }
+    }
+  }
+  return out
+}
+
+/**
  * 닿자 크기 · 무게중심을 칸에 입힌다.
  * 닿자 크기: 첫닿자 · 받침 칸을 제 가운데를 붙든 채 가로세로 같이 키우고 줄인다(1 = 엔진 그대로, 칸에 꽉).
  * 무게중심(거북이 A안, 하니무스 2026-11-21): 틀(기둥 위 · 아래 끝)은 그대로 두고 안쪽 허리선만 옮긴다.
@@ -744,13 +797,10 @@ export function impressBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: Look
   const lift = centerLiftRoom(centerLift(look, boxes, layout), boxes, layout)
   if (k === 1 && lift === 0) return boxes
   const out: Partial<Record<Part, BoxConfig>> = {}
-  for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) {
+  const pushed = k === 1 ? boxes : pushJamo(boxes, k, layout)
+  for (const [part, box] of Object.entries(pushed) as [Part, BoxConfig][]) {
     if (!box) continue
     let next = box
-    if (k !== 1 && (part === 'CH' || part === 'JO')) {
-      const cx = box.x + box.width / 2, cy = box.y + box.height / 2
-      next = { ...box, x: cx - box.width * k / 2, y: cy - box.height * k / 2, width: box.width * k, height: box.height * k }
-    }
     if (lift !== 0 && layout) {
       const horizontalVowel = !isVertical(layout) && !layout.includes('jungseong-mixed')
       // 첫닿자: 윗변은 그대로, 밑변만 허리선을 따라.
@@ -1024,17 +1074,17 @@ export function seamPos(seam: Seam, boxes: Partial<Record<Part, BoxConfig>>): nu
   return (far + near) / 2
 }
 /** 보선을 더 밀 수 있는 범위 [아래, 위](글자 단위). 양쪽 부위 모두 처음 크기의 0.7~1.6배 안. 처음부터 선 하나인 칸(ㅢ의 ㅡ)은 따지지 않는다. */
-export function seamRange(seam: Seam, origin: Partial<Record<Part, BoxConfig>>, now: Partial<Record<Part, BoxConfig>>): [number, number] {
+export function seamRange(seam: Seam, origin: Partial<Record<Part, BoxConfig>>, now: Partial<Record<Part, BoxConfig>>, floor = NEIGHBOR_FLOOR): [number, number] {
   let lo = -Infinity, hi = Infinity
   for (const part of seam.a) {
     const o = sizeOn(origin[part]!, seam.axis), c = sizeOn(now[part]!, seam.axis)
     if (o < 0.03) continue
-    lo = Math.max(lo, NEIGHBOR_FLOOR * o - c); hi = Math.min(hi, OWN_RANGE[1] * o - c)
+    lo = Math.max(lo, floor * o - c); hi = Math.min(hi, OWN_RANGE[1] * o - c)
   }
   for (const part of seam.b) {
     const o = sizeOn(origin[part]!, seam.axis), c = sizeOn(now[part]!, seam.axis)
     if (o < 0.03) continue
-    lo = Math.max(lo, c - OWN_RANGE[1] * o); hi = Math.min(hi, c - NEIGHBOR_FLOOR * o)
+    lo = Math.max(lo, c - OWN_RANGE[1] * o); hi = Math.min(hi, c - floor * o)
   }
   return [Math.min(lo, 0), Math.max(hi, 0)]
 }
@@ -1045,14 +1095,28 @@ const addEdit = (edits: PartEdits, part: Part, index: number, amount: number): P
   next[index] += amount
   return { ...edits, [key]: next }
 }
-/** 보선을 d(글자 단위)만큼 민 편집. 범위 밖이면 범위 끝까지. */
-export function dragSeam(seam: Seam, origin: Partial<Record<Part, BoxConfig>>, start: PartEdits, d: number): { edits: PartEdits; clamped: boolean } {
-  const [lo, hi] = seamRange(seam, origin, applyPartEdits(origin, start))
-  const used = Math.max(lo, Math.min(hi, d))
+/**
+ * 벽은 막지 않고 알린다(버전 1 부위 다듬기, 고양이 흐름 다시 보기 v1c-4). 이웃이 처음의 70%(최소 간격)에 닿으면 한 번 붙들고,
+ * 그보다 `SEAM_HOLD`만큼 더 끌면 넘어가 `SEAM_HARD_FLOOR`(처음의 45%)까지 간다. 그 밖은 막는다.
+ */
+export const SEAM_HOLD = 0.06
+export const SEAM_HARD_FLOOR = 0.45
+export type SeamWall = 'free' | 'held' | 'past' | 'hard'
+/** 보선을 d(글자 단위)만큼 민 편집. 최소 간격에서 한 번 붙들고, 더 끌면 넘어간다. */
+export function dragSeam(seam: Seam, origin: Partial<Record<Part, BoxConfig>>, start: PartEdits, d: number): { edits: PartEdits; clamped: boolean; wall: SeamWall } {
+  const now = applyPartEdits(origin, start)
+  const [lo, hi] = seamRange(seam, origin, now)
+  const [hardLo, hardHi] = seamRange(seam, origin, now, SEAM_HARD_FLOOR)
+  let used = d, wall: SeamWall = 'free'
+  if (d > hi) { if (d <= hi + SEAM_HOLD) { used = hi; wall = 'held' } else { used = Math.min(hardHi, d - SEAM_HOLD); wall = used < d - SEAM_HOLD - 1e-9 ? 'hard' : 'past' } }
+  else if (d < lo) { if (d >= lo - SEAM_HOLD) { used = lo; wall = 'held' } else { used = Math.max(hardLo, d + SEAM_HOLD); wall = used > d + SEAM_HOLD + 1e-9 ? 'hard' : 'past' } }
   let edits = start
-  for (const part of seam.a) edits = addEdit(edits, part, seam.axis === 'v' ? 1 : 3, used)
-  for (const part of seam.b) edits = addEdit(edits, part, seam.axis === 'v' ? 0 : 2, used)
-  return { edits, clamped: Math.abs(used - d) > 1e-9 }
+  // 처음부터 선 하나인 칸(ㅣ · ㅡ, 폭 0.03 아래)은 줄일 몫이 없어 칸째로 옮긴다(줄이면 폭이 0 아래로 간다).
+  const thin = (part: Part) => sizeOn(origin[part]!, seam.axis) < 0.03
+  const lo0 = seam.axis === 'v' ? 0 : 2, hi0 = seam.axis === 'v' ? 1 : 3
+  for (const part of seam.a) { edits = addEdit(edits, part, hi0, used); if (thin(part)) edits = addEdit(edits, part, lo0, used) }
+  for (const part of seam.b) { edits = addEdit(edits, part, lo0, used); if (thin(part)) edits = addEdit(edits, part, hi0, used) }
+  return { edits, clamped: wall === 'hard', wall }
 }
 
 /**
@@ -1234,7 +1298,7 @@ export const BALLOON_THICK_GAIN = 2.5
  * 그 변(또는 그 획 두께)만 멈추고 나머지는 계속 부푼다. 보이지 않는 벽은 없다 — 글자 끝도 `ok`가 잉크로 본다.
  * `ok(boxes, thick)`가 틈 검사, thick 열쇠는 `strokeKey`.
  */
-export function growSides(boxes: Partial<Record<Part, BoxConfig>>, k: number, strokeIds: Partial<Record<Part, string[]>>, ok: (boxes: Partial<Record<Part, BoxConfig>>, thick: Record<string, number>) => boolean, steps = 8): { boxes: Partial<Record<Part, BoxConfig>>; thick: Record<string, number> } {
+export function growSides(boxes: Partial<Record<Part, BoxConfig>>, k: number, strokeIds: Partial<Record<Part, string[]>>, ok: (boxes: Partial<Record<Part, BoxConfig>>, thick: Record<string, number>) => boolean, steps = 8, layout?: LayoutType): { boxes: Partial<Record<Part, BoxConfig>>; thick: Record<string, number> } {
   const out = { ...boxes }
   const thick: Record<string, number> = {}
   if (k <= 1) return { boxes: out, thick }
@@ -1255,9 +1319,12 @@ export function growSides(boxes: Partial<Record<Part, BoxConfig>>, k: number, st
         else open.delete(key)
       }
       const o = boxes[part]!
-      const dx = o.width * (k - 1) / 2 / steps, dy = o.height * (k - 1) / 2 / steps
-      for (const side of ['t', 'b', 'l', 'r']) {
+      // 변마다 몫은 밀림 공식대로(안쪽 3/4 · 바깥 1/4). 짜임을 모르면 반반.
+      const inner = layout ? innerSides(part, layout) : []
+      for (const side of ['t', 'b', 'l', 'r'] as const) {
         if (!open.has(part + side)) continue
+        const share = sideShare(inner, side)
+        const dx = o.width * (k - 1) * share / steps, dy = o.height * (k - 1) * share / steps
         const b = out[part]!
         const next = side === 'l' ? { ...b, x: b.x - dx, width: b.width + dx }
           : side === 'r' ? { ...b, width: b.width + dx }

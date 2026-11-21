@@ -19,9 +19,12 @@ const OY = 44
 const S = N * P
 /** 값마다 세로줄 수. 판 너비는 그대로, 값 수에 따라 가로 칸 너비만 바뀐다. */
 const W = 2
-const NAMES: Record<DotKey, string> = { size: '크기', frame: '비율', jamo: '닿자 크기', open: '탈네모', jag: '윗선 들쭉날쭉', center: '무게중심', weight: '굵기', contrast: '획 대비', round: '둥글기', nib: '붓촉' }
+// 화면 이름은 고양이 표(mold-flow-review/이름과-문구.md, 2026-11-21). 코드 열쇠는 그대로.
+const NAMES: Record<DotKey, string> = { size: '크기', frame: '비율', jamo: '닿자 크기', open: '받침 자리', jag: '윗선', center: '허리선', weight: '굵기', contrast: '대비', round: '둥글기', nib: '붓촉' }
+/** 양 끝 말(아래 ↔ 위). 읽기 줄에 같이 쓴다. */
+const ENDS: Record<DotKey, readonly [string, string]> = { size: ['작게', '크게'], frame: ['길쭉', '납작'], jamo: ['작게', '크게'], open: ['채움', '비움'], jag: ['가지런', '들쭉날쭉'], center: ['낮게', '높게'], weight: ['가늘게', '굵게'], contrast: ['같게', '가로 가늘게'], round: ['각지게', '둥글게'], nib: ['둥근 붓', '납작 붓'] }
 /** 판 밑에 쓰는 짧은 이름(두 줄 폭이 좁다). 읽기 줄은 긴 이름. */
-const SHORT: Record<DotKey, string> = { size: '크기', frame: '비율', jamo: '닿자', open: '탈네모', jag: '윗선', center: '중심', weight: '굵기', contrast: '대비', round: '둥글기', nib: '붓촉' }
+const SHORT: Record<DotKey, string> = { size: '크기', frame: '비율', jamo: '닿자', open: '받침', jag: '윗선', center: '허리', weight: '굵기', contrast: '대비', round: '둥글기', nib: '붓촉' }
 // 레퍼런스 점 판 색(이 화면에만 쓰는 외관 — 하니무스 결정 2026-11-21 "레퍼런스풍 외관은 이 화면에만").
 const COL: Record<DotKey, string> = { weight: '#D8552B', size: '#8A6A44', frame: '#7357C9', open: '#D97FA8', jamo: '#5B93C4', center: '#C9A227', round: '#1F5B45', contrast: '#A9335C', jag: '#2E9BA6', nib: '#4E5D6C' } // style-guard: allow 도트판 전용 값 색
 const OFF = '#bfc0c0' // style-guard: allow 도트판 꺼진 점
@@ -141,7 +144,7 @@ export function MoldDotPlate({ keys, locks, look, setLook, onBegin, onSay }: { k
     const q = pt.matrixTransform(svg.getScreenCTM()!.inverse())
     return { c: (q.x - OX) / PX - 0.5, r: (OY + S - q.y) / P - 0.5, x: q.x, y: q.y }
   }
-  const NAME = (b: number) => `${NAMES[keys[b]]} ${vals.current[b] * 5}${vals.current[b] >= lockOf(b) && lockOf(b) < N ? ' · 더 가면 획이 붙어요' : ''}`
+  const NAME = (b: number) => `${NAMES[keys[b]]} ${vals.current[b] * 5} · ${ENDS[keys[b]][0]} ↔ ${ENDS[keys[b]][1]}${vals.current[b] >= lockOf(b) && lockOf(b) < N ? ' · 더 가면 획이 붙어요' : ''}`
   const down = (event: ReactPointerEvent<SVGSVGElement>) => {
     const q = cellOf(event)
     if (q.r < -1.5 || q.r > N || q.c < -1 || q.c > C) return

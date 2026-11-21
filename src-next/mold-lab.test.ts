@@ -263,12 +263,23 @@ describe('보선 끌기(A안)', () => {
     expect(seamPos(seams[0], now)).toBeCloseTo(0.59)
     expect(out.clamped).toBe(false)
   })
-  it('보선은 부위가 처음의 0.7배 아래로 줄기 전에 멈춘다', async () => {
+  it('보선은 최소 간격(처음의 0.7배)에서 한 번 붙들고, 더 끌면 넘어가 0.45배에서 막힌다', async () => {
     const { seamsOf, dragSeam, applyPartEdits } = await import('./moldLab')
     const seam = seamsOf('choseong-jungseong-vertical', VERTICAL)[0]
+    const held = dragSeam(seam, VERTICAL, {}, 0.1)
+    expect(held.wall).toBe('held')
+    expect(applyPartEdits(VERTICAL, held.edits).JU!.width).toBeCloseTo(0.21)
+    const past = dragSeam(seam, VERTICAL, {}, 0.2)
+    expect(past.wall).toBe('past')
+    expect(applyPartEdits(VERTICAL, past.edits).JU!.width).toBeCloseTo(0.16)
     const out = dragSeam(seam, VERTICAL, {}, 0.5)
     expect(out.clamped).toBe(true)
-    expect(applyPartEdits(VERTICAL, out.edits).JU!.width).toBeCloseTo(0.21)
+    expect(applyPartEdits(VERTICAL, out.edits).JU!.width).toBeCloseTo(0.135)
+    // 선 하나인 칸(ㅣ)은 칸째로 옮긴다
+    const thin = { CH: VERTICAL.CH, JU: { x: 0.7, y: 0.05, width: 0.01, height: 0.9 } }
+    const moved = applyPartEdits(thin, dragSeam(seamsOf('choseong-jungseong-vertical', thin)[0], thin, {}, 0.05).edits)
+    expect(moved.JU!.width).toBeCloseTo(0.01)
+    expect(moved.JU!.x).toBeCloseTo(0.75)
   })
   it('받침 있는 가로 짜임은 보선이 둘', async () => {
     const { seamsOf } = await import('./moldLab')
@@ -310,6 +321,20 @@ describe('도트판 인상 잡기', () => {
     expect(out.CH!.x + out.CH!.width / 2).toBeCloseTo(0.3)
     expect(out.CH!.y + out.CH!.height / 2).toBeCloseTo(0.5)
     expect(out.JU).toEqual(VERTICAL.JU)
+  })
+  it('밀림 공식: 첫닿자가 커지면 안쪽 3/4 · 바깥 1/4, 홀자는 0.1만 밀린다 · 받침이 커지면 첫닿자 밑이 0.665배 따라 오른다', async () => {
+    const { impressBoxes } = await import('./moldLab')
+    const v = impressBoxes(VERTICAL, { jamo: 1.2 }, 'choseong-jungseong-vertical')
+    // 늘어난 폭 0.08: 왼쪽으로 0.02, 오른쪽으로 0.06
+    expect(v.CH!.x).toBeCloseTo(0.08)
+    expect(v.CH!.x + v.CH!.width).toBeCloseTo(0.56)
+    expect(v.JU!.x).toBeCloseTo(0.608)
+    expect(v.JU!.x + v.JU!.width).toBeCloseTo(0.9)
+    const h = impressBoxes(HORIZONTAL_FINAL, { jamo: 1.2 }, 'choseong-jungseong-horizontal-jongseong')
+    // 받침 키 0.35 → 늘어난 0.07의 3/4(0.0525)만큼 윗변이 오르고, 첫닿자 밑은 0.665배
+    expect(h.JO!.y).toBeCloseTo(0.6 - 0.0525)
+    expect(h.JO!.y + h.JO!.height).toBeCloseTo(0.95 + 0.0175)
+    expect(h.CH!.y).toBeCloseTo(0.05 - 0.015)
   })
   it('무게중심(허리선): 틀은 두고 첫닿자 밑변과 보가 오른다 · 받침 글자는 폭이 좁다', async () => {
     const { impressBoxes, waistSyllable } = await import('./moldLab')
