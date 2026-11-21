@@ -1,7 +1,7 @@
 import { addContextBoxDelta, boxToFaces, identityOfSyllable } from '../src/services/contextBoxResolver'
 import type { ContextBoxDelta, FacesDelta } from '../src/services/contextBoxResolver'
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
-import type { BoxConfig, BrushStyle, DecomposedSyllable, LayoutSchema, Part, StrokeRenderStyle } from '../src/types'
+import type { BoxConfig, DecomposedSyllable, LayoutSchema, Part } from '../src/types'
 import { effectiveLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { contextPlacementOf } from './notoModel'
@@ -58,11 +58,6 @@ export function bakeLayout(input: { bundle: NotoPresetModelBundle; snapshot: Lay
   }
   // 마지막 더하기는 아직 안 풀어 봤으니, 남은 차이는 그 전 값으로 적는다(다음 판에서 더 줄어든다).
   return { rule: ruleOfContext(identity.contextId), delta: { faces }, residual, char: item.char }
-}
-
-/** 빚은 획 판 값 → 전역 스타일(굵기 · 둥글기 · 대비 · 붓촉 · 자간). */
-export function bakedStyle(input: { style: GlobalStyle; weight: number; strokeStyle: StrokeRenderStyle; brush: BrushStyle; letterSpacing: number }): Pick<GlobalStyle, 'weight' | 'strokeStyle' | 'brush' | 'letterSpacing'> {
-  return { weight: input.weight, strokeStyle: input.strokeStyle, brush: input.brush, letterSpacing: Math.round(input.letterSpacing * 1000) / 1000 }
 }
 
 /** 찾은 Δ를 저장소에 더한다(같은 범위에 다시 써 넣으면 더해진다 — 늘 지금 칸 기준 차이라서). */

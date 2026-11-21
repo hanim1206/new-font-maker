@@ -736,8 +736,8 @@ export function MoldLabPage() {
     store.updateStyle('letterSpacing', letterSpacing)
     store.setBrushStyle(inked.brush)
     store.setStrokeRenderStyle(inked.strokeStyle)
-    // 저장소가 빚은 값을 가졌으니 화면 값은 처음으로(두 번 얹히지 않게).
-    remember()
+    // 저장소가 빚은 값을 가졌으니 화면 값은 처음으로(두 번 얹히지 않게). 되돌리기도 비운다 — 되돌리면 빚은 값이 저장소 위에 한 번 더 얹힌다.
+    setHistory([])
     setLook({}); setEdits({}); setBakeAsk(false)
     setBaked({ layouts: layouts.length, residual: Math.max(0, ...layouts.map((item) => item.residual)) })
   }
