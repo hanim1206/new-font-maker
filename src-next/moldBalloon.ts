@@ -67,11 +67,41 @@ function normalized(strokes: readonly BalloonStroke[], boxes: Partial<Record<Par
     return stroke.points.map((p) => ({ x: box.width > EPS ? (p.x - box.x) / box.width : 0.5, y: box.height > EPS ? (p.y - box.y) / box.height : 0.5 }))
   })
 }
-function segmentsOf(strokes: readonly BalloonStroke[], unit: Pt[][], boxes: Partial<Record<Part, BoxConfig>>): Seg[] {
+/**
+ * 열린 끝을 늘일 길이(em). 가로가 세로보다 덜 굵어지면(대비) 가로획의 열린 끝이 세로줄기 바깥선보다 안으로 들어간다 —
+ * 「른」의 ㄹ에서 윗 가로줄기 왼끝과 아래 세로줄기 바깥선이 어긋났다(하니무스 2026-11-21). 그 차이만큼 끝을 늘인다(처음 굵기 대비).
+ * 세로획은 거꾸로(가로가 더 굵어지면). 사선 · 곡선 끝은 그대로.
+ */
+export function endReachOf(points: readonly Pt[], thickness: number, thick: Thick, base: Thick): { start: number; end: number } {
+  const reachAt = (a: Pt, b: Pt) => {
+    const l = Math.hypot(b.x - a.x, b.y - a.y)
+    if (l < EPS) return 0
+    const u = ((b.y - a.y) / l) ** 2, gainV = thick.v - base.v, gainH = thick.h - base.h
+    if (u < 0.15) return Math.max(0, thickness / 2 * (gainV - gainH))
+    if (u > 0.85) return Math.max(0, thickness / 2 * (gainH - gainV))
+    return 0
+  }
+  if (points.length < 2) return { start: 0, end: 0 }
+  return { start: reachAt(points[0], points[1]), end: reachAt(points[points.length - 2], points[points.length - 1]) }
+}
+const stretched = (points: Pt[], reach: { start: number; end: number }): Pt[] => {
+  if (points.length < 2 || (reach.start < EPS && reach.end < EPS)) return points
+  const out = points.map((p) => ({ ...p }))
+  const push = (at: number, from: number, by: number) => {
+    const l = Math.hypot(out[at].x - out[from].x, out[at].y - out[from].y)
+    if (l < EPS || by < EPS) return
+    out[at] = { x: out[at].x + (out[at].x - out[from].x) / l * by, y: out[at].y + (out[at].y - out[from].y) / l * by }
+  }
+  push(0, 1, reach.start); push(out.length - 1, out.length - 2, reach.end)
+  return out
+}
+
+function segmentsOf(strokes: readonly BalloonStroke[], unit: Pt[][], boxes: Partial<Record<Part, BoxConfig>>, ends?: { thick: Record<BalloonGroup, Thick>; base: Thick }): Seg[] {
   const out: Seg[] = []
   strokes.forEach((stroke, index) => {
     const box = boxes[stroke.part]
-    const points = unit[index].map((p) => (box ? { x: box.x + p.x * box.width, y: box.y + p.y * box.height } : p))
+    let points = unit[index].map((p) => (box ? { x: box.x + p.x * box.width, y: box.y + p.y * box.height } : p))
+    if (ends && !stroke.closed) points = stretched(points, endReachOf(points, stroke.thickness, ends.thick[balloonGroupOf(stroke.part)], ends.base))
     const count = stroke.closed ? points.length : points.length - 1
     for (let at = 0; at < count; at++) {
       const a = points[at], b = points[(at + 1) % points.length]
@@ -121,13 +151,32 @@ function gapBetween(p: Seg, q: Seg, thickP: Thick, thickQ: Thick) {
 const parallel = (p: Seg, q: Seg) => Math.abs((p.bx - p.ax) * (q.bx - q.ax) + (p.by - p.ay) * (q.by - q.ay)) >= PARALLEL_COS * lengthOf(p) * lengthOf(q)
 const facing = (p: Seg, q: Seg) => (p.bx - p.ax) * (q.bx - q.ax) + (p.by - p.ay) * (q.by - q.ay) < -0.5 * lengthOf(p) * lengthOf(q)
 
-interface InsidePair { i: number; j: number; target: number }
+interface InsidePair { i: number; j: number; target: number; ring?: boolean }
 /** 꼭지 · 곁줄기처럼 다른 획 옆면에 끝이 붙은 짧은 획. 붙은 획이 굵어져도 보이는 길이가 처음의 반은 남는다. */
-interface Stub { on: number; room: number }
+interface Stub { on: number; stroke: number; keep: number; free: 0 | 1 }
 /** 붙은 짧은 획이 남길 보이는 길이(처음 대비). */
 const STUB_KEEP = 0.5
+/** 붙은 짧은 획을 살리려고 이웃 자소 칸을 비켜 세울 때, 처음 칸의 이만큼은 남긴다. */
+const NEIGHBOR_KEEP = 0.8
+/** ㅇ 속 흰 틈은 처음의 이만큼 아래로 안 줄인다. */
+const RING_KEEP = 0.45
+/** 자소 사이 경계를 한 판에 옮기는 양(굵기 모자람 차이 1당 em). */
+const SHARE_STEP = 0.006
+/** 한 자소 안 가로÷세로가 바라는 비의 이만큼 아래로 안 간다. */
+const CONTRAST_KEEP = 0.72
 interface BetweenPair { i: number; j: number }
 interface PartPair { a: Part; b: Part; target: number; pairs: BetweenPair[] }
+
+/** 한 점이 다른 자소 잉크에 묻힌 깊이(가장 깊은 것)와 그 토막. */
+function coveredAt(at: Pt, segs: readonly Seg[], own: BalloonGroup, thickOf: (g: BalloonGroup) => Thick): { depth: number; seg: number } {
+  let best = { depth: 0, seg: -1 }
+  segs.forEach((seg, index) => {
+    if (seg.group === own || lengthOf(seg) < EPS) return
+    const depth = halfOf(seg, thickOf(seg.group)) - pointToSeg(at.x, at.y, seg).d
+    if (depth > best.depth) best = { depth, seg: index }
+  })
+  return best
+}
 
 /**
  * 지킬 틈을 처음 모양에서 고른다(엔진 `counterGapFilter`와 같은 거름망).
@@ -152,14 +201,22 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
     if ((joints.get(key)?.d ?? Infinity) <= near.d) continue
     joints.set(key, { x: (near.p.x + near.q.x) / 2, y: (near.p.y + near.q.y) / 2, d: near.d })
   }
+  // 닫힌 속(ㅍ · ㅂ 두 기둥과 두 보가 두른 칸): 두 획에 함께 닿은 획이 둘 이상이면 그 사이는 막힌 속이다(ㅐ 두 기둥은 다리 하나라 열린 속).
+  const touch = new Set<string>()
+  for (const key of joints.keys()) { const [a, b] = key.split(':'); touch.add(`${a}:${b}`); touch.add(`${b}:${a}`) }
+  const enclosed = (a: number, b: number) => strokes.reduce((count, _, r) => (r !== a && r !== b && touch.has(`${r}:${a}`) && touch.has(`${r}:${b}`) ? count + 1 : count), 0) >= 2
   for (let i = 0; i < segs.length; i++) for (let j = i + 1; j < segs.length; j++) {
     const p = segs[i], q = segs[j]
     if (lengthOf(p) < EPS || lengthOf(q) < EPS) continue
     if (p.group === q.group) {
-      if (!parallel(p, q)) continue
       const near = nearest(p, q)
-      const gap = near.d - halfOf(p, base) - halfOf(q, base)
+      // 틈은 잇는 방향으로 내미는 두께로 잰다 — 나란한 옆면끼리(ㅐ 두 기둥)도, 끝이 옆면을 보는 것(ㄲ 둘째 ㄱ 가로 끝 ↔ 첫 ㄱ 세로)도.
+      // 끝끼리 마주 본 것(한 줄 위 두 가로 끝)은 굵기로 안 좁아지니 빠진다.
+      const g0 = gapBetween(p, q, base, base)
+      if (near.d < EPS || g0.reachP + g0.reachQ < EPS) continue
+      const gap = g0.gap
       if (gap <= JOINED_RATIO * Math.min(p.t, q.t)) continue
+      if (!parallel(p, q) && p.stroke === q.stroke && !strokes[p.stroke].closed) continue
       if (p.stroke === q.stroke && !facing(p, q)) {
         const closed = strokes[p.stroke].closed
         const kp = Math.hypot(near.p.x - p.ax, near.p.y - p.ay), kq = Math.hypot(near.q.x - q.ax, near.q.y - q.ay)
@@ -168,8 +225,10 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
         if (near.d >= 0.5 * along) continue
       }
       const joint = p.stroke === q.stroke ? undefined : joints.get(`${p.stroke}:${q.stroke}`)
+      // 이어진 두 획이 나란하지 않으면(ㅅ 두 다리) 이음에서 멀어질수록 벌어진다 — 이음 옆 쐐기는 틈이 아니다.
+      if (joint && !parallel(p, q)) continue
       if (joint && !facing(p, q) && near.d >= 0.5 * (Math.hypot(near.p.x - joint.x, near.p.y - joint.y) + Math.hypot(near.q.x - joint.x, near.q.y - joint.y))) continue
-      inside.push({ i, j, target: gap })
+      inside.push({ i, j, target: gap, ring: p.stroke === q.stroke ? !!strokes[p.stroke].closed : enclosed(p.stroke, q.stroke) })
     } else {
       const { gap } = gapBetween(p, q, base, base)
       const key = p.part < q.part ? `${p.part}|${q.part}` : `${q.part}|${p.part}`
@@ -183,7 +242,8 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
     const own = segs.filter((seg) => seg.stroke === index)
     if (!own.length || strokes[index].closed) continue
     const length = own.reduce((sum, seg) => sum + lengthOf(seg), 0)
-    for (const [end, seg] of [[{ x: own[0].ax, y: own[0].ay }, own[0]], [{ x: own[own.length - 1].bx, y: own[own.length - 1].by }, own[own.length - 1]]] as const) {
+    const found: Stub[] = []
+    for (const [end, seg, which] of [[{ x: own[0].ax, y: own[0].ay }, own[0], 0], [{ x: own[own.length - 1].bx, y: own[own.length - 1].by }, own[own.length - 1], 1]] as const) {
       let best: { on: number; d: number } | null = null
       segs.forEach((other, at) => {
         if (other.stroke === index || other.group !== seg.group || lengthOf(other) < EPS) return
@@ -202,13 +262,20 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
       const dx = (seg.bx - seg.ax) / lengthOf(seg), dy = (seg.by - seg.ay) / lengthOf(seg)
       const visible0 = length - reachOf(other, dx, dy, base)
       if (visible0 <= 0) continue
-      stubs.push({ on: (best as { on: number }).on, room: length - STUB_KEEP * visible0 })
+      // 반대 끝이 다른 자소 잉크에 묻힌 몫(「풍」 짧은기둥 끝이 ㅇ에 닿음)은 처음부터 안 보이던 길이다.
+      const freeEnd = which === 0 ? { x: own[own.length - 1].bx, y: own[own.length - 1].by } : { x: own[0].ax, y: own[0].ay }
+      const covered0 = coveredAt(freeEnd, segs, seg.group, () => base)
+      found.push({ on: (best as { on: number }).on, stroke: index, keep: STUB_KEEP * Math.max(0, visible0 - covered0.depth), free: which === 0 ? 1 : 0 })
     }
+    // 두 끝이 다 붙은 획(ㅐ 두 기둥 사이 가로획)은 꼭지가 아니라 다리다 — 두 기둥 사이 틈은 자소 안 틈이 맡는다.
+    // 꼭지로 보면 보이는 길이 반을 지키려 기둥 굵기를 눌러 「깨」 기둥이 유난히 가늘었다.
+    if (found.length === 1) stubs.push(found[0])
   }
   // 자소 안 목표는 그 자소의 가장 좁은 틈에서 잰다. 사이에 획이 낀 먼 쌍(ㅌ 첫 · 셋째 가로줄기)이 제 넓은 틈을 지키려 들면 가까운 쌍보다 먼저 막는다.
-  const narrow = new Map<BalloonGroup, number>()
-  for (const pair of inside) { const g = segs[pair.i].group; narrow.set(g, Math.min(narrow.get(g) ?? Infinity, pair.target)) }
-  for (const pair of inside) { const least = narrow.get(segs[pair.i].group)!; pair.target = Math.min(pair.target, Math.max(BALLOON_END.inside, least - BALLOON_SLOPE.inside * delta)) }
+  // 자소 안 틈은 바닥까지 내준다 — 획 굵기를 먼저 지키고 흰 틈으로 버틴다(하니무스 2026-11-21 「깨」: "패딩을 최소한까지 밀어붙이더라도 획 두께는 유지").
+  // 틈은 굵기가 실제로 그만큼 필요할 때만 준다(예산이 남으면 처음 틈 그대로). 처음부터 바닥보다 좁은 틈은 그대로 지킨다.
+  // 막힌 속(ㅇ 고리 안, ㅍ · ㅂ 네 획이 두른 칸)은 처음의 RING_KEEP은 남긴다 — 바닥까지 내주면 「풍」 받침 ㅇ이 막혀 점이 되고 ㅍ이 덩어리가 됐다.
+  for (const pair of inside) pair.target = Math.min(pair.target, pair.ring ? Math.max(BALLOON_END.inside, RING_KEEP * pair.target) : BALLOON_END.inside)
   const between: PartPair[] = []
   for (const { a, b, list } of byParts.values()) {
     const least = Math.min(...list.map((item) => item.gap))
@@ -260,7 +327,8 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
   const parts = [...new Set(strokes.map((s) => s.part))]
   // 칸 = 처음 굵기의 잉크 칸. 자소 사이 틈에 따라 변이 움직인다.
   const cells = new Map<Part, Cell>(), firstCenter = new Map<Part, Cell>()
-  for (const part of parts) { const e = extents(first, part, start[balloonGroupOf(part)]); if (e) { cells.set(part, { ...e.ink }); firstCenter.set(part, e.center) } }
+  const firstCell = new Map<Part, Cell>()
+  for (const part of parts) { const e = extents(first, part, start[balloonGroupOf(part)]); if (e) { cells.set(part, { ...e.ink }); firstCell.set(part, { ...e.ink }); firstCenter.set(part, e.center) } }
   const thick = Object.fromEntries(groups.map((g) => [g, { ...want }])) as Record<BalloonGroup, Thick>
   const cap = Object.fromEntries(groups.map((g) => [g, { v: Infinity, h: Infinity }])) as Record<BalloonGroup, Thick>
   let boxes: Partial<Record<Part, BoxConfig>> = { ...input.boxes }
@@ -268,7 +336,7 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
   /** 3. 안으로: 지금 굵기의 잉크가 칸에 꼭 맞게 중심선 칸을 놓는다. 뼈대가 너무 줄면 그 축 굵기를 누른다. */
   const fit = () => {
     for (let pass = 0; pass < 2; pass++) {
-      const segs = segmentsOf(strokes, unit, boxes)
+      const segs = segmentsOf(strokes, unit, boxes, { thick, base })
       for (const part of parts) {
         const cell = cells.get(part), box = boxes[part], e = extents(segs, part, thick[balloonGroupOf(part)]), base0 = firstCenter.get(part)
         if (!cell || !box || !e || !base0) continue
@@ -299,12 +367,18 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
 
   for (let round = 0; round < ROUNDS; round++) {
     fit()
-    const segs = segmentsOf(strokes, unit, boxes)
+    const segs = segmentsOf(strokes, unit, boxes, { thick, base })
     // 2. 예산: 자소 안 나란한 획 사이 틈이 목표를 지키는 가장 굵은 값. 칸이 바뀌면 다시 푼다(바라는 값에서 출발).
     const sol = Object.fromEntries(groups.map((g) => [g, { v: Math.min(want.v, cap[g].v), h: Math.min(want.h, cap[g].h) }])) as Record<BalloonGroup, Thick>
     for (const pair of inside) {
       const p = segs[pair.i], q = segs[pair.j], g = p.group, now = thick[g]
-      const d = nearest(p, q).d, sp = sharesOf(p), sq = sharesOf(q), a = sp.a + sq.a, b = sp.b + sq.b
+      const gp = gapBetween(p, q, now, now)
+      if (gp.d < EPS) continue
+      // 잇는 방향으로 내미는 몫(옆면이면 반 두께, 끝이면 0)의 가로 · 세로 계수.
+      const k = (s: Seg) => { const l = lengthOf(s); return l > EPS ? Math.abs(gp.nx * (s.by - s.ay) / l - gp.ny * (s.bx - s.ax) / l) : 0 }
+      const sp = sharesOf(p), sq = sharesOf(q), kp = k(p), kq = k(q)
+      const d = gp.d, a = sp.a * kp + sq.a * kq, b = sp.b * kp + sq.b * kq
+      if (a + b < EPS) continue
       const room = d - pair.target
       const lean = b / (a + b)
       if (lean < 0.3) sol[g].h = Math.min(sol[g].h, (room - b * now.v) / Math.max(a, EPS))
@@ -314,7 +388,27 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
     // 붙은 짧은 획: 붙은 획의 반 두께가 그 획 길이를 다 먹지 않게(곁줄기 · 꼭지가 사라지지 않게).
     for (const stub of stubs) {
       const o = segs[stub.on], g = o.group
-      const { a, b } = sharesOf(o), room = stub.room, lean = b / Math.max(a + b, EPS)
+      // 지금 길이로 잰다 — 뼈대가 줄면(굵어진 보에 밀려) 짧은기둥도 같이 줄어, 처음 길이로 재면 「풍」「숲」 짧은기둥이 묻혔다.
+      const own = segs.filter((seg) => seg.stroke === stub.stroke)
+      const now = own.reduce((sum, seg) => sum + lengthOf(seg), 0)
+      // 반대 끝이 이웃 자소 잉크에 묻히면 그 몫도 뺀다. 모자라면 이웃 칸을 먼저 비켜 세운다(받침 ㅇ이 조금 작아진다) — 보 굵기는 그다음.
+      const freeEnd = stub.free === 1 ? { x: own[own.length - 1].bx, y: own[own.length - 1].by } : { x: own[0].ax, y: own[0].ay }
+      const cover = coveredAt(freeEnd, segs, g, (group) => thick[group])
+      const short = stub.keep - (now - halfOf(o, thick[g]) - cover.depth)
+      let depth = cover.depth
+      if (short > 5e-4 && cover.seg >= 0) {
+        const nbr = segs[cover.seg], cell = cells.get(nbr.part), first0 = firstCell.get(nbr.part)
+        const tail = stub.free === 1 ? own[own.length - 1] : own[0]
+        const dx = stub.free === 1 ? tail.bx - tail.ax : tail.ax - tail.bx, dy = stub.free === 1 ? tail.by - tail.ay : tail.ay - tail.by
+        if (cell && first0) {
+          const axis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y', lo = axis === 'x' ? 'x0' : 'y0', hi = axis === 'x' ? 'x1' : 'y1'
+          const least = NEIGHBOR_KEEP * (first0[hi] - first0[lo])
+          const step = Math.min(0.5 * short, Math.max(0, cell[hi] - cell[lo] - least))
+          if ((axis === 'x' ? dx : dy) > 0) cell[lo] += step; else cell[hi] -= step
+          depth = Math.max(0, depth - step)
+        }
+      }
+      const { a, b } = sharesOf(o), room = now - stub.keep - depth, lean = b / Math.max(a + b, EPS)
       if (lean > 0.7) sol[g].v = Math.min(sol[g].v, (room - a * thick[g].h) / Math.max(b, EPS))
       else if (lean < 0.3) sol[g].h = Math.min(sol[g].h, (room - b * thick[g].v) / Math.max(a, EPS))
       else { const f = room / Math.max(a * thick[g].h + b * thick[g].v, EPS); sol[g].h = Math.min(sol[g].h, thick[g].h * f); sol[g].v = Math.min(sol[g].v, thick[g].v * f) }
@@ -333,6 +427,13 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
     }
     const present = groups.filter((g) => strokes.some((s) => balloonGroupOf(s.part) === g))
     for (const g of present) { sol[g].v = Math.max(base.v, sol[g].v); sol[g].h = Math.max(base.h, sol[g].h) }
+    // 한 자소 안 가로 · 세로 고르기: 가로가 예산에 막혀 얇아지면 세로도 같이 덜 굵어진다(「향」 ㅎ 가로만 가늘어 고르지 않음).
+    // 폰트도 획 많은 글자는 가로÷세로가 조금 준다(「를」 0.71 → 0.65) — 바라는 비의 CONTRAST_KEEP까지만 벌어진다.
+    for (const g of present) {
+      const ratio = want.h / Math.max(want.v, EPS)
+      sol[g].v = Math.min(sol[g].v, Math.max(base.v, sol[g].h / (CONTRAST_KEEP * ratio)))
+      sol[g].h = Math.min(sol[g].h, Math.max(base.h, sol[g].v * ratio / CONTRAST_KEEP))
+    }
     // 한 글자 안 굵기 띠.
     const leastV = Math.min(...present.map((g) => sol[g].v)), leastH = Math.min(...present.map((g) => sol[g].h))
     for (const g of present) {
@@ -350,7 +451,6 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
       }
       if (!worst) continue
       const err = worst.gap - pp.target
-      if (Math.abs(err) < 5e-4) continue
       const axis = Math.abs(worst.nx) >= Math.abs(worst.ny) ? 'x' : 'y'
       const dir = axis === 'x' ? Math.sign(worst.nx) : Math.sign(worst.ny)
       if (dir === 0) continue
@@ -374,8 +474,27 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
         if (toward > 0) cell[hi] = Math.max(cell[lo] + 0.02, cell[hi] + amount)
         else cell[lo] = Math.min(cell[hi] - 0.02, cell[lo] - amount)
       }
-      if (mp) move(worst.p, dir, step * (mq ? 0.5 : 1))
-      if (mq) move(worst.q, -dir, step * (mp ? 0.5 : 1))
+      if (Math.abs(err) >= 5e-4) {
+        if (mp) move(worst.p, dir, step * (mq ? 0.5 : 1))
+        if (mq) move(worst.q, -dir, step * (mp ? 0.5 : 1))
+      }
+      // 나누기: 굵기가 더 모자란 자소 쪽으로 경계를 민다(틈은 그대로). 획이 많은 자소(「향」 ㅎ, 「깨」 ㄲ)가 여유 있는 이웃(받침 ㅇ)한테서 칸을 얻는다.
+      // 이웃은 처음 칸의 NEIGHBOR_KEEP 아래로 안 줄어든다.
+      if (mp && mq) {
+        const need = (s: Seg) => { const t = thick[s.group]; return axis === 'x' ? want.v / Math.max(t.v, EPS) : want.h / Math.max(t.h, EPS) }
+        const room = (s: Seg) => { const c = cells.get(s.part), f = firstCell.get(s.part); return c && f ? c[hi] - c[lo] - NEIGHBOR_KEEP * (f[hi] - f[lo]) : 0 }
+        const diff = need(worst.p) - need(worst.q)
+        if (Math.abs(diff) > 0.02) {
+          const giver = diff > 0 ? worst.q : worst.p
+          const shift = Math.min(SHARE_STEP * Math.abs(diff), Math.max(0, room(giver)))
+          if (shift > 1e-5) {
+            // p가 모자라면 p 변을 이웃 쪽으로(dir), q 변도 같은 쪽으로 물린다. 거꾸로면 반대로.
+            const sign = diff > 0 ? 1 : -1
+            move(worst.p, dir, sign * shift)
+            move(worst.q, -dir, -sign * shift)
+          }
+        }
+      }
     }
   }
   fit()

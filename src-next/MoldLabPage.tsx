@@ -24,7 +24,7 @@ import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
 import { HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement, useNotoModel } from './notoModel'
-import { inkOfThick, solveBalloon, type BalloonGroup, type BalloonStroke } from './moldBalloon'
+import { balloonGroupOf, endReachOf, inkOfThick, solveBalloon, type BalloonGroup, type BalloonStroke } from './moldBalloon'
 import { applyBakedLayouts, bakedConsonants, bakedResidual, bakedVowels, bakeLayout, jagRules, meanThick, type BakeTarget, type BakedLayout } from './moldBake'
 import { layoutDeltaSnapshot } from './layoutDeltaStore'
 import { SAMPLE_SENTENCES } from './sampleSentences'
@@ -170,6 +170,23 @@ function moldedBoxes(boxes: Partial<Record<Part, BoxConfig>>, layout: LayoutType
 function onlyGroup(syllable: DecomposedSyllable, group: BalloonGroup): DecomposedSyllable {
   return { ...syllable, choseong: group === 'CH' ? syllable.choseong : null, jungseong: group === 'JU' ? syllable.jungseong : null, jongseong: group === 'JO' ? syllable.jongseong : null }
 }
+type Pt2 = { x: number; y: number }
+/** 획 열린 끝을 옮긴 글자(자소 칸 안 좌표의 옮김, 부위|획 id로). 손잡이도 같이 옮긴다. */
+function stretchedSyllable(syllable: DecomposedSyllable, reaches: ReadonlyMap<string, { start: Pt2; end: Pt2 }>): DecomposedSyllable {
+  const moveStrokes = (parts: readonly Part[], list: StrokeDataV2[] | undefined) => list?.map((stroke) => {
+    const reach = parts.map((part) => reaches.get(`${part}|${stroke.id}`)).find(Boolean)
+    if (!reach || stroke.closed || stroke.points.length < 2) return stroke
+    const shift = (point: StrokeDataV2['points'][number], by: Pt2) => ({ ...point, x: point.x + by.x, y: point.y + by.y, ...(point.handleIn ? { handleIn: { x: point.handleIn.x + by.x, y: point.handleIn.y + by.y } } : {}), ...(point.handleOut ? { handleOut: { x: point.handleOut.x + by.x, y: point.handleOut.y + by.y } } : {}) })
+    const points = [...stroke.points]
+    points[0] = shift(points[0], reach.start); points[points.length - 1] = shift(points[points.length - 1], reach.end)
+    return { ...stroke, points }
+  })
+  const moveJamo = (jamo: JamoData | null | undefined, parts: readonly Part[]) => jamo && {
+    ...jamo, strokes: moveStrokes(parts, jamo.strokes), horizontalStrokes: moveStrokes(parts, jamo.horizontalStrokes), verticalStrokes: moveStrokes(parts, jamo.verticalStrokes),
+    contextStrokes: jamo.contextStrokes && Object.fromEntries(Object.entries(jamo.contextStrokes).map(([family, list]) => [family, moveStrokes(parts, list) ?? list])),
+  }
+  return { ...syllable, choseong: moveJamo(syllable.choseong, ['CH']) ?? syllable.choseong, jungseong: moveJamo(syllable.jungseong, ['JU', 'JU_H', 'JU_V']) ?? syllable.jungseong, jongseong: moveJamo(syllable.jongseong, ['JO']) ?? syllable.jongseong }
+}
 /** 붓 스타일의 대비만 바꾼다(0이면 뺀다). */
 function heavyStrokeStyle(style: GlobalStyle['strokeStyle'], contrast: number): GlobalStyle['strokeStyle'] {
   if (style.mode !== 'brush') return style
@@ -281,7 +298,21 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       const kx = from.width > 1e-6 ? next.width / from.width : 1, ky = from.height > 1e-6 ? next.height / from.height : 1
       out[part] = { ...box, x: next.x + (box.x - from.x) * kx, y: next.y + (box.y - from.y) * ky, width: box.width * kx, height: box.height * ky }
     }
-    return { boxes: out, thick: solved.thick }
+    // 열린 끝 늘이기(푼 셈과 같은 값): 가로가 덜 굵어진 만큼 가로획 열린 끝을 늘여 세로줄기 바깥선과 맞춘다(「른」 ㄹ).
+    const reaches = new Map<string, { start: Pt2; end: Pt2 }>()
+    result.primitives.forEach((primitive, index) => {
+      const stroke = strokes[index], part = primitive.source.part
+      if (stroke.closed) return
+      const reach = endReachOf(stroke.points, stroke.thickness, solved.thick[balloonGroupOf(part)], base)
+      if (reach.start < 1e-6 && reach.end < 1e-6) return
+      const from = placed[part], next = solved.boxes[part]
+      const kx = from && next && from.width > 1e-6 ? next.width / from.width : 1, ky = from && next && from.height > 1e-6 ? next.height / from.height : 1
+      const bw = primitive.box.width * kx, bh = primitive.box.height * ky
+      const local = (a: Pt2, b: Pt2, by: number): Pt2 => { const l = Math.hypot(b.x - a.x, b.y - a.y); return l < 1e-9 || bw < 1e-9 || bh < 1e-9 ? { x: 0, y: 0 } : { x: (a.x - b.x) / l * by / bw, y: (a.y - b.y) / l * by / bh } }
+      const pts = stroke.points, n = pts.length
+      reaches.set(`${part}|${primitive.source.strokeId}`, { start: local(pts[0], pts[1], reach.start), end: local(pts[n - 1], pts[n - 2], reach.end) })
+    })
+    return { boxes: out, thick: solved.thick, syllable: reaches.size ? stretchedSyllable(balloon.syllable, reaches) : balloon.syllable }
   }, [heavyOn, boxes, balloon.syllable, effective.linecap, effective.linejoin, contrast, wanted])
   const globalStyle = useMemo(() => {
     const weighted = ratio === 1 ? effective : { ...effective, weight: scaledWeight(effective.weight, ratio) }
@@ -316,7 +347,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
         const style = flat || globalStyle.strokeStyle.mode !== 'brush' ? globalStyle : { ...globalStyle, strokeStyle: heavyStrokeStyle(globalStyle.strokeStyle, ink.contrast) }
         return <span key={group} className={at === 0 ? undefined : styles.glyphLayer}>
           <SvgRenderer
-            syllable={onlyGroup(balloon.syllable, group)}
+            syllable={onlyGroup(heavy.syllable, group)}
             boxes={heavy.boxes}
             size={size}
             globalStyle={style}
