@@ -22,7 +22,7 @@ import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
 import { applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement, useNotoModel } from './notoModel'
-import { applyBakedLayouts, bakeLayout, type BakeTarget, type BakedLayout } from './moldBake'
+import { applyBakedLayouts, bakedConsonants, bakedVowels, bakeLayout, jagRules, meanThick, type BakeTarget, type BakedLayout } from './moldBake'
 import { layoutDeltaSnapshot } from './layoutDeltaStore'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
@@ -728,7 +728,7 @@ export function MoldLabPage() {
   const bakeReporters = useMemo(() => Object.fromEntries(PART_LAYOUTS.map(({ sample }) => [sample, (item: BakeTarget) => { bakeItems.current[sample] = item }])), [])
   const bakeLook = useMemo(() => ({ ...look, jag: LOOK_ENGINE.jag }), [look])
   const [bakeAsk, setBakeAsk] = useState(false)
-  const [baked, setBaked] = useState<{ layouts: number; residual: number } | null>(null)
+  const [baked, setBaked] = useState<{ layouts: number; residual: number; jamo: number } | null>(null)
   const writeStore = () => {
     const items = PART_LAYOUTS.map(({ sample }) => bakeItems.current[sample]).filter((item): item is BakeTarget => !!item)
     if (!bundle || items.length === 0) return
@@ -741,15 +741,25 @@ export function MoldLabPage() {
     const snapshot = layoutDeltaSnapshot()
     const ends = { linecap: inked.linecap, linejoin: inked.linejoin, strokeStyle: inked.strokeStyle }
     const layouts = items.map((item) => bakeLayout({ bundle, snapshot, ends, item })).filter((item): item is BakedLayout => !!item)
-    applyBakedLayouts(layouts)
+    // 윗선 들쭉날쭉: 첫닿자 × 짜임 규칙(칸 Δ 위에 더한다).
+    const jag = lookOf(look, 'jag')
+    applyBakedLayouts(jag > LOOK_ENGINE.jag + 1e-6 ? [...layouts, ...jagRules(items, jag)] : layouts)
+    // 획: 긋기 · 허리선 곁줄기 · 곁줄기 길이 · 닿자 획 두께 → 자모 저장소.
+    const jamo = useJamoStore.getState()
+    const choseongOut = bakedConsonants(jamo.choseong, drawn?.consonants, 'choseong', meanThick(items, 'CH'))
+    const jongseongOut = bakedConsonants(jamo.jongseong, drawn?.consonants, 'jongseong', meanThick(items, 'JO'))
+    const jungseongOut = bakedVowels(jamo.jungseong, drawn?.jungseong, items, lookOf(look, 'branch'))
+    for (const [char, data] of Object.entries(choseongOut)) jamo.updateChoseong(char, data)
+    for (const [char, data] of Object.entries(jungseongOut)) jamo.updateJungseong(char, data)
+    for (const [char, data] of Object.entries(jongseongOut)) jamo.updateJongseong(char, data)
     store.updateStyle('weight', inked.weight)
     store.updateStyle('letterSpacing', letterSpacing)
     store.setBrushStyle(inked.brush)
     store.setStrokeRenderStyle(inked.strokeStyle)
     // 저장소가 빚은 값을 가졌으니 화면 값은 처음으로(두 번 얹히지 않게). 되돌리기도 비운다 — 되돌리면 빚은 값이 저장소 위에 한 번 더 얹힌다.
     setHistory([])
-    setLook({}); setEdits({}); setBakeAsk(false)
-    setBaked({ layouts: layouts.length, residual: Math.max(0, ...layouts.map((item) => item.residual)) })
+    setLook({}); setEdits({}); setRaws({}); setBakeAsk(false)
+    setBaked({ layouts: layouts.length, residual: Math.max(0, ...layouts.map((item) => item.residual)), jamo: Object.keys(choseongOut).length + Object.keys(jungseongOut).length + Object.keys(jongseongOut).length })
   }
   const fenceReportsNow = [...sentence].flatMap((char, at) => (char === ' ' ? [] : fenceReports[`${sentence}-${at}`] ? [fenceReports[`${sentence}-${at}`]] : []))
   const jamoScale = Math.min(1, ...fenceReportsNow.map((report) => report.need))
@@ -917,7 +927,7 @@ export function MoldLabPage() {
             <Button size="sm" onClick={writeStore} disabled={!bundle} data-testid="mold-bake-yes">써 넣기</Button>
           </div>
           : <Button size="sm" onClick={() => { setBaked(null); setBakeAsk(true) }} data-testid="mold-bake">저장소에 써 넣기</Button>}
-        {baked && <p className={styles.note} data-testid="mold-baked">써 넣음 · 짜임 {baked.layouts} · 남은 차이 {Math.round(baked.residual * 1000)}u. 긋기 획 · 획 다듬기(곁줄기 · 허리선 곁줄기 · 부리) · 닿자 획 두께 · 윗선은 아직 안 넘어감</p>}
+        {baked && <p className={styles.note} data-testid="mold-baked">써 넣음 · 짜임 {baked.layouts} · 자모 {baked.jamo} · 남은 차이 {Math.round(baked.residual * 1000)}u. 부리는 출시 뒤</p>}
         {baked && <div className={styles.moldActions}>
           <Button variant="outline" size="sm" onClick={() => window.location.assign('/workspace/font')} data-testid="mold-go-font">폰트 탭에서 보기</Button>
           <Button variant="outline" size="sm" onClick={() => window.location.assign('/dashboard')} data-testid="mold-go-dashboard">이어서 깎기</Button>
