@@ -924,9 +924,8 @@ function openBoxes(boxes: Partial<Record<Part, BoxConfig>>, open: number, layout
   const cut = ch && a !== b ? ch.y + ch.height : bottom
   const map = (y: number) => (y <= cut ? top + (y - top) * a : top + (cut - top) * a + (y - cut) * b)
   const out: Partial<Record<Part, BoxConfig>> = {}
-  // 폭도 √배로 좁힌다 — 키만 줄이면 납작해진다. Dongle의 받침 없는 글자도 작고 좁다.
-  const sx = Math.sqrt(open), cx = (Math.min(...list.map((box) => box.x)) + Math.max(...list.map((box) => box.x + box.width))) / 2
-  for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) if (box) { const y = map(box.y); out[part] = { ...box, x: cx + (box.x - cx) * sx, width: box.width * sx, y, height: map(box.y + box.height) - y } }
+  // 바닥만 올라간다 — 폭은 그대로(하니무스 2026-11-22 "받침을 위로 올리면 바닥면만 위로 올라가야지 왜 … 오른쪽에서 왼쪽으로도 줄어드는지").
+  for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) if (box) { const y = map(box.y); out[part] = { ...box, y, height: map(box.y + box.height) - y } }
   return out
 }
 

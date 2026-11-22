@@ -188,6 +188,8 @@ const STEM_GAP = { least: 0.025, ratio: 0.2 } as const
 const SHARE_STEP = 0.006
 /** 한 자소 안 가로÷세로가 바라는 비의 이만큼 아래로 안 간다. */
 const CONTRAST_KEEP = 0.72
+/** 가장 가는 획 ÷ 바라는 굵기의 바닥: 노토 산스 KR 900 600자, 가장 가는 세로 · 가로줄기 ÷ 「이」 기둥 · 「으」 보 p5(세로 0.69 · 가로 0.68). 좁은 칸 예산(`moldBudget`) · 글줄 굵기 멈춤(`MoldLabPage`)이 쓴다. */
+export const THIN_FLOOR = 0.69
 interface BetweenPair { i: number; j: number }
 interface PartPair { a: Part; b: Part; target: number; pairs: BetweenPair[] }
 
@@ -367,6 +369,19 @@ export function inkOfThick(thick: Thick): { multiplier: number; contrast: number
   return { multiplier: thick.v / (1 + 0.5 * c), contrast: c }
 }
 
+/** 모서리만 겹친 쌍(이 축으로 마주 봤지만 다른 축으로는 끝만 조금 겹침)이면 다른 축과 방향. */
+const CORNER_OVERLAP = 0.25
+function cornerSide(p: Seg, q: Seg, axis: 'x' | 'y'): { axis: 'x' | 'y'; dir: number } | null {
+  const other = axis === 'x' ? 'y' : 'x'
+  const lo = (s: Seg) => Math.min(s[`a${other}`], s[`b${other}`]), hi = (s: Seg) => Math.max(s[`a${other}`], s[`b${other}`])
+  const sp = hi(p) - lo(p), sq = hi(q) - lo(q)
+  if (sp < 0.01 || sq < 0.01) return null
+  const overlap = Math.min(hi(p), hi(q)) - Math.max(lo(p), lo(q))
+  if (overlap >= CORNER_OVERLAP * Math.min(sp, sq)) return null
+  const dir = Math.sign((lo(q) + hi(q)) - (lo(p) + hi(p)))
+  return dir ? { axis: other, dir } : null
+}
+
 export function solveBalloon(input: BalloonInput): BalloonResult {
   const { strokes, base, want } = input
   const groups: BalloonGroup[] = ['CH', 'JU', 'JO']
@@ -530,8 +545,12 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
       }
       if (!worst) continue
       const err = worst.gap - pp.target
-      const axis = Math.abs(worst.nx) >= Math.abs(worst.ny) ? 'x' : 'y'
-      const dir = axis === 'x' ? Math.sign(worst.nx) : Math.sign(worst.ny)
+      let axis: 'x' | 'y' = Math.abs(worst.nx) >= Math.abs(worst.ny) ? 'x' : 'y'
+      let dir = axis === 'x' ? Math.sign(worst.nx) : Math.sign(worst.ny)
+      // 모서리만 겹친 쌍(「저」 ㅈ 머리 가로 끝 위 · ㅓ 곁줄기 끝 아래): 위아래로 떼면 두 자소 키가 다 눌린다(하니무스 2026-11-22 "저 왤케 납작해").
+      // 겹친 몫이 짧은 쪽 길이의 CORNER_OVERLAP보다 작으면 옆으로 뗀다 — 겹침만 풀면 되니 조금만 움직인다.
+      const side = cornerSide(worst.p, worst.q, axis)
+      if (side) { axis = side.axis; dir = side.dir }
       if (dir === 0) continue
       const lo = axis === 'x' ? 'x0' : 'y0', hi = axis === 'x' ? 'x1' : 'y1'
       // 마주 본 변만 움직인다(글자 바깥 변은 안 움직인다 — 그 변은 이웃이 없어 여기 안 온다). 한 줄짜리(ㅡ의 키)는 못 움직인다.

@@ -1,5 +1,6 @@
 import type { DecomposedSyllable, JamoData, Part, StrokeDataV2 } from '../src/types'
-import { balloonGroupOf } from './moldBalloon'
+import { balloonGroupOf, THIN_FLOOR } from './moldBalloon'
+export { THIN_FLOOR }
 
 /**
  * 좁은 칸 굵기 예산(거북이 2026-11-22 줄 끝 균형 규칙 ①, 하니무스 승인 "1 다음 3까지 한 번에").
@@ -20,7 +21,6 @@ export interface BudgetStroke { part: Part; id: string; points: { x: number; y: 
 /** 열린 틈 바닥(em): max(least, ratio × 세로줄기). `moldBalloon` STEM_GAP과 같은 값. */
 const GAP = { least: 0.025, ratio: 0.2 } as const
 /** 획이 이보다 가늘어지지는 않는다(처음 굵기 대비). */
-export const THIN_FLOOR = 0.69
 /** 같은 결 획 굵기 고르기(노토 900 p5). */
 export const EVEN = 0.78
 /** 자소 칸 넓힘 끝(배). */
