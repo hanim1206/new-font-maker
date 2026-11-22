@@ -8,13 +8,23 @@ import { balloonGroupOf } from './moldBalloon'
  * - 바닥 g: 풍선 굵기의 열린 틈 바닥과 같은 식(거북이 넓어짐 공식 2절, `STEM_GAP`).
  * - 처음(엔진 칸, 대비 0)부터 g보다 좁던 쌍은 그 처음 틈까지만 지킨다 — 처음 모습은 안 바꾼다.
  * - 실험실 근거: 겹기둥 홀자(ㅐ · ㅔ · ㅒ) 기둥은 0.083 → 0.079로 가늘다. 굵기 실험실 S7(ㅃ · ㅉ)은 900에서 가로가 1.10배만 굵어진다. 좁으면 획이 양보한다.
- * 획마다 두께 배율(`strokeKey` 열쇠)을 돌려준다. 1이면 안 넣는다.
+ * 하니무스 2026-11-22 "획을 줄이기 전에 먼저 옆으로 늘리는 걸 시도해 보고" · "노토 산스 블랙의 굵은 선 ↔ 가는 선 대비를 기준으로":
+ * - 먼저 자소 칸을 넓힌다(위아래로 쌓인 쌍은 높인다). 넓힘 끝 `WIDEN_MAX` 1.10 = 굵기 실험실 ㄱ ㅁ ㅂ ㅇ 900 폭 1.10배 · 노토 900 첫닿자 칸 1.08~1.11배(거북이 넓어짐 공식).
+ *   칸이 넓어질 빈 자리(`room`)는 부르는 쪽이 준다.
+ * - 그래도 모자라면 가늘게. 바닥 `THIN_FLOOR` 0.69 = 노토 산스 KR 900에서 글자 안 가장 가는 세로 · 가로줄기 ÷ 「이」 기둥 · 「으」 보(600자, p5 세로 0.69 · 가로 0.68).
+ * - 같은 결(세로끼리 · 가로끼리) 획은 한 글자 안에서 가장 가는 것의 `EVEN`(0.78)배 넘게 굵지 않다 = 노토 900 글자 안 가장 가는 ÷ 가장 굵은 같은 결 줄기(p5 세로 0.78 · 가로 0.80). 「빼」 ㅃ 0.113 · ㅐ 0.140 → 0.81.
+ * - 처음 칸에서 마주 보지 않던 쌍(「숲」 ㅅ 두 삐침이 닿자 100에서 나란해짐)은 틈이 아니다.
+ * 획마다 두께 배율(`strokeKey` 열쇠)과 자소 칸 넓힘 배율을 돌려준다. 1이면 안 넣는다.
  */
 export interface BudgetStroke { part: Part; id: string; points: { x: number; y: number }[]; closed: boolean; /** em */ thickness: number }
 /** 열린 틈 바닥(em): max(least, ratio × 세로줄기). `moldBalloon` STEM_GAP과 같은 값. */
 const GAP = { least: 0.025, ratio: 0.2 } as const
-/** 획이 이보다 가늘어지지는 않는다(처음 굵기 대비). 닿자 작은 폰트 굵기 0.87배 · 가로 0.7배(거북이 규칙 ②)보다 넉넉히. */
-export const THIN_FLOOR = 0.5
+/** 획이 이보다 가늘어지지는 않는다(처음 굵기 대비). */
+export const THIN_FLOOR = 0.69
+/** 같은 결 획 굵기 고르기(노토 900 p5). */
+export const EVEN = 0.78
+/** 자소 칸 넓힘 끝(배). */
+export const WIDEN_MAX = 1.1
 /** 처음부터 이보다 가까운 쌍(두께 대비)은 붙여 그린 것(`moldBalloon` JOINED_RATIO). */
 const JOINED = 0.25
 const PARALLEL_COS = Math.cos(20 / 180 * Math.PI)
@@ -47,17 +57,24 @@ function facingOf(p: Seg, q: Seg): { d: number } | null {
   return { d: Math.abs(mx * uy - my * ux) }
 }
 
+/** 자소마다 칸을 넓힐 수 있는 끝(배): x 옆으로 · y 위아래로. 없으면 1. */
+export type BudgetRoom = Partial<Record<Part, { x: number; y: number }>>
+export interface BudgetResult { factors: Record<string, number>; widen: Partial<Record<Part, { x: number; y: number }>> }
+
 /**
  * `now`: 지금 칸에 놓인 획(em). `ref`: 같은 획을 엔진 처음 칸에 놓은 것(같은 순서). `contrast`: 대비 값(−0.38 ~ 0.97).
+ * `room`: 자소 칸을 넓힐 수 있는 끝(배, `WIDEN_MAX` 안쪽으로 부르는 쪽이 자른다).
  */
-export function thinBudget(now: readonly BudgetStroke[], ref: readonly BudgetStroke[] | null, contrast: number): Record<string, number> {
+export function thinBudget(now: readonly BudgetStroke[], ref: readonly BudgetStroke[] | null, contrast: number, room: BudgetRoom = {}): BudgetResult {
   const cv = contrast >= 0 ? 1 + 0.8 * contrast : 1 + 0.5 * contrast, ch = contrast >= 0 ? 1 - 0.45 * contrast : 1 - 0.5 * contrast
   const segs = segsOf(now), refSegs = ref && ref.length === now.length ? segsOf(ref) : null
   const sameShape = !!refSegs && refSegs.length === segs.length
   const stems = segs.filter((s) => upright(s) > 0.5).map((s) => s.t * cv).sort((a, b) => a - b)
   const stem = stems[Math.floor(stems.length / 2)] ?? (segs[0]?.t ?? 0.07)
   const floor = Math.max(GAP.least, GAP.ratio * stem)
-  const factor = new Map<number, number>()
+  // 1) 좁아진 쌍을 모은다.
+  interface Tight { p: Seg; q: Seg; d: number; h: number; target: number; axis: 'x' | 'y' }
+  const tight: Tight[] = []
   for (let i = 0; i < segs.length; i++) for (let j = i + 1; j < segs.length; j++) {
     const p = segs[i], q = segs[j]
     if (p.group !== q.group) continue
@@ -65,22 +82,50 @@ export function thinBudget(now: readonly BudgetStroke[], ref: readonly BudgetStr
     if (p.stroke === q.stroke && (Math.abs(p.at - q.at) < 2 || (p.at === 0 && q.at === q.last) || (q.at === 0 && p.at === p.last))) continue
     const face = facingOf(p, q)
     if (!face) continue
-    const hp = halfOf(p, cv, ch), hq = halfOf(q, cv, ch)
-    // 처음 틈: 엔진 칸 · 대비 0.
+    // 처음 틈: 엔진 칸 · 대비 0. 처음 칸에서 마주 보지 않던 쌍은 틈이 아니다.
     let start = Infinity
     if (sameShape) {
       const rp = refSegs![i], rq = refSegs![j], rf = facingOf(rp, rq)
-      if (rf) start = rf.d - rp.t / 2 - rq.t / 2
+      if (!rf) continue
+      start = rf.d - rp.t / 2 - rq.t / 2
     }
     if (start <= JOINED * Math.min(p.t, q.t)) continue
-    const target = Math.min(floor, start)
-    if (face.d - hp - hq >= target - 1e-5) continue
-    const f = Math.max(THIN_FLOOR, (face.d - target) / Math.max(hp + hq, 1e-6))
-    for (const s of [p.stroke, q.stroke]) factor.set(s, Math.min(factor.get(s) ?? 1, f))
+    const h = halfOf(p, cv, ch) + halfOf(q, cv, ch), target = Math.min(floor, start)
+    if (face.d - h >= target - 1e-5) continue
+    tight.push({ p, q, d: face.d, h, target, axis: upright(p) > 0.5 ? 'x' : 'y' })
   }
-  const out: Record<string, number> = {}
-  for (const [index, f] of factor) if (f < 1 - 1e-4) out[`${now[index].part}:${now[index].id}`] = f
-  return out
+  // 2) 먼저 칸을 넓힌다: 쌍마다 모자란 만큼(중심선 거리는 칸 배율만큼 는다), 빈 자리 · `WIDEN_MAX` 안에서.
+  const widen: BudgetResult['widen'] = {}
+  const partOf = (s: Seg) => now[s.stroke].part
+  for (const t of tight) {
+    const part = partOf(t.p), limit = Math.min(WIDEN_MAX, room[part]?.[t.axis] ?? 1)
+    if (limit <= 1 + 1e-6) continue
+    const need = Math.min(limit, (t.target + t.h) / Math.max(t.d, 1e-6))
+    const was = widen[part] ?? { x: 1, y: 1 }
+    widen[part] = { ...was, [t.axis]: Math.max(was[t.axis], need) }
+  }
+  // 3) 그래도 모자라면 가늘게.
+  const factor = new Map<number, number>()
+  for (const t of tight) {
+    const d = t.d * (widen[partOf(t.p)]?.[t.axis] ?? 1)
+    if (d - t.h >= t.target - 1e-5) continue
+    const f = Math.max(THIN_FLOOR, (d - t.target) / Math.max(t.h, 1e-6))
+    for (const s of [t.p.stroke, t.q.stroke]) factor.set(s, Math.min(factor.get(s) ?? 1, f))
+  }
+  // 4) 같은 결 고르기: 한 글자 안 같은 결 획은 가장 가는 것의 1/EVEN배까지만. 닫힌 획(ㅇ)은 결이 없어 뺀다.
+  if (factor.size) {
+    const kind = now.map((stroke, index) => { if (stroke.closed) return 'o'; let v = 0, all = 0; for (const s of segs) if (s.stroke === index) { v += upright(s) * s.len; all += s.len } return all > 0 && v / all > 0.5 ? 'v' : 'h' })
+    for (const k of ['v', 'h'] as const) {
+      let least = 1
+      for (const [index, f] of factor) if (kind[index] === k) least = Math.min(least, f)
+      if (least >= 1) continue
+      now.forEach((_, index) => { if (kind[index] === k) factor.set(index, Math.min(factor.get(index) ?? 1, least / EVEN)) })
+    }
+  }
+  const factors: Record<string, number> = {}
+  for (const [index, f] of factor) if (f < 1 - 1e-4) factors[`${now[index].part}:${now[index].id}`] = f
+  for (const part of Object.keys(widen) as Part[]) { const w = widen[part]!; if (w.x <= 1 + 1e-4 && w.y <= 1 + 1e-4) delete widen[part] }
+  return { factors, widen }
 }
 
 /** 획마다 두께 배율을 입힌다. 홀자는 `JU` · `JU_H` · `JU_V` 어느 열쇠든 그 획 id로. */

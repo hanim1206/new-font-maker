@@ -183,6 +183,45 @@ function onlyGroup(syllable: DecomposedSyllable, group: BalloonGroup): Decompose
  * 오른끝: 곁줄기로 끝나면 0.10, 기둥 0.37, 섞임 0.49, 기둥 둘 0.35(쌍닿자와 만나면 0.55). 가로 짜임 0.20.
  * 왼끝: ㄱ · 쌍닿자 0.43, ㅇ ㅁ ㅂ 0.27, 가로 짜임 0.15, 그 밖 0.29.
  */
+type Room = { left: number; right: number; up: number; down: number }
+/** 자소 칸마다 옆 · 위아래 빈 자리(글자 칸 0~1 끝, 또는 그쪽에 마주 선 다른 자소 칸까지). 이미 겹친 쪽은 0. */
+function roomsOf(boxes: Partial<Record<Part, BoxConfig>>): Partial<Record<Part, Room>> {
+  const out: Partial<Record<Part, Room>> = {}
+  const all = Object.entries(boxes).filter(([, box]) => box) as [Part, BoxConfig][]
+  for (const [part, b] of all) {
+    let left = b.x, right = 1 - b.x - b.width, up = b.y, down = 1 - b.y - b.height
+    for (const [other, o] of all) {
+      if (other === part) continue
+      const rowOverlap = o.y < b.y + b.height - 1e-6 && o.y + o.height > b.y + 1e-6, colOverlap = o.x < b.x + b.width - 1e-6 && o.x + o.width > b.x + 1e-6
+      if (rowOverlap) {
+        if (o.x + o.width <= b.x + 1e-6) left = Math.min(left, b.x - o.x - o.width)
+        else if (o.x >= b.x + b.width - 1e-6) right = Math.min(right, o.x - b.x - b.width)
+        else if (colOverlap) { if (o.x + o.width / 2 < b.x + b.width / 2) left = 0; else right = 0 }
+      }
+      if (colOverlap) {
+        if (o.y + o.height <= b.y + 1e-6) up = Math.min(up, b.y - o.y - o.height)
+        else if (o.y >= b.y + b.height - 1e-6) down = Math.min(down, o.y - b.y - b.height)
+        else if (rowOverlap) { if (o.y + o.height / 2 < b.y + b.height / 2) up = 0; else down = 0 }
+      }
+    }
+    out[part] = { left: Math.max(0, left), right: Math.max(0, right), up: Math.max(0, up), down: Math.max(0, down) }
+  }
+  return out
+}
+/** 넓힘 배율만큼 칸을 키운다. 늘어난 몫은 양쪽 빈 자리 비율대로 나눈다. */
+function widenedBoxes(boxes: Partial<Record<Part, BoxConfig>>, widen: Partial<Record<Part, { x: number; y: number }>>, rooms: Partial<Record<Part, Room>>): Partial<Record<Part, BoxConfig>> {
+  const parts = Object.keys(widen) as Part[]
+  if (!parts.length) return boxes
+  const out = { ...boxes }
+  for (const part of parts) {
+    const box = boxes[part], w = widen[part]!, r = rooms[part]
+    if (!box || !r) continue
+    const gx = box.width * (w.x - 1), gy = box.height * (w.y - 1)
+    const sx = r.left + r.right, sy = r.up + r.down
+    out[part] = { ...box, x: box.x - (sx > 0 ? gx * r.left / sx : 0), width: box.width + gx, y: box.y - (sy > 0 ? gy * r.up / sy : 0), height: box.height + gy }
+  }
+  return out
+}
 function outerWidenOf(syllable: DecomposedSyllable): { left: number; right: number } {
   const initial = syllable.choseong?.char ?? '', medial = syllable.jungseong?.char ?? ''
   const doubled = 'ㄲㄸㅃㅆㅉ'.includes(initial) && initial !== ''
@@ -317,17 +356,21 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   // 좁은 칸 굵기 예산(줄 끝 균형 규칙 ①, `moldBudget.ts`): 자소 칸이 작아져 한 자소 안 나란한 획 틈이 바닥 아래로 가면 그 획부터 가늘어진다.
   // 기준은 엔진 처음 칸(대비 0)의 틈 — 처음 모습은 그대로다. 풍선 굵기도 이 가늘어진 획에서 시작한다.
   const budget = useMemo(() => {
-    if (placement.kind !== 'boxes' || !boxes) return { syllable: balloon.syllable, factors: {} as Record<string, number> }
+    if (placement.kind !== 'boxes' || !boxes) return { syllable: balloon.syllable, factors: {} as Record<string, number>, boxes }
     const m = weightToMultiplier(ratio === 1 ? effective.weight : scaledWeight(effective.weight, ratio))
     const strokesOn = (on: Partial<Record<Part, BoxConfig>>): BudgetStroke[] => resolveGlyphInkPrimitives({ syllable: balloon.syllable, placement: { kind: 'boxes', boxes: on }, weightMultiplier: 1, globalLinecap: effective.linecap, globalLinejoin: effective.linejoin, horizontalInkBounds: { min: 0, max: 1 } })
       .primitives.map((primitive) => ({ part: primitive.source.part, id: primitive.source.strokeId, points: flattenStrokeCenterline(primitive.stroke as StrokeDataV2, primitive.box), closed: primitive.stroke.closed, thickness: primitive.stroke.thickness * m }))
-    const factors = thinBudget(strokesOn(boxes), strokesOn(placement.boxes), contrast)
-    return { syllable: thinSyllable(balloon.syllable, factors), factors }
+    // 먼저 넓힌다(하니무스 2026-11-22): 자소 칸이 옆 자소 칸 · 글자 칸 끝까지 빈 자리만큼.
+    const rooms = roomsOf(boxes)
+    const room = Object.fromEntries(Object.entries(rooms).map(([part, r]) => [part, { x: 1 + (r.left + r.right) / Math.max(boxes[part as Part]!.width, 1e-6), y: 1 + (r.up + r.down) / Math.max(boxes[part as Part]!.height, 1e-6) }]))
+    const { factors, widen } = thinBudget(strokesOn(boxes), strokesOn(placement.boxes), contrast, room)
+    return { syllable: thinSyllable(balloon.syllable, factors), factors, boxes: widenedBoxes(boxes, widen, rooms) }
   }, [placement, boxes, balloon.syllable, effective, ratio, contrast])
+  const budgetBoxes = budget.boxes
   // 풍선 굵기: 보이는 글자 그대로(풍선 닿자까지 입힌 뒤)의 중심선으로 자소마다 칸 · 굵기를 푼다. 납작 붓은 방향별 굵기가 없어 가는 쪽 하나로.
   const heavy = useMemo(() => {
-    if (!heavyOn || !boxes) return null
-    const result = resolveGlyphInkPrimitives({ syllable: budget.syllable, placement: { kind: 'boxes', boxes }, weightMultiplier: 1, globalLinecap: effective.linecap, globalLinejoin: effective.linejoin, horizontalInkBounds: { min: 0, max: 1 } })
+    if (!heavyOn || !budgetBoxes) return null
+    const result = resolveGlyphInkPrimitives({ syllable: budget.syllable, placement: { kind: 'boxes', boxes: budgetBoxes }, weightMultiplier: 1, globalLinecap: effective.linecap, globalLinejoin: effective.linejoin, horizontalInkBounds: { min: 0, max: 1 } })
     const strokes: BalloonStroke[] = result.primitives.map((primitive) => ({ part: primitive.source.part, points: flattenStrokeCenterline(primitive.stroke as StrokeDataV2, primitive.box), closed: primitive.stroke.closed, thickness: primitive.stroke.thickness }))
     // 칸은 획이 실제로 놓인 상자로(엔진이 부위 칸 안에서 다시 놓을 수 있다). 한 부위에 상자가 여럿이면 합친다.
     const placed: Partial<Record<Part, BoxConfig>> = {}
@@ -339,9 +382,9 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     const k = heavyThicknessOf(wanted)
     const solved = solveBalloon({ strokes, boxes: placed, base, want: { v: base.v * k, h: base.h * (1 + (k - 1) * HEAVY_HORIZONTAL_SHARE) }, outer: outerWidenOf(budget.syllable) })
     // 푼 칸(획 상자 기준)의 바뀐 만큼을 부위 칸에 그대로 옮긴다.
-    const out: Partial<Record<Part, BoxConfig>> = { ...boxes }
+    const out: Partial<Record<Part, BoxConfig>> = { ...budgetBoxes }
     for (const [part, next] of Object.entries(solved.boxes) as [Part, BoxConfig][]) {
-      const from = placed[part], box = boxes[part]
+      const from = placed[part], box = budgetBoxes[part]
       if (!from || !box || !next) continue
       const kx = from.width > 1e-6 ? next.width / from.width : 1, ky = from.height > 1e-6 ? next.height / from.height : 1
       out[part] = { ...box, x: next.x + (box.x - from.x) * kx, y: next.y + (box.y - from.y) * ky, width: box.width * kx, height: box.height * ky }
@@ -410,7 +453,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       reaches.set(`${part}|${primitive.source.strokeId}`, { start: local(pts[0], pts[1], reach.start), end: local(pts[n - 1], pts[n - 2], reach.end) })
     })
     return { boxes: out, thick: solved.thick, syllable: reaches.size ? stretchedSyllable(budget.syllable, reaches) : budget.syllable }
-  }, [heavyOn, boxes, budget.syllable, effective.linecap, effective.linejoin, contrast, wanted])
+  }, [heavyOn, budgetBoxes, budget.syllable, effective.linecap, effective.linejoin, contrast, wanted])
   const globalStyle = useMemo(() => {
     const weighted = ratio === 1 ? effective : { ...effective, weight: scaledWeight(effective.weight, ratio) }
     // 획 끝 · 꺾임은 둥글기 하나가 맡는다(거북이 방향안 4차). 둥글기 · 대비 · 붓촉은 엔진의 붓 값에 얹는다(`moldInk`).
@@ -450,7 +493,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     }
     return { boxes: heavy.boxes, ink }
   }, [heavy])
-  useEffect(() => { if (onBake && boxes && molded) onBake({ char, syllable: raw, schema, target: boxes, sx: scale + balloon.spread.left + balloon.spread.right, lift, molded, thick: bakeThick, heavy: heavyBake }) }, [onBake, boxes, char, raw, schema, scale, lift, molded, bakeThick, balloon.spread, heavyBake])
+  useEffect(() => { if (onBake && budgetBoxes && molded) onBake({ char, syllable: raw, schema, target: budgetBoxes, sx: scale + balloon.spread.left + balloon.spread.right, lift, molded, thick: bakeThick, heavy: heavyBake }) }, [onBake, budgetBoxes, char, raw, schema, scale, lift, molded, bakeThick, balloon.spread, heavyBake])
   const strokeColorOf = shownStroke || highlight || (sel && sel !== 'WHOLE') ? colorOf : undefined
   if (heavy) {
     // 자소마다 가로 · 세로 굵기가 다르다. 엔진의 대비(토막 방향별 두께)를 자소마다 따로 줘서 겹쳐 그린다.
@@ -480,7 +523,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     <SvgRenderer
       syllable={budget.syllable}
       schema={placement.kind === 'schema' ? placement.schema : undefined}
-      boxes={boxes}
+      boxes={budgetBoxes}
       size={size}
       globalStyle={globalStyle}
       overflow="visible"
