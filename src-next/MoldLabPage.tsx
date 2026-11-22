@@ -222,6 +222,11 @@ function widenedBoxes(boxes: Partial<Record<Part, BoxConfig>>, widen: Partial<Re
   }
   return out
 }
+/**
+ * 글자 바닥(거북이 굵을-때-획-균형.md ② · ③, 완료 기준): 굵을 때 어느 글자든 가장 가는 획 ≥ 글줄 기준 T(바라는 세로줄기)의 이 비율.
+ * 폰트 패턴: 검은고딕(T 0.19em) 글자마다 가장 가는 획 ÷ 「이」 기둥의 가장 낮은 값 0.50, 노토 900 가운데 0.78.
+ */
+const GLYPH_FLOOR = 0.5
 function outerWidenOf(syllable: DecomposedSyllable): { left: number; right: number } {
   const initial = syllable.choseong?.char ?? '', medial = syllable.jungseong?.char ?? ''
   const doubled = 'ㄲㄸㅃㅆㅉ'.includes(initial) && initial !== ''
@@ -305,7 +310,6 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     for (let i = 0; i < 3 && cap !== Infinity; i++) cap = Math.min(capAt(cap), LOOK_WALL.weight[1])
     return cap
   }, [onCap, placement, raw.layoutType, edits, look.frame, look.size, look.height, look.jamo, look.center, look.open, look.jag, syllable, effective, char]) // eslint-disable-line react-hooks/exhaustive-deps -- 굵기 값은 일부러 뺀다
-  useEffect(() => { onCap?.(capRatio) }, [onCap, capRatio])
   // 풍선 굵기: 여기서부터(자소 키우기 · 울타리 · 풍선 닿자)는 처음 굵기로 재고, 굵기는 맨 끝에서 자소마다 푼다.
   const ratio = heavyOn ? 1 : appliedWeight(wanted, BALLOON_WEIGHT ? Infinity : weightCap)
   const grown = useMemo(() => {
@@ -368,7 +372,8 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   }, [placement, boxes, balloon.syllable, effective, ratio, contrast])
   const budgetBoxes = budget.boxes
   // 풍선 굵기: 보이는 글자 그대로(풍선 닿자까지 입힌 뒤)의 중심선으로 자소마다 칸 · 굵기를 푼다. 납작 붓은 방향별 굵기가 없어 가는 쪽 하나로.
-  const heavy = useMemo(() => {
+  // 풍선에 넣을 획 · 칸(굵기 값과 무관 — 글줄 멈춤을 잴 때도 같이 쓴다).
+  const heavyInput = useMemo(() => {
     if (!heavyOn || !budgetBoxes) return null
     const result = resolveGlyphInkPrimitives({ syllable: budget.syllable, placement: { kind: 'boxes', boxes: budgetBoxes }, weightMultiplier: 1, globalLinecap: effective.linecap, globalLinejoin: effective.linejoin, horizontalInkBounds: { min: 0, max: 1 } })
     const strokes: BalloonStroke[] = result.primitives.map((primitive) => ({ part: primitive.source.part, points: flattenStrokeCenterline(primitive.stroke as StrokeDataV2, primitive.box), closed: primitive.stroke.closed, thickness: primitive.stroke.thickness }))
@@ -379,8 +384,33 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       placed[part] = old ? { x: Math.min(old.x, b.x), y: Math.min(old.y, b.y), width: Math.max(old.x + old.width, b.x + b.width) - Math.min(old.x, b.x), height: Math.max(old.y + old.height, b.y + b.height) - Math.min(old.y, b.y) } : { ...b }
     }
     const base = { v: contrast >= 0 ? 1 + 0.8 * contrast : 1 + 0.5 * contrast, h: contrast >= 0 ? 1 - 0.45 * contrast : 1 - 0.5 * contrast }
-    const k = heavyThicknessOf(wanted)
-    const solved = solveBalloon({ strokes, boxes: placed, base, want: { v: base.v * k, h: base.h * (1 + (k - 1) * HEAVY_HORIZONTAL_SHARE) }, outer: outerWidenOf(budget.syllable) })
+    const wantOf = (weight: number) => { const k = heavyThicknessOf(weight); return { v: base.v * k, h: base.h * (1 + (k - 1) * HEAVY_HORIZONTAL_SHARE) } }
+    const solveAt = (weight: number) => solveBalloon({ strokes, boxes: placed, base, want: wantOf(weight), outer: outerWidenOf(budget.syllable) })
+    return { result, strokes, placed, base, wantOf, solveAt }
+  }, [heavyOn, budgetBoxes, budget.syllable, effective.linecap, effective.linejoin, contrast])
+  // 글줄 바닥 · 같이 멈춤(거북이 굵을-때-획-균형.md ② · ③, 하니무스 2026-11-22 "넣어"): 이 글자를 풀었을 때 가장 가는 몫이
+  // 글줄 기준 굵기(T = 바라는 세로줄기)의 바닥(`heavyFloorOf`) 아래로 가면, 이 글자를 처음 굵기로 떨어뜨리지 않고 글줄 굵기를 그 바닥에 닿는 데까지만 올린다.
+  // 굵기 값과 무관하게 한 번 잰다(굵기 끝까지 걸음으로 훑어 바닥을 지키는 가장 굵은 값) — 지금 굵기로 재면 멈춤 → 굵기 → 멈춤이 물린다.
+  const heavyCap = useMemo(() => {
+    if (!heavyInput || !onCap) return Infinity
+    const { strokes, solveAt, wantOf } = heavyInput
+    // 닫힌 획만 있는 자소(ㅇ)는 뺀다 — 고리 두께는 속이 정한다(거북이 자도 ㅇ은 기울기 45° 안쪽만 재고 기준에 안 넣었다).
+    const present = (['CH', 'JU', 'JO'] as const).filter((g) => strokes.some((stroke) => balloonGroupOf(stroke.part) === g && !stroke.closed))
+    const holds = (weight: number) => {
+      const want = wantOf(weight), thick = solveAt(weight).thick
+      return present.every((g) => Math.min(thick[g].v, thick[g].h) >= GLYPH_FLOOR * want.v - 1e-6)
+    }
+    const top = LOOK_WALL.weight[1]
+    if (holds(top)) return Infinity
+    let lo = 1, hi = top
+    for (let i = 0; i < 9; i++) { const mid = (lo + hi) / 2; if (holds(mid)) lo = mid; else hi = mid }
+    return lo
+  }, [heavyInput, onCap])
+  useEffect(() => { onCap?.(heavyOn ? heavyCap : capRatio) }, [onCap, heavyOn, heavyCap, capRatio])
+  const heavy = useMemo(() => {
+    if (!heavyInput || !budgetBoxes) return null
+    const { result, strokes, placed, solveAt, base } = heavyInput
+    const solved = solveAt(Math.min(wanted, Math.max(1, weightCap)))
     // 푼 칸(획 상자 기준)의 바뀐 만큼을 부위 칸에 그대로 옮긴다.
     const out: Partial<Record<Part, BoxConfig>> = { ...budgetBoxes }
     for (const [part, next] of Object.entries(solved.boxes) as [Part, BoxConfig][]) {
@@ -453,7 +483,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       reaches.set(`${part}|${primitive.source.strokeId}`, { start: local(pts[0], pts[1], reach.start), end: local(pts[n - 1], pts[n - 2], reach.end) })
     })
     return { boxes: out, thick: solved.thick, syllable: reaches.size ? stretchedSyllable(budget.syllable, reaches) : budget.syllable }
-  }, [heavyOn, budgetBoxes, budget.syllable, effective.linecap, effective.linejoin, contrast, wanted])
+  }, [heavyInput, budgetBoxes, budget.syllable, effective.linecap, contrast, wanted, weightCap])
   const globalStyle = useMemo(() => {
     const weighted = ratio === 1 ? effective : { ...effective, weight: scaledWeight(effective.weight, ratio) }
     // 획 끝 · 꺾임은 둥글기 하나가 맡는다(거북이 방향안 4차). 둥글기 · 대비 · 붓촉은 엔진의 붓 값에 얹는다(`moldInk`).
@@ -1047,7 +1077,7 @@ export function MoldLabPage() {
     return out
   }, [sentence])
   const weightCap = Math.min(Infinity, ...[...sentence].map((char, at) => (char === ' ' ? Infinity : caps[`${sentence}-${at}`] ?? Infinity)))
-  const weightNote = appliedWeight(lookOf(look, 'weight'), weightCap) < lookOf(look, 'weight') ? '획이 붙기 직전이라 글줄 전체가 여기서 멈춤' : ''
+  const weightNote = appliedWeight(lookOf(look, 'weight'), weightCap) < lookOf(look, 'weight') ? (lookOf(look, 'weight') > 1 ? '가장 빽빽한 글자의 가는 획이 글자 바닥(기준 세로줄기의 0.5배)에 닿아 글줄 굵기가 여기서 멈춤' : '획이 붙기 직전이라 글줄 전체가 여기서 멈춤') : ''
   // 굵기 줄에서 더 가면 획이 붙는 칸은 잠근다(그림이 안 바뀌는데 값만 오르는 일이 없게).
   const weightLock = weightCap === Infinity ? undefined : Math.max(0, ...Array.from({ length: 21 }, (_, k) => k).filter((k) => dotToLook('weight', k) <= Math.max(1, weightCap) + 1e-6))
   // 울타리 보정과 획 사이 최소 틈은 사용자 값이 아니라 서비스가 지킬 기준이라 화면에서 뺐다(고양이 흐름 다시 보기 7번). 늘 안전선으로 켜 둔다.
