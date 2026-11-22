@@ -24,6 +24,7 @@ import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
 import { HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement, useNotoModel } from './notoModel'
+import { stackColumns, stackLay } from './moldStack'
 import { balloonGroupOf, endReachOf, inkOfThick, solveBalloon, type BalloonGroup, type BalloonStroke } from './moldBalloon'
 import { applyBakedLayouts, bakedConsonants, bakedResidual, bakedVowels, bakeLayout, jagRules, meanThick, type BakeTarget, type BakedLayout } from './moldBake'
 import { layoutDeltaSnapshot } from './layoutDeltaStore'
@@ -227,6 +228,8 @@ function widenedBoxes(boxes: Partial<Record<Part, BoxConfig>>, widen: Partial<Re
  * 폰트 패턴: 검은고딕(T 0.19em) 글자마다 가장 가는 획 ÷ 「이」 기둥의 가장 낮은 값 0.50, 노토 900 가운데 0.78.
  */
 const GLYPH_FLOOR = 0.5
+/** 쌓인 획 법칙에서 앞 걸음 굵기를 볼 때 굵기 1 ~ 지금을 나눈 칸 수. */
+const STACK_STEPS = 8
 function outerWidenOf(syllable: DecomposedSyllable): { left: number; right: number } {
   const initial = syllable.choseong?.char ?? '', medial = syllable.jungseong?.char ?? ''
   const doubled = 'ㄲㄸㅃㅆㅉ'.includes(initial) && initial !== ''
@@ -385,7 +388,14 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     }
     const base = { v: contrast >= 0 ? 1 + 0.8 * contrast : 1 + 0.5 * contrast, h: contrast >= 0 ? 1 - 0.45 * contrast : 1 - 0.5 * contrast }
     const wantOf = (weight: number) => { const k = heavyThicknessOf(weight); return { v: base.v * k, h: base.h * (1 + (k - 1) * HEAVY_HORIZONTAL_SHARE) } }
-    const solveAt = (weight: number) => solveBalloon({ strokes, boxes: placed, base, want: wantOf(weight), outer: outerWidenOf(budget.syllable) })
+    const outer = outerWidenOf(budget.syllable)
+    // 쌓인 획 법칙(거북이 ①): 칸을 글자 기둥 전체로 먼저 다시 나누고, 풍선은 그 칸 · 그 굵기에서 출발한다. 앞 걸음들의 굵기를 바닥으로 넘겨 굵기를 올려도 획이 안 가늘어진다.
+    const columns = stackColumns(strokes, base)
+    const solveAt = (weight: number) => {
+      const wants = Array.from({ length: STACK_STEPS + 1 }, (_, i) => wantOf(1 + (weight - 1) * i / STACK_STEPS))
+      const lay = stackLay(columns, strokes, placed, base, wants, outer)
+      return solveBalloon({ strokes: lay.strokes, boxes: lay.boxes, base, start: lay.start, want: wantOf(weight), outer })
+    }
     return { result, strokes, placed, base, wantOf, solveAt }
   }, [heavyOn, budgetBoxes, budget.syllable, effective.linecap, effective.linejoin, contrast])
   // 글줄 바닥 · 같이 멈춤(거북이 굵을-때-획-균형.md ② · ③, 하니무스 2026-11-22 "넣어"): 이 글자를 풀었을 때 가장 가는 몫이

@@ -31,6 +31,11 @@ export interface BalloonInput {
   /** 출발 굵기(대비 줄 값까지 든 것)와 바라는 굵기. */
   base: Thick
   want: Thick
+  /**
+   * 자소 묶음마다 출발 굵기(없으면 `base`). 쌓인 획 법칙(`stackLay`)이 칸을 먼저 놓은 묶음은 그 굵기에서 출발한다 — 그 굵기가 바닥이고,
+   * 짝 · 틈 목표도 그 굵기의 잉크로 잰다. 기둥에 안 걸린 묶음(「밤」 받침 ㅁ 세로)은 처음 굵기에서 풍선이 그대로 푼다.
+   */
+  start?: Partial<Record<BalloonGroup, Thick>>
   /** 글자 잉크 폭이 바깥으로 넓어지는 양(세로줄기가 굵어진 em 1당, 왼끝 · 오른끝). 거북이 넓어짐 공식 1절. 없으면 안 넓어진다. */
   outer?: { left: number; right: number }
 }
@@ -190,6 +195,8 @@ const SHARE_STEP = 0.006
 const CONTRAST_KEEP = 0.72
 /** 가장 가는 획 ÷ 바라는 굵기의 바닥: 노토 산스 KR 900 600자, 가장 가는 세로 · 가로줄기 ÷ 「이」 기둥 · 「으」 보 p5(세로 0.69 · 가로 0.68). 좁은 칸 예산(`moldBudget`) · 글줄 굵기 멈춤(`MoldLabPage`)이 쓴다. */
 export const THIN_FLOOR = 0.69
+/** 한 글자 안 가장 가는 가로 ÷ 세로 기둥의 바닥. 노토 산스 KR 900 600자에서 글자 안 가는 ÷ 굵은 p5 0.78(좁은 칸 같은 결 고르기 EVEN과 같은 값). */
+const GLYPH_EVEN = 0.78
 interface BetweenPair { i: number; j: number }
 interface PartPair { a: Part; b: Part; target: number; pairs: BetweenPair[] }
 
@@ -209,7 +216,7 @@ function coveredAt(at: Pt, segs: readonly Seg[], own: BalloonGroup, thickOf: (g:
  * 자소 안: 나란한 두 토막, 처음부터 붙지 않은 것, 한 획 굽은 길의 이웃 · 이음 자리 쐐기는 뺀다.
  * 자소 사이: 모든 토막 쌍(끝이 옆면을 보는 것도) 가운데 가까운 것들.
  */
-function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, delta: number): { inside: InsidePair[]; between: PartPair[]; stubs: Stub[]; arms: Arm[] } {
+function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], startOf: Record<BalloonGroup, Thick>, delta: number): { inside: InsidePair[]; between: PartPair[]; stubs: Stub[]; arms: Arm[] } {
   const inside: InsidePair[] = []
   const stubs: Stub[] = []
   const arms: Arm[] = []
@@ -223,7 +230,7 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
     const p = segs[i], q = segs[j]
     if (p.group !== q.group || p.stroke === q.stroke) continue
     const near = nearest(p, q)
-    if (near.d > halfOf(p, base) + halfOf(q, base)) continue
+    if (near.d > halfOf(p, startOf[p.group]) + halfOf(q, startOf[q.group])) continue
     const key = `${p.stroke}:${q.stroke}`
     if ((joints.get(key)?.d ?? Infinity) <= near.d) continue
     joints.set(key, { x: (near.p.x + near.q.x) / 2, y: (near.p.y + near.q.y) / 2, d: near.d })
@@ -239,7 +246,7 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
       const near = nearest(p, q)
       // 틈은 잇는 방향으로 내미는 두께로 잰다 — 나란한 옆면끼리(ㅐ 두 기둥)도, 끝이 옆면을 보는 것(ㄲ 둘째 ㄱ 가로 끝 ↔ 첫 ㄱ 세로)도.
       // 끝끼리 마주 본 것(한 줄 위 두 가로 끝)은 굵기로 안 좁아지니 빠진다.
-      const g0 = gapBetween(p, q, base, base)
+      const g0 = gapBetween(p, q, startOf[p.group], startOf[q.group])
       if (near.d < EPS || g0.reachP + g0.reachQ < EPS) continue
       const gap = g0.gap
       if (gap <= JOINED_RATIO * Math.min(p.t, q.t)) continue
@@ -256,7 +263,7 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
       if (p.stroke !== q.stroke && !parallel(p, q)) {
         const mid = { x: (near.p.x + near.q.x) / 2, y: (near.p.y + near.q.y) / 2 }
         const hung = strokes.some((_, r) => r !== p.stroke && r !== q.stroke && touch.has(`${r}:${p.stroke}`) && touch.has(`${r}:${q.stroke}`)
-          && segs.some((seg) => seg.stroke === r && pointToSeg(mid.x, mid.y, seg).d <= halfOf(seg, base) + Math.max(p.t, q.t)))
+          && segs.some((seg) => seg.stroke === r && pointToSeg(mid.x, mid.y, seg).d <= halfOf(seg, startOf[seg.group]) + Math.max(p.t, q.t)))
         if (hung) continue
       }
       // 서로 이어진 두 획(ㅊ의 ㅅ 두 다리가 한 점에서 갈라짐)은 마주 보지 않는 한 그 사이가 쐐기다 — 굵어지면 메워진다.
@@ -266,7 +273,7 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
       if (joint && !facing(p, q) && near.d >= 0.5 * (Math.hypot(near.p.x - joint.x, near.p.y - joint.y) + Math.hypot(near.q.x - joint.x, near.q.y - joint.y))) continue
       inside.push({ i, j, target: gap, ring: p.stroke === q.stroke ? !!strokes[p.stroke].closed : enclosed(p.stroke, q.stroke), closed: p.stroke === q.stroke && !!strokes[p.stroke].closed })
     } else {
-      const { gap } = gapBetween(p, q, base, base)
+      const { gap } = gapBetween(p, q, startOf[p.group], startOf[q.group])
       const key = p.part < q.part ? `${p.part}|${q.part}` : `${q.part}|${p.part}`
       const entry = byParts.get(key) ?? { a: p.part, b: q.part, list: [] }
       entry.list.push({ i, j, gap })
@@ -284,23 +291,23 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
       segs.forEach((other, at) => {
         if (other.stroke === index || other.group !== seg.group || lengthOf(other) < EPS) return
         const d = pointToSeg(end.x, end.y, other).d
-        if (d > halfOf(other, base) + 1e-3 || (best && d >= best.d)) return
+        if (d > halfOf(other, startOf[other.group]) + 1e-3 || (best && d >= best.d)) return
         // 옆면에 붙어야 한다 — 다른 획의 끝과 만나는 것(ㅈ · ㅅ 두 다리, ㄱ 꺾임)은 이음이지 꼭지가 아니다.
         const strokeOf = segs.filter((seg2) => seg2.stroke === other.stroke)
         const head = strokeOf[0], tail = strokeOf[strokeOf.length - 1]
         const nearEnd = Math.min(Math.hypot(end.x - head.ax, end.y - head.ay), Math.hypot(end.x - tail.bx, end.y - tail.by))
-        if (!strokes[other.stroke].closed && nearEnd <= halfOf(other, base) + halfOf(seg, base) + 1e-3) return
+        if (!strokes[other.stroke].closed && nearEnd <= halfOf(other, startOf[other.group]) + halfOf(seg, startOf[seg.group]) + 1e-3) return
         best = { on: at, d }
       })
       if (!best) continue
       const other = segs[(best as { on: number }).on]
       if (parallel(seg, other)) continue
       const dx = (seg.bx - seg.ax) / lengthOf(seg), dy = (seg.by - seg.ay) / lengthOf(seg)
-      const visible0 = length - reachOf(other, dx, dy, base)
+      const visible0 = length - reachOf(other, dx, dy, startOf[other.group])
       if (visible0 <= 0) continue
       // 반대 끝이 다른 자소 잉크에 묻힌 몫(「풍」 짧은기둥 끝이 ㅇ에 닿음)은 처음부터 안 보이던 길이다.
       const freeEnd = which === 0 ? { x: own[own.length - 1].bx, y: own[own.length - 1].by } : { x: own[0].ax, y: own[0].ay }
-      const covered0 = coveredAt(freeEnd, segs, seg.group, () => base)
+      const covered0 = coveredAt(freeEnd, segs, seg.group, (group) => startOf[group])
       found.push({ on: (best as { on: number }).on, stroke: index, keep: STUB_KEEP * Math.max(0, visible0 - covered0.depth), visible: Math.max(0, visible0 - covered0.depth), free: which === 0 ? 1 : 0 })
     }
     // 두 끝이 다 붙은 획(ㅐ 두 기둥 사이 가로획)은 꼭지가 아니라 다리다 — 두 기둥 사이 틈은 자소 안 틈이 맡는다.
@@ -335,8 +342,8 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], base: Thick, 
       if (ll < EPS || lp < EPS) continue
       const cos = Math.abs(((leg.seg.bx - leg.seg.ax) * (perp.seg.bx - perp.seg.ax) + (leg.seg.by - leg.seg.ay) * (perp.seg.by - perp.seg.ay)) / ll / lp)
       if (cos > 0.3) continue
-      if (segs.some((other) => other.stroke !== index && other.group === leg.seg.group && pointToSeg(end.x, end.y, other).d <= halfOf(other, base) + 1e-3)) continue
-      const half0 = halfOf(perp.seg, base)
+      if (segs.some((other) => other.stroke !== index && other.group === leg.seg.group && pointToSeg(end.x, end.y, other).d <= halfOf(other, startOf[other.group]) + 1e-3)) continue
+      const half0 = halfOf(perp.seg, startOf[perp.seg.group])
       if (half0 < EPS) continue
       arms.push({ leg: leg.at, perp: perp.at, keep: Math.max(0, (ll - half0) / (2 * half0)) })
     }
@@ -385,13 +392,13 @@ function cornerSide(p: Seg, q: Seg, axis: 'x' | 'y'): { axis: 'x' | 'y'; dir: nu
 export function solveBalloon(input: BalloonInput): BalloonResult {
   const { strokes, base, want } = input
   const groups: BalloonGroup[] = ['CH', 'JU', 'JO']
-  const start = Object.fromEntries(groups.map((g) => [g, { ...base }])) as Record<BalloonGroup, Thick>
-  if (!(want.v > base.v + EPS) && !(want.h > base.h + EPS)) return { boxes: input.boxes, thick: Object.fromEntries(groups.map((g) => [g, { ...want }])) as Record<BalloonGroup, Thick> }
+  const start = Object.fromEntries(groups.map((g) => [g, { ...(input.start?.[g] ?? base) }])) as Record<BalloonGroup, Thick>
+  if (groups.every((g) => !(want.v > start[g].v + EPS) && !(want.h > start[g].h + EPS))) return { boxes: input.boxes, thick: Object.fromEntries(groups.map((g) => [g, { ...want }])) as Record<BalloonGroup, Thick> }
   const unit = normalized(strokes, input.boxes)
   const first = segmentsOf(strokes, unit, input.boxes)
   const median = [...strokes].map((s) => s.thickness).sort((a, b) => a - b)[Math.floor(strokes.length / 2)] ?? 0.07
   const delta = median * Math.max(0, want.v - base.v)
-  const { inside, between, stubs, arms } = pickPairs(first, strokes, base, delta)
+  const { inside, between, stubs, arms } = pickPairs(first, strokes, start, delta)
   const parts = [...new Set(strokes.map((s) => s.part))]
   // 칸 = 처음 굵기의 잉크 칸. 자소 사이 틈에 따라 변이 움직인다.
   const cells = new Map<Part, Cell>(), firstCenter = new Map<Part, Cell>()
@@ -520,18 +527,21 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
       }
     }
     const present = groups.filter((g) => strokes.some((s) => balloonGroupOf(s.part) === g))
-    for (const g of present) { sol[g].v = Math.max(base.v, sol[g].v); sol[g].h = Math.max(base.h, sol[g].h) }
+    for (const g of present) { sol[g].v = Math.max(start[g].v, sol[g].v); sol[g].h = Math.max(start[g].h, sol[g].h) }
     // 한 자소 안 가로 · 세로 고르기: 가로가 예산에 막혀 얇아지면 세로도 같이 덜 굵어진다(「향」 ㅎ 가로만 가늘어 고르지 않음).
     // 폰트도 획 많은 글자는 가로÷세로가 조금 준다(「를」 0.71 → 0.65) — 바라는 비의 CONTRAST_KEEP까지만 벌어진다.
     for (const g of present) {
       const ratio = want.h / Math.max(want.v, EPS)
-      sol[g].v = Math.min(sol[g].v, Math.max(base.v, sol[g].h / (CONTRAST_KEEP * ratio)))
-      sol[g].h = Math.min(sol[g].h, Math.max(base.h, sol[g].v * ratio / CONTRAST_KEEP))
+      sol[g].v = Math.min(sol[g].v, Math.max(start[g].v, sol[g].h / (CONTRAST_KEEP * ratio)))
+      sol[g].h = Math.min(sol[g].h, Math.max(start[g].h, sol[g].v * ratio / CONTRAST_KEEP))
     }
     // 한 글자 안 굵기 띠.
     const leastV = Math.min(...present.map((g) => sol[g].v)), leastH = Math.min(...present.map((g) => sol[g].h))
     for (const g of present) {
       sol[g].v = Math.min(sol[g].v, leastV / BALLOON_BAND); sol[g].h = Math.min(sol[g].h, leastH / BALLOON_BAND)
+      // 글자 안 가로 · 세로 고르기(글자 전체): 가장 가는 가로가 막히면 모든 세로가 그 1 ÷ GLYPH_EVEN배까지만 — 쌓인 획 법칙의 바닥보다 앞선다.
+      // 하니무스 2026-11-22 굵기 100 캡처 「절」 「늘」 「습」 「득」: ㄹ · ㅂ · ㅡ 가로가 ㅓ · ㅣ 기둥의 반쯤으로 눈에 띄게 가늘었다.
+      sol[g].v = Math.min(sol[g].v, Math.max(base.v, leastH / GLYPH_EVEN))
       // 반씩 다가간다 — 굵기와 칸이 서로 물려 출렁이지 않게.
       thick[g] = { v: thick[g].v + 0.5 * (sol[g].v - thick[g].v), h: thick[g].h + 0.5 * (sol[g].h - thick[g].h) }
     }
