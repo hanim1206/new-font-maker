@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BoxConfig, Part } from '../src/types'
-import { BALLOON_END, inkOfThick, solveBalloon, type BalloonStroke } from './moldBalloon'
+import { engineGapOf, inkOfThick, solveBalloon, type BalloonStroke } from './moldBalloon'
 
 const T = 0.07
 const bar = (part: Part, y: number, x0: number, x1: number): BalloonStroke => ({ part, thickness: T, points: [{ x: x0, y }, { x: x1, y }] })
@@ -17,13 +17,14 @@ describe('풍선 굵기', () => {
     expect(out.thick.CH).toEqual(one)
   })
 
-  it('한 자소에 가로줄기 셋이 쌓였으면 (칸 − 흰 틈 × 2) ÷ 3까지만 굵어진다. 기둥은 바라는 대로', () => {
+  it('한 자소에 가로줄기 셋이 쌓였으면 (칸 − 엔진 틈 바닥 × 2) ÷ 3까지만 굵어진다. 기둥은 바라는 대로', () => {
     // ㅌ 꼴: 가로줄기 셋 + 왼쪽 기둥. 잉크 칸 키 = 0.4 + 0.07.
     const box: BoxConfig = { x: 0.2, y: 0.3, width: 0.4, height: 0.4 }
     const strokes = [bar('CH', 0.3, 0.2, 0.6), bar('CH', 0.5, 0.2, 0.6), bar('CH', 0.7, 0.2, 0.6), stem('CH', 0.2, 0.3, 0.7)]
     const out = solveBalloon({ strokes, boxes: { CH: box }, base: one, want: { v: 4, h: 4 } })
-    const cell = 0.47, budget = (cell - BALLOON_END.inside * 2) / 3
-    expect(out.thick.CH.h * T).toBeCloseTo(budget, 2)
+    // 흰 틈 바닥은 엔진 하나(그 글자 세로줄기의 0.2배, 최소 0.025em): 3t + 2 × 바닥 = 칸.
+    const cell = 0.47, t = out.thick.CH.h * T
+    expect(3 * t + 2 * engineGapOf(out.thick.CH.v * T)).toBeCloseTo(cell, 2)
     // 잉크 바깥 끝은 그대로: 중심선 칸이 굵어진 만큼 안으로.
     const b = out.boxes.CH!
     expect(b.y - out.thick.CH.h * T / 2).toBeCloseTo(0.3 - T / 2, 2)
@@ -40,7 +41,7 @@ describe('풍선 굵기', () => {
       const yOf = (part: Part, unit: number) => { const b = out.boxes[part]!; return b.y + unit * b.height }
       const ys = [yOf('CH', 0), yOf('CH', 0.5), yOf('CH', 1), yOf('JU', 0), yOf('JO', 0), yOf('JO', 0.5), yOf('JO', 1)]
       const th = [out.thick.CH.h, out.thick.CH.h, out.thick.CH.h, out.thick.JU.h, out.thick.JO.h, out.thick.JO.h, out.thick.JO.h].map((m) => m * T)
-      for (const gap of gapsOf(ys, th)) expect(gap).toBeGreaterThan(BALLOON_END.inside - 0.006)
+      gapsOf(ys, th).forEach((gap, i) => expect(gap).toBeGreaterThan(engineGapOf(Math.max(th[i], th[i + 1])) - 0.006))
       expect(Math.min(...th) / Math.max(...th)).toBeGreaterThan(0.7)
       // 글자 바깥 끝은 안 넘는다.
       expect(ys[0] - th[0] / 2).toBeGreaterThan(0.1 - T / 2 - 0.005)
@@ -58,8 +59,9 @@ describe('풍선 굵기', () => {
     }
     const start = 0.75 - 0.5 - T
     expect(gapAt(1.5).gap).toBeLessThan(start)
-    expect(gapAt(1.5).gap).toBeGreaterThan(BALLOON_END.between - 0.004)
-    expect(gapAt(4).gap).toBeGreaterThan(BALLOON_END.between - 0.004)
+    const floorAt = (k: number) => { const { out } = gapAt(k); return engineGapOf(Math.max(out.thick.CH.v, out.thick.JU.v) * T) }
+    expect(gapAt(1.5).gap).toBeGreaterThan(floorAt(1.5) - 0.004)
+    expect(gapAt(4).gap).toBeGreaterThan(floorAt(4) - 0.004)
     expect(gapAt(4).gap).toBeLessThan(0.06)
     // 기둥의 오른쪽 잉크 끝(글자 바깥)은 그대로.
     const ju = gapAt(4).out

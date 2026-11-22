@@ -1,4 +1,5 @@
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
+import { ENGINE_GAP_RULE } from './moldGap'
 import { instanceInJamo, instanceOf, JAMO_CHANNELS, masterFromStroke, masterNameOf, baseOf, stemAxisOf, stemReferenceBox, type AxisPoint, type StemBase, type StemMaster } from '../src/services/stemMaster'
 import type { BoxConfig, BrushStyle, DecomposedSyllable, JamoData, LayoutType, Part, StrokeDataV2, StrokeRenderStyle } from '../src/types'
 
@@ -351,8 +352,6 @@ export function bigText(info: BigInfo, value: number | undefined, weightCap = In
 export const GAP_FLOOR = 0.7
 /** 굵기선 기울기(굵기가 늘면 기대 틈이 주는 몫). 거북이 자소별 표의 가운데쯤 — 자소별로 나누기 전 임시. */
 export const GAP_SLOPE = 0.9
-/** 어떤 경우에도 남기는 틈(두께의 몫). 엔진의 최소 틈과 같다. */
-export const MIN_GAP_OF_THICKNESS = 0.25
 
 export interface GapStroke {
   points: readonly { x: number; y: number; handleIn?: { x: number; y: number }; handleOut?: { x: number; y: number } }[]
@@ -462,8 +461,8 @@ export function gapCapMultiplier(reference: readonly GapStroke[], current: reado
       // ① 굵기선 바닥: d − m·h ≥ floor × (g0 − slope × (m − m0)·h). g0 = 빚은 상자에서 처음 굵기일 때 틈 — 칸을 줄였으면 기대 틈도 같이 준다.
       const g0 = dCur - half * baseMultiplier
       const byLine = (dCur - floor * (g0 + slope * baseMultiplier * half)) / (half * (1 - floor * slope))
-      // ② 절대 바닥: 틈 ≥ 두께 × 0.25(엔진의 최소 틈). 칸이 너무 좁아져 처음 굵기로도 붙으면 여기서 가늘어진다.
-      const byFloor = dCur / (half * (1 + MIN_GAP_OF_THICKNESS))
+      // ② 절대 바닥: 엔진 전체 틈 바닥(`moldGap.ts`) — 틈 ≥ max(0.025em, 0.2 × 두께). 칸이 너무 좁아져 처음 굵기로도 붙으면 여기서 가늘어진다.
+      const byFloor = Math.min(dCur / (half * (1 + ENGINE_GAP_RULE.ratio)), (dCur - ENGINE_GAP_RULE.least) / half)
       cap = Math.min(cap, Math.max(Math.min(byLine, byFloor), 0))
     }
   }

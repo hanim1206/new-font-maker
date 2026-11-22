@@ -1,12 +1,13 @@
 import type { DecomposedSyllable, JamoData, Part, StrokeDataV2 } from '../src/types'
 import { balloonGroupOf, THIN_FLOOR } from './moldBalloon'
+import { engineGapOf } from './moldGap'
 export { THIN_FLOOR }
 
 /**
  * 좁은 칸 굵기 예산(거북이 2026-11-22 줄 끝 균형 규칙 ①, 하니무스 승인 "1 다음 3까지 한 번에").
  * 자소 칸이 작아지면(닿자 0 · 받침 자리 100 · 대비 100) 한 자소 안 나란한 획 사이 흰 틈이 먼저 사라져 덩어리가 됐다.
  * 그래서 틈이 바닥 아래로 내려가는 쌍은 획이 먼저 가늘어진다: 획 굵기 t ≤ (W − (n − 1) g) / n, g = max(0.025em, 0.2 × 세로줄기).
- * - 바닥 g: 풍선 굵기의 열린 틈 바닥과 같은 식(거북이 넓어짐 공식 2절, `STEM_GAP`).
+ * - 바닥 g: 엔진 전체 틈 바닥(`moldGap.ts` engineGapOf).
  * - 처음(엔진 칸, 대비 0)부터 g보다 좁던 쌍은 그 처음 틈까지만 지킨다 — 처음 모습은 안 바꾼다.
  * - 실험실 근거: 겹기둥 홀자(ㅐ · ㅔ · ㅒ) 기둥은 0.083 → 0.079로 가늘다. 굵기 실험실 S7(ㅃ · ㅉ)은 900에서 가로가 1.10배만 굵어진다. 좁으면 획이 양보한다.
  * 하니무스 2026-11-22 "획을 줄이기 전에 먼저 옆으로 늘리는 걸 시도해 보고" · "노토 산스 블랙의 굵은 선 ↔ 가는 선 대비를 기준으로":
@@ -18,8 +19,6 @@ export { THIN_FLOOR }
  * 획마다 두께 배율(`strokeKey` 열쇠)과 자소 칸 넓힘 배율을 돌려준다. 1이면 안 넣는다.
  */
 export interface BudgetStroke { part: Part; id: string; points: { x: number; y: number }[]; closed: boolean; /** em */ thickness: number }
-/** 열린 틈 바닥(em): max(least, ratio × 세로줄기). `moldBalloon` STEM_GAP과 같은 값. */
-const GAP = { least: 0.025, ratio: 0.2 } as const
 /** 획이 이보다 가늘어지지는 않는다(처음 굵기 대비). */
 /** 같은 결 획 굵기 고르기(노토 900 p5). */
 export const EVEN = 0.78
@@ -71,7 +70,7 @@ export function thinBudget(now: readonly BudgetStroke[], ref: readonly BudgetStr
   const sameShape = !!refSegs && refSegs.length === segs.length
   const stems = segs.filter((s) => upright(s) > 0.5).map((s) => s.t * cv).sort((a, b) => a - b)
   const stem = stems[Math.floor(stems.length / 2)] ?? (segs[0]?.t ?? 0.07)
-  const floor = Math.max(GAP.least, GAP.ratio * stem)
+  const floor = engineGapOf(stem)
   // 1) 좁아진 쌍을 모은다.
   interface Tight { p: Seg; q: Seg; d: number; h: number; target: number; axis: 'x' | 'y' }
   const tight: Tight[] = []

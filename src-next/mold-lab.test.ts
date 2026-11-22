@@ -116,12 +116,12 @@ describe('획 사이 최소 틈', () => {
     expect(gapCapMultiplier(rieul(0.5), rieul(0.4), 1, 0.7, 0)).toBeCloseTo(1.9)
   })
 
-  it('굵기선을 따르면 굵어진 만큼 기대 틈도 줄어 바닥이 낮아지되, 틈은 두께의 1/4 밑으로 안 간다', async () => {
+  it('굵기선을 따르면 굵어진 만큼 기대 틈도 줄어 바닥이 낮아지되, 틈은 엔진 틈 바닥(두께의 0.2배, 최소 0.025em) 밑으로 안 간다', async () => {
     const { gapCapMultiplier } = await import('./moldLab')
-    // 굵기선 쪽은 여유가 커서, 절대 바닥(0.2 ≥ 1.25 × 0.05m → m ≤ 3.2)이 먼저 막는다.
-    expect(gapCapMultiplier(rieul(0.5), rieul(0.4), 1)).toBeCloseTo(3.2)
-    // 칸을 아주 좁히면(중심 거리 0.05) 처음 굵기로도 붙는다 → 가늘게(m ≤ 0.8).
-    expect(gapCapMultiplier(rieul(0.5), rieul(0.1), 1)).toBeCloseTo(0.8)
+    // 굵기선 쪽은 여유가 커서, 절대 바닥(0.2 ≥ 1.2 × 0.05m → m ≤ 3.33)이 먼저 막는다.
+    expect(gapCapMultiplier(rieul(0.5), rieul(0.4), 1)).toBeCloseTo(10 / 3)
+    // 칸을 아주 좁히면(중심 거리 0.05) 처음 굵기로도 붙는다 → 가늘게. 0.025em 바닥이 먼저 막는다(0.05 − 0.05m ≥ 0.025 → m ≤ 0.5).
+    expect(gapCapMultiplier(rieul(0.5), rieul(0.1), 1)).toBeCloseTo(0.5)
   })
 })
 

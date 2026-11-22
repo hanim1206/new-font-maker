@@ -1,4 +1,6 @@
 import type { BoxConfig, Part } from '../src/types'
+import { engineGapOf } from './moldGap'
+export { ENGINE_GAP_RULE, engineGapOf } from './moldGap'
 
 /**
  * 풍선 굵기(하니무스 2026-11-21 "꽉 채운 네모 안에 하얀 획을 얼마나 남길지로 거꾸로"). 플랜 `docs/plans/2026-11-21_풍선-굵기.md`.
@@ -44,15 +46,7 @@ export interface BalloonResult {
   thick: Record<BalloonGroup, Thick>
 }
 
-/** 꽉 찬 끝의 흰 틈(em). 자소 사이는 가석원 0.027, 자소 안 획 사이 바닥은 0.02(그 뒤는 붙여 그리는 폰트 — 이번엔 안 함). */
-/**
- * 꽉 찬 끝의 흰 틈(em). 굵기 줄 위 끝은 검은고딕(세로줄기 0.19em)이다 — 그 폰트의 자소 사이 틈 0.06~0.08, 속공간 0.07.
- * 작은 글자(글줄 42px)에서도 흰 틈이 보이게 사이 0.05 · 안 0.03을 바닥으로 둔다(하니무스 2026-11-21 폰 캡처: 0.03 · 0.02에서 덩어리).
- * 가석원(0.28em, 획을 붙여 그림)은 이 셈의 끝이 아니다 — 붙여 그리기는 따로.
- */
-export const BALLOON_END = { between: 0.05, inside: 0.03 } as const
-/** 막힌 속(ㅇ · ㅁ · ㅍ)이 굵기 끝에서 남기는 몫: 검은고딕 속 너비 ÷ 처음(거북이 넓어짐 공식 표). */
-const RING_END = 0.27
+// 꽉 찬 끝의 흰 틈 바닥(자소 안 · 사이 · 막힌 속)은 하나 — `moldGap.ts` ENGINE_GAP_RULE. 예전 사이 0.05em · 안 0.03em · 막힌 속 처음의 0.27배를 합쳤다.
 /** 세로줄기가 1 굵어질 때 흰 틈이 줄어드는 양. 받침 위는 덜 준다(받침이 밀려 내려가서). */
 export const BALLOON_SLOPE = { inside: 0.5, between: 0.67, final: 0.33 } as const
 /** 한 글자 안에서 자소끼리 굵기가 이보다 갈리지 않는다(10-01 눈 ② "획 두께 차이가 커서 안 예쁨" · 바닥 0.8과 같은 뜻). */
@@ -190,13 +184,6 @@ interface Arm { leg: number; perp: number; keep: number }
 const NEIGHBOR_KEEP = 0.82
 /** ㅇ 속 흰 틈은 처음의 이만큼 아래로 안 줄인다. */
 /** 자소 안 열린 틈의 바닥(거북이 넓어짐 공식 2절): max(least em, ratio × 세로줄기). */
-/**
- * 엔진 전체의 획 사이 틈 바닥: max(0.025em, 0.2 × 세로줄기). 풍선 자소 안 틈 · 쌓인 획 틈(`moldStack`)이 같이 쓴다.
- * 자소 사이(BALLOON_END.between 0.05em) · 막힌 속(RING_END)은 이보다 넓은 제 바닥을 그대로 둔다.
- */
-export const ENGINE_GAP_RULE = { least: 0.025, ratio: 0.2 } as const
-export const engineGapOf = (stem: number) => Math.max(ENGINE_GAP_RULE.least, ENGINE_GAP_RULE.ratio * stem)
-const STEM_GAP = ENGINE_GAP_RULE
 /** 틈이 출발 굵기 바닥을 이길 때도 처음 굵기의 이 배 아래로는 안 간다(획이 사라지지 않게). */
 const GAP_WINS_FLOOR = 0.6
 /** 자소 사이 경계를 한 판에 옮기는 양(굵기 모자람 차이 1당 em). */
@@ -226,7 +213,7 @@ function coveredAt(at: Pt, segs: readonly Seg[], own: BalloonGroup, thickOf: (g:
  * 자소 안: 나란한 두 토막, 처음부터 붙지 않은 것, 한 획 굽은 길의 이웃 · 이음 자리 쐐기는 뺀다.
  * 자소 사이: 모든 토막 쌍(끝이 옆면을 보는 것도) 가운데 가까운 것들.
  */
-function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], startOf: Record<BalloonGroup, Thick>, delta: number): { inside: InsidePair[]; between: PartPair[]; stubs: Stub[]; arms: Arm[] } {
+function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], startOf: Record<BalloonGroup, Thick>, delta: number, stemNow: number): { inside: InsidePair[]; between: PartPair[]; stubs: Stub[]; arms: Arm[] } {
   const inside: InsidePair[] = []
   const stubs: Stub[] = []
   const arms: Arm[] = []
@@ -331,14 +318,14 @@ function pickPairs(segs: Seg[], strokes: readonly BalloonStroke[], startOf: Reco
   // 열린 틈은 여기서 처음 틈만 적어 두고, 바닥은 굵기에 따라 푼다(세로줄기 예산 g = max(0.025, 0.2 × 줄기), 2절).
   // 굵기 줄 끝(검은고딕)에서 막힌 속은 처음의 0.27배가 남는다(거북이 넓어짐 공식 표: 노토 900 0.63 · 주아 0.59 · 검은고딕 0.27). 그 아래로는 안 줄인다 —
   // 바닥 0.03em만 두면 「풍」 ㅍ 속이 굵기 100에서 실금이 됐다(다람쥐 재검수 3번).
-  for (const pair of inside) if (pair.ring) pair.target = Math.min(pair.target, Math.max(BALLOON_END.inside, RING_END * pair.target, pair.target - (pair.closed ? 1.0 : 1.24) * delta))
+  for (const pair of inside) if (pair.ring) pair.target = Math.min(pair.target, Math.max(engineGapOf(stemNow), pair.target - (pair.closed ? 1.0 : 1.24) * delta))
   const between: PartPair[] = []
   for (const { a, b, list } of byParts.values()) {
     const least = Math.min(...list.map((item) => item.gap))
     // 처음부터 닿은 자소 쌍은 그렇게 그린 것 — 손대지 않는다.
     if (least <= 0.005) continue
     const slope = balloonGroupOf(a) === 'JO' || balloonGroupOf(b) === 'JO' ? BALLOON_SLOPE.final : BALLOON_SLOPE.between
-    const target = Math.min(least, Math.max(BALLOON_END.between, least - slope * delta))
+    const target = Math.min(least, Math.max(engineGapOf(stemNow), least - slope * delta))
     // 가까운 쌍만 본다(칸이 움직이며 순서가 바뀔 수 있어 넉넉히).
     between.push({ a, b, target, pairs: list.filter((item) => item.gap <= least + 0.15).sort((x, y) => x.gap - y.gap).slice(0, 16).map(({ i, j }) => ({ i, j })) })
   }
@@ -408,7 +395,7 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
   const first = segmentsOf(strokes, unit, input.boxes)
   const median = [...strokes].map((s) => s.thickness).sort((a, b) => a - b)[Math.floor(strokes.length / 2)] ?? 0.07
   const delta = median * Math.max(0, want.v - base.v)
-  const { inside, between, stubs, arms } = pickPairs(first, strokes, start, delta)
+  const { inside, between, stubs, arms } = pickPairs(first, strokes, start, delta, median * want.v)
   const parts = [...new Set(strokes.map((s) => s.part))]
   // 칸 = 처음 굵기의 잉크 칸. 자소 사이 틈에 따라 변이 움직인다.
   const cells = new Map<Part, Cell>(), firstCenter = new Map<Part, Cell>()
@@ -478,7 +465,7 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
       const d = gp.d, a = sp.a * kp + sq.a * kq, b = sp.b * kp + sq.b * kq
       if (a + b < EPS) continue
       // 열린 틈의 바닥은 줄기 굵기를 따른다: max(0.025em, 0.2 × 줄기). 처음 틈이 그보다 좁으면 처음 틈.
-      const floor = pair.ring ? pair.target : Math.min(pair.target, Math.max(STEM_GAP.least, STEM_GAP.ratio * median * now.v))
+      const floor = pair.ring ? pair.target : Math.min(pair.target, engineGapOf(median * now.v))
       const room = d - floor
       const lean = b / (a + b)
       if (lean < 0.3) sol[g].h = Math.min(sol[g].h, (room - b * now.v) / Math.max(a, EPS))

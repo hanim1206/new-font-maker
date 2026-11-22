@@ -1,5 +1,6 @@
 import type { BoxConfig, Part } from '../src/types'
-import { balloonGroupOf, engineGapOf, type BalloonGroup, type BalloonStroke, type Thick } from './moldBalloon'
+import { engineGapOf } from './moldGap'
+import { balloonGroupOf, type BalloonGroup, type BalloonStroke, type Thick } from './moldBalloon'
 
 /**
  * 쌓인 획 법칙으로 자소 칸을 글자 기둥 전체로 다시 나눈다(거북이 굵을-때-획-균형.md ①, 하니무스 2026-11-22 "넣어").
@@ -8,18 +9,12 @@ import { balloonGroupOf, engineGapOf, type BalloonGroup, type BalloonStroke, typ
  * 1. 기둥: 같은 자리를 지나는 곧은 획(25° 안, 길이 0.08em 이상)이 가장 많은 곳. 획 끝 제 굵기 안쪽은 안 센다(「운」 ㅜ 짧은기둥 끝과 ㄴ 기둥 윗끝이 살짝 겹친 것은 쌓임이 아니다). 줄 n개, 쌓인 높이 S(첫 줄 바깥 ~ 끝 줄 바깥, 처음 굵기 잉크).
  * 2. 굵기 t: 자연 틈 p = (S − n × 바라는 굵기) ÷ (n − 1)이 넉넉하면(p ≥ a ÷ (1 − b) × T) 바라는 굵기 그대로,
  *    좁으면 틈 = max(0.16T, aT + bp), t = (S − (n − 1) × 틈) ÷ n. 이 글자의 그 결 획은 자소 가리지 않고 모두 t.
- * 3. 흰 틈: 남은 흰 몫 S − n × t를 처음 틈 비율대로(틈 = max(바닥, λ × 처음 틈)). 바닥 = min(0.16T, 처음 틈). 자소 안 · 사이 틈을 가리지 않는다.
+ * 3. 흰 틈: 남은 흰 몫 S − n × t를 처음 틈 비율대로(틈 = max(바닥, λ × 처음 틈)). 바닥 = min(엔진 틈 바닥(t), 처음 틈) — `moldGap.ts` 하나. 자소 안 · 사이 틈을 가리지 않는다.
  * 4. 첫 줄 바깥 변은 그대로, 거기서부터 t · 틈을 쌓아 줄 자리를 정한다.
  * 5. 자소마다 제 줄의 옛 중심선 → 새 자리로 칸을 늘이고 옮긴다(줄 하나면 옮기기만). 기둥에 안 걸린 자소는 그 결에선 그대로.
  * 반복해 풀지 않고 한 번에 셈한다. 꼭지 · 열린 팔 · 곁줄기 바닥과 남은 틈은 그 뒤 풍선(`solveBalloon`)이 이 칸 · 이 굵기에서 출발해 맡는다.
  * a · b는 고딕 굵은 폰트 12벌 238자(가로) · 38자(세로)에서 맞춘 값(law.py). 숫자는 방향 · 비율로만 쓴다(R042).
  */
-/**
- * 틈 바닥(기준 T = 바라는 세로줄기의 배). 노토 산스 KR 700과 같은 크기로 나란히 놓고 정함(하니무스 2026-11-22 11:41 "노토 700까지"):
- * 법칙 틈(0.21T + 0.64p, 바닥 0.16T)대로면 「늘」 가로가 노토 700보다 가늘고 틈은 넓었고, 「빼」 「뿐」 ㅃ은 0.16T 틈이 실금이라 덩어리였다.
- * 노토 700은 획을 먼저 지키고 틈을 획의 반쯤까지 내준다 — 그래서 획은 바라는 굵기를 먼저, 틈은 그 글자 획의 0.4배까지 줄인 뒤에야 획을 줄인다(노토 700 「늘」 틈 ÷ 보 ≈ 0.4).
- */
-export const STACK_LAW = { floor: 0.4 } as const
 const LINE_MIN = 0.08
 const LINE_TILT = Math.sin(25 / 180 * Math.PI) ** 2
 /**
@@ -92,15 +87,15 @@ export function stackColumns(strokes: readonly BalloonStroke[], base: Thick): St
 }
 
 /**
- * 바라는 굵기 `ref`(그 결 줄기, em) · 기준 `T`(바라는 세로줄기, em)에서 법칙 굵기와 줄 자리. 넉넉하면 null.
- * `least`는 앞 걸음들이 낸 가장 굵은 t — 굵기 값을 올렸는데 틈 바닥(0.16T)이 커져 획이 도로 가늘어지지 않게(④) 그 아래로 안 내린다.
+ * 바라는 굵기 `ref`(그 결 줄기, em)에서 법칙 굵기와 줄 자리. 넉넉하면 null.
+ * `least`는 앞 걸음들이 낸 가장 굵은 t — 굵기 값을 올렸는데 틈 바닥이 커져 획이 도로 가늘어지지 않게(④) 그 아래로 안 내린다.
  */
-function layOf(column: StackColumn, ref: number, T: number, extra: { lo: number; hi: number }, least: number) {
+function layOf(column: StackColumn, ref: number, extra: { lo: number; hi: number }, least: number) {
   const { lines } = column, n = lines.length
   const top = lines[0].at - lines[0].width / 2 - extra.lo
   const S = lines[n - 1].at + lines[n - 1].width / 2 + extra.hi - top
   const gaps0 = lines.slice(1).map((line, i) => Math.max(0, line.at - line.width / 2 - (lines[i].at + lines[i].width / 2)) + (i === 0 ? extra.lo : 0) + (i === n - 2 ? extra.hi : 0))
-  // 굳은 틈: 중심선 사이 D 그대로(틈 = D − t). 무른 틈: 바닥 min(0.5t, 처음 틈) 위에서 처음 틈 비율대로.
+  // 굳은 틈: 중심선 사이 D 그대로(틈 = D − t). 무른 틈: 바닥 min(엔진 틈 바닥(t), 처음 틈) 위에서 처음 틈 비율대로.
   // 바닥은 굵기 값(T)이 아니라 그 글자의 획 t에 묶는다 — T에 묶으면 굵기를 올릴수록 바닥이 커져 획이 도로 가늘어졌다(「뿐」).
   const { rigid } = column
   const D = lines.slice(1).map((line, i) => line.at - lines[i].at)
@@ -108,7 +103,7 @@ function layOf(column: StackColumn, ref: number, T: number, extra: { lo: number;
   const rigidD = D.reduce((sum, d, i) => sum + (rigid[i] ? d : 0), 0)
   let t = ref, floors: number[] = [], flexFloor = 0
   for (let k = 0; k < 8; k++) {
-    floors = gaps0.map((g) => Math.min(Math.max(STACK_LAW.floor * t, engineGapOf(T)), g))
+    floors = gaps0.map((g) => Math.min(engineGapOf(t), g))
     flexFloor = floors.reduce((sum, f, i) => sum + (rigid[i] ? 0 : f), 0)
     // 무른 틈이 모두 바닥이면 t = (S − 굳은 D 합 − 무른 바닥 합) ÷ (n − 굳은 틈 수). 굳은 틈도 바닥 아래로는 안 간다.
     t = Math.min(ref, (S - rigidD - flexFloor) / (n - r), ...D.map((d, i) => (rigid[i] ? d - floors[i] : Infinity)))
@@ -158,8 +153,8 @@ export function stackLay(
     }
     let least = 0, lay: ReturnType<typeof layOf> | null = null
     for (const w of wants) {
-      const ref = median * (kind === 'h' ? w.h : w.v), T = median * w.v
-      lay = layOf(column, ref, T, extraOf(w), least)
+      const ref = median * (kind === 'h' ? w.h : w.v)
+      lay = layOf(column, ref, extraOf(w), least)
       if (lay) least = Math.max(least, lay.t)
     }
     if (!lay) continue
