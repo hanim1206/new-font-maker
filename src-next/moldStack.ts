@@ -14,7 +14,12 @@ import { balloonGroupOf, type BalloonGroup, type BalloonStroke, type Thick } fro
  * 반복해 풀지 않고 한 번에 셈한다. 꼭지 · 열린 팔 · 곁줄기 바닥과 남은 틈은 그 뒤 풍선(`solveBalloon`)이 이 칸 · 이 굵기에서 출발해 맡는다.
  * a · b는 고딕 굵은 폰트 12벌 238자(가로) · 38자(세로)에서 맞춘 값(law.py). 숫자는 방향 · 비율로만 쓴다(R042).
  */
-export const STACK_LAW = { h: { a: 0.211, b: 0.637 }, v: { a: 0.228, b: 0.534 }, floor: 0.16 } as const
+/**
+ * 틈 바닥(기준 T = 바라는 세로줄기의 배). 노토 산스 KR 700과 같은 크기로 나란히 놓고 정함(하니무스 2026-11-22 11:41 "노토 700까지"):
+ * 법칙 틈(0.21T + 0.64p, 바닥 0.16T)대로면 「늘」 가로가 노토 700보다 가늘고 틈은 넓었고, 「빼」 「뿐」 ㅃ은 0.16T 틈이 실금이라 덩어리였다.
+ * 노토 700은 획을 먼저 지키고 틈을 획의 반쯤까지 내준다 — 그래서 획은 바라는 굵기를 먼저, 틈은 그 글자 획의 0.4배까지 줄인 뒤에야 획을 줄인다(노토 700 「늘」 틈 ÷ 보 ≈ 0.4).
+ */
+export const STACK_LAW = { floor: 0.4 } as const
 const LINE_MIN = 0.08
 const LINE_TILT = Math.sin(25 / 180 * Math.PI) ** 2
 /**
@@ -90,22 +95,25 @@ export function stackColumns(strokes: readonly BalloonStroke[], base: Thick): St
  * 바라는 굵기 `ref`(그 결 줄기, em) · 기준 `T`(바라는 세로줄기, em)에서 법칙 굵기와 줄 자리. 넉넉하면 null.
  * `least`는 앞 걸음들이 낸 가장 굵은 t — 굵기 값을 올렸는데 틈 바닥(0.16T)이 커져 획이 도로 가늘어지지 않게(④) 그 아래로 안 내린다.
  */
-function layOf(column: StackColumn, kind: 'h' | 'v', ref: number, T: number, extra: { lo: number; hi: number }, least: number) {
+function layOf(column: StackColumn, ref: number, T: number, extra: { lo: number; hi: number }, least: number) {
   const { lines } = column, n = lines.length
   const top = lines[0].at - lines[0].width / 2 - extra.lo
   const S = lines[n - 1].at + lines[n - 1].width / 2 + extra.hi - top
   const gaps0 = lines.slice(1).map((line, i) => Math.max(0, line.at - line.width / 2 - (lines[i].at + lines[i].width / 2)) + (i === 0 ? extra.lo : 0) + (i === n - 2 ? extra.hi : 0))
-  const law = STACK_LAW[kind], p = (S - n * ref) / (n - 1) / T
-  let t = p >= law.a / (1 - law.b) ? ref : (S - (n - 1) * Math.max(STACK_LAW.floor, law.a + law.b * p) * T) / n
-  // 굳은 틈: 중심선 사이 D 그대로(틈 = D − t). 무른 틈: 바닥 min(0.16T, 처음 틈) 위에서 처음 틈 비율대로.
+  // 굳은 틈: 중심선 사이 D 그대로(틈 = D − t). 무른 틈: 바닥 min(0.5t, 처음 틈) 위에서 처음 틈 비율대로.
+  // 바닥은 굵기 값(T)이 아니라 그 글자의 획 t에 묶는다 — T에 묶으면 굵기를 올릴수록 바닥이 커져 획이 도로 가늘어졌다(「뿐」).
   const { rigid } = column
   const D = lines.slice(1).map((line, i) => line.at - lines[i].at)
-  const floors = gaps0.map((g) => Math.min(STACK_LAW.floor * T, g))
   const r = rigid.filter(Boolean).length
   const rigidD = D.reduce((sum, d, i) => sum + (rigid[i] ? d : 0), 0)
-  const flexFloor = floors.reduce((sum, f, i) => sum + (rigid[i] ? 0 : f), 0)
-  // 무른 틈이 모두 바닥이면 t = (S − 굳은 D 합 − 무른 바닥 합) ÷ (n − 굳은 틈 수). 굳은 틈도 바닥 아래로는 안 간다.
-  t = Math.min(t, (S - rigidD - flexFloor) / (n - r), ...D.map((d, i) => (rigid[i] ? d - floors[i] : Infinity)))
+  let t = ref, floors: number[] = [], flexFloor = 0
+  for (let k = 0; k < 8; k++) {
+    floors = gaps0.map((g) => Math.min(STACK_LAW.floor * t, g))
+    flexFloor = floors.reduce((sum, f, i) => sum + (rigid[i] ? 0 : f), 0)
+    // 무른 틈이 모두 바닥이면 t = (S − 굳은 D 합 − 무른 바닥 합) ÷ (n − 굳은 틈 수). 굳은 틈도 바닥 아래로는 안 간다.
+    t = Math.min(ref, (S - rigidD - flexFloor) / (n - r), ...D.map((d, i) => (rigid[i] ? d - floors[i] : Infinity)))
+  }
+  void T
   t = Math.min(ref, Math.max(t, least))
   const white = Math.max(0, S - rigidD - (n - r) * t)
   let gaps: number[]
@@ -152,7 +160,7 @@ export function stackLay(
     let least = 0, lay: ReturnType<typeof layOf> | null = null
     for (const w of wants) {
       const ref = median * (kind === 'h' ? w.h : w.v), T = median * w.v
-      lay = layOf(column, kind, ref, T, extraOf(w), least)
+      lay = layOf(column, ref, T, extraOf(w), least)
       if (lay) least = Math.max(least, lay.t)
     }
     if (!lay) continue

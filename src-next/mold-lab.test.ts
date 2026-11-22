@@ -199,10 +199,10 @@ describe('심즈처럼 빚기', () => {
     expect(dragLook({}, 'STROKE', 0, 5).weight).toBe(LOOK_WALL.weight[0])
     expect(dragLook({}, 'WHOLE', 5, 0).tracking).toBe(LOOK_WALL.tracking[1])
   })
-  it('굵기 벽은 엔진 굵기 100~900을 다 쓴다(기본 400)', async () => {
-    const { LOOK_WALL, scaledWeight } = await import('./moldLab')
+  it('굵기 벽은 엔진 굵기 100부터, 위 끝은 노토 700 수준 두께(하니무스 2026-11-22 "노토 700까지")', async () => {
+    const { LOOK_WALL, scaledWeight, heavyThicknessOf, NOTO_700_RATIO } = await import('./moldLab')
     expect(scaledWeight(400, LOOK_WALL.weight[0])).toBe(100)
-    expect(scaledWeight(400, LOOK_WALL.weight[1])).toBe(900)
+    expect(heavyThicknessOf(LOOK_WALL.weight[1])).toBeCloseTo(NOTO_700_RATIO, 2)
   })
   it('홀자 기둥을 끝까지 옮겨도 홀자는 납작해지지 않고, 첫닿자는 70% 벽에서 멈춘다', async () => {
     const { dragPart, NEIGHBOR_FLOOR } = await import('./moldLab')

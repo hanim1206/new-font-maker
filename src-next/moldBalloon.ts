@@ -176,6 +176,8 @@ interface Stub { on: number; stroke: number; keep: number; free: 0 | 1; /** 처�
 const STUB_KEEP = 0.5
 /** 폰트 128벌 곁줄기ㅏ(기둥 밖으로 나온 길이 ÷ 제 두께) 5번째 백분위(mold-fit/dist.json). `moldLab` 곁줄기 길이 바닥과 같은 값. */
 const BRANCH_FLOOR = 0.754
+/** 꼭지가 보 위로 보이는 길이의 바닥(제 굵기 배). 노토 산스 KR 700 「하」 「치」 꼭지가 굵기의 0.6~1배쯤 보인다(같은 크기 나란히 그림). */
+const TICK_KEEP = 0.5
 /**
  * 꺾인 획의 열린 팔(ㄱ · ㄲ 윗 가로, ㄴ 세로): 꺾인 기둥 밖으로 보이는 길이 ≥ 기둥 굵기 × 이 값. 처음부터 더 짧은 팔은 처음 비율을 지킨다.
  * 거북이 2026-11-22 열린-팔.md(고딕 · 제목체 103벌): 쌍닿자는 고딕 900에서 0.85 ~ 0.96, 가장 작은 값 0.83. 홑닿자 끝은 가석원 0.78.
@@ -414,7 +416,8 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
     }
   }
   const thick = Object.fromEntries(groups.map((g) => [g, { ...want }])) as Record<BalloonGroup, Thick>
-  const cap = Object.fromEntries(groups.map((g) => [g, { v: Infinity, h: Infinity }])) as Record<BalloonGroup, Thick>
+  // 쌓인 획 법칙이 걸린 결(출발 굵기가 처음보다 굵음)은 그 굵기에서 더 안 굵어진다 — 칸이 그 굵기로 나뉘었다(틈을 다시 먹으면 「뿐」 ㅃ 틈이 실금).
+  const cap = Object.fromEntries(groups.map((g) => [g, { v: input.start?.[g] && input.start[g].v > base.v + EPS ? input.start[g].v : Infinity, h: input.start?.[g] && input.start[g].h > base.h + EPS ? input.start[g].h : Infinity }])) as Record<BalloonGroup, Thick>
   let boxes: Partial<Record<Part, BoxConfig>> = { ...input.boxes }
 
   /** 3. 안으로: 지금 굵기의 잉크가 칸에 꼭 맞게 중심선 칸을 놓는다. 뼈대가 너무 줄면 그 축 굵기를 누른다. */
@@ -494,7 +497,11 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
       const cover = coveredAt(freeEnd, segs, g, (group) => thick[group])
       // 바닥: 기둥 잉크 밖으로 나온 길이가 제 두께의 0.754배(폰트 128벌 곁줄기ㅏ 5번째 백분위 — 곁줄기 길이 줄과 같은 값).
       // 처음 보이던 길이의 반만 지키면 굵기 끝에서 「향」 ㅑ 곁줄기가 기둥에 묻혀 점이 됐다(다람쥐 재검수 3번).
-      const keep = Math.max(stub.keep, Math.min(stub.visible, BRANCH_FLOOR * 2 * halfOf(own[stub.free === 1 ? own.length - 1 : 0], thick[g])))
+      const stubWidth = 2 * halfOf(own[stub.free === 1 ? own.length - 1 : 0], thick[g])
+      // 꼭지(보 위로 선 세로 토막, ㅎ · ㅊ): 보 굵기를 먼저 지키고 꼭지는 제 굵기의 TICK_KEEP배만 보이면 된다 — 곁줄기 바닥(0.754배)을 쓰면
+      // 「하」 ㅎ 보가 기둥의 0.78배까지 눌리고, 글자 안 고르기로 기둥까지 가늘어졌다(하니무스 2026-11-22 노토 700 나란히: 하 · 는 가로 가늘음).
+      const tick = uprightOf(own[0]) > 0.7 && freeEnd.y < Math.min(o.ay, o.by)
+      const keep = tick ? Math.min(stub.keep, TICK_KEEP * stubWidth) : Math.max(stub.keep, Math.min(stub.visible, BRANCH_FLOOR * stubWidth))
       const short = keep - (now - halfOf(o, thick[g]) - cover.depth)
       let depth = cover.depth
       if (short > 5e-4 && cover.seg >= 0) {

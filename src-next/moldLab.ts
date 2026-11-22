@@ -529,7 +529,14 @@ export const STEM_KEYS = Object.keys(STEM_ENGINE) as StemKey[]
  * 「가」 「저」가 덩어리가 됐다(하니무스 2026-11-21 폰 캡처). 실제로 얼마나 굵어지는지는 자소마다 칸이 정한다(`moldBalloon.ts`).
  */
 export const ENGINE_TOP = 2.25
-export const HEAVY_TOP = ENGINE_TOP * 2.7 / 1.9502
+/**
+ * 굵기 막대 위 끝 = 노토 산스 KR 700 수준(하니무스 2026-11-22 11:41 "노토 700까지, 블랙은 뒤에").
+ * 노토 700 ÷ 400 기둥은 1.60배(0.133 ÷ 0.083em, 가변 폰트 인스턴스로 잼)지만, 1.6배로 두면 같은 크기로 나란히 놓았을 때 「이」 기둥 ÷ 글자 키가
+ * 0.12로 노토 700의 0.14보다 가늘었다(엔진 굵기 1이 노토 400보다 조금 가늚). 그래서 끝은 기둥 ÷ 키가 노토 700과 같아지는 1.6 × 0.14 ÷ 0.12 ≈ 1.86배.
+ * 검은고딕(2.7배) 끝은 뒤에.
+ */
+export const NOTO_700_RATIO = 1.86
+export const HEAVY_TOP = weightRatioOfThickness(NOTO_700_RATIO)
 /** 굵어진 몫 가운데 가로줄기가 받는 비율. 굵은 폰트는 가로를 덜 굵게 한다(검은고딕 가로 ÷ 세로 0.79, 노토 900 0.96). */
 export const HEAVY_HORIZONTAL_SHARE = 0.8
 export const LOOK_WALL = { weight: [0.25, HEAVY_TOP], weightBase: [0.25, HEAVY_TOP], soft: [0, 1], frame: [0.74, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09], ...STEM_WALL } as const
