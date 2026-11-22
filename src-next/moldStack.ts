@@ -1,5 +1,5 @@
 import type { BoxConfig, Part } from '../src/types'
-import { balloonGroupOf, type BalloonGroup, type BalloonStroke, type Thick } from './moldBalloon'
+import { balloonGroupOf, engineGapOf, type BalloonGroup, type BalloonStroke, type Thick } from './moldBalloon'
 
 /**
  * 쌓인 획 법칙으로 자소 칸을 글자 기둥 전체로 다시 나눈다(거북이 굵을-때-획-균형.md ①, 하니무스 2026-11-22 "넣어").
@@ -108,12 +108,11 @@ function layOf(column: StackColumn, ref: number, T: number, extra: { lo: number;
   const rigidD = D.reduce((sum, d, i) => sum + (rigid[i] ? d : 0), 0)
   let t = ref, floors: number[] = [], flexFloor = 0
   for (let k = 0; k < 8; k++) {
-    floors = gaps0.map((g) => Math.min(STACK_LAW.floor * t, g))
+    floors = gaps0.map((g) => Math.min(Math.max(STACK_LAW.floor * t, engineGapOf(T)), g))
     flexFloor = floors.reduce((sum, f, i) => sum + (rigid[i] ? 0 : f), 0)
     // 무른 틈이 모두 바닥이면 t = (S − 굳은 D 합 − 무른 바닥 합) ÷ (n − 굳은 틈 수). 굳은 틈도 바닥 아래로는 안 간다.
     t = Math.min(ref, (S - rigidD - flexFloor) / (n - r), ...D.map((d, i) => (rigid[i] ? d - floors[i] : Infinity)))
   }
-  void T
   t = Math.min(ref, Math.max(t, least))
   const white = Math.max(0, S - rigidD - (n - r) * t)
   let gaps: number[]

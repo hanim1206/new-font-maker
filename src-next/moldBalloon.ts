@@ -190,7 +190,15 @@ interface Arm { leg: number; perp: number; keep: number }
 const NEIGHBOR_KEEP = 0.82
 /** ㅇ 속 흰 틈은 처음의 이만큼 아래로 안 줄인다. */
 /** 자소 안 열린 틈의 바닥(거북이 넓어짐 공식 2절): max(least em, ratio × 세로줄기). */
-const STEM_GAP = { least: 0.025, ratio: 0.2 } as const
+/**
+ * 엔진 전체의 획 사이 틈 바닥: max(0.025em, 0.2 × 세로줄기). 풍선 자소 안 틈 · 쌓인 획 틈(`moldStack`)이 같이 쓴다.
+ * 자소 사이(BALLOON_END.between 0.05em) · 막힌 속(RING_END)은 이보다 넓은 제 바닥을 그대로 둔다.
+ */
+export const ENGINE_GAP_RULE = { least: 0.025, ratio: 0.2 } as const
+export const engineGapOf = (stem: number) => Math.max(ENGINE_GAP_RULE.least, ENGINE_GAP_RULE.ratio * stem)
+const STEM_GAP = ENGINE_GAP_RULE
+/** 틈이 출발 굵기 바닥을 이길 때도 처음 굵기의 이 배 아래로는 안 간다(획이 사라지지 않게). */
+const GAP_WINS_FLOOR = 0.6
 /** 자소 사이 경계를 한 판에 옮기는 양(굵기 모자람 차이 1당 em). */
 const SHARE_STEP = 0.006
 /** 한 자소 안 가로÷세로가 바라는 비의 이만큼 아래로 안 간다. */
@@ -477,6 +485,8 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
       else if (lean > 0.7) sol[g].v = Math.min(sol[g].v, (room - a * now.h) / Math.max(b, EPS))
       else { const f = room / Math.max(a * now.h + b * now.v, EPS); sol[g].h = Math.min(sol[g].h, now.h * f); sol[g].v = Math.min(sol[g].v, now.v * f) }
     }
+    // 틈이 허락하는 굵기(자소 안 틈만 본 값). 아래 출발 굵기 바닥보다 앞선다 — 획 사이 틈은 엔진 어디서든 `ENGINE_GAP` 아래로 안 간다(하니무스 2026-11-22 "획과 획 사이가 붙는 것은 막아야").
+    const gapLimit = Object.fromEntries(groups.map((g) => [g, { ...sol[g] }])) as Record<BalloonGroup, Thick>
     // 붙은 짧은 획: 붙은 획의 반 두께가 그 획 길이를 다 먹지 않게(곁줄기 · 꼭지가 사라지지 않게).
     // 열린 팔: 기둥 반 두께 ≤ 팔 길이 ÷ (1 + 2 × 지킬 비).
     for (const arm of arms) {
@@ -534,7 +544,8 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
       }
     }
     const present = groups.filter((g) => strokes.some((s) => balloonGroupOf(s.part) === g))
-    for (const g of present) { sol[g].v = Math.max(start[g].v, sol[g].v); sol[g].h = Math.max(start[g].h, sol[g].h) }
+    // 출발 굵기가 바닥이되, 틈이 바닥 아래로 가야만 지킬 수 있으면 틈이 이긴다(처음 굵기의 GAP_WINS_FLOOR배까지).
+    for (const g of present) for (const axis of ['v', 'h'] as const) sol[g][axis] = Math.max(Math.min(start[g][axis], Math.max(GAP_WINS_FLOOR * base[axis], gapLimit[g][axis])), sol[g][axis])
     // 한 자소 안 가로 · 세로 고르기: 가로가 예산에 막혀 얇아지면 세로도 같이 덜 굵어진다(「향」 ㅎ 가로만 가늘어 고르지 않음).
     // 폰트도 획 많은 글자는 가로÷세로가 조금 준다(「를」 0.71 → 0.65) — 바라는 비의 CONTRAST_KEEP까지만 벌어진다.
     for (const g of present) {
@@ -548,7 +559,9 @@ export function solveBalloon(input: BalloonInput): BalloonResult {
       sol[g].v = Math.min(sol[g].v, leastV / BALLOON_BAND); sol[g].h = Math.min(sol[g].h, leastH / BALLOON_BAND)
       // 글자 안 가로 · 세로 고르기(글자 전체): 가장 가는 가로가 막히면 모든 세로가 그 1 ÷ GLYPH_EVEN배까지만 — 쌓인 획 법칙의 바닥보다 앞선다.
       // 하니무스 2026-11-22 굵기 100 캡처 「절」 「늘」 「습」 「득」: ㄹ · ㅂ · ㅡ 가로가 ㅓ · ㅣ 기둥의 반쯤으로 눈에 띄게 가늘었다.
-      sol[g].v = Math.min(sol[g].v, Math.max(base.v, leastH / GLYPH_EVEN))
+      // 대비 줄로 일부러 낸 차이(처음 굵기의 가로 ÷ 세로)는 빼고 잰다 — 빼지 않으면 대비를 올려 가늘게 만든 가로가 기둥까지 끌어내려
+      // 대비 끝에서 글자 전체가 가는 글씨가 됐다(하니무스 2026-11-22 "ㅇㅇ", 대비는 세로 그대로 가로만).
+      sol[g].v = Math.min(sol[g].v, Math.max(base.v, leastH / (GLYPH_EVEN * Math.min(1, base.h / Math.max(base.v, EPS)))))
       // 반씩 다가간다 — 굵기와 칸이 서로 물려 출렁이지 않게.
       thick[g] = { v: thick[g].v + 0.5 * (sol[g].v - thick[g].v), h: thick[g].h + 0.5 * (sol[g].h - thick[g].h) }
     }

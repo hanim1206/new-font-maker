@@ -387,7 +387,12 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       placed[part] = old ? { x: Math.min(old.x, b.x), y: Math.min(old.y, b.y), width: Math.max(old.x + old.width, b.x + b.width) - Math.min(old.x, b.x), height: Math.max(old.y + old.height, b.y + b.height) - Math.min(old.y, b.y) } : { ...b }
     }
     const base = { v: contrast >= 0 ? 1 + 0.8 * contrast : 1 + 0.5 * contrast, h: contrast >= 0 ? 1 - 0.45 * contrast : 1 - 0.5 * contrast }
-    const wantOf = (weight: number) => { const k = heavyThicknessOf(weight); return { v: base.v * k, h: base.h * (1 + (k - 1) * HEAVY_HORIZONTAL_SHARE) } }
+    // 대비를 올리면 세로 기둥은 굵기 막대 끝(노토 700 수준)을 넘지 않고 가로만 가늘어진다(하니무스 2026-11-22 "ㅇㅇ").
+    // 대비가 세로를 굵히는 몫(base.v)에 굵기 배율을 또 곱하면 대비 끝 · 굵기 끝에서 기둥이 3.3배(0.23em)까지 가 「습」 ㅂ이 막혔다.
+    const wantOf = (weight: number) => {
+      const k = heavyThicknessOf(weight), v = contrast > 0 ? Math.max(base.v, k) : base.v * k, grown = v / base.v
+      return { v, h: base.h * (1 + (grown - 1) * HEAVY_HORIZONTAL_SHARE) }
+    }
     const outer = outerWidenOf(budget.syllable)
     // 쌓인 획 법칙(거북이 ①): 칸을 글자 기둥 전체로 먼저 다시 나누고, 풍선은 그 칸 · 그 굵기에서 출발한다. 앞 걸음들의 굵기를 바닥으로 넘겨 굵기를 올려도 획이 안 가늘어진다.
     const columns = stackColumns(strokes, base)
@@ -408,7 +413,8 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     const present = (['CH', 'JU', 'JO'] as const).filter((g) => strokes.some((stroke) => balloonGroupOf(stroke.part) === g && !stroke.closed))
     const holds = (weight: number) => {
       const want = wantOf(weight), thick = solveAt(weight).thick
-      return present.every((g) => Math.min(thick[g].v, thick[g].h) >= GLYPH_FLOOR * want.v - 1e-6)
+      // 결마다 제 바라는 굵기에 잰다 — 가로를 세로 기준으로 재면 대비를 올려 일부러 가늘게 한 가로가 늘 바닥 아래라 글줄이 굵기 1에서 멈췄다.
+      return present.every((g) => thick[g].v >= GLYPH_FLOOR * want.v - 1e-6 && thick[g].h >= GLYPH_FLOOR * want.h - 1e-6)
     }
     const top = LOOK_WALL.weight[1]
     if (holds(top)) return Infinity
