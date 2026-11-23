@@ -47,4 +47,19 @@ describe('900 쌓임 규칙', () => {
     expect(out.strokes).toEqual(st)
     expect(out.thick).toEqual({ v: 1, h: 1 })
   })
+  it('겹받침(ㅀ)은 두 자소의 막대가 엇갈려도 한 덩이로 옮긴다 — 받침 안 모양이 안 뭉개진다', () => {
+    const ring = (cx: number, cy: number, r: number): StackStroke => ({ ...line('CH', Array.from({ length: 16 }, (_, i) => [cx + r * Math.cos(i * Math.PI / 8), cy + 0.6 * r * Math.sin(i * Math.PI / 8)] as [number, number])), closed: true })
+    const st: StackStroke[] = [
+      ring(0.5, 0.15, 0.2),
+      line('JU', [[0.5, 0.3], [0.5, 0.42]]), line('JU', [[0.1, 0.42], [0.9, 0.42]]),
+      line('JO', [[0.15, 0.55], [0.45, 0.55], [0.45, 0.7], [0.15, 0.7], [0.15, 0.85], [0.47, 0.85]]),
+      line('JO', [[0.6, 0.55], [0.6, 0.6]]), line('JO', [[0.5, 0.6], [0.8, 0.6]]),
+      { ...ring(0.65, 0.75, 0.1), part: 'JO' },
+    ]
+    const out = solveStack900({ char: '옳', strokes: st, height: inkHeightOf(st) * 0.95, reach: 0, inward: 1 })
+    const ys = (s: StackStroke[]) => s.filter((x) => x.part === 'JO').flatMap((x) => x.points.map((p) => p.y))
+    const a = ys(st), b = ys(out.strokes), k = (b[b.length - 1] - b[0]) / (a[a.length - 1] - a[0])
+    // 받침 점들은 한 배율 · 한 이동으로만 옮겨진다.
+    a.forEach((y, i) => expect(b[i]).toBeCloseTo(b[0] + (y - a[0]) * k, 6))
+  })
 })

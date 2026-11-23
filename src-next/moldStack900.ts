@@ -70,6 +70,8 @@ export function jamoOf(char: string): { cho: string; jung: string; jong: string 
   return { cho: CHO[Math.floor(s / 588)], jung: JUNG[Math.floor((s % 588) / 28)], jong: JONG[s % 28].trim() }
 }
 const HORIZONTAL_VOWELS = 'ㅗㅛㅜㅠㅡ'
+/** 서로 다른 두 닿자가 나란히 선 겹받침. ㄲ · ㅆ은 막대 높이가 같아 낱받침처럼 둔다. */
+const COMPOUND_FINALS = 'ㄳㄵㄶㄺㄻㄼㄽㄾㄿㅀㅄ'
 
 type Pt = { x: number; y: number }
 type Map2 = (p: Pt) => Pt
@@ -135,12 +137,13 @@ export function inkGap(strokes: readonly StackStroke[], upper: (part: Part) => b
 }
 
 // ── 쌓인 막대(warp.py `bars` · `gaptype` · `plan`) ──
-type Bar = { y: number; i: number; kind: 'ring-top' | 'ring-bot' | 'box-top' | 'box-bot' | 'bar' }
-function barsOf(st: readonly StackStroke[]): Bar[] {
+type Bar = { y: number; i: number; kind: 'ring-top' | 'ring-bot' | 'box-top' | 'box-bot' | 'bar' | 'block-top' | 'block-bot' }
+function barsOf(st: readonly StackStroke[], block?: Part): Bar[] {
   const xs = st.flatMap((s) => s.points.map((p) => p.x)), xc = (Math.min(...xs) + Math.max(...xs)) / 2
   const out: Bar[] = []
   st.forEach((s, i) => {
     const P = s.points
+    if (s.part === block) return
     if (s.closed) {
       const ys = P.map((p) => p.y), xr = P.map((p) => p.x)
       if (Math.min(...xr) < xc + BAR_BAND && Math.max(...xr) > xc - BAR_BAND) {
@@ -154,6 +157,13 @@ function barsOf(st: readonly StackStroke[]): Bar[] {
       if (Math.abs(a.y - b.y) < 1e-4 && Math.abs(a.x - b.x) > 0.05 && Math.min(a.x, b.x) < xc + BAR_BAND && Math.max(a.x, b.x) > xc - BAR_BAND) out.push({ y: a.y, i, kind: 'bar' })
     }
   })
+  // 겹받침(ㄺ · ㅀ …)은 두 자소가 나란히 서 막대 높이가 엇갈린다. 한 덩이로 보고 맨 위 · 맨 아래만 잡아 통째로 옮긴다.
+  const held = block ? st.map((s, i) => [s, i] as const).filter(([s]) => s.part === block) : []
+  if (held.length) {
+    const ys = held.flatMap(([s]) => s.points.map((p) => p.y)), top = Math.min(...ys), bot = Math.max(...ys)
+    const at = (y: number) => held.find(([s]) => s.points.some((p) => Math.abs(p.y - y) < 1e-9))![1]
+    out.push({ y: top, i: at(top), kind: 'block-top' }, { y: bot, i: at(bot), kind: 'block-bot' })
+  }
   out.sort((a, b) => a.y - b.y)
   const ded: Bar[] = []
   for (const o of out) { if (ded.length && Math.abs(o.y - ded[ded.length - 1].y) < SAME_BAR) continue; ded.push(o) }
@@ -161,6 +171,7 @@ function barsOf(st: readonly StackStroke[]): Bar[] {
 }
 type GapKind = 'counter' | 'box' | 'inner' | 'hring' | 'between'
 function gapKind(a: Bar, b: Bar, st: readonly StackStroke[]): GapKind {
+  if (a.kind === 'block-top' && b.kind === 'block-bot') return 'inner'
   if (a.i === b.i && a.kind === 'ring-top') return 'counter'
   if (a.i === b.i && a.kind.endsWith('-top')) return 'box'
   if (a.i === b.i) return 'inner'
@@ -183,8 +194,8 @@ function warpY(old: number[], next: number[]): Map2 {
 }
 
 /** 가로홀자 글자: 키를 막대 n개 · 고른 틈 n−1개 · 속으로 나눈다(규칙 2~9). 막대가 셋 아래면 손대지 않는다. */
-function stackPlan(st0: StackStroke[], G: number, height: number | undefined): { strokes: StackStroke[]; f: number; bars: number } | null {
-  const B = barsOf(st0)
+function stackPlan(st0: StackStroke[], G: number, height: number | undefined, block?: Part): { strokes: StackStroke[]; f: number; bars: number } | null {
+  const B = barsOf(st0, block)
   if (B.length < 3) return null
   const t = st0[0].thickness, n = B.length, one = { v: 1, h: 1 }
   const kinds = B.slice(1).map((b, i) => gapKind(B[i], b, st0))
@@ -300,7 +311,7 @@ export function solveStack900(input: StackInput): StackResult {
   const G = evenGapOf(height, stem)
   let st = st0, f = 1, bars = 0
   if (jamo && HORIZONTAL_VOWELS.includes(jamo.jung)) {
-    const plan = stackPlan(st0, G, input.height)
+    const plan = stackPlan(st0, G, input.height, COMPOUND_FINALS.includes(jamo.jong) ? 'JO' : undefined)
     if (plan) { st = plan.strokes; f = plan.f; bars = plan.bars }
   } else if (jamo && jamo.jong) {
     const plan = finalPlan(st0, G, input.height)
