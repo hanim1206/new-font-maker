@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getBaseJamo } from '../src/stores/jamoStore'
 import { propagatedJungseong } from '../src/stores/stemMasterStore'
 import type { JamoData } from '../src/types'
-import { consonantShapesOf, drawnStem, mastersOf, shapeConsonants, shapeConsonantStroke, type DrawnStem, type StemKind } from './strokeLab'
+import { consonantShapesOf, drawnStem, mastersOf, penThicknessOf, shapeConsonants, shapeConsonantStroke, withPenThicknessVowels, type DrawnStem, type StemKind } from './strokeLab'
 
 type P = { x: number; y: number }
 /** a→b로 가며 진행 방향 오른쪽(+)으로 `bow`만큼 부푼 선. 잔떨림을 얹는다. */
@@ -118,5 +118,28 @@ describe('획 긋기 시험판', () => {
       expect(b[0]).toMatchObject({ x: a[0].x, y: a[0].y })
       expect(Math.hypot(b[b.length - 1].x - a[a.length - 1].x, b[b.length - 1].y - a[a.length - 1].y)).toBeLessThan(1e-9)
     })
+  })
+  it('그은 획은 펜 두께 하나 — 저장소에서 ㄹ · ㅇ · ㅅ만 가늘어도 그은 획은 「ㅣ」 기둥 두께로 고르다', () => {
+    const thin = (jamo: JamoData): JamoData => ({ ...jamo, strokes: jamo.strokes!.map((stroke) => ({ ...stroke, thickness: 0.05 })) })
+    const consonants = Object.fromEntries(Object.entries(jamos('choseong', ['ㄹ', 'ㅇ', 'ㅅ', 'ㄱ'])).map(([char, jamo]) => [char, char === 'ㄱ' ? jamo : thin(jamo)]))
+    const vowels = jamos('jungseong', ['ㅣ', 'ㅡ', 'ㅏ'])
+    const pen = penThicknessOf(vowels)
+    expect(pen).toBe(vowels['ㅣ'].strokes![0].thickness)
+    const stems: Partial<Record<StemKind, DrawnStem>> = {
+      vertical: drawnStem(bowed({ x: 0.37, y: 0.1 }, { x: 0.37, y: 0.9 }), 'vertical'),
+      horizontal: drawnStem(bowed({ x: 0.2, y: 0.5 }, { x: 0.55, y: 0.5 }), 'horizontal'),
+      longHorizontal: drawnStem(bowed({ x: 0.05, y: 0.5 }, { x: 0.7, y: 0.5 }), 'longHorizontal'),
+      diagonal: drawnStem(bowed({ x: 0.6, y: 0.2 }, { x: 0.15, y: 0.8 }), 'diagonal'),
+      circle: drawnStem(loop(), 'circle'),
+    }
+    // 그대로 물려받으면(예전) ㄹ · ㅇ · ㅅ만 0.05로 남는다.
+    const old = shapeConsonants(consonants, consonantShapesOf(stems)).changed
+    expect(old['ㄹ'].strokes!.every((stroke) => stroke.thickness === 0.05)).toBe(true)
+    const { changed } = shapeConsonants(consonants, consonantShapesOf(stems), undefined, pen)
+    for (const char of ['ㄹ', 'ㅇ', 'ㅅ', 'ㄱ']) for (const stroke of changed[char].strokes!) expect(stroke.thickness).toBe(pen)
+    // 홀자: 그은 줄기가 입혀진 획만 펜 두께, 안 그은 것은 그대로.
+    const thinVowels = { ...vowels, 'ㅡ': thin(vowels['ㅡ']) }
+    expect(withPenThicknessVowels(thinVowels, new Set<StemKind>(['longHorizontal']), pen)['ㅡ'].strokes![0].thickness).toBe(pen)
+    expect(withPenThicknessVowels(thinVowels, new Set<StemKind>(['vertical']), pen)['ㅡ'].strokes![0].thickness).toBe(0.05)
   })
 })

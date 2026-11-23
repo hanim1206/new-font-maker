@@ -31,7 +31,7 @@ import { applyBakedLayouts, bakedConsonants, bakedResidual, bakedVowels, bakeLay
 import { layoutDeltaSnapshot } from './layoutDeltaStore'
 import { captureOrigin, dropOrigin, MoldOriginContext, readOrigin, restoreOrigin, storesStamp, useMoldOrigin, writeOrigin, type MoldOrigin } from './moldOrigin'
 import { SAMPLE_SENTENCES } from './sampleSentences'
-import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
+import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, penThicknessOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, withPenThicknessVowels, type DrawnStem, type StemKind } from './strokeLab'
 import { MoldDotPlate } from './MoldDotPlate'
 import { thinBudget, thinSyllable, type BudgetStroke } from './moldBudget'
 import { HALO_PRESETS, haloFit, haloScope, type HaloFit, type HaloStroke } from './moldHalo'
@@ -1329,11 +1329,14 @@ export function MoldLabPage() {
     if (!Object.values(stems).some((stem) => stem?.ok)) return undefined
     const masters = mastersOf(stems, jungseong)
     const shapes = consonantShapesOf(stems)
+    // 한 펜으로 그었으니 그은 획은 두께 하나 — 저장소 획마다 다른 두께를 물려받지 않는다(`penThicknessOf`).
+    const pen = penThicknessOf(jungseong)
+    const drawnKinds = new Set(STEMS.filter((info) => stems[info.kind]?.ok).map((info) => info.kind))
     const consonants = Object.fromEntries(LAYOUTS.map((layout) => {
       const box = consonantBoxesOf(layout)
-      return [layout, { choseong: shapeConsonants(choseong, shapes, box.CH).changed, jongseong: shapeConsonants(jongseong, shapes, box.JO).changed }]
+      return [layout, { choseong: shapeConsonants(choseong, shapes, box.CH, pen).changed, jongseong: shapeConsonants(jongseong, shapes, box.JO, pen).changed }]
     })) as Drawn['consonants']
-    return { jungseong: Object.keys(masters).length ? propagatedJungseong(jungseong, {}, masters) : undefined, consonants }
+    return { jungseong: Object.keys(masters).length ? withPenThicknessVowels(propagatedJungseong(jungseong, {}, masters), drawnKinds, pen) : undefined, consonants }
   }, [stems, choseong, jungseong, jongseong])
 
   // 긋기 단계 글줄: 내가 그은 줄기 종류가 쓰인 획만 보인다(그을 때마다 글자가 조금씩 채워진다).

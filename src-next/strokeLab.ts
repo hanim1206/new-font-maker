@@ -1,6 +1,6 @@
 import { fitPenStroke, PEN_STABILIZATION_MAX_WINDOW, penClosesOnItself } from '../src/services/penStrokeFit'
 import type { PenFitResult, PenPoint } from '../src/services/penStrokeFit'
-import { boundStrokesOf, isUnder, stemReferenceBox, type AxisPoint, type StemMaster, type StemMasters } from '../src/services/stemMaster'
+import { boundStrokesOf, isUnder, JAMO_CHANNELS, stemReferenceBox, type AxisPoint, type StemMaster, type StemMasters } from '../src/services/stemMaster'
 import { DEFAULT_LAYOUT_CONFIGS } from '../src/data/layoutConfigs'
 import type { AnchorPoint, JamoData, LayoutType, StrokeDataV2 } from '../src/types'
 
@@ -182,6 +182,40 @@ export function vowelStemKeys(jungseong: Readonly<Record<string, JamoData>>): Ma
   return keys
 }
 
+/**
+ * 그은 획의 두께 — 한 펜으로 그었으니 획마다 같다. 저장된 「ㅣ」 기둥 두께(없으면 모음 획 가운데값)를 쓴다.
+ * 저장소 자모는 획마다 두께가 다를 수 있다(이은 획 ㄹ · ㅇ · ㅅ이 가로 · 세로 사이 값으로 들어온 것 등). 그 값을 그은 획에 그대로 물려주면
+ * 기본 굵기에서 그은 ㄹ · ㅇ · ㅅ만 가늘어진다(하니무스 2026-11-24 8:40). 굵을 때는 자소마다 두께를 다시 정해 가려졌다.
+ */
+export function penThicknessOf(jungseong: Readonly<Record<string, JamoData>>): number {
+  const stem = jungseong['ㅣ']?.strokes?.find((stroke) => stroke.thickness > 0)
+  if (stem) return stem.thickness
+  const all = Object.values(jungseong).flatMap((jamo) => JAMO_CHANNELS.flatMap((channel) => jamo[channel] ?? [])).map((stroke) => stroke.thickness).filter((t) => t > 0).sort((a, b) => a - b)
+  return all.length ? all[Math.floor(all.length / 2)] : FIT_THICKNESS
+}
+
+/** 그은 줄기가 입혀진 홀자 획(`홀자:획id`)에 펜 두께를 준다. 안 그은 획은 그대로. */
+export function withPenThicknessVowels(jungseong: Readonly<Record<string, JamoData>>, drawnKinds: ReadonlySet<StemKind>, thickness: number): Record<string, JamoData> {
+  const keys = vowelStemKeys(jungseong)
+  const out: Record<string, JamoData> = {}
+  for (const [char, jamo] of Object.entries(jungseong)) {
+    let touched = false
+    const next = { ...jamo }
+    for (const channel of JAMO_CHANNELS) {
+      const strokes = jamo[channel]
+      if (!strokes) continue
+      next[channel] = strokes.map((stroke) => {
+        const kind = keys.get(`${char}:${stroke.id}`)
+        if (!kind || !drawnKinds.has(kind) || stroke.thickness === thickness) return stroke
+        touched = true
+        return { ...stroke, thickness }
+      })
+    }
+    out[char] = touched ? next : jamo
+  }
+  return out
+}
+
 // ── 닿자: 간이 퍼뜨리기 ──
 
 type Vec = { x: number; y: number }
@@ -352,7 +386,7 @@ export function shapeConsonantStroke(stroke: StrokeDataV2, shapes: ConsonantShap
 }
 
 /** 닿자 자모 묶음 전체에 줄기 모양을 입힌다. 바뀐 자모와 `자모:획id` → 종류 표를 돌려준다. */
-export function shapeConsonants(jamos: Readonly<Record<string, JamoData>>, shapes: ConsonantShapes, box: BoxSize = SQUARE): { changed: Record<string, JamoData>; keys: Map<string, StemKind[]> } {
+export function shapeConsonants(jamos: Readonly<Record<string, JamoData>>, shapes: ConsonantShapes, box: BoxSize = SQUARE, thickness?: number): { changed: Record<string, JamoData>; keys: Map<string, StemKind[]> } {
   const changed: Record<string, JamoData> = {}
   const keys = new Map<string, StemKind[]>()
   if (!Object.values(shapes).some(Boolean)) return { changed, keys }
@@ -364,7 +398,8 @@ export function shapeConsonants(jamos: Readonly<Record<string, JamoData>>, shape
       if (result.kinds.length === 0) return stroke
       touched = true
       keys.set(`${char}:${stroke.id}`, result.kinds)
-      return result.stroke
+      // 그은 모양을 입힌 획은 펜 두께 하나로(`penThicknessOf`).
+      return thickness === undefined ? result.stroke : { ...result.stroke, thickness }
     })
     if (touched) changed[char] = { ...jamo, strokes }
   }
