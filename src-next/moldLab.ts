@@ -1,4 +1,5 @@
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
+import { HALO_ENGINE, HALO_SCALE } from './moldHalo'
 import { ENGINE_GAP_RULE } from './moldGap'
 import { instanceInJamo, instanceOf, JAMO_CHANNELS, masterFromStroke, masterNameOf, baseOf, stemAxisOf, stemReferenceBox, type AxisPoint, type StemBase, type StemMaster } from '../src/services/stemMaster'
 import type { BoxConfig, BrushStyle, DecomposedSyllable, JamoData, LayoutType, Part, StrokeDataV2, StrokeRenderStyle } from '../src/types'
@@ -489,7 +490,7 @@ export type LayoutEdits = Partial<Record<LayoutType, PartEdits>>
  * balloon = 풍선 닿자의 획 사이 최소 틈(em, 사용자가 고름),
  * round = 끝 · 모서리 둥글기(0~1, 붓 둥글기), contrast = 획 대비(0~1, + 는 세로 굵게 · 가로 가늘게).
  */
-export interface Look { weight?: number; /** 저장소에 써 넣은 굵기(그 당김은 이미 저장된 칸에 들어 있다). 사용자 값 아님. */ weightBase?: number; soft?: number; frame?: number; tracking?: number; size?: number; height?: number; jamo?: number; center?: number; round?: number; contrast?: number; balloon?: number; open?: number; branch?: number; serif?: number; nib?: number; jag?: number; bendGidung?: number; bendGyeot?: number; bendJjal?: number; bendBo?: number; bendGeol?: number; gapGyeot?: number }
+export interface Look { weight?: number; /** 저장소에 써 넣은 굵기(그 당김은 이미 저장된 칸에 들어 있다). 사용자 값 아님. */ weightBase?: number; soft?: number; frame?: number; tracking?: number; size?: number; height?: number; jamo?: number; center?: number; round?: number; contrast?: number; balloon?: number; open?: number; branch?: number; serif?: number; nib?: number; jag?: number; bendGidung?: number; bendGyeot?: number; bendJjal?: number; bendBo?: number; bendGeol?: number; gapGyeot?: number; /** 자소 사이 여유(흐림 선, `moldHalo.ts`). */ ease?: number; /** 굵어질 때 넓어짐 지수(흐림 선). */ spread?: number }
 export type Dir = 'up' | 'down' | 'left' | 'right' | 'ul' | 'ur' | 'dl' | 'dr'
 export interface RegionLabels { name: string; up: string; down: string; left: string; right: string }
 
@@ -538,8 +539,8 @@ export const NOTO_700_RATIO = 1.86
 export const HEAVY_TOP = weightRatioOfThickness(NOTO_700_RATIO)
 /** 굵어진 몫 가운데 가로줄기가 받는 비율. 굵은 폰트는 가로를 덜 굵게 한다(검은고딕 가로 ÷ 세로 0.79, 노토 900 0.96). */
 export const HEAVY_HORIZONTAL_SHARE = 0.8
-export const LOOK_WALL = { weight: [0.25, HEAVY_TOP], weightBase: [0.25, HEAVY_TOP], soft: [0, 1], frame: [0.74, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09], ...STEM_WALL } as const
-export const LOOK_ENGINE = { weight: 1, weightBase: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.04, open: 1, branch: 1, serif: 0, nib: 0, jag: 0.027, ...STEM_ENGINE } as const
+export const LOOK_WALL = { weight: [0.25, HEAVY_TOP], weightBase: [0.25, HEAVY_TOP], soft: [0, 1], frame: [0.74, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09], ease: [HALO_SCALE.ease[0], Math.max(HALO_SCALE.ease[2], HALO_ENGINE.ease)], spread: [HALO_SCALE.spread[0], HALO_SCALE.spread[2]], ...STEM_WALL } as const
+export const LOOK_ENGINE = { weight: 1, weightBase: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.04, open: 1, branch: 1, serif: 0, nib: 0, jag: 0.027, ease: HALO_ENGINE.ease, spread: HALO_ENGINE.spread, ...STEM_ENGINE } as const
 const clampLook = (key: keyof typeof LOOK_WALL, value: number) => Math.max(LOOK_WALL[key][0], Math.min(LOOK_WALL[key][1], value))
 export const lookOf = (look: Look, key: keyof Look) => look[key] ?? LOOK_ENGINE[key]
 
@@ -1312,7 +1313,7 @@ export function movePartEdit(edits: PartEdits, part: Part, du: number, dv: numbe
  * 틀 판: 크기 · 비율 · 닿자 크기 · 탈네모 · 윗선 들쭉날쭉, 맨 끝에 무게중심. 획 판: 굵기 · 획 대비 · 둥글기 · 붓촉.
  * 폭 · 키는 비율 한 줄(`frame`)로 합쳤다. 크기가 키를, 비율이 폭을 정한다.
  */
-export const FRAME_KEYS = ['size', 'frame', 'jamo', 'open', 'jag', 'center'] as const
+export const FRAME_KEYS = ['size', 'frame', 'jamo', 'ease', 'open', 'jag', 'center'] as const
 export const INK_KEYS = ['weight', 'contrast', 'round', 'nib'] as const
 export const DOT_KEYS = [...FRAME_KEYS, ...INK_KEYS] as const
 export type DotKey = (typeof DOT_KEYS)[number]
@@ -1331,6 +1332,8 @@ export const DOT_SCALE: Partial<Record<DotKey, readonly [number, number, number]
   // 닿자 크기(ㅇ 높이 ÷ 기둥) 0.40 · 0.64 · 1.00 ÷ 노토 0.73
   jamo: [0.55, 0.88, 1.37],
   center: [-1, 0, 1],
+  // 자소 사이 여유: 칸 0 = 촘촘(선이 닿자에 가까움, 고운돋움 0.76) · 칸 10 = 폰트 가운데 · 칸 20 = 여유(IBM 플렉스 0.48). `moldHalo.ts` HALO_SCALE.
+  ease: [HALO_SCALE.ease[2], HALO_SCALE.ease[1], HALO_SCALE.ease[0]],
 }
 /** 두께 배율(400 대비) → 굵기 값 비율. 굵기 값과 두께는 곧은 비례가 아니다(`weightToMultiplier`). */
 function weightRatioOfThickness(t: number): number {

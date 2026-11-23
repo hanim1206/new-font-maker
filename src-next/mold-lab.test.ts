@@ -307,7 +307,8 @@ describe('도트판 인상 잡기', () => {
     // 노토는 크기 · 비율에서 가운데보다 조금 아래, 획 대비는 1.0이라 가운데(0.83)보다 아래
     expect(notoDot('size')).toBe(9)
     expect(notoDot('contrast')).toBe(7)
-    expect(dotsOf({}, FRAME_KEYS)).toEqual([9, 9, 12, 0, 20, 10])
+    // 자소 사이 여유: 엔진(0.78)은 폰트 여섯보다 촘촘해 칸 0(촘촘 끝)에 선다.
+    expect(dotsOf({}, FRAME_KEYS)).toEqual([9, 9, 12, 0, 0, 20, 10])
     expect(dotsOf({}, INK_KEYS)).toEqual([9, 7, 0, 0])
     // 획 대비 눈금은 가로 ÷ 세로 굵기: 1이면 엔진 0, 1을 넘으면(가로가 더 굵음) 음수
     expect(contrastOfRatio(1)).toBe(0)
