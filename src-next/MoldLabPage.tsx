@@ -276,6 +276,13 @@ function heavyStrokeStyle(style: GlobalStyle['strokeStyle'], contrast: number): 
 }
 
 /** 흐림 선 재기에 넣을 잉크(중심선 + 두께). `thickOf`가 있으면 자소마다 세로 · 가로 배율을 준다(풍선 굵기). */
+/** 글자에 든 획(자소 데이터 그대로)을 id로 찾는다. */
+function strokeOfSyllable(syllable: DecomposedSyllable, part: Part, id: string): StrokeDataV2 | undefined {
+  const jamo = part === 'CH' ? syllable.choseong : part === 'JU' || part === 'JU_H' || part === 'JU_V' ? syllable.jungseong : syllable.jongseong
+  if (!jamo) return undefined
+  return [...(jamo.strokes ?? []), ...(jamo.horizontalStrokes ?? []), ...(jamo.verticalStrokes ?? [])].find((stroke) => stroke.id === id) as StrokeDataV2 | undefined
+}
+
 function haloStrokesOf(syllable: DecomposedSyllable, boxes: Partial<Record<Part, BoxConfig>>, style: { linecap: GlobalStyle['linecap']; linejoin: GlobalStyle['linejoin'] }, multiplier: number, thickOf?: (part: Part) => { v: number; h: number }): HaloStroke[] {
   return resolveGlyphInkPrimitives({ syllable, placement: { kind: 'boxes', boxes }, weightMultiplier: 1, globalLinecap: style.linecap, globalLinejoin: style.linejoin, horizontalInkBounds: { min: 0, max: 1 } })
     .primitives.map((primitive) => ({ part: primitive.source.part, points: flattenStrokeCenterline(primitive.stroke as StrokeDataV2, primitive.box), thickness: primitive.stroke.thickness * multiplier, closed: primitive.stroke.closed, cap: (primitive.stroke as StrokeDataV2).linecap ?? style.linecap, ...(thickOf ? { thick: thickOf(primitive.source.part) } : {}) }))
@@ -491,9 +498,19 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       const box = primitive.box, raw = primitive.stroke as StrokeDataV2, next = out.strokes[index], part = primitive.source.part
       if (box.width < 1e-9 || box.height < 1e-9) return
       const { dx, dy } = shiftOf(part), thinX = box.width < THIN_BOX, thinY = box.height < THIN_BOX
-      const local = (p: { x: number; y: number }) => ({ x: (p.x - (thinX ? dx : 0) - box.x) / box.width, y: (p.y - (thinY ? dy : 0) - box.y) / box.height })
-      const points = raw.points.map((p, at) => { const a = next.anchors[at]; return { ...p, ...local(a), ...(a.handleIn ? { handleIn: local(a.handleIn) } : {}), ...(a.handleOut ? { handleOut: local(a.handleOut) } : {}) } })
-      reshape.set(`${primitive.source.part}|${primitive.source.strokeId}`, { pieces: [{ ...raw, points }] })
+      // 엔진이 그릴 때 손본 획(primitive)이 아니라 글자에 든 획에 옮긴 만큼만 더한다. 손본 획을 다시 넣으면 엔진이 한 번 더 손봐 그은 획(곡선)이 틀어진다.
+      const own = strokeOfSyllable(budget.syllable, part, primitive.source.strokeId)
+      const base = own && own.points.length === raw.points.length ? own : raw
+      const before = stackStart.strokes[index].anchors
+      const step = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: (a.x - b.x - (thinX ? dx : 0)) / box.width, y: (a.y - b.y - (thinY ? dy : 0)) / box.height })
+      const plus = (p: { x: number; y: number }, m: { x: number; y: number }) => ({ x: p.x + m.x, y: p.y + m.y })
+      let still = true
+      const points = base.points.map((p, at) => {
+        const a = next.anchors[at], b = before[at], m = step(a, b)
+        if (Math.abs(m.x) > 1e-9 || Math.abs(m.y) > 1e-9) still = false
+        return { ...p, ...plus(p, m), ...(p.handleIn && a.handleIn && b.handleIn ? { handleIn: plus(p.handleIn, step(a.handleIn, b.handleIn)) } : {}), ...(p.handleOut && a.handleOut && b.handleOut ? { handleOut: plus(p.handleOut, step(a.handleOut, b.handleOut)) } : {}) }
+      })
+      if (!still) reshape.set(`${part}|${primitive.source.strokeId}`, { pieces: [{ ...base, points }] })
     })
     const syllable = stretchedSyllable(budget.syllable, reshape)
     const result = resolveGlyphInkPrimitives({ syllable, placement: { kind: 'boxes', boxes }, weightMultiplier: 1, globalLinecap: effective.linecap, globalLinejoin: effective.linejoin, horizontalInkBounds: { min: 0, max: 1 } })

@@ -60,6 +60,8 @@ export const BLACK_CONTRAST = 0.8
 /** ㅁ · ㅂ · ㅇ(가로홀자 위 첫닿자 · 받침) 폭 0.92배(굵은 고딕 6벌보다 7~10% 넓음, 규칙 11, 판 21). */
 export const NARROW_ROUND = 0.92
 const BAR_BAND = 0.12, SAME_BAR = 0.02, RING_POINTS = 12
+/** 이만큼(기울기 dy/dx) 아래로 누운 토막은 가로 막대로 본다. */
+const BAR_SLOPE = 0.25
 
 const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
 const JUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
@@ -152,9 +154,18 @@ function barsOf(st: readonly StackStroke[], block?: Part): Bar[] {
       }
       return
     }
-    for (let k = 0; k < P.length - 1; k++) {
-      const a = P[k], b = P[k + 1]
-      if (Math.abs(a.y - b.y) < 1e-4 && Math.abs(a.x - b.x) > 0.05 && Math.min(a.x, b.x) < xc + BAR_BAND && Math.max(a.x, b.x) > xc - BAR_BAND) out.push({ y: a.y, i, kind: 'bar' })
+    // 가로로 누운 토막이 이어진 한 줄을 막대 하나로 본다. 손으로 그은 획은 조금 기울고 굽어 있어 딱 수평인 토막만 보면 막대를 놓친다.
+    const flat = (a: Pt, b: Pt) => Math.abs(b.y - a.y) <= BAR_SLOPE * Math.abs(b.x - a.x)
+    for (let k = 0; k < P.length - 1;) {
+      if (!flat(P[k], P[k + 1])) { k++; continue }
+      let end = k + 1
+      const dir = Math.sign(P[k + 1].x - P[k].x)
+      while (end < P.length - 1 && flat(P[end], P[end + 1]) && Math.sign(P[end + 1].x - P[end].x) === dir) end++
+      const run = P.slice(k, end + 1), x0 = Math.min(...run.map((p) => p.x)), x1 = Math.max(...run.map((p) => p.x))
+      let len = 0, sum = 0
+      for (let j = k; j < end; j++) { const l = Math.hypot(P[j + 1].x - P[j].x, P[j + 1].y - P[j].y); len += l; sum += l * (P[j].y + P[j + 1].y) / 2 }
+      if (x1 - x0 > 0.05 && x0 < xc + BAR_BAND && x1 > xc - BAR_BAND) out.push({ y: len > 0 ? sum / len : run[0].y, i, kind: 'bar' })
+      k = end
     }
   })
   // 겹받침(ㄺ · ㅀ …)은 두 자소가 나란히 서 막대 높이가 엇갈린다. 한 덩이로 보고 맨 위 · 맨 아래만 잡아 통째로 옮긴다.

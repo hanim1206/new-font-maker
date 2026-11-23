@@ -62,4 +62,9 @@ describe('900 쌓임 규칙', () => {
     // 받침 점들은 한 배율 · 한 이동으로만 옮겨진다.
     a.forEach((y, i) => expect(b[i]).toBeCloseTo(b[0] + (y - a[0]) * k, 6))
   })
+  it('손으로 그은 듯 조금 기운 가로획도 막대로 센다', () => {
+    const tilt = reul().map((s) => ({ ...s, points: s.points.map((p) => ({ x: p.x, y: p.y + 0.03 * (p.x - 0.5) })), anchors: s.anchors.map((p) => ({ x: p.x, y: p.y + 0.03 * (p.x - 0.5) })) }))
+    const out = solveStack900({ char: '를', strokes: tilt, height: inkHeightOf(tilt), reach: 0, inward: 1 })
+    expect(out.bars).toBe(7)
+  })
 })
