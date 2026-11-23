@@ -1,4 +1,5 @@
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
+import { BLACK_STEM_GAIN } from './moldStack900'
 import { HALO_ENGINE, HALO_SCALE } from './moldHalo'
 import { ENGINE_GAP_RULE } from './moldGap'
 import { instanceInJamo, instanceOf, JAMO_CHANNELS, masterFromStroke, masterNameOf, baseOf, stemAxisOf, stemReferenceBox, type AxisPoint, type StemBase, type StemMaster } from '../src/services/stemMaster'
@@ -536,7 +537,13 @@ export const ENGINE_TOP = 2.25
  * 검은고딕(2.7배) 끝은 뒤에.
  */
 export const NOTO_700_RATIO = 1.86
-export const HEAVY_TOP = weightRatioOfThickness(NOTO_700_RATIO)
+/**
+ * 굵기 막대 위 끝 = 900(하니무스 2026-11-24 "900으로 가기로 해." — 11/22 노토 700 결정을 바꿈).
+ * 노토 700 수준 두께(1.86배)까지는 중심선 그대로 굵히고, 그 위 1.15배는 세로만 안쪽으로 굵힌다(바깥 테두리 고정, `moldStack900.ts`).
+ * 1.15 = 고딕A1 블랙 · 노토 900 기둥 ÷ 키(0.167 · 0.170) ÷ 우리 끝 0.146(거북이 판 22, 굵은 폰트 두 집안).
+ */
+export const BLACK_RATIO = NOTO_700_RATIO * BLACK_STEM_GAIN
+export const HEAVY_TOP = weightRatioOfThickness(BLACK_RATIO)
 /** 굵어진 몫 가운데 가로줄기가 받는 비율. 굵은 폰트는 가로를 덜 굵게 한다(검은고딕 가로 ÷ 세로 0.79, 노토 900 0.96). */
 export const HEAVY_HORIZONTAL_SHARE = 0.8
 export const LOOK_WALL = { weight: [0.25, HEAVY_TOP], weightBase: [0.25, HEAVY_TOP], soft: [0, 1], frame: [0.74, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09], ease: [HALO_SCALE.ease[0], Math.max(HALO_SCALE.ease[2], HALO_ENGINE.ease)], spread: [HALO_SCALE.spread[0], HALO_SCALE.spread[2]], ...STEM_WALL } as const
@@ -1337,6 +1344,9 @@ export const DOT_SCALE: Partial<Record<DotKey, readonly [number, number, number]
 }
 /** 두께 배율(400 대비) → 굵기 값 비율. 굵기 값과 두께는 곧은 비례가 아니다(`weightToMultiplier`). */
 function weightRatioOfThickness(t: number): number {
+  // 엔진 끝(900) 너머는 `heavyThicknessOf`처럼 곧은 비례로.
+  const top = thicknessOf(ENGINE_TOP)
+  if (t > top) return ENGINE_TOP * t / top
   let lo = 100, hi = 900
   for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; if (weightToMultiplier(mid) < t * weightToMultiplier(400)) lo = mid; else hi = mid }
   return lo / 400
