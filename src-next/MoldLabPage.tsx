@@ -400,6 +400,8 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     return { syllable: thinSyllable(balloon.syllable, factors), factors, boxes: widenedBoxes(boxes, widen, rooms) }
   }, [placement, boxes, balloon.syllable, effective, ratio, contrast])
   const budgetBoxes = budget.boxes
+  // 900 쌓임 규칙은 틈을 규칙(머리 → 가로획 → 속 → 틈 순서)으로 낸다. 붙을 획을 미리 가늘게 하는 예산(`thinBudget`)을 거치면 그은 획처럼 넓은 획에서 글자마다 두께가 달라진다(하니무스 2026-11-24).
+  const heavyBase = STACK_900 ? balloon.syllable : budget.syllable
   // 흐림 선(새 틈 규칙 1단계, `moldHalo.ts`): 처음 굵기 이하는 그리는 칸 그대로 재서 닿자 뼈대를 넓히거나 기둥을 민다.
   const halo = useMemo(() => {
     if (heavyOn || placement.kind !== 'boxes' || !budgetBoxes || !haloScope(raw)) return null
@@ -411,7 +413,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   // 풍선에 넣을 획 · 칸(굵기 값과 무관 — 글줄 멈춤을 잴 때도 같이 쓴다).
   const heavyInput = useMemo(() => {
     if (!heavyOn || !budgetBoxes) return null
-    const result = resolveGlyphInkPrimitives({ syllable: budget.syllable, placement: { kind: 'boxes', boxes: budgetBoxes }, weightMultiplier: 1, globalLinecap: effective.linecap, globalLinejoin: effective.linejoin, horizontalInkBounds: { min: 0, max: 1 } })
+    const result = resolveGlyphInkPrimitives({ syllable: heavyBase, placement: { kind: 'boxes', boxes: budgetBoxes }, weightMultiplier: 1, globalLinecap: effective.linecap, globalLinejoin: effective.linejoin, horizontalInkBounds: { min: 0, max: 1 } })
     const strokes: BalloonStroke[] = result.primitives.map((primitive) => ({ part: primitive.source.part, points: flattenStrokeCenterline(primitive.stroke as StrokeDataV2, primitive.box), closed: primitive.stroke.closed, thickness: primitive.stroke.thickness }))
     // 칸은 획이 실제로 놓인 상자로(엔진이 부위 칸 안에서 다시 놓을 수 있다). 한 부위에 상자가 여럿이면 합친다.
     const placed: Partial<Record<Part, BoxConfig>> = {}
@@ -427,7 +429,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       return { v, h: base.h * (1 + (grown - 1) * HEAVY_HORIZONTAL_SHARE) }
     }
     // 넓어짐 표는 2단계에서 뺀다. 1단계는 표로 푼 뒤에도 흐림 선이 기둥을 넘는 만큼만 기둥을 더 민다(아래 `heavy`).
-    const outer = outerWidenOf(budget.syllable)
+    const outer = outerWidenOf(heavyBase)
     // 쌓인 획 법칙(거북이 ①): 칸을 글자 기둥 전체로 먼저 다시 나누고, 풍선은 그 칸 · 그 굵기에서 출발한다. 앞 걸음들의 굵기를 바닥으로 넘겨 굵기를 올려도 획이 안 가늘어진다.
     const columns = stackColumns(strokes, base)
     const solveAt = (weight: number) => {
@@ -436,7 +438,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       return solveBalloon({ strokes: lay.strokes, boxes: lay.boxes, base, start: lay.start, want: wantOf(weight), outer })
     }
     return { result, strokes, placed, base, wantOf, solveAt }
-  }, [heavyOn, budgetBoxes, budget.syllable, effective.linecap, effective.linejoin, contrast])
+  }, [heavyOn, budgetBoxes, heavyBase, effective.linecap, effective.linejoin, contrast])
   // 글줄 바닥 · 같이 멈춤(거북이 굵을-때-획-균형.md ② · ③, 하니무스 2026-11-22 "넣어"): 이 글자를 풀었을 때 가장 가는 몫이
   // 글줄 기준 굵기(T = 바라는 세로줄기)의 바닥(`heavyFloorOf`) 아래로 가면, 이 글자를 처음 굵기로 떨어뜨리지 않고 글줄 굵기를 그 바닥에 닿는 데까지만 올린다.
   // 굵기 값과 무관하게 한 번 잰다(굵기 끝까지 걸음으로 훑어 바닥을 지키는 가장 굵은 값) — 지금 굵기로 재면 멈춤 → 굵기 → 멈춤이 물린다.
@@ -499,7 +501,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       if (box.width < 1e-9 || box.height < 1e-9) return
       const { dx, dy } = shiftOf(part), thinX = box.width < THIN_BOX, thinY = box.height < THIN_BOX
       // 엔진이 그릴 때 손본 획(primitive)이 아니라 글자에 든 획에 옮긴 만큼만 더한다. 손본 획을 다시 넣으면 엔진이 한 번 더 손봐 그은 획(곡선)이 틀어진다.
-      const own = strokeOfSyllable(budget.syllable, part, primitive.source.strokeId)
+      const own = strokeOfSyllable(heavyBase, part, primitive.source.strokeId)
       const base = own && own.points.length === raw.points.length ? own : raw
       const before = stackStart.strokes[index].anchors
       const step = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: (a.x - b.x - (thinX ? dx : 0)) / box.width, y: (a.y - b.y - (thinY ? dy : 0)) / box.height })
@@ -512,7 +514,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       })
       if (!still) reshape.set(`${part}|${primitive.source.strokeId}`, { pieces: [{ ...base, points }] })
     })
-    const syllable = stretchedSyllable(budget.syllable, reshape)
+    const syllable = stretchedSyllable(heavyBase, reshape)
     const result = resolveGlyphInkPrimitives({ syllable, placement: { kind: 'boxes', boxes }, weightMultiplier: 1, globalLinecap: effective.linecap, globalLinejoin: effective.linejoin, horizontalInkBounds: { min: 0, max: 1 } })
     const strokes: BalloonStroke[] = result.primitives.map((primitive) => ({ part: primitive.source.part, points: flattenStrokeCenterline(primitive.stroke as StrokeDataV2, primitive.box), closed: primitive.stroke.closed, thickness: primitive.stroke.thickness }))
     const placed: Partial<Record<Part, BoxConfig>> = {}
@@ -522,13 +524,13 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     }
     const thick = { v: center * out.thick.v * heavyInput.base.v, h: center * out.thick.h * heavyInput.base.h }
     return { syllable, result, strokes, boxes, placed, thick: { CH: thick, JU: { ...thick }, JO: { ...thick } } as Record<BalloonGroup, Thick>, gap: out.gap }
-  }, [stackStart, heavyInput, budgetBoxes, char, stackHeight, budget.syllable, effective.linecap, effective.linejoin])
+  }, [stackStart, heavyInput, budgetBoxes, char, stackHeight, heavyBase, effective.linecap, effective.linejoin])
   const heavy = useMemo(() => {
     if (!heavyInput || !budgetBoxes) return null
     const { solveAt, base } = heavyInput
     const result = stacked ? stacked.result : heavyInput.result, strokes = stacked ? stacked.strokes : heavyInput.strokes, placed = stacked ? stacked.placed : heavyInput.placed
     const startBoxes = stacked ? stacked.boxes : budgetBoxes
-    const startSyllable = stacked ? stacked.syllable : budget.syllable
+    const startSyllable = stacked ? stacked.syllable : heavyBase
     const solved = stacked ? { boxes: placed, thick: stacked.thick } : solveAt(Math.min(wanted, Math.max(1, weightCap)))
     // 푼 칸(획 상자 기준)의 바뀐 만큼을 부위 칸에 그대로 옮긴다.
     const out: Partial<Record<Part, BoxConfig>> = { ...startBoxes }
@@ -609,7 +611,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       fit = haloFit(haloStrokesOf(syllableOut, out, effective, m, (part) => solved.thick[balloonGroupOf(part)]), { ease: lookOf(look, 'ease'), spread: lookOf(look, 'spread'), grown: solved.thick.JU.v / base.v })
     }
     return { boxes: haloBoxes(out, fit), thick: solved.thick, syllable: syllableOut, halo: fit }
-  }, [heavyInput, stacked, budgetBoxes, budget.syllable, effective, contrast, wanted, weightCap, look])
+  }, [heavyInput, stacked, budgetBoxes, heavyBase, effective, contrast, wanted, weightCap, look])
   const globalStyle = useMemo(() => {
     const weighted = ratio === 1 ? effective : { ...effective, weight: scaledWeight(effective.weight, ratio) }
     // 획 끝 · 꺾임은 둥글기 하나가 맡는다(거북이 방향안 4차). 둥글기 · 대비 · 붓촉은 엔진의 붓 값에 얹는다(`moldInk`).
