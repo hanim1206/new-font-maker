@@ -22,7 +22,7 @@ import { Pressable } from './components/ui/pressable'
 import { Field, RangeBar } from './components/ui/range'
 import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
-import { BLACK_RATIO, NOTO_700_RATIO, HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { BLACK_CENTER, BLACK_RATIO, HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement, useNotoModel } from './notoModel'
 import { stackColumns, stackLay } from './moldStack'
 import { balloonGroupOf, endReachOf, inkOfThick, solveBalloon, type BalloonGroup, type BalloonStroke, type Thick } from './moldBalloon'
@@ -355,7 +355,10 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   }, [molded, placement, ratio, syllable, effective])
 
   // 울타리: 그은 획 때문에 칸 밖으로 나간 것을 당긴다. 기준 글자는 그은 게 없을 때 같은 칸의 모습.
-  const fenced = useMemo(() => fence && grown.boxes ? fencedBoxes({ syllable, baseSyllable: drawn ? base.syllable : syllable, boxes: grown.boxes, style: effective, padding, fence }) : null, [fence, grown.boxes, syllable, base.syllable, drawn, effective, padding])
+  // 굵을 때(900 쌓임 규칙)는 울타리가 글줄 공통으로 자소를 줄이지 않는다. 글줄에서 가장 많이 줄여야 하는 글자에 맞춰 모두 줄이면
+  // 굵어질 자리가 없어 ㅏ · ㅐ 곁줄기가 기둥에 묻힌다(다람쥐 검수 2026-11-24, 긴 글줄에서만). 휜 획 자리 맞추기(배치 값 당기기)는 그대로 둔다.
+  const fenceNow = useMemo(() => fence && heavyOn && STACK_900 ? { ...fence, scale: 1 } : fence, [fence, heavyOn])
+  const fenced = useMemo(() => fenceNow && grown.boxes ? fencedBoxes({ syllable, baseSyllable: drawn ? base.syllable : syllable, boxes: grown.boxes, style: effective, padding, fence: fenceNow }) : null, [fenceNow, grown.boxes, syllable, base.syllable, drawn, effective, padding])
   useEffect(() => { if (fenced) onFence?.(fenced.need, fenced.pulls) }, [onFence, fenced])
   const fencedOut = fenced?.boxes ?? grown.boxes
   // 풍선 닿자(하니무스 2026-11-21): 보이는 글자 그대로(굵기 · 울타리까지 입힌 뒤) 잰다. 닿자 칸의 변과 획 하나하나가 같이 부풀고,
@@ -464,7 +467,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const stackStart = useMemo(() => {
     if (!STACK_900 || !heavyInput) return null
     const k = heavyThicknessOf(Math.min(wanted, Math.max(1, weightCap)))
-    const center = Math.min(k, NOTO_700_RATIO), m = weightToMultiplier(MOLD_BASE_WEIGHT)
+    const center = Math.min(k, BLACK_CENTER), m = weightToMultiplier(MOLD_BASE_WEIGHT)
     const strokes: StackStroke[] = heavyInput.result.primitives.map((primitive, index) => {
       const box = primitive.box, raw = primitive.stroke as StrokeDataV2
       const em = (p: { x: number; y: number }) => ({ x: box.x + p.x * box.width, y: box.y + p.y * box.height })

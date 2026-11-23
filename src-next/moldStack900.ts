@@ -54,14 +54,27 @@ export const HIEUT_GAP = 0.6
 /** 넘칠 때 양보 순서(규칙 7): 막대 없는 머리(ㅅ) → 가로획 → ㅇ · ㅁ 속 → 모든 틈. 머리는 0.9배, 가로획은 0.75배(막대 5줄 이상) · 0.84배까지.
  * 세로홀자 받침 글자는 키가 넘치면 가로획 0.9배. 모두 몇 값 중 겹침이 가장 높은 값(가설). */
 export const YIELD = { head: 0.9, barMany: 0.75, barFew: 0.84, finalBar: 0.9 } as const
-/** 대비(규칙 12, 판 22): 굵기 끝에서 세로는 안쪽으로 1.15배, 가로 = 세로 × 0.8. 고딕A1 블랙 · 노토 900 기둥 ÷ 키(0.167 · 0.170) ÷ 우리 0.146, 가로 ÷ 세로 0.8. */
-export const BLACK_STEM_GAIN = 1.15
+/**
+ * 굵기 끝(900)은 노토 한 집안 숫자가 아니라 900이 있는 고딕 다섯 집안(고딕 A1 · 노토 산스 · 프리텐다드 · SUIT · 원티드 산스, 노토는 한 표)의 패턴으로 정한다
+ * (거북이 폰트 156벌 자 `research-hangul-form/mold-fit/heavy/heavy-out.json`, 다람쥐 검수 2026-11-24).
+ * - 기둥 ÷ 키: 900 가운데값 0.173(0.167~0.177).
+ * - 900 ÷ 700 기둥: 집안마다 1.21~1.39, 가운데 1.23 → 그만큼은 세로만 안쪽으로 굵힌다(규칙 12).
+ * - 가로 ÷ 세로(900): 0.80~0.85, 가운데 0.81 → 0.8.
+ */
+export const BLACK_FAMILY = { stemToHeight: 0.173, growth: 1.23, contrast: 0.81 } as const
+/** 엔진 처음 굵기(400)의 「이」 기둥 ÷ 키(0.07 ÷ 0.9033, `heavy-engine.json` 「처음」). */
+export const ENGINE_STEM_TO_HEIGHT = 0.07 / 0.9033
+/** 굵기 끝 두께 배율 = 다섯 집안 900 기둥 ÷ 키를 엔진 처음 기둥 ÷ 키로 나눈 것(≈ 2.23). */
+export const BLACK_TOTAL = BLACK_FAMILY.stemToHeight / ENGINE_STEM_TO_HEIGHT
+export const BLACK_STEM_GAIN = BLACK_FAMILY.growth
 export const BLACK_CONTRAST = 0.8
 /** ㅁ · ㅂ · ㅇ(가로홀자 위 첫닿자 · 받침) 폭 0.92배(굵은 고딕 6벌보다 7~10% 넓음, 규칙 11, 판 21). */
 export const NARROW_ROUND = 0.92
 const BAR_BAND = 0.12, SAME_BAR = 0.02, RING_POINTS = 12
 /** 이만큼(기울기 dy/dx) 아래로 누운 토막은 가로 막대로 본다. */
 const BAR_SLOPE = 0.25
+/** 이만큼(em) 넘게 곧게 선 토막 줄을 기둥으로 본다. */
+const STEM_MIN = 0.2
 
 const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
 const JUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
@@ -309,6 +322,39 @@ function splitDouble(st: StackStroke[], cho: string, want: number, thick: StackT
   return out
 }
 
+/** 홀자 안 기둥 사이(ㅐ · ㅔ · ㅒ · ㅖ의 두 기둥)도 고른 틈을 지킨다. 안쪽으로 굵히면 두 기둥이 서로 다가가 틈이 실처럼 된다(다람쥐 검수 2026-11-24).
+ * 모자라면 왼 기둥(첫닿자 쪽)은 두고 홀자를 오른쪽으로 넓힌다(세로획 많은 글자는 굵기 끝에서 넓혀도 됨, 하니무스 2026-11-21). */
+function spreadStems(st: StackStroke[], G: number, V: number): StackStroke[] {
+  let out = st
+  for (const part of ['JU', 'JU_V'] as const) {
+    const idx = st.map((s, i) => s.part === part ? i : -1).filter((i) => i >= 0)
+    const stems: { x: number; t: number }[] = []
+    for (const i of idx) {
+      const P = st[i].points
+      for (let k = 0; k < P.length - 1;) {
+        const up = (a: Pt, b: Pt) => Math.abs(b.x - a.x) <= BAR_SLOPE * Math.abs(b.y - a.y)
+        if (!up(P[k], P[k + 1])) { k++; continue }
+        let end = k + 1
+        while (end < P.length - 1 && up(P[end], P[end + 1])) end++
+        const run = P.slice(k, end + 1), ys = run.map((p) => p.y)
+        if (Math.max(...ys) - Math.min(...ys) > STEM_MIN) stems.push({ x: run.reduce((a, p) => a + p.x, 0) / run.length, t: st[i].thickness * V })
+        k = end
+      }
+    }
+    if (stems.length < 2) continue
+    stems.sort((a, b) => a.x - b.x)
+    let need = 1
+    for (let k = 0; k < stems.length - 1; k++) {
+      const dx = stems[k + 1].x - stems[k].x, gap = dx - (stems[k].t + stems[k + 1].t) / 2
+      if (dx > 1e-6 && gap < G) need = Math.max(need, (dx + G - gap) / dx)
+    }
+    if (need <= 1 + 1e-6) continue
+    const x0 = stems[0].x
+    out = out.map((s) => s.part === part ? mapStroke(s, (p) => ({ x: x0 + (p.x - x0) * need, y: p.y })) : s)
+  }
+  return out
+}
+
 /** 고른 틈(em): 키 × (0.151 − 0.693 × 기둥 ÷ 키). */
 export const evenGapOf = (height: number, stem: number) => Math.max(0, height * (EVEN_GAP.base - EVEN_GAP.slope * stem / height))
 
@@ -331,6 +377,7 @@ export function solveStack900(input: StackInput): StackResult {
   const reach = Math.max(0, Math.min(1, input.reach))
   const V = input.inward
   st = inwardX(st, V)
+  st = spreadStems(st, G, V)
   // 가로 = min(쌓임이 준 배율, 세로 × 대비). 대비는 굵기 끝으로 갈수록(가설: 굵기에 곧게).
   const contrast = 1 - (1 - BLACK_CONTRAST) * reach
   const thick = { v: V, h: Math.min(f, contrast * V) }

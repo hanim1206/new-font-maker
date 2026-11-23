@@ -67,4 +67,13 @@ describe('900 쌓임 규칙', () => {
     const out = solveStack900({ char: '를', strokes: tilt, height: inkHeightOf(tilt), reach: 0, inward: 1 })
     expect(out.bars).toBe(7)
   })
+  it('ㅐ 두 기둥은 안쪽으로 굵어져도 고른 틈을 지킨다 — 모자라면 오른쪽으로 넓힌다', () => {
+    const st = [line('CH', [[0.1, 0.3], [0.3, 0.3], [0.3, 0.7]], 0.12), line('JU', [[0.6, 0.1], [0.6, 0.9]], 0.12), line('JU', [[0.6, 0.5], [0.72, 0.5]], 0.12), line('JU', [[0.74, 0.1], [0.74, 0.9]], 0.12)]
+    const out = solveStack900({ char: '대', strokes: st, height: 0.8, reach: 1, inward: BLACK_STEM_GAIN })
+    const xs = out.strokes.filter((s) => s.part === 'JU' && s.points[0].x === s.points[1].x).map((s) => s.points[0].x).sort((a, b) => a - b)
+    const gap = xs[1] - xs[0] - 0.12 * BLACK_STEM_GAIN
+    expect(gap).toBeGreaterThanOrEqual(out.gap - 1e-9)
+    // 왼 기둥(첫닿자 쪽)은 안쪽으로 굵힌 자리 그대로.
+    expect(out.strokes[1].points[0].x).toBeLessThan(0.6 + 0.05)
+  })
 })
