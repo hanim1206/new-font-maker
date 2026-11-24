@@ -355,9 +355,11 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   }, [molded, placement, ratio, syllable, effective])
 
   // 울타리: 그은 획 때문에 칸 밖으로 나간 것을 당긴다. 기준 글자는 그은 게 없을 때 같은 칸의 모습.
-  // 굵을 때(900 쌓임 규칙)는 울타리가 글줄 공통으로 자소를 줄이지 않는다. 글줄에서 가장 많이 줄여야 하는 글자에 맞춰 모두 줄이면
-  // 굵어질 자리가 없어 ㅏ · ㅐ 곁줄기가 기둥에 묻힌다(다람쥐 검수 2026-11-24, 긴 글줄에서만). 휜 획 자리 맞추기(배치 값 당기기)는 그대로 둔다.
-  const fenceNow = useMemo(() => fence && heavyOn && STACK_900 ? { ...fence, scale: 1 } : fence, [fence, heavyOn])
+  // 울타리는 글줄 공통으로 자소를 줄이지 않는다(휜 획 자리 맞추기 = 배치 값 당기기는 그대로).
+  // - 굵을 때: 글줄에서 가장 많이 줄여야 하는 글자에 맞춰 모두 줄이면 굵어질 자리가 없어 ㅏ · ㅐ 곁줄기가 기둥에 묻혔다(다람쥐 검수 2026-11-24).
+  // - 처음 굵기 이하: 그은 획이 조금만 휘어도 틈 비율이 기본 획보다 낮아 거의 늘 끝(0.8배)까지 줄었다. 글자가 굵기 1에서 1.5로 넘어갈 때
+  //   잉크 키 0.76 → 0.98로 튀었다(자동 검사 2026-11-24). 줄이지 않아도 하니무스 모양 글줄에서 자소가 안 닿는다.
+  const fenceNow = useMemo(() => fence && STACK_900 ? { ...fence, scale: 1 } : fence, [fence])
   const fenced = useMemo(() => fenceNow && grown.boxes ? fencedBoxes({ syllable, baseSyllable: drawn ? base.syllable : syllable, boxes: grown.boxes, style: effective, padding, fence: fenceNow }) : null, [fenceNow, grown.boxes, syllable, base.syllable, drawn, effective, padding])
   useEffect(() => { if (fenced) onFence?.(fenced.need, fenced.pulls) }, [onFence, fenced])
   const fencedOut = fenced?.boxes ?? grown.boxes
@@ -670,7 +672,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     // 자소마다 가로 · 세로 굵기가 다르다. 엔진의 대비(토막 방향별 두께)를 자소마다 따로 줘서 겹쳐 그린다.
     const flat = globalStyle.strokeStyle.mode !== 'brush' || globalStyle.strokeStyle.brush.tip !== 'round'
     const layers = (['CH', 'JU', 'JO'] as const).filter((group) => (group === 'CH' ? budget.syllable.choseong : group === 'JU' ? budget.syllable.jungseong : budget.syllable.jongseong))
-    return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char} data-halo={haloAttr(haloFitNow)} data-heavy={layers.map((group) => `${group}:${heavy.thick[group].v.toFixed(3)}/${heavy.thick[group].h.toFixed(3)}`).join(' ')}>
+    return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char} data-halo={haloAttr(haloFitNow)} data-fence={fenced ? fenced.need.toFixed(3) : undefined} data-heavy={layers.map((group) => `${group}:${heavy.thick[group].v.toFixed(3)}/${heavy.thick[group].h.toFixed(3)}`).join(' ')}>
       {layers.map((group, at) => {
         const ink = flat ? { multiplier: Math.min(heavy.thick[group].v, heavy.thick[group].h), contrast: 0 } : inkOfThick(heavy.thick[group])
         const style = flat || globalStyle.strokeStyle.mode !== 'brush' ? globalStyle : { ...globalStyle, strokeStyle: heavyStrokeStyle(globalStyle.strokeStyle, ink.contrast) }
@@ -690,7 +692,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       })}
     </span>
   }
-  return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char} data-halo={haloAttr(haloFitNow)} data-budget={Object.entries(budget.factors).map(([key, f]) => `${key}:${f.toFixed(2)}`).join(' ') || undefined}>
+  return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char} data-halo={haloAttr(haloFitNow)} data-fence={fenced ? fenced.need.toFixed(3) : undefined} data-budget={Object.entries(budget.factors).map(([key, f]) => `${key}:${f.toFixed(2)}`).join(' ') || undefined}>
     <SvgRenderer
       syllable={budget.syllable}
       schema={placement.kind === 'schema' ? placement.schema : undefined}
