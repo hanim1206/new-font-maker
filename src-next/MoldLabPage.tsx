@@ -31,7 +31,7 @@ import { applyBakedLayouts, bakedConsonants, bakedResidual, bakedVowels, bakeLay
 import { layoutDeltaSnapshot } from './layoutDeltaStore'
 import { captureOrigin, dropOrigin, MoldOriginContext, readOrigin, restoreOrigin, storesStamp, useMoldOrigin, writeOrigin, type MoldOrigin } from './moldOrigin'
 import { SAMPLE_SENTENCES } from './sampleSentences'
-import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, penThicknessOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, withPenThicknessVowels, type DrawnStem, type StemKind } from './strokeLab'
+import { consonantBoxesOf, consonantShapesOf, drawnStem, LAYOUTS, mastersOf, penThicknessOf, shapeConsonants, shownRunsOf, STEMS, stemInfo, type ShownRuns, vowelStemKeys, withPenThicknessVowels, type DrawnStem, type StemKind } from './strokeLab'
 import { MoldDotPlate } from './MoldDotPlate'
 import { thinBudget, thinSyllable, type BudgetStroke } from './moldBudget'
 import { HALO_PRESETS, haloFit, haloScope, type HaloFit, type HaloStroke } from './moldHalo'
@@ -180,6 +180,37 @@ function moldedBoxes(boxes: Partial<Record<Part, BoxConfig>>, layout: LayoutType
  * `sel`이 있으면 고른 부위만 제 색으로, 나머지는 옅게 그린다.
  */
 /** 한 자소만 남긴 글자(풍선 굵기에서 자소마다 따로 그릴 때). 짜임은 그대로 둬 칸 열쇠가 안 바뀐다. */
+/** 긋기 단계: 닿자 획을 보이는 토막만 남긴 획들로 나눈다(그리기만, 칸 · 굵기 셈은 온 획으로 한다). */
+const SHOWN_CUT = '~'
+function shownCut(syllable: DecomposedSyllable, shownStroke: ((key: string) => ShownRuns) | undefined): DecomposedSyllable {
+  if (!shownStroke) return syllable
+  const cut = (jamo: JamoData | null | undefined, family: 'CH' | 'JO'): JamoData | null | undefined => {
+    if (!jamo) return jamo
+    let changed = false
+    const cutList = (list: StrokeDataV2[]) => list.flatMap((stroke) => {
+      const shown = shownStroke(`${family}:${jamo.char}:${stroke.id}`)
+      if (typeof shown === 'string') return [stroke]
+      // 입힌 뒤 앵커 수가 셈과 다르면(엔진이 점을 보탠 경우) 나누지 않고 온 획을 보인다.
+      if (stroke.points.length !== shown.total) return [stroke]
+      changed = true
+      return shown.runs.map((run, at) => ({
+        ...stroke,
+        id: `${stroke.id}${SHOWN_CUT}${at}`,
+        closed: false,
+        points: run.map((index, k) => {
+          const { handleIn, handleOut, ...point } = stroke.points[index]
+          return { ...point, ...(k > 0 && handleIn ? { handleIn } : {}), ...(k < run.length - 1 && handleOut ? { handleOut } : {}) }
+        }),
+      }))
+    })
+    // 문맥 계열 획(`contextStrokes`)도 같은 id면 같이 나눈다(앵커 수가 다르면 온 획).
+    const strokes = jamo.strokes && cutList(jamo.strokes)
+    const contextStrokes = jamo.contextStrokes && Object.fromEntries(Object.entries(jamo.contextStrokes).map(([family, list]) => [family, list && cutList(list)]))
+    return changed ? { ...jamo, strokes, contextStrokes } : jamo
+  }
+  const choseong = cut(syllable.choseong, 'CH'), jongseong = cut(syllable.jongseong, 'JO')
+  return choseong === syllable.choseong && jongseong === syllable.jongseong ? syllable : { ...syllable, choseong: choseong ?? null, jongseong: jongseong ?? null }
+}
 function onlyGroup(syllable: DecomposedSyllable, group: BalloonGroup): DecomposedSyllable {
   return { ...syllable, choseong: group === 'CH' ? syllable.choseong : null, jungseong: group === 'JU' ? syllable.jungseong : null, jongseong: group === 'JO' ? syllable.jongseong : null }
 }
@@ -297,7 +328,7 @@ function haloBoxes(boxes: Partial<Record<Part, BoxConfig>>, fit: HaloFit | null)
 }
 const haloAttr = (fit: HaloFit | null) => fit ? `${fit.err.toFixed(4)} ${fit.ease.toFixed(4)} ${fit.widen.toFixed(3)} ${fit.push.toFixed(4)} ${fit.stem.toFixed(4)} ${fit.gap.toFixed(4)}` : undefined
 
-function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke, testId, weightCap = Infinity, onCap, fence, onFence, onBake, onHalo, stackHeight, onStart }: { onHalo?: (push: number) => void; stackHeight?: number; onStart?: (height: number) => void; char: string; size: number; edits: LayoutEdits; look: Look; drawn?: Drawn; sel?: Region | null; highlight?: readonly Part[]; shownStroke?: (key: string) => boolean; testId?: string; weightCap?: number; onCap?: (ratio: number) => void; fence?: MoldFence; onFence?: (need: number, pulls: readonly FencePull[]) => void; onBake?: (item: BakeTarget) => void }) {
+function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke, testId, weightCap = Infinity, onCap, fence, onFence, onBake, onHalo, stackHeight, onStart }: { onHalo?: (push: number) => void; stackHeight?: number; onStart?: (height: number) => void; char: string; size: number; edits: LayoutEdits; look: Look; drawn?: Drawn; sel?: Region | null; highlight?: readonly Part[]; shownStroke?: (key: string) => ShownRuns; testId?: string; weightCap?: number; onCap?: (ratio: number) => void; fence?: MoldFence; onFence?: (need: number, pulls: readonly FencePull[]) => void; onBake?: (item: BakeTarget) => void }) {
   const { syllable: raw, effective, placement, padding, schema } = useGlyphBase(char, drawn)
   const base = useGlyphBase(char, undefined)
   // 무게중심(거북이 A안): ㅏ · ㅓ 곁줄기 높이는 획에서, 첫닿자 밑변 · 보는 칸에서(`impressBoxes`) 옮긴다.
@@ -629,7 +660,8 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     return moldInk(weighted, { round, contrast, nib })
   }, [effective, ratio, round, contrast, nib])
   const colorOf = useCallback((source: ResolvedStrokeInkSource) => {
-    if (shownStroke) return shownStroke(`${simsPartOf(source.part)}:${source.jamoId}:${source.strokeId}`) ? undefined : 'transparent'
+    // 토막으로 나눈 획(`~`)은 보이는 토막만 남긴 것이다.
+    if (shownStroke) return source.strokeId.includes(SHOWN_CUT) || shownStroke(`${simsPartOf(source.part)}:${source.jamoId}:${source.strokeId}`) !== 'none' ? undefined : 'transparent'
     // 잡은 보선 양쪽 부위만 제 색(선 이름 대신).
     if (highlight) return highlight.includes(source.part) ? SLOT_COLOR[simsPartOf(source.part)] : EDIT_COLOR.editSlotOff
     if (sel === 'STROKE') return EDIT_COLOR.editSelect
@@ -678,7 +710,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
         const style = flat || globalStyle.strokeStyle.mode !== 'brush' ? globalStyle : { ...globalStyle, strokeStyle: heavyStrokeStyle(globalStyle.strokeStyle, ink.contrast) }
         return <span key={group} className={at === 0 ? undefined : styles.glyphLayer}>
           <SvgRenderer
-            syllable={onlyGroup(heavy.syllable, group)}
+            syllable={shownCut(onlyGroup(heavy.syllable, group), shownStroke)}
             boxes={heavy.boxes}
             size={size}
             globalStyle={style}
@@ -694,7 +726,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   }
   return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char} data-halo={haloAttr(haloFitNow)} data-fence={fenced ? fenced.need.toFixed(3) : undefined} data-budget={Object.entries(budget.factors).map(([key, f]) => `${key}:${f.toFixed(2)}`).join(' ') || undefined}>
     <SvgRenderer
-      syllable={budget.syllable}
+      syllable={shownCut(budget.syllable, shownStroke)}
       schema={placement.kind === 'schema' ? placement.schema : undefined}
       boxes={halo?.boxes ?? budgetBoxes}
       size={size}
@@ -1348,15 +1380,16 @@ export function MoldLabPage() {
   }, [stems, choseong, jungseong, jongseong])
 
   // 긋기 단계 글줄: 내가 그은 줄기 종류가 쓰인 획만 보인다(그을 때마다 글자가 조금씩 채워진다).
-  // 닿자는 ㄴ · ㅂ 밑처럼 세로 + 가로가 한 획으로 이어진 것이 있어, 그 획에 쓰인 줄기를 다 그어야 보인다.
-  const stemKeys = useMemo(() => ({ CH: consonantStemKeys(choseong), JU: vowelStemKeys(jungseong), JO: consonantStemKeys(jongseong) }), [choseong, jungseong, jongseong])
-  const shownStroke = useCallback((key: string) => {
-    const [family, ...rest] = key.split(':')
+  // 닿자는 ㄷ · ㄹ · ㄴ처럼 세로 + 가로가 한 획으로 이어진 것이 있어, 그은 종류의 마디만 보인다(`shownRunsOf`).
+  const stemKeys = useMemo(() => ({ JU: vowelStemKeys(jungseong) }), [jungseong])
+  const drawnShapes = useMemo(() => consonantShapesOf(stems), [stems])
+  const shownStroke = useCallback((key: string): ShownRuns => {
+    const [family, char, ...rest] = key.split(':')
     const id = rest.join(':')
-    if (family === 'JU') { const kind = stemKeys.JU.get(id); return !!kind && !!stems[kind]?.ok }
-    const kinds = (family === 'CH' ? stemKeys.CH : stemKeys.JO).get(id)
-    return !!kinds && kinds.length > 0 && kinds.every((kind) => stems[kind]?.ok)
-  }, [stemKeys, stems])
+    if (family === 'JU') { const kind = stemKeys.JU.get(`${char}:${id}`); return kind && stems[kind]?.ok ? 'all' : 'none' }
+    const stroke = (family === 'CH' ? choseong : jongseong)[char]?.strokes?.find((item) => item.id === id)
+    return stroke ? shownRunsOf(stroke, drawnShapes) : 'none'
+  }, [stemKeys, stems, drawnShapes, choseong, jongseong])
 
   const chars = [...sentence]
   const focusIndex = chars[focusAt] && chars[focusAt] !== ' ' ? focusAt : chars.findIndex((char) => char !== ' ')

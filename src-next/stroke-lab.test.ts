@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getBaseJamo } from '../src/stores/jamoStore'
 import { propagatedJungseong } from '../src/stores/stemMasterStore'
 import type { JamoData } from '../src/types'
-import { consonantShapesOf, drawnStem, mastersOf, penThicknessOf, shapeConsonants, shapeConsonantStroke, withPenThicknessVowels, type DrawnStem, type StemKind } from './strokeLab'
+import { consonantShapesOf, drawnStem, mastersOf, penThicknessOf, shapeConsonants, shapeConsonantStroke, shownRunsOf, withPenThicknessVowels, type DrawnStem, type StemKind } from './strokeLab'
 
 type P = { x: number; y: number }
 /** a→b로 가며 진행 방향 오른쪽(+)으로 `bow`만큼 부푼 선. 잔떨림을 얹는다. */
@@ -141,5 +141,23 @@ describe('획 긋기 시험판', () => {
     const thinVowels = { ...vowels, 'ㅡ': thin(vowels['ㅡ']) }
     expect(withPenThicknessVowels(thinVowels, new Set<StemKind>(['longHorizontal']), pen)['ㅡ'].strokes![0].thickness).toBe(pen)
     expect(withPenThicknessVowels(thinVowels, new Set<StemKind>(['vertical']), pen)['ㅡ'].strokes![0].thickness).toBe(0.05)
+  })
+  it('긋기 단계: 한 획으로 이어진 ㄷ은 그은 종류의 마디만 보인다 — 가로선 하나로 ㄷ이 다 채워지지 않는다', () => {
+    const digeut = { id: 'd', closed: false, thickness: 0.07, points: [{ x: 1, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }] }
+    const horizontal = drawnStem(bowed({ x: 0.2, y: 0.5 }, { x: 0.55, y: 0.5 }), 'horizontal')
+    const vertical = drawnStem(bowed({ x: 0.37, y: 0.1 }, { x: 0.37, y: 0.9 }), 'vertical')
+    expect(shownRunsOf(digeut, consonantShapesOf({}))).toBe('none')
+    const onlyH = consonantShapesOf({ horizontal })
+    const shown = shownRunsOf(digeut, onlyH)
+    if (typeof shown === 'string') throw new Error('토막으로 나뉘어야 한다')
+    // 입힌 획과 앵커 수가 같고, 위 · 아래 가로 마디 두 토막만.
+    expect(shown.total).toBe(shapeConsonantStroke(digeut, onlyH).stroke.points.length)
+    expect(shown.runs).toHaveLength(2)
+    const placed = shapeConsonantStroke(digeut, onlyH).stroke.points
+    for (const run of shown.runs) {
+      const ys = run.map((index) => placed[index].y)
+      expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(0.2)
+    }
+    expect(shownRunsOf(digeut, consonantShapesOf({ horizontal, vertical }))).toBe('all')
   })
 })

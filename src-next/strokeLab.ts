@@ -385,6 +385,59 @@ export function shapeConsonantStroke(stroke: StrokeDataV2, shapes: ConsonantShap
   return { stroke: { ...stroke, points: out }, kinds: [...kinds] }
 }
 
+/**
+ * 긋기 단계에서 닿자 획의 어느 토막이 보이나(하니무스 2026-11-24 "가로선 하나 그리면 ㄷ이 다 채워지는").
+ * ㄷ · ㄹ처럼 가로 · 세로가 한 획으로 이어진 닿자는 그은 줄기 종류의 마디만 보인다. 입힐 때와 같은 대신 규칙(`segmentShape`)을 쓴다.
+ * `shapes`에는 그은 줄기만 든다. 돌려주는 번호는 `shapeConsonantStroke`가 입힌 뒤의 앵커 번호이고, `total`은 그 앵커 수(맞춰 보기용).
+ * 꺾임처럼 종류가 없는 마디는 양옆 마디가 다 보일 때만 보인다.
+ */
+export type ShownRuns = 'all' | 'none' | { total: number; runs: number[][] }
+export function shownRunsOf(stroke: StrokeDataV2, shapes: ConsonantShapes): ShownRuns {
+  if (isRound(stroke)) return shapes.loop ? 'all' : 'none'
+  if (isDiagonal(stroke)) return shapes.diagonal ? 'all' : 'none'
+  const points = stroke.points
+  const count = stroke.closed ? points.length : points.length - 1
+  if (count < 1) return 'none'
+  const kinds: ('horizontal' | 'vertical' | null)[] = []
+  const sizes: number[] = []
+  const drawn: boolean[] = []
+  for (let i = 0; i < count; i++) {
+    const a = points[i], b = points[(i + 1) % points.length]
+    const kind = segmentKind(a, b)
+    const chosen = kind ? segmentShape(kind, a, b, shapes) : null
+    kinds.push(kind)
+    drawn.push(!!chosen)
+    sizes.push(chosen ? chosen.shape.length - 1 : 1)
+  }
+  if (!drawn.some(Boolean)) return 'none'
+  const near = (i: number, step: number) => {
+    const j = i + step
+    if (stroke.closed) return drawn[(j + count) % count]
+    return j < 0 || j >= count ? null : drawn[j]
+  }
+  const shown = drawn.map((on, i) => {
+    if (kinds[i]) return on
+    const sides = [near(i, -1), near(i, 1)].filter((side) => side !== null)
+    return sides.length > 0 && sides.every(Boolean)
+  })
+  if (shown.every(Boolean)) return 'all'
+  const starts: number[] = []
+  let at = 0
+  for (const size of sizes) { starts.push(at); at += size }
+  const total = stroke.closed ? at : at + 1
+  // 닫힌 획은 숨은 마디 다음에서 시작해 한 바퀴 돈다(보이는 토막이 끝과 처음에 걸쳐도 한 토막).
+  const first = stroke.closed ? (shown.findIndex((on) => !on) + 1) % count : 0
+  const runs: number[][] = []
+  let run: number[] | null = null
+  for (let k = 0; k < count; k++) {
+    const i = (first + k) % count
+    if (!shown[i]) { run = null; continue }
+    if (!run) { run = [starts[i] % total]; runs.push(run) }
+    for (let n = 1; n <= sizes[i]; n++) run.push((starts[i] + n) % total)
+  }
+  return { total, runs }
+}
+
 /** 닿자 자모 묶음 전체에 줄기 모양을 입힌다. 바뀐 자모와 `자모:획id` → 종류 표를 돌려준다. */
 export function shapeConsonants(jamos: Readonly<Record<string, JamoData>>, shapes: ConsonantShapes, box: BoxSize = SQUARE, thickness?: number): { changed: Record<string, JamoData>; keys: Map<string, StemKind[]> } {
   const changed: Record<string, JamoData> = {}
