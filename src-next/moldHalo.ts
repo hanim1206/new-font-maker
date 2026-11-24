@@ -70,11 +70,13 @@ export interface HaloRule {
   grown: number
 }
 
-/** 1단계가 다루는 글자: 홑닿자(ㅍ 빼고) + 세로홀자 중 곁줄기가 오른쪽인 것(ㅏ ㅑ ㅣ ㅐ ㅒ), 받침 없음. 쌍닿자 · ㅍ · ㅓ · 받침은 다음 단계. */
+/** 다루는 글자: 홑닿자(ㅍ 빼고) + 세로홀자 중 곁줄기가 오른쪽인 것(ㅏ ㅑ ㅣ ㅐ ㅒ), 받침 있어도 됨. 쌍닿자 · ㅍ · ㅓ는 다음 단계. */
 const SCOPE_INITIAL = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅎ'
 const SCOPE_MEDIAL = 'ㅏㅑㅣㅐㅒ'
 export function haloScope(syllable: DecomposedSyllable): boolean {
-  if (syllable.layoutType !== 'choseong-jungseong-vertical' || syllable.jongseong) return false
+  // 받침 글자도(하니무스 2026-11-24 "모든 굵기의 글자"). 키는 받침까지 든 글자 전체 키 — 폰트 일곱 집안에서 전체 키 2.2% · 첫닿자 칸 4.6% · 위 덩이 7.3%로
+  // 전체 키가 가장 잘 모였다(4단계-전면/m13.py). 흐림은 첫닿자 잉크만 칠한다(받침 잉크는 안 넣음).
+  if (syllable.layoutType !== 'choseong-jungseong-vertical' && syllable.layoutType !== 'choseong-jungseong-vertical-jongseong') return false
   const initial = syllable.choseong?.char, medial = syllable.jungseong?.char
   return !!initial && !!medial && SCOPE_INITIAL.includes(initial) && SCOPE_MEDIAL.includes(medial)
 }

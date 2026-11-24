@@ -21,7 +21,7 @@ describe('흐림 선(새 틈 규칙 1단계)', () => {
     expect(haloScope(syllable('ㅃ', 'ㅏ'))).toBe(false) // 쌍닿자는 다음 단계
     expect(haloScope(syllable('ㅍ', 'ㅏ'))).toBe(false) // ㅍ도 다음 단계
     expect(haloScope(syllable('ㄱ', 'ㅓ'))).toBe(false) // ㅓ 곁줄기 규칙 없음
-    expect(haloScope(syllable('ㄱ', 'ㅏ', 'ㄱ'))).toBe(false) // 받침은 3단계
+    expect(haloScope(syllable('ㄱ', 'ㅏ', 'ㄱ'))).toBe(true) // 받침 글자도 기둥 쪽은 흐림선(키는 글자 전체, 하니무스 2026-11-24)
   })
 
   it('기둥은 가장 왼쪽 세로 홀자 토막', () => {
