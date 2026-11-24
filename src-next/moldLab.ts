@@ -1,5 +1,5 @@
 import { weightToMultiplier } from '../src/utils/globalStyleUtils'
-import { BLACK_STEM_GAIN, BLACK_TOTAL } from './moldStack900'
+import { BLACK_FAMILY, BLACK_STEM_GAIN, BLACK_TOTAL, ENGINE_STEM_TO_HEIGHT } from './moldStack900'
 import { HALO_ENGINE, HALO_SCALE } from './moldHalo'
 import { ENGINE_GAP_RULE } from './moldGap'
 import { instanceInJamo, instanceOf, JAMO_CHANNELS, masterFromStroke, masterNameOf, baseOf, stemAxisOf, stemReferenceBox, type AxisPoint, type StemBase, type StemMaster } from '../src/services/stemMaster'
@@ -551,7 +551,35 @@ export const HEAVY_HORIZONTAL_SHARE = 0.8
 export const LOOK_WALL = { weight: [0.25, HEAVY_TOP], weightBase: [0.25, HEAVY_TOP], soft: [0, 1], frame: [0.74, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09], ease: [HALO_SCALE.ease[0], Math.max(HALO_SCALE.ease[2], HALO_ENGINE.ease)], spread: [HALO_SCALE.spread[0], HALO_SCALE.spread[2]], ...STEM_WALL } as const
 export const LOOK_ENGINE = { weight: 1, weightBase: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.04, open: 1, branch: 1, serif: 0, nib: 0, jag: 0.027, ease: HALO_ENGINE.ease, spread: HALO_ENGINE.spread, ...STEM_ENGINE } as const
 const clampLook = (key: keyof typeof LOOK_WALL, value: number) => Math.max(LOOK_WALL[key][0], Math.min(LOOK_WALL[key][1], value))
-export const lookOf = (look: Look, key: keyof Look) => look[key] ?? LOOK_ENGINE[key]
+export const lookOf = (look: Look, key: keyof Look): number => {
+  const value = look[key]
+  if (value !== undefined) return value
+  // 대비를 안 만졌으면 굵기마다 폰트 패턴 값(`contrastPatternOf`). 굵기 1 위는 1의 값 — 그 위 몫은 900 쌓임이 `contrastEnd`로 더한다.
+  if (key === 'contrast') return contrastOfRatio(contrastPatternOf(Math.min(1, look.weight ?? LOOK_ENGINE.weight)))
+  return LOOK_ENGINE[key]
+}
+
+/**
+ * 가로 ÷ 세로 획 두께 = 0.94 − 0.77 × (기둥 ÷ 키), 바닥 0.8(하니무스 2026-11-24 "기본 대비를 폰트 패턴으로, 모든 굵기").
+ * 실험실 폰트 35집안(노토는 한 집안 한 표, 굵기마다 집안 무게 나눔) 116벌 `research-hangul-form/mold-fit/heavy/heavy-out.json`의 tv · th · body로 맞춘 직선.
+ * 세로획이 같은 두께면 가로보다 가늘어 보이는 착시를 폰트들이 이만큼 보정한다 — 숫자 하나가 아니라 굵을수록 대비가 커지는 경향을 가져온다.
+ */
+export const CONTRAST_PATTERN = { base: 0.94, slope: 0.77, floor: 0.8 } as const
+const patternRatio = (stemToHeight: number) => Math.max(CONTRAST_PATTERN.floor, CONTRAST_PATTERN.base - CONTRAST_PATTERN.slope * stemToHeight)
+/** 굵기 값 → 그 굵기 폰트 패턴의 가로 ÷ 세로. */
+export function contrastPatternOf(weight: number): number {
+  return patternRatio(ENGINE_STEM_TO_HEIGHT * heavyThicknessOf(weight))
+}
+/** 대비 기본값일 때 900 쌓임의 가로 ÷ 세로: 굵기 1 위 첫 걸음 → 굵기 끝(900 고딕 기둥 ÷ 키). `solveStack900`의 `contrastRange`. */
+export const CONTRAST_PATTERN_RANGE: readonly [number, number] = [patternRatio(ENGINE_STEM_TO_HEIGHT), patternRatio(BLACK_FAMILY.stemToHeight)]
+/**
+ * 대비 값은 세로를 굵히고 가로를 가늘게 한다(`contrastWidthOf`: 세로 1 + 0.8c). 패턴 대비는 착시 보정이라 기둥 두께(굵기 값)는 그대로 두고
+ * 가로만 가늘어야 한다 — 세로가 굵어지는 몫만큼 굵기 비율을 덜어 준다.
+ */
+export function patternWeightRatio(ratio: number, contrast: number): number {
+  const gain = contrast >= 0 ? 1 + 0.8 * contrast : 1 + 0.5 * contrast
+  return gain === 1 ? ratio : weightRatioOfThickness(thicknessOf(ratio) / gain)
+}
 
 export const simsPartOf = (part: Part): SimsPart => (part === 'JU_H' || part === 'JU_V' ? 'JU' : part)
 const isVertical = (layout: LayoutType) => layout.includes('jungseong-vertical')

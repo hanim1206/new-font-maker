@@ -35,6 +35,8 @@ export interface StackInput {
   reach: number
   /** 안쪽으로 굵히는 세로 배율(1 = 안 굵힘). 굵기 끝에서 `BLACK_STEM_GAIN`. */
   inward: number
+  /** 가로 ÷ 세로 [굵기 1 위 첫 걸음, 굵기 끝]. 없으면 [1, `BLACK_CONTRAST`](바탕 대비 위에 곱함). 대비 기본값(폰트 패턴, `contrastPatternOf`)이면 그 식의 두 끝. */
+  contrastRange?: readonly [number, number]
 }
 export interface StackResult {
   strokes: StackStroke[]
@@ -380,7 +382,8 @@ export function solveStack900(input: StackInput): StackResult {
   st = inwardX(st, V)
   st = spreadStems(st, G, V)
   // 가로 = min(쌓임이 준 배율, 세로 × 대비). 대비는 굵기 끝으로 갈수록(가설: 굵기에 곧게).
-  const contrast = 1 - (1 - BLACK_CONTRAST) * reach
+  const [c0, c1] = input.contrastRange ?? [1, BLACK_CONTRAST]
+  const contrast = c0 + (c1 - c0) * reach
   const thick = { v: V, h: Math.min(f, contrast * V) }
   if (jamo) {
     st = narrowRound(st, jamo, 1 - (1 - NARROW_ROUND) * reach)

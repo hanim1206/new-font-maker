@@ -22,7 +22,7 @@ import { Pressable } from './components/ui/pressable'
 import { Field, RangeBar } from './components/ui/range'
 import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
-import { BLACK_CENTER, BLACK_RATIO, HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { BLACK_CENTER, BLACK_RATIO, CONTRAST_PATTERN_RANGE, patternWeightRatio, HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement, useNotoModel } from './notoModel'
 import { stackColumns, stackLay } from './moldStack'
 import { balloonGroupOf, endReachOf, inkOfThick, solveBalloon, type BalloonGroup, type BalloonStroke, type Thick } from './moldBalloon'
@@ -439,7 +439,9 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     return { syllable: grownSyllable, boxes: out.boxes, thick: out.thick, spread }
   }, [fencedOut, wantJamo, syllable, effective, ratio])
   const boxes = balloon.boxes
-  const round = lookOf(look, 'round'), contrast = lookOf(look, 'contrast'), nib = lookOf(look, 'nib')
+  // 대비를 안 만졌으면 폰트 패턴(`contrastPatternOf`). 굵을 때는 바탕을 대비 0으로 두고 900 쌓임이 패턴 대비를 맡는다(`contrastRange`).
+  const patternContrast = look.contrast === undefined
+  const round = lookOf(look, 'round'), contrast = heavyOn && patternContrast ? 0 : lookOf(look, 'contrast'), nib = lookOf(look, 'nib')
   // 좁은 칸 굵기 예산(줄 끝 균형 규칙 ①, `moldBudget.ts`): 자소 칸이 작아져 한 자소 안 나란한 획 틈이 바닥 아래로 가면 그 획부터 가늘어진다.
   // 기준은 엔진 처음 칸(대비 0)의 틈 — 처음 모습은 그대로다. 풍선 굵기도 이 가늘어진 획에서 시작한다.
   const budget = useMemo(() => {
@@ -531,7 +533,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const stacked = useMemo(() => {
     if (!stackStart || !heavyInput || !budgetBoxes) return null
     const { k, center } = stackStart
-    const out = solveStack900({ char, strokes: stackStart.strokes, height: stackHeight, inward: k / center, reach: Math.max(0, Math.min(1, (k - 1) / (BLACK_RATIO - 1))) })
+    const out = solveStack900({ char, strokes: stackStart.strokes, height: stackHeight, inward: k / center, reach: Math.max(0, Math.min(1, (k - 1) / (BLACK_RATIO - 1))), ...(patternContrast ? { contrastRange: CONTRAST_PATTERN_RANGE } : {}) })
     // 옮긴 꼭짓점을 자소 칸 좌표로 돌려 획을 바꿔 끼운다(id 그대로).
     // 한 줄짜리 칸(ㅡ의 키, ㅣ의 너비)은 칸 좌표로 못 옮긴다 — 그 축은 칸을 통째로 옮긴다(그 부위 점들의 평균 이동).
     const THIN_BOX = 0.02
@@ -578,7 +580,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     }
     const thick = { v: center * out.thick.v * heavyInput.base.v, h: center * out.thick.h * heavyInput.base.h }
     return { syllable, result, strokes, boxes, placed, thick: { CH: thick, JU: { ...thick }, JO: { ...thick } } as Record<BalloonGroup, Thick>, gap: out.gap }
-  }, [stackStart, heavyInput, budgetBoxes, char, stackHeight, heavyBase, effective.linecap, effective.linejoin])
+  }, [stackStart, heavyInput, budgetBoxes, char, stackHeight, heavyBase, effective.linecap, effective.linejoin, patternContrast])
   const heavy = useMemo(() => {
     if (!heavyInput || !budgetBoxes) return null
     const { solveAt, base } = heavyInput
@@ -667,10 +669,12 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     return { boxes: haloBoxes(out, fit), thick: solved.thick, syllable: syllableOut, halo: fit }
   }, [heavyInput, stacked, budgetBoxes, heavyBase, effective, contrast, wanted, weightCap, look])
   const globalStyle = useMemo(() => {
-    const weighted = ratio === 1 ? effective : { ...effective, weight: scaledWeight(effective.weight, ratio) }
+    // 패턴 대비는 가로만 가늘게 — 대비가 세로를 굵히는 몫만큼 굵기를 덜어 기둥 두께는 굵기 값 그대로다.
+    const inkRatio = patternContrast && !heavyOn ? patternWeightRatio(ratio, contrast) : ratio
+    const weighted = inkRatio === 1 ? effective : { ...effective, weight: scaledWeight(effective.weight, inkRatio) }
     // 획 끝 · 꺾임은 둥글기 하나가 맡는다(거북이 방향안 4차). 둥글기 · 대비 · 붓촉은 엔진의 붓 값에 얹는다(`moldInk`).
     return moldInk(weighted, { round, contrast, nib })
-  }, [effective, ratio, round, contrast, nib])
+  }, [effective, ratio, round, contrast, nib, patternContrast, heavyOn])
   const colorOf = useCallback((source: ResolvedStrokeInkSource) => {
     // 토막으로 나눈 획(`#`)은 보이는 토막만 남긴 것이다.
     if (shownStroke) return source.strokeId.includes(SHOWN_CUT) || shownStroke(`${simsPartOf(source.part)}:${source.jamoId}:${pieceOf(source.strokeId)?.id ?? source.strokeId}`) !== 'none' ? undefined : 'transparent'
@@ -1318,7 +1322,10 @@ export function MoldLabPage() {
     const store = useGlobalStyleStore.getState()
     const baseStyle = { ...store.style, ...base.style }
     // 획 판 → 전역 스타일. 굵기는 글줄이 실제로 쓴 값(막힌 데서 멈춘 값), 자간은 비율로 좁아진 폭 + 자간 줄.
-    const inked = moldInk({ ...moldBaseStyle(baseStyle), weight: scaledWeight(MOLD_BASE_WEIGHT, appliedWeight(lookOf(look, 'weight'), weightCap)) }, look)
+    // 패턴 대비(대비를 안 만짐)는 화면처럼 기둥 두께를 그대로 두고 가로만 가늘게(`patternWeightRatio`). 굵을 때는 900 쌓임이 따로 굽는다.
+    const bakeWeight = appliedWeight(lookOf(look, 'weight'), weightCap)
+    const inkWeight = look.contrast === undefined && bakeWeight <= 1 ? patternWeightRatio(bakeWeight, lookOf(look, 'contrast')) : bakeWeight
+    const inked = moldInk({ ...moldBaseStyle(baseStyle), weight: scaledWeight(MOLD_BASE_WEIGHT, inkWeight) }, look.contrast === undefined && bakeWeight > 1 ? { ...look, contrast: 0 } : look)
     const sx = items.reduce((sum, item) => sum + item.sx, 0) / items.length
     const letterSpacing = Math.round((base.style.letterSpacing + sx - 1 + lookOf(look, 'tracking')) * 1000) / 1000
     // 칸 → 레이아웃 Δ. 새 스타일의 끝 모양으로 풀어 본다.

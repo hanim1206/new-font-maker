@@ -311,7 +311,8 @@ describe('도트판 인상 잡기', () => {
     expect(notoDot('contrast')).toBe(7)
     // 자소 사이 여유: 엔진(0.78)은 폰트 여섯보다 촘촘해 칸 0(촘촘 끝)에 선다.
     expect(dotsOf({}, FRAME_KEYS)).toEqual([9, 9, 12, 0, 0, 20, 10])
-    expect(dotsOf({}, INK_KEYS)).toEqual([9, 7, 0, 0])
+    // 대비를 안 만지면 굵기 1의 폰트 패턴(가로 ÷ 세로 0.88, `contrastPatternOf`)이라 가운데(0.83) 바로 아래 칸 9.
+    expect(dotsOf({}, INK_KEYS)).toEqual([9, 9, 0, 0])
     // 획 대비 눈금은 가로 ÷ 세로 굵기: 1이면 엔진 0, 1을 넘으면(가로가 더 굵음) 음수
     expect(contrastOfRatio(1)).toBe(0)
     expect(contrastOfRatio(1.46)).toBeLessThan(0)
@@ -471,7 +472,10 @@ describe('저장소에 써 넣기', () => {
   it('획 판 값은 붓 스타일로: 납작 붓이면 타원 붓촉, 아니면 둥글기 · 대비', async () => {
     const { moldInk } = await import('./moldLab')
     const style = { brush: { tip: 'round' as const, aspectRatio: 1, angle: 0 }, strokeStyle: { mode: 'brush' as const, brush: { tip: 'round' as const, aspectRatio: 1, angle: 0 } } }
-    expect(moldInk(style, {})).toBe(style)
+    // 대비를 안 만졌어도 굵기 패턴 대비가 들어간다(하니무스 2026-11-24 "기본 대비를 폰트 패턴으로").
+    const { contrastOfRatio, contrastPatternOf } = await import('./moldLab')
+    expect(moldInk(style, {}).strokeStyle).toMatchObject({ contrast: contrastOfRatio(contrastPatternOf(1)) })
+    expect(moldInk(style, { contrast: 0 })).toBe(style)
     const flat = moldInk(style, { nib: 1, round: 0.5 })
     expect(flat.brush.tip).toBe('ellipse')
     expect(flat.strokeStyle).toMatchObject({ brush: { tip: 'ellipse' } })
@@ -542,5 +546,21 @@ describe('획 판은 저장된 값을 그대로 읽는다', () => {
       // 바탕은 저장 값을 뺀 것이라, 다시 얹어도 두 번 얹히지 않는다.
       expect(moldBaseStyle(baked).weight).toBe(MOLD_BASE_WEIGHT)
     }
+  })
+})
+
+describe('대비 기본값 = 폰트 패턴', () => {
+  it('가로 ÷ 세로는 굵을수록 작아진다: 굵기 1 ≈ 0.88, 900 고딕 기둥 ÷ 키에서 0.8 바닥', async () => {
+    const { contrastPatternOf, CONTRAST_PATTERN_RANGE, lookOf, patternWeightRatio, thicknessOf, contrastOfRatio } = await import('./moldLab')
+    expect(contrastPatternOf(1)).toBeCloseTo(0.94 - 0.77 * 0.07 / 0.9033, 6)
+    expect(contrastPatternOf(0.5)).toBeGreaterThan(contrastPatternOf(1))
+    expect(CONTRAST_PATTERN_RANGE[0]).toBeCloseTo(contrastPatternOf(1), 9)
+    expect(CONTRAST_PATTERN_RANGE[1]).toBeCloseTo(0.94 - 0.77 * 0.173, 6)
+    // 기둥 두께는 그대로: 덜어 준 굵기 × 대비의 세로 몫 = 처음 두께.
+    const c = contrastOfRatio(contrastPatternOf(1))
+    expect(thicknessOf(patternWeightRatio(1, c)) * (1 + 0.8 * c)).toBeCloseTo(1, 3)
+    // 사용자가 정한 대비는 그대로(판 값은 절댓값).
+    expect(lookOf({ contrast: 0 }, 'contrast')).toBe(0)
+    expect(lookOf({ weight: 0.5 }, 'contrast')).toBeLessThan(lookOf({ weight: 1 }, 'contrast'))
   })
 })
