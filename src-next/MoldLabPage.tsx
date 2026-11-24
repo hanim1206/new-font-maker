@@ -181,13 +181,25 @@ function moldedBoxes(boxes: Partial<Record<Part, BoxConfig>>, layout: LayoutType
  */
 /** 한 자소만 남긴 글자(풍선 굵기에서 자소마다 따로 그릴 때). 짜임은 그대로 둬 칸 열쇠가 안 바뀐다. */
 /** 긋기 단계: 닿자 획을 보이는 토막만 남긴 획들로 나눈다(그리기만, 칸 · 굵기 셈은 온 획으로 한다). */
-const SHOWN_CUT = '~'
+const SHOWN_CUT = '#'
+/** 굵을 때 곧은 닿자 획은 마디마다 조각(`id~마디`)으로 나뉘어 온다(`heavy` 끝 늘이기). 조각의 본 획 id와 마디 번호. */
+const PIECE = /^(.*)~(\d+)$/
+const pieceOf = (id: string) => { const m = PIECE.exec(id); return m ? { id: m[1], at: Number(m[2]) } : null }
+const runHas = (runs: readonly number[][], at: number) => runs.some((run) => run.some((index, k) => k > 0 && run[k - 1] === at && index === at + 1))
 function shownCut(syllable: DecomposedSyllable, shownStroke: ((key: string) => ShownRuns) | undefined): DecomposedSyllable {
   if (!shownStroke) return syllable
   const cut = (jamo: JamoData | null | undefined, family: 'CH' | 'JO'): JamoData | null | undefined => {
     if (!jamo) return jamo
     let changed = false
     const cutList = (list: StrokeDataV2[]) => list.flatMap((stroke) => {
+      const piece = pieceOf(stroke.id)
+      if (piece) {
+        // 마디 조각: 보이는 토막 안의 마디만 남긴다.
+        const whole = shownStroke(`${family}:${jamo.char}:${piece.id}`)
+        if (typeof whole === 'string') return [stroke]
+        changed = true
+        return runHas(whole.runs, piece.at) ? [stroke] : []
+      }
       const shown = shownStroke(`${family}:${jamo.char}:${stroke.id}`)
       if (typeof shown === 'string') return [stroke]
       // 입힌 뒤 앵커 수가 셈과 다르면(엔진이 점을 보탠 경우) 나누지 않고 온 획을 보인다.
@@ -660,8 +672,8 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     return moldInk(weighted, { round, contrast, nib })
   }, [effective, ratio, round, contrast, nib])
   const colorOf = useCallback((source: ResolvedStrokeInkSource) => {
-    // 토막으로 나눈 획(`~`)은 보이는 토막만 남긴 것이다.
-    if (shownStroke) return source.strokeId.includes(SHOWN_CUT) || shownStroke(`${simsPartOf(source.part)}:${source.jamoId}:${source.strokeId}`) !== 'none' ? undefined : 'transparent'
+    // 토막으로 나눈 획(`#`)은 보이는 토막만 남긴 것이다.
+    if (shownStroke) return source.strokeId.includes(SHOWN_CUT) || shownStroke(`${simsPartOf(source.part)}:${source.jamoId}:${pieceOf(source.strokeId)?.id ?? source.strokeId}`) !== 'none' ? undefined : 'transparent'
     // 잡은 보선 양쪽 부위만 제 색(선 이름 대신).
     if (highlight) return highlight.includes(source.part) ? SLOT_COLOR[simsPartOf(source.part)] : EDIT_COLOR.editSlotOff
     if (sel === 'STROKE') return EDIT_COLOR.editSelect
