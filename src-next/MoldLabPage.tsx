@@ -6,6 +6,7 @@ import { resolveGlyphInkPrimitives } from '../src/services/glyphInkResolver'
 import type { PenPoint } from '../src/services/penStrokeFit'
 import { useEffectiveGlobalStyle, useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import { flattenStrokeCenterline } from '../src/services/brushGeometry'
+import { contrastWidthOf } from '../src/services/flatStrokeGeometry'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { DEFAULT_GLOBAL_PADDING, mergePadding, useLayoutStore } from '../src/stores/layoutStore'
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
@@ -34,7 +35,7 @@ import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, drawnStem, LAYOUTS, mastersOf, penThicknessOf, shapeConsonants, shownRunsOf, STEMS, stemInfo, type ShownRuns, vowelStemKeys, withPenThicknessVowels, type DrawnStem, type StemKind } from './strokeLab'
 import { MoldDotPlate } from './MoldDotPlate'
 import { thinBudget, thinSyllable, type BudgetStroke } from './moldBudget'
-import { HALO_PRESETS, haloFit, haloScope, type HaloFit, type HaloStroke } from './moldHalo'
+import { HALO_PRESETS, haloFinalFit, haloFit, haloScope, type FinalFit, type HaloFit, type HaloStroke } from './moldHalo'
 import styles from './MoldLabPage.module.css'
 
 /**
@@ -338,6 +339,14 @@ function haloBoxes(boxes: Partial<Record<Part, BoxConfig>>, fit: HaloFit | null)
   if (fit.push) for (const part of ['JU', 'JU_H', 'JU_V'] as const) if (out[part]) out[part] = { ...out[part]!, x: out[part]!.x + fit.push }
   return out
 }
+/** 받침 위 흐림 선: 받침 칸 윗변만 옮긴다(밑변 고정). 받침 획은 칸에 맞춰 늘거나 줄어든다. */
+function finalBoxes(boxes: Partial<Record<Part, BoxConfig>>, fit: FinalFit | null): Partial<Record<Part, BoxConfig>> {
+  if (!fit || !fit.move || !boxes.JO) return boxes
+  const jo = boxes.JO, scale = (fit.bottom - fit.top - fit.move) / Math.max(fit.bottom - fit.top, 1e-6)
+  // 칸 밑변은 그대로, 칸 높이는 잉크 높이와 같은 비율로.
+  const bottom = jo.y + jo.height, height = jo.height * scale
+  return { ...boxes, JO: { ...jo, y: bottom - height, height } }
+}
 const haloAttr = (fit: HaloFit | null) => fit ? `${fit.err.toFixed(4)} ${fit.ease.toFixed(4)} ${fit.widen.toFixed(3)} ${fit.push.toFixed(4)} ${fit.stem.toFixed(4)} ${fit.gap.toFixed(4)}` : undefined
 
 function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke, testId, weightCap = Infinity, onCap, fence, onFence, onBake, onHalo, stackHeight, onStart }: { onHalo?: (push: number) => void; stackHeight?: number; onStart?: (height: number) => void; char: string; size: number; edits: LayoutEdits; look: Look; drawn?: Drawn; sel?: Region | null; highlight?: readonly Part[]; shownStroke?: (key: string) => ShownRuns; testId?: string; weightCap?: number; onCap?: (ratio: number) => void; fence?: MoldFence; onFence?: (need: number, pulls: readonly FencePull[]) => void; onBake?: (item: BakeTarget) => void }) {
@@ -460,11 +469,21 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const heavyBase = STACK_900 ? balloon.syllable : budget.syllable
   // 흐림 선(새 틈 규칙 1단계, `moldHalo.ts`): 처음 굵기 이하는 그리는 칸 그대로 재서 닿자 뼈대를 넓히거나 기둥을 민다.
   const halo = useMemo(() => {
-    if (heavyOn || placement.kind !== 'boxes' || !budgetBoxes || !haloScope(raw)) return null
+    if (heavyOn || placement.kind !== 'boxes' || !budgetBoxes) return null
+    const pillar = haloScope(raw), final = !!budget.syllable.jongseong && !!budgetBoxes.JO
+    if (!pillar && !final) return null
     const weighted = ratio === 1 ? effective.weight : scaledWeight(effective.weight, ratio)
-    const fit = haloFit(haloStrokesOf(budget.syllable, budgetBoxes, effective, weightToMultiplier(weighted)), { ease: lookOf(look, 'ease'), spread: lookOf(look, 'spread'), grown: weightToMultiplier(weighted) / weightToMultiplier(MOLD_BASE_WEIGHT) })
-    return { fit, boxes: haloBoxes(budgetBoxes, fit) }
-  }, [heavyOn, placement.kind, budgetBoxes, raw, ratio, effective, budget.syllable, look])
+    const m = weightToMultiplier(weighted)
+    // 흐림은 그려질 모양 그대로 칠한다(고양이 ③ "잴 때는 대비 없이, 엔진은 실제 대비 모양으로"): 가로 · 세로 두께는 대비가 정한 배율, 굵기는 패턴 대비가 덜어 준 만큼.
+    const inkRatio = patternContrast ? patternWeightRatio(ratio, contrast) : ratio
+    const mInk = weightToMultiplier(inkRatio === 1 ? effective.weight : scaledWeight(effective.weight, inkRatio))
+    const widthOf = contrastWidthOf(contrast), shape = contrast === 0 ? undefined : () => ({ v: widthOf({ x: 0, y: 1 }, false), h: widthOf({ x: 1, y: 0 }, false) })
+    const fit = pillar ? haloFit(haloStrokesOf(budget.syllable, budgetBoxes, effective, mInk, shape), { ease: lookOf(look, 'ease'), spread: lookOf(look, 'spread'), grown: m / weightToMultiplier(MOLD_BASE_WEIGHT) }) : null
+    const boxes = haloBoxes(budgetBoxes, fit)
+    // 받침 위(흐림 선 셋째 방향): 폰트 일곱 집안 3.5% 폭 밖만 받침 윗변을 옮긴다. 굵어져도 지수 ~0이라 굵기를 안 곱한다.
+    const top = final ? haloFinalFit(haloStrokesOf(budget.syllable, boxes, effective, mInk, shape)) : null
+    return { fit, final: top, boxes: finalBoxes(boxes, top) }
+  }, [heavyOn, placement.kind, budgetBoxes, raw, ratio, effective, budget.syllable, look, contrast, patternContrast])
   // 풍선 굵기: 보이는 글자 그대로(풍선 닿자까지 입힌 뒤)의 중심선으로 자소마다 칸 · 굵기를 푼다. 납작 붓은 방향별 굵기가 없어 가는 쪽 하나로.
   // 풍선에 넣을 획 · 칸(굵기 값과 무관 — 글줄 멈춤을 잴 때도 같이 쓴다).
   const heavyInput = useMemo(() => {
@@ -666,7 +685,9 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       const m = weightToMultiplier(MOLD_BASE_WEIGHT)
       fit = haloFit(haloStrokesOf(syllableOut, out, effective, m, (part) => solved.thick[balloonGroupOf(part)]), { ease: lookOf(look, 'ease'), spread: lookOf(look, 'spread'), grown: solved.thick.JU.v / base.v })
     }
-    return { boxes: haloBoxes(out, fit), thick: solved.thick, syllable: syllableOut, halo: fit }
+    const pillarBoxes = haloBoxes(out, fit)
+    const top = syllableOut.jongseong && pillarBoxes.JO ? haloFinalFit(haloStrokesOf(syllableOut, pillarBoxes, effective, weightToMultiplier(MOLD_BASE_WEIGHT), (part) => solved.thick[balloonGroupOf(part)])) : null
+    return { boxes: finalBoxes(pillarBoxes, top), thick: solved.thick, syllable: syllableOut, halo: fit, final: top }
   }, [heavyInput, stacked, budgetBoxes, heavyBase, effective, contrast, wanted, weightCap, look])
   const globalStyle = useMemo(() => {
     // 패턴 대비는 가로만 가늘게 — 대비가 세로를 굵히는 몫만큼 굵기를 덜어 기둥 두께는 굵기 값 그대로다.
@@ -691,6 +712,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   // 저장소의 자간(써 넣은 값 포함)도 얹는다 — 써 넣은 뒤 화면 값을 처음으로 돌려도 글줄 간격이 그대로다.
   // 흐림 선이 기둥을 민 만큼 글자 자리가 오른쪽으로 넓어진다(써 넣기에는 아직 안 들어감 — 첫닿자마다 달라서 다음 단계).
   const haloFitNow = heavy ? heavy.halo : halo?.fit ?? null
+  const finalNow = heavy ? heavy.final : halo?.final ?? null
   const spreadRight = balloon.spread.right + (haloFitNow?.push ?? 0)
   useEffect(() => { onHalo?.(haloFitNow?.push ?? 0) }, [onHalo, haloFitNow])
   const slot = { width: size * (scale + balloon.spread.left + spreadRight) + size * (lookOf(look, 'tracking') + effective.letterSpacing), marginInline: 0, // 가운데 맞춤이라 왼쪽 · 오른쪽 넓힘의 차이만큼 한쪽에 여백을 두어 글자를 그 쪽으로 민다.
@@ -720,7 +742,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     // 자소마다 가로 · 세로 굵기가 다르다. 엔진의 대비(토막 방향별 두께)를 자소마다 따로 줘서 겹쳐 그린다.
     const flat = globalStyle.strokeStyle.mode !== 'brush' || globalStyle.strokeStyle.brush.tip !== 'round'
     const layers = (['CH', 'JU', 'JO'] as const).filter((group) => (group === 'CH' ? budget.syllable.choseong : group === 'JU' ? budget.syllable.jungseong : budget.syllable.jongseong))
-    return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char} data-halo={haloAttr(haloFitNow)} data-fence={fenced ? fenced.need.toFixed(3) : undefined} data-heavy={layers.map((group) => `${group}:${heavy.thick[group].v.toFixed(3)}/${heavy.thick[group].h.toFixed(3)}`).join(' ')}>
+    return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char} data-halo={haloAttr(haloFitNow)} data-final={finalNow ? `${finalNow.err.toFixed(4)} ${finalNow.move.toFixed(4)}` : undefined} data-fence={fenced ? fenced.need.toFixed(3) : undefined} data-heavy={layers.map((group) => `${group}:${heavy.thick[group].v.toFixed(3)}/${heavy.thick[group].h.toFixed(3)}`).join(' ')}>
       {layers.map((group, at) => {
         const ink = flat ? { multiplier: Math.min(heavy.thick[group].v, heavy.thick[group].h), contrast: 0 } : inkOfThick(heavy.thick[group])
         const style = flat || globalStyle.strokeStyle.mode !== 'brush' ? globalStyle : { ...globalStyle, strokeStyle: heavyStrokeStyle(globalStyle.strokeStyle, ink.contrast) }
@@ -740,7 +762,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       })}
     </span>
   }
-  return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char} data-halo={haloAttr(haloFitNow)} data-fence={fenced ? fenced.need.toFixed(3) : undefined} data-budget={Object.entries(budget.factors).map(([key, f]) => `${key}:${f.toFixed(2)}`).join(' ') || undefined}>
+  return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char} data-halo={haloAttr(haloFitNow)} data-final={finalNow ? `${finalNow.err.toFixed(4)} ${finalNow.move.toFixed(4)}` : undefined} data-fence={fenced ? fenced.need.toFixed(3) : undefined} data-budget={Object.entries(budget.factors).map(([key, f]) => `${key}:${f.toFixed(2)}`).join(' ') || undefined}>
     <SvgRenderer
       syllable={shownCut(budget.syllable, shownStroke)}
       schema={placement.kind === 'schema' ? placement.schema : undefined}

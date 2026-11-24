@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DecomposedSyllable } from '../src/types'
-import { HALO_END_GAP, HALO_ENGINE, HALO_TOLERANCE, haloFit, haloScope, haloStemOf, type HaloStroke } from './moldHalo'
+import { FINAL_TOLERANCE, HALO_END_GAP, HALO_ENGINE, HALO_TOLERANCE, haloFinalFit, haloFit, haloScope, haloStemOf, type HaloStroke } from './moldHalo'
 
 const syllable = (initial: string, medial: string, final?: string, layoutType = final ? 'choseong-jungseong-vertical-jongseong' : 'choseong-jungseong-vertical') =>
   ({ char: '', layoutType, choseong: { char: initial }, jungseong: { char: medial }, jongseong: final ? { char: final } : null }) as unknown as DecomposedSyllable
@@ -64,5 +64,39 @@ describe('흐림 선(새 틈 규칙 1단계)', () => {
     const tight = haloFit(dieut(0.56), { ease: 0.76, spread: 0.42, grown: 1 })!
     const loose = haloFit(dieut(0.56), { ease: 0.48, spread: 0.42, grown: 1 })!
     expect(loose.err).toBeGreaterThan(tight.err)
+  })
+})
+
+/** 「간」꼴: ㄱ(가로 + 세로) · ㅏ 기둥 · ㄴ 받침(윗변 `top`). */
+function gan(top: number, t = 0.07): HaloStroke[] {
+  return [
+    { part: 'CH', points: [{ x: 0.12, y: 0.08 }, { x: 0.5, y: 0.08 }, { x: 0.5, y: 0.5 }], thickness: t, cap: 'butt' },
+    { part: 'JU', points: [{ x: 0.7, y: 0.04 }, { x: 0.7, y: 0.6 }], thickness: t, cap: 'butt' },
+    { part: 'JU', points: [{ x: 0.7, y: 0.3 }, { x: 0.89, y: 0.3 }], thickness: t, cap: 'butt' },
+    { part: 'JO', points: [{ x: 0.2, y: top }, { x: 0.2, y: 0.92 }, { x: 0.8, y: 0.92 }], thickness: t, cap: 'butt' },
+  ]
+}
+
+describe('받침 위 흐림 선(셋째 방향)', () => {
+  it('바짝 붙은 받침은 윗변을 내리고, 멀리 떨어진 받침은 올리고, 폭 안이면 그대로 둔다', () => {
+    const tight = haloFinalFit(gan(0.54))!
+    expect(tight.err).toBeGreaterThan(FINAL_TOLERANCE)
+    expect(tight.move).toBeGreaterThan(0)
+    const after = haloFinalFit(gan(0.54 + tight.move))!
+    expect(Math.abs(after.err)).toBeLessThanOrEqual(FINAL_TOLERANCE)
+    expect(after.move).toBe(0)
+    const far = haloFinalFit(gan(0.7))!
+    expect(far.err).toBeLessThan(-FINAL_TOLERANCE)
+    expect(far.move).toBeLessThan(0)
+    expect(haloFinalFit(gan(0.62))!.move).toBe(0)
+  })
+
+  it('받침을 반 넘게 줄이지 않는다', () => {
+    const fit = haloFinalFit(gan(0.52))!
+    expect(fit.move).toBeLessThanOrEqual(0.5 * (fit.bottom - fit.top) + 1e-9)
+  })
+
+  it('받침이 없으면 재지 않는다', () => {
+    expect(haloFinalFit(gan(0.6).filter((s) => s.part !== 'JO'))).toBeNull()
   })
 })

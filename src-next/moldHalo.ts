@@ -125,7 +125,7 @@ export function haloStemOf(strokes: readonly HaloStroke[]): { left: number; thic
 }
 
 /** 첫닿자 잉크를 흐린 진하기의 세로 단면 최댓값. x(글자 칸 좌표)마다 읽는 함수를 돌려준다. */
-function profileOf(ch: readonly HaloStroke[], H: number, around: Ink): (x: number) => number {
+function profileOf(ch: readonly HaloStroke[], H: number, around: Ink, rows?: { x0: number; x1: number }): (x: number) => number {
   const cell = H / GRID, sigma = HALO_RADIUS * GRID, pad = Math.ceil(3 * sigma) + 2
   const ox = around.x0 - pad * cell, oy = around.y0 - pad * cell
   const nx = Math.ceil((around.x1 - around.x0) / cell) + 2 * pad, ny = Math.ceil((around.y1 - around.y0) / cell) + 2 * pad
@@ -169,12 +169,17 @@ function profileOf(ch: readonly HaloStroke[], H: number, around: Ink): (x: numbe
     for (let k = -r; k <= r; k++) { const j = iy + k; if (j >= 0 && j < ny) v += tmp[j * nx + ix] * kernel[k + r] }
     out[iy * nx + ix] = v
   }
-  const col = new Float32Array(nx)
-  for (let ix = 0; ix < nx; ix++) { let m = 0; for (let iy = 0; iy < ny; iy++) m = Math.max(m, out[iy * nx + ix]); col[ix] = m }
+  // `rows`가 있으면 가로 단면(그 x 범위 안 최댓값)을 y마다 읽는다 — 받침 위.
+  const n = rows ? ny : nx, o = rows ? oy : ox
+  const col = new Float32Array(n)
+  if (rows) {
+    const ix0 = Math.max(0, Math.floor((rows.x0 - ox) / cell)), ix1 = Math.min(nx - 1, Math.ceil((rows.x1 - ox) / cell))
+    for (let iy = 0; iy < ny; iy++) { let m = 0; for (let ix = ix0; ix <= ix1; ix++) m = Math.max(m, out[iy * nx + ix]); col[iy] = m }
+  } else for (let ix = 0; ix < nx; ix++) { let m = 0; for (let iy = 0; iy < ny; iy++) m = Math.max(m, out[iy * nx + ix]); col[ix] = m }
   return (x: number) => {
-    const f = (x - ox) / cell - 0.5, i = Math.floor(f)
+    const f = (x - o) / cell - 0.5, i = Math.floor(f)
     if (i < 0) return col[0]
-    if (i >= nx - 1) return col[nx - 1]
+    if (i >= n - 1) return col[n - 1]
     return col[i] + (col[i + 1] - col[i]) * (f - i)
   }
 }
@@ -244,4 +249,45 @@ export function haloFit(strokes: readonly HaloStroke[], rule: HaloRule): HaloFit
     after = HALO_TOLERANCE; gap += push / H
   }
   return { err, ease, widen, anchor: chInk.x0, push, after, gap, stem: stem.thickness / H }
+}
+
+/**
+ * 받침 위 흐림 선(하니무스 2026-11-24 "방향마다 폰트가 따르는 규칙"). 위 덩이(첫닿자 + 홀자) 잉크를 흐려, 받침 윗변이 진하기 `FINAL_EASE` × (기둥 ÷ 키)에 서게 한다.
+ * 폰트 일곱 집안(노토 한 표)에서 받침 윗변 진하기 ÷ (기둥 ÷ 키)의 가운데 1.51, 굵어져도 거의 그대로(지수 0, 4집안). 폰트끼리도 3.5% 흩어져서 그 폭 밖만 고친다.
+ * 받침 밑변은 두고 윗변만 옮긴다(받침 칸 위를 줄이거나 늘림). 재는 도구 `study/mold-gap-design/4단계-전면/m5.py`.
+ */
+export const FINAL_EASE = 1.51
+export const FINAL_TOLERANCE = 0.035
+/** 이 셈(중심선 + 두께로 칠한 흐림)이 그려진 글자 픽셀로 잰 값보다 받침 쪽으로 1.0% 높게 나온다 — 엔진 19자 × 굵기 0.5 · 1 · 900 가운데, 흩어짐 0.3~1.3%(4단계-전면/fcmp.py). 폭 가운데를 그만큼 옮겨 잰다. */
+export const FINAL_MODEL_BIAS = 0.01
+export interface FinalFit {
+  /** 선 − 받침 윗변, 글자 키의 몫(+ 답답 · − 자리 남음). 고치기 전. */
+  err: number
+  /** 받침 윗변을 아래로 옮길 양(글자 칸 좌표, − 이면 위로). */
+  move: number
+  /** 받침 잉크 윗변 · 밑변(글자 칸 좌표). */
+  top: number
+  bottom: number
+}
+export function haloFinalFit(strokes: readonly HaloStroke[], ease = FINAL_EASE): FinalFit | null {
+  const all = inkOf(strokes), up = strokes.filter((s) => s.part !== 'JO'), jo = strokes.filter((s) => s.part === 'JO'), stem = haloStemOf(strokes)
+  const upInk = inkOf(up), joInk = inkOf(jo)
+  if (!all || !upInk || !joInk || !stem || joInk.y0 <= upInk.y0) return null
+  const H = all.y1 - all.y0
+  const T = ease * stem.thickness / H
+  // 위 덩이 잉크 중 받침 윗변보다 위에 있는 것만(기둥 끝이 받침 옆으로 내려와도 선을 안 당기게).
+  const profile = profileOf(up, H, { x0: Math.min(upInk.x0, joInk.x0), x1: Math.max(upInk.x1, joInk.x1), y0: upInk.y0, y1: Math.max(upInk.y1, joInk.y1) }, { x0: joInk.x0, x1: joInk.x1 })
+  // 받침 윗변 바로 위에서 시작해 아래로: 진하기가 T 아래로 처음 내려가는 y.
+  let from = joInk.y0 - 0.5 * H
+  while (from < joInk.y0 && profile(from) <= T) from += H / GRID / 4
+  const line = lineOf(profile, from, T, H)
+  const err = (line - joInk.y0) / H - FINAL_MODEL_BIAS
+  let move = 0
+  // 폭 밖이면 폭 가운데 쪽(폭의 반)까지 옮긴다 — 폭 끝에 세우면 획 끝 · 꺾임 모양 차로 그려진 글자가 다시 폭을 살짝 넘는다.
+  const land = 0.5 * FINAL_TOLERANCE
+  if (err > FINAL_TOLERANCE) move = (err - land) * H
+  else if (err < -FINAL_TOLERANCE) move = (err + land) * H
+  // 받침을 반 넘게 줄이지는 않는다.
+  move = Math.min(move, 0.5 * (joInk.y1 - joInk.y0))
+  return { err, move, top: joInk.y0, bottom: joInk.y1 }
 }
