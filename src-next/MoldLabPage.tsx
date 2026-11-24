@@ -361,6 +361,9 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const fenced = useMemo(() => fenceNow && grown.boxes ? fencedBoxes({ syllable, baseSyllable: drawn ? base.syllable : syllable, boxes: grown.boxes, style: effective, padding, fence: fenceNow }) : null, [fenceNow, grown.boxes, syllable, base.syllable, drawn, effective, padding])
   useEffect(() => { if (fenced) onFence?.(fenced.need, fenced.pulls) }, [onFence, fenced])
   const fencedOut = fenced?.boxes ?? grown.boxes
+  // 굵기 예산의 기준 칸: 엔진 처음 칸에 같은 울타리를 입힌 것. 울타리가 그은 획 때문에 자소를 줄인 것은 처음 모습이다 —
+  // 기준을 울타리 전 칸으로 두면 처음 굵기에서도 틈이 줄었다고 보고 ㄹ · ㅇ · ㅍ 같은 획을 바닥(0.69배)까지 깎았다(하니무스 2026-11-24 9:04 진단).
+  const fencedStart = useMemo(() => fenceNow && placement.kind === 'boxes' && placement.boxes ? fencedBoxes({ syllable, baseSyllable: drawn ? base.syllable : syllable, boxes: placement.boxes, style: effective, padding, fence: fenceNow })?.boxes ?? placement.boxes : null, [fenceNow, placement, syllable, base.syllable, drawn, effective, padding])
   // 풍선 닿자(하니무스 2026-11-21): 보이는 글자 그대로(굵기 · 울타리까지 입힌 뒤) 잰다. 닿자 칸의 변과 획 하나하나가 같이 부풀고,
   // 잉크가 옆 자소와 최소 틈에 닿은 변 · 획만 멈춘다. 처음부터 그보다 가까운 쌍은 처음 틈을 지킨다. 글자 칸(0~1) 밖으로는 잉크가 안 나간다.
   const wantJamo = lookOf(look, 'jamo')
@@ -399,9 +402,9 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     // 먼저 넓힌다(하니무스 2026-11-22): 자소 칸이 옆 자소 칸 · 글자 칸 끝까지 빈 자리만큼.
     const rooms = roomsOf(boxes)
     const room = Object.fromEntries(Object.entries(rooms).map(([part, r]) => [part, { x: 1 + (r.left + r.right) / Math.max(boxes[part as Part]!.width, 1e-6), y: 1 + (r.up + r.down) / Math.max(boxes[part as Part]!.height, 1e-6) }]))
-    const { factors, widen } = thinBudget(strokesOn(boxes), strokesOn(placement.boxes), contrast, room)
+    const { factors, widen } = thinBudget(strokesOn(boxes), strokesOn(fencedStart ?? placement.boxes), contrast, room)
     return { syllable: thinSyllable(balloon.syllable, factors), factors, boxes: widenedBoxes(boxes, widen, rooms) }
-  }, [placement, boxes, balloon.syllable, effective, ratio, contrast])
+  }, [placement, boxes, balloon.syllable, effective, ratio, contrast, fencedStart])
   const budgetBoxes = budget.boxes
   // 900 쌓임 규칙은 틈을 규칙(머리 → 가로획 → 속 → 틈 순서)으로 낸다. 붙을 획을 미리 가늘게 하는 예산(`thinBudget`)을 거치면 그은 획처럼 넓은 획에서 글자마다 두께가 달라진다(하니무스 2026-11-24).
   const heavyBase = STACK_900 ? balloon.syllable : budget.syllable
@@ -684,7 +687,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       })}
     </span>
   }
-  return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char} data-halo={haloAttr(haloFitNow)}>
+  return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char} data-halo={haloAttr(haloFitNow)} data-budget={Object.entries(budget.factors).map(([key, f]) => `${key}:${f.toFixed(2)}`).join(' ') || undefined}>
     <SvgRenderer
       syllable={budget.syllable}
       schema={placement.kind === 'schema' ? placement.schema : undefined}
