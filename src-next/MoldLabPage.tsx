@@ -363,7 +363,10 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const fencedOut = fenced?.boxes ?? grown.boxes
   // 굵기 예산의 기준 칸: 엔진 처음 칸에 같은 울타리를 입힌 것. 울타리가 그은 획 때문에 자소를 줄인 것은 처음 모습이다 —
   // 기준을 울타리 전 칸으로 두면 처음 굵기에서도 틈이 줄었다고 보고 ㄹ · ㅇ · ㅍ 같은 획을 바닥(0.69배)까지 깎았다(하니무스 2026-11-24 9:04 진단).
-  const fencedStart = useMemo(() => fenceNow && placement.kind === 'boxes' && placement.boxes ? fencedBoxes({ syllable, baseSyllable: drawn ? base.syllable : syllable, boxes: placement.boxes, style: effective, padding, fence: fenceNow })?.boxes ?? placement.boxes : null, [fenceNow, placement, syllable, base.syllable, drawn, effective, padding])
+  // 굵기 줄이 칸을 옮긴 것(얇으면 획이 가늘어진 반만큼 칸이 밖으로 — `lookScale`)도 처음 모습이다. 이걸 빼고 재면 얇게 갈수록
+  // ㅅ · ㅌ · ㅗ 같은 획만 0.69배로 깎여 대비가 커졌다(하니무스 2026-11-24 9:11 "얇아질 때 대비가 이렇게 안 커도 되잖아").
+  const startBoxes = useMemo(() => placement.kind === 'boxes' && placement.boxes ? moldedBoxes(placement.boxes, raw.layoutType, {}, heavyOn ? {} : { weight: lookOf(look, 'weight'), weightBase: lookOf(look, 'weightBase') }, char) : null, [placement, raw.layoutType, heavyOn, look, char])
+  const fencedStart = useMemo(() => startBoxes ? (fenceNow ? fencedBoxes({ syllable, baseSyllable: drawn ? base.syllable : syllable, boxes: startBoxes, style: effective, padding, fence: fenceNow })?.boxes : undefined) ?? startBoxes : null, [fenceNow, startBoxes, syllable, base.syllable, drawn, effective, padding])
   // 풍선 닿자(하니무스 2026-11-21): 보이는 글자 그대로(굵기 · 울타리까지 입힌 뒤) 잰다. 닿자 칸의 변과 획 하나하나가 같이 부풀고,
   // 잉크가 옆 자소와 최소 틈에 닿은 변 · 획만 멈춘다. 처음부터 그보다 가까운 쌍은 처음 틈을 지킨다. 글자 칸(0~1) 밖으로는 잉크가 안 나간다.
   const wantJamo = lookOf(look, 'jamo')
