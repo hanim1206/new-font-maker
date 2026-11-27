@@ -51,6 +51,14 @@ describe('좁은 칸 굵기 예산(줄 끝 균형 규칙 ①)', () => {
     const out = thin(now, [...pair(0.12), now[2]], 0)
     expect(out['JU:c']).toBeCloseTo(THIN_FLOOR / EVEN, 6)
   })
+  it('닿자를 키워 곡선 토막 수가 바뀌어도 삐침(ㅅ · ㅈ · ㅊ)을 깎지 않는다', () => {
+    // 칸이 커지면 곡선을 더 잘게 편다(토막 4 → 9). 예전엔 토막 번호로 처음 모습을 맞춰, 수가 다르면 비교를 통째로 꺼
+    // 한 곡선 안 이웃 토막끼리를 좁은 틈으로 보고 삐침을 바닥까지 깎았다(하니무스 2026-11-27 「수」 · 「초」).
+    const leg = (n: number, k: number): BudgetStroke => ({ part: 'CH', id: 'leg', closed: false, thickness: 0.06,
+      points: Array.from({ length: n + 1 }, (_, i) => { const a = Math.PI / 2 * i / n; return { x: 0.5 - k * 0.3 * Math.sin(a), y: 0.1 + k * 0.2 * (1 - Math.cos(a)) } }) })
+    const bar = (k: number): BudgetStroke => ({ part: 'CH', id: 'bar', closed: false, thickness: 0.06, points: [{ x: 0.5 - 0.35 * k, y: 0.08 }, { x: 0.5 + 0.35 * k, y: 0.08 }] })
+    expect(thin([bar(1.27), leg(9, 1.27)], [bar(1), leg(4, 1)], 0)).toEqual({})
+  })
   it('다른 자소끼리는 안 본다', () => {
     const strokes = pair(0.05); strokes[1] = { ...strokes[1], part: 'JU' }
     expect(thin(strokes, pair(0.12), 0)).toEqual({})
