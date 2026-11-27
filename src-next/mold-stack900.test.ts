@@ -93,4 +93,14 @@ describe('900 쌓임 규칙', () => {
     expect(out.yieldV?.CH ?? 1).toBeGreaterThan(0.9)
     expect(out.yieldV?.JU).toBeUndefined()
   })
+  it('겹받침(ㄼ)은 ㄹ 아래 열린 속과 ㅂ 사이를 한 자소 속으로 보지 않는다 — 굵기 끝에서 ㄹ이 안 찌그러지고 ㅂ도 안 홀쭉해진다(「짧」)', () => {
+    // 굵기 20 「짧」 받침(빚기 화면에서 뜬 값). 예전엔 ㄹ 폭이 0.26 → 0.10으로 눌려 획 하나보다 좁아졌다.
+    const rieul = line('JO', [[0.119, 0.61], [0.376, 0.61], [0.376, 0.762], [0.158, 0.762], [0.158, 0.916], [0.436, 0.916]], 0.127)
+    const bieup = line('JO', [[0.506, 0.573], [0.506, 0.918], [0.729, 0.918], [0.729, 0.573]], 0.127)
+    const bar = line('JO', [[0.464, 0.728], [0.77, 0.728]], 0.127)
+    const out = solveStack900({ char: '짧', strokes: [rieul, bieup, bar], height: 0.905, reach: 1, inward: BLACK_STEM_GAIN })
+    const width = (s: StackStroke) => Math.max(...s.points.map((p) => p.x)) - Math.min(...s.points.map((p) => p.x))
+    expect(width(out.strokes[0])).toBeGreaterThan(0.9 * width(rieul))
+    expect(width(out.strokes[1])).toBeGreaterThan(0.9 * width(bieup))
+  })
 })

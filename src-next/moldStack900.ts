@@ -383,13 +383,16 @@ export function solveStack900(input: StackInput): StackResult {
   // 칸(글자 폭)이 먼저 `WIDEN_MAX`까지 넓어지고, 그래도 모자라면 그 자소 세로만 `THIN_FLOOR`까지 가늘어지고, 그래도 모자라면 칸을 더 넓힌다.
   // 예전에는 ㅃ만 두 ㅂ 사이를 벌리려고 ㅂ 폭을 줄여(`splitDouble`) 굵기 끝에서 ㅂ 속이 막혔다(다람쥐 극단 검수 2026-11-27).
   // 가로로 마주 선 막대(ㄹ · ㅂ 속)는 키가 정해져 있어 칸을 못 넓힌다 — 그 자소 가로만 가늘게 한다(축을 바꿔 같은 셈).
-  const kept = keepCounters(st, st0, G, thick, true, INNER_COUNTER)
+  const apart = new Set<Part>(jamo && CLUSTER_FINALS.includes(jamo.jong) ? ['JO'] : [])
+  const kept = keepCounters(st, st0, G, thick, true, INNER_COUNTER, apart)
   const swap = (s: StackStroke) => mapStroke(s, (p) => ({ x: p.y, y: p.x }))
-  const keptH = keepCounters(kept.strokes.map(swap), st0.map(swap), G, { v: thick.h, h: thick.v }, false, INNER_COUNTER_H)
+  const keptH = keepCounters(kept.strokes.map(swap), st0.map(swap), G, { v: thick.h, h: thick.v }, false, INNER_COUNTER_H, apart)
   return { strokes: kept.strokes, thick, gap: G, bars, ...(Object.keys(kept.yieldV).length ? { yieldV: kept.yieldV } : {}), ...(Object.keys(keptH.yieldV).length ? { yieldH: keptH.yieldV } : {}), ...(kept.widen > 1e-6 ? { widenEm: kept.widen } : {}) }
 }
 
 // ── 속 지키기: 마주 선 세로 줄기 사이 흰 틈 ──
+/** 겹받침: 받침 안 다른 획은 다른 자소(ㄹ · ㅂ)다. */
+const CLUSTER_FINALS = 'ㄳㄵㄶㄺㄻㄼㄽㄾㄿㅀㅄ'
 /** 이만큼(dx/dy) 안쪽으로 선 토막을 세로 줄기로 본다(ㅅ · ㅈ 다리처럼 기운 것까지). */
 const UPRIGHT = 0.6
 /** 마주 보는 세로 겹침이 이만큼(em) 아래면 마주 선 것으로 안 본다. */
@@ -442,7 +445,7 @@ export const INNER_COUNTER = 0.7
 /** 가로로 쌓인 속(ㄹ · ㅌ · ㅌ 가로획 사이)의 최소값. 글자 키를 못 늘리니(쌓인 글자 키 = 받침 없는 글자 키) 세로 속보다 더 좁아져도 된다(가설 — 하니무스 「절의 받침 ㄹ은 왤케 가로획 얇지」). */
 export const INNER_COUNTER_H = 0.5
 /** 마주 선 줄기 쌍마다 가장 좁은 가로 흰 틈. `joined`(처음 그림에서 이어진 쌍 — ㅅ 꼭짓점 · ㅂ 모서리)은 뺀다. */
-function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yieldV: Partial<Record<StackGroup, number>>, joined: Set<string>, G: number, inner0: number): Face[] {
+function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yieldV: Partial<Record<StackGroup, number>>, joined: Set<string>, G: number, inner0: number, apart: ReadonlySet<Part>): Face[] {
   const out: Face[] = []
   const halfOf = (r: Run, slope: number) => {
     const t = st[r.s].thickness * (yieldV[r.group] ?? 1), uy2 = 1 / (1 + slope * slope)
@@ -462,7 +465,9 @@ function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yie
       if (w < white) { white = w; cut = (l.x + ha + r.x - hb) / 2; half = (ha + hb) / 2 }
     }
     if (crossed) continue
-    const pa = st[A.s].part, inner = A.s === B.s || (pa === st[B.s].part && (pa === 'CH' || pa === 'JO'))
+    // 한 닿자 안 속: 같은 획이거나, 같은 부위의 다른 획(ㅃ 두 ㅂ 사이). 겹받침(`apart`)은 다른 획이 다른 자소다 — 「짧」 ㄹ 아래 열린 속과
+    // ㅂ 사이를 한 자소 속으로 보고 0.7배까지 좁혀 ㄹ이 찌그러졌다(하니무스 2026-11-27).
+    const pa = st[A.s].part, inner = A.s === B.s || (pa === st[B.s].part && (pa === 'CH' || pa === 'JO') && !apart.has(pa))
     out.push({ a: left === i ? i : j, b: left === i ? j : i, white, cut, half, want: inner ? G * inner0 : G, inner })
   }
   return out
@@ -470,7 +475,7 @@ function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yie
 /** x를 자르는 자리마다 오른쪽을 민다. */
 const widenAt = (cuts: { x: number; d: number }[]): Map2 => (p) => ({ x: p.x + cuts.reduce((s, c) => s + (p.x > c.x ? c.d : 0), 0), y: p.y })
 type Yield = Partial<Record<StackGroup, number>>
-function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number, thick: StackThick, widen: boolean, inner0: number): { strokes: StackStroke[]; yieldV: Yield; widen: number } {
+function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number, thick: StackThick, widen: boolean, inner0: number, apart: ReadonlySet<Part> = new Set()): { strokes: StackStroke[]; yieldV: Yield; widen: number } {
   const runs0 = runsOf(st0)
   // 처음(점 옮기기 전) 그림에서 줄기 반 두께 안으로 붙어 있던 쌍은 원래 이어진 것(ㅅ 꼭짓점, ㅆ 안 다리)이다.
   if (runs0.length !== runsOf(st).length) return { strokes: st, yieldV: {}, widen: 0 }
@@ -479,7 +484,7 @@ function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number,
     if (runDist(runs0[i], runs0[j]) < 0.5 * Math.min(st0[runs0[i].s].thickness, st0[runs0[j].s].thickness)) joined.add(`${i}|${j}`)
   }
   const box0 = inkBox(st, thick), width0 = box0.x1 - box0.x0, cx = (box0.x0 + box0.x1) / 2
-  const shortOf = (s: StackStroke[], y: Yield) => facesOf(s, runsOf(s), thick, y, joined, G, inner0).filter((f) => f.white < f.want - 1e-6)
+  const shortOf = (s: StackStroke[], y: Yield) => facesOf(s, runsOf(s), thick, y, joined, G, inner0, apart).filter((f) => f.white < f.want - 1e-6)
   const center = (s: StackStroke[]) => { const b = inkBox(s, thick), d = cx - (b.x0 + b.x1) / 2; return s.map((x) => mapStroke(x, (p) => ({ x: p.x + d, y: p.y }))) }
   const straight = (r: Run) => r.pts.every((p, k) => k === 0 || Math.abs(p.x - r.pts[k - 1].x) <= 0.02 * Math.abs(p.y - r.pts[k - 1].y))
   /**
@@ -487,7 +492,7 @@ function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number,
    *    곧은 세로 줄기끼리, 바로 옆 쌍만(ㅂ · ㅁ · ㄹ 속, ㅃ 두 ㅂ 사이). 그 자소 획만 옮겨 다른 자소(쌈의 ㅆ)는 안 밀린다.
    */
   const reclaim = (s: StackStroke[], y: Yield): StackStroke[] => {
-    const runs = runsOf(s), faces = facesOf(s, runs, thick, y, joined, G, inner0)
+    const runs = runsOf(s), faces = facesOf(s, runs, thick, y, joined, G, inner0, apart)
     const groups = new Set(faces.filter((f) => f.white < f.want - 1e-6).flatMap((f) => [runs[f.a].group, runs[f.b].group]))
     const next = (f: Face) => {
       const A = runs[f.a], B = runs[f.b], m = (Math.max(A.y0, B.y0) + Math.min(A.y1, B.y1)) / 2, xa = runAt(A, m).x, xb = runAt(B, m).x
@@ -495,7 +500,8 @@ function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number,
     }
     let out = s
     for (const g of groups) {
-      const spare = faces.filter((f) => f.inner && runs[f.a].group === g && f.white > f.want + 1e-6 && straight(runs[f.a]) && straight(runs[f.b]) && next(f))
+      // 겹받침은 한 자소 속(ㅂ)을 좁혀 옆 자소(ㄹ) 자리를 내지 않는다 — ㅂ만 홀쭉해졌다(「짧」). 칸 · 굵기로 받는다.
+      const spare = faces.filter((f) => f.inner && !apart.has(st[runs[f.a].s].part) && runs[f.a].group === g && f.white > f.want + 1e-6 && straight(runs[f.a]) && straight(runs[f.b]) && next(f))
       if (!spare.length) continue
       const warp = widenAt(spare.map((f) => ({ x: f.cut, d: f.want - f.white })))
       out = out.map((x) => (groupOf(x.part) === g ? mapStroke(x, warp) : x))
