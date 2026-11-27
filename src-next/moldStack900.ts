@@ -401,7 +401,9 @@ export function solveStack900(input: StackInput): StackResult {
   // 고른 틈은 쌓기 전에 정한다 — 양보로 가늘어지는 몫(f)은 이 틈에서 나오므로 넣지 않는다(그리기 전 가로획, 가설).
   const [g0, g1] = input.gothicRange ?? [c0, c1]
   const gothic = g0 + (g1 - g0) * reach
-  const G = input.gapFromBar === false ? evenGapOf(height, stem) : evenGapOfBar(height, stem * contrast * V * (input.barScale ?? 1), gothic * V)
+  // 옆 틈(첫닿자 ↔ 기둥, ㅐ 두 기둥, 쌍닿자 두 짝)은 세로획 사이라 기둥으로 센다 — 가로획으로 세면 대비를 낮출 때 「저」 ㅈ이 좁아졌다(하니무스 2026-11-27 "저 얇네").
+  const side = evenGapOf(height, stem)
+  const G = input.gapFromBar === false ? side : evenGapOfBar(height, stem * contrast * V * (input.barScale ?? 1), gothic * V)
   let st = st0, f = 1, bars = 0
   if (jamo && HORIZONTAL_VOWELS.includes(jamo.jung)) {
     const plan = stackPlan(st0, G, input.height, COMPOUND_FINALS.includes(jamo.jong) ? 'JO' : undefined)
@@ -411,13 +413,13 @@ export function solveStack900(input: StackInput): StackResult {
     st = plan.strokes; f = plan.f
   }
   st = inwardX(st, V)
-  st = spreadStems(st, G, V)
+  st = spreadStems(st, side, V)
   const thick = { v: V, h: Math.min(f, contrast * V) }
   if (jamo) {
     st = narrowRound(st, jamo, 1 - (1 - NARROW_ROUND) * reach)
     // 첫닿자가 먼저 양보하고, 쌍닿자는 그 좁아진 폭 안에서 두 짝 사이 틈을 다시 지킨다.
-    if (!HORIZONTAL_VOWELS.includes(jamo.jung)) st = yieldChoseong(st, G, { v: V, h: thick.h })
-    st = splitDouble(st, jamo.cho, G, { v: V, h: thick.h })
+    if (!HORIZONTAL_VOWELS.includes(jamo.jung)) st = yieldChoseong(st, side, { v: V, h: thick.h })
+    st = splitDouble(st, jamo.cho, side, { v: V, h: thick.h })
   }
   return { strokes: st, thick, gap: G, bars }
 }
