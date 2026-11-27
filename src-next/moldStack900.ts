@@ -433,17 +433,27 @@ function cutBarBeforeSide(st: StackStroke[], thick: StackThick, G: number): Stac
   const stems = st.filter((s) => s.part === 'JU_H' && !flat(s) && s.points.length === 2 && Math.abs(s.points[1].x - s.points[0].x) < 1e-6)
   const floor = stems.length ? Math.max(...stems.map((s) => s.points[0].x + s.thickness * thick.v / 2)) + G : -Infinity
   let cut = bRight
-  for (const s of st) {
+  const out = [...st]
+  // 기둥 밑(곁줄기가 내려갈 수 있는 끝).
+  const pillarBottom = Math.max(-Infinity, ...st.filter((s) => s.part === 'JU_V' && !flat(s)).flatMap((s) => s.points.map((p) => p.y)))
+  for (const [k, s] of st.entries()) {
     if (s.part !== 'JU_V' || !flat(s)) continue
     const left = Math.min(s.points[0].x, s.points[1].x), dy = Math.abs(s.points[0].y - by)
     if (left >= bRight) continue
-    if (dy - (bar.s.thickness + s.thickness) * thick.h / 2 >= G - 1e-9) continue
+    const need = (bar.s.thickness + s.thickness) * thick.h / 2 + G - dy
+    if (need <= 1e-9) continue
+    // 곁줄기가 보 아래에 있으면 보를 자르지 않고 곁줄기를 틈만큼 내린다 — 폰트는 ㅜ 보가 길고 곁줄기가 그 아래에 선다
+    // (뭐 · 워 보 길이 ÷ 글자 폭: 폰트 900 0.74~0.78, 자르던 때 0.58. 하니무스 2026-11-27 "뭐에서 ㅜ가 짧거든").
+    const low = s.points[0].y + need + s.thickness * thick.h / 2
+    if (s.points[0].y > by && low <= pillarBottom) {
+      out[k] = { ...s, points: s.points.map((p) => ({ ...p, y: p.y + need })), anchors: s.anchors.map((p) => ({ ...p, y: p.y + need, ...(p.handleIn ? { handleIn: { ...p.handleIn, y: p.handleIn.y + need } } : {}), ...(p.handleOut ? { handleOut: { ...p.handleOut, y: p.handleOut.y + need } } : {}) })) }
+      continue
+    }
     // 그릴 때 가로획 열린 끝은 세로 · 가로 굵기 차만큼 늘어난다(`endReachOf`) — 보 · 곁줄기 두 끝 몫을 미리 뺀다.
     const reach = (t: number) => t / 2 * Math.max(0, thick.v - thick.h)
     cut = Math.min(cut, Math.max(floor, left - G - reach(bar.s.thickness) - reach(s.thickness)))
   }
-  if (cut >= bRight - 1e-9) return st
-  const out = [...st]
+  if (cut >= bRight - 1e-9) return out
   out[bar.i] = { ...bar.s, points: bar.s.points.map((p) => (p.x === bRight ? { ...p, x: cut } : p)), anchors: bar.s.anchors.map((p) => (Math.abs(p.x - bRight) < 1e-9 ? { ...p, x: cut } : p)) }
   return out
 }
