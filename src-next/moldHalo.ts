@@ -268,11 +268,24 @@ export function haloFit(strokes: readonly HaloStroke[], rule: HaloRule): HaloFit
 
 /**
  * 받침 위 흐림 선(하니무스 2026-11-24 "방향마다 폰트가 따르는 규칙"). 위 덩이(첫닿자 + 홀자) 잉크를 흐려, 받침 윗변이 진하기 `FINAL_EASE` × (기둥 ÷ 키)에 서게 한다.
- * 폰트 일곱 집안(노토 한 표)에서 받침 윗변 진하기 ÷ (기둥 ÷ 키)의 가운데 1.51, 굵어져도 거의 그대로(지수 0, 4집안). 폰트끼리도 3.5% 흩어져서 그 폭 밖만 고친다.
+ * 폰트 일곱 집안(노토 한 표)에서 받침 윗변 진하기 ÷ (기둥 ÷ 키)의 가운데 1.51, 굵어져도 거의 그대로(지수 0, 4집안). 폭은 처음 3.5%(폰트끼리 흩어짐)였는데 짜임마다 기준을 나누니 폰트끼리 1% 안팎이라 1%로 좁혔다(넓으면 틈이 키의 1~8%를 오가 고르지 않았다, 2026-11-27).
  * 받침 밑변은 두고 윗변만 옮긴다(받침 칸 위를 줄이거나 늘림). 재는 도구 `study/mold-gap-design/4단계-전면/m5.py`.
  */
 export const FINAL_EASE = 1.51
-export const FINAL_TOLERANCE = 0.035
+/**
+ * 짜임마다 받침 윗변 진하기 ÷ (기둥 ÷ 키). 1.51은 세로홀자(낙 · 각 …)와 가로홀자(묵 · 문 …)를 섞은 가운데였고 섞임홀자(원 · 괜 …)는 재지 않았다.
+ * 짜임마다 따로 재면(프리텐다드 · 고딕 A1 · 노토 산스 · 나눔고딕, 400 · 700 · 900, 2026-11-27 비버 `study/font-key/rub/gray/calm.py`)
+ * 세로 1.33~1.41 · 가로 1.87~1.90 · 섞임 1.89~2.11 — 굵기를 바꿔도 거의 그대로고 짜임끼리만 다르다. 가로 · 섞임에 1.51을 쓰면 받침을 밀어내
+ * 굵은 횟 · 원 · 줬의 받침 위 틈이 폰트의 두세 배가 됐다(하니무스 2026-11-27 "자소랑 자소 사이의 gap이 ... 균일하게 가까워져도").
+ */
+export const FINAL_EASE_BY = { V: 1.38, H: 1.88, M: 1.92 } as const
+const MIXED_VOWELS = 'ㅘㅙㅚㅝㅞㅟㅢ', FLAT_VOWELS = 'ㅗㅛㅜㅠㅡ'
+/** 그 글자 짜임의 받침 위 여유(`FINAL_EASE_BY`). */
+export function finalEaseOf(syllable: Pick<DecomposedSyllable, 'jungseong'>): number {
+  const v = syllable.jungseong?.char ?? ''
+  return MIXED_VOWELS.includes(v) ? FINAL_EASE_BY.M : FLAT_VOWELS.includes(v) ? FINAL_EASE_BY.H : FINAL_EASE_BY.V
+}
+export const FINAL_TOLERANCE = 0.01
 /** 이 셈(중심선 + 두께로 칠한 흐림)이 그려진 글자 픽셀로 잰 값보다 받침 쪽으로 1.0% 높게 나온다 — 엔진 19자 × 굵기 0.5 · 1 · 900 가운데, 흩어짐 0.3~1.3%(4단계-전면/fcmp.py). 폭 가운데를 그만큼 옮겨 잰다. */
 export const FINAL_MODEL_BIAS = 0.01
 export interface FinalFit {
@@ -347,7 +360,7 @@ export function haloCorrect(input: { syllable: DecomposedSyllable; boxes: Boxes;
     if (push !== fit.push) fit = { ...fit, push }
   }
   const moved = haloBoxes(boxes, fit)
-  // 받침 위(흐림 선 셋째 방향): 폰트 일곱 집안 3.5% 폭 밖만 받침 윗변을 옮긴다. 굵어져도 지수 ~0이라 굵기를 안 곱한다.
-  const top = final ? haloFinalFit(strokesOn(moved)) : null
+  // 받침 위(흐림 선 셋째 방향): 짜임별 여유(`finalEaseOf`)로, 1% 폭 밖만 받침 윗변을 옮긴다. 굵어져도 지수 ~0이라 굵기를 안 곱한다.
+  const top = final ? haloFinalFit(strokesOn(moved), finalEaseOf(syllable)) : null
   return { fit, final: top, boxes: finalBoxes(moved, top) }
 }
