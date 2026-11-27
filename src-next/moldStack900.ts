@@ -38,6 +38,12 @@ export interface StackInput {
   inward: number
   /** 가로 ÷ 세로 [굵기 1 위 첫 걸음, 굵기 끝]. 없으면 [1, `BLACK_CONTRAST`](바탕 대비 위에 곱함). 대비 기본값(폰트 패턴, `contrastPatternOf`)이면 그 식의 두 끝. */
   contrastRange?: readonly [number, number]
+  /**
+   * 만진 대비가 가로에 곱하는 배율(바탕 대비의 가로 ÷ 세로, 1 = 안 만짐). 돌려주는 `thick.h`에 들어 있다.
+   * 1보다 크면(가로 굵게 쪽 대비) 쌓임이 준 배율(`f`)을 넘지 않게 자른다 — 예전엔 쌓임을 다 푼 뒤 밖에서 곱해
+   * 굵기 끝 + 대비 0에서 을 · 른 · 숲의 ㄹ · ㅡ가 뭉쳤다(다람쥐 검수 2026-11-27).
+   */
+  hScale?: number
 }
 export interface StackResult {
   strokes: StackStroke[]
@@ -165,12 +171,12 @@ export function inkGap(strokes: readonly StackStroke[], upper: (part: Part) => b
 
 // ── 쌓인 막대(warp.py `bars` · `gaptype` · `plan`) ──
 type Bar = { y: number; i: number; kind: 'ring-top' | 'ring-bot' | 'box-top' | 'box-bot' | 'bar' | 'block-top' | 'block-bot' }
-function barsOf(st: readonly StackStroke[], block?: Part): Bar[] {
+function barsOf(st: readonly StackStroke[], block?: Part, skip?: Part): Bar[] {
   const xs = st.flatMap((s) => s.points.map((p) => p.x)), xc = (Math.min(...xs) + Math.max(...xs)) / 2
   const out: Bar[] = []
   st.forEach((s, i) => {
     const P = s.points
-    if (s.part === block) return
+    if (s.part === block || s.part === skip) return
     if (s.closed) {
       const ys = P.map((p) => p.y), xr = P.map((p) => p.x)
       if (Math.min(...xr) < xc + BAR_BAND && Math.max(...xr) > xc - BAR_BAND) {
@@ -230,8 +236,8 @@ function warpY(old: number[], next: number[]): Map2 {
 }
 
 /** 가로홀자 글자: 키를 막대 n개 · 고른 틈 n−1개 · 속으로 나눈다(규칙 2~9). 막대가 셋 아래면 손대지 않는다. */
-function stackPlan(st0: StackStroke[], G: number, height: number | undefined, block?: Part): { strokes: StackStroke[]; f: number; bars: number } | null {
-  const B = barsOf(st0, block)
+function stackPlan(st0: StackStroke[], G: number, height: number | undefined, block?: Part, skip?: Part): { strokes: StackStroke[]; f: number; bars: number } | null {
+  const B = barsOf(st0, block, skip)
   if (B.length < 3) return null
   const t = st0[0].thickness, n = B.length, one = { v: 1, h: 1 }
   const kinds = B.slice(1).map((b, i) => gapKind(B[i], b, st0))
@@ -363,8 +369,10 @@ export function solveStack900(input: StackInput): StackResult {
   const height = input.height ?? ink0.y1 - ink0.y0
   const G = evenGapOf(height, stem)
   let st = st0, f = 1, bars = 0
-  if (jamo && HORIZONTAL_VOWELS.includes(jamo.jung)) {
-    const plan = stackPlan(st0, G, input.height, COMPOUND_FINALS.includes(jamo.jong) ? 'JO' : undefined)
+  // ㅝ · ㅞ도 위아래로 쌓인 글자다(ㅇ · ㅜ 보 · 받침). 오른쪽 ㅓ · ㅔ(`JU_V`)는 막대로 안 센다 — 곁줄기는 보 옆에 선다(`cutBarBeforeSide`).
+  const stacked = jamo && (HORIZONTAL_VOWELS.includes(jamo.jung) || 'ㅝㅞ'.includes(jamo.jung))
+  if (jamo && stacked) {
+    const plan = stackPlan(st0, G, input.height, COMPOUND_FINALS.includes(jamo.jong) ? 'JO' : undefined, 'ㅝㅞ'.includes(jamo.jung) ? 'JU_V' : undefined)
     if (plan) { st = plan.strokes; f = plan.f; bars = plan.bars }
   } else if (jamo && jamo.jong) {
     const plan = finalPlan(st0, G, input.height)
@@ -377,8 +385,10 @@ export function solveStack900(input: StackInput): StackResult {
   // 가로 = min(쌓임이 준 배율, 세로 × 대비). 대비는 굵기 끝으로 갈수록(가설: 굵기에 곧게).
   const [c0, c1] = input.contrastRange ?? [1, BLACK_CONTRAST]
   const contrast = c0 + (c1 - c0) * reach
-  const thick = { v: V, h: Math.min(f, contrast * V) }
+  const hs = input.hScale ?? 1
+  const thick = { v: V, h: hs > 1 ? Math.min(f, contrast * V * hs) : Math.min(f, contrast * V) * hs }
   if (jamo) st = narrowRound(st, jamo, 1 - (1 - NARROW_ROUND) * reach)
+  if (jamo && 'ㅝㅞ'.includes(jamo.jung)) st = cutBarBeforeSide(st, thick, G)
   // 마지막에 속(마주 선 세로 줄기 사이 흰 틈)을 고른 틈까지 지킨다. 지키는 순서 틈 → 굵기 → 칸(하니무스 2026-11-22):
   // 칸(글자 폭)이 먼저 `WIDEN_MAX`까지 넓어지고, 그래도 모자라면 그 자소 세로만 `THIN_FLOOR`까지 가늘어지고, 그래도 모자라면 칸을 더 넓힌다.
   // 예전에는 ㅃ만 두 ㅂ 사이를 벌리려고 ㅂ 폭을 줄여(`splitDouble`) 굵기 끝에서 ㅂ 속이 막혔다(다람쥐 극단 검수 2026-11-27).
@@ -388,6 +398,35 @@ export function solveStack900(input: StackInput): StackResult {
   const swap = (s: StackStroke) => mapStroke(s, (p) => ({ x: p.y, y: p.x }))
   const keptH = keepCounters(kept.strokes.map(swap), st0.map(swap), G, { v: thick.h, h: thick.v }, false, INNER_COUNTER_H, apart)
   return { strokes: kept.strokes, thick, gap: G, bars, ...(Object.keys(kept.yieldV).length ? { yieldV: kept.yieldV } : {}), ...(Object.keys(keptH.yieldV).length ? { yieldH: keptH.yieldV } : {}), ...(kept.widen > 1e-6 ? { widenEm: kept.widen } : {}) }
+}
+
+/**
+ * ㅝ · ㅞ: ㅜ 보 오른쪽이 ㅓ 곁줄기 위에 겹쳐 서면 굵을 때 둘 사이 위아래 틈이 모자라, 틈을 지키려 가로획을 바닥까지 깎았다
+ * (하니무스 2026-11-27 원 · 웠 · 훨, 고른 안 「ㅜ 보 오른쪽 끊기」). 위아래 틈이 고른 틈보다 모자라면 보 오른끝을 곁줄기 왼끝에서
+ * 고른 틈만큼 앞에서 끊는다. ㅜ 기둥 오른쪽 바깥선을 넘어서까지는 안 끊는다. 위아래 틈이 넉넉하면(얇을 때) 그대로.
+ */
+function cutBarBeforeSide(st: StackStroke[], thick: StackThick, G: number): StackStroke[] {
+  const flat = (s: StackStroke) => s.points.length === 2 && Math.abs(s.points[1].y - s.points[0].y) < 1e-6 && Math.abs(s.points[1].x - s.points[0].x) > 1e-6
+  const bars = st.map((s, i) => ({ s, i })).filter(({ s }) => s.part === 'JU_H' && flat(s))
+  if (!bars.length) return st
+  const bar = bars.reduce((m, b) => (Math.abs(b.s.points[1].x - b.s.points[0].x) > Math.abs(m.s.points[1].x - m.s.points[0].x) ? b : m))
+  const by = bar.s.points[0].y, bRight = Math.max(bar.s.points[0].x, bar.s.points[1].x)
+  const stems = st.filter((s) => s.part === 'JU_H' && !flat(s) && s.points.length === 2 && Math.abs(s.points[1].x - s.points[0].x) < 1e-6)
+  const floor = stems.length ? Math.max(...stems.map((s) => s.points[0].x + s.thickness * thick.v / 2)) + G : -Infinity
+  let cut = bRight
+  for (const s of st) {
+    if (s.part !== 'JU_V' || !flat(s)) continue
+    const left = Math.min(s.points[0].x, s.points[1].x), dy = Math.abs(s.points[0].y - by)
+    if (left >= bRight) continue
+    if (dy - (bar.s.thickness + s.thickness) * thick.h / 2 >= G - 1e-9) continue
+    // 그릴 때 가로획 열린 끝은 세로 · 가로 굵기 차만큼 늘어난다(`endReachOf`) — 보 · 곁줄기 두 끝 몫을 미리 뺀다.
+    const reach = (t: number) => t / 2 * Math.max(0, thick.v - thick.h)
+    cut = Math.min(cut, Math.max(floor, left - G - reach(bar.s.thickness) - reach(s.thickness)))
+  }
+  if (cut >= bRight - 1e-9) return st
+  const out = [...st]
+  out[bar.i] = { ...bar.s, points: bar.s.points.map((p) => (p.x === bRight ? { ...p, x: cut } : p)), anchors: bar.s.anchors.map((p) => (Math.abs(p.x - bRight) < 1e-9 ? { ...p, x: cut } : p)) }
+  return out
 }
 
 // ── 속 지키기: 마주 선 세로 줄기 사이 흰 틈 ──

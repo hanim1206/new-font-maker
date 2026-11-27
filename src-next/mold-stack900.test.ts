@@ -103,4 +103,15 @@ describe('900 쌓임 규칙', () => {
     expect(width(out.strokes[0])).toBeGreaterThan(0.9 * width(rieul))
     expect(width(out.strokes[1])).toBeGreaterThan(0.9 * width(bieup))
   })
+  it('ㅝ: ㅜ 보 오른쪽은 ㅓ 곁줄기 앞에서 끊고, 가로획을 바닥까지 깎지 않는다(「원」, 하니무스 고른 안)', () => {
+    // 굵기 20 「원」(빚기 화면에서 뜬 값을 줄인 것). 예전엔 보와 곁줄기가 위아래로 겹쳐 가로가 0.69배까지 깎였다.
+    const ring: StackStroke = { part: 'CH', closed: true, thickness: 0.127, points: Array.from({ length: 64 }, (_, k) => ({ x: 0.339 + 0.175 * Math.cos(k / 32 * Math.PI), y: 0.245 + 0.128 * Math.sin(k / 32 * Math.PI) })), anchors: [] }
+    const bar = line('JU_H', [[0.045, 0.504], [0.631, 0.504]], 0.127), stem = line('JU_H', [[0.338, 0.504], [0.338, 0.667]], 0.127)
+    const nieun = line('JO', [[0.218, 0.699], [0.218, 0.903], [0.815, 0.903]], 0.127)
+    const pillar = line('JU_V', [[0.753, 0.054], [0.753, 0.76]], 0.127), side = line('JU_V', [[0.518, 0.596], [0.753, 0.596]], 0.127)
+    const out = solveStack900({ char: '원', strokes: [ring, bar, stem, nieun, pillar, side], height: 0.905, reach: 1, inward: BLACK_STEM_GAIN })
+    expect(out.yieldH?.JU ?? 1).toBe(1)
+    const barRight = Math.max(...out.strokes[1].points.map((p) => p.x)), sideLeft = Math.min(...out.strokes[5].points.map((p) => p.x))
+    expect(sideLeft - barRight).toBeGreaterThanOrEqual(out.gap - 1e-6)
+  })
 })
