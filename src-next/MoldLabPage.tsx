@@ -23,7 +23,7 @@ import { Pressable } from './components/ui/pressable'
 import { Field, RangeBar } from './components/ui/range'
 import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
-import { nibStemFactor, openFactorOf, BLACK_CENTER, BLACK_RATIO, CONTRAST_PATTERN_RANGE, patternWeightRatio, HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, waistSyllable, dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { nibStemFactor, openFactorOf, BLACK_CENTER, BLACK_RATIO, CONTRAST_PATTERN_RANGE, patternWeightRatio, HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, waistSyllable, armSyllable, dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement, useNotoModel } from './notoModel'
 import { stackColumns, stackLay } from './moldStack'
 import { balloonGroupOf, endReachOf, inkOfThick, solveBalloon, type BalloonGroup, type BalloonStroke, type Thick } from './moldBalloon'
@@ -380,7 +380,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     // 풍선 굵기는 자소마다 안으로 당기므로(`solveBalloon`), 글자 통째로 안으로 당기는 셈(`lookScale`)에는 굵기를 안 넣는다.
     const boxes = moldedBoxes(placement.boxes, raw.layoutType, edits, { ...sizedLook, jamo: Math.min(1, lookOf(look, 'jamo')), ...(heavyOn ? { weight: 1, weightBase: 1 } : {}) }, char)
     // 허리선 → 곁줄기 길이 → 줄기마다(휨 · 길이 · 틈) → 부리 → 붓촉 순서로 획을 고친다(획 다듬기 값은 획 모양만 바꾸고 칸은 두지 않는다).
-    const waisted = waistSyllable(raw, waistLift(look, placement.boxes, raw.layoutType), boxes)
+    const waisted = armSyllable(waistSyllable(raw, waistLift(look, placement.boxes, raw.layoutType), boxes), boxes)
     const stroked = serifSyllable(stemSyllable(branchSyllable(waisted, lookOf(look, 'branch'), { boxes, ink: weightToMultiplier(MOLD_BASE_WEIGHT), linecap: effective.linecap }), look), lookOf(look, 'serif'), boxes)
     return { boxes, syllable: stroked }
   }, [placement, raw, edits, look, sizedLook, char, heavyOn, effective.linecap])

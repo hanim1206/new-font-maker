@@ -957,6 +957,29 @@ export function waistSyllable(syllable: DecomposedSyllable, lift: number, boxes:
 }
 
 /**
+ * ㅝ · ㅞ 곁줄기 높이(하니무스 2026-11-27 "원웠훨: ㅝ 가로세로 줄기두께랑 위치 균형"). 곁줄기를 ㅜ 보 가운데에서 기둥 밑까지의 `ARM_DROP` 몫에 둔다.
+ * 고딕 세 집안(Gothic A1 · Noto · 나눔) 「뭐 · 워」 400 · 900에서 잰 몫 0.36~0.45(가운데 0.42). 엔진은 0.36이고 받침 글자(원 · 웠 · 훨)는
+ * 보와 거의 같은 높이라 곁줄기와 보가 한 줄로 붙어 보였다. 칸이 정해진 뒤 글자마다 다시 셈한다(허리선을 옮겨도 보를 따라간다).
+ */
+export const ARM_DROP = 0.42
+const LEFT_ARM_MIXED = new Set([...'ㅝㅞ'])
+export function armSyllable(syllable: DecomposedSyllable, boxes: Partial<Record<Part, BoxConfig>>): DecomposedSyllable {
+  const ju = syllable.jungseong, h = boxes.JU_H, v = boxes.JU_V
+  if (!ju || !h || !v || !LEFT_ARM_MIXED.has(ju.char) || v.height < 0.05) return syllable
+  const bar = ju.horizontalStrokes?.find((stroke) => isLevel(stroke))
+  const pillars = (ju.verticalStrokes ?? []).filter((stroke) => !isLevel(stroke) && stroke.points.length >= 2)
+  const arm = ju.verticalStrokes?.find((stroke) => isLevel(stroke))
+  if (!bar || !arm || !pillars.length) return syllable
+  const barY = h.y + bar.points[0].y * h.height
+  const bottom = v.y + Math.max(...pillars.flatMap((stroke) => stroke.points.map((p) => p.y))) * v.height
+  if (bottom <= barY) return syllable
+  const y = Math.max(0.04, Math.min(0.96, (barY + ARM_DROP * (bottom - barY) - v.y) / v.height)), d = y - arm.points[0].y
+  if (Math.abs(d) < 1e-6) return syllable
+  const moved = { ...arm, points: arm.points.map((p) => ({ ...p, y: p.y + d, ...(p.handleIn ? { handleIn: { ...p.handleIn, y: p.handleIn.y + d } } : {}), ...(p.handleOut ? { handleOut: { ...p.handleOut, y: p.handleOut.y + d } } : {}) })) }
+  return { ...syllable, jungseong: { ...ju, verticalStrokes: ju.verticalStrokes!.map((stroke) => (stroke === arm ? moved : stroke)) } }
+}
+
+/**
  * 탈네모 끝 = 받침 없는 글자 키가 받침 글자의 윗덩이(첫닿자 + 홀자) 키와 같아지는 곳(하니무스 2026-11-27 카드 "연속, 끝은 윗덩이 키").
  * 값은 실제 탈네모 폰트 일곱 벌(Sunflower · Gaegu · Poor Story · Dongle · Cute Font · Hi Melody · Black And White Picture, OFL)에서 잰
  * 「받침 없는 글자 잉크 키 ÷ 같은 홀자 받침 글자 잉크 키」의 가운데값, 짜임마다 6쌍씩(가강 거건 나낭 다당 하항 기긴 / 고공 구군 노농 도동 호홍 그근 / 과광 궈권 놔놘 돠돤 화황 뭐뭔).
