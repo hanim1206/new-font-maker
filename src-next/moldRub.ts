@@ -7,14 +7,17 @@ import { LAYOUT_CONTEXT_IDS, LAYOUT_CONTEXT_LABEL, SAMPLE_BATCHES } from './revi
  * 이 파일은 값 눈금과 창 계산만(화면 없음). 화면은 `MoldRubPlate.tsx`.
  */
 
-/** 속성 여덟: 엔진 판 일곱 + 네모 ↔ 탈네모(부엉이 추천, 하니무스 "ㅇㅇ구현"). 폭 · 키는 따로(`frame` · `height`). */
-export const RUB_KEYS = ['weight', 'open', 'jamo', 'center', 'round', 'contrast', 'frame', 'height'] as const
+/**
+ * 속성 아홉: 엔진 판 일곱 + 네모 ↔ 탈네모(부엉이 추천, 하니무스 "ㅇㅇ구현") + 보정 세기(#53, 자소 사이 여유 촘촘 ↔ 여유).
+ * 폭 · 키는 따로(`frame` · `height`).
+ */
+export const RUB_KEYS = ['weight', 'open', 'jamo', 'ease', 'center', 'round', 'contrast', 'frame', 'height'] as const
 export type RubKey = (typeof RUB_KEYS)[number]
 export const RUB_ROWS = 20
 
-export const RUB_NAMES: Record<RubKey, string> = { weight: '굵기', open: '탈네모', jamo: '닿자 크기', center: '무게중심', round: '둥글기', contrast: '대비', frame: '폭', height: '키' }
+export const RUB_NAMES: Record<RubKey, string> = { weight: '굵기', open: '탈네모', jamo: '닿자 크기', ease: '보정 세기', center: '무게중심', round: '둥글기', contrast: '대비', frame: '폭', height: '키' }
 export const RUB_ENDS: Record<RubKey, readonly [string, string]> = {
-  weight: ['가늘게', '굵게'], open: ['네모', '탈네모'], jamo: ['작게', '크게'], center: ['낮게', '높게'],
+  weight: ['가늘게', '굵게'], open: ['네모', '탈네모'], jamo: ['작게', '크게'], ease: ['촘촘', '여유'], center: ['낮게', '높게'],
   round: ['각지게', '둥글게'], contrast: ['같게', '가로 가늘게'], frame: ['좁게', '넓게'], height: ['낮게', '높게'],
 }
 
@@ -54,7 +57,7 @@ export function setRub(look: Look, home: Look, key: RubKey, k: number): Look {
   return out
 }
 
-/** 주사위: 여덟 값을 칸 1~19 사이에서 아무렇게나(양 끝 벽은 피함). 출발점일 뿐 정답이 아니다. */
+/** 주사위: 아홉 값을 칸 1~19 사이에서 아무렇게나(양 끝 벽은 피함). 출발점일 뿐 정답이 아니다. */
 export function rollRub(look: Look, home: Look, random: () => number = Math.random, locks: Partial<Record<RubKey, number>> = {}): Look {
   let out = look
   for (const key of RUB_KEYS) out = setRub(out, home, key, Math.min(locks[key] ?? RUB_ROWS, 1 + Math.floor(random() * (RUB_ROWS - 1))))

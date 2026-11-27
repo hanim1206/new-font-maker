@@ -110,6 +110,13 @@ describe('흐림 선을 화면 · 파일에 같이(실험 6-앞 길 B)', () => {
     expect(out?.boxes.CH?.width).toBeGreaterThan(boxes.CH.width)
     expect(out?.boxes.JU).toEqual(boxes.JU)
   })
+  it('닿자를 줄였으면(닿자 크기 < 1) 줄이기 전 모양이 넓힐 만큼까지만 넓힌다 — 「가」 ㄱ 납작 막기', () => {
+    const strokesOn = (on: Partial<typeof boxes>) => dieut(on === boxes ? 0.5 : 0.12 + (0.5 - 0.12) * on.CH!.width / boxes.CH.width)
+    const free = haloCorrect({ syllable: syllable('ㄷ', 'ㅏ'), boxes, strokesOn, rule: { ...HALO_ENGINE, grown: 1 } })
+    const shrunk = haloCorrect({ syllable: syllable('ㄷ', 'ㅏ'), boxes, strokesOn, rule: { ...HALO_ENGINE, grown: 1 }, jamo: 0.85 })
+    expect(free!.fit!.widen).toBeGreaterThan(1)
+    expect(shrunk?.fit?.widen).toBeLessThan(free!.fit!.widen)
+  })
   it('범위 밖 글자 · 스키마로 그린 글자 · 굵은 글자는 받은 그대로', () => {
     expect(haloCorrect({ syllable: syllable('ㄲ', 'ㅏ'), boxes, strokesOn: () => [], rule: { ...HALO_ENGINE, grown: 1 } })).toBeNull()
     const style = { weight: 400, linecap: 'butt', linejoin: 'miter', strokeStyle: { mode: 'brush', brush: { tip: 'round', aspectRatio: 0.5, angle: 0 } } } as const

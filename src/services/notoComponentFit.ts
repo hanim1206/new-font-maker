@@ -1,6 +1,7 @@
 import * as polygonBoolean from './polygonBoolean'
 import type { BoxConfig, DeepReadonly, InkRegion, JamoData, MedialFamily, Part, ResolvedCenterlinePrimitive, ResolvedInkPrimitive, ResolvedInkSource, ResolvedStrokeInkSource, StrokeDataV2, StrokeRenderStyle } from '../types'
-import { strokesForFamily } from '../utils/jamoContextStrokes'
+import { hasFamilyStrokes, strokesForFamily } from '../utils/jamoContextStrokes'
+import { easeBendForFamily } from '../utils/giyeokBendEase'
 import { frameJamoOf } from '../utils/jamoFrame'
 import { getJamoRenderBox, getStrokeCenterlineBounds } from '../utils/jamoGeometry'
 import { materializeFinalGlyphInk } from './finalGlyphInk'
@@ -99,7 +100,9 @@ const EPSILON = 1e-6
 
 export function componentStrokesOf(jamo: DeepReadonly<JamoData>, channel?: ComponentFitInput['channel'], family?: MedialFamily | null): StrokeDataV2[] {
   // 리졸버(selectMixedChannel·selectGeneralChannels)와 같은 규칙: 채널이 있으면 그 채널, 없으면 문맥 계열 strokes.
-  const base = strokesForFamily(jamo, family)
+  // 첫닿자 ㄱ 무리는 리졸버처럼 벌마다 굽음을 줄인다(가른 벌은 그대로).
+  const picked = strokesForFamily(jamo, family)
+  const base = jamo.type === 'choseong' && picked && !hasFamilyStrokes(jamo, family) ? easeBendForFamily(jamo.char, picked as unknown as StrokeDataV2[], family) : picked
   const strokes = channel
     ? (jamo[channel]?.length ? jamo[channel] : base) ?? []
     : base?.length ? base : [...(jamo.verticalStrokes ?? []), ...(jamo.horizontalStrokes ?? [])]

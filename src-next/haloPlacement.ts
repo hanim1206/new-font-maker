@@ -45,7 +45,7 @@ export function haloPlacementOf(syllable: DecomposedSyllable, placement: GlyphPl
   const m = weightToMultiplier(style.weight)
   const strokesOn = (boxes: typeof placement.boxes): HaloStroke[] => resolveGlyphInkPrimitives({ syllable, placement: { kind: 'boxes', boxes }, weightMultiplier: 1, globalLinecap: style.linecap, globalLinejoin: style.linejoin, horizontalInkBounds: { min: 0, max: 1 } })
     .primitives.map((primitive) => ({ part: primitive.source.part, points: flattenStrokeCenterline(primitive.stroke as StrokeDataV2, primitive.box), thickness: primitive.stroke.thickness * m, closed: primitive.stroke.closed, cap: (primitive.stroke as StrokeDataV2).linecap ?? style.linecap, ...(thick ? { thick } : {}) }))
-  const knobs = style.halo ?? HALO_ENGINE
-  const out = haloCorrect({ syllable, boxes: placement.boxes, strokesOn, rule: { ease: knobs.ease, spread: knobs.spread, grown }, bodyRight })
+  const knobs: { ease: number; spread: number; jamo?: number } = style.halo ?? HALO_ENGINE
+  const out = haloCorrect({ syllable, boxes: placement.boxes, strokesOn, rule: { ease: knobs.ease, spread: knobs.spread, grown }, bodyRight, jamo: knobs.jamo })
   return out && out.boxes !== placement.boxes ? { kind: 'boxes', boxes: out.boxes } : placement
 }

@@ -350,6 +350,7 @@ function spreadStems(st: StackStroke[], G: number, V: number): StackStroke[] {
   return out
 }
 
+
 /** 고른 틈(em): 키 × (0.151 − 0.693 × 기둥 ÷ 키). */
 export const evenGapOf = (height: number, stem: number) => Math.max(0, height * (EVEN_GAP.base - EVEN_GAP.slope * stem / height))
 

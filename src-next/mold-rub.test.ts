@@ -3,8 +3,8 @@ import { LOOK_ENGINE } from './moldLab'
 import { edgeOver, lookToRub, rollRub, RUB_BATCHES, RUB_KEYS, rubToLook, rubView, setRub, settle, tapZoom, zoomAround } from './moldRub'
 
 describe('글자 문지르기 판', () => {
-  it('속성 여덟 · 묶음 여섯(8열 × 3행)', () => {
-    expect(RUB_KEYS).toHaveLength(8)
+  it('속성 아홉 · 묶음 여섯(8열 × 3행)', () => {
+    expect(RUB_KEYS).toHaveLength(9)
     expect(RUB_BATCHES.map((batch) => batch.name)).toHaveLength(6)
     for (const batch of RUB_BATCHES) { expect(batch.rows).toHaveLength(3); expect(batch.rows[0]).toHaveLength(8) }
   })

@@ -34,8 +34,18 @@ export interface GlobalStyle {
   halo?: HaloKnobs
 }
 
-/** 흐림 선 손잡이 둘. 여유 = 선이 기둥에 얼마나 붙나, 넓어짐 = 굵어질 때 여유가 커지는 지수. */
-export interface HaloKnobs { ease: number; spread: number }
+/**
+ * 흐림 선 손잡이. 여유 = 선이 기둥에 얼마나 붙나, 넓어짐 = 굵어질 때 여유가 커지는 지수.
+ * `jamo`(빚기 「닿자 크기」, 1 미만일 때만): 줄인 닿자는 줄이기 전 모양이 넓힐 만큼까지만 넓힌다.
+ */
+export interface HaloKnobs { ease: number; spread: number; jamo?: number }
+
+/** 흐림 선 손잡이를 고른다. 여유 · 넓어짐이 숫자가 아니면 없음, 닿자 크기는 0~1 사이일 때만 둔다. */
+function cleanHalo(value: HaloKnobs | undefined): HaloKnobs | undefined {
+  if (!value || !Number.isFinite(value.ease) || !Number.isFinite(value.spread)) return undefined
+  const jamo = value.jamo !== undefined && Number.isFinite(value.jamo) && value.jamo > 0 && value.jamo < 1 ? value.jamo : undefined
+  return { ease: value.ease, spread: value.spread, ...(jamo !== undefined ? { jamo } : {}) }
+}
 
 /** 속공간 지키기가 켜졌나. 화면 · OTF · 비교 도구가 모두 이 한 곳으로 판단한다. */
 export function isCounterKeepOn(style: Pick<GlobalStyle, 'counterKeep'> | null | undefined): boolean {
@@ -196,7 +206,8 @@ function normalizeGlobalStyle(style: GlobalStyle): GlobalStyle {
   if (style.counterKeep === true) normalized.counterKeep = true
   else delete normalized.counterKeep
   // 흐림 선 손잡이는 둘 다 수일 때만 남긴다.
-  if (style.halo && Number.isFinite(style.halo.ease) && Number.isFinite(style.halo.spread)) normalized.halo = { ease: style.halo.ease, spread: style.halo.spread }
+  const halo = cleanHalo(style.halo)
+  if (halo) normalized.halo = halo
   else delete normalized.halo
   return normalized
 }
@@ -265,7 +276,8 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
 
       setHalo: (value) =>
         set((state) => {
-          if (value && Number.isFinite(value.ease) && Number.isFinite(value.spread)) state.style.halo = { ease: value.ease, spread: value.spread }
+          const halo = cleanHalo(value)
+          if (halo) state.style.halo = halo
           else delete state.style.halo
         }),
 

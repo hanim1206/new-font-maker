@@ -24,7 +24,7 @@ import styles from './MoldLabPage.module.css'
 /** 격자 한 칸의 바탕 크기(px). 확대는 이 판을 통째로 늘린다(글자는 SVG라 흐려지지 않는다). */
 const BASE = 120
 const GLYPH = 78
-const GAP = 8
+const GAP = 0
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 interface Cam { zoom: number; x: number; y: number }
@@ -249,7 +249,7 @@ export function MoldRubPlate({ look, home, setLook, onBegin, renderGlyph, locks,
       <div className={styles.rubRead}>
         <strong data-testid="rub-name">{RUB_NAMES[key]}</strong>
         <span className={styles.rubEnds}>{RUB_ENDS[key][0]} ↔ {RUB_ENDS[key][1]}{lock !== undefined && value >= lock && lock < RUB_ROWS ? ' · 더 가면 획이 붙어요' : ''}</span>
-        <Button variant="ghost" size="icon" onClick={() => { onBegin(); t0.current = performance.now(); setLook(rollRub(lookRef.current, home, Math.random, locks)) }} aria-label="주사위 · 여덟 값 아무렇게나" data-testid="rub-dice"><Dices aria-hidden="true" /></Button>
+        <Button variant="ghost" size="icon" onClick={() => { onBegin(); t0.current = performance.now(); setLook(rollRub(lookRef.current, home, Math.random, locks)) }} aria-label="주사위 · 아홉 값 아무렇게나" data-testid="rub-dice"><Dices aria-hidden="true" /></Button>
         <output className={styles.rubValue} data-testid="rub-value">{value}</output>
       </div>
       {note && <p className={styles.rubNote} data-testid="mold-readout">{note}</p>}

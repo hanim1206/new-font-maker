@@ -3,7 +3,8 @@ import { resolveContextBoxes } from '../src/services/contextBoxResolver'
 import { mapBoxToDesignBody } from '../src/services/designBodyPlacement'
 import { layoutTypeOfSyllable } from '../src/utils/hangulUtils'
 import type { BoxConfig, JamoData, MedialFamily, Part, StrokeDataV2 } from '../src/types'
-import { medialFamilyOf, strokesForFamily, wholeJamoStrokes } from '../src/utils/jamoContextStrokes'
+import { hasFamilyStrokes, medialFamilyOf, strokesForFamily, wholeJamoStrokes } from '../src/utils/jamoContextStrokes'
+import { easeBendForFamily } from '../src/utils/giyeokBendEase'
 import { pointsToSvgD } from '../src/utils/pathUtils'
 import { effectiveLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import { corpusIdentity } from './notoCorpus'
@@ -45,7 +46,11 @@ function inkStrokesOf(ink: LayoutContextInk, contextId: string, parts: LayoutCon
   const family = familyOfContext(contextId)
   if (ink.part !== 'JU') {
     const box = boxOf(ink.part)
-    return box ? (strokesForFamily(ink.jamo, family) ?? []).map((stroke) => ({ stroke, box })) : []
+    if (!box) return []
+    const strokes = strokesForFamily(ink.jamo, family) ?? []
+    // 첫닿자 ㄱ 무리는 벌마다 굽음을 줄여 그린다(화면 · OTF와 같게). 가른 벌은 손 안 댐.
+    const shown = ink.part === 'CH' && !hasFamilyStrokes(ink.jamo, family) ? easeBendForFamily(ink.jamo.char, strokes, family) : strokes
+    return shown.map((stroke) => ({ stroke, box }))
   }
   if (medialFamilyOf(ink.jamo.char) !== family) return []
   const whole = boxOf('JU')

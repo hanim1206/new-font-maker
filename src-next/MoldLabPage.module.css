@@ -216,9 +216,7 @@
   display: grid;
   place-items: center;
   overflow: hidden;
-  border-radius: var(--radius-md);
   background: rgb(var(--color-surface));
-  box-shadow: var(--shadow-sm);
   pointer-events: none;
 }
 .rubEdge {

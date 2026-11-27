@@ -470,9 +470,10 @@ function validateStemBeak(value: unknown, path: string, issues: FontPayloadValid
 
 function validateHalo(value: unknown, path: string, issues: FontPayloadValidationIssue[]): void {
   if (!isRecord(value)) return push(issues, 'invalid-field', path, 'halo는 객체여야 합니다.')
-  exactKeys(value, ['ease', 'spread'], ['ease', 'spread'], path, issues)
+  exactKeys(value, ['ease', 'spread', 'jamo'], ['ease', 'spread'], path, issues)
   finite(value.ease, `${path}.ease`, issues)
   finite(value.spread, `${path}.spread`, issues)
+  if (value.jamo !== undefined) finite(value.jamo, `${path}.jamo`, issues)
 }
 
 function validateGlobalStyle(value: unknown, issues: FontPayloadValidationIssue[], allowLegacy: boolean): void {

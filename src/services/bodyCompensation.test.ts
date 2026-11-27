@@ -150,6 +150,11 @@ describe('폰트 데이터의 흐림 선 손잡이', () => {
     const broken = structuredClone(on) as unknown as { globalStyle: { style: Record<string, unknown> } }
     broken.globalStyle.style.halo = { ease: 0.6 }
     expect(parseAndMigrateFontData(broken).ok).toBe(false)
+    // 닿자 크기(줄였을 때만)도 같이 남는다.
+    useGlobalStyleStore.getState().setHalo({ ease: 0.6, spread: 0.89, jamo: 0.85 })
+    const shrunk = collectFontData()
+    expect(parseAndMigrateFontData(shrunk).ok).toBe(true)
+    expect(loadedGlobalStyle(shrunk.globalStyle.style).halo).toEqual({ ease: 0.6, spread: 0.89, jamo: 0.85 })
     useGlobalStyleStore.getState().setHalo(undefined)
   })
 })
