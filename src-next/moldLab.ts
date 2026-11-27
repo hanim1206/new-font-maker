@@ -1328,40 +1328,6 @@ export function dragSeam(seam: Seam, origin: Partial<Record<Part, BoxConfig>>, s
   return { edits, clamped: wall === 'hard', wall }
 }
 
-/**
- * 부위 칸을 통째로 옮기되 다른 부위와 겹치지 않게 멈춘다(가로 먼저, 다음 세로). 글자 끝(0.02~0.98)도 넘지 않는다.
- * 처음부터 겹쳐 있는 칸(섞임홀자의 첫닿자 ↔ 가로 쪽 등)은 벽으로 치지 않는다.
- */
-export function moveApart(boxes: Partial<Record<Part, BoxConfig>>, part: Part, du: number, dv: number): { du: number; dv: number } {
-  const p = boxes[part]
-  if (!p) return { du: 0, dv: 0 }
-  const others = (Object.entries(boxes) as [Part, BoxConfig][]).filter(([key, box]) => key !== part && box && editKey(key) !== editKey(part) && !(part.startsWith('JU') && key.startsWith('JU')))
-  const overlap = (a0: number, a1: number, b0: number, b1: number) => a0 < b1 - 1e-6 && b0 < a1 - 1e-6
-  const [x0, y0, x1, y1] = rectOf(p)
-  let lo = SIMS_LO - x0, hi = SIMS_HI - x1
-  for (const [, q] of others) {
-    const [qx0, qy0, qx1, qy1] = rectOf(q)
-    if (!overlap(y0, y1, qy0, qy1) || overlap(x0, x1, qx0, qx1)) continue
-    if (qx0 >= x1) hi = Math.min(hi, qx0 - x1)
-    else lo = Math.max(lo, qx1 - x0)
-  }
-  const u = Math.max(Math.min(lo, 0), Math.min(Math.max(hi, 0), du))
-  const nx0 = x0 + u, nx1 = x1 + u
-  let vlo = SIMS_LO - y0, vhi = SIMS_HI - y1
-  for (const [, q] of others) {
-    const [qx0, qy0, qx1, qy1] = rectOf(q)
-    if (!overlap(nx0, nx1, qx0, qx1) || overlap(y0, y1, qy0, qy1)) continue
-    if (qy0 >= y1) vhi = Math.min(vhi, qy0 - y1)
-    else vlo = Math.max(vlo, qy1 - y0)
-  }
-  const v = Math.max(Math.min(vlo, 0), Math.min(Math.max(vhi, 0), dv))
-  return { du: u, dv: v }
-}
-/** 부위 칸 하나를 옮긴 편집. */
-export function movePartEdit(edits: PartEdits, part: Part, du: number, dv: number): PartEdits {
-  return addEdit(addEdit(addEdit(addEdit(edits, part, 0, du), part, 1, du), part, 2, dv), part, 3, dv)
-}
-
 // ── 도트판 인상 잡기(하니무스 2026-11-21): 판 둘(틀 · 획), 값마다 0~20칸(한 칸 = 5) ──
 
 /**
@@ -1369,7 +1335,7 @@ export function movePartEdit(edits: PartEdits, part: Part, du: number, dv: numbe
  * 틀 판: 크기 · 비율 · 닿자 크기 · 탈네모 · 윗선 들쭉날쭉, 맨 끝에 무게중심. 획 판: 굵기 · 획 대비 · 둥글기 · 붓촉.
  * 폭 · 키는 비율 한 줄(`frame`)로 합쳤다. 크기가 키를, 비율이 폭을 정한다.
  */
-// 크기 · 자소 사이 여유는 판에서 뺐다(하니무스 2026-11-27 카드 "크기·여유 빼고 받침 남김"). 여유는 엔진 몫(`HALO_ENGINE`), 고딕 · 명조 시작값 고르기만 남는다.
+// 크기 · 자소 사이 여유는 판에서 뺐다(하니무스 2026-11-27 카드 "크기·여유 빼고 받침 남김"). 여유는 엔진 몫(`HALO_ENGINE`). 고딕 · 명조 시작값 고르기도 뺐다(11-27 "의미없어보임").
 export const FRAME_KEYS = ['frame', 'jamo', 'open', 'jag', 'center'] as const
 export const INK_KEYS = ['weight', 'contrast', 'round'] as const
 /** 판에 없는 값(눈금 · 이름은 남겨 둠). */

@@ -282,13 +282,6 @@ describe('보선 끌기(A안)', () => {
     const { seamsOf } = await import('./moldLab')
     expect(seamsOf('choseong-jungseong-horizontal-jongseong', HORIZONTAL_FINAL).map((s) => [s.a, s.b])).toEqual([[['CH'], ['JU']], [['JU'], ['JO']]])
   })
-  it('부위를 통째로 옮기면 다른 부위에 닿는 데서 멈춘다', async () => {
-    const { moveApart } = await import('./moldLab')
-    expect(moveApart(VERTICAL, 'CH', 0.3, 0).du).toBeCloseTo(0.1)
-    expect(moveApart(VERTICAL, 'CH', -0.3, 0).du).toBeCloseTo(-0.08)
-    const down = moveApart(HORIZONTAL_FINAL, 'CH', 0, 0.2)
-    expect(down.dv).toBeCloseTo(0.03)
-  })
 })
 
 describe('도트판 인상 잡기', () => {

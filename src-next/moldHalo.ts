@@ -46,11 +46,6 @@ export const HALO_SCALE = {
  * 넓어짐은 고딕 가운데. 노토 숫자가 아니라 이 엔진 글자에서 잰 값이다.
  */
 export const HALO_ENGINE = { ease: 0.78, spread: 0.42 } as const
-/** 고딕 · 명조 시작값(그 집안 폰트의 가운데). */
-export const HALO_PRESETS = {
-  gothic: { ease: 0.66, spread: 0.42 }, // 고딕 A1 · 나눔고딕 · 고운돋움 · IBM 플렉스
-  myeongjo: { ease: 0.6, spread: 0.89 }, // 나눔명조 · 고운바탕
-} as const
 /**
  * 빗나감 폭(글자 키의 몫): 보통 굵기 폰트 넷이 제 선에서 빗나간 양(ㅏ 14자 평균)의 가운데 —
  * IBM 플렉스 0.89 · 고딕 A1 1.34 · 고운돋움 1.58 · 나눔고딕 2.15%(거북이 설계 0절 표). 이 안이면 고치지 않는다.
