@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { DecomposedSyllable } from '../src/types'
-import { FINAL_TOLERANCE, HALO_END_GAP, HALO_ENGINE, HALO_TOLERANCE, haloFinalFit, haloFit, haloScope, haloStemOf, type HaloStroke } from './moldHalo'
+import { FINAL_TOLERANCE, HALO_END_GAP, HALO_ENGINE, HALO_TOLERANCE, haloCorrect, haloFinalFit, haloFit, haloScope, haloStemOf, type HaloStroke } from './moldHalo'
+import { haloGrownOf, haloPlacementOf } from './haloPlacement'
 
 const syllable = (initial: string, medial: string, final?: string, layoutType = final ? 'choseong-jungseong-vertical-jongseong' : 'choseong-jungseong-vertical') =>
   ({ char: '', layoutType, choseong: { char: initial }, jungseong: { char: medial }, jongseong: final ? { char: final } : null }) as unknown as DecomposedSyllable
@@ -98,5 +99,32 @@ describe('받침 위 흐림 선(셋째 방향)', () => {
 
   it('받침이 없으면 재지 않는다', () => {
     expect(haloFinalFit(gan(0.6).filter((s) => s.part !== 'JO'))).toBeNull()
+  })
+})
+
+describe('흐림 선을 화면 · 파일에 같이(실험 6-앞 길 B)', () => {
+  const boxes = { CH: { x: 0.05, y: 0.1, width: 0.5, height: 0.7 }, JU: { x: 0.6, y: 0, width: 0.35, height: 1 } }
+  it('넓힐 자리가 남은 「다」는 첫닿자 칸만 왼변을 두고 넓힌다', () => {
+    const out = haloCorrect({ syllable: syllable('ㄷ', 'ㅏ'), boxes, strokesOn: (on) => dieut(on === boxes ? 0.42 : 0.12 + (0.42 - 0.12) * on.CH!.width / boxes.CH.width), rule: { ...HALO_ENGINE, grown: 1 } })
+    expect(out?.fit?.widen).toBeGreaterThan(1)
+    expect(out?.boxes.CH?.width).toBeGreaterThan(boxes.CH.width)
+    expect(out?.boxes.JU).toEqual(boxes.JU)
+  })
+  it('닿자를 줄였으면(닿자 크기 < 1) 줄이기 전 모양이 넓힐 만큼까지만 넓힌다 — 「가」 ㄱ 납작 막기', () => {
+    const strokesOn = (on: Partial<typeof boxes>) => dieut(on === boxes ? 0.5 : 0.12 + (0.5 - 0.12) * on.CH!.width / boxes.CH.width)
+    const free = haloCorrect({ syllable: syllable('ㄷ', 'ㅏ'), boxes, strokesOn, rule: { ...HALO_ENGINE, grown: 1 } })
+    const shrunk = haloCorrect({ syllable: syllable('ㄷ', 'ㅏ'), boxes, strokesOn, rule: { ...HALO_ENGINE, grown: 1 }, jamo: 0.85 })
+    expect(free!.fit!.widen).toBeGreaterThan(1)
+    expect(shrunk?.fit?.widen).toBeLessThan(free!.fit!.widen)
+  })
+  it('범위 밖 글자 · 스키마로 그린 글자 · 굵은 글자는 받은 그대로', () => {
+    expect(haloCorrect({ syllable: syllable('ㄲ', 'ㅏ'), boxes, strokesOn: () => [], rule: { ...HALO_ENGINE, grown: 1 } })).toBeNull()
+    const style = { weight: 400, linecap: 'butt', linejoin: 'miter', strokeStyle: { mode: 'brush', brush: { tip: 'round', aspectRatio: 0.5, angle: 0 } } } as const
+    const schema = { kind: 'schema', schema: {} } as never
+    expect(haloPlacementOf(syllable('ㄷ', 'ㅏ'), schema, style)).toBe(schema)
+    expect(haloGrownOf(style)).toBeCloseTo(1, 6)
+    const heavy = { kind: 'boxes', boxes } as const
+    expect(haloGrownOf({ ...style, weight: 700 })).toBeGreaterThan(1.02)
+    expect(haloPlacementOf(syllable('ㄷ', 'ㅏ'), heavy, { ...style, weight: 700 })).toBe(heavy)
   })
 })
