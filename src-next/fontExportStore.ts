@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { identityOfSyllable } from '../src/services/contextBoxResolver'
+import { resolveEffectiveStyle, useGlobalStyleStore } from '../src/stores/globalStyleStore'
 import type { GlyphPlacementResolver } from '../src/services/fontExportUtils'
 import { EXPORT_SIMPLIFY_EPSILON } from '../src/services/contourSimplify'
 import { collectFontData } from '../src/services/fontDataBridge'
@@ -14,6 +15,7 @@ import { readStamp } from './accountFont'
 import { accountFontName, nextExportRevision } from './accountFontSync'
 import { effectiveLayoutDelta, layoutDeltaSnapshot } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
+import { haloPlacementOf } from './haloPlacement'
 import { contextPlacementOf, loadNotoModel } from './notoModel'
 import type { NotoPresetModelBundle } from './notoPresetGlyphs'
 import { navigate } from './router'
@@ -74,7 +76,10 @@ export interface LastExport {
 export function placementResolverOf(bundle: NotoPresetModelBundle, deltas: LayoutDeltaSnapshot): GlyphPlacementResolver {
   return (syllable, schema, ends) => {
     const identity = identityOfSyllable(syllable)
-    return contextPlacementOf({ bundle, identity, syllable, schema, ends, delta: effectiveLayoutDelta(deltas, identity) }).placement
+    const { placement } = contextPlacementOf({ bundle, identity, syllable, schema, ends, delta: effectiveLayoutDelta(deltas, identity) })
+    // 흐림 선(실험 6-앞 길 B): 써 넣은 칸 위에 글자마다 다시 센다. 화면(`AppGlyph`)도 같은 함수.
+    const { style, exclusions } = useGlobalStyleStore.getState()
+    return haloPlacementOf(syllable, placement, resolveEffectiveStyle(style, exclusions, syllable.layoutType, schema.padding), 1 - (schema.padding?.right ?? 0))
   }
 }
 

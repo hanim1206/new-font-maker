@@ -10,6 +10,9 @@ import { NoticeIcon } from './components/ui/notice-icon'
 import { Pressable } from './components/ui/pressable'
 import { Field, RangeBar } from './components/ui/range'
 import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs'
+import { WheelPicker } from './components/ui/wheel-picker'
+import { TickTape } from './components/ui/tick-tape'
+import { PagerBar } from './components/ui/pager-bar'
 import { RangeTicks } from './RangeTicks'
 
 /**
@@ -35,6 +38,7 @@ export const LIBRARY_GROUPS: LibraryGroup[] = [
   { id: 'checkbox', label: '체크', section: '부품', note: '켬 · 끔.' },
   { id: 'switch', label: '스위치', section: '부품', note: '켬 · 끔 토글(iOS 크기).' },
   { id: 'notice', label: '알림', section: '부품', note: '화면 아래 알림과 저장 토스트.' },
+  { id: 'rub', label: '문지르기', section: '부품', note: '글자 문지르기 판(빚기 인상 잡기)의 세로 휠 · 눈금 섬 · 묶음 좌우 단추.' },
   { id: 'pressable', label: '누르는 덩어리', section: '부품', note: '카드 · 글자 칸 · 목록 줄 · 특수 단추. 공용 생김새 없이 화면 CSS가 그린다 — 통일 후보.' },
 ]
 
@@ -195,6 +199,25 @@ function DemoNotice({ card }: { card: boolean }) {
     </div>
 }
 
+
+const DEMO_KEYS = ['굵기', '탈네모', '닿자 크기', '무게중심', '둥글기', '대비', '폭', '키']
+function DemoWheel() {
+  const [at, setAt] = useState(0)
+  return <div className="h-[220px] w-24 rounded-md bg-surface shadow-sm"><WheelPicker items={DEMO_KEYS.map((name, i) => ({ id: `demo-${i}`, label: name, detail: [10, 6, 10, 10, 4, 6, 10, 10][i] }))} value={at} onValueChange={setAt} aria-label="속성 고르기" /></div>
+}
+function DemoTape() {
+  const [value, setValue] = useState(10)
+  return <div className="flex w-[320px] flex-col gap-2">
+    <TickTape value={value} max={20} onValueChange={setValue} label="굵기 값" />
+    <TickTape value={14} max={20} lock={14} onValueChange={() => {}} label="잠긴 눈금" />
+  </div>
+}
+function DemoPager() {
+  const [at, setAt] = useState(0)
+  const names = ['오른쪽 홀자', '오른쪽 홀자 · 받침', '아래 홀자', '아래 홀자 · 받침', '섞임 홀자', '섞임 홀자 · 받침']
+  return <PagerBar className="w-[300px]" index={at} count={names.length} label={names[at]} onPrev={() => setAt(at - 1)} onNext={() => setAt(at + 1)} />
+}
+
 export function libraryItems(): LibraryItem[] {
   const items: LibraryItem[] = [
     { id: 'color.semantic', group: '색', title: '의미 색', note: '화면은 이 층만 쓴다. 테마가 바꾸는 층. 앞쪽이 shadcn 표준 이름.', story: () => <Swatches names={SEMANTIC} /> },
@@ -246,6 +269,9 @@ export function libraryItems(): LibraryItem[] {
     { id: 'checkbox.primary', group: '체크', title: '주색 체크', note: 'shadcn 기본 체크. 지금 앱 화면에서는 안 쓴다.', selector: '[data-slot="checkbox"][data-tone="primary"]', screens: [], story: () => <DemoCheckbox tone="primary" /> },
     { id: 'notice.bar', group: '알림', title: '어두운 막대(단추 하나)', note: '토스식. 왼쪽 동그라미 아이콘, 파란 글자 단추. 오류도 바탕은 그대로 아이콘만 빨강. 저장 토스트도 같은 막대.', selector: '[data-testid="app-notice"]', screens: [{ name: '대시보드에 띄우기', route: '/dashboard', show: 'notice-bar' }], story: () => <DemoNotice card={false} /> },
     { id: 'notice.card', group: '알림', title: '흰 카드(단추 둘)', note: '하단 드로어를 줄인 카드. 큰 단추 검정 · 회색.', selector: '[data-testid="app-notice"]', screens: [{ name: '대시보드에 띄우기', route: '/dashboard', show: 'notice-card' }], story: () => <DemoNotice card /> },
+    { id: 'rub.wheel', group: '문지르기', title: '세로 휠', note: '속성 고르기. 굴리면 칸에 앉고 고른 줄이 맨 위 자리에 선다. 이름 밑에 값. 줄을 눌러도 그 줄로.', selector: '[data-slot="wheel-picker"]', screens: [{ name: '빚기 · 인상 잡기', route: '/mold-lab', hint: '`2 인상 잡기`를 누른다' }], story: () => <DemoWheel /> },
+    { id: 'rub.tape', group: '문지르기', title: '눈금 섬', note: '값 바꾸기. 바늘은 서 있고 눈금이 손 따라 간다(한 칸 16px, 손 10px에 한 칸). 놓으면 칸에 앉는다. 잠긴 칸은 옅게.', selector: '[data-slot="tick-tape"]', screens: [{ name: '빚기 · 인상 잡기', route: '/mold-lab', hint: '`2 인상 잡기`를 누른다' }], story: () => <DemoTape /> },
+    { id: 'rub.pager', group: '문지르기', title: '묶음 좌우 단추', note: '이름 가운데, 옆에 몇째. 끝이면 그쪽 단추가 꺼진다.', selector: '[data-slot="pager-bar"]', screens: [{ name: '빚기 · 인상 잡기', route: '/mold-lab', hint: '`2 인상 잡기`를 누른다' }], story: () => <DemoPager /> },
     { id: 'pressable.block', group: '누르는 덩어리', title: 'Pressable', note: '브라우저 단추 생김새만 지운 것. 모양은 쓰는 화면의 CSS가 토큰으로 그린다. 대시보드 카드 · 자모 칸 · 도구 줄 · 문장 글자 등 140곳쯤.', selector: '[data-slot="pressable"]', screens: [{ name: '대시보드', route: '/dashboard' }, { name: '자소', route: '/workspace/jamo' }], story: () => <Samples items={[
       { label: '예: 자모 칸(대시보드)', node: <Pressable className="grid size-16 place-items-center rounded-lg bg-surface-2 text-28">ㄱ</Pressable> },
       { label: '예: 목록 줄', node: <Pressable className="w-56 rounded-md px-3 py-2 text-left text-14 hover:bg-surface-2">내 폰트 2</Pressable> },
@@ -267,6 +293,9 @@ export function itemIdsOfElement(element: Element | null): string[] {
   if (kind === 'range-bar' || kind === 'field') return ['range.field']
   if (kind === 'checkbox') return [`checkbox.${slot.getAttribute('data-tone') ?? 'primary'}`]
   if (kind === 'switch') return ['switch.primary']
+  if (kind === 'wheel-picker') return ['rub.wheel']
+  if (kind === 'tick-tape') return ['rub.tape']
+  if (kind === 'pager-bar') return ['rub.pager']
   if (kind === 'pressable') {
     // 알림 막대 안의 글자 단추는 알림으로 본다.
     const notice = slot.closest('[data-testid="app-notice"]')

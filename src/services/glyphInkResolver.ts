@@ -14,7 +14,8 @@ import type {
 import { resolveSyllableContextualInkSafety } from '../utils/contextualInkSafety'
 import { getJamoRenderBox } from '../utils/jamoGeometry'
 import { calculateBoxes } from '../utils/layoutCalculator'
-import { familyOfSyllable, strokesForFamily } from '../utils/jamoContextStrokes'
+import { familyOfSyllable, hasFamilyStrokes, strokesForFamily } from '../utils/jamoContextStrokes'
+import { easeBendForFamily } from '../utils/giyeokBendEase'
 import { counterKeepStrokeFactors, jamoOfPart } from './counterKeep'
 import { placeStemStroke } from './stemBend'
 
@@ -103,6 +104,23 @@ function selectGeneralChannels(jamo: JamoData, family: MedialFamily | null): Sel
   return { jamo, strokes: sources.map(({ stroke }) => stroke), sources }
 }
 
+/** 첫닿자 ㄱ 무리: 아래 · 섞임 벌에서 내림 굽음을 엔진이 줄인다(`giyeokBendEase.ts`). 사용자가 그 벌을 갈라 그렸으면 손 안 댐. */
+function easedChoseong(selected: SelectedPartStrokes, syllable: DecomposedSyllable, input: ResolveGlyphInkInput): SelectedPartStrokes {
+  // 홀자를 뺀 채 첫닿자만 그리는 곳(빚기 굵을 때 겹 그리기)도 있다 — 홀자가 없으면 짜임으로 벌을 읽는다.
+  const family = familyOfSyllable(syllable) ?? familyOfLayout(syllable.layoutType)
+  if (hasFamilyStrokes(selected.jamo, family)) return selected
+  const strokes = easeBendForFamily(selected.jamo.char, selected.strokes, family, input.bendEase ?? undefined)
+  if (strokes === selected.strokes) return selected
+  return { jamo: selected.jamo, strokes, sources: strokes.map((stroke, index) => ({ stroke, channel: selected.sources[index].channel })) }
+}
+
+function familyOfLayout(layoutType: DecomposedSyllable['layoutType']): MedialFamily | null {
+  if (layoutType.startsWith('choseong-jungseong-mixed')) return 'mixed'
+  if (layoutType.startsWith('choseong-jungseong-horizontal')) return 'bottom'
+  if (layoutType.startsWith('choseong-jungseong-vertical')) return 'right'
+  return null
+}
+
 function selectPartStrokes(
   part: Part,
   syllable: DecomposedSyllable,
@@ -141,8 +159,9 @@ function resolvePartPrimitives(
   input: ResolveGlyphInkInput,
 ): ResolvedCenterlinePrimitive<ResolvedStrokeInkSource>[] {
   const rawBox = boxes[part]
-  const selected = selectPartStrokes(part, syllable)
-  if (!rawBox || !selected) return []
+  const picked = selectPartStrokes(part, syllable)
+  if (!rawBox || !picked) return []
+  const selected = part === 'CH' ? easedChoseong(picked, syllable, input) : picked
 
   const box = getJamoRenderBox(
     selected.jamo,
