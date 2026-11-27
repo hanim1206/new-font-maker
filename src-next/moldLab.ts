@@ -951,10 +951,12 @@ export function waistSyllable(syllable: DecomposedSyllable, lift: number, boxes:
 
 /**
  * 탈네모 끝 = 받침 없는 글자 키가 받침 글자의 윗덩이(첫닿자 + 홀자) 키와 같아지는 곳(하니무스 2026-11-27 카드 "연속, 끝은 윗덩이 키").
- * 값은 짜임마다 엔진(노토 모델 칸)에서 잰 「받침 글자 윗덩이 키 ÷ 받침 없는 글자 키」 가운데값, 8쌍씩
- * (가각 다달 나난 사산 하한 거걱 마맘 기길 / 고곡 모몸 노논 두둔 수숨 그극 보봄 로롤 / 과광 괴괸 워원 뭐뭔 의읜 좌좍 화활 귀귄).
+ * 값은 실제 탈네모 폰트 일곱 벌(Sunflower · Gaegu · Poor Story · Dongle · Cute Font · Hi Melody · Black And White Picture, OFL)에서 잰
+ * 「받침 없는 글자 잉크 키 ÷ 같은 홀자 받침 글자 잉크 키」의 가운데값, 짜임마다 6쌍씩(가강 거건 나낭 다당 하항 기긴 / 고공 구군 노농 도동 호홍 그근 / 과광 궈권 놔놘 돠돤 화황 뭐뭔).
+ * 처음엔 엔진의 윗덩이 키(오른 0.59)로 잡았는데, 실제 탈네모는 오른 · 아래가 거의 같고(가 ≈ 고) 섞임(궈)만 길다(하니무스 2026-11-27 "원래 탈네모에선 어케하는데").
+ * 폰트마다 흩어짐: 오른 0.59~0.78, 아래 0.53~0.81, 섞임 0.61~0.79. 재는 스크립트 study/auto-correction-plan/2-가-전파/tal.py.
  */
-export const OPEN_END = { right: 0.59, bottom: 0.67, mixed: 0.73 } as const
+export const OPEN_END = { right: 0.64, bottom: 0.65, mixed: 0.73 } as const
 
 /**
  * 판 값 `open`(1 = 네모, `LOOK_WALL.open[0]` = 탈네모 끝)을 이 짜임의 실제 세로 배율로. 받침 있는 짜임은 1.
