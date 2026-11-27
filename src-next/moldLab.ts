@@ -488,10 +488,9 @@ export type LayoutEdits = Partial<Record<LayoutType, PartEdits>>
 /**
  * 전체 값. 도트판 인상 잡기(하니무스 2026-11-21)가 다섯 값을 더 쓴다:
  * jamo = 닿자(첫닿자 · 받침) 크기 배율(제 칸 가운데를 붙든 채 가로세로 같이), center = 무게중심(+ 위로, 글자 단위),
- * balloon = 풍선 닿자의 획 사이 최소 틈(em, 사용자가 고름),
  * round = 끝 · 모서리 둥글기(0~1, 붓 둥글기), contrast = 획 대비(0~1, + 는 세로 굵게 · 가로 가늘게).
  */
-export interface Look { weight?: number; /** 저장소에 써 넣은 굵기(그 당김은 이미 저장된 칸에 들어 있다). 사용자 값 아님. */ weightBase?: number; soft?: number; frame?: number; tracking?: number; size?: number; height?: number; jamo?: number; center?: number; round?: number; contrast?: number; balloon?: number; open?: number; branch?: number; serif?: number; nib?: number; jag?: number; bendGidung?: number; bendGyeot?: number; bendJjal?: number; bendBo?: number; bendGeol?: number; gapGyeot?: number; /** 자소 사이 여유(흐림 선, `moldHalo.ts`). */ ease?: number; /** 굵어질 때 넓어짐 지수(흐림 선). */ spread?: number }
+export interface Look { weight?: number; /** 저장소에 써 넣은 굵기(그 당김은 이미 저장된 칸에 들어 있다). 사용자 값 아님. */ weightBase?: number; frame?: number; tracking?: number; size?: number; height?: number; jamo?: number; center?: number; round?: number; contrast?: number; open?: number; branch?: number; serif?: number; nib?: number; jag?: number; bendGidung?: number; bendGyeot?: number; bendJjal?: number; bendBo?: number; bendGeol?: number; gapGyeot?: number; /** 자소 사이 여유(흐림 선, `moldHalo.ts`). */ ease?: number; /** 굵어질 때 넓어짐 지수(흐림 선). */ spread?: number }
 export type Dir = 'up' | 'down' | 'left' | 'right' | 'ul' | 'ur' | 'dl' | 'dr'
 export interface RegionLabels { name: string; up: string; down: string; left: string; right: string }
 
@@ -548,8 +547,8 @@ export const BLACK_CENTER = BLACK_TOTAL / BLACK_STEM_GAIN
 export const HEAVY_TOP = weightRatioOfThickness(BLACK_RATIO)
 /** 굵어진 몫 가운데 가로줄기가 받는 비율. 굵은 폰트는 가로를 덜 굵게 한다(검은고딕 가로 ÷ 세로 0.79, 노토 900 0.96). */
 export const HEAVY_HORIZONTAL_SHARE = 0.8
-export const LOOK_WALL = { weight: [0.25, HEAVY_TOP], weightBase: [0.25, HEAVY_TOP], soft: [0, 1], frame: [0.74, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09], ease: [HALO_SCALE.ease[0], Math.max(HALO_SCALE.ease[2], HALO_ENGINE.ease)], spread: [HALO_SCALE.spread[0], HALO_SCALE.spread[2]], ...STEM_WALL } as const
-export const LOOK_ENGINE = { weight: 1, weightBase: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.04, open: 1, branch: 1, serif: 0, nib: 0, jag: 0.027, ease: HALO_ENGINE.ease, spread: HALO_ENGINE.spread, ...STEM_ENGINE } as const
+export const LOOK_WALL = { weight: [0.25, HEAVY_TOP], weightBase: [0.25, HEAVY_TOP], frame: [0.74, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09], ease: [HALO_SCALE.ease[0], Math.max(HALO_SCALE.ease[2], HALO_ENGINE.ease)], spread: [HALO_SCALE.spread[0], HALO_SCALE.spread[2]], ...STEM_WALL } as const
+export const LOOK_ENGINE = { weight: 1, weightBase: 1, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, open: 1, branch: 1, serif: 0, nib: 0, jag: 0.027, ease: HALO_ENGINE.ease, spread: HALO_ENGINE.spread, ...STEM_ENGINE } as const
 const clampLook = (key: keyof typeof LOOK_WALL, value: number) => Math.max(LOOK_WALL[key][0], Math.min(LOOK_WALL[key][1], value))
 export const lookOf = (look: Look, key: keyof Look): number => {
   const value = look[key]
@@ -1242,13 +1241,6 @@ export function dragWhole(start: Look, body: Rect, grip: WholeGrip, du: number, 
   return { ...start, height: clampLook('height', lookOf(start, 'height') * (halfH + wy) / halfH) }
 }
 
-/** 획 · 전체를 끈 결과. du · dv는 글자 단위(위로 끌면 dv < 0). */
-export function dragLook(start: Look, region: 'STROKE' | 'WHOLE', du: number, dv: number): Look {
-  // 굵기 폭이 넓어져(100~900) 같은 손 거리에 더 많이 바뀐다.
-  if (region === 'STROKE') return { ...start, weight: clampLook('weight', lookOf(start, 'weight') * Math.exp(-dv * 2.4)), soft: clampLook('soft', lookOf(start, 'soft') + du * 2.5) }
-  // 전체: 네모꼴 밖에서 좌우로 끌면 자간. 키 · 폭 · 크기는 네모꼴 손잡이(`dragWhole`).
-  return { ...start, tracking: clampLook('tracking', lookOf(start, 'tracking') + du * 0.3) }
-}
 
 /**
  * 실제로 쓰는 굵기 배율. 틈 바닥은 사용자가 굵게 할 때만 멈추는 데 쓴다.
@@ -1506,10 +1498,6 @@ export function nibBrush(nib: number): { tip: 'ellipse'; aspectRatio: number; an
 
 // ── 풍선 닿자(하니무스 2026-11-21): 닿자가 커지다 옆 획에 닿을 만큼 가까워지면 서로 밀어내 최소 틈을 지킨다 ──
 
-/** 획 사이 최소 틈(em) 고르기. 사용자가 정한다. */
-// 눈으로 차이가 보이게 벌린다(다람쥐 세 번째 맞추기: 0.01 · 0.025 · 0.045는 거의 같아 보임).
-export const BALLOON_GAPS = { narrow: 0.012, normal: 0.04, wide: 0.08 } as const
-export type BalloonGap = keyof typeof BALLOON_GAPS
 type PairKey = 'CH-JU' | 'JU-JO' | 'CH-JO'
 type Near = { gap: number; dx: number; dy: number }
 

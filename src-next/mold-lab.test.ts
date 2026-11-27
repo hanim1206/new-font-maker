@@ -193,12 +193,6 @@ describe('심즈처럼 빚기', () => {
     expect(regionLabels('JU', vertical).left).toBe('기둥 왼쪽으로')
     expect(regionLabels('JU', 'choseong-jungseong-horizontal').up).toBe('보 위로')
   })
-  it('획 · 전체는 한계선 밖으로 안 나간다', async () => {
-    const { dragLook, LOOK_WALL } = await import('./moldLab')
-    expect(dragLook({}, 'STROKE', 0, -5).weight).toBe(LOOK_WALL.weight[1])
-    expect(dragLook({}, 'STROKE', 0, 5).weight).toBe(LOOK_WALL.weight[0])
-    expect(dragLook({}, 'WHOLE', 5, 0).tracking).toBe(LOOK_WALL.tracking[1])
-  })
   it('굵기 벽은 엔진 굵기 100부터, 위 끝은 900(노토 700 수준 두께 × 1.15, 하니무스 2026-11-24 "900으로 가기로 해.")', async () => {
     const { LOOK_WALL, scaledWeight, heavyThicknessOf, BLACK_RATIO, BLACK_CENTER } = await import('./moldLab')
     expect(scaledWeight(400, LOOK_WALL.weight[0])).toBe(100)
