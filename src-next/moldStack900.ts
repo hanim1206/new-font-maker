@@ -435,9 +435,9 @@ function runDist(a: Run, b: Run): number {
 type Face = { a: number; b: number; white: number; cut: number; half: number; want: number; inner: boolean }
 /**
  * 한 닿자 안의 속(ㅂ · ㅁ · ㄹ처럼 같은 획의 두 줄기 사이, ㅃ · ㅆ처럼 같은 닿자 두 획 사이)은 고른 틈의 이만큼까지 좁아져도 된다
- * (하니무스 2026-11-27 「뻐에서 ㅃ 속공간 더 작게 해도 될 듯」, 「ㅂ랑 ㅂ 사이 너무 두꺼워. 그것도 최소값대로」). 다른 자소 사이 · 홀자 안(ㅐ)은 고른 틈 그대로. 0.6은 눈으로 고른 값(가설) — 재서 정한 것 아님.
+ * (하니무스 2026-11-27 「뻐에서 ㅃ 속공간 더 작게 해도 될 듯」, 「ㅂ랑 ㅂ 사이 너무 두꺼워. 그것도 최소값대로」). 다른 자소 사이 · 홀자 안(ㅐ)은 고른 틈 그대로. 0.7은 눈으로 고른 값(가설, 하니무스 「속공간 조오오금만 늘면?」으로 0.6에서) — 재서 정한 것 아님.
  */
-export const INNER_COUNTER = 0.6
+export const INNER_COUNTER = 0.7
 /** 마주 선 줄기 쌍마다 가장 좁은 가로 흰 틈. `joined`(처음 그림에서 이어진 쌍 — ㅅ 꼭짓점 · ㅂ 모서리)은 뺀다. */
 function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yieldV: Partial<Record<StackGroup, number>>, joined: Set<string>, G: number): Face[] {
   const out: Face[] = []
