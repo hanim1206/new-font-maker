@@ -990,7 +990,13 @@ function openBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: number, layout
   const map = (y: number) => (y <= cut ? top + (y - top) * a : top + (cut - top) * a + (y - cut) * b)
   const out: Partial<Record<Part, BoxConfig>> = {}
   // 바닥만 올라간다 — 폭은 그대로(하니무스 2026-11-22 "받침을 위로 올리면 바닥면만 위로 올라가야지 왜 … 오른쪽에서 왼쪽으로도 줄어드는지").
-  for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) if (box) { const y = map(box.y); out[part] = { ...box, y, height: map(box.y + box.height) - y } }
+  // 세로 짜임은 홀자 기둥만 짧아지고 첫닿자는 √배만 누른다. 통째로 누르면 「저」 ㅈ · 「깨」 ㄲ이 납작해졌다(다람쥐 모순 8). 실제 탈네모 폰트도 닿자 꼴은 남기고 기둥이 짧다.
+  const chK = ch ? Math.min(Math.sqrt(open), open * span / Math.max(1e-6, ch.y + ch.height - top)) : 1
+  const chMap = ch && isVertical(layout) ? (y: number) => top + (y - top) * chK : null
+  for (const [part, box] of Object.entries(boxes) as [Part, BoxConfig][]) if (box) {
+    const m = part === 'CH' && chMap ? chMap : map
+    const y = m(box.y); out[part] = { ...box, y, height: m(box.y + box.height) - y }
+  }
   return out
 }
 

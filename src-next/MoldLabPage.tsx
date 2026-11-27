@@ -1002,6 +1002,8 @@ function SimsStep({ char, drawn, edits, setEdits, look, weightCap, stackHeight, 
   // ── 선 만들기(지금 값으로. 끌기는 잡은 때의 값에서 셈한다) ──
   const lines: GuideLine[] = []
   {
+    // 선은 틀 값(닿자 크기 · 탈네모 · 윗선 …)까지 입힌 칸 위에 그린다. 부위 값만 입힌 칸에 그리면 닿자 작게 + 탈네모에서 선이 ㅏ 기둥 위에 떴다(다람쥐 모순 6).
+    const lookedNow = moldedBoxes(origin, layout, edits, look, char), lookedOrigin = moldedBoxes(origin, layout, {}, look, char)
     seamsOf(layout, origin).forEach((seam, i) => {
       const v = seam.axis === 'v', scale = v ? sx : sy, t = v ? tx : ty
       const startEdits = edits[layout] ?? {}
@@ -1009,7 +1011,7 @@ function SimsStep({ char, drawn, edits, setEdits, look, weightCap, stackHeight, 
       const [lo, hi] = seamRange(seam, origin, now, SEAM_HARD_FLOOR)
       const color = seam.b.includes('JO') ? SLOT_COLOR.JO : SLOT_COLOR.JU
       lines.push({
-        id: `seam${i}`, axis: seam.axis, pos: t(pre), color, end: 'end', lo: t(pre + lo), hi: t(pre + hi), origin: t(seamPos(seam, origin)), parts: [...seam.a, ...seam.b], scale,
+        id: `seam${i}`, axis: seam.axis, pos: seamPos(seam, lookedNow), color, end: 'end', lo: seamPos(seam, lookedNow) + (t(pre + lo) - t(pre)), hi: seamPos(seam, lookedNow) + (t(pre + hi) - t(pre)), origin: seamPos(seam, lookedOrigin), parts: [...seam.a, ...seam.b], scale,
         drag: (d) => {
           // 넘어가도 획이 서로 겹치기 전에서 멈춘다(하니무스 2026-11-21 "당긴다": 「가」가 「기」로 보이면 안 됨). 처음부터 겹친 쌍은 더 겹치지만 않게.
           const want = d / scale, out = dragSeam(seam, origin, startEdits, want)
@@ -1044,7 +1046,7 @@ function SimsStep({ char, drawn, edits, setEdits, look, weightCap, stackHeight, 
   const handleAt = (line: GuideLine) => line.axis === 'h' ? { x: stageW - HANDLE.long / 2 - 4, y: px(line.pos) } : { x: px(line.pos), y: line.end === 'start' ? HANDLE.long / 2 + 4 : stageW - RULER - HANDLE.long / 2 - 4 }
   const partAt = (x: number, y: number): Part | null => {
     const u = (x - off) / STAGE, v = (y - off) / STAGE
-    const shownBoxes = placement.kind === 'boxes' ? moldedBoxes(placement.boxes, layout, edits, look) : {}
+    const shownBoxes = placement.kind === 'boxes' ? moldedBoxes(placement.boxes, layout, edits, look, char) : {}
     let best: { part: Part; d: number } | null = null
     for (const part of ALL_PARTS) {
       const b = shownBoxes[part]
@@ -1523,7 +1525,7 @@ export function MoldLabPage() {
         <ChoiceGroup variant="segment" aria-label="줄기 고르기" className={styles.plates} data-testid="mold-stem-picks">
           {STEM_PICKS.map((base) => <ChoiceItem key={base} checked={stemPick === base} onClick={() => setStemPick(base)} data-testid={`mold-stem-${base}`}>{STEM_TUNE[base].name}</ChoiceItem>)}
         </ChoiceGroup>
-        {[...stemBarsOf(stemPick), { key: 'serif' as const, name: '부리' }].map((bar) => {
+        {[...stemBarsOf(stemPick), { key: 'serif' as const, name: '부리 · 미리보기만' }].map((bar) => {
           const [lo, hi] = LOOK_WALL[bar.key], value = lookOf(look, bar.key), pct = Math.round((value - lo) / (hi - lo) * 100)
           return <Field key={bar.key} label={bar.name} value={pct}>
             <RangeBar min={0} max={100} value={pct} onPointerDown={remember} onKeyDown={remember} onChange={(event) => setLook({ ...look, [bar.key]: lo + (hi - lo) * Number(event.currentTarget.value) / 100 })} aria-label={`${bar.key === 'serif' ? '' : `${STEM_TUNE[stemPick].name} `}${bar.name}`} data-testid={`stroke-${bar.key}`} />
