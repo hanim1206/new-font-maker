@@ -310,7 +310,8 @@ function narrowRound(st: StackStroke[], jamo: { cho: string; jung: string; jong:
 }
 /** ㅃ 두 ㅂ 사이 = 고른 틈. 바깥 끝은 두고 안쪽 끝만 물린다(규칙 13, 판 23 셋째 칸). */
 function splitDouble(st: StackStroke[], cho: string, want: number, thick: StackThick): StackStroke[] {
-  if (cho !== 'ㅃ') return st
+  // ㅃ만 보다가 ㄲ · ㄸ · ㅆ · ㅉ도(첫닿자가 양보해 좁아지면 두 짝이 붙었다, 다람쥐 모순 3).
+  if (!'ㄲㄸㅃㅆㅉ'.includes(cho)) return st
   const ch = st.map((s, i) => s.part === 'CH' ? i : -1).filter((i) => i >= 0)
   const xs = ch.flatMap((i) => st[i].points.map((p) => p.x)), mid = (Math.min(...xs) + Math.max(...xs)) / 2
   const L = ch.filter((i) => st[i].points.reduce((s, p) => s + p.x, 0) / st[i].points.length < mid), R = ch.filter((i) => !L.includes(i))
@@ -358,6 +359,17 @@ function spreadStems(st: StackStroke[], G: number, V: number): StackStroke[] {
   return out
 }
 
+/** 첫닿자 ↔ 오른쪽 기둥(ㅏ · ㅐ · ㅙ의 세로 덩이) 틈도 고른 틈 아래로 안 간다. 모자라면 첫닿자 폭이 양보한다(지키는 순서 틈 → 굵기 → 칸, 하니무스 2026-11-22).
+ * 굵기 끝 + 비율 길쭉 끝 · 닿자 크기 끝에서 「깨」 ㄲ과 ㅐ가 붙었다(다람쥐 모순 3). 왼끝은 그대로 두고 오른쪽으로 좁힌다. */
+function yieldChoseong(st: StackStroke[], G: number, thick: StackThick): StackStroke[] {
+  const ch = st.filter((s) => s.part === 'CH'), right = st.filter((s) => s.part === 'JU' || s.part === 'JU_V')
+  if (!ch.length || !right.length) return st
+  const a = inkBox(ch, thick), b = inkBox(right, thick), g = b.x0 - a.x1
+  if (g >= G || a.x1 <= a.x0) return st
+  const w = a.x1 - a.x0, f = Math.max(0.5, (w - (G - g)) / w), x0 = a.x0
+  return st.map((s) => s.part === 'CH' ? mapStroke(s, (p) => ({ x: x0 + (p.x - x0) * f, y: p.y })) : s)
+}
+
 /** 고른 틈(em): 키 × (0.151 − 0.693 × 기둥 ÷ 키). */
 export const evenGapOf = (height: number, stem: number) => Math.max(0, height * (EVEN_GAP.base - EVEN_GAP.slope * stem / height))
 
@@ -387,6 +399,8 @@ export function solveStack900(input: StackInput): StackResult {
   const thick = { v: V, h: Math.min(f, contrast * V) }
   if (jamo) {
     st = narrowRound(st, jamo, 1 - (1 - NARROW_ROUND) * reach)
+    // 첫닿자가 먼저 양보하고, 쌍닿자는 그 좁아진 폭 안에서 두 짝 사이 틈을 다시 지킨다.
+    if (!HORIZONTAL_VOWELS.includes(jamo.jung)) st = yieldChoseong(st, G, { v: V, h: thick.h })
     st = splitDouble(st, jamo.cho, G, { v: V, h: thick.h })
   }
   return { strokes: st, thick, gap: G, bars }

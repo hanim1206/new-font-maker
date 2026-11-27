@@ -26,9 +26,9 @@ describe('획 문법 G0 대표', () => {
   it('ㄱ — 이름 없는 기본 줄기, 마디 둘과 꺾임 하나, 두 끝이 열려 있다', () => {
     const [stroke] = describeJamoStrokes(preset('choseong', 'ㄱ'))
     expect(stroke).toMatchObject({ strokeId: 'ㄱ-1', bound: true, name: null })
-    expect(shapes(stroke)).toEqual(['garojulgi', 'serojulgi'])
+    // 기본 ㄱ 내림은 왼쪽 아래로 굽어 삐침이다(2026-11-27 굽은 ㄱ, 하니무스 "굽은 내림은 그대로 두기").
+    expect(shapes(stroke)).toEqual(['garojulgi', 'ppichim'])
     expect(stroke.corners).toHaveLength(1)
-    expect(stroke.corners[0].turn).toBeCloseTo(90, 0)
     expect(stroke.head).toMatchObject({ point: 0, open: true })
     expect(stroke.tail).toMatchObject({ point: 2, open: true })
   })

@@ -547,6 +547,10 @@ export interface ResolveGlyphInkInput {
    * `stemScale`: 실효 스타일의 세로줄기 배율(네모꼴 자동 보정) — 틈을 잴 때 쓴다.
    */
   counterKeep?: Readonly<{ stemScale: number }>
+  /**
+   * ㄱ · ㅋ · ㄲ 내림 굽음 덜기(아래 · 섞임 벌). 없으면 기본 비율, `false`면 끔(`giyeokBendEase.ts`).
+   */
+  bendEase?: Readonly<{ bottom: number; mixed: number }> | false
 }
 
 export interface ResolvedGlyphInkResult<
