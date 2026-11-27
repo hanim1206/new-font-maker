@@ -310,7 +310,10 @@ describe('도트판 인상 잡기', () => {
     expect(notoDot('size')).toBe(9)
     expect(notoDot('contrast')).toBe(7)
     // 자소 사이 여유: 엔진(0.78)은 폰트 여섯보다 촘촘해 칸 0(촘촘 끝)에 선다.
-    expect(dotsOf({}, FRAME_KEYS)).toEqual([9, 9, 12, 0, 0, 20, 10])
+    expect(dotsOf({}, FRAME_KEYS)).toEqual([9, 12, 0, 20, 10])
+    // 크기 · 여유는 판에서 뺐다(하니무스 2026-11-27).
+    expect(FRAME_KEYS).not.toContain('size')
+    expect(FRAME_KEYS).not.toContain('ease')
     // 대비를 안 만지면 굵기 1의 폰트 패턴(가로 ÷ 세로 0.88, `contrastPatternOf`)이라 가운데(0.83) 바로 아래 칸 9.
     expect(dotsOf({}, INK_KEYS)).toEqual([9, 9, 0, 0])
     // 획 대비 눈금은 가로 ÷ 세로 굵기: 1이면 엔진 0, 1을 넘으면(가로가 더 굵음) 음수
@@ -433,10 +436,14 @@ describe('인상 · 획 다듬기 값', () => {
     expect(new Set(tops.map((y) => y.toFixed(3))).size).toBeGreaterThan(1)
   })
   it('탈네모: 받침 없는 글자만 윗변을 두고 짧아진다 · 넘치면 비율 두고 줄여 넣는다', async () => {
-    const { lookBoxes, lookScale } = await import('./moldLab')
+    const { lookBoxes, lookScale, openFactorOf, OPEN_END, LOOK_WALL } = await import('./moldLab')
     const short = lookBoxes(VERTICAL, { open: 0.6 }, 'choseong-jungseong-vertical')
     expect(short.JU!.y).toBeCloseTo(0.05)
-    expect(short.JU!.height).toBeCloseTo(0.54)
+    expect(short.JU!.height).toBeCloseTo(0.9 * openFactorOf(0.6, 'choseong-jungseong-vertical'))
+    // 탈네모 끝 = 받침 글자 윗덩이 키(짜임마다)
+    expect(openFactorOf(LOOK_WALL.open[0], 'choseong-jungseong-vertical')).toBeCloseTo(OPEN_END.right)
+    expect(openFactorOf(LOOK_WALL.open[0], 'choseong-jungseong-mixed')).toBeCloseTo(OPEN_END.mixed)
+    expect(lookBoxes(VERTICAL, { open: LOOK_WALL.open[0] }, 'choseong-jungseong-vertical').JU!.height).toBeCloseTo(0.9 * OPEN_END.right)
     expect(lookBoxes(HORIZONTAL_FINAL, { open: 0.6 }, 'choseong-jungseong-horizontal-jongseong')).toEqual(HORIZONTAL_FINAL)
     const { sx, sy } = lookScale(VERTICAL, { frame: 1.24, size: 1.105 })
     expect(sx).toBeLessThan(1.24 * 1.105)
@@ -481,6 +488,15 @@ describe('저장소에 써 넣기', () => {
     expect(flat.strokeStyle).toMatchObject({ brush: { tip: 'ellipse' } })
     expect(flat.strokeStyle).not.toHaveProperty('roundness')
     expect(moldInk(style, { round: 0.5, contrast: 0.2 }).strokeStyle).toMatchObject({ roundness: 0.5, innerRoundness: 1, contrast: 0.2 })
+  })
+
+  it('납작 붓은 기둥 두께를 굵기 값 그대로 지킨다(타원 긴 축 = 지름이라 그냥 두면 가늘어짐)', async () => {
+    const { moldInk, nibBrush, nibStemFactor, thicknessOf } = await import('./moldLab')
+    const brush = nibBrush(0.7)!
+    expect(nibStemFactor(brush)).toBeCloseTo(0.863, 2)
+    const style = { weight: 400, brush: { tip: 'round' as const, aspectRatio: 1, angle: 0 }, strokeStyle: { mode: 'brush' as const, brush: { tip: 'round' as const, aspectRatio: 1, angle: 0 } } }
+    const flat = moldInk(style, { nib: 0.7 })
+    expect(thicknessOf(flat.weight / 400) * nibStemFactor(brush)).toBeCloseTo(1, 2)
   })
 })
 
@@ -540,7 +556,7 @@ describe('획 판은 저장된 값을 그대로 읽는다', () => {
   it('써 넣은 굵기 · 둥글기 · 대비 · 붓촉을 다시 읽으면 같은 칸', async () => {
     const { DEFAULT_STYLE } = await import('../src/stores/globalStyleStore')
     const { inkLookOf, moldBaseStyle, moldInk, scaledWeight, MOLD_BASE_WEIGHT, dotsOf, INK_KEYS } = await import('./moldLab')
-    for (const look of [{ weight: 0.9, round: 0.4 }, { weight: 1.6, contrast: 0.3 }, { nib: 0.5 }]) {
+    for (const look of [{ weight: 0.9, round: 0.4 }, { weight: 1.6, contrast: 0.3 }, { nib: 0.5 }, { weight: 1.3, nib: 0.7 }]) {
       const baked = moldInk({ ...moldBaseStyle(DEFAULT_STYLE), weight: scaledWeight(MOLD_BASE_WEIGHT, look.weight ?? 1) }, look)
       expect(dotsOf(inkLookOf(baked), INK_KEYS)).toEqual(dotsOf(look, INK_KEYS))
       // 바탕은 저장 값을 뺀 것이라, 다시 얹어도 두 번 얹히지 않는다.

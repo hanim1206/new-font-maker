@@ -949,8 +949,27 @@ export function waistSyllable(syllable: DecomposedSyllable, lift: number, boxes:
   return { ...syllable, jungseong: next }
 }
 
-/** 받침 없는 글자의 키(탈네모): 받침 없는 짜임은 글자 윗변을 두고 세로로 `open`배. */
-function openBoxes(boxes: Partial<Record<Part, BoxConfig>>, open: number, layout?: LayoutType): Partial<Record<Part, BoxConfig>> {
+/**
+ * 탈네모 끝 = 받침 없는 글자 키가 받침 글자의 윗덩이(첫닿자 + 홀자) 키와 같아지는 곳(하니무스 2026-11-27 카드 "연속, 끝은 윗덩이 키").
+ * 값은 짜임마다 엔진(노토 모델 칸)에서 잰 「받침 글자 윗덩이 키 ÷ 받침 없는 글자 키」 가운데값, 8쌍씩
+ * (가각 다달 나난 사산 하한 거걱 마맘 기길 / 고곡 모몸 노논 두둔 수숨 그극 보봄 로롤 / 과광 괴괸 워원 뭐뭔 의읜 좌좍 화활 귀귄).
+ */
+export const OPEN_END = { right: 0.59, bottom: 0.67, mixed: 0.73 } as const
+
+/**
+ * 판 값 `open`(1 = 네모, `LOOK_WALL.open[0]` = 탈네모 끝)을 이 짜임의 실제 세로 배율로. 받침 있는 짜임은 1.
+ * 저장 값은 예전 그대로(1 ~ 0.45) 두고, 그 사이 몫을 이 짜임의 끝(`OPEN_END`)까지로 읽는다.
+ */
+export function openFactorOf(open: number, layout?: LayoutType): number {
+  if (open >= 1 || !layout || layout.includes('jongseong') || !layout.startsWith('choseong-jungseong')) return 1
+  const end = layout.includes('mixed') ? OPEN_END.mixed : layout.includes('horizontal') ? OPEN_END.bottom : OPEN_END.right
+  const t = Math.min(1, (1 - open) / (1 - LOOK_WALL.open[0]))
+  return 1 - t * (1 - end)
+}
+
+/** 받침 없는 글자의 키(탈네모): 받침 없는 짜임은 글자 윗변을 두고 세로로 `openFactorOf`배. */
+function openBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: number, layout?: LayoutType): Partial<Record<Part, BoxConfig>> {
+  const open = openFactorOf(look, layout)
   if (open === 1 || !layout || layout.includes('jongseong')) return boxes
   const list = Object.values(boxes).filter((box): box is BoxConfig => !!box)
   const top = Math.min(...list.map((box) => box.y)), bottom = Math.max(...list.map((box) => box.y + box.height)), span = bottom - top
@@ -1350,9 +1369,12 @@ export function movePartEdit(edits: PartEdits, part: Part, du: number, dv: numbe
  * 틀 판: 크기 · 비율 · 닿자 크기 · 탈네모 · 윗선 들쭉날쭉, 맨 끝에 무게중심. 획 판: 굵기 · 획 대비 · 둥글기 · 붓촉.
  * 폭 · 키는 비율 한 줄(`frame`)로 합쳤다. 크기가 키를, 비율이 폭을 정한다.
  */
-export const FRAME_KEYS = ['size', 'frame', 'jamo', 'ease', 'open', 'jag', 'center'] as const
+// 크기 · 자소 사이 여유는 판에서 뺐다(하니무스 2026-11-27 카드 "크기·여유 빼고 받침 남김"). 여유는 엔진 몫(`HALO_ENGINE`), 고딕 · 명조 시작값 고르기만 남는다.
+export const FRAME_KEYS = ['frame', 'jamo', 'open', 'jag', 'center'] as const
 export const INK_KEYS = ['weight', 'contrast', 'round', 'nib'] as const
-export const DOT_KEYS = [...FRAME_KEYS, ...INK_KEYS] as const
+/** 판에 없는 값(눈금 · 이름은 남겨 둠). */
+export const HIDDEN_DOT_KEYS = ['size', 'ease'] as const
+export const DOT_KEYS = [...FRAME_KEYS, ...INK_KEYS, ...HIDDEN_DOT_KEYS] as const
 export type DotKey = (typeof DOT_KEYS)[number]
 export const DOT_ROWS = 20
 const half = DOT_ROWS / 2
@@ -1421,7 +1443,11 @@ export function moldInk<T extends { brush: BrushStyle; strokeStyle: StrokeRender
   const round = lookOf(look, 'round'), contrast = lookOf(look, 'contrast')
   // 붓촉: 납작 붓이면 엔진의 타원 붓촉. 이때 둥글기 · 대비는 엔진이 안 쓴다.
   const flat = nibBrush(lookOf(look, 'nib'))
-  if (flat) return { ...style, brush: flat, strokeStyle: { ...style.strokeStyle, brush: flat } }
+  if (flat) {
+    // 타원 긴 축이 붓 지름이라 그대로 두면 기둥까지 가늘어진다(하니무스 2026-11-27 "붓촉쪽도 이상한거"). 기둥 두께를 굵기 값 그대로 지키게 굵기를 올린다.
+    const weight = 'weight' in style && typeof style.weight === 'number' ? { weight: nibWeight(style.weight, flat) } : {}
+    return { ...style, ...weight, brush: flat, strokeStyle: { ...style.strokeStyle, brush: flat } }
+  }
   if (round === 0 && contrast === 0) return style
   return { ...style, strokeStyle: { ...style.strokeStyle, ...(round > 0 ? { roundness: round, innerRoundness: round * 2 } : {}), ...(contrast !== 0 ? { contrast } : {}) } }
 }
@@ -1444,7 +1470,13 @@ export function inkLookOf(style: { weight: number; strokeStyle: StrokeRenderStyl
   if (style.weight !== MOLD_BASE_WEIGHT) out.weight = out.weightBase = style.weight / MOLD_BASE_WEIGHT
   const ink = style.strokeStyle as StrokeRenderStyle & { roundness?: number; contrast?: number; brush?: BrushStyle }
   if (ink.mode !== 'brush') return out
-  if (ink.brush?.tip === 'ellipse') out.nib = Math.max(0, Math.min(1, (1 - ink.brush.aspectRatio) / 0.75))
+  if (ink.brush?.tip === 'ellipse') {
+    out.nib = Math.max(0, Math.min(1, (1 - ink.brush.aspectRatio) / 0.75))
+    // 써 넣을 때 기둥 몫으로 올린 굵기(`nibWeight`)를 되돌려 읽는다.
+    const weight = weightRatioOfThickness(thicknessOf(style.weight / MOLD_BASE_WEIGHT) * nibStemFactor(ink.brush))
+    if (Math.abs(weight - 1) > 1e-3) out.weight = out.weightBase = weight
+    else { delete out.weight; delete out.weightBase }
+  }
   if (ink.roundness) out.round = ink.roundness
   if (ink.contrast) out.contrast = ink.contrast
   return out
@@ -1455,6 +1487,15 @@ export const NIB_ANGLE = 35
  * 붓촉(하니무스 2026-11-21 "붓촉 바꾸면 바뀌는 게 없다"): 획 굵기 흉내 대신 엔진의 진짜 납작 붓(타원 붓촉)을 쓴다.
  * 0이면 둥근 붓 그대로(null). 올릴수록 붓이 납작해져 짧은 축 ÷ 긴 축이 1 → 0.25. 납작 붓에서는 엔진이 둥글기 · 대비를 안 쓴다.
  */
+/** 납작 붓으로 세로로 그은 기둥 폭 ÷ 붓 지름. 타원의 가로 폭이다(긴 축 = 지름). */
+export function nibStemFactor(brush: { aspectRatio: number; angle: number }): number {
+  const r = brush.angle * Math.PI / 180, b = Math.max(0.2, Math.min(1, brush.aspectRatio))
+  return Math.hypot(Math.cos(r), b * Math.sin(r))
+}
+/** 납작 붓에서도 기둥 두께가 굵기 값 그대로 되게 올린 굵기. 가로는 붓 각도만큼 저절로 가늘다. */
+function nibWeight(weight: number, brush: { aspectRatio: number; angle: number }): number {
+  return scaledWeight(MOLD_BASE_WEIGHT, weightRatioOfThickness(thicknessOf(weight / MOLD_BASE_WEIGHT) / nibStemFactor(brush)))
+}
 export function nibBrush(nib: number): { tip: 'ellipse'; aspectRatio: number; angle: number } | null {
   if (nib <= 0) return null
   return { tip: 'ellipse', aspectRatio: 1 - 0.75 * Math.min(1, nib), angle: NIB_ANGLE }

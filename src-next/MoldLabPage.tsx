@@ -23,7 +23,7 @@ import { Pressable } from './components/ui/pressable'
 import { Field, RangeBar } from './components/ui/range'
 import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
-import { BLACK_CENTER, BLACK_RATIO, CONTRAST_PATTERN_RANGE, patternWeightRatio, HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { nibStemFactor, openFactorOf, BLACK_CENTER, BLACK_RATIO, CONTRAST_PATTERN_RANGE, patternWeightRatio, HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement, useNotoModel } from './notoModel'
 import { stackColumns, stackLay } from './moldStack'
 import { balloonGroupOf, endReachOf, inkOfThick, solveBalloon, type BalloonGroup, type BalloonStroke, type Thick } from './moldBalloon'
@@ -548,7 +548,9 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     })
     return { strokes, k, center, height: inkHeightOf(strokes) }
   }, [heavyInput, wanted, weightCap])
-  useEffect(() => { if (stackStart && isOpenSyllable(char)) onStart?.(stackStart.height) }, [onStart, stackStart, char])
+  // 글줄 키는 네모일 때의 받침 없는 글자 키로 알린다. 탈네모로 줄인 키를 알리면 받침 글자까지 같이 낮아져 글줄이 지그재그가 된다(고양이 점검 2026-11-27).
+  const openFactor = openFactorOf(lookOf(look, 'open'), raw.layoutType)
+  useEffect(() => { if (stackStart && isOpenSyllable(char)) onStart?.(stackStart.height / openFactor) }, [onStart, stackStart, char, openFactor])
   const stacked = useMemo(() => {
     if (!stackStart || !heavyInput || !budgetBoxes) return null
     const { k, center } = stackStart
@@ -674,9 +676,14 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
         reaches.set(`${part}|${primitive.source.strokeId}`, { pieces })
         return
       }
-      if (reach.start < 1e-6 && reach.end < 1e-6) return
+      // 같은 자소 수직 줄기 한가운데서 시작하는 끝(ㅏ 곁줄기 왼끝)은 줄기 속이라 늘이지 않는다.
+      // 늘이면 납작 붓(타원 끝)에서 줄기 밖으로 혹이 나왔다(하니무스 2026-11-27 "붓촉쪽도 이상한거").
+      const own = stroke.thickness / 2 * thick.h, ne = em.length
+      const inside = (end: Pt2, other: Pt2) => ne >= 2 && alignReach(part, end, { x: other.x - end.x, y: other.y - end.y }, own) >= 0
+      const startBy = inside(em[0], em[1]) ? 0 : reach.start, endBy = inside(em[ne - 1], em[ne - 2]) ? 0 : reach.end
+      if (startBy < 1e-6 && endBy < 1e-6) return
       const pts = stroke.points, n = pts.length
-      reaches.set(`${part}|${primitive.source.strokeId}`, { start: local(pts[0], pts[1], reach.start), end: local(pts[n - 1], pts[n - 2], reach.end) })
+      reaches.set(`${part}|${primitive.source.strokeId}`, { start: local(pts[0], pts[1], startBy), end: local(pts[n - 1], pts[n - 2], endBy) })
     })
     const syllableOut = reaches.size ? stretchedSyllable(startSyllable, reaches) : startSyllable
     // 흐림 선(굵기 끝): 자소마다 푼 굵기로 다시 재서, 선이 기둥을 넘으면 기둥이 밖으로 나가고 자리가 남으면 닿자 뼈대가 넓어진다.
@@ -744,7 +751,9 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     const layers = (['CH', 'JU', 'JO'] as const).filter((group) => (group === 'CH' ? budget.syllable.choseong : group === 'JU' ? budget.syllable.jungseong : budget.syllable.jongseong))
     return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char} data-halo={haloAttr(haloFitNow)} data-final={finalNow ? `${finalNow.err.toFixed(4)} ${finalNow.move.toFixed(4)}` : undefined} data-fence={fenced ? fenced.need.toFixed(3) : undefined} data-heavy={layers.map((group) => `${group}:${heavy.thick[group].v.toFixed(3)}/${heavy.thick[group].h.toFixed(3)}`).join(' ')}>
       {layers.map((group, at) => {
-        const ink = flat ? { multiplier: Math.min(heavy.thick[group].v, heavy.thick[group].h), contrast: 0 } : inkOfThick(heavy.thick[group])
+        // 납작 붓: 기둥은 세로 두께 그대로(타원 가로 폭 몫만큼 붓을 키운다), 가로는 붓 각도가 저절로 가늘게 한다.
+        const brush = globalStyle.strokeStyle.mode === 'brush' ? globalStyle.strokeStyle.brush : null
+        const ink = brush?.tip === 'ellipse' ? { multiplier: heavy.thick[group].v / nibStemFactor(brush), contrast: 0 } : flat ? { multiplier: Math.min(heavy.thick[group].v, heavy.thick[group].h), contrast: 0 } : inkOfThick(heavy.thick[group])
         const style = flat || globalStyle.strokeStyle.mode !== 'brush' ? globalStyle : { ...globalStyle, strokeStyle: heavyStrokeStyle(globalStyle.strokeStyle, ink.contrast) }
         return <span key={group} className={at === 0 ? undefined : styles.glyphLayer}>
           <SvgRenderer
