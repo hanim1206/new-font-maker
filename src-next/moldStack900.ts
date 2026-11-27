@@ -37,6 +37,12 @@ export interface StackInput {
   inward: number
   /** 가로 ÷ 세로 [굵기 1 위 첫 걸음, 굵기 끝]. 없으면 [1, `BLACK_CONTRAST`](바탕 대비 위에 곱함). 대비 기본값(폰트 패턴, `contrastPatternOf`)이면 그 식의 두 끝. */
   contrastRange?: readonly [number, number]
+  /** 고른 틈을 그린 가로획 두께에서 셈(기본 켬). false면 옛 식 그대로(기둥 두께, C029 스위치). */
+  gapFromBar?: boolean
+  /** 바탕 대비(만진 대비)가 그릴 때 가로 ÷ 세로에 더 곱하는 배율(대비를 안 만졌으면 1). 그린 가로획 = 기둥 × 쌓임 대비 × 이 값. */
+  barScale?: number
+  /** 고딕 패턴의 가로 ÷ 세로 [굵기 1 위 첫 걸음, 굵기 끝] — 고른 틈 식에 든 "쌓인 가로획 = 기둥 × 고딕 비율" 자리. 없으면 `contrastRange`(= 늘 옛 식과 같음). */
+  gothicRange?: readonly [number, number]
 }
 export interface StackResult {
   strokes: StackStroke[]
@@ -372,6 +378,13 @@ function yieldChoseong(st: StackStroke[], G: number, thick: StackThick): StackSt
 
 /** 고른 틈(em): 키 × (0.151 − 0.693 × 기둥 ÷ 키). */
 export const evenGapOf = (height: number, stem: number) => Math.max(0, height * (EVEN_GAP.base - EVEN_GAP.slope * stem / height))
+/**
+ * 고른 틈(em)을 그린 가로획 두께에서(하니무스 2026-11-27 "추천대로", 거북이 명조 · 손글씨 재기 `study/mold-rules-myeongjo-hand/`).
+ * 0.151 − 0.693 식은 기둥만 보지만 「쌓인 가로획 = 기둥 × 고딕 비율」이라는 고딕 버릇이 숫자에 들어 있다. 그 자리에 실제 가로획을 넣는다:
+ * 기둥 → 가로획 ÷ 고딕 비율. 고딕 비율은 같은 굵기 고딕 패턴의 가로 ÷ 세로라 고딕 기본에서는 옛 식과 같고, 가로획이 가늘어질수록(명조 쪽) 틈이 넓어진다.
+ * 새로 맞춘 계수는 없다(식의 방향 · 비율 그대로).
+ */
+export const evenGapOfBar = (height: number, bar: number, gothicRatio: number) => evenGapOf(height, bar / Math.max(1e-6, gothicRatio))
 
 export function solveStack900(input: StackInput): StackResult {
   const jamo = jamoOf(input.char)
@@ -380,7 +393,15 @@ export function solveStack900(input: StackInput): StackResult {
   const stem = thickList[Math.floor(thickList.length / 2)] ?? 0.07
   const ink0 = inkBox(st0, { v: 1, h: 1 })
   const height = input.height ?? ink0.y1 - ink0.y0
-  const G = evenGapOf(height, stem)
+  const reach = Math.max(0, Math.min(1, input.reach))
+  const V = input.inward
+  // 가로 = min(쌓임이 준 배율, 세로 × 대비). 대비는 굵기 끝으로 갈수록(가설: 굵기에 곧게).
+  const [c0, c1] = input.contrastRange ?? [1, BLACK_CONTRAST]
+  const contrast = c0 + (c1 - c0) * reach
+  // 고른 틈은 쌓기 전에 정한다 — 양보로 가늘어지는 몫(f)은 이 틈에서 나오므로 넣지 않는다(그리기 전 가로획, 가설).
+  const [g0, g1] = input.gothicRange ?? [c0, c1]
+  const gothic = g0 + (g1 - g0) * reach
+  const G = input.gapFromBar === false ? evenGapOf(height, stem) : evenGapOfBar(height, stem * contrast * V * (input.barScale ?? 1), gothic * V)
   let st = st0, f = 1, bars = 0
   if (jamo && HORIZONTAL_VOWELS.includes(jamo.jung)) {
     const plan = stackPlan(st0, G, input.height, COMPOUND_FINALS.includes(jamo.jong) ? 'JO' : undefined)
@@ -389,13 +410,8 @@ export function solveStack900(input: StackInput): StackResult {
     const plan = finalPlan(st0, G, input.height)
     st = plan.strokes; f = plan.f
   }
-  const reach = Math.max(0, Math.min(1, input.reach))
-  const V = input.inward
   st = inwardX(st, V)
   st = spreadStems(st, G, V)
-  // 가로 = min(쌓임이 준 배율, 세로 × 대비). 대비는 굵기 끝으로 갈수록(가설: 굵기에 곧게).
-  const [c0, c1] = input.contrastRange ?? [1, BLACK_CONTRAST]
-  const contrast = c0 + (c1 - c0) * reach
   const thick = { v: V, h: Math.min(f, contrast * V) }
   if (jamo) {
     st = narrowRound(st, jamo, 1 - (1 - NARROW_ROUND) * reach)

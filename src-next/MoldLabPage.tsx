@@ -81,6 +81,8 @@ interface Drawn {
 const BALLOON_WEIGHT = true
 /** 굵을 때 900 쌓임 규칙(`moldStack900.ts`)으로 푼다. 끄면 예전 풍선 · 쌓인 획 법칙 셈. */
 const STACK_900 = true
+/** 고른 틈을 그린 가로획 두께에서 셈(`evenGapOfBar`, 2026-11-27). 실험실 주소에 `?evenGap=stem`이면 옛 식(기둥, C029 스위치). */
+const EVEN_GAP_FROM_BAR = typeof window === 'undefined' || new URLSearchParams(window.location.search).get('evenGap') !== 'stem'
 
 /** 굵게 할 때 자소 칸을 키워 보는 비율(작은 것부터). 거북이 표: 굵기 1%p마다 자소가 0.3~0.6% 커진다 — 900(두께 ×1.95)이면 4%쯤, 넉넉히 12%까지. */
 const JAMO_GROWS: readonly number[] = [1, 1.03, 1.06, 1.09, 1.12]
@@ -534,7 +536,11 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const stacked = useMemo(() => {
     if (!stackStart || !heavyInput || !budgetBoxes) return null
     const { k, center } = stackStart
-    const out = solveStack900({ char, strokes: stackStart.strokes, height: stackHeight, inward: k / center, reach: Math.max(0, Math.min(1, (k - 1) / (BLACK_RATIO - 1))), ...(patternContrast ? { contrastRange: CONTRAST_PATTERN_RANGE } : {}) })
+    // 고른 틈은 그릴 가로획에서: 만진 대비는 그릴 때 가로 ÷ 세로에 (base.h ÷ base.v) × (붓 대비 가로 ÷ 세로)를 더 곱한다(아래 `thick` · `moldInk`). 고딕 비율은 굵기마다 폰트 패턴.
+    const ib = heavyInput.base, widthOf = contrastWidthOf(contrast)
+    const barScale = contrast === 0 ? 1 : (ib.h / ib.v) * (widthOf({ x: 1, y: 0 }, false) / widthOf({ x: 0, y: 1 }, false))
+    const out = solveStack900({ char, strokes: stackStart.strokes, height: stackHeight, inward: k / center, reach: Math.max(0, Math.min(1, (k - 1) / (BLACK_RATIO - 1))), ...(patternContrast ? { contrastRange: CONTRAST_PATTERN_RANGE } : {}),
+      gapFromBar: EVEN_GAP_FROM_BAR, barScale, gothicRange: CONTRAST_PATTERN_RANGE })
     // 옮긴 꼭짓점을 자소 칸 좌표로 돌려 획을 바꿔 끼운다(id 그대로).
     // 한 줄짜리 칸(ㅡ의 키, ㅣ의 너비)은 칸 좌표로 못 옮긴다 — 그 축은 칸을 통째로 옮긴다(그 부위 점들의 평균 이동).
     const THIN_BOX = 0.02
@@ -580,10 +586,9 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       placed[part] = old ? { x: Math.min(old.x, b.x), y: Math.min(old.y, b.y), width: Math.max(old.x + old.width, b.x + b.width) - Math.min(old.x, b.x), height: Math.max(old.y + old.height, b.y + b.height) - Math.min(old.y, b.y) } : { ...b }
     }
     // 만진 대비도 가로만 가늘게: 기둥은 굵기 값 그대로(세로 몫 base.v로 나눈다). 세로까지 굵히면 900 + 대비 끝에서 깨 · 괘 · 절 속이 막혔다(다람쥐 모순 1 · 2).
-    const ib = heavyInput.base
     const thick = { v: center * out.thick.v, h: center * out.thick.h * ib.h / ib.v }
     return { syllable, result, strokes, boxes, placed, thick: { CH: thick, JU: { ...thick }, JO: { ...thick } } as Record<BalloonGroup, Thick>, gap: out.gap }
-  }, [stackStart, heavyInput, budgetBoxes, char, stackHeight, heavyBase, effective.linecap, effective.linejoin, patternContrast])
+  }, [stackStart, heavyInput, budgetBoxes, char, stackHeight, heavyBase, effective.linecap, effective.linejoin, patternContrast, contrast])
   const heavy = useMemo(() => {
     if (!heavyInput || !budgetBoxes) return null
     const { solveAt, base } = heavyInput
