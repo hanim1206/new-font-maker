@@ -103,6 +103,19 @@ describe('900 쌓임 규칙', () => {
     expect(width(out.strokes[0])).toBeGreaterThan(0.9 * width(rieul))
     expect(width(out.strokes[1])).toBeGreaterThan(0.9 * width(bieup))
   })
+  it('받침 줄을 넓혀도 위 닿자 비스듬한 다리는 꺾이지 않는다 — 자른 자리는 그 자소에만, 비스듬한 획은 통째로(「짧」)', () => {
+    // 예전엔 ㄼ 사이를 벌리려 자른 x가 글자 전체를 갈라 ㅉ 둘째 ㅈ 왼다리 한가운데가 꺾였다(하니무스 2026-11-27).
+    const steps = Array.from({ length: 9 }, (_, k) => k / 8)
+    const leg = line('CH', steps.map((t) => [0.46 - 0.14 * t, 0.14 + 0.35 * t] as [number, number]), 0.127)
+    const top = line('CH', [[0.08, 0.14], [0.6, 0.14]], 0.127)
+    const rieul = line('JO', [[0.119, 0.61], [0.376, 0.61], [0.376, 0.762], [0.158, 0.762], [0.158, 0.916], [0.436, 0.916]], 0.127)
+    const bieup = line('JO', [[0.506, 0.573], [0.506, 0.918], [0.729, 0.918], [0.729, 0.573]], 0.127)
+    const bar = line('JO', [[0.464, 0.728], [0.77, 0.728]], 0.127)
+    const out = solveStack900({ char: '짧', strokes: [top, leg, rieul, bieup, bar], height: 0.905, reach: 1, inward: BLACK_STEM_GAIN })
+    const P = out.strokes[1].points, a = P[0], b = P[P.length - 1]
+    const off = Math.max(...P.map((p) => Math.abs((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) / Math.hypot(b.x - a.x, b.y - a.y)))
+    expect(off).toBeLessThan(1e-6)
+  })
   it('ㅝ: ㅜ 보 오른쪽은 ㅓ 곁줄기 앞에서 끊고, 가로획을 바닥까지 깎지 않는다(「원」, 하니무스 고른 안)', () => {
     // 굵기 20 「원」(빚기 화면에서 뜬 값을 줄인 것). 예전엔 보와 곁줄기가 위아래로 겹쳐 가로가 0.69배까지 깎였다.
     const ring: StackStroke = { part: 'CH', closed: true, thickness: 0.127, points: Array.from({ length: 64 }, (_, k) => ({ x: 0.339 + 0.175 * Math.cos(k / 32 * Math.PI), y: 0.245 + 0.128 * Math.sin(k / 32 * Math.PI) })), anchors: [] }

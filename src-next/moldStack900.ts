@@ -513,6 +513,18 @@ function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yie
 }
 /** x를 자르는 자리마다 오른쪽을 민다. */
 const widenAt = (cuts: { x: number; d: number }[]): Map2 => (p) => ({ x: p.x + cuts.reduce((s, c) => s + (p.x > c.x ? c.d : 0), 0), y: p.y })
+/** 비스듬한 열린 획(ㅅ · ㅈ · ㅊ 다리)인가 — 가로도 세로도 아닌 토막이 있다. */
+const slanted = (s: StackStroke) => !s.closed && s.points.some((p, k) => { if (!k) return false; const q = s.points[k - 1], dx = Math.abs(p.x - q.x), dy = Math.abs(p.y - q.y); return dx > 0.15 * dy && dy > 0.15 * dx })
+/**
+ * 자른 자리에서 미는 것을 획에 입힌다. 비스듬한 획은 통째로(맨 위 점이 받는 만큼) 민다 — 점마다 밀면 다리 한가운데가 갈려
+ * 「짧」 ㅉ 다리가 꺾였다(하니무스 2026-11-27). 곧은 줄기 · ㄹ · 닫힌 획은 점마다(속을 벌리려면 그 획 안을 갈라야 한다).
+ */
+function warpStroke(s: StackStroke, cuts: { x: number; d: number }[]): StackStroke {
+  const f = widenAt(cuts)
+  if (!slanted(s)) return mapStroke(s, f)
+  const top = s.points.reduce((a, p) => (p.y < a.y ? p : a)), d = f(top).x - top.x
+  return mapStroke(s, (p) => ({ x: p.x + d, y: p.y }))
+}
 type Yield = Partial<Record<StackGroup, number>>
 function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number, thick: StackThick, widen: boolean, inner0: number, apart: ReadonlySet<Part> = new Set()): { strokes: StackStroke[]; yieldV: Yield; widen: number } {
   const runs0 = runsOf(st0)
@@ -542,8 +554,8 @@ function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number,
       // 겹받침은 한 자소 속(ㅂ)을 좁혀 옆 자소(ㄹ) 자리를 내지 않는다 — ㅂ만 홀쭉해졌다(「짧」). 칸 · 굵기로 받는다.
       const spare = faces.filter((f) => f.inner && !apart.has(st[runs[f.a].s].part) && runs[f.a].group === g && f.white > f.want + 1e-6 && straight(runs[f.a]) && straight(runs[f.b]) && next(f))
       if (!spare.length) continue
-      const warp = widenAt(spare.map((f) => ({ x: f.cut, d: f.want - f.white })))
-      out = out.map((x) => (groupOf(x.part) === g ? mapStroke(x, warp) : x))
+      const cutsG = spare.map((f) => ({ x: f.cut, d: f.want - f.white }))
+      out = out.map((x) => (groupOf(x.part) === g ? warpStroke(x, cutsG) : x))
     }
     return out
   }
@@ -555,13 +567,16 @@ function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number,
       if (room <= 1e-6) break
       const short = shortOf(out, y)
       if (!short.length) break
-      const cuts: { x: number; d: number }[] = []
+      // 자르는 자리는 모자란 쌍의 자소 묶음(초성 · 중성 · 종성)에만 쓴다. 예전엔 글자 전체를 그 x에서 갈라 밀어,
+      // 「짧」 ㄼ 사이를 벌리려던 자리가 위 ㅉ 삐침 한가운데를 갈라 다리가 꺾였다(하니무스 2026-11-27).
+      const runs = runsOf(out)
+      const cuts: { x: number; d: number; groups: Set<StackGroup> }[] = []
       for (const f of short.sort((p, q) => p.cut - q.cut)) {
-        const d = f.want - f.white, near = cuts.find((c) => Math.abs(c.x - f.cut) < 0.01)
-        if (near) near.d = Math.max(near.d, d); else cuts.push({ x: f.cut, d })
+        const d = f.want - f.white, gs = [runs[f.a].group, runs[f.b].group], near = cuts.find((c) => Math.abs(c.x - f.cut) < 0.01)
+        if (near) { near.d = Math.max(near.d, d); gs.forEach((g) => near.groups.add(g)) } else cuts.push({ x: f.cut, d, groups: new Set(gs) })
       }
       const total = cuts.reduce((t, c) => t + c.d, 0), k = Math.min(1, room / total)
-      out = out.map((x) => mapStroke(x, widenAt(cuts.map((c) => ({ x: c.x, d: c.d * k })))))
+      out = out.map((x) => { const own = cuts.filter((c) => c.groups.has(groupOf(x.part))); return own.length ? warpStroke(x, own.map((c) => ({ x: c.x, d: c.d * k }))) : x })
     }
     return center(out)
   }
