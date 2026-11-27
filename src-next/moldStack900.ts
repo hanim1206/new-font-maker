@@ -436,7 +436,7 @@ function cutBarBeforeSide(st: StackStroke[], thick: StackThick, G: number): Stac
   const out = [...st]
   // 기둥 밑(곁줄기가 내려갈 수 있는 끝).
   const pillarBottom = Math.max(-Infinity, ...st.filter((s) => s.part === 'JU_V' && !flat(s)).flatMap((s) => s.points.map((p) => p.y)))
-  const finalTop = Math.min(Infinity, ...st.filter((s) => s.part === 'JO').flatMap((s) => s.points.map((p) => p.y - s.thickness * Math.max(thick.v, thick.h) / 2)))
+  const finalTop = Math.min(Infinity, ...st.filter((s) => s.part === 'JO').flatMap((s) => s.points.map((p) => p.y - s.thickness * thick.h / 2)))
   for (const [k, s] of st.entries()) {
     if (s.part !== 'JU_V' || !flat(s)) continue
     const left = Math.min(s.points[0].x, s.points[1].x), dy = Math.abs(s.points[0].y - by)
@@ -451,9 +451,22 @@ function cutBarBeforeSide(st: StackStroke[], thick: StackThick, G: number): Stac
       out[k] = { ...s, points: s.points.map((p) => ({ ...p, y: p.y + need })), anchors: s.anchors.map((p) => ({ ...p, y: p.y + need, ...(p.handleIn ? { handleIn: { ...p.handleIn, y: p.handleIn.y + need } } : {}), ...(p.handleOut ? { handleOut: { ...p.handleOut, y: p.handleOut.y + need } } : {}) })) }
       continue
     }
+    // 내릴 자리가 없고 곁줄기가 받침 윗변과 틈이 모자라면(「뭘」 · 「퀄」) 곁줄기를 보 높이로 올려 보 옆에 세운다(보는 그 앞에서 끊는다).
+    // 보와 받침 사이에 곁줄기 하나 + 위아래 틈 둘이 안 들어가는 쌓인 글자다 — 폰트도 곁줄기를 보 바로 옆 · 아래에 붙인다.
+    if (s.points[0].y > by && s.points[0].y + s.thickness * thick.h / 2 + G > finalTop) {
+      const up = by - s.points[0].y
+      out[k] = { ...s, points: s.points.map((p) => ({ ...p, y: p.y + up })), anchors: s.anchors.map((p) => ({ ...p, y: p.y + up, ...(p.handleIn ? { handleIn: { ...p.handleIn, y: p.handleIn.y + up } } : {}), ...(p.handleOut ? { handleOut: { ...p.handleOut, y: p.handleOut.y + up } } : {}) })) }
+    }
     // 그릴 때 가로획 열린 끝은 세로 · 가로 굵기 차만큼 늘어난다(`endReachOf`) — 보 · 곁줄기 두 끝 몫을 미리 뺀다.
     const reach = (t: number) => t / 2 * Math.max(0, thick.v - thick.h)
     cut = Math.min(cut, Math.max(floor, left - G - reach(bar.s.thickness) - reach(s.thickness)))
+  }
+  // ㅜ 짧은기둥은 받침 윗변과 고른 틈을 남기고 끝난다(「뭘」에서 ㄹ 윗줄에 붙던 것).
+  for (const [k, s] of out.entries()) {
+    if (s.part !== 'JU_H' || flat(s) || s.points.length !== 2 || Math.abs(s.points[1].x - s.points[0].x) > 1e-6) continue
+    const end = finalTop - G, lowY = Math.max(s.points[0].y, s.points[1].y)
+    if (lowY <= end || end <= by + bar.s.thickness * thick.h / 2) continue
+    out[k] = { ...s, points: s.points.map((p) => (p.y === lowY ? { ...p, y: end } : p)), anchors: s.anchors.map((p) => (Math.abs(p.y - lowY) < 1e-9 ? { ...p, y: end } : p)) }
   }
   if (cut >= bRight - 1e-9) return out
   out[bar.i] = { ...bar.s, points: bar.s.points.map((p) => (p.x === bRight ? { ...p, x: cut } : p)), anchors: bar.s.anchors.map((p) => (Math.abs(p.x - bRight) < 1e-9 ? { ...p, x: cut } : p)) }
