@@ -354,9 +354,9 @@ describe('도트판 인상 잡기', () => {
     // 받침은 윗변만 같은 만큼 따라 오른다(밑변 = 틀은 그대로) — 받침마다 따로 놀지 않게(하니무스 2026-11-27).
     expect(out.JO!.y).toBeCloseTo(HORIZONTAL_FINAL.JO!.y - up)
     expect(out.JO!.y + out.JO!.height).toBeCloseTo(HORIZONTAL_FINAL.JO!.y + HORIZONTAL_FINAL.JO!.height)
-    // 아래로는 받침 윗변까지(틈 0.05 남김) 간 뒤 받침 윗변을 같이 눌러 받침을 줄인다. 밑변은 그대로.
+    // 아래로도 받침 윗변이 허리선과 같은 만큼 같이 내려간다(밑변은 그대로) — ㅡ 글자 받침이 낮게 → 가운데에서 안 움직이던 것(다람쥐 검수 2026-11-28).
     const down = impressBoxes(HORIZONTAL_FINAL, { center: -1 }, 'choseong-jungseong-horizontal-jongseong')
-    const pushBy = 0.066 * 0.9 - (0.6 - 0.53 - 0.05)
+    const pushBy = 0.066 * 0.9
     expect(down.JO!.y).toBeCloseTo(0.6 + pushBy)
     expect(down.JO!.y + down.JO!.height).toBeCloseTo(0.95)
     // 받침 없음: 위로 12%, 아래로 23%. 홀자 칸은 그대로.

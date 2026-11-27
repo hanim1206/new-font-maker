@@ -413,12 +413,117 @@ export function solveStack900(input: StackInput): StackResult {
   // 예전에는 ㅃ만 두 ㅂ 사이를 벌리려고 ㅂ 폭을 줄여(`splitDouble`) 굵기 끝에서 ㅂ 속이 막혔다(다람쥐 극단 검수 2026-11-27).
   // 가로로 마주 선 막대(ㄹ · ㅂ 속)는 키가 정해져 있어 칸을 못 넓힌다 — 그 자소 가로만 가늘게 한다(축을 바꿔 같은 셈).
   const apart = new Set<Part>(jamo && CLUSTER_FINALS.includes(jamo.jong) ? ['JO'] : [])
+  st = trimArms(st, thick, side * INNER_COUNTER, apart)
   const kept = keepCounters(st, st0, side, thick, true, INNER_COUNTER, apart)
   const swap = (s: StackStroke) => mapStroke(s, (p) => ({ x: p.y, y: p.x }))
   const keptH = keepCounters(kept.strokes.map(swap), st0.map(swap), G, { v: thick.h, h: thick.v }, false, INNER_COUNTER_H, apart)
-  return { strokes: kept.strokes, thick, gap: G, bars, ...(Object.keys(kept.yieldV).length ? { yieldV: kept.yieldV } : {}), ...(Object.keys(keptH.yieldV).length ? { yieldH: keptH.yieldV } : {}), ...(kept.widen > 1e-6 ? { widenEm: kept.widen } : {}) }
+  const strokesOut = flatApex(shortenKkokji(kept.strokes, thick, G, kept.yieldV), thick)
+  return { strokes: strokesOut, thick, gap: G, bars, ...(Object.keys(kept.yieldV).length ? { yieldV: kept.yieldV } : {}), ...(Object.keys(keptH.yieldV).length ? { yieldH: keptH.yieldV } : {}), ...(kept.widen > 1e-6 ? { widenEm: kept.widen } : {}) }
 }
 
+/**
+ * ㅅ · ㅆ 꼭짓점: 두 획이 거의 한 점에서 시작해 바깥으로 기울면 butt 끝 두 개가 V로 벌어져 꼭대기에 홈이 진다(「수」, 다람쥐 검수 2026-11-28 · 11/21부터).
+ * 두 획의 첫 토막을 곧게 세우고 시작 높이를 맞춰 끝이 한 줄로 평평하게 닿게 한다. 첫 토막만 바꾼다.
+ */
+function flatApex(st: StackStroke[], thick: StackThick): StackStroke[] {
+  const out = st.slice()
+  for (let i = 0; i < st.length; i++) for (let j = i + 1; j < st.length; j++) {
+    const a = out[i], b = out[j]
+    if (a.part !== b.part || a.closed || b.closed || a.points.length < 2 || b.points.length < 2) continue
+    const pa = a.points[0], pb = b.points[0], t = Math.min(a.thickness, b.thickness) * thick.v
+    if (Math.hypot(pa.x - pb.x, pa.y - pb.y) > 0.5 * t) continue
+    // 위로 선 꼭짓점만(두 획 다 아래로 내려간다).
+    if (a.points[1].y <= pa.y || b.points[1].y <= pb.y) continue
+    const y = Math.min(pa.y, pb.y)
+    const fix = (s: StackStroke): StackStroke => {
+      const p1 = s.points[1], p0 = { x: p1.x, y }
+      const k = s.anchors.reduce((m, q, n) => (Math.hypot(q.x - s.points[0].x, q.y - s.points[0].y) < Math.hypot(s.anchors[m].x - s.points[0].x, s.anchors[m].y - s.points[0].y) ? n : m), 0)
+      return { ...s, points: [p0, ...s.points.slice(1)], anchors: s.anchors.map((q, n) => (n === k ? { ...q, x: p0.x, y } : q)) }
+    }
+    out[i] = fix(a); out[j] = fix(b)
+  }
+  return out
+}
+/**
+ * ㅗ · ㅛ 꼭지(가로홀자 위로 선 짧은 줄기)가 첫닿자 잉크 밑변보다 위에서 시작하면 꼭지 윗끝을 첫닿자 밑변 + 고른 틈까지 내린다.
+ * 「꽤」 · 「꽝」은 ㄲ 두 줄기 사이로 꼭지가 올라와 「ㅍ」처럼 읽혔다(다람쥐 검수 2026-11-28). 보 위로 꼭지가 제 두께만큼은 보이게 남기고, 남은 몫은 위 흐림 선이 첫닿자를 줄여 받는다.
+ */
+function shortenKkokji(st: StackStroke[], thick: StackThick, G: number, yieldV: Yield): StackStroke[] {
+  const ch = st.filter((s) => s.part === 'CH')
+  if (!ch.length) return st
+  return st.map((s) => {
+    if ((s.part !== 'JU_H' && s.part !== 'JU') || s.closed || s.points.length !== 2) return s
+    const [a, b] = s.points, dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y)
+    if (dy < 1e-6 || dx > 0.1 * dy) return s
+    const topI = a.y < b.y ? 0 : 1, top = s.points[topI], bottom = s.points[1 - topI]
+    const kh = s.thickness * thick.v * (yieldV.JU ?? 1) / 2, x0 = top.x - kh - G, x1 = top.x + kh + G
+    let floor = -Infinity
+    for (const c of ch) {
+      const hv = c.thickness * thick.v * (yieldV.CH ?? 1) / 2, hh = c.thickness * thick.h / 2
+      const P = c.closed ? [...c.points, c.points[0]] : c.points
+      for (let k = 0; k < P.length - 1; k++) {
+        const p = P[k], q = P[k + 1]
+        if (Math.max(p.x, q.x) + hv < x0 || Math.min(p.x, q.x) - hv > x1) continue
+        // 토막 사각형의 아래 모서리(기운 줄기는 끝 모서리가 반 두께 × 기울기만큼 더 내려온다).
+        const l = Math.hypot(q.x - p.x, q.y - p.y)
+        if (l < 1e-9) continue
+        const ux = (q.x - p.x) / l, uy = (q.y - p.y) / l, half = hv * uy * uy + hh * ux * ux
+        floor = Math.max(floor, Math.max(p.y, q.y) + half * Math.abs(ux))
+      }
+    }
+    const want = floor + G
+    if (!Number.isFinite(floor) || top.y >= want) return s
+    // 보 위로 꼭지가 제 두께만큼은 보이게 남긴다. 그래도 모자란 틈은 위 흐림 선이 첫닿자를 줄여 받는다(`haloTopFit`).
+    const y = Math.min(want, bottom.y - s.thickness * thick.h / 2 - 2 * kh)
+    if (y <= top.y) return s
+    const points = s.points.map((p, k) => (k === topI ? { ...p, y } : p))
+    // 꼭짓점은 편 점과 순서가 다를 수 있어 윗점에 가장 가까운 것을 옮긴다.
+    const ai = s.anchors.reduce((m, p, k) => (Math.hypot(p.x - top.x, p.y - top.y) < Math.hypot(s.anchors[m].x - top.x, s.anchors[m].y - top.y) ? k : m), 0)
+    const anchors = s.anchors.map((p, k) => (k === ai ? { ...p, y } : p))
+    return { ...s, points, anchors }
+  })
+}
+/**
+ * 한 닿자 안에서 가로 토막의 끝이 옆 획 줄기에 붙으면 그 끝만 줄기에서 속 최소값만큼 물린다(줄기 · 칸은 그대로).
+ * 「꽤」 · 「꽝」 ㄲ 둘째 ㄱ 보 왼끝이 굵어진 첫 ㄱ 줄기에 붙어 「패」로 읽혔다(다람쥐 검수 2026-11-28) — 폰트도 둘째 ㄱ 보를 첫 줄기 앞에서 끊는다.
+ * 줄기 사이(속)는 `keepCounters`가 따로 지킨다. 토막은 줄기 두께의 0.6배(줄기 반 두께 밖으로 조금은 나오게)까지만 줄인다(가설 값).
+ */
+function trimArms(st: StackStroke[], thick: StackThick, want: number, apart: ReadonlySet<Part>): StackStroke[] {
+  const out = st.slice()
+  st.forEach((s, i) => {
+    if (s.closed || s.points.length < 2 || !(s.part === 'CH' || s.part === 'JO') || apart.has(s.part)) return
+    for (const end of [0, s.points.length - 1]) {
+      const cur = out[i], P = cur.points, e = P[end], q = P[end === 0 ? 1 : end - 1]
+      const dx = e.x - q.x, dy = Math.abs(e.y - q.y)
+      if (Math.abs(dx) < 1e-6 || dy > 0.25 * Math.abs(dx)) continue
+      const dir = Math.sign(dx)
+      // 끝이 어느 세로 줄기 중심 가까이(반 두께의 0.3배 안)에 얹혀 있으면(ㅂ 보 끝 · ㄱ 꺾임) 이음이라 안 물린다. 줄기 잉크 안이라도 중심에서 벗어나 있으면(ㄲ) 붙은 것이다.
+      const seated = st.some((o) => o.part === s.part && runsOf([o]).some((r) => e.y >= r.y0 - 1e-6 && e.y <= r.y1 + 1e-6 && Math.abs(runAt(r, e.y).x - e.x) < 0.3 * o.thickness * thick.v / 2))
+      if (seated) continue
+      let limit = dir > 0 ? Infinity : -Infinity
+      st.forEach((o, j) => {
+        if (j === i || o.part !== s.part) return
+        for (const r of runsOf([o])) {
+          if (e.y < r.y0 - 1e-6 || e.y > r.y1 + 1e-6) continue
+          const sx = runAt(r, e.y).x, hv = o.thickness * thick.v / 2
+          // 토막이 줄기 쪽으로 뻗었지만 줄기 중심까지는 안 닿을 때만 — 중심까지 닿으면 이음(ㅂ 가운데 보)이다.
+          if (dir < 0 ? sx < q.x && e.x > sx + hv / 2 : sx > q.x && e.x < sx - hv / 2) limit = dir < 0 ? Math.max(limit, sx + hv + want) : Math.min(limit, sx - hv - want)
+        }
+      })
+      if (!Number.isFinite(limit) || (dir < 0 ? e.x >= limit : e.x <= limit)) continue
+      // 너무 짧아지면 그 끝까지만 물리고, 남은 틈은 `keepCounters`(칸 · 그 자소 세로 굵기)가 받는다.
+      const least = 0.6 * cur.thickness * thick.v
+      if (Math.abs(limit - q.x) < least) limit = q.x + dir * least
+      if (dir < 0 ? e.x >= limit : e.x <= limit) continue
+      const moved = { x: limit, y: e.y }
+      const points = P.map((p, k) => (k === end ? moved : p))
+      const ai = end === 0 ? 0 : cur.anchors.length - 1
+      const anchors = cur.anchors.map((a, k) => (k === ai ? { ...a, x: limit } : a))
+      out[i] = { ...cur, points, anchors }
+    }
+  })
+  return out
+}
 /**
  * ㅝ · ㅞ: ㅜ 보 오른쪽이 ㅓ 곁줄기 위에 겹쳐 서면 굵을 때 둘 사이 위아래 틈이 모자라, 틈을 지키려 가로획을 바닥까지 깎았다
  * (하니무스 2026-11-27 원 · 웠 · 훨, 고른 안 「ㅜ 보 오른쪽 끊기」). 위아래 틈이 고른 틈보다 모자라면 보 오른끝을 곁줄기 왼끝에서
@@ -519,6 +624,23 @@ function runDist(a: Run, b: Run): number {
   }
   return best
 }
+/** 한 닿자 안 두 획인가: 같은 획이거나 같은 부위(첫닿자 · 받침)의 다른 획(ㅃ 두 ㅂ). 겹받침(`apart`)은 다른 획이 다른 자소다. */
+const sameJamo = (st: readonly StackStroke[], a: number, b: number, apart: ReadonlySet<Part>) => { const pa = st[a].part; return a === b || (pa === st[b].part && (pa === 'CH' || pa === 'JO') && !apart.has(pa)) }
+/** 획의 가로 토막 중 높이 y를 덮는 것의 잉크 끝 x — 오른쪽 끝(`dir` 1)이나 왼쪽 끝(−1). 없으면 ∓무한. */
+function armEdge(s: StackStroke, y: number, thick: StackThick, dir: 1 | -1): number {
+  let edge = dir > 0 ? -Infinity : Infinity
+  // 닫힌 획(ㅇ · ㅁ)의 위아래는 제 두 옆을 잇는 테두리다 — 토막 끝이 아니다.
+  if (s.closed) return edge
+  const P = s.points
+  const hh = s.thickness * thick.h / 2
+  for (let k = 0; k < P.length - 1; k++) {
+    const a = P[k], b = P[k + 1], dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y)
+    if (dx < 1e-9 || dy > 0.25 * dx) continue
+    if (y < Math.min(a.y, b.y) - hh || y > Math.max(a.y, b.y) + hh) continue
+    edge = dir > 0 ? Math.max(edge, a.x, b.x) : Math.min(edge, a.x, b.x)
+  }
+  return edge
+}
 type Face = { a: number; b: number; white: number; cut: number; half: number; want: number; inner: boolean }
 /**
  * 한 닿자 안의 속(ㅂ · ㅁ · ㄹ처럼 같은 획의 두 줄기 사이, ㅃ · ㅆ처럼 같은 닿자 두 획 사이)은 고른 틈의 이만큼까지 좁아져도 된다
@@ -528,7 +650,7 @@ export const INNER_COUNTER = 0.7
 /** 가로로 쌓인 속(ㄹ · ㅌ · ㅌ 가로획 사이)의 최소값. 글자 키를 못 늘리니(쌓인 글자 키 = 받침 없는 글자 키) 세로 속보다 더 좁아져도 된다(가설 — 하니무스 「절의 받침 ㄹ은 왤케 가로획 얇지」). */
 export const INNER_COUNTER_H = 0.5
 /** 마주 선 줄기 쌍마다 가장 좁은 가로 흰 틈. `joined`(처음 그림에서 이어진 쌍 — ㅅ 꼭짓점 · ㅂ 모서리)은 뺀다. */
-function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yieldV: Partial<Record<StackGroup, number>>, joined: Set<string>, G: number, inner0: number, apart: ReadonlySet<Part>): Face[] {
+function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yieldV: Partial<Record<StackGroup, number>>, joined: Set<string>, G: number, inner0: number, apart: ReadonlySet<Part>, arms = true): Face[] {
   const out: Face[] = []
   const halfOf = (r: Run, slope: number) => {
     const t = st[r.s].thickness * (yieldV[r.group] ?? 1), uy2 = 1 / (1 + slope * slope)
@@ -538,19 +660,29 @@ function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yie
     if (joined.has(`${i}|${j}`)) continue
     const A = runs[i], B = runs[j], lo = Math.max(A.y0, B.y0), hi = Math.min(A.y1, B.y1)
     if (hi - lo < FACE_MIN) continue
+    const armed = arms && sameJamo(st, A.s, B.s, apart)
     let white = Infinity, cut = 0, half = 0, left = -1, crossed = false
     for (let k = 0; k <= 8; k++) {
       const y = lo + (hi - lo) * k / 8, a = runAt(A, y), b = runAt(B, y)
       const [l, r, li] = a.x <= b.x ? [a, b, i] : [b, a, j]
       if (left >= 0 && li !== left) { crossed = true; break } // 서로 가로지름 — 이어진 쌍으로 본다
       left = li
-      const ha = halfOf(li === i ? A : B, l.slope), hb = halfOf(li === i ? B : A, r.slope), w = r.x - l.x - ha - hb
-      if (w < white) { white = w; cut = (l.x + ha + r.x - hb) / 2; half = (ha + hb) / 2 }
+      const ha = halfOf(li === i ? A : B, l.slope), hb = halfOf(li === i ? B : A, r.slope)
+      // 한 닿자 안(ㄲ · ㅃ)에서는 같은 획의 가로 토막이 두 줄기 사이로 나와 있으면 그 끝까지가 잉크다(「꽤」 ㄲ 둘째 ㄱ 보 왼끝).
+      // 건너편 줄기 중심 가까이까지 닿는 보(ㅂ 가운데 보 같은 이음)는 뺀다. 홀자 보 끝(ㅙ ㅗ 보 → ㅐ 기둥)은 다른 자소 사이라 흐림 선이 맡는다.
+      // 토막 끝이 어느 줄기 중심 가까이 얹혀 있으면(ㅂ 보 끝) 이음이라 안 센다.
+      const seated = (x: number) => runs.some((r) => y >= r.y0 - 1e-6 && y <= r.y1 + 1e-6 && Math.abs(runAt(r, y).x - x) < 0.3 * st[r.s].thickness * thick.v / 2)
+      let la = armed ? armEdge(st[(li === i ? A : B).s], y, thick, 1) : -Infinity, ra = armed ? armEdge(st[(li === i ? B : A).s], y, thick, -1) : Infinity
+      if (Number.isFinite(la) && seated(la)) la = -Infinity
+      if (Number.isFinite(ra) && seated(ra)) ra = Infinity
+      const le = la > l.x && la < r.x - hb / 2 ? Math.max(l.x + ha, la) : l.x + ha, re = ra < r.x && ra > l.x + ha / 2 ? Math.min(r.x - hb, ra) : r.x - hb
+      const w = re - le
+      if (w < white) { white = w; cut = (le + re) / 2; half = (ha + hb) / 2 }
     }
     if (crossed) continue
     // 한 닿자 안 속: 같은 획이거나, 같은 부위의 다른 획(ㅃ 두 ㅂ 사이). 겹받침(`apart`)은 다른 획이 다른 자소다 — 「짧」 ㄹ 아래 열린 속과
     // ㅂ 사이를 한 자소 속으로 보고 0.7배까지 좁혀 ㄹ이 찌그러졌다(하니무스 2026-11-27).
-    const pa = st[A.s].part, inner = A.s === B.s || (pa === st[B.s].part && (pa === 'CH' || pa === 'JO') && !apart.has(pa))
+    const inner = sameJamo(st, A.s, B.s, apart)
     out.push({ a: left === i ? i : j, b: left === i ? j : i, white, cut, half, want: inner ? G * inner0 : G, inner })
   }
   return out
@@ -579,7 +711,7 @@ function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number,
     if (runDist(runs0[i], runs0[j]) < 0.5 * Math.min(st0[runs0[i].s].thickness, st0[runs0[j].s].thickness)) joined.add(`${i}|${j}`)
   }
   const box0 = inkBox(st, thick), width0 = box0.x1 - box0.x0, cx = (box0.x0 + box0.x1) / 2
-  const shortOf = (s: StackStroke[], y: Yield) => facesOf(s, runsOf(s), thick, y, joined, G, inner0, apart).filter((f) => f.white < f.want - 1e-6)
+  const shortOf = (s: StackStroke[], y: Yield) => facesOf(s, runsOf(s), thick, y, joined, G, inner0, apart, widen).filter((f) => f.white < f.want - 1e-6)
   const center = (s: StackStroke[]) => { const b = inkBox(s, thick), d = cx - (b.x0 + b.x1) / 2; return s.map((x) => mapStroke(x, (p) => ({ x: p.x + d, y: p.y }))) }
   const straight = (r: Run) => r.pts.every((p, k) => k === 0 || Math.abs(p.x - r.pts[k - 1].x) <= 0.02 * Math.abs(p.y - r.pts[k - 1].y))
   /**
@@ -587,7 +719,7 @@ function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number,
    *    곧은 세로 줄기끼리, 바로 옆 쌍만(ㅂ · ㅁ · ㄹ 속, ㅃ 두 ㅂ 사이). 그 자소 획만 옮겨 다른 자소(쌈의 ㅆ)는 안 밀린다.
    */
   const reclaim = (s: StackStroke[], y: Yield): StackStroke[] => {
-    const runs = runsOf(s), faces = facesOf(s, runs, thick, y, joined, G, inner0, apart)
+    const runs = runsOf(s), faces = facesOf(s, runs, thick, y, joined, G, inner0, apart, widen)
     const groups = new Set(faces.filter((f) => f.white < f.want - 1e-6).flatMap((f) => [runs[f.a].group, runs[f.b].group]))
     const next = (f: Face) => {
       const A = runs[f.a], B = runs[f.b], m = (Math.max(A.y0, B.y0) + Math.min(A.y1, B.y1)) / 2, xa = runAt(A, m).x, xb = runAt(B, m).x

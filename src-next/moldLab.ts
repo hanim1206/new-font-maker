@@ -797,10 +797,10 @@ const CENTER_CH_KEEP = 0.8
 function centerLiftRoom(lift: number, boxes: Partial<Record<Part, BoxConfig>>, layout?: LayoutType): number {
   if (lift > 0) return boxes.CH ? Math.min(lift, (1 - CENTER_CH_KEEP) * boxes.CH.height) : lift
   if (lift >= 0 || !layout) return lift
-  // 받침 글자는 받침 칸 윗변까지 내리고, 그 너머는 받침 윗변을 같이 눌러 받침을 줄인다(`finalPushOf`) — 받침이 처음의 0.65배(닿자 크기 바닥, 폰트 측정)가 될 때까지.
+  // 받침 글자는 받침 윗변을 허리선과 같은 만큼 같이 내려 받침을 줄인다(`finalPushOf`) — 받침이 처음의 0.65배(닿자 크기 바닥, 폰트 측정)가 될 때까지.
   // 다람쥐 4차(허리선 0에서 「한」 ㅎ이 ㄴ과 겹침) 뒤로 받침 윗변에서 멈췄더니 받침 글자 첫닿자 밑이 0.64까지만 갔다(폰트 95% 0.664, 다람쥐 재검수 4번).
   const jo = boxes.JO
-  const above = (box?: BoxConfig) => (jo && box ? Math.max(0, jo.y - box.y - box.height - 0.05) + (1 - FINAL_PUSH_FLOOR) * jo.height : Infinity)
+  const above = (box?: BoxConfig) => (jo && box ? (1 - FINAL_PUSH_FLOOR) * jo.height : Infinity)
   if (isVertical(layout)) return jo ? Math.max(lift, -above(boxes.CH)) : lift
   const bar = boxes.JU_H ?? boxes.JU
   return bar ? Math.max(lift, -Math.min(Math.max(0, 0.98 - bar.y - bar.height), above(bar))) : lift
@@ -808,12 +808,12 @@ function centerLiftRoom(lift: number, boxes: Partial<Record<Part, BoxConfig>>, l
 /** 받침이 눌려 줄어드는 바닥(처음 키 대비): 닿자 크기 줄 아래 끝 0.65(CH_SIZE, 폰트 측정). */
 const FINAL_PUSH_FLOOR = 0.65
 /** 허리선이 받침 칸 윗변을 넘어 내려간 만큼(받침 윗변을 같이 누르는 양). */
-function finalPushOf(lift: number, boxes: Partial<Record<Part, BoxConfig>>, layout: LayoutType): number {
+function finalPushOf(lift: number, boxes: Partial<Record<Part, BoxConfig>>): number {
   const jo = boxes.JO
   if (lift >= 0 || !jo) return 0
-  const over = isVertical(layout) ? boxes.CH : boxes.JU_H ?? boxes.JU
-  if (!over) return 0
-  return Math.max(0, -lift - Math.max(0, jo.y - over.y - over.height - 0.05))
+  // 내릴 때도 올릴 때처럼 받침 윗변이 허리선과 같은 만큼 따라 내려간다(밑변은 그대로) — 예전엔 위 덩이와 받침 사이 틈을 먼저 먹고서야
+  // 받침을 눌러, ㅡ 글자(급 · 는 · 들)는 낮게 → 가운데 구간에서 받침이 안 움직였다(다람쥐 검수 2026-11-28).
+  return -lift
 }
 export function centerLift(look: Look, boxes: Partial<Record<Part, BoxConfig>>, layout?: LayoutType): number {
   const c = lookOf(look, 'center')
@@ -912,7 +912,7 @@ export function impressBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: Look
   if (k === 1 && lift === 0) return boxes
   const out: Partial<Record<Part, BoxConfig>> = {}
   const pushed = k === 1 ? boxes : pushJamo(boxes, k, layout)
-  const finalPush = layout ? finalPushOf(lift, pushed, layout) : 0
+  const finalPush = layout ? finalPushOf(lift, pushed) : 0
   for (const [part, box] of Object.entries(pushed) as [Part, BoxConfig][]) {
     if (!box) continue
     let next = box

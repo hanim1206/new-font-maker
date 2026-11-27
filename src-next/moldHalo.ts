@@ -1,4 +1,5 @@
 import type { BoxConfig, DecomposedSyllable, Part } from '../src/types'
+import { engineGapOf } from './moldGap'
 
 /**
  * 흐림 선(새 틈 규칙 1단계, 거북이 설계 2026-11-23 · 하니무스 "추천대로 ㄱ"). 설계 `study/mold-gap-design/빚기-새-틈-규칙-설계.md`.
@@ -400,11 +401,67 @@ export function haloFinalFit(strokes: readonly HaloStroke[], ease = FINAL_EASE):
   else if (err < -FINAL_TOLERANCE) move = (err + land) * H
   // 받침을 반 넘게 줄이지는 않는다.
   move = Math.min(move, 0.5 * (joInk.y1 - joInk.y0))
+  if (move > 0) move = Math.min(move, (1 - squashFloorOf(jo)) * (joInk.y1 - joInk.y0))
   return { err, move, top: joInk.y0, bottom: joInk.y1 }
 }
 
 type Boxes = Partial<Record<Part, BoxConfig>>
 
+/**
+ * 자소 칸을 세로로 줄일 때 넘으면 안 되는 배율: 자소 안 위아래로 쌓인 가로 토막 사이 흰 틈이 엔진 틈 바닥(`engineGapOf`) 아래로 가지 않게.
+ * 칸을 줄이면 중심선 사이만 줄고 획 두께는 그대로라, 막지 않으면 를 ㄹ · 북 ㅂ · 뿌 ㅃ 속이 막혔다(다람쥐 검수 2026-11-28). 이미 바닥보다 좁은 틈은 더 안 좁힌다.
+ */
+export function squashFloorOf(strokes: readonly HaloStroke[]): number {
+  const flats: { y: number; half: number; x0: number; x1: number }[] = []
+  for (const stroke of strokes) for (const [a, b] of segsOf(stroke)) {
+    const l = Math.hypot(b.x - a.x, b.y - a.y)
+    if (l < 1e-9 || ((b.y - a.y) / l) ** 2 > 0.1) continue
+    flats.push({ y: (a.y + b.y) / 2, half: segThick(stroke, a, b) / 2, x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x) })
+  }
+  flats.sort((p, q) => p.y - q.y)
+  let floor = 0
+  for (let i = 0; i < flats.length; i++) for (let j = i + 1; j < flats.length; j++) {
+    const p = flats[i], q = flats[j], x0 = Math.max(p.x0, q.x0), x1 = Math.min(p.x1, q.x1), d = q.y - p.y
+    if (x1 - x0 < 1e-3 || d < 1e-6) continue
+    // 사이에 같은 자리를 덮는 토막이 있으면 그 쌍은 이웃이 아니다.
+    if (flats.slice(i + 1, j).some((k) => k.y > p.y + 1e-6 && k.y < q.y - 1e-6 && Math.min(k.x1, x1) - Math.max(k.x0, x0) > 1e-3)) continue
+    const need = p.half + q.half, white = d - need
+    if (white <= 1e-6) continue
+    const keep = Math.min(white, engineGapOf(Math.max(p.half, q.half) * 2))
+    floor = Math.max(floor, (keep + need) / d)
+  }
+  return Math.min(1, floor)
+}
+/** 첫닿자와 보 사이에 선 꼭지(홀자의 세로 토막)의 잉크 윗끝 · 가로 폭 · 두께. 없으면 null. */
+function kkokjiTopOf(strokes: readonly HaloStroke[], chTop: number, chBottom: number, barY: number): { y: number; x0: number; x1: number; t: number } | null {
+  let best: { y: number; x0: number; x1: number; t: number } | null = null
+  for (const stroke of strokes) {
+    if (stroke.part === 'CH' || stroke.part === 'JO') continue
+    for (const [a, b] of segsOf(stroke)) {
+      const l = Math.hypot(b.x - a.x, b.y - a.y)
+      if (l < 1e-9 || ((b.x - a.x) / l) ** 2 > 0.1) continue
+      const top = Math.min(a.y, b.y), bot = Math.max(a.y, b.y), t = segThick(stroke, a, b)
+      // 보 위에서 끝나고(보까지 내려오는) 첫닿자 밑변 아래 가까이에서 시작하는 짧은 세로 — 기둥(ㅐ)은 첫닿자 위까지 올라가 뺀다.
+      if (bot < barY - t || top > barY || top < chTop + 0.25 * (chBottom - chTop)) continue
+      const x = (a.x + b.x) / 2
+      if (!best || top < best.y) best = { y: top, x0: x - t / 2, x1: x + t / 2, t }
+    }
+  }
+  return best
+}
+/** x 띠 안에서 획 잉크의 가장 낮은 y(토막 사각형 모서리까지). */
+function inkBottomIn(strokes: readonly HaloStroke[], x0: number, x1: number): number | null {
+  let low: number | null = null
+  for (const stroke of strokes) for (const [a, b] of segsOf(stroke)) {
+    const l = Math.hypot(b.x - a.x, b.y - a.y)
+    if (l < 1e-9) continue
+    const half = segThick(stroke, a, b) / 2, ux = (b.x - a.x) / l
+    if (Math.max(a.x, b.x) + half < x0 || Math.min(a.x, b.x) - half > x1) continue
+    const y = Math.max(a.y, b.y) + half * Math.abs(ux)
+    low = low === null ? y : Math.max(low, y)
+  }
+  return low
+}
 /** 위 흐림 선 결과: 첫닿자 잉크 밑변을 위로 올릴 양(+ 줄임 · − 늘림, 글자 칸 좌표)과 잉크 윗변 · 밑변. */
 export interface TopFit {
   /** 선 − 보 윗변, 글자 키의 몫(+ 답답 · − 자리 남음). 고치기 전. */
@@ -431,7 +488,8 @@ export function haloTopFit(strokes: readonly HaloStroke[], rule: HaloRule, top: 
       const l = Math.hypot(b.x - a.x, b.y - a.y)
       if (l < 1e-9 || ((b.y - a.y) / l) ** 2 > 0.1) continue
       const half = segThick(stroke, a, b) / 2, y = Math.min(a.y, b.y) - half
-      if (y <= chInk.y1) continue
+      // 보는 첫닿자 가운데보다 아래에서 가장 긴 가로 토막 — 첫닿자 줄기가 보 윗변 아래까지 내려와 있어도(꽝 ㄲ 굵기 끝) 보를 놓치지 않게.
+      if (y <= (chInk.y0 + chInk.y1) / 2) continue
       if (!bar || l > bar.len) bar = { y, x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), len: l, unit: stroke.thickness * (stroke.thick?.v ?? 1) }
     }
   }
@@ -448,6 +506,20 @@ export function haloTopFit(strokes: readonly HaloStroke[], rule: HaloRule, top: 
   // 늘릴 때는 보와 바닥 틈을 남기고, 어느 쪽이든 첫닿자 키의 몫 끝까지만.
   move = Math.max(move, chInk.y1 - (bar.y - TOP_FLOOR * H))
   move = Math.max(-TOP_LIMIT * height, Math.min(TOP_LIMIT * height, move))
+  // 꼭지(보 위로 선 짧은 줄기)와 첫닿자 사이에도 엔진 틈 바닥을 — 「꽤」 ㄲ 두 줄기 사이로 꼭지가 올라와 「ㅍ」처럼 읽혔다(다람쥐 검수 2026-11-28).
+  const kk = kkokjiTopOf(strokes, chInk.y0, chInk.y1, bar.y)
+  if (kk) {
+    // 꼭지 위(양옆 틈 바닥만큼 넓힌 띠), 그리고 꼭지가 양쪽 줄기 사이에 끼면(꽈 · 꽝 ㄲ — 「ㅍ」처럼 읽힘) 덜 내려온 쪽 줄기까지 꼭지 위로.
+    // 한쪽에만 줄기가 있는 것(고 ㄱ)은 폰트도 꼭지 옆으로 내려온다.
+    const g = engineGapOf(kk.t), over = inkBottomIn(ch, kk.x0 - g, kk.x1 + g)
+    const left = inkBottomIn(ch, -Infinity, kk.x0 - g), right = inkBottomIn(ch, kk.x1 + g, Infinity)
+    const nested = left !== null && right !== null && left > kk.y - g && right > kk.y - g ? Math.min(left, right) : null
+    const low = over === null ? nested : nested === null ? over : Math.max(over, nested)
+    // 칸 윗변을 두고 세로로 줄이면 낮은 점은 y0 + (low − y0) × (1 − move ÷ 키)로 간다.
+    if (low !== null && low - chInk.y0 > 1e-6) move = Math.max(move, height * (1 - (kk.y - g - chInk.y0) / (low - chInk.y0)))
+  }
+  // 줄일 때는 첫닿자 속이 엔진 틈 바닥 아래로 막히지 않을 만큼만.
+  if (move > 0) move = Math.min(move, (1 - squashFloorOf(ch)) * height)
   return { err, move, top: chInk.y0, bottom: chInk.y1 }
 }
 /** 위 흐림 선: 첫닿자 칸을 잉크 윗변을 두고 세로로만 늘이거나 줄인다. */
