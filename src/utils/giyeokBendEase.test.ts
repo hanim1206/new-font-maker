@@ -35,6 +35,12 @@ describe('easeBendForFamily', () => {
     expect(easeBendForFamily('ㄱ', [mild], 'bottom')[0]).toBe(mild)
   })
 
+  it('긋기로 가로 마디에 점이 촘촘히 붙어도 굽음을 줄인다', () => {
+    const dense = { ...giyeok, points: [{ x: 0, y: 0 }, { x: 0.5, y: 0.01 }, { x: 0.97, y: 0.002 }, { x: 0.976, y: 0 }, giyeok.points[2]] }
+    const [out] = easeBendForFamily('ㄱ', [dense], 'bottom', { bottom: 0.1, mixed: 0.05 })
+    expect(out.points[4].x).toBeCloseTo(0.976 - 0.92 * 0.1)
+  })
+
   it('ㄱ 무리가 아니면(ㅈ 삐침 등) 손 안 댐', () => {
     expect(easeBendForFamily('ㅈ', [giyeok], 'bottom')).toEqual([giyeok])
   })

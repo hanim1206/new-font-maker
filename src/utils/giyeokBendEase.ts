@@ -7,24 +7,27 @@ import type { MedialFamily, StrokeDataV2 } from '../types'
  *
  * 비율 출처(2026-11-27, 고딕 7벌 노토 한 표, 2-가 전파 판 img/10 · 11):
  * 「고 ÷ 가」 굽음 비 0.09~0.21(가운데 0.13), 「과 ÷ 가」 0.13~0.24. 엔진 획에서 폰트 범위 안에 드는 값으로
- * 아래 0.08 ÷ 0.92 ≈ 0.087, 섞임 0.06 ÷ 0.92 ≈ 0.065. 사용자가 바꿀 수 있게 값으로 받는다(화면 손잡이는 아직 없음).
+ * 처음엔 가운데쯤(아래 0.087 · 섞임 0.065, 잰 굽음 0.12)으로 넣었다가 하니무스 "고 에서 너무 커브 쎈데"(2026-11-27)로
+ * 폰트 범위 맨 아래(고 굽음 0.08, 42닷)에 맞춰 아래 0.04 · 섞임 0.03으로 내림. 사용자가 바꿀 수 있게 값으로 받는다(화면 손잡이는 아직 없음).
  *
- * 바닥: 원래 굽음이 작으면(살짝 굽은 ㄱ) 더 펴지 않는다. 줄인 굽음 = max(굽음 × 비율, min(굽음, 비율 × FULL_BEND)).
- * FULL_BEND 0.92 = 기본 프리셋 가 ㄱ 굽음(칸 폭 대비). 그래서 기본 프리셋은 고 0.08 · 과 0.06이 되고,
- * 그보다 덜 굽은 획(사용자 프리셋 01의 ㄱ 0.056 등)은 고 · 과에서도 그대로 둔다.
+ * 줄인 굽음 = max(굽음 × 비율, 비율 × FULL_BEND). 기본 프리셋(0.92)은 고 0.037 · 과 0.028.
+ * 굽음이 GENTLE_BEND 이하인 획(살짝 굽은 ㄱ)은 고 · 과에서도 그대로 둔다.
  */
 export interface BendEase {
   bottom: number
   mixed: number
 }
 
-export const BEND_EASE_DEFAULT: Readonly<BendEase> = { bottom: 0.087, mixed: 0.065 }
+export const BEND_EASE_DEFAULT: Readonly<BendEase> = { bottom: 0.04, mixed: 0.03 }
 
 /** 굽음을 더는 닿자. ㅈ · ㅅ 같은 삐침은 모양이 비슷해도 넣지 않는다(내림이 아니라 삐침). */
 export const BEND_EASE_JAMO = 'ㄱㅋㄲ'
 
 /** 기본 프리셋 가 ㄱ 굽음(꺾임 − 내림 끝, 칸 폭 대비). 바닥 = 비율 × 이 값. */
 export const FULL_BEND = 0.92
+
+/** 이만큼 이하로 굽은 내림(살짝 굽은 ㄱ, 사용자 프리셋 01의 0.056 등)은 이미 고 · 과 모양이라 손 안 댄다. */
+export const GENTLE_BEND = 0.06
 
 type Pt = { x: number; y: number }
 type Anchor = StrokeDataV2['points'][number]
@@ -61,7 +64,8 @@ function bentDescender(stroke: StrokeDataV2): boolean {
   const pts = stroke.points
   if (stroke.closed || pts.length < 3) return false
   const [a, c, e] = pts.slice(-3)
-  const horizontal = Math.abs(c.y - a.y) < 0.15 && c.x - a.x > 0.1
+  // 긋기로 가로 마디를 바꾸면 꺾임 앞에 점이 촘촘히 붙는다. 바로 앞 점은 꺾임과 높이가 비슷하고 왼쪽이면 가로 마디로 본다.
+  const horizontal = Math.abs(c.y - a.y) < 0.15 && c.x - a.x > 0.001
   return horizontal && e.y - c.y > 0.3 && c.x - e.x > 0.005
 }
 
@@ -106,7 +110,8 @@ function easeStrokes(strokes: StrokeDataV2[], factor: number): StrokeDataV2[] {
     const corner = pts[n - 2]
     const end = pts[n - 1]
     const dx = corner.x - end.x
-    const keep = Math.max(dx * factor, Math.min(dx, factor * FULL_BEND)) / dx
+    if (dx <= GENTLE_BEND) return stroke
+    const keep = Math.max(dx * factor, factor * FULL_BEND) / dx
     if (keep >= 1 - 1e-9) return stroke
     const nextEnd: Anchor = { ...end, x: corner.x - dx * keep, handleIn: scaleX(end.handleIn, corner.x, keep) }
     if (!end.handleIn) delete nextEnd.handleIn
