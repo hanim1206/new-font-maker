@@ -877,7 +877,9 @@ function pushJamo(boxes: Partial<Record<Part, BoxConfig>>, k: number, layout?: L
     out[part] = { ...box, x: box.x - dw * sideShare(inner, 'l'), y: box.y - dh * sideShare(inner, 't'), width: box.width + dw, height: box.height + dh }
     if (part === 'CH') {
       // 기둥은 닿자 크기에 따라(`pillarPush`), 보는 0.1만 밀린다(먼 변은 그대로).
-      const side = mixed ? out.JU_V : vertical ? out.JU : undefined
+      // 섞임홀자(ㅘ ㅙ ㅚ …)는 기둥을 안 민다: 보(가로 쪽)는 그 자리라 기둥만 닿자 쪽으로 오면 보를 뚫는다
+      // (「과」 닿자 작게: 세로 쪽 칸이 0.2 → 0.38로 왼쪽으로 늘어 ㅏ 기둥이 ㅗ 보 위에 섰다, 2026-11-27). 기둥 · 보는 고정(C026).
+      const side = mixed ? undefined : vertical ? out.JU : undefined
       if (side && inner.includes('r')) { const m = dw * pillarPush(k), next = { ...side, x: side.x + m, width: Math.max(0.01, side.width - m) }; if (mixed) out.JU_V = next; else out.JU = next }
       const bar = mixed ? out.JU_H : !vertical ? out.JU : undefined
       if (bar && inner.includes('b')) { const m = dh * PUSH.vowel; if (mixed) out.JU_H = { ...bar, y: bar.y + m }; else out.JU = { ...bar, y: bar.y + m } }

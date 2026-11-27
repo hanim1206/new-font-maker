@@ -35,6 +35,7 @@ import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, drawnStem, LAYOUTS, mastersOf, penThicknessOf, shapeConsonants, shownRunsOf, STEMS, stemInfo, type ShownRuns, vowelStemKeys, withPenThicknessVowels, type DrawnStem, type StemKind } from './strokeLab'
 import { MoldDotPlate } from './MoldDotPlate'
 import { thinBudget, thinSyllable, type BudgetStroke } from './moldBudget'
+import { kkokjiSyllable } from './moldKkokji'
 import { finalBoxes, HALO_ENGINE, haloBoxes, haloCorrect, haloFinalFit, haloFit, haloScope, type HaloFit, type HaloStroke } from './moldHalo'
 import styles from './MoldLabPage.module.css'
 
@@ -686,6 +687,12 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     // 획 끝 · 꺾임은 둥글기 하나가 맡는다(거북이 방향안 4차). 둥글기 · 대비 · 붓촉은 엔진의 붓 값에 얹는다(`moldInk`).
     return moldInk(weighted, { round, contrast, nib })
   }, [effective, ratio, round, contrast, nib, patternContrast, heavyOn])
+  // ㅗ 꼭지는 그릴 칸이 다 정해진 뒤, 꼭지 높이의 닿자 밑 흰 넓이 가운데로(C026). 기둥 · 보는 그대로.
+  const kkokji = useMemo(() => {
+    if (heavy) return kkokjiSyllable(heavy.syllable, heavy.boxes, effective, weightToMultiplier(MOLD_BASE_WEIGHT) * heavy.thick.CH.v)
+    if (placement.kind !== 'boxes' || !budgetBoxes) return null
+    return kkokjiSyllable(budget.syllable, halo?.boxes ?? budgetBoxes, globalStyle, weightToMultiplier(globalStyle.weight))
+  }, [heavy, placement.kind, budgetBoxes, budget.syllable, halo, globalStyle, effective])
   const colorOf = useCallback((source: ResolvedStrokeInkSource) => {
     // 토막으로 나눈 획(`#`)은 보이는 토막만 남긴 것이다.
     if (shownStroke) return source.strokeId.includes(SHOWN_CUT) || shownStroke(`${simsPartOf(source.part)}:${source.jamoId}:${pieceOf(source.strokeId)?.id ?? source.strokeId}`) !== 'none' ? undefined : 'transparent'
@@ -732,7 +739,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     // 자소마다 가로 · 세로 굵기가 다르다. 엔진의 대비(토막 방향별 두께)를 자소마다 따로 줘서 겹쳐 그린다.
     const flat = globalStyle.strokeStyle.mode !== 'brush' || globalStyle.strokeStyle.brush.tip !== 'round'
     const layers = (['CH', 'JU', 'JO'] as const).filter((group) => (group === 'CH' ? budget.syllable.choseong : group === 'JU' ? budget.syllable.jungseong : budget.syllable.jongseong))
-    return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char} data-halo={haloAttr(haloFitNow)} data-final={finalNow ? `${finalNow.err.toFixed(4)} ${finalNow.move.toFixed(4)}` : undefined} data-fence={fenced ? fenced.need.toFixed(3) : undefined} data-heavy={layers.map((group) => `${group}:${heavy.thick[group].v.toFixed(3)}/${heavy.thick[group].h.toFixed(3)}`).join(' ')}>
+    return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char} data-halo={haloAttr(haloFitNow)} data-final={finalNow ? `${finalNow.err.toFixed(4)} ${finalNow.move.toFixed(4)}` : undefined} data-fence={fenced ? fenced.need.toFixed(3) : undefined} data-kkokji={kkokji?.fit ? kkokji.fit.shift.toFixed(4) : undefined} data-heavy={layers.map((group) => `${group}:${heavy.thick[group].v.toFixed(3)}/${heavy.thick[group].h.toFixed(3)}`).join(' ')}>
       {layers.map((group, at) => {
         // 납작 붓: 기둥은 세로 두께 그대로(타원 가로 폭 몫만큼 붓을 키운다), 가로는 붓 각도가 저절로 가늘게 한다.
         const brush = globalStyle.strokeStyle.mode === 'brush' ? globalStyle.strokeStyle.brush : null
@@ -740,7 +747,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
         const style = flat || globalStyle.strokeStyle.mode !== 'brush' ? globalStyle : { ...globalStyle, strokeStyle: heavyStrokeStyle(globalStyle.strokeStyle, ink.contrast) }
         return <span key={group} className={at === 0 ? undefined : styles.glyphLayer}>
           <SvgRenderer
-            syllable={shownCut(onlyGroup(heavy.syllable, group), shownStroke)}
+            syllable={shownCut(onlyGroup(kkokji?.syllable ?? heavy.syllable, group), shownStroke)}
             boxes={heavy.boxes}
             size={size}
             globalStyle={style}
@@ -754,9 +761,9 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       })}
     </span>
   }
-  return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char} data-halo={haloAttr(haloFitNow)} data-final={finalNow ? `${finalNow.err.toFixed(4)} ${finalNow.move.toFixed(4)}` : undefined} data-fence={fenced ? fenced.need.toFixed(3) : undefined} data-budget={Object.entries(budget.factors).map(([key, f]) => `${key}:${f.toFixed(2)}`).join(' ') || undefined}>
+  return <span className={styles.glyph} style={slot} data-testid={testId} data-char={char} data-halo={haloAttr(haloFitNow)} data-final={finalNow ? `${finalNow.err.toFixed(4)} ${finalNow.move.toFixed(4)}` : undefined} data-fence={fenced ? fenced.need.toFixed(3) : undefined} data-kkokji={kkokji?.fit ? kkokji.fit.shift.toFixed(4) : undefined} data-budget={Object.entries(budget.factors).map(([key, f]) => `${key}:${f.toFixed(2)}`).join(' ') || undefined}>
     <SvgRenderer
-      syllable={shownCut(budget.syllable, shownStroke)}
+      syllable={shownCut(kkokji?.syllable ?? budget.syllable, shownStroke)}
       schema={placement.kind === 'schema' ? placement.schema : undefined}
       boxes={halo?.boxes ?? budgetBoxes}
       size={size}
