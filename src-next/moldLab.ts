@@ -879,7 +879,9 @@ function pushJamo(boxes: Partial<Record<Part, BoxConfig>>, k: number, layout?: L
     if (part === 'CH') {
       // 기둥은 닿자 크기에 따라(`pillarPush`), 보는 0.1만 밀린다(먼 변은 그대로).
       const side = mixed ? out.JU_V : vertical ? out.JU : undefined
-      if (side && inner.includes('r')) { const m = dw * pillarPush(k), next = { ...side, x: side.x + m, width: Math.max(0.01, side.width - m) }; if (mixed) out.JU_V = next; else out.JU = next }
+      // 기둥은 첫닿자 안쪽 변이 움직인 만큼(dw × 안쪽 몫)보다 더 따라가지 않는다 — 「틈을 지킨다」의 끝이 거기다. 예전엔 닿자를 줄일 때
+      // dw 전체(밀림 1.0)를 밀어 기둥 · 곁줄기가 안쪽 변을 넘어 첫닿자와 겹쳤다(닿자 크기 0에서 쌔 ㅆ이 ㅐ 기둥에 묻힘, 다람쥐 극단 검수 2026-11-27).
+      if (side && inner.includes('r')) { const m = dw * Math.min(pillarPush(k), sideShare(inner, 'r')), next = { ...side, x: side.x + m, width: Math.max(0.01, side.width - m) }; if (mixed) out.JU_V = next; else out.JU = next }
       const bar = mixed ? out.JU_H : !vertical ? out.JU : undefined
       if (bar && inner.includes('b')) { const m = dh * PUSH.vowel; if (mixed) out.JU_H = { ...bar, y: bar.y + m }; else out.JU = { ...bar, y: bar.y + m } }
     } else {

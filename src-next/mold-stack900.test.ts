@@ -76,4 +76,17 @@ describe('900 쌓임 규칙', () => {
     // 왼 기둥(첫닿자 쪽)은 안쪽으로 굵힌 자리 그대로.
     expect(out.strokes[1].points[0].x).toBeLessThan(0.6 + 0.05)
   })
+  it('ㅃ 속은 굵기 끝에서도 고른 틈을 지킨다 — 먼저 칸을 넓히고(1.1배까지), 모자라면 그 자소 세로만 가늘게, 그래도 모자라면 더 넓힌다', () => {
+    // 「뻐」 꼴: ㅂ 둘(위가 열린 U + 가운데 가로) · ㅓ. 두 ㅂ 사이도 붙어 있다.
+    const b = (x0: number, x1: number): StackStroke[] => [line('CH', [[x0, 0.14], [x0, 0.7], [x1, 0.7], [x1, 0.14]], 0.127), line('CH', [[x0, 0.4], [x1, 0.4]], 0.127)]
+    const st = [...b(0.1, 0.29), ...b(0.4, 0.59), line('JU', [[0.78, 0.05], [0.78, 0.96]], 0.127), line('JU', [[0.62, 0.43], [0.78, 0.43]], 0.127)]
+    const out = solveStack900({ char: '뻐', strokes: st, height: 0.9, reach: 1, inward: BLACK_STEM_GAIN })
+    const v = (g: 'CH' | 'JU') => out.thick.v * (out.yieldV?.[g] ?? 1)
+    const stems = out.strokes.flatMap((s) => s.points.slice(0, -1).map((p, i) => [p, s.points[i + 1], s.part] as const)).filter(([p, q]) => Math.abs(p.x - q.x) < 1e-9 && Math.abs(p.y - q.y) > 0.2)
+      .map(([p, , part]) => ({ x: p.x, t: 0.127 * v(part === 'CH' ? 'CH' : 'JU') })).sort((a, c) => a.x - c.x)
+    for (let i = 0; i < stems.length - 1; i++) expect(stems[i + 1].x - stems[i].x - (stems[i].t + stems[i + 1].t) / 2).toBeGreaterThanOrEqual(out.gap - 1e-3)
+    // 칸 넓힘(1.1배) → 가늘게(바닥 0.69) 다음에야 1.1배 너머로 — 이 빽빽한 꼴은 셋 다 쓴다.
+    expect(out.yieldV?.CH).toBeCloseTo(0.69, 6)
+    expect(out.widenEm ?? 0).toBeGreaterThan(0.1 * (0.78 - 0.1 + 0.127 * BLACK_STEM_GAIN))
+  })
 })
