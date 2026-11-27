@@ -341,6 +341,14 @@ describe('도트판 인상 잡기', () => {
     expect(h.JO!.y + h.JO!.height).toBeCloseTo(0.95 + 0.0175)
     expect(h.CH!.y).toBeCloseTo(0.05 - 0.015)
   })
+  it('닿자를 줄여도 기둥은 첫닿자 안쪽 변을 넘어오지 않는다 — 칸 틈 그대로(닿자 크기 0)', async () => {
+    const { impressBoxes } = await import('./moldLab')
+    const v = impressBoxes(VERTICAL, { jamo: 0.55 }, 'choseong-jungseong-vertical')
+    const gap0 = VERTICAL.JU.x - (VERTICAL.CH.x + VERTICAL.CH.width), gap = v.JU!.x - (v.CH!.x + v.CH!.width)
+    expect(gap).toBeGreaterThanOrEqual(gap0 - 1e-9)
+    // 먼 변(글자 오른끝)은 그대로.
+    expect(v.JU!.x + v.JU!.width).toBeCloseTo(0.9)
+  })
   it('무게중심(허리선): 틀은 두고 첫닿자 밑변과 보가 오른다 · 받침 글자는 폭이 좁다', async () => {
     const { impressBoxes, waistSyllable } = await import('./moldLab')
     // 받침 글자: 위로 끝까지 글자 키(0.9)의 15.5%(폰트 첫닿자밑받침 5번째 백분위 0.451까지, 다람쥐 재검수 4번)

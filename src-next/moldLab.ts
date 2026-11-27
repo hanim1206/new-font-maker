@@ -548,7 +548,7 @@ export const BLACK_CENTER = BLACK_TOTAL / BLACK_STEM_GAIN
 export const HEAVY_TOP = weightRatioOfThickness(BLACK_RATIO)
 /** 굵어진 몫 가운데 가로줄기가 받는 비율. 굵은 폰트는 가로를 덜 굵게 한다(검은고딕 가로 ÷ 세로 0.79, 노토 900 0.96). */
 export const HEAVY_HORIZONTAL_SHARE = 0.8
-export const LOOK_WALL = { weight: [0.25, HEAVY_TOP], weightBase: [0.25, HEAVY_TOP], soft: [0, 1], frame: [0.74, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.45, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09], ease: [HALO_SCALE.ease[0], Math.max(HALO_SCALE.ease[2], HALO_ENGINE.ease)], spread: [HALO_SCALE.spread[0], HALO_SCALE.spread[2]], ...STEM_WALL } as const
+export const LOOK_WALL = { weight: [0.25, HEAVY_TOP], weightBase: [0.25, HEAVY_TOP], soft: [0, 1], frame: [0.74, 1.24], tracking: [-0.08, 0.2], size: [0.83, 1.105], height: [0.6, 1.3], jamo: [0.55, 1.37], center: [-1, 1], round: [0, 1], contrast: [-0.38, 0.97], balloon: [0.01, 0.08], open: [0.6, 1], branch: [0.3, 1.6], serif: [0, 1], nib: [0, 1], jag: [0.027, 0.09], ease: [HALO_SCALE.ease[0], Math.max(HALO_SCALE.ease[2], HALO_ENGINE.ease)], spread: [HALO_SCALE.spread[0], HALO_SCALE.spread[2]], ...STEM_WALL } as const
 export const LOOK_ENGINE = { weight: 1, weightBase: 1, soft: 0, frame: 1, tracking: 0, size: 1, height: 1, jamo: 1, center: 0, round: 0, contrast: 0, balloon: 0.04, open: 1, branch: 1, serif: 0, nib: 0, jag: 0.027, ease: HALO_ENGINE.ease, spread: HALO_ENGINE.spread, ...STEM_ENGINE } as const
 const clampLook = (key: keyof typeof LOOK_WALL, value: number) => Math.max(LOOK_WALL[key][0], Math.min(LOOK_WALL[key][1], value))
 export const lookOf = (look: Look, key: keyof Look): number => {
@@ -879,7 +879,9 @@ function pushJamo(boxes: Partial<Record<Part, BoxConfig>>, k: number, layout?: L
     if (part === 'CH') {
       // 기둥은 닿자 크기에 따라(`pillarPush`), 보는 0.1만 밀린다(먼 변은 그대로).
       const side = mixed ? out.JU_V : vertical ? out.JU : undefined
-      if (side && inner.includes('r')) { const m = dw * pillarPush(k), next = { ...side, x: side.x + m, width: Math.max(0.01, side.width - m) }; if (mixed) out.JU_V = next; else out.JU = next }
+      // 기둥은 첫닿자 안쪽 변이 움직인 만큼(dw × 안쪽 몫)보다 더 따라가지 않는다 — 「틈을 지킨다」의 끝이 거기다. 예전엔 닿자를 줄일 때
+      // dw 전체(밀림 1.0)를 밀어 기둥 · 곁줄기가 안쪽 변을 넘어 첫닿자와 겹쳤다(닿자 크기 0에서 쌔 ㅆ이 ㅐ 기둥에 묻힘, 다람쥐 극단 검수 2026-11-27).
+      if (side && inner.includes('r')) { const m = dw * Math.min(pillarPush(k), sideShare(inner, 'r')), next = { ...side, x: side.x + m, width: Math.max(0.01, side.width - m) }; if (mixed) out.JU_V = next; else out.JU = next }
       const bar = mixed ? out.JU_H : !vertical ? out.JU : undefined
       if (bar && inner.includes('b')) { const m = dh * PUSH.vowel; if (mixed) out.JU_H = { ...bar, y: bar.y + m }; else out.JU = { ...bar, y: bar.y + m } }
     } else {
@@ -949,7 +951,7 @@ export function waistSyllable(syllable: DecomposedSyllable, lift: number, boxes:
   return { ...syllable, jungseong: next }
 }
 
-/** 받침 없는 글자의 키(탈네모): 받침 없는 짜임은 글자 윗변을 두고 세로로 `open`배. */
+/** 받침 없는 글자의 키(탈네모): 받침 없는 짜임은 글자 윗변을 두고 세로로 `open`배. 끝은 0.6배(하니무스 2026-11-27 「ㅇㅇ」 — 0.45에서 글자 키가 절반 가까이 납작해졌다. 잰 값 아님, 가설). */
 function openBoxes(boxes: Partial<Record<Part, BoxConfig>>, open: number, layout?: LayoutType): Partial<Record<Part, BoxConfig>> {
   if (open === 1 || !layout || layout.includes('jongseong')) return boxes
   const list = Object.values(boxes).filter((box): box is BoxConfig => !!box)
