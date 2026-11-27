@@ -297,10 +297,11 @@ describe('도트판 인상 잡기', () => {
     expect(notoDot('size')).toBe(9)
     expect(notoDot('contrast')).toBe(7)
     // 자소 사이 여유: 엔진(0.78)은 폰트 여섯보다 촘촘해 칸 0(촘촘 끝)에 선다.
-    expect(dotsOf({}, FRAME_KEYS)).toEqual([9, 12, 0, 20, 10])
-    // 크기 · 여유는 판에서 뺐다(하니무스 2026-11-27).
+    expect(dotsOf({}, FRAME_KEYS)).toEqual([9, 12, 0, 20, 0, 10])
+    expect(dotToLook('ease', 0)).toBeCloseTo(0.78)
+    // 크기는 판에서 뺐다. 여유는 「보정 세기」로 무게중심 앞에 돌아왔다(하니무스 2026-11-27).
     expect(FRAME_KEYS).not.toContain('size')
-    expect(FRAME_KEYS).not.toContain('ease')
+    expect(FRAME_KEYS[FRAME_KEYS.length - 2]).toBe('ease')
     // 대비를 안 만지면 굵기 1의 폰트 패턴(가로 ÷ 세로 0.88, `contrastPatternOf`)이라 가운데(0.83) 바로 아래 칸 9.
     expect(dotsOf({}, INK_KEYS)).toEqual([9, 9, 0])
     expect(INK_KEYS).not.toContain('nib')
