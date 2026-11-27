@@ -190,8 +190,9 @@
 /* 글자 문지르기 판(인상 잡기 도트판 대신, 2026-11-27): 왼쪽 세로 휠 · 오른쪽 묶음 판 · 아래 눈금 섬 */
 .rub {
   display: grid;
+  min-height: 0;
   grid-template-columns: 96px minmax(0, 1fr);
-  grid-template-rows: auto auto auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 8px;
   padding: 8px;
   border-radius: var(--radius-lg);
@@ -199,11 +200,11 @@
   user-select: none;
   -webkit-user-select: none;
 }
-.rubWheel { grid-row: 1; height: 348px; border-radius: var(--radius-md); background: rgb(var(--color-surface)); }
-.rubMain { grid-row: 1; display: grid; grid-template-rows: auto 1fr; min-width: 0; gap: 4px; }
+.rubWheel { grid-row: 1; min-height: 0; border-radius: var(--radius-md); background: rgb(var(--color-surface)); }
+.rubMain { grid-row: 1; display: grid; min-height: 0; grid-template-rows: auto minmax(0, 1fr); min-width: 0; gap: 4px; }
 .rubStage {
   position: relative;
-  height: 300px;
+  min-height: 0;
   overflow: hidden;
   border-radius: var(--radius-md);
   touch-action: none;
@@ -254,4 +255,18 @@
 .rubRead strong { font-size: var(--font-16); font-weight: var(--weight-bold); }
 .rubEnds { flex: 1; min-width: 0; color: rgb(var(--color-text-3)); font-size: var(--font-12); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rubValue { font-size: var(--font-24); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; }
-.rubDice { grid-column: 1 / -1; justify-self: center; }
+.rubNote { margin: 0; padding-inline: 4px; color: rgb(var(--color-warning)); font-size: var(--font-12); }
+
+/* 인상 잡기: 판이 화면 전체, 스크롤 없음(하니무스 2026-11-27) */
+.page[data-full] {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-content: stretch;
+  gap: 8px;
+  padding-block: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-bottom));
+}
+.page[data-full] .eyebrow { display: none; }
+.page[data-full] .steps { margin-top: 0; }
+.moldActions[data-row] { grid-template-columns: 1fr 1fr 1.4fr; }

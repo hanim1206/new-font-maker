@@ -1335,7 +1335,6 @@ export function MoldLabPage() {
   const widenPct = lineChars.length ? Math.round(lineChars.reduce((sum, [, at]) => sum + (pushes[`${sentence}-${at}`] ?? 0), 0) / lineChars.length * 1000) / 10 : 0
   // 1단계 흐림 선이 아직 안 맡는 글자(쌍닿자 · ㅍ). 예전 셈 그대로라고 작게 알린다(고양이 제안, 하니무스 2026-11-23 "ㅇㅇ").
   const oldRule = [...new Set(lineChars.map(([char]) => char).filter((char) => { const code = char.charCodeAt(0) - 0xac00; return code >= 0 && code < 11172 && [1, 4, 8, 10, 13, 17].includes(Math.floor(code / 588)) /* ㄲ ㄸ ㅃ ㅆ ㅉ ㅍ */ }))]
-  const [more, setMore] = useState(false)
   const weightCap = Math.min(Infinity, ...[...sentence].map((char, at) => (char === ' ' ? Infinity : caps[`${sentence}-${at}`] ?? Infinity)))
   const weightNote = appliedWeight(lookOf(look, 'weight'), weightCap) < lookOf(look, 'weight') ? (lookOf(look, 'weight') > 1 ? '가장 빽빽한 글자의 가는 획이 글자 바닥(기준 세로줄기의 0.5배)에 닿아 글줄 굵기가 여기서 멈춤' : '획이 붙기 직전이라 글줄 전체가 여기서 멈춤') : ''
   // 굵기 줄에서 더 가면 획이 붙는 칸은 잠근다(그림이 안 바뀌는데 값만 오르는 일이 없게).
@@ -1525,7 +1524,11 @@ export function MoldLabPage() {
   const NEXT_LABEL: Partial<Record<Step, string>> = { shape: '부위 다듬기로', part: '획 다듬기로', stroke: '마무리로' }
   const tracking = lookOf(look, 'tracking'), [t0, t1] = LOOK_WALL.tracking, trackingPct = Math.round((tracking - t0) / (t1 - t0) * 100)
 
-  return <MoldOriginContext.Provider value={origin}><main className={styles.page}>
+  // 인상 잡기는 판이 화면 전체(하니무스 2026-11-27 "인상잡기 예시문장 말고 전체화묜을 쟤가 잡아야해. 스크롤없게").
+  // 예시 글줄은 숨겨만 둔다 — 글줄 글자가 굵기 상한 · 쌓임 키를 재서 판 글자에 넘겨 준다.
+  const full = step === 'shape'
+  const rubNote = [weightNote, widenPct > 0 ? `굵어져 넓어짐 +${widenPct}%` : '', oldRule.length > 0 ? `아직 예전 셈 · ${oldRule.join(' ')}` : ''].filter(Boolean).join(' · ')
+  return <MoldOriginContext.Provider value={origin}><main className={styles.page} data-full={full || undefined}>
     <header className={styles.header}>
       <span className={styles.eyebrow}>빚기 시험판 · {stepIndex + 1}/{STEP_ORDER.length} {STEP_NAMES[step]}</span>
       <ChoiceGroup variant="segment" aria-label="단계" className={styles.steps}>
@@ -1533,7 +1536,7 @@ export function MoldLabPage() {
       </ChoiceGroup>
     </header>
 
-    <section className={styles.card} aria-label="예시 글줄">
+    <section className={full ? styles.bakeHidden : styles.card} aria-label="예시 글줄" aria-hidden={full || undefined}>
       <div className={styles.line} data-testid="mold-line" data-compact={step === 'shape' || undefined}>
         {chars.map((char, at) => char === ' '
           ? <span key={at} className={styles.space} />
@@ -1551,16 +1554,7 @@ export function MoldLabPage() {
 
     {step === 'draw' && <DrawStep raws={raws} setRaws={setRaws} stems={stems} onDone={() => setStep('shape')} />}
     {step !== 'draw' && <>
-      {step === 'shape' && <section className={styles.panel} aria-label="인상 잡기">
-        {/* 고딕 · 명조 시작값은 뺐다(하니무스 2026-11-27 "고딕/명조 의미없어보임", PR #54와 같음). */}
-        <MoldRubPlate locks={weightLock !== undefined ? { weight: weightLock } : undefined} look={look} home={homeLook} setLook={setLook} onBegin={remember} renderGlyph={rubGlyph} />
-        {(weightNote || widenPct > 0) && <p className={styles.simsReadout} data-testid="mold-readout">{weightNote}{weightNote && widenPct > 0 ? <br /> : null}{widenPct > 0 ? <span data-testid="mold-widen">굵어져 넓어짐 +{widenPct}%</span> : null}</p>}
-        {oldRule.length > 0 && <p className={styles.skipNote} data-testid="mold-old-rule">아직 예전 셈 · {oldRule.join(' ')}</p>}
-        <Button variant="ghost" size="sm" onClick={() => setMore(!more)} aria-expanded={more} data-testid="mold-more">{more ? '접기' : '더 보기'}</Button>
-        {more && <Field label="굵어질 때 넓어짐" value={`${Math.round((LOOK_WALL.spread[1] - lookOf(look, 'spread')) / (LOOK_WALL.spread[1] - LOOK_WALL.spread[0]) * 100)}`}>
-          <RangeBar min={0} max={100} value={Math.round((LOOK_WALL.spread[1] - lookOf(look, 'spread')) / (LOOK_WALL.spread[1] - LOOK_WALL.spread[0]) * 100)} onPointerDown={remember} onKeyDown={remember} onChange={(event) => setLook({ ...look, spread: LOOK_WALL.spread[1] - (LOOK_WALL.spread[1] - LOOK_WALL.spread[0]) * Number(event.currentTarget.value) / 100 })} aria-label="굵어질 때 넓어짐" data-testid="mold-spread" />
-        </Field>}
-      </section>}
+      {step === 'shape' && <MoldRubPlate locks={weightLock !== undefined ? { weight: weightLock } : undefined} look={look} home={homeLook} setLook={setLook} onBegin={remember} renderGlyph={rubGlyph} note={rubNote} />}
       {step === 'part' && <>
         <nav className={styles.layouts} aria-label="짜임" data-testid="mold-layouts">
           <span className={styles.layoutCount}>짜임 {PART_LAYOUTS.findIndex((item) => item.layout === layoutOfFocus) + 1}/6</span>
@@ -1615,15 +1609,15 @@ export function MoldLabPage() {
         </div>
         <Button variant="outline" size="sm" onClick={downloadOutline} data-testid="mold-export">윤곽 내보내기(SVG)</Button>
       </section>}
-      <div className={styles.moldActions}>
+      <div className={styles.moldActions} data-row={full || undefined}>
         <Button variant="outline" size="sm" onClick={undo} disabled={!history.length} data-testid="mold-undo"><Undo2 aria-hidden="true" />되돌리기</Button>
         <Button variant="outline" size="sm" onClick={resetRegion} disabled={step === 'part' && !edits[layoutOfFocus]} data-testid="mold-reset-region"><RotateCcw aria-hidden="true" />{step === 'shape' ? '처음 값' : step === 'stroke' ? '획 처음대로' : step === 'finish' ? '자간 처음대로' : '이 짜임 처음대로'}</Button>
+        {full && <Button size="sm" onClick={goNext} data-testid="mold-next-shape">{NEXT_LABEL.shape}<ChevronRight aria-hidden="true" /></Button>}
       </div>
-      {NEXT_LABEL[step] && <Button size="block" onClick={goNext} data-testid={`mold-next-${step}`}>{NEXT_LABEL[step]}<ChevronRight aria-hidden="true" /></Button>}
-      {step === 'shape' && <p className={styles.skipNote}>부위 다듬기는 건너뛰어도 돼요.</p>}
+      {!full && NEXT_LABEL[step] && <Button size="block" onClick={goNext} data-testid={`mold-next-${step}`}>{NEXT_LABEL[step]}<ChevronRight aria-hidden="true" /></Button>}
     </>}
 
-    {changed > 0 && (askReset
+    {!full && changed > 0 && (askReset
       ? <div className={styles.moldActions} data-testid="mold-reset-ask">
         <span className={styles.skipNote}>그은 획까지 모두 지움</span>
         <Button variant="outline" size="sm" onClick={() => setAskReset(false)} data-testid="mold-reset-no">취소</Button>
