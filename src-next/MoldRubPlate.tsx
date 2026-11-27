@@ -4,10 +4,11 @@ import { Dices, ZoomOut } from 'lucide-react'
 import { Button } from './components/ui/button'
 import { PagerBar } from './components/ui/pager-bar'
 import { TickTape } from './components/ui/tick-tape'
+import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { WheelPicker } from './components/ui/wheel-picker'
 import type { Look } from './moldLab'
 import {
-  batchCols, clamp, EDGE_PULL, edgeOver, rollRub, RUB_BATCHES, RUB_ENDS, RUB_KEYS, RUB_NAMES, RUB_ROWS, rubOf, rubView, setRub, settle, soft, tapZoom, zoomAround, ZOOM_MAX, ZOOM_MIN, type RubKey,
+  batchCols, clamp, EDGE_PULL, edgeOver, rollRub, RUB_BATCHES, RUB_ENDS, RUB_KEYS, RUB_NAMES, RUB_ROWS, RUB_STEPS, rubOf, rubView, setRub, settle, soft, tapZoom, zoomAround, ZOOM_MAX, ZOOM_MIN, type RubKey,
 } from './moldRub'
 import styles from './MoldLabPage.module.css'
 
@@ -182,7 +183,9 @@ export function MoldRubPlate({ look, home, setLook, onBegin, renderGlyph, locks,
 
   // ── 값 ──
   const vals = useMemo(() => RUB_KEYS.map((k) => rubOf(look, k)), [look])
-  const wheelItems = useMemo(() => RUB_KEYS.map((k, i) => ({ id: k, label: RUB_NAMES[k], detail: vals[i] })), [vals])
+  // 칸이 둘뿐인 속성은 숫자 대신 그 칸 이름(네모 · 탈네모).
+  const shown = (k: RubKey, v: number) => RUB_STEPS[k]?.length === 2 ? RUB_ENDS[k][RUB_STEPS[k]!.indexOf(v)] ?? v : v
+  const wheelItems = useMemo(() => RUB_KEYS.map((k, i) => ({ id: k, label: RUB_NAMES[k], detail: shown(k, vals[i]) })), [vals])
   const lookRef = useRef(look)
   lookRef.current = look
   const t0 = useRef<number | null>(null)
@@ -247,10 +250,13 @@ export function MoldRubPlate({ look, home, setLook, onBegin, renderGlyph, locks,
         <strong data-testid="rub-name">{RUB_NAMES[key]}</strong>
         <span className={styles.rubEnds}>{RUB_ENDS[key][0]} ↔ {RUB_ENDS[key][1]}{lock !== undefined && value >= lock && lock < RUB_ROWS ? ' · 더 가면 획이 붙어요' : ''}</span>
         <Button variant="ghost" size="icon" onClick={() => { onBegin(); t0.current = performance.now(); setLook(rollRub(lookRef.current, home, Math.random, locks)) }} aria-label="주사위 · 아홉 값 아무렇게나" data-testid="rub-dice"><Dices aria-hidden="true" /></Button>
-        <output className={styles.rubValue} data-testid="rub-value">{value}</output>
+        <output className={styles.rubValue} data-testid="rub-value" data-value={value}>{shown(key, value)}</output>
       </div>
       <p className={styles.rubNote} data-testid="mold-readout" aria-live="polite">{note ?? ''}</p>
-      <TickTape value={value} max={RUB_ROWS} lock={lock} onValueChange={change} onBegin={onBegin} label={`${RUB_NAMES[key]} 값`} valueText={`${RUB_NAMES[key]} ${value}`} data-testid="rub-tape" />
+      {/* 칸이 나뉜 속성(탈네모: 네모 / 탈네모)은 눈금 대신 그 칸만 */}
+      {RUB_STEPS[key] ? <ChoiceGroup variant="segment" className={styles.rubSteps} aria-label={`${RUB_NAMES[key]} 값`} data-testid="rub-steps">
+        {RUB_STEPS[key]!.map((k, i, all) => <ChoiceItem key={k} checked={value === k} onClick={() => { if (value !== k) { onBegin(); change(k) } }} data-testid={`rub-step-${k}`}>{all.length === 2 ? RUB_ENDS[key][i] : k}</ChoiceItem>)}
+      </ChoiceGroup> : <TickTape value={value} max={RUB_ROWS} lock={lock} onValueChange={change} onBegin={onBegin} label={`${RUB_NAMES[key]} 값`} valueText={`${RUB_NAMES[key]} ${value}`} data-testid="rub-tape" />}
     </div>
   </section>
 }

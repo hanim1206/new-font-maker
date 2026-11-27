@@ -238,6 +238,7 @@
 .rubEdge[data-go] { background: rgb(var(--color-primary)); }
 .rubZoomOut { position: absolute; right: 6px; bottom: 6px; }
 .rubTapeRow { grid-column: 1 / -1; display: grid; gap: 4px; }
+.rubSteps { height: 64px; }
 .rubRead { display: flex; align-items: baseline; gap: 8px; padding-inline: 4px; }
 .rubRead strong { font-size: var(--font-16); font-weight: var(--weight-bold); }
 .rubEnds { flex: 1; min-width: 0; color: rgb(var(--color-text-3)); font-size: var(--font-12); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

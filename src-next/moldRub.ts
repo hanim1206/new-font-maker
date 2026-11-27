@@ -29,9 +29,21 @@ export const HEIGHT_SCALE = [0.8, 1, 1.2] as const
 
 const isDot = (key: RubKey): key is RubKey & DotKey => key !== 'height'
 
+/**
+ * 칸이 몇 개로만 나뉜 속성. 탈네모는 두 칸(네모 = 칸 0 · 탈네모 = 칸 20, 하니무스 2026-11-27 카드 「두 단계(네모 / 탈네모)」).
+ * 탈네모 칸의 키는 짜임마다 실제 탈네모 폰트에서 잰 끝(`OPEN_END`, `openFactorOf`). 사이 값은 없다 — 끌어도 가까운 칸으로 붙는다.
+ */
+export const RUB_STEPS: Partial<Record<RubKey, readonly number[]>> = { open: [0, RUB_ROWS] }
+/** 나뉜 속성은 가장 가까운 칸으로. */
+export function snapRub(key: RubKey, k: number): number {
+  const steps = RUB_STEPS[key]
+  if (!steps) return k
+  return steps.reduce((a, b) => (Math.abs(b - k) < Math.abs(a - k) ? b : a))
+}
+
 /** 칸(0~20, 소수 가능) → 엔진 값. */
 export function rubToLook(key: RubKey, k: number): number {
-  const t = Math.max(0, Math.min(RUB_ROWS, k))
+  const t = snapRub(key, Math.max(0, Math.min(RUB_ROWS, k)))
   if (isDot(key)) return dotToLook(key, t)
   const [lo, mid, hi] = HEIGHT_SCALE, half = RUB_ROWS / 2
   const value = t <= half ? lo + (mid - lo) * t / half : mid + (hi - mid) * (t - half) / half
@@ -39,7 +51,7 @@ export function rubToLook(key: RubKey, k: number): number {
 }
 /** 엔진 값 → 가장 가까운 칸. */
 export function lookToRub(key: RubKey, value: number): number {
-  if (isDot(key)) return lookToDot(key, value)
+  if (isDot(key)) return snapRub(key, lookToDot(key, value))
   let best = 0, gap = Infinity
   for (let k = 0; k <= RUB_ROWS; k++) { const d = Math.abs(rubToLook(key, k) - value); if (d < gap - 1e-9) { gap = d; best = k } }
   return best
@@ -50,17 +62,20 @@ export const rubOf = (look: Look, key: RubKey) => lookToRub(key, lookOf(look, ke
  * 한 값만 칸 k로. 처음 값(`home`)의 칸으로 돌아오면 처음 값 그대로 쓴다(칸 값으로 반올림하지 않는다, 도트판과 같음).
  * 다른 값은 건드리지 않는다(하니무스 2026-11-21 "각 좌표는 절댓값만").
  */
-export function setRub(look: Look, home: Look, key: RubKey, k: number): Look {
-  const out: Look = { ...look }
+export function setRub(look: Look, home: Look, key: RubKey, at: number): Look {
+  const out: Look = { ...look }, k = snapRub(key, at)
   if (k === lookToRub(key, lookOf(home, key))) { if (home[key] === undefined) delete out[key]; else out[key] = home[key] }
   else out[key] = rubToLook(key, k)
   return out
 }
 
-/** 주사위: 아홉 값을 칸 1~19 사이에서 아무렇게나(양 끝 벽은 피함). 출발점일 뿐 정답이 아니다. */
+/** 주사위: 아홉 값을 칸 1~19 사이에서 아무렇게나(양 끝 벽은 피함, 나뉜 속성은 그 칸 가운데 하나). 출발점일 뿐 정답이 아니다. */
 export function rollRub(look: Look, home: Look, random: () => number = Math.random, locks: Partial<Record<RubKey, number>> = {}): Look {
   let out = look
-  for (const key of RUB_KEYS) out = setRub(out, home, key, Math.min(locks[key] ?? RUB_ROWS, 1 + Math.floor(random() * (RUB_ROWS - 1))))
+  for (const key of RUB_KEYS) {
+    const steps = RUB_STEPS[key], r = random()
+    out = setRub(out, home, key, steps ? steps[Math.min(steps.length - 1, Math.floor(r * steps.length))] : Math.min(locks[key] ?? RUB_ROWS, 1 + Math.floor(r * (RUB_ROWS - 1))))
+  }
   return out
 }
 
