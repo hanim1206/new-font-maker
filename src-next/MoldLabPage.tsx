@@ -725,9 +725,11 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   }, [effective, ratio, round, contrast, nib, patternContrast, heavyOn])
   // ㅗ 꼭지는 그릴 칸이 다 정해진 뒤, 꼭지 높이의 닿자 밑 흰 넓이 가운데로(C026). 기둥 · 보는 그대로.
   const kkokji = useMemo(() => {
-    if (heavy) return kkokjiSyllable(heavy.syllable, heavy.boxes, effective, weightToMultiplier(MOLD_BASE_WEIGHT) * heavy.thick.CH.v)
-    if (placement.kind !== 'boxes' || !budgetBoxes) return null
-    return kkokjiSyllable(budget.syllable, halo?.boxes ?? budgetBoxes, globalStyle, weightToMultiplier(globalStyle.weight))
+    if (placement.kind !== 'boxes' || !budgetBoxes) return heavy ? kkokjiSyllable(heavy.syllable, heavy.boxes, effective, weightToMultiplier(MOLD_BASE_WEIGHT) * heavy.thick.CH.v) : null
+    // 굵을 때는 처음 굵기 그림에서 잰 꼭지 자리(닿자 잉크 폭의 몫)를 굵은 닿자에 옮긴다.
+    const base = kkokjiSyllable(budget.syllable, halo?.boxes ?? budgetBoxes, globalStyle, weightToMultiplier(heavy ? MOLD_BASE_WEIGHT : globalStyle.weight))
+    if (!heavy) return base
+    return kkokjiSyllable(heavy.syllable, heavy.boxes, effective, weightToMultiplier(MOLD_BASE_WEIGHT) * heavy.thick.CH.v, base.fit?.rel)
   }, [heavy, placement.kind, budgetBoxes, budget.syllable, halo, globalStyle, effective])
   const colorOf = useCallback((source: ResolvedStrokeInkSource) => {
     // 토막으로 나눈 획(`#`)은 보이는 토막만 남긴 것이다.
