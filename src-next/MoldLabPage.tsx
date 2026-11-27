@@ -23,7 +23,7 @@ import { Pressable } from './components/ui/pressable'
 import { Field, RangeBar } from './components/ui/range'
 import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
-import { BLACK_CENTER, BLACK_RATIO, CONTRAST_PATTERN_RANGE, patternWeightRatio, HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { BLACK_CENTER, BLACK_RATIO, CONTRAST_PATTERN_RANGE, patternWeightRatio, HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement, useNotoModel } from './notoModel'
 import { stackColumns, stackLay } from './moldStack'
 import { balloonGroupOf, endReachOf, inkOfThick, solveBalloon, type BalloonGroup, type BalloonStroke, type Thick } from './moldBalloon'
@@ -33,7 +33,7 @@ import { layoutDeltaSnapshot } from './layoutDeltaStore'
 import { captureOrigin, dropOrigin, MoldOriginContext, readOrigin, restoreOrigin, storesStamp, useMoldOrigin, writeOrigin, type MoldOrigin } from './moldOrigin'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, drawnStem, LAYOUTS, mastersOf, penThicknessOf, shapeConsonants, shownRunsOf, STEMS, stemInfo, type ShownRuns, vowelStemKeys, withPenThicknessVowels, type DrawnStem, type StemKind } from './strokeLab'
-import { MoldDotPlate } from './MoldDotPlate'
+import { MoldRubPlate } from './MoldRubPlate'
 import { thinBudget, thinSyllable, type BudgetStroke } from './moldBudget'
 import { finalBoxes, HALO_ENGINE, HALO_PRESETS, haloBoxes, haloCorrect, haloFinalFit, haloFit, haloScope, type HaloFit, type HaloStroke } from './moldHalo'
 import styles from './MoldLabPage.module.css'
@@ -54,8 +54,6 @@ const FIRST_SENTENCE = '아버지가 바다 너머 저기 산다'
 type Step = 'draw' | 'shape' | 'part' | 'stroke' | 'finish'
 const STEP_NAMES: Record<Step, string> = { draw: '긋기', shape: '인상 잡기', part: '부위 다듬기', stroke: '획 다듬기', finish: '마무리' }
 const STEP_ORDER: readonly Step[] = ['draw', 'shape', 'part', 'stroke', 'finish']
-type Plate = 'frame' | 'ink'
-const PLATE_NAMES: Record<Plate, string> = { ink: '획', frame: '틀' }
 /**
  * 획 다듬기(C): 줄기 다섯 중 하나를 골라 휨 · 길이 · 틈. 같은 이름 줄기는 모든 글자에서 함께 바뀐다(엔진 줄기 마스터).
  * 값 0~100으로 보이고, 안에서는 벽 사이로 잇는다. 손 떨림 값은 두지 않는다(정할 것 5). 부리 묶음은 출시 뒤(하니무스 2026-11-21).
@@ -1258,8 +1256,6 @@ export function MoldLabPage() {
     return count
   }, [storedVowels])
   const [compare, setCompare] = useState(false)
-  const [plate, setPlate] = useState<Plate>('ink')
-  const [plateSay, setPlateSay] = useState('판을 가로질러 한 번에 그어 보기')
   const [askReset, setAskReset] = useState(false)
   // 글자마다 버틸 수 있는 가장 굵은 비율(자소를 끝까지 키워도 획이 안 붙는 데까지). 글줄은 가장 작은 것을 다 같이 쓴다 — 굵기는 글줄 전체가 같다.
   const [caps, setCaps] = useState<Record<string, number>>({})
@@ -1457,6 +1453,8 @@ export function MoldLabPage() {
   const lazyLook = useDeferredValue(look)
   const lineLook = compare ? NO_LOOK : lazyLook
   const lineDrawn = compare ? undefined : drawn
+  // 글자 문지르기 판의 글자(빚기 엔진 그대로). 판 값은 바로(글줄처럼 늦추지 않음) — 눈금을 미는 동안 판 글자가 먼저 따라온다.
+  const rubGlyph = useCallback((char: string, size: number) => <MoldGlyph char={char} size={size} edits={compare ? NO_EDITS : edits} look={compare ? NO_LOOK : look} drawn={compare ? undefined : drawn} weightCap={weightCap} stackHeight={stackHeight} fence={compare ? undefined : fence} />, [compare, NO_EDITS, NO_LOOK, edits, look, drawn, weightCap, stackHeight, fence])
   const stepIndex = STEP_ORDER.indexOf(step)
   const changed = Object.keys(edits).length + Object.values(look).filter((value) => value !== undefined).length + Object.keys(raws).filter((key) => raws[key as StemKind]).length
 
@@ -1504,20 +1502,16 @@ export function MoldLabPage() {
     {step === 'draw' && <DrawStep raws={raws} setRaws={setRaws} stems={stems} onDone={() => setStep('shape')} />}
     {step !== 'draw' && <>
       {step === 'shape' && <section className={styles.panel} aria-label="인상 잡기">
-        <ChoiceGroup variant="segment" aria-label="판" className={styles.plates}>
-          {(['ink', 'frame'] as const).map((key) => <ChoiceItem key={key} checked={plate === key} onClick={() => setPlate(key)} data-testid={`mold-plate-${key}`}>{PLATE_NAMES[key]}</ChoiceItem>)}
-        </ChoiceGroup>
         <ChoiceGroup variant="segment" aria-label="시작값" className={styles.plates} data-testid="mold-halo-preset">
           {(['gothic', 'myeongjo'] as const).map((key) => <ChoiceItem key={key} checked={lookOf(look, 'ease') === HALO_PRESETS[key].ease && lookOf(look, 'spread') === HALO_PRESETS[key].spread} onClick={() => { remember(); setLook({ ...look, ...HALO_PRESETS[key] }) }} data-testid={`mold-halo-${key}`}>{key === 'gothic' ? '고딕' : '명조'}</ChoiceItem>)}
         </ChoiceGroup>
-        <MoldDotPlate key={plate} keys={plate === 'frame' ? FRAME_KEYS : INK_KEYS} locks={plate === 'ink' && weightLock !== undefined ? { weight: weightLock } : undefined} look={look} home={homeLook} setLook={setLook} onBegin={remember} onSay={setPlateSay} />
-        <p className={styles.simsReadout} data-testid="mold-readout">{plateSay}{weightNote ? <><br />{weightNote}</> : null}{plate === 'ink' && widenPct > 0 ? <><br /><span data-testid="mold-widen">굵어져 넓어짐 +{widenPct}%</span></> : null}</p>
+        <MoldRubPlate locks={weightLock !== undefined ? { weight: weightLock } : undefined} look={look} home={homeLook} setLook={setLook} onBegin={remember} renderGlyph={rubGlyph} />
+        {(weightNote || widenPct > 0) && <p className={styles.simsReadout} data-testid="mold-readout">{weightNote}{weightNote && widenPct > 0 ? <br /> : null}{widenPct > 0 ? <span data-testid="mold-widen">굵어져 넓어짐 +{widenPct}%</span> : null}</p>}
         {oldRule.length > 0 && <p className={styles.skipNote} data-testid="mold-old-rule">아직 예전 셈 · {oldRule.join(' ')}</p>}
         <Button variant="ghost" size="sm" onClick={() => setMore(!more)} aria-expanded={more} data-testid="mold-more">{more ? '접기' : '더 보기'}</Button>
         {more && <Field label="굵어질 때 넓어짐" value={`${Math.round((LOOK_WALL.spread[1] - lookOf(look, 'spread')) / (LOOK_WALL.spread[1] - LOOK_WALL.spread[0]) * 100)}`}>
           <RangeBar min={0} max={100} value={Math.round((LOOK_WALL.spread[1] - lookOf(look, 'spread')) / (LOOK_WALL.spread[1] - LOOK_WALL.spread[0]) * 100)} onPointerDown={remember} onKeyDown={remember} onChange={(event) => setLook({ ...look, spread: LOOK_WALL.spread[1] - (LOOK_WALL.spread[1] - LOOK_WALL.spread[0]) * Number(event.currentTarget.value) / 100 })} aria-label="굵어질 때 넓어짐" data-testid="mold-spread" />
         </Field>}
-        <p className={styles.skipNote}>점선 · 폰트들의 가운데 / 검은 눈금 · 지금 바탕(노토)</p>
       </section>}
       {step === 'part' && <>
         <nav className={styles.layouts} aria-label="짜임" data-testid="mold-layouts">
