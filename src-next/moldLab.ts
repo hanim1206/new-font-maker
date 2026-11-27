@@ -792,7 +792,10 @@ export const CENTER_SHARE = { open: { up: 0.12, down: 0.23 }, closed: { up: 0.15
  * 가로 · 섞임 짜임은 보가 첫닿자 밑을 따라 내려가므로, 보가 글자 칸 밑(0.98)에 닿으면 더 안 내려간다(첫닿자만 길어져 보를 덮지 않게).
  * 받침 없는 세로 짜임만 첫닿자 밑이 글자 밑까지 간다(Gugi · 나눔펜).
  */
+/** 허리를 올릴 때 첫닿자 칸 키를 이 몫까지만 줄인다. 더 줄이면 획 두께는 그대로라 「봅」 ㅂ · 「몸」 ㅁ이 납작한 막대가 됐다(하니무스 2026-11-27 확인 그림). */
+const CENTER_CH_KEEP = 0.8
 function centerLiftRoom(lift: number, boxes: Partial<Record<Part, BoxConfig>>, layout?: LayoutType): number {
+  if (lift > 0) return boxes.CH ? Math.min(lift, (1 - CENTER_CH_KEEP) * boxes.CH.height) : lift
   if (lift >= 0 || !layout) return lift
   // 받침 글자는 받침 칸 윗변까지 내리고, 그 너머는 받침 윗변을 같이 눌러 받침을 줄인다(`finalPushOf`) — 받침이 처음의 0.65배(닿자 크기 바닥, 폰트 측정)가 될 때까지.
   // 다람쥐 4차(허리선 0에서 「한」 ㅎ이 ㄴ과 겹침) 뒤로 받침 윗변에서 멈췄더니 받침 글자 첫닿자 밑이 0.64까지만 갔다(폰트 95% 0.664, 다람쥐 재검수 4번).
@@ -877,10 +880,10 @@ function pushJamo(boxes: Partial<Record<Part, BoxConfig>>, k: number, layout?: L
     out[part] = { ...box, x: box.x - dw * sideShare(inner, 'l'), y: box.y - dh * sideShare(inner, 't'), width: box.width + dw, height: box.height + dh }
     if (part === 'CH') {
       // 기둥은 닿자 크기에 따라(`pillarPush`), 보는 0.1만 밀린다(먼 변은 그대로).
-      // 섞임홀자(ㅘ ㅙ ㅚ …)는 기둥을 안 민다: 보(가로 쪽)는 그 자리라 기둥만 닿자 쪽으로 오면 보를 뚫는다
-      // (「과」 닿자 작게: 세로 쪽 칸이 0.2 → 0.38로 왼쪽으로 늘어 ㅏ 기둥이 ㅗ 보 위에 섰다, 2026-11-27). 기둥 · 보는 고정(C026).
+      // 섞임홀자(ㅘ ㅙ ㅚ …)는 기둥을 안 민다: 보(가로 쪽)는 그 자리라 기둥만 닿자 쪽으로 오면 보를 뚫는다(「과」 닿자 작게, 2026-11-27, C026).
+      // 기둥은 첫닿자 안쪽 변이 움직인 만큼(dw × 안쪽 몫)보다 더 따라가지 않는다(닿자 크기 0에서 쌔 ㅆ이 ㅐ 기둥에 묻힘, 다람쥐 극단 검수 2026-11-27).
       const side = mixed ? undefined : vertical ? out.JU : undefined
-      if (side && inner.includes('r')) { const m = dw * pillarPush(k), next = { ...side, x: side.x + m, width: Math.max(0.01, side.width - m) }; if (mixed) out.JU_V = next; else out.JU = next }
+      if (side && inner.includes('r')) { const m = dw * Math.min(pillarPush(k), sideShare(inner, 'r')), next = { ...side, x: side.x + m, width: Math.max(0.01, side.width - m) }; out.JU = next }
       const bar = mixed ? out.JU_H : !vertical ? out.JU : undefined
       if (bar && inner.includes('b')) { const m = dh * PUSH.vowel; if (mixed) out.JU_H = { ...bar, y: bar.y + m }; else out.JU = { ...bar, y: bar.y + m } }
     } else {
@@ -914,6 +917,9 @@ export function impressBoxes(boxes: Partial<Record<Part, BoxConfig>>, look: Look
     if (!box) continue
     let next = box
     if (part === 'JO' && finalPush > 0) next = { ...next, y: next.y + finalPush, height: next.height - finalPush }
+    // 허리를 올리면 받침 윗변도 같은 만큼 따라 오른다(밑변은 그대로) — 위 덩이와 받침 사이 틈이 그대로라 모든 받침이 같이 움직인다.
+    // 예전엔 받침 칸을 두고 받침 위 흐림 선(1% 폭)만 받침을 당겨, 폭을 넘은 글자만 받침이 따라 오르고 나머지는 홀자만 올랐다(하니무스 2026-11-27).
+    if (part === 'JO' && lift > 0) next = { ...next, y: next.y - lift, height: next.height + lift }
     if (lift !== 0 && layout) {
       const horizontalVowel = !isVertical(layout) && !layout.includes('jungseong-mixed')
       // 첫닿자: 윗변은 그대로, 밑변만 허리선을 따라.
@@ -948,6 +954,29 @@ export function waistSyllable(syllable: DecomposedSyllable, lift: number, boxes:
     : stroke)
   const next: JamoData = mixed ? { ...ju, verticalStrokes: move(ju.verticalStrokes) } : { ...ju, strokes: move(ju.strokes) }
   return { ...syllable, jungseong: next }
+}
+
+/**
+ * ㅝ · ㅞ 곁줄기 높이(하니무스 2026-11-27 "원웠훨: ㅝ 가로세로 줄기두께랑 위치 균형"). 곁줄기를 ㅜ 보 가운데에서 기둥 밑까지의 `ARM_DROP` 몫에 둔다.
+ * 고딕 세 집안(Gothic A1 · Noto · 나눔) 「뭐 · 워」 400 · 900에서 잰 몫 0.36~0.45(가운데 0.42). 엔진은 0.36이고 받침 글자(원 · 웠 · 훨)는
+ * 보와 거의 같은 높이라 곁줄기와 보가 한 줄로 붙어 보였다. 칸이 정해진 뒤 글자마다 다시 셈한다(허리선을 옮겨도 보를 따라간다).
+ */
+export const ARM_DROP = 0.42
+const LEFT_ARM_MIXED = new Set([...'ㅝㅞ'])
+export function armSyllable(syllable: DecomposedSyllable, boxes: Partial<Record<Part, BoxConfig>>): DecomposedSyllable {
+  const ju = syllable.jungseong, h = boxes.JU_H, v = boxes.JU_V
+  if (!ju || !h || !v || !LEFT_ARM_MIXED.has(ju.char) || v.height < 0.05) return syllable
+  const bar = ju.horizontalStrokes?.find((stroke) => isLevel(stroke))
+  const pillars = (ju.verticalStrokes ?? []).filter((stroke) => !isLevel(stroke) && stroke.points.length >= 2)
+  const arm = ju.verticalStrokes?.find((stroke) => isLevel(stroke))
+  if (!bar || !arm || !pillars.length) return syllable
+  const barY = h.y + bar.points[0].y * h.height
+  const bottom = v.y + Math.max(...pillars.flatMap((stroke) => stroke.points.map((p) => p.y))) * v.height
+  if (bottom <= barY) return syllable
+  const y = Math.max(0.04, Math.min(0.96, (barY + ARM_DROP * (bottom - barY) - v.y) / v.height)), d = y - arm.points[0].y
+  if (Math.abs(d) < 1e-6) return syllable
+  const moved = { ...arm, points: arm.points.map((p) => ({ ...p, y: p.y + d, ...(p.handleIn ? { handleIn: { ...p.handleIn, y: p.handleIn.y + d } } : {}), ...(p.handleOut ? { handleOut: { ...p.handleOut, y: p.handleOut.y + d } } : {}) })) }
+  return { ...syllable, jungseong: { ...ju, verticalStrokes: ju.verticalStrokes!.map((stroke) => (stroke === arm ? moved : stroke)) } }
 }
 
 /**

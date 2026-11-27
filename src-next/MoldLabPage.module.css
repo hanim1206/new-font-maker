@@ -186,3 +186,76 @@
 
 /* 저장소에 써 넣기: 짜임 대표 글자를 안 보이게 그려 칸만 받는다. */
 .bakeHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+
+/* 글자 문지르기 판(인상 잡기 도트판 대신, 2026-11-27): 왼쪽 세로 휠 · 오른쪽 묶음 판 · 아래 눈금 섬 */
+.rub {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--radius-lg);
+  background: rgb(var(--color-surface-3));
+  user-select: none;
+  -webkit-user-select: none;
+}
+.rubWheel { grid-row: 1; min-height: 0; border-radius: var(--radius-md); background: rgb(var(--color-surface)); }
+.rubMain { grid-row: 1; display: grid; min-height: 0; grid-template-rows: auto minmax(0, 1fr); min-width: 0; gap: 4px; }
+.rubStage {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  /* 글자 판보다 창이 길면 남는 곳도 같은 흰 판으로(다람쥐 검수: 2열 아래 빈 회색 40%) */
+  background: rgb(var(--color-surface));
+  border-radius: var(--radius-md);
+  touch-action: none;
+  cursor: grab;
+}
+.rubLayer { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.rubCell {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: rgb(var(--color-surface));
+  pointer-events: none;
+}
+.rubEdge {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: rgb(var(--color-foreground));
+  color: rgb(var(--color-surface));
+  font-size: var(--font-13);
+  font-weight: var(--weight-semibold);
+  pointer-events: none;
+}
+.rubEdge[data-side='right'] { right: 6px; }
+.rubEdge[data-side='left'] { left: 6px; }
+.rubEdge[data-go] { background: rgb(var(--color-primary)); }
+.rubZoomOut { position: absolute; right: 6px; bottom: 6px; }
+.rubTapeRow { grid-column: 1 / -1; display: grid; gap: 4px; }
+.rubSteps { height: 64px; }
+.rubRead { display: flex; align-items: baseline; gap: 8px; padding-inline: 4px; }
+.rubRead strong { font-size: var(--font-16); font-weight: var(--weight-bold); }
+.rubEnds { flex: 1; min-width: 0; color: rgb(var(--color-text-3)); font-size: var(--font-12); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rubValue { font-size: var(--font-24); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; }
+/* 알림 줄은 늘 한 줄 자리를 잡아 둔다 — 알림이 뜰 때 판이 튀지 않게(다람쥐 검수 2026-11-27, 21px) */
+.rubNote { margin: 0; padding-inline: 4px; min-height: 1.5em; line-height: 1.5; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: rgb(var(--color-warning)); font-size: var(--font-12); }
+
+/* 인상 잡기: 판이 화면 전체, 스크롤 없음(하니무스 2026-11-27) */
+.page[data-full] {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-content: stretch;
+  gap: 8px;
+  padding-block: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-bottom));
+}
+.page[data-full] .eyebrow { display: none; }
+.page[data-full] .steps { margin-top: 0; }
+.moldActions[data-row] { grid-template-columns: 1fr 1fr 1.4fr; }

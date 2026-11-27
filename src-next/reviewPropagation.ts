@@ -150,7 +150,7 @@ export function applyFacesDelta(faces: ComponentFaces, delta: FacesDelta): Compo
 
 // 카드에 먼저 올리는 글자. 우리말에서 자주 쓰는 글자를 레이아웃마다 사용자가 묶음(카드 한 장면)째 골랐다 — 묶음 안에서 초성·받침이 되도록 안 겹친다.
 // 고른 기록은 옵시디언 `아이디어/2026-09-21_예시-글자-후보.md`. 드문 자모나 묶음이 다 돌고 나면 아래 기계 조합으로 채운다.
-const SAMPLE_BATCHES: Readonly<Record<string, readonly string[]>> = {
+export const SAMPLE_BATCHES: Readonly<Record<string, readonly string[]>> = {
   right: ['이처계때께하서녀', '에터키며가례대지', '피야배려다혜써게'],
   'right-final': ['한임명집실것없력', '있심년할책정법같', '일많겠성힘닭짧적'],
   bottom: ['고조수끄뿌요크효', '도구누유쓰보트표', '로뉴초교부무뜨으'],

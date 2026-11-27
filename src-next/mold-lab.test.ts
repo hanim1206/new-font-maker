@@ -334,14 +334,26 @@ describe('도트판 인상 잡기', () => {
     expect(h.JO!.y + h.JO!.height).toBeCloseTo(0.95 + 0.0175)
     expect(h.CH!.y).toBeCloseTo(0.05 - 0.015)
   })
-  it('무게중심(허리선): 틀은 두고 첫닿자 밑변과 보가 오른다 · 받침 글자는 폭이 좁다', async () => {
+  it('닿자를 줄여도 기둥은 첫닿자 안쪽 변을 넘어오지 않는다 — 칸 틈 그대로(닿자 크기 0)', async () => {
+    const { impressBoxes } = await import('./moldLab')
+    const v = impressBoxes(VERTICAL, { jamo: 0.55 }, 'choseong-jungseong-vertical')
+    const gap0 = VERTICAL.JU.x - (VERTICAL.CH.x + VERTICAL.CH.width), gap = v.JU!.x - (v.CH!.x + v.CH!.width)
+    expect(gap).toBeGreaterThanOrEqual(gap0 - 1e-9)
+    // 먼 변(글자 오른끝)은 그대로.
+    expect(v.JU!.x + v.JU!.width).toBeCloseTo(0.9)
+  })
+  it('무게중심(허리선): 틀은 두고 첫닿자 밑변 · 보 · 받침 윗변이 같이 오른다 · 받침 글자는 폭이 좁다', async () => {
     const { impressBoxes, waistSyllable } = await import('./moldLab')
-    // 받침 글자: 위로 끝까지 글자 키(0.9)의 15.5%(폰트 첫닿자밑받침 5번째 백분위 0.451까지, 다람쥐 재검수 4번)
+    // 받침 글자: 위로 끝까지 글자 키(0.9)의 15.5%(폰트 첫닿자밑받침 5번째 백분위 0.451까지, 다람쥐 재검수 4번).
+    // 다만 첫닿자 칸 키는 0.8배까지만 줄인다(납작 막기) — 이 칸(키 0.3)은 0.06에서 멈춘다.
+    const up = Math.min(0.155 * 0.9, 0.2 * 0.3)
     const out = impressBoxes(HORIZONTAL_FINAL, { center: 1 }, 'choseong-jungseong-horizontal-jongseong')
     expect(out.CH!.y).toBeCloseTo(0.05)
-    expect(out.CH!.height).toBeCloseTo(0.3 - 0.155 * 0.9)
-    expect(out.JU!.y).toBeCloseTo(0.38 - 0.155 * 0.9)
-    expect(out.JO).toEqual(HORIZONTAL_FINAL.JO)
+    expect(out.CH!.height).toBeCloseTo(0.3 - up)
+    expect(out.JU!.y).toBeCloseTo(0.38 - up)
+    // 받침은 윗변만 같은 만큼 따라 오른다(밑변 = 틀은 그대로) — 받침마다 따로 놀지 않게(하니무스 2026-11-27).
+    expect(out.JO!.y).toBeCloseTo(HORIZONTAL_FINAL.JO!.y - up)
+    expect(out.JO!.y + out.JO!.height).toBeCloseTo(HORIZONTAL_FINAL.JO!.y + HORIZONTAL_FINAL.JO!.height)
     // 아래로는 받침 윗변까지(틈 0.05 남김) 간 뒤 받침 윗변을 같이 눌러 받침을 줄인다. 밑변은 그대로.
     const down = impressBoxes(HORIZONTAL_FINAL, { center: -1 }, 'choseong-jungseong-horizontal-jongseong')
     const pushBy = 0.066 * 0.9 - (0.6 - 0.53 - 0.05)

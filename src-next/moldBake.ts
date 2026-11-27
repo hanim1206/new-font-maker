@@ -3,7 +3,7 @@ import type { ContextBoxDelta, FacesDelta } from '../src/services/contextBoxReso
 import type { GlobalStyle } from '../src/stores/globalStyleStore'
 import type { BoxConfig, DecomposedSyllable, JamoData, LayoutSchema, LayoutType, Part, StrokeDataV2 } from '../src/types'
 import { medialFamilyOf } from '../src/utils/jamoContextStrokes'
-import { branchSyllable, jagBoxes, JAG_INITIALS, lookOf, stemSyllable, waistSyllable, type Look } from './moldLab'
+import { armSyllable, branchSyllable, jagBoxes, JAG_INITIALS, lookOf, stemSyllable, waistSyllable, type Look } from './moldLab'
 import { effectiveLayoutDelta, useLayoutDeltaStore } from './layoutDeltaStore'
 import type { LayoutDeltaSnapshot } from './layoutDeltaStore'
 import { contextPlacementOf } from './notoModel'
@@ -176,7 +176,7 @@ export function bakedVowels(stored: JamoMap, drawn: JamoMap | undefined, items: 
     const family = medialFamilyOf(char) ?? 'right'
     const rep = repOf(family)
     let syllable: DecomposedSyllable = { char, choseong: null, jongseong: null, jungseong: start, layoutType: FAMILY_LAYOUT[family].open }
-    if (rep) syllable = waistSyllable(syllable, rep.lift, rep.molded)
+    if (rep) syllable = armSyllable(waistSyllable(syllable, rep.lift, rep.molded), rep.molded)
     syllable = stemSyllable(branchSyllable(syllable, lookOf(look, 'branch'), rep && ends ? { boxes: rep.molded, ...ends } : undefined), look)
     let next = syllable.jungseong!
     // 곁줄기 길이 · 허리선은 칸에 놓은 뒤 획만 고친 것이라, 틀(`frame`)을 고치기 전 획으로 둔다. 안 그러면 짧아진 곁줄기 범위로 자소를 다시 늘려 맞춘다.

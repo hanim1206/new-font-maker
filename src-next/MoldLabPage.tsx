@@ -23,7 +23,7 @@ import { Pressable } from './components/ui/pressable'
 import { Field, RangeBar } from './components/ui/range'
 import { EDIT_COLOR } from './editColors'
 import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
-import { nibStemFactor, openFactorOf, BLACK_CENTER, BLACK_RATIO, CONTRAST_PATTERN_RANGE, patternWeightRatio, HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { nibStemFactor, openFactorOf, BLACK_CENTER, BLACK_RATIO, CONTRAST_PATTERN_RANGE, patternWeightRatio, HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, waistSyllable, armSyllable, dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement, useNotoModel } from './notoModel'
 import { stackColumns, stackLay } from './moldStack'
 import { balloonGroupOf, endReachOf, inkOfThick, solveBalloon, type BalloonGroup, type BalloonStroke, type Thick } from './moldBalloon'
@@ -33,10 +33,11 @@ import { layoutDeltaSnapshot } from './layoutDeltaStore'
 import { captureOrigin, dropOrigin, MoldOriginContext, readOrigin, restoreOrigin, storesStamp, useMoldOrigin, writeOrigin, type MoldOrigin } from './moldOrigin'
 import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, drawnStem, LAYOUTS, mastersOf, penThicknessOf, shapeConsonants, shownRunsOf, STEMS, stemInfo, type ShownRuns, vowelStemKeys, withPenThicknessVowels, type DrawnStem, type StemKind } from './strokeLab'
-import { MoldDotPlate } from './MoldDotPlate'
+import { MoldRubPlate } from './MoldRubPlate'
 import { thinBudget, thinSyllable, type BudgetStroke } from './moldBudget'
+import { engineGapOf } from './moldGap'
 import { kkokjiSyllable } from './moldKkokji'
-import { finalBoxes, HALO_ENGINE, haloBoxes, haloCorrect, haloFinalFit, haloFit, haloScope, type HaloFit, type HaloStroke } from './moldHalo'
+import { finalBoxes, finalEaseOf, HALO_ENGINE, haloBoxes, haloCorrect, haloFinalFit, haloFit, haloSideOf, haloTopFit, haloTopOf, topBoxes, type HaloFit, type HaloStroke } from './moldHalo'
 import styles from './MoldLabPage.module.css'
 
 /**
@@ -55,8 +56,6 @@ const FIRST_SENTENCE = '아버지가 바다 너머 저기 산다'
 type Step = 'draw' | 'shape' | 'part' | 'stroke' | 'finish'
 const STEP_NAMES: Record<Step, string> = { draw: '긋기', shape: '인상 잡기', part: '부위 다듬기', stroke: '획 다듬기', finish: '마무리' }
 const STEP_ORDER: readonly Step[] = ['draw', 'shape', 'part', 'stroke', 'finish']
-type Plate = 'frame' | 'ink'
-const PLATE_NAMES: Record<Plate, string> = { ink: '획', frame: '틀' }
 /**
  * 획 다듬기(C): 줄기 다섯 중 하나를 골라 휨 · 길이 · 틈. 같은 이름 줄기는 모든 글자에서 함께 바뀐다(엔진 줄기 마스터).
  * 값 0~100으로 보이고, 안에서는 벽 사이로 잇는다. 손 떨림 값은 두지 않는다(정할 것 5). 부리 묶음은 출시 뒤(하니무스 2026-11-21).
@@ -82,6 +81,8 @@ interface Drawn {
 const BALLOON_WEIGHT = true
 /** 굵을 때 900 쌓임 규칙(`moldStack900.ts`)으로 푼다. 끄면 예전 풍선 · 쌓인 획 법칙 셈. */
 const STACK_900 = true
+/** 고른 틈을 그린 가로획 두께에서 셈(`evenGapOfBar`, 2026-11-27). 실험실 주소에 `?evenGap=stem`이면 옛 식(기둥, C029 스위치). */
+const EVEN_GAP_FROM_BAR = typeof window === 'undefined' || new URLSearchParams(window.location.search).get('evenGap') !== 'stem'
 
 /** 굵게 할 때 자소 칸을 키워 보는 비율(작은 것부터). 거북이 표: 굵기 1%p마다 자소가 0.3~0.6% 커진다 — 900(두께 ×1.95)이면 4%쯤, 넉넉히 12%까지. */
 const JAMO_GROWS: readonly number[] = [1, 1.03, 1.06, 1.09, 1.12]
@@ -234,7 +235,10 @@ function onlyGroup(syllable: DecomposedSyllable, group: BalloonGroup): Decompose
  * 왼끝: ㄱ · 쌍닿자 0.43, ㅇ ㅁ ㅂ 0.27, 가로 짜임 0.15, 그 밖 0.29.
  */
 type Room = { left: number; right: number; up: number; down: number }
-/** 자소 칸마다 옆 · 위아래 빈 자리(글자 칸 0~1 끝, 또는 그쪽에 마주 선 다른 자소 칸까지). 이미 겹친 쪽은 0. */
+/**
+ * 자소 칸마다 옆 · 위아래 빈 자리(글자 칸 0~1 끝까지). 그쪽에 마주 선 다른 자소 칸이 있으면 0 — 자소 사이 칸 틈은 자소 사이 틈이라
+ * 넓힘이 먹으면 안 된다(지키는 순서 틈 → 굵기 → 칸). 예전엔 그 틈까지 넓혀 닿자 크기 0에서 ㅆ이 ㅐ 기둥에 닿았다(다람쥐 극단 검수 2026-11-27).
+ */
 function roomsOf(boxes: Partial<Record<Part, BoxConfig>>): Partial<Record<Part, Room>> {
   const out: Partial<Record<Part, Room>> = {}
   const all = Object.entries(boxes).filter(([, box]) => box) as [Part, BoxConfig][]
@@ -244,13 +248,13 @@ function roomsOf(boxes: Partial<Record<Part, BoxConfig>>): Partial<Record<Part, 
       if (other === part) continue
       const rowOverlap = o.y < b.y + b.height - 1e-6 && o.y + o.height > b.y + 1e-6, colOverlap = o.x < b.x + b.width - 1e-6 && o.x + o.width > b.x + 1e-6
       if (rowOverlap) {
-        if (o.x + o.width <= b.x + 1e-6) left = Math.min(left, b.x - o.x - o.width)
-        else if (o.x >= b.x + b.width - 1e-6) right = Math.min(right, o.x - b.x - b.width)
+        if (o.x + o.width <= b.x + 1e-6) left = 0
+        else if (o.x >= b.x + b.width - 1e-6) right = 0
         else if (colOverlap) { if (o.x + o.width / 2 < b.x + b.width / 2) left = 0; else right = 0 }
       }
       if (colOverlap) {
-        if (o.y + o.height <= b.y + 1e-6) up = Math.min(up, b.y - o.y - o.height)
-        else if (o.y >= b.y + b.height - 1e-6) down = Math.min(down, o.y - b.y - b.height)
+        if (o.y + o.height <= b.y + 1e-6) up = 0
+        else if (o.y >= b.y + b.height - 1e-6) down = 0
         else if (rowOverlap) { if (o.y + o.height / 2 < b.y + b.height / 2) up = 0; else down = 0 }
       }
     }
@@ -334,6 +338,32 @@ function haloStrokesOf(syllable: DecomposedSyllable, boxes: Partial<Record<Part,
 }
 const haloAttr = (fit: HaloFit | null) => fit ? `${fit.err.toFixed(4)} ${fit.ease.toFixed(4)} ${fit.widen.toFixed(3)} ${fit.push.toFixed(4)} ${fit.stem.toFixed(4)} ${fit.gap.toFixed(4)}` : undefined
 
+/** 글자 잉크의 가로 끝(글자 칸 0~1). 중심선 ± 반 두께로 잰다(자간 바닥용, 대비 · 붓은 굵은 쪽으로 넉넉히). */
+function inkSpanOf(syllable: DecomposedSyllable, boxes: Partial<Record<Part, BoxConfig>>, halfOf: (part: Part, thickness: number) => number, linecap: StrokeDataV2['linecap'], linejoin: StrokeDataV2['linejoin']): { left: number; right: number; stroke: number } | null {
+  const result = resolveGlyphInkPrimitives({ syllable, placement: { kind: 'boxes', boxes }, weightMultiplier: 1, globalLinecap: linecap, globalLinejoin: linejoin, horizontalInkBounds: { min: -1, max: 2 } })
+  let left = Infinity, right = -Infinity, stroke = 0
+  for (const primitive of result.primitives) {
+    const half = halfOf(primitive.source.part, primitive.stroke.thickness)
+    stroke = Math.max(stroke, half * 2)
+    for (const p of flattenStrokeCenterline(primitive.stroke as StrokeDataV2, primitive.box)) { left = Math.min(left, p.x - half); right = Math.max(right, p.x + half) }
+  }
+  return Number.isFinite(left) ? { left, right, stroke } : null
+}
+/** 확인용 `?look=` 판 값. 벽 밖 값은 벽으로 자른다. */
+function urlLook(): Look | null {
+  try {
+    const raw = new URLSearchParams(window.location.search).get('look')
+    if (!raw) return null
+    const value = JSON.parse(raw) as Record<string, unknown>
+    const out: Look = {}
+    for (const [key, v] of Object.entries(value)) {
+      if (!(key in LOOK_WALL) || typeof v !== 'number') continue
+      const [lo, hi] = LOOK_WALL[key as keyof typeof LOOK_WALL]
+      ;(out as Record<string, number>)[key] = Math.max(lo, Math.min(hi, v))
+    }
+    return out
+  } catch { return null }
+}
 function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke, testId, weightCap = Infinity, onCap, fence, onFence, onBake, onHalo, stackHeight, onStart }: { onHalo?: (push: number) => void; stackHeight?: number; onStart?: (height: number) => void; char: string; size: number; edits: LayoutEdits; look: Look; drawn?: Drawn; sel?: Region | null; highlight?: readonly Part[]; shownStroke?: (key: string) => ShownRuns; testId?: string; weightCap?: number; onCap?: (ratio: number) => void; fence?: MoldFence; onFence?: (need: number, pulls: readonly FencePull[]) => void; onBake?: (item: BakeTarget) => void }) {
   const { syllable: raw, effective, placement, padding, schema } = useGlyphBase(char, drawn)
   const base = useGlyphBase(char, undefined)
@@ -350,7 +380,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     // 풍선 굵기는 자소마다 안으로 당기므로(`solveBalloon`), 글자 통째로 안으로 당기는 셈(`lookScale`)에는 굵기를 안 넣는다.
     const boxes = moldedBoxes(placement.boxes, raw.layoutType, edits, { ...sizedLook, jamo: Math.min(1, lookOf(look, 'jamo')), ...(heavyOn ? { weight: 1, weightBase: 1 } : {}) }, char)
     // 허리선 → 곁줄기 길이 → 줄기마다(휨 · 길이 · 틈) → 부리 → 붓촉 순서로 획을 고친다(획 다듬기 값은 획 모양만 바꾸고 칸은 두지 않는다).
-    const waisted = waistSyllable(raw, waistLift(look, placement.boxes, raw.layoutType), boxes)
+    const waisted = armSyllable(waistSyllable(raw, waistLift(look, placement.boxes, raw.layoutType), boxes), boxes)
     const stroked = serifSyllable(stemSyllable(branchSyllable(waisted, lookOf(look, 'branch'), { boxes, ink: weightToMultiplier(MOLD_BASE_WEIGHT), linecap: effective.linecap }), look), lookOf(look, 'serif'), boxes)
     return { boxes, syllable: stroked }
   }, [placement, raw, edits, look, sizedLook, char, heavyOn, effective.linecap])
@@ -535,7 +565,11 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const stacked = useMemo(() => {
     if (!stackStart || !heavyInput || !budgetBoxes) return null
     const { k, center } = stackStart
-    const out = solveStack900({ char, strokes: stackStart.strokes, height: stackHeight, inward: k / center, reach: Math.max(0, Math.min(1, (k - 1) / (BLACK_RATIO - 1))), ...(patternContrast ? { contrastRange: CONTRAST_PATTERN_RANGE } : {}) })
+    // 고른 틈은 그릴 가로획에서: 만진 대비는 가로 ÷ 세로에 (base.h ÷ base.v, `hScale`) × (붓 대비 가로 ÷ 세로)를 더 곱한다. 고딕 비율은 굵기마다 폰트 패턴.
+    const ib = heavyInput.base, widthOf = contrastWidthOf(contrast), hScale = ib.h / ib.v
+    const barScale = contrast === 0 ? 1 : hScale * (widthOf({ x: 1, y: 0 }, false) / widthOf({ x: 0, y: 1 }, false))
+    const out = solveStack900({ char, strokes: stackStart.strokes, height: stackHeight, inward: k / center, reach: Math.max(0, Math.min(1, (k - 1) / (BLACK_RATIO - 1))), ...(patternContrast ? { contrastRange: CONTRAST_PATTERN_RANGE } : {}), hScale,
+      gapFromBar: EVEN_GAP_FROM_BAR, barScale, gothicRange: CONTRAST_PATTERN_RANGE })
     // 옮긴 꼭짓점을 자소 칸 좌표로 돌려 획을 바꿔 끼운다(id 그대로).
     // 한 줄짜리 칸(ㅡ의 키, ㅣ의 너비)은 칸 좌표로 못 옮긴다 — 그 축은 칸을 통째로 옮긴다(그 부위 점들의 평균 이동).
     const THIN_BOX = 0.02
@@ -580,11 +614,13 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       const part = primitive.source.part, old = placed[part], b = primitive.box
       placed[part] = old ? { x: Math.min(old.x, b.x), y: Math.min(old.y, b.y), width: Math.max(old.x + old.width, b.x + b.width) - Math.min(old.x, b.x), height: Math.max(old.y + old.height, b.y + b.height) - Math.min(old.y, b.y) } : { ...b }
     }
-    // 만진 대비도 가로만 가늘게: 기둥은 굵기 값 그대로(세로 몫 base.v로 나눈다). 세로까지 굵히면 900 + 대비 끝에서 깨 · 괘 · 절 속이 막혔다(다람쥐 모순 1 · 2).
-    const ib = heavyInput.base
-    const thick = { v: center * out.thick.v, h: center * out.thick.h * ib.h / ib.v }
-    return { syllable, result, strokes, boxes, placed, thick: { CH: thick, JU: { ...thick }, JO: { ...thick } } as Record<BalloonGroup, Thick>, gap: out.gap }
-  }, [stackStart, heavyInput, budgetBoxes, char, stackHeight, heavyBase, effective.linecap, effective.linejoin, patternContrast])
+    // 만진 대비도 가로만 가늘게: 기둥은 굵기 값 그대로(세로 몫 base.v로 나눈다). 세로까지 굵히면 900 + 대비 끝에서 깨 · 괘 · 절 속이 막혔다.
+    // 만진 대비의 가로 배율(`hScale`)은 쌓임 안에서 이미 들어갔다 — 가로 굵게 쪽이면 쌓임 배율을 넘지 않게 잘라서.
+    const thick = { v: center * out.thick.v, h: center * out.thick.h }
+    // 속을 지키려 더 가늘게 한 자소(세로 `yieldV` · 가로 `yieldH`)만 그 묶음에 곱한다.
+    const groupThick = (g: BalloonGroup): Thick => ({ v: thick.v * (out.yieldV?.[g] ?? 1), h: thick.h * (out.yieldH?.[g] ?? 1) })
+    return { syllable, result, strokes, boxes, placed, thick: { CH: groupThick('CH'), JU: groupThick('JU'), JO: groupThick('JO') } as Record<BalloonGroup, Thick>, gap: out.gap, widenEm: out.widenEm ?? 0 }
+  }, [stackStart, heavyInput, budgetBoxes, char, stackHeight, heavyBase, effective.linecap, effective.linejoin, patternContrast, contrast])
   const heavy = useMemo(() => {
     if (!heavyInput || !budgetBoxes) return null
     const { solveAt, base } = heavyInput
@@ -670,13 +706,15 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     })
     const syllableOut = reaches.size ? stretchedSyllable(startSyllable, reaches) : startSyllable
     // 흐림 선(굵기 끝): 자소마다 푼 굵기로 다시 재서, 선이 기둥을 넘으면 기둥이 밖으로 나가고 자리가 남으면 닿자 뼈대가 넓어진다.
-    let fit: HaloFit | null = null
-    if (haloScope(budget.syllable)) {
-      const m = weightToMultiplier(MOLD_BASE_WEIGHT)
-      fit = haloFit(haloStrokesOf(syllableOut, out, effective, m, (part) => solved.thick[balloonGroupOf(part)]), { ease: lookOf(look, 'ease'), spread: lookOf(look, 'spread'), grown: solved.thick.JU.v / base.v })
-    }
-    const pillarBoxes = haloBoxes(out, fit)
-    const top = syllableOut.jongseong && pillarBoxes.JO ? haloFinalFit(haloStrokesOf(syllableOut, pillarBoxes, effective, weightToMultiplier(MOLD_BASE_WEIGHT), (part) => solved.thick[balloonGroupOf(part)])) : null
+    // 조건 없이 모든 짜임: 위(첫닿자 → 보)를 먼저, 그다음 옆(첫닿자 → 오른쪽 홀자). 여유는 짜임마다(`HALO_SIDE_BY` · `HALO_TOP_BY`).
+    const m = weightToMultiplier(MOLD_BASE_WEIGHT), thickOf = (part: Part) => solved.thick[balloonGroupOf(part)]
+    const rule = { ease: lookOf(look, 'ease'), spread: lookOf(look, 'spread'), grown: solved.thick.JU.v / base.v }
+    const side = haloSideOf(budget.syllable), above = haloTopOf(budget.syllable)
+    const topFit = above ? haloTopFit(haloStrokesOf(syllableOut, out, effective, m, thickOf), rule, above) : null
+    const topped = topBoxes(out, topFit)
+    const fit: HaloFit | null = side ? haloFit(haloStrokesOf(syllableOut, topped, effective, m, thickOf), rule, side) : null
+    const pillarBoxes = haloBoxes(topped, fit)
+    const top = syllableOut.jongseong && pillarBoxes.JO ? haloFinalFit(haloStrokesOf(syllableOut, pillarBoxes, effective, weightToMultiplier(MOLD_BASE_WEIGHT), (part) => solved.thick[balloonGroupOf(part)]), finalEaseOf(syllableOut)) : null
     return { boxes: finalBoxes(pillarBoxes, top), thick: solved.thick, syllable: syllableOut, halo: fit, final: top }
   }, [heavyInput, stacked, budgetBoxes, heavyBase, effective, contrast, wanted, weightCap, look])
   const globalStyle = useMemo(() => {
@@ -689,9 +727,11 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   }, [effective, ratio, round, contrast, nib, patternContrast, heavyOn])
   // ㅗ 꼭지는 그릴 칸이 다 정해진 뒤, 꼭지 높이의 닿자 밑 흰 넓이 가운데로(C026). 기둥 · 보는 그대로.
   const kkokji = useMemo(() => {
-    if (heavy) return kkokjiSyllable(heavy.syllable, heavy.boxes, effective, weightToMultiplier(MOLD_BASE_WEIGHT) * heavy.thick.CH.v)
-    if (placement.kind !== 'boxes' || !budgetBoxes) return null
-    return kkokjiSyllable(budget.syllable, halo?.boxes ?? budgetBoxes, globalStyle, weightToMultiplier(globalStyle.weight))
+    if (placement.kind !== 'boxes' || !budgetBoxes) return heavy ? kkokjiSyllable(heavy.syllable, heavy.boxes, effective, weightToMultiplier(MOLD_BASE_WEIGHT) * heavy.thick.CH.v) : null
+    // 굵을 때는 처음 굵기 그림에서 잰 꼭지 자리(닿자 잉크 폭의 몫)를 굵은 닿자에 옮긴다.
+    const base = kkokjiSyllable(budget.syllable, halo?.boxes ?? budgetBoxes, globalStyle, weightToMultiplier(heavy ? MOLD_BASE_WEIGHT : globalStyle.weight))
+    if (!heavy) return base
+    return kkokjiSyllable(heavy.syllable, heavy.boxes, effective, weightToMultiplier(MOLD_BASE_WEIGHT) * heavy.thick.CH.v, base.fit?.rel)
   }, [heavy, placement.kind, budgetBoxes, budget.syllable, halo, globalStyle, effective])
   const colorOf = useCallback((source: ResolvedStrokeInkSource) => {
     // 토막으로 나눈 획(`#`)은 보이는 토막만 남긴 것이다.
@@ -712,7 +752,23 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const finalNow = heavy ? heavy.final : halo?.final ?? null
   const spreadRight = balloon.spread.right + (haloFitNow?.push ?? 0)
   useEffect(() => { onHalo?.(haloFitNow?.push ?? 0) }, [onHalo, haloFitNow])
-  const slot = { width: size * (scale + balloon.spread.left + spreadRight) + size * (lookOf(look, 'tracking') + effective.letterSpacing), marginInline: 0, // 가운데 맞춤이라 왼쪽 · 오른쪽 넓힘의 차이만큼 한쪽에 여백을 두어 글자를 그 쪽으로 민다.
+  // 굵기 끝에서 속을 지키려 넓힌 잉크 폭(`solveStack900` 칸 양보)만큼 자리도 넓힌다 — 안 넓히면 이웃 글자와 닿는다(다람쥐 극단 검수 2026-11-27).
+  const stackWiden = heavyOn && stacked ? scale * stacked.widenEm : 0
+  // 자간 바닥(지키는 순서 틈 → 굵기 → 칸): 자간을 줄여도 글자 자리는 「잉크 폭 + 엔진 틈」 아래로 안 간다 — 이웃 글자 잉크와 안 닿게.
+  // 자간 0 이상의 자리는 그대로다(줄일 때만 막는다). 예전엔 자간 끝에서 쌔 · 깨가 붙었다(다람쥐 극단 검수 2026-11-27).
+  const inkSpan = useMemo(() => {
+    if (placement.kind !== 'boxes') return null
+    if (heavy) return inkSpanOf(heavy.syllable, heavy.boxes, (part, t) => t * weightToMultiplier(MOLD_BASE_WEIGHT) * Math.max(heavy.thick[balloonGroupOf(part)].v, heavy.thick[balloonGroupOf(part)].h) / 2, effective.linecap, effective.linejoin)
+    const boxesNow = halo?.boxes ?? budgetBoxes
+    if (!boxesNow) return null
+    const m = weightToMultiplier(globalStyle.weight) * Math.max(1, 1 + 0.8 * contrast)
+    return inkSpanOf(budget.syllable, boxesNow, (_, t) => t * m / 2, effective.linecap, effective.linejoin)
+  }, [placement.kind, heavy, halo, budgetBoxes, budget.syllable, globalStyle.weight, contrast, effective.linecap, effective.linejoin])
+  const room = scale + balloon.spread.left + spreadRight + stackWiden
+  const tracked = room + lookOf(look, 'tracking') + effective.letterSpacing
+  const inkFloor = inkSpan ? 2 * Math.max(0.5 - inkSpan.left, inkSpan.right - 0.5) + engineGapOf(inkSpan.stroke) : 0
+  const slotEm = tracked >= room ? tracked : Math.max(tracked, Math.min(room, inkFloor))
+  const slot = { width: size * slotEm, marginInline: 0, // 가운데 맞춤이라 왼쪽 · 오른쪽 넓힘의 차이만큼 한쪽에 여백을 두어 글자를 그 쪽으로 민다.
     paddingLeft: Math.max(0, size * (balloon.spread.left - spreadRight)), paddingRight: Math.max(0, size * (spreadRight - balloon.spread.left)), boxSizing: 'border-box' as const }
   // 저장소에 써 넣기: 그리는 칸 그대로를 목표로 넘긴다(긋기 · 획 다듬기 획은 아직 안 넘어감).
   const lift = placement.kind === 'boxes' ? waistLift(look, placement.boxes, raw.layoutType) : 0
@@ -1199,7 +1255,8 @@ export function MoldLabPage() {
   const [origin, setOrigin] = useState<MoldOrigin | null>(() => readOrigin())
   const [raws, setRaws] = useState<Partial<Record<StemKind, PenPoint[]>>>(() => origin?.saved.raws ?? {})
   const [edits, setEdits] = useState<LayoutEdits>(() => origin?.saved.edits ?? {})
-  const [look, setLook] = useState<Look>(() => origin?.saved.look ?? inkLookOf(useGlobalStyleStore.getState().style))
+  // `?look={"weight":2.25}`으로 판 값을 정해 열 수 있다(극단 확인용, `?s=`와 같은 쓰임).
+  const [look, setLook] = useState<Look>(() => urlLook() ?? origin?.saved.look ?? inkLookOf(useGlobalStyleStore.getState().style))
   const storeStyle = useGlobalStyleStore((state) => state.style)
   // 판의 처음 값: 원본(없으면 저장소) 굵기 · 붓 + 엔진 그대로. 그 칸으로 돌아오면 처음 값 그대로 쓴다.
   const homeStyle = origin?.style ?? storeStyle
@@ -1229,8 +1286,6 @@ export function MoldLabPage() {
     return count
   }, [storedVowels])
   const [compare, setCompare] = useState(false)
-  const [plate, setPlate] = useState<Plate>('ink')
-  const [plateSay, setPlateSay] = useState('판을 가로질러 한 번에 그어 보기')
   const [askReset, setAskReset] = useState(false)
   // 글자마다 버틸 수 있는 가장 굵은 비율(자소를 끝까지 키워도 획이 안 붙는 데까지). 글줄은 가장 작은 것을 다 같이 쓴다 — 굵기는 글줄 전체가 같다.
   const [caps, setCaps] = useState<Record<string, number>>({})
@@ -1261,7 +1316,6 @@ export function MoldLabPage() {
   const widenPct = lineChars.length ? Math.round(lineChars.reduce((sum, [, at]) => sum + (pushes[`${sentence}-${at}`] ?? 0), 0) / lineChars.length * 1000) / 10 : 0
   // 1단계 흐림 선이 아직 안 맡는 글자(쌍닿자 · ㅍ). 예전 셈 그대로라고 작게 알린다(고양이 제안, 하니무스 2026-11-23 "ㅇㅇ").
   const oldRule = [...new Set(lineChars.map(([char]) => char).filter((char) => { const code = char.charCodeAt(0) - 0xac00; return code >= 0 && code < 11172 && [1, 4, 8, 10, 13, 17].includes(Math.floor(code / 588)) /* ㄲ ㄸ ㅃ ㅆ ㅉ ㅍ */ }))]
-  const [more, setMore] = useState(false)
   const weightCap = Math.min(Infinity, ...[...sentence].map((char, at) => (char === ' ' ? Infinity : caps[`${sentence}-${at}`] ?? Infinity)))
   const weightNote = appliedWeight(lookOf(look, 'weight'), weightCap) < lookOf(look, 'weight') ? (lookOf(look, 'weight') > 1 ? '가장 빽빽한 글자의 가는 획이 글자 바닥(기준 세로줄기의 0.5배)에 닿아 글줄 굵기가 여기서 멈춤' : '획이 붙기 직전이라 글줄 전체가 여기서 멈춤') : ''
   // 굵기 줄에서 더 가면 획이 붙는 칸은 잠근다(그림이 안 바뀌는데 값만 오르는 일이 없게).
@@ -1414,6 +1468,7 @@ export function MoldLabPage() {
     remember()
     // 인상은 통째로, 칸은 서로 맞물려 있어 짜임째로 되돌린다.
     // 처음 값 = 판의 처음 칸(원본 · 저장소 굵기 · 붓, `homeLook`). 써 넣은 굵기(`weightBase`)를 지우면 그 당김이 두 번 들어간다(다람쥐 2026-11-22).
+    // 판 읽기 줄은 마지막으로 끈 값을 그대로 들고 있다 — 처음 값으로 돌렸다고 바꿔 쓴다(다람쥐 극단 검수 2026-11-27: 「굵기 100」이 남아 값이 안 돌아간 것처럼 보임).
     if (step === 'shape') setLook((now) => ({ ...homeLook, ...Object.fromEntries([...STROKE_KEYS, 'tracking' as const].map((key) => [key, now[key]])) }))
     else if (step === 'finish') setLook((now) => ({ ...now, tracking: undefined }))
     else if (step === 'stroke') setLook((now) => ({ ...now, ...Object.fromEntries(STROKE_KEYS.map((key) => [key, undefined])) }))
@@ -1429,6 +1484,10 @@ export function MoldLabPage() {
   const lazyLook = useDeferredValue(look)
   const lineLook = compare ? NO_LOOK : lazyLook
   const lineDrawn = compare ? undefined : drawn
+  // 글자 문지르기 판의 글자(빚기 엔진 그대로).
+  // 눈금을 미는 동안 버벅임(하니무스 2026-11-27 "랜더를 우선으로"): 눈금 · 휠 숫자는 바로, 판 글자는 한 박자 늦게(끊어 그려 손을 안 막는다).
+  const rubLook = useDeferredValue(look)
+  const rubGlyph = useCallback((char: string, size: number) => <MoldGlyph char={char} size={size} edits={compare ? NO_EDITS : edits} look={compare ? NO_LOOK : rubLook} drawn={compare ? undefined : drawn} weightCap={weightCap} stackHeight={stackHeight} fence={compare ? undefined : fence} />, [compare, NO_EDITS, NO_LOOK, edits, rubLook, drawn, weightCap, stackHeight, fence])
   const stepIndex = STEP_ORDER.indexOf(step)
   const changed = Object.keys(edits).length + Object.values(look).filter((value) => value !== undefined).length + Object.keys(raws).filter((key) => raws[key as StemKind]).length
 
@@ -1449,7 +1508,11 @@ export function MoldLabPage() {
   const NEXT_LABEL: Partial<Record<Step, string>> = { shape: '부위 다듬기로', part: '획 다듬기로', stroke: '마무리로' }
   const tracking = lookOf(look, 'tracking'), [t0, t1] = LOOK_WALL.tracking, trackingPct = Math.round((tracking - t0) / (t1 - t0) * 100)
 
-  return <MoldOriginContext.Provider value={origin}><main className={styles.page}>
+  // 인상 잡기는 판이 화면 전체(하니무스 2026-11-27 "인상잡기 예시문장 말고 전체화묜을 쟤가 잡아야해. 스크롤없게").
+  // 예시 글줄은 숨겨만 둔다 — 글줄 글자가 굵기 상한 · 쌓임 키를 재서 판 글자에 넘겨 준다.
+  const full = step === 'shape'
+  const rubNote = [weightNote, widenPct > 0 ? `굵어져 넓어짐 +${widenPct}%` : '', oldRule.length > 0 ? `아직 예전 셈 · ${oldRule.join(' ')}` : ''].filter(Boolean).join(' · ')
+  return <MoldOriginContext.Provider value={origin}><main className={styles.page} data-full={full || undefined}>
     <header className={styles.header}>
       <span className={styles.eyebrow}>빚기 시험판 · {stepIndex + 1}/{STEP_ORDER.length} {STEP_NAMES[step]}</span>
       <ChoiceGroup variant="segment" aria-label="단계" className={styles.steps}>
@@ -1457,7 +1520,7 @@ export function MoldLabPage() {
       </ChoiceGroup>
     </header>
 
-    <section className={styles.card} aria-label="예시 글줄">
+    <section className={full ? styles.bakeHidden : styles.card} aria-label="예시 글줄" aria-hidden={full || undefined}>
       <div className={styles.line} data-testid="mold-line" data-compact={step === 'shape' || undefined}>
         {chars.map((char, at) => char === ' '
           ? <span key={at} className={styles.space} />
@@ -1475,20 +1538,7 @@ export function MoldLabPage() {
 
     {step === 'draw' && <DrawStep raws={raws} setRaws={setRaws} stems={stems} onDone={() => setStep('shape')} />}
     {step !== 'draw' && <>
-      {step === 'shape' && <section className={styles.panel} aria-label="인상 잡기">
-        <ChoiceGroup variant="segment" aria-label="판" className={styles.plates}>
-          {(['ink', 'frame'] as const).map((key) => <ChoiceItem key={key} checked={plate === key} onClick={() => setPlate(key)} data-testid={`mold-plate-${key}`}>{PLATE_NAMES[key]}</ChoiceItem>)}
-        </ChoiceGroup>
-        {/* 고딕 · 명조 시작값은 뺐다: 두 값 차이가 글자에 0.8%밖에 안 보였다(하니무스 2026-11-27 "고딕/명조 의미없어보임"). 엔진 여유 값 그대로. */}
-        <MoldDotPlate key={plate} keys={plate === 'frame' ? FRAME_KEYS : INK_KEYS} locks={plate === 'ink' && weightLock !== undefined ? { weight: weightLock } : undefined} look={look} home={homeLook} setLook={setLook} onBegin={remember} onSay={setPlateSay} />
-        <p className={styles.simsReadout} data-testid="mold-readout">{plateSay}{weightNote ? <><br />{weightNote}</> : null}{plate === 'ink' && widenPct > 0 ? <><br /><span data-testid="mold-widen">굵어져 넓어짐 +{widenPct}%</span></> : null}</p>
-        {oldRule.length > 0 && <p className={styles.skipNote} data-testid="mold-old-rule">아직 예전 셈 · {oldRule.join(' ')}</p>}
-        <Button variant="ghost" size="sm" onClick={() => setMore(!more)} aria-expanded={more} data-testid="mold-more">{more ? '접기' : '더 보기'}</Button>
-        {more && <Field label="굵어질 때 넓어짐" value={`${Math.round((LOOK_WALL.spread[1] - lookOf(look, 'spread')) / (LOOK_WALL.spread[1] - LOOK_WALL.spread[0]) * 100)}`}>
-          <RangeBar min={0} max={100} value={Math.round((LOOK_WALL.spread[1] - lookOf(look, 'spread')) / (LOOK_WALL.spread[1] - LOOK_WALL.spread[0]) * 100)} onPointerDown={remember} onKeyDown={remember} onChange={(event) => setLook({ ...look, spread: LOOK_WALL.spread[1] - (LOOK_WALL.spread[1] - LOOK_WALL.spread[0]) * Number(event.currentTarget.value) / 100 })} aria-label="굵어질 때 넓어짐" data-testid="mold-spread" />
-        </Field>}
-        <p className={styles.skipNote}>점선 · 폰트들의 가운데 / 검은 눈금 · 지금 바탕(노토)</p>
-      </section>}
+      {step === 'shape' && <MoldRubPlate locks={weightLock !== undefined ? { weight: weightLock } : undefined} look={look} home={homeLook} setLook={setLook} onBegin={remember} renderGlyph={rubGlyph} note={rubNote} />}
       {step === 'part' && <>
         <nav className={styles.layouts} aria-label="짜임" data-testid="mold-layouts">
           <span className={styles.layoutCount}>짜임 {PART_LAYOUTS.findIndex((item) => item.layout === layoutOfFocus) + 1}/6</span>
@@ -1543,15 +1593,15 @@ export function MoldLabPage() {
         </div>
         <Button variant="outline" size="sm" onClick={downloadOutline} data-testid="mold-export">윤곽 내보내기(SVG)</Button>
       </section>}
-      <div className={styles.moldActions}>
+      <div className={styles.moldActions} data-row={full || undefined}>
         <Button variant="outline" size="sm" onClick={undo} disabled={!history.length} data-testid="mold-undo"><Undo2 aria-hidden="true" />되돌리기</Button>
         <Button variant="outline" size="sm" onClick={resetRegion} disabled={step === 'part' && !edits[layoutOfFocus]} data-testid="mold-reset-region"><RotateCcw aria-hidden="true" />{step === 'shape' ? '처음 값' : step === 'stroke' ? '획 처음대로' : step === 'finish' ? '자간 처음대로' : '이 짜임 처음대로'}</Button>
+        {full && <Button size="sm" onClick={goNext} data-testid="mold-next-shape">{NEXT_LABEL.shape}<ChevronRight aria-hidden="true" /></Button>}
       </div>
-      {NEXT_LABEL[step] && <Button size="block" onClick={goNext} data-testid={`mold-next-${step}`}>{NEXT_LABEL[step]}<ChevronRight aria-hidden="true" /></Button>}
-      {step === 'shape' && <p className={styles.skipNote}>부위 다듬기는 건너뛰어도 돼요.</p>}
+      {!full && NEXT_LABEL[step] && <Button size="block" onClick={goNext} data-testid={`mold-next-${step}`}>{NEXT_LABEL[step]}<ChevronRight aria-hidden="true" /></Button>}
     </>}
 
-    {changed > 0 && (askReset
+    {!full && changed > 0 && (askReset
       ? <div className={styles.moldActions} data-testid="mold-reset-ask">
         <span className={styles.skipNote}>그은 획까지 모두 지움</span>
         <Button variant="outline" size="sm" onClick={() => setAskReset(false)} data-testid="mold-reset-no">취소</Button>
