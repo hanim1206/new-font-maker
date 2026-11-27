@@ -297,7 +297,8 @@ describe('도트판 인상 잡기', () => {
     expect(notoDot('size')).toBe(9)
     expect(notoDot('contrast')).toBe(7)
     // 자소 사이 여유: 엔진(0.78)은 폰트 여섯보다 촘촘해 칸 0(촘촘 끝)에 선다.
-    expect(dotsOf({}, FRAME_KEYS)).toEqual([9, 12, 0, 20, 0, 10])
+    expect(dotsOf({}, FRAME_KEYS)).toEqual([9, 12, 0, 0, 10])
+    expect(FRAME_KEYS).not.toContain('jag')
     expect(dotToLook('ease', 0)).toBeCloseTo(0.78)
     // 크기는 판에서 뺐다. 여유는 「보정 세기」로 무게중심 앞에 돌아왔다(하니무스 2026-11-27).
     expect(FRAME_KEYS).not.toContain('size')

@@ -1339,11 +1339,12 @@ export function dragSeam(seam: Seam, origin: Partial<Record<Part, BoxConfig>>, s
  */
 // 크기는 판에서 뺐다(하니무스 2026-11-27 카드 "크기·여유 빼고 받침 남김"). 고딕 · 명조 시작값 고르기도 뺐다(11-27 "의미없어보임").
 // 자소 사이 여유는 「보정 세기」(촘촘 ↔ 여유)로 다시 틀 판에, 무게중심 바로 앞(하니무스 2026-11-27 카드 "틀 판에 막대 하나로").
-export const FRAME_KEYS = ['frame', 'jamo', 'open', 'jag', 'ease', 'center'] as const
+// 윗선(들쭉날쭉)도 판에서 숨겼다(하니무스 2026-11-27 카드 "판에서 숨기기"): 고딕만 내는 출시에서 차이가 거의 안 보인다. 코드 · 값은 남겨 손글씨 꼴에서 다시 연다.
+export const FRAME_KEYS = ['frame', 'jamo', 'open', 'ease', 'center'] as const
 export const INK_KEYS = ['weight', 'contrast', 'round'] as const
 /** 판에 없는 값(눈금 · 이름은 남겨 둠). */
 // 붓촉은 판에서 뺀다: 납작 붓이면 둥글기 · 대비가 안 먹어 한 판에 같이 켜 둘 수 없다(하니무스 2026-11-27 "붓촉을 그 단계에서 보여주면 안되겠지").
-export const HIDDEN_DOT_KEYS = ['size', 'nib'] as const
+export const HIDDEN_DOT_KEYS = ['size', 'jag', 'nib'] as const
 export const DOT_KEYS = [...FRAME_KEYS, ...INK_KEYS, ...HIDDEN_DOT_KEYS] as const
 export type DotKey = (typeof DOT_KEYS)[number]
 export const DOT_ROWS = 20
