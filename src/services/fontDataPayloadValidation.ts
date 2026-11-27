@@ -468,6 +468,13 @@ function validateStemBeak(value: unknown, path: string, issues: FontPayloadValid
   finite(value.angle, `${path}.angle`, issues)
 }
 
+function validateHalo(value: unknown, path: string, issues: FontPayloadValidationIssue[]): void {
+  if (!isRecord(value)) return push(issues, 'invalid-field', path, 'halo는 객체여야 합니다.')
+  exactKeys(value, ['ease', 'spread'], ['ease', 'spread'], path, issues)
+  finite(value.ease, `${path}.ease`, issues)
+  finite(value.spread, `${path}.spread`, issues)
+}
+
 function validateGlobalStyle(value: unknown, issues: FontPayloadValidationIssue[], allowLegacy: boolean): void {
   if (!isRecord(value)) return
   const style = value.style
@@ -475,12 +482,14 @@ function validateGlobalStyle(value: unknown, issues: FontPayloadValidationIssue[
     const path = '$.globalStyle.style'
     const keys = ['slant', 'weight', 'letterSpacing', 'linecap', 'linejoin', 'brush', 'strokeStyle']
     // 부리는 나중에 생긴 값이라 없어도 된다(옛 저장분).
-    exactKeys(style, [...keys, 'stemBeak', 'autoCompensation', 'counterKeep'], keys, path, issues)
+    exactKeys(style, [...keys, 'stemBeak', 'autoCompensation', 'counterKeep', 'halo'], keys, path, issues)
     if (style.stemBeak !== undefined) validateStemBeak(style.stemBeak, `${path}.stemBeak`, issues)
     // 네모꼴 자동 보정은 껐을 때만 `false`로 남는다.
     if (style.autoCompensation !== undefined && typeof style.autoCompensation !== 'boolean') push(issues, 'invalid-field', `${path}.autoCompensation`, 'autoCompensation은 boolean이어야 합니다.')
     // 속공간 지키기도 껐을 때만 `false`로 남는다.
     if (style.counterKeep !== undefined && typeof style.counterKeep !== 'boolean') push(issues, 'invalid-field', `${path}.counterKeep`, 'counterKeep은 boolean이어야 합니다.')
+    // 흐림 선 손잡이(2026-11-27)도 나중에 생긴 값이라 없어도 된다.
+    if (style.halo !== undefined) validateHalo(style.halo, `${path}.halo`, issues)
     for (const key of ['slant', 'weight', 'letterSpacing']) finite(style[key], `${path}.${key}`, issues)
     if (!['round', 'butt', 'square'].includes(String(style.linecap))) push(issues, 'invalid-field', `${path}.linecap`, 'linecap이 유효하지 않습니다.')
     if (!['miter', 'round', 'bevel'].includes(String(style.linejoin))) push(issues, 'invalid-field', `${path}.linejoin`, 'linejoin이 유효하지 않습니다.')

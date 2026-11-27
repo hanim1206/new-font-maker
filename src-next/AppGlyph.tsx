@@ -5,6 +5,7 @@ import { useJamoStore } from '../src/stores/jamoStore'
 import { mergePadding, useLayoutStore } from '../src/stores/layoutStore'
 import type { BoxConfig, DecomposedSyllable, JamoData, LayoutSchema, Padding, Part, ResolvedStrokeInkSource } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
+import { haloPlacementOf } from './haloPlacement'
 import { useContextPlacement } from './notoModel'
 
 function withEffectivePadding(
@@ -56,7 +57,11 @@ export function AppGlyph({ char, size, className, strokeColorOf, jungseongOverri
     globalPadding,
     paddingOverrides[syllable.layoutType],
   )
-  const { placement } = useContextPlacement(syllable, schema, globalStyle)
+  const { placement: modelPlacement } = useContextPlacement(syllable, schema, globalStyle)
+  // 흐림 선: OTF 추출(`placementResolverOf`)과 같은 함수로 글자마다 다시 센다 — 폰트 탭 · 검수 격자와 파일이 같다.
+  const { weight, linecap, linejoin, strokeStyle, halo } = globalStyle
+  const bodyRight = 1 - (schema.padding?.right ?? 0)
+  const placement = useMemo(() => haloPlacementOf(syllable, modelPlacement, { weight, linecap, linejoin, strokeStyle, halo }, bodyRight), [syllable, modelPlacement, weight, linecap, linejoin, strokeStyle, halo, bodyRight])
   const shift = placementShift?.(syllable)
   const boxes = useMemo(() => placement.kind === 'boxes' ? shiftedBoxes(placement.boxes, shift) : undefined, [placement, shift])
 

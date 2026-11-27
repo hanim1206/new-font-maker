@@ -1,4 +1,4 @@
-import type { DecomposedSyllable, Part } from '../src/types'
+import type { BoxConfig, DecomposedSyllable, Part } from '../src/types'
 
 /**
  * 흐림 선(새 틈 규칙 1단계, 거북이 설계 2026-11-23 · 하니무스 "추천대로 ㄱ"). 설계 `study/mold-gap-design/빚기-새-틈-규칙-설계.md`.
@@ -290,4 +290,45 @@ export function haloFinalFit(strokes: readonly HaloStroke[], ease = FINAL_EASE):
   // 받침을 반 넘게 줄이지는 않는다.
   move = Math.min(move, 0.5 * (joInk.y1 - joInk.y0))
   return { err, move, top: joInk.y0, bottom: joInk.y1 }
+}
+
+type Boxes = Partial<Record<Part, BoxConfig>>
+
+/** 흐림 선 맞춤을 칸에 옮긴다: 첫닿자 칸은 잉크 왼끝을 두고 가로로 넓히고, 홀자 칸은 오른쪽으로 민다. */
+export function haloBoxes(boxes: Boxes, fit: HaloFit | null): Boxes {
+  if (!fit || (fit.widen === 1 && fit.push === 0)) return boxes
+  const out = { ...boxes }
+  if (out.CH && fit.widen !== 1) out.CH = { ...out.CH, x: fit.anchor - (fit.anchor - out.CH.x) * fit.widen, width: out.CH.width * fit.widen }
+  if (fit.push) for (const part of ['JU', 'JU_H', 'JU_V'] as const) if (out[part]) out[part] = { ...out[part]!, x: out[part]!.x + fit.push }
+  return out
+}
+/** 받침 위 흐림 선: 받침 칸 윗변만 옮긴다(밑변 고정). 받침 획은 칸에 맞춰 늘거나 줄어든다. */
+export function finalBoxes(boxes: Boxes, fit: FinalFit | null): Boxes {
+  if (!fit || !fit.move || !boxes.JO) return boxes
+  const jo = boxes.JO, scale = (fit.bottom - fit.top - fit.move) / Math.max(fit.bottom - fit.top, 1e-6)
+  // 칸 밑변은 그대로, 칸 높이는 잉크 높이와 같은 비율로.
+  const bottom = jo.y + jo.height, height = jo.height * scale
+  return { ...boxes, JO: { ...jo, y: bottom - height, height } }
+}
+
+/**
+ * 흐림 선 세 방향(첫닿자↔기둥 · 받침 위)을 한 글자 칸에 입힌다. 빚기 화면과 내보내기(`haloPlacement.ts`)가 이 한 함수를 같이 써서
+ * 화면과 파일이 안 갈라진다(실험 6-앞, 2026-11-25). `strokesOn`은 그 칸에 그려질 잉크(중심선 + 두께). 고칠 것이 없으면 null.
+ */
+export function haloCorrect(input: { syllable: DecomposedSyllable; boxes: Boxes; strokesOn: (boxes: Boxes) => HaloStroke[]; rule: HaloRule; bodyRight?: number }): { fit: HaloFit | null; final: FinalFit | null; boxes: Boxes } | null {
+  const { syllable, boxes, strokesOn, rule, bodyRight } = input
+  const pillar = haloScope(syllable), final = !!syllable.jongseong && !!boxes.JO
+  if (!pillar && !final) return null
+  const strokes = pillar || bodyRight !== undefined ? strokesOn(boxes) : []
+  let fit = pillar ? haloFit(strokes, rule) : null
+  // 글자 폭이 정해진 곳(폰트 탭 · OTF)은 기둥을 글자 몸통 오른끝까지만 민다. 빚기 화면은 글자 자리를 같이 넓혀서 이 끝이 없다.
+  if (fit && fit.push > 0 && bodyRight !== undefined) {
+    const right = inkOf(strokes.filter((stroke) => stroke.part !== 'CH' && stroke.part !== 'JO'))?.x1 ?? -Infinity
+    const push = Math.max(0, Math.min(fit.push, bodyRight - right))
+    if (push !== fit.push) fit = { ...fit, push }
+  }
+  const moved = haloBoxes(boxes, fit)
+  // 받침 위(흐림 선 셋째 방향): 폰트 일곱 집안 3.5% 폭 밖만 받침 윗변을 옮긴다. 굵어져도 지수 ~0이라 굵기를 안 곱한다.
+  const top = final ? haloFinalFit(strokesOn(moved)) : null
+  return { fit, final: top, boxes: finalBoxes(moved, top) }
 }

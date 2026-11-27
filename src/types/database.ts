@@ -28,6 +28,8 @@ export interface FontGlobalStyle {
   autoCompensation?: boolean
   /** 속공간 지키기(굵기 자동 보정). 껐을 때만 `false`가 온다 — 없으면 켜짐. */
   counterKeep?: boolean
+  /** 흐림 선 손잡이(여유 · 넓어짐). 엔진 처음 값이면 없다 — 없으면 처음 값으로 켜짐. */
+  halo?: { ease: number; spread: number }
 }
 
 export interface FontGlobalStyleExclusion {

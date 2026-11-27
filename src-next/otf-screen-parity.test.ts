@@ -90,6 +90,7 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
       import('./fontExportStore'), import('./notoModel'), import('../src/services/contextBoxResolver'),
       import('../src/services/glyphInkResolver'), import('./scopeRule'),
     ])
+    const { haloPlacementOf } = await import('./haloPlacement')
     /** 한 글자의 (OTF 잉크, 화면 잉크, 스키마 OTF 잉크). */
     const measure = (char: string) => {
       const placementOf = exportStore.placementResolverOf(MODEL, deltaStore.layoutDeltaSnapshot())
@@ -104,10 +105,12 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
       const padding = { ...layouts.globalPadding, ...layouts.paddingOverrides[syllable.layoutType] }
       const schema = { ...layouts.layoutSchemas[syllable.layoutType], padding, designBodyPadding: padding }
       const identity = resolver.identityOfSyllable(syllable)
-      const screenPlacement = notoModel.contextPlacementOf({
+      const modelPlacement = notoModel.contextPlacementOf({
         bundle: MODEL, identity, syllable, schema, ends: globalStyle,
         delta: deltaStore.effectiveLayoutDelta(deltaStore.useLayoutDeltaStore.getState(), identity),
       }).placement
+      // `AppGlyph`는 모델 칸 위에 흐림 선을 얹는다(`haloPlacement.ts`). OTF도 같은 함수를 지난다.
+      const screenPlacement = haloPlacementOf(syllable, modelPlacement, globalStyle, 1 - padding.right)
       const screen = xor.appGlyphInkRegions(syllable, screenPlacement, globalStyle)
       if (!screen.ok) throw new Error(`${char} 화면 잉크 실패: ${screen.message}`)
       // 화면의 기울기는 SVG 변환이다(`SvgRenderer`: 글자 칸 세로 중심 기준 skewX(−기울기)). 같은 식을 잉크에 얹어 OTF와 견준다.
@@ -121,6 +124,11 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
         globalLinecap: globalStyle.linecap, globalLinejoin: globalStyle.linejoin, horizontalInkBounds: { min: 0, max: 1 },
       }).primitives.map((primitive) => primitive.kind === 'centerline' ? { id: primitive.stroke.id, box: { ...primitive.box, x: primitive.box.x - metrics.hangulOriginX(padding) } } : null)
       const otfBoxes = data.strokes.map((item) => ({ id: item.stroke.id, box: item.box }))
+      // 흐림 선을 얹기 전 모델 칸(같은 좌표). 대비 · 줄기 휨이 "칸을 안 바꾼다"는 약속은 이 칸으로 본다 — 흐림 선은 그려질 획을 보고 칸을 고치는 층이라 따로 움직인다.
+      const modelBoxes = inkResolver.resolveGlyphInkPrimitives({
+        syllable, placement: modelPlacement, weightMultiplier: data.weightMultiplier,
+        globalLinecap: globalStyle.linecap, globalLinejoin: globalStyle.linejoin, horizontalInkBounds: { min: 0, max: 1 },
+      }).primitives.flatMap((primitive) => primitive.kind === 'centerline' ? [{ id: primitive.stroke.id, box: { ...primitive.box, x: primitive.box.x - metrics.hangulOriginX(padding) } }] : [])
       // OTF 좌표는 정수 폰트 단위로 반올림된다. 가장자리가 평균 몇 유닛 어긋났는지 = xor 면적 / 잉크 둘레.
       const edgeDriftUnits = (shape: MultiPolygon) => fit.multiPolygonArea(polygonClipping.xor(mine, shape)) / perimeterOf(mine) * exportUtils.UPM
       const ratio = (shape: MultiPolygon) => fit.multiPolygonArea(polygonClipping.xor(mine, shape)) / fit.multiPolygonArea(mine)
@@ -129,7 +137,7 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
       if (!schemaScreen.ok) throw new Error(`${char} 스키마 화면 잉크 실패`)
       const schemaMine = fit.unionOf(schemaScreen.regions)
       const floorXor = fit.multiPolygonArea(polygonClipping.xor(schemaMine, toInk(legacy))) / fit.multiPolygonArea(schemaMine)
-      return { data, globalStyle, floorXor, screenBoxes, otfBoxes, edgeDrift: edgeDriftUnits(toInk(data)), screenKind: screenPlacement.kind, otf: toInk(data), modelXor: ratio(toInk(data)), schemaXor: ratio(toInk(legacy)) }
+      return { data, globalStyle, floorXor, screenBoxes, otfBoxes, modelBoxes, edgeDrift: edgeDriftUnits(toInk(data)), screenKind: screenPlacement.kind, otf: toInk(data), modelXor: ratio(toInk(data)), schemaXor: ratio(toInk(legacy)) }
     }
     return { measure, deltaStore, resolver, hangul, jamo, rule }
   }
@@ -213,7 +221,7 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
           expect(row.data.strokeStyle, row.char).toMatchObject({ mode: 'brush', roundness })
           // 둥글기는 상자를 안 건드린다.
           expect(row.otfBoxes, row.char).toEqual(row.screenBoxes)
-          expect(row.otfBoxes, row.char).toEqual(square[index].otfBoxes)
+          expect(row.modelBoxes, row.char).toEqual(square[index].modelBoxes)
           expect(row.edgeDrift, row.char).toBeLessThan(1)
           expect(row.modelXor, row.char).toBeLessThan(0.015)
           // 잉크는 각진 끝 네모 안에서만 굴려진다 — 극점이 밖으로 안 나간다(정수 반올림 1유닛 허용).
@@ -246,7 +254,7 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
         rows.forEach((row, index) => {
           expect(row.data.strokeStyle, row.char).toMatchObject({ mode: 'brush', contrast })
           expect(row.otfBoxes, row.char).toEqual(row.screenBoxes)
-          expect(row.otfBoxes, row.char).toEqual(square[index].otfBoxes)
+          expect(row.modelBoxes, row.char).toEqual(square[index].modelBoxes)
           expect(row.edgeDrift, row.char).toBeLessThan(1)
           expect(row.modelXor, row.char).toBeLessThan(0.015)
         })
@@ -334,8 +342,8 @@ describe('OTF와 화면이 같은 상자를 쓴다', () => {
       }
       // 마스터는 모양만 바꾸고 상자는 그대로 둔다(틀로 굳힌 곧은 획이 상자를 정한다).
       // 두께 0인 칸(ㅣ · ㅡ · ㅚ ㅟ ㅢ의 한 줄기)만 휠 방향 변이 넓어진다 — 가운데와 축 방향 변은 그대로.
-      for (const row of rows) row.otfBoxes.forEach((item, index) => {
-        const was = straight[row.char].otfBoxes[index]
+      for (const row of rows) row.modelBoxes.forEach((item, index) => {
+        const was = straight[row.char].modelBoxes[index]
         expect(item.id, row.char).toBe(was.id)
         const same = (a: number, b: number) => Math.abs(a - b) < 1e-9
         const widenedX = same(item.box.y, was.box.y) && same(item.box.height, was.box.height) && same(item.box.x + item.box.width / 2, was.box.x + was.box.width / 2) && was.box.width < 0.05

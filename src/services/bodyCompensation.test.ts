@@ -136,6 +136,24 @@ describe('폰트 데이터의 속공간 지키기 끔', () => {
   })
 })
 
+describe('폰트 데이터의 흐림 선 손잡이', () => {
+  it('처음 값이면 키가 없고, 바꾼 값은 읽고 쓸 때 남는다. 모양이 틀리면 거른다', async () => {
+    const { loadedGlobalStyle, useGlobalStyleStore } = await import('../stores/globalStyleStore')
+    const { collectFontData } = await import('./fontDataBridge')
+    useGlobalStyleStore.getState().setHalo(undefined)
+    expect('halo' in collectFontData().globalStyle.style).toBe(false)
+    useGlobalStyleStore.getState().setHalo({ ease: 0.6, spread: 0.89 })
+    const on = collectFontData()
+    expect(on.globalStyle.style.halo).toEqual({ ease: 0.6, spread: 0.89 })
+    expect(parseAndMigrateFontData(on).ok).toBe(true)
+    expect(loadedGlobalStyle(on.globalStyle.style).halo).toEqual({ ease: 0.6, spread: 0.89 })
+    const broken = structuredClone(on) as unknown as { globalStyle: { style: Record<string, unknown> } }
+    broken.globalStyle.style.halo = { ease: 0.6 }
+    expect(parseAndMigrateFontData(broken).ok).toBe(false)
+    useGlobalStyleStore.getState().setHalo(undefined)
+  })
+})
+
 describe('옛 기본 네모꼴(사방 0.075) 환산', () => {
   it('읽는 입구(`parseAndMigrateFontData`) 한 곳에서 새 기본으로 바뀌고, 다른 여백은 그대로다', async () => {
     const { collectFontData } = await import('./fontDataBridge')
