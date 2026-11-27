@@ -67,15 +67,48 @@ export interface HaloRule {
   widenMax?: number
 }
 
-/** 다루는 글자: 홑닿자(ㅍ 빼고) + 세로홀자 중 곁줄기가 오른쪽인 것(ㅏ ㅑ ㅣ ㅐ ㅒ), 받침 있어도 됨. 쌍닿자 · ㅍ · ㅓ는 다음 단계. */
-const SCOPE_INITIAL = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅎ'
-const SCOPE_MEDIAL = 'ㅏㅑㅣㅐㅒ'
-export function haloScope(syllable: DecomposedSyllable): boolean {
-  // 받침 글자도(하니무스 2026-11-24 "모든 굵기의 글자"). 키는 받침까지 든 글자 전체 키 — 폰트 일곱 집안에서 전체 키 2.2% · 첫닿자 칸 4.6% · 위 덩이 7.3%로
-  // 전체 키가 가장 잘 모였다(4단계-전면/m13.py). 흐림은 첫닿자 잉크만 칠한다(받침 잉크는 안 넣음).
-  if (syllable.layoutType !== 'choseong-jungseong-vertical' && syllable.layoutType !== 'choseong-jungseong-vertical-jongseong') return false
+/**
+ * 흐림 선은 조건 없이 모든 짜임 · 모든 굵기에 돈다(하니무스 2026-11-27 "왜 계속 조건이 붙냐 ... 회색도랑 모래 분포 쓰기로 했잖아").
+ * 규칙은 하나(첫닿자 흐림 진하기 T에 홀자가 선다)이고, T의 여유만 짜임마다 폰트에서 잰 값이다 — 받침 위(`FINAL_EASE_BY`)와 같은 방식.
+ * - 옆(첫닿자 → 오른쪽 홀자): 홑닿자 + ㅏ꼴 `single` · 쌍닿자 · ㅍ + ㅏ꼴 `double` · ㅓ꼴(곁줄기 끝) `arm` · 섞임(오른 기둥) `mixed`.
+ * - 위(첫닿자 → 아래 보): ㅗ꼴 `flat` · 섞임 `mixed`.
+ * 받침 있어도 된다(키는 받침까지 든 글자 전체 키 — 폰트 일곱 집안에서 가장 잘 모였다, 4단계-전면/m13.py). 흐림은 첫닿자 잉크만 칠한다.
+ */
+export type HaloSide = 'single' | 'double' | 'arm' | 'mixed'
+export type HaloTop = 'flat' | 'mixed'
+const RIGHT_PILLAR = 'ㅏㅑㅣㅐㅒ', LEFT_ARM = 'ㅓㅕㅔㅖ', DOUBLE_INITIAL = 'ㄲㄸㅃㅆㅉㅍ'
+const MIXED_VOWELS = 'ㅘㅙㅚㅝㅞㅟㅢ', FLAT_VOWELS = 'ㅗㅛㅜㅠㅡ'
+export function haloSideOf(syllable: Pick<DecomposedSyllable, 'choseong' | 'jungseong'>): HaloSide | null {
   const initial = syllable.choseong?.char, medial = syllable.jungseong?.char
-  return !!initial && !!medial && SCOPE_INITIAL.includes(initial) && SCOPE_MEDIAL.includes(medial)
+  if (!initial || !medial) return null
+  if (MIXED_VOWELS.includes(medial)) return 'mixed'
+  if (LEFT_ARM.includes(medial)) return 'arm'
+  if (RIGHT_PILLAR.includes(medial)) return DOUBLE_INITIAL.includes(initial) ? 'double' : 'single'
+  return null
+}
+export function haloTopOf(syllable: Pick<DecomposedSyllable, 'choseong' | 'jungseong'>): HaloTop | null {
+  const medial = syllable.jungseong?.char
+  if (!syllable.choseong?.char || !medial) return null
+  return MIXED_VOWELS.includes(medial) ? 'mixed' : FLAT_VOWELS.includes(medial) ? 'flat' : null
+}
+/** 옆 흐림 선이 도는 글자(예전 이름). 이제 홀자가 오른쪽에 있으면 다 돈다. */
+export const haloScope = (syllable: DecomposedSyllable) => haloSideOf(syllable) !== null
+
+/**
+ * 짜임마다 여유 · 넓어짐을 손잡이 값(`HaloRule`, 홑닿자 + ㅏ꼴에서 잰 값)에 곱하는 배율.
+ * 고딕 세 집안(Gothic A1 · Noto · 나눔) × 400 · 700 · 900에서 같은 자(흐림 진하기 ÷ 기둥/키, 2026-11-27 비버 `study/font-key/rub/gray/calm3.py`)로 잰
+ * 여유 = e0 × 굵어진 배율^q의 e0 · q를 홑닿자 ㅏ꼴(e0 0.63 · q 0.45)로 나눈 몫. 엔진 그림으로 다시 재 맞춘 값은 진행 기록에.
+ */
+export const HALO_SIDE_BY: Record<HaloSide, { ease: number; spread: number }> = {
+  single: { ease: 1, spread: 1 },
+  double: { ease: 1.58, spread: 1.4 },
+  arm: { ease: 2.23, spread: 0 },
+  mixed: { ease: 1.12, spread: 0.62 },
+}
+/** 위(첫닿자 → 보): 보 윗변 진하기 ÷ (기둥 ÷ 키). 섞임 e0 0.94 · q 0.42, ㅗ꼴은 흐림 꼬리(0.05)라 잰 값이 흔들려 엔진 그림으로 맞춘다. */
+export const HALO_TOP_BY: Record<HaloTop, { ease: number; spread: number }> = {
+  flat: { ease: 0.05, spread: 2.6 },
+  mixed: { ease: 1.0, spread: 0.69 },
 }
 
 const segThick = (stroke: HaloStroke, a: HaloPt, b: HaloPt) => {
@@ -106,6 +139,31 @@ function inkOf(strokes: readonly HaloStroke[]): Ink | null {
   return x0 < x1 ? { x0, x1, y0, y1 } : null
 }
 
+/** 획들의 잉크를 y 범위 [y0, y1] 안에서만 본 가로 끝(왼 · 오른)과 그 잉크가 든 y 범위. 없으면 null. */
+function bandInkOf(strokes: readonly HaloStroke[], y0: number, y1: number): Ink | null {
+  let x0 = Infinity, x1 = -Infinity, iy0 = Infinity, iy1 = -Infinity
+  for (const stroke of strokes) for (const [a, b] of segsOf(stroke)) {
+    const half = segThick(stroke, a, b) / 2, dy = b.y - a.y
+    // 토막의 반 두께를 넣은 y 범위가 띠와 겹치는 몫만 잘라 본다.
+    const lo = Math.min(a.y, b.y) - half, hi = Math.max(a.y, b.y) + half
+    if (hi < y0 || lo > y1) continue
+    let t0 = 0, t1 = 1
+    if (Math.abs(dy) > 1e-9) {
+      // 중심선이 띠 안에 든 몫. 중심선은 띠 밖인데 두께만 걸치면 가까운 끝 하나.
+      const ta = (y0 - a.y) / dy, tb = (y1 - a.y) / dy
+      t0 = Math.max(0, Math.min(ta, tb)); t1 = Math.min(1, Math.max(ta, tb))
+      if (t0 > t1) t0 = t1 = Math.max(ta, tb) < 0 ? 0 : 1
+    }
+    const xa = a.x + (b.x - a.x) * t0, xb = a.x + (b.x - a.x) * t1
+    // 세로 쪽 토막은 옆으로 반 두께, 가로 쪽 토막은 각진 끝이면 끝 그대로.
+    const l = Math.hypot(b.x - a.x, dy), u = l < 1e-9 ? 1 : (dy / l) ** 2
+    const side = u > 0.5 || !stroke.cap || stroke.cap !== 'butt' ? half : 0
+    x0 = Math.min(x0, xa - side, xb - side); x1 = Math.max(x1, xa + side, xb + side)
+    iy0 = Math.min(iy0, Math.max(y0, lo)); iy1 = Math.max(iy1, Math.min(y1, hi))
+  }
+  return x0 < x1 ? { x0, x1, y0: iy0, y1: iy1 } : null
+}
+
 /** 홀자 기둥: 세로로 가장 긴 홀자 토막 가운데 가장 왼쪽 것. 왼변과 두께. */
 export function haloStemOf(strokes: readonly HaloStroke[]): { left: number; thickness: number } | null {
   let best: { left: number; thickness: number; len: number } | null = null
@@ -122,7 +180,7 @@ export function haloStemOf(strokes: readonly HaloStroke[]): { left: number; thic
 }
 
 /** 첫닿자 잉크를 흐린 진하기의 세로 단면 최댓값. x(글자 칸 좌표)마다 읽는 함수를 돌려준다. */
-function profileOf(ch: readonly HaloStroke[], H: number, around: Ink, rows?: { x0: number; x1: number }): (x: number) => number {
+function profileOf(ch: readonly HaloStroke[], H: number, around: Ink, rows?: { x0: number; x1: number }, band?: { y0: number; y1: number }): (x: number) => number {
   const cell = H / GRID, sigma = HALO_RADIUS * GRID, pad = Math.ceil(3 * sigma) + 2
   const ox = around.x0 - pad * cell, oy = around.y0 - pad * cell
   const nx = Math.ceil((around.x1 - around.x0) / cell) + 2 * pad, ny = Math.ceil((around.y1 - around.y0) / cell) + 2 * pad
@@ -175,11 +233,13 @@ function profileOf(ch: readonly HaloStroke[], H: number, around: Ink, rows?: { x
   const n = rows ? ny : nx, o = rows ? oy : ox
   const col = new Float32Array(n).fill(-1)
   const rx0 = rows ? Math.max(0, Math.floor((rows.x0 - ox) / cell)) : 0, rx1 = rows ? Math.min(nx - 1, Math.ceil((rows.x1 - ox) / cell)) : 0
+  // `band`가 있으면 세로 단면을 그 y 범위 안에서만(ㅓ 곁줄기 끝처럼 표적이 짧을 때).
+  const by0 = band ? Math.max(0, Math.floor((band.y0 - oy) / cell)) : 0, by1 = band ? Math.min(ny - 1, Math.ceil((band.y1 - oy) / cell)) : ny - 1
   const colAt = (i: number) => {
     if (col[i] >= 0) return col[i]
     let m = 0
     if (rows) for (let ix = rx0; ix <= rx1; ix++) m = Math.max(m, at(ix, i))
-    else for (let iy = 0; iy < ny; iy++) m = Math.max(m, at(i, iy))
+    else for (let iy = by0; iy <= by1; iy++) m = Math.max(m, at(i, iy))
     return (col[i] = m)
   }
   return (x: number) => {
@@ -230,33 +290,56 @@ export function scaleChoseong(strokes: readonly HaloStroke[], k: number): HaloSt
 
 const scaleCh = (strokes: readonly HaloStroke[], anchor: number, k: number) => strokes.map((s) => ({ ...s, points: s.points.map((p) => ({ x: anchor + (p.x - anchor) * k, y: p.y })) }))
 
-/** 한 글자의 흐림 선 맞추기. 다루지 않는 모양(기둥 · 닿자 없음)이면 null. */
-export function haloFit(strokes: readonly HaloStroke[], rule: HaloRule): HaloFit | null {
+/**
+ * 한 글자의 흐림 선 맞추기(옆: 첫닿자 → 오른쪽 홀자). 표적은 첫닿자 높이 안 홀자 잉크의 왼끝 — ㅏ꼴 · 섞임은 기둥 왼변, ㅓ꼴은 곁줄기 끝.
+ * 여유는 짜임마다(`HALO_SIDE_BY`). 다루지 않는 모양(기둥 · 닿자 없음)이면 null.
+ */
+export function haloFit(strokes: readonly HaloStroke[], rule: HaloRule, side: HaloSide = 'single'): HaloFit | null {
   const all = inkOf(strokes), ch = strokes.filter((s) => s.part === 'CH'), stem = haloStemOf(strokes)
-  const chInk = inkOf(ch)
-  if (!all || !chInk || !stem || chInk.x1 >= stem.left) return null
-  const H = all.y1 - all.y0
-  const T = rule.ease * Math.max(rule.grown, 1e-3) ** rule.spread * stem.thickness / H
+  const chInk = inkOf(ch), vowel = strokes.filter((s) => s.part !== 'CH' && s.part !== 'JO')
+  if (!all || !chInk || !stem) return null
+  // ㅓ꼴은 곁줄기 끝이 표적이라 그 줄기 높이에서만 읽는다(첫닿자 다른 높이의 잉크가 끝보다 오른쪽에 있어도 된다).
+  let band: { y0: number; y1: number } | undefined
+  if (side === 'arm') {
+    let best: { x: number; y0: number; y1: number } | null = null
+    for (const stroke of vowel) for (const [a, b] of segsOf(stroke)) {
+      const l = Math.hypot(b.x - a.x, b.y - a.y)
+      if (l < 1e-9 || ((b.y - a.y) / l) ** 2 > 0.5) continue
+      const half = segThick(stroke, a, b) / 2, y = (a.y + b.y) / 2
+      if (y + half < chInk.y0 || y - half > chInk.y1) continue
+      const x = Math.min(a.x, b.x) - (stroke.cap && stroke.cap !== 'butt' ? half : 0)
+      if (!best || x < best.x) best = { x, y0: y - half, y1: y + half }
+    }
+    if (!best) return null
+    band = { y0: best.y0, y1: best.y1 }
+  }
+  const target = bandInkOf(vowel, band?.y0 ?? chInk.y0, band?.y1 ?? chInk.y1)
+  if (!target) return null
+  const left = target.x0
+  if (!band && chInk.x1 >= left) return null
+  const H = all.y1 - all.y0, by = HALO_SIDE_BY[side]
+  const T = rule.ease * by.ease * Math.max(rule.grown, 1e-3) ** (rule.spread * by.spread) * stem.thickness / H
   const measure = (k: number) => {
     const scaled = k === 1 ? ch : scaleCh(ch, chInk.x0, k)
     const ink = inkOf(scaled)!
-    const profile = profileOf(scaled, H, { x0: ink.x0, x1: Math.max(ink.x1, stem.left + 0.5 * H), y0: all.y0, y1: all.y1 })
-    return { line: lineOf(profile, ink.x1, T, H), right: ink.x1, profile }
+    const right = band ? bandInkOf(scaled, band.y0, band.y1)?.x1 ?? ink.x0 : ink.x1
+    const profile = profileOf(scaled, H, { x0: ink.x0, x1: Math.max(ink.x1, left + 0.5 * H), y0: all.y0, y1: all.y1 }, undefined, band)
+    return { line: lineOf(profile, Math.min(right, left), T, H), right, profile }
   }
   const first = measure(1)
-  const err = (first.line - stem.left) / H
-  const ease = first.profile(stem.left) / (stem.thickness / H)
-  let widen = 1, push = 0, after = err, gap = (stem.left - first.right) / H
+  const err = (first.line - left) / H
+  const ease = first.profile(left) / (stem.thickness / H)
+  let widen = 1, push = 0, after = err, gap = (left - first.right) / H
   if (err < -HALO_TOLERANCE) {
     // 자리가 남음: 선이 기둥에 닿거나 끝 틈이 폰트 아래 끝에 닿을 때까지 뼈대를 넓힌다(남은 자리는 선까지 메운다).
-    const ok = (k: number) => { const m = measure(k); return m.line <= stem.left && (stem.left - m.right) / H >= HALO_END_GAP }
+    const ok = (k: number) => { const m = measure(k); return m.line <= left && (left - m.right) / H >= HALO_END_GAP }
     if (ok(1)) {
       let lo = 1, hi = Math.max(1, Math.min(WIDEN_MAX, rule.widenMax ?? WIDEN_MAX))
       if (ok(hi)) lo = hi
       else for (let i = 0; i < 12; i++) { const mid = (lo + hi) / 2; if (ok(mid)) lo = mid; else hi = mid }
       widen = lo
       const m = measure(widen)
-      after = (m.line - stem.left) / H; gap = (stem.left - m.right) / H
+      after = (m.line - left) / H; gap = (left - m.right) / H
     }
   } else if (err > HALO_TOLERANCE) {
     // 답답함: 기둥이 밖으로(글자가 넓어진다). 글자 폭은 덜 바뀌게 빗나감 폭 끝까지만.
@@ -280,7 +363,6 @@ export const FINAL_EASE = 1.51
  * 굵은 횟 · 원 · 줬의 받침 위 틈이 폰트의 두세 배가 됐다(하니무스 2026-11-27 "자소랑 자소 사이의 gap이 ... 균일하게 가까워져도").
  */
 export const FINAL_EASE_BY = { V: 1.35, H: 1.87, M: 1.99 } as const
-const MIXED_VOWELS = 'ㅘㅙㅚㅝㅞㅟㅢ', FLAT_VOWELS = 'ㅗㅛㅜㅠㅡ'
 /** 그 글자 짜임의 받침 위 여유(`FINAL_EASE_BY`). */
 export function finalEaseOf(syllable: Pick<DecomposedSyllable, 'jungseong'>): number {
   const v = syllable.jungseong?.char ?? ''
@@ -323,6 +405,60 @@ export function haloFinalFit(strokes: readonly HaloStroke[], ease = FINAL_EASE):
 
 type Boxes = Partial<Record<Part, BoxConfig>>
 
+/** 위 흐림 선 결과: 첫닿자 잉크 밑변을 위로 올릴 양(+ 줄임 · − 늘림, 글자 칸 좌표)과 잉크 윗변 · 밑변. */
+export interface TopFit {
+  /** 선 − 보 윗변, 글자 키의 몫(+ 답답 · − 자리 남음). 고치기 전. */
+  err: number
+  move: number
+  top: number
+  bottom: number
+}
+/** 첫닿자를 늘릴 때 보와 남길 가장 좁은 틈(글자 키의 몫). 폰트 900에서 위 틈이 가장 좁은 쪽(섞임 7%)보다 안쪽. */
+const TOP_FLOOR = 0.05
+/** 첫닿자 키를 이 몫보다 많이 바꾸지 않는다. */
+const TOP_LIMIT = 0.3
+/**
+ * 위 흐림 선(첫닿자 → 아래 보, ㅗ꼴 · 섞임). 첫닿자 잉크를 흐려 보 윗변이 진하기 T에 서게 — 첫닿자 칸의 밑변만 옮긴다(윗변 고정).
+ * T = (손잡이 여유 ÷ 엔진 여유) × `HALO_TOP_BY` × 굵어진 배율^q × (보 세로 두께 ÷ 키).
+ */
+export function haloTopFit(strokes: readonly HaloStroke[], rule: HaloRule, top: HaloTop): TopFit | null {
+  const all = inkOf(strokes), ch = strokes.filter((s) => s.part === 'CH'), chInk = inkOf(ch)
+  if (!all || !chInk) return null
+  let bar: { y: number; x0: number; x1: number; len: number; unit: number } | null = null
+  for (const stroke of strokes) {
+    if (stroke.part === 'CH' || stroke.part === 'JO') continue
+    for (const [a, b] of segsOf(stroke)) {
+      const l = Math.hypot(b.x - a.x, b.y - a.y)
+      if (l < 1e-9 || ((b.y - a.y) / l) ** 2 > 0.1) continue
+      const half = segThick(stroke, a, b) / 2, y = Math.min(a.y, b.y) - half
+      if (y <= chInk.y1) continue
+      if (!bar || l > bar.len) bar = { y, x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), len: l, unit: stroke.thickness * (stroke.thick?.v ?? 1) }
+    }
+  }
+  if (!bar) return null
+  const H = all.y1 - all.y0, by = HALO_TOP_BY[top]
+  const T = rule.ease / HALO_ENGINE.ease * by.ease * Math.max(rule.grown, 1e-3) ** (rule.spread / HALO_ENGINE.spread * by.spread) * bar.unit / H
+  const profile = profileOf(ch, H, { x0: Math.min(chInk.x0, bar.x0), x1: Math.max(chInk.x1, bar.x1), y0: chInk.y0, y1: Math.max(all.y1, bar.y) }, { x0: bar.x0, x1: bar.x1 })
+  const line = lineOf(profile, chInk.y1, T, H)
+  const err = (line - bar.y) / H
+  const land = 0.5 * HALO_TOLERANCE, height = chInk.y1 - chInk.y0
+  let move = 0
+  if (err > HALO_TOLERANCE) move = (err - land) * H
+  else if (err < -HALO_TOLERANCE) move = (err + land) * H
+  // 늘릴 때는 보와 바닥 틈을 남기고, 어느 쪽이든 첫닿자 키의 몫 끝까지만.
+  move = Math.max(move, chInk.y1 - (bar.y - TOP_FLOOR * H))
+  move = Math.max(-TOP_LIMIT * height, Math.min(TOP_LIMIT * height, move))
+  return { err, move, top: chInk.y0, bottom: chInk.y1 }
+}
+/** 위 흐림 선: 첫닿자 칸을 잉크 윗변을 두고 세로로만 늘이거나 줄인다. */
+export function topBoxes(boxes: Boxes, fit: TopFit | null): Boxes {
+  if (!fit || !fit.move || !boxes.CH) return boxes
+  const ch = boxes.CH, scale = (fit.bottom - fit.top - fit.move) / Math.max(fit.bottom - fit.top, 1e-6)
+  return { ...boxes, CH: { ...ch, y: fit.top + (ch.y - fit.top) * scale, height: ch.height * scale } }
+}
+
+
+
 /** 흐림 선 맞춤을 칸에 옮긴다: 첫닿자 칸은 잉크 왼끝을 두고 가로로 넓히고, 홀자 칸은 오른쪽으로 민다. */
 export function haloBoxes(boxes: Boxes, fit: HaloFit | null): Boxes {
   if (!fit || (fit.widen === 1 && fit.push === 0)) return boxes
@@ -344,16 +480,19 @@ export function finalBoxes(boxes: Boxes, fit: FinalFit | null): Boxes {
  * 흐림 선 세 방향(첫닿자↔기둥 · 받침 위)을 한 글자 칸에 입힌다. 빚기 화면과 내보내기(`haloPlacement.ts`)가 이 한 함수를 같이 써서
  * 화면과 파일이 안 갈라진다(실험 6-앞, 2026-11-25). `strokesOn`은 그 칸에 그려질 잉크(중심선 + 두께). 고칠 것이 없으면 null.
  */
-export function haloCorrect(input: { syllable: DecomposedSyllable; boxes: Boxes; strokesOn: (boxes: Boxes) => HaloStroke[]; rule: HaloRule; bodyRight?: number; jamo?: number }): { fit: HaloFit | null; final: FinalFit | null; boxes: Boxes } | null {
-  const { syllable, boxes, strokesOn, bodyRight, jamo = 1 } = input
+export function haloCorrect(input: { syllable: DecomposedSyllable; boxes: Boxes; strokesOn: (boxes: Boxes) => HaloStroke[]; rule: HaloRule; bodyRight?: number; jamo?: number }): { fit: HaloFit | null; top: TopFit | null; final: FinalFit | null; boxes: Boxes } | null {
+  const { syllable, boxes: start, strokesOn, bodyRight, jamo = 1 } = input
   let rule = input.rule
-  const pillar = haloScope(syllable), final = !!syllable.jongseong && !!boxes.JO
-  if (!pillar && !final) return null
-  const strokes = pillar || bodyRight !== undefined ? strokesOn(boxes) : []
+  const side = haloSideOf(syllable), above = haloTopOf(syllable), final = !!syllable.jongseong && !!start.JO
+  if (!side && !above && !final) return null
+  // 위(첫닿자 → 보)를 먼저: 첫닿자 키가 정해져야 옆 선을 읽는 높이가 정해진다.
+  const top = above ? haloTopFit(strokesOn(start), rule, above) : null
+  const boxes = topBoxes(start, top)
+  const strokes = side || bodyRight !== undefined ? strokesOn(boxes) : []
   // 닿자를 줄였으면(빚기 「닿자 크기」 < 1) 줄이기 전 모양이 넓힐 만큼까지만 넓힌다. 남는 자리로 다시 넓히면
   // 「가」 ㄱ이 키만 줄고 폭은 돌아와 납작해졌다(고양이 잰 표 44×63 → 41×54, 2026-11-27).
-  if (pillar && jamo < 1 && jamo > 0) rule = { ...rule, widenMax: haloFit(scaleChoseong(strokes, 1 / jamo), rule)?.widen ?? 1 }
-  let fit = pillar ? haloFit(strokes, rule) : null
+  if (side && jamo < 1 && jamo > 0) rule = { ...rule, widenMax: haloFit(scaleChoseong(strokes, 1 / jamo), rule, side)?.widen ?? 1 }
+  let fit = side ? haloFit(strokes, rule, side) : null
   // 글자 폭이 정해진 곳(폰트 탭 · OTF)은 기둥을 글자 몸통 오른끝까지만 민다. 빚기 화면은 글자 자리를 같이 넓혀서 이 끝이 없다.
   if (fit && fit.push > 0 && bodyRight !== undefined) {
     const right = inkOf(strokes.filter((stroke) => stroke.part !== 'CH' && stroke.part !== 'JO'))?.x1 ?? -Infinity
@@ -362,6 +501,6 @@ export function haloCorrect(input: { syllable: DecomposedSyllable; boxes: Boxes;
   }
   const moved = haloBoxes(boxes, fit)
   // 받침 위(흐림 선 셋째 방향): 짜임별 여유(`finalEaseOf`)로, 1% 폭 밖만 받침 윗변을 옮긴다. 굵어져도 지수 ~0이라 굵기를 안 곱한다.
-  const top = final ? haloFinalFit(strokesOn(moved), finalEaseOf(syllable)) : null
-  return { fit, final: top, boxes: finalBoxes(moved, top) }
+  const fin = final ? haloFinalFit(strokesOn(moved), finalEaseOf(syllable)) : null
+  return { fit, top, final: fin, boxes: finalBoxes(moved, fin) }
 }

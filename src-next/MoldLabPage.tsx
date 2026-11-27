@@ -37,7 +37,7 @@ import { MoldRubPlate } from './MoldRubPlate'
 import { thinBudget, thinSyllable, type BudgetStroke } from './moldBudget'
 import { engineGapOf } from './moldGap'
 import { kkokjiSyllable } from './moldKkokji'
-import { finalBoxes, finalEaseOf, HALO_ENGINE, haloBoxes, haloCorrect, haloFinalFit, haloFit, haloScope, type HaloFit, type HaloStroke } from './moldHalo'
+import { finalBoxes, finalEaseOf, HALO_ENGINE, haloBoxes, haloCorrect, haloFinalFit, haloFit, haloSideOf, haloTopFit, haloTopOf, topBoxes, type HaloFit, type HaloStroke } from './moldHalo'
 import styles from './MoldLabPage.module.css'
 
 /**
@@ -706,12 +706,14 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     })
     const syllableOut = reaches.size ? stretchedSyllable(startSyllable, reaches) : startSyllable
     // 흐림 선(굵기 끝): 자소마다 푼 굵기로 다시 재서, 선이 기둥을 넘으면 기둥이 밖으로 나가고 자리가 남으면 닿자 뼈대가 넓어진다.
-    let fit: HaloFit | null = null
-    if (haloScope(budget.syllable)) {
-      const m = weightToMultiplier(MOLD_BASE_WEIGHT)
-      fit = haloFit(haloStrokesOf(syllableOut, out, effective, m, (part) => solved.thick[balloonGroupOf(part)]), { ease: lookOf(look, 'ease'), spread: lookOf(look, 'spread'), grown: solved.thick.JU.v / base.v })
-    }
-    const pillarBoxes = haloBoxes(out, fit)
+    // 조건 없이 모든 짜임: 위(첫닿자 → 보)를 먼저, 그다음 옆(첫닿자 → 오른쪽 홀자). 여유는 짜임마다(`HALO_SIDE_BY` · `HALO_TOP_BY`).
+    const m = weightToMultiplier(MOLD_BASE_WEIGHT), thickOf = (part: Part) => solved.thick[balloonGroupOf(part)]
+    const rule = { ease: lookOf(look, 'ease'), spread: lookOf(look, 'spread'), grown: solved.thick.JU.v / base.v }
+    const side = haloSideOf(budget.syllable), above = haloTopOf(budget.syllable)
+    const topFit = above ? haloTopFit(haloStrokesOf(syllableOut, out, effective, m, thickOf), rule, above) : null
+    const topped = topBoxes(out, topFit)
+    const fit: HaloFit | null = side ? haloFit(haloStrokesOf(syllableOut, topped, effective, m, thickOf), rule, side) : null
+    const pillarBoxes = haloBoxes(topped, fit)
     const top = syllableOut.jongseong && pillarBoxes.JO ? haloFinalFit(haloStrokesOf(syllableOut, pillarBoxes, effective, weightToMultiplier(MOLD_BASE_WEIGHT), (part) => solved.thick[balloonGroupOf(part)]), finalEaseOf(syllableOut)) : null
     return { boxes: finalBoxes(pillarBoxes, top), thick: solved.thick, syllable: syllableOut, halo: fit, final: top }
   }, [heavyInput, stacked, budgetBoxes, heavyBase, effective, contrast, wanted, weightCap, look])
