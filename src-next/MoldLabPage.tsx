@@ -475,7 +475,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     const weighted = ratio === 1 ? effective.weight : scaledWeight(effective.weight, ratio)
     const m = weightToMultiplier(weighted)
     // 흐림은 그려질 모양 그대로 칠한다(고양이 ③ "잴 때는 대비 없이, 엔진은 실제 대비 모양으로"): 가로 · 세로 두께는 대비가 정한 배율, 굵기는 패턴 대비가 덜어 준 만큼.
-    const inkRatio = patternContrast ? patternWeightRatio(ratio, contrast) : ratio
+    const inkRatio = nib <= 0 ? patternWeightRatio(ratio, contrast) : ratio
     const mInk = weightToMultiplier(inkRatio === 1 ? effective.weight : scaledWeight(effective.weight, inkRatio))
     const widthOf = contrastWidthOf(contrast), shape = contrast === 0 ? undefined : () => ({ v: widthOf({ x: 0, y: 1 }, false), h: widthOf({ x: 1, y: 0 }, false) })
     const rule = { ease: lookOf(look, 'ease'), spread: lookOf(look, 'spread'), grown: m / weightToMultiplier(MOLD_BASE_WEIGHT) }
@@ -487,7 +487,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     // 받침 위(흐림 선 셋째 방향): 폰트 일곱 집안 3.5% 폭 밖만 받침 윗변을 옮긴다. 굵어져도 지수 ~0이라 굵기를 안 곱한다.
     const top = final ? haloFinalFit(haloStrokesOf(budget.syllable, boxes, effective, mInk, shape)) : null
     return { fit, final: top, boxes: finalBoxes(boxes, top) }
-  }, [heavyOn, placement.kind, budgetBoxes, raw, ratio, effective, budget.syllable, look, contrast, patternContrast])
+  }, [heavyOn, placement.kind, budgetBoxes, raw, ratio, effective, budget.syllable, look, contrast, nib])
   // 풍선 굵기: 보이는 글자 그대로(풍선 닿자까지 입힌 뒤)의 중심선으로 자소마다 칸 · 굵기를 푼다. 납작 붓은 방향별 굵기가 없어 가는 쪽 하나로.
   // 풍선에 넣을 획 · 칸(굵기 값과 무관 — 글줄 멈춤을 잴 때도 같이 쓴다).
   const heavyInput = useMemo(() => {
@@ -603,7 +603,9 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       const part = primitive.source.part, old = placed[part], b = primitive.box
       placed[part] = old ? { x: Math.min(old.x, b.x), y: Math.min(old.y, b.y), width: Math.max(old.x + old.width, b.x + b.width) - Math.min(old.x, b.x), height: Math.max(old.y + old.height, b.y + b.height) - Math.min(old.y, b.y) } : { ...b }
     }
-    const thick = { v: center * out.thick.v * heavyInput.base.v, h: center * out.thick.h * heavyInput.base.h }
+    // 만진 대비도 가로만 가늘게: 기둥은 굵기 값 그대로(세로 몫 base.v로 나눈다). 세로까지 굵히면 900 + 대비 끝에서 깨 · 괘 · 절 속이 막혔다(다람쥐 모순 1 · 2).
+    const ib = heavyInput.base
+    const thick = { v: center * out.thick.v, h: center * out.thick.h * ib.h / ib.v }
     return { syllable, result, strokes, boxes, placed, thick: { CH: thick, JU: { ...thick }, JO: { ...thick } } as Record<BalloonGroup, Thick>, gap: out.gap }
   }, [stackStart, heavyInput, budgetBoxes, char, stackHeight, heavyBase, effective.linecap, effective.linejoin, patternContrast])
   const heavy = useMemo(() => {
@@ -702,7 +704,8 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   }, [heavyInput, stacked, budgetBoxes, heavyBase, effective, contrast, wanted, weightCap, look])
   const globalStyle = useMemo(() => {
     // 패턴 대비는 가로만 가늘게 — 대비가 세로를 굵히는 몫만큼 굵기를 덜어 기둥 두께는 굵기 값 그대로다.
-    const inkRatio = patternContrast && !heavyOn ? patternWeightRatio(ratio, contrast) : ratio
+    // 대비는 가로만 가늘게 — 만진 대비도 세로를 굵히는 몫만큼 굵기를 덜어 기둥 두께는 굵기 값 그대로(다람쥐 모순 1). 납작 붓은 대비를 안 쓴다.
+    const inkRatio = !heavyOn && nib <= 0 ? patternWeightRatio(ratio, contrast) : ratio
     const weighted = inkRatio === 1 ? effective : { ...effective, weight: scaledWeight(effective.weight, inkRatio) }
     // 획 끝 · 꺾임은 둥글기 하나가 맡는다(거북이 방향안 4차). 둥글기 · 대비 · 붓촉은 엔진의 붓 값에 얹는다(`moldInk`).
     return moldInk(weighted, { round, contrast, nib })
@@ -881,7 +884,6 @@ function DrawStep({ raws, setRaws, stems, onDone }: { raws: Partial<Record<StemK
 }
 
 
-const LOOK_KEYS = ['weight', 'frame', 'tracking', 'size', 'height', 'jamo', 'center', 'round', 'contrast', 'balloon', 'open', 'branch', 'serif', 'nib', 'jag'] as const
 const STAGE = 220
 const ALL_PARTS: readonly Part[] = ['CH', 'JU', 'JU_H', 'JU_V', 'JO']
 /** 선 · 손잡이 잡는 폭(px). 폰 손가락 크기. */
@@ -983,12 +985,12 @@ function SimsStep({ char, drawn, edits, setEdits, look, weightCap, stackHeight, 
     const out: Record<string, number> = {}
     const mine = edits[layout] ?? {}
     for (const key of ['CH', 'JU', 'JU_H', 'JU_V', 'JO'] as const) (mine[key] ?? [0, 0, 0, 0]).forEach((value, i) => { out[`${key}${i}`] = value })
-    for (const key of LOOK_KEYS) out[key] = lookOf(look, key)
     return out
-  }, [edits, layout, look])
+  }, [edits, layout])
   const shown = target
   const shownEdits: LayoutEdits = { [layout]: Object.fromEntries((['CH', 'JU', 'JU_H', 'JU_V', 'JO'] as const).filter((key) => edits[layout]?.[key]).map((key) => [key, [0, 1, 2, 3].map((i) => shown[`${key}${i}`] ?? 0)])) }
-  const shownLook: Look = Object.fromEntries(LOOK_KEYS.map((key) => [key, shown[key]]))
+  // 큰 글자는 글줄과 같은 판 값 그대로(값을 전부 채워 넘기면 대비가 "만진 것"이 되어 기둥이 14% 굵었고 획 다듬기 휨 · 틈이 빠졌다, 다람쥐 모순 5).
+  const shownLook = look
 
   // 지금(보이기 전) 칸 · 보이는 칸
   const now = applyPartEdits(origin, edits[layout])
@@ -1309,7 +1311,7 @@ export function MoldLabPage() {
     // 획 판 → 전역 스타일. 굵기는 글줄이 실제로 쓴 값(막힌 데서 멈춘 값), 자간은 비율로 좁아진 폭 + 자간 줄.
     // 패턴 대비(대비를 안 만짐)는 화면처럼 기둥 두께를 그대로 두고 가로만 가늘게(`patternWeightRatio`). 굵을 때는 900 쌓임이 따로 굽는다.
     const bakeWeight = appliedWeight(lookOf(look, 'weight'), weightCap)
-    const inkWeight = look.contrast === undefined && bakeWeight <= 1 ? patternWeightRatio(bakeWeight, lookOf(look, 'contrast')) : bakeWeight
+    const inkWeight = bakeWeight <= 1 && lookOf(look, 'nib') <= 0 ? patternWeightRatio(bakeWeight, lookOf(look, 'contrast')) : bakeWeight
     const inked = moldInk({ ...moldBaseStyle(baseStyle), weight: scaledWeight(MOLD_BASE_WEIGHT, inkWeight) }, look.contrast === undefined && bakeWeight > 1 ? { ...look, contrast: 0 } : look)
     const sx = items.reduce((sum, item) => sum + item.sx, 0) / items.length
     const letterSpacing = Math.round((base.style.letterSpacing + sx - 1 + lookOf(look, 'tracking')) * 1000) / 1000

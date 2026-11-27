@@ -557,12 +557,18 @@ describe('획 판은 저장된 값을 그대로 읽는다', () => {
   it('써 넣은 굵기 · 둥글기 · 대비 · 붓촉을 다시 읽으면 같은 칸', async () => {
     const { DEFAULT_STYLE } = await import('../src/stores/globalStyleStore')
     const { inkLookOf, moldBaseStyle, moldInk, scaledWeight, MOLD_BASE_WEIGHT, dotsOf, INK_KEYS } = await import('./moldLab')
-    for (const look of [{ weight: 0.9, round: 0.4 }, { weight: 1.6, contrast: 0.3 }, { nib: 0.5 }, { weight: 1.3, nib: 0.7 }]) {
+    for (const look of [{ weight: 0.9, round: 0.4 }, { weight: 1.6, contrast: 0.3 }]) {
       const baked = moldInk({ ...moldBaseStyle(DEFAULT_STYLE), weight: scaledWeight(MOLD_BASE_WEIGHT, look.weight ?? 1) }, look)
-      expect(dotsOf(inkLookOf(baked), [...INK_KEYS, 'nib'])).toEqual(dotsOf(look, [...INK_KEYS, 'nib']))
+      expect(dotsOf(inkLookOf(baked), INK_KEYS)).toEqual(dotsOf(look, INK_KEYS))
       // 바탕은 저장 값을 뺀 것이라, 다시 얹어도 두 번 얹히지 않는다.
       expect(moldBaseStyle(baked).weight).toBe(MOLD_BASE_WEIGHT)
     }
+  })
+  it('예전에 납작 붓으로 써 넣은 폰트도 붓촉을 읽지 않는다(판에 붓촉 줄이 없다)', async () => {
+    const { DEFAULT_STYLE } = await import('../src/stores/globalStyleStore')
+    const { inkLookOf, moldBaseStyle, moldInk } = await import('./moldLab')
+    const baked = moldInk(moldBaseStyle(DEFAULT_STYLE), { nib: 0.7 })
+    expect(inkLookOf(baked).nib).toBeUndefined()
   })
 })
 

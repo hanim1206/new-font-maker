@@ -1473,13 +1473,7 @@ export function inkLookOf(style: { weight: number; strokeStyle: StrokeRenderStyl
   if (style.weight !== MOLD_BASE_WEIGHT) out.weight = out.weightBase = style.weight / MOLD_BASE_WEIGHT
   const ink = style.strokeStyle as StrokeRenderStyle & { roundness?: number; contrast?: number; brush?: BrushStyle }
   if (ink.mode !== 'brush') return out
-  if (ink.brush?.tip === 'ellipse') {
-    out.nib = Math.max(0, Math.min(1, (1 - ink.brush.aspectRatio) / 0.75))
-    // 써 넣을 때 기둥 몫으로 올린 굵기(`nibWeight`)를 되돌려 읽는다.
-    const weight = weightRatioOfThickness(thicknessOf(style.weight / MOLD_BASE_WEIGHT) * nibStemFactor(ink.brush))
-    if (Math.abs(weight - 1) > 1e-3) out.weight = out.weightBase = weight
-    else { delete out.weight; delete out.weightBase }
-  }
+  // 붓촉은 판에서 뺐다(2026-11-27). 예전에 납작 붓으로 써 넣은 폰트도 읽지 않아, 다시 써 넣으면 둥근 붓으로 돌아간다 — 안 읽으면 판에 줄도 없는 붓촉이 둥글기 · 대비를 막았다(다람쥐 모순 4).
   if (ink.roundness) out.round = ink.roundness
   if (ink.contrast) out.contrast = ink.contrast
   return out
