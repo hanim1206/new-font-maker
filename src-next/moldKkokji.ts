@@ -27,8 +27,8 @@ export interface KkokjiFit {
   band: readonly [number, number]
 }
 
-/** 한 높이 줄(또는 띠)에서 닿자 상자 폭 안 가장 넓은 흰 구간 [왼, 오른]. 잉크 토막은 em 좌표 + 두께. */
-function widestWhite(span: readonly [number, number], band: readonly [number, number], inks: readonly { points: readonly Pt[]; thickness: number }[]): [number, number] {
+/** 한 높이 줄(또는 띠)에서 닿자 상자 폭 안 흰 구간들. 잉크 토막은 em 좌표 + 두께. */
+function whitesOf(span: readonly [number, number], band: readonly [number, number], inks: readonly { points: readonly Pt[]; thickness: number }[]): [number, number][] {
   const [left, right] = span, [top, bottom] = band
   const blocks: [number, number][] = []
   for (const ink of inks) {
@@ -46,29 +46,30 @@ function widestWhite(span: readonly [number, number], band: readonly [number, nu
     }
   }
   blocks.sort((p, q) => p[0] - q[0])
-  let best: [number, number] = [left, left], cursor = left
+  const out: [number, number][] = []
+  let cursor = left
   for (const [b0, b1] of blocks) {
     if (b1 <= cursor) continue
     const end = Math.min(b0, right)
-    if (end - cursor > best[1] - best[0]) best = [cursor, end]
+    if (end > cursor) out.push([cursor, end])
     cursor = Math.max(cursor, b1)
     if (cursor >= right) break
   }
-  if (right - cursor > best[1] - best[0]) best = [cursor, right]
-  return best
+  if (right > cursor) out.push([cursor, right])
+  return out
 }
 
 /**
- * 꼭지 높이 띠 [위, 아래]에서 닿자 상자 폭 [왼, 오른] 안 흰 넓이의 가운데. 띠를 여러 줄로 잘라 줄마다 가장 넓은 흰 구간을 찾고,
- * 흰 폭으로 무게를 둔 가운데를 낸다. 닿자 획이 다 막은 줄(꼭지 끝이 ㄷ 밑 가로에 붙은 곳)은 뺀다. 흰 곳이 없으면 상자 가운데.
+ * 꼭지 높이 띠 [위, 아래]에서 닿자 폭 [왼, 오른] 안 흰 넓이의 가운데. 띠를 여러 줄로 잘라 줄마다 흰 구간을 모두 모아
+ * 흰 폭으로 무게를 둔 가운데를 낸다. 닿자 획이 다 막은 줄(꼭지 끝이 ㄷ 밑 가로에 붙은 곳)은 뺀다. 흰 곳이 없으면 폭 가운데.
+ * 예전엔 줄마다 가장 넓은 흰 구간 하나만 봐서, 굵을 때 ㅉ 다리 끝 · ㅎ 고리 밑이 띠로 내려오면 한쪽 흰 곳만 잡아
+ * 꼭지가 그쪽으로 쏠렸다(하니무스 2026-11-27 「쪽」 · 「횟」).
  */
 export function whiteCenterOf(span: readonly [number, number], band: readonly [number, number], inks: readonly { points: readonly Pt[]; thickness: number }[], rows = 9): number {
   let sum = 0, weight = 0
   for (let i = 0; i < rows; i++) {
     const y = band[0] + (band[1] - band[0]) * (i + 0.5) / rows
-    const [l, r] = widestWhite(span, [y, y], inks)
-    if (r - l <= 0) continue
-    sum += (l + r) / 2 * (r - l); weight += r - l
+    for (const [l, r] of whitesOf(span, [y, y], inks)) { sum += (l + r) / 2 * (r - l); weight += r - l }
   }
   return weight > 0 ? sum / weight : (span[0] + span[1]) / 2
 }
@@ -96,7 +97,11 @@ export function kkokjiSyllable(syllable: DecomposedSyllable, boxes: Boxes, style
   const top = Math.min(...tick.points.map((q) => q.y)), bottom = boY - bo.thickness / 2
   if (bottom <= top) return { syllable, fit: null }
   const inks = em.filter(({ p }) => p.source.part === 'CH')
-  const center = whiteCenterOf([ch.x, ch.x + ch.width], [top, bottom], inks)
+  // 폭은 닿자 상자와 닿자 잉크 폭이 겹치는 곳: 상자가 잉크보다 한쪽으로 넓으면(굵을 때 칸을 옮긴 ㅉ) 그 빈 곳이 가운데를 끌었다.
+  let inkL = Infinity, inkR = -Infinity
+  for (const ink of inks) for (const q of ink.points) { inkL = Math.min(inkL, q.x - ink.thickness / 2); inkR = Math.max(inkR, q.x + ink.thickness / 2) }
+  const span: [number, number] = inkR > inkL ? [Math.max(ch.x, inkL), Math.min(ch.x + ch.width, inkR)] : [ch.x, ch.x + ch.width]
+  const center = whiteCenterOf(span[1] > span[0] ? span : [ch.x, ch.x + ch.width], [top, bottom], inks)
   const now = tick.points.reduce((s, q) => s + q.x, 0) / tick.points.length
   const shift = center - now
   if (Math.abs(shift) < 1e-4) return { syllable, fit: { shift: 0, center, band: [top, bottom] } }

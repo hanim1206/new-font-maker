@@ -234,20 +234,7 @@
 .rubEdge[data-side='right'] { right: 6px; }
 .rubEdge[data-side='left'] { left: 6px; }
 .rubEdge[data-go] { background: rgb(var(--color-primary)); }
-.rubHint {
-  position: absolute;
-  inset: auto 8px 8px 8px;
-  margin: 0;
-  padding: 8px 10px;
-  border-radius: var(--radius-md);
-  background: rgb(var(--color-foreground) / 0.86);
-  color: rgb(var(--color-surface));
-  font-size: var(--font-12);
-  line-height: 1.5;
-  pointer-events: none;
-}
 .rubZoomOut { position: absolute; right: 6px; bottom: 6px; }
-.rubHint ~ .rubZoomOut { display: none; }
 .rubTapeRow { grid-column: 1 / -1; display: grid; gap: 4px; }
 .rubRead { display: flex; align-items: baseline; gap: 8px; padding-inline: 4px; }
 .rubRead strong { font-size: var(--font-16); font-weight: var(--weight-bold); }

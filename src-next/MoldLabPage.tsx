@@ -565,10 +565,10 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const stacked = useMemo(() => {
     if (!stackStart || !heavyInput || !budgetBoxes) return null
     const { k, center } = stackStart
-    // 고른 틈은 그릴 가로획에서: 만진 대비는 그릴 때 가로 ÷ 세로에 (base.h ÷ base.v) × (붓 대비 가로 ÷ 세로)를 더 곱한다(아래 `thick` · `moldInk`). 고딕 비율은 굵기마다 폰트 패턴.
-    const ib = heavyInput.base, widthOf = contrastWidthOf(contrast)
-    const barScale = contrast === 0 ? 1 : (ib.h / ib.v) * (widthOf({ x: 1, y: 0 }, false) / widthOf({ x: 0, y: 1 }, false))
-    const out = solveStack900({ char, strokes: stackStart.strokes, height: stackHeight, inward: k / center, reach: Math.max(0, Math.min(1, (k - 1) / (BLACK_RATIO - 1))), ...(patternContrast ? { contrastRange: CONTRAST_PATTERN_RANGE } : {}),
+    // 고른 틈은 그릴 가로획에서: 만진 대비는 가로 ÷ 세로에 (base.h ÷ base.v, `hScale`) × (붓 대비 가로 ÷ 세로)를 더 곱한다. 고딕 비율은 굵기마다 폰트 패턴.
+    const ib = heavyInput.base, widthOf = contrastWidthOf(contrast), hScale = ib.h / ib.v
+    const barScale = contrast === 0 ? 1 : hScale * (widthOf({ x: 1, y: 0 }, false) / widthOf({ x: 0, y: 1 }, false))
+    const out = solveStack900({ char, strokes: stackStart.strokes, height: stackHeight, inward: k / center, reach: Math.max(0, Math.min(1, (k - 1) / (BLACK_RATIO - 1))), ...(patternContrast ? { contrastRange: CONTRAST_PATTERN_RANGE } : {}), hScale,
       gapFromBar: EVEN_GAP_FROM_BAR, barScale, gothicRange: CONTRAST_PATTERN_RANGE })
     // 옮긴 꼭짓점을 자소 칸 좌표로 돌려 획을 바꿔 끼운다(id 그대로).
     // 한 줄짜리 칸(ㅡ의 키, ㅣ의 너비)은 칸 좌표로 못 옮긴다 — 그 축은 칸을 통째로 옮긴다(그 부위 점들의 평균 이동).
@@ -615,7 +615,8 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       placed[part] = old ? { x: Math.min(old.x, b.x), y: Math.min(old.y, b.y), width: Math.max(old.x + old.width, b.x + b.width) - Math.min(old.x, b.x), height: Math.max(old.y + old.height, b.y + b.height) - Math.min(old.y, b.y) } : { ...b }
     }
     // 만진 대비도 가로만 가늘게: 기둥은 굵기 값 그대로(세로 몫 base.v로 나눈다). 세로까지 굵히면 900 + 대비 끝에서 깨 · 괘 · 절 속이 막혔다.
-    const thick = { v: center * out.thick.v, h: center * out.thick.h * ib.h / ib.v }
+    // 만진 대비의 가로 배율(`hScale`)은 쌓임 안에서 이미 들어갔다 — 가로 굵게 쪽이면 쌓임 배율을 넘지 않게 잘라서.
+    const thick = { v: center * out.thick.v, h: center * out.thick.h }
     // 속을 지키려 더 가늘게 한 자소(세로 `yieldV` · 가로 `yieldH`)만 그 묶음에 곱한다.
     const groupThick = (g: BalloonGroup): Thick => ({ v: thick.v * (out.yieldV?.[g] ?? 1), h: thick.h * (out.yieldH?.[g] ?? 1) })
     return { syllable, result, strokes, boxes, placed, thick: { CH: groupThick('CH'), JU: groupThick('JU'), JO: groupThick('JO') } as Record<BalloonGroup, Thick>, gap: out.gap, widenEm: out.widenEm ?? 0 }

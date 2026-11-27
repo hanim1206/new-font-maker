@@ -40,10 +40,16 @@ export interface StackInput {
   contrastRange?: readonly [number, number]
   /** 고른 틈을 그린 가로획 두께에서 셈(기본 켬). false면 옛 식 그대로(기둥 두께, C029 스위치). */
   gapFromBar?: boolean
-  /** 바탕 대비(만진 대비)가 그릴 때 가로 ÷ 세로에 더 곱하는 배율(대비를 안 만졌으면 1). 그린 가로획 = 기둥 × 쌓임 대비 × 이 값. */
+  /** 만진 대비가 그린 가로 ÷ 세로에 더 곱하는 배율 전부(`hScale` × 붓 대비 가로 ÷ 세로, 대비를 안 만졌으면 1). 그린 가로획 = 기둥 × 쌓임 대비 × 이 값. 고른 틈 셈에만 쓴다. */
   barScale?: number
   /** 고딕 패턴의 가로 ÷ 세로 [굵기 1 위 첫 걸음, 굵기 끝] — 고른 틈 식에 든 "쌓인 가로획 = 기둥 × 고딕 비율" 자리. 없으면 `contrastRange`(= 늘 옛 식과 같음). */
   gothicRange?: readonly [number, number]
+  /**
+   * 만진 대비가 가로에 곱하는 배율(바탕 대비의 가로 ÷ 세로, 1 = 안 만짐). 돌려주는 `thick.h`에 들어 있다.
+   * 1보다 크면(가로 굵게 쪽 대비) 쌓임이 준 배율(`f`)을 넘지 않게 자른다 — 예전엔 쌓임을 다 푼 뒤 밖에서 곱해
+   * 굵기 끝 + 대비 0에서 을 · 른 · 숲의 ㄹ · ㅡ가 뭉쳤다(다람쥐 검수 2026-11-27).
+   */
+  hScale?: number
 }
 export interface StackResult {
   strokes: StackStroke[]
@@ -171,12 +177,12 @@ export function inkGap(strokes: readonly StackStroke[], upper: (part: Part) => b
 
 // ── 쌓인 막대(warp.py `bars` · `gaptype` · `plan`) ──
 type Bar = { y: number; i: number; kind: 'ring-top' | 'ring-bot' | 'box-top' | 'box-bot' | 'bar' | 'block-top' | 'block-bot' }
-function barsOf(st: readonly StackStroke[], block?: Part): Bar[] {
+function barsOf(st: readonly StackStroke[], block?: Part, skip?: Part): Bar[] {
   const xs = st.flatMap((s) => s.points.map((p) => p.x)), xc = (Math.min(...xs) + Math.max(...xs)) / 2
   const out: Bar[] = []
   st.forEach((s, i) => {
     const P = s.points
-    if (s.part === block) return
+    if (s.part === block || s.part === skip) return
     if (s.closed) {
       const ys = P.map((p) => p.y), xr = P.map((p) => p.x)
       if (Math.min(...xr) < xc + BAR_BAND && Math.max(...xr) > xc - BAR_BAND) {
@@ -236,8 +242,8 @@ function warpY(old: number[], next: number[]): Map2 {
 }
 
 /** 가로홀자 글자: 키를 막대 n개 · 고른 틈 n−1개 · 속으로 나눈다(규칙 2~9). 막대가 셋 아래면 손대지 않는다. */
-function stackPlan(st0: StackStroke[], G: number, height: number | undefined, block?: Part): { strokes: StackStroke[]; f: number; bars: number } | null {
-  const B = barsOf(st0, block)
+function stackPlan(st0: StackStroke[], G: number, height: number | undefined, block?: Part, skip?: Part): { strokes: StackStroke[]; f: number; bars: number } | null {
+  const B = barsOf(st0, block, skip)
   if (B.length < 3) return null
   const t = st0[0].thickness, n = B.length, one = { v: 1, h: 1 }
   const kinds = B.slice(1).map((b, i) => gapKind(B[i], b, st0))
@@ -386,8 +392,10 @@ export function solveStack900(input: StackInput): StackResult {
   const side = evenGapOf(height, stem)
   const G = input.gapFromBar === false ? side : evenGapOfBar(height, stem * contrast * V * (input.barScale ?? 1), gothic * V)
   let st = st0, f = 1, bars = 0
-  if (jamo && HORIZONTAL_VOWELS.includes(jamo.jung)) {
-    const plan = stackPlan(st0, G, input.height, COMPOUND_FINALS.includes(jamo.jong) ? 'JO' : undefined)
+  // ㅝ · ㅞ도 위아래로 쌓인 글자다(ㅇ · ㅜ 보 · 받침). 오른쪽 ㅓ · ㅔ(`JU_V`)는 막대로 안 센다 — 곁줄기는 보 옆에 선다(`cutBarBeforeSide`).
+  const stacked = jamo && (HORIZONTAL_VOWELS.includes(jamo.jung) || 'ㅝㅞ'.includes(jamo.jung))
+  if (jamo && stacked) {
+    const plan = stackPlan(st0, G, input.height, COMPOUND_FINALS.includes(jamo.jong) ? 'JO' : undefined, 'ㅝㅞ'.includes(jamo.jung) ? 'JU_V' : undefined)
     if (plan) { st = plan.strokes; f = plan.f; bars = plan.bars }
   } else if (jamo && jamo.jong) {
     const plan = finalPlan(st0, G, input.height)
@@ -395,20 +403,54 @@ export function solveStack900(input: StackInput): StackResult {
   }
   st = inwardX(st, V)
   st = spreadStems(st, side, V)
-  const thick = { v: V, h: Math.min(f, contrast * V) }
+  const hs = input.hScale ?? 1
+  const thick = { v: V, h: hs > 1 ? Math.min(f, contrast * V * hs) : Math.min(f, contrast * V) * hs }
   if (jamo) st = narrowRound(st, jamo, 1 - (1 - NARROW_ROUND) * reach)
-  // 옆 틈(마주 선 세로 줄기)은 기둥으로 센 `side`, 가로로 쌓인 속은 가로획으로 센 `G`(하니무스 2026-11-27 "저 얇네").
+  if (jamo && 'ㅝㅞ'.includes(jamo.jung)) st = cutBarBeforeSide(st, thick, G)
+  // 옆 틈(마주 선 세로 줄기)은 기둥으로 센 `side`, 가로로 쌓인 속 · ㅜ 보와 곁줄기 위아래 틈은 가로획으로 센 `G`(하니무스 2026-11-27 "저 얇네").
   // 마지막에 속(마주 선 세로 줄기 사이 흰 틈)을 고른 틈까지 지킨다. 지키는 순서 틈 → 굵기 → 칸(하니무스 2026-11-22):
   // 칸(글자 폭)이 먼저 `WIDEN_MAX`까지 넓어지고, 그래도 모자라면 그 자소 세로만 `THIN_FLOOR`까지 가늘어지고, 그래도 모자라면 칸을 더 넓힌다.
   // 예전에는 ㅃ만 두 ㅂ 사이를 벌리려고 ㅂ 폭을 줄여(`splitDouble`) 굵기 끝에서 ㅂ 속이 막혔다(다람쥐 극단 검수 2026-11-27).
   // 가로로 마주 선 막대(ㄹ · ㅂ 속)는 키가 정해져 있어 칸을 못 넓힌다 — 그 자소 가로만 가늘게 한다(축을 바꿔 같은 셈).
-  const kept = keepCounters(st, st0, side, thick, true, INNER_COUNTER)
+  const apart = new Set<Part>(jamo && CLUSTER_FINALS.includes(jamo.jong) ? ['JO'] : [])
+  const kept = keepCounters(st, st0, side, thick, true, INNER_COUNTER, apart)
   const swap = (s: StackStroke) => mapStroke(s, (p) => ({ x: p.y, y: p.x }))
-  const keptH = keepCounters(kept.strokes.map(swap), st0.map(swap), G, { v: thick.h, h: thick.v }, false, INNER_COUNTER_H)
+  const keptH = keepCounters(kept.strokes.map(swap), st0.map(swap), G, { v: thick.h, h: thick.v }, false, INNER_COUNTER_H, apart)
   return { strokes: kept.strokes, thick, gap: G, bars, ...(Object.keys(kept.yieldV).length ? { yieldV: kept.yieldV } : {}), ...(Object.keys(keptH.yieldV).length ? { yieldH: keptH.yieldV } : {}), ...(kept.widen > 1e-6 ? { widenEm: kept.widen } : {}) }
 }
 
+/**
+ * ㅝ · ㅞ: ㅜ 보 오른쪽이 ㅓ 곁줄기 위에 겹쳐 서면 굵을 때 둘 사이 위아래 틈이 모자라, 틈을 지키려 가로획을 바닥까지 깎았다
+ * (하니무스 2026-11-27 원 · 웠 · 훨, 고른 안 「ㅜ 보 오른쪽 끊기」). 위아래 틈이 고른 틈보다 모자라면 보 오른끝을 곁줄기 왼끝에서
+ * 고른 틈만큼 앞에서 끊는다. ㅜ 기둥 오른쪽 바깥선을 넘어서까지는 안 끊는다. 위아래 틈이 넉넉하면(얇을 때) 그대로.
+ */
+function cutBarBeforeSide(st: StackStroke[], thick: StackThick, G: number): StackStroke[] {
+  const flat = (s: StackStroke) => s.points.length === 2 && Math.abs(s.points[1].y - s.points[0].y) < 1e-6 && Math.abs(s.points[1].x - s.points[0].x) > 1e-6
+  const bars = st.map((s, i) => ({ s, i })).filter(({ s }) => s.part === 'JU_H' && flat(s))
+  if (!bars.length) return st
+  const bar = bars.reduce((m, b) => (Math.abs(b.s.points[1].x - b.s.points[0].x) > Math.abs(m.s.points[1].x - m.s.points[0].x) ? b : m))
+  const by = bar.s.points[0].y, bRight = Math.max(bar.s.points[0].x, bar.s.points[1].x)
+  const stems = st.filter((s) => s.part === 'JU_H' && !flat(s) && s.points.length === 2 && Math.abs(s.points[1].x - s.points[0].x) < 1e-6)
+  const floor = stems.length ? Math.max(...stems.map((s) => s.points[0].x + s.thickness * thick.v / 2)) + G : -Infinity
+  let cut = bRight
+  for (const s of st) {
+    if (s.part !== 'JU_V' || !flat(s)) continue
+    const left = Math.min(s.points[0].x, s.points[1].x), dy = Math.abs(s.points[0].y - by)
+    if (left >= bRight) continue
+    if (dy - (bar.s.thickness + s.thickness) * thick.h / 2 >= G - 1e-9) continue
+    // 그릴 때 가로획 열린 끝은 세로 · 가로 굵기 차만큼 늘어난다(`endReachOf`) — 보 · 곁줄기 두 끝 몫을 미리 뺀다.
+    const reach = (t: number) => t / 2 * Math.max(0, thick.v - thick.h)
+    cut = Math.min(cut, Math.max(floor, left - G - reach(bar.s.thickness) - reach(s.thickness)))
+  }
+  if (cut >= bRight - 1e-9) return st
+  const out = [...st]
+  out[bar.i] = { ...bar.s, points: bar.s.points.map((p) => (p.x === bRight ? { ...p, x: cut } : p)), anchors: bar.s.anchors.map((p) => (Math.abs(p.x - bRight) < 1e-9 ? { ...p, x: cut } : p)) }
+  return out
+}
+
 // ── 속 지키기: 마주 선 세로 줄기 사이 흰 틈 ──
+/** 겹받침: 받침 안 다른 획은 다른 자소(ㄹ · ㅂ)다. */
+const CLUSTER_FINALS = 'ㄳㄵㄶㄺㄻㄼㄽㄾㄿㅀㅄ'
 /** 이만큼(dx/dy) 안쪽으로 선 토막을 세로 줄기로 본다(ㅅ · ㅈ 다리처럼 기운 것까지). */
 const UPRIGHT = 0.6
 /** 마주 보는 세로 겹침이 이만큼(em) 아래면 마주 선 것으로 안 본다. */
@@ -461,7 +503,7 @@ export const INNER_COUNTER = 0.7
 /** 가로로 쌓인 속(ㄹ · ㅌ · ㅌ 가로획 사이)의 최소값. 글자 키를 못 늘리니(쌓인 글자 키 = 받침 없는 글자 키) 세로 속보다 더 좁아져도 된다(가설 — 하니무스 「절의 받침 ㄹ은 왤케 가로획 얇지」). */
 export const INNER_COUNTER_H = 0.5
 /** 마주 선 줄기 쌍마다 가장 좁은 가로 흰 틈. `joined`(처음 그림에서 이어진 쌍 — ㅅ 꼭짓점 · ㅂ 모서리)은 뺀다. */
-function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yieldV: Partial<Record<StackGroup, number>>, joined: Set<string>, G: number, inner0: number): Face[] {
+function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yieldV: Partial<Record<StackGroup, number>>, joined: Set<string>, G: number, inner0: number, apart: ReadonlySet<Part>): Face[] {
   const out: Face[] = []
   const halfOf = (r: Run, slope: number) => {
     const t = st[r.s].thickness * (yieldV[r.group] ?? 1), uy2 = 1 / (1 + slope * slope)
@@ -481,7 +523,9 @@ function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yie
       if (w < white) { white = w; cut = (l.x + ha + r.x - hb) / 2; half = (ha + hb) / 2 }
     }
     if (crossed) continue
-    const pa = st[A.s].part, inner = A.s === B.s || (pa === st[B.s].part && (pa === 'CH' || pa === 'JO'))
+    // 한 닿자 안 속: 같은 획이거나, 같은 부위의 다른 획(ㅃ 두 ㅂ 사이). 겹받침(`apart`)은 다른 획이 다른 자소다 — 「짧」 ㄹ 아래 열린 속과
+    // ㅂ 사이를 한 자소 속으로 보고 0.7배까지 좁혀 ㄹ이 찌그러졌다(하니무스 2026-11-27).
+    const pa = st[A.s].part, inner = A.s === B.s || (pa === st[B.s].part && (pa === 'CH' || pa === 'JO') && !apart.has(pa))
     out.push({ a: left === i ? i : j, b: left === i ? j : i, white, cut, half, want: inner ? G * inner0 : G, inner })
   }
   return out
@@ -489,7 +533,7 @@ function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yie
 /** x를 자르는 자리마다 오른쪽을 민다. */
 const widenAt = (cuts: { x: number; d: number }[]): Map2 => (p) => ({ x: p.x + cuts.reduce((s, c) => s + (p.x > c.x ? c.d : 0), 0), y: p.y })
 type Yield = Partial<Record<StackGroup, number>>
-function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number, thick: StackThick, widen: boolean, inner0: number): { strokes: StackStroke[]; yieldV: Yield; widen: number } {
+function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number, thick: StackThick, widen: boolean, inner0: number, apart: ReadonlySet<Part> = new Set()): { strokes: StackStroke[]; yieldV: Yield; widen: number } {
   const runs0 = runsOf(st0)
   // 처음(점 옮기기 전) 그림에서 줄기 반 두께 안으로 붙어 있던 쌍은 원래 이어진 것(ㅅ 꼭짓점, ㅆ 안 다리)이다.
   if (runs0.length !== runsOf(st).length) return { strokes: st, yieldV: {}, widen: 0 }
@@ -498,7 +542,7 @@ function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number,
     if (runDist(runs0[i], runs0[j]) < 0.5 * Math.min(st0[runs0[i].s].thickness, st0[runs0[j].s].thickness)) joined.add(`${i}|${j}`)
   }
   const box0 = inkBox(st, thick), width0 = box0.x1 - box0.x0, cx = (box0.x0 + box0.x1) / 2
-  const shortOf = (s: StackStroke[], y: Yield) => facesOf(s, runsOf(s), thick, y, joined, G, inner0).filter((f) => f.white < f.want - 1e-6)
+  const shortOf = (s: StackStroke[], y: Yield) => facesOf(s, runsOf(s), thick, y, joined, G, inner0, apart).filter((f) => f.white < f.want - 1e-6)
   const center = (s: StackStroke[]) => { const b = inkBox(s, thick), d = cx - (b.x0 + b.x1) / 2; return s.map((x) => mapStroke(x, (p) => ({ x: p.x + d, y: p.y }))) }
   const straight = (r: Run) => r.pts.every((p, k) => k === 0 || Math.abs(p.x - r.pts[k - 1].x) <= 0.02 * Math.abs(p.y - r.pts[k - 1].y))
   /**
@@ -506,7 +550,7 @@ function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number,
    *    곧은 세로 줄기끼리, 바로 옆 쌍만(ㅂ · ㅁ · ㄹ 속, ㅃ 두 ㅂ 사이). 그 자소 획만 옮겨 다른 자소(쌈의 ㅆ)는 안 밀린다.
    */
   const reclaim = (s: StackStroke[], y: Yield): StackStroke[] => {
-    const runs = runsOf(s), faces = facesOf(s, runs, thick, y, joined, G, inner0)
+    const runs = runsOf(s), faces = facesOf(s, runs, thick, y, joined, G, inner0, apart)
     const groups = new Set(faces.filter((f) => f.white < f.want - 1e-6).flatMap((f) => [runs[f.a].group, runs[f.b].group]))
     const next = (f: Face) => {
       const A = runs[f.a], B = runs[f.b], m = (Math.max(A.y0, B.y0) + Math.min(A.y1, B.y1)) / 2, xa = runAt(A, m).x, xb = runAt(B, m).x
@@ -514,7 +558,8 @@ function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number,
     }
     let out = s
     for (const g of groups) {
-      const spare = faces.filter((f) => f.inner && runs[f.a].group === g && f.white > f.want + 1e-6 && straight(runs[f.a]) && straight(runs[f.b]) && next(f))
+      // 겹받침은 한 자소 속(ㅂ)을 좁혀 옆 자소(ㄹ) 자리를 내지 않는다 — ㅂ만 홀쭉해졌다(「짧」). 칸 · 굵기로 받는다.
+      const spare = faces.filter((f) => f.inner && !apart.has(st[runs[f.a].s].part) && runs[f.a].group === g && f.white > f.want + 1e-6 && straight(runs[f.a]) && straight(runs[f.b]) && next(f))
       if (!spare.length) continue
       const warp = widenAt(spare.map((f) => ({ x: f.cut, d: f.want - f.white })))
       out = out.map((x) => (groupOf(x.part) === g ? mapStroke(x, warp) : x))

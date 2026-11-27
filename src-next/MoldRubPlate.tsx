@@ -57,7 +57,6 @@ export function MoldRubPlate({ look, home, setLook, onBegin, renderGlyph, locks,
   const [cam, setCam] = useState<Cam>({ zoom: 2, x: 0, y: 0 })
   const [size, setSize] = useState({ w: 260, h: 300 })
   const [edge, setEdge] = useState(0)
-  const [hint, setHint] = useState(true)
   const stageRef = useRef<HTMLDivElement>(null)
   const layerRef = useRef<HTMLDivElement>(null)
   const pts = useRef(new Map<number, { x: number; y: number }>())
@@ -104,7 +103,6 @@ export function MoldRubPlate({ look, home, setLook, onBegin, renderGlyph, locks,
   const centre = () => ({ c: cam.x + cam.zoom / 2, r: cam.y + view.visRows / 2 })
 
   const down = (event: ReactPointerEvent<HTMLDivElement>) => {
-    setHint(false)
     event.currentTarget.setPointerCapture(event.pointerId)
     pts.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
     if (pts.current.size === 2) {
@@ -241,7 +239,6 @@ export function MoldRubPlate({ look, home, setLook, onBegin, renderGlyph, locks,
         {edgeTo && <span className={styles.rubEdge} data-side={edge > 0 ? 'right' : 'left'} data-go={Math.abs(edge) >= EDGE_PULL || undefined} data-testid="rub-edge">
           {Math.abs(edge) >= EDGE_PULL ? '놓으면 ' : '더 당기면 '}{edgeTo.name}
         </span>}
-        {hint && <p className={styles.rubHint} aria-hidden="true">한 손으로 밀면 옆 · 아래 글자, 톡 하면 크게, 두 손으로 오므리면 작게</p>}
         <Button variant="outline" size="icon" className={styles.rubZoomOut} onPointerDown={(event) => event.stopPropagation()} onClick={() => zoomBy(1)} disabled={cam.zoom >= ZOOM_MAX} aria-label="작게 보기" data-testid="rub-zoom-out"><ZoomOut aria-hidden="true" /></Button>
       </div>
     </div>
