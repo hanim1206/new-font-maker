@@ -136,11 +136,10 @@ describe('900 쌓임 규칙', () => {
     expect(out.yieldH?.JU ?? 1).toBe(1)
     const barRight = Math.max(...out.strokes[1].points.map((p) => p.x)), sideLeft = Math.min(...out.strokes[5].points.map((p) => p.x))
     // 곁줄기가 보 아래로 내려갈 자리(기둥 밑)가 있으면 보는 그대로 길고 곁줄기가 틈만큼 내려간다(하니무스 2026-11-27 "뭐에서 ㅜ가 짧거든").
-    // 자리가 없을 때만 예전처럼 보를 곁줄기 앞에서 끊는다. 어느 쪽이든 보와 곁줄기는 틈을 둔다.
+    // 받침까지 틈을 못 남기면(이 「원」) 예전처럼 보를 곁줄기 앞에서 끊는다. 어느 쪽이든 보와 곁줄기는 틈을 둔다.
     const half = (k: number) => out.strokes[k].thickness * out.thick.h / 2
     const below = out.strokes[5].points[0].y - half(5) - (out.strokes[1].points[0].y + half(1))
     expect(Math.max(sideLeft - barRight, below)).toBeGreaterThanOrEqual(out.gap - 1e-6)
-    expect(barRight).toBeGreaterThan(sideLeft)
   })
   it('가로 굵게 쪽 대비(hScale > 1)여도 쌓임이 준 배율을 넘지 않아 ㄹ · ㅡ가 안 뭉친다(굵기 끝 + 대비 0 「를」 · 「을」)', () => {
     const st = reul(), height = inkHeightOf(st)

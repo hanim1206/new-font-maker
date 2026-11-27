@@ -436,6 +436,7 @@ function cutBarBeforeSide(st: StackStroke[], thick: StackThick, G: number): Stac
   const out = [...st]
   // 기둥 밑(곁줄기가 내려갈 수 있는 끝).
   const pillarBottom = Math.max(-Infinity, ...st.filter((s) => s.part === 'JU_V' && !flat(s)).flatMap((s) => s.points.map((p) => p.y)))
+  const finalTop = Math.min(Infinity, ...st.filter((s) => s.part === 'JO').flatMap((s) => s.points.map((p) => p.y - s.thickness * Math.max(thick.v, thick.h) / 2)))
   for (const [k, s] of st.entries()) {
     if (s.part !== 'JU_V' || !flat(s)) continue
     const left = Math.min(s.points[0].x, s.points[1].x), dy = Math.abs(s.points[0].y - by)
@@ -445,7 +446,8 @@ function cutBarBeforeSide(st: StackStroke[], thick: StackThick, G: number): Stac
     // 곁줄기가 보 아래에 있으면 보를 자르지 않고 곁줄기를 틈만큼 내린다 — 폰트는 ㅜ 보가 길고 곁줄기가 그 아래에 선다
     // (뭐 · 워 보 길이 ÷ 글자 폭: 폰트 900 0.74~0.78, 자르던 때 0.58. 하니무스 2026-11-27 "뭐에서 ㅜ가 짧거든").
     const low = s.points[0].y + need + s.thickness * thick.h / 2
-    if (s.points[0].y > by && low <= pillarBottom) {
+    // 받침이 있으면 받침 윗변과도 틈을 남길 때만 내린다 — 「뭘」처럼 보 · 곁줄기 · 받침이 한 덩어리로 뭉치지 않게.
+    if (s.points[0].y > by && low <= pillarBottom && low + G <= finalTop) {
       out[k] = { ...s, points: s.points.map((p) => ({ ...p, y: p.y + need })), anchors: s.anchors.map((p) => ({ ...p, y: p.y + need, ...(p.handleIn ? { handleIn: { ...p.handleIn, y: p.handleIn.y + need } } : {}), ...(p.handleOut ? { handleOut: { ...p.handleOut, y: p.handleOut.y + need } } : {}) })) }
       continue
     }
