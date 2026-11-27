@@ -124,4 +124,13 @@ describe('900 쌓임 규칙', () => {
     const barRight = Math.max(...out.strokes[1].points.map((p) => p.x)), sideLeft = Math.min(...out.strokes[5].points.map((p) => p.x))
     expect(sideLeft - barRight).toBeGreaterThanOrEqual(out.gap - 1e-6)
   })
+  it('가로 굵게 쪽 대비(hScale > 1)여도 쌓임이 준 배율을 넘지 않아 ㄹ · ㅡ가 안 뭉친다(굵기 끝 + 대비 0 「를」 · 「을」)', () => {
+    const st = reul(), height = inkHeightOf(st)
+    const plain = solveStack900({ char: '를', strokes: st, height, reach: 0, inward: 1 })
+    const fat = solveStack900({ char: '를', strokes: reul(), height, reach: 0, inward: 1, hScale: 1.46 })
+    expect(fat.thick.h).toBeLessThanOrEqual(plain.thick.h * 1.46 + 1e-9)
+    expect(inkHeightOf(fat.strokes, fat.thick)).toBeLessThanOrEqual(height + 1e-6)
+    const g = inkGap(fat.strokes, (p) => p === 'CH', (p) => p === 'JU', fat.thick)
+    expect(g!).toBeGreaterThan(0)
+  })
 })

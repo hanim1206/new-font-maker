@@ -206,6 +206,8 @@
   position: relative;
   min-height: 0;
   overflow: hidden;
+  /* 글자 판보다 창이 길면 남는 곳도 같은 흰 판으로(다람쥐 검수: 2열 아래 빈 회색 40%) */
+  background: rgb(var(--color-surface));
   border-radius: var(--radius-md);
   touch-action: none;
   cursor: grab;
@@ -240,7 +242,8 @@
 .rubRead strong { font-size: var(--font-16); font-weight: var(--weight-bold); }
 .rubEnds { flex: 1; min-width: 0; color: rgb(var(--color-text-3)); font-size: var(--font-12); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rubValue { font-size: var(--font-24); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; }
-.rubNote { margin: 0; padding-inline: 4px; color: rgb(var(--color-warning)); font-size: var(--font-12); }
+/* 알림 줄은 늘 한 줄 자리를 잡아 둔다 — 알림이 뜰 때 판이 튀지 않게(다람쥐 검수 2026-11-27, 21px) */
+.rubNote { margin: 0; padding-inline: 4px; min-height: 1.5em; line-height: 1.5; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: rgb(var(--color-warning)); font-size: var(--font-12); }
 
 /* 인상 잡기: 판이 화면 전체, 스크롤 없음(하니무스 2026-11-27) */
 .page[data-full] {

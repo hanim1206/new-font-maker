@@ -155,29 +155,39 @@ function profileOf(ch: readonly HaloStroke[], H: number, around: Ink, rows?: { x
   let sum = 0
   for (let i = -r; i <= r; i++) { kernel[i + r] = Math.exp(-(i * i) / (2 * sigma * sigma)); sum += kernel[i + r] }
   for (let i = 0; i < kernel.length; i++) kernel[i] /= sum
-  const tmp = new Float32Array(nx * ny), out = new Float32Array(nx * ny)
-  for (let iy = 0; iy < ny; iy++) for (let ix = 0; ix < nx; ix++) {
+  // 가우스는 가로 · 세로로 나눠 흐려도 순서가 상관없다. 세로를 먼저, 잉크 있는 열만 흐리고,
+  // 가로는 읽는 열(선 찾기가 지나가는 몇 칸)만 그때 흐린다 — 판 전체를 두 번 흐리던 것보다 몇 배 빠르고 값은 같다.
+  const inked = new Uint8Array(nx)
+  for (let iy = 0; iy < ny; iy++) for (let ix = 0; ix < nx; ix++) if (grid[iy * nx + ix] > 0) inked[ix] = 1
+  const vb = new Float32Array(nx * ny)
+  for (let ix = 0; ix < nx; ix++) if (inked[ix]) for (let iy = 0; iy < ny; iy++) {
     let v = 0
-    for (let k = -r; k <= r; k++) { const j = ix + k; if (j >= 0 && j < nx) v += grid[iy * nx + j] * kernel[k + r] }
-    tmp[iy * nx + ix] = v
+    for (let k = -r; k <= r; k++) { const j = iy + k; if (j >= 0 && j < ny) v += grid[j * nx + ix] * kernel[k + r] }
+    vb[iy * nx + ix] = v
   }
-  for (let ix = 0; ix < nx; ix++) for (let iy = 0; iy < ny; iy++) {
+  const k0 = (ix: number) => Math.max(-r, -ix), k1 = (ix: number) => Math.min(r, nx - 1 - ix)
+  const at = (ix: number, iy: number) => {
     let v = 0
-    for (let k = -r; k <= r; k++) { const j = iy + k; if (j >= 0 && j < ny) v += tmp[j * nx + ix] * kernel[k + r] }
-    out[iy * nx + ix] = v
+    for (let k = k0(ix), e = k1(ix); k <= e; k++) if (inked[ix + k]) v += vb[iy * nx + ix + k] * kernel[k + r]
+    return v
   }
   // `rows`가 있으면 가로 단면(그 x 범위 안 최댓값)을 y마다 읽는다 — 받침 위.
   const n = rows ? ny : nx, o = rows ? oy : ox
-  const col = new Float32Array(n)
-  if (rows) {
-    const ix0 = Math.max(0, Math.floor((rows.x0 - ox) / cell)), ix1 = Math.min(nx - 1, Math.ceil((rows.x1 - ox) / cell))
-    for (let iy = 0; iy < ny; iy++) { let m = 0; for (let ix = ix0; ix <= ix1; ix++) m = Math.max(m, out[iy * nx + ix]); col[iy] = m }
-  } else for (let ix = 0; ix < nx; ix++) { let m = 0; for (let iy = 0; iy < ny; iy++) m = Math.max(m, out[iy * nx + ix]); col[ix] = m }
+  const col = new Float32Array(n).fill(-1)
+  const rx0 = rows ? Math.max(0, Math.floor((rows.x0 - ox) / cell)) : 0, rx1 = rows ? Math.min(nx - 1, Math.ceil((rows.x1 - ox) / cell)) : 0
+  const colAt = (i: number) => {
+    if (col[i] >= 0) return col[i]
+    let m = 0
+    if (rows) for (let ix = rx0; ix <= rx1; ix++) m = Math.max(m, at(ix, i))
+    else for (let iy = 0; iy < ny; iy++) m = Math.max(m, at(i, iy))
+    return (col[i] = m)
+  }
   return (x: number) => {
     const f = (x - o) / cell - 0.5, i = Math.floor(f)
-    if (i < 0) return col[0]
-    if (i >= n - 1) return col[n - 1]
-    return col[i] + (col[i + 1] - col[i]) * (f - i)
+    if (i < 0) return colAt(0)
+    if (i >= n - 1) return colAt(n - 1)
+    const a = colAt(i)
+    return a + (colAt(i + 1) - a) * (f - i)
   }
 }
 

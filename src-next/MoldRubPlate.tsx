@@ -249,7 +249,7 @@ export function MoldRubPlate({ look, home, setLook, onBegin, renderGlyph, locks,
         <Button variant="ghost" size="icon" onClick={() => { onBegin(); t0.current = performance.now(); setLook(rollRub(lookRef.current, home, Math.random, locks)) }} aria-label="주사위 · 아홉 값 아무렇게나" data-testid="rub-dice"><Dices aria-hidden="true" /></Button>
         <output className={styles.rubValue} data-testid="rub-value">{value}</output>
       </div>
-      {note && <p className={styles.rubNote} data-testid="mold-readout">{note}</p>}
+      <p className={styles.rubNote} data-testid="mold-readout" aria-live="polite">{note ?? ''}</p>
       <TickTape value={value} max={RUB_ROWS} lock={lock} onValueChange={change} onBegin={onBegin} label={`${RUB_NAMES[key]} 값`} valueText={`${RUB_NAMES[key]} ${value}`} data-testid="rub-tape" />
     </div>
   </section>
