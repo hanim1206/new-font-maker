@@ -35,7 +35,7 @@ import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, drawnStem, LAYOUTS, mastersOf, penThicknessOf, shapeConsonants, shownRunsOf, STEMS, stemInfo, type ShownRuns, vowelStemKeys, withPenThicknessVowels, type DrawnStem, type StemKind } from './strokeLab'
 import { MoldDotPlate } from './MoldDotPlate'
 import { thinBudget, thinSyllable, type BudgetStroke } from './moldBudget'
-import { HALO_PRESETS, haloFinalFit, haloFit, haloScope, type FinalFit, type HaloFit, type HaloStroke } from './moldHalo'
+import { haloFinalFit, haloFit, haloScope, type FinalFit, type HaloFit, type HaloStroke } from './moldHalo'
 import styles from './MoldLabPage.module.css'
 
 /**
@@ -1504,9 +1504,7 @@ export function MoldLabPage() {
         <ChoiceGroup variant="segment" aria-label="판" className={styles.plates}>
           {(['ink', 'frame'] as const).map((key) => <ChoiceItem key={key} checked={plate === key} onClick={() => setPlate(key)} data-testid={`mold-plate-${key}`}>{PLATE_NAMES[key]}</ChoiceItem>)}
         </ChoiceGroup>
-        <ChoiceGroup variant="segment" aria-label="시작값" className={styles.plates} data-testid="mold-halo-preset">
-          {(['gothic', 'myeongjo'] as const).map((key) => <ChoiceItem key={key} checked={lookOf(look, 'ease') === HALO_PRESETS[key].ease && lookOf(look, 'spread') === HALO_PRESETS[key].spread} onClick={() => { remember(); setLook({ ...look, ...HALO_PRESETS[key] }) }} data-testid={`mold-halo-${key}`}>{key === 'gothic' ? '고딕' : '명조'}</ChoiceItem>)}
-        </ChoiceGroup>
+        {/* 고딕 · 명조 시작값은 뺐다: 두 값 차이가 글자에 0.8%밖에 안 보였다(하니무스 2026-11-27 "고딕/명조 의미없어보임"). 엔진 여유 값 그대로. */}
         <MoldDotPlate key={plate} keys={plate === 'frame' ? FRAME_KEYS : INK_KEYS} locks={plate === 'ink' && weightLock !== undefined ? { weight: weightLock } : undefined} look={look} home={homeLook} setLook={setLook} onBegin={remember} onSay={setPlateSay} />
         <p className={styles.simsReadout} data-testid="mold-readout">{plateSay}{weightNote ? <><br />{weightNote}</> : null}{plate === 'ink' && widenPct > 0 ? <><br /><span data-testid="mold-widen">굵어져 넓어짐 +{widenPct}%</span></> : null}</p>
         {oldRule.length > 0 && <p className={styles.skipNote} data-testid="mold-old-rule">아직 예전 셈 · {oldRule.join(' ')}</p>}
