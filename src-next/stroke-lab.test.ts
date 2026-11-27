@@ -53,14 +53,15 @@ describe('획 긋기 시험판', () => {
     expect(Object.keys(propagatedJungseong(jungseong, {}, masters)).sort()).toEqual(['ㅏ', 'ㅗ', 'ㅡ', 'ㅣ'])
   })
 
-  it('닿자: ㄱ은 꺾임을 두고 가로 · 세로 마디만 바뀐다', () => {
+  it('닿자: ㄱ은 꺾임을 두고 가로 마디만 바뀐다 — 굽은 내림(삐침)은 그대로', () => {
     const stems: Partial<Record<StemKind, DrawnStem>> = {
       vertical: drawnStem(bowed({ x: 0.37, y: 0.1 }, { x: 0.37, y: 0.9 }), 'vertical'),
       horizontal: drawnStem(bowed({ x: 0.2, y: 0.5 }, { x: 0.55, y: 0.5 }), 'horizontal'),
     }
     const giyeok = getBaseJamo('choseong', 'ㄱ')!.strokes![0]
     const { stroke, kinds } = shapeConsonantStroke(giyeok, consonantShapesOf(stems))
-    expect(kinds.sort()).toEqual(['horizontal', 'vertical'])
+    expect(kinds.sort()).toEqual(['horizontal'])
+    expect(stroke.points[stroke.points.length - 1].handleIn).toEqual(giyeok.points[2].handleIn)
     const corner = giyeok.points[1]
     expect(stroke.points.some((point) => Math.hypot(point.x - corner.x, point.y - corner.y) < 1e-9)).toBe(true)
     expect(stroke.points[0]).toMatchObject({ x: giyeok.points[0].x, y: giyeok.points[0].y })
@@ -76,7 +77,7 @@ describe('획 긋기 시험판', () => {
     const all = shapeConsonants(hieut, consonantShapesOf({ vertical, shortVertical, horizontal, longHorizontal })).keys
     expect(all.get('ㅎ:ㅎ-1')).toEqual(['shortVertical'])
     expect(all.get('ㅎ:ㅎ-2')).toEqual(['longHorizontal'])
-    expect(all.get('ㄱ:ㄱ-1')?.sort()).toEqual(['longHorizontal', 'vertical'])
+    expect(all.get('ㄱ:ㄱ-1')?.sort()).toEqual(['longHorizontal'])
     const pairOnly = shapeConsonants(hieut, consonantShapesOf({ vertical, horizontal })).keys
     expect(pairOnly.get('ㅎ:ㅎ-1')).toEqual(['vertical'])
     expect(pairOnly.get('ㅎ:ㅎ-2')).toEqual(['horizontal'])
