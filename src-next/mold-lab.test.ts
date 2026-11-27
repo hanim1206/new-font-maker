@@ -297,10 +297,12 @@ describe('도트판 인상 잡기', () => {
     expect(notoDot('size')).toBe(9)
     expect(notoDot('contrast')).toBe(7)
     // 자소 사이 여유: 엔진(0.78)은 폰트 여섯보다 촘촘해 칸 0(촘촘 끝)에 선다.
-    expect(dotsOf({}, FRAME_KEYS)).toEqual([9, 12, 0, 20, 10])
-    // 크기 · 여유는 판에서 뺐다(하니무스 2026-11-27).
+    expect(dotsOf({}, FRAME_KEYS)).toEqual([9, 12, 0, 0, 10])
+    expect(FRAME_KEYS).not.toContain('jag')
+    expect(dotToLook('ease', 0)).toBeCloseTo(0.78)
+    // 크기는 판에서 뺐다. 여유는 「보정 세기」로 무게중심 앞에 돌아왔다(하니무스 2026-11-27).
     expect(FRAME_KEYS).not.toContain('size')
-    expect(FRAME_KEYS).not.toContain('ease')
+    expect(FRAME_KEYS[FRAME_KEYS.length - 2]).toBe('ease')
     // 대비를 안 만지면 굵기 1의 폰트 패턴(가로 ÷ 세로 0.88, `contrastPatternOf`)이라 가운데(0.83) 바로 아래 칸 9.
     expect(dotsOf({}, INK_KEYS)).toEqual([9, 9, 0])
     expect(INK_KEYS).not.toContain('nib')
@@ -331,6 +333,14 @@ describe('도트판 인상 잡기', () => {
     expect(h.JO!.y).toBeCloseTo(0.6 - 0.0525)
     expect(h.JO!.y + h.JO!.height).toBeCloseTo(0.95 + 0.0175)
     expect(h.CH!.y).toBeCloseTo(0.05 - 0.015)
+  })
+  it('닿자를 줄여도 기둥은 첫닿자 안쪽 변을 넘어오지 않는다 — 칸 틈 그대로(닿자 크기 0)', async () => {
+    const { impressBoxes } = await import('./moldLab')
+    const v = impressBoxes(VERTICAL, { jamo: 0.55 }, 'choseong-jungseong-vertical')
+    const gap0 = VERTICAL.JU.x - (VERTICAL.CH.x + VERTICAL.CH.width), gap = v.JU!.x - (v.CH!.x + v.CH!.width)
+    expect(gap).toBeGreaterThanOrEqual(gap0 - 1e-9)
+    // 먼 변(글자 오른끝)은 그대로.
+    expect(v.JU!.x + v.JU!.width).toBeCloseTo(0.9)
   })
   it('무게중심(허리선): 틀은 두고 첫닿자 밑변과 보가 오른다 · 받침 글자는 폭이 좁다', async () => {
     const { impressBoxes, waistSyllable } = await import('./moldLab')

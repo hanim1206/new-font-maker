@@ -877,8 +877,10 @@ function pushJamo(boxes: Partial<Record<Part, BoxConfig>>, k: number, layout?: L
     out[part] = { ...box, x: box.x - dw * sideShare(inner, 'l'), y: box.y - dh * sideShare(inner, 't'), width: box.width + dw, height: box.height + dh }
     if (part === 'CH') {
       // 기둥은 닿자 크기에 따라(`pillarPush`), 보는 0.1만 밀린다(먼 변은 그대로).
-      const side = mixed ? out.JU_V : vertical ? out.JU : undefined
-      if (side && inner.includes('r')) { const m = dw * pillarPush(k), next = { ...side, x: side.x + m, width: Math.max(0.01, side.width - m) }; if (mixed) out.JU_V = next; else out.JU = next }
+      // 섞임홀자(ㅘ ㅙ ㅚ …)는 기둥을 안 민다: 보(가로 쪽)는 그 자리라 기둥만 닿자 쪽으로 오면 보를 뚫는다(「과」 닿자 작게, 2026-11-27, C026).
+      // 기둥은 첫닿자 안쪽 변이 움직인 만큼(dw × 안쪽 몫)보다 더 따라가지 않는다(닿자 크기 0에서 쌔 ㅆ이 ㅐ 기둥에 묻힘, 다람쥐 극단 검수 2026-11-27).
+      const side = mixed ? undefined : vertical ? out.JU : undefined
+      if (side && inner.includes('r')) { const m = dw * Math.min(pillarPush(k), sideShare(inner, 'r')), next = { ...side, x: side.x + m, width: Math.max(0.01, side.width - m) }; out.JU = next }
       const bar = mixed ? out.JU_H : !vertical ? out.JU : undefined
       if (bar && inner.includes('b')) { const m = dh * PUSH.vowel; if (mixed) out.JU_H = { ...bar, y: bar.y + m }; else out.JU = { ...bar, y: bar.y + m } }
     } else {
@@ -1335,12 +1337,14 @@ export function dragSeam(seam: Seam, origin: Partial<Record<Part, BoxConfig>>, s
  * 틀 판: 크기 · 비율 · 닿자 크기 · 탈네모 · 윗선 들쭉날쭉, 맨 끝에 무게중심. 획 판: 굵기 · 획 대비 · 둥글기 · 붓촉.
  * 폭 · 키는 비율 한 줄(`frame`)로 합쳤다. 크기가 키를, 비율이 폭을 정한다.
  */
-// 크기 · 자소 사이 여유는 판에서 뺐다(하니무스 2026-11-27 카드 "크기·여유 빼고 받침 남김"). 여유는 엔진 몫(`HALO_ENGINE`). 고딕 · 명조 시작값 고르기도 뺐다(11-27 "의미없어보임").
-export const FRAME_KEYS = ['frame', 'jamo', 'open', 'jag', 'center'] as const
+// 크기는 판에서 뺐다(하니무스 2026-11-27 카드 "크기·여유 빼고 받침 남김"). 고딕 · 명조 시작값 고르기도 뺐다(11-27 "의미없어보임").
+// 자소 사이 여유는 「보정 세기」(촘촘 ↔ 여유)로 다시 틀 판에, 무게중심 바로 앞(하니무스 2026-11-27 카드 "틀 판에 막대 하나로").
+// 윗선(들쭉날쭉)도 판에서 숨겼다(하니무스 2026-11-27 카드 "판에서 숨기기"): 고딕만 내는 출시에서 차이가 거의 안 보인다. 코드 · 값은 남겨 손글씨 꼴에서 다시 연다.
+export const FRAME_KEYS = ['frame', 'jamo', 'open', 'ease', 'center'] as const
 export const INK_KEYS = ['weight', 'contrast', 'round'] as const
 /** 판에 없는 값(눈금 · 이름은 남겨 둠). */
 // 붓촉은 판에서 뺀다: 납작 붓이면 둥글기 · 대비가 안 먹어 한 판에 같이 켜 둘 수 없다(하니무스 2026-11-27 "붓촉을 그 단계에서 보여주면 안되겠지").
-export const HIDDEN_DOT_KEYS = ['size', 'ease', 'nib'] as const
+export const HIDDEN_DOT_KEYS = ['size', 'jag', 'nib'] as const
 export const DOT_KEYS = [...FRAME_KEYS, ...INK_KEYS, ...HIDDEN_DOT_KEYS] as const
 export type DotKey = (typeof DOT_KEYS)[number]
 export const DOT_ROWS = 20
@@ -1358,8 +1362,8 @@ export const DOT_SCALE: Partial<Record<DotKey, readonly [number, number, number]
   // 닿자 크기(ㅇ 높이 ÷ 기둥) 0.40 · 0.64 · 1.00 ÷ 노토 0.73
   jamo: [0.55, 0.88, 1.37],
   center: [-1, 0, 1],
-  // 자소 사이 여유: 칸 0 = 촘촘(선이 닿자에 가까움, 고운돋움 0.76) · 칸 10 = 폰트 가운데 · 칸 20 = 여유(IBM 플렉스 0.48). `moldHalo.ts` HALO_SCALE.
-  ease: [HALO_SCALE.ease[2], HALO_SCALE.ease[1], HALO_SCALE.ease[0]],
+  // 보정 세기(자소 사이 여유): 칸 0 = 촘촘(엔진 값 0.78 — 폰트 끝 고운돋움 0.76보다 살짝 촘촘해 엔진을 끝에 둔다) · 칸 10 = 폰트 가운데 · 칸 20 = 여유(IBM 플렉스 0.48). `moldHalo.ts` HALO_SCALE.
+  ease: [Math.max(HALO_SCALE.ease[2], HALO_ENGINE.ease), HALO_SCALE.ease[1], HALO_SCALE.ease[0]],
 }
 /** 두께 배율(400 대비) → 굵기 값 비율. 굵기 값과 두께는 곧은 비례가 아니다(`weightToMultiplier`). */
 function weightRatioOfThickness(t: number): number {
