@@ -315,7 +315,8 @@ describe('도트판 인상 잡기', () => {
     expect(FRAME_KEYS).not.toContain('size')
     expect(FRAME_KEYS).not.toContain('ease')
     // 대비를 안 만지면 굵기 1의 폰트 패턴(가로 ÷ 세로 0.88, `contrastPatternOf`)이라 가운데(0.83) 바로 아래 칸 9.
-    expect(dotsOf({}, INK_KEYS)).toEqual([9, 9, 0, 0])
+    expect(dotsOf({}, INK_KEYS)).toEqual([9, 9, 0])
+    expect(INK_KEYS).not.toContain('nib')
     // 획 대비 눈금은 가로 ÷ 세로 굵기: 1이면 엔진 0, 1을 넘으면(가로가 더 굵음) 음수
     expect(contrastOfRatio(1)).toBe(0)
     expect(contrastOfRatio(1.46)).toBeLessThan(0)
@@ -558,7 +559,7 @@ describe('획 판은 저장된 값을 그대로 읽는다', () => {
     const { inkLookOf, moldBaseStyle, moldInk, scaledWeight, MOLD_BASE_WEIGHT, dotsOf, INK_KEYS } = await import('./moldLab')
     for (const look of [{ weight: 0.9, round: 0.4 }, { weight: 1.6, contrast: 0.3 }, { nib: 0.5 }, { weight: 1.3, nib: 0.7 }]) {
       const baked = moldInk({ ...moldBaseStyle(DEFAULT_STYLE), weight: scaledWeight(MOLD_BASE_WEIGHT, look.weight ?? 1) }, look)
-      expect(dotsOf(inkLookOf(baked), INK_KEYS)).toEqual(dotsOf(look, INK_KEYS))
+      expect(dotsOf(inkLookOf(baked), [...INK_KEYS, 'nib'])).toEqual(dotsOf(look, [...INK_KEYS, 'nib']))
       // 바탕은 저장 값을 뺀 것이라, 다시 얹어도 두 번 얹히지 않는다.
       expect(moldBaseStyle(baked).weight).toBe(MOLD_BASE_WEIGHT)
     }

@@ -1371,9 +1371,10 @@ export function movePartEdit(edits: PartEdits, part: Part, du: number, dv: numbe
  */
 // 크기 · 자소 사이 여유는 판에서 뺐다(하니무스 2026-11-27 카드 "크기·여유 빼고 받침 남김"). 여유는 엔진 몫(`HALO_ENGINE`), 고딕 · 명조 시작값 고르기만 남는다.
 export const FRAME_KEYS = ['frame', 'jamo', 'open', 'jag', 'center'] as const
-export const INK_KEYS = ['weight', 'contrast', 'round', 'nib'] as const
+export const INK_KEYS = ['weight', 'contrast', 'round'] as const
 /** 판에 없는 값(눈금 · 이름은 남겨 둠). */
-export const HIDDEN_DOT_KEYS = ['size', 'ease'] as const
+// 붓촉은 판에서 뺀다: 납작 붓이면 둥글기 · 대비가 안 먹어 한 판에 같이 켜 둘 수 없다(하니무스 2026-11-27 "붓촉을 그 단계에서 보여주면 안되겠지").
+export const HIDDEN_DOT_KEYS = ['size', 'ease', 'nib'] as const
 export const DOT_KEYS = [...FRAME_KEYS, ...INK_KEYS, ...HIDDEN_DOT_KEYS] as const
 export type DotKey = (typeof DOT_KEYS)[number]
 export const DOT_ROWS = 20
