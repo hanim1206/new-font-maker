@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BLACK_CONTRAST, BLACK_STEM_GAIN, INNER_COUNTER, evenGapOf, inkGap, inkHeightOf, jamoOf, solveStack900, type StackStroke } from './moldStack900'
+import { BLACK_CONTRAST, BLACK_STEM_GAIN, INNER_COUNTER, evenGapOf, evenGapOfBar, inkGap, inkHeightOf, jamoOf, solveStack900, type StackStroke } from './moldStack900'
 
 const line = (part: StackStroke['part'], pts: [number, number][], t = 0.1): StackStroke => ({ part, points: pts.map(([x, y]) => ({ x, y })), anchors: pts.map(([x, y]) => ({ x, y })), thickness: t })
 // 「를」 꼴: ㄹ(가로 셋) · ㅡ · ㄹ(가로 셋). 굵기 끝이라 위아래가 붙어 있다.
@@ -13,6 +13,16 @@ describe('900 쌓임 규칙', () => {
   it('고른 틈은 키 × (0.151 − 0.693 × 기둥 ÷ 키)', () => {
     expect(evenGapOf(0.8, 0.1)).toBeCloseTo(0.8 * 0.151 - 0.693 * 0.1, 9)
     expect(evenGapOf(0.5, 1)).toBe(0)
+  })
+  it('고른 틈을 그린 가로획에서: 고딕 비율 그대로면 옛 식, 같은 기둥에 가로획만 얇게(0.55) 하면 틈이 넓어지고, 끄면 옛 식', () => {
+    expect(evenGapOfBar(0.8, 0.1 * 0.85, 0.85)).toBeCloseTo(evenGapOf(0.8, 0.1), 9)
+    const st = reul(), height = inkHeightOf(st), gothic = [0.88, 0.807] as const
+    const at = (barScale: number, gapFromBar?: boolean) => solveStack900({ char: '를', strokes: st, height, reach: 0.5, inward: 1.1, contrastRange: gothic, gothicRange: gothic, barScale, gapFromBar }).gap
+    const old = evenGapOf(height, 0.1)
+    expect(at(1)).toBeCloseTo(old, 9)
+    const thin = 0.55 / ((gothic[0] + gothic[1]) / 2)
+    expect(at(thin)).toBeGreaterThan(old + 0.01)
+    expect(at(thin, false)).toBeCloseTo(old, 9)
   })
   it('글자를 초성 · 중성 · 종성으로 읽는다', () => {
     expect(jamoOf('를')).toEqual({ cho: 'ㄹ', jung: 'ㅡ', jong: 'ㄹ' })

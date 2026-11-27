@@ -81,6 +81,8 @@ interface Drawn {
 const BALLOON_WEIGHT = true
 /** 굵을 때 900 쌓임 규칙(`moldStack900.ts`)으로 푼다. 끄면 예전 풍선 · 쌓인 획 법칙 셈. */
 const STACK_900 = true
+/** 고른 틈을 그린 가로획 두께에서 셈(`evenGapOfBar`, 2026-11-27). 실험실 주소에 `?evenGap=stem`이면 옛 식(기둥, C029 스위치). */
+const EVEN_GAP_FROM_BAR = typeof window === 'undefined' || new URLSearchParams(window.location.search).get('evenGap') !== 'stem'
 
 /** 굵게 할 때 자소 칸을 키워 보는 비율(작은 것부터). 거북이 표: 굵기 1%p마다 자소가 0.3~0.6% 커진다 — 900(두께 ×1.95)이면 4%쯤, 넉넉히 12%까지. */
 const JAMO_GROWS: readonly number[] = [1, 1.03, 1.06, 1.09, 1.12]
@@ -563,7 +565,11 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
   const stacked = useMemo(() => {
     if (!stackStart || !heavyInput || !budgetBoxes) return null
     const { k, center } = stackStart
-    const out = solveStack900({ char, strokes: stackStart.strokes, height: stackHeight, inward: k / center, reach: Math.max(0, Math.min(1, (k - 1) / (BLACK_RATIO - 1))), ...(patternContrast ? { contrastRange: CONTRAST_PATTERN_RANGE } : {}), hScale: heavyInput.base.h / heavyInput.base.v })
+    // 고른 틈은 그릴 가로획에서: 만진 대비는 가로 ÷ 세로에 (base.h ÷ base.v, `hScale`) × (붓 대비 가로 ÷ 세로)를 더 곱한다. 고딕 비율은 굵기마다 폰트 패턴.
+    const ib = heavyInput.base, widthOf = contrastWidthOf(contrast), hScale = ib.h / ib.v
+    const barScale = contrast === 0 ? 1 : hScale * (widthOf({ x: 1, y: 0 }, false) / widthOf({ x: 0, y: 1 }, false))
+    const out = solveStack900({ char, strokes: stackStart.strokes, height: stackHeight, inward: k / center, reach: Math.max(0, Math.min(1, (k - 1) / (BLACK_RATIO - 1))), ...(patternContrast ? { contrastRange: CONTRAST_PATTERN_RANGE } : {}), hScale,
+      gapFromBar: EVEN_GAP_FROM_BAR, barScale, gothicRange: CONTRAST_PATTERN_RANGE })
     // 옮긴 꼭짓점을 자소 칸 좌표로 돌려 획을 바꿔 끼운다(id 그대로).
     // 한 줄짜리 칸(ㅡ의 키, ㅣ의 너비)은 칸 좌표로 못 옮긴다 — 그 축은 칸을 통째로 옮긴다(그 부위 점들의 평균 이동).
     const THIN_BOX = 0.02
@@ -614,7 +620,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     // 속을 지키려 더 가늘게 한 자소(세로 `yieldV` · 가로 `yieldH`)만 그 묶음에 곱한다.
     const groupThick = (g: BalloonGroup): Thick => ({ v: thick.v * (out.yieldV?.[g] ?? 1), h: thick.h * (out.yieldH?.[g] ?? 1) })
     return { syllable, result, strokes, boxes, placed, thick: { CH: groupThick('CH'), JU: groupThick('JU'), JO: groupThick('JO') } as Record<BalloonGroup, Thick>, gap: out.gap, widenEm: out.widenEm ?? 0 }
-  }, [stackStart, heavyInput, budgetBoxes, char, stackHeight, heavyBase, effective.linecap, effective.linejoin, patternContrast])
+  }, [stackStart, heavyInput, budgetBoxes, char, stackHeight, heavyBase, effective.linecap, effective.linejoin, patternContrast, contrast])
   const heavy = useMemo(() => {
     if (!heavyInput || !budgetBoxes) return null
     const { solveAt, base } = heavyInput

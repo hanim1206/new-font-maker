@@ -38,6 +38,12 @@ export interface StackInput {
   inward: number
   /** 가로 ÷ 세로 [굵기 1 위 첫 걸음, 굵기 끝]. 없으면 [1, `BLACK_CONTRAST`](바탕 대비 위에 곱함). 대비 기본값(폰트 패턴, `contrastPatternOf`)이면 그 식의 두 끝. */
   contrastRange?: readonly [number, number]
+  /** 고른 틈을 그린 가로획 두께에서 셈(기본 켬). false면 옛 식 그대로(기둥 두께, C029 스위치). */
+  gapFromBar?: boolean
+  /** 만진 대비가 그린 가로 ÷ 세로에 더 곱하는 배율 전부(`hScale` × 붓 대비 가로 ÷ 세로, 대비를 안 만졌으면 1). 그린 가로획 = 기둥 × 쌓임 대비 × 이 값. 고른 틈 셈에만 쓴다. */
+  barScale?: number
+  /** 고딕 패턴의 가로 ÷ 세로 [굵기 1 위 첫 걸음, 굵기 끝] — 고른 틈 식에 든 "쌓인 가로획 = 기둥 × 고딕 비율" 자리. 없으면 `contrastRange`(= 늘 옛 식과 같음). */
+  gothicRange?: readonly [number, number]
   /**
    * 만진 대비가 가로에 곱하는 배율(바탕 대비의 가로 ÷ 세로, 1 = 안 만짐). 돌려주는 `thick.h`에 들어 있다.
    * 1보다 크면(가로 굵게 쪽 대비) 쌓임이 준 배율(`f`)을 넘지 않게 자른다 — 예전엔 쌓임을 다 푼 뒤 밖에서 곱해
@@ -359,6 +365,13 @@ function spreadStems(st: StackStroke[], G: number, V: number): StackStroke[] {
 
 /** 고른 틈(em): 키 × (0.151 − 0.693 × 기둥 ÷ 키). */
 export const evenGapOf = (height: number, stem: number) => Math.max(0, height * (EVEN_GAP.base - EVEN_GAP.slope * stem / height))
+/**
+ * 고른 틈(em)을 그린 가로획 두께에서(하니무스 2026-11-27 "추천대로", 거북이 명조 · 손글씨 재기 `study/mold-rules-myeongjo-hand/`).
+ * 0.151 − 0.693 식은 기둥만 보지만 「쌓인 가로획 = 기둥 × 고딕 비율」이라는 고딕 버릇이 숫자에 들어 있다. 그 자리에 실제 가로획을 넣는다:
+ * 기둥 → 가로획 ÷ 고딕 비율. 고딕 비율은 같은 굵기 고딕 패턴의 가로 ÷ 세로라 고딕 기본에서는 옛 식과 같고, 가로획이 가늘어질수록(명조 쪽) 틈이 넓어진다.
+ * 새로 맞춘 계수는 없다(식의 방향 · 비율 그대로).
+ */
+export const evenGapOfBar = (height: number, bar: number, gothicRatio: number) => evenGapOf(height, bar / Math.max(1e-6, gothicRatio))
 
 export function solveStack900(input: StackInput): StackResult {
   const jamo = jamoOf(input.char)
@@ -367,7 +380,17 @@ export function solveStack900(input: StackInput): StackResult {
   const stem = thickList[Math.floor(thickList.length / 2)] ?? 0.07
   const ink0 = inkBox(st0, { v: 1, h: 1 })
   const height = input.height ?? ink0.y1 - ink0.y0
-  const G = evenGapOf(height, stem)
+  const reach = Math.max(0, Math.min(1, input.reach))
+  const V = input.inward
+  // 가로 = min(쌓임이 준 배율, 세로 × 대비). 대비는 굵기 끝으로 갈수록(가설: 굵기에 곧게).
+  const [c0, c1] = input.contrastRange ?? [1, BLACK_CONTRAST]
+  const contrast = c0 + (c1 - c0) * reach
+  // 고른 틈은 쌓기 전에 정한다 — 양보로 가늘어지는 몫(f)은 이 틈에서 나오므로 넣지 않는다(그리기 전 가로획, 가설).
+  const [g0, g1] = input.gothicRange ?? [c0, c1]
+  const gothic = g0 + (g1 - g0) * reach
+  // 옆 틈(첫닿자 ↔ 기둥, ㅐ 두 기둥, 쌍닿자 두 짝)은 세로획 사이라 기둥으로 센다 — 가로획으로 세면 대비를 낮출 때 「저」 ㅈ이 좁아졌다(하니무스 2026-11-27 "저 얇네").
+  const side = evenGapOf(height, stem)
+  const G = input.gapFromBar === false ? side : evenGapOfBar(height, stem * contrast * V * (input.barScale ?? 1), gothic * V)
   let st = st0, f = 1, bars = 0
   // ㅝ · ㅞ도 위아래로 쌓인 글자다(ㅇ · ㅜ 보 · 받침). 오른쪽 ㅓ · ㅔ(`JU_V`)는 막대로 안 센다 — 곁줄기는 보 옆에 선다(`cutBarBeforeSide`).
   const stacked = jamo && (HORIZONTAL_VOWELS.includes(jamo.jung) || 'ㅝㅞ'.includes(jamo.jung))
@@ -378,23 +401,19 @@ export function solveStack900(input: StackInput): StackResult {
     const plan = finalPlan(st0, G, input.height)
     st = plan.strokes; f = plan.f
   }
-  const reach = Math.max(0, Math.min(1, input.reach))
-  const V = input.inward
   st = inwardX(st, V)
-  st = spreadStems(st, G, V)
-  // 가로 = min(쌓임이 준 배율, 세로 × 대비). 대비는 굵기 끝으로 갈수록(가설: 굵기에 곧게).
-  const [c0, c1] = input.contrastRange ?? [1, BLACK_CONTRAST]
-  const contrast = c0 + (c1 - c0) * reach
+  st = spreadStems(st, side, V)
   const hs = input.hScale ?? 1
   const thick = { v: V, h: hs > 1 ? Math.min(f, contrast * V * hs) : Math.min(f, contrast * V) * hs }
   if (jamo) st = narrowRound(st, jamo, 1 - (1 - NARROW_ROUND) * reach)
   if (jamo && 'ㅝㅞ'.includes(jamo.jung)) st = cutBarBeforeSide(st, thick, G)
+  // 옆 틈(마주 선 세로 줄기)은 기둥으로 센 `side`, 가로로 쌓인 속 · ㅜ 보와 곁줄기 위아래 틈은 가로획으로 센 `G`(하니무스 2026-11-27 "저 얇네").
   // 마지막에 속(마주 선 세로 줄기 사이 흰 틈)을 고른 틈까지 지킨다. 지키는 순서 틈 → 굵기 → 칸(하니무스 2026-11-22):
   // 칸(글자 폭)이 먼저 `WIDEN_MAX`까지 넓어지고, 그래도 모자라면 그 자소 세로만 `THIN_FLOOR`까지 가늘어지고, 그래도 모자라면 칸을 더 넓힌다.
   // 예전에는 ㅃ만 두 ㅂ 사이를 벌리려고 ㅂ 폭을 줄여(`splitDouble`) 굵기 끝에서 ㅂ 속이 막혔다(다람쥐 극단 검수 2026-11-27).
   // 가로로 마주 선 막대(ㄹ · ㅂ 속)는 키가 정해져 있어 칸을 못 넓힌다 — 그 자소 가로만 가늘게 한다(축을 바꿔 같은 셈).
   const apart = new Set<Part>(jamo && CLUSTER_FINALS.includes(jamo.jong) ? ['JO'] : [])
-  const kept = keepCounters(st, st0, G, thick, true, INNER_COUNTER, apart)
+  const kept = keepCounters(st, st0, side, thick, true, INNER_COUNTER, apart)
   const swap = (s: StackStroke) => mapStroke(s, (p) => ({ x: p.y, y: p.x }))
   const keptH = keepCounters(kept.strokes.map(swap), st0.map(swap), G, { v: thick.h, h: thick.v }, false, INNER_COUNTER_H, apart)
   return { strokes: kept.strokes, thick, gap: G, bars, ...(Object.keys(kept.yieldV).length ? { yieldV: kept.yieldV } : {}), ...(Object.keys(keptH.yieldV).length ? { yieldH: keptH.yieldV } : {}), ...(kept.widen > 1e-6 ? { widenEm: kept.widen } : {}) }
