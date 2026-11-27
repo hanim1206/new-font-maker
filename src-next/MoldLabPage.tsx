@@ -868,36 +868,6 @@ function DrawStep({ raws, setRaws, stems, onDone }: { raws: Partial<Record<StemK
 }
 
 
-/** 젤리: 보이는 값이 목표 값을 스프링으로 따라가 살짝 넘쳤다 돌아온다. */
-function useSpring(target: Record<string, number>): Record<string, number> {
-  const cur = useRef<Record<string, number>>({ ...target })
-  const vel = useRef<Record<string, number>>({})
-  const goal = useRef(target)
-  const frame = useRef<number | null>(null)
-  const [, setTick] = useState(0)
-  goal.current = target
-  const key = JSON.stringify(target)
-  useEffect(() => {
-    if (frame.current !== null) return
-    const step = () => {
-      let moving = false
-      for (const [name, aim] of Object.entries(goal.current)) {
-        const now = cur.current[name] ?? aim
-        const v = ((vel.current[name] ?? 0) + (aim - now) * 0.22) * 0.68
-        const next = now + v
-        if (Math.abs(aim - next) > 1e-4 || Math.abs(v) > 1e-4) { moving = true; cur.current[name] = next; vel.current[name] = v }
-        else { cur.current[name] = aim; vel.current[name] = 0 }
-      }
-      setTick((n) => n + 1)
-      frame.current = moving ? requestAnimationFrame(step) : null
-    }
-    frame.current = requestAnimationFrame(step)
-  }, [key])
-  // 개발 모드(StrictMode)는 효과를 한 번 껐다 켠다. 끌 때 표시를 지워야 다시 켤 때 스프링이 돈다.
-  useEffect(() => () => { if (frame.current !== null) cancelAnimationFrame(frame.current); frame.current = null }, [])
-  return cur.current
-}
-
 const LOOK_KEYS = ['weight', 'frame', 'tracking', 'size', 'height', 'jamo', 'center', 'round', 'contrast', 'balloon', 'open', 'branch', 'serif', 'nib', 'jag'] as const
 const STAGE = 220
 const ALL_PARTS: readonly Part[] = ['CH', 'JU', 'JU_H', 'JU_V', 'JO']
@@ -999,7 +969,7 @@ function SimsStep({ char, drawn, edits, setEdits, look, weightCap, stackHeight, 
   const grab = useRef<Grab | null>(null)
   const pointers = useRef(new Map<number, { x: number; y: number }>())
 
-  // 큰 글자만 젤리로 따라온다(글줄은 손 그대로).
+  // 큰 글자도 손 그대로 따라온다(젤리 움직임은 뺌, 하니무스 2026-11-27 "그 이상한 애니메이션 지금 없애자. 레이아웃 수정시.").
   const target = useMemo(() => {
     const out: Record<string, number> = {}
     const mine = edits[layout] ?? {}
@@ -1007,7 +977,7 @@ function SimsStep({ char, drawn, edits, setEdits, look, weightCap, stackHeight, 
     for (const key of LOOK_KEYS) out[key] = lookOf(look, key)
     return out
   }, [edits, layout, look])
-  const shown = useSpring(target)
+  const shown = target
   const shownEdits: LayoutEdits = { [layout]: Object.fromEntries((['CH', 'JU', 'JU_H', 'JU_V', 'JO'] as const).filter((key) => edits[layout]?.[key]).map((key) => [key, [0, 1, 2, 3].map((i) => shown[`${key}${i}`] ?? 0)])) }
   const shownLook: Look = Object.fromEntries(LOOK_KEYS.map((key) => [key, shown[key]]))
 
