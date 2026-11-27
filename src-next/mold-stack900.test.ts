@@ -76,7 +76,7 @@ describe('900 쌓임 규칙', () => {
     // 왼 기둥(첫닿자 쪽)은 안쪽으로 굵힌 자리 그대로.
     expect(out.strokes[1].points[0].x).toBeLessThan(0.6 + 0.05)
   })
-  it('ㅃ 속은 굵기 끝에서도 고른 틈을 지킨다 — 먼저 칸을 넓히고(1.1배까지), 모자라면 그 자소 세로만 가늘게, 그래도 모자라면 더 넓힌다', () => {
+  it('ㅃ 속은 굵기 끝에서 최소값까지 좁아지고, 그 몫으로 ㅂ과 ㅓ 사이 고른 틈을 지킨다 — 세로는 꼭 필요한 만큼만 가늘어진다', () => {
     // 「뻐」 꼴: ㅂ 둘(위가 열린 U + 가운데 가로) · ㅓ. 두 ㅂ 사이도 붙어 있다.
     const b = (x0: number, x1: number): StackStroke[] => [line('CH', [[x0, 0.14], [x0, 0.7], [x1, 0.7], [x1, 0.14]], 0.127), line('CH', [[x0, 0.4], [x1, 0.4]], 0.127)]
     const st = [...b(0.1, 0.29), ...b(0.4, 0.59), line('JU', [[0.78, 0.05], [0.78, 0.96]], 0.127), line('JU', [[0.62, 0.43], [0.78, 0.43]], 0.127)]
@@ -84,11 +84,13 @@ describe('900 쌓임 규칙', () => {
     const v = (g: 'CH' | 'JU') => out.thick.v * (out.yieldV?.[g] ?? 1)
     const stems = out.strokes.flatMap((s) => s.points.slice(0, -1).map((p, i) => [p, s.points[i + 1], s.part] as const)).filter(([p, q]) => Math.abs(p.x - q.x) < 1e-9 && Math.abs(p.y - q.y) > 0.2)
       .map(([p, , part]) => ({ x: p.x, t: 0.127 * v(part === 'CH' ? 'CH' : 'JU') })).sort((a, c) => a.x - c.x)
-    // ㅂ 안 속(같은 획 두 기둥)은 고른 틈의 `INNER_COUNTER`배까지, 두 ㅂ 사이 · ㅂ과 ㅓ 사이는 고른 틈 그대로.
-    const want = [INNER_COUNTER, 1, INNER_COUNTER, 1]
+    // ㅃ 안(ㅂ 속, 두 ㅂ 사이)은 고른 틈의 `INNER_COUNTER`배까지, ㅂ과 ㅓ 사이는 고른 틈 그대로.
+    const want = [INNER_COUNTER, INNER_COUNTER, INNER_COUNTER, 1]
     for (let i = 0; i < stems.length - 1; i++) expect(stems[i + 1].x - stems[i].x - (stems[i].t + stems[i + 1].t) / 2).toBeGreaterThanOrEqual(out.gap * want[i] - 1e-3)
-    // 칸 넓힘(1.1배)으로 모자라 ㅃ 세로가 가늘어진다(바닥 0.69 위).
-    expect(out.yieldV?.CH ?? 1).toBeLessThan(1)
-    expect(out.yieldV?.CH ?? 1).toBeGreaterThanOrEqual(0.69 - 1e-9)
+    // ㅃ 안 속은 최소값 그대로(하니무스 「그것도 최소값대로」).
+    for (const i of [0, 1, 2]) expect(stems[i + 1].x - stems[i].x - (stems[i].t + stems[i + 1].t) / 2).toBeCloseTo(out.gap * INNER_COUNTER, 3)
+    // 속을 거둔 몫으로 틈을 채워 ㅃ 세로는 조금만 가늘어진다(예전 0.69 바닥까지 갔던 꼴). ㅓ는 그대로.
+    expect(out.yieldV?.CH ?? 1).toBeGreaterThan(0.9)
+    expect(out.yieldV?.JU).toBeUndefined()
   })
 })

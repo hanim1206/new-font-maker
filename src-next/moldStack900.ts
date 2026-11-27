@@ -432,10 +432,10 @@ function runDist(a: Run, b: Run): number {
   }
   return best
 }
-type Face = { a: number; b: number; white: number; cut: number; half: number; want: number }
+type Face = { a: number; b: number; white: number; cut: number; half: number; want: number; inner: boolean }
 /**
- * 한 획 안의 속(ㅂ · ㅁ · ㄹ처럼 같은 획의 두 줄기 사이)은 고른 틈의 이만큼까지 좁아져도 된다(하니무스 2026-11-27 「뻐에서 ㅃ 속공간 더 작게 해도 될 듯」).
- * 다른 획 · 다른 자소 사이는 고른 틈 그대로. 0.6은 눈으로 고른 값(가설) — 재서 정한 것 아님.
+ * 한 닿자 안의 속(ㅂ · ㅁ · ㄹ처럼 같은 획의 두 줄기 사이, ㅃ · ㅆ처럼 같은 닿자 두 획 사이)은 고른 틈의 이만큼까지 좁아져도 된다
+ * (하니무스 2026-11-27 「뻐에서 ㅃ 속공간 더 작게 해도 될 듯」, 「ㅂ랑 ㅂ 사이 너무 두꺼워. 그것도 최소값대로」). 다른 자소 사이 · 홀자 안(ㅐ)은 고른 틈 그대로. 0.6은 눈으로 고른 값(가설) — 재서 정한 것 아님.
  */
 export const INNER_COUNTER = 0.6
 /** 마주 선 줄기 쌍마다 가장 좁은 가로 흰 틈. `joined`(처음 그림에서 이어진 쌍 — ㅅ 꼭짓점 · ㅂ 모서리)은 뺀다. */
@@ -459,66 +459,86 @@ function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yie
       if (w < white) { white = w; cut = (l.x + ha + r.x - hb) / 2; half = (ha + hb) / 2 }
     }
     if (crossed) continue
-    out.push({ a: left === i ? i : j, b: left === i ? j : i, white, cut, half, want: A.s === B.s ? G * INNER_COUNTER : G })
+    const pa = st[A.s].part, inner = A.s === B.s || (pa === st[B.s].part && (pa === 'CH' || pa === 'JO'))
+    out.push({ a: left === i ? i : j, b: left === i ? j : i, white, cut, half, want: inner ? G * INNER_COUNTER : G, inner })
   }
   return out
 }
 /** x를 자르는 자리마다 오른쪽을 민다. */
 const widenAt = (cuts: { x: number; d: number }[]): Map2 => (p) => ({ x: p.x + cuts.reduce((s, c) => s + (p.x > c.x ? c.d : 0), 0), y: p.y })
-function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number, thick: StackThick, widen: boolean): { strokes: StackStroke[]; yieldV: Partial<Record<StackGroup, number>>; widen: number } {
+type Yield = Partial<Record<StackGroup, number>>
+function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number, thick: StackThick, widen: boolean): { strokes: StackStroke[]; yieldV: Yield; widen: number } {
   const runs0 = runsOf(st0)
-  let runs = runsOf(st)
-  const yieldV: Partial<Record<StackGroup, number>> = {}
   // 처음(점 옮기기 전) 그림에서 줄기 반 두께 안으로 붙어 있던 쌍은 원래 이어진 것(ㅅ 꼭짓점, ㅆ 안 다리)이다.
-  if (runs0.length !== runs.length) return { strokes: st, yieldV, widen: 0 }
+  if (runs0.length !== runsOf(st).length) return { strokes: st, yieldV: {}, widen: 0 }
   const joined = new Set<string>()
   for (let i = 0; i < runs0.length; i++) for (let j = i + 1; j < runs0.length; j++) {
     if (runDist(runs0[i], runs0[j]) < 0.5 * Math.min(st0[runs0[i].s].thickness, st0[runs0[j].s].thickness)) joined.add(`${i}|${j}`)
   }
   const box0 = inkBox(st, thick), width0 = box0.x1 - box0.x0, cx = (box0.x0 + box0.x1) / 2
-  let room = widen ? (WIDEN_MAX - 1) * width0 : 0, out = st
-  // 1) 칸을 넓힌다(모자란 쌍 사이를 자른 자리에서 오른쪽을 민다). 몇 번 다시 잰다.
-  for (let pass = 0; pass < 4 && room > 1e-6; pass++) {
-    const short = facesOf(out, runs, thick, yieldV, joined, G).filter((f) => f.white < f.want - 1e-6)
-    if (!short.length) break
-    const cuts: { x: number; d: number }[] = []
-    for (const f of short.sort((p, q) => p.cut - q.cut)) {
-      const d = f.want - f.white, near = cuts.find((c) => Math.abs(c.x - f.cut) < 0.01)
-      if (near) near.d = Math.max(near.d, d); else cuts.push({ x: f.cut, d })
+  const shortOf = (s: StackStroke[], y: Yield) => facesOf(s, runsOf(s), thick, y, joined, G).filter((f) => f.white < f.want - 1e-6)
+  const center = (s: StackStroke[]) => { const b = inkBox(s, thick), d = cx - (b.x0 + b.x1) / 2; return s.map((x) => mapStroke(x, (p) => ({ x: p.x + d, y: p.y }))) }
+  const straight = (r: Run) => r.pts.every((p, k) => k === 0 || Math.abs(p.x - r.pts[k - 1].x) <= 0.02 * Math.abs(p.y - r.pts[k - 1].y))
+  /**
+   * 0) 모자란 틈이 있으면 먼저 그 자소 안 속을 최소값(`INNER_COUNTER`)까지 좁힌다(칸 · 굵기보다 먼저).
+   *    곧은 세로 줄기끼리, 바로 옆 쌍만(ㅂ · ㅁ · ㄹ 속, ㅃ 두 ㅂ 사이). 그 자소 획만 옮겨 다른 자소(쌈의 ㅆ)는 안 밀린다.
+   */
+  const reclaim = (s: StackStroke[], y: Yield): StackStroke[] => {
+    const runs = runsOf(s), faces = facesOf(s, runs, thick, y, joined, G)
+    const groups = new Set(faces.filter((f) => f.white < f.want - 1e-6).flatMap((f) => [runs[f.a].group, runs[f.b].group]))
+    const next = (f: Face) => {
+      const A = runs[f.a], B = runs[f.b], m = (Math.max(A.y0, B.y0) + Math.min(A.y1, B.y1)) / 2, xa = runAt(A, m).x, xb = runAt(B, m).x
+      return !runs.some((r, k) => k !== f.a && k !== f.b && r.y0 <= m && r.y1 >= m && runAt(r, m).x > xa + 1e-9 && runAt(r, m).x < xb - 1e-9)
     }
-    const total = cuts.reduce((s, c) => s + c.d, 0), k = Math.min(1, room / total)
-    for (const c of cuts) c.d *= k
-    room -= total * k
-    const warp = widenAt(cuts)
-    out = out.map((s) => mapStroke(s, warp))
-    runs = runsOf(out)
-  }
-  // 가운데는 그대로(양쪽으로 반씩 넓어진다).
-  const box1 = inkBox(out, thick), shift = cx - (box1.x0 + box1.x1) / 2
-  out = out.map((s) => mapStroke(s, (p) => ({ x: p.x + shift, y: p.y })))
-  runs = runsOf(out)
-  // 2) 그래도 모자라면 그 자소 세로를 가늘게(바닥 `THIN_FLOOR`).
-  for (let pass = 0; pass < 3; pass++) {
-    const short = facesOf(out, runs, thick, yieldV, joined, G).filter((f) => f.white < f.want - 1e-6)
-    if (!short.length) break
-    for (const f of short) {
-      const q = Math.max(THIN_FLOOR, 1 - (f.want - f.white) / Math.max(f.half * 2, 1e-6))
-      for (const g of new Set([runs[f.a].group, runs[f.b].group])) yieldV[g] = Math.max(THIN_FLOOR, Math.min(yieldV[g] ?? 1, (yieldV[g] ?? 1) * q))
+    let out = s
+    for (const g of groups) {
+      const spare = faces.filter((f) => f.inner && runs[f.a].group === g && f.white > f.want + 1e-6 && straight(runs[f.a]) && straight(runs[f.b]) && next(f))
+      if (!spare.length) continue
+      const warp = widenAt(spare.map((f) => ({ x: f.cut, d: f.want - f.white })))
+      out = out.map((x) => (groupOf(x.part) === g ? mapStroke(x, warp) : x))
     }
+    return out
   }
-  // 3) 굵기도 바닥이면 틈이 이긴다: 칸을 `WIDEN_MAX` 너머로 더 넓힌다(틈은 양보하지 않는다).
-  if (widen) {
+  /** 1) 칸을 넓힌다(모자란 쌍 사이를 자른 자리에서 오른쪽을 민다). 처음 폭의 `WIDEN_MAX`배까지(`limit` false면 끝없이 — 틈은 양보하지 않는다). */
+  const widenTo = (s: StackStroke[], y: Yield, limit: boolean): StackStroke[] => {
+    let out = s
     for (let pass = 0; pass < 4; pass++) {
-      const short = facesOf(out, runs, thick, yieldV, joined, G).filter((f) => f.white < f.want - 1e-6)
+      const b = inkBox(out, thick), room = limit ? WIDEN_MAX * width0 - (b.x1 - b.x0) : Infinity
+      if (room <= 1e-6) break
+      const short = shortOf(out, y)
       if (!short.length) break
       const cuts: { x: number; d: number }[] = []
-      for (const f of short) { const near = cuts.find((c) => Math.abs(c.x - f.cut) < 0.01); if (near) near.d = Math.max(near.d, f.want - f.white); else cuts.push({ x: f.cut, d: f.want - f.white }) }
-      out = out.map((s) => mapStroke(s, widenAt(cuts)))
-      runs = runsOf(out)
+      for (const f of short.sort((p, q) => p.cut - q.cut)) {
+        const d = f.want - f.white, near = cuts.find((c) => Math.abs(c.x - f.cut) < 0.01)
+        if (near) near.d = Math.max(near.d, d); else cuts.push({ x: f.cut, d })
+      }
+      const total = cuts.reduce((t, c) => t + c.d, 0), k = Math.min(1, room / total)
+      out = out.map((x) => mapStroke(x, widenAt(cuts.map((c) => ({ x: c.x, d: c.d * k })))))
     }
-    const box2 = inkBox(out, thick), shift2 = cx - (box2.x0 + box2.x1) / 2
-    out = out.map((s) => mapStroke(s, (p) => ({ x: p.x + shift2, y: p.y })))
+    return center(out)
   }
+  const fit = (y: Yield) => widenTo(reclaim(st, y), y, true)
+  let yieldV: Yield = {}
+  let out = widen ? fit(yieldV) : reclaim(st, yieldV)
+  // 2) 그래도 모자라면 모자란 쌍의 자소 세로를 가늘게(바닥 `THIN_FLOOR`). 가늘어진 만큼 속은 다시 최소값까지 좁혀 다시 잰다 —
+  //    그래서 세로는 꼭 필요한 만큼만 가늘어진다(ㅃ 속이 커지지 않는다).
+  for (let pass = 0; pass < 4; pass++) {
+    const short = shortOf(out, yieldV)
+    if (!short.length) break
+    const runs = runsOf(out), groups = new Set(short.flatMap((f) => [runs[f.a].group, runs[f.b].group]))
+    for (const g of groups) {
+      const ok = (q: number) => { const y = { ...yieldV, [g]: q }; return !shortOf(widen ? fit(y) : reclaim(st, y), y).length }
+      let lo = THIN_FLOOR, hi = yieldV[g] ?? 1
+      if (ok(hi)) continue
+      if (!ok(lo)) { yieldV = { ...yieldV, [g]: lo }; continue }
+      for (let k = 0; k < 12; k++) { const m = (lo + hi) / 2; if (ok(m)) lo = m; else hi = m }
+      yieldV = { ...yieldV, [g]: lo }
+    }
+    out = widen ? fit(yieldV) : reclaim(st, yieldV)
+  }
+  // 3) 굵기도 바닥이면 틈이 이긴다: 칸을 `WIDEN_MAX` 너머로 더 넓힌다.
+  if (widen) out = widenTo(out, yieldV, false)
+  for (const g of Object.keys(yieldV) as StackGroup[]) if ((yieldV[g] ?? 1) >= 1 - 1e-9) delete yieldV[g]
   const box3 = inkBox(out, thick)
   return { strokes: out, yieldV, widen: (box3.x1 - box3.x0) - width0 }
 }
