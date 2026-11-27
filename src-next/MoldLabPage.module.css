@@ -1,0 +1,188 @@
+/* 빚기 시험판. 폰 한 손 화면 — 위에서 글줄을 보고, 아래 무대에서 부위를 콕 골라 여덟 방향으로 끈다(심즈처럼). 울타리 실험지와 같은 틀. */
+.page {
+  display: grid;
+  gap: 12px;
+  width: min(480px, 100%);
+  min-height: 100dvh;
+  margin-inline: auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+  background: rgb(var(--color-background));
+  color: rgb(var(--color-foreground));
+  align-content: start;
+}
+
+.header { display: grid; gap: 2px; }
+.eyebrow { color: rgb(var(--color-primary)); font-size: var(--font-11); font-weight: var(--weight-heavy); letter-spacing: .08em; }
+.header h1 { font-size: var(--font-24); font-weight: var(--weight-heavy); line-height: 1.2; }
+.header p { color: rgb(var(--color-text-3)); font-size: var(--font-14); }
+
+.card, .panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px 12px;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: var(--radius-lg);
+  background: rgb(var(--color-surface));
+}
+.line { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; row-gap: 6px; min-height: 120px; align-content: center; }
+.space { width: 14px; }
+.glyph { position: relative; display: inline-flex; justify-content: center; overflow: visible; touch-action: manipulation; border-radius: var(--radius-sm); }
+/* 풍선 굵기: 자소마다 따로 그린 판을 같은 자리에 겹친다 */
+.glyphLayer { position: absolute; inset: 0; display: flex; justify-content: center; pointer-events: none; }
+.lineActions { display: flex; align-items: center; justify-content: space-between; }
+
+
+
+
+
+
+.note { color: rgb(var(--color-text-4)); font-size: var(--font-12); }
+.center { justify-self: center; }
+
+.steps { width: 100%; margin-top: 6px; }
+
+.stems { display: flex; gap: 6px; overflow-x: auto; margin-inline: -12px; padding-inline: 12px; scrollbar-width: none; }
+.stems::-webkit-scrollbar { display: none; }
+.stems > button { flex: none; }
+.stems > button[data-done]:not([aria-selected='true']) { color: rgb(var(--color-success)); }
+.stemNo { font-variant-numeric: tabular-nums; opacity: .6; }
+.pad {
+  width: 100%;
+  max-height: 38dvh;
+  aspect-ratio: 3 / 4;
+  justify-self: center;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: var(--radius-lg);
+  background: rgb(var(--color-background));
+  touch-action: none;
+  cursor: crosshair;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.padNote { min-height: 20px; color: rgb(var(--color-text-4)); font-size: var(--font-13); text-align: center; }
+.padNote[data-state='done'] { color: rgb(var(--color-foreground)); font-weight: var(--weight-semibold); }
+.padNote[data-state='warn'] { color: rgb(var(--color-warning)); font-weight: var(--weight-semibold); }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+
+/* 빚기(심즈처럼): 큰 글자 무대 + 여덟 방향 표시 + 부위 단추 */
+.lineChar { display: inline-flex; border-radius: var(--radius-sm); cursor: pointer; }
+.lineChar[data-on] { background: rgb(var(--color-primary) / .1); }
+.stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-md);
+  background: rgb(var(--color-surface-2));
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  overflow: hidden;
+}
+.stageGlyph { display: grid; place-items: center; transform-origin: 50% 50%; pointer-events: none; }
+.arrow {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 4px 9px;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: var(--radius-full);
+  background: rgb(var(--color-surface) / .92);
+  color: rgb(var(--color-text-3));
+  font-size: var(--font-12);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity .12s, background-color .12s, color .12s;
+}
+.arrow[data-corner] { padding: 3px 7px; border-style: dashed; font-size: var(--font-10); color: rgb(var(--color-text-4)); }
+.arrow[data-on] { border-style: solid; border-color: rgb(var(--color-foreground)); background: rgb(var(--color-foreground)); color: rgb(var(--color-surface)); }
+.arrow[data-off] { opacity: .3; }
+.tapNote { position: absolute; bottom: 12px; color: rgb(var(--color-text-4)); font-size: var(--font-12); pointer-events: none; }
+.simsReadout { min-height: 20px; color: rgb(var(--color-text-3)); font-size: var(--font-13); text-align: center; font-variant-numeric: tabular-nums; }
+.simsReadout strong { color: rgb(var(--color-foreground)); font-weight: var(--weight-heavy); }
+.regions { width: 100%; }
+.dot { display: inline-block; width: 8px; height: 8px; margin-right: 4px; border-radius: var(--radius-full); }
+.moldActions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* 울타리 보정 카드(획 긋기 시험판과 같은 모양) */
+.fence { display: grid; gap: 8px; padding-top: 8px; border-top: 1px solid rgb(var(--color-border)); }
+.fenceHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.fenceTitle { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.fenceTitle strong { font-size: var(--font-13); font-weight: var(--weight-heavy); }
+.fenceTitle span { overflow: hidden; color: rgb(var(--color-text-3)); font-size: var(--font-12); font-weight: var(--weight-medium); text-overflow: ellipsis; white-space: nowrap; }
+.fenceLine { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: rgb(var(--color-text-3)); font-size: var(--font-12); }
+.fenceLineSwitch { flex: none; }
+
+/* 무대 손잡이: 큰 글자와 같은 자리(무대 가운데 네모)에 깐다. 누르기는 무대가 받고, 여기는 그림만. */
+.line[data-drag] { touch-action: none; cursor: ew-resize; }
+.handles { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+.frameBox, .partBox { position: absolute; box-sizing: border-box; }
+.frameBox { border: 1.5px dashed rgb(var(--color-text-4)); }
+.partBox { border: 1.5px solid; }
+.grip { position: absolute; border-radius: var(--radius-full); background: rgb(var(--color-foreground)); box-shadow: 0 0 0 2px rgb(var(--color-surface)); transition: transform .1s; }
+.grip[data-on] { transform: scale(1.4); }
+.grip[data-grip='t'], .grip[data-grip='b'] { left: 50%; width: 22px; height: 6px; margin-left: -11px; }
+.grip[data-grip='l'], .grip[data-grip='r'] { top: 50%; width: 6px; height: 22px; margin-top: -11px; }
+.grip[data-grip='t'] { top: -3px; } .grip[data-grip='b'] { bottom: -3px; }
+.grip[data-grip='l'] { left: -3px; } .grip[data-grip='r'] { right: -3px; }
+.grip[data-grip='tl'], .grip[data-grip='tr'], .grip[data-grip='bl'], .grip[data-grip='br'] { width: 12px; height: 12px; border-radius: var(--radius-xs); }
+.grip[data-grip='tl'] { top: -6px; left: -6px; } .grip[data-grip='tr'] { top: -6px; right: -6px; }
+.grip[data-grip='bl'] { bottom: -6px; left: -6px; } .grip[data-grip='br'] { bottom: -6px; right: -6px; }
+.grip[data-grip='move'] { top: 50%; left: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; opacity: .85; }
+
+/* 벽에 닿으면 글자 + 손잡이가 툭 튕긴다(a · b를 번갈아 써 매번 다시 돈다). */
+.bumper { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.bumper[data-bump='a'] { animation: wallBumpA .32s ease-out; }
+.bumper[data-bump='b'] { animation: wallBumpB .32s ease-out; }
+@keyframes wallBumpA { 0% { transform: scale(1); } 35% { transform: scale(1.035); } 70% { transform: scale(.99); } 100% { transform: scale(1); } }
+@keyframes wallBumpB { 0% { transform: scale(1); } 35% { transform: scale(1.035); } 70% { transform: scale(.99); } 100% { transform: scale(1); } }
+/* 인상 잡기에 처음 들어오면 손잡이가 한 번 움찔해 끌 수 있는 곳을 알린다. */
+.handles[data-mode='shape'] .grip { animation: gripHint .7s ease-out .25s 1 backwards; }
+@keyframes gripHint { 0% { transform: scale(1); } 30% { transform: scale(1.8); } 55% { transform: scale(.85); } 80% { transform: scale(1.15); } 100% { transform: scale(1); } }
+.skipNote { color: rgb(var(--color-text-4)); font-size: var(--font-12); text-align: center; }
+
+.guides {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* 인상 잡기 도트판(레퍼런스풍 외관은 이 화면에만) */
+.dotPlate {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.dotNum {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+}
+.fenceTools { display: flex; flex: none; align-items: center; gap: 4px; }
+.fenceChevron { transition: transform .15s; }
+.fenceChevron[data-open] { transform: rotate(180deg); }
+/* 인상 잡기: 글줄을 낮춰 도트판과 한 화면에 */
+.line[data-compact] { min-height: 64px; }
+.dotPlate { max-width: 300px; margin-inline: auto; }
+
+/* 인상 잡기 판 둘(틀 판 · 획 판) 고르기 */
+.plates {
+  align-self: center;
+}
+.simsReadout[data-wall='held'], .simsReadout[data-wall='past'] { color: rgb(var(--color-warning)); font-weight: var(--weight-heavy); }
+
+/* 부위 다듬기: 짜임 여섯 · 닿는 글자 */
+.layouts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.layoutCount { color: rgb(var(--color-text-3)); font-size: var(--font-12); font-variant-numeric: tabular-nums; }
+.touched { display: grid; gap: 6px; }
+.touchedRow { display: flex; flex-wrap: wrap; gap: 4px; }
+.touchedChar { position: relative; display: inline-flex; border-radius: var(--radius-sm); cursor: pointer; }
+.touchedGhost { position: absolute; inset: 0; opacity: .25; pointer-events: none; }
+
+/* 저장소에 써 넣기: 짜임 대표 글자를 안 보이게 그려 칸만 받는다. */
+.bakeHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }

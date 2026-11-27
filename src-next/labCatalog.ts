@@ -19,6 +19,7 @@ const LAB_NAMES: Record<LabRoute, string> = {
   '/pen-lab': '펜 그리기',
   '/pillar-lab': '획 긋기 시험판',
   '/fence-lab': '울타리 실험지',
+  '/mold-lab': '빚기 시험판',
   '/ink-parity-lab': '면 그리기 견줌',
   '/style-guide': '스타일가이드',
 }

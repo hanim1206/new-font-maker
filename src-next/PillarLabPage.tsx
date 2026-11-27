@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { Check, ChevronRight, Dices, RotateCcw } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Dices, RotateCcw } from 'lucide-react'
 import type { PenPoint } from '../src/services/penStrokeFit'
 import { useJamoStore } from '../src/stores/jamoStore'
 import { propagatedJungseong } from '../src/stores/stemMasterStore'
 import type { JamoData, LayoutType, ResolvedStrokeInkSource } from '../src/types'
 import { decomposeSyllable } from '../src/utils/hangulUtils'
 import { pointsToSvgD } from '../src/utils/pathUtils'
-import { AppGlyph } from './AppGlyph'
 import { Button } from './components/ui/button'
 import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
+import { Switch } from './components/ui/switch'
 import { EDIT_COLOR } from './editColors'
+import { FENCE_NAMES, summarize, type FencePull, type FenceSummaryRow, type ShakeLevel } from './fenceBand'
+import { FencedGlyph } from './FencedGlyph'
 import { randomSampleSentence } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, consonantStemKeys, drawnStem, LAYOUTS, mastersOf, shapeConsonants, STEMS, stemInfo, vowelStemKeys, type DrawnStem, type StemKind } from './strokeLab'
 import styles from './PillarLabPage.module.css'
@@ -63,6 +65,15 @@ function reasonText(stem: Exclude<DrawnStem, { ok: true }>): string {
   return stem.kind === 'vertical' || stem.kind === 'shortVertical' ? '세로로 그어 주세요' : '가로로 그어 주세요'
 }
 
+const percent = (value: number) => `${(value * 100).toFixed(1)}%`
+/** 값 하나의 결과 한 줄: 당긴 글자 수와 가장 크게 당긴 양, 못 당기고 남은 것. */
+function fenceRowText(row: FenceSummaryRow): string {
+  if (row.checked === 0) return '잴 글자 없음'
+  const moved = row.count > 0 ? (row.value === 'clearance' ? `모든 자소 ${percent(row.max)} 줄임` : `${row.count}자 ${percent(row.max)} ${row.word}`) : ''
+  const stuck = row.stuck > 0 ? (row.value === 'clearance' ? `${row.stuck}자 아직 좁음` : `${row.stuck}자 ${percent(row.left)} 남음`) : ''
+  return [moved, stuck].filter(Boolean).join(' · ') || '울타리 안'
+}
+
 /** 판에 까는 점선 길잡이. 길이 · 자리는 서비스가 정하니 대충의 크기만 보인다. */
 function Guide({ kind }: { kind: StemKind }) {
   const props = { fill: 'none', stroke: EDIT_COLOR.editGuide, strokeWidth: 4, strokeDasharray: '12 16', strokeLinecap: 'round' as const }
@@ -82,6 +93,16 @@ export function PillarLabPage() {
   const [kind, setKind] = useState<StemKind>('vertical')
   const [view, setView] = useState<View>('mine')
   const [marked, setMarked] = useState(true)
+  // 울타리 보정: 켜면 배치 값이 울타리(안전선) 밖인 글자를 당긴다. 흔들기는 보정이 당기는 걸 보려고 배치를 일부러 민다.
+  const [fenceOn, setFenceOn] = useState(true)
+  const [shake, setShake] = useState<ShakeLevel>(0)
+  // 자세히(값 넷 · 흔들기)는 접어 둔다 — 폰에서 긋는 판까지 한 화면에 들어와야 긋다가 화면이 안 밀린다.
+  const [fenceOpen, setFenceOpen] = useState(false)
+  const [pulls, setPulls] = useState<Record<number, readonly FencePull[]>>({})
+  const reportPulls = useCallback((index: number, list: readonly FencePull[]) => setPulls((all) => (all[index] === list ? all : { ...all, [index]: list })), [])
+  // 글자마다 바라는 줄이는 비율을 모아, 글줄에서 가장 작은 비율로 모든 글자의 자소를 똑같이 줄인다.
+  const [needs, setNeeds] = useState<Record<number, number>>({})
+  const reportNeed = useCallback((index: number, wanted: number) => setNeeds((all) => (all[index] === wanted ? all : { ...all, [index]: wanted })), [])
   const drawing = useRef<PenPoint[] | null>(null)
   const activePointer = useRef<number | null>(null)
   const padRef = useRef<SVGSVGElement>(null)
@@ -170,9 +191,15 @@ export function PillarLabPage() {
   }
 
   const chars = [...sentence]
+  const jamoScale = Math.min(1, ...chars.map((char, index) => (char === ' ' ? 1 : needs[index] ?? 1)))
+  const livePulls = chars.map((char, index) => (char === ' ' ? [] : pulls[index] ?? []))
+  const fenceRows = summarize(livePulls)
+  const pulledCount = livePulls.filter((list) => list.some((item) => item.pulled !== 0)).length
+  const stuckCount = livePulls.filter((list) => list.some((item) => item.left > 0)).length
+  const fenceNote = [pulledCount > 0 ? `${fenceOn ? '' : '켜면 '}${pulledCount}자 당김` : '', stuckCount > 0 ? `${stuckCount}자는 다 못 당김` : ''].filter(Boolean).join(' · ') || '모두 울타리 안'
   const note = stem && !stem.ok ? reasonText(stem) : accepted ? `방금 그은 게 ${withCopula(info.term)}. 길이와 자리, 굵기는 우리가 맞췄어요.` : info.hint
 
-  return <main className={styles.page}>
+  return <main className={styles.page} data-open={fenceOpen || undefined}>
     <header className={styles.header}>
       <span className={styles.eyebrow}>시험판 · 줄기 {doneCount}/{STEMS.length}</span>
       <h1>획 긋기</h1>
@@ -182,11 +209,14 @@ export function PillarLabPage() {
       <div className={styles.line} data-testid="pillar-line">
         {chars.map((char, index) => char === ' '
           ? <span key={index} className={styles.space} />
-          : <AppGlyph key={index} char={char} size={40}
-            jungseongOverride={mine ? overrides.jungseong : undefined}
-            choseongOverride={mine ? overrides.consonants[layoutOf(char)]?.choseong : undefined}
-            jongseongOverride={mine ? overrides.consonants[layoutOf(char)]?.jongseong : undefined}
-            strokeColorOf={strokeColorOf} />)}
+          : <span key={index} className={styles.glyph} data-pulled={livePulls[index].some((item) => item.pulled !== 0) || undefined}>
+            <FencedGlyph char={char} size={40}
+              jungseongOverride={mine ? overrides.jungseong : undefined}
+              choseongOverride={mine ? overrides.consonants[layoutOf(char)]?.choseong : undefined}
+              jongseongOverride={mine ? overrides.consonants[layoutOf(char)]?.jongseong : undefined}
+              strokeColorOf={strokeColorOf}
+              fence={{ on: fenceOn, line: 'safe', shake, index, scale: jamoScale }} onPulls={reportPulls} onNeed={reportNeed} />
+          </span>)}
       </div>
       <div className={styles.lineTools}>
         <Button variant="soft" size="chip" onClick={() => setSentence((now) => randomSampleSentence(now))} data-testid="pillar-roll"><Dices aria-hidden="true" />다른 문장</Button>
@@ -195,6 +225,28 @@ export function PillarLabPage() {
           <ChoiceItem checked={mine} disabled={doneCount === 0} onClick={() => setView('mine')}>내 줄기</ChoiceItem>
           <ChoiceItem checked={!mine} onClick={() => setView('base')}>기본</ChoiceItem>
         </ChoiceGroup>
+      </div>
+      <div className={styles.fence} data-testid="fence-card">
+        <div className={styles.fenceHead}>
+          <Button variant="ghost" size="chip" aria-expanded={fenceOpen} onClick={() => setFenceOpen((open) => !open)} data-testid="fence-more">
+            <strong>울타리 보정</strong><span data-testid="fence-count">{fenceNote}</span><ChevronDown aria-hidden="true" data-open={fenceOpen || undefined} />
+          </Button>
+          <Switch checked={fenceOn} onCheckedChange={setFenceOn} aria-label="울타리 보정" data-testid="fence-switch" />
+        </div>
+        {fenceOpen && <>
+          <ul className={styles.fenceRows}>
+            {fenceRows.map((row) => <li key={row.value} data-moved={row.count > 0 || undefined} data-stuck={row.stuck > 0 || undefined} data-testid={`fence-row-${row.value}`}>
+              <span>{FENCE_NAMES[row.value]}</span>
+              <b>{fenceRowText(row)}</b>
+            </li>)}
+          </ul>
+          <div className={styles.fenceShake}>
+            <span>일부러 흔들기</span>
+            <ChoiceGroup variant="segment" aria-label="일부러 흔들기" className={styles.shakeSwitch}>
+              {([[0, '끔'], [1, '조금'], [2, '많이']] as const).map(([level, name]) => <ChoiceItem key={level} checked={shake === level} onClick={() => setShake(level)} data-testid={`fence-shake-${level}`}>{name}</ChoiceItem>)}
+            </ChoiceGroup>
+          </div>
+        </>}
       </div>
     </section>
 
@@ -208,13 +260,13 @@ export function PillarLabPage() {
     </nav>
 
     <section className={styles.padWrap} aria-label="긋는 판">
-      <svg ref={padRef} viewBox={VIEWBOX} className={styles.pad} data-testid="pillar-pad"
+      <div className={styles.padBox}><svg ref={padRef} viewBox={VIEWBOX} className={styles.pad} data-testid="pillar-pad"
         onPointerDown={begin} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish}>
         <Guide kind={kind} />
         {!current && stem?.ok && <path d={pointsToSvgD(stem.fit.stroke.points, kind === 'circle', UNIT_BOX, VIEW)} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={PAD_INK * VIEW} strokeLinecap="round" strokeLinejoin="round" data-testid="pillar-fitted" />}
         {!current && raw && <path d={rawPath(raw)} fill="none" stroke={EDIT_COLOR.editSelect} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" opacity={0.7} />}
         {current && <path d={rawPath(current)} fill="none" stroke={EDIT_COLOR.foreground} strokeWidth={PAD_INK * VIEW} strokeLinecap="round" strokeLinejoin="round" />}
-      </svg>
+      </svg></div>
       <p className={styles.padNote} data-testid="pillar-note" data-state={stem && !stem.ok ? 'warn' : accepted ? 'done' : 'idle'}>{note}</p>
       <div className={styles.padActions}>
         <Button variant="outline" size="block" onClick={() => setRaws((all) => ({ ...all, [kind]: undefined }))} disabled={!raw} data-testid="pillar-reset"><RotateCcw aria-hidden="true" />다시 긋기</Button>

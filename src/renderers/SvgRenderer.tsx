@@ -70,6 +70,9 @@ interface SvgRendererProps {
   svgRef?: React.RefObject<SVGSVGElement | null>
   // 추가 className (반응형 크기 조절 등)
   className?: string
+  // 잉크를 다시 맞추는 가로 경계(글자 칸 0~1 기준). 기본은 0~1 — 칸 밖으로 나가는 중심선은 자소 칸째 안으로 민다.
+  // 칸을 이미 잉크로 푼 쪽(빚기 풍선 굵기)은 넓게 줘서 끈다.
+  horizontalInkBounds?: { min: number; max: number }
 }
 
 // SVG viewBox 기준 크기
@@ -105,6 +108,7 @@ export function SvgRenderer({
   straightUnderlay,
   svgRef,
   className,
+  horizontalInkBounds = HORIZONTAL_INK_BOUNDS,
 }: SvgRendererProps) {
   // 글리프 클리핑 여부 (명시적 prop 우선, 없으면 overflow='hidden'과 동일)
   const shouldClipGlyphs = clipGlyphs ?? (overflow === 'hidden')
@@ -121,7 +125,7 @@ export function SvgRenderer({
   // 나머지 입력이 바뀌면 통째로 새 캐시라 묵은 값이 남지 않는다.
   const counterKeepVariants = useMemo(
     () => new Map<boolean, ReturnType<typeof resolveGlyphInkPrimitives>>(),
-    [boxesProp, globalStyle?.linecap, globalStyle?.linejoin, schema, syllable, weightMultiplier, counterKeepStemScale],
+    [boxesProp, globalStyle?.linecap, globalStyle?.linejoin, schema, syllable, weightMultiplier, counterKeepStemScale, horizontalInkBounds],
   )
   const resolvedInk = useMemo(() => {
     const cached = counterKeepVariants.get(counterKeepOn)
@@ -136,12 +140,12 @@ export function SvgRenderer({
       globalLinejoin: globalStyle?.linejoin,
       // viewportBox는 조판 창의 크기일 뿐 잉크를 다시 맞추는 경계가 아니다.
       // Design Body보다 돌출된 획도 편집기와 같은 형태로 보여야 한다.
-      horizontalInkBounds: HORIZONTAL_INK_BOUNDS,
+      horizontalInkBounds,
       counterKeep: counterKeepOn ? { stemScale: counterKeepStemScale } : undefined,
     })
     counterKeepVariants.set(counterKeepOn, resolved)
     return resolved
-  }, [counterKeepVariants, boxesProp, globalStyle?.linecap, globalStyle?.linejoin, schema, syllable, weightMultiplier, counterKeepOn, counterKeepStemScale])
+  }, [counterKeepVariants, boxesProp, globalStyle?.linecap, globalStyle?.linejoin, schema, syllable, weightMultiplier, counterKeepOn, counterKeepStemScale, horizontalInkBounds])
   const centerlines = useMemo(() => resolvedInk.primitives.map((primitive) => {
     if (primitive.kind !== 'centerline') {
       throw new Error(`SvgRenderer가 지원하지 않는 잉크 primitive입니다: ${primitive.kind}`)
