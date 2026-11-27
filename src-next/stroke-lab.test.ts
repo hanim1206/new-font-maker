@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getBaseJamo } from '../src/stores/jamoStore'
 import { propagatedJungseong } from '../src/stores/stemMasterStore'
 import type { JamoData } from '../src/types'
-import { consonantShapesOf, drawnStem, mastersOf, shapeConsonants, shapeConsonantStroke, type DrawnStem, type StemKind } from './strokeLab'
+import { consonantShapesOf, drawnStem, mastersOf, penThicknessOf, shapeConsonants, shapeConsonantStroke, shownRunsOf, withPenThicknessVowels, type DrawnStem, type StemKind } from './strokeLab'
 
 type P = { x: number; y: number }
 /** a→b로 가며 진행 방향 오른쪽(+)으로 `bow`만큼 부푼 선. 잔떨림을 얹는다. */
@@ -53,14 +53,15 @@ describe('획 긋기 시험판', () => {
     expect(Object.keys(propagatedJungseong(jungseong, {}, masters)).sort()).toEqual(['ㅏ', 'ㅗ', 'ㅡ', 'ㅣ'])
   })
 
-  it('닿자: ㄱ은 꺾임을 두고 가로 · 세로 마디만 바뀐다', () => {
+  it('닿자: ㄱ은 꺾임을 두고 가로 마디만 바뀐다 — 굽은 내림(삐침)은 그대로', () => {
     const stems: Partial<Record<StemKind, DrawnStem>> = {
       vertical: drawnStem(bowed({ x: 0.37, y: 0.1 }, { x: 0.37, y: 0.9 }), 'vertical'),
       horizontal: drawnStem(bowed({ x: 0.2, y: 0.5 }, { x: 0.55, y: 0.5 }), 'horizontal'),
     }
     const giyeok = getBaseJamo('choseong', 'ㄱ')!.strokes![0]
     const { stroke, kinds } = shapeConsonantStroke(giyeok, consonantShapesOf(stems))
-    expect(kinds.sort()).toEqual(['horizontal', 'vertical'])
+    expect(kinds.sort()).toEqual(['horizontal'])
+    expect(stroke.points[stroke.points.length - 1].handleIn).toEqual(giyeok.points[2].handleIn)
     const corner = giyeok.points[1]
     expect(stroke.points.some((point) => Math.hypot(point.x - corner.x, point.y - corner.y) < 1e-9)).toBe(true)
     expect(stroke.points[0]).toMatchObject({ x: giyeok.points[0].x, y: giyeok.points[0].y })
@@ -76,7 +77,7 @@ describe('획 긋기 시험판', () => {
     const all = shapeConsonants(hieut, consonantShapesOf({ vertical, shortVertical, horizontal, longHorizontal })).keys
     expect(all.get('ㅎ:ㅎ-1')).toEqual(['shortVertical'])
     expect(all.get('ㅎ:ㅎ-2')).toEqual(['longHorizontal'])
-    expect(all.get('ㄱ:ㄱ-1')?.sort()).toEqual(['longHorizontal', 'vertical'])
+    expect(all.get('ㄱ:ㄱ-1')?.sort()).toEqual(['longHorizontal'])
     const pairOnly = shapeConsonants(hieut, consonantShapesOf({ vertical, horizontal })).keys
     expect(pairOnly.get('ㅎ:ㅎ-1')).toEqual(['vertical'])
     expect(pairOnly.get('ㅎ:ㅎ-2')).toEqual(['horizontal'])
@@ -118,5 +119,46 @@ describe('획 긋기 시험판', () => {
       expect(b[0]).toMatchObject({ x: a[0].x, y: a[0].y })
       expect(Math.hypot(b[b.length - 1].x - a[a.length - 1].x, b[b.length - 1].y - a[a.length - 1].y)).toBeLessThan(1e-9)
     })
+  })
+  it('그은 획은 펜 두께 하나 — 저장소에서 ㄹ · ㅇ · ㅅ만 가늘어도 그은 획은 「ㅣ」 기둥 두께로 고르다', () => {
+    const thin = (jamo: JamoData): JamoData => ({ ...jamo, strokes: jamo.strokes!.map((stroke) => ({ ...stroke, thickness: 0.05 })) })
+    const consonants = Object.fromEntries(Object.entries(jamos('choseong', ['ㄹ', 'ㅇ', 'ㅅ', 'ㄱ'])).map(([char, jamo]) => [char, char === 'ㄱ' ? jamo : thin(jamo)]))
+    const vowels = jamos('jungseong', ['ㅣ', 'ㅡ', 'ㅏ'])
+    const pen = penThicknessOf(vowels)
+    expect(pen).toBe(vowels['ㅣ'].strokes![0].thickness)
+    const stems: Partial<Record<StemKind, DrawnStem>> = {
+      vertical: drawnStem(bowed({ x: 0.37, y: 0.1 }, { x: 0.37, y: 0.9 }), 'vertical'),
+      horizontal: drawnStem(bowed({ x: 0.2, y: 0.5 }, { x: 0.55, y: 0.5 }), 'horizontal'),
+      longHorizontal: drawnStem(bowed({ x: 0.05, y: 0.5 }, { x: 0.7, y: 0.5 }), 'longHorizontal'),
+      diagonal: drawnStem(bowed({ x: 0.6, y: 0.2 }, { x: 0.15, y: 0.8 }), 'diagonal'),
+      circle: drawnStem(loop(), 'circle'),
+    }
+    // 그대로 물려받으면(예전) ㄹ · ㅇ · ㅅ만 0.05로 남는다.
+    const old = shapeConsonants(consonants, consonantShapesOf(stems)).changed
+    expect(old['ㄹ'].strokes!.every((stroke) => stroke.thickness === 0.05)).toBe(true)
+    const { changed } = shapeConsonants(consonants, consonantShapesOf(stems), undefined, pen)
+    for (const char of ['ㄹ', 'ㅇ', 'ㅅ', 'ㄱ']) for (const stroke of changed[char].strokes!) expect(stroke.thickness).toBe(pen)
+    // 홀자: 그은 줄기가 입혀진 획만 펜 두께, 안 그은 것은 그대로.
+    const thinVowels = { ...vowels, 'ㅡ': thin(vowels['ㅡ']) }
+    expect(withPenThicknessVowels(thinVowels, new Set<StemKind>(['longHorizontal']), pen)['ㅡ'].strokes![0].thickness).toBe(pen)
+    expect(withPenThicknessVowels(thinVowels, new Set<StemKind>(['vertical']), pen)['ㅡ'].strokes![0].thickness).toBe(0.05)
+  })
+  it('긋기 단계: 한 획으로 이어진 ㄷ은 그은 종류의 마디만 보인다 — 가로선 하나로 ㄷ이 다 채워지지 않는다', () => {
+    const digeut = { id: 'd', closed: false, thickness: 0.07, points: [{ x: 1, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }] }
+    const horizontal = drawnStem(bowed({ x: 0.2, y: 0.5 }, { x: 0.55, y: 0.5 }), 'horizontal')
+    const vertical = drawnStem(bowed({ x: 0.37, y: 0.1 }, { x: 0.37, y: 0.9 }), 'vertical')
+    expect(shownRunsOf(digeut, consonantShapesOf({}))).toBe('none')
+    const onlyH = consonantShapesOf({ horizontal })
+    const shown = shownRunsOf(digeut, onlyH)
+    if (typeof shown === 'string') throw new Error('토막으로 나뉘어야 한다')
+    // 입힌 획과 앵커 수가 같고, 위 · 아래 가로 마디 두 토막만.
+    expect(shown.total).toBe(shapeConsonantStroke(digeut, onlyH).stroke.points.length)
+    expect(shown.runs).toHaveLength(2)
+    const placed = shapeConsonantStroke(digeut, onlyH).stroke.points
+    for (const run of shown.runs) {
+      const ys = run.map((index) => placed[index].y)
+      expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(0.2)
+    }
+    expect(shownRunsOf(digeut, consonantShapesOf({ horizontal, vertical }))).toBe('all')
   })
 })
