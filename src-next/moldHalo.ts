@@ -68,6 +68,8 @@ export interface HaloRule {
   spread: number
   /** 기둥 두께 ÷ 처음 굵기의 기둥 두께. */
   grown: number
+  /** 닿자 뼈대를 넓힐 수 있는 끝(없으면 `WIDEN_MAX`). 사용자가 닿자를 줄였을 때 줄이기 전 넓힘까지만 — 그 이상 넓히면 키만 줄고 폭은 돌아와 납작해진다. */
+  widenMax?: number
 }
 
 /** 다루는 글자: 홑닿자(ㅍ 빼고) + 세로홀자 중 곁줄기가 오른쪽인 것(ㅏ ㅑ ㅣ ㅐ ㅒ), 받침 있어도 됨. 쌍닿자 · ㅍ · ㅓ는 다음 단계. */
@@ -213,6 +215,14 @@ export interface HaloFit {
   stem: number
 }
 
+/** 첫닿자 획을 제 잉크 가운데를 두고 가로세로 k배(닿자 크기를 줄이기 전 모양을 다시 만들 때). */
+export function scaleChoseong(strokes: readonly HaloStroke[], k: number): HaloStroke[] {
+  const ink = inkOf(strokes.filter((s) => s.part === 'CH'))
+  if (!ink || k === 1) return [...strokes]
+  const cx = (ink.x0 + ink.x1) / 2, cy = (ink.y0 + ink.y1) / 2
+  return strokes.map((s) => s.part !== 'CH' ? s : { ...s, points: s.points.map((p) => ({ x: cx + (p.x - cx) * k, y: cy + (p.y - cy) * k })) })
+}
+
 const scaleCh = (strokes: readonly HaloStroke[], anchor: number, k: number) => strokes.map((s) => ({ ...s, points: s.points.map((p) => ({ x: anchor + (p.x - anchor) * k, y: p.y })) }))
 
 /** 한 글자의 흐림 선 맞추기. 다루지 않는 모양(기둥 · 닿자 없음)이면 null. */
@@ -236,7 +246,7 @@ export function haloFit(strokes: readonly HaloStroke[], rule: HaloRule): HaloFit
     // 자리가 남음: 선이 기둥에 닿거나 끝 틈이 폰트 아래 끝에 닿을 때까지 뼈대를 넓힌다(남은 자리는 선까지 메운다).
     const ok = (k: number) => { const m = measure(k); return m.line <= stem.left && (stem.left - m.right) / H >= HALO_END_GAP }
     if (ok(1)) {
-      let lo = 1, hi = WIDEN_MAX
+      let lo = 1, hi = Math.max(1, Math.min(WIDEN_MAX, rule.widenMax ?? WIDEN_MAX))
       if (ok(hi)) lo = hi
       else for (let i = 0; i < 12; i++) { const mid = (lo + hi) / 2; if (ok(mid)) lo = mid; else hi = mid }
       widen = lo

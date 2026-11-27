@@ -22,8 +22,8 @@ import { ChoiceGroup, ChoiceItem } from './components/ui/choice-group'
 import { Pressable } from './components/ui/pressable'
 import { Field, RangeBar } from './components/ui/range'
 import { EDIT_COLOR } from './editColors'
-import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type Clearances, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
-import { nibStemFactor, openFactorOf, BLACK_CENTER, BLACK_RATIO, CONTRAST_PATTERN_RANGE, patternWeightRatio, HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, moveApart, movePartEdit, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
+import { clearanceRatio, correctGlyph, GOTHIC_FENCE, measureGlyph, movedBoxes, partClearances, pickJamoScale, scaledBoxes, type FenceLine, type FencePull, type PartPair, nearestBetweenParts } from './fenceBand'
+import { nibStemFactor, openFactorOf, BLACK_CENTER, BLACK_RATIO, CONTRAST_PATTERN_RANGE, patternWeightRatio, HEAVY_HORIZONTAL_SHARE, heavyThicknessOf, inkLookOf, moldBaseStyle, MOLD_BASE_WEIGHT, stemSyllable, STEM_KEYS, STEM_TUNE, type StemKey, applyPartEdits, appliedWeight, balloonOk, branchSyllable, growSides, GAP_FLOOR, lookScale, serifSyllable, waistLift, moldInk, inflateSyllable, dotToLook, FRAME_KEYS, INK_KEYS, waistSyllable,  dragSeam, lookBoxes, gapCapMultiplier, lookOf, LOOK_ENGINE, LOOK_WALL, scaledWeight, seamPos, seamRange, seamsOf, SEAM_HARD_FLOOR, type SeamWall, simsPartOf, type GapStroke, type LayoutEdits, type Look, type PartEdits, type Region, type SimsPart } from './moldLab'
 import { useContextPlacement, useNotoModel } from './notoModel'
 import { stackColumns, stackLay } from './moldStack'
 import { balloonGroupOf, endReachOf, inkOfThick, solveBalloon, type BalloonGroup, type BalloonStroke, type Thick } from './moldBalloon'
@@ -35,7 +35,7 @@ import { SAMPLE_SENTENCES } from './sampleSentences'
 import { consonantBoxesOf, consonantShapesOf, drawnStem, LAYOUTS, mastersOf, penThicknessOf, shapeConsonants, shownRunsOf, STEMS, stemInfo, type ShownRuns, vowelStemKeys, withPenThicknessVowels, type DrawnStem, type StemKind } from './strokeLab'
 import { MoldDotPlate } from './MoldDotPlate'
 import { thinBudget, thinSyllable, type BudgetStroke } from './moldBudget'
-import { haloFinalFit, haloFit, haloScope, type FinalFit, type HaloFit, type HaloStroke } from './moldHalo'
+import { haloFinalFit, haloFit, haloScope, scaleChoseong, type FinalFit, type HaloFit, type HaloStroke } from './moldHalo'
 import styles from './MoldLabPage.module.css'
 
 /**
@@ -478,7 +478,11 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
     const inkRatio = patternContrast ? patternWeightRatio(ratio, contrast) : ratio
     const mInk = weightToMultiplier(inkRatio === 1 ? effective.weight : scaledWeight(effective.weight, inkRatio))
     const widthOf = contrastWidthOf(contrast), shape = contrast === 0 ? undefined : () => ({ v: widthOf({ x: 0, y: 1 }, false), h: widthOf({ x: 1, y: 0 }, false) })
-    const fit = pillar ? haloFit(haloStrokesOf(budget.syllable, budgetBoxes, effective, mInk, shape), { ease: lookOf(look, 'ease'), spread: lookOf(look, 'spread'), grown: m / weightToMultiplier(MOLD_BASE_WEIGHT) }) : null
+    const rule = { ease: lookOf(look, 'ease'), spread: lookOf(look, 'spread'), grown: m / weightToMultiplier(MOLD_BASE_WEIGHT) }
+    const haloStrokes = pillar ? haloStrokesOf(budget.syllable, budgetBoxes, effective, mInk, shape) : null
+    // 닿자를 줄였으면 줄이기 전 모양의 넓힘까지만 넓힌다. 남는 자리로 다시 넓히면 「가」 ㄱ이 키만 줄고 폭은 돌아와 납작해졌다(고양이 잰 표 44×63 → 41×54, 2026-11-27).
+    const jamo = lookOf(look, 'jamo'), unshrunk = haloStrokes && jamo < 1 ? haloFit(scaleChoseong(haloStrokes, 1 / jamo), rule) : null
+    const fit = haloStrokes ? haloFit(haloStrokes, unshrunk ? { ...rule, widenMax: unshrunk.widen } : rule) : null
     const boxes = haloBoxes(budgetBoxes, fit)
     // 받침 위(흐림 선 셋째 방향): 폰트 일곱 집안 3.5% 폭 밖만 받침 윗변을 옮긴다. 굵어져도 지수 ~0이라 굵기를 안 곱한다.
     const top = final ? haloFinalFit(haloStrokesOf(budget.syllable, boxes, effective, mInk, shape)) : null
@@ -905,12 +909,8 @@ interface GuideLine {
 }
 type Grab =
   | { kind: 'line'; line: GuideLine; x0: number; y0: number; moved: boolean; last?: number }
-  | { kind: 'move'; part: Part; x0: number; y0: number; moved: boolean; edits: PartEdits; gaps?: Clearances }
   | { kind: 'tap'; x0: number; y0: number; moved: boolean }
 
-/** 부위를 옮길 때 획끼리 지킬 틈(em). 처음부터 이보다 가까웠으면 그 틈을 지킨다. */
-const INK_GAP = 0.02
-const groupOf = (part: Part): 'CH' | 'JU' | 'JO' => (part === 'CH' ? 'CH' : part === 'JO' ? 'JO' : 'JU')
 function inkStrokes(syllable: DecomposedSyllable, boxes: Partial<Record<Part, BoxConfig>>, style: GlobalStyle, multiplier: number) {
   const result = resolveGlyphInkPrimitives({ syllable, placement: { kind: 'boxes', boxes }, weightMultiplier: multiplier, globalLinecap: style.linecap, globalLinejoin: style.linejoin, horizontalInkBounds: { min: 0, max: 1 } })
   return result.primitives.map((primitive) => ({ part: primitive.source.part, box: primitive.box, points: primitive.stroke.points, closed: primitive.stroke.closed, thickness: primitive.stroke.thickness * primitive.weightMultiplier }))
@@ -946,7 +946,7 @@ function inkReach(strokes: ReturnType<typeof inkStrokes>) {
 
 /**
  * 부위 다듬기 무대(보선 끌기). 상자 없이 화면 끝까지 가는 선을 끈다.
- * 부위 사이 보선(양쪽 부위가 나눠 쓴다)을 끌거나, 부위를 끌어 다른 부위와 겹치지 않는 데까지 통째로 옮긴다.
+ * 부위 사이 보선(양쪽 부위가 나눠 쓴다)을 끈다. 부위 통째로 옮기기는 뺐다(틈은 엔진 몫).
  * 바깥 틀 · 굵기 · 크기는 인상 잡기 몫이라 여기서는 안 바뀐다. 조작은 한 손가락만(R034) — 두 손가락 · Ctrl + 휠은 쓰지 않는다.
  * 왼쪽(가로선) · 아래(세로선) 눈금자에 지금 자리, 처음 자리(점선), 움직일 수 있는 범위(옅은 띠). 선은 여섯 개 이하, 잡은 선만 진하게.
  */
@@ -1068,8 +1068,7 @@ function SimsStep({ char, drawn, edits, setEdits, look, weightCap, stackHeight, 
       if (d < best) { best = d; hit = line }
     }
     if (hit) { grab.current = { kind: 'line', line: hit, x0: at.x, y0: at.y, moved: false }; setActive(hit); return }
-    const part = partAt(at.x, at.y)
-    if (part) { grab.current = { kind: 'move', part, x0: at.x, y0: at.y, moved: false, edits: edits[layout] ?? {} }; return }
+    // 부위 통째로 옮기기는 뺐다(하니무스 2026-11-27 카드 "보선 끌기만 남김"): 틈은 엔진 몫, 부위를 누르면 고르기만.
     grab.current = { kind: 'tap', x0: at.x, y0: at.y, moved: false }
   }
   const move = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1088,21 +1087,6 @@ function SimsStep({ char, drawn, edits, setEdits, look, weightCap, stackHeight, 
       if (now === 'held' && wall !== 'held') bumpWall()
       setWall(now); ok = now !== 'hard'
     }
-    else if (g.kind === 'move') {
-      if (sel !== simsPartOf(g.part)) setSel(simsPartOf(g.part))
-      const startBoxes = applyPartEdits(origin, g.edits)
-      const want = { du: dx / STAGE / sx, dv: dy / STAGE / sy }
-      // 글자 끝(0.02~0.98)은 상자로, 다른 부위와는 획(잉크)끼리 닿기 전에 멈춘다 — 상자끼리는 원래 겹쳐 있어도 획은 떨어져 있다.
-      const boxed = moveApart({ [g.part]: startBoxes[g.part] }, g.part, want.du, want.dv)
-      const gapsAt = (du: number, dv: number) => partClearances(inkStrokes(syllable, applyPartEdits(origin, movePartEdit(g.edits, g.part, du, dv)), effective, multiplier))
-      const start = g.gaps ?? (g.gaps = gapsAt(0, 0))
-      const clear = (du: number, dv: number) => { const gaps = gapsAt(du, dv); return (Object.keys(start) as PartPair[]).every((pair) => !pair.includes(groupOf(g.part)) || (gaps[pair] ?? 1) >= Math.min(start[pair] ?? 1, INK_GAP) - 1e-4) }
-      const furthest = (ok0: (t: number) => boolean) => { if (ok0(1)) return 1; let lo = 0, hi = 1; for (let i = 0; i < 10; i++) { const mid = (lo + hi) / 2; if (ok0(mid)) lo = mid; else hi = mid } return lo }
-      const u = boxed.du * furthest((t) => clear(boxed.du * t, 0))
-      const v = boxed.dv * furthest((t) => clear(u, boxed.dv * t))
-      ok = Math.abs(u - want.du) < 1e-6 && Math.abs(v - want.dv) < 1e-6
-      setEdits((all) => ({ ...all, [layout]: movePartEdit(g.edits, g.part, u, v) }))
-    }
     if (!ok) bumpWall()
   }
   const end = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1112,7 +1096,7 @@ function SimsStep({ char, drawn, edits, setEdits, look, weightCap, stackHeight, 
     setActive(null)
     setWall('free')
     if (!g || g.moved) return
-    if (g.kind === 'tap' || g.kind === 'move' || g.kind === 'line') { const part = partAt(g.x0, g.y0); setSel(part ? simsPartOf(part) : null) }
+    if (g.kind === 'tap' || g.kind === 'line') { const part = partAt(g.x0, g.y0); setSel(part ? simsPartOf(part) : null) }
   }
   // 잡은 보선의 양쪽 부위에만 색. 부위를 골랐으면 그 부위.
   const highlight = active?.parts ?? (sel && sel !== 'STROKE' && sel !== 'WHOLE' ? ALL_PARTS.filter((part) => simsPartOf(part) === sel) : undefined)
@@ -1162,10 +1146,10 @@ function SimsStep({ char, drawn, edits, setEdits, look, weightCap, stackHeight, 
           </g>
         })}
       </svg>
-      {!sel && !active && <span className={styles.tapNote}>부위를 끌면 옮김 · 선을 끌면 양쪽이 같이</span>}
+      {!sel && !active && <span className={styles.tapNote}>선을 끌면 양쪽이 나눠 가짐</span>}
     </div>
     <p className={styles.simsReadout} data-testid="mold-readout" data-wall={wall === 'free' ? undefined : wall}>{readout || ' '}</p>
-    <p className={styles.note}>선을 끌면 양쪽 부위가 나눠 가짐. 부위를 끌면 다른 부위에 닿기 전까지 통째로 옮김. 바깥 틀 · 굵기 · 크기는 그대로. 같은 짜임 글자가 다 같이 바뀜.</p>
+    <p className={styles.note}>선을 끌면 양쪽 부위가 나눠 가짐. 부위를 누르면 고르기. 바깥 틀 · 굵기 · 크기는 그대로. 같은 짜임 글자가 다 같이 바뀜.</p>
   </section>
 }
 
