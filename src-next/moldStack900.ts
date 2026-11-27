@@ -432,9 +432,14 @@ function runDist(a: Run, b: Run): number {
   }
   return best
 }
-type Face = { a: number; b: number; white: number; cut: number; half: number }
+type Face = { a: number; b: number; white: number; cut: number; half: number; want: number }
+/**
+ * 한 획 안의 속(ㅂ · ㅁ · ㄹ처럼 같은 획의 두 줄기 사이)은 고른 틈의 이만큼까지 좁아져도 된다(하니무스 2026-11-27 「뻐에서 ㅃ 속공간 더 작게 해도 될 듯」).
+ * 다른 획 · 다른 자소 사이는 고른 틈 그대로. 0.6은 눈으로 고른 값(가설) — 재서 정한 것 아님.
+ */
+export const INNER_COUNTER = 0.6
 /** 마주 선 줄기 쌍마다 가장 좁은 가로 흰 틈. `joined`(처음 그림에서 이어진 쌍 — ㅅ 꼭짓점 · ㅂ 모서리)은 뺀다. */
-function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yieldV: Partial<Record<StackGroup, number>>, joined: Set<string>): Face[] {
+function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yieldV: Partial<Record<StackGroup, number>>, joined: Set<string>, G: number): Face[] {
   const out: Face[] = []
   const halfOf = (r: Run, slope: number) => {
     const t = st[r.s].thickness * (yieldV[r.group] ?? 1), uy2 = 1 / (1 + slope * slope)
@@ -454,7 +459,7 @@ function facesOf(st: readonly StackStroke[], runs: Run[], thick: StackThick, yie
       if (w < white) { white = w; cut = (l.x + ha + r.x - hb) / 2; half = (ha + hb) / 2 }
     }
     if (crossed) continue
-    out.push({ a: left === i ? i : j, b: left === i ? j : i, white, cut, half })
+    out.push({ a: left === i ? i : j, b: left === i ? j : i, white, cut, half, want: A.s === B.s ? G * INNER_COUNTER : G })
   }
   return out
 }
@@ -474,11 +479,11 @@ function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number,
   let room = widen ? (WIDEN_MAX - 1) * width0 : 0, out = st
   // 1) 칸을 넓힌다(모자란 쌍 사이를 자른 자리에서 오른쪽을 민다). 몇 번 다시 잰다.
   for (let pass = 0; pass < 4 && room > 1e-6; pass++) {
-    const short = facesOf(out, runs, thick, yieldV, joined).filter((f) => f.white < G - 1e-6)
+    const short = facesOf(out, runs, thick, yieldV, joined, G).filter((f) => f.white < f.want - 1e-6)
     if (!short.length) break
     const cuts: { x: number; d: number }[] = []
     for (const f of short.sort((p, q) => p.cut - q.cut)) {
-      const d = G - f.white, near = cuts.find((c) => Math.abs(c.x - f.cut) < 0.01)
+      const d = f.want - f.white, near = cuts.find((c) => Math.abs(c.x - f.cut) < 0.01)
       if (near) near.d = Math.max(near.d, d); else cuts.push({ x: f.cut, d })
     }
     const total = cuts.reduce((s, c) => s + c.d, 0), k = Math.min(1, room / total)
@@ -494,20 +499,20 @@ function keepCounters(st: StackStroke[], st0: readonly StackStroke[], G: number,
   runs = runsOf(out)
   // 2) 그래도 모자라면 그 자소 세로를 가늘게(바닥 `THIN_FLOOR`).
   for (let pass = 0; pass < 3; pass++) {
-    const short = facesOf(out, runs, thick, yieldV, joined).filter((f) => f.white < G - 1e-6)
+    const short = facesOf(out, runs, thick, yieldV, joined, G).filter((f) => f.white < f.want - 1e-6)
     if (!short.length) break
     for (const f of short) {
-      const q = Math.max(THIN_FLOOR, 1 - (G - f.white) / Math.max(f.half * 2, 1e-6))
+      const q = Math.max(THIN_FLOOR, 1 - (f.want - f.white) / Math.max(f.half * 2, 1e-6))
       for (const g of new Set([runs[f.a].group, runs[f.b].group])) yieldV[g] = Math.max(THIN_FLOOR, Math.min(yieldV[g] ?? 1, (yieldV[g] ?? 1) * q))
     }
   }
   // 3) 굵기도 바닥이면 틈이 이긴다: 칸을 `WIDEN_MAX` 너머로 더 넓힌다(틈은 양보하지 않는다).
   if (widen) {
     for (let pass = 0; pass < 4; pass++) {
-      const short = facesOf(out, runs, thick, yieldV, joined).filter((f) => f.white < G - 1e-6)
+      const short = facesOf(out, runs, thick, yieldV, joined, G).filter((f) => f.white < f.want - 1e-6)
       if (!short.length) break
       const cuts: { x: number; d: number }[] = []
-      for (const f of short) { const near = cuts.find((c) => Math.abs(c.x - f.cut) < 0.01); if (near) near.d = Math.max(near.d, G - f.white); else cuts.push({ x: f.cut, d: G - f.white }) }
+      for (const f of short) { const near = cuts.find((c) => Math.abs(c.x - f.cut) < 0.01); if (near) near.d = Math.max(near.d, f.want - f.white); else cuts.push({ x: f.cut, d: f.want - f.white }) }
       out = out.map((s) => mapStroke(s, widenAt(cuts)))
       runs = runsOf(out)
     }

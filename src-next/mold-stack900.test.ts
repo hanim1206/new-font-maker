@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BLACK_CONTRAST, BLACK_STEM_GAIN, evenGapOf, inkGap, inkHeightOf, jamoOf, solveStack900, type StackStroke } from './moldStack900'
+import { BLACK_CONTRAST, BLACK_STEM_GAIN, INNER_COUNTER, evenGapOf, inkGap, inkHeightOf, jamoOf, solveStack900, type StackStroke } from './moldStack900'
 
 const line = (part: StackStroke['part'], pts: [number, number][], t = 0.1): StackStroke => ({ part, points: pts.map(([x, y]) => ({ x, y })), anchors: pts.map(([x, y]) => ({ x, y })), thickness: t })
 // 「를」 꼴: ㄹ(가로 셋) · ㅡ · ㄹ(가로 셋). 굵기 끝이라 위아래가 붙어 있다.
@@ -84,9 +84,11 @@ describe('900 쌓임 규칙', () => {
     const v = (g: 'CH' | 'JU') => out.thick.v * (out.yieldV?.[g] ?? 1)
     const stems = out.strokes.flatMap((s) => s.points.slice(0, -1).map((p, i) => [p, s.points[i + 1], s.part] as const)).filter(([p, q]) => Math.abs(p.x - q.x) < 1e-9 && Math.abs(p.y - q.y) > 0.2)
       .map(([p, , part]) => ({ x: p.x, t: 0.127 * v(part === 'CH' ? 'CH' : 'JU') })).sort((a, c) => a.x - c.x)
-    for (let i = 0; i < stems.length - 1; i++) expect(stems[i + 1].x - stems[i].x - (stems[i].t + stems[i + 1].t) / 2).toBeGreaterThanOrEqual(out.gap - 1e-3)
-    // 칸 넓힘(1.1배) → 가늘게(바닥 0.69) 다음에야 1.1배 너머로 — 이 빽빽한 꼴은 셋 다 쓴다.
-    expect(out.yieldV?.CH).toBeCloseTo(0.69, 6)
-    expect(out.widenEm ?? 0).toBeGreaterThan(0.1 * (0.78 - 0.1 + 0.127 * BLACK_STEM_GAIN))
+    // ㅂ 안 속(같은 획 두 기둥)은 고른 틈의 `INNER_COUNTER`배까지, 두 ㅂ 사이 · ㅂ과 ㅓ 사이는 고른 틈 그대로.
+    const want = [INNER_COUNTER, 1, INNER_COUNTER, 1]
+    for (let i = 0; i < stems.length - 1; i++) expect(stems[i + 1].x - stems[i].x - (stems[i].t + stems[i + 1].t) / 2).toBeGreaterThanOrEqual(out.gap * want[i] - 1e-3)
+    // 칸 넓힘(1.1배)으로 모자라 ㅃ 세로가 가늘어진다(바닥 0.69 위).
+    expect(out.yieldV?.CH ?? 1).toBeLessThan(1)
+    expect(out.yieldV?.CH ?? 1).toBeGreaterThanOrEqual(0.69 - 1e-9)
   })
 })
