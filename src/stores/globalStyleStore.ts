@@ -27,6 +27,24 @@ export interface GlobalStyle {
   autoCompensation?: boolean
   /** 속공간 지키기(굵기 자동 보정). 굵기 400 초과에서 빽빽한 자소부터 덜 굵게 한다. 켰을 때만 `true` — 없으면 꺼짐(기본, 개발 중이라 10-03부터). 옛 `false`는 읽을 때 지운다. */
   counterKeep?: boolean
+  /**
+   * 흐림 선 손잡이(빚기 「자소 사이 여유」 · 「넓어짐」, `src-next/moldHalo.ts`). 써 넣기가 저장하고 화면 · OTF가 글자마다 다시 센다(`haloPlacement.ts`).
+   * 엔진 처음 값과 같으면 키를 안 둔다 — 없으면 처음 값으로 켜짐(옛 폰트 포함, 하니무스 2026-11-27).
+   */
+  halo?: HaloKnobs
+}
+
+/**
+ * 흐림 선 손잡이. 여유 = 선이 기둥에 얼마나 붙나, 넓어짐 = 굵어질 때 여유가 커지는 지수.
+ * `jamo`(빚기 「닿자 크기」, 1 미만일 때만): 줄인 닿자는 줄이기 전 모양이 넓힐 만큼까지만 넓힌다.
+ */
+export interface HaloKnobs { ease: number; spread: number; jamo?: number }
+
+/** 흐림 선 손잡이를 고른다. 여유 · 넓어짐이 숫자가 아니면 없음, 닿자 크기는 0~1 사이일 때만 둔다. */
+function cleanHalo(value: HaloKnobs | undefined): HaloKnobs | undefined {
+  if (!value || !Number.isFinite(value.ease) || !Number.isFinite(value.spread)) return undefined
+  const jamo = value.jamo !== undefined && Number.isFinite(value.jamo) && value.jamo > 0 && value.jamo < 1 ? value.jamo : undefined
+  return { ease: value.ease, spread: value.spread, ...(jamo !== undefined ? { jamo } : {}) }
 }
 
 /** 속공간 지키기가 켜졌나. 화면 · OTF · 비교 도구가 모두 이 한 곳으로 판단한다. */
@@ -64,6 +82,8 @@ interface GlobalStyleActions {
   setAutoCompensation: (on: boolean) => void
   /** 속공간 지키기를 켜고 끈다. 켜짐이 기본이라 켜면 키를 지운다. */
   setCounterKeep: (on: boolean) => void
+  /** 흐림 선 손잡이. `undefined`면 키를 지운다(엔진 처음 값). */
+  setHalo: (value: HaloKnobs | undefined) => void
 
   // 제외 규칙 관리
   addExclusion: (property: keyof GlobalStyle, layoutType: LayoutType) => void
@@ -185,6 +205,10 @@ function normalizeGlobalStyle(style: GlobalStyle): GlobalStyle {
   // 속공간 지키기는 꺼짐이 기본이라 `true`만 남긴다.
   if (style.counterKeep === true) normalized.counterKeep = true
   else delete normalized.counterKeep
+  // 흐림 선 손잡이는 둘 다 수일 때만 남긴다.
+  const halo = cleanHalo(style.halo)
+  if (halo) normalized.halo = halo
+  else delete normalized.halo
   return normalized
 }
 
@@ -248,6 +272,13 @@ export const useGlobalStyleStore = create<GlobalStyleState & GlobalStyleActions>
         set((state) => {
           if (on) state.style.counterKeep = true
           else delete state.style.counterKeep
+        }),
+
+      setHalo: (value) =>
+        set((state) => {
+          const halo = cleanHalo(value)
+          if (halo) state.style.halo = halo
+          else delete state.style.halo
         }),
 
       addExclusion: (property, layoutType) =>

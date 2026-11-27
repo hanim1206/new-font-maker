@@ -28,14 +28,18 @@ export const WIDEN_MAX = 1.1
 const JOINED = 0.25
 const PARALLEL_COS = Math.cos(20 / 180 * Math.PI)
 
-interface Seg { stroke: number; at: number; last: number; group: string; ax: number; ay: number; bx: number; by: number; len: number; t: number }
+interface Seg { stroke: number; at: number; last: number; group: string; ax: number; ay: number; bx: number; by: number; len: number; t: number; /** 획 길이 안에서 이 토막 가운데 자리(0~1) */ mid: number }
 function segsOf(strokes: readonly BudgetStroke[]): Seg[] {
   const out: Seg[] = []
   strokes.forEach((stroke, index) => {
     const ps = stroke.points, count = stroke.closed ? ps.length : ps.length - 1
+    let total = 0
+    for (let at = 0; at < count; at++) { const a = ps[at], b = ps[(at + 1) % ps.length]; total += Math.hypot(b.x - a.x, b.y - a.y) }
+    let run = 0
     for (let at = 0; at < count; at++) {
       const a = ps[at], b = ps[(at + 1) % ps.length], len = Math.hypot(b.x - a.x, b.y - a.y)
-      if (len > 1e-4) out.push({ stroke: index, at, last: count - 1, group: balloonGroupOf(stroke.part), ax: a.x, ay: a.y, bx: b.x, by: b.y, len, t: stroke.thickness })
+      if (len > 1e-4) out.push({ stroke: index, at, last: count - 1, group: balloonGroupOf(stroke.part), ax: a.x, ay: a.y, bx: b.x, by: b.y, len, t: stroke.thickness, mid: total > 0 ? (run + len / 2) / total : 0 })
+      run += len
     }
   })
   return out
@@ -67,7 +71,16 @@ export interface BudgetResult { factors: Record<string, number>; widen: Partial<
 export function thinBudget(now: readonly BudgetStroke[], ref: readonly BudgetStroke[] | null, contrast: number, room: BudgetRoom = {}): BudgetResult {
   const cv = contrast >= 0 ? 1 + 0.8 * contrast : 1 + 0.5 * contrast, ch = contrast >= 0 ? 1 - 0.45 * contrast : 1 - 0.5 * contrast
   const segs = segsOf(now), refSegs = ref && ref.length === now.length ? segsOf(ref) : null
-  const sameShape = !!refSegs && refSegs.length === segs.length
+  // 처음 칸의 같은 자리 토막: 획 번호와 획 안 자리(길이 비율)로 찾는다. 토막 번호로 맞추면 안 된다 — 곡선은 칸 크기에 따라
+  // 잘게 펴는 토막 수가 달라져(닿자를 키우면 ㅅ · ㅈ · ㅊ 삐침 곡선이 토막이 는다) 번호가 어긋나고, 그러면 처음 모습 비교가 통째로 꺼져
+  // 한 곡선 안 이웃 토막끼리를 「좁아진 틈」으로 보고 삐침을 바닥(0.69배)까지 깎았다(하니무스 2026-11-27 「수」 · 「초」).
+  const refOf = (s: Seg): Seg | undefined => {
+    if (!refSegs) return undefined
+    let best: Seg | undefined, gap = Infinity
+    for (const r of refSegs) if (r.stroke === s.stroke) { const d = Math.abs(r.mid - s.mid); if (d < gap) { gap = d; best = r } }
+    return best
+  }
+  const sameShape = !!refSegs
   const stems = segs.filter((s) => upright(s) > 0.5).map((s) => s.t * cv).sort((a, b) => a - b)
   const stem = stems[Math.floor(stems.length / 2)] ?? (segs[0]?.t ?? 0.07)
   const floor = engineGapOf(stem)
@@ -84,7 +97,10 @@ export function thinBudget(now: readonly BudgetStroke[], ref: readonly BudgetStr
     // 처음 틈: 엔진 칸 · 대비 0. 처음 칸에서 마주 보지 않던 쌍은 틈이 아니다.
     let start = Infinity
     if (sameShape) {
-      const rp = refSegs![i], rq = refSegs![j], rf = facingOf(rp, rq)
+      const rp = refOf(p), rq = refOf(q)
+      // 처음 칸에서 같은 토막 · 이웃 토막이었던 곳(한 곡선 안)은 틈이 아니다.
+      if (!rp || !rq || rp === rq || (rp.stroke === rq.stroke && Math.abs(rp.at - rq.at) < 2)) continue
+      const rf = facingOf(rp, rq)
       if (!rf) continue
       start = rf.d - rp.t / 2 - rq.t / 2
     }
