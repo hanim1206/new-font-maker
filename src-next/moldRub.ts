@@ -64,9 +64,11 @@ export function rollRub(look: Look, home: Look, random: () => number = Math.rand
   return out
 }
 
-// ── 묶음: 레이아웃 여섯 칸의 고른 글자(`SAMPLE_BATCHES`), 묶음마다 8열 × 3행 고정 격자 ──
+// ── 묶음: 레이아웃 여섯 칸의 고른 글자(`SAMPLE_BATCHES`). 가로는 4열까지만(하니무스 2026-11-27 "그리드 최대 칸을 네 개로") — 넘치는 글자는 아래 줄로 ──
 export interface RubBatch { id: string; name: string; rows: string[][] }
-export const RUB_BATCHES: RubBatch[] = LAYOUT_CONTEXT_IDS.map((id) => ({ id, name: LAYOUT_CONTEXT_LABEL[id], rows: (SAMPLE_BATCHES[id] ?? []).map((row) => [...row]) }))
+export const RUB_COLS = 4
+const fold = (chars: string[]) => Array.from({ length: Math.ceil(chars.length / RUB_COLS) }, (_, i) => chars.slice(i * RUB_COLS, (i + 1) * RUB_COLS))
+export const RUB_BATCHES: RubBatch[] = LAYOUT_CONTEXT_IDS.map((id) => ({ id, name: LAYOUT_CONTEXT_LABEL[id], rows: fold((SAMPLE_BATCHES[id] ?? []).flatMap((row) => [...row])) }))
 export const batchCols = (batch: RubBatch) => Math.max(...batch.rows.map((row) => row.length))
 
 // ── 창: 확대 = 한 화면에 보이는 열 수(1~4). 창만 움직이고 글자 자리는 그대로 ──

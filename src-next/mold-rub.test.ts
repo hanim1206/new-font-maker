@@ -3,10 +3,10 @@ import { LOOK_ENGINE } from './moldLab'
 import { edgeOver, lookToRub, rollRub, RUB_BATCHES, RUB_KEYS, rubToLook, rubView, setRub, settle, tapZoom, zoomAround } from './moldRub'
 
 describe('글자 문지르기 판', () => {
-  it('속성 아홉 · 묶음 여섯(8열 × 3행)', () => {
+  it('속성 아홉 · 묶음 여섯(4열까지, 옆으로 안 넘침)', () => {
     expect(RUB_KEYS).toHaveLength(9)
     expect(RUB_BATCHES.map((batch) => batch.name)).toHaveLength(6)
-    for (const batch of RUB_BATCHES) { expect(batch.rows).toHaveLength(3); expect(batch.rows[0]).toHaveLength(8) }
+    for (const batch of RUB_BATCHES) { expect(batch.rows.length).toBeGreaterThanOrEqual(5); expect(Math.max(...batch.rows.map((row) => row.length))).toBe(4) }
   })
 
   it('칸 → 값 → 칸이 제자리로 온다', () => {

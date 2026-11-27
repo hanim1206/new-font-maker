@@ -54,7 +54,7 @@ export function MoldRubPlate({ look, home, setLook, onBegin, renderGlyph, locks,
   const [batchAt, setBatchAt] = useState(0)
   const batch = RUB_BATCHES[batchAt]
   const cols = batchCols(batch), rows = batch.rows.length
-  const [cam, setCam] = useState<Cam>({ zoom: 2, x: 0, y: 0 })
+  const [cam, setCam] = useState<Cam>({ zoom: ZOOM_MAX, x: 0, y: 0 })
   const [size, setSize] = useState({ w: 260, h: 300 })
   const [edge, setEdge] = useState(0)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -239,7 +239,7 @@ export function MoldRubPlate({ look, home, setLook, onBegin, renderGlyph, locks,
         {edgeTo && <span className={styles.rubEdge} data-side={edge > 0 ? 'right' : 'left'} data-go={Math.abs(edge) >= EDGE_PULL || undefined} data-testid="rub-edge">
           {Math.abs(edge) >= EDGE_PULL ? '놓으면 ' : '더 당기면 '}{edgeTo.name}
         </span>}
-        <Button variant="outline" size="icon" className={styles.rubZoomOut} onPointerDown={(event) => event.stopPropagation()} onClick={() => zoomBy(1)} disabled={cam.zoom >= ZOOM_MAX} aria-label="작게 보기" data-testid="rub-zoom-out"><ZoomOut aria-hidden="true" /></Button>
+        {cam.zoom < ZOOM_MAX && <Button variant="outline" size="icon" className={styles.rubZoomOut} onPointerDown={(event) => event.stopPropagation()} onClick={() => zoomBy(1)} aria-label="작게 보기" data-testid="rub-zoom-out"><ZoomOut aria-hidden="true" /></Button>}
       </div>
     </div>
     <div className={styles.rubTapeRow}>

@@ -37,7 +37,7 @@ import { MoldRubPlate } from './MoldRubPlate'
 import { thinBudget, thinSyllable, type BudgetStroke } from './moldBudget'
 import { engineGapOf } from './moldGap'
 import { kkokjiSyllable } from './moldKkokji'
-import { finalBoxes, HALO_ENGINE, haloBoxes, haloCorrect, haloFinalFit, haloFit, haloScope, type HaloFit, type HaloStroke } from './moldHalo'
+import { finalBoxes, finalEaseOf, HALO_ENGINE, haloBoxes, haloCorrect, haloFinalFit, haloFit, haloScope, type HaloFit, type HaloStroke } from './moldHalo'
 import styles from './MoldLabPage.module.css'
 
 /**
@@ -712,7 +712,7 @@ function MoldGlyph({ char, size, edits, look, drawn, sel, highlight, shownStroke
       fit = haloFit(haloStrokesOf(syllableOut, out, effective, m, (part) => solved.thick[balloonGroupOf(part)]), { ease: lookOf(look, 'ease'), spread: lookOf(look, 'spread'), grown: solved.thick.JU.v / base.v })
     }
     const pillarBoxes = haloBoxes(out, fit)
-    const top = syllableOut.jongseong && pillarBoxes.JO ? haloFinalFit(haloStrokesOf(syllableOut, pillarBoxes, effective, weightToMultiplier(MOLD_BASE_WEIGHT), (part) => solved.thick[balloonGroupOf(part)])) : null
+    const top = syllableOut.jongseong && pillarBoxes.JO ? haloFinalFit(haloStrokesOf(syllableOut, pillarBoxes, effective, weightToMultiplier(MOLD_BASE_WEIGHT), (part) => solved.thick[balloonGroupOf(part)]), finalEaseOf(syllableOut)) : null
     return { boxes: finalBoxes(pillarBoxes, top), thick: solved.thick, syllable: syllableOut, halo: fit, final: top }
   }, [heavyInput, stacked, budgetBoxes, heavyBase, effective, contrast, wanted, weightCap, look])
   const globalStyle = useMemo(() => {

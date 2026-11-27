@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DecomposedSyllable } from '../src/types'
-import { FINAL_TOLERANCE, HALO_END_GAP, HALO_ENGINE, HALO_TOLERANCE, haloCorrect, haloFinalFit, haloFit, haloScope, haloStemOf, type HaloStroke } from './moldHalo'
+import { FINAL_EASE_BY, FINAL_TOLERANCE, finalEaseOf, HALO_END_GAP, HALO_ENGINE, HALO_TOLERANCE, haloCorrect, haloFinalFit, haloFit, haloScope, haloStemOf, type HaloStroke } from './moldHalo'
 import { haloGrownOf, haloPlacementOf } from './haloPlacement'
 
 const syllable = (initial: string, medial: string, final?: string, layoutType = final ? 'choseong-jungseong-vertical-jongseong' : 'choseong-jungseong-vertical') =>
@@ -89,7 +89,15 @@ describe('받침 위 흐림 선(셋째 방향)', () => {
     const far = haloFinalFit(gan(0.7))!
     expect(far.err).toBeLessThan(-FINAL_TOLERANCE)
     expect(far.move).toBeLessThan(0)
-    expect(haloFinalFit(gan(0.62))!.move).toBe(0)
+  })
+
+  it('받침 위 여유는 짜임마다(세로 · 가로 · 섞임) — 폰트 넷 × 굵기 셋에서 잰 값', () => {
+    expect(finalEaseOf(syllable('ㄱ', 'ㅏ', 'ㄱ'))).toBe(FINAL_EASE_BY.V)
+    expect(finalEaseOf(syllable('ㅎ', 'ㅗ', 'ㅅ'))).toBe(FINAL_EASE_BY.H)
+    expect(finalEaseOf(syllable('ㅇ', 'ㅝ', 'ㄴ'))).toBe(FINAL_EASE_BY.M)
+    // 같은 위 덩이 · 같은 받침 자리에서 여유가 크면(가로 · 섞임) 받침을 덜 밀어낸다.
+    const v = haloFinalFit(gan(0.54), FINAL_EASE_BY.V)!, m = haloFinalFit(gan(0.54), FINAL_EASE_BY.M)!
+    expect(m.err).toBeLessThan(v.err)
   })
 
   it('받침을 반 넘게 줄이지 않는다', () => {
